@@ -107,6 +107,11 @@ struct display_path *dal_tm_create_resource_context_for_display_index(
 		struct topology_mgr *tm_mgr,
 		uint32_t display_index);
 
+/** Reverse actions of dal_tm_create_resource_context_for_display_index() */
+void dal_tm_destroy_resource_context_for_display_path(
+		struct topology_mgr *tm_mgr,
+		struct display_path *display_path);
+
 /** Acquire stereo-sync object on display path (the display path itself
  *  should be already acquired) */
 enum tm_result dal_tm_attach_stereo_synch_to_display_path(

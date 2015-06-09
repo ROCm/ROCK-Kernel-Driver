@@ -337,7 +337,8 @@ bool dal_ds_dispatch_is_valid_mode_timing_for_display(
 		}
 	}
 
-	dal_display_path_destroy(&display_path);
+	dal_tm_destroy_resource_context_for_display_path(ds_dispatch->tm,
+			display_path);
 
 	return result;
 }

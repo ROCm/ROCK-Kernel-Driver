@@ -229,26 +229,14 @@ void tm_resource_mgr_associate_link_services(
 		struct tm_resource_mgr *tm_rm,
 		struct display_path *path);
 
-enum tm_result tm_resource_mgr_acquire_mandatory_resources(
-		struct tm_resource_mgr *tm_rm,
-		struct display_path *path,
-		enum controller_id controller_id,
-		enum clock_source_id clock_source_id,
-		enum engine_id engine_id);
-
 void tm_resource_mgr_dump(struct tm_resource_mgr *tm_rm);
 
 uint32_t tm_resource_mgr_get_display_path_index_for_controller(
 		struct tm_resource_mgr *tm_rm,
 		enum controller_id controller_id);
 
-uint32_t tm_resource_mgr_ref_counter_decrement_if_allowed(
-	struct tm_resource_mgr *tm_rm,
-	struct tm_resource *tm_resource,
-	enum tm_acquire_method method);
-
 uint32_t tm_resource_mgr_ref_counter_decrement(
-	struct tm_resource_mgr *tm_rm,
+	const struct tm_resource_mgr *tm_rm,
 	struct tm_resource *tm_resource);
 
 struct controller *dal_tmrm_get_free_controller(

@@ -438,13 +438,11 @@ enum tm_result dal_tm_acquire_display_path(struct topology_mgr *tm,
 	if (TM_RESULT_SUCCESS != tm_resource_mgr_acquire_resources(
 			tm->tm_rm,
 			display_path,
-			TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE)) {
+			TM_ACQUIRE_METHOD_HW)) {
 		TM_ERROR("%s: path 0x%p (index: %d) : error in TMRM!\n",
 			__func__, display_path, display_index);
 		return TM_RESULT_FAILURE;
 	}
-
-	dal_display_path_acquire(display_path);
 
 	return TM_RESULT_SUCCESS;
 }
@@ -474,16 +472,14 @@ void dal_tm_release_display_path(struct topology_mgr *tm,
 		return;
 	}
 
-	/* Releases optional objects which should be detached explicitly
+	/* Release optional objects which should be detached explicitly
 	 * from display path. */
 	dal_tm_detach_stereo_sync_from_display_path(tm, display_index);
 
 	dal_tm_detach_sync_output_from_display_path(tm, display_index);
 
-	dal_display_path_release(display_path);
-
 	tm_resource_mgr_release_resources(tm->tm_rm, display_path,
-		TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE);
+		TM_ACQUIRE_METHOD_HW);
 }
 
 /**
@@ -510,10 +506,8 @@ void dal_tm_release_vbios_enabled_display_path(struct topology_mgr *tm,
 		return;
 	}
 
-	dal_display_path_release(display_path);
-
 	tm_resource_mgr_release_resources(tm->tm_rm, display_path,
-			TM_ACQUIRE_METHOD_ACTIVE_SET);
+			TM_ACQUIRE_METHOD_HW);
 }
 
 /**
@@ -531,42 +525,67 @@ struct display_path *dal_tm_create_resource_context_for_display_index(
 		struct topology_mgr *tm,
 		uint32_t display_index)
 {
+	struct dal_context *dal_context = tm->dal_context;
 	struct display_path *src_display_path;
 	struct display_path *dst_display_path;
+	bool is_dst_path_acquired;
 
 	if (!tm_is_display_index_valid(tm, display_index, __func__))
 		return NULL;
 
-	src_display_path = tm_get_display_path_at_index(tm,
-			display_index);
+	src_display_path = tm_get_display_path_at_index(tm, display_index);
 
+	/* We are cloning CURRENT state - this is why the 'true' flag.
+	 * Note that validation code works only with a COPY of the path,
+	 * and when it is done, the copy is destroyed.
+	 * The idea is NOT to change SW or HW state of the ORIGINAL path.
+	 * However, the Resources are NOT copies, that means all resources
+	 * which are acquired by this function must be released by calling
+	 * dal_tm_destroy_resource_context_for_display_path() */
 	dst_display_path = dal_display_path_clone(src_display_path, true);
 
-	if (dst_display_path != NULL) {
-		bool is_dst_path_acquired =
-			dal_display_path_is_acquired(dst_display_path);
+	if (dst_display_path == NULL) {
+		TM_ERROR("%s: failed to clone Path:%d!\n", __func__,
+				display_index);
+		return NULL;
+	}
 
-		/* Re-acquire links and signals on already active path or
-		 * acquire resources on inactive path. */
-		if (is_dst_path_acquired)
-			dal_display_path_acquire_links(dst_display_path);
-		else {
-			enum tm_result tm_result =
-				tm_resource_mgr_acquire_resources(
-					tm->tm_rm, dst_display_path,
-					TM_ACQUIRE_METHOD_ACTIVE_PATH);
+	is_dst_path_acquired = dal_display_path_is_acquired(dst_display_path);
 
-			if (tm_result == TM_RESULT_SUCCESS)
-				dal_display_path_acquire(dst_display_path);
-			else {
-				dal_display_path_destroy(&dst_display_path);
-				dst_display_path = NULL;
-			}
+	/* Re-acquire links and signals on already active path or
+	 * acquire resources on inactive path. */
+	if (is_dst_path_acquired)
+		dal_display_path_acquire_links(dst_display_path);
+	else {
+		enum tm_result tm_result = tm_resource_mgr_acquire_resources(
+				tm->tm_rm, dst_display_path,
+				/* Validation only - no need to change
+				 * HW state. */
+				TM_ACQUIRE_METHOD_SW);
+
+		if (tm_result != TM_RESULT_SUCCESS) {
+			dal_display_path_destroy(&dst_display_path);
+			dst_display_path = NULL;
 		}
 	}
 
 	return dst_display_path;
 }
+
+void dal_tm_destroy_resource_context_for_display_path(
+		struct topology_mgr *tm_mgr,
+		struct display_path *display_path)
+{
+	tm_resource_mgr_release_resources(
+			tm_mgr->tm_rm,
+			display_path,
+			/* Validation only - no need to change
+			 * HW state. */
+			TM_ACQUIRE_METHOD_SW);
+
+	dal_display_path_destroy(&display_path);
+}
+
 
 /** Acquire stereo-sync object on display path (the display path itself
  *  should be already acquired) */
@@ -618,21 +637,17 @@ void dal_tm_detach_stereo_sync_from_display_path(struct topology_mgr *tm,
 
 	if (stereo_resource != NULL) {
 
-		if (TM_RES_REF_CNT_GET(stereo_resource) > 0) {
-
-			tm_resource_mgr_ref_counter_decrement(
-				tm->tm_rm,
+		tm_resource_mgr_ref_counter_decrement(tm->tm_rm,
 				stereo_resource);
 
-			/* Optimisation - if refCount > 0 then stereosync
-			 * encoder points to encoder on the acquired
-			 * display path.
-			 * In this case no cofunctional paths changed. */
-			recache_needed =
+		/* Optimisation - if refCount > 0 then stereosync
+		 * encoder points to encoder on the acquired
+		 * display path.
+		 * In this case no cofunctional paths changed. */
+		recache_needed =
 				(stereo_resource->flags.display_path_resource
 				&&
 				!TM_RES_REF_CNT_GET(stereo_resource));
-		}
 
 		/* Once reference count falls to 0 - we need to
 		 * power down the object. */
@@ -723,23 +738,20 @@ void dal_tm_detach_sync_output_from_display_path(
 
 		if (sync_output_rsrc != NULL) {
 
-			if (TM_RES_REF_CNT_GET(sync_output_rsrc) > 0) {
-
-				tm_resource_mgr_ref_counter_decrement(
-					tm->tm_rm,
+			tm_resource_mgr_ref_counter_decrement(tm->tm_rm,
 					sync_output_rsrc);
 
-				/* Optimisation - if refCount > 0 then
-				 * syncoutput encoder points to encoder on the
-				 * acquired display path.
-				 * In this case no cofunctional paths
-				 * changed. */
-				recache_needed =
+			/* Optimisation - if refCount > 0 then
+			 * syncoutput encoder points to encoder on the
+			 * acquired display path.
+			 * In this case no cofunctional paths
+			 * changed. */
+			recache_needed =
 					(sync_output_rsrc->
 						flags.display_path_resource &&
 						TM_RES_REF_CNT_GET(
 							sync_output_rsrc) == 0);
-			}
+
 
 			/* Once reference count falls to 0 - we need to power
 			 * down the object. */
@@ -754,7 +766,7 @@ void dal_tm_detach_sync_output_from_display_path(
 				display_path);
 
 	/* Remove sync-output object from display path (need to be done
-	 * before we recache cofunctional paths, but after we disable
+	 * before we re-cache co-functional paths, but after we disable
 	 * sync-output in HWSS). */
 	dal_display_path_set_sync_output_object(display_path,
 			SYNC_SOURCE_NONE, NULL);
@@ -1046,17 +1058,19 @@ struct display_path_set *dal_tm_create_resource_context_for_display_indices(
 
 	/* Acquire resources on display paths. Once
 	 * acquired (or failed to acquired) we do
-	 * not need these resources anymore
+	 * not need these resources anymore - it means we can delete
+	 * the temporary TM Resource Manager.
 	 */
 	for (i = 0; i < array_size; i++) {
 		if (!tm_resource_mgr_acquire_resources(
 			resource_mgr,
 			dal_display_path_set_path_at_index(
 				display_path_set, i),
-				TM_ACQUIRE_METHOD_ACTIVE_SET)) {
+				/* Validation of views etc. No need to
+				 * change HW state. */
+				TM_ACQUIRE_METHOD_SW)) {
 
-			TM_ERROR("%s: Failed to acquire resources",
-				__func__);
+			TM_ERROR("%s: Failed to acquire resources", __func__);
 			goto release_dps;
 		}
 	}
@@ -4208,9 +4222,6 @@ static enum tm_result transfer_paths_from_resource_builder_to_tm(
 			TM_ERROR("%s: failed to add path!\n", __func__);
 			return TM_RESULT_FAILURE;
 		}
-
-		/* Lock Display path so it cannot be destroyed */
-		dal_display_path_lock(display_path);
 	}
 
 	return TM_RESULT_SUCCESS;
@@ -4867,7 +4878,8 @@ static bool tm_can_display_paths_be_enabled_at_the_same_time(
 		if (!tm_resource_mgr_acquire_resources(
 			tm_rm_clone,
 			display_path,
-			TM_ACQUIRE_METHOD_COFUNCTIONAL_SET)) {
+			/* Validation doesn't require change of HW state! */
+			TM_ACQUIRE_METHOD_SW)) {
 
 			success = false;
 			break;
@@ -4901,7 +4913,7 @@ static bool tm_can_display_paths_be_enabled_at_the_same_time(
 		tm_resource_mgr_release_resources(
 			tm_rm_clone,
 			display_path,
-			TM_ACQUIRE_METHOD_COFUNCTIONAL_SET);
+			TM_ACQUIRE_METHOD_SW);
 	}
 
 	/* validate against MST bandwidth*/
@@ -5179,7 +5191,7 @@ void dal_tm_acquire_plane_resources(
 
 			dal_tmrm_acquire_controller(tm->tm_rm, path,
 					controller_index,
-					TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE);
+					TM_ACQUIRE_METHOD_HW);
 		}
 	} /* for() */
 
@@ -5259,7 +5271,7 @@ void dal_tm_release_plane_resources(
 	}
 
 	dal_tmrm_release_non_root_controllers(tm->tm_rm, display_path,
-			TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE);
+			TM_ACQUIRE_METHOD_HW);
 
 	dal_display_path_release_non_root_planes(display_path);
 }

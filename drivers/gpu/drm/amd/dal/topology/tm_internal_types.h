@@ -229,18 +229,9 @@ enum tm_power_gate_state {
 enum tm_acquire_method {
 	/* Activates all resources, checks for co-functionality and
 	 * updates HW and Display path context if needed */
-	TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE = 0,
-	/* Activates resources only, no co-functional check.
-	 * Used by TM Detection to acquire a potentially active path.
-	 * If path is active then "do nothing" and return success.
-	 * If path is inactive - do full acquire and return real result
-	 * of the acquisition. */
-	TM_ACQUIRE_METHOD_ACTIVE_PATH,
-	/* Activates all resources and checks for co-functionality.
-	 * No HW or Display path context update */
-	TM_ACQUIRE_METHOD_ACTIVE_SET,
-	/* Checks for co-functionality only, no resource activation */
-	TM_ACQUIRE_METHOD_COFUNCTIONAL_SET
+	TM_ACQUIRE_METHOD_HW = 0,
+	/* Checks for co-functionality only. Will NOT change HW state. */
+	TM_ACQUIRE_METHOD_SW
 };
 
 /************

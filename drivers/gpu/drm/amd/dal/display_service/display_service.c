@@ -444,7 +444,8 @@ enum ds_return dal_display_service_mem_request_control(
 		signal = dal_display_path_get_query_signal(
 				display_path, SINK_LINK_INDEX);
 
-		dal_display_path_destroy(&display_path);
+		dal_tm_destroy_resource_context_for_display_path(
+				ds->ds_dispatch->tm, display_path);
 
 		if (!blank) {
 			dal_hw_sequencer_enable_memory_requests(

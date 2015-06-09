@@ -83,8 +83,8 @@ struct display_path {
 	} src_tgt_state;
 
 	bool connected; /* display connected*/
-	bool acquired;
-	bool locked;
+	int32_t acquired_counter; /* if zero then Path is not acquired by
+					a "HW" method */
 	bool valid;
 
 	/* properties*/

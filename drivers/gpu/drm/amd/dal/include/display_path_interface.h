@@ -52,9 +52,6 @@ struct display_path *dal_display_path_clone(
 void dal_display_path_destroy(
 	struct display_path **to_destroy);
 
-void dal_display_path_release(
-	struct display_path *to_release);
-
 bool dal_display_path_validate(
 	struct display_path *path,
 	enum signal_type sink_signal);
@@ -70,25 +67,22 @@ bool dal_display_path_add_connector(
 struct connector *dal_display_path_get_connector(
 	struct display_path *path);
 
-void dal_display_path_acquire(
+int32_t dal_display_path_acquire(
 	struct display_path *path);
 
 bool dal_display_path_is_acquired(
 	const struct display_path *path);
 
-void dal_display_path_release(
+int32_t dal_display_path_get_ref_counter(
+	const struct display_path *path);
+
+int32_t dal_display_path_release(
 	struct display_path *path);
 
 void dal_display_path_release_resources(
 	struct display_path *path);
 
 void dal_display_path_acquire_links(
-	struct display_path *path);
-
-void dal_display_path_lock(
-	struct display_path *path);
-
-void dal_display_path_unlock(
 	struct display_path *path);
 
 bool dal_display_path_is_source_blanked(

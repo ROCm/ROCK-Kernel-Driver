@@ -92,8 +92,7 @@ static bool display_path_construct(struct display_path *path)
 	path->src_tgt_state.src_blanked = DISPLAY_TRI_STATE_UNKNOWN;
 	path->src_tgt_state.tgt_blanked = DISPLAY_TRI_STATE_UNKNOWN;
 	path->properties.raw = 0;
-	path->acquired = false;
-	path->locked = false;
+	path->acquired_counter = 0;
 	path->valid = false;
 	path->display_index = INVALID_DISPLAY_INDEX;
 	path->clock_sharing_group = CLOCK_SHARING_GROUP_EXCLUSIVE;
@@ -227,10 +226,6 @@ struct display_path *dal_display_path_clone(
 	/* copy everything from origin */
 	dal_memmove(path, origin, sizeof(struct display_path));
 
-	/* Lock and acquire should be performed explicitly */
-	path->acquired = false;
-	path->locked = false;
-
 	/* All optional objects are not copied */
 	path->stereo_sync_object = NULL;
 	path->sync_output_object = NULL;
@@ -245,12 +240,12 @@ struct display_path *dal_display_path_clone(
 	if (!path->planes)
 		return NULL;
 
-	if (copy_active_state && origin->acquired) {
-		dal_display_path_acquire(path);
-	} else {
+	path->acquired_counter = 0;
+
+	if (copy_active_state && dal_display_path_is_acquired(origin))
+		path->acquired_counter = origin->acquired_counter;
+	else
 		dal_display_path_release_resources(path);
-		dal_display_path_release(path);
-	}
 
 	return path;
 }
@@ -323,17 +318,27 @@ struct connector *dal_display_path_get_connector(struct display_path *path)
 	return path->connector;
 }
 
-void dal_display_path_acquire(struct display_path *path)
+int32_t dal_display_path_acquire(struct display_path *path)
 {
-	path->acquired = true;
+	++path->acquired_counter;
+	return path->acquired_counter;
 }
+
+int32_t dal_display_path_get_ref_counter(const struct display_path *path)
+{
+	return path->acquired_counter;
+}
+
 bool dal_display_path_is_acquired(const struct display_path *path)
 {
-	return path->acquired;
+	/* if counter is greater than zero than path is acquired */
+	return (dal_display_path_get_ref_counter(path) > 0);
 }
-void dal_display_path_release(struct display_path *path)
+
+int32_t dal_display_path_release(struct display_path *path)
 {
-	path->acquired = false;
+	--path->acquired_counter;
+	return path->acquired_counter;
 }
 
 void dal_display_path_release_resources(struct display_path *path)
@@ -358,15 +363,6 @@ void dal_display_path_release_resources(struct display_path *path)
 	path->sync_input_source = SYNC_SOURCE_NONE;
 
 	dal_display_path_release_planes(path);
-}
-
-void dal_display_path_lock(struct display_path *path)
-{
-	path->locked = true;
-}
-void dal_display_path_unlock(struct display_path *path)
-{
-	path->locked = false;
 }
 
 bool dal_display_path_is_source_blanked(const struct display_path *path)
@@ -983,7 +979,7 @@ enum signal_type dal_display_path_get_active_signal(
 	struct display_path *path,
 	uint32_t idx)
 {
-	if (path->acquired)
+	if (dal_display_path_is_acquired(path))
 		return dal_display_path_get_config_signal(path, idx);
 	else
 		return dal_display_path_get_query_signal(path, idx);

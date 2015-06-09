@@ -55,7 +55,6 @@ struct tm_resource_mgr {
 	struct gpu *gpu_interface;
 
 	bool prioritize_controllers;
-	uint32_t active_audio_resources_num;
 
 	struct flat_set *resources;
 
@@ -93,74 +92,93 @@ static void tmrm_release_clock_source(
 		struct clock_source *clock_source,
 		enum tm_acquire_method method);
 
-static bool tmrm_update_ref_count_needed(enum tm_acquire_method method);
-
 
 /*****************************************************************************
  *	private functions
  ***************************************************************************/
-static void tm_resource_ref_counter_increment(
-	struct tm_resource *tm_resource,
-	enum tm_acquire_method method)
-{
-	if (tmrm_update_ref_count_needed(method))
-		TM_RES_REF_CNT_INCREMENT(tm_resource);
-}
-
-uint32_t tm_resource_mgr_ref_counter_decrement(
-	struct tm_resource_mgr *tm_rm,
+static uint32_t tm_resource_ref_counter_increment(
+	const struct tm_resource_mgr *tm_rm,
 	struct tm_resource *tm_resource)
 {
 	struct dal_context *dal_context = tm_rm->dal_context;
-	if (TM_RES_REF_CNT_GET(tm_resource) > 0) {
-		/* Counter is greater than zero - OK to decrement. */
-		TM_RES_REF_CNT_DECREMENT(tm_resource);
-	} else {
-		/* Some code is not balanced.
-		 * Don't go below zero to avoid over flow */
-		TM_WARNING("%s: decrement a zero count?\n", __func__);
+	uint32_t current_count = TM_RES_REF_CNT_GET(tm_resource);
+
+	if (current_count != 0) {
+		/* Ideally, we should allow only 0-->1 transition.
+		 *
+		 * But, in theory a resource could be sharable, this is
+		 * why we treat it as a Warning.
+		 *
+		 * In practice, we get here if resource usage is unbalanced!
+		 *
+		 * Do NOT remove this warning unless you are absolutely sure
+		 * that it should be removed! */
+		TM_WARNING("%s: increment a non-zero count: %d?\n",
+				__func__, current_count);
+		ASSERT(false);
 	}
 
+	TM_RES_REF_CNT_INCREMENT(tm_resource);
+
 	return TM_RES_REF_CNT_GET(tm_resource);
 }
 
-/**
- * Decrement by one the reference counter of a resource if it is allowed to do
- * for given method parameter
- *
- * \param tm_resource: the resource
- * \param method: acquisition method of the tm_resource
- *
- * \return - reference counter *after* the decrement.
- */
-uint32_t tm_resource_mgr_ref_counter_decrement_if_allowed(
-	struct tm_resource_mgr *tm_rm,
-	struct tm_resource *tm_resource,
-	enum tm_acquire_method method)
+uint32_t tm_resource_mgr_ref_counter_decrement(
+	const struct tm_resource_mgr *tm_rm,
+	struct tm_resource *tm_resource)
 {
-	if (tmrm_update_ref_count_needed(method))
-		return tm_resource_mgr_ref_counter_decrement(
-			tm_rm,
-			tm_resource);
+	struct dal_context *dal_context = tm_rm->dal_context;
+	uint32_t current_count = TM_RES_REF_CNT_GET(tm_resource);
+
+	if (current_count != 1) {
+		/* Ideally, we should allow only 1-->0 transition.
+		 *
+		 * But, in theory a resource could be sharable, this is
+		 * why we treat it as a Warning.
+		 *
+		 * In practice, we get here if resource usage is unbalanced!
+		 *
+		 * Do NOT remove this warning unless you are absolutely sure
+		 * that it should be removed! */
+		TM_WARNING("%s: decrement a non-one count: %d?\n",
+				__func__, current_count);
+		ASSERT(false);
+	}
+
+	TM_RES_REF_CNT_DECREMENT(tm_resource);
 
 	return TM_RES_REF_CNT_GET(tm_resource);
 }
 
-static bool is_resource_available(const struct tm_resource *tm_resource,
-		enum tm_acquire_method method)
+
+static bool is_resource_available(const struct tm_resource *tm_resource)
 {
 	if (TM_RES_REF_CNT_GET(tm_resource) == 0)
 		return true;
 
-	if (!tmrm_update_ref_count_needed(method)) {
-		/* No need to update reference count for "method",
-		 * that means "method" doesn't care if resource is
-		 * actually acquired. Than means resource is available,
-		 * but only for "method! "*/
-		return true;
-	}
-
 	return false;
+}
+
+/**
+ * Returns true if during acquire we need to change HW state
+ * in display path context.
+ *
+ * It is very important that we don't change HW State during
+ * cofunctional validation!
+ *
+ * Note: even if this function returns 'true', the action may still depend
+ * on the value of "resource reference count".
+ * Most important cases is the transition of "reference count" from 0 to 1 and
+ * from 1 to 0.
+ *
+ * \param [in] method: How to acquire resources/How resources were acquired
+ *
+ * \return true: if during acquire we need to activate resources,
+ *	false: otherwise
+ */
+static inline bool update_hw_state_needed(enum tm_acquire_method method)
+{
+	return (method == TM_ACQUIRE_METHOD_HW);
 }
 
 static bool tm_rm_less_than(
@@ -900,49 +918,6 @@ tm_resource_mgr_find_engine_resource(
 	return NULL;
 }
 
-
-/**
- * Returns true if during acquire we need to update resource ref count in
- * ResourceMgr context
- *
- * \param [in] method: How to acquire resources/How resources were acquired
- *
- * \return  true: if during acquire we need to update resource ref count,
- *	false: otherwise
- */
-static bool tmrm_update_ref_count_needed(enum tm_acquire_method method)
-{
-	return (method == TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE
-		|| method == TM_ACQUIRE_METHOD_ACTIVE_SET
-		|| method == TM_ACQUIRE_METHOD_COFUNCTIONAL_SET);
-}
-
-/**
- * Returns true if during acquire we need to activate resources
- * in display path context.
- *
- * This function decides if it is ok/needed to modify a display path state
- * (like changing pointers inside of it) or change Power State.
- * This is very important that we don't change Path or HW State during
- * cofunctional validation!
- *
- * Note: even if this function returns 'true', the action may still depend
- * on the value of "resource reference count".
- * Most important cases is the transition of "reference count" from 0 to 1 and
- * from 1 to 0.
- *
- * \param [in] method: How to acquire resources/How resources were acquired
- *
- * \return true: if during acquire we need to activate resources,
- *	false: otherwise
- */
-static bool update_path_or_hw_state_needed(enum tm_acquire_method method)
-{
-	return (method == TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE
-			|| method == TM_ACQUIRE_METHOD_ACTIVE_PATH
-			|| method == TM_ACQUIRE_METHOD_ACTIVE_SET);
-}
-
 /**
  * Verifies permanent resources required for given display path are available.
  *
@@ -983,7 +958,7 @@ static bool tmrm_resources_available(struct tm_resource_mgr *tm_rm,
 	if (TM_RES_REF_CNT_GET(tm_resource) > 0
 			&& !tm_resource->flags.mst_resource) {
 
-		TM_RESOURCES("%s: Connector resource NOT available!"\
+		TM_WARNING("%s: Connector resource NOT available!"\
 				" ref_count:%d\n",
 				__func__,
 				TM_RES_REF_CNT_GET(tm_resource));
@@ -1005,7 +980,7 @@ static bool tmrm_resources_available(struct tm_resource_mgr *tm_rm,
 		/* Primary resource is busy */
 		if (TM_RES_REF_CNT_GET(tm_resource) > 0 &&
 				!tm_resource->flags.mst_resource) {
-			TM_RESOURCES("%s: Encoder resource NOT available!"\
+			TM_WARNING("%s: Encoder resource NOT available!"\
 					" ref_count:%d, Link Index:%d\n",
 				__func__,
 				TM_RES_REF_CNT_GET(tm_resource),
@@ -1031,7 +1006,7 @@ static bool tmrm_resources_available(struct tm_resource_mgr *tm_rm,
 		if (tm_paired_resource != NULL &&
 			TM_RES_REF_CNT_GET(tm_paired_resource) > 0) {
 			/* Paired resource required, but is busy */
-			TM_RESOURCES("%s: Paired resource is busy!"\
+			TM_WARNING("%s: Paired resource is busy!"\
 					" Link Index:%d\n",
 					__func__, i);
 			return false;
@@ -1042,15 +1017,21 @@ static bool tmrm_resources_available(struct tm_resource_mgr *tm_rm,
 	tm_resource = tm_resource_mgr_get_stereo_sync_resource(tm_rm,
 			display_path);
 
-	if (tm_resource != NULL && TM_RES_REF_CNT_GET(tm_resource) > 0)
+	if (tm_resource != NULL && TM_RES_REF_CNT_GET(tm_resource) > 0) {
+		TM_WARNING("%s: Stereosync encoder resource is busy!\n",
+				__func__);
 		return false;
+	}
 
 	/* Sync-output encoder will be present only on already acquired path */
 	tm_resource = tm_resource_mgr_get_sync_output_resource(tm_rm,
 			display_path);
 
-	if (tm_resource != NULL && TM_RES_REF_CNT_GET(tm_resource) > 0)
+	if (tm_resource != NULL && TM_RES_REF_CNT_GET(tm_resource) > 0) {
+		TM_WARNING("%s: Sync-output encoder resource is busy!\n",
+				__func__);
 		return false;
+	}
 
 	/* No need to check GLSync Connector resources - it is never
 	 * acquired within display path and never intersects with other
@@ -1184,7 +1165,7 @@ static uint32_t tmrm_get_available_clock_source(
 		if (GRPH_ID(tm_resource).type != OBJECT_TYPE_CLOCK_SOURCE)
 			continue;
 
-		if (false == is_resource_available(tm_resource, method))
+		if (false == is_resource_available(tm_resource))
 			continue;
 
 		clock_source = TO_CLOCK_SOURCE(tm_resource);
@@ -1287,7 +1268,7 @@ enum engine_id tmrm_get_available_stream_engine(
 				break;
 		}
 
-		if (is_resource_available(tm_resource, method) &&
+		if (is_resource_available(tm_resource) &&
 				TO_ENGINE_INFO(tm_resource)->priority <
 				best_priority) {
 			/* found a free resource with a higher priority */
@@ -1317,7 +1298,7 @@ enum engine_id tmrm_get_available_stream_engine(
 					GRPH_ID(tm_resource).id))
 				continue;
 
-			if (is_resource_available(tm_resource, method) &&
+			if (is_resource_available(tm_resource) &&
 				TO_ENGINE_INFO(tm_resource)->priority <
 				best_priority) {
 				/* found a non-preferred engine */
@@ -1338,6 +1319,67 @@ enum engine_id tmrm_get_available_stream_engine(
 	return ENGINE_ID_UNKNOWN;
 }
 
+static void tmrm_acquire_encoder(
+		struct tm_resource_mgr *tm_rm,
+		struct display_path *display_path,
+		uint32_t link_idx)
+{
+	enum signal_type signal = dal_display_path_get_query_signal(
+			display_path, link_idx);
+	struct tm_resource *tm_resource = NULL;
+	struct tm_resource *tm_paired_resource = NULL;
+	struct dal_context *dal_context = tm_rm->dal_context;
+	bool is_dual_link_signal;
+
+	tm_resource = tmrm_display_path_find_upstream_resource(tm_rm,
+			display_path, link_idx);
+	TM_ASSERT(tm_resource != NULL);
+
+	dal_display_path_set_link_active_state(display_path, link_idx, true);
+
+	is_dual_link_signal = dal_is_dual_link_signal(signal);
+
+	tm_resource_ref_counter_increment(tm_rm, tm_resource);
+
+	tm_resource->flags.mst_resource =
+				(signal == SIGNAL_TYPE_DISPLAY_PORT_MST);
+
+	/* Paired resource required - acquire it as well.
+	 * In current design, we do not program paired resources -
+	 * only need to handle confunctional enumeration properly */
+	if (is_dual_link_signal &&
+			TO_ENCODER_INFO(tm_resource)->paired_encoder_index !=
+					RESOURCE_INVALID_INDEX) {
+
+		TM_ASSERT(!tm_resource->flags.mst_resource);
+
+		tm_paired_resource = tm_resource_mgr_enum_resource(
+				tm_rm,
+				TO_ENCODER_INFO(tm_resource)->
+				paired_encoder_index);
+
+		tm_resource_ref_counter_increment(tm_rm, tm_paired_resource);
+	}
+}
+
+static void tmrm_acquire_audio(
+		struct tm_resource_mgr *tm_rm,
+		struct display_path *display_path,
+		uint32_t link_idx)
+{
+	struct tm_resource *tm_resource;
+
+	tm_resource = tmrm_display_path_find_audio_resource(tm_rm,
+			display_path, link_idx);
+
+	if (tm_resource != NULL) {
+		/* Audio reference count already updated when it was attached
+		 * to display path - need only to activate */
+		dal_display_path_set_audio_active_state(display_path, link_idx,
+				true);
+	}
+}
+
 /**
  * Acquires resources associated with given link
  * Assumes resources are available
@@ -1352,62 +1394,9 @@ static void tmrm_acquire_link(
 		uint32_t link_idx,
 		enum tm_acquire_method method)
 {
-	bool activate_resource = update_path_or_hw_state_needed(method);
-	bool update_ref_count = tmrm_update_ref_count_needed(method);
-	enum signal_type signal = dal_display_path_get_query_signal(
-			display_path, link_idx);
-	struct tm_resource *tm_resource = NULL;
-	struct tm_resource *tm_paired_resource = NULL;
-	struct dal_context *dal_context = tm_rm->dal_context;
+	tmrm_acquire_encoder(tm_rm, display_path, link_idx);
 
-	/* Acquire encoder */
-	tm_resource = tmrm_display_path_find_upstream_resource(tm_rm,
-			display_path, link_idx);
-	TM_ASSERT(tm_resource != NULL);
-
-	if (activate_resource) {
-		dal_display_path_set_link_active_state(display_path,
-			link_idx, true);
-	}
-
-	if (update_ref_count) {
-		bool is_dual_link_signal = dal_is_dual_link_signal(signal);
-
-		tm_resource_ref_counter_increment(tm_resource, method);
-
-		tm_resource->flags.mst_resource =
-				(signal == SIGNAL_TYPE_DISPLAY_PORT_MST);
-
-		/* Paired resource required - acquire it as well.
-		 * In current design, we do not program paired resources -
-		 * only need to handle confunctional enumeration properly */
-
-		if (is_dual_link_signal &&
-			TO_ENCODER_INFO(tm_resource)->paired_encoder_index !=
-					RESOURCE_INVALID_INDEX) {
-
-			TM_ASSERT(!tm_resource->flags.mst_resource);
-
-			tm_paired_resource = tm_resource_mgr_enum_resource(
-				tm_rm,
-				TO_ENCODER_INFO(tm_resource)->
-				paired_encoder_index);
-
-			tm_resource_ref_counter_increment(tm_paired_resource,
-					method);
-		}
-	}
-
-	/* Acquire audio */
-	tm_resource = tmrm_display_path_find_audio_resource(tm_rm,
-			display_path, link_idx);
-
-	if (tm_resource != NULL && activate_resource) {
-		/* Audio reference count already updated when it was attached
-		 * to display path - need only to activate */
-		dal_display_path_set_audio_active_state(display_path,
-					link_idx, true);
-	}
+	tmrm_acquire_audio(tm_rm, display_path, link_idx);
 }
 
 /**
@@ -1432,7 +1421,7 @@ static void tmrm_do_controller_power_gating(
 
 	TM_ASSERT(GRPH_ID(tm_resource).type == OBJECT_TYPE_CONTROLLER);
 
-	if (method != TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE)
+	if (false == update_hw_state_needed(method))
 		return;
 
 	ref_counter = TM_RES_REF_CNT_GET(tm_resource);
@@ -1501,6 +1490,8 @@ static void tmrm_do_controller_power_gating(
 		dal_controller_power_gating_enable(TO_CONTROLLER(tm_resource),
 				PIPE_GATING_CONTROL_DISABLE);
 
+		/* TODO: 'power_gating_state' flag is set in many places, but
+		 * it should be set *only* by this function. */
 		TO_CONTROLLER_INFO(tm_resource)->power_gating_state =
 				TM_POWER_GATE_STATE_OFF;
 
@@ -1588,7 +1579,8 @@ static void tmrm_update_controller_to_path_lookup_table(
  * \param [in] controller_idx: Index of controller in resource database
  * \param [in] method:       How to acquire resources
  */
-void dal_tmrm_acquire_controller(struct tm_resource_mgr *tm_rm,
+void dal_tmrm_acquire_controller(
+		struct tm_resource_mgr *tm_rm,
 		struct display_path *display_path,
 		uint32_t controller_idx,
 		enum tm_acquire_method method)
@@ -1608,9 +1600,8 @@ void dal_tmrm_acquire_controller(struct tm_resource_mgr *tm_rm,
 		return;
 	}
 
-	tm_resource_ref_counter_increment(tm_resource, method);
-
-	if (update_path_or_hw_state_needed(method)) {
+	if (1 == tm_resource_ref_counter_increment(tm_rm, tm_resource)
+			&& update_hw_state_needed(method)) {
 
 		TM_CONTROLLER_ASN("Path[%02d]: "\
 				"Acquired: Controller: %s(%d)\n",
@@ -1639,9 +1630,10 @@ void dal_tmrm_acquire_controller(struct tm_resource_mgr *tm_rm,
  * \param [in] clk_index:  Index or clock source in resource database
  * \param [in] method:     How to acquire resources
  */
-static void tmrm_acquire_clock_source(struct tm_resource_mgr *tm_rm,
-	struct display_path *display_path, uint32_t clk_index,
-	enum tm_acquire_method method)
+static void tmrm_acquire_clock_source(
+		struct tm_resource_mgr *tm_rm,
+		struct display_path *display_path,
+		uint32_t clk_index)
 {
 	struct tm_resource *tm_resource;
 	struct dal_context *dal_context = tm_rm->dal_context;
@@ -1656,19 +1648,13 @@ static void tmrm_acquire_clock_source(struct tm_resource_mgr *tm_rm,
 		return;
 	}
 
-	tm_resource_ref_counter_increment(tm_resource, method);
-
-	if (update_path_or_hw_state_needed(method)) {
-
-		dal_display_path_set_clock_source(display_path,
+	dal_display_path_set_clock_source(display_path,
 			TO_CLOCK_SOURCE(tm_resource));
-	}
 
-	if (tmrm_update_ref_count_needed(method)) {
-
-		TO_CLOCK_SOURCE_INFO(tm_resource)->clk_sharing_group =
+	TO_CLOCK_SOURCE_INFO(tm_resource)->clk_sharing_group =
 			dal_display_path_get_clock_sharing_group(display_path);
-	}
+
+	tm_resource_ref_counter_increment(tm_rm, tm_resource);
 }
 
 
@@ -1683,8 +1669,7 @@ static void tmrm_acquire_clock_source(struct tm_resource_mgr *tm_rm,
 static void tmrm_acquire_stream_engine(
 		struct tm_resource_mgr *tm_rm,
 		struct display_path *display_path,
-		enum engine_id engine_id,
-		enum tm_acquire_method method)
+		enum engine_id engine_id)
 {
 	struct dal_context *dal_context = tm_rm->dal_context;
 	struct tm_resource *tm_rsrc;
@@ -1710,11 +1695,6 @@ static void tmrm_acquire_stream_engine(
 	TM_ASSERT(engine_id >= ENGINE_ID_DIGA);
 	TM_ASSERT(engine_id <= ENGINE_ID_COUNT);
 
-	if (false == update_path_or_hw_state_needed(method)) {
-		/* Do NOT change path state! */
-		return;
-	}
-
 	tm_rsrc = tm_resource_mgr_find_engine_resource(tm_rm, engine_id);
 	if (NULL == tm_rsrc) {
 		TM_ERROR("%s: failed to find engine (0x%X) resource!\n",
@@ -1722,10 +1702,10 @@ static void tmrm_acquire_stream_engine(
 		return;
 	}
 
+	tm_resource_ref_counter_increment(tm_rm, tm_rsrc);
+
 	dal_display_path_set_stream_engine(display_path, ASIC_LINK_INDEX,
 			engine_id);
-
-	tm_resource_ref_counter_increment(tm_rsrc, method);
 
 	TM_ENG_ASN("Path[%02d]: Acquired StreamEngine=%s(%u) Transmitter=%s\n",
 		dal_display_path_get_display_index(display_path),
@@ -1742,8 +1722,7 @@ static void tmrm_acquire_stream_engine(
  */
 static void tmrm_release_stream_engine(
 		struct tm_resource_mgr *tm_rm,
-		struct display_path *display_path,
-		enum tm_acquire_method method)
+		struct display_path *display_path)
 {
 	enum engine_id engine_id;
 	struct tm_resource *tm_resource;
@@ -1767,10 +1746,7 @@ static void tmrm_release_stream_engine(
 	dal_display_path_set_stream_engine(display_path, ASIC_LINK_INDEX,
 			ENGINE_ID_UNKNOWN);
 
-	tm_resource_mgr_ref_counter_decrement_if_allowed(
-		tm_rm,
-		tm_resource,
-		method);
+	tm_resource_mgr_ref_counter_decrement(tm_rm, tm_resource);
 
 	TM_ENG_ASN("Path[%02d]: Released StreamEngine=%s(%u)\n",
 		dal_display_path_get_display_index(display_path),
@@ -1846,21 +1822,130 @@ void dal_tmrm_release_controller(
 		return;
 	}
 
-	if (tm_resource_mgr_ref_counter_decrement_if_allowed(tm_rm, tm_rsrc,
-			method) == 0) {
+	if (tm_resource_mgr_ref_counter_decrement(tm_rm, tm_rsrc) == 0) {
 
-		tmrm_do_controller_power_gating(tm_rm, tm_rsrc, method, true);
+		if (update_hw_state_needed(method)) {
 
-		tmrm_update_controller_to_path_lookup_table(tm_rm, tm_rsrc,
-				NULL);
+			tmrm_do_controller_power_gating(
+					tm_rm,
+					tm_rsrc,
+					method,
+					true);
 
-		TM_CONTROLLER_ASN("Path[%02d]: "\
+			tmrm_update_controller_to_path_lookup_table(
+					tm_rm,
+					tm_rsrc,
+					NULL);
+
+			TM_CONTROLLER_ASN("Path[%02d]: "\
 				"Released: Controller: %s(%d)\n",
-			display_index,
-			tm_utils_go_id_to_str(GRPH_ID(tm_rsrc)),
-			dal_graphics_object_id_get_controller_id(
-				GRPH_ID(tm_rsrc)));
+				display_index,
+				tm_utils_go_id_to_str(GRPH_ID(tm_rsrc)),
+				dal_graphics_object_id_get_controller_id(
+						GRPH_ID(tm_rsrc)));
+		}
 	}
+}
+
+static void tmrm_acquire_connector(
+		struct tm_resource_mgr *tm_rm,
+		struct display_path *display_path)
+{
+	struct dal_context *dal_context = tm_rm->dal_context;
+	struct tm_resource *tm_resource;
+
+	tm_resource = tmrm_display_path_find_connector_resource(tm_rm,
+			display_path);
+
+	TM_ASSERT(tm_resource != NULL);
+
+	tm_resource_ref_counter_increment(tm_rm, tm_resource);
+
+	tm_resource->flags.mst_resource =
+			(dal_display_path_get_query_signal(display_path,
+				SINK_LINK_INDEX) ==
+					SIGNAL_TYPE_DISPLAY_PORT_MST);
+}
+
+static void tmrm_acquire_stereo_sync(
+		struct tm_resource_mgr *tm_rm,
+		struct display_path *display_path)
+{
+	struct tm_resource *tm_resource;
+
+	tm_resource = tm_resource_mgr_get_stereo_sync_resource(tm_rm,
+			display_path);
+
+	if (tm_resource != NULL)
+		tm_resource_ref_counter_increment(tm_rm, tm_resource);
+}
+
+static void tmrm_acquire_sync_output(
+		struct tm_resource_mgr *tm_rm,
+		struct display_path *display_path)
+{
+	struct tm_resource *tm_resource;
+
+	tm_resource = tm_resource_mgr_get_sync_output_resource(tm_rm,
+		display_path);
+
+	if (tm_resource != NULL)
+		tm_resource_ref_counter_increment(tm_rm, tm_resource);
+}
+
+static void tmrm_acquire_alternative_clock(
+		struct tm_resource_mgr *tm_rm,
+		struct display_path *display_path)
+{
+	struct tm_resource *tm_resource;
+
+	tm_resource = tmrm_display_path_find_alternative_clock_resource(
+			tm_rm, display_path);
+
+	if (tm_resource != NULL) {
+
+		TO_CLOCK_SOURCE_INFO(tm_resource)->clk_sharing_group =
+			dal_display_path_get_clock_sharing_group(display_path);
+		tm_resource_ref_counter_increment(tm_rm, tm_resource);
+	}
+}
+
+enum tm_result tmrm_add_root_plane(
+		struct tm_resource_mgr *tm_rm,
+		struct display_path *display_path,
+		uint32_t controller_index)
+{
+	struct dal_context *dal_context = tm_rm->dal_context;
+	struct controller *controller;
+	struct display_path_plane plane;
+	struct tm_resource *tm_resource;
+
+	if (dal_display_path_get_number_of_planes(display_path) != 0) {
+		ASSERT(false);
+		TM_ERROR(
+		"%s: Path Should NOT have any planes! [Path: %d]\n",
+			__func__,
+			dal_display_path_get_display_index(
+					display_path));
+		return TM_RESULT_FAILURE;
+	}
+
+	/* TODO: add real 'plane' initialisation here, based on
+	 * parameters passed in. */
+	dal_memset(&plane, 0, sizeof(plane));
+
+	tm_resource = tm_resource_mgr_enum_resource(tm_rm, controller_index);
+
+	controller = TO_CONTROLLER_INFO(tm_resource)->controller;
+
+	plane.controller = controller;
+
+	/* We checked that path has no planes, it means we are adding the 'root'
+	 * plane. */
+	if (false == dal_display_path_add_plane(display_path, &plane))
+		return TM_RESULT_FAILURE;
+
+	return TM_RESULT_SUCCESS;
 }
 
 /**
@@ -1880,11 +1965,7 @@ enum tm_result tm_resource_mgr_acquire_resources(
 		struct display_path *display_path,
 		enum tm_acquire_method method)
 {
-	struct tm_resource *tm_resource;
-	bool update_ref_count;
 	uint32_t controller_index;
-	struct controller *controller;
-	struct display_path_plane plane;
 	uint32_t clock_source_index;
 	enum engine_id engine_id;
 	uint32_t i;
@@ -1895,27 +1976,23 @@ enum tm_result tm_resource_mgr_acquire_resources(
 		return TM_RESULT_FAILURE;
 	}
 
-	/* If display path is already acquired - all resources already
-	 * active */
-	if (method == TM_ACQUIRE_METHOD_ACTIVE_PATH &&
-			dal_display_path_is_acquired(display_path))
+	if (true == dal_display_path_is_acquired(display_path)) {
+		if (update_hw_state_needed(method)) {
+			/* If display path is already acquired - increment
+			 * reference counter so it could be balanced by
+			 * tm_resource_mgr_release_resources() */
+			dal_display_path_acquire(display_path);
+		} else {
+			/* Do nothing because for SW acquire all resources
+			 * already there. */
+		}
+
 		return TM_RESULT_SUCCESS;
-
-	if (dal_display_path_get_number_of_planes(display_path) != 0) {
-		ASSERT(false);
-		TM_ERROR("%s: Path Should NOT have any planes! [Path: %d]\n",
-			__func__,
-			dal_display_path_get_display_index(display_path));
-		return TM_RESULT_FAILURE;
 	}
-
-	tm_resource = NULL;
-	update_ref_count = tmrm_update_ref_count_needed(method);
 
 	/* Verify that all resources (which are PERMANENT to display path) are
 	 * available. */
-	if (update_ref_count &&
-			!tmrm_resources_available(tm_rm, display_path))
+	if (false == tmrm_resources_available(tm_rm, display_path))
 		return TM_RESULT_FAILURE;
 
 	/* Obtain indexes of available resources which are NOT permanent
@@ -1929,29 +2006,20 @@ enum tm_result tm_resource_mgr_acquire_resources(
 	if (clock_source_index == RESOURCE_INVALID_INDEX)
 		return TM_RESULT_FAILURE;
 
-	engine_id = tmrm_get_available_stream_engine(tm_rm,
-			display_path, method);
+	engine_id = tmrm_get_available_stream_engine(tm_rm, display_path,
+			method);
 	if (engine_id == ENGINE_ID_UNKNOWN)
 		return TM_RESULT_FAILURE;
 
 	/*****************************************************************
 	 * At this point we know that all required resources are available
 	 * and we know IDs/indexes of these.
+	 * Some of the resources are already in display_path (for example
+	 * the connector), but from Resources point of view the acquisition
+	 * was not done yet, and this is what will be done.
 	 *****************************************************************/
 
-	/* Acquire connector */
-	tm_resource = tmrm_display_path_find_connector_resource(tm_rm,
-			display_path);
-
-	TM_ASSERT(tm_resource != NULL);
-
-	if (update_ref_count) {
-		tm_resource_ref_counter_increment(tm_resource, method);
-		tm_resource->flags.mst_resource =
-			(dal_display_path_get_query_signal(display_path,
-				SINK_LINK_INDEX) ==
-					SIGNAL_TYPE_DISPLAY_PORT_MST);
-	}
+	tmrm_acquire_connector(tm_rm, display_path);
 
 	/* Acquire links (encoder, audio) */
 	for (i = 0;
@@ -1960,58 +2028,38 @@ enum tm_result tm_resource_mgr_acquire_resources(
 		tmrm_acquire_link(tm_rm, display_path, i, method);
 	}
 
-	/* Stereosync encoder will be present only on already acquired path */
-	tm_resource = tm_resource_mgr_get_stereo_sync_resource(tm_rm,
-				display_path);
-	if (tm_resource != NULL)
-		tm_resource_ref_counter_increment(tm_resource, method);
+	tmrm_acquire_stereo_sync(tm_rm, display_path);
 
-	/* Sync-output encoder will be present only on already acquired path */
-	tm_resource = tm_resource_mgr_get_sync_output_resource(tm_rm,
-			display_path);
-	if (tm_resource != NULL)
-		tm_resource_ref_counter_increment(tm_resource, method);
+	tmrm_acquire_sync_output(tm_rm, display_path);
 
 	/* NOTE: GLSync Connector resources never acquired within
 	 * display path and never intersects with other resources */
 
 	/* In the context of checking co-func set, if the alternative
 	 * clock source is attached to display path, there is a need
-	 * to acquire it. */
-
-	tm_resource = tmrm_display_path_find_alternative_clock_resource(
-			tm_rm, display_path);
-
-	if (tm_resource != NULL && update_ref_count) {
-
-		TO_CLOCK_SOURCE_INFO(tm_resource)->clk_sharing_group =
-			dal_display_path_get_clock_sharing_group(display_path);
-		tm_resource_ref_counter_increment(tm_resource, method);
-	}
-
-	tm_resource = tm_resource_mgr_enum_resource(tm_rm, controller_index);
-	controller = TO_CONTROLLER_INFO(tm_resource)->controller;
-
-	/* TODO: add real 'plane' initialisation here, based on parameters
-	 * passed in */
-	dal_memset(&plane, 0, sizeof(plane));
-
-	plane.controller = controller;
-
-	dal_display_path_add_plane(display_path, &plane);
+	 * to acquire its resource. */
+	tmrm_acquire_alternative_clock(tm_rm, display_path);
 
 	/* Acquire temporary, but mandatory components - CAN NOT fail,
-	 * since we passed validation in the beginning of the function */
+	 * since we confirmed availability of resources at the beginning of
+	 * this function. */
 	dal_tmrm_acquire_controller(tm_rm, display_path, controller_index,
 			method);
 
-	tmrm_acquire_clock_source(tm_rm, display_path, clock_source_index,
-			method);
+	tmrm_acquire_clock_source(tm_rm, display_path, clock_source_index);
 
-	tmrm_acquire_stream_engine(tm_rm, display_path, engine_id, method);
+	tmrm_acquire_stream_engine(tm_rm, display_path, engine_id);
 
-	if (update_path_or_hw_state_needed(method))
+	if (TM_RESULT_SUCCESS != tmrm_add_root_plane(tm_rm, display_path,
+			controller_index)) {
+		TM_ERROR("%s: failed to add 'root' plane!\n", __func__);
+		return TM_RESULT_FAILURE;
+	}
+
+	if (update_hw_state_needed(method)) {
 		dal_display_path_acquire_links(display_path);
+		dal_display_path_acquire(display_path);
+	}
 
 	return TM_RESULT_SUCCESS;
 }
@@ -2028,15 +2076,16 @@ static void tmrm_release_resource(struct tm_resource_mgr *tm_rm,
 {
 	/* Release Resource and clear MST flag for main resource. */
 	if (resource != NULL &&
-		tm_resource_mgr_ref_counter_decrement(tm_rm, resource) == 0) {
+		tm_resource_mgr_ref_counter_decrement(tm_rm,
+					resource) == 0) {
 		/* it was the last reference */
 		resource->flags.mst_resource = false;
 	}
 
 	/* Release Resource and clear MST flag for paired resource. */
 	if (paired_resource != NULL &&
-		tm_resource_mgr_ref_counter_decrement(tm_rm, paired_resource) ==
-			0) {
+		tm_resource_mgr_ref_counter_decrement(tm_rm,
+					paired_resource) == 0) {
 		/* it was the last reference */
 		paired_resource->flags.mst_resource = false;
 	}
@@ -2073,7 +2122,7 @@ static void tmrm_release_connector_resource(
 	struct tm_resource_mgr *tm_rm,
 	struct display_path *display_path)
 {
-	struct tm_resource *resource = NULL;
+	struct tm_resource *resource;
 	struct connector *connector;
 
 	connector = dal_display_path_get_connector(display_path);
@@ -2159,27 +2208,35 @@ void tm_resource_mgr_release_resources(
 		enum tm_acquire_method method)
 {
 	struct dal_context *dal_context = tm_rm->dal_context;
-	bool deactivate_resource;
-	bool update_ref_count;
 
 	if (display_path == NULL) {
 		TM_ERROR("%s: invalid state or input data!\n", __func__);
 		return;
 	}
 
-	if (method == TM_ACQUIRE_METHOD_ACTIVE_PATH
-			&& dal_display_path_is_acquired(display_path)) {
-		/* If display path is acquired - it means on
-		 * acquire-resources we did nothing. */
-		/* We can get here if a Detection is done on an
-		 * already active path (not an error). */
-		TM_RESOURCES("%s: no action - display_path is active.\n",
-				__func__);
-		return;
+	if (true == dal_display_path_is_acquired(display_path)) {
+		if (update_hw_state_needed(method)) {
+			if (dal_display_path_get_ref_counter(
+					display_path) > 1) {
+				/* We get here when handling HPD-Disconnect.
+				 * It is ok because Path is double-acquired:
+				 * 1st acquire - to drive the display.
+				 * 2nd acquire - to detect the display.
+				 *
+				 * Decrement reference counter of the path. */
+				dal_display_path_release(display_path);
+				/* We can NOT release path-resources because
+				 * someone is still using it.*/
+				return;
+			}
+		} else {
+			/* Path is "in-use" at HW level. We should NOT change
+			 * its state. */
+			return;
+		}
 	}
 
-	deactivate_resource = update_path_or_hw_state_needed(method);
-	update_ref_count = tmrm_update_ref_count_needed(method);
+	tmrm_release_stream_engine(tm_rm, display_path);
 
 	/* Clock source should be released before controller. */
 	tmrm_release_clock_source(tm_rm, display_path,
@@ -2190,32 +2247,40 @@ void tm_resource_mgr_release_resources(
 			dal_display_path_get_alt_clock_source(display_path),
 			method);
 
-	if (update_ref_count) {
-		tmrm_release_stereo_sync_resource(tm_rm, display_path);
+	tmrm_release_stereo_sync_resource(tm_rm, display_path);
 
-		tmrm_release_sync_output_resource(tm_rm, display_path);
+	tmrm_release_sync_output_resource(tm_rm, display_path);
 
-		tmrm_release_connector_resource(tm_rm, display_path);
+	tmrm_release_connector_resource(tm_rm, display_path);
 
-		tmrm_release_link_service_resources(tm_rm, display_path);
-	}
+	tmrm_release_link_service_resources(tm_rm, display_path);
 
 	/* Deactivate all resources */
-	if (deactivate_resource) {
-		tmrm_release_stream_engine(tm_rm, display_path, method);
-
-		dal_tmrm_release_controller(tm_rm, display_path, method,
-			dal_display_path_get_controller(display_path));
+	if (update_hw_state_needed(method)) {
 
 		/* Release ALL Planes, including the "root" one.
 		 * This is different from "dal_tm_release_plane_resources()"
-		 * where we release only non-root planes. */
+		 * where we release only NON-ROOT planes. */
 
+		/* Non-root MUST be released BEFORE root because
+		 * dal_tmrm_release_non_root_controllers() will NOT release
+		 * the 1st controller in the vector.
+		 * If we don't do it in this order will "leak" a controller.
+		 * (because it is falsely considered a 'root') */
 		dal_tmrm_release_non_root_controllers(
+				tm_rm,
+				display_path,
+				method);
+
+		dal_display_path_release(display_path);
+	}
+
+	/* this will release 'root' controller */
+	dal_tmrm_release_controller(
 			tm_rm,
 			display_path,
-			method);
-	}
+			method,
+			dal_display_path_get_controller(display_path));
 
 	dal_display_path_release_resources(display_path);
 }
@@ -2242,7 +2307,7 @@ enum tm_result tm_resource_mgr_acquire_alternative_clock_source(
 
 	/* Find an appropriate clock source. */
 	clock_source_index = tmrm_get_available_clock_source(tm_rm,
-			display_path, TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE);
+			display_path, TM_ACQUIRE_METHOD_HW);
 	if (clock_source_index == RESOURCE_INVALID_INDEX)
 		return TM_RESULT_FAILURE;
 
@@ -2252,7 +2317,7 @@ enum tm_result tm_resource_mgr_acquire_alternative_clock_source(
 	TO_CLOCK_SOURCE_INFO(tm_resource)->clk_sharing_group =
 		dal_display_path_get_clock_sharing_group(display_path);
 
-	TM_RES_REF_CNT_INCREMENT(tm_resource);
+	tm_resource_ref_counter_increment(tm_rm, tm_resource);
 
 	dal_display_path_set_alt_clock_source(display_path,
 			TO_CLOCK_SOURCE(tm_resource));
@@ -2289,26 +2354,27 @@ static void tmrm_release_clock_source(
 	if (tm_resource == NULL)
 		return;
 
-	if (tm_resource_mgr_ref_counter_decrement_if_allowed(
-			tm_rm, tm_resource, method) == 0) {
+	if (tm_resource_mgr_ref_counter_decrement(tm_rm, tm_resource) == 0) {
 		/* Once nobody uses this Clock Source - restore default
 		 * sharing group. */
 		TO_CLOCK_SOURCE_INFO(tm_resource)->clk_sharing_group =
 				CLOCK_SHARING_GROUP_EXCLUSIVE;
-	}
 
-	/* HWSS cannot not power off PLL due to sharing of resources (because
-	 * it doesn't know if anyone else is still using it).
-	 * Do it now when last reference removed. */
-	if (method == TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE
-			&& TM_RES_REF_CNT_GET(tm_resource) == 0) {
+		if (update_hw_state_needed(method)) {
 
-		controller = dal_display_path_get_controller(display_path);
+			/* HWSS cannot not power off PLL due to sharing of
+			 * resources (because it doesn't know if anyone else is
+			 * still using it).
+			 * Do it now when last reference removed. */
 
-		TM_ASSERT(controller != NULL);
+			controller = dal_display_path_get_controller(
+					display_path);
 
-		dal_clock_source_power_down_pll(clock_source,
-				dal_controller_get_id(controller));
+			TM_ASSERT(controller != NULL);
+
+			dal_clock_source_power_down_pll(clock_source,
+					dal_controller_get_id(controller));
+		}
 	}
 }
 
@@ -2327,7 +2393,7 @@ void tm_resource_mgr_release_alternative_clock_source(
 {
 	tmrm_release_clock_source(tm_rm, display_path,
 		dal_display_path_get_alt_clock_source(display_path),
-		TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE);
+		TM_ACQUIRE_METHOD_HW);
 
 	dal_display_path_set_alt_clock_source(display_path, NULL);
 }
@@ -2349,7 +2415,7 @@ bool tm_resource_mgr_is_alternative_clk_src_available(
 
 	/* Check if alternative clock source can be found. */
 	clock_source_index = tmrm_get_available_clock_source(tm_rm,
-			display_path, TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE);
+			display_path, TM_ACQUIRE_METHOD_HW);
 
 	if (clock_source_index == RESOURCE_INVALID_INDEX) {
 		/* not found means not available */
@@ -2557,13 +2623,9 @@ enum tm_result tm_resource_mgr_attach_audio_to_display_path(
 		if (GRPH_ID(tm_audio_resource).type != OBJECT_TYPE_AUDIO)
 			continue;
 
-		/* We allow at most one display path using same
-		 * audio resource. */
-		TM_ASSERT(TM_RES_REF_CNT_GET(tm_audio_resource) == 0 ||
-			TM_RES_REF_CNT_GET(tm_audio_resource) == 1);
-
-		if (TM_RES_REF_CNT_GET(tm_audio_resource) != 0) {
-			/* audio is unavailable, continue */
+		/* Allow at most ONE display path to use an audio resource. */
+		if (is_resource_available(tm_audio_resource) == false) {
+			/* This audio is in-use, continue the search. */
 			continue;
 		}
 
@@ -2580,9 +2642,7 @@ enum tm_result tm_resource_mgr_attach_audio_to_display_path(
 		dal_display_path_set_audio(display_path, ASIC_LINK_INDEX,
 				TO_AUDIO_INFO(tm_audio_resource)->audio);
 
-		TM_RES_REF_CNT_INCREMENT(tm_audio_resource);
-
-		tm_rm->active_audio_resources_num++;
+		tm_resource_ref_counter_increment(tm_rm, tm_audio_resource);
 
 		return TM_RESULT_SUCCESS;
 	}
@@ -2612,9 +2672,7 @@ void tm_resource_mgr_detach_audio_from_display_path(
 		return;
 	}
 
-	if (tm_resource_mgr_ref_counter_decrement(tm_rm, tm_audio_resource) >=
-		0)
-		tm_rm->active_audio_resources_num--;
+	tm_resource_mgr_ref_counter_decrement(tm_rm, tm_audio_resource);
 
 	dal_display_path_set_audio_active_state(
 		display_path,
@@ -2622,12 +2680,6 @@ void tm_resource_mgr_detach_audio_from_display_path(
 		false);
 
 	dal_display_path_set_audio(display_path, ASIC_LINK_INDEX, NULL);
-}
-
-uint32_t tm_resource_mgr_get_active_audio_resources_num(
-		struct tm_resource_mgr *tm_rm)
-{
-	return tm_rm->active_audio_resources_num;
 }
 
 /**
@@ -3066,152 +3118,6 @@ void tm_resource_mgr_associate_link_services(
 			}
 		}
 	}
-}
-
-/**
- * Acquire mandatory resources for display path.
- * Mandatory resources include: Controller, Clock and Engine
- *
- * \param [in] display_path:   Display path to assign resource to
- * \param [in] controller_id:     Controller to assign to display path
- * \param [in] clock_source_id: Clock to assign to display path
- * \param [in] engine_id:         Engine to assign to display path
- *
- * \return TM_RESULT_SUCCESS: if the mandatory resources can be acquired.
- *		TM_RESULT_FAILURE: otherwise
- */
-enum tm_result tm_resource_mgr_acquire_mandatory_resources(
-		struct tm_resource_mgr *tm_rm,
-		struct display_path *display_path,
-		enum controller_id controller_id,
-		enum clock_source_id clock_source_id,
-		enum engine_id engine_id)
-{
-	struct tm_resource *tm_resource_tmp = NULL;
-	struct tm_resource *tm_resource_connector = NULL;
-	struct tm_resource *tm_resource_engine = NULL;
-	struct dal_context *dal_context = tm_rm->dal_context;
-
-	uint32_t controller_index = RESOURCE_INVALID_INDEX;
-	uint32_t clk_index = RESOURCE_INVALID_INDEX;
-
-	uint32_t i;
-	struct connector *connector;
-
-	if (!display_path || CONTROLLER_ID_UNDEFINED == controller_id
-			|| CLOCK_SOURCE_ID_UNDEFINED == clock_source_id
-			|| ENGINE_ID_UNKNOWN == engine_id) {
-		TM_ERROR("%s: Invalid input!\n", __func__);
-		return TM_RESULT_FAILURE;
-	}
-
-	/* find Engine resource */
-	tm_resource_engine = tm_resource_mgr_find_engine_resource(tm_rm,
-			engine_id);
-	if (NULL == tm_resource_engine) {
-		TM_ERROR("%s: Invalid engine id!\n", __func__);
-		return TM_RESULT_FAILURE;
-	}
-
-	TM_ENG_ASN("%s: Path:0x%p, engine_id:%d\n",
-			__func__, display_path, engine_id);
-
-	/* find controller resource */
-	for (i = 0; i < tm_resource_mgr_get_total_resources_num(tm_rm); i++) {
-
-		struct controller *controller;
-
-		tm_resource_tmp = tm_resource_mgr_enum_resource(tm_rm, i);
-
-		if (GRPH_ID(tm_resource_tmp).type != OBJECT_TYPE_CONTROLLER)
-			continue;
-
-		controller = TO_CONTROLLER_INFO(tm_resource_tmp)->controller;
-
-		if (controller_id == dal_controller_get_id(controller) &&
-				!TM_RES_REF_CNT_GET(tm_resource_tmp)) {
-
-			/* EPR 345872: need to make sure controller is
-			 *  actually running. */
-			if (!dal_controller_is_counter_moving(controller)) {
-				TM_ERROR("%s: controller is NOT running!\n",
-						__func__);
-				return TM_RESULT_FAILURE;
-			}
-
-			controller_index = i;
-			break;
-		}
-	}
-
-	/* find clock source resource index */
-	for (i = 0; i < tm_resource_mgr_get_total_resources_num(tm_rm); i++) {
-
-		struct clock_source *clock_source;
-
-		tm_resource_tmp = tm_resource_mgr_enum_resource(tm_rm, i);
-
-		if (GRPH_ID(tm_resource_tmp).type != OBJECT_TYPE_CLOCK_SOURCE)
-			continue;
-
-
-		clock_source = TO_CLOCK_SOURCE(tm_resource_tmp);
-
-		if (clock_source_id == dal_clock_source_get_id(clock_source) &&
-				!TM_RES_REF_CNT_GET(tm_resource_tmp)) {
-			clk_index = i;
-			break;
-		}
-	}
-
-	if (RESOURCE_INVALID_INDEX == controller_index ||
-		RESOURCE_INVALID_INDEX == clk_index ||
-		NULL == tm_resource_engine) {
-		TM_ERROR("%s: Failed to acquire mandatory resources",
-				__func__);
-		return TM_RESULT_FAILURE;
-	}
-
-	/*******************************************************
-	 * After this point we cannot fail since we start taking
-	 * resources / updating reference count.
-	 *******************************************************/
-
-	/* Acquire connector */
-	connector = dal_display_path_get_connector(display_path);
-
-	tm_resource_connector = tm_resource_mgr_find_resource(tm_rm,
-		dal_connector_get_graphics_object_id(connector));
-
-	TM_ASSERT(tm_resource_connector != NULL);
-
-	TM_RES_REF_CNT_INCREMENT(tm_resource_connector);
-
-	tm_resource_connector->flags.mst_resource =
-		(dal_display_path_get_query_signal(
-				display_path, SINK_LINK_INDEX) ==
-						SIGNAL_TYPE_DISPLAY_PORT_MST);
-
-	/* Acquire per-link resources (encoder, audio) */
-	for (i = 0; i < dal_display_path_get_number_of_links(display_path);
-			i++) {
-		tmrm_acquire_link(tm_rm, display_path, i,
-				TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE);
-	}
-
-	dal_tmrm_acquire_controller(tm_rm, display_path, controller_index,
-			/* To get around power gating assert */
-			TM_ACQUIRE_METHOD_ACTIVE_SET);
-
-	tmrm_acquire_clock_source(tm_rm, display_path, clk_index,
-			TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE);
-
-	tmrm_acquire_stream_engine(tm_rm, display_path, engine_id,
-			TM_ACQUIRE_METHOD_STATEFULL_ACQUIRE);
-
-	dal_display_path_acquire_links(display_path);
-
-	return TM_RESULT_SUCCESS;
 }
 
 /**

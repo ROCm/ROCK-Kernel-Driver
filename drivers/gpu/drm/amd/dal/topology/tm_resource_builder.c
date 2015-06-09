@@ -372,9 +372,6 @@ static enum tm_result tmrb_add_link(
 {
 	uint32_t current_num_of_links;
 	struct encoder_feature_support efs;
-	uint32_t ind;
-	struct graphics_object_id object_id;
-	struct tm_resource *tm_resource;
 	struct dal_context *dal_context = tm_rb->dal_context;
 
 	/* keep number of links *before* a new one was added */
