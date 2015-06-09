@@ -589,6 +589,7 @@ static enum scaler_validation_code build_path_parameters(
 		actual_min_clock_params->scaler_efficiency =
 				translate_lb_pixel_depth_to_scaler_efficiency(
 					actual_line_buffer_params->depth);
+		actual_min_clock_params->line_buffer_prefetch_enabled = false;
 		actual_line_buffer_params->id = path_index;
 
 		/* validate taps if it is set */

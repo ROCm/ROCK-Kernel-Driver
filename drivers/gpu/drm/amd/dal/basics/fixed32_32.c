@@ -26,17 +26,33 @@
 #include "dal_services.h"
 #include "include/fixed32_32.h"
 
+static uint64_t u64_div(uint64_t n, uint64_t d)
+{
+	uint32_t i = 0;
+	uint64_t r;
+	uint64_t q = div64_u64_rem(n, d, &r);
+
+	for (i = 0; i < 32; ++i) {
+		uint64_t sbit = q & (1ULL<<63);
+
+		r <<= 1;
+		r |= sbit ? 1 : 0;
+		q <<= 1;
+		if (r >= d) {
+			r -= d;
+			q |= 1;
+		}
+	}
+
+	if (2*r >= d)
+		q += 1;
+	return q;
+}
+
 struct fixed32_32 dal_fixed32_32_from_fraction(uint32_t n, uint32_t d)
 {
 	struct fixed32_32 fx;
-	uint64_t div_res;
-	uint32_t rem;
-	fx.value = (uint64_t)n<<32;
-	div_res = div_u64_rem(fx.value, d, &rem);
-	if (rem)
-		fx.value = div_res + 1;
-	else
-		fx.value = div_res;
+	fx.value = u64_div((uint64_t)n << 32, (uint64_t)d << 32);
 	return fx;
 }
 
@@ -86,10 +102,14 @@ struct fixed32_32 dal_fixed32_32_mul(
 	struct fixed32_32 rhs)
 {
 	struct fixed32_32 fx;
-	uint64_t ahbh = (lhs.value>>32) * (rhs.value>>32);
-	uint64_t ahbl = (lhs.value>>32) * ((uint32_t)rhs.value);
-	uint64_t albh = ((uint32_t)lhs.value) * (rhs.value>>32);
-	uint64_t albl = ((uint32_t)lhs.value) * ((uint32_t)rhs.value);
+	uint64_t lhs_int = lhs.value>>32;
+	uint64_t lhs_frac = (uint32_t)lhs.value;
+	uint64_t rhs_int = rhs.value>>32;
+	uint64_t rhs_frac = (uint32_t)rhs.value;
+	uint64_t ahbh = lhs_int * rhs_int;
+	uint64_t ahbl = lhs_int * rhs_frac;
+	uint64_t albh = lhs_frac * rhs_int;
+	uint64_t albl = lhs_frac * rhs_frac;
 
 	ASSERT((ahbh>>32) == 0);
 
@@ -110,27 +130,7 @@ struct fixed32_32 dal_fixed32_32_mul_int(struct fixed32_32 lhs, uint32_t rhs)
 	return fx;
 }
 
-static uint64_t u64_div(uint64_t n, uint64_t d)
-{
-	uint32_t i = 0;
-	uint64_t r;
-	uint64_t q = div64_u64_rem(n, d, &r);
 
-	for (i = 0; i < 32; ++i) {
-		uint64_t sbit = q & (1ULL<<63);
-		r <<= 1;
-		r |= sbit ? 1 : 0;
-		q <<= 1;
-		if (r >= d) {
-			r -= d;
-			q |= 1;
-		}
-	}
-
-	if (2*r >= d)
-		q += 1;
-	return q;
-}
 
 struct fixed32_32 dal_fixed32_32_div(
 	struct fixed32_32 lhs,
@@ -144,7 +144,7 @@ struct fixed32_32 dal_fixed32_32_div(
 struct fixed32_32 dal_fixed32_32_div_int(struct fixed32_32 lhs, uint32_t rhs)
 {
 	struct fixed32_32 fx;
-	fx.value = div_u64(lhs.value, rhs);
+	fx.value = u64_div(lhs.value, (uint64_t)rhs << 32);
 	return fx;
 }
 

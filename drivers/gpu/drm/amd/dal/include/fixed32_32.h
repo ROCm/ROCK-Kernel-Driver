@@ -32,6 +32,7 @@ struct fixed32_32 {
 
 static const struct fixed32_32 dal_fixed32_32_zero = { 0 };
 static const struct fixed32_32 dal_fixed32_32_one = { 0x100000000LL };
+static const struct fixed32_32 dal_fixed32_32_half = { 0x80000000LL };
 
 struct fixed32_32 dal_fixed32_32_from_fraction(uint32_t n, uint32_t d);
 struct fixed32_32 dal_fixed32_32_from_int(uint32_t value);

@@ -96,6 +96,7 @@ struct min_clock_params {
 	enum signal_type signal_type;
 	enum dc_deep_color_depth deep_color_depth;
 	enum v_scaler_efficiency scaler_efficiency;
+	bool line_buffer_prefetch_enabled;
 };
 
 /* Enumerations for Source selection of the Display clock */

@@ -35,11 +35,11 @@ struct display_clock_dce110 {
 	uint32_t dentist_vco_freq_khz;
 	/* Cache the status of DFS-bypass feature*/
 	bool dfs_bypass_enabled;
-	/*GPU PLL SS percentage (if down-spread enabled)*/
+	/* GPU PLL SS percentage (if down-spread enabled) */
 	uint32_t gpu_pll_ss_percentage;
-	/* GPU PLL SS percentage Divider (100 or 1000)*/
+	/* GPU PLL SS percentage Divider (100 or 1000) */
 	uint32_t gpu_pll_ss_divider;
-	/* Flag for Enabled SS on GPU PLL*/
+	/* Flag for Enabled SS on GPU PLL */
 	bool ss_on_gpu_pll;
 	/* Cache the display clock returned by VBIOS if DFS-bypass is enabled.
 	 * This is basically "Crystal Frequency In KHz" (XTALIN) frequency */

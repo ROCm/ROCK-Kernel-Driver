@@ -312,34 +312,55 @@ static struct fixed32_32 get_deep_color_factor(struct min_clock_params *params)
 	return deep_color_factor;
 }
 
-static uint32_t get_scaler_efficiency(struct dal_context *dal_context,
-		struct min_clock_params *params)
+static struct fixed32_32 get_scaler_efficiency(
+	struct dal_context *dal_context,
+	struct min_clock_params *params)
 {
-	uint32_t scaler_efficiency = 3;
+	struct fixed32_32 scaler_efficiency = dal_fixed32_32_from_int(3);
 
-	NOT_IMPLEMENTED();
+	if (params->scaler_efficiency == V_SCALER_EFFICIENCY_LB18BPP) {
+		scaler_efficiency =
+			dal_fixed32_32_add(
+				dal_fixed32_32_from_fraction(35555, 10000),
+				dal_fixed32_32_from_fraction(
+					55556,
+					100000 * 10000));
+	} else if (params->scaler_efficiency == V_SCALER_EFFICIENCY_LB24BPP) {
+		scaler_efficiency =
+			dal_fixed32_32_add(
+				dal_fixed32_32_from_fraction(34285, 10000),
+				dal_fixed32_32_from_fraction(
+					71429,
+					100000 * 10000));
+	} else if (params->scaler_efficiency == V_SCALER_EFFICIENCY_LB30BPP)
+		scaler_efficiency = dal_fixed32_32_from_fraction(32, 10);
 
 	return scaler_efficiency;
 }
 
 static struct fixed32_32 get_lb_lines_in_per_line_out(
 		struct min_clock_params *params,
-		struct fixed32_32 v_scale)
+		struct fixed32_32 v_scale_ratio)
 {
-	if (dal_fixed32_32_le(v_scale, dal_fixed32_32_from_int(1)))
-		return dal_fixed32_32_from_int(1);
-	else if (dal_fixed32_32_le(v_scale,
-			dal_fixed32_32_from_fraction(4, 3)))
-		return dal_fixed32_32_from_fraction(4, 3);
-	else if (dal_fixed32_32_le(v_scale,
-			dal_fixed32_32_from_fraction(6, 4)))
-		return dal_fixed32_32_from_fraction(6, 4);
-	else if (dal_fixed32_32_le(v_scale, dal_fixed32_32_from_int(2)))
-		return dal_fixed32_32_from_int(2);
-	else if (dal_fixed32_32_le(v_scale, dal_fixed32_32_from_int(3)))
-		return dal_fixed32_32_from_int(4);
+	struct fixed32_32 two = dal_fixed32_32_from_int(2);
+	struct fixed32_32 four = dal_fixed32_32_from_int(4);
+	struct fixed32_32 f4_to_3 = dal_fixed32_32_from_fraction(4, 3);
+	struct fixed32_32 f6_to_4 = dal_fixed32_32_from_fraction(6, 4);
+
+	if (params->line_buffer_prefetch_enabled)
+		return dal_fixed32_32_max(v_scale_ratio, dal_fixed32_32_one);
+	else if (dal_fixed32_32_le(v_scale_ratio, dal_fixed32_32_one))
+		return dal_fixed32_32_one;
+	else if (dal_fixed32_32_le(v_scale_ratio, f4_to_3))
+		return f4_to_3;
+	else if (dal_fixed32_32_le(v_scale_ratio, f6_to_4))
+		return f6_to_4;
+	else if (dal_fixed32_32_le(v_scale_ratio, two))
+		return two;
+	else if (dal_fixed32_32_le(v_scale_ratio, dal_fixed32_32_from_int(3)))
+		return four;
 	else
-		return dal_fixed32_32_from_int(0);
+		return dal_fixed32_32_zero;
 }
 
 static uint32_t get_actual_required_display_clk(
@@ -385,12 +406,12 @@ static uint32_t calc_single_display_min_clks(
 	struct min_clock_params *params,
 	bool set_clk)
 {
-	struct fixed32_32 h_scale = dal_fixed32_32_from_int(1);
-	struct fixed32_32 v_scale = dal_fixed32_32_from_int(1);
+	struct fixed32_32 h_scale_ratio = dal_fixed32_32_one;
+	struct fixed32_32 v_scale_ratio = dal_fixed32_32_one;
 	uint32_t pix_clk_khz = 0;
-	uint32_t source_width = 0;
+	uint32_t lb_source_width = 0;
 	struct fixed32_32 deep_color_factor;
-	uint32_t scaler_efficiency;
+	struct fixed32_32 scaler_efficiency;
 	struct fixed32_32 v_filter_init;
 	uint32_t v_filter_init_trunc;
 	uint32_t num_lines_at_frame_start = 3;
@@ -400,7 +421,7 @@ static uint32_t calc_single_display_min_clks(
 	uint32_t src_wdth_rnd_to_chunks;
 	struct fixed32_32 scaling_coeff;
 	struct fixed32_32 h_blank_granularity_factor =
-			dal_fixed32_32_from_int(1);
+			dal_fixed32_32_one;
 	struct fixed32_32 fx_disp_clk_mhz;
 	struct fixed32_32 line_time;
 	struct fixed32_32 disp_pipe_pix_throughput;
@@ -409,6 +430,7 @@ static uint32_t calc_single_display_min_clks(
 	uint32_t alt_disp_clk_khz;
 	struct display_clock_dce110 *disp_clk_110 = DCLCK110_FROM_BASE(base);
 	uint32_t max_clk_khz = get_validation_clock(base);
+	bool panning_allowed = false; /* TODO: receive this value from AS */
 
 	if (params == NULL) {
 		dal_logger_write(base->dal_context->logger,
@@ -422,14 +444,14 @@ static uint32_t calc_single_display_min_clks(
 	deep_color_factor = get_deep_color_factor(params);
 	scaler_efficiency = get_scaler_efficiency(base->dal_context, params);
 	pix_clk_khz = params->requested_pixel_clock;
-	source_width = params->source_view.width;
+	lb_source_width = params->source_view.width;
 
 	if (0 != params->dest_view.height && 0 != params->dest_view.width) {
 
-		h_scale = dal_fixed32_32_from_fraction(
+		h_scale_ratio = dal_fixed32_32_from_fraction(
 			params->source_view.width,
 			params->dest_view.width);
-		v_scale = dal_fixed32_32_from_fraction(
+		v_scale_ratio = dal_fixed32_32_from_fraction(
 			params->source_view.height,
 			params->dest_view.height);
 	} else {
@@ -439,12 +461,17 @@ static uint32_t calc_single_display_min_clks(
 				"Destination height or width is 0!\n");
 	}
 
-	v_filter_init = dal_fixed32_32_from_fraction(
-		params->scaling_info.v_taps, 2u);
-	v_filter_init = dal_fixed32_32_add(v_filter_init,
-		dal_fixed32_32_div_int(v_scale, 2));
-	v_filter_init = dal_fixed32_32_add(v_filter_init,
-		dal_fixed32_32_from_fraction(15, 10));
+	v_filter_init =
+		dal_fixed32_32_add(
+			v_scale_ratio,
+			dal_fixed32_32_add_int(
+				dal_fixed32_32_div_int(
+					dal_fixed32_32_mul_int(
+						v_scale_ratio,
+						params->timing_info.INTERLACED),
+					2),
+				params->scaling_info.v_taps + 1));
+	v_filter_init = dal_fixed32_32_div_int(v_filter_init, 2);
 
 	v_filter_init_trunc = dal_fixed32_32_floor(v_filter_init);
 
@@ -458,38 +485,51 @@ static uint32_t calc_single_display_min_clks(
 			dal_fixed32_32_div_int(v_filter_init_ceil,
 					num_lines_at_frame_start);
 	lb_lines_in_per_line_out =
-			get_lb_lines_in_per_line_out(params, v_scale);
+			get_lb_lines_in_per_line_out(params, v_scale_ratio);
 
-	src_wdth_rnd_to_chunks =
-		((params->source_view.width - 1) / 128) * 128 + 256;
+	if (panning_allowed)
+		src_wdth_rnd_to_chunks =
+			((lb_source_width - 1) / 128) * 128 + 256;
+	else
+		src_wdth_rnd_to_chunks =
+			((lb_source_width + 127) / 128) * 128;
 
-	scaling_coeff = dal_fixed32_32_from_fraction(
-			params->scaling_info.v_taps, scaler_efficiency);
+	scaling_coeff =
+		dal_fixed32_32_div(
+			dal_fixed32_32_from_int(params->scaling_info.v_taps),
+			scaler_efficiency);
 
-	if (dal_fixed32_32_le(h_scale, dal_fixed32_32_from_int(1)))
+	if (dal_fixed32_32_le(h_scale_ratio, dal_fixed32_32_one))
 		scaling_coeff = dal_fixed32_32_max(
 			dal_fixed32_32_from_int(
-			dal_fixed32_32_ceil(dal_fixed32_32_from_fraction(
-				params->scaling_info.h_taps, 4))),
-				dal_fixed32_32_max(
-				dal_fixed32_32_mul(scaling_coeff, h_scale),
-				dal_fixed32_32_from_int(1)));
+				dal_fixed32_32_ceil(
+					dal_fixed32_32_from_fraction(
+						params->scaling_info.h_taps,
+						4))),
+			dal_fixed32_32_max(
+				dal_fixed32_32_mul(
+					scaling_coeff,
+					h_scale_ratio),
+				dal_fixed32_32_one));
 
-	if (dal_fixed32_32_floor(lb_lines_in_per_line_out) != 2 &&
+	if (!params->line_buffer_prefetch_enabled &&
+		dal_fixed32_32_floor(lb_lines_in_per_line_out) != 2 &&
 		dal_fixed32_32_floor(lb_lines_in_per_line_out) != 4) {
 		uint32_t line_total_pixel =
-			params->timing_info.h_total + source_width - 256;
+			params->timing_info.h_total + lb_source_width - 256;
 		h_blank_granularity_factor = dal_fixed32_32_div(
 			dal_fixed32_32_from_int(params->timing_info.h_total),
 			dal_fixed32_32_div(
 			dal_fixed32_32_from_fraction(
 				line_total_pixel, 2),
-				h_scale));
+				h_scale_ratio));
 	}
 
 	/* Calculate display clock with ramping. Ramping factor is 1.1*/
-	fx_disp_clk_mhz = dal_fixed32_32_mul(scaling_coeff,
-			dal_fixed32_32_from_fraction(11, 10));
+	fx_disp_clk_mhz =
+		dal_fixed32_32_div_int(
+			dal_fixed32_32_mul_int(scaling_coeff, 11),
+			10);
 	line_time = dal_fixed32_32_from_fraction(
 			params->timing_info.h_total * 1000, pix_clk_khz);
 
@@ -503,12 +543,16 @@ static uint32_t calc_single_display_min_clks(
 			line_time);
 
 	if (0 != params->timing_info.h_total) {
-		fx_disp_clk_mhz = dal_fixed32_32_max(
-				dal_fixed32_32_div_int(dal_fixed32_32_mul_int(
+		fx_disp_clk_mhz =
+			dal_fixed32_32_max(
+				dal_fixed32_32_div_int(
+					dal_fixed32_32_mul_int(
 						scaling_coeff, pix_clk_khz),
 						1000),
-						disp_pipe_pix_throughput);
-		fx_disp_clk_mhz = dal_fixed32_32_mul(fx_disp_clk_mhz,
+				disp_pipe_pix_throughput);
+		fx_disp_clk_mhz =
+			dal_fixed32_32_mul(
+				fx_disp_clk_mhz,
 				dal_fixed32_32_from_fraction(11, 10));
 	}
 
@@ -811,7 +855,7 @@ bool dal_display_clock_dce110_construct(
 
 	dc110->dfs_bypass_disp_clk = 0;
 
-	if (display_clock_integrated_info_construct(dc110, as))
+	if (!display_clock_integrated_info_construct(dc110, as))
 		dal_logger_write(dc_base->dal_context->logger,
 			LOG_MAJOR_WARNING,
 			LOG_MINOR_COMPONENT_GPU,
@@ -824,7 +868,7 @@ bool dal_display_clock_dce110_construct(
 	dc_base->id = CLOCK_SOURCE_ID_DFS;
 /* Initially set max clocks state to nominal.  This should be updated by
  * via a pplib call to DAL IRI eventually calling a
- * DisplayEngineClock_Dce50::StoreMaxClocksState().  This call will come in
+ * DisplayEngineClock_Dce110::StoreMaxClocksState().  This call will come in
  * on PPLIB init. This is from DCE5x. in case HW wants to use mixed method.*/
 	dc110->max_clks_state = CLOCKS_STATE_NOMINAL;
 
@@ -846,6 +890,47 @@ bool dal_display_clock_dce110_construct(
 		DIVIDER_RANGE_03_STEP_SIZE,
 		DIVIDER_RANGE_03_BASE_DIVIDER_ID,
 		DIVIDER_RANGE_MAX_DIVIDER_ID);
+
+	{
+		uint32_t ss_info_num =
+			dal_adapter_service_get_ss_info_num(
+				as,
+				AS_SIGNAL_TYPE_GPU_PLL);
+
+		if (ss_info_num) {
+			struct spread_spectrum_info info;
+			bool result;
+
+			dal_memset(&info, 0, sizeof(info));
+
+			result =
+				dal_adapter_service_get_ss_info(
+					as,
+					AS_SIGNAL_TYPE_GPU_PLL,
+					0,
+					&info);
+
+			/* Based on VBIOS, VBIOS will keep entry for GPU PLL SS
+			 * even if SS not enabled and in that case
+			 * SSInfo.spreadSpectrumPercentage !=0 would be sign
+			 * that SS is enabled
+			 */
+			if (result && info.spread_spectrum_percentage != 0) {
+				dc110->ss_on_gpu_pll = true;
+				dc110->gpu_pll_ss_divider =
+					info.spread_percentage_divider;
+
+				if (info.type.CENTER_MODE == 0) {
+					/* Currently for DP Reference clock we
+					 * need only SS percentage for
+					 * downspread */
+					dc110->gpu_pll_ss_percentage =
+						info.spread_spectrum_percentage;
+				}
+			}
+
+		}
+	}
 
 	return true;
 }
