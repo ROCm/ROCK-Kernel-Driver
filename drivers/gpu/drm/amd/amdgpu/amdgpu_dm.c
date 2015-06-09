@@ -1089,3 +1089,16 @@ static int dm_early_init(void *handle)
 
 	return 0;
 }
+
+
+bool amdgpu_dm_acquire_dal_lock(struct amdgpu_display_manager *dm)
+{
+	/* TODO */
+	return true;
+}
+
+bool amdgpu_dm_release_dal_lock(struct amdgpu_display_manager *dm)
+{
+	/* TODO */
+	return true;
+}

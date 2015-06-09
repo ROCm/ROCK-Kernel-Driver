@@ -8,7 +8,9 @@ ccflags-y := -Iinclude/drm -Idrivers/gpu/drm/amd/include/asic_reg \
 		-Idrivers/gpu/drm/amd/acp/include \
 		-Idrivers/gpu/drm/amd/amdgpu \
 		-Idrivers/gpu/drm/amd/dal \
-		-Idrivers/gpu/drm/amd/dal/include
+		-Idrivers/gpu/drm/amd/dal/include \
+		-Idrivers/gpu/drm/amd/dsat
+		
 amdgpu-y := amdgpu_drv.o
 
 # add KMS driver
@@ -100,6 +102,9 @@ amdgpu-y += amdgpu_dal_services.o amdgpu_dm_types.o amdgpu_dm.o \
 include drivers/gpu/drm/amd/dal/Makefile
 
 amdgpu-y += $(AMD_DAL_FILES)
+
+include drivers/gpu/drm/amd/dsat/Makefile
+
 endif
 
 obj-$(CONFIG_DRM_AMDGPU)+= amdgpu.o

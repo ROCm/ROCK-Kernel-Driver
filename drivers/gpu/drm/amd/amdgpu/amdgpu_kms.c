@@ -31,6 +31,8 @@
 #include "amdgpu_uvd.h"
 #include "amdgpu_vce.h"
 
+#include "amdgpu_dsat_ioctl.h"
+
 #include <linux/vga_switcheroo.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
@@ -699,5 +701,11 @@ const struct drm_ioctl_desc amdgpu_ioctls_kms[] = {
 	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_VA, amdgpu_gem_va_ioctl, DRM_AUTH|DRM_UNLOCKED|DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_OP, amdgpu_gem_op_ioctl, DRM_AUTH|DRM_UNLOCKED|DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_USERPTR, amdgpu_gem_userptr_ioctl, DRM_AUTH|DRM_UNLOCKED|DRM_RENDER_ALLOW),
+
+#ifdef CONFIG_DRM_AMD_DAL
+	/* DSAT */
+	DRM_IOCTL_DEF_DRV(AMDGPU_DSAT_COMMAND, amdgpu_dsat_cmd_ioctl, DRM_AUTH|DRM_ROOT_ONLY),
+#endif
+
 };
 int amdgpu_max_kms_ioctl = ARRAY_SIZE(amdgpu_ioctls_kms);

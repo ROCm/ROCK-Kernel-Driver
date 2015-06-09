@@ -46,6 +46,7 @@
 #define DRM_AMDGPU_WAIT_CS		0x09
 #define DRM_AMDGPU_GEM_OP		0x10
 #define DRM_AMDGPU_GEM_USERPTR		0x11
+#define DRM_AMDGPU_DSAT_COMMAND     0x12
 
 #define DRM_IOCTL_AMDGPU_GEM_CREATE	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_CREATE, union drm_amdgpu_gem_create)
 #define DRM_IOCTL_AMDGPU_GEM_MMAP	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_MMAP, union drm_amdgpu_gem_mmap)
@@ -59,6 +60,9 @@
 #define DRM_IOCTL_AMDGPU_WAIT_CS	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_WAIT_CS, union drm_amdgpu_wait_cs)
 #define DRM_IOCTL_AMDGPU_GEM_OP		DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_OP, struct drm_amdgpu_gem_op)
 #define DRM_IOCTL_AMDGPU_GEM_USERPTR	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_USERPTR, struct drm_amdgpu_gem_userptr)
+
+/* DSAT COMMAND IOCTL */
+#define DRM_IOCTL_AMDGPU_DSAT_COMMAND DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_DSAT_COMMAND, struct drm_amdgpu_dsat_cmd_context)
 
 #define AMDGPU_GEM_DOMAIN_CPU		0x1
 #define AMDGPU_GEM_DOMAIN_GTT		0x2
@@ -627,5 +631,19 @@ struct drm_amdgpu_info_hw_ip {
 #define AMDGPU_FAMILY_KV			125 /* Kaveri, Kabini, Mullins */
 #define AMDGPU_FAMILY_VI			130 /* Iceland, Tonga */
 #define AMDGPU_FAMILY_CZ			135 /* Carrizo */
+
+/*
+ * Input structure for the DSAT ioctl
+ */
+struct drm_amdgpu_dsat_cmd_context {
+	uint64_t in_ptr; /* Pointer to dsat_input_context */
+	uint64_t out_ptr; /* Pointer to dsat_output_context */
+
+	int32_t ret;
+	uint32_t in_size; /* Including data buffer packed correctly */
+	uint32_t out_size;
+};
+
+
 
 #endif

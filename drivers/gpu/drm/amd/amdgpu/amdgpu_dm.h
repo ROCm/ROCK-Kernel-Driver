@@ -119,6 +119,11 @@ int amdgpu_dm_initialize_drm_device(
 void amdgpu_dm_destroy_drm_device(
 	struct amdgpu_display_manager *dm);
 
+/* Locking/Mutex */
+bool amdgpu_dm_acquire_dal_lock(struct amdgpu_display_manager *dm);
+
+bool amdgpu_dm_release_dal_lock(struct amdgpu_display_manager *dm);
+
 extern const struct amd_ip_funcs amdgpu_dm_funcs;
 
 #endif /* __AMDGPU_DM_H__ */
