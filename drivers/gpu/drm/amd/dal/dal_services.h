@@ -1,0 +1,375 @@
+/*
+ * Copyright 2012-13 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE COPYRIGHT HOLDER(S) OR AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Authors: AMD
+ *
+ */
+
+#ifndef __DAL_SERVICES_H__
+#define __DAL_SERVICES_H__
+
+#include "dal_services_types.h"
+#include "dal_power_interface_types.h"
+
+#include "include/irq_types.h"
+#include "include/dal_types.h"
+
+/* TODO: investigate if it can be removed. */
+/* Undefine DEPRECATED because it conflicts with printk.h */
+#undef DEPRECATED
+
+/*
+ *
+ * interrupt services to register and unregister handlers
+ *
+ */
+
+/* the timer "interrupt" current implementation supports only
+'one-shot' type, and LOW level (asynchronous) context */
+void dal_register_timer_interrupt(
+	struct dal_context *context,
+	struct dal_timer_interrupt_params *int_params,
+	interrupt_handler ih,
+	void *handler_args);
+
+irq_handler_idx dal_register_interrupt(
+	struct dal_context *context,
+	struct dal_interrupt_params *int_params,
+	interrupt_handler ih,
+	void *handler_args);
+
+void dal_unregister_interrupt(
+	struct dal_context *context,
+	enum dal_irq_source irq_source,
+	irq_handler_idx handler_idx);
+
+/*
+ *
+ * kernel memory manipulation
+ *
+ */
+
+/* if the pointer is not NULL, the allocated memory is zeroed */
+void *dal_alloc(uint32_t size);
+
+/* Reallocate memory. The contents will remain unchanged.*/
+void *dal_realloc(const void *ptr, uint32_t size);
+
+void dal_memmove(void *dst, const void *src, uint32_t size);
+
+void dal_free(void *p);
+
+void dal_memset(void *p, int32_t c, uint32_t count);
+
+int32_t dal_memcmp(const void *p1, const void *p2, uint32_t count);
+
+int32_t dal_strcmp(const int8_t *p1, const int8_t *p2);
+
+int32_t dal_strncmp(const int8_t *p1, const int8_t *p2, uint32_t count);
+
+/*
+ *
+ * GPU registers access
+ *
+ */
+
+uint32_t dal_read_reg(
+	struct dal_context *ctx,
+	uint32_t address);
+
+static inline uint32_t get_reg_field_value_ex(
+	uint32_t reg_value,
+	uint32_t mask,
+	uint8_t shift)
+{
+	return (mask & reg_value) >> shift;
+}
+
+#define get_reg_field_value(reg_value, reg_name, reg_field)\
+	get_reg_field_value_ex(\
+		(reg_value),\
+		reg_name ## __ ## reg_field ## _MASK,\
+		reg_name ## __ ## reg_field ## __SHIFT)
+
+static inline uint32_t set_reg_field_value_ex(
+	uint32_t reg_value,
+	uint32_t value,
+	uint32_t mask,
+	uint8_t shift)
+{
+	return (reg_value & ~mask) | (mask & (value << shift));
+}
+
+#define set_reg_field_value(reg_value, value, reg_name, reg_field)\
+	(reg_value) = set_reg_field_value_ex(\
+		(reg_value),\
+		(value),\
+		reg_name ## __ ## reg_field ## _MASK,\
+		reg_name ## __ ## reg_field ## __SHIFT)
+
+void dal_write_reg(
+	struct dal_context *ctx,
+	uint32_t address,
+	uint32_t value);
+
+static inline uint32_t dal_read_index_reg(
+	struct dal_context *ctx,
+	uint32_t index_reg_offset,
+	uint32_t index,
+	uint32_t data_reg_offset)
+{
+	dal_write_reg(ctx, index_reg_offset, index);
+	return dal_read_reg(ctx, data_reg_offset);
+}
+
+static inline void dal_write_index_reg(
+	struct dal_context *ctx,
+	uint32_t index_reg_offset,
+	uint32_t index,
+	uint32_t data_reg_offset,
+	uint32_t value)
+{
+	dal_write_reg(ctx, index_reg_offset, index);
+	dal_write_reg(ctx, data_reg_offset, value);
+}
+
+enum platform_method {
+	PM_GET_AVAILABLE_METHODS = 1 << 0,
+	PM_GET_LID_STATE = 1 << 1,
+	PM_GET_EXTENDED_BRIGHNESS_CAPS = 1 << 2
+};
+
+struct platform_info_params {
+	enum platform_method method;
+	void *data;
+};
+
+struct platform_info_brightness_caps {
+	uint8_t ac_level_percentage;
+	uint8_t dc_level_percentage;
+};
+
+struct platform_info_ext_brightness_caps {
+	struct platform_info_brightness_caps basic_caps;
+	struct data_point {
+		uint8_t luminance;
+		uint8_t	signal_level;
+	} data_points[99];
+
+	uint8_t	data_points_num;
+	uint8_t	min_input_signal;
+	uint8_t	max_input_signal;
+};
+
+bool dal_get_platform_info(
+	struct dal_context *dal_context,
+	struct platform_info_params *params);
+
+
+
+/**************************************
+ * Calls to Power Play (PP) component
+ **************************************/
+
+/* DAL calls this function to notify PP about clocks it needs for the Mode Set.
+ * This is done *before* it changes DCE clock.
+ *
+ * If required clock is higher than current, then PP will increase the voltage.
+ *
+ * If required clock is lower than current, then PP will defer reduction of
+ * voltage until the call to dal_pp_post_dce_clock_change().
+ *
+ * \input - Contains clocks needed for Mode Set.
+ *
+ * \output - Contains clocks adjusted by PP which DAL should use for Mode Set.
+ *		Valid only if function returns zero.
+ *
+ * \returns	true - call is successful
+ *		false - call failed
+ */
+bool dal_pp_pre_dce_clock_change(
+	struct dal_context *ctx,
+	struct dal_to_power_info *input,
+	struct power_to_dal_info *output);
+
+/* DAL calls this function to notify PP about completion of Mode Set.
+ * For PP it means that current DCE clocks are those which were returned
+ * by dal_pp_pre_dce_clock_change(), in the 'output' parameter.
+ *
+ * If the clocks are higher than before, then PP does nothing.
+ *
+ * If the clocks are lower than before, then PP reduces the voltage.
+ *
+ * \returns	true - call is successful
+ *		false - call failed
+ */
+bool dal_pp_post_dce_clock_change(struct dal_context *ctx);
+
+/* The returned clocks range are 'static' system clocks which will be used for
+ * mode validation purposes.
+ *
+ * \returns	true - call is successful
+ *		false - call failed
+ */
+bool dal_get_system_clocks_range(
+	struct dal_context *ctx,
+	struct dal_system_clock_range *sys_clks);
+
+/* for future use */
+bool dal_pp_set_display_clock(
+	struct dal_context *ctx,
+	struct dal_to_power_dclk *dclk);
+
+
+/* end of power component calls */
+
+
+/* Calls to notification */
+
+/* Notify display manager for hotplug event */
+void dal_notify_hotplug(
+	struct dal_context *ctx,
+	uint32_t display_index,
+	bool is_connected);
+
+/* Notify display manager for capability change event */
+void dal_notify_capability_change(
+	struct dal_context *ctx,
+	uint32_t display_index);
+
+void dal_notify_setmode_complete(
+	struct dal_context *ctx,
+	uint32_t h_total,
+	uint32_t v_total,
+	uint32_t h_active,
+	uint32_t v_active,
+	uint32_t pix_clk_in_khz);
+
+/* End of notification calls */
+
+/*
+ *
+ * Delay functions.
+ *
+ *
+ */
+
+/* Following the guidance:
+ * https://www.kernel.org/doc/Documentation/timers/timers-howto.txt
+ *
+ * This is a busy wait for nano seconds and should be used only for
+ * extremely short ranges
+ */
+void dal_delay_in_nanoseconds(uint32_t nanoseconds);
+
+/* Following the guidance:
+ * https://www.kernel.org/doc/Documentation/timers/timers-howto.txt
+ *
+ * This is a busy wait for micro seconds and should.
+ */
+void dal_delay_in_microseconds(uint32_t microseconds);
+
+/* Following the guidances:
+ * https://www.kernel.org/doc/Documentation/timers/timers-howto.txt
+ * http://lkml.indiana.edu/hypermail/linux/kernel/1008.0/00733.html
+ *
+ * This is a sleep (not busy-waiting) for milli seconds with a
+ * good precision.
+ */
+void dal_sleep_in_milliseconds(uint32_t milliseconds);
+
+/*
+ *
+ * atombios services
+ *
+ */
+
+bool dal_exec_bios_cmd_table(
+	struct dal_context *ctx,
+	uint32_t index,
+	void *params);
+
+uint32_t dal_bios_cmd_table_para_revision(
+	struct dal_context *ctx,
+	uint32_t index);
+
+struct cmd_table_revision {
+	uint32_t revision;
+	uint32_t content_revision;
+};
+
+bool dal_bios_cmd_table_revision(
+	struct dal_context *ctx,
+	uint32_t index,
+	struct cmd_table_revision *table_revision);
+
+/*
+ *
+ * print-out services
+ *
+ */
+#define dal_log_to_buffer(buffer, size, fmt, args)\
+	vsnprintf(buffer, size, fmt, args)
+
+long dal_get_pid(void);
+long dal_get_tgid(void);
+
+/*
+ *
+ * general debug capabilities
+ *
+ */
+#if defined(CONFIG_DEBUG_KERNEL) || defined(CONFIG_DEBUG_DRIVER)
+
+#if defined(CONFIG_HAVE_KGDB) || defined(CONFIG_KGDB)
+#define ASSERT_CRITICAL(expr) do {	\
+	if (WARN_ON(!(expr))) { \
+		kgdb_breakpoint(); \
+	} \
+} while (0)
+#else
+#define ASSERT_CRITICAL(expr) do {	\
+	if (WARN_ON(!(expr))) { \
+		; \
+	} \
+} while (0)
+#endif
+
+#if defined(CONFIG_DEBUG_KERNEL_DAL)
+#define ASSERT(expr) ASSERT_CRITICAL(expr)
+
+#else
+#define ASSERT(expr) WARN_ON(!(expr))
+#endif
+
+#define BREAK_TO_DEBUGGER() ASSERT(0)
+
+#else
+
+#define ASSERT_CRITICAL(expr)  do {if (expr)/* Do nothing */; } while (0)
+
+#define ASSERT(expr) do {if (expr)/* Do nothing */; } while (0)
+
+#define BREAK_TO_DEBUGGER() do {} while (0)
+
+#endif /* CONFIG_DEBUG_KERNEL || CONFIG_DEBUG_DRIVER */
+
+#endif /* __DAL_SERVICES_H__ */

@@ -1,0 +1,39 @@
+menu "Display Engine Configuration"
+	depends on DRM && (DRM_AMDSOC || DRM_AMDGPU)
+
+config DRM_AMD_DAL
+        bool "AMD DAL - Enable new display engine (will be deprecated when the development is done)"
+        help
+          Choose this option if you want to use the new display engine
+          support for AMD SOC.
+
+          Will be deprecated when the DAL component becomes stable and
+          AMDSOC will fully switch to it.
+
+config DRM_AMD_DAL_VBIOS_PRESENT
+        bool "Video Bios available on board"
+        depends on DRM_AMD_DAL
+        help
+         This option is needed to allow a full range of feature
+	 support when working on
+	 x86 platforms and there is a VBIOS
+	 present in the system
+
+config DRM_AMD_DAL_DCE11_0
+        bool "Carrizo family"
+        depends on DRM_AMD_DAL
+        help
+         Choose this option
+	 if you want to have
+	 CZ family
+	 for display engine
+
+config DEBUG_KERNEL_DAL
+        bool "Enable kgdb break in DAL"
+        depends on DRM_AMD_DAL
+        help
+         Choose this option
+         if you want to hit
+         kdgb_break in assert.
+
+endmenu
