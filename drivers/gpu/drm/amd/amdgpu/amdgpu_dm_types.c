@@ -583,16 +583,28 @@ bool amdgpu_dm_mode_reset(struct drm_crtc *crtc)
 	struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 	uint32_t display_index = acrtc->crtc_id;
 
-	DRM_DEBUG_KMS("dal_reset_path_mode\n");
-
 	/* Turn vblank off before reset */
 	drm_crtc_vblank_off(crtc);
 
 	/* Blank the display */
 	dal_set_blanking(adev->dm.dal, acrtc->crtc_id, true);
 
-	/* the actual reset mode call */
-	ret = dal_reset_path_mode(adev->dm.dal, 1, &display_index);
+	/* Somehow we will get called from drm ask us reset mode
+	 * when fb is null, it will lead us remove mode unnecessarily
+	 * so change the code,we won't do the actual reset mode call
+	 * when display is connected,as that's unnecessarily and harmful.*/
+	if (dal_get_connected_targets_vector(adev->dm.dal)
+			& (1 << display_index)) {
+		ret = true;
+		DRM_DEBUG_KMS(
+			"Skip reset mode for disp_index %d\n",
+			display_index);
+	} else {
+		ret = dal_reset_path_mode(adev->dm.dal, 1, &display_index);
+		DRM_DEBUG_KMS(
+			"Do reset mode for disp_index %d\n",
+			display_index);
+	}
 
 	/* unpin the FB */
 	if (crtc->primary->fb)	{
