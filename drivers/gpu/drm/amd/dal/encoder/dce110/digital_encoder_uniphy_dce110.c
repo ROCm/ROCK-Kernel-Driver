@@ -229,6 +229,7 @@ bool dal_digital_encoder_uniphy_dce110_construct(
 
 	enc_impl->features.max_pixel_clock =
 		DCE11_UNIPHY_MAX_PIXEL_CLOCK_IN_KHZ_3GB;
+	enc_impl->features.max_deep_color = HW_COLOR_DEPTH_121212;
 	/* TODO: implement */
 
 	return true;
