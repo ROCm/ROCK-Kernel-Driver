@@ -53,7 +53,16 @@ uint32_t dal_read_reg(
 	struct dal_context *ctx,
 	uint32_t address)
 {
-	return amdgpu_mm_rreg(ctx->driver_context, address, false);
+	uint32_t value = amdgpu_mm_rreg(ctx->driver_context, address, false);
+
+#if defined(__DAL_REGISTER_LOGGER__)
+	if (true == dal_reg_logger_should_dump_register()) {
+		dal_reg_logger_rw_count_increment();
+		DRM_INFO("%s 0x%x 0x%x\n", __func__, address, value);
+	}
+#endif
+
+	return value;
 }
 
 
@@ -62,6 +71,13 @@ void dal_write_reg(
 	uint32_t address,
 	uint32_t value)
 {
+#if defined(__DAL_REGISTER_LOGGER__)
+	if (true == dal_reg_logger_should_dump_register()) {
+		dal_reg_logger_rw_count_increment();
+		DRM_INFO("%s 0x%x 0x%x\n", __func__, address, value);
+	}
+#endif
+
 	amdgpu_mm_wreg(ctx->driver_context, address, value, false);
 }
 
