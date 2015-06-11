@@ -155,20 +155,6 @@ const struct path_mode *dal_pms_get_path_mode_for_display_index(
 	return NULL;
 }
 
-/* Add control flag to unblank source after set mode */
-void dal_pms_unblank_source_after_set_mode(
-		struct path_mode_set *set,
-		bool unblank)
-{
-	set->control_flags.bits.UNBLANCK_SOURCE_AFTER_SETMODE = unblank;
-}
-
-/* Return control flag if source needs to be unblankced after set mode */
-bool dal_pms_is_unblank_source_required(const struct path_mode_set *set)
-{
-	return set->control_flags.bits.UNBLANCK_SOURCE_AFTER_SETMODE;
-}
-
 /* Add control flag to keep display powered off */
 void dal_pms_keep_display_powered_off(
 		struct path_mode_set *set,

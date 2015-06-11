@@ -69,8 +69,7 @@ static bool build_hw_path_mode(
 /* Program HW layer through HWSS */
 static bool program_hw(
 	struct ds_dispatch *ds,
-	bool enable_display,
-	bool unblank_source);
+	bool enable_display);
 
 /* Update notification and flags after set mode */
 static void post_mode_change_update(
@@ -945,13 +944,8 @@ enum ds_return dal_ds_dispatch_set_mode(
 		bool enable_display =
 			!dal_pms_is_display_power_off_required(path_mode_set);
 
-		bool unblank_source =
-			dal_pms_is_unblank_source_required(path_mode_set);
-
-		result = (program_hw(
-				ds_dispatch,
-				enable_display,
-				unblank_source) ? DS_SUCCESS : DS_ERROR);
+		result = (program_hw(ds_dispatch, enable_display)
+				? DS_SUCCESS : DS_ERROR);
 	}
 
 	if (result == DS_SUCCESS) {
@@ -1152,7 +1146,7 @@ enum ds_return do_reset_mode(
 	}
 
 	if (do_hw_programming)
-		ret = (program_hw(ds_dispatch, false, false) ?
+		ret = (program_hw(ds_dispatch, false) ?
 				DS_SUCCESS : DS_ERROR);
 
 	post_mode_change_update(ds_dispatch);
@@ -1357,8 +1351,7 @@ static bool ds_dispatch_construct(
  */
 static bool program_hw(
 	struct ds_dispatch *ds,
-	bool enable_display,
-	bool unblank_source)
+	bool enable_display)
 {
 	uint32_t path_num = dal_pms_with_data_get_path_mode_num(ds->set);
 
@@ -1400,15 +1393,6 @@ static bool program_hw(
 		if (enable_display)
 			enable_output(ds, hw_mode_set);
 
-		/* Unblank source*/
-		if (unblank_source)
-			for (i = 0; i < num; ++i) {
-				struct hw_path_mode *hw_mode =
-					dal_hw_path_mode_set_get_path_by_index(
-							hw_mode_set, i);
-				dal_hw_sequencer_enable_memory_requests(
-						ds->hwss, hw_mode);
-			}
 	}
 
 	/* TODO: update ISR and DRR setup */
