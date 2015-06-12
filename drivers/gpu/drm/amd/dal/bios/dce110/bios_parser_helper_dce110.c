@@ -248,6 +248,8 @@ static bool is_accelerated_mode(
 	return (value & ATOM_S6_ACC_MODE) ? true : false;
 }
 
+#define BIOS_SCRATCH0_DAC_B_SHIFT 8
+
 /**
  * detect_sink
  *
@@ -271,11 +273,50 @@ static enum signal_type detect_sink(
 	struct graphics_object_id connector,
 	enum signal_type signal)
 {
-/* Need implementation for eDP */
-	DAL_LOGGER_NOT_IMPL(
-		LOG_MINOR_COMPONENT_BIOS,
-		"Bios Parser:%s\n",
-		__func__);
+	uint32_t bios_scratch0;
+	uint32_t encoder_id = encoder.id;
+	/* after DCE 10.x does not support DAC2, so assert and return
+	 * SIGNAL_TYPE_NONE */
+	if (encoder_id == ENCODER_ID_INTERNAL_DAC2
+		|| encoder_id == ENCODER_ID_INTERNAL_KLDSCP_DAC2) {
+		ASSERT(false);
+		return SIGNAL_TYPE_NONE;
+	}
+
+	bios_scratch0 = dal_read_reg(dal_context,
+		mmBIOS_SCRATCH_0 + ATOM_DEVICE_CONNECT_INFO_DEF);
+
+	/* In further processing we use DACB masks. If we want detect load on
+	 * DACA, we need to shift the register so DACA bits will be in place of
+	 * DACB bits
+	 */
+	if (encoder_id == ENCODER_ID_INTERNAL_DAC1
+		|| encoder_id == ENCODER_ID_INTERNAL_KLDSCP_DAC1
+		|| encoder_id == ENCODER_ID_EXTERNAL_NUTMEG
+		|| encoder_id == ENCODER_ID_EXTERNAL_TRAVIS) {
+		bios_scratch0 <<= BIOS_SCRATCH0_DAC_B_SHIFT;
+	}
+
+	switch (signal) {
+	case SIGNAL_TYPE_RGB: {
+		if (bios_scratch0 & ATOM_S0_CRT2_MASK)
+			return SIGNAL_TYPE_RGB;
+		break;
+	}
+	case SIGNAL_TYPE_LVDS: {
+		if (bios_scratch0 & ATOM_S0_LCD1)
+			return SIGNAL_TYPE_LVDS;
+		break;
+	}
+	case SIGNAL_TYPE_EDP: {
+		if (bios_scratch0 & ATOM_S0_LCD1)
+			return SIGNAL_TYPE_EDP;
+		break;
+	}
+	default:
+		break;
+	}
+
 	return SIGNAL_TYPE_NONE;
 }
 
@@ -392,6 +433,22 @@ static void set_scratch_lcd_scale(
 		__func__);
 }
 
+static bool is_lid_open(struct dal_context *dal_context)
+{
+	uint32_t bios_scratch6;
+
+	bios_scratch6 =
+		dal_read_reg(
+			dal_context,
+			mmBIOS_SCRATCH_0 + ATOM_ACC_CHANGE_INFO_DEF);
+
+	/* lid is open if the bit is not set */
+	if (!(bios_scratch6 & ATOM_S6_LID_STATE))
+		return true;
+
+	return false;
+}
+
 /* function table */
 static const struct bios_parser_helper bios_parser_helper_funcs = {
 	.detect_sink = detect_sink,
@@ -405,7 +462,7 @@ static const struct bios_parser_helper bios_parser_helper_funcs = {
 	.is_accelerated_mode = is_accelerated_mode,
 	.is_active_display = NULL,
 	.is_display_config_changed = NULL,
-	.is_lid_open = NULL,
+	.is_lid_open = is_lid_open,
 	.is_lid_status_changed = NULL,
 	.prepare_scratch_active_and_requested =
 			prepare_scratch_active_and_requested,

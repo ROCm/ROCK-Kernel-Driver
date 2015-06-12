@@ -557,7 +557,7 @@ static const struct edid_funcs funcs = {
 	.destroy = destroy,
 	.get_display_tile_info = dal_edid_base_get_display_tile_info,
 	.get_min_drr_fps = dal_edid_base_get_min_drr_fps,
-	.get_drr_pixel_clk_khz = dal_edid_get_drr_pixel_clk_khz,
+	.get_drr_pixel_clk_khz = dal_edid_base_get_drr_pixel_clk_khz,
 	.is_non_continuous_frequency =
 		dal_edid_base_is_non_continuous_frequency,
 	.get_stereo_3d_support = dal_edid_base_get_stereo_3d_support,

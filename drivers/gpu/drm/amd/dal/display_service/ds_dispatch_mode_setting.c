@@ -2147,9 +2147,11 @@ static void set_dithering_options(
 		DISPLAY_COLOR_DEPTH_101010) &&
 		(dal_dcs_get_enabled_packed_pixel_format(
 			dal_display_path_get_dcs(display_path)) ==
-		DCS_PACKED_PIXEL_FORMAT_NOT_PACKED)) {
+		DCS_PACKED_PIXEL_FORMAT_NOT_PACKED))
 		info->dithering = HW_DITHERING_OPTION_ENABLE;
-	}
+	else
+		info->dithering = HW_DITHERING_OPTION_SKIP_PROGRAMMING;
+
 
 	signal = dal_display_path_get_config_signal(
 		display_path, ASIC_LINK_INDEX);
@@ -2184,6 +2186,12 @@ static void set_dithering_options(
 		/* Enabling dithering will affect VCE bitrate management
 		 * due to randomness of pixel data, so we should disable it */
 		info->dithering = HW_DITHERING_OPTION_DISABLE;
+		break;
+	case SIGNAL_TYPE_LVDS:
+	case SIGNAL_TYPE_EDP:
+		if (dal_adapter_service_is_feature_supported(
+			FEATURE_EMBEDDED_DISABLE_DITHERING))
+			info->dithering = HW_DITHERING_OPTION_SKIP_PROGRAMMING;
 		break;
 	default:
 		/* Dithering should be applied (usually due to incompatible

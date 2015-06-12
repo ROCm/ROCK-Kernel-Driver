@@ -12,7 +12,8 @@ ENCODER = encoder_impl.o encoder.o hw_ctx_analog_encoder.o \
 		hw_ctx_external_digital_encoder_hal.o \
 		digital_encoder.o digital_encoder_dp.o \
 		external_digital_encoder.o \
-		wireless_encoder.o
+		hw_ctx_external_digital_encoder_travis.o \
+		wireless_encoder.o travis_encoder_lvds.o wireless_encoder.o
 
 AMD_DAL_ENCODER = $(addprefix $(AMDDALPATH)/encoder/,$(ENCODER))
 

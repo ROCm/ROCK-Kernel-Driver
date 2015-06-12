@@ -40,6 +40,7 @@
  */
 
 #include "external_digital_encoder.h"
+#include "hw_ctx_external_digital_encoder_travis.h"
 
 /*
  * This unit
@@ -144,6 +145,11 @@ static enum encoder_result create_hw_ctx(
 		return ENCODER_RESULT_OK;
 
 	switch (enc->base.id.id) {
+	case ENCODER_ID_EXTERNAL_TRAVIS:
+		enc->hw_ctx =
+			dal_hw_ctx_external_digital_encoder_travis_create(
+				init->dal_ctx);
+	break;
 	default:
 		BREAK_TO_DEBUGGER();
 	}

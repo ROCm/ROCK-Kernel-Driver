@@ -30,8 +30,6 @@
  */
 
 #include "include/encoder_types.h"
-#include "include/fixed31_32.h"
-#include "hw_ctx_digital_encoder.h"
 
 /*
  * Header of this unit
@@ -46,38 +44,6 @@
 /*
  * This unit
  */
-bool dal_hw_ctx_external_digital_encoder_hal_get_link_cap(
-	const struct hw_ctx_external_digital_encoder_hal *ctx,
-	enum channel_id channel_id,
-	struct link_settings *link_settings)
-{
-	uint8_t buffer[DPCD_ADDRESS_RECEIVE_PORT1_CAP1 -
-			DPCD_ADDRESS_DPCD_REV + 1] = {0};
-
-	if (!link_settings) {
-		BREAK_TO_DEBUGGER();
-		return false;
-	}
-
-	if (!ctx->base.funcs->dpcd_read_registers(
-		&ctx->base, channel_id,
-		DPCD_ADDRESS_DPCD_REV, buffer, sizeof(buffer))) {
-		BREAK_TO_DEBUGGER();
-		return false;
-	}
-
-	link_settings->link_rate = buffer[DPCD_ADDRESS_MAX_LINK_RATE];
-
-	link_settings->lane_count =
-		(DPCD_VALUE_MASK_MAX_LANE_COUNT_LANE_COUNT &
-		buffer[DPCD_ADDRESS_MAX_LANE_COUNT]);
-
-	link_settings->link_spread = (DPCD_VALUE_MASK_MAX_DOWNSPREAD &
-		buffer[DPCD_ADDRESS_MAX_DOWNSPREAD]) ?
-			LINK_SPREAD_05_DOWNSPREAD_30KHZ : LINK_SPREAD_DISABLED;
-
-	return true;
-}
 
 bool dal_hw_ctx_external_digital_encoder_hal_requires_authentication(
 	const struct hw_ctx_external_digital_encoder_hal *ctx,

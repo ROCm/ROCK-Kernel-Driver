@@ -127,7 +127,7 @@ struct feature_source_entry feature_entry_table[] = {
 	{FEATURE_TMDS_DISABLE_DITHERING, false, true},
 	{FEATURE_HDMI_DISABLE_DITHERING, false, true},
 	{FEATURE_DP_DISABLE_DITHERING, false, true},
-	{FEATURE_EMBEDDED_DISABLE_DITHERING, false, true},
+	{FEATURE_EMBEDDED_DISABLE_DITHERING, true, true},
 	{FEATURE_ALLOW_SELF_REFRESH, false, true},
 	{FEATURE_ALLOW_DYNAMIC_PIXEL_ENCODING_CHANGE, false, true},
 	{FEATURE_ALLOW_HSYNC_VSYNC_ADJUSTMENT, false, true},
@@ -1950,16 +1950,11 @@ bool dal_adapter_service_is_lid_open(struct adapter_service *as)
 	bool is_lid_open = false;
 	struct platform_info_params params;
 
-	if (!(PM_GET_LID_STATE & as->platform_methods_mask)) {
-				dal_logger_write(as->dal_context->logger,
-						LOG_MAJOR_BACKLIGHT,
-						LOG_MINOR_BACKLIGHT_LID,
-						"This method is not support\n");
-				return false;
-	}
 	params.data = &is_lid_open;
 	params.method = PM_GET_LID_STATE;
-	if (dal_get_platform_info(as->dal_context, &params))
+
+	if ((PM_GET_LID_STATE & as->platform_methods_mask) &&
+		dal_get_platform_info(as->dal_context, &params))
 		return is_lid_open;
 	else {
 #if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)

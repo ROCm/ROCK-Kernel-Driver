@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-14 Advanced Micro Devices, Inc.
+ * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,42 +23,43 @@
  *
  */
 
-#ifndef __DAL_EXTERNAL_DIGITAL_ENCODER_H__
-#define __DAL_EXTERNAL_DIGITAL_ENCODER_H__
+#ifndef __DAL_HW_CTX_EXTERNAL_DIGITAL_ENCODER_TRAVIS_H__
+#define __DAL_HW_CTX_EXTERNAL_DIGITAL_ENCODER_TRAVIS_H__
 
-#include "encoder_impl.h"
+#include "hw_ctx_external_digital_encoder_hal.h"
 
-struct external_digital_encoder;
-
-struct external_digital_encoder_funcs {
-	/* create HW context */
-	enum encoder_result (*create_hw_ctx)(
-		struct external_digital_encoder *enc,
-		const struct hw_ctx_init *init);
+enum lvds_pwrseq_state {
+	LVDS_PWRSEQ_STATE_DISABLED = 0,
+	LVDS_PWRSEQ_STATE_POWER_UP0 = 1,
+	LVDS_PWRSEQ_STATE_POWER_UP1 = 2,
+	LVDS_PWRSEQ_STATE_POWER_UP2 = 3,
+	LVDS_PWRSEQ_STATE_POWER_UP_DONE = 4,
+	LVDS_PWRSEQ_STATE_POWER_DOWN0 = 5,
+	LVDS_PWRSEQ_STATE_POWER_DOWN1 = 6,
+	LVDS_PWRSEQ_STATE_POWER_DOWN2 = 7,
+	LVDS_PWRSEQ_STATE_DELAY = 8,
+	LVDS_PWRSEQ_STATE_POWER_DOWN_DONE = 9,
+	LVDS_PWRSEQ_STATE_INVALID,
 };
 
-struct external_digital_encoder {
-	struct encoder_impl base;
-	const struct external_digital_encoder_funcs *funcs;
-	struct hw_ctx_external_digital_encoder_hal *hw_ctx;
+union travis_pwrseq_status {
+	struct {
+		uint8_t DIG_ON:1;
+		uint8_t SYNC_EN:1;
+		uint8_t BL_ON:1;
+		uint8_t DONE:1;
+		uint8_t STATE:4;
+	} bits;
+	uint8_t raw;
 };
 
-#define FROM_ENCODER_IMPL(ptr) \
-	container_of((ptr), struct external_digital_encoder, base)
+struct hw_ctx_external_digital_encoder_hal *
+	dal_hw_ctx_external_digital_encoder_travis_create(
+		struct dal_context *dal_ctx);
 
-bool dal_external_digital_encoder_construct(
-	struct external_digital_encoder *enc,
-	const struct encoder_init_data *init_data);
-
-void dal_external_digital_encoder_destruct(
-	struct external_digital_encoder *enc);
-
-enum encoder_result dal_external_digital_encoder_initialize(
-	struct encoder_impl *enc,
-	const struct encoder_context *ctx);
-
-enum encoder_result dal_external_digital_encoder_power_up(
-	struct encoder_impl *enc,
-	const struct encoder_context *ctx);
+union travis_pwrseq_status
+	dal_hw_ctx_external_digital_encoder_travis_get_pwrseq_status(
+	struct hw_ctx_external_digital_encoder_hal *ctx,
+	enum channel_id channel_id);
 
 #endif

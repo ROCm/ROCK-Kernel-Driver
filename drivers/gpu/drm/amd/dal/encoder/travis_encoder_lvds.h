@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-14 Advanced Micro Devices, Inc.
+ * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,42 +23,14 @@
  *
  */
 
-#ifndef __DAL_EXTERNAL_DIGITAL_ENCODER_H__
-#define __DAL_EXTERNAL_DIGITAL_ENCODER_H__
+#ifndef __DAL_TRAVIS_ENCODER_LVDS_H__
+#define __DAL_TRAVIS_ENCODER_LVDS_H__
 
-#include "encoder_impl.h"
+#include "include/encoder_interface.h"
 
-struct external_digital_encoder;
+#include "external_digital_encoder.h"
 
-struct external_digital_encoder_funcs {
-	/* create HW context */
-	enum encoder_result (*create_hw_ctx)(
-		struct external_digital_encoder *enc,
-		const struct hw_ctx_init *init);
-};
-
-struct external_digital_encoder {
-	struct encoder_impl base;
-	const struct external_digital_encoder_funcs *funcs;
-	struct hw_ctx_external_digital_encoder_hal *hw_ctx;
-};
-
-#define FROM_ENCODER_IMPL(ptr) \
-	container_of((ptr), struct external_digital_encoder, base)
-
-bool dal_external_digital_encoder_construct(
-	struct external_digital_encoder *enc,
+struct encoder_impl *dal_travis_encoder_lvds_create(
 	const struct encoder_init_data *init_data);
-
-void dal_external_digital_encoder_destruct(
-	struct external_digital_encoder *enc);
-
-enum encoder_result dal_external_digital_encoder_initialize(
-	struct encoder_impl *enc,
-	const struct encoder_context *ctx);
-
-enum encoder_result dal_external_digital_encoder_power_up(
-	struct encoder_impl *enc,
-	const struct encoder_context *ctx);
 
 #endif

@@ -26,13 +26,17 @@
 #ifndef __DAL_HW_CTX_EXTERNAL_DIGITAL_ENCODER_HAL_H__
 #define __DAL_HW_CTX_EXTERNAL_DIGITAL_ENCODER_HAL_H__
 
+#include "hw_ctx_digital_encoder.h"
+
 struct display_ppll_divider {
 	uint32_t ref_div;
 	uint32_t post_div;
 	uint32_t feedback_div_integer;
 	uint32_t feedback_div_fraction;
 };
+
 struct hw_ctx_external_digital_encoder_hal;
+struct hw_crtc_timing;
 
 struct hw_ctx_external_digital_encoder_hal_funcs {
 	void (*power_up)(
@@ -73,10 +77,6 @@ struct hw_ctx_external_digital_encoder_hal_funcs {
 	void (*post_ddc)(
 		struct hw_ctx_external_digital_encoder_hal *ctx,
 		enum channel_id channel_id);
-	bool (*get_link_cap)(
-		const struct hw_ctx_external_digital_encoder_hal *ctx,
-		enum channel_id channel_id,
-		struct link_settings *link_settings);
 	bool (*requires_authentication)(
 		const struct hw_ctx_external_digital_encoder_hal *ctx,
 		enum channel_id channel_id);
@@ -86,11 +86,6 @@ struct hw_ctx_external_digital_encoder_hal {
 	struct hw_ctx_digital_encoder base;
 	const struct hw_ctx_external_digital_encoder_hal_funcs *funcs;
 };
-
-bool dal_hw_ctx_external_digital_encoder_hal_get_link_cap(
-	const struct hw_ctx_external_digital_encoder_hal *ctx,
-	enum channel_id channel_id,
-	struct link_settings *link_settings);
 
 bool dal_hw_ctx_external_digital_encoder_hal_requires_authentication(
 	const struct hw_ctx_external_digital_encoder_hal *ctx,

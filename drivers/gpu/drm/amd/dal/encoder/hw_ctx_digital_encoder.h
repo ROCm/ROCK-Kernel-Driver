@@ -26,6 +26,8 @@
 #ifndef __DAL_HW_CTX_DIGITAL_ENCODER_H__
 #define __DAL_HW_CTX_DIGITAL_ENCODER_H__
 
+#include "include/hw_sequencer_types.h"
+
 struct hw_ctx_init {
 	struct adapter_service *adapter_service;
 	struct graphics_object_id connector;

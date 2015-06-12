@@ -750,14 +750,14 @@ static bool read_edid(
 	/*On successful Edid read we need to update detection status*/
 	if (status == EDID_RETRIEVE_SUCCESS ||
 		status == EDID_RETRIEVE_SAME_EDID) {
-		enum dcs_edid_connector_type connectorType;
+		enum dcs_edid_connector_type connector_type;
 		enum display_dongle_type dongle;
 		enum signal_type signal;
 		/*apply EDID-based sink capability patches*/
 		apply_detection_status_patches(
 				tm_dm, display_path, detection_status);
 
-		connectorType = dal_dcs_get_connector_type(
+		connector_type = dal_dcs_get_connector_type(
 				dal_display_path_get_dcs(display_path));
 
 		signal = detection_status->detected_signal;
@@ -767,13 +767,13 @@ static bool read_edid(
 		/*check whether EDID connector is right for the signal*/
 		if (tm_utils_is_edid_connector_type_valid_with_signal_type(
 				dongle,
-				connectorType, signal)) {
+				connector_type, signal)) {
 			/*downgrade signal in case it has
 			 *  changed but EDID hasn't*/
 			detection_status->detected_signal =
 				tm_utils_get_downgraded_signal_type(
 						signal,
-						connectorType);
+						connector_type);
 
 			/* report connected since edid successfully detected*/
 			connected = true;

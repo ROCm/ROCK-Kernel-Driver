@@ -51,6 +51,7 @@
 #include "digital_encoder_dp.h"
 #include "wireless_encoder.h"
 #include "external_digital_encoder.h"
+#include "travis_encoder_lvds.h"
 
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 #include "dce110/digital_encoder_dp_dce110.h"
@@ -203,26 +204,6 @@ struct encoder_impl *dal_nutmeg_encoder_create(
 	return NULL;
 }
 
-struct encoder_impl *dal_encoder_create_travis_encoder_vga(
-	const struct encoder_init_data *init)
-{
-	dal_logger_write(init->ctx->logger,
-			LOG_MAJOR_ERROR, LOG_MINOR_COMPONENT_ENCODER,
-			"TRAVIS-VGA encoder not supported\n");
-
-	return NULL;
-}
-
-struct encoder_impl *dal_encoder_create_travis_encoder_lvds(
-	const struct encoder_init_data *init)
-{
-	dal_logger_write(init->ctx->logger,
-			LOG_MAJOR_ERROR, LOG_MINOR_COMPONENT_ENCODER,
-			"TRAVIS-LVDS encoder not supported\n");
-
-	return NULL;
-}
-
 static struct encoder_impl *create_digital_encoder_impl(
 	enum signal_type signal,
 	const struct encoder_init_data *init)
@@ -360,9 +341,13 @@ static struct encoder_impl *create_travis_encoder_impl(
 {
 	switch (init->encoder.enum_id) {
 	case ENUM_ID_1:
-		return dal_encoder_create_travis_encoder_vga(init);
+		dal_logger_write(init->ctx->logger,
+				LOG_MAJOR_ERROR, LOG_MINOR_COMPONENT_ENCODER,
+				"TRAVIS-VGA encoder not supported\n");
+
+		return NULL;
 	case ENUM_ID_2:
-		return dal_encoder_create_travis_encoder_lvds(init);
+		return dal_travis_encoder_lvds_create(init);
 	default:
 		BREAK_TO_DEBUGGER();
 		return NULL;
