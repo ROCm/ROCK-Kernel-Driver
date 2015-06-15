@@ -1288,6 +1288,7 @@ static void tm_update_audio_connectivity(struct topology_mgr *tm)
 static void tm_reset_controllers(struct topology_mgr *tm)
 {
 	uint32_t i;
+	uint32_t controller_index = 0;
 	struct tm_resource *tm_resource;
 	struct tm_resource_controller_info *controller_info;
 	struct controller *controller;
@@ -1309,7 +1310,8 @@ static void tm_reset_controllers(struct topology_mgr *tm)
 
 		controller = controller_info->controller;
 
-		if (asic_runtime_flags.bits.GNB_WAKEUP_SUPPORTED == 1)
+		if (controller_index == 0 &&
+			asic_runtime_flags.bits.GNB_WAKEUP_SUPPORTED == 1)
 			dal_controller_power_gating_enable(controller,
 					PIPE_GATING_CONTROL_INIT);
 
@@ -1322,6 +1324,8 @@ static void tm_reset_controllers(struct topology_mgr *tm)
 
 		dal_controller_enable_display_pipe_clock_gating(controller,
 				true);
+
+		++controller_index;
 	}
 }
 
