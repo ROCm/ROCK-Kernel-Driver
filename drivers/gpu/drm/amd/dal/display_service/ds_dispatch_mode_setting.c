@@ -1377,10 +1377,6 @@ static bool program_hw(
 
 	/* HW programming */
 	if (result) {
-		uint32_t i;
-		uint32_t num =
-			dal_hw_path_mode_set_get_paths_number(hw_mode_set);
-
 		/* Disable output*/
 		disable_output(ds, hw_mode_set);
 
