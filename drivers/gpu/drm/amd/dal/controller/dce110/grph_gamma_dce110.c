@@ -1440,13 +1440,12 @@ static void program_prescale_legacy(
 	break;
 
 	case PIXEL_FORMAT_ARGB8888:
-		prescale_num = 1;
-		/* set default by pass */
-		set_reg_field_value(
-			prescale_control,
-			1,
-			PRESCALE_GRPH_CONTROL,
-			GRPH_PRESCALE_BYPASS);
+		/* This function should only be called when using regamma
+		 * and bypassing legacy INPUT GAMMA LUT (function name is
+		 * misleading)
+		 */
+		prescale_num = 256;
+		prescale_denom = 255;
 	break;
 
 	case PIXEL_FORMAT_ARGB2101010:
