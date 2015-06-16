@@ -99,7 +99,9 @@ ifneq ($(CONFIG_DRM_AMD_DAL),)
 amdgpu-y += amdgpu_dal_services.o amdgpu_dm_types.o amdgpu_dm.o \
 	amdgpu_dm_irq.o
 
-include drivers/gpu/drm/amd/dal/Makefile
+FULL_AMD_DAL_PATH = drivers/gpu/drm/amd/dal
+RELATIVE_AMD_DAL_PATH = ../dal
+include $(FULL_AMD_DAL_PATH)/Makefile
 
 amdgpu-y += $(AMD_DAL_FILES)
 
