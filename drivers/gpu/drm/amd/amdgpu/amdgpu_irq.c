@@ -234,21 +234,14 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 	}
 
 #ifdef CONFIG_DRM_AMD_DAL
-			switch(adev->asic_type)
-			{
-			case CHIP_CARRIZO:
-				/* DAL handles DCE11 and up.
-				 * See amdgpu_dm_irq.c. */
-				break;
-			default:
-				/* pre DCE11 */
-				INIT_WORK(&adev->hotplug_work,
-						amdgpu_hotplug_work_func);
-				break;
-			}
+	if (adev->asic_type != CHIP_CARRIZO || amdgpu_dal == 0) {
+		/* pre DCE11 */
+		INIT_WORK(&adev->hotplug_work,
+				amdgpu_hotplug_work_func);
+	}
 #else
-			INIT_WORK(&adev->hotplug_work,
-					amdgpu_hotplug_work_func);
+	INIT_WORK(&adev->hotplug_work,
+			amdgpu_hotplug_work_func);
 #endif
 
 

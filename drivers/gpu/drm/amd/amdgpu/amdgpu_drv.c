@@ -73,6 +73,7 @@ int amdgpu_deep_color = 0;
 int amdgpu_vm_size = 8;
 int amdgpu_vm_block_size = -1;
 int amdgpu_exp_hw_support = 0;
+int amdgpu_dal = 1;
 
 MODULE_PARM_DESC(vramlimit, "Restrict VRAM for testing, in megabytes");
 module_param_named(vramlimit, amdgpu_vram_limit, int, 0600);
@@ -136,6 +137,9 @@ module_param_named(vm_block_size, amdgpu_vm_block_size, int, 0444);
 
 MODULE_PARM_DESC(exp_hw_support, "experimental hw support (1 = enable, 0 = disable (default))");
 module_param_named(exp_hw_support, amdgpu_exp_hw_support, int, 0444);
+
+MODULE_PARM_DESC(dal, "DAL display driver (1 = enable (default), 0 = disable)");
+module_param_named(dal, amdgpu_dal, int, 0444);
 
 static struct pci_device_id pciidlist[] = {
 #ifdef CONFIG_DRM_AMDGPU_CIK

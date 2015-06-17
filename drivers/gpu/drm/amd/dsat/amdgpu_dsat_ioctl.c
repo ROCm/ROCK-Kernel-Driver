@@ -36,6 +36,9 @@
 int amdgpu_dsat_cmd_ioctl(struct drm_device *dev, void *data,
 		struct drm_file *filp)
 {
+	if (amdgpu_dal == 0)
+		return -EINVAL;
+
 	struct amdgpu_device *rdev;
 	struct amdgpu_display_manager *dm;
 	struct dal *dal;
