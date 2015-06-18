@@ -60,6 +60,10 @@ struct amdgpu_dm_prev_state {
 	struct drm_display_mode mode;
 };
 
+struct common_irq_params {
+	struct amdgpu_device *adev;
+	enum dal_irq_source irq_src;
+};
 
 struct amdgpu_display_manager {
 	struct dal *dal;
@@ -87,8 +91,14 @@ struct amdgpu_display_manager {
 	 * Note that handlers are called in the same order as they were
 	 * registered (FIFO).
 	 */
-	struct list_head irq_handler_list_table[INTERRUPT_CONTEXT_NUMBER]
-					  [DAL_IRQ_SOURCES_NUMBER];
+	struct list_head
+	irq_handler_list_tab[INTERRUPT_CONTEXT_NUMBER][DAL_IRQ_SOURCES_NUMBER];
+
+	struct common_irq_params
+	pflip_params[DAL_IRQ_SOURCE_PFLIP_LAST - DAL_IRQ_SOURCE_PFLIP_FIRST + 1];
+
+	struct common_irq_params
+	vsync_params[DAL_IRQ_SOURCE_CRTC6VSYNC - DAL_IRQ_SOURCE_CRTC1VSYNC + 1];
 
 	/* this spin lock synchronizes access to 'irq_handler_list_table' */
 	spinlock_t irq_handler_list_table_lock;

@@ -116,7 +116,7 @@ static struct list_head *remove_irq_handler(
 	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
 
 	handler_list =
-		&adev->dm.irq_handler_list_table[int_params->int_context]
+		&adev->dm.irq_handler_list_tab[int_params->int_context]
 						  [int_params->irq_source];
 	list_for_each_safe(entry, tmp, handler_list) {
 
@@ -269,7 +269,7 @@ void *amdgpu_dm_irq_register_interrupt(
 	/* Lock the list, add the handler. */
 	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
 
-	handler_list = &adev->dm.irq_handler_list_table[int_params->int_context]
+	handler_list = &adev->dm.irq_handler_list_tab[int_params->int_context]
 						  [int_params->irq_source];
 
 	list_add_tail(&handler_data->hcd.list, handler_list);
@@ -338,7 +338,7 @@ void amdgpu_dm_irq_schedule_work(
 	/* Since the caller is interested in 'work_struct' then
 	 * the irq will be post-processed at "INTERRUPT_LOW_IRQ_CONTEXT". */
 	handler_list =
-		&adev->dm.irq_handler_list_table[INTERRUPT_LOW_IRQ_CONTEXT]
+		&adev->dm.irq_handler_list_tab[INTERRUPT_LOW_IRQ_CONTEXT]
 						     [irq_source];
 
 	list_for_each_safe(entry, tmp, handler_list) {
@@ -350,6 +350,41 @@ void amdgpu_dm_irq_schedule_work(
 				handler->irq_source);
 
 		schedule_work(&handler->work);
+	}
+
+	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
+}
+
+/** amdgpu_dm_irq_immediate_work
+ *  Callback high irq work immediately, don't send to work queue
+ */
+void amdgpu_dm_irq_immediate_work(
+	struct amdgpu_device *adev,
+	enum dal_irq_source irq_source)
+{
+	struct list_head *handler_list;
+	struct amdgpu_dm_irq_handler_data *handler_data;
+	struct list_head *entry, *tmp;
+	unsigned long irq_table_flags;
+
+	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
+
+	handler_list =
+		&adev->dm.irq_handler_list_tab[INTERRUPT_HIGH_IRQ_CONTEXT]
+						     [irq_source];
+
+	list_for_each_safe(entry, tmp, handler_list) {
+
+		handler_data = list_entry(entry, struct amdgpu_dm_irq_handler_data,
+				hcd.list);
+
+		DRM_DEBUG_KMS("DM_IRQ: immediate_work: for dal_src=%d\n",
+				handler_data->irq_source);
+
+		/* Call a subcomponent which registered for immediate
+		 * interrupt notification */
+		handler_data->hcd.handler(handler_data->hcd.handler_arg);
+
 	}
 
 	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
@@ -369,7 +404,7 @@ int amdgpu_dm_irq_init(
 	for (ctx = 0; ctx < INTERRUPT_CONTEXT_NUMBER; ctx++) {
 		for (src = 0; src < DAL_IRQ_SOURCES_NUMBER; src++) {
 
-			lh = &adev->dm.irq_handler_list_table[ctx][src];
+			lh = &adev->dm.irq_handler_list_tab[ctx][src];
 			INIT_LIST_HEAD(lh);
 		}
 	}

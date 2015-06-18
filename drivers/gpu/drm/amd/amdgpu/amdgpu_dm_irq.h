@@ -94,6 +94,10 @@ void amdgpu_dm_irq_schedule_work(
 		struct amdgpu_device *adev,
 		enum dal_irq_source irq_source);
 
+void amdgpu_dm_irq_immediate_work(
+	struct amdgpu_device *adev,
+	enum dal_irq_source irq_source);
+
 
 void amdgpu_dm_irq_register_timer(
 	struct amdgpu_device *adev,

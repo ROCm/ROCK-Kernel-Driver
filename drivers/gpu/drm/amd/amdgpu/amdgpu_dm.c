@@ -452,27 +452,46 @@ static int amdgpu_dm_set_crtc_irq_state(struct amdgpu_device *adev,
 	return 0;
 }
 
-
-static int amdgpu_dm_pflip_irq(struct amdgpu_device *adev,
-				  struct amdgpu_irq_src *source,
-				  struct amdgpu_iv_entry *entry)
+/**
+ * amdgpu_dm_irq - Generic IRQ handler, calls all registered high irq work
+ * immediately, and schedules work for low irq
+ */
+static int amdgpu_dm_irq(
+		struct amdgpu_device *adev,
+		struct amdgpu_irq_src *source,
+		struct amdgpu_iv_entry *entry)
 {
-	unsigned long flags;
+
 	enum dal_irq_source src =
 		dal_interrupt_to_irq_source(
 			adev->dm.dal,
 			entry->src_id,
 			entry->src_data);
+
+	dal_interrupt_ack(adev->dm.dal, src);
+
+	/* Call high irq work immediately */
+	amdgpu_dm_irq_immediate_work(adev, src);
+	/*Schedule low_irq work */
+	amdgpu_dm_irq_schedule_work(adev, src);
+
+	return 0;
+}
+
+static void amdgpu_dm_pflip_high_irq(void *interrupt_params)
+{
+	struct common_irq_params *irq_params = interrupt_params;
+	struct amdgpu_device *adev = irq_params->adev;
+	enum dal_irq_source src = irq_params->irq_src;
+	unsigned long flags;
 	uint32_t display_index =
 		dal_get_display_index_from_int_src(adev->dm.dal, src);
 	struct amdgpu_crtc *amdgpu_crtc = adev->mode_info.crtcs[display_index];
 	struct amdgpu_flip_work *works;
 
-	dal_interrupt_ack(adev->dm.dal, src);
-
 	/* IRQ could occur when in initial stage */
 	if(amdgpu_crtc == NULL)
-		return 0;
+		return;
 
 	spin_lock_irqsave(&adev->ddev->event_lock, flags);
 	works = amdgpu_crtc->pflip_works;
@@ -482,7 +501,7 @@ static int amdgpu_dm_pflip_irq(struct amdgpu_device *adev,
 						 amdgpu_crtc->pflip_status,
 						 AMDGPU_FLIP_SUBMITTED);
 		spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
-		return 0;
+		return;
 	}
 
 	/* page flip completed. clean up */
@@ -502,51 +521,27 @@ static int amdgpu_dm_pflip_irq(struct amdgpu_device *adev,
 	amdgpu_irq_put(adev, &adev->pageflip_irq, amdgpu_crtc->crtc_id);
 	queue_work(amdgpu_crtc->pflip_queue, &works->unpin_work);
 
-	return 0;
 }
 
 
-static int amdgpu_dm_crtc_irq(
-		struct amdgpu_device *adev,
-		struct amdgpu_irq_src *source,
-		struct amdgpu_iv_entry *entry)
+static void amdgpu_dm_crtc_high_irq(void *interrupt_params)
 {
-	enum dal_irq_source src =
-		dal_interrupt_to_irq_source(
-			adev->dm.dal,
-			entry->src_id,
-			entry->src_data);
+	struct common_irq_params *irq_params = interrupt_params;
+	struct amdgpu_device *adev = irq_params->adev;
+	enum dal_irq_source src = irq_params->irq_src;
+
 	uint32_t display_index =
-			dal_get_display_index_from_int_src(adev->dm.dal, src);
+		dal_get_display_index_from_int_src(adev->dm.dal, src);
 
-	if (src < DAL_IRQ_SOURCE_CRTC1VSYNC || src > DAL_IRQ_SOURCE_CRTC6VSYNC)
-		return -EINVAL;
-
-	dal_interrupt_ack(adev->dm.dal, src);
 	drm_handle_vblank(adev->ddev, display_index);
 
-	return 0;
 }
 
-static int amdgpu_dm_hpd_irq(
-	struct amdgpu_device *adev,
-	struct amdgpu_irq_src *source,
-	struct amdgpu_iv_entry *entry)
+static void amdgpu_dm_hpd_low_irq(void *interrupt_params)
 {
-	enum dal_irq_source src =
-		dal_interrupt_to_irq_source(
-			adev->dm.dal,
-			entry->src_id,
-			entry->src_data);
+	struct amdgpu_device *adev = interrupt_params;
 
-	if (src < DAL_IRQ_SOURCE_HPD1 || src > DAL_IRQ_SOURCE_HPD6)
-		return -EINVAL;
-
-	dal_interrupt_ack(adev->dm.dal, src);
-
-	amdgpu_dm_irq_schedule_work(adev, src);
-
-	return 0;
+	/* TODO: add implementation */
 }
 
 static int dm_set_clockgating_state(void *handle,
@@ -827,27 +822,69 @@ const struct amd_ip_funcs amdgpu_dm_funcs = {
 
 static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 {
-	int r, i;
-	/* Jordan: Removing this, since already done beforehand in
-	 * amdgpu_device.c
-	 */
-	/*drm_mode_config_init(adev->ddev);*/
+	int r;
+	int i;
 
-	/* TODO: copy from DCE11 */
-	for (i = 0; i < adev->mode_info.num_crtc; i++) {
-		r = amdgpu_irq_add_id(adev, i + 1, &adev->crtc_irq);
+	/* Register IRQ sources and initialize high IRQ callbacks */
+	struct common_irq_params *c_irq_params;
+	struct dal_interrupt_params int_params = {0};
+	int_params.requested_polarity = INTERRUPT_POLARITY_DEFAULT;
+	int_params.current_polarity = INTERRUPT_POLARITY_DEFAULT;
+	int_params.no_mutex_wait = false;
+	int_params.one_shot = false;
+
+	for (i = 7; i < 19; i += 2) {
+		r = amdgpu_irq_add_id(adev, i, &adev->crtc_irq);
+
+		/* High IRQ callback for crtc irq */
+		int_params.int_context = INTERRUPT_HIGH_IRQ_CONTEXT;
+		int_params.irq_source =
+			dal_interrupt_to_irq_source(adev->dm.dal, i, 0);
+
+		c_irq_params = &adev->dm.vsync_params[int_params.irq_source - DAL_IRQ_SOURCE_CRTC1VSYNC];
+
+		c_irq_params->adev = adev;
+		c_irq_params->irq_src = int_params.irq_source;
+
+		amdgpu_dm_irq_register_interrupt(adev, &int_params,
+				amdgpu_dm_crtc_high_irq, c_irq_params);
+
 		if (r)
-		return r;
+			return r;
 	}
 
 	for (i = 8; i < 20; i += 2) {
 		r = amdgpu_irq_add_id(adev, i, &adev->pageflip_irq);
+
+		/* High IRQ callback for pflip irq */
+		int_params.int_context = INTERRUPT_HIGH_IRQ_CONTEXT;
+		int_params.irq_source =
+			dal_interrupt_to_irq_source(adev->dm.dal, i, 0);
+
+		c_irq_params = &adev->dm.pflip_params[int_params.irq_source - DAL_IRQ_SOURCE_PFLIP_FIRST];
+
+		c_irq_params->adev = adev;
+		c_irq_params->irq_src = int_params.irq_source;
+
+		amdgpu_dm_irq_register_interrupt(adev, &int_params,
+				amdgpu_dm_pflip_high_irq, c_irq_params);
+
 		if (r)
 			return r;
 	}
 
 	/* HPD hotplug */
 	r = amdgpu_irq_add_id(adev, 42, &adev->hpd_irq);
+
+	for (i = 0; i < adev->mode_info.num_crtc; i++) {
+		/* High IRQ callback for hpd irq */
+		int_params.int_context = INTERRUPT_LOW_IRQ_CONTEXT;
+		int_params.irq_source =
+			dal_interrupt_to_irq_source(adev->dm.dal, 42, i);
+		amdgpu_dm_irq_register_interrupt(adev, &int_params,
+			amdgpu_dm_hpd_low_irq, adev);
+	}
+
 	if (r)
 		return r;
 
@@ -1105,17 +1142,17 @@ static void set_display_funcs(struct amdgpu_device *adev)
 
 static const struct amdgpu_irq_src_funcs dm_crtc_irq_funcs = {
 	.set = amdgpu_dm_set_crtc_irq_state,
-	.process = amdgpu_dm_crtc_irq,
+	.process = amdgpu_dm_irq,
 };
 
 static const struct amdgpu_irq_src_funcs dm_pageflip_irq_funcs = {
 	.set = amdgpu_dm_set_pflip_irq_state,
-	.process = amdgpu_dm_pflip_irq,
+	.process = amdgpu_dm_irq,
 };
 
 static const struct amdgpu_irq_src_funcs dm_hpd_irq_funcs = {
 	.set = amdgpu_dm_set_hpd_irq_state,
-	.process = amdgpu_dm_hpd_irq,
+	.process = amdgpu_dm_irq,
 };
 
 static void dm_set_irq_funcs(struct amdgpu_device *adev)
@@ -1127,7 +1164,6 @@ static void dm_set_irq_funcs(struct amdgpu_device *adev)
 	adev->pageflip_irq.funcs = &dm_pageflip_irq_funcs;
 
 	adev->hpd_irq.num_types = AMDGPU_HPD_LAST;
-
 	adev->hpd_irq.funcs = &dm_hpd_irq_funcs;
 }
 
