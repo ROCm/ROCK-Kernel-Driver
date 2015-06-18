@@ -217,8 +217,7 @@ static void power_up(struct gpu *base)
 
 	dal_gpu_power_up_base(base);
 
-	if (gpu110->dc_clock_gating)
-		dal_dc_clock_gating_dce110_power_up(base->dal_context);
+	dal_dc_clock_gating_dce110_power_up(base->dal_context, gpu110->dc_clock_gating );
 }
 
 static void power_down(

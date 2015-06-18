@@ -26,7 +26,10 @@
 #ifndef __DAL_DC_CLOCK_GATING_DCE110_H__
 #define __DAL_DC_CLOCK_GATING_DCE110_H__
 
-void dal_dc_clock_gating_dce110_power_up(struct dal_context *dal_context);
+void dal_dc_clock_gating_dce110_power_up(
+		struct dal_context *dal_context,
+		bool enable);
+
 void dal_dc_clock_gating_dce110_power_down(struct dal_context *dal_context);
 
 #endif /* __DAL_DC_CLOCK_GATING_DCE110_H__ */

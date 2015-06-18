@@ -27,6 +27,8 @@
 
 #include "include/logger_interface.h"
 
+#include "dce/dce_11_0_d.h"
+#include "dce/dce_11_0_sh_mask.h"
 #include "dc_clock_gating_dce110.h"
 
 /******************************************************************************
@@ -39,8 +41,33 @@
 /******************************************************************************
  * static functions
  *****************************************************************************/
+static void force_hw_base_light_sleep(struct dal_context *dal_context)
+{
+	uint32_t addr = 0;
+	uint32_t value = 0;
+
+
+	addr = mmDC_MEM_GLOBAL_PWR_REQ_CNTL;
+	/* Read the mmDC_MEM_GLOBAL_PWR_REQ_CNTL to get the currently
+	 * programmed DC_MEM_GLOBAL_PWR_REQ_DIS*/
+	value = dal_read_reg(dal_context, addr);
+
+	set_reg_field_value(
+			value,
+			1,
+			DC_MEM_GLOBAL_PWR_REQ_CNTL,
+			DC_MEM_GLOBAL_PWR_REQ_DIS);
+
+	dal_write_reg(dal_context, addr, value);
+
+}
 
 static void enable_hw_base_light_sleep(struct dal_context *dal_context)
+{
+	NOT_IMPLEMENTED();
+}
+
+static void disable_hw_base_light_sleep(struct dal_context *dal_context)
 {
 	NOT_IMPLEMENTED();
 }
@@ -61,10 +88,19 @@ static void enable_sw_manual_control_light_sleep(
  * public functions
  *****************************************************************************/
 
-void dal_dc_clock_gating_dce110_power_up(struct dal_context *dal_context)
+void dal_dc_clock_gating_dce110_power_up(
+		struct dal_context *dal_context,
+		bool enable)
 {
-	enable_hw_base_light_sleep(dal_context);
-	disable_sw_manual_control_light_sleep(dal_context);
+	if(enable)
+	{
+		enable_hw_base_light_sleep(dal_context);
+		disable_sw_manual_control_light_sleep(dal_context);
+	}
+	else
+	{
+		force_hw_base_light_sleep(dal_context);
+	}
 }
 
 void dal_dc_clock_gating_dce110_power_down(struct dal_context *dal_context)
