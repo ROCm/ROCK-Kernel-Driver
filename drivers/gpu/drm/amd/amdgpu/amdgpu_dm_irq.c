@@ -47,8 +47,6 @@ struct amdgpu_dm_irq_handler_data {
 	struct handler_common_data hcd;
 	/* DAL irq source which registered for this interrupt. */
 	enum dal_irq_source irq_source;
-	/* In case this interrupt needs post-processing, 'work' will be queued*/
-	struct work_struct work;
 };
 
 struct amdgpu_dm_timer_handler_data {
@@ -83,19 +81,33 @@ static void init_handler_common_data(
  *
  * @work: work struct
  */
-static void dm_irq_work_func(
-	struct work_struct *work)
+static void dm_irq_work_func(struct work_struct *work)
 {
-	struct amdgpu_dm_irq_handler_data *handler_data =
-		container_of(work, struct amdgpu_dm_irq_handler_data, work);
+	struct list_head *entry;
+	struct irq_list_head *irq_list_head =
+		container_of(work, struct irq_list_head, work);
+	struct list_head *handler_list = &irq_list_head->head;
+	struct amdgpu_dm_irq_handler_data *handler_data;
 
-	DRM_DEBUG_KMS("DM_IRQ: work_func: for dal_src=%d\n",
+	list_for_each(entry, handler_list) {
+		handler_data =
+			list_entry(
+				entry,
+				struct amdgpu_dm_irq_handler_data,
+				hcd.list);
+
+		DRM_DEBUG_KMS("DM_IRQ: work_func: for dal_src=%d\n",
+				handler_data->irq_source);
+
+		DRM_DEBUG_KMS("DM_IRQ: schedule_work: for dal_src=%d\n",
 			handler_data->irq_source);
+
+		handler_data->hcd.handler(handler_data->hcd.handler_arg);
+	}
 
 	/* Call a DAL subcomponent which registered for interrupt notification
 	 * at INTERRUPT_LOW_IRQ_CONTEXT.
 	 * (The most common use is HPD interrupt) */
-	handler_data->hcd.handler(handler_data->hcd.handler_arg);
 }
 
 /**
@@ -107,18 +119,28 @@ static struct list_head *remove_irq_handler(
 	void *ih,
 	const struct dal_interrupt_params *int_params)
 {
-	struct list_head *handler_list;
+	struct list_head *hnd_list;
 	struct list_head *entry, *tmp;
 	struct amdgpu_dm_irq_handler_data *handler;
 	unsigned long irq_table_flags;
 	bool handler_removed = false;
+	enum dal_irq_source irq_source;
 
 	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
 
-	handler_list =
-		&adev->dm.irq_handler_list_tab[int_params->int_context]
-						  [int_params->irq_source];
-	list_for_each_safe(entry, tmp, handler_list) {
+	irq_source = int_params->irq_source;
+
+	switch (int_params->int_context) {
+	case INTERRUPT_HIGH_IRQ_CONTEXT:
+		hnd_list = &adev->dm.irq_handler_list_high_tab[irq_source];
+		break;
+	case INTERRUPT_LOW_IRQ_CONTEXT:
+	default:
+		hnd_list = &adev->dm.irq_handler_list_low_tab[irq_source].head;
+		break;
+	}
+
+	list_for_each_safe(entry, tmp, hnd_list) {
 
 		handler = list_entry(entry, struct amdgpu_dm_irq_handler_data,
 				hcd.list);
@@ -139,18 +161,13 @@ static struct list_head *remove_irq_handler(
 		return NULL;
 	}
 
-	/* The handler was removed from the table,
-	 * it means it is safe to flush all the 'work'
-	 * (because no code can schedule a new one). */
-	flush_work(&handler->work);
-
 	kfree(handler);
 
 	DRM_DEBUG_KMS(
 	"DM_IRQ: removed irq handler: %p for: dal_src=%d, irq context=%d\n",
 		ih, int_params->irq_source, int_params->int_context);
 
-	return handler_list;
+	return hnd_list;
 }
 
 /* If 'handler_in == NULL' then remove ALL handlers. */
@@ -247,9 +264,10 @@ void *amdgpu_dm_irq_register_interrupt(
 	void (*ih)(void *),
 	void *handler_args)
 {
-	struct list_head *handler_list;
+	struct list_head *hnd_list;
 	struct amdgpu_dm_irq_handler_data *handler_data;
 	unsigned long irq_table_flags;
+	enum dal_irq_source irq_source;
 
 	handler_data = kzalloc(sizeof(*handler_data), GFP_KERNEL);
 	if (!handler_data) {
@@ -262,17 +280,24 @@ void *amdgpu_dm_irq_register_interrupt(
 	init_handler_common_data(&handler_data->hcd, ih, handler_args,
 			&adev->dm);
 
-	handler_data->irq_source = int_params->irq_source;
+	irq_source = int_params->irq_source;
 
-	INIT_WORK(&handler_data->work, dm_irq_work_func);
+	handler_data->irq_source = irq_source;
 
 	/* Lock the list, add the handler. */
 	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
 
-	handler_list = &adev->dm.irq_handler_list_tab[int_params->int_context]
-						  [int_params->irq_source];
+	switch (int_params->int_context) {
+	case INTERRUPT_HIGH_IRQ_CONTEXT:
+		hnd_list = &adev->dm.irq_handler_list_high_tab[irq_source];
+		break;
+	case INTERRUPT_LOW_IRQ_CONTEXT:
+	default:
+		hnd_list = &adev->dm.irq_handler_list_low_tab[irq_source].head;
+		break;
+	}
 
-	list_add_tail(&handler_data->hcd.list, handler_list);
+	list_add_tail(&handler_data->hcd.list, hnd_list);
 
 	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 
@@ -282,8 +307,10 @@ void *amdgpu_dm_irq_register_interrupt(
 	 * interrupt. */
 
 	DRM_DEBUG_KMS(
-	"DM_IRQ: added irq handler: %p for: dal_src=%d, irq context=%d\n",
-		handler_data, int_params->irq_source, int_params->int_context);
+		"DM_IRQ: added irq handler: %p for: dal_src=%d, irq context=%d\n",
+		handler_data,
+		irq_source,
+		int_params->int_context);
 
 	return handler_data;
 }
@@ -328,29 +355,14 @@ void amdgpu_dm_irq_schedule_work(
 	struct amdgpu_device *adev,
 	enum dal_irq_source irq_source)
 {
-	struct list_head *handler_list;
-	struct amdgpu_dm_irq_handler_data *handler;
-	struct list_head *entry, *tmp;
 	unsigned long irq_table_flags;
 
 	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
 
 	/* Since the caller is interested in 'work_struct' then
 	 * the irq will be post-processed at "INTERRUPT_LOW_IRQ_CONTEXT". */
-	handler_list =
-		&adev->dm.irq_handler_list_tab[INTERRUPT_LOW_IRQ_CONTEXT]
-						     [irq_source];
 
-	list_for_each_safe(entry, tmp, handler_list) {
-
-		handler = list_entry(entry, struct amdgpu_dm_irq_handler_data,
-				hcd.list);
-
-		DRM_DEBUG_KMS("DM_IRQ: schedule_work: for dal_src=%d\n",
-				handler->irq_source);
-
-		schedule_work(&handler->work);
-	}
+	schedule_work(&adev->dm.irq_handler_list_low_tab[irq_source].work);
 
 	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
 }
@@ -362,18 +374,15 @@ void amdgpu_dm_irq_immediate_work(
 	struct amdgpu_device *adev,
 	enum dal_irq_source irq_source)
 {
-	struct list_head *handler_list;
 	struct amdgpu_dm_irq_handler_data *handler_data;
-	struct list_head *entry, *tmp;
+	struct list_head *entry;
 	unsigned long irq_table_flags;
 
 	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
 
-	handler_list =
-		&adev->dm.irq_handler_list_tab[INTERRUPT_HIGH_IRQ_CONTEXT]
-						     [irq_source];
-
-	list_for_each_safe(entry, tmp, handler_list) {
+	list_for_each(
+		entry,
+		&adev->dm.irq_handler_list_high_tab[irq_source]) {
 
 		handler_data = list_entry(entry, struct amdgpu_dm_irq_handler_data,
 				hcd.list);
@@ -384,7 +393,6 @@ void amdgpu_dm_irq_immediate_work(
 		/* Call a subcomponent which registered for immediate
 		 * interrupt notification */
 		handler_data->hcd.handler(handler_data->hcd.handler_arg);
-
 	}
 
 	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
@@ -393,20 +401,21 @@ void amdgpu_dm_irq_immediate_work(
 int amdgpu_dm_irq_init(
 	struct amdgpu_device *adev)
 {
-	int ctx;
 	int src;
-	struct list_head *lh;
+	struct irq_list_head *lh;
 
 	DRM_DEBUG_KMS("DM_IRQ\n");
 
 	spin_lock_init(&adev->dm.irq_handler_list_table_lock);
 
-	for (ctx = 0; ctx < INTERRUPT_CONTEXT_NUMBER; ctx++) {
-		for (src = 0; src < DAL_IRQ_SOURCES_NUMBER; src++) {
+	for (src = 0; src < DAL_IRQ_SOURCES_NUMBER; src++) {
+		/* low context handler list init */
+		lh = &adev->dm.irq_handler_list_low_tab[src];
+		INIT_LIST_HEAD(&lh->head);
+		INIT_WORK(&lh->work, dm_irq_work_func);
 
-			lh = &adev->dm.irq_handler_list_tab[ctx][src];
-			INIT_LIST_HEAD(lh);
-		}
+		/* high context handler init */
+		INIT_LIST_HEAD(&adev->dm.irq_handler_list_high_tab[src]);
 	}
 
 	INIT_LIST_HEAD(&adev->dm.timer_handler_list);
@@ -468,7 +477,18 @@ void amdgpu_dm_irq_register_timer(
 void amdgpu_dm_irq_fini(
 	struct amdgpu_device *adev)
 {
+	int src;
+	struct irq_list_head *lh;
 	DRM_DEBUG_KMS("DM_IRQ: releasing resources.\n");
+
+	for (src = 0; src < DAL_IRQ_SOURCES_NUMBER; src++) {
+
+		/* The handler was removed from the table,
+		 * it means it is safe to flush all the 'work'
+		 * (because no code can schedule a new one). */
+		lh = &adev->dm.irq_handler_list_low_tab[src];
+		flush_work(&lh->work);
+	}
 
 	/* Cancel ALL timers and release handlers (if any). */
 	remove_timer_handler(adev, NULL);

@@ -65,6 +65,12 @@ struct common_irq_params {
 	enum dal_irq_source irq_src;
 };
 
+struct irq_list_head {
+	struct list_head head;
+	/* In case this interrupt needs post-processing, 'work' will be queued*/
+	struct work_struct work;
+};
+
 struct amdgpu_display_manager {
 	struct dal *dal;
 	void *cgs_device;
@@ -92,8 +98,8 @@ struct amdgpu_display_manager {
 	 * Note that handlers are called in the same order as they were
 	 * registered (FIFO).
 	 */
-	struct list_head
-	irq_handler_list_tab[INTERRUPT_CONTEXT_NUMBER][DAL_IRQ_SOURCES_NUMBER];
+	struct irq_list_head irq_handler_list_low_tab[DAL_IRQ_SOURCES_NUMBER];
+	struct list_head irq_handler_list_high_tab[DAL_IRQ_SOURCES_NUMBER];
 
 	struct common_irq_params
 	pflip_params[DAL_IRQ_SOURCE_PFLIP_LAST - DAL_IRQ_SOURCE_PFLIP_FIRST + 1];
