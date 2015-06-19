@@ -113,6 +113,24 @@ struct amdgpu_display_manager {
 	/* Timer-related data. */
 	struct list_head timer_handler_list;
 	struct workqueue_struct *timer_workqueue;
+
+	/*
+	 * The problem:
+	 * We don't get Set Mode call if only one display is connected, and
+	 * this display is disconnected and connected back to the same
+	 * connector.
+	 *
+	 * The workaround:
+	 * 1. When the last display is disconnected, simulate a hot-plug for a
+	 * fake display which has the same EDID as the one which was just
+	 * disconnected, but with a mode list reduced to a single mode
+	 * (the fail-safe mode) 640x480.
+	 * Because of the change in mode-list we do get Set Mode.
+	 * 2. When the real display is connected notify the OS about the
+	 * new mode-list, which is different from the fake one, because
+	 * of the difference the OS calls Set Mode again, which is exactly
+	 * what we need. */
+	uint32_t fake_display_index;
 };
 
 

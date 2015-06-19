@@ -367,9 +367,100 @@ static void amdgpu_dm_crtc_high_irq(void *interrupt_params)
 
 }
 
+static void hpd_low_irq_helper_func(
+	void *param,
+	const struct path_mode *pm)
+{
+	uint32_t *display_index = param;
+
+	*display_index = pm->display_path_index;
+}
+
 static void amdgpu_dm_hpd_low_irq(void *interrupt_params)
 {
-	/* TODO: add implementation */
+	struct amdgpu_device *adev = interrupt_params;
+	struct dal *dal = adev->dm.dal;
+	struct drm_device *dev = adev->ddev;
+	uint32_t connected_displays = dal_get_connected_targets_vector(dal);
+	struct drm_connector *connector = NULL;
+	struct amdgpu_connector *aconnector = NULL;
+
+	if (connected_displays == 0) {
+		uint32_t display_index = INVALID_DISPLAY_INDEX;
+
+		dal_pin_active_path_modes(
+			dal,
+			&display_index,
+			INVALID_DISPLAY_INDEX,
+			hpd_low_irq_helper_func);
+
+		adev->dm.fake_display_index = display_index;
+
+		list_for_each_entry(
+			connector,
+			&dev->mode_config.connector_list,
+			head) {
+			aconnector = to_amdgpu_connector(connector);
+
+			/*aconnector->connector_id means display_index*/
+			if (aconnector->connector_id == display_index)
+				break;
+		}
+
+		/*
+		 * force connected status on fake display connector
+		 */
+		aconnector->base.status = connector_status_connected;
+
+		/*
+		 * we need to force user-space notification on changed modes
+		 */
+		drm_kms_helper_hotplug_event(dev);
+	} else if (adev->dm.fake_display_index != INVALID_DISPLAY_INDEX) {
+		/* we assume only one display is connected */
+		uint32_t connected_display_index = 0;
+
+		/* identify first connected display index */
+		while (connected_displays) {
+			if (1 & connected_displays)
+				break;
+
+			++connected_display_index;
+			connected_displays >>= 1;
+		}
+
+		/*
+		 * if there is display on another connector get connected
+		 * we need to clean-up connection status on fake display
+		 */
+		if (connected_display_index != adev->dm.fake_display_index) {
+			list_for_each_entry(
+				connector,
+				&dev->mode_config.connector_list,
+				head) {
+				aconnector = to_amdgpu_connector(connector);
+
+				/*aconnector->connector_id means display_index*/
+				if (aconnector->connector_id ==
+					adev->dm.fake_display_index)
+					break;
+			}
+
+			/*
+			 * reset connected status on fake display connector
+			 */
+			aconnector->base.status = connector_status_disconnected;
+		} else {
+			dal_reset_path_mode(
+				dal,
+				1,
+				&adev->dm.fake_display_index);
+		}
+
+		adev->dm.fake_display_index = INVALID_DISPLAY_INDEX;
+
+		drm_kms_helper_hotplug_event(dev);
+	}
 }
 
 static int dm_set_clockgating_state(void *handle,
@@ -399,6 +490,7 @@ int amdgpu_dm_init(struct amdgpu_device *adev)
 	struct drm_device *ddev = adev->ddev;
 	adev->dm.ddev = adev->ddev;
 	adev->dm.adev = adev;
+	adev->dm.fake_display_index = INVALID_DISPLAY_INDEX;
 
 	/* Zero all the fields */
 	memset(&init_data, 0, sizeof(init_data));

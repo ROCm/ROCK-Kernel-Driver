@@ -256,27 +256,30 @@ void dal_notify_hotplug(
 
 	/* 1. Update status of drm connectors
 	 * 2. Send a uevent and let userspace tell us what to do */
-	drm_helper_hpd_irq_event(dev);
-
 	list_for_each_entry(connector,
 		&dev->mode_config.connector_list, head) {
 		aconnector = to_amdgpu_connector(connector);
 
 		/*aconnector->connector_id means display_index*/
-		if (aconnector->connector_id == display_index) {
-			if (is_connected)
-				drm_mode_connector_update_edid_property(
-					connector,
-					(struct edid *)
-					dal_get_display_edid(
-						adev->dm.dal,
-						display_index,
-						NULL));
-			else
-				drm_mode_connector_update_edid_property(
-					connector, NULL);
-		}
+		if (aconnector->connector_id != display_index)
+			continue;
+
+		if (is_connected) {
+			drm_mode_connector_update_edid_property(
+				connector,
+				(struct edid *)
+				dal_get_display_edid(
+					adev->dm.dal,
+					display_index,
+					NULL));
+		} else
+			drm_mode_connector_update_edid_property(
+				connector, NULL);
+
+		break;
 	}
+
+	drm_helper_hpd_irq_event(dev);
 }
 
 void dal_notify_capability_change(

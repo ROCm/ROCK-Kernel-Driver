@@ -1358,7 +1358,16 @@ int amdgpu_display_manager_fill_modes(struct drm_connector *connector,
 				stop = true;
 			else
 				++non_filtered_modes_num;
+
+			if (adev->dm.fake_display_index ==
+				aconnector->connector_id)
+				break;
+
 		} while (!stop && dal_mode_query_select_next_refresh_rate(mq));
+
+		if (adev->dm.fake_display_index == aconnector->connector_id)
+			break;
+
 	} while (!stop && dal_mode_query_select_next_render_mode(mq));
 
 	if (stop)
