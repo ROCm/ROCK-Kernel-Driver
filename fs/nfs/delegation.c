@@ -377,6 +377,25 @@ int nfs_inode_set_delegation(struct inode *inode, struct rpc_cred *cred, struct 
 				old_delegation, clp);
 		if (freeme == NULL)
 			goto out;
+	} else {
+		/* Don't accept an incompatible delegation */
+		int incompatible = 0;
+		struct nfs_inode *nfsi = NFS_I(inode);
+		struct nfs4_state *state;
+
+		spin_lock(&inode->i_lock);
+		list_for_each_entry(state, &nfsi->open_states, inode_states) {
+			if ((state->state & delegation->type) != state->state) {
+				incompatible = 1;
+				break;
+			}
+		}
+		spin_unlock(&inode->i_lock);
+		if (incompatible) {
+			freeme = delegation;
+			delegation = NULL;
+			goto out;
+		}
 	}
 	list_add_tail_rcu(&delegation->super_list, &server->delegations);
 	rcu_assign_pointer(nfsi->delegation, delegation);
