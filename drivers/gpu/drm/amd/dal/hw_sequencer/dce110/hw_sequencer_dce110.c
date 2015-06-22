@@ -633,11 +633,11 @@ static void setup_audio_wall_dto(
 				path_mode->display_path);
 
 		dal_hw_sequencer_build_audio_output(
-		hws,
-		path_mode,
-		engine_id,
-		&build_params->pll_settings_params[selected_path_id],
-		&audio_output);
+			hws,
+			path_mode,
+			engine_id,
+			&build_params->pll_settings_params[selected_path_id],
+			&audio_output);
 
 		dal_audio_setup_audio_wall_dto(
 			selected_audio,

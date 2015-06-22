@@ -156,6 +156,12 @@ enum encoder_result dal_digital_encoder_dp_enable_output(
 
 	/* Enable the PHY */
 
+	if (output->flags.bits.ENABLE_AUDIO)
+		HW_CTX(enc)->funcs->set_afmt_memory_power_state(
+			HW_CTX(enc),
+			output->ctx.engine,
+			true);
+
 	result = DIGITAL_ENCODER_DP(enc)->funcs->do_enable_output(
 		DIGITAL_ENCODER_DP(enc), output, &output->link_settings);
 
@@ -199,6 +205,12 @@ enum encoder_result dal_digital_encoder_dp_disable_output(
 	 * on the last do_enable_output(). */
 	DIGITAL_ENCODER_DP(enc)->funcs->do_disable_output(
 		DIGITAL_ENCODER_DP(enc), output);
+
+	if (output->flags.bits.ENABLE_AUDIO)
+		HW_CTX(enc)->funcs->set_afmt_memory_power_state(
+			HW_CTX(enc),
+			output->ctx.engine,
+			false);
 
 	return ENCODER_RESULT_OK;
 }

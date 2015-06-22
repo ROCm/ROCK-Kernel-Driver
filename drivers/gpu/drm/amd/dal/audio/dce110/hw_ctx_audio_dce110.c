@@ -347,17 +347,15 @@ static void setup_audio_wall_dto(
 	const struct audio_crtc_info *crtc_info,
 	const struct audio_pll_info *pll_info)
 {
-	struct azalia_clock_info azaliaclockinfo = { 0 };
+	struct azalia_clock_info clock_info = { 0 };
 
-	uint32_t value = 0;
-	value = dal_read_reg(hw_ctx->ctx,
-			mmDCCG_AUDIO_DTO_SOURCE);
+	uint32_t value = dal_read_reg(hw_ctx->ctx, mmDCCG_AUDIO_DTO_SOURCE);
 
 	/* TODO: GraphicsObject\inc\GraphicsObjectDefs.hpp(131):
 	 *inline bool isHdmiSignal(SignalType signal)
 	 *if (Signals::isHdmiSignal(signal))
 	 */
-	if (signal == SIGNAL_TYPE_HDMI_TYPE_A) {
+	if (dal_is_hdmi_signal(signal)) {
 		/*DTO0 Programming goal:
 		-generate 24MHz, 128*Fs from 24MHz
 		-use DTO0 when an active HDMI port is connected
@@ -368,7 +366,7 @@ static void setup_audio_wall_dto(
 			hw_ctx,
 			crtc_info->requested_pixel_clock,
 			crtc_info->calculated_pixel_clock,
-			&azaliaclockinfo);
+			&clock_info);
 
 		/* On TN/SI, Program DTO source select and DTO select before
 		programming DTO modulo and DTO phase. These bits must be
@@ -395,12 +393,10 @@ static void setup_audio_wall_dto(
 
 		/* module */
 		{
-			value = 0;
-
 			value = dal_read_reg(hw_ctx->ctx,
 					mmDCCG_AUDIO_DTO0_MODULE);
 			set_reg_field_value(value,
-				azaliaclockinfo.audio_dto_module,
+				clock_info.audio_dto_module,
 				DCCG_AUDIO_DTO0_MODULE,
 				DCCG_AUDIO_DTO0_MODULE);
 			dal_write_reg(hw_ctx->ctx,
@@ -414,7 +410,7 @@ static void setup_audio_wall_dto(
 			value = dal_read_reg(hw_ctx->ctx,
 					mmDCCG_AUDIO_DTO0_PHASE);
 			set_reg_field_value(value,
-				azaliaclockinfo.audio_dto_phase,
+				clock_info.audio_dto_phase,
 				DCCG_AUDIO_DTO0_PHASE,
 				DCCG_AUDIO_DTO0_PHASE);
 
@@ -434,7 +430,7 @@ static void setup_audio_wall_dto(
 			hw_ctx,
 			crtc_info->requested_pixel_clock,
 			pll_info,
-			&azaliaclockinfo);
+			&clock_info);
 
 		/* Program DTO select before programming DTO modulo and DTO
 		phase. default to use DTO1 */
@@ -446,10 +442,11 @@ static void setup_audio_wall_dto(
 			/*dal_write_reg(mmDCCG_AUDIO_DTO_SOURCE, value)*/
 
 			/* Select 512fs for DP TODO: web register definition
-			does not match register header file */
+			does not match register header file
 			set_reg_field_value(value, 1,
 				DCCG_AUDIO_DTO_SOURCE,
 				DCCG_AUDIO_DTO2_USE_512FBR_DTO);
+			*/
 
 			dal_write_reg(hw_ctx->ctx,
 					mmDCCG_AUDIO_DTO_SOURCE, value);
@@ -463,7 +460,7 @@ static void setup_audio_wall_dto(
 					mmDCCG_AUDIO_DTO1_MODULE);
 
 			set_reg_field_value(value,
-				azaliaclockinfo.audio_dto_module,
+				clock_info.audio_dto_module,
 				DCCG_AUDIO_DTO1_MODULE,
 				DCCG_AUDIO_DTO1_MODULE);
 
@@ -479,7 +476,7 @@ static void setup_audio_wall_dto(
 					mmDCCG_AUDIO_DTO1_PHASE);
 
 			set_reg_field_value(value,
-				azaliaclockinfo.audio_dto_phase,
+				clock_info.audio_dto_phase,
 				DCCG_AUDIO_DTO1_PHASE,
 				DCCG_AUDIO_DTO1_PHASE);
 
@@ -1783,8 +1780,7 @@ static bool get_azalia_clock_info_dp(
 
 	/*audio_dto_phase = 24 * 10,000;
 	 * 24MHz in [100Hz] units */
-	azalia_clock_info->audio_dto_phase =
-			24 * 10000;
+	azalia_clock_info->audio_dto_phase = 24 * 10000;
 
 	/*audio_dto_module = dpDtoSourceClockInkhz * 10,000;
 	 *  [khz] ->[100Hz] */
