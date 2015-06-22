@@ -352,8 +352,12 @@ bool dal_timing_list_query_add_timing(struct dal_timing_list_query *tlsq,
 		}
 	}
 
-	if (ret)
+	if (ret) {
+		dal_mode_manager_update_disp_path_func_view_tbl(
+			dal_get_mode_manager(tlsq->parent_dal),
+			tlsq->display_index);
 		tlsq->added_timing_count++;
+	}
 
 	return ret;
 }
