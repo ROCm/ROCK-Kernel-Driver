@@ -782,6 +782,11 @@ void dal_set_display_dpms(
 	case DAL_POWER_STATE_STANDBY:
 	case DAL_POWER_STATE_SUSPEND:
 	case DAL_POWER_STATE_OFF:
+		dal_display_service_mem_request_control(
+			dal->display_service,
+			display_index,
+			false);
+
 		dal_display_service_target_power_control(
 			dal->display_service,
 			display_index, false);
@@ -1082,31 +1087,52 @@ uint32_t dal_get_crtc_scanoutpos(
 
 }
 
-enum dal_irq_source dal_get_vblank_irq_src_from_display_index(struct dal *dal,
-		uint32_t display_index)
+static enum dal_irq_source get_irq_src_from_display_index_helper(
+	struct dal *dal,
+	uint32_t display_index,
+	uint32_t plane_no,
+	enum dal_irq_source base_irq_source)
 {
 	struct display_path *display_path;
 	struct controller *controller;
 	enum controller_id crtc_id;
 	enum dal_irq_source src;
 
+	/* return base irq source in DAL bypass mode */
+	if (dal == NULL)
+		return base_irq_source;
+
 	display_path = dal_tm_display_index_to_display_path(dal->topology_mgr,
 			display_index);
 
-	controller = dal_tm_get_controller_from_display_path(dal->topology_mgr,
-			display_path);
+	controller = dal_display_path_get_controller_for_layer_index(
+			display_path, plane_no);
 
 	if (NULL == controller)
 		return DAL_IRQ_SOURCE_INVALID;
 
 	crtc_id = dal_controller_get_graphics_object_id(controller).id;
 
-	src = crtc_id - 1 + DAL_IRQ_SOURCE_CRTC1VSYNC;
+	src = crtc_id - 1 + base_irq_source;
 
 	return src;
 }
 
-void dal_set_vblank_irq(struct dal *dal, uint32_t display_index, bool enable)
+enum dal_irq_source dal_get_vblank_irq_src_from_display_index(
+	struct dal *dal,
+	uint32_t display_index)
+{
+	return get_irq_src_from_display_index_helper(
+		dal,
+		display_index,
+		0,
+		DAL_IRQ_SOURCE_CRTC1VSYNC);
+}
+
+void dal_set_vblank_irq(
+	struct dal *dal,
+	uint32_t display_index,
+	bool enable)
 {
 	struct display_path *display_path;
 	struct controller *controller;
@@ -1132,29 +1158,11 @@ enum dal_irq_source dal_get_pflip_irq_src_from_display_index(
 	uint32_t display_index,
 	uint32_t plane_no)
 {
-	struct display_path *display_path;
-	struct controller *controller;
-	enum controller_id crtc_id;
-	enum dal_irq_source src;
-
-	/* return first flip source in DAL bypass mode */
-	if (dal == NULL)
-		return DAL_IRQ_SOURCE_PFLIP1;
-
-	display_path = dal_tm_display_index_to_display_path(dal->topology_mgr,
-			display_index);
-
-	controller = dal_display_path_get_controller_for_layer_index(
-			display_path, plane_no);
-
-	if (NULL == controller)
-		return DAL_IRQ_SOURCE_INVALID;
-
-	crtc_id = dal_controller_get_graphics_object_id(controller).id;
-
-	src = crtc_id - 1 + DAL_IRQ_SOURCE_PFLIP1;
-
-	return src;
+	return get_irq_src_from_display_index_helper(
+		dal,
+		display_index,
+		plane_no,
+		DAL_IRQ_SOURCE_PFLIP1);
 }
 
 struct is_display_active_param {
