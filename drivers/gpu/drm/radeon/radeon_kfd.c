@@ -711,6 +711,16 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 	is_wptr_shadow_valid = !get_user(wptr_shadow, wptr);
 
 	acquire_queue(kgd, pipe_id, queue_id);
+
+	write_register(kgd, COMPUTE_STATIC_THREAD_MGMT_SE0,
+			m->compute_static_thread_mgmt_se0);
+	write_register(kgd, COMPUTE_STATIC_THREAD_MGMT_SE1,
+			m->compute_static_thread_mgmt_se1);
+	write_register(kgd, COMPUTE_STATIC_THREAD_MGMT_SE2,
+			m->compute_static_thread_mgmt_se2);
+	write_register(kgd, COMPUTE_STATIC_THREAD_MGMT_SE3,
+			m->compute_static_thread_mgmt_se3);
+
 	write_register(kgd, CP_MQD_BASE_ADDR, m->cp_mqd_base_addr_lo);
 	write_register(kgd, CP_MQD_BASE_ADDR_HI, m->cp_mqd_base_addr_hi);
 	write_register(kgd, CP_MQD_CONTROL, m->cp_mqd_control);
