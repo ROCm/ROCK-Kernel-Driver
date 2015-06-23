@@ -364,6 +364,31 @@ int pqm_update_queue(struct process_queue_manager *pqm, unsigned int qid,
 	return 0;
 }
 
+int pqm_set_cu_mask(struct process_queue_manager *pqm, unsigned int qid,
+			struct queue_properties *p)
+{
+	int retval;
+	struct process_queue_node *pqn;
+
+	BUG_ON(!pqm);
+
+	pqn = get_queue_by_qid(pqm, qid);
+	if (!pqn) {
+		pr_debug("amdkfd: No queue %d exists for update operation\n",
+				qid);
+		return -EFAULT;
+	}
+
+	pqn->q->properties.cu_mask = p->cu_mask;
+
+	retval = pqn->q->device->dqm->ops.update_queue(pqn->q->device->dqm,
+							pqn->q);
+	if (retval != 0)
+		return retval;
+
+	return 0;
+}
+
 struct kernel_queue *pqm_get_kernel_queue(
 					struct process_queue_manager *pqm,
 					unsigned int qid)

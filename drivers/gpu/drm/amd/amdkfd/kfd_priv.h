@@ -337,6 +337,8 @@ struct queue_properties {
 	uint32_t eop_ring_buffer_size;
 	uint64_t ctx_save_restore_area_address;
 	uint32_t ctx_save_restore_area_size;
+	/* Relevant for CU */
+	uint32_t cu_mask;
 };
 
 /**
@@ -679,6 +681,8 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 			    unsigned int *qid);
 int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid);
 int pqm_update_queue(struct process_queue_manager *pqm, unsigned int qid,
+			struct queue_properties *p);
+int pqm_set_cu_mask(struct process_queue_manager *pqm, unsigned int qid,
 			struct queue_properties *p);
 struct kernel_queue *pqm_get_kernel_queue(struct process_queue_manager *pqm,
 						unsigned int qid);

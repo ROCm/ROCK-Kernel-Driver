@@ -385,7 +385,23 @@ static int kfd_ioctl_update_queue(struct file *filp, struct kfd_process *p,
 static int kfd_ioctl_set_cu_mask(struct file *filp, struct kfd_process *p,
 					void *data)
 {
-	return 0;
+	int retval;
+	struct kfd_ioctl_set_cu_mask_args *args = data;
+	struct queue_properties properties;
+	uint32_t __user *cu_mask_ptr = (uint32_t __user *)args->cu_mask_ptr;
+
+	if (get_user(properties.cu_mask, cu_mask_ptr))
+		return -EFAULT;
+	if (properties.cu_mask == 0)
+		return 0;
+
+	mutex_lock(&p->mutex);
+
+	retval = pqm_set_cu_mask(&p->pqm, args->queue_id, &properties);
+
+	mutex_unlock(&p->mutex);
+
+	return retval;
 }
 
 static int kfd_ioctl_set_memory_policy(struct file *filep,
