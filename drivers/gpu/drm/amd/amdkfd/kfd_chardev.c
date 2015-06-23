@@ -382,6 +382,12 @@ static int kfd_ioctl_update_queue(struct file *filp, struct kfd_process *p,
 	return retval;
 }
 
+static int kfd_ioctl_set_cu_mask(struct file *filp, struct kfd_process *p,
+					void *data)
+{
+	return 0;
+}
+
 static int kfd_ioctl_set_memory_policy(struct file *filep,
 					struct kfd_process *p, void *data)
 {
@@ -1288,6 +1294,9 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ALLOC_MEMORY_OF_SCRATCH,
 			kfd_ioctl_alloc_scratch_memory, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_CU_MASK,
+			kfd_ioctl_set_cu_mask, 0),
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
