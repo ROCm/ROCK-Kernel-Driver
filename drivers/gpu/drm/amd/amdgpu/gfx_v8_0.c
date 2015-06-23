@@ -3115,6 +3115,10 @@ static int gfx_v8_0_cp_compute_resume(struct amdgpu_device *adev)
 
 		amdgpu_bo_kunmap(ring->mqd_obj);
 		amdgpu_bo_unreserve(ring->mqd_obj);
+
+		/* reset wptr */
+		ring->wptr = 0;
+		amdgpu_ring_set_wptr(ring);
 	}
 
 	if (use_doorbell) {
