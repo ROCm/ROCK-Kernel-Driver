@@ -36,6 +36,52 @@ static inline struct vi_mqd *get_mqd(void *mqd)
 	return (struct vi_mqd *)mqd;
 }
 
+static void update_cu_mask(struct mqd_manager *mm, void *mqd,
+			struct queue_properties *q)
+{
+	struct vi_mqd *m;
+	struct kfd_cu_info cu_info;
+	uint32_t *mgmt_se_mask;
+	uint32_t cu_per_sh_mask, cu_per_sh_shift;
+	uint32_t cu_per_se, cu_mask;
+	uint32_t sh0_cu_mask, sh1_cu_mask;
+	int se;
+
+	if (q->cu_mask == 0)
+		return;
+
+	m = get_mqd(mqd);
+	m->compute_static_thread_mgmt_se0 = 0;
+	m->compute_static_thread_mgmt_se1 = 0;
+	m->compute_static_thread_mgmt_se2 = 0;
+	m->compute_static_thread_mgmt_se3 = 0;
+
+	mm->dev->kfd2kgd->get_cu_info(mm->dev->kgd, &cu_info);
+	cu_per_sh_shift = cu_info.num_cu_per_sh;
+	cu_per_sh_mask = (1 << cu_per_sh_shift) - 1;
+	cu_per_se = cu_info.num_cu_per_sh *
+		cu_info.num_shader_arrays_per_engine;
+
+	mgmt_se_mask = &m->compute_static_thread_mgmt_se0;
+	cu_mask = q->cu_mask;
+	for (se = 0; se < cu_info.num_shader_engines; se++) {
+		sh0_cu_mask = cu_mask & cu_per_sh_mask;
+		if (cu_info.num_shader_arrays_per_engine > 1)
+			sh1_cu_mask = (cu_mask >> cu_per_sh_shift)
+					& cu_per_sh_mask;
+		else
+			sh1_cu_mask = 0;
+		*mgmt_se_mask = sh0_cu_mask | (sh1_cu_mask << 16);
+		mgmt_se_mask++;
+		cu_mask >>= cu_per_se;
+	}
+	pr_debug("kfd: update cu mask to %#x %#x %#x %#x\n",
+		m->compute_static_thread_mgmt_se0,
+		m->compute_static_thread_mgmt_se1,
+		m->compute_static_thread_mgmt_se2,
+		m->compute_static_thread_mgmt_se3);
+}
+
 static int init_mqd(struct mqd_manager *mm, void **mqd,
 			struct kfd_mem_obj **mqd_mem_obj, uint64_t *gart_addr,
 			struct queue_properties *q)
@@ -153,6 +199,8 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 		m->cp_hqd_pq_control |= CP_HQD_PQ_CONTROL__NO_UPDATE_RPTR_MASK |
 				2 << CP_HQD_PQ_CONTROL__SLOT_BASED_WPTR__SHIFT;
 	}
+
+	update_cu_mask(mm, mqd, q);
 
 	m->cp_hqd_active = 0;
 	q->is_active = false;
