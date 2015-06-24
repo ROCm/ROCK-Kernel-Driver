@@ -67,6 +67,7 @@ struct common_irq_params {
 
 struct amdgpu_display_manager {
 	struct dal *dal;
+	void *cgs_device;
 	/* lock to be used when DAL is called from SYNC IRQ context */
 	spinlock_t dal_lock;
 

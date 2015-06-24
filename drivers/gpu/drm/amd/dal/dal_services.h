@@ -90,10 +90,24 @@ int32_t dal_strncmp(const int8_t *p1, const int8_t *p2, uint32_t count);
  * GPU registers access
  *
  */
-
-uint32_t dal_read_reg(
+#ifndef BUILD_DAL_TEST
+static inline uint32_t dal_read_reg(
 	struct dal_context *ctx,
-	uint32_t address);
+	uint32_t address)
+{
+	uint32_t value = cgs_read_register(ctx->cgs_device, address);
+
+#if defined(__DAL_REGISTER_LOGGER__)
+	if (true == dal_reg_logger_should_dump_register()) {
+		dal_reg_logger_rw_count_increment();
+		DRM_INFO("%s 0x%x 0x%x\n", __func__, address, value);
+	}
+#endif
+	return value;
+}
+#else
+uint32_t dal_read_reg(struct dal_context *ctx, uint32_t address);
+#endif
 
 static inline uint32_t get_reg_field_value_ex(
 	uint32_t reg_value,
@@ -125,10 +139,23 @@ static inline uint32_t set_reg_field_value_ex(
 		reg_name ## __ ## reg_field ## _MASK,\
 		reg_name ## __ ## reg_field ## __SHIFT)
 
-void dal_write_reg(
+#ifndef BUILD_DAL_TEST
+static inline void dal_write_reg(
 	struct dal_context *ctx,
 	uint32_t address,
-	uint32_t value);
+	uint32_t value)
+{
+#if defined(__DAL_REGISTER_LOGGER__)
+	if (true == dal_reg_logger_should_dump_register()) {
+		dal_reg_logger_rw_count_increment();
+		DRM_INFO("%s 0x%x 0x%x\n", __func__, address, value);
+	}
+#endif
+	cgs_write_register(ctx->cgs_device, address, value);
+}
+#else
+void dal_write_reg(struct dal_context *ctx, uint32_t address, uint32_t value);
+#endif
 
 static inline uint32_t dal_read_index_reg(
 	struct dal_context *ctx,
@@ -182,8 +209,6 @@ struct platform_info_ext_brightness_caps {
 bool dal_get_platform_info(
 	struct dal_context *dal_context,
 	struct platform_info_params *params);
-
-
 
 /**************************************
  * Calls to Power Play (PP) component

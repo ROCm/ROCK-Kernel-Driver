@@ -612,6 +612,15 @@ int amdgpu_dm_init(struct amdgpu_device *adev)
 
 	init_data.driver = adev;
 
+	adev->dm.cgs_device = amdgpu_cgs_create_device(adev);
+
+	if (!adev->dm.cgs_device) {
+		DRM_ERROR("amdgpu: failed to create cgs device.\n");
+		goto error;
+	}
+
+	init_data.cgs_device = adev->dm.cgs_device;
+
 	adev->dm.dal = NULL;
 
 	/* enable gpu scaling in DAL */
@@ -676,6 +685,11 @@ void amdgpu_dm_fini(struct amdgpu_device *adev)
 	amdgpu_dm_destroy_drm_device(&adev->dm);
 
 	/*amdgpu_dm_irq_fini(adev);*/
+
+	if (adev->dm.cgs_device) {
+		amdgpu_cgs_destroy_device(adev->dm.cgs_device);
+		adev->dm.cgs_device = NULL;
+	}
 
 	dal_destroy(&adev->dm.dal);
 	return;

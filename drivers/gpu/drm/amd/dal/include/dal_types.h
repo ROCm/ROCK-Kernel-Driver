@@ -173,6 +173,7 @@ struct dal_init_data {
 	struct bdf_info bdf_info;
 	struct dal_override_parameters display_param;
 	void *driver; /* dal_context */
+	void *cgs_device;
 };
 
 
@@ -194,6 +195,7 @@ struct dal_context {
 	void *driver_context; /* e.g. amdsoc_device */
 #endif
 	struct dal_logger *logger;
+	void *cgs_device;
 };
 
 /* Wireless display structs */

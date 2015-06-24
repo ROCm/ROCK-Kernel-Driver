@@ -116,7 +116,6 @@ struct dal *dal_create(struct dal_init_data *init)
 		return NULL;
 	}
 
-
 	if (dal_construct(init, dal_instance))
 		return dal_instance;
 	else {
@@ -153,6 +152,7 @@ static bool dal_construct(struct dal_init_data *init,
 	struct dal_context *dal_context = &dal_instance->dal_context;
 	dal_instance->init_data = *init;
 	dal_instance->dal_context.driver_context = init->driver;
+	dal_instance->dal_context.cgs_device = init->cgs_device;
 
 	/* Logger */
 
