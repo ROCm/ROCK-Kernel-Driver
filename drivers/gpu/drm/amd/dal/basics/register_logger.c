@@ -41,6 +41,7 @@ struct dal_reg_dump_stack_location {
 	const char *current_caller_func;
 	long current_pid;
 	long current_tgid;
+	uint32_t rw_count;/* register access counter for current function. */
 };
 
 /* This the maximum number of nested calls to the 'reg_dump' facility. */
@@ -50,7 +51,7 @@ struct dal_reg_dump_stack {
 	int32_t stack_pointer;
 	struct dal_reg_dump_stack_location
 		stack_locations[DAL_REG_DUMP_STACK_MAX_SIZE];
-	uint32_t dal_test_dump_rw_count;
+	uint32_t total_rw_count; /* Total count for *all* functions. */
 };
 
 static struct dal_reg_dump_stack reg_dump_stack = {0};
@@ -137,6 +138,8 @@ void dal_reg_logger_push(const char *caller_func)
 	if (NULL == free_stack_location)
 		return;
 
+	dal_memset(free_stack_location, 0, sizeof(*free_stack_location));
+
 	free_stack_location->current_caller_func = caller_func;
 	free_stack_location->current_pid = dal_get_pid();
 	free_stack_location->current_tgid = dal_get_tgid();
@@ -160,9 +163,11 @@ void dal_reg_logger_pop(void)
 	}
 
 	dal_output_to_console(
-	"[REG_DUMP]:%s - end. Reg R/W Total Count:%d. (pid:%ld, tgid:%ld)\n",
+	"[REG_DUMP]:%s - end."\
+	" Reg R/W Count: Total=%d Function=%d. (pid:%ld, tgid:%ld)\n",
 			top_stack_location->current_caller_func,
-			reg_dump_stack.dal_test_dump_rw_count,
+			reg_dump_stack.total_rw_count,
+			top_stack_location->rw_count,
 			dal_get_pid(),
 			dal_get_tgid());
 
@@ -171,7 +176,10 @@ void dal_reg_logger_pop(void)
 
 void dal_reg_logger_rw_count_increment(void)
 {
-	++reg_dump_stack.dal_test_dump_rw_count;
+	++reg_dump_stack.total_rw_count;
+
+	++reg_dump_stack.stack_locations
+		[reg_dump_stack.stack_pointer - 1].rw_count;
 }
 
 bool dal_reg_logger_should_dump_register(void)
