@@ -636,15 +636,15 @@ ldt_ss:
 restore_all_enable_events:
 	TRACE_IRQS_ON
 	__ENABLE_INTERRUPTS
-scrit:	/**** START OF CRITICAL REGION ****/
+.Lscrit: /**** START OF CRITICAL REGION ****/
 	__TEST_PENDING
 	jnz  14f			# process more events if necessary...
 	RESTORE_REGS 4
 1:	INTERRUPT_RETURN
 	_ASM_EXTABLE(1b,iret_exc)
 14:	__DISABLE_INTERRUPTS
+.Lecrit: /**** END OF CRITICAL REGION ****/
 	TRACE_IRQS_OFF
-ecrit:  /**** END OF CRITICAL REGION ****/
 	jmp  .Ldo_upcall
 
 	CFI_RESTORE_STATE
@@ -879,15 +879,15 @@ ENTRY(hypervisor_callback)
 	andl $SEGMENT_RPL_MASK,%ecx
 	cmpl $USER_RPL,%ecx
 	jae  .Ldo_upcall
-	cmpl $scrit,%eax
+	cmpl $.Lscrit,%eax
 	jb   0f
-	cmpl $ecrit,%eax
+	cmpl $.Lecrit,%eax
 	jb   critical_region_fixup
 0:
 #ifdef CONFIG_XEN_SUPERVISOR_MODE_KERNEL
-	cmpl $sysexit_scrit,%eax
+	cmpl $.Lsysexit_scrit,%eax
 	jb   .Ldo_upcall
-	cmpl $sysexit_ecrit,%eax
+	cmpl $.Lsysexit_ecrit,%eax
 	ja   .Ldo_upcall
 	addl $PT_OLDESP,%esp		# Remove eflags...ebx from stack frame.
 #endif
@@ -918,7 +918,7 @@ ENTRY(hypervisor_callback)
 # provides the number of bytes which have already been popped from the
 # interrupted stack frame.
 critical_region_fixup:
-	movsbl critical_fixup_table-scrit(%eax),%ecx # %ecx contains num slots popped
+	movsbl critical_fixup_table-.Lscrit(%eax),%ecx # %ecx contains num slots popped
 	testl %ecx,%ecx
 	leal (%esp,%ecx,4),%esi		# %esi points at end of src region
 	leal PT_OLDESP(%esp),%edi	# %edi points at end of dst region

@@ -137,14 +137,14 @@
 #define INTERRUPT_RETURN		iret
 #define ENABLE_INTERRUPTS_SYSEXIT					  \
 	movb $0,evtchn_upcall_mask(%esi) /* __ENABLE_INTERRUPTS */	; \
-sysexit_scrit:	/**** START OF SYSEXIT CRITICAL REGION ****/		; \
+.Lsysexit_scrit: /**** START OF SYSEXIT CRITICAL REGION ****/		; \
 	cmpb $0,evtchn_upcall_pending(%esi) /* __TEST_PENDING */	; \
 	jnz  14f	/* process more events if necessary... */	; \
 	movl PT_ESI(%esp), %esi						; \
 	sysexit								; \
 14:	movb $1,evtchn_upcall_mask(%esi) /* __DISABLE_INTERRUPTS */	; \
+.Lsysexit_ecrit: /**** END OF SYSEXIT CRITICAL REGION ****/		; \
 	TRACE_IRQS_OFF							; \
-sysexit_ecrit:	/**** END OF SYSEXIT CRITICAL REGION ****/		; \
 	mov  $__KERNEL_PERCPU, %ecx					; \
 	push %esp							; \
 	mov  %ecx, %fs							; \

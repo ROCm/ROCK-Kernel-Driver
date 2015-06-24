@@ -152,6 +152,8 @@ struct backend_info {
 	struct xenbus_watch hotplug_status_watch;
 	int have_hotplug_status_watch:1;
 
+	const char *hotplug_script;
+
 	/* State relating to the netback accelerator */
 	void *netback_accel_priv;
 	/* The accelerator that this backend is currently using */

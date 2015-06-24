@@ -47,6 +47,7 @@ static int netback_remove(struct xenbus_device *dev)
 	}
 	dev_set_drvdata(&dev->dev, NULL);
 	up_write(&teardown_sem);
+	kfree(be->hotplug_script);
 	kfree(be);
 	return 0;
 }
@@ -73,6 +74,7 @@ static int netback_probe(struct xenbus_device *dev,
 	struct xenbus_transaction xbt;
 	int err;
 	int sg;
+	const char *script;
 	struct backend_info *be = kzalloc(sizeof(struct backend_info),
 					  GFP_KERNEL);
 	if (!be) {
@@ -150,6 +152,15 @@ static int netback_probe(struct xenbus_device *dev,
 
 	netback_probe_accelerators(be, dev);
 
+	script = xenbus_read(XBT_NIL, dev->nodename, "script", NULL);
+	if (IS_ERR(script)) {
+		err = PTR_ERR(script);
+		xenbus_dev_fatal(dev, err, "reading script");
+		goto fail;
+	}
+
+	be->hotplug_script = script;
+
 	err = xenbus_switch_state(dev, XenbusStateInitWait);
 	if (err)
 		goto fail;
@@ -179,22 +190,13 @@ fail:
 static int netback_uevent(struct xenbus_device *xdev, struct kobj_uevent_env *env)
 {
 	struct backend_info *be;
-	char *val;
 
 	DPRINTK("netback_uevent");
 
-	val = xenbus_read(XBT_NIL, xdev->nodename, "script", NULL);
-	if (IS_ERR(val)) {
-		int err = PTR_ERR(val);
-		xenbus_dev_fatal(xdev, err, "reading script");
-		return err;
-	}
-
-	add_uevent_var(env, "script=%s", val);
-	kfree(val);
-
 	down_read(&teardown_sem);
 	be = dev_get_drvdata(&xdev->dev);
+	if (be)
+		add_uevent_var(env, "script=%s", be->hotplug_script);
 	if (be && be->netif)
 		add_uevent_var(env, "vif=%s", be->netif->dev->name);
 	up_read(&teardown_sem);
