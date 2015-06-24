@@ -2377,10 +2377,11 @@ int __i915_add_request(struct intel_engine_cs *ring,
 		ret = ring->add_request(ring);
 		if (ret)
 			return ret;
+
+		request->tail = intel_ring_get_tail(ringbuf);
 	}
 
 	request->head = request_start;
-	request->tail = intel_ring_get_tail(ringbuf);
 
 	/* Whilst this request exists, batch_obj will be on the
 	 * active_list, and so will hold the active reference. Only when this
@@ -3002,8 +3003,8 @@ int i915_vma_unbind(struct i915_vma *vma)
 		} else if (vma->ggtt_view.pages) {
 			sg_free_table(vma->ggtt_view.pages);
 			kfree(vma->ggtt_view.pages);
-			vma->ggtt_view.pages = NULL;
 		}
+		vma->ggtt_view.pages = NULL;
 	}
 
 	drm_mm_remove_node(&vma->node);
