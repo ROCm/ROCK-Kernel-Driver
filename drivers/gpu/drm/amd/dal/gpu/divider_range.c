@@ -80,7 +80,7 @@ static uint32_t dal_divider_range_calc_did(
 	}
 	/* Is this divider within our range?*/
 	if ((div < div_range->div_range_start)
-		|| (div >= div_range->div_range_start))
+		|| (div >= div_range->div_range_end))
 		return INVALID_DID;
 /* did = (divider - range_start + (range_step-1)) / range_step) + did_min*/
 	did = div - div_range->div_range_start;
