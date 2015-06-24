@@ -42,6 +42,7 @@ struct kgd_mem;
 struct kfd_cu_info {
 	uint32_t num_shader_engines;
 	uint32_t num_shader_arrays_per_engine;
+	uint32_t num_cu_per_sh;
 	uint32_t cu_active_number;
 	uint32_t cu_ao_mask;
 	uint32_t cu_bitmap[4][4];
