@@ -254,4 +254,5 @@ void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 	memcpy(&cu_info->cu_bitmap[0], &acu_info.bitmap[0], sizeof(acu_info.bitmap));
 	cu_info->num_shader_engines = adev->gfx.config.max_shader_engines;
 	cu_info->num_shader_arrays_per_engine = adev->gfx.config.max_sh_per_se;
+	cu_info->num_cu_per_sh = adev->gfx.config.max_cu_per_sh;
 }
