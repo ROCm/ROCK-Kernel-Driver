@@ -65,4 +65,4 @@ source "sound/soc/codecs/Kconfig"
 source "sound/soc/generic/Kconfig"
 
 endif	# SND_SOC
-
+source "sound/soc/amd/Kconfig"

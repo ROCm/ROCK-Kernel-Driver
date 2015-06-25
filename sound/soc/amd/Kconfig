@@ -1,0 +1,13 @@
+ config SND_SOC_AMD_CZ_RT286_MACH
+        tristate "AMD ASoC Audio driver for Carrizo with rt286 codec"
+	select SND_SOC_RT286
+	select SND_SOC_AMD_ACP
+        depends on I2C_DESIGNWARE_PLATFORM
+        help
+           This option enables AMD I2S Audio support on Carrizo
+	   with ALC288 codec.
+ config SND_SOC_AMD_ACP
+        tristate "AMD Audio Coprocessor support"
+        depends on DRM_AMD_GNB_BUS
+        help
+          This option enables ACP support (DMA,I2S) on AMD platforms.
