@@ -802,7 +802,7 @@ static int dm_resume(void *handle)
 			current_display_index++) {
 		if ((connected_displays_vector & 1) == 1) {
 			struct amdgpu_crtc *crtc =
-				adev->mode_info.crtcs[displays_number];
+				adev->mode_info.crtcs[current_display_index];
 
 			displays_vector[displays_number] =
 				current_display_index;
