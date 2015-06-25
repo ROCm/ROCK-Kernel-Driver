@@ -171,12 +171,12 @@ static int dm_crtc_cursor_set(struct drm_crtc *crtc,
 	int ret;
 	struct cursor_position position;
 
-
 	if (!handle) {
 		/* turn off cursor */
 		position.enable = false;
 		position.x = 0;
 		position.y = 0;
+		position.hot_spot_enable = false;
 		dal_set_cursor_position(adev->dm.dal, amdgpu_crtc->crtc_id, &position);
 
 		obj = NULL;
@@ -237,6 +237,10 @@ static int dm_crtc_cursor_move(struct drm_crtc *crtc,
 	position.enable = true;
 	position.x = x;
 	position.y = y;
+
+	position.hot_spot_enable = true;
+	position.x_origin = xorigin;
+	position.y_origin = yorigin;
 
 	dal_set_cursor_position(adev->dm.dal, amdgpu_crtc->crtc_id, &position);
 
