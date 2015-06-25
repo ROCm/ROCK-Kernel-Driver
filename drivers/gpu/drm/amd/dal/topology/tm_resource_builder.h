@@ -75,9 +75,6 @@ enum tm_result tm_resource_builder_add_feature_resources(
 void tm_resource_builder_sort_display_paths(
 		struct tm_resource_builder *tm_rb);
 
-void tm_resource_builder_assign_dmcu_resource(
-		struct tm_resource_builder *tm_rb);
-
 uint32_t tm_resource_builder_get_num_of_paths(
 		struct tm_resource_builder *tm_rb);
 

@@ -181,12 +181,6 @@ void tm_resource_mgr_set_gpu_interface(
 struct gpu *tm_resource_mgr_get_gpu_interface(
 		struct tm_resource_mgr *tm_rm);
 
-void tm_resource_mgr_set_dmcu(
-		struct tm_resource_mgr *tm_rm,
-		struct dmcu *dmcu);
-struct dmcu *tm_resource_mgr_get_dmcu(
-		struct tm_resource_mgr *tm_rm);
-
 enum tm_result tm_resource_mgr_attach_audio_to_display_path(
 		struct tm_resource_mgr *tm_rm,
 		struct display_path *display_path,

@@ -34,7 +34,6 @@
 #include "include/dc_clock_generator_interface.h"
 #include "include/dcs_interface.h"
 #include "include/ddc_service_types.h"
-#include "include/dmcu_interface.h"
 #include "include/encoder_interface.h"
 #include "include/logger_interface.h"
 #include "include/signal_types.h"
@@ -1244,101 +1243,6 @@ static void build_upstream_encoder_output(
 				hw_path_mode->display_path) ?
 					LINK_SPREAD_05_DOWNSPREAD_30KHZ :
 					LINK_SPREAD_DISABLED);
-}
-
-static void build_dmcu_context(
-		struct hw_sequencer *hws,
-		const struct hw_path_mode *hw_path_mode,
-		const struct psr_caps *psr_caps,
-		struct dmcu_context *dmcu_context)
-{
-	uint32_t link_idx = ASIC_LINK_INDEX;
-	struct display_path *display_path = hw_path_mode->display_path;
-	struct dcs *dcs;
-	struct controller *controller;
-
-	struct display_sink_capability sink_capability = {
-			DISPLAY_DONGLE_NONE };
-
-	struct connector_feature_support cfs;
-	struct encoder *upstream_enc;
-
-	if (hw_path_mode == NULL || dmcu_context == NULL)
-			return;
-	upstream_enc = dal_display_path_get_upstream_encoder(
-				hw_path_mode->display_path,
-				link_idx);
-	dcs = dal_display_path_get_dcs(hw_path_mode->display_path);
-
-	if (upstream_enc == NULL || dcs == NULL) {
-		BREAK_TO_DEBUGGER();
-		dal_logger_write(hws->dal_context->logger,
-			LOG_MAJOR_WARNING,
-			LOG_MINOR_COMPONENT_HWSS,
-			"%s: Failed to obtain encoder or dcs", __func__);
-		return;
-	}
-
-	dal_dcs_get_sink_capability(dcs, &sink_capability);
-
-	controller = dal_display_path_get_controller(
-			hw_path_mode->display_path);
-
-	dal_connector_get_features(
-			dal_display_path_get_connector(
-					hw_path_mode->display_path),
-					&cfs);
-
-	dmcu_context->channel = cfs.ddc_line;
-
-	dmcu_context->engine_id = ENGINE_ID_UNKNOWN;
-	if (dal_display_path_is_link_active(display_path, ASIC_LINK_INDEX))
-		dmcu_context->engine_id = dal_display_path_get_stream_engine(
-				display_path,
-				ASIC_LINK_INDEX);
-
-	dmcu_context->smu_physical_phy_id = dal_encoder_get_phy(upstream_enc);
-
-	dmcu_context->transmitter_id = dal_encoder_get_transmitter(
-			upstream_enc);
-
-	dmcu_context->controller_id = dal_controller_get_id(controller);
-
-	dmcu_context->phy_type = PHY_TYPE_UNIPHY;
-
-	dmcu_context->psr_supported_display_config =
-			(psr_caps->psr_version > 0);
-
-	/* Check if PSR CRC workaround should be applied for this ASIC */
-	if (dal_adapter_service_get_asic_bugs(
-			hws->as).PSR_WA_OVERSCAN_CRC_ERROR)
-		/* Workaround for CRC mismatch when overscan enabled
-		 * since FMT CRCs generated do not include overscan borders.*/
-		if (hw_path_mode->mode.overscan.top != 0
-				|| hw_path_mode->mode.overscan.bottom != 0
-				|| hw_path_mode->mode.overscan.left != 0
-				|| hw_path_mode->mode.overscan.right != 0)
-			/* Keep PSR disabled if overscan is enabled. */
-			dmcu_context->psr_supported_display_config = false;
-
-	/* Whether fast link training is supported by the panel */
-	dmcu_context->psr_exit_link_training_required =
-			psr_caps->psr_exit_link_training_req;
-
-	/* Vertical total pixels from crtc timing. This is used for static
-	 * screen detection. For example, if we want to enter PSR state after
-	 * idle for half a frame, we use this do determine how many lines. */
-	dmcu_context->crtc_timing_vertical_total =
-			hw_path_mode->mode.timing.v_total;
-
-	/* The following two parameters are calculated based on Display Timing
-	 * (Specifically VBLANK size) and RFB Setup Time. It is used to
-	 *  determine whether the Sink is able to capture static video frame
-	 *  on the same frame as the frame GPU transmits SDP. */
-	dmcu_context->sdp_transmit_line_num_deadline =
-			psr_caps->psr_sdp_transmit_line_num_deadline;
-	dmcu_context->psr_frame_capture_indication_required =
-			psr_caps->psr_frame_capture_indication_req;
 }
 
 /**

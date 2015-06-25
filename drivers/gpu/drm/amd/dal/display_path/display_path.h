@@ -55,10 +55,6 @@ struct display_path {
 	uint32_t number_of_links;
 	struct connector *connector;
 
-	/* optional components that are always attached
-	 * to a particular display path*/
-	struct dmcu *dmcu; /* dmcu is for embedded display paths*/
-
 	/* dcp components that attached only on acquired display path*/
 	struct clock_source *clock_source;
 

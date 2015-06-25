@@ -27,7 +27,6 @@
 
 #include "include/logger_interface.h"
 #include "include/bandwidth_manager_interface.h"
-#include "include/dmcu_interface.h"
 #include "include/connector_interface.h"
 #include "include/controller_interface.h"
 #include "include/display_path_interface.h"
@@ -522,22 +521,6 @@ static void set_display_clock(
 	else
 		dal_display_clock_set_clock(objs.dc,
 				min_clocks->min_dclk_khz);
-
-	/* When changing display engine clock, DMCU WaitLoop must be
-	 * reconfigured in order to maintain the same delays within DMCU
-	 * programming sequences. */
-	paths_number = dal_hw_path_mode_set_get_paths_number(path_set);
-	for (i = 0; i < paths_number; i++) {
-		const struct hw_path_mode *path_mode =
-			dal_hw_path_mode_set_get_path_by_index(path_set, i);
-
-		if (path_mode == NULL || path_mode->display_path == NULL)
-			continue;
-
-		/* There is only only DMCU on the ASIC. We can break from this
-		 * loop once DMCU has been found. */
-		break;
-	}
 
 	/* Start GTC counter */
 	hws->funcs->start_gtc_counter(hws, path_set);

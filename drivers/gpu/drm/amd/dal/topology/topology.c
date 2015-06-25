@@ -32,7 +32,6 @@
 #include "include/encoder_interface.h"
 #include "include/controller_interface.h"
 #include "include/display_path_interface.h"
-#include "include/dmcu_interface.h"
 #include "include/audio_interface.h"
 #include "include/dcs_interface.h"
 #include "include/vector.h"
@@ -266,8 +265,6 @@ static bool construct(struct topology_mgr_init_data *init_data,
 		 * Note: Do NOT call dal_tm_destroy()! */
 		if (tm->display_paths)
 			dal_vector_destroy(&tm->display_paths);
-
-		/* TODO: remove dmcu if was created*/
 
 		if (tm->tm_rm)
 			tm_resource_mgr_destroy(&tm->tm_rm);
@@ -2016,12 +2013,7 @@ enum tm_result dal_tm_init_hw(struct topology_mgr *tm)
 	 * number of pipes and wireless etc. */
 	tm_update_audio_connectivity(tm);
 
-	/* TODO 4. PowerUp DMCU - This should be done before Encoder */
-/*
-	dmcu = tm_resource_mgr_get_dmcu(tm->tm_rm);
-	if (dmcu != NULL)
-		dal_dmcu_power_up(dmcu);
-*/
+	/* 4. TODO PowerUp DMCU - This should be done before Encoder */
 
 	/* 5. PowerUp controllers :move to step0 to make sure init front pipe*/
 
@@ -2082,11 +2074,6 @@ enum tm_result dal_tm_power_down_hw(struct topology_mgr *tm)
 	TM_NOT_IMPLEMENTED();
 
 	/* TODO 2. PowerDown DMCU*/
-/*
-	dmcu = tm_resource_mgr_get_dmcu(tm->tm_rm);
-	if (dmcu != NULL)
-		dal_dmcu_power_down(dmcu);
-*/
 
 	/* 3.0 If we are going to S4 or BACO,
 	 * then we only need to invalidate states
@@ -4161,7 +4148,6 @@ static enum tm_result miscellaneous_init(struct topology_mgr *tm)
 	tm_resource_builder_sort_display_paths(tm->tm_rb);
 
 	/* Step 6. Assign display path specific resources */
-	tm_resource_builder_assign_dmcu_resource(tm->tm_rb);
 
 	/* Step 7. Check number of paths */
 	if (!tm_resource_builder_get_num_of_paths(tm->tm_rb)) {

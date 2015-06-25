@@ -32,7 +32,6 @@
 #include "include/controller_interface.h"
 #include "include/dcs_interface.h"
 #include "include/ddc_service_interface.h"
-#include "include/dmcu_interface.h"
 #include "include/vector.h"
 #include "include/flat_set.h"
 
@@ -54,7 +53,6 @@ struct tm_resource_mgr {
 	uint32_t link_services_number_of_paths;
 
 	struct gpu *gpu_interface;
-	struct dmcu *dmcu;
 
 	bool prioritize_controllers;
 	uint32_t active_audio_resources_num;
@@ -395,8 +393,6 @@ static void tm_resource_mgr_destruct(struct tm_resource_mgr *tm_rm)
 	/* Only the original RM should delete these objects. */
 	if (false == tm_rm->is_cloned) {
 		tm_resource_mgr_release_all_link_services(tm_rm);
-
-		/* TODO Destroy DMCU */
 	}
 
 	/* Go over all entries in tm_rm->resource_vector
@@ -466,13 +462,7 @@ void tm_resource_mgr_release_hw(struct tm_resource_mgr *tm_rm)
 	if (tm_rm->gpu_interface != NULL)
 		dal_gpu_release_hw(tm_rm->gpu_interface);
 
-	/* TODO 3. Call DMCU to release HW access */
-/*
-	if (tm_rm->dmcu != NULL)
-		dal_dmcu_release_hw(tm_rm->dmcu);
-*/
-
-	/* 4. Release HW access on all graphics objects */
+	/* 3. Release HW access on all graphics objects */
 	for (i = 0; i < tm_resource_mgr_get_total_resources_num(tm_rm); i++) {
 		tm_resource = tm_resource_mgr_enum_resource(tm_rm, i);
 		tmrm_resource_release_hw(tm_rm, tm_resource);
@@ -2517,19 +2507,6 @@ struct gpu *tm_resource_mgr_get_gpu_interface(
 	return tm_rm->gpu_interface;
 }
 
-
-void tm_resource_mgr_set_dmcu(
-		struct tm_resource_mgr *tm_rm,
-		struct dmcu *dmcu)
-{
-	tm_rm->dmcu = dmcu;
-}
-
-struct dmcu *tm_resource_mgr_get_dmcu(
-		struct tm_resource_mgr *tm_rm)
-{
-	return tm_rm->dmcu;
-}
 
 /**
  * Attaches an audio to display path if available for the specified

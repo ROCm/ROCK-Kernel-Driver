@@ -36,7 +36,6 @@
 #include "include/link_service_interface.h"
 #include "include/ddc_service_interface.h"
 #include "include/controller_interface.h"
-#include "include/dmcu_interface.h"
 #include "include/audio_interface.h"
 
 /* Internal includes */
@@ -198,14 +197,6 @@ static struct gpu *tm_resource_builder_create_gpu(
 	return gpu;
 }
 
-static struct dmcu *tm_resource_builder_create_dmcu(
-		struct tm_resource_builder *tm_rb,
-		struct gpu *gpu)
-{
-	/* TODO Create DMCU object */
-	return NULL;
-}
-
 static enum tm_result tm_resource_builder_add_engines(
 		struct tm_resource_builder *tm_rb)
 {
@@ -322,7 +313,6 @@ enum tm_result tm_resource_builder_create_gpu_resources(
 {
 	enum tm_result rc = TM_RESULT_SUCCESS;
 	struct gpu *gpu;
-	struct dmcu *dmcu;
 	struct dal_context *dal_context = tm_rb->dal_context;
 
 	do {
@@ -330,16 +320,6 @@ enum tm_result tm_resource_builder_create_gpu_resources(
 		if (!gpu) {
 			rc = TM_RESULT_FAILURE;
 			break;
-		}
-
-		/********************************************************
-		Add DMCU
-		*********************************************************/
-		dmcu = tm_resource_builder_create_dmcu(tm_rb, gpu);
-		if (!dmcu) {
-			/* not necessarily an error because
-			 * DMCU doesn't exist on discrete. */
-			TM_RESOURCES("DMCU doesn't exist.\n");
 		}
 
 		/********************************************************
@@ -1883,28 +1863,6 @@ void tm_resource_builder_sort_display_paths(struct tm_resource_builder *tm_rb)
 
 	/* Feature 8464. Put default display on top of the list */
 	tmrb_put_default_display_on_top_of_the_list(tm_rb);
-}
-
-void tm_resource_builder_assign_dmcu_resource(
-		struct tm_resource_builder *tm_rb)
-{
-	/* If embedded display is available on the system, it will be located
-	 * at diplay path index 0. */
-	struct display_path *display_path =
-			tm_resource_builder_get_path_at(tm_rb, 0);
-
-	if (display_path != NULL) {
-		struct connector_device_tag_info *tag =
-				dal_display_path_get_device_tag(display_path);
-
-		/* For LCD displays, attach DMCU object for ABM/PSR and other
-		 * embedded display related features. */
-		if (tag->dev_id.device_type == DEVICE_TYPE_LCD) {
-			struct dmcu *dmcu = tm_resource_mgr_get_dmcu(
-					tm_rb->tm_rm);
-			dal_display_path_set_dmcu(display_path, dmcu);
-		}
-	}
 }
 
 uint32_t tm_resource_builder_get_num_of_paths(

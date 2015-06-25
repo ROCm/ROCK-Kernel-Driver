@@ -32,7 +32,6 @@
 #include "include/connector_interface.h"
 #include "include/dcs_interface.h"
 #include "include/encoder_interface.h"
-#include "include/dmcu_interface.h"
 #include "include/flat_set.h"
 
 

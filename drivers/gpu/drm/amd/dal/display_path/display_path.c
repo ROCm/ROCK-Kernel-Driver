@@ -509,15 +509,6 @@ struct clock_source *dal_display_path_get_alt_clock_source(
 	return path->alt_clock_source;
 }
 
-void dal_display_path_set_dmcu(struct display_path *path, struct dmcu *dmcu)
-{
-	path->dmcu = dmcu;
-}
-struct dmcu *dal_display_path_get_dmcu(const struct display_path *path)
-{
-	return path->dmcu;
-}
-
 void dal_display_path_set_fbc_info(
 	struct display_path *path,
 	struct fbc_info *fbc_info)
@@ -792,17 +783,6 @@ void dal_display_path_get_static_screen_triggers(
 
 bool dal_display_path_is_psr_supported(const struct display_path *path)
 {
-	struct link_service *ls =
-		dal_display_path_get_link_query_interface(
-				path, ASIC_LINK_INDEX);
-
-	/* Condition 1: PSR supported through registry key (FEATURE_PSR_ENABLE)
-	 *              and Panel reports PSR support through DPCD
-	 * Condition 2: DMCU object is attached to this display path
-	 */
-	if (dal_ls_is_link_psr_supported(ls) && (path->dmcu != NULL))
-		return true;
-
 	return false;
 }
 

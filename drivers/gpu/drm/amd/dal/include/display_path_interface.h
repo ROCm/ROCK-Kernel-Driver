@@ -36,7 +36,6 @@ struct encoder;
 struct controller;
 struct connector;
 struct audio;
-struct dmcu;
 struct clock_source;
 struct link_service;
 struct goc_link_service_data;
@@ -186,13 +185,6 @@ void dal_display_path_set_alt_clock_source(
 	struct clock_source *clock);
 
 struct clock_source *dal_display_path_get_alt_clock_source(
-	const struct display_path *path);
-
-void dal_display_path_set_dmcu(
-	struct display_path *path,
-	struct dmcu *clock);
-
-struct dmcu *dal_display_path_get_dmcu(
 	const struct display_path *path);
 
 void dal_display_path_set_fbc_info(
