@@ -32,6 +32,7 @@
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/pci.h>
+#include <linux/pm_runtime.h>
 
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -379,10 +380,12 @@ static int acp_dma_close(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct audio_substream_data *rtd = runtime->private_data;
 
+	struct snd_soc_pcm_runtime *prtd = substream->private_data;
 	kfree(rtd->dma_config);
 	kfree(rtd->i2s_config);
 	kfree(rtd);
 
+	pm_runtime_mark_last_busy(prtd->platform->dev);
 	return 0;
 }
 
@@ -610,6 +613,10 @@ static int acp_amdsoc_probe(struct amd_gnb_bus_dev *adev)
 	else
 		pr_err("ACP initialization Failed\n");
 
+	pm_runtime_set_autosuspend_delay(&adev->dev, 10000);
+	pm_runtime_use_autosuspend(&adev->dev);
+	pm_runtime_enable(&adev->dev);
+
 	return status;
 }
 
@@ -621,36 +628,96 @@ static int acp_amdsoc_remove(struct amd_gnb_bus_dev *adev)
 	snd_soc_unregister_platform(&adev->dev);
 
 	acp_dev->fini(acp_dev);
-
+	pm_runtime_disable(&adev->dev);
 	return 0;
 }
 
 static int acp_pcm_suspend(struct device *dev)
 {
+	bool pm_rts;
+	struct audio_drv_data *adata =
+	    (struct audio_drv_data *)dev_get_drvdata(dev);
+
+	pm_rts = pm_runtime_status_suspended(dev);
+	if (pm_rts == false)
+		adata->acp_dev->fini(adata->acp_dev);
+
 	return 0;
 }
 
 static int acp_pcm_resume(struct device *dev)
 {
-	struct snd_pcm_substream *substream;
-	struct snd_pcm_runtime *runtime;
+	bool pm_rts;
+	struct snd_pcm_substream *pstream, *cstream;
+	struct snd_pcm_runtime *prtd, *crtd;
 	struct audio_substream_data *rtd;
 
-	struct audio_drv_data *irq_data =
+	struct audio_drv_data *adata =
 	    (struct audio_drv_data *)dev_get_drvdata(dev);
 
-	substream = irq_data->play_stream;
-	runtime = substream->runtime;
-	rtd = runtime->private_data;
+	pm_rts = pm_runtime_status_suspended(dev);
+	if (pm_rts == true) {
+		/* Resumed from system wide suspend and there is
+		 * no pending audio activity to resume. */
+		pm_runtime_disable(dev);
+		pm_runtime_set_active(dev);
+		pm_runtime_enable(dev);
 
-	irq_data->acp_dev->config_i2s(irq_data->acp_dev, rtd->i2s_config);
-	irq_data->acp_dev->config_dma(irq_data->acp_dev, rtd->dma_config);
+		goto out;
+	}
 
+	pstream = adata->play_stream;
+	prtd = pstream ? pstream->runtime : NULL;
+	if (prtd != NULL) {
+		/* Resume playback stream from a suspended state */
+		rtd = prtd->private_data;
+
+		adata->acp_dev->config_dma(adata->acp_dev, rtd->dma_config);
+		adata->acp_dev->config_i2s(adata->acp_dev, rtd->i2s_config);
+	}
+
+	cstream = adata->capture_stream;
+	crtd =  cstream ? cstream->runtime : NULL;
+	if (crtd != NULL) {
+		/* Resume capture stream from a suspended state */
+		rtd = crtd->private_data;
+
+		adata->acp_dev->config_dma(adata->acp_dev, rtd->dma_config);
+		adata->acp_dev->config_i2s(adata->acp_dev, rtd->i2s_config);
+	}
+out:
+	return 0;
+}
+
+int acp_pcm_runtime_suspend(struct device *dev)
+{
+	struct audio_drv_data *adata =
+	    (struct audio_drv_data *)dev_get_drvdata(dev);
+
+	adata->acp_dev->acp_suspend(adata->acp_dev);
+	return 0;
+}
+
+int acp_pcm_runtime_resume(struct device *dev)
+{
+	struct audio_drv_data *adata =
+	    (struct audio_drv_data *)dev_get_drvdata(dev);
+
+	adata->acp_dev->acp_resume(adata->acp_dev);
+	return 0;
+}
+
+int acp_pcm_runtime_idle(struct device *dev)
+{
 	return 0;
 }
 
 static const struct dev_pm_ops acp_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(acp_pcm_suspend, acp_pcm_resume)
+	.suspend = acp_pcm_suspend,
+	.resume = acp_pcm_resume,
+	.runtime_suspend = acp_pcm_runtime_suspend,
+	.runtime_resume = acp_pcm_runtime_resume,
+	.runtime_idle = acp_pcm_runtime_idle
 };
 
 static struct amd_gnb_bus_driver acp_dma_driver = {
