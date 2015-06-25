@@ -30,6 +30,7 @@
  * ASIC internal revision ID
  */
 
+/* DCE80 (based on ci_id.h in Perforce) */
 #define	CI_BONAIRE_M_A0 0x14
 #define	CI_BONAIRE_M_A1	0x15
 #define	CI_HAWAII_P_A0	0x28
@@ -39,7 +40,7 @@
 	((rev >= CI_BONAIRE_M_A0) && (rev < CI_HAWAII_P_A0))
 
 #define ASIC_REV_IS_HAWAII_P(rev) \
-	((rev >= CI_HAWAII_P_A0))
+	(rev >= CI_HAWAII_P_A0)
 
 /* KV1 with Spectre GFX core, 8-8-1-2 (CU-Pix-Primitive-RB) */
 #define KV_SPECTRE_A0 0x01

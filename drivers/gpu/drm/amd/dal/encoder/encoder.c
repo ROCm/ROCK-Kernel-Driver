@@ -222,7 +222,6 @@ static struct encoder_impl *create_digital_encoder_impl(
 		switch (dce_version) {
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 		case DCE_VERSION_11_0:
-		case DCE_VERSION_11_1:
 			return dal_digital_encoder_uniphy_dce110_create(
 				init);
 #endif
@@ -238,7 +237,6 @@ static struct encoder_impl *create_digital_encoder_impl(
 		switch (dce_version) {
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 		case DCE_VERSION_11_0:
-		case DCE_VERSION_11_1:
 			return dal_digital_encoder_dp_dce110_create(
 				init);
 #endif
@@ -251,7 +249,6 @@ static struct encoder_impl *create_digital_encoder_impl(
 		switch (dce_version) {
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 		case DCE_VERSION_11_0:
-		case DCE_VERSION_11_1:
 			return dal_digital_encoder_edp_dce110_create(
 				init);
 #endif
@@ -278,13 +275,6 @@ static struct encoder_impl *create_analog_encoder_impl(
 				init->adapter_service);
 
 		switch (dce_version) {
-		case DCE_VERSION_8_1:
-		case DCE_VERSION_10_1:
-		case DCE_VERSION_11_1:
-			/* APU DCE 4.1, 6.1, 8.1, 11.1
-			 * does not support internal DAC */
-			BREAK_TO_DEBUGGER();
-			return NULL;
 		default:
 			/* CRT */
 			return dal_analog_encoder_crt_create(init);

@@ -894,28 +894,8 @@ enum dce_version dal_adapter_service_get_dce_version(
 	uint32_t version = as->asic_cap->data[ASIC_DATA_DCE_VERSION];
 
 	switch (version) {
-	case 0x80:
-		/* CI Bonaire */
-		return DCE_VERSION_8_0;
-	case 0x81:
-		/* Kaveri */
-		return DCE_VERSION_8_1;
-	case 0x83:
-		/* Kabini */
-		return DCE_VERSION_8_3;
-	case 0x85:
-		/* Mullins */
-		return DCE_VERSION_8_5;
-	case 0x100:
-		return DCE_VERSION_10_0;
-	case 0x101:
-		return DCE_VERSION_10_1;
-	case 0x102:
-		return DCE_VERSION_10_2;
 	case 0x110:
 		return DCE_VERSION_11_0;
-	case 0x111:
-		return DCE_VERSION_11_1;
 	default:
 		ASSERT_CRITICAL(false);
 		return DCE_VERSION_UNKNOWN;

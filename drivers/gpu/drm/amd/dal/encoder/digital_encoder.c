@@ -722,7 +722,6 @@ enum encoder_result dal_digital_encoder_create_hw_ctx(
 	switch (dce_version) {
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	case DCE_VERSION_11_0:
-	case DCE_VERSION_11_1:
 		enc->hw_ctx = dal_hw_ctx_digital_encoder_dce110_create(
 			init);
 	break;
