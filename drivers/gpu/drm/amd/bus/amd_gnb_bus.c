@@ -142,11 +142,6 @@ static const struct dev_pm_ops amd_gnb_bus_device_pm_ops = {
 	.thaw = amd_gnb_bus_device_pm_thaw,
 	.poweroff = amd_gnb_bus_device_pm_poweroff,
 	.restore = amd_gnb_bus_device_pm_restore,
-	SET_RUNTIME_PM_OPS(
-		pm_generic_runtime_suspend,
-		pm_generic_runtime_resume,
-		pm_runtime_idle
-	)
 };
 
 /* The bus should only be registered by the first amd_gnb, but further
