@@ -189,8 +189,26 @@ struct amd_acp_device {
 	 */
 	void (*i2s_stop)(struct amd_acp_device *acp_dev, int direction);
 
+	/**
+	 * acp_suspend() - Power off ACP
+	 * @acp_dev:	acp device
+	 *
+	 * Switch off power tiles of ACP
+	 */
+	void (*acp_suspend)(struct amd_acp_device *acp_dev);
+
+	/**
+	 * acp_resume() - Power on ACP
+	 * @acp_dev:	acp device
+	 *
+	 * Switch on power tiles of ACP
+	 */
+
+	void (*acp_resume)(struct amd_acp_device *acp_dev);
+
 	/* TODO: Need callback registration interface for asynchronous
 	 * notifications */
+
 };
 
 #endif /* _AMD_ACP_H */

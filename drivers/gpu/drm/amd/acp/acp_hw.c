@@ -737,12 +737,14 @@ static void acp_resume_tile(struct amd_acp_private *acp_prv, int tile)
 	u32 val = 0;
 	u32 timeout = 0;
 
-	if ((tile == ACP_TILE_P1) || (tile == ACP_TILE_P2)) {
-		val = cgs_read_register(acp_prv->cgs_device,
+	if ((tile  < ACP_TILE_P1) || (tile > ACP_TILE_DSP2)) {
+		pr_err(" %s : Invalid ACP power tile index\n", __func__);
+		return;
+	}
+
+	val = cgs_read_register(acp_prv->cgs_device,
 					mmACP_PGFSM_READ_REG_0 + tile);
-		val = val & ACP_TILE_ON_MASK;
-	} else
-		val = 0;
+	val = val & ACP_TILE_ON_MASK;
 
 	if (val != 0x0) {
 		cgs_write_register(acp_prv->cgs_device,	mmACP_PGFSM_CONFIG_REG,
@@ -1012,6 +1014,22 @@ static void configure_i2s(struct amd_acp_device *acp_dev,
 	configure_i2s_stream(acp_dev, i2s_config);
 }
 
+void amd_acp_pcm_suspend(struct amd_acp_device *acp_dev)
+{
+	struct amd_acp_private *acp_prv;
+
+	acp_prv = (struct amd_acp_private *)acp_dev;
+	amd_acp_suspend(acp_prv);
+}
+
+void amd_acp_pcm_resume(struct amd_acp_device *acp_dev)
+{
+	struct amd_acp_private *acp_prv;
+
+	acp_prv = (struct amd_acp_private *)acp_dev;
+	amd_acp_resume(acp_prv);
+}
+
 int amd_acp_hw_init(void *cgs_device,
 		    unsigned acp_version_major, unsigned acp_version_minor,
 		    struct amd_acp_private **acp_private)
@@ -1047,6 +1065,9 @@ int amd_acp_hw_init(void *cgs_device,
 	(*acp_private)->public.i2s_start = i2s_start;
 	(*acp_private)->public.i2s_stop = i2s_stop;
 
+	(*acp_private)->public.acp_suspend = amd_acp_pcm_suspend;
+	(*acp_private)->public.acp_resume = amd_acp_pcm_resume;
+
 	return 0;
 }
 
@@ -1058,8 +1079,6 @@ int amd_acp_hw_fini(struct amd_acp_private *acp_private)
 
 void amd_acp_suspend(struct amd_acp_private *acp_private)
 {
-	acp_deinit(acp_private);
-
 	acp_suspend_tile(acp_private, ACP_TILE_P2);
 	acp_suspend_tile(acp_private, ACP_TILE_P1);
 }
@@ -1069,10 +1088,16 @@ void amd_acp_resume(struct amd_acp_private *acp_private)
 	acp_resume_tile(acp_private, ACP_TILE_P1);
 	acp_resume_tile(acp_private, ACP_TILE_P2);
 
+	/* TODO: PGFSM registers need not be touched here.
+	 * We do it here, as a workaround */
+	cgs_write_register(acp_private->cgs_device, mmACP_PGFSM_RETAIN_REG,
+							0x30);
+	cgs_write_register(acp_private->cgs_device, mmACP_PGFSM_CONFIG_REG,
+							0x504);
+	acp_init(acp_private);
+
 	/* Disable DSPs which might have been enabled by SMU */
 	acp_suspend_tile(acp_private, ACP_TILE_DSP0);
 	acp_suspend_tile(acp_private, ACP_TILE_DSP1);
 	acp_suspend_tile(acp_private, ACP_TILE_DSP2);
-
-	acp_init(acp_private);
 }
