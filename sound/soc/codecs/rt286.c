@@ -358,6 +358,15 @@ static int rt286_jack_detect(struct rt286_priv *rt286, bool *hp, bool *mic)
 		*hp = buf & 0x80000000;
 		regmap_read(rt286->regmap, RT286_GET_MIC1_SENSE, &buf);
 		*mic = buf & 0x80000000;
+		if (*mic) {
+			regmap_write(rt286->regmap, RT286_SET_MIC1, 0x24);
+			msleep(50);
+
+			regmap_update_bits(rt286->regmap,
+						RT286_CBJ_CTRL1,
+						0xfcc0, 0xd400);
+			msleep(300);
+		}
 	}
 
 	snd_soc_dapm_disable_pin(&rt286->codec->dapm, "HV");
@@ -1078,7 +1087,6 @@ static int rt286_suspend(struct snd_soc_codec *codec)
 
 	regcache_cache_only(rt286->regmap, true);
 	regcache_mark_dirty(rt286->regmap);
-
 	return 0;
 }
 
@@ -1089,7 +1097,6 @@ static int rt286_resume(struct snd_soc_codec *codec)
 	regcache_cache_only(rt286->regmap, false);
 	rt286_index_sync(codec);
 	regcache_sync(rt286->regmap);
-
 	return 0;
 }
 #else
@@ -1099,7 +1106,8 @@ static int rt286_resume(struct snd_soc_codec *codec)
 
 #define RT286_STEREO_RATES (SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000)
 #define RT286_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE | \
-			SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S8)
+			SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S8) | \
+			SNDRV_PCM_FMTBIT_S32_LE
 
 static const struct snd_soc_dai_ops rt286_aif_dai_ops = {
 	.hw_params = rt286_hw_params,
@@ -1214,10 +1222,15 @@ static struct dmi_system_id dmi_dell_dino[] = {
 	{ }
 };
 
+static struct rt286_platform_data rt286_acpi_data = {
+	.cbj_en = false,
+	.gpio2_en = false,
+};
+
 static int rt286_i2c_probe(struct i2c_client *i2c,
 			   const struct i2c_device_id *id)
 {
-	struct rt286_platform_data *pdata = dev_get_platdata(&i2c->dev);
+	struct rt286_platform_data *pdata = &rt286_acpi_data;
 	struct rt286_priv *rt286;
 	int i, ret, val;
 
@@ -1314,7 +1327,7 @@ static int rt286_i2c_probe(struct i2c_client *i2c,
 
 	if (rt286->i2c->irq) {
 		ret = request_threaded_irq(rt286->i2c->irq, NULL, rt286_irq,
-			IRQF_TRIGGER_HIGH | IRQF_ONESHOT, "rt286", rt286);
+			IRQF_TRIGGER_RISING | IRQF_ONESHOT, "rt286", rt286);
 		if (ret != 0) {
 			dev_err(&i2c->dev,
 				"Failed to reguest IRQ: %d\n", ret);

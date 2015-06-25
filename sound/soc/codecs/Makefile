@@ -78,6 +78,7 @@ snd-soc-pcm512x-i2c-objs := pcm512x-i2c.o
 snd-soc-pcm512x-spi-objs := pcm512x-spi.o
 snd-soc-rl6231-objs := rl6231.o
 snd-soc-rt286-objs := rt286.o
+snd-soc-rt286-objs := rt286.o
 snd-soc-rt5631-objs := rt5631.o
 snd-soc-rt5640-objs := rt5640.o
 snd-soc-rt5645-objs := rt5645.o
