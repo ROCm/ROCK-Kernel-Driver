@@ -28,7 +28,7 @@
 #include <linux/delay.h>
 #include <linux/errno.h>
 
-#define VISLANDS30_IV_SRCID_ACP                                0x000000a2  // 162
+#define VISLANDS30_IV_SRCID_ACP 0x000000a2
 
 #include "acp_gfx_if.h"
 #include "acp_hw.h"
@@ -79,10 +79,9 @@ static void config_acp_dma_channel(struct amd_acp_device *acp_dev, u8 ch_num,
 
 
 /* Initialize the dma descriptors location in SRAM and page size */
-static void acp_dma_descr_init(struct amd_acp_device *acp_dev)
+static void acp_dma_descr_init(struct amd_acp_private *acp_prv)
 {
 	u32 sram_pte_offset = 0;
-	struct amd_acp_private *acp_prv = (struct amd_acp_private *)acp_dev;
 
 	/* SRAM starts at 0x04000000. From that offset one page (4KB) left for
 	 * filling DMA descriptors.sram_pte_offset = 0x04001000 , used for
@@ -134,9 +133,10 @@ static void config_dma_descriptor_in_sram(struct amd_acp_device *acp_dev,
 
 /* Initialize the DMA descriptor information */
 static void set_acp_sysmem_dma_descriptors(struct amd_acp_device *acp_dev,
-					   u32 size, int direction, u32 pte_offset)
+					   u32 size, int direction,
+					   u32 pte_offset)
 {
-	u16 dma_dscr_idx = PLAYBACK_START_DMA_DESCR_CH12;
+	u16 dma_dscr_idx;
 	u16 num_descr;
 	acp_dma_dscr_transfer_t dmadscr[2];
 
@@ -145,11 +145,13 @@ static void set_acp_sysmem_dma_descriptors(struct amd_acp_device *acp_dev,
 	dmadscr[0].size_xfer_dir.val = (u32) 0x0;
 	if (direction == STREAM_PLAYBACK) {
 		dma_dscr_idx = PLAYBACK_START_DMA_DESCR_CH12;
-		dmadscr[0].dest = ACP_SHARED_RAM_BANK_38_ADDRESS;
+		dmadscr[0].dest = ACP_SHARED_RAM_BANK_38_ADDRESS + (size / 2);
 		dmadscr[0].src = ACP_INTERNAL_APERTURE_WINDOW_0_ADDRESS +
 			(pte_offset * PAGE_SIZE_4K);
 		dmadscr[0].size_xfer_dir.s.trans_direction =
 		    ACP_DMA_ATTRIBUTES_DAGB_ONION_TO_SHAREDMEM;
+		dmadscr[0].size_xfer_dir.s.size = (size / 2);
+		dmadscr[0].size_xfer_dir.s.ioc = (u32) 0x0;
 	} else if (direction == STREAM_CAPTURE) {
 		dma_dscr_idx = CAPTURE_START_DMA_DESCR_CH14;
 		dmadscr[0].src = ACP_SHARED_RAM_BANK_47_ADDRESS;
@@ -157,31 +159,31 @@ static void set_acp_sysmem_dma_descriptors(struct amd_acp_device *acp_dev,
 			(pte_offset * PAGE_SIZE_4K);
 		dmadscr[0].size_xfer_dir.s.trans_direction =
 		    ACP_DMA_ATTRIBUTES_SHAREDMEM_TO_DAGB_ONION;
+		dmadscr[0].size_xfer_dir.s.size = size / 2;
+		dmadscr[0].size_xfer_dir.s.ioc = (u32) 0x1;
 	}
-
-	/* allot 1 period size per descriptor = total size (size) /2
-	 * => params_buffer_bytes(params)/params_periods(params);
-	 */
-	dmadscr[0].size_xfer_dir.s.size = size / 2;
-
-	dmadscr[0].size_xfer_dir.s.ioc = (u32) 0x0;
 
 	config_dma_descriptor_in_sram(acp_dev, dma_dscr_idx, &dmadscr[0]);
 
 	dmadscr[1].size_xfer_dir.val = (u32) 0x0;
-	dmadscr[1].dest = dmadscr[0].dest + dmadscr[0].size_xfer_dir.s.size;
-	dmadscr[1].src = dmadscr[0].src + dmadscr[0].size_xfer_dir.s.size;
-	dmadscr[1].size_xfer_dir.s.size = dmadscr[0].size_xfer_dir.s.size;
-	dmadscr[1].size_xfer_dir.s.ioc = (u32) 0x0;
-
 	if (direction == STREAM_PLAYBACK) {
 		dma_dscr_idx = PLAYBACK_END_DMA_DESCR_CH12;
+		dmadscr[1].dest = ACP_SHARED_RAM_BANK_38_ADDRESS;
+		dmadscr[1].src = ACP_INTERNAL_APERTURE_WINDOW_0_ADDRESS +
+			(pte_offset * PAGE_SIZE_4K) + (size / 2);
 		dmadscr[1].size_xfer_dir.s.trans_direction =
 		    ACP_DMA_ATTRIBUTES_DAGB_ONION_TO_SHAREDMEM;
+		dmadscr[1].size_xfer_dir.s.size = (size / 2);
+		dmadscr[1].size_xfer_dir.s.ioc = (u32) 0x0;
 	} else if (direction == STREAM_CAPTURE) {
 		dma_dscr_idx = CAPTURE_END_DMA_DESCR_CH14;
 		dmadscr[1].size_xfer_dir.s.trans_direction =
 		    ACP_DMA_ATTRIBUTES_SHAREDMEM_TO_DAGB_ONION;
+		dmadscr[1].size_xfer_dir.val = (u32) 0x0;
+		dmadscr[1].dest = dmadscr[0].dest + (size / 2);
+		dmadscr[1].src = dmadscr[0].src + (size / 2);
+		dmadscr[1].size_xfer_dir.s.size = (size / 2);
+		dmadscr[1].size_xfer_dir.s.ioc = (u32) 0x1;
 	}
 
 	config_dma_descriptor_in_sram(acp_dev, dma_dscr_idx, &dmadscr[1]);
@@ -216,34 +218,38 @@ static void set_acp_to_i2s_dma_descriptors(struct amd_acp_device *acp_dev,
 	 *  of data
 	 */
 	dmadscr[0].size_xfer_dir.val = (u32) 0x0;
-	dmadscr[0].size_xfer_dir.s.size = (size / 2);
-	dmadscr[0].size_xfer_dir.s.ioc = (u32) 0x1;
 	if (direction == STREAM_PLAYBACK) {
 		dma_dscr_idx = PLAYBACK_START_DMA_DESCR_CH13;
 		dmadscr[0].src = ACP_SHARED_RAM_BANK_38_ADDRESS;
 		dmadscr[0].size_xfer_dir.s.trans_direction = TO_ACP_I2S_1;
+		dmadscr[0].size_xfer_dir.s.size = (size / 2);
+		dmadscr[0].size_xfer_dir.s.ioc = (u32) 0x1;
 	} else if (direction == STREAM_CAPTURE) {
 		dma_dscr_idx = CAPTURE_START_DMA_DESCR_CH15;
 		dmadscr[0].dest = ACP_SHARED_RAM_BANK_47_ADDRESS;
-		dmadscr[0].size_xfer_dir.s.trans_direction = 0xa;
+		dmadscr[0].size_xfer_dir.s.trans_direction = FROM_ACP_I2S_1;
+		dmadscr[0].size_xfer_dir.s.size = (size / 2);
+		dmadscr[0].size_xfer_dir.s.ioc = (u32) 0x1;
 	}
+
 	config_dma_descriptor_in_sram(acp_dev, dma_dscr_idx, &dmadscr[0]);
 
 	dmadscr[1].size_xfer_dir.val = (u32) 0x0;
-	dmadscr[1].size_xfer_dir.s.size = (size / 2);
-	dmadscr[1].size_xfer_dir.s.ioc = (u32) 0x1;
 	if (direction == STREAM_PLAYBACK) {
 		dma_dscr_idx = PLAYBACK_END_DMA_DESCR_CH13;
-		dmadscr[1].src = dmadscr[0].src +
-		    dmadscr[0].size_xfer_dir.s.size;
+		dmadscr[1].src = dmadscr[0].src + (size / 2);
 		dmadscr[1].size_xfer_dir.s.trans_direction = TO_ACP_I2S_1;
+		dmadscr[1].size_xfer_dir.s.size = (size / 2);
+		dmadscr[1].size_xfer_dir.s.ioc = (u32) 0x1;
 
 	} else if (direction == STREAM_CAPTURE) {
 		dma_dscr_idx = CAPTURE_END_DMA_DESCR_CH15;
-		dmadscr[1].dest = dmadscr[0].dest +
-		    dmadscr[0].size_xfer_dir.s.size;
-		dmadscr[1].size_xfer_dir.s.trans_direction = 0xa;
+		dmadscr[1].dest = dmadscr[0].dest + (size / 2);
+		dmadscr[1].size_xfer_dir.s.trans_direction = FROM_ACP_I2S_1;
+		dmadscr[1].size_xfer_dir.s.size = (size / 2);
+		dmadscr[1].size_xfer_dir.s.ioc = (u32) 0x1;
 	}
+
 	config_dma_descriptor_in_sram(acp_dev, dma_dscr_idx, &dmadscr[1]);
 
 	/* Configure the DMA channel with the above descriptore */
@@ -272,8 +278,8 @@ static u16 get_dscr_idx(struct amd_acp_device *acp_dev, int direction)
 		dscr_idx = cgs_read_register(acp_prv->cgs_device,
 							mmACP_DMA_CUR_DSCR_13);
 		dscr_idx = (dscr_idx == PLAYBACK_START_DMA_DESCR_CH13) ?
-				PLAYBACK_END_DMA_DESCR_CH12 :
-				PLAYBACK_START_DMA_DESCR_CH12;
+				PLAYBACK_START_DMA_DESCR_CH12 :
+				PLAYBACK_END_DMA_DESCR_CH12;
 	} else {
 		dscr_idx = cgs_read_register(acp_prv->cgs_device,
 							mmACP_DMA_CUR_DSCR_15);
@@ -458,7 +464,7 @@ static void configure_i2s_stream(struct amd_acp_device *acp_dev,
 		/*Enable Transmit */
 		cgs_write_register(acp_prv->cgs_device,
 				   (mmACP_I2SSP_TER0 + (0x10 *
-							i2s_config->ch_reg)), 1);
+						i2s_config->ch_reg)), 1);
 	} else {
 		/* Receive configuration register for data width */
 		cgs_write_register(acp_prv->cgs_device,
@@ -467,11 +473,11 @@ static void configure_i2s_stream(struct amd_acp_device *acp_dev,
 				   i2s_config->xfer_resolution);
 		cgs_write_register(acp_prv->cgs_device,
 				   (mmACP_I2SMICSP_RFCR0 + (0x10 *
-							    i2s_config->ch_reg)), 0x07);
+						    i2s_config->ch_reg)), 0x07);
 		/*Read interrupt mask register */
 		i2s_config->irq = cgs_read_register(acp_prv->cgs_device,
 						    (mmACP_I2SMICSP_IMR0 +
-						     (0x10 * i2s_config->ch_reg)));
+					     (0x10 * i2s_config->ch_reg)));
 
 		/* TX FIFO Overrun,Empty interrupts */
 		cgs_write_register(acp_prv->cgs_device,
@@ -481,8 +487,7 @@ static void configure_i2s_stream(struct amd_acp_device *acp_dev,
 		/*Enable Receive */
 		cgs_write_register(acp_prv->cgs_device,
 				   (mmACP_I2SMICSP_RER0 + (0x10 *
-							   i2s_config->ch_reg)), 1);
-
+						   i2s_config->ch_reg)), 1);
 	}
 }
 
@@ -533,16 +538,18 @@ static int acp_dma_start(struct amd_acp_device *acp_dev,
 	dma_ctrl |= ACP_DMA_CNTL_0__DMAChRun_MASK;
 
 	if ((ch_num == ACP_TO_I2S_DMA_CH_NUM) ||
+	    (ch_num == ACP_TO_SYSRAM_CH_NUM) ||
 	    (ch_num == I2S_TO_ACP_DMA_CH_NUM)) {
 		dma_ctrl |= ACP_DMA_CNTL_0__DMAChIOCEn_MASK;
-		cgs_irq_get(acp_prv->cgs_device, VISLANDS30_IV_SRCID_ACP, 0);
 	} else {
 		dma_ctrl &= ~ACP_DMA_CNTL_0__DMAChIOCEn_MASK;
 	}
 
 	/* enable  for ACP SRAM to/from I2S DMA channel */
-	if (is_circular == true)
+	if (is_circular == true) {
 		dma_ctrl |= ACP_DMA_CNTL_0__Circular_DMA_En_MASK;
+		cgs_irq_get(acp_prv->cgs_device, VISLANDS30_IV_SRCID_ACP, 0);
+	}
 	else
 		dma_ctrl &= ~ACP_DMA_CNTL_0__Circular_DMA_En_MASK;
 
@@ -550,7 +557,6 @@ static int acp_dma_start(struct amd_acp_device *acp_dev,
 			   dma_ctrl);
 
 	status = STATUS_SUCCESS;
-
 	return status;
 }
 
@@ -602,7 +608,8 @@ static int acp_dma_stop(struct amd_acp_device *acp_dev, u8 ch_num)
 			dma_ctrl &= ~ACP_DMA_CNTL_0__DMAChRst_MASK;
 
 			cgs_write_register(acp_prv->cgs_device,
-					   (mmACP_DMA_CNTL_0 + ch_num), dma_ctrl);
+					   (mmACP_DMA_CNTL_0 + ch_num),
+					   dma_ctrl);
 			status = STATUS_SUCCESS;
 			break;
 		}
@@ -619,47 +626,58 @@ static int acp_dma_stop(struct amd_acp_device *acp_dev, u8 ch_num)
 
 static int dma_irq_handler(void *prv_data)
 {
-	u16 play_intr, capture_intr;
+	u16 play_acp_i2s_intr, cap_i2s_acp_intr, cap_acp_sysram_intr;
 	u16 dscr_idx, intr_flag;
+	u32 ext_intr_status;
 	int priority_level = 0x0;
 	int dma_transfer_status = STATUS_UNSUCCESSFUL;
 	struct acp_irq_prv *idata = prv_data;
 	struct amd_acp_device *acp_dev = idata->acp_dev;
+	struct amd_acp_private *acp_prv = (struct amd_acp_private *)acp_dev;
 
 	intr_flag = acp_get_intr_flag(acp_dev);
-	play_intr = (intr_flag & BIT(ACP_TO_I2S_DMA_CH_NUM));
-	capture_intr = (intr_flag & BIT(I2S_TO_ACP_DMA_CH_NUM));
 
-	if (!play_intr && !capture_intr) {
+	play_acp_i2s_intr = (intr_flag & BIT(ACP_TO_I2S_DMA_CH_NUM));
+	cap_i2s_acp_intr = (intr_flag & BIT(I2S_TO_ACP_DMA_CH_NUM));
+	cap_acp_sysram_intr = (intr_flag & BIT(ACP_TO_SYSRAM_CH_NUM));
+
+	if (!play_acp_i2s_intr && !cap_i2s_acp_intr && !cap_acp_sysram_intr) {
 		/* We registered for DMA Interrupt-On-Complete interrupts only.
-		 * If we hit here, just return. */
-		pr_info("ACP:irq_handler: play_intr && capture_intr = false\n");
+		 * If we hit here, log, acknowledge it and return. */
+		ext_intr_status = cgs_read_register(acp_prv->cgs_device,
+					    mmACP_EXTERNAL_INTR_STAT);
+		pr_info("ACP: Not a DMA IOC irq: %x\n", ext_intr_status);
 		return 0;
 	}
 
-	if (play_intr) {
+	if (play_acp_i2s_intr) {
 		dscr_idx = get_dscr_idx(acp_dev, STREAM_PLAYBACK);
 		config_acp_dma_channel(acp_dev, SYSRAM_TO_ACP_CH_NUM, dscr_idx,
 				       1, priority_level);
 		dma_transfer_status = acp_dma_start(acp_dev,
 						    SYSRAM_TO_ACP_CH_NUM,
 						    false);
-		idata->set_elapsed(idata->dev, play_intr, capture_intr);
+		idata->set_elapsed(idata->dev, 1, 0);
 
 		acp_ext_stat_clear_dmaioc(acp_dev, ACP_TO_I2S_DMA_CH_NUM);
 	}
 
-	if (capture_intr) {
+	if (cap_i2s_acp_intr) {
 		dscr_idx = get_dscr_idx(acp_dev, STREAM_CAPTURE);
 		config_acp_dma_channel(acp_dev, ACP_TO_SYSRAM_CH_NUM, dscr_idx,
 				       1, priority_level);
 		dma_transfer_status = acp_dma_start(acp_dev,
 						    ACP_TO_SYSRAM_CH_NUM,
 						    false);
-		idata->set_elapsed(idata->dev, play_intr, capture_intr);
 
 		acp_ext_stat_clear_dmaioc(acp_dev, I2S_TO_ACP_DMA_CH_NUM);
 	}
+
+	if (cap_acp_sysram_intr) {
+		idata->set_elapsed(idata->dev, 0, 1);
+		acp_ext_stat_clear_dmaioc(acp_dev, ACP_TO_SYSRAM_CH_NUM);
+	}
+
 	return 0;
 }
 
@@ -725,7 +743,7 @@ static int acp_hw_init(struct amd_acp_device *acp_dev, void *iprv)
 	cgs_write_register(acp_prv->cgs_device,	mmACP_AXI2DAGB_GARLIC_CNTL,
 			   GARLIC_CNTL_DEFAULT);
 
-	acp_dma_descr_init(acp_dev);
+	acp_dma_descr_init(acp_prv);
 
 	/* DMA DSCR BASE ADDRESS IN SRAM */
 	cgs_write_register(acp_prv->cgs_device,	mmACP_DMA_DESC_BASE_ADDR,
@@ -799,24 +817,24 @@ static u32 acp_update_dma_pointer(struct amd_acp_device *acp_dev, int direction,
 	if (direction == STREAM_PLAYBACK) {
 		dscr = cgs_read_register(acp_prv->cgs_device,
 					 mmACP_DMA_CUR_DSCR_13);
-		pos = cgs_read_register(acp_prv->cgs_device,
-					mmACP_DMA_CUR_TRANS_CNT_13);
-		/* dscr = either 2 or 3 only */
-		mul = (dscr == PLAYBACK_START_DMA_DESCR_CH13) ? 1 : 0;
-		pos =  (mul * period_size) + pos;
+
+		mul = (dscr == PLAYBACK_START_DMA_DESCR_CH13) ? 0 : 1;
+		pos =  (mul * period_size);
+
 	} else if (direction == STREAM_CAPTURE) {
-		dscr = cgs_read_register(acp_prv->cgs_device,
-					 mmACP_DMA_CUR_DSCR_15);
-		pos = cgs_read_register(acp_prv->cgs_device,
-					mmACP_DMA_CUR_TRANS_CNT_15);
 		dma_config = cgs_read_register(acp_prv->cgs_device,
 					       mmACP_DMA_CNTL_14);
 		if (dma_config != 0) {
-			mul = (dscr == CAPTURE_START_DMA_DESCR_CH15) ? 1 : 0;
-			pos =  (mul * period_size) + pos;
+			dscr = cgs_read_register(acp_prv->cgs_device,
+					 mmACP_DMA_CUR_DSCR_14);
+			mul = (dscr == CAPTURE_START_DMA_DESCR_CH14) ? 1 : 2;
+			pos = (mul * period_size);
 		}
-	}
 
+		if (pos >= (2 * period_size))
+			pos = 0;
+
+	}
 	return pos;
 }
 
