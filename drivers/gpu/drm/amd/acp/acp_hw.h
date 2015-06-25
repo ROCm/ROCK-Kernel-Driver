@@ -40,6 +40,25 @@
 #define FROM_ACP_I2S_1 0xa
 #define FROM_ACP_I2S_2 0xb
 
+#define ACP_TILE_ON_MASK                0x03
+#define ACP_TILE_OFF_MASK               0x02
+#define ACP_TILE_ON_RETAIN_REG_MASK     0x1f
+#define ACP_TILE_OFF_RETAIN_REG_MASK    0x20
+
+#define ACP_TILE_P1_MASK                0x3e
+#define ACP_TILE_P2_MASK                0x3d
+#define ACP_TILE_DSP0_MASK              0x3b
+#define ACP_TILE_DSP1_MASK              0x37
+#define ACP_TILE_DSP2_MASK              0x2f
+
+enum {
+	ACP_TILE_P1 = 0,
+	ACP_TILE_P2,
+	ACP_TILE_DSP0,
+	ACP_TILE_DSP1,
+	ACP_TILE_DSP2,
+};
+
 enum {
 	STREAM_PLAYBACK = 0,
 	STREAM_CAPTURE,

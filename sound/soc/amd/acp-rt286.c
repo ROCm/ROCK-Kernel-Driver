@@ -129,7 +129,6 @@ static struct snd_soc_dai_link carrizo_dai_rt286 = {
 	.codec_name = "rt286.3-001c",
 	.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF
 			| SND_SOC_DAIFMT_CBM_CFM,
-	.ignore_suspend = 1,
 	.ops = &carrizo_rt286_ops,
 	.init = carrizo_init,
 };

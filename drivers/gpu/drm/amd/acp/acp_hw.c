@@ -690,16 +690,93 @@ static int irq_handler(void *private_data, unsigned src_id,
 		return -1;
 }
 
+static void acp_suspend_tile(struct amd_acp_private *acp_prv, int tile)
+{
+	u32 val = 0;
+	u32 timeout = 0;
+
+	if ((tile  < ACP_TILE_P1) || (tile > ACP_TILE_DSP2)) {
+		pr_err(" %s : Invalid ACP power tile index\n", __func__);
+		return;
+	}
+
+	val = cgs_read_register(acp_prv->cgs_device,
+					mmACP_PGFSM_READ_REG_0 + tile);
+	val &= ACP_TILE_ON_MASK;
+
+	if (val == 0x0) {
+		val = cgs_read_register(acp_prv->cgs_device,
+					mmACP_PGFSM_RETAIN_REG + tile);
+		val = val | (1 << tile);
+		cgs_write_register(acp_prv->cgs_device,	mmACP_PGFSM_RETAIN_REG,
+							val);
+		cgs_write_register(acp_prv->cgs_device,	mmACP_PGFSM_CONFIG_REG,
+							0x500 + tile);
+
+		timeout = ACP_SOFT_RESET_DONE_TIME_OUT_VALUE;
+		while (timeout--) {
+			val = cgs_read_register(acp_prv->cgs_device,
+					mmACP_PGFSM_READ_REG_0 + tile);
+			val = val & ACP_TILE_ON_MASK;
+			if (val == ACP_TILE_OFF_MASK)
+				break;
+		}
+
+		val = cgs_read_register(acp_prv->cgs_device,
+					mmACP_PGFSM_RETAIN_REG + tile);
+
+		val |= ACP_TILE_OFF_RETAIN_REG_MASK;
+		cgs_write_register(acp_prv->cgs_device,	mmACP_PGFSM_RETAIN_REG,
+							val);
+	}
+
+}
+
+static void acp_resume_tile(struct amd_acp_private *acp_prv, int tile)
+{
+	u32 val = 0;
+	u32 timeout = 0;
+
+	if ((tile == ACP_TILE_P1) || (tile == ACP_TILE_P2)) {
+		val = cgs_read_register(acp_prv->cgs_device,
+					mmACP_PGFSM_READ_REG_0 + tile);
+		val = val & ACP_TILE_ON_MASK;
+	} else
+		val = 0;
+
+	if (val != 0x0) {
+		cgs_write_register(acp_prv->cgs_device,	mmACP_PGFSM_CONFIG_REG,
+							0x600 + tile);
+		timeout = ACP_SOFT_RESET_DONE_TIME_OUT_VALUE;
+		while (timeout--) {
+			val = cgs_read_register(acp_prv->cgs_device,
+					mmACP_PGFSM_READ_REG_0 + tile);
+			val = val & ACP_TILE_ON_MASK;
+			if (val == 0x0)
+				break;
+		}
+		val = cgs_read_register(acp_prv->cgs_device,
+					mmACP_PGFSM_RETAIN_REG + tile);
+		if (tile == ACP_TILE_P1)
+			val = val & (ACP_TILE_P1_MASK);
+		else if (tile == ACP_TILE_P2)
+			val = val & (ACP_TILE_P2_MASK);
+
+		cgs_write_register(acp_prv->cgs_device,	mmACP_PGFSM_RETAIN_REG,
+							val);
+		val = cgs_read_register(acp_prv->cgs_device,
+					mmACP_PGFSM_RETAIN_REG + tile);
+		val = val & (ACP_TILE_ON_RETAIN_REG_MASK);
+		cgs_write_register(acp_prv->cgs_device,	mmACP_PGFSM_RETAIN_REG,
+							val);
+	}
+}
+
 /* Initialize and bring ACP hardware to default state. */
-static int acp_hw_init(struct amd_acp_device *acp_dev, void *iprv)
+static void acp_init(struct amd_acp_private *acp_prv)
 {
 	u32 val;
 	u32 timeout_value;
-	int acp_hw_init_status = STATUS_UNSUCCESSFUL;
-	struct amd_acp_private *acp_prv = (struct amd_acp_private *)acp_dev;
-
-	if (acp_dev == NULL)
-		return acp_hw_init_status;
 
 	/* Assert Soft reset of ACP */
 	val = cgs_read_register(acp_prv->cgs_device, mmACP_SOFT_RESET);
@@ -756,18 +833,31 @@ static int acp_hw_init(struct amd_acp_device *acp_dev, void *iprv)
 	cgs_write_register(acp_prv->cgs_device,	mmACP_EXTERNAL_INTR_CNTL,
 			   ACP_EXTERNAL_INTR_CNTL__DMAIOCMask_MASK);
 
-	cgs_add_irq_source(acp_prv->cgs_device, VISLANDS30_IV_SRCID_ACP, 1,
-			   irq_set_source,	irq_handler, iprv);
-
 	pr_info("ACP: Initialized.\n");
+
+}
+
+static int acp_hw_init(struct amd_acp_device *acp_dev, void *iprv)
+{
+	struct amd_acp_private *acp_prv = (struct amd_acp_private *)acp_dev;
+
+	acp_init(acp_prv);
+
+	cgs_add_irq_source(acp_prv->cgs_device, VISLANDS30_IV_SRCID_ACP, 1,
+			   irq_set_source, irq_handler, iprv);
+
+	/* Disable DSPs which are not used */
+	acp_suspend_tile(acp_prv, ACP_TILE_DSP0);
+	acp_suspend_tile(acp_prv, ACP_TILE_DSP1);
+	acp_suspend_tile(acp_prv, ACP_TILE_DSP2);
+
 	return STATUS_SUCCESS;
 }
 
-static void acp_hw_deinit(struct amd_acp_device *acp_dev)
+static void acp_deinit(struct amd_acp_private *acp_prv)
 {
 	u32 val;
 	u32 timeout_value;
-	struct amd_acp_private *acp_prv = (struct amd_acp_private *)acp_dev;
 
 	  /* Assert Soft reset of ACP */
 	val = cgs_read_register(acp_prv->cgs_device, mmACP_SOFT_RESET);
@@ -800,6 +890,12 @@ static void acp_hw_deinit(struct amd_acp_device *acp_dev)
 	pr_info("ACP: De-Initialized.\n");
 }
 
+static void acp_hw_deinit(struct amd_acp_device *acp_dev)
+{
+	struct amd_acp_private *acp_prv = (struct amd_acp_private *)acp_dev;
+
+	acp_deinit(acp_prv);
+}
 
 /*	Get the number of bytes consumed for SRAM_TO_I2S DMA
  *	 channel during rendering
@@ -812,6 +908,7 @@ static u32 acp_update_dma_pointer(struct amd_acp_device *acp_dev, int direction,
 	u32 mul;
 	u32 dma_config;
 	struct amd_acp_private *acp_prv = (struct amd_acp_private *)acp_dev;
+
 	pos = 0;
 
 	if (direction == STREAM_PLAYBACK) {
@@ -961,10 +1058,21 @@ int amd_acp_hw_fini(struct amd_acp_private *acp_private)
 
 void amd_acp_suspend(struct amd_acp_private *acp_private)
 {
-	/* TODO */
+	acp_deinit(acp_private);
+
+	acp_suspend_tile(acp_private, ACP_TILE_P2);
+	acp_suspend_tile(acp_private, ACP_TILE_P1);
 }
 
 void amd_acp_resume(struct amd_acp_private *acp_private)
 {
-	/* TODO */
+	acp_resume_tile(acp_private, ACP_TILE_P1);
+	acp_resume_tile(acp_private, ACP_TILE_P2);
+
+	/* Disable DSPs which might have been enabled by SMU */
+	acp_suspend_tile(acp_private, ACP_TILE_DSP0);
+	acp_suspend_tile(acp_private, ACP_TILE_DSP1);
+	acp_suspend_tile(acp_private, ACP_TILE_DSP2);
+
+	acp_init(acp_private);
 }

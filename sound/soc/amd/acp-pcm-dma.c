@@ -625,11 +625,42 @@ static int acp_amdsoc_remove(struct amd_gnb_bus_dev *adev)
 	return 0;
 }
 
+static int acp_pcm_suspend(struct device *dev)
+{
+	return 0;
+}
+
+static int acp_pcm_resume(struct device *dev)
+{
+	struct snd_pcm_substream *substream;
+	struct snd_pcm_runtime *runtime;
+	struct audio_substream_data *rtd;
+
+	struct audio_drv_data *irq_data =
+	    (struct audio_drv_data *)dev_get_drvdata(dev);
+
+	substream = irq_data->play_stream;
+	runtime = substream->runtime;
+	rtd = runtime->private_data;
+
+	irq_data->acp_dev->config_i2s(irq_data->acp_dev, rtd->i2s_config);
+	irq_data->acp_dev->config_dma(irq_data->acp_dev, rtd->dma_config);
+
+	return 0;
+}
+
+static const struct dev_pm_ops acp_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(acp_pcm_suspend, acp_pcm_resume)
+};
+
 static struct amd_gnb_bus_driver acp_dma_driver = {
 	.name = "acp-pcm-driver",
 	.ip = AMD_GNB_IP_ACP_PCM,
 	.probe = acp_amdsoc_probe,
 	.remove = acp_amdsoc_remove,
+	.driver = {
+		.pm = &acp_pm_ops,
+	},
 };
 
 static int __init amdsoc_bus_acp_dma_driver_init(void)
