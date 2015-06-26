@@ -29,6 +29,7 @@
 #include "adjustment_types.h"
 #include "hw_adjustment_types.h"
 #include "include/plane_types.h"
+#include "scaler_types.h"
 
 /* Forward declaration */
 struct mode_timing;
@@ -68,13 +69,7 @@ enum tiling_mode {
 	TILING_MODE_TILED
 };
 
-/* Rotation angle */
-enum rotation_angle {
-	ROTATION_ANGLE_0 = 0,
-	ROTATION_ANGLE_90,
-	ROTATION_ANGLE_180,
-	ROTATION_ANGLE_270,
-};
+
 
 /* State of stereo 3D for workstation */
 enum ws_stereo_state {

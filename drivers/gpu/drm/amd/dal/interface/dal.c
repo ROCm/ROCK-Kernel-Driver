@@ -213,7 +213,9 @@ static bool dal_construct(struct dal_init_data *init,
 	{
 		struct mode_manager_init_data init_data;
 		init_data.as = dal_instance->adapter_srv;
-		init_data.ts = dal_instance->timing_srv;
+		init_data.default_modes =
+			dal_timing_service_get_default_mode_list(
+				dal_instance->timing_srv);
 		init_data.dal_context = &dal_instance->dal_context;
 		dal_instance->mm = dal_mode_manager_create(&init_data);
 

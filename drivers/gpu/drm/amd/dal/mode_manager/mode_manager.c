@@ -52,7 +52,6 @@ static struct view_info guaranteed_view_info[] = {
 	{ { 1680, 1050 }, { ADAPTER_VIEW_IMPORTANCE_GUARANTEED_16x10 } }, };
 
 struct mode_manager {
-	struct timing_service *ts;
 	struct ds_dispatch *ds_dispatch;
 	struct adapter_service *as;
 
@@ -126,12 +125,11 @@ static bool construct(
 		return false;
 	if (!init_data->as)
 		return false;
-	if (!init_data->ts)
+	if (!init_data->default_modes)
 		return false;
 
 	mm->ctx = init_data->dal_context;
 	mm->as = init_data->as;
-	mm->ts = init_data->ts;
 	mm->pixel_granularity =
 		dal_adapter_service_get_view_port_pixel_granularity(mm->as);
 
@@ -146,7 +144,7 @@ static bool construct(
 	/*
 	 * populate master_view_list with views from default_mode_list
 	 */
-	default_modes = dal_timing_service_get_default_mode_list(mm->ts);
+	default_modes = init_data->default_modes;
 	count = dal_default_mode_list_get_count(default_modes);
 
 	for (i = 0; i < count; i++) {
@@ -713,14 +711,14 @@ free_validator:
  */
 bool dal_mode_manager_update_disp_path_func_view_tbl(
 	struct mode_manager *mm,
-	uint32_t display_index)
+	uint32_t display_index,
+	struct mode_timing_list *mtl)
 {
 	/* gets the association table of the given display path */
 	struct display_view_solution_container *tbl =
 		get_association_table(
 			mm,
 			display_index);
-	struct mode_timing_list *mtl;
 
 	/* create new associate table if it doesn't exist already */
 	if (!tbl) {
@@ -731,11 +729,6 @@ bool dal_mode_manager_update_disp_path_func_view_tbl(
 			display_index);
 		return false;
 	}
-
-	/* gets the updated mode timing list associated to given display path
-	 * from TS */
-	mtl = dal_timing_service_get_mode_timing_list_for_path(
-		mm->ts, display_index);
 
 	if (!mtl) {
 		dal_logger_write(mm->ctx->logger, LOG_MAJOR_MODE_ENUM,
@@ -785,7 +778,8 @@ void dal_mode_manager_set_bestview_options(
 	struct mode_manager *mm,
 	uint32_t display_index,
 	const struct bestview_options *opts,
-	bool rebuild_bestview)
+	bool rebuild_bestview,
+	struct mode_timing_list *mtl)
 {
 	struct display_view_solution_container *tbl;
 
@@ -801,7 +795,7 @@ void dal_mode_manager_set_bestview_options(
 
 	if (rebuild_bestview)
 		dal_mode_manager_update_disp_path_func_view_tbl(
-			mm, display_index);
+			mm, display_index, mtl);
 }
 
 void dal_mode_manager_set_ds_dispatch(

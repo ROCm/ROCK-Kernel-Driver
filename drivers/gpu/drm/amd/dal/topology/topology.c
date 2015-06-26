@@ -2812,7 +2812,14 @@ static void display_connection_changed_at_display_index(
 		opts.MAINTAIN_ASPECT_RATIO = true;
 	}
 
-	dal_mode_manager_set_bestview_options(mm, display_index, &opts, true);
+	dal_mode_manager_set_bestview_options(
+		mm,
+		display_index,
+		&opts,
+		true,
+		dal_timing_service_get_mode_timing_list_for_path(
+			tm->timing_srv,
+			display_index));
 }
 
 /* A possible use-case which will run this function is "Change monitor during
@@ -2832,7 +2839,12 @@ static void display_capability_changed_at_display_index(
 		dcs,
 		display_idx);
 
-	dal_mode_manager_update_disp_path_func_view_tbl(tm->mm, display_idx);
+	dal_mode_manager_update_disp_path_func_view_tbl(
+		tm->mm,
+		display_idx,
+		dal_timing_service_get_mode_timing_list_for_path(
+			tm->timing_srv,
+			display_idx));
 }
 
 /**

@@ -73,7 +73,10 @@ static void destruct(struct dal_timing_list_query *tlsq)
 	if (tlsq->added_timing_count) {
 		dal_mode_manager_update_disp_path_func_view_tbl(
 			dal_get_mode_manager(tlsq->parent_dal),
-			tlsq->display_index);
+			tlsq->display_index,
+			dal_timing_service_get_mode_timing_list_for_path(
+				tlsq->timing_srv,
+				tlsq->display_index));
 
 		dal_timing_service_dump(tlsq->timing_srv,
 				tlsq->display_index);
@@ -355,7 +358,10 @@ bool dal_timing_list_query_add_timing(struct dal_timing_list_query *tlsq,
 	if (ret) {
 		dal_mode_manager_update_disp_path_func_view_tbl(
 			dal_get_mode_manager(tlsq->parent_dal),
-			tlsq->display_index);
+			tlsq->display_index,
+			dal_timing_service_get_mode_timing_list_for_path(
+				tlsq->timing_srv,
+				tlsq->display_index));
 		tlsq->added_timing_count++;
 	}
 

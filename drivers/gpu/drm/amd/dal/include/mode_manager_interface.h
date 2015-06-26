@@ -29,9 +29,11 @@
 #include "mode_query_interface.h"
 #include "mode_manager_types.h"
 
+struct mode_timing_list;
+
 struct mode_manager;
 struct mode_manager_init_data {
-	struct timing_service *ts;
+	const struct default_mode_list *default_modes;
 	struct adapter_service *as;
 	struct dal_context *dal_context;
 };
@@ -60,14 +62,16 @@ void dal_mode_manager_set_bestview_options(
 	struct mode_manager *mode_mgr,
 	uint32_t display_index,
 	const struct bestview_options *bv_options,
-	bool rebuild_best_view);
+	bool rebuild_best_view,
+	struct mode_timing_list *mtl);
 
 /* Updates the cached render view table
  * associated with given DisplayPath accordingly
  */
 bool dal_mode_manager_update_disp_path_func_view_tbl(
 	struct mode_manager *mode_mgr,
-	uint32_t display_index);
+	uint32_t display_index,
+	struct mode_timing_list *mtl);
 
 /* generate all supported render modes
  * and the corresponding cofunctional output mode set
