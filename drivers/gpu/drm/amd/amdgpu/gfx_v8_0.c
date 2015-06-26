@@ -3144,6 +3144,12 @@ static int gfx_v8_0_cp_compute_resume(struct amdgpu_device *adev)
 		WREG32(mmCP_HQD_PQ_DOORBELL_CONTROL,
 		       mqd->cp_hqd_pq_doorbell_control);
 
+		/* reset read and write pointers, similar to CP_RB0_WPTR/_RPTR */
+		ring->wptr = 0;
+		mqd->cp_hqd_pq_wptr = ring->wptr;
+		WREG32(mmCP_HQD_PQ_WPTR, mqd->cp_hqd_pq_wptr);
+		mqd->cp_hqd_pq_rptr = RREG32(mmCP_HQD_PQ_RPTR);
+
 		/* set the vmid for the queue */
 		mqd->cp_hqd_vmid = 0;
 		WREG32(mmCP_HQD_VMID, mqd->cp_hqd_vmid);
@@ -3162,10 +3168,6 @@ static int gfx_v8_0_cp_compute_resume(struct amdgpu_device *adev)
 
 		amdgpu_bo_kunmap(ring->mqd_obj);
 		amdgpu_bo_unreserve(ring->mqd_obj);
-
-		/* reset wptr */
-		ring->wptr = 0;
-		amdgpu_ring_set_wptr(ring);
 	}
 
 	if (use_doorbell) {
