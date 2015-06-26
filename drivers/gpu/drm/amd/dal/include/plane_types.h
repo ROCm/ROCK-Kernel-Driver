@@ -26,7 +26,7 @@
 #ifndef __DAL_PLANE_TYPES_H__
 #define __DAL_PLANE_TYPES_H__
 
-#include "fixed31_32.h"
+#include "scaler_types.h"
 
 union large_integer {
 	struct {
@@ -64,53 +64,10 @@ enum display_flip_mode {
 	DISPLAY_FLIP_MODE_HORIZONTAL
 };
 
-struct scaling_tap_info {
-	uint32_t v_taps;
-	uint32_t h_taps;
-	uint32_t v_taps_c;
-	uint32_t h_taps_c;
-};
-
-struct scaling_ratios {
-	struct fixed31_32 horz;
-	struct fixed31_32 vert;
-	struct fixed31_32 horz_c;
-	struct fixed31_32 vert_c;
-};
-
-/*overscan or window*/
-struct overscan_info {
-	uint32_t left;
-	uint32_t right;
-	uint32_t top;
-	uint32_t bottom;
-};
-
-struct rect {
-	uint32_t x;
-	uint32_t y;
-	uint32_t width;
-	uint32_t height;
-};
-
 /*rect or view */
 struct rect_position {
 	uint32_t x;
 	uint32_t y;
-};
-
-/*size: Number of pixels in height and width*/
-struct view {
-	uint32_t width;
-	uint32_t height;
-};
-
-struct mp_scaling_data {
-	struct rect viewport;
-	struct view dst_res;
-	struct overscan_info overscan;
-	struct scaling_tap_info taps;
-	struct scaling_ratios ratios;
 };
 
 union plane_config_change_flags {
@@ -181,31 +138,6 @@ enum surface_pixel_format {
 	SURFACE_PIXEL_FORMAT_VIDEO_444_ACrYCb2101010,
 	SURFACE_PIXEL_FORMAT_VIDEO_444_CbYCrA1010102
 	/*grow 444 video here if necessary */
-};
-
-/* Pixel format */
-enum pixel_format {
-	/*graph*/
-	PIXEL_FORMAT_UNINITIALIZED,
-	PIXEL_FORMAT_INDEX8 = 0x0001,
-	PIXEL_FORMAT_RGB565 = 0x0002,
-	PIXEL_FORMAT_ARGB8888 = 0x0004,
-	PIXEL_FORMAT_ARGB2101010 = 0x0008,
-	PIXEL_FORMAT_ARGB2101010_XRBIAS = 0x0010,
-	PIXEL_FORMAT_FP16 = 0x0020,
-	/*video*/
-	PIXEL_FORMAT_420BPP12 = 0x0040,
-	PIXEL_FORMAT_422BPP16 = 0x0080,
-	PIXEL_FORMAT_444BPP16 = 0x0100,
-	PIXEL_FORMAT_444BPP32 = 0x0200,
-	/*end of pixel format definition*/
-	PIXEL_FORMAT_INVALID = 0x8000,
-
-	PIXEL_FORMAT_GRPH_BEGIN = PIXEL_FORMAT_INDEX8,
-	PIXEL_FORMAT_GRPH_END = PIXEL_FORMAT_FP16,
-	PIXEL_FORMAT_VIDEO_BEGIN = PIXEL_FORMAT_420BPP12,
-	PIXEL_FORMAT_VIDEO_END = PIXEL_FORMAT_444BPP32,
-	PIXEL_FORMAT_UNKNOWN
 };
 
 /* TODO: Find way to calculate number of bits
@@ -421,7 +353,6 @@ union plane_size {
 	} video;
 };
 
-
 struct plane_surface_config {
 	uint32_t layer_index;
 	/*used in set operation*/
@@ -517,7 +448,7 @@ struct plane_attributes {
 	struct rect src_rect;
 	struct rect dst_rect;
 	struct rect clip_rect;
-	struct plane_src_scaling_quality scaling_quality;
+	struct scaling_tap_info scaling_quality;
 	/*progressive, interlaced*/
 	enum plane_vid_scan_fmt video_scan_format;
 	enum plane_stereo_format stereo_format;

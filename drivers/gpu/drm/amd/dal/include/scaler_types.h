@@ -26,17 +26,56 @@
 #ifndef __DAL_SCALER_TYPES_H__
 #define __DAL_SCALER_TYPES_H__
 
-#include "timing_generator_types.h"
 #include "signal_types.h"
-#include "set_mode_types.h"
-#include "hw_sequencer_types.h"
-#include "plane_types.h"
 #include "fixed31_32.h"
 
 
 enum pixel_type {
 	PIXEL_TYPE_30BPP = 1,
 	PIXEL_TYPE_20BPP
+};
+
+struct scaling_tap_info {
+	uint32_t v_taps;
+	uint32_t h_taps;
+	uint32_t v_taps_c;
+	uint32_t h_taps_c;
+};
+
+struct scaling_ratios {
+	struct fixed31_32 horz;
+	struct fixed31_32 vert;
+	struct fixed31_32 horz_c;
+	struct fixed31_32 vert_c;
+};
+
+/*overscan or window*/
+struct overscan_info {
+	uint32_t left;
+	uint32_t right;
+	uint32_t top;
+	uint32_t bottom;
+};
+
+struct rect {
+	uint32_t x;
+	uint32_t y;
+	uint32_t width;
+	uint32_t height;
+};
+
+/*size: Number of pixels in height and width*/
+struct view {
+	uint32_t width;
+	uint32_t height;
+};
+
+struct mp_scaling_data {
+	struct rect viewport;
+	struct view dst_res;
+	struct overscan_info overscan;
+	struct scaling_tap_info taps;
+	struct scaling_ratios ratios;
 };
 
 struct scaler_validation_params {
@@ -81,6 +120,31 @@ enum scaler_validation_code {
 	SCALER_VALIDATION_SCALING_RATIO_NOT_SUPPORTED,
 	SCALER_VALIDATION_SOURCE_VIEW_WIDTH_EXCEEDING_LIMIT,
 	SCALER_VALIDATION_DISPLAY_CLOCK_BELOW_PIXEL_CLOCK
+};
+
+/* Pixel format */
+enum pixel_format {
+	/*graph*/
+	PIXEL_FORMAT_UNINITIALIZED,
+	PIXEL_FORMAT_INDEX8 = 0x0001,
+	PIXEL_FORMAT_RGB565 = 0x0002,
+	PIXEL_FORMAT_ARGB8888 = 0x0004,
+	PIXEL_FORMAT_ARGB2101010 = 0x0008,
+	PIXEL_FORMAT_ARGB2101010_XRBIAS = 0x0010,
+	PIXEL_FORMAT_FP16 = 0x0020,
+	/*video*/
+	PIXEL_FORMAT_420BPP12 = 0x0040,
+	PIXEL_FORMAT_422BPP16 = 0x0080,
+	PIXEL_FORMAT_444BPP16 = 0x0100,
+	PIXEL_FORMAT_444BPP32 = 0x0200,
+	/*end of pixel format definition*/
+	PIXEL_FORMAT_INVALID = 0x8000,
+
+	PIXEL_FORMAT_GRPH_BEGIN = PIXEL_FORMAT_INDEX8,
+	PIXEL_FORMAT_GRPH_END = PIXEL_FORMAT_FP16,
+	PIXEL_FORMAT_VIDEO_BEGIN = PIXEL_FORMAT_420BPP12,
+	PIXEL_FORMAT_VIDEO_END = PIXEL_FORMAT_444BPP32,
+	PIXEL_FORMAT_UNKNOWN
 };
 
 #define FILTER_TYPE_MASK 0x0000000FL
