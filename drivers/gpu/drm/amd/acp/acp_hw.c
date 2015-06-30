@@ -706,7 +706,7 @@ static void acp_suspend_tile(struct amd_acp_private *acp_prv, int tile)
 
 	if (val == 0x0) {
 		val = cgs_read_register(acp_prv->cgs_device,
-					mmACP_PGFSM_RETAIN_REG + tile);
+					mmACP_PGFSM_RETAIN_REG);
 		val = val | (1 << tile);
 		cgs_write_register(acp_prv->cgs_device,	mmACP_PGFSM_RETAIN_REG,
 							val);
@@ -723,7 +723,7 @@ static void acp_suspend_tile(struct amd_acp_private *acp_prv, int tile)
 		}
 
 		val = cgs_read_register(acp_prv->cgs_device,
-					mmACP_PGFSM_RETAIN_REG + tile);
+					mmACP_PGFSM_RETAIN_REG);
 
 		val |= ACP_TILE_OFF_RETAIN_REG_MASK;
 		cgs_write_register(acp_prv->cgs_device,	mmACP_PGFSM_RETAIN_REG,
@@ -758,17 +758,12 @@ static void acp_resume_tile(struct amd_acp_private *acp_prv, int tile)
 				break;
 		}
 		val = cgs_read_register(acp_prv->cgs_device,
-					mmACP_PGFSM_RETAIN_REG + tile);
+					mmACP_PGFSM_RETAIN_REG);
 		if (tile == ACP_TILE_P1)
 			val = val & (ACP_TILE_P1_MASK);
 		else if (tile == ACP_TILE_P2)
 			val = val & (ACP_TILE_P2_MASK);
 
-		cgs_write_register(acp_prv->cgs_device,	mmACP_PGFSM_RETAIN_REG,
-							val);
-		val = cgs_read_register(acp_prv->cgs_device,
-					mmACP_PGFSM_RETAIN_REG + tile);
-		val = val & (ACP_TILE_ON_RETAIN_REG_MASK);
 		cgs_write_register(acp_prv->cgs_device,	mmACP_PGFSM_RETAIN_REG,
 							val);
 	}
@@ -1088,12 +1083,6 @@ void amd_acp_resume(struct amd_acp_private *acp_private)
 	acp_resume_tile(acp_private, ACP_TILE_P1);
 	acp_resume_tile(acp_private, ACP_TILE_P2);
 
-	/* TODO: PGFSM registers need not be touched here.
-	 * We do it here, as a workaround */
-	cgs_write_register(acp_private->cgs_device, mmACP_PGFSM_RETAIN_REG,
-							0x30);
-	cgs_write_register(acp_private->cgs_device, mmACP_PGFSM_CONFIG_REG,
-							0x504);
 	acp_init(acp_private);
 
 	/* Disable DSPs which might have been enabled by SMU */
