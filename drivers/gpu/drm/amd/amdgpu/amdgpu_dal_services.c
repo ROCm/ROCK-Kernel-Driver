@@ -287,7 +287,7 @@ void dal_notify_capability_change(
 	struct dal_context *ctx,
 	uint32_t display_index)
 {
-	/*TODO*/
+	dal_notify_hotplug(ctx, display_index, true);
 }
 
 void dal_notify_setmode_complete(struct dal_context *ctx,
