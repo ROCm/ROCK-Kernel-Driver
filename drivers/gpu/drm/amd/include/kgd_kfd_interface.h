@@ -223,7 +223,10 @@ struct kfd2kgd_calls {
 
 	void (*set_num_of_requests)(struct kgd_dev *kgd,
 			uint8_t num_of_requests);
-
+	int (*alloc_memory_of_scratch)(struct kgd_dev *kgd,
+			uint64_t va, uint32_t vmid);
+	int (*write_config_static_mem)(struct kgd_dev *kgd, bool swizzle_enable,
+		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
 	void (*get_cu_info)(struct kgd_dev *kgd,
 			struct kfd_cu_info *cu_info);
 };
