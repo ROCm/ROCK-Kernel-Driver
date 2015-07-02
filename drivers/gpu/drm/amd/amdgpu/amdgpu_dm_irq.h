@@ -105,4 +105,11 @@ void amdgpu_dm_irq_register_timer(
 	interrupt_handler ih,
 	void *args);
 
+/**
+ * amdgpu_dm_irq_resume - enable ASIC interrupt during resume.
+ *
+ */
+int amdgpu_dm_irq_resume(
+	struct amdgpu_device *adev);
+
 #endif /* __AMDGPU_DM_IRQ_H__ */

@@ -794,6 +794,8 @@ static int dm_resume(void *handle)
 	/* save previous connected display to reset mode correctly */
 	connected_displays_vector = prev_connected_displays_vector;
 
+	amdgpu_dm_irq_resume(adev);
+
 	dal_resume(dm->dal);
 
 	for (displays_number = 0, current_display_index = 0;
