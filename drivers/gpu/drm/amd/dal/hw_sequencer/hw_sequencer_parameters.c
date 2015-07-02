@@ -739,8 +739,15 @@ static enum scaler_validation_code build_path_parameters(
 		scaler_params.signal_type = path_mode->mode.scaling_info.signal;
 
 		scaler_params.source_view = path_mode->mode.scaling_info.src;
-		scaler_params.dest_view = path_mode->mode.scaling_info.dst;
-		scaler_params.dest_view.height = dst_pixel_height;
+
+		if (pl_cfg) {
+			scaler_params.dest_view =
+				pl_cfg->mp_scaling_data.dst_res;
+		} else {
+			scaler_params.dest_view =
+				path_mode->mode.scaling_info.dst;
+			scaler_params.dest_view.height = dst_pixel_height;
+		}
 
 
 /*		scaler_params.source_view.height =
@@ -773,10 +780,17 @@ static enum scaler_validation_code build_path_parameters(
 		actual_min_clock_params->source_view.height =
 			path_mode->mode.scaling_info.src.height;
 
-		actual_min_clock_params->dest_view.width =
-			path_mode->mode.scaling_info.dst.width;
-		actual_min_clock_params->dest_view.height =
+		if (pl_cfg) {
+			actual_min_clock_params->dest_view.height =
+				pl_cfg->mp_scaling_data.dst_res.height;
+			actual_min_clock_params->dest_view.width =
+				pl_cfg->mp_scaling_data.dst_res.width;
+		} else {
+			actual_min_clock_params->dest_view.width =
+				path_mode->mode.scaling_info.dst.width;
+			actual_min_clock_params->dest_view.height =
 				dst_pixel_height;
+		}
 
 		actual_min_clock_params->timing_info.INTERLACED =
 			path_mode->mode.timing.flags.INTERLACED;
@@ -792,10 +806,17 @@ static enum scaler_validation_code build_path_parameters(
 		actual_min_clock_params->timing_info.h_sync_width =
 			path_mode->mode.timing.h_sync_width;
 
-		actual_min_clock_params->scaling_info.h_overscan_right =
-			path_mode->mode.overscan.right;
-		actual_min_clock_params->scaling_info.h_overscan_left =
-			path_mode->mode.overscan.left;
+		if (pl_cfg) {
+			actual_min_clock_params->scaling_info.h_overscan_right =
+				pl_cfg->mp_scaling_data.overscan.right;
+			actual_min_clock_params->scaling_info.h_overscan_left =
+				pl_cfg->mp_scaling_data.overscan.left;
+		} else {
+			actual_min_clock_params->scaling_info.h_overscan_right =
+				path_mode->mode.overscan.right;
+			actual_min_clock_params->scaling_info.h_overscan_left =
+				path_mode->mode.overscan.left;
+		}
 
 		actual_min_clock_params->scaling_info.h_taps =
 			actual_tap_info->h_taps;

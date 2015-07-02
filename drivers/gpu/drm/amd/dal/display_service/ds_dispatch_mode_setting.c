@@ -412,12 +412,13 @@ static struct overscan_info get_overscan(
 	return overscan;
 }
 
+DAL_VECTOR_AT_INDEX(plane_configs, struct plane_config *)
+
 static void cal_scaling_overscan_params(
-		const struct path_mode *mode,
-		enum scaling_transformation scl_type,
-		struct hw_mode_info *info,
-		struct plane_config *plane_config,
-		uint32_t plane_nums)
+	const struct path_mode *mode,
+	enum scaling_transformation scl_type,
+	struct hw_mode_info *info,
+	struct vector *plane_configs)
 {
 	uint32_t screen_w;
 	uint32_t screen_h;
@@ -426,23 +427,15 @@ static void cal_scaling_overscan_params(
 	uint32_t i;
 	struct view os_resolution;
 
+	uint32_t planes_num = dal_vector_get_count(plane_configs);
+
 	/*PlaneConfig used instead of PlaneAttributes since only
 	 *planeConfig can be an indexable array for getBoundingClipRect
 	 */
-	struct plane_config scl_data;
 
-	dal_memset(&scl_data, 0, sizeof(scl_data));
-
-	if (plane_nums == 0) {
-		plane_nums = 1;
-		scl_data.attributes.dst_rect.height = mode->view.height;
-		scl_data.attributes.dst_rect.width  = mode->view.width;
-		scl_data.attributes.dst_rect.x = 0;
-		scl_data.attributes.dst_rect.y = 0;
-		scl_data.attributes.clip_rect = scl_data.attributes.dst_rect;
-		scl_data.attributes.src_rect = scl_data.attributes.dst_rect;
-		/* TODO: add stereo 3d translation here */
-		plane_config = &scl_data;
+	if (planes_num == 0) {
+		BREAK_TO_DEBUGGER();
+		return;
 	}
 
 	os_resolution = mode->view;
@@ -473,7 +466,7 @@ static void cal_scaling_overscan_params(
 	 * Fixed31_32 v_sr
 	 *ScalingTransformation_PreserveAspectRatioScale
 	 */
-	for (i = 0; i < plane_nums; i++) {
+	for (i = 0; i < planes_num; i++) {
 
 		struct view dest;
 		struct rect clip_rect;
@@ -481,6 +474,8 @@ static void cal_scaling_overscan_params(
 		struct rect src_rect;
 		struct rect viewport;
 		struct overscan_info overscan;
+		struct plane_config *plane_config =
+			plane_configs_vector_at_index(plane_configs, i);
 
 		struct fixed31_32 v_sr;
 		struct fixed31_32 h_sr;
@@ -493,9 +488,9 @@ static void cal_scaling_overscan_params(
 			/* this is the else case when rotation is not enabled
 			 * TODO: add rotation case above */
 
-			src_rect = plane_config[i].attributes.src_rect;
-			dst_rect = plane_config[i].attributes.dst_rect;
-			clip_rect = plane_config[i].attributes.clip_rect;
+			src_rect = plane_config->attributes.src_rect;
+			dst_rect = plane_config->attributes.dst_rect;
+			clip_rect = plane_config->attributes.clip_rect;
 		}
 
 		if (dst_rect.height == 0 || dst_rect.width == 0) {
@@ -607,15 +602,15 @@ static void cal_scaling_overscan_params(
 				screen_h - bound_h - (screen_h - bound_h) / 2;
 
 			dest.width =
-				plane_config[i].attributes.clip_rect.width;
+				plane_config->attributes.clip_rect.width;
 			dest.height =
-				plane_config[i].attributes.clip_rect.height;
+				plane_config->attributes.clip_rect.height;
 		} else if (scl_type == SCALING_TRANSFORMATION_IDENTITY) {
 			/*do nothing for identity*/
 			dest.width  =
-				plane_config[i].attributes.clip_rect.width;
+				plane_config->attributes.clip_rect.width;
 			dest.height =
-				plane_config[i].attributes.clip_rect.height;
+				plane_config->attributes.clip_rect.height;
 		} else {
 			/*error unsupported scalingTransformation*/
 			BREAK_TO_DEBUGGER();
@@ -635,81 +630,68 @@ static void cal_scaling_overscan_params(
 		if (dest.height == 0 || dest.width == 0)
 			BREAK_TO_DEBUGGER();
 
-		plane_config[i].mp_scaling_data.overscan = overscan;
+		plane_config->mp_scaling_data.overscan = overscan;
 
-		if (plane_config[i].mp_scaling_data.viewport.x == 0 &&
-			plane_config[i].mp_scaling_data.viewport.y == 0 &&
-			plane_config[i].mp_scaling_data.viewport.width == 0 &&
-			plane_config[i].mp_scaling_data.viewport.height == 0)
-			plane_config[i].mp_scaling_data.viewport = viewport;
+		if (plane_config->mp_scaling_data.viewport.x == 0 &&
+			plane_config->mp_scaling_data.viewport.y == 0 &&
+			plane_config->mp_scaling_data.viewport.width == 0 &&
+			plane_config->mp_scaling_data.viewport.height == 0)
+			plane_config->mp_scaling_data.viewport = viewport;
 
-		plane_config[i].mp_scaling_data.dst_res = dest;
-		plane_config[i].mp_scaling_data.ratios.horz = h_sr;
-		plane_config[i].mp_scaling_data.ratios.vert = v_sr;
-		plane_config[i].mp_scaling_data.ratios.horz_c = h_sr;
-		plane_config[i].mp_scaling_data.ratios.vert_c = v_sr;
+		plane_config->mp_scaling_data.dst_res = dest;
+		plane_config->mp_scaling_data.ratios.horz = h_sr;
+		plane_config->mp_scaling_data.ratios.vert = v_sr;
+		plane_config->mp_scaling_data.ratios.horz_c = h_sr;
+		plane_config->mp_scaling_data.ratios.vert_c = v_sr;
 
 		/* TODO: add MPO horzc and vertc preparation w amd w/o rotation
 		 */
 
-		if (plane_nums == 0) {
-			info->scaling_info.src = info->view;
-			info->scaling_info.dst = dest;
-			info->overscan = overscan;
-			info->ds_info.position_x = overscan.left;
-			info->ds_info.position_y  = overscan.top;
-			info->ds_info.TIMING_SCALING_PATCHED = 1;
-		} else {
-			/* DM always passes requested num of taps even if
-			 * scaling is not required
-			 */
-			if (viewport.width  == dest.width
-				&& viewport.height == dest.height) {
-				plane_config[i].attributes.scaling_quality.
-				h_taps = 1;
-				plane_config[i].attributes.scaling_quality.
-				v_taps = 1;
-			}
+		/* DM always passes requested num of taps even if
+		 * scaling is not required
+		 */
+		if (viewport.width  == dest.width
+			&& viewport.height == dest.height) {
+			plane_config->attributes.scaling_quality.
+			h_taps = 1;
+			plane_config->attributes.scaling_quality.
+			v_taps = 1;
+		}
 
-			if (viewport.width == 2 * dest.width
-				&& (plane_config[i].config.dal_pixel_format ==
-					PIXEL_FORMAT_420BPP12
-				|| plane_config[i].config.rotation ==
-						PLANE_ROTATION_ANGLE_90
-				|| plane_config[i].config.rotation ==
+		if (viewport.width == 2 * dest.width
+			&& (plane_config->config.dal_pixel_format ==
+				PIXEL_FORMAT_420BPP12
+				|| plane_config->config.rotation ==
+					PLANE_ROTATION_ANGLE_90
+					|| plane_config->config.rotation ==
 						PLANE_ROTATION_ANGLE_270))
-				plane_config[i].attributes.scaling_quality.
-				h_taps_c = 1;
+			plane_config->attributes.scaling_quality.h_taps_c = 1;
 
-			if (viewport.height == 2 * dest.height
-				&& (plane_config[i].config.dal_pixel_format ==
-						PIXEL_FORMAT_420BPP12
-				|| plane_config[i].config.rotation ==
-						PLANE_ROTATION_ANGLE_0
-				|| plane_config[i].config.rotation ==
-						PLANE_ROTATION_ANGLE_180))
-				plane_config[i].attributes.scaling_quality.
-				v_taps_c = 1;
+		if (viewport.height == 2 * dest.height &&
+			(plane_config->config.dal_pixel_format ==
+				PIXEL_FORMAT_420BPP12 ||
+				plane_config->config.rotation ==
+					PLANE_ROTATION_ANGLE_0 ||
+				plane_config->config.rotation ==
+					PLANE_ROTATION_ANGLE_180))
+			plane_config->attributes.scaling_quality.
+			v_taps_c = 1;
 
 
-			/*Graphics don't need to match mmd scaling*/
-			if (plane_config[i].config.dal_pixel_format <=
-					PIXEL_FORMAT_GRPH_END) {
-				plane_config[i].attributes.scaling_quality.
-				h_taps = TAP_VALUE_INVALID;
-			plane_config[i].attributes.scaling_quality.v_taps =
-					TAP_VALUE_INVALID;
-			plane_config[i].attributes.scaling_quality.h_taps_c =
-						TAP_VALUE_INVALID;
-			plane_config[i].attributes.scaling_quality.v_taps_c =
-						TAP_VALUE_INVALID;
-			}
+		/*Graphics don't need to match mmd scaling*/
+		if (plane_config->config.dal_pixel_format <=
+			PIXEL_FORMAT_GRPH_END) {
+			plane_config->attributes.scaling_quality.
+			h_taps = TAP_VALUE_INVALID;
+			plane_config->attributes.scaling_quality.v_taps =
+				TAP_VALUE_INVALID;
+			plane_config->attributes.scaling_quality.h_taps_c =
+				TAP_VALUE_INVALID;
+			plane_config->attributes.scaling_quality.v_taps_c =
+				TAP_VALUE_INVALID;
 		}
 	}
 }
-
-
-DAL_VECTOR_AT_INDEX(plane_configs, struct plane_config *)
 
 /*build scaler overscan parameters for new_mode*/
 static void build_scaling_params(
@@ -720,30 +702,20 @@ static void build_scaling_params(
 {
 	struct display_path *disp_path = NULL;
 	struct vector *plane_configs = NULL;
-	uint32_t plane_nums = 0;
 
 	disp_path = dal_tm_display_index_to_display_path(
 		ds->tm, mode->display_path_index);
 
-	plane_configs = dal_pms_with_data_get_plane_configs(
-			ds->set, mode->display_path_index);
+	plane_configs =
+		dal_pms_with_data_get_plane_configs(
+			ds->set,
+			mode->display_path_index);
 
-	/*Calculated values of scaler and overscan are saved into
-	 *struct ds_dispatch -->
-	 *struct path_mode_set_with_data *set -->
-	 *struct vector plane_configs */
-	if (plane_configs) {
-		struct plane_config *plane_config =
-				plane_configs_vector_at_index(
-					plane_configs,
-					0);
-		plane_nums = dal_vector_get_count(plane_configs);
-
-		if (plane_config != NULL)
-			cal_scaling_overscan_params(
-					mode, scl_type, info,
-					plane_config, plane_nums);
-	}
+	cal_scaling_overscan_params(
+		mode,
+		scl_type,
+		info,
+		plane_configs);
 }
 
 static bool is_timing_change_required(
@@ -912,6 +884,26 @@ enum ds_return dal_ds_dispatch_set_mode(
 			result = DS_SUCCESS;
 		else
 			BREAK_TO_DEBUGGER();
+
+		{
+			struct plane_config pc;
+
+			dal_memset(&pc, 0, sizeof(pc));
+
+			pc.attributes.dst_rect.height = mode->view.height;
+			pc.attributes.dst_rect.width  = mode->view.width;
+			pc.attributes.dst_rect.x = 0;
+			pc.attributes.dst_rect.y = 0;
+			pc.attributes.clip_rect = pc.attributes.dst_rect;
+			pc.attributes.src_rect = pc.attributes.dst_rect;
+
+			/* TODO: add stereo 3d translation here */
+			dal_pms_with_data_add_plane_configs(
+				ds_dispatch->set,
+				mode->display_path_index,
+				&pc,
+				1);
+		}
 
 		/* Setup active data flags for pre-mode change*/
 		if (result == DS_SUCCESS) {
