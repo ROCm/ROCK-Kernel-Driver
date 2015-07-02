@@ -536,6 +536,7 @@ bool amdgpu_dm_mode_set(
 	}
 
 
+	dal_set_blanking(adev->dm.dal, acrtc->crtc_id, true);
 	/* the actual mode set call */
 	ret = dal_set_path_mode(adev->dm.dal, pms);
 
