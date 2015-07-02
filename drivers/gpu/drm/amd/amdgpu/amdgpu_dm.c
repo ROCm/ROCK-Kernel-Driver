@@ -66,46 +66,6 @@ struct dal_override_parameters display_param = {
 #define AMDGPU_DM_NOT_IMPL(fmt, ...) \
 	DRM_INFO("DM_NOT_IMPL: " fmt, ##__VA_ARGS__)
 
-static enum dal_irq_source amdgpu_dm_crtc_to_dal_irq_source(unsigned type)
-{
-	switch (type) {
-	case AMDGPU_CRTC_IRQ_VBLANK1:
-		return DAL_IRQ_SOURCE_CRTC1VSYNC;
-	case AMDGPU_CRTC_IRQ_VBLANK2:
-		return DAL_IRQ_SOURCE_CRTC2VSYNC;
-	case AMDGPU_CRTC_IRQ_VBLANK3:
-		return DAL_IRQ_SOURCE_CRTC3VSYNC;
-	case AMDGPU_CRTC_IRQ_VBLANK4:
-		return DAL_IRQ_SOURCE_CRTC4VSYNC;
-	case AMDGPU_CRTC_IRQ_VBLANK5:
-		return DAL_IRQ_SOURCE_CRTC5VSYNC;
-	case AMDGPU_CRTC_IRQ_VBLANK6:
-		return DAL_IRQ_SOURCE_CRTC6VSYNC;
-	default:
-		return DAL_IRQ_SOURCE_INVALID;
-	}
-}
-
-static enum dal_irq_source amdgpu_dm_hpd_to_dal_irq_source(unsigned type)
-{
-	switch (type) {
-	case AMDGPU_HPD_1:
-		return DAL_IRQ_SOURCE_HPD1;
-	case AMDGPU_HPD_2:
-		return DAL_IRQ_SOURCE_HPD2;
-	case AMDGPU_HPD_3:
-		return DAL_IRQ_SOURCE_HPD3;
-	case AMDGPU_HPD_4:
-		return DAL_IRQ_SOURCE_HPD4;
-	case AMDGPU_HPD_5:
-		return DAL_IRQ_SOURCE_HPD5;
-	case AMDGPU_HPD_6:
-		return DAL_IRQ_SOURCE_HPD6;
-	default:
-		return DAL_IRQ_SOURCE_INVALID;
-	}
-}
-
 static u32 dm_vblank_get_counter(struct amdgpu_device *adev, int crtc)
 {
 	if (crtc >= adev->mode_info.num_crtc)
@@ -123,69 +83,6 @@ static int dm_crtc_get_scanoutpos(struct amdgpu_device *adev, int crtc,
 	dal_get_crtc_scanoutpos(adev->dm.dal, crtc, vbl, position);
 
 	return 0;
-}
-
-
-/**
- * dce_v11_0_hpd_init - hpd setup callback.
- *
- * @adev: amdgpu_device pointer
- *
- * Setup the hpd pins used by the card (evergreen+).
- * Enable the pin, set the polarity, and enable the hpd interrupts.
- */
-/*TODOOOOOO  */
-static void amdgpu_dm_hpd_init(struct amdgpu_device *adev)
-{
-	struct drm_device *dev = adev->ddev;
-	struct drm_connector *connector;
-
-	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
-		struct amdgpu_connector *amdgpu_connector =
-				to_amdgpu_connector(connector);
-		enum dal_irq_source src =
-			amdgpu_dm_hpd_to_dal_irq_source(
-				amdgpu_connector->hpd.hpd);
-
-		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP ||
-			connector->connector_type == DRM_MODE_CONNECTOR_LVDS) {
-			/* don't try to enable hpd on eDP or LVDS avoid breaking
-			 * the aux dp channel on imac and help (but not
-			 * completely fix)
-			 * https://bugzilla.redhat.com/show_bug.cgi?id=726143
-			 * also avoid interrupt storms during dpms.
-			 */
-			continue;
-		}
-
-		dal_interrupt_set(adev->dm.dal, src, true);
-		amdgpu_irq_get(adev, &adev->hpd_irq, amdgpu_connector->hpd.hpd);
-	}
-}
-
-/**
- * dce_v11_0_hpd_fini - hpd tear down callback.
- *
- * @adev: amdgpu_device pointer
- *
- * Tear down the hpd pins used by the card (evergreen+).
- * Disable the hpd interrupts.
- */
-static void amdgpu_dm_hpd_fini(struct amdgpu_device *adev)
-{
-	struct drm_device *dev = adev->ddev;
-	struct drm_connector *connector;
-
-	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
-		struct amdgpu_connector *amdgpu_connector =
-				to_amdgpu_connector(connector);
-		enum dal_irq_source src =
-			amdgpu_dm_hpd_to_dal_irq_source(
-				amdgpu_connector->hpd.hpd);
-
-		dal_interrupt_set(adev->dm.dal, src, false);
-		amdgpu_irq_put(adev, &adev->hpd_irq, amdgpu_connector->hpd.hpd);
-	}
 }
 
 static u32 dm_hpd_get_gpio_reg(struct amdgpu_device *adev)
@@ -412,72 +309,6 @@ static int dm_soft_reset(void *handle)
 	return 0;
 }
 
-static int amdgpu_dm_set_hpd_irq_state(struct amdgpu_device *adev,
-					struct amdgpu_irq_src *source,
-					unsigned type,
-					enum amdgpu_interrupt_state state)
-{
-	enum dal_irq_source src = amdgpu_dm_hpd_to_dal_irq_source(type);
-	bool st = (state == AMDGPU_IRQ_STATE_ENABLE);
-
-	dal_interrupt_set(adev->dm.dal, src, st);
-	return 0;
-}
-
-static int amdgpu_dm_set_pflip_irq_state(struct amdgpu_device *adev,
-					struct amdgpu_irq_src *source,
-					unsigned type,
-					enum amdgpu_interrupt_state state)
-{
-	enum dal_irq_source src = dal_get_pflip_irq_src_from_display_index(
-			adev->dm.dal,
-			type,	/* this is the display_index because passed
-				 * via work->crtc_id*/
-			0	/* plane_no */);
-	bool st = (state == AMDGPU_IRQ_STATE_ENABLE);
-
-	dal_interrupt_set(adev->dm.dal, src, st);
-	return 0;
-}
-
-static int amdgpu_dm_set_crtc_irq_state(struct amdgpu_device *adev,
-					struct amdgpu_irq_src *source,
-					unsigned type,
-					enum amdgpu_interrupt_state state)
-{
-	enum dal_irq_source src = amdgpu_dm_crtc_to_dal_irq_source(type);
-	bool st = (state == AMDGPU_IRQ_STATE_ENABLE);
-
-	dal_interrupt_set(adev->dm.dal, src, st);
-	return 0;
-}
-
-/**
- * amdgpu_dm_irq - Generic IRQ handler, calls all registered high irq work
- * immediately, and schedules work for low irq
- */
-static int amdgpu_dm_irq(
-		struct amdgpu_device *adev,
-		struct amdgpu_irq_src *source,
-		struct amdgpu_iv_entry *entry)
-{
-
-	enum dal_irq_source src =
-		dal_interrupt_to_irq_source(
-			adev->dm.dal,
-			entry->src_id,
-			entry->src_data);
-
-	dal_interrupt_ack(adev->dm.dal, src);
-
-	/* Call high irq work immediately */
-	amdgpu_dm_irq_immediate_work(adev, src);
-	/*Schedule low_irq work */
-	amdgpu_dm_irq_schedule_work(adev, src);
-
-	return 0;
-}
-
 static void amdgpu_dm_pflip_high_irq(void *interrupt_params)
 {
 	struct common_irq_params *irq_params = interrupt_params;
@@ -520,7 +351,6 @@ static void amdgpu_dm_pflip_high_irq(void *interrupt_params)
 	drm_vblank_put(adev->ddev, amdgpu_crtc->crtc_id);
 	amdgpu_irq_put(adev, &adev->pageflip_irq, amdgpu_crtc->crtc_id);
 	queue_work(amdgpu_crtc->pflip_queue, &works->unpin_work);
-
 }
 
 
@@ -1156,38 +986,11 @@ static void set_display_funcs(struct amdgpu_device *adev)
 		adev->mode_info.funcs = &display_funcs;
 }
 
-static const struct amdgpu_irq_src_funcs dm_crtc_irq_funcs = {
-	.set = amdgpu_dm_set_crtc_irq_state,
-	.process = amdgpu_dm_irq,
-};
-
-static const struct amdgpu_irq_src_funcs dm_pageflip_irq_funcs = {
-	.set = amdgpu_dm_set_pflip_irq_state,
-	.process = amdgpu_dm_irq,
-};
-
-static const struct amdgpu_irq_src_funcs dm_hpd_irq_funcs = {
-	.set = amdgpu_dm_set_hpd_irq_state,
-	.process = amdgpu_dm_irq,
-};
-
-static void dm_set_irq_funcs(struct amdgpu_device *adev)
-{
-	adev->crtc_irq.num_types = AMDGPU_CRTC_IRQ_LAST;
-	adev->crtc_irq.funcs = &dm_crtc_irq_funcs;
-
-	adev->pageflip_irq.num_types = AMDGPU_PAGEFLIP_IRQ_LAST;
-	adev->pageflip_irq.funcs = &dm_pageflip_irq_funcs;
-
-	adev->hpd_irq.num_types = AMDGPU_HPD_LAST;
-	adev->hpd_irq.funcs = &dm_hpd_irq_funcs;
-}
-
 static int dm_early_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	set_display_funcs(adev);
-	dm_set_irq_funcs(adev);
+	amdgpu_dm_set_irq_funcs(adev);
 
 	switch (adev->asic_type) {
 	case CHIP_CARRIZO:

@@ -25,6 +25,9 @@
 
 #include <drm/drmP.h>
 
+#include "amdgpu_dal_types.h"
+#include "include/dal_interface.h"
+
 #include "amdgpu.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_irq.h"
@@ -348,57 +351,6 @@ void amdgpu_dm_irq_unregister_interrupt(
 	}
 }
 
-/**
- * amdgpu_dm_irq_schedule_work - schedule all work items registered for
- * 				the "irq_source".
- */
-void amdgpu_dm_irq_schedule_work(
-	struct amdgpu_device *adev,
-	enum dal_irq_source irq_source)
-{
-	unsigned long irq_table_flags;
-
-	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
-
-	/* Since the caller is interested in 'work_struct' then
-	 * the irq will be post-processed at "INTERRUPT_LOW_IRQ_CONTEXT". */
-
-	schedule_work(&adev->dm.irq_handler_list_low_tab[irq_source].work);
-
-	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
-}
-
-/** amdgpu_dm_irq_immediate_work
- *  Callback high irq work immediately, don't send to work queue
- */
-void amdgpu_dm_irq_immediate_work(
-	struct amdgpu_device *adev,
-	enum dal_irq_source irq_source)
-{
-	struct amdgpu_dm_irq_handler_data *handler_data;
-	struct list_head *entry;
-	unsigned long irq_table_flags;
-
-	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
-
-	list_for_each(
-		entry,
-		&adev->dm.irq_handler_list_high_tab[irq_source]) {
-
-		handler_data = list_entry(entry, struct amdgpu_dm_irq_handler_data,
-				hcd.list);
-
-		DRM_DEBUG_KMS("DM_IRQ: immediate_work: for dal_src=%d\n",
-				handler_data->irq_source);
-
-		/* Call a subcomponent which registered for immediate
-		 * interrupt notification */
-		handler_data->hcd.handler(handler_data->hcd.handler_arg);
-	}
-
-	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
-}
-
 int amdgpu_dm_irq_init(
 	struct amdgpu_device *adev)
 {
@@ -513,4 +465,253 @@ int amdgpu_dm_irq_resume(
 			dal_interrupt_set(adev->dm.dal, src, true);
 	}
 	return 0;
+}
+
+
+/**
+ * amdgpu_dm_irq_schedule_work - schedule all work items registered for the
+ * "irq_source".
+ */
+static void amdgpu_dm_irq_schedule_work(
+	struct amdgpu_device *adev,
+	enum dal_irq_source irq_source)
+{
+	unsigned long irq_table_flags;
+
+	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
+
+	/* Since the caller is interested in 'work_struct' then
+	 * the irq will be post-processed at "INTERRUPT_LOW_IRQ_CONTEXT". */
+
+	schedule_work(&adev->dm.irq_handler_list_low_tab[irq_source].work);
+
+	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
+}
+
+/** amdgpu_dm_irq_immediate_work
+ *  Callback high irq work immediately, don't send to work queue
+ */
+static void amdgpu_dm_irq_immediate_work(
+	struct amdgpu_device *adev,
+	enum dal_irq_source irq_source)
+{
+	struct amdgpu_dm_irq_handler_data *handler_data;
+	struct list_head *entry;
+	unsigned long irq_table_flags;
+
+	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
+
+	list_for_each(
+		entry,
+		&adev->dm.irq_handler_list_high_tab[irq_source]) {
+
+		handler_data =
+			list_entry(
+				entry,
+				struct amdgpu_dm_irq_handler_data,
+				hcd.list);
+
+		/* Call a subcomponent which registered for immediate
+		 * interrupt notification */
+		handler_data->hcd.handler(handler_data->hcd.handler_arg);
+	}
+
+	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
+}
+
+/*
+ * amdgpu_dm_irq_handler
+ *
+ * Generic IRQ handler, calls all registered high irq work immediately, and
+ * schedules work for low irq
+ */
+int amdgpu_dm_irq_handler(
+		struct amdgpu_device *adev,
+		struct amdgpu_irq_src *source,
+		struct amdgpu_iv_entry *entry)
+{
+
+	enum dal_irq_source src =
+		dal_interrupt_to_irq_source(
+			adev->dm.dal,
+			entry->src_id,
+			entry->src_data);
+
+	dal_interrupt_ack(adev->dm.dal, src);
+
+	/* Call high irq work immediately */
+	amdgpu_dm_irq_immediate_work(adev, src);
+	/*Schedule low_irq work */
+	amdgpu_dm_irq_schedule_work(adev, src);
+
+	return 0;
+}
+
+static enum dal_irq_source amdgpu_dm_hpd_to_dal_irq_source(unsigned type)
+{
+	switch (type) {
+	case AMDGPU_HPD_1:
+		return DAL_IRQ_SOURCE_HPD1;
+	case AMDGPU_HPD_2:
+		return DAL_IRQ_SOURCE_HPD2;
+	case AMDGPU_HPD_3:
+		return DAL_IRQ_SOURCE_HPD3;
+	case AMDGPU_HPD_4:
+		return DAL_IRQ_SOURCE_HPD4;
+	case AMDGPU_HPD_5:
+		return DAL_IRQ_SOURCE_HPD5;
+	case AMDGPU_HPD_6:
+		return DAL_IRQ_SOURCE_HPD6;
+	default:
+		return DAL_IRQ_SOURCE_INVALID;
+	}
+}
+
+static enum dal_irq_source amdgpu_dm_crtc_to_dal_irq_source(
+	unsigned type)
+{
+	switch (type) {
+	case AMDGPU_CRTC_IRQ_VBLANK1:
+		return DAL_IRQ_SOURCE_CRTC1VSYNC;
+	case AMDGPU_CRTC_IRQ_VBLANK2:
+		return DAL_IRQ_SOURCE_CRTC2VSYNC;
+	case AMDGPU_CRTC_IRQ_VBLANK3:
+		return DAL_IRQ_SOURCE_CRTC3VSYNC;
+	case AMDGPU_CRTC_IRQ_VBLANK4:
+		return DAL_IRQ_SOURCE_CRTC4VSYNC;
+	case AMDGPU_CRTC_IRQ_VBLANK5:
+		return DAL_IRQ_SOURCE_CRTC5VSYNC;
+	case AMDGPU_CRTC_IRQ_VBLANK6:
+		return DAL_IRQ_SOURCE_CRTC6VSYNC;
+	default:
+		return DAL_IRQ_SOURCE_INVALID;
+	}
+}
+
+static int amdgpu_dm_set_hpd_irq_state(struct amdgpu_device *adev,
+					struct amdgpu_irq_src *source,
+					unsigned type,
+					enum amdgpu_interrupt_state state)
+{
+	enum dal_irq_source src = amdgpu_dm_hpd_to_dal_irq_source(type);
+	bool st = (state == AMDGPU_IRQ_STATE_ENABLE);
+
+	dal_interrupt_set(adev->dm.dal, src, st);
+	return 0;
+}
+
+static int amdgpu_dm_set_pflip_irq_state(struct amdgpu_device *adev,
+					struct amdgpu_irq_src *source,
+					unsigned type,
+					enum amdgpu_interrupt_state state)
+{
+	enum dal_irq_source src = dal_get_pflip_irq_src_from_display_index(
+			adev->dm.dal,
+			type,	/* this is the display_index because passed
+				 * via work->crtc_id*/
+			0	/* plane_no */);
+	bool st = (state == AMDGPU_IRQ_STATE_ENABLE);
+
+	dal_interrupt_set(adev->dm.dal, src, st);
+	return 0;
+}
+
+static int amdgpu_dm_set_crtc_irq_state(struct amdgpu_device *adev,
+					struct amdgpu_irq_src *source,
+					unsigned type,
+					enum amdgpu_interrupt_state state)
+{
+	enum dal_irq_source src = amdgpu_dm_crtc_to_dal_irq_source(type);
+	bool st = (state == AMDGPU_IRQ_STATE_ENABLE);
+
+	dal_interrupt_set(adev->dm.dal, src, st);
+	return 0;
+}
+
+static const struct amdgpu_irq_src_funcs dm_crtc_irq_funcs = {
+	.set = amdgpu_dm_set_crtc_irq_state,
+	.process = amdgpu_dm_irq_handler,
+};
+
+static const struct amdgpu_irq_src_funcs dm_pageflip_irq_funcs = {
+	.set = amdgpu_dm_set_pflip_irq_state,
+	.process = amdgpu_dm_irq_handler,
+};
+
+static const struct amdgpu_irq_src_funcs dm_hpd_irq_funcs = {
+	.set = amdgpu_dm_set_hpd_irq_state,
+	.process = amdgpu_dm_irq_handler,
+};
+
+void amdgpu_dm_set_irq_funcs(struct amdgpu_device *adev)
+{
+	adev->crtc_irq.num_types = AMDGPU_CRTC_IRQ_LAST;
+	adev->crtc_irq.funcs = &dm_crtc_irq_funcs;
+
+	adev->pageflip_irq.num_types = AMDGPU_PAGEFLIP_IRQ_LAST;
+	adev->pageflip_irq.funcs = &dm_pageflip_irq_funcs;
+
+	adev->hpd_irq.num_types = AMDGPU_HPD_LAST;
+	adev->hpd_irq.funcs = &dm_hpd_irq_funcs;
+}
+
+/*
+ * amdgpu_dm_hpd_init - hpd setup callback.
+ *
+ * @adev: amdgpu_device pointer
+ *
+ * Setup the hpd pins used by the card (evergreen+).
+ * Enable the pin, set the polarity, and enable the hpd interrupts.
+ */
+void amdgpu_dm_hpd_init(struct amdgpu_device *adev)
+{
+	struct drm_device *dev = adev->ddev;
+	struct drm_connector *connector;
+
+	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
+		struct amdgpu_connector *amdgpu_connector =
+				to_amdgpu_connector(connector);
+		enum dal_irq_source src =
+			amdgpu_dm_hpd_to_dal_irq_source(
+				amdgpu_connector->hpd.hpd);
+
+		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP ||
+			connector->connector_type == DRM_MODE_CONNECTOR_LVDS) {
+			/* don't try to enable hpd on eDP or LVDS avoid breaking
+			 * the aux dp channel on imac and help (but not
+			 * completely fix)
+			 * https://bugzilla.redhat.com/show_bug.cgi?id=726143
+			 * also avoid interrupt storms during dpms.
+			 */
+			continue;
+		}
+
+		dal_interrupt_set(adev->dm.dal, src, true);
+		amdgpu_irq_get(adev, &adev->hpd_irq, amdgpu_connector->hpd.hpd);
+	}
+}
+
+/**
+ * amdgpu_dm_hpd_fini - hpd tear down callback.
+ *
+ * @adev: amdgpu_device pointer
+ *
+ * Tear down the hpd pins used by the card (evergreen+).
+ * Disable the hpd interrupts.
+ */
+void amdgpu_dm_hpd_fini(struct amdgpu_device *adev)
+{
+	struct drm_device *dev = adev->ddev;
+	struct drm_connector *connector;
+
+	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
+		struct amdgpu_connector *amdgpu_connector =
+				to_amdgpu_connector(connector);
+		enum dal_irq_source src =
+			amdgpu_dm_hpd_to_dal_irq_source(
+				amdgpu_connector->hpd.hpd);
+
+		dal_interrupt_set(adev->dm.dal, src, false);
+		amdgpu_irq_put(adev, &adev->hpd_irq, amdgpu_connector->hpd.hpd);
+	}
 }

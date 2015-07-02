@@ -84,26 +84,26 @@ void amdgpu_dm_irq_unregister_interrupt(
 		enum dal_irq_source irq_source,
 		void *ih_index);
 
-/**
- * amdgpu_dm_irq_schedule_work - schedule all work items registered for
- * 				the "irq_source".
- *
- * @adev: AMD DRM device
- */
-void amdgpu_dm_irq_schedule_work(
-		struct amdgpu_device *adev,
-		enum dal_irq_source irq_source);
-
-void amdgpu_dm_irq_immediate_work(
-	struct amdgpu_device *adev,
-	enum dal_irq_source irq_source);
-
-
 void amdgpu_dm_irq_register_timer(
 	struct amdgpu_device *adev,
 	struct dal_timer_interrupt_params *int_params,
 	interrupt_handler ih,
 	void *args);
+
+/**
+ * amdgpu_dm_irq_handler
+ * Generic IRQ handler, calls all registered high irq work immediately, and
+ * schedules work for low irq
+ */
+int amdgpu_dm_irq_handler(
+		struct amdgpu_device *adev,
+		struct amdgpu_irq_src *source,
+		struct amdgpu_iv_entry *entry);
+
+void amdgpu_dm_set_irq_funcs(struct amdgpu_device *adev);
+
+void amdgpu_dm_hpd_init(struct amdgpu_device *adev);
+void amdgpu_dm_hpd_fini(struct amdgpu_device *adev);
 
 /**
  * amdgpu_dm_irq_resume - enable ASIC interrupt during resume.
