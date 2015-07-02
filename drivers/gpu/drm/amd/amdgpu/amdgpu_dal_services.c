@@ -287,7 +287,31 @@ void dal_notify_capability_change(
 	struct dal_context *ctx,
 	uint32_t display_index)
 {
-	dal_notify_hotplug(ctx, display_index, true);
+	struct amdgpu_device *adev = ctx->driver_context;
+	struct drm_device *dev = adev->ddev;
+	struct drm_connector *connector = NULL;
+	struct amdgpu_connector *aconnector = NULL;
+
+	/* 1. Update status of drm connectors
+	 * 2. Send a uevent and let userspace tell us what to do */
+
+	list_for_each_entry(connector,
+		&dev->mode_config.connector_list, head) {
+		aconnector = to_amdgpu_connector(connector);
+
+		/*aconnector->connector_id means display_index*/
+		if (aconnector->connector_id == display_index) {
+			drm_mode_connector_update_edid_property(
+				connector,
+				(struct edid *)
+				dal_get_display_edid(
+					adev->dm.dal,
+					display_index,
+					NULL));
+		}
+	}
+
+	drm_kms_helper_hotplug_event(dev);
 }
 
 void dal_notify_setmode_complete(struct dal_context *ctx,
