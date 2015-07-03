@@ -932,19 +932,15 @@ int amdgpu_dm_set_config(struct drm_mode_set *set)
 		/* program plane config */
 		pl_config.display_index = acrtc->crtc_id;
 
-		/*we won't handle the wrong case: FB size < crtc->mode(viewport size) */
-		if (set->fb->height >= set->crtc->mode.vdisplay &&
-				set->fb->width >= set->crtc->mode.hdisplay) {
-
-			/*Blank display before programming surface */
-			dal_set_blanking(adev->dm.dal, acrtc->crtc_id, true);
-			fill_plane_attributes(adev, &pl_config, set->crtc);
-			dal_setup_plane_configurations(adev->dm.dal, 1, &pl_config);
-			/* program the surface addr and flip control*/
-			addr_flip_info.display_index = acrtc->crtc_id;
-			amdgpu_dm_fill_surface_address(set->crtc, &addr_flip_info, afb, save_set.fb);
-			dal_set_blanking(adev->dm.dal, acrtc->crtc_id, false);
-		}
+		/* Blank display before programming surface */
+		dal_set_blanking(adev->dm.dal, acrtc->crtc_id, true);
+		fill_plane_attributes(adev, &pl_config, set->crtc);
+		dal_setup_plane_configurations(adev->dm.dal, 1, &pl_config);
+		/* Program the surface addr and flip control */
+		addr_flip_info.display_index = acrtc->crtc_id;
+		amdgpu_dm_fill_surface_address(set->crtc, &addr_flip_info,
+					       afb, save_set.fb);
+		dal_set_blanking(adev->dm.dal, acrtc->crtc_id, false);
 	}
 	DRM_DEBUG_KMS("=== Finished dm_set_config ===\n");
 
