@@ -215,24 +215,6 @@ enum hwss_result dal_hw_sequencer_set_backlight_adjustment(
 	struct display_path *display_path,
 	struct hw_adjustment_value *adjustment);
 
-enum hwss_result dal_hw_sequencer_set_varibright_level_adjustment(
-	struct hw_sequencer *hws,
-	struct display_path *display_path,
-	struct hw_adjustment_value *adjustment);
-
-enum hwss_result dal_hw_sequencer_set_varibright_adjustment(
-	struct hw_sequencer *hws,
-	struct display_path *display_path,
-	struct hw_adjustment_value *adjustment);
-
-enum hwss_result dal_hw_sequencer_enable_smooth_brightness(
-	struct hw_sequencer *hws,
-	struct display_path *display_path);
-
-enum hwss_result dal_hw_sequencer_disable_smooth_brightness(
-	struct hw_sequencer *hws,
-	struct display_path *display_path);
-
 void dal_hw_sequencer_disable_memory_requests(
 	struct hw_sequencer *hws,
 	const struct hw_path_mode *path_mode);

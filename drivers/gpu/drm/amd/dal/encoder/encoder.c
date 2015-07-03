@@ -57,6 +57,7 @@
 #include "dce110/digital_encoder_dp_dce110.h"
 #include "dce110/digital_encoder_edp_dce110.h"
 #include "dce110/digital_encoder_uniphy_dce110.h"
+
 #endif
 
 /*
@@ -194,16 +195,6 @@ struct encoder_impl *dal_encoder_create_mvpu_encoder(
 	return NULL;
 }
 
-struct encoder_impl *dal_nutmeg_encoder_create(
-	const struct encoder_init_data *init)
-{
-	dal_logger_write(init->ctx->logger,
-			LOG_MAJOR_ERROR, LOG_MINOR_COMPONENT_ENCODER,
-			"TRAVIS-VGA encoder not supported\n");
-
-	return NULL;
-}
-
 static struct encoder_impl *create_digital_encoder_impl(
 	enum signal_type signal,
 	const struct encoder_init_data *init)
@@ -235,6 +226,7 @@ static struct encoder_impl *create_digital_encoder_impl(
 	case SIGNAL_TYPE_RGB:
 		/* DP PHY uses driver proprietary programming */
 		switch (dce_version) {
+
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 		case DCE_VERSION_11_0:
 			return dal_digital_encoder_dp_dce110_create(
@@ -318,13 +310,6 @@ static struct encoder_impl *create_dvo_mvpu_encoder_impl(
 	}
 }
 
-static struct encoder_impl *create_nutmeg_encoder_impl(
-	enum signal_type signal,
-	const struct encoder_init_data *init)
-{
-	return dal_nutmeg_encoder_create(init);
-}
-
 static struct encoder_impl *create_travis_encoder_impl(
 	enum signal_type signal,
 	const struct encoder_init_data *init)
@@ -342,14 +327,6 @@ static struct encoder_impl *create_travis_encoder_impl(
 		BREAK_TO_DEBUGGER();
 		return NULL;
 	}
-}
-
-static struct encoder_impl *create_wireless_encoder_impl(
-	enum signal_type signal,
-	const struct encoder_init_data *init)
-{
-	BREAK_TO_DEBUGGER();
-	return NULL;
 }
 
 /*
@@ -405,14 +382,8 @@ static enum creation_result create_impl(
 	case ENCODER_ID_INTERNAL_KLDSCP_DVO1:
 		impl = create_dvo_mvpu_encoder_impl(signal, &init);
 	break;
-	case ENCODER_ID_EXTERNAL_NUTMEG:
-		impl = create_nutmeg_encoder_impl(signal, &init);
-	break;
 	case ENCODER_ID_EXTERNAL_TRAVIS:
 		impl = create_travis_encoder_impl(signal, &init);
-	break;
-	case ENCODER_ID_INTERNAL_WIRELESS:
-		impl = create_wireless_encoder_impl(signal, &init);
 	break;
 	default:
 		impl = NULL;

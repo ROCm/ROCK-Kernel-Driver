@@ -2087,7 +2087,7 @@ enum tm_result dal_tm_power_down_hw(struct topology_mgr *tm)
 	/*TODO: Power Down GLSyncConnector*/
 	TM_NOT_IMPLEMENTED();
 
-	/* TODO 2. PowerDown DMCU*/
+	/*2. TODO PowerDown DMCU*/
 
 	/* 3.0 If we are going to S4 or BACO,
 	 * then we only need to invalidate states
@@ -2194,12 +2194,12 @@ enum tm_result dal_tm_power_down_hw_active(struct topology_mgr *tm,
 /**
  * Powers down all HW blocks that compose display paths in the following
  * order (reverse order from PowerUp):
- *	2. Audios
- *	3. Connectors
- *	4. Routers
- *	5. Encoders
- *	6. Controllers
- *	7. Clock Sources
+ *	1. Audios
+ *	2. Connectors
+ *	3. Routers
+ *	4. Encoders
+ *	5. Controllers
+ *	6. Clock Sources
  *
  * \return	TM_RESULT_SUCCESS: no error
  *		TM_RESULT_FAILURE: error

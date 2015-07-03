@@ -40,6 +40,11 @@
  */
 
 #include "external_digital_encoder.h"
+
+/*
+ * Post-requisites: headers required by this unit
+ */
+
 #include "hw_ctx_external_digital_encoder_travis.h"
 
 /*
@@ -149,7 +154,7 @@ static enum encoder_result create_hw_ctx(
 		enc->hw_ctx =
 			dal_hw_ctx_external_digital_encoder_travis_create(
 				init->dal_ctx);
-	break;
+		break;
 	default:
 		BREAK_TO_DEBUGGER();
 	}

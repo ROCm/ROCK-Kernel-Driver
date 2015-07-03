@@ -30,7 +30,6 @@
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
 
-
 #include "include/encoder_types.h"
 #include "include/fixed31_32.h"
 
@@ -605,7 +604,6 @@ static void configure_encoder(
 	set_reg_field_value(value, link_settings->lane_count - LANE_COUNT_ONE,
 			DP_CONFIG, DP_UDI_LANES);
 	dal_write_reg(ctx->base.dal_ctx, addr, value);
-
 
 	/* set enhanced frame mode */
 	addr = mmDP_LINK_FRAMING_CNTL + fe_engine_offsets[engine];
@@ -1190,6 +1188,8 @@ static void setup_hdmi(
 			HDMI_VBI_PACKET_CONTROL, HDMI_GC_SEND);
 	set_reg_field_value(value, 1,
 			HDMI_VBI_PACKET_CONTROL, HDMI_NULL_SEND);
+
+	dal_write_reg(ctx->base.dal_ctx, addr, value);
 
 
 	/* following belongs to audio */
@@ -1798,7 +1798,6 @@ static void set_dp_phy_pattern_hbr2_compliance(
 
 	dal_write_reg(ctx->base.dal_ctx, addr, value);
 
-
 	/*TODO add support for this test pattern
 	 * support_dp_hbr2_eye_pattern
 	 */
@@ -1845,7 +1844,6 @@ static void set_dp_phy_pattern_passthrough_mode(
 	set_reg_field_value(value, 1,
 			DP_LINK_FRAMING_CNTL, DP_VID_ENHANCED_FRAME_MODE);
 	dal_write_reg(ctx, addr, value);
-
 
 	/* set link training complete */
 

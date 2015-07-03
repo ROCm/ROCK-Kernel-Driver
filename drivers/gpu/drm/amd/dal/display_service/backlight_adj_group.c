@@ -40,10 +40,6 @@ static uint32_t adj_id_to_cache_index(
 {
 	if (adj_id == ADJ_ID_BACKLIGHT)
 		return BI_ADJ_INDEX_BACKLIGHT;
-	else if (adj_id == ADJ_ID_VARIBRIGHT)
-		return BI_ADJ_INDEX_VARIBRIGHT;
-	else if (adj_id == ADJ_ID_VARIBRIGHT_LEVEL)
-		return BI_ADJ_INDEX_VARIBRIGHT_LEVEL;
 	else if (adj_id == ADJ_ID_BACKLIGHT_OPTIMIZATION)
 		return BI_ADJ_INDEX_BACKLIGHT_OPTIMIZATION;
 
@@ -111,7 +107,7 @@ bool dal_backlight_adj_group_include_backlight_opt_adj(
 	case DS_BACKLIGHT_OPTIMIZATION_DYNAMIC:
 	{
 		uint32_t backlight;
-		uint32_t varibright_level;
+
 		if (dal_backlight_adj_group_get_current_adj(
 				backlight_adj,
 				disp_path,
@@ -121,18 +117,6 @@ bool dal_backlight_adj_group_include_backlight_opt_adj(
 			if (dal_backlight_adj_group_add_adj_to_post_mode_set(
 					backlight_adj,
 					backlight,
-					set))
-				count++;
-		}
-		if (dal_backlight_adj_group_get_current_adj(
-				backlight_adj,
-				disp_path,
-				ADJ_ID_VARIBRIGHT_LEVEL,
-				false,
-				&varibright_level))	{
-			if (dal_backlight_adj_group_add_adj_to_post_mode_set(
-					backlight_adj,
-					varibright_level,
 					set))
 				count++;
 		}
@@ -198,25 +182,6 @@ bool dal_backlight_adj_group_include_post_set_mode_adj(
 
 	switch (adj.adj_id)	{
 	case ADJ_ID_BACKLIGHT:
-	{
-		if (opt_adjustment != DS_BACKLIGHT_OPTIMIZATION_DIMMED)
-			result =
-			dal_backlight_adj_group_add_adj_to_post_mode_set(
-					backlight_adj,
-					value,
-					set);
-	}
-		break;
-	case ADJ_ID_VARIBRIGHT:
-	{
-		result =
-			dal_backlight_adj_group_add_adj_to_post_mode_set(
-				backlight_adj,
-				value,
-				set);
-	}
-		break;
-	case ADJ_ID_VARIBRIGHT_LEVEL:
 	{
 		if (opt_adjustment != DS_BACKLIGHT_OPTIMIZATION_DIMMED)
 			result =
@@ -346,25 +311,6 @@ enum ds_return dal_backlight_adj_group_set_adjustment(
 						value);
 		}
 			break;
-		case ADJ_ID_VARIBRIGHT:
-		{
-			result =
-				dal_backlight_adj_group_set_varibright_adj(
-					backlight_adj,
-					disp_path,
-					value);
-		}
-			break;
-		case ADJ_ID_VARIBRIGHT_LEVEL:
-		{
-			if (opt_adj != DS_BACKLIGHT_OPTIMIZATION_DIMMED)
-				result =
-			dal_backlight_adj_group_set_varibright_level_adj(
-						backlight_adj,
-						disp_path,
-						value);
-		}
-			break;
 		case ADJ_ID_BACKLIGHT_OPTIMIZATION:
 		{
 			result =
@@ -431,42 +377,6 @@ enum ds_return dal_backlight_adj_group_set_backlight_adj(
 	return result;
 }
 
-enum ds_return dal_backlight_adj_group_set_varibright_adj(
-	struct backlight_adj_group *backlight_adj,
-	struct display_path *disp_path,
-	uint32_t value)
-{
-	enum ds_return result = DS_ERROR;
-	struct hw_adjustment_value hw_adj_value;
-
-	hw_adj_value.ui_value = value;
-	if (dal_hw_sequencer_set_varibright_adjustment(
-			backlight_adj->hws,
-			disp_path,
-			&hw_adj_value) == HWSS_RESULT_OK)
-		result = DS_SUCCESS;
-
-	return result;
-}
-
-enum ds_return dal_backlight_adj_group_set_varibright_level_adj(
-	struct backlight_adj_group *backlight_adj,
-	struct display_path *disp_path,
-	uint32_t value)
-{
-	enum ds_return result = DS_ERROR;
-	struct hw_adjustment_value hw_adj_value;
-
-	hw_adj_value.ui_value = value;
-	if (dal_hw_sequencer_set_varibright_level_adjustment(
-			backlight_adj->hws,
-			disp_path,
-			&hw_adj_value) == HWSS_RESULT_OK)
-		result = DS_SUCCESS;
-
-	return result;
-}
-
 enum ds_return dal_backlight_adj_group_set_backlight_optimization_adj(
 	struct backlight_adj_group *backlight_adj,
 	struct display_path *disp_path,
@@ -489,18 +399,12 @@ enum ds_return dal_backlight_adj_group_set_backlight_optimization_adj(
 					backlight) != DS_SUCCESS)
 				return DS_ERROR;
 		}
-		if (dal_backlight_adj_group_set_varibright_level_adj(
-				backlight_adj,
-				disp_path,
-				0) != DS_SUCCESS)
-			return DS_ERROR;
 	}
 		break;
 	case DS_BACKLIGHT_OPTIMIZATION_DESKTOP:
 	case DS_BACKLIGHT_OPTIMIZATION_DYNAMIC:
 	{
 		uint32_t backlight;
-		uint32_t varibright_level;
 
 		if (dal_backlight_adj_group_get_current_adj(
 				backlight_adj,
@@ -515,18 +419,6 @@ enum ds_return dal_backlight_adj_group_set_backlight_optimization_adj(
 				return DS_ERROR;
 		}
 
-		if (dal_backlight_adj_group_get_current_adj(
-				backlight_adj,
-				disp_path,
-				ADJ_ID_VARIBRIGHT_LEVEL,
-				false,
-				&varibright_level))	{
-			if (dal_backlight_adj_group_set_varibright_level_adj(
-					backlight_adj,
-					disp_path,
-					varibright_level) != DS_SUCCESS)
-				return DS_ERROR;
-		}
 	}
 		break;
 	case DS_BACKLIGHT_OPTIMIZATION_DIMMED:
@@ -545,11 +437,6 @@ enum ds_return dal_backlight_adj_group_set_backlight_optimization_adj(
 				backlight) != DS_SUCCESS)
 			return DS_ERROR;
 
-		if (dal_backlight_adj_group_set_varibright_level_adj(
-				backlight_adj,
-				disp_path,
-				0) != DS_SUCCESS)
-			return DS_ERROR;
 	}
 		break;
 	default:

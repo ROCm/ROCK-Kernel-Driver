@@ -1655,38 +1655,7 @@ enum hwss_result dal_hw_sequencer_set_backlight_adjustment(
 		dal_encoder_set_lcd_backlight_level(
 				obj.downstream_encoder,
 				adjustment->ui_value);
-
 	return HWSS_RESULT_OK;
-}
-
-enum hwss_result dal_hw_sequencer_set_varibright_level_adjustment(
-	struct hw_sequencer *hws,
-	struct display_path *display_path,
-	struct hw_adjustment_value *adjustment)
-{
-	return HWSS_RESULT_OK;
-}
-
-enum hwss_result dal_hw_sequencer_set_varibright_adjustment(
-	struct hw_sequencer *hws,
-	struct display_path *display_path,
-	struct hw_adjustment_value *adjustment)
-{
-	return HWSS_RESULT_OK;
-}
-
-enum hwss_result dal_hw_sequencer_enable_smooth_brightness(
-	struct hw_sequencer *hws,
-	struct display_path *display_path)
-{
-	return HWSS_RESULT_ERROR;
-}
-
-enum hwss_result dal_hw_sequencer_disable_smooth_brightness(
-	struct hw_sequencer *hws,
-	struct display_path *display_path)
-{
-	return HWSS_RESULT_ERROR;
 }
 
 enum hwss_result dal_hw_sequencer_validate_link(
@@ -2474,10 +2443,6 @@ static void program_adjustments(
 		hws,
 		path_mode->display_path,
 		backlight_adjustment);
-	dal_hw_sequencer_set_varibright_level_adjustment(
-		hws,
-		path_mode->display_path,
-		vb_level_adjustment);
 }
 
 static void program_encoder_and_audio(
@@ -2956,14 +2921,12 @@ void dal_hw_sequencer_psr_setup(
 	const struct hw_path_mode *path_mode,
 	const struct psr_caps *psr_caps)
 {
-	/* TODO Add DMCU */
 }
 
 void dal_hw_sequencer_psr_enable(
 	struct hw_sequencer *hws,
 	struct display_path *display_path)
 {
-	/* TODO Add DMCU */
 }
 
 /**
@@ -3060,7 +3023,6 @@ void dal_hw_sequencer_psr_disable(
 	struct hw_sequencer *hws,
 	struct display_path *display_path)
 {
-	/* TODO Add DMCU */
 }
 
 

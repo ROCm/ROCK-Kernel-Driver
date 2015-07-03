@@ -98,8 +98,6 @@ enum adjustment_id {
 
 	/* Backlight Adjustment Group*/
 	ADJ_ID_BACKLIGHT,
-	ADJ_ID_VARIBRIGHT,
-	ADJ_ID_VARIBRIGHT_LEVEL,
 	ADJ_ID_BACKLIGHT_OPTIMIZATION,
 
 	/* flag the first and last*/

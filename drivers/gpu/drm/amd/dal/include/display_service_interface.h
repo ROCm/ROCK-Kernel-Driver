@@ -127,14 +127,6 @@ enum ds_return dal_display_service_get_backlight_effective_level(
 	uint32_t display_index,
 	uint32_t *level);
 
-enum ds_return dal_display_service_enable_smooth_brightness(
-	struct display_service *ds,
-	uint32_t display_index);
-
-enum ds_return dal_display_service_disable_smooth_brightness(
-	struct display_service *ds,
-	uint32_t display_index);
-
 enum ds_return dal_display_service_enable_hpd(
 	struct display_service *ds,
 	uint32_t display_index);

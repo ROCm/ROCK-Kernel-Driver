@@ -39,8 +39,6 @@ struct adj_catch {
 };
 enum bi_adj_index {
 	BI_ADJ_INDEX_BACKLIGHT = 0,
-	BI_ADJ_INDEX_VARIBRIGHT,
-	BI_ADJ_INDEX_VARIBRIGHT_LEVEL,
 	BI_ADJ_INDEX_BACKLIGHT_OPTIMIZATION
 };
 
@@ -75,16 +73,6 @@ bool dal_backlight_adj_group_get_current_adj(
 	uint32_t *value);
 
 enum ds_return dal_backlight_adj_group_set_backlight_adj(
-	struct backlight_adj_group *backlight_adj,
-	struct display_path *disp_path,
-	uint32_t value);
-
-enum ds_return dal_backlight_adj_group_set_varibright_adj(
-	struct backlight_adj_group *backlight_adj,
-	struct display_path *disp_path,
-	uint32_t value);
-
-enum ds_return dal_backlight_adj_group_set_varibright_level_adj(
 	struct backlight_adj_group *backlight_adj,
 	struct display_path *disp_path,
 	uint32_t value);
