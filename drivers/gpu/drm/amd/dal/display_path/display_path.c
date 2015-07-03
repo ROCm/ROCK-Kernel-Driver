@@ -349,8 +349,6 @@ void dal_display_path_release_resources(struct display_path *path)
 		cntx->state.LINK = false;
 		cntx->state.AUDIO = false;
 		cntx->engine = ENGINE_ID_UNKNOWN;
-		cntx->input_config_signal = SIGNAL_TYPE_NONE;
-		cntx->output_config_signal = SIGNAL_TYPE_NONE;
 		cntx->link_config_interface = NULL;
 	}
 
@@ -484,9 +482,9 @@ void dal_display_path_set_clock_source(
 	struct display_path *path,
 	struct clock_source *clock)
 {
-	/*ASSERT(path->clock_source == NULL || clock == NULL);*/
 	path->clock_source = clock;
 }
+
 struct clock_source *dal_display_path_get_clock_source(
 	const struct display_path *path)
 {
@@ -499,6 +497,7 @@ void dal_display_path_set_alt_clock_source(
 {
 	path->alt_clock_source = clock;
 }
+
 struct clock_source *dal_display_path_get_alt_clock_source(
 	const struct display_path *path)
 {
@@ -511,6 +510,7 @@ void dal_display_path_set_fbc_info(
 {
 	path->fbc_info = *fbc_info;
 }
+
 struct fbc_info *dal_display_path_get_fbc_info(struct display_path *path)
 {
 	return &path->fbc_info;
@@ -589,6 +589,7 @@ void dal_display_path_set_stereo_sync_object(
 {
 	path->stereo_sync_object = stereo_sync;
 }
+
 struct encoder *dal_display_path_get_stereo_sync_object(
 	const struct display_path *path)
 {
@@ -601,6 +602,7 @@ void dal_display_path_set_sync_input_source(
 {
 	path->sync_input_source = s;
 }
+
 enum sync_source dal_display_path_get_sync_input_source(
 	const struct display_path *path)
 {
@@ -613,6 +615,7 @@ void dal_display_path_set_sync_output_source(
 {
 	path->sync_output_source = s;
 }
+
 enum sync_source dal_display_path_get_sync_output_source(
 	const struct display_path *path)
 {

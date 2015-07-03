@@ -1435,7 +1435,7 @@ static void tmrm_do_controller_power_gating(
 		}
 
 		if (ref_counter != 0) {
-			TM_ERROR("%s: Can NOT power gate with non-zero "\
+			TM_WARNING("%s: Can NOT power gate with non-zero "\
 					"reference counter:%d!\n",
 				__func__, ref_counter);
 			return;
@@ -1445,7 +1445,7 @@ static void tmrm_do_controller_power_gating(
 		 * It must have logical state of "not power gated". */
 		if (TO_CONTROLLER_INFO(tm_resource)->power_gating_state !=
 				TM_POWER_GATE_STATE_OFF) {
-			TM_ERROR("%s: Invalid state:%d!"\
+			TM_WARNING("%s: Invalid state:%d!"\
 				" (expected TM_POWER_GATE_STATE_OFF)\n",
 				__func__,
 				TO_CONTROLLER_INFO(tm_resource)->
@@ -1470,7 +1470,7 @@ static void tmrm_do_controller_power_gating(
 
 		if (ref_counter != 1) {
 			/* Un-gate only once! */
-			TM_ERROR("%s: Can NOT un-gate with reference "\
+			TM_WARNING("%s: Can NOT un-gate with reference "\
 					"counter '%d' note equal to one!\n",
 				__func__, ref_counter);
 			return;
@@ -1479,7 +1479,7 @@ static void tmrm_do_controller_power_gating(
 		/* Un-gate the pipe, if NOT un-gated already. */
 		if (TO_CONTROLLER_INFO(tm_resource)->power_gating_state !=
 				TM_POWER_GATE_STATE_ON) {
-			TM_ERROR("%s: Invalid state:%d!"\
+			TM_WARNING("%s: Invalid state:%d!"\
 				" (expected TM_POWER_GATE_STATE_ON)\n",
 				__func__,
 				TO_CONTROLLER_INFO(tm_resource)->
@@ -1954,6 +1954,15 @@ enum tm_result tmrm_add_root_plane(
  * connect/disconnect.
  * Here we only activate audio if required and such acquired
  *
+ * It is OK to use TM_ACQUIRE_METHOD_SW on a path which is already
+ * acquired by TM_ACQUIRE_METHOD_HW (because it is a noop).
+ *
+ * It is *not* OK to use TM_ACQUIRE_METHOD_HW on a path which is already
+ * acquired by TM_ACQUIRE_METHOD_SW because many HW-update actions depend on
+ * resource usage counter transitions from 1-to-0 and from 0-to-1.
+ * If this is done, then tmrm_resources_available() will fail and this function
+ * will fail too.
+ *
  * \param [in] display_path:	Display path for which to acquire resources
  * \param [in] method:	How to acquire resources
  *
@@ -2376,26 +2385,11 @@ static void tmrm_release_clock_source(
 					dal_controller_get_id(controller));
 		}
 	}
-}
 
-/**
- * Detaches the alternative ClockSource resource from display path,
- * and powers it down.
- * If alternative ClockSource resource is not attached to display path,
- * then this function does nothing.
- *
- * \param [in] display_path: Display path from which ClockSource resource
- *	should be detached.
- */
-void tm_resource_mgr_release_alternative_clock_source(
-		struct tm_resource_mgr *tm_rm,
-		struct display_path *display_path)
-{
-	tmrm_release_clock_source(tm_rm, display_path,
-		dal_display_path_get_alt_clock_source(display_path),
-		TM_ACQUIRE_METHOD_HW);
-
-	dal_display_path_set_alt_clock_source(display_path, NULL);
+	if (dal_display_path_get_alt_clock_source(display_path) == clock_source)
+		dal_display_path_set_alt_clock_source(display_path, NULL);
+	else
+		dal_display_path_set_clock_source(display_path, NULL);
 }
 
 /**
