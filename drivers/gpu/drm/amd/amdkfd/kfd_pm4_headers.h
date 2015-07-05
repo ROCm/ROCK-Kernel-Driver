@@ -186,6 +186,68 @@ struct pm4_map_process {
 };
 #endif
 
+/*--------------------MES_MAP_PROCESS_SCRATCH-------------------- */
+
+#ifndef PM4_MES_MAP_PROCESS_SCRATCH_DEFINED
+#define PM4_MES_MAP_PROCESS_SCRATCH_DEFINED
+
+struct pm4_map_process_scratch {
+	union {
+		union PM4_MES_TYPE_3_HEADER header;	/* header */
+		uint32_t ordinal1;
+	};
+
+	union {
+		struct {
+			uint32_t pasid:16;
+			uint32_t reserved1:8;
+			uint32_t diq_enable:1;
+			uint32_t process_quantum:7;
+		} bitfields2;
+		uint32_t ordinal2;
+	};
+
+	union {
+		struct {
+			uint32_t page_table_base:28;
+			uint32_t reserved3:4;
+		} bitfields3;
+		uint32_t ordinal3;
+	};
+
+	uint32_t reserved;
+
+	uint32_t sh_mem_bases;
+	uint32_t sh_mem_config;
+	uint32_t sh_mem_ape1_base;
+	uint32_t sh_mem_ape1_limit;
+
+	uint32_t sh_hidden_private_base_vmid;
+
+	uint32_t reserved2;
+	uint32_t reserved3;
+
+	uint32_t gds_addr_lo;
+	uint32_t gds_addr_hi;
+
+	union {
+		struct {
+			uint32_t num_gws:6;
+			uint32_t reserved4:2;
+			uint32_t num_oac:4;
+			uint32_t reserved5:4;
+			uint32_t gds_size:6;
+			uint32_t num_queues:10;
+		} bitfields10;
+		uint32_t ordinal10;
+	};
+
+	uint32_t completion_signal_lo;
+	uint32_t completion_signal_hi;
+
+};
+#endif
+
 /*--------------------MES_MAP_QUEUES--------------------*/
 
 #ifndef PM4_MES_MAP_QUEUES_DEFINED
