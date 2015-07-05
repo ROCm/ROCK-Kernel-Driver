@@ -76,7 +76,7 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 		sizeof(struct pm4_mes_map_queues) :
 		sizeof(struct pm4_map_queues);
 	/* calculate run list ib allocation size */
-	*rlib_size = process_count * sizeof(struct pm4_map_process) +
+	*rlib_size = process_count * pm->pmf->get_map_process_packet_size() +
 		     queue_count * map_queue_size;
 
 	/*
@@ -175,6 +175,48 @@ static int pm_create_map_process(struct packet_manager *pm, uint32_t *buffer,
 	packet->sh_mem_bases = qpd->sh_mem_bases;
 	packet->sh_mem_ape1_base = qpd->sh_mem_ape1_base;
 	packet->sh_mem_ape1_limit = qpd->sh_mem_ape1_limit;
+
+	packet->gds_addr_lo = lower_32_bits(qpd->gds_context_area);
+	packet->gds_addr_hi = upper_32_bits(qpd->gds_context_area);
+
+	return 0;
+}
+
+static int pm_create_map_process_scratch(struct packet_manager *pm,
+		uint32_t *buffer, struct qcm_process_device *qpd)
+{
+	struct pm4_map_process_scratch *packet;
+	struct queue *cur;
+	uint32_t num_queues;
+
+	BUG_ON(!pm || !buffer || !qpd);
+
+	packet = (struct pm4_map_process_scratch *)buffer;
+
+	pr_debug("kfd: In func %s\n", __func__);
+
+	memset(buffer, 0, sizeof(struct pm4_map_process_scratch));
+
+	packet->header.u32all = build_pm4_header(IT_MAP_PROCESS,
+					sizeof(struct pm4_map_process_scratch));
+	packet->bitfields2.diq_enable = (qpd->is_debug) ? 1 : 0;
+	packet->bitfields2.process_quantum = 1;
+	packet->bitfields2.pasid = qpd->pqm->process->pasid;
+	packet->bitfields3.page_table_base = qpd->page_table_base;
+	packet->bitfields10.gds_size = qpd->gds_size;
+	packet->bitfields10.num_gws = qpd->num_gws;
+	packet->bitfields10.num_oac = qpd->num_oac;
+	num_queues = 0;
+	list_for_each_entry(cur, &qpd->queues_list, list)
+		num_queues++;
+	packet->bitfields10.num_queues = (qpd->is_debug) ? 0 : num_queues;
+
+	packet->sh_mem_config = qpd->sh_mem_config;
+	packet->sh_mem_bases = qpd->sh_mem_bases;
+	packet->sh_mem_ape1_base = qpd->sh_mem_ape1_base;
+	packet->sh_mem_ape1_limit = qpd->sh_mem_ape1_limit;
+
+	packet->sh_hidden_private_base_vmid = qpd->sh_hidden_private_base;
 
 	packet->gds_addr_lo = lower_32_bits(qpd->gds_context_area);
 	packet->gds_addr_hi = upper_32_bits(qpd->gds_context_area);
@@ -347,12 +389,12 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 			return -ENOMEM;
 		}
 
-		retval = pm_create_map_process(pm, &rl_buffer[rl_wptr], qpd);
+		retval = pm->pmf->map_process(pm, &rl_buffer[rl_wptr], qpd);
 		if (retval != 0)
 			return retval;
 
 		proccesses_mapped++;
-		inc_wptr(&rl_wptr, sizeof(struct pm4_map_process),
+		inc_wptr(&rl_wptr, pm->pmf->get_map_process_packet_size(),
 				alloc_size_bytes);
 
 		list_for_each_entry(kq, &qpd->priv_queue_list, list) {
@@ -422,7 +464,18 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 	return 0;
 }
 
-int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm)
+static int get_map_process_packet_size(void)
+{
+	return sizeof(struct pm4_map_process);
+}
+
+static int get_map_process_packet_size_scratch(void)
+{
+	return sizeof(struct pm4_map_process_scratch);
+}
+
+int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
+		uint16_t fw_ver)
 {
 	BUG_ON(!dqm);
 
@@ -433,7 +486,18 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm)
 		mutex_destroy(&pm->lock);
 		return -ENOMEM;
 	}
+	pm->pmf = kzalloc(sizeof(struct packet_manager_firmware), GFP_KERNEL);
 	pm->allocated = false;
+
+	if (fw_ver == 558) {
+		pm->pmf->map_process = pm_create_map_process_scratch;
+		pm->pmf->get_map_process_packet_size =
+				get_map_process_packet_size_scratch;
+	} else {
+		pm->pmf->map_process = pm_create_map_process;
+		pm->pmf->get_map_process_packet_size =
+						get_map_process_packet_size;
+	}
 
 	return 0;
 }
@@ -444,6 +508,7 @@ void pm_uninit(struct packet_manager *pm)
 
 	mutex_destroy(&pm->lock);
 	kernel_queue_uninit(pm->priv_queue);
+	kfree(pm->pmf);
 }
 
 int pm_send_set_resources(struct packet_manager *pm,

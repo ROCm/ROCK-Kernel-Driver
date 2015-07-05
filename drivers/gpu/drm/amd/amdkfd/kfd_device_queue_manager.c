@@ -736,7 +736,9 @@ static int start_cpsch(struct device_queue_manager *dqm)
 
 	retval = 0;
 
-	retval = pm_init(&dqm->packets, dqm);
+	retval = pm_init(&dqm->packets, dqm,
+			dqm->dev->kfd2kgd->get_fw_version
+			(dqm->dev->kgd, KGD_ENGINE_MEC1));
 	if (retval != 0)
 		goto fail_packet_manager_init;
 

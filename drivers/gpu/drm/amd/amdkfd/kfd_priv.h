@@ -690,15 +690,27 @@ struct kernel_queue *pqm_get_kernel_queue(struct process_queue_manager *pqm,
 #define KFD_FENCE_INIT   (10)
 #define KFD_UNMAP_LATENCY (150)
 
+struct packet_manager_firmware;
+
 struct packet_manager {
 	struct device_queue_manager *dqm;
 	struct kernel_queue *priv_queue;
 	struct mutex lock;
 	bool allocated;
 	struct kfd_mem_obj *ib_buffer_obj;
+
+	struct packet_manager_firmware *pmf;
 };
 
-int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm);
+struct packet_manager_firmware {
+	/* Support different firmware versions for map process packet */
+	int (*map_process)(struct packet_manager *pm, uint32_t *buffer,
+				struct qcm_process_device *qpd);
+	int (*get_map_process_packet_size)(void);
+};
+
+int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
+		uint16_t fw_ver);
 void pm_uninit(struct packet_manager *pm);
 int pm_send_set_resources(struct packet_manager *pm,
 				struct scheduling_resources *res);
