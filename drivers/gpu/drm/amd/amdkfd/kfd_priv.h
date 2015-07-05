@@ -437,6 +437,7 @@ struct qcm_process_device {
 	uint32_t gds_size;
 	uint32_t num_gws;
 	uint32_t num_oac;
+	uint32_t sh_hidden_private_base;
 };
 
 /*8 byte handle containing GPU ID in the most significant 4 bytes and
