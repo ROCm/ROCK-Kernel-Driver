@@ -106,6 +106,10 @@ static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);
 static void set_num_of_requests(struct kgd_dev *kgd,
 			uint8_t num_of_requests);
+static int alloc_memory_of_scratch(struct kgd_dev *kgd,
+				 uint64_t va, uint32_t vmid);
+static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
+		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
 
 static const struct kfd2kgd_calls kfd2kgd = {
 	.init_gtt_mem_allocation = alloc_gtt_mem,
@@ -144,11 +148,15 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.unmap_memory_to_gpu = unmap_memory_from_gpu,
 	.get_fw_version = get_fw_version,
 	.set_num_of_requests = set_num_of_requests,
-	.get_cu_info = get_cu_info
+	.get_cu_info = get_cu_info,
+	.set_num_of_requests = set_num_of_requests,
+	.alloc_memory_of_scratch = alloc_memory_of_scratch,
+	.write_config_static_mem = write_config_static_mem
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions()
 {
+	return (struct kfd2kgd_calls *)&kfd2kgd;
 	return (struct kfd2kgd_calls *)&kfd2kgd;
 }
 
@@ -551,6 +559,32 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
 					unsigned int reg_offset)
 {
+	return 0;
+}
+
+static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
+		uint8_t element_size, uint8_t index_stride, uint8_t mtype)
+{
+	uint32_t reg;
+	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
+
+	reg = swizzle_enable << SH_STATIC_MEM_CONFIG__SWIZZLE_ENABLE__SHIFT |
+		element_size << SH_STATIC_MEM_CONFIG__ELEMENT_SIZE__SHIFT |
+		index_stride << SH_STATIC_MEM_CONFIG__INDEX_STRIDE__SHIFT |
+		mtype << SH_STATIC_MEM_CONFIG__PRIVATE_MTYPE__SHIFT;
+
+	WREG32(mmSH_STATIC_MEM_CONFIG, reg);
+	return 0;
+}
+static int alloc_memory_of_scratch(struct kgd_dev *kgd,
+				 uint64_t va, uint32_t vmid)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
+
+	lock_srbm(kgd, 0, 0, 0, vmid);
+	WREG32(mmSH_HIDDEN_PRIVATE_BASE_VMID, va);
+	unlock_srbm(kgd);
+
 	return 0;
 }
 
