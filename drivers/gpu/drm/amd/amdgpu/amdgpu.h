@@ -2061,6 +2061,9 @@ struct amdgpu_device {
 	/* tracking pinned memory */
 	u64 vram_pin_size;
 	u64 gart_pin_size;
+
+	/* kernel conext for IB submission */
+	struct amdgpu_ctx *kernel_ctx;
 };
 
 bool amdgpu_device_is_px(struct drm_device *dev);
