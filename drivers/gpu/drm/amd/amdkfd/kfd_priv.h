@@ -767,4 +767,6 @@ void radeon_flush_tlb(struct kfd_dev *dev, uint32_t pasid);
 
 int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 
+#define KFD_SCRATCH_FW_VER 600
+
 #endif

@@ -921,7 +921,8 @@ kfd_ioctl_wait_events(struct file *filp, struct kfd_process *p, void *data)
 static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
 					struct kfd_process *p, void *data)
 {
-	struct kfd_ioctl_alloc_memory_of_gpu_args *args = data;
+	struct kfd_ioctl_alloc_memory_of_gpu_args *args =
+			(struct kfd_ioctl_alloc_memory_of_gpu_args *)data;
 	struct kfd_process_device *pdd;
 	struct kfd_dev *dev;
 	long err;
@@ -933,7 +934,6 @@ static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
-
 	mutex_lock(&p->mutex);
 
 	pdd = kfd_bind_process_to_device(dev, p);
@@ -942,15 +942,15 @@ static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
 		goto bind_process_to_device_fail;
 	}
 
-	/* write here mmap address to the SH_HIDDEN_PRIVATE_BASE_VMID */
-
 	pdd->sh_hidden_private_base_vmid = args->va_addr;
+	pdd->qpd.sh_hidden_private_base = args->va_addr;
 
-	err = dev->kfd2kgd->alloc_memory_of_scratch(
-		dev->kgd, args->va_addr, 8);
-	/* err = qcm_program_scratch_memory(dev ,pdd);*/
-	if (err != 0)
-		goto alloc_memory_of_scratch_failed;
+	if (sched_policy == KFD_SCHED_POLICY_NO_HWS && pdd->qpd.vmid != 0) {
+		err = dev->kfd2kgd->alloc_memory_of_scratch(
+			dev->kgd, args->va_addr, pdd->qpd.vmid);
+		if (err != 0)
+			goto alloc_memory_of_scratch_failed;
+	}
 
 	mutex_unlock(&p->mutex);
 

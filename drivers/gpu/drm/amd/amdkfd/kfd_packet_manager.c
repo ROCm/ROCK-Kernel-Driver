@@ -489,7 +489,7 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 	pm->pmf = kzalloc(sizeof(struct packet_manager_firmware), GFP_KERNEL);
 	pm->allocated = false;
 
-	if (fw_ver == 558) {
+	if (fw_ver == KFD_SCRATCH_FW_VER) {
 		pm->pmf->map_process = pm_create_map_process_scratch;
 		pm->pmf->get_map_process_packet_size =
 				get_map_process_packet_size_scratch;

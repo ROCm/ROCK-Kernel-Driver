@@ -307,6 +307,9 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 
 	kfd->dbgmgr = NULL;
 
+	/* Initialize scratch memory access */
+	kfd->kfd2kgd->write_config_static_mem(kfd->kgd, true, 1, 3, 0);
+
 	kfd->init_complete = true;
 	dev_info(kfd_device, "added device (%x:%x)\n", kfd->pdev->vendor,
 		 kfd->pdev->device);
