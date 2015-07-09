@@ -333,31 +333,6 @@ static enum color_space translate_to_color_space(
 	}
 }
 
-static enum color_space translate_from_surface_color_splace(
-		struct plane_colorimetry surface_colorimetry)
-{
-	switch (surface_colorimetry.color_space)
-	{
-	case SURFACE_COLOR_SPACE_SRGB:
-		return surface_colorimetry.limited_range ?
-				COLOR_SPACE_SRGB_LIMITED_RANGE :
-				COLOR_SPACE_SRGB_FULL_RANGE;
-	case SURFACE_COLOR_SPACE_BT601:
-	case SURFACE_COLOR_SPACE_XVYCC_BT601:
-		return surface_colorimetry.limited_range ?
-			COLOR_SPACE_YCBCR601 :
-			COLOR_SPACE_YPBPR601;
-	case SURFACE_COLOR_SPACE_BT709:
-	case SURFACE_COLOR_SPACE_XVYCC_BT709:
-		return surface_colorimetry.limited_range ?
-			COLOR_SPACE_YCBCR709 :
-			COLOR_SPACE_YPBPR709;
-	case SURFACE_COLOR_SPACE_XRRGB:
-	default:
-		return COLOR_SPACE_SRGB_FULL_RANGE;
-	}
-}
-
 static enum display_output_bit_depth translate_to_display_output_bit_depth(
 	enum hw_color_depth color_depth)
 {

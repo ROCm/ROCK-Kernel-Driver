@@ -101,7 +101,8 @@ bool dal_i2c_generic_hw_engine_submit_request(
 
 	struct i2c_generic_transaction_attributes attributes;
 
-	enum i2c_channel_operation_result operation_result;
+	enum i2c_channel_operation_result operation_result =
+		I2C_CHANNEL_OPERATION_FAILED;
 
 	bool result = false;
 

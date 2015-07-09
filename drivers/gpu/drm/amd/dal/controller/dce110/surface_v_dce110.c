@@ -119,6 +119,15 @@ static void program_pixel_format(
 
 		value = dal_read_reg(sf->ctx, addr);
 
+		grph_depth = get_reg_field_value(
+			value,
+			UNP_GRPH_CONTROL,
+			GRPH_DEPTH);
+		grph_format = get_reg_field_value(
+			value,
+			UNP_GRPH_CONTROL,
+			GRPH_FORMAT);
+
 		switch (format) {
 		case SURFACE_PIXEL_FORMAT_GRPH_PALETA_256_COLORS:
 			grph_depth = 0;

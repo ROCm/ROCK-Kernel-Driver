@@ -67,11 +67,6 @@ static void enable_hw_base_light_sleep(struct dal_context *dal_context)
 	NOT_IMPLEMENTED();
 }
 
-static void disable_hw_base_light_sleep(struct dal_context *dal_context)
-{
-	NOT_IMPLEMENTED();
-}
-
 static void disable_sw_manual_control_light_sleep(
 		struct dal_context *dal_context)
 {
