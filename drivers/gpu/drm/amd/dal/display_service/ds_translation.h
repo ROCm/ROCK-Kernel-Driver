@@ -61,9 +61,6 @@ void dal_ds_translation_setup_hw_stereo_mixer_params(
 /*enum hw_pixel_format dal_ds_traslation_hw_pixel_format_from_pixel_format(
 	const enum pixel_format pf);*/
 
-enum hw_tiling_mode dal_ds_translation_hw_tiling_mode_from_tiling_mode(
-	enum tiling_mode tiling_mode);
-
 enum underscan_reason {
 	UNDERSCAN_REASON_PATCH_TIMING,
 	UNDERSCAN_REASON_CHECK_STEP,

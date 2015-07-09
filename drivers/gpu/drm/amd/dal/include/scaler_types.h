@@ -35,6 +35,13 @@ enum pixel_type {
 	PIXEL_TYPE_20BPP
 };
 
+/* Rotation angle */
+enum rotation_angle {
+	ROTATION_ANGLE_0 = 0,
+	ROTATION_ANGLE_90,
+	ROTATION_ANGLE_180,
+	ROTATION_ANGLE_270,
+};
 
 /* Pixel format */
 enum pixel_format {
@@ -59,14 +66,6 @@ enum pixel_format {
 	PIXEL_FORMAT_VIDEO_BEGIN = PIXEL_FORMAT_420BPP12,
 	PIXEL_FORMAT_VIDEO_END = PIXEL_FORMAT_444BPP32,
 	PIXEL_FORMAT_UNKNOWN
-};
-
-/* Rotation angle */
-enum rotation_angle {
-	ROTATION_ANGLE_0 = 0,
-	ROTATION_ANGLE_90,
-	ROTATION_ANGLE_180,
-	ROTATION_ANGLE_270,
 };
 
 struct scaling_tap_info {

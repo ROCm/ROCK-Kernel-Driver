@@ -29,7 +29,6 @@
 #include "adjustment_types.h"
 #include "hw_adjustment_types.h"
 #include "include/plane_types.h"
-#include "scaler_types.h"
 
 /* Forward declaration */
 struct mode_timing;
@@ -61,15 +60,6 @@ enum scaling_transformation {
 	SCALING_TRANSFORMATION_END =
 			SCALING_TRANSFORMATION_PRESERVE_ASPECT_RATIO_SCALE
 };
-
-/* Tiling mode */
-enum tiling_mode {
-	TILING_MODE_INVALID,
-	TILING_MODE_LINEAR,
-	TILING_MODE_TILED
-};
-
-
 
 /* State of stereo 3D for workstation */
 enum ws_stereo_state {

@@ -824,14 +824,14 @@ static uint32_t convert_controller_id_to_index(
 
 static uint32_t calculate_source_width_rounded_up_to_chunks(
 		struct dal_context *dal_ctx,
-		struct view_params src_vw,
-		enum hw_rotation_angle rotation_angle)
+		struct view src_vw,
+		enum rotation_angle rotation_angle)
 {
 	uint32_t src_width_rounded_up_to_chunks = 0;
 	uint32_t src_width_pixels = src_vw.width;
 
-	if (rotation_angle == HW_ROTATION_ANGLE_90
-			|| rotation_angle == HW_ROTATION_ANGLE_270)
+	if (rotation_angle == ROTATION_ANGLE_90
+			|| rotation_angle == ROTATION_ANGLE_270)
 		src_width_pixels = src_vw.height;
 
 	if (0 == src_width_pixels) {
@@ -871,8 +871,8 @@ static bool is_orthogonal_rotation(const struct bandwidth_params *param)
 {
 	bool orthogonal_rotation = false;
 
-	if (param->rotation_angle == HW_ROTATION_ANGLE_90 ||
-			param->rotation_angle == HW_ROTATION_ANGLE_270)
+	if (param->rotation_angle == ROTATION_ANGLE_90 ||
+			param->rotation_angle == ROTATION_ANGLE_270)
 		orthogonal_rotation = !param->is_tiling_rotated;
 	else
 		orthogonal_rotation = param->is_tiling_rotated;
@@ -1166,7 +1166,7 @@ static void get_memory_size_per_request(
 	*out_useful_lines_in_mem_access = 2;
 	*out_latency_hiding_lines = 2;
 
-	if (param->tiling_mode == HW_TILING_MODE_LINEAR ||
+	if (param->tiling_mode == TILING_MODE_LINEAR ||
 		param->surface_pixel_format < PIXEL_FORMAT_VIDEO_BEGIN) {
 		/* return default values */
 		return;
@@ -1254,7 +1254,7 @@ static void get_bytes_per_request(
 			param->src_vw,
 			param->rotation_angle);
 
-	if (param->tiling_mode == HW_TILING_MODE_LINEAR) {
+	if (param->tiling_mode == TILING_MODE_LINEAR) {
 		/* return default values */
 		*out_bytes_per_request = bytes_per_request;
 		*out_useful_bytes_per_request = useful_bytes_per_request;
@@ -1385,7 +1385,7 @@ static void get_scatter_gather_page_info(
 {
 	uint32_t total_bytes_pp = calc_total_bytes_pp(params);
 
-	if (params->tiling_mode == HW_TILING_MODE_LINEAR) {
+	if (params->tiling_mode == TILING_MODE_LINEAR) {
 		*useful_pte_per_request = 8;
 		*page_width = 4096 / total_bytes_pp;
 		*page_height = 1;
@@ -1398,8 +1398,8 @@ static void get_scatter_gather_page_info(
 		*page_width = 32;
 		*page_height = 32;
 	} else if (total_bytes_pp == 2) {
-		if (params->rotation_angle == HW_ROTATION_ANGLE_0 ||
-			params->rotation_angle == HW_ROTATION_ANGLE_180) {
+		if (params->rotation_angle == ROTATION_ANGLE_0 ||
+			params->rotation_angle == ROTATION_ANGLE_180) {
 			*page_width = 64;
 			*page_height = 32;
 		} else {
@@ -1411,8 +1411,8 @@ static void get_scatter_gather_page_info(
 		*page_height = 64;
 	}
 
-	if (params->rotation_angle == HW_ROTATION_ANGLE_0 ||
-		params->rotation_angle == HW_ROTATION_ANGLE_180)
+	if (params->rotation_angle == ROTATION_ANGLE_0 ||
+		params->rotation_angle == ROTATION_ANGLE_180)
 		*useful_pte_per_request = 8;
 	else
 		*useful_pte_per_request = 1;
@@ -1452,7 +1452,7 @@ static uint32_t get_bytes_per_page_close_open(
 	 * NumberOfDRAMChannels, BytesPerPixel(i) * ScatterGatherPageWidth(i))
 	 */
 	/* scatter gather is always enabled */
-	if (params->tiling_mode != HW_TILING_MODE_LINEAR) {
+	if (params->tiling_mode != TILING_MODE_LINEAR) {
 		uint32_t useful_lines_in_memory;
 		uint32_t dram_channels_num = 2;
 		uint32_t dram_banks_num = 8;
@@ -1484,7 +1484,7 @@ static uint32_t get_bytes_per_page_close_open(
 			dal_max(total_bytes_pp * tile_width_in_pixels *
 				dram_banks_num * dram_channels_num,
 				total_bytes_pp * page_width);
-	} else if (params->tiling_mode == HW_TILING_MODE_LINEAR) {
+	} else if (params->tiling_mode == TILING_MODE_LINEAR) {
 		/* And _
 		 * (PitchInPixelsAfterSurfaceType(i) * BytesPerPixel(i))
 		 * Mod InefficientLinearPitchInBytes = 0 Then)
@@ -2038,8 +2038,8 @@ static struct fixed32_32 calc_vert_scale_ratio(
 		return dal_fixed32_32_one;
 	}
 
-	if (param->rotation_angle == HW_ROTATION_ANGLE_90
-			|| param->rotation_angle == HW_ROTATION_ANGLE_270) {
+	if (param->rotation_angle == ROTATION_ANGLE_90
+			|| param->rotation_angle == ROTATION_ANGLE_270) {
 		/* HW Rotation is being used in Mixed Mode SLS configuration */
 		vsr = dal_fixed32_32_from_fraction(param->src_vw.width,
 				denominator);
@@ -2935,8 +2935,8 @@ static uint32_t get_scatter_gather_pte_request_limit(
 			&useful_pte_per_request);
 
 	if (path_num > 1 ||
-		params->rotation_angle == HW_ROTATION_ANGLE_90 ||
-		params->rotation_angle == HW_ROTATION_ANGLE_270)
+		params->rotation_angle == ROTATION_ANGLE_90 ||
+		params->rotation_angle == ROTATION_ANGLE_270)
 		pte_request_to_eviction_ratio =
 				dal_fixed32_32_from_fraction(3, 10);
 	else
@@ -3127,8 +3127,8 @@ static uint32_t calc_urgency_watermark(
 
 	if (0 != wm_params->dst_view.height
 		&& 0 != wm_params->dst_view.width) {
-		if (HW_ROTATION_ANGLE_0 == wm_params->rotation_angle ||
-			HW_ROTATION_ANGLE_180 == wm_params->rotation_angle) {
+		if (ROTATION_ANGLE_0 == wm_params->rotation_angle ||
+			ROTATION_ANGLE_180 == wm_params->rotation_angle) {
 			h_sr =
 				dal_fixed32_32_div(
 					dal_fixed32_32_from_fraction(
@@ -3224,8 +3224,8 @@ static uint32_t calc_urgency_watermark(
 		uint32_t h_total = wm_params->timing_info.h_total;
 		struct fixed32_32 line_total_pixels;
 
-		if (wm_params->rotation_angle == HW_ROTATION_ANGLE_90 ||
-			wm_params->rotation_angle == HW_ROTATION_ANGLE_270)
+		if (wm_params->rotation_angle == ROTATION_ANGLE_90 ||
+			wm_params->rotation_angle == ROTATION_ANGLE_270)
 			source_width_pixels = wm_params->src_view.height /
 				chroma_factor;
 

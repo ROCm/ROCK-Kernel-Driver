@@ -308,20 +308,6 @@ void dal_ds_translation_setup_hw_stereo_mixer_params(
 	}
 }
 
-enum hw_tiling_mode dal_ds_translation_hw_tiling_mode_from_tiling_mode(
-	enum tiling_mode tiling_mode)
-{
-	/* translate the TilingMode */
-	switch (tiling_mode) {
-	case TILING_MODE_LINEAR:
-		return HW_TILING_MODE_LINEAR;
-	case TILING_MODE_TILED:
-		return HW_TILING_MODE_TILED;
-	default:
-		return HW_TILING_MODE_INVALID;
-	}
-}
-
 enum hw_color_space dal_ds_translation_hw_color_space_from_color_space(
 	enum ds_color_space color_space)
 {

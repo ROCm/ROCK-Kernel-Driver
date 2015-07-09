@@ -27,10 +27,7 @@
 
 #include "hw_sequencer_types.h"
 #include "scaler_types.h"
-
 #include "set_mode_types.h"
-
-#include "validation_common_types.h"
 
 struct watermark_timing_params {
 	uint32_t INTERLACED:1;
@@ -42,21 +39,22 @@ struct watermark_timing_params {
 
 /* Parameters needed as input into watermark calculation */
 struct watermark_input_params {
-	enum controller_id controller_id;
 	uint32_t pixel_clk_khz;
 	uint32_t v_taps;
 	uint32_t h_taps;
-	struct view_params src_view;
-	struct view_params dst_view;
 	struct watermark_timing_params timing_info;
-	struct color_quality color_info;
 	enum hw_stereo_format single_stereo_type;
 	bool fbc_enabled;
 	bool lpt_enabled;
-	enum hw_tiling_mode tiling_mode;
-	enum hw_rotation_angle rotation_angle;
 	uint32_t deep_sleep_sclk_khz;
+
+	enum controller_id controller_id;
+	struct view src_view;
+	struct view dst_view;
+	struct color_quality color_info;
+	enum tiling_mode tiling_mode;
 	bool is_tiling_rotated;
+	enum rotation_angle rotation_angle;
 	enum pixel_format surface_pixel_format;
 	enum hw_stereo_format stereo_format;
 };
@@ -72,17 +70,19 @@ struct validation_timing_params {
 
 struct bandwidth_params {
 	enum controller_id controller_id;
-	struct view_params src_vw;
-	struct view_params dst_vw;
+
 	struct validation_timing_params timing_info;
 	struct scaling_tap_info scaler_taps;
+	bool is_chroma_surface;
+
+	struct view src_vw;
+	struct view dst_vw;
 	struct color_quality color_info;
-	enum hw_tiling_mode tiling_mode;
+	enum tiling_mode tiling_mode;
 	bool is_tiling_rotated;
-	enum hw_rotation_angle rotation_angle;
+	enum rotation_angle rotation_angle;
 	enum pixel_format surface_pixel_format;
 	enum hw_stereo_format stereo_format;
-	bool is_chroma_surface;
 };
 
 enum stutter_mode_type {

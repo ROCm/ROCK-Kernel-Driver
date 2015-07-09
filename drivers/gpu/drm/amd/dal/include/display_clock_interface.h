@@ -26,9 +26,10 @@
 #ifndef __DISPLAY_CLOCK_INTERFACE_H__
 #define __DISPLAY_CLOCK_INTERFACE_H__
 
-#include "validation_common_types.h"
+#include "hw_sequencer_types.h"
 #include "grph_object_defs.h"
 #include "signal_types.h"
+#include "scaler_types.h"
 
 /* Timing related information*/
 struct dc_timing_params {
@@ -88,8 +89,8 @@ struct min_clock_params {
 	uint32_t id;
 	uint32_t requested_pixel_clock; /* in KHz */
 	uint32_t actual_pixel_clock; /* in KHz */
-	struct view_params source_view;
-	struct view_params dest_view;
+	struct view source_view;
+	struct view dest_view;
 	struct dc_timing_params timing_info;
 	struct dc_scaling_params scaling_info;
 	struct color_quality color_info;

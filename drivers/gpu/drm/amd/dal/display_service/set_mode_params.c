@@ -216,8 +216,7 @@ bool dal_set_mode_params_update_tiling_mode_on_path(
 		get_hw_path_mode_by_display_index(smp, display_index);
 
 	if (path_mode) {
-		path_mode->mode.tiling_mode =
-			dal_ds_translation_hw_tiling_mode_from_tiling_mode(tm);
+		path_mode->mode.tiling_mode = tm;
 		return true;
 	} else
 		return false;

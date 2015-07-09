@@ -31,6 +31,17 @@
 #include "link_service_types.h"
 #include "plane_types.h"
 
+struct color_quality {
+	uint32_t bpp_graphics;
+	uint32_t bpp_backend_video;
+};
+
+enum tiling_mode {
+	TILING_MODE_INVALID,
+	TILING_MODE_LINEAR,
+	TILING_MODE_TILED
+};
+
 enum {
 	HW_MAX_NUM_VIEWPORTS = 2,
 	HW_CURRENT_PIPE_INDEX = 0,
@@ -232,13 +243,6 @@ enum hw_overlay_format {
 	HW_OVERLAY_FORMAT_RGB32_2101010
 };
 
-enum hw_tiling_mode {
-	HW_TILING_MODE_INVALID,
-	HW_TILING_MODE_LINEAR,
-	HW_TILING_MODE_TILED
-
-};
-
 enum hw_scale_options {
 	HW_SCALE_OPTION_UNKNOWN,
 	HW_SCALE_OPTION_OVERSCAN, /* multimedia pass through mode */
@@ -272,14 +276,6 @@ enum hw_dithering_options {
 	HW_DITHERING_OPTION_DISABLE
 };
 
-enum hw_rotation_angle {
-	HW_ROTATION_ANGLE_0,
-	HW_ROTATION_ANGLE_90,
-	HW_ROTATION_ANGLE_180,
-	HW_ROTATION_ANGLE_270,
-	HW_ROTATION_ANGLE_INVALID
-};
-
 struct hw_stereo_mixer_params {
 	bool sub_sampling;
 	bool single_pipe;
@@ -299,7 +295,7 @@ struct hw_mode_info {
 	enum hw_scale_options underscan_rule;
 	bool fbc_enabled;
 	bool lpt_enabled;
-	enum hw_tiling_mode tiling_mode;
+	enum tiling_mode tiling_mode;
 	struct hw_stereo_mixer_params stereo_mixer_params;
 	enum hw_dithering_options dithering;
 
@@ -321,7 +317,7 @@ struct hw_mode_info {
 		uint32_t cea_vic;
 	} ds_info;
 
-	enum hw_rotation_angle rotation;
+	enum rotation_angle rotation;
 	bool is_tiling_rotated;
 	/* 'stereo_format' is used in:
 	 *	1. stereo mixer parameters

@@ -127,14 +127,6 @@ static void convert_mode_info(
 	const struct path_mode *mode,
 	enum build_path_set_reason reason);
 
-/* Convert tiling mode into HW tiling mode */
-static enum hw_tiling_mode hw_tiling_mode_from_tiling_mode(
-	enum tiling_mode mode);
-
-/* Convert rotation angle into HW format */
-static enum hw_rotation_angle hw_rotation_angle_from_rotation(
-	enum rotation_angle rotation);
-
 static enum timing_3d_format get_active_timing_3d_format(
 	enum timing_3d_format timing_3d_format,
 	enum view_3d_format view_3d_format);
@@ -2239,11 +2231,10 @@ static void convert_mode_info(
 
 	info->pixel_format = mode->pixel_format;
 
-	info->tiling_mode =
-		hw_tiling_mode_from_tiling_mode(mode->tiling_mode);
+	info->tiling_mode = mode->tiling_mode;
 
 	info->is_tiling_rotated = mode->is_tiling_rotated;
-	info->rotation = hw_rotation_angle_from_rotation(mode->rotation_angle);
+	info->rotation = mode->rotation_angle;
 
 	/* temporary */
 	info->ds_info.cea_vic = mode->mode_timing->crtc_timing.vic;
@@ -2271,46 +2262,6 @@ static void convert_mode_info(
 
 	/*build scaler overscan parameters for new_mode*/
 	build_scaling_params(ds, mode, scl_type, info);
-}
-
-/*
- * hw_tiling_mode_from_tiling_mode
- *
- * Convert tiling mode into HW tiling mode
- */
-static enum hw_tiling_mode hw_tiling_mode_from_tiling_mode(
-	enum tiling_mode mode)
-{
-	switch (mode) {
-	case TILING_MODE_LINEAR:
-		return HW_TILING_MODE_LINEAR;
-	case TILING_MODE_TILED:
-		return HW_TILING_MODE_TILED;
-	default:
-		return HW_TILING_MODE_INVALID;
-	}
-}
-
-/*
- *  hw_rotation_angle_from_rotation
- *
- * Convert rotation angle into HW format
- */
-static enum hw_rotation_angle hw_rotation_angle_from_rotation(
-	enum rotation_angle rotation)
-{
-	switch (rotation) {
-	case ROTATION_ANGLE_0:
-		return HW_ROTATION_ANGLE_0;
-	case ROTATION_ANGLE_90:
-		return HW_ROTATION_ANGLE_90;
-	case ROTATION_ANGLE_180:
-		return HW_ROTATION_ANGLE_180;
-	case ROTATION_ANGLE_270:
-		return HW_ROTATION_ANGLE_270;
-	default:
-		return HW_ROTATION_ANGLE_INVALID;
-	}
 }
 
 static enum timing_3d_format get_active_timing_3d_format(
