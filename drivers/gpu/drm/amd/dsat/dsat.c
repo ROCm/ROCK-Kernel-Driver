@@ -811,7 +811,6 @@ bool dsat_display_mode_timing_get_list(
 	uint32_t mt_nums = 0;
 	uint32_t idx = 0;
 	struct dal_timing_list_query *tlsq;
-	struct mode_timing *mt_dst = mode_timing;
 	bool ret_val = false;
 
 	amdgpu_dm_acquire_dal_lock(dm);

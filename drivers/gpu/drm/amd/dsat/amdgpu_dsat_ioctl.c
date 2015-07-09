@@ -36,15 +36,11 @@
 int amdgpu_dsat_cmd_ioctl(struct drm_device *dev, void *data,
 		struct drm_file *filp)
 {
-	if (amdgpu_dal == 0)
-		return -EINVAL;
-
 	struct amdgpu_device *rdev;
 	struct amdgpu_display_manager *dm;
 	struct dal *dal;
 	struct drm_amdgpu_dsat_cmd_context *dsat_ctx = data;
 
-	int i;
 	uint32_t ret = 0;
 
 	uint64_t user_input_ptr = dsat_ctx->in_ptr;
@@ -53,6 +49,9 @@ int amdgpu_dsat_cmd_ioctl(struct drm_device *dev, void *data,
 
 	struct amdgpu_dsat_input_context *kernel_in_data = NULL;
 	struct amdgpu_dsat_output_context *kernel_out_data = NULL;
+
+	if (amdgpu_dal == 0)
+		return -EINVAL;
 
 	rdev = (struct amdgpu_device *) dev->dev_private;
 	dm = &rdev->dm;
@@ -315,6 +314,9 @@ int amdgpu_dsat_cmd_ioctl(struct drm_device *dev, void *data,
 		break;
 	}
 	case DSAT_CMD_READ_HW_REG: {
+		struct dsat_hw_rw_request *request;
+		uint32_t *reg_value;
+
 		if (kernel_in_data->in_data_size <
 				sizeof(struct dsat_hw_rw_request)) {
 			dsat_ctx->ret = DSAT_CMD_DATA_ERROR;
@@ -325,10 +327,8 @@ int amdgpu_dsat_cmd_ioctl(struct drm_device *dev, void *data,
 			break;
 		}
 
-
-		struct dsat_hw_rw_request *request =
-			(struct dsat_hw_rw_request *) kernel_in_data->data;
-		uint32_t *reg_value = (uint32_t *) kernel_out_data->data;
+		request = (struct dsat_hw_rw_request *) kernel_in_data->data;
+		reg_value = (uint32_t *) kernel_out_data->data;
 
 		kernel_out_data->data_size = sizeof(uint32_t);
 		*reg_value = dsat_read_hw_reg(dm, request->address);
@@ -336,14 +336,15 @@ int amdgpu_dsat_cmd_ioctl(struct drm_device *dev, void *data,
 		break;
 	}
 	case DSAT_CMD_WRITE_HW_REG: {
+		struct dsat_hw_rw_request *request;
+
 		if (kernel_in_data->in_data_size <
 				sizeof(struct dsat_hw_rw_request)) {
 			dsat_ctx->ret = DSAT_CMD_DATA_ERROR;
 			break;
 		}
 
-		struct dsat_hw_rw_request *request =
-			(struct dsat_hw_rw_request *) kernel_in_data->data;
+		request = (struct dsat_hw_rw_request *) kernel_in_data->data;
 
 		dsat_write_hw_reg(dm, request->address, request->value);
 
