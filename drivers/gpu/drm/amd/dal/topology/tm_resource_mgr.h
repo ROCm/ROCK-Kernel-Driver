@@ -74,6 +74,11 @@ struct tm_resource_mgr_init_data {
 
 #define RESOURCE_INVALID_INDEX ((uint32_t)(-1))
 
+struct tm_resource_range {
+	uint32_t start;
+	uint32_t end;
+};
+
 /****************************
   Public interface functions
 *****************************/
@@ -229,7 +234,7 @@ void tm_resource_mgr_associate_link_services(
 		struct tm_resource_mgr *tm_rm,
 		struct display_path *path);
 
-void tm_resource_mgr_dump(struct tm_resource_mgr *tm_rm);
+void dal_tmrm_dump(struct tm_resource_mgr *tm_rm);
 
 uint32_t tm_resource_mgr_get_display_path_index_for_controller(
 		struct tm_resource_mgr *tm_rm,
@@ -259,5 +264,11 @@ void dal_tmrm_release_non_root_controllers(
 		struct tm_resource_mgr *tm_rm,
 		struct display_path *display_path,
 		enum tm_acquire_method method);
+
+void dal_tmrm_set_resources_range_by_type(struct tm_resource_mgr *tm_rm);
+
+const struct tm_resource_range *dal_tmrm_get_resource_range_by_type(
+	struct tm_resource_mgr *tm_rm,
+	enum object_type type);
 
 #endif /* __DAL_TM_RESOURCE_MGR_H__ */

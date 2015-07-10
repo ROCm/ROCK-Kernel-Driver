@@ -58,6 +58,8 @@ struct tm_resource_mgr {
 
 	struct flat_set *resources;
 
+	struct tm_resource_range resources_range[OBJECT_TYPE_COUNT];
+
 	/* This lookup will be used to translate IRQ source to Display Index.
 	 * The translation will occur on every Vblank interrupt. */
 	uint32_t controller_to_display_path_lookup[CONTROLLER_ID_MAX + 1];
@@ -707,8 +709,7 @@ struct tm_resource *tm_resource_mgr_add_engine(
 	if (engine >= ENGINE_ID_COUNT)
 		return NULL;
 
-	id = dal_graphics_object_id_init(engine, ENUM_ID_1,
-		OBJECT_TYPE_ENGINE);
+	id = dal_graphics_object_id_init(engine, ENUM_ID_1, OBJECT_TYPE_ENGINE);
 
 	return dal_tm_resource_mgr_add_resource(tm_rm,
 		dal_tm_resource_engine_create(id));
@@ -731,12 +732,12 @@ void tm_resource_mgr_relink_encoders(struct tm_resource_mgr *tm_rm)
 	struct encoder *encoder;
 	struct encoder *paired_encoder;
 
-	for (i = 0; i < tm_resource_mgr_get_total_resources_num(tm_rm); i++) {
+	const struct tm_resource_range *range =
+		dal_tmrm_get_resource_range_by_type(tm_rm, OBJECT_TYPE_ENCODER);
+
+	for (i = range->start; i < range->end; i++) {
 
 		encoder_rsrc = tm_resource_mgr_enum_resource(tm_rm, i);
-
-		if (GRPH_ID(encoder_rsrc).type != OBJECT_TYPE_ENCODER)
-			continue;
 
 		encoder = TO_ENCODER(encoder_rsrc);
 
@@ -753,16 +754,10 @@ void tm_resource_mgr_relink_encoders(struct tm_resource_mgr *tm_rm)
 			continue;
 		}
 
-		for (pair = 0;
-			pair < tm_resource_mgr_get_total_resources_num(tm_rm);
-			pair++) {
+		for (pair = range->start; pair < range->end; pair++) {
 
 			paired_encoder_rsrc = tm_resource_mgr_enum_resource(
 					tm_rm, pair);
-
-			if (GRPH_ID(paired_encoder_rsrc).type !=
-					OBJECT_TYPE_ENCODER)
-				continue;
 
 			paired_encoder = TO_ENCODER(paired_encoder_rsrc);
 
@@ -899,13 +894,14 @@ tm_resource_mgr_find_engine_resource(
 	struct dal_context *dal_context = tm_rm->dal_context;
 	uint32_t i;
 	struct tm_resource *tm_resource;
+	const struct tm_resource_range *engines =
+		dal_tmrm_get_resource_range_by_type(tm_rm, OBJECT_TYPE_ENGINE);
 
-	for (i = 0; i < tm_resource_mgr_get_total_resources_num(tm_rm); i++) {
+	for (i = engines->start; i < engines->end; i++) {
 
 		tm_resource = tm_resource_mgr_enum_resource(tm_rm, i);
 
-		if (GRPH_ID(tm_resource).id == engine_id &&
-			GRPH_ID(tm_resource).type == OBJECT_TYPE_ENGINE) {
+		if (GRPH_ID(tm_resource).id == engine_id) {
 			/* We can ignore 'id.enum' for engine
 			 * because it is not used. */
 			return tm_resource;
@@ -1049,7 +1045,7 @@ static bool tmrm_resources_available(struct tm_resource_mgr *tm_rm,
  *
  * \return index if available controller, RESOURCE_INVALID_INDEX otherwise
  */
-static uint32_t tmrm_find_controller_for_display_path(
+static uint32_t dal_tmrm_find_controller_for_display_path(
 		struct tm_resource_mgr *tm_rm,
 		uint32_t exclude_mask)
 {
@@ -1057,13 +1053,14 @@ static uint32_t tmrm_find_controller_for_display_path(
 	uint32_t controller_res_ind = RESOURCE_INVALID_INDEX;
 	uint32_t i;
 	struct tm_resource *tm_resource;
+	const struct tm_resource_range *controllers =
+		dal_tmrm_get_resource_range_by_type(
+			tm_rm,
+			OBJECT_TYPE_CONTROLLER);
 
-	for (i = 0; i < tm_resource_mgr_get_total_resources_num(tm_rm); i++) {
+	for (i = controllers->start; i < controllers->end; i++) {
 
 		tm_resource = tm_resource_mgr_enum_resource(tm_rm, i);
-
-		if (GRPH_ID(tm_resource).type != OBJECT_TYPE_CONTROLLER)
-			continue;
 
 		if (tm_utils_test_bit(&exclude_mask, GRPH_ID(tm_resource).id))
 			continue;
@@ -1109,6 +1106,7 @@ static uint32_t tmrm_get_available_clock_source(
 	enum clock_sharing_group clock_sharing_group;
 	enum signal_type signal;
 	enum clock_sharing_level clock_sharing_level;
+	const struct tm_resource_range *clock_sources;
 
 	TM_ASSERT(display_path != NULL);
 
@@ -1123,18 +1121,17 @@ static uint32_t tmrm_get_available_clock_source(
 	clock_sharing_group = dal_display_path_get_clock_sharing_group(
 			display_path);
 
+	clock_sources =
+		dal_tmrm_get_resource_range_by_type(
+			tm_rm,
+			OBJECT_TYPE_CLOCK_SOURCE);
+
 	/* Round 1: Try to find already used (in shared mode) Clock Source */
 	if (clock_sharing_group != CLOCK_SHARING_GROUP_EXCLUSIVE) {
 
-		for (i = 0;
-			i < tm_resource_mgr_get_total_resources_num(tm_rm);
-			i++) {
+		for (i = clock_sources->start; i < clock_sources->end; i++) {
 
 			tm_resource = tm_resource_mgr_enum_resource(tm_rm, i);
-
-			if (GRPH_ID(tm_resource).type !=
-				OBJECT_TYPE_CLOCK_SOURCE)
-				continue;
 
 			clock_source = TO_CLOCK_SOURCE(tm_resource);
 
@@ -1158,12 +1155,9 @@ static uint32_t tmrm_get_available_clock_source(
 
 	/* Round 2: If shared Clock Source was not found - try to find
 	 *	available Clock Source */
-	for (i = 0; i < tm_resource_mgr_get_total_resources_num(tm_rm); i++) {
+	for (i = clock_sources->start; i < clock_sources->end; i++) {
 
 		tm_resource = tm_resource_mgr_enum_resource(tm_rm, i);
-
-		if (GRPH_ID(tm_resource).type != OBJECT_TYPE_CLOCK_SOURCE)
-			continue;
 
 		if (false == is_resource_available(tm_resource))
 			continue;
@@ -1222,6 +1216,8 @@ enum engine_id tmrm_get_available_stream_engine(
 	union supported_stream_engines supported_stream_engines;
 	uint32_t i;
 	struct dal_context *dal_context = tm_rm->dal_context;
+	const struct tm_resource_range *engines =
+		dal_tmrm_get_resource_range_by_type(tm_rm, OBJECT_TYPE_ENGINE);
 
 	TM_ASSERT(display_path != NULL);
 
@@ -1252,17 +1248,13 @@ enum engine_id tmrm_get_available_stream_engine(
 	preferred_engine_id = dal_encoder_get_preferred_stream_engine(encoder);
 
 	if (preferred_engine_id != ENGINE_ID_UNKNOWN) {
+
 		/* Use preferred engine as available engine for now */
 		available_engine_id = preferred_engine_id;
 
-		for (i = 0;
-			i < tm_resource_mgr_get_total_resources_num(tm_rm);
-			i++) {
+		for (i = engines->start; i < engines->end; i++) {
 
 			tm_resource = tm_resource_mgr_enum_resource(tm_rm, i);
-
-			if (GRPH_ID(tm_resource).type != OBJECT_TYPE_ENGINE)
-				continue;
 
 			if (GRPH_ID(tm_resource).id == preferred_engine_id)
 				break;
@@ -1284,14 +1276,8 @@ enum engine_id tmrm_get_available_stream_engine(
 				dal_encoder_get_supported_stream_engines(
 							encoder);
 
-		for (i = 0;
-			i < tm_resource_mgr_get_total_resources_num(tm_rm);
-			i++) {
-
+		for (i = engines->start; i < engines->end; i++) {
 			tm_resource = tm_resource_mgr_enum_resource(tm_rm, i);
-
-			if (GRPH_ID(tm_resource).type != OBJECT_TYPE_ENGINE)
-				continue;
 
 			if (false == tm_utils_is_supported_engine(
 					supported_stream_engines,
@@ -2006,7 +1992,7 @@ enum tm_result tm_resource_mgr_acquire_resources(
 
 	/* Obtain indexes of available resources which are NOT permanent
 	 * to display path. */
-	controller_index = tmrm_find_controller_for_display_path(tm_rm, 0);
+	controller_index = dal_tmrm_find_controller_for_display_path(tm_rm, 0);
 	if (controller_index == RESOURCE_INVALID_INDEX)
 		return TM_RESULT_FAILURE;
 
@@ -2507,6 +2493,8 @@ tm_resource_mgr_get_available_sync_output_for_display_path(
 	enum sync_source current_sync_source;
 	bool path_contains_obj;
 	uint32_t i;
+	const struct tm_resource_range *encoders =
+		dal_tmrm_get_resource_range_by_type(tm_rm, OBJECT_TYPE_ENCODER);
 
 	if (display_path == NULL ||
 		!dal_display_path_is_acquired(display_path)) {
@@ -2516,12 +2504,8 @@ tm_resource_mgr_get_available_sync_output_for_display_path(
 	}
 
 	/* Loop over all encoders */
-	for (i = 0; i < tm_resource_mgr_get_total_resources_num(tm_rm); i++) {
-
+	for (i = encoders->start; i < encoders->end; i++) {
 		encoder_rsrc = tm_resource_mgr_enum_resource(tm_rm, i);
-
-		if (GRPH_ID(encoder_rsrc).type != OBJECT_TYPE_ENCODER)
-			continue;
 
 		/* We are looking for an encoder with the requested sync-output
 		 * capabilities, that satisfies one of these:
@@ -2584,6 +2568,7 @@ enum tm_result tm_resource_mgr_attach_audio_to_display_path(
 	union display_path_properties path_props;
 	uint32_t i;
 	struct tm_resource *tm_audio_resource = NULL;
+	const struct tm_resource_range *audios;
 
 	/* First we check if the display path already has an audio assigned,
 	 * and if so, we print a warning (should never happen) and
@@ -2608,14 +2593,13 @@ enum tm_result tm_resource_mgr_attach_audio_to_display_path(
 		return TM_RESULT_FAILURE;
 	}
 
+	audios = dal_tmrm_get_resource_range_by_type(tm_rm, OBJECT_TYPE_AUDIO);
+
 	/* Loop over all audio resources, and assign the first free audio
 	 * which supports the signal. */
-	for (i = 0; i < tm_resource_mgr_get_total_resources_num(tm_rm); i++) {
+	for (i = audios->start; i < audios->end; i++) {
 
 		tm_audio_resource = tm_resource_mgr_enum_resource(tm_rm, i);
-
-		if (GRPH_ID(tm_audio_resource).type != OBJECT_TYPE_AUDIO)
-			continue;
 
 		/* Allow at most ONE display path to use an audio resource. */
 		if (is_resource_available(tm_audio_resource) == false) {
@@ -3114,10 +3098,42 @@ void tm_resource_mgr_associate_link_services(
 	}
 }
 
+void dal_tmrm_set_resources_range_by_type(struct tm_resource_mgr *tm_rm)
+{
+	uint32_t index;
+	struct tm_resource *tm_resource;
+	uint32_t count = tm_resource_mgr_get_total_resources_num(tm_rm);
+	struct tm_resource_range *resources;
+
+	for (index = 0; index < count; index++) {
+		tm_resource = tm_resource_mgr_enum_resource(tm_rm, index);
+		resources = &tm_rm->resources_range[GRPH_ID(tm_resource).type];
+
+		if (resources->end == 0) {
+			resources->end = index;
+			resources->start = index;
+		}
+
+		resources->end++;
+	}
+}
+
+const struct tm_resource_range *dal_tmrm_get_resource_range_by_type(
+	struct tm_resource_mgr *tm_rm,
+	enum object_type type)
+{
+	if (type <= OBJECT_TYPE_UNKNOWN ||
+		type >= OBJECT_TYPE_COUNT)
+		return NULL;
+
+	return &tm_rm->resources_range[type];
+}
+
+
 /**
  * Debug output of all resources
  */
-void tm_resource_mgr_dump(struct tm_resource_mgr *tm_rm)
+void dal_tmrm_dump(struct tm_resource_mgr *tm_rm)
 {
 	uint32_t index;
 	struct tm_resource *tm_resource;
@@ -3149,7 +3165,10 @@ struct controller *dal_tmrm_get_free_controller(
 	uint32_t res_ind;
 	struct tm_resource *tm_resource_tmp = NULL;
 
-	res_ind = tmrm_find_controller_for_display_path(tm_rm, exclude_mask);
+	res_ind =
+		dal_tmrm_find_controller_for_display_path(
+			tm_rm,
+			exclude_mask);
 
 	if (RESOURCE_INVALID_INDEX == res_ind) {
 		TM_MPO("%s: failed to find controller!\n", __func__);

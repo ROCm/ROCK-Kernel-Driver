@@ -1193,6 +1193,7 @@ static uint32_t get_number_of_audio_capable_display_paths(
 	struct tm_resource *tm_resource;
 	union audio_support audio_support;
 	struct dal_context *dal_context = tm->dal_context;
+	const struct tm_resource_range *connectors;
 
 	paths_per_mst_connector =
 		dal_adapter_service_get_num_of_path_per_dp_mst_connector(
@@ -1203,17 +1204,17 @@ static uint32_t get_number_of_audio_capable_display_paths(
 		paths_per_mst_connector = 1;
 	}
 
-	for (i = 0;
-		i < tm_resource_mgr_get_total_resources_num(tm->tm_rm);
-		i++) {
+	connectors =
+		dal_tmrm_get_resource_range_by_type(
+			tm->tm_rm,
+			OBJECT_TYPE_CONNECTOR);
+
+	for (i = connectors->start; i < connectors->end; i++) {
 		struct graphics_object_id object_id;
 
 		tm_resource = tm_resource_mgr_enum_resource(tm->tm_rm, i);
 
 		object_id = GRPH_ID(tm_resource);
-
-		if (object_id.type != OBJECT_TYPE_CONNECTOR)
-			continue;
 
 		switch (object_id.id) {
 		case CONNECTOR_ID_HDMI_TYPE_A:
@@ -1304,18 +1305,19 @@ static void tm_reset_controllers(struct topology_mgr *tm)
 	struct tm_resource_controller_info *controller_info;
 	struct controller *controller;
 	struct dal_asic_runtime_flags asic_runtime_flags;
+	const struct tm_resource_range *controllers;
 
 	asic_runtime_flags = dal_adapter_service_get_asic_runtime_flags(
 		tm->adapter_srv);
 
-	for (i = 0;
-		i < tm_resource_mgr_get_total_resources_num(tm->tm_rm);
-		i++) {
+	controllers =
+		dal_tmrm_get_resource_range_by_type(
+			tm->tm_rm,
+			OBJECT_TYPE_CONTROLLER);
+
+	for (i = controllers->start; i < controllers->end; i++) {
 
 		tm_resource = tm_resource_mgr_enum_resource(tm->tm_rm, i);
-
-		if (GRPH_ID(tm_resource).type != OBJECT_TYPE_CONTROLLER)
-			continue;
 
 		controller_info = TO_CONTROLLER_INFO(tm_resource);
 
@@ -1556,23 +1558,21 @@ static void tm_power_up_encoder(struct topology_mgr *tm,
 static void tm_power_up_encoders(struct topology_mgr *tm)
 {
 	uint32_t i;
-	uint32_t resource_num;
 	struct tm_resource *tm_resource;
 	struct encoder_context context;
 	struct encoder *encoder;
 	struct dal_context *dal_context = tm->dal_context;
-
-	resource_num = tm_resource_mgr_get_total_resources_num(tm->tm_rm);
+	const struct tm_resource_range *encoders =
+		dal_tmrm_get_resource_range_by_type(
+			tm->tm_rm,
+			OBJECT_TYPE_ENCODER);
 
 	/* Power Up encoders.
 	 * Order is important - from first (internal) to last (external).
 	 * The order is enforced by resource list being sorted according to
 	 * priorities (in tm_rm_add_tm_resource()). */
-	for (i = 0; i < resource_num; i++) {
+	for (i = encoders->start; i < encoders->end; i++) {
 		tm_resource = tm_resource_mgr_enum_resource(tm->tm_rm, i);
-
-		if (GRPH_ID(tm_resource).type != OBJECT_TYPE_ENCODER)
-			continue;
 
 		if (!tm_resource->flags.resource_active)
 			continue;
@@ -1816,19 +1816,21 @@ static void tm_power_down_encoders(struct topology_mgr *tm)
 	struct tm_resource *tm_resource;
 	bool turn_off_vcc = true;
 
+	const struct tm_resource_range *encoders =
+		dal_tmrm_get_resource_range_by_type(
+			tm->tm_rm,
+			OBJECT_TYPE_ENCODER);
+
 	/* Power Down encoders.
 	 * Order is important - from last (external) to first (internal).
 	 * The order is enforced by resource list being sorted according to
 	 * priorities (in tm_rm_add_tm_resource()). */
-	i = tm_resource_mgr_get_total_resources_num(tm->tm_rm);
+	i = encoders->end;
 
 	do {
 		i--;
 
 		tm_resource = tm_resource_mgr_enum_resource(tm->tm_rm, i);
-
-		if (GRPH_ID(tm_resource).type != OBJECT_TYPE_ENCODER)
-			continue;
 
 		if (!tm_resource->flags.resource_active)
 			continue;
@@ -1841,7 +1843,7 @@ static void tm_power_down_encoders(struct topology_mgr *tm)
 			TO_ENCODER(tm_resource),
 			turn_off_vcc);
 
-	} while(i != 0);
+	} while (i != encoders->start);
 }
 
 static void tm_power_down_controller(struct topology_mgr *tm,
@@ -1870,17 +1872,16 @@ static void tm_power_down_controller(struct topology_mgr *tm,
 static void tm_power_down_controllers(struct topology_mgr *tm)
 {
 	uint32_t i;
-	uint32_t resource_num;
 	struct tm_resource *tm_resource;
 
-	resource_num = tm_resource_mgr_get_total_resources_num(tm->tm_rm);
+	const struct tm_resource_range *controllers =
+		dal_tmrm_get_resource_range_by_type(
+			tm->tm_rm,
+			OBJECT_TYPE_CONTROLLER);
 
-	for (i = 0; i < resource_num; i++) {
+	for (i = controllers->start; i < controllers->end; i++) {
 
 		tm_resource = tm_resource_mgr_enum_resource(tm->tm_rm, i);
-
-		if (GRPH_ID(tm_resource).type != OBJECT_TYPE_CONTROLLER)
-			continue;
 
 		tm_power_down_controller(tm, tm_resource);
 
@@ -1890,28 +1891,25 @@ static void tm_power_down_controllers(struct topology_mgr *tm)
 static void tm_power_down_clock_sources(struct topology_mgr *tm)
 {
 	uint32_t i;
-	uint32_t resource_num;
 	struct tm_resource *tm_resource;
 	enum controller_id first_controller_id = CONTROLLER_ID_UNDEFINED;
+	const struct tm_resource_range *resources =
+		dal_tmrm_get_resource_range_by_type(
+			tm->tm_rm,
+			OBJECT_TYPE_CONTROLLER);
 
-	resource_num = tm_resource_mgr_get_total_resources_num(tm->tm_rm);
+	tm_resource =
+		tm_resource_mgr_enum_resource(tm->tm_rm, resources->start);
+	first_controller_id = GRPH_ID(tm_resource).id;
 
-	for (i = 0; i < resource_num; i++) {
+	resources =
+		dal_tmrm_get_resource_range_by_type(
+			tm->tm_rm,
+			OBJECT_TYPE_CLOCK_SOURCE);
+
+	for (i = resources->start; i < resources->end; i++) {
 
 		tm_resource = tm_resource_mgr_enum_resource(tm->tm_rm, i);
-
-		if (GRPH_ID(tm_resource).type == OBJECT_TYPE_CONTROLLER) {
-			first_controller_id = GRPH_ID(tm_resource).id;
-			break;
-		}
-	}
-
-	for (i = 0; i < resource_num; i++) {
-
-		tm_resource = tm_resource_mgr_enum_resource(tm->tm_rm, i);
-
-		if (GRPH_ID(tm_resource).type != OBJECT_TYPE_CLOCK_SOURCE)
-			continue;
 
 		dal_clock_source_power_down_pll(
 			TO_CLOCK_SOURCE(tm_resource),
@@ -1975,19 +1973,17 @@ static bool tm_can_optimize_resume_sequence(
 static void power_up_audio_objects(struct topology_mgr *tm)
 {
 	uint32_t i;
-	uint32_t resource_num;
 	struct tm_resource *tm_resource;
 	struct audio *audio;
 	struct dal_context *dal_context = tm->dal_context;
+	const struct tm_resource_range *audios =
+		dal_tmrm_get_resource_range_by_type(
+			tm->tm_rm,
+			OBJECT_TYPE_AUDIO);
 
-	resource_num = tm_resource_mgr_get_total_resources_num(tm->tm_rm);
-
-	for (i = 0; i < resource_num; i++) {
+	for (i = audios->start; i < audios->end; i++) {
 
 		tm_resource = tm_resource_mgr_enum_resource(tm->tm_rm, i);
-
-		if (GRPH_ID(tm_resource).type != OBJECT_TYPE_AUDIO)
-			continue;
 
 		if (!tm_resource->flags.resource_active)
 			continue;
@@ -2072,17 +2068,19 @@ enum tm_result dal_tm_init_hw(struct topology_mgr *tm)
 enum tm_result dal_tm_power_down_hw(struct topology_mgr *tm)
 {
 	uint32_t i;
-	uint32_t resource_num;
 	struct tm_resource *tm_resource = NULL;
 	struct display_path *display_path = NULL;
 	struct dal_context *dal_context = tm->dal_context;
 	uint32_t display_paths_num = tm_get_display_path_count(tm);
 	struct bios_parser *bp = NULL;
+	const struct tm_resource_range *controllers =
+		dal_tmrm_get_resource_range_by_type(
+				tm->tm_rm,
+				OBJECT_TYPE_CONTROLLER);
 
 	enum dal_video_power_state power_state =
 		dal_tm_get_current_power_state(tm);
 
-	resource_num = tm_resource_mgr_get_total_resources_num(tm->tm_rm);
 	/*1. PowerDown GLSync Connectors*/
 	/*TODO: Power Down GLSyncConnector*/
 	TM_NOT_IMPLEMENTED();
@@ -2095,13 +2093,11 @@ enum tm_result dal_tm_power_down_hw(struct topology_mgr *tm)
 	if (power_state == DAL_VIDEO_POWER_HIBERNATE ||
 		power_state == DAL_VIDEO_POWER_ULPS) {
 
-		for (i = 0; i < resource_num; i++) {
+		for (i = controllers->start; i < controllers->end; i++) {
 
 			tm_resource =
 				tm_resource_mgr_enum_resource(
 					tm->tm_rm, i);
-			if (GRPH_ID(tm_resource).type != OBJECT_TYPE_CONTROLLER)
-				continue;
 
 			TO_CONTROLLER_INFO(tm_resource)->power_gating_state =
 				TM_POWER_GATE_STATE_ON;
@@ -2136,14 +2132,12 @@ enum tm_result dal_tm_power_down_hw(struct topology_mgr *tm)
 		/* 3.1.2 Power gating enable for all controllers
 		 * We could move this into GPU object
 		 */
-		for (i = 0; i < resource_num; i++) {
+		for (i = controllers->start; i < controllers->end; i++) {
 
 			struct controller *controller = NULL;
 			tm_resource =
 				tm_resource_mgr_enum_resource(
 					tm->tm_rm, i);
-			if (GRPH_ID(tm_resource).type != OBJECT_TYPE_CONTROLLER)
-				continue;
 
 			controller =
 				TO_CONTROLLER_INFO(tm_resource)->controller;
@@ -3412,6 +3406,10 @@ void dal_tm_enable_accelerated_mode(struct topology_mgr *tm)
 	struct controller *controller;
 	struct bios_parser *bp;
 	struct dal_context *dal_context = tm->dal_context;
+	const struct tm_resource_range *controllers =
+		dal_tmrm_get_resource_range_by_type(
+			tm->tm_rm,
+			OBJECT_TYPE_CONTROLLER);
 
 	TM_IFACE_TRACE();
 
@@ -3423,12 +3421,9 @@ void dal_tm_enable_accelerated_mode(struct topology_mgr *tm)
 	/* 2. Disable VGA engine on all controllers. */
 	resource_num = tm_resource_mgr_get_total_resources_num(tm->tm_rm);
 
-	for (i = 0; i < resource_num; i++) {
+	for (i = controllers->start; i < controllers->end; i++) {
 
 		tm_resource = tm_resource_mgr_enum_resource(tm->tm_rm, i);
-
-		if (GRPH_ID(tm_resource).type != OBJECT_TYPE_CONTROLLER)
-			continue;
 
 		controller = TO_CONTROLLER_INFO(tm_resource)->controller;
 
@@ -3962,17 +3957,16 @@ void dal_tm_disable_all_dcp_pipes(struct topology_mgr *tm)
 	struct tm_resource *tm_resource;
 	struct controller *controller;
 	struct dal_context *dal_context = tm->dal_context;
+	const struct tm_resource_range *controllers =
+		dal_tmrm_get_resource_range_by_type(
+			tm->tm_rm,
+			OBJECT_TYPE_CONTROLLER);
 
 	TM_IFACE_TRACE();
 
-	for (i = 0;
-		i < tm_resource_mgr_get_total_resources_num(tm->tm_rm);
-		i++) {
+	for (i = controllers->start; i < controllers->end; i++) {
 
 		tm_resource = tm_resource_mgr_enum_resource(tm->tm_rm, i);
-
-		if (GRPH_ID(tm_resource).type != OBJECT_TYPE_CONTROLLER)
-			continue;
 
 		controller = TO_CONTROLLER_INFO(tm_resource)->controller;
 
@@ -4092,6 +4086,8 @@ static enum tm_result tm_init_during_construct(struct topology_mgr *tm)
 
 		tm_init_features(tm);
 
+		dal_tmrm_set_resources_range_by_type(tm->tm_rm);
+
 		rc = tm_update_internal_database(tm);
 		if (TM_RESULT_FAILURE == rc)
 			break;
@@ -4116,7 +4112,7 @@ static enum tm_result tm_init_during_construct(struct topology_mgr *tm)
 
 		dal_tm_dump(tm);
 
-		tm_resource_mgr_dump(tm->tm_rm);
+		dal_tmrm_dump(tm->tm_rm);
 
 	} while (0);
 
@@ -4277,6 +4273,10 @@ static void tm_init_features(struct topology_mgr *tm)
 	struct tm_resource *tm_resource;
 	struct clock_source *clock_source;
 	enum clock_sharing_level clock_sharing_level;
+	const struct tm_resource_range *clock_sources =
+		dal_tmrm_get_resource_range_by_type(
+			tm->tm_rm,
+			OBJECT_TYPE_CLOCK_SOURCE);
 
 	/* TODO: is there a 'force-connect' or 'always connected' Display
 	 * Path feature, as in DAL2? */
@@ -4294,11 +4294,9 @@ static void tm_init_features(struct topology_mgr *tm)
 
 	resource_num = tm_resource_mgr_get_total_resources_num(tm->tm_rm);
 
-	for (i = 0; i < resource_num; i++) {
+	for (i = clock_sources->start; i < clock_sources->end; i++) {
 
 		tm_resource = tm_resource_mgr_enum_resource(tm->tm_rm, i);
-		if (GRPH_ID(tm_resource).type != OBJECT_TYPE_CLOCK_SOURCE)
-			continue;
 
 		clock_source = TO_CLOCK_SOURCE_INFO(tm_resource)->clock_source;
 
@@ -4512,7 +4510,6 @@ static void tm_update_stream_engine_priorities_for_path(
 		struct display_path *display_path)
 {
 	uint32_t i;
-	struct tm_resource_mgr *tm_rm;
 	struct tm_resource *tm_resource;
 	struct tm_resource_engine_info *engine_info;
 	struct encoder *encoder;
@@ -4521,9 +4518,12 @@ static void tm_update_stream_engine_priorities_for_path(
 	bool is_preferred_engine;
 	enum tm_engine_priority priority;
 	uint32_t engine_id;
+	struct tm_resource_mgr *tm_rm = tm->tm_rm;
 	struct dal_context *dal_context = tm->dal_context;
-
-	tm_rm = tm->tm_rm;
+	const struct tm_resource_range *engines =
+		dal_tmrm_get_resource_range_by_type(
+			tm_rm,
+			OBJECT_TYPE_ENGINE);
 
 	/* We check engine only to first encoder - most close to GPU. */
 	encoder = dal_display_path_get_upstream_object(display_path,
@@ -4539,12 +4539,9 @@ static void tm_update_stream_engine_priorities_for_path(
 
 	preferred_engine_id = dal_encoder_get_preferred_stream_engine(encoder);
 
-	for (i = 0; i < tm_resource_mgr_get_total_resources_num(tm_rm); i++) {
+	for (i = engines->start; i < engines->end; i++) {
 
 		tm_resource = tm_resource_mgr_enum_resource(tm_rm, i);
-
-		if (GRPH_ID(tm_resource).type != OBJECT_TYPE_ENGINE)
-			continue;
 
 		engine_id = GRPH_ID(tm_resource).id;
 
@@ -4597,15 +4594,16 @@ static void tm_update_stream_engine_priorities(struct topology_mgr *tm)
 	uint32_t i;
 	uint32_t paths_num;
 	struct dal_context *dal_context = tm->dal_context;
+	const struct tm_resource_range *engines =
+		dal_tmrm_get_resource_range_by_type(
+			tm_rm,
+			OBJECT_TYPE_ENGINE);
 
 	TM_ENG_ASN("%s() - Start\n", __func__);
 
-	for (i = 0; i < tm_resource_mgr_get_total_resources_num(tm_rm); i++) {
+	for (i = engines->start; i < engines->end; i++) {
 
 		tm_resource = tm_resource_mgr_enum_resource(tm_rm, i);
-
-		if (GRPH_ID(tm_resource).type != OBJECT_TYPE_ENGINE)
-			continue;
 
 		TO_ENGINE_INFO(tm_resource)->priority =
 			TM_ENGINE_PRIORITY_UNKNOWN;
