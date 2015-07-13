@@ -131,6 +131,12 @@ struct amdgpu_display_manager {
 	 * of the difference the OS calls Set Mode again, which is exactly
 	 * what we need. */
 	uint32_t fake_display_index;
+	/* Use dal_mutex for any activity which is NOT syncronized by
+	 * DRM mode setting locks.
+	 * For example: amdgpu_dm_hpd_low_irq() calls into DAL *without*
+	 * DRM mode setting locks being acquired. This is where dal_mutex
+	 * is acquired before calling into DAL. */
+	struct mutex dal_mutex;
 };
 
 

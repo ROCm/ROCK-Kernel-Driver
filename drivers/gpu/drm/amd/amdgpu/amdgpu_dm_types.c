@@ -604,7 +604,9 @@ bool amdgpu_dm_mode_reset(struct drm_crtc *crtc)
 			"Skip reset mode for disp_index %d\n",
 			display_index);
 	} else {
+		mutex_lock(&adev->dm.dal_mutex);
 		ret = dal_reset_path_mode(adev->dm.dal, 1, &display_index);
+		mutex_unlock(&adev->dm.dal_mutex);
 		DRM_DEBUG_KMS(
 			"Do reset mode for disp_index %d\n",
 			display_index);
@@ -698,7 +700,6 @@ int amdgpu_dm_set_config(struct drm_mode_set *set)
 
 	if (!set->mode)
 		set->fb = NULL;
-
 
 	/* Allocate space for the backup of all (non-pointer) crtc, encoder and
 	 * connector data. */
@@ -884,11 +885,17 @@ int amdgpu_dm_set_config(struct drm_mode_set *set)
 	}
 
 	if (mode_changed) {
-		DRM_DEBUG_KMS(
-				"Attempting to set mode from userspace\n");
+		struct amdgpu_device *adev;
+
+		DRM_DEBUG_KMS("Attempting to set mode from userspace. Mode:\n");
+
 		drm_mode_debug_printmodeline(set->mode);
 
 		set->crtc->primary->fb = set->fb;
+
+		adev = set->crtc->dev->dev_private;
+
+		mutex_lock(&adev->dm.dal_mutex);
 		if (!amdgpu_dm_mode_set(
 				set->crtc,
 				set->mode,
@@ -901,8 +908,11 @@ int amdgpu_dm_set_config(struct drm_mode_set *set)
 					acrtc->crtc_id);
 			set->crtc->primary->fb = save_set.fb;
 			ret = -EINVAL;
+			mutex_unlock(&adev->dm.dal_mutex);
 			goto fail;
 		}
+
+		mutex_unlock(&adev->dm.dal_mutex);
 
 		DRM_DEBUG_KMS("Setting connector DPMS state to on\n");
 		for (i = 0; i < set->num_connectors; i++) {

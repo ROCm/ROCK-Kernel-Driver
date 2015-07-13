@@ -384,6 +384,15 @@ static void amdgpu_dm_hpd_low_irq(void *interrupt_params)
 	uint32_t connected_displays = dal_get_connected_targets_vector(dal);
 	struct drm_connector *connector = NULL;
 	struct amdgpu_connector *aconnector = NULL;
+	bool trigger_drm_hpd_event = false;
+
+	/* This function runs after dal_notify_hotplug().
+	 * That means the user-mode may already called DAL with a Set/Reset
+	 * mode, that means this function must acquire the dal_mutex
+	 * *before* calling into DAL.
+	 * The vice-versa sequence may also happen - this function is
+	 * calling into DAL and preempted by a call from user-mode. */
+	mutex_lock(&adev->dm.dal_mutex);
 
 	if (connected_displays == 0) {
 		uint32_t display_index = INVALID_DISPLAY_INDEX;
@@ -412,10 +421,9 @@ static void amdgpu_dm_hpd_low_irq(void *interrupt_params)
 		 */
 		aconnector->base.status = connector_status_connected;
 
-		/*
-		 * we need to force user-space notification on changed modes
-		 */
-		drm_kms_helper_hotplug_event(dev);
+		/* we need to force user-space notification on changed modes */
+		trigger_drm_hpd_event = true;
+
 	} else if (adev->dm.fake_display_index != INVALID_DISPLAY_INDEX) {
 		/* we assume only one display is connected */
 		uint32_t connected_display_index = 0;
@@ -446,9 +454,7 @@ static void amdgpu_dm_hpd_low_irq(void *interrupt_params)
 					break;
 			}
 
-			/*
-			 * reset connected status on fake display connector
-			 */
+			/* reset connected status on fake display connector */
 			aconnector->base.status = connector_status_disconnected;
 		} else {
 			dal_reset_path_mode(
@@ -459,8 +465,13 @@ static void amdgpu_dm_hpd_low_irq(void *interrupt_params)
 
 		adev->dm.fake_display_index = INVALID_DISPLAY_INDEX;
 
-		drm_kms_helper_hotplug_event(dev);
+		trigger_drm_hpd_event = true;
 	}
+
+	mutex_unlock(&adev->dm.dal_mutex);
+
+	if (true == trigger_drm_hpd_event)
+		drm_kms_helper_hotplug_event(dev);
 }
 
 static int dm_set_clockgating_state(void *handle,
@@ -500,6 +511,8 @@ int amdgpu_dm_init(struct amdgpu_device *adev)
 
 	/* initialize DAL's lock (for SYNC context use) */
 	spin_lock_init(&adev->dm.dal_lock);
+
+	mutex_init(&adev->dm.dal_mutex);
 
 	if(amdgpu_dm_irq_init(adev)) {
 		DRM_ERROR("amdgpu: failed to initialize DM IRQ support.\n");
@@ -726,7 +739,9 @@ static int dm_resume(void *handle)
 		}
 	}
 
+	mutex_lock(&adev->dm.dal_mutex);
 	dal_reset_path_mode(dm->dal, displays_number, displays_vector);
+	mutex_unlock(&adev->dm.dal_mutex);
 
 	return 0;
 }
