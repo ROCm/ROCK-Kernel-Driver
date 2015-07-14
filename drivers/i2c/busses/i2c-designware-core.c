@@ -782,9 +782,6 @@ irqreturn_t i2c_dw_isr(int this_irq, void *dev_id)
 	if (!enabled || !(stat & ~DW_IC_INTR_ACTIVITY))
 		return IRQ_NONE;
 
-	if (dev->accessor_flags & ACCESS_INTR_MASK)
-		i2c_dw_disable_int(dev);
-
 	stat = i2c_dw_read_clear_intrbits(dev);
 
 	if (stat & DW_IC_INTR_TX_ABRT) {
@@ -814,9 +811,6 @@ irqreturn_t i2c_dw_isr(int this_irq, void *dev_id)
 tx_aborted:
 	if ((stat & (DW_IC_INTR_TX_ABRT | DW_IC_INTR_STOP_DET)) || dev->msg_err)
 		complete(&dev->cmd_complete);
-
-	if (dev->accessor_flags & ACCESS_INTR_MASK)
-		dw_writel(dev, DW_IC_INTR_DEFAULT_MASK, DW_IC_INTR_MASK);
 
 	return IRQ_HANDLED;
 }
