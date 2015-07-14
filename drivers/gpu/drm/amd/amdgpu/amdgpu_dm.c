@@ -490,7 +490,6 @@ int amdgpu_dm_init(struct amdgpu_device *adev)
 	adev->ddev->mode_config.cursor_height = 128;
 
 	/*TODO: check pageflip, vblank implementation*/
-	/*amdgpu_dm_vblank_irq_state_disable(adev);*/
 
 	if (drm_vblank_init(adev->ddev, adev->dm.display_indexes_num)) {
 		DRM_ERROR(
@@ -510,7 +509,6 @@ error:
 void amdgpu_dm_fini(struct amdgpu_device *adev)
 {
 	/*TODO: pageflip, vlank interrupt
-	 * amdgpu_dm_vblank_irq_state_disable(adev);*/
 
 	amdgpu_dm_destroy_drm_device(&adev->dm);
 
@@ -585,10 +583,6 @@ static int dm_suspend(void *handle)
 	struct amdgpu_device *adev = handle;
 	struct amdgpu_display_manager *dm = &adev->dm;
 
-	/*
-	amdsoc_dm_vblank_irq_state_disable(adev);
-	*/
-
 	dal_set_power_state(
 		dm->dal,
 		DAL_ACPI_CM_POWER_STATE_D3,
@@ -607,10 +601,6 @@ static int dm_resume(void *handle)
 	struct amdgpu_device *adev = handle;
 	struct amdgpu_display_manager *dm = &adev->dm;
 	uint32_t displays_vector[MAX_COFUNC_PATH];
-
-	/*
-	amdsoc_dm_vblank_irq_state_disable(adev);
-	*/
 
 	dal_set_power_state(
 		dm->dal,

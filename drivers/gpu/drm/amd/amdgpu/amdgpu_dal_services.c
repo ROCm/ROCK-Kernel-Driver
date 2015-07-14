@@ -23,10 +23,6 @@
  *
  */
 
-/*
- * TODO review this function and organize it to align with Brick design
- */
-
 #include <linux/string.h>
 #include <linux/acpi.h>
 
