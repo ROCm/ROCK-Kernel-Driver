@@ -369,8 +369,6 @@ static void amdgpu_dm_crtc_high_irq(void *interrupt_params)
 
 static void amdgpu_dm_hpd_low_irq(void *interrupt_params)
 {
-	struct amdgpu_device *adev = interrupt_params;
-
 	/* TODO: add implementation */
 }
 
@@ -508,11 +506,12 @@ error:
 
 void amdgpu_dm_fini(struct amdgpu_device *adev)
 {
-	/*TODO: pageflip, vlank interrupt
-
-	amdgpu_dm_destroy_drm_device(&adev->dm);
-
-	/*amdgpu_dm_irq_fini(adev);*/
+	/*
+	 * TODO: pageflip, vlank interrupt
+	 *
+	 * amdgpu_dm_destroy_drm_device(&adev->dm);
+	 * amdgpu_dm_irq_fini(adev);
+	 */
 
 	if (adev->dm.cgs_device) {
 		amdgpu_cgs_destroy_device(adev->dm.cgs_device);
