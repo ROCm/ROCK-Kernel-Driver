@@ -476,7 +476,7 @@ static void allow_aux_while_hpd_low(
  *  Function: need_handle_connection_status_based_on_sink_count
  *
  *  @brief : check whether we need handle dongle sink count info. only check
- *  sink_count == 0 for some known dongle or registry key exist.
+ *  sink_count == 0 for some known dongle or if runtime parameter exist.
  *
  *  @return
  *
@@ -586,7 +586,7 @@ static bool apply_load_detection_based_edid_patch(
 				/*if connectors are the same, and the temp
 				 * display path's signal type is RGB (CRT).
 				 * TODO : what does temp_path !=
-				 * display_path mean? debug under windbg
+				 * display_path mean? debug
 				 * if (temp_path != display_path &&
 				 *  dal_display_path_get_query_signal
 				 * (temp_path, SINK_LINK_INDEX) ==
@@ -827,7 +827,7 @@ static bool read_edid(
 	if (dal_is_dp_signal(detection_status->detected_signal))
 		connected = (detection_status->connected || connected);
 
-	/* Handling the case of unplugging of a VGA monitor on Win7 with
+	/* Handling the case of unplugging of a VGA monitor with
 	 * DDC polling. In this case we keep track of previous EDID read status
 	 * so we can detect a change and detect the unplug return so that we do
 	 * not try and detect load as this is non destructive and we want to
@@ -1106,8 +1106,8 @@ static void do_target_detection(
 	}
 
 	/** Step 5. Edid read  - updates detection status
-	 *  only read edid, if connected (HPD sensebit check), or registry key
-	 *  not set, or set but value is 0
+	 *  only read edid, if connected (HPD sensebit check), or
+	 *  runtime parameters not set, or set but value is 0
 	 */
 	if (detection_status->connected
 			|| !dal_adapter_service_is_feature_supported(
@@ -2329,7 +2329,7 @@ void dal_tm_detection_mgr_update_active_state(
 
 	/*here only handle registered display path*/
 	for (i = 0; i < connector_irq->displays_num; ++i) {
-		/* TODO: check connector id only. check under windbg*/
+		/* TODO: check connector id only. */
 		if (dal_graphics_object_id_is_equal(
 				get_connector_obj_id(
 						connector_irq->displays[i]),

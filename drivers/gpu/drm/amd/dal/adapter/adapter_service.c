@@ -412,7 +412,7 @@ case FEATURE_ ## feature: \
 /*
  * override_default_parameters
  *
- * Override features (from registry or cmdline)
+ * Override features (from runtime parameter)
  * corresponding to Adapter Service Feature ID
  */
 static bool override_default_parameters(
@@ -628,7 +628,7 @@ static bool generate_feature_set(
 		set_idx = (uint32_t)((entry->feature_id - 1) / 32);
 		internal_idx = (uint32_t)((entry->feature_id - 1) % 32);
 
-		/* TODO: wireless->registry->vbios->asiccap*/
+		/* TODO: wireless, runtime parameter, vbios */
 		if (!override_default_parameters(as, param, i, &value)) {
 			if (!get_feature_value_from_data_sources(
 					as, i, &value)) {
@@ -1442,7 +1442,7 @@ bool dal_adapter_service_get_bandwidth_tuning_params(
 	union bandwidth_tuning_params *params)
 {
 	/* TODO: add implementation */
-	/* note: data comes from Registry */
+	/* note: data comes from runtime parameters */
 	return false;
 }
 
@@ -1500,7 +1500,7 @@ struct gpio *dal_adapter_service_obtain_gpio(
 struct gpio *dal_adapter_service_obtain_stereo_gpio(
 	struct adapter_service *as)
 {
-	const bool have_registry_stereo_gpio = false;
+	const bool have_param_stereo_gpio = false;
 
 	struct asic_feature_flags result;
 
@@ -1512,12 +1512,12 @@ struct gpio *dal_adapter_service_obtain_stereo_gpio(
 		return dal_gpio_service_create_gpio_ex(
 			as->gpio_service, GPIO_ID_GENERIC, GPIO_GENERIC_A,
 			GPIO_PIN_OUTPUT_STATE_ACTIVE_LOW);
-	/* Case 2 : registry override for sideband stereo */
-	else if (have_registry_stereo_gpio) {
-		/* TODO implement */
-		return NULL;
-	/* Case 3 : VBIOS gives us GPIO for sideband stereo */
-	} else {
+       /* Case 2 : runtime parameter override for sideband stereo */
+       else if (have_param_stereo_gpio) {
+               /* TODO implement */
+               return NULL;
+       /* Case 3 : VBIOS gives us GPIO for sideband stereo */
+       } else {
 		const struct graphics_object_id id =
 			dal_graphics_object_id_init(
 				GENERIC_ID_STEREO,
@@ -1978,11 +1978,13 @@ uint32_t dal_adapter_service_get_view_port_pixel_granularity(
 }
 
 /**
- * Get number of paths per DP 1.2 connector from the registry if exists
+ * Get number of paths per DP 1.2 connector from the runtime parameter if it
+ * exists.
  * A check to see if MST is supported for the generation of ASIC is done
  *
  * \return
- *    Number of paths per DP 1.2 connector is exists in registry or ASIC cap
+ *    Number of paths per DP 1.2 connector is exists in runtime parameters
+ *    or ASIC cap
  */
 uint32_t dal_adapter_service_get_num_of_path_per_dp_mst_connector(
 		struct adapter_service *as)

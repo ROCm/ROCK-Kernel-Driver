@@ -141,7 +141,7 @@ bool dal_default_modes_dco_multi_sync_dco_add_mode_timing(
 
 		/* set default timing standard as GTF.*/
 		/* default modes getting from "DALNonStandardModesBCD"
-		registry should use GTF for Non-EDID monitor.*/
+		runtime parameters should use GTF for Non-EDID monitor.*/
 		if (mode_timing.mode_info.timing_standard ==
 			TIMING_STANDARD_UNDEFINED)
 			mode_timing.mode_info.timing_standard =

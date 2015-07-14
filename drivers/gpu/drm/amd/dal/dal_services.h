@@ -219,8 +219,11 @@ static inline uint32_t dal_bios_cmd_table_para_revision(
 	uint8_t frev;
 	uint8_t crev;
 
-	if (cgs_atom_get_cmd_table_revs(ctx->cgs_device,
-			index, &frev, &crev) != 0)
+	if (cgs_atom_get_cmd_table_revs(
+			ctx->cgs_device,
+			index,
+			&frev,
+			&crev) != 0)
 		return 0;
 
 	return crev;

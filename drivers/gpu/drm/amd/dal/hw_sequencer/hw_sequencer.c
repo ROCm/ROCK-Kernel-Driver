@@ -3192,8 +3192,8 @@ static void program_alpha_mode(
 	if (blend_flags->bits.PER_PIXEL_ALPHA_BLEND == 1) {
 		blending_config.flags.bits.MODE_IS_SET = 1;
 		blending_config.mode = ALPHA_MODE_PIXEL;
-		/* TODO we need to understand why Windows programs
-		 * MODE_MULTIPLIED bits. These seem to be the root of
+		/* TODO we need to understand why MODE_MULTIPLIED bits
+		 * are set. These seem to be the root of
 		 * color corruption on HDMI.
 		 * We'll only set these for RGB for now to avoid color
 		 * corruption with YCbCr outputs.

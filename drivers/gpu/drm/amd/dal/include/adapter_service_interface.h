@@ -299,7 +299,7 @@ enum adapter_feature_id {
 	FEATURE_SET_27_START = FEATURE_SMOOTH_BRTN_ADJ_TIME_IN_MS,
 	FEATURE_SET_27_END = FEATURE_SET_27_START + 31,
 
-	/* Set 28: UInt set, 1 entry: Allow registry key  to force specific
+	/* Set 28: UInt set, 1 entry: Allow runtime parameter to force specific
 	 * Static Screen Event triggers for test purposes. */
 	FEATURE_FORCE_STATIC_SCREEN_EVENT_TRIGGERS = FEATURE_SET_27_END + 1,
 	FEATURE_SET_28_START = FEATURE_FORCE_STATIC_SCREEN_EVENT_TRIGGERS,

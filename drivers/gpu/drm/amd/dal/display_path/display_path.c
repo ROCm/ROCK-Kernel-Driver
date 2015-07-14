@@ -795,7 +795,7 @@ bool dal_display_path_is_drr_supported(const struct display_path *path)
 
 	/* The check for DRR supported returns true means it satisfied:
 	 * 1. EDID reported DRR capability and Stream supports DRR or
-	 * 2. Forced capability through registry key or
+	 * 2. Forced capability through runtime parameter or
 	 * 3. Forced capability through VBIOS */
 	if (((drr_config.support_method.SUPPORTED_BY_EDID == 1) &&
 		dal_ls_is_stream_drr_supported(ls)) ||

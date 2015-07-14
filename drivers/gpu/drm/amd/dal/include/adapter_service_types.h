@@ -36,9 +36,10 @@ enum as_signal_type {
 	AS_SIGNAL_TYPE_UNKNOWN
 };
 
-/*Struct used for algorithm of Bandwidth tuning parameters
- *the sequence of the fields is binded with
- *registry reading and static tables aRegBandwidthTuningParameter.*/
+/*
+ * Struct used for algorithm of Bandwidth tuning parameters
+ * the sequence of the fields is binded with runtime parameter.
+ */
 union bandwidth_tuning_params {
 	struct bandwidth_tuning_params_struct {
 		uint32_t read_delay_stutter_off_usec;

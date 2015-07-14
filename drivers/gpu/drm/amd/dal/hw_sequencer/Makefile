@@ -2,8 +2,6 @@
 # Makefile for the 'hw_sequencer' sub-component of DAL.
 # It provides hw programming sequences implementation.
 
-ccflags-y += -Iinclude/drm -Idrivers/staging/android -Idrivers/gpu/drm/amdsoc/
-
 HWS = hw_sequencer.o hw_path_mode_set.o hw_sequencer_helpers.o \
 	hw_sync_control.o hw_sequencer_adjustments.o hw_sequencer_parameters.o
 

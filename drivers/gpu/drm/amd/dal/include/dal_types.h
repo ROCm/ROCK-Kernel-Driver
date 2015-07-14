@@ -119,7 +119,7 @@ struct bdf_info {
 /* shift values for bool override parameter mask
  * bmask is for this struct,if we touch this feature
  * bval indicates every bit fields for this struct too,1 is enable this feature
- * amdsoc.disp_bval=1594, amdsoc.disp_bmask=1594 ,
+ * amdgpu.disp_bval=1594, amdgpu.disp_bmask=1594 ,
  * finally will show log like this:
  * Overridden FEATURE_LIGHT_SLEEP is enabled now
  * Overridden FEATURE_USE_MAX_DISPLAY_CLK is enabled now
@@ -184,7 +184,7 @@ struct dal_context {
 #if defined(BUILD_DAL_TEST)
 	struct test_driver_context *driver_context;
 #else
-	void *driver_context; /* e.g. amdsoc_device */
+	void *driver_context; /* e.g. amdgpu_device */
 #endif
 	struct dal_logger *logger;
 	void *cgs_device;

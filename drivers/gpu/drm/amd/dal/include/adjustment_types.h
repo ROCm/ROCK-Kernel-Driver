@@ -126,7 +126,7 @@ union adjustment_property {
 		uint32_t SETMODE_REQ:1;
 		/*adjustment is applied at the end of set mode*/
 		uint32_t POST_SET:1;
-/*when adjustment is applied its value should be stored in registry
+/*when adjustment is applied its value should be stored
 in place and not wait for flush call*/
 		uint32_t SAVE_IN_PLACE:1;
 		/*adjustment is always apply*/
@@ -250,9 +250,9 @@ enum ds_color_space {
 	DS_COLOR_SPACE_YCBCR709_YONLY/*same as YCbCr, but Y in Full range*/
 };
 
-enum ds_reg_underscan_options {
-	DS_REG_UNDERSCAN_OPTION_DEFAULT = 0,
-	DS_REG_UNDERSCAN_OPTION_USECEA861D
+enum ds_underscan_options {
+	DS_UNDERSCAN_OPTION_DEFAULT = 0,
+	DS_UNDERSCAN_OPTION_USECEA861D
 };
 
 enum dpms_state {
@@ -380,8 +380,7 @@ union ds_regamma_flags {
 };
 
 struct ds_regamma_ramp {
-/* gamma ramp packed  in same way as OS windows ,r , g & b*/
-	uint16_t gamma[256 * 3];
+	uint16_t gamma[256 * 3]; /* gamma ramp packed as RGB */
 
 };
 

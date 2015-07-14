@@ -588,7 +588,7 @@ static void retrieve_psr_link_cap(
 	}
 
 	/* For PSR test support. This code enables PSR on non-supported panels
-	 * through registry key settings. */
+	 * through runtime parameters. */
 	if (dal_adapter_service_is_feature_supported(FEATURE_FORCE_PSR)) {
 		union psr_capabilities psr_capabilities;
 
@@ -2724,7 +2724,7 @@ static bool handle_hpd_irq_psr_sink(struct link_service *ls)
 	 * registers. We should only read PSR status registers in
 	 * DPCD only if we've attached the DMCU object to the display
 	 * path and we are supporting the PSR feature. Without test
-	 * related registry keys set, the DMCU object is only attached
+	 * related runtime parameters set, the DMCU object is only attached
 	 * to an eDP panel, in which values are defined by the eDP 1.3 spec. */
 	if (!dal_ls_is_link_psr_supported(ls))
 		return false;

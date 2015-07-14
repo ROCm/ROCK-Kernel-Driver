@@ -198,7 +198,7 @@ void dal_ds_calculation_setup_ranged_timing(
 	} else if (dal_display_path_is_drr_supported(display_path)) {
 		/* The check for DRR supported returns true means it satisfied:
 		 * 1. EDID reported DRR capability and Stream supports DRR or
-		 * 2. Forced capability through registry key or
+		 * 2. Forced capability through runtime parameter or
 		 * 3. Forced capability through VBIOS */
 		drr_supported = true;
 	}

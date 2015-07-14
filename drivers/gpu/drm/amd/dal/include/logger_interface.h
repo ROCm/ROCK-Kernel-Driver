@@ -33,10 +33,7 @@ struct dal_context;
 union logger_flags;
 
 /*
- * TODO:
- * This logger functionality needs to be implemented and reworked.
- * for now, just moving it outside of amdsoc_dal_services
- *
+ * TODO: This logger functionality needs to be implemented and reworked.
  */
 
 

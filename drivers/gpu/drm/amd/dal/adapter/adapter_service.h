@@ -54,7 +54,7 @@ struct adapter_service {
 	uint32_t backlight_8bit_lut[SIZEOF_BACKLIGHT_LUT];
 };
 
-/* Type of feature with its registry and default value */
+/* Type of feature with its runtime parameter and default value */
 struct feature_source_entry {
 	enum adapter_feature_id feature_id;
 	uint32_t default_value;

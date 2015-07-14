@@ -1640,10 +1640,10 @@ static void hw_initialize(
 	if (stream_id != FIRST_AUDIO_STREAM_ID)
 		return;
 
+
 	/* Suport R5 - 32khz
 	 * Suport R6 - 44.1khz
 	 * Suport R7 - 48khz
-	 * 44.1khz needs to be supported for Windows7
 	 */
 	addr = mmAZALIA_F0_CODEC_FUNCTION_PARAMETER_SUPPORTED_SIZE_RATES;
 	{

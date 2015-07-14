@@ -722,18 +722,18 @@ static void build_drr_settings(struct dcs *dcs)
 	}
 
 	/* PART B - DRR Feature */
-	/* VBIOS override and registry key override is only for embedded */
+	/* VBIOS override and runtime parameter override is only for embedded */
 	if ((INTERFACE_TYPE_LVDS == dcs->display_type) ||
 			(INTERFACE_TYPE_EDP == dcs->display_type)) {
-		/* First try to find DRR capability from Registry Key.
-		 * DRR registry key may disable feature. */
+		/* First try to find DRR capability from runtime parameter.
+		 * DRR runtime parameter may disable feature. */
 		if (!dal_adapter_service_get_feature_value(
 			FEATURE_DRR_SUPPORT,
 			&feature_value,
 			sizeof(feature_value)))
 			return;
 
-		/* DRR is not supported if disabled by registry key. */
+		/* DRR is not supported if disabled by runtime parameter. */
 		if (feature_value == AS_DRR_SUPPORT_DISABLED)
 			return;
 		else if (feature_value >= AS_DRR_SUPPORT_MIN_FORCED_FPS) {
@@ -745,7 +745,7 @@ static void build_drr_settings(struct dcs *dcs)
 		}
 
 
-		/* Check VBIOS if not forced by registry */
+		/* Check VBIOS if not forced by runtime parameter */
 		if (0 == dcs->drr_config.min_fps_in_microhz &&
 				NULL != dcs->vbios_dco) {
 			dcs->drr_config.min_fps_in_microhz =
@@ -759,17 +759,18 @@ static void build_drr_settings(struct dcs *dcs)
 
 	} else {
 		/* For non-embedded displays, check if DRR support is disabled
-		 * by registry key */
+		 * by runtime parameter */
 		if (dal_adapter_service_is_feature_supported(
 				FEATURE_SUPPORT_EXTERNAL_PANEL_DRR)) {
 			/* DRR is not supported on external panels if disabled
-			 * by registry key. */
+			 * by runtime parameter. */
 			return;
 		}
 	}
 
-	/* Finally check EDID if not found in VBIOS or Registry. EDID method of
-	 * supporting DRR is possible on both external and internal panels. */
+	/* Finally check EDID if not found in VBIOS or runtime parameters.
+	 * EDID method of supporting DRR is possible on both external and
+	 * internal panels. */
 	if (0 == dcs->drr_config.min_fps_in_microhz && NULL != edid_base) {
 		dcs->drr_config.min_fps_in_microhz =
 			dal_edid_get_min_drr_fps(edid_base);

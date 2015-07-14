@@ -2670,13 +2670,13 @@ static void tm_initialize_static_screen_events(struct topology_mgr *tm,
 	/* Initialize to set no events. */
 	events.u_all = 0;
 
-	/* Try to find registry forced events. */
+	/* Try to find runtime parameter forced events. */
 	dal_adapter_service_get_feature_value(
 			FEATURE_FORCE_STATIC_SCREEN_EVENT_TRIGGERS,
 			&events.u_all,
 			sizeof(events.u_all));
 
-	/* If registry key is not set or set to 0, we should use Driver
+	/* If runtime parameter is not set or set to 0, we should use Driver
 	 * defaults, which is defined by the logic below. */
 	if (events.u_all == 0) {
 		/* Set initial Static Screen trigger events. */
@@ -2684,13 +2684,10 @@ static void tm_initialize_static_screen_events(struct topology_mgr *tm,
 		events.bits.GFX_UPDATE = 1;
 		events.bits.OVL_UPDATE = 1;
 
-		/* Memory hit region trigger events are only needed if OS
-		 * supports writing directly to primary surface. These OS
-		 * include Win 7 DWM Off case and Linux. Otherwise, memory
-		 * hit region triggers would not be needed because a flip
-		 * would occur in order to update surface, such as for Win 8
-		 * and above. This registry key may be set to some default
-		 * value for different OS based on its behaviour. */
+		/*
+		 * On Linux the OS might write directly to the primary
+		 * surface. Enable memory trigger events.
+		 */
 		if (dal_adapter_service_is_feature_supported(
 				FEATURE_ALLOW_DIRECT_MEMORY_ACCESS_TRIG)) {
 
@@ -4451,7 +4448,7 @@ static enum tm_engine_priority tm_get_stream_engine_priority(
 
 	/* For embedded panels(LVDS only), we want to reserve one stream engine
 	 * resource to guarantee the embedded panel can be used.
-	 * We don't reserve for eDP (controlled by registry key) because on
+	 * We don't reserve for eDP (controlled by runtime parameter) because on
 	 * some ASICs for e.g. Kabini where there are only 2 DIGs and if we
 	 * reserve one for eDP then we can drive only one MST monitor even if
 	 * the user disables eDP, by not reserving for eDP, the user will have

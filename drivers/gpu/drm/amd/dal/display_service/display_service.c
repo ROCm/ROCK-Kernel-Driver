@@ -269,35 +269,9 @@ enum ds_return dal_display_service_target_power_control(
 			path_data->display_state.OUTPUT_ENABLED = 1;
 			path_data->display_state.OUTPUT_BLANKED = 0;
 
-			/* Re-enable PSR if display is not in blanked state
-			 * This is added particularly for a specific Win7
-			 * case, but looks like a logical generic change.
-			 * In Win8+,
-			 * Lid close/open action is accompanied by
-			 * Blank/Unblank calls. In this function,
-			 * DisplaySetPowerState is called while
-			 * display is blanked. We do not want
-			 * to enable PSR while display is blanked!
-			 * We will correctly disable/enable PSR
-			 * because unblank will re-enable PSR when
-			 * lid is opened.
-			 * In Win7,
-			 * Lid close/open do NOT call
-			 * blank/unblank/setmode.
-			 * Only DisplaySetPowerState
-			 * is called if the LCD is the
-			 * last display connected. When we
-			 * close lid, we power down the
-			 * display stream, therefore we
-			 * should disable PSR. However,
-			 * when lid is opened PSR is
-			 * not properly re-enabled
-			 * because there is no
-			 * unblank/setmode call.
-			 * So, this should be done here.
-			 *
+			/*
+			 * Re-enable PSR if display is not in blanked state
 			 */
-
 			if (dal_display_path_is_source_blanked(display_path) &&
 				dal_display_path_is_psr_supported(display_path))
 				dal_hw_sequencer_psr_enable(

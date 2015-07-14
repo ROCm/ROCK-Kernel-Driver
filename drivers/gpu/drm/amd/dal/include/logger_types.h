@@ -27,11 +27,10 @@
 #define __DAL_LOGGER_TYPES_H__
 
 
-/* TODO:
- * This logger functionality needs to be implemented and reworked.
- * for now, just moving it outside of amdsoc_dal_services
- *
+/*
+ * TODO: This logger functionality needs to be implemented and reworked.
  */
+
 
 struct dal_logger;
 

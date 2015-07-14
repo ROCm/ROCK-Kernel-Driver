@@ -96,7 +96,7 @@ static const uint32_t csc_grph_regs[][CG_REGS_IDX_SIZE] = {
 	regs_for_csc_grph(5)
 };
 
-static const struct dcp_color_matrix global_color_matrix_reg[] = {
+static const struct dcp_color_matrix global_color_matrix[] = {
 { COLOR_SPACE_SRGB_FULL_RANGE,
 	{ 0x2000, 0, 0, 0, 0, 0x2000, 0, 0, 0, 0, 0x2000, 0} },
 { COLOR_SPACE_SRGB_LIMITED_RANGE,
@@ -259,14 +259,16 @@ static void set_grph_csc_default(
 		enum grph_color_adjust_option option =
 			GRPH_COLOR_MATRIX_HW_DEFAULT;
 		uint32_t i;
-		/* HW default false we program locally defined matrix
+		/*
+		 * HW default false we program locally defined matrix
 		 * HW default true  we use predefined hw matrix and we
 		 * do not need to program matrix
-		 * OEM wants the HW default via registry key. */
+		 * OEM wants the HW default via runtime parameter.
+		 */
 		option = GRPH_COLOR_MATRIX_SW;
 
-		for (i = 0; i < ARRAY_SIZE(global_color_matrix_reg); ++i) {
-			elm = &global_color_matrix_reg[i];
+		for (i = 0; i < ARRAY_SIZE(global_color_matrix); ++i) {
+			elm = &global_color_matrix[i];
 			if (elm->color_space != default_adjust->color_space)
 				continue;
 			/* program the matrix with default values from this

@@ -222,9 +222,6 @@ struct scaler_data {
 	const struct hw_crtc_timing *hw_crtc_timing;
 
 	struct rect viewport;
-	/* pixel_format
-	 * Android set_mode_types.h == window surfacetypes
-	 * Android surface_pixel_format == window dalpixelformat*/
 
 	enum pixel_format dal_pixel_format;/*plane concept*/
 	/*stereoformat TODO*/

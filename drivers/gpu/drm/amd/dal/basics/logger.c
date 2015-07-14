@@ -28,7 +28,7 @@
 #include "include/logger_interface.h"
 #include "logger.h"
 
-/* TODO: for now - empty, use DRM defines from amdsoc_dal_services.h
+/* TODO: for now - empty, use DRM defines from dal services.
 		Need to define appropriate levels of prints, and implement
 		this component
 void dal_log(const char *format, ...)

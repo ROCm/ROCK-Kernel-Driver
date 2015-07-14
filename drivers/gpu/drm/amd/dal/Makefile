@@ -1,6 +1,6 @@
 #
 # Makefile for the DAL (Display Abstract Layer), which is a  sub-component
-# of AMDSOC/AMDGPU drm driver.
+# of the AMDGPU drm driver.
 # It provides the HW control for display related functionalities.
 
 AMDDALPATH = $(RELATIVE_AMD_DAL_PATH)

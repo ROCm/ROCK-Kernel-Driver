@@ -587,7 +587,7 @@ static uint8_t i2c_read_edid_block(
 /*
  * Some I2C engines don't handle stop/start between write-offset and read-data
  * commands properly. For those displays, we have to force the newer E-DDC
- * behavior of repeated-start which can be enabled by registry key. */
+ * behavior of repeated-start which can be enabled by runtime parameter. */
 /* Originally implemented for OnLive using NXP receiver chip */
 
 	if (index == 0 && !ddc->flags.FORCE_READ_REPEATED_START) {
@@ -612,7 +612,7 @@ static uint8_t i2c_read_edid_block(
 	} else {
 		/*
 		 * extension block use E-DDC, submit as 1 command
-		 * or if repeated-start is forced by registry key
+		 * or if repeated-start is forced by runtime parameter
 		 */
 		if (segment != 0) {
 			/* include segment offset in command*/

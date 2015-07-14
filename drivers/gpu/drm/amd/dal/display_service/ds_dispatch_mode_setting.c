@@ -437,10 +437,10 @@ static void cal_scaling_overscan_params(
 	/* Here we build a bounding rectangle for the destination rectangles
 	 * provided by OS. As the name implies all of the destination
 	 * rectangles are bound inside this rectangle. It is necessary as
-	 * windows destination rectangles do not necessarily coincide with
+	 * destination rectangles do not necessarily coincide with the
 	 * display timing. The bounding rectangle is used to calculate a common
 	 * scaling ratio (CSR) for all surfaces which when multiplied by scaling
-	 * ration to get windows source rect scaled onto the dest rect will give
+	 * ration to get source rect scaled onto the dest rect will give
 	 * us the true scaling ratio. This is done in a single step so no actual
 	 * CSR is calculated.
 	 */

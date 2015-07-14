@@ -222,7 +222,6 @@ static bool construct(
 	mm->supported_pixel_format |= PIXEL_FORMAT_ARGB8888;
 	mm->supported_pixel_format |= PIXEL_FORMAT_ARGB2101010;
 
-	/* XRBIAS supported on win7 */
 	if (dal_adapter_service_get_asic_runtime_flags(mm->as).bits.
 		SUPPORT_XRBIAS)
 		mm->supported_pixel_format |=
@@ -556,7 +555,10 @@ static bool insert_view_and_update_solutions(
 	/* this is newly added view, insert the View to master view list, and
 	 * insert association to all association tables. */
 	if (!dal_view_info_list_insert(&mm->master_view_list, vi))
-		/* failed to insert the view due to pruning against registry */
+		/*
+		 * failed to insert the view due to pruning against
+		 * runtime parameters
+		 */
 		return false;
 
 	solution_container_count =

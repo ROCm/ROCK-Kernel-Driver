@@ -79,7 +79,7 @@ bool dal_bandwidth_manager_construct_base(
 	base->fix_latency_multiplier = 100;
 	base->use_urgency_watermark_offset = 0;
 
-	/* obtain Bandwidth tuning parameters from registry*/
+	/* obtain Bandwidth tuning parameters from runtime parameters*/
 	if (dal_adapter_service_get_bandwidth_tuning_params(as, &info)) {
 		base->read_dly_stutter_off =
 			info.tuning_info.read_delay_stutter_off_usec;
@@ -91,7 +91,7 @@ bool dal_bandwidth_manager_construct_base(
 			base->no_extra_recording_latency = false;
 
 		/*MCLatency is obtained from ASIC cap as in the above,
-		 * extraMCLatency which is obtained from registry */
+		 * extraMCLatency which is obtained from runtime parameters*/
 		if (info.tuning_info.extra_mc_latency_usec != 0)
 			base->mc_latency +=
 				info.tuning_info.extra_mc_latency_usec;

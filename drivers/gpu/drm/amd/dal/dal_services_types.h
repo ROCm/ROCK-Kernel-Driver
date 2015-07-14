@@ -36,8 +36,6 @@
 
 #include "cgs_linux.h"
 
-/* The same symbols are defined in amdsoc.h, redefined here just in
- * case DAL need to work with other drivers besides amdsoc. */
 #if defined(__BIG_ENDIAN) && !defined(BIGENDIAN_CPU)
 #define BIGENDIAN_CPU
 #elif defined(__LITTLE_ENDIAN) && !defined(LITTLEENDIAN_CPU)

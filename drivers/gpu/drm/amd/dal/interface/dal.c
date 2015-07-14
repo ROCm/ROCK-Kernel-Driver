@@ -718,9 +718,8 @@ bool dal_pre_adapter_clock_change(struct dal *dal,
 		result = dal_ds_dispatch_pre_adapter_clock_change(ds_dispatch);
 
 		/* cache new clock values, to be applied when
-		 * amdsoc_dm_post_adapter_clock_change is called
+		 * post_adapter_clock_change is called
 		 */
-
 		gpu_clk_info.min_sclk_khz = clks_info->min_sclk;
 		gpu_clk_info.max_sclk_khz = clks_info->max_sclk;
 		gpu_clk_info.min_mclk_khz = clks_info->min_mclk;

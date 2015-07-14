@@ -314,7 +314,7 @@ static bool setup_scaling_configuration(
 
 	{
 		/* we can ignore this register because we are ok with hw
-		 * default 0 -- change to 1 according to window code*/
+		 * default 0 -- change to 1 according to dal2 code*/
 		value = dal_read_reg(dal_ctx,
 				scl->regs[IDX_SCL_CONTROL]);
 		 /* 0 - Replaced out of bound pixels with black pixel
