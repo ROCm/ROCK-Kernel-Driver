@@ -1719,6 +1719,8 @@ static int cz_dpm_force_dpm_level(struct amdgpu_device *adev,
 		break;
 	}
 
+	adev->pm.dpm.forced_level = level;
+
 	return ret;
 }
 
