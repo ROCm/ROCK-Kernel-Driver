@@ -1061,6 +1061,7 @@ static inline bool compare_mode_query_info_and_mode_timing(
 static inline void fill_drm_mode_info(
 	struct drm_display_mode *drm_mode,
 	const struct mode_timing *mode_timing,
+	const struct render_mode *rm,
 	const struct refresh_rate *rr)
 {
 	drm_mode->hsync_start = mode_timing->mode_info.pixel_width +
@@ -1069,14 +1070,14 @@ static inline void fill_drm_mode_info(
 		mode_timing->crtc_timing.h_front_porch +
 		mode_timing->crtc_timing.h_sync_width;
 	drm_mode->htotal = mode_timing->crtc_timing.h_total;
-	drm_mode->hdisplay = mode_timing->crtc_timing.h_addressable;
+	drm_mode->hdisplay = rm->view.width;
 	drm_mode->vsync_start = mode_timing->mode_info.pixel_height +
 		mode_timing->crtc_timing.v_front_porch;
 	drm_mode->vsync_end = mode_timing->mode_info.pixel_height +
 		mode_timing->crtc_timing.v_front_porch +
 		mode_timing->crtc_timing.v_sync_width;
 	drm_mode->vtotal = mode_timing->crtc_timing.v_total;
-	drm_mode->vdisplay = mode_timing->crtc_timing.v_addressable;
+	drm_mode->vdisplay = rm->view.height;
 
 	drm_mode->clock = mode_timing->crtc_timing.pix_clk_khz;
 	drm_mode->vrefresh = rr->field_rate;
@@ -1104,73 +1105,21 @@ static inline void fill_drm_mode_info(
  */
 static int dm_add_mode(
 	struct drm_connector *connector,
-	const struct path_mode *pm,
+	const struct mode_timing *mt,
 	const struct render_mode *rm,
-	const struct refresh_rate *rr,
-	const struct dal_timing_list_query *tlq)
+	const struct refresh_rate *rr)
 {
 	struct drm_display_mode *drm_mode;
 
-	if (!pm || !tlq)
+	if (!mt)
 		return -1;
 
-	if (pm->scaling == SCALING_TRANSFORMATION_IDENTITY) {
-		/* in this case crtc timing is the same as render mode,
-		 * we can use it for timing values calculations right away
-		 */
-		drm_mode = drm_mode_create(connector->dev);
+	drm_mode = drm_mode_create(connector->dev);
 
-		if (!drm_mode)
-			return -1;
+	if (!drm_mode)
+		return -1;
 
-		fill_drm_mode_info(drm_mode, pm->mode_timing, rr);
-	} else {
-		uint32_t tlq_index;
-		uint32_t tlq_count =
-			dal_timing_list_query_get_mode_timing_count(tlq);
-		const struct mode_timing *tlq_mt;
-
-		/* trying to find proper mode_timing */
-		for (tlq_index = 0; tlq_index < tlq_count; tlq_index++) {
-			tlq_mt = dal_timing_list_query_get_mode_timing_at_index(
-				tlq, tlq_index);
-
-			if (compare_mode_query_info_and_mode_timing(
-				rm,
-				rr,
-				&tlq_mt->mode_info))
-				break;
-		}
-
-		if (tlq_index == tlq_count) {
-			/* in this case we did not find mode_timing in timing
-			 * list query and rely on gtf (generalized timing
-			 * formula) to calculate timing values reported to OS
-			 */
-
-			drm_mode =
-				drm_gtf_mode(
-					connector->dev,
-					rm->view.width,
-					rm->view.height,
-					rr->field_rate,
-					rr->INTERLACED,
-					0);
-
-			if (!drm_mode)
-				return -1;
-		} else {
-			/* in this case we found mode_timing in timing list
-			 * query and can use it to fill mode information
-			 */
-			drm_mode = drm_mode_create(connector->dev);
-
-			if (!drm_mode)
-				return -1;
-
-			fill_drm_mode_info(drm_mode, tlq_mt, rr);
-		}
-	}
+	fill_drm_mode_info(drm_mode, mt, rm, rr);
 
 	list_add(&drm_mode->head, &connector->modes);
 
@@ -1280,11 +1229,9 @@ int amdgpu_display_manager_fill_modes(struct drm_connector *connector,
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = dev->dev_private;
 	struct drm_display_mode *mode, *t;
-	bool stop;
 	unsigned int non_filtered_modes_num = 0;
 	struct mode_query *mq;
 	struct topology tp;
-	struct dal_timing_list_query *tlq;
 
 	if (!adev->dm.dal)
 		return 0;
@@ -1322,13 +1269,6 @@ int amdgpu_display_manager_fill_modes(struct drm_connector *connector,
 	if (!mq)
 		goto prune;
 
-	tlq = dal_create_timing_list_query(
-		adev->dm.dal,
-		aconnector->connector_id);
-
-	if (!tlq)
-		goto free_mode_query;
-
 	dal_pin_active_path_modes(
 		adev->dm.dal,
 		mq,
@@ -1336,9 +1276,7 @@ int amdgpu_display_manager_fill_modes(struct drm_connector *connector,
 		add_to_mq_helper);
 
 	if (!dal_mode_query_select_first(mq))
-		goto free_timing_list_query;
-
-	stop = false;
+		goto prune;
 
 	do {
 		const struct render_mode *rm =
@@ -1364,31 +1302,20 @@ int amdgpu_display_manager_fill_modes(struct drm_connector *connector,
 				mt->mode_info.flags.INTERLACE)
 				continue;
 
-			if (dm_add_mode(connector, pm, rm, rr, tlq))
-				stop = true;
-			else
+			if (dm_add_mode(connector, mt, rm, rr) == 0)
 				++non_filtered_modes_num;
 
 			if (adev->dm.fake_display_index ==
 				aconnector->connector_id)
 				break;
 
-		} while (!stop && dal_mode_query_select_next_refresh_rate(mq));
+		} while (dal_mode_query_select_next_refresh_rate(mq));
 
 		if (adev->dm.fake_display_index == aconnector->connector_id)
 			break;
 
-	} while (!stop && dal_mode_query_select_next_render_mode(mq));
+	} while (dal_mode_query_select_next_render_mode(mq));
 
-	if (stop)
-		DRM_ERROR("KMS: failed to add mode on [CONNECTOR: %d, DISPLAY_IDX: %d]\n",
-			connector->connector_type_id,
-			aconnector->connector_id);
-
-free_timing_list_query:
-	dal_timing_list_query_destroy(&tlq);
-
-free_mode_query:
 	dal_mode_query_destroy(&mq);
 
 prune:
