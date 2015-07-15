@@ -1029,7 +1029,6 @@ static void configure_azalia(
 	const struct audio_info *audio_info)
 {
 	uint32_t speakers = audio_info->flags.info.ALLSPEAKERS;
-	bool audio_interface = audio_info->flags.info.SUPPORT_AI;
 	uint32_t value;
 	uint32_t field = 0;
 	enum audio_format_code audio_format_code;

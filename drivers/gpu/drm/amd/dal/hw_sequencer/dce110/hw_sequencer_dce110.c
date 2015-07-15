@@ -500,8 +500,6 @@ static void set_display_clock(
 	const struct minimum_clocks_calculation_result *min_clocks)
 {
 	struct hw_global_objects objs = { NULL };
-	uint32_t i;
-	uint32_t paths_number;
 
 	dal_hw_sequencer_get_global_objects(path_set, &objs);
 

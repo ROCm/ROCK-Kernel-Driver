@@ -1613,10 +1613,11 @@ enum hwss_result dal_hw_sequencer_set_backlight_adjustment(
 	struct display_path *display_path,
 	struct hw_adjustment_value *adjustment)
 {
+	struct display_path_objects obj;
+
 	if (adjustment == NULL)
 		return HWSS_RESULT_ERROR;
 
-	struct display_path_objects obj;
 	dal_hw_sequencer_get_objects(display_path, &obj);
 
 	if (dal_display_path_get_controller(display_path) == NULL

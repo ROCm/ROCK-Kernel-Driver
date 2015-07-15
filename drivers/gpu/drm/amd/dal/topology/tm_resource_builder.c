@@ -313,7 +313,6 @@ enum tm_result tm_resource_builder_create_gpu_resources(
 {
 	enum tm_result rc = TM_RESULT_SUCCESS;
 	struct gpu *gpu;
-	struct dal_context *dal_context = tm_rb->dal_context;
 
 	do {
 		gpu = tm_resource_builder_create_gpu(tm_rb);
