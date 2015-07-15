@@ -1354,7 +1354,7 @@ static int vi_common_early_init(void *handle)
 	bool smc_enabled = false;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-	if (adev->asic_type == CHIP_CARRIZO) {
+	if (adev->flags & AMDGPU_IS_APU) {
 		adev->smc_rreg = &cz_smc_rreg;
 		adev->smc_wreg = &cz_smc_wreg;
 	} else {
