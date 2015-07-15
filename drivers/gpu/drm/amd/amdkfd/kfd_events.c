@@ -798,6 +798,7 @@ int kfd_wait_on_events(struct kfd_process *p,
 			*wait_result = KFD_WAIT_COMPLETE;
 		else
 			*wait_result = KFD_WAIT_ERROR;
+		free_waiters(num_events, event_waiters);
 	} else {
 		/* Add to wait lists if we need to wait. */
 		for (i = 0; i < num_events; i++)
@@ -829,6 +830,8 @@ int kfd_wait_on_events(struct kfd_process *p,
 			break;
 		}
 
+		set_current_state(TASK_INTERRUPTIBLE);
+
 		if (test_event_condition(all, num_events, event_waiters)) {
 			if (copy_signaled_event_data(num_events,
 					event_waiters, events))
@@ -843,7 +846,7 @@ int kfd_wait_on_events(struct kfd_process *p,
 			break;
 		}
 
-		timeout = schedule_timeout_interruptible(timeout);
+		timeout = schedule_timeout(timeout);
 	}
 	__set_current_state(TASK_RUNNING);
 
