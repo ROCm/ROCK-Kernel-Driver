@@ -231,6 +231,10 @@ static int dw_i2c_probe(struct platform_device *pdev)
 		dev->rx_fifo_depth = ((param1 >> 8)  & 0xff) + 1;
 		dev->adapter.nr = pdev->id;
 	}
+
+	if (!strncmp(pdev->name, "AMD0010", 7))
+		dev->accessor_flags |= ACCESS_INTR_MASK;
+
 	r = i2c_dw_init(dev);
 	if (r)
 		return r;
