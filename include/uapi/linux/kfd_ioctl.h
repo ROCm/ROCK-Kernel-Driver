@@ -336,7 +336,10 @@ struct kfd_ioctl_open_graphic_handle_args {
 #define AMDKFD_IOC_OPEN_GRAPHIC_HANDLE		\
 		AMDKFD_IOWR(0x15, struct kfd_ioctl_open_graphic_handle_args)
 
+#define AMDKFD_IOC_ALLOC_MEMORY_OF_SCRATCH	\
+		AMDKFD_IOWR(0x16, struct kfd_ioctl_alloc_memory_of_gpu_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x16
+#define AMDKFD_COMMAND_END		0x17
 
 #endif
