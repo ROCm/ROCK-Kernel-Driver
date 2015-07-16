@@ -89,23 +89,28 @@ void pqm_uninit(struct process_queue_manager *pqm)
 {
 	int retval;
 	struct process_queue_node *pqn, *next;
+	struct kfd_process_device *pdd;
 
 	BUG_ON(!pqm);
 
 	pr_debug("In func %s\n", __func__);
 
 	list_for_each_entry_safe(pqn, next, &pqm->queues, process_queue_list) {
-		retval = pqm_destroy_queue(
-				pqm,
-				(pqn->q != NULL) ?
-					pqn->q->properties.queue_id :
-					pqn->kq->queue->properties.queue_id);
-
-		if (retval != 0) {
-			pr_err("kfd: failed to destroy queue\n");
-			return;
+		pdd = kfd_get_process_device_data(pqn->q->device, pqm->process);
+		if (pdd) {
+			retval = pqn->q->device->dqm->ops.process_termination
+				(pqn->q->device->dqm, &pdd->qpd);
+			if (retval != 0)
+				pdd->reset_wavefronts = true;
 		}
 	}
+
+	list_for_each_entry_safe(pqn, next, &pqm->queues, process_queue_list) {
+		uninit_queue(pqn->q);
+		list_del(&pqn->process_queue_list);
+		kfree(pqn);
+	}
+
 	kfree(pqm->queue_slot_bitmap);
 	pqm->queue_slot_bitmap = NULL;
 }
@@ -313,9 +318,11 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
 	if (pqn->q) {
 		dqm = pqn->q->device->dqm;
 		retval = dqm->ops.destroy_queue(dqm, &pdd->qpd, pqn->q);
-		if (retval != 0)
+		if (retval != 0) {
+			if (retval == -ETIME)
+				pdd->reset_wavefronts = true;
 			return retval;
-
+		}
 		uninit_queue(pqn->q);
 	}
 
