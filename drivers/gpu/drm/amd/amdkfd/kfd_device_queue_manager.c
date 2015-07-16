@@ -1218,6 +1218,72 @@ out:
 	return retval;
 }
 
+static int process_termination_nocpsch(struct device_queue_manager *dqm,
+		struct qcm_process_device *qpd)
+{
+	return 0;
+}
+
+static int process_termination_cpsch(struct device_queue_manager *dqm,
+		struct qcm_process_device *qpd)
+{
+	int retval;
+	struct queue *q, *next;
+	struct kernel_queue *kq, *kq_next;
+	struct mqd_manager *mqd;
+	struct device_process_node *cur, *next_dpn;
+
+	retval = 0;
+
+	mutex_lock(&dqm->lock);
+
+	retval = destroy_queues_cpsch(dqm, true, false);
+
+	/* Clean all kernel queues */
+	list_for_each_entry_safe(kq, kq_next, &qpd->priv_queue_list, list) {
+		list_del(&kq->list);
+		dqm->queue_count--;
+		qpd->is_debug = false;
+		dqm->total_queue_count--;
+	}
+
+	/* Clear all user mode queues */
+	list_for_each_entry_safe(q, next, &qpd->queues_list, list) {
+		mqd = dqm->ops.get_mqd_manager(dqm,
+			get_mqd_type_from_queue_type(q->properties.type));
+		if (!mqd) {
+			mutex_unlock(&dqm->lock);
+			return -ENOMEM;
+		}
+
+		if (q->properties.type == KFD_QUEUE_TYPE_SDMA)
+				dqm->sdma_queue_count--;
+
+		list_del(&q->list);
+		if (q->properties.is_active)
+			dqm->queue_count--;
+
+		dqm->total_queue_count--;
+		mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
+	}
+
+	/* Unregister process */
+	list_for_each_entry_safe(cur, next_dpn, &dqm->queues, list) {
+		if (qpd == cur->qpd) {
+			list_del(&cur->list);
+			kfree(cur);
+			dqm->processes_count--;
+			break;
+		}
+	}
+
+	if (retval == 0)
+		execute_queues_cpsch(dqm, false);
+
+	mutex_unlock(&dqm->lock);
+	return retval;
+}
+
 struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 {
 	struct device_queue_manager *dqm;
@@ -1249,6 +1315,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		dqm->ops.destroy_kernel_queue = destroy_kernel_queue_cpsch;
 		dqm->ops.set_cache_memory_policy = set_cache_memory_policy;
 		dqm->ops.set_page_directory_base = set_page_directory_base;
+		dqm->ops.process_termination = process_termination_cpsch;
 		break;
 	case KFD_SCHED_POLICY_NO_HWS:
 		/* initialize dqm for no cp scheduling */
@@ -1264,6 +1331,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		dqm->ops.uninitialize = uninitialize_nocpsch;
 		dqm->ops.set_cache_memory_policy = set_cache_memory_policy;
 		dqm->ops.set_page_directory_base = set_page_directory_base;
+		dqm->ops.process_termination = process_termination_nocpsch;
 		break;
 	default:
 		BUG();

@@ -85,6 +85,8 @@ struct device_process_node {
  * in all the queues of the relevant process running on the specified device.
  * It preempts the queues, updates the value and execute the runlist again.
  *
+ * @process_termination: Clears all process queues belongs to that device.
+ *
  */
 
 struct device_queue_manager_ops {
@@ -131,6 +133,8 @@ struct device_queue_manager_ops {
 
 	int	(*set_page_directory_base)(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd);
+	int (*process_termination)(struct device_queue_manager *dqm,
+			struct qcm_process_device *qpd);
 };
 
 struct device_queue_manager_asic_ops {
