@@ -19,7 +19,19 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
+ * NOTE:
+ * Certain pieces were reused from Synopsis I2S IP related code,
+ * which otherwise can also be found at:
+ * sound/soc/dwc/designware_i2s.c
  *
+ * Copyright notice as appears in the above file:
+ *
+ * Copyright (C) 2010 ST Microelectronics
+ * Rajeev Kumar <rajeevkumar.linux@gmail.com>
+ *
+ * This file is licensed under the terms of the GNU General Public
+ * License version 2. This program is licensed "as is" without any
+ * warranty of any kind, whether express or implied.
  */
 
 #include <linux/mm.h>
@@ -28,17 +40,16 @@
 #include <linux/delay.h>
 #include <linux/errno.h>
 
-#define VISLANDS30_IV_SRCID_ACP 0x000000a2
-
 #include "acp_gfx_if.h"
 #include "acp_hw.h"
 
 #include "acp_2_2_d.h"
 #include "acp_2_2_sh_mask.h"
 
+#define VISLANDS30_IV_SRCID_ACP 0x000000a2
+
 /* Configure a given dma channel parameters - enable/disble,
  * number of descriptors, priority */
-
 static void config_acp_dma_channel(struct amd_acp_device *acp_dev, u8 ch_num,
 				   u16 dscr_strt_idx, u16 num_dscrs,
 				   enum acp_dma_priority_level priority_level)
@@ -46,37 +57,29 @@ static void config_acp_dma_channel(struct amd_acp_device *acp_dev, u8 ch_num,
 	u32 dma_ctrl;
 	struct amd_acp_private *acp_prv = (struct amd_acp_private *)acp_dev;
 
-	/* read the dma control register and disable the channel run field */
+	/* disable the channel run field */
 	dma_ctrl = cgs_read_register(acp_prv->cgs_device,
 				     mmACP_DMA_CNTL_0 + ch_num);
-	/* clear the dma channel control bits */
 	dma_ctrl &= ~ACP_DMA_CNTL_0__DMAChRun_MASK;
-
 	cgs_write_register(acp_prv->cgs_device, (mmACP_DMA_CNTL_0 + ch_num),
 			   dma_ctrl);
 
-	/* there is no transfer happening on this channel so
-	 * program DMAChDscrStrIdx to the index number of the first descriptor
-	 * to be processed.
-	 */
+	/* program a DMA channel with first descriptor to be processed. */
 	cgs_write_register(acp_prv->cgs_device,
 			   (mmACP_DMA_DSCR_STRT_IDX_0 + ch_num),
 			   (ACP_DMA_DSCR_STRT_IDX_0__DMAChDscrStrtIdx_MASK &
 			    dscr_strt_idx));
 
-	/* program DMAChDscrDscrCnt to the number of descriptors to be
-	 * processed in the transfer
-	 */
+	/* program a DMA channel with the number of descriptors to be
+	 * processed in the transfer */
 	cgs_write_register(acp_prv->cgs_device,
 			   (mmACP_DMA_DSCR_CNT_0 + ch_num),
 			   (ACP_DMA_DSCR_CNT_0__DMAChDscrCnt_MASK & num_dscrs));
 
-	/* set DMAChPrioLvl according to the priority */
+	/* set DMA channel priority */
 	cgs_write_register(acp_prv->cgs_device,	(mmACP_DMA_PRIO_0 + ch_num),
 			   priority_level);
 }
-
-
 
 /* Initialize the dma descriptors location in SRAM and page size */
 static void acp_dma_descr_init(struct amd_acp_private *acp_prv)
@@ -131,13 +134,15 @@ static void config_dma_descriptor_in_sram(struct amd_acp_device *acp_dev,
 			   descr_info->size_xfer_dir.val);
 }
 
-/* Initialize the DMA descriptor information */
+/* Initialize the DMA descriptor information for transfer between
+ * system memory <-> ACP SRAM
+ */
 static void set_acp_sysmem_dma_descriptors(struct amd_acp_device *acp_dev,
 					   u32 size, int direction,
 					   u32 pte_offset)
 {
-	u16 dma_dscr_idx;
 	u16 num_descr;
+	u16 dma_dscr_idx = PLAYBACK_START_DMA_DESCR_CH12;
 	acp_dma_dscr_transfer_t dmadscr[2];
 
 	num_descr = 2;
@@ -152,7 +157,7 @@ static void set_acp_sysmem_dma_descriptors(struct amd_acp_device *acp_dev,
 		    ACP_DMA_ATTRIBUTES_DAGB_ONION_TO_SHAREDMEM;
 		dmadscr[0].size_xfer_dir.s.size = (size / 2);
 		dmadscr[0].size_xfer_dir.s.ioc = (u32) 0x0;
-	} else if (direction == STREAM_CAPTURE) {
+	} else {
 		dma_dscr_idx = CAPTURE_START_DMA_DESCR_CH14;
 		dmadscr[0].src = ACP_SHARED_RAM_BANK_47_ADDRESS;
 		dmadscr[0].dest = ACP_INTERNAL_APERTURE_WINDOW_0_ADDRESS +
@@ -175,7 +180,7 @@ static void set_acp_sysmem_dma_descriptors(struct amd_acp_device *acp_dev,
 		    ACP_DMA_ATTRIBUTES_DAGB_ONION_TO_SHAREDMEM;
 		dmadscr[1].size_xfer_dir.s.size = (size / 2);
 		dmadscr[1].size_xfer_dir.s.ioc = (u32) 0x0;
-	} else if (direction == STREAM_CAPTURE) {
+	} else {
 		dma_dscr_idx = CAPTURE_END_DMA_DESCR_CH14;
 		dmadscr[1].size_xfer_dir.s.trans_direction =
 		    ACP_DMA_ATTRIBUTES_SHAREDMEM_TO_DAGB_ONION;
@@ -194,7 +199,7 @@ static void set_acp_sysmem_dma_descriptors(struct amd_acp_device *acp_dev,
 		config_acp_dma_channel(acp_dev, SYSRAM_TO_ACP_CH_NUM,
 					dma_dscr_idx, num_descr,
 					ACP_DMA_PRIORITY_LEVEL_NORMAL);
-	} else if (direction == STREAM_CAPTURE) {
+	} else {
 		/* starting descriptor for this channel */
 		dma_dscr_idx = CAPTURE_START_DMA_DESCR_CH14;
 		config_acp_dma_channel(acp_dev, ACP_TO_SYSRAM_CH_NUM,
@@ -203,7 +208,9 @@ static void set_acp_sysmem_dma_descriptors(struct amd_acp_device *acp_dev,
 	}
 }
 
-/* Initialize the i2s dma descriptors in SRAM */
+/* Initialize the DMA descriptor information for transfer between
+ * ACP SRAM <-> I2S
+ */
 static void set_acp_to_i2s_dma_descriptors(struct amd_acp_device *acp_dev,
 					   u32 size, int direction)
 {
@@ -214,9 +221,6 @@ static void set_acp_to_i2s_dma_descriptors(struct amd_acp_device *acp_dev,
 
 	num_descr = 2;
 
-	/* Let I2s Know the direction of transfer and source/destination
-	 *  of data
-	 */
 	dmadscr[0].size_xfer_dir.val = (u32) 0x0;
 	if (direction == STREAM_PLAYBACK) {
 		dma_dscr_idx = PLAYBACK_START_DMA_DESCR_CH13;
@@ -224,7 +228,7 @@ static void set_acp_to_i2s_dma_descriptors(struct amd_acp_device *acp_dev,
 		dmadscr[0].size_xfer_dir.s.trans_direction = TO_ACP_I2S_1;
 		dmadscr[0].size_xfer_dir.s.size = (size / 2);
 		dmadscr[0].size_xfer_dir.s.ioc = (u32) 0x1;
-	} else if (direction == STREAM_CAPTURE) {
+	} else {
 		dma_dscr_idx = CAPTURE_START_DMA_DESCR_CH15;
 		dmadscr[0].dest = ACP_SHARED_RAM_BANK_47_ADDRESS;
 		dmadscr[0].size_xfer_dir.s.trans_direction = FROM_ACP_I2S_1;
@@ -242,7 +246,7 @@ static void set_acp_to_i2s_dma_descriptors(struct amd_acp_device *acp_dev,
 		dmadscr[1].size_xfer_dir.s.size = (size / 2);
 		dmadscr[1].size_xfer_dir.s.ioc = (u32) 0x1;
 
-	} else if (direction == STREAM_CAPTURE) {
+	} else {
 		dma_dscr_idx = CAPTURE_END_DMA_DESCR_CH15;
 		dmadscr[1].dest = dmadscr[0].dest + (size / 2);
 		dmadscr[1].size_xfer_dir.s.trans_direction = FROM_ACP_I2S_1;
@@ -259,7 +263,7 @@ static void set_acp_to_i2s_dma_descriptors(struct amd_acp_device *acp_dev,
 		config_acp_dma_channel(acp_dev, ACP_TO_I2S_DMA_CH_NUM,
 					dma_dscr_idx, num_descr,
 					ACP_DMA_PRIORITY_LEVEL_NORMAL);
-	} else if (direction == STREAM_CAPTURE) {
+	} else {
 		/* starting descriptor for this channel */
 		dma_dscr_idx = CAPTURE_START_DMA_DESCR_CH15;
 		config_acp_dma_channel(acp_dev, I2S_TO_ACP_DMA_CH_NUM,
@@ -292,7 +296,7 @@ static u16 get_dscr_idx(struct amd_acp_device *acp_dev, int direction)
 
 }
 
-/*	Create page table entries in ACP SRAM for the allocated memory */
+/* Create page table entries in ACP SRAM for the allocated memory */
 static void acp_pte_config(struct amd_acp_device *acp_dev, struct page *pg,
 			   u16 num_of_pages, u32 pte_offset)
 {
@@ -332,7 +336,6 @@ static void acp_pte_config(struct amd_acp_device *acp_dev, struct page *pg,
 	}
 }
 
-
 /* enables/disables ACP's external interrupt */
 static void acp_enable_external_interrupts(struct amd_acp_device *acp_dev,
 					   int enable)
@@ -349,8 +352,8 @@ static void acp_enable_external_interrupts(struct amd_acp_device *acp_dev,
 			   mmACP_EXTERNAL_INTR_ENB, acp_ext_intr_enb);
 }
 
-/*	Clear (acknowledge) DMA 'Interrupt on Complete' (IOC) in ACP
- *	external interrupt status register
+/* Clear (acknowledge) DMA 'Interrupt on Complete' (IOC) in ACP
+ * external interrupt status register
  */
 static void acp_ext_stat_clear_dmaioc(struct amd_acp_device *acp_dev, u8 ch_num)
 {
@@ -370,7 +373,7 @@ static void acp_ext_stat_clear_dmaioc(struct amd_acp_device *acp_dev, u8 ch_num)
 	}
 }
 
-/*	Check whether interrupt (IOC) is generated or not	*/
+/* Check whether ACP DMA interrupt (IOC) is generated or not */
 static u16 acp_get_intr_flag(struct amd_acp_device *acp_dev)
 {
 	u32 ext_intr_status;
@@ -399,7 +402,6 @@ static int irq_set_source(void *private_data, unsigned src_id, unsigned type,
 		return -1;
 	}
 }
-
 
 static inline void i2s_clear_irqs(struct amd_acp_device *acp_dev,
 				  int direction)
@@ -504,17 +506,17 @@ static void config_acp_dma(struct amd_acp_device *acp_dev,
 	acp_pte_config(acp_dev, dma_config->pg,	dma_config->num_of_pages,
 		       pte_offset);
 
-	/* Configure System memory to acp dma descriptors */
+	/* Configure System memory <-> ACP SRAM DMA descriptors */
 	set_acp_sysmem_dma_descriptors(acp_dev, dma_config->size,
 				       dma_config->direction,
 				       pte_offset);
 
-	/* Configure acp to i2s dma descriptors */
+	/* Configure ACP SRAM <-> I2S DMA descriptors */
 	set_acp_to_i2s_dma_descriptors(acp_dev, dma_config->size,
 				       dma_config->direction);
 }
 
-/* Start a given dma channel */
+/* Start a given DMA channel transfer */
 static int acp_dma_start(struct amd_acp_device *acp_dev,
 			 u16 ch_num, bool is_circular)
 {
@@ -560,7 +562,7 @@ static int acp_dma_start(struct amd_acp_device *acp_dev,
 	return status;
 }
 
-/* Stop a given dma channel number*/
+/* Stop a given DMA channel transfer */
 static int acp_dma_stop(struct amd_acp_device *acp_dev, u8 ch_num)
 {
 	int status = STATUS_UNSUCCESSFUL;
@@ -572,7 +574,6 @@ static int acp_dma_stop(struct amd_acp_device *acp_dev, u8 ch_num)
 	if (acp_dev == NULL)
 		return status;
 
-	/* register mask value to check the channel status bits */
 	dma_ctrl = cgs_read_register(acp_prv->cgs_device,
 				     mmACP_DMA_CNTL_0 + ch_num);
 
@@ -624,6 +625,7 @@ static int acp_dma_stop(struct amd_acp_device *acp_dev, u8 ch_num)
 	return status;
 }
 
+/* ACP DMA irq handler routine for playback, capture usecases */
 static int dma_irq_handler(void *prv_data)
 {
 	u16 play_acp_i2s_intr, cap_i2s_acp_intr, cap_acp_sysram_intr;
@@ -643,7 +645,7 @@ static int dma_irq_handler(void *prv_data)
 
 	if (!play_acp_i2s_intr && !cap_i2s_acp_intr && !cap_acp_sysram_intr) {
 		/* We registered for DMA Interrupt-On-Complete interrupts only.
-		 * If we hit here, log, acknowledge it and return. */
+		 * If we hit here, log it and return. */
 		ext_intr_status = cgs_read_register(acp_prv->cgs_device,
 					    mmACP_EXTERNAL_INTR_STAT);
 		pr_info("ACP: Not a DMA IOC irq: %x\n", ext_intr_status);
@@ -690,6 +692,7 @@ static int irq_handler(void *private_data, unsigned src_id,
 		return -1;
 }
 
+/* power off a tile/block within ACP */
 static void acp_suspend_tile(struct amd_acp_private *acp_prv, int tile)
 {
 	u32 val = 0;
@@ -732,6 +735,7 @@ static void acp_suspend_tile(struct amd_acp_private *acp_prv, int tile)
 
 }
 
+/* power on a tile/block within ACP */
 static void acp_resume_tile(struct amd_acp_private *acp_prv, int tile)
 {
 	u32 val = 0;
@@ -790,7 +794,7 @@ static void acp_init(struct amd_acp_private *acp_prv)
 			break;
 	}
 
-	/* Enabling clock to ACP and waits until the clock is enabled */
+	/* Enable clock to ACP and wait until the clock is enabled */
 	val = cgs_read_register(acp_prv->cgs_device, mmACP_CONTROL);
 	val = val | ACP_CONTROL__ClkEn_MASK;
 	cgs_write_register(acp_prv->cgs_device,	mmACP_CONTROL, val);
@@ -819,7 +823,6 @@ static void acp_init(struct amd_acp_private *acp_prv)
 
 	acp_dma_descr_init(acp_prv);
 
-	/* DMA DSCR BASE ADDRESS IN SRAM */
 	cgs_write_register(acp_prv->cgs_device,	mmACP_DMA_DESC_BASE_ADDR,
 			   ACP_SRAM_BASE_ADDRESS);
 
@@ -851,12 +854,13 @@ static int acp_hw_init(struct amd_acp_device *acp_dev, void *iprv)
 	return STATUS_SUCCESS;
 }
 
+/* Deintialize ACP */
 static void acp_deinit(struct amd_acp_private *acp_prv)
 {
 	u32 val;
 	u32 timeout_value;
 
-	  /* Assert Soft reset of ACP */
+	/* Assert Soft reset of ACP */
 	val = cgs_read_register(acp_prv->cgs_device, mmACP_SOFT_RESET);
 
 	val |= ACP_SOFT_RESET__SoftResetAud_MASK;
@@ -870,7 +874,7 @@ static void acp_deinit(struct amd_acp_private *acp_prv)
 			break;
 	    }
 	}
-	 /** Disable ACP clock */
+	/** Disable ACP clock */
 	val = cgs_read_register(acp_prv->cgs_device, mmACP_CONTROL);
 	val &= ~ACP_CONTROL__ClkEn_MASK;
 	cgs_write_register(acp_prv->cgs_device, mmACP_CONTROL, val);
@@ -894,8 +898,8 @@ static void acp_hw_deinit(struct amd_acp_device *acp_dev)
 	acp_deinit(acp_prv);
 }
 
-/*	Get the number of bytes consumed for SRAM_TO_I2S DMA
- *	 channel during rendering
+/* Update DMA postion in audio ring buffer at period level granularity.
+ * This will be used by ALSA PCM driver
  */
 static u32 acp_update_dma_pointer(struct amd_acp_device *acp_dev, int direction,
 				  u32 period_size)
@@ -915,7 +919,7 @@ static u32 acp_update_dma_pointer(struct amd_acp_device *acp_dev, int direction,
 		mul = (dscr == PLAYBACK_START_DMA_DESCR_CH13) ? 0 : 1;
 		pos =  (mul * period_size);
 
-	} else if (direction == STREAM_CAPTURE) {
+	} else {
 		dma_config = cgs_read_register(acp_prv->cgs_device,
 					       mmACP_DMA_CNTL_14);
 		if (dma_config != 0) {
@@ -932,8 +936,8 @@ static u32 acp_update_dma_pointer(struct amd_acp_device *acp_dev, int direction,
 	return pos;
 }
 
-/*	Wait for complete buffering to complete in HOST
- *	 to SRAM DMA channel
+/* Wait for initial buffering to complete in HOST to SRAM DMA channel
+ * for plaback usecase
  */
 static void wait_for_prebuffer_finish(struct amd_acp_device *acp_dev)
 {
@@ -1085,7 +1089,7 @@ void amd_acp_resume(struct amd_acp_private *acp_private)
 
 	acp_init(acp_private);
 
-	/* Disable DSPs which might have been enabled by SMU */
+	/* Disable DSPs which are not going to be used */
 	acp_suspend_tile(acp_private, ACP_TILE_DSP0);
 	acp_suspend_tile(acp_private, ACP_TILE_DSP1);
 	acp_suspend_tile(acp_private, ACP_TILE_DSP2);
