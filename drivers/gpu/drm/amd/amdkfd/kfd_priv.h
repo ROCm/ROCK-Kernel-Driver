@@ -469,6 +469,7 @@ struct kfd_process_device {
 	uint64_t scratch_base;
 	uint64_t scratch_limit;
 
+	uint64_t sh_hidden_private_base_vmid;
 	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
 	bool bound;
 

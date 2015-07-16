@@ -918,6 +918,49 @@ kfd_ioctl_wait_events(struct file *filp, struct kfd_process *p, void *data)
 
 	return err;
 }
+static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
+					struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_alloc_memory_of_gpu_args *args = data;
+	struct kfd_process_device *pdd;
+	struct kfd_dev *dev;
+	long err;
+
+	if (args->size == 0)
+		return -EINVAL;
+
+	dev = kfd_device_by_id(args->gpu_id);
+	if (dev == NULL)
+		return -EINVAL;
+
+
+	mutex_lock(&p->mutex);
+
+	pdd = kfd_bind_process_to_device(dev, p);
+	if (IS_ERR(pdd) < 0) {
+		err = PTR_ERR(pdd);
+		goto bind_process_to_device_fail;
+	}
+
+	/* write here mmap address to the SH_HIDDEN_PRIVATE_BASE_VMID */
+
+	pdd->sh_hidden_private_base_vmid = args->va_addr;
+
+	err = dev->kfd2kgd->alloc_memory_of_scratch(
+		dev->kgd, args->va_addr, 8);
+	/* err = qcm_program_scratch_memory(dev ,pdd);*/
+	if (err != 0)
+		goto alloc_memory_of_scratch_failed;
+
+	mutex_unlock(&p->mutex);
+
+	return 0;
+
+alloc_memory_of_scratch_failed:
+bind_process_to_device_fail:
+	mutex_unlock(&p->mutex);
+	return -EFAULT;
+}
 
 static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 					struct kfd_process *p, void *data)
@@ -1242,6 +1285,9 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_OPEN_GRAPHIC_HANDLE,
 			kfd_ioctl_open_graphic_handle, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ALLOC_MEMORY_OF_SCRATCH,
+			kfd_ioctl_alloc_scratch_memory, 0),
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
