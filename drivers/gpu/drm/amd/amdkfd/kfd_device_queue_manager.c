@@ -46,7 +46,7 @@ static int create_compute_queue_nocpsch(struct device_queue_manager *dqm,
 
 static int execute_queues_cpsch(struct device_queue_manager *dqm, bool lock);
 static int destroy_queues_cpsch(struct device_queue_manager *dqm,
-				bool preempt_static_queues, bool lock);
+		bool preempt_static_queues, bool lock, bool reset);
 
 static int create_sdma_queue_nocpsch(struct device_queue_manager *dqm,
 					struct queue *q,
@@ -785,7 +785,7 @@ static int stop_cpsch(struct device_queue_manager *dqm)
 
 	BUG_ON(!dqm);
 
-	destroy_queues_cpsch(dqm, true, true);
+	destroy_queues_cpsch(dqm, true, true, false);
 
 	list_for_each_entry(node, &dqm->queues, list) {
 		pdd = qpd_to_pdd(node->qpd);
@@ -840,7 +840,7 @@ static void destroy_kernel_queue_cpsch(struct device_queue_manager *dqm,
 
 	mutex_lock(&dqm->lock);
 	/* here we actually preempt the DIQ */
-	destroy_queues_cpsch(dqm, true, false);
+	destroy_queues_cpsch(dqm, true, false, false);
 	list_del(&kq->list);
 	dqm->queue_count--;
 	qpd->is_debug = false;
@@ -952,7 +952,7 @@ static int destroy_sdma_queues(struct device_queue_manager *dqm,
 }
 
 static int destroy_queues_cpsch(struct device_queue_manager *dqm,
-				bool preempt_static_queues, bool lock)
+		bool preempt_static_queues, bool lock, bool reset)
 {
 	int retval;
 	enum kfd_preempt_type_filter preempt_type;
@@ -979,7 +979,7 @@ static int destroy_queues_cpsch(struct device_queue_manager *dqm,
 			KFD_PREEMPT_TYPE_FILTER_DYNAMIC_QUEUES;
 
 	retval = pm_send_unmap_queue(&dqm->packets, KFD_QUEUE_TYPE_COMPUTE,
-			preempt_type, 0, false, 0);
+			preempt_type, 0, reset, 0);
 	if (retval != 0)
 		goto out;
 
@@ -1010,7 +1010,7 @@ static int execute_queues_cpsch(struct device_queue_manager *dqm, bool lock)
 	if (lock)
 		mutex_lock(&dqm->lock);
 
-	retval = destroy_queues_cpsch(dqm, false, false);
+	retval = destroy_queues_cpsch(dqm, false, false, false);
 	if (retval != 0) {
 		pr_err("kfd: the cp might be in an unrecoverable state due to an unsuccessful queues preemption");
 		goto out;
@@ -1080,7 +1080,7 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 	if (q->properties.is_active)
 		dqm->queue_count--;
 
-	execute_queues_cpsch(dqm, false);
+	retval = execute_queues_cpsch(dqm, false);
 
 	mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
 
@@ -1094,7 +1094,7 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 
 	mutex_unlock(&dqm->lock);
 
-	return 0;
+	return retval;
 
 failed:
 failed_try_destroy_debugged_queue:
@@ -1233,7 +1233,7 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 
 	mutex_lock(&dqm->lock);
 
-	retval = destroy_queues_cpsch(dqm, true, false);
+	retval = destroy_queues_cpsch(dqm, true, false, true);
 
 	/* Clean all kernel queues */
 	list_for_each_entry_safe(kq, kq_next, &qpd->priv_queue_list, list) {
