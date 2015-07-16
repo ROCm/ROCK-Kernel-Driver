@@ -132,7 +132,7 @@ static void acp_pcm_period_elapsed(struct device *dev, u16 play_intr,
 	/* Inform ALSA about the period elapsed (one out of two periods) */
 	if (play_intr)
 		substream = irq_data->play_stream;
-	else if (capture_intr)
+	else
 		substream = irq_data->capture_stream;
 
 	if (substream->runtime && snd_pcm_running(substream))

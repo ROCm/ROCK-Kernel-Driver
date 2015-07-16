@@ -202,7 +202,6 @@ static struct platform_driver carrizo_pcm_driver = {
 	.driver = {
 		.name = "carrizo_i2s_audio",
 		.acpi_match_table = ACPI_PTR(cz_audio_acpi_match),
-		.owner = THIS_MODULE,
 		.pm = &snd_soc_pm_ops,
 	},
 	.probe = carrizo_probe,
