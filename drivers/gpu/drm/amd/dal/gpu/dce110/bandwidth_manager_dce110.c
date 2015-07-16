@@ -44,10 +44,10 @@
 
 /* Debug macros */
 #define NOT_IMPLEMENTED() DAL_LOGGER_NOT_IMPL(LOG_MINOR_COMPONENT_GPU, \
-		"BM:%s()\n", __func__);
+		"BM:%s()\n", __func__)
 
 #define BM_DBG_REQ_BANDW(...) dal_logger_write(dal_ctx->logger, LOG_MAJOR_BWM, \
-	LOG_MINOR_BWM_REQUIRED_BANDWIDTH_CALCS, __VA_ARGS__);
+	LOG_MINOR_BWM_REQUIRED_BANDWIDTH_CALCS, __VA_ARGS__)
 
 
 #define regs_for_bm(id) \
@@ -2741,6 +2741,7 @@ static bool register_interrupt(
 	enum controller_id ctrl_id)
 {
 	struct dal_context *dal_context = bm_dce110->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 	return false;
 }
@@ -3641,6 +3642,7 @@ static uint32_t validate_stutter_mode(
 	uint32_t stutter_mode = 0;
 	struct bandwidth_manager_dce110 *bm_dce110 = BM110_FROM_BM_BASE(bm);
 	uint32_t i = 0;
+
 	stutter_mode = bm_dce110->supported_stutter_mode;
 
 	for (i = 0; i < path_num; ++i) {
@@ -3768,6 +3770,7 @@ static void self_refresh_dmif_watermark(
 			} else {
 				struct bandwidth_params chroma_params;
 				uint32_t adjusted_buffer_size = 0;
+
 				get_chroma_surface_params_for_underlay(
 					bm->dal_ctx,
 					bw_params_copy,
@@ -3892,6 +3895,7 @@ static void urgency_marks(
 					dal_fixed32_32_from_int(MAX_WATERMARK);
 		} else {
 			uint32_t adjusted_buffer_size = 0;
+
 			if ((local_wm_params->pixel_clk_khz == 0) ||
 				local_wm_params->timing_info.h_total == 0){
 
@@ -3956,6 +3960,7 @@ static void urgency_marks(
 			} else {
 				struct bandwidth_params chroma_params;
 				uint32_t adjusted_buffer_size = 0;
+
 				get_chroma_surface_params_for_underlay(
 					bm->dal_ctx,
 					bw_params_copy,
@@ -4232,6 +4237,7 @@ static void nb_pstate_watermark(
 				wm_low_clks = MAX_WATERMARK;
 			} else {
 				struct bandwidth_params bw_chroma_param;
+
 				get_chroma_surface_params_for_underlay(
 					bm->dal_ctx,
 					cur_bw_params,
@@ -4588,6 +4594,7 @@ static uint32_t get_min_deep_sleep_sclk(
 	 */
 	for (i = 0; i < paths_num; i++) {
 		uint32_t total_pixels;
+
 		if (bw_params == NULL ||
 			bw_params->timing_info.pix_clk_khz == 0 ||
 			bw_params->timing_info.h_total == 0) {

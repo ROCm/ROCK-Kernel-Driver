@@ -38,11 +38,6 @@
 #include "hw_sequencer_dce110.h"
 #include "hw_sync_control_dce110.h"
 
-/**********************/
-/* Additional defines */
-/**********************/
-#define NOT_IMPLEMENTED()  DAL_LOGGER_NOT_IMPL(LOG_MINOR_COMPONENT_HWSS, \
-			"%s()\n", __func__);
 
 /******************/
 /* Implementation */
@@ -452,6 +447,7 @@ static void set_display_clock_dfs_bypass(
 				DELAY_AFTER_DISABLE_BACKLIGHT_DFS_BYPASS) {
 			const struct monitor_patch_info *patch_info;
 			unsigned int delay_after_disable_backlight_dfs_bypass;
+
 			patch_info =  dal_dcs_get_monitor_patch_info(
 				dal_display_path_get_dcs(display_path),
 				MONITOR_PATCH_TYPE_DELAY_AFTER_DISABLE_BACKLIGHT_DFS_BYPASS);
@@ -474,6 +470,7 @@ static void set_display_clock_dfs_bypass(
 		embedded_dp_display) {
 		struct pixel_clk_params pixel_clk_params;
 		int32_t j;
+
 		dal_memset(&pixel_clk_params, 0, sizeof(pixel_clk_params));
 		dal_hw_sequencer_get_pixel_clock_parameters(
 			path_mode, &pixel_clk_params);

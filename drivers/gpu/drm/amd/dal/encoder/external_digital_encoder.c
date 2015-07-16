@@ -196,6 +196,7 @@ void dal_external_digital_encoder_destruct(
 {
 	if (enc->hw_ctx) {
 		struct hw_ctx_digital_encoder *base = &enc->hw_ctx->base;
+
 		enc->hw_ctx->base.funcs->destroy(&base);
 	}
 

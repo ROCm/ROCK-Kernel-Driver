@@ -32,6 +32,7 @@ bool dal_mode_query_no_pan_build_cofunc_view_solution_set(struct mode_query *mq)
 	bool is_display_view = false;
 	bool is_view_supported = true;
 	uint32_t i;
+
 	for (i = 0; i < mq->query_set->num_path; i++) {
 		struct view_solution vs = get_solution_on_path_by_index(
 			mq,
@@ -92,6 +93,7 @@ static bool mode_query_no_pan_construct(
 static bool are_all_refresh_rates_equal_and_preferred(struct mode_query *mq)
 {
 	uint32_t i;
+
 	for (i = 0; i < mq->query_set->num_path; i++) {
 		ASSERT(mq->cur_solutions[i] != NULL);
 		if (mq->cur_solutions[i]->importance

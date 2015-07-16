@@ -215,9 +215,9 @@ static bool construct(struct topology_mgr_init_data *init_data,
 			init_err = true;
 			TM_ERROR("tm_resource_mgr_create() failed!\n");
 			break;
-		} else {
-			tm->tm_rm = tm_rm;
 		}
+
+		tm->tm_rm = tm_rm;
 
 		/* create/initialise Detection Manager */
 		tm_dm_init_data.dal_context = init_data->dal_context;
@@ -231,9 +231,9 @@ static bool construct(struct topology_mgr_init_data *init_data,
 			TM_ERROR("dal_tm_detection_mgr_create() failed!\n");
 			init_err = true;
 			break;
-		} else {
-			tm->tm_dm = tm_dm;
 		}
+
+		tm->tm_dm = tm_dm;
 
 		/* create/initialise Resource Builder */
 		tm_rb_init_data.dal_context = tm->dal_context;
@@ -250,15 +250,14 @@ static bool construct(struct topology_mgr_init_data *init_data,
 			TM_ERROR("tm_resource_builder_create() failed!\n");
 			init_err = true;
 			break;
-		} else {
-			tm->tm_rb = tm_rb;
 		}
+
+		tm->tm_rb = tm_rb;
 
 	} while (0);
 
-	if (false == init_err) {
+	if (false == init_err)
 		init_err = (tm_init_during_construct(tm) != TM_RESULT_SUCCESS);
-	}
 
 	if (true == init_err) {
 		/* Clean-up.
@@ -276,10 +275,10 @@ static bool construct(struct topology_mgr_init_data *init_data,
 			tm_resource_builder_destroy(&tm->tm_rb);
 
 		return false;
-	} else {
-		/* All O.K. */
-		return true;
 	}
+
+	/* All O.K. */
+	return true;
 }
 
 static struct display_path *tm_get_display_path_at_index(
@@ -334,6 +333,7 @@ static void destruct(struct topology_mgr *tm)
 
 	if (tm->display_paths) {
 		uint32_t i;
+
 		for (i = 0; i < tm_get_display_path_count(tm); i++) {
 			struct display_path *display_path =
 				tm_get_display_path_at_index(tm, i);
@@ -378,19 +378,18 @@ struct topology_mgr *dal_tm_create(struct topology_mgr_init_data *init_data)
 		return NULL;
 	}
 
-	if (construct(init_data, tm) == true)
-		return tm;
-	else {
+	if (!construct(init_data, tm) == true) {
 		dal_free(tm);
 		return NULL;
 	}
+
+	return tm;
 }
 
 void dal_tm_destroy(struct topology_mgr **tm)
 {
-	if (!tm || !(*tm)) {
+	if (!tm || !(*tm))
 		return;
-	}
 
 	/***************************************
 	 * deallocate all subcomponents of TM
@@ -422,6 +421,7 @@ enum tm_result dal_tm_acquire_display_path(struct topology_mgr *tm,
 {
 	struct display_path *display_path;
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_IFACE_TRACE();
 
 	if (!tm_is_display_index_valid(tm, display_index, __func__))
@@ -1538,12 +1538,11 @@ static void tm_power_up_encoder(struct topology_mgr *tm,
 		if (ENCODER_RESULT_OK != dal_encoder_update_implementation(
 				enc_input, &context)) {
 			/* TODO: should we return error to caller? */
-			TM_ERROR("%s: failed to update encoder"\
-				" implementation!\n", __func__);
+			TM_ERROR("%s: failed to update encoder implementation!\n",
+					__func__);
 		}
 
-		TM_ENCODER_CTL("%s:[UpdateImpl]: %s, on Active Path=%u,"\
-				" Link=%u, Engine=%s, Signal=%s",
+		TM_ENCODER_CTL("%s:[UpdateImpl]: %s, on Active Path=%u, Link=%u, Engine=%s, Signal=%s",
 			__func__,
 			tm_utils_transmitter_id_to_str(
 				dal_encoder_get_graphics_object_id(
@@ -1738,9 +1737,7 @@ static void tm_power_down_encoder(struct topology_mgr *tm,
 						__func__);
 
 			TM_ENCODER_CTL(
-				"TM Encoder PowerDown [Supported Engine]: %s,"
-				" Active Path=%u, Link=%u,"
-				" Engine=%s, Signal=%s",
+				"TM Encoder PowerDown [Supported Engine]: %s, Active Path=%u, Link=%u, Engine=%s, Signal=%s",
 				tm_utils_transmitter_id_to_str(
 						enc_input_obj_id),
 				dal_display_path_get_display_index(
@@ -1768,9 +1765,7 @@ static void tm_power_down_encoder(struct topology_mgr *tm,
 						__func__);
 
 			TM_ENCODER_CTL(
-				"TM Encoder PowerDown [1st Valid Engine]: %s,"
-				" Active Path=%u, Link=%u,"
-				" Engine=%s, Signal=%s",
+				"TM Encoder PowerDown [1st Valid Engine]: %s, Active Path=%u, Link=%u, Engine=%s, Signal=%s",
 				tm_utils_transmitter_id_to_str(
 						enc_input_obj_id),
 				dal_display_path_get_display_index(
@@ -1795,9 +1790,7 @@ static void tm_power_down_encoder(struct topology_mgr *tm,
 					__func__);
 
 		TM_ENCODER_CTL(
-			"TM Encoder PowerDown [Input Engine]: %s,"
-			" Active Path=%u, Link=%u,"
-			" Engine=%s, Signal=%s",
+			"TM Encoder PowerDown [Input Engine]: %s, Active Path=%u, Link=%u, Engine=%s, Signal=%s",
 			tm_utils_transmitter_id_to_str(
 					enc_input_obj_id),
 			dal_display_path_get_display_index(
@@ -1860,8 +1853,7 @@ static void tm_power_down_controller(struct topology_mgr *tm,
 	} else {
 		/* Resource is power gated and we could not
 		 * access it to PowerDown(). */
-		TM_PWR_GATING("Could not PowerDown Controller Id:%d because it"\
-			"is power gated.",
+		TM_PWR_GATING("Could not PowerDown Controller Id:%d because it is power gated.",
 			dal_controller_get_graphics_object_id(
 				info->controller));
 	}
@@ -2135,6 +2127,7 @@ enum tm_result dal_tm_power_down_hw(struct topology_mgr *tm)
 		for (i = controllers->start; i < controllers->end; i++) {
 
 			struct controller *controller = NULL;
+
 			tm_resource =
 				tm_resource_mgr_enum_resource(
 					tm->tm_rm, i);
@@ -2232,6 +2225,7 @@ void dal_tm_reset_vbios_controllers(struct topology_mgr *tm)
 /*ResetControllersForFSDOSToWindows()*/
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 }
 
@@ -2441,8 +2435,8 @@ static void arbitrate_audio_on_disconnect(struct topology_mgr *tm,
 		if (tm->attached_hdmi_num > 0)
 			tm->attached_hdmi_num--;
 		else
-			TM_ERROR("%s: can NOT reduce attached_hdmi_num"\
-					" below zero!\n", __func__);
+			TM_ERROR("%s: can NOT reduce attached_hdmi_num below zero!\n",
+					__func__);
 	}
 }
 
@@ -2744,16 +2738,15 @@ static void tm_update_on_connect_link_services_and_encoder_implementation(
 		if (ENCODER_RESULT_OK != dal_encoder_update_implementation(
 				encoder, &context)) {
 			/* should never happen */
-			TM_ERROR("%s:dal_encoder_update_implementation()"\
-					" failed!\n", __func__);
+			TM_ERROR("%s:dal_encoder_update_implementation() failed!\n",
+					__func__);
 		}
 
 		id = dal_encoder_get_graphics_object_id(encoder);
 		display_index = dal_display_path_get_display_index(
 				display_path);
 
-		TM_ENCODER_CTL("OnConnect[UpdateImpl]: Transmitter=%s,"\
-				" Path=%u, LinkIdx=%u, Engine=%s, Signal=%s\n",
+		TM_ENCODER_CTL("OnConnect[UpdateImpl]: Transmitter=%s, Path=%u, LinkIdx=%u, Engine=%s, Signal=%s\n",
 				tm_utils_transmitter_id_to_str(id),
 				display_index,
 				link_idx,
@@ -3314,6 +3307,7 @@ void dal_tm_do_detection_for_connector(struct topology_mgr *tm,
 		uint32_t connector_index)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 }
 
@@ -3379,6 +3373,7 @@ uint32_t dal_tm_do_complete_detection(
 enum tm_result dal_tm_do_asynchronous_detection(struct topology_mgr *tm)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 	return TM_RESULT_FAILURE;
 }
@@ -3388,6 +3383,7 @@ void dal_tm_toggle_hw_base_light_sleep(struct topology_mgr *tm,
 		bool enable)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 }
 
@@ -3460,6 +3456,7 @@ void dal_tm_enable_accelerated_mode(struct topology_mgr *tm)
 void dal_tm_block_interrupts(struct topology_mgr *tm, bool blocking)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 }
 
@@ -3467,6 +3464,7 @@ void dal_tm_block_interrupts(struct topology_mgr *tm, bool blocking)
 enum tm_result dal_tm_setup_embedded_display_path(struct topology_mgr *tm)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 	return TM_RESULT_FAILURE;
 }
@@ -3585,6 +3583,7 @@ bool dal_tm_is_sync_output_available_for_display_path(
 		enum sync_source sync_output)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 	return false;
 }
@@ -3630,6 +3629,7 @@ struct gpu_clock_interface *dal_tm_get_gpu_clock_interface(
 		struct topology_mgr *tm)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 	return NULL;
 }
@@ -3640,6 +3640,7 @@ struct ddc *dal_tm_get_dpcd_access_interface(
 		uint32_t display_index)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 	return NULL;
 }
@@ -3650,6 +3651,7 @@ struct ddc *dal_tm_get_ddc_access_interface_by_index(
 		uint32_t display_index)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 	return NULL;
 }
@@ -3660,6 +3662,7 @@ struct ddc *dal_tm_get_ddc_access_interface_by_connector(
 		struct graphics_object_id connector)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 	return NULL;
 }
@@ -3668,6 +3671,7 @@ struct ddc *dal_tm_get_ddc_access_interface_by_connector(
 uint32_t dal_tm_get_num_functional_controllers(struct topology_mgr *tm)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 	return 0;
 }
@@ -3685,6 +3689,7 @@ enum dal_video_power_state dal_tm_get_current_power_state(
 		struct topology_mgr *tm)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_IFACE_TRACE();
 	return tm->current_power_state;
 }
@@ -3694,6 +3699,7 @@ enum dal_video_power_state dal_tm_get_previous_power_state(
 		struct topology_mgr *tm)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_IFACE_TRACE();
 	return tm->previous_power_state;
 }
@@ -3714,6 +3720,7 @@ enum tm_result dal_tm_set_signal_type(struct topology_mgr *tm,
 		enum signal_type signal)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 	return TM_RESULT_FAILURE;
 }
@@ -3810,6 +3817,7 @@ enum tm_result dal_tm_detect_and_notify_target_connection(
 		enum tm_detection_method method)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 	return TM_RESULT_FAILURE;
 }
@@ -3820,6 +3828,7 @@ void dal_tm_detect_notify_connectivity_change(struct topology_mgr *tm,
 		bool connected)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 }
 
@@ -3830,6 +3839,7 @@ void dal_tm_notify_capability_change(struct topology_mgr *tm,
 		enum tm_reenum_modes_reason reason)
 {
 	struct dal_context *dal_context = tm->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 }
 
@@ -4128,8 +4138,8 @@ static enum tm_result create_gpu_resources(struct topology_mgr *tm)
 	rc = tm_resource_builder_create_gpu_resources(tm->tm_rb);
 
 	if (TM_RESULT_FAILURE == rc) {
-		TM_ERROR("%s: tm_resource_builder_create_gpu_resources()"\
-				" failed!\n", __func__);
+		TM_ERROR("%s: tm_resource_builder_create_gpu_resources() failed!\n",
+				__func__);
 	}
 
 	return rc;
@@ -4349,8 +4359,7 @@ static enum tm_result tm_update_single_encoder_implementation(
 
 	dsp_index = dal_display_path_get_display_index(display_path);
 
-	TM_ENCODER_CTL("Encoder Update Impl:"\
-			"%s, Path=%u, Link=%u, Engine=%s, Signal=%s\n",
+	TM_ENCODER_CTL("Encoder Update Impl: %s, Path=%u, Link=%u, Engine=%s, Signal=%s\n",
 			transmitter_str,
 			dsp_index,
 			link_index,
@@ -5291,6 +5300,7 @@ void dal_tm_handle_sink_connectivity_change(
 {
 	struct display_path *display_path;
 	struct dal_context *dal_context = tm->dal_context;
+
 	display_path = tm_get_display_path_at_index(tm, display_index);
 
 	if (NULL == display_path) {

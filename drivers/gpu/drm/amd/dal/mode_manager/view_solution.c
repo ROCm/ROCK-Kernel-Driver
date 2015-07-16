@@ -44,6 +44,7 @@ static bool view_info_list_less_then(const void *lhs, const void *rhs)
 {
 	const struct view_info *lvi = lhs;
 	const struct view_info *rvi = rhs;
+
 	return view_less_then(&lvi->view, &rvi->view);
 }
 

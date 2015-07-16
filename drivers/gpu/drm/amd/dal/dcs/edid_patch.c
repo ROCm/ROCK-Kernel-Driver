@@ -179,6 +179,7 @@ static inline struct monitor_patch_info *monitor_patch_list_get_patch_info(
 	enum monitor_patch_type type)
 {
 	uint32_t i;
+
 	for (i = 0; i < dal_vector_get_count(&mpl->vector); ++i) {
 		struct monitor_patch_info *info =
 			dal_vector_at_index(&mpl->vector, i);
@@ -539,6 +540,7 @@ static void patch_multipacked_type_panel_edid(
 			MONITOR_PATCH_TYPE_MULTIPLE_PACKED_TYPE);
 	/* check whether the packed type. */
 	union edid13_multipacked_panel_manufacture_reserved_timing_info timing_info;
+
 	timing_info.all = edid_data->established_timings[2];
 
 	if (timing_info.all == 0)
@@ -562,6 +564,7 @@ static void patch_multipacked_type_panel_edid(
 		uint32_t h_total;
 		uint32_t new_h_total;
 		uint32_t pix_clk;
+
 		if (edid_detailed->pix_clk == 0)
 			continue;
 
@@ -829,6 +832,7 @@ void dal_edid_patch_update_dp_receiver_id_based_monitor_patches(
 	/* handle MONITOR_PATCH_TYPE_DELAY_AFTER_DP_RECEIVER_POWER_UP */
 	if (delay_after_power_up > 0) {
 		struct monitor_patch_info info;
+
 		info.type =
 			MONITOR_PATCH_TYPE_DELAY_AFTER_DP_RECEIVER_POWER_UP;
 		info.param = delay_after_power_up;
@@ -863,6 +867,7 @@ void dal_edid_patch_update_dp_receiver_id_based_monitor_patches(
 		 * not. If it isn't applied yet, we insert it to the list. */
 		if (!ep->mpl.flags.flags.KEEP_DP_RECEIVER_POWERED) {
 			struct monitor_patch_info info;
+
 			info.type =
 				MONITOR_PATCH_TYPE_KEEP_DP_RECEIVER_POWERED;
 			info.param = 0;
@@ -882,6 +887,7 @@ void dal_edid_patch_update_dp_receiver_id_based_monitor_patches(
 		 * If it isn't applied yet, we insert it to the list. */
 		if (!ep->mpl.flags.flags.DISABLE_PSR_ENTRY_ABORT) {
 			struct monitor_patch_info info;
+
 			info.type =
 				MONITOR_PATCH_TYPE_DISABLE_PSR_ENTRY_ABORT;
 			info.param = 0;
@@ -899,6 +905,7 @@ void dal_edid_patch_update_dp_receiver_id_based_monitor_patches(
 		if (!ep->mpl.flags.flags.
 				DELAY_AFTER_DISABLE_BACKLIGHT_DFS_BYPASS) {
 			struct monitor_patch_info info;
+
 			info.type =
 				MONITOR_PATCH_TYPE_DELAY_AFTER_DISABLE_BACKLIGHT_DFS_BYPASS;
 			info.param = delay_after_disable_backlight_dfs_bypass;
@@ -910,6 +917,4 @@ void dal_edid_patch_update_dp_receiver_id_based_monitor_patches(
 			monitor_patch_list_insert(&ep->mpl, &info);
 		}
 	}
-
-	return;
 }

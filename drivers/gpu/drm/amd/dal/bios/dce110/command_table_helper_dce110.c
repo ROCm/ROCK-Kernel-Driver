@@ -104,6 +104,7 @@ static uint8_t clock_source_id_to_atom_phy_clk_src_id(
 		enum clock_source_id id)
 {
 	uint8_t atom_phy_clk_src_id = 0;
+
 	switch (id) {
 	case CLOCK_SOURCE_ID_PLL0:
 		atom_phy_clk_src_id = ATOM_TRANSMITTER_CONFIG_V5_P0PLL;
@@ -195,6 +196,7 @@ static bool clock_source_id_to_atom(
 	uint32_t *atom_pll_id)
 {
 	bool result = true;
+
 	if (atom_pll_id != NULL)
 		switch (id) {
 		case CLOCK_SOURCE_ID_PLL0:
@@ -287,6 +289,7 @@ static bool engine_bp_to_atom(enum engine_id id, uint32_t *atom_engine_id)
 static uint8_t encoder_action_to_atom(enum bp_encoder_control_action action)
 {
 	uint8_t atom_action = 0;
+
 	switch (action) {
 	case ENCODER_CONTROL_ENABLE:
 		atom_action = ATOM_ENABLE;

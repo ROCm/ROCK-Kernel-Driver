@@ -29,32 +29,37 @@
 /* DDC service transaction error codes
  * depends on transaction status
  */
-enum ddc_result
-{
-    DDCRESULT_UNKNOWN       = 0,
-    DDCRESULT_SUCESSFULL,
-    DDCRESULT_FAILEDCHANNELBUSY,
-    DDCRESULT_FAILEDTIMEOUT,
-    DDCRESULT_FAILEDPROTOCOLERROR,
-    DDCRESULT_FAILEDNACK,
-    DDCRESULT_FAILEDINCOMPLETE,
-    DDCRESULT_FAILEDOPERATION,
-    DDCRESULT_FAILEDINVALIDOPERATION,
-    DDCRESULT_FAILEDBUFFEROVERFLOW
+enum ddc_result {
+	DDCRESULT_UNKNOWN = 0,
+	DDCRESULT_SUCESSFULL,
+	DDCRESULT_FAILEDCHANNELBUSY,
+	DDCRESULT_FAILEDTIMEOUT,
+	DDCRESULT_FAILEDPROTOCOLERROR,
+	DDCRESULT_FAILEDNACK,
+	DDCRESULT_FAILEDINCOMPLETE,
+	DDCRESULT_FAILEDOPERATION,
+	DDCRESULT_FAILEDINVALIDOPERATION,
+	DDCRESULT_FAILEDBUFFEROVERFLOW
 };
 
-enum 
-{
-    MaxNativeAuxTransactionSize = 16
+enum {
+	MaxNativeAuxTransactionSize = 16
 };
 
 struct display_sink_capability;
 
 /* TO DO: below functions can be moved to ddc_service (think about it)*/
-enum ddc_result dal_ddc_read_dpcd_data(uint32_t address, unsigned char* data, uint32_t size);
-enum ddc_result dal_ddc_write_dpcd_data(uint32_t address, const unsigned char* data uint32_t size);
-bool dal_aux_query_dp_sink_capability(display_sink_capability* sink_cap);
-bool start_gtc_sync();
-bool stop_gtc_sync();
+enum ddc_result dal_ddc_read_dpcd_data(
+		uint32_t address,
+		unsigned char *data,
+		uint32_t size);
+
+enum ddc_result dal_ddc_write_dpcd_data(
+		uint32_t address,
+		const unsigned char *data uint32_t size);
+
+bool dal_aux_query_dp_sink_capability(display_sink_capability *sink_cap);
+bool start_gtc_sync(void);
+bool stop_gtc_sync(void);
 
 #endif /*__DPCD_ACCESS_SERVICE_INTERFACE_HPP__*/

@@ -46,6 +46,7 @@ struct flat_set *dal_flat_set_create(
 		const struct flat_set_init_data *init_data)
 {
 	struct flat_set *flat_set;
+
 	if (init_data == NULL)
 		return NULL;
 
@@ -134,6 +135,7 @@ void *dal_flat_set_insert(
 {
 	uint32_t where;
 	void *found_elm = dal_flat_set_search(flat_set, what, &where);
+
 	if (found_elm)
 		/*already there, not inserting*/
 		return found_elm;

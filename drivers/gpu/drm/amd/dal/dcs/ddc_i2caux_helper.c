@@ -39,13 +39,14 @@ struct aux_payloads {
 struct i2c_payloads *dal_ddc_i2c_payloads_create(uint32_t count)
 {
 	struct i2c_payloads *payloads;
+
 	payloads = dal_alloc(sizeof(struct i2c_payloads));
 
 	if (!payloads)
 		return NULL;
 
 	if (dal_vector_construct(
-		&payloads->payloads, count , sizeof(struct i2c_payload)))
+		&payloads->payloads, count, sizeof(struct i2c_payload)))
 		return payloads;
 
 	dal_free(payloads);
@@ -76,13 +77,14 @@ void dal_ddc_i2c_payloads_destroy(struct i2c_payloads **p)
 struct aux_payloads *dal_ddc_aux_payloads_create(uint32_t count)
 {
 	struct aux_payloads *payloads;
+
 	payloads = dal_alloc(sizeof(struct aux_payloads));
 
 	if (!payloads)
 		return NULL;
 
 	if (dal_vector_construct(
-		&payloads->payloads, count , sizeof(struct aux_payloads)))
+		&payloads->payloads, count, sizeof(struct aux_payloads)))
 		return payloads;
 
 	dal_free(payloads);
@@ -122,6 +124,7 @@ void dal_ddc_i2c_payloads_add(
 {
 	uint32_t payload_size = EDID_SEGMENT_SIZE;
 	uint32_t pos;
+
 	for (pos = 0; pos < len; pos += payload_size) {
 		struct i2c_payload payload = {
 			.write = write,
@@ -142,6 +145,7 @@ void dal_ddc_aux_payloads_add(
 {
 	uint32_t payload_size = DEFAULT_AUX_MAX_DATA_SIZE;
 	uint32_t pos;
+
 	for (pos = 0; pos < len; pos += payload_size) {
 		struct aux_payload payload = {
 			.i2c_over_aux = true,

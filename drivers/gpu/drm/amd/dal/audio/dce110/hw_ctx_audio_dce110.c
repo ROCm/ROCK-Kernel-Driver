@@ -46,7 +46,7 @@
 #define FIRST_AUDIO_STREAM_ID 1
 
 #define NOT_IMPLEMENTED() DAL_LOGGER_NOT_IMPL(LOG_MINOR_COMPONENT_AUDIO, \
-			"Audio:%s()\n", __func__);
+			"Audio:%s()\n", __func__)
 
 static const uint32_t engine_offset[] = {
 	0,
@@ -65,6 +65,7 @@ static void destroy(
 	struct hw_ctx_audio **ptr)
 {
 	struct hw_ctx_audio_dce110 *hw_ctx_dce110;
+
 	hw_ctx_dce110 = container_of(
 		*ptr, struct hw_ctx_audio_dce110, base);
 
@@ -849,6 +850,7 @@ static void setup_vce_audio(
 	const struct hw_ctx_audio *hw_ctx)
 {
 	struct dal_context *dal_context = hw_ctx->ctx;
+
 	NOT_IMPLEMENTED();
 
 	/*TODO:
@@ -1462,8 +1464,8 @@ static void setup_azalia(
 	{
 		const uint32_t addr =
 			mmAFMT_AUDIO_PACKET_CONTROL2 + engine_offset[engine_id];
-
 		uint32_t value = dal_read_reg(hw_ctx->ctx, addr);
+
 		set_reg_field_value(value,
 			channels,
 			AFMT_AUDIO_PACKET_CONTROL2,
@@ -1608,6 +1610,7 @@ static void set_unsolicited_response_payload(
 	/* set the payload value for the unsolicited response
 	 Jack presence is not required to be enabled */
 	uint32_t value = 0;
+
 	value = read_indirect_azalia_reg(
 		hw_ctx,
 		ixAZALIA_F0_CODEC_PIN_CONTROL_UNSOLICITED_RESPONSE_FORCE);
@@ -1647,6 +1650,7 @@ static void hw_initialize(
 	addr = mmAZALIA_F0_CODEC_FUNCTION_PARAMETER_SUPPORTED_SIZE_RATES;
 	{
 		uint32_t value;
+
 		value = dal_read_reg(hw_ctx->ctx, addr);
 
 		set_reg_field_value(value, 0x70,

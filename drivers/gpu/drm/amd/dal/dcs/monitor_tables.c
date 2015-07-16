@@ -275,6 +275,7 @@ const struct monitor_patch_info *dal_monitor_tables_find_entry(
 	enum monitor_patch_type patch_type)
 {
 	uint32_t i;
+
 	for (i = 0; i < dal_monitor_tables_get_count(); ++i) {
 		const struct monitor_patch_info *entry =
 			&monitor_patch_table[i];

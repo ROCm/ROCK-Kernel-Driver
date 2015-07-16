@@ -250,6 +250,7 @@ bool dal_timing_generator_validate_timing(
 	uint32_t h_blank;
 	uint32_t h_front_porch;
 	uint32_t h_back_porch;
+
 	ASSERT(hw_crtc_timing != NULL);
 
 	if (!hw_crtc_timing)

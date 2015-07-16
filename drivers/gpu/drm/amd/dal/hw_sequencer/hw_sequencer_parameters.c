@@ -1032,10 +1032,10 @@ static uint32_t prepare_per_path_parameters(
 			params_prepared = 0;
 			ASSERT(false);
 			return params_prepared;
-		} else {
-			/* OK */
-			param_current++;
 		}
+
+		/* OK */
+		param_current++;
 	} /* for() */
 
 	/* we prepared as many parameters as planes */

@@ -120,8 +120,6 @@ static void set_denormalization(
 		DENORM_10BIT_OUT);
 
 	dal_write_reg(csc->ctx, addr, value);
-
-	return;
 }
 
 bool configure_graphics_mode(
@@ -151,32 +149,32 @@ bool configure_graphics_mode(
 			 * method) so we handle it in one place.
 			 */
 			return true;
-		} else {
-			switch (color_space) {
-			case COLOR_SPACE_SRGB_FULL_RANGE:
-				/* bypass */
-				break;
-			case COLOR_SPACE_YCBCR601:
-			case COLOR_SPACE_YPBPR601:
-			case COLOR_SPACE_YCBCR601_YONLY:
-				set_reg_field_value(
-					value,
-					2,
-					COL_MAN_OUTPUT_CSC_CONTROL,
-					OUTPUT_CSC_MODE);
-				break;
-			case COLOR_SPACE_YCBCR709:
-			case COLOR_SPACE_YPBPR709:
-			case COLOR_SPACE_YCBCR709_YONLY:
-				set_reg_field_value(
-					value,
-					3,
-					COL_MAN_OUTPUT_CSC_CONTROL,
-					OUTPUT_CSC_MODE);
-				break;
-			default:
-				return false;
-			}
+		}
+
+		switch (color_space) {
+		case COLOR_SPACE_SRGB_FULL_RANGE:
+			/* bypass */
+			break;
+		case COLOR_SPACE_YCBCR601:
+		case COLOR_SPACE_YPBPR601:
+		case COLOR_SPACE_YCBCR601_YONLY:
+			set_reg_field_value(
+				value,
+				2,
+				COL_MAN_OUTPUT_CSC_CONTROL,
+				OUTPUT_CSC_MODE);
+			break;
+		case COLOR_SPACE_YCBCR709:
+		case COLOR_SPACE_YPBPR709:
+		case COLOR_SPACE_YCBCR709_YONLY:
+			set_reg_field_value(
+				value,
+				3,
+				COL_MAN_OUTPUT_CSC_CONTROL,
+				OUTPUT_CSC_MODE);
+			break;
+		default:
+			return false;
 		}
 	} else if (csc_adjust_type == GRAPHICS_CSC_ADJUST_TYPE_HW) {
 		switch (color_space) {

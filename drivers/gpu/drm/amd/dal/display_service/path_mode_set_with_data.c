@@ -147,6 +147,7 @@ struct active_path_data *dal_pms_with_data_get_path_data_for_display_index(
 		uint32_t index)
 {
 	uint32_t i;
+
 	for (i = 0; i < set->base.count; i++) {
 		if (set->base.path_mode_set[i].display_path_index == index)
 			return &set->path_data[i];
@@ -212,7 +213,9 @@ bool dal_pms_with_data_remove_path_mode_for_display_index(
 
 	for (i = 0; i < set_with_data->base.count; i++) {
 		if (set_with_data->base.path_mode_set[i].display_path_index == index)
-			return dal_pms_with_data_remove_path_mode_at_index(set_with_data, i);
+			return dal_pms_with_data_remove_path_mode_at_index(
+					set_with_data,
+					i);
 	}
 
 	return false;
@@ -230,6 +233,7 @@ static bool get_path_mode_index(
 	uint32_t *index)
 {
 	uint32_t i;
+
 	for (i = 0; i < set->base.count; ++i) {
 		if (set->base.path_mode_set[i].display_path_index ==
 			display_index) {
@@ -288,6 +292,7 @@ void dal_pms_with_data_clear_plane_configs(
 static void destruct(struct path_mode_set_with_data *set)
 {
 	uint32_t i;
+
 	for (i = 0; i < dal_pms_get_path_mode_num(&set->base); ++i)
 		dal_vector_destruct(&set->plane_configs[i]);
 }

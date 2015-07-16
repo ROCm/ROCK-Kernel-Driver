@@ -526,6 +526,7 @@ struct edid_ext_cea {
 bool dal_edid_ext_cea_is_cea_ext(uint32_t len, const uint8_t *buf)
 {
 	const struct edid_data_cea861_ext *ext;
+
 	if (len < sizeof(struct edid_data_cea861_ext))
 		return false; /* CEA extension is 128 byte in length*/
 
@@ -1121,6 +1122,7 @@ static bool add_hdmi_vic_timings(
 			++i) {
 			/* get non video optimized version */
 			struct mode_timing mode_timing;
+
 			if (get_timing_for_hdmi_vic(
 				edid,
 				video_fields.hdmi_vic[i],
@@ -1252,6 +1254,7 @@ static bool get_cea_vendor_specific_data_block(
 	/* optional 7th byte */
 	if (descr.len >= 7) {
 		const struct monitor_patch_info *patch_info;
+
 		vendor_block->max_tmds_clk_mhz = vsdb->max_tmds_clk * 5;
 
 		patch_info =
@@ -1444,6 +1447,7 @@ static bool get_cea_speaker_allocation_data_block(
 {
 	struct edid_ext_cea *ext = FROM_EDID(edid);
 	struct short_descr_info descr;
+
 	if (!find_short_descr(
 		ext->data,
 		0,
@@ -1610,8 +1614,10 @@ static bool add_cea861b_audio_modes(
 			&descr)) {
 		uint8_t index;
 		const uint8_t *sad = &ext->data->data_block[descr.offset];
+
 		for (index = 0; index < descr.len/3; ++index) {
 			struct cea_audio_mode audio_mode = { 0 };
+
 			audio_mode.format_code = sad[0]>>3;
 			audio_mode.channel_count = (sad[0] & 0x7) + 1;
 			audio_mode.sample_rate = sad[1] & 0x7F;
@@ -1634,18 +1640,21 @@ static bool get_cea_audio_modes(
 	struct dcs_cea_audio_mode_list *audio_list)
 {
 	struct edid_ext_cea *ext = FROM_EDID(edid);
+
 	return add_cea861b_audio_modes(ext, audio_list);
 }
 
 static uint8_t get_edid_extension_tag(struct edid_base *edid)
 {
 	struct edid_ext_cea *ext = FROM_EDID(edid);
+
 	return ext->data->extension_tag;
 }
 
 static const uint8_t *get_raw_data(struct edid_base *edid)
 {
 	struct edid_ext_cea *ext = FROM_EDID(edid);
+
 	return (const uint8_t *)ext->data;
 }
 

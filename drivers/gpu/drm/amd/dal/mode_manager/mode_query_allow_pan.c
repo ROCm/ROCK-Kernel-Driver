@@ -50,6 +50,7 @@ static bool build_cofunc_view_solution_set(struct mode_query *mq)
 			mq->cur_view_solutions[i] = vs;
 		} else {
 			struct view_solution vs_pan;
+
 			if (mq_allow_pan->panning_view_solution_indicies[i]
 				== INVALID_VIEW_SOLUTION_INDEX){
 				BREAK_TO_DEBUGGER();
@@ -230,6 +231,7 @@ void dal_mode_query_allow_pan_post_initialize(struct mode_query *mq)
 			base);
 	for (i = 0; i < mq->query_set->num_path; i++) {
 		uint32_t j;
+
 		mq_allow_pan->panning_view_solution_indicies[i] =
 				INVALID_VIEW_SOLUTION_INDEX;
 
@@ -251,16 +253,17 @@ void dal_mode_query_allow_pan_post_initialize(struct mode_query *mq)
 				mq_allow_pan->panning_view_solution_indicies[i]
 					= j - 1;
 				break;
-			} else
-				if (mq_allow_pan->
-					panning_view_solution_indicies[i] ==
-						INVALID_VIEW_SOLUTION_INDEX &&
-				view_solution_get_display_view_importance(&vs)
-						<= mq->enum_display_view_level)
+			}
 
-					mq_allow_pan->
-					panning_view_solution_indicies[i] =
-							j - 1;
+			if (mq_allow_pan->
+				panning_view_solution_indicies[i] ==
+					INVALID_VIEW_SOLUTION_INDEX &&
+			view_solution_get_display_view_importance(&vs)
+					<= mq->enum_display_view_level)
+
+				mq_allow_pan->
+				panning_view_solution_indicies[i] =
+						j - 1;
 		}
 
 		ASSERT(mq_allow_pan->panning_view_solution_indicies[i] !=

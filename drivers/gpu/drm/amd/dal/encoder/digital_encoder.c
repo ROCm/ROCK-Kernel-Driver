@@ -574,9 +574,8 @@ enum encoder_result dal_digital_encoder_setup_stereo(
 
 		/* Enable output side-band stereo-sync through GPIO */
 
-		if (!enc->stereo_gpio) {
+		if (!enc->stereo_gpio)
 			return ENCODER_RESULT_ERROR;
-		}
 
 		/* Open GPIO in HW mode */
 
@@ -872,6 +871,7 @@ void dal_digital_encoder_destruct(
 {
 	if (enc->hw_ctx) {
 		struct hw_ctx_digital_encoder *hw_ctx_base = &enc->hw_ctx->base;
+
 		enc->hw_ctx->base.funcs->destroy(&hw_ctx_base);
 	}
 

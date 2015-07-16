@@ -102,6 +102,7 @@ static void reset_lb_on_vblank(
 	/* Wait for one frame if CRTC is moving */
 	if (value != dal_read_reg(lb->dal_context, addr)) {
 		uint32_t retry_count = 0;
+
 		addr = lb_dce110->lbx_lb_sync_reset_sel;
 		value = dal_read_reg(lb->dal_context, addr);
 		set_reg_field_value(
@@ -161,6 +162,7 @@ bool dal_line_buffer_dce110_get_pixel_storage_depth(
 		/*we have to go the higher lb if it is possible*/
 		uint32_t i;
 		uint32_t max_depth = LB_PIXEL_DEPTH_36BPP;
+
 		for (i = display_depth; i <= max_depth; i <<= 1) {
 			if (i & lb->caps) {
 				*depth = i;
@@ -175,6 +177,7 @@ bool dal_line_buffer_dce110_get_pixel_storage_depth(
 static uint32_t calculate_pitch(uint32_t depth, uint32_t width)
 {
 	uint32_t pitch = 0;
+
 	switch (depth) {
 	case LB_PIXEL_DEPTH_18BPP:
 		pitch = (width + 7) >> 3;

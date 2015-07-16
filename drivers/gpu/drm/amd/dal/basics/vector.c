@@ -55,6 +55,7 @@ bool dal_vector_presized_costruct(
 	uint32_t struct_size)
 {
 	uint32_t i;
+
 	vector->container = NULL;
 
 	if (!struct_size || !count) {
@@ -179,6 +180,7 @@ void dal_vector_set_at_index(
 	uint32_t index)
 {
 	void *where = dal_vector_at_index(vector, index);
+
 	if (!where) {
 		BREAK_TO_DEBUGGER();
 		return;

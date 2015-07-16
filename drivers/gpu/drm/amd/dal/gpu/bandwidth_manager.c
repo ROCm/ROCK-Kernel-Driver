@@ -328,6 +328,7 @@ uint32_t dal_bandwidth_manager_get_available_mclk_switch_time(
 uint32_t dal_bandwidth_manager_controller_id_to_index(enum controller_id id)
 {
 	uint32_t index = 0;
+
 	switch (id) {
 	case CONTROLLER_ID_D0:
 	case CONTROLLER_ID_UNDERLAY0:

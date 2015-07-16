@@ -392,12 +392,14 @@ bool dal_grph_colors_group_compute_hw_adj_color_control(
 				&gamut->gamut_src);
 		{
 			struct adjustment_info *non_const_temp = temperature;
+
 			non_const_temp->adj_data.ranged.cur =
 					requested_temperature;
 		}
 	}
 	{
 		union update_color_flags flags = {0};
+
 		if (!dal_gamut_space_update_gamut(
 					gamut, false, &flags))
 				return false;
@@ -583,6 +585,7 @@ enum ds_color_space dal_grph_colors_group_build_default_color_space(
 	case SIGNAL_TYPE_HDMI_TYPE_A:
 	{
 		uint32_t pix_clk_khz;
+
 		color_space = hdmi_request_color_space;
 		if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR422 &&
 			timing->pixel_encoding == PIXEL_ENCODING_YCBCR444) {
@@ -826,6 +829,7 @@ enum ds_return dal_grph_colors_group_set_color_graphics_gamut(
 	if (apply_to_hw) {
 		enum hwss_result result;
 		enum ds_color_space color_space;
+
 		color_control = dal_alloc(sizeof(*color_control));
 		if (!color_control)
 			return DS_ERROR;
@@ -861,6 +865,7 @@ enum ds_return dal_grph_colors_group_set_color_graphics_gamut(
 		if (result == HWSS_RESULT_OK) {
 			if (grph_colors_adj->regamma_updated) {
 				enum ds_return ret;
+
 				if (!dal_adj_container_get_regamma_copy(
 						adj_container,
 						old_regamma))
@@ -1256,6 +1261,7 @@ enum ds_return dal_grph_colors_group_update_gamut(
 	dal_memmove(&gamut->regamma, const_regamma, sizeof(gamut->regamma));
 	{
 		union update_color_flags flags = {0};
+
 		if (!dal_gamut_space_update_gamut(
 				gamut, false, &flags))
 			goto gamut_fail;

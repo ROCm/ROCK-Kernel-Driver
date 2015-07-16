@@ -131,8 +131,9 @@ static bool build_custom_float(
 		dal_fixed31_32_zero)) {
 		*negative = format->sign;
 		value = dal_fixed31_32_neg(value);
-	} else
+	} else {
 		*negative = false;
+	}
 
 	if (dal_fixed31_32_lt(
 		value,
@@ -152,8 +153,9 @@ static bool build_custom_float(
 			*mantissa = 0;
 			*exponenta = 0;
 			return true;
-		} else
-			*exponenta = exp_offset - i;
+		}
+
+		*exponenta = exp_offset - i;
 	} else if (dal_fixed31_32_le(
 		mantissa_constant_plus_max_fraction,
 		value)) {
@@ -167,8 +169,9 @@ static bool build_custom_float(
 			value));
 
 		*exponenta = exp_offset + i - 1;
-	} else
+	} else {
 		*exponenta = exp_offset;
+	}
 
 	mantiss = dal_fixed31_32_sub(
 		value,

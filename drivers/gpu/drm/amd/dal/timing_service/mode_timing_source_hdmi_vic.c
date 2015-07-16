@@ -115,6 +115,7 @@ static bool get_timing_for_mode(
 		struct crtc_timing *crtc_timing)
 {
 	uint32_t i;
+
 	if (crtc_timing == NULL)
 		return false;
 	for (i = 0; i < MODE_COUNT; ++i)
@@ -136,6 +137,7 @@ static bool is_timing_in_standard(const struct crtc_timing *crtc_timing)
 {
 	uint32_t i;
 	struct crtc_timing modified_timing = *crtc_timing;
+
 	modified_timing.timing_3d_format = TIMING_3D_FORMAT_NONE;
 	modified_timing.display_color_depth = DISPLAY_COLOR_DEPTH_UNDEFINED;
 	modified_timing.pixel_encoding = PIXEL_ENCODING_UNDEFINED;

@@ -120,8 +120,8 @@ static enum encoder_result power_up(
 		dal_logger_write(enc->ctx->logger,
 			LOG_MAJOR_ERROR,
 			LOG_MINOR_COMPONENT_ENCODER,
-			"%s: Failed to execute VBIOS"
-			" command table!\n", __func__);
+			"%s: Failed to execute VBIOS command table!\n",
+			__func__);
 
 		return ENCODER_RESULT_ERROR;
 	}

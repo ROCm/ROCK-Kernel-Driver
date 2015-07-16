@@ -46,6 +46,7 @@ static inline uint64_t complete_integer_division_u64(
 	uint64_t *remainder)
 {
 	uint64_t result;
+
 	ASSERT(divisor);
 
 	result = div64_u64_rem(dividend, divisor, remainder);

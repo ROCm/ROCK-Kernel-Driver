@@ -618,10 +618,15 @@ struct cursor_position {
 	uint32_t x_origin;
 	uint32_t y_origin;
 
-	/*This parameter indicates whether HW cursor should be enabled */
+	/*
+	 * This parameter indicates whether HW cursor should be enabled
+	 */
 	bool enable;
 
-	/* This parameter indicates whether cursor hot spot should be programmed */
+	/*
+	 * This parameter indicates whether cursor hot spot should be
+	 * programmed
+	 */
 	bool hot_spot_enable;
 };
 

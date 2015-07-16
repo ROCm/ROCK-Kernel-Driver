@@ -131,6 +131,7 @@ static bool is_timing_priority_higher(
 		const struct mode_timing *rhs)
 {
 	uint32_t distance_lhs, distance_rhs;
+
 	if (rhs == NULL || lhs == NULL) {
 		BREAK_TO_DEBUGGER();
 		return false;
@@ -201,6 +202,7 @@ void update_solution_support_matrix_for_scaling_trans(
 {
 	enum pixel_format pf;
 	bool guaranteed, supported;
+
 	dal_set_mode_params_update_scaling_on_path(
 			bv->set_mode_params,
 			bv->display_index,
@@ -351,6 +353,7 @@ static bool add_timing_to_candidate_list_with_priority(
 	struct mtp last_mtp;
 	enum timing_3d_format last_mt_3d_fmt;
 	enum timing_3d_format new_mt_3d_fmt;
+
 	if (cl == NULL || mode_timing == NULL) {
 		BREAK_TO_DEBUGGER();
 		return false;
@@ -435,6 +438,7 @@ static bool is_fid9204hp_ce_mode(const struct mode_info *mode_info)
 {
 	uint32_t i;
 	const struct mode_info *ce_mode_info;
+
 	for (i = 0; i < NUM_FID9204HP_CE_MODES; i++) {
 		ce_mode_info = &best_view_ce_mode_only_fid9204hp_ce_modes[i];
 		if ((mode_info->pixel_width == ce_mode_info->pixel_width) &&
@@ -458,6 +462,7 @@ static enum display_view_importance
 {
 	uint32_t i;
 	const struct mode_info *ce_mode_info;
+
 	for (i = 0; i < NUM_FID9204HP_CE_MODES; i++) {
 		ce_mode_info =  &best_view_ce_mode_only_fid9204hp_ce_modes[i];
 		if (vw->width == ce_mode_info->pixel_width &&
@@ -815,6 +820,7 @@ static bool best_view_single_selected_timing_construct(
 		struct best_view_init_data *bv_init_data)
 {
 	const struct mode_timing *selected_mode_timing;
+
 	if (bv_init_data == NULL ||
 			bv_init_data->mode_timing_list == NULL ||
 			!best_view_construct(bv, bv_init_data))
@@ -928,6 +934,7 @@ static bool match_view_with_identity_timing(
 	struct mtp mtp;
 	struct scaling_support scaling_support;
 	const struct crtc_timing *crtc_timing;
+
 	if (dal_candidate_list_find_matching_view(
 			&bv->identity_candidates,
 			vw,
@@ -1050,6 +1057,7 @@ static bool match_view_with_next_lower_timing(
 	int32_t i;
 	struct scaling_support scaling_support;
 	struct mtp mtp;
+
 	for (i = start_index; i >= 0; i--) {
 		mtp = dal_candidate_list_at_index(&bv->scaled_candidates, i);
 
@@ -1201,6 +1209,7 @@ bool dal_best_view_match_view_to_timing(
 {
 	uint32_t index;
 	bool found = match_view_with_identity_timing(bv, vw, target_list);
+
 	if (!found) {
 		/* Either no timing found, or the timing is OS forced
 		 * may not be able to use,
@@ -1275,8 +1284,7 @@ void dal_best_view_dump_statistics(struct best_view *bv)
 	dal_logger_write(bv->ctx->logger,
 		LOG_MAJOR_MODE_ENUM,
 		LOG_MINOR_MODE_ENUM_BEST_VIEW_CANDIDATES,
-		"Path #%d contains %d supported PathMode combinations."
-		" %d PathModes are supported but not guaranteed\n",
+		"Path #%d contains %d supported PathMode combinations. %d PathModes are supported but not guaranteed\n",
 		bv->display_index,
 		bv->supported_path_mode_cnt,
 		bv->non_guaranteed_path_mode_cnt);

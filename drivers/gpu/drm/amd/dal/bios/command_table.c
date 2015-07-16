@@ -150,6 +150,7 @@ static enum bp_result encoder_control_dig2_v1(
 static void init_encoder_control_dig_v1(struct bios_parser *bp)
 {
 	struct cmd_tbl *cmd_tbl = &bp->cmd_tbl;
+
 	if (1 == BIOS_CMD_TABLE_PARA_REVISION(DIG1EncoderControl))
 		cmd_tbl->encoder_control_dig1 = encoder_control_dig1_v1;
 	else
@@ -489,7 +490,7 @@ static enum bp_result transmitter_control_v2(
 	 * 01 - incoherent mode
 	 */
 
-	params.acConfig.fCoherentMode = cntl->coherent ;
+	params.acConfig.fCoherentMode = cntl->coherent;
 
 	if ((TRANSMITTER_UNIPHY_B == cntl->transmitter)
 			|| (TRANSMITTER_UNIPHY_D == cntl->transmitter)
@@ -789,7 +790,7 @@ static enum bp_result transmitter_control_v4(
 	 * 01 - incoherent mode
 	 */
 
-	params.acConfig.fCoherentMode = cntl->coherent ;
+	params.acConfig.fCoherentMode = cntl->coherent;
 
 	if ((TRANSMITTER_UNIPHY_B == cntl->transmitter)
 		|| (TRANSMITTER_UNIPHY_D == cntl->transmitter)
@@ -1390,6 +1391,7 @@ static enum bp_result adjust_display_pll_v2(
 	/* We need to convert from KHz units into 10KHz units and then convert
 	 * output pixel clock back 10KHz-->KHz */
 	uint32_t pixel_clock_10KHz_in = bp_params->pixel_clock / 10;
+
 	params.usPixelClock = (uint16_t)(pixel_clock_10KHz_in);
 	params.ucTransmitterID =
 		bp->cmd_helper->encoder_id_to_atom(
@@ -1407,6 +1409,7 @@ static enum bp_result adjust_display_pll_v2(
 		 * [output pxlClk/input pxlClk] */
 		uint64_t pixel_clock_10KHz_out = (uint64_t)params.usPixelClock;
 		uint64_t pixel_clock = (uint64_t)bp_params->pixel_clock;
+
 		bp_params->adjusted_pixel_clock =
 			div_u64(pixel_clock * pixel_clock_10KHz_out,
 				pixel_clock_10KHz_in);
@@ -1469,6 +1472,7 @@ static enum bp_result adjust_display_pll_v3(
 		uint64_t pixel_clk_10_khz_out =
 			(uint64_t)params.sOutput.ulDispPllFreq;
 		uint64_t pixel_clk = (uint64_t)bp_params->pixel_clock;
+
 		if (pixel_clk_10_kHz_in != 0) {
 			bp_params->adjusted_pixel_clock =
 				div_u64(pixel_clk * pixel_clk_10_khz_out,
@@ -1758,6 +1762,7 @@ static enum signal_type dac_load_detection_v3(
 		 * VBIOS call
 		 */
 		struct connector_device_tag_info info;
+
 		info.dev_id.device_type = DEVICE_TYPE_CV;
 		info.dev_id.enum_id = 1;
 		info.acpi_device = 0;
@@ -2349,6 +2354,7 @@ static enum bp_result program_clock_v5(
 
 	SET_PIXEL_CLOCK_PS_ALLOCATION_V5 params;
 	uint32_t atom_pll_id;
+
 	dal_memset(&params, 0, sizeof(params));
 	if (!bp->cmd_helper->clock_source_id_to_atom(
 		bp_params->pll_id, &atom_pll_id)) {
@@ -2379,6 +2385,7 @@ static enum bp_result program_clock_v6(
 
 	SET_PIXEL_CLOCK_PS_ALLOCATION_V6 params;
 	uint32_t atom_pll_id;
+
 	dal_memset(&params, 0, sizeof(params));
 
 	if (!bp->cmd_helper->clock_source_id_to_atom(

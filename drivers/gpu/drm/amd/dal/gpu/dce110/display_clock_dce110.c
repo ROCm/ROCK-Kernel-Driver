@@ -37,12 +37,6 @@
 
 #include "display_clock_dce110.h"
 
-/*****************************************************************************
- * macro definitions
- *****************************************************************************/
-#define NOT_IMPLEMENTED()  DAL_LOGGER_NOT_IMPL(LOG_MINOR_COMPONENT_GPU, \
-			"DCLK:%s()\n", __func__);
-
 #define FROM_DISPLAY_CLOCK(base) \
 	container_of(base, struct display_clock_dce110, disp_clk_base)
 
@@ -621,6 +615,7 @@ static uint32_t calculate_min_clock(
 
 	if (params != NULL) {
 		uint32_t disp_clk_khz = 0;
+
 		for (i = 0; i < path_num; ++i) {
 
 			disp_clk_khz = calc_single_display_min_clks(
@@ -669,6 +664,7 @@ static bool display_clock_integrated_info_construct(
 	/*update the maximum display clock for each power state*/
 	for (i = 0; i < NUMBER_OF_DISP_CLK_VOLTAGE; ++i) {
 		enum clocks_state clk_state = CLOCKS_STATE_INVALID;
+
 		switch (i) {
 		case 0:
 			clk_state = CLOCKS_STATE_ULTRA_LOW;
@@ -805,6 +801,7 @@ static void set_clock_state(
 	struct display_clock_state clk_state)
 {
 	struct display_clock_dce110 *disp_clk = DCLCK110_FROM_BASE(dc);
+
 	disp_clk->clock_state = clk_state;
 }
 
@@ -812,6 +809,7 @@ static struct display_clock_state get_clock_state(
 	struct display_clock *dc)
 {
 	struct display_clock_dce110 *disp_clk = DCLCK110_FROM_BASE(dc);
+
 	return disp_clk->clock_state;
 }
 

@@ -309,6 +309,7 @@ static bool get_supported_mode_timing(
 static void validate(struct edid_base *edid)
 {
 	struct edid_ext_vtb *ext = FROM_EDID(edid);
+
 	if (ext->data->checksum != dal_edid_compute_checksum(edid))
 		edid->error.BAD_CHECKSUM = true;
 }
@@ -316,6 +317,7 @@ static void validate(struct edid_base *edid)
 static const uint8_t *get_raw_data(struct edid_base *edid)
 {
 	struct edid_ext_vtb *ext = FROM_EDID(edid);
+
 	return (const uint8_t *)ext->data;
 }
 
@@ -424,6 +426,7 @@ struct edid_base *dal_edid_ext_vtb_create(
 bool dal_edid_ext_vtb_is_vtb_ext(uint32_t len, const uint8_t *buf)
 {
 	const struct edid_data_vtb_ext *ext;
+
 	if (len < sizeof(struct edid_data_vtb_ext))
 		return false;
 

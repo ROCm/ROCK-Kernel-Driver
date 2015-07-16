@@ -112,6 +112,7 @@ static void connector_destroy(struct tm_resource **resource)
 static void engine_destroy(struct tm_resource **resource)
 {
 	struct tm_resource_engine_info *info;
+
 	info = TO_ENGINE_INFO(*resource);
 	dal_free((*resource)->res_private);
 	dal_free(info);

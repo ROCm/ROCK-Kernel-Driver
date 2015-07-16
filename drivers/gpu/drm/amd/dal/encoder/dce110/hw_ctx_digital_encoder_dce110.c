@@ -63,7 +63,7 @@
 #endif
 
 #define NOT_IMPLEMENTED() DAL_LOGGER_NOT_IMPL(LOG_MINOR_COMPONENT_ENCODER,\
-		"ENC:%s\n", __func__);
+		"ENC:%s\n", __func__)
 
 enum hw_ctx_digital_encoder_dce110_constants {
 	/* Sending blank requires to wait until stream is disabled.
@@ -242,6 +242,7 @@ static void set_dvo_stream_attributes(
 	bool ddr_memory_rate)
 {
 	struct dal_context *dal_context = ctx->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 }
 
@@ -251,6 +252,7 @@ static bool setup_tmds_stereo_sync(
 	enum tmds_stereo_sync_select stereo_select)
 {
 	struct dal_context *dal_context = ctx->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 
 	return false;
@@ -262,6 +264,7 @@ static bool setup_stereo_sync(
 	enum sync_source source)
 {
 	struct dal_context *dal_context = ctx->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 	return false;
 }
@@ -272,6 +275,7 @@ static bool control_stereo_sync(
 	bool enable)
 {
 	struct dal_context *dal_context = ctx->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 	return false;
 }
@@ -285,6 +289,7 @@ static void hpd_initialize(
 	/* Associate HPD with DIG_BE */
 	const uint32_t addr = mmDIG_BE_CNTL + FROM_HAL(ctx)->be_engine_offset;
 	uint32_t value = dal_read_reg(ctx->base.dal_ctx, addr);
+
 	set_reg_field_value(value, hpd_source, DIG_BE_CNTL, DIG_HPD_SELECT);
 	dal_write_reg(ctx->base.dal_ctx, addr, value);
 }
@@ -627,6 +632,7 @@ static bool get_lane_settings(
 	struct link_training_settings *link_training_settings)
 {
 	struct dal_context *dal_context = ctx->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 	return true;
 }
@@ -636,6 +642,7 @@ static bool enable_dvo_sync_output(
 	enum sync_source source)
 {
 	struct dal_context *dal_context = ctx->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 	return false;
 }
@@ -644,6 +651,7 @@ static bool disable_dvo_sync_output(
 	struct hw_ctx_digital_encoder_hal *ctx)
 {
 	struct dal_context *dal_context = ctx->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 	return false;
 }
@@ -1164,6 +1172,7 @@ static void setup_hdmi(
 
 		/* TODO: New feature for DCE11, still need to implement */
 		struct dal_context *dal_context = ctx->base.dal_ctx;
+
 		NOT_IMPLEMENTED();
 
 		/* enable HDMI data scrambler */
@@ -1365,6 +1374,7 @@ static void backlight_control(
 	 * If yes, this function is not needed for android becuase LVDS is not
 	 * supported. If yes, need implemented.*/
 	struct dal_context *dal_context = ctx->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 }
 
@@ -1375,6 +1385,7 @@ static void enable_mvpu_downstream(
 	/*TODO android does not support mvpu, should remove functions
 	 * for upper layer  */
 	struct dal_context *dal_context = ctx->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 }
 
@@ -1383,6 +1394,7 @@ static void disable_mvpu_downstream(struct hw_ctx_digital_encoder_hal *ctx)
 	/*TODO android does not support mvpu, should remove functions
 	 * for upper layer  */
 	struct dal_context *dal_context = ctx->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 }
 
@@ -1393,6 +1405,7 @@ static void update_mst_stream_allocation_table(
 	bool is_removal)
 {
 	struct dal_context *dal_context = ctx->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 }
 
@@ -1402,6 +1415,7 @@ static void set_mst_bandwidth(
 	struct fixed31_32 avg_time_slots_per_mtp)
 {
 	struct dal_context *dal_context = ctx->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 }
 
@@ -1653,6 +1667,7 @@ static void set_dp_phy_pattern_symbol_error(
 	{
 		const uint32_t addr = mmDP_DPHY_PRBS_CNTL + addr_offset;
 		uint32_t value = dal_read_reg(ctx, addr);
+
 		set_reg_field_value(value, 1,
 				DP_DPHY_PRBS_CNTL, DPHY_PRBS_SEL);
 		set_reg_field_value(value, 1,
@@ -2032,6 +2047,7 @@ static enum clock_source_id get_active_clock_source(
 	enum transmitter transmitter)
 {
 	struct dal_context *dal_context = ctx->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 	return CLOCK_SOURCE_ID_UNDEFINED;
 }
@@ -2099,6 +2115,7 @@ static enum engine_id get_active_engine(
 	enum transmitter transmitter)
 {
 	struct dal_context *dal_context = ctx->base.dal_ctx;
+
 	NOT_IMPLEMENTED();
 	return ENGINE_ID_UNKNOWN;
 }

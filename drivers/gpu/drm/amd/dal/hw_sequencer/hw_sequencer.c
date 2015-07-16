@@ -360,6 +360,7 @@ void build_encoder_context(
 	uint32_t i;
 	struct connector_feature_support cfs;
 	uint32_t links_number = dal_display_path_get_number_of_links(dp);
+
 	ASSERT(dp != NULL);
 	ASSERT(context != NULL);
 
@@ -447,6 +448,7 @@ void translate_info_frame(const struct hw_info_frame *hw_info_frame,
 		uint8_t chk_sum = 0;
 		uint8_t *ptr;
 		uint8_t i;
+
 		dal_memmove(
 			&encoder_info_frame->gamut,
 			&hw_info_frame->gamut_packet,
@@ -970,6 +972,7 @@ bool dal_hw_sequencer_enable_line_buffer_power_gating(
 	bool interlaced)
 {
 	struct lb_config_data lb_config_data;
+
 	if (!lb)
 		return false;
 
@@ -1033,6 +1036,7 @@ static void enable_hpd(
 {
 	struct encoder_context encoder_context;
 	struct display_path_objects disp_path_obj;
+
 	dal_hw_sequencer_get_objects(display_path, &disp_path_obj);
 	build_encoder_context(
 			display_path,
@@ -1100,6 +1104,7 @@ static void build_upstream_encoder_output(
 	struct dcs *dcs;
 	struct encoder *enc;
 	union dcs_monitor_patch_flags patch_flags;
+
 	if (hw_path_mode == NULL || encoder_output == NULL)
 		return;
 	dcs = dal_display_path_get_dcs(hw_path_mode->display_path);
@@ -1255,6 +1260,7 @@ void dal_hw_sequencer_enable_audio_endpoint(
 	bool enable)
 {
 	struct audio *audio;
+
 	if (!display_path)
 		return;
 
@@ -1339,6 +1345,7 @@ enum hwss_result dal_hw_sequencer_reset_audio_device(
 
 	if (disp_path_obj.audio != NULL) {
 		struct audio_channel_associate_info audio_mapping;
+
 		audio_mapping.u32all = 0;
 
 		dal_audio_enable_channel_splitting_mapping(
@@ -1466,6 +1473,7 @@ static enum hwss_result encoder_validate_path_mode(
 		path_mode->action == HW_PATH_ACTION_STATIC_VALIDATE ?
 			bo_validate : bo_enable;
 	enum encoder_result validation_result;
+
 	build_encoder_output(path_mode, option, &enc_output);
 
 	validation_result =
@@ -1492,6 +1500,7 @@ enum hwss_result dal_hw_sequencer_validate_display_path_mode(
 	enum hwss_result validation_result;
 	struct display_path_objects disp_path_obj;
 	struct controller *controller;
+
 	dal_hw_sequencer_get_objects(path_mode->display_path, &disp_path_obj);
 
 	controller = dal_display_path_get_controller(path_mode->display_path);
@@ -1688,6 +1697,7 @@ bool dal_hw_sequencer_is_supported_dp_training_pattern3(
 {
 	struct encoder *encoder;
 	struct encoder_feature_support features;
+
 	if (!display_path) {
 		BREAK_TO_DEBUGGER();
 
@@ -1717,6 +1727,7 @@ enum hwss_result dal_hw_sequencer_set_dp_phy_pattern(
 
 	/* Build encoder context */
 	struct encoder_context context;
+
 	build_encoder_context(param->display_path, encoder, &context);
 
 	/* Set EncoderDpPhyPattern */
@@ -1765,6 +1776,7 @@ enum hwss_result dal_hw_sequencer_set_lane_settings(
 	struct display_path_objects obj;
 	struct encoder *encoder;
 	struct encoder_context context;
+
 	if (!link_settings) {
 		BREAK_TO_DEBUGGER();
 		return HWSS_RESULT_ERROR;
@@ -2015,6 +2027,7 @@ void dal_hw_sequencer_blank_stream(
 {
 	struct encoder *enc;
 	struct encoder_context enc_ctx;
+
 	ASSERT(in && in->display_path);
 	enc = dal_display_path_get_upstream_encoder(in->display_path,
 				in->link_idx);
@@ -2029,6 +2042,7 @@ void dal_hw_sequencer_unblank_stream(
 {
 	struct encoder *enc;
 	struct encoder_unblank_param enc_unbl_param;
+
 	ASSERT(in != NULL && in->display_path != NULL);
 
 	enc = dal_display_path_get_upstream_encoder(
@@ -2470,6 +2484,7 @@ static void program_encoder_and_audio(
 		path_mode->action_flags.PIXEL_ENCODING_CHANGED) {
 		/* setup Encoder - prepare enable encoder parameters */
 		struct encoder_output encoder_output;
+
 		build_encoder_output(path_mode, BUILD_OPTION_ENABLE_UPSTREAM,
 			&encoder_output);
 
@@ -2520,6 +2535,7 @@ static void reprogram_crtc_and_pll(
 
 		/* program PLL */
 		struct pixel_clk_params pixel_clk_params;
+
 		dal_memset(&pixel_clk_params, 0, sizeof(pixel_clk_params));
 		dal_hw_sequencer_get_pixel_clock_parameters(
 			path_mode, &pixel_clk_params);
@@ -2678,6 +2694,7 @@ static enum hwss_result set_path_mode_back_end(
 	{
 		/* select CRTC source for encoder */
 		struct bp_crtc_source_select crtc_source_select;
+
 		dal_memset(&crtc_source_select, 0, sizeof(crtc_source_select));
 		crtc_source_select.engine_id = engine_id;
 		crtc_source_select.controller_id =
@@ -2877,6 +2894,7 @@ enum signal_type dal_hw_sequencer_detect_load(
 	struct display_path_objects objs;
 	struct encoder *encoder;
 	struct encoder_context context;
+
 	dal_hw_sequencer_get_objects(display_path, &objs);
 
 	encoder = objs.downstream_encoder != NULL ?
@@ -3277,6 +3295,7 @@ static enum hwss_result set_path_mode_front_end(
 
 		{
 			struct watermark_input_params params;
+
 			params.controller_id = dal_controller_get_id(crtc);
 
 			/*
@@ -3364,6 +3383,7 @@ static void configure_locking(struct display_path *dp, bool enable)
 		struct display_path_plane *plane =
 			dal_display_path_get_plane_at_index(dp, i);
 		struct controller *crtc = plane->controller;
+
 		dal_controller_pipe_control_lock(
 			crtc,
 			PIPE_LOCK_CONTROL_MODE,

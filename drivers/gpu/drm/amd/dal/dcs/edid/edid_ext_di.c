@@ -141,6 +141,7 @@ struct edid_ext_di {
 static const uint8_t *get_raw_data(struct edid_base *edid)
 {
 	struct edid_ext_di *ext = FROM_EDID(edid);
+
 	return (const uint8_t *)ext->data;
 }
 

@@ -153,6 +153,7 @@ bool dal_dcp_bit_depth_reduction_dce110_program(
 	bool frame_random_enable;
 	bool rgb_random_enable;
 	bool highpass_random_enable;
+
 	if (depth > CSC_COLOR_DEPTH_121212) {
 		ASSERT_CRITICAL(false); /* Invalid clamp bit depth */
 		return false;

@@ -157,6 +157,7 @@ static bool get_default_pixel_encoding(
 	struct display_pixel_encoding_support *pixel_encoding)
 {
 	struct edid_base *edid = NULL;
+
 	pixel_encoding->mask = 0;
 
 	/* Wireless has fixed color depth support */
@@ -222,6 +223,7 @@ static void add_dp_default_audio_modes(
 	 *	bit 1 - 20 bit
 	 *	bit 2 - 24 bit*/
 	struct cea_audio_mode audio_mode = { 0 };
+
 	audio_mode.format_code = AUDIO_FORMAT_CODE_LINEARPCM;
 	audio_mode.channel_count = 2;/* 2 channels */
 	audio_mode.sample_rate = 7;/* 32, 44.1, 48 kHz supported */
@@ -234,6 +236,7 @@ static void add_dp_forced_audio_modes(
 {
 	/* CEA-861 short audio descriptor*/
 	struct cea_audio_mode audio_mode = { 0 };
+
 	audio_mode.format_code = AUDIO_FORMAT_CODE_LINEARPCM;
 	audio_mode.channel_count = 8;/* 8 channels */
 	/*32, 44.1, 48, 88.2, 96, 176.4 kHz */
@@ -253,6 +256,7 @@ static void add_hdmi_default_audio_modes(
 {
 	/* CEA-861 short audio descriptor*/
 	struct cea_audio_mode audio_mode = { 0 };
+
 	audio_mode.format_code = AUDIO_FORMAT_CODE_LINEARPCM;
 	audio_mode.channel_count = 2;/* 2 channels */
 	audio_mode.sample_rate = 7;/* 32, 44.1, 48 kHz supported */
@@ -283,6 +287,7 @@ static void add_wireless_default_audio_modes(
 			* mode that should be appended.
 			*/
 			struct cea_audio_mode resultant_cea_audio_mode;
+
 			if (dal_rdr_get_supported_cea_audio_mode(
 				dcs->rdrm,
 				dal_dcs_cea_audio_mode_list_at_index(
@@ -739,8 +744,7 @@ static void build_drr_settings(struct dcs *dcs)
 		else if (feature_value >= AS_DRR_SUPPORT_MIN_FORCED_FPS) {
 			dcs->drr_config.min_fps_in_microhz = feature_value;
 			if (dcs->drr_config.min_fps_in_microhz > 0)
-				dcs->drr_config.support_method. \
-					FORCED_BY_REGKEY_OR_ESCAPE
+				dcs->drr_config.support_method.FORCED_BY_REGKEY_OR_ESCAPE
 					= true;
 		}
 
@@ -802,6 +806,7 @@ enum edid_retrieve_status dal_dcs_update_edid_from_last_retrieved(
 	struct dcs *dcs)
 {
 	enum edid_retrieve_status ret;
+
 	if (!dcs->edid_mgr) {
 		BREAK_TO_DEBUGGER();
 		return EDID_RETRIEVE_FAIL;
@@ -838,6 +843,7 @@ struct ddc_service *dal_dcs_update_ddc(
 	struct ddc_service *ddc)
 {
 	struct ddc_service *old_ddc_service = dcs->ddc_service;
+
 	dcs->ddc_service = ddc;
 	return old_ddc_service;
 }
@@ -1017,6 +1023,7 @@ static bool should_insert_mode(
 	bool ce_mode = dal_timing_service_is_ce_timing_standard(
 		mode_timing->crtc_timing.timing_standard);
 	bool insert_mode = false;
+
 	switch (mode_timing->crtc_timing.pixel_encoding) {
 	case PIXEL_ENCODING_YCBCR444:
 		/* 3) for CE timing, we allow all color depth for YCbCr444
@@ -1199,6 +1206,7 @@ enum { DEFAULT_3D_RIGHT_EYE_POLARITY = false };
 static void setup_projector_stereo_3d_timings(struct dcs_mode_timing_list *list)
 {
 	uint32_t i;
+
 	for (i = 0; i < dal_dcs_mode_timing_list_get_count(list); i++) {
 		struct mode_timing *mt =
 			dal_dcs_mode_timing_list_at_index(list, i);
@@ -1208,6 +1216,7 @@ static void setup_projector_stereo_3d_timings(struct dcs_mode_timing_list *list)
 		bool progresive_120hz = mt->mode_info.field_rate == 120 &&
 			!mt->mode_info.flags.INTERLACE;
 		bool edid_source = false;
+
 		switch (mt->mode_info.timing_source) {
 		case TIMING_SOURCE_EDID_CEA_SVD_3D:
 		case TIMING_SOURCE_EDID_DETAILED:
@@ -1291,6 +1300,7 @@ static bool are_3d_formats_compatible(
 	 * symmetric */
 	if (f2 == TIMING_3D_FORMAT_SW_FRAME_PACKING) {
 		enum timing_3d_format tmp = f1;
+
 		f1 = f2;
 		f2 = tmp;
 	}
@@ -1542,6 +1552,7 @@ static void add_default_modes(
 		struct mode_timing *mode_timing = NULL;
 		uint32_t list_count = dal_dcs_mode_timing_list_get_count(list);
 		uint32_t i;
+
 		for (i = list_count; i > 0; --i) {
 			mode_timing =
 				dal_dcs_mode_timing_list_at_index(list, i-1);
@@ -1753,6 +1764,7 @@ static void insert_edid_dco_mode_timing(
 			pixel_encoding <= PIXEL_ENCODING_MASK_RGB;
 			pixel_encoding <<= 1) {
 			bool insert_mode = false;
+
 			if (!(pixel_encoding &
 				color_and_pixel_support->
 				pixel_encoding_support.mask))
@@ -2300,6 +2312,7 @@ void dal_dcs_query_sink_capability(
 		if (dal_ddc_service_is_in_aux_transaction_mode(
 			dcs->ddc_service)) {
 			struct av_sync_data av_sync_data = {0};
+
 			dal_ddc_service_aux_query_dp_sink_capability(
 				dcs->ddc_service, sink_cap);
 			dal_ddc_service_retrieve_dpcd_data(

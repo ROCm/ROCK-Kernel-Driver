@@ -223,6 +223,7 @@ void dal_edid_list_destroy(struct edid_base *edid)
 
 	do {
 		struct edid_base *edid_base = edid->next;
+
 		dal_edid_destroy(&edid);
 		edid = edid_base;
 	} while (edid);
@@ -244,6 +245,7 @@ bool dal_edid_get_supported_mode_timing(
 	bool *preferred_mode_found)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_ALL(
 		edid,
 		get_supported_mode_timing(edid, list, preferred_mode_found),
@@ -256,6 +258,7 @@ bool dal_edid_get_vendor_product_id_info(
 	struct vendor_product_id_info *info)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		get_vendor_product_id_info(edid, info),
@@ -269,6 +272,7 @@ bool dal_edid_get_display_name(
 	uint32_t name_size)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		get_display_name(edid, name, name_size),
@@ -281,6 +285,7 @@ bool dal_edid_get_monitor_range_limits(
 	struct monitor_range_limits *limits)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		get_monitor_range_limits(edid, limits),
@@ -293,6 +298,7 @@ bool dal_edid_get_display_characteristics(
 	struct display_characteristics *characteristics)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		get_display_characteristics(edid, characteristics),
@@ -305,6 +311,7 @@ bool dal_edid_get_screen_info(
 	struct edid_screen_info *info)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		get_screen_info(edid, info),
@@ -316,6 +323,7 @@ enum dcs_edid_connector_type dal_edid_get_connector_type(struct edid_base *edid)
 {
 	enum dcs_edid_connector_type type = EDID_CONNECTOR_UNKNOWN;
 	bool res = false;
+
 	FOR_EACH_EDID_ALL(
 		edid, get_connector_type(edid, &type), res);
 	return type;
@@ -325,6 +333,7 @@ bool dal_edid_get_display_color_depth(
 	struct display_color_depth_support *color_depth)
 {
 	bool res = false;
+
 	FOR_EACH_EDID_ALL(
 		edid, get_display_color_depth(edid, color_depth), res);
 	return res;
@@ -349,6 +358,7 @@ bool dal_edid_get_cea861_support(
 	struct cea861_support *cea861_support)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		get_cea861_support(edid, cea861_support),
@@ -361,6 +371,7 @@ bool dal_edid_get_cea_vendor_specific_data_block(
 	struct cea_vendor_specific_data_block *vendor_block)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		get_cea_vendor_specific_data_block(edid, vendor_block),
@@ -373,6 +384,7 @@ bool dal_edid_get_cea_speaker_allocation_data_block(
 	union cea_speaker_allocation_data_block *spkr_data)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		get_cea_speaker_allocation_data_block(edid, spkr_data),
@@ -384,6 +396,7 @@ bool dal_edid_get_cea_colorimetry_data_block(
 	struct cea_colorimetry_data_block *colorimetry_data_block)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		get_cea_colorimetry_data_block(edid, colorimetry_data_block),
@@ -396,6 +409,7 @@ bool dal_edid_get_cea_video_capability_data_block(
 	union cea_video_capability_data_block *video_capability_data_block)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		get_cea_video_capability_data_block(
@@ -443,6 +457,7 @@ bool dal_edid_get_stereo_3d_support(
 	struct edid_stereo_3d_capability *stereo_capability)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		get_stereo_3d_support(edid, stereo_capability),
@@ -453,6 +468,7 @@ bool dal_edid_get_stereo_3d_support(
 bool dal_edid_is_non_continous_frequency(struct edid_base *edid)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		is_non_continuous_frequency(edid),
@@ -463,6 +479,7 @@ bool dal_edid_is_non_continous_frequency(struct edid_base *edid)
 uint32_t dal_edid_get_drr_pixel_clk_khz(struct edid_base *edid)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		get_drr_pixel_clk_khz(edid),
@@ -473,6 +490,7 @@ uint32_t dal_edid_get_drr_pixel_clk_khz(struct edid_base *edid)
 uint32_t dal_edid_get_min_drr_fps(struct edid_base *edid)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		get_min_drr_fps(edid),
@@ -485,6 +503,7 @@ bool dal_edid_get_display_tile_info(
 	struct dcs_display_tile *display_tile)
 {
 	bool ret = false;
+
 	FOR_EACH_EDID_FIRST(
 		edid,
 		get_display_tile_info(edid, display_tile),
@@ -512,7 +531,8 @@ bool dal_edid_validate_display_gamma(struct edid_base *edid, uint8_t gamma)
 	/*TODO: looks useless, input uint8_t + 100 in range 100-355*/
 	uint32_t min_gamma = 100; /*min acc.to vesa spec*/
 	uint32_t max_gamma = 355; /*max acc.to vesa spec*/
-	uint32_t i_gamma = gamma ;
+	uint32_t i_gamma = gamma;
+
 	/*gamma should be in range 1 - 3.55
 	edid has the gamma in the following form= 120(x78),
 	the usage is (120+100)/100=2.2*/
@@ -734,13 +754,13 @@ bool dal_edid_detailed_to_timing(
 	}
 
 	/* Check if the timing parsed has realistically valid values*/
-	if (dal_timing_service_are_timing_parameters_valid(timing)) {
-		patch_porch_values_for_4k(timing);
-		return true;
-	} else {
+	if (!dal_timing_service_are_timing_parameters_valid(timing)) {
 		BREAK_TO_DEBUGGER();
 		return false;
 	}
+
+	patch_porch_values_for_4k(timing);
+	return true;
 }
 
 bool dal_edid_get_timing_for_vesa_mode(

@@ -59,6 +59,7 @@ bool dal_vbios_dco_construct(
 	struct adapter_service *as)
 {
 	bool ret = false;
+
 	if (!as)
 		return ret;
 
@@ -90,6 +91,7 @@ struct vbios_dco *dal_vbios_dco_create(
 	struct adapter_service *as)
 {
 	struct vbios_dco *dco;
+
 	dco = dal_alloc(sizeof(struct vbios_dco));
 
 	if (!dco)
@@ -205,6 +207,7 @@ static void add_patch_mode_timing(
 		dco->as, index++, &patch_mode)) {
 
 		struct mode_timing mode_timing = { { 0 } };
+
 		if (!patch_mode.width)
 			continue;
 

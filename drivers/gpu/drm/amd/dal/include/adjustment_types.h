@@ -40,7 +40,7 @@ enum adjustment_id {
 
 	/*this useful type when i need to indicate unknown adjustment and code
 	look if not the specific type*/
-	ADJ_ID_INVALID ,
+	ADJ_ID_INVALID,
 
 	ADJ_ID_CONTRAST,
 	ADJ_ID_BRIGHTNESS,
@@ -141,7 +141,7 @@ in place and not wait for flush call*/
 enum adjustment_state {
 	ADJUSTMENT_STATE_INVALID,
 	ADJUSTMENT_STATE_VALID,
-	ADJUSTMENT_STATE_REQUESTED ,
+	ADJUSTMENT_STATE_REQUESTED,
 	ADJUSTMENT_STATE_COMMITTED_TO_HW,
 };
 

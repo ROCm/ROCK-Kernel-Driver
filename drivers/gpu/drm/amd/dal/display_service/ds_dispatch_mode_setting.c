@@ -1437,6 +1437,7 @@ bool dal_ds_dispatch_build_hw_path_set(
 	if (!result) {
 		uint32_t j;
 		struct hw_path_mode *mode;
+
 		for (j = 0; j < i; j++) {
 			mode = dal_hw_path_mode_set_get_path_by_index(
 				hw_mode_set, j);
@@ -1972,6 +1973,7 @@ static void tune_up_timing(
 	struct hw_path_mode *hw_mode)
 {
 	struct timing_limits timing_limits;
+
 	if (dal_dcs_get_timing_limits(dal_display_path_get_dcs(display_path),
 			&timing_limits)) {
 		struct pixel_clock_safe_range pixel_clock_safe_range;
@@ -2561,6 +2563,7 @@ static void send_wireless_setmode_end_event(
 {
 	uint32_t i;
 	uint32_t path_mode_num = dal_pms_get_path_mode_num(path_mode_set);
+
 	for (i = 0; i < path_mode_num; i++) {
 		const struct path_mode *path_mode_in =
 				dal_pms_get_path_mode_at_index(

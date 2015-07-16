@@ -201,8 +201,7 @@ static const struct log_minor_info ds_minor_info_tbl[] = {
 };
 
 
-struct log_major_mask_info
-{
+struct log_major_mask_info {
 	struct log_major_info major_info;
 	uint32_t default_mask;
 	const struct log_minor_info *minor_tbl;
@@ -297,6 +296,7 @@ static bool construct(struct dal_logger *logger)
 	for (i = 0; i < NUM_ELEMENTS(log_major_mask_info_tbl); i++) {
 
 		uint32_t dflt_mask = log_major_mask_info_tbl[i].default_mask;
+
 		logger->log_enable_mask_minors[i] = dflt_mask;
 	}
 
@@ -320,6 +320,7 @@ struct dal_logger *dal_logger_create(void)
 {
 	/* malloc struct */
 	struct dal_logger *logger = dal_alloc(sizeof(struct dal_logger));
+
 	if (!logger)
 		return NULL;
 	if (!construct(logger)) {
@@ -510,6 +511,7 @@ static void log_major_minor(struct log_entry *entry)
 
 		const struct log_major_mask_info *maj_mask_info =
 				&log_major_mask_info_tbl[i];
+
 		if (maj_mask_info->major_info.major == major) {
 
 			dal_logger_append(entry, "[%s_",
@@ -517,13 +519,13 @@ static void log_major_minor(struct log_entry *entry)
 
 			if (maj_mask_info->minor_tbl != NULL) {
 				uint32_t j;
+
 				for (j = 0; j < maj_mask_info->tbl_element_cnt; j++) {
 
 					const struct log_minor_info *min_info = &maj_mask_info->minor_tbl[j];
 
-					if (min_info->minor == minor) {
+					if (min_info->minor == minor)
 						dal_logger_append(entry, "%s]\t", min_info->minor_name);
-					}
 				}
 			}
 
@@ -577,6 +579,7 @@ void dal_logger_write(
 		va_list args;
 		char buffer[DAL_LOGGER_BUFFER_MAX_LOG_LINE_SIZE];
 		struct log_entry entry;
+
 		va_start(args, msg);
 		dal_logger_open(logger, &entry, major, minor);
 
@@ -626,6 +629,7 @@ void dal_logger_append(
 		uint32_t size;
 		va_list args;
 		char buffer[DAL_LOGGER_BUFFER_MAX_LOG_LINE_SIZE];
+
 		va_start(args, msg);
 
 		size = dal_log_to_buffer(
@@ -644,7 +648,6 @@ uint32_t dal_logger_read(
 	uint32_t *bytes_read, /* >[out] */
 	bool single_line)
 {
-	char cur;
 	uint32_t bytes_remaining = 0;
 	uint32_t bytes_read_count = 0;
 	bool keep_reading = true;
@@ -662,6 +665,7 @@ uint32_t dal_logger_read(
 	 */
 
 	do {
+		char cur;
 
 		/* Stop when we've read everything */
 		if (logger->buffer_read_offset ==
@@ -719,16 +723,14 @@ void dal_logger_open(
 		enum log_major major,
 		enum log_minor minor)
 {
-
-	entry->major = LOG_MAJOR_COUNT;
-	entry->minor = 0;
-	entry->logger = logger;
-
-
 	if (!entry) {
 		BREAK_TO_DEBUGGER();
 		return;
 	}
+
+	entry->major = LOG_MAJOR_COUNT;
+	entry->minor = 0;
+	entry->logger = logger;
 
 	entry->buf = dal_alloc(
 		DAL_LOGGER_BUFFER_MAX_LOG_LINE_SIZE * sizeof(char));
@@ -778,9 +780,10 @@ uint32_t dal_logger_get_mask(
 	enum log_major lvl_major, enum log_minor lvl_minor)
 {
 	uint32_t log_mask = 0;
-	if (logger && lvl_major < LOG_MAJOR_COUNT) {
+
+	if (logger && lvl_major < LOG_MAJOR_COUNT)
 		log_mask = logger->log_enable_mask_minors[lvl_major];
-	}
+
 	log_mask &= 1 << lvl_minor;
 	return log_mask;
 }
@@ -807,9 +810,10 @@ uint32_t dal_logger_get_masks(
 	enum log_major lvl_major)
 {
 	uint32_t log_mask = 0;
-	if (logger && lvl_major < LOG_MAJOR_COUNT) {
+
+	if (logger && lvl_major < LOG_MAJOR_COUNT)
 		log_mask = logger->log_enable_mask_minors[lvl_major];
-	}
+
 	return log_mask;
 }
 
@@ -817,10 +821,8 @@ void dal_logger_set_masks(
 	struct dal_logger *logger,
 	enum log_major lvl_major, uint32_t log_mask)
 {
-
-	if (logger && lvl_major < LOG_MAJOR_COUNT) {
+	if (logger && lvl_major < LOG_MAJOR_COUNT)
 		logger->log_enable_mask_minors[lvl_major] = log_mask;
-	}
 }
 
 uint32_t dal_logger_unset_mask(
@@ -872,41 +874,43 @@ uint32_t dal_logger_set_buffer_size(
 }
 
 
-const struct log_major_info* dal_logger_enum_log_major_info(
+const struct log_major_info *dal_logger_enum_log_major_info(
 		struct dal_logger *logger,
 		unsigned int enum_index)
 {
-	const struct log_major_info* major_info;
-	if(enum_index >= NUM_ELEMENTS(log_major_mask_info_tbl))
-	return NULL;
+	const struct log_major_info *major_info;
+
+	if (enum_index >= NUM_ELEMENTS(log_major_mask_info_tbl))
+		return NULL;
+
 	major_info = &log_major_mask_info_tbl[enum_index].major_info;
 	return major_info;
 }
 
-const struct log_minor_info* dal_logger_enum_log_minor_info(
+const struct log_minor_info *dal_logger_enum_log_minor_info(
 		struct dal_logger *logger,
 		enum log_major major,
 		unsigned int enum_index)
 {
-	const struct log_minor_info* minor_info = NULL;
+	const struct log_minor_info *minor_info = NULL;
 	uint32_t i;
 
 	for (i = 0; i < NUM_ELEMENTS(log_major_mask_info_tbl); i++) {
 
 		const struct log_major_mask_info *maj_mask_info =
 				&log_major_mask_info_tbl[i];
+
 		if (maj_mask_info->major_info.major == major) {
 
 			if (maj_mask_info->minor_tbl != NULL) {
 				uint32_t j;
+
 				for (j = 0; j < maj_mask_info->tbl_element_cnt; j++) {
 
 					minor_info = &maj_mask_info->minor_tbl[j];
 
-					if (minor_info->minor == enum_index) {
-
+					if (minor_info->minor == enum_index)
 						return minor_info;
-					}
 				}
 			}
 

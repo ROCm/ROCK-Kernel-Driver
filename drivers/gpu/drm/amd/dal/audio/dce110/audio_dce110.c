@@ -284,6 +284,7 @@ static enum audio_result initialize(
 	struct audio *audio)
 {
 	uint8_t audio_endpoint_enum_id = 0;
+
 	audio_endpoint_enum_id = audio->id.enum_id;
 
 	/* HW CTX already create*/
@@ -426,6 +427,7 @@ struct audio *dal_audio_create_dce110(
 {
 	/*allocate memory for audio_dce110 */
 	struct audio_dce110 *audio = dal_alloc(sizeof(*audio));
+
 	if (audio == NULL) {
 		ASSERT_CRITICAL(audio);
 		return NULL;

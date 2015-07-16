@@ -48,9 +48,6 @@ static const struct graphics_object_id invalid_go = {
 };
 
 /* Macro */
-#define NOT_IMPLEMENTED() DAL_LOGGER_NOT_IMPL( \
-	LOG_MINOR_COMPONENT_ADAPTER_SERVICE, "HWCTX_AS:%s()\n", __func__);
-
 #define AUDIO_STRAPS_HDMI_ENABLE 0x2
 
 #define FROM_HW_CTX(ptr) \
@@ -139,6 +136,7 @@ static uint32_t get_number_of_connected_audio_endpoints_multistream(
 	 */
 	for (i = 0; i < MAX_NUMBER_OF_AUDIO_PINS; i++) {
 		uint32_t value = 0;
+
 		set_reg_field_value(value,
 			default_config,
 			AZALIA_F0_CODEC_ENDPOINT_INDEX,
@@ -216,16 +214,13 @@ static bool power_up(
 	hw_ctx->cached_audio_straps = AUDIO_STRAPS_DP_AUDIO_ALLOWED;
 
 	{
-		uint32_t addr = mmCC_DC_HDMI_STRAPS;
 		uint32_t value = 0;
 		uint32_t field = 0;
 
-		value = dal_read_reg(hw_ctx->dal_context, addr);
+		value = dal_read_reg(hw_ctx->dal_context, mmCC_DC_HDMI_STRAPS);
 		field = get_reg_field_value(
 				value, CC_DC_HDMI_STRAPS, HDMI_DISABLE);
 		if (field == 0) {
-
-			addr = mmDC_PINSTRAPS;
 
 			value = dal_read_reg(
 					hw_ctx->dal_context, mmDC_PINSTRAPS);

@@ -171,6 +171,7 @@ static enum signal_type calculate_asic_signal(
 {
 	uint32_t i;
 	uint32_t current_signal;
+
 	if (path->connector == NULL)
 		return SIGNAL_TYPE_NONE;
 
@@ -270,6 +271,7 @@ bool dal_display_path_validate(
 	enum signal_type sink_signal)
 {
 	uint32_t i;
+
 	path->valid = false;
 	/* verify connector and at least one link present*/
 	if (path->number_of_links < 1 || path->connector == NULL) {
@@ -344,8 +346,10 @@ int32_t dal_display_path_release(struct display_path *path)
 void dal_display_path_release_resources(struct display_path *path)
 {
 	uint32_t i;
+
 	for (i = 0; i < path->number_of_links; i++) {
 		struct stream_context *cntx = &path->stream_contexts[i];
+
 		cntx->state.LINK = false;
 		cntx->state.AUDIO = false;
 		cntx->engine = ENGINE_ID_UNKNOWN;
@@ -521,6 +525,7 @@ struct fbc_info *dal_display_path_get_fbc_info(struct display_path *path)
 void dal_display_path_acquire_links(struct display_path *path)
 {
 	uint32_t i;
+
 	for (i = 0; i < path->number_of_links; i++) {
 		path->stream_contexts[i].input_config_signal =
 			path->stream_contexts[i].input_query_signal;
@@ -536,6 +541,7 @@ struct link_service *dal_display_path_get_mst_link_service(
 {
 	uint32_t i;
 	struct link_service *link_service = NULL;
+
 	for (i = 0; i < path->number_of_links; i++) {
 		link_service = path->stream_contexts[i].link_query_interface;
 		if (link_service != NULL
@@ -630,6 +636,7 @@ bool dal_display_path_set_pixel_clock_safe_range(
 	struct pixel_clock_safe_range *range)
 {
 	struct timing_limits timing_limits = { 0 };
+
 	if (range == NULL)
 		return false;
 
@@ -794,6 +801,7 @@ bool dal_display_path_is_drr_supported(const struct display_path *path)
 		dal_display_path_get_link_query_interface(
 				path, SINK_LINK_INDEX);
 	struct drr_config drr_config;
+
 	dal_display_path_get_drr_config(path, &drr_config);
 
 	/* The check for DRR supported returns true means it satisfied:
@@ -836,6 +844,7 @@ bool dal_display_path_is_audio_present(
 	uint32_t i;
 	const struct stream_context *link;
 	struct audio_feature_support features;
+
 	for (i = 0; i < path->number_of_links; i++) {
 		link = &path->stream_contexts[i];
 
@@ -858,6 +867,7 @@ bool dal_display_path_is_dp_auth_supported(struct display_path *path)
 	uint32_t i;
 	struct encoder_feature_support features;
 	struct stream_context *link;
+
 	for (i = 0; i < path->number_of_links; i++) {
 		link = &path->stream_contexts[i];
 		features = dal_encoder_get_supported_features(link->encoder);
@@ -874,6 +884,7 @@ bool dal_display_path_is_vce_supported(const struct display_path *path)
 	uint32_t i;
 	const struct stream_context *link;
 	struct encoder_feature_support features;
+
 	for (i = 0; i < path->number_of_links; i++) {
 		link = &path->stream_contexts[i];
 		features = dal_encoder_get_supported_features(link->encoder);
@@ -895,7 +906,6 @@ bool dal_display_path_is_sls_capable(const struct display_path *path)
 	case SIGNAL_TYPE_DISPLAY_PORT_MST:
 	case SIGNAL_TYPE_EDP:
 		return true;
-		break;
 	default:
 		break;
 	}
@@ -913,7 +923,6 @@ bool dal_display_path_is_gen_lock_capable(const struct display_path *path)
 	case SIGNAL_TYPE_DISPLAY_PORT_MST:
 	case SIGNAL_TYPE_EDP:
 		return true;
-		break;
 	default:
 		break;
 	}
@@ -938,8 +947,8 @@ struct transmitter_configuration dal_display_path_get_transmitter_configuration(
 		if (!dal_encoder_get_supported_features(
 			encoder).flags.bits.EXTERNAL_ENCODER)
 			break;
-		else
-			encoder = NULL;
+
+		encoder = NULL;
 	}
 
 	if (encoder == NULL)
@@ -1125,12 +1134,12 @@ struct controller *dal_display_path_get_controller_for_layer_index(
 
 	/* the planes are ordered starting from zero */
 	plane = dal_display_path_get_plane_at_index(path, layer_index);
-	if (plane)
-		return plane->controller;
-	else {
+	if (!plane) {
 		/* Not found. TODO: add a debug message here. */
 		return NULL;
 	}
+
+	return plane->controller;
 }
 
 void dal_display_path_release_planes(
@@ -1143,6 +1152,7 @@ void dal_display_path_release_non_root_planes(
 	struct display_path *path)
 {
 	uint32_t last_plane = dal_vector_get_count(path->planes) - 1;
+
 	for (; last_plane > 0; last_plane--)
 		dal_vector_remove_at_index(path->planes, last_plane);
 }

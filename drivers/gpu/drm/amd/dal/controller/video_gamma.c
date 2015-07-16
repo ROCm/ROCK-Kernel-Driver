@@ -165,6 +165,7 @@ static bool build_custom_gamma_mapping_coefficients(
 	uint32_t points_num)
 {
 	uint32_t i;
+
 	for (i = 0; i <= points_num; ++i) {
 		struct fixed31_32 coord_x;
 		uint32_t index_to_start = 0;
@@ -259,6 +260,7 @@ static bool build_oem_custom_gamma_mapping_coefficients(
 	uint32_t points_num)
 {
 	uint32_t i;
+
 	for (i = 0; i <= points_num; ++i) {
 		struct fixed31_32 coord_x = xhw[i];
 
@@ -362,6 +364,7 @@ static bool build_oem_regamma(
 
 	if (data->regamma.features.bits.GAMMA_RAMP_ARRAY == 0) {
 		uint32_t i;
+
 		for (i = 0; i <= points_num; ++i) {
 			/* for gamma array these values are same because a0-a3
 			 * for ideals are the same */
@@ -587,6 +590,7 @@ static void generate_gamma(
 
 	for (i = 0; i < MAX_GAMMA_256X3X16; ++i) {
 		struct fixed31_32 value;
+
 		gamma_sample[i].point_x =
 			dal_fixed31_32_from_fraction(i, MAX_GAMMA_256X3X16 - 1);
 
@@ -621,6 +625,7 @@ static bool build_resulted_regamma(
 	uint32_t points_num)
 {
 	uint32_t i;
+
 	if (!build_custom_gamma_mapping_coefficients(item->axis_x256,
 		item->regamma, item->coeff_128, CHANNEL_NAME_RED,
 		points_num))
@@ -663,6 +668,7 @@ static bool find_software_points(
 	enum hw_point_position *position)
 {
 	uint32_t i;
+
 	for (i = *index_to_start; i < points_num; ++i) {
 		struct fixed31_32 left = x[i];
 

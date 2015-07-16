@@ -130,6 +130,7 @@ static bool construct(
 			struct clock_source_init_data *clk_src_init_data)
 {
 	struct firmware_info fw_info = {};
+
 	if (!dal_clock_source_construct(
 		&vce_clk_src->base, clk_src_init_data)) {
 		ASSERT_CRITICAL(false);

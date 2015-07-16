@@ -50,6 +50,7 @@ bool dal_refresh_rate_less_than(
 {
 	unsigned int lhsRefreshRate;
 	unsigned int rhsRefreshRate;
+
 	lhsRefreshRate = lhs->INTERLACED ?
 			(lhs->field_rate / 2) : lhs->field_rate;
 	rhsRefreshRate = rhs->INTERLACED ?
@@ -73,6 +74,7 @@ bool dal_solution_less_than(const void *lhs, const void *rhs)
 	const struct solution *rhs_solution = rhs;
 	struct refresh_rate l_refresh_rate, r_refresh_rate;
 	enum timing_3d_format l_timing_3d_format, r_timing_3d_format;
+
 	refresh_rate_from_mode_info(
 				&l_refresh_rate,
 				&lhs_solution->mode_timing->mode_info);
@@ -104,6 +106,7 @@ uint32_t dal_pixel_format_list_get_count(
 		const struct pixel_format_list *pfl)
 {
 	uint32_t i, count = 0;
+
 	for (i = pfl->set; i > 0; i >>= 1)
 		if ((i & 1) != 0)
 			count += 1;

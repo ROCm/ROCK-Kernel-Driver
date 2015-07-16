@@ -84,6 +84,7 @@ bool dal_backlight_adj_group_include_backlight_opt_adj(
 	case DS_BACKLIGHT_OPTIMIZATION_DISABLE:
 	{
 		uint32_t backlight;
+
 		if (dal_backlight_adj_group_get_current_adj(
 				backlight_adj,
 				disp_path,
@@ -265,6 +266,7 @@ enum ds_return dal_backlight_adj_group_set_adjustment(
 	if (adj_info == NULL) {
 
 		struct adjustment_info default_adj_info;
+
 		if (dal_ds_dispatch_get_adjustment_info(
 				backlight_adj->ds,
 				display_index,
@@ -386,6 +388,7 @@ enum ds_return dal_backlight_adj_group_set_backlight_optimization_adj(
 	case DS_BACKLIGHT_OPTIMIZATION_DISABLE:
 	{
 		uint32_t backlight;
+
 		if (dal_backlight_adj_group_get_current_adj(
 				backlight_adj,
 				disp_path,
@@ -425,6 +428,7 @@ enum ds_return dal_backlight_adj_group_set_backlight_optimization_adj(
 	{
 		struct panel_backlight_boundaries boundaries = {0};
 		uint32_t backlight;
+
 		if (!dal_adapter_service_get_panel_backlight_boundaries(
 				backlight_adj->as,
 				&boundaries))
@@ -466,6 +470,7 @@ struct backlight_adj_group *dal_backlight_adj_group_create(
 		struct backlight_adj_group_init_data *init_data)
 {
 	struct backlight_adj_group *backlight_adj = NULL;
+
 	backlight_adj = dal_alloc(sizeof(*backlight_adj));
 
 	if (!backlight_adj)

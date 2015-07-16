@@ -63,6 +63,7 @@ enum hwss_result dal_hw_sync_control_inter_path_synchronize(
 	/* Perform CRTC synchronization*/
 	if (sync_needed) {
 		struct hw_resync_flags resync_flags = { false, false, false };
+
 		resync_flags.INTERPATH = true;
 		resync_flags.NOTIFY_SYNCED = true;
 		return sync_control->funcs->resync_display_paths(

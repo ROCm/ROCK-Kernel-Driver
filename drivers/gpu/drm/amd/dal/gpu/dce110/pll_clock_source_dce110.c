@@ -100,7 +100,7 @@ static bool calculate_ss(
 
 	/* compute SS_STEP_SIZE_DSFRAC */
 	modulation_time = dal_fixed32_32_from_fraction(
-		pll_settings->reference_freq * 1000 ,
+		pll_settings->reference_freq * 1000,
 		pll_settings->reference_divider * ss_data->modulation_freq_hz);
 
 
@@ -464,6 +464,7 @@ static void ss_info_from_atombios_create(
 	struct pll_clock_source_dce110 *clk_src)
 {
 	struct clock_source *base = &clk_src->base.base;
+
 	dal_clock_source_get_ss_info_from_atombios(
 		base,
 		AS_SIGNAL_TYPE_DISPLAY_PORT,

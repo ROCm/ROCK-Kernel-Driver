@@ -465,6 +465,7 @@ bool dal_i2caux_construct(
 	struct dal_context *dal_context)
 {
 	uint32_t i = 0;
+
 	i2caux->dal_context = dal_context;
 	do {
 		i2caux->i2c_sw_engines[i] = NULL;

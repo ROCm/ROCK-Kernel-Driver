@@ -88,126 +88,104 @@ static bool construct(
 	struct controller *crtc,
 	struct controller_init_data *init_data)
 {
-	bool err = false;
 	struct scaler_init_data scl_init_data = {0};
 	struct surface_init_data surf_init_data = {0};
 
 	if (!dal_controller_base_construct(crtc, init_data))
 		return false;
 
-	do {
-		scl_init_data.bp = dal_adapter_service_get_bios_parser(
-				init_data->as);
-		scl_init_data.dal_ctx = init_data->dal_context;
-		scl_init_data.id = CONTROLLER_ID_UNDERLAY0;
+	scl_init_data.bp = dal_adapter_service_get_bios_parser(
+			init_data->as);
+	scl_init_data.dal_ctx = init_data->dal_context;
+	scl_init_data.id = CONTROLLER_ID_UNDERLAY0;
 
-		crtc->scl = dal_scaler_v_dce110_create(&scl_init_data);
+	crtc->scl = dal_scaler_v_dce110_create(&scl_init_data);
 
-		if (!crtc->scl) {
-			err = true;
-			break;
-		}
+	if (!crtc->scl)
+		goto scl_fail;
 
 
-		surf_init_data.dal_ctx = init_data->dal_context;
-		surf_init_data.id = CONTROLLER_ID_UNDERLAY0;
-		crtc->surface = dal_surface_v_dce110_create(&surf_init_data);
+	surf_init_data.dal_ctx = init_data->dal_context;
+	surf_init_data.id = CONTROLLER_ID_UNDERLAY0;
+	crtc->surface = dal_surface_v_dce110_create(&surf_init_data);
 
-		if (!crtc->surface) {
-			err = true;
-			break;
-		}
+	if (!crtc->surface)
+		goto surface_fail;
 
-		crtc->pc = dal_pipe_control_v_dce110_create(
-			init_data->as,
-			init_data->dal_context,
-			init_data->controller);
+	crtc->pc = dal_pipe_control_v_dce110_create(
+		init_data->as,
+		init_data->dal_context,
+		init_data->controller);
 
-		if (!crtc->pc) {
-			err = true;
-			break;
-		}
+	if (!crtc->pc)
+		goto pc_fail;
 
-		crtc->tg = dal_timing_generator_v_dce110_create(
-			init_data->as,
-			init_data->dal_context,
-			init_data->controller);
+	crtc->tg = dal_timing_generator_v_dce110_create(
+		init_data->as,
+		init_data->dal_context,
+		init_data->controller);
 
-		if (!crtc->tg) {
-			err = true;
-			break;
-		}
+	if (!crtc->tg)
+		goto tg_fail;
 
-		{
-			struct line_buffer_init_data lb_init_data = {0};
-			lb_init_data.dal_context = crtc->dal_context;
-			lb_init_data.as = init_data->as;
-			lb_init_data.id = init_data->controller;
-			crtc->lb =
-				dal_line_buffer_v_dce110_create(&lb_init_data);
-		}
+	{
+		struct line_buffer_init_data lb_init_data = {0};
 
-		if (!crtc->lb) {
-			err = true;
-			break;
-		}
-
-		{
-			struct csc_init_data csc_init_data = {0};
-			csc_init_data.id = init_data->controller;
-			csc_init_data.ctx = crtc->dal_context;
-			csc_init_data.as = init_data->as;
-			crtc->csc =
-				dal_col_man_csc_dce110_create(&csc_init_data);
-		}
-
-		if (!crtc->csc) {
-			err = true;
-			break;
-		}
-
-		{
-			struct grph_gamma_init_data gg_init_data = {0};
-			gg_init_data.as = init_data->as;
-			gg_init_data.ctx = crtc->dal_context;
-			gg_init_data.id = init_data->controller;
-			crtc->grph_gamma =
-				dal_col_man_grph_dce110_create(&gg_init_data);
-		}
-
-		if (!crtc->grph_gamma) {
-			err = true;
-			break;
-		}
-	} while (0);
-
-	if (err == false) {
-		/* all OK */
-		crtc->funcs.destroy = destroy;
-		crtc->funcs.is_surface_supported = is_surface_supported;
-		return true;
-	} else {
-		/* cleanup after an error */
-		if (crtc->pc)
-			crtc->pc->funcs->destroy(&crtc->pc);
-
-		if (crtc->surface)
-			crtc->surface->funcs->destroy(&crtc->surface);
-
-		if (crtc->scl)
-			crtc->scl->funcs->destroy(&crtc->scl);
-
-		if (crtc->tg)
-			crtc->tg->funcs->destroy(&crtc->tg);
-
-		if (crtc->csc)
-			crtc->csc->funcs->destroy(&crtc->csc);
-
-		if (crtc->grph_gamma)
-			crtc->grph_gamma->funcs->destroy(&crtc->grph_gamma);
-
-		return false;
+		lb_init_data.dal_context = crtc->dal_context;
+		lb_init_data.as = init_data->as;
+		lb_init_data.id = init_data->controller;
+		crtc->lb =
+			dal_line_buffer_v_dce110_create(&lb_init_data);
 	}
+
+	if (!crtc->lb)
+		goto lb_fail;
+
+	{
+		struct csc_init_data csc_init_data = {0};
+
+		csc_init_data.id = init_data->controller;
+		csc_init_data.ctx = crtc->dal_context;
+		csc_init_data.as = init_data->as;
+		crtc->csc =
+			dal_col_man_csc_dce110_create(&csc_init_data);
+	}
+
+	if (!crtc->csc)
+		goto csc_fail;
+
+	{
+		struct grph_gamma_init_data gg_init_data = {0};
+
+		gg_init_data.as = init_data->as;
+		gg_init_data.ctx = crtc->dal_context;
+		gg_init_data.id = init_data->controller;
+		crtc->grph_gamma =
+			dal_col_man_grph_dce110_create(&gg_init_data);
+	}
+
+	if (!crtc->grph_gamma)
+		goto gamma_fail;
+
+	/* all OK */
+	crtc->funcs.destroy = destroy;
+	crtc->funcs.is_surface_supported = is_surface_supported;
+	return true;
+
+gamma_fail:
+	crtc->csc->funcs->destroy(&crtc->csc);
+csc_fail:
+	crtc->lb->funcs->destroy(&crtc->lb);
+lb_fail:
+	crtc->tg->funcs->destroy(&crtc->tg);
+tg_fail:
+	crtc->pc->funcs->destroy(&crtc->pc);
+pc_fail:
+	crtc->surface->funcs->destroy(&crtc->surface);
+surface_fail:
+	crtc->scl->funcs->destroy(&crtc->scl);
+scl_fail:
+	return false;
 }
 
 struct controller *dal_controller_v_dce110_create(

@@ -44,6 +44,7 @@ static bool enable_stream(struct link_service *ls,
 		struct hw_path_mode *path_mode)
 {
 	enum signal_type signal;
+
 	ASSERT(ls->strm_state == STREAM_STATE_DISABLED ||
 		ls->strm_state == STREAM_STATE_OPTIMIZED_READY);
 
@@ -147,6 +148,7 @@ bool dal_link_service_blank_stream(struct link_service *ls,
 				struct hw_path_mode *path_mode)
 {
 	struct blank_stream_param blank_param = {0};
+
 	ASSERT(ls->strm_state == STREAM_STATE_ACTIVE ||
 			ls->strm_state == STREAM_STATE_OPTIMIZED_READY ||
 			ls->strm_state == STREAM_STATE_POWER_SAVE  ||
@@ -175,6 +177,7 @@ bool dal_link_service_unblank_stream(struct link_service *ls,
 			struct hw_path_mode *path_mode)
 {
 	struct blank_stream_param blank_param = {0};
+
 	ASSERT(ls->strm_state == STREAM_STATE_ENABLED ||
 			ls->strm_state == STREAM_STATE_OPTIMIZED_READY ||
 			ls->strm_state == STREAM_STATE_ACTIVE);
@@ -444,6 +447,7 @@ static struct link_service *create_legacy_link_service(
 				struct link_service_init_data *init_data)
 {
 	struct link_service *link_service = NULL;
+
 	link_service = dal_alloc(sizeof(struct link_service));
 
 	if (link_service == NULL)
@@ -514,6 +518,7 @@ void dal_ls_try_enable_stream(
 				const struct link_settings *link_setting)
 {
 	struct enable_stream_param stream_param = {0};
+
 	stream_param.display_path = path_mode->display_path;
 	stream_param.link_idx = ls->link_idx;
 	stream_param.timing = path_mode->mode.timing;
@@ -621,6 +626,7 @@ bool dal_ls_try_enable_link_base(
 {
 	enum hwss_result result = HWSS_RESULT_UNKNOWN;
 	struct enable_link_param link_param = {0};
+
 	link_param.display_path = path_mode->display_path;
 	link_param.link_idx = ls->link_idx;
 	link_param.optimized_programming =
@@ -744,6 +750,7 @@ void dal_ls_disable_link(struct link_service *ls,
 				const struct hw_path_mode *path_mode)
 {
 	struct enable_link_param link_param = {0};
+
 	link_param.display_path = path_mode->display_path;
 	link_param.link_idx = ls->link_idx;
 	link_param.path_mode = path_mode;
@@ -757,6 +764,7 @@ bool dal_ls_disable_stream_base(
 	struct hw_path_mode *path_mode)
 {
 	struct enable_stream_param stream_param = {0};
+
 	dal_memset(&ls->cur_link_setting, '\0', sizeof(ls->cur_link_setting));
 
 	/* When we returning from S3/S4 we want to remain in

@@ -92,13 +92,13 @@ enum scl_regs_idx {
 	[IDX_SCL_SCL_COEF_RAM_TAP_DATA] = mmSCLV_COEF_RAM_TAP_DATA,\
 	[IDX_SCL_TAP_CONTROL] = mmSCLV_TAP_CONTROL,\
 	[IDX_SCL_OVERSCAN_LEFT_RIGHT] = mmSCLV_EXT_OVERSCAN_LEFT_RIGHT,\
-	[IDX_SCL_OVERSCAN_TOP_BOTTOM] = mmSCLV_EXT_OVERSCAN_TOP_BOTTOM ,\
-	[IDX_SCL_VIEWPORT_START] = mmSCLV_VIEWPORT_START ,\
+	[IDX_SCL_OVERSCAN_TOP_BOTTOM] = mmSCLV_EXT_OVERSCAN_TOP_BOTTOM,\
+	[IDX_SCL_VIEWPORT_START] = mmSCLV_VIEWPORT_START,\
 	[IDX_SCL_VIEWPORT_SIZE] = mmSCLV_VIEWPORT_SIZE,\
 	[IDX_SCL_MODE] = mmSCLV_MODE,\
 	[IDX_SCL_ROUND_OFFSET] = mmSCL_ROUND_OFFSET,\
 	[IDX_SCL_CONTROL] = mmSCLV_CONTROL,\
-	[IDX_SCL_VIEWPORT_START_C] = mmSCLV_VIEWPORT_START_C ,\
+	[IDX_SCL_VIEWPORT_START_C] = mmSCLV_VIEWPORT_START_C,\
 	[IDX_SCL_VIEWPORT_SIZE_C] = mmSCLV_VIEWPORT_SIZE_C,\
 }
 
@@ -228,7 +228,7 @@ static void program_viewport(
  * macro definitions
  *****************************************************************************/
 #define NOT_IMPLEMENTED()  DAL_LOGGER_NOT_IMPL(LOG_MINOR_COMPONENT_CONTROLLER,\
-			"SCALER:%s()\n", __func__);
+			"SCALER:%s()\n", __func__)
 
 /* Until and For MPO video play story, to reduce time for implementation,
  * below limits are applied for now: 2_TAPS only
@@ -383,6 +383,7 @@ static void set_scaler_bypass(struct scaler *scl)
 {
 	uint32_t addr = scl->regs[IDX_SCL_MODE];
 	uint32_t value = dal_read_reg(scl->ctx, addr);
+
 	set_reg_field_value(value, 0, SCLV_MODE, SCL_MODE);
 	set_reg_field_value(value, 0, SCLV_MODE, SCL_MODE_C);
 	set_reg_field_value(value, 0, SCLV_MODE, SCL_PSCL_EN);
@@ -459,6 +460,7 @@ static bool program_multi_taps_filter(
 	bool horizontal)
 {
 	struct dal_context *dal_context = scl->ctx;
+
 	NOT_IMPLEMENTED();
 	return false;
 }
@@ -548,6 +550,7 @@ static void program_scl_ratios_inits(
 	struct dal_context *ctx = scl->ctx;
 	uint32_t addr = scl->regs[IDX_SCL_HORZ_SCALE_RATIO];
 	uint32_t value = dal_read_reg(ctx, addr);
+
 	set_reg_field_value(
 		value,
 		inits->h_int_scale_ratio_luma,
@@ -711,6 +714,7 @@ struct scaler *dal_scaler_v_dce110_create(
 	struct scaler_init_data *init_data)
 {
 	struct scaler *scl = dal_alloc(sizeof(struct scaler));
+
 	if (!scl)
 		return NULL;
 

@@ -70,6 +70,7 @@ DAL_VECTOR_APPEND(solution_container,
 static void destruct(struct mode_manager *mm)
 {
 	uint32_t i;
+
 	dal_view_info_list_destruct(&mm->master_view_list);
 
 	for (i = 0; i < dal_vector_get_count(&mm->solution_container_list);
@@ -307,6 +308,7 @@ struct mode_query *dal_mode_manager_create_mode_query(
 	struct mode_query_set_init_data mqs_init_data = {0};
 
 	uint32_t i;
+
 	if (topology == NULL) {
 		dal_logger_write(mm->ctx->logger,
 			LOG_MAJOR_MODE_ENUM,
@@ -613,6 +615,7 @@ static void process_display_views(
 {
 	uint32_t i;
 	uint32_t mtl_count = dal_mode_timing_list_get_count(mode_timing_list);
+
 	for (i = 0; i < mtl_count; ++i) {
 		const struct mode_timing *mt =
 			dal_mode_timing_list_get_timing_at_index(
@@ -638,6 +641,7 @@ static void process_display_views(
 
 		{
 			struct view_info vi_sls_compatible = vi;
+
 			if (patch_view_for_sls_compatibility(
 				mm, &vi_sls_compatible))
 				add_display_view(

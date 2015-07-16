@@ -55,6 +55,7 @@ static bool ds_construct(
 struct display_service *dal_display_service_create(struct ds_init_data *data)
 {
 	struct display_service *ds;
+
 	ds = dal_alloc(sizeof(struct display_service));
 
 	if (ds == NULL)
@@ -408,6 +409,7 @@ enum ds_return dal_display_service_mem_request_control(
 		struct display_path *display_path;
 		enum signal_type signal;
 		struct hw_path_mode mode;
+
 		if (!dal_ds_dispatch_build_hw_path_mode_for_adjustment(
 				ds->ds_dispatch, &mode, display_index, NULL))
 			return DS_ERROR;

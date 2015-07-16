@@ -52,7 +52,7 @@ enum surface_type {
 
 /* used by Graphics and Overlay gamma */
 struct gamma_coeff {
-	int32_t gamma[3]  ;
+	int32_t gamma[3];
 	int32_t a0[3]; /* index 0 for red, 1 for green, 2 for blue */
 	int32_t a1[3];
 	int32_t a2[3];

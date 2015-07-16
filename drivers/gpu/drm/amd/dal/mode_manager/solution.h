@@ -63,6 +63,7 @@ static inline enum solution_importance dal_solution_get_importance(
 static inline bool dal_solution_is_empty(struct solution *solution)
 {
 	uint32_t i;
+
 	for (i = 0; i < NUM_PIXEL_FORMATS; i++)
 		if (solution->scl_support[i])
 			return false;
@@ -105,6 +106,7 @@ static inline bool dal_solution_is_supported(
 		enum scaling_transformation st)
 {
 	uint32_t i = get_support_index_for_pixel_fmt(pf);
+
 	if (i >= NUM_PIXEL_FORMATS) {
 		BREAK_TO_DEBUGGER();
 		return false;
@@ -118,6 +120,7 @@ static inline bool dal_solution_is_guaranteed(
 		enum scaling_transformation st)
 {
 	uint32_t i = get_support_index_for_pixel_fmt(pf);
+
 	return (sol->scl_support_guaranteed[i] & st) != 0;
 }
 

@@ -149,8 +149,7 @@ static void init_gpu_static_clocks(struct tm_resource_builder *tm_rb,
 		dal_logger_write(tm_rb->dal_context->logger,
 			LOG_MAJOR_WARNING,
 			LOG_MINOR_COMPONENT_GPU,
-			"Failed to get BM Static Clock Ranges!"\
-			" Will be using default values.\n");
+			"Failed to get BM Static Clock Ranges! Will be using default values.\n");
 	} else {
 		struct gpu_clock_info gpu_clk_info;
 
@@ -461,8 +460,7 @@ static void tmrb_set_display_path_properties(struct tm_resource_builder *tm_rb,
 
 			if (!aud_support.bits.HDMI_AUDIO_NATIVE) {
 				/* this should not happen */
-				TM_ERROR("%s: HDMI connector exists, but HDMI"\
-						"native audio not supported",
+				TM_ERROR("%s: HDMI connector exists, but HDMI native audio not supported",
 						__func__);
 			}
 		} else {
@@ -524,8 +522,8 @@ static enum tm_result tmrb_update_device_tag(
 	conn_object_id = dal_connector_get_graphics_object_id(connector);
 
 	if (conn_object_id.type != OBJECT_TYPE_CONNECTOR) {
-		TM_ERROR("%s: This path doesn't have connector,"\
-			" something is wrong!\n", __func__);
+		TM_ERROR("%s: This path doesn't have connector, something is wrong!\n",
+				__func__);
 		return TM_RESULT_FAILURE;
 	}
 
@@ -540,8 +538,7 @@ static enum tm_result tmrb_update_device_tag(
 
 		dal_display_path_set_device_tag(display_path, device_tag);
 
-		TM_BUILD_DSP_PATH("  Device tag \"fake\" [%u:%u] was set"\
-				" on display path [0x%p].\n",
+		TM_BUILD_DSP_PATH("  Device tag \"fake\" [%u:%u] was set on display path [0x%p].\n",
 			device_tag.dev_id.device_type,
 			device_tag.dev_id.enum_id,
 			display_path);
@@ -580,8 +577,7 @@ static enum tm_result tmrb_update_device_tag(
 
 		dal_display_path_set_device_tag(display_path, device_tag);
 
-		TM_BUILD_DSP_PATH("  Device tag \"CF\" [%u:%u] was set on "\
-				"display path [0x%p].\n",
+		TM_BUILD_DSP_PATH("  Device tag \"CF\" [%u:%u] was set on display path [0x%p].\n",
 				device_tag.dev_id.device_type,
 				device_tag.dev_id.enum_id,
 				display_path);
@@ -598,8 +594,7 @@ static enum tm_result tmrb_update_device_tag(
 
 		dal_display_path_set_device_tag(display_path, device_tag);
 
-		TM_BUILD_DSP_PATH("  Device tag \"wireless\" [%u:%u] was"\
-				" set on display path [0x%p].\n",
+		TM_BUILD_DSP_PATH("  Device tag \"wireless\" [%u:%u] was set on display path [0x%p].\n",
 				device_tag.dev_id.device_type,
 				device_tag.dev_id.enum_id,
 				display_path);
@@ -630,8 +625,7 @@ static enum tm_result tmrb_update_device_tag(
 						device_tag);
 
 				TM_BUILD_DSP_PATH(
-					"  Device tag [%u:%u] was"
-					" set on display path [0x%p].\n",
+					"  Device tag [%u:%u] was set on display path [0x%p].\n",
 						device_tag.dev_id.device_type,
 						device_tag.dev_id.enum_id,
 						display_path);
@@ -857,8 +851,8 @@ static enum tm_result tmrb_activate_display_path_resource(
 		 * is no TM Resource which 'knows' about it. Possible scenario
 		 * is BIOS parser created an object but returns invalid
 		 * GO pointer for it. */
-		TM_ERROR("%s: No corresponding TM Resource for a Graphics"\
-				" Object!\n", __func__);
+		TM_ERROR("%s: No corresponding TM Resource for a Graphics Object!\n",
+				__func__);
 		return TM_RESULT_FAILURE;
 	}
 
@@ -918,8 +912,7 @@ static void tmrb_clone_mst_paths(struct tm_resource_builder *tm_rb,
 			continue;
 		}
 
-		TM_BUILD_DSP_PATH("  Creating branch-MST display path"\
-				" from [0x%p]. New Display path is [0x%p]\n",
+		TM_BUILD_DSP_PATH("  Creating branch-MST display path from [0x%p]. New Display path is [0x%p]\n",
 				root_display_path, branch_display_path);
 
 		/* copy signal from source to new display path */
@@ -1002,9 +995,8 @@ static void tmrb_clone_mst_paths(struct tm_resource_builder *tm_rb,
 
 				if (NULL == link_service) {
 					success = false;
-					TM_ERROR("%s: Failed to GET Root"\
-						" Link Service for link"\
-						" index:%d!\n", __func__,
+					TM_ERROR("%s: Failed to GET Root Link Service for link index:%d!\n",
+							__func__,
 						link_index);
 					break;
 				}
@@ -1016,9 +1008,8 @@ static void tmrb_clone_mst_paths(struct tm_resource_builder *tm_rb,
 						link_index,
 						link_service)) {
 					success = false;
-					TM_ERROR("%s: Failed to add Root"\
-						" Link Service for branch"\
-						" link index:%d!\n", __func__,
+					TM_ERROR("%s: Failed to add Root Link Service for branch link index:%d!\n",
+							__func__,
 						link_index);
 					break;
 				}
@@ -1041,8 +1032,7 @@ static void tmrb_clone_mst_paths(struct tm_resource_builder *tm_rb,
 			tm_rb->num_of_display_paths++;
 		} else {
 
-			TM_BUILD_DSP_PATH("  Destroying unsuccessful"\
-				" branch-MST of display path [0x%p].\n",
+			TM_BUILD_DSP_PATH("  Destroying unsuccessful branch-MST of display path [0x%p].\n",
 					branch_display_path);
 
 			dcs = dal_display_path_get_dcs(branch_display_path);
@@ -1106,6 +1096,7 @@ static void tmrb_create_display_path(
 		i = init_data->num_of_encoders;
 		do {
 			enum tm_result tm_result;
+
 			i--; /* "index" is less-by-one than "number" */
 
 			tm_result = tmrb_add_link(tm_rb, display_path,
@@ -1188,8 +1179,8 @@ static void tmrb_create_display_path(
 
 				dal_display_path_set_dcs(display_path, dcs);
 			} else {
-				TM_ERROR("%s: DDC service is"\
-					" not initialised!\n", __func__);
+				TM_ERROR("%s: DDC service is not initialised!\n",
+						__func__);
 				success = false;
 			}
 
@@ -1235,8 +1226,7 @@ static void tmrb_create_display_path(
 					dal_encoder_get_graphics_object_id(
 						encoder)) != TM_RESULT_SUCCESS){
 				success = false;
-				TM_ERROR("%s:Failed to activate Encoder"\
-						" resource for link:%d!\n",
+				TM_ERROR("%s:Failed to activate Encoder resource for link:%d!\n",
 					__func__, i);
 				break;
 			}
@@ -1248,8 +1238,7 @@ static void tmrb_create_display_path(
 				dal_audio_get_graphics_object_id(audio)) !=
 					TM_RESULT_SUCCESS){
 				success = false;
-				TM_ERROR("%s:Failed to activate Audio"\
-						" resource for link:%d!\n",
+				TM_ERROR("%s:Failed to activate Audio resource for link:%d!\n",
 					__func__, i);
 				break;
 			}
@@ -1302,8 +1291,7 @@ static void tmrb_create_display_path(
 	} /* if (success) */
 
 	if (success) {
-		TM_BUILD_DSP_PATH("  Display path [0x%p] at index %u"\
-			" was successfully created.\n",
+		TM_BUILD_DSP_PATH("  Display path [0x%p] at index %u was successfully created.\n",
 			display_path, tm_rb->num_of_display_paths - 1);
 	} else {
 		struct dcs *dcs;
@@ -1393,8 +1381,8 @@ static void tmrb_build_link_chain(struct tm_resource_builder *tm_rb,
 				this_object_id, source);
 
 		if (false == dal_graphics_object_id_is_valid(src_object_id)) {
-			TM_ERROR("%s: dal_adapter_service_get_src_obj()"\
-				" returned invalid src!\n", __func__);
+			TM_ERROR("%s: dal_adapter_service_get_src_obj() returned invalid src!\n",
+					__func__);
 		}
 
 		/* For each 'source' object (at this level) the starting
@@ -1404,6 +1392,7 @@ static void tmrb_build_link_chain(struct tm_resource_builder *tm_rb,
 		switch (src_object_id.type) {
 		case OBJECT_TYPE_ENCODER: {
 			struct encoder *enc;
+
 			tm_resource_src = tm_resource_mgr_find_resource(
 					tm_rb->tm_rm, src_object_id);
 
@@ -1437,8 +1426,8 @@ static void tmrb_build_link_chain(struct tm_resource_builder *tm_rb,
 			}
 
 			if (NULL == tm_resource_src) {
-				TM_ERROR("%s: Failed to add Encoder Resource"\
-						" to display path", __func__);
+				TM_ERROR("%s: Failed to add Encoder Resource to display path",
+						__func__);
 			} else {
 				init_data->
 					encoders[init_data->num_of_encoders] =
@@ -1482,8 +1471,7 @@ static void tmrb_build_single_display_path(struct tm_resource_builder *tm_rb,
 			connector_index);
 
 	if (connector_obj_id.type != OBJECT_TYPE_CONNECTOR) {
-		TM_WARNING("%s: Invalid Connector ObjectID from"\
-				" Adapter Service for connector index:%d!\n",
+		TM_WARNING("%s: Invalid Connector ObjectID from Adapter Service for connector index:%d!\n",
 				__func__, connector_index);
 		return;
 	}
@@ -1501,8 +1489,8 @@ static void tmrb_build_single_display_path(struct tm_resource_builder *tm_rb,
 		dal_tm_resource_connector_create(connector));
 
 	if (NULL == tm_resource) {
-		TM_WARNING("TM_RB: failed to add connector resource "\
-				"for connector index: %d\n", connector_index);
+		TM_WARNING("TM_RB: failed to add connector resource for connector index: %d\n",
+				connector_index);
 		return;
 	}
 
@@ -1517,8 +1505,8 @@ static void tmrb_build_single_display_path(struct tm_resource_builder *tm_rb,
 		dal_ddc_service_create(&ddc_init_data);
 
 	if (NULL == TO_CONNECTOR_INFO(tm_resource)->ddc_service) {
-		TM_WARNING("TM_RB: failed to create DDC service "\
-			"for connector index:%d!\n", connector_index);
+		TM_WARNING("TM_RB: failed to create DDC service for connector index:%d!\n",
+				connector_index);
 		return;
 	}
 
@@ -1544,8 +1532,8 @@ static void tmrb_build_single_display_path(struct tm_resource_builder *tm_rb,
 		tmrb_build_link_chain(tm_rb, &path_init_data);
 	}
 
-	TM_BUILD_DSP_PATH("Finished building display paths"\
-			" for connector index: %d.\n", connector_index);
+	TM_BUILD_DSP_PATH("Finished building display paths for connector index: %d.\n",
+			connector_index);
 }
 
 /**
@@ -1601,6 +1589,7 @@ enum tm_result tm_resource_builder_add_fake_display_paths(
 		struct tm_resource_builder *tm_rb)
 {
 	struct dal_context *dal_context = tm_rb->dal_context;
+
 	TM_NOT_IMPLEMENTED();
 	return TM_RESULT_SUCCESS;
 }

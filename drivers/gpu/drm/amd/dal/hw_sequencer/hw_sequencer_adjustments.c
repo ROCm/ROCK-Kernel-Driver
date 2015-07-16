@@ -56,6 +56,7 @@ static struct hw_path_mode *get_required_mode_path(
 {
 	struct hw_path_mode *path_mode;
 	uint32_t i;
+
 	for (i = 0; i < dal_hw_path_mode_set_get_paths_number(set); i++) {
 		path_mode = dal_hw_path_mode_set_get_path_by_index(set, i);
 	if (path_mode->action == action)

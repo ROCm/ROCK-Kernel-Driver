@@ -94,6 +94,7 @@ struct mode_timing_list *dal_mode_timing_list_create(
 	};
 
 	struct mode_timing_list *mtl = dal_alloc(sizeof(*mtl));
+
 	if (mtl == NULL)
 		return NULL;
 
@@ -211,8 +212,7 @@ const struct mode_timing *dal_mode_timing_list_get_single_selected_mode_timing(
 		dal_logger_write(mtl->ctx->logger,
 			LOG_MAJOR_MODE_ENUM,
 			LOG_MINOR_MODE_ENUM_TS_LIST_BUILD,
-			"Failed to find valid timing. "
-			"Returned timing may be not supported");
+			"Failed to find valid timing. Returned timing may be not supported");
 		return dal_mode_timing_list_get_timing_at_index(
 				mtl,
 				entries_num - 1);

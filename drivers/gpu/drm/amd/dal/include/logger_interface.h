@@ -112,11 +112,11 @@ uint32_t dal_logger_set_buffer_size(
 		struct dal_logger *logger,
 		uint32_t new_size);
 
-const struct log_major_info* dal_logger_enum_log_major_info(
+const struct log_major_info *dal_logger_enum_log_major_info(
 		struct dal_logger *logger,
 		unsigned int enum_index);
 
-const struct log_minor_info* dal_logger_enum_log_minor_info(
+const struct log_minor_info *dal_logger_enum_log_minor_info(
 		struct dal_logger *logger,
 		enum log_major major,
 		unsigned int enum_index);

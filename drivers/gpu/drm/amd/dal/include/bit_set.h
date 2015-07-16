@@ -39,6 +39,7 @@ static inline uint32_t get_next_significant_bit(
 		struct bit_set_iterator_32 *bs32)
 {
 	uint32_t lsb = least_significant_bit(bs32->value);
+
 	bs32->value &= ~lsb;
 	return lsb;
 }

@@ -75,6 +75,7 @@ bool dal_edid20_is_v_20(uint32_t len, const uint8_t *buf)
 {
 	uint8_t major;
 	uint8_t minor;
+
 	if (!dal_edid_get_version_raw(buf, len, &major, &minor))
 		return false;
 
@@ -272,6 +273,7 @@ static bool get_supported_mode_timing(
 	/*Calling sequence/order is important for preferred mode lookup*/
 	bool ret_det = add_detailed_timings(e, list, preferred_mode_found);
 	bool ret_4byte = add_4byte_timings(e, list, preferred_mode_found);
+
 	return ret_det || ret_4byte;
 }
 
@@ -526,6 +528,7 @@ static uint16_t get_version(struct edid_base *edid)
 static const uint8_t *get_raw_data(struct edid_base *edid)
 {
 	struct edid_20 *e = FROM_EDID(edid);
+
 	return (uint8_t *)e->data;
 }
 
@@ -537,6 +540,7 @@ static const uint32_t get_raw_size(struct edid_base *edid)
 static void validate(struct edid_base *edid)
 {
 	struct edid_20 *e = FROM_EDID(edid);
+
 	if (e->data->checksum != dal_edid_compute_checksum(edid))
 		edid->error.BAD_CHECKSUM = true;
 }

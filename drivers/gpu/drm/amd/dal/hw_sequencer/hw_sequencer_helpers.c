@@ -129,6 +129,7 @@ void dal_hw_sequencer_get_objects(
 {
 	uint32_t i;
 	uint32_t links_number = dal_display_path_get_number_of_links(dp);
+
 	dal_memset(objs, 0, sizeof(struct display_path_objects));
 
 	for (i = 0; i < links_number; ++i) {
@@ -151,6 +152,7 @@ enum engine_id dal_hw_sequencer_get_engine_id(struct display_path *dp)
 {
 	uint32_t i;
 	uint32_t links_number = dal_display_path_get_number_of_links(dp);
+
 	for (i = 0; i < links_number; ++i) {
 		if (dal_display_path_get_stream_engine(dp, i) !=
 			ENGINE_ID_UNKNOWN) {

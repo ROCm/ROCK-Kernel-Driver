@@ -63,24 +63,20 @@ struct dal {
 
 /* debugging macro definitions */
 #define DAL_IF_TRACE()	\
-	do {	\
-		dal_logger_write(dal_context->logger, \
-			LOG_MAJOR_INTERFACE_TRACE, \
-			LOG_MINOR_COMPONENT_DAL_INTERFACE, \
-			"DAL_IF_TRACE: %s()\n", __func__);	\
-	} while (0)
+	dal_logger_write(dal_context->logger, \
+		LOG_MAJOR_INTERFACE_TRACE, \
+		LOG_MINOR_COMPONENT_DAL_INTERFACE, \
+		"DAL_IF_TRACE: %s()\n", __func__)
 
 #define DAL_IF_NOT_IMPLEMENTED() \
 	DAL_LOGGER_NOT_IMPL(LOG_MINOR_COMPONENT_DAL_INTERFACE, \
 			"DAL_IF:%s()\n", __func__)
 
 #define DAL_IF_ERROR(...) \
-	do { \
-		dal_logger_write(dal_context->logger, \
-			LOG_MAJOR_ERROR, \
-			LOG_MINOR_COMPONENT_DAL_INTERFACE, \
-			__VA_ARGS__); \
-	} while (0)
+	dal_logger_write(dal_context->logger, \
+		LOG_MAJOR_ERROR, \
+		LOG_MINOR_COMPONENT_DAL_INTERFACE, \
+		__VA_ARGS__)
 
 enum {
 	MAX_PLANE_NUM = 4
@@ -116,12 +112,12 @@ struct dal *dal_create(struct dal_init_data *init)
 		return NULL;
 	}
 
-	if (dal_construct(init, dal_instance))
-		return dal_instance;
-	else {
+	if (!dal_construct(init, dal_instance)) {
 		dal_free(dal_instance);
 		return NULL;
 	}
+
+	return dal_instance;
 }
 
 void dal_destroy(struct dal **dal)
@@ -150,6 +146,7 @@ static bool dal_construct(struct dal_init_data *init,
 		struct dal *dal_instance)
 {
 	struct dal_context *dal_context = &dal_instance->dal_context;
+
 	dal_instance->init_data = *init;
 	dal_instance->dal_context.driver_context = init->driver;
 	dal_instance->dal_context.cgs_device = init->cgs_device;
@@ -176,8 +173,8 @@ static bool dal_construct(struct dal_init_data *init,
 	/* Initialise HW controlled by Adapter Service */
 	if (false == dal_adapter_service_initialize_hw_data(
 			dal_instance->adapter_srv)) {
-		DAL_IF_ERROR("%s: dal_adapter_service_initialize_hw_data()"\
-				"  failed!\n", __func__);
+		DAL_IF_ERROR("%s: dal_adapter_service_initialize_hw_data() failed!\n",
+				__func__);
 		/* Note that AS exist, so have to destroy it.*/
 		goto ts_fail;
 	}
@@ -212,6 +209,7 @@ static bool dal_construct(struct dal_init_data *init,
 
 	{
 		struct mode_manager_init_data init_data;
+
 		init_data.as = dal_instance->adapter_srv;
 		init_data.default_modes =
 			dal_timing_service_get_default_mode_list(
@@ -393,13 +391,11 @@ static bool dal_enable(struct dal *dal)
 		tm_rc = dal_tm_register_for_display_detection_interrupt(tm_mgr);
 	}
 
-	if (TM_RESULT_SUCCESS == tm_rc) {
-		/* no error */
-		return true;
-	} else {
+	if (TM_RESULT_SUCCESS != tm_rc)
 		/* error occurred */
 		return false;
-	}
+
+	return true;
 }
 
 /*
@@ -451,9 +447,8 @@ uint32_t dal_get_connected_targets_vector(struct dal *dal)
 	for (ind = 0; ind < disp_path_num; ind++) {
 		disp_path = dal_tm_display_index_to_display_path(tm_mgr, ind);
 
-		if (dal_display_path_is_target_connected(disp_path)) {
+		if (dal_display_path_is_target_connected(disp_path))
 			connected_displays |= (1 << ind);
-		}
 	} /* for() */
 
 	return connected_displays;
@@ -1101,10 +1096,10 @@ uint32_t dal_get_crtc_scanoutpos(
 				tm, display_index);
 	struct controller *cont = dal_display_path_get_controller(dp);
 
-	if (!cont)
-	{
+	if (!cont) {
 		dal_logger_write(dal->dal_context.logger,
-				LOG_MAJOR_ERROR, LOG_MINOR_COMPONENT_DAL_INTERFACE,
+				LOG_MAJOR_ERROR,
+				LOG_MINOR_COMPONENT_DAL_INTERFACE,
 				"Failed to find controller at display index %d\n",
 				display_index);
 		return 0;

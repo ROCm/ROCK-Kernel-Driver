@@ -148,6 +148,7 @@ static struct audio_feature_support get_supported_features(struct audio *audio)
 {
 	/*DCE specific, must be implemented in derived*/
 	struct audio_feature_support features;
+
 	dal_memset(&features, 0, sizeof(features));
 
 	features.ENGINE_DIGA = 1;
@@ -181,6 +182,7 @@ bool dal_audio_construct_base(
 	const struct audio_init_data *init_data)
 {
 	enum signal_type signals = SIGNAL_TYPE_HDMI_TYPE_A;
+
 	ASSERT(init_data->as != NULL);
 
 	/* base hook functions */
@@ -254,6 +256,7 @@ struct audio *dal_audio_create(
 	const struct audio_init_data *init_data)
 {
 	struct adapter_service *as;
+
 	if (init_data->as == NULL)
 		return NULL;
 

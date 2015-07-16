@@ -124,6 +124,7 @@ static bool construct(
 	const struct i2c_sw_engine_dce110_create_arg *arg_dce110)
 {
 	struct i2c_sw_engine_create_arg arg_base;
+
 	arg_base.ctx = arg_dce110->ctx;
 	arg_base.default_speed = arg_dce110->default_speed;
 

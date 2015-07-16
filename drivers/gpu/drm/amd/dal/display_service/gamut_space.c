@@ -136,7 +136,6 @@ static void set_regamma_support(
 
 		}
 	}
-	return;
 }
 
 
@@ -200,7 +199,7 @@ bool dal_gamut_space_find_predefined_gamut(
 	uint32_t const_size;
 	uint32_t i;
 
-	const_size = sizeof(gamut_array) / sizeof(gamut_array[0]);
+	const_size = ARRAY_SIZE(gamut_array);
 
 	for (p = gamut_array ; p < &gamut_array[const_size]; p++) {
 		if (p->index == predefine.u32all) {
@@ -256,7 +255,7 @@ bool dal_gamut_space_find_regamma_coefficients(
 		coeff->gamma[0] != coeff->gamma[2])
 		return false;
 
-	const_size = sizeof(gamut_array) / sizeof(gamut_array[0]);
+	const_size = ARRAY_SIZE(gamut_array);
 
 	for (p = gamut_array; p < &gamut_array[const_size]; p++) {
 		if (p->a0 == coeff->coeff_a0[0] &&
@@ -281,7 +280,7 @@ bool dal_gamut_space_find_color_coordinates(
 	const struct gamut_space_entry *p;
 	uint32_t const_size;
 
-	const_size = sizeof(gamut_array) / sizeof(gamut_array[0]);
+	const_size = ARRAY_SIZE(gamut_array);
 	for (p = gamut_array; p < &gamut_array[const_size]; p++) {
 		if (p->red_x == csc->red_x &&
 			p->red_y == csc->red_y &&
@@ -363,6 +362,7 @@ bool dal_gamut_space_build_gamut_space_matrix(
 {
 	struct gamut_matrixs matrix;
 	bool ret = false;
+
 	matrix.rgb_coeff_dst = NULL;
 
 	if (gamut->source == GAMUT_SPACE_SOURCE_DEFAULT) {
@@ -521,24 +521,23 @@ bool dal_gamut_space_build_gamut_matrix(
 		csc.blue_x = data->gamut.custom.blue_x;
 		csc.blue_y = data->gamut.custom.blue_y;
 	} else {
-		dal_memset(&coeff, 0 , sizeof(coeff));
+		dal_memset(&coeff, 0, sizeof(coeff));
 		if (!dal_gamut_space_find_predefined_gamut(
 				data->gamut.predefined,
 				&csc,
 				&coeff))
 			return false;
-		else {
-			if (custom_regamma->flags.bits.GAMMA_RAMP_ARRAY
-					== 0) {
-				regamma->coeff = coeff;
-				dal_gamut_space_is_equal_gamma_coefficients(
-						&coeff,
-						&custom_regamma->coeff,
-						flags);
-				regamma->flags.bits.GAMMA_FROM_USER = 1;
-				regamma->flags.bits.GAMMA_FROM_EDID = 0;
-				regamma->flags.bits.GAMMA_FROM_EDID_EX = 0;
-			}
+
+		if (custom_regamma->flags.bits.GAMMA_RAMP_ARRAY
+				== 0) {
+			regamma->coeff = coeff;
+			dal_gamut_space_is_equal_gamma_coefficients(
+					&coeff,
+					&custom_regamma->coeff,
+					flags);
+			regamma->flags.bits.GAMMA_FROM_USER = 1;
+			regamma->flags.bits.GAMMA_FROM_EDID = 0;
+			regamma->flags.bits.GAMMA_FROM_EDID_EX = 0;
 		}
 	}
 	if (data->option.bits.CUSTOM_WHITE_POINT == 1) {
@@ -976,7 +975,7 @@ void dal_gamut_space_transpose_matrix(
 	uint32_t cols,
 	struct fixed31_32 *transposed)
 {
-	uint32_t i , j;
+	uint32_t i, j;
 
 	for (i = 0 ; i < rows ;  i++) {
 		for (j = 0 ; j < cols ; j++)
@@ -990,22 +989,22 @@ bool dal_gamut_space_setup_white_point(
 	struct gamut_data *gamut,
 	struct ds_white_point_coordinates *data)
 {
+	struct color_space_coodinates csc;
+
 	if (gamut->option.bits.CUSTOM_WHITE_POINT == 1) {
 		data->white_x = gamut->white_point.custom.white_x;
 		data->white_y = gamut->white_point.custom.white_y;
 		return true;
-	} else {
-		{
-			struct color_space_coodinates csc;
-			if (dal_gamut_space_find_predefined_white_point(
-					gamut->white_point.predefined,
-					&csc)) {
-				data->white_x = csc.white_x;
-				data->white_y = csc.white_y;
-				return true;
-			}
-		}
 	}
+
+	if (dal_gamut_space_find_predefined_white_point(
+			gamut->white_point.predefined,
+			&csc)) {
+		data->white_x = csc.white_x;
+		data->white_y = csc.white_y;
+		return true;
+	}
+
 	return false;
 }
 
@@ -1017,7 +1016,7 @@ bool dal_gamut_space_find_predefined_white_point(
 	const struct white_point_coodinates_entry *p;
 	uint32_t const_size;
 
-	const_size = sizeof(white_point_array) / sizeof(white_point_array[0]);
+	const_size = ARRAY_SIZE(white_point_array);
 	for (p = white_point_array;
 			p < &white_point_array[const_size]; p++) {
 		if (p->index == predefined.u32all) {

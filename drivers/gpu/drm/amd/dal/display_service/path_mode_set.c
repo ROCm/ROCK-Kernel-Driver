@@ -33,6 +33,7 @@
 struct path_mode_set *dal_pms_create()
 {
 	struct path_mode_set *set;
+
 	set = dal_alloc(sizeof(struct path_mode_set));
 
 	if (set == NULL)
@@ -74,6 +75,7 @@ struct path_mode_set *dal_pms_copy(const struct path_mode_set *copy)
 
 	if (dal_pms_construct(set)) {
 		uint32_t i = 0;
+
 		set->count = copy->count;
 		set->control_flags.all = copy->control_flags.all;
 
@@ -148,6 +150,7 @@ const struct path_mode *dal_pms_get_path_mode_for_display_index(
 		uint32_t index)
 {
 	uint32_t i;
+
 	for (i = 0; i < set->count; i++) {
 		if (set->path_mode_set[i].display_path_index == index)
 			return &set->path_mode_set[i];
@@ -191,6 +194,7 @@ bool dal_pms_remove_path_mode_at_index(
 {
 	if (index < set->count) {
 		uint32_t i = 0;
+
 		for (i = index; i < set->count; i++)
 			set->path_mode_set[i] = set->path_mode_set[i + 1];
 		set->count--;

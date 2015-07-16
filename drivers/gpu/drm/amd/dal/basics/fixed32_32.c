@@ -52,6 +52,7 @@ static uint64_t u64_div(uint64_t n, uint64_t d)
 struct fixed32_32 dal_fixed32_32_from_fraction(uint32_t n, uint32_t d)
 {
 	struct fixed32_32 fx;
+
 	fx.value = u64_div((uint64_t)n << 32, (uint64_t)d << 32);
 	return fx;
 }
@@ -59,6 +60,7 @@ struct fixed32_32 dal_fixed32_32_from_fraction(uint32_t n, uint32_t d)
 struct fixed32_32 dal_fixed32_32_from_int(uint32_t value)
 {
 	struct fixed32_32 fx;
+
 	fx.value = (uint64_t)value<<32;
 	return fx;
 }
@@ -68,6 +70,7 @@ struct fixed32_32 dal_fixed32_32_add(
 	struct fixed32_32 rhs)
 {
 	struct fixed32_32 fx = {lhs.value + rhs.value};
+
 	ASSERT(fx.value >= rhs.value);
 	return fx;
 }
@@ -75,6 +78,7 @@ struct fixed32_32 dal_fixed32_32_add(
 struct fixed32_32 dal_fixed32_32_add_int(struct fixed32_32 lhs, uint32_t rhs)
 {
 	struct fixed32_32 fx = {lhs.value + ((uint64_t)rhs << 32)};
+
 	ASSERT(fx.value >= (uint64_t)rhs << 32);
 	return fx;
 
@@ -84,6 +88,7 @@ struct fixed32_32 dal_fixed32_32_sub(
 	struct fixed32_32 rhs)
 {
 	struct fixed32_32 fx;
+
 	ASSERT(lhs.value >= rhs.value);
 	fx.value = lhs.value - rhs.value;
 	return fx;
@@ -92,6 +97,7 @@ struct fixed32_32 dal_fixed32_32_sub(
 struct fixed32_32 dal_fixed32_32_sub_int(struct fixed32_32 lhs, uint32_t rhs)
 {
 	struct fixed32_32 fx;
+
 	ASSERT(lhs.value >= ((uint64_t)rhs<<32));
 	fx.value = lhs.value - ((uint64_t)rhs<<32);
 	return fx;
@@ -123,6 +129,7 @@ struct fixed32_32 dal_fixed32_32_mul_int(struct fixed32_32 lhs, uint32_t rhs)
 	struct fixed32_32 fx;
 	uint64_t lhsi = (lhs.value>>32) * (uint64_t)rhs;
 	uint64_t lhsf;
+
 	ASSERT((lhsi>>32) == 0);
 	lhsf = ((uint32_t)lhs.value) * (uint64_t)rhs;
 	ASSERT((lhsi<<32) + lhsf >= lhsf);
@@ -137,6 +144,7 @@ struct fixed32_32 dal_fixed32_32_div(
 	struct fixed32_32 rhs)
 {
 	struct fixed32_32 fx;
+
 	fx.value = u64_div(lhs.value, rhs.value);
 	return fx;
 }
@@ -144,6 +152,7 @@ struct fixed32_32 dal_fixed32_32_div(
 struct fixed32_32 dal_fixed32_32_div_int(struct fixed32_32 lhs, uint32_t rhs)
 {
 	struct fixed32_32 fx;
+
 	fx.value = u64_div(lhs.value, (uint64_t)rhs << 32);
 	return fx;
 }

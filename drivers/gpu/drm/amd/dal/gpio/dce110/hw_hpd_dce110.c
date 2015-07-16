@@ -273,6 +273,7 @@ static enum gpio_result set_config(
 
 	{
 		uint32_t value;
+
 		value = dal_read_reg(
 			ptr->ctx,
 			pin->addr.DC_HPD_TOGGLE_FILT_CNTL);

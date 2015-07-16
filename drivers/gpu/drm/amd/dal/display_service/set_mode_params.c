@@ -225,6 +225,7 @@ bool dal_set_mode_params_update_tiling_mode_on_path(
 static void update_hw_path_mode_scaling_info(struct set_mode_params *smp)
 {
 	uint32_t i;
+
 	for (i = 0; i < smp->path_num; ++i) {
 		struct hw_path_mode *path_mode =
 			dal_hw_path_mode_set_get_path_by_index(
@@ -283,8 +284,8 @@ static void update_hw_path_mode_scaling_info(struct set_mode_params *smp)
 			dal_logger_write(smp->ctx->logger,
 				LOG_MAJOR_ERROR,
 				LOG_MINOR_COMPONENT_DISPLAY_SERVICE,
-				"%s: something is wrong here, why do we have"
-				" bogus parameters?", __func__);
+				"%s: something is wrong here, why do we have bogus parameters?",
+				__func__);
 			break;
 		}
 	}
@@ -420,6 +421,7 @@ static bool validate_path_mode(
 		uint32_t i;
 
 		struct link_validation_flags flags = { 0 };
+
 		flags.CANDIDATE_TIMING = guaranteed_validation;
 		flags.START_OF_VALIDATION =
 			smp->guaranteed_validation_count == 0;
@@ -581,6 +583,7 @@ bool dal_set_mode_params_report_ce_mode_only(struct set_mode_params *smp,
 				SINK_LINK_INDEX);
 		bool is_hdmi = signal == SIGNAL_TYPE_HDMI_TYPE_A;
 		bool enabled = false;
+
 		if (dal_dcs_get_fid9204_allow_ce_mode_only_option(
 			dcs,
 			is_hdmi,
@@ -597,6 +600,7 @@ bool dal_set_mode_params_init_with_topology(
 	uint32_t idx_num)
 {
 	struct hw_path_mode path_mode;
+
 	ASSERT(smp->display_path_set == NULL);
 	ASSERT(smp->hw_path_mode_set == NULL);
 
@@ -650,6 +654,7 @@ bool dal_set_mode_params_init_with_topology(
 
 	if (smp->hw_path_mode_set) {
 		uint32_t i;
+
 		for (i = 0; i < idx_num; i++) {
 			dal_memset(&path_mode, 0, sizeof(path_mode));
 
@@ -748,6 +753,7 @@ enum pixel_encoding dal_set_mode_params_get_default_pixel_format_preference(
 				SINK_LINK_INDEX);
 		bool is_hdmi = signal == SIGNAL_TYPE_HDMI_TYPE_A;
 		bool enabled = false;
+
 		if (dal_dcs_get_fid9204_allow_ce_mode_only_option(
 			dcs, is_hdmi, &enabled))
 			pf = PIXEL_ENCODING_RGB;

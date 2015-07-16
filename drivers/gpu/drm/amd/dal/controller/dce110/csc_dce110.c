@@ -232,7 +232,6 @@ static void set_denormalization(
 	dal_write_reg(csc->ctx,
 		FROM_CSC(csc)->dcp_denorm_control_offset, value);
 
-	return;
 }
 
 /*******************************************************************************
@@ -303,6 +302,7 @@ static bool csc_dce110_construct(
 
 	{
 		struct csc_grph_init_data cg_init_data;
+
 		cg_init_data.ctx = csc->base.ctx;
 		cg_init_data.id = init_data->id;
 		csc->base.csc_grph =

@@ -53,6 +53,7 @@ static bool can_scaling_be_applied(
 {
 	struct adjustment_info *info = NULL;
 	enum signal_type type;
+
 	if (!container)
 		return false;
 
@@ -85,39 +86,40 @@ static bool is_pass_thru_enabled(
 	enum build_path_set_reason reason)
 {
 	const struct adjustment_info *info;
+	enum underscan_reason reason_for_underscan;
+
 	if (scaler_param->adjust_id == ADJ_ID_MULTIMEDIA_PASS_THROUGH &&
 		scaler_param->value > 0)
 		return true;
-	else {
-		enum underscan_reason reason_for_underscan;
-		switch (reason) {
-		case BUILD_PATH_SET_REASON_FALLBACK_UNDERSCAN:
-			reason_for_underscan = UNDERSCAN_REASON_FALL_BACK;
-			break;
-		case BUILD_PATH_SET_REASON_SET_MODE:
-			reason_for_underscan = UNDERSCAN_REASON_PATCH_TIMING;
-			break;
-		case BUILD_PATH_SET_REASON_SET_ADJUSTMENT:
-		default:
-			reason_for_underscan = UNDERSCAN_REASON_SET_ADJUSTMENT;
-			break;
-		}
 
-		if (can_scaling_be_applied(
-			container,
-			scaler_param->timing_standard,
-			scaler_param->timing_source,
-			scaler_param->adjust_id,
-			reason_for_underscan)) {
-			info = dal_adj_info_set_get_adj_info(
-				&container->adj_info_set,
-				ADJ_ID_MULTIMEDIA_PASS_THROUGH);
-			if (!info)
-				return false;
-			if (info->adj_data.ranged.cur > 0)
-				return true;
-			}
+	switch (reason) {
+	case BUILD_PATH_SET_REASON_FALLBACK_UNDERSCAN:
+		reason_for_underscan = UNDERSCAN_REASON_FALL_BACK;
+		break;
+	case BUILD_PATH_SET_REASON_SET_MODE:
+		reason_for_underscan = UNDERSCAN_REASON_PATCH_TIMING;
+		break;
+	case BUILD_PATH_SET_REASON_SET_ADJUSTMENT:
+	default:
+		reason_for_underscan = UNDERSCAN_REASON_SET_ADJUSTMENT;
+		break;
 	}
+
+	if (can_scaling_be_applied(
+		container,
+		scaler_param->timing_standard,
+		scaler_param->timing_source,
+		scaler_param->adjust_id,
+		reason_for_underscan)) {
+		info = dal_adj_info_set_get_adj_info(
+			&container->adj_info_set,
+			ADJ_ID_MULTIMEDIA_PASS_THROUGH);
+		if (!info)
+			return false;
+		if (info->adj_data.ranged.cur > 0)
+			return true;
+	}
+
 	return false;
 }
 
@@ -130,6 +132,7 @@ static bool build_base_avi_info_frame_parameter(
 	enum hw_scale_options *underscan_avi_rule)
 {
 	struct cea861_support cea861_support = {0};
+
 	if (hw_path_mode->mode.ds_info.cea_vic != 0)
 		if (is_pass_thru_enabled(
 			scaler_param, underscan_param, container, reason))
@@ -157,6 +160,7 @@ static bool build_avi_info_frame_parameter(
 {
 	union cea_video_capability_data_block vcdb = { {0} };
 	bool result = false;
+
 	if (dal_adj_container_get_cea_video_cap_data_block(container, &vcdb)) {
 		if (hw_path_mode->mode.ds_info.DISPLAY_PREFERED_MODE == 1 &&
 			(vcdb.bits.S_PT0 != 0 || vcdb.bits.S_PT1 != 0)) {
@@ -476,6 +480,7 @@ bool dal_scaler_adj_group_build_scaler_parameter(
 {
 	struct dcs *dcs = dal_display_path_get_dcs(display_path);
 	struct dcs_stereo_3d_features feature;
+
 	if (!display_path || !path_mode || !dcs)
 		return false;
 	dal_memset(param, 0, sizeof(*param));
@@ -518,6 +523,7 @@ static bool build_underscan_bundle(
 {
 	struct adjustment_info *mm_pass_thur;
 	struct adjustment_info *underscan;
+
 	dal_memset(group, 0, sizeof(*group));
 	group->id_overscan = ADJ_ID_OVERSCAN;
 	group->id_underscan = ADJ_ID_UNDERSCAN;
@@ -563,6 +569,7 @@ static bool build_underscan_parameters(
 	struct ds_overscan *overscan)
 {
 	struct underscan_adjustment_group group;
+
 	if (!build_underscan_bundle(
 		param,
 		container,
@@ -594,6 +601,7 @@ static struct hw_path_mode *find_hw_path_mode(
 	uint32_t num_of_path;
 	struct hw_path_mode *mode = NULL;
 	struct hw_path_mode *local_mode;
+
 	num_of_path = dal_hw_path_mode_set_get_paths_number(hw_pms);
 	for (i = 0; i < num_of_path; i++) {
 		local_mode = dal_hw_path_mode_set_get_path_by_index(hw_pms, i);
@@ -860,6 +868,7 @@ enum ds_return dal_scaler_adj_group_set_adjustment(
 	const struct path_mode *path_mode;
 	enum ds_return result = DS_ERROR;
 	const struct adjustment_info *adj_info;
+
 	pms_wd = dal_ds_dispatch_get_active_pms_with_data(ds);
 	if (NULL == pms_wd)
 		return DS_ERROR;

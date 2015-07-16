@@ -310,6 +310,7 @@ bool dal_timing_list_query_add_timing(struct dal_timing_list_query *tlsq,
 		/* mt.crtc_timing.pixel_encoding is NOT defined.
 		 * We need to get from DCS the supported pixel encoding. */
 		enum pixel_encoding pe;
+
 		query_dcs = true;
 		pe = PIXEL_ENCODING_UNDEFINED;
 
@@ -328,6 +329,7 @@ bool dal_timing_list_query_add_timing(struct dal_timing_list_query *tlsq,
 		 * we need to get from DCS the supported
 		 */
 		enum pixel_encoding pe = PIXEL_ENCODING_UNDEFINED;
+
 		query_dcs = true;
 		while (get_next_display_supported_pixel_encoding(
 			tlsq,

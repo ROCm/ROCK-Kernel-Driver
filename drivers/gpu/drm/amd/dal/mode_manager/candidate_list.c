@@ -37,6 +37,7 @@ static bool mtp_less_than(
 {
 	const struct mtp *lhs = lhs_address;
 	const struct mtp *rhs = rhs_address;
+
 	return dal_mode_timing_less_than(lhs->value, rhs->value);
 }
 
@@ -74,6 +75,7 @@ bool dal_candidate_list_insert(
 		const struct mode_timing *mode_timing)
 {
 	struct mtp mtp = { mode_timing };
+
 	return dal_flat_set_insert(&cl->mode_timing_set, &mtp);
 }
 
@@ -97,6 +99,7 @@ bool dal_candidate_list_find_matching_view(
 	const struct mode_info *mode_info;
 	struct mode_timing mt = { { 0 } };
 	struct mtp mtp = { &mt };
+
 	mt.mode_info.pixel_width = vw->width;
 	mt.mode_info.pixel_height = vw->height;
 

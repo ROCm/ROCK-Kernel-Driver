@@ -164,6 +164,7 @@ bool dal_edid14_is_v_14(uint32_t len, const uint8_t *buff)
 {
 	uint8_t major;
 	uint8_t minor;
+
 	if (!dal_edid_get_version_raw(buff, len, &major, &minor))
 		return false;
 
@@ -390,6 +391,7 @@ static bool add_established_timing(
 /*Parse Established Timing I/II & Manufacturer's Timing without selecting
  preferred mode. Preferred mode will be selected in the end of this function*/
 		bool ignore_preffered = true;
+
 		dal_edid13_add_established_timings(
 			edid, list, &ignore_preffered);
 	}
@@ -591,6 +593,7 @@ static bool get_display_color_depth(
 	uint8_t vsi = e->data->basic_display_params[0];
 	uint8_t bit_depth = vsi & EDID14_BITDEPTH_MASK;
 	enum dcs_edid_connector_type connector;
+
 	color_depth->mask = 0;
 
 	ASSERT(color_depth != NULL);

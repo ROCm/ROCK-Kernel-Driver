@@ -68,6 +68,7 @@ const struct graphics_object_id dal_encoder_get_graphics_object_id(
 	const struct encoder *enc)
 {
 	struct graphics_object_id id = {0};
+
 	if (enc->impl)
 		return enc->impl->id;
 
@@ -427,9 +428,8 @@ enum encoder_result dal_encoder_power_up(
 	signal = dal_encoder_impl_convert_downstream_to_signal(
 		enc->impl->id, ctx->downstream);
 
-	if (create_impl(enc, signal, enc->impl->id) == CREATION_FAILED) {
+	if (create_impl(enc, signal, enc->impl->id) == CREATION_FAILED)
 		return ENCODER_RESULT_ERROR;
-	}
 
 	if (!enc->impl) {
 		BREAK_TO_DEBUGGER();

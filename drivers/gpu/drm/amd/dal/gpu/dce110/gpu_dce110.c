@@ -50,7 +50,7 @@ const enum controller_id controller_array[4] = {
  *****************************************************************************/
 
 #define FROM_BASE_TO_DCE11(ptr) \
-	container_of((ptr), struct gpu_dce110, base);
+	container_of((ptr), struct gpu_dce110, base)
 
 /*****************************************************************************
  * static functions
@@ -64,6 +64,7 @@ static void destruct(struct gpu_dce110 *gpu)
 static void destroy(struct gpu **base)
 {
 	struct gpu_dce110 *gpu;
+
 	gpu = FROM_BASE_TO_DCE11(*base);
 	destruct(gpu);
 	dal_free(gpu);
@@ -217,7 +218,9 @@ static void power_up(struct gpu *base)
 
 	dal_gpu_power_up_base(base);
 
-	dal_dc_clock_gating_dce110_power_up(base->dal_context, gpu110->dc_clock_gating );
+	dal_dc_clock_gating_dce110_power_up(
+			base->dal_context,
+			gpu110->dc_clock_gating);
 }
 
 static void power_down(
@@ -320,6 +323,7 @@ static bool construct(
 struct gpu *dal_gpu_dce110_create(struct gpu_init_data *init_data)
 {
 	struct gpu_dce110 *gpu = dal_alloc(sizeof(struct gpu_dce110));
+
 	if (gpu == NULL)
 		return NULL;
 

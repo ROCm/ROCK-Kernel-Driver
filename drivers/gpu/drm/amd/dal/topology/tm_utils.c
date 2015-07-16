@@ -397,9 +397,8 @@ const char *tm_utils_engine_priority_to_str(enum tm_engine_priority priority)
 
 const char *tm_utils_transmitter_id_to_str(struct graphics_object_id encoder)
 {
-	if (encoder.type != OBJECT_TYPE_ENCODER) {
+	if (encoder.type != OBJECT_TYPE_ENCODER)
 		return "\b";
-	}
 
 	switch (dal_graphics_object_id_get_encoder_id(encoder)) {
 	case ENCODER_ID_INTERNAL_UNIPHY: {
@@ -549,19 +548,19 @@ const char *tm_utils_ddc_line_to_str(enum channel_id line)
 
 const char *tm_utils_device_type_to_str(enum dal_device_type device)
 {
-    switch (device)
-    {
-        case DEVICE_TYPE_LCD:      return "LCD";
-        case DEVICE_TYPE_CRT:      return "CRT";
-        case DEVICE_TYPE_DFP:      return "DFP";
-        case DEVICE_TYPE_CV:       return "CV";
-        case DEVICE_TYPE_TV:       return "TV";
-        case DEVICE_TYPE_CF:       return "CF";
-        case DEVICE_TYPE_WIRELESS: return "Wireless";
-        default:                  break;
-    }
+	switch (device) {
+	case DEVICE_TYPE_LCD:		return "LCD";
+	case DEVICE_TYPE_CRT:		return "CRT";
+	case DEVICE_TYPE_DFP:		return "DFP";
+	case DEVICE_TYPE_CV:		return "CV";
+	case DEVICE_TYPE_TV:		return "TV";
+	case DEVICE_TYPE_CF:		return "CF";
+	case DEVICE_TYPE_WIRELESS:	return "Wireless";
+	default:
+		break;
+	}
 
-    return "Unknown";
+	return "Unknown";
 }
 
 
@@ -589,11 +588,11 @@ bool tm_utils_is_edid_connector_type_valid_with_signal_type(
 		 that may convert digital signal to analog. In this case
 		 EDID connector type will be analog. Here we need to check
 		 the dongle type and switch to analog signal */
-		if (dongle_type == DISPLAY_DONGLE_DP_VGA_CONVERTER) {
+		if (dongle_type == DISPLAY_DONGLE_DP_VGA_CONVERTER)
 			is_signal_digital = false;
-		} else {
+		else
 			is_signal_digital = true;
-		}
+
 	}
 		break;
 	case SIGNAL_TYPE_RGB:
@@ -633,6 +632,7 @@ enum tm_utils_display_type tm_utils_signal_to_display_type(
 	enum signal_type signal)
 {
 	enum tm_utils_display_type res = DISPLAY_DFP;
+
 	switch (signal) {
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
 	case SIGNAL_TYPE_DVI_SINGLE_LINK1:
@@ -853,7 +853,7 @@ enum signal_type tm_utils_get_downgraded_signal_type(
 		hdmi1 = false;
 		break;
 	default:
-		return signal; //No need to downgrade the signal
+		return signal; /* No need to downgrade the signal */
 
 	};
 
@@ -867,20 +867,19 @@ enum signal_type tm_utils_get_downgraded_signal_type(
 		hdmi2 = false;
 		break;
 	default:
-		return signal; //No need to downgrade the signal
+		return signal; /* No need to downgrade the signal */
 
 	};
 
 	dl3 = dl1 && dl2;
 	hdmi3 = hdmi1 && hdmi2;
 
-	if (dl3 && !hdmi3) {
+	if (dl3 && !hdmi3)
 		signal = SIGNAL_TYPE_DVI_DUAL_LINK;
-	} else if (!dl3 && hdmi3) {
+	else if (!dl3 && hdmi3)
 		signal = SIGNAL_TYPE_HDMI_TYPE_A;
-	} else if (!dl3 && !hdmi3) {
+	else if (!dl3 && !hdmi3)
 		signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
-	}
 
 	return signal;
 }
@@ -1097,6 +1096,7 @@ uint32_t dal_tm_calc_subset_get_value(
 bool dal_tm_calc_subset_step(struct tm_calc_subset *subset)
 {
 	uint32_t next_value;
+
 	if (subset->subset_size == 0 ||
 		subset->subset_size > subset->max_subset_size)
 		return false;

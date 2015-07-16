@@ -290,6 +290,7 @@ static bool construct(
 	struct line_buffer_init_data *init_data)
 {
 	bool ret = true;
+
 	if (!dal_line_buffer_dce110_construct(lb, init_data))
 		return false;
 

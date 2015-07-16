@@ -38,6 +38,7 @@ struct edid_ext_unknown {
 static const uint8_t *get_raw_data(struct edid_base *edid)
 {
 	struct edid_ext_unknown *ext = FROM_EDID(edid);
+
 	return ext->data;
 }
 

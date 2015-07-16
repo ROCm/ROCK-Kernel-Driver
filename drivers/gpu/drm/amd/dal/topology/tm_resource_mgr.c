@@ -191,6 +191,7 @@ static enum tm_result tm_resource_mgr_construct(struct tm_resource_mgr *tm_rm)
 {
 	struct dal_context *dal_context = tm_rm->dal_context;
 	struct flat_set_init_data init;
+
 	init.capacity = TM_RM_MAX_NUM_OF_RESOURCES;
 	init.funcs.less_than = tm_rm_less_than;
 	init.struct_size = sizeof(struct tm_resource *);
@@ -548,6 +549,7 @@ struct tm_resource_mgr *tm_resource_mgr_clone(
 
 		{
 			struct flat_set_init_data init_data;
+
 			init_data.capacity = TM_RM_MAX_NUM_OF_RESOURCES;
 			init_data.funcs.less_than = tm_rm_less_than;
 			init_data.struct_size = sizeof(struct tm_resource *);
@@ -954,8 +956,7 @@ static bool tmrm_resources_available(struct tm_resource_mgr *tm_rm,
 	if (TM_RES_REF_CNT_GET(tm_resource) > 0
 			&& !tm_resource->flags.mst_resource) {
 
-		TM_WARNING("%s: Connector resource NOT available!"\
-				" ref_count:%d\n",
+		TM_WARNING("%s: Connector resource NOT available! ref_count:%d\n",
 				__func__,
 				TM_RES_REF_CNT_GET(tm_resource));
 		return false;
@@ -976,8 +977,7 @@ static bool tmrm_resources_available(struct tm_resource_mgr *tm_rm,
 		/* Primary resource is busy */
 		if (TM_RES_REF_CNT_GET(tm_resource) > 0 &&
 				!tm_resource->flags.mst_resource) {
-			TM_WARNING("%s: Encoder resource NOT available!"\
-					" ref_count:%d, Link Index:%d\n",
+			TM_WARNING("%s: Encoder resource NOT available! ref_count:%d, Link Index:%d\n",
 				__func__,
 				TM_RES_REF_CNT_GET(tm_resource),
 				i);
@@ -1002,8 +1002,7 @@ static bool tmrm_resources_available(struct tm_resource_mgr *tm_rm,
 		if (tm_paired_resource != NULL &&
 			TM_RES_REF_CNT_GET(tm_paired_resource) > 0) {
 			/* Paired resource required, but is busy */
-			TM_WARNING("%s: Paired resource is busy!"\
-					" Link Index:%d\n",
+			TM_WARNING("%s: Paired resource is busy! Link Index:%d\n",
 					__func__, i);
 			return false;
 		}
@@ -1415,14 +1414,12 @@ static void tmrm_do_controller_power_gating(
 	if (enable == true) {
 
 		if (false == tm_rm->pipe_power_gating_enabled) {
-			TM_PWR_GATING("Pipe PG Feature disabled"\
-						" --> not gating.\n");
+			TM_PWR_GATING("Pipe PG Feature disabled  --> not gating.\n");
 			return;
 		}
 
 		if (ref_counter != 0) {
-			TM_WARNING("%s: Can NOT power gate with non-zero "\
-					"reference counter:%d!\n",
+			TM_WARNING("%s: Can NOT power gate with non-zero reference counter:%d!\n",
 				__func__, ref_counter);
 			return;
 		}
@@ -1431,8 +1428,7 @@ static void tmrm_do_controller_power_gating(
 		 * It must have logical state of "not power gated". */
 		if (TO_CONTROLLER_INFO(tm_resource)->power_gating_state !=
 				TM_POWER_GATE_STATE_OFF) {
-			TM_WARNING("%s: Invalid state:%d!"\
-				" (expected TM_POWER_GATE_STATE_OFF)\n",
+			TM_WARNING("%s: Invalid state:%d! (expected TM_POWER_GATE_STATE_OFF)\n",
 				__func__,
 				TO_CONTROLLER_INFO(tm_resource)->
 				power_gating_state);
@@ -1456,8 +1452,7 @@ static void tmrm_do_controller_power_gating(
 
 		if (ref_counter != 1) {
 			/* Un-gate only once! */
-			TM_WARNING("%s: Can NOT un-gate with reference "\
-					"counter '%d' note equal to one!\n",
+			TM_WARNING("%s: Can NOT un-gate with reference counter '%d' note equal to one!\n",
 				__func__, ref_counter);
 			return;
 		}
@@ -1465,8 +1460,7 @@ static void tmrm_do_controller_power_gating(
 		/* Un-gate the pipe, if NOT un-gated already. */
 		if (TO_CONTROLLER_INFO(tm_resource)->power_gating_state !=
 				TM_POWER_GATE_STATE_ON) {
-			TM_WARNING("%s: Invalid state:%d!"\
-				" (expected TM_POWER_GATE_STATE_ON)\n",
+			TM_WARNING("%s: Invalid state:%d! (expected TM_POWER_GATE_STATE_ON)\n",
 				__func__,
 				TO_CONTROLLER_INFO(tm_resource)->
 				power_gating_state);
@@ -1589,8 +1583,7 @@ void dal_tmrm_acquire_controller(
 	if (1 == tm_resource_ref_counter_increment(tm_rm, tm_resource)
 			&& update_hw_state_needed(method)) {
 
-		TM_CONTROLLER_ASN("Path[%02d]: "\
-				"Acquired: Controller: %s(%d)\n",
+		TM_CONTROLLER_ASN("Path[%02d]: Acquired: Controller: %s(%d)\n",
 			display_index,
 			tm_utils_go_id_to_str(GRPH_ID(tm_resource)),
 			dal_graphics_object_id_get_controller_id(
@@ -1823,8 +1816,7 @@ void dal_tmrm_release_controller(
 					tm_rsrc,
 					NULL);
 
-			TM_CONTROLLER_ASN("Path[%02d]: "\
-				"Released: Controller: %s(%d)\n",
+			TM_CONTROLLER_ASN("Path[%02d]: Released: Controller: %s(%d)\n",
 				display_index,
 				tm_utils_go_id_to_str(GRPH_ID(tm_rsrc)),
 				dal_graphics_object_id_get_controller_id(
@@ -2589,8 +2581,8 @@ enum tm_result tm_resource_mgr_attach_audio_to_display_path(
 			!path_props.bits.IS_DP_AUDIO_SUPPORTED) ||
 	(dal_is_hdmi_signal(sig_type) &&
 			!path_props.bits.IS_HDMI_AUDIO_SUPPORTED)) {
-		TM_WARNING("%s: can't attach audio - no audio support"\
-				" on path!\n ", __func__);
+		TM_WARNING("%s: can't attach audio - no audio support on path!\n ",
+				__func__);
 		return TM_RESULT_FAILURE;
 	}
 
@@ -2736,14 +2728,14 @@ enum tm_result tm_resource_mgr_setup_link_storage(
 
 	tm_rm->link_services = link_services;
 
-	if (tm_rm->link_services != NULL && requested_num_of_cells > 0) {
-		tm_rm->link_services_number_of_paths = number_of_paths;
-		return TM_RESULT_SUCCESS;
-	} else {
+	if (tm_rm->link_services == NULL || requested_num_of_cells == 0) {
 		tm_rm->link_services_number_of_paths = 0;
 		TM_ERROR("%s: no link services were allocated!\n", __func__);
 		return TM_RESULT_FAILURE;
 	}
+
+	tm_rm->link_services_number_of_paths = number_of_paths;
+	return TM_RESULT_SUCCESS;
 }
 
 /**

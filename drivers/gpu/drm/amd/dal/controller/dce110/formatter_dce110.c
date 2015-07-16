@@ -81,6 +81,7 @@ struct formatter *dal_formatter_dce110_create(
 	struct formatter_init_data *init_data)
 {
 	struct formatter *fmt = dal_alloc(sizeof(struct formatter));
+
 	if (!fmt)
 		return NULL;
 
@@ -106,6 +107,7 @@ static void set_dyn_expansion(
 {
 	uint32_t value;
 	bool enable_dyn_exp = false;
+
 	value = dal_read_reg(fmt->ctx,
 			fmt->regs[IDX_FMT_DYNAMIC_EXP_CNTL]);
 
@@ -701,6 +703,7 @@ static void setup_stereo_polarity(
 	bool right_eye_polarity)
 {
 	uint32_t fmt_cntl_value;
+
 	fmt_cntl_value = dal_read_reg(fmt->ctx,
 			fmt->regs[IDX_FMT_CONTROL]);
 

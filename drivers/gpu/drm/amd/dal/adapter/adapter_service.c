@@ -298,7 +298,7 @@ static void initialize_backlight_caps(
 						as->backlight_8bit_lut[index-1];
 				uint16_t delta_signal =
 						signal_level - base_value;
-				uint16_t delta_luma = luminance - index + 1 ;
+				uint16_t delta_luma = luminance - index + 1;
 				uint16_t step = delta_signal;
 
 				for (; index < luminance ; index++) {
@@ -357,7 +357,6 @@ static void initialize_backlight_caps(
 		}
 	}
 	as->backlight_caps_initialized = true;
-	return;
 }
 
 static void log_overriden_features(
@@ -424,6 +423,7 @@ static bool override_default_parameters(
 	bool ret = false;
 	bool bool_feature = true;
 	char *feature_name;
+
 	if (idx >= get_feature_entries_num()) {
 		ASSERT_CRITICAL(false);
 		return false;
@@ -632,9 +632,11 @@ static bool generate_feature_set(
 		if (!override_default_parameters(as, param, i, &value)) {
 			if (!get_feature_value_from_data_sources(
 					as, i, &value)) {
-				/* Can't find feature values from 
-				 * 	above data sources
-				 * Assign default value */
+				/*
+				 * Can't find feature values from
+				 * above data sources
+				 * Assign default value
+				 */
 				value = entry->default_value;
 			}
 		}
@@ -698,8 +700,6 @@ static bool adapter_service_construct(
 	struct adapter_service *as,
 	struct as_init_data *init_data)
 {
-	struct wireless_init_data wireless_init;
-
 	if (!init_data)
 		return false;
 
@@ -716,6 +716,7 @@ static bool adapter_service_construct(
 #if defined(DAL_CZ_BRINGUP)
 	if (dal_adapter_service_get_dce_version(as) == DCE_VERSION_11_0) {
 		uint32_t i;
+
 		for (i = 0; i < ARRAY_SIZE(feature_entry_table); i++) {
 			enum adapter_feature_id id =
 				feature_entry_table[i].feature_id;
@@ -1163,6 +1164,7 @@ uint32_t dal_adapter_service_get_max_cofunc_non_dp_displays(void)
 uint32_t dal_adapter_service_get_single_selected_timing_signals(void)
 {
 	uint32_t signals_bitmap = 0;
+
 	if (dal_adapter_service_is_feature_supported(
 			FEATURE_REPORT_SINGLE_SELECTED_TIMING)) {
 		/* the cached value exist */
@@ -1493,12 +1495,12 @@ struct gpio *dal_adapter_service_obtain_stereo_gpio(
 		return dal_gpio_service_create_gpio_ex(
 			as->gpio_service, GPIO_ID_GENERIC, GPIO_GENERIC_A,
 			GPIO_PIN_OUTPUT_STATE_ACTIVE_LOW);
-       /* Case 2 : runtime parameter override for sideband stereo */
-       else if (have_param_stereo_gpio) {
-               /* TODO implement */
-               return NULL;
-       /* Case 3 : VBIOS gives us GPIO for sideband stereo */
-       } else {
+	/* Case 2 : runtime parameter override for sideband stereo */
+	else if (have_param_stereo_gpio) {
+		/* TODO implement */
+		return NULL;
+	/* Case 3 : VBIOS gives us GPIO for sideband stereo */
+	} else {
 		const struct graphics_object_id id =
 			dal_graphics_object_id_init(
 				GENERIC_ID_STEREO,
@@ -1734,6 +1736,7 @@ bool dal_adapter_service_get_embedded_panel_info(
 	struct embedded_panel_info *info)
 {
 	enum bp_result result;
+
 	if (info == NULL)
 		/*TODO: add DALASSERT_MSG here*/
 		return false;
@@ -1750,6 +1753,7 @@ bool dal_adapter_service_enum_embedded_panel_patch_mode(
 	struct embedded_panel_patch_mode *mode)
 {
 	enum bp_result result;
+
 	if (mode == NULL)
 		/*TODO: add DALASSERT_MSG here*/
 		return false;
@@ -1765,6 +1769,7 @@ bool dal_adapter_service_get_faked_edid_len(
 	uint32_t *len)
 {
 	enum bp_result result;
+
 	result = dal_bios_parser_get_faked_edid_len(
 		as->bios_parser,
 		len);
@@ -1777,6 +1782,7 @@ bool dal_adapter_service_get_faked_edid_buf(
 	uint32_t len)
 {
 	enum bp_result result;
+
 	result = dal_bios_parser_get_faked_edid_buf(
 		as->bios_parser,
 		buf,
@@ -1915,13 +1921,12 @@ bool dal_adapter_service_is_lid_open(struct adapter_service *as)
 	if ((PM_GET_LID_STATE & as->platform_methods_mask) &&
 		dal_get_platform_info(as->dal_context, &params))
 		return is_lid_open;
-	else {
+
 #if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)
-		return dal_bios_parser_is_lid_open(as->bios_parser);
+	return dal_bios_parser_is_lid_open(as->bios_parser);
 #else
-		return false;
+	return false;
 #endif
-	}
 }
 
 bool dal_adapter_service_get_panel_backlight_default_levels(
@@ -1992,13 +1997,14 @@ bool dal_adapter_service_get_encoder_cap_info(
 	struct bp_encoder_cap_info bp_cap_info = {0};
 	enum bp_result result;
 
-	if (NULL == info)
-	{
+	if (NULL == info) {
 		ASSERT_CRITICAL(false);
 		return false;
 	}
 
-	/* Retrieve Encoder Capability Information from VBIOS and store the call result (success or fail)
+	/*
+	 * Retrieve Encoder Capability Information from VBIOS and store the
+	 * call result (success or fail)
 	 * Info from VBIOS about HBR2 has two fields:
 	 *
 	 * - dpHbr2Cap: indicates supported/not supported by HW Encoder

@@ -67,8 +67,10 @@ static struct edid_base *create_edid_ext_block(
 	struct edid_patch *edid_patch)
 {
 	struct edid_base *ext = NULL;
+
 	if (dal_edid_ext_cea_is_cea_ext(len, buf)) {
 		struct edid_ext_cea_init_data init_data;
+
 		init_data.ts = ts;
 		init_data.len = len;
 		init_data.buf = buf;
@@ -256,18 +258,18 @@ enum edid_retrieve_status dal_edid_mgr_override_raw_data(
 				edid_mgr,
 				&edid_mgr->override_edid_handle);
 			return EDID_RETRIEVE_SAME_EDID;
-		} else {
-			/*We need to return back to physical Edid -
-			 * consider it as successful override to new EDID*/
-			dal_edid_patch_initialize(
-				edid_mgr->edid_patch,
-				edid_handle->edid_buffer,
-				edid_handle->buffer_size);
-			free_edid_handle(
-				edid_mgr,
-				&edid_mgr->override_edid_handle);
-			return EDID_RETRIEVE_SUCCESS;
 		}
+
+		/*We need to return back to physical Edid -
+		 * consider it as successful override to new EDID*/
+		dal_edid_patch_initialize(
+			edid_mgr->edid_patch,
+			edid_handle->edid_buffer,
+			edid_handle->buffer_size);
+		free_edid_handle(
+			edid_mgr,
+			&edid_mgr->override_edid_handle);
+		return EDID_RETRIEVE_SUCCESS;
 	}
 
 	/* New override same as current override/physical: Nothing to do */

@@ -236,6 +236,7 @@ static void program_size_and_rotation(
 		rotation == PLANE_ROTATION_ANGLE_270) {
 
 		uint32_t swap;
+
 		swap = local_size.video.luma_size.x;
 		local_size.video.luma_size.x =
 			local_size.video.luma_size.y;
@@ -372,6 +373,7 @@ static void program_tiling(
 	const enum surface_pixel_format pixel_format)
 {
 	uint32_t value = 0;
+
 	value = dal_read_reg(
 			sf->ctx,
 			sf->regs[IDX_GRPH_CONTROL]);
@@ -576,6 +578,7 @@ static void set_flip_control(
 static void enable(struct surface *sf)
 {
 	uint32_t value = 0;
+
 	value = dal_read_reg(sf->ctx, sf->regs[IDX_GRPH_ENABLE]);
 	set_reg_field_value(value, 1, UNP_GRPH_ENABLE, GRPH_ENABLE);
 	dal_write_reg(sf->ctx, sf->regs[IDX_GRPH_ENABLE], value);
@@ -619,6 +622,7 @@ struct surface *dal_surface_v_dce110_create(
 	struct surface_init_data *init_data)
 {
 	struct surface *sf = dal_alloc(sizeof(struct surface));
+
 	if (!sf)
 		return NULL;
 

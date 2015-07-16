@@ -100,8 +100,8 @@ enum scl_regs_idx {
 	[IDX_SCL_OVERSCAN_LEFT_RIGHT] =\
 	mmSCL ## id ## _EXT_OVERSCAN_LEFT_RIGHT,\
 	[IDX_SCL_OVERSCAN_TOP_BOTTOM] =\
-	mmSCL ## id ## _EXT_OVERSCAN_TOP_BOTTOM ,\
-	[IDX_SCL_VIEWPORT_START] = mmSCL ## id ## _VIEWPORT_START ,\
+	mmSCL ## id ## _EXT_OVERSCAN_TOP_BOTTOM,\
+	[IDX_SCL_VIEWPORT_START] = mmSCL ## id ## _VIEWPORT_START,\
 	[IDX_SCL_VIEWPORT_SIZE] = mmSCL ## id ## _VIEWPORT_SIZE,\
 	[IDX_SCL_MODE] = mmSCL ## id ## _SCL_MODE,\
 	[IDX_SCL_ROUND_OFFSET] = mmSCL ## id ## _SCL_ROUND_OFFSET,\
@@ -116,15 +116,10 @@ static const uint32_t scl_regs[][SCL_REGS_IDX_SIZE] = {
 	regs_for_scaler(2),
 };
 
-/*****************************************************************************
- * macro definitions
- *****************************************************************************/
-#define NOT_IMPLEMENTED()  DAL_LOGGER_NOT_IMPL(LOG_MINOR_COMPONENT_CONTROLLER,\
-			"SCALER:%s()\n", __func__);
-
 static void disable_enhanced_sharpness(struct scaler *scl)
 {
 	uint32_t  value;
+
 	value = dal_read_reg(scl->ctx,
 			scl->regs[IDX_SCL_F_SHARP_CONTROL]);
 
@@ -628,6 +623,7 @@ static void calculate_inits(
 	struct fixed31_32 h_init;
 	struct fixed31_32 v_init;
 	struct fixed31_32 v_init_bot;
+
 	inits->bottom_enable = 0;
 	inits->h_int_scale_ratio =
 		dal_fixed31_32_u2d19(data->ratios->horz) << 5;
@@ -676,6 +672,7 @@ static void program_scl_ratios_inits(
 {
 	uint32_t addr = scl->regs[IDX_SCL_HORZ_SCALE_RATIO];
 	uint32_t value = 0;
+
 	set_reg_field_value(
 		value,
 		inits->h_int_scale_ratio,
@@ -761,6 +758,7 @@ static bool set_scaler_wrapper(
 	{
 		uint32_t addr = scl->regs[IDX_SCL_BYPASS_CONTROL];
 		uint32_t value = dal_read_reg(scl->ctx, addr);
+
 		set_reg_field_value(
 			value,
 			0,
@@ -915,6 +913,7 @@ struct scaler *dal_scaler_dce110_create(
 	struct scaler_init_data *init_data)
 {
 	struct scaler *scl = dal_alloc(sizeof(struct scaler));
+
 	if (!scl)
 		return NULL;
 

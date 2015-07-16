@@ -127,6 +127,7 @@ static bool solution_less_then(const void *p1, const void *p2)
 bool dal_solution_set_construct(struct solution_set *ss)
 {
 	struct flat_set_init_data data;
+
 	data.capacity = SOLUTION_SET_INITIAL_CAPACITY;
 	data.struct_size = sizeof(struct solution);
 	data.funcs.less_than = solution_less_then;

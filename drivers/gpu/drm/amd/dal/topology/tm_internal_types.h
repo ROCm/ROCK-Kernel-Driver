@@ -49,51 +49,51 @@
 #define TM_IFACE_TRACE() \
 	dal_logger_write(dal_context->logger, \
 		LOG_MAJOR_TM, LOG_MINOR_TM_IFACE_TRACE, \
-			"%s():line:%d\n", __func__, __LINE__);
+			"%s():line:%d\n", __func__, __LINE__)
 
 #define TM_RESOURCES(...) \
 	dal_logger_write(dal_context->logger, \
-		LOG_MAJOR_TM, LOG_MINOR_TM_RESOURCES, __VA_ARGS__);
+		LOG_MAJOR_TM, LOG_MINOR_TM_RESOURCES, __VA_ARGS__)
 
 #define TM_ENCODER_CTL(...) \
 	dal_logger_write(dal_context->logger, \
-		LOG_MAJOR_TM, LOG_MINOR_TM_ENCODER_CTL, __VA_ARGS__);
+		LOG_MAJOR_TM, LOG_MINOR_TM_ENCODER_CTL, __VA_ARGS__)
 
 #define TM_ENG_ASN(...) \
 	dal_logger_write(dal_context->logger, \
-		LOG_MAJOR_TM, LOG_MINOR_TM_ENG_ASN, __VA_ARGS__);
+		LOG_MAJOR_TM, LOG_MINOR_TM_ENG_ASN, __VA_ARGS__)
 
 #define TM_CONTROLLER_ASN(...) \
 	dal_logger_write(dal_context->logger, \
-		LOG_MAJOR_TM, LOG_MINOR_TM_CONTROLLER_ASN, __VA_ARGS__);
+		LOG_MAJOR_TM, LOG_MINOR_TM_CONTROLLER_ASN, __VA_ARGS__)
 
 #define TM_PWR_GATING(...) \
 	dal_logger_write(dal_context->logger, \
-		LOG_MAJOR_TM, LOG_MINOR_TM_PWR_GATING, __VA_ARGS__);
+		LOG_MAJOR_TM, LOG_MINOR_TM_PWR_GATING, __VA_ARGS__)
 
 #define TM_BUILD_DSP_PATH(...) \
 	dal_logger_write(dal_context->logger, \
-		LOG_MAJOR_TM, LOG_MINOR_TM_BUILD_DSP_PATH, __VA_ARGS__);
+		LOG_MAJOR_TM, LOG_MINOR_TM_BUILD_DSP_PATH, __VA_ARGS__)
 
 #define TM_INFO(...) \
 	dal_logger_write(dal_context->logger, \
-		LOG_MAJOR_TM, LOG_MINOR_TM_INFO, __VA_ARGS__);
+		LOG_MAJOR_TM, LOG_MINOR_TM_INFO, __VA_ARGS__)
 
 #define TM_DISPLAY_DETECT(...) \
 	dal_logger_write(dal_context->logger, \
-		LOG_MAJOR_TM, LOG_MINOR_TM_DISPLAY_DETECT, __VA_ARGS__);
+		LOG_MAJOR_TM, LOG_MINOR_TM_DISPLAY_DETECT, __VA_ARGS__)
 
 #define TM_LINK_SRV(...) \
 	dal_logger_write(dal_context->logger, \
-		LOG_MAJOR_TM, LOG_MINOR_TM_LINK_SRV, __VA_ARGS__);
+		LOG_MAJOR_TM, LOG_MINOR_TM_LINK_SRV, __VA_ARGS__)
 
 #define TM_COFUNC_PATH(...) \
 	dal_logger_write(dal_context->logger, \
-		LOG_MAJOR_TM, LOG_MINOR_TM_COFUNC_PATH, __VA_ARGS__);
+		LOG_MAJOR_TM, LOG_MINOR_TM_COFUNC_PATH, __VA_ARGS__)
 
 #define TM_HPD_IRQ(...) \
 	dal_logger_write(dal_context->logger, \
-		LOG_MAJOR_HW_TRACE, LOG_MINOR_HW_TRACE_INTERRUPT, __VA_ARGS__);
+		LOG_MAJOR_HW_TRACE, LOG_MINOR_HW_TRACE_INTERRUPT, __VA_ARGS__)
 
 #define TM_MPO(...) \
 	dal_logger_write(dal_context->logger, \
@@ -102,7 +102,7 @@
 #define TM_NOT_IMPLEMENTED()  \
 	dal_logger_write(dal_context->logger, \
 		LOG_MAJOR_TM, LOG_MINOR_TM_NOT_IMPLEMENTED, \
-				"%s()\n", __func__);
+				"%s()\n", __func__)
 
 #define TM_ASSERT(condition) \
 	do { \
@@ -125,7 +125,7 @@
 #define TM_WARNING(...) \
 	dal_logger_write(dal_context->logger, LOG_MAJOR_WARNING, \
 		LOG_MINOR_COMPONENT_TOPOLOGY_MANAGER, \
-		__VA_ARGS__);
+		__VA_ARGS__)
 
 /*******
  Enums

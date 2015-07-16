@@ -132,6 +132,7 @@ void dal_csc_video_apply_oem_matrix(
 
 	for (i = 0; i < 4; ++i) {
 		uint32_t j;
+
 		for (j = 0; j < 4; ++j) {
 			struct fixed31_32 value = dal_fixed31_32_zero;
 			uint32_t k;
@@ -150,6 +151,7 @@ void dal_csc_video_apply_oem_matrix(
 
 	for (i = 0; i < 3; ++i) {
 		uint32_t j;
+
 		for (j = 0; j < 4; ++j)
 			matrix[index++] = result[(i << 2) + j];
 	}

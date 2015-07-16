@@ -182,6 +182,7 @@ bool dal_clock_source_adjust_pxl_clk_by_pxl_amount(
 	uint32_t cur_pix_rate_hz;
 	uint32_t reqested_pix_rate_hz;
 	bool success = false;
+
 	if (pix_clk_params == NULL)
 			return false;
 
@@ -190,8 +191,7 @@ bool dal_clock_source_adjust_pxl_clk_by_pxl_amount(
 	dal_logger_write(clk_src->dal_ctx->logger,
 		LOG_MAJOR_SYNC,
 		LOG_MINOR_SYNC_HW_CLOCK_ADJUST,
-		"%s[start]: Current(Raw): %u,%03u,%03uHz, "
-		"Requested(Raw): %u,%03u,%03uHz\n",
+		"%s[start]: Current(Raw): %u,%03u,%03uHz, Requested(Raw): %u,%03u,%03uHz\n",
 		__func__,
 		(cur_pix_rate_hz / 1000000),
 		(cur_pix_rate_hz / 1000) % 1000,
@@ -215,8 +215,7 @@ bool dal_clock_source_adjust_pxl_clk_by_pxl_amount(
 	dal_logger_write(clk_src->dal_ctx->logger,
 		LOG_MAJOR_SYNC,
 		LOG_MINOR_SYNC_HW_CLOCK_ADJUST,
-		"%s[end]: Current(Raw): %u,%03u,%03uHz, "
-		"Requested(Raw): %u,%03u,%03uHz\n\n",
+		"%s[end]: Current(Raw): %u,%03u,%03uHz, Requested(Raw): %u,%03u,%03uHz\n\n",
 		__func__,
 		(cur_pix_rate_hz / 1000000),
 		(cur_pix_rate_hz / 1000) % 1000,
@@ -441,8 +440,8 @@ bool dal_clock_source_adjust_pxl_clk_by_ref_pixel_rate(
 	dal_logger_write(clk_src->dal_ctx->logger,
 		LOG_MAJOR_SYNC,
 		LOG_MINOR_SYNC_HW_CLOCK_ADJUST,
-		"%s[start]: Current: %u,%03u,%03uHz, "
-		"Requested: %u,%03u,%03uHz\n", __func__,
+		"%s[start]: Current: %u,%03u,%03uHz, Requested: %u,%03u,%03uHz\n",
+		__func__,
 		(current_pix_rate_hz / 1000000),
 		(current_pix_rate_hz / 1000) % 1000,
 		(current_pix_rate_hz % 1000),
@@ -477,8 +476,7 @@ bool dal_clock_source_adjust_pxl_clk_by_ref_pixel_rate(
 	dal_logger_write(clk_src->dal_ctx->logger,
 		LOG_MAJOR_SYNC,
 		LOG_MINOR_SYNC_HW_CLOCK_ADJUST,
-		"%s[end]: Current: %u,%03u,%03uHz, "
-		"Requested: %u,%03u,%03uHz\n",
+		"%s[end]: Current: %u,%03u,%03uHz, Requested: %u,%03u,%03uHz\n",
 		__func__,
 		(current_pix_rate_hz / 1000000),
 		(current_pix_rate_hz / 1000) % 1000,
@@ -490,8 +488,7 @@ bool dal_clock_source_adjust_pxl_clk_by_ref_pixel_rate(
 	dal_logger_write(clk_src->dal_ctx->logger,
 		LOG_MAJOR_SYNC,
 		LOG_MINOR_SYNC_HW_CLOCK_ADJUST,
-		"%s[end]: Current(Raw): %u,%03u,%03uHz, "
-		"Requested(Raw): %u,%03u,%03uHz\n\n",
+		"%s[end]: Current(Raw): %u,%03u,%03uHz, Requested(Raw): %u,%03u,%03uHz\n\n",
 		__func__,
 		(raw_cur_pix_rate_hz / 1000000),
 		(raw_cur_pix_rate_hz / 1000) % 1000,
@@ -510,7 +507,7 @@ bool dal_clock_source_adjust_pxl_clk_by_pix_amount(
 					int32_t pix_num)
 {
 	bool success = false;
-	uint32_t requested_pix_rate_hz ;
+	uint32_t requested_pix_rate_hz;
 	uint32_t cur_pix_rate_hz = retrieve_raw_pix_rate_hz(
 			clk_src,
 			pix_clk_params);
@@ -522,8 +519,7 @@ bool dal_clock_source_adjust_pxl_clk_by_pix_amount(
 	dal_logger_write(clk_src->dal_ctx->logger,
 		LOG_MAJOR_SYNC,
 		LOG_MINOR_SYNC_HW_CLOCK_ADJUST,
-		"%s[start]: Current(Raw): %u,%03u,%03uHz, "
-		"Requested(Raw): %u,%03u,%03uHz\n",
+		"%s[start]: Current(Raw): %u,%03u,%03uHz, Requested(Raw): %u,%03u,%03uHz\n",
 		__func__,
 		(cur_pix_rate_hz / 1000000),
 		(cur_pix_rate_hz / 1000) % 1000,
@@ -548,8 +544,7 @@ bool dal_clock_source_adjust_pxl_clk_by_pix_amount(
 	dal_logger_write(clk_src->dal_ctx->logger,
 		LOG_MAJOR_SYNC,
 		LOG_MINOR_SYNC_HW_CLOCK_ADJUST,
-		"%s[end]: Current(Raw): %u,%03u,%03uHz,"
-		"Requested(Raw): %u,%03u,%03uHz\n\n",
+		"%s[end]: Current(Raw): %u,%03u,%03uHz,Requested(Raw): %u,%03u,%03uHz\n\n",
 		__func__,
 		(cur_pix_rate_hz / 1000000),
 		(cur_pix_rate_hz / 1000) % 1000,

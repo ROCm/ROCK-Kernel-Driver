@@ -705,6 +705,7 @@ static bool get_timing_for_mode(
 		struct crtc_timing *crtc_timing)
 {
 	uint32_t i;
+
 	if (crtc_timing == NULL)
 		return false;
 	for (i = 0; i < MODE_COUNT; ++i)
@@ -725,6 +726,7 @@ static bool get_timing_for_mode(
 static bool is_timing_in_standard(const struct crtc_timing *timing)
 {
 	uint32_t i;
+
 	for (i = 0; i < MODE_COUNT; ++i)
 		if (dal_crtc_timing_is_equal(
 				timing,

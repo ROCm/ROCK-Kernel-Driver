@@ -365,6 +365,7 @@ static enum dal_irq_source get_irq_source(
 
 	case TM_INTERRUPT_TYPE_HOTPLUG: {
 		struct irq *hpd_gpio;
+
 		hpd_gpio = dal_adapter_service_obtain_hpd_irq(tm_dm->as,
 				connector);
 
@@ -933,6 +934,7 @@ static void detect_sink_caps(
 	if (detection_status->connected &&
 		detection_status->detected_signal == SIGNAL_TYPE_DISPLAY_PORT) {
 		struct link_service *link_service;
+
 		link_service = tm_resource_mgr_find_link_service(
 				tm_dm->resource_mgr,
 				display_path,
@@ -1425,6 +1427,7 @@ static void reconnect_link_services(
 		/*connect link service*/
 		for (i = 0; i < link_count; ++i) {
 			enum signal_type current_signal;
+
 			current_signal =
 				dal_display_path_sink_signal_to_link_signal(
 					display_path, connect_signal, i);
@@ -1672,6 +1675,7 @@ static void register_interrupt(
 
 	case TM_INTERRUPT_TYPE_HOTPLUG: {
 		struct display_sink_capability sink_cap;
+
 		int_params.int_context = INTERRUPT_LOW_IRQ_CONTEXT;
 		int_params.irq_source = irq_src;
 
@@ -2019,6 +2023,7 @@ void dal_tm_detection_mgr_release_hw(
 
 	for (i = 0; i < tm_dm->irq_registrations_num; ++i) {
 		uint8_t j;
+
 		for (j = 0; j < TM_INTERRUPT_TYPE_COUNT; ++j) {
 			enum tm_interrupt_type irq_type;
 

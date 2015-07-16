@@ -57,6 +57,7 @@ bool dal_mode_query_construct(
 
 	for (i = 0; i < mq->query_set->num_path; i++) {
 		enum mode_aspect_ratio aspect;
+
 		path_mode.display_path_index =
 			mode_query_set_get_solution_container_on_path(
 					mq->query_set,
@@ -230,6 +231,7 @@ static bool increment_cofunc_3d_view_it(struct mode_query *mq)
 void increment_cofunc_view_solution_it(struct mode_query *mq)
 {
 	uint32_t i;
+
 	for (i = 0; i < mq->query_set->num_path; i++) {
 		struct view_solution *vs;
 		uint32_t vs_count;
@@ -253,6 +255,7 @@ void increment_cofunc_view_solution_it(struct mode_query *mq)
 static bool increment_cofunc_scaling_support_it(struct mode_query *mq)
 {
 	int32_t i;
+
 	for (i = mq->query_set->num_path - 1; i >= 0; i--) {
 		for (mq->cofunc_scl[i]++;
 			*mq->cofunc_scl[i] != SCALING_TRANSFORMATION_INVALID;
@@ -280,9 +283,11 @@ static bool is_cofunc_view_solution_it_in_range(struct mode_query *mq)
 	uint32_t i;
 	uint32_t valid_solution_idx_cnt;
 	bool all_has_solution;
+
 	for (i = 0; i < mq->query_set->num_path; i++) {
 		struct view_solution *vs = &mq->cur_view_solutions[i];
 		uint32_t view_solution_count = view_solution_get_count(vs);
+
 		while (mq->cur_solution_idxs[i] < view_solution_count) {
 			bool strict_match_3d_view;
 			const struct crtc_timing *crtc_timing;
@@ -417,6 +422,7 @@ static bool is_cur_3d_view_valid(struct mode_query *mq)
 static void reset_cofunc_scaling_support_it(struct mode_query *mq)
 {
 	uint32_t i;
+
 	for (i = 0; i < mq->query_set->num_path; i++)
 		mq->cofunc_scl[i] =
 			mode_query_set_get_solution_container_on_path(
@@ -434,6 +440,7 @@ void dal_mode_query_update_validator_entry(
 		uint32_t mode_query_index)
 {
 	bool is_guaranteed;
+
 	dal_memmove(
 		&cofunctional_mode_validator_get_at(
 			validator, validator_index)->view,
@@ -466,6 +473,7 @@ void dal_mode_query_update_validator_entry(
 static void update_cur_path_mode_set(struct mode_query *mq)
 {
 	uint32_t i;
+
 	for (i = 0; i < mq->query_set->num_path; i++)
 		dal_mode_query_update_validator_entry(mq, &mq->validator, i, i);
 }
@@ -473,6 +481,7 @@ static void update_cur_path_mode_set(struct mode_query *mq)
 static bool is_cur_scaling_valid(struct mode_query *mq)
 {
 	uint32_t i;
+
 	for (i = 0; i < mq->query_set->num_path; i++) {
 		if (!dal_solution_is_supported(
 			mq->cur_solutions[i],
@@ -544,6 +553,7 @@ bool dal_mode_query_base_select_next_refresh_rate(struct mode_query *mq)
 void dal_mode_query_reset_cofunc_view_solution_it(struct mode_query *mq)
 {
 	uint32_t i;
+
 	for (i = 0; i < mq->query_set->num_path; i++) {
 		mq->cur_solution_idxs[i] = 0;
 		mq->cur_solutions[i] = NULL;
@@ -582,6 +592,7 @@ static void reset_confunc_3d_view_it(struct mode_query *mq)
 static bool increment_render_mode_iterator(struct mode_query *mq)
 {
 	uint32_t view_count = dal_mode_query_set_get_view_count(mq->query_set);
+
 	dal_pixel_format_list_next(&mq->query_set->pixel_format_list_iterator);
 	if (dal_pixel_format_list_get_pixel_format(
 		&mq->query_set->pixel_format_list_iterator)) {
@@ -642,6 +653,7 @@ bool dal_mode_query_select_render_mode(struct mode_query *mq,
 	uint32_t vw_count = dal_mode_query_set_get_view_count(mq->query_set);
 	bool view_found = false;
 	bool found = false;
+
 	mq->valid_iterators.RENDER_MODE = false;
 
 	for (mq->cur_view_idx = 0;
@@ -659,6 +671,7 @@ bool dal_mode_query_select_render_mode(struct mode_query *mq,
 	if (view_found) {
 		if (render_mode->pixel_format != PIXEL_FORMAT_UNINITIALIZED) {
 			enum pixel_format fmt;
+
 			dal_pixel_format_list_reset_iterator(
 				&mq->query_set->pixel_format_list_iterator);
 			fmt = dal_pixel_format_list_get_pixel_format(
@@ -752,6 +765,7 @@ bool dal_mode_query_select_refresh_rate_ex(
 		bool interlaced)
 {
 	uint32_t field_rate = interlaced ? refresh_rate * 2 : refresh_rate;
+
 	dal_mode_query_reset_cofunc_view_solution_it(mq);
 
 	while (dal_mode_query_select_next_refresh_rate(mq)) {

@@ -46,7 +46,7 @@
 #include "path_mode_set_with_data.h"
 
 #define NOT_IMPLEMENTED() DAL_LOGGER_NOT_IMPL( \
-	LOG_MINOR_COMPONENT_DISPLAY_SERVICE, "Display Service:%s\n", __func__);
+	LOG_MINOR_COMPONENT_DISPLAY_SERVICE, "Display Service:%s\n", __func__)
 
 /* NOTE make sure to update CURRENT_ADJUSTMENT_NUM when updating this array */
 static const struct adj_global_info adj_global_info_array[CURRENT_ADJUSTMENT_NUM] = {
@@ -79,6 +79,7 @@ static enum ds_return get_adj_type(
 	enum adjustment_data_type *type)
 {
 	uint32_t i = 0;
+
 	if (adj_id < ADJ_ID_BEGIN || ADJ_ID_END < adj_id)
 		return DS_ERROR;
 	for (i = 0; i < CURRENT_ADJUSTMENT_NUM; i++) {
@@ -101,6 +102,7 @@ static enum ds_return get_adj_info_from_defaults(
 	enum signal_type signal;
 	union cea_video_capability_data_block video_cap = { {0} };
 	struct dcs *dcs = dal_display_path_get_dcs(path);
+
 	dal_dcs_get_cea_video_capability_data_block(dcs, &video_cap);
 	signal = dal_display_path_get_query_signal(path, SINK_LINK_INDEX);
 
@@ -287,6 +289,7 @@ static enum ds_return get_adj_property(
 {
 	enum ds_return result = DS_ERROR;
 	uint32_t i = 0;
+
 	if (disp_index >= dal_tm_get_num_display_paths(ds->tm, false))
 		return DS_ERROR;
 	for (i = 0; i < CURRENT_ADJUSTMENT_NUM; i++) {
@@ -441,6 +444,7 @@ void dal_ds_dispatch_update_adj_container_for_path_with_edid(
 {
 	uint32_t index = dal_display_path_get_display_index(path);
 	struct adj_container *container;
+
 	if (!path)
 		dal_logger_write(ds->dal_context->logger,
 			LOG_MAJOR_ERROR,
@@ -461,6 +465,7 @@ void dal_ds_dispatch_update_adj_container_for_path_with_mode_info(
 {
 	uint32_t index = dal_display_path_get_display_index(display_path);
 	struct adj_container *container;
+
 	if (!display_path)
 		dal_logger_write(ds->dal_context->logger,
 			LOG_MAJOR_ERROR,
@@ -624,6 +629,7 @@ void dal_ds_dispatch_cleanup_adjustment(struct ds_dispatch *ds)
 {
 	uint32_t i;
 	uint32_t num;
+
 	num = ds->disp_path_num;
 
 	for (i = 0; i < num; i++)
@@ -668,6 +674,7 @@ bool dal_ds_dispatch_apply_scaling(
 	struct ds_adjustment_scaler scaler;
 	const struct adjustment_info *info;
 	struct adj_container *set;
+
 	if (!hw_path_mode || !container)
 		return false;
 	info = dal_adj_info_set_get_adj_info(&container->adj_info_set, adj_id);
@@ -1001,6 +1008,7 @@ static void build_adj_container_for_path(
 
 	struct adjustment_info info;
 	struct adj_container *container = NULL;
+
 	dal_memset(&info, 0, sizeof(struct adjustment_info));
 	index = dal_display_path_get_display_index(display_path);
 	if (!display_path)
@@ -1022,6 +1030,7 @@ static void build_adj_container_for_path(
 
 	for (i = ADJ_ID_BEGIN; i < ADJ_ID_END; i++) {
 		enum adjustment_id adj_id = i;
+
 		if (is_adjustment_supported(ds, display_path, adj_id)) {
 			if (DS_SUCCESS != get_adj_info_from_defaults(
 				ds,

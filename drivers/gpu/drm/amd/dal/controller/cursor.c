@@ -56,7 +56,10 @@ bool dal_cursor_set_position(
 	cur->funcs->program_position(cur, position->x, position->y);
 
 	if (position->hot_spot_enable)
-		cur->funcs->program_hotspot(cur, position->x_origin, position->y_origin);
+		cur->funcs->program_hotspot(
+				cur,
+				position->x_origin,
+				position->y_origin);
 
 	/* unlock cursor registers */
 	cur->funcs->lock(cur, false);

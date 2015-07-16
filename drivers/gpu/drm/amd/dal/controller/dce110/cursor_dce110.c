@@ -76,6 +76,7 @@ static void enable(
 	struct cursor *cur, bool enable)
 {
 	uint32_t value = 0;
+
 	value = dal_read_reg(cur->ctx, cur->regs[IDX_CUR_CONTROL]);
 	set_reg_field_value(value, enable, CUR_CONTROL, CURSOR_EN);
 	dal_write_reg(cur->ctx, cur->regs[IDX_CUR_CONTROL], value);
@@ -86,6 +87,7 @@ static void lock(
 	struct cursor *cur, bool lock)
 {
 	uint32_t value = 0;
+
 	value = dal_read_reg(cur->ctx, cur->regs[IDX_CUR_UPDATE]);
 	set_reg_field_value(value, lock, CUR_UPDATE, CURSOR_UPDATE_LOCK);
 	dal_write_reg(cur->ctx, cur->regs[IDX_CUR_UPDATE], value);
@@ -97,6 +99,7 @@ static void program_position(
 	uint32_t y)
 {
 	uint32_t value = 0;
+
 	value = dal_read_reg(cur->ctx, cur->regs[IDX_CUR_POSITION]);
 	set_reg_field_value(value, x, CUR_POSITION, CURSOR_X_POSITION);
 	set_reg_field_value(value, y, CUR_POSITION, CURSOR_Y_POSITION);
@@ -151,6 +154,7 @@ static void program_hotspot(
 	uint32_t y)
 {
 	uint32_t value = 0;
+
 	value = dal_read_reg(cur->ctx, cur->regs[IDX_CUR_HOT_SPOT]);
 	set_reg_field_value(value, x, CUR_HOT_SPOT, CURSOR_HOT_SPOT_X);
 	set_reg_field_value(value, y, CUR_HOT_SPOT, CURSOR_HOT_SPOT_Y);
@@ -163,6 +167,7 @@ static void program_size(
 	uint32_t height)
 {
 	uint32_t value = 0;
+
 	value = dal_read_reg(cur->ctx, cur->regs[IDX_CUR_SIZE]);
 	set_reg_field_value(value, width, CUR_SIZE, CURSOR_WIDTH);
 	set_reg_field_value(value, height, CUR_SIZE, CURSOR_HEIGHT);
@@ -218,6 +223,7 @@ struct cursor *dal_cursor_dce110_create(
 	struct cursor_init_data *init_data)
 {
 	struct cursor *cur = dal_alloc(sizeof(struct cursor));
+
 	if (!cur)
 		return NULL;
 

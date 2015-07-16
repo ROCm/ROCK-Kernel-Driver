@@ -126,6 +126,7 @@ bool default_mode_list_construct(
 		const struct flat_set_init_data *fs_init_data)
 {
 	uint32_t i;
+
 	if (!dal_flat_set_construct(&dml->set, fs_init_data))
 		return false;
 

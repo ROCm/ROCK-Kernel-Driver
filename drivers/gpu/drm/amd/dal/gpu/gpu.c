@@ -44,8 +44,8 @@ void dal_gpu_init_controller_info_table(
 
 	for (i = 0; i < combinations_num; ++i)
 		for (j = 0; j < controllers_num; ++j) {
-
 			uint32_t idx = i * controllers_num + j;
+
 			infos[idx].id = ids[idx];
 			infos[idx].HARVESTED = 0;
 			infos[idx].CREATED = 0;

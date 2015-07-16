@@ -117,6 +117,7 @@ struct mode_timing_list *dal_timing_service_get_mode_timing_list_for_path(
 	struct mode_timing_list **mtl;
 	uint32_t i;
 	uint32_t size = dal_vector_get_count(&ts->mtl_vec);
+
 	for (i = 0; i < size; ++i) {
 		mtl = dal_vector_at_index(&ts->mtl_vec, i);
 		if (dal_mode_timing_list_get_display_index(*mtl) ==
@@ -132,13 +133,13 @@ static bool create_mode_timing_list_for_path(
 		uint32_t display_index)
 {
 	struct mode_timing_list *timing_list;
+
 	if (dal_timing_service_get_mode_timing_list_for_path(ts, display_index)
 								!= NULL) {
 		dal_logger_write(ts->dal_context->logger,
 			LOG_MAJOR_MODE_ENUM,
 			LOG_MINOR_MODE_ENUM_TS_LIST_BUILD,
-			"Attempted to create a new ModeTimingList "
-			"for an existing display_index");
+			"Attempted to create a new ModeTimingList for an existing display_index");
 		return false;
 	}
 
@@ -173,6 +174,7 @@ bool dal_timing_service_add_mode_timing_to_path(
 		const struct mode_timing *mode_timing)
 {
 	struct mode_timing_list *timing_list;
+
 	if (mode_timing == NULL) {
 		BREAK_TO_DEBUGGER();
 		return false;
@@ -312,6 +314,7 @@ bool dal_timing_service_get_mode_timing_for_video_code(
 	struct mode_timing_source_funcs *mts_cea861 =
 			ts->timing_sources[TIMING_STANDARD_CEA861];
 	const struct mode_timing *mt;
+
 	if (mode_timing == NULL || mts_cea861 == NULL || video_code == 0) {
 		BREAK_TO_DEBUGGER();
 		return false;
@@ -851,6 +854,7 @@ struct timing_service *dal_timing_service_create(
 		bool support_cea861e)
 {
 	struct timing_service *ts;
+
 	ts = dal_alloc(sizeof(struct timing_service));
 
 	if (ts == NULL)

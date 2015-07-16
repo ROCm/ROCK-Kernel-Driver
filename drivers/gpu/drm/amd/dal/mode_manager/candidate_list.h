@@ -66,7 +66,6 @@ bool dal_candidate_list_find_matching_view(
 static inline void dal_candidate_list_print_to_log(
 		const struct candidate_list *cl)
 {
-	return;
 }
 
 #endif /*__DAL_CANDIDATE_LIST_H__*/

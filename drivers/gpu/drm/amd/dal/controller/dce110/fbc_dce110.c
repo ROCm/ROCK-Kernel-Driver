@@ -376,6 +376,7 @@ void dal_fbc_dce110_program_compressed_surface_address_and_pitch(
 
 	if (fbc->options.bits.LPT_SUPPORT) {
 		uint32_t lpt_alignment = lpt_size_alignment(fbc);
+
 		if (lpt_alignment != 0) {
 			compressed_surf_address_low_part =
 				((compressed_surf_address_low_part
@@ -552,6 +553,7 @@ bool dal_fbc_dce110_is_lpt_enabled_in_hw(struct fbc *fbc)
 {
 	/* Check the hardware register */
 	uint32_t value = dal_read_reg(fbc->context, mmLOW_POWER_TILING_CONTROL);
+
 	return get_reg_field_value(
 		value,
 		LOW_POWER_TILING_CONTROL,

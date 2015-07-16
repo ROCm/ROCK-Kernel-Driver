@@ -42,14 +42,6 @@
 
 
 /*****************************************************************************
- * macro definitions
- *****************************************************************************/
-
-#define NOT_IMPLEMENTED() DAL_LOGGER_NOT_IMPL(LOG_MINOR_COMPONENT_CONTROLLER, \
-			"CTRLR:%s()\n", __func__);
-
-
-/*****************************************************************************
  * functions
  *****************************************************************************/
 static bool is_surface_supported(
@@ -116,6 +108,7 @@ bool dal_controller_dce110_construct(
 
 	{
 		struct grph_gamma_init_data gg_init_data = {0};
+
 		gg_init_data.as = init_data->as;
 		gg_init_data.ctx = base->dal_context;
 		gg_init_data.id = base->id;
@@ -127,6 +120,7 @@ bool dal_controller_dce110_construct(
 
 	{
 		struct csc_init_data csc_init_data = {0};
+
 		csc_init_data.id = base->id;
 		csc_init_data.ctx = base->dal_context;
 		csc_init_data.as = init_data->as;
@@ -161,6 +155,7 @@ bool dal_controller_dce110_construct(
 
 	{
 		struct formatter_init_data fmt_init_data = {0};
+
 		fmt_init_data.ctx = base->dal_context;
 		fmt_init_data.id = base->id;
 		base->fmt = dal_formatter_dce110_create(&fmt_init_data);
@@ -171,6 +166,7 @@ bool dal_controller_dce110_construct(
 
 	{
 		struct scaler_init_data scl_init_data = {0};
+
 		scl_init_data.bp =
 			dal_adapter_service_get_bios_parser(init_data->as);
 		scl_init_data.dal_ctx = base->dal_context;
@@ -184,6 +180,7 @@ bool dal_controller_dce110_construct(
 	{
 
 		struct line_buffer_init_data lb_init_data = {0};
+
 		lb_init_data.dal_context = base->dal_context;
 		lb_init_data.as = init_data->as;
 		lb_init_data.id = init_data->controller;
@@ -195,6 +192,7 @@ bool dal_controller_dce110_construct(
 
 	{
 		struct surface_init_data surf_init_data = {0};
+
 		surf_init_data.dal_ctx = base->dal_context;
 		surf_init_data.id = base->id;
 		base->surface = dal_surface_dce110_create(&surf_init_data);
@@ -206,6 +204,7 @@ bool dal_controller_dce110_construct(
 
 	{
 		struct cursor_init_data cur_init_data = {0};
+
 		cur_init_data.dal_ctx = base->dal_context;
 		cur_init_data.id = base->id;
 		base->cursor = dal_cursor_dce110_create(&cur_init_data);

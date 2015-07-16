@@ -77,6 +77,7 @@ bool dal_edid13_is_v_13(uint32_t len, const uint8_t *buff)
 {
 	uint8_t major;
 	uint8_t minor;
+
 	if (!dal_edid_get_version_raw(buff, len, &major, &minor))
 		return false;
 
@@ -444,6 +445,7 @@ bool dal_edid13_get_vendor_product_id_info(
 		struct vendor_product_id_info *info)
 {
 	struct edid_13 *e = FROM_EDID(edid);
+
 	if (info == NULL)
 		return false;
 
@@ -673,6 +675,7 @@ static bool get_screen_info(
 		struct edid_screen_info *edid_screen_info)
 {
 	struct edid_13 *e = FROM_EDID(edid);
+
 	ASSERT(edid_screen_info != NULL);
 
 	/* Projector*/
@@ -737,18 +740,21 @@ bool dal_edid13_get_display_pixel_encoding(
 uint8_t dal_edid13_num_of_extension(struct edid_base *edid)
 {
 	struct edid_13 *e = FROM_EDID(edid);
+
 	return e->data->ext_blk_cnt;
 }
 
 uint16_t dal_edid13_get_version(struct edid_base *edid)
 {
 	struct edid_13 *e = FROM_EDID(edid);
+
 	return (e->data->version[0] << 8) | (e->data->version[1]);
 }
 
 const uint8_t *dal_edid13_get_raw_data(struct edid_base *edid)
 {
 	struct edid_13 *e = FROM_EDID(edid);
+
 	return (uint8_t *)e->data;
 }
 
@@ -760,6 +766,7 @@ const uint32_t dal_edid13_get_raw_size(struct edid_base *edid)
 void dal_edid13_validate(struct edid_base *edid)
 {
 	struct edid_13 *e = FROM_EDID(edid);
+
 	if (e->data->checksum != dal_edid_compute_checksum(edid))
 		edid->error.BAD_CHECKSUM = true;
 }

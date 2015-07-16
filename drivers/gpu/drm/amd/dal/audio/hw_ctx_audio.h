@@ -96,7 +96,7 @@ struct hw_ctx_audio_funcs {
 	/* setup Azalia HW block */
 	void (*setup_azalia)(
 		const struct hw_ctx_audio *hw_ctx,
-		enum engine_id engine_id ,
+		enum engine_id engine_id,
 		enum signal_type signal,
 		const struct audio_crtc_info *crtc_info,
 		const struct audio_pll_info *pll_info,

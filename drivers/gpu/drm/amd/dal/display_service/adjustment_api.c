@@ -83,6 +83,7 @@ static bool build_default_adj_table(struct adjustment_api *adj_api)
 	uint32_t i;
 	uint32_t range_alloc_size = 0;
 	const struct range_adjustment_api *tmp_range_table = NULL;
+
 	switch (adj_api->adj_category) {
 	case CAT_CRT:
 		adj_api->range_table_size = sizeof(default_adj_range_crt_table)
@@ -118,13 +119,12 @@ static bool build_default_adj_table(struct adjustment_api *adj_api)
 			/* not to do read config from reg key*/
 			}
 		}
-		if (adj_api->range_table)
-			return true;
-		else {
+		if (adj_api->range_table == NULL) {
 			destruct(adj_api);
 			return false;
 		}
 
+		return true;
 	}
 	/* to do vector table in furture*/
 	return false;
@@ -136,6 +136,7 @@ void dal_adj_api_get_api_flag(
 	union adjustment_api_flag *flag)
 {
 	uint32_t i;
+
 	if (adj_api->range_table) {
 		for (i = 0; i < adj_api->range_table_size; i++) {
 			if (adj_api->range_table[i].adj_id == adj_id) {
@@ -152,6 +153,7 @@ bool dal_adj_api_get_range_adj_data(
 	struct adjustment_info *adj_info)
 {
 	uint32_t i;
+
 	if (adj_api->range_table) {
 		for (i = 0; i < adj_api->range_table_size; i++) {
 			if (adj_api->range_table[i].adj_id == adj_id) {
@@ -201,6 +203,7 @@ static void parent_api_destruct(struct adjustment_parent_api **parent_api)
 struct adjustment_api *dal_adj_api_create(enum adjustment_category category)
 {
 	struct adjustment_api *adj_api;
+
 	adj_api = dal_alloc(sizeof(*adj_api));
 
 	if (!adj_api)
@@ -216,6 +219,7 @@ struct adjustment_api *dal_adj_api_create(enum adjustment_category category)
 struct adjustment_parent_api *dal_adj_parent_api_create()
 {
 	struct adjustment_parent_api *parent_api;
+
 	parent_api = dal_alloc(sizeof(*parent_api));
 	if (!parent_api)
 		return NULL;

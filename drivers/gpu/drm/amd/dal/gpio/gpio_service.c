@@ -435,15 +435,15 @@ enum gpio_result dal_gpio_service_open(
 		return GPIO_RESULT_NON_SPECIFIC_ERROR;
 	}
 
-	if (pin->funcs->open(pin, mode, options)) {
-		set_pin_busy(service, id, en);
-		*ptr = pin;
-		return GPIO_RESULT_OK;
-	} else {
+	if (!pin->funcs->open(pin, mode, options)) {
 		ASSERT_CRITICAL(false);
 		dal_gpio_service_close(service, &pin);
 		return GPIO_RESULT_OPEN_FAILED;
 	}
+
+	set_pin_busy(service, id, en);
+	*ptr = pin;
+	return GPIO_RESULT_OK;
 }
 
 void dal_gpio_service_close(

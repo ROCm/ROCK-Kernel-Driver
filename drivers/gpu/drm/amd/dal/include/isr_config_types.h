@@ -83,7 +83,7 @@ struct display_plane_set {
 };
 
 enum layers_setup {
-	LAYERS_SETUP_NOTHING = 0 ,
+	LAYERS_SETUP_NOTHING = 0,
 	LAYERS_SETUP_SET,
 	LAYERS_SETUP_FREE
 };
@@ -104,7 +104,7 @@ struct plane_cfg_internal {
 };
 
 enum lock_type {
-	LOCK_TYPE_GRPH = 0 ,
+	LOCK_TYPE_GRPH = 0,
 	LOCK_TYPE_SURF,
 	LOCK_TYPE_SCL,
 	LOCK_TYPE_BLND,
@@ -113,7 +113,7 @@ enum lock_type {
 };
 
 enum alpha_mode {
-	ALPHA_MODE_PIXEL = 0 ,
+	ALPHA_MODE_PIXEL = 0,
 	ALPHA_MODE_PIXEL_AND_GLOBAL = 1,
 	ALPHA_MODE_GLOBAL = 2
 };

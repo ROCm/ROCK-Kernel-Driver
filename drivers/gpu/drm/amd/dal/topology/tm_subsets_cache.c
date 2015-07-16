@@ -442,30 +442,30 @@ void dal_update_display_mapping(
 				tm_subsets_cache->
 					dp2_cache_mapping[display_index] = i;
 				break;
-			} else {
-				/* check if current index is set,
-				 * but disconnected, we can reuse it
-				 */
-				if (!tm_utils_test_bit(
-					&tm_subsets_cache->connected,
-					tm_subsets_cache->
-						cache_2dp_mapping[i])) {
+			}
 
-					uint32_t previous_index =
-						tm_subsets_cache->
-						cache_2dp_mapping[i];
+			/* check if current index is set,
+			 * but disconnected, we can reuse it
+			 */
+			if (!tm_utils_test_bit(
+				&tm_subsets_cache->connected,
+				tm_subsets_cache->
+					cache_2dp_mapping[i])) {
+
+				uint32_t previous_index =
 					tm_subsets_cache->
-						cache_2dp_mapping[i] =
-							display_index;
-					tm_subsets_cache->
-						dp2_cache_mapping[
-						display_index] = i;
-					tm_subsets_cache->
-						dp2_cache_mapping[
-						previous_index] =
-						MAPPING_NOT_SET;
-					break;
-				}
+					cache_2dp_mapping[i];
+				tm_subsets_cache->
+					cache_2dp_mapping[i] =
+						display_index;
+				tm_subsets_cache->
+					dp2_cache_mapping[
+					display_index] = i;
+				tm_subsets_cache->
+					dp2_cache_mapping[
+					previous_index] =
+					MAPPING_NOT_SET;
+				break;
 			}
 		}
 		/* whatever happened above, we need
@@ -536,6 +536,7 @@ static bool all_connected(
 	uint32_t array_size)
 {
 	uint32_t i;
+
 	for (i = 0; i < array_size; ++i) {
 		if (!tm_utils_test_bit(
 				&tm_subsets_cache->connected,
@@ -606,6 +607,7 @@ static uint32_t find_index(
 		 * smallest such element, and so on.
 		 */
 		uint32_t j = 0;
+
 		while (j < array_size &&
 			tm_subsets_cache->dp2_cache_mapping[displays[j]] <
 			next_possible_min) {

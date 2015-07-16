@@ -497,13 +497,11 @@ void dal_controller_set_lock_graph_surface_registers(
 	bool lock)
 {
 	crtc->tg->funcs->set_lock_graph_surface_registers(crtc->tg, lock);
-	return;
 }
 
 void dal_controller_set_lock_master(struct controller *crtc, bool lock)
 {
 	crtc->tg->funcs->set_lock_master(crtc->tg, lock);
-	return;
 }
 
 /* (Set/Get) Global Swap Lock */

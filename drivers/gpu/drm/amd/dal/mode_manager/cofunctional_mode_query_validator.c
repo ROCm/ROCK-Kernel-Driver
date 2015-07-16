@@ -92,6 +92,7 @@ bool dal_cmqv_add_mode_query(
 	uint32_t count =
 		dal_pms_get_path_mode_num(validator->cmv.pms);
 	struct path_mode pm = {};
+
 	for (i = 0; i < topology->disp_path_num; i++) {
 		if (count >= MAX_COFUNC_PATH)
 			return false; /* too many displays */
@@ -119,6 +120,7 @@ void dal_cmqv_update_mode_query(
 {
 	uint32_t i;
 	uint32_t count = dal_pms_get_path_mode_num(validator->cmv.pms);
+
 	for (i = 0; i < count; ++i) {
 		struct mode_query *mq = validator->mode_query[i];
 

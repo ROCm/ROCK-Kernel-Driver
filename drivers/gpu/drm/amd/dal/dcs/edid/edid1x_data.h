@@ -132,8 +132,7 @@ struct edid_display_descriptor {
 
 		/* as standard timing id, when ucTypeTag == 0xfa*/
 		struct {
-			struct standard_timing timing[
-			MAX_NUM_OF_STD_TIMING_IDS_IN_DET_TIMING_DESC];
+			struct standard_timing timing[MAX_NUM_OF_STD_TIMING_IDS_IN_DET_TIMING_DESC];
 			uint8_t magic;
 		} std_timings;
 
@@ -145,8 +144,7 @@ struct edid_display_descriptor {
 		/* as CVT 3byte timings, when ucTypeTag == 0xf8*/
 		struct {
 			uint8_t version;
-			struct cvt_3byte_timing timing[
-			MAX_NUM_OF_CVT3BYTE_TIMING_IDS_IN_DET_TIMING_DESC];
+			struct cvt_3byte_timing timing[MAX_NUM_OF_CVT3BYTE_TIMING_IDS_IN_DET_TIMING_DESC];
 		} cvt_3byte_timing;
 
 		/* as established timings III, when ucTypeTag = 0xf7*/

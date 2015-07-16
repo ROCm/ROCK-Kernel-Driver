@@ -159,6 +159,7 @@ static bool bios_parser_construct(
 	if (bp->object_info_tbl.revision.major == 1
 		&& bp->object_info_tbl.revision.minor >= 3) {
 		ATOM_OBJECT_HEADER_V3 *tbl_v3;
+
 		tbl_v3 = GET_IMAGE(ATOM_OBJECT_HEADER_V3,
 			bp->object_info_tbl_offset);
 		if (!tbl_v3)
@@ -186,6 +187,7 @@ struct bios_parser *dal_bios_parser_create(
 	struct bp_init_data *init, struct adapter_service *as)
 {
 	struct bios_parser *bp = NULL;
+
 	bp = dal_alloc(sizeof(struct bios_parser));
 	if (!bp)
 		return NULL;
@@ -238,7 +240,7 @@ static uint8_t get_number_of_objects(struct bios_parser *bp, uint32_t offset)
 
 	uint32_t object_table_offset = bp->object_info_tbl_offset + offset;
 
-	table = GET_IMAGE(ATOM_OBJECT_TABLE , object_table_offset);
+	table = GET_IMAGE(ATOM_OBJECT_TABLE, object_table_offset);
 
 	if (!table)
 		return 0;
@@ -265,7 +267,7 @@ uint32_t dal_bios_parser_get_oem_ddc_lines_number(struct bios_parser *bp)
 	if (DATA_TABLES(OemInfo) != 0) {
 		ATOM_OEM_INFO *info;
 
-		info = GET_IMAGE(ATOM_OEM_INFO ,
+		info = GET_IMAGE(ATOM_OEM_INFO,
 			DATA_TABLES(OemInfo));
 
 		if (info->sHeader.usStructureSize
@@ -295,6 +297,7 @@ struct graphics_object_id dal_bios_parser_get_encoder_id(struct bios_parser *bp,
 
 	if (tbl && tbl->ucNumberOfObjects > i) {
 		const uint16_t id = tbl->asObjects[i].usObjectID;
+
 		object_id = object_id_from_bios_object_id(id);
 	}
 
@@ -316,6 +319,7 @@ struct graphics_object_id dal_bios_parser_get_connector_id(
 
 	if (tbl && tbl->ucNumberOfObjects > i) {
 		const uint16_t id = tbl->asObjects[i].usObjectID;
+
 		object_id = object_id_from_bios_object_id(id);
 	}
 
@@ -421,6 +425,7 @@ enum bp_result dal_bios_parser_get_oem_ddc_info(struct bios_parser *bp,
 			> sizeof(ATOM_COMMON_TABLE_HEADER)) {
 			ATOM_I2C_RECORD record;
 			ATOM_I2C_ID_CONFIG_ACCESS *config;
+
 			dal_memset(&record, 0, sizeof(record));
 
 			config = &tbl->sucI2cId + index - 1;
@@ -1385,6 +1390,7 @@ bool dal_bios_parser_is_device_id_supported(
 	struct device_id id)
 {
 	uint32_t mask = get_support_mask_for_device_id(id);
+
 	return (bp->object_info_tbl.v1_1->usDeviceSupport & mask) != 0;
 }
 
@@ -1735,6 +1741,7 @@ static enum bp_result get_ss_info_from_ss_info_table(
 	case ASIC_INTERNAL_SS_ON_LVDS:
 	{
 		struct embedded_panel_info panel_info;
+
 		if (dal_bios_parser_get_embedded_panel_info(bp, &panel_info)
 			== BP_RESULT_OK)
 			id_local = panel_info.ss_id;
@@ -2025,6 +2032,7 @@ static enum bp_result get_embedded_panel_info_v1_3(
 		uint8_t min_rr =
 			lvds->sRefreshRateSupport.ucMinRefreshRateForDRR;
 		uint8_t rr = lvds->sRefreshRateSupport.ucSupportedRefreshRate;
+
 		if (min_rr != 0) {
 			if (SUPPORTED_LCD_REFRESHRATE_30Hz & min_rr)
 				info->supported_rr.REFRESH_RATE_30HZ = 1;
@@ -2331,6 +2339,7 @@ static uint32_t get_ss_entry_number_from_ss_info_tbl(
 		break;
 	case ASIC_INTERNAL_SS_ON_LVDS: {
 		struct embedded_panel_info panel_info;
+
 		if (dal_bios_parser_get_embedded_panel_info(bp, &panel_info)
 			== BP_RESULT_OK)
 			id_local = panel_info.ss_id;
@@ -2912,6 +2921,7 @@ static uint32_t get_record_size(uint8_t *record)
 static uint32_t get_edid_size(const ATOM_FAKE_EDID_PATCH_RECORD *edid)
 {
 	uint32_t length = edid->ucFakeEDIDLength;
+
 	if (length < 128)
 		length = length * 128;
 
@@ -3369,6 +3379,7 @@ static uint32_t get_support_mask_for_device_id(struct device_id device_id)
 {
 	enum dal_device_type device_type = device_id.device_type;
 	uint32_t enum_id = device_id.enum_id;
+
 	switch (device_type) {
 	case DEVICE_TYPE_LCD:
 		switch (enum_id) {
@@ -3580,13 +3591,12 @@ static uint32_t enum_first_device_id(uint32_t dev_id)
 		return ATOM_DEVICE_TV1_SUPPORT;
 	else if (dev_id & ATOM_DEVICE_CV_SUPPORT)
 		return ATOM_DEVICE_CV_SUPPORT;
-	else {
-		/* No group found for this device ID. */
 
-		dal_error("%s: incorrect input %d\n", __func__, dev_id);
-		/* No matching support flag for given device ID */
-		return 0;
-	}
+	/* No group found for this device ID. */
+
+	dal_error("%s: incorrect input %d\n", __func__, dev_id);
+	/* No matching support flag for given device ID */
+	return 0;
 }
 
 /*
@@ -3682,9 +3692,11 @@ static void add_device_tag_from_ext_display_path(
 	enum bp_result result =
 		dal_bios_parser_get_device_tag_record(
 			bp, object, &device_tag_record);
+
 	if ((ext_display_path->usDeviceTag != CONNECTOR_OBJECT_ID_NONE)
 		&& (result == BP_RESULT_OK)) {
 		uint8_t index;
+
 		if ((device_tag_record->ucNumberOfDevice == 1) &&
 			(device_tag_record->asDeviceTag[0].usDeviceID == 0)) {
 			/*Workaround bug in current VBIOS releases where
@@ -3942,6 +3954,7 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 	 * from the external display connection info table. */
 	for (i = 0; i < connector_tbl->ucNumberOfObjects; i++) {
 		uint32_t j;
+
 		object = &connector_tbl->asObjects[i];
 		object_id = object_id_from_bios_object_id(object->usObjectID);
 		if ((OBJECT_TYPE_CONNECTOR != object_id.type) ||
@@ -4005,6 +4018,7 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 			ATOM_OBJECT *next_object;
 			struct graphics_object_id next_object_id;
 			EXT_DISPLAY_PATH *next_ext_display_path;
+
 			next_object = &connector_tbl->asObjects[j];
 			next_object_id = object_id_from_bios_object_id(
 				next_object->usObjectID);
@@ -4045,6 +4059,7 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 
 	for (i = 0; i < encoder_table->ucNumberOfObjects; i++) {
 		uint32_t j;
+
 		object = &encoder_table->asObjects[i];
 
 		dst_number = get_dest_obj_list(bp, object, &dst_object_id_list);
@@ -4683,6 +4698,7 @@ struct integrated_info *dal_bios_parser_create_integrated_info(
 	struct bios_parser *bp)
 {
 	struct integrated_info *info = NULL;
+
 	info = dal_alloc(sizeof(struct integrated_info));
 
 	if (info == NULL) {

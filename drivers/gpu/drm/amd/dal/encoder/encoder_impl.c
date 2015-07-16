@@ -39,12 +39,6 @@
 
 #include "encoder_impl.h"
 
-/*
- * Post-requisites: headers required by this unit
- */
-
-#define NOT_IMPLEMENTED() DAL_LOGGER_NOT_IMPL(LOG_MINOR_COMPONENT_ENCODER,\
-	"ENC:%s\n", __func__);
 
 /******************************************************************************
  * This unit

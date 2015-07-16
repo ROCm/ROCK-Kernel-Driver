@@ -57,6 +57,7 @@ bool dal_pll_clock_source_adjust_pix_clk(
 	struct bp_adjust_pixel_clock_parameters bp_adjust_pixel_clock_params = {
 							0 };
 	enum bp_result bp_result;
+
 	switch (pix_clk_params->signal_type) {
 	case SIGNAL_TYPE_HDMI_TYPE_A: {
 		requested_clk_khz = pix_clk_params->requested_pix_clk;
@@ -124,6 +125,7 @@ bool dal_pll_clock_source_construct(
 		struct clock_source_init_data *clk_src_init_data)
 {
 	struct firmware_info fw_info = {};
+
 	if (!dal_clock_source_construct(
 			&pll_clk_src->base,
 			clk_src_init_data))

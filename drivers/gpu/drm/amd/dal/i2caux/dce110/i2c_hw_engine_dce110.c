@@ -99,6 +99,7 @@ static void disable_i2c_hw_engine(
 	uint32_t value = 0;
 
 	struct dal_context *ctx = NULL;
+
 	ctx = engine->base.base.base.ctx;
 
 	value = dal_read_reg(ctx, addr);
@@ -143,6 +144,7 @@ static void release_engine(
 	/* Reset HW engine */
 	{
 		uint32_t i2c_sw_status = 0;
+
 		value = dal_read_reg(engine->ctx, mmDC_I2C_SW_STATUS);
 
 		i2c_sw_status = get_reg_field_value(
@@ -425,6 +427,7 @@ static bool process_transaction(
 	uint32_t value = 0;
 
 	struct dal_context *ctx = NULL;
+
 	ctx = engine->base.base.base.ctx;
 
 	{
@@ -558,6 +561,7 @@ static void execute_transaction(
 {
 	uint32_t value = 0;
 	struct dal_context *ctx = NULL;
+
 	ctx = engine->base.base.base.ctx;
 
 	{
@@ -745,9 +749,9 @@ static enum i2c_channel_operation_result get_channel_status(
 		return I2C_CHANNEL_OPERATION_FAILED;
 	else if (value & DC_I2C_SW_STATUS__DC_I2C_SW_DONE_MASK)
 		return I2C_CHANNEL_OPERATION_SUCCEEDED;
-	else
-		/* in DAL2, I2C_RESULT_OK was returned */
-		return I2C_CHANNEL_OPERATION_NOT_STARTED;
+
+	/* in DAL2, I2C_RESULT_OK was returned */
+	return I2C_CHANNEL_OPERATION_NOT_STARTED;
 }
 
 static uint8_t get_hw_buffer_available_size(

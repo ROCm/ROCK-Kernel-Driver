@@ -190,8 +190,8 @@ static bool tmds_converter_capability_translate(
 		 * exists and treat as a "no converter" case. */
 		if (downstream_port->bits.FORMAT_CONV)
 			return false;
-		else
-			converter_caps->use_default_caps = true;
+
+		converter_caps->use_default_caps = true;
 	}
 
 	if (converter_caps->use_default_caps) {
@@ -459,6 +459,7 @@ static void disable_mst_mode(struct link_service *ls)
 {
 	struct dpsst_link_service *dpsst;
 	union mstm_cntl mstm_cntl;
+
 	dal_memset(&mstm_cntl, '\0', sizeof(union mstm_cntl));
 
 	dpsst = container_of(ls, struct dpsst_link_service, link_service);
@@ -523,10 +524,9 @@ static void retrieve_link_setting(struct link_service *ls,
 			status_01.bits.CHANNEL_EQ_DONE_0 != 1 ||
 			status_01.bits.SYMBOL_LOCKED_0 != 1)
 			break;
-		else {
-			lane_status_ok = true;
-			break;
-		}
+
+		lane_status_ok = true;
+		break;
 	default:
 		break;
 
@@ -668,6 +668,7 @@ static void retrieve_link_cap(struct link_service *ls)
 	if (dpsst->prev_sink_count == UNKNOWN_SINK_COUNT) {
 
 		uint8_t sink_count = 0;
+
 		dal_dpsst_ls_read_dpcd_data(ls,
 			DPCD_ADDRESS_SINK_COUNT,
 			&sink_count,
@@ -781,6 +782,7 @@ static bool disable_stream(
 	struct hw_path_mode *path_mode)
 {
 	struct enable_stream_param stream_params;
+
 	dal_memset(&stream_params, '\0', sizeof(struct enable_stream_param));
 
 	if (ls->strm_state != STREAM_STATE_ENABLED &&
@@ -879,8 +881,7 @@ static void program_drr(
 
 	if ((path_mode->mode.timing.ranged_timing.vertical_total_min !=
 		path_mode->mode.timing.ranged_timing.vertical_total_max) &&
-		(!path_mode->mode.timing.ranged_timing.control.\
-				force_disable_drr))
+		(!path_mode->mode.timing.ranged_timing.control.force_disable_drr))
 		downspread_write.bits.IGNORE_MSA_TIMING_PARAM = 1;
 	else
 		downspread_write.bits.IGNORE_MSA_TIMING_PARAM = 0;
@@ -1036,6 +1037,7 @@ static bool validate_link(struct link_service *ls,
 {
 	enum hwss_result result;
 	struct validate_link_param param = {0};
+
 	dal_memset(&param, '\0', sizeof(struct validate_link_param));
 
 	param.display_path = display_path;
@@ -1430,6 +1432,7 @@ static void dpcd_configure_assr(
 
 	if (DP_ALT_SCRAMBLER_RESET_NONE != assr) {
 		bool alt_scrambler_reset_enable = false;
+
 		switch (assr) {
 		case DP_ALT_SCRAMBLER_RESET_STANDARD:
 		case DP_ALT_SCRAMBLER_RESET_SPECIAL:
@@ -1468,6 +1471,7 @@ static uint8_t get_nibble_at_index(const uint8_t *buf,
 	uint32_t index)
 {
 	uint8_t nibble;
+
 	nibble = buf[index / 2];
 
 	if (index % 2)
@@ -1501,6 +1505,7 @@ static bool is_ch_eq_done(enum lane_count ln_count,
 {
 	bool done = true;
 	uint32_t lane;
+
 	if (!lane_status_updated->bits.INTERLANE_ALIGN_DONE)
 		done = false;
 	else {
@@ -1537,6 +1542,7 @@ static enum pre_emphasis get_max_pre_emphasis_for_voltage_swing(
 	enum voltage_swing voltage)
 {
 	enum pre_emphasis pre_emphasis;
+
 	pre_emphasis = PRE_EMPHASIS_MAX_LEVEL;
 
 	if (voltage <= VOLTAGE_SWING_MAX_LEVEL)
@@ -1554,6 +1560,7 @@ static void find_max_drive_settings(
 	uint32_t lane;
 
 	struct lane_settings max_requested;
+
 	max_requested.VOLTAGE_SWING =
 		link_training_setting->
 		lane_settings[0].VOLTAGE_SWING;
@@ -1652,6 +1659,7 @@ static void update_drive_settings(
 		struct link_training_settings src)
 {
 	uint32_t lane;
+
 	for (lane = 0; lane <
 		src.link_settings.lane_count; lane++) {
 
@@ -1669,6 +1677,7 @@ static bool is_max_vs_reached(
 	const struct link_training_settings *lt_settings)
 {
 	uint32_t lane;
+
 	for (lane = 0; lane <
 		(uint32_t)(lt_settings->link_settings.lane_count);
 		lane++) {
@@ -1862,6 +1871,7 @@ static bool set_dp_phy_pattern(
 {
 	struct set_dp_phy_pattern_param set_dp_phy_pattern_param = {0};
 	enum hwss_result hwss_result;
+
 	set_dp_phy_pattern_param.display_path = display_path;
 	set_dp_phy_pattern_param.link_idx = ls->link_idx;
 	set_dp_phy_pattern_param.test_pattern = test_pattern;
@@ -2126,8 +2136,7 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 	dal_logger_write(ls->dal_context->logger,
 		LOG_MAJOR_HW_TRACE,
 		LOG_MINOR_HW_TRACE_LINK_TRAINING,
-		"%s:\n %x VS set = %x  PE set = %x \
-		max VS Reached = %x  max PE Reached = %x\n",
+		"%s:\n %x VS set = %x  PE set = %x max VS Reached = %x  max PE Reached = %x\n",
 		__func__,
 		DPCD_ADDRESS_LANE0_SET,
 		dpcd_lane[0].bits.VOLTAGE_SWING_SET,
@@ -2223,8 +2232,7 @@ static void dpcd_set_lane_settings(
 	dal_logger_write(ls->dal_context->logger,
 		LOG_MAJOR_HW_TRACE,
 		LOG_MINOR_HW_TRACE_LINK_TRAINING,
-		"%s\n %x VS set = %x  PE set = %x \
-		max VS Reached = %x  max PE Reached = %x\n",
+		"%s\n %x VS set = %x  PE set = %x max VS Reached = %x  max PE Reached = %x\n",
 		__func__,
 		DPCD_ADDRESS_LANE0_SET,
 		dpcd_lane[0].bits.VOLTAGE_SWING_SET,
@@ -2347,9 +2355,8 @@ static bool perform_clock_recovery_sequence(
 		dal_logger_write(ls->dal_context->logger,
 			LOG_MAJOR_ERROR,
 			LOG_MINOR_COMPONENT_LINK_SERVICE,
-			"%s: Link Training Error, could not \
-			 get CR after %d tries. \
-			Possibly voltage swing issue", __func__,
+			"%s: Link Training Error, could not get CR after %d tries. Possibly voltage swing issue",
+			__func__,
 			LINK_TRAINING_MAX_CR_RETRY);
 
 	}
@@ -2805,9 +2812,7 @@ static bool handle_hpd_irq_psr_sink(struct link_service *ls)
 			dal_logger_write(ls->dal_context->logger,
 				LOG_MAJOR_WARNING,
 				LOG_MINOR_COMPONENT_LINK_SERVICE,
-				"PSR: Unexpected IRQ_HPD triggered by \
-				Sink with no PSR Error Status! May point \
-				to panel issue!");
+				"PSR: Unexpected IRQ_HPD triggered by Sink with no PSR Error Status! May point to panel issue!");
 
 			 /* In this case no error is detected,
 			 * but PSR is active.*
@@ -3517,6 +3522,7 @@ static bool retry_link_training_workaround(struct link_service *ls,
 	struct dcs *dcs;
 	uint32_t max_retry;
 	uint32_t sleep_in_ms;
+
 	dcs = dal_display_path_get_dcs(path_mode->display_path);
 	patch_info = dal_dcs_get_monitor_patch_info(dcs,
 		MONITOR_PATCH_TYPE_RETRY_LINK_TRAINING_ON_FAILURE);
@@ -3548,6 +3554,7 @@ static void destroy(struct link_service **ls)
 {
 
 	struct dpsst_link_service *dpsst;
+
 	dpsst = container_of(*ls, struct dpsst_link_service, link_service);
 	destruct(dpsst);
 	dal_free(dpsst);
@@ -3641,6 +3648,7 @@ struct link_service *dal_dpsst_ls_create(
 	struct link_service_init_data *init_data)
 {
 	struct dpsst_link_service *dpsst_link_service = dal_alloc(
+
 	sizeof(struct dpsst_link_service));
 
 	if (dpsst_link_service == NULL)
@@ -3752,8 +3760,7 @@ bool dal_dpsst_ls_try_enable_link_with_hbr2_fallback(
 		dal_logger_write(ls->dal_context->logger,
 			LOG_MAJOR_HW_TRACE,
 			LOG_MINOR_HW_TRACE_LINK_TRAINING,
-			"%s: Link training failed, sending \
-			notification for user pop-up\n",
+			"%s: Link training failed, sending notification for user pop-up\n",
 			__func__);
 
 		/* sends the notification only
@@ -3832,6 +3839,7 @@ bool dal_dpsst_ls_verify_link_cap(
 				uint8_t num_retries = 3;
 				uint8_t j;
 				uint8_t delay_between_retries = 10;
+
 				for (j = 0; j < num_retries; ++j) {
 					success = perform_link_training(
 						ls,
@@ -3883,8 +3891,7 @@ bool dal_dpsst_ls_verify_link_cap(
 		dal_logger_write(ls->dal_context->logger,
 			LOG_MAJOR_HW_TRACE,
 			LOG_MINOR_HW_TRACE_LINK_TRAINING,
-			"%s: Link settings were reduced, sending \
-			notification for mode re-enumeration\n",
+			"%s: Link settings were reduced, sending notification for mode re-enumeration\n",
 			__func__);
 
 		/* notify lower settings applied
@@ -3971,6 +3978,7 @@ struct link_training_preference dal_dpsst_ls_get_link_training_preference(
 {
 	struct dpsst_link_service *dpsst;
 	struct link_training_preference lt_preference;
+
 	lt_preference.FAIL_LINK_TRAINING = 0;
 
 	dpsst = container_of(ls, struct dpsst_link_service, link_service);
@@ -3984,6 +3992,7 @@ uint32_t dal_dpsst_ls_bandwidth_in_kbps_from_timing(
 {
 	uint32_t bits_per_channel = 0;
 	uint32_t kbps;
+
 	switch (timing->flags.COLOR_DEPTH) {
 
 	case HW_COLOR_DEPTH_666:
@@ -4028,6 +4037,7 @@ uint32_t dal_dpsst_ls_bandwidth_in_kbps_from_link_settings(
 
 	uint32_t lane_count  = link_setting->lane_count;
 	uint32_t kbps = link_rate_in_kbps;
+
 	kbps *= lane_count;
 	kbps *= 8;   /* 8 bits per byte*/
 

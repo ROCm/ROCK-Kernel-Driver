@@ -37,6 +37,7 @@ struct mode_query_set {
 	struct pixel_format_list pixel_format_list_iterator;
 	const struct view_info_list *master_view_info_list;
 	uint32_t num_path;
+
 	const struct display_view_solution_container
 		*solutions[MAX_COFUNC_PATH];
 };

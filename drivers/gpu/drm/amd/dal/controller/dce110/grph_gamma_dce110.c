@@ -1125,6 +1125,7 @@ static void select_lut(
 	struct grph_gamma *gg)
 {
 	uint32_t value = 0;
+
 	set_lut_inc(gg, 0, false, false);
 
 	{

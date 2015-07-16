@@ -68,12 +68,11 @@ static struct dal_reg_dump_stack reg_dump_stack = {0};
 static bool is_reg_dump_process(void)
 {
 	uint32_t i;
-	struct dal_reg_dump_stack_location *stack_location;
 
 	/* walk the list of our processes */
 	for (i = 0; i < reg_dump_stack.stack_pointer; i++) {
-
-		stack_location = &reg_dump_stack.stack_locations[i];
+		struct dal_reg_dump_stack_location *stack_location
+					= &reg_dump_stack.stack_locations[i];
 
 		if (stack_location->current_pid == dal_get_pid()
 			&& stack_location->current_tgid == dal_get_tgid())

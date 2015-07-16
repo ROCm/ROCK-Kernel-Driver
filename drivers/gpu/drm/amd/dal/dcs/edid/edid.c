@@ -39,6 +39,7 @@ bool dal_edid_get_version_raw(
 	uint8_t *minor)
 {
 	const struct edid_data_v1x *data;
+
 	if (!minor || !major)
 		return false;
 

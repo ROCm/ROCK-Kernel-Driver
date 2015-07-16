@@ -223,6 +223,7 @@ void dal_ds_calculation_setup_ranged_timing(
 	 * detection and prepare ranged timing. */
 	if (drr_supported || psr_supported || vce_supported) {
 		struct static_screen_events ss_events;
+
 		rt->control.program_static_screen_mask = true;
 
 		/* Initialize to the VTOTAL value. This means refresh rate will
@@ -234,8 +235,8 @@ void dal_ds_calculation_setup_ranged_timing(
 		 * if possible, even if not for static screen purpose. It could
 		 * still be used for 48 Hz feature. */
 		if (drr_config.min_fps_in_microhz != 0) {
-			timing->ranged_timing.control. \
-			program_dynamic_refresh_rate = true;
+			timing->ranged_timing.control.program_dynamic_refresh_rate
+					= true;
 
 			/* If DRR is supported, update DRR parameters with min
 			 * and max VTOTAL values to define the refresh rate

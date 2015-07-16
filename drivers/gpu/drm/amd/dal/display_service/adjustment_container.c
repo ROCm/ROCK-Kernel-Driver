@@ -44,6 +44,7 @@ void dal_adj_container_update_display_cap(
 	struct cea861_support cea861_support = { 0 };
 	union cea_video_capability_data_block video_cap = { {0} };
 	struct dcs *dcs = dal_display_path_get_dcs(display_path);
+
 	dal_dcs_get_vendor_product_id_info(dcs, &vendor_info);
 	if (!((container->ctx.edid_signature.manufacturer_id ==
 		vendor_info.manufacturer_id) && (container->ctx.
@@ -86,6 +87,7 @@ struct adj_container *dal_adj_container_create()
 {
 
 	struct adj_container *container = dal_alloc(sizeof(*container));
+
 	if (!container) {
 		dal_free(container);
 		BREAK_TO_DEBUGGER();
@@ -159,6 +161,7 @@ static void copy_contents_from(
 	const struct adj_info_set *adj_info_set_src)
 {
 	uint32_t i;
+
 	for (i = 0; i < MAX_ADJUSTMENT_NUM; i++)
 		adj_info_set->adj_info_array[i] =
 			adj_info_set_src->adj_info_array[i];
@@ -312,7 +315,7 @@ bool dal_adj_info_set_get_adj_val(
 {
 	struct adjustment_info *info = dal_adj_info_set_get_adj_info(
 		adj_info_set, adj_id);
-	if(info && val) {
+	if (info && val) {
 		*val = info->adj_data.ranged.cur;
 		return true;
 	}
@@ -326,7 +329,7 @@ bool dal_adj_info_set_update_cur_value(
 {
 	struct adjustment_info *info = dal_adj_info_set_get_adj_info(
 		adj_info_set, adj_id);
-	if(info) {
+	if (info) {
 		info->adj_data.ranged.cur = val;
 		info->adj_state = ADJUSTMENT_STATE_REQUESTED;
 		return true;

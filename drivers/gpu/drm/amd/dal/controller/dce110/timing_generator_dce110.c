@@ -183,6 +183,7 @@ static bool enable_crtc(struct timing_generator *tg)
 	/* 0 value is needed by DRR and is also suggested default value for CZ
 	 */
 	uint32_t value;
+
 	value = dal_read_reg(tg->ctx,
 			tg->regs[IDX_CRTC_MASTER_UPDATE_MODE]);
 	set_reg_field_value(value, 0,
@@ -223,6 +224,7 @@ static bool blank_crtc(
 		uint32_t addr = tg->regs[IDX_CRTC_BLANK_CONTROL];
 		uint32_t value;
 		uint8_t counter = 34;
+
 		while (counter > 0) {
 			value = dal_read_reg(tg->ctx, addr);
 
@@ -377,9 +379,10 @@ static void disable_stereo(struct timing_generator *tg)
 			CRTC_3D_STRUCTURE_CONTROL,
 			CRTC_3D_STRUCTURE_STEREO_SEL_OVR);
 
-	/* When disabling Frame Packing in 2 step mode, we need to program both
+	/*
+	 * When disabling Frame Packing in 2 step mode, we need to program both
 	 * registers at the same frame
-	 * Programming it in the beginning of VActive makes sure we are ok 
+	 * Programming it in the beginning of VActive makes sure we are ok
 	 */
 
 	if (struc_en != 0 && struc_stereo_sel_ovr == 0) {
@@ -426,6 +429,7 @@ static void program_pixel_repetition(
 	uint32_t repeat_cnt)
 {
 	uint32_t regval;
+
 	ASSERT((repeat_cnt > 0) && (repeat_cnt < 10));
 
 	regval = dal_read_reg(tg->ctx,
@@ -448,6 +452,7 @@ static void program_horz_count_by_2(
 	const struct hw_crtc_timing *timing)
 {
 	uint32_t regval;
+
 	regval = dal_read_reg(tg->ctx,
 			tg->regs[IDX_CRTC_COUNT_CONTROL]);
 
@@ -585,6 +590,7 @@ static void program_drr(
 	uint32_t static_screen_cntl = 0;
 
 	uint32_t addr = 0;
+
 	addr = tg->regs[IDX_CRTC_V_TOTAL_MIN];
 	v_total_min = dal_read_reg(tg->ctx, addr);
 
@@ -790,7 +796,7 @@ static uint32_t get_crtc_scanoutpos(
 
 	{
 		uint32_t value = dal_read_reg(tg->ctx,
-				tg->regs[IDX_CRTC_V_TOTAL]);;
+				tg->regs[IDX_CRTC_V_TOTAL]);
 		vtotal = get_reg_field_value(
 			value, CRTC_V_TOTAL, CRTC_V_TOTAL);
 	}
@@ -1124,7 +1130,7 @@ static bool timing_generator_dce110_construct(struct timing_generator *tg,
 
 	tg->ctx = ctx;
 	tg->bp = dal_adapter_service_get_bios_parser(as);
-	tg->regs = tg_regs[id - 1];
+	tg->regs = tg_regs[id-1];
 	tg->funcs = &timing_generator_dce110_funcs;
 	tg->max_h_total = CRTC_H_TOTAL__CRTC_H_TOTAL_MASK + 1;
 	tg->max_v_total = CRTC_V_TOTAL__CRTC_V_TOTAL_MASK + 1;

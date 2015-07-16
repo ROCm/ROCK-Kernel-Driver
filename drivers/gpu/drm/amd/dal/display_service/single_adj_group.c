@@ -327,6 +327,7 @@ bool dal_single_adj_group_setup_bit_depth_parameters(
 		{
 			union panel_misc_info panel_info;
 			struct dcs *dcs = dal_display_path_get_dcs(disp_path);
+
 			bit_depth->bits.TEMPORAL_LEVEL = 0;
 			if (dal_dcs_get_panel_misc_info(dcs, &panel_info)) {
 				if (panel_info.bits.GREY_LEVEL)

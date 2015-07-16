@@ -36,7 +36,7 @@
  *****************************************************************************/
 
 #define NOT_IMPLEMENTED() DAL_LOGGER_NOT_IMPL(LOG_MINOR_COMPONENT_GPU, \
-		"%s:%s()\n", __FILE__, __func__);
+		"%s:%s()\n", __FILE__, __func__)
 
 /******************************************************************************
  * static functions
@@ -87,13 +87,10 @@ void dal_dc_clock_gating_dce110_power_up(
 		struct dal_context *dal_context,
 		bool enable)
 {
-	if(enable)
-	{
+	if (enable) {
 		enable_hw_base_light_sleep(dal_context);
 		disable_sw_manual_control_light_sleep(dal_context);
-	}
-	else
-	{
+	} else {
 		force_hw_base_light_sleep(dal_context);
 	}
 }

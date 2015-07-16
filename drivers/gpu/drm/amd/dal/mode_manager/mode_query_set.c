@@ -45,6 +45,7 @@ struct mode_query_set *dal_mode_query_set_create(
 		struct mode_query_set_init_data *mqs_init_data)
 {
 	struct mode_query_set *mqs = dal_alloc(sizeof(struct mode_query_set));
+
 	if (mqs == NULL)
 		return NULL;
 

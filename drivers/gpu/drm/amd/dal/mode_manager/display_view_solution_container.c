@@ -40,6 +40,7 @@ struct view_solution dal_dvsc_get_view_solution_at_index(
 	uint32_t index)
 {
 	struct view_solution vw_sol;
+
 	view_solution_construct(
 		&vw_sol,
 		&dal_view_info_list_at_index(
@@ -123,6 +124,7 @@ static bool construct(
 	const struct display_view_solution_container_init_data *dvsc_init_data)
 {
 	uint32_t display_index_array[] = { dvsc_init_data->display_index };
+
 	dvsc->display_index = dvsc_init_data->display_index;
 	dvsc->master_view_list = dvsc_init_data->master_view_list;
 	dvsc->bv_flags = dvsc_init_data->bv_flags;

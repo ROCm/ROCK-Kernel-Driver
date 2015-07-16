@@ -120,6 +120,7 @@ static bool acquire_engine(
 
 		if (field == 0) {
 			uint8_t counter = 0;
+
 			set_reg_field_value(
 				value,
 				1,
@@ -669,18 +670,17 @@ static enum aux_channel_operation_result get_channel_status(
 			AUX_SW_STATUS,
 			AUX_SW_RX_INVALID_STOP))
 			return AUX_CHANNEL_OPERATION_FAILED_INVALID_REPLY;
+
+		*returned_bytes = get_reg_field_value(
+				value,
+				AUX_SW_STATUS,
+				AUX_SW_REPLY_BYTE_COUNT);
+		if (*returned_bytes == 0)
+			return
+			AUX_CHANNEL_OPERATION_FAILED_INVALID_REPLY;
 		else {
-			*returned_bytes = get_reg_field_value(
-					value,
-					AUX_SW_STATUS,
-					AUX_SW_REPLY_BYTE_COUNT);
-			if (*returned_bytes == 0)
-				return
-				AUX_CHANNEL_OPERATION_FAILED_INVALID_REPLY;
-			else {
-				*returned_bytes -= 1;
-				return AUX_CHANNEL_OPERATION_SUCCEEDED;
-			}
+			*returned_bytes -= 1;
+			return AUX_CHANNEL_OPERATION_SUCCEEDED;
 		}
 	} else {
 		/*time_elapsed >= aux_engine->timeout_period */

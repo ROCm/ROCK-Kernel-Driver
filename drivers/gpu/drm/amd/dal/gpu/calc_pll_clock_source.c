@@ -321,6 +321,7 @@ static bool calc_pll_clock_source_max_vco_construct(
 
 	uint32_t i;
 	struct firmware_info fw_info = {};
+
 	if (calc_pll_cs == NULL ||
 			init_data == NULL ||
 			init_data->bp == NULL)

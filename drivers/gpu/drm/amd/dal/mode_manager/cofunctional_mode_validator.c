@@ -53,6 +53,7 @@ static bool validate(struct cofunctional_mode_validator *cmv)
 {
 	uint32_t i;
 	uint32_t mode_count = get_total_mode_count(cmv);
+
 	if (cmv->set_mode_params == NULL) {
 		uint32_t disp_idx[MAX_COFUNC_PATH];
 

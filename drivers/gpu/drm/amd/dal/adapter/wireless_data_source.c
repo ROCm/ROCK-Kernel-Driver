@@ -156,7 +156,6 @@ struct graphics_object_id wireless_get_connector_id(
 		break;
 	default:
 		return unknown_object_id;
-		break;
 	}
 }
 
@@ -167,10 +166,8 @@ uint8_t wireless_get_srcs_num(
 	switch (id.type) {
 	case OBJECT_TYPE_CONNECTOR:
 		return wireless_get_encoders_num(as);
-		break;
 	case OBJECT_TYPE_ENCODER:
 		return 1;
-		break;
 
 	default:
 		ASSERT_CRITICAL(false);

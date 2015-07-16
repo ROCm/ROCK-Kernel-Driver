@@ -215,6 +215,7 @@ static uint32_t defer_delay_converter_wa(
 	uint32_t defer_delay)
 {
 	struct dp_receiver_id_info dp_rec_info = {0};
+
 	if (dal_ddc_service_get_dp_receiver_id_info(ddc, &dp_rec_info) &&
 		(dp_rec_info.branch_id == DP_BRANCH_DEVICE_ID_4) &&
 		!dal_strncmp(dp_rec_info.branch_name,
@@ -232,6 +233,7 @@ static uint32_t defer_delay_converter_wa(
 static uint32_t get_defer_delay(struct ddc_service *ddc)
 {
 	uint32_t defer_delay = 0;
+
 	switch (ddc->transaction_type) {
 	case DDC_TRANSACTION_TYPE_I2C_OVER_AUX:
 		if ((DISPLAY_DONGLE_DP_VGA_CONVERTER == ddc->dongle_type) ||
@@ -529,6 +531,7 @@ static uint8_t aux_read_edid_block(
 			.length = 1,
 			.data = &segment } };
 		bool result = false;
+
 		segment = 0;
 
 		cmd.number_of_payloads = ARRAY_SIZE(payloads);
@@ -842,8 +845,7 @@ bool dal_ddc_service_i2c_query_dp_dual_mode_adaptor(
 			dal_logger_write(ddc->ctx->logger,
 				LOG_MAJOR_DCS,
 				LOG_MINOR_DCS_DONGLE_DETECTION,
-				"Detected Type 1 DP-HDMI dongle"
-				"(no valid HDMI signature EOT).\n");
+				"Detected Type 1 DP-HDMI dongle (no valid HDMI signature EOT).\n");
 
 			*dongle = DISPLAY_DONGLE_DP_HDMI_MISMATCHED_DONGLE;
 			return true;
@@ -869,8 +871,7 @@ bool dal_ddc_service_i2c_query_dp_dual_mode_adaptor(
 			dal_logger_write(ddc->ctx->logger,
 				LOG_MAJOR_DCS,
 				LOG_MINOR_DCS_DONGLE_DETECTION,
-				"Detected Type 1 DP-HDMI dongle"
-				"(no valid HDMI signature EOT).\n");
+				"Detected Type 1 DP-HDMI dongle (no valid HDMI signature EOT).\n");
 
 			*dongle = DISPLAY_DONGLE_DP_HDMI_MISMATCHED_DONGLE;
 			return true;
