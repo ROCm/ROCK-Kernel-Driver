@@ -607,7 +607,7 @@ static bool apply_load_detection_based_edid_patch(
 					tm_resource_mgr_acquire_resources(
 						tm_dm->resource_mgr,
 						temp_path,
-					TM_ACQUIRE_METHOD_HW);
+					TM_ACQUIRE_METHOD_SW);
 				if (TM_RESULT_SUCCESS == tm_ret) {
 					signal =
 						dal_hw_sequencer_detect_load(
@@ -619,7 +619,7 @@ static bool apply_load_detection_based_edid_patch(
 					tm_resource_mgr_release_resources(
 						tm_dm->resource_mgr,
 						temp_path,
-					TM_ACQUIRE_METHOD_HW);
+					TM_ACQUIRE_METHOD_SW);
 				} else
 					BREAK_TO_DEBUGGER();
 			}
@@ -2065,7 +2065,7 @@ bool dal_tm_detection_mgr_detect_display(
 	}
 
 	if (!tm_resource_mgr_acquire_resources(tm_dm->resource_mgr,
-			display_path, TM_ACQUIRE_METHOD_HW))
+			display_path, TM_ACQUIRE_METHOD_SW))
 		return detect_performed;
 
 	/**Step 1: retrieve the current sink capabilities and Edid
@@ -2112,7 +2112,7 @@ bool dal_tm_detection_mgr_detect_display(
 	}
 
 	tm_resource_mgr_release_resources(tm_dm->resource_mgr, display_path,
-			TM_ACQUIRE_METHOD_HW);
+			TM_ACQUIRE_METHOD_SW);
 
 	return detect_performed;
 }

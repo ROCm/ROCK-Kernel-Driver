@@ -2051,8 +2051,9 @@ enum tm_result tm_resource_mgr_acquire_resources(
 		return TM_RESULT_FAILURE;
 	}
 
+	dal_display_path_acquire_links(display_path);
+
 	if (update_hw_state_needed(method)) {
-		dal_display_path_acquire_links(display_path);
 		dal_display_path_acquire(display_path);
 	}
 

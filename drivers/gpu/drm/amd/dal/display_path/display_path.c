@@ -349,6 +349,8 @@ void dal_display_path_release_resources(struct display_path *path)
 		cntx->state.LINK = false;
 		cntx->state.AUDIO = false;
 		cntx->engine = ENGINE_ID_UNKNOWN;
+		cntx->input_config_signal = SIGNAL_TYPE_NONE;
+		cntx->output_config_signal = SIGNAL_TYPE_NONE;
 		cntx->link_config_interface = NULL;
 	}
 
