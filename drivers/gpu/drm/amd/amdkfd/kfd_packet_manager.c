@@ -489,14 +489,24 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 	pm->pmf = kzalloc(sizeof(struct packet_manager_firmware), GFP_KERNEL);
 	pm->allocated = false;
 
-	if (fw_ver == KFD_SCRATCH_FW_VER) {
-		pm->pmf->map_process = pm_create_map_process_scratch;
-		pm->pmf->get_map_process_packet_size =
-				get_map_process_packet_size_scratch;
-	} else {
+	switch (pm->dqm->dev->device_info->asic_family) {
+	case CHIP_KAVERI:
 		pm->pmf->map_process = pm_create_map_process;
 		pm->pmf->get_map_process_packet_size =
+					get_map_process_packet_size;
+		break;
+	case CHIP_CARRIZO:
+		if (fw_ver >= KFD_SCRATCH_CZ_FW_VER) {
+			pm->pmf->map_process = pm_create_map_process_scratch;
+			pm->pmf->get_map_process_packet_size =
+					get_map_process_packet_size_scratch;
+		} else {
+			pm->pmf->map_process = pm_create_map_process;
+			pm->pmf->get_map_process_packet_size =
 						get_map_process_packet_size;
+		}
+		break;
+
 	}
 
 	return 0;
