@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-14 Advanced Micro Devices, Inc.
+ * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of enc software and associated documentation files (the "Software"),
