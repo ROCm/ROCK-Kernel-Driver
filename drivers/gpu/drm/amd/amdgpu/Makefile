@@ -97,7 +97,8 @@ endif
 
 # GPU scheduler
 amdgpu-y += \
-	../scheduler/gpu_scheduler.o
+	../scheduler/gpu_scheduler.o \
+	amdgpu_sched.o
 
 amdgpu-$(CONFIG_COMPAT) += amdgpu_ioc32.o
 amdgpu-$(CONFIG_VGA_SWITCHEROO) += amdgpu_atpx_handler.o
