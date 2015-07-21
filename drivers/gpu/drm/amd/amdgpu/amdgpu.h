@@ -417,8 +417,6 @@ struct amdgpu_user_fence {
 	struct amdgpu_bo 	*bo;
 	/* write-back address offset to bo start */
 	uint32_t                offset;
-	/* resulting sequence number */
-	uint64_t                sequence;
 };
 
 int amdgpu_fence_driver_init(struct amdgpu_device *adev);
@@ -848,6 +846,8 @@ struct amdgpu_ib {
 	uint32_t			gws_base, gws_size;
 	uint32_t			oa_base, oa_size;
 	uint32_t			flags;
+	/* resulting sequence number */
+	uint64_t			sequence;
 };
 
 enum amdgpu_ring_type {
