@@ -128,7 +128,6 @@ static void disable_vga(struct vga *vga)
 	set_reg_field_value(value, 0, D1VGA_CONTROL, D1VGA_TIMING_SELECT);
 	set_reg_field_value(
 			value, 0, D1VGA_CONTROL, D1VGA_SYNC_POLARITY_SELECT);
-	/* RegFields1.bitfields.D1VGA_OVERSCAN_TIMING_SELECT = 0; */
 	set_reg_field_value(value, 0, D1VGA_CONTROL, D1VGA_OVERSCAN_COLOR_EN);
 
 	dal_write_reg(vga->ctx, addr, value);

@@ -269,10 +269,6 @@ static void program_self_refresh_dmif_watermark_crtc(
 	uint32_t wm_addr = regs->reg_dpg_watermark_mask_ctrl;
 
 	/*Write mask to enable reading/writing of watermark set A*/
-	/* TODO: check whether this Hersen's change is correct
-	 * (2 following lines)
-	stutter_cntl.u32All = 0;
-	stutter_cntl.bitfields.STUTTER_WM_HIGH_EXCLUDES_VBLANK = 0x1;*/
 
 	wm_mask_cntl = dal_read_reg(dal_ctx, wm_addr);
 	set_reg_field_value(wm_mask_cntl,
@@ -537,11 +533,6 @@ static void program_self_refresh_dmif_watermark_underlay_hw_seq(
 	uint32_t wm_addr = regs->reg_dpg_watermark_mask_ctrl;
 
 	/*Write mask to enable reading/writing of watermark set A*/
-
-	/* TODO: check whether this Hersen's change is correct
-	 * (2 following lines)
-	stutter_cntl.u32All = 0;
-	stutter_cntl.bitfields.STUTTER_WM_HIGH_EXCLUDES_VBLANK = 0x1;*/
 
 	value = dal_read_reg(dal_ctx, wm_addr);
 	set_reg_field_value(value,
@@ -2827,7 +2818,7 @@ static void allocate_dmif_buffer(
 	/*
 	 * Stella Wong proposed the following change
 	 *
-	 * Value of mcHubRdReqDmifLimit.bitfields.ENABLE:
+	 * Value of mcHubRdReqDmifLimit.ENABLE:
 	 * 00 - disable DMIF rdreq limit
 	 * 01 - enable DMIF rdreq limit, disabled by DMIF stall = 1 || urg != 0
 	 * 02 - enable DMIF rdreq limit, disable by DMIF stall = 1
@@ -4745,7 +4736,7 @@ static void deallocate_dmif_buffer(
 	}
 	*/
 
-	/* Value of mcHubRdReqDmifLimit.bitfields.ENABLE.
+	/* Value of mcHubRdReqDmifLimit.ENABLE.
 	 * 00 - disable dmif rdreq limit
 	 * 01 - enable dmif rdreq limit, disable by dmif stall=1||urg!=0
 	 * 02 - enable dmif rdreq limit, disable by dmif stall=1

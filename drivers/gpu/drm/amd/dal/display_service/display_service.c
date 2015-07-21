@@ -568,14 +568,6 @@ enum ds_return dal_display_service_enable_advanced_request(
 }
 
 /*Audio related*/
-enum ds_return dal_display_service_get_audio_info(
-	struct display_service *ds,
-	uint32_t display_index,
-	struct ds_display_audio_info *audio_info)
-{
-	/*TODO: add implementation*/
-	return DS_ERROR;
-}
 
 enum ds_return dal_display_service_enable_audio_endpoint(
 	struct display_service *ds,
@@ -590,23 +582,6 @@ enum ds_return dal_display_service_mute_audio_endpoint(
 	struct display_service *ds,
 	uint32_t display_index,
 	bool mute)
-{
-	/*TODO: add implementation*/
-	return DS_ERROR;
-}
-
-enum ds_return dal_display_service_get_audio_channel_split_config(
-	struct display_service *ds,
-	struct ds_adapter_audio_azalia_channel_mapping_set *audio_set)
-{
-	/*TODO: add implementation*/
-	return DS_ERROR;
-}
-
-enum ds_return dal_display_service_enable_audio_channel_split(
-	struct display_service *ds,
-	const struct ds_adapter_audio_azalia_channel_mapping_set *audio_set,
-	bool enable)
 {
 	/*TODO: add implementation*/
 	return DS_ERROR;

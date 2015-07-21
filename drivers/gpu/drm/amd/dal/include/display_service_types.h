@@ -114,98 +114,11 @@ enum ds_audio_azalia_channel_name {
 	DS_AUDIO_AZALIA_CHANNEL_NO_ASSOCIATION = 15
 };
 
-struct ds_audio_encoding_format_cap {
-	union {
-		struct {
-			uint32_t ENCODING_FORMAT_LPCM:1;
-			uint32_t ENCODING_FORMAT_AC3:1;
-			uint32_t ENCODING_FORMAT_MPEG1:1;
-			uint32_t ENCODING_FORMAT_MP3:1;
-			uint32_t ENCODING_FORMAT_MPEG2:1;
-			uint32_t ENCODING_FORMAT_AAC:1;
-			uint32_t ENCODING_FORMAT_DTS:1;
-			uint32_t ENCODING_FORMAT_ATRAC:1;
-			uint32_t ENCODING_FORMAT_DOLBYDIGITALPLUS:1;
-			uint32_t ENCODING_FORMAT_DTSHD:1;
-			uint32_t ENCODING_FORMAT_DOLBYTRUEHD:1;
-			uint32_t ENCODING_FORMAT_WMAPRO:1;
-		} bitfields;
-		uint32_t u32all;
-	};
-};
-
 enum ds_audio_channel_format {
 	DS_AUDIO_CHANNEL_FORMAT_2P0 = 0,
 	DS_AUDIO_CHANNEL_FORMAT_2P1,
 	DS_AUDIO_CHANNEL_FORMAT_5P1,
 	DS_AUDIO_CHANNEL_FORMAT_7P1
-};
-
-struct ds_audio_sample_rate_cap {
-	union {
-		struct {
-			uint32_t SAMPLE_RATE_32KHZ:1;
-			uint32_t SAMPLE_RATE_44P1KHZ:1;
-			uint32_t SAMPLE_RATE_48KHZ:1;
-			uint32_t SAMPLE_RATE_88P2KHZ:1;
-			uint32_t SAMPLE_RATE_96KHZ:1;
-			uint32_t SAMPLE_RATE_176P4KHZ:1;
-			uint32_t SAMPLE_RATE_192KHZ:1;
-		} bitfields;
-		uint32_t u32all;
-	};
-};
-
-struct ds_audio_bits_per_sample_cap {
-	union {
-		struct {
-			uint32_t BITS_PER_SAMPLE_16BPS:1;
-			uint32_t BITS_PER_SAMPLE_20BPS:1;
-			uint32_t BITS_PER_SAMPLE_24BPS:1;
-		} bitfields;
-		uint32_t u32all;
-	};
-};
-
-/* audio capability from EDID*/
-struct ds_audio_data_cap {
-	struct ds_audio_encoding_format_cap format;
-	enum ds_audio_channel_format channels;
-	struct ds_audio_sample_rate_cap sample_rate;
-	struct ds_audio_bits_per_sample_cap bit_per_sample;
-};
-
-struct ds_audio_os_channel_mapping {
-	union {
-		struct {
-			uint32_t channel_l:4;
-			uint32_t channel_r:4;
-			uint32_t channel_c:4;
-			uint32_t channel_sub:4;
-			uint32_t channel_rl:4;
-			uint32_t channel_rr:4;
-			uint32_t channel_sl:4;
-			uint32_t channel_sr:4;
-
-		} bitfields;
-		uint32_t u32all;
-	};
-};
-
-struct ds_audio_azalia_channel_mapping {
-	union {
-		struct {
-			uint32_t CHANNEL_FL:4;
-			uint32_t CHANNEL_FR:4;
-			uint32_t CHANNEL_FC:4;
-			uint32_t CHANNEL_SUB:4;
-			uint32_t CHANNEL_SL:4;
-			uint32_t CHANNEL_SR:4;
-			uint32_t CHANNEL_BL:4;
-			uint32_t CHANNEL_BR:4;
-		} bitfields;
-		uint32_t u32all;
-	};
 };
 
 /*Used for get/set Mirabilis*/
@@ -221,47 +134,6 @@ struct ds_disp_identifier {
 	uint32_t manufacture_id;
 	uint32_t product_id;
 	uint32_t serial_no;
-};
-
-struct ds_display_audio_os_channel_mapping {
-	struct ds_disp_identifier identifier;
-	struct ds_audio_os_channel_mapping mapping;
-};
-
-struct ds_display_audio_azalia_channel_mapping {
-	struct ds_disp_identifier identifier;
-	struct ds_audio_azalia_channel_mapping mapping;
-};
-
-/*Used for GetDisplayAudioInfo is per display*/
-#define DS_MAX_AUDIO_CONFIG 16
-struct ds_display_audio_info {
-	uint32_t size;
-	uint32_t num_of_audio_formats_supported;
-	struct ds_disp_identifier identifier;
-	struct ds_audio_data_cap audio_caps[DS_MAX_AUDIO_CONFIG];
-	struct ds_audio_os_channel_mapping mapping;
-};
-
-struct ds_display_audio_config {
-	uint32_t size;
-	bool mirabilis_enabled;
-	struct ds_display_audio_azalia_channel_mapping channel_mapping;
-};
-
-#define DS_MAX_MIRABILIS_DISPLAY_COUNT 6
-struct ds_adapter_audio_os_channel_mapping_set {
-	enum ds_mirabilis_control_option options;
-	uint32_t num_of_displays;
-	struct ds_display_audio_os_channel_mapping
-		channel_mapping[DS_MAX_MIRABILIS_DISPLAY_COUNT];
-};
-
-struct ds_adapter_audio_azalia_channel_mapping_set {
-	enum ds_mirabilis_control_option options;
-	uint32_t num_of_displays;
-	struct ds_display_audio_azalia_channel_mapping
-		channel_mapping[DS_MAX_MIRABILIS_DISPLAY_COUNT];
 };
 
 struct ds_view_port {
