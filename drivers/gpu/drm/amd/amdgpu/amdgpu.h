@@ -419,6 +419,7 @@ struct amdgpu_user_fence {
 	struct amdgpu_bo 	*bo;
 	/* write-back address offset to bo start */
 	uint32_t                offset;
+	uint64_t                sequence;
 };
 
 int amdgpu_fence_driver_init(struct amdgpu_device *adev);
@@ -1240,6 +1241,7 @@ struct amdgpu_cs_parser {
 	struct work_struct job_work;
 	int (*prepare_job)(struct amdgpu_cs_parser *sched_job);
 	int (*run_job)(struct amdgpu_cs_parser *sched_job);
+	int (*free_job)(struct amdgpu_cs_parser *sched_job);
 };
 
 static inline u32 amdgpu_get_ib_value(struct amdgpu_cs_parser *p, uint32_t ib_idx, int idx)
