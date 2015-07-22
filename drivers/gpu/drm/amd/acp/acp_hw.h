@@ -19,10 +19,10 @@
 #define ACP_PHYSICAL_BASE			0x14000
 
 /* Playback SRAM address (as a destination in dma descriptor) */
-#define ACP_SHARED_RAM_BANK_38_ADDRESS		0x404A000
+#define ACP_SHARED_RAM_BANK_1_ADDRESS		0x4002000
 
 /* Capture SRAM address (as a source in dma descriptor) */
-#define ACP_SHARED_RAM_BANK_47_ADDRESS		0x4054000
+#define ACP_SHARED_RAM_BANK_5_ADDRESS		0x400A000
 
 #define ACP_DMA_RESET_TIME			10000
 #define ACP_CLOCK_EN_TIME_OUT_VALUE		0x000000FF

@@ -150,7 +150,7 @@ static void set_acp_sysmem_dma_descriptors(struct amd_acp_device *acp_dev,
 	dmadscr[0].size_xfer_dir.val = (u32) 0x0;
 	if (direction == STREAM_PLAYBACK) {
 		dma_dscr_idx = PLAYBACK_START_DMA_DESCR_CH12;
-		dmadscr[0].dest = ACP_SHARED_RAM_BANK_38_ADDRESS + (size / 2);
+		dmadscr[0].dest = ACP_SHARED_RAM_BANK_1_ADDRESS + (size / 2);
 		dmadscr[0].src = ACP_INTERNAL_APERTURE_WINDOW_0_ADDRESS +
 			(pte_offset * PAGE_SIZE_4K);
 		dmadscr[0].size_xfer_dir.s.trans_direction =
@@ -159,7 +159,7 @@ static void set_acp_sysmem_dma_descriptors(struct amd_acp_device *acp_dev,
 		dmadscr[0].size_xfer_dir.s.ioc = (u32) 0x0;
 	} else {
 		dma_dscr_idx = CAPTURE_START_DMA_DESCR_CH14;
-		dmadscr[0].src = ACP_SHARED_RAM_BANK_47_ADDRESS;
+		dmadscr[0].src = ACP_SHARED_RAM_BANK_5_ADDRESS;
 		dmadscr[0].dest = ACP_INTERNAL_APERTURE_WINDOW_0_ADDRESS +
 			(pte_offset * PAGE_SIZE_4K);
 		dmadscr[0].size_xfer_dir.s.trans_direction =
@@ -173,7 +173,7 @@ static void set_acp_sysmem_dma_descriptors(struct amd_acp_device *acp_dev,
 	dmadscr[1].size_xfer_dir.val = (u32) 0x0;
 	if (direction == STREAM_PLAYBACK) {
 		dma_dscr_idx = PLAYBACK_END_DMA_DESCR_CH12;
-		dmadscr[1].dest = ACP_SHARED_RAM_BANK_38_ADDRESS;
+		dmadscr[1].dest = ACP_SHARED_RAM_BANK_1_ADDRESS;
 		dmadscr[1].src = ACP_INTERNAL_APERTURE_WINDOW_0_ADDRESS +
 			(pte_offset * PAGE_SIZE_4K) + (size / 2);
 		dmadscr[1].size_xfer_dir.s.trans_direction =
@@ -224,13 +224,13 @@ static void set_acp_to_i2s_dma_descriptors(struct amd_acp_device *acp_dev,
 	dmadscr[0].size_xfer_dir.val = (u32) 0x0;
 	if (direction == STREAM_PLAYBACK) {
 		dma_dscr_idx = PLAYBACK_START_DMA_DESCR_CH13;
-		dmadscr[0].src = ACP_SHARED_RAM_BANK_38_ADDRESS;
+		dmadscr[0].src = ACP_SHARED_RAM_BANK_1_ADDRESS;
 		dmadscr[0].size_xfer_dir.s.trans_direction = TO_ACP_I2S_1;
 		dmadscr[0].size_xfer_dir.s.size = (size / 2);
 		dmadscr[0].size_xfer_dir.s.ioc = (u32) 0x1;
 	} else {
 		dma_dscr_idx = CAPTURE_START_DMA_DESCR_CH15;
-		dmadscr[0].dest = ACP_SHARED_RAM_BANK_47_ADDRESS;
+		dmadscr[0].dest = ACP_SHARED_RAM_BANK_5_ADDRESS;
 		dmadscr[0].size_xfer_dir.s.trans_direction = FROM_ACP_I2S_1;
 		dmadscr[0].size_xfer_dir.s.size = (size / 2);
 		dmadscr[0].size_xfer_dir.s.ioc = (u32) 0x1;
