@@ -773,6 +773,52 @@ static void acp_resume_tile(struct amd_acp_private *acp_prv, int tile)
 	}
 }
 
+/* Shutdown unused SRAM memory banks in ACP IP */
+static void acp_turnoff_sram_banks(struct amd_acp_private *acp_prv)
+{
+	/* Bank 0 : used for DMA descriptors
+	 * Bank 1 to 4 : used for playback
+	 * Bank 5 to 8 : used for capture
+	 * Each bank is 8kB and max size allocated for playback/ capture is
+	 * 16kB(max period size) * 2(max periods) reserved for playback/capture
+	 * in ALSA driver
+	 * Turn off all SRAM banks except above banks during playback/capture
+	 */
+	u32 val, bank;
+
+	for (bank = 9; bank < 32; bank++) {
+		val = cgs_read_register(acp_prv->cgs_device,
+					mmACP_MEM_SHUT_DOWN_REQ_LO);
+		if (!(val & (1 << bank))) {
+			val |= 1 << bank;
+			cgs_write_register(acp_prv->cgs_device,
+					mmACP_MEM_SHUT_DOWN_REQ_LO, val);
+			/* If ACP_MEM_SHUT_DOWN_STS_LO is 0xFFFFFFFF, then
+			 * shutdown sequence is complete. */
+			do {
+				val = cgs_read_register(acp_prv->cgs_device,
+						mmACP_MEM_SHUT_DOWN_STS_LO);
+			} while (val != 0xFFFFFFFF);
+		}
+	}
+
+	for (bank = 32; bank < 48; bank++) {
+		val = cgs_read_register(acp_prv->cgs_device,
+					mmACP_MEM_SHUT_DOWN_REQ_HI);
+		if (!(val & (1 << (bank - 32)))) {
+			val |= 1 << (bank - 32);
+			cgs_write_register(acp_prv->cgs_device,
+					mmACP_MEM_SHUT_DOWN_REQ_HI, val);
+			/* If ACP_MEM_SHUT_DOWN_STS_HI is 0x0000FFFF, then
+			 * shutdown sequence is complete. */
+			do {
+				val = cgs_read_register(acp_prv->cgs_device,
+						mmACP_MEM_SHUT_DOWN_STS_HI);
+			} while (val != 0x0000FFFF);
+		}
+	}
+}
+
 /* Initialize and bring ACP hardware to default state. */
 static void acp_init(struct amd_acp_private *acp_prv)
 {
@@ -833,6 +879,7 @@ static void acp_init(struct amd_acp_private *acp_prv)
 	cgs_write_register(acp_prv->cgs_device,	mmACP_EXTERNAL_INTR_CNTL,
 			   ACP_EXTERNAL_INTR_CNTL__DMAIOCMask_MASK);
 
+	acp_turnoff_sram_banks(acp_prv);
 	pr_info("ACP: Initialized.\n");
 
 }
