@@ -33,7 +33,7 @@
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_types.h"
 
-#include "amdgpu_family.h"
+#include "amd_shared.h"
 #include "amdgpu_dm_irq.h"
 
 #include "dce/dce_11_0_d.h"
