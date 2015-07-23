@@ -251,13 +251,13 @@ static uint8_t get_number_of_objects(struct bios_parser *bp, uint32_t offset)
 uint8_t dal_bios_parser_get_encoders_number(struct bios_parser *bp)
 {
 	return get_number_of_objects(bp,
-		bp->object_info_tbl.v1_1->usEncoderObjectTableOffset);
+		le16_to_cpu(bp->object_info_tbl.v1_1->usEncoderObjectTableOffset));
 }
 
 uint8_t dal_bios_parser_get_connectors_number(struct bios_parser *bp)
 {
 	return get_number_of_objects(bp,
-		bp->object_info_tbl.v1_1->usConnectorObjectTableOffset);
+		le16_to_cpu(bp->object_info_tbl.v1_1->usConnectorObjectTableOffset));
 }
 
 uint32_t dal_bios_parser_get_oem_ddc_lines_number(struct bios_parser *bp)
@@ -270,10 +270,10 @@ uint32_t dal_bios_parser_get_oem_ddc_lines_number(struct bios_parser *bp)
 		info = GET_IMAGE(ATOM_OEM_INFO,
 			DATA_TABLES(OemInfo));
 
-		if (info->sHeader.usStructureSize
+		if (le16_to_cpu(info->sHeader.usStructureSize)
 			> sizeof(ATOM_COMMON_TABLE_HEADER)) {
 
-			number = (info->sHeader.usStructureSize
+			number = (le16_to_cpu(info->sHeader.usStructureSize)
 				- sizeof(ATOM_COMMON_TABLE_HEADER))
 				/ sizeof(ATOM_I2C_ID_CONFIG_ACCESS);
 
@@ -290,13 +290,13 @@ struct graphics_object_id dal_bios_parser_get_encoder_id(struct bios_parser *bp,
 		0, ENUM_ID_UNKNOWN, OBJECT_TYPE_UNKNOWN);
 
 	uint32_t encoder_table_offset = bp->object_info_tbl_offset
-		+ bp->object_info_tbl.v1_1->usEncoderObjectTableOffset;
+		+ le16_to_cpu(bp->object_info_tbl.v1_1->usEncoderObjectTableOffset);
 
 	ATOM_OBJECT_TABLE *tbl =
 		GET_IMAGE(ATOM_OBJECT_TABLE, encoder_table_offset);
 
 	if (tbl && tbl->ucNumberOfObjects > i) {
-		const uint16_t id = tbl->asObjects[i].usObjectID;
+		const uint16_t id = le16_to_cpu(tbl->asObjects[i].usObjectID);
 
 		object_id = object_id_from_bios_object_id(id);
 	}
@@ -312,13 +312,13 @@ struct graphics_object_id dal_bios_parser_get_connector_id(
 		0, ENUM_ID_UNKNOWN, OBJECT_TYPE_UNKNOWN);
 
 	uint32_t connector_table_offset = bp->object_info_tbl_offset
-		+ bp->object_info_tbl.v1_1->usConnectorObjectTableOffset;
+		+ le16_to_cpu(bp->object_info_tbl.v1_1->usConnectorObjectTableOffset);
 
 	ATOM_OBJECT_TABLE *tbl =
 		GET_IMAGE(ATOM_OBJECT_TABLE, connector_table_offset);
 
 	if (tbl && tbl->ucNumberOfObjects > i) {
-		const uint16_t id = tbl->asObjects[i].usObjectID;
+		const uint16_t id = le16_to_cpu(tbl->asObjects[i].usObjectID);
 
 		object_id = object_id_from_bios_object_id(id);
 	}
@@ -340,7 +340,8 @@ uint32_t dal_bios_parser_get_src_number(struct bios_parser *bp,
 		return 0;
 	}
 
-	offset = object->usSrcDstTableOffset + bp->object_info_tbl_offset;
+	offset = le16_to_cpu(object->usSrcDstTableOffset)
+			+ bp->object_info_tbl_offset;
 
 	number = GET_IMAGE(uint8_t, offset);
 	if (!number)
@@ -421,7 +422,7 @@ enum bp_result dal_bios_parser_get_oem_ddc_info(struct bios_parser *bp,
 
 		tbl = GET_IMAGE(ATOM_OEM_INFO, DATA_TABLES(OemInfo));
 
-		if (tbl->sHeader.usStructureSize
+		if (le16_to_cpu(tbl->sHeader.usStructureSize)
 			> sizeof(ATOM_COMMON_TABLE_HEADER)) {
 			ATOM_I2C_RECORD record;
 			ATOM_I2C_ID_CONFIG_ACCESS *config;
@@ -461,7 +462,8 @@ enum bp_result dal_bios_parser_get_i2c_info(struct bios_parser *bp,
 	if (!object)
 		return BP_RESULT_BADINPUT;
 
-	offset = object->usRecordOffset + bp->object_info_tbl_offset;
+	offset = le16_to_cpu(object->usRecordOffset)
+			+ bp->object_info_tbl_offset;
 
 	for (;;) {
 		header = GET_IMAGE(ATOM_COMMON_RECORD_HEADER, offset);
@@ -498,7 +500,7 @@ static enum bp_result get_voltage_ddc_info_v1(uint8_t *i2c_line,
 
 	uint8_t *voltage_current_object = (uint8_t *) &info->asVoltageObj[0];
 
-	while ((address + header->usStructureSize) > voltage_current_object) {
+	while ((address + le16_to_cpu(header->usStructureSize)) > voltage_current_object) {
 		ATOM_VOLTAGE_OBJECT *object =
 			(ATOM_VOLTAGE_OBJECT *) voltage_current_object;
 
@@ -529,7 +531,7 @@ static enum bp_result get_voltage_ddc_info_v3(uint8_t *i2c_line,
 	uint8_t *voltage_current_object =
 		(uint8_t *) (&(info->asVoltageObj[0]));
 
-	while ((address + header->usStructureSize) > voltage_current_object) {
+	while ((address + le16_to_cpu(header->usStructureSize)) > voltage_current_object) {
 		ATOM_I2C_VOLTAGE_OBJECT_V3 *object =
 			(ATOM_I2C_VOLTAGE_OBJECT_V3 *) voltage_current_object;
 
@@ -543,7 +545,7 @@ static enum bp_result get_voltage_ddc_info_v3(uint8_t *i2c_line,
 			}
 		}
 
-		voltage_current_object += object->sHeader.usSize;
+		voltage_current_object += le16_to_cpu(object->sHeader.usSize);
 	}
 	return result;
 }
@@ -622,7 +624,7 @@ enum bp_result dal_bios_parser_get_ddc_info_for_i2c_line(struct bios_parser *bp,
 	if (!info)
 		return BP_RESULT_BADINPUT;
 
-	offset = bp->object_info_tbl.v1_1->usConnectorObjectTableOffset;
+	offset = le16_to_cpu(bp->object_info_tbl.v1_1->usConnectorObjectTableOffset);
 
 	offset += bp->object_info_tbl_offset;
 
@@ -639,7 +641,8 @@ enum bp_result dal_bios_parser_get_ddc_info_for_i2c_line(struct bios_parser *bp,
 			return BP_RESULT_BADINPUT;
 		}
 
-		offset = object->usRecordOffset + bp->object_info_tbl_offset;
+		offset = le16_to_cpu(object->usRecordOffset)
+				+ bp->object_info_tbl_offset;
 
 		for (;;) {
 			ATOM_COMMON_RECORD_HEADER *header =
@@ -717,7 +720,8 @@ uint32_t dal_bios_parser_get_gpio_record(
 		return 0;
 
 	/* Initialise offset */
-	offset = object->usRecordOffset + bp->object_info_tbl_offset;
+	offset = le16_to_cpu(object->usRecordOffset)
+			+ bp->object_info_tbl_offset;
 
 	for (;;) {
 		/* Get record header */
@@ -780,7 +784,8 @@ enum bp_result dal_bios_parser_get_device_tag_record(
 	ATOM_COMMON_RECORD_HEADER *header;
 	uint32_t offset;
 
-	offset = object->usRecordOffset + bp->object_info_tbl_offset;
+	offset = le16_to_cpu(object->usRecordOffset)
+			+ bp->object_info_tbl_offset;
 
 	for (;;) {
 		header = GET_IMAGE(ATOM_COMMON_RECORD_HEADER, offset);
@@ -838,8 +843,9 @@ enum bp_result dal_bios_parser_get_device_tag(
 
 	device_tag = &record->asDeviceTag[device_tag_index];
 
-	info->acpi_device = device_tag->ulACPIDeviceEnum;
-	info->dev_id = device_type_from_device_id(device_tag->usDeviceID);
+	info->acpi_device = le32_to_cpu(device_tag->ulACPIDeviceEnum);
+	info->dev_id =
+		device_type_from_device_id(le16_to_cpu(device_tag->usDeviceID));
 
 	return BP_RESULT_OK;
 }
@@ -915,15 +921,16 @@ static enum bp_result get_firmware_info_v1_4(
 
 	/* Pixel clock pll information. We need to convert from 10KHz units into
 	 * KHz units */
-	info->pll_info.crystal_frequency = firmware_info->usReferenceClock * 10;
+	info->pll_info.crystal_frequency =
+			le16_to_cpu(firmware_info->usReferenceClock) * 10;
 	info->pll_info.min_input_pxl_clk_pll_frequency =
-		firmware_info->usMinPixelClockPLL_Input * 10;
+		le16_to_cpu(firmware_info->usMinPixelClockPLL_Input) * 10;
 	info->pll_info.max_input_pxl_clk_pll_frequency =
-		firmware_info->usMaxPixelClockPLL_Input * 10;
+		le16_to_cpu(firmware_info->usMaxPixelClockPLL_Input) * 10;
 	info->pll_info.min_output_pxl_clk_pll_frequency =
-		firmware_info->ulMinPixelClockPLL_Output * 10;
+		le32_to_cpu(firmware_info->ulMinPixelClockPLL_Output) * 10;
 	info->pll_info.max_output_pxl_clk_pll_frequency =
-		firmware_info->ulMaxPixelClockPLL_Output * 10;
+		le32_to_cpu(firmware_info->ulMaxPixelClockPLL_Output) * 10;
 
 	if (firmware_info->usFirmwareCapability.sbfAccess.MemoryClockSS_Support)
 		/* Since there is no information on the SS, report conservative
@@ -965,20 +972,20 @@ static enum bp_result get_firmware_info_v2_1(
 
 	/* Pixel clock pll information. We need to convert from 10KHz units into
 	 * KHz units */
-	info->pll_info.crystal_frequency = firmwareInfo->usCoreReferenceClock
-		* 10;
+	info->pll_info.crystal_frequency =
+			le16_to_cpu(firmwareInfo->usCoreReferenceClock) * 10;
 	info->pll_info.min_input_pxl_clk_pll_frequency =
-		firmwareInfo->usMinPixelClockPLL_Input * 10;
+		le16_to_cpu(firmwareInfo->usMinPixelClockPLL_Input) * 10;
 	info->pll_info.max_input_pxl_clk_pll_frequency =
-		firmwareInfo->usMaxPixelClockPLL_Input * 10;
+		le16_to_cpu(firmwareInfo->usMaxPixelClockPLL_Input) * 10;
 	info->pll_info.min_output_pxl_clk_pll_frequency =
-		firmwareInfo->ulMinPixelClockPLL_Output * 10;
+		le32_to_cpu(firmwareInfo->ulMinPixelClockPLL_Output) * 10;
 	info->pll_info.max_output_pxl_clk_pll_frequency =
-		firmwareInfo->ulMaxPixelClockPLL_Output * 10;
+		le32_to_cpu(firmwareInfo->ulMaxPixelClockPLL_Output) * 10;
 	info->default_display_engine_pll_frequency =
-		firmwareInfo->ulDefaultDispEngineClkFreq * 10;
+		le32_to_cpu(firmwareInfo->ulDefaultDispEngineClkFreq) * 10;
 	info->external_clock_source_frequency_for_dp =
-		firmwareInfo->usUniphyDPModeExtClkFreq * 10;
+		le16_to_cpu(firmwareInfo->usUniphyDPModeExtClkFreq) * 10;
 	info->min_allowed_bl_level = firmwareInfo->ucMinAllowedBL_Level;
 
 	/* There should be only one entry in the SS info table for Memory Clock
@@ -1051,20 +1058,20 @@ static enum bp_result get_firmware_info_v2_2(
 
 	/* Pixel clock pll information. We need to convert from 10KHz units into
 	 * KHz units */
-	info->pll_info.crystal_frequency = firmware_info->usCoreReferenceClock
-		* 10;
+	info->pll_info.crystal_frequency =
+			le16_to_cpu(firmware_info->usCoreReferenceClock) * 10;
 	info->pll_info.min_input_pxl_clk_pll_frequency =
-		firmware_info->usMinPixelClockPLL_Input * 10;
+		le16_to_cpu(firmware_info->usMinPixelClockPLL_Input) * 10;
 	info->pll_info.max_input_pxl_clk_pll_frequency =
-		firmware_info->usMaxPixelClockPLL_Input * 10;
+		le16_to_cpu(firmware_info->usMaxPixelClockPLL_Input) * 10;
 	info->pll_info.min_output_pxl_clk_pll_frequency =
-		firmware_info->ulMinPixelClockPLL_Output * 10;
+		le32_to_cpu(firmware_info->ulMinPixelClockPLL_Output) * 10;
 	info->pll_info.max_output_pxl_clk_pll_frequency =
-		firmware_info->ulMaxPixelClockPLL_Output * 10;
+		le32_to_cpu(firmware_info->ulMaxPixelClockPLL_Output) * 10;
 	info->default_display_engine_pll_frequency =
-		firmware_info->ulDefaultDispEngineClkFreq * 10;
+		le32_to_cpu(firmware_info->ulDefaultDispEngineClkFreq) * 10;
 	info->external_clock_source_frequency_for_dp =
-		firmware_info->usUniphyDPModeExtClkFreq * 10;
+		le16_to_cpu(firmware_info->usUniphyDPModeExtClkFreq) * 10;
 
 	/* There should be only one entry in the SS info table for Memory Clock
 	 */
@@ -1119,7 +1126,7 @@ static enum bp_result get_firmware_info_v2_2(
 	info->min_allowed_bl_level = firmware_info->ucMinAllowedBL_Level;
 	/* Used starting from CI */
 	info->smu_gpu_pll_output_freq =
-		(uint32_t) (firmware_info->ulGPUPLL_OutputFreq * 10);
+		(uint32_t) (le32_to_cpu(firmware_info->ulGPUPLL_OutputFreq) * 10);
 
 	return BP_RESULT_OK;
 }
@@ -1144,7 +1151,8 @@ static enum bp_result get_ss_info_v3_1(
 
 	ss_table_header_include = GET_IMAGE(ATOM_ASIC_INTERNAL_SS_INFO_V3,
 		DATA_TABLES(ASIC_InternalSS_Info));
-	table_size = (ss_table_header_include->sHeader.usStructureSize
+	table_size =
+		(le16_to_cpu(ss_table_header_include->sHeader.usStructureSize)
 		- sizeof(ATOM_COMMON_TABLE_HEADER))
 				/ sizeof(ATOM_ASIC_SS_ASSIGNMENT_V3);
 
@@ -1190,11 +1198,12 @@ static enum bp_result get_ss_info_v3_1(
 
 		ss_info->type.STEP_AND_DELAY_INFO = false;
 		 /* convert [10KHz] into [KHz] */
-		ss_info->target_clock_range = tbl[i].ulTargetClockRange * 10;
+		ss_info->target_clock_range =
+			le32_to_cpu(tbl[i].ulTargetClockRange) * 10;
 		ss_info->spread_spectrum_percentage =
-			(uint32_t)tbl[i].usSpreadSpectrumPercentage;
+			(uint32_t)le16_to_cpu(tbl[i].usSpreadSpectrumPercentage);
 		ss_info->spread_spectrum_range =
-			(uint32_t)(tbl[i].usSpreadRateIn10Hz * 10);
+			(uint32_t)(le16_to_cpu(tbl[i].usSpreadRateIn10Hz) * 10);
 
 		return BP_RESULT_OK;
 	}
@@ -1391,7 +1400,7 @@ bool dal_bios_parser_is_device_id_supported(
 {
 	uint32_t mask = get_support_mask_for_device_id(id);
 
-	return (bp->object_info_tbl.v1_1->usDeviceSupport & mask) != 0;
+	return (le16_to_cpu(bp->object_info_tbl.v1_1->usDeviceSupport) & mask) != 0;
 }
 
 enum bp_result dal_bios_parser_crt_control(
@@ -1460,7 +1469,8 @@ static ATOM_HPD_INT_RECORD *get_hpd_record(struct bios_parser *bp,
 		return NULL;
 	}
 
-	offset = object->usRecordOffset + bp->object_info_tbl_offset;
+	offset = le16_to_cpu(object->usRecordOffset)
+			+ bp->object_info_tbl_offset;
 
 	for (;;) {
 		header = GET_IMAGE(ATOM_COMMON_RECORD_HEADER, offset);
@@ -1500,7 +1510,8 @@ static ATOM_I2C_RECORD *get_i2c_record(
 		return NULL;
 	}
 
-	offset = object->usRecordOffset + bp->object_info_tbl_offset;
+	offset = le16_to_cpu(object->usRecordOffset)
+			+ bp->object_info_tbl_offset;
 
 	for (;;) {
 		record_header = GET_IMAGE(ATOM_COMMON_RECORD_HEADER, offset);
@@ -1661,7 +1672,7 @@ static enum bp_result get_ss_info_from_internal_ss_info_tbl_V2_1(
 
 	dal_memset(info, 0, sizeof(struct spread_spectrum_info));
 
-	tbl_size = (header->sHeader.usStructureSize
+	tbl_size = (le16_to_cpu(header->sHeader.usStructureSize)
 		- sizeof(ATOM_COMMON_TABLE_HEADER))
 				/ sizeof(ATOM_ASIC_SS_ASSIGNMENT_V2);
 
@@ -1683,11 +1694,12 @@ static enum bp_result get_ss_info_from_internal_ss_info_tbl_V2_1(
 		}
 		info->type.STEP_AND_DELAY_INFO = false;
 		/* convert [10KHz] into [KHz] */
-		info->target_clock_range = tbl[i].ulTargetClockRange * 10;
+		info->target_clock_range =
+			le32_to_cpu(tbl[i].ulTargetClockRange) * 10;
 		info->spread_spectrum_percentage =
-			(uint32_t)tbl[i].usSpreadSpectrumPercentage;
+			(uint32_t)le16_to_cpu(tbl[i].usSpreadSpectrumPercentage);
 		info->spread_spectrum_range =
-			(uint32_t)(tbl[i].usSpreadRateIn10Hz * 10);
+			(uint32_t)(le16_to_cpu(tbl[i].usSpreadRateIn10Hz) * 10);
 		result = BP_RESULT_OK;
 		break;
 	}
@@ -1754,7 +1766,7 @@ static enum bp_result get_ss_info_from_ss_info_table(
 	if (id_local == SS_ID_UNKNOWN)
 		return result;
 
-	table_size = (tbl->sHeader.usStructureSize -
+	table_size = (le16_to_cpu(tbl->sHeader.usStructureSize) -
 		sizeof(ATOM_COMMON_TABLE_HEADER)) /
 			sizeof(ATOM_SPREAD_SPECTRUM_ASSIGNMENT);
 
@@ -1774,7 +1786,7 @@ static enum bp_result get_ss_info_from_ss_info_table(
 
 		ss_info->type.STEP_AND_DELAY_INFO = true;
 		ss_info->spread_spectrum_percentage =
-			tbl->asSS_Info[i].usSpreadSpectrumPercentage;
+			(uint32_t)le16_to_cpu(tbl->asSS_Info[i].usSpreadSpectrumPercentage);
 		ss_info->step_and_delay_info.step = tbl->asSS_Info[i].ucSS_Step;
 		ss_info->step_and_delay_info.delay =
 			tbl->asSS_Info[i].ucSS_Delay;
@@ -1856,32 +1868,34 @@ static enum bp_result get_embedded_panel_info_v1_2(
 	dal_memset(info, 0, sizeof(struct embedded_panel_info));
 
 	/* We need to convert from 10KHz units into KHz units*/
-	info->lcd_timing.pixel_clk = lvds->sLCDTiming.usPixClk * 10;
+	info->lcd_timing.pixel_clk =
+		le16_to_cpu(lvds->sLCDTiming.usPixClk) * 10;
 	/* usHActive does not include borders, according to VBIOS team*/
 	info->lcd_timing.horizontal_addressable =
-		lvds->sLCDTiming.usHActive;
+		le16_to_cpu(lvds->sLCDTiming.usHActive);
 	/* usHBlanking_Time includes borders, so we should really be subtracting
 	 * borders duing this translation, but LVDS generally*/
 	/* doesn't have borders, so we should be okay leaving this as is for
 	 * now.  May need to revisit if we ever have LVDS with borders*/
 	info->lcd_timing.horizontal_blanking_time =
-		lvds->sLCDTiming.usHBlanking_Time;
+		le16_to_cpu(lvds->sLCDTiming.usHBlanking_Time);
 	/* usVActive does not include borders, according to VBIOS team*/
-	info->lcd_timing.vertical_addressable = lvds->sLCDTiming.usVActive;
+	info->lcd_timing.vertical_addressable =
+			le16_to_cpu(lvds->sLCDTiming.usVActive);
 	/* usVBlanking_Time includes borders, so we should really be subtracting
 	 * borders duing this translation, but LVDS generally*/
 	/* doesn't have borders, so we should be okay leaving this as is for
 	 * now. May need to revisit if we ever have LVDS with borders*/
 	info->lcd_timing.vertical_blanking_time =
-		lvds->sLCDTiming.usVBlanking_Time;
+		le16_to_cpu(lvds->sLCDTiming.usVBlanking_Time);
 	info->lcd_timing.horizontal_sync_offset =
-		lvds->sLCDTiming.usHSyncOffset;
+		le16_to_cpu(lvds->sLCDTiming.usHSyncOffset);
 	info->lcd_timing.horizontal_sync_width =
-		lvds->sLCDTiming.usHSyncWidth;
+		le16_to_cpu(lvds->sLCDTiming.usHSyncWidth);
 	info->lcd_timing.vertical_sync_offset =
-		lvds->sLCDTiming.usVSyncOffset;
+		le16_to_cpu(lvds->sLCDTiming.usVSyncOffset);
 	info->lcd_timing.vertical_sync_width =
-		lvds->sLCDTiming.usVSyncWidth;
+		le16_to_cpu(lvds->sLCDTiming.usVSyncWidth);
 	info->lcd_timing.horizontal_border = lvds->sLCDTiming.ucHBorder;
 	info->lcd_timing.vertical_border = lvds->sLCDTiming.ucVBorder;
 	info->lcd_timing.misc_info.HORIZONTAL_CUT_OFF =
@@ -1907,7 +1921,7 @@ static enum bp_result get_embedded_panel_info_v1_2(
 	info->ss_id = lvds->ucSS_Id;
 
 	{
-		uint8_t rr = lvds->usSupportedRefreshRate;
+		uint8_t rr = le16_to_cpu(lvds->usSupportedRefreshRate);
 		/* Get minimum supported refresh rate*/
 		if (SUPPORTED_LCD_REFRESHRATE_30Hz & rr)
 			info->supported_rr.REFRESH_RATE_30HZ = 1;
@@ -1972,32 +1986,34 @@ static enum bp_result get_embedded_panel_info_v1_3(
 	dal_memset(info, 0, sizeof(struct embedded_panel_info));
 
 	/* We need to convert from 10KHz units into KHz units */
-	info->lcd_timing.pixel_clk = lvds->sLCDTiming.usPixClk * 10;
+	info->lcd_timing.pixel_clk =
+		le16_to_cpu(lvds->sLCDTiming.usPixClk) * 10;
 	/* usHActive does not include borders, according to VBIOS team */
 	info->lcd_timing.horizontal_addressable =
-		lvds->sLCDTiming.usHActive;
+		le16_to_cpu(lvds->sLCDTiming.usHActive);
 	/* usHBlanking_Time includes borders, so we should really be subtracting
 	 * borders duing this translation, but LVDS generally*/
 	/* doesn't have borders, so we should be okay leaving this as is for
 	 * now.  May need to revisit if we ever have LVDS with borders*/
 	info->lcd_timing.horizontal_blanking_time =
-		lvds->sLCDTiming.usHBlanking_Time;
+		le16_to_cpu(lvds->sLCDTiming.usHBlanking_Time);
 	/* usVActive does not include borders, according to VBIOS team*/
-	info->lcd_timing.vertical_addressable = lvds->sLCDTiming.usVActive;
+	info->lcd_timing.vertical_addressable =
+		le16_to_cpu(lvds->sLCDTiming.usVActive);
 	/* usVBlanking_Time includes borders, so we should really be subtracting
 	 * borders duing this translation, but LVDS generally*/
 	/* doesn't have borders, so we should be okay leaving this as is for
 	 * now. May need to revisit if we ever have LVDS with borders*/
 	info->lcd_timing.vertical_blanking_time =
-		lvds->sLCDTiming.usVBlanking_Time;
+		le16_to_cpu(lvds->sLCDTiming.usVBlanking_Time);
 	info->lcd_timing.horizontal_sync_offset =
-		lvds->sLCDTiming.usHSyncOffset;
+		le16_to_cpu(lvds->sLCDTiming.usHSyncOffset);
 	info->lcd_timing.horizontal_sync_width =
-		lvds->sLCDTiming.usHSyncWidth;
+		le16_to_cpu(lvds->sLCDTiming.usHSyncWidth);
 	info->lcd_timing.vertical_sync_offset =
-		lvds->sLCDTiming.usVSyncOffset;
+		le16_to_cpu(lvds->sLCDTiming.usVSyncOffset);
 	info->lcd_timing.vertical_sync_width =
-		lvds->sLCDTiming.usVSyncWidth;
+		le16_to_cpu(lvds->sLCDTiming.usVSyncWidth);
 	info->lcd_timing.horizontal_border = lvds->sLCDTiming.ucHBorder;
 	info->lcd_timing.vertical_border = lvds->sLCDTiming.ucVBorder;
 	info->lcd_timing.misc_info.HORIZONTAL_CUT_OFF =
@@ -2133,7 +2149,8 @@ static ATOM_ENCODER_CAP_RECORD *get_encoder_cap_record(
 		return NULL;
 	}
 
-	offset = object->usRecordOffset + bp->object_info_tbl_offset;
+	offset = le16_to_cpu(object->usRecordOffset)
+			+ bp->object_info_tbl_offset;
 
 	for (;;) {
 		header = GET_IMAGE(ATOM_COMMON_RECORD_HEADER, offset);
@@ -2192,7 +2209,8 @@ enum bp_result dal_bios_parser_get_din_connector_info(
 		return BP_RESULT_BADINPUT;
 	}
 
-	offset = object->usRecordOffset + bp->object_info_tbl_offset;
+	offset = le16_to_cpu(object->usRecordOffset)
+				+ bp->object_info_tbl_offset;
 
 	for (;;) {
 		header = GET_IMAGE(ATOM_COMMON_RECORD_HEADER, offset);
@@ -2352,7 +2370,7 @@ static uint32_t get_ss_entry_number_from_ss_info_tbl(
 	if (id_local == SS_ID_UNKNOWN)
 		return number;
 
-	table_size = (tbl->sHeader.usStructureSize -
+	table_size = (le16_to_cpu(tbl->sHeader.usStructureSize) -
 		sizeof(ATOM_COMMON_TABLE_HEADER)) /
 			sizeof(ATOM_SPREAD_SPECTRUM_ASSIGNMENT);
 
@@ -2408,7 +2426,7 @@ static uint32_t get_ss_entry_number_from_internal_ss_info_tbl_v2_1(
 	header_include = GET_IMAGE(ATOM_ASIC_INTERNAL_SS_INFO_V2,
 		DATA_TABLES(ASIC_InternalSS_Info));
 
-	size = (header_include->sHeader.usStructureSize
+	size = (le16_to_cpu(header_include->sHeader.usStructureSize)
 		- sizeof(ATOM_COMMON_TABLE_HEADER))
 				/ sizeof(ATOM_ASIC_SS_ASSIGNMENT_V2);
 
@@ -2443,7 +2461,7 @@ static uint32_t get_ss_entry_number_from_internal_ss_info_tbl_V3_1(
 
 	header_include = GET_IMAGE(ATOM_ASIC_INTERNAL_SS_INFO_V3,
 		DATA_TABLES(ASIC_InternalSS_Info));
-	size = (header_include->sHeader.usStructureSize -
+	size = (le16_to_cpu(header_include->sHeader.usStructureSize) -
 		sizeof(ATOM_COMMON_TABLE_HEADER)) /
 			sizeof(ATOM_ASIC_SS_ASSIGNMENT_V3);
 
@@ -2476,11 +2494,11 @@ static ATOM_FAKE_EDID_PATCH_RECORD *get_faked_edid_record(
 		|| 2 > info->sHeader.ucTableContentRevision)
 		return NULL;
 
-	if (!info->usExtInfoTableOffset)
+	if (!le16_to_cpu(info->usExtInfoTableOffset))
 		return NULL;
 
-	record = GET_IMAGE(uint8_t,
-		DATA_TABLES(LVDS_Info) + info->usExtInfoTableOffset);
+	record = GET_IMAGE(uint8_t, DATA_TABLES(LVDS_Info)
+		+ le16_to_cpu(info->usExtInfoTableOffset));
 
 	if (!record)
 		return NULL;
@@ -2568,13 +2586,13 @@ enum bp_result dal_bios_parser_get_gpio_pin_info(
 		return BP_RESULT_BADBIOSTABLE;
 
 	if (sizeof(ATOM_COMMON_TABLE_HEADER) + sizeof(ATOM_GPIO_PIN_LUT)
-		> header->sHeader.usStructureSize)
+		> le16_to_cpu(header->sHeader.usStructureSize))
 		return BP_RESULT_BADBIOSTABLE;
 
 	if (1 != header->sHeader.ucTableContentRevision)
 		return BP_RESULT_UNSUPPORTED;
 
-	count = (header->sHeader.usStructureSize
+	count = (le16_to_cpu(header->sHeader.usStructureSize)
 		- sizeof(ATOM_COMMON_TABLE_HEADER))
 		/ sizeof(ATOM_GPIO_PIN_ASSIGNMENT);
 	for (i = 0; i < count; ++i) {
@@ -2582,7 +2600,7 @@ enum bp_result dal_bios_parser_get_gpio_pin_info(
 			continue;
 
 		info->offset =
-			header->asGPIO_Pin[i].usGpioPin_AIndex;
+			(uint32_t) le16_to_cpu(header->asGPIO_Pin[i].usGpioPin_AIndex);
 		info->offset_y = info->offset + 2;
 		info->offset_en = info->offset + 1;
 		info->offset_mask = info->offset - 1;
@@ -2635,11 +2653,11 @@ enum bp_result dal_bios_parser_enum_embedded_panel_patch_mode(
 		|| 2 > info->sHeader.ucTableContentRevision)
 		return BP_RESULT_UNSUPPORTED;
 
-	if (!info->usExtInfoTableOffset)
+	if (!le16_to_cpu(info->usExtInfoTableOffset))
 		return BP_RESULT_UNSUPPORTED;
 
 	record = GET_IMAGE(uint8_t, list_of_tables->LVDS_Info +
-		info->usExtInfoTableOffset);
+		le16_to_cpu(info->usExtInfoTableOffset));
 
 	if (!record)
 		return BP_RESULT_BADBIOSTABLE;
@@ -2664,8 +2682,8 @@ enum bp_result dal_bios_parser_enum_embedded_panel_patch_mode(
 
 	mode_record = (ATOM_PATCH_RECORD_MODE *) record;
 
-	mode->width = mode_record->usHDisp;
-	mode->height = mode_record->usVDisp;
+	mode->width = le16_to_cpu(mode_record->usHDisp);
+	mode->height = le16_to_cpu(mode_record->usVDisp);
 
 	return BP_RESULT_OK;
 }
@@ -2689,14 +2707,14 @@ static enum bp_result get_gpio_i2c_info(struct bios_parser *bp,
 		return BP_RESULT_BADBIOSTABLE;
 
 	if (sizeof(ATOM_COMMON_TABLE_HEADER) + sizeof(ATOM_GPIO_I2C_ASSIGMENT)
-		> header->sHeader.usStructureSize)
+		> le16_to_cpu(header->sHeader.usStructureSize))
 		return BP_RESULT_BADBIOSTABLE;
 
 	if (1 != header->sHeader.ucTableContentRevision)
 		return BP_RESULT_UNSUPPORTED;
 
 	/* get data count */
-	count = (header->sHeader.usStructureSize
+	count = (le16_to_cpu(header->sHeader.usStructureSize)
 		- sizeof(ATOM_COMMON_TABLE_HEADER))
 		/ sizeof(ATOM_GPIO_I2C_ASSIGMENT);
 	if (count < record->sucI2cId.bfI2C_LineMux)
@@ -2709,21 +2727,21 @@ static enum bp_result get_gpio_i2c_info(struct bios_parser *bp,
 	info->i2c_slave_address = record->ucI2CAddr;
 
 	info->gpio_info.clk_mask_register_index =
-		header->asGPIO_Info[info->i2c_line].usClkMaskRegisterIndex;
+		le16_to_cpu(header->asGPIO_Info[info->i2c_line].usClkMaskRegisterIndex);
 	info->gpio_info.clk_en_register_index =
-		header->asGPIO_Info[info->i2c_line].usClkEnRegisterIndex;
+		le16_to_cpu(header->asGPIO_Info[info->i2c_line].usClkEnRegisterIndex);
 	info->gpio_info.clk_y_register_index =
-		header->asGPIO_Info[info->i2c_line].usClkY_RegisterIndex;
+		le16_to_cpu(header->asGPIO_Info[info->i2c_line].usClkY_RegisterIndex);
 	info->gpio_info.clk_a_register_index =
-		header->asGPIO_Info[info->i2c_line].usClkA_RegisterIndex;
+		le16_to_cpu(header->asGPIO_Info[info->i2c_line].usClkA_RegisterIndex);
 	info->gpio_info.data_mask_register_index =
-		header->asGPIO_Info[info->i2c_line].usDataMaskRegisterIndex;
+		le16_to_cpu(header->asGPIO_Info[info->i2c_line].usDataMaskRegisterIndex);
 	info->gpio_info.data_en_register_index =
-		header->asGPIO_Info[info->i2c_line].usDataEnRegisterIndex;
+		le16_to_cpu(header->asGPIO_Info[info->i2c_line].usDataEnRegisterIndex);
 	info->gpio_info.data_y_register_index =
-		header->asGPIO_Info[info->i2c_line].usDataY_RegisterIndex;
+		le16_to_cpu(header->asGPIO_Info[info->i2c_line].usDataY_RegisterIndex);
 	info->gpio_info.data_a_register_index =
-		header->asGPIO_Info[info->i2c_line].usDataA_RegisterIndex;
+		le16_to_cpu(header->asGPIO_Info[info->i2c_line].usDataA_RegisterIndex);
 
 	info->gpio_info.clk_mask_shift =
 		header->asGPIO_Info[info->i2c_line].ucClkMaskShift;
@@ -2754,21 +2772,21 @@ static ATOM_OBJECT *get_bios_object(struct bios_parser *bp,
 
 	switch (id.type) {
 	case OBJECT_TYPE_ENCODER:
-		offset = bp->object_info_tbl.v1_1->usEncoderObjectTableOffset;
+		offset = le16_to_cpu(bp->object_info_tbl.v1_1->usEncoderObjectTableOffset);
 		break;
 
 	case OBJECT_TYPE_CONNECTOR:
-		offset = bp->object_info_tbl.v1_1->usConnectorObjectTableOffset;
+		offset = le16_to_cpu(bp->object_info_tbl.v1_1->usConnectorObjectTableOffset);
 		break;
 
 	case OBJECT_TYPE_ROUTER:
-		offset = bp->object_info_tbl.v1_1->usRouterObjectTableOffset;
+		offset = le16_to_cpu(bp->object_info_tbl.v1_1->usRouterObjectTableOffset);
 		break;
 
 	case OBJECT_TYPE_GENERIC:
 		if (bp->object_info_tbl.revision.minor < 3)
 			return NULL;
-		offset = bp->object_info_tbl.v1_3->usMiscObjectTableOffset;
+		offset = le16_to_cpu(bp->object_info_tbl.v1_3->usMiscObjectTableOffset);
 		break;
 
 	default:
@@ -2784,7 +2802,7 @@ static ATOM_OBJECT *get_bios_object(struct bios_parser *bp,
 	for (i = 0; i < tbl->ucNumberOfObjects; i++)
 		if (dal_graphics_object_id_is_equal(id,
 			object_id_from_bios_object_id(
-				tbl->asObjects[i].usObjectID)))
+				le16_to_cpu(tbl->asObjects[i].usObjectID))))
 			return &tbl->asObjects[i];
 
 	return NULL;
@@ -2801,7 +2819,8 @@ static uint32_t get_dest_obj_list(struct bios_parser *bp,
 		return 0;
 	}
 
-	offset = object->usSrcDstTableOffset + bp->object_info_tbl_offset;
+	offset = le16_to_cpu(object->usSrcDstTableOffset)
+				+ bp->object_info_tbl_offset;
 
 	number = GET_IMAGE(uint8_t, offset);
 	if (!number)
@@ -2835,7 +2854,8 @@ static uint32_t get_src_obj_list(struct bios_parser *bp, ATOM_OBJECT *object,
 		return 0;
 	}
 
-	offset = object->usSrcDstTableOffset + bp->object_info_tbl_offset;
+	offset = le16_to_cpu(object->usSrcDstTableOffset)
+			+ bp->object_info_tbl_offset;
 
 	number = GET_IMAGE(uint8_t, offset);
 	if (!number)
@@ -2862,7 +2882,8 @@ static uint32_t get_dst_number_from_object(struct bios_parser *bp,
 		return 0;
 	}
 
-	offset = object->usSrcDstTableOffset + bp->object_info_tbl_offset;
+	offset = le16_to_cpu(object->usSrcDstTableOffset)
+			+ bp->object_info_tbl_offset;
 
 	number = GET_IMAGE(uint8_t, offset);
 	if (!number)
@@ -3649,19 +3670,20 @@ static bool get_patched_device_tag(
 	/* Use fallback behaviour if not supported. */
 	if (!bp->remap_device_tags) {
 		device_tag->ulACPIDeviceEnum =
-			ext_display_path->usDeviceACPIEnum;
-		device_tag->usDeviceID = ext_display_path->usDeviceTag;
+			cpu_to_le32((uint32_t) le16_to_cpu(ext_display_path->usDeviceACPIEnum));
+		device_tag->usDeviceID =
+			cpu_to_le16(le16_to_cpu(ext_display_path->usDeviceTag));
 		return true;
 	}
 
 	/* Find the first unused in the same group. */
-	dev_id = enum_first_device_id(ext_display_path->usDeviceTag);
+	dev_id = enum_first_device_id(le16_to_cpu(ext_display_path->usDeviceTag));
 	while (dev_id != 0) {
 		/* Assign this device ID if supported. */
 		if ((device_support & dev_id) != 0) {
 			device_tag->ulACPIDeviceEnum =
-				ext_display_path->usDeviceACPIEnum;
-			device_tag->usDeviceID = (USHORT) dev_id;
+				cpu_to_le32((uint32_t) le16_to_cpu(ext_display_path->usDeviceACPIEnum));
+			device_tag->usDeviceID = cpu_to_le16((USHORT) dev_id);
 			return true;
 		}
 
@@ -3693,12 +3715,12 @@ static void add_device_tag_from_ext_display_path(
 		dal_bios_parser_get_device_tag_record(
 			bp, object, &device_tag_record);
 
-	if ((ext_display_path->usDeviceTag != CONNECTOR_OBJECT_ID_NONE)
+	if ((le16_to_cpu(ext_display_path->usDeviceTag) != CONNECTOR_OBJECT_ID_NONE)
 		&& (result == BP_RESULT_OK)) {
 		uint8_t index;
 
 		if ((device_tag_record->ucNumberOfDevice == 1) &&
-			(device_tag_record->asDeviceTag[0].usDeviceID == 0)) {
+			(le16_to_cpu(device_tag_record->asDeviceTag[0].usDeviceID) == 0)) {
 			/*Workaround bug in current VBIOS releases where
 			 * ucNumberOfDevice = 1 but there is no actual device
 			 * tag data. This w/a is temporary until the updated
@@ -3717,7 +3739,7 @@ static void add_device_tag_from_ext_display_path(
 			device_tag)) {
 			/* Update cached device support to remove assigned ID.
 			 */
-			*device_support &= ~device_tag->usDeviceID;
+			*device_support &= ~le16_to_cpu(device_tag->usDeviceID);
 			device_tag_record->ucNumberOfDevice++;
 		}
 	}
@@ -3746,8 +3768,8 @@ static EXT_DISPLAY_PATH *get_ext_display_path_entry(
 
 	ext_display_path = &config_table->sPath[ext_display_path_index];
 
-	if (ext_display_path->usDeviceConnector == INVALID_CONNECTOR)
-		ext_display_path->usDeviceConnector = 0;
+	if (le16_to_cpu(ext_display_path->usDeviceConnector) == INVALID_CONNECTOR)
+		ext_display_path->usDeviceConnector = cpu_to_le16(0);
 
 	return ext_display_path;
 }
@@ -3771,7 +3793,8 @@ static ATOM_CONNECTOR_AUXDDC_LUT_RECORD *get_ext_connector_aux_ddc_lut_record(
 		return NULL;
 	}
 
-	offset = object->usRecordOffset + bp->object_info_tbl_offset;
+	offset = le16_to_cpu(object->usRecordOffset)
+			+ bp->object_info_tbl_offset;
 
 	for (;;) {
 		header = GET_IMAGE(ATOM_COMMON_RECORD_HEADER, offset);
@@ -3814,7 +3837,8 @@ static ATOM_CONNECTOR_HPDPIN_LUT_RECORD *get_ext_connector_hpd_pin_lut_record(
 		return NULL;
 	}
 
-	offset = object->usRecordOffset + bp->object_info_tbl_offset;
+	offset = le16_to_cpu(object->usRecordOffset)
+			+ bp->object_info_tbl_offset;
 
 	for (;;) {
 		header = GET_IMAGE(ATOM_COMMON_RECORD_HEADER, offset);
@@ -3872,7 +3896,7 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 			OBJECT_TYPE_GENERIC);
 	ATOM_CONNECTOR_DEVICE_TAG_RECORD *dev_tag_record;
 	uint32_t cached_device_support =
-		bp->object_info_tbl.v1_1->usDeviceSupport;
+		le16_to_cpu(bp->object_info_tbl.v1_1->usDeviceSupport);
 
 	uint32_t dst_number;
 	uint16_t *dst_object_id_list;
@@ -3885,7 +3909,7 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 		sizeof(ATOM_EXTERNAL_DISPLAY_CONNECTION_INFO));
 
 	connector_tbl_offset = bp->object_info_tbl_offset
-		+ bp->object_info_tbl.v1_1->usConnectorObjectTableOffset;
+		+ le16_to_cpu(bp->object_info_tbl.v1_1->usConnectorObjectTableOffset);
 	connector_tbl = GET_IMAGE(ATOM_OBJECT_TABLE, connector_tbl_offset);
 
 	/* Read Connector info table from EEPROM through i2c */
@@ -3898,11 +3922,11 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 			for (i = 0; i < connector_tbl->ucNumberOfObjects; ++i) {
 				object = &connector_tbl->asObjects[i];
 				object_id = object_id_from_bios_object_id(
-					object->usObjectID);
+					le16_to_cpu(object->usObjectID));
 				if (OBJECT_TYPE_CONNECTOR == object_id.type &&
 					CONNECTOR_ID_CROSSFIRE
 					!= object_id.id)
-					object->usObjectID = 0;
+					object->usObjectID = cpu_to_le16(0);
 			}
 
 			return BP_RESULT_OK;
@@ -3931,7 +3955,7 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 			/* Remove support for all non-MXM connectors. */
 			object = &connector_tbl->asObjects[i];
 			object_id = object_id_from_bios_object_id(
-				object->usObjectID);
+				le16_to_cpu(object->usObjectID));
 			if ((OBJECT_TYPE_CONNECTOR != object_id.type) ||
 				(CONNECTOR_ID_MXM == object_id.id))
 				continue;
@@ -3945,7 +3969,7 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 				ATOM_CONNECTOR_DEVICE_TAG *device_tag =
 					&dev_tag_record->asDeviceTag[j];
 				cached_device_support &=
-					~device_tag->usDeviceID;
+					~le16_to_cpu(device_tag->usDeviceID);
 			}
 		}
 	}
@@ -3956,7 +3980,7 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 		uint32_t j;
 
 		object = &connector_tbl->asObjects[i];
-		object_id = object_id_from_bios_object_id(object->usObjectID);
+		object_id = object_id_from_bios_object_id(le16_to_cpu(object->usObjectID));
 		if ((OBJECT_TYPE_CONNECTOR != object_id.type) ||
 			(CONNECTOR_ID_MXM != object_id.id))
 			continue;
@@ -3965,12 +3989,13 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 		 * id. */
 		ext_display_path = get_ext_display_path_entry(
 			&ext_display_connection_info_tbl,
-			object->usObjectID);
+			le16_to_cpu(object->usObjectID));
 		if (!ext_display_path)
 			return BP_RESULT_FAILURE;
 
 		/* Patch device connector ID */
-		object->usObjectID = ext_display_path->usDeviceConnector;
+		object->usObjectID =
+			cpu_to_le16(le16_to_cpu(ext_display_path->usDeviceConnector));
 
 		/* Patch device tag, ulACPIDeviceEnum. */
 		add_device_tag_from_ext_display_path(
@@ -4021,7 +4046,7 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 
 			next_object = &connector_tbl->asObjects[j];
 			next_object_id = object_id_from_bios_object_id(
-				next_object->usObjectID);
+				le16_to_cpu(next_object->usObjectID));
 
 			if ((OBJECT_TYPE_CONNECTOR != next_object_id.type) &&
 				(CONNECTOR_ID_MXM == next_object_id.id))
@@ -4029,17 +4054,17 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 
 			next_ext_display_path = get_ext_display_path_entry(
 				&ext_display_connection_info_tbl,
-				next_object->usObjectID);
+				le16_to_cpu(next_object->usObjectID));
 
 			if (next_ext_display_path == NULL)
 				return BP_RESULT_FAILURE;
 
 			/* Merge if using same connector. */
-			if ((next_ext_display_path->usDeviceConnector ==
-				ext_display_path->usDeviceConnector) &&
-				(ext_display_path->usDeviceConnector != 0)) {
+			if ((le16_to_cpu(next_ext_display_path->usDeviceConnector) ==
+				le16_to_cpu(ext_display_path->usDeviceConnector)) &&
+				(le16_to_cpu(ext_display_path->usDeviceConnector) != 0)) {
 				/* Clear duplicate connector from table. */
-				next_object->usObjectID = 0;
+				next_object->usObjectID = cpu_to_le16(0);
 				add_device_tag_from_ext_display_path(
 					bp,
 					object,
@@ -4054,7 +4079,7 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 	 *  display connection info table */
 
 	encoder_table_offset = bp->object_info_tbl_offset
-		+ bp->object_info_tbl.v1_1->usEncoderObjectTableOffset;
+		+ le16_to_cpu(bp->object_info_tbl.v1_1->usEncoderObjectTableOffset);
 	encoder_table = GET_IMAGE(ATOM_OBJECT_TABLE, encoder_table_offset);
 
 	for (i = 0; i < encoder_table->ucNumberOfObjects; i++) {
@@ -4083,7 +4108,7 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 				return BP_RESULT_FAILURE;
 
 			dst_object_id_list[j] =
-				ext_display_path->usDeviceConnector;
+				le16_to_cpu(ext_display_path->usDeviceConnector);
 		}
 	}
 
@@ -4112,7 +4137,7 @@ static void process_ext_display_connection_info(struct bios_parser *bp)
 	uint32_t i = 0;
 
 	connector_tbl_offset = bp->object_info_tbl_offset +
-		bp->object_info_tbl.v1_1->usConnectorObjectTableOffset;
+		le16_to_cpu(bp->object_info_tbl.v1_1->usConnectorObjectTableOffset);
 	connector_tbl = GET_IMAGE(ATOM_OBJECT_TABLE, connector_tbl_offset);
 
 	/* Look for MXM connectors to determine whether we need patch the VBIOS
@@ -4120,7 +4145,7 @@ static void process_ext_display_connection_info(struct bios_parser *bp)
 	 * need to compact connector table. */
 	for (i = 0; i < connector_tbl->ucNumberOfObjects; i++) {
 		object = &connector_tbl->asObjects[i];
-		object_id = object_id_from_bios_object_id(object->usObjectID);
+		object_id = object_id_from_bios_object_id(le16_to_cpu(object->usObjectID));
 
 		if ((OBJECT_TYPE_CONNECTOR == object_id.type) &&
 			(CONNECTOR_ID_MXM == object_id.id)) {
@@ -4172,7 +4197,7 @@ static void process_ext_display_connection_info(struct bios_parser *bp)
 		for (i = 0; i < connector_tbl->ucNumberOfObjects; i++) {
 			object = &connector_tbl->asObjects[i];
 			object_id = object_id_from_bios_object_id(
-				object->usObjectID);
+				le16_to_cpu(object->usObjectID));
 
 			if (OBJECT_TYPE_CONNECTOR != object_id.type)
 				continue;
@@ -4351,22 +4376,26 @@ static enum bp_result get_integrated_info_v8(
 		bp->master_data_tbl->ListOfDataTables.IntegratedSystemInfo);
 
 	if (info_v8 != NULL) {
-		info->boot_up_engine_clock = info_v8->ulBootUpEngineClock * 10;
-		info->dentist_vco_freq = info_v8->ulDentistVCOFreq * 10;
-		info->boot_up_uma_clock = info_v8->ulBootUpUMAClock * 10;
+		info->boot_up_engine_clock =
+			le32_to_cpu(info_v8->ulBootUpEngineClock) * 10;
+		info->dentist_vco_freq =
+			le32_to_cpu(info_v8->ulDentistVCOFreq) * 10;
+		info->boot_up_uma_clock =
+			le32_to_cpu(info_v8->ulBootUpUMAClock) * 10;
 
 		for (i = 0; i < NUMBER_OF_DISP_CLK_VOLTAGE; ++i) {
 			/* Convert [10KHz] into [KHz] */
 			info->disp_clk_voltage[i].max_supported_clk =
-					info_v8->sDISPCLK_Voltage[i].
-					ulMaximumSupportedCLK * 10;
+					le32_to_cpu(info_v8->sDISPCLK_Voltage[i].
+					ulMaximumSupportedCLK) * 10;
 			info->disp_clk_voltage[i].voltage_index =
-				info_v8->sDISPCLK_Voltage[i].ulVoltageIndex;
+				le32_to_cpu(info_v8->sDISPCLK_Voltage[i].ulVoltageIndex);
 		}
 
 		info->boot_up_req_display_vector =
-				info_v8->ulBootUpReqDisplayVector;
-		info->gpu_cap_info = info_v8->ulGPUCapInfo;
+			le32_to_cpu(info_v8->ulBootUpReqDisplayVector);
+		info->gpu_cap_info =
+			le32_to_cpu(info_v8->ulGPUCapInfo);
 
 		/*
 		 * system_config: Bit[0] = 0 : PCIE power gating disabled
@@ -4376,37 +4405,45 @@ static enum bp_result get_integrated_info_v8(
 		 *                Bit[2] = 0 : DDR-PLL power down disabled
 		 *                       = 1 : DDR-PLL power down enabled
 		 */
-		info->system_config = info_v8->ulSystemConfig;
-		info->cpu_cap_info = info_v8->ulCPUCapInfo;
-		info->boot_up_nb_voltage = info_v8->usBootUpNBVoltage;
+		info->system_config = le32_to_cpu(info_v8->ulSystemConfig);
+		info->cpu_cap_info = le32_to_cpu(info_v8->ulCPUCapInfo);
+		info->boot_up_nb_voltage =
+				le16_to_cpu(info_v8->usBootUpNBVoltage);
 		info->ext_disp_conn_info_offset =
-				info_v8->usExtDispConnInfoOffset;
+				le16_to_cpu(info_v8->usExtDispConnInfoOffset);
 		info->memory_type = info_v8->ucMemoryType;
 		info->ma_channel_number = info_v8->ucUMAChannelNumber;
-		info->gmc_restore_reset_time = info_v8->ulGMCRestoreResetTime;
+		info->gmc_restore_reset_time =
+				le32_to_cpu(info_v8->ulGMCRestoreResetTime);
 
-		info->minimum_n_clk = info_v8->ulNbpStateNClkFreq[0];
+		info->minimum_n_clk =
+				le32_to_cpu(info_v8->ulNbpStateNClkFreq[0]);
 		for (i = 1; i < 4; ++i)
 			info->minimum_n_clk =
-			info->minimum_n_clk < info_v8->ulNbpStateNClkFreq[i] ?
-			info->minimum_n_clk : info_v8->ulNbpStateNClkFreq[i];
+			info->minimum_n_clk < le32_to_cpu(info_v8->ulNbpStateNClkFreq[i]) ?
+			info->minimum_n_clk : le32_to_cpu(info_v8->ulNbpStateNClkFreq[i]);
 
-		info->idle_n_clk = info_v8->ulIdleNClk;
-		info->ddr_dll_power_up_time = info_v8->ulDDR_DLL_PowerUpTime;
-		info->ddr_pll_power_up_time = info_v8->ulDDR_PLL_PowerUpTime;
-		info->pcie_clk_ss_type = info_v8->usPCIEClkSSType;
-		info->lvds_ss_percentage = info_v8->usLvdsSSPercentage;
+		info->idle_n_clk = le32_to_cpu(info_v8->ulIdleNClk);
+		info->ddr_dll_power_up_time =
+				le32_to_cpu(info_v8->ulDDR_DLL_PowerUpTime);
+		info->ddr_pll_power_up_time =
+				le32_to_cpu(info_v8->ulDDR_PLL_PowerUpTime);
+		info->pcie_clk_ss_type = le16_to_cpu(info_v8->usPCIEClkSSType);
+		info->lvds_ss_percentage =
+				le16_to_cpu(info_v8->usLvdsSSPercentage);
 		info->lvds_sspread_rate_in_10hz =
-				info_v8->usLvdsSSpreadRateIn10Hz;
-		info->hdmi_ss_percentage = info_v8->usHDMISSPercentage;
+				le16_to_cpu(info_v8->usLvdsSSpreadRateIn10Hz);
+		info->hdmi_ss_percentage =
+				le16_to_cpu(info_v8->usHDMISSPercentage);
 		info->hdmi_sspread_rate_in_10hz =
-				info_v8->usHDMISSpreadRateIn10Hz;
-		info->dvi_ss_percentage = info_v8->usDVISSPercentage;
+				le16_to_cpu(info_v8->usHDMISSpreadRateIn10Hz);
+		info->dvi_ss_percentage =
+				le16_to_cpu(info_v8->usDVISSPercentage);
 		info->dvi_sspread_rate_in_10_hz =
-				info_v8->usDVISSpreadRateIn10Hz;
+				le16_to_cpu(info_v8->usDVISSpreadRateIn10Hz);
 
 		info->max_lvds_pclk_freq_in_single_link =
-				info_v8->usMaxLVDSPclkFreqInSingleLink;
+				le16_to_cpu(info_v8->usMaxLVDSPclkFreqInSingleLink);
 		info->lvds_misc = info_v8->ucLvdsMisc;
 		info->lvds_pwr_on_seq_dig_on_to_de_in_4ms =
 				info_v8->ucLVDSPwrOnSeqDIGONtoDE_in4Ms;
@@ -4423,16 +4460,16 @@ static enum bp_result get_integrated_info_v8(
 		info->lvds_off_to_on_delay_in_4ms =
 				info_v8->ucLVDSOffToOnDelay_in4Ms;
 		info->lvds_bit_depth_control_val =
-				info_v8->ulLCDBitDepthControlVal;
+				le32_to_cpu(info_v8->ulLCDBitDepthControlVal);
 
 		for (i = 0; i < NUMBER_OF_AVAILABLE_SCLK; ++i) {
 			/* Convert [10KHz] into [KHz] */
 			info->avail_s_clk[i].supported_s_clk =
-				info_v8->sAvail_SCLK[i].ulSupportedSCLK * 10;
+				le32_to_cpu(info_v8->sAvail_SCLK[i].ulSupportedSCLK) * 10;
 			info->avail_s_clk[i].voltage_index =
-					info_v8->sAvail_SCLK[i].usVoltageIndex;
+				le16_to_cpu(info_v8->sAvail_SCLK[i].usVoltageIndex);
 			info->avail_s_clk[i].voltage_id =
-					info_v8->sAvail_SCLK[i].usVoltageID;
+				le16_to_cpu(info_v8->sAvail_SCLK[i].usVoltageID);
 		}
 
 		for (i = 0; i < NUMBER_OF_UCHAR_FOR_GUID; ++i) {
@@ -4443,16 +4480,16 @@ static enum bp_result get_integrated_info_v8(
 		for (i = 0; i < MAX_NUMBER_OF_EXT_DISPLAY_PATH; ++i) {
 			info->ext_disp_conn_info.path[i].device_connector_id =
 					object_id_from_bios_object_id(
-			info_v8->sExtDispConnInfo.sPath[i].usDeviceConnector);
+			le16_to_cpu(info_v8->sExtDispConnInfo.sPath[i].usDeviceConnector));
 
 			info->ext_disp_conn_info.path[i].ext_encoder_obj_id =
 					object_id_from_bios_object_id(
-			info_v8->sExtDispConnInfo.sPath[i].usExtEncoderObjId);
+			le16_to_cpu(info_v8->sExtDispConnInfo.sPath[i].usExtEncoderObjId));
 
 			info->ext_disp_conn_info.path[i].device_tag =
-				info_v8->sExtDispConnInfo.sPath[i].usDeviceTag;
+				le16_to_cpu(info_v8->sExtDispConnInfo.sPath[i].usDeviceTag);
 			info->ext_disp_conn_info.path[i].device_acpi_enum =
-			info_v8->sExtDispConnInfo.sPath[i].usDeviceACPIEnum;
+				le16_to_cpu(info_v8->sExtDispConnInfo.sPath[i].usDeviceACPIEnum);
 			info->ext_disp_conn_info.path[i].ext_aux_ddc_lut_index =
 			info_v8->sExtDispConnInfo.sPath[i].ucExtAUXDDCLutIndex;
 			info->ext_disp_conn_info.path[i].ext_hpd_pin_lut_index =
@@ -4495,22 +4532,24 @@ static enum bp_result get_integrated_info_v9(
 		bp->master_data_tbl->ListOfDataTables.IntegratedSystemInfo);
 
 	if (info_v9 != NULL) {
-		info->boot_up_engine_clock = info_v9->ulBootUpEngineClock * 10;
-		info->dentist_vco_freq = info_v9->ulDentistVCOFreq * 10;
-		info->boot_up_uma_clock = info_v9->ulBootUpUMAClock * 10;
+		info->boot_up_engine_clock =
+				le32_to_cpu(info_v9->ulBootUpEngineClock) * 10;
+		info->dentist_vco_freq =
+				le32_to_cpu(info_v9->ulDentistVCOFreq) * 10;
+		info->boot_up_uma_clock =
+				le32_to_cpu(info_v9->ulBootUpUMAClock) * 10;
 
 		for (i = 0; i < NUMBER_OF_DISP_CLK_VOLTAGE; ++i) {
 			/* Convert [10KHz] into [KHz] */
 			info->disp_clk_voltage[i].max_supported_clk =
-					info_v9->sDISPCLK_Voltage[i].
-					ulMaximumSupportedCLK * 10;
+				le32_to_cpu(info_v9->sDISPCLK_Voltage[i].ulMaximumSupportedCLK) * 10;
 			info->disp_clk_voltage[i].voltage_index =
-				info_v9->sDISPCLK_Voltage[i].ulVoltageIndex;
+				le32_to_cpu(info_v9->sDISPCLK_Voltage[i].ulVoltageIndex);
 		}
 
 		info->boot_up_req_display_vector =
-				info_v9->ulBootUpReqDisplayVector;
-		info->gpu_cap_info = info_v9->ulGPUCapInfo;
+				le32_to_cpu(info_v9->ulBootUpReqDisplayVector);
+		info->gpu_cap_info = le32_to_cpu(info_v9->ulGPUCapInfo);
 
 		/*
 		 * system_config: Bit[0] = 0 : PCIE power gating disabled
@@ -4520,37 +4559,45 @@ static enum bp_result get_integrated_info_v9(
 		 *                Bit[2] = 0 : DDR-PLL power down disabled
 		 *                       = 1 : DDR-PLL power down enabled
 		 */
-		info->system_config = info_v9->ulSystemConfig;
-		info->cpu_cap_info = info_v9->ulCPUCapInfo;
-		info->boot_up_nb_voltage = info_v9->usBootUpNBVoltage;
+		info->system_config = le32_to_cpu(info_v9->ulSystemConfig);
+		info->cpu_cap_info = le32_to_cpu(info_v9->ulCPUCapInfo);
+		info->boot_up_nb_voltage =
+				le16_to_cpu(info_v9->usBootUpNBVoltage);
 		info->ext_disp_conn_info_offset =
-				info_v9->usExtDispConnInfoOffset;
+				le16_to_cpu(info_v9->usExtDispConnInfoOffset);
 		info->memory_type = info_v9->ucMemoryType;
 		info->ma_channel_number = info_v9->ucUMAChannelNumber;
-		info->gmc_restore_reset_time = info_v9->ulGMCRestoreResetTime;
+		info->gmc_restore_reset_time =
+				le32_to_cpu(info_v9->ulGMCRestoreResetTime);
 
-		info->minimum_n_clk = info_v9->ulNbpStateNClkFreq[0];
+		info->minimum_n_clk =
+				le32_to_cpu(info_v9->ulNbpStateNClkFreq[0]);
 		for (i = 1; i < 4; ++i)
 			info->minimum_n_clk =
-			info->minimum_n_clk < info_v9->ulNbpStateNClkFreq[i] ?
-			info->minimum_n_clk : info_v9->ulNbpStateNClkFreq[i];
+			info->minimum_n_clk < le32_to_cpu(info_v9->ulNbpStateNClkFreq[i]) ?
+			info->minimum_n_clk : le32_to_cpu(info_v9->ulNbpStateNClkFreq[i]);
 
-		info->idle_n_clk = info_v9->ulIdleNClk;
-		info->ddr_dll_power_up_time = info_v9->ulDDR_DLL_PowerUpTime;
-		info->ddr_pll_power_up_time = info_v9->ulDDR_PLL_PowerUpTime;
-		info->pcie_clk_ss_type = info_v9->usPCIEClkSSType;
-		info->lvds_ss_percentage = info_v9->usLvdsSSPercentage;
+		info->idle_n_clk = le32_to_cpu(info_v9->ulIdleNClk);
+		info->ddr_dll_power_up_time =
+				le32_to_cpu(info_v9->ulDDR_DLL_PowerUpTime);
+		info->ddr_pll_power_up_time =
+				le32_to_cpu(info_v9->ulDDR_PLL_PowerUpTime);
+		info->pcie_clk_ss_type = le16_to_cpu(info_v9->usPCIEClkSSType);
+		info->lvds_ss_percentage =
+				le16_to_cpu(info_v9->usLvdsSSPercentage);
 		info->lvds_sspread_rate_in_10hz =
-				info_v9->usLvdsSSpreadRateIn10Hz;
-		info->hdmi_ss_percentage = info_v9->usHDMISSPercentage;
+				le16_to_cpu(info_v9->usLvdsSSpreadRateIn10Hz);
+		info->hdmi_ss_percentage =
+				le16_to_cpu(info_v9->usHDMISSPercentage);
 		info->hdmi_sspread_rate_in_10hz =
-				info_v9->usHDMISSpreadRateIn10Hz;
-		info->dvi_ss_percentage = info_v9->usDVISSPercentage;
+				le16_to_cpu(info_v9->usHDMISSpreadRateIn10Hz);
+		info->dvi_ss_percentage =
+				le16_to_cpu(info_v9->usDVISSPercentage);
 		info->dvi_sspread_rate_in_10_hz =
-				info_v9->usDVISSpreadRateIn10Hz;
+				le16_to_cpu(info_v9->usDVISSpreadRateIn10Hz);
 
 		info->max_lvds_pclk_freq_in_single_link =
-				info_v9->usMaxLVDSPclkFreqInSingleLink;
+				le16_to_cpu(info_v9->usMaxLVDSPclkFreqInSingleLink);
 		info->lvds_misc = info_v9->ucLvdsMisc;
 		info->lvds_pwr_on_seq_dig_on_to_de_in_4ms =
 				info_v9->ucLVDSPwrOnSeqDIGONtoDE_in4Ms;
@@ -4567,16 +4614,16 @@ static enum bp_result get_integrated_info_v9(
 		info->lvds_off_to_on_delay_in_4ms =
 				info_v9->ucLVDSOffToOnDelay_in4Ms;
 		info->lvds_bit_depth_control_val =
-				info_v9->ulLCDBitDepthControlVal;
+				le32_to_cpu(info_v9->ulLCDBitDepthControlVal);
 
 		for (i = 0; i < NUMBER_OF_AVAILABLE_SCLK; ++i) {
 			/* Convert [10KHz] into [KHz] */
 			info->avail_s_clk[i].supported_s_clk =
-				info_v9->sAvail_SCLK[i].ulSupportedSCLK * 10;
+				le32_to_cpu(info_v9->sAvail_SCLK[i].ulSupportedSCLK) * 10;
 			info->avail_s_clk[i].voltage_index =
-					info_v9->sAvail_SCLK[i].usVoltageIndex;
+				le16_to_cpu(info_v9->sAvail_SCLK[i].usVoltageIndex);
 			info->avail_s_clk[i].voltage_id =
-					info_v9->sAvail_SCLK[i].usVoltageID;
+				le16_to_cpu(info_v9->sAvail_SCLK[i].usVoltageID);
 		}
 
 		for (i = 0; i < NUMBER_OF_UCHAR_FOR_GUID; ++i) {
@@ -4587,16 +4634,16 @@ static enum bp_result get_integrated_info_v9(
 		for (i = 0; i < MAX_NUMBER_OF_EXT_DISPLAY_PATH; ++i) {
 			info->ext_disp_conn_info.path[i].device_connector_id =
 					object_id_from_bios_object_id(
-			info_v9->sExtDispConnInfo.sPath[i].usDeviceConnector);
+			le16_to_cpu(info_v9->sExtDispConnInfo.sPath[i].usDeviceConnector));
 
 			info->ext_disp_conn_info.path[i].ext_encoder_obj_id =
 					object_id_from_bios_object_id(
-			info_v9->sExtDispConnInfo.sPath[i].usExtEncoderObjId);
+			le16_to_cpu(info_v9->sExtDispConnInfo.sPath[i].usExtEncoderObjId));
 
 			info->ext_disp_conn_info.path[i].device_tag =
-				info_v9->sExtDispConnInfo.sPath[i].usDeviceTag;
+				le16_to_cpu(info_v9->sExtDispConnInfo.sPath[i].usDeviceTag);
 			info->ext_disp_conn_info.path[i].device_acpi_enum =
-			info_v9->sExtDispConnInfo.sPath[i].usDeviceACPIEnum;
+				le16_to_cpu(info_v9->sExtDispConnInfo.sPath[i].usDeviceACPIEnum);
 			info->ext_disp_conn_info.path[i].ext_aux_ddc_lut_index =
 			info_v9->sExtDispConnInfo.sPath[i].ucExtAUXDDCLutIndex;
 			info->ext_disp_conn_info.path[i].ext_hpd_pin_lut_index =

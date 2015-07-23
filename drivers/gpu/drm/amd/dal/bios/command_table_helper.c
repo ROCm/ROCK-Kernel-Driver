@@ -196,7 +196,7 @@ void dal_cmd_table_helper_assign_control_parameter(
 
 	/* We need to convert from KHz units into 10KHz units */
 	ctrl_param->ucAction = h->encoder_action_to_atom(control->action);
-	ctrl_param->usPixelClock = (uint16_t)(control->pixel_clock / 10);
+	ctrl_param->usPixelClock = cpu_to_le16((uint16_t)(control->pixel_clock / 10));
 	ctrl_param->ucEncoderMode =
 		(uint8_t)(h->encoder_mode_bp_to_atom(
 			control->signal, control->enable_dp_audio));

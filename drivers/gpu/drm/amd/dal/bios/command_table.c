@@ -237,7 +237,7 @@ static enum bp_result encoder_control_digx_v3(
 
 	/* We need to convert from KHz units into 10KHz units */
 	params.ucAction = bp->cmd_helper->encoder_action_to_atom(cntl->action);
-	params.usPixelClock = (uint16_t)(cntl->pixel_clock / 10);
+	params.usPixelClock = cpu_to_le16((uint16_t)(cntl->pixel_clock / 10));
 	params.ucEncoderMode =
 		(uint8_t)bp->cmd_helper->encoder_mode_bp_to_atom(
 				cntl->signal,
@@ -247,13 +247,16 @@ static enum bp_result encoder_control_digx_v3(
 	if (cntl->signal == SIGNAL_TYPE_HDMI_TYPE_A)
 		switch (cntl->colordepth) {
 		case TRANSMITTER_COLOR_DEPTH_30:
-			params.usPixelClock = (params.usPixelClock * 30) / 24;
+			params.usPixelClock =
+				cpu_to_le16((le32_to_cpu(params.usPixelClock) * 30) / 24);
 			break;
 		case TRANSMITTER_COLOR_DEPTH_36:
-			params.usPixelClock = (params.usPixelClock * 36) / 24;
+			params.usPixelClock =
+				cpu_to_le16((le32_to_cpu(params.usPixelClock) * 36) / 24);
 			break;
 		case TRANSMITTER_COLOR_DEPTH_48:
-			params.usPixelClock = (params.usPixelClock * 48) / 24;
+			params.usPixelClock =
+				cpu_to_le16((le32_to_cpu(params.usPixelClock) * 48) / 24);
 			break;
 		default:
 			break;
@@ -282,7 +285,7 @@ static enum bp_result encoder_control_digx_v4(
 
 	/* We need to convert from KHz units into 10KHz units */
 	params.ucAction = bp->cmd_helper->encoder_action_to_atom(cntl->action);
-	params.usPixelClock = (uint16_t)(cntl->pixel_clock / 10);
+	params.usPixelClock = cpu_to_le16((uint16_t)(cntl->pixel_clock / 10));
 	params.ucEncoderMode =
 		(uint8_t)(bp->cmd_helper->encoder_mode_bp_to_atom(
 				cntl->signal,
@@ -292,13 +295,16 @@ static enum bp_result encoder_control_digx_v4(
 	if (cntl->signal == SIGNAL_TYPE_HDMI_TYPE_A)
 		switch (cntl->colordepth) {
 		case TRANSMITTER_COLOR_DEPTH_30:
-			params.usPixelClock = (params.usPixelClock * 30) / 24;
+			params.usPixelClock =
+				cpu_to_le16((le32_to_cpu(params.usPixelClock) * 30) / 24);
 			break;
 		case TRANSMITTER_COLOR_DEPTH_36:
-			params.usPixelClock = (params.usPixelClock * 36) / 24;
+			params.usPixelClock =
+				cpu_to_le16((le32_to_cpu(params.usPixelClock) * 36) / 24);
 			break;
 		case TRANSMITTER_COLOR_DEPTH_48:
-			params.usPixelClock = (params.usPixelClock * 48) / 24;
+			params.usPixelClock =
+				cpu_to_le16((le32_to_cpu(params.usPixelClock) * 48) / 24);
 			break;
 		default:
 			break;
@@ -360,7 +366,7 @@ static enum bp_result dvo_encoder_control_v3(
 	/* We need to convert from KHz units into 10KHz units */
 	dal_memset(&params, 0, sizeof(params));
 	params.ucAction = (uint8_t) cntl->action;
-	params.usPixelClock = (uint16_t) (cntl->pixel_clock / 10);
+	params.usPixelClock = cpu_to_le16((uint16_t) (cntl->pixel_clock / 10));
 	params.ucDVOConfig = config;
 
 	if (EXEC_BIOS_CMD_TABLE(DVOEncoderControl, params))
@@ -454,7 +460,8 @@ static enum bp_result transmitter_control_v2(
 			params.acConfig.fDualLinkConnector = 1;
 
 		/* connector object id */
-		params.usInitInfo = (uint8_t)cntl->connector_obj_id.id;
+		params.usInitInfo =
+			cpu_to_le16((uint8_t)cntl->connector_obj_id.id);
 		break;
 	case TRANSMITTER_CONTROL_SET_VOLTAGE_AND_PREEMPASIS:
 		/* votage swing and pre-emphsis */
@@ -476,13 +483,13 @@ static enum bp_result transmitter_control_v2(
 			 * We need to convert from KHz units into 20KHz units
 			 */
 			params.usPixelClock =
-				(uint16_t)(cntl->pixel_clock / 20);
+				cpu_to_le16((uint16_t)(cntl->pixel_clock / 20));
 		} else
 			/* link rate, half for dual link
 			 * We need to convert from KHz units into 10KHz units
 			 */
 			params.usPixelClock =
-				(uint16_t)(cntl->pixel_clock / 10);
+				cpu_to_le16((uint16_t)(cntl->pixel_clock / 10));
 		break;
 	}
 
@@ -581,7 +588,8 @@ static enum bp_result transmitter_control_v3(
 		}
 
 		/* connector object id */
-		params.usInitInfo = (uint8_t)(cntl->connector_obj_id.id);
+		params.usInitInfo =
+			cpu_to_le16((uint8_t)(cntl->connector_obj_id.id));
 		break;
 	case TRANSMITTER_CONTROL_SET_VOLTAGE_AND_PREEMPASIS:
 		/* votage swing and pre-emphsis */
@@ -612,26 +620,26 @@ static enum bp_result transmitter_control_v3(
 			 * We need to convert from KHz units into 20KHz units
 			 */
 			params.usPixelClock =
-				(uint16_t)(cntl->pixel_clock / 20);
+				cpu_to_le16((uint16_t)(cntl->pixel_clock / 20));
 		} else {
 			/* link rate, half for dual link
 			 * We need to convert from KHz units into 10KHz units
 			 */
 			params.usPixelClock =
-				(uint16_t)(cntl->pixel_clock / 10);
+				cpu_to_le16((uint16_t)(cntl->pixel_clock / 10));
 			if (cntl->signal == SIGNAL_TYPE_HDMI_TYPE_A)
 				switch (cntl->color_depth) {
 				case TRANSMITTER_COLOR_DEPTH_30:
 					params.usPixelClock =
-						(params.usPixelClock * 30) / 24;
+						cpu_to_le16((le16_to_cpu(params.usPixelClock) * 30) / 24);
 					break;
 				case TRANSMITTER_COLOR_DEPTH_36:
 					params.usPixelClock =
-						(params.usPixelClock * 36) / 24;
+						cpu_to_le16((le16_to_cpu(params.usPixelClock) * 36) / 24);
 					break;
 				case TRANSMITTER_COLOR_DEPTH_48:
 					params.usPixelClock =
-						(params.usPixelClock * 48) / 24;
+						cpu_to_le16((le16_to_cpu(params.usPixelClock) * 48) / 24);
 					break;
 				default:
 					break;
@@ -729,7 +737,8 @@ static enum bp_result transmitter_control_v4(
 			params.acConfig.fDualLinkConnector = 1;
 
 		/* connector object id */
-		params.usInitInfo = (uint8_t)(cntl->connector_obj_id.id);
+		params.usInitInfo =
+			cpu_to_le16((uint8_t)(cntl->connector_obj_id.id));
 	}
 	break;
 	case TRANSMITTER_CONTROL_SET_VOLTAGE_AND_PREEMPASIS:
@@ -754,30 +763,27 @@ static enum bp_result transmitter_control_v4(
 			 * We need to convert from KHz units into 20KHz units
 			 */
 			params.usPixelClock =
-				(uint16_t)(cntl->pixel_clock / 20);
+				cpu_to_le16((uint16_t)(cntl->pixel_clock / 20));
 		else {
 			/* link rate, half for dual link
 			 * We need to convert from KHz units into 10KHz units
 			 */
 			params.usPixelClock =
-				(uint16_t)(cntl->pixel_clock / 10);
+				cpu_to_le16((uint16_t)(cntl->pixel_clock / 10));
 
 			if (cntl->signal == SIGNAL_TYPE_HDMI_TYPE_A)
 				switch (cntl->color_depth) {
 				case TRANSMITTER_COLOR_DEPTH_30:
 					params.usPixelClock =
-						(params.usPixelClock * 30)
-							/ 24;
+						cpu_to_le16((le16_to_cpu(params.usPixelClock) * 30) / 24);
 					break;
 				case TRANSMITTER_COLOR_DEPTH_36:
 					params.usPixelClock =
-						(params.usPixelClock * 36)
-							/ 24;
+						cpu_to_le16((le16_to_cpu(params.usPixelClock) * 36) / 24);
 					break;
 				case TRANSMITTER_COLOR_DEPTH_48:
 					params.usPixelClock =
-						(params.usPixelClock * 48)
-							/ 24;
+						cpu_to_le16((le16_to_cpu(params.usPixelClock) * 48) / 24);
 					break;
 				default:
 					break;
@@ -854,7 +860,7 @@ static enum bp_result transmitter_control_v1_5(
 	params.ucDigEncoderSel =
 		cmd->dig_encoder_sel_to_atom(cntl->engine_id);
 	params.ucDPLaneSet = (uint8_t) cntl->lane_settings;
-	params.usSymClock = (uint16_t) (cntl->pixel_clock / 10);
+	params.usSymClock = cpu_to_le16((uint16_t) (cntl->pixel_clock / 10));
 	/*
 	 * In SI/TN case, caller have to set usPixelClock as following:
 	 * DP mode: usPixelClock = DP_LINK_CLOCK/10
@@ -869,13 +875,16 @@ static enum bp_result transmitter_control_v1_5(
 	case SIGNAL_TYPE_HDMI_TYPE_A:
 		switch (cntl->color_depth) {
 		case TRANSMITTER_COLOR_DEPTH_30:
-			params.usSymClock = (params.usSymClock * 30) / 24;
+			params.usSymClock =
+				cpu_to_le16((le16_to_cpu(params.usSymClock) * 30) / 24);
 			break;
 		case TRANSMITTER_COLOR_DEPTH_36:
-			params.usSymClock = (params.usSymClock * 36) / 24;
+			params.usSymClock =
+				cpu_to_le16((le16_to_cpu(params.usSymClock) * 36) / 24);
 			break;
 		case TRANSMITTER_COLOR_DEPTH_48:
-			params.usSymClock = (params.usSymClock * 48) / 24;
+			params.usSymClock =
+				cpu_to_le16((le16_to_cpu(params.usSymClock) * 48) / 24);
 			break;
 		default:
 			break;
@@ -945,9 +954,9 @@ static enum bp_result set_pixel_clock_v3(
 		return BP_RESULT_BADINPUT;
 
 	allocation.sPCLKInput.usRefDiv =
-		(uint16_t)bp_params->reference_divider;
+		cpu_to_le16((uint16_t)bp_params->reference_divider);
 	allocation.sPCLKInput.usFbDiv =
-		(uint16_t)bp_params->feedback_divider;
+		cpu_to_le16((uint16_t)bp_params->feedback_divider);
 	allocation.sPCLKInput.ucFracFbDiv =
 		(uint8_t)bp_params->fractional_feedback_divider;
 	allocation.sPCLKInput.ucPostDiv =
@@ -955,7 +964,7 @@ static enum bp_result set_pixel_clock_v3(
 
 	/* We need to convert from KHz units into 10KHz units */
 	allocation.sPCLKInput.usPixelClock =
-		(uint16_t)(bp_params->target_pixel_clock / 10);
+		cpu_to_le16((uint16_t)(bp_params->target_pixel_clock / 10));
 
 	params = (PIXEL_CLOCK_PARAMETERS_V3 *)&allocation.sPCLKInput;
 	params->ucTransmitterId =
@@ -1018,9 +1027,9 @@ static enum bp_result set_pixel_clock_v5(
 		clk.sPCLKInput.ucRefDiv =
 			(uint8_t)(bp_params->reference_divider);
 		clk.sPCLKInput.usFbDiv =
-			(uint16_t)(bp_params->feedback_divider);
+			cpu_to_le16((uint16_t)(bp_params->feedback_divider));
 		clk.sPCLKInput.ulFbDivDecFrac =
-			bp_params->fractional_feedback_divider;
+			cpu_to_le32(bp_params->fractional_feedback_divider);
 		clk.sPCLKInput.ucPostDiv =
 			(uint8_t)(bp_params->pixel_clock_post_divider);
 		clk.sPCLKInput.ucTransmitterID =
@@ -1033,7 +1042,7 @@ static enum bp_result set_pixel_clock_v5(
 
 		/* We need to convert from KHz units into 10KHz units */
 		clk.sPCLKInput.usPixelClock =
-			(uint16_t)(bp_params->target_pixel_clock / 10);
+			cpu_to_le16((uint16_t)(bp_params->target_pixel_clock / 10));
 
 		if (bp_params->flags.FORCE_PROGRAMMING_OF_PLL)
 			clk.sPCLKInput.ucMiscInfo |=
@@ -1094,9 +1103,9 @@ static enum bp_result set_pixel_clock_v6(
 		clk.sPCLKInput.ucRefDiv =
 			(uint8_t) bp_params->reference_divider;
 		clk.sPCLKInput.usFbDiv =
-			(uint16_t) bp_params->feedback_divider;
+			cpu_to_le16((uint16_t) bp_params->feedback_divider);
 		clk.sPCLKInput.ulFbDivDecFrac =
-			bp_params->fractional_feedback_divider;
+			cpu_to_le32(bp_params->fractional_feedback_divider);
 		clk.sPCLKInput.ucPostDiv =
 			(uint8_t) bp_params->pixel_clock_post_divider;
 		clk.sPCLKInput.ucTransmitterID =
@@ -1109,7 +1118,7 @@ static enum bp_result set_pixel_clock_v6(
 
 		/* We need to convert from KHz units into 10KHz units */
 		clk.sPCLKInput.ulCrtcPclkFreq.ulPixelClock =
-			bp_params->target_pixel_clock / 10;
+			cpu_to_le32(bp_params->target_pixel_clock / 10);
 
 		if (bp_params->flags.FORCE_PROGRAMMING_OF_PLL) {
 			clk.sPCLKInput.ucMiscInfo |=
@@ -1191,7 +1200,7 @@ static enum bp_result enable_spread_spectrum_on_ppll_v1(
 		params.ucEnable = ATOM_DISABLE;
 
 	params.usSpreadSpectrumPercentage =
-		(uint16_t)bp_params->percentage;
+		cpu_to_le16((uint16_t)bp_params->percentage);
 	params.ucSpreadSpectrumStep =
 		(uint8_t)bp_params->ver1.step;
 	params.ucSpreadSpectrumDelay =
@@ -1240,9 +1249,9 @@ static enum bp_result enable_spread_spectrum_on_ppll_v2(
 		params.ucEnable = ATOM_ENABLE;
 
 		params.usSpreadSpectrumPercentage =
-			(uint16_t)(bp_params->percentage);
+			cpu_to_le16((uint16_t)(bp_params->percentage));
 		params.usSpreadSpectrumStep =
-			(uint16_t)(bp_params->ds.ds_frac_size);
+			cpu_to_le16((uint16_t)(bp_params->ds.ds_frac_size));
 
 		if (bp_params->flags.EXTERNAL_SS)
 			params.ucSpreadSpectrumType |=
@@ -1255,13 +1264,13 @@ static enum bp_result enable_spread_spectrum_on_ppll_v2(
 		/* Both amounts need to be left shifted first before bit
 		 * comparison. Otherwise, the result will always be zero here
 		 */
-		params.usSpreadSpectrumAmount = (uint16_t)(
+		params.usSpreadSpectrumAmount = cpu_to_le16((uint16_t)(
 			((bp_params->ds.feedback_amount <<
 				ATOM_PPLL_SS_AMOUNT_V2_FBDIV_SHIFT) &
 				ATOM_PPLL_SS_AMOUNT_V2_FBDIV_MASK) |
 			((bp_params->ds.nfrac_amount <<
 				ATOM_PPLL_SS_AMOUNT_V2_NFRAC_SHIFT) &
-				ATOM_PPLL_SS_AMOUNT_V2_NFRAC_MASK));
+				ATOM_PPLL_SS_AMOUNT_V2_NFRAC_MASK)));
 	} else
 		params.ucEnable = ATOM_DISABLE;
 
@@ -1310,9 +1319,9 @@ static enum bp_result enable_spread_spectrum_on_ppll_v3(
 		params.ucEnable = ATOM_ENABLE;
 
 		params.usSpreadSpectrumAmountFrac =
-			(uint16_t)(bp_params->ds_frac_amount);
+			cpu_to_le16((uint16_t)(bp_params->ds_frac_amount));
 		params.usSpreadSpectrumStep =
-			(uint16_t)(bp_params->ds.ds_frac_size);
+			cpu_to_le16((uint16_t)(bp_params->ds.ds_frac_size));
 
 		if (bp_params->flags.EXTERNAL_SS)
 			params.ucSpreadSpectrumType |=
@@ -1324,13 +1333,13 @@ static enum bp_result enable_spread_spectrum_on_ppll_v3(
 		/* Both amounts need to be left shifted first before bit
 		 * comparison. Otherwise, the result will always be zero here
 		 */
-		params.usSpreadSpectrumAmount = (uint16_t)(
+		params.usSpreadSpectrumAmount = cpu_to_le16((uint16_t)(
 			((bp_params->ds.feedback_amount <<
 				ATOM_PPLL_SS_AMOUNT_V3_FBDIV_SHIFT) &
 				ATOM_PPLL_SS_AMOUNT_V3_FBDIV_MASK) |
 			((bp_params->ds.nfrac_amount <<
 				ATOM_PPLL_SS_AMOUNT_V3_NFRAC_SHIFT) &
-				ATOM_PPLL_SS_AMOUNT_V3_NFRAC_MASK));
+				ATOM_PPLL_SS_AMOUNT_V3_NFRAC_MASK)));
 	} else
 		params.ucEnable = ATOM_DISABLE;
 
@@ -1392,7 +1401,7 @@ static enum bp_result adjust_display_pll_v2(
 	 * output pixel clock back 10KHz-->KHz */
 	uint32_t pixel_clock_10KHz_in = bp_params->pixel_clock / 10;
 
-	params.usPixelClock = (uint16_t)(pixel_clock_10KHz_in);
+	params.usPixelClock = cpu_to_le16((uint16_t)(pixel_clock_10KHz_in));
 	params.ucTransmitterID =
 		bp->cmd_helper->encoder_id_to_atom(
 			dal_graphics_object_id_get_encoder_id(
@@ -1407,7 +1416,8 @@ static enum bp_result adjust_display_pll_v2(
 		/* Convert output pixel clock back 10KHz-->KHz: multiply
 		 * original pixel clock in KHz by ratio
 		 * [output pxlClk/input pxlClk] */
-		uint64_t pixel_clock_10KHz_out = (uint64_t)params.usPixelClock;
+		uint64_t pixel_clock_10KHz_out =
+				le16_to_cpu((uint64_t)params.usPixelClock);
 		uint64_t pixel_clock = (uint64_t)bp_params->pixel_clock;
 
 		bp_params->adjusted_pixel_clock =
@@ -1431,7 +1441,7 @@ static enum bp_result adjust_display_pll_v3(
 
 	/* We need to convert from KHz units into 10KHz units and then convert
 	 * output pixel clock back 10KHz-->KHz */
-	params.sInput.usPixelClock = (uint16_t)pixel_clk_10_kHz_in;
+	params.sInput.usPixelClock = cpu_to_le16((uint16_t)pixel_clk_10_kHz_in);
 	params.sInput.ucTransmitterID =
 		bp->cmd_helper->encoder_id_to_atom(
 			dal_graphics_object_id_get_encoder_id(
@@ -1470,7 +1480,7 @@ static enum bp_result adjust_display_pll_v3(
 		 * original pixel clock in KHz by ratio
 		 * [output pxlClk/input pxlClk] */
 		uint64_t pixel_clk_10_khz_out =
-			(uint64_t)params.sOutput.ulDispPllFreq;
+			(uint64_t)le32_to_cpu(params.sOutput.ulDispPllFreq);
 		uint64_t pixel_clk = (uint64_t)bp_params->pixel_clock;
 
 		if (pixel_clk_10_kHz_in != 0) {
@@ -1545,7 +1555,7 @@ static void dac_encoder_control_prepare_params(
 	/* We need to convert from KHz units into 10KHz units
 	 * it looks as if the TvControl do not care about pixel clock
 	 */
-	params->usPixelClock = (uint16_t)(pixel_clock / 10);
+	params->usPixelClock = cpu_to_le16((uint16_t)(pixel_clock / 10));
 }
 
 static enum bp_result dac1_encoder_control_v1(
@@ -1702,7 +1712,8 @@ static enum signal_type dac_load_detection_v3(
 	case SIGNAL_TYPE_SVIDEO:
 	case SIGNAL_TYPE_SCART:
 	case SIGNAL_TYPE_COMPOSITE: {
-		params.sDacload.usDeviceID = ATOM_DEVICE_TV1_SUPPORT;
+		params.sDacload.usDeviceID =
+				cpu_to_le16(ATOM_DEVICE_TV1_SUPPORT);
 	}
 		break;
 	case SIGNAL_TYPE_RGB:
@@ -1710,19 +1721,20 @@ static enum signal_type dac_load_detection_v3(
 		case ENCODER_ID_INTERNAL_DAC1:
 		case ENCODER_ID_INTERNAL_KLDSCP_DAC1:
 			params.sDacload.usDeviceID =
-				ATOM_DEVICE_CRT1_SUPPORT;
+				cpu_to_le16(ATOM_DEVICE_CRT1_SUPPORT);
 			break;
 		case ENCODER_ID_INTERNAL_DAC2:
 		case ENCODER_ID_INTERNAL_KLDSCP_DAC2:
 			params.sDacload.usDeviceID =
-				ATOM_DEVICE_CRT2_SUPPORT;
+				cpu_to_le16(ATOM_DEVICE_CRT2_SUPPORT);
 			break;
 		default:
 			break;
 		}
 		break;
 	case SIGNAL_TYPE_YPBPR:
-		params.sDacload.usDeviceID = ATOM_DEVICE_CV_SUPPORT;
+		params.sDacload.usDeviceID =
+				cpu_to_le16(ATOM_DEVICE_CV_SUPPORT);
 		break;
 	default:
 		return signal;
@@ -1754,7 +1766,7 @@ static enum signal_type dac_load_detection_v3(
 		params.sDacload.ucMisc |= DAC_LOAD_MISC_YPrPb;
 		/* for DIN connectors without GPIO do not perform per line
 		 * detection */
-		params.sDacload.usDeviceID = 0;
+		params.sDacload.usDeviceID = cpu_to_le16(0);
 	} else if (display_signal == SIGNAL_TYPE_YPBPR) {
 		/* ASSUMPTION: CV smart dongle case
 		 * VBIOS only sets the bit when load is detected (it does not
@@ -1831,9 +1843,12 @@ static enum bp_result blank_crtc_v1(
 			params.ucBlanking = ATOM_BLANKING;
 		else
 			params.ucBlanking = ATOM_BLANKING_OFF;
-		params.usBlackColorRCr = (uint16_t)bp_params->black_color_rcr;
-		params.usBlackColorGY = (uint16_t)bp_params->black_color_gy;
-		params.usBlackColorBCb = (uint16_t)bp_params->black_color_bcb;
+		params.usBlackColorRCr =
+			cpu_to_le16((uint16_t)bp_params->black_color_rcr);
+		params.usBlackColorGY =
+			cpu_to_le16((uint16_t)bp_params->black_color_gy);
+		params.usBlackColorBCb =
+			cpu_to_le16((uint16_t)bp_params->black_color_bcb);
 
 		if (EXEC_BIOS_CMD_TABLE(BlankCRTC, params))
 			result = BP_RESULT_OK;
@@ -1898,14 +1913,16 @@ static enum bp_result set_crtc_timing_v1(
 		bp_params->controller_id, &atom_controller_id))
 		params.ucCRTC = atom_controller_id;
 
-	params.usH_Total = (uint16_t)(bp_params->h_total);
-	params.usH_Disp = (uint16_t)(bp_params->h_addressable);
-	params.usH_SyncStart = (uint16_t)(bp_params->h_sync_start);
-	params.usH_SyncWidth = (uint16_t)(bp_params->h_sync_width);
-	params.usV_Total = (uint16_t)(bp_params->v_total);
-	params.usV_Disp = (uint16_t)(bp_params->v_addressable);
-	params.usV_SyncStart = (uint16_t)(bp_params->v_sync_start);
-	params.usV_SyncWidth = (uint16_t)(bp_params->v_sync_width);
+	params.usH_Total = cpu_to_le16((uint16_t)(bp_params->h_total));
+	params.usH_Disp = cpu_to_le16((uint16_t)(bp_params->h_addressable));
+	params.usH_SyncStart = cpu_to_le16((uint16_t)(bp_params->h_sync_start));
+	params.usH_SyncWidth = cpu_to_le16((uint16_t)(bp_params->h_sync_width));
+	params.usV_Total = cpu_to_le16((uint16_t)(bp_params->v_total));
+	params.usV_Disp = cpu_to_le16((uint16_t)(bp_params->v_addressable));
+	params.usV_SyncStart =
+			cpu_to_le16((uint16_t)(bp_params->v_sync_start));
+	params.usV_SyncWidth =
+			cpu_to_le16((uint16_t)(bp_params->v_sync_width));
 
 
 	/* VBIOS does not expect any value except zero into this call, for
@@ -1920,13 +1937,16 @@ static enum bp_result set_crtc_timing_v1(
 	params.ucOverscanTop = (uint8_t)bp_params->v_overscan_top;
 
 	if (0 == bp_params->flags.HSYNC_POSITIVE_POLARITY)
-		params.susModeMiscInfo.usAccess |= ATOM_HSYNC_POLARITY;
+		params.susModeMiscInfo.usAccess =
+			cpu_to_le16(le16_to_cpu(params.susModeMiscInfo.usAccess) | ATOM_HSYNC_POLARITY);
 
 	if (0 == bp_params->flags.VSYNC_POSITIVE_POLARITY)
-		params.susModeMiscInfo.usAccess |= ATOM_VSYNC_POLARITY;
+		params.susModeMiscInfo.usAccess =
+			cpu_to_le16(le16_to_cpu(params.susModeMiscInfo.usAccess) | ATOM_VSYNC_POLARITY);
 
 	if (bp_params->flags.INTERLACE) {
-		params.susModeMiscInfo.usAccess |= ATOM_INTERLACE;
+		params.susModeMiscInfo.usAccess =
+			cpu_to_le16(le16_to_cpu(params.susModeMiscInfo.usAccess) | ATOM_INTERLACE);
 
 		/* original DAL code has this condition to apply tis for
 		 * non-TV/CV only due to complex MV testing for possible
@@ -1941,11 +1961,13 @@ static enum bp_result set_crtc_timing_v1(
 		 * of 4, but it is 4 either from Edid data
 		 * (spec CEA 861) or CEA timing table.
 		 */
-		params.usV_SyncStart = (uint16_t)(bp_params->v_sync_start + 1);
+		params.usV_SyncStart =
+			cpu_to_le16((uint16_t)(bp_params->v_sync_start + 1));
 	}
 
 	if (bp_params->flags.HORZ_COUNT_BY_TWO)
-		params.susModeMiscInfo.usAccess |= ATOM_DOUBLE_CLOCK_MODE;
+		params.susModeMiscInfo.usAccess =
+			cpu_to_le16(le16_to_cpu(params.susModeMiscInfo.usAccess) | ATOM_DOUBLE_CLOCK_MODE);
 
 	if (EXEC_BIOS_CMD_TABLE(SetCRTC_Timing, params))
 		result = BP_RESULT_OK;
@@ -1966,27 +1988,27 @@ static enum bp_result set_crtc_using_dtd_timing_v3(
 		params.ucCRTC = atom_controller_id;
 
 	/* bios usH_Size wants h addressable size */
-	params.usH_Size = (uint16_t)bp_params->h_addressable;
+	params.usH_Size = cpu_to_le16((uint16_t)bp_params->h_addressable);
 	/* bios usH_Blanking_Time wants borders included in blanking */
 	params.usH_Blanking_Time =
-		(uint16_t)(bp_params->h_total - bp_params->h_addressable);
+		cpu_to_le16((uint16_t)(bp_params->h_total - bp_params->h_addressable));
 	/* bios usV_Size wants v addressable size */
-	params.usV_Size = (uint16_t)bp_params->v_addressable;
+	params.usV_Size = cpu_to_le16((uint16_t)bp_params->v_addressable);
 	/* bios usV_Blanking_Time wants borders included in blanking */
 	params.usV_Blanking_Time =
-		(uint16_t)(bp_params->v_total - bp_params->v_addressable);
+		cpu_to_le16((uint16_t)(bp_params->v_total - bp_params->v_addressable));
 	/* bios usHSyncOffset is the offset from the end of h addressable,
 	 * our horizontalSyncStart is the offset from the beginning
 	 * of h addressable */
 	params.usH_SyncOffset =
-		(uint16_t)(bp_params->h_sync_start - bp_params->h_addressable);
-	params.usH_SyncWidth = (uint16_t)bp_params->h_sync_width;
+		cpu_to_le16((uint16_t)(bp_params->h_sync_start - bp_params->h_addressable));
+	params.usH_SyncWidth = cpu_to_le16((uint16_t)bp_params->h_sync_width);
 	/* bios usHSyncOffset is the offset from the end of v addressable,
 	 * our verticalSyncStart is the offset from the beginning of
 	 * v addressable */
 	params.usV_SyncOffset =
-		(uint16_t)(bp_params->v_sync_start - bp_params->v_addressable);
-	params.usV_SyncWidth = (uint16_t)bp_params->v_sync_width;
+		cpu_to_le16((uint16_t)(bp_params->v_sync_start - bp_params->v_addressable));
+	params.usV_SyncWidth = cpu_to_le16((uint16_t)bp_params->v_sync_width);
 
 	/* we assume that overscan from original timing does not get bigger
 	 * than 255
@@ -1994,14 +2016,17 @@ static enum bp_result set_crtc_using_dtd_timing_v3(
 	 */
 
 	if (0 == bp_params->flags.HSYNC_POSITIVE_POLARITY)
-		params.susModeMiscInfo.usAccess |= ATOM_HSYNC_POLARITY;
+		params.susModeMiscInfo.usAccess =
+			cpu_to_le16(le16_to_cpu(params.susModeMiscInfo.usAccess) | ATOM_HSYNC_POLARITY);
 
 	if (0 == bp_params->flags.VSYNC_POSITIVE_POLARITY)
-		params.susModeMiscInfo.usAccess |= ATOM_VSYNC_POLARITY;
+		params.susModeMiscInfo.usAccess =
+			cpu_to_le16(le16_to_cpu(params.susModeMiscInfo.usAccess) | ATOM_VSYNC_POLARITY);
 
 
 	if (bp_params->flags.INTERLACE)	{
-		params.susModeMiscInfo.usAccess |= ATOM_INTERLACE;
+		params.susModeMiscInfo.usAccess =
+			cpu_to_le16(le16_to_cpu(params.susModeMiscInfo.usAccess) | ATOM_INTERLACE);
 
 		/* original DAL code has this condition to apply this
 		 * for non-TV/CV only
@@ -2018,12 +2043,15 @@ static enum bp_result set_crtc_using_dtd_timing_v3(
 			 * but it is 4 either from Edid data (spec CEA 861)
 			 * or CEA timing table.
 			 */
-			params.usV_SyncOffset += 1;
+			params.usV_SyncOffset =
+				cpu_to_le16(le16_to_cpu(params.usV_SyncOffset) + 1);
+
 		}
 	}
 
 	if (bp_params->flags.HORZ_COUNT_BY_TWO)
-		params.susModeMiscInfo.usAccess |= ATOM_DOUBLE_CLOCK_MODE;
+		params.susModeMiscInfo.usAccess =
+			cpu_to_le16(le16_to_cpu(params.susModeMiscInfo.usAccess) | ATOM_DOUBLE_CLOCK_MODE);
 
 	if (EXEC_BIOS_CMD_TABLE(SetCRTC_UsingDTDTiming, params))
 		result = BP_RESULT_OK;
@@ -2069,10 +2097,14 @@ static enum bp_result set_crtc_overscan_v1(
 	else
 		return BP_RESULT_BADINPUT;
 
-	params.usOverscanRight = (uint16_t)bp_params->h_overscan_right;
-	params.usOverscanLeft = (uint16_t)bp_params->h_overscan_left;
-	params.usOverscanBottom = (uint16_t)bp_params->v_overscan_bottom;
-	params.usOverscanTop = (uint16_t)bp_params->v_overscan_top;
+	params.usOverscanRight =
+			cpu_to_le16((uint16_t)bp_params->h_overscan_right);
+	params.usOverscanLeft =
+			cpu_to_le16((uint16_t)bp_params->h_overscan_left);
+	params.usOverscanBottom =
+			cpu_to_le16((uint16_t)bp_params->v_overscan_bottom);
+	params.usOverscanTop =
+			cpu_to_le16((uint16_t)bp_params->v_overscan_top);
 
 	if (EXEC_BIOS_CMD_TABLE(SetCRTC_OverScan, params))
 		result = BP_RESULT_OK;
@@ -2365,7 +2397,7 @@ static enum bp_result program_clock_v5(
 	/* We need to convert from KHz units into 10KHz units */
 	params.sPCLKInput.ucPpll = (uint8_t) atom_pll_id;
 	params.sPCLKInput.usPixelClock =
-		(uint16_t) (bp_params->target_pixel_clock / 10);
+		cpu_to_le16((uint16_t) (bp_params->target_pixel_clock / 10));
 	params.sPCLKInput.ucCRTC = (uint8_t) ATOM_CRTC_INVALID;
 
 	if (bp_params->flags.SET_EXTERNAL_REF_DIV_SRC)
@@ -2397,7 +2429,7 @@ static enum bp_result program_clock_v6(
 	/* We need to convert from KHz units into 10KHz units */
 	params.sPCLKInput.ucPpll = (uint8_t)atom_pll_id;
 	params.sPCLKInput.ulDispEngClkFreq =
-		bp_params->target_pixel_clock / 10;
+		cpu_to_le32(bp_params->target_pixel_clock / 10);
 
 	if (bp_params->flags.SET_EXTERNAL_REF_DIV_SRC)
 		params.sPCLKInput.ucMiscInfo |= PIXEL_CLOCK_MISC_REF_DIV_SRC;
@@ -2406,7 +2438,7 @@ static enum bp_result program_clock_v6(
 		/* True display clock is returned by VBIOS if DFS bypass
 		 * is enabled. */
 		bp_params->dfs_bypass_display_clock =
-			(uint32_t)(params.sPCLKInput.ulDispEngClkFreq * 10);
+			(uint32_t)(le32_to_cpu(params.sPCLKInput.ulDispEngClkFreq) * 10);
 		result = BP_RESULT_OK;
 	}
 
@@ -2447,14 +2479,15 @@ static enum bp_result compute_memore_engine_pll_v4(
 
 	dal_memset(&params, 0, sizeof(params));
 
-	params.ulClock = bp_params->target_display_clock / 10;
+	params.ulClock = cpu_to_le32(bp_params->target_display_clock / 10);
 
 	/* Initialize this to the target clock in case this call fails */
 	bp_params->actual_display_clock = bp_params->target_display_clock;
 
 	if (EXEC_BIOS_CMD_TABLE(ComputeMemoryEnginePLL, params)) {
 		/* Convert from 10KHz units back to KHz */
-		bp_params->actual_display_clock = params.ulClock * 10;
+		bp_params->actual_display_clock =
+				le32_to_cpu(params.ulClock) * 10;
 		bp_params->actual_post_divider_id = params.ucPostDiv;
 		result = BP_RESULT_OK;
 	}
@@ -2538,7 +2571,7 @@ static enum bp_result external_encoder_control_v3(
 		/* output display connector type. Only valid in encoder
 		 * initialization */
 		cntl_params->usConnectorId =
-			(uint16_t)cntl->connector_obj_id.id;
+			cpu_to_le16((uint16_t)cntl->connector_obj_id.id);
 		break;
 	case EXTERNAL_ENCODER_CONTROL_SETUP:
 		/* EXTERNAL_ENCODER_CONTROL_PARAMETERS_V3 pixel clock unit in
@@ -2547,7 +2580,7 @@ static enum bp_result external_encoder_control_v3(
 		 * Only valid in setup and enableoutput
 		 */
 		cntl_params->usPixelClock =
-			(uint16_t)(cntl->pixel_clock / 10);
+			cpu_to_le16((uint16_t)(cntl->pixel_clock / 10));
 		/* Indicate display output signal type drive by external
 		 * encoder, only valid in setup and enableoutput */
 		cntl_params->ucEncoderMode =
@@ -2570,7 +2603,8 @@ static enum bp_result external_encoder_control_v3(
 		cntl_params->ucLaneNum = (uint8_t)(cntl->lanes_number);
 		break;
 	case EXTERNAL_ENCODER_CONTROL_ENABLE:
-		cntl_params->usPixelClock = (uint16_t)(cntl->pixel_clock / 10);
+		cntl_params->usPixelClock =
+			cpu_to_le16((uint16_t)(cntl->pixel_clock / 10));
 		cntl_params->ucEncoderMode =
 			(uint8_t)bp->cmd_helper->encoder_mode_bp_to_atom(
 				cntl->signal, false);
