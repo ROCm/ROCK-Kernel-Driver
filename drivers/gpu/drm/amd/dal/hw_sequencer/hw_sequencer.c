@@ -1531,15 +1531,41 @@ enum hwss_result dal_hw_sequencer_validate_display_path_mode(
 	return HWSS_RESULT_OK;
 }
 
-
-
 enum hwss_result dal_hw_sequencer_set_gamma_ramp_adjustment(
 	struct hw_sequencer *hws,
-	struct display_path *display_path,
+	const struct display_path *display_path,
 	struct hw_adjustment_gamma_ramp *adjusment)
 {
-	/* TODO: add implementation */
-	return HWSS_RESULT_ERROR;
+	struct gamma_ramp *ramp = NULL;
+	struct gamma_parameters *gamma_param = NULL;
+	enum hwss_result result = HWSS_RESULT_OK;
+	struct controller *crtc;
+
+	crtc = dal_display_path_get_controller(display_path);
+
+	if (crtc == NULL)
+		return HWSS_RESULT_ERROR;
+
+	if (adjusment == NULL)
+		return HWSS_RESULT_ERROR;
+
+	ramp = dal_alloc(sizeof(struct gamma_ramp));
+	gamma_param = dal_alloc(sizeof(struct gamma_parameters));
+
+	if (ramp && gamma_param) {
+		dal_hw_sequencer_build_gamma_ramp_adj_params(
+				adjusment,
+				gamma_param,
+				ramp);
+
+		if (!dal_controller_set_gamma_ramp(crtc, ramp, gamma_param))
+			result = HWSS_RESULT_ERROR;
+	}
+
+	dal_free(ramp);
+	dal_free(gamma_param);
+
+	return HWSS_RESULT_OK;
 }
 
 enum hwss_result dal_hw_sequencer_set_color_control_adjustment(

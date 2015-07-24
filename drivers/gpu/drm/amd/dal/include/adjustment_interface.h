@@ -165,7 +165,7 @@ enum ds_return dal_ds_dispatch_get_info_packets(
 	uint32_t display_index,
 	struct info_frame *info_frames);
 
-bool dal_ds_dispatch_initilize_adjustment(struct ds_dispatch *ds);
+bool dal_ds_dispatch_initialize_adjustment(struct ds_dispatch *ds);
 
 void dal_ds_dispatch_cleanup_adjustment(struct ds_dispatch *ds);
 

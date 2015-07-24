@@ -102,6 +102,7 @@ struct ds_dispatch {
 	struct backlight_adj_group *backlight_adj;
 	struct single_adj_group *single_adj;
 	struct grph_colors_group *grph_colors_adj;
+	struct grph_gamma_lut_group *grph_gamma_adj;
 };
 
 

@@ -1322,7 +1322,7 @@ static bool ds_dispatch_construct(
 		BREAK_TO_DEBUGGER();
 		return false;
 	}
-	if (!dal_ds_dispatch_initilize_adjustment(ds)) {
+	if (!dal_ds_dispatch_initialize_adjustment(ds)) {
 		dal_pms_with_data_destroy(&ds->set);
 		return false;
 	}

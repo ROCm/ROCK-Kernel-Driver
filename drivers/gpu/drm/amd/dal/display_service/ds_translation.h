@@ -58,7 +58,7 @@ void dal_ds_translation_setup_hw_stereo_mixer_params(
 	const struct crtc_timing *timing,
 	enum view_3d_format view_3d_format);
 
-/*enum hw_pixel_format dal_ds_traslation_hw_pixel_format_from_pixel_format(
+/*enum hw_pixel_format dal_ds_translate_hw_pixel_format_from_pixel_format(
 	const enum pixel_format pf);*/
 
 enum underscan_reason {
@@ -76,19 +76,23 @@ enum hw_color_space dal_ds_translation_hw_color_space_from_color_space(
 enum ds_color_space dal_ds_translation_color_space_from_hw_color_space(
 	enum hw_color_space hw_color_space);
 
-bool dal_ds_traslation_regamma_to_external(
+bool dal_ds_translate_regamma_to_external(
 	const struct ds_regamma_lut *gamma_int,
 	struct ds_regamma_lut *gamma_ext);
 
-bool dal_ds_traslation_regamma_to_internal(
+bool dal_ds_translate_regamma_to_internal(
 	const struct ds_regamma_lut *gamma_ext,
 	struct ds_regamma_lut *gamma_int);
 
-bool dal_ds_traslation_internal_gamut_to_external_parameter(
+bool dal_ds_translate_regamma_to_hw(
+		const struct ds_regamma_lut *regumma_lut,
+		struct hw_regamma_lut *regamma_lut_hw);
+
+bool dal_ds_translate_internal_gamut_to_external_parameter(
 	const struct gamut_data *gamut,
 	struct ds_gamut_data *data);
 
-bool dal_ds_traslation_gamut_reference(
+bool dal_ds_translate_gamut_reference(
 	const struct ds_gamut_reference_data *ref,
 	enum adjustment_id *adj_id);
 

@@ -103,11 +103,11 @@ enum graphics_gamma_lut {
 
 union gamma_flag {
 	struct {
-		uint32_t CONFIG_IS_CHANGED:1;
-		uint32_t BOTH_PIPE_REQ:1;
-		uint32_t REGAMMA_UPDATE:1;
-		uint32_t GAMMA_UPDATE:1;
-		uint32_t RESERVED:28;
+		uint32_t config_is_changed:1;
+		uint32_t both_pipe_req:1;
+		uint32_t regamma_update:1;
+		uint32_t gamma_update:1;
+		uint32_t reserved:28;
 	} bits;
 	uint32_t u_all;
 };

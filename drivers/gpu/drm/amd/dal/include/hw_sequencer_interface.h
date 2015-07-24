@@ -32,6 +32,7 @@
 #include "include/display_clock_interface.h"
 #include "include/scaler_types.h"
 #include "include/grph_csc_types.h"
+#include "controller/grph_gamma_types.h"
 #include "plane_types.h"
 
 #include "adapter_service_interface.h"
@@ -179,7 +180,7 @@ struct hw_adjustment_gamma_ramp;
 
 enum hwss_result dal_hw_sequencer_set_gamma_ramp_adjustment(
 	struct hw_sequencer *hws,
-	struct display_path *display_path,
+	const struct display_path *display_path,
 	struct hw_adjustment_gamma_ramp *adjusment);
 
 enum hwss_result dal_hw_sequencer_set_color_control_adjustment(
@@ -345,6 +346,15 @@ enum hwss_result dal_hw_sequencer_build_csc_adjust(
 	struct hw_sequencer *hws,
 	struct hw_adjustment_color_control *color_control,
 	struct grph_csc_adjustment *adjust);
+
+void dal_hw_sequencer_build_gamma_ramp_adj_params(
+		const struct hw_adjustment_gamma_ramp *adjusment,
+		struct gamma_parameters *gamma_param,
+		struct gamma_ramp *ramp);
+
+void translate_from_hw_to_controller_regamma(
+		const struct hw_regamma_lut *hw_regamma,
+		struct regamma_lut *regamma);
 
 void dal_hw_sequencer_enable_wireless_idle_detection(
 		struct hw_sequencer *hws,

@@ -909,6 +909,32 @@ void dal_set_palette(struct dal *dal,
 	/* TODO */
 }
 
+bool dal_set_gamma(
+	struct dal *dal,
+	uint32_t display_index,
+	struct raw_gamma_ramp *gamma)
+{
+	enum ds_return result;
+	struct dal_context *dal_context = &dal->dal_context;
+	struct ds_dispatch *ds_dispatch =
+		dal_display_service_get_adjustment_interface(
+			dal->display_service);
+
+	if (NULL == ds_dispatch) {
+		DAL_IF_ERROR("%s: Display Service is NULL!\n",
+				__func__);
+		return false;
+	}
+
+	result = dal_ds_dispatch_set_gamma_adjustment(
+			ds_dispatch,
+			display_index,
+			ADJ_ID_GAMMA_RAMP,
+			gamma);
+
+	return result == DS_SUCCESS;
+}
+
 /* Active Stereo Interface */
 bool dal_control_stereo(struct dal *dal,
 		uint32_t display_index,

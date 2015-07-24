@@ -114,4 +114,92 @@ enum hw_surface_type {
 	HW_GRAPHIC_SURFACE
 };
 
+/* LUT type for GammaCorrection */
+struct hw_gamma_lut {
+	uint32_t red;
+	uint32_t green;
+	uint32_t blue;
+};
+
+struct hw_devc_lut {
+	uint8_t red;
+	uint8_t green;
+	uint8_t blue;
+	uint8_t reserved;
+};
+
+struct hw_adjustment_gamma_lut {
+	struct hw_gamma_lut *pGammaLut;
+	uint32_t size_in_elements;
+	enum pixel_format surface_pixel_format;
+};
+
+
+enum hw_gamma_ramp_type {
+	HW_GAMMA_RAMP_UNITIALIZED = 0,
+	HW_GAMMA_RAMP_DEFAULT,
+	HW_GAMMA_RAMP_RBG_256x3x16,
+	HW_GAMMA_RAMP_RBG_DXGI_1
+};
+
+#define HW_GAMMA_RAMP_RBG_256 256
+
+struct hw_gamma_ramp_rgb256x3x16 {
+	unsigned short red[HW_GAMMA_RAMP_RBG_256];
+	unsigned short green[HW_GAMMA_RAMP_RBG_256];
+	unsigned short blue[HW_GAMMA_RAMP_RBG_256];
+};
+
+union hw_gamma_flags {
+	uint32_t raw;
+	struct {
+		uint32_t gamma_ramp_array :1;
+		uint32_t graphics_degamma_srgb :1;
+		uint32_t overlay_degamma_srgb :1;
+		uint32_t apply_degamma :1;
+		uint32_t reserved :28;
+	} bits;
+};
+
+struct hw_regamma_coefficients {
+	int32_t gamma[3];
+	int32_t a0[3];
+	int32_t a1[3];
+	int32_t a2[3];
+	int32_t a3[3];
+};
+
+struct hw_regamma_ramp {
+	/* Gamma ramp packed as RGB */
+	unsigned short gamma[256 * 3];
+};
+
+struct hw_regamma_lut {
+	union hw_gamma_flags flags;
+	union {
+		struct hw_regamma_ramp gamma;
+		struct hw_regamma_coefficients coeff;
+	};
+};
+
+union hw_gamma_flag {
+	uint32_t uint;
+	struct {
+		uint32_t config_is_changed :1;
+		uint32_t regamma_update :1;
+		uint32_t gamma_update :1;
+		uint32_t reserved :29;
+	} bits;
+};
+
+struct hw_adjustment_gamma_ramp {
+	uint32_t size;
+	enum hw_gamma_ramp_type type;
+	enum pixel_format surface_pixel_format;
+	enum hw_color_space color_space;
+	struct hw_regamma_lut regamma;
+	union hw_gamma_flag flag;
+	struct hw_gamma_ramp_rgb256x3x16 gamma_ramp_rgb256x3x16;
+};
+
 #endif

@@ -376,7 +376,7 @@ enum ds_color_space dal_ds_translation_color_space_from_hw_color_space(
 	return color_space;
 }
 
-bool dal_ds_traslation_regamma_to_external(
+bool dal_ds_translate_regamma_to_external(
 	const struct ds_regamma_lut *gamma_int,
 	struct ds_regamma_lut *gamma_ext)
 {
@@ -422,7 +422,7 @@ bool dal_ds_traslation_regamma_to_external(
 
 }
 
-bool dal_ds_traslation_regamma_to_internal(
+bool dal_ds_translate_regamma_to_internal(
 	const struct ds_regamma_lut *gamma_ext,
 	struct ds_regamma_lut *gamma_int)
 {
@@ -475,7 +475,46 @@ bool dal_ds_traslation_regamma_to_internal(
 	return true;
 }
 
-bool dal_ds_traslation_internal_gamut_to_external_parameter(
+bool dal_ds_translate_regamma_to_hw(
+		const struct ds_regamma_lut *regumma_lut,
+		struct hw_regamma_lut *regamma_lut_hw)
+{
+	bool ret = true;
+	uint32_t i = 0;
+
+	regamma_lut_hw->flags.bits.gamma_ramp_array =
+			regumma_lut->flags.bits.GAMMA_RAMP_ARRAY;
+	regamma_lut_hw->flags.bits.graphics_degamma_srgb =
+			regumma_lut->flags.bits.GRAPHICS_DEGAMMA_SRGB;
+	regamma_lut_hw->flags.bits.overlay_degamma_srgb  =
+			regumma_lut->flags.bits.OVERLAY_DEGAMMA_SRGB;
+
+	if (regumma_lut->flags.bits.GAMMA_RAMP_ARRAY == 1) {
+		regamma_lut_hw->flags.bits.apply_degamma =
+				regumma_lut->flags.bits.APPLY_DEGAMMA;
+
+		for (i = 0; i < 256 * 3; i++)
+			regamma_lut_hw->gamma.gamma[i] = regumma_lut->gamma.gamma[i];
+	} else {
+		regamma_lut_hw->flags.bits.apply_degamma = 0;
+
+		for (i = 0; i < 3; i++) {
+			regamma_lut_hw->coeff.a0[i] =
+					regumma_lut->coeff.coeff_a0[i];
+			regamma_lut_hw->coeff.a1[i] =
+					regumma_lut->coeff.coeff_a1[i];
+			regamma_lut_hw->coeff.a2[i] =
+					regumma_lut->coeff.coeff_a2[i];
+			regamma_lut_hw->coeff.a3[i] =
+					regumma_lut->coeff.coeff_a3[i];
+			regamma_lut_hw->coeff.gamma[i] =
+					regumma_lut->coeff.gamma[i];
+		}
+	}
+	return ret;
+}
+
+bool dal_ds_translate_internal_gamut_to_external_parameter(
 	const struct gamut_data *gamut,
 	struct ds_gamut_data *data)
 {
@@ -505,7 +544,7 @@ bool dal_ds_traslation_internal_gamut_to_external_parameter(
 	return true;
 }
 
-bool dal_ds_traslation_gamut_reference(
+bool dal_ds_translate_gamut_reference(
 	const struct ds_gamut_reference_data *ref,
 	enum adjustment_id *adj_id)
 {

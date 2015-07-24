@@ -551,7 +551,8 @@ struct link_service *dal_display_path_get_mst_link_service(
 /* This function is for backward compatibility only (called from many places).
  * (All callers are interested in the "root" controller)
  * TODO: remove it when Planes code is finalised. */
-struct controller *dal_display_path_get_controller(struct display_path *path)
+struct controller *dal_display_path_get_controller(
+		const struct display_path *path)
 {
 	struct display_path_plane *plane_zero =
 			dal_display_path_get_plane_at_index(path, 0);

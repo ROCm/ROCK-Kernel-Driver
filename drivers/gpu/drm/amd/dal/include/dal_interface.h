@@ -149,6 +149,11 @@ void  dal_set_palette(
 	uint32_t start,
 	uint32_t length);
 
+bool  dal_set_gamma(
+	struct dal *dal,
+	uint32_t display_index,
+	struct raw_gamma_ramp *gamma);
+
 /* Active Stereo Interface */
 bool dal_control_stereo(struct dal *dal, uint32_t display_index, bool enable);
 

@@ -165,7 +165,7 @@ void dal_display_path_set_controller(
 	struct controller *controller);
 
 struct controller *dal_display_path_get_controller(
-	struct display_path *path);
+	const struct display_path *path);
 
 void dal_display_path_set_clock_source(
 	struct display_path *path,

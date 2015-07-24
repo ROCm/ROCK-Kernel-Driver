@@ -941,7 +941,7 @@ enum ds_return dal_grph_colors_group_get_color_gamut(
 		return DS_ERROR;
 
 	dal_memset(&gamut_data, 0, sizeof(gamut_data));
-	if (!dal_ds_traslation_gamut_reference(
+	if (!dal_ds_translate_gamut_reference(
 			ref, &adj_id))
 		return DS_ERROR;
 
@@ -1029,7 +1029,7 @@ enum ds_return dal_grph_colors_group_get_color_gamut(
 				adj_id,
 				&gamut_data))
 			return DS_ERROR;
-	if (!dal_ds_traslation_internal_gamut_to_external_parameter(
+	if (!dal_ds_translate_internal_gamut_to_external_parameter(
 			&gamut_data,
 			&data->gamut))
 		return DS_ERROR;
@@ -1085,7 +1085,7 @@ enum ds_return dal_grph_colors_group_get_regamma_lut(
 	if (!regamma)
 		return DS_ERROR;
 
-	dal_ds_traslation_regamma_to_external(regamma, data);
+	dal_ds_translate_regamma_to_external(regamma, data);
 	return DS_SUCCESS;
 }
 
@@ -1142,7 +1142,7 @@ enum ds_return dal_grph_colors_group_set_regamma_lut(
 
 	dal_memmove(regamma, old_regamma, sizeof(*regamma));
 
-	if (!dal_ds_traslation_regamma_to_internal(
+	if (!dal_ds_translate_regamma_to_internal(
 			data, regamma))
 		goto regamma_copy_fail;
 

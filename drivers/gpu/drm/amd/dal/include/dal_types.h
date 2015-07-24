@@ -176,6 +176,12 @@ struct dal_dev_c_lut {
 	uint8_t reserved;
 };
 
+struct dal_dev_gamma_lut {
+	uint16_t red;
+	uint16_t green;
+	uint16_t blue;
+};
+
 #if defined(BUILD_DAL_TEST)
 struct test_driver_context;
 #endif /* BUILD_DAL_TEST */

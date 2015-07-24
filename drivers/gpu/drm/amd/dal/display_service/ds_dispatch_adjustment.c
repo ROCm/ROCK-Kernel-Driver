@@ -42,40 +42,30 @@
 #include "single_adj_group.h"
 #include "grph_colors_group.h"
 #include "gamut_space.h"
+#include "gamma_lut.h"
 #include "path_mode_set_with_data.h"
 
 #define NOT_IMPLEMENTED() DAL_LOGGER_NOT_IMPL( \
 	LOG_MINOR_COMPONENT_DISPLAY_SERVICE, "Display Service:%s\n", __func__);
 
-static const struct adj_global_info
-	adj_global_info_array[CURRENT_ADJUSTMENT_NUM] = {
-		{ADJ_ID_SATURATION, ADJ_RANGED, {0x140 },
-			{ 1, 1, 1, 1, 1, 1, 1, 0, 1 } },
-		{ADJ_ID_BIT_DEPTH_REDUCTION, ADJ_RANGED, {0x14A },
-			{ 1, 1, 1, 1, 1, 1, 1, 0, 0 } },
-		{ADJ_ID_UNDERSCAN, ADJ_RANGED, {0x145 },
-			{ 0, 0, 1, 1, 1, 1, 1, 0, 1 } },
-		{ADJ_ID_UNDERSCAN_TYPE, ADJ_RANGED, {0x101 },
-			{ 0, 0, 1, 0, 1, 0, 0, 0, 1 } },
-		{ADJ_ID_BACKLIGHT, ADJ_RANGED, {0x1a0 },
-			{ 1, 1, 1, 1, 1, 1, 1, 0, 0 } },
-		{ADJ_ID_CONTRAST, ADJ_RANGED, {0x160 },
-			{ 1, 1, 1, 1, 1, 1, 1, 0, 1 } },
-		{ADJ_ID_BRIGHTNESS, ADJ_RANGED, {0x140 },
-			{ 1, 1, 1, 1, 1, 1, 1, 0, 1 } },
-		{ADJ_ID_HUE, ADJ_RANGED, {0x140 },
-			{ 1, 1, 1, 1, 1, 1, 1, 0, 1 } },
-		{ADJ_ID_TEMPERATURE, ADJ_RANGED, {0x140 },
-			{ 1, 1, 1, 1, 1, 1, 1, 0, 1 } },
-		{ADJ_ID_TEMPERATURE_SOURCE, ADJ_RANGED, {0x142 },
-			{ 1, 1, 1, 1, 0, 1, 1, 0, 1 } },
-		{ADJ_ID_NOMINAL_RANGE_RGB_LIMITED, ADJ_RANGED, {0x141 },
-			{ 1, 1, 1, 1, 1, 1, 1, 0, 1 } },
+/* NOTE make sure to update CURRENT_ADJUSTMENT_NUM when updating this array */
+static const struct adj_global_info adj_global_info_array[CURRENT_ADJUSTMENT_NUM] = {
+		{ ADJ_ID_SATURATION,			ADJ_RANGED,	{ 0x140 },	{ 1, 1, 1, 1, 1, 1, 1, 0, 1 } },
+		{ ADJ_ID_BIT_DEPTH_REDUCTION,		ADJ_RANGED,	{ 0x14A },	{ 1, 1, 1, 1, 1, 1, 1, 0, 0 } },
+		{ ADJ_ID_UNDERSCAN,			ADJ_RANGED,	{ 0x145 },	{ 0, 0, 1, 1, 1, 1, 1, 0, 1 } },
+		{ ADJ_ID_UNDERSCAN_TYPE,		ADJ_RANGED,	{ 0x101 },	{ 0, 0, 1, 0, 1, 0, 0, 0, 1 } },
+		{ ADJ_ID_BACKLIGHT,			ADJ_RANGED,	{ 0x1a0 },	{ 1, 1, 1, 1, 1, 1, 1, 0, 0 } },
+		{ ADJ_ID_CONTRAST,			ADJ_RANGED,	{ 0x160 },	{ 1, 1, 1, 1, 1, 1, 1, 0, 1 } },
+		{ ADJ_ID_BRIGHTNESS,			ADJ_RANGED,	{ 0x140 },	{ 1, 1, 1, 1, 1, 1, 1, 0, 1 } },
+		{ ADJ_ID_HUE,				ADJ_RANGED,	{ 0x140 },	{ 1, 1, 1, 1, 1, 1, 1, 0, 1 } },
+		{ ADJ_ID_TEMPERATURE,			ADJ_RANGED,	{ 0x140 },	{ 1, 1, 1, 1, 1, 1, 1, 0, 1 } },
+		{ ADJ_ID_TEMPERATURE_SOURCE,		ADJ_RANGED,	{ 0x142 },	{ 1, 1, 1, 1, 0, 1, 1, 0, 1 } },
+		{ ADJ_ID_NOMINAL_RANGE_RGB_LIMITED,	ADJ_RANGED,	{ 0x141 },	{ 1, 1, 1, 1, 1, 1, 1, 0, 1 } },
+		{ ADJ_ID_GAMMA_RAMP,			ADJ_LUT,	{ 0x108 },	{ 1, 1, 1, 1, 1, 1, 1, 1, 1 } }
 };
 
-static void build_adj_container_for_path(
-	struct ds_dispatch *ds,
-	struct display_path *display_path);
+static void build_adj_container_for_path(struct ds_dispatch *ds,
+		struct display_path *display_path);
 
 static enum ds_signal_type get_ds_signal_from_display_path(
 	struct ds_dispatch *ds,
@@ -549,13 +539,16 @@ struct adj_container *dal_ds_dispatch_get_adj_container_for_path(
 	return NULL;
 }
 
-bool dal_ds_dispatch_initilize_adjustment(struct ds_dispatch *ds)
+bool dal_ds_dispatch_initialize_adjustment(struct ds_dispatch *ds)
 {
 	uint32_t i;
 	uint32_t num;
+
+	/* TODO unnecesary init_data. can just pass ds */
 	struct backlight_adj_group_init_data backlight_init_data;
 	struct single_adj_group_init_data single_init_data;
-	struct grph_colors_group_init_data grph_init_data;
+	struct grph_colors_group_init_data colors_init_data;
+	struct grph_gamma_lut_group_init_data gamma_init_data;
 
 	ds->disp_path_num = dal_tm_get_num_display_paths(ds->tm, false);
 	num = ds->disp_path_num;
@@ -605,12 +598,21 @@ bool dal_ds_dispatch_initilize_adjustment(struct ds_dispatch *ds)
 		dal_ds_dispatch_cleanup_adjustment(ds);
 		return false;
 	}
-	grph_init_data.ds = ds;
-	grph_init_data.hws = ds->hwss;
-	grph_init_data.dal_context = ds->dal_context;
+	colors_init_data.ds = ds;
+	colors_init_data.hws = ds->hwss;
+	colors_init_data.dal_context = ds->dal_context;
 	ds->grph_colors_adj =
-		dal_grph_colors_group_create(&grph_init_data);
+		dal_grph_colors_group_create(&colors_init_data);
 	if (!ds->grph_colors_adj) {
+		dal_ds_dispatch_cleanup_adjustment(ds);
+		return false;
+	}
+
+	gamma_init_data.ds = ds;
+	gamma_init_data.hws = ds->hwss;
+	gamma_init_data.dal_context = ds->dal_context;
+	ds->grph_gamma_adj = dal_gamma_adj_group_create(&gamma_init_data);
+	if (!ds->grph_gamma_adj) {
 		dal_ds_dispatch_cleanup_adjustment(ds);
 		return false;
 	}
@@ -639,6 +641,9 @@ void dal_ds_dispatch_cleanup_adjustment(struct ds_dispatch *ds)
 
 	if (ds->grph_colors_adj != NULL)
 		dal_grph_colors_adj_group_destroy(&ds->grph_colors_adj);
+
+	if (ds->grph_gamma_adj != NULL)
+		dal_grph_gamma_adj_group_destroy(&ds->grph_gamma_adj);
 
 }
 
@@ -774,6 +779,60 @@ enum ds_return dal_ds_dispatch_set_adjustment(
 		result = DS_ERROR;
 	}
 	return result;
+}
+
+enum ds_return dal_ds_dispatch_set_gamma_adjustment(struct ds_dispatch *ds,
+		uint32_t display_index, enum adjustment_id adjust_id,
+		const struct raw_gamma_ramp *gamma) {
+	struct adj_container *adj_container = NULL;
+	const struct adjustment_info *cont_info = NULL;
+	const struct ds_regamma_lut *regumma_lut = NULL;
+	struct display_path *disp_path;
+	const struct path_mode *disp_path_mode;
+
+	if (ds == NULL)
+		return DS_ERROR;
+
+	disp_path = dal_tm_display_index_to_display_path(
+			ds->tm, display_index);
+
+	disp_path_mode = dal_pms_with_data_get_path_mode_for_display_index(
+				ds->set,
+				display_index);
+
+	if (disp_path == NULL || disp_path_mode == NULL)
+		return DS_ERROR;
+
+	adj_container = dal_ds_dispatch_get_adj_container_for_path(ds,
+			display_index);
+
+	if (adj_container == NULL)
+		return DS_ERROR;
+
+	cont_info = dal_adj_info_set_get_adj_info(&adj_container->adj_info_set,
+			adjust_id);
+
+	if (cont_info == NULL)
+		return DS_ERROR;
+
+	if (disp_path  == NULL || cont_info == NULL ||
+		!is_adjustment_supported(ds, disp_path, adjust_id))
+		return DS_ERROR;
+
+	if (!is_adjustment_supported(ds, disp_path, adjust_id))
+		return DS_ERROR;
+
+	regumma_lut = dal_adj_container_get_regamma(
+			adj_container);
+
+	if (regumma_lut == NULL)
+		return DS_ERROR;
+
+	if (dal_grph_gamma_lut_set_adjustment(ds, disp_path, disp_path_mode,
+			adjust_id, gamma, regumma_lut))
+		return DS_SUCCESS;
+
+	return DS_ERROR;
 }
 
 const struct raw_gamma_ramp *dal_ds_dispatch_get_current_gamma(
@@ -1041,17 +1100,6 @@ bool dal_ds_dispatch_build_color_control_adj(
 			mode,
 			disp_path,
 			set);
-}
-
-enum ds_return dal_ds_dispatch_set_gamma_adjustment(
-	struct ds_dispatch *ds,
-	uint32_t display_index,
-	enum adjustment_id ad_id,
-	const struct raw_gamma_ramp *gamma)
-{
-	struct dal_context *dal_context = ds->dal_context;
-	NOT_IMPLEMENTED();
-	return DS_ERROR;
 }
 
 void dal_ds_dispatch_update_adj_container_for_path_with_color_space(

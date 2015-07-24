@@ -471,3 +471,85 @@ enum hwss_result dal_hw_sequencer_build_csc_adjust(
 	return HWSS_RESULT_OK;
 
 }
+
+void dal_hw_sequencer_build_gamma_ramp_adj_params(
+		const struct hw_adjustment_gamma_ramp *adjustment,
+		struct gamma_parameters *gamma_param,
+		struct gamma_ramp *ramp) {
+	ramp->type = GAMMA_RAMP_DEFAULT;
+	ramp->size = adjustment->size;
+
+	switch (adjustment->type) {
+	case HW_GAMMA_RAMP_UNITIALIZED:
+		ramp->type = GAMMA_RAMP_UNINITIALIZED;
+		break;
+	case HW_GAMMA_RAMP_DEFAULT:
+		ramp->type = GAMMA_RAMP_DEFAULT;
+		break;
+	case HW_GAMMA_RAMP_RBG_256x3x16:
+		ramp->type = GAMMA_RAMP_RBG256X3X16;
+		dal_memmove(&ramp->gamma_ramp_rgb256x3x16,
+			&adjustment->gamma_ramp_rgb256x3x16,
+			adjustment->size);
+		break;
+	default:
+		break;
+	}
+	/* translate parameters */
+	gamma_param->surface_pixel_format = adjustment->surface_pixel_format;
+
+	translate_from_hw_to_controller_regamma(
+			&adjustment->regamma,
+			&gamma_param->regamma);
+
+	gamma_param->regamma_adjust_type = GRAPHICS_REGAMMA_ADJUST_SW;
+	gamma_param->degamma_adjust_type = GRAPHICS_REGAMMA_ADJUST_SW;
+
+	gamma_param->selected_gamma_lut = GRAPHICS_GAMMA_LUT_LEGACY;
+
+	/* TODO support non-legacy gamma */
+
+	gamma_param->disable_adjustments = false;
+	gamma_param->flag.bits.config_is_changed =
+			adjustment->flag.bits.config_is_changed;
+	gamma_param->flag.bits.regamma_update =
+			adjustment->flag.bits.regamma_update;
+	gamma_param->flag.bits.gamma_update =
+			adjustment->flag.bits.gamma_update;
+}
+
+void translate_from_hw_to_controller_regamma(
+		const struct hw_regamma_lut *hw_regamma,
+		struct regamma_lut *regamma)
+{
+	unsigned int i;
+
+	regamma->features.bits.GRAPHICS_DEGAMMA_SRGB =
+			hw_regamma->flags.bits.graphics_degamma_srgb;
+	regamma->features.bits.OVERLAY_DEGAMMA_SRGB =
+			hw_regamma->flags.bits.overlay_degamma_srgb;
+	regamma->features.bits.GAMMA_RAMP_ARRAY =
+			hw_regamma->flags.bits.gamma_ramp_array;
+
+	if (hw_regamma->flags.bits.gamma_ramp_array == 1) {
+		regamma->features.bits.APPLY_DEGAMMA =
+				hw_regamma->flags.bits.apply_degamma;
+
+		for (i = 0; i < 256 * 3; i++)
+			regamma->regamma_ramp.gamma[i] =
+					hw_regamma->gamma.gamma[i];
+
+	} else {
+		regamma->features.bits.APPLY_DEGAMMA = 0;
+
+		for (i = 0; i < 3; i++) {
+			regamma->gamma_coeff.a0[i] = hw_regamma->coeff.a0[i];
+			regamma->gamma_coeff.a1[i] = hw_regamma->coeff.a1[i];
+			regamma->gamma_coeff.a2[i] = hw_regamma->coeff.a2[i];
+			regamma->gamma_coeff.a3[i] = hw_regamma->coeff.a3[i];
+			regamma->gamma_coeff.gamma[i] =
+					hw_regamma->coeff.gamma[i];
+		}
+	}
+
+}

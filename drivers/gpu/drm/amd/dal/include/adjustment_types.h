@@ -26,7 +26,8 @@
 #ifndef __DAL_ADJUSTMENT_TYPES_H__
 #define __DAL_ADJUSTMENT_TYPES_H__
 
-#define CURRENT_ADJUSTMENT_NUM 11
+/* make sure to update this when updating adj_global_info_array */
+#define CURRENT_ADJUSTMENT_NUM 12
 #define MAX_ADJUSTMENT_NUM (ADJ_ID_END - ADJ_ID_BEGIN)
 #define REGAMMA_VALUE	256
 #define REGAMMA_RANGE	(REGAMMA_VALUE*3)
@@ -193,27 +194,10 @@ struct raw_gamma_ramp_rgb {
 	uint32_t blue;
 };
 
-/*struct raw_rgb_float {
-	float red;
-	float green;
-	float blue;
-};
-
-#define NUM_OF_RAW_GAMMA_RAMP_FLOAT_1025 = 1025;
-struct raw_gamma_ramp_float {
-	struct raw_rgb_float scale;
-	struct raw_rgb_float offset;
-	struct raw_rgb_float gamma_curve[NUM_OF_RAW_GAMMA_RAMP_FLOAT_1025];
-};
-*/
 #define NUM_OF_RAW_GAMMA_RAMP_RGB_256 256
 struct raw_gamma_ramp {
 	enum raw_gamma_ramp_type type;
-	union {
-		struct raw_gamma_ramp_rgb
-			rgb_256[NUM_OF_RAW_GAMMA_RAMP_RGB_256];
-		/*struct raw_rgb_float rgb_float;*/
-	};
+	struct raw_gamma_ramp_rgb rgb_256[NUM_OF_RAW_GAMMA_RAMP_RGB_256];
 	uint32_t size;
 };
 
@@ -372,10 +356,14 @@ union ds_regamma_flags {
 		uint32_t COEFF_FROM_USER:1;
 		/*coeff. A0-A3 from edid is in use only for Display Id 1.2*/
 		uint32_t COEFF_FROM_EDID:1;
+		/*which ROM to choose for graphics*/
+		uint32_t GRAPHICS_DEGAMMA_SRGB:1;
+		/*which ROM to choose for video overlay*/
+		uint32_t OVERLAY_DEGAMMA_SRGB:1;
 		/*apply degamma removal in driver*/
 		uint32_t APPLY_DEGAMMA:1;
 
-		uint32_t reserved:25;
+		uint32_t reserved:23;
 	} bits;
 };
 

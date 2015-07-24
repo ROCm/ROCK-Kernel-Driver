@@ -908,8 +908,10 @@ static bool set_gamma_ramp(
 		dal_grph_gamma_scale_dx(gg, params->surface_pixel_format,
 			gamma_ramp->gamma_ramp_dxgi1.gamma_curve);
 
-	/* 2. Do degamma step : remove the given gamma value from FB. */
-	/*For FP16 or no degamma do by pass */
+	/*
+	 * 2. Do degamma step : remove the given gamma value from FB.
+	 * For FP16 or no degamma do by pass
+	 */
 	configure_degamma_mode(gg, params, false);
 
 	/* 3. Configure regamma curve without analysis (future task) */
@@ -963,7 +965,9 @@ static bool set_gamma_ramp(
 		program_pwl(gg, params);
 	}
 
-	/* 12. program regamma config */
+	/*
+	 * 12. program regamma config
+	 */
 	configure_regamma_mode(gg, params, false);
 
 	{

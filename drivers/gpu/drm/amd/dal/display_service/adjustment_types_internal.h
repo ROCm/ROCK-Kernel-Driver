@@ -118,6 +118,16 @@ struct ds_adjustment_scaler {
 	union ds_scaler_flags flags;
 };
 
+struct ds_adjustment_status {
+	uint32_t val;
+	struct {
+		uint32_t	SET_TO_DEFAULT:1;
+		uint32_t	SET_FROM_EXTERNAL:1;
+		uint32_t	SET_TO_HARDWARE:1;
+		uint32_t	RESERVED:29;
+	} bits;
+};
+
 enum ds_underscan_type {
 	DS_UNDERSCAN_TYPE_PERCENT,
 	DS_UNDERSCAN_TYPE_DIMENTIONS,

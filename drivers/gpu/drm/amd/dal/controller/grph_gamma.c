@@ -1433,6 +1433,9 @@ bool dal_grph_gamma_build_hw_curve_configuration(
 			(i <= 1)) {
 			int32_t j = 0;
 
+			segments = curve_config->segments[region_number];
+			divisor = 1 << segments;
+
 			if (segments == -1) {
 				if (i > 0) {
 					region1 = dal_fixed31_32_shl(
@@ -1468,10 +1471,6 @@ bool dal_grph_gamma_build_hw_curve_configuration(
 					dal_fixed31_32_one,
 					-(i + 1));
 			}
-
-			segments = curve_config->segments[region_number];
-
-			divisor = 1 << segments;
 
 			gamma_curve[region_number].offset = offset;
 			gamma_curve[region_number].segments_num = segments;
