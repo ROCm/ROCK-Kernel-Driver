@@ -73,26 +73,6 @@ enum {
 	ACP_DMA_ATTRIBUTES_FORCE_SIZE = 0xF
 };
 
-typedef struct acp_dma_dscr_size_transfer_direction {
-	/* Specifies the number of bytes need to be transferred
-	 *  from source to destination memory. */
-	u32 size:16;
-	/* Specifies transfer direction. */
-	u32 trans_direction:4;
-	/* reserved. */
-	u32 reserved1:2;
-	/* Specifies the IOC enable or not for descriptor. */
-	/* Defaultly this will be 0, for the last descriptor, make it Enable */
-	u32 ioc:1;
-	/* reserved. */
-	u32 reserved2:9;
-} acp_dma_dscr_size_transfer_direction_t;
-
-typedef union {
-	u32 val:32;
-	acp_dma_dscr_size_transfer_direction_t s;
-} acp_dma_dscr_size_transfer_direction_u;
-
 typedef struct acp_dma_dscr_transfer {
 	/* Specifies the source memory location for the DMA data transfer. */
 	u32 src;
@@ -103,7 +83,7 @@ typedef struct acp_dma_dscr_transfer {
 	/* Specifies the number of bytes need to be transferred
 	 * from source to destination memory.Transfer direction & IOC enable
 	 */
-	acp_dma_dscr_size_transfer_direction_u size_xfer_dir;
+	u32 xfer_val;
 	/** Reserved for future use */
 	u32 reserved;
 } acp_dma_dscr_transfer_t;
