@@ -1004,7 +1004,30 @@ void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc)
 	kfree(crtc);
 }
 
+static void amdgpu_dm_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				  u16 *blue, uint32_t start, uint32_t size)
+{
+	struct amdgpu_device *adev = crtc->dev->dev_private;
+	struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+	uint32_t display_index = acrtc->crtc_id;
+	int end = (start + size > 256) ? 256 : start + size;
+	int i;
+	struct raw_gamma_ramp *gamma;
 
+	gamma = kzalloc(sizeof(struct raw_gamma_ramp), GFP_KERNEL);
+
+	for (i = start; i < end; i++) {
+		gamma->rgb_256[i].red = red[i];
+		gamma->rgb_256[i].green = green[i];
+		gamma->rgb_256[i].blue = blue[i];
+	}
+
+	gamma->size = sizeof(gamma->rgb_256);
+	gamma->type = GAMMA_RAMP_TYPE_RGB256;
+
+	dal_set_gamma(adev->dm.dal, display_index, gamma);
+	kfree(gamma);
+}
 
 /* Implemented only the options currently availible for the driver */
 static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
@@ -1014,6 +1037,7 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.cursor_set = dm_crtc_cursor_set,
 	.cursor_move = dm_crtc_cursor_move,
 	.destroy = amdgpu_dm_crtc_destroy,
+	.gamma_set = amdgpu_dm_crtc_gamma_set,
 	.set_config = amdgpu_dm_set_config,
 	.page_flip = amdgpu_crtc_page_flip /* this function is common for
 				all implementations of DCE code (original and
