@@ -772,25 +772,6 @@ static bool adapter_service_construct(
 		goto failed_to_create_hw_ctx;
 	}
 
-	/* Construct wireless data source*/
-	/* AWDTODO, is DCEversion needed?
-	 * wirelessDataSourceInitData.dceVersion = getDCEVersion();*/
-	wireless_init.fusion = dal_adapter_service_is_fusion(as);
-	wireless_init.vce_supported = as->asic_cap->caps.VCE_SUPPORTED;
-	wireless_init.miracast_target_required =
-		dal_adapter_service_get_asic_runtime_flags(as).
-		bits.MIRACAST_SUPPORTED != 0;
-	/*AWDTODO get from key*/
-	wireless_init.platform_override = false;
-	/*AWDTODO get from key*/
-	wireless_init.remote_disp_path_override = false;
-
-	if (!wireless_data_init(
-		&as->wireless_data, as->bios_parser, &wireless_init)) {
-		ASSERT_CRITICAL(false);
-		goto failed_to_generate_features;
-	}
-
 	/* Integrated info is not provided on discrete ASIC. NULL is allowed */
 	as->integrated_info = dal_bios_parser_create_integrated_info(
 			as->bios_parser);
