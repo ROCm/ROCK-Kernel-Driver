@@ -1490,8 +1490,14 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	r = amdgpu_atombios_get_clock_info(adev);
 	if (r)
 		return r;
+
 	/* init i2c buses */
+#ifndef CONFIG_DRM_AMD_DAL
 	amdgpu_atombios_i2c_init(adev);
+#else
+	if (amdgpu_dal == 0)
+		amdgpu_atombios_i2c_init(adev);
+#endif
 
 	/* Fence driver */
 	r = amdgpu_fence_driver_init(adev);
@@ -1595,7 +1601,12 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	adev->ip_block_enabled = NULL;
 	adev->accel_working = false;
 	/* free i2c buses */
+#ifndef CONFIG_DRM_AMD_DAL
 	amdgpu_i2c_fini(adev);
+#else
+	if (amdgpu_dal == 0)
+		amdgpu_i2c_fini(adev);
+#endif
 	amdgpu_atombios_fini(adev);
 	kfree(adev->bios);
 	adev->bios = NULL;
