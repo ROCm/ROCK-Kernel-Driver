@@ -935,6 +935,13 @@ static void lookup_events_by_type_and_signal(struct kfd_process *p,
 		}
 	}
 
+	if (type == KFD_EVENT_TYPE_MEMORY) {
+		dev_warn(kfd_device,
+			"Sending SIGSEGV to HSA Process with PID %d ",
+				p->lead_thread->pid);
+		send_sig(SIGSEGV, p->lead_thread, 0);
+	}
+
 	/* Send SIGTERM no event of type "type" has been found*/
 	if (send_signal) {
 		if (send_sigterm) {
