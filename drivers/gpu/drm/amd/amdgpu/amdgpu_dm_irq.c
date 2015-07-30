@@ -567,27 +567,6 @@ static enum dal_irq_source amdgpu_dm_hpd_to_dal_irq_source(unsigned type)
 	}
 }
 
-static enum dal_irq_source amdgpu_dm_crtc_to_dal_irq_source(
-	unsigned type)
-{
-	switch (type) {
-	case AMDGPU_CRTC_IRQ_VBLANK1:
-		return DAL_IRQ_SOURCE_CRTC1VSYNC;
-	case AMDGPU_CRTC_IRQ_VBLANK2:
-		return DAL_IRQ_SOURCE_CRTC2VSYNC;
-	case AMDGPU_CRTC_IRQ_VBLANK3:
-		return DAL_IRQ_SOURCE_CRTC3VSYNC;
-	case AMDGPU_CRTC_IRQ_VBLANK4:
-		return DAL_IRQ_SOURCE_CRTC4VSYNC;
-	case AMDGPU_CRTC_IRQ_VBLANK5:
-		return DAL_IRQ_SOURCE_CRTC5VSYNC;
-	case AMDGPU_CRTC_IRQ_VBLANK6:
-		return DAL_IRQ_SOURCE_CRTC6VSYNC;
-	default:
-		return DAL_IRQ_SOURCE_INVALID;
-	}
-}
-
 static int amdgpu_dm_set_hpd_irq_state(struct amdgpu_device *adev,
 					struct amdgpu_irq_src *source,
 					unsigned type,
@@ -621,7 +600,9 @@ static int amdgpu_dm_set_crtc_irq_state(struct amdgpu_device *adev,
 					unsigned type,
 					enum amdgpu_interrupt_state state)
 {
-	enum dal_irq_source src = amdgpu_dm_crtc_to_dal_irq_source(type);
+	enum dal_irq_source src = dal_get_vblank_irq_src_from_display_index(
+			adev->dm.dal,
+			type);
 	bool st = (state == AMDGPU_IRQ_STATE_ENABLE);
 
 	dal_interrupt_set(adev->dm.dal, src, st);
