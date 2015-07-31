@@ -1323,18 +1323,14 @@ int vi_set_ip_blocks(struct amdgpu_device *adev)
 		adev->num_ip_blocks = ARRAY_SIZE(tonga_ip_blocks);
 		break;
 	case CHIP_CARRIZO:
-#if defined(CONFIG_DRM_AMD_DAL)
-		if (amdgpu_dal != 0) {
-			adev->ip_blocks = cz_ip_blocks_dal;
-			adev->num_ip_blocks = ARRAY_SIZE(cz_ip_blocks_dal);
-		} else {
+		if (amdgpu_dal == 0 || (amdgpu_dal != 0 && !amdgpu_device_has_dal_support(adev))) {
 			adev->ip_blocks = cz_ip_blocks;
 			adev->num_ip_blocks = ARRAY_SIZE(cz_ip_blocks);
 		}
-#else
-		adev->ip_blocks = cz_ip_blocks;
-		adev->num_ip_blocks = ARRAY_SIZE(cz_ip_blocks);
-#endif
+		else {
+			adev->ip_blocks = cz_ip_blocks_dal;
+			adev->num_ip_blocks = ARRAY_SIZE(cz_ip_blocks_dal);
+		}
 		break;
 	default:
 		/* FIXME: not supported yet */

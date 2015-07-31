@@ -233,16 +233,15 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 		}
 	}
 
-#ifdef CONFIG_DRM_AMD_DAL
-	if (adev->asic_type != CHIP_CARRIZO || amdgpu_dal == 0) {
+
+	if (amdgpu_dal == 0 || (amdgpu_dal != 0 && !amdgpu_device_has_dal_support(adev))) {
 		/* pre DCE11 */
 		INIT_WORK(&adev->hotplug_work,
 				amdgpu_hotplug_work_func);
-	}
-#else
+	} else {
 	INIT_WORK(&adev->hotplug_work,
 			amdgpu_hotplug_work_func);
-#endif
+	}
 
 
 	INIT_WORK(&adev->reset_work, amdgpu_irq_reset_work_func);
