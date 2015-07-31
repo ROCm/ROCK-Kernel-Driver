@@ -1,14 +1,11 @@
 menu "Display Engine Configuration"
-	depends on DRM && (DRM_AMDSOC || DRM_AMDGPU)
+	depends on DRM && DRM_AMDGPU
 
 config DRM_AMD_DAL
-        bool "AMD DAL - Enable new display engine (will be deprecated when the development is done)"
+        bool "AMD DAL - Enable new display engine
         help
           Choose this option if you want to use the new display engine
-          support for AMD SOC.
-
-          Will be deprecated when the DAL component becomes stable and
-          AMDSOC will fully switch to it.
+          support for AMDGPU.
 
 config DRM_AMD_DAL_VBIOS_PRESENT
         bool "Video Bios available on board"
