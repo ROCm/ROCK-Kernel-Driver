@@ -34,7 +34,6 @@
 #include "bios_parser_helper.h"
 #include "bios_parser.h"
 
-#ifndef BUILD_DAL_TEST
 #define EXEC_BIOS_CMD_TABLE(command, params)\
 	(cgs_atom_exec_cmd_table(bp->dal_context->cgs_device, \
 		GetIndexIntoMasterTable(COMMAND, command), \
@@ -43,17 +42,6 @@
 #define BIOS_CMD_TABLE_REVISION(command, frev, crev)\
 	cgs_atom_get_cmd_table_revs(bp->dal_context->cgs_device, \
 		GetIndexIntoMasterTable(COMMAND, command), &frev, &crev)
-#else
-#define EXEC_BIOS_CMD_TABLE(command, params)\
-	dal_exec_bios_cmd_table(bp->dal_context, \
-		GetIndexIntoMasterTable(COMMAND, command), \
-		&params)
-
-#define BIOS_CMD_TABLE_REVISION(command, frev, crev)\
-		dal_bios_cmd_table_revision(bp->dal_context, \
-		GetIndexIntoMasterTable(COMMAND, command), &frev, &crev)
-
-#endif
 
 #define BIOS_CMD_TABLE_PARA_REVISION(command)\
 	dal_bios_cmd_table_para_revision(bp->dal_context, \

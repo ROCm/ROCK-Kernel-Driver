@@ -66,7 +66,7 @@
  */
 
 static
-#if !defined(DAL_CZ_BRINGUP) && !defined(BUILD_DAL_TEST)
+#if !defined(DAL_CZ_BRINGUP)
 const
 #endif
 struct feature_source_entry feature_entry_table[] = {

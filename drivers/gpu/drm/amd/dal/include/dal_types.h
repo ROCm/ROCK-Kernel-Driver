@@ -182,16 +182,8 @@ struct dal_dev_gamma_lut {
 	uint16_t blue;
 };
 
-#if defined(BUILD_DAL_TEST)
-struct test_driver_context;
-#endif /* BUILD_DAL_TEST */
-
 struct dal_context {
-#if defined(BUILD_DAL_TEST)
-	struct test_driver_context *driver_context;
-#else
 	void *driver_context; /* e.g. amdgpu_device */
-#endif
 	struct dal_logger *logger;
 	void *cgs_device;
 };
