@@ -26,15 +26,13 @@
 #ifndef __DAL_SERVICES_H__
 #define __DAL_SERVICES_H__
 
+#include <linux/slab.h>
+
 #include "dal_services_types.h"
 #include "dal_power_interface_types.h"
 
 #include "include/irq_types.h"
 #include "include/dal_types.h"
-
-/* TODO: investigate if it can be removed. */
-/* Undefine DEPRECATED because it conflicts with printk.h */
-#undef DEPRECATED
 
 /*
  *
@@ -68,22 +66,24 @@ void dal_unregister_interrupt(
  */
 
 /* if the pointer is not NULL, the allocated memory is zeroed */
-void *dal_alloc(uint32_t size);
+#define dal_alloc(size) kzalloc(size, GFP_KERNEL)
 
 /* Reallocate memory. The contents will remain unchanged.*/
-void *dal_realloc(const void *ptr, uint32_t size);
+#define dal_realloc(ptr, size) krealloc(ptr, size, GFP_KERNEL)
 
-void dal_memmove(void *dst, const void *src, uint32_t size);
+#define dal_memmove(dst, src, size) memmove(dst, src, size)
 
-void dal_free(void *p);
+/* free the memory which was allocated by dal_alloc or dal_realloc */
+#define dal_free(p) kfree(p)
 
-void dal_memset(void *p, int32_t c, uint32_t count);
+#define dal_memset(ptr, value, count) memset(ptr, value, count)
 
-int32_t dal_memcmp(const void *p1, const void *p2, uint32_t count);
+#define dal_memcmp(p1, p2, count) memcmp(p1, p2, count)
 
-int32_t dal_strcmp(const int8_t *p1, const int8_t *p2);
+/* comparison of null-terminated strings */
+#define dal_strcmp(p1, p2) strcmp(p1, p2)
 
-int32_t dal_strncmp(const int8_t *p1, const int8_t *p2, uint32_t count);
+#define dal_strncmp(p1, p2, count) strncmp(p1, p2, count)
 
 /*
  *
@@ -327,23 +327,29 @@ void dal_notify_setmode_complete(
  * This is a busy wait for nano seconds and should be used only for
  * extremely short ranges
  */
-void dal_delay_in_nanoseconds(uint32_t nanoseconds);
+#define dal_delay_in_nanoseconds(nanoseconds) ndelay(nanoseconds)
 
 /* Following the guidance:
  * https://www.kernel.org/doc/Documentation/timers/timers-howto.txt
  *
  * This is a busy wait for micro seconds and should.
  */
-void dal_delay_in_microseconds(uint32_t microseconds);
+#define dal_delay_in_microseconds(microseconds) udelay(microseconds)
 
 /* Following the guidances:
  * https://www.kernel.org/doc/Documentation/timers/timers-howto.txt
  * http://lkml.indiana.edu/hypermail/linux/kernel/1008.0/00733.html
  *
- * This is a sleep (not busy-waiting) for milli seconds with a
+ * This is a sleep (not busy-waiting) for milliseconds with a
  * good precision.
  */
-void dal_sleep_in_milliseconds(uint32_t milliseconds);
+#define dal_sleep_in_milliseconds(milliseconds) \
+{ \
+	if (milliseconds >= 20) \
+		msleep(milliseconds); \
+	else \
+		usleep_range(milliseconds*1000, milliseconds*1000+1); \
+}
 
 /*
  *

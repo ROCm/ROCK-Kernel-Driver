@@ -43,65 +43,6 @@
 #include "amdgpu_notifications.h"
 */
 
-/* if the pointer is not NULL, the allocated memory is zeroed */
-void *dal_alloc(uint32_t size)
-{
-	return kzalloc(size, GFP_KERNEL);
-}
-
-/* Reallocate memory. The contents will remain unchanged.*/
-void *dal_realloc(const void *ptr, uint32_t size)
-{
-	return krealloc(ptr, size, GFP_KERNEL);
-}
-
-void dal_memmove(void *dst, const void *src, uint32_t size)
-{
-	memmove(dst, src, size);
-}
-
-void dal_free(void *p)
-{
-	kfree(p);
-}
-
-void dal_memset(void *p, int32_t c, uint32_t count)
-{
-	memset(p, c, count);
-}
-
-int32_t dal_memcmp(const void *p1, const void *p2, uint32_t count)
-{
-	return memcmp(p1, p2, count);
-}
-
-int32_t dal_strcmp(const int8_t *p1, const int8_t *p2)
-{
-	return strcmp(p1, p2);
-}
-int32_t dal_strncmp(const int8_t *p1, const int8_t *p2, uint32_t count)
-{
-	return strncmp(p1, p2, count);
-}
-
-void dal_sleep_in_milliseconds(uint32_t milliseconds)
-{
-	if (milliseconds >= 20)
-		msleep(milliseconds);
-	else
-		usleep_range(milliseconds*1000, milliseconds*1000+1);
-}
-
-void dal_delay_in_nanoseconds(uint32_t nanoseconds)
-{
-	ndelay(nanoseconds);
-}
-
-void dal_delay_in_microseconds(uint32_t microseconds)
-{
-	udelay(microseconds);
-}
-
 /******************************************************************************
  * IRQ Interfaces.
  *****************************************************************************/
