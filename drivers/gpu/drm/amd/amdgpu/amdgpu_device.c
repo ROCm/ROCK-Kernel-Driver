@@ -1365,7 +1365,7 @@ bool amdgpu_device_has_dal_support(struct amdgpu_device *adev)
 
 	switch(adev->asic_type) {
 	case CHIP_CARRIZO:
-#ifdef CONFIG_DRM_AMD_DAL && CONFIG_DRM_AMD_DAL_DCE11_0
+#if defined(CONFIG_DRM_AMD_DAL) && defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 		return true;
 #endif
 	default:
