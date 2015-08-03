@@ -1017,6 +1017,15 @@ amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 			*bo = reloc->bo_va->bo;
 			return mapping;
 		}
+
+		list_for_each_entry(mapping, &reloc->bo_va->invalids, list) {
+			if (mapping->it.start > addr ||
+			    addr > mapping->it.last)
+				continue;
+
+			*bo = reloc->bo_va->bo;
+			return mapping;
+		}
 	}
 
 	return NULL;
