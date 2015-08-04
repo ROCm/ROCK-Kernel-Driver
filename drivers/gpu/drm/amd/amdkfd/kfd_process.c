@@ -429,6 +429,7 @@ void kfd_unbind_process_from_device(struct kfd_dev *dev, unsigned int pasid)
 	struct kfd_process *p;
 	struct kfd_process_device *pdd;
 	int idx, i;
+	long status = -EFAULT;
 
 	BUG_ON(dev == NULL);
 
@@ -444,8 +445,18 @@ void kfd_unbind_process_from_device(struct kfd_dev *dev, unsigned int pasid)
 
 	mutex_lock(&p->mutex);
 
-	if ((dev->dbgmgr) && (dev->dbgmgr->pasid == p->pasid))
-		kfd_dbgmgr_destroy(dev->dbgmgr);
+	mutex_lock(get_dbgmgr_mutex());
+
+	if ((dev->dbgmgr) && (dev->dbgmgr->pasid == p->pasid)) {
+
+		status = kfd_dbgmgr_unregister(dev->dbgmgr, p);
+		if (status == 0) {
+			kfd_dbgmgr_destroy(dev->dbgmgr);
+			dev->dbgmgr = NULL;
+		}
+	}
+
+	mutex_unlock(get_dbgmgr_mutex());
 
 	pqm_uninit(&p->pqm);
 
