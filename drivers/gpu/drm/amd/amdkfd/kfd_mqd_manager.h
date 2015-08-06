@@ -84,6 +84,8 @@ struct mqd_manager {
 				uint64_t queue_address,	uint32_t pipe_id,
 				uint32_t queue_id);
 
+	uint32_t (*check_preempt_status)(struct mqd_manager *mm, void *mqd);
+
 	struct mutex	mqd_mutex;
 	struct kfd_dev	*dev;
 };

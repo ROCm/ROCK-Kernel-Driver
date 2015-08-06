@@ -955,10 +955,32 @@ static int destroy_sdma_queues(struct device_queue_manager *dqm,
 			sdma_engine);
 }
 
+static int probe_hqd_state(struct device_queue_manager *dqm,
+				uint32_t *queue_id_bits)
+{
+	int retval = 0;
+	struct kernel_queue *hiq = dqm->packets.priv_queue;
+
+	*queue_id_bits = 0;
+	*dqm->fence_addr = KFD_FENCE_INIT;
+	pm_send_query_status(&dqm->packets, dqm->fence_gpu_addr,
+				KFD_FENCE_COMPLETED);
+	retval = amdkfd_fence_wait_timeout(dqm->fence_addr,
+					KFD_FENCE_COMPLETED,
+					QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS);
+	if (retval != 0)
+		return retval;
+	if (hiq->mqd->check_preempt_status)
+		*queue_id_bits = hiq->mqd->check_preempt_status(
+					hiq->mqd, hiq->queue->mqd);
+
+	return retval;
+}
+
 static int destroy_queues_cpsch(struct device_queue_manager *dqm,
 		bool preempt_static_queues, bool lock, bool reset)
 {
-	int retval;
+	int retval, tmp = 0;
 	enum kfd_preempt_type_filter preempt_type;
 
 	BUG_ON(!dqm);
@@ -987,14 +1009,20 @@ static int destroy_queues_cpsch(struct device_queue_manager *dqm,
 	if (retval != 0)
 		goto out;
 
-	*dqm->fence_addr = KFD_FENCE_INIT;
-	pm_send_query_status(&dqm->packets, dqm->fence_gpu_addr,
-				KFD_FENCE_COMPLETED);
-	/* should be timed out */
-	retval = amdkfd_fence_wait_timeout(dqm->fence_addr, KFD_FENCE_COMPLETED,
-				QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS);
+	retval = probe_hqd_state(dqm, &tmp);
 	if (retval != 0)
 		goto out;
+
+	if (tmp && reset == false) {
+		retval = pm_send_unmap_queue(&dqm->packets,
+					KFD_QUEUE_TYPE_COMPUTE,
+					preempt_type, 0, true, 0);
+		if (retval != 0)
+			goto out;
+		retval = probe_hqd_state(dqm, &tmp);
+		if (retval != 0)
+			goto out;
+	}
 
 	pm_release_ib(&dqm->packets);
 	dqm->active_runlist = false;
