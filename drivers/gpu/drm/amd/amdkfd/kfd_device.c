@@ -223,8 +223,28 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			 const struct kgd2kfd_shared_resources *gpu_resources)
 {
 	unsigned int size;
+	unsigned int vmid_bitmap_kfd, vmid_num_kfd;
+
+	kfd->mec_fw_version = kfd->kfd2kgd->get_fw_version(kfd->kgd,
+			KGD_ENGINE_MEC1);
 
 	kfd->shared_resources = *gpu_resources;
+
+	vmid_bitmap_kfd = kfd->shared_resources.compute_vmid_bitmap;
+	vmid_num_kfd = fls(vmid_bitmap_kfd) - ffs(vmid_bitmap_kfd) + 1;
+
+	/* If MEC firmware is too old, turn off hws multiple process mapping */
+	if (kfd->mec_fw_version	< KFD_MULTI_PROC_MAPPING_HWS_SUPPORT)
+		kfd->max_proc_per_quantum = 0;
+	/* Verify module parameters regarding mapped process number*/
+	else if ((hws_max_conc_proc < 0)
+			|| (hws_max_conc_proc > vmid_num_kfd)) {
+		dev_err(kfd_device,
+			"hws_max_conc_proc (%d) must be between 0 and %d, use %d instead\n",
+			hws_max_conc_proc, vmid_num_kfd, vmid_num_kfd);
+		kfd->max_proc_per_quantum = vmid_num_kfd;
+	} else
+		kfd->max_proc_per_quantum = hws_max_conc_proc;
 
 	/* calculate max size of mqds needed for queues */
 	size = max_num_of_queues_per_device *

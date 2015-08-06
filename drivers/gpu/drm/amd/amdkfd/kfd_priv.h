@@ -77,6 +77,12 @@ extern int max_num_of_queues_per_device;
 extern int sched_policy;
 
 /*
+ * Kernel module parameter to specify the maximum process
+ * number per HW scheduler
+ */
+extern int hws_max_conc_proc;
+
+/*
  * Kernel module parameter to specify whether to send sigterm to HSA process on
  * unhandled exception
  */
@@ -200,6 +206,12 @@ struct kfd_dev {
 
 	/* Debug manager */
 	struct kfd_dbgmgr *dbgmgr;
+
+	/* MEC firmware version*/
+	uint16_t mec_fw_version;
+
+	/* Maximum process number mapped to HW scheduler */
+	unsigned int max_proc_per_quantum;
 };
 
 /* KGD2KFD callbacks */
@@ -773,5 +785,6 @@ int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 
 #define KFD_SCRATCH_CZ_FW_VER 600
 #define KFD_SCRATCH_KV_FW_VER 405
+#define KFD_MULTI_PROC_MAPPING_HWS_SUPPORT 600
 
 #endif

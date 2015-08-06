@@ -127,7 +127,8 @@ struct pm4_runlist {
 			uint32_t offload_polling:1;
 			uint32_t reserved3:1;
 			uint32_t valid:1;
-			uint32_t reserved4:8;
+			uint32_t process_cnt:4;
+			uint32_t reserved4:4;
 		} bitfields4;
 		uint32_t ordinal4;
 	};

@@ -123,8 +123,23 @@ static int pm_create_runlist(struct packet_manager *pm, uint32_t *buffer,
 			uint64_t ib, size_t ib_size_in_dwords, bool chain)
 {
 	struct pm4_runlist *packet;
+	int concurrent_proc_cnt = 0;
+	struct kfd_dev *kfd = pm->dqm->dev;
 
 	BUG_ON(!pm || !buffer || !ib);
+
+	/* Determine the number of processes to map together to HW:
+	 * it can not exceed the number of VMIDs available to the
+	 * scheduler, and it is determined by the smaller of the number
+	 * of processes in the runlist and kfd module parameter
+	 * hws_max_conc_proc.
+	 * Note: the arbitration between the number of VMIDs and
+	 * hws_max_conc_proc has been done in
+	 * kgd2kfd_device_init().
+	 */
+	concurrent_proc_cnt = min(pm->dqm->processes_count,
+			kfd->max_proc_per_quantum);
+
 
 	packet = (struct pm4_runlist *)buffer;
 
@@ -136,6 +151,7 @@ static int pm_create_runlist(struct packet_manager *pm, uint32_t *buffer,
 	packet->bitfields4.chain = chain ? 1 : 0;
 	packet->bitfields4.offload_polling = 0;
 	packet->bitfields4.valid = 1;
+	packet->bitfields4.process_cnt = concurrent_proc_cnt;
 	packet->ordinal2 = lower_32_bits(ib);
 	packet->bitfields3.ib_base_hi = upper_32_bits(ib);
 
