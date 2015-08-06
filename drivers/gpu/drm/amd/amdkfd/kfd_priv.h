@@ -693,7 +693,7 @@ struct kernel_queue *pqm_get_kernel_queue(struct process_queue_manager *pqm,
 
 #define KFD_FENCE_COMPLETED (100)
 #define KFD_FENCE_INIT   (10)
-#define KFD_UNMAP_LATENCY (150)
+#define KFD_UNMAP_LATENCY (40)
 
 struct packet_manager_firmware;
 
