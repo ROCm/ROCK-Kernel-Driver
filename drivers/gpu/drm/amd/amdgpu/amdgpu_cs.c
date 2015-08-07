@@ -910,7 +910,7 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 		parser->free_job = amdgpu_cs_parser_free_job;
 		mutex_lock(&parser->job_lock);
 		r = amd_sched_push_job(ring->scheduler,
-				       &parser->ctx->rings[ring->idx].c_entity,
+				       &parser->ctx->rings[ring->idx].entity,
 				       parser,
 				       &parser->s_fence);
 		if (r) {
