@@ -279,27 +279,6 @@ static int update_mqd_hiq(struct mqd_manager *mm, void *mqd,
 	return retval;
 }
 
-#define QUEUE_DOORBELL_ID_OFFSET	240
-#define QUEUE_DOORBELL_ID_END		256
-
-static uint32_t check_preempt_status(struct mqd_manager *mm, void *mqd)
-{
-	int i;
-	uint32_t failed = 0;
-	uint32_t *tmp = (uint32_t *)mqd;
-
-	for (i = QUEUE_DOORBELL_ID_OFFSET ; i < QUEUE_DOORBELL_ID_END; ++i) {
-		if (tmp[i] & 0x80000000) {
-			failed |= 1 << (i - QUEUE_DOORBELL_ID_OFFSET);
-			tmp[i] = 0;
-		}
-	}
-	if (failed)
-		pr_debug("kfd: func %s, failed 0x%x.\n", __func__, failed);
-
-	return failed;
-}
-
 struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		struct kfd_dev *dev)
 {
@@ -325,7 +304,6 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd;
 		mqd->destroy_mqd = destroy_mqd;
 		mqd->is_occupied = is_occupied;
-		mqd->check_preempt_status = check_preempt_status;
 		break;
 	case KFD_MQD_TYPE_HIQ:
 		mqd->init_mqd = init_mqd_hiq;
@@ -334,7 +312,6 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd_hiq;
 		mqd->destroy_mqd = destroy_mqd;
 		mqd->is_occupied = is_occupied;
-		mqd->check_preempt_status = check_preempt_status;
 		break;
 	case KFD_MQD_TYPE_SDMA:
 		break;
