@@ -4094,9 +4094,9 @@ static enum tm_result tm_init_during_construct(struct topology_mgr *tm)
 
 		associate_link_services_with_display_paths(tm);
 
-		tm_init_features(tm);
-
 		dal_tmrm_set_resources_range_by_type(tm->tm_rm);
+
+		tm_init_features(tm);
 
 		rc = tm_update_internal_database(tm);
 		if (TM_RESULT_FAILURE == rc)
