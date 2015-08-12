@@ -28,6 +28,7 @@
 #include <linux/types.h>
 #include <drm/drmP.h>
 #include "amdgpu.h"
+#include "amdgpu_pm.h"
 // We need to #undef FRAME_SIZE and DEPRECATED because they conflict
 // with ptrace-abi.h's #define's of them.
 #undef FRAME_SIZE
@@ -666,6 +667,7 @@ int amdgpu_dm_set_config(struct drm_mode_set *set)
 	 */
 
 	struct drm_device *dev;
+	struct amdgpu_device *adev;
 	struct drm_crtc *save_crtcs, *crtc;
 	struct drm_encoder *save_encoders, *encoder, *new_encoder;
 	bool mode_changed = false; /* if true do a full mode set */
@@ -697,6 +699,7 @@ int amdgpu_dm_set_config(struct drm_mode_set *set)
 	}
 
 	dev = set->crtc->dev;
+	adev = dev->dev_private;
 
 	if (!set->mode)
 		set->fb = NULL;
@@ -957,6 +960,10 @@ int amdgpu_dm_set_config(struct drm_mode_set *set)
 	kfree(save_connectors);
 	kfree(save_encoders);
 	kfree(save_crtcs);
+
+	/* adjust pm to dpms */
+	amdgpu_pm_compute_clocks(adev);
+
 	return 0;
 
 fail:
@@ -1158,6 +1165,8 @@ static void add_to_mq_helper(void *what, const struct path_mode *pm)
 
 static void amdgpu_dm_connector_dpms(struct drm_connector *connector, int mode)
 {
+	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = dev->dev_private;
 	/* TODO: uncomment these definitions to enable DPMS call later
 	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
 	struct amdgpu_device *adev = connector->dev->dev_private;
@@ -1188,6 +1197,9 @@ static void amdgpu_dm_connector_dpms(struct drm_connector *connector, int mode)
 	/* dal_set_display_dpms(adev->dm.dal, display_index, ps); */
 
 	connector->dpms = mode;
+
+	/* adjust pm to dpms */
+	amdgpu_pm_compute_clocks(adev);
 }
 
 static enum drm_connector_status
