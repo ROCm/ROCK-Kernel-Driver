@@ -852,6 +852,58 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 	return r;
 }
 
+#if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) ||\
+	defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE)
+static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
+{
+	struct amdgpu_display_manager *dm = bl_get_data(bd);
+	uint32_t current_display_index = 0;
+	uint32_t connected_displays_vector;
+	uint32_t total_supported_displays_vector;
+
+	if (!dm->dal)
+		return 0;
+
+	connected_displays_vector =
+		dal_get_connected_targets_vector(dm->dal);
+	total_supported_displays_vector =
+		dal_get_supported_displays_vector(dm->dal);
+
+	/* loops over all the connected displays*/
+	for (; total_supported_displays_vector != 0;
+		total_supported_displays_vector >>= 1,
+		connected_displays_vector >>= 1,
+		++current_display_index) {
+		enum signal_type st;
+
+		if (!(connected_displays_vector & 1))
+			continue;
+
+		st = dal_get_display_signal(dm->dal, current_display_index);
+
+		if (dal_is_embedded_signal(st))
+			break;
+	}
+
+	if (dal_set_backlight_level(
+		dm->dal,
+		current_display_index,
+		bd->props.brightness))
+		return 0;
+	else
+		return 1;
+}
+
+static int amdgpu_dm_backlight_get_brightness(struct backlight_device *bd)
+{
+	return bd->props.brightness;
+}
+
+static const struct backlight_ops amdgpu_dm_backlight_ops = {
+	.get_brightness = amdgpu_dm_backlight_get_brightness,
+	.update_status	= amdgpu_dm_backlight_update_status,
+};
+#endif
 
 /* In this architecture, the association
  * connector -> encoder -> crtc
@@ -884,6 +936,32 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_display_manager *dm)
 	if (switch_dev_register(&dm->hdmi_audio_dev) < 0)
 		goto fail_switch_dev;
 	*/
+
+#if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) ||\
+	defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE)
+	{
+		struct backlight_device *bd;
+		char bl_name[16];
+		struct backlight_properties props;
+
+		memset(&props, 0, sizeof(props));
+		props.max_brightness = AMDGPU_MAX_BL_LEVEL;
+		props.type = BACKLIGHT_RAW;
+		snprintf(bl_name, sizeof(bl_name),
+			"amdgpu_bl%d", dm->adev->ddev->primary->index);
+		bd = backlight_device_register(
+			bl_name,
+			dm->adev->ddev->dev,
+			dm,
+			&amdgpu_dm_backlight_ops,
+			&props);
+		if (!bd) {
+			DRM_ERROR("Backlight registration failed\n");
+			goto fail_backlight_dev;
+		}
+		dm->backlight_dev = bd;
+	}
+#endif
 
 	/* loops over all the connected displays*/
 	for (; total_supported_displays_vector != 0;
@@ -954,6 +1032,8 @@ fail_encoder:
 fail_connector:
 	/*switch_dev_unregister(&dm->hdmi_audio_dev);
 fail_switch_dev:*/
+	backlight_device_unregister(dm->backlight_dev);
+fail_backlight_dev:
 	return -1;
 }
 
