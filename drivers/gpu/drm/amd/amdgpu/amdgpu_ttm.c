@@ -235,6 +235,8 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 static int amdgpu_verify_access(struct ttm_buffer_object *bo, struct file *filp)
 {
 	struct amdgpu_bo *abo = container_of(bo, struct amdgpu_bo, tbo);
+	if (filp == NULL)
+		return 0;
 
 	if (amdgpu_ttm_tt_get_usermm(bo->ttm))
 		return -EPERM;
