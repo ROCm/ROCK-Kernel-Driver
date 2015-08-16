@@ -265,7 +265,8 @@ static int create_compute_queue_nocpsch(struct device_queue_manager *dqm,
 			dqm->dev->kgd, qpd->sh_hidden_private_base, qpd->vmid);
 
 	retval = mqd->load_mqd(mqd, q->mqd, q->pipe,
-			q->queue, (uint32_t __user *) q->properties.write_ptr);
+			q->queue,
+			(uint32_t __user *)q->properties.write_ptr, 0);
 	if (retval != 0) {
 		deallocate_hqd(dqm, q);
 		mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
@@ -369,7 +370,8 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 	if (sched_policy == KFD_SCHED_POLICY_NO_HWS &&
 		q->properties.type == KFD_QUEUE_TYPE_COMPUTE)
 		retval = mqd->load_mqd(mqd, q->mqd, q->pipe,
-			q->queue, (uint32_t __user *) q->properties.write_ptr);
+			q->queue,
+			(uint32_t __user *)q->properties.write_ptr, 0);
 	if ((q->properties.is_active == true) && (prev_active == false))
 		dqm->queue_count++;
 	else if ((q->properties.is_active == false) && (prev_active == true))
@@ -670,7 +672,7 @@ static int create_sdma_queue_nocpsch(struct device_queue_manager *dqm,
 	}
 
 	retval = mqd->load_mqd(mqd, q->mqd, 0,
-				0, NULL);
+				0, NULL, 0);
 	if (retval != 0) {
 		deallocate_sdma_queue(dqm, q->sdma_id);
 		mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);

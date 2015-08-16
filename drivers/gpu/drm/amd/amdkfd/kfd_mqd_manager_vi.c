@@ -145,10 +145,10 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 
 static int load_mqd(struct mqd_manager *mm, void *mqd,
 			uint32_t pipe_id, uint32_t queue_id,
-			uint32_t __user *wptr)
+			uint32_t __user *wptr, uint32_t page_table_base)
 {
 	return mm->dev->kfd2kgd->hqd_load
-		(mm->dev->kgd, mqd, pipe_id, queue_id, wptr, 0);
+		(mm->dev->kgd, mqd, pipe_id, queue_id, wptr, page_table_base);
 }
 
 static int __update_mqd(struct mqd_manager *mm, void *mqd,
@@ -226,6 +226,12 @@ static int update_mqd(struct mqd_manager *mm, void *mqd,
 			struct queue_properties *q)
 {
 	return __update_mqd(mm, mqd, q, MTYPE_CC, 1);
+}
+
+static int update_mqd_tonga(struct mqd_manager *mm, void *mqd,
+			struct queue_properties *q)
+{
+	return __update_mqd(mm, mqd, q, MTYPE_UC, 0);
 }
 
 static int destroy_mqd(struct mqd_manager *mm, void *mqd,
@@ -329,3 +335,17 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 
 	return mqd;
 }
+
+struct mqd_manager *mqd_manager_init_vi_tonga(enum KFD_MQD_TYPE type,
+			struct kfd_dev *dev)
+{
+	struct mqd_manager *mqd;
+
+	mqd = mqd_manager_init_vi(type, dev);
+	if (!mqd)
+		return NULL;
+
+	mqd->update_mqd = update_mqd_tonga;
+	return mqd;
+}
+
