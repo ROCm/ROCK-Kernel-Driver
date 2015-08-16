@@ -85,8 +85,9 @@ static uint32_t get_process_page_dir(void *vm);
 static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm, int fd, uint32_t handle, struct kgd_mem **mem);
 static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
 static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
-static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
-			size_t size, void *vm, struct kgd_mem **mem);
+static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
+		void *vm, struct kgd_mem **mem,
+		uint64_t *offset, void **kptr);
 static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
 
 static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
@@ -106,7 +107,8 @@ static int kgd_init_pipeline(struct kgd_dev *kgd, uint32_t pipe_id,
 				uint32_t hpd_size, uint64_t hpd_gpu_addr);
 static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id);
 static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
-			uint32_t queue_id, uint32_t __user *wptr);
+		uint32_t queue_id, uint32_t __user *wptr,
+		uint32_t page_table_base);
 static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd);
 static bool kgd_hqd_is_occupied(struct kgd_dev *kgd, uint64_t queue_address,
 				uint32_t pipe_id, uint32_t queue_id);
@@ -140,6 +142,9 @@ static int alloc_memory_of_scratch(struct kgd_dev *kgd,
 					 uint64_t va, uint32_t vmid);
 static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
 		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
+static int mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma);
+static int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
+			struct kgd_mem *mem, void **kptr);
 
 static const struct kfd2kgd_calls kfd2kgd = {
 	.init_gtt_mem_allocation = alloc_gtt_mem,
@@ -176,7 +181,9 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.set_num_of_requests = set_num_of_requests,
 	.get_cu_info = get_cu_info,
 	.alloc_memory_of_scratch = alloc_memory_of_scratch,
-	.write_config_static_mem = write_config_static_mem
+	.write_config_static_mem = write_config_static_mem,
+	.mmap_bo = mmap_bo,
+	.map_gtt_bo_to_kernel = map_gtt_bo_to_kernel
 };
 
 static const struct kgd2kfd_calls *kgd2kfd;
@@ -654,7 +661,8 @@ static inline struct cik_sdma_rlc_registers *get_sdma_mqd(void *mqd)
 }
 
 static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
-			uint32_t queue_id, uint32_t __user *wptr)
+		uint32_t queue_id, uint32_t __user *wptr,
+		uint32_t page_table_base)
 {
 	uint32_t wptr_shadow, is_wptr_shadow_valid;
 	struct cik_mqd *m;
@@ -1344,7 +1352,8 @@ static int alloc_memory_of_scratch(struct kgd_dev *kgd,
 }
 
 static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
-				void *vm, struct kgd_mem **mem)
+		void *vm, struct kgd_mem **mem,
+		uint64_t *offset, void **kptr)
 {
 	struct radeon_device *rdev = (struct radeon_device *) kgd;
 	int ret;
@@ -1579,4 +1588,15 @@ static void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 	cu_info->num_shader_engines = rdev->config.cik.max_shader_engines;
 	cu_info->num_shader_arrays_per_engine = rdev->config.cik.max_sh_per_se;
 	cu_info->num_cu_per_sh = rdev->config.cik.max_cu_per_sh;
+}
+
+static int mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma)
+{
+	return 0;
+}
+
+static int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
+			struct kgd_mem *mem, void **kptr)
+{
+	return 0;
 }
