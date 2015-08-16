@@ -483,6 +483,8 @@ struct kfd_process_device {
 	uint64_t gpuvm_limit;
 	uint64_t scratch_base;
 	uint64_t scratch_limit;
+	uint64_t dgpu_base;
+	uint64_t dgpu_limit;
 
 	uint64_t sh_hidden_private_base_vmid;
 	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
@@ -652,6 +654,8 @@ int kgd2kfd_resume(struct kfd_dev *kfd);
 
 /* amdkfd Apertures */
 int kfd_init_apertures(struct kfd_process *process);
+void kfd_set_process_dgpu_aperture(uint32_t node_id,
+		struct kfd_process *process, uint64_t base, uint64_t limit);
 
 /* Queue Context Management */
 inline uint32_t lower_32(uint64_t x);

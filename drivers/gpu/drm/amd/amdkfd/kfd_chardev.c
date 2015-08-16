@@ -1221,6 +1221,17 @@ bind_process_to_device_failed:
 	return err;
 }
 
+static int kfd_ioctl_set_process_dgpu_aperture(struct file *filep,
+		struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_set_process_dgpu_aperture_args *args = data;
+
+	kfd_set_process_dgpu_aperture(args->node_id, p, args->dgpu_base,
+			args->dgpu_limit);
+
+	return 0;
+}
+
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, .cmd_drv = 0, .name = #ioctl}
 
@@ -1294,6 +1305,9 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_CU_MASK,
 			kfd_ioctl_set_cu_mask, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_PROCESS_DGPU_APERTURE,
+			kfd_ioctl_set_process_dgpu_aperture, 0),
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)

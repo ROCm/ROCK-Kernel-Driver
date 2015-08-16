@@ -293,6 +293,25 @@
 #define MAKE_LDS_APP_LIMIT(base) \
 	(((uint64_t)(base) & 0xFFFFFFFF00000000UL) | 0xFFFFFFFF)
 
+#define KFD_GPUVM_ADDRESS_RANGE_MASK (0xFFFFFFFFFFUL)
+#define KFD_GPUVM_ADDRESS_RANGE_SIZE (1000000000UL)
+
+void kfd_set_process_dgpu_aperture(uint32_t node_id,
+		struct kfd_process *process, uint64_t base, uint64_t limit)
+{
+	uint32_t i;
+	struct kfd_process_device *pdd;
+
+	pdd = kfd_get_first_process_device_data(process);
+	for (i = 0; i < node_id; i++)
+		pdd = kfd_get_next_process_device_data(process, pdd);
+
+	if (pdd) {
+		pdd->dgpu_base = base;
+		pdd->dgpu_limit = limit;
+	}
+}
+
 int kfd_init_apertures(struct kfd_process *process)
 {
 	uint8_t id  = 0;
