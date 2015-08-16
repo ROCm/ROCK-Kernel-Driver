@@ -191,6 +191,8 @@ struct device_queue_manager {
 
 void device_queue_manager_init_cik(struct device_queue_manager_asic_ops *ops);
 void device_queue_manager_init_vi(struct device_queue_manager_asic_ops *ops);
+void device_queue_manager_init_vi_tonga(
+		struct device_queue_manager_asic_ops *ops);
 void program_sh_mem_settings(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd);
 int init_pipelines(struct device_queue_manager *dqm,

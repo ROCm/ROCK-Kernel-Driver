@@ -265,8 +265,8 @@ static int create_compute_queue_nocpsch(struct device_queue_manager *dqm,
 			dqm->dev->kgd, qpd->sh_hidden_private_base, qpd->vmid);
 
 	retval = mqd->load_mqd(mqd, q->mqd, q->pipe,
-			q->queue,
-			(uint32_t __user *)q->properties.write_ptr, 0);
+			q->queue, (uint32_t __user *) q->properties.write_ptr,
+			qpd->page_table_base);
 	if (retval != 0) {
 		deallocate_hqd(dqm, q);
 		mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
@@ -1345,6 +1345,10 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 
 	case CHIP_KAVERI:
 		device_queue_manager_init_cik(&dqm->ops_asic_specific);
+		break;
+
+	case CHIP_TONGA:
+		device_queue_manager_init_vi_tonga(&dqm->ops_asic_specific);
 		break;
 	}
 
