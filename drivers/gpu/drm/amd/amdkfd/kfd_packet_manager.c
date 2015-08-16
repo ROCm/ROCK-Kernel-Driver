@@ -72,7 +72,8 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 	}
 
 	map_queue_size =
-		(pm->dqm->dev->device_info->asic_family == CHIP_CARRIZO) ?
+		(pm->dqm->dev->device_info->asic_family == CHIP_CARRIZO ||
+		pm->dqm->dev->device_info->asic_family == CHIP_TONGA) ?
 		sizeof(struct pm4_mes_map_queues) :
 		sizeof(struct pm4_map_queues);
 	/* calculate run list ib allocation size */
@@ -421,7 +422,9 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 				kq->queue->queue, qpd->is_debug);
 
 			if (pm->dqm->dev->device_info->asic_family ==
-					CHIP_CARRIZO)
+					CHIP_CARRIZO ||
+				pm->dqm->dev->device_info->asic_family ==
+					CHIP_TONGA)
 				retval = pm_create_map_queue_vi(pm,
 						&rl_buffer[rl_wptr],
 						kq->queue,
@@ -447,7 +450,9 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 				q->queue, qpd->is_debug);
 
 			if (pm->dqm->dev->device_info->asic_family ==
-					CHIP_CARRIZO)
+					CHIP_CARRIZO ||
+				pm->dqm->dev->device_info->asic_family ==
+					CHIP_TONGA)
 				retval = pm_create_map_queue_vi(pm,
 						&rl_buffer[rl_wptr],
 						q,
@@ -511,6 +516,7 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 		pm->pmf->get_map_process_packet_size =
 					get_map_process_packet_size;
 		break;
+	case CHIP_TONGA:
 	case CHIP_CARRIZO:
 		if (fw_ver >= KFD_SCRATCH_CZ_FW_VER) {
 			pm->pmf->map_process = pm_create_map_process_scratch;
