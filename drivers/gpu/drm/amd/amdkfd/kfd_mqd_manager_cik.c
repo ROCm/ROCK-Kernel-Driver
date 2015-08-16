@@ -208,7 +208,7 @@ static int load_mqd(struct mqd_manager *mm, void *mqd, uint32_t pipe_id,
 			uint32_t queue_id, uint32_t __user *wptr)
 {
 	return mm->dev->kfd2kgd->hqd_load
-		(mm->dev->kgd, mqd, pipe_id, queue_id, wptr);
+		(mm->dev->kgd, mqd, pipe_id, queue_id, wptr, 0);
 }
 
 static int load_mqd_sdma(struct mqd_manager *mm, void *mqd,

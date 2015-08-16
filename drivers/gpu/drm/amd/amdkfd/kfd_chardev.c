@@ -997,7 +997,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
-		pdd->vm, (struct kgd_mem **) &mem);
+		pdd->vm, (struct kgd_mem **) &mem, NULL, NULL);
 
 	if (err != 0)
 		goto alloc_memory_of_gpu_failed;

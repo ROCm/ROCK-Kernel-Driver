@@ -29,6 +29,7 @@
 #define KGD_KFD_INTERFACE_H_INCLUDED
 
 #include <linux/types.h>
+#include <linux/mm_types.h>
 
 struct pci_dev;
 
@@ -177,7 +178,8 @@ struct kfd2kgd_calls {
 	
 
 	int (*hqd_load)(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
-			uint32_t queue_id, uint32_t __user *wptr);
+				uint32_t queue_id, uint32_t __user *wptr,
+				uint32_t page_table_base);
 
 	int (*hqd_sdma_load)(struct kgd_dev *kgd, void *mqd);
 
@@ -214,7 +216,9 @@ struct kfd2kgd_calls {
 	void (*write_vmid_invalidate_request)(struct kgd_dev *kgd,
 					uint8_t vmid);
 	int (*alloc_memory_of_gpu)(struct kgd_dev *kgd, uint64_t va,
-				size_t size, void *vm, struct kgd_mem **mem);
+			size_t size, void *vm,
+			struct kgd_mem **mem, uint64_t *offset,
+			void **kptr);
 	int (*free_memory_of_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
 	int (*map_memory_to_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
 	int (*unmap_memory_to_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
@@ -230,6 +234,9 @@ struct kfd2kgd_calls {
 		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
 	void (*get_cu_info)(struct kgd_dev *kgd,
 			struct kfd_cu_info *cu_info);
+	int (*mmap_bo)(struct kgd_dev *kgd, struct vm_area_struct *vma);
+	int (*map_gtt_bo_to_kernel)(struct kgd_dev *kgd,
+			struct kgd_mem *mem, void **kptr);
 };
 
 /**
