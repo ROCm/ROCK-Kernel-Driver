@@ -974,6 +974,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	struct kfd_dev *dev;
 	int idr_handle;
 	long err;
+	uint64_t offset;
 
 	if (args->size == 0)
 		return -EINVAL;
@@ -997,7 +998,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
-		pdd->vm, (struct kgd_mem **) &mem, NULL, NULL);
+		pdd->vm, (struct kgd_mem **) &mem, &offset, NULL);
 
 	if (err != 0)
 		goto alloc_memory_of_gpu_failed;
@@ -1009,6 +1010,9 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	}
 
 	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
+	args->mmap_offset =  KFD_MMAP_MAP_BO_MASK;
+	args->mmap_offset <<= PAGE_SHIFT;
+	args->mmap_offset |= offset;
 
 	mutex_unlock(&p->mutex);
 
@@ -1403,6 +1407,9 @@ err_i1:
 static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	struct kfd_process *process;
+	struct kfd_dev *kfd;
+	unsigned int i;
+	int retval;
 
 	process = kfd_get_process(current);
 	if (IS_ERR(process))
@@ -1416,6 +1423,21 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 			KFD_MMAP_EVENTS_MASK) {
 		vma->vm_pgoff = vma->vm_pgoff ^ KFD_MMAP_EVENTS_MASK;
 		return kfd_event_mmap(process, vma);
+	} else if ((vma->vm_pgoff & KFD_MMAP_MAP_BO_MASK) ==
+			KFD_MMAP_MAP_BO_MASK) {
+		vma->vm_pgoff = vma->vm_pgoff ^ KFD_MMAP_MAP_BO_MASK;
+
+		i = 0;
+		do {
+			kfd = kfd_topology_enum_kfd_devices(i);
+			if (!kfd)
+				break;
+			retval = kfd->kfd2kgd->mmap_bo(kfd->kgd, vma);
+			if (retval != 0)
+				return retval;
+			i++;
+		} while (kfd);
+		return retval;
 	}
 
 	return -EFAULT;

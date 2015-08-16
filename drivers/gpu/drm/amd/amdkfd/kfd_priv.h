@@ -38,6 +38,7 @@
 
 #define	KFD_MMAP_DOORBELL_MASK	0x8000000000000
 #define KFD_MMAP_EVENTS_MASK	0x4000000000000
+#define KFD_MMAP_MAP_BO_MASK	0x2000000000000
 
 /*
  * When working with cp scheduler we should assign the HIQ manually or via
