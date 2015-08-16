@@ -249,7 +249,7 @@ struct kfd_ioctl_alloc_memory_of_gpu_args {
 	uint64_t size;		/* to KFD */
 	uint64_t handle;	/* from KFD */
 	uint32_t gpu_id;	/* to KFD */
-	uint32_t pad;
+	uint64_t mmap_offset;   /* from KFD */
 };
 
 struct kfd_ioctl_free_memory_of_gpu_args {
@@ -271,6 +271,12 @@ struct kfd_ioctl_open_graphic_handle_args {
 	int graphic_device_fd;		/* to KFD */
 	uint32_t graphic_handle;	/* to KFD */
 	uint32_t pad;
+};
+
+struct kfd_ioctl_set_process_dgpu_aperture_args {
+	uint32_t node_id;
+	uint64_t dgpu_base;
+	uint64_t dgpu_limit;
 };
 
 #define AMDKFD_IOCTL_BASE 'K'
@@ -344,10 +350,16 @@ struct kfd_ioctl_open_graphic_handle_args {
 
 #define AMDKFD_IOC_ALLOC_MEMORY_OF_SCRATCH	\
 		AMDKFD_IOWR(0x16, struct kfd_ioctl_alloc_memory_of_gpu_args)
+
 #define AMDKFD_IOC_SET_CU_MASK		\
 		AMDKFD_IOW(0x17, struct kfd_ioctl_set_cu_mask_args)
 
+#define AMDKFD_IOC_SET_PROCESS_DGPU_APERTURE   \
+		AMDKFD_IOW(0x18,	\
+	struct kfd_ioctl_set_process_dgpu_aperture_args)
+
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x18
+#define AMDKFD_COMMAND_END		0x19
 
 #endif
