@@ -122,7 +122,8 @@ enum cache_policy {
 
 enum asic_family_type {
 	CHIP_KAVERI = 0,
-	CHIP_CARRIZO
+	CHIP_CARRIZO,
+	CHIP_TONGA
 };
 
 struct kfd_event_interrupt_class {

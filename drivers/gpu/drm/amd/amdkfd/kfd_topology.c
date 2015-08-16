@@ -430,6 +430,24 @@ static struct kfd_topology_device *kfd_create_topology_device(void)
 	return dev;
 }
 
+static int kfd_parse_crat_table_fake(void)
+{
+	struct kfd_topology_device *top_dev;
+
+	top_dev = kfd_create_topology_device();
+	if (!top_dev) {
+			kfd_release_live_view();
+			return -ENOMEM;
+	}
+
+	top_dev->node_props.simd_count = 1;
+	sys_props.generation_count++;
+	topology_crat_parsed = 1;
+
+	return 0;
+}
+
+
 static int kfd_parse_crat_table(void *crat_image)
 {
 	struct kfd_topology_device *top_dev;
@@ -1061,6 +1079,10 @@ int kfd_topology_init(void)
 		}
 		kfree(crat_image);
 	} else if (ret == -ENODATA) {
+		down_write(&topology_lock);
+		kfd_parse_crat_table_fake();
+		ret = kfd_topology_update_sysfs();
+		up_write(&topology_lock);
 		ret = 0;
 	} else {
 		pr_err("Couldn't get CRAT table size from ACPI\n");
