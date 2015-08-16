@@ -222,6 +222,8 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 static int amdgpu_verify_access(struct ttm_buffer_object *bo, struct file *filp)
 {
 	struct amdgpu_bo *rbo = container_of(bo, struct amdgpu_bo, tbo);
+	if (filp == NULL)
+		return 0;
 
 	return drm_vma_node_verify_access(&rbo->gem_base.vma_node, filp);
 }
