@@ -50,6 +50,9 @@ bool amdgpu_amdkfd_load_interface(struct amdgpu_device *rdev)
 	case CHIP_CARRIZO:
 		kfd2kgd = amdgpu_amdkfd_gfx_8_0_get_functions();
 		break;
+	case CHIP_TONGA:
+		kfd2kgd = amdgpu_amdkfd_gfx_8_0_tonga_get_functions();
+		break;
 	default:
 		return false;
 	}
@@ -255,4 +258,10 @@ void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 	cu_info->num_shader_engines = adev->gfx.config.max_shader_engines;
 	cu_info->num_shader_arrays_per_engine = adev->gfx.config.max_sh_per_se;
 	cu_info->num_cu_per_sh = adev->gfx.config.max_cu_per_sh;
+}
+
+int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
+		struct kgd_mem *mem, void **kptr)
+{
+	return 0;
 }

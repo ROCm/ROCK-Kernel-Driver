@@ -40,6 +40,8 @@ struct kgd_mem {
 		struct {
 			struct amdgpu_bo *bo;
 			struct amdgpu_bo_va *bo_va;
+			bool mapped_to_gpu_memory;
+			void *kptr;
 		} data2;
 	};
 };
@@ -72,5 +74,10 @@ uint64_t get_gpu_clock_counter(struct kgd_dev *kgd);
 
 uint32_t get_max_engine_clock_in_mhz(struct kgd_dev *kgd);
 void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info);
+int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
+		struct kgd_mem *mem, void **kptr);
+
+/* Tonga API */
+struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_tonga_get_functions(void);
 
 #endif /* AMDGPU_AMDKFD_H_INCLUDED */

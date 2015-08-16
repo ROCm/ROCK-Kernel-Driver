@@ -106,7 +106,8 @@ amdgpu-y += \
 amdgpu-y += \
 	 amdgpu_amdkfd.o \
 	 amdgpu_amdkfd_gfx_v7.o \
-	 amdgpu_amdkfd_gfx_v8.o
+	 amdgpu_amdkfd_gfx_v8.o \
+	 amdgpu_amdkfd_gfx_v8_tonga.o
 
 amdgpu-$(CONFIG_COMPAT) += amdgpu_ioc32.o
 amdgpu-$(CONFIG_VGA_SWITCHEROO) += amdgpu_atpx_handler.o
