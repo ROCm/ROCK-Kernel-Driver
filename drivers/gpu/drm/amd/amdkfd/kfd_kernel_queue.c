@@ -293,6 +293,7 @@ struct kernel_queue *kernel_queue_init(struct kfd_dev *dev,
 
 	switch (dev->device_info->asic_family) {
 	case CHIP_CARRIZO:
+	case CHIP_TONGA:
 		kernel_queue_init_vi(&kq->ops_asic_specific);
 		break;
 
