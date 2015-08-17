@@ -71,8 +71,8 @@ static int amd_gnb_bus_device_pm_suspend(struct device *dev)
 {
 	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
 
-	if (pm)
-		return pm_generic_suspend(dev);
+	if (pm && pm->suspend)
+		return pm->suspend(dev);
 	else
 		return amd_gnb_bus_legacy_suspend(dev, PMSG_SUSPEND);
 }
@@ -81,8 +81,8 @@ static int amd_gnb_bus_device_pm_resume(struct device *dev)
 {
 	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
 
-	if (pm)
-		return pm_generic_resume(dev);
+	if (pm && pm->suspend)
+		return pm->suspend(dev);
 	else
 		return amd_gnb_bus_legacy_resume(dev);
 }
@@ -91,8 +91,8 @@ static int amd_gnb_bus_device_pm_freeze(struct device *dev)
 {
 	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
 
-	if (pm)
-		return pm_generic_freeze(dev);
+	if (pm && pm->freeze)
+		return pm->freeze(dev);
 	else
 		return amd_gnb_bus_legacy_suspend(dev, PMSG_FREEZE);
 }
@@ -101,8 +101,8 @@ static int amd_gnb_bus_device_pm_thaw(struct device *dev)
 {
 	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
 
-	if (pm)
-		return pm_generic_thaw(dev);
+	if (pm && pm->thaw)
+		return pm->thaw(dev);
 	else
 		return amd_gnb_bus_legacy_resume(dev);
 }
@@ -111,8 +111,8 @@ static int amd_gnb_bus_device_pm_poweroff(struct device *dev)
 {
 	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
 
-	if (pm)
-		return pm_generic_poweroff(dev);
+	if (pm && pm->poweroff)
+		return pm->poweroff(dev);
 	else
 		return amd_gnb_bus_legacy_suspend(dev, PMSG_HIBERNATE);
 }
@@ -121,8 +121,8 @@ static int amd_gnb_bus_device_pm_restore(struct device *dev)
 {
 	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
 
-	if (pm)
-		return pm_generic_restore(dev);
+	if (pm && pm->restore)
+		return pm->restore(dev);
 	else
 		return amd_gnb_bus_legacy_resume(dev);
 }
