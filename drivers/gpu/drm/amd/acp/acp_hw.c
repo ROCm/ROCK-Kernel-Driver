@@ -39,6 +39,7 @@
 #include <linux/device.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
+#include <linux/io.h>
 
 #include "acp_gfx_if.h"
 #include "acp_hw.h"
