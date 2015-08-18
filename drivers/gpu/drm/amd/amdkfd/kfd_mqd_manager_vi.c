@@ -41,11 +41,10 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 {
 	struct vi_mqd *m;
 	struct kfd_cu_info cu_info;
-	uint32_t *mgmt_se_mask;
-	uint32_t cu_per_sh_mask, cu_per_sh_shift;
-	uint32_t cu_per_se, cu_mask;
-	uint32_t sh0_cu_mask, sh1_cu_mask;
-	int se;
+	uint32_t mgmt_se_mask;
+	uint32_t cu_sh_mask, cu_sh_shift;
+	uint32_t cu_mask;
+	int se, sh;
 
 	if (q->cu_mask == 0)
 		return;
@@ -57,23 +56,31 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 	m->compute_static_thread_mgmt_se3 = 0;
 
 	mm->dev->kfd2kgd->get_cu_info(mm->dev->kgd, &cu_info);
-	cu_per_sh_shift = cu_info.num_cu_per_sh;
-	cu_per_sh_mask = (1 << cu_per_sh_shift) - 1;
-	cu_per_se = cu_info.num_cu_per_sh *
-		cu_info.num_shader_arrays_per_engine;
-
-	mgmt_se_mask = &m->compute_static_thread_mgmt_se0;
 	cu_mask = q->cu_mask;
-	for (se = 0; se < cu_info.num_shader_engines; se++) {
-		sh0_cu_mask = cu_mask & cu_per_sh_mask;
-		if (cu_info.num_shader_arrays_per_engine > 1)
-			sh1_cu_mask = (cu_mask >> cu_per_sh_shift)
-					& cu_per_sh_mask;
-		else
-			sh1_cu_mask = 0;
-		*mgmt_se_mask = sh0_cu_mask | (sh1_cu_mask << 16);
-		mgmt_se_mask++;
-		cu_mask >>= cu_per_se;
+	for (se = 0; se < cu_info.num_shader_engines && cu_mask; se++) {
+		mgmt_se_mask = 0;
+		for (sh = 0; sh < 2 && cu_mask; sh++) {
+			cu_sh_shift = hweight32(cu_info.cu_bitmap[se][sh]);
+			cu_sh_mask = (1 << cu_sh_shift) - 1;
+			mgmt_se_mask |= (cu_mask & cu_sh_mask) << (sh * 16);
+			cu_mask >>= cu_sh_shift;
+		}
+		switch (se) {
+		case 0:
+			m->compute_static_thread_mgmt_se0 = mgmt_se_mask;
+			break;
+		case 1:
+			m->compute_static_thread_mgmt_se1 = mgmt_se_mask;
+			break;
+		case 2:
+			m->compute_static_thread_mgmt_se2 = mgmt_se_mask;
+			break;
+		case 3:
+			m->compute_static_thread_mgmt_se3 = mgmt_se_mask;
+			break;
+		default:
+			break;
+		}
 	}
 	pr_debug("kfd: update cu mask to %#x %#x %#x %#x\n",
 		m->compute_static_thread_mgmt_se0,
