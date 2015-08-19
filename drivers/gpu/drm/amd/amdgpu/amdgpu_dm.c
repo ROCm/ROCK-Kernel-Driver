@@ -692,6 +692,8 @@ static int dm_suspend(void *handle)
 		DAL_ACPI_CM_POWER_STATE_D3,
 		DAL_VIDEO_POWER_SUSPEND);
 
+	amdgpu_dm_irq_suspend(adev);
+
 	return 0;
 }
 

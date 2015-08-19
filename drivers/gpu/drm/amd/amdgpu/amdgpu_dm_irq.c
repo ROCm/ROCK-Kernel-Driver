@@ -449,11 +449,41 @@ void amdgpu_dm_irq_fini(
 	destroy_workqueue(adev->dm.timer_workqueue);
 }
 
+int amdgpu_dm_irq_suspend(
+	struct amdgpu_device *adev)
+{
+	int src;
+	struct list_head *hnd_list_h;
+	struct list_head *hnd_list_l;
+	unsigned long irq_table_flags;
+
+	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
+
+	DRM_DEBUG_KMS("DM_IRQ: suspend\n");
+
+	/* disable HW interrupt */
+	for (src = DAL_IRQ_SOURCE_HPD1; src < DAL_IRQ_SOURCES_NUMBER; src++) {
+		hnd_list_l = &adev->dm.irq_handler_list_low_tab[src].head;
+		hnd_list_h = &adev->dm.irq_handler_list_high_tab[src];
+		if (!list_empty(hnd_list_l) || !list_empty(hnd_list_h))
+			dal_interrupt_set(adev->dm.dal, src, false);
+
+		flush_work(&adev->dm.irq_handler_list_low_tab[src].work);
+	}
+
+	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
+
+	return 0;
+}
+
 int amdgpu_dm_irq_resume(
 	struct amdgpu_device *adev)
 {
 	int src;
 	struct list_head *hnd_list_h, *hnd_list_l;
+	unsigned long irq_table_flags;
+
+	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
 
 	DRM_DEBUG_KMS("DM_IRQ: resume\n");
 
@@ -464,6 +494,9 @@ int amdgpu_dm_irq_resume(
 		if (!list_empty(hnd_list_l) || !list_empty(hnd_list_h))
 			dal_interrupt_set(adev->dm.dal, src, true);
 	}
+
+	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
+
 	return 0;
 }
 
