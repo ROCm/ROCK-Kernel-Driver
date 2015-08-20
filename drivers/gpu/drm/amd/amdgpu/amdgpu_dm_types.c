@@ -1176,10 +1176,8 @@ static void amdgpu_dm_connector_dpms(struct drm_connector *connector, int mode)
 {
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = dev->dev_private;
-	/* TODO: uncomment these definitions to enable DPMS call later
 	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
-	struct amdgpu_device *adev = connector->dev->dev_private;
-	uint32_t display_index = aconnector->connector_id; */
+	uint32_t display_index = aconnector->connector_id;
 	enum dal_power_state ps;
 
 	if (mode == connector->dpms)
@@ -1203,7 +1201,7 @@ static void amdgpu_dm_connector_dpms(struct drm_connector *connector, int mode)
 		return;
 	}
 
-	/* dal_set_display_dpms(adev->dm.dal, display_index, ps); */
+	dal_set_display_dpms(adev->dm.dal, display_index, ps);
 
 	connector->dpms = mode;
 
