@@ -2,7 +2,7 @@
 # Makefile for the drm device driver.  This driver provides support for the
 # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
 
-FULL_AMD_PATH=drivers/gpu/drm/amd
+FULL_AMD_PATH=$(src)/..
 DAL_FOLDER_NAME=dal
 FULL_AMD_DAL_PATH = $(FULL_AMD_PATH)/$(DAL_FOLDER_NAME)
 

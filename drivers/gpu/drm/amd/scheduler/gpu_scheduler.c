@@ -30,27 +30,27 @@
 /* Initialize a given run queue struct */
 static void amd_sched_rq_init(struct amd_sched_rq *rq)
 {
+	spin_lock_init(&rq->lock);
 	INIT_LIST_HEAD(&rq->entities);
-	mutex_init(&rq->lock);
 	rq->current_entity = NULL;
 }
 
 static void amd_sched_rq_add_entity(struct amd_sched_rq *rq,
 				    struct amd_sched_entity *entity)
 {
-	mutex_lock(&rq->lock);
+	spin_lock(&rq->lock);
 	list_add_tail(&entity->list, &rq->entities);
-	mutex_unlock(&rq->lock);
+	spin_unlock(&rq->lock);
 }
 
 static void amd_sched_rq_remove_entity(struct amd_sched_rq *rq,
 				       struct amd_sched_entity *entity)
 {
-	mutex_lock(&rq->lock);
+	spin_lock(&rq->lock);
 	list_del_init(&entity->list);
 	if (rq->current_entity == entity)
 		rq->current_entity = NULL;
-	mutex_unlock(&rq->lock);
+	spin_unlock(&rq->lock);
 }
 
 /**
@@ -61,12 +61,16 @@ static void amd_sched_rq_remove_entity(struct amd_sched_rq *rq,
 static struct amd_sched_entity *
 amd_sched_rq_select_entity(struct amd_sched_rq *rq)
 {
-	struct amd_sched_entity *entity = rq->current_entity;
+	struct amd_sched_entity *entity;
 
+	spin_lock(&rq->lock);
+
+	entity = rq->current_entity;
 	if (entity) {
 		list_for_each_entry_continue(entity, &rq->entities, list) {
 			if (!kfifo_is_empty(&entity->job_queue)) {
 				rq->current_entity = entity;
+				spin_unlock(&rq->lock);
 				return rq->current_entity;
 			}
 		}
@@ -76,12 +80,15 @@ amd_sched_rq_select_entity(struct amd_sched_rq *rq)
 
 		if (!kfifo_is_empty(&entity->job_queue)) {
 			rq->current_entity = entity;
+			spin_unlock(&rq->lock);
 			return rq->current_entity;
 		}
 
 		if (entity == rq->current_entity)
 			break;
 	}
+
+	spin_unlock(&rq->lock);
 
 	return NULL;
 }
@@ -109,22 +116,6 @@ static bool is_scheduler_ready(struct amd_gpu_scheduler *sched)
 }
 
 /**
- * Select next entity from the kernel run queue, if not available,
- * return null.
-*/
-static struct amd_sched_entity *
-kernel_rq_select_context(struct amd_gpu_scheduler *sched)
-{
-	struct amd_sched_entity *sched_entity;
-	struct amd_sched_rq *rq = &sched->kernel_rq;
-
-	mutex_lock(&rq->lock);
-	sched_entity = amd_sched_rq_select_entity(rq);
-	mutex_unlock(&rq->lock);
-	return sched_entity;
-}
-
-/**
  * Select next entity containing real IB submissions
 */
 static struct amd_sched_entity *
@@ -132,21 +123,15 @@ select_context(struct amd_gpu_scheduler *sched)
 {
 	struct amd_sched_entity *wake_entity = NULL;
 	struct amd_sched_entity *tmp;
-	struct amd_sched_rq *rq;
 
 	if (!is_scheduler_ready(sched))
 		return NULL;
 
 	/* Kernel run queue has higher priority than normal run queue*/
-	tmp = kernel_rq_select_context(sched);
-	if (tmp != NULL)
-		goto exit;
+	tmp = amd_sched_rq_select_entity(&sched->kernel_rq);
+	if (tmp == NULL)
+		tmp = amd_sched_rq_select_entity(&sched->sched_rq);
 
-	rq = &sched->sched_rq;
-	mutex_lock(&rq->lock);
-	tmp = amd_sched_rq_select_entity(rq);
-	mutex_unlock(&rq->lock);
-exit:
 	if (sched->current_entity && (sched->current_entity != tmp))
 		wake_entity = sched->current_entity;
 	sched->current_entity = tmp;
@@ -282,30 +267,18 @@ int amd_sched_entity_fini(struct amd_gpu_scheduler *sched,
  *	     scheduler consum some queued command.
  *	  -1 other fail.
 */
-int amd_sched_push_job(struct amd_gpu_scheduler *sched,
-		       struct amd_sched_entity *c_entity,
-		       void *data,
-		       struct amd_sched_fence **fence)
+int amd_sched_push_job(struct amd_sched_job *sched_job)
 {
-	struct amd_sched_job *job;
-
+	struct amd_sched_fence 	*fence =
+		amd_sched_fence_create(sched_job->s_entity);
 	if (!fence)
 		return -EINVAL;
-	job = kzalloc(sizeof(struct amd_sched_job), GFP_KERNEL);
-	if (!job)
-		return -ENOMEM;
-	job->sched = sched;
-	job->s_entity = c_entity;
-	job->data = data;
-	*fence = amd_sched_fence_create(c_entity);
-	if ((*fence) == NULL) {
-		kfree(job);
-		return -EINVAL;
-	}
-	fence_get(&(*fence)->base);
-	job->s_fence = *fence;
-	while (kfifo_in_spinlocked(&c_entity->job_queue, &job, sizeof(void *),
-				   &c_entity->queue_lock) != sizeof(void *)) {
+	fence_get(&fence->base);
+	sched_job->s_fence = fence;
+	while (kfifo_in_spinlocked(&sched_job->s_entity->job_queue,
+				   &sched_job, sizeof(void *),
+				   &sched_job->s_entity->queue_lock) !=
+	       sizeof(void *)) {
 		/**
 		 * Current context used up all its IB slots
 		 * wait here, or need to check whether GPU is hung
@@ -313,8 +286,8 @@ int amd_sched_push_job(struct amd_gpu_scheduler *sched,
 		schedule();
 	}
 	/* first job wake up scheduler */
-	if ((kfifo_len(&c_entity->job_queue) / sizeof(void *)) == 1)
-		wake_up_interruptible(&sched->wait_queue);
+	if ((kfifo_len(&sched_job->s_entity->job_queue) / sizeof(void *)) == 1)
+		wake_up_interruptible(&sched_job->sched->wait_queue);
 	return 0;
 }
 
@@ -333,10 +306,8 @@ static void amd_sched_process_job(struct fence *f, struct fence_cb *cb)
 	list_del(&sched_job->list);
 	atomic64_dec(&sched->hw_rq_count);
 	spin_unlock_irqrestore(&sched->queue_lock, flags);
-
-	sched->ops->process_job(sched, sched_job);
 	fence_put(&sched_job->s_fence->base);
-	kfree(sched_job);
+	sched->ops->process_job(sched, sched_job);
 	wake_up_interruptible(&sched->wait_queue);
 }
 
@@ -359,7 +330,9 @@ static int amd_sched_main(void *param)
 		r = kfifo_out(&c_entity->job_queue, &job, sizeof(void *));
 		if (r != sizeof(void *))
 			continue;
-		r = sched->ops->prepare_job(sched, c_entity, job);
+		r = 0;
+		if (sched->ops->prepare_job)
+			r = sched->ops->prepare_job(sched, c_entity, job);
 		if (!r) {
 			unsigned long flags;
 			spin_lock_irqsave(&sched->queue_lock, flags);

@@ -63,7 +63,7 @@ struct amd_sched_entity {
  * the next entity to emit commands from.
 */
 struct amd_sched_rq {
-	struct mutex		lock;
+	spinlock_t		lock;
 	struct list_head	entities;
 	struct amd_sched_entity	*current_entity;
 };
@@ -81,7 +81,6 @@ struct amd_sched_job {
 	struct fence_cb                 cb;
 	struct amd_gpu_scheduler        *sched;
 	struct amd_sched_entity         *s_entity;
-	void                            *data;
 	struct amd_sched_fence          *s_fence;
 };
 
@@ -140,10 +139,7 @@ struct amd_gpu_scheduler *amd_sched_create(void *device,
 				uint32_t hw_submission);
 int amd_sched_destroy(struct amd_gpu_scheduler *sched);
 
-int amd_sched_push_job(struct amd_gpu_scheduler *sched,
-		       struct amd_sched_entity *c_entity,
-		       void *data,
-		       struct amd_sched_fence **fence);
+int amd_sched_push_job(struct amd_sched_job *sched_job);
 
 int amd_sched_entity_init(struct amd_gpu_scheduler *sched,
 			  struct amd_sched_entity *entity,

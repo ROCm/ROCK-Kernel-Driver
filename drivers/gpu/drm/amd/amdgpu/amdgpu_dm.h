@@ -137,6 +137,8 @@ struct amdgpu_display_manager {
 	 * DRM mode setting locks being acquired. This is where dal_mutex
 	 * is acquired before calling into DAL. */
 	struct mutex dal_mutex;
+
+	struct backlight_device *backlight_dev;
 };
 
 

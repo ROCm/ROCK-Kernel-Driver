@@ -307,7 +307,7 @@ static void amdgpu_vm_update_pages(struct amdgpu_device *adev,
 }
 
 static int amdgpu_vm_free_job(
-	struct amdgpu_cs_parser *sched_job)
+	struct amdgpu_job *sched_job)
 {
 	int i;
 	for (i = 0; i < sched_job->num_ibs; i++)
@@ -495,7 +495,10 @@ int amdgpu_vm_update_page_directory(struct amdgpu_device *adev,
 							 &fence);
 		if (r)
 			goto error_free;
+
 		amdgpu_bo_fence(pd, fence, true);
+		fence_put(vm->page_directory_fence);
+		vm->page_directory_fence = fence_get(fence);
 		fence_put(fence);
 	}
 
@@ -1291,6 +1294,8 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		return -ENOMEM;
 	}
 
+	vm->page_directory_fence = NULL;
+
 	r = amdgpu_bo_create(adev, pd_size, align, true,
 			     AMDGPU_GEM_DOMAIN_VRAM, 0,
 			     NULL, &vm->page_directory);
@@ -1339,6 +1344,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	kfree(vm->page_tables);
 
 	amdgpu_bo_unref(&vm->page_directory);
+	fence_put(vm->page_directory_fence);
 
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 		amdgpu_fence_unref(&vm->ids[i].flushed_updates);
