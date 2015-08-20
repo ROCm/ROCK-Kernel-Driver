@@ -939,6 +939,116 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data,
 }
 
 /**
+ * amdgpu_cs_wait_fences_ioctl - wait for multiple command submissions to finish
+ *
+ * @dev: drm device
+ * @data: data from userspace
+ * @filp: file private
+ */
+int amdgpu_cs_wait_fences_ioctl(struct drm_device *dev, void *data,
+				struct drm_file *filp)
+{
+	union drm_amdgpu_wait_fences *wait = data;
+	struct drm_amdgpu_fence *fences_user = NULL;
+	struct drm_amdgpu_fence *fences = NULL;
+	struct fence **array = NULL;
+	struct amdgpu_device *adev = dev->dev_private;
+	unsigned long timeout = amdgpu_gem_timeout(wait->in.timeout_ns);
+	bool wait_all = wait->in.wait_all;
+	uint32_t fence_count = wait->in.fence_count;
+	struct amdgpu_ring *ring;
+	struct amdgpu_ctx **ctxs;
+	struct fence *fence;
+	long r;
+	uint32_t i;
+
+	/* Get the fences from userspace */
+	fences = kmalloc_array(fence_count, sizeof(struct drm_amdgpu_fence),
+			GFP_KERNEL);
+	if (fences == NULL)
+		return -ENOMEM;
+
+	fences_user = (void __user *)wait->in.fences;
+	if (copy_from_user(fences, fences_user,
+		sizeof(struct drm_amdgpu_fence) * fence_count)) {
+		r = -EFAULT;
+		goto err_free_fences;
+	}
+
+	ctxs = (struct amdgpu_ctx **)kcalloc(fence_count,
+			sizeof(struct amdgpu_ctx *), GFP_KERNEL);
+	if (ctxs == NULL) {
+		r = -ENOMEM;
+		goto err_free_fences;
+	}
+	memset(&ctxs[0], 0, sizeof(struct amdgpu_ctxs *) * fence_count);
+
+	/* Prepare the fence array */
+	array = (struct fence **)kcalloc(fence_count, sizeof(struct fence *),
+			GFP_KERNEL);
+	if (array == NULL) {
+		r = -ENOMEM;
+		goto err_free_ctxs;
+	}
+	memset(&array[0], 0, sizeof(struct fence *) * fence_count);
+
+	for (i = 0; i < fence_count; i++) {
+		ring = NULL;
+		r = amdgpu_cs_get_ring(adev, fences[i].ip_type,
+				fences[i].ip_instance, fences[i].ring, &ring);
+		if (r)
+			goto err_free_fence_array;
+
+		ctxs[i] = amdgpu_ctx_get(filp->driver_priv, fences[i].ctx_id);
+		if (ctxs[i] == NULL) {
+			r = -EINVAL;
+			goto err_free_fence_array;
+		}
+
+		fence = amdgpu_ctx_get_fence(ctxs[i], ring, fences[i].seq_no);
+		if (IS_ERR(fence)) {
+			r = PTR_ERR(fence);
+			goto err_free_fence_array;
+		} else if (fence) {
+			array[i] = fence;
+		} else { /* NULL, the fence has been already signaled */
+			if (wait_all)
+				continue;
+			r = 1;
+			goto out;
+		}
+	}
+
+	r = amdgpu_fence_wait_multiple(adev, array, fence_count, wait_all,
+			true, timeout);
+	if (r < 0)
+		goto err_free_fence_array;
+
+out:
+	memset(wait, 0, sizeof(*wait));
+	wait->out.status = (r > 0);
+	/* set return value 0 to indicate success */
+	r = 0;
+
+err_free_fence_array:
+	for (i = 0; i < fence_count; i++) {
+		if (array[i])
+			fence_put(array[i]);
+		if (ctxs[i])
+			amdgpu_ctx_put(ctxs[i]);
+	}
+	kfree(array);
+
+err_free_ctxs:
+	kfree(ctxs);
+
+err_free_fences:
+	kfree(fences);
+
+	return r;
+}
+
+/**
  * amdgpu_cs_find_bo_va - find bo_va for VM address
  *
  * @parser: command submission parser context
