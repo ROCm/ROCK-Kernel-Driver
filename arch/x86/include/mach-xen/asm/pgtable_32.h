@@ -62,8 +62,8 @@ do {									\
 		BUG(); \
 } while (0)
 
-void make_lowmem_page_readonly(void *va, unsigned int feature);
-void make_lowmem_page_writable(void *va, unsigned int feature);
+void make_lowmem_page_readonly(const void *, unsigned int feature);
+void make_lowmem_page_writable(const void *, unsigned int feature);
 
 #endif /* !__ASSEMBLY__ */
 

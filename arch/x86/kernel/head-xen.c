@@ -200,7 +200,7 @@ void __init xen_arch_setup(void)
 #ifdef CONFIG_X86_64
 	static const struct callback_register __initconst syscall = {
 		.type = CALLBACKTYPE_syscall,
-		.address = CALLBACK_ADDR(system_call)
+		.address = CALLBACK_ADDR(entry_SYSCALL_64)
 	};
 #endif
 	static const struct callback_register __initconst nmi_cb = {

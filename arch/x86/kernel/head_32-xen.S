@@ -12,7 +12,6 @@
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
 #include <asm/boot.h>
-#include <asm/dwarf2.h>
 #include <asm/percpu.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/arch-x86/xen-mca.h>
@@ -119,15 +118,7 @@ ENTRY(startup_32)
 	.balign PAGE_SIZE
 #endif
 ENTRY(hypercall_page)
-	CFI_STARTPROC
-	.skip __HYPERVISOR_iret * 32
-	CFI_REMEMBER_STATE
-	.skip 1 /* push %eax */
-	CFI_ADJUST_CFA_OFFSET	8
-	CFI_REL_OFFSET	eax,0
-	CFI_RESTORE_STATE
-	.balign 0x1000,0
-	CFI_ENDPROC
+	.fill PAGE_SIZE, 1, 0xcc
 
 #define HYPERCALL(n) \
 	.equ HYPERVISOR_##n, hypercall_page + __HYPERVISOR_##n * 32; \

@@ -110,7 +110,7 @@ static int __init parse_reservetop(char *arg)
 early_param("reservetop", parse_reservetop);
 #endif
 
-void make_lowmem_page_readonly(void *va, unsigned int feature)
+void make_lowmem_page_readonly(const void *va, unsigned int feature)
 {
 	pte_t *pte;
 	unsigned int level;
@@ -126,7 +126,7 @@ void make_lowmem_page_readonly(void *va, unsigned int feature)
 	BUG_ON(rc);
 }
 
-void make_lowmem_page_writable(void *va, unsigned int feature)
+void make_lowmem_page_writable(const void *va, unsigned int feature)
 {
 	pte_t *pte;
 	unsigned int level;

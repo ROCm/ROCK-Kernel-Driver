@@ -60,11 +60,13 @@ static inline void x86_ce4100_early_setup(void) { }
 #ifndef _SETUP
 
 #include <asm/espfix.h>
+#include <linux/kernel.h>
 
 /*
  * This is set up by the setup-routine at boot-time
  */
 extern struct boot_params boot_params;
+extern char _text[];
 
 static inline bool kaslr_enabled(void)
 {
@@ -73,6 +75,11 @@ static inline bool kaslr_enabled(void)
 #else
 	return false;
 #endif
+}
+
+static inline unsigned long kaslr_offset(void)
+{
+	return (unsigned long)&_text - __START_KERNEL;
 }
 
 /*

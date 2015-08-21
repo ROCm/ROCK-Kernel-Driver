@@ -5,10 +5,10 @@
  */
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/ktime.h>
 #include <linux/pci.h>
 #include <linux/spinlock.h>
 #include <asm/bitops.h>
-#include <linux/time.h>
 #include <xen/evtchn.h>
 #include "pcifront.h"
 
@@ -173,7 +173,6 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 	unsigned long irq_flags;
 	evtchn_port_t port = pdev->evtchn;
 	s64 ns, ns_timeout;
-	struct timeval tv;
 
 	spin_lock_irqsave(&pdev->sh_info_lock, irq_flags);
 
@@ -190,8 +189,7 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 	 * (in the latter case we end up continually re-executing poll() with a
 	 * timeout in the past). 1s difference gives plenty of slack for error.
 	 */
-	do_gettimeofday(&tv);
-	ns_timeout = timeval_to_ns(&tv) + 2 * (s64)NSEC_PER_SEC;
+	ns_timeout = ktime_get_ns() + 2 * (s64)NSEC_PER_SEC;
 
 	clear_evtchn(port);
 
@@ -200,8 +198,7 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 		if (HYPERVISOR_poll(&port, 1, jiffies + 3*HZ))
 			BUG();
 		clear_evtchn(port);
-		do_gettimeofday(&tv);
-		ns = timeval_to_ns(&tv);
+		ns = ktime_get_ns();
 		if (ns > ns_timeout) {
 			dev_err(&pdev->xdev->dev,
 				"pciback not responding!!!\n");
@@ -434,9 +431,15 @@ int pcifront_scan_root(struct pcifront_device *pdev,
 		       unsigned int domain, unsigned int bus)
 {
 	struct pci_bus *b;
+	LIST_HEAD(resources);
 	struct pcifront_sd *sd;
 	struct pci_bus_entry *bus_entry;
 	int err = 0;
+	static struct resource busn_res = {
+		.start = 0,
+		.end = 255,
+		.flags = IORESOURCE_BUS,
+	};
 
 #ifndef CONFIG_PCI_DOMAINS
 	if (domain != 0) {
@@ -457,14 +460,18 @@ int pcifront_scan_root(struct pcifront_device *pdev,
 		err = -ENOMEM;
 		goto err_out;
 	}
+	pci_add_resource(&resources, &ioport_resource);
+	pci_add_resource(&resources, &iomem_resource);
+	pci_add_resource(&resources, &busn_res);
 	pcifront_init_sd(sd, domain, bus, pdev);
 
 	pci_lock_rescan_remove();
 
-	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
-				  &pcifront_bus_ops, sd);
+	b = pci_scan_root_bus(&pdev->xdev->dev, bus,
+			      &pcifront_bus_ops, sd, &resources);
 	if (!b) {
 		pci_unlock_rescan_remove();
+		pci_free_resource_list(&resources);
 		dev_err(&pdev->xdev->dev,
 			"Error creating PCI Frontend Bus!\n");
 		err = -ENOMEM;

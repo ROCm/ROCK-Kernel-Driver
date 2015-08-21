@@ -41,7 +41,7 @@
 #include <linux/list.h>
 #include <linux/module.h>
 #include <linux/string.h>
-#include <linux/delay.h>
+#include <linux/vmalloc.h>
 #include <xen/balloon.h>
 #include <xen/evtchn.h>
 #include <xen/gnttab.h>

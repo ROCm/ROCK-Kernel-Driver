@@ -398,11 +398,17 @@ static inline int is_new_memtype_allowed(u64 paddr, unsigned long size,
 	 * requested memtype:
 	 * - request is uncached, return cannot be write-back
 	 * - request is write-combine, return cannot be write-back
+	 * - request is write-through, return cannot be write-back
+	 * - request is write-through, return cannot be write-combine
 	 */
 	if ((pcm == _PAGE_CACHE_MODE_UC_MINUS &&
 	     new_pcm == _PAGE_CACHE_MODE_WB) ||
 	    (pcm == _PAGE_CACHE_MODE_WC &&
-	     new_pcm == _PAGE_CACHE_MODE_WB)) {
+	     new_pcm == _PAGE_CACHE_MODE_WB) ||
+	    (pcm == _PAGE_CACHE_MODE_WT &&
+	     new_pcm == _PAGE_CACHE_MODE_WB) ||
+	    (pcm == _PAGE_CACHE_MODE_WT &&
+	     new_pcm == _PAGE_CACHE_MODE_WC)) {
 		return 0;
 	}
 
@@ -840,9 +846,9 @@ static inline int pmd_write(pmd_t pmd)
 	return pmd_flags(pmd) & _PAGE_RW;
 }
 
-#define __HAVE_ARCH_PMDP_GET_AND_CLEAR
+#define __HAVE_ARCH_PMDP_HUGE_GET_AND_CLEAR
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-static inline pmd_t pmdp_get_and_clear(struct mm_struct *mm, unsigned long addr,
+static inline pmd_t pmdp_huge_get_and_clear(struct mm_struct *mm, unsigned long addr,
 				       pmd_t *pmdp)
 {
 	pmd_t pmd = xen_pmdp_get_and_clear(pmdp);
@@ -976,10 +982,10 @@ static inline pte_t pte_swp_clear_soft_dirty(pte_t pte)
 #include <asm-generic/pgtable.h>
 
 #include <xen/features.h>
-void make_page_readonly(void *va, unsigned int feature);
-void make_page_writable(void *va, unsigned int feature);
-void make_pages_readonly(void *va, unsigned int nr, unsigned int feature);
-void make_pages_writable(void *va, unsigned int nr, unsigned int feature);
+void make_page_readonly(const void *, unsigned int feature);
+void make_page_writable(const void *, unsigned int feature);
+void make_pages_readonly(const void *, unsigned int nr, unsigned int feature);
+void make_pages_writable(const void *, unsigned int nr, unsigned int feature);
 
 struct vm_area_struct;
 

@@ -189,12 +189,12 @@ static int __acpi_processor_start(struct acpi_device *device)
 	acpi_processor_ppc_has_changed(pr, 0);
 #endif
 	/*
-	 * pr->id may equal to -1 while processor_cntl_external enabled.
+	 * pr->id may be invalid when processor_cntl_external is enabled.
 	 * throttle and thermal module don't support this case.
 	 * Tx only works when dom0 vcpu == pcpu num by far, as we give
 	 * control to dom0.
 	 */
-	if (pr->id != -1) {
+	if (!invalid_logical_cpuid(pr->id)) {
 		acpi_processor_get_throttling_info(pr);
 
 		if (pr->flags.throttling)

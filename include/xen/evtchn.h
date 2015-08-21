@@ -61,6 +61,7 @@ struct irq_cfg {
 };
 struct irq_cfg *alloc_irq_and_cfg_at(unsigned int at, int node);
 static inline int evtchn_make_refcounted(unsigned int evtchn) { return 0; }
+extern struct irq_domain *xen_irq_domain;
 #endif
 
 /*

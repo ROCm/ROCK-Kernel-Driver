@@ -7,7 +7,6 @@
  */
 #include <linux/linkage.h>
 #include <linux/stringify.h>
-#include <asm/dwarf2.h>
 #include <asm/irqflags.h>
 #include <asm/percpu.h>
 #include <xen/interface/xen.h>
@@ -24,7 +23,6 @@
  * %al  : Operation successful
  */
 ENTRY(this_cpu_cmpxchg16b_emu)
-	CFI_STARTPROC
 
 #
 # Emulate 'cmpxchg16b %gs:(%rsi)' except we return the result in %al not
@@ -39,8 +37,7 @@ ENTRY(this_cpu_cmpxchg16b_emu)
 	       __stringify(__DISABLE_INTERRUPTS)
 	.equ rbp_saved, 0
 	.else
-	pushq_cfi %rbp
-	CFI_REL_OFFSET rbp, 0
+	pushq %rbp
 	.equ rbp_saved, 1
 #ifndef __REG_si
 # error Out of sync with asm/irqflags.h!
@@ -50,8 +47,7 @@ ENTRY(this_cpu_cmpxchg16b_emu)
 #define esi ebp
 	GET_VCPU_INFO
 	.endif
-	pushq_cfi %rdi
-	CFI_REL_OFFSET rdi, 0
+	pushq %rdi
 	__SAVE_INTERRUPTS(edi)
 	__DISABLE_INTERRUPTS
 
@@ -68,33 +64,26 @@ ENTRY(this_cpu_cmpxchg16b_emu)
 
 	test %edi, %edi
 	jz .Lcheck_events
-	CFI_REMEMBER_STATE
 .Lexit:
-	popq_cfi %rdi
-	CFI_RESTORE rdi
+	popq %rdi
 	.if rbp_saved
-	popq_cfi %rbp
-	CFI_RESTORE rbp
+	popq %rbp
 	.endif
 	ret
 
-	CFI_RESTORE_STATE
 .Lcheck_events:
 	__ENABLE_INTERRUPTS
 	__TEST_PENDING
 	jz .Lexit
 #undef __REG_si
 #undef esi
-	pushq_cfi %rsi
-	CFI_REL_OFFSET rsi, 0
-	pushq_cfi %rax
+	pushq %rsi
+	pushq %rax
 	/* %edi is zero already */
 	xor %esi, %esi
 	call hypercall_page + __HYPERVISOR_xen_version * 32
-	popq_cfi %rax
-	popq_cfi %rsi
-	CFI_RESTORE rsi
+	popq %rax
+	popq %rsi
 	jmp .Lexit
 
-	CFI_ENDPROC
 ENDPROC(this_cpu_cmpxchg16b_emu)

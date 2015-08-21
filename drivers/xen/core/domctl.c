@@ -193,6 +193,31 @@ struct xen_sysctl_topologyinfo_v8 {
 	};
 };
 
+struct xen_sysctl_cputopo_v12 {
+    uint32_t core;
+    uint32_t socket;
+    uint32_t node;
+};
+typedef struct xen_sysctl_cputopo_v12 xen_sysctl_cputopo_v12_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cputopo_v12_t);
+struct xen_sysctl_cputopoinfo_v12 {
+	uint32_t num_cpus;
+	union {
+		XEN_GUEST_HANDLE(xen_sysctl_cputopo_v12_t) cputopo;
+		uint64_aligned_t _ct_align;
+	};
+};
+
+#if XEN_SYSCTL_INTERFACE_VERSION >= 12
+# define XEN_SYSCTL_topologyinfo XEN_SYSCTL_cputopoinfo
+# define INVALID_TOPOLOGY_ID (~0U)
+#else
+# define XEN_SYSCTL_cputopoinfo XEN_SYSCTL_topologyinfo
+# define XEN_INVALID_CORE_ID    INVALID_TOPOLOGY_ID
+# define XEN_INVALID_SOCKET_ID  INVALID_TOPOLOGY_ID
+# define XEN_INVALID_NODE_ID    INVALID_TOPOLOGY_ID
+#endif
+
 union xen_sysctl {
 	/* v6: Xen 3.4.x */
 	struct {
@@ -216,7 +241,7 @@ union xen_sysctl {
 	 * v8: Xen 4.1.x
 	 * v9: Xen 4.2.x
 	 * v10: Xen 4.3.x and 4.4.x
-	 * v11: Xen 4.5+
+	 * v11: Xen 4.5
 	 */
 	struct {
 		uint32_t cmd;
@@ -225,6 +250,14 @@ union xen_sysctl {
 			struct xen_sysctl_topologyinfo_v8 topologyinfo;
 		};
 	} v8, v9, v10, v11;
+	/* v12: Xen 4.6+ */
+	struct {
+		uint32_t cmd;
+		uint32_t interface_version;
+		union {
+			struct xen_sysctl_cputopoinfo_v12 cputopoinfo;
+		};
+	} v12;
 };
 
 /* The actual code comes here */
@@ -463,22 +496,49 @@ EXPORT_SYMBOL_GPL(xen_set_physical_cpu_affinity);
 int xen_get_topology_info(unsigned int cpu, u32 *core, u32 *sock, u32 *node)
 {
 	union xen_sysctl sysctl;
+	struct xen_sysctl_cputopo_v12 *cputopo;
 	uint32_t *cores = NULL, *socks = NULL, *nodes = NULL;
 	unsigned int nr;
 	int rc;
 
-	if (core)
-		cores = kmalloc((cpu + 1) * sizeof(*cores), GFP_KERNEL);
-	if (sock)
-		socks = kmalloc((cpu + 1) * sizeof(*socks), GFP_KERNEL);
-	if (node)
-		nodes = kmalloc((cpu + 1) * sizeof(*nodes), GFP_KERNEL);
-	if ((core && !cores) || (sock && !socks) || (node && !nodes)) {
-		kfree(cores);
-		kfree(socks);
-		kfree(nodes);
+	BUILD_BUG_ON(XEN_SYSCTL_INTERFACE_VERSION > 12);
+	if (!core && !sock && !node)
+		return 0;
+
+	cputopo = kmalloc((cpu + 1) * sizeof(*cputopo), GFP_KERNEL);
+	if (!cputopo)
 		return -ENOMEM;
+
+#define cputopoinfo(ver) do {						\
+	memset(&sysctl, 0, sizeof(sysctl));				\
+	sysctl.v##ver.cmd = XEN_SYSCTL_cputopoinfo;			\
+	sysctl.v##ver.interface_version = ver;				\
+	sysctl.v##ver.cputopoinfo.num_cpus = cpu + 1;			\
+	set_xen_guest_handle(sysctl.v##ver.cputopoinfo.cputopo, cputopo); \
+	rc = hypervisor_sysctl(&sysctl);				\
+	nr = sysctl.v##ver.cputopoinfo.num_cpus;			\
+} while (0)
+
+	cputopoinfo(12);
+	if (!rc) {
+		if (core &&
+		    (*core = cputopo[cpu].core) == XEN_INVALID_CORE_ID)
+			rc = -ENOENT;
+		if (sock &&
+		    (*sock = cputopo[cpu].socket) == XEN_INVALID_SOCKET_ID)
+			rc = -ENOENT;
+		if (node &&
+		    (*node = cputopo[cpu].node) == XEN_INVALID_NODE_ID)
+			rc = -ENOENT;
+		kfree(cputopo);
+		return rc;
 	}
+
+	BUILD_BUG_ON(sizeof(*cputopo) !=
+		     sizeof(*cores) + sizeof(*socks) + sizeof(*nodes));
+	cores = core ? &cputopo->core : NULL;
+	socks = sock ? &cputopo->core + cpu + 1 : NULL;
+	nodes = node ? &cputopo->core + 2 * (cpu + 1) : NULL;
 
 #define topologyinfo(ver) do {						\
 	memset(&sysctl, 0, sizeof(sysctl));				\
@@ -495,8 +555,9 @@ int xen_get_topology_info(unsigned int cpu, u32 *core, u32 *sock, u32 *node)
 	nr = sysctl.v##ver.topologyinfo.max_cpu_index + 1;		\
 } while (0)
 
-	BUILD_BUG_ON(XEN_SYSCTL_INTERFACE_VERSION > 11);
+/* #if CONFIG_XEN_COMPAT < 0x040600 */
 	topologyinfo(11);
+/* #endif */
 #if CONFIG_XEN_COMPAT < 0x040500
 	if (rc)
 		topologyinfo(10);
@@ -545,15 +606,12 @@ int xen_get_topology_info(unsigned int cpu, u32 *core, u32 *sock, u32 *node)
 
 	if (!rc && core && (*core = cores[cpu]) == INVALID_TOPOLOGY_ID)
 		rc = -ENOENT;
-	kfree(cores);
-
 	if (!rc && sock && (*sock = socks[cpu]) == INVALID_TOPOLOGY_ID)
 		rc = -ENOENT;
-	kfree(socks);
-
 	if (!rc && node && (*node = nodes[cpu]) == INVALID_TOPOLOGY_ID)
 		rc = -ENOENT;
-	kfree(nodes);
+
+	kfree(cputopo);
 
 	return rc;
 }

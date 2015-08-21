@@ -90,7 +90,6 @@ unsigned __pvclock_read_cycles(const struct pvclock_vcpu_time_info *src,
 #else
 	ret_flags = PVCLOCK_TSC_STABLE_BIT;
 #endif
-	rdtsc_barrier();
 
 	*cycles = ret;
 	*flags = ret_flags;

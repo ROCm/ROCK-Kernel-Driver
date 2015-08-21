@@ -20,7 +20,6 @@
 #include <asm/pgtable.h>
 #include <asm/msr.h>
 #include <asm/cache.h>
-#include <asm/dwarf2.h>
 #include <asm/percpu.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/arch-x86/xen-mca.h>
@@ -88,39 +87,7 @@ NEXT_PAGE(hypercall_page)
 #if CONFIG_XEN_COMPAT <= 0x030002
 	phys_hypercall_page = . - .head.text
 #endif
-	CFI_STARTPROC
-	i = 0
-	.rept 0x1000 / 0x20
-	.skip 1 /* push %rcx */
-	CFI_ADJUST_CFA_OFFSET	8
-	CFI_REL_OFFSET	rcx,0
-	.skip 2 /* push %r11 */
-	CFI_ADJUST_CFA_OFFSET	8
-	CFI_REL_OFFSET	r11,0
-	.if i == __HYPERVISOR_iret
-	.skip 1 /* push %rax */
-	CFI_ADJUST_CFA_OFFSET	8
-	CFI_REL_OFFSET	rax,0
-	.endif
-	.skip 5 /* mov $#,%eax */
-	.skip 2 /* syscall */
-	.if i == __HYPERVISOR_iret
-	CFI_ADJUST_CFA_OFFSET	-3*8
-	CFI_SAME_VALUE	rax
-	CFI_SAME_VALUE	r11
-	CFI_SAME_VALUE	rcx
-	.else
-	.skip 2 /* pop %r11 */
-	CFI_ADJUST_CFA_OFFSET -8
-	CFI_RESTORE r11
-	.skip 1 /* pop %rcx */
-	CFI_ADJUST_CFA_OFFSET -8
-	CFI_RESTORE rcx
-	.endif
-	.balign 0x20,0 /* ret */
-	i = i + 1
-	.endr
-	CFI_ENDPROC
+	.fill PAGE_SIZE, 1, 0xcc
 
 #define HYPERCALL(n) \
 	.equ HYPERVISOR_##n, hypercall_page + __HYPERVISOR_##n * 32; \

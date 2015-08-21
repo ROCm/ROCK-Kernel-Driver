@@ -35,11 +35,13 @@
   */
 
 #define ARCH_HAS_IOREMAP_WC
+#define ARCH_HAS_IOREMAP_WT
 
 #include <linux/string.h>
 #include <linux/compiler.h>
 #include <asm/page.h>
 #include <asm/early_ioremap.h>
+#include <asm/pgtable_types.h>
 #ifdef __KERNEL__
 #include <asm/fixmap.h>
 #endif
@@ -183,6 +185,7 @@ static inline void *phys_to_virt(phys_addr_t address)
  * look at pci_iomap().
  */
 extern void __iomem *ioremap_nocache(resource_size_t offset, unsigned long size);
+extern void __iomem *ioremap_uc(resource_size_t offset, unsigned long size);
 extern void __iomem *ioremap_cache(resource_size_t offset, unsigned long size);
 extern void __iomem *ioremap_prot(resource_size_t offset, unsigned long size,
 				unsigned long prot_val);
@@ -202,8 +205,6 @@ extern void set_iounmap_nonlazy(void);
 #ifdef __KERNEL__
 
 #include <asm-generic/iomap.h>
-
-#include <linux/vmalloc.h>
 
 /*
  * Convert a virtual cached pointer to an uncached pointer
@@ -241,6 +242,12 @@ static inline void flush_write_buffers(void)
 #if defined(CONFIG_X86_PPRO_FENCE)
 	asm volatile("lock; addl $0,0(%%esp)": : :"memory");
 #endif
+}
+
+static inline void __pmem *arch_memremap_pmem(resource_size_t offset,
+	unsigned long size)
+{
+	return (void __force __pmem *) ioremap_cache(offset, size);
 }
 
 #endif /* __KERNEL__ */
@@ -325,12 +332,16 @@ extern void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr);
 extern int ioremap_check_change_attr(unsigned long mfn, unsigned long size,
 				     enum page_cache_mode pcm);
 extern void __iomem *ioremap_wc(resource_size_t offset, unsigned long size);
+extern void __iomem *ioremap_wt(resource_size_t offset, unsigned long size);
 
 extern bool is_early_ioremap_ptep(pte_t *ptep);
 
 #define IO_SPACE_LIMIT 0xffff
 
 #ifdef CONFIG_MTRR
+extern int __must_check arch_phys_wc_index(int handle);
+#define arch_phys_wc_index arch_phys_wc_index
+
 extern int __must_check arch_phys_wc_add(unsigned long base,
 					 unsigned long size);
 extern void arch_phys_wc_del(int handle);

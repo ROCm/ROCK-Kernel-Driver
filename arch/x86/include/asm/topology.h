@@ -25,14 +25,8 @@
 #ifndef _ASM_X86_TOPOLOGY_H
 #define _ASM_X86_TOPOLOGY_H
 
-#ifdef CONFIG_X86_32
-# ifdef CONFIG_X86_HT
-#  define ENABLE_TOPO_DEFINES
-# endif
-#else
-# if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
-#  define ENABLE_TOPO_DEFINES
-# endif
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+# define ENABLE_TOPO_DEFINES
 #endif
 
 /*
@@ -126,7 +120,7 @@ extern const struct cpumask *cpu_coregroup_mask(int cpu);
 
 #ifdef ENABLE_TOPO_DEFINES
 #define topology_core_cpumask(cpu)		(per_cpu(cpu_core_map, cpu))
-#define topology_thread_cpumask(cpu)		(per_cpu(cpu_sibling_map, cpu))
+#define topology_sibling_cpumask(cpu)		(per_cpu(cpu_sibling_map, cpu))
 #endif
 
 static inline void arch_fix_phys_package_id(int num, u32 slot)

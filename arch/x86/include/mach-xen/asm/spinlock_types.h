@@ -3,6 +3,9 @@
 
 #include <linux/types.h>
 
+#ifdef CONFIG_QUEUED_SPINLOCKS
+#include <asm-generic/qspinlock_types.h>
+#else
 #ifdef CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING
 #define __TICKET_LOCK_INC	1
 #define TICKET_SLOWPATH_FLAG	((__ticket_t)0)
@@ -56,6 +59,7 @@ typedef struct {
 } arch_spinlock_t;
 
 #define __ARCH_SPIN_LOCK_UNLOCKED	{ 0 }
+#endif /* CONFIG_QUEUED_SPINLOCKS */
 
 #include <asm-generic/qrwlock_types.h>
 

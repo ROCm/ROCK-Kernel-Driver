@@ -49,10 +49,6 @@ void dump_trace(struct task_struct *task, struct pt_regs *regs,
 	if (!task)
 		task = current;
 
-	bp = stack_frame(task, regs);
-	if (try_stack_unwind(task, regs, &stack, &bp, ops, data))
-		return;
-
 	if (!stack) {
 		unsigned long dummy;
 

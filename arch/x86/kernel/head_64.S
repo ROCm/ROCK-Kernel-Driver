@@ -346,7 +346,7 @@ early_idt_handler_common:
 	cld
 
 	cmpl $2,(%rsp)		# X86_TRAP_NMI
-	je is_nmi		# Ignore NMI
+	je .Lis_nmi		# Ignore NMI
 
 	cmpl $2,early_recursion_flag(%rip)
 	jz  1f
@@ -380,25 +380,6 @@ early_idt_handler_common:
 
 11:
 #ifdef CONFIG_EARLY_PRINTK
-#include <asm/dwarf2.h>
-	CFI_STARTPROC	simple
-	CFI_SIGNAL_FRAME
-	CFI_DEF_CFA	rsp, 16*8
-#	CFI_REL_OFFSET	ss, 15*8
-	CFI_REL_OFFSET	rsp, 14*8
-#	CFI_REL_OFFSET	rflags, 13*8
-#	CFI_REL_OFFSET	cs, 12*8
-	CFI_REL_OFFSET	rip, 11*8
-	CFI_REL_OFFSET	rax, 8*8
-	CFI_REL_OFFSET	rcx, 7*8
-	CFI_REL_OFFSET	rdx, 6*8
-	CFI_REL_OFFSET	rsi, 5*8
-	CFI_REL_OFFSET	rdi, 4*8
-	CFI_REL_OFFSET	r8, 3*8
-	CFI_REL_OFFSET	r9, 2*8
-	CFI_REL_OFFSET	r10, 1*8
-	CFI_REL_OFFSET	r11, 0*8
-
 	GET_CR2_INTO(%r9)	# can clobber any volatile register if pv
 	movl 80(%rsp),%r8d	# error code
 	movl 72(%rsp),%esi	# vector number
@@ -415,7 +396,6 @@ early_idt_handler_common:
 	movq 40(%rsp),%rsi	# %rip again
 	call __print_symbol
 #endif
-	CFI_ENDPROC
 #endif /* EARLY_PRINTK */
 1:	hlt
 	jmp 1b
@@ -431,7 +411,7 @@ early_idt_handler_common:
 	popq %rcx
 	popq %rax
 	decl early_recursion_flag(%rip)
-is_nmi:
+.Lis_nmi:
 	addq $16,%rsp		# drop vector number and error code
 	INTERRUPT_RETURN
 ENDPROC(early_idt_handler_common)
@@ -536,38 +516,9 @@ ENTRY(phys_base)
 	/* This must match the first entry in level2_kernel_pgt */
 	.quad   0x0000000000000000
 
-#ifdef CONFIG_KASAN
-#define FILL(VAL, COUNT)				\
-	.rept (COUNT) ;					\
-	.quad	(VAL) ;					\
-	.endr
-
-NEXT_PAGE(kasan_zero_pte)
-	FILL(kasan_zero_page - __START_KERNEL_map + _KERNPG_TABLE, 512)
-NEXT_PAGE(kasan_zero_pmd)
-	FILL(kasan_zero_pte - __START_KERNEL_map + _KERNPG_TABLE, 512)
-NEXT_PAGE(kasan_zero_pud)
-	FILL(kasan_zero_pmd - __START_KERNEL_map + _KERNPG_TABLE, 512)
-
-#undef FILL
-#endif
-
-
 #include "../../x86/xen/xen-head.S"
 	
 	__PAGE_ALIGNED_BSS
 NEXT_PAGE(empty_zero_page)
 	.skip PAGE_SIZE
 
-#ifdef CONFIG_KASAN
-/*
- * This page used as early shadow. We don't use empty_zero_page
- * at early stages, stack instrumentation could write some garbage
- * to this page.
- * Latter we reuse it as zero shadow for large ranges of memory
- * that allowed to access, but not instrumented by kasan
- * (vmalloc/vmemmap ...).
- */
-NEXT_PAGE(kasan_zero_page)
-	.skip PAGE_SIZE
-#endif

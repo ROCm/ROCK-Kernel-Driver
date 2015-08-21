@@ -654,7 +654,7 @@ unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c)
 	unsigned int trace = 0, l1i = 0, l1d = 0, l2 = 0, l3 = 0;
 	unsigned int new_l1d = 0, new_l1i = 0; /* Cache sizes from cpuid(4) */
 	unsigned int new_l2 = 0, new_l3 = 0, i; /* Cache sizes from cpuid(4) */
-#ifdef CONFIG_X86_HT
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 	unsigned int l2_id = 0, l3_id = 0, num_threads_sharing, index_msb;
 	unsigned int cpu = c->cpu_index;
 #endif
@@ -689,7 +689,7 @@ unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c)
 				break;
 			case 2:
 				new_l2 = this_leaf.size/1024;
-#ifdef CONFIG_X86_HT
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 				num_threads_sharing = 1 + this_leaf.eax.split.num_threads_sharing;
 				index_msb = get_count_order(num_threads_sharing);
 				l2_id = c->apicid & ~((1 << index_msb) - 1);
@@ -697,7 +697,7 @@ unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c)
 				break;
 			case 3:
 				new_l3 = this_leaf.size/1024;
-#ifdef CONFIG_X86_HT
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 				num_threads_sharing = 1 + this_leaf.eax.split.num_threads_sharing;
 				index_msb = get_count_order(num_threads_sharing);
 				l3_id = c->apicid & ~((1 << index_msb) - 1);
@@ -778,19 +778,19 @@ unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c)
 
 	if (new_l2) {
 		l2 = new_l2;
-#ifdef CONFIG_X86_HT
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 		per_cpu(cpu_llc_id, cpu) = l2_id;
 #endif
 	}
 
 	if (new_l3) {
 		l3 = new_l3;
-#ifdef CONFIG_X86_HT
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 		per_cpu(cpu_llc_id, cpu) = l3_id;
 #endif
 	}
 
-#ifdef CONFIG_X86_HT
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 	/*
 	 * If cpu_llc_id is not yet set, this means cpuid_level < 4 which in
 	 * turns means that the only possibility is SMT (as indicated in

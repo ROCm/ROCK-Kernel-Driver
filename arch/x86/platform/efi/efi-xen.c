@@ -343,6 +343,10 @@ void efi_get_time(struct timespec *now)
 	now->tv_nsec = 0;
 }
 
+void __init efi_find_mirror(void)
+{
+}
+
 void __init efi_probe(void)
 {
 	static struct xen_platform_op __initdata op = {
@@ -433,6 +437,8 @@ void __init efi_init(void)
 	efi_config_parse_tables(cfgtab, info->cfg.nent,
 				sizeof(efi_config_table_64_t), arch_tables);
 	early_iounmap(cfgtab, info->cfg.nent * sizeof(efi_config_table_64_t));
+
+	efi_esrt_init();
 }
 
 #undef DECLARE_CALL
@@ -486,6 +492,11 @@ u64 efi_mem_attributes(unsigned long phys_addr)
 
 static int __init arch_parse_efi_cmdline(char *str)
 {
+	if (!str) {
+		pr_warn("need at least one option\n");
+		return -EINVAL;
+	}
+
 	if (parse_option_str(str, "debug"))
 		set_bit(EFI_DBG, &efi.flags);
 

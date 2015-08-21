@@ -36,6 +36,13 @@ const struct mtrr_ops generic_mtrr_ops = {
 
 const struct mtrr_ops *mtrr_if = &generic_mtrr_ops;
 unsigned int num_var_ranges;
+static bool __mtrr_enabled;
+
+static bool mtrr_enabled(void)
+{
+	return __mtrr_enabled;
+}
+
 unsigned int mtrr_usage_table[MTRR_MAX_VAR_RANGES];
 
 static u64 tom2;
@@ -66,6 +73,9 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 {
 	int error;
 	struct xen_platform_op op;
+
+	if (!mtrr_enabled())
+		return -ENXIO;
 
 	mutex_lock(&mtrr_mutex);
 
@@ -102,6 +112,8 @@ static int mtrr_check(unsigned long base, unsigned long size)
 int mtrr_add(unsigned long base, unsigned long size, unsigned int type,
 	     bool increment)
 {
+	if (!mtrr_enabled())
+		return -ENODEV;
 	if (mtrr_check(base, size))
 		return -EINVAL;
 	return mtrr_add_page(base >> PAGE_SHIFT, size >> PAGE_SHIFT, type,
@@ -116,6 +128,9 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 	unsigned long lbase, lsize;
 	int error = -EINVAL;
 	struct xen_platform_op op;
+
+	if (!mtrr_enabled())
+		return -ENODEV;
 
 	mutex_lock(&mtrr_mutex);
 
@@ -156,6 +171,8 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 
 int mtrr_del(int reg, unsigned long base, unsigned long size)
 {
+	if (!mtrr_enabled())
+		return -ENODEV;
 	if (mtrr_check(base, size))
 		return -EINVAL;
 	return mtrr_del_page(reg, base >> PAGE_SHIFT, size >> PAGE_SHIFT);
@@ -171,6 +188,9 @@ EXPORT_SYMBOL(mtrr_del);
  * attempts to add a WC MTRR covering size bytes starting at base and
  * logs an error if this fails.
  *
+ * The called should provide a power of two size on an equivalent
+ * power of two boundary.
+ *
  * Drivers must store the return value to pass to mtrr_del_wc_if_needed,
  * but drivers should not try to interpret that return value.
  */
@@ -178,7 +198,7 @@ int arch_phys_wc_add(unsigned long base, unsigned long size)
 {
 	int ret;
 
-	if (pat_enabled)
+	if (pat_enabled() || !mtrr_enabled())
 		return 0;  /* Success!  (We don't need to do anything.) */
 
 	ret = mtrr_add(base, size, MTRR_TYPE_WRCOMB, true);
@@ -210,7 +230,7 @@ void arch_phys_wc_del(int handle)
 EXPORT_SYMBOL(arch_phys_wc_del);
 
 /*
- * phys_wc_to_mtrr_index - translates arch_phys_wc_add's return value
+ * arch_phys_wc_index - translates arch_phys_wc_add's return value
  * @handle: Return value from arch_phys_wc_add
  *
  * This will turn the return value from arch_phys_wc_add into an mtrr
@@ -220,33 +240,40 @@ EXPORT_SYMBOL(arch_phys_wc_del);
  * in printk line.  Alas there is an illegitimate use in some ancient
  * drm ioctls.
  */
-int phys_wc_to_mtrr_index(int handle)
+int arch_phys_wc_index(int handle)
 {
 	if (handle < MTRR_TO_PHYS_WC_OFFSET)
 		return -1;
 	else
 		return handle - MTRR_TO_PHYS_WC_OFFSET;
 }
-EXPORT_SYMBOL_GPL(phys_wc_to_mtrr_index);
+EXPORT_SYMBOL_GPL(arch_phys_wc_index);
 
-/*
- * Returns the effective MTRR type for the region
- * Error returns:
- * - 0xFE - when the range is "not entirely covered" by _any_ var range MTRR
- * - 0xFF - when MTRR is not enabled
+/**
+ * mtrr_type_lookup - look up memory type in MTRR
+ *
+ * Return Values:
+ * MTRR_TYPE_(type)  - The effective MTRR type for the region
+ * MTRR_TYPE_INVALID - MTRR is disabled
+ *
+ * Output Argument:
+ * uniform - Set to 1 when an MTRR covers the region uniformly, i.e. the
+ *	     region is fully covered by a single MTRR entry or the default
+ *	     type.
  */
-u8 mtrr_type_lookup(u64 start, u64 end)
+u8 mtrr_type_lookup(u64 start, u64 end, u8 *uniform)
 {
 	int i, error;
 	u64 start_mfn, end_mfn, base_mfn, top_mfn;
 	u8 prev_match, curr_match;
 	struct xen_platform_op op;
 
+	*uniform = 1;
 	if (!is_initial_xendomain())
 		return MTRR_TYPE_WRBACK;
 
 	if (!num_var_ranges)
-		return 0xFF;
+		return MTRR_TYPE_INVALID;
 
 	start_mfn = start >> PAGE_SHIFT;
 	/* Make end inclusive end, instead of exclusive */
@@ -261,6 +288,7 @@ u8 mtrr_type_lookup(u64 start, u64 end)
 		if (!error)
 			return op.u.read_memtype.type;
 #endif
+		*uniform = 0;
 		return MTRR_TYPE_UNCACHABLE;
 	}
 
@@ -269,7 +297,7 @@ u8 mtrr_type_lookup(u64 start, u64 end)
 	 * Look of multiple ranges matching this address and pick type
 	 * as per MTRR precedence
 	 */
-	prev_match = 0xFF;
+	prev_match = MTRR_TYPE_INVALID;
 	for (i = 0; i < num_var_ranges; ++i) {
 		op.cmd = XENPF_read_memtype;
 		op.u.read_memtype.reg = i;
@@ -285,12 +313,11 @@ u8 mtrr_type_lookup(u64 start, u64 end)
 			continue;
 		}
 
-		if (base_mfn > start_mfn || end_mfn > top_mfn) {
-			return 0xFE;
-		}
+		if (base_mfn > start_mfn || end_mfn > top_mfn)
+			*uniform = 0;
 
 		curr_match = op.u.read_memtype.type;
-		if (prev_match == 0xFF) {
+		if (prev_match == MTRR_TYPE_INVALID) {
 			prev_match = curr_match;
 			continue;
 		}
@@ -318,7 +345,7 @@ u8 mtrr_type_lookup(u64 start, u64 end)
 			return MTRR_TYPE_WRBACK;
 	}
 
-	if (prev_match != 0xFF)
+	if (prev_match != MTRR_TYPE_INVALID)
 		return prev_match;
 
 #if 0//todo
@@ -369,6 +396,9 @@ void __init mtrr_bp_init(void)
 		rdmsrl(MSR_K8_TOP_MEM2, tom2);
 		tom2 &= 0xffffff8000000ULL;
 	}
+
+	if (!mtrr_enabled())
+		pr_info("MTRR: Disabled\n");
 }
 
 void mtrr_ap_init(void)

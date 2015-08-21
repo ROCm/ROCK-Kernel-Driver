@@ -17,18 +17,12 @@
 #include <linux/sysfs.h>
 
 #include <asm/stacktrace.h>
-#include <linux/unwind.h>
 
 
 int panic_on_unrecovered_nmi;
 int panic_on_io_nmi;
 unsigned int code_bytes = 64;
 int kstack_depth_to_print = 3 * STACKSLOTS_PER_LINE;
-#ifdef CONFIG_STACK_UNWIND
-static int call_trace = 1;
-#else
-#define call_trace (-1)
-#endif
 static int die_counter;
 
 static void printk_stack_address(unsigned long address, int reliable,
@@ -77,70 +71,6 @@ print_ftrace_graph_addr(unsigned long addr, void *data,
 			struct thread_info *tinfo, int *graph)
 { }
 #endif
-
-static int asmlinkage dump_trace_unwind(struct unwind_frame_info *info,
-					const struct stacktrace_ops *ops,
-					void *data)
-{
-	int n = 0;
-#ifdef CONFIG_STACK_UNWIND
-	unsigned long sp = UNW_SP(info);
-
-	if (arch_unw_user_mode(info))
-		return -1;
-	while (unwind(info) == 0 && UNW_PC(info)) {
-		n++;
-		ops->address(data, UNW_PC(info), 1);
-		if (arch_unw_user_mode(info))
-			break;
-		if ((sp & ~(PAGE_SIZE - 1)) == (UNW_SP(info) & ~(PAGE_SIZE - 1))
-		    && sp > UNW_SP(info))
-			break;
-		sp = UNW_SP(info);
-	}
-#endif
-	return n;
-}
-
-int try_stack_unwind(struct task_struct *task, struct pt_regs *regs,
-		     unsigned long **stack, unsigned long *bp,
-		     const struct stacktrace_ops *ops, void *data)
-{
-#ifdef CONFIG_STACK_UNWIND
-	int unw_ret = 0;
-	struct unwind_frame_info info;
-	if (call_trace < 0)
-		return 0;
-
-	if (regs) {
-		if (unwind_init_frame_info(&info, task, regs) == 0)
-			unw_ret = dump_trace_unwind(&info, ops, data);
-	} else if (task == current)
-		unw_ret = unwind_init_running(&info, dump_trace_unwind, ops, data);
-#ifdef CONFIG_SMP
-	else if (task->on_cpu)
-		/* nothing */;
-#endif
-	else if (unwind_init_blocked(&info, task) == 0)
-		unw_ret = dump_trace_unwind(&info, ops, data);
-	if (unw_ret > 0) {
-		if (call_trace == 1 && !arch_unw_user_mode(&info)) {
-			ops->warning_symbol(data, "DWARF2 unwinder stuck at %s\n",
-					    UNW_PC(&info));
-			if (UNW_SP(&info) >= PAGE_OFFSET) {
-				ops->warning(data, "Leftover inexact backtrace:\n");
-				*stack = (void *)UNW_SP(&info);
-				*bp = UNW_FP(&info);
-				return 0;
-			}
-		} else if (call_trace >= 1)
-			return -1;
-		ops->warning(data, "Full inexact backtrace again:\n");
-	} else
-		ops->warning(data, "Inexact backtrace:\n");
-#endif
-	return 0;
-}
 
 /*
  * x86-64 can have up to three kernel stacks:
@@ -437,21 +367,3 @@ static int __init code_bytes_setup(char *s)
 	return 1;
 }
 __setup("code_bytes=", code_bytes_setup);
-
-#ifdef CONFIG_STACK_UNWIND
-static int __init call_trace_setup(char *s)
-{
-	if (!s)
-		return -EINVAL;
-	if (strcmp(s, "old") == 0)
-		call_trace = -1;
-	else if (strcmp(s, "both") == 0)
-		call_trace = 0;
-	else if (strcmp(s, "newfallback") == 0)
-		call_trace = 1;
-	else if (strcmp(s, "new") == 0)
-		call_trace = 2;
-	return 0;
-}
-early_param("call_trace", call_trace_setup);
-#endif

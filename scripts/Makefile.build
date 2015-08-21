@@ -80,7 +80,7 @@ endif
 ifeq ($(CONFIG_XEN),y)
 Makefile.xen := $(if $(KBUILD_EXTMOD),$(KBUILD_EXTMOD),$(objtree)/scripts)/Makefile.xen
 $(Makefile.xen): $(srctree)/scripts/Makefile.xen.awk $(srctree)/scripts/Makefile.build
-	@echo '  Updating $@'
+	@$(kecho) '  GEN     $@'
 	$(if $(shell echo a | $(AWK) '{ print gensub(/a/, "AA", "g"); }'),\
         ,$(error 'Your awk program does not define gensub.  Use gawk or another awk with gensub'))
 	@$(AWK) -f $< $(filter-out $<,$^) >$@

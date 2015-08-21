@@ -1,25 +1,16 @@
 /*
- *	CPU Microcode Update Driver for Linux on Xen
+ * CPU Microcode Update Driver for Linux on Xen
  *
- *	Copyright (C) 2000-2006 Tigran Aivazian <tigran@aivazian.fsnet.co.uk>
- *		      2006	Shaohua Li <shaohua.li@intel.com>
+ * Copyright (C) 2000-2006 Tigran Aivazian <tigran@aivazian.fsnet.co.uk>
+ *	      2006	Shaohua Li <shaohua.li@intel.com>
+ *	      2013-2015	Borislav Petkov <bp@alien8.de>
  *
- *	This driver allows to upgrade microcode on Intel processors
- *	belonging to IA-32 family - PentiumPro, Pentium II,
- *	Pentium III, Xeon, Pentium 4, etc.
+ * This driver allows to upgrade microcode on x86 processors.
  *
- *	Reference: Section 8.11 of Volume 3a, IA-32 Intel? Architecture
- *	Software Developer's Manual
- *	Order Number 253668 or free download from:
- *
- *	http://developer.intel.com/Assets/PDF/manual/253668.pdf
- *
- *	For more information, go to http://www.urbanmyth.org/microcode
- *
- *	This program is free software; you can redistribute it and/or
- *	modify it under the terms of the GNU General Public License
- *	as published by the Free Software Foundation; either version
- *	2 of the License, or (at your option) any later version.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version
+ * 2 of the License, or (at your option) any later version.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt

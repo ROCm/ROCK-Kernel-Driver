@@ -135,6 +135,7 @@ static int x86_pmu_extra_regs(u64 config, struct perf_event *event)
 }
 
 static atomic_t active_events;
+static atomic_t pmc_refcount;
 static DEFINE_MUTEX(pmc_reserve_mutex);
 
 #ifdef CONFIG_X86_LOCAL_APIC
@@ -271,6 +272,7 @@ msr_fail:
 static void hw_perf_event_destroy(struct perf_event *event)
 {
 	x86_release_hardware();
+	atomic_dec(&active_events);
 }
 
 void hw_perf_lbr_event_destroy(struct perf_event *event)
@@ -324,16 +326,16 @@ int x86_reserve_hardware(void)
 {
 	int err = 0;
 
-	if (!atomic_inc_not_zero(&active_events)) {
+	if (!atomic_inc_not_zero(&pmc_refcount)) {
 		mutex_lock(&pmc_reserve_mutex);
-		if (atomic_read(&active_events) == 0) {
+		if (atomic_read(&pmc_refcount) == 0) {
 			if (!reserve_pmc_hardware())
 				err = -EBUSY;
 			else
 				reserve_ds_buffers();
 		}
 		if (!err)
-			atomic_inc(&active_events);
+			atomic_inc(&pmc_refcount);
 		mutex_unlock(&pmc_reserve_mutex);
 	}
 
@@ -342,7 +344,7 @@ int x86_reserve_hardware(void)
 
 void x86_release_hardware(void)
 {
-	if (atomic_dec_and_mutex_lock(&active_events, &pmc_reserve_mutex)) {
+	if (atomic_dec_and_mutex_lock(&pmc_refcount, &pmc_reserve_mutex)) {
 		release_pmc_hardware();
 		release_ds_buffers();
 		mutex_unlock(&pmc_reserve_mutex);
@@ -355,28 +357,30 @@ void x86_release_hardware(void)
  */
 int x86_add_exclusive(unsigned int what)
 {
-	int ret = -EBUSY, i;
+	int i;
 
-	if (atomic_inc_not_zero(&x86_pmu.lbr_exclusive[what]))
-		return 0;
-
-	mutex_lock(&pmc_reserve_mutex);
-	for (i = 0; i < ARRAY_SIZE(x86_pmu.lbr_exclusive); i++) {
-		if (i != what && atomic_read(&x86_pmu.lbr_exclusive[i]))
-			goto out;
+	if (!atomic_inc_not_zero(&x86_pmu.lbr_exclusive[what])) {
+		mutex_lock(&pmc_reserve_mutex);
+		for (i = 0; i < ARRAY_SIZE(x86_pmu.lbr_exclusive); i++) {
+			if (i != what && atomic_read(&x86_pmu.lbr_exclusive[i]))
+				goto fail_unlock;
+		}
+		atomic_inc(&x86_pmu.lbr_exclusive[what]);
+		mutex_unlock(&pmc_reserve_mutex);
 	}
 
-	atomic_inc(&x86_pmu.lbr_exclusive[what]);
-	ret = 0;
+	atomic_inc(&active_events);
+	return 0;
 
-out:
+fail_unlock:
 	mutex_unlock(&pmc_reserve_mutex);
-	return ret;
+	return -EBUSY;
 }
 
 void x86_del_exclusive(unsigned int what)
 {
 	atomic_dec(&x86_pmu.lbr_exclusive[what]);
+	atomic_dec(&active_events);
 }
 
 int x86_setup_perfctr(struct perf_event *event)
@@ -557,6 +561,7 @@ static int __x86_pmu_event_init(struct perf_event *event)
 	if (err)
 		return err;
 
+	atomic_inc(&active_events);
 	event->destroy = hw_perf_event_destroy;
 
 	event->hw.idx = -1;
@@ -895,10 +900,7 @@ int x86_schedule_events(struct cpu_hw_events *cpuc, int n, int *assign)
 			if (x86_pmu.commit_scheduling)
 				x86_pmu.commit_scheduling(cpuc, i, assign[i]);
 		}
-	}
-
-	if (!assign || unsched) {
-
+	} else {
 		for (i = 0; i < n; i++) {
 			e = cpuc->event_list[i];
 			/*
@@ -1111,13 +1113,16 @@ int x86_perf_event_set_period(struct perf_event *event)
 
 	per_cpu(pmc_prev_left[idx], smp_processor_id()) = left;
 
-	/*
-	 * The hw event starts counting from this event offset,
-	 * mark it to be able to extra future deltas:
-	 */
-	local64_set(&hwc->prev_count, (u64)-left);
+	if (!(hwc->flags & PERF_X86_EVENT_AUTO_RELOAD) ||
+	    local64_read(&hwc->prev_count) != (u64)-left) {
+		/*
+		 * The hw event starts counting from this event offset,
+		 * mark it to be able to extra future deltas:
+		 */
+		local64_set(&hwc->prev_count, (u64)-left);
 
-	wrmsrl(hwc->event_base, (u64)(-left) & x86_pmu.cntval_mask);
+		wrmsrl(hwc->event_base, (u64)(-left) & x86_pmu.cntval_mask);
+	}
 
 	/*
 	 * Due to erratum on certan cpu we need
@@ -1429,6 +1434,10 @@ perf_event_nmi_handler(unsigned int cmd, struct pt_regs *regs)
 	u64 finish_clock;
 	int ret;
 
+	/*
+	 * All PMUs/events that share this PMI handler should make sure to
+	 * increment active_events for their events.
+	 */
 	if (!atomic_read(&active_events))
 		return NMI_DONE;
 
@@ -2183,21 +2192,25 @@ static unsigned long get_segment_base(unsigned int segment)
 	int idx = segment >> 3;
 
 	if ((segment & SEGMENT_TI_MASK) == SEGMENT_LDT) {
+		struct ldt_struct *ldt;
+
 		if (idx > LDT_ENTRIES)
 			return 0;
 
-		if (idx > current->active_mm->context.size)
+		/* IRQs are off, so this synchronizes with smp_store_release */
+		ldt = lockless_dereference(current->active_mm->context.ldt);
+		if (!ldt || idx > ldt->size)
 			return 0;
 
-		desc = current->active_mm->context.ldt;
+		desc = &ldt->entries[idx];
 	} else {
 		if (idx > GDT_ENTRIES)
 			return 0;
 
-		desc = raw_cpu_ptr(gdt_page.gdt);
+		desc = raw_cpu_ptr(gdt_page.gdt) + idx;
 	}
 
-	return get_desc_base(desc + idx);
+	return get_desc_base(desc);
 }
 
 #ifdef CONFIG_COMPAT

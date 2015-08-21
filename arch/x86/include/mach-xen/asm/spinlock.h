@@ -37,6 +37,10 @@
 # define UNLOCK_LOCK_PREFIX
 #endif
 
+#ifdef CONFIG_QUEUED_SPINLOCKS
+#include <asm/qspinlock.h>
+#else
+
 #ifdef TICKET_SHIFT
 
 /* How long a lock should spin before we consider blocking */
@@ -45,8 +49,6 @@
 #include <asm/irqflags.h>
 #include <asm/smp-processor-id.h>
 
-int xen_spinlock_init(unsigned int cpu);
-void xen_spinlock_cleanup(unsigned int cpu);
 #if CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING
 struct __raw_tickets xen_spin_adjust(const arch_spinlock_t *,
 				     struct __raw_tickets);
@@ -202,9 +204,6 @@ static inline void __ticket_spin_unlock_wait(arch_spinlock_t *lock)
 
 #else /* TICKET_SHIFT */
 
-static inline int xen_spinlock_init(unsigned int cpu) { return 0; }
-static inline void xen_spinlock_cleanup(unsigned int cpu) {}
-
 static __always_inline int __byte_spin_value_unlocked(arch_spinlock_t lock)
 {
 	return lock.lock == 0;
@@ -308,6 +307,15 @@ static __always_inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
 }
 
 #undef __arch_spin
+#endif /* CONFIG_QUEUED_SPINLOCKS */
+
+#if !defined(CONFIG_QUEUED_SPINLOCKS) && defined(TICKET_SHIFT)
+int xen_spinlock_init(unsigned int cpu);
+void xen_spinlock_cleanup(unsigned int cpu);
+#else
+static inline int xen_spinlock_init(unsigned int cpu) { return 0; }
+static inline void xen_spinlock_cleanup(unsigned int cpu) {}
+#endif
 
 /*
  * Read-write spinlocks, allowing multiple readers

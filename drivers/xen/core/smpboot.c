@@ -16,6 +16,7 @@
 #include <linux/percpu.h>
 #include <linux/tick.h>
 #include <asm/desc.h>
+#include <asm/proto.h>
 #include <asm/pgalloc.h>
 #include <xen/clock.h>
 #include <xen/evtchn.h>
@@ -28,7 +29,6 @@ extern void local_teardown_timer(unsigned int cpu);
 
 extern void hypervisor_callback(void);
 extern void failsafe_callback(void);
-extern void system_call(void);
 extern void smp_trap_init(trap_info_t *);
 
 cpumask_var_t vcpu_initialized_mask;
@@ -202,7 +202,7 @@ static void cpu_initialize_context(unsigned int cpu, unsigned long sp0)
 	ctxt.user_regs.fs = __KERNEL_PERCPU;
 	ctxt.user_regs.gs = __KERNEL_STACK_CANARY;
 #else /* __x86_64__ */
-	ctxt.syscall_callback_eip  = (unsigned long)system_call;
+	ctxt.syscall_callback_eip  = (unsigned long)entry_SYSCALL_64;
 
 	ctxt.ctrlreg[3] = xen_pfn_to_cr3(virt_to_mfn(init_level4_pgt));
 
@@ -353,12 +353,12 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 
 #ifdef CONFIG_X86_64
 	clear_tsk_thread_flag(idle, TIF_FORK);
+	per_cpu(cpu_sp0, cpu) = (unsigned long)task_stack_page(idle) +
+				THREAD_SIZE;
 #else
 	per_cpu(cpu_current_top_of_stack, cpu) =
 		(unsigned long)task_stack_page(idle) + THREAD_SIZE;
 #endif
-	per_cpu(kernel_stack, cpu) = (unsigned long)task_stack_page(idle) +
-				     THREAD_SIZE;
  	per_cpu(current_task, cpu) = idle;
 
 	cpu_initialize_context(cpu, idle->thread.sp0);

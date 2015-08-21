@@ -170,7 +170,7 @@ static int acpi_processor_hotadd_init(struct acpi_processor *pr)
 	acpi_status status;
 	int ret;
 
-	if (pr->phys_id == PHYS_CPUID_INVALID)
+	if (invalid_phys_cpuid(pr->phys_id))
 		return -ENODEV;
 
 #ifdef CONFIG_XEN
@@ -226,8 +226,7 @@ static int acpi_processor_get_info(struct acpi_device *device)
 	union acpi_object object = { 0 };
 	struct acpi_buffer buffer = { sizeof(union acpi_object), &object };
 	struct acpi_processor *pr = acpi_driver_data(device);
-	phys_cpuid_t phys_id;
-	int cpu_index, device_declaration = 0;
+	int device_declaration = 0;
 	acpi_status status = AE_OK;
 	static int cpu0_initialized;
 	unsigned long long value;
@@ -274,35 +273,35 @@ static int acpi_processor_get_info(struct acpi_device *device)
 		pr->acpi_id = value;
 	}
 
-	phys_id = acpi_get_phys_id(pr->handle, device_declaration, pr->acpi_id);
-	if (phys_id == PHYS_CPUID_INVALID)
+	pr->phys_id = acpi_get_phys_id(pr->handle, device_declaration,
+					pr->acpi_id);
+	if (invalid_phys_cpuid(pr->phys_id))
 		acpi_handle_debug(pr->handle, "failed to get CPU physical ID.\n");
-	pr->phys_id = phys_id;
 
-	cpu_index = acpi_map_cpuid(pr->phys_id, pr->acpi_id);
+	pr->id = acpi_map_cpuid(pr->phys_id, pr->acpi_id);
 	if (!cpu0_initialized && !acpi_has_cpu_in_madt()) {
 		cpu0_initialized = 1;
 		/*
 		 * Handle UP system running SMP kernel, with no CPU
 		 * entry in MADT
 		 */
-		if ((cpu_index == -1) && (num_online_cpus() == 1))
-			cpu_index = 0;
+		if (invalid_logical_cpuid(pr->id) && (num_online_cpus() == 1))
+			pr->id = 0;
 	}
-	pr->id = cpu_index;
 
 	/*
 	 *  Extra Processor objects may be enumerated on MP systems with
 	 *  less than the max # of CPUs. They should be ignored _iff
 	 *  they are physically not present.
 	 */
-	if (pr->id == -1) {
+	if (invalid_logical_cpuid(pr->id)) {
 		int ret = acpi_processor_hotadd_init(pr);
-		if (ret && (ret != -ENODEV || pr->phys_id == -1))
+		if (ret && (ret != -ENODEV || invalid_phys_cpuid(pr->phys_id)))
 			return ret;
 	}
 #if defined(CONFIG_SMP) && defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
-	if (pr->id >= setup_max_cpus && pr->id > 0)
+	if (pr->id >= setup_max_cpus && pr->id
+	    && !invalid_logical_cpuid(pr->id))
 		pr->id = -1;
 #endif
 
@@ -315,7 +314,7 @@ static int acpi_processor_get_info(struct acpi_device *device)
 	 * generated as the following format:
 	 * CPU+CPU ID.
 	 */
-	if (pr->id != -1)
+	if (!invalid_logical_cpuid(pr->id))
 		sprintf(acpi_device_bid(device), "CPU%X", pr->id);
 	else
 		snprintf(acpi_device_bid(device),
@@ -354,7 +353,7 @@ static int acpi_processor_get_info(struct acpi_device *device)
 	 * of /proc/cpuinfo
 	 */
 	status = acpi_evaluate_integer(pr->handle, "_SUN", NULL, &value);
-	if (ACPI_SUCCESS(status) && pr->id != -1)
+	if (ACPI_SUCCESS(status) && !invalid_logical_cpuid(pr->id))
 		arch_fix_phys_package_id(pr->id, value);
 
 	return 0;
@@ -398,14 +397,14 @@ static int acpi_processor_add(struct acpi_device *device,
 
 	result = acpi_processor_get_info(device);
 	if (result || /* Processor is not physically present or unavailable */
-	    ((pr->id == -1) && !processor_cntl_external()))
+	    (invalid_logical_cpuid(pr->id) && !processor_cntl_external()))
 		return 0;
 
 #ifdef CONFIG_SMP
 	if (pr->id >= setup_max_cpus && pr->id != 0) {
 		if (!processor_cntl_external())
 			return 0;
-		WARN_ON(pr->id != -1);
+		WARN_ON(!invalid_logical_cpuid(pr->id));
 	}
 #endif
 
@@ -450,7 +449,7 @@ static int acpi_processor_add(struct acpi_device *device,
 #ifndef CONFIG_XEN
 	per_cpu(processor_device_array, pr->id) = device;
 #else
-	if (pr->id != -1) {
+	if (!invalid_logical_cpuid(pr->id)) {
 #endif
 	per_cpu(processors, pr->id) = pr;
 
@@ -481,7 +480,7 @@ static int acpi_processor_add(struct acpi_device *device,
 	free_cpumask_var(pr->throttling.shared_cpu_map);
 	device->driver_data = NULL;
 #ifdef CONFIG_XEN
-	if (pr->id != -1)
+	if (!invalid_logical_cpuid(pr->id))
 #endif
 	per_cpu(processors, pr->id) = NULL;
  err_free_pr:
@@ -513,7 +512,7 @@ static void acpi_processor_remove(struct acpi_device *device)
 	 * Unbind the driver from the processor device and detach it from the
 	 * ACPI companion object.
 	 */
-	if (pr->id != -1) {
+	if (!invalid_logical_cpuid(pr->id)) {
 		device_release_driver(pr->dev);
 		acpi_unbind_one(pr->dev);
 	}
@@ -527,7 +526,7 @@ static void acpi_processor_remove(struct acpi_device *device)
 	mutex_lock(&processor_device_mutex);
 	radix_tree_delete(&processor_device_tree, pr->acpi_id);
 	mutex_unlock(&processor_device_mutex);
-	if (pr->id != -1)
+	if (!invalid_logical_cpuid(pr->id))
 		per_cpu(processors, pr->id) = NULL;
 	goto out;
 #else

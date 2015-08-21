@@ -1825,9 +1825,81 @@ static int __init evtchn_register(void)
 core_initcall(evtchn_register);
 #endif
 
+#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
+#include <asm/irqdomain.h>
+
+struct irq_domain *xen_irq_domain;
+
+static void xen_free_irqs(struct irq_domain *domain,
+			  unsigned int virq, unsigned int nr_irqs)
+{
+	unsigned int i;
+
+	/* XXX x86_vector_free_irqs() uses x86_vector_domain here. */
+	WARN_ON_ONCE(domain != xen_irq_domain);
+	for (i = 0; i < nr_irqs; i++) {
+		struct irq_data *data;
+
+		data = irq_domain_get_irq_data(domain, virq + i);
+		if (data && data->chip_data) {
+			if (virq + i >= ARRAY_SIZE(_irq_cfg))
+				kfree(data->chip_data);
+			irq_domain_reset_irq_data(data);
+		}
+	}
+}
+
+static int xen_alloc_irqs(struct irq_domain *domain, unsigned int virq,
+			  unsigned int nr_irqs, void *arg)
+{
+	unsigned int i;
+#ifdef CONFIG_X86
+	struct irq_alloc_info *info = arg;
+
+	/* Currently this allocator can't guarantee contiguous allocations. */
+	if ((info->flags & X86_IRQ_ALLOC_CONTIGUOUS_VECTORS) && nr_irqs > 1)
+		return -ENOSYS;
+#endif
+
+	for (i = 0; i < nr_irqs; i++) {
+		struct irq_data *data;
+		struct irq_cfg *cfg;
+
+		data = irq_domain_get_irq_data(domain, virq + i);
+		BUG_ON(!data);
+
+		if (virq + i < ARRAY_SIZE(_irq_cfg))
+			cfg = _irq_cfg + virq + i;
+		else
+			cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
+		if (!cfg) {
+			xen_free_irqs(domain, virq, i);
+			return -ENOMEM;
+		}
+
+		data->chip_data = cfg;
+		data->hwirq = virq + i;
+	}
+
+	return 0;
+}
+
+static const struct irq_domain_ops xen_irq_domain_ops = {
+	.alloc	= xen_alloc_irqs,
+	.free	= xen_free_irqs,
+};
+#endif
+
 int __init arch_early_irq_init(void)
 {
 	unsigned int i;
+
+#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
+	xen_irq_domain = irq_domain_add_tree(NULL, &xen_irq_domain_ops,
+						NULL);
+	BUG_ON(xen_irq_domain == NULL);
+	irq_set_default_host(xen_irq_domain);
+#endif
 
 	for (i = 0; i < ARRAY_SIZE(_irq_cfg); i++)
 		irq_set_chip_data(i, _irq_cfg + i);
@@ -1837,6 +1909,12 @@ int __init arch_early_irq_init(void)
 
 struct irq_cfg *alloc_irq_and_cfg_at(unsigned int at, int node)
 {
+#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
+	struct irq_alloc_info info = {};
+	int res = __irq_domain_alloc_irqs(NULL, at, 1, node, &info, false);
+
+	return res >= 0 || res == -EEXIST ? irq_cfg(at) : NULL;
+#else
 	int res = irq_alloc_desc_at(at, node);
 	struct irq_cfg *cfg = NULL;
 
@@ -1863,7 +1941,8 @@ struct irq_cfg *alloc_irq_and_cfg_at(unsigned int at, int node)
 	return cfg;
 #else
 	return irq_cfg(at);
-#endif
+#endif /* CONFIG_SPARSE_IRQ */
+#endif /* CONFIG_IRQ_DOMAIN_HIERARCHY */
 }
 
 #ifdef CONFIG_SPARSE_IRQ

@@ -92,10 +92,6 @@ extern void
 show_stack_log_lvl(struct task_struct *task, struct pt_regs *regs,
 		   unsigned long *sp, unsigned long bp, char *log_lvl);
 
-int try_stack_unwind(struct task_struct *task, struct pt_regs *regs,
-                     unsigned long **stack, unsigned long *bp,
-                     const struct stacktrace_ops *ops, void *data);
-
 extern unsigned int code_bytes;
 
 /* The form of the top of the frame on the stack */

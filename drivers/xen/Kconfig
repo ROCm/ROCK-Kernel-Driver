@@ -348,14 +348,7 @@ config XEN_VCPU_INFO_PLACEMENT
 
 config XEN_ADVANCED_COMPRESSION
 	def_bool y
-#	depends on XEN && (XEN_UNPRIVILEGED_GUEST || X86) && (XEN_COMPAT >= 0x040000)
-	depends on XEN && (XEN_UNPRIVILEGED_GUEST || X86)
-	depends on !XEN_COMPAT_030002_AND_LATER
-	depends on !XEN_COMPAT_030004_AND_LATER
-	depends on !XEN_COMPAT_030100_AND_LATER
-	depends on !XEN_COMPAT_030200_AND_LATER
-	depends on !XEN_COMPAT_030300_AND_LATER
-	depends on !XEN_COMPAT_030400_AND_LATER
+	depends on XEN && (XEN_UNPRIVILEGED_GUEST || X86) && (XEN_COMPAT >= 0x040000)
 
 endmenu
 
@@ -372,11 +365,9 @@ config XEN_SMPBOOT
 
 config XEN_SPINLOCK_ACQUIRE_NESTING
 	int "maximum nesting level for acquiring spin locks"
-	depends on SMP
+	depends on SMP && !QUEUED_SPINLOCKS
 	# Xen versions prior to 3.2.x have a race condition with HYPERVISOR_poll().
-	depends on !XEN_COMPAT_030002_AND_LATER
-	depends on !XEN_COMPAT_030004_AND_LATER
-	depends on !XEN_COMPAT_030100_AND_LATER
+	depends on XEN_COMPAT >= 0x030200
 	range 0 3
 	default 0
 	help

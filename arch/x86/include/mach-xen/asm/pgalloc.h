@@ -20,7 +20,7 @@ static inline void paravirt_release_pmd(unsigned long pfn) {}
 static inline void paravirt_release_pud(unsigned long pfn) {}
 
 #ifdef CONFIG_X86_64
-void early_make_page_readonly(void *va, unsigned int feature);
+void early_make_page_readonly(const void *, unsigned int feature);
 pmd_t *early_get_pmd(unsigned long va);
 #define make_lowmem_page_readonly make_page_readonly
 #define make_lowmem_page_writable make_page_writable

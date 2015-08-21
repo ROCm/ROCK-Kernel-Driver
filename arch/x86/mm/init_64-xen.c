@@ -94,7 +94,7 @@ pmd_t *__init early_get_pmd(unsigned long va)
 	return (pmd_t *)&page[pmd_index(va)];
 }
 
-void __init early_make_page_readonly(void *va, unsigned int feature)
+void __init early_make_page_readonly(const void *va, unsigned int feature)
 {
 	unsigned long addr, _va = (unsigned long)va;
 	pte_t pte, *ptep;

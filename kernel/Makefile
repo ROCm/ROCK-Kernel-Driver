@@ -49,7 +49,6 @@ obj-$(CONFIG_SYSTEM_TRUSTED_KEYRING) += system_keyring.o system_certificates.o
 obj-$(CONFIG_MODULES) += module.o
 obj-$(CONFIG_MODULE_SIG) += module_signing.o
 obj-$(CONFIG_KALLSYMS) += kallsyms.o
-obj-$(CONFIG_STACK_UNWIND) += unwind.o
 obj-$(CONFIG_BSD_PROCESS_ACCT) += acct.o
 obj-$(CONFIG_KEXEC) += kexec.o
 obj-$(CONFIG_BACKTRACE_SELF_TEST) += backtracetest.o
@@ -138,7 +137,7 @@ endif
 
 ifneq ($(wildcard $(obj)/.x509.list),)
 ifneq ($(shell cat $(obj)/.x509.list),$(X509_CERTIFICATES))
-$(info X.509 certificate list changed)
+$(warning X.509 certificate list changed to "$(X509_CERTIFICATES)" from "$(shell cat $(obj)/.x509.list)")
 $(shell rm $(obj)/.x509.list)
 endif
 endif

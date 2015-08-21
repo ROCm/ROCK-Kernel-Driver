@@ -4,9 +4,6 @@
 #define MCE_VECTOR			0x12
 
 #define IA32_SYSCALL_VECTOR		0x80
-#ifdef CONFIG_X86_32
-# define SYSCALL_VECTOR			0x80
-#endif
 
 #define RESCHEDULE_VECTOR		0
 #define CALL_FUNCTION_VECTOR		1
@@ -48,7 +45,7 @@ static inline int invalid_vm86_irq(int irq)
  * static arrays.
  */
 
-#define NR_IRQS_LEGACY			  16
+#define NR_IRQS_LEGACY			16
 
 /*
  * The flat IRQ space is divided into two regions:
@@ -67,15 +64,17 @@ static inline int invalid_vm86_irq(int irq)
 #define IO_APIC_VECTOR_LIMIT		PIRQ_MAX(32 * MAX_IO_APICS)
 #define CPU_VECTOR_LIMIT		PIRQ_MAX(64 * NR_CPUS)
 
-#if defined(CONFIG_X86_IO_APIC)
-# define NR_PIRQS					\
+#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_PCI_MSI)
+#define NR_PIRQS						\
 	(CPU_VECTOR_LIMIT > IO_APIC_VECTOR_LIMIT ?	\
 		(NR_VECTORS + CPU_VECTOR_LIMIT)  :	\
 		(NR_VECTORS + IO_APIC_VECTOR_LIMIT))
-#elif defined(CONFIG_XEN_PCIDEV_FRONTEND)
-# define NR_PIRQS			(NR_VECTORS + CPU_VECTOR_LIMIT)
-#else /* !CONFIG_X86_IO_APIC: */
-# define NR_PIRQS			NR_IRQS_LEGACY
+#elif defined(CONFIG_X86_IO_APIC)
+#define NR_PIRQS				(NR_VECTORS + IO_APIC_VECTOR_LIMIT)
+#elif defined(CONFIG_PCI_MSI)
+#define NR_PIRQS				(NR_VECTORS + CPU_VECTOR_LIMIT)
+#else
+#define NR_PIRQS				NR_IRQS_LEGACY
 #endif
 
 #ifndef __ASSEMBLY__

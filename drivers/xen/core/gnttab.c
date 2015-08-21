@@ -37,6 +37,7 @@
 #include <linux/mm.h>
 #include <linux/seqlock.h>
 #include <linux/timer.h>
+#include <linux/vmalloc.h>
 #include <xen/interface/xen.h>
 #include <xen/gnttab.h>
 #include <asm/pgtable.h>

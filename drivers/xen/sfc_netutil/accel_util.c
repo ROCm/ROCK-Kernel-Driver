@@ -25,6 +25,7 @@
 #include <linux/slab.h>
 #include <linux/if_ether.h>
 #include <linux/module.h>
+#include <linux/vmalloc.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/hypercall.h>

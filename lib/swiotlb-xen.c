@@ -26,6 +26,7 @@
 #include <linux/iommu-helper.h>
 #include <linux/highmem.h>
 #include <linux/gfp.h>
+#include <linux/scatterlist.h>
 
 #include <asm/io.h>
 #include <asm/pci.h>

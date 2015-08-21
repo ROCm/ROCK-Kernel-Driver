@@ -15,6 +15,7 @@
 #include <xen/events.h>
 #include <asm/xen/pci.h>
 #else
+#include <linux/vmalloc.h>
 #include <xen/evtchn.h>
 #endif
 #include "pciback.h"

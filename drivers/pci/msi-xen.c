@@ -58,27 +58,6 @@ struct msi_dev_list {
 
 /* Arch hooks */
 
-static void msi_set_enable(struct pci_dev *dev, int enable)
-{
-	u16 control;
-
-	pci_read_config_word(dev, dev->msi_cap + PCI_MSI_FLAGS, &control);
-	control &= ~PCI_MSI_FLAGS_ENABLE;
-	if (enable)
-		control |= PCI_MSI_FLAGS_ENABLE;
-	pci_write_config_word(dev, dev->msi_cap + PCI_MSI_FLAGS, control);
-}
-
-static void msix_clear_and_set_ctrl(struct pci_dev *dev, u16 clear, u16 set)
-{
-	u16 ctrl;
-
-	pci_read_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, &ctrl);
-	ctrl &= ~clear;
-	ctrl |= set;
-	pci_write_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, ctrl);
-}
-
 static int (*get_owner)(struct pci_dev *dev);
 
 static domid_t msi_get_dev_owner(struct pci_dev *dev)
@@ -326,9 +305,11 @@ void pci_restore_msi_state(struct pci_dev *dev)
 
 	pci_intx_for_msi(dev, 0);
 	if (dev->msi_enabled)
-		msi_set_enable(dev, 0);
+		pci_msi_set_enable(dev, 0);
 	if (dev->msix_enabled)
-		msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
+		pci_msix_clear_and_set_ctrl(dev, 0,
+					    PCI_MSIX_FLAGS_ENABLE |
+					    PCI_MSIX_FLAGS_MASKALL);
 
 	if (pci_seg_supported) {
 		struct physdev_pci_device restore = {
@@ -352,6 +333,9 @@ void pci_restore_msi_state(struct pci_dev *dev)
 	}
 #endif
 	WARN(rc && rc != -ENOSYS, "restore_msi -> %d\n", rc);
+
+	if (dev->msix_enabled)
+		pci_msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_MASKALL, 0);
 }
 EXPORT_SYMBOL_GPL(pci_restore_msi_state);
 
@@ -550,7 +534,7 @@ static int msi_capability_init(struct pci_dev *dev, int nvec)
 	struct msi_dev_list *dev_entry = get_msi_dev_pirq_list(dev);
 	int pirq;
 
-	msi_set_enable(dev, 0);	/* Disable MSI during set up */
+	pci_msi_set_enable(dev, 0);	/* Disable MSI during set up */
 
 	pirq = msi_map_vector(dev, nvec, 0, dev_entry->owner);
 	if (pirq < 0)
@@ -559,7 +543,7 @@ static int msi_capability_init(struct pci_dev *dev, int nvec)
 
 	/* Set MSI enabled bits	 */
 	pci_intx_for_msi(dev, 0);
-	msi_set_enable(dev, 1);
+	pci_msi_set_enable(dev, 1);
 	dev->msi_enabled = 1;
 
 	dev->irq = dev_entry->e.pirq = pirq;
@@ -589,7 +573,7 @@ static int msix_capability_init(struct pci_dev *dev,
 		return -ENOMEM;
 
 	/* Ensure MSI-X is disabled while it is set up */
-	msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
+	pci_msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
 
 	table_base = find_table_base(dev);
 	if (!table_base)
@@ -600,7 +584,7 @@ static int msix_capability_init(struct pci_dev *dev,
 	 * MSI-X registers.  We need to mask all the vectors to prevent
 	 * interrupts coming in before they're fully set up.
 	 */
-	msix_clear_and_set_ctrl(dev, 0,
+	pci_msix_clear_and_set_ctrl(dev, 0,
 				PCI_MSIX_FLAGS_MASKALL | PCI_MSIX_FLAGS_ENABLE);
 
 	for (i = 0; i < nvec; i++) {
@@ -649,7 +633,7 @@ static int msix_capability_init(struct pci_dev *dev,
 	dev->msix_enabled = 1;
 	populate_msi_sysfs(dev);
 
-	msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_MASKALL, 0);
+	pci_msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_MASKALL, 0);
 
 	return 0;
 }
@@ -747,7 +731,7 @@ void pci_msi_shutdown(struct pci_dev *dev)
 	msi_dev_entry->owner = DOMID_IO;
 
 	/* Disable MSI mode */
-	msi_set_enable(dev, 0);
+	pci_msi_set_enable(dev, 0);
 	pci_intx_for_msi(dev, 1);
 	dev->msi_enabled = 0;
 }
@@ -920,7 +904,7 @@ void pci_msix_shutdown(struct pci_dev *dev)
 
 	/* Disable MSI mode */
 	if (is_initial_xendomain()) {
-		msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
+		pci_msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
 		pci_intx_for_msi(dev, 1);
 	}
 	dev->msix_enabled = 0;
@@ -952,26 +936,6 @@ EXPORT_SYMBOL(pci_msi_enabled);
 void pci_msi_init_pci_dev(struct pci_dev *dev)
 {
 	INIT_LIST_HEAD(&dev->msi_list);
-
-	/* Disable the msi hardware to avoid screaming interrupts
-	 * during boot.  This is the power on reset default so
-	 * usually this should be a noop.
-	 * But on a Xen host don't do this for
-	 * - IOMMUs which the hypervisor is in control of (and hence has
-	 *   already enabled on purpose),
-	 * - unprivileged domains.
-	 */
-	if (is_initial_xendomain()
-	    && (dev->class >> 8) == PCI_CLASS_SYSTEM_IOMMU
-	    && dev->vendor == PCI_VENDOR_ID_AMD)
-		return;
-	dev->msi_cap = pci_find_capability(dev, PCI_CAP_ID_MSI);
-	if (dev->msi_cap && is_initial_xendomain())
-		msi_set_enable(dev, 0);
-
-	dev->msix_cap = pci_find_capability(dev, PCI_CAP_ID_MSIX);
-	if (dev->msix_cap && is_initial_xendomain())
-		msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
 }
 
 /**

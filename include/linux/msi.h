@@ -110,11 +110,16 @@ struct msi_controller {
 	struct device *dev;
 	struct device_node *of_node;
 	struct list_head list;
+#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+	struct irq_domain *domain;
+#endif
 
 	int (*setup_irq)(struct msi_controller *chip, struct pci_dev *dev,
 			 struct msi_desc *desc);
 	void (*teardown_irq)(struct msi_controller *chip, unsigned int irq);
 };
+#else /* CONFIG_XEN */
+struct msi_msg;
 #endif /* CONFIG_XEN */
 
 #ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN

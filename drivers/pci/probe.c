@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/cpumask.h>
 #include <linux/pci-aspm.h>
+#include <xen/xen.h>
 #include <asm-generic/pci-bridge.h>
 #include "pci.h"
 
@@ -254,8 +255,8 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 	}
 
 	if (res->flags & IORESOURCE_MEM_64) {
-		if ((sizeof(dma_addr_t) < 8 || sizeof(resource_size_t) < 8) &&
-		    sz64 > 0x100000000ULL) {
+		if ((sizeof(pci_bus_addr_t) < 8 || sizeof(resource_size_t) < 8)
+		    && sz64 > 0x100000000ULL) {
 			res->flags |= IORESOURCE_UNSET | IORESOURCE_DISABLED;
 			res->start = 0;
 			res->end = 0;
@@ -264,7 +265,7 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 			goto out;
 		}
 
-		if ((sizeof(dma_addr_t) < 8) && l) {
+		if ((sizeof(pci_bus_addr_t) < 8) && l) {
 			/* Above 32-bit boundary; try to reallocate */
 			res->flags |= IORESOURCE_UNSET;
 			res->start = 0;
@@ -399,7 +400,7 @@ static void pci_read_bridge_mmio_pref(struct pci_bus *child)
 	struct pci_dev *dev = child->self;
 	u16 mem_base_lo, mem_limit_lo;
 	u64 base64, limit64;
-	dma_addr_t base, limit;
+	pci_bus_addr_t base, limit;
 	struct pci_bus_region region;
 	struct resource *res;
 
@@ -426,8 +427,8 @@ static void pci_read_bridge_mmio_pref(struct pci_bus *child)
 		}
 	}
 
-	base = (dma_addr_t) base64;
-	limit = (dma_addr_t) limit64;
+	base = (pci_bus_addr_t) base64;
+	limit = (pci_bus_addr_t) limit64;
 
 	if (base != base64) {
 		dev_err(&dev->dev, "can't handle bridge window above 4GB (bus address %#010llx)\n",
@@ -661,21 +662,6 @@ static void pci_set_bus_speed(struct pci_bus *bus)
 	}
 }
 
-void __weak pcibios_set_phb_msi_domain(struct pci_bus *bus)
-{
-	pci_set_phb_of_msi_domain(bus);
-}
-
-static void pci_set_bus_msi_domain(struct pci_bus *bus)
-{
-	struct pci_dev *bridge = bus->self;
-
-	if (!bridge)
-		pcibios_set_phb_msi_domain(bus);
-	else
-		dev_set_msi_domain(&bus->dev, dev_get_msi_domain(&bridge->dev));
-}
-
 static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
 					   struct pci_dev *bridge, int busnr)
 {
@@ -729,7 +715,6 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
 	bridge->subordinate = child;
 
 add_dev:
-	pci_set_bus_msi_domain(child);
 	ret = device_register(&child->dev);
 	WARN_ON(ret < 0);
 
@@ -989,6 +974,8 @@ void set_pcie_port_type(struct pci_dev *pdev)
 {
 	int pos;
 	u16 reg16;
+	int type;
+	struct pci_dev *parent;
 
 	pos = pci_find_capability(pdev, PCI_CAP_ID_EXP);
 	if (!pos)
@@ -998,6 +985,22 @@ void set_pcie_port_type(struct pci_dev *pdev)
 	pdev->pcie_flags_reg = reg16;
 	pci_read_config_word(pdev, pos + PCI_EXP_DEVCAP, &reg16);
 	pdev->pcie_mpss = reg16 & PCI_EXP_DEVCAP_PAYLOAD;
+
+	/*
+	 * A Root Port is always the upstream end of a Link.  No PCIe
+	 * component has two Links.  Two Links are connected by a Switch
+	 * that has a Port on each Link and internal logic to connect the
+	 * two Ports.
+	 */
+	type = pci_pcie_type(pdev);
+	if (type == PCI_EXP_TYPE_ROOT_PORT)
+		pdev->has_secondary_link = 1;
+	else if (type == PCI_EXP_TYPE_UPSTREAM ||
+		 type == PCI_EXP_TYPE_DOWNSTREAM) {
+		parent = pci_upstream_bridge(pdev);
+		if (!parent->has_secondary_link)
+			pdev->has_secondary_link = 1;
+	}
 }
 
 void set_pcie_hotplug_bridge(struct pci_dev *pdev)
@@ -1101,6 +1104,31 @@ int pci_cfg_space_size(struct pci_dev *dev)
 
 #define LEGACY_IO_RESOURCE	(IORESOURCE_IO | IORESOURCE_PCI_FIXED)
 
+static void pci_msi_setup_pci_dev(struct pci_dev *dev)
+{
+	/*
+	 * Disable the MSI hardware to avoid screaming interrupts
+	 * during boot.  This is the power on reset default so
+	 * usually this should be a noop.
+	 *
+	 * But on a Xen host don't do this for
+	 * - IOMMUs which the hypervisor is in control of (and hence has
+	 *   already enabled on purpose),
+	 * - unprivileged domains.
+	 */
+	if (xen_initial_domain()
+	    && (dev->class >> 8) == PCI_CLASS_SYSTEM_IOMMU
+	    && dev->vendor == PCI_VENDOR_ID_AMD)
+		return;
+	dev->msi_cap = pci_find_capability(dev, PCI_CAP_ID_MSI);
+	if (dev->msi_cap && xen_initial_domain())
+		pci_msi_set_enable(dev, 0);
+
+	dev->msix_cap = pci_find_capability(dev, PCI_CAP_ID_MSIX);
+	if (dev->msix_cap && xen_initial_domain())
+		pci_msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
+}
+
 /**
  * pci_setup_device - fill in class and map information of a device
  * @dev: the device structure to fill
@@ -1155,6 +1183,8 @@ int pci_setup_device(struct pci_dev *dev)
 
 	/* "Unknown power state" */
 	dev->current_state = PCI_UNKNOWN;
+
+	pci_msi_setup_pci_dev(dev);
 
 	/* Early fixups, before probing the BARs */
 	pci_fixup_device(pci_fixup_early, dev);
@@ -1529,17 +1559,6 @@ static void pci_init_capabilities(struct pci_dev *dev)
 	pci_enable_acs(dev);
 }
 
-static void pci_set_msi_domain(struct pci_dev *dev)
-{
-	/*
-	 * If no domain has been set through the pcibios callback,
-	 * inherit the default from the bus device.
-	 */
-	if (!dev_get_msi_domain(&dev->dev))
-		dev_set_msi_domain(&dev->dev,
-				   dev_get_msi_domain(&dev->bus->dev));
-}
-
 void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
 {
 	int ret;
@@ -1580,9 +1599,6 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
 
 	ret = pcibios_add_device(dev);
 	WARN_ON(ret < 0);
-
-	/* Setup MSI irq domain */
-	pci_set_msi_domain(dev);
 
 	/* Notifier could use PCI capabilities */
 	dev->match_driver = false;
@@ -1650,7 +1666,7 @@ static int only_one_child(struct pci_bus *bus)
 		return 0;
 	if (pci_pcie_type(parent) == PCI_EXP_TYPE_ROOT_PORT)
 		return 1;
-	if (pci_pcie_type(parent) == PCI_EXP_TYPE_DOWNSTREAM &&
+	if (parent->has_secondary_link &&
 	    !pci_has_flag(PCI_SCAN_ALL_PCIE_DEVS))
 		return 1;
 	return 0;
@@ -1981,7 +1997,6 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
 	b->bridge = get_device(&bridge->dev);
 	device_enable_async_suspend(b->bridge);
 	pci_set_bus_of_node(b);
-	pci_set_bus_msi_domain(b);
 
 	if (!parent)
 		set_dev_node(b->bridge, pcibus_to_node(b));
@@ -2136,25 +2151,6 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
 	return b;
 }
 EXPORT_SYMBOL(pci_scan_root_bus);
-
-/* Deprecated; use pci_scan_root_bus() instead */
-struct pci_bus *pci_scan_bus_parented(struct device *parent,
-		int bus, struct pci_ops *ops, void *sysdata)
-{
-	LIST_HEAD(resources);
-	struct pci_bus *b;
-
-	pci_add_resource(&resources, &ioport_resource);
-	pci_add_resource(&resources, &iomem_resource);
-	pci_add_resource(&resources, &busn_resource);
-	b = pci_create_root_bus(parent, bus, ops, sysdata, &resources);
-	if (b)
-		pci_scan_child_bus(b);
-	else
-		pci_free_resource_list(&resources);
-	return b;
-}
-EXPORT_SYMBOL(pci_scan_bus_parented);
 
 struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops,
 					void *sysdata)

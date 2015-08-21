@@ -211,7 +211,7 @@ static int xen_hotplug_notifier(struct acpi_processor *pr, int event)
 		return -EOPNOTSUPP;
 	}
 
-	if (pr->phys_id == -1) {
+	if (invalid_phys_cpuid(pr->phys_id)) {
 		pr_warn("no valid phys_id for acpi_id %#x\n", pr->acpi_id);
 		return -ENODATA;
 	}

@@ -85,20 +85,7 @@ static unsigned int skip_txen_test; /* force skip of txen test at init time */
 #define BOTH_EMPTY 	(UART_LSR_TEMT | UART_LSR_THRE)
 
 
-#ifdef CONFIG_SERIAL_8250_DETECT_IRQ
-#define CONFIG_SERIAL_DETECT_IRQ 1
-#endif
-#ifdef CONFIG_SERIAL_8250_MANY_PORTS
-#define CONFIG_SERIAL_MANY_PORTS 1
-#endif
-
 #define arch_8250_sysrq_via_ctrl_o(a,b) 0
-
-/*
- * HUB6 is always on.  This will be removed once the header
- * files have been cleaned.
- */
-#define CONFIG_HUB6 1
 
 #include <asm/serial.h>
 /*
@@ -2025,8 +2012,9 @@ EXPORT_SYMBOL_GPL(serial8250_do_set_mctrl);
 static void serial8250_set_mctrl(struct uart_port *port, unsigned int mctrl)
 {
 	if (port->set_mctrl)
-		return port->set_mctrl(port, mctrl);
-	return serial8250_do_set_mctrl(port, mctrl);
+		port->set_mctrl(port, mctrl);
+	else
+		serial8250_do_set_mctrl(port, mctrl);
 }
 
 static void serial8250_break_ctl(struct uart_port *port, int break_state)
@@ -3554,6 +3542,9 @@ static struct console univ8250_console = {
 
 static int __init univ8250_console_init(void)
 {
+	if (nr_uarts == 0)
+		return -ENODEV;
+
 	serial8250_isa_init_ports();
 	register_console(&univ8250_console);
 	return 0;
@@ -3584,7 +3575,7 @@ int __init early_serial_setup(struct uart_port *port)
 {
 	struct uart_port *p;
 
-	if (port->line >= ARRAY_SIZE(serial8250_ports))
+	if (port->line >= ARRAY_SIZE(serial8250_ports) || nr_uarts == 0)
 		return -ENODEV;
 
 	serial8250_isa_init_ports();
@@ -3856,7 +3847,6 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
 		uart->port.mapbase      = up->port.mapbase;
 		uart->port.mapsize      = up->port.mapsize;
 		uart->port.private_data = up->port.private_data;
-		uart->port.fifosize	= up->port.fifosize;
 		uart->tx_loadsz		= up->tx_loadsz;
 		uart->capabilities	= up->capabilities;
 		uart->port.throttle	= up->port.throttle;
@@ -3950,6 +3940,9 @@ EXPORT_SYMBOL(serial8250_unregister_port);
 static int __init serial8250_init(void)
 {
 	int ret;
+
+	if (nr_uarts == 0)
+		return -ENODEV;
 
 	serial8250_isa_init_ports();
 
