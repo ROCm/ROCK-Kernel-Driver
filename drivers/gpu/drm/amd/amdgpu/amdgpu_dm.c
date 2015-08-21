@@ -23,7 +23,7 @@
  *
  */
 
-#include "amdgpu_dal_types.h"
+#include "dal_services_types.h"
 #include "include/dal_interface.h"
 #include "include/mode_query_interface.h"
 

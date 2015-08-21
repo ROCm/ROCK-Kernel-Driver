@@ -25,7 +25,7 @@
 
 #include <drm/drmP.h>
 
-#include "amdgpu_dal_types.h"
+#include "dal_services_types.h"
 #include "include/dal_interface.h"
 
 #include "amdgpu.h"
