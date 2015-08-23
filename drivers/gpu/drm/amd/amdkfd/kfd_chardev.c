@@ -474,14 +474,14 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
 		return status;
 	}
 
-	mutex_lock(get_dbgmgr_mutex());
 	mutex_lock(&p->mutex);
+	mutex_lock(get_dbgmgr_mutex());
 
 	/* make sure that we have pdd, if this the first queue created for this process */
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd) < 0) {
-		mutex_unlock(&p->mutex);
 		mutex_unlock(get_dbgmgr_mutex());
+		mutex_unlock(&p->mutex);
 		return PTR_ERR(pdd);
 	}
 
@@ -497,8 +497,9 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
 				dev->dbgmgr = dbgmgr_ptr;
 		}
 	}
-	mutex_unlock(&p->mutex);
+
 	mutex_unlock(get_dbgmgr_mutex());
+	mutex_unlock(&p->mutex);
 
 	return status;
 }
