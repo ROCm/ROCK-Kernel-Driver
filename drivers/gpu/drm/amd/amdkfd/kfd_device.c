@@ -38,7 +38,8 @@ static const struct kfd_device_info kaveri_device_info = {
 	.ih_ring_entry_size = 4 * sizeof(uint32_t),
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
-	.mqd_size_aligned = MQD_SIZE_ALIGNED
+	.mqd_size_aligned = MQD_SIZE_ALIGNED,
+	.is_need_iommu_device = true
 };
 
 static const struct kfd_device_info carrizo_device_info = {
@@ -49,7 +50,8 @@ static const struct kfd_device_info carrizo_device_info = {
 	.ih_ring_entry_size = 4 * sizeof(uint32_t),
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
-	.mqd_size_aligned = MQD_SIZE_ALIGNED
+	.mqd_size_aligned = MQD_SIZE_ALIGNED,
+	.is_need_iommu_device = true
 };
 
 static const struct kfd_device_info tonga_device_info = {
@@ -59,7 +61,8 @@ static const struct kfd_device_info tonga_device_info = {
 	.ih_ring_entry_size = 4 * sizeof(uint32_t),
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
-	.mqd_size_aligned = MQD_SIZE_ALIGNED
+	.mqd_size_aligned = MQD_SIZE_ALIGNED,
+	.is_need_iommu_device = false
 };
 
 struct kfd_deviceid {
@@ -128,6 +131,8 @@ struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 
 	if (!device_info)
 		return NULL;
+
+	BUG_ON(!f2g);
 
 	kfd = kzalloc(sizeof(*kfd), GFP_KERNEL);
 	if (!kfd)
@@ -312,15 +317,17 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 		goto kfd_interrupt_error;
 	}
 
-	if (!device_iommu_pasid_init(kfd)) {
-		dev_err(kfd_device,
-			"Error initializing iommuv2 for device (%x:%x)\n",
-			kfd->pdev->vendor, kfd->pdev->device);
-		goto device_iommu_pasid_error;
+	if (kfd->device_info->is_need_iommu_device) {
+		if (!device_iommu_pasid_init(kfd)) {
+			dev_err(kfd_device,
+				"Error initializing iommuv2 for device (%x:%x)\n",
+				kfd->pdev->vendor, kfd->pdev->device);
+			goto device_iommu_pasid_error;
+		}
+		amd_iommu_set_invalidate_ctx_cb(kfd->pdev,
+					iommu_pasid_shutdown_callback);
+		amd_iommu_set_invalid_ppr_cb(kfd->pdev, iommu_invalid_ppr_cb);
 	}
-	amd_iommu_set_invalidate_ctx_cb(kfd->pdev,
-						iommu_pasid_shutdown_callback);
-	amd_iommu_set_invalid_ppr_cb(kfd->pdev, iommu_invalid_ppr_cb);
 
 	kfd->dqm = device_queue_manager_init(kfd);
 	if (!kfd->dqm) {
@@ -354,7 +361,8 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 dqm_start_error:
 	device_queue_manager_uninit(kfd->dqm);
 device_queue_manager_error:
-	amd_iommu_free_device(kfd->pdev);
+	if (kfd->device_info->is_need_iommu_device)
+		amd_iommu_free_device(kfd->pdev);
 device_iommu_pasid_error:
 	kfd_interrupt_exit(kfd);
 kfd_interrupt_error:
@@ -374,7 +382,8 @@ void kgd2kfd_device_exit(struct kfd_dev *kfd)
 {
 	if (kfd->init_complete) {
 		device_queue_manager_uninit(kfd->dqm);
-		amd_iommu_free_device(kfd->pdev);
+		if (kfd->device_info->is_need_iommu_device)
+			amd_iommu_free_device(kfd->pdev);
 		kfd_interrupt_exit(kfd);
 		kfd_topology_remove_device(kfd);
 		kfd_gtt_sa_fini(kfd);
@@ -390,9 +399,11 @@ void kgd2kfd_suspend(struct kfd_dev *kfd)
 
 	if (kfd->init_complete) {
 		kfd->dqm->ops.stop(kfd->dqm);
-		amd_iommu_set_invalidate_ctx_cb(kfd->pdev, NULL);
-		amd_iommu_set_invalid_ppr_cb(kfd->pdev, NULL);
-		amd_iommu_free_device(kfd->pdev);
+		if (kfd->device_info->is_need_iommu_device) {
+			amd_iommu_set_invalidate_ctx_cb(kfd->pdev, NULL);
+			amd_iommu_set_invalid_ppr_cb(kfd->pdev, NULL);
+			amd_iommu_free_device(kfd->pdev);
+		}
 	}
 }
 
@@ -406,12 +417,15 @@ int kgd2kfd_resume(struct kfd_dev *kfd)
 	pasid_limit = kfd_get_pasid_limit();
 
 	if (kfd->init_complete) {
-		err = amd_iommu_init_device(kfd->pdev, pasid_limit);
-		if (err < 0)
-			return -ENXIO;
-		amd_iommu_set_invalidate_ctx_cb(kfd->pdev,
-						iommu_pasid_shutdown_callback);
-		amd_iommu_set_invalid_ppr_cb(kfd->pdev, iommu_invalid_ppr_cb);
+		if (kfd->device_info->is_need_iommu_device) {
+			err = amd_iommu_init_device(kfd->pdev, pasid_limit);
+			if (err < 0)
+				return -ENXIO;
+			amd_iommu_set_invalidate_ctx_cb(kfd->pdev,
+					iommu_pasid_shutdown_callback);
+			amd_iommu_set_invalid_ppr_cb(kfd->pdev,
+					iommu_invalid_ppr_cb);
+		}
 		kfd->dqm->ops.start(kfd->dqm);
 	}
 

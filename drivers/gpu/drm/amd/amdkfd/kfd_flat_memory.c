@@ -293,9 +293,6 @@
 #define MAKE_LDS_APP_LIMIT(base) \
 	(((uint64_t)(base) & 0xFFFFFFFF00000000UL) | 0xFFFFFFFF)
 
-#define KFD_GPUVM_ADDRESS_RANGE_MASK (0xFFFFFFFFFFUL)
-#define KFD_GPUVM_ADDRESS_RANGE_SIZE (1000000000UL)
-
 void kfd_set_process_dgpu_aperture(uint32_t node_id,
 		struct kfd_process *process, uint64_t base, uint64_t limit)
 {

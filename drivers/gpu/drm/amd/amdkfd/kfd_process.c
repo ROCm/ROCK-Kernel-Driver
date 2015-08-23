@@ -178,7 +178,8 @@ static void kfd_process_wq_release(struct work_struct *work)
 		pr_debug("Releasing pdd (topology id %d) for process (pasid %d) in workqueue\n",
 				pdd->dev->id, p->pasid);
 
-		amd_iommu_unbind_pasid(pdd->dev->pdev, p->pasid);
+		if (pdd->dev->device_info->is_need_iommu_device)
+			amd_iommu_unbind_pasid(pdd->dev->pdev, p->pasid);
 		list_del(&pdd->per_device_list);
 
 		/*
@@ -415,9 +416,11 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 	if (pdd->bound)
 		return pdd;
 
-	err = amd_iommu_bind_pasid(dev->pdev, p->pasid, p->lead_thread);
-	if (err < 0)
-		return ERR_PTR(err);
+	if (dev->device_info->is_need_iommu_device) {
+		err = amd_iommu_bind_pasid(dev->pdev, p->pasid, p->lead_thread);
+		if (err < 0)
+			return ERR_PTR(err);
+	}
 
 	pdd->bound = true;
 

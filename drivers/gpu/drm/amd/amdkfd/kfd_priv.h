@@ -140,6 +140,7 @@ struct kfd_device_info {
 	size_t ih_ring_entry_size;
 	uint8_t num_of_watch_points;
 	uint16_t mqd_size_aligned;
+	bool is_need_iommu_device;
 };
 
 struct kfd_mem_obj {
