@@ -591,15 +591,24 @@ bool amdgpu_dm_mode_reset(struct drm_crtc *crtc)
 	/* Turn vblank off before reset */
 	drm_crtc_vblank_off(crtc);
 
-	/* Blank the display */
-	dal_set_blanking(adev->dm.dal, acrtc->crtc_id, true);
+	/* When we will get called from drm asking to reset mode
+	 * when fb is null, it will lead us reset mode unnecessarily.
+	 * So change the sequence, we won't do the actual reset mode call
+	 * when display is connected, as that's harmful for glitchless mode
+	 * change (when we only reprogram pipe front end). */
+	if ((dal_get_connected_targets_vector(adev->dm.dal)
+			& (1 << display_index)) &&
+		adev->dm.fake_display_index == INVALID_DISPLAY_INDEX) {
 
-	/* Somehow we will get called from drm ask us reset mode
-	 * when fb is null, it will lead us remove mode unnecessarily
-	 * so change the code,we won't do the actual reset mode call
-	 * when display is connected,as that's unnecessarily and harmful.*/
-	if (dal_get_connected_targets_vector(adev->dm.dal)
-			& (1 << display_index)) {
+		/*
+		 * Blank the display, as buffer will be invalidated.
+		 * For the else case it would be done as part of dal reset mode
+		 * sequence.
+		 */
+		mutex_lock(&adev->dm.dal_mutex);
+		dal_set_blanking(adev->dm.dal, acrtc->crtc_id, true);
+		mutex_unlock(&adev->dm.dal_mutex);
+
 		ret = true;
 		DRM_DEBUG_KMS(
 			"Skip reset mode for disp_index %d\n",
@@ -1398,8 +1407,23 @@ static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
 	.force = amdgpu_dm_connector_force
 };
 
+static void dm_crtc_helper_dpms(struct drm_crtc *crtc, int mode)
+{
+	switch (mode) {
+	case DRM_MODE_DPMS_ON:
+		drm_crtc_vblank_on(crtc);
+		break;
+	case DRM_MODE_DPMS_STANDBY:
+	case DRM_MODE_DPMS_SUSPEND:
+	case DRM_MODE_DPMS_OFF:
+		drm_crtc_vblank_off(crtc);
+		break;
+	}
+}
+
 static const struct drm_crtc_helper_funcs amdgpu_dm_crtc_helper_funcs = {
 	.disable = amdgpu_dm_crtc_disable,
+	.dpms = dm_crtc_helper_dpms,
 	.load_lut = NULL
 };
 

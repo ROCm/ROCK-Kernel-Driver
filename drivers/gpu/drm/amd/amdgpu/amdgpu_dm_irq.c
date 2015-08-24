@@ -462,7 +462,7 @@ int amdgpu_dm_irq_suspend(
 	DRM_DEBUG_KMS("DM_IRQ: suspend\n");
 
 	/* disable HW interrupt */
-	for (src = DAL_IRQ_SOURCE_HPD1; src < DAL_IRQ_SOURCES_NUMBER; src++) {
+	for (src = DAL_IRQ_SOURCE_HPD1; src <= DAL_IRQ_SOURCE_HPD6; src++) {
 		hnd_list_l = &adev->dm.irq_handler_list_low_tab[src].head;
 		hnd_list_h = &adev->dm.irq_handler_list_high_tab[src];
 		if (!list_empty(hnd_list_l) || !list_empty(hnd_list_h))
@@ -488,7 +488,7 @@ int amdgpu_dm_irq_resume(
 	DRM_DEBUG_KMS("DM_IRQ: resume\n");
 
 	/* re-enable HW interrupt */
-	for (src = DAL_IRQ_SOURCE_HPD1; src < DAL_IRQ_SOURCES_NUMBER; src++) {
+	for (src = DAL_IRQ_SOURCE_HPD1; src <= DAL_IRQ_SOURCE_HPD6; src++) {
 		hnd_list_l = &adev->dm.irq_handler_list_low_tab[src].head;
 		hnd_list_h = &adev->dm.irq_handler_list_high_tab[src];
 		if (!list_empty(hnd_list_l) || !list_empty(hnd_list_h))
