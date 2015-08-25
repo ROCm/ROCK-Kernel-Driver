@@ -870,13 +870,50 @@ static int
 kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 {
 	struct kfd_ioctl_create_event_args *args = data;
-	int err;
+	struct kfd_dev *kfd;
+	struct kfd_process_device *pdd;
+	int err, i;
+	void *mem, *kern_addr;
+
+	/* Map dGPU gtt BO to kernel */
+	if (args->event_page_offset != 0) {
+		i = 0;
+		do {
+			kfd = kfd_topology_enum_kfd_devices(i);
+			if (!kfd)
+				break;
+			if (kfd->device_info->asic_family == CHIP_TONGA) {
+				pdd = kfd_bind_process_to_device(kfd, p);
+				if (IS_ERR(pdd) < 0) {
+					err = PTR_ERR(pdd);
+					return -EFAULT;
+				}
+				mem = kfd_process_device_translate_handle(pdd,
+					GET_IDR_HANDLE(args->event_page_offset));
+				BUG_ON(!mem);
+				kfd->kfd2kgd->map_gtt_bo_to_kernel(kfd->kgd,
+						mem, &kern_addr);
+				pr_err("amdkfd: event page kernel address %p\n",
+						kern_addr);
+				err = kfd_event_create(filp, p,
+						args->event_type,
+						args->auto_reset != 0,
+						args->node_id,
+						&args->event_id,
+						&args->event_trigger_data,
+						&args->event_page_offset,
+						&args->event_slot_index,
+						kern_addr);
+			}
+			i++;
+		} while (kfd);
+	}
 
 	err = kfd_event_create(filp, p, args->event_type,
 				args->auto_reset != 0, args->node_id,
 				&args->event_id, &args->event_trigger_data,
 				&args->event_page_offset,
-				&args->event_slot_index);
+				&args->event_slot_index, NULL);
 
 	return err;
 }

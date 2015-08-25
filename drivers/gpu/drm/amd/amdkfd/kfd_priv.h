@@ -783,9 +783,10 @@ void kfd_signal_hw_exception_event(unsigned int pasid);
 int kfd_set_event(struct kfd_process *p, uint32_t event_id);
 int kfd_reset_event(struct kfd_process *p, uint32_t event_id);
 int kfd_event_create(struct file *devkfd, struct kfd_process *p,
-		     uint32_t event_type, bool auto_reset, uint32_t node_id,
-		     uint32_t *event_id, uint32_t *event_trigger_data,
-		     uint64_t *event_page_offset, uint32_t *event_slot_index);
+	     uint32_t event_type, bool auto_reset, uint32_t node_id,
+	     uint32_t *event_id, uint32_t *event_trigger_data,
+	     uint64_t *event_page_offset, uint32_t *event_slot_index,
+	     void *kern_addr);
 int kfd_event_destroy(struct kfd_process *p, uint32_t event_id);
 
 void radeon_flush_tlb(struct kfd_dev *dev, uint32_t pasid);

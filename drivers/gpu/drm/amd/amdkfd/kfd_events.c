@@ -196,6 +196,40 @@ allocate_event_notification_slot(struct file *devkfd, struct kfd_process *p,
 }
 
 static bool
+allocate_signal_page_dgpu(struct kfd_process *p,
+		struct signal_page **page,
+		uint64_t *kernel_address)
+{
+	struct signal_page *my_page;
+
+	my_page = kzalloc(SIGNAL_PAGE_SIZE, GFP_KERNEL);
+	if (!page)
+		return false;
+
+	/* prevent user-mode info leaks */
+	memset(kernel_address, (uint8_t) UNSIGNALED_EVENT_SLOT,
+			KFD_SIGNAL_EVENT_LIMIT * 8);
+
+	my_page->kernel_address = kernel_address;
+	my_page->user_address = NULL;
+	my_page->free_slots = SLOTS_PER_PAGE;
+	if (list_empty(&p->signal_event_pages))
+			my_page->page_index = 0;
+	else
+		my_page->page_index = list_tail_entry(&p->signal_event_pages,
+		   struct signal_page,
+		   event_pages)->page_index + 1;
+
+	pr_debug("allocated new event signal page at %p, for process %p\n",
+			my_page, p);
+	pr_debug("page index is %d\n", my_page->page_index);
+
+	list_add(&my_page->event_pages, &p->signal_event_pages);
+
+	return true;
+}
+
+static bool
 allocate_debug_event_notification_slot(struct file *devkfd,
 				struct kfd_process *p,
 				struct signal_page **out_page,
@@ -427,9 +461,11 @@ static void shutdown_signal_pages(struct kfd_process *p)
 	struct signal_page *page, *tmp;
 
 	list_for_each_entry_safe(page, tmp, &p->signal_event_pages, event_pages) {
-		free_pages((unsigned long)page->kernel_address,
-				get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
-		kfree(page);
+		if (page->user_address) {
+			free_pages((unsigned long)page->kernel_address,
+					get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
+			kfree(page);
+		}
 	}
 }
 
@@ -452,7 +488,8 @@ static bool event_can_be_cpu_signaled(const struct kfd_event *ev)
 int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		     uint32_t event_type, bool auto_reset, uint32_t node_id,
 		     uint32_t *event_id, uint32_t *event_trigger_data,
-		     uint64_t *event_page_offset, uint32_t *event_slot_index)
+		     uint64_t *event_page_offset, uint32_t *event_slot_index,
+		     void *kern_addr)
 {
 	int ret = 0;
 
@@ -469,6 +506,9 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 	*event_page_offset = 0;
 
 	mutex_lock(&p->event_mutex);
+
+	if (kern_addr && list_empty(&p->signal_event_pages))
+		allocate_signal_page_dgpu(p, &ev->signal_page, kern_addr);
 
 	switch (event_type) {
 	case KFD_EVENT_TYPE_SIGNAL:
