@@ -2101,11 +2101,11 @@ static enum hwss_result hw_sequencer_pre_dce_clock_change(
 	}
 
 	if (!dal_pp_pre_dce_clock_change(hws->dal_context, &input, output)) {
-		dal_logger_write(hws->dal_context->logger,
+		/*dal_logger_write(hws->dal_context->logger,
 			LOG_MAJOR_WARNING,
 			LOG_MINOR_COMPONENT_HWSS,
 			"%s: dal_pp_pre_dce_clock_change failed!\n",
-			__func__);
+			__func__);*/
 		return HWSS_RESULT_ERROR;
 	}
 
@@ -2300,11 +2300,11 @@ enum hwss_result dal_hw_sequencer_set_mode(
 		/* Let PPLib know that we are using the clocks it
 		 * provided to us. */
 		if (!dal_pp_post_dce_clock_change(dal_context)) {
-			dal_logger_write(dal_context->logger,
+			/*dal_logger_write(dal_context->logger,
 				LOG_MAJOR_WARNING,
 				LOG_MINOR_COMPONENT_HWSS,
 				"%s: dal_pp_post_dce_clock_change() failed!\n",
-				__func__);
+				__func__);*/
 		}
 	}
 
