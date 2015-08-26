@@ -478,6 +478,8 @@ static void amdgpu_dm_hpd_low_irq(void *interrupt_params)
 		adev->dm.fake_display_index = INVALID_DISPLAY_INDEX;
 
 		trigger_drm_hpd_event = true;
+	} else {
+		mutex_unlock(&adev->dm.dal_mutex);
 	}
 
 	if (true == trigger_drm_hpd_event)
