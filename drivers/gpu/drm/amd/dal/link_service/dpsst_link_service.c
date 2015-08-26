@@ -706,8 +706,9 @@ static bool enable_stream(struct link_service *ls, uint32_t display_index,
 
 	dpsst = container_of(ls, struct dpsst_link_service, link_service);
 
-	if (!(ls->strm_state == STREAM_STATE_DISABLED) ||
-		(ls->strm_state == STREAM_STATE_OPTIMIZED_READY))
+	if ((ls->strm_state != STREAM_STATE_DISABLED) ||
+		(ls->strm_state != STREAM_STATE_OPTIMIZED_READY) ||
+		(ls->strm_state != STREAM_STATE_POWER_SAVE))
 		dal_logger_write(ls->dal_context->logger,
 			LOG_MAJOR_WARNING,
 			LOG_MINOR_COMPONENT_LINK_SERVICE,

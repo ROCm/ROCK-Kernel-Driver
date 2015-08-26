@@ -46,7 +46,8 @@ static bool enable_stream(struct link_service *ls,
 	enum signal_type signal;
 
 	ASSERT(ls->strm_state == STREAM_STATE_DISABLED ||
-		ls->strm_state == STREAM_STATE_OPTIMIZED_READY);
+		ls->strm_state == STREAM_STATE_OPTIMIZED_READY ||
+		ls->strm_state == STREAM_STATE_POWER_SAVE);
 
 	if (ls->strm_state == STREAM_STATE_ACTIVE ||
 		ls->strm_state == STREAM_STATE_ENABLED)
