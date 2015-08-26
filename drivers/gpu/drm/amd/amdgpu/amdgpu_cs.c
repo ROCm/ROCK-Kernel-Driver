@@ -954,8 +954,6 @@ int amdgpu_cs_wait_fences_ioctl(struct drm_device *dev, void *data,
 	unsigned long timeout = amdgpu_gem_timeout(wait->in.timeout_ns);
 	bool wait_all = wait->in.wait_all;
 	uint32_t fence_count = wait->in.fence_count;
-	struct amdgpu_ring *ring;
-	struct amdgpu_ctx **ctxs;
 	struct fence *fence;
 	long r;
 	uint32_t i;
@@ -973,37 +971,32 @@ int amdgpu_cs_wait_fences_ioctl(struct drm_device *dev, void *data,
 		goto err_free_fences;
 	}
 
-	ctxs = (struct amdgpu_ctx **)kcalloc(fence_count,
-			sizeof(struct amdgpu_ctx *), GFP_KERNEL);
-	if (ctxs == NULL) {
-		r = -ENOMEM;
-		goto err_free_fences;
-	}
-	memset(&ctxs[0], 0, sizeof(struct amdgpu_ctxs *) * fence_count);
-
 	/* Prepare the fence array */
 	array = (struct fence **)kcalloc(fence_count, sizeof(struct fence *),
 			GFP_KERNEL);
 	if (array == NULL) {
 		r = -ENOMEM;
-		goto err_free_ctxs;
+		goto err_free_fences;
 	}
 	memset(&array[0], 0, sizeof(struct fence *) * fence_count);
 
 	for (i = 0; i < fence_count; i++) {
-		ring = NULL;
+		struct amdgpu_ring *ring;
+		struct amdgpu_ctx *ctx;
+
 		r = amdgpu_cs_get_ring(adev, fences[i].ip_type,
 				fences[i].ip_instance, fences[i].ring, &ring);
 		if (r)
 			goto err_free_fence_array;
 
-		ctxs[i] = amdgpu_ctx_get(filp->driver_priv, fences[i].ctx_id);
-		if (ctxs[i] == NULL) {
+		ctx = amdgpu_ctx_get(filp->driver_priv, fences[i].ctx_id);
+		if (ctx == NULL) {
 			r = -EINVAL;
 			goto err_free_fence_array;
 		}
 
-		fence = amdgpu_ctx_get_fence(ctxs[i], ring, fences[i].seq_no);
+		fence = amdgpu_ctx_get_fence(ctx, ring, fences[i].seq_no);
+		amdgpu_ctx_put(ctx);
 		if (IS_ERR(fence)) {
 			r = PTR_ERR(fence);
 			goto err_free_fence_array;
@@ -1032,13 +1025,8 @@ err_free_fence_array:
 	for (i = 0; i < fence_count; i++) {
 		if (array[i])
 			fence_put(array[i]);
-		if (ctxs[i])
-			amdgpu_ctx_put(ctxs[i]);
 	}
 	kfree(array);
-
-err_free_ctxs:
-	kfree(ctxs);
 
 err_free_fences:
 	kfree(fences);
