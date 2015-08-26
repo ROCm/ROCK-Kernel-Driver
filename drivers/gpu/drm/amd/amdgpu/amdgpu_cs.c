@@ -937,6 +937,137 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data,
 }
 
 /**
+ * amdgpu_cs_get_fence - helper to get fence from drm_amdgpu_fence
+ *
+ * @adev: amdgpu device
+ * @filp: file private
+ * @user: drm_amdgpu_fence copied from user space
+ */
+static struct fence *amdgpu_cs_get_fence(struct amdgpu_device *adev,
+					 struct drm_file *filp,
+					 struct drm_amdgpu_fence *user)
+{
+	struct amdgpu_ring *ring;
+	struct amdgpu_ctx *ctx;
+	struct fence *fence;
+	int r;
+
+	r = amdgpu_cs_get_ring(adev, user->ip_type, user->ip_instance,
+			       user->ring, &ring);
+	if (r)
+		return ERR_PTR(r);
+
+	ctx = amdgpu_ctx_get(filp->driver_priv, user->ctx_id);
+	if (ctx == NULL)
+		return ERR_PTR(-EINVAL);
+
+	fence = amdgpu_ctx_get_fence(ctx, ring, user->seq_no);
+	amdgpu_ctx_put(ctx);
+
+	return fence;
+}
+
+/**
+ * amdgpu_cs_wait_all_fence - wait on all fences to signal
+ *
+ * @adev: amdgpu device
+ * @filp: file private
+ * @wait: wait parameters
+ * @fences: array of drm_amdgpu_fence
+ */
+static int amdgpu_cs_wait_all_fences(struct amdgpu_device *adev,
+				     struct drm_file *filp,
+				     union drm_amdgpu_wait_fences *wait,
+				     struct drm_amdgpu_fence *fences)
+{
+	uint32_t fence_count = wait->in.fence_count;
+	unsigned i;
+	long r = 1;
+
+	for (i = 0; i < fence_count; i++) {
+		struct fence *fence;
+		unsigned long timeout = amdgpu_gem_timeout(wait->in.timeout_ns);
+
+		fence = amdgpu_cs_get_fence(adev, filp, &fences[i]);
+		if (IS_ERR(fence))
+			return PTR_ERR(fence);
+		else if (!fence)
+			continue;
+
+		r = fence_wait_timeout(fence, true, timeout);
+		if (r < 0)
+			return r;
+
+		if (r == 0)
+			break;
+	}
+
+	memset(wait, 0, sizeof(*wait));
+	wait->out.status = (r > 0);
+
+	return 0;
+}
+
+/**
+ * amdgpu_cs_wait_any_fence - wait on any fence to signal
+ *
+ * @adev: amdgpu device
+ * @filp: file private
+ * @wait: wait parameters
+ * @fences: array of drm_amdgpu_fence
+ */
+static int amdgpu_cs_wait_any_fence(struct amdgpu_device *adev,
+				    struct drm_file *filp,
+				    union drm_amdgpu_wait_fences *wait,
+				    struct drm_amdgpu_fence *fences)
+{
+	unsigned long timeout = amdgpu_gem_timeout(wait->in.timeout_ns);
+	uint32_t fence_count = wait->in.fence_count;
+	struct fence **array;
+	unsigned i;
+	long r;
+
+	/* Prepare the fence array */
+	array = (struct fence **)kcalloc(fence_count, sizeof(struct fence *),
+			GFP_KERNEL);
+	if (array == NULL)
+		return -ENOMEM;
+
+	for (i = 0; i < fence_count; i++) {
+		struct fence *fence;
+
+		fence = amdgpu_cs_get_fence(adev, filp, &fences[i]);
+		if (IS_ERR(fence)) {
+			r = PTR_ERR(fence);
+			goto err_free_fence_array;
+		} else if (fence) {
+			array[i] = fence;
+		} else { /* NULL, the fence has been already signaled */
+			r = 1;
+			goto out;
+		}
+	}
+
+	r = amdgpu_fence_wait_multiple(adev, array, fence_count, false,
+			true, timeout);
+	if (r < 0)
+		goto err_free_fence_array;
+
+out:
+	memset(wait, 0, sizeof(*wait));
+	wait->out.status = (r > 0);
+	/* set return value 0 to indicate success */
+	r = 0;
+
+err_free_fence_array:
+	for (i = 0; i < fence_count; i++)
+		fence_put(array[i]);
+	kfree(array);
+
+	return r;
+}
+
+/**
  * amdgpu_cs_wait_fences_ioctl - wait for multiple command submissions to finish
  *
  * @dev: drm device
@@ -946,17 +1077,12 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data,
 int amdgpu_cs_wait_fences_ioctl(struct drm_device *dev, void *data,
 				struct drm_file *filp)
 {
-	union drm_amdgpu_wait_fences *wait = data;
-	struct drm_amdgpu_fence *fences_user = NULL;
-	struct drm_amdgpu_fence *fences = NULL;
-	struct fence **array = NULL;
 	struct amdgpu_device *adev = dev->dev_private;
-	unsigned long timeout = amdgpu_gem_timeout(wait->in.timeout_ns);
-	bool wait_all = wait->in.wait_all;
+	union drm_amdgpu_wait_fences *wait = data;
 	uint32_t fence_count = wait->in.fence_count;
-	struct fence *fence;
-	long r;
-	uint32_t i;
+	struct drm_amdgpu_fence *fences_user;
+	struct drm_amdgpu_fence *fences;
+	int r;
 
 	/* Get the fences from userspace */
 	fences = kmalloc_array(fence_count, sizeof(struct drm_amdgpu_fence),
@@ -971,62 +1097,10 @@ int amdgpu_cs_wait_fences_ioctl(struct drm_device *dev, void *data,
 		goto err_free_fences;
 	}
 
-	/* Prepare the fence array */
-	array = (struct fence **)kcalloc(fence_count, sizeof(struct fence *),
-			GFP_KERNEL);
-	if (array == NULL) {
-		r = -ENOMEM;
-		goto err_free_fences;
-	}
-	memset(&array[0], 0, sizeof(struct fence *) * fence_count);
-
-	for (i = 0; i < fence_count; i++) {
-		struct amdgpu_ring *ring;
-		struct amdgpu_ctx *ctx;
-
-		r = amdgpu_cs_get_ring(adev, fences[i].ip_type,
-				fences[i].ip_instance, fences[i].ring, &ring);
-		if (r)
-			goto err_free_fence_array;
-
-		ctx = amdgpu_ctx_get(filp->driver_priv, fences[i].ctx_id);
-		if (ctx == NULL) {
-			r = -EINVAL;
-			goto err_free_fence_array;
-		}
-
-		fence = amdgpu_ctx_get_fence(ctx, ring, fences[i].seq_no);
-		amdgpu_ctx_put(ctx);
-		if (IS_ERR(fence)) {
-			r = PTR_ERR(fence);
-			goto err_free_fence_array;
-		} else if (fence) {
-			array[i] = fence;
-		} else { /* NULL, the fence has been already signaled */
-			if (wait_all)
-				continue;
-			r = 1;
-			goto out;
-		}
-	}
-
-	r = amdgpu_fence_wait_multiple(adev, array, fence_count, wait_all,
-			true, timeout);
-	if (r < 0)
-		goto err_free_fence_array;
-
-out:
-	memset(wait, 0, sizeof(*wait));
-	wait->out.status = (r > 0);
-	/* set return value 0 to indicate success */
-	r = 0;
-
-err_free_fence_array:
-	for (i = 0; i < fence_count; i++) {
-		if (array[i])
-			fence_put(array[i]);
-	}
-	kfree(array);
+	if (wait->in.wait_all)
+		r = amdgpu_cs_wait_all_fences(adev, filp, wait, fences);
+	else
+		r = amdgpu_cs_wait_any_fence(adev, filp, wait, fences);
 
 err_free_fences:
 	kfree(fences);
