@@ -186,7 +186,7 @@ static bool enable_crtc(struct timing_generator *tg)
 
 	value = dal_read_reg(tg->ctx,
 			tg->regs[IDX_CRTC_MASTER_UPDATE_MODE]);
-	set_reg_field_value(value, 0,
+	set_reg_field_value(value, 3,
 			CRTC_MASTER_UPDATE_MODE, MASTER_UPDATE_MODE);
 	dal_write_reg(tg->ctx,
 			tg->regs[IDX_CRTC_MASTER_UPDATE_MODE], value);
