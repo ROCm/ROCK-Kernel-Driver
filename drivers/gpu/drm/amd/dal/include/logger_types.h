@@ -102,7 +102,7 @@ enum log_minor {
 	LOG_MINOR_COMPONENT_CONTROLLER,
 	LOG_MINOR_COMPONENT_ISR,
 	LOG_MINOR_COMPONENT_BIOS,
-
+	LOG_MINOR_COMPONENT_IRQ_SERVICE,
 
 /**
 * @brief define minor category for LogMajor_HardwareTrace

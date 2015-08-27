@@ -25,6 +25,8 @@
 
 #include "dal_services.h"
 
+#include "include/logger_interface.h"
+
 #include "irq_service_dce110.h"
 
 #include "dce/dce_11_0_d.h"
@@ -137,8 +139,61 @@ static const struct irq_source_info_funcs vblank_irq_info_funcs = {
 		.funcs = &vblank_irq_info_funcs\
 	}
 
+#define dummy_irq_entry() \
+	{\
+		.funcs = &dummy_irq_info_funcs\
+	}
+
+#define i2c_int_entry(reg_num) \
+	[DAL_IRQ_SOURCE_I2C_DDC ## reg_num] = dummy_irq_entry()
+
+#define azalia_int_entry(reg_num) \
+	[DAL_IRQ_SOURCE_AZALIA ## reg_num] = dummy_irq_entry()
+
+#define dp_sink_int_entry(reg_num) \
+	[DAL_IRQ_SOURCE_DPSINK ## reg_num] = dummy_irq_entry()
+
+#define gpio_pad_int_entry(reg_num) \
+	[DAL_IRQ_SOURCE_GPIOPAD ## reg_num] = dummy_irq_entry()
+
+#define dc_underflow_int_entry(reg_num) \
+	[DAL_IRQ_SOURCE_DC ## reg_num ## UNDERFLOW] = dummy_irq_entry()
+
+static bool dummy_set(
+	struct irq_service *irq_service,
+	const struct irq_source_info *info,
+	bool enable)
+{
+	dal_logger_write(
+		irq_service->ctx->logger,
+		LOG_MAJOR_ERROR,
+		LOG_MINOR_COMPONENT_IRQ_SERVICE,
+		"%s: called for non-implemented irq source\n",
+		__func__);
+	return false;
+}
+
+static bool dummy_ack(
+	struct irq_service *irq_service,
+	const struct irq_source_info *info)
+{
+	dal_logger_write(
+		irq_service->ctx->logger,
+		LOG_MAJOR_ERROR,
+		LOG_MINOR_COMPONENT_IRQ_SERVICE,
+		"%s: called for non-implemented irq source\n",
+		__func__);
+	return false;
+}
+
+static const struct irq_source_info_funcs dummy_irq_info_funcs = {
+	.set = dummy_set,
+	.ack = dummy_ack
+};
+
 static const struct irq_source_info
 irq_source_info_dce110[DAL_IRQ_SOURCES_NUMBER] = {
+	[DAL_IRQ_SOURCE_INVALID] = dummy_irq_entry(),
 	hpd_int_entry(0),
 	hpd_int_entry(1),
 	hpd_int_entry(2),
@@ -151,18 +206,77 @@ irq_source_info_dce110[DAL_IRQ_SOURCES_NUMBER] = {
 	hpd_rx_int_entry(3),
 	hpd_rx_int_entry(4),
 	hpd_rx_int_entry(5),
-	pflip_int_entry(0),
-	pflip_int_entry(1),
-	pflip_int_entry(2),
-	pflip_int_entry(3),
-	pflip_int_entry(4),
-	pflip_int_entry(5),
+	i2c_int_entry(1),
+	i2c_int_entry(2),
+	i2c_int_entry(3),
+	i2c_int_entry(4),
+	i2c_int_entry(5),
+	i2c_int_entry(6),
+	azalia_int_entry(0),
+	azalia_int_entry(1),
+	azalia_int_entry(2),
+	azalia_int_entry(3),
+	azalia_int_entry(4),
+	azalia_int_entry(5),
+	dp_sink_int_entry(1),
+	dp_sink_int_entry(2),
+	dp_sink_int_entry(3),
+	dp_sink_int_entry(4),
+	dp_sink_int_entry(5),
+	dp_sink_int_entry(6),
 	vblank_int_entry(0),
 	vblank_int_entry(1),
 	vblank_int_entry(2),
 	vblank_int_entry(3),
 	vblank_int_entry(4),
 	vblank_int_entry(5),
+	[DAL_IRQ_SOURCE_TIMER] = dummy_irq_entry(),
+	pflip_int_entry(0),
+	pflip_int_entry(1),
+	pflip_int_entry(2),
+	pflip_int_entry(3),
+	pflip_int_entry(4),
+	pflip_int_entry(5),
+	[DAL_IRQ_SOURCE_PFLIP_UNDERLAY0] = dummy_irq_entry(),
+	gpio_pad_int_entry(0),
+	gpio_pad_int_entry(1),
+	gpio_pad_int_entry(2),
+	gpio_pad_int_entry(3),
+	gpio_pad_int_entry(4),
+	gpio_pad_int_entry(5),
+	gpio_pad_int_entry(6),
+	gpio_pad_int_entry(7),
+	gpio_pad_int_entry(8),
+	gpio_pad_int_entry(9),
+	gpio_pad_int_entry(10),
+	gpio_pad_int_entry(11),
+	gpio_pad_int_entry(12),
+	gpio_pad_int_entry(13),
+	gpio_pad_int_entry(14),
+	gpio_pad_int_entry(15),
+	gpio_pad_int_entry(16),
+	gpio_pad_int_entry(17),
+	gpio_pad_int_entry(18),
+	gpio_pad_int_entry(19),
+	gpio_pad_int_entry(20),
+	gpio_pad_int_entry(21),
+	gpio_pad_int_entry(22),
+	gpio_pad_int_entry(23),
+	gpio_pad_int_entry(24),
+	gpio_pad_int_entry(25),
+	gpio_pad_int_entry(26),
+	gpio_pad_int_entry(27),
+	gpio_pad_int_entry(28),
+	gpio_pad_int_entry(29),
+	gpio_pad_int_entry(30),
+	dc_underflow_int_entry(1),
+	dc_underflow_int_entry(2),
+	dc_underflow_int_entry(3),
+	dc_underflow_int_entry(4),
+	dc_underflow_int_entry(5),
+	dc_underflow_int_entry(6),
+	[DAL_IRQ_SOURCE_DMCU_SCP] = dummy_irq_entry(),
+	[DAL_IRQ_SOURCE_VBIOS_SW] = dummy_irq_entry()
 };
 
 static enum dal_irq_source to_dal_irq_source(

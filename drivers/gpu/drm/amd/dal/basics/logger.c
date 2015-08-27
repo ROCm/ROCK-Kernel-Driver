@@ -56,6 +56,7 @@ static const struct log_minor_info component_minor_info_tbl[] = {
 	{LOG_MINOR_COMPONENT_CONTROLLER, "Cntrlr"},
 	{LOG_MINOR_COMPONENT_ISR, "ISR"},
 	{LOG_MINOR_COMPONENT_BIOS, "BIOS"},
+	{LOG_MINOR_COMPONENT_IRQ_SERVICE, "IRQ SERVICE"}
 };
 
 static const struct log_minor_info hw_trace_minor_info_tbl[] = {

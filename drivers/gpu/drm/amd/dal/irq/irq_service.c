@@ -26,6 +26,7 @@
 #include "dal_services.h"
 
 #include "include/irq_service_interface.h"
+#include "include/logger_interface.h"
 
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 #include "dce110/irq_service_dce110.h"
@@ -74,6 +75,9 @@ const struct irq_source_info *find_irq_source_info(
 	struct irq_service *irq_service,
 	enum dal_irq_source source)
 {
+	if (source > DAL_IRQ_SOURCES_NUMBER || source < DAL_IRQ_SOURCE_INVALID)
+		return NULL;
+
 	return &irq_service->info[source];
 }
 
@@ -97,6 +101,17 @@ bool dal_irq_service_set(
 {
 	const struct irq_source_info *info =
 		find_irq_source_info(irq_service, source);
+
+	if (!info) {
+		dal_logger_write(
+			irq_service->ctx->logger,
+			LOG_MAJOR_ERROR,
+			LOG_MINOR_COMPONENT_IRQ_SERVICE,
+			"%s: cannot find irq info table entry for %d\n",
+			__func__,
+			source);
+		return false;
+	}
 
 	dal_irq_service_ack(irq_service, source);
 
@@ -126,6 +141,17 @@ bool dal_irq_service_ack(
 {
 	const struct irq_source_info *info =
 		find_irq_source_info(irq_service, source);
+
+	if (!info) {
+		dal_logger_write(
+			irq_service->ctx->logger,
+			LOG_MAJOR_ERROR,
+			LOG_MINOR_COMPONENT_IRQ_SERVICE,
+			"%s: cannot find irq info table entry for %d\n",
+			__func__,
+			source);
+		return false;
+	}
 
 	if (info->funcs->ack)
 		return info->funcs->ack(irq_service, info);
