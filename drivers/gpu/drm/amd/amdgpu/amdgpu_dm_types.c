@@ -623,7 +623,7 @@ bool amdgpu_dm_mode_reset(struct drm_crtc *crtc)
 	}
 
 	/* unpin the FB */
-	if (crtc->primary->fb)	{
+	if (crtc->primary->fb)  {
 		struct amdgpu_framebuffer *afb;
 		struct amdgpu_bo *rbo;
 		int r;
@@ -765,6 +765,17 @@ int amdgpu_dm_set_config(struct drm_mode_set *set)
 		call drm_helper_disable_unused_functions here?*/
 
 		DRM_DEBUG_KMS("[CRTC:%d] [NOFB]\n", set->crtc->base.id);
+
+		DRM_DEBUG_KMS("Setting connector DPMS state to off\n");
+		for (i = 0; i < set->num_connectors; i++) {
+			DRM_DEBUG_KMS(
+				"\t[CONNECTOR:%d] set DPMS off\n",
+				set->connectors[i]->base.id);
+
+			set->connectors[i]->funcs->dpms(
+				set->connectors[i], DRM_MODE_DPMS_OFF);
+
+		}
 
 		if (!amdgpu_dm_mode_reset(set->crtc)) {
 			DRM_ERROR("### Failed to reset mode on [CRTC:%d] ###\n",
@@ -1171,44 +1182,6 @@ static void add_to_mq_helper(void *what, const struct path_mode *pm)
 	dal_mode_query_pin_path_mode(what, pm);
 }
 
-
-static void amdgpu_dm_connector_dpms(struct drm_connector *connector, int mode)
-{
-	struct drm_device *dev = connector->dev;
-	struct amdgpu_device *adev = dev->dev_private;
-	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
-	uint32_t display_index = aconnector->connector_id;
-	enum dal_power_state ps;
-
-	if (mode == connector->dpms)
-		return;
-
-	switch (mode) {
-	case DRM_MODE_DPMS_ON:
-		ps = DAL_POWER_STATE_ON;
-		break;
-	case DRM_MODE_DPMS_OFF:
-		ps = DAL_POWER_STATE_OFF;
-		break;
-	case DRM_MODE_DPMS_STANDBY:
-		ps = DAL_POWER_STATE_STANDBY;
-		break;
-	case DRM_MODE_DPMS_SUSPEND:
-		ps = DAL_POWER_STATE_SUSPEND;
-		break;
-	default:
-		DRM_ERROR("Invalid DPMS mode requested\n");
-		return;
-	}
-
-	dal_set_display_dpms(adev->dm.dal, display_index, ps);
-
-	connector->dpms = mode;
-
-	/* adjust pm to dpms */
-	amdgpu_pm_compute_clocks(adev);
-}
-
 static enum drm_connector_status
 amdgpu_dm_connector_detect(struct drm_connector *connector, bool force)
 {
@@ -1393,6 +1366,47 @@ static void amdgpu_dm_connector_force(struct drm_connector *connector)
 	DRM_ERROR("NOT IMPLEMENTED\n");
 }
 
+static inline enum dal_power_state to_dal_power_state(int mode)
+{
+	switch (mode) {
+	case DRM_MODE_DPMS_ON:
+		return DAL_POWER_STATE_ON;
+	case DRM_MODE_DPMS_OFF:
+		return DAL_POWER_STATE_OFF;
+	case DRM_MODE_DPMS_STANDBY:
+		return DAL_POWER_STATE_STANDBY;
+	case DRM_MODE_DPMS_SUSPEND:
+		return DAL_POWER_STATE_SUSPEND;
+	default:
+		/*
+		 * if unknown dpms mode passed for any reason display would be
+		 * disabled, with log notification
+		 */
+		DRM_ERROR("Invalid DPMS mode requested\n");
+		return DAL_POWER_STATE_OFF;
+	}
+}
+
+
+static void amdgpu_dm_connector_dpms(struct drm_connector *connector, int mode)
+{
+	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
+	uint32_t display_index = aconnector->connector_id;
+	enum dal_power_state ps = to_dal_power_state(mode);
+
+	if (mode == connector->dpms)
+		return;
+
+	dal_set_display_dpms(adev->dm.dal, display_index, ps);
+
+	connector->dpms = mode;
+
+	/* adjust pm to dpms */
+	amdgpu_pm_compute_clocks(adev);
+}
+
 static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
 	.dpms = amdgpu_dm_connector_dpms,
 /*	.save = NULL,
@@ -1407,16 +1421,19 @@ static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
 
 static void dm_crtc_helper_dpms(struct drm_crtc *crtc, int mode)
 {
+
 	switch (mode) {
 	case DRM_MODE_DPMS_ON:
 		drm_crtc_vblank_on(crtc);
 		break;
-	case DRM_MODE_DPMS_STANDBY:
-	case DRM_MODE_DPMS_SUSPEND:
 	case DRM_MODE_DPMS_OFF:
+	case DRM_MODE_DPMS_SUSPEND:
+	case DRM_MODE_DPMS_STANDBY:
+	default:
 		drm_crtc_vblank_off(crtc);
 		break;
 	}
+
 }
 
 static const struct drm_crtc_helper_funcs amdgpu_dm_crtc_helper_funcs = {

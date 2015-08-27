@@ -444,6 +444,7 @@ static void amdgpu_dm_hpd_low_irq(void *interrupt_params)
 	} else if (adev->dm.fake_display_index != INVALID_DISPLAY_INDEX) {
 		/* we assume only one display is connected */
 		uint32_t connected_display_index = 0;
+		struct drm_crtc *crtc;
 
 		mutex_unlock(&adev->dm.dal_mutex);
 
@@ -472,15 +473,33 @@ static void amdgpu_dm_hpd_low_irq(void *interrupt_params)
 			/* reset connected status on fake display connector */
 			aconnector->base.status = connector_status_disconnected;
 		} else {
-			amdgpu_dm_mode_reset(aconnector->base.encoder->crtc);
+			crtc = aconnector->base.encoder->crtc;
+
+			DRM_DEBUG_KMS("Setting connector DPMS state to off\n");
+			DRM_DEBUG_KMS("\t[CONNECTOR:%d] set DPMS off\n",
+					aconnector->base.base.id);
+			aconnector->base.funcs->dpms(
+					&aconnector->base, DRM_MODE_DPMS_OFF);
+
+			amdgpu_dm_mode_reset(crtc);
+
+			/*
+			 * as mode reset is done for fake display, we should
+			 * unreference drm fb and assign NULL pointer to the
+			 * primary drm frame, so we will receive full set mode
+			 * sequence later
+			 */
+
+			drm_framebuffer_unreference(crtc->primary->fb);
+
+			crtc->primary->fb = NULL;
 		}
 
 		adev->dm.fake_display_index = INVALID_DISPLAY_INDEX;
 
 		trigger_drm_hpd_event = true;
-	} else {
+	} else
 		mutex_unlock(&adev->dm.dal_mutex);
-	}
 
 	if (true == trigger_drm_hpd_event)
 		drm_kms_helper_hotplug_event(dev);
