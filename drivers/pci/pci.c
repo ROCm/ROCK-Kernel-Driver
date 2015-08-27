@@ -2911,6 +2911,29 @@ bool pci_acs_enabled(struct pci_dev *pdev, u16 acs_flags)
 }
 
 /**
+ * pci_enable_atomic_request - enable or disable AtomicOp requester
+ * @dev: the PCI device
+ */
+void pci_enable_atomic_request(struct pci_dev *dev)
+{
+	if (!pci_is_pcie(dev))
+		return;
+
+	switch (pci_pcie_type(dev)) {
+	/* PCIe 3.0, 6.15 specifies that endpoints and root ports are permitted
+	 * to implement AtomicOp requester capabilities. */
+	case PCI_EXP_TYPE_ENDPOINT:
+	case PCI_EXP_TYPE_LEG_END:
+	case PCI_EXP_TYPE_RC_END:
+	case PCI_EXP_TYPE_ROOT_PORT:
+		pcie_capability_set_word(dev, PCI_EXP_DEVCTL2,
+					 PCI_EXP_DEVCTL2_ATOMICOP_REQ);
+		break;
+	}
+}
+EXPORT_SYMBOL(pci_enable_atomic_request);
+
+/**
  * pci_acs_path_enable - test ACS flags from start to end in a hierarchy
  * @start: starting downstream device
  * @end: ending upstream device or NULL to search to the root bus
