@@ -772,66 +772,25 @@ static uint32_t get_vblank_counter(struct timing_generator *tg)
  */
 static uint32_t get_crtc_scanoutpos(
 	struct timing_generator *tg,
-	int32_t *vpos,
-	int32_t *hpos)
+	int32_t *vbl,
+	int32_t *position)
 {
-	bool in_vlank = true;
-	uint32_t ret_val = 0;
-	uint32_t vblank_start = 0;
-	uint32_t vblank_end = 0;
-	uint32_t vtotal = 0;
+	/* @TODO: Update the implementation once caller is updated
+	 * WARNING!! This function is returning the whole register value
+	 * because the caller is expecting it instead of proper vertical and
+	 * horizontal position. This should be a temporary implementation
+	 * until the caller is updated. */
 
-	{
-		uint32_t value = dal_read_reg(tg->ctx,
-				tg->regs[IDX_CRTC_V_BLANK_START_END]);
-		vblank_start = get_reg_field_value(
-			value, CRTC_V_BLANK_START_END, CRTC_V_BLANK_START);
-		vblank_end = get_reg_field_value(
-			value, CRTC_V_BLANK_START_END, CRTC_V_BLANK_END);
 
-		ret_val |= DAL_CRTC_DRM_SCANOUTPOS_VALID;
-		if (vblank_start > 0)
-			ret_val |= DAL_CRTC_DRM_SCANOUTPOS_ACCURATE;
-	}
+	*vbl = dal_read_reg(tg->ctx,
+			tg->regs[IDX_CRTC_V_BLANK_START_END]);
 
-	{
-		uint32_t value = dal_read_reg(tg->ctx,
-				tg->regs[IDX_CRTC_V_TOTAL]);
-		vtotal = get_reg_field_value(
-			value, CRTC_V_TOTAL, CRTC_V_TOTAL);
-	}
+	*position = dal_read_reg(tg->ctx,
+			tg->regs[IDX_CRTC_STATUS_POSITION]);
 
-	{
-		uint32_t value = dal_read_reg(tg->ctx,
-				tg->regs[IDX_CRTC_STATUS_POSITION]);
-		*vpos = get_reg_field_value(
-			value, CRTC_STATUS_POSITION, CRTC_VERT_COUNT);
-		*hpos = get_reg_field_value(
-			value, CRTC_STATUS_POSITION, CRTC_HORZ_COUNT);
-	}
-
-	/* Test scanout position against vblank region. */
-	if ((*vpos < vblank_start) && (*vpos >= vblank_end))
-		in_vlank = false;
-
-	/* Check if inside vblank area and apply corrective offsets:
-	 * vpos will then be >=0 in video scanout area, but negative
-	 * within vblank area, counting down the number of lines until
-	 * start of scanout.
-	 */
-
-	/*Inside "upper part" of vblank area? Apply corrective offset if so*/
-	if (in_vlank && (*vpos >= vblank_start))
-		*vpos = *vpos - vtotal;
-
-	/* Correct for shifted end of vbl at vbl_end. */
-	*vpos = *vpos - vblank_end;
-
-	/* In vblank? */
-	if (in_vlank)
-		ret_val |= DAL_CRTC_DRM_SCANOUTPOS_INVBL;
-
-	return ret_val;
+	/* @TODO: return value should indicate if current
+	 * crtc is inside vblank*/
+	return 0;
 }
 
 static void set_lock_master(struct timing_generator *tg, bool lock)
