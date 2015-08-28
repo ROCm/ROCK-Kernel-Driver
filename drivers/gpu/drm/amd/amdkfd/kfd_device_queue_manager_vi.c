@@ -139,7 +139,7 @@ static bool set_cache_memory_policy_vi_tonga(struct device_queue_manager *dqm,
 	uint32_t default_mtype;
 	uint32_t ape1_mtype;
 
-	default_mtype = MTYPE_NC;
+	default_mtype = MTYPE_UC;
 
 	ape1_mtype = MTYPE_NC;
 
