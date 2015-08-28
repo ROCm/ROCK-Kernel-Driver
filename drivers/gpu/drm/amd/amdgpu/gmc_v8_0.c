@@ -996,6 +996,10 @@ static int gmc_v8_0_sw_init(void *handle)
 		adev->vm_manager.enabled = true;
 	}
 
+	/* Allow BIF to recode atomics to PCIe 3.0 AtomicOps.
+	 */
+	pci_enable_atomic_request(adev->pdev);
+
 	return r;
 }
 
