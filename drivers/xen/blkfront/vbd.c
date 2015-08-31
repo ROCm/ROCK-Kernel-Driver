@@ -379,7 +379,8 @@ xlvbd_init_blk_queue(struct gendisk *gd, unsigned int sector_size,
 	/* Hard sector size and max sectors impersonate the equiv. hardware. */
 	blk_queue_logical_block_size(rq, sector_size);
 	blk_queue_physical_block_size(rq, physical_sector_size);
-	blk_queue_max_hw_sectors(rq, 512);
+	blk_queue_max_hw_sectors(rq,
+				 info->max_segs_per_req << (PAGE_SHIFT - 9));
 
 	/* Each segment in a request is up to an aligned page in size. */
 	blk_queue_segment_boundary(rq, PAGE_SIZE - 1);
