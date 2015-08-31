@@ -116,7 +116,7 @@ static const struct irq_source_info_funcs vblank_irq_info_funcs = {
 		.enable_value = {\
 			GRPH_INTERRUPT_CONTROL__GRPH_PFLIP_INT_MASK_MASK,\
 			~GRPH_INTERRUPT_CONTROL__GRPH_PFLIP_INT_MASK_MASK},\
-		.ack_reg = mmDCP ## reg_num ## _GRPH_INTERRUPT_CONTROL,\
+		.ack_reg = mmDCP ## reg_num ## _GRPH_INTERRUPT_STATUS,\
 		.ack_mask = GRPH_INTERRUPT_STATUS__GRPH_PFLIP_INT_CLEAR_MASK,\
 		.ack_value = GRPH_INTERRUPT_STATUS__GRPH_PFLIP_INT_CLEAR_MASK,\
 		.status_reg = mmDCP ## reg_num ##_GRPH_INTERRUPT_STATUS,\
