@@ -161,18 +161,18 @@ enum ds_return dal_display_service_target_power_control(
 				ds->ds_dispatch->set,
 				display_index);
 
-		ASSERT(path_data != NULL);
-		if (path_data != NULL)
-			path_data->flags.bits.TURN_OFF_BACK_END_AND_RX =
-				power_on ? 0 : 1;
+		if (!path_data)
+			return DS_ERROR;
+
+		path_data->flags.bits.TURN_OFF_BACK_END_AND_RX =
+			power_on ? 0 : 1;
 
 		/* Create hw_path_mode for this display path*/
 		if (!dal_ds_dispatch_build_hw_path_mode_for_adjustment(
 			ds->ds_dispatch,
 			&hw_path_mode,
 			display_index,
-			NULL
-			))
+			NULL))
 			/* DisplayIndex requested not in
 			 * currently active PathModeSet,
 			 * therefore invalid parameter
