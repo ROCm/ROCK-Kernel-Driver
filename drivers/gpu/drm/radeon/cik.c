@@ -3190,6 +3190,8 @@ static void cik_gpu_init(struct radeon_device *rdev)
 	u32 hdp_host_path_cntl;
 	u32 tmp;
 	int i, j;
+	/* will store the value of SPI_ARB_PRIORITY register */
+	uint32_t spi_regval;
 
 	switch (rdev->family) {
 	case CHIP_BONAIRE:
@@ -3454,6 +3456,18 @@ static void cik_gpu_init(struct radeon_device *rdev)
 	WREG32(PA_CL_ENHANCE, CLIP_VTX_REORDER_ENA | NUM_CLIP_SEQ(3));
 	WREG32(PA_SC_ENHANCE, ENABLE_PA_SC_OUT_OF_ORDER);
 	mutex_unlock(&rdev->grbm_idx_mutex);
+
+	/* get the register's current value */
+	spi_regval = RREG32(mmSPI_ARB_PRIORITY);
+
+	/* prepare PIPE_ORDER_TS fields (does NOT write to register) */
+	spi_regval = REG_SET_FIELD(spi_regval, SPI_ARB_PRIORITY, PIPE_ORDER_TS0, 3);
+	spi_regval = REG_SET_FIELD(spi_regval, SPI_ARB_PRIORITY, PIPE_ORDER_TS1, 3);
+	spi_regval = REG_SET_FIELD(spi_regval, SPI_ARB_PRIORITY, PIPE_ORDER_TS2, 3);
+	spi_regval = REG_SET_FIELD(spi_regval, SPI_ARB_PRIORITY, PIPE_ORDER_TS3, 3);
+
+	/* write out the new value to the actual register*/
+	WREG32(mmSPI_ARB_PRIORITY, spi_regval);
 
 	udelay(50);
 }
