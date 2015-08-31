@@ -1711,6 +1711,7 @@ struct amdgpu_sdma {
 	uint32_t		feature_version;
 
 	struct amdgpu_ring	ring;
+	bool			burst_nop;
 };
 
 /*
