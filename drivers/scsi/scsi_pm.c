@@ -71,11 +71,28 @@ static int scsi_dev_type_resume(struct device *dev,
 		int (*cb)(struct device *, const struct dev_pm_ops *))
 {
 	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
+	struct scsi_device *sdev = to_scsi_device(dev);
+	struct request_queue *q = sdev->request_queue;
 	int err = 0;
+
+	if (pm_runtime_suspended(dev)) {
+		spin_lock_irq(q->queue_lock);
+		q->rpm_status = RPM_RESUMING;
+		spin_unlock_irq(q->queue_lock);
+	}
 
 	err = cb(dev, pm);
 	scsi_device_resume(to_scsi_device(dev));
 	dev_dbg(dev, "scsi resume: %d\n", err);
+
+	if (pm_runtime_suspended(dev)) {
+		spin_lock_irq(q->queue_lock);
+		if (!err)
+			q->rpm_status = RPM_ACTIVE;
+		else
+			q->rpm_status = RPM_SUSPENDED;
+		spin_unlock_irq(q->queue_lock);
+	}
 
 	if (err == 0) {
 		pm_runtime_disable(dev);
