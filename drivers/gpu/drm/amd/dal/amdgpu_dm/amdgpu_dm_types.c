@@ -68,23 +68,6 @@ static void init_dal_topology(
 {
 	DRM_DEBUG_KMS("current_display_index: %d\n", current_display_index);
 
-/* TODO: the following code is used for clone mode, uncomment in case needed
-	uint32_t current_display_index;
-	uint32_t connected_displays_vector =
-		dal_get_connected_targets_vector(dm->dal);
-	uint32_t total_connected_displays = 0;
-
-	for (current_display_index = 0;
-		connected_displays_vector != 0;
-		connected_displays_vector >>= 1,
-		++current_display_index) {
-		if ((connected_displays_vector & 1) == 1) {
-			tp->display_index[total_connected_displays] =
-				current_display_index;
-			++total_connected_displays;
-		}
-	} */
-
 	tp->display_index[0] = current_display_index;
 	tp->disp_path_num = 1;
 }
@@ -105,13 +88,6 @@ static enum pixel_format convert_to_dal_pixel_format(uint32_t drm_pf)
 		return PIXEL_FORMAT_ARGB8888;
 	}
 }
-
-/* TODO: Use DAL define if available */
-#define DAL_MODE_FLAG_VIDEO_OPTIMIZED (1 << 0)
-
-/*TODO define max plane nums*/
-#define AMDGPU_PFLIP_IRQ_SRC_NUM  6
-
 
 static int dm_set_cursor(struct drm_crtc *crtc, struct drm_gem_object *obj,
 		uint32_t width, uint32_t height)
@@ -505,8 +481,7 @@ bool amdgpu_dm_mode_set(
 		rm.pixel_format =
 			convert_to_dal_pixel_format(crtc->primary->fb->pixel_format);
 		rf.field_rate = drm_mode_vrefresh(mode);
-		rf.VIDEO_OPTIMIZED_RATE = (mode->private_flags &
-			DAL_MODE_FLAG_VIDEO_OPTIMIZED) != 0;
+		rf.VIDEO_OPTIMIZED_RATE = 0;
 		rf.INTERLACED = (mode->flags & DRM_MODE_FLAG_INTERLACE) != 0;
 
 		mq = dal_get_mode_query(
@@ -1072,42 +1047,6 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 
 	/*.set_property = NULL*/
 };
-
-
-/*
- * dm_add_display_info
- *
- * @brief:
- * Update required display info from mode
- *
- * @param
- * disp_info: [out] display information
- * mode: [in] mode containing display information
- *
- * @return
- * void
- */
-void dm_add_display_info(
-		struct drm_display_info *disp_info,
-		struct amdgpu_display_manager *dm,
-		uint32_t display_index)
-{
-}
-
-static inline bool compare_mode_query_info_and_mode_timing(
-	const struct render_mode *rm,
-	const struct refresh_rate *rr,
-	const struct mode_info *mi)
-{
-	if (rm->view.height == mi->pixel_height &&
-		rm->view.width == mi->pixel_width &&
-		rr->field_rate == mi->field_rate &&
-		rr->INTERLACED == mi->flags.INTERLACE &&
-		rr->VIDEO_OPTIMIZED_RATE == mi->flags.VIDEO_OPTIMIZED_RATE)
-		return true;
-	else
-		return false;
-}
 
 static inline void fill_drm_mode_info(
 	struct drm_display_mode *drm_mode,

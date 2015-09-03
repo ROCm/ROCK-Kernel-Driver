@@ -66,9 +66,4 @@ bool amdgpu_dm_mode_set(
 	int y,
 	struct drm_framebuffer *old_fb);
 
-void dm_add_display_info(
-	struct drm_display_info *disp_info,
-	struct amdgpu_display_manager *dm,
-	uint32_t display_index);
-
 #endif		/* __AMDGPU_DM_TYPES_H__ */
