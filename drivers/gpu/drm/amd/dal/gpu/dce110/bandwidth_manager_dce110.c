@@ -178,6 +178,7 @@ struct internal_funcs {
 
 #define MAX_OFFSETS_DCE110 3
 #define MAX_WATERMARK 0xFFFF
+#define MAX_NB_PSTATE_WATERMARK 0x7FFF
 
 static void program_pix_dur_crtc(
 	struct bandwidth_manager *bm,
@@ -4179,8 +4180,8 @@ static void nb_pstate_watermark(
 				__func__);
 
 		if (safe_mark) {
-			wm_high_clks = MAX_WATERMARK;
-			wm_low_clks = MAX_WATERMARK;
+			wm_high_clks = MAX_NB_PSTATE_WATERMARK;
+			wm_low_clks = MAX_NB_PSTATE_WATERMARK;
 		} else {
 			if (cur_wm_params == NULL) {
 				dal_logger_write(bm->dal_ctx->logger,
@@ -4233,8 +4234,8 @@ static void nb_pstate_watermark(
 			cur_wm_params->surface_pixel_format ==
 				PIXEL_FORMAT_422BPP16) {
 			if (safe_mark) {
-				wm_high_clks = MAX_WATERMARK;
-				wm_low_clks = MAX_WATERMARK;
+				wm_high_clks = MAX_NB_PSTATE_WATERMARK;
+				wm_low_clks = MAX_NB_PSTATE_WATERMARK;
 			} else {
 				struct bandwidth_params bw_chroma_param;
 
