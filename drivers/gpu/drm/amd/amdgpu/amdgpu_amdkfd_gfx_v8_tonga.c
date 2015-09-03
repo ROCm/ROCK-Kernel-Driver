@@ -496,7 +496,7 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 	if (offset)
 		return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
 				offset, kptr, AMDGPU_GEM_DOMAIN_GTT,
-				AMDGPU_GEM_CREATE_CPU_GTT_USWC);
+				0);
 
 	return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
 			offset, kptr, AMDGPU_GEM_DOMAIN_VRAM,
