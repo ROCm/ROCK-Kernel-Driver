@@ -656,12 +656,12 @@ u32 vi_gpu_check_soft_reset(struct amdgpu_device *adev)
 			reset_mask |= AMDGPU_RESET_VCE1;
 
 	}
-#endif
 
 	if (adev->asic_type != CHIP_TOPAZ) {
 		if (amdgpu_display_is_display_hung(adev))
 			reset_mask |= AMDGPU_RESET_DISPLAY;
 	}
+#endif
 
 	/* Skip MC reset as it's mostly likely not hung, just busy */
 	if (reset_mask & AMDGPU_RESET_MC) {
