@@ -178,10 +178,16 @@ static void program_address(
 	struct cursor *cur,
 	PHYSICAL_ADDRESS_LOC address)
 {
-	dal_write_reg(cur->ctx, cur->regs[IDX_CUR_SURFACE_ADDRESS],
-			address.low_part);
+	/* SURFACE_ADDRESS_HIGH: Higher order bits (39:32) of hardware cursor
+	 * surface base address in byte. It is 4K byte aligned.
+	 * The correct way to program cursor surface address is to first write
+	 * to CUR_SURFACE_ADDRESS_HIGH, and then write to CUR_SURFACE_ADDRESS */
+
 	dal_write_reg(cur->ctx, cur->regs[IDX_CUR_SURFACE_ADDRESS_HIGH],
 			address.high_part);
+
+	dal_write_reg(cur->ctx, cur->regs[IDX_CUR_SURFACE_ADDRESS],
+			address.low_part);
 }
 
 
