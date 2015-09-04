@@ -14,7 +14,8 @@ ccflags-y := -Iinclude/drm -I$(FULL_AMD_PATH)/include/asic_reg \
 		-I$(FULL_AMD_DAL_PATH) \
 		-I$(FULL_AMD_DAL_PATH)/include \
 		-I$(FULL_AMD_PATH)/dsat \
-		-I$(FULL_AMD_PATH)/scheduler
+		-I$(FULL_AMD_PATH)/scheduler \
+		-I$(FULL_AMD_DAL_PATH)/amdgpu_dm
 		
 amdgpu-y := amdgpu_drv.o
 
@@ -108,8 +109,6 @@ amdgpu-$(CONFIG_ACPI) += amdgpu_acpi.o
 amdgpu-$(CONFIG_MMU_NOTIFIER) += amdgpu_mn.o
 
 ifneq ($(CONFIG_DRM_AMD_DAL),)
-amdgpu-y += amdgpu_dal_services.o amdgpu_dm_types.o amdgpu_dm.o \
-	amdgpu_dm_irq.o
 
 RELATIVE_AMD_DAL_PATH = ../$(DAL_FOLDER_NAME)
 include $(FULL_AMD_DAL_PATH)/Makefile
