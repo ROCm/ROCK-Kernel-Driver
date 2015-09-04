@@ -34,6 +34,8 @@
 #include "smu/smu_8_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
 
+#define ixVCE_HARVEST_FUSE_MACRO__ADDRESS     0xC0014074
+
 /*
  * carrizo_asic_capability_create
  *
@@ -79,9 +81,7 @@ void carrizo_asic_capability_create(struct asic_capability *cap)
 	cap->stereo_3d_caps.DISPLAYPORT_FRAME_ALT = true;
 	cap->stereo_3d_caps.INTERLEAVE = true;
 
-	e_fuse_setting = dal_read_index_reg(
-			cap->dal_context, mmMP0PUB_IND_INDEX_4,
-			0xC0014074, mmMP0PUB_IND_DATA_4);
+	e_fuse_setting = dal_read_index_reg(cap->dal_context,CGS_IND_REG__SMC,ixVCE_HARVEST_FUSE_MACRO__ADDRESS);
 	/* Bits [28:27]*/
 	switch ((e_fuse_setting >> 27) & 0x3) {
 	case 0:

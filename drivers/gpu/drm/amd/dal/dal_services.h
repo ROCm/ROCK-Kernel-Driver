@@ -151,23 +151,20 @@ static inline void dal_write_reg(
 
 static inline uint32_t dal_read_index_reg(
 	struct dal_context *ctx,
-	uint32_t index_reg_offset,
-	uint32_t index,
-	uint32_t data_reg_offset)
+	enum cgs_ind_reg addr_space,
+	uint32_t index)
 {
-	dal_write_reg(ctx, index_reg_offset, index);
-	return dal_read_reg(ctx, data_reg_offset);
+
+	return cgs_read_ind_register(ctx->cgs_device,addr_space,index);
 }
 
 static inline void dal_write_index_reg(
 	struct dal_context *ctx,
-	uint32_t index_reg_offset,
+	enum cgs_ind_reg addr_space,
 	uint32_t index,
-	uint32_t data_reg_offset,
 	uint32_t value)
 {
-	dal_write_reg(ctx, index_reg_offset, index);
-	dal_write_reg(ctx, data_reg_offset, value);
+	cgs_write_ind_register(ctx->cgs_device,addr_space,index,value);
 }
 
 enum platform_method {
