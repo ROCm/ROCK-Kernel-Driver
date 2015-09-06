@@ -382,6 +382,7 @@ static bool refill_dirty(struct cached_dev *dc)
 		refill_full_stripes(dc);
 		if (array_freelist_empty(&buf->freelist))
 			return false;
+		bch_refill_keybuf(dc->disk.c, buf, &end, dirty_pred);
 	}
 
 	if (bkey_cmp(&buf->last_scanned, &end) >= 0) {
