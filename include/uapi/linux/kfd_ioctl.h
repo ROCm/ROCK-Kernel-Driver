@@ -279,6 +279,22 @@ struct kfd_ioctl_set_process_dgpu_aperture_args {
 	uint64_t dgpu_limit;
 };
 
+/*
+ * GPU Memory allocation flags
+ */
+#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_HOST	(1 << 0)
+#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE	(1 << 1)
+#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_SCRATCH	(1 << 2)
+
+struct kfd_ioctl_alloc_memory_of_gpu_new_args {
+	uint64_t va_addr;	/* to KFD */
+	uint64_t size;		/* to KFD */
+	uint64_t handle;	/* from KFD */
+	uint32_t gpu_id;	/* to KFD */
+	uint64_t mmap_offset;   /* from KFD */
+	uint32_t flags;
+};
+
 #define AMDKFD_IOCTL_BASE 'K'
 #define AMDKFD_IO(nr)			_IO(AMDKFD_IOCTL_BASE, nr)
 #define AMDKFD_IOR(nr, type)		_IOR(AMDKFD_IOCTL_BASE, nr, type)
@@ -356,10 +372,13 @@ struct kfd_ioctl_set_process_dgpu_aperture_args {
 
 #define AMDKFD_IOC_SET_PROCESS_DGPU_APERTURE   \
 		AMDKFD_IOW(0x18,	\
-	struct kfd_ioctl_set_process_dgpu_aperture_args)
+		struct kfd_ioctl_set_process_dgpu_aperture_args)
+
+#define AMDKFD_IOC_ALLOC_MEMORY_OF_GPU_NEW		\
+		AMDKFD_IOWR(0x19, struct kfd_ioctl_alloc_memory_of_gpu_new_args)
 
 
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x19
+#define AMDKFD_COMMAND_END		0x20
 
 #endif
