@@ -1011,6 +1011,63 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	struct kfd_dev *dev;
 	int idr_handle;
 	long err;
+
+	if (args->size == 0)
+		return -EINVAL;
+
+	dev = kfd_device_by_id(args->gpu_id);
+	if (dev == NULL)
+		return -EINVAL;
+
+	if (dev->device_info->asic_family == CHIP_CARRIZO) {
+		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+		return -EINVAL;
+	}
+
+	mutex_lock(&p->mutex);
+
+	pdd = kfd_bind_process_to_device(dev, p);
+	if (IS_ERR(pdd) < 0) {
+		err = PTR_ERR(pdd);
+		goto bind_process_to_device_failed;
+	}
+
+	err = dev->kfd2kgd->alloc_memory_of_gpu(
+		dev->kgd, args->va_addr, args->size,
+		pdd->vm, (struct kgd_mem **) &mem, NULL, NULL);
+
+	if (err != 0)
+		goto alloc_memory_of_gpu_failed;
+
+	idr_handle = kfd_process_device_create_obj_handle(pdd, mem);
+	if (idr_handle < 0) {
+		err = -EFAULT;
+		goto handle_creation_failed;
+	}
+
+	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
+
+	mutex_unlock(&p->mutex);
+
+	return 0;
+
+handle_creation_failed:
+	dev->kfd2kgd->free_memory_of_gpu(dev->kgd, (struct kgd_mem *) mem);
+alloc_memory_of_gpu_failed:
+bind_process_to_device_failed:
+	mutex_unlock(&p->mutex);
+	return err;
+}
+
+static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
+					struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_alloc_memory_of_gpu_new_args *args = data;
+	struct kfd_process_device *pdd;
+	void *mem;
+	struct kfd_dev *dev;
+	int idr_handle;
+	long err;
 	uint64_t offset;
 
 	if (args->size == 0)
@@ -1349,6 +1406,9 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_PROCESS_DGPU_APERTURE,
 			kfd_ioctl_set_process_dgpu_aperture, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ALLOC_MEMORY_OF_GPU_NEW,
+				kfd_ioctl_alloc_memory_of_gpu_new, 0),
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)

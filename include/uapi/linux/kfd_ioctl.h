@@ -282,9 +282,11 @@ struct kfd_ioctl_set_process_dgpu_aperture_args {
 /*
  * GPU Memory allocation flags
  */
-#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_HOST	(1 << 0)
-#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE	(1 << 1)
+#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_HOST		(1 << 0)
+#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE		(1 << 1)
 #define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_SCRATCH	(1 << 2)
+#define KFD_IOC_ALLOC_MEM_FLAGS_APU_DEVICE		(1 << 3)
+#define KFD_IOC_ALLOC_MEM_FLAGS_APU_SCRATCH		(1 << 4)
 
 struct kfd_ioctl_alloc_memory_of_gpu_new_args {
 	uint64_t va_addr;	/* to KFD */
