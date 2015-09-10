@@ -29,7 +29,7 @@
 #include "amdgpu_dsat_structs.h"
 
 #include "dal_services_types.h"
-#include "include/dal_interface.h"
+#include "dal_interface.h"
 #include "dsat.h"
 #include "amdgpu_dsat_ioctl.h"
 

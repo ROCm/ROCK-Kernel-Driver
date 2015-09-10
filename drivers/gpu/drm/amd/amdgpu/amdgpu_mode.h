@@ -404,6 +404,11 @@ struct amdgpu_crtc {
 	u32 wm_low;
 	u32 wm_high;
 	struct drm_display_mode hw_mode;
+
+#ifdef BUILD_DC_CORE
+	/* After Set Mode target will be non-NULL */
+	struct dc_target *target;
+#endif
 };
 
 struct amdgpu_encoder_atom_dig {
@@ -504,6 +509,13 @@ struct amdgpu_connector {
 	/* we need to mind the EDID between detect
 	   and get modes due to analog/digital/tvencoder */
 	struct edid *edid;
+#ifdef BUILD_DC_CORE
+	/* number of mode generate from EDID */
+	int num_modes;
+	const struct dc_sink *dc_sink;
+	/* After Set Mode stream will be non-NULL */
+	struct dc_stream *stream;
+#endif
 	void *con_priv;
 	bool dac_load_detect;
 	bool detected_by_load; /* if the connection status was determined by load */
