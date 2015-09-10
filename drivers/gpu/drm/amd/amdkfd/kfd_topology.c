@@ -698,39 +698,30 @@ int kfd_topology_init(void)
 	/*
 	 * Get the CRAT image from the ACPI
 	 */
-	ret = kfd_topology_get_crat_acpi(crat_image, &image_size);
-	if (ret == 0 && image_size > 0) {
-		pr_info("Found CRAT image with size=%zd\n", image_size);
-		crat_image = kmalloc(image_size, GFP_KERNEL);
-		if (!crat_image) {
-			ret = -ENOMEM;
-			pr_err("No memory for allocating CRAT image\n");
-			goto err;
-		}
-		ret = kfd_topology_get_crat_acpi(crat_image, &image_size);
-
-		if (ret == 0) {
-			down_write(&topology_lock);
-			ret = kfd_parse_crat_table(crat_image);
-			if (ret == 0)
-				ret = kfd_topology_update_sysfs();
-			up_write(&topology_lock);
-		} else {
-			pr_err("Couldn't get CRAT table size from ACPI\n");
-		}
-		kfree(crat_image);
-	} else if (ret == -ENODATA) {
+	ret = kfd_create_crat_image_acpi(&crat_image, &image_size);
+	if (ret == 0) {
 		down_write(&topology_lock);
-		kfd_parse_crat_table_fake();
-		ret = kfd_topology_update_sysfs();
-		up_write(&topology_lock);
-		ret = 0;
+		ret = kfd_parse_crat_table(crat_image);
+	}
+	else if (ret == -ENODATA) {
+		down_write(&topology_lock);
+		ret = kfd_parse_crat_table_fake();
 	} else {
 		pr_err("Couldn't get CRAT table size from ACPI\n");
+		goto err;
 	}
 
+	if (ret == 0)
+		ret = kfd_topology_update_sysfs();
+	up_write(&topology_lock);
+
+	if (ret == 0)
+		pr_info("Finished initializing topology\n");
+	else
+		pr_err("Failed to update topology in sysfs ret=%d\n", ret);
+
 err:
-	pr_info("Finished initializing topology ret=%d\n", ret);
+	kfd_destroy_crat_image(crat_image);
 	return ret;
 }
 
@@ -750,7 +741,7 @@ static void kfd_debug_print_topology(void)
 		pr_info("Node: %d\n", i);
 		pr_info("\tGPU assigned: %s\n", (dev->gpu ? "yes" : "no"));
 		pr_info("\tCPU count: %d\n", dev->node_props.cpu_cores_count);
-		pr_info("\tSIMD count: %d", dev->node_props.simd_count);
+		pr_info("\tSIMD count: %d\n", dev->node_props.simd_count);
 		i++;
 	}
 }
