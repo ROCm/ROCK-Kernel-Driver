@@ -33,6 +33,7 @@
 #include "kfd_crat.h"
 #include "kfd_topology.h"
 
+/* topology_device_list - Master list of all topology devices */
 struct list_head topology_device_list;
 struct kfd_system_properties sys_props;
 
@@ -123,7 +124,8 @@ void kfd_release_live_view(void)
 	memset(&sys_props, 0, sizeof(sys_props));
 }
 
-struct kfd_topology_device *kfd_create_topology_device(void)
+struct kfd_topology_device *kfd_create_topology_device(
+				struct list_head *device_list)
 {
 	struct kfd_topology_device *dev;
 
@@ -137,7 +139,7 @@ struct kfd_topology_device *kfd_create_topology_device(void)
 	INIT_LIST_HEAD(&dev->cache_props);
 	INIT_LIST_HEAD(&dev->io_link_props);
 
-	list_add_tail(&dev->list, &topology_device_list);
+	list_add_tail(&dev->list, device_list);
 	sys_props.num_devices++;
 
 	return dev;
@@ -681,16 +683,30 @@ static void kfd_topology_release_sysfs(void)
 	}
 }
 
+static void kfd_topology_update_device_list(struct list_head *temp_list,
+					struct list_head *master_list)
+{
+	while (!list_empty(temp_list))
+		list_move_tail(temp_list->next, master_list);
+}
+
 int kfd_topology_init(void)
 {
 	void *crat_image = NULL;
 	size_t image_size = 0;
 	int ret;
+	struct list_head temp_topology_device_list;
 
-	/*
-	 * Initialize the head for the topology device list
+	/* topology_device_list - Master list of all topology devices
+	 * temp_topology_device_list - temporary list created while parsing CRAT
+	 * or VCRAT. Once parsing is complete the contents of list is moved to
+	 * topology_device_list
+	 */
+
+	 /* Initialize the head for the both the lists
 	 */
 	INIT_LIST_HEAD(&topology_device_list);
+	INIT_LIST_HEAD(&temp_topology_device_list);
 	init_rwsem(&topology_lock);
 
 	memset(&sys_props, 0, sizeof(sys_props));
@@ -699,17 +715,18 @@ int kfd_topology_init(void)
 	 * Get the CRAT image from the ACPI
 	 */
 	ret = kfd_create_crat_image_acpi(&crat_image, &image_size);
-	if (ret == 0) {
-		down_write(&topology_lock);
-		ret = kfd_parse_crat_table(crat_image);
-	}
-	else if (ret == -ENODATA) {
-		down_write(&topology_lock);
-		ret = kfd_parse_crat_table_fake();
-	} else {
+	if (ret == 0)
+		ret = kfd_parse_crat_table(crat_image, &temp_topology_device_list);
+	else if (ret == -ENODATA)
+		ret = kfd_parse_crat_table_fake(&temp_topology_device_list);
+	else {
 		pr_err("Couldn't get CRAT table size from ACPI\n");
 		goto err;
 	}
+
+	down_write(&topology_lock);
+	kfd_topology_update_device_list(&temp_topology_device_list,
+					&topology_device_list);
 
 	if (ret == 0)
 		ret = kfd_topology_update_sysfs();
@@ -801,14 +818,16 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	struct kfd_topology_device *dev;
 	struct kfd_cu_info cu_info;
 	int res;
+	struct list_head temp_topology_device_list;
 
 	BUG_ON(!gpu);
+
+	INIT_LIST_HEAD(&temp_topology_device_list);
 
 	gpu_id = kfd_generate_gpu_id(gpu);
 
 	pr_debug("kfd: Adding new GPU (ID: 0x%x) to topology\n", gpu_id);
 
-	down_write(&topology_lock);
 	/*
 	 * Try to assign the GPU to existing topology device (generated from
 	 * CRAT table
@@ -817,11 +836,12 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	if (!dev) {
 		pr_info("GPU was not found in the current topology. Extending.\n");
 		kfd_debug_print_topology();
-		dev = kfd_create_topology_device();
+		dev = kfd_create_topology_device(&temp_topology_device_list);
 		if (!dev) {
 			res = -ENOMEM;
 			goto err;
 		}
+
 		dev->gpu = gpu;
 
 		/*
@@ -829,11 +849,17 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 		 * GPU vBIOS
 		 */
 
+		down_write(&topology_lock);
+		kfd_topology_update_device_list(&temp_topology_device_list,
+			&topology_device_list);
+
 		/*
 		 * Update the SYSFS tree, since we added another topology device
 		 */
 		if (kfd_topology_update_sysfs() < 0)
 			kfd_topology_release_sysfs();
+
+		up_write(&topology_lock);
 
 	}
 
@@ -858,8 +884,6 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	res = 0;
 
 err:
-	up_write(&topology_lock);
-
 	if (res == 0)
 		kfd_notify_gpu_change(gpu_id, 1);
 

@@ -2,9 +2,7 @@
 #include "kfd_crat.h"
 #include "kfd_topology.h"
 
-static int topology_crat_parsed = 0;
 extern struct kfd_system_properties sys_props;
-extern struct list_head topology_device_list;
 
 static void kfd_populated_cu_info_cpu(struct kfd_topology_device *dev,
 		struct crat_subtype_computeunit *cu)
@@ -42,8 +40,11 @@ static void kfd_populated_cu_info_gpu(struct kfd_topology_device *dev,
 	pr_info("CU GPU: id_base=%d\n", cu->processor_id_low);
 }
 
-/* kfd_parse_subtype_cu is called when the topology mutex is already acquired */
-static int kfd_parse_subtype_cu(struct crat_subtype_computeunit *cu)
+/* kfd_parse_subtype_cu - parse compute unit subtypes and attach it to correct
+ *		topology device present in the device_list
+ */
+static int kfd_parse_subtype_cu(struct crat_subtype_computeunit *cu,
+				struct list_head *device_list)
 {
 	struct kfd_topology_device *dev;
 	int i = 0;
@@ -52,7 +53,7 @@ static int kfd_parse_subtype_cu(struct crat_subtype_computeunit *cu)
 
 	pr_info("Found CU entry in CRAT table with proximity_domain=%d caps=%x\n",
 			cu->proximity_domain, cu->hsa_capability);
-	list_for_each_entry(dev, &topology_device_list, list) {
+	list_for_each_entry(dev, device_list, list) {
 		if (cu->proximity_domain == i) {
 			if (cu->flags & CRAT_CU_FLAGS_CPU_PRESENT)
 				kfd_populated_cu_info_cpu(dev, cu);
@@ -67,11 +68,11 @@ static int kfd_parse_subtype_cu(struct crat_subtype_computeunit *cu)
 	return 0;
 }
 
-/*
- * kfd_parse_subtype_mem is called when the topology mutex is
- * already acquired
+/* kfd_parse_subtype_mem - parse memory subtypes and attach it to correct
+ *		topology device present in the device_list
  */
-static int kfd_parse_subtype_mem(struct crat_subtype_memory *mem)
+static int kfd_parse_subtype_mem(struct crat_subtype_memory *mem,
+				struct list_head *device_list)
 {
 	struct kfd_mem_properties *props;
 	struct kfd_topology_device *dev;
@@ -81,7 +82,7 @@ static int kfd_parse_subtype_mem(struct crat_subtype_memory *mem)
 
 	pr_info("Found memory entry in CRAT table with proximity_domain=%d\n",
 			mem->promixity_domain);
-	list_for_each_entry(dev, &topology_device_list, list) {
+	list_for_each_entry(dev, device_list, list) {
 		if (mem->promixity_domain == i) {
 			props = kfd_alloc_struct(props);
 			if (props == NULL)
@@ -113,11 +114,11 @@ static int kfd_parse_subtype_mem(struct crat_subtype_memory *mem)
 	return 0;
 }
 
-/*
- * kfd_parse_subtype_cache is called when the topology mutex
- * is already acquired
+/* kfd_parse_subtype_cache - parse cache subtypes and attach it to correct
+ *		topology device present in the device_list
  */
-static int kfd_parse_subtype_cache(struct crat_subtype_cache *cache)
+static int kfd_parse_subtype_cache(struct crat_subtype_cache *cache,
+			struct list_head *device_list)
 {
 	struct kfd_cache_properties *props;
 	struct kfd_topology_device *dev;
@@ -128,7 +129,7 @@ static int kfd_parse_subtype_cache(struct crat_subtype_cache *cache)
 	id = cache->processor_id_low;
 
 	pr_info("Found cache entry in CRAT table with processor_id=%d\n", id);
-	list_for_each_entry(dev, &topology_device_list, list)
+	list_for_each_entry(dev, device_list, list)
 		if (id == dev->node_props.cpu_core_id_base ||
 		    id == dev->node_props.simd_id_base) {
 			props = kfd_alloc_struct(props);
@@ -162,11 +163,11 @@ static int kfd_parse_subtype_cache(struct crat_subtype_cache *cache)
 	return 0;
 }
 
-/*
- * kfd_parse_subtype_iolink is called when the topology mutex
- * is already acquired
+/* kfd_parse_subtype_iolink - parse iolink subtypes and attach it to correct
+ *		topology device present in the device_list
  */
-static int kfd_parse_subtype_iolink(struct crat_subtype_iolink *iolink)
+static int kfd_parse_subtype_iolink(struct crat_subtype_iolink *iolink,
+					struct list_head *device_list)
 {
 	struct kfd_iolink_properties *props;
 	struct kfd_topology_device *dev;
@@ -180,7 +181,7 @@ static int kfd_parse_subtype_iolink(struct crat_subtype_iolink *iolink)
 	id_to = iolink->proximity_domain_to;
 
 	pr_info("Found IO link entry in CRAT table with id_from=%d\n", id_from);
-	list_for_each_entry(dev, &topology_device_list, list) {
+	list_for_each_entry(dev, device_list, list) {
 		if (id_from == i) {
 			props = kfd_alloc_struct(props);
 			if (props == NULL)
@@ -215,7 +216,13 @@ static int kfd_parse_subtype_iolink(struct crat_subtype_iolink *iolink)
 	return 0;
 }
 
-static int kfd_parse_subtype(struct crat_subtype_generic *sub_type_hdr)
+/* kfd_parse_subtype - parse subtypes and attach it to correct topology device
+ *		present in the device_list
+ *	@sub_type_hdr - subtype section of crat_image
+ *	@device_list - list of topology devices present in this crat_image
+ */
+static int kfd_parse_subtype(struct crat_subtype_generic *sub_type_hdr,
+				struct list_head *device_list)
 {
 	struct crat_subtype_computeunit *cu;
 	struct crat_subtype_memory *mem;
@@ -228,15 +235,15 @@ static int kfd_parse_subtype(struct crat_subtype_generic *sub_type_hdr)
 	switch (sub_type_hdr->type) {
 	case CRAT_SUBTYPE_COMPUTEUNIT_AFFINITY:
 		cu = (struct crat_subtype_computeunit *)sub_type_hdr;
-		ret = kfd_parse_subtype_cu(cu);
+		ret = kfd_parse_subtype_cu(cu, device_list);
 		break;
 	case CRAT_SUBTYPE_MEMORY_AFFINITY:
 		mem = (struct crat_subtype_memory *)sub_type_hdr;
-		ret = kfd_parse_subtype_mem(mem);
+		ret = kfd_parse_subtype_mem(mem, device_list);
 		break;
 	case CRAT_SUBTYPE_CACHE_AFFINITY:
 		cache = (struct crat_subtype_cache *)sub_type_hdr;
-		ret = kfd_parse_subtype_cache(cache);
+		ret = kfd_parse_subtype_cache(cache, device_list);
 		break;
 	case CRAT_SUBTYPE_TLB_AFFINITY:
 		/*
@@ -252,7 +259,7 @@ static int kfd_parse_subtype(struct crat_subtype_generic *sub_type_hdr)
 		break;
 	case CRAT_SUBTYPE_IOLINK_AFFINITY:
 		iolink = (struct crat_subtype_iolink *)sub_type_hdr;
-		ret = kfd_parse_subtype_iolink(iolink);
+		ret = kfd_parse_subtype_iolink(iolink, device_list);
 		break;
 	default:
 		pr_warn("Unknown subtype (%d) in CRAT\n",
@@ -262,7 +269,16 @@ static int kfd_parse_subtype(struct crat_subtype_generic *sub_type_hdr)
 	return ret;
 }
 
-int kfd_parse_crat_table(void *crat_image)
+/* kfd_parse_crat_table - parse CRAT table. For each node present in CRAT
+ *		create a kfd_topology_device and add in to device_list. Also parse
+ *		CRAT subtypes and attach it to appropriate kfd_topology_device
+ *	@crat_image - input image containing CRAT
+ *	@device_list - [OUT] list of kfd_topology_device generated after parsing
+ *				   crat_image
+ *	Return - 0 if successful else -ve value
+ */
+int kfd_parse_crat_table(void *crat_image,
+						struct list_head *device_list)
 {
 	struct kfd_topology_device *top_dev;
 	struct crat_subtype_generic *sub_type_hdr;
@@ -275,13 +291,17 @@ int kfd_parse_crat_table(void *crat_image)
 	if (!crat_image)
 		return -EINVAL;
 
+	if (!list_empty(device_list)) {
+		pr_warn("Error device list should be empty\n");
+	}
+
 	num_nodes = crat_table->num_domains;
 	image_len = crat_table->length;
 
 	pr_info("Parsing CRAT table with %d nodes\n", num_nodes);
 
 	for (node_id = 0; node_id < num_nodes; node_id++) {
-		top_dev = kfd_create_topology_device();
+		top_dev = kfd_create_topology_device(device_list);
 		if (!top_dev) {
 			kfd_release_live_view();
 			return -ENOMEM;
@@ -297,7 +317,7 @@ int kfd_parse_crat_table(void *crat_image)
 	while ((char *)sub_type_hdr + sizeof(struct crat_subtype_generic) <
 			((char *)crat_image) + image_len) {
 		if (sub_type_hdr->flags & CRAT_SUBTYPE_FLAGS_ENABLED) {
-			ret = kfd_parse_subtype(sub_type_hdr);
+			ret = kfd_parse_subtype(sub_type_hdr, device_list);
 			if (ret != 0) {
 				kfd_release_live_view();
 				return ret;
@@ -309,7 +329,6 @@ int kfd_parse_crat_table(void *crat_image)
 	}
 
 	sys_props.generation_count++;
-	topology_crat_parsed = 1;
 
 	return 0;
 }
@@ -377,11 +396,11 @@ void kfd_destroy_crat_image(void *crat_image)
 	return;
 }
 
-int kfd_parse_crat_table_fake(void)
+int kfd_parse_crat_table_fake(struct list_head *device_list)
 {
 	struct kfd_topology_device *top_dev;
 
-	top_dev = kfd_create_topology_device();
+	top_dev = kfd_create_topology_device(device_list);
 	if (!top_dev) {
 			kfd_release_live_view();
 			return -ENOMEM;
@@ -389,7 +408,6 @@ int kfd_parse_crat_table_fake(void)
 
 	top_dev->node_props.simd_count = 1;
 	sys_props.generation_count++;
-	topology_crat_parsed = 1;
 
 	return 0;
 }

@@ -293,7 +293,7 @@ struct cdit_header {
 
 int kfd_create_crat_image_acpi(void **crat_image, size_t *size);
 void kfd_destroy_crat_image(void *crat_image);
-int kfd_parse_crat_table(void *crat_image);
-int kfd_parse_crat_table_fake(void);
+int kfd_parse_crat_table(void *crat_image, struct list_head *device_list);
+int kfd_parse_crat_table_fake(struct list_head *device_list);
 
 #endif /* KFD_CRAT_H_INCLUDED */
