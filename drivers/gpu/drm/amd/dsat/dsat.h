@@ -22,7 +22,7 @@
 
 #ifndef __DSAT__H
 #define __DSAT__H
-
+#if !defined(BUILD_DC_CORE)
 #include <linux/types.h>
 
 #include "amdgpu_dm.h"
@@ -191,5 +191,7 @@ bool dsat_display_mode_timing_get_list(
 		uint32_t display_index,
 		uint32_t buffer_size,
 		struct dsat_mode_timing *mode_timing);
+
+#endif
 
 #endif /* __DSAT__H */

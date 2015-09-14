@@ -703,7 +703,10 @@ const struct drm_ioctl_desc amdgpu_ioctls_kms[] = {
 
 #ifdef CONFIG_DRM_AMD_DAL
 	/* DSAT */
+#if !defined(BUILD_DC_CORE)
 	DRM_IOCTL_DEF_DRV(AMDGPU_DSAT_COMMAND, amdgpu_dsat_cmd_ioctl, DRM_AUTH|DRM_ROOT_ONLY),
+#endif
+
 #endif
 
 };

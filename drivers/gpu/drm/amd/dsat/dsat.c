@@ -26,7 +26,7 @@
  * missing DSAT specific code*/
 
 /* Declarations for dal interface accessors */
-
+#if !defined(BUILD_DC_CORE)
 #include <linux/firmware.h>
 #include <linux/module.h>
 
@@ -843,3 +843,4 @@ bool dsat_display_mode_timing_get_list(
 	amdgpu_dm_release_dal_lock(dm);
 	return ret_val;
 }
+#endif

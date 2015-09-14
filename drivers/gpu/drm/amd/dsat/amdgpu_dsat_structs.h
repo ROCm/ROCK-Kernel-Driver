@@ -29,7 +29,7 @@
 
 #ifndef __AMDGPU_DSAT_STRUCTS__H
 #define __AMDGPU_DSAT_STRUCTS__H
-
+#if !defined(BUILD_DC_CORE)
 #define DSAT_DISPLAY_DISPLAYINFO_DISPLAYCONNECTED		0x00000001
 #define DSAT_DISPLAY_DISPLAYINFO_DISPLAYMAPPED			0x00000002
 #define DSAT_DISPLAY_DISPLAYINFO_NONLOCAL			0x00000004
@@ -571,5 +571,5 @@ struct dsat_mode_timing {
 
 /* restore default packing  */
 #pragma pack()
-
+#endif
 #endif /* __AMDGPU_DSAT_STRUCTS__H */

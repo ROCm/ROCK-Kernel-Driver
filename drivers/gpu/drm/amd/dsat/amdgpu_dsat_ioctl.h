@@ -22,11 +22,12 @@
 
 #ifndef __AMDGPU_DSAT_IOCTL__H
 #define __AMDGPU_DSAT_IOCTL__H
-
+#if !defined(BUILD_DC_CORE)
 #include <linux/types.h>
 
 int amdgpu_dsat_cmd_ioctl(struct drm_device *dev,
 		void *data,
 		struct drm_file *filp);
 
-#endif /* __AMDGPU_DSAT_IOCTL__H */
+#endif
+#endif/* __AMDGPU_DSAT_IOCTL__H */

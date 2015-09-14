@@ -19,7 +19,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
+#if !defined(BUILD_DC_CORE)
 #include <linux/firmware.h>
 #include <linux/module.h>
 
@@ -711,3 +711,4 @@ cleanup:
 	}
 	return 0;
 }
+#endif
