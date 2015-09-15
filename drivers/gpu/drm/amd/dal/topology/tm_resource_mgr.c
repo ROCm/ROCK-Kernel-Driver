@@ -105,7 +105,8 @@ static uint32_t tm_resource_ref_counter_increment(
 	struct dal_context *dal_context = tm_rm->dal_context;
 	uint32_t current_count = TM_RES_REF_CNT_GET(tm_resource);
 
-	if (current_count != 0) {
+	if (current_count != 0  &&
+		!tm_resource->funcs->is_sharable(tm_resource)) {
 		/* Ideally, we should allow only 0-->1 transition.
 		 *
 		 * But, in theory a resource could be sharable, this is
@@ -132,7 +133,8 @@ uint32_t tm_resource_mgr_ref_counter_decrement(
 	struct dal_context *dal_context = tm_rm->dal_context;
 	uint32_t current_count = TM_RES_REF_CNT_GET(tm_resource);
 
-	if (current_count != 1) {
+	if (current_count != 1 &&
+		!tm_resource->funcs->is_sharable(tm_resource)) {
 		/* Ideally, we should allow only 1-->0 transition.
 		 *
 		 * But, in theory a resource could be sharable, this is

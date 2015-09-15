@@ -48,6 +48,7 @@ struct tm_resource_funcs {
 	void (*set_multi_path)(
 		struct tm_resource *resource,
 		bool is_multi_path);
+	bool (*is_sharable)(const struct tm_resource *resource);
 };
 
 /* Reference count functions - these operations IDENTICAL for all types of

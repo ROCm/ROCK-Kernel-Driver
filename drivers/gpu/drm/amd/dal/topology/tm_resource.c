@@ -207,6 +207,16 @@ static uint32_t empty_get_priority(const struct tm_resource *resource)
 	return 0;
 }
 
+static bool clock_source_is_sharable(const struct tm_resource *resource)
+{
+	return true;
+}
+
+static bool empty_is_sharable(const struct tm_resource *resource)
+{
+	return false;
+}
+
 static void encoder_set_multi_path(
 	struct tm_resource *resource,
 	bool is_multi_path)
@@ -227,7 +237,8 @@ static const struct tm_resource_funcs connector_funcs = {
 	.release_hw = empty_release_hw,
 	.clone = connector_clone,
 	.get_priority = empty_get_priority,
-	.set_multi_path = empty_set_multi_path
+	.set_multi_path = empty_set_multi_path,
+	.is_sharable = empty_is_sharable
 };
 
 static const struct tm_resource_funcs controller_funcs = {
@@ -236,7 +247,8 @@ static const struct tm_resource_funcs controller_funcs = {
 	.release_hw = empty_release_hw,
 	.clone = controller_clone,
 	.get_priority = empty_get_priority,
-	.set_multi_path = empty_set_multi_path
+	.set_multi_path = empty_set_multi_path,
+	.is_sharable = empty_is_sharable
 };
 
 static const struct tm_resource_funcs encoder_funcs = {
@@ -245,7 +257,8 @@ static const struct tm_resource_funcs encoder_funcs = {
 	.release_hw = encoder_release_hw,
 	.clone = encoder_clone,
 	.get_priority = encoder_get_priority,
-	.set_multi_path = encoder_set_multi_path
+	.set_multi_path = encoder_set_multi_path,
+	.is_sharable = empty_is_sharable
 };
 
 static const struct tm_resource_funcs clock_source_funcs = {
@@ -254,7 +267,8 @@ static const struct tm_resource_funcs clock_source_funcs = {
 	.release_hw = empty_release_hw,
 	.clone = clock_source_clone,
 	.get_priority = clock_source_get_priority,
-	.set_multi_path = empty_set_multi_path
+	.set_multi_path = empty_set_multi_path,
+	.is_sharable = clock_source_is_sharable
 };
 
 static const struct tm_resource_funcs audio_funcs = {
@@ -263,7 +277,8 @@ static const struct tm_resource_funcs audio_funcs = {
 	.release_hw = empty_release_hw,
 	.clone = audio_clone,
 	.get_priority = empty_get_priority,
-	.set_multi_path = empty_set_multi_path
+	.set_multi_path = empty_set_multi_path,
+	.is_sharable = empty_is_sharable
 };
 
 static const struct tm_resource_funcs engine_funcs = {
@@ -272,7 +287,8 @@ static const struct tm_resource_funcs engine_funcs = {
 	.release_hw = empty_release_hw,
 	.clone = engine_clone,
 	.get_priority = empty_get_priority,
-	.set_multi_path = empty_set_multi_path
+	.set_multi_path = empty_set_multi_path,
+	.is_sharable = empty_is_sharable
 };
 
 struct tm_resource *dal_tm_resource_encoder_create(struct encoder *enc)
