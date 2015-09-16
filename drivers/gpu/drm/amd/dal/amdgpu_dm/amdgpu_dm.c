@@ -128,15 +128,6 @@ static bool dm_is_display_hung(struct amdgpu_device *adev)
 	return true;
 }
 
-static void dm_stop_mc_access(struct amdgpu_device *adev,
-				     struct amdgpu_mode_mc_save *save)
-{
-}
-
-static void dm_resume_mc_access(struct amdgpu_device *adev,
-				       struct amdgpu_mode_mc_save *save)
-{
-}
 
 static bool dm_is_idle(void *handle)
 {
@@ -1043,8 +1034,8 @@ static const struct amdgpu_display_funcs display_funcs = {
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
 	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
-	.stop_mc_access = dm_stop_mc_access, /* called unconditionally */
-	.resume_mc_access = dm_resume_mc_access, /* called unconditionally */
+	.stop_mc_access = dal_stop_mc_access, /* called unconditionally */
+	.resume_mc_access = dal_resume_mc_access, /* called unconditionally */
 };
 
 static void set_display_funcs(struct amdgpu_device *adev)

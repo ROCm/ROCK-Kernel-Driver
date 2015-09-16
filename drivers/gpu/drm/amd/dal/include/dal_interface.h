@@ -45,6 +45,8 @@ struct address_info;
 struct wifi_display_caps;
 struct path_mode;
 struct path_mode_set;
+struct amdgpu_device;
+struct amdgpu_mode_mc_save;
 
 struct dal *dal_create(struct dal_init_data *init);
 void dal_destroy(struct dal **dal);
@@ -257,5 +259,11 @@ enum dal_irq_source dal_interrupt_to_irq_source(
 		struct dal *dal,
 		uint32_t src_id,
 		uint32_t ext_id);
+
+void dal_stop_mc_access(struct amdgpu_device *adev,
+				     struct amdgpu_mode_mc_save *save);
+
+void dal_resume_mc_access(struct amdgpu_device *adev,
+				       struct amdgpu_mode_mc_save *save);
 
 #endif
