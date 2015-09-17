@@ -70,6 +70,19 @@ struct kfd_deviceid {
 	const struct kfd_device_info *device_info;
 };
 
+/*
+ * //
+// TONGA/AMETHYST device IDs (performance segment)
+//
+#define DEVICE_ID_VI_TONGA_P_6920               0x6920  // unfused
+#define DEVICE_ID_VI_TONGA_P_6921               0x6921  // Amethyst XT
+#define DEVICE_ID_VI_TONGA_P_6928               0x6928  // Tonga GL XT
+#define DEVICE_ID_VI_TONGA_P_692B               0x692B  // Tonga GL PRO
+#define DEVICE_ID_VI_TONGA_P_692F               0x692F  // Tonga GL PRO VF
+#define DEVICE_ID_VI_TONGA_P_6938               0x6938  // Tonga XT
+#define DEVICE_ID_VI_TONGA_P_6939               0x6939  // Tonga PRO
+ *
+ */
 /* Please keep this sorted by increasing device id. */
 static const struct kfd_deviceid supported_devices[] = {
 	{ 0x1304, &kaveri_device_info },	/* Kaveri */
@@ -99,8 +112,13 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x9875, &carrizo_device_info },	/* Carrizo */
 	{ 0x9876, &carrizo_device_info },	/* Carrizo */
 	{ 0x9877, &carrizo_device_info },	/* Carrizo */
-	{ 0x6939, &tonga_device_info   },	/* Tonga */
-	{ 0x692b, &tonga_device_info   }	/* Tonga */
+	{ 0x6920, &tonga_device_info   },	/* Tonga */
+	{ 0x6921, &tonga_device_info   },	/* Tonga */
+	{ 0x6928, &tonga_device_info   },	/* Tonga */
+	{ 0x692B, &tonga_device_info   },	/* Tonga */
+	{ 0x692F, &tonga_device_info   },	/* Tonga */
+	{ 0x6938, &tonga_device_info   },	/* Tonga */
+	{ 0x6939, &tonga_device_info   }	/* Tonga */
 };
 
 static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,
