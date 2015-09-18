@@ -27,6 +27,7 @@
 #include <linux/amd-iommu.h>
 #include <linux/notifier.h>
 #include <linux/compat.h>
+#include <linux/mm.h>
 
 struct mm_struct;
 
@@ -376,6 +377,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 		INIT_LIST_HEAD(&pdd->qpd.queues_list);
 		INIT_LIST_HEAD(&pdd->qpd.priv_queue_list);
 		pdd->qpd.dqm = dev->dqm;
+		pdd->qpd.pqm = &p->pqm;
 		pdd->reset_wavefronts = false;
 		list_add(&pdd->per_device_list, &p->per_device_data);
 
@@ -562,3 +564,40 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 
 	return p;
 }
+
+int kfd_reserved_mem_mmap(struct kfd_process *process, struct vm_area_struct *vma)
+{
+	unsigned long pfn;
+	struct kfd_dev *dev = kfd_device_by_id(vma->vm_pgoff);
+
+	if (dev == NULL)
+		return -EINVAL;
+
+	pr_debug("kfd reserved mem mmap been called.\n");
+	/* We supported  two reserved memory mmap in the future .
+	    1. Trap handler code and parameter (TBA and TMA , 2 pages total)
+	    2. Relaunch stack (control  block, 1 page for Carrizo)
+	 */
+	if ((vma->vm_end - vma->vm_start) > 4 * PAGE_SIZE) {
+		pr_err("amdkfd: reserved mmap requested illegal size\n");
+		return -EINVAL;
+	}
+
+	pfn = page_to_pfn(dev->cwsr_pages);
+
+	vma->vm_flags |= VM_IO | VM_DONTCOPY | VM_DONTEXPAND | VM_NORESERVE
+		       | VM_DONTDUMP | VM_PFNMAP;
+
+	pr_debug("mapping reserved memory page\n");
+	pr_debug("     start user address  == 0x%08lx\n", vma->vm_start);
+	pr_debug("     end user address    == 0x%08lx\n", vma->vm_end);
+	pr_debug("     pfn                 == 0x%016lX\n", pfn);
+	pr_debug("     vm_flags            == 0x%08lX\n", vma->vm_flags);
+	pr_debug("     size                == 0x%08lX\n",
+			vma->vm_end - vma->vm_start);
+
+	/* mapping the page to user process */
+	return remap_pfn_range(vma, vma->vm_start, pfn,
+			vma->vm_end - vma->vm_start, vma->vm_page_prot);
+}
+

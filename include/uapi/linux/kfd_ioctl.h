@@ -58,7 +58,8 @@ struct kfd_ioctl_create_queue_args {
 	uint64_t eop_buffer_address;	/* to KFD */
 	uint64_t eop_buffer_size;	/* to KFD */
 	uint64_t ctx_save_restore_address; /* to KFD */
-	uint64_t ctx_save_restore_size;	/* to KFD */
+	uint32_t ctx_save_restore_size;	/* to KFD */
+	uint32_t ctl_stack_size;	/* to KFD */
 };
 
 struct kfd_ioctl_destroy_queue_args {
@@ -92,6 +93,13 @@ struct kfd_ioctl_set_memory_policy_args {
 	uint32_t gpu_id;			/* to KFD */
 	uint32_t default_policy;		/* to KFD */
 	uint32_t alternate_policy;		/* to KFD */
+	uint32_t pad;
+};
+
+struct kfd_ioctl_set_trap_handler_args {
+	uint64_t tba_addr;
+	uint64_t tma_addr;
+	uint32_t gpu_id;			/* to KFD */
 	uint32_t pad;
 };
 
@@ -379,8 +387,10 @@ struct kfd_ioctl_alloc_memory_of_gpu_new_args {
 #define AMDKFD_IOC_ALLOC_MEMORY_OF_GPU_NEW		\
 		AMDKFD_IOWR(0x19, struct kfd_ioctl_alloc_memory_of_gpu_new_args)
 
+#define AMDKFD_IOC_SET_TRAP_HANDLER		\
+		AMDKFD_IOW(0x1a, struct kfd_ioctl_set_trap_handler_args)
 
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x20
+#define AMDKFD_COMMAND_END		0x1b
 
 #endif

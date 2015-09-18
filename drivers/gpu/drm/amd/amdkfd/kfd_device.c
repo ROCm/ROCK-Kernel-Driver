@@ -24,9 +24,11 @@
 #include <linux/bsearch.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/highmem.h>
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_pm4_headers.h"
+#include "cwsr_trap_handler_carrizo.h"
 
 #define MQD_SIZE_ALIGNED 768
 
@@ -367,6 +369,26 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	/* Initialize scratch memory access */
 	kfd->kfd2kgd->write_config_static_mem(kfd->kgd, true, 1, 3, 0);
 
+	/* Initialize the CWSR required memory, for TBA and TMA */
+	if (cwsr_enable) {
+		size = sizeof(cwsr_trap_carrizo_hex);
+		kfd->cwsr_size =
+			ALIGN(size, PAGE_SIZE) + PAGE_SIZE;
+		kfd->cwsr_pages = alloc_pages(GFP_KERNEL | __GFP_HIGHMEM,
+					get_order(kfd->cwsr_size));
+		if (!kfd->cwsr_pages) {
+			pr_err("amdkfd: error alloc CWSR isa memory \n");
+			goto dqm_start_error;
+		}
+		kfd->cwsr_addr = kmap(kfd->cwsr_pages);
+		memset(kfd->cwsr_addr, 0, kfd->cwsr_size);
+		memcpy(kfd->cwsr_addr, cwsr_trap_carrizo_hex, size);
+		kfd->tma_offset = ALIGN(size, PAGE_SIZE);
+		dev_info(kfd_device,
+			"Reserved pages for cwsr,kaddr:%p, 0x%x.\n",
+			kfd->cwsr_addr, kfd->cwsr_size);
+	}
+
 	kfd->init_complete = true;
 	dev_info(kfd_device, "added device (%x:%x)\n", kfd->pdev->vendor,
 		 kfd->pdev->device);
@@ -399,6 +421,7 @@ out:
 void kgd2kfd_device_exit(struct kfd_dev *kfd)
 {
 	if (kfd->init_complete) {
+		__free_pages(kfd->cwsr_pages, get_order(kfd->cwsr_size));
 		device_queue_manager_uninit(kfd->dqm);
 		if (kfd->device_info->is_need_iommu_device)
 			amd_iommu_free_device(kfd->pdev);

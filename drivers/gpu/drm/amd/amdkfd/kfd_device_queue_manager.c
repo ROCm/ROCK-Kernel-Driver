@@ -902,6 +902,8 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 
 	dqm->ops_asic_specific.init_sdma_vm(dqm, q, qpd);
 
+	q->properties.tba_addr = qpd->pqm->tba_addr;
+	q->properties.tma_addr = qpd->pqm->tma_addr;
 	retval = mqd->init_mqd(mqd, &q->mqd, &q->mqd_mem_obj,
 				&q->gart_mqd_addr, &q->properties);
 	if (retval != 0)
@@ -1182,6 +1184,16 @@ out:
 	return false;
 }
 
+static int set_trap_handler(struct device_queue_manager *dqm,
+				struct qcm_process_device *qpd,
+				uint64_t tba_addr,
+				uint64_t tma_addr)
+{
+	pr_err("kfd: second level trap handler still not supported. \n");
+	return 0;
+}
+
+
 static int set_page_directory_base(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd)
 {
@@ -1314,6 +1326,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		dqm->ops.create_kernel_queue = create_kernel_queue_cpsch;
 		dqm->ops.destroy_kernel_queue = destroy_kernel_queue_cpsch;
 		dqm->ops.set_cache_memory_policy = set_cache_memory_policy;
+		dqm->ops.set_trap_handler = set_trap_handler;
 		dqm->ops.set_page_directory_base = set_page_directory_base;
 		dqm->ops.process_termination = process_termination_cpsch;
 		break;
@@ -1330,6 +1343,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		dqm->ops.initialize = initialize_nocpsch;
 		dqm->ops.uninitialize = uninitialize_nocpsch;
 		dqm->ops.set_cache_memory_policy = set_cache_memory_policy;
+		dqm->ops.set_trap_handler = set_trap_handler;
 		dqm->ops.set_page_directory_base = set_page_directory_base;
 		dqm->ops.process_termination = process_termination_nocpsch;
 		break;

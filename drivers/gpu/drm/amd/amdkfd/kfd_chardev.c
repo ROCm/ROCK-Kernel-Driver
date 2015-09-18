@@ -208,6 +208,7 @@ static int set_queue_properties_from_user(struct queue_properties *q_properties,
 	q_properties->ctx_save_restore_area_address =
 			args->ctx_save_restore_address;
 	q_properties->ctx_save_restore_area_size = args->ctx_save_restore_size;
+	q_properties->ctl_stack_size = args->ctl_stack_size;
 	if (args->queue_type == KFD_IOC_QUEUE_TYPE_COMPUTE ||
 		args->queue_type == KFD_IOC_QUEUE_TYPE_COMPUTE_AQL)
 		q_properties->type = KFD_QUEUE_TYPE_COMPUTE;
@@ -257,6 +258,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	struct kfd_process_device *pdd;
 	struct queue_properties q_properties;
 
+	unsigned long  offset;
 	memset(&q_properties, 0, sizeof(struct queue_properties));
 
 	pr_debug("kfd: creating queue ioctl\n");
@@ -283,6 +285,26 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	pr_debug("kfd: creating queue for PASID %d on GPU 0x%x\n",
 			p->pasid,
 			dev->id);
+
+	if (cwsr_enable && !p->pqm.tba_addr) {
+		pr_debug("amdkfd:Start vm_mmap, file :0x%p.\n", filep);
+		offset = (args->gpu_id | KFD_MMAP_RESERVED_MEM_MASK)
+				<< PAGE_SHIFT;
+		p->pqm.tba_addr = (int64_t)vm_mmap(filep, 0,
+			dev->cwsr_size,
+			PROT_READ | PROT_EXEC,
+			MAP_SHARED,
+			offset);
+		if (p->pqm.tba_addr < 0) {
+			pr_err("Something wrong during vm_mmap. error -%d.\n",
+				(int)-p->pqm.tba_addr);
+			p->pqm.tba_addr = 0;
+		} else
+			p->pqm.tma_addr = p->pqm.tba_addr + dev->tma_offset;
+
+		pr_debug("set tba :0x%llx, tma:0x%llx for pqm.\n",
+			p->pqm.tba_addr, p->pqm.tma_addr);
+	}
 
 	err = pqm_create_queue(&p->pqm, dev, filep, &q_properties,
 				0, q_properties.type, &queue_id);
@@ -448,6 +470,38 @@ static int kfd_ioctl_set_memory_policy(struct file *filep,
 				alternate_policy,
 				(void __user *)args->alternate_aperture_base,
 				args->alternate_aperture_size))
+		err = -EINVAL;
+
+out:
+	mutex_unlock(&p->mutex);
+
+	return err;
+}
+
+static int kfd_ioctl_set_trap_handler(struct file *filep,
+					struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_set_trap_handler_args *args = data;
+	struct kfd_dev *dev;
+	int err = 0;
+	struct kfd_process_device *pdd;
+
+	dev = kfd_device_by_id(args->gpu_id);
+	if (dev == NULL)
+		return -EINVAL;
+
+	mutex_lock(&p->mutex);
+
+	pdd = kfd_bind_process_to_device(dev, p);
+	if (IS_ERR(pdd)) {
+		err = -ESRCH;
+		goto out;
+	}
+
+	if (dev->dqm->ops.set_trap_handler(dev->dqm,
+					&pdd->qpd,
+					args->tba_addr,
+					args->tma_addr))
 		err = -EINVAL;
 
 out:
@@ -1407,8 +1461,12 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_PROCESS_DGPU_APERTURE,
 			kfd_ioctl_set_process_dgpu_aperture, 0),
 
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_TRAP_HANDLER,
+			kfd_ioctl_set_trap_handler, 0),
+
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ALLOC_MEMORY_OF_GPU_NEW,
 				kfd_ioctl_alloc_memory_of_gpu_new, 0),
+
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
@@ -1535,6 +1593,10 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 			i++;
 		} while (kfd);
 		return retval;
+	} else if ((vma->vm_pgoff & KFD_MMAP_RESERVED_MEM_MASK) ==
+			KFD_MMAP_RESERVED_MEM_MASK) {
+		vma->vm_pgoff = vma->vm_pgoff ^ KFD_MMAP_RESERVED_MEM_MASK;
+		return kfd_reserved_mem_mmap(process, vma);
 	}
 
 	return -EFAULT;

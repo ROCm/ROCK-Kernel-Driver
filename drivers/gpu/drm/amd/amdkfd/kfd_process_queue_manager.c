@@ -197,10 +197,8 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 	if (retval != 0)
 		return retval;
 
-	if (list_empty(&pqm->queues)) {
-		pdd->qpd.pqm = pqm;
+	if (list_empty(&pqm->queues))
 		dev->dqm->ops.register_process(dev->dqm, &pdd->qpd);
-	}
 
 	pqn = kzalloc(sizeof(struct process_queue_node), GFP_KERNEL);
 	if (!pqn) {

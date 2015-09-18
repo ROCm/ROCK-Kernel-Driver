@@ -39,6 +39,7 @@
 #define	KFD_MMAP_DOORBELL_MASK	0x8000000000000
 #define KFD_MMAP_EVENTS_MASK	0x4000000000000
 #define KFD_MMAP_MAP_BO_MASK	0x2000000000000
+#define KFD_MMAP_RESERVED_MEM_MASK	0x1000000000000
 
 /*
  * When working with cp scheduler we should assign the HIQ manually or via
@@ -76,6 +77,8 @@ extern int max_num_of_queues_per_device;
 
 /* Kernel module parameter to specify the scheduling policy */
 extern int sched_policy;
+
+extern int cwsr_enable;
 
 /*
  * Kernel module parameter to specify the maximum process
@@ -215,6 +218,12 @@ struct kfd_dev {
 
 	/* Maximum process number mapped to HW scheduler */
 	unsigned int max_proc_per_quantum;
+
+	/* cwsr */
+	struct page *cwsr_pages;
+	void *cwsr_addr;
+	uint32_t cwsr_size;
+	uint32_t tma_offset;  /*Offset for TMA from the  start of cwsr_mem*/
 };
 
 /* KGD2KFD callbacks */
@@ -352,6 +361,9 @@ struct queue_properties {
 	uint32_t eop_ring_buffer_size;
 	uint64_t ctx_save_restore_area_address;
 	uint32_t ctx_save_restore_area_size;
+	uint32_t ctl_stack_size;
+	uint64_t tba_addr;
+	uint64_t tma_addr;
 	/* Relevant for CU */
 	uint32_t cu_mask;
 };
@@ -429,6 +441,10 @@ struct process_queue_manager {
 	unsigned int		num_concurrent_processes;
 	struct list_head	queues;
 	unsigned long		*queue_slot_bitmap;
+
+	/*cwsr trap handler isa memory*/
+	int64_t		tba_addr;
+	int64_t		tma_addr;
 };
 
 struct qcm_process_device {
@@ -593,6 +609,8 @@ struct kfd_process_device *kfd_get_process_device_data(struct kfd_dev *dev,
 							struct kfd_process *p);
 struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 							struct kfd_process *p);
+
+int kfd_reserved_mem_mmap(struct kfd_process *process, struct vm_area_struct *vma);
 
 /* KFD process API for creating and translating handles */
 int kfd_process_device_create_obj_handle(struct kfd_process_device *p, void *mem);
