@@ -29,9 +29,9 @@
 #define KFD_DRIVER_AUTHOR	"AMD Inc. and others"
 
 #define KFD_DRIVER_DESC		"Standalone HSA driver for AMD's GPUs"
-#define KFD_DRIVER_DATE		"20150728"
+#define KFD_DRIVER_DATE		"20150924"
 #define KFD_DRIVER_MAJOR	1
-#define KFD_DRIVER_MINOR	5
+#define KFD_DRIVER_MINOR	6
 #define KFD_DRIVER_PATCHLEVEL	0
 #define KFD_DRIVER_RC_LEVEL	""
 
