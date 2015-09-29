@@ -567,37 +567,34 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 
 int kfd_reserved_mem_mmap(struct kfd_process *process, struct vm_area_struct *vma)
 {
-	unsigned long pfn;
+	unsigned long pfn, i;
+	int ret = 0;
 	struct kfd_dev *dev = kfd_device_by_id(vma->vm_pgoff);
 
 	if (dev == NULL)
 		return -EINVAL;
+	if ((vma->vm_start & (PAGE_SIZE - 1)) ||
+		(vma->vm_end & (PAGE_SIZE - 1))) {
+		pr_err("KFD only support page aligned memory map.\n");
+		return -EINVAL;
+	}
 
 	pr_debug("kfd reserved mem mmap been called.\n");
 	/* We supported  two reserved memory mmap in the future .
 	    1. Trap handler code and parameter (TBA and TMA , 2 pages total)
 	    2. Relaunch stack (control  block, 1 page for Carrizo)
 	 */
-	if ((vma->vm_end - vma->vm_start) > 4 * PAGE_SIZE) {
-		pr_err("amdkfd: reserved mmap requested illegal size\n");
-		return -EINVAL;
+
+	for (i = 0; i < ((vma->vm_end - vma->vm_start) >> PAGE_SHIFT); ++i) {
+		pfn = page_to_pfn(&dev->cwsr_pages[i]);
+		vma->vm_flags |= VM_IO | VM_DONTCOPY | VM_DONTEXPAND
+			| VM_NORESERVE | VM_DONTDUMP | VM_PFNMAP;
+		/* mapping the page to user process */
+		ret = remap_pfn_range(vma, vma->vm_start + (i << PAGE_SHIFT),
+				pfn, PAGE_SIZE, vma->vm_page_prot);
+		if (ret)
+			break;
 	}
-
-	pfn = page_to_pfn(dev->cwsr_pages);
-
-	vma->vm_flags |= VM_IO | VM_DONTCOPY | VM_DONTEXPAND | VM_NORESERVE
-		       | VM_DONTDUMP | VM_PFNMAP;
-
-	pr_debug("mapping reserved memory page\n");
-	pr_debug("     start user address  == 0x%08lx\n", vma->vm_start);
-	pr_debug("     end user address    == 0x%08lx\n", vma->vm_end);
-	pr_debug("     pfn                 == 0x%016lX\n", pfn);
-	pr_debug("     vm_flags            == 0x%08lX\n", vma->vm_flags);
-	pr_debug("     size                == 0x%08lX\n",
-			vma->vm_end - vma->vm_start);
-
-	/* mapping the page to user process */
-	return remap_pfn_range(vma, vma->vm_start, pfn,
-			vma->vm_end - vma->vm_start, vma->vm_page_prot);
+	return ret;
 }
 

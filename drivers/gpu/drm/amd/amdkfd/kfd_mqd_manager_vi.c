@@ -117,13 +117,6 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 	m->cp_hqd_persistent_state = CP_HQD_PERSISTENT_STATE__PRELOAD_REQ_MASK |
 			0x53 << CP_HQD_PERSISTENT_STATE__PRELOAD_SIZE__SHIFT;
 
-	if (cwsr_enable) {
-		m->cp_hqd_persistent_state |=
-			(1 << CP_HQD_PERSISTENT_STATE__QSWITCH_MODE__SHIFT);
-		m->compute_pgm_rsrc2 |=
-			(1 << COMPUTE_PGM_RSRC2__TRAP_PRESENT__SHIFT);
-	}
-
 	m->cp_mqd_control = 1 << CP_MQD_CONTROL__PRIV_STATE__SHIFT |
 			MTYPE_UC << CP_MQD_CONTROL__MTYPE__SHIFT;
 
@@ -142,19 +135,25 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 	if (q->format == KFD_QUEUE_FORMAT_AQL)
 		m->cp_hqd_iq_rptr = 1;
 
-	m->cp_hqd_ctx_save_base_addr_lo =
-		lower_32_bits(q->ctx_save_restore_area_address);
-	m->cp_hqd_ctx_save_base_addr_hi =
-		upper_32_bits(q->ctx_save_restore_area_address);
-	m->cp_hqd_ctx_save_control = 0x3;
-	m->cp_hqd_ctx_save_size = q->ctx_save_restore_area_size;
-	m->cp_hqd_cntl_stack_size = q->ctl_stack_size;
-	m->cp_hqd_cntl_stack_offset = q->ctl_stack_size;
-	m->cp_hqd_wg_state_offset = q->ctl_stack_size;
-	m->compute_tba_lo = lower_32_bits(q->tba_addr >> 8);
-	m->compute_tba_hi = upper_32_bits(q->tba_addr >> 8);
-	m->compute_tma_lo = lower_32_bits(q->tma_addr >> 8);
-	m->compute_tma_hi = upper_32_bits(q->tma_addr >> 8);
+	if (q->tba_addr) {
+		m->cp_hqd_persistent_state |=
+			(1 << CP_HQD_PERSISTENT_STATE__QSWITCH_MODE__SHIFT);
+		m->compute_pgm_rsrc2 |=
+			(1 << COMPUTE_PGM_RSRC2__TRAP_PRESENT__SHIFT);
+		m->cp_hqd_ctx_save_base_addr_lo =
+			lower_32_bits(q->ctx_save_restore_area_address);
+		m->cp_hqd_ctx_save_base_addr_hi =
+			upper_32_bits(q->ctx_save_restore_area_address);
+		m->cp_hqd_ctx_save_control = 0x3;
+		m->cp_hqd_ctx_save_size = q->ctx_save_restore_area_size;
+		m->cp_hqd_cntl_stack_size = q->ctl_stack_size;
+		m->cp_hqd_cntl_stack_offset = q->ctl_stack_size;
+		m->cp_hqd_wg_state_offset = q->ctl_stack_size;
+		m->compute_tba_lo = lower_32_bits(q->tba_addr >> 8);
+		m->compute_tba_hi = upper_32_bits(q->tba_addr >> 8);
+		m->compute_tma_lo = lower_32_bits(q->tma_addr >> 8);
+		m->compute_tma_hi = upper_32_bits(q->tma_addr >> 8);
+	}
 
 	*mqd = m;
 	if (gart_addr != NULL)

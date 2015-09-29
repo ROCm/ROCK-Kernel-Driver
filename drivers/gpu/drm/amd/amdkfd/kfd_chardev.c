@@ -286,7 +286,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 			p->pasid,
 			dev->id);
 
-	if (cwsr_enable && !p->pqm.tba_addr) {
+	if (dev->cwsr_enabled && !p->pqm.tba_addr) {
 		pr_debug("amdkfd:Start vm_mmap, file :0x%p.\n", filep);
 		offset = (args->gpu_id | KFD_MMAP_RESERVED_MEM_MASK)
 				<< PAGE_SHIFT;

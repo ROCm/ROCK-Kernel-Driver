@@ -369,9 +369,19 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	/* Initialize scratch memory access */
 	kfd->kfd2kgd->write_config_static_mem(kfd->kgd, true, 1, 3, 0);
 
-	/* Initialize the CWSR required memory, for TBA and TMA */
-	if (cwsr_enable) {
+	/*
+	 * Initialize the CWSR required memory for TBA and TMA
+	 * only support CWSR on CARRIZO with FW version >=625 for now.
+	 */
+	if (cwsr_enable &&
+		(kfd->device_info->asic_family == CHIP_CARRIZO) &&
+		(kfd->mec_fw_version >= KFD_CWSR_CZ_FW_VER)) {
+		void *cwsr_addr = NULL;
 		size = sizeof(cwsr_trap_carrizo_hex);
+		if (size > PAGE_SIZE) {
+			pr_err("amdkfd: wrong CWSR ISA size.\n");
+			goto dqm_start_error;
+		}
 		kfd->cwsr_size =
 			ALIGN(size, PAGE_SIZE) + PAGE_SIZE;
 		kfd->cwsr_pages = alloc_pages(GFP_KERNEL | __GFP_HIGHMEM,
@@ -380,13 +390,16 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			pr_err("amdkfd: error alloc CWSR isa memory \n");
 			goto dqm_start_error;
 		}
-		kfd->cwsr_addr = kmap(kfd->cwsr_pages);
-		memset(kfd->cwsr_addr, 0, kfd->cwsr_size);
-		memcpy(kfd->cwsr_addr, cwsr_trap_carrizo_hex, size);
+		/*Only first page used for cwsr ISA code */
+		cwsr_addr = kmap(kfd->cwsr_pages);
+		memset(cwsr_addr, 0, PAGE_SIZE);
+		memcpy(cwsr_addr, cwsr_trap_carrizo_hex, size);
+		kunmap(kfd->cwsr_pages);
 		kfd->tma_offset = ALIGN(size, PAGE_SIZE);
+		kfd->cwsr_enabled = true;
 		dev_info(kfd_device,
-			"Reserved pages for cwsr,kaddr:%p, 0x%x.\n",
-			kfd->cwsr_addr, kfd->cwsr_size);
+			"Reserved %d pages for cwsr.\n",
+			(kfd->cwsr_size >> PAGE_SHIFT));
 	}
 
 	kfd->init_complete = true;
@@ -421,7 +434,9 @@ out:
 void kgd2kfd_device_exit(struct kfd_dev *kfd)
 {
 	if (kfd->init_complete) {
-		__free_pages(kfd->cwsr_pages, get_order(kfd->cwsr_size));
+		if (kfd->cwsr_pages)
+			__free_pages(kfd->cwsr_pages,
+				get_order(kfd->cwsr_size));
 		device_queue_manager_uninit(kfd->dqm);
 		if (kfd->device_info->is_need_iommu_device)
 			amd_iommu_free_device(kfd->pdev);
