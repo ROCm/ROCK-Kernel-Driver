@@ -39,8 +39,12 @@
 #define HSA_CAP_WATCH_POINTS_SUPPORTED		0x00000080
 #define HSA_CAP_WATCH_POINTS_TOTALBITS_MASK	0x00000f00
 #define HSA_CAP_WATCH_POINTS_TOTALBITS_SHIFT	8
-#define HSA_CAP_RESERVED			0xfffff000
-#define HSA_CAP_DOORBELL_PACKET_TYPE		0x00001000
+#define HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK	0x00003000
+#define HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT	12
+#define HSA_CAP_RESERVED			0xffffc000
+
+#define HSA_CAP_DOORBELL_TYPE_PRE_1_0		0x0
+#define HSA_CAP_DOORBELL_TYPE_1_0		0x1
 
 struct kfd_node_properties {
 	uint32_t cpu_cores_count;
@@ -136,7 +140,6 @@ struct kfd_topology_device {
 	struct list_head		list;
 	uint32_t			gpu_id;
 	struct kfd_node_properties	node_props;
-	uint32_t			mem_bank_count;
 	struct list_head		mem_props;
 	uint32_t			cache_count;
 	struct list_head		cache_props;
@@ -150,6 +153,9 @@ struct kfd_topology_device {
 	struct attribute		attr_gpuid;
 	struct attribute		attr_name;
 	struct attribute		attr_props;
+	uint8_t		oem_id[CRAT_OEMID_LENGTH];
+	uint8_t		oem_table_id[CRAT_OEMTABLEID_LENGTH];
+	uint32_t	oem_revision;
 };
 
 struct kfd_system_properties {

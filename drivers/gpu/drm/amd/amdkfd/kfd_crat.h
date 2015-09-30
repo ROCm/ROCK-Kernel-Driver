@@ -24,6 +24,7 @@
 #define KFD_CRAT_H_INCLUDED
 
 #include <linux/types.h>
+#include "kfd_priv.h"
 
 #pragma pack(1)
 
@@ -43,6 +44,10 @@
 #define CRAT_RESERVED_LENGTH	6
 
 #define CRAT_OEMID_64BIT_MASK ((1ULL << (CRAT_OEMID_LENGTH * 8)) - 1)
+
+/* Compute Unit flags */
+#define COMPUTE_UNIT_CPU	(1 << 0)	/* Create Virtual CRAT for CPU */
+#define COMPUTE_UNIT_GPU	(1 << 1)	/* Create Virtual CRAT for GPU */
 
 struct crat_header {
 	uint32_t	signature;
@@ -105,7 +110,7 @@ struct crat_subtype_computeunit {
 	uint8_t		wave_front_size;
 	uint8_t		num_banks;
 	uint16_t	micro_engine_id;
-	uint8_t		num_arrays;
+	uint8_t		array_count;
 	uint8_t		num_cu_per_array;
 	uint8_t		num_simd_per_cu;
 	uint8_t		max_slots_scatch_cu;
@@ -294,6 +299,6 @@ struct cdit_header {
 int kfd_create_crat_image_acpi(void **crat_image, size_t *size);
 void kfd_destroy_crat_image(void *crat_image);
 int kfd_parse_crat_table(void *crat_image, struct list_head *device_list);
-int kfd_parse_crat_table_fake(struct list_head *device_list);
-
+int kfd_create_crat_image_virtual(void **crat_image, size_t *size,
+					int flags, struct kfd_dev *kdev);
 #endif /* KFD_CRAT_H_INCLUDED */
