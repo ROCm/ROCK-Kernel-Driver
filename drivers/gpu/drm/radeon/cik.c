@@ -9860,6 +9860,12 @@ int cik_get_cu_info(struct radeon_device *rdev, struct radeon_cu_info *cu_info)
 
 	cu_info->number = active_cu_number;
 	cu_info->ao_cu_mask = ao_cu_mask;
+	if (rdev->family == CHIP_KAVERI) {
+		cu_info->simd_per_cu = 4;
+		cu_info->max_waves_per_simd = 10;
+		cu_info->max_scratch_slots_per_cu = 32;
+		cu_info->wave_front_size = 64;
+	}
 
 	return 0;
 }
