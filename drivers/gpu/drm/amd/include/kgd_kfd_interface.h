@@ -46,7 +46,18 @@ struct kfd_cu_info {
 	uint32_t num_cu_per_sh;
 	uint32_t cu_active_number;
 	uint32_t cu_ao_mask;
+	uint32_t simd_per_cu;
+	uint32_t max_waves_per_simd;
+	uint32_t wave_front_size;
+	uint32_t max_scratch_slots_per_cu;
 	uint32_t cu_bitmap[4][4];
+};
+
+/* For getting GPU local memory information from KGD */
+struct kfd_local_mem_info {
+	uint64_t local_mem_size;
+	uint32_t vram_width;
+	uint32_t mem_clk_max;
 };
 
 enum kgd_memory_pool {
@@ -96,6 +107,8 @@ struct kgd2kfd_shared_resources {
  * @free_gtt_mem: Frees a buffer that was allocated on the gart aperture
  *
  * @get_vmem_size: Retrieves (physical) size of VRAM
+ *
+ * @get_local_mem_info: Retrieves information about GPU local memory
  *
  * @get_gpu_clock_counter: Retrieves GPU clock counter
  *
@@ -149,6 +162,8 @@ struct kfd2kgd_calls {
 	void (*free_gtt_mem)(struct kgd_dev *kgd, void *mem_obj);
 
 	uint64_t (*get_vmem_size)(struct kgd_dev *kgd);
+	void(*get_local_mem_info)(struct kgd_dev *kgd,
+			struct kfd_local_mem_info *mem_info);
 	uint64_t (*get_gpu_clock_counter)(struct kgd_dev *kgd);
 
 	uint32_t (*get_max_engine_clock_in_mhz)(struct kgd_dev *kgd);
