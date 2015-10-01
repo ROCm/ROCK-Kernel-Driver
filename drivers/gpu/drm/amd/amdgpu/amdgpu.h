@@ -941,6 +941,7 @@ struct amdgpu_gfx_config {
 };
 
 struct amdgpu_cu_info {
+	uint32_t simd_per_cu;
 	uint32_t max_waves_per_simd;
 	uint32_t wave_front_size;
 	uint32_t max_scratch_slots_per_cu;
@@ -1277,6 +1278,7 @@ struct amdgpu_allowed_register_entry {
 	uint32_t reg_offset;
 	bool grbm_indexed;
 };
+
 
 /*
  * ASIC specific functions.
