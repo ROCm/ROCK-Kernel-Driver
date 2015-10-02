@@ -296,6 +296,7 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 	char public_name[KFD_TOPOLOGY_PUBLIC_NAME_SIZE];
 	uint32_t i;
 	uint32_t log_max_watch_addr;
+	struct kfd_local_mem_info local_mem_info;
 
 	/* Making sure that the buffer is an empty string */
 	buffer[0] = 0;
@@ -392,10 +393,12 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 		 * If the ASIC is CZ, set local memory size to 0 to disable
 		 * local memory support
 		 */
-		if (dev->gpu->device_info->asic_family != CHIP_CARRIZO)
+		if (dev->gpu->device_info->asic_family != CHIP_CARRIZO) {
+			dev->gpu->kfd2kgd->get_local_mem_info(dev->gpu->kgd,
+				&local_mem_info);
 			sysfs_show_64bit_prop(buffer, "local_mem_size",
-					dev->gpu->kfd2kgd->get_vmem_size(
-						dev->gpu->kgd));
+					local_mem_info.local_mem_size);
+		}
 		else
 			sysfs_show_64bit_prop(buffer, "local_mem_size",
 					(unsigned long long int) 0);
@@ -768,18 +771,20 @@ static uint32_t kfd_generate_gpu_id(struct kfd_dev *gpu)
 	uint32_t hashout;
 	uint32_t buf[7];
 	int i;
+	struct kfd_local_mem_info local_mem_info;
 
 	if (!gpu)
 		return 0;
+
+	gpu->kfd2kgd->get_local_mem_info(gpu->kgd, &local_mem_info);
 
 	buf[0] = gpu->pdev->devfn;
 	buf[1] = gpu->pdev->subsystem_vendor;
 	buf[2] = gpu->pdev->subsystem_device;
 	buf[3] = gpu->pdev->device;
 	buf[4] = gpu->pdev->bus->number;
-	buf[5] = (uint32_t)(gpu->kfd2kgd->get_vmem_size(gpu->kgd)
-			& 0xffffffff);
-	buf[6] = (uint32_t)(gpu->kfd2kgd->get_vmem_size(gpu->kgd) >> 32);
+	buf[5] = lower_32_bits(local_mem_info.local_mem_size);
+	buf[6] = upper_32_bits(local_mem_info.local_mem_size);
 
 	for (i = 0, hashout = 0; i < 7; i++)
 		hashout ^= hash_32(buf[i], KFD_GPU_ID_HASH_WIDTH);
