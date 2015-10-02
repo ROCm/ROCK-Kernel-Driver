@@ -224,6 +224,20 @@ uint64_t get_vmem_size(struct kgd_dev *kgd)
 	return rdev->mc.real_vram_size;
 }
 
+void get_local_mem_info(struct kgd_dev *kgd,
+				struct kfd_local_mem_info *mem_info)
+{
+	struct amdgpu_device *rdev = (struct amdgpu_device *)kgd;
+
+	BUG_ON(kgd == NULL);
+
+	memset(mem_info, 0, sizeof(*mem_info));
+	mem_info->local_mem_size = rdev->mc.real_vram_size;
+	mem_info->vram_width = rdev->mc.vram_width;
+	if (rdev->pm.funcs->get_mclk)
+		mem_info->mem_clk_max = rdev->pm.funcs->get_mclk(rdev, false);
+}
+
 uint64_t get_gpu_clock_counter(struct kgd_dev *kgd)
 {
 	struct amdgpu_device *rdev = (struct amdgpu_device *)kgd;
@@ -258,6 +272,10 @@ void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 	cu_info->num_shader_engines = adev->gfx.config.max_shader_engines;
 	cu_info->num_shader_arrays_per_engine = adev->gfx.config.max_sh_per_se;
 	cu_info->num_cu_per_sh = adev->gfx.config.max_cu_per_sh;
+	cu_info->simd_per_cu = acu_info.simd_per_cu;
+	cu_info->max_waves_per_simd = acu_info.max_waves_per_simd;
+	cu_info->wave_front_size = acu_info.wave_front_size;
+	cu_info->max_scratch_slots_per_cu = acu_info.max_scratch_slots_per_cu;
 }
 
 int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
