@@ -1146,7 +1146,9 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
-		pdd->vm, (struct kgd_mem **) &mem, &offset, NULL);
+		pdd->vm, (struct kgd_mem **) &mem,
+		(args->flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE) ?
+		NULL : &offset, NULL);
 
 	if (err != 0)
 		goto alloc_memory_of_gpu_failed;
@@ -1158,9 +1160,13 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	}
 
 	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
-	args->mmap_offset =  KFD_MMAP_MAP_BO_MASK;
-	args->mmap_offset <<= PAGE_SHIFT;
-	args->mmap_offset |= offset;
+	if ((args->flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE) != 0) {
+		args->mmap_offset = 0;
+	} else {
+		args->mmap_offset =  KFD_MMAP_MAP_BO_MASK;
+		args->mmap_offset <<= PAGE_SHIFT;
+		args->mmap_offset |= offset;
+	}
 
 	mutex_unlock(&p->mutex);
 
