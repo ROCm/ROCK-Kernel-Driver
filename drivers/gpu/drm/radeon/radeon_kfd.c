@@ -73,6 +73,8 @@ static int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 static void free_gtt_mem(struct kgd_dev *kgd, void *mem_obj);
 
 static uint64_t get_vmem_size(struct kgd_dev *kgd);
+static void get_local_mem_info(struct kgd_dev *kgd,
+		struct kfd_local_mem_info *mem_info);
 static uint64_t get_gpu_clock_counter(struct kgd_dev *kgd);
 
 static uint32_t get_max_engine_clock_in_mhz(struct kgd_dev *kgd);
@@ -150,6 +152,7 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.init_gtt_mem_allocation = alloc_gtt_mem,
 	.free_gtt_mem = free_gtt_mem,
 	.get_vmem_size = get_vmem_size,
+	.get_local_mem_info = get_local_mem_info,
 	.get_gpu_clock_counter = get_gpu_clock_counter,
 	.get_max_engine_clock_in_mhz = get_max_engine_clock_in_mhz,
 	.create_process_vm = create_process_vm,
@@ -357,6 +360,19 @@ static void free_gtt_mem(struct kgd_dev *kgd, void *mem_obj)
 	radeon_bo_unreserve(mem->data1.bo);
 	radeon_bo_unref(&(mem->data1.bo));
 	kfree(mem);
+}
+
+void get_local_mem_info(struct kgd_dev *kgd,
+			struct kfd_local_mem_info *mem_info)
+{
+	struct radeon_device *rdev = (struct radeon_device *)kgd;
+
+	BUG_ON(kgd == NULL);
+
+	memset(mem_info, 0, sizeof(*mem_info));
+	mem_info->local_mem_size = rdev->mc.real_vram_size;
+	mem_info->vram_width = rdev->mc.vram_width;
+	mem_info->mem_clk_max = radeon_dpm_get_mclk(rdev, false);
 }
 
 static uint64_t get_vmem_size(struct kgd_dev *kgd)
@@ -1588,6 +1604,10 @@ static void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 	cu_info->num_shader_engines = rdev->config.cik.max_shader_engines;
 	cu_info->num_shader_arrays_per_engine = rdev->config.cik.max_sh_per_se;
 	cu_info->num_cu_per_sh = rdev->config.cik.max_cu_per_sh;
+	cu_info->simd_per_cu = rcu_info.simd_per_cu;
+	cu_info->max_waves_per_simd = rcu_info.max_waves_per_simd;
+	cu_info->wave_front_size = rcu_info.wave_front_size;
+	cu_info->max_scratch_slots_per_cu = rcu_info.max_scratch_slots_per_cu;
 }
 
 static int mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma)
