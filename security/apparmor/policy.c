@@ -157,12 +157,10 @@ static void policy_destroy(struct aa_policy *policy)
 		AA_ERROR("%s: internal error, "
 			 "policy '%s' still contains profiles\n",
 			 __func__, policy->name);
-		BUG();
 	}
 	if (on_list_rcu(&policy->list)) {
 		AA_ERROR("%s: internal error, policy '%s' still on list\n",
 			 __func__, policy->name);
-		BUG();
 	}
 
 	/* don't free name as its a subset of hname */
