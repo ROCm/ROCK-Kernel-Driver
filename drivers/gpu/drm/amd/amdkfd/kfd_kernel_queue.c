@@ -48,6 +48,7 @@ static bool initialize(struct kernel_queue *kq, struct kfd_dev *dev,
 			__func__, KFD_QUEUE_TYPE_HIQ, queue_size);
 
 	memset(&prop, 0, sizeof(prop));
+	memset(&nop, 0, sizeof(nop));
 
 	nop.opcode = IT_NOP;
 	nop.type = PM4_TYPE_3;
