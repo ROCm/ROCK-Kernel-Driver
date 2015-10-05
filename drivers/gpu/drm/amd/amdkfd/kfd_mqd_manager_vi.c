@@ -312,6 +312,53 @@ static int update_mqd_hiq(struct mqd_manager *mm, void *mqd,
 	return retval;
 }
 
+static int init_mqd_sdma(struct mqd_manager *mm, void **mqd,
+		struct kfd_mem_obj **mqd_mem_obj, uint64_t *gart_addr,
+		struct queue_properties *q)
+{
+	return 0;
+}
+
+static void uninit_mqd_sdma(struct mqd_manager *mm, void *mqd,
+		struct kfd_mem_obj *mqd_mem_obj)
+{
+	return 0;
+}
+
+static int load_mqd_sdma(struct mqd_manager *mm, void *mqd,
+		uint32_t pipe_id, uint32_t queue_id,
+		uint32_t __user *wptr, uint32_t page_table_base)
+{
+	return 0;
+}
+
+static int update_mqd_sdma(struct mqd_manager *mm, void *mqd,
+		struct queue_properties *q)
+{
+	return 0;
+}
+
+/*
+ *  * preempt type here is ignored because there is only one way
+ *  * to preempt sdma queue
+ */
+static int destroy_mqd_sdma(struct mqd_manager *mm, void *mqd,
+		enum kfd_preempt_type type,
+		unsigned int timeout, uint32_t pipe_id,
+		uint32_t queue_id)
+{
+	return 0;
+}
+
+static bool is_occupied_sdma(struct mqd_manager *mm, void *mqd,
+		uint64_t queue_address, uint32_t pipe_id,
+		uint32_t queue_id)
+{
+	return 0;
+}
+
+
+
 struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		struct kfd_dev *dev)
 {
