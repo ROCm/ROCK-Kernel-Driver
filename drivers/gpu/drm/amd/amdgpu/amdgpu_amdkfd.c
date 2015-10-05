@@ -43,6 +43,11 @@ bool amdgpu_amdkfd_init(void)
 
 bool amdgpu_amdkfd_load_interface(struct amdgpu_device *rdev)
 {
+	if (kgd2kfd_init_p == NULL) {
+		kfd2kgd = NULL;
+		return false;
+	}
+
 	switch (rdev->asic_type) {
 	case CHIP_KAVERI:
 		kfd2kgd = amdgpu_amdkfd_gfx_7_get_functions();
