@@ -344,6 +344,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 
 	(*mem)->data2.bo = bo;
 	(*mem)->data2.bo_va = bo_va;
+	(*mem)->data2.domain = domain;
 	(*mem)->data2.mapped_to_gpu_memory = 0;
 
 	if (offset)
@@ -560,7 +561,7 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 		return 0;
 	}
 
-	domain = AMDGPU_GEM_DOMAIN_GTT;
+	domain = mem->data2.domain;
 	/*
 	 * We need to pin the allocated BO, PD and appropriate PTs and to
 	 * create a mapping of virtual to MC address
