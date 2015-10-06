@@ -213,19 +213,23 @@ static int acquire_packet_buffer(struct kernel_queue *kq,
 
 	BUG_ON(!kq || !buffer_ptr);
 
+	/* When rptr == wptr, the buffer is empty.
+	 * When rptr == wptr + 1, the buffer is full.
+	 * It is always rptr that advances to the position of wptr, rather than
+	 * the opposite. So we can only use up to queue_size_dwords - 1 dwords.
+	 */
 	rptr = *kq->rptr_kernel;
 	wptr = *kq->wptr_kernel;
 	queue_address = (unsigned int *)kq->pq_kernel_addr;
 	queue_size_dwords = kq->queue->properties.queue_size / sizeof(uint32_t);
 
-	pr_debug("amdkfd: In func %s\nrptr: %d\nwptr: %d\nqueue_address 0x%p\n",
+	pr_debug("amdkfd: In func %s\n rptr: %d\n wptr: %d\n queue_address 0x%p\n",
 			__func__, rptr, wptr, queue_address);
 
 	available_size = (rptr + queue_size_dwords - 1 - wptr) %
 							queue_size_dwords;
 
-	if (packet_size_in_dwords >= queue_size_dwords ||
-			packet_size_in_dwords >= available_size) {
+	if (packet_size_in_dwords > available_size) {
 		/*
 		 * make sure calling functions know
 		 * acquire_packet_buffer() failed
@@ -235,6 +239,13 @@ static int acquire_packet_buffer(struct kernel_queue *kq,
 	}
 
 	if (wptr + packet_size_in_dwords >= queue_size_dwords) {
+		/* make sure after rolling back to position 0, there is
+		 * still enough space. */
+		if (packet_size_in_dwords >= rptr) {
+			*buffer_ptr = NULL;
+			return -ENOMEM;
+		}
+		/* fill nops, roll back and start at position 0 */
 		while (wptr > 0) {
 			queue_address[wptr] = kq->nop_packet;
 			wptr = (wptr + 1) % queue_size_dwords;
