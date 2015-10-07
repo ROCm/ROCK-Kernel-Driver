@@ -376,9 +376,10 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	struct amdgpu_bo_list_entry *vm_bos;
 	struct ttm_validate_buffer *entry;
 	struct ww_acquire_ctx ticket;
-	struct list_head list;
+	struct list_head list, duplicates;
 
 	INIT_LIST_HEAD(&list);
+	INIT_LIST_HEAD(&duplicates);
 
 	vm = bo_va->vm;
 
@@ -395,7 +396,7 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		goto err_failed_to_get_bos;
 	}
 
-	ret = ttm_eu_reserve_buffers(&ticket, &list, false, NULL);
+	ret = ttm_eu_reserve_buffers(&ticket, &list, false, &duplicates);
 	if (ret) {
 		pr_err("amdkfd: Failed to reserve buffers in ttm\n");
 		goto err_failed_to_ttm_reserve;
@@ -661,9 +662,10 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 	struct ttm_validate_buffer tv;
 	struct amdgpu_bo_list_entry *vm_bos;
 	struct ww_acquire_ctx ticket;
-	struct list_head list;
+	struct list_head list, duplicates;
 
 	INIT_LIST_HEAD(&list);
+	INIT_LIST_HEAD(&duplicates);
 
 	vm = bo_va->vm;
 	tv.bo = &bo_va->bo->tbo;
@@ -677,7 +679,7 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 		goto err_failed_to_get_bos;
 	}
 
-	ret = ttm_eu_reserve_buffers(&ticket, &list, false, NULL);
+	ret = ttm_eu_reserve_buffers(&ticket, &list, false, &duplicates);
 	if (ret) {
 		pr_err("amdkfd: Failed to reserve buffers in ttm\n");
 		goto err_failed_to_ttm_reserve;
