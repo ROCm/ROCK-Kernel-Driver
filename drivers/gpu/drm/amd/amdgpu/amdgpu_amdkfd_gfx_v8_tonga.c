@@ -158,6 +158,8 @@ static int try_pin_bo(struct amdgpu_bo *bo, uint64_t *mc_address, bool resv,
 		ret = amdgpu_bo_kmap(bo, NULL);
 		if (ret != 0) {
 			pr_err("amdgpu: failed kmap GTT BO\n");
+			if (resv)
+				amdgpu_bo_unreserve(bo);
 			return ret;
 		}
 	}
@@ -353,9 +355,9 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	return 0;
 
 allocate_mem_kmap_bo_failed:
-	amdgpu_bo_unpin((*mem)->data2.bo);
+	amdgpu_bo_unpin(bo);
 allocate_mem_pin_bo_failed:
-	amdgpu_bo_unreserve((*mem)->data2.bo);
+	amdgpu_bo_unreserve(bo);
 allocate_mem_reserve_bo_failed:
 err_map:
 	amdgpu_bo_unref(&bo);
