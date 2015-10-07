@@ -620,7 +620,6 @@ static int create_process_vm(struct kgd_dev *kgd, void **vm)
 
 static void destroy_process_vm(struct kgd_dev *kgd, void *vm)
 {
-	int ret;
 	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
 	struct amdgpu_vm *avm = (struct amdgpu_vm *) vm;
 
@@ -628,15 +627,6 @@ static void destroy_process_vm(struct kgd_dev *kgd, void *vm)
 	BUG_ON(vm == NULL);
 
 	pr_debug("Destroying process vm with address %p\n", vm);
-
-	/*
-	 * The previously "released" BOs are really released and their VAs are
-	 * removed from PT. This function is called here because it requires
-	 * the radeon_vm::mutex to be locked and PT to be reserved
-	 */
-	ret = amdgpu_vm_clear_freed(adev, vm);
-	if (ret != 0)
-		pr_err("amdkfd: Failed to amdgpu_vm_clear_freed\n");
 
 	/* Release the VM context */
 	amdgpu_vm_fini(adev, avm);
