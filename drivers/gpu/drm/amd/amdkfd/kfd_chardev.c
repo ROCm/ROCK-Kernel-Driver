@@ -936,7 +936,7 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 			kfd = kfd_topology_enum_kfd_devices(i);
 			if (!kfd)
 				break;
-			if (kfd->device_info->asic_family == CHIP_TONGA) {
+			if (KFD_IS_DGPU(kfd->device_info->asic_family)) {
 				pdd = kfd_bind_process_to_device(kfd, p);
 				if (IS_ERR(pdd) < 0) {
 					err = PTR_ERR(pdd);

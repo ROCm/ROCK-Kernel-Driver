@@ -32,6 +32,7 @@ struct mqd_manager *mqd_manager_init(enum KFD_MQD_TYPE type,
 	case CHIP_CARRIZO:
 		return mqd_manager_init_vi(type, dev);
 	case CHIP_TONGA:
+	case CHIP_FIJI:
 		return mqd_manager_init_vi_tonga(type, dev);
 	}
 

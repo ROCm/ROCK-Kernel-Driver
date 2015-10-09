@@ -1362,6 +1362,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		break;
 
 	case CHIP_TONGA:
+	case CHIP_FIJI:
 		device_queue_manager_init_vi_tonga(&dqm->ops_asic_specific);
 		break;
 	}

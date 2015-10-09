@@ -127,8 +127,12 @@ enum cache_policy {
 enum asic_family_type {
 	CHIP_KAVERI = 0,
 	CHIP_CARRIZO,
-	CHIP_TONGA
+	CHIP_TONGA,
+	CHIP_FIJI
 };
+
+#define KFD_IS_VI(chip) ((chip) >= CHIP_CARRIZO && (chip) <= CHIP_FIJI)
+#define KFD_IS_DGPU(chip) ((chip) >= CHIP_TONGA && (chip) <= CHIP_FIJI)
 
 struct kfd_event_interrupt_class {
 	bool (*interrupt_isr)(struct kfd_dev *dev, const uint32_t *ih_ring_entry);

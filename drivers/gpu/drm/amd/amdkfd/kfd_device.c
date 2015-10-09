@@ -67,6 +67,17 @@ static const struct kfd_device_info tonga_device_info = {
 	.is_need_iommu_device = false
 };
 
+static const struct kfd_device_info fiji_device_info = {
+	.asic_family = CHIP_FIJI,
+	.max_pasid_bits = 16,
+	.max_no_of_hqd  = 24,
+	.ih_ring_entry_size = 4 * sizeof(uint32_t),
+	.event_interrupt_class = &event_interrupt_class_cik,
+	.num_of_watch_points = 4,
+	.mqd_size_aligned = MQD_SIZE_ALIGNED,
+	.is_need_iommu_device = false
+}
+;
 struct kfd_deviceid {
 	unsigned short did;
 	const struct kfd_device_info *device_info;
@@ -120,7 +131,8 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x692B, &tonga_device_info   },	/* Tonga */
 	{ 0x692F, &tonga_device_info   },	/* Tonga */
 	{ 0x6938, &tonga_device_info   },	/* Tonga */
-	{ 0x6939, &tonga_device_info   }	/* Tonga */
+	{ 0x6939, &tonga_device_info   },	/* Tonga */
+	{ 0x7300, &fiji_device_info    }	/* Fiji */
 };
 
 static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,
