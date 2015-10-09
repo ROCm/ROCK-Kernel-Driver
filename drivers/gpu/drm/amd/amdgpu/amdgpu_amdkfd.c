@@ -56,6 +56,7 @@ bool amdgpu_amdkfd_load_interface(struct amdgpu_device *rdev)
 		kfd2kgd = amdgpu_amdkfd_gfx_8_0_get_functions();
 		break;
 	case CHIP_TONGA:
+	case CHIP_FIJI:
 		kfd2kgd = amdgpu_amdkfd_gfx_8_0_tonga_get_functions();
 		break;
 	default:
