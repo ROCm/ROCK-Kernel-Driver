@@ -808,6 +808,12 @@ struct drm_amdgpu_cs_chunk_data {
 /* RAS MASK: FUSE */
 #define AMDGPU_INFO_RAS_ENABLED_FUSE			(1 << 13)
 
+/* Hybrid Stack Specific Defs*/
+/* gpu capability */
+#define AMDGPU_INFO_CAPABILITY			0x50
+/* virtual range */
+#define AMDGPU_INFO_VIRTUAL_RANGE		0x51
+
 #define AMDGPU_INFO_MMR_SE_INDEX_SHIFT	0
 #define AMDGPU_INFO_MMR_SE_INDEX_MASK	0xff
 #define AMDGPU_INFO_MMR_SH_INDEX_SHIFT	8
@@ -863,6 +869,11 @@ struct drm_amdgpu_info {
 			/** For future use, no flags defined so far */
 			__u32 flags;
 		} read_mmr_reg;
+
+		struct {
+			uint32_t aperture;
+			uint32_t _pad;
+		} virtual_range;
 
 		struct drm_amdgpu_query_fw query_fw;
 
@@ -1081,6 +1092,16 @@ struct drm_amdgpu_info_vce_clock_table {
 #define AMDGPU_FAMILY_AI			141 /* Vega10 */
 #define AMDGPU_FAMILY_RV			142 /* Raven */
 #define AMDGPU_FAMILY_NV			143 /* Navi10 */
+
+/**
+ *  Definition of System Unified Address (SUA) apertures
+ */
+#define AMDGPU_SUA_APERTURE_PRIVATE    1
+#define AMDGPU_SUA_APERTURE_SHARED     2
+struct drm_amdgpu_virtual_range {
+	uint64_t start;
+	uint64_t end;
+};
 
 /*
  * Definition of free sync enter and exit signals
