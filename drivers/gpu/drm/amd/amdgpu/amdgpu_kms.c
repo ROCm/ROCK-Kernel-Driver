@@ -565,6 +565,24 @@ int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 		return -EINVAL;
 
 	switch (info->query) {
+	case AMDGPU_INFO_VIRTUAL_RANGE: {
+		struct drm_amdgpu_virtual_range range_info;
+
+		switch (info->virtual_range.aperture) {
+		case AMDGPU_SUA_APERTURE_PRIVATE:
+			range_info.start = adev->gmc.private_aperture_start;
+			range_info.end = adev->gmc.private_aperture_end;
+			break;
+		case AMDGPU_SUA_APERTURE_SHARED:
+			range_info.start = adev->gmc.shared_aperture_start;
+			range_info.end = adev->gmc.shared_aperture_end;
+			break;
+		default:
+			return -EINVAL;
+		}
+		return copy_to_user(out, &range_info,
+				min((size_t)size, sizeof(range_info))) ? -EFAULT : 0;
+	}
 	case AMDGPU_INFO_ACCEL_WORKING:
 		ui32 = adev->accel_working;
 		return copy_to_user(out, &ui32, min(size, 4u)) ? -EFAULT : 0;
