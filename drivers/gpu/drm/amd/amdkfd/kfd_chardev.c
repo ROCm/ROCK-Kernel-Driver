@@ -932,10 +932,10 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 	/* Map dGPU gtt BO to kernel */
 	if (args->event_page_offset != 0) {
 		i = 0;
-		do {
-			kfd = kfd_topology_enum_kfd_devices(i);
+		while (kfd_topology_enum_kfd_devices(i, &kfd) == 0) {
+			i++;
 			if (!kfd)
-				break;
+				continue; /* Skip non GPU devices */
 			if (KFD_IS_DGPU(kfd->device_info->asic_family)) {
 				mutex_lock(&p->mutex);
 				pdd = kfd_bind_process_to_device(kfd, p);
@@ -960,8 +960,7 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 						&args->event_slot_index,
 						kern_addr);
 			}
-			i++;
-		} while (kfd);
+		}
 	} else {
 		err = kfd_event_create(filp, p, args->event_type,
 					args->auto_reset != 0,
@@ -1593,15 +1592,14 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 		vma->vm_pgoff = vma->vm_pgoff ^ KFD_MMAP_MAP_BO_MASK;
 
 		i = 0;
-		do {
-			kfd = kfd_topology_enum_kfd_devices(i);
+		while (kfd_topology_enum_kfd_devices(i, &kfd) == 0) {
+			i++;
 			if (!kfd)
-				break;
+				continue; /* Skip non GPU devices */
 			retval = kfd->kfd2kgd->mmap_bo(kfd->kgd, vma);
 			if (retval != 0)
 				return retval;
-			i++;
-		} while (kfd);
+		}
 		return retval;
 	} else if ((vma->vm_pgoff & KFD_MMAP_RESERVED_MEM_MASK) ==
 			KFD_MMAP_RESERVED_MEM_MASK) {
