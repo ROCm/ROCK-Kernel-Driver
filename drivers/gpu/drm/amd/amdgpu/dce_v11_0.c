@@ -2384,6 +2384,18 @@ static u32 dce_v11_0_pick_pll(struct drm_crtc *crtc)
 	u32 pll_in_use;
 	int pll;
 
+	if ((adev->asic_type == CHIP_ELLESMERE) ||
+	    (adev->asic_type == CHIP_BAFFIN)) {
+		if (ENCODER_MODE_IS_DP(amdgpu_atombios_encoder_get_encoder_mode(amdgpu_crtc->encoder)))
+			return ATOM_DP_DTO;
+		/* use the same PPLL for all monitors with the same clock */
+		pll = amdgpu_pll_get_shared_nondp_ppll(crtc);
+		if (pll != ATOM_PPLL_INVALID)
+			return pll;
+
+		return ATOM_COMBOPHY_PLL0 + amdgpu_crtc->crtc_id;
+	}
+
 	if (ENCODER_MODE_IS_DP(amdgpu_atombios_encoder_get_encoder_mode(amdgpu_crtc->encoder))) {
 		if (adev->clock.dp_extclk)
 			/* skip PPLL programming if using ext clock */
