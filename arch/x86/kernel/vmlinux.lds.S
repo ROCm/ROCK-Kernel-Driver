@@ -338,7 +338,9 @@ SECTIONS
 
 	/* Sections to be discarded */
 	DISCARDS
+#ifndef CONFIG_UNWIND_INFO
 	/DISCARD/ : { *(.eh_frame) }
+#endif
 }
 
 
@@ -370,7 +372,7 @@ INIT_PER_CPU(irq_stack_union);
 
 #endif /* CONFIG_X86_32 */
 
-#ifdef CONFIG_KEXEC
+#ifdef CONFIG_KEXEC_CORE
 #include <asm/kexec.h>
 
 . = ASSERT(kexec_control_code_size <= KEXEC_CONTROL_CODE_MAX_SIZE,

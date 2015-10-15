@@ -40,6 +40,7 @@ static inline void load_mm_cr4(struct mm_struct *mm)
 static inline void load_mm_cr4(struct mm_struct *mm) {}
 #endif
 
+#ifdef CONFIG_MODIFY_LDT_SYSCALL
 /*
  * ldt_structs can be allocated, used, and freed, but they are never
  * modified while live.
@@ -55,8 +56,23 @@ struct ldt_struct {
 	int size;
 };
 
+/*
+ * Used for LDT copy/destruction.
+ */
+int init_new_context(struct task_struct *tsk, struct mm_struct *mm);
+void destroy_context(struct mm_struct *mm);
+#else	/* CONFIG_MODIFY_LDT_SYSCALL */
+static inline int init_new_context(struct task_struct *tsk,
+				   struct mm_struct *mm)
+{
+	return 0;
+}
+static inline void destroy_context(struct mm_struct *mm) {}
+#endif
+
 static inline void load_mm_ldt(struct mm_struct *mm)
 {
+#ifdef CONFIG_MODIFY_LDT_SYSCALL
 	struct ldt_struct *ldt;
 
 	/* lockless_dereference synchronizes with smp_store_release */
@@ -80,16 +96,12 @@ static inline void load_mm_ldt(struct mm_struct *mm)
 		set_ldt(ldt->entries, ldt->size);
 	else
 		clear_LDT();
+#else
+	clear_LDT();
+#endif
 
 	DEBUG_LOCKS_WARN_ON(preemptible());
 }
-
-/*
- * Used for LDT copy/destruction.
- */
-int init_new_context(struct task_struct *tsk, struct mm_struct *mm);
-void destroy_context(struct mm_struct *mm);
-
 
 static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
@@ -177,6 +189,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		/* Load per-mm CR4 state */
 		load_mm_cr4(next);
 
+#ifdef CONFIG_MODIFY_LDT_SYSCALL
 		/*
 		 * Load the LDT, if the LDT is different.
 		 *
@@ -205,6 +218,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 			}
 			op++;
 		}
+#endif
 
 		BUG_ON(HYPERVISOR_mmuext_op(_op, op-_op, NULL, DOMID_SELF));
 

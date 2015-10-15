@@ -129,7 +129,7 @@ blktap_ring_vm_close(struct vm_area_struct *vma)
 		blktap_control_destroy_tap(tap);
 }
 
-static struct vm_operations_struct blktap_ring_vm_operations = {
+static const struct vm_operations_struct blktap_ring_vm_operations = {
 	.close    = blktap_ring_vm_close,
 	.fault    = blktap_ring_fault,
 };

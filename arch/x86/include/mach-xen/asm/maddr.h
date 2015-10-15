@@ -147,9 +147,17 @@ static inline paddr_t machine_to_phys(maddr_t machine)
 
 #endif /* !CONFIG_XEN */
 
+/* For now (and just for x86) this is okay: */
+#define pfn_to_gfn pfn_to_mfn
+#define gfn_to_pfn mfn_to_pfn
+
 /* VIRT <-> MACHINE conversion */
 #define virt_to_machine(v)	phys_to_machine(__pa(v))
 #define virt_to_mfn(v)		pfn_to_mfn(__pa(v) >> PAGE_SHIFT)
 #define mfn_to_virt(m)		__va(mfn_to_pfn(m) << PAGE_SHIFT)
+
+/* VIRT <-> GUEST conversion */
+#define virt_to_gfn(v)		pfn_to_gfn(__pa(v) >> PAGE_SHIFT)
+#define gfn_to_virt(m)		__va(gfn_to_pfn(m) << PAGE_SHIFT)
 
 #endif /* _X86_MADDR_H */

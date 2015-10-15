@@ -264,6 +264,25 @@ int ioremap_check_change_attr(unsigned long mfn, unsigned long size,
 	return rc;
 }
 
+static int __ioremap_check_ram(unsigned long start_mfn, unsigned long nr_pages,
+			       void *arg)
+{
+	domid_t *domid = arg;
+	unsigned long i;
+
+	for (i = 0; i < nr_pages; ++i) {
+		unsigned long pfn = mfn_to_local_pfn(start_mfn + i);
+
+		if (pfn_valid(pfn)) {
+			if (!PageReserved(pfn_to_page(pfn)))
+				return 1;
+			*domid = DOMID_SELF;
+		}
+	}
+
+	return 0;
+}
+
 /*
  * Remap an arbitrary physical address space into the kernel virtual
  * address space. It transparently creates kernel huge I/O mapping when
@@ -291,7 +310,6 @@ static void __iomem *__ioremap_caller(resource_size_t phys_addr,
 	int retval;
 	domid_t domid = DOMID_IO;
 	void __iomem *ret_addr;
-	int ram_region;
 
 	/* Don't allow wraparound or zero size */
 	last_addr = phys_addr + size - 1;
@@ -314,22 +332,18 @@ static void __iomem *__ioremap_caller(resource_size_t phys_addr,
 	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
 	 */
-	ram_region = is_initial_xendomain() ? region_is_ram(phys_addr, size)
-					    : -1;
-	last_mfn = PFN_DOWN(last_addr);
-	for (mfn = PFN_DOWN(phys_addr);
-	     ram_region < 0 && mfn <= last_mfn; mfn++) {
-		unsigned long pfn = mfn_to_local_pfn(mfn);
-
-		if (pfn_valid(pfn)) {
-			if (!PageReserved(pfn_to_page(pfn)))
-				ram_region = 1;
-			domid = DOMID_SELF;
-		}
-	}
-	if (WARN_ONCE(ram_region > 0, "ioremap on RAM at %pa - %pa\n",
-		      &phys_addr, &last_addr))
+	mfn      = phys_addr >> PAGE_SHIFT;
+	last_mfn = last_addr >> PAGE_SHIFT;
+	if (is_initial_xendomain())
+		retval = walk_system_ram_range(mfn, last_mfn - mfn + 1, &domid,
+					       __ioremap_check_ram);
+	else
+		retval = __ioremap_check_ram(mfn, last_mfn - mfn + 1, &domid);
+	if (retval == 1) {
+		WARN_ONCE(1, "ioremap on RAM at %pa - %pa\n",
+			  &phys_addr, &last_addr);
 		return NULL;
+	}
 	WARN_ON_ONCE(domid == DOMID_SELF);
 
 	/*

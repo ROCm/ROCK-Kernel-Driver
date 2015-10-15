@@ -58,6 +58,7 @@ static bool __initdata bind_threads;
 struct netbk_rx_cb {
 	unsigned int nr_frags;
 	unsigned int nr_slots;
+	bool coalesce;
 };
 #define netbk_rx_cb(skb) ((struct netbk_rx_cb *)skb->cb)
 
@@ -161,13 +162,16 @@ static inline pending_ring_idx_t nr_pending_reqs(const struct xen_netbk *netbk)
  * request which exceeds this limit it is considered malicious.
  */
 static unsigned int max_tx_slots = XEN_NETIF_NR_SLOTS_MIN;
-module_param(max_tx_slots, uint, 0444);
+module_param(max_tx_slots, uint, S_IRUGO);
 MODULE_PARM_DESC(max_tx_slots, "Maximum number of slots accepted in netfront TX requests");
 
 /* Setting this allows the safe use of this driver without netloop. */
-static bool MODPARM_copy_skb = true;
+static bool __initdata MODPARM_copy_skb = true;
 module_param_named(copy_skb, MODPARM_copy_skb, bool, 0);
 MODULE_PARM_DESC(copy_skb, "Copy data received from netfront without netloop");
+static int always_coalesce = -1;
+module_param(always_coalesce, bint, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(always_coalesce, "Always fully coalesce RX data");
 static bool MODPARM_permute_returns;
 module_param_named(permute_returns, MODPARM_permute_returns, bool, S_IRUSR|S_IWUSR);
 MODULE_PARM_DESC(permute_returns, "Randomly permute the order in which TX responses are sent to the frontend");
@@ -337,6 +341,80 @@ static struct sk_buff *netbk_copy_skb(struct sk_buff *skb)
 	return NULL;
 }
 
+/*
+ * No locking is required in netbk_mcast_add/del() as they are
+ * only ever invoked in the context of net_tx_action(). An RCU list
+ * is used because netbk_mcast_match() is called asynchronously,
+ * during start_xmit.
+ */
+static int netbk_mcast_add(netif_t *netif, const u8 *addr)
+{
+	struct netbk_mcast_addr *mcast;
+
+	if (netif->fe_mcast_count == NETBK_MCAST_MAX) {
+		net_warn_ratelimited("%s: Too many multicast addresses\n",
+				     netdev_name(netif->dev));
+		return -ENOSPC;
+	}
+
+	mcast = kzalloc(sizeof(*mcast), GFP_ATOMIC);
+	if (!mcast)
+		return -ENOMEM;
+
+	ether_addr_copy(mcast->addr, addr);
+	list_add_tail_rcu(&mcast->entry, &netif->fe_mcast_addr);
+	netif->fe_mcast_count++;
+
+	return 0;
+}
+
+static int netbk_mcast_del(netif_t *netif, const u8 *addr)
+{
+	struct netbk_mcast_addr *mcast;
+
+	list_for_each_entry_rcu(mcast, &netif->fe_mcast_addr, entry) {
+		if (ether_addr_equal(addr, mcast->addr)) {
+			--netif->fe_mcast_count;
+			list_del_rcu(&mcast->entry);
+			kfree_rcu(mcast, rcu);
+			return 0;
+		}
+	}
+
+	return -ESRCH;
+}
+
+static bool netbk_mcast_match(const netif_t *netif, const u8 *addr)
+{
+	const struct netbk_mcast_addr *mcast;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(mcast, &netif->fe_mcast_addr, entry) {
+		if (ether_addr_equal(addr, mcast->addr)) {
+			rcu_read_unlock();
+			return true;
+		}
+	}
+	rcu_read_unlock();
+
+	return false;
+}
+
+void netbk_mcast_addr_list_free(netif_t *netif)
+{
+	/* No need for locking or RCU here: RX and TX are stopped. */
+	while (!list_empty(&netif->fe_mcast_addr)) {
+		struct netbk_mcast_addr *mcast;
+
+		mcast = list_first_entry(&netif->fe_mcast_addr,
+					 struct netbk_mcast_addr,
+					 entry);
+		--netif->fe_mcast_count;
+		list_del(&mcast->entry);
+		kfree(mcast);
+	}
+}
+
 static inline unsigned int netbk_max_required_rx_slots(const netif_t *netif)
 {
 	return netif->can_sg || netif->gso || netif->gso6
@@ -382,7 +460,7 @@ static unsigned int netbk_count_slots(const struct skb_shared_info *shinfo,
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
-	unsigned int group = GET_GROUP_INDEX(netif);
+	unsigned int group = GET_GROUP_INDEX(netif), slots;
 	struct xen_netbk_rx *netbk;
 
 	BUG_ON(skb->dev != dev);
@@ -396,15 +474,31 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (unlikely(!netif_schedulable(netif) || netbk_queue_full(netif)))
 		goto drop;
 
-	/*
-	 * Copy the packet here if it's destined for a flipping interface
-	 * but isn't flippable (e.g. extra references to data).
-	 * XXX For now we also copy skbuffs whose head crosses a page
-	 * boundary, because netbk_gop_skb can't handle them.
-	 */
-	if (!netif->copying_receiver ||
-	    ((skb_headlen(skb) + offset_in_page(skb->data)) >= PAGE_SIZE)) {
+	if (netif->mcast && skb->pkt_type == PACKET_MULTICAST) {
+		const struct ethhdr *eth = (struct ethhdr *)skb->data;
+
+		if (!netbk_mcast_match(netif, eth->h_dest))
+			goto drop;
+	}
+
+	netbk_rx_cb(skb)->coalesce = false;
+	if (netif->copying_receiver) {
+		slots = 1 + netbk_count_slots(skb_shinfo(skb), true);
+		if (always_coalesce || slots >= XEN_NETIF_NR_SLOTS_MIN ||
+		    offset_in_page(skb->data) + skb_headlen(skb) > PAGE_SIZE) {
+			netbk_rx_cb(skb)->coalesce = true;
+			netif->nr_coalesced_skbs++;
+			slots = PFN_UP(skb->len);
+		}
+	} else {
+		/*
+		 * Copy the packet here if it's destined for a flipping
+		 * interface but isn't flippable (e.g. extra references to
+		 * data or head crossing a page boundary).
+		 * XXX For now, copy always.
+		 */
 		struct sk_buff *nskb = netbk_copy_skb(skb);
+
 		if ( unlikely(nskb == NULL) )
 			goto drop;
 		/* Copy only the header fields we use in this driver. */
@@ -412,12 +506,12 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		nskb->ip_summed = skb->ip_summed;
 		dev_kfree_skb(skb);
 		skb = nskb;
+		netif->nr_copied_rx_skbs++;
+		slots = 1 + netbk_count_slots(skb_shinfo(nskb), false);
 	}
 
 	netbk_rx_cb(skb)->nr_frags = skb_shinfo(skb)->nr_frags;
-	netbk_rx_cb(skb)->nr_slots = 1 + !!skb_is_gso(skb) +
-				     netbk_count_slots(skb_shinfo(skb),
-						       netif->copying_receiver);
+	netbk_rx_cb(skb)->nr_slots = slots + !!skb_is_gso(skb);
 	netif->rx_req_cons_peek += netbk_rx_cb(skb)->nr_slots;
 	netif_get(netif);
 
@@ -484,6 +578,79 @@ struct netrx_pending_operations {
 	struct netbk_rx_meta *meta;
 };
 
+static void set_copy_source(gnttab_copy_t *cop, const struct page *page)
+{
+	struct xen_netbk *netbk;
+	unsigned int idx;
+
+	netif_get_pg_ext(page, netbk, idx);
+	if (netbk) {
+		struct pending_tx_info *src_pend;
+		unsigned int grp;
+
+		src_pend = &netbk->tx.pending_info[idx];
+		grp = GET_GROUP_INDEX(src_pend->netif);
+		BUG_ON(netbk != &xen_netbk[grp] && grp != UINT_MAX);
+		cop->source.domid = src_pend->netif->domid;
+		cop->source.u.ref = src_pend->req.gref;
+		cop->flags |= GNTCOPY_source_gref;
+	} else {
+		cop->source.domid = DOMID_SELF;
+		cop->source.u.gmfn = pfn_to_mfn(page_to_pfn(page));
+	}
+}
+
+struct netrx_coalesce {
+	netif_rx_request_t *req;
+	struct netbk_rx_meta *meta;
+	unsigned int nr;
+};
+
+/* Set up coalescing grant operations for this fragment. */
+static void netbk_coalesce_frag(netif_t *netif,
+				struct netrx_pending_operations *npo,
+				struct netrx_coalesce *rxc,
+				struct page *page, unsigned int size,
+				unsigned int offset)
+{
+	struct netbk_rx_meta *meta = rxc->meta;
+
+	while (size) {
+		gnttab_copy_t *cop;
+		unsigned int limit;
+
+		if (meta->frag.size == PAGE_SIZE) {
+			rxc->req = RING_GET_REQUEST(&netif->rx,
+						    netif->rx.req_cons + rxc->nr++);
+			meta = npo->meta + npo->meta_prod++;
+			meta->frag.size = 0;
+			meta->copy = 0;
+			meta->tail = 0;
+			meta->id = rxc->req->id;
+		}
+		meta->copy++;
+		cop = npo->copy + npo->copy_prod++;
+		cop->flags = GNTCOPY_dest_gref;
+		set_copy_source(cop, page);
+		cop->source.offset = offset;
+		cop->dest.domid = netif->domid;
+		cop->dest.offset = meta->frag.size;
+		cop->dest.u.ref = rxc->req->gref;
+		limit = PAGE_SIZE - max_t(unsigned int, offset,
+					  meta->frag.size);
+		cop->len = min(size, limit);
+		size -= cop->len;
+		meta->frag.size += cop->len;
+		if ((offset += cop->len) == PAGE_SIZE) {
+			++page;
+			offset = 0;
+		}
+	}
+
+	meta->tail++;
+	rxc->meta = meta;
+}
+
 /* Set up the grant operations for this fragment.  If it's a flipping
    interface, we also set up the unmap request from here. */
 static void netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
@@ -500,29 +667,12 @@ static void netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 
 	req = RING_GET_REQUEST(&netif->rx, netif->rx.req_cons + i);
 	if (netif->copying_receiver) {
-		struct xen_netbk *netbk;
-		unsigned int idx;
-
 		/* The fragment needs to be copied rather than
 		   flipped. */
 		meta->copy++;
 		copy_gop = npo->copy + npo->copy_prod++;
 		copy_gop->flags = GNTCOPY_dest_gref;
-		netif_get_pg_ext(page, netbk, idx);
-		if (netbk) {
-			struct pending_tx_info *src_pend;
-			unsigned int grp;
-
-			src_pend = &netbk->tx.pending_info[idx];
-			grp = GET_GROUP_INDEX(src_pend->netif);
-			BUG_ON(netbk != &xen_netbk[grp] && grp != UINT_MAX);
-			copy_gop->source.domid = src_pend->netif->domid;
-			copy_gop->source.u.ref = src_pend->req.gref;
-			copy_gop->flags |= GNTCOPY_source_gref;
-		} else {
-			copy_gop->source.domid = DOMID_SELF;
-			copy_gop->source.u.gmfn = virt_to_mfn(page_address(page));
-		}
+		set_copy_source(copy_gop, page);
 		copy_gop->source.offset = offset;
 		copy_gop->dest.domid = netif->domid;
 		copy_gop->dest.offset = i ? meta->frag.size : 0;
@@ -553,7 +703,7 @@ static void netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 		}
 
 		gop = npo->trans - npo->trans_prod++;
-		gop->mfn = virt_to_mfn(page_address(page));
+		gop->mfn = pfn_to_mfn(page_to_pfn(page));
 		gop->domid = netif->domid;
 		gop->ref = req->gref;
 	}
@@ -569,9 +719,42 @@ static unsigned int netbk_gop_skb(struct sk_buff *skb,
 
 	head_meta = npo->meta + npo->meta_prod++;
 	head_meta->frag.page_offset = skb_shinfo(skb)->gso_type;
-	head_meta->frag.size = skb_shinfo(skb)->gso_size;
 	head_meta->copy = 0;
-	n = !!head_meta->frag.size + 1;
+	n = !!skb_shinfo(skb)->gso_size + 1;
+
+	if (netbk_rx_cb(skb)->coalesce) {
+		struct netrx_coalesce rxc = {
+			.req = RING_GET_REQUEST(&netif->rx,
+						netif->rx.req_cons),
+			.meta = head_meta, .nr = n
+		};
+
+		head_meta->id = rxc.req->id;
+		head_meta->frag.size = 0;
+		head_meta->tail = 0;
+		netbk_coalesce_frag(netif, npo, &rxc,
+				    virt_to_page(skb->data), skb_headlen(skb),
+				    offset_in_page(skb->data));
+		/* Head must not exceed PAGE_SIZE. */
+		BUG_ON(rxc.meta != head_meta);
+
+		for (i = 0; i < nr_frags; i++) {
+			const skb_frag_t *frag = skb_shinfo(skb)->frags + i;
+			unsigned int offset = frag->page_offset;
+
+			netbk_coalesce_frag(netif, npo, &rxc,
+					    skb_frag_page(frag) +
+						PFN_DOWN(offset),
+					    skb_frag_size(frag),
+					    offset & ~PAGE_MASK);
+		}
+
+		head_meta->frag.size = skb_shinfo(skb)->gso_size;
+		netif->rx.req_cons += rxc.nr;
+		return rxc.nr;
+	}
+
+	head_meta->frag.size = skb_shinfo(skb)->gso_size;
 
 	for (i = 0; i < nr_frags; i++, n++) {
 		const skb_frag_t *frag = skb_shinfo(skb)->frags + i;
@@ -712,8 +895,8 @@ static unsigned int netbk_add_frag_responses(netif_t *netif, int status,
 {
 	unsigned int i, n;
 
-	for (n = i = 0; i < nr_frags; meta++, n++) {
-		int flags = (meta->tail && ++i == nr_frags)
+	for (i = meta[-1].tail - 1, n = 0; i < nr_frags; meta++, n++) {
+		int flags = ((i += meta->tail) == nr_frags)
 			    ? 0 : XEN_NETRXF_more_data;
 
 		make_rx_response(netif, meta->id, status,
@@ -845,7 +1028,8 @@ static void net_rx_action(unsigned long group)
 		skb->dev->stats.tx_packets++;
 
 		id = netbk->meta[npo.meta_cons].id;
-		flags = nr_frags ? XEN_NETRXF_more_data : 0;
+		flags = 1 + nr_frags - netbk->meta[npo.meta_cons].tail
+			? XEN_NETRXF_more_data : 0;
 
 		switch (skb->ip_summed) {
 		case CHECKSUM_PARTIAL: /* local packet? */
@@ -862,7 +1046,11 @@ static void net_rx_action(unsigned long group)
 		else
 			offset = offset_in_page(skb->data);
 		resp = make_rx_response(netif, id, status, offset,
-					skb_headlen(skb), flags);
+					netbk_rx_cb(skb)->coalesce
+				        ? min_t(unsigned int, skb->len,
+						PAGE_SIZE)
+				        : skb_headlen(skb),
+					flags);
 
 		if (netbk->meta[npo.meta_cons].frag.size) {
 			struct netif_extra_info *gso =
@@ -1139,7 +1327,7 @@ inline static void net_tx_action_dealloc(struct xen_netbk *netbk)
 
 			pending_idx = inuse - netbk->tx.pending_inuse;
 
-			pending_tx_info[pending_idx].netif->nr_copied_skbs++;
+			pending_tx_info[pending_idx].netif->nr_copied_tx_skbs++;
 
 			switch (copy_pending_req(netbk, pending_idx)) {
 			case 0:
@@ -1670,11 +1858,30 @@ static void net_tx_action(unsigned long group)
 
 		memset(extras, 0, sizeof(extras));
 		if (txreq.flags & XEN_NETTXF_extra_info) {
+			const struct netif_extra_info *extra = NULL;
+
 			work_to_do = netbk_get_extras(netif, extras,
 						      work_to_do);
 			i = netif->tx.req_cons;
 			if (unlikely(work_to_do < 0))
 				continue;
+
+			ret = 0;
+			if (extras[XEN_NETIF_EXTRA_TYPE_MCAST_ADD - 1].type) {
+				extra = &extras[XEN_NETIF_EXTRA_TYPE_MCAST_ADD - 1];
+				ret |= netbk_mcast_add(netif, extra->u.mcast.addr);
+			}
+			if (extras[XEN_NETIF_EXTRA_TYPE_MCAST_DEL - 1].type) {
+				extra = &extras[XEN_NETIF_EXTRA_TYPE_MCAST_DEL - 1];
+				ret |= netbk_mcast_del(netif, extra->u.mcast.addr);
+			}
+			if (extra) {
+				make_tx_response(netif, &txreq,
+						 ret == 0 ? XEN_NETIF_RSP_OKAY
+							  : XEN_NETIF_RSP_ERROR,
+						 NULL);
+				continue;
+			}
 		}
 
 		txslot = netbk->tx.slots;
@@ -2105,6 +2312,14 @@ static int __init netback_init(void)
 			max_tx_slots, XEN_NETIF_NR_SLOTS_MIN);
 		max_tx_slots = XEN_NETIF_NR_SLOTS_MIN;
 	}
+
+	if (always_coalesce < 0)
+		always_coalesce = HYPERVISOR_xen_version(XENVER_version, NULL)
+#ifdef CONFIG_SUSE_KERNEL /* Assume SUSE netback runs on a patched 4.5 Xen. */
+				  >= 0x00040005;
+#else
+				  >= 0x00040006;
+#endif
 
 	group = netbk_nr_groups;
 	if (!netbk_nr_groups)

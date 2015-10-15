@@ -59,7 +59,7 @@ __setup("cpu0_hotplug", enable_cpu0_hotplug);
  *
  * This is only called for debugging CPU offline/online feature.
  */
-int __ref _debug_hotplug_cpu(int cpu, int action)
+int _debug_hotplug_cpu(int cpu, int action)
 {
 	struct device *dev = get_cpu_device(cpu);
 	int ret;
@@ -106,7 +106,7 @@ static int __init debug_hotplug_cpu(void)
 late_initcall_sync(debug_hotplug_cpu);
 #endif /* CONFIG_DEBUG_HOTPLUG_CPU0 */
 
-int __ref arch_register_cpu(int num)
+int arch_register_cpu(int num)
 {
 #ifndef cpu0_hotpluggable
 	struct cpuinfo_x86 *c = &cpu_data(num);

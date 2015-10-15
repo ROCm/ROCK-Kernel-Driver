@@ -24,16 +24,6 @@
  */
 #define NR_VECTORS			 256
 
-#define	FIRST_VM86_IRQ			   3
-#define LAST_VM86_IRQ			  15
-
-#ifndef __ASSEMBLY__
-static inline int invalid_vm86_irq(int irq)
-{
-	return irq < FIRST_VM86_IRQ || irq > LAST_VM86_IRQ;
-}
-#endif
-
 /*
  * Size the maximum number of interrupts.
  *

@@ -214,7 +214,7 @@ static void copy_buff_to_pages(void *buff, pending_req_t *pending_req,
 				buf_off += offset - buf_off;
 			}
 			if (buf_off + len > offset + length)
-				len -= offset + length - buf_off;
+				len = offset + length - buf_off;
 			memcpy((void *)vaddr(pending_req, i) + off,
 			       buff + buf_off, len);
 		}

@@ -1568,6 +1568,7 @@ int fcntl_getlease(struct file *filp)
  * 			    desired lease.
  * @dentry:	dentry to check
  * @arg:	type of lease that we're trying to acquire
+ * @flags:	current lock flags
  *
  * Check to see if there's an existing open fd on this file that would
  * conflict with the lease we're trying to set.
@@ -2558,8 +2559,8 @@ static void lock_get_status(struct seq_file *f, struct file_lock *fl,
 	if (inode) {
 		/* userspace relies on this representation of dev_t */
 		seq_printf(f, "%d %02x:%02x:%ld ", fl_pid,
-				MAJOR(inode->i_sb->s_dev),
-				MINOR(inode->i_sb->s_dev), inode->i_ino);
+				MAJOR(inode_get_dev(inode)),
+				MINOR(inode_get_dev(inode)), inode->i_ino);
 	} else {
 		seq_printf(f, "%d <none>:0 ", fl_pid);
 	}

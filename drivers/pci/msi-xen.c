@@ -546,6 +546,7 @@ static int msi_capability_init(struct pci_dev *dev, int nvec)
 	pci_msi_set_enable(dev, 1);
 	dev->msi_enabled = 1;
 
+	pcibios_free_irq(dev);
 	dev->irq = dev_entry->e.pirq = pirq;
 	populate_msi_sysfs(dev);
 	return 0;
@@ -632,9 +633,9 @@ static int msix_capability_init(struct pci_dev *dev,
 	pci_intx_for_msi(dev, 0);
 	dev->msix_enabled = 1;
 	populate_msi_sysfs(dev);
-
 	pci_msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_MASKALL, 0);
 
+	pcibios_free_irq(dev);
 	return 0;
 }
 
@@ -698,6 +699,9 @@ int pci_msi_vec_count(struct pci_dev *dev)
 	if (!dev->msi_cap)
 		return -EINVAL;
 
+	if (!msi_multi_vec_supported)
+		return 1;
+
 	pci_read_config_word(dev, dev->msi_cap + PCI_MSI_FLAGS, &msgctl);
 	ret = 1 << ((msgctl & PCI_MSI_FLAGS_QMASK) >> 1);
 
@@ -724,8 +728,9 @@ void pci_msi_shutdown(struct pci_dev *dev)
 	}
 
 	pirq = dev->irq;
-	/* Restore dev->irq to its default pin-assertion vector */
+	/* Restore dev->irq to its default pin-assertion irq */
 	dev->irq = msi_dev_entry->default_irq;
+	pcibios_alloc_irq(dev);
 	msi_unmap_pirq(dev, pirq, -msi_dev_entry->e.entry_nr,
 		       msi_dev_entry->owner);
 	msi_dev_entry->owner = DOMID_IO;
@@ -908,6 +913,7 @@ void pci_msix_shutdown(struct pci_dev *dev)
 		pci_intx_for_msi(dev, 1);
 	}
 	dev->msix_enabled = 0;
+	pcibios_alloc_irq(dev);
 }
 
 void pci_disable_msix(struct pci_dev *dev)
@@ -971,10 +977,7 @@ int pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec)
 	if (minvec <= 0 || maxvec < minvec)
 		return -ERANGE;
 
-	if (msi_multi_vec_supported)
-		nvec = pci_msi_vec_count(dev);
-	else
-		nvec = 1;
+	nvec = pci_msi_vec_count(dev);
 	if (nvec < 0)
 		return nvec;
 	else if (nvec < minvec)

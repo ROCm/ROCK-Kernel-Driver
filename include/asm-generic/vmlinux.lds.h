@@ -379,6 +379,8 @@
 		MEM_KEEP(exit.rodata)					\
 	}								\
 									\
+	EH_FRAME							\
+									\
 	/* Built-in module parameters. */				\
 	__param : AT(ADDR(__param) - LOAD_OFFSET) {			\
 		VMLINUX_SYMBOL(__start___param) = .;			\
@@ -412,12 +414,10 @@
  * during second ld run in second ld pass when generating System.map */
 #define TEXT_TEXT							\
 		ALIGN_FUNCTION();					\
-		*(.text.hot)						\
-		*(.text .text.fixup)					\
+		*(.text.hot .text .text.fixup .text.unlikely)		\
 		*(.ref.text)						\
 	MEM_KEEP(init.text)						\
 	MEM_KEEP(exit.text)						\
-		*(.text.unlikely)
 
 
 /* sched.text is aling to function alignment to secure we have same
@@ -828,3 +828,23 @@
 	BSS(bss_align)							\
 	. = ALIGN(stop_align);						\
 	VMLINUX_SYMBOL(__bss_stop) = .;
+
+#ifdef CONFIG_STACK_UNWIND
+#define EH_FRAME							\
+		/* Unwind data binary search table */			\
+		. = ALIGN(8);						\
+		.eh_frame_hdr : AT(ADDR(.eh_frame_hdr) - LOAD_OFFSET) {	\
+			VMLINUX_SYMBOL(__start_unwind_hdr) = .;		\
+			*(.eh_frame_hdr)				\
+			VMLINUX_SYMBOL(__end_unwind_hdr) = .;		\
+		}							\
+		/* Unwind data */					\
+		. = ALIGN(8);						\
+		.eh_frame : AT(ADDR(.eh_frame) - LOAD_OFFSET) {		\
+			VMLINUX_SYMBOL(__start_unwind) = .;		\
+			*(.eh_frame)					\
+			VMLINUX_SYMBOL(__end_unwind) = .;		\
+		}
+#else
+#define EH_FRAME
+#endif

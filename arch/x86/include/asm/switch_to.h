@@ -100,12 +100,22 @@ do {									\
 #define __switch_canary_iparam
 #endif	/* CC_STACKPROTECTOR */
 
+/* The stack unwind code needs this but it pollutes traces otherwise */
+#ifdef CONFIG_UNWIND_INFO
+#define THREAD_RETURN_SYM \
+	".globl thread_return\n" \
+	"thread_return:\n\t"
+#else
+#define THREAD_RETURN_SYM
+#endif
+
 /* Save restore flags to clear handle leaking NT */
 #define switch_to(prev, next, last) \
 	asm volatile(SAVE_CONTEXT					  \
 	     "movq %%rsp,%P[threadrsp](%[prev])\n\t" /* save RSP */	  \
 	     "movq %P[threadrsp](%[next]),%%rsp\n\t" /* restore RSP */	  \
 	     "call __switch_to\n\t"					  \
+	     THREAD_RETURN_SYM						  \
 	     "movq "__percpu_arg([current_task])",%%rsi\n\t"		  \
 	     __switch_canary						  \
 	     "movq %P[thread_info](%%rsi),%%r8\n\t"			  \

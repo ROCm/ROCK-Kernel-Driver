@@ -23,8 +23,6 @@ static int pcifront_enable_irq(struct pci_dev *dev)
 	return 0;
 }
 
-extern u8 pci_cache_line_size;
-
 static int __init pcifront_x86_stub_init(void)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
@@ -36,11 +34,14 @@ static int __init pcifront_x86_stub_init(void)
 	pr_info("PCI: setting up Xen PCI frontend stub\n");
 
 	/* Copied from arch/i386/pci/common.c */
-	pci_cache_line_size = 32 >> 2;
-	if (c->x86 >= 6 && c->x86_vendor == X86_VENDOR_AMD)
-		pci_cache_line_size = 64 >> 2;	/* K7 & K8 */
-	else if (c->x86 > 6 && c->x86_vendor == X86_VENDOR_INTEL)
-		pci_cache_line_size = 128 >> 2;	/* P4 */
+	if (c->x86_clflush_size > 0) {
+		pci_dfl_cache_line_size = c->x86_clflush_size >> 2;
+		printk(KERN_DEBUG "PCI: pci_cache_line_size set to %d bytes\n",
+			pci_dfl_cache_line_size << 2);
+	} else {
+ 		pci_dfl_cache_line_size = 32 >> 2;
+		printk(KERN_DEBUG "PCI: Unknown cacheline size. Setting to 32 bytes\n");
+	}
 
 	/* On x86, we need to disable the normal IRQ routing table and
 	 * just ask the backend

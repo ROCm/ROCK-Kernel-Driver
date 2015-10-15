@@ -488,7 +488,7 @@ static ssize_t balloon_write(struct file *file, const char __user *buffer,
 
 static int balloon_show(struct seq_file *m, void *v)
 {
-	return seq_printf(m,
+	seq_printf(m,
 		"Current allocation: %8lu kB\n"
 		"Requested target:   %8lu kB\n"
 		"Minimum target:     %8lu kB\n"
@@ -501,6 +501,7 @@ static int balloon_show(struct seq_file *m, void *v)
 		PAGES2KB(balloon_num_physpages()),
 		PAGES2KB(bs.balloon_low), PAGES2KB(bs.balloon_high),
 		PAGES2KB(bs.driver_pages));
+	return 0;
 }
 
 static int balloon_open(struct inode *inode, struct file *file)

@@ -98,7 +98,7 @@ enum xenstore_init xen_store_domain_type;
 EXPORT_SYMBOL_GPL(xen_store_domain_type);
 #endif
 
-static unsigned long xen_store_mfn;
+static unsigned long xen_store_gfn;
 
 extern struct mutex xenwatch_mutex;
 
@@ -1187,7 +1187,7 @@ static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
 	if ((size > PAGE_SIZE) || (vma->vm_pgoff != 0))
 		return -EINVAL;
 
-	if (remap_pfn_range(vma, vma->vm_start, mfn_to_pfn(xen_store_mfn),
+	if (remap_pfn_range(vma, vma->vm_start, mfn_to_pfn(xen_store_gfn),
 			    size, vma->vm_page_prot))
 		return -EAGAIN;
 
@@ -1196,7 +1196,8 @@ static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
 
 static int xsd_kva_show(struct seq_file *m, void *v)
 {
-	return seq_printf(m, "0x%p", xen_store_interface);
+	seq_printf(m, "0x%p", xen_store_interface);
+	return 0;
 }
 
 static int xsd_kva_open(struct inode *inode, struct file *file)
@@ -1214,7 +1215,8 @@ static const struct file_operations xsd_kva_fops = {
 
 static int xsd_port_show(struct seq_file *m, void *v)
 {
-	return seq_printf(m, "%d", xen_store_evtchn);
+	seq_printf(m, "%d", xen_store_evtchn);
+	return 0;
 }
 
 static int xsd_port_open(struct inode *inode, struct file *file)
@@ -1255,8 +1257,8 @@ int xenbus_conn(domid_t remote_dom, grant_ref_t *grant_ref,
 		goto fail0;
 	*local_port = xen_store_evtchn = alloc_unbound.port;
 
-	/* keep the old page (xen_store_mfn, xen_store_interface) */
-	rc = gnttab_grant_foreign_access(remote_dom, xen_store_mfn,
+	/* keep the old page (xen_store_gfn, xen_store_interface) */
+	rc = gnttab_grant_foreign_access(remote_dom, xen_store_gfn,
 	                                 GTF_permit_access);
 	if (rc < 0)
 		goto fail1;
@@ -1293,9 +1295,7 @@ static int __init xenstored_local_init(void)
 	if (!page)
 		goto out_err;
 
-	xen_store_mfn = xen_start_info->store_mfn =
-		pfn_to_mfn(virt_to_phys((void *)page) >>
-			   PAGE_SHIFT);
+	xen_store_gfn = xen_start_info->store_mfn = virt_to_gfn((void *)page);
 
 	/* Next allocate a local port which xenstored can bind to */
 	alloc_unbound.dom        = DOMID_SELF;
@@ -1385,7 +1385,7 @@ xenbus_init(void)
 		create_xen_proc_entry("xsd_port", S_IFREG|S_IRUSR,
 				      &xsd_port_fops, NULL);
 #endif
-		xen_store_interface = mfn_to_virt(xen_store_mfn);
+		xen_store_interface = gfn_to_virt(xen_store_gfn);
 	} else {
 #ifndef CONFIG_XEN
 		uint64_t v = 0;
@@ -1397,14 +1397,14 @@ xenbus_init(void)
 		err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
 		if (err)
 			goto out_error;
-		xen_store_mfn = (unsigned long)v;
-		xen_store_interface = ioremap(xen_store_mfn << PAGE_SHIFT,
+		xen_store_gfn = (unsigned long)v;
+		xen_store_interface = ioremap(xen_store_gfn << PAGE_SHIFT,
 					      PAGE_SIZE);
 #endif
 #ifndef MODULE
 		xen_store_evtchn = xen_start_info->store_evtchn;
-		xen_store_mfn = xen_start_info->store_mfn;
-		xen_store_interface = mfn_to_virt(xen_store_mfn);
+		xen_store_gfn = xen_start_info->store_mfn;
+		xen_store_interface = gfn_to_virt(xen_store_gfn);
 #endif
 		atomic_set(&xenbus_xsd_state, XENBUS_XSD_FOREIGN_READY);
 
@@ -1434,12 +1434,12 @@ xenbus_init(void)
 		err = xenstored_local_init();
 		if (err)
 			goto out_error;
-		xen_store_interface = mfn_to_virt(xen_store_mfn);
+		xen_store_interface = gfn_to_virt(xen_store_gfn);
 		break;
 	case XS_PV:
 		xen_store_evtchn = xen_start_info->store_evtchn;
-		xen_store_mfn = xen_start_info->store_mfn;
-		xen_store_interface = mfn_to_virt(xen_store_mfn);
+		xen_store_gfn = xen_start_info->store_mfn;
+		xen_store_interface = gfn_to_virt(xen_store_gfn);
 		break;
 	case XS_HVM:
 		err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
@@ -1449,9 +1449,9 @@ xenbus_init(void)
 		err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
 		if (err)
 			goto out_error;
-		xen_store_mfn = (unsigned long)v;
+		xen_store_gfn = (unsigned long)v;
 		xen_store_interface =
-			xen_remap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
+			xen_remap(xen_store_gfn << PAGE_SHIFT, PAGE_SIZE);
 		break;
 	default:
 		pr_warn("Xenstore state unknown\n");

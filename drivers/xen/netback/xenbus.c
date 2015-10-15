@@ -142,6 +142,14 @@ static int netback_probe(struct xenbus_device *dev,
 			goto abort_transaction;
 		}
 
+		/* We support multicast-control. */
+		err = xenbus_write(xbt, dev->nodename,
+				   "feature-multicast-control", "1");
+		if (err) {
+			message = "writing feature-multicast-control";
+			goto abort_transaction;
+		}
+
 		err = xenbus_transaction_end(xbt, 0);
 	} while (err == -EAGAIN);
 
@@ -480,6 +488,11 @@ static int connect_rings(struct backend_info *be)
 			 "%d", &val) < 0)
 		val = 0;
 	netif->csum6 = !!val;
+
+	if (xenbus_scanf(XBT_NIL, dev->otherend, "request-multicast-control",
+			 "%d", &val) < 0)
+		val = 0;
+	netif->mcast = !!val;
 
 	/* Map the shared frame, irq etc. */
 	err = netif_map(be, tx_ring_ref, rx_ring_ref, evtchn);

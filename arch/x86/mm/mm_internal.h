@@ -14,8 +14,6 @@ unsigned long kernel_physical_mapping_init(unsigned long start,
 					     unsigned long page_size_mask);
 #ifdef CONFIG_X86_64_XEN
 void xen_finish_init_mapping(void);
-#else
-static inline void xen_finish_init_mapping(void) {}
 #endif
 void zone_sizes_init(void);
 
