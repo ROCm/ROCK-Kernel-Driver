@@ -926,7 +926,7 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 	struct kfd_ioctl_create_event_args *args = data;
 	struct kfd_dev *kfd;
 	struct kfd_process_device *pdd;
-	int err, i;
+	int err = -EINVAL, i;
 	void *mem, *kern_addr;
 
 	/* Map dGPU gtt BO to kernel */
