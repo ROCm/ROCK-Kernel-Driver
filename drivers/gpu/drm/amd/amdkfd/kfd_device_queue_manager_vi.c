@@ -151,8 +151,7 @@ static bool set_cache_memory_policy_vi_tonga(struct device_queue_manager *dqm,
 			SH_MEM_ALIGNMENT_MODE_UNALIGNED <<
 				   SH_MEM_CONFIG__ALIGNMENT_MODE__SHIFT |
 			default_mtype << SH_MEM_CONFIG__DEFAULT_MTYPE__SHIFT |
-			ape1_mtype << SH_MEM_CONFIG__APE1_MTYPE__SHIFT |
-			SH_MEM_CONFIG__PRIVATE_ATC_MASK;
+			ape1_mtype << SH_MEM_CONFIG__APE1_MTYPE__SHIFT;
 
 	return true;
 }
@@ -204,6 +203,7 @@ static int register_process_vi_tonga(struct device_queue_manager *dqm,
 			struct qcm_process_device *qpd)
 {
 	struct kfd_process_device *pdd;
+	unsigned int temp;
 
 	BUG_ON(!dqm || !qpd);
 
@@ -223,7 +223,13 @@ static int register_process_vi_tonga(struct device_queue_manager *dqm,
 		qpd->sh_mem_ape1_base = 0;
 	}
 
-	qpd->sh_mem_bases = 0;
+	/* On dGPU we're always in GPUVM64 addressing mode with 64-bit
+	 * aperture addresses. */
+	temp = get_sh_mem_bases_nybble_64(pdd);
+	qpd->sh_mem_bases = compute_sh_mem_bases_64bit(temp);
+
+	pr_debug("kfd: sh_mem_bases nybble: 0x%X and register 0x%X\n",
+		temp, qpd->sh_mem_bases);
 
 	return 0;
 }
