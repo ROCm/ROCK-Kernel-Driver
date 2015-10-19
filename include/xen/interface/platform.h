@@ -586,6 +586,23 @@ struct xenpf_resource_op {
 typedef struct xenpf_resource_op xenpf_resource_op_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_resource_op_t);
 
+#define XENPF_get_symbol      63
+struct xenpf_symdata {
+	/* IN/OUT variables */
+	uint32_t	namelen; /* size of 'name' buffer */
+
+	/* IN/OUT variables */
+	uint32_t	symnum; /* IN:  Symbol to read                       */
+				/* OUT: Next available symbol. If same as IN */
+				/* then  we reached the end                  */
+
+	/* OUT variables */
+	XEN_GUEST_HANDLE(char) name;
+	uint64_t	address;
+	char            type;
+};
+DEFINE_GUEST_HANDLE_STRUCT(xenpf_symdata);
+
 #define XENPF_get_cpu_freq        ('N' << 24)
 #define XENPF_get_cpu_freq_min    (XENPF_get_cpu_freq + 1)
 #define XENPF_get_cpu_freq_max    (XENPF_get_cpu_freq_min + 1)
@@ -625,6 +642,7 @@ struct xen_platform_op {
 		struct xenpf_mem_hotadd        mem_add;
 		struct xenpf_core_parking      core_parking;
 		struct xenpf_resource_op       resource_op;
+		struct xenpf_symdata           symdata;
 		struct xenpf_get_cpu_freq      get_cpu_freq;
 		uint8_t                        pad[128];
 	} u;

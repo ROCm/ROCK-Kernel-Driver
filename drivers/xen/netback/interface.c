@@ -152,7 +152,9 @@ static const struct netif_stat {
 	char name[ETH_GSTRING_LEN];
 	u16 offset;
 } netbk_stats[] = {
-	{ "copied_skbs", offsetof(netif_t, nr_copied_skbs) / sizeof(long) },
+	{ "copied_rx_skbs", offsetof(netif_t, nr_copied_rx_skbs) / sizeof(long) },
+	{ "copied_tx_skbs", offsetof(netif_t, nr_copied_tx_skbs) / sizeof(long) },
+	{ "coalesced_skbs", offsetof(netif_t, nr_coalesced_skbs) / sizeof(long) },
 	{ "rx_gso_csum_fixups", offsetof(netif_t, rx_gso_csum_fixups) / sizeof(long) },
 };
 
@@ -233,7 +235,8 @@ netif_t *netif_alloc(struct device *parent, domid_t domid, unsigned int handle)
 	netif->csum = 1;
 	atomic_set(&netif->refcnt, 1);
 	init_waitqueue_head(&netif->waiting_to_free);
-	netif->dev = dev;
+	INIT_LIST_HEAD(&netif->fe_mcast_addr);
+ 	netif->dev = dev;
 
 	netback_carrier_off(netif);
 
@@ -374,5 +377,8 @@ void netif_free(struct backend_info *be)
 	netif_t *netif = be->netif;
 
 	unregister_netdev(netif->dev);
+
+	netbk_mcast_addr_list_free(netif);
+
 	free_netdev(netif->dev);
 }

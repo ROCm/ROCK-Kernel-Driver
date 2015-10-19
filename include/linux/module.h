@@ -398,6 +398,9 @@ struct module {
 	/* Size of RO sections of the module (text+rodata) */
 	unsigned int init_ro_size, core_ro_size;
 
+	/* The handle returned from unwind_add_table. */
+	void *unwind_info;
+
 	/* Arch-specific module values */
 	struct mod_arch_specific arch;
 

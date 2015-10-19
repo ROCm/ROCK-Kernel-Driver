@@ -133,10 +133,8 @@ static void init_cpu_khz(void)
 
 static u64 get_nsec_offset(struct shadow_time_info *shadow)
 {
-	u64 now, delta;
-	rdtscll(now);
-	delta = now - shadow->tsc_timestamp;
-	return scale_delta(delta, shadow->tsc_to_nsec_mul, shadow->tsc_shift);
+	return scale_delta(rdtsc_ordered() - shadow->tsc_timestamp,
+			   shadow->tsc_to_nsec_mul, shadow->tsc_shift);
 }
 
 static void update_wallclock(void)
@@ -313,7 +311,6 @@ unsigned long long xen_local_clock(void)
 
 	do {
 		local_time_version = shadow->version;
-		rdtsc_barrier();
 		time = shadow->system_timestamp + get_nsec_offset(shadow);
 		if (!time_values_up_to_date())
 			get_time_values_from_xen(cpu);

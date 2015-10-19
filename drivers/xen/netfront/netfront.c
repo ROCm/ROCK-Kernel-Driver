@@ -1257,7 +1257,7 @@ static int xennet_get_responses(struct netfront_info *np,
 			     rx->offset + rx->status > PAGE_SIZE)) {
 			if (net_ratelimit())
 				netdev_warn(np->netdev,
-					    "rx->offset: %x, size: %u\n",
+					    "rx->offset: %#x, size: %d\n",
 					    rx->offset, rx->status);
 			xennet_move_rx_slot(np, skb, ref);
 			err = -EINVAL;

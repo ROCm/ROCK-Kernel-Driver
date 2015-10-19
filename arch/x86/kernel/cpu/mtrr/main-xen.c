@@ -119,7 +119,6 @@ int mtrr_add(unsigned long base, unsigned long size, unsigned int type,
 	return mtrr_add_page(base >> PAGE_SHIFT, size >> PAGE_SHIFT, type,
 			     increment);
 }
-EXPORT_SYMBOL(mtrr_add);
 
 int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 {
@@ -177,7 +176,6 @@ int mtrr_del(int reg, unsigned long base, unsigned long size)
 		return -EINVAL;
 	return mtrr_del_page(reg, base >> PAGE_SHIFT, size >> PAGE_SHIFT);
 }
-EXPORT_SYMBOL(mtrr_del);
 
 /**
  * arch_phys_wc_add - add a WC MTRR and handle errors if PAT is unavailable

@@ -151,7 +151,7 @@ static void gntdev_vma_close(struct vm_area_struct *vma);
 static pte_t gntdev_clear_pte(struct vm_area_struct *vma, unsigned long addr,
 			      pte_t *ptep, int is_fullmm);
 
-static struct vm_operations_struct gntdev_vmops = {
+static const struct vm_operations_struct gntdev_vmops = {
 	.close = gntdev_vma_close,
 	.zap_pte = gntdev_clear_pte
 };

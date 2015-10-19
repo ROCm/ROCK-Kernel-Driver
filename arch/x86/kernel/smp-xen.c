@@ -29,6 +29,7 @@
 #include <asm/proto.h>
 #include <asm/ipi.h>
 #include <asm/nmi.h>
+#include <asm/mce.h>
 #include <xen/evtchn.h>
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
@@ -221,6 +222,7 @@ void xen_stop_other_cpus(int wait)
 finish:
 	local_irq_save(flags);
 	disable_all_local_evtchn();
+	mcheck_cpu_clear(this_cpu_ptr(&cpu_info));
 	local_irq_restore(flags);
 }
 

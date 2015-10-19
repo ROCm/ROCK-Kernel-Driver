@@ -420,7 +420,7 @@ static int xenfb_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	return VM_FAULT_MINOR;
 }
 
-static struct vm_operations_struct xenfb_vm_ops = {
+static const struct vm_operations_struct xenfb_vm_ops = {
 	.open	= xenfb_vm_open,
 	.close	= xenfb_vm_close,
 	.fault	= xenfb_vm_fault,

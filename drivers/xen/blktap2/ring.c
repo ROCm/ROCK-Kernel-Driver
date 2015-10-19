@@ -198,7 +198,7 @@ blktap_ring_vm_close(struct vm_area_struct *vma)
 	wake_up(&tap->wq);
 }
 
-static struct vm_operations_struct blktap_ring_vm_operations = {
+static const struct vm_operations_struct blktap_ring_vm_operations = {
 	.close    = blktap_ring_vm_close,
 	.unmap    = blktap_ring_vm_unmap,
 	.fault    = blktap_ring_fault,

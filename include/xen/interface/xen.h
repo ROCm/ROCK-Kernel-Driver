@@ -105,6 +105,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define __HYPERVISOR_kexec_op             37
 #define __HYPERVISOR_tmem_op              38
 #define __HYPERVISOR_xc_reserved_op       39 /* reserved for XenClient */
+#define __HYPERVISOR_xenpmu_op            40
 
 /* Architecture-specific hypercall definitions. */
 #define __HYPERVISOR_arch_0               48
@@ -165,6 +166,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define VIRQ_MEM_EVENT  10 /* G. (DOM0) A memory event has occured           */
 #define VIRQ_XC_RESERVED 11 /* G. Reserved for XenClient                     */
 #define VIRQ_ENOMEM     12 /* G. (DOM0) Low on heap memory       */
+#define VIRQ_XENPMU     13  /* PMC interrupt                                 */
 
 /* Architecture-specific VIRQ definitions. */
 #define VIRQ_ARCH_0    16
@@ -729,19 +731,22 @@ typedef struct shared_info shared_info_t;
  *  3. This the order of bootstrap elements in the initial virtual region:
  *      a. relocated kernel image
  *      b. initial ram disk              [mod_start, mod_len]
+ *         (may be omitted)
  *      c. list of allocated page frames [mfn_list, nr_pages]
  *         (unless relocated due to XEN_ELFNOTE_INIT_P2M)
  *      d. start_info_t structure        [register ESI (x86)]
- *      e. bootstrap page tables         [pt_base and CR3 (x86)]
- *      f. bootstrap stack               [register ESP (x86)]
+ *         in case of dom0 this page contains the console info, too
+ *      e. unless dom0: xenstore ring page
+ *      f. unless dom0: console ring page
+ *      g. bootstrap page tables         [pt_base and CR3 (x86)]
+ *      h. bootstrap stack               [register ESP (x86)]
  *  4. Bootstrap elements are packed together, but each is 4kB-aligned.
- *  5. The initial ram disk may be omitted.
- *  6. The list of page frames forms a contiguous 'pseudo-physical' memory
+ *  5. The list of page frames forms a contiguous 'pseudo-physical' memory
  *     layout for the domain. In particular, the bootstrap virtual-memory
  *     region is a 1:1 mapping to the first section of the pseudo-physical map.
- *  7. All bootstrap elements are mapped read-writable for the guest OS. The
+ *  6. All bootstrap elements are mapped read-writable for the guest OS. The
  *     only exception is the bootstrap page table, which is mapped read-only.
- *  8. There is guaranteed to be at least 512kB padding after the final
+ *  7. There is guaranteed to be at least 512kB padding after the final
  *     bootstrap element. If necessary, the bootstrap virtual region is
  *     extended by an extra 4MB to ensure this.
  *
@@ -798,10 +803,12 @@ typedef struct start_info start_info_t;
 #endif /* XEN_HAVE_PV_GUEST_ENTRY */
 
 /* These flags are passed in the 'flags' field of start_info_t. */
-#define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */
-#define SIF_INITDOMAIN    (1<<1)  /* Is this the initial control domain? */
-#define SIF_MULTIBOOT_MOD (1<<2)  /* Is mod_start a multiboot module? */
-#define SIF_MOD_START_PFN (1<<3)  /* Is mod_start a PFN? */
+#define SIF_PRIVILEGED      (1<<0)  /* Is the domain privileged? */
+#define SIF_INITDOMAIN      (1<<1)  /* Is this the initial control domain? */
+#define SIF_MULTIBOOT_MOD   (1<<2)  /* Is mod_start a multiboot module? */
+#define SIF_MOD_START_PFN   (1<<3)  /* Is mod_start a PFN? */
+#define SIF_VIRT_P2M_4TOOLS (1<<4)  /* Do Xen tools understand a virt. mapped */
+				    /* P->M making the 3 level tree obsolete? */
 #define SIF_PM_MASK       (0xFF<<8) /* reserve 1 byte for xen-pm options */
 
 /*

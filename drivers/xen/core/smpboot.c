@@ -374,9 +374,10 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 		/* Wait 5s total for a response. */
 		unsigned long timeout = jiffies + 5 * HZ;
 
-		while (!cpu_online(cpu) && time_before_eq(jiffies, timeout))
+		while ((!cpu_online(cpu) || !cpu_active(cpu)) &&
+			time_before_eq(jiffies, timeout))
 			HYPERVISOR_yield();
-		if (!cpu_online(cpu)) {
+		if (!cpu_online(cpu) || !cpu_active(cpu)) {
 			VOID(HYPERVISOR_vcpu_op(VCPUOP_down, cpu, NULL));
 			rc = -ETIMEDOUT;
 		}

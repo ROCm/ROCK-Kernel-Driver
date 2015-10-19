@@ -892,7 +892,7 @@ static int wait_for_concurrent_writes(struct file *file)
 	int err = 0;
 
 	if (atomic_read(&inode->i_writecount) > 1
-	    || (last_ino == inode->i_ino && last_dev == inode->i_sb->s_dev)) {
+	    || (last_ino == inode->i_ino && last_dev == inode_get_dev(inode))) {
 		dprintk("nfsd: write defer %d\n", task_pid_nr(current));
 		msleep(10);
 		dprintk("nfsd: write resume %d\n", task_pid_nr(current));
@@ -903,7 +903,7 @@ static int wait_for_concurrent_writes(struct file *file)
 		err = vfs_fsync(file, 0);
 	}
 	last_ino = inode->i_ino;
-	last_dev = inode->i_sb->s_dev;
+	last_dev = inode_get_dev(inode);
 	return err;
 }
 
@@ -1248,12 +1248,6 @@ out_nfserr:
 }
 
 #ifdef CONFIG_NFSD_V3
-
-static inline int nfsd_create_is_exclusive(int createmode)
-{
-	return createmode == NFS3_CREATE_EXCLUSIVE
-	       || createmode == NFS4_CREATE_EXCLUSIVE4_1;
-}
 
 /*
  * NFSv3 and NFSv4 version of nfsd_create

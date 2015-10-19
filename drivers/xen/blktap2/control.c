@@ -234,8 +234,7 @@ blktap_control_free(void)
 		blktap_control_destroy_device(blktaps[i], NULL);
 
 	if (blktap_control_registered)
-		if (misc_deregister(&blktap_misc) < 0)
-			BTERR("misc_deregister failed for control device");
+		misc_deregister(&blktap_misc);
 }
 
 static void

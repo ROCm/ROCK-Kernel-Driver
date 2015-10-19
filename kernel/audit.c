@@ -1711,7 +1711,7 @@ void audit_copy_inode(struct audit_names *name, const struct dentry *dentry,
 		      const struct inode *inode)
 {
 	name->ino   = inode->i_ino;
-	name->dev   = inode->i_sb->s_dev;
+	name->dev   = inode_get_dev(inode);
 	name->mode  = inode->i_mode;
 	name->uid   = inode->i_uid;
 	name->gid   = inode->i_gid;
@@ -1761,7 +1761,7 @@ void audit_log_name(struct audit_context *context, struct audit_names *n,
 	} else
 		audit_log_format(ab, " name=(null)");
 
-	if (n->ino != (unsigned long)-1)
+	if (n->ino != AUDIT_INO_UNSET)
 		audit_log_format(ab, " inode=%lu"
 				 " dev=%02x:%02x mode=%#ho"
 				 " ouid=%u ogid=%u rdev=%02x:%02x",

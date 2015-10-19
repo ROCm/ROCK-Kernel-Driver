@@ -462,6 +462,7 @@ static void __init acpi_sci_ioapic_setup(u8 bus_irq, u16 polarity, u16 trigger, 
 		polarity = acpi_sci_flags & ACPI_MADT_POLARITY_MASK;
 
 	mp_override_legacy_irq(bus_irq, polarity, trigger, gsi);
+	acpi_penalize_sci_irq(bus_irq, trigger, polarity);
 
 	/*
 	 * stash over-ride to indicate we've been here
@@ -727,9 +728,11 @@ static void acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
 	}
 #endif
 }
+#endif
 
-static int _acpi_map_lsapic(acpi_handle handle, int physid, int *pcpu)
+int acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, int *pcpu)
 {
+#ifndef CONFIG_XEN
 	int cpu;
 
 	cpu = acpi_register_lapic(physid, ACPI_MADT_ENABLED);
@@ -743,15 +746,9 @@ static int _acpi_map_lsapic(acpi_handle handle, int physid, int *pcpu)
 
 	*pcpu = cpu;
 	return 0;
-}
 #else
-#define _acpi_map_lsapic(h, p, c) (-EINVAL)
+	return -EOPNOTSUPP;
 #endif
-
-/* wrapper to silence section mismatch warning */
-int __ref acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, int *pcpu)
-{
-	return _acpi_map_lsapic(handle, physid, pcpu);
 }
 EXPORT_SYMBOL(acpi_map_cpu);
 

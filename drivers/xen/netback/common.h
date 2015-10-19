@@ -46,6 +46,9 @@
 	pr_debug("(file=%s, line=%d) " _f,	\
 		 __FILE__ , __LINE__ , ## _a )
 
+#define NET_TX_RING_SIZE __CONST_RING_SIZE(netif_tx, PAGE_SIZE)
+#define NET_RX_RING_SIZE __CONST_RING_SIZE(netif_rx, PAGE_SIZE)
+
 typedef struct netif_st {
 	/* Unique identifier for this interface. */
 	domid_t          domid;
@@ -53,6 +56,8 @@ typedef struct netif_st {
 	unsigned int     handle;
 
 	u8               fe_dev_addr[6];
+	struct list_head fe_mcast_addr;
+	unsigned int     fe_mcast_count;
 
 	unsigned int     irq;
 
@@ -77,6 +82,7 @@ typedef struct netif_st {
 	u8 gso6:1;
 	u8 csum:1;
 	u8 csum6:1;
+	u8 mcast:1;
 
 	/* Internal feature information. */
 	u8 can_queue:1;	/* can queue packets for receiver? */
@@ -98,7 +104,9 @@ typedef struct netif_st {
 	struct timer_list tx_queue_timeout;
 
 	/* Statistics */
-	unsigned long nr_copied_skbs;
+	unsigned long nr_copied_rx_skbs;
+	unsigned long nr_copied_tx_skbs;
+	unsigned long nr_coalesced_skbs;
 	unsigned long rx_gso_csum_fixups;
 
 	/* Miscellaneous private stuff. */
@@ -145,6 +153,14 @@ struct netback_accelerator {
 	struct netback_accel_hooks *hooks;
 };
 
+struct netbk_mcast_addr {
+	struct list_head entry;
+	struct rcu_head rcu;
+	u8 addr[6];
+};
+
+#define NETBK_MCAST_MAX 64
+
 struct backend_info {
 	struct xenbus_device *dev;
 	netif_t *netif;
@@ -160,71 +176,6 @@ struct backend_info {
 	struct netback_accelerator *accelerator;
 };
 
-#define NETBACK_ACCEL_VERSION 0x00010001
-
-/* 
- * Connect an accelerator plugin module to netback.  Returns zero on
- * success, < 0 on error, > 0 (with highest version number supported)
- * if version mismatch.
- */
-extern int netback_connect_accelerator(unsigned version,
-				       int id, const char *eth_name, 
-				       struct netback_accel_hooks *hooks);
-/* Disconnect a previously connected accelerator plugin module */
-extern void netback_disconnect_accelerator(int id, const char *eth_name);
-
-
-extern
-void netback_probe_accelerators(struct backend_info *be,
-				struct xenbus_device *dev);
-extern
-void netback_remove_accelerators(struct backend_info *be,
-				 struct xenbus_device *dev);
-extern
-void netif_accel_init(void);
-
-
-#define NET_TX_RING_SIZE __CONST_RING_SIZE(netif_tx, PAGE_SIZE)
-#define NET_RX_RING_SIZE __CONST_RING_SIZE(netif_rx, PAGE_SIZE)
-
-void netif_disconnect(struct backend_info *be);
-void netif_free(struct backend_info *be);
-
-netif_t *netif_alloc(struct device *parent, domid_t domid, unsigned int handle);
-int netif_map(struct backend_info *be, grant_ref_t tx_ring_ref,
-	      grant_ref_t rx_ring_ref, evtchn_port_t evtchn);
-
-#define netif_get(_b) (atomic_inc(&(_b)->refcnt))
-#define netif_put(_b)						\
-	do {							\
-		if ( atomic_dec_and_test(&(_b)->refcnt) )	\
-			wake_up(&(_b)->waiting_to_free);	\
-	} while (0)
-
-void netif_xenbus_init(void);
-
-#define netif_schedulable(netif)				\
-	(likely(!(netif)->busted) &&				\
-	 netif_running((netif)->dev) &&	netback_carrier_ok(netif))
-
-void netif_schedule_work(netif_t *netif);
-void netif_deschedule_work(netif_t *netif);
-
-int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev);
-irqreturn_t netif_be_int(int irq, void *dev_id);
-
-static inline int netbk_can_queue(struct net_device *dev)
-{
-	netif_t *netif = netdev_priv(dev);
-	return netif->can_queue;
-}
-
-static inline int netbk_can_sg(struct net_device *dev)
-{
-	netif_t *netif = netdev_priv(dev);
-	return netif->can_sg;
-}
-
 struct pending_tx_info {
 	netif_tx_request_t req;
 	grant_handle_t grant_handle;
@@ -235,8 +186,8 @@ typedef unsigned int pending_ring_idx_t;
 struct netbk_rx_meta {
 	skb_frag_t frag;
 	u16 id;
-	u8 copy:2;
-	u8 tail:1;
+	u8 copy;
+	u8 tail;
 };
 
 struct netbk_tx_pending_inuse {
@@ -285,7 +236,14 @@ struct xen_netbk {
 		unsigned int alloc_index;
 		struct multicall_entry mcl[NET_RX_RING_SIZE+3];
 		struct mmu_update mmu[NET_RX_RING_SIZE];
-		struct gnttab_copy grant_copy_op[2 * NET_RX_RING_SIZE];
+		/*
+		 * An skb may have a maximal number of frags but still be
+		 * small in overall size. Thus the worst case number of copy
+		 * operations is one more (for the head) than MAX_SKB_FRAGS
+		 * per ring slot.
+		 */
+		struct gnttab_copy grant_copy_op[(MAX_SKB_FRAGS + 1) *
+						 NET_RX_RING_SIZE];
 		struct gnttab_transfer grant_trans_op;
 		struct netbk_rx_meta meta[NET_RX_RING_SIZE];
 		unsigned long mfn_list[MAX_MFN_ALLOC];
@@ -294,5 +252,69 @@ struct xen_netbk {
 
 extern struct xen_netbk *xen_netbk;
 extern unsigned int netbk_nr_groups;
+
+#define NETBACK_ACCEL_VERSION 0x00010001
+
+/* 
+ * Connect an accelerator plugin module to netback.  Returns zero on
+ * success, < 0 on error, > 0 (with highest version number supported)
+ * if version mismatch.
+ */
+extern int netback_connect_accelerator(unsigned version,
+				       int id, const char *eth_name, 
+				       struct netback_accel_hooks *hooks);
+/* Disconnect a previously connected accelerator plugin module */
+extern void netback_disconnect_accelerator(int id, const char *eth_name);
+
+
+extern
+void netback_probe_accelerators(struct backend_info *be,
+				struct xenbus_device *dev);
+extern
+void netback_remove_accelerators(struct backend_info *be,
+				 struct xenbus_device *dev);
+extern
+void netif_accel_init(void);
+
+void netif_disconnect(struct backend_info *be);
+void netif_free(struct backend_info *be);
+
+netif_t *netif_alloc(struct device *parent, domid_t domid, unsigned int handle);
+int netif_map(struct backend_info *be, grant_ref_t tx_ring_ref,
+	      grant_ref_t rx_ring_ref, evtchn_port_t evtchn);
+
+#define netif_get(_b) (atomic_inc(&(_b)->refcnt))
+#define netif_put(_b)						\
+	do {							\
+		if ( atomic_dec_and_test(&(_b)->refcnt) )	\
+			wake_up(&(_b)->waiting_to_free);	\
+	} while (0)
+
+void netif_xenbus_init(void);
+
+#define netif_schedulable(netif)				\
+	(likely(!(netif)->busted) &&				\
+	 netif_running((netif)->dev) &&	netback_carrier_ok(netif))
+
+void netif_schedule_work(netif_t *netif);
+void netif_deschedule_work(netif_t *netif);
+
+int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev);
+irqreturn_t netif_be_int(int irq, void *dev_id);
+
+static inline int netbk_can_queue(struct net_device *dev)
+{
+	netif_t *netif = netdev_priv(dev);
+	return netif->can_queue;
+}
+
+static inline int netbk_can_sg(struct net_device *dev)
+{
+	netif_t *netif = netdev_priv(dev);
+	return netif->can_sg;
+}
+
+/* Multicast control */
+void netbk_mcast_addr_list_free(netif_t *);
 
 #endif /* __NETIF__BACKEND__COMMON_H__ */

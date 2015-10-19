@@ -30,8 +30,11 @@
 /*
  * Tables translating between page_cache_type_t and pte encoding.
  *
- * Minimal supported modes are defined statically, they are modified
- * during bootup if more supported cache modes are available.
+ * The default values are defined statically as minimal supported mode;
+ * WC and WT fall back to UC-.  pat_init() updates these values to support
+ * more cache modes, WC and WT, when it is safe to do so.  See pat_init()
+ * for the details.  Note, __early_ioremap() used during early boot-time
+ * takes pgprot_t (pte encoding) and does not use these tables.
  *
  *   Index into __cachemode2pte_tbl[] is the cachemode.
  *
@@ -431,9 +434,6 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 
 	add_pfn_range_mapped(start >> PAGE_SHIFT, ret >> PAGE_SHIFT);
 
-	if (!start)
-		xen_finish_init_mapping();
-
 	return ret >> PAGE_SHIFT;
 }
 
@@ -632,6 +632,7 @@ void __init init_mem_mapping(void)
 		/* can we preseve max_low_pfn ?*/
 		max_low_pfn = max_pfn;
 	}
+	xen_finish_init_mapping();
 #else
 	early_ioremap_page_table_range_init();
 #endif

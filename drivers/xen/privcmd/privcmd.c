@@ -471,7 +471,7 @@ static int privcmd_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	return VM_FAULT_SIGBUS;
 }
 
-static struct vm_operations_struct privcmd_vm_ops = {
+static const struct vm_operations_struct privcmd_vm_ops = {
 	.fault = privcmd_fault
 };
 
@@ -503,12 +503,10 @@ static const struct file_operations privcmd_file_ops = {
 
 static int capabilities_show(struct seq_file *m, void *v)
 {
-	int len = 0;
-
 	if (is_initial_xendomain())
-		len = seq_printf(m, "control_d\n");
+		seq_printf(m, "control_d\n");
 
-	return len;
+	return 0;
 }
 
 static int capabilities_open(struct inode *inode, struct file *file)

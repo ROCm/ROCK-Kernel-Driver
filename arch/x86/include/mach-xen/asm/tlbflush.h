@@ -208,4 +208,7 @@ static inline void reset_lazy_tlbstate(void)
 
 #endif	/* SMP */
 
+/* Simple as there is no TLB accounting on Xen. */
+#define flush_tlb_local local_flush_tlb
+
 #endif /* _ASM_X86_TLBFLUSH_H */

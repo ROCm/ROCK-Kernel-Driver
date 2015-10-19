@@ -270,9 +270,9 @@ static void _bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu,
 	if (data) {
 		BUG_ON(!cpumask_test_cpu(cpu, cpumask));
 		if (!irqd_is_per_cpu(data))
-			cpumask_copy(data->affinity, cpumask);
+			cpumask_copy(irq_data_get_affinity_mask(data), cpumask);
 		else
-			cpumask_set_cpu(cpu, data->affinity);
+			cpumask_set_cpu(cpu, irq_data_get_affinity_mask(data));
 	}
 
 	clear_bit(chn, per_cpu(cpu_evtchn_mask, cpu_evtchn[chn]));
@@ -298,7 +298,8 @@ static void init_evtchn_cpu_bindings(void)
 		struct irq_data *data = irq_get_irq_data(i);
 
 		if (data)
-			cpumask_copy(data->affinity, cpumask_of(0));
+			cpumask_copy(irq_data_get_affinity_mask(data),
+				     cpumask_of(0));
 	}
 
 	memset(cpu_evtchn, 0, sizeof(cpu_evtchn));
@@ -441,7 +442,7 @@ __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 				irq = evtchn_to_irq[port];
 				BUG_ON(irq == -1);
 #endif
-				if (!handle_irq(irq, regs))
+				if (!handle_irq(irq_to_desc(irq), regs))
 					BUG();
 			}
 		}
@@ -489,7 +490,7 @@ __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 					if (port != __this_cpu_read(ipi_evtchn))
 #endif
 						clear_evtchn(port);
-					handled = handle_irq(irq, regs);
+					handled = handle_irq(irq_to_desc(irq), regs);
 				}
 				if (!handled)
 					pr_emerg_ratelimited("No handler for irq %d (port %u)\n",
@@ -886,7 +887,7 @@ void unbind_from_per_cpu_irq(unsigned int irq, unsigned int cpu,
 		}
 #endif
 
-		cpumask_clear_cpu(cpu, data->affinity);
+		cpumask_clear_cpu(cpu, irq_data_get_affinity_mask(data));
 
 		close.port = evtchn;
 		if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close))
@@ -1929,7 +1930,7 @@ struct irq_cfg *alloc_irq_and_cfg_at(unsigned int at, int node)
 #ifdef CONFIG_SPARSE_IRQ
 #ifdef CONFIG_SMP
 	/* By default all event channels notify CPU#0. */
-	cpumask_copy(irq_get_irq_data(at)->affinity, cpumask_of(0));
+	cpumask_copy(irq_get_affinity_mask(at), cpumask_of(0));
 #endif
 
 	cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);

@@ -69,7 +69,7 @@ static struct file_system_type btrfs_fs_type;
 
 static int btrfs_remount(struct super_block *sb, int *flags, char *data);
 
-static const char *btrfs_decode_error(int errno)
+const char *btrfs_decode_error(int errno)
 {
 	char *errstr = "unknown";
 
@@ -1033,6 +1033,7 @@ static int btrfs_fill_super(struct super_block *sb,
 	sb->s_flags |= MS_POSIXACL;
 #endif
 	sb->s_flags |= MS_I_VERSION;
+	sb->s_iflags |= SB_I_CGROUPWB;
 	err = open_ctree(sb, fs_devices, (char *)data);
 	if (err) {
 		printk(KERN_ERR "BTRFS: open_ctree failed\n");
@@ -1650,6 +1651,15 @@ static int btrfs_remount(struct super_block *sb, int *flags, char *data)
 
 		sb->s_flags |= MS_RDONLY;
 
+		/*
+		 * Setting MS_RDONLY will put the cleaner thread to
+		 * sleep at the next loop if it's already active.
+		 * If it's already asleep, we'll leave unused block
+		 * groups on disk until we're mounted read-write again
+		 * unless we clean them up here.
+		 */
+		btrfs_delete_unused_bgs(fs_info);
+
 		btrfs_dev_replace_suspend_for_unmount(fs_info);
 		btrfs_scrub_cancel(fs_info);
 		btrfs_pause_balance(fs_info);
@@ -2124,6 +2134,11 @@ static int btrfs_show_devname(struct seq_file *m, struct dentry *root)
 	return 0;
 }
 
+static dev_t btrfs_get_inode_dev(const struct inode *inode)
+{
+	return BTRFS_I(inode)->root->anon_dev;
+}
+
 static const struct super_operations btrfs_super_ops = {
 	.drop_inode	= btrfs_drop_inode,
 	.evict_inode	= btrfs_evict_inode,
@@ -2137,6 +2152,7 @@ static const struct super_operations btrfs_super_ops = {
 	.statfs		= btrfs_statfs,
 	.remount_fs	= btrfs_remount,
 	.freeze_fs	= btrfs_freeze,
+	.get_inode_dev	= btrfs_get_inode_dev,
 };
 
 static const struct file_operations btrfs_ctl_fops = {
@@ -2163,8 +2179,7 @@ static int btrfs_interface_init(void)
 
 static void btrfs_interface_exit(void)
 {
-	if (misc_deregister(&btrfs_misc) < 0)
-		printk(KERN_INFO "BTRFS: misc_deregister failed for control device\n");
+	misc_deregister(&btrfs_misc);
 }
 
 static void btrfs_print_info(void)

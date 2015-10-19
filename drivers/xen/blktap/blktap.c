@@ -420,7 +420,7 @@ static void blktap_vma_close(struct vm_area_struct *vma)
 	blktap_vma_open(next);
 }
 
-static struct vm_operations_struct blktap_vm_ops = {
+static const struct vm_operations_struct blktap_vm_ops = {
 	fault:    blktap_fault,
 	zap_pte:  blktap_clear_pte,
 	open:     blktap_vma_open,

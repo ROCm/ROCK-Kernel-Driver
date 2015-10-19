@@ -55,30 +55,18 @@ static u64 get_abs_timeout(unsigned long delta)
 }
 
 #if CONFIG_XEN_COMPAT <= 0x030004
-static void timerop_set_mode(enum clock_event_mode mode,
-			     struct clock_event_device *evt)
+static int timerop_shutdown(struct clock_event_device *evt)
 {
-	switch (mode) {
-	case CLOCK_EVT_MODE_PERIODIC:
-		WARN_ON(1); /* unsupported */
-		break;
+	if (HYPERVISOR_set_timer_op(0)) /* cancel timeout */
+		BUG();
 
-	case CLOCK_EVT_MODE_ONESHOT:
-	case CLOCK_EVT_MODE_RESUME:
-		break;
-
-	case CLOCK_EVT_MODE_UNUSED:
-	case CLOCK_EVT_MODE_SHUTDOWN:
-		if (HYPERVISOR_set_timer_op(0)) /* cancel timeout */
-			BUG();
-		break;
-	}
+	return 0;
 }
 
 static int timerop_set_next_event(unsigned long delta,
 				  struct clock_event_device *evt)
 {
-	WARN_ON(evt->mode != CLOCK_EVT_MODE_ONESHOT);
+	WARN_ON(!clockevent_state_oneshot(evt));
 
 	if (HYPERVISOR_set_timer_op(get_abs_timeout(delta)) < 0)
 		BUG();
@@ -93,29 +81,24 @@ static int timerop_set_next_event(unsigned long delta,
 }
 #endif
 
-static void vcpuop_set_mode(enum clock_event_mode mode,
-			    struct clock_event_device *evt)
+static int vcpuop_shutdown(struct clock_event_device *evt)
 {
-	switch (mode) {
-	case CLOCK_EVT_MODE_PERIODIC:
-		WARN_ON(1); /* unsupported */
-		break;
+	unsigned int cpu = smp_processor_id();
 
-	case CLOCK_EVT_MODE_UNUSED:
-	case CLOCK_EVT_MODE_SHUTDOWN:
-		if (HYPERVISOR_vcpu_op(VCPUOP_stop_singleshot_timer,
-				       smp_processor_id(), NULL))
-			BUG();
-		/* fall through */
-	case CLOCK_EVT_MODE_ONESHOT:
-		if (HYPERVISOR_vcpu_op(VCPUOP_stop_periodic_timer,
-				       smp_processor_id(), NULL))
-			BUG();
-		break;
+	if (HYPERVISOR_vcpu_op(VCPUOP_stop_singleshot_timer, cpu, NULL) ||
+	    HYPERVISOR_vcpu_op(VCPUOP_stop_periodic_timer, cpu, NULL))
+		BUG();
 
-	case CLOCK_EVT_MODE_RESUME:
-		break;
-	}
+	return 0;
+}
+
+static int vcpuop_set_oneshot(struct clock_event_device *evt)
+{
+	if (HYPERVISOR_vcpu_op(VCPUOP_stop_periodic_timer,
+			       smp_processor_id(), NULL))
+		BUG();
+
+	return 0;
 }
 
 static int vcpuop_set_next_event(unsigned long delta,
@@ -124,7 +107,7 @@ static int vcpuop_set_next_event(unsigned long delta,
 	struct vcpu_set_singleshot_timer single;
 	int ret;
 
-	WARN_ON(evt->mode != CLOCK_EVT_MODE_ONESHOT);
+	WARN_ON(!clockevent_state_oneshot(evt));
 
 	single.timeout_abs_ns = get_abs_timeout(delta);
 	single.flags = VCPU_SSHOTTMR_future;
@@ -232,7 +215,8 @@ int local_setup_timer(unsigned int cpu)
 		return evt->irq;
 	BUG_ON(per_cpu(xen_clock_event.irq, 0) != evt->irq);
 
-	evt->set_mode = this_cpu_read(xen_clock_event.set_mode);
+	evt->set_state_oneshot = this_cpu_read(xen_clock_event.set_state_oneshot);
+	evt->set_state_shutdown = this_cpu_read(xen_clock_event.set_state_shutdown);
 	evt->set_next_event = this_cpu_read(xen_clock_event.set_next_event);
 
 	return 0;
@@ -274,8 +258,7 @@ void xen_clockevents_resume(bool late)
 	for_each_online_cpu(cpu) {
 		init_missing_ticks_accounting(cpu);
 
-		if ((__this_cpu_read(xen_clock_event.set_mode)
-		     == vcpuop_set_mode)
+		if (__this_cpu_read(xen_clock_event.set_state_oneshot)
 		    && HYPERVISOR_vcpu_op(VCPUOP_stop_periodic_timer, cpu,
 					  NULL))
 			BUG();
@@ -294,13 +277,14 @@ void __init xen_clockevents_init(void)
 		 * Successfully turned off 100Hz tick, so we have the
 		 * vcpuop-based timer interface
 		 */
-		evt->set_mode = vcpuop_set_mode;
+		evt->set_state_shutdown = vcpuop_shutdown;
+		evt->set_state_oneshot = vcpuop_set_oneshot;
 		evt->set_next_event = vcpuop_set_next_event;
 		break;
 #if CONFIG_XEN_COMPAT <= 0x030004
 	case -ENOSYS:
 		printk(KERN_DEBUG "Xen: using timerop interface\n");
-		evt->set_mode = timerop_set_mode;
+		evt->set_state_shutdown	= timerop_shutdown;
 		evt->set_next_event = timerop_set_next_event;
 		break;
 #endif

@@ -58,7 +58,7 @@ static struct ldt_struct *alloc_ldt_struct(int size)
 	if (alloc_size > PAGE_SIZE)
 		new_ldt->entries = vzalloc(alloc_size);
 	else
-		new_ldt->entries = (void *)__get_free_page(GFP_KERNEL|__GFP_ZERO);
+		new_ldt->entries = (void *)get_zeroed_page(GFP_KERNEL);
 
 	if (!new_ldt->entries) {
 		kfree(new_ldt);
@@ -96,7 +96,7 @@ static void free_ldt_struct(struct ldt_struct *ldt)
 	if (ldt->size * LDT_ENTRY_SIZE > PAGE_SIZE)
 		vfree(ldt->entries);
 	else
-		put_page(virt_to_page(ldt->entries));
+		free_page((unsigned long)ldt->entries);
 	kfree(ldt);
 }
 

@@ -343,7 +343,7 @@ fail_flush:
 }
 
 /* quoted scsi_lib.c/scsi_bi_endio */
-static void scsiback_bi_endio(struct bio *bio, int error)
+static void scsiback_bi_endio(struct bio *bio)
 {
 	bio_put(bio);
 }
