@@ -296,6 +296,8 @@ struct kfd_ioctl_set_process_dgpu_aperture_args {
 #define KFD_IOC_ALLOC_MEM_FLAGS_APU_DEVICE		(1 << 3)
 #define KFD_IOC_ALLOC_MEM_FLAGS_APU_SCRATCH		(1 << 4)
 
+#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM		(1 << 5)
+
 struct kfd_ioctl_alloc_memory_of_gpu_new_args {
 	uint64_t va_addr;	/* to KFD */
 	uint64_t size;		/* to KFD */

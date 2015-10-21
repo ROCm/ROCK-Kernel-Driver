@@ -30,6 +30,11 @@
 
 struct amdgpu_device;
 
+struct kfd_bo_va_list {
+	struct list_head bo_list;
+	struct amdgpu_bo_va *bo_va;
+};
+
 struct kgd_mem {
 	union {
 		struct {
@@ -39,7 +44,7 @@ struct kgd_mem {
 		} data1;
 		struct {
 			struct amdgpu_bo *bo;
-			struct amdgpu_bo_va *bo_va;
+			struct list_head bo_va_list;
 			uint32_t domain;
 			bool mapped_to_gpu_memory;
 			void *kptr;

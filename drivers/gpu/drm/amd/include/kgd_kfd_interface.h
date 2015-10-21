@@ -98,6 +98,19 @@ struct kgd2kfd_shared_resources {
 	size_t doorbell_start_offset;
 };
 
+/*
+ * alloc_memory_of_gpu memory flags should be identical to the flags
+ * on kfd_ioctl.h
+ */
+
+#define ALLOC_MEM_FLAGS_DGPU_HOST		(1 << 0)
+#define ALLOC_MEM_FLAGS_DGPU_DEVICE		(1 << 1)
+#define ALLOC_MEM_FLAGS_DGPU_SCRATCH	(1 << 2)
+#define ALLOC_MEM_FLAGS_APU_DEVICE		(1 << 3)
+#define ALLOC_MEM_FLAGS_APU_SCRATCH		(1 << 4)
+
+#define ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM	(1 << 5)
+
 /**
  * struct kfd2kgd_calls
  *
@@ -230,7 +243,7 @@ struct kfd2kgd_calls {
 	int (*alloc_memory_of_gpu)(struct kgd_dev *kgd, uint64_t va,
 			size_t size, void *vm,
 			struct kgd_mem **mem, uint64_t *offset,
-			void **kptr);
+			void **kptr, uint32_t flags);
 	int (*free_memory_of_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
 	int (*map_memory_to_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
 	int (*unmap_memory_to_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
