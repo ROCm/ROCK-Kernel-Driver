@@ -951,13 +951,6 @@ static int amdgpu_ttm_tt_populate(struct ttm_tt *ttm)
 		goto trace_mappings;
 	}
 
-#ifdef CONFIG_SWIOTLB
-	if (swiotlb_nr_tbl()) {
-		r = ttm_dma_populate(&gtt->ttm, adev->dev);
-		goto trace_mappings;
-	}
-#endif
-
 	r = ttm_populate_and_map_pages(adev->dev, &gtt->ttm);
 trace_mappings:
 	if (likely(!r))
@@ -983,13 +976,6 @@ static void amdgpu_ttm_tt_unpopulate(struct ttm_tt *ttm)
 	adev = amdgpu_ttm_adev(ttm->bdev);
 
 	amdgpu_trace_dma_unmap(ttm);
-
-#ifdef CONFIG_SWIOTLB
-	if (swiotlb_nr_tbl()) {
-		ttm_dma_unpopulate(&gtt->ttm, adev->dev);
-		return;
-	}
-#endif
 
 	ttm_unmap_and_unpopulate_pages(adev->dev, &gtt->ttm);
 }
