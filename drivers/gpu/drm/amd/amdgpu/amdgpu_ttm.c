@@ -888,12 +888,6 @@ static int amdgpu_ttm_tt_populate(struct ttm_tt *ttm)
 
 	adev = amdgpu_ttm_adev(ttm->bdev);
 
-#ifdef CONFIG_SWIOTLB
-	if (swiotlb_nr_tbl()) {
-		return ttm_dma_populate(&gtt->ttm, adev->dev);
-	}
-#endif
-
 	r = ttm_pool_populate(ttm);
 	if (r) {
 		return r;
@@ -933,13 +927,6 @@ static void amdgpu_ttm_tt_unpopulate(struct ttm_tt *ttm)
 		return;
 
 	adev = amdgpu_ttm_adev(ttm->bdev);
-
-#ifdef CONFIG_SWIOTLB
-	if (swiotlb_nr_tbl()) {
-		ttm_dma_unpopulate(&gtt->ttm, adev->dev);
-		return;
-	}
-#endif
 
 	for (i = 0; i < ttm->num_pages; i++) {
 		if (gtt->ttm.dma_address[i]) {
