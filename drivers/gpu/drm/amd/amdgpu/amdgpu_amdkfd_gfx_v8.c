@@ -40,7 +40,7 @@
 
 #define VI_PIPE_PER_MEC	(4)
 
-struct cik_sdma_rlc_registers;
+struct vi_sdma_mqd;
 
 static int create_process_vm(struct kgd_dev *kgd, void **vm);
 static void destroy_process_vm(struct kgd_dev *kgd, void *vm);
@@ -312,9 +312,15 @@ static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id)
 	return 0;
 }
 
-static inline uint32_t get_sdma_base_addr(struct cik_sdma_rlc_registers *m)
+static inline uint32_t get_sdma_base_addr(struct vi_sdma_mqd *m)
 {
-	return 0;
+	uint32_t retval;
+
+	retval = m->sdma_engine_id * SDMA1_REGISTER_OFFSET +
+		m->sdma_queue_id * KFD_VI_SDMA_QUEUE_OFFSET;
+	pr_err("kfd: sdma base address: 0x%x\n", retval);
+
+	return retval;
 }
 
 static inline struct vi_mqd *get_mqd(void *mqd)
@@ -322,9 +328,9 @@ static inline struct vi_mqd *get_mqd(void *mqd)
 	return (struct vi_mqd *)mqd;
 }
 
-static inline struct cik_sdma_rlc_registers *get_sdma_mqd(void *mqd)
+static inline struct vi_sdma_mqd *get_sdma_mqd(void *mqd)
 {
-	return (struct cik_sdma_rlc_registers *)mqd;
+	return (struct vi_sdma_mqd *)mqd;
 }
 
 static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
@@ -401,6 +407,21 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 
 static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd)
 {
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	struct vi_sdma_mqd *m;
+	uint32_t sdma_base_addr;
+
+	m = get_sdma_mqd(mqd);
+	sdma_base_addr = get_sdma_base_addr(m);
+
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_VIRTUAL_ADDR, m->sdmax_rlcx_virtual_addr);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_BASE, m->sdmax_rlcx_rb_base);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_BASE_HI, m->sdmax_rlcx_rb_base_hi);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR_ADDR_LO, m->sdmax_rlcx_rb_rptr_addr_lo);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR_ADDR_HI, m->sdmax_rlcx_rb_rptr_addr_hi);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL, m->sdmax_rlcx_doorbell);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL, m->sdmax_rlcx_rb_cntl);
+
 	return 0;
 }
 
@@ -429,7 +450,7 @@ static bool kgd_hqd_is_occupied(struct kgd_dev *kgd, uint64_t queue_address,
 static bool kgd_hqd_sdma_is_occupied(struct kgd_dev *kgd, void *mqd)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-	struct cik_sdma_rlc_registers *m;
+	struct vi_sdma_mqd *m;
 	uint32_t sdma_base_addr;
 	uint32_t sdma_rlc_rb_cntl;
 
@@ -477,7 +498,7 @@ static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 				unsigned int timeout)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-	struct cik_sdma_rlc_registers *m;
+	struct vi_sdma_mqd *m;
 	uint32_t sdma_base_addr;
 	uint32_t temp;
 
