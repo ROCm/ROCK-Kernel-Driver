@@ -947,11 +947,13 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	/* Fix errors in CZ CRAT.
 	 * simd_count: Carrizo CRAT reports wrong simd_count, probably because it
 	 *		doesn't consider masked out CUs
-	 * capability flag: Carrizo CRAT doesn't report IOMMU flags. TODO: Fix this.
+	 * capability flag: Carrizo CRAT doesn't report IOMMU flags.
 	 */
-	if (dev->gpu->device_info->asic_family == CHIP_CARRIZO)
+	if (dev->gpu->device_info->asic_family == CHIP_CARRIZO) {
 		dev->node_props.simd_count =
 			cu_info.simd_per_cu * cu_info.cu_active_number;
+		dev->node_props.capability |= HSA_CAP_ATS_PRESENT;
+        }
 
 	kfd_debug_print_topology();
 err:
