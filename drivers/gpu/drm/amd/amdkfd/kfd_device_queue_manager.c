@@ -100,11 +100,11 @@ static int allocate_vmid(struct device_queue_manager *dqm,
 	if (dqm->vmid_bitmap == 0)
 		return -ENOMEM;
 
-	bit = find_first_bit((unsigned long *)&dqm->vmid_bitmap, CIK_VMID_NUM);
+	bit = find_first_bit((unsigned long *)&dqm->vmid_bitmap,
+				dqm->dev->vm_info.vmid_num_kfd);
 	clear_bit(bit, (unsigned long *)&dqm->vmid_bitmap);
 
-	/* Kaveri kfd vmid's starts from vmid 8 */
-	allocated_vmid = bit + KFD_VMID_START_OFFSET;
+	allocated_vmid = bit + dqm->dev->vm_info.first_vmid_kfd;
 	pr_debug("kfd: vmid allocation %d\n", allocated_vmid);
 	qpd->vmid = allocated_vmid;
 	q->properties.vmid = allocated_vmid;
@@ -123,7 +123,7 @@ static void deallocate_vmid(struct device_queue_manager *dqm,
 				struct qcm_process_device *qpd,
 				struct queue *q)
 {
-	int bit = qpd->vmid - KFD_VMID_START_OFFSET;
+	int bit = qpd->vmid - dqm->dev->vm_info.first_vmid_kfd;
 
 	/* Release the vmid mapping */
 	set_pasid_vmid_mapping(dqm, 0, qpd->vmid);
@@ -587,7 +587,7 @@ static int initialize_nocpsch(struct device_queue_manager *dqm)
 	for (i = 0; i < get_pipes_num(dqm); i++)
 		dqm->allocated_queues[i] = (1 << QUEUES_PER_PIPE) - 1;
 
-	dqm->vmid_bitmap = (1 << VMID_PER_DEVICE) - 1;
+	dqm->vmid_bitmap = (1 << dqm->dev->vm_info.vmid_num_kfd) - 1;
 	dqm->sdma_bitmap = (1 << CIK_SDMA_QUEUES) - 1;
 
 	init_scheduler(dqm);
@@ -701,8 +701,7 @@ static int set_sched_resources(struct device_queue_manager *dqm)
 
 	queue_num = get_pipes_num_cpsch() * QUEUES_PER_PIPE;
 	queue_mask = (1 << queue_num) - 1;
-	res.vmid_mask = (1 << VMID_PER_DEVICE) - 1;
-	res.vmid_mask <<= KFD_VMID_START_OFFSET;
+	res.vmid_mask = dqm->dev->shared_resources.compute_vmid_bitmap;
 	res.queue_mask = queue_mask << (get_first_pipe(dqm) * QUEUES_PER_PIPE);
 	res.gws_mask = res.oac_mask = res.gds_heap_base =
 						res.gds_heap_size = 0;

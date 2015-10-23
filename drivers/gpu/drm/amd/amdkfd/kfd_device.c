@@ -280,7 +280,11 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	kfd->shared_resources = *gpu_resources;
 
 	vmid_bitmap_kfd = kfd->shared_resources.compute_vmid_bitmap;
-	vmid_num_kfd = fls(vmid_bitmap_kfd) - ffs(vmid_bitmap_kfd) + 1;
+	kfd->vm_info.first_vmid_kfd = ffs(vmid_bitmap_kfd) - 1;
+	kfd->vm_info.last_vmid_kfd = fls(vmid_bitmap_kfd) - 1;
+	vmid_num_kfd = kfd->vm_info.last_vmid_kfd
+			- kfd->vm_info.first_vmid_kfd + 1;
+	kfd->vm_info.vmid_num_kfd = vmid_num_kfd;
 
 	/* If MEC firmware is too old, turn off hws multiple process mapping */
 	if (kfd->mec_fw_version	< KFD_MULTI_PROC_MAPPING_HWS_SUPPORT)

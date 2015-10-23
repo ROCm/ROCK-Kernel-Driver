@@ -157,6 +157,12 @@ struct kfd_mem_obj {
 	uint32_t *cpu_ptr;
 };
 
+struct kfd_vmid_info {
+	uint32_t first_vmid_kfd;
+	uint32_t last_vmid_kfd;
+	uint32_t vmid_num_kfd;
+};
+
 struct kfd_dev {
 	struct kgd_dev *kgd;
 
@@ -181,6 +187,7 @@ struct kfd_dev {
 					   */
 
 	struct kgd2kfd_shared_resources shared_resources;
+	struct kfd_vmid_info vm_info;
 
 	const struct kfd2kgd_calls *kfd2kgd;
 	struct mutex doorbell_mutex;
