@@ -36,6 +36,11 @@ static inline struct vi_mqd *get_mqd(void *mqd)
 	return (struct vi_mqd *)mqd;
 }
 
+static inline struct vi_sdma_mqd *get_sdma_mqd(void *mqd)
+{
+	return (struct vi_sdma_mqd *)mqd;
+}
+
 static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 			struct queue_properties *q)
 {
@@ -411,8 +416,8 @@ struct mqd_manager *mqd_manager_init_vi_tonga(enum KFD_MQD_TYPE type,
 	mqd = mqd_manager_init_vi(type, dev);
 	if (!mqd)
 		return NULL;
-
-	mqd->update_mqd = update_mqd_tonga;
+	if ((type == KFD_MQD_TYPE_CP) || (type == KFD_MQD_TYPE_COMPUTE))
+		mqd->update_mqd = update_mqd_tonga;
 	return mqd;
 }
 

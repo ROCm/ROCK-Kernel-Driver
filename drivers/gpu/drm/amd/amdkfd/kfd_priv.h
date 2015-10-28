@@ -684,8 +684,6 @@ void kfd_set_process_dgpu_aperture(uint32_t node_id,
 /* Queue Context Management */
 inline uint32_t lower_32(uint64_t x);
 inline uint32_t upper_32(uint64_t x);
-struct cik_sdma_rlc_registers *get_sdma_mqd(void *mqd);
-inline uint32_t get_sdma_base_addr(struct cik_sdma_rlc_registers *m);
 
 int init_queue(struct queue **q, struct queue_properties properties);
 void uninit_queue(struct queue *q);

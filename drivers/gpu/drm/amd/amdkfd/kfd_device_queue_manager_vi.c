@@ -244,7 +244,7 @@ static void init_sdma_vm(struct device_queue_manager *dqm, struct queue *q,
 				get_sh_mem_bases_32(qpd_to_pdd(qpd));
 	else
 		value |= ((get_sh_mem_bases_nybble_64(qpd_to_pdd(qpd))) <<
-				SDMA0_RLC0_VIRTUAL_ADDR__SHARED_BASE__SHIFT) &&
+				SDMA0_RLC0_VIRTUAL_ADDR__SHARED_BASE__SHIFT) &
 				SDMA0_RLC0_VIRTUAL_ADDR__SHARED_BASE_MASK;
 
 	q->properties.sdma_vm_addr = value;
@@ -254,6 +254,16 @@ static void init_sdma_vm_tonga(struct device_queue_manager *dqm,
 			struct queue *q,
 			struct qcm_process_device *qpd)
 {
+	uint32_t value = 0;
+
+	if (q->process->is_32bit_user_mode)
+		value |= (1 << SDMA0_RLC0_VIRTUAL_ADDR__PTR32__SHIFT) |
+				get_sh_mem_bases_32(qpd_to_pdd(qpd));
+	else
+		value |= ((get_sh_mem_bases_nybble_64(qpd_to_pdd(qpd))) <<
+				SDMA0_RLC0_VIRTUAL_ADDR__SHARED_BASE__SHIFT) &
+				SDMA0_RLC0_VIRTUAL_ADDR__SHARED_BASE_MASK;
+	q->properties.sdma_vm_addr = value;
 }
 
 
