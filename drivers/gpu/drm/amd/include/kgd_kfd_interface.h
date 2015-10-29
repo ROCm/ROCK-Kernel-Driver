@@ -262,6 +262,8 @@ struct kfd2kgd_calls {
 	int (*mmap_bo)(struct kgd_dev *kgd, struct vm_area_struct *vma);
 	int (*map_gtt_bo_to_kernel)(struct kgd_dev *kgd,
 			struct kgd_mem *mem, void **kptr);
+	void (*set_vm_context_page_table_base)(struct kgd_dev *kgd, uint32_t vmid,
+			uint32_t page_table_base);
 };
 
 /**

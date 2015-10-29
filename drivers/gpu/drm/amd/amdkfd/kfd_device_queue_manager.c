@@ -112,6 +112,10 @@ static int allocate_vmid(struct device_queue_manager *dqm,
 	set_pasid_vmid_mapping(dqm, q->process->pasid, q->properties.vmid);
 	program_sh_mem_settings(dqm, qpd);
 
+	dqm->dev->kfd2kgd->set_vm_context_page_table_base(dqm->dev->kgd,
+			allocated_vmid,
+			qpd->page_table_base);
+
 	return 0;
 }
 

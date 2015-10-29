@@ -146,6 +146,8 @@ static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
 static int mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma);
 static int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 			struct kgd_mem *mem, void **kptr);
+static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
+			uint32_t page_table_base);
 
 static const struct kfd2kgd_calls kfd2kgd = {
 	.init_gtt_mem_allocation = alloc_gtt_mem,
@@ -184,7 +186,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.alloc_memory_of_scratch = alloc_memory_of_scratch,
 	.write_config_static_mem = write_config_static_mem,
 	.mmap_bo = mmap_bo,
-	.map_gtt_bo_to_kernel = map_gtt_bo_to_kernel
+	.map_gtt_bo_to_kernel = map_gtt_bo_to_kernel,
+	.set_vm_context_page_table_base = set_vm_context_page_table_base
 };
 
 static const struct kgd2kfd_calls *kgd2kfd;
@@ -1608,4 +1611,16 @@ static int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 			struct kgd_mem *mem, void **kptr)
 {
 	return 0;
+}
+
+static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
+			uint32_t page_table_base)
+{
+	struct radeon_device *rdev = get_radeon_device(kgd);
+
+	if (vmid < 8 || vmid > 15) {
+		pr_err("amdkfd: trying to set page table base for wrong VMID\n");
+		return;
+	}
+	WREG32(VM_CONTEXT8_PAGE_TABLE_BASE_ADDR + vmid - 8, page_table_base);
 }

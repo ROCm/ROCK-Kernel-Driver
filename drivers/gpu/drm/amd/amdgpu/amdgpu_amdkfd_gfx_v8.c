@@ -113,6 +113,8 @@ static int alloc_memory_of_scratch(struct kgd_dev *kgd,
 				 uint64_t va, uint32_t vmid);
 static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
 		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
+static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
+		uint32_t page_table_base);
 
 static const struct kfd2kgd_calls kfd2kgd = {
 	.init_gtt_mem_allocation = alloc_gtt_mem,
@@ -156,7 +158,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.alloc_memory_of_scratch = alloc_memory_of_scratch,
 	.write_config_static_mem = write_config_static_mem,
 	.mmap_bo = mmap_bo,
-	.map_gtt_bo_to_kernel = map_gtt_bo_to_kernel
+	.map_gtt_bo_to_kernel = map_gtt_bo_to_kernel,
+	.set_vm_context_page_table_base = set_vm_context_page_table_base
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions()
@@ -690,4 +693,16 @@ static void set_num_of_requests(struct kgd_dev *kgd,
 static int mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma)
 {
 	return -EINVAL;
+}
+
+static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
+		uint32_t page_table_base)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	/* TODO: Don't use hardcoded VMIDs */
+	if (vmid < 8 || vmid > 15) {
+		pr_err("amdkfd: trying to set page table base for wrong VMID\n");
+		return;
+	}
+	WREG32(mmVM_CONTEXT8_PAGE_TABLE_BASE_ADDR + vmid - 8, page_table_base);
 }
