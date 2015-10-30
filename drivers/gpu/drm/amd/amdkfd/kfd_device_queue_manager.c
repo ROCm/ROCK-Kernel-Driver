@@ -728,6 +728,7 @@ static int initialize_cpsch(struct device_queue_manager *dqm)
 	dqm->queue_count = dqm->processes_count = 0;
 	dqm->sdma_queue_count = 0;
 	dqm->active_runlist = false;
+	dqm->sdma_bitmap = (1 << CIK_SDMA_QUEUES) - 1;
 	retval = dqm->ops_asic_specific.initialize(dqm);
 	if (retval != 0)
 		goto fail_init_pipelines;
@@ -862,14 +863,6 @@ static void destroy_kernel_queue_cpsch(struct device_queue_manager *dqm,
 	mutex_unlock(&dqm->lock);
 }
 
-static void select_sdma_engine_id(struct queue *q)
-{
-	static int sdma_id;
-
-	q->sdma_id = sdma_id;
-	sdma_id = (sdma_id + 1) % 2;
-}
-
 static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 			struct qcm_process_device *qpd, int *allocate_vmid)
 {
@@ -892,9 +885,15 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 		goto out;
 	}
 
-	if (q->properties.type == KFD_QUEUE_TYPE_SDMA)
-		select_sdma_engine_id(q);
-
+	if (q->properties.type == KFD_QUEUE_TYPE_SDMA) {
+		retval = allocate_sdma_queue(dqm, &q->sdma_id);
+		if (retval != 0)
+			goto out;
+		q->properties.sdma_queue_id =
+			q->sdma_id % CIK_SDMA_QUEUES_PER_ENGINE;
+		q->properties.sdma_engine_id =
+			q->sdma_id / CIK_SDMA_ENGINE_NUM;
+	}
 	mqd = dqm->ops.get_mqd_manager(dqm,
 			get_mqd_type_from_queue_type(q->properties.type));
 
@@ -1082,8 +1081,10 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 		goto failed;
 	}
 
-	if (q->properties.type == KFD_QUEUE_TYPE_SDMA)
+	if (q->properties.type == KFD_QUEUE_TYPE_SDMA) {
 		dqm->sdma_queue_count--;
+		deallocate_sdma_queue(dqm, q->sdma_id);
+	}
 
 	list_del(&q->list);
 	if (q->properties.is_active)
