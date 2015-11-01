@@ -197,6 +197,48 @@ static int pm_create_map_process(struct packet_manager *pm, uint32_t *buffer,
 	return 0;
 }
 
+static int pm_create_map_process_scratch_kv(struct packet_manager *pm,
+		uint32_t *buffer, struct qcm_process_device *qpd)
+{
+	struct pm4_map_process_scratch_kv *packet;
+	struct queue *cur;
+	uint32_t num_queues;
+
+	BUG_ON(!pm || !buffer || !qpd);
+
+	packet = (struct pm4_map_process_scratch_kv *)buffer;
+
+	pr_debug("kfd: In func %s\n", __func__);
+
+	memset(buffer, 0, sizeof(struct pm4_map_process_scratch_kv));
+
+	packet->header.u32all = build_pm4_header(IT_MAP_PROCESS,
+				sizeof(struct pm4_map_process_scratch_kv));
+	packet->bitfields2.diq_enable = (qpd->is_debug) ? 1 : 0;
+	packet->bitfields2.process_quantum = 1;
+	packet->bitfields2.pasid = qpd->pqm->process->pasid;
+	packet->bitfields3.page_table_base = qpd->page_table_base;
+	packet->bitfields14.gds_size = qpd->gds_size;
+	packet->bitfields14.num_gws = qpd->num_gws;
+	packet->bitfields14.num_oac = qpd->num_oac;
+	num_queues = 0;
+	list_for_each_entry(cur, &qpd->queues_list, list)
+		num_queues++;
+	packet->bitfields14.num_queues = (qpd->is_debug) ? 0 : num_queues;
+
+	packet->sh_mem_config = qpd->sh_mem_config;
+	packet->sh_mem_bases = qpd->sh_mem_bases;
+	packet->sh_mem_ape1_base = qpd->sh_mem_ape1_base;
+	packet->sh_mem_ape1_limit = qpd->sh_mem_ape1_limit;
+
+	packet->sh_hidden_private_base_vmid = qpd->sh_hidden_private_base;
+
+	packet->gds_addr_lo = lower_32_bits(qpd->gds_context_area);
+	packet->gds_addr_hi = upper_32_bits(qpd->gds_context_area);
+
+	return 0;
+}
+
 static int pm_create_map_process_scratch(struct packet_manager *pm,
 		uint32_t *buffer, struct qcm_process_device *qpd)
 {
@@ -482,6 +524,11 @@ static int get_map_process_packet_size(void)
 	return sizeof(struct pm4_map_process);
 }
 
+static int get_map_process_packet_size_scratch_kv(void)
+{
+	return sizeof(struct pm4_map_process_scratch_kv);
+}
+
 static int get_map_process_packet_size_scratch(void)
 {
 	return sizeof(struct pm4_map_process_scratch);
@@ -504,9 +551,15 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 
 	switch (pm->dqm->dev->device_info->asic_family) {
 	case CHIP_KAVERI:
-		pm->pmf->map_process = pm_create_map_process;
-		pm->pmf->get_map_process_packet_size =
-					get_map_process_packet_size;
+		if (fw_ver >= KFD_SCRATCH_KV_FW_VER) {
+			pm->pmf->map_process = pm_create_map_process_scratch_kv;
+			pm->pmf->get_map_process_packet_size =
+					get_map_process_packet_size_scratch_kv;
+		} else {
+			pm->pmf->map_process = pm_create_map_process;
+			pm->pmf->get_map_process_packet_size =
+						get_map_process_packet_size;
+		}
 		break;
 	case CHIP_CARRIZO:
 	case CHIP_TONGA:
