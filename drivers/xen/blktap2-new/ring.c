@@ -431,7 +431,7 @@ static unsigned int blktap_ring_poll(struct file *filp, poll_table *wait)
 	RING_PUSH_REQUESTS(&ring->ring);
 
 	if (work ||
-	    ring->ring.sring->private.tapif_user.msg ||
+	    ring->ring.sring->pvt.tapif_user.msg ||
 	    test_and_clear_bit(BLKTAP_DEVICE_CLOSED, &tap->dev_inuse))
 		return POLLIN | POLLRDNORM;
 

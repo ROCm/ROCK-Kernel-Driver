@@ -16,6 +16,8 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
+ *
+ * Copyright (c) 2007, Keir Fraser
  */
 
 #ifndef __XEN_PUBLIC_HVM_PARAMS_H__
@@ -97,10 +99,15 @@
 #define _HVMPV_time_ref_count 2
 #define HVMPV_time_ref_count  (1 << _HVMPV_time_ref_count)
 
+/* Enable Reference TSC Page (HV_X64_MSR_REFERENCE_TSC) */
+#define _HVMPV_reference_tsc 3
+#define HVMPV_reference_tsc  (1 << _HVMPV_reference_tsc)
+
 #define HVMPV_feature_mask \
 	(HVMPV_base_freq | \
 	 HVMPV_no_freq | \
-	 HVMPV_time_ref_count)
+	 HVMPV_time_ref_count | \
+	 HVMPV_reference_tsc)
 
 #endif
 
@@ -162,8 +169,7 @@
  */
 #define HVM_PARAM_ACPI_IOPORTS_LOCATION 19
 
-/* Enable blocking memory events, async or sync (pause vcpu until response)
- * onchangeonly indicates messages only on a change of value */
+/* Deprecated */
 #define HVM_PARAM_MEMORY_EVENT_CR0          20
 #define HVM_PARAM_MEMORY_EVENT_CR3          21
 #define HVM_PARAM_MEMORY_EVENT_CR4          22
@@ -171,18 +177,12 @@
 #define HVM_PARAM_MEMORY_EVENT_SINGLE_STEP  25
 #define HVM_PARAM_MEMORY_EVENT_MSR          30
 
-#define HVMPME_MODE_MASK       (3 << 0)
-#define HVMPME_mode_disabled   0
-#define HVMPME_mode_async      1
-#define HVMPME_mode_sync       2
-#define HVMPME_onchangeonly    (1 << 2)
-
 /* Boolean: Enable nestedhvm (hvm only) */
 #define HVM_PARAM_NESTEDHVM    24
 
 /* Params for the mem event rings */
 #define HVM_PARAM_PAGING_RING_PFN   27
-#define HVM_PARAM_ACCESS_RING_PFN   28
+#define HVM_PARAM_MONITOR_RING_PFN  28
 #define HVM_PARAM_SHARING_RING_PFN  29
 
 /* SHUTDOWN_* action in case of a triple fault */
@@ -194,6 +194,9 @@
 /* Location of the VM Generation ID in guest physical address space. */
 #define HVM_PARAM_VM_GENERATION_ID_ADDR 34
 
-#define HVM_NR_PARAMS          35
+/* Boolean: Enable altp2m */
+#define HVM_PARAM_ALTP2M       35
+
+#define HVM_NR_PARAMS          36
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

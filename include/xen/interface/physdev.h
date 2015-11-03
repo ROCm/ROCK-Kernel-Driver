@@ -16,6 +16,8 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
+ *
+ * Copyright (c) 2006, Keir Fraser
  */
 
 #ifndef __XEN_PUBLIC_PHYSDEV_H__
@@ -293,6 +295,11 @@ struct physdev_pci_device_add {
         uint8_t bus;
         uint8_t devfn;
     } physfn;
+    /*
+     * Optional parameters array.
+     * First element ([0]) is PXM domain associated with the device (if
+     * XEN_PCI_DEV_PXM is set)
+     */
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
     uint32_t optarr[];
 #elif defined(__GNUC__)
@@ -345,10 +352,11 @@ DEFINE_XEN_GUEST_HANDLE(physdev_dbgp_op_t);
 #define PHYSDEVOP_IRQ_UNMASK_NOTIFY	 4
 
 #if !defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H)
-
+#if __XEN_INTERFACE_VERSION__ < 0x00040600
 /*
  * These all-capitals physdev operation names are superceded by the new names
- * (defined above) since interface version 0x00030202.
+ * (defined above) since interface version 0x00030202. The guard above was
+ * added post-4.5 only though and hence shouldn't check for 0x00030202.
  */
 #define PHYSDEVOP_IRQ_STATUS_QUERY	 PHYSDEVOP_irq_status_query
 #define PHYSDEVOP_SET_IOPL		 PHYSDEVOP_set_iopl
@@ -359,13 +367,13 @@ DEFINE_XEN_GUEST_HANDLE(physdev_dbgp_op_t);
 #define PHYSDEVOP_FREE_VECTOR		 PHYSDEVOP_free_irq_vector
 #define PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY XENIRQSTAT_needs_eoi
 #define PHYSDEVOP_IRQ_SHARED		 XENIRQSTAT_shared
+#endif
 
 #if __XEN_INTERFACE_VERSION__ < 0x00040200
 #define PHYSDEVOP_pirq_eoi_gmfn PHYSDEVOP_pirq_eoi_gmfn_v1
 #else
 #define PHYSDEVOP_pirq_eoi_gmfn PHYSDEVOP_pirq_eoi_gmfn_v2
 #endif
-
 #endif /* !CONFIG_PARAVIRT_XEN || HAVE_XEN_PLATFORM_COMPAT_H */
 
 #endif /* __XEN_PUBLIC_PHYSDEV_H__ */

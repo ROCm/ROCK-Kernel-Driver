@@ -37,9 +37,9 @@
 
 #define DOM0_INTERFACE_VERSION XENPF_INTERFACE_VERSION
 
-#define DOM0_SETTIME          XENPF_settime
-#define dom0_settime          xenpf_settime
-#define dom0_settime_t        xenpf_settime_t
+#define DOM0_SETTIME          XENPF_settime32
+#define dom0_settime          xenpf_settime32
+typedef struct dom0_settime dom0_settime_t;
 
 #define DOM0_ADD_MEMTYPE      XENPF_add_memtype
 #define dom0_add_memtype      xenpf_add_memtype

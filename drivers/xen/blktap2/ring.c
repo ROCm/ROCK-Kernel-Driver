@@ -357,7 +357,7 @@ blktap_ring_set_message(struct blktap *tap, int msg)
 
 	down_read(&tap->tap_sem);
 	if (ring->ring.sring)
-		ring->ring.sring->private.tapif_user.msg = msg;
+		ring->ring.sring->pvt.tapif_user.msg = msg;
 	up_read(&tap->tap_sem);
 }
 
@@ -466,7 +466,7 @@ static unsigned int blktap_ring_poll(struct file *filp, poll_table *wait)
 	struct blktap_ring *ring = &tap->ring;
 
 	poll_wait(filp, &ring->poll_wait, wait);
-	if (ring->ring.sring->private.tapif_user.msg ||
+	if (ring->ring.sring->pvt.tapif_user.msg ||
 	    ring->ring.req_prod_pvt != ring->ring.sring->req_prod) {
 		RING_PUSH_REQUESTS(&ring->ring);
 		return POLLIN | POLLRDNORM;

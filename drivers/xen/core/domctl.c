@@ -18,6 +18,7 @@
 #undef __XEN_PUBLIC_XEN_H__
 #undef __XEN_PUBLIC_GRANT_TABLE_H__
 #undef __XEN_PUBLIC_MEMORY_H__
+#undef __XEN_PUBLIC_PHYSDEV_H__
 #undef __XEN_TOOLS__
 #include <linux/kernel.h>
 #include <linux/module.h>

@@ -142,6 +142,25 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_platform_quirk_t);
 #define XEN_EFI_query_capsule_capabilities   10
 #define XEN_EFI_update_capsule               11
 
+struct xenpf_efi_time {
+	uint16_t year;
+	uint8_t month;
+	uint8_t day;
+	uint8_t hour;
+	uint8_t min;
+	uint8_t sec;
+	uint32_t ns;
+	int16_t tz;
+	uint8_t daylight;
+};
+
+struct xenpf_efi_guid {
+	uint32_t data1;
+	uint16_t data2;
+	uint16_t data3;
+	uint8_t data4[8];
+};
+
 struct xenpf_efi_runtime_call {
 	uint32_t function;
 	/*
@@ -154,17 +173,7 @@ struct xenpf_efi_runtime_call {
 	union {
 #define XEN_EFI_GET_TIME_SET_CLEARS_NS 0x00000001
 		struct {
-			struct xenpf_efi_time {
-				uint16_t year;
-				uint8_t month;
-				uint8_t day;
-				uint8_t hour;
-				uint8_t min;
-				uint8_t sec;
-				uint32_t ns;
-				int16_t tz;
-				uint8_t daylight;
-			} time;
+			struct xenpf_efi_time time;
 			uint32_t resolution;
 			uint32_t accuracy;
 		} get_time;
@@ -186,12 +195,7 @@ struct xenpf_efi_runtime_call {
 			XEN_GUEST_HANDLE(void) name;  /* UCS-2/UTF-16 string */
 			xen_ulong_t size;
 			XEN_GUEST_HANDLE(void) data;
-			struct xenpf_efi_guid {
-				uint32_t data1;
-				uint16_t data2;
-				uint16_t data3;
-				uint8_t data4[8];
-			} vendor_guid;
+			struct xenpf_efi_guid vendor_guid;
 		} get_variable, set_variable;
 
 		struct {
@@ -566,6 +570,16 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_core_parking_t);
 #define XEN_RESOURCE_OP_MSR_READ  0
 #define XEN_RESOURCE_OP_MSR_WRITE 1
 
+/*
+ * Specially handled MSRs:
+ * - MSR_IA32_TSC
+ * READ: Returns the scaled system time(ns) instead of raw timestamp. In
+ *       multiple entry case, if other MSR read is followed by a MSR_IA32_TSC
+ *       read, then both reads are guaranteed to be performed atomically (with
+ *       IRQ disabled). The return time indicates the point of reading that MSR.
+ * WRITE: Not supported.
+ */
+
 struct xenpf_resource_entry {
     union {
         uint32_t cmd;   /* IN: XEN_RESOURCE_OP_* */
@@ -589,9 +603,11 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_resource_op_t);
 #define XENPF_get_symbol      63
 struct xenpf_symdata {
 	/* IN/OUT variables */
-	uint32_t	namelen; /* size of 'name' buffer */
+	uint32_t	namelen; /* IN:  size of 'name' buffer               */
+				 /* OUT: strlen(name) of hypervisor symbol   */
+				 /*      (may be larger than what's been     */
+                                /*      copied to guest)                    */
 
-	/* IN/OUT variables */
 	uint32_t	symnum; /* IN:  Symbol to read                       */
 				/* OUT: Next available symbol. If same as IN */
 				/* then  we reached the end                  */
@@ -602,6 +618,8 @@ struct xenpf_symdata {
 	char            type;
 };
 DEFINE_GUEST_HANDLE_STRUCT(xenpf_symdata);
+typedef struct xenpf_symdata xenpf_symdata_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_symdata_t);
 
 #define XENPF_get_cpu_freq        ('N' << 24)
 #define XENPF_get_cpu_freq_min    (XENPF_get_cpu_freq + 1)

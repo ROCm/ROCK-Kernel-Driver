@@ -76,7 +76,7 @@ blktap_sysfs_remove_device(struct device *dev,
 
 	if (tap->ring.vma) {
 		struct blkif_sring *sring = tap->ring.ring.sring;
-		sring->private.tapif_user.msg = BLKTAP2_RING_MESSAGE_CLOSE;
+		sring->pvt.tapif_user.msg = BLKTAP2_RING_MESSAGE_CLOSE;
 		blktap_ring_kick_user(tap);
 	} else {
 		INIT_WORK(&tap->remove_work, blktap_sysfs_remove_work);

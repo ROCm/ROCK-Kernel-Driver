@@ -28,6 +28,8 @@
 #endif
 #include <xen/tmem.h>
 
+#define tmem_oid xen_tmem_oid
+
 #ifndef CONFIG_XEN_TMEM_MODULE
 bool __read_mostly tmem_enabled = false;
 
@@ -64,10 +66,6 @@ struct tmem_pool_uuid {
 	u64 uuid_hi;
 };
 
-struct tmem_oid {
-	u64 oid[3];
-};
-
 #define TMEM_POOL_PRIVATE_UUID	{ 0, 0 }
 
 /* flags for tmem_ops.new_pool */
@@ -84,9 +82,13 @@ static inline int xen_tmem_op(u32 tmem_cmd, u32 tmem_pool, struct tmem_oid oid,
 
 	op.cmd = tmem_cmd;
 	op.pool_id = tmem_pool;
+#if __XEN_INTERFACE_VERSION__ < 0x00040600
 	op.u.gen.oid[0] = oid.oid[0];
 	op.u.gen.oid[1] = oid.oid[1];
 	op.u.gen.oid[2] = oid.oid[2];
+#else
+	op.u.gen.oid = oid;
+#endif
 	op.u.gen.index = index;
 	op.u.gen.tmem_offset = tmem_offset;
 	op.u.gen.pfn_offset = pfn_offset;

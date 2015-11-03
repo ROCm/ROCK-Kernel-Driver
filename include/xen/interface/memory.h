@@ -28,6 +28,7 @@
 #define __XEN_PUBLIC_MEMORY_H__
 
 #include "xen.h"
+#include "physdev.h"
 
 /*
  * Increase or decrease the specified domain's memory reservation. Returns a
@@ -55,6 +56,8 @@
 /* Flag to request allocation only from the node specified */
 #define XENMEMF_exact_node_request  (1<<17)
 #define XENMEMF_exact_node(n) (XENMEMF_node(n) | XENMEMF_exact_node_request)
+/* Flag to indicate the node specified is virtual node */
+#define XENMEMF_vnode  (1<<18)
 #endif
 
 struct xen_memory_reservation {
@@ -387,23 +390,23 @@ typedef struct xen_pod_target xen_pod_target_t;
 #define XENMEM_paging_op_evict              1
 #define XENMEM_paging_op_prep               2
 
-struct xen_mem_event_op {
-    uint8_t     op;         /* XENMEM_*_op_* */
+struct xen_mem_paging_op {
+    uint8_t     op;         /* XENMEM_paging_op_* */
     domid_t     domain;
-
 
     /* PAGING_PREP IN: buffer to immediately fill page in */
     uint64_aligned_t    buffer;
     /* Other OPs */
     uint64_aligned_t    gfn;           /* IN:  gfn of page being operated on */
 };
-typedef struct xen_mem_event_op xen_mem_event_op_t;
-DEFINE_XEN_GUEST_HANDLE(xen_mem_event_op_t);
+typedef struct xen_mem_paging_op xen_mem_paging_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_mem_paging_op_t);
 
 #define XENMEM_access_op                    21
-#define XENMEM_access_op_resume             0
-#define XENMEM_access_op_set_access         1
-#define XENMEM_access_op_get_access         2
+#define XENMEM_access_op_set_access         0
+#define XENMEM_access_op_get_access         1
+#define XENMEM_access_op_enable_emulate     2
+#define XENMEM_access_op_disable_emulate    3
 
 typedef enum {
     XENMEM_access_n,
@@ -454,12 +457,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_access_op_t);
 #define XENMEM_sharing_op_nominate_gfn      0
 #define XENMEM_sharing_op_nominate_gref     1
 #define XENMEM_sharing_op_share             2
-#define XENMEM_sharing_op_resume            3
-#define XENMEM_sharing_op_debug_gfn         4
-#define XENMEM_sharing_op_debug_mfn         5
-#define XENMEM_sharing_op_debug_gref        6
-#define XENMEM_sharing_op_add_physmap       7
-#define XENMEM_sharing_op_audit             8
+#define XENMEM_sharing_op_debug_gfn         3
+#define XENMEM_sharing_op_debug_mfn         4
+#define XENMEM_sharing_op_debug_gref        5
+#define XENMEM_sharing_op_add_physmap       6
+#define XENMEM_sharing_op_audit             7
 
 #define XENMEM_SHARING_OP_S_HANDLE_INVALID  (-10)
 #define XENMEM_SHARING_OP_C_HANDLE_INVALID  (-9)
@@ -536,6 +538,40 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_sharing_op_t);
  * The zero value is appropiate.
  */
 
+/*
+ * With some legacy devices, certain guest-physical addresses cannot safely
+ * be used for other purposes, e.g. to map guest RAM.  This hypercall
+ * enumerates those regions so the toolstack can avoid using them.
+ */
+#define XENMEM_reserved_device_memory_map   27
+struct xen_reserved_device_memory {
+    xen_pfn_t start_pfn;
+    xen_ulong_t nr_pages;
+};
+typedef struct xen_reserved_device_memory xen_reserved_device_memory_t;
+DEFINE_XEN_GUEST_HANDLE(xen_reserved_device_memory_t);
+
+struct xen_reserved_device_memory_map {
+#define XENMEM_RDM_ALL 1 /* Request all regions (ignore dev union). */
+    /* IN */
+    uint32_t flags;
+    /*
+     * IN/OUT
+     *
+     * Gets set to the required number of entries when too low,
+     * signaled by error code -ERANGE.
+     */
+    unsigned int nr_entries;
+    /* OUT */
+    XEN_GUEST_HANDLE(xen_reserved_device_memory_t) buffer;
+    /* IN */
+    union {
+        struct physdev_pci_device pci;
+    } dev;
+};
+typedef struct xen_reserved_device_memory_map xen_reserved_device_memory_map_t;
+DEFINE_XEN_GUEST_HANDLE(xen_reserved_device_memory_map_t);
+
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
 /*
@@ -587,7 +623,7 @@ struct xen_vnuma_topology_info {
 typedef struct xen_vnuma_topology_info xen_vnuma_topology_info_t;
 DEFINE_XEN_GUEST_HANDLE(xen_vnuma_topology_info_t);
 
-/* Next available subop number is 27 */
+/* Next available subop number is 28 */
 
 #ifndef CONFIG_XEN
 #include <linux/spinlock.h>

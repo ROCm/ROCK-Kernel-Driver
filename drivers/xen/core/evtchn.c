@@ -2011,16 +2011,36 @@ int assign_irq_vector(int irq, struct irq_cfg *cfg, const struct cpumask *mask)
 #define identity_mapped_irq(irq) (1)
 #endif
 
-void evtchn_register_pirq(int irq, unsigned int xen_pirq)
+int evtchn_register_pirq(int irq, unsigned int xen_pirq)
 {
 	struct irq_cfg *cfg = irq_cfg(irq);
+	struct physdev_map_pirq map_pirq = {
+		.domid = DOMID_SELF,
+		.type = MAP_PIRQ_TYPE_GSI,
+		.index = irq,
+		.pirq = irq
+	};
 
 	BUG_ON(irq < PIRQ_BASE || irq - PIRQ_BASE >= nr_pirqs);
-	if (identity_mapped_irq(irq) || type_from_irq_cfg(cfg) != IRQT_UNBOUND)
-		return;
-	cfg->info = mk_irq_info(IRQT_PIRQ, xen_pirq, 0);
-	irq_set_chip_and_handler_name(irq, &pirq_chip, handle_fasteoi_irq,
-				      "fasteoi");
+
+	switch (type_from_irq_cfg(cfg)) {
+	case IRQT_UNBOUND:
+		break;
+	case IRQT_PIRQ:
+		if (index_from_irq(irq) == irq)
+			return -EEXIST;
+	default:
+		return -EBUSY;
+	}
+
+	if (!identity_mapped_irq(irq)) {
+		cfg->info = mk_irq_info(IRQT_PIRQ, xen_pirq, 0);
+		irq_set_chip_and_handler_name(irq, &pirq_chip,
+					      handle_fasteoi_irq, "fasteoi");
+	}
+
+	return is_initial_xendomain()
+	       ? HYPERVISOR_physdev_op(PHYSDEVOP_map_pirq, &map_pirq) : 0;
 }
 
 #ifdef CONFIG_PCI_MSI

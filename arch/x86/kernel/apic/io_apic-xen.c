@@ -2640,7 +2640,9 @@ void __init setup_ioapic_dest(void)
 			mask = apic->target_cpus();
 
 		chip = irq_data_get_irq_chip(idata);
-		chip->irq_set_affinity(idata, mask, false);
+		/* Might be lapic_chip for irq 0 */
+		if (chip->irq_set_affinity)
+			chip->irq_set_affinity(idata, mask, false);
 	}
 }
 #endif
@@ -3013,6 +3015,9 @@ int mp_irqdomain_alloc(struct irq_domain *domain, unsigned int virq,
 	struct irq_data *irq_data;
 	struct mp_chip_data *data;
 	struct irq_alloc_info *info = arg;
+#ifndef CONFIG_XEN
+	unsigned long flags;
+#endif
 
 	if (!info || nr_irqs > 1)
 		return -EINVAL;
@@ -3049,12 +3054,17 @@ int mp_irqdomain_alloc(struct irq_domain *domain, unsigned int virq,
 
 	cfg = irqd_cfg(irq_data);
 	add_pin_to_irq_node(data, ioapic_alloc_attr_node(info), ioapic, pin);
+
+#ifndef CONFIG_XEN
+	local_irq_save(flags);
+#endif
 	if (info->ioapic_entry)
 		mp_setup_entry(cfg, data, info->ioapic_entry);
 #ifndef CONFIG_XEN
 	mp_register_handler(virq, data->trigger);
 	if (virq < nr_legacy_irqs())
 		legacy_pic->mask(virq);
+	local_irq_restore(flags);
 
 	apic_printk(APIC_VERBOSE, KERN_DEBUG
 		    "IOAPIC[%d]: Set routing entry (%d-%d -> 0x%x -> IRQ %d Mode:%i Active:%i Dest:%d)\n",
@@ -3068,12 +3078,6 @@ int mp_irqdomain_alloc(struct irq_domain *domain, unsigned int virq,
 			.triggering = data->trigger,
 			.polarity = data->polarity
 		};
-		struct physdev_map_pirq map_pirq = {
-			.domid = DOMID_SELF,
-			.type = MAP_PIRQ_TYPE_GSI,
-			.index = gsi,
-			.pirq = gsi
-		};
 
 		switch (HYPERVISOR_physdev_op(PHYSDEVOP_setup_gsi,
 					      &setup_gsi)) {
@@ -3082,9 +3086,7 @@ int mp_irqdomain_alloc(struct irq_domain *domain, unsigned int virq,
 				break;
 			/* fall through */
 		case 0:
-			evtchn_register_pirq(virq, gsi);
-			if (HYPERVISOR_physdev_op(PHYSDEVOP_map_pirq,
-						  &map_pirq) == 0) {
+			if (evtchn_register_pirq(virq, gsi) == 0) {
 				data->entry.vector = gsi;
 				/* fake (for init_IO_APIC_traps()): */
 				cfg->vector = gsi;

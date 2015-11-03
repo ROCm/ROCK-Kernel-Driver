@@ -166,7 +166,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define VIRQ_MEM_EVENT  10 /* G. (DOM0) A memory event has occured           */
 #define VIRQ_XC_RESERVED 11 /* G. Reserved for XenClient                     */
 #define VIRQ_ENOMEM     12 /* G. (DOM0) Low on heap memory       */
-#define VIRQ_XENPMU     13  /* PMC interrupt                                 */
+#define VIRQ_XENPMU     13 /* V.  PMC interrupt                              */
 
 /* Architecture-specific VIRQ definitions. */
 #define VIRQ_ARCH_0    16
@@ -494,7 +494,16 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 /* x86/PAE guests: support PDPTs above 4GB. */
 #define VMASST_TYPE_pae_extended_cr3     3
 
-/* x86/64 guests: strictly hide M2P from user mode. */
+/*
+ * x86/64 guests: strictly hide M2P from user mode.
+ * This allows the guest to control respective hypervisor behavior:
+ * - when not set, L4 tables get created with the respective slot blank,
+ *   and whenever the L4 table gets used as a kernel one the missing
+ *   mapping gets inserted,
+ * - when set, L4 tables get created with the respective slot initialized
+ *   as before, and whenever the L4 table gets used as a user one the
+ *   mapping gets zapped.
+ */
 #define VMASST_TYPE_m2p_strict           32
 
 #if __XEN_INTERFACE_VERSION__ < 0x00040600
@@ -708,12 +717,12 @@ struct shared_info {
 	uint32_t wc_version;      /* Version counter: see vcpu_time_info_t. */
 	uint32_t wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
 	uint32_t wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
-# if !defined(__i386__)
+#endif
+#if !defined(__i386__)
 	uint32_t wc_sec_hi;
-#  define xen_wc_sec_hi wc_sec_hi
-# elif !defined(__XEN__) && !defined(__XEN_TOOLS__)
-#  define xen_wc_sec_hi arch.wc_sec_hi
-# endif
+# define xen_wc_sec_hi wc_sec_hi
+#elif !defined(__XEN__) && !defined(__XEN_TOOLS__)
+# define xen_wc_sec_hi arch.wc_sec_hi
 #endif
 
 	struct arch_shared_info arch;
@@ -751,7 +760,7 @@ typedef struct shared_info shared_info_t;
  *     extended by an extra 4MB to ensure this.
  *
  * Note: Prior to 25833:bb85bbccb1c9. ("x86/32-on-64 adjust Dom0 initial page
- * table layout") a bug caused the pt_base (3.e above) and cr3 to not point
+ * table layout") a bug caused the pt_base (3.g above) and cr3 to not point
  * to the start of the guest page tables (it was offset by two pages).
  * This only manifested itself on 32-on-64 dom0 kernels and not 32-on-64 domU
  * or 64-bit kernels of any colour. The page tables for a 32-on-64 dom0 got
@@ -907,6 +916,9 @@ __DEFINE_XEN_GUEST_HANDLE(uint64, uint64_t);
 /* Default definitions for macros used by domctl/sysctl. */
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
+#ifndef int64_aligned_t
+#define int64_aligned_t int64_t
+#endif
 #ifndef uint64_aligned_t
 #define uint64_aligned_t uint64_t
 #endif

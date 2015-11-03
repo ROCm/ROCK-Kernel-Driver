@@ -37,7 +37,7 @@
 #include "hvm/save.h"
 #include "memory.h"
 
-#define XEN_DOMCTL_INTERFACE_VERSION 0x0000000a
+#define XEN_DOMCTL_INTERFACE_VERSION 0x0000000b
 
 /*
  * NB. xen_domctl.domain is an IN/OUT parameter for this operation.
@@ -64,22 +64,10 @@ struct xen_domctl_createdomain {
 #define _XEN_DOMCTL_CDF_pvh_guest     4
 #define XEN_DOMCTL_CDF_pvh_guest      (1U<<_XEN_DOMCTL_CDF_pvh_guest)
     uint32_t flags;
+    struct xen_arch_domainconfig config;
 };
 typedef struct xen_domctl_createdomain xen_domctl_createdomain_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_createdomain_t);
-
-#if defined(__arm__) || defined(__aarch64__)
-#define XEN_DOMCTL_CONFIG_GIC_DEFAULT   0
-#define XEN_DOMCTL_CONFIG_GIC_V2        1
-#define XEN_DOMCTL_CONFIG_GIC_V3        2
-/* XEN_DOMCTL_configure_domain */
-struct xen_domctl_arm_configuredomain {
-    /* IN/OUT parameters */
-    uint8_t gic_version;
-};
-typedef struct xen_domctl_arm_configuredomain xen_domctl_arm_configuredomain_t;
-DEFINE_XEN_GUEST_HANDLE(xen_domctl_arm_configuredomain_t);
-#endif
 
 /* XEN_DOMCTL_getdomaininfo */
 struct xen_domctl_getdomaininfo {
@@ -160,27 +148,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_getmemlist_t);
 #define XEN_DOMCTL_PFINFO_XALLOC  (0xeU<<28) /* allocate-only page */
 #define XEN_DOMCTL_PFINFO_BROKEN  (0xdU<<28) /* broken page */
 #define XEN_DOMCTL_PFINFO_LTAB_MASK (0xfU<<28)
-
-struct xen_domctl_getpageframeinfo {
-    /* IN variables. */
-    uint64_aligned_t gmfn; /* GMFN to query */
-    /* OUT variables. */
-    /* Is the page PINNED to a type? */
-    uint32_t type;         /* see above type defs */
-};
-typedef struct xen_domctl_getpageframeinfo xen_domctl_getpageframeinfo_t;
-DEFINE_XEN_GUEST_HANDLE(xen_domctl_getpageframeinfo_t);
-
-
-/* XEN_DOMCTL_getpageframeinfo2 */
-struct xen_domctl_getpageframeinfo2 {
-    /* IN variables. */
-    uint64_aligned_t num;
-    /* IN/OUT variables. */
-    XEN_GUEST_HANDLE_64(uint32) array;
-};
-typedef struct xen_domctl_getpageframeinfo2 xen_domctl_getpageframeinfo2_t;
-DEFINE_XEN_GUEST_HANDLE(xen_domctl_getpageframeinfo2_t);
 
 /* XEN_DOMCTL_getpageframeinfo3 */
 struct xen_domctl_getpageframeinfo3 {
@@ -357,7 +324,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_max_vcpus_t);
 
 /* XEN_DOMCTL_scheduler_op */
 /* Scheduler types. */
-#define XEN_SCHEDULER_SEDF     4
+/* #define XEN_SCHEDULER_SEDF  4 (Removed) */
 #define XEN_SCHEDULER_CREDIT   5
 #define XEN_SCHEDULER_CREDIT2  6
 #define XEN_SCHEDULER_ARINC653 7
@@ -370,13 +337,6 @@ struct xen_domctl_scheduler_op {
     uint32_t sched_id;  /* XEN_SCHEDULER_* */
     uint32_t cmd;       /* XEN_DOMCTL_SCHEDOP_* */
     union {
-        struct xen_domctl_sched_sedf {
-            uint64_aligned_t period;
-            uint64_aligned_t slice;
-            uint64_aligned_t latency;
-            uint32_t extratime;
-            uint32_t weight;
-        } sedf;
         struct xen_domctl_sched_credit {
             uint16_t weight;
             uint16_t cap;
@@ -469,7 +429,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_arch_setup_t);
 
 /* XEN_DOMCTL_settimeoffset */
 struct xen_domctl_settimeoffset {
-    int32_t  time_offset_seconds; /* applied to domain wallclock time */
+    int64_aligned_t time_offset_seconds; /* applied to domain wallclock time */
 };
 typedef struct xen_domctl_settimeoffset xen_domctl_settimeoffset_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_settimeoffset_t);
@@ -515,12 +475,33 @@ typedef struct xen_domctl_sendtrigger xen_domctl_sendtrigger_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_sendtrigger_t);
 
 
-/* Assign PCI device to HVM guest. Sets up IOMMU structures. */
+/* Assign a device to a guest. Sets up IOMMU structures. */
 /* XEN_DOMCTL_assign_device */
 /* XEN_DOMCTL_test_assign_device */
-/* XEN_DOMCTL_deassign_device */
+/*
+ * XEN_DOMCTL_deassign_device: The behavior of this DOMCTL differs
+ * between the different type of device:
+ *  - PCI device (XEN_DOMCTL_DEV_PCI) will be reassigned to DOM0
+ *  - DT device (XEN_DOMCTL_DT_PCI) will left unassigned. DOM0
+ *  will have to call XEN_DOMCTL_assign_device in order to use the
+ *  device.
+ */
+#define XEN_DOMCTL_DEV_PCI      0
+#define XEN_DOMCTL_DEV_DT       1
 struct xen_domctl_assign_device {
-    uint32_t  machine_sbdf;   /* machine PCI ID of assigned device */
+    uint32_t dev;   /* XEN_DOMCTL_DEV_* */
+    union {
+        struct {
+            uint32_t machine_sbdf;   /* machine PCI ID of assigned device */
+        } pci;
+        struct {
+            uint32_t size; /* Length of the path */
+            XEN_GUEST_HANDLE_64(char) path; /* path to the device tree node */
+        } dt;
+    } u;
+    /* IN */
+#define XEN_DOMCTL_DEV_RDM_RELAXED      1
+    uint32_t  flag;   /* flag of assigned device */
 };
 typedef struct xen_domctl_assign_device xen_domctl_assign_device_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_assign_device_t);
@@ -544,6 +525,7 @@ typedef enum pt_irq_type_e {
     PT_IRQ_TYPE_ISA,
     PT_IRQ_TYPE_MSI,
     PT_IRQ_TYPE_MSI_TRANSLATE,
+    PT_IRQ_TYPE_SPI,    /* ARM: valid range 32-1019 */
 } pt_irq_type_t;
 struct xen_domctl_bind_pt_irq {
     uint32_t machine_irq;
@@ -564,6 +546,9 @@ struct xen_domctl_bind_pt_irq {
             uint32_t gflags;
             uint64_aligned_t gtable;
         } msi;
+        struct {
+            uint16_t spi;
+        } spi;
     } u;
 };
 typedef struct xen_domctl_bind_pt_irq xen_domctl_bind_pt_irq_t;
@@ -571,6 +556,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_bind_pt_irq_t);
 
 
 /* Bind machine I/O address range -> HVM address range. */
+/* If this returns -E2BIG lower nr_mfns value. */
 /* XEN_DOMCTL_memory_mapping */
 #define DPCI_ADD_MAPPING         1
 #define DPCI_REMOVE_MAPPING      0
@@ -752,18 +738,13 @@ typedef struct xen_domctl_disable_migrate {
 
 /* XEN_DOMCTL_gettscinfo */
 /* XEN_DOMCTL_settscinfo */
-struct xen_guest_tsc_info {
+typedef struct xen_domctl_tsc_info {
+    /* IN/OUT */
     uint32_t tsc_mode;
     uint32_t gtsc_khz;
     uint32_t incarnation;
     uint32_t pad;
     uint64_aligned_t elapsed_nsec;
-};
-typedef struct xen_guest_tsc_info xen_guest_tsc_info_t;
-DEFINE_XEN_GUEST_HANDLE(xen_guest_tsc_info_t);
-typedef struct xen_domctl_tsc_info {
-    XEN_GUEST_HANDLE_64(xen_guest_tsc_info_t) out_info; /* OUT */
-    xen_guest_tsc_info_t info; /* IN */
 } xen_domctl_tsc_info_t;
 
 /* XEN_DOMCTL_gdbsx_guestmemio      guest mem io */
@@ -793,10 +774,21 @@ struct xen_domctl_gdbsx_domstatus {
 };
 
 /*
- * Memory event operations
+ * VM event operations
  */
 
-/* XEN_DOMCTL_mem_event_op */
+/* XEN_DOMCTL_vm_event_op */
+
+/*
+ * There are currently three rings available for VM events:
+ * sharing, monitor and paging. This hypercall allows one to
+ * control these rings (enable/disable), as well as to signal
+ * to the hypervisor to pull responses (resume) from the given
+ * ring.
+ */
+#define XEN_VM_EVENT_ENABLE               0
+#define XEN_VM_EVENT_DISABLE              1
+#define XEN_VM_EVENT_RESUME               2
 
 /*
  * Domain memory paging
@@ -805,42 +797,38 @@ struct xen_domctl_gdbsx_domstatus {
  * pager<->hypervisor interface. Use XENMEM_paging_op*
  * to perform per-page operations.
  *
- * The XEN_DOMCTL_MEM_EVENT_OP_PAGING_ENABLE domctl returns several
+ * The XEN_VM_EVENT_PAGING_ENABLE domctl returns several
  * non-standard error codes to indicate why paging could not be enabled:
  * ENODEV - host lacks HAP support (EPT/NPT) or HAP is disabled in guest
  * EMLINK - guest has iommu passthrough enabled
  * EXDEV  - guest has PoD enabled
  * EBUSY  - guest has or had paging enabled, ring buffer still active
  */
-#define XEN_DOMCTL_MEM_EVENT_OP_PAGING            1
-
-#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_ENABLE     0
-#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_DISABLE    1
+#define XEN_DOMCTL_VM_EVENT_OP_PAGING            1
 
 /*
- * Access permissions.
+ * Monitor helper.
  *
  * As with paging, use the domctl for teardown/setup of the
  * helper<->hypervisor interface.
  *
- * There are HVM hypercalls to set the per-page access permissions of every
- * page in a domain.  When one of these permissions--independent, read, 
- * write, and execute--is violated, the VCPU is paused and a memory event 
- * is sent with what happened.  (See public/mem_event.h) .
+ * The monitor interface can be used to register for various VM events. For
+ * example, there are HVM hypercalls to set the per-page access permissions
+ * of every page in a domain.  When one of these permissions--independent,
+ * read, write, and execute--is violated, the VCPU is paused and a memory event
+ * is sent with what happened. The memory event handler can then resume the
+ * VCPU and redo the access with a XEN_VM_EVENT_RESUME option.
  *
- * The memory event handler can then resume the VCPU and redo the access 
- * with a XENMEM_access_op_resume hypercall.
+ * See public/vm_event.h for the list of available events that can be
+ * subscribed to via the monitor interface.
  *
- * The XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE domctl returns several
+ * The XEN_VM_EVENT_MONITOR_* domctls returns
  * non-standard error codes to indicate why access could not be enabled:
  * ENODEV - host lacks HAP support (EPT/NPT) or HAP is disabled in guest
  * EBUSY  - guest has or had access enabled, ring buffer still active
+ *
  */
-#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS                        2
-
-#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE                 0
-#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_DISABLE                1
-#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE_INTROSPECTION   2
+#define XEN_DOMCTL_VM_EVENT_OP_MONITOR           2
 
 /*
  * Sharing ENOMEM helper.
@@ -855,21 +843,18 @@ struct xen_domctl_gdbsx_domstatus {
  * Note that shring can be turned on (as per the domctl below)
  * *without* this ring being setup.
  */
-#define XEN_DOMCTL_MEM_EVENT_OP_SHARING           3
-
-#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_ENABLE    0
-#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_DISABLE   1
+#define XEN_DOMCTL_VM_EVENT_OP_SHARING           3
 
 /* Use for teardown/setup of helper<->hypervisor interface for paging, 
  * access and sharing.*/
-struct xen_domctl_mem_event_op {
-    uint32_t       op;           /* XEN_DOMCTL_MEM_EVENT_OP_*_* */
-    uint32_t       mode;         /* XEN_DOMCTL_MEM_EVENT_OP_* */
+struct xen_domctl_vm_event_op {
+    uint32_t       op;           /* XEN_VM_EVENT_* */
+    uint32_t       mode;         /* XEN_DOMCTL_VM_EVENT_OP_* */
 
     uint32_t port;              /* OUT: event channel for ring */
 };
-typedef struct xen_domctl_mem_event_op xen_domctl_mem_event_op_t;
-DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_event_op_t);
+typedef struct xen_domctl_vm_event_op xen_domctl_vm_event_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_vm_event_op_t);
 
 /*
  * Memory sharing operations
@@ -1001,27 +986,37 @@ typedef struct xen_domctl_vcpu_msrs xen_domctl_vcpu_msrs_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_vcpu_msrs_t);
 #endif
 
-/*
- * Use in XEN_DOMCTL_setvnumainfo to set
- * vNUMA domain topology.
- */
+/* XEN_DOMCTL_setvnumainfo: specifies a virtual NUMA topology for the guest */
 struct xen_domctl_vnuma {
+    /* IN: number of vNUMA nodes to setup. Shall be greater than 0 */
     uint32_t nr_vnodes;
+    /* IN: number of memory ranges to setup */
     uint32_t nr_vmemranges;
+    /*
+     * IN: number of vCPUs of the domain (used as size of the vcpu_to_vnode
+     * array declared below). Shall be equal to the domain's max_vcpus.
+     */
     uint32_t nr_vcpus;
-    uint32_t pad;
-    XEN_GUEST_HANDLE_64(uint) vdistance;
-    XEN_GUEST_HANDLE_64(uint) vcpu_to_vnode;
+    uint32_t pad;                                  /* must be zero */
 
     /*
-     * vnodes to physical NUMA nodes mask.
-     * This kept on per-domain basis for
-     * interested consumers, such as numa aware ballooning.
+     * IN: array for specifying the distances of the vNUMA nodes
+     * between each others. Shall have nr_vnodes*nr_vnodes elements.
+     */
+    XEN_GUEST_HANDLE_64(uint) vdistance;
+    /*
+     * IN: array for specifying to what vNUMA node each vCPU belongs.
+     * Shall have nr_vcpus elements.
+     */
+    XEN_GUEST_HANDLE_64(uint) vcpu_to_vnode;
+    /*
+     * IN: array for specifying on what physical NUMA node each vNUMA
+     * node is placed. Shall have nr_vnodes elements.
      */
     XEN_GUEST_HANDLE_64(uint) vnode_to_pnode;
-
     /*
-     * memory rages for each vNUMA node
+     * IN: array for specifying the memory ranges. Shall have
+     * nr_vmemranges elements.
      */
     XEN_GUEST_HANDLE_64(xen_vmemrange_t) vmemrange;
 };
@@ -1038,6 +1033,79 @@ struct xen_domctl_psr_cmt_op {
 typedef struct xen_domctl_psr_cmt_op xen_domctl_psr_cmt_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_psr_cmt_op_t);
 
+/*  XEN_DOMCTL_MONITOR_*
+ *
+ * Enable/disable monitoring various VM events.
+ * This domctl configures what events will be reported to helper apps
+ * via the ring buffer "MONITOR". The ring has to be first enabled
+ * with the domctl XEN_DOMCTL_VM_EVENT_OP_MONITOR.
+ *
+ * GET_CAPABILITIES can be used to determine which of these features is
+ * available on a given platform.
+ *
+ * NOTICE: mem_access events are also delivered via the "MONITOR" ring buffer;
+ * however, enabling/disabling those events is performed with the use of
+ * memory_op hypercalls!
+ */
+#define XEN_DOMCTL_MONITOR_OP_ENABLE            0
+#define XEN_DOMCTL_MONITOR_OP_DISABLE           1
+#define XEN_DOMCTL_MONITOR_OP_GET_CAPABILITIES  2
+
+#define XEN_DOMCTL_MONITOR_EVENT_WRITE_CTRLREG         0
+#define XEN_DOMCTL_MONITOR_EVENT_MOV_TO_MSR            1
+#define XEN_DOMCTL_MONITOR_EVENT_SINGLESTEP            2
+#define XEN_DOMCTL_MONITOR_EVENT_SOFTWARE_BREAKPOINT   3
+#define XEN_DOMCTL_MONITOR_EVENT_GUEST_REQUEST         4
+
+struct xen_domctl_monitor_op {
+    uint32_t op; /* XEN_DOMCTL_MONITOR_OP_* */
+
+    /*
+     * When used with ENABLE/DISABLE this has to be set to
+     * the requested XEN_DOMCTL_MONITOR_EVENT_* value.
+     * With GET_CAPABILITIES this field returns a bitmap of
+     * events supported by the platform, in the format
+     * (1 << XEN_DOMCTL_MONITOR_EVENT_*).
+     */
+    uint32_t event;
+
+    /*
+     * Further options when issuing XEN_DOMCTL_MONITOR_OP_ENABLE.
+     */
+    union {
+        struct {
+            /* Which control register */
+            uint8_t index;
+            /* Pause vCPU until response */
+            uint8_t sync;
+            /* Send event only on a change of value */
+            uint8_t onchangeonly;
+        } mov_to_cr;
+
+        struct {
+            /* Enable the capture of an extended set of MSRs */
+            uint8_t extended_capture;
+        } mov_to_msr;
+
+        struct {
+            /* Pause vCPU until response */
+            uint8_t sync;
+        } guest_request;
+    } u;
+};
+typedef struct xen_domctl_monitor_op xen_domctl_monitor_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_monitor_op_t);
+
+struct xen_domctl_psr_cat_op {
+#define XEN_DOMCTL_PSR_CAT_OP_SET_L3_CBM     0
+#define XEN_DOMCTL_PSR_CAT_OP_GET_L3_CBM     1
+    uint32_t cmd;       /* IN: XEN_DOMCTL_PSR_CAT_OP_* */
+    uint32_t target;    /* IN */
+    uint64_t data;      /* IN/OUT */
+};
+typedef struct xen_domctl_psr_cat_op xen_domctl_psr_cat_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_psr_cat_op_t);
+
 struct xen_domctl {
     uint32_t cmd;
 #define XEN_DOMCTL_createdomain                   1
@@ -1046,8 +1114,8 @@ struct xen_domctl {
 #define XEN_DOMCTL_unpausedomain                  4
 #define XEN_DOMCTL_getdomaininfo                  5
 #define XEN_DOMCTL_getmemlist                     6
-#define XEN_DOMCTL_getpageframeinfo               7
-#define XEN_DOMCTL_getpageframeinfo2              8
+/* #define XEN_DOMCTL_getpageframeinfo            7 Obsolete - use getpageframeinfo3 */
+/* #define XEN_DOMCTL_getpageframeinfo2           8 Obsolete - use getpageframeinfo3 */
 #define XEN_DOMCTL_setvcpuaffinity                9
 #define XEN_DOMCTL_shadow_op                     10
 #define XEN_DOMCTL_max_mem                       11
@@ -1062,10 +1130,10 @@ struct xen_domctl {
 #define XEN_DOMCTL_iomem_permission              20
 #define XEN_DOMCTL_ioport_permission             21
 #define XEN_DOMCTL_hypercall_init                22
-#define XEN_DOMCTL_arch_setup                    23
+#define XEN_DOMCTL_arch_setup                    23 /* Obsolete IA64 only */
 #define XEN_DOMCTL_settimeoffset                 24
 #define XEN_DOMCTL_getvcpuaffinity               25
-#define XEN_DOMCTL_real_mode_area                26
+#define XEN_DOMCTL_real_mode_area                26 /* Obsolete PPC only */
 #define XEN_DOMCTL_resumedomain                  27
 #define XEN_DOMCTL_sendtrigger                   28
 #define XEN_DOMCTL_subscribe                     29
@@ -1080,7 +1148,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_pin_mem_cacheattr             41
 #define XEN_DOMCTL_set_ext_vcpucontext           42
 #define XEN_DOMCTL_get_ext_vcpucontext           43
-#define XEN_DOMCTL_set_opt_feature               44
+#define XEN_DOMCTL_set_opt_feature               44 /* Obsolete IA64 only */
 #define XEN_DOMCTL_test_assign_device            45
 #define XEN_DOMCTL_set_target                    46
 #define XEN_DOMCTL_deassign_device               47
@@ -1092,7 +1160,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_suppress_spurious_page_faults 53
 #define XEN_DOMCTL_debug_op                      54
 #define XEN_DOMCTL_gethvmcontext_partial         55
-#define XEN_DOMCTL_mem_event_op                  56
+#define XEN_DOMCTL_vm_event_op                   56
 #define XEN_DOMCTL_mem_sharing_op                57
 #define XEN_DOMCTL_disable_migrate               58
 #define XEN_DOMCTL_gettscinfo                    59
@@ -1112,7 +1180,8 @@ struct xen_domctl {
 #define XEN_DOMCTL_set_vcpu_msrs                 73
 #define XEN_DOMCTL_setvnumainfo                  74
 #define XEN_DOMCTL_psr_cmt_op                    75
-#define XEN_DOMCTL_arm_configure_domain          76
+#define XEN_DOMCTL_monitor_op                    77
+#define XEN_DOMCTL_psr_cat_op                    78
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -1126,8 +1195,6 @@ struct xen_domctl {
 #endif
         struct xen_domctl_getdomaininfo     getdomaininfo;
         struct xen_domctl_getmemlist        getmemlist;
-        struct xen_domctl_getpageframeinfo  getpageframeinfo;
-        struct xen_domctl_getpageframeinfo2 getpageframeinfo2;
         struct xen_domctl_getpageframeinfo3 getpageframeinfo3;
         struct xen_domctl_nodeaffinity      nodeaffinity;
         struct xen_domctl_vcpuaffinity      vcpuaffinity;
@@ -1163,7 +1230,7 @@ struct xen_domctl {
         struct xen_domctl_set_target        set_target;
         struct xen_domctl_subscribe         subscribe;
         struct xen_domctl_debug_op          debug_op;
-        struct xen_domctl_mem_event_op      mem_event_op;
+        struct xen_domctl_vm_event_op       vm_event_op;
         struct xen_domctl_mem_sharing_op    mem_sharing_op;
 #if defined(__i386__) || defined(__x86_64__)
         struct xen_domctl_cpuid             cpuid;
@@ -1181,6 +1248,8 @@ struct xen_domctl {
         struct xen_domctl_gdbsx_domstatus   gdbsx_domstatus;
         struct xen_domctl_vnuma             vnuma;
         struct xen_domctl_psr_cmt_op        psr_cmt_op;
+        struct xen_domctl_monitor_op        monitor_op;
+        struct xen_domctl_psr_cat_op        psr_cat_op;
         uint8_t                             pad[128];
     } u;
 };

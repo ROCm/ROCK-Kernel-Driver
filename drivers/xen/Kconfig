@@ -8,7 +8,7 @@ config XEN
 if XEN
 config XEN_INTERFACE_VERSION
 	hex
-	default 0x00040500
+	default 0x00040600
 
 menu "XEN"
 
@@ -274,25 +274,10 @@ config XEN_NR_GUEST_DEVICES
 
 choice
 	prompt "Xen version compatibility"
-	default XEN_COMPAT_030002_AND_LATER
+	default XEN_COMPAT_040000_AND_LATER
 
-	config XEN_COMPAT_030002_AND_LATER
-		bool "3.0.2 and later"
-
-	config XEN_COMPAT_030004_AND_LATER
-		bool "3.0.4 and later"
-
-	config XEN_COMPAT_030100_AND_LATER
-		bool "3.1.0 and later"
-
-	config XEN_COMPAT_030200_AND_LATER
-		bool "3.2.0 and later"
-
-	config XEN_COMPAT_030300_AND_LATER
-		bool "3.3.0 and later"
-
-	config XEN_COMPAT_030400_AND_LATER
-		bool "3.4.0 and later"
+	config XEN_COMPAT_3x
+		bool "3.x and later"
 
 	config XEN_COMPAT_040000_AND_LATER
 		bool "4.0.0 and later"
@@ -312,14 +297,41 @@ choice
 	config XEN_COMPAT_040500_AND_LATER
 		bool "4.5.0 and later"
 
+	config XEN_COMPAT_040600_AND_LATER
+		bool "4.6.0 and later"
+
 	config XEN_COMPAT_LATEST_ONLY
 		bool "no compatibility code"
+endchoice
 
+choice
+	prompt "Xen 3.x version compatibility"
+	depends on XEN_COMPAT_3x
+	default XEN_COMPAT_030002_AND_LATER
+
+	config XEN_COMPAT_030002_AND_LATER
+		bool "3.0.2 and later"
+
+	config XEN_COMPAT_030004_AND_LATER
+		bool "3.0.4 and later"
+
+	config XEN_COMPAT_030100_AND_LATER
+		bool "3.1.0 and later"
+
+	config XEN_COMPAT_030200_AND_LATER
+		bool "3.2.0 and later"
+
+	config XEN_COMPAT_030300_AND_LATER
+		bool "3.3.0 and later"
+
+	config XEN_COMPAT_030400_AND_LATER
+		bool "3.4.0 and later"
 endchoice
 
 config XEN_COMPAT
 	hex
 	default 0xffffff if XEN_COMPAT_LATEST_ONLY
+	default 0x040600 if XEN_COMPAT_040600_AND_LATER
 	default 0x040500 if XEN_COMPAT_040500_AND_LATER
 	default 0x040400 if XEN_COMPAT_040400_AND_LATER
 	default 0x040300 if XEN_COMPAT_040300_AND_LATER

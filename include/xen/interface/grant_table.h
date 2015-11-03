@@ -136,8 +136,10 @@ struct grant_entry_v1 {
     /* The domain being granted foreign privileges. [GST] */
     domid_t  domid;
     /*
-     * GTF_permit_access: Frame that @domid is allowed to map and access. [GST]
-     * GTF_accept_transfer: Frame whose ownership transferred by @domid. [XEN]
+     * GTF_permit_access: GFN that @domid is allowed to map and access. [GST]
+     * GTF_accept_transfer: GFN that @domid is allowed to transfer into. [GST]
+     * GTF_transfer_completed: MFN whose ownership transferred by @domid
+     *                         (non-translated guests only). [XEN]
      */
     uint32_t frame;
 };
@@ -324,7 +326,7 @@ typedef uint32_t grant_handle_t;
 /*
  * GNTTABOP_map_grant_ref: Map the grant entry (<dom>,<ref>) for access
  * by devices and/or host CPUs. If successful, <handle> is a tracking number
- * that must be presented later to destroy the mapping(s). On error, <handle>
+ * that must be presented later to destroy the mapping(s). On error, <status>
  * is a negative status code.
  * NOTES:
  *  1. If GNTMAP_device_map is specified then <dev_bus_addr> is the address
@@ -461,7 +463,7 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_transfer_t);
 
 struct gnttab_copy {
 	/* IN parameters. */
-	struct {
+	struct gnttab_copy_ptr {
 		union {
 			grant_ref_t ref;
 			xen_pfn_t   gmfn;

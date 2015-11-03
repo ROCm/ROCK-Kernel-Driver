@@ -1384,6 +1384,14 @@ void __init setup_arch(char **cmdline_p)
 	clone_pgd_range(initial_page_table + KERNEL_PGD_BOUNDARY,
 			swapper_pg_dir     + KERNEL_PGD_BOUNDARY,
 			KERNEL_PGD_PTRS);
+
+	/*
+	 * sync back low identity map too.  It is used for example
+	 * in the 32-bit EFI stub.
+	 */
+	clone_pgd_range(initial_page_table,
+			swapper_pg_dir     + KERNEL_PGD_BOUNDARY,
+			KERNEL_PGD_PTRS);
 #endif
 
 	tboot_probe();
@@ -1395,7 +1403,12 @@ void __init setup_arch(char **cmdline_p)
 	xen_machine_kexec_setup_resources();
 # define kexec_enabled() (crashk_res.start < crashk_res.end)
 #else
-# define kexec_enabled() 0
+/* Need to query the hypervisor directly in this case. */
+# define kexec_enabled() ({ \
+	xen_kexec_range_t range = { .range = KEXEC_RANGE_MA_CRASH }; \
+	HYPERVISOR_kexec_op(KEXEC_CMD_kexec_get_range, &range) == 0 \
+		&& range.size; \
+})
 #endif
 	p2m_pages = max_pfn;
 	if (xen_start_info->nr_pages > max_pfn) {
