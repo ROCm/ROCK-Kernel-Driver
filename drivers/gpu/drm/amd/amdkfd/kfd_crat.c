@@ -6,8 +6,23 @@
 #include "kfd_priv.h"
 #include "kfd_topology.h"
 
-static uint32_t gpu_processor_id_low = 0x80000000; /*GPU Processor ID base*/
+/* GPU Processor ID base for dGPUs for which VCRAT needs to be created.
+ * GPU processor ID are expressed with Bit[31]=1.
+ * The base is set to 0x8000_0000 + 0x1000 to avoid collision with GPU IDs
+ * used in the CRAT. */
+static uint32_t gpu_processor_id_low = 0x80001000;
 
+/* Return the next available gpu_processor_id and increment it for next GPU
+ * @total_cu_count - Total CUs present in the GPU including ones masked off
+ */
+static inline unsigned int get_and_inc_gpu_processor_id(
+				unsigned int total_cu_count)
+{
+	int current_id = gpu_processor_id_low;
+
+	gpu_processor_id_low += total_cu_count;
+	return current_id;
+}
 
 static void kfd_populated_cu_info_cpu(struct kfd_topology_device *dev,
 		struct crat_subtype_computeunit *cu)
@@ -513,6 +528,7 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	struct kfd_local_mem_info local_mem_info;
 	struct amd_iommu_device_info iommu_info;
 	int avail_size = *size;
+	uint32_t total_num_of_cu;
 	const u32 required_iommu_flags = AMD_IOMMU_DEVICE_FLAG_ATS_SUP |
 								AMD_IOMMU_DEVICE_FLAG_PRI_SUP |
 								AMD_IOMMU_DEVICE_FLAG_PASID_SUP;
@@ -557,7 +573,6 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	cu = (struct crat_subtype_computeunit *)sub_type_hdr;
 	cu->flags |= CRAT_CU_FLAGS_GPU_PRESENT;
 	cu->proximity_domain = 0;
-	cu->processor_id_low = gpu_processor_id_low++;
 
 	kdev->kfd2kgd->get_cu_info(kdev->kgd, &cu_info);
 	cu->num_simd_per_cu = cu_info.simd_per_cu;
@@ -567,6 +582,8 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	cu->wave_front_size = cu_info.wave_front_size;
 	cu->array_count = cu_info.num_shader_arrays_per_engine *
 		cu_info.num_shader_engines;
+	total_num_of_cu = (cu->array_count * cu_info.num_cu_per_sh);
+	cu->processor_id_low = get_and_inc_gpu_processor_id(total_num_of_cu);
 	cu->num_cu_per_array = cu_info.num_cu_per_sh;
 	cu->max_slots_scatch_cu = cu_info.max_scratch_slots_per_cu;
 	cu->num_banks = cu_info.num_shader_engines;
