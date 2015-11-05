@@ -261,7 +261,9 @@ void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 		return;
 
 	memset(&acu_info, 0, sizeof(acu_info));
-	amdgpu_asic_get_cu_info(adev, &acu_info);
+	if (amdgpu_asic_get_cu_info(adev, &acu_info) != 0)
+		return;
+
 	cu_info->cu_active_number = acu_info.number;
 	cu_info->cu_ao_mask = acu_info.ao_cu_mask;
 	memcpy(&cu_info->cu_bitmap[0], &acu_info.bitmap[0], sizeof(acu_info.bitmap));
@@ -272,6 +274,7 @@ void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 	cu_info->max_waves_per_simd = acu_info.max_waves_per_simd;
 	cu_info->wave_front_size = acu_info.wave_front_size;
 	cu_info->max_scratch_slots_per_cu = acu_info.max_scratch_slots_per_cu;
+	cu_info->lds_size = acu_info.lds_size;
 }
 
 int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
