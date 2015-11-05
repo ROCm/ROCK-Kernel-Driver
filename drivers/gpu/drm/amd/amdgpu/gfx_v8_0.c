@@ -7163,6 +7163,7 @@ static void gfx_v8_0_get_cu_info(struct amdgpu_device *adev)
 		cu_info->max_waves_per_simd = 10;
 		cu_info->max_scratch_slots_per_cu = 32;
 		cu_info->wave_front_size = 64;
+		cu_info->lds_size = 64;
 		break;
 	default:
 		dev_warn(adev->dev, "CU info asic_type [0x%x] not supported\n",
