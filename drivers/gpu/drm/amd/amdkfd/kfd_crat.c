@@ -570,7 +570,7 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	cu->num_cu_per_array = cu_info.num_cu_per_sh;
 	cu->max_slots_scatch_cu = cu_info.max_scratch_slots_per_cu;
 	cu->num_banks = cu_info.num_shader_engines;
-
+	cu->lds_size_in_kb = cu_info.lds_size;
 
 	cu->hsa_capability = 0;
 
