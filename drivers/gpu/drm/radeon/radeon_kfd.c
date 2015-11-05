@@ -1600,6 +1600,7 @@ static void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 	cu_info->max_waves_per_simd = rcu_info.max_waves_per_simd;
 	cu_info->wave_front_size = rcu_info.wave_front_size;
 	cu_info->max_scratch_slots_per_cu = rcu_info.max_scratch_slots_per_cu;
+	cu_info->lds_size = rcu_info.lds_size;
 }
 
 static int mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma)
