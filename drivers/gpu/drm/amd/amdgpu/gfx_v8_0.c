@@ -6188,6 +6188,7 @@ int gfx_v8_0_get_cu_info(struct amdgpu_device *adev,
 {
 	int i, j, k, counter, active_cu_number = 0;
 	u32 mask, bitmap, ao_bitmap, ao_cu_mask = 0;
+	int ret = 0;
 
 	if (!adev || !cu_info)
 		return -EINVAL;
@@ -6229,10 +6230,12 @@ int gfx_v8_0_get_cu_info(struct amdgpu_device *adev,
 		cu_info->max_waves_per_simd = 10;
 		cu_info->max_scratch_slots_per_cu = 32;
 		cu_info->wave_front_size = 64;
+		cu_info->lds_size = 64;
 		break;
 	default:
 		dev_warn(adev->dev, "CU info asic_type [0x%x] not supported\n",
 					adev->asic_type);
+		ret = -EINVAL;
 	}
-	return 0;
+	return ret;
 }
