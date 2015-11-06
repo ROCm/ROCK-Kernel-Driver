@@ -187,7 +187,7 @@ static void remove_bo_from_vm(struct amdgpu_device *adev,
 static int try_pin_bo(struct amdgpu_bo *bo, uint64_t *mc_address, bool resv,
 		uint32_t domain)
 {
-	int ret;
+	int ret = 0;
 	uint64_t temp;
 
 	if (resv) {
@@ -196,33 +196,45 @@ static int try_pin_bo(struct amdgpu_bo *bo, uint64_t *mc_address, bool resv,
 			return ret;
 	}
 
-	ret = amdgpu_bo_pin(bo, domain, &temp);
-	if (mc_address)
-		*mc_address = temp;
-	if (ret != 0) {
-		if (resv)
-			amdgpu_bo_unreserve(bo);
-		return ret;
-	}
-	if (domain == AMDGPU_GEM_DOMAIN_GTT) {
-		ret = amdgpu_bo_kmap(bo, NULL);
-		if (ret != 0) {
-			pr_err("amdgpu: failed kmap GTT BO\n");
-			if (resv)
-				amdgpu_bo_unreserve(bo);
-			return ret;
+	if (!amdgpu_ttm_tt_has_userptr(bo->tbo.ttm)) {
+		ret = amdgpu_bo_pin(bo, domain, &temp);
+		if (mc_address)
+			*mc_address = temp;
+		if (ret != 0)
+			goto error;
+		if (domain == AMDGPU_GEM_DOMAIN_GTT) {
+			ret = amdgpu_bo_kmap(bo, NULL);
+			if (ret != 0) {
+				pr_err("amdgpu: failed kmap GTT BO\n");
+				goto error;
+			}
 		}
+	} else {
+		/* amdgpu_bo_pin doesn't support userptr. Therefore we
+		 * can use the bo->pin_count for our version of
+		 * pinning without conflict. */
+		if (bo->pin_count == 0) {
+			amdgpu_ttm_placement_from_domain(bo, domain);
+			ret = ttm_bo_validate(&bo->tbo, &bo->placement,
+					      true, false);
+			if (ret != 0) {
+				pr_err("amdgpu: failed to validate BO\n");
+				goto error;
+			}
+		}
+		bo->pin_count++;
 	}
 
+error:
 	if (resv)
 		amdgpu_bo_unreserve(bo);
 
-	return 0;
+	return ret;
 }
 
 static int unpin_bo(struct amdgpu_bo *bo, bool resv)
 {
-	int ret;
+	int ret = 0;
 
 	if (resv) {
 		ret = amdgpu_bo_reserve(bo, true);
@@ -232,17 +244,24 @@ static int unpin_bo(struct amdgpu_bo *bo, bool resv)
 
 	amdgpu_bo_kunmap(bo);
 
-	ret = amdgpu_bo_unpin(bo);
-	if (ret != 0) {
-		if (resv)
-			amdgpu_bo_unreserve(bo);
-		return ret;
+	if (!amdgpu_ttm_tt_has_userptr(bo->tbo.ttm)) {
+		ret = amdgpu_bo_unpin(bo);
+		if (ret != 0)
+			goto error;
+	} else if (--bo->pin_count == 0) {
+		amdgpu_ttm_placement_from_domain(bo, AMDGPU_GEM_DOMAIN_CPU);
+		ret = ttm_bo_validate(&bo->tbo, &bo->placement, true, false);
+		if (ret != 0) {
+			pr_err("amdgpu: failed to validate BO\n");
+			goto error;
+		}
 	}
 
+error:
 	if (resv)
 		amdgpu_bo_unreserve(bo);
 
-	return 0;
+	return ret;
 }
 
 
@@ -333,11 +352,12 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		size_t size, void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr,
 		u32 domain, u64 flags, bool aql_queue,
-		bool readonly, bool execute, bool no_sub)
+		bool readonly, bool execute, bool no_sub, bool userptr)
 {
 	struct amdgpu_device *adev;
 	int ret;
 	struct amdgpu_bo *bo;
+	uint64_t user_addr = 0;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(size == 0);
@@ -346,6 +366,11 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 
 	if (aql_queue)
 		size = size >> 1;
+	if (userptr) {
+		if (!offset || !*offset)
+			return -EINVAL;
+		user_addr = *offset;
+	}
 
 	adev = get_amdgpu_device(kgd);
 
@@ -361,9 +386,11 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 
 	pr_debug("amdkfd: allocating GTT BO size %lu\n", size);
 
-	/* Allocate buffer object on VRAM */
+	/* Allocate buffer object. Userptr objects need to start out
+	 * in the CPU domain, get moved to GTT when pinned. */
 	ret = amdgpu_bo_create(adev, size, TONGA_BO_SIZE_ALIGN, false,
-			domain, flags, NULL, NULL, &bo);
+			       userptr ? AMDGPU_GEM_DOMAIN_CPU : domain,
+			       flags, NULL, NULL, &bo);
 	if (ret != 0) {
 		pr_err("amdkfd: Failed to create BO object on GTT. ret == %d\n",
 				ret);
@@ -372,6 +399,16 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	bo->is_kfd_bo = true;
 
 	pr_debug("Created BO on GTT with size %zu bytes\n", size);
+
+	if (userptr) {
+		ret = amdgpu_ttm_tt_set_userptr(bo->tbo.ttm, user_addr,
+						AMDGPU_GEM_USERPTR_ANONONLY);
+		if (ret) {
+			dev_err(adev->dev,
+				"(%d) failed to set userptr\n", ret);
+			goto allocate_mem_set_userptr_failed;
+		}
+	}
 
 	ret = add_bo_to_vm(adev, va, vm, bo, &(*mem)->data2.bo_va_list,
 			(*mem)->data2.readonly, (*mem)->data2.execute);
@@ -427,6 +464,7 @@ allocate_mem_kmap_bo_failed:
 	amdgpu_bo_unpin(bo);
 allocate_mem_pin_bo_failed:
 	amdgpu_bo_unreserve(bo);
+allocate_mem_set_userptr_failed:
 allocate_mem_reserve_bo_failed:
 err_map:
 	amdgpu_bo_unref(&bo);
@@ -556,7 +594,7 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 				void *vm, struct kgd_mem **mem,
 				uint64_t *offset, void **kptr, uint32_t flags)
 {
-	bool aql_queue, public, readonly, execute, no_sub;
+	bool aql_queue, public, readonly, execute, no_sub, userptr;
 	u64 alloc_flag;
 	uint32_t domain;
 	uint64_t *temp_offset;
@@ -575,20 +613,24 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 	readonly = (flags & ALLOC_MEM_FLAGS_READONLY) ? true : false;
 	execute = (flags & ALLOC_MEM_FLAGS_EXECUTE_ACCESS) ? true : false;
 	no_sub = (flags & ALLOC_MEM_FLAGS_NO_SUBSTITUTE) ? true : false;
+	userptr = (flags & ALLOC_MEM_FLAGS_USERPTR) ? true : false;
+
+	if (userptr && kptr) {
+		pr_err("amdgpu: userptr can't be mapped to kernel\n");
+		return -EINVAL;
+	}
 
 	/*
-	 * Check on which domain to allocate BO if we have mmap offset than
-	 * we should allocate BO on GTT domain other cases we should allocate
-	 * on VRAM domain.
+	 * Check on which domain to allocate BO
 	 */
-	if (offset)
+	if (offset && !userptr)
 		*offset = 0;
 	if (flags & ALLOC_MEM_FLAGS_VRAM) {
 		domain = AMDGPU_GEM_DOMAIN_VRAM;
 		alloc_flag = AMDGPU_GEM_CREATE_NO_CPU_ACCESS;
 		if (public)
 			alloc_flag = AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
-	} else if (flags & ALLOC_MEM_FLAGS_GTT) {
+	} else if (flags & (ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_USERPTR)) {
 		domain = AMDGPU_GEM_DOMAIN_GTT;
 		alloc_flag = 0;
 		temp_offset = offset;
@@ -607,7 +649,7 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 			temp_offset, kptr, domain,
 			alloc_flag,
 			aql_queue, readonly, execute,
-			no_sub);
+			no_sub, userptr);
 }
 
 static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
