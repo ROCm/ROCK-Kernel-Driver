@@ -765,7 +765,7 @@ int kfd_set_process_dgpu_aperture(struct kfd_process_device *pdd,
 inline uint32_t lower_32(uint64_t x);
 inline uint32_t upper_32(uint64_t x);
 
-int init_queue(struct queue **q, struct queue_properties properties);
+int init_queue(struct queue **q, const struct queue_properties *properties);
 void uninit_queue(struct queue *q);
 void print_queue_properties(struct queue_properties *q);
 void print_queue(struct queue *q);
@@ -799,8 +799,6 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 			    struct kfd_dev *dev,
 			    struct file *f,
 			    struct queue_properties *properties,
-			    unsigned int flags,
-			    enum kfd_queue_type type,
 			    unsigned int *qid);
 int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid);
 int pqm_update_queue(struct process_queue_manager *pqm, unsigned int qid,

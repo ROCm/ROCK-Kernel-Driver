@@ -184,7 +184,10 @@ static int dbgdev_register_diq(struct kfd_dbgdev *dbgdev)
 			break;
 		}
 
-		status = pqm_create_queue(dbgdev->pqm, dbgdev->dev, NULL, &properties, 0, KFD_QUEUE_TYPE_DIQ, &qid);
+		properties.type = KFD_QUEUE_TYPE_DIQ;
+
+		status = pqm_create_queue(dbgdev->pqm, dbgdev->dev, NULL,
+				&properties, &qid);
 
 		if (status != 0) {
 			pr_debug("Error! kfd: In func %s >> Create Queue failed\n", __func__);
