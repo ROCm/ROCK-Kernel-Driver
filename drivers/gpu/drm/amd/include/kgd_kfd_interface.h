@@ -109,6 +109,7 @@ struct kgd2kfd_shared_resources {
  */
 #define ALLOC_MEM_FLAGS_VRAM			(1 << 0)
 #define ALLOC_MEM_FLAGS_GTT				(1 << 1)
+#define ALLOC_MEM_FLAGS_USERPTR			(1 << 2)
 
 /*
  * Allocation flags attributes/access options.
