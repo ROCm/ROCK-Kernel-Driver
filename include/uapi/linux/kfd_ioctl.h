@@ -322,12 +322,14 @@ enum evict_type {
 
 #define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM		(1 << 5)
 
+#define KFD_IOC_ALLOC_MEM_FLAGS_USERPTR			(1 << 6)
+
 struct kfd_ioctl_alloc_memory_of_gpu_new_args {
 	uint64_t va_addr;	/* to KFD */
 	uint64_t size;		/* to KFD */
 	uint64_t handle;	/* from KFD */
 	uint32_t gpu_id;	/* to KFD */
-	uint64_t mmap_offset;   /* from KFD */
+	uint64_t mmap_offset;   /* to KFD (userptr), from KFD (mmap offset) */
 	uint32_t flags;
 };
 
