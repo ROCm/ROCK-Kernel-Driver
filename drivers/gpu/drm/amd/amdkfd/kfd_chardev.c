@@ -1284,6 +1284,11 @@ static uint32_t kfd_convert_user_mem_alloction_flags(
 		kernel_allocation_flags = ALLOC_MEM_FLAGS_GTT;
 		goto out;
 	}
+	/* Allocate userptr BO */
+	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
+		kernel_allocation_flags = ALLOC_MEM_FLAGS_USERPTR;
+		goto out;
+	}
 
 out:
 	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM)
@@ -1334,6 +1339,7 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 		goto bind_process_to_device_failed;
 	}
 
+	offset = args->mmap_offset;
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
 		pdd->vm, (struct kgd_mem **) &mem, &offset,
