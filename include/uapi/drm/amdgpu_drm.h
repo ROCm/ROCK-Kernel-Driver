@@ -88,6 +88,10 @@ extern "C" {
 /* Flag that allocating the BO should use linear VRAM */
 #define AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS	(1 << 5)
 
+/* hybrid specific */
+/* Flag that the memory allocation should be pinned */
+#define AMDGPU_GEM_CREATE_NO_EVICT		(1 << 31)
+
 struct drm_amdgpu_gem_create_in  {
 	/** the requested memory size */
 	__u64 bo_size;
