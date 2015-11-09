@@ -230,7 +230,8 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 		      AMDGPU_GEM_CREATE_CPU_GTT_USWC |
 		      AMDGPU_GEM_CREATE_VRAM_CLEARED |
 		      AMDGPU_GEM_CREATE_VM_ALWAYS_VALID |
-		      AMDGPU_GEM_CREATE_EXPLICIT_SYNC))
+		      AMDGPU_GEM_CREATE_EXPLICIT_SYNC |
+		      AMDGPU_GEM_CREATE_NO_EVICT))
 
 		return -EINVAL;
 

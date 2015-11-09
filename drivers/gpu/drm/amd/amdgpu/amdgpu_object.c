@@ -465,6 +465,14 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	if (type == ttm_bo_type_device)
 		bo->flags &= ~AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 
+	if ((flags & AMDGPU_GEM_CREATE_NO_EVICT) && amdgpu_no_evict) {
+		r = amdgpu_bo_reserve(bo, false);
+		if (unlikely(r != 0))
+			return r;
+		r = amdgpu_bo_pin(bo, domain, NULL);
+		amdgpu_bo_unreserve(bo);
+	}
+
 	return 0;
 
 fail_unreserve:
