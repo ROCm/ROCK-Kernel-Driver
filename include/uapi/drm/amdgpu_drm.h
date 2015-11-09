@@ -174,6 +174,10 @@ extern "C" {
 /* Set PTE.D and recompress during GTT->VRAM moves according to TILING flags. */
 #define AMDGPU_GEM_CREATE_GFX12_DCC		(1 << 16)
 
+/* hybrid specific */
+/* Flag that the memory allocation should be pinned */
+#define AMDGPU_GEM_CREATE_NO_EVICT		(1ULL << 31)
+
 struct drm_amdgpu_gem_create_in  {
 	/** the requested memory size */
 	__u64 bo_size;
