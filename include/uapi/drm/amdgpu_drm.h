@@ -142,6 +142,10 @@ extern "C" {
  */
 #define AMDGPU_GEM_CREATE_ENCRYPTED		(1 << 10)
 
+/* hybrid specific */
+/* Flag that the memory allocation should be pinned */
+#define AMDGPU_GEM_CREATE_NO_EVICT		(1ULL << 31)
+
 struct drm_amdgpu_gem_create_in  {
 	/** the requested memory size */
 	__u64 bo_size;
