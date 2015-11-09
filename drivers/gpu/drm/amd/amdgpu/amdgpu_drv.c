@@ -140,6 +140,7 @@ int amdgpu_exp_hw_support;
 int amdgpu_dc = -1;
 int amdgpu_sched_jobs = 32;
 int amdgpu_sched_hw_submission = 2;
+int amdgpu_no_evict;
 uint amdgpu_pcie_gen_cap;
 uint amdgpu_pcie_lane_cap;
 u64 amdgpu_cg_mask = 0xffffffffffffffff;
@@ -449,6 +450,8 @@ module_param_named(sched_hw_submission, amdgpu_sched_hw_submission, int, 0444);
 MODULE_PARM_DESC(ppfeaturemask, "all power features enabled (default))");
 module_param_named(ppfeaturemask, amdgpu_pp_feature_mask, hexint, 0444);
 
+MODULE_PARM_DESC(no_evict, "Support pinning request from user space (1 = enable, 0 = disable (default))");
+module_param_named(no_evict, amdgpu_no_evict, int, 0444);
 /**
  * DOC: forcelongtraining (uint)
  * Force long memory training in resume.
