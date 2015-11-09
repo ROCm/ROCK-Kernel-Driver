@@ -45,6 +45,8 @@
 #include "vi.h"
 #include "bif/bif_4_1_d.h"
 
+#include "amdgpu_amdkfd.h"
+
 static int amdgpu_debugfs_regs_init(struct amdgpu_device *adev);
 static void amdgpu_debugfs_regs_cleanup(struct amdgpu_device *adev);
 
@@ -1681,6 +1683,8 @@ int amdgpu_suspend_kms(struct drm_device *dev, bool suspend, bool fbcon)
 		drm_helper_connector_dpms(connector, DRM_MODE_DPMS_OFF);
 	}
 
+	amdgpu_amdkfd_suspend(adev);
+
 	/* unpin the front buffers */
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		struct amdgpu_framebuffer *rfb = to_amdgpu_framebuffer(crtc->primary->fb);
@@ -1767,6 +1771,10 @@ int amdgpu_resume_kms(struct drm_device *dev, bool resume, bool fbcon)
 		DRM_ERROR("ib ring test failed (%d).\n", r);
 
 	r = amdgpu_late_init(adev);
+	if (r)
+		return r;
+
+	r = amdgpu_amdkfd_resume(adev);
 	if (r)
 		return r;
 
