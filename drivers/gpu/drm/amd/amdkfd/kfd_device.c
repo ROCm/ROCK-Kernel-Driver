@@ -139,6 +139,8 @@ static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,
 				unsigned int chunk_size);
 static void kfd_gtt_sa_fini(struct kfd_dev *kfd);
 
+static int kfd_resume(struct kfd_dev *kfd);
+
 static const struct kfd_device_info *lookup_device_info(unsigned short did)
 {
 	size_t i;
@@ -219,15 +221,8 @@ static bool device_iommu_pasid_init(struct kfd_dev *kfd)
 				pasid_limit,
 				kfd->doorbell_process_limit - 1);
 
-	err = amd_iommu_init_device(kfd->pdev, pasid_limit);
-	if (err < 0) {
-		dev_err(kfd_device, "error initializing iommu device\n");
-		return false;
-	}
-
 	if (!kfd_set_pasid_limit(pasid_limit)) {
 		dev_err(kfd_device, "error setting pasid limit\n");
-		amd_iommu_free_device(kfd->pdev);
 		return false;
 	}
 
@@ -266,6 +261,51 @@ static int iommu_invalid_ppr_cb(struct pci_dev *pdev, int pasid,
 			flags & PPR_FAULT_WRITE, flags & PPR_FAULT_EXEC);
 
 	return AMD_IOMMU_INV_PRI_RSP_INVALID;
+}
+
+static int kfd_cwsr_init(struct kfd_dev *kfd)
+{
+	/*
+	 * Initialize the CWSR required memory for TBA and TMA
+	 * only support CWSR on CARRIZO with FW version >=625 for now.
+	 */
+	if (cwsr_enable &&
+		(kfd->device_info->asic_family == CHIP_CARRIZO) &&
+		(kfd->mec_fw_version >= KFD_CWSR_CZ_FW_VER)) {
+		void *cwsr_addr = NULL;
+		unsigned int size = sizeof(cwsr_trap_carrizo_hex);
+
+		if (size > PAGE_SIZE) {
+			pr_err("amdkfd: wrong CWSR ISA size.\n");
+			return -EINVAL;
+		}
+		kfd->cwsr_size =
+			ALIGN(size, PAGE_SIZE) + PAGE_SIZE;
+		kfd->cwsr_pages = alloc_pages(GFP_KERNEL | __GFP_HIGHMEM,
+					get_order(kfd->cwsr_size));
+		if (!kfd->cwsr_pages) {
+			pr_err("amdkfd: error alloc CWSR isa memory.\n");
+			return -ENOMEM;
+		}
+		/*Only first page used for cwsr ISA code */
+		cwsr_addr = kmap(kfd->cwsr_pages);
+		memset(cwsr_addr, 0, PAGE_SIZE);
+		memcpy(cwsr_addr, cwsr_trap_carrizo_hex, size);
+		kunmap(kfd->cwsr_pages);
+		kfd->tma_offset = ALIGN(size, PAGE_SIZE);
+		kfd->cwsr_enabled = true;
+		dev_info(kfd_device,
+			"Reserved %d pages for cwsr.\n",
+			(kfd->cwsr_size >> PAGE_SHIFT));
+	}
+
+	return 0;
+}
+
+static void kfd_cwsr_fini(struct kfd_dev *kfd)
+{
+	if (kfd->cwsr_pages)
+		__free_pages(kfd->cwsr_pages, get_order(kfd->cwsr_size));
 }
 
 bool kgd2kfd_device_init(struct kfd_dev *kfd,
@@ -353,18 +393,6 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 		goto kfd_interrupt_error;
 	}
 
-	if (kfd->device_info->is_need_iommu_device) {
-		if (!device_iommu_pasid_init(kfd)) {
-			dev_err(kfd_device,
-				"Error initializing iommuv2 for device (%x:%x)\n",
-				kfd->pdev->vendor, kfd->pdev->device);
-			goto device_iommu_pasid_error;
-		}
-		amd_iommu_set_invalidate_ctx_cb(kfd->pdev,
-					iommu_pasid_shutdown_callback);
-		amd_iommu_set_invalid_ppr_cb(kfd->pdev, iommu_invalid_ppr_cb);
-	}
-
 	kfd->dqm = device_queue_manager_init(kfd);
 	if (!kfd->dqm) {
 		dev_err(kfd_device,
@@ -373,50 +401,22 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 		goto device_queue_manager_error;
 	}
 
-	if (kfd->dqm->ops.start(kfd->dqm) != 0) {
-		dev_err(kfd_device,
-			"Error starting queuen manager for device (%x:%x)\n",
-			kfd->pdev->vendor, kfd->pdev->device);
-		goto dqm_start_error;
+	if (kfd->device_info->is_need_iommu_device) {
+		if (!device_iommu_pasid_init(kfd)) {
+			dev_err(kfd_device,
+				"Error initializing iommuv2 for device (%x:%x)\n",
+				kfd->pdev->vendor, kfd->pdev->device);
+			goto device_iommu_pasid_error;
+		}
 	}
+
+	if (kfd_cwsr_init(kfd))
+		goto device_iommu_pasid_error;
+
+	if (kfd_resume(kfd))
+		goto kfd_resume_error;
 
 	kfd->dbgmgr = NULL;
-
-	/* Initialize scratch memory access */
-	kfd->kfd2kgd->write_config_static_mem(kfd->kgd, true, 1, 3, 0);
-
-	/*
-	 * Initialize the CWSR required memory for TBA and TMA
-	 * only support CWSR on CARRIZO with FW version >=625 for now.
-	 */
-	if (cwsr_enable &&
-		(kfd->device_info->asic_family == CHIP_CARRIZO) &&
-		(kfd->mec_fw_version >= KFD_CWSR_CZ_FW_VER)) {
-		void *cwsr_addr = NULL;
-		size = sizeof(cwsr_trap_carrizo_hex);
-		if (size > PAGE_SIZE) {
-			pr_err("amdkfd: wrong CWSR ISA size.\n");
-			goto dqm_start_error;
-		}
-		kfd->cwsr_size =
-			ALIGN(size, PAGE_SIZE) + PAGE_SIZE;
-		kfd->cwsr_pages = alloc_pages(GFP_KERNEL | __GFP_HIGHMEM,
-					get_order(kfd->cwsr_size));
-		if (!kfd->cwsr_pages) {
-			pr_err("amdkfd: error alloc CWSR isa memory \n");
-			goto dqm_start_error;
-		}
-		/*Only first page used for cwsr ISA code */
-		cwsr_addr = kmap(kfd->cwsr_pages);
-		memset(cwsr_addr, 0, PAGE_SIZE);
-		memcpy(cwsr_addr, cwsr_trap_carrizo_hex, size);
-		kunmap(kfd->cwsr_pages);
-		kfd->tma_offset = ALIGN(size, PAGE_SIZE);
-		kfd->cwsr_enabled = true;
-		dev_info(kfd_device,
-			"Reserved %d pages for cwsr.\n",
-			(kfd->cwsr_size >> PAGE_SHIFT));
-	}
 
 	kfd->init_complete = true;
 	dev_info(kfd_device, "added device (%x:%x)\n", kfd->pdev->vendor,
@@ -427,12 +427,11 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 
 	goto out;
 
-dqm_start_error:
+kfd_resume_error:
+	kfd_cwsr_fini(kfd);
+device_iommu_pasid_error:
 	device_queue_manager_uninit(kfd->dqm);
 device_queue_manager_error:
-	if (kfd->device_info->is_need_iommu_device)
-		amd_iommu_free_device(kfd->pdev);
-device_iommu_pasid_error:
 	kfd_interrupt_exit(kfd);
 kfd_interrupt_error:
 	kfd_topology_remove_device(kfd);
@@ -450,12 +449,9 @@ out:
 void kgd2kfd_device_exit(struct kfd_dev *kfd)
 {
 	if (kfd->init_complete) {
-		if (kfd->cwsr_pages)
-			__free_pages(kfd->cwsr_pages,
-				get_order(kfd->cwsr_size));
+		kgd2kfd_suspend(kfd);
+		kfd_cwsr_fini(kfd);
 		device_queue_manager_uninit(kfd->dqm);
-		if (kfd->device_info->is_need_iommu_device)
-			amd_iommu_free_device(kfd->pdev);
 		kfd_interrupt_exit(kfd);
 		kfd_topology_remove_device(kfd);
 		kfd_gtt_sa_fini(kfd);
@@ -481,27 +477,48 @@ void kgd2kfd_suspend(struct kfd_dev *kfd)
 
 int kgd2kfd_resume(struct kfd_dev *kfd)
 {
-	unsigned int pasid_limit;
-	int err;
-
 	BUG_ON(kfd == NULL);
 
-	pasid_limit = kfd_get_pasid_limit();
+	if (!kfd->init_complete)
+		return 0;
 
-	if (kfd->init_complete) {
-		if (kfd->device_info->is_need_iommu_device) {
-			err = amd_iommu_init_device(kfd->pdev, pasid_limit);
-			if (err < 0)
-				return -ENXIO;
-			amd_iommu_set_invalidate_ctx_cb(kfd->pdev,
-					iommu_pasid_shutdown_callback);
-			amd_iommu_set_invalid_ppr_cb(kfd->pdev,
-					iommu_invalid_ppr_cb);
-		}
-		kfd->dqm->ops.start(kfd->dqm);
+	return kfd_resume(kfd);
+
+}
+
+static int kfd_resume(struct kfd_dev *kfd)
+{
+	int err = 0;
+
+	if (kfd->device_info->is_need_iommu_device) {
+		unsigned int pasid_limit = kfd_get_pasid_limit();
+
+		err = amd_iommu_init_device(kfd->pdev, pasid_limit);
+		if (err)
+			return -ENXIO;
+		amd_iommu_set_invalidate_ctx_cb(kfd->pdev,
+				iommu_pasid_shutdown_callback);
+		amd_iommu_set_invalid_ppr_cb(kfd->pdev,
+				iommu_invalid_ppr_cb);
 	}
 
-	return 0;
+	err = kfd->dqm->ops.start(kfd->dqm);
+	if (err) {
+		dev_err(kfd_device,
+			"Error starting queue manager for device (%x:%x)\n",
+			kfd->pdev->vendor, kfd->pdev->device);
+		goto dqm_start_error;
+	}
+
+	kfd->kfd2kgd->write_config_static_mem(kfd->kgd, true, 1, 3, 0);
+
+	return err;
+
+dqm_start_error:
+	if (kfd->device_info->is_need_iommu_device)
+		amd_iommu_free_device(kfd->pdev);
+
+	return err;
 }
 
 /* This is called directly from KGD at ISR. */
