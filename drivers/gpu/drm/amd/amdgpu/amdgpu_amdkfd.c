@@ -249,7 +249,10 @@ uint32_t get_max_engine_clock_in_mhz(struct kgd_dev *kgd)
 	struct amdgpu_device *rdev = (struct amdgpu_device *)kgd;
 
 	/* The sclk is in quantas of 10kHz */
-	return rdev->pm.dpm.dyn_state.max_clock_voltage_on_ac.sclk / 100;
+	if (amdgpu_powerplay)
+		return amdgpu_dpm_get_sclk(rdev, false) / 100;
+	else
+		return rdev->pm.dpm.dyn_state.max_clock_voltage_on_ac.sclk / 100;
 }
 
 void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
