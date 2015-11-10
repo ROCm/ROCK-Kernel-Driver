@@ -1029,6 +1029,7 @@ __init
 #endif
 xs_init(void)
 {
+	int err = 0;
 	struct task_struct *task;
 
 	INIT_LIST_HEAD(&xs_state.reply_list);
@@ -1042,6 +1043,13 @@ xs_init(void)
 	atomic_set(&xs_state.transaction_count, 0);
 	init_waitqueue_head(&xs_state.transaction_wq);
 
+#if !defined(CONFIG_XEN) && !defined(MODULE)
+	/* Initialize the shared memory rings to talk to xenstored */
+	err = xb_init_comms();
+	if (err)
+		return err;
+#endif
+
 	task = kthread_run(xenwatch_thread, NULL, "xenwatch");
 	if (IS_ERR(task))
 		return PTR_ERR(task);
@@ -1054,5 +1062,5 @@ xs_init(void)
 	/* shutdown watches for kexec boot */
 	xs_reset_watches();
 
-	return 0;
+	return err;
 }

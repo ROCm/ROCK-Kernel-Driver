@@ -58,7 +58,7 @@ static DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
 
 static irqreturn_t wake_waiting(int irq, void *unused)
 {
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#if defined(CONFIG_XEN_DOM0) || defined(CONFIG_XEN_PRIVILEGED_GUEST)
 	static DECLARE_WORK(probe_work, xenbus_probe);
 	int old, new;
 

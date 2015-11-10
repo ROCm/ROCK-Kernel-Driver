@@ -48,7 +48,7 @@ static long xenbus_alloc(domid_t domid)
 	 * unnecessarily complex for the intended use where xenstored is only
 	 * started once - so return -EEXIST if it's already running.
 	 */
-	if (xenstored_ready)
+	if (is_xenstored_ready())
 		goto out_err;
 
 	gnttab_grant_foreign_access_ref(GNTTAB_RESERVED_XENSTORE, domid,

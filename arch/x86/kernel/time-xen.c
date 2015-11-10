@@ -222,7 +222,7 @@ static inline int time_values_up_to_date(void)
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
 static int xen_settime(u64 sec, unsigned int nsec, u64 systime)
 {
-	static bool xen_time_64 = true;
+	static bool __read_mostly xen_time_64 = true;
 	struct timespec64 ts;
 	struct xen_platform_op op;
 	int rc = -ENOSYS;
@@ -237,7 +237,7 @@ static int xen_settime(u64 sec, unsigned int nsec, u64 systime)
 		op.u.settime64.system_time = systime;
 		rc = HYPERVISOR_platform_op(&op);
 	}
-/* #if CONFIG_XEN_COMPAT < 0x040600 */
+#if CONFIG_XEN_COMPAT < 0x040600
 	if (rc == -ENOSYS) {
 		xen_time_64 = false;
 		op.cmd = XENPF_settime32;
@@ -248,7 +248,7 @@ static int xen_settime(u64 sec, unsigned int nsec, u64 systime)
 		     ? HYPERVISOR_platform_op(&op)
 		     : -ERANGE;
 	}
-/* #endif */
+#endif
 	WARN_ON_ONCE(rc);
 	return rc;
 }

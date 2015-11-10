@@ -220,7 +220,7 @@ static struct xen_bus_type xenbus_backend = {
 		.uevent		= xenbus_uevent_backend,
 		.probe		= xenbus_dev_probe,
 		.remove		= xenbus_dev_remove,
-#ifdef CONFIG_XEN
+#ifndef CONFIG_XEN
 		.shutdown	= xenbus_dev_shutdown,
 #endif
 		.dev_groups	= xenbus_dev_groups,
@@ -319,7 +319,7 @@ static int __init xenbus_probe_backend_init(void)
 	DPRINTK("");
 
 	/* Register ourselves with the kernel bus subsystem */
-	err = bus_register(&xenbus_backend.bus);
+	xenbus_backend.error = err = bus_register(&xenbus_backend.bus);
 	if (err)
 		return err;
 

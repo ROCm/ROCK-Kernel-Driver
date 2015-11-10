@@ -1435,6 +1435,7 @@ xenbus_init(void)
 		if (err)
 			goto out_error;
 		xen_store_interface = gfn_to_virt(xen_store_gfn);
+		atomic_set(&xenbus_xsd_state, XENBUS_XSD_LOCAL_INIT);
 		break;
 	case XS_PV:
 		xen_store_evtchn = xen_start_info->store_evtchn;

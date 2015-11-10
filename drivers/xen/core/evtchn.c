@@ -1424,7 +1424,8 @@ static void enable_pirq(struct irq_data *data)
 			  ? 0 : BIND_PIRQ__WILL_SHARE;
 	if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_pirq, &bind_pirq) != 0) {
 		if (bind_pirq.flags)
-			pr_info("Failed to obtain physical IRQ %d\n", irq);
+			pr_info("Failed to obtain physical IRQ %d (%u)\n",
+				irq, bind_pirq.pirq);
 		return;
 	}
 	evtchn = bind_pirq.port;
@@ -2017,8 +2018,8 @@ int evtchn_register_pirq(int irq, unsigned int xen_pirq)
 	struct physdev_map_pirq map_pirq = {
 		.domid = DOMID_SELF,
 		.type = MAP_PIRQ_TYPE_GSI,
-		.index = irq,
-		.pirq = irq
+		.index = xen_pirq,
+		.pirq = xen_pirq
 	};
 
 	BUG_ON(irq < PIRQ_BASE || irq - PIRQ_BASE >= nr_pirqs);
@@ -2027,7 +2028,7 @@ int evtchn_register_pirq(int irq, unsigned int xen_pirq)
 	case IRQT_UNBOUND:
 		break;
 	case IRQT_PIRQ:
-		if (index_from_irq(irq) == irq)
+		if (index_from_irq(irq) == xen_pirq)
 			return -EEXIST;
 	default:
 		return -EBUSY;
