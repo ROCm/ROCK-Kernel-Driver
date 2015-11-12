@@ -39,6 +39,7 @@
 #include "tonga_dyn_defaults.h"
 #include "smumgr.h"
 #include "tonga_smumgr.h"
+#include "amd_pcie_helpers.h"
 
 #include "smu/smu_7_1_2_d.h"
 #include "smu/smu_7_1_2_sh_mask.h"
@@ -2643,117 +2644,6 @@ static void tonga_setup_pcie_table_entry(
 	dpm_table->dpm_levels[index].enabled = 1;
 }
 
-bool is_pcie_gen3_supported(uint32_t pcie_link_speed_cap)
-{
-	if (pcie_link_speed_cap & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN3)
-		return 1;
-
-	return 0;
-}
-
-bool is_pcie_gen2_supported(uint32_t pcie_link_speed_cap)
-{
-	if (pcie_link_speed_cap & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN2)
-		return 1;
-
-	return 0;
-}
-
-/* Get the new PCIE speed given the ASIC PCIE Cap and the NewState's requested PCIE speed*/
-uint16_t get_pcie_gen_support(uint32_t pcie_link_speed_cap, uint16_t ns_pcie_gen)
-{
-	uint32_t asic_pcie_link_speed_cap = (pcie_link_speed_cap &
-		CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_MASK);
-	uint32_t sys_pcie_link_speed_cap  = (pcie_link_speed_cap &
-		CAIL_PCIE_LINK_SPEED_SUPPORT_MASK);
-
-	switch (asic_pcie_link_speed_cap) {
-	case CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN1:
-		return PP_PCIEGen1;
-
-	case CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN2:
-		return PP_PCIEGen2;
-
-	case CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN3:
-		return PP_PCIEGen3;
-
-	default:
-		if (is_pcie_gen3_supported(sys_pcie_link_speed_cap) &&
-			(ns_pcie_gen == PP_PCIEGen3)) {
-			return PP_PCIEGen3;
-		} else if (is_pcie_gen2_supported(sys_pcie_link_speed_cap) &&
-			((ns_pcie_gen == PP_PCIEGen3) || (ns_pcie_gen == PP_PCIEGen2))) {
-			return PP_PCIEGen2;
-		}
-	}
-
-	return PP_PCIEGen1;
-}
-
-uint16_t get_pcie_lane_support(uint32_t pcie_lane_width_cap, uint16_t ns_pcie_lanes)
-{
-	int i, j;
-	uint16_t new_pcie_lanes = ns_pcie_lanes;
-	uint16_t pcie_lanes[7] = {1, 2, 4, 8, 12, 16, 32};
-
-	switch (pcie_lane_width_cap) {
-	case 0:
-		printk(KERN_ERR "[ powerplay ] No valid PCIE lane width reported by CAIL!");
-		break;
-	case CAIL_PCIE_LINK_WIDTH_SUPPORT_X1:
-		new_pcie_lanes = 1;
-		break;
-	case CAIL_PCIE_LINK_WIDTH_SUPPORT_X2:
-		new_pcie_lanes = 2;
-		break;
-	case CAIL_PCIE_LINK_WIDTH_SUPPORT_X4:
-		new_pcie_lanes = 4;
-		break;
-	case CAIL_PCIE_LINK_WIDTH_SUPPORT_X8:
-		new_pcie_lanes = 8;
-		break;
-	case CAIL_PCIE_LINK_WIDTH_SUPPORT_X12:
-		new_pcie_lanes = 12;
-		break;
-	case CAIL_PCIE_LINK_WIDTH_SUPPORT_X16:
-		new_pcie_lanes = 16;
-		break;
-	case CAIL_PCIE_LINK_WIDTH_SUPPORT_X32:
-		new_pcie_lanes = 32;
-		break;
-	default:
-		for (i = 0; i < 7; i++) {
-			if (ns_pcie_lanes == pcie_lanes[i]) {
-				if (pcie_lane_width_cap & (0x10000 << i)) {
-					break;
-				} else {
-					for (j = i - 1; j >= 0; j--) {
-						if (pcie_lane_width_cap & (0x10000 << j)) {
-							new_pcie_lanes = pcie_lanes[j];
-							break;
-						}
-					}
-
-					if (j < 0) {
-						for (j = i + 1; j < 7; j++) {
-							if (pcie_lane_width_cap & (0x10000 << j)) {
-								new_pcie_lanes = pcie_lanes[j];
-								break;
-							}
-						}
-						if (j > 7)
-							printk(KERN_ERR "[ powerplay ] Cannot find a valid PCIE lane width!");
-					}
-				}
-				break;
-			}
-		}
-		break;
-	}
-
-	return new_pcie_lanes;
-}
-
 static int tonga_setup_default_pcie_tables(struct pp_hwmgr *hwmgr)
 {
 	tonga_hwmgr *data = (tonga_hwmgr *)(hwmgr->backend);
@@ -4631,14 +4521,30 @@ int tonga_hwmgr_backend_init(struct pp_hwmgr *hwmgr)
 	data->vddc_phase_shed_control = 0;
 
 	if (0 == result) {
+		struct cgs_system_info sys_info = {0};
+
 		data->is_tlu_enabled = 0;
 		hwmgr->platform_descriptor.hardwareActivityPerformanceLevels =
 			TONGA_MAX_HARDWARE_POWERLEVELS;
 		hwmgr->platform_descriptor.hardwarePerformanceLevels = 2;
 		hwmgr->platform_descriptor.minimumClocksReductionPercentage  = 50;
 
-		data->pcie_gen_cap = 0x30007;
-		data->pcie_lane_cap = 0x2f0000;
+		sys_info.size = sizeof(struct cgs_system_info);
+		sys_info.info_id = CGS_SYSTEM_INFO_PCIE_GEN_INFO;
+		result = cgs_query_system_info(hwmgr->device, &sys_info);
+		if (result)
+			data->pcie_gen_cap = 0x30007;
+		else
+			data->pcie_gen_cap = (uint32_t)sys_info.value;
+		if (data->pcie_gen_cap & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN3)
+			data->pcie_spc_cap = 20;
+		sys_info.size = sizeof(struct cgs_system_info);
+		sys_info.info_id = CGS_SYSTEM_INFO_PCIE_MLW;
+		result = cgs_query_system_info(hwmgr->device, &sys_info);
+		if (result)
+			data->pcie_lane_cap = 0x2f0000;
+		else
+			data->pcie_lane_cap = (uint32_t)sys_info.value;
 	} else {
 		/* Ignore return value in here, we are cleaning up a mess. */
 		tonga_hwmgr_backend_fini(hwmgr);
