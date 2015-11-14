@@ -132,6 +132,9 @@ err_vmsetaddr:
 	amdgpu_vm_clear_freed(adev, avm);
 	mutex_unlock(&avm->mutex);
 	kfree(bo_va_entry);
+	/* Don't fall through to unreserve because the BO was already
+	   unreserved by amdgpu_vm_bo_map. */
+	return ret;
 err_vmadd:
 	amdgpu_bo_unreserve(bo);
 	return ret;
