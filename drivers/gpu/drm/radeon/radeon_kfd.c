@@ -1021,7 +1021,7 @@ static int add_bo_to_vm(struct radeon_device *rdev, uint64_t va,
 
 	/* Add BO to VM internal data structures*/
 	*bo_va = radeon_vm_bo_add(rdev, rvm, bo);
-	if (bo_va == NULL) {
+	if (*bo_va == NULL) {
 		ret = -EINVAL;
 		pr_err("amdkfd: Failed to add BO object to VM. ret == %d\n",
 				ret);
@@ -1048,6 +1048,9 @@ err_vmsetaddr:
 	mutex_lock(&rvm->mutex);
 	radeon_vm_clear_freed(rdev, rvm);
 	mutex_unlock(&rvm->mutex);
+	/* Don't fall through to unreserve because the BO was already
+	   unreserved by radeon_vm_bo_set_addr. */
+	return ret;
 err_vmadd:
 	radeon_bo_unreserve(bo);
 	return ret;
