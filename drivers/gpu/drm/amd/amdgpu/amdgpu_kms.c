@@ -1083,6 +1083,15 @@ out:
 			return -EINVAL;
 		}
 	}
+	case AMDGPU_INFO_CAPABILITY: {
+		struct drm_amdgpu_capability cap;
+
+		memset(&cap, 0, sizeof(cap));
+		if (amdgpu_no_evict)
+			cap.flag |= AMDGPU_CAPABILITY_PIN_MEM_FLAG;
+		return copy_to_user(out, &cap,
+				    min((size_t)size, sizeof(cap))) ? -EFAULT : 0;
+	}
 	case AMDGPU_INFO_SENSOR: {
 		if (!adev->pm.dpm_enabled)
 			return -ENOENT;
