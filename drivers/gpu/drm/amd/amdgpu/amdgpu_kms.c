@@ -713,6 +713,11 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 			return -EINVAL;
 		}
 	}
+	case AMDGPU_INFO_CAPABILITY: {
+		if (amdgpu_no_evict)
+			ui64 |= AMDGPU_CAPABILITY_PIN_MEM_FLAG;
+		return copy_to_user(out, &ui64, min(size, 8u)) ? -EFAULT : 0;
+	}
 	case AMDGPU_INFO_SENSOR: {
 		struct pp_gpu_power query = {0};
 		int query_size = sizeof(query);
