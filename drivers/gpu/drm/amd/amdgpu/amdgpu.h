@@ -113,6 +113,7 @@ extern int amdgpu_vm_update_mode;
 extern int amdgpu_dc;
 extern int amdgpu_sched_jobs;
 extern int amdgpu_sched_hw_submission;
+extern int amdgpu_no_evict;
 extern uint amdgpu_pcie_gen_cap;
 extern uint amdgpu_pcie_lane_cap;
 extern uint amdgpu_cg_mask;
