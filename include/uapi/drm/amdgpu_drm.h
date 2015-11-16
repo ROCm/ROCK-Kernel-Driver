@@ -817,6 +817,8 @@ struct drm_amdgpu_cs_chunk_data {
 #define AMDGPU_INFO_CAPABILITY			0x50
 /* virtual range */
 #define AMDGPU_INFO_VIRTUAL_RANGE		0x51
+/* query pin memory capability */
+#define AMDGPU_CAPABILITY_PIN_MEM_FLAG  (1 << 0)
 
 #define AMDGPU_INFO_MMR_SE_INDEX_SHIFT	0
 #define AMDGPU_INFO_MMR_SE_INDEX_MASK	0xff
@@ -1105,6 +1107,10 @@ struct drm_amdgpu_info_vce_clock_table {
 struct drm_amdgpu_virtual_range {
 	uint64_t start;
 	uint64_t end;
+};
+
+struct drm_amdgpu_capability {
+	__u32 flag;
 };
 
 /*
