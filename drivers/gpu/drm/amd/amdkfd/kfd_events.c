@@ -516,7 +516,7 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		ret = create_signal_event(devkfd, p, ev);
 		if (!ret) {
 			*event_page_offset = (ev->signal_page->page_index |
-					KFD_MMAP_EVENTS_MASK);
+					KFD_MMAP_TYPE_EVENTS);
 			*event_page_offset <<= PAGE_SHIFT;
 			*event_slot_index = ev->signal_slot_index;
 		}

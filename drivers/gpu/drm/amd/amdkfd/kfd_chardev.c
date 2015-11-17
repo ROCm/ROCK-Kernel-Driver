@@ -288,7 +288,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 
 	if (dev->cwsr_enabled && !p->pqm.tba_addr) {
 		pr_debug("amdkfd:Start vm_mmap, file :0x%p.\n", filep);
-		offset = (args->gpu_id | KFD_MMAP_RESERVED_MEM_MASK)
+		offset = (args->gpu_id | KFD_MMAP_TYPE_RESERVED_MEM)
 				<< PAGE_SHIFT;
 		p->pqm.tba_addr = (int64_t)vm_mmap(filep, 0,
 			dev->cwsr_size,
@@ -315,7 +315,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 
 
 	/* Return gpu_id as doorbell offset for mmap usage */
-	args->doorbell_offset = (KFD_MMAP_DOORBELL_MASK | args->gpu_id);
+	args->doorbell_offset = (KFD_MMAP_TYPE_DOORBELL | args->gpu_id);
 	args->doorbell_offset <<= PAGE_SHIFT;
 
 	mutex_unlock(&p->mutex);
@@ -1166,7 +1166,7 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	if ((args->flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE) != 0) {
 		args->mmap_offset = 0;
 	} else {
-		args->mmap_offset =  KFD_MMAP_MAP_BO_MASK;
+		args->mmap_offset = KFD_MMAP_TYPE_MAP_BO;
 		args->mmap_offset <<= PAGE_SHIFT;
 		args->mmap_offset |= offset;
 	}
@@ -1579,17 +1579,17 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 	if (IS_ERR(process))
 		return PTR_ERR(process);
 
-	if ((vma->vm_pgoff & KFD_MMAP_DOORBELL_MASK) ==
-			KFD_MMAP_DOORBELL_MASK) {
-		vma->vm_pgoff = vma->vm_pgoff ^ KFD_MMAP_DOORBELL_MASK;
+	if ((vma->vm_pgoff & KFD_MMAP_TYPE_MASK) ==
+			KFD_MMAP_TYPE_DOORBELL) {
+		vma->vm_pgoff = KFD_MMAP_OFFSET_VALUE_GET(vma->vm_pgoff);
 		return kfd_doorbell_mmap(process, vma);
-	} else if ((vma->vm_pgoff & KFD_MMAP_EVENTS_MASK) ==
-			KFD_MMAP_EVENTS_MASK) {
-		vma->vm_pgoff = vma->vm_pgoff ^ KFD_MMAP_EVENTS_MASK;
+	} else if ((vma->vm_pgoff & KFD_MMAP_TYPE_MASK) ==
+			KFD_MMAP_TYPE_EVENTS) {
+		vma->vm_pgoff = KFD_MMAP_OFFSET_VALUE_GET(vma->vm_pgoff);
 		return kfd_event_mmap(process, vma);
-	} else if ((vma->vm_pgoff & KFD_MMAP_MAP_BO_MASK) ==
-			KFD_MMAP_MAP_BO_MASK) {
-		vma->vm_pgoff = vma->vm_pgoff ^ KFD_MMAP_MAP_BO_MASK;
+	} else if ((vma->vm_pgoff & KFD_MMAP_TYPE_MASK) ==
+			KFD_MMAP_TYPE_MAP_BO) {
+		vma->vm_pgoff = KFD_MMAP_OFFSET_VALUE_GET(vma->vm_pgoff);
 
 		i = 0;
 		while (kfd_topology_enum_kfd_devices(i, &kfd) == 0) {
@@ -1601,9 +1601,9 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 				return retval;
 		}
 		return retval;
-	} else if ((vma->vm_pgoff & KFD_MMAP_RESERVED_MEM_MASK) ==
-			KFD_MMAP_RESERVED_MEM_MASK) {
-		vma->vm_pgoff = vma->vm_pgoff ^ KFD_MMAP_RESERVED_MEM_MASK;
+	} else if ((vma->vm_pgoff & KFD_MMAP_TYPE_MASK) ==
+			KFD_MMAP_TYPE_RESERVED_MEM) {
+		vma->vm_pgoff = KFD_MMAP_OFFSET_VALUE_GET(vma->vm_pgoff);
 		return kfd_reserved_mem_mmap(process, vma);
 	}
 
