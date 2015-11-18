@@ -1573,23 +1573,24 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 	struct kfd_process *process;
 	struct kfd_dev *kfd;
 	unsigned int i;
+	unsigned long kfd_mmap_type;
 	int retval;
 
 	process = kfd_get_process(current);
 	if (IS_ERR(process))
 		return PTR_ERR(process);
 
-	if ((vma->vm_pgoff & KFD_MMAP_TYPE_MASK) ==
-			KFD_MMAP_TYPE_DOORBELL) {
-		vma->vm_pgoff = KFD_MMAP_OFFSET_VALUE_GET(vma->vm_pgoff);
+	kfd_mmap_type = vma->vm_pgoff & KFD_MMAP_TYPE_MASK;
+	vma->vm_pgoff = KFD_MMAP_OFFSET_VALUE_GET(vma->vm_pgoff);
+
+	switch (kfd_mmap_type) {
+	case KFD_MMAP_TYPE_DOORBELL:
 		return kfd_doorbell_mmap(process, vma);
-	} else if ((vma->vm_pgoff & KFD_MMAP_TYPE_MASK) ==
-			KFD_MMAP_TYPE_EVENTS) {
-		vma->vm_pgoff = KFD_MMAP_OFFSET_VALUE_GET(vma->vm_pgoff);
+
+	case KFD_MMAP_TYPE_EVENTS:
 		return kfd_event_mmap(process, vma);
-	} else if ((vma->vm_pgoff & KFD_MMAP_TYPE_MASK) ==
-			KFD_MMAP_TYPE_MAP_BO) {
-		vma->vm_pgoff = KFD_MMAP_OFFSET_VALUE_GET(vma->vm_pgoff);
+
+	case KFD_MMAP_TYPE_MAP_BO:
 
 		i = 0;
 		while (kfd_topology_enum_kfd_devices(i, &kfd) == 0) {
@@ -1601,10 +1602,10 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 				return retval;
 		}
 		return retval;
-	} else if ((vma->vm_pgoff & KFD_MMAP_TYPE_MASK) ==
-			KFD_MMAP_TYPE_RESERVED_MEM) {
-		vma->vm_pgoff = KFD_MMAP_OFFSET_VALUE_GET(vma->vm_pgoff);
+
+	case KFD_MMAP_TYPE_RESERVED_MEM:
 		return kfd_reserved_mem_mmap(process, vma);
+
 	}
 
 	return -EFAULT;
