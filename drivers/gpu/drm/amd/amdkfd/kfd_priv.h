@@ -36,9 +36,13 @@
 
 #define KFD_SYSFS_FILE_MODE 0444
 
+/* GPU ID hash width in bits */
+#define KFD_GPU_ID_HASH_WIDTH 16
+
 /* Use upper bits of mmap offset to store KFD driver specific information.
  * BITS[63:62] - Encode MMAP type
- * BITS[40:61] - Reserved. Not Used.
+ * BITS[61:46] - Encode gpu_id. To identify to which GPU the offset belongs to
+ * BITS[45:40] - Reserved. Not Used.
  * BITS[39:0]  - MMAP offset value. Used by TTM.
  *
  * NOTE: struct vm_area_struct.vm_pgoff uses offset in pages. Hence, these
@@ -50,6 +54,14 @@
 #define KFD_MMAP_TYPE_EVENTS	(0x2ULL << KFD_MMAP_TYPE_SHIFT)
 #define KFD_MMAP_TYPE_MAP_BO	(0x1ULL << KFD_MMAP_TYPE_SHIFT)
 #define KFD_MMAP_TYPE_RESERVED_MEM	(0x0ULL << KFD_MMAP_TYPE_SHIFT)
+
+#define KFD_MMAP_GPU_ID_SHIFT (46 - PAGE_SHIFT)
+#define KFD_MMAP_GPU_ID_MASK (((1ULL << KFD_GPU_ID_HASH_WIDTH) - 1) \
+				<< KFD_MMAP_GPU_ID_SHIFT)
+#define KFD_MMAP_GPU_ID(gpu_id) ((((uint64_t)gpu_id) << KFD_MMAP_GPU_ID_SHIFT)\
+				& KFD_MMAP_GPU_ID_MASK)
+#define KFD_MMAP_GPU_ID_GET(offset)    ((offset & KFD_MMAP_GPU_ID_MASK) \
+				>> KFD_MMAP_GPU_ID_SHIFT)
 
 #define KFD_MMAP_OFFSET_VALUE_MASK	(0xFFFFFFFFFFULL >> PAGE_SHIFT)
 #define KFD_MMAP_OFFSET_VALUE_GET(offset) (offset & KFD_MMAP_OFFSET_VALUE_MASK)
@@ -64,9 +76,6 @@
 #define KFD_CIK_HIQ_PIPE 4
 #define KFD_CIK_HIQ_QUEUE 0
 
-
-/* GPU ID hash width in bits */
-#define KFD_GPU_ID_HASH_WIDTH 16
 
 /* Macro for allocating structures */
 #define kfd_alloc_struct(ptr_to_struct)	\

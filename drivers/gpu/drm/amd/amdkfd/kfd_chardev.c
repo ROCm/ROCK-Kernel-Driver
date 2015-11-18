@@ -1167,6 +1167,7 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 		args->mmap_offset = 0;
 	} else {
 		args->mmap_offset = KFD_MMAP_TYPE_MAP_BO;
+		args->mmap_offset |= KFD_MMAP_GPU_ID(args->gpu_id);
 		args->mmap_offset <<= PAGE_SHIFT;
 		args->mmap_offset |= offset;
 	}
@@ -1572,18 +1573,17 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	struct kfd_process *process;
 	struct kfd_dev *kfd;
-	unsigned int i;
-	unsigned long kfd_mmap_type;
+	unsigned long vm_pgoff;
 	int retval;
 
 	process = kfd_get_process(current);
 	if (IS_ERR(process))
 		return PTR_ERR(process);
 
-	kfd_mmap_type = vma->vm_pgoff & KFD_MMAP_TYPE_MASK;
+	vm_pgoff = vma->vm_pgoff;
 	vma->vm_pgoff = KFD_MMAP_OFFSET_VALUE_GET(vma->vm_pgoff);
 
-	switch (kfd_mmap_type) {
+	switch (vm_pgoff & KFD_MMAP_TYPE_MASK) {
 	case KFD_MMAP_TYPE_DOORBELL:
 		return kfd_doorbell_mmap(process, vma);
 
@@ -1591,16 +1591,10 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 		return kfd_event_mmap(process, vma);
 
 	case KFD_MMAP_TYPE_MAP_BO:
-
-		i = 0;
-		while (kfd_topology_enum_kfd_devices(i, &kfd) == 0) {
-			i++;
-			if (!kfd)
-				continue; /* Skip non GPU devices */
-			retval = kfd->kfd2kgd->mmap_bo(kfd->kgd, vma);
-			if (retval != 0)
-				return retval;
-		}
+		kfd = kfd_device_by_id(KFD_MMAP_GPU_ID_GET(vm_pgoff));
+		if (!kfd)
+			return -EFAULT;
+		retval = kfd->kfd2kgd->mmap_bo(kfd->kgd, vma);
 		return retval;
 
 	case KFD_MMAP_TYPE_RESERVED_MEM:
