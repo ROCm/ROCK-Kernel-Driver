@@ -42,7 +42,6 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 		(c->x86 == 0x6 && c->x86_model >= 0x0e))
 		set_cpu_cap(c, X86_FEATURE_CONSTANT_TSC);
 
-#ifndef CONFIG_XEN
 	if (c->x86 >= 6 && !cpu_has(c, X86_FEATURE_IA64)) {
 		unsigned lower_word;
 
@@ -65,7 +64,6 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 		printk(KERN_WARNING "Atom PSE erratum detected, BIOS microcode update recommended\n");
 		clear_cpu_cap(c, X86_FEATURE_PSE);
 	}
-#endif
 
 #ifdef CONFIG_X86_64
 	set_cpu_cap(c, X86_FEATURE_SYSENTER32);
@@ -99,6 +97,7 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 		switch (c->x86_model) {
 		case 0x27:	/* Penwell */
 		case 0x35:	/* Cloverview */
+		case 0x4a:	/* Merrifield */
 			set_cpu_cap(c, X86_FEATURE_NONSTOP_TSC_S3);
 			break;
 		default:
@@ -300,7 +299,6 @@ static void intel_workarounds(struct cpuinfo_x86 *c)
 }
 #endif
 
-#ifndef CONFIG_XEN
 static void srat_detect_node(struct cpuinfo_x86 *c)
 {
 #ifdef CONFIG_NUMA
@@ -373,7 +371,6 @@ static void detect_vmx_virtcap(struct cpuinfo_x86 *c)
 			set_cpu_cap(c, X86_FEATURE_VPID);
 	}
 }
-#endif
 
 static void init_intel_energy_perf(struct cpuinfo_x86 *c)
 {
@@ -420,7 +417,6 @@ static void init_intel(struct cpuinfo_x86 *c)
 	 */
 	detect_extended_topology(c);
 
-#ifndef CONFIG_XEN
 	if (!cpu_has(c, X86_FEATURE_XTOPOLOGY)) {
 		/*
 		 * let's use the legacy cpuid vector 0x1 and 0x4 for topology
@@ -431,7 +427,6 @@ static void init_intel(struct cpuinfo_x86 *c)
 		detect_ht(c);
 #endif
 	}
-#endif
 
 	l2 = init_intel_cacheinfo(c);
 
@@ -508,13 +503,11 @@ static void init_intel(struct cpuinfo_x86 *c)
 		set_cpu_cap(c, X86_FEATURE_P3);
 #endif
 
-#ifndef CONFIG_XEN
 	/* Work around errata */
 	srat_detect_node(c);
 
 	if (cpu_has(c, X86_FEATURE_VMX))
 		detect_vmx_virtcap(c);
-#endif
 
 	init_intel_energy_perf(c);
 }

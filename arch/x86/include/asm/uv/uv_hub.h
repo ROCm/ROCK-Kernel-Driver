@@ -11,7 +11,7 @@
 #ifndef _ASM_X86_UV_UV_HUB_H
 #define _ASM_X86_UV_UV_HUB_H
 
-#ifdef CONFIG_X86_UV
+#ifdef CONFIG_X86_64
 #include <linux/numa.h>
 #include <linux/percpu.h>
 #include <linux/timer.h>
@@ -609,7 +609,7 @@ struct uv_cpu_nmi_s {
 
 DECLARE_PER_CPU(struct uv_cpu_nmi_s, uv_cpu_nmi);
 
-#define uv_hub_nmi			(uv_cpu_nmi.hub)
+#define uv_hub_nmi			this_cpu_read(uv_cpu_nmi.hub)
 #define uv_cpu_nmi_per(cpu)		(per_cpu(uv_cpu_nmi, cpu))
 #define uv_hub_nmi_per(cpu)		(uv_cpu_nmi_per(cpu).hub)
 

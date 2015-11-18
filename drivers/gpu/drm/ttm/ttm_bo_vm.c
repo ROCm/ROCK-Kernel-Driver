@@ -195,9 +195,6 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	if (bo->mem.bus.is_iomem) {
 		cvma.vm_page_prot = ttm_io_prot(bo->mem.placement,
 						cvma.vm_page_prot);
-#if defined(CONFIG_XEN) && defined(_PAGE_IOMAP)
-		pgprot_val(cvma.vm_page_prot) |= _PAGE_IOMAP;
-#endif
 	} else {
 		ttm = bo->ttm;
 		cvma.vm_page_prot = ttm_io_prot(bo->mem.placement,

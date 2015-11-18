@@ -10,8 +10,7 @@
  * to devices.
  */
 
-#if defined(CONFIG_X86_XEN) ? CONFIG_XEN_COMPAT < 0x040300 \
-			    : defined(CONFIG_X86_32)
+#ifdef CONFIG_X86_32
 /*
  * Some non-Intel clones support out of order store. wmb() ceases to be a
  * nop for these.

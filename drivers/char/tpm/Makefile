@@ -22,6 +22,4 @@ obj-$(CONFIG_TCG_INFINEON) += tpm_infineon.o
 obj-$(CONFIG_TCG_IBMVTPM) += tpm_ibmvtpm.o
 obj-$(CONFIG_TCG_TIS_ST33ZP24) += st33zp24/
 obj-$(CONFIG_TCG_XEN) += xen-tpmfront.o
-obj-$(CONFIG_TCG_XEN_V1) += tpm_xenu.o
-tpm_xenu-y = tpm_xen.o tpm_vtpm.o
 obj-$(CONFIG_TCG_CRB) += tpm_crb.o

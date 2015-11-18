@@ -164,6 +164,24 @@ static int acpi_processor_errata(void)
    -------------------------------------------------------------------------- */
 
 #ifdef CONFIG_ACPI_HOTPLUG_CPU
+int __weak acpi_map_cpu(acpi_handle handle,
+		phys_cpuid_t physid, int *pcpu)
+{
+	return -ENODEV;
+}
+
+int __weak acpi_unmap_cpu(int cpu)
+{
+	return -ENODEV;
+}
+
+int __weak arch_register_cpu(int cpu)
+{
+	return -ENODEV;
+}
+
+void __weak arch_unregister_cpu(int cpu) {}
+
 static int acpi_processor_hotadd_init(struct acpi_processor *pr)
 {
 	unsigned long long sta;
@@ -173,20 +191,9 @@ static int acpi_processor_hotadd_init(struct acpi_processor *pr)
 	if (invalid_phys_cpuid(pr->phys_id))
 		return -ENODEV;
 
-#ifdef CONFIG_XEN
-	if (xen_pcpu_index(pr->acpi_id, 1) != -1)
-		return AE_OK;
-#endif
-
 	status = acpi_evaluate_integer(pr->handle, "_STA", NULL, &sta);
 	if (ACPI_FAILURE(status) || !(sta & ACPI_STA_DEVICE_PRESENT))
 		return -ENODEV;
-
-	if (processor_cntl_external()) {
-		processor_notify_external(pr, PROCESSOR_HOTPLUG,
-					  HOTPLUG_TYPE_ADD);
-		return 0;
-	}
 
 	cpu_maps_update_begin();
 	cpu_hotplug_begin();
@@ -296,14 +303,9 @@ static int acpi_processor_get_info(struct acpi_device *device)
 	 */
 	if (invalid_logical_cpuid(pr->id)) {
 		int ret = acpi_processor_hotadd_init(pr);
-		if (ret && (ret != -ENODEV || invalid_phys_cpuid(pr->phys_id)))
+		if (ret)
 			return ret;
 	}
-#if defined(CONFIG_SMP) && defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
-	if (pr->id >= setup_max_cpus && pr->id
-	    && !invalid_logical_cpuid(pr->id))
-		pr->id = -1;
-#endif
 
 	/*
 	 * On some boxes several processors use the same processor bus id.
@@ -314,14 +316,7 @@ static int acpi_processor_get_info(struct acpi_device *device)
 	 * generated as the following format:
 	 * CPU+CPU ID.
 	 */
-	if (!invalid_logical_cpuid(pr->id))
-		sprintf(acpi_device_bid(device), "CPU%X", pr->id);
-	else
-		snprintf(acpi_device_bid(device),
-			 ARRAY_SIZE(acpi_device_bid(device)),
-			 "#%0*X",
-			 (int)ARRAY_SIZE(acpi_device_bid(device)) - 2,
-			 pr->acpi_id);
+	sprintf(acpi_device_bid(device), "CPU%X", pr->id);
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Processor [%d:%d]\n", pr->id,
 			  pr->acpi_id));
 
@@ -353,7 +348,7 @@ static int acpi_processor_get_info(struct acpi_device *device)
 	 * of /proc/cpuinfo
 	 */
 	status = acpi_evaluate_integer(pr->handle, "_SUN", NULL, &value);
-	if (ACPI_SUCCESS(status) && !invalid_logical_cpuid(pr->id))
+	if (ACPI_SUCCESS(status))
 		arch_fix_phys_package_id(pr->id, value);
 
 	return 0;
@@ -365,14 +360,7 @@ static int acpi_processor_get_info(struct acpi_device *device)
  * (cpu_data(cpu)) values, like CPU feature flags, family, model, etc.
  * Such things have to be put in and set up by the processor driver's .probe().
  */
-#ifndef CONFIG_XEN
 static DEFINE_PER_CPU(void *, processor_device_array);
-#else
-#include <linux/mutex.h>
-#include <linux/radix-tree.h>
-static DEFINE_MUTEX(processor_device_mutex);
-static RADIX_TREE(processor_device_tree, GFP_KERNEL);
-#endif
 
 static int acpi_processor_add(struct acpi_device *device,
 					const struct acpi_device_id *id)
@@ -396,68 +384,37 @@ static int acpi_processor_add(struct acpi_device *device,
 	device->driver_data = pr;
 
 	result = acpi_processor_get_info(device);
-	if (result || /* Processor is not physically present or unavailable */
-	    (invalid_logical_cpuid(pr->id) && !processor_cntl_external()))
+	if (result) /* Processor is not physically present or unavailable */
 		return 0;
 
 #ifdef CONFIG_SMP
-	if (pr->id >= setup_max_cpus && pr->id != 0) {
-		if (!processor_cntl_external())
-			return 0;
-		WARN_ON(!invalid_logical_cpuid(pr->id));
-	}
+	if (pr->id >= setup_max_cpus && pr->id != 0)
+		return 0;
 #endif
 
-	BUG_ON(!processor_cntl_external() && pr->id >= nr_cpu_ids);
+	BUG_ON(pr->id >= nr_cpu_ids);
 
 	/*
 	 * Buggy BIOS check.
 	 * ACPI id of processors can be reported wrongly by the BIOS.
 	 * Don't trust it blindly
 	 */
-#ifndef CONFIG_XEN
 	if (per_cpu(processor_device_array, pr->id) != NULL &&
 	    per_cpu(processor_device_array, pr->id) != device) {
-#else
-	mutex_lock(&processor_device_mutex);
-	result = radix_tree_insert(&processor_device_tree,
-				   pr->acpi_id, device);
-	switch (result) {
-	default:
-		mutex_unlock(&processor_device_mutex);
-		goto err;
-	case -EEXIST:
-		if (radix_tree_lookup(&processor_device_tree,
-				      pr->acpi_id) == device) {
-	case 0:
-			mutex_unlock(&processor_device_mutex);
-			break;
-		}
-		mutex_unlock(&processor_device_mutex);
-#endif
 		dev_warn(&device->dev,
 			"BIOS reported wrong ACPI id %d for the processor\n",
 			pr->id);
 		/* Give up, but do not abort the namespace scan. */
 		goto err;
 	}
-
 	/*
 	 * processor_device_array is not cleared on errors to allow buggy BIOS
 	 * checks.
 	 */
-#ifndef CONFIG_XEN
 	per_cpu(processor_device_array, pr->id) = device;
-#else
-	if (!invalid_logical_cpuid(pr->id)) {
-#endif
 	per_cpu(processors, pr->id) = pr;
 
 	dev = get_cpu_device(pr->id);
-#ifdef CONFIG_XEN
-	} else
-		dev = get_pcpu_device(pr->acpi_id);
-#endif
 	if (!dev) {
 		result = -ENODEV;
 		goto err;
@@ -479,9 +436,6 @@ static int acpi_processor_add(struct acpi_device *device,
  err:
 	free_cpumask_var(pr->throttling.shared_cpu_map);
 	device->driver_data = NULL;
-#ifdef CONFIG_XEN
-	if (!invalid_logical_cpuid(pr->id))
-#endif
 	per_cpu(processors, pr->id) = NULL;
  err_free_pr:
 	kfree(pr);
@@ -501,7 +455,7 @@ static void acpi_processor_remove(struct acpi_device *device)
 		return;
 
 	pr = acpi_driver_data(device);
-	if (!processor_cntl_external() && pr->id >= nr_cpu_ids)
+	if (pr->id >= nr_cpu_ids)
 		goto out;
 
 	/*
@@ -512,27 +466,12 @@ static void acpi_processor_remove(struct acpi_device *device)
 	 * Unbind the driver from the processor device and detach it from the
 	 * ACPI companion object.
 	 */
-	if (!invalid_logical_cpuid(pr->id)) {
-		device_release_driver(pr->dev);
-		acpi_unbind_one(pr->dev);
-	}
-
-	if (processor_cntl_external())
-		processor_notify_external(pr, PROCESSOR_HOTPLUG,
-					  HOTPLUG_TYPE_REMOVE);
+	device_release_driver(pr->dev);
+	acpi_unbind_one(pr->dev);
 
 	/* Clean up. */
-#ifdef CONFIG_XEN
-	mutex_lock(&processor_device_mutex);
-	radix_tree_delete(&processor_device_tree, pr->acpi_id);
-	mutex_unlock(&processor_device_mutex);
-	if (!invalid_logical_cpuid(pr->id))
-		per_cpu(processors, pr->id) = NULL;
-	goto out;
-#else
 	per_cpu(processor_device_array, pr->id) = NULL;
 	per_cpu(processors, pr->id) = NULL;
-#endif
 
 	cpu_maps_update_begin();
 	cpu_hotplug_begin();

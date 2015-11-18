@@ -16,47 +16,6 @@
 #define _COMPONENT		ACPI_PROCESSOR_COMPONENT
 ACPI_MODULE_NAME("processor_core");
 
-#ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
-/*
- * External processor control logic may register with its own set of
- * ops to get ACPI related notification. One example is like VMM.
- */
-const struct processor_extcntl_ops *processor_extcntl_ops;
-EXPORT_SYMBOL(processor_extcntl_ops);
-
-int processor_notify_external(struct acpi_processor *pr, int event, int type)
-{
-	int ret = -EINVAL;
-
-	if (!processor_cntl_external())
-		return -EINVAL;
-
-	switch (event) {
-	case PROCESSOR_PM_INIT:
-	case PROCESSOR_PM_CHANGE:
-		if (type >= PM_TYPE_MAX
-		    || !processor_extcntl_ops->pm_ops[type])
-			break;
-
-		ret = processor_extcntl_ops->pm_ops[type](pr, event);
-		break;
-#ifdef CONFIG_ACPI_HOTPLUG_CPU
-	case PROCESSOR_HOTPLUG:
-		if (processor_extcntl_ops->hotplug)
-			ret = processor_extcntl_ops->hotplug(pr, type);
-		xen_pcpu_hotplug(type);
-		break;
-#endif
-	default:
-		pr_err("Unsupported processor event %d.\n", event);
-		break;
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(processor_notify_external);
-#endif
-
 static struct acpi_table_madt *get_madt_table(void)
 {
 	static struct acpi_table_madt *madt;
@@ -233,7 +192,7 @@ phys_cpuid_t acpi_get_phys_id(acpi_handle handle, int type, u32 acpi_id)
 
 int acpi_map_cpuid(phys_cpuid_t phys_id, u32 acpi_id)
 {
-#if defined(CONFIG_SMP) && !defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
+#ifdef CONFIG_SMP
 	int i;
 #endif
 
@@ -265,20 +224,10 @@ int acpi_map_cpuid(phys_cpuid_t phys_id, u32 acpi_id)
 	}
 
 #ifdef CONFIG_SMP
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	for_each_possible_cpu(i) {
 		if (cpu_physical_id(i) == phys_id)
 			return i;
 	}
-#else
-	/*
-	 * Use of cpu_physical_id() is bogus here. Rather than defining a
-	 * stub enforcing a 1:1 mapping, we keep it undefined to catch bad
-	 * uses. Return as if there was a 1:1 mapping.
-	 */
-	if (phys_id < nr_cpu_ids && cpu_possible(phys_id))
-		return phys_id;
-#endif
 #else
 	/* In UP kernel, only processor 0 is valid */
 	if (phys_id == 0)

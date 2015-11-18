@@ -1,8 +1,7 @@
 /*
  *	Xen Watchdog Driver
  *
- *	(c) Copyright 2010,2011 Novell, Inc.
- *	(c) Copyright 2011,2012 SuSE
+ *	(c) Copyright 2010 Novell, Inc.
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -29,10 +28,8 @@
 #include <linux/spinlock.h>
 #include <linux/uaccess.h>
 #include <linux/watchdog.h>
-#ifdef CONFIG_PARAVIRT_XEN
 #include <xen/xen.h>
 #include <asm/xen/hypercall.h>
-#endif
 #include <xen/interface/sched.h>
 
 static struct platform_device *platform_device;
@@ -331,10 +328,8 @@ static int __init xen_wdt_init_module(void)
 {
 	int err;
 
-#ifdef CONFIG_PARAVIRT_XEN
 	if (!xen_domain())
 		return -ENODEV;
-#endif
 
 	pr_info("Xen WatchDog Timer Driver v%s\n", DRV_VERSION);
 
@@ -343,7 +338,7 @@ static int __init xen_wdt_init_module(void)
 		return err;
 
 	platform_device = platform_device_register_simple(DRV_NAME,
-							  -1, NULL, 0);
+								  -1, NULL, 0);
 	if (IS_ERR(platform_device)) {
 		err = PTR_ERR(platform_device);
 		platform_driver_unregister(&xen_wdt_driver);

@@ -74,12 +74,6 @@ extern const struct consw vga_con;	/* VGA text console */
 extern const struct consw newport_con;	/* SGI Newport console  */
 extern const struct consw prom_con;	/* SPARC PROM console */
 
-#ifdef CONFIG_XEN
-extern int console_use_vt;
-#else
-#define console_use_vt 1
-#endif
-
 int con_is_bound(const struct consw *csw);
 int do_unregister_con_driver(const struct consw *csw);
 int do_take_over_console(const struct consw *sw, int first, int last, int deflt);

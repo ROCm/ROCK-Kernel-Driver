@@ -53,14 +53,12 @@ $(out)/syscalls_64.h: $(syscall64) $(systbl)
 $(out)/xen-hypercalls.h: $(srctree)/scripts/xen-hypercalls.sh
 	$(call if_changed,hypercalls)
 
-$(out)/xen-hypercalls.h: $(srctree)/include/xen/interface/xen.h
-$(out)/xen-hypercalls.h: $(srctree)/include/xen/interface/arch-$(SRCARCH)/xen*.h
+$(out)/xen-hypercalls.h: $(srctree)/include/xen/interface/xen*.h
 
 uapisyshdr-y			+= unistd_32.h unistd_64.h unistd_x32.h
 syshdr-y			+= syscalls_32.h
 syshdr-$(CONFIG_X86_64)		+= unistd_32_ia32.h unistd_64_x32.h
 syshdr-$(CONFIG_X86_64)		+= syscalls_64.h
-syshdr-$(CONFIG_PARAVIRT_XEN)	+= xen-hypercalls.h
 syshdr-$(CONFIG_XEN)		+= xen-hypercalls.h
 
 targets	+= $(uapisyshdr-y) $(syshdr-y)

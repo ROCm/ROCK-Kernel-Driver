@@ -172,7 +172,6 @@
 #include <linux/firmware.h>
 #include <linux/rtnetlink.h>
 #include <asm/unaligned.h>
-#include <xen/xen_pvonhvm.h>
 
 
 #define DRV_NAME		"e100"
@@ -3195,9 +3194,6 @@ static struct pci_driver e100_driver = {
 
 static int __init e100_init_module(void)
 {
-	if (xen_pvonhvm_unplugged_nics)
-		return -EBUSY;
-
 	if (((1 << debug) - 1) & NETIF_MSG_DRV) {
 		pr_info("%s, %s\n", DRV_DESCRIPTION, DRV_VERSION);
 		pr_info("%s\n", DRV_COPYRIGHT);

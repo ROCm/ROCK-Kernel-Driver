@@ -272,7 +272,7 @@ struct xen_mc_fetch {
 	uint64_t fetch_id;
 
 	/* OUT variables. */
-	XEN_GUEST_HANDLE(mc_info) data;
+	GUEST_HANDLE(mc_info) data;
 };
 DEFINE_GUEST_HANDLE_STRUCT(xen_mc_fetch);
 
@@ -297,7 +297,7 @@ struct xen_mc_physcpuinfo {
 	uint32_t ncpus;
 	uint32_t _pad0;
 	/* OUT */
-	XEN_GUEST_HANDLE(mcinfo_logical_cpu) info;
+	GUEST_HANDLE(mcinfo_logical_cpu) info;
 };
 
 #define XEN_MC_msrinject	4

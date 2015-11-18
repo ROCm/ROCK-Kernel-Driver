@@ -180,7 +180,6 @@ extern void mp_save_irq(struct mpc_intsrc *m);
 
 extern void disable_ioapic_support(void);
 
-#ifndef CONFIG_XEN
 extern void __init io_apic_init_mappings(void);
 extern unsigned int native_io_apic_read(unsigned int apic, unsigned int reg);
 extern void native_disable_io_apic(void);
@@ -189,7 +188,6 @@ static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 {
 	return x86_io_apic_ops.read(apic, reg);
 }
-#endif /* !CONFIG_XEN */
 
 extern void setup_IO_APIC(void);
 extern void enable_IO_APIC(void);

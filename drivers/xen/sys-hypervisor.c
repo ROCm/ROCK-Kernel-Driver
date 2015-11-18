@@ -13,12 +13,8 @@
 #include <linux/kobject.h>
 #include <linux/err.h>
 
-#if defined(CONFIG_XEN) || defined(MODULE)
-#include <asm/hypervisor.h>
-#else
 #include <asm/xen/hypervisor.h>
 #include <asm/xen/hypercall.h>
-#endif
 
 #include <xen/xen.h>
 #include <xen/xenbus.h>
@@ -27,8 +23,6 @@
 #ifdef CONFIG_XEN_HAVE_VPMU
 #include <xen/interface/xenpmu.h>
 #endif
-
-#include "xenbus/xenbus_comms.h"
 
 #define HYPERVISOR_ATTR_RO(_name) \
 static struct hyp_sysfs_attr  _name##_attr = __ATTR_RO(_name)
@@ -124,13 +118,13 @@ static void xen_sysfs_version_destroy(void)
 
 /* UUID */
 
-#if !defined(CONFIG_XEN) || CONFIG_XEN_COMPAT < 0x030100
 static ssize_t uuid_show_fallback(struct hyp_sysfs_attr *attr, char *buffer)
 {
 	char *vm, *val;
 	int ret;
+	extern int xenstored_ready;
 
-	if (!is_xenstored_ready())
+	if (!xenstored_ready)
 		return -EBUSY;
 
 	vm = xenbus_read(XBT_NIL, "vm", "", NULL);
@@ -144,9 +138,6 @@ static ssize_t uuid_show_fallback(struct hyp_sysfs_attr *attr, char *buffer)
 	kfree(val);
 	return ret;
 }
-#else
-# define uuid_show_fallback(attr, buf) ret
-#endif
 
 static ssize_t uuid_show(struct hyp_sysfs_attr *attr, char *buffer)
 {
@@ -380,35 +371,6 @@ static void xen_properties_destroy(void)
 	sysfs_remove_group(hypervisor_kobj, &xen_properties_group);
 }
 
-#if defined(CONFIG_XEN) && defined(CONFIG_KEXEC)
-extern size_t vmcoreinfo_size_xen;
-extern unsigned long paddr_vmcoreinfo_xen;
-
-static ssize_t vmcoreinfo_show(struct hyp_sysfs_attr *attr, char *page)
-{
-	return sprintf(page, "%lx %zx\n",
-		       paddr_vmcoreinfo_xen, vmcoreinfo_size_xen);
-}
-
-HYPERVISOR_ATTR_RO(vmcoreinfo);
-
-static int __init xen_sysfs_vmcoreinfo_init(void)
-{
-	if (!vmcoreinfo_size_xen)
-		return 0;
-	return sysfs_create_file(hypervisor_kobj, &vmcoreinfo_attr.attr);
-}
-
-static void xen_sysfs_vmcoreinfo_destroy(void)
-{
-	if (vmcoreinfo_size_xen)
-		sysfs_remove_file(hypervisor_kobj, &vmcoreinfo_attr.attr);
-}
-#else
-static inline int __init xen_sysfs_vmcoreinfo_init(void) { return 0; }
-static inline void xen_sysfs_vmcoreinfo_destroy(void) { }
-#endif
-
 #ifdef CONFIG_XEN_HAVE_VPMU
 struct pmu_mode {
 	const char *name;
@@ -560,11 +522,8 @@ static int __init hyper_sysfs_init(void)
 		}
 	}
 #endif
-	ret = xen_sysfs_vmcoreinfo_init();
-	if (!ret)
-		goto out;
+	goto out;
 
-	xen_properties_destroy();
 prop_out:
 	xen_sysfs_uuid_destroy();
 uuid_out:
@@ -579,7 +538,6 @@ out:
 
 static void __exit hyper_sysfs_exit(void)
 {
-	xen_sysfs_vmcoreinfo_destroy();
 #ifdef CONFIG_XEN_HAVE_VPMU
 	xen_pmu_destroy();
 #endif

@@ -54,12 +54,10 @@ static void __init check_fpu(void)
 
 	write_cr0(cr0_saved);
 
-#ifndef CONFIG_XEN
 	if (fdiv_bug) {
 		set_cpu_bug(&boot_cpu_data, X86_BUG_FDIV);
 		pr_warn("Hmm, FPU with FDIV bug\n");
 	}
-#endif
 }
 
 void __init fpu__init_check_bugs(void)

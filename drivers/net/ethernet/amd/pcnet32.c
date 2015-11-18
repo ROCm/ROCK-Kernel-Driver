@@ -57,7 +57,6 @@ static const char *const version =
 
 #include <asm/dma.h>
 #include <asm/irq.h>
-#include <xen/xen_pvonhvm.h>
 
 /*
  * PCI device identifiers for "new style" Linux PCI Device Drivers
@@ -1501,7 +1500,7 @@ pcnet32_probe_pci(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return -ENODEV;
 	}
 
-	if (!pci_dma_supported(pdev, PCNET32_DMA_MASK)) {
+	if (!pci_set_dma_mask(pdev, PCNET32_DMA_MASK)) {
 		if (pcnet32_debug & NETIF_MSG_PROBE)
 			pr_err("architecture does not support 32bit PCI busmaster DMA\n");
 		return -ENODEV;
@@ -2938,9 +2937,6 @@ MODULE_LICENSE("GPL");
 
 static int __init pcnet32_init_module(void)
 {
-	if (xen_pvonhvm_unplugged_nics)
-		return -EBUSY;
-
 	pr_info("%s", version);
 
 	pcnet32_debug = netif_msg_init(debug, PCNET32_MSG_DEFAULT);

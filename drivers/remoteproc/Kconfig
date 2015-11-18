@@ -1,5 +1,4 @@
 menu "Remoteproc drivers"
-	depends on !XEN # not compatible with the selection of VIRTIO below
 
 # REMOTEPROC gets selected by whoever wants it
 config REMOTEPROC

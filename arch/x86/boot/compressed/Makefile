@@ -35,9 +35,6 @@ KBUILD_AFLAGS  := $(KBUILD_CFLAGS) -D__ASSEMBLY__
 GCOV_PROFILE := n
 
 LDFLAGS := -m elf_$(UTS_MACHINE)
-ifeq ($(CONFIG_XEN),y)
-LDFLAGS += -e 0
-endif
 LDFLAGS_vmlinux := -T
 
 hostprogs-y	:= mkpiggy
@@ -55,8 +52,6 @@ $(obj)/eboot.o: KBUILD_CFLAGS += -fshort-wchar -mno-red-zone
 vmlinux-objs-$(CONFIG_EFI_STUB) += $(obj)/eboot.o $(obj)/efi_stub_$(BITS).o \
 	$(objtree)/drivers/firmware/efi/libstub/lib.a
 vmlinux-objs-$(CONFIG_EFI_MIXED) += $(obj)/efi_thunk_$(BITS).o
-
-vmlinux-objs-$(CONFIG_XEN) := $(obj)/vmlinux.lds $(obj)/piggy.o
 
 $(obj)/vmlinux: $(vmlinux-objs-y) FORCE
 	$(call if_changed,ld)

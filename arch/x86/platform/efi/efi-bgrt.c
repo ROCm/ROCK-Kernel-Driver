@@ -16,11 +16,6 @@
 #include <linux/efi.h>
 #include <linux/efi-bgrt.h>
 
-#ifdef CONFIG_XEN
-#define early_memremap early_ioremap
-#define early_memunmap early_iounmap
-#endif
-
 struct acpi_table_bgrt *bgrt_tab;
 void *__initdata bgrt_image;
 size_t __initdata bgrt_image_size;
@@ -55,9 +50,14 @@ void __init efi_bgrt_init(void)
 		       bgrt_tab->version);
 		return;
 	}
-	if (bgrt_tab->status != 1) {
-		pr_err("Ignoring BGRT: invalid status %u (expected 1)\n",
+	if (bgrt_tab->status & 0xfe) {
+		pr_err("Ignoring BGRT: reserved status bits are non-zero %u\n",
 		       bgrt_tab->status);
+		return;
+	}
+	if (bgrt_tab->status != 1) {
+		pr_debug("Ignoring BGRT: invalid status %u (expected 1)\n",
+			 bgrt_tab->status);
 		return;
 	}
 	if (bgrt_tab->image_type != 0) {

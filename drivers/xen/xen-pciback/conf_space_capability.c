@@ -140,21 +140,6 @@ static int pm_ctrl_write(struct pci_dev *dev, int offset, u16 new_value,
 		goto out;
 	}
 
-#ifdef CONFIG_XEN
-	/*
-	 * Device may lose PCI config info on D3->D0 transition. This
-	 * is a problem for some guests which will not reset BARs. Even
-	 * those that have a go will be foiled by our BAR-write handler
-	 * which will discard the write! Since Linux won't re-init
-	 * the config space automatically in all cases, we do it here.
-	 * Future: Should we re-initialise all first 64 bytes of config space?
-	 */
-	if (new_state == PCI_D0 &&
-	    (old_state == PCI_D3hot || old_state == PCI_D3cold) &&
-	    !(old_value & PCI_PM_CTRL_NO_SOFT_RESET))
-		pci_restore_bars(dev);
-#endif
-
  out:
 	return err;
 }

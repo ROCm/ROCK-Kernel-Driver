@@ -514,28 +514,6 @@ static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm)
 	}
 }
 
-#ifdef CONFIG_PCI_GUESTDEV
-#include <linux/sysfs.h>
-
-static ssize_t seg_show(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	struct acpi_pci_root *root = acpi_driver_data(to_acpi_device(dev));
-
-	return sprintf(buf, "%04x\n", root->segment);
-}
-static DEVICE_ATTR(seg, 0444, seg_show, NULL);
-
-static ssize_t bbn_show(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	struct acpi_pci_root *root = acpi_driver_data(to_acpi_device(dev));
-
-	return sprintf(buf, "%02x\n", (unsigned int)root->secondary.start);
-}
-static DEVICE_ATTR(bbn, 0444, bbn_show, NULL);
-#endif
-
 static int acpi_pci_root_add(struct acpi_device *device,
 			     const struct acpi_device_id *not_used)
 {
@@ -629,13 +607,6 @@ static int acpi_pci_root_add(struct acpi_device *device,
 	if (no_aspm)
 		pcie_no_aspm();
 
-#ifdef CONFIG_PCI_GUESTDEV
-	if (device_create_file(&device->dev, &dev_attr_seg))
-		dev_warn(&device->dev, "could not create seg attr\n");
-	if (device_create_file(&device->dev, &dev_attr_bbn))
-		dev_warn(&device->dev, "could not create bbn attr\n");
-#endif
-
 	pci_acpi_add_bus_pm_notifier(device);
 	if (device->wakeup.flags.run_wake)
 		device_set_run_wake(root->bus->bridge, true);
@@ -681,6 +652,210 @@ static void acpi_pci_root_remove(struct acpi_device *device)
 	kfree(root);
 }
 
+/*
+ * Following code to support acpi_pci_root_create() is copied from
+ * arch/x86/pci/acpi.c and modified so it could be reused by x86, IA64
+ * and ARM64.
+ */
+static void acpi_pci_root_validate_resources(struct device *dev,
+					     struct list_head *resources,
+					     unsigned long type)
+{
+	LIST_HEAD(list);
+	struct resource *res1, *res2, *root = NULL;
+	struct resource_entry *tmp, *entry, *entry2;
+
+	BUG_ON((type & (IORESOURCE_MEM | IORESOURCE_IO)) == 0);
+	root = (type & IORESOURCE_MEM) ? &iomem_resource : &ioport_resource;
+
+	list_splice_init(resources, &list);
+	resource_list_for_each_entry_safe(entry, tmp, &list) {
+		bool free = false;
+		resource_size_t end;
+
+		res1 = entry->res;
+		if (!(res1->flags & type))
+			goto next;
+
+		/* Exclude non-addressable range or non-addressable portion */
+		end = min(res1->end, root->end);
+		if (end <= res1->start) {
+			dev_info(dev, "host bridge window %pR (ignored, not CPU addressable)\n",
+				 res1);
+			free = true;
+			goto next;
+		} else if (res1->end != end) {
+			dev_info(dev, "host bridge window %pR ([%#llx-%#llx] ignored, not CPU addressable)\n",
+				 res1, (unsigned long long)end + 1,
+				 (unsigned long long)res1->end);
+			res1->end = end;
+		}
+
+		resource_list_for_each_entry(entry2, resources) {
+			res2 = entry2->res;
+			if (!(res2->flags & type))
+				continue;
+
+			/*
+			 * I don't like throwing away windows because then
+			 * our resources no longer match the ACPI _CRS, but
+			 * the kernel resource tree doesn't allow overlaps.
+			 */
+			if (resource_overlaps(res1, res2)) {
+				res2->start = min(res1->start, res2->start);
+				res2->end = max(res1->end, res2->end);
+				dev_info(dev, "host bridge window expanded to %pR; %pR ignored\n",
+					 res2, res1);
+				free = true;
+				goto next;
+			}
+		}
+
+next:
+		resource_list_del(entry);
+		if (free)
+			resource_list_free_entry(entry);
+		else
+			resource_list_add_tail(entry, resources);
+	}
+}
+
+int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
+{
+	int ret;
+	struct list_head *list = &info->resources;
+	struct acpi_device *device = info->bridge;
+	struct resource_entry *entry, *tmp;
+	unsigned long flags;
+
+	flags = IORESOURCE_IO | IORESOURCE_MEM | IORESOURCE_MEM_8AND16BIT;
+	ret = acpi_dev_get_resources(device, list,
+				     acpi_dev_filter_resource_type_cb,
+				     (void *)flags);
+	if (ret < 0)
+		dev_warn(&device->dev,
+			 "failed to parse _CRS method, error code %d\n", ret);
+	else if (ret == 0)
+		dev_dbg(&device->dev,
+			"no IO and memory resources present in _CRS\n");
+	else {
+		resource_list_for_each_entry_safe(entry, tmp, list) {
+			if (entry->res->flags & IORESOURCE_DISABLED)
+				resource_list_destroy_entry(entry);
+			else
+				entry->res->name = info->name;
+		}
+		acpi_pci_root_validate_resources(&device->dev, list,
+						 IORESOURCE_MEM);
+		acpi_pci_root_validate_resources(&device->dev, list,
+						 IORESOURCE_IO);
+	}
+
+	return ret;
+}
+
+static void pci_acpi_root_add_resources(struct acpi_pci_root_info *info)
+{
+	struct resource_entry *entry, *tmp;
+	struct resource *res, *conflict, *root = NULL;
+
+	resource_list_for_each_entry_safe(entry, tmp, &info->resources) {
+		res = entry->res;
+		if (res->flags & IORESOURCE_MEM)
+			root = &iomem_resource;
+		else if (res->flags & IORESOURCE_IO)
+			root = &ioport_resource;
+		else
+			continue;
+
+		conflict = insert_resource_conflict(root, res);
+		if (conflict) {
+			dev_info(&info->bridge->dev,
+				 "ignoring host bridge window %pR (conflicts with %s %pR)\n",
+				 res, conflict->name, conflict);
+			resource_list_destroy_entry(entry);
+		}
+	}
+}
+
+static void __acpi_pci_root_release_info(struct acpi_pci_root_info *info)
+{
+	struct resource *res;
+	struct resource_entry *entry, *tmp;
+
+	if (!info)
+		return;
+
+	resource_list_for_each_entry_safe(entry, tmp, &info->resources) {
+		res = entry->res;
+		if (res->parent &&
+		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
+			release_resource(res);
+		resource_list_destroy_entry(entry);
+	}
+
+	info->ops->release_info(info);
+}
+
+static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
+{
+	struct resource *res;
+	struct resource_entry *entry;
+
+	resource_list_for_each_entry(entry, &bridge->windows) {
+		res = entry->res;
+		if (res->parent &&
+		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
+			release_resource(res);
+	}
+	__acpi_pci_root_release_info(bridge->release_data);
+}
+
+struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+				     struct acpi_pci_root_ops *ops,
+				     struct acpi_pci_root_info *info,
+				     void *sysdata)
+{
+	int ret, busnum = root->secondary.start;
+	struct acpi_device *device = root->device;
+	int node = acpi_get_node(device->handle);
+	struct pci_bus *bus;
+
+	info->root = root;
+	info->bridge = device;
+	info->ops = ops;
+	INIT_LIST_HEAD(&info->resources);
+	snprintf(info->name, sizeof(info->name), "PCI Bus %04x:%02x",
+		 root->segment, busnum);
+
+	if (ops->init_info && ops->init_info(info))
+		goto out_release_info;
+	if (ops->prepare_resources)
+		ret = ops->prepare_resources(info);
+	else
+		ret = acpi_pci_probe_root_resources(info);
+	if (ret < 0)
+		goto out_release_info;
+
+	pci_acpi_root_add_resources(info);
+	pci_add_resource(&info->resources, &root->secondary);
+	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
+				  sysdata, &info->resources);
+	if (!bus)
+		goto out_release_info;
+
+	pci_scan_child_bus(bus);
+	pci_set_host_bridge_release(to_pci_host_bridge(bus->bridge),
+				    acpi_pci_root_release_info, info);
+	if (node != NUMA_NO_NODE)
+		dev_printk(KERN_DEBUG, &bus->dev, "on NUMA node %d\n", node);
+	return bus;
+
+out_release_info:
+	__acpi_pci_root_release_info(info);
+	return NULL;
+}
+
 void __init acpi_pci_root_init(void)
 {
 	acpi_hest_init();
@@ -690,45 +865,3 @@ void __init acpi_pci_root_init(void)
 	pci_acpi_crs_quirks();
 	acpi_scan_add_handler_with_hotplug(&pci_root_handler, "pci_root");
 }
-
-#ifdef CONFIG_PCI_GUESTDEV
-struct acpi_pci_get_root_seg_bbn {
-	const char *hid, *uid;
-	int *seg, *bbn;
-};
-
-static int _acpi_pci_get_root_seg_bbn(struct device *dev, void *ctxt)
-{
-	struct acpi_device *device = to_acpi_device(dev);
-	const struct acpi_pci_root *root = acpi_driver_data(device);
-	const struct acpi_pci_get_root_seg_bbn *data = ctxt;
-
-	if (!acpi_is_root_bridge(ACPI_HANDLE(dev))
-	    || strcmp(acpi_device_hid(device), data->hid)
-	    || (device->pnp.unique_id ? strcmp(device->pnp.unique_id,
-					       data->uid)
-				      : strlen(data->uid)))
-		return 0;
-
-	if (WARN_ON_ONCE(device != root->device))
-		return 0;
-
-	*data->seg = root->segment;
-	*data->bbn = root->secondary.start;
-
-	return 1;
-}
-
-int acpi_pci_get_root_seg_bbn(char *hid, char *uid, int *seg, int *bbn)
-{
-	struct acpi_pci_get_root_seg_bbn data = {
-		.hid = hid,
-		.uid = uid,
-		.seg = seg,
-		.bbn = bbn
-	};
-
-	return bus_for_each_dev(&acpi_bus_type, NULL, &data,
-				_acpi_pci_get_root_seg_bbn) > 0;
-}
-#endif

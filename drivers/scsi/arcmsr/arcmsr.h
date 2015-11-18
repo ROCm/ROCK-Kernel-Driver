@@ -45,7 +45,7 @@
 #include <linux/interrupt.h>
 struct device_attribute;
 /*The limit of outstanding scsi command that firmware can handle*/
-#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
+#ifdef CONFIG_XEN
 	#define ARCMSR_MAX_FREECCB_NUM	160
 #define ARCMSR_MAX_OUTSTANDING_CMD	155
 #else

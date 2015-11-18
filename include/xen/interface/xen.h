@@ -27,53 +27,28 @@
 #ifndef __XEN_PUBLIC_XEN_H__
 #define __XEN_PUBLIC_XEN_H__
 
-#include "xen-compat.h"
-
-#if defined(CONFIG_PARAVIRT_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H)
 #include <asm/xen/interface.h>
-#elif defined(__i386__) || defined(__x86_64__)
-#include "arch-x86/xen.h"
-#elif defined(__ia64__)
-#include "arch-ia64.h"
-#elif defined(__arm__) || defined (__aarch64__)
-#include "arch-arm.h"
-#else
-#error "Unsupported architecture"
-#endif
-
-#ifndef __ASSEMBLY__
-/* Guest handles for primitive C types. */
-DEFINE_XEN_GUEST_HANDLE(char);
-__DEFINE_XEN_GUEST_HANDLE(uchar, unsigned char);
-DEFINE_XEN_GUEST_HANDLE(int);
-__DEFINE_XEN_GUEST_HANDLE(uint,  unsigned int);
-#if __XEN_INTERFACE_VERSION__ < 0x00040300 && (!defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H))
-DEFINE_XEN_GUEST_HANDLE(long);
-__DEFINE_XEN_GUEST_HANDLE(ulong, unsigned long);
-#endif
-DEFINE_XEN_GUEST_HANDLE(void);
-
-DEFINE_XEN_GUEST_HANDLE(uint64_t);
-DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
-DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
-#endif
 
 /*
- * HYPERCALLS
+ * XEN "SYSTEM CALLS" (a.k.a. HYPERCALLS).
  */
 
-/* `incontents 100 hcalls List of hypercalls
- * ` enum hypercall_num { // __HYPERVISOR_* => HYPERVISOR_*()
+/*
+ * x86_32: EAX = vector; EBX, ECX, EDX, ESI, EDI = args 1, 2, 3, 4, 5.
+ *         EAX = return value
+ *         (argument registers may be clobbered on return)
+ * x86_64: RAX = vector; RDI, RSI, RDX, R10, R8, R9 = args 1, 2, 3, 4, 5, 6.
+ *         RAX = return value
+ *         (argument registers not clobbered on return; RCX, R11 are)
  */
-
 #define __HYPERVISOR_set_trap_table        0
 #define __HYPERVISOR_mmu_update            1
 #define __HYPERVISOR_set_gdt               2
 #define __HYPERVISOR_stack_switch          3
 #define __HYPERVISOR_set_callbacks         4
 #define __HYPERVISOR_fpu_taskswitch        5
-#define __HYPERVISOR_sched_op_compat       6 /* compat since 0x00030101 */
-#define __HYPERVISOR_platform_op           7
+#define __HYPERVISOR_sched_op_compat       6
+#define __HYPERVISOR_dom0_op               7
 #define __HYPERVISOR_set_debugreg          8
 #define __HYPERVISOR_get_debugreg          9
 #define __HYPERVISOR_update_descriptor    10
@@ -81,10 +56,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define __HYPERVISOR_multicall            13
 #define __HYPERVISOR_update_va_mapping    14
 #define __HYPERVISOR_set_timer_op         15
-#define __HYPERVISOR_event_channel_op_compat 16 /* compat since 0x00030202 */
+#define __HYPERVISOR_event_channel_op_compat 16
 #define __HYPERVISOR_xen_version          17
 #define __HYPERVISOR_console_io           18
-#define __HYPERVISOR_physdev_op_compat    19 /* compat since 0x00030202 */
+#define __HYPERVISOR_physdev_op_compat    19
 #define __HYPERVISOR_grant_table_op       20
 #define __HYPERVISOR_vm_assist            21
 #define __HYPERVISOR_update_va_mapping_otherdomain 22
@@ -94,7 +69,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define __HYPERVISOR_mmuext_op            26
 #define __HYPERVISOR_xsm_op               27
 #define __HYPERVISOR_nmi_op               28
-#define __HYPERVISOR_sched_op_new         29
+#define __HYPERVISOR_sched_op             29
 #define __HYPERVISOR_callback_op          30
 #define __HYPERVISOR_xenoprof_op          31
 #define __HYPERVISOR_event_channel_op     32
@@ -117,43 +92,15 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define __HYPERVISOR_arch_6               54
 #define __HYPERVISOR_arch_7               55
 
-/* ` } */
-
-/*
- * HYPERCALL COMPATIBILITY.
- */
-
-/* New sched_op hypercall introduced in 0x00030101. */
-#if __XEN_INTERFACE_VERSION__ < 0x00030101 && (!defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H))
-#define __HYPERVISOR_sched_op __HYPERVISOR_sched_op_compat
-#else
-#define __HYPERVISOR_sched_op __HYPERVISOR_sched_op_new
-#endif
-
-/* New event-channel and physdev hypercalls introduced in 0x00030202. */
-#if __XEN_INTERFACE_VERSION__ < 0x00030202 && (!defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H))
-#undef __HYPERVISOR_event_channel_op
-#define __HYPERVISOR_event_channel_op __HYPERVISOR_event_channel_op_compat
-#undef __HYPERVISOR_physdev_op
-#define __HYPERVISOR_physdev_op __HYPERVISOR_physdev_op_compat
-#endif
-
-/* New platform_op hypercall introduced in 0x00030204. */
-#if __XEN_INTERFACE_VERSION__ < 0x00030204 || (defined(CONFIG_PARAVIRT_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H))
-#define __HYPERVISOR_dom0_op __HYPERVISOR_platform_op
-#endif
-
 /*
  * VIRTUAL INTERRUPTS
  *
  * Virtual interrupts that a guest OS may receive from Xen.
- *
  * In the side comments, 'V.' denotes a per-VCPU VIRQ while 'G.' denotes a
  * global VIRQ. The former can be bound once per VCPU and cannot be re-bound.
  * The latter can be allocated only once per guest: they must initially be
  * allocated to VCPU0 but can subsequently be re-bound.
  */
-/* ` enum virq { */
 #define VIRQ_TIMER      0  /* V. Timebase update, and/or requested timeout.  */
 #define VIRQ_DEBUG      1  /* V. Request guest to dump debug info.           */
 #define VIRQ_CONSOLE    2  /* G. (DOM0) Bytes received on emergency console. */
@@ -166,7 +113,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define VIRQ_MEM_EVENT  10 /* G. (DOM0) A memory event has occured           */
 #define VIRQ_XC_RESERVED 11 /* G. Reserved for XenClient                     */
 #define VIRQ_ENOMEM     12 /* G. (DOM0) Low on heap memory       */
-#define VIRQ_XENPMU     13 /* V.  PMC interrupt                              */
+#define VIRQ_XENPMU     13  /* PMC interrupt                                 */
 
 /* Architecture-specific VIRQ definitions. */
 #define VIRQ_ARCH_0    16
@@ -177,16 +124,13 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define VIRQ_ARCH_5    21
 #define VIRQ_ARCH_6    22
 #define VIRQ_ARCH_7    23
-/* ` } */
 
 #define NR_VIRQS       24
 
 /*
- * ` enum neg_errnoval
- * ` HYPERVISOR_mmu_update(const struct mmu_update reqs[],
- * `                       unsigned count, unsigned *done_out,
- * `                       unsigned foreigndom)
- * `
+ * enum neg_errnoval HYPERVISOR_mmu_update(const struct mmu_update reqs[],
+ *                                         unsigned count, unsigned *done_out,
+ *                                         unsigned foreigndom)
  * @reqs is an array of mmu_update_t structures ((ptr, val) pairs).
  * @count is the length of the above array.
  * @pdone is an output parameter indicating number of completed operations
@@ -327,11 +271,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 /*
  * MMU EXTENDED OPERATIONS
  *
- * ` enum neg_errnoval
- * ` HYPERVISOR_mmuext_op(mmuext_op_t uops[],
- * `                      unsigned int count,
- * `                      unsigned int *pdone,
- * `                      unsigned int foreigndom)
+ * enum neg_errnoval HYPERVISOR_mmuext_op(mmuext_op_t uops[],
+ *                                        unsigned int count,
+ *                                        unsigned int *pdone,
+ *                                        unsigned int foreigndom)
  */
 /* HYPERVISOR_mmuext_op() accepts a list of mmuext_op structures.
  * A foreigndom (FD) can be specified (or DOMID_SELF for none).
@@ -388,7 +331,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
  * cmd: MMUEXT_[UN]MARK_SUPER
  * mfn: Machine frame number of head of superpage to be [un]marked.
  */
-/* ` enum mmuext_cmd { */
 #define MMUEXT_PIN_L1_TABLE      0
 #define MMUEXT_PIN_L2_TABLE      1
 #define MMUEXT_PIN_L3_TABLE      2
@@ -409,11 +351,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define MMUEXT_FLUSH_CACHE_GLOBAL 18
 #define MMUEXT_MARK_SUPER       19
 #define MMUEXT_UNMARK_SUPER     20
-/* ` } */
 
 #ifndef __ASSEMBLY__
 struct mmuext_op {
-	unsigned int cmd; /* => enum mmuext_cmd */
+	unsigned int cmd;
 	union {
 		/* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR
 		 * CLEAR_PAGE, COPY_PAGE, [UN]MARK_SUPER */
@@ -425,38 +366,17 @@ struct mmuext_op {
 		/* SET_LDT */
 		unsigned int nr_ents;
 		/* TLB_FLUSH_MULTI, INVLPG_MULTI */
-#if __XEN_INTERFACE_VERSION__ >= 0x00030205
-		XEN_GUEST_HANDLE(const_void) vcpumask;
-#else
-		const void *vcpumask;
-#endif
+		void *vcpumask;
 		/* COPY_PAGE */
 		xen_pfn_t src_mfn;
 	} arg2;
 };
 DEFINE_GUEST_HANDLE_STRUCT(mmuext_op);
-typedef struct mmuext_op mmuext_op_t;
-DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 #endif
 
-/*
- * ` enum neg_errnoval
- * ` HYPERVISOR_update_va_mapping(unsigned long va, u64 val,
- * `                              enum uvm_flags flags)
- * `
- * ` enum neg_errnoval
- * ` HYPERVISOR_update_va_mapping_otherdomain(unsigned long va, u64 val,
- * `                                          enum uvm_flags flags,
- * `                                          domid_t domid)
- * `
- * ` @va: The virtual address whose mapping we want to change
- * ` @val: The new page table entry, must contain a machine address
- * ` @flags: Control TLB flushes
- */
 /* These are passed as 'flags' to update_va_mapping. They can be ORed. */
 /* When specifying UVMF_MULTI, also OR in a pointer to a CPU bitmap.   */
 /* UVMF_LOCAL is merely UVMF_MULTI with a NULL bitmap pointer.         */
-/* ` enum uvm_flags { */
 #define UVMF_NONE               (0UL<<0) /* No flushing at all.   */
 #define UVMF_TLB_FLUSH          (1UL<<0) /* Flush entire TLB(s).  */
 #define UVMF_INVLPG             (2UL<<0) /* Flush only one entry. */
@@ -464,7 +384,6 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 #define UVMF_MULTI              (0UL<<2) /* Flush subset of TLBs. */
 #define UVMF_LOCAL              (0UL<<2) /* Flush local TLB.      */
 #define UVMF_ALL                (1UL<<2) /* Flush all TLBs.       */
-/* ` } */
 
 /*
  * Commands to HYPERVISOR_console_io().
@@ -494,21 +413,7 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 /* x86/PAE guests: support PDPTs above 4GB. */
 #define VMASST_TYPE_pae_extended_cr3     3
 
-/*
- * x86/64 guests: strictly hide M2P from user mode.
- * This allows the guest to control respective hypervisor behavior:
- * - when not set, L4 tables get created with the respective slot blank,
- *   and whenever the L4 table gets used as a kernel one the missing
- *   mapping gets inserted,
- * - when set, L4 tables get created with the respective slot initialized
- *   as before, and whenever the L4 table gets used as a user one the
- *   mapping gets zapped.
- */
-#define VMASST_TYPE_m2p_strict           32
-
-#if __XEN_INTERFACE_VERSION__ < 0x00040600
-#define MAX_VMASST_TYPE                  3
-#endif
+#define MAX_VMASST_TYPE 3
 
 #ifndef __ASSEMBLY__
 
@@ -557,38 +462,19 @@ struct mmu_update {
     uint64_t val;       /* New contents of PTE.    */
 };
 DEFINE_GUEST_HANDLE_STRUCT(mmu_update);
-typedef struct mmu_update mmu_update_t;
-DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
 
 /*
- * ` enum neg_errnoval
- * ` HYPERVISOR_multicall(multicall_entry_t call_list[],
- * `                      uint32_t nr_calls);
- *
+ * Send an array of these to HYPERVISOR_multicall().
  * NB. The fields are logically the natural register size for this
  * architecture. In cases where xen_ulong_t is larger than this then
  * any unused bits in the upper portion must be zero.
  */
 struct multicall_entry {
     xen_ulong_t op;
-#if !defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H)
-    xen_ulong_t result;
-#else
     xen_long_t result;
-#endif
     xen_ulong_t args[6];
 };
 DEFINE_GUEST_HANDLE_STRUCT(multicall_entry);
-typedef struct multicall_entry multicall_entry_t;
-DEFINE_XEN_GUEST_HANDLE(multicall_entry_t);
-
-#if __XEN_INTERFACE_VERSION__ < 0x00040400 && (!defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H))
-/*
- * Event channel endpoints per domain (when using the 2-level ABI):
- *  1024 if a long is 32 bits; 4096 if a long is 64 bits.
- */
-#define NR_EVENT_CHANNELS EVTCHN_2L_NR_CHANNELS
-#endif
 
 struct vcpu_time_info {
 	/*
@@ -615,7 +501,6 @@ struct vcpu_time_info {
 	int8_t   tsc_shift;
 	int8_t   pad1[3];
 }; /* 32 bytes */
-typedef struct vcpu_time_info vcpu_time_info_t;
 
 struct vcpu_info {
 	/*
@@ -644,34 +529,18 @@ struct vcpu_info {
 	 * to block: this avoids wakeup-waiting races.
 	 */
 	uint8_t evtchn_upcall_pending;
-#ifdef XEN_HAVE_PV_UPCALL_MASK
 	uint8_t evtchn_upcall_mask;
-#else /* XEN_HAVE_PV_UPCALL_MASK */
-	uint8_t pad0;
-#endif /* XEN_HAVE_PV_UPCALL_MASK */
 	xen_ulong_t evtchn_pending_sel;
 	struct arch_vcpu_info arch;
-#ifdef CONFIG_PARAVIRT_XEN
 	struct pvclock_vcpu_time_info time;
-#else
-	struct vcpu_time_info time;
-#endif
 }; /* 64 bytes (x86) */
-#ifndef __XEN__
-typedef struct vcpu_info vcpu_info_t;
-#endif
 
 /*
- * `incontents 200 startofday_shared Start-of-day shared data structure
  * Xen/kernel shared data -- pointer provided in start_info.
- *
- * This structure is defined to be both smaller than a page, and the
- * only data on the shared page, but may vary in actual size even within
- * compatible Xen versions; guests should not rely on the size
- * of this structure remaining constant.
+ * NB. We expect that this struct is smaller than a page.
  */
 struct shared_info {
-	struct vcpu_info vcpu_info[XEN_LEGACY_MAX_VCPUS];
+	struct vcpu_info vcpu_info[MAX_VIRT_CPUS];
 
 	/*
 	 * A domain can create "event channels" on which it can send and receive
@@ -711,32 +580,17 @@ struct shared_info {
 	 * Wallclock time: updated only by control software. Guests should base
 	 * their gettimeofday() syscall on this wallclock-base value.
 	 */
-#ifdef CONFIG_PARAVIRT_XEN
 	struct pvclock_wall_clock wc;
-#else
-	uint32_t wc_version;      /* Version counter: see vcpu_time_info_t. */
-	uint32_t wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
-	uint32_t wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
-#endif
-#if !defined(__i386__)
-	uint32_t wc_sec_hi;
-# define xen_wc_sec_hi wc_sec_hi
-#elif !defined(__XEN__) && !defined(__XEN_TOOLS__)
-# define xen_wc_sec_hi arch.wc_sec_hi
-#endif
 
 	struct arch_shared_info arch;
 
 };
-#ifndef __XEN__
-typedef struct shared_info shared_info_t;
-#endif
 
 /*
- * `incontents 200 startofday Start-of-day memory layout
+ * Start-of-day memory layout
  *
  *  1. The domain is started within contiguous virtual-memory region.
- *  2. The contiguous region ends on an aligned 4MB boundary.
+ *  2. The contiguous region begins and ends on an aligned 4MB boundary.
  *  3. This the order of bootstrap elements in the initial virtual region:
  *      a. relocated kernel image
  *      b. initial ram disk              [mod_start, mod_len]
@@ -747,7 +601,7 @@ typedef struct shared_info shared_info_t;
  *         in case of dom0 this page contains the console info, too
  *      e. unless dom0: xenstore ring page
  *      f. unless dom0: console ring page
- *      g. bootstrap page tables         [pt_base and CR3 (x86)]
+ *      g. bootstrap page tables         [pt_base, CR3 (x86)]
  *      h. bootstrap stack               [register ESP (x86)]
  *  4. Bootstrap elements are packed together, but each is 4kB-aligned.
  *  5. The list of page frames forms a contiguous 'pseudo-physical' memory
@@ -758,18 +612,9 @@ typedef struct shared_info shared_info_t;
  *  7. There is guaranteed to be at least 512kB padding after the final
  *     bootstrap element. If necessary, the bootstrap virtual region is
  *     extended by an extra 4MB to ensure this.
- *
- * Note: Prior to 25833:bb85bbccb1c9. ("x86/32-on-64 adjust Dom0 initial page
- * table layout") a bug caused the pt_base (3.g above) and cr3 to not point
- * to the start of the guest page tables (it was offset by two pages).
- * This only manifested itself on 32-on-64 dom0 kernels and not 32-on-64 domU
- * or 64-bit kernels of any colour. The page tables for a 32-on-64 dom0 got
- * allocated in the order: 'first L1','first L2', 'first L3', so the offset
- * to the page table base is by two pages back. The initial domain if it is
- * 32-bit and runs under a 64-bit hypervisor should _NOT_ use two of the
- * pages preceding pt_base and mark them as reserved/unused.
  */
-#if defined(XEN_HAVE_PV_GUEST_ENTRY) || defined(CONFIG_PARAVIRT_XEN)
+
+#define MAX_GUEST_CMDLINE 1024
 struct start_info {
 	/* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.    */
 	char magic[32];             /* "xen-<version>-<platform>".            */
@@ -793,23 +638,12 @@ struct start_info {
 	unsigned long nr_pt_frames; /* Number of bootstrap p.t. frames.       */
 	unsigned long mfn_list;     /* VIRTUAL address of page-frame list.    */
 	unsigned long mod_start;    /* VIRTUAL address of pre-loaded module.  */
-	                            /* (PFN of pre-loaded module if           */
-	                            /*  SIF_MOD_START_PFN set in flags).      */
 	unsigned long mod_len;      /* Size (bytes) of pre-loaded module.     */
-#define MAX_GUEST_CMDLINE 1024
 	int8_t cmd_line[MAX_GUEST_CMDLINE];
 	/* The pfn range here covers both page table and p->m table frames.   */
 	unsigned long first_p2m_pfn;/* 1st pfn forming initial P->M table.    */
 	unsigned long nr_p2m_frames;/* # of pfns forming initial P->M table.  */
 };
-typedef struct start_info start_info_t;
-
-/* New console union for dom0 introduced in 0x00030203. */
-#if __XEN_INTERFACE_VERSION__ < 0x00030203
-#define console_mfn    console.domU.mfn
-#define console_evtchn console.domU.evtchn
-#endif
-#endif /* XEN_HAVE_PV_GUEST_ENTRY */
 
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED      (1<<0)  /* Is the domain privileged? */
@@ -845,15 +679,13 @@ struct xen_multiboot_mod_list {
 	uint32_t pad;
 };
 /*
- * `incontents 200 startofday_dom0_console Dom0_console
- *
  * The console structure in start_info.console.dom0
  *
  * This structure includes a variety of information required to
  * have a working VGA/VESA console.
  */
-typedef struct dom0_vga_console_info {
-	uint8_t video_type; /* DOM0_VGA_CONSOLE_??? */
+struct dom0_vga_console_info {
+	uint8_t video_type;
 #define XEN_VGATYPE_TEXT_MODE_3 0x03
 #define XEN_VGATYPE_VESA_LFB    0x23
 #define XEN_VGATYPE_EFI_LFB     0x70
@@ -883,17 +715,16 @@ typedef struct dom0_vga_console_info {
 			uint8_t  green_pos, green_size;
 			uint8_t  blue_pos, blue_size;
 			uint8_t  rsvd_pos, rsvd_size;
-#if __XEN_INTERFACE_VERSION__ >= 0x00030206 || (defined(CONFIG_PARAVIRT_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H))
+
 			/* VESA capabilities (offset 0xa, VESA command 0x4f00). */
 			uint32_t gbl_caps;
 			/* Mode attributes (offset 0x0, VESA command 0x4f01). */
 			uint16_t mode_attrs;
-#endif
 		} vesa_lfb;
 	} u;
-} dom0_vga_console_info_t;
-#define xen_vga_console_info dom0_vga_console_info
-#define xen_vga_console_info_t dom0_vga_console_info_t
+};
+
+typedef uint64_t cpumap_t;
 
 typedef uint8_t xen_domain_handle_t[16];
 
@@ -901,10 +732,28 @@ typedef uint8_t xen_domain_handle_t[16];
 #define __mk_unsigned_long(x) x ## UL
 #define mk_unsigned_long(x) __mk_unsigned_long(x)
 
-__DEFINE_XEN_GUEST_HANDLE(uint8,  uint8_t);
-__DEFINE_XEN_GUEST_HANDLE(uint16, uint16_t);
-__DEFINE_XEN_GUEST_HANDLE(uint32, uint32_t);
-__DEFINE_XEN_GUEST_HANDLE(uint64, uint64_t);
+#define TMEM_SPEC_VERSION 1
+
+struct tmem_op {
+	uint32_t cmd;
+	int32_t pool_id;
+	union {
+		struct {  /* for cmd == TMEM_NEW_POOL */
+			uint64_t uuid[2];
+			uint32_t flags;
+		} new;
+		struct {
+			uint64_t oid[3];
+			uint32_t index;
+			uint32_t tmem_offset;
+			uint32_t pfn_offset;
+			uint32_t len;
+			GUEST_HANDLE(void) gmfn; /* guest machine page frame */
+		} gen;
+	} u;
+};
+
+DEFINE_GUEST_HANDLE(u64);
 
 #else /* __ASSEMBLY__ */
 
@@ -912,27 +761,5 @@ __DEFINE_XEN_GUEST_HANDLE(uint64, uint64_t);
 #define mk_unsigned_long(x) x
 
 #endif /* !__ASSEMBLY__ */
-
-/* Default definitions for macros used by domctl/sysctl. */
-#if defined(__XEN__) || defined(__XEN_TOOLS__)
-
-#ifndef int64_aligned_t
-#define int64_aligned_t int64_t
-#endif
-#ifndef uint64_aligned_t
-#define uint64_aligned_t uint64_t
-#endif
-#ifndef XEN_GUEST_HANDLE_64
-#define XEN_GUEST_HANDLE_64(name) XEN_GUEST_HANDLE(name)
-#endif
-
-#ifndef __ASSEMBLY__
-struct xenctl_bitmap {
-    XEN_GUEST_HANDLE_64(uint8) bitmap;
-    uint32_t nr_bits;
-};
-#endif
-
-#endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
 #endif /* __XEN_PUBLIC_XEN_H__ */

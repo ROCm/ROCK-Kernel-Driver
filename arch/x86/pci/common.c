@@ -643,7 +643,6 @@ unsigned int pcibios_assign_all_busses(void)
 
 int pcibios_add_device(struct pci_dev *dev)
 {
-#if !defined(CONFIG_XEN)
 	struct setup_data *data;
 	struct pci_setup_rom *rom;
 	u64 pa_data;
@@ -671,32 +670,19 @@ int pcibios_add_device(struct pci_dev *dev)
 		pa_data = data->next;
 		iounmap(data);
 	}
-#elif defined(CONFIG_EFI)
-	struct xen_platform_op op = {
-		.cmd = XENPF_firmware_info,
-		.u.firmware_info = {
-			.type = XEN_FW_EFI_INFO,
-			.index = XEN_FW_EFI_PCI_ROM,
-			.u.efi_info.pci_rom = {
-				.segment = pci_domain_nr(dev->bus),
-				.bus = dev->bus->number,
-				.devfn = dev->devfn,
-				.vendor = dev->vendor,
-				.devid = dev->device
-			}
-		}
-	};
-
-	if (HYPERVISOR_platform_op(&op) == 0) {
-		dev->rom = op.u.firmware_info.u.efi_info.pci_rom.address;
-		dev->romlen = op.u.firmware_info.u.efi_info.pci_rom.size;
-	}
-#endif
 	return 0;
 }
 
 int pcibios_alloc_irq(struct pci_dev *dev)
 {
+	/*
+	 * If the PCI device was already claimed by core code and has
+	 * MSI enabled, probing of the pcibios IRQ will overwrite
+	 * dev->irq.  So bail out if MSI is already enabled.
+	 */
+	if (pci_dev_msi_enabled(dev))
+		return -EBUSY;
+
 	return pcibios_enable_irq(dev);
 }
 

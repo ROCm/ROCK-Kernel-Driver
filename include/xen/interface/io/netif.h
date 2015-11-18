@@ -3,32 +3,14 @@
  *
  * Unified network-device I/O interface for Xen guest OSes.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- *
  * Copyright (c) 2003-2004, Keir Fraser
  */
 
 #ifndef __XEN_PUBLIC_IO_NETIF_H__
 #define __XEN_PUBLIC_IO_NETIF_H__
 
-#include "ring.h"
-#include "../grant_table.h"
+#include <xen/interface/io/ring.h>
+#include <xen/interface/grant_table.h>
 
 /*
  * Older implementation of Xen network frontend / backend has an
@@ -56,69 +38,16 @@
  * that it cannot safely queue packets (as it may not be kicked to send them).
  */
 
-/*
+ /*
  * "feature-split-event-channels" is introduced to separate guest TX
- * and RX notification. Backend either doesn't support this feature or
- * advertises it via xenstore as 0 (disabled) or 1 (enabled).
+ * and RX notificaion. Backend either doesn't support this feature or
+ * advertise it via xenstore as 0 (disabled) or 1 (enabled).
  *
  * To make use of this feature, frontend should allocate two event
  * channels for TX and RX, advertise them to backend as
  * "event-channel-tx" and "event-channel-rx" respectively. If frontend
  * doesn't want to use this feature, it just writes "event-channel"
  * node as before.
- */
-
-/*
- * Multiple transmit and receive queues:
- * If supported, the backend will write the key "multi-queue-max-queues" to
- * the directory for that vif, and set its value to the maximum supported
- * number of queues.
- * Frontends that are aware of this feature and wish to use it can write the
- * key "multi-queue-num-queues", set to the number they wish to use, which
- * must be greater than zero, and no more than the value reported by the backend
- * in "multi-queue-max-queues".
- *
- * Queues replicate the shared rings and event channels.
- * "feature-split-event-channels" may optionally be used when using
- * multiple queues, but is not mandatory.
- *
- * Each queue consists of one shared ring pair, i.e. there must be the same
- * number of tx and rx rings.
- *
- * For frontends requesting just one queue, the usual event-channel and
- * ring-ref keys are written as before, simplifying the backend processing
- * to avoid distinguishing between a frontend that doesn't understand the
- * multi-queue feature, and one that does, but requested only one queue.
- *
- * Frontends requesting two or more queues must not write the toplevel
- * event-channel (or event-channel-{tx,rx}) and {tx,rx}-ring-ref keys,
- * instead writing those keys under sub-keys having the name "queue-N" where
- * N is the integer ID of the queue for which those keys belong. Queues
- * are indexed from zero. For example, a frontend with two queues and split
- * event channels must write the following set of queue-related keys:
- *
- * /local/domain/1/device/vif/0/multi-queue-num-queues = "2"
- * /local/domain/1/device/vif/0/queue-0 = ""
- * /local/domain/1/device/vif/0/queue-0/tx-ring-ref = "<ring-ref-tx0>"
- * /local/domain/1/device/vif/0/queue-0/rx-ring-ref = "<ring-ref-rx0>"
- * /local/domain/1/device/vif/0/queue-0/event-channel-tx = "<evtchn-tx0>"
- * /local/domain/1/device/vif/0/queue-0/event-channel-rx = "<evtchn-rx0>"
- * /local/domain/1/device/vif/0/queue-1 = ""
- * /local/domain/1/device/vif/0/queue-1/tx-ring-ref = "<ring-ref-tx1>"
- * /local/domain/1/device/vif/0/queue-1/rx-ring-ref = "<ring-ref-rx1"
- * /local/domain/1/device/vif/0/queue-1/event-channel-tx = "<evtchn-tx1>"
- * /local/domain/1/device/vif/0/queue-1/event-channel-rx = "<evtchn-rx1>"
- *
- * If there is any inconsistency in the XenStore data, the backend may
- * choose not to connect any queues, instead treating the request as an
- * error. This includes scenarios where more (or fewer) queues were
- * requested than the frontend provided details for.
- *
- * Mapping of packets to queues is considered to be a function of the
- * transmitting system (backend or frontend) and is not negotiated
- * between the two. Guests are free to transmit packets on any queue
- * they choose, provided it has been set up correctly. Guests must be
- * prepared to receive packets on any queue they have requested be set up.
  */
 
 /*
@@ -189,21 +118,6 @@
  */
 
 /*
- * "feature-multicast-control" advertises the capability to filter ethernet
- * multicast packets in the backend. To enable use of this capability the
- * frontend must set "request-multicast-control" before moving into the
- * connected state.
- *
- * If "request-multicast-control" is set then the backend transmit side should
- * no longer flood multicast packets to the frontend, it should instead drop any
- * multicast packet that does not match in a filter list. The list is
- * amended by the frontend by sending dummy transmit requests containing
- * XEN_NETIF_EXTRA_TYPE_MCAST_{ADD,DEL} extra-info fragments as specified below.
- * Once enabled by the frontend, the feature cannot be disabled except by
- * closing and re-connecting to the backend.
- */
-
-/*
  * This is the 'wire' format for packets:
  *  Request 1: xen_netif_tx_request  -- XEN_NETTXF_* (any flags)
  * [Request 2: xen_netif_extra_info]    (only if request 1 has XEN_NETTXF_extra_info)
@@ -211,123 +125,7 @@
  *  Request 4: xen_netif_tx_request  -- XEN_NETTXF_more_data
  *  Request 5: xen_netif_tx_request  -- XEN_NETTXF_more_data
  *  ...
- *  Request N: xen_netif_tx_request_t -- 0
- */
-
-/*
- * Guest transmit
- * ==============
- *
- * Ring slot size is 12 octets, however not all request/response
- * structs use the full size.
- *
- * tx request data (xen_netif_tx_request_t)
- * ------------------------------------
- *
- *    0     1     2     3     4     5     6     7  octet
- * +-----+-----+-----+-----+-----+-----+-----+-----+
- * | grant ref             | offset    | flags     |
- * +-----+-----+-----+-----+-----+-----+-----+-----+
- * | id        | size      |
- * +-----+-----+-----+-----+
- *
- * grant ref: Reference to buffer page.
- * offset: Offset within buffer page.
- * flags: XEN_NETTXF_*.
- * id: request identifier, echoed in response.
- * size: packet size in bytes.
- *
- * tx response (netif_tx_response_t)
- * ---------------------------------
- *
- *    0     1     2     3     4     5     6     7  octet
- * +-----+-----+-----+-----+-----+-----+-----+-----+
- * | id        | status    | unused                |
- * +-----+-----+-----+-----+-----+-----+-----+-----+
- * | unused                |
- * +-----+-----+-----+-----+
- *
- * id: reflects id in transmit request
- * status: NETIF_RSP_*
- *
- * Guest receive
- * =============
- *
- * Ring slot size is 8 octets.
- *
- * rx request (netif_rx_request_t)
- * -------------------------------
- *
- *    0     1     2     3     4     5     6     7  octet
- * +-----+-----+-----+-----+-----+-----+-----+-----+
- * | id        | pad       | gref                  |
- * +-----+-----+-----+-----+-----+-----+-----+-----+
- *
- * id: request identifier, echoed in response.
- * gref: reference to incoming granted frame.
- *
- * rx response (netif_rx_response_t)
- * ---------------------------------
- *
- *    0     1     2     3     4     5     6     7  octet
- * +-----+-----+-----+-----+-----+-----+-----+-----+
- * | id        | offset    | flags     | status    |
- * +-----+-----+-----+-----+-----+-----+-----+-----+
- *
- * id: reflects id in receive request
- * offset: offset in page of start of received packet
- * flags: NETRXF_*
- * status: -ve: NETIF_RSP_*; +ve: Rx'ed pkt size.
- *
- * Extra Info
- * ==========
- *
- * Can be present if initial request has NET{T,R}XF_extra_info, or
- * previous extra request has XEN_NETIF_EXTRA_MORE.
- *
- * The struct therefore needs to fit into either a tx or rx slot and
- * is therefore limited to 8 octets.
- *
- * extra info (xen_netif_extra_info_t)
- * -------------------------------
- *
- * General format:
- *
- *    0     1     2     3     4     5     6     7  octet
- * +-----+-----+-----+-----+-----+-----+-----+-----+
- * |type |flags| type specfic data                 |
- * +-----+-----+-----+-----+-----+-----+-----+-----+
- * | padding for tx        |
- * +-----+-----+-----+-----+
- *
- * type: XEN_NETIF_EXTRA_TYPE_*
- * flags: XEN_NETIF_EXTRA_FLAG_*
- * padding for tx: present only in the tx case due to 8 octet limit
- *     from rx case. Not shown in type specific entries below.
- *
- * XEN_NETIF_EXTRA_TYPE_GSO:
- *
- *    0     1     2     3     4     5     6     7  octet
- * +-----+-----+-----+-----+-----+-----+-----+-----+
- * |type |flags| size      |type | pad | features  |
- * +-----+-----+-----+-----+-----+-----+-----+-----+
- *
- * type: Must be XEN_NETIF_EXTRA_TYPE_GSO
- * flags: XEN_NETIF_EXTRA_FLAG_*
- * size: Maximum payload size of each segment.
- * type: XEN_NETIF_GSO_TYPE_*
- * features: EN_NETIF_GSO_FEAT_*
- *
- * XEN_NETIF_EXTRA_TYPE_MCAST_{ADD,DEL}:
- *
- *    0     1     2     3     4     5     6     7  octet
- * +-----+-----+-----+-----+-----+-----+-----+-----+
- * |type |flags| addr                              |
- * +-----+-----+-----+-----+-----+-----+-----+-----+
- *
- * type: Must be XEN_NETIF_EXTRA_TYPE_MCAST_{ADD,DEL}
- * flags: XEN_NETIF_EXTRA_FLAG_*
- * addr: address to add/remove
+ *  Request N: xen_netif_tx_request  -- 0
  */
 
 /* Protocol checksum field is blank in the packet (hardware offload)? */
@@ -347,23 +145,22 @@
 #define  XEN_NETTXF_extra_info		(1U<<_XEN_NETTXF_extra_info)
 
 #define XEN_NETIF_MAX_TX_SIZE 0xFFFF
-struct netif_tx_request {
+struct xen_netif_tx_request {
     grant_ref_t gref;      /* Reference to buffer page */
     uint16_t offset;       /* Offset within buffer page */
     uint16_t flags;        /* XEN_NETTXF_* */
     uint16_t id;           /* Echoed in response message. */
     uint16_t size;         /* Packet size in bytes.       */
 };
-typedef struct netif_tx_request netif_tx_request_t;
 
-/* Types of netif_extra_info descriptors. */
+/* Types of xen_netif_extra_info descriptors. */
 #define XEN_NETIF_EXTRA_TYPE_NONE	(0)  /* Never used - invalid */
 #define XEN_NETIF_EXTRA_TYPE_GSO	(1)  /* u.gso */
 #define XEN_NETIF_EXTRA_TYPE_MCAST_ADD	(2)  /* u.mcast */
 #define XEN_NETIF_EXTRA_TYPE_MCAST_DEL	(3)  /* u.mcast */
 #define XEN_NETIF_EXTRA_TYPE_MAX	(4)
 
-/* xen_netif_extra_info_t flags. */
+/* xen_netif_extra_info flags. */
 #define _XEN_NETIF_EXTRA_FLAG_MORE	(0)
 #define  XEN_NETIF_EXTRA_FLAG_MORE	(1U<<_XEN_NETIF_EXTRA_FLAG_MORE)
 
@@ -373,17 +170,14 @@ typedef struct netif_tx_request netif_tx_request_t;
 #define XEN_NETIF_GSO_TYPE_TCPV6	(2)
 
 /*
- * This structure needs to fit within both netif_tx_request_t and
- * netif_rx_response_t for compatibility.
+ * This structure needs to fit within both netif_tx_request and
+ * netif_rx_response for compatibility.
  */
-struct netif_extra_info {
+struct xen_netif_extra_info {
 	uint8_t type;  /* XEN_NETIF_EXTRA_TYPE_* */
 	uint8_t flags; /* XEN_NETIF_EXTRA_FLAG_* */
 
 	union {
-		/*
-		 * XEN_NETIF_EXTRA_TYPE_GSO:
-		 */
 		struct {
 			/*
 			 * Maximum payload size of each segment. For
@@ -409,9 +203,6 @@ struct netif_extra_info {
 			uint16_t features; /* XEN_NETIF_GSO_FEAT_* */
 		} gso;
 
-		/*
-		 * XEN_NETIF_EXTRA_TYPE_MCAST_{ADD,DEL}:
-		 */
 		struct {
 			uint8_t addr[6]; /* Address to add/remove. */
 		} mcast;
@@ -419,20 +210,16 @@ struct netif_extra_info {
 		uint16_t pad[3];
 	} u;
 };
-typedef struct netif_extra_info netif_extra_info_t;
 
-struct netif_tx_response {
+struct xen_netif_tx_response {
 	uint16_t id;
 	int16_t  status;       /* XEN_NETIF_RSP_* */
 };
-typedef struct netif_tx_response netif_tx_response_t;
 
-struct netif_rx_request {
+struct xen_netif_rx_request {
 	uint16_t    id;        /* Echoed in response message.        */
-	uint16_t    pad;
 	grant_ref_t gref;      /* Reference to incoming granted frame */
 };
-typedef struct netif_rx_request netif_rx_request_t;
 
 /* Packet data has been validated against protocol checksum. */
 #define _XEN_NETRXF_data_validated	(0)
@@ -454,39 +241,28 @@ typedef struct netif_rx_request netif_rx_request_t;
 #define _XEN_NETRXF_gso_prefix		(4)
 #define  XEN_NETRXF_gso_prefix		(1U<<_XEN_NETRXF_gso_prefix)
 
-struct netif_rx_response {
+struct xen_netif_rx_response {
     uint16_t id;
     uint16_t offset;       /* Offset in page of start of received packet  */
     uint16_t flags;        /* XEN_NETRXF_* */
-    int16_t  status;       /* -ve: NETIF_RSP_* ; +ve: Rx'ed pkt size. */
+    int16_t  status;       /* -ve: BLKIF_RSP_* ; +ve: Rx'ed pkt size. */
 };
-typedef struct netif_rx_response netif_rx_response_t;
 
 /*
  * Generate netif ring structures and types.
  */
 
-#if defined(CONFIG_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H)
-DEFINE_RING_TYPES(netif_tx, struct netif_tx_request, struct netif_tx_response);
-DEFINE_RING_TYPES(netif_rx, struct netif_rx_request, struct netif_rx_response);
-#else
-#define xen_netif_tx_request netif_tx_request
-#define xen_netif_rx_request netif_rx_request
-#define xen_netif_tx_response netif_tx_response
-#define xen_netif_rx_response netif_rx_response
 DEFINE_RING_TYPES(xen_netif_tx,
 		  struct xen_netif_tx_request,
 		  struct xen_netif_tx_response);
 DEFINE_RING_TYPES(xen_netif_rx,
 		  struct xen_netif_rx_request,
 		  struct xen_netif_rx_response);
-#define xen_netif_extra_info netif_extra_info
-#endif
 
 #define XEN_NETIF_RSP_DROPPED	-2
 #define XEN_NETIF_RSP_ERROR	-1
 #define XEN_NETIF_RSP_OKAY	 0
-/* No response: used for auxiliary requests (e.g., netif_extra_info_t). */
+/* No response: used for auxiliary requests (e.g., xen_netif_extra_info). */
 #define XEN_NETIF_RSP_NULL	 1
 
 #endif

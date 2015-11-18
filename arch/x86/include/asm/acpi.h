@@ -32,8 +32,11 @@
 #include <asm/mpspec.h>
 #include <asm/realmode.h>
 
-#ifdef CONFIG_ACPI
+#ifdef CONFIG_ACPI_APEI
+# include <asm/pgtable_types.h>
+#endif
 
+#ifdef CONFIG_ACPI
 extern int acpi_lapic;
 extern int acpi_ioapic;
 extern int acpi_noirq;
@@ -80,7 +83,6 @@ extern int (*acpi_suspend_lowlevel)(void);
  */
 static inline unsigned int acpi_processor_cstate_check(unsigned int max_cstate)
 {
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	/*
 	 * Early models (<=5) of AMD Opterons are not supposed to go into
 	 * C2 state.
@@ -95,7 +97,6 @@ static inline unsigned int acpi_processor_cstate_check(unsigned int max_cstate)
 	else if (amd_e400_c1e_detected)
 		return 1;
 	else
-#endif
 		return max_cstate;
 }
 
@@ -141,9 +142,7 @@ static inline void disable_acpi(void) { }
 
 #endif /* !CONFIG_ACPI */
 
-#ifndef CONFIG_XEN
 #define ARCH_HAS_POWER_INIT	1
-#endif
 
 #ifdef CONFIG_ACPI_NUMA
 extern int acpi_numa;
@@ -151,5 +150,24 @@ extern int x86_acpi_numa_init(void);
 #endif /* CONFIG_ACPI_NUMA */
 
 #define acpi_unlazy_tlb(x)	leave_mm(x)
+
+#ifdef CONFIG_ACPI_APEI
+static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+{
+	/*
+	 * We currently have no way to look up the EFI memory map
+	 * attributes for a region in a consistent way, because the
+	 * memmap is discarded after efi_free_boot_services(). So if
+	 * you call efi_mem_attributes() during boot and at runtime,
+	 * you could theoretically see different attributes.
+	 *
+	 * Since we are yet to see any x86 platforms that require
+	 * anything other than PAGE_KERNEL (some arm64 platforms
+	 * require the equivalent of PAGE_KERNEL_NOCACHE), return that
+	 * until we know differently.
+	 */
+	 return PAGE_KERNEL;
+}
+#endif
 
 #endif /* _ASM_X86_ACPI_H */

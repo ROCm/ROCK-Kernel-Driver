@@ -23,12 +23,8 @@
 #include <stdarg.h>
 #include <linux/types.h>
 #include <linux/edd.h>
-#ifndef CONFIG_XEN
 #include <asm/boot.h>
 #include <asm/setup.h>
-#else
-#include <asm/bootparam.h>
-#endif
 #include "bitops.h"
 #include "ctype.h"
 #include "cpuflags.h"

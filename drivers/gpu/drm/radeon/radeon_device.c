@@ -766,18 +766,6 @@ int radeon_dummy_page_init(struct radeon_device *rdev)
 	rdev->dummy_page.page = alloc_page(GFP_DMA32 | GFP_KERNEL | __GFP_ZERO);
 	if (rdev->dummy_page.page == NULL)
 		return -ENOMEM;
-#ifdef CONFIG_XEN
-	{
-		int ret = xen_limit_pages_to_max_mfn(rdev->dummy_page.page,
-						     0, 32);
-
-		if (!ret)
-			clear_page(page_address(rdev->dummy_page.page));
-		else
-			dev_warn(rdev->dev,
-				 "Error restricting dummy page: %d\n", ret);
-	}
-#endif
 	rdev->dummy_page.addr = pci_map_page(rdev->pdev, rdev->dummy_page.page,
 					0, PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
 	if (pci_dma_mapping_error(rdev->pdev, rdev->dummy_page.addr)) {
@@ -1209,7 +1197,7 @@ static void radeon_check_arguments(struct radeon_device *rdev)
  * radeon_switcheroo_set_state - set switcheroo state
  *
  * @pdev: pci dev pointer
- * @state: vga switcheroo state
+ * @state: vga_switcheroo state
  *
  * Callback for the switcheroo driver.  Suspends or resumes the
  * the asics before or after it is powered up using ACPI methods.

@@ -133,7 +133,7 @@ struct bus_type cpu_subsys = {
 };
 EXPORT_SYMBOL_GPL(cpu_subsys);
 
-#if defined(CONFIG_KEXEC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_KEXEC
 #include <linux/kexec.h>
 
 static ssize_t show_crash_notes(struct device *dev, struct device_attribute *attr,
@@ -181,14 +181,14 @@ static struct attribute_group crash_note_cpu_attr_group = {
 #endif
 
 static const struct attribute_group *common_cpu_attr_groups[] = {
-#if defined(CONFIG_KEXEC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_KEXEC
 	&crash_note_cpu_attr_group,
 #endif
 	NULL
 };
 
 static const struct attribute_group *hotplugable_cpu_attr_groups[] = {
-#if defined(CONFIG_KEXEC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_KEXEC
 	&crash_note_cpu_attr_group,
 #endif
 	NULL

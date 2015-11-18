@@ -21,6 +21,20 @@
 
 #include "internals.h"
 
+static irqreturn_t bad_chained_irq(int irq, void *dev_id)
+{
+	WARN_ONCE(1, "Chained irq %d should not call an action\n", irq);
+	return IRQ_NONE;
+}
+
+/*
+ * Chained handlers should never call action on their IRQ. This default
+ * action will emit warning if such thing happens.
+ */
+struct irqaction chained_action = {
+	.handler = bad_chained_irq,
+};
+
 /**
  *	irq_set_chip - set the irq chip for an irq
  *	@irq:	irq number
@@ -89,7 +103,6 @@ int irq_set_handler_data(unsigned int irq, void *data)
 }
 EXPORT_SYMBOL(irq_set_handler_data);
 
-#ifndef CONFIG_XEN
 /**
  *	irq_set_msi_desc_off - set MSI descriptor data for an irq at offset
  *	@irq_base:	Interrupt number base
@@ -124,7 +137,6 @@ int irq_set_msi_desc(unsigned int irq, struct msi_desc *entry)
 {
 	return irq_set_msi_desc_off(irq, 0, entry);
 }
-#endif
 
 /**
  *	irq_set_chip_data - set irq chip data for an irq
@@ -229,6 +241,13 @@ void irq_enable(struct irq_desc *desc)
  * disabled. If an interrupt happens, then the interrupt flow
  * handler masks the line at the hardware level and marks it
  * pending.
+ *
+ * If the interrupt chip does not implement the irq_disable callback,
+ * a driver can disable the lazy approach for a particular irq line by
+ * calling 'irq_set_status_flags(irq, IRQ_DISABLE_UNLAZY)'. This can
+ * be used for devices which cannot disable the interrupt at the
+ * device level under certain circumstances and have to use
+ * disable_irq[_nosync] instead.
  */
 void irq_disable(struct irq_desc *desc)
 {
@@ -236,6 +255,8 @@ void irq_disable(struct irq_desc *desc)
 	if (desc->irq_data.chip->irq_disable) {
 		desc->irq_data.chip->irq_disable(&desc->irq_data);
 		irq_state_set_masked(desc);
+	} else if (irq_settings_disable_unlazy(desc)) {
+		mask_irq(desc);
 	}
 }
 
@@ -671,7 +692,7 @@ void handle_percpu_irq(struct irq_desc *desc)
 	if (chip->irq_ack)
 		chip->irq_ack(&desc->irq_data);
 
-	handle_irq_event_percpu(desc, desc->action);
+	handle_irq_event_percpu(desc);
 
 	if (chip->irq_eoi)
 		chip->irq_eoi(&desc->irq_data);
@@ -748,6 +769,8 @@ __irq_do_set_handler(struct irq_desc *desc, irq_flow_handler_t handle,
 		if (desc->irq_data.chip != &no_irq_chip)
 			mask_ack_irq(desc);
 		irq_state_set_disabled(desc);
+		if (is_chained)
+			desc->action = NULL;
 		desc->depth = 1;
 	}
 	desc->handle_irq = handle;
@@ -757,6 +780,7 @@ __irq_do_set_handler(struct irq_desc *desc, irq_flow_handler_t handle,
 		irq_settings_set_noprobe(desc);
 		irq_settings_set_norequest(desc);
 		irq_settings_set_nothread(desc);
+		desc->action = &chained_action;
 		irq_startup(desc, true);
 	}
 }

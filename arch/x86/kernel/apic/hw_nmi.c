@@ -28,17 +28,9 @@ u64 hw_nmi_get_sample_period(int watchdog_thresh)
 #endif
 
 #ifdef arch_trigger_all_cpu_backtrace
-#ifdef CONFIG_XEN
-#include <asm/ipi.h>
-#endif
-
 static void nmi_raise_cpu_backtrace(cpumask_t *mask)
 {
-#ifndef CONFIG_XEN
 	apic->send_IPI_mask(mask, NMI_VECTOR);
-#else /* this works even without CONFIG_X86_LOCAL_APIC */
-	xen_send_IPI_mask(mask, NMI_VECTOR);
-#endif
 }
 
 void arch_trigger_all_cpu_backtrace(bool include_self)

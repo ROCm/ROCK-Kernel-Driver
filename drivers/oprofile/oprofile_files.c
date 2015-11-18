@@ -5,17 +5,11 @@
  * @remark Read the file COPYING
  *
  * @author John Levon <levon@movementarian.org>
- *
- * Modified by Aravind Menon for Xen
- * These modifications are:
- * Copyright (C) 2005 Hewlett-Packard Co.
  */
 
 #include <linux/fs.h>
 #include <linux/oprofile.h>
 #include <linux/jiffies.h>
-#include <asm/uaccess.h>
-#include <linux/ctype.h>
 
 #include "event_buffer.h"
 #include "oprofile_stats.h"
@@ -181,141 +175,6 @@ static const struct file_operations dump_fops = {
 	.llseek		= noop_llseek,
 };
 
-#ifdef CONFIG_XEN
-#include <linux/slab.h>
-
-#define TMPBUFSIZE 512
-
-struct domain_data {
-    unsigned int nr;
-    int ids[MAX_OPROF_DOMAINS + 1];
-    struct mutex mutex;
-    int (*set)(int[], unsigned int);
-};
-#define DEFINE_DOMAIN_DATA(what) \
-	struct domain_data what##_domains = { \
-		.mutex = __MUTEX_INITIALIZER(what##_domains.mutex), \
-		.set = oprofile_set_##what \
-	}
-
-static ssize_t domain_write(struct file *filp, char const __user *buf,
-			    size_t count, loff_t *offset)
-{
-	struct domain_data *dom = filp->private_data;
-	char *tmpbuf;
-	char *startp, *endp;
-	int i;
-	unsigned long val;
-	ssize_t retval = count;
-
-	if (*offset)
-		return -EINVAL;
-	if (count > TMPBUFSIZE - 1)
-		return -EINVAL;
-
-	if (!(tmpbuf = kmalloc(TMPBUFSIZE, GFP_KERNEL)))
-		return -ENOMEM;
-
-	if (copy_from_user(tmpbuf, buf, count)) {
-		kfree(tmpbuf);
-		return -EFAULT;
-	}
-	tmpbuf[count] = 0;
-
-	mutex_lock(&dom->mutex);
-
-	startp = tmpbuf;
-	/* Parse one more than MAX_OPROF_DOMAINS, for easy error checking */
-	for (i = 0; i <= MAX_OPROF_DOMAINS; i++) {
-		val = simple_strtoul(startp, &endp, 0);
-		if (endp == startp)
-			break;
-		while (ispunct(*endp) || isspace(*endp))
-			endp++;
-		dom->ids[i] = val;
-		if (dom->ids[i] != val)
-			/* Overflow, force error below */
-			i = MAX_OPROF_DOMAINS + 1;
-		startp = endp;
-	}
-	/* Force error on trailing junk */
-	dom->nr = *startp ? MAX_OPROF_DOMAINS + 1 : i;
-
-	kfree(tmpbuf);
-
-	if (dom->nr > MAX_OPROF_DOMAINS
-	    || dom->set(dom->ids, dom->nr)) {
-		dom->nr = 0;
-		retval = -EINVAL;
-	}
-
-	mutex_unlock(&dom->mutex);
-	return retval;
-}
-
-static ssize_t domain_read(struct file *filp, char __user *buf,
-			    size_t count, loff_t *offset)
-{
-	struct domain_data *dom = filp->private_data;
-	char *tmpbuf;
-	size_t len;
-	int i;
-	ssize_t retval;
-
-	if (!(tmpbuf = kmalloc(TMPBUFSIZE, GFP_KERNEL)))
-		return -ENOMEM;
-
-	mutex_lock(&dom->mutex);
-
-	len = 0;
-	for (i = 0; i < dom->nr; i++)
-		len += snprintf(tmpbuf + len,
-				len < TMPBUFSIZE ? TMPBUFSIZE - len : 0,
-				"%u ", dom->ids[i]);
-	WARN_ON(len > TMPBUFSIZE);
-	if (len != 0 && len <= TMPBUFSIZE)
-		tmpbuf[len-1] = '\n';
-
-	mutex_unlock(&dom->mutex);
-
-	retval = simple_read_from_buffer(buf, count, offset, tmpbuf, len);
-
-	kfree(tmpbuf);
-	return retval;
-}
-
-static DEFINE_DOMAIN_DATA(active);
-
-static int adomain_open(struct inode *inode, struct file *filp)
-{
-	filp->private_data = &active_domains;
-	return 0;
-}
-
-static const struct file_operations active_domain_ops = {
-	.open		= adomain_open,
-	.read		= domain_read,
-	.write		= domain_write,
-	.llseek		= default_llseek,
-};
-
-static DEFINE_DOMAIN_DATA(passive);
-
-static int pdomain_open(struct inode *inode, struct file *filp)
-{
-	filp->private_data = &passive_domains;
-	return 0;
-}
-
-static const struct file_operations passive_domain_ops = {
-	.open		= pdomain_open,
-	.read		= domain_read,
-	.write		= domain_write,
-	.llseek		= default_llseek,
-};
-
-#endif /* CONFIG_XEN */
-
 void oprofile_create_files(struct dentry *root)
 {
 	/* reinitialize default values */
@@ -326,10 +185,6 @@ void oprofile_create_files(struct dentry *root)
 
 	oprofilefs_create_file(root, "enable", &enable_fops);
 	oprofilefs_create_file_perm(root, "dump", &dump_fops, 0666);
-#ifdef CONFIG_XEN
-	oprofilefs_create_file(root, "active_domains", &active_domain_ops);
-	oprofilefs_create_file(root, "passive_domains", &passive_domain_ops);
-#endif
 	oprofilefs_create_file(root, "buffer", &event_buffer_fops);
 	oprofilefs_create_ulong(root, "buffer_size", &oprofile_buffer_size);
 	oprofilefs_create_ulong(root, "buffer_watershed", &oprofile_buffer_watershed);

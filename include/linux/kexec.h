@@ -15,10 +15,6 @@
 #if !defined(__ASSEMBLY__)
 
 #include <uapi/linux/kexec.h>
-#ifdef CONFIG_XEN
-#include <asm/hypervisor.h>
-#include <xen/interface/kexec.h>
-#endif
 
 #ifdef CONFIG_KEXEC_CORE
 #include <linux/list.h>
@@ -77,13 +73,6 @@
 #define KEXEC_NOTE_BYTES ( (KEXEC_NOTE_HEAD_BYTES * 2) +		\
 			    KEXEC_CORE_NOTE_NAME_BYTES +		\
 			    KEXEC_CORE_NOTE_DESC_BYTES )
-#endif
-
-#ifndef KEXEC_ARCH_HAS_PAGE_MACROS
-#define kexec_page_to_pfn(page)  page_to_pfn(page)
-#define kexec_pfn_to_page(pfn)   pfn_to_page(pfn)
-#define kexec_virt_to_phys(addr) virt_to_phys(addr)
-#define kexec_phys_to_virt(addr) phys_to_virt(addr)
 #endif
 
 /*
@@ -228,12 +217,6 @@ struct kexec_file_ops {
 extern void machine_kexec(struct kimage *image);
 extern int machine_kexec_prepare(struct kimage *image);
 extern void machine_kexec_cleanup(struct kimage *image);
-#ifdef CONFIG_XEN
-extern int xen_machine_kexec_load(struct kimage *image);
-extern void xen_machine_kexec_unload(struct kimage *image);
-extern void xen_machine_kexec_setup_resources(void);
-extern void xen_machine_kexec_register_resources(struct resource *res);
-#endif
 extern asmlinkage long sys_kexec_load(unsigned long entry,
 					unsigned long nr_segments,
 					struct kexec_segment __user *segments,
@@ -309,15 +292,8 @@ extern int kexec_load_disabled;
 #define VMCOREINFO_BYTES           (4096)
 #define VMCOREINFO_NOTE_NAME       "VMCOREINFO"
 #define VMCOREINFO_NOTE_NAME_BYTES ALIGN(sizeof(VMCOREINFO_NOTE_NAME), 4)
-#if !defined(CONFIG_XEN) || !defined(CONFIG_X86)
 #define VMCOREINFO_NOTE_SIZE       (KEXEC_NOTE_HEAD_BYTES*2 + VMCOREINFO_BYTES \
 				    + VMCOREINFO_NOTE_NAME_BYTES)
-#else
-#define VMCOREINFO_NOTE_SIZE       ALIGN(KEXEC_NOTE_HEAD_BYTES*2 \
-					 + VMCOREINFO_BYTES \
-					 + VMCOREINFO_NOTE_NAME_BYTES, \
-					 PAGE_SIZE)
-#endif
 
 /* Location of a reserved region to hold the crash kernel.
  */
@@ -356,15 +332,7 @@ int __weak arch_kexec_apply_relocations(const Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
 #else /* !CONFIG_KEXEC_CORE */
 struct pt_regs;
 struct task_struct;
-static inline void crash_kexec(struct pt_regs *regs) {
-#ifdef CONFIG_XEN
-	if (is_initial_xendomain()) {
-		xen_kexec_exec_t xke = { .type = KEXEC_TYPE_CRASH };
-
-		VOID(HYPERVISOR_kexec_op(KEXEC_CMD_kexec, &xke));
-	}
-#endif
-}
+static inline void crash_kexec(struct pt_regs *regs) { }
 static inline int kexec_should_crash(struct task_struct *p) { return 0; }
 #define kexec_in_progress false
 #endif /* CONFIG_KEXEC_CORE */

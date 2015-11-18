@@ -157,7 +157,7 @@ struct _cpuid4_info_regs {
 	struct amd_northbridge *nb;
 };
 
-unsigned short			num_cache_leaves;
+static unsigned short num_cache_leaves;
 
 /* AMD doesn't have CPUID4. Emulate it here to report the same
    information to the user.  This makes some assumptions about the machine:
@@ -279,9 +279,8 @@ amd_cpuid4(int leaf, union _cpuid4_leaf_eax *eax,
 	eax->split.type = types[leaf];
 	eax->split.level = levels[leaf];
 	eax->split.num_threads_sharing = 0;
-#ifndef CONFIG_XEN
 	eax->split.num_cores_on_die = __this_cpu_read(cpu_info.x86_max_cores) - 1;
-#endif
+
 
 	if (assoc == 0xffff)
 		eax->split.is_fully_associative = 1;
@@ -292,7 +291,7 @@ amd_cpuid4(int leaf, union _cpuid4_leaf_eax *eax,
 		(ebx->split.ways_of_associativity + 1) - 1;
 }
 
-#if defined(CONFIG_AMD_NB) && defined(CONFIG_SYSFS) && !defined(CONFIG_XEN)
+#if defined(CONFIG_AMD_NB) && defined(CONFIG_SYSFS)
 
 /*
  * L3 cache descriptors
@@ -327,7 +326,7 @@ static void amd_calc_l3_indices(struct amd_northbridge *nb)
  *
  * @returns: the disabled index if used or negative value if slot free.
  */
-int amd_get_l3_disable_slot(struct amd_northbridge *nb, unsigned slot)
+static int amd_get_l3_disable_slot(struct amd_northbridge *nb, unsigned slot)
 {
 	unsigned int reg = 0;
 
@@ -404,8 +403,8 @@ static void amd_l3_disable_index(struct amd_northbridge *nb, int cpu,
  *
  * @return: 0 on success, error status on failure
  */
-int amd_set_l3_disable_slot(struct amd_northbridge *nb, int cpu, unsigned slot,
-			    unsigned long index)
+static int amd_set_l3_disable_slot(struct amd_northbridge *nb, int cpu,
+			    unsigned slot, unsigned long index)
 {
 	int ret = 0;
 
@@ -654,8 +653,8 @@ unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c)
 	unsigned int trace = 0, l1i = 0, l1d = 0, l2 = 0, l3 = 0;
 	unsigned int new_l1d = 0, new_l1i = 0; /* Cache sizes from cpuid(4) */
 	unsigned int new_l2 = 0, new_l3 = 0, i; /* Cache sizes from cpuid(4) */
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 	unsigned int l2_id = 0, l3_id = 0, num_threads_sharing, index_msb;
+#ifdef CONFIG_SMP
 	unsigned int cpu = c->cpu_index;
 #endif
 
@@ -689,19 +688,15 @@ unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c)
 				break;
 			case 2:
 				new_l2 = this_leaf.size/1024;
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 				num_threads_sharing = 1 + this_leaf.eax.split.num_threads_sharing;
 				index_msb = get_count_order(num_threads_sharing);
 				l2_id = c->apicid & ~((1 << index_msb) - 1);
-#endif
 				break;
 			case 3:
 				new_l3 = this_leaf.size/1024;
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 				num_threads_sharing = 1 + this_leaf.eax.split.num_threads_sharing;
 				index_msb = get_count_order(num_threads_sharing);
 				l3_id = c->apicid & ~((1 << index_msb) - 1);
-#endif
 				break;
 			default:
 				break;
@@ -778,19 +773,19 @@ unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c)
 
 	if (new_l2) {
 		l2 = new_l2;
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 		per_cpu(cpu_llc_id, cpu) = l2_id;
 #endif
 	}
 
 	if (new_l3) {
 		l3 = new_l3;
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 		per_cpu(cpu_llc_id, cpu) = l3_id;
 #endif
 	}
 
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 	/*
 	 * If cpu_llc_id is not yet set, this means cpuid_level < 4 which in
 	 * turns means that the only possibility is SMT (as indicated in
@@ -807,7 +802,6 @@ unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c)
 	return l2;
 }
 
-#ifndef CONFIG_XEN
 static int __cache_amd_cpumap_setup(unsigned int cpu, int index,
 				    struct _cpuid4_info_regs *base)
 {
@@ -945,4 +939,3 @@ static int __populate_cache_leaves(unsigned int cpu)
 
 DEFINE_SMP_CALL_CACHE_FUNCTION(init_cache_level)
 DEFINE_SMP_CALL_CACHE_FUNCTION(populate_cache_leaves)
-#endif /* !CONFIG_XEN */

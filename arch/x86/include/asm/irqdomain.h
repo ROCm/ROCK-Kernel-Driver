@@ -10,11 +10,7 @@ enum {
 	X86_IRQ_ALLOC_CONTIGUOUS_VECTORS		= 0x1,
 };
 
-#ifndef CONFIG_XEN
 extern struct irq_domain *x86_vector_domain;
-#else
-#define x86_vector_domain xen_irq_domain
-#endif
 
 extern void init_irq_alloc_info(struct irq_alloc_info *info,
 				const struct cpumask *mask);

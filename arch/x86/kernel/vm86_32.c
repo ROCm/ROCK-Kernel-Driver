@@ -92,9 +92,7 @@
 
 void save_v86_state(struct kernel_vm86_regs *regs, int retval)
 {
-#ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *tss;
-#endif
 	struct task_struct *tsk = current;
 	struct vm86plus_struct __user *user;
 	struct vm86 *vm86 = current->thread.vm86;
@@ -146,16 +144,12 @@ void save_v86_state(struct kernel_vm86_regs *regs, int retval)
 		do_exit(SIGSEGV);
 	}
 
-#ifndef CONFIG_X86_NO_TSS
 	tss = &per_cpu(cpu_tss, get_cpu());
-#endif
 	tsk->thread.sp0 = vm86->saved_sp0;
 	tsk->thread.sysenter_cs = __KERNEL_CS;
 	load_sp0(tss, &tsk->thread);
 	vm86->saved_sp0 = 0;
-#ifndef CONFIG_X86_NO_TSS
 	put_cpu();
-#endif
 
 	memcpy(&regs->pt, &vm86->regs32, sizeof(struct pt_regs));
 
@@ -232,9 +226,7 @@ SYSCALL_DEFINE2(vm86, unsigned long, cmd, unsigned long, arg)
 
 static long do_sys_vm86(struct vm86plus_struct __user *user_vm86, bool plus)
 {
-#ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *tss;
-#endif
 	struct task_struct *tsk = current;
 	struct vm86 *vm86 = tsk->thread.vm86;
 	struct kernel_vm86_regs vm86regs;
@@ -362,17 +354,13 @@ static long do_sys_vm86(struct vm86plus_struct __user *user_vm86, bool plus)
 	vm86->saved_sp0 = tsk->thread.sp0;
 	lazy_save_gs(vm86->regs32.gs);
 
-#ifndef CONFIG_X86_NO_TSS
 	tss = &per_cpu(cpu_tss, get_cpu());
-#endif
 	/* make room for real-mode segments */
 	tsk->thread.sp0 += 16;
 	if (cpu_has_sep)
 		tsk->thread.sysenter_cs = 0;
 	load_sp0(tss, &tsk->thread);
-#ifndef CONFIG_X86_NO_TSS
 	put_cpu();
-#endif
 
 	if (vm86->flags & VM86_SCREEN_BITMAP)
 		mark_screen_rdonly(tsk->mm);

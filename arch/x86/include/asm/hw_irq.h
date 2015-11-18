@@ -133,14 +133,10 @@ struct irq_alloc_info {
 	};
 };
 
-#ifndef CONFIG_XEN
 struct irq_cfg {
 	unsigned int		dest_apicid;
 	u8			vector;
 };
-#else
-struct irq_cfg;
-#endif
 
 extern struct irq_cfg *irq_cfg(unsigned int irq);
 extern struct irq_cfg *irqd_cfg(struct irq_data *irq_data);
@@ -179,13 +175,7 @@ extern asmlinkage void smp_irq_move_cleanup_interrupt(void);
 extern __visible void smp_reschedule_interrupt(struct pt_regs *);
 extern __visible void smp_call_function_interrupt(struct pt_regs *);
 extern __visible void smp_call_function_single_interrupt(struct pt_regs *);
-extern void smp_irq_work_interrupt(struct pt_regs *);
-#ifdef CONFIG_XEN
-extern void smp_reboot_interrupt(struct pt_regs *);
 #endif
-#endif
-
-#ifndef CONFIG_XEN
 
 extern char irq_entries_start[];
 #ifdef CONFIG_TRACING
@@ -197,8 +187,6 @@ extern char irq_entries_start[];
 
 typedef struct irq_desc* vector_irq_t[NR_VECTORS];
 DECLARE_PER_CPU(vector_irq_t, vector_irq);
-
-#endif /* !CONFIG_XEN */
 
 #endif /* !ASSEMBLY_ */
 

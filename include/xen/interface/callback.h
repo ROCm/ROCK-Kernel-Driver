@@ -27,7 +27,7 @@
 #ifndef __XEN_PUBLIC_CALLBACK_H__
 #define __XEN_PUBLIC_CALLBACK_H__
 
-#include "xen.h"
+#include <xen/interface/xen.h>
 
 /*
  * Prototype for this hypercall is:
@@ -36,7 +36,7 @@
  * @extra_args == Operation-specific extra arguments (NULL if none).
  */
 
-/* ia64, x86: Callback for event delivery. */
+/* x86: Callback for event delivery. */
 #define CALLBACKTYPE_event                 0
 
 /* x86: Failsafe callback when guest state cannot be restored by Xen. */
@@ -86,8 +86,6 @@ struct callback_register {
 	uint16_t flags;
 	xen_callback_t address;
 };
-typedef struct callback_register callback_register_t;
-DEFINE_XEN_GUEST_HANDLE(callback_register_t);
 
 /*
  * Unregister a callback.
@@ -100,12 +98,5 @@ struct callback_unregister {
     uint16_t type;
     uint16_t _unused;
 };
-typedef struct callback_unregister callback_unregister_t;
-DEFINE_XEN_GUEST_HANDLE(callback_unregister_t);
-
-#if __XEN_INTERFACE_VERSION__ < 0x00030207 && (!defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H))
-#undef CALLBACKTYPE_sysenter
-#define CALLBACKTYPE_sysenter CALLBACKTYPE_sysenter_deprecated
-#endif
 
 #endif /* __XEN_PUBLIC_CALLBACK_H__ */

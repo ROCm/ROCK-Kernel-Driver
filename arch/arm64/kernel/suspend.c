@@ -41,7 +41,7 @@ void notrace __cpu_suspend_save(struct cpu_suspend_ctx *ptr,
  * time the notifier runs debug exceptions might have been enabled already,
  * with HW breakpoints registers content still in an unknown state.
  */
-void (*hw_breakpoint_restore)(void *);
+static void (*hw_breakpoint_restore)(void *);
 void __init cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
 {
 	/* Prevent multiple restore hook initializations */
@@ -90,7 +90,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
 		 * restoration before returning.
 		 */
 		cpu_set_reserved_ttbr0();
-		flush_tlb_all();
+		local_flush_tlb_all();
 		cpu_set_default_tcr_t0sz();
 
 		if (mm != &init_mm)

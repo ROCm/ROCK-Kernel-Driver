@@ -216,9 +216,7 @@
 
 #endif
 
-#if defined(CONFIG_X86_XEN)
-# define get_kernel_rpl() (!xen_feature(XENFEAT_supervisor_mode_kernel))
-#elif !defined(CONFIG_PARAVIRT)
+#ifndef CONFIG_PARAVIRT
 # define get_kernel_rpl()		0
 #endif
 

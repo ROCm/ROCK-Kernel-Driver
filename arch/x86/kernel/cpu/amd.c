@@ -296,7 +296,7 @@ static int nearby_node(int apicid)
  *     Assumption: Number of cores in each internal node is the same.
  * (2) AMD processors supporting compute units
  */
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 static void amd_get_topology(struct cpuinfo_x86 *c)
 {
 	u32 cores_per_cu = 1;
@@ -349,9 +349,10 @@ static void amd_get_topology(struct cpuinfo_x86 *c)
  */
 static void amd_detect_cmp(struct cpuinfo_x86 *c)
 {
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 	unsigned bits;
 	int cpu = smp_processor_id();
+	unsigned int socket_id, core_complex_id;
 
 	bits = c->x86_coreid_bits;
 	/* Low order bits define the core id (index of core in socket) */
@@ -361,13 +362,25 @@ static void amd_detect_cmp(struct cpuinfo_x86 *c)
 	/* use socket ID also for last level cache */
 	per_cpu(cpu_llc_id, cpu) = c->phys_proc_id;
 	amd_get_topology(c);
+
+	/*
+	 * Fix percpu cpu_llc_id here as LLC topology is different
+	 * for Fam17h systems.
+	 */
+	 if (c->x86 != 0x17 || !cpuid_edx(0x80000006))
+		return;
+
+	socket_id	= (c->apicid >> bits) - 1;
+	core_complex_id	= (c->apicid & ((1 << bits) - 1)) >> 3;
+
+	per_cpu(cpu_llc_id, cpu) = (socket_id << 3) | core_complex_id;
 #endif
 }
 
 u16 amd_get_nb_id(int cpu)
 {
 	u16 id = 0;
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 	id = per_cpu(cpu_llc_id, cpu);
 #endif
 	return id;
@@ -434,7 +447,7 @@ static void srat_detect_node(struct cpuinfo_x86 *c)
 
 static void early_init_amd_mc(struct cpuinfo_x86 *c)
 {
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 	unsigned bits, ecx;
 
 	/* Multi core CPU? */
@@ -461,7 +474,7 @@ static void early_init_amd_mc(struct cpuinfo_x86 *c)
 static void bsp_init_amd(struct cpuinfo_x86 *c)
 {
 
-#if defined(CONFIG_X86_64) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_64
 	if (c->x86 >= 0xf) {
 		unsigned long long tseg;
 
@@ -508,10 +521,8 @@ static void bsp_init_amd(struct cpuinfo_x86 *c)
 		va_align.bits = get_random_int() & va_align.mask;
 	}
 
-#ifndef CONFIG_XEN
 	if (cpu_has(c, X86_FEATURE_MWAITX))
 		use_mwaitx_delay();
-#endif
 }
 
 static void early_init_amd(struct cpuinfo_x86 *c)
@@ -538,7 +549,7 @@ static void early_init_amd(struct cpuinfo_x86 *c)
 		    (c->x86_model == 8 && c->x86_mask >= 8))
 			set_cpu_cap(c, X86_FEATURE_K6_MTRR);
 #endif
-#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PCI) && !defined(CONFIG_XEN)
+#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PCI)
 	/*
 	 * ApicID can always be treated as an 8-bit value for AMD APIC versions
 	 * >= 0x10, but even old K8s came out of reset with version 0x10. So, we
@@ -568,18 +579,14 @@ static void early_init_amd(struct cpuinfo_x86 *c)
 		msr_set_bit(MSR_AMD64_LS_CFG, 15);
 }
 
-#ifndef CONFIG_XEN
 static const int amd_erratum_383[];
 static const int amd_erratum_400[];
 static bool cpu_has_amd_erratum(struct cpuinfo_x86 *cpu, const int *erratum);
-#endif
 
 static void init_amd_k8(struct cpuinfo_x86 *c)
 {
 	u32 level;
-#ifndef CONFIG_XEN
 	u64 value;
-#endif
 
 	/* On C+ stepping K8 rep microcode works well for copy/memset */
 	level = cpuid_eax(1);
@@ -593,15 +600,10 @@ static void init_amd_k8(struct cpuinfo_x86 *c)
 	 */
 	if (c->x86_model < 0x14 && cpu_has(c, X86_FEATURE_LAHF_LM)) {
 		clear_cpu_cap(c, X86_FEATURE_LAHF_LM);
-#ifndef CONFIG_XEN
 		if (!rdmsrl_amd_safe(0xc001100d, &value)) {
 			value &= ~BIT_64(32);
 			wrmsrl_amd_safe(0xc001100d, value);
 		}
-#else
-		pr_warning("Long-mode LAHF feature wrongly enabled -"
-			   "hypervisor update needed\n");
-#endif
 	}
 
 	if (!c->x86_model_id[0])
@@ -629,7 +631,6 @@ static void init_amd_gh(struct cpuinfo_x86 *c)
 	fam10h_check_enable_mmcfg();
 #endif
 
-#ifndef CONFIG_XEN
 	/*
 	 * Disable GART TLB Walk Errors on Fam10h. We do this here because this
 	 * is always needed when GART is enabled, even in a kernel which has no
@@ -653,12 +654,10 @@ static void init_amd_gh(struct cpuinfo_x86 *c)
 
 	if (cpu_has_amd_erratum(c, amd_erratum_383))
 		set_cpu_bug(c, X86_BUG_AMD_TLB_MMATCH);
-#endif
 }
 
 static void init_amd_bd(struct cpuinfo_x86 *c)
 {
-#ifndef CONFIG_XEN
 	u64 value;
 
 	/* re-enable TopologyExtensions if switched off by BIOS */
@@ -684,14 +683,11 @@ static void init_amd_bd(struct cpuinfo_x86 *c)
 			wrmsrl_safe(0xc0011021, value);
 		}
 	}
-#endif
 }
 
 static void init_amd(struct cpuinfo_x86 *c)
 {
-#ifndef CONFIG_XEN
 	u32 dummy;
-#endif
 
 	early_init_amd(c);
 
@@ -704,10 +700,8 @@ static void init_amd(struct cpuinfo_x86 *c)
 	if (c->x86 >= 0x10)
 		set_cpu_cap(c, X86_FEATURE_REP_GOOD);
 
-#ifndef CONFIG_XEN
 	/* get apicid instead of initial apic id from cpuid */
 	c->apicid = hard_smp_processor_id();
-#endif
 
 	/* K6s reports MCEs but don't actually have all the MSRs */
 	if (c->x86 < 6)
@@ -755,22 +749,18 @@ static void init_amd(struct cpuinfo_x86 *c)
 	if (c->x86 > 0x11)
 		set_cpu_cap(c, X86_FEATURE_ARAT);
 
-#ifndef CONFIG_XEN
 	if (cpu_has_amd_erratum(c, amd_erratum_400))
 		set_cpu_bug(c, X86_BUG_AMD_APIC_C1E);
 
 	rdmsr_safe(MSR_AMD64_PATCH_LEVEL, &c->microcode, &dummy);
-#endif
 
 	/* 3DNow or LM implies PREFETCHW */
 	if (!cpu_has(c, X86_FEATURE_3DNOWPREFETCH))
 		if (cpu_has(c, X86_FEATURE_3DNOW) || cpu_has(c, X86_FEATURE_LM))
 			set_cpu_cap(c, X86_FEATURE_3DNOWPREFETCH);
 
-#ifndef CONFIG_XEN
 	/* AMD CPUs don't reset SS attributes on SYSRET */
 	set_cpu_bug(c, X86_BUG_SYSRET_SS_ATTRS);
-#endif
 }
 
 #ifdef CONFIG_X86_32
@@ -866,7 +856,6 @@ static const struct cpu_dev amd_cpu_dev = {
 
 cpu_dev_register(amd_cpu_dev);
 
-#ifndef CONFIG_XEN
 /*
  * AMD errata checking
  *
@@ -930,7 +919,6 @@ static bool cpu_has_amd_erratum(struct cpuinfo_x86 *cpu, const int *erratum)
 
 	return false;
 }
-#endif
 
 void set_dr_addr_mask(unsigned long mask, int dr)
 {

@@ -79,11 +79,7 @@ unsigned __pvclock_read_cycles(const struct pvclock_vcpu_time_info *src,
 
 	offset = pvclock_get_nsec_offset(src);
 	ret = src->system_time + offset;
-#ifndef CONFIG_XEN
 	ret_flags = src->flags;
-#else
-	ret_flags = PVCLOCK_TSC_STABLE_BIT;
-#endif
 
 	*cycles = ret;
 	*flags = ret_flags;

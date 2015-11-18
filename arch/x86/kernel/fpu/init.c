@@ -6,8 +6,6 @@
 
 #include <linux/sched.h>
 
-static int x86_noxsave_setup(char *);
-
 /*
  * Initialize the TS bit in CR0 according to the style of context-switches
  * we are using:
@@ -66,7 +64,7 @@ void fpu__init_cpu(void)
  * Set the X86_FEATURE_FPU CPU-capability bit based on
  * trying to execute an actual sequence of FPU instructions:
  */
-static void __init fpu__init_system_early_generic(struct cpuinfo_x86 *c)
+static void fpu__init_system_early_generic(struct cpuinfo_x86 *c)
 {
 	unsigned long cr0;
 	u16 fsw, fcw;
@@ -91,10 +89,6 @@ static void __init fpu__init_system_early_generic(struct cpuinfo_x86 *c)
 		for (;;)
 			asm volatile("hlt");
 	}
-#endif
-#ifdef CONFIG_XEN
-	if (!cpu_has_xsave)
-		x86_noxsave_setup("");
 #endif
 }
 
@@ -296,11 +290,11 @@ static void __init fpu__init_system_ctx_switch(void)
 	if (cpu_has_xsaveopt && eagerfpu != DISABLE)
 		eagerfpu = ENABLE;
 
-	if (xfeatures_mask & XSTATE_EAGER) {
+	if (xfeatures_mask & XFEATURE_MASK_EAGER) {
 		if (eagerfpu == DISABLE) {
 			pr_err("x86/fpu: eagerfpu switching disabled, disabling the following xstate features: 0x%llx.\n",
-			       xfeatures_mask & XSTATE_EAGER);
-			xfeatures_mask &= ~XSTATE_EAGER;
+			       xfeatures_mask & XFEATURE_MASK_EAGER);
+			xfeatures_mask &= ~XFEATURE_MASK_EAGER;
 		} else {
 			eagerfpu = ENABLE;
 		}
@@ -360,17 +354,7 @@ static int __init x86_noxsave_setup(char *s)
 	if (strlen(s))
 		return 0;
 
-	setup_clear_cpu_cap(X86_FEATURE_XSAVE);
-	setup_clear_cpu_cap(X86_FEATURE_XSAVEOPT);
-	setup_clear_cpu_cap(X86_FEATURE_XSAVEC);
-	setup_clear_cpu_cap(X86_FEATURE_XSAVES);
-	setup_clear_cpu_cap(X86_FEATURE_AVX);
-	setup_clear_cpu_cap(X86_FEATURE_AVX2);
-	setup_clear_cpu_cap(X86_FEATURE_AVX512F);
-	setup_clear_cpu_cap(X86_FEATURE_AVX512PF);
-	setup_clear_cpu_cap(X86_FEATURE_AVX512ER);
-	setup_clear_cpu_cap(X86_FEATURE_AVX512CD);
-	setup_clear_cpu_cap(X86_FEATURE_MPX);
+	fpu__xstate_clear_all_cpu_caps();
 
 	return 1;
 }
