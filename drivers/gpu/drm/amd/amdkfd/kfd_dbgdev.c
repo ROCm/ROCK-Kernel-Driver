@@ -220,16 +220,14 @@ static int dbgdev_unregister_diq(struct kfd_dbgdev *dbgdev)
 {
 	/* todo - if needed, kill wavefronts and disable watch */
 	int status = 0;
-
-	if (dbgdev->pqm) {
-
-		pqm_destroy_queue(dbgdev->pqm, dbgdev->kq->queue->properties.queue_id);
-		dbgdev->kq = NULL;
-	} else {
-		pr_debug("Error! kfd: In func %s >> destroy queue failed\n", __func__);
+	if ((dbgdev == NULL) || (dbgdev->pqm == NULL) || (dbgdev->kq == NULL)) {
+		pr_debug("kfd Err:In func %s >> can't destroy diq\n", __func__);
 		status = -EFAULT;
+	} else {
+		pqm_destroy_queue(dbgdev->pqm,
+				dbgdev->kq->queue->properties.queue_id);
+		dbgdev->kq = NULL;
 	}
-
 	return status;
 }
 

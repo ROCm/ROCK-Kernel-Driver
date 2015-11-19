@@ -151,7 +151,8 @@ kfd_dbgmgr_unregister(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
 
 	do {
 
-		if ((pmgr == NULL) || (pmgr->dev == NULL) || (pmgr->dbgdev == NULL)) {
+		if ((pmgr == NULL) || (pmgr->dev == NULL)
+				|| (pmgr->dbgdev == NULL) || (p == NULL)) {
 			dev_info(NULL, "Error! kfd: In func %s >> Illegal pointers\n", __func__);
 			/* Invalid Pointer */
 			status = -EINVAL;
