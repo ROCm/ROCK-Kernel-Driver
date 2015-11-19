@@ -59,25 +59,17 @@ void dm_add_display_info(
 
 int amdgpu_dm_connector_get_modes(struct drm_connector *connector);
 
-struct amdgpu_connector *aconnector_from_drm_crtc(
-		struct drm_crtc *crtc,
-		struct drm_atomic_state *state);
-
 int amdgpu_dm_atomic_commit(
 	struct drm_device *dev,
 	struct drm_atomic_state *state,
 	bool async);
 int amdgpu_dm_atomic_check(struct drm_device *dev,
-			    	struct drm_atomic_state *state);
+				struct drm_atomic_state *state);
 
 int dm_create_validation_set_for_target(
 	struct drm_connector *connector,
 	struct drm_display_mode *mode,
 	struct dc_validation_set *val_set);
-int dm_add_surface_to_validation_set(
-	struct drm_plane *plane,
-	struct drm_plane_state *state,
-	struct dc_surface **surface);
 
 void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector);
 struct drm_connector_state *amdgpu_dm_connector_atomic_duplicate_state(

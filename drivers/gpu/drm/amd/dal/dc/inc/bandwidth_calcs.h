@@ -434,7 +434,7 @@ struct bw_calcs_output {
 	struct bw_watermarks stutter_exit_watermark[4];
 	struct bw_watermarks nbp_state_change_watermark[4];
 	uint32_t required_sclk;
-	uint32_t dispclk;
+	uint32_t dispclk_khz;
 };
 
 

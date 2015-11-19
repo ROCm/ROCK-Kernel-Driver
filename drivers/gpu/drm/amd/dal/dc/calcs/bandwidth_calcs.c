@@ -3457,7 +3457,7 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_input_dceip *dceip,
 				bw_results_internal->cpup_state_change_enable;
 		calcs_output->stutter_mode_enable =
 				bw_results_internal->stutter_mode_enable;
-		calcs_output->dispclk =
+		calcs_output->dispclk_khz =
 				mul(bw_results_internal->dispclk,
 					int_to_fixed(1000)).value >> 24;
 		calcs_output->required_sclk =
@@ -3474,7 +3474,7 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_input_dceip *dceip,
 		calcs_output->cpuc_state_change_enable = true;
 		calcs_output->cpup_state_change_enable = true;
 		calcs_output->stutter_mode_enable = true;
-		calcs_output->dispclk = 0;
+		calcs_output->dispclk_khz = 0;
 		calcs_output->required_sclk = 0;
 	}
 

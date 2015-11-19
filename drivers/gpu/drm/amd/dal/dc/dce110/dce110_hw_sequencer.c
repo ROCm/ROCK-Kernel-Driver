@@ -1237,7 +1237,7 @@ static void set_display_clock(struct validate_context *context)
 				context->res_ctx.min_clocks.min_dclk_khz);*/
 	} else
 		dal_display_clock_set_clock(context->res_ctx.pool.display_clock,
-				context->bw_results.dispclk);
+				context->bw_results.dispclk_khz);
 
 	/* TODO: When changing display engine clock, DMCU WaitLoop must be
 	 * reconfigured in order to maintain the same delays within DMCU
