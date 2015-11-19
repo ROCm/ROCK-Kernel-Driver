@@ -44,6 +44,9 @@ enum dce110_clk_src_array_id {
 	DCE110_CLK_SRC_TOTAL
 };
 
+#define DCE110_MAX_DISPCLK 643000
+#define DCE110_MAX_SCLK 626000
+
 static void set_vendor_info_packet(struct core_stream *stream,
 		struct hw_info_packet *info_packet)
 {
@@ -1197,22 +1200,27 @@ enum dc_status dce110_validate_bandwidth(
 		LOG_MINOR_BWM_REQUIRED_BANDWIDTH_CALCS,
 		"%s: Start bandwidth calculations",
 		__func__);
-	if (true == bw_calcs(
-					dc->ctx,
-					&dc->bw_dceip,
-					&dc->bw_vbios,
-					&context->bw_mode_data,
-					&context->bw_results))
-		result =  DC_OK;
-	else {
+	if (!bw_calcs(
+			dc->ctx,
+			&dc->bw_dceip,
+			&dc->bw_vbios,
+			&context->bw_mode_data,
+			&context->bw_results))
 		result =  DC_FAIL_BANDWIDTH_VALIDATE;
+	else
+		result =  DC_OK;
+
+
+	if (context->bw_results.dispclk_khz > DCE110_MAX_DISPCLK
+		|| context->bw_results.required_sclk > DCE110_MAX_SCLK)
+		result =  DC_FAIL_BANDWIDTH_VALIDATE;
+
+	if (result == DC_FAIL_BANDWIDTH_VALIDATE)
 		dal_logger_write(dc->ctx->logger,
 			LOG_MAJOR_BWM,
 			LOG_MINOR_BWM_MODE_VALIDATION,
 			"%s: Bandwidth validation failed!",
 			__func__);
-	}
-
 
 	dal_logger_write(dc->ctx->logger,
 		LOG_MAJOR_BWM,

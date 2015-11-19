@@ -337,7 +337,7 @@ static void dm_crtc_cursor_reset(struct drm_crtc *crtc)
 	}
 }
 static bool fill_rects_from_plane_state(
-	struct drm_plane_state *state,
+	const struct drm_plane_state *state,
 	struct dc_surface *surface)
 {
 	surface->src_rect.x = state->src_x >> 16;
@@ -388,7 +388,7 @@ static bool fill_rects_from_plane_state(
 	return true;
 }
 static bool get_fb_info(
-	struct amdgpu_framebuffer *amdgpu_fb,
+	const struct amdgpu_framebuffer *amdgpu_fb,
 	uint64_t *tiling_flags,
 	uint64_t *fb_location)
 {
@@ -412,11 +412,11 @@ static bool get_fb_info(
 }
 static void fill_plane_attributes_from_fb(
 	struct dc_surface *surface,
-	struct amdgpu_framebuffer *amdgpu_fb)
+	const struct amdgpu_framebuffer *amdgpu_fb)
 {
 	uint64_t tiling_flags;
 	uint64_t fb_location;
-	struct drm_framebuffer *fb = &amdgpu_fb->base;
+	const struct drm_framebuffer *fb = &amdgpu_fb->base;
 
 	get_fb_info(
 		amdgpu_fb,
@@ -495,7 +495,7 @@ static void fill_plane_attributes_from_fb(
 }
 
 static void fill_gamma_from_crtc(
-	struct drm_crtc *crtc,
+	const struct drm_crtc *crtc,
 	struct dc_surface *dc_surface)
 {
 	int i;
@@ -524,10 +524,10 @@ static void fill_gamma_from_crtc(
 }
 
 static void fill_plane_attributes(
-	struct dc_surface *surface,
-	struct drm_crtc *crtc)
+			struct dc_surface *surface,
+			const struct drm_crtc *crtc)
 {
-	struct amdgpu_framebuffer *amdgpu_fb =
+	const struct amdgpu_framebuffer *amdgpu_fb =
 		to_amdgpu_framebuffer(crtc->primary->state->fb);
 	fill_rects_from_plane_state(crtc->primary->state, surface);
 	fill_plane_attributes_from_fb(
@@ -538,32 +538,10 @@ static void fill_plane_attributes(
 	if (crtc->mode.private_flags &
 			AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET) {
 		fill_gamma_from_crtc(crtc, surface);
-		/* reset trigger of gamma */
-		crtc->mode.private_flags &=
-			~AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
 	}
 }
 
 /*****************************************************************************/
-
-struct amdgpu_connector *aconnector_from_drm_crtc(
-		struct drm_crtc *crtc,
-		struct drm_atomic_state *state)
-{
-	struct drm_connector *connector;
-	struct amdgpu_connector *aconnector;
-	struct drm_connector_state *conn_state;
-	uint8_t i;
-
-	for_each_connector_in_state(state, connector, conn_state, i) {
-		aconnector = to_amdgpu_connector(connector);
-		if (connector->state->crtc == crtc)
-				return aconnector;
-	}
-
-	/* If we get here, not found. */
-	return NULL;
-}
 
 struct amdgpu_connector *aconnector_from_drm_crtc_id(
 		const struct drm_crtc *crtc)
@@ -592,11 +570,10 @@ struct amdgpu_connector *aconnector_from_drm_crtc_id(
 
 static void dm_dc_surface_commit(
 		struct dc *dc,
-		struct drm_crtc *crtc,
-		struct amdgpu_framebuffer *afb)
+		struct drm_crtc *crtc)
 {
 	struct dc_surface *dc_surface;
-	struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+	const struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 	struct dc_target *dc_target = acrtc->target;
 
 	if (!dc_target) {
@@ -619,6 +596,12 @@ static void dm_dc_surface_commit(
 	/* Surface programming */
 
 	fill_plane_attributes(dc_surface, crtc);
+	if (crtc->mode.private_flags &
+		AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET) {
+		/* reset trigger of gamma */
+		crtc->mode.private_flags &=
+			~AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
+	}
 
 	if (false == dc_commit_surfaces_to_target(
 			dc,
@@ -1343,8 +1326,8 @@ static void clear_unrelated_fields(struct drm_plane_state *state)
 }
 
 static bool page_flip_needed(
-	struct drm_plane_state *new_state,
-	struct drm_plane_state *old_state)
+	const struct drm_plane_state *new_state,
+	const struct drm_plane_state *old_state)
 {
 	struct drm_plane_state old_state_tmp;
 	struct drm_plane_state new_state_tmp;
@@ -1497,70 +1480,6 @@ fail:
 	dc_stream_release(streams[0]);
 	return result;
 
-}
-
-int dm_add_surface_to_validation_set(struct drm_plane *plane,
-		    struct drm_plane_state *state, struct dc_surface **surface)
-{
-	int res;
-
-	struct amdgpu_framebuffer *afb;
-	struct amdgpu_connector *aconnector;
-	struct drm_crtc *crtc;
-	struct drm_framebuffer *fb;
-
-	struct drm_device *dev;
-	struct amdgpu_device *adev;
-
-	res = -EINVAL;
-
-	if (NULL == plane || NULL == state) {
-		DRM_ERROR("invalid parameters dm_plane_atomic_check\n");
-		return res;
-	}
-
-	crtc = state->crtc;
-	fb = state->fb;
-
-
-	afb = to_amdgpu_framebuffer(fb);
-
-	if (NULL == state->crtc) {
-		return res;
-	}
-
-	aconnector = aconnector_from_drm_crtc(crtc, state->state);
-
-	if (NULL == aconnector) {
-		DRM_ERROR("Connector is NULL in dm_plane_atomic_check\n");
-		return res;
-	}
-
-	if (NULL == aconnector->dc_sink) {
-		DRM_ERROR("dc_sink is NULL in dm_plane_atomic_check\n");
-		return res;
-	}
-	dev  = state->crtc->dev;
-	adev = dev->dev_private;
-
-	*surface = dc_create_surface(adev->dm.dc);
-	if (NULL == *surface){
-		DRM_ERROR("surface is NULL\n");
-		return res;
-	}
-
-	if (!fill_rects_from_plane_state( state, *surface)) {
-		DRM_ERROR("Failed to fill surface!\n");
-		goto fail;
-	}
-
-	fill_plane_attributes_from_fb(*surface, afb);
-
-	return MODE_OK;
-
-fail:
-	dc_surface_release(*surface);
-	return res;
 }
 
 static const struct drm_plane_helper_funcs dm_plane_helper_funcs = {
@@ -1951,8 +1870,7 @@ enum dm_commit_action {
 	DM_COMMIT_ACTION_SET
 };
 
-enum dm_commit_action get_dm_commit_action(struct drm_crtc *crtc,
-		struct drm_crtc_state *state)
+static enum dm_commit_action get_dm_commit_action(struct drm_crtc_state *state)
 {
 	/* mode changed means either actually mode changed or enabled changed */
 	/* active changed means dpms changed */
@@ -2103,7 +2021,7 @@ int amdgpu_dm_atomic_commit(
 	struct amdgpu_display_manager *dm = &adev->dm;
 	struct drm_plane *plane;
 	struct drm_plane_state *old_plane_state;
-	uint32_t i;
+	uint32_t i, j;
 	int32_t ret;
 	uint32_t commit_targets_count = 0;
 	uint32_t new_crtcs_count = 0;
@@ -2140,24 +2058,33 @@ int amdgpu_dm_atomic_commit(
 	/* update changed items */
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		struct amdgpu_crtc *acrtc;
-		struct amdgpu_connector *aconnector;
+		struct amdgpu_connector *aconnector = NULL;
 		enum dm_commit_action action;
 		struct drm_crtc_state *new_state = crtc->state;
+		struct drm_connector *connector;
+		struct drm_connector_state *old_con_state;
 
 		acrtc = to_amdgpu_crtc(crtc);
-		aconnector = aconnector_from_drm_crtc(crtc, state);
+
+		for_each_connector_in_state(state,
+				connector, old_con_state, j) {
+			if (connector->state->crtc == crtc) {
+				aconnector = to_amdgpu_connector(connector);
+				break;
+			}
+		}
 
 		/* handles headless hotplug case, updating new_state and
 		 * aconnector as needed
 		 */
 		handle_headless_hotplug(acrtc, new_state, &aconnector);
-
-		action = get_dm_commit_action(crtc, new_state);
-
 		if (!aconnector) {
-			DRM_ERROR("Can't find connector for crtc %d\n", acrtc->crtc_id);
+			DRM_ERROR("Can't find connector for crtc %d\n",
+							acrtc->crtc_id);
 			break;
 		}
+
+		action = get_dm_commit_action(new_state);
 
 		switch (action) {
 		case DM_COMMIT_ACTION_DPMS_ON:
@@ -2167,7 +2094,7 @@ int amdgpu_dm_atomic_commit(
 				create_target_for_sink(
 					aconnector,
 					&crtc->state->mode);
-
+			DRM_DEBUG_KMS("Atomic commit: SET.\n");
 			if (!new_target) {
 				/*
 				 * this could happen because of issues with
@@ -2218,6 +2145,7 @@ int amdgpu_dm_atomic_commit(
 
 		case DM_COMMIT_ACTION_DPMS_OFF:
 		case DM_COMMIT_ACTION_RESET:
+			DRM_DEBUG_KMS("Atomic commit: RESET.\n");
 			/* i.e. reset mode */
 			if (acrtc->target) {
 				manage_dm_interrupts(adev, acrtc, false);
@@ -2266,10 +2194,7 @@ int amdgpu_dm_atomic_commit(
 					crtc->state->event,
 					0);
 			else
-				dm_dc_surface_commit(
-					dm->dc,
-					crtc,
-					to_amdgpu_framebuffer(fb));
+				dm_dc_surface_commit(dm->dc, crtc);
 		}
 	}
 
@@ -2295,102 +2220,224 @@ int amdgpu_dm_atomic_commit(
 	return 0;
 }
 
+static uint32_t add_val_sets_surface(
+	struct dc_validation_set *val_sets,
+	uint32_t set_count,
+	const struct dc_target *target,
+	const struct dc_surface *surface)
+{
+	uint32_t i = 0;
+
+	while (i < set_count) {
+		if (val_sets[i].target == target)
+			break;
+		++i;
+	}
+
+	val_sets[i].surfaces[val_sets[i].surface_count] = surface;
+	val_sets[i].surface_count++;
+
+	return val_sets[i].surface_count;
+}
+
+static uint32_t update_in_val_sets_target(
+	struct dc_validation_set *val_sets,
+	uint32_t set_count,
+	const struct dc_target *old_target,
+	const struct dc_target *new_target)
+{
+	uint32_t i = 0;
+
+	while (i < set_count) {
+		if (val_sets[i].target == old_target)
+			break;
+		++i;
+	}
+
+	val_sets[i].target = new_target;
+
+	if (i == set_count) {
+		/* nothing found. add new one to the end */
+		return set_count + 1;
+	}
+
+	return set_count;
+}
+
+static uint32_t remove_from_val_sets(
+	struct dc_validation_set *val_sets,
+	uint32_t set_count,
+	const struct dc_target *target)
+{
+	uint32_t i = 0;
+
+	while (i < set_count) {
+		if (val_sets[i].target == target)
+			break;
+		++i;
+	}
+
+	if (i == set_count) {
+		/* nothing found */
+		return set_count;
+	}
+
+	memmove(
+		&val_sets[i],
+		&val_sets[i + 1],
+		sizeof(struct dc_validation_set *) * (set_count - i - 1));
+
+	return set_count - 1;
+}
+
 int amdgpu_dm_atomic_check(struct drm_device *dev,
-			    struct drm_atomic_state *s)
+			struct drm_atomic_state *state)
 {
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *crtc_state;
 	struct drm_plane *plane;
 	struct drm_plane_state *plane_state;
-	struct drm_connector *connector;
-	struct drm_connector_state *conn_state;
-	int i, j, ret, set_count;
+	int i, j, ret, set_count, new_target_count;
 	struct dc_validation_set set[MAX_TARGET_NUM] = {{ 0 }};
+	struct dc_target *new_targets[MAX_TARGET_NUM] = { 0 };
 	struct amdgpu_device *adev = dev->dev_private;
-	struct amdgpu_connector *aconnector = NULL;
-	set_count = 0;
+	struct dc *dc = adev->dm.dc;
 
-	ret = drm_atomic_helper_check(dev,s);
+	ret = drm_atomic_helper_check(dev, state);
 
 	if (ret) {
-		DRM_ERROR("Atomic state integrity validation failed with error :%d !\n",ret);
+		DRM_ERROR("Atomic state validation failed with error :%d !\n",
+				ret);
 		return ret;
 	}
 
 	ret = -EINVAL;
 
-	if (s->num_connector > MAX_TARGET_NUM) {
+	if (state->num_connector > MAX_TARGET_NUM) {
 		DRM_ERROR("Exceeded max targets number !\n");
 		return ret;
 	}
 
+	/* copy existing configuration */
+	new_target_count = 0;
+	set_count = 0;
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 
-	for_each_crtc_in_state(s, crtc, crtc_state, i) {
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+
+		if (acrtc->target) {
+			set[set_count].target = acrtc->target;
+			++set_count;
+		}
+	}
+
+	/* update changed items */
+	for_each_crtc_in_state(state, crtc, crtc_state, i) {
+		struct amdgpu_crtc *acrtc = NULL;
+		struct amdgpu_connector *aconnector = NULL;
 		enum dm_commit_action action;
-		aconnector = NULL;
+		struct drm_connector *connector;
+		struct drm_connector_state *con_state;
 
-		action = get_dm_commit_action(crtc, crtc_state);
-		if (action == DM_COMMIT_ACTION_DPMS_OFF || DM_COMMIT_ACTION_RESET)
-			continue;
+		acrtc = to_amdgpu_crtc(crtc);
 
-		for_each_connector_in_state(s, connector, conn_state, j) {
-			if (conn_state->crtc && conn_state->crtc == crtc) {
+		for_each_connector_in_state(state, connector, con_state, j) {
+			if (con_state->crtc == crtc) {
 				aconnector = to_amdgpu_connector(connector);
-				/*I assume at most once connector for CRTC*/
 				break;
 			}
 		}
 
-		/*In this case validate against existing connector if possible*/
-		if (!aconnector)
-			aconnector = aconnector_from_drm_crtc(crtc, s);
+		/*TODO:
+		handle_headless_hotplug(acrtc, crtc_state, &aconnector);*/
 
-		if (!aconnector || !aconnector->dc_sink)
-			continue;
+		action = get_dm_commit_action(crtc_state);
 
-		set[set_count].surface_count = 0;
-		ret = dm_create_validation_set_for_target(&aconnector->base,
-								&crtc_state->adjusted_mode, &set[set_count]);
-		if (ret)
-		{
-			DRM_ERROR("Creation of validation set target failed !\n");
-			goto end;
+		switch (action) {
+		case DM_COMMIT_ACTION_DPMS_ON:
+		case DM_COMMIT_ACTION_SET: {
+			struct drm_display_mode mode = crtc_state->mode;
+			struct dc_target *new_target = NULL;
+
+			if (!aconnector) {
+				DRM_ERROR("Can't find connector for crtc %d\n",
+								acrtc->crtc_id);
+				goto connector_not_found;
+			}
+			new_target =
+				create_target_for_sink(
+					aconnector,
+					&mode);
+			new_targets[new_target_count] = new_target;
+
+			set_count = update_in_val_sets_target(
+					set,
+					set_count,
+					acrtc->target,
+					new_target);
+			new_target_count++;
+			break;
 		}
 
-		for_each_plane_in_state(s, plane, plane_state, j) {
-			/*Since we use drm_atomic_helper_set_config as our hook we garnteed to have the mask in correct state*/
-			if (crtc_state->plane_mask & (1 << drm_plane_index(plane))) {
-				if (set[set_count].surface_count == MAX_SURFACE_NUM) {
-					DRM_ERROR("Exceeded max surfaces number per target!\n");
-					ret = MODE_OK;
-					goto end;
-				}
+		case DM_COMMIT_ACTION_NOTHING:
+			break;
+		case DM_COMMIT_ACTION_DPMS_OFF:
+		case DM_COMMIT_ACTION_RESET:
+			/* i.e. reset mode */
+			if (acrtc->target) {
+				set_count = remove_from_val_sets(
+						set,
+						set_count,
+						acrtc->target);
+			}
+			break;
+		}
+	}
 
-				ret = dm_add_surface_to_validation_set(plane,plane_state,
-						(struct dc_surface **)&(set[set_count].surfaces[set[set_count].surface_count]));
 
-				if (ret) {
-					DRM_ERROR("Failed to add surface  for validation!\n");
-					goto end;
-				}
+	for (i = 0; i < set_count; i++) {
+		for_each_plane_in_state(state, plane, plane_state, j) {
+			struct drm_plane_state *old_plane_state = plane->state;
+			struct drm_framebuffer *fb = plane_state->fb;
+			struct amdgpu_crtc *acrtc =
+					to_amdgpu_crtc(plane_state->crtc);
 
-				set[set_count].surface_count++;
+			if (!fb || acrtc->target != set[i].target)
+				continue;
+			if (!plane_state->crtc->state->planes_changed)
+				continue;
+
+			if (!page_flip_needed(plane_state, old_plane_state)) {
+				struct dc_surface *surface =
+					dc_create_surface(dc);
+
+				fill_plane_attributes(
+						surface, plane_state->crtc);
+				add_val_sets_surface(
+					set,
+					set_count,
+					acrtc->target,
+					surface);
 			}
 		}
 
-		set_count++;
 	}
 
-	if (!set_count || dc_validate_resources(adev->dm.dc, set, set_count)) {
-		ret = MODE_OK;
-	}
-end:
+	if (set_count == 0 || dc_validate_resources(dc, set, set_count))
+		ret = 0;
 
-	for (i = 0; i < MAX_TARGET_NUM; i++) {
-		if (set[i].target)
-			dc_target_release((struct dc_target *)set[i].target);
+connector_not_found:
+	for (i = 0; i < set_count; i++) {
+		for (j = 0; j < set[i].surface_count; j++) {
+			dc_surface_release(
+				(struct dc_surface *)set[i].surfaces[j]);
+		}
 	}
+	for (i = 0; i < new_target_count; i++)
+		dc_target_release(new_targets[i]);
+
+	if (ret != 0)
+		DRM_ERROR("Atomic check failed.\n");
 
 	return ret;
-
 }
