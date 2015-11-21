@@ -1227,7 +1227,8 @@ static int set_page_directory_base(struct device_queue_manager *dqm,
 	 * Preempt queues, destroy runlist and create new runlist. Queues
 	 * will have the update PD base address
 	 */
-	retval = execute_queues_cpsch(dqm, false);
+	if (sched_policy != KFD_SCHED_POLICY_NO_HWS)
+		retval = execute_queues_cpsch(dqm, false);
 
 out:
 	mutex_unlock(&dqm->lock);
@@ -1273,8 +1274,10 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 			return -ENOMEM;
 		}
 
-		if (q->properties.type == KFD_QUEUE_TYPE_SDMA)
-				dqm->sdma_queue_count--;
+		if (q->properties.type == KFD_QUEUE_TYPE_SDMA) {
+			dqm->sdma_queue_count--;
+			deallocate_sdma_queue(dqm, q->sdma_id);
+		}
 
 		list_del(&q->list);
 		if (q->properties.is_active)
