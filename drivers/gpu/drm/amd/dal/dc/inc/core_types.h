@@ -225,6 +225,9 @@ struct core_link {
 
 	enum edp_revision edp_revision;
 	union dp_wa dp_wa;
+
+	/* MST record stream using this link */
+	uint8_t stream_count;
 };
 
 #define DC_LINK_TO_LINK(dc_link) container_of(dc_link, struct core_link, public)

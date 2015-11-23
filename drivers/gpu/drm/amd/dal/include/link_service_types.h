@@ -37,6 +37,10 @@
 struct ddc;
 struct irq_manager;
 
+enum {
+	MAX_CONTROLLER_NUM = 6
+};
+
 enum link_service_type {
 	LINK_SERVICE_TYPE_LEGACY = 0,
 	LINK_SERVICE_TYPE_DP_SST,
@@ -399,9 +403,10 @@ struct dp_mst_stream_allocation {
 /* DP MST stream allocation table */
 struct dp_mst_stream_allocation_table {
 	/* number of DP video streams */
-	uint32_t stream_count;
+	uint8_t stream_count;
+	uint8_t cur_stream_payload_idx;
 	/* array of stream allocations */
-	struct dp_mst_stream_allocation stream_allocations[1];
+	struct dp_mst_stream_allocation stream_allocations[MAX_CONTROLLER_NUM];
 };
 
 struct dp_test_event_data {
