@@ -97,6 +97,9 @@ struct kgd2kfd_shared_resources {
 
 	/* Number of bytes at start of aperture reserved for KGD. */
 	size_t doorbell_start_offset;
+
+	/* GPUVM address space size in bytes */
+	uint64_t gpuvm_size;
 };
 
 /*
