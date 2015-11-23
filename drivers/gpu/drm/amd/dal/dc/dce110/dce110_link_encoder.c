@@ -1591,8 +1591,8 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	const struct dp_mst_stream_allocation_table *table)
 {
 	int32_t addr_offset = enc->be_engine_offset;
-	uint32_t value0;
-	uint32_t value1;
+	uint32_t value0 = 0;
+	uint32_t value1 = 0;
 	uint32_t retries = 0;
 
 	/* For CZ, there are only 3 pipes. So Virtual channel is up 3.*/
@@ -1601,9 +1601,6 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	 * Setup VC Payload Table on Tx Side,
 	 * Issue allocation change trigger
 	 * to commit payload on both tx and rx side */
-
-	value0 = dal_read_reg(enc->ctx, mmDP_MSE_SAT0 + addr_offset);
-	value1 = dal_read_reg(enc->ctx, mmDP_MSE_SAT1 + addr_offset);
 
 	if (table->stream_count >= 1) {
 		set_reg_field_value(

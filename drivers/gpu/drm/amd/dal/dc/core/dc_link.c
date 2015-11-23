@@ -708,6 +708,7 @@ static bool construct(
 			dal_adapter_service_release_irq(
 					init_params->adapter_srv, hpd_gpio);
 		}
+
 		break;
 	case CONNECTOR_ID_EDP:
 		link->public.connector_signal = SIGNAL_TYPE_EDP;
@@ -915,6 +916,51 @@ static enum dc_status enable_link_dp(struct core_stream *stream)
 	return status;
 }
 
+static enum dc_status enable_link_dp_mst(struct core_stream *stream)
+{
+	enum dc_status status;
+	bool skip_video_pattern;
+	struct core_link *link = stream->sink->link;
+	struct link_settings link_settings = {0};
+	enum dp_panel_mode panel_mode;
+
+	/* sink signal type after MST branch is MST. Multiple MST sinks
+	 * share one link. Link DP PHY is enable or training only once.
+	 */
+	if (link->cur_link_settings.lane_count != LANE_COUNT_UNKNOWN)
+		return DC_OK;
+
+	/* get link settings for video mode timing */
+	decide_link_settings(stream, &link_settings);
+	status = dp_enable_link_phy(
+		stream->sink->link,
+		stream->signal,
+		stream->stream_enc->id,
+		&link_settings);
+
+	panel_mode = dp_get_panel_mode(link);
+	dpcd_configure_panel_mode(link, panel_mode);
+
+	skip_video_pattern = true;
+
+	if (link_settings.link_rate == LINK_RATE_LOW)
+			skip_video_pattern = false;
+
+	if (perform_link_training(link, &link_settings, skip_video_pattern)) {
+		link->cur_link_settings = link_settings;
+
+		/* TODO MST link shared by stream. counter? */
+		if (link->stream_count < 4)
+			link->stream_count++;
+
+		status = DC_OK;
+	}
+	else
+		status = DC_ERROR_UNEXPECTED;
+
+	return status;
+}
+
 static enum dc_status enable_link_hdmi(struct core_stream *stream)
 {
 	struct core_link *link = stream->sink->link;
@@ -977,10 +1023,12 @@ enum dc_status core_link_enable(struct core_stream *stream)
 {
 	enum dc_status status;
 	switch (stream->signal) {
-	case SIGNAL_TYPE_DISPLAY_PORT_MST:
 	case SIGNAL_TYPE_DISPLAY_PORT:
 	case SIGNAL_TYPE_EDP:
 		status = enable_link_dp(stream);
+		break;
+	case SIGNAL_TYPE_DISPLAY_PORT_MST:
+		status = enable_link_dp_mst(stream);
 		break;
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
@@ -1019,8 +1067,17 @@ enum dc_status core_link_disable(struct core_stream *stream)
 	 * it will lead to querying dynamic link capabilities
 	 * which should be done before enable output */
 
-	if (dc_is_dp_signal(stream->signal))
-		dp_disable_link_phy(stream->sink->link, stream->signal);
+	if (dc_is_dp_signal(stream->signal)) {
+		/* SST DP, eDP */
+		if (dc_is_dp_sst_signal(stream->signal))
+			dp_disable_link_phy(
+					stream->sink->link, stream->signal);
+		else {
+			dp_disable_link_phy_mst(
+					stream->sink->link, stream->signal);
+		}
+	}
+
 	else if (ENCODER_RESULT_OK != dc->hwss.encoder_disable_output(
 					stream->sink->link->link_enc, stream->signal))
 		status = DC_ERROR_UNEXPECTED;

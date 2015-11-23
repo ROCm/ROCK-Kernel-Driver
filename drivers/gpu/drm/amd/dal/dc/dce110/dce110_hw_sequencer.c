@@ -780,25 +780,31 @@ static enum color_space get_output_color_space(
 
 static enum dc_status allocate_mst_payload(struct core_stream *stream)
 {
-	struct link_encoder *link_encoder = stream->sink->link->link_enc;
+	struct core_link *link = stream->sink->link;
+	struct link_encoder *link_encoder = link->link_enc;
 	struct stream_encoder *stream_encoder = stream->stream_enc;
-	struct dp_mst_stream_allocation_table table;
+	struct dp_mst_stream_allocation_table table = {0};
 	struct fixed31_32 avg_time_slots_per_mtp;
+	uint8_t cur_stream_payload_idx;
 
-	/* TODO: remove hardcode */
-	table.stream_count = 1;
-	table.stream_allocations[0].engine = stream_encoder->id;
+	if (stream_encoder->id == ENGINE_ID_UNKNOWN) {
+		/* TODO ASSERT */
+		return DC_ERROR_UNEXPECTED;
+	}
 
+	/* get calculate VC payload for stream: stream_alloc */
 	dc_helpers_dp_mst_write_payload_allocation_table(
 		stream->ctx,
 		&stream->sink->public,
-		&table.stream_allocations[0],
+		&table,
 		true);
 
+	/* program DP source TX for payload */
 	dce110_link_encoder_update_mst_stream_allocation_table(
 		link_encoder,
 		&table);
 
+	/* send down message */
 	dc_helpers_dp_mst_poll_for_allocation_change_trigger(
 			stream->ctx,
 			&stream->sink->public);
@@ -808,9 +814,11 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 			&stream->sink->public,
 			true);
 
+	/* slot X.Y for only current stream */
+	cur_stream_payload_idx = table.cur_stream_payload_idx;
 	avg_time_slots_per_mtp = dal_fixed31_32_from_fraction(
-			table.stream_allocations[0].pbn,
-			table.stream_allocations[0].pbn_per_slot);
+		table.stream_allocations[cur_stream_payload_idx].pbn,
+		table.stream_allocations[cur_stream_payload_idx].pbn_per_slot);
 
 	dce110_stream_encoder_set_mst_bandwidth(
 		stream_encoder,
@@ -823,24 +831,28 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 
 static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 {
-	struct link_encoder *link_encoder = stream->sink->link->link_enc;
+	struct core_link *link = stream->sink->link;
+	struct link_encoder *link_encoder = link->link_enc;
 	struct stream_encoder *stream_encoder = stream->stream_enc;
-	struct dp_mst_stream_allocation_table table;
+	struct dp_mst_stream_allocation_table table = {0};
 	struct fixed31_32 avg_time_slots_per_mtp = dal_fixed31_32_from_int(0);
 
-	/* TODO: remove hardcode */
-	table.stream_count = 1;
-	table.stream_allocations[0].slot_count = 0;
+	if (stream_encoder->id == ENGINE_ID_UNKNOWN) {
+		/* TODO ASSERT */
+		return DC_ERROR_UNEXPECTED;
+	}
 
+	/* slot X.Y */
 	dce110_stream_encoder_set_mst_bandwidth(
 		stream_encoder,
 		stream_encoder->id,
 		avg_time_slots_per_mtp);
 
+	/* TODO: which component is responsible for remove payload table? */
 	dc_helpers_dp_mst_write_payload_allocation_table(
 		stream->ctx,
 		&stream->sink->public,
-		&table.stream_allocations[0],
+		&table,
 		false);
 
 	dce110_link_encoder_update_mst_stream_allocation_table(

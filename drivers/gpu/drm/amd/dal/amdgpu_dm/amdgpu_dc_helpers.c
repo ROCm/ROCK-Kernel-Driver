@@ -32,6 +32,8 @@
 #include <drm/drm_edid.h>
 
 #include "dc_types.h"
+#include "core_types.h"
+#include "stream_encoder_types.h"
 #include "amdgpu.h"
 #include "dc.h"
 #include "dc_services.h"
@@ -167,12 +169,14 @@ static struct amdgpu_connector *get_connector_for_link(
 bool dc_helpers_dp_mst_write_payload_allocation_table(
 		struct dc_context *ctx,
 		const struct dc_sink *sink,
-		struct dp_mst_stream_allocation *alloc_entity,
+		struct dp_mst_stream_allocation_table *table,
 		bool enable)
 {
 	struct amdgpu_device *adev = ctx->driver_context;
 	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector;
+	struct drm_connector *connector;
+	struct amdgpu_crtc *amdgpu_crtc;
 	struct drm_crtc *crtc;
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	struct drm_dp_mst_port *mst_port;
@@ -181,9 +185,15 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 	int clock;
 	int bpp;
 	int pbn = 0;
+	uint8_t i;
+	uint8_t vcid;
+	bool find_stream_for_sink;
 
 	aconnector = get_connector_for_sink(dev, sink);
 	crtc = aconnector->base.state->crtc;
+
+	if (!crtc)
+		return false;
 
 	if (!aconnector->mst_port)
 		return false;
@@ -201,6 +211,8 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 		pbn = drm_dp_calc_pbn_mode(clock, bpp);
 
 		ret = drm_dp_mst_allocate_vcpi(mst_mgr, mst_port, pbn, &slots);
+		/* mst_port->vcpi.vcpi is vc_id for this stream.*/
+		vcid = mst_port->vcpi.vcpi;
 
 		if (!ret)
 			return false;
@@ -209,11 +221,105 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 		drm_dp_mst_reset_vcpi_slots(mst_mgr, mst_port);
 	}
 
-	alloc_entity->slot_count = slots;
-	alloc_entity->pbn = pbn;
-	alloc_entity->pbn_per_slot = mst_mgr->pbn_div;
-
 	ret = drm_dp_update_payload_part1(mst_mgr);
+
+	/* mst_mgr->->payloads are VC payload notify MST branch using DPCD or
+	 * AUX message. The sequence is slot 1-63 allocated sequence for each
+	 * stream. AMD ASIC stream slot allocation should follow the same
+	 * sequence. copy DRM MST allocation to dc */
+
+	mutex_lock(&mst_mgr->payload_lock);
+
+	/* number of active streams */
+	for (i = 0; i < mst_mgr->max_payloads; i++) {
+		if (mst_mgr->payloads[i].num_slots == 0)
+			break;
+		table->stream_count++;
+	}
+
+	for (i = 0; i < table->stream_count; i++) {
+		table->stream_allocations[i].slot_count =
+				mst_mgr->proposed_vcpis[i]->num_slots;
+		/* mst_mgr->pbn_div is fixed value after link training for
+		 * current link PHY */
+		table->stream_allocations[i].pbn_per_slot = mst_mgr->pbn_div;
+
+		/* find which payload is for current stream
+		 * after drm_dp_update_payload_part1, payload and proposed_vcpis
+		 * are sync to the same allocation sequence. vcpi is not saved
+		 * into payload by drm_dp_update_payload_part1. In order to
+		 * find sequence of a payload within allocation sequence, we
+		 * need check vcpi from proposed_vcpis*/
+
+		table->stream_allocations[i].pbn =
+				mst_mgr->proposed_vcpis[i]->pbn;
+
+		if (mst_mgr->proposed_vcpis[i]->vcpi == vcid)
+			table->cur_stream_payload_idx = i;
+
+		find_stream_for_sink = false;
+
+		list_for_each_entry(connector,
+				&dev->mode_config.connector_list, head) {
+
+			aconnector = to_amdgpu_connector(connector);
+
+			/* not mst connector */
+			if (!aconnector->mst_port)
+				continue;
+			mst_port = aconnector->port;
+
+			if (mst_port->vcpi.vcpi ==
+					mst_mgr->proposed_vcpis[i]->vcpi) {
+				/* find connector with same vcid as payload */
+
+				const struct dc_sink *dc_sink_connector;
+				struct core_sink *core_sink;
+				struct dc_target *dc_target;
+				struct core_target *core_target;
+				struct stream_encoder *stream_enc;
+				uint8_t j;
+
+				dc_sink_connector = aconnector->dc_sink;
+				core_sink = DC_SINK_TO_CORE(dc_sink_connector);
+
+				/* find stream to drive this sink
+				 * crtc -> target -> stream -> sink */
+				crtc = aconnector->base.state->crtc;
+				amdgpu_crtc = to_amdgpu_crtc(crtc);
+				dc_target = amdgpu_crtc->target;
+				core_target = DC_TARGET_TO_CORE(dc_target);
+
+				for (j = 0; j < core_target->stream_count;
+						j++) {
+					if (core_target->streams[j]->sink ==
+							core_sink)
+						break;
+				}
+
+				if (j < core_target->stream_count) {
+					/* find sink --> stream --> target -->
+					 * connector*/
+					stream_enc =
+					core_target->streams[j]->stream_enc;
+					table->stream_allocations[i].engine =
+							stream_enc->id;
+					/* exit loop connector */
+					find_stream_for_sink = true;
+					break;
+				}
+			}
+		}
+		if (!find_stream_for_sink) {
+			/* TODO: do not find stream for sink. This should not
+			 * happen
+			 */
+			ASSERT(0);
+		}
+	}
+
+	mutex_unlock(&mst_mgr->payload_lock);
+
 	if (ret)
 		return false;
 
