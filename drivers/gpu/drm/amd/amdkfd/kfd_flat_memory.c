@@ -278,9 +278,8 @@
 #define MAKE_GPUVM_APP_BASE(gpu_num) \
 	(((uint64_t)(gpu_num) << 61) + 0x1000000000000L)
 
-#define MAKE_GPUVM_APP_LIMIT(base) \
-	(((uint64_t)(base) & \
-		0xFFFFFF0000000000UL) | 0xFFFFFFFFFFL)
+#define MAKE_GPUVM_APP_LIMIT(base, size) \
+	(((uint64_t)(base) & 0xFFFFFF0000000000UL) + (size) - 1)
 
 #define MAKE_SCRATCH_APP_BASE(gpu_num) \
 	(((uint64_t)(gpu_num) << 61) + 0x100000000L)
@@ -349,8 +348,9 @@ int kfd_init_apertures(struct kfd_process *process)
 
 			pdd->gpuvm_base = MAKE_GPUVM_APP_BASE(id + 1);
 
-			pdd->gpuvm_limit =
-					MAKE_GPUVM_APP_LIMIT(pdd->gpuvm_base);
+			pdd->gpuvm_limit = MAKE_GPUVM_APP_LIMIT(
+				pdd->gpuvm_base,
+				dev->shared_resources.gpuvm_size);
 
 			pdd->scratch_base = MAKE_SCRATCH_APP_BASE(id + 1);
 
