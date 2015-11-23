@@ -246,6 +246,7 @@ void radeon_kfd_device_init(struct radeon_device *rdev)
 
 			.first_compute_pipe = 1,
 			.compute_pipe_count = 4 - 1,
+			.gpuvm_size = (uint64_t)radeon_vm_size << 30
 		};
 
 		radeon_doorbell_get_kfd_info(rdev,
