@@ -95,6 +95,7 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *rdev)
 
 			.first_compute_pipe = 1,
 			.compute_pipe_count = 4 - 1,
+			.gpuvm_size = (uint64_t)amdgpu_vm_size << 30
 		};
 
 		amdgpu_doorbell_get_kfd_info(rdev,
