@@ -239,8 +239,6 @@ dm_dp_create_fake_mst_encoder(struct amdgpu_connector *connector)
 		break;
 	}
 
-	encoder->possible_crtcs = 0x1;
-
 	drm_encoder_init(
 		dev,
 		&amdgpu_encoder->base,
