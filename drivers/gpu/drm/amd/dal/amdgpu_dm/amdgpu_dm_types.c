@@ -1002,8 +1002,14 @@ amdgpu_dm_connector_detect(struct drm_connector *connector, bool force)
 	 * TODO: check whether we should lock here for mst_mgr.lock
 	 */
 	/* set root connector to disconnected */
-	if (aconnector->mst_mgr.mst_state)
+	if (aconnector->is_mst_connector) {
+		if (!aconnector->mst_mgr.mst_state)
+			drm_dp_mst_topology_mgr_set_mst(
+				&aconnector->mst_mgr,
+				true);
+
 		return connector_status_disconnected;
+	}
 
 	connected = (NULL != aconnector->dc_sink);
 	return (connected ? connector_status_connected :
