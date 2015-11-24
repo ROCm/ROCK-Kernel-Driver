@@ -784,17 +784,25 @@ static struct stream_encoder *find_first_free_match_stream_enc_for_link(
 		struct core_link *link)
 {
 	uint8_t i;
+	int8_t j = -1;
 
 	for (i = 0; i < res_ctx->pool.stream_enc_count; i++) {
 		if (!res_ctx->is_stream_enc_acquired[i] &&
-				res_ctx->pool.stream_enc[i]) {
+					res_ctx->pool.stream_enc[i]) {
+			/* Store first available for MST second display
+			 * in daisy chain use case */
+			j = i;
 			if (res_ctx->pool.stream_enc[i]->id ==
 					link->link_enc->preferred_engine)
 				return res_ctx->pool.stream_enc[i];
 		}
 	}
 
-	/* TODO: Handle MST*/
+	/* TODO: Handle MST properly
+	 * Currently pick next available stream encoder if found*/
+	if (j >= 0 && link->public.sink[0]->sink_signal ==
+			SIGNAL_TYPE_DISPLAY_PORT_MST)
+		return res_ctx->pool.stream_enc[j];
 
 	return NULL;
 }
