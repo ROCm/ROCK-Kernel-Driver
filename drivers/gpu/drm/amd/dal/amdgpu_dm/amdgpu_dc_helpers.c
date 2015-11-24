@@ -331,8 +331,7 @@ bool dc_helpers_dp_mst_start_top_mgr(
 	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
 
-	if (aconnector)
-		drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, true);
+	aconnector->is_mst_connector = true;
 
 	return true;
 }
@@ -345,6 +344,7 @@ void dc_helpers_dp_mst_stop_top_mgr(
 	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
 
-	if (aconnector)
-		drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, false);
+	drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, false);
+
+	aconnector->is_mst_connector = false;
 }
