@@ -30,26 +30,11 @@ struct link_encoder *dce110_link_encoder_create(
 	const struct encoder_init_data *init);
 void dce110_link_encoder_destroy(struct link_encoder **enc);
 
-void dce110_link_encoder_set_dp_phy_pattern(
-	struct link_encoder *enc,
-	const struct encoder_set_dp_phy_pattern_param *param);
-
-enum encoder_result dce110_link_encoder_power_up(struct link_encoder *enc);
-
-enum encoder_result dce110_link_encoder_dp_set_lane_settings(
-	struct link_encoder *enc,
-	const struct link_training_settings *link_settings);
-
-union supported_stream_engines dce110_get_supported_stream_engines(
-	const struct link_encoder *enc);
-
 enum encoder_result dce110_link_encoder_validate_output_with_stream(
 	struct link_encoder *enc,
 	const struct core_stream *stream);
 
-void dce110_link_encoder_set_lcd_backlight_level(
-	struct link_encoder *enc,
-	uint32_t level);
+enum encoder_result dce110_link_encoder_power_up(struct link_encoder *enc);
 
 void dce110_link_encoder_setup(
 	struct link_encoder *enc,
@@ -68,15 +53,31 @@ enum encoder_result dce110_link_encoder_disable_output(
 	struct link_encoder *link_enc,
 	enum signal_type signal);
 
-void dce110_set_afmt_memory_power_state(
-	const struct dc_context *ctx,
-	enum engine_id id,
-	bool enable);
+
+enum encoder_result dce110_link_encoder_dp_set_lane_settings(
+	struct link_encoder *enc,
+	const struct link_training_settings *link_settings);
+
+void dce110_link_encoder_set_dp_phy_pattern(
+	struct link_encoder *enc,
+	const struct encoder_set_dp_phy_pattern_param *param);
+
+union supported_stream_engines dce110_get_supported_stream_engines(
+	const struct link_encoder *enc);
 
 void dce110_link_encoder_update_mst_stream_allocation_table(
 	struct link_encoder *enc,
 	const struct dp_mst_stream_allocation_table *table,
 	bool is_removal);
+
+void dce110_link_encoder_set_lcd_backlight_level(
+	struct link_encoder *enc,
+	uint32_t level);
+
+void dce110_set_afmt_memory_power_state(
+	const struct dc_context *ctx,
+	enum engine_id id,
+	bool enable);
 
 void dce110_link_encoder_set_mst_bandwidth(
 	struct link_encoder *enc,
