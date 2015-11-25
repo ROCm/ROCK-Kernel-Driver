@@ -54,29 +54,6 @@ static void construct(
 	enc->adapter_service = init->adapter_service;
 }
 
-struct stream_encoder *dce110_stream_encoder_create(
-	struct stream_enc_init_data *init)
-{
-	struct stream_encoder *enc =
-		dc_service_alloc(init->ctx, sizeof(struct stream_encoder));
-
-	if (!enc)
-		goto enc_create_fail;
-
-	construct(enc, init);
-
-	return enc;
-
-enc_create_fail:
-	return NULL;
-}
-
-void dce110_stream_encoder_destroy(struct stream_encoder **enc)
-{
-	dc_service_free((*enc)->ctx, *enc);
-	*enc = NULL;
-}
-
 static void stop_hdmi_info_packets(struct dc_context *ctx, uint32_t offset)
 {
 	uint32_t addr = 0;
@@ -206,22 +183,6 @@ static void stop_dp_info_packets(struct dc_context *ctx, int32_t offset)
 
 	dal_write_reg(ctx, addr, value);
 }
-
-void dce110_stream_encoder_stop_info_packets(
-	struct stream_encoder *enc,
-	enum engine_id engine,
-	enum signal_type signal)
-{
-	if (dc_is_hdmi_signal(signal))
-		stop_hdmi_info_packets(
-			enc->ctx,
-			fe_engine_offsets[engine]);
-	else if (dc_is_dp_signal(signal))
-		stop_dp_info_packets(
-			enc->ctx,
-			fe_engine_offsets[engine]);
-}
-
 
 static void update_avi_info_packet(
 	struct stream_encoder *enc,
@@ -615,24 +576,6 @@ static void update_dp_info_packet(
 	dal_write_reg(enc->ctx, addr, value);
 }
 
-void dce110_stream_encoder_update_info_packets(
-	struct stream_encoder *enc,
-	enum signal_type signal,
-	const struct encoder_info_frame *info_frame)
-{
-	if (dc_is_hdmi_signal(signal)) {
-		update_avi_info_packet(
-			enc,
-			enc->id,
-			signal,
-			&info_frame->avi);
-		update_hdmi_info_packet(enc, enc->id, 0, &info_frame->vendor);
-		update_hdmi_info_packet(enc, enc->id, 1, &info_frame->gamut);
-		update_hdmi_info_packet(enc, enc->id, 2, &info_frame->spd);
-	} else if (dc_is_dp_signal(signal))
-		update_dp_info_packet(enc, enc->id, 0, &info_frame->vsc);
-}
-
 static void dp_steer_fifo_reset(
 	struct dc_context *ctx,
 	enum engine_id engine,
@@ -645,76 +588,6 @@ static void dp_steer_fifo_reset(
 	set_reg_field_value(value, reset, DP_STEER_FIFO, DP_STEER_FIFO_RESET);
 
 	dal_write_reg(ctx, addr, value);
-}
-
-/*
- * @brief
- * Output blank data,
- * prevents output of the actual surface data on active transmitter
- */
-enum encoder_result dce110_stream_encoder_blank(
-				struct stream_encoder *enc,
-				enum signal_type signal)
-{
-	enum engine_id engine = enc->id;
-	const uint32_t addr = mmDP_VID_STREAM_CNTL + fe_engine_offsets[engine];
-	uint32_t value = dal_read_reg(enc->ctx, addr);
-	uint32_t retries = 0;
-	uint32_t max_retries = DP_BLANK_MAX_RETRY * 10;
-
-	if (!dc_is_dp_signal(signal))
-		return ENCODER_RESULT_OK;
-
-	/* Note: For CZ, we are changing driver default to disable
-	 * stream deferred to next VBLANK. If results are positive, we
-	 * will make the same change to all DCE versions. There are a
-	 * handful of panels that cannot handle disable stream at
-	 * HBLANK and will result in a white line flash across the
-	 * screen on stream disable. */
-
-	/* Specify the video stream disable point
-	 * (2 = start of the next vertical blank) */
-	set_reg_field_value(
-		value,
-		2,
-		DP_VID_STREAM_CNTL,
-		DP_VID_STREAM_DIS_DEFER);
-	/* Larger delay to wait until VBLANK - use max retry of
-	 * 10us*3000=30ms. This covers 16.6ms of typical 60 Hz mode +
-	 * a little more because we may not trust delay accuracy. */
-	max_retries = DP_BLANK_MAX_RETRY * 150;
-
-	/* disable DP stream */
-	set_reg_field_value(value, 0, DP_VID_STREAM_CNTL, DP_VID_STREAM_ENABLE);
-	dal_write_reg(enc->ctx, addr, value);
-
-	/* the encoder stops sending the video stream
-	 * at the start of the vertical blanking.
-	 * Poll for DP_VID_STREAM_STATUS == 0 */
-
-	do {
-		value = dal_read_reg(enc->ctx, addr);
-
-		if (!get_reg_field_value(
-			value,
-			DP_VID_STREAM_CNTL,
-			DP_VID_STREAM_STATUS))
-			break;
-
-		dc_service_delay_in_microseconds(enc->ctx, 10);
-
-		++retries;
-	} while (retries < max_retries);
-
-	ASSERT(retries <= max_retries);
-
-	/* Tell the DP encoder to ignore timing from CRTC, must be done after
-	 * the polling. If we set DP_STEER_FIFO_RESET before DP stream blank is
-	 * complete, stream status will be stuck in video stream enabled state,
-	 * i.e. DP_VID_STREAM_STATUS stuck at 1. */
-	dp_steer_fifo_reset(enc->ctx, engine, true);
-
-	return ENCODER_RESULT_OK;
 }
 
 static void unblank_dp_output(
@@ -785,46 +658,6 @@ static void setup_vid_stream(
 	value = dal_read_reg(enc->ctx, addr);
 	set_reg_field_value(value, 1, DP_VID_TIMING, DP_VID_M_N_GEN_EN);
 	dal_write_reg(enc->ctx, addr, value);
-}
-/*
- * @brief
- * Stop sending blank data,
- * output the actual surface data on active transmitter
- */
-enum encoder_result dce110_stream_encoder_unblank(
-	struct stream_encoder *enc,
-	const struct encoder_unblank_param *param)
-{
-	bool is_dp_signal = param->signal == SIGNAL_TYPE_DISPLAY_PORT
-		|| param->signal == SIGNAL_TYPE_DISPLAY_PORT_MST
-		|| param->signal == SIGNAL_TYPE_EDP;
-
-	if (!is_dp_signal)
-		return ENCODER_RESULT_OK;
-
-	if (param->link_settings.link_rate != LINK_RATE_UNKNOWN) {
-		uint32_t n_vid = 0x8000;
-		uint32_t m_vid;
-
-		/* M / N = Fstream / Flink
-		 * m_vid / n_vid = pixel rate / link rate */
-
-		uint64_t m_vid_l = n_vid;
-
-		m_vid_l *= param->crtc_timing.pixel_clock;
-		m_vid_l = div_u64(m_vid_l,
-			param->link_settings.link_rate
-				* LINK_RATE_REF_FREQ_IN_KHZ);
-
-		m_vid = (uint32_t) m_vid_l;
-
-		setup_vid_stream(enc,
-			enc->id, m_vid, n_vid);
-	}
-
-	unblank_dp_output(enc, enc->id);
-
-	return ENCODER_RESULT_OK;
 }
 
 static void set_dp_stream_attributes(
@@ -1106,6 +939,29 @@ static void set_tmds_stream_attributes(
 	dal_write_reg(enc->ctx, addr, value);
 }
 
+struct stream_encoder *dce110_stream_encoder_create(
+	struct stream_enc_init_data *init)
+{
+	struct stream_encoder *enc =
+		dc_service_alloc(init->ctx, sizeof(struct stream_encoder));
+
+	if (!enc)
+		goto enc_create_fail;
+
+	construct(enc, init);
+
+	return enc;
+
+enc_create_fail:
+	return NULL;
+}
+
+void dce110_stream_encoder_destroy(struct stream_encoder **enc)
+{
+	dc_service_free((*enc)->ctx, *enc);
+	*enc = NULL;
+}
+
 /*
  * @brief
  * Associate digital encoder with specified output transmitter
@@ -1166,3 +1022,148 @@ enum encoder_result dce110_stream_encoder_setup(
 
 	return ENCODER_RESULT_OK;
 }
+
+void dce110_stream_encoder_update_info_packets(
+	struct stream_encoder *enc,
+	enum signal_type signal,
+	const struct encoder_info_frame *info_frame)
+{
+	if (dc_is_hdmi_signal(signal)) {
+		update_avi_info_packet(
+			enc,
+			enc->id,
+			signal,
+			&info_frame->avi);
+		update_hdmi_info_packet(enc, enc->id, 0, &info_frame->vendor);
+		update_hdmi_info_packet(enc, enc->id, 1, &info_frame->gamut);
+		update_hdmi_info_packet(enc, enc->id, 2, &info_frame->spd);
+	} else if (dc_is_dp_signal(signal))
+		update_dp_info_packet(enc, enc->id, 0, &info_frame->vsc);
+}
+
+void dce110_stream_encoder_stop_info_packets(
+	struct stream_encoder *enc,
+	enum engine_id engine,
+	enum signal_type signal)
+{
+	if (dc_is_hdmi_signal(signal))
+		stop_hdmi_info_packets(
+			enc->ctx,
+			fe_engine_offsets[engine]);
+	else if (dc_is_dp_signal(signal))
+		stop_dp_info_packets(
+			enc->ctx,
+			fe_engine_offsets[engine]);
+}
+
+/*
+ * @brief
+ * Output blank data,
+ * prevents output of the actual surface data on active transmitter
+ */
+enum encoder_result dce110_stream_encoder_blank(
+				struct stream_encoder *enc,
+				enum signal_type signal)
+{
+	enum engine_id engine = enc->id;
+	const uint32_t addr = mmDP_VID_STREAM_CNTL + fe_engine_offsets[engine];
+	uint32_t value = dal_read_reg(enc->ctx, addr);
+	uint32_t retries = 0;
+	uint32_t max_retries = DP_BLANK_MAX_RETRY * 10;
+
+	if (!dc_is_dp_signal(signal))
+		return ENCODER_RESULT_OK;
+
+	/* Note: For CZ, we are changing driver default to disable
+	 * stream deferred to next VBLANK. If results are positive, we
+	 * will make the same change to all DCE versions. There are a
+	 * handful of panels that cannot handle disable stream at
+	 * HBLANK and will result in a white line flash across the
+	 * screen on stream disable. */
+
+	/* Specify the video stream disable point
+	 * (2 = start of the next vertical blank) */
+	set_reg_field_value(
+		value,
+		2,
+		DP_VID_STREAM_CNTL,
+		DP_VID_STREAM_DIS_DEFER);
+	/* Larger delay to wait until VBLANK - use max retry of
+	 * 10us*3000=30ms. This covers 16.6ms of typical 60 Hz mode +
+	 * a little more because we may not trust delay accuracy. */
+	max_retries = DP_BLANK_MAX_RETRY * 150;
+
+	/* disable DP stream */
+	set_reg_field_value(value, 0, DP_VID_STREAM_CNTL, DP_VID_STREAM_ENABLE);
+	dal_write_reg(enc->ctx, addr, value);
+
+	/* the encoder stops sending the video stream
+	 * at the start of the vertical blanking.
+	 * Poll for DP_VID_STREAM_STATUS == 0 */
+
+	do {
+		value = dal_read_reg(enc->ctx, addr);
+
+		if (!get_reg_field_value(
+			value,
+			DP_VID_STREAM_CNTL,
+			DP_VID_STREAM_STATUS))
+			break;
+
+		dc_service_delay_in_microseconds(enc->ctx, 10);
+
+		++retries;
+	} while (retries < max_retries);
+
+	ASSERT(retries <= max_retries);
+
+	/* Tell the DP encoder to ignore timing from CRTC, must be done after
+	 * the polling. If we set DP_STEER_FIFO_RESET before DP stream blank is
+	 * complete, stream status will be stuck in video stream enabled state,
+	 * i.e. DP_VID_STREAM_STATUS stuck at 1. */
+	dp_steer_fifo_reset(enc->ctx, engine, true);
+
+	return ENCODER_RESULT_OK;
+}
+
+/*
+ * @brief
+ * Stop sending blank data,
+ * output the actual surface data on active transmitter
+ */
+enum encoder_result dce110_stream_encoder_unblank(
+	struct stream_encoder *enc,
+	const struct encoder_unblank_param *param)
+{
+	bool is_dp_signal = param->signal == SIGNAL_TYPE_DISPLAY_PORT
+		|| param->signal == SIGNAL_TYPE_DISPLAY_PORT_MST
+		|| param->signal == SIGNAL_TYPE_EDP;
+
+	if (!is_dp_signal)
+		return ENCODER_RESULT_OK;
+
+	if (param->link_settings.link_rate != LINK_RATE_UNKNOWN) {
+		uint32_t n_vid = 0x8000;
+		uint32_t m_vid;
+
+		/* M / N = Fstream / Flink
+		 * m_vid / n_vid = pixel rate / link rate */
+
+		uint64_t m_vid_l = n_vid;
+
+		m_vid_l *= param->crtc_timing.pixel_clock;
+		m_vid_l = div_u64(m_vid_l,
+			param->link_settings.link_rate
+				* LINK_RATE_REF_FREQ_IN_KHZ);
+
+		m_vid = (uint32_t) m_vid_l;
+
+		setup_vid_stream(enc,
+			enc->id, m_vid, n_vid);
+	}
+
+	unblank_dp_output(enc, enc->id);
+
+	return ENCODER_RESULT_OK;
+}
+

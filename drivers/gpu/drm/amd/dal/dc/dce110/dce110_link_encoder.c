@@ -461,45 +461,6 @@ static void set_dp_phy_pattern_80bit_custom(
 	enable_phy_bypass_mode(ctx, be_addr_offset, true);
 }
 
-void dce110_link_encoder_setup(
-	struct link_encoder *enc,
-	enum signal_type signal)
-{
-	const uint32_t addr = mmDIG_BE_CNTL + enc->be_engine_offset;
-	uint32_t value = dal_read_reg(enc->ctx, addr);
-
-	switch (signal) {
-	case SIGNAL_TYPE_EDP:
-	case SIGNAL_TYPE_DISPLAY_PORT:
-		/* DP SST */
-		set_reg_field_value(value, 0, DIG_BE_CNTL, DIG_MODE);
-		break;
-	case SIGNAL_TYPE_LVDS:
-		/* LVDS */
-		set_reg_field_value(value, 1, DIG_BE_CNTL, DIG_MODE);
-		break;
-	case SIGNAL_TYPE_DVI_SINGLE_LINK:
-	case SIGNAL_TYPE_DVI_DUAL_LINK:
-		/* TMDS-DVI */
-		set_reg_field_value(value, 2, DIG_BE_CNTL, DIG_MODE);
-		break;
-	case SIGNAL_TYPE_HDMI_TYPE_A:
-		/* TMDS-HDMI */
-		set_reg_field_value(value, 3, DIG_BE_CNTL, DIG_MODE);
-		break;
-	case SIGNAL_TYPE_DISPLAY_PORT_MST:
-		/* DP MST */
-		set_reg_field_value(value, 5, DIG_BE_CNTL, DIG_MODE);
-		break;
-	default:
-		ASSERT_CRITICAL(false);
-		/* invalid mode ! */
-		break;
-	}
-
-	dal_write_reg(enc->ctx, addr, value);
-}
-
 static void set_dp_phy_pattern_hbr2_compliance(
 	struct link_encoder *enc,
 	const int32_t be_addr_offset)
@@ -749,137 +710,6 @@ static void construct(
 	enc->features.flags.bits.IS_YCBCR_CAPABLE =
 		dal_adapter_service_is_feature_supported(
 			FEATURE_SUPPORT_DP_YUV);
-}
-
-struct link_encoder *dce110_link_encoder_create(
-	const struct encoder_init_data *init)
-{
-	struct link_encoder *enc =
-		dc_service_alloc(init->ctx, sizeof(struct link_encoder));
-
-	if (!enc)
-		goto enc_create_fail;
-
-	construct(enc, init);
-
-	return enc;
-
-enc_create_fail:
-	return NULL;
-}
-
-void dce110_link_encoder_destroy(struct link_encoder **enc)
-{
-	struct link_encoder *encoder = *enc;
-	dc_service_free(encoder->ctx, encoder);
-	*enc = NULL;
-}
-
-void dce110_link_encoder_set_dp_phy_pattern(
-	struct link_encoder *enc,
-	const struct encoder_set_dp_phy_pattern_param *param)
-{
-	const int32_t offset = enc->be_engine_offset;
-
-
-	switch (param->dp_phy_pattern) {
-	case DP_TEST_PATTERN_TRAINING_PATTERN1:
-		set_dp_phy_pattern_training_pattern(enc->ctx,
-			offset, 0);
-		break;
-	case DP_TEST_PATTERN_TRAINING_PATTERN2:
-		set_dp_phy_pattern_training_pattern(enc->ctx,
-			offset, 1);
-		break;
-	case DP_TEST_PATTERN_TRAINING_PATTERN3:
-		set_dp_phy_pattern_training_pattern(enc->ctx,
-			offset, 2);
-		break;
-	case DP_TEST_PATTERN_D102:
-		set_dp_phy_pattern_d102(enc->ctx, offset);
-		break;
-	case DP_TEST_PATTERN_SYMBOL_ERROR:
-		set_dp_phy_pattern_symbol_error(enc->ctx, offset);
-		break;
-	case DP_TEST_PATTERN_PRBS7:
-		set_dp_phy_pattern_prbs7(enc->ctx, offset);
-		break;
-	case DP_TEST_PATTERN_80BIT_CUSTOM:
-		set_dp_phy_pattern_80bit_custom(
-				enc->ctx,
-			offset, param->custom_pattern);
-		break;
-	case DP_TEST_PATTERN_HBR2_COMPLIANCE_EYE:
-		set_dp_phy_pattern_hbr2_compliance(
-			enc, offset);
-		break;
-	case DP_TEST_PATTERN_VIDEO_MODE: {
-		set_dp_phy_pattern_passthrough_mode(
-			enc->ctx,
-			offset,
-			param->dp_panel_mode);
-		break;
-	}
-
-
-	default:
-		/* invalid phy pattern */
-		ASSERT_CRITICAL(false);
-		break;
-	}
-}
-
-enum encoder_result dce110_link_encoder_dp_set_lane_settings(
-	struct link_encoder *enc,
-	const struct link_training_settings *link_settings)
-{
-	union dpcd_training_lane_set training_lane_set = { { 0 } };
-
-	int32_t lane = 0;
-
-	struct bp_transmitter_control cntl = { 0 };
-
-	if (!link_settings) {
-		BREAK_TO_DEBUGGER();
-		return ENCODER_RESULT_ERROR;
-	}
-
-	cntl.action = TRANSMITTER_CONTROL_SET_VOLTAGE_AND_PREEMPASIS;
-	cntl.transmitter = enc->transmitter;
-	cntl.connector_obj_id = enc->connector;
-	cntl.lanes_number = link_settings->link_settings.lane_count;
-	cntl.hpd_sel = enc->hpd_source;
-	cntl.pixel_clock = link_settings->link_settings.link_rate *
-						LINK_RATE_REF_FREQ_IN_KHZ;
-
-	for (lane = 0; lane < link_settings->link_settings.lane_count; ++lane) {
-		/* translate lane settings */
-
-		training_lane_set.bits.VOLTAGE_SWING_SET =
-			link_settings->lane_settings[lane].VOLTAGE_SWING;
-		training_lane_set.bits.PRE_EMPHASIS_SET =
-			link_settings->lane_settings[lane].PRE_EMPHASIS;
-
-		/* post cursor 2 setting only applies to HBR2 link rate */
-		if (link_settings->link_settings.link_rate == LINK_RATE_HIGH2) {
-			/* this is passed to VBIOS
-			 * to program post cursor 2 level */
-
-			training_lane_set.bits.POST_CURSOR2_SET =
-				link_settings->lane_settings[lane].POST_CURSOR2;
-		}
-
-		cntl.lane_select = lane;
-		cntl.lane_settings = training_lane_set.raw;
-
-		/* call VBIOS table to set voltage swing and pre-emphasis */
-
-		dal_bios_parser_transmitter_control(
-			dal_adapter_service_get_bios_parser(
-				enc->adapter_service), &cntl);
-	}
-
-	return ENCODER_RESULT_OK;
 }
 
 /* return value is bit-vector */
@@ -1167,72 +997,6 @@ static enum encoder_result link_encoder_edp_backlight_control(
 	return ENCODER_RESULT_OK;
 }
 
-/*
- * @brief
- * Configure digital transmitter and enable both encoder and transmitter
- * Actual output will be available after calling unblank()
- */
-enum encoder_result dce110_link_encoder_enable_output(
-	struct link_encoder *enc,
-	const struct link_settings *link_settings,
-	enum engine_id engine,
-	enum clock_source_id clock_source,
-	enum signal_type signal,
-	enum dc_color_depth color_depth,
-	uint32_t pixel_clock)
-{
-	struct bp_transmitter_control cntl = { 0 };
-
-	if (enc->connector.id == CONNECTOR_ID_EDP) {
-		/* power up eDP panel */
-
-		link_encoder_edp_power_control(
-			enc, true);
-
-		link_encoder_edp_wait_for_hpd_ready(
-			enc, enc->connector, true);
-
-		/* have to turn off the backlight
-		 * before power down eDP panel */
-		link_encoder_edp_backlight_control(
-				enc, true);
-	}
-
-	/* Enable the PHY */
-
-	/* number_of_lanes is used for pixel clock adjust,
-	 * but it's not passed to asic_control.
-	 * We need to set number of lanes manually. */
-	if (dc_is_dp_signal(signal))
-		configure_encoder(enc, engine, link_settings);
-
-	cntl.action = TRANSMITTER_CONTROL_ENABLE;
-	cntl.engine_id = engine;
-	cntl.transmitter = enc->transmitter;
-	cntl.pll_id = clock_source;
-	cntl.signal = signal;
-	cntl.lanes_number = link_settings->lane_count;
-	cntl.hpd_sel = enc->hpd_source;
-	if (dc_is_dp_signal(signal))
-		cntl.pixel_clock = link_settings->link_rate
-						* LINK_RATE_REF_FREQ_IN_KHZ;
-	else
-		cntl.pixel_clock = pixel_clock;
-	cntl.color_depth = color_depth;
-
-	if (DELAY_AFTER_PIXEL_FORMAT_CHANGE)
-		dc_service_sleep_in_milliseconds(
-			enc->ctx,
-			DELAY_AFTER_PIXEL_FORMAT_CHANGE);
-
-	dal_bios_parser_transmitter_control(
-		dal_adapter_service_get_bios_parser(
-			enc->adapter_service),
-		&cntl);
-
-	return ENCODER_RESULT_OK;
-}
-
 static bool is_dig_enabled(const struct link_encoder *link_enc)
 {
 	uint32_t value;
@@ -1268,70 +1032,6 @@ static void link_encoder_disable(struct link_encoder *link_enc)
 	dal_write_reg(link_enc->ctx, addr, value);
 }
 
-/*
- * @brief
- * Disable transmitter and its encoder
- */
-enum encoder_result dce110_link_encoder_disable_output(
-	struct link_encoder *link_enc,
-	enum signal_type signal)
-{
-	struct bp_transmitter_control cntl = { 0 };
-
-	if (link_enc->connector.id == CONNECTOR_ID_EDP) {
-		/* have to turn off the backlight
-		 * before power down eDP panel */
-		link_encoder_edp_backlight_control(
-				link_enc, false);
-	}
-
-	if (!is_dig_enabled(link_enc) &&
-		dal_adapter_service_should_optimize(link_enc->adapter_service,
-					OF_SKIP_POWER_DOWN_INACTIVE_ENCODER)) {
-		return ENCODER_RESULT_OK;
-	}
-	/* Power-down RX and disable GPU PHY should be paired.
-	 * Disabling PHY without powering down RX may cause
-	 * symbol lock loss, on which we will get DP Sink interrupt. */
-
-	/* There is a case for the DP active dongles
-	 * where we want to disable the PHY but keep RX powered,
-	 * for those we need to ignore DP Sink interrupt
-	 * by checking lane count that has been set
-	 * on the last do_enable_output(). */
-
-	/* disable transmitter */
-	cntl.action = TRANSMITTER_CONTROL_DISABLE;
-	cntl.transmitter = link_enc->transmitter;
-	cntl.hpd_sel = link_enc->hpd_source;
-	cntl.signal = signal;
-	cntl.connector_obj_id = link_enc->connector;
-
-	dal_bios_parser_transmitter_control(
-		dal_adapter_service_get_bios_parser(
-			link_enc->adapter_service), &cntl);
-
-	/* disable encoder */
-	if (dc_is_dp_signal(signal))
-		link_encoder_disable(link_enc);
-
-	if (link_enc->connector.id == CONNECTOR_ID_EDP) {
-		/* power down eDP panel */
-		/* TODO: Power control cause regression, we should implement
-		 * it properly, for now just comment it.
-		 *
-		 * link_encoder_edp_wait_for_hpd_ready(
-			link_enc,
-			link_enc->connector,
-			false);
-
-		 * link_encoder_edp_power_control(
-				link_enc, false); */
-	}
-
-	return ENCODER_RESULT_OK;
-}
-
 static void hpd_initialize(
 	struct link_encoder *enc,
 	enum hpd_source_id hpd_source)
@@ -1343,65 +1043,6 @@ static void hpd_initialize(
 	set_reg_field_value(value, hpd_source, DIG_BE_CNTL, DIG_HPD_SELECT);
 	dal_write_reg(enc->ctx, addr, value);
 }
-
-enum encoder_result dce110_link_encoder_power_up(
-	struct link_encoder *enc)
-{
-	struct bp_transmitter_control cntl = { 0 };
-
-	enum bp_result result;
-
-	cntl.action = TRANSMITTER_CONTROL_INIT;
-	cntl.engine_id = ENGINE_ID_UNKNOWN;
-	cntl.transmitter = enc->transmitter;
-	cntl.connector_obj_id = enc->connector;
-	cntl.lanes_number = LANE_COUNT_FOUR;
-	cntl.coherent = false;
-	cntl.hpd_sel = enc->hpd_source;
-
-	result = dal_bios_parser_transmitter_control(
-		dal_adapter_service_get_bios_parser(
-			enc->adapter_service),
-		&cntl);
-
-	if (result != BP_RESULT_OK) {
-		dal_logger_write(enc->ctx->logger,
-			LOG_MAJOR_ERROR,
-			LOG_MINOR_COMPONENT_ENCODER,
-			"%s: Failed to execute VBIOS command table!\n",
-			__func__);
-		BREAK_TO_DEBUGGER();
-		return ENCODER_RESULT_ERROR;
-	}
-
-	if (enc->connector.id == CONNECTOR_ID_LVDS) {
-		cntl.action = TRANSMITTER_CONTROL_BACKLIGHT_BRIGHTNESS;
-
-		result = dal_bios_parser_transmitter_control(
-			dal_adapter_service_get_bios_parser(
-				enc->adapter_service),
-			&cntl);
-		ASSERT(result == BP_RESULT_OK);
-
-	} else if (enc->connector.id == CONNECTOR_ID_EDP) {
-		link_encoder_edp_power_control(enc, true);
-
-		link_encoder_edp_wait_for_hpd_ready(
-			enc, enc->connector, true);
-
-	}
-	aux_initialize(enc, enc->hpd_source);
-
-	/* reinitialize HPD.
-	 * hpd_initialize() will pass DIG_FE id to HW context.
-	 * All other routine within HW context will use fe_engine_offset
-	 * as DIG_FE id even caller pass DIG_FE id.
-	 * So this routine must be called first. */
-	hpd_initialize(enc, enc->hpd_source);
-
-	return ENCODER_RESULT_OK;
-}
-
 
 static bool validate_dvi_output(
 	const struct link_encoder *enc,
@@ -1569,6 +1210,31 @@ static bool validate_wireless_output(
 	return false;
 }
 
+struct link_encoder *dce110_link_encoder_create(
+	const struct encoder_init_data *init)
+{
+	struct link_encoder *enc =
+		dc_service_alloc(init->ctx, sizeof(struct link_encoder));
+
+	if (!enc)
+		goto enc_create_fail;
+
+	construct(enc, init);
+
+	return enc;
+
+enc_create_fail:
+	return NULL;
+}
+
+void dce110_link_encoder_destroy(struct link_encoder **enc)
+{
+	struct link_encoder *encoder = *enc;
+
+	dc_service_free(encoder->ctx, encoder);
+	*enc = NULL;
+}
+
 enum encoder_result dce110_link_encoder_validate_output_with_stream(
 	struct link_encoder *enc,
 	const struct core_stream *stream)
@@ -1614,6 +1280,340 @@ enum encoder_result dce110_link_encoder_validate_output_with_stream(
 	return is_valid ? ENCODER_RESULT_OK : ENCODER_RESULT_ERROR;
 }
 
+enum encoder_result dce110_link_encoder_power_up(
+	struct link_encoder *enc)
+{
+	struct bp_transmitter_control cntl = { 0 };
+
+	enum bp_result result;
+
+	cntl.action = TRANSMITTER_CONTROL_INIT;
+	cntl.engine_id = ENGINE_ID_UNKNOWN;
+	cntl.transmitter = enc->transmitter;
+	cntl.connector_obj_id = enc->connector;
+	cntl.lanes_number = LANE_COUNT_FOUR;
+	cntl.coherent = false;
+	cntl.hpd_sel = enc->hpd_source;
+
+	result = dal_bios_parser_transmitter_control(
+		dal_adapter_service_get_bios_parser(
+			enc->adapter_service),
+		&cntl);
+
+	if (result != BP_RESULT_OK) {
+		dal_logger_write(enc->ctx->logger,
+			LOG_MAJOR_ERROR,
+			LOG_MINOR_COMPONENT_ENCODER,
+			"%s: Failed to execute VBIOS command table!\n",
+			__func__);
+		BREAK_TO_DEBUGGER();
+		return ENCODER_RESULT_ERROR;
+	}
+
+	if (enc->connector.id == CONNECTOR_ID_LVDS) {
+		cntl.action = TRANSMITTER_CONTROL_BACKLIGHT_BRIGHTNESS;
+
+		result = dal_bios_parser_transmitter_control(
+			dal_adapter_service_get_bios_parser(
+				enc->adapter_service),
+			&cntl);
+		ASSERT(result == BP_RESULT_OK);
+
+	} else if (enc->connector.id == CONNECTOR_ID_EDP) {
+		link_encoder_edp_power_control(enc, true);
+
+		link_encoder_edp_wait_for_hpd_ready(
+			enc, enc->connector, true);
+
+	}
+	aux_initialize(enc, enc->hpd_source);
+
+	/* reinitialize HPD.
+	 * hpd_initialize() will pass DIG_FE id to HW context.
+	 * All other routine within HW context will use fe_engine_offset
+	 * as DIG_FE id even caller pass DIG_FE id.
+	 * So this routine must be called first. */
+	hpd_initialize(enc, enc->hpd_source);
+
+	return ENCODER_RESULT_OK;
+}
+
+void dce110_link_encoder_setup(
+	struct link_encoder *enc,
+	enum signal_type signal)
+{
+	const uint32_t addr = mmDIG_BE_CNTL + enc->be_engine_offset;
+	uint32_t value = dal_read_reg(enc->ctx, addr);
+
+	switch (signal) {
+	case SIGNAL_TYPE_EDP:
+	case SIGNAL_TYPE_DISPLAY_PORT:
+		/* DP SST */
+		set_reg_field_value(value, 0, DIG_BE_CNTL, DIG_MODE);
+		break;
+	case SIGNAL_TYPE_LVDS:
+		/* LVDS */
+		set_reg_field_value(value, 1, DIG_BE_CNTL, DIG_MODE);
+		break;
+	case SIGNAL_TYPE_DVI_SINGLE_LINK:
+	case SIGNAL_TYPE_DVI_DUAL_LINK:
+		/* TMDS-DVI */
+		set_reg_field_value(value, 2, DIG_BE_CNTL, DIG_MODE);
+		break;
+	case SIGNAL_TYPE_HDMI_TYPE_A:
+		/* TMDS-HDMI */
+		set_reg_field_value(value, 3, DIG_BE_CNTL, DIG_MODE);
+		break;
+	case SIGNAL_TYPE_DISPLAY_PORT_MST:
+		/* DP MST */
+		set_reg_field_value(value, 5, DIG_BE_CNTL, DIG_MODE);
+		break;
+	default:
+		ASSERT_CRITICAL(false);
+		/* invalid mode ! */
+		break;
+	}
+
+	dal_write_reg(enc->ctx, addr, value);
+}
+
+/*
+ * @brief
+ * Configure digital transmitter and enable both encoder and transmitter
+ * Actual output will be available after calling unblank()
+ */
+enum encoder_result dce110_link_encoder_enable_output(
+	struct link_encoder *enc,
+	const struct link_settings *link_settings,
+	enum engine_id engine,
+	enum clock_source_id clock_source,
+	enum signal_type signal,
+	enum dc_color_depth color_depth,
+	uint32_t pixel_clock)
+{
+	struct bp_transmitter_control cntl = { 0 };
+
+	if (enc->connector.id == CONNECTOR_ID_EDP) {
+		/* power up eDP panel */
+
+		link_encoder_edp_power_control(
+			enc, true);
+
+		link_encoder_edp_wait_for_hpd_ready(
+			enc, enc->connector, true);
+
+		/* have to turn off the backlight
+		 * before power down eDP panel */
+		link_encoder_edp_backlight_control(
+				enc, true);
+	}
+
+	/* Enable the PHY */
+
+	/* number_of_lanes is used for pixel clock adjust,
+	 * but it's not passed to asic_control.
+	 * We need to set number of lanes manually. */
+	if (dc_is_dp_signal(signal))
+		configure_encoder(enc, engine, link_settings);
+
+	cntl.action = TRANSMITTER_CONTROL_ENABLE;
+	cntl.engine_id = engine;
+	cntl.transmitter = enc->transmitter;
+	cntl.pll_id = clock_source;
+	cntl.signal = signal;
+	cntl.lanes_number = link_settings->lane_count;
+	cntl.hpd_sel = enc->hpd_source;
+	if (dc_is_dp_signal(signal))
+		cntl.pixel_clock = link_settings->link_rate
+						* LINK_RATE_REF_FREQ_IN_KHZ;
+	else
+		cntl.pixel_clock = pixel_clock;
+	cntl.color_depth = color_depth;
+
+	if (DELAY_AFTER_PIXEL_FORMAT_CHANGE)
+		dc_service_sleep_in_milliseconds(
+			enc->ctx,
+			DELAY_AFTER_PIXEL_FORMAT_CHANGE);
+
+	dal_bios_parser_transmitter_control(
+		dal_adapter_service_get_bios_parser(
+			enc->adapter_service),
+		&cntl);
+
+	return ENCODER_RESULT_OK;
+}
+
+/*
+ * @brief
+ * Disable transmitter and its encoder
+ */
+enum encoder_result dce110_link_encoder_disable_output(
+	struct link_encoder *link_enc,
+	enum signal_type signal)
+{
+	struct bp_transmitter_control cntl = { 0 };
+
+	if (link_enc->connector.id == CONNECTOR_ID_EDP) {
+		/* have to turn off the backlight
+		 * before power down eDP panel */
+		link_encoder_edp_backlight_control(
+				link_enc, false);
+	}
+
+	if (!is_dig_enabled(link_enc) &&
+		dal_adapter_service_should_optimize(link_enc->adapter_service,
+					OF_SKIP_POWER_DOWN_INACTIVE_ENCODER)) {
+		return ENCODER_RESULT_OK;
+	}
+	/* Power-down RX and disable GPU PHY should be paired.
+	 * Disabling PHY without powering down RX may cause
+	 * symbol lock loss, on which we will get DP Sink interrupt. */
+
+	/* There is a case for the DP active dongles
+	 * where we want to disable the PHY but keep RX powered,
+	 * for those we need to ignore DP Sink interrupt
+	 * by checking lane count that has been set
+	 * on the last do_enable_output(). */
+
+	/* disable transmitter */
+	cntl.action = TRANSMITTER_CONTROL_DISABLE;
+	cntl.transmitter = link_enc->transmitter;
+	cntl.hpd_sel = link_enc->hpd_source;
+	cntl.signal = signal;
+	cntl.connector_obj_id = link_enc->connector;
+
+	dal_bios_parser_transmitter_control(
+		dal_adapter_service_get_bios_parser(
+			link_enc->adapter_service), &cntl);
+
+	/* disable encoder */
+	if (dc_is_dp_signal(signal))
+		link_encoder_disable(link_enc);
+
+	if (link_enc->connector.id == CONNECTOR_ID_EDP) {
+		/* power down eDP panel */
+		/* TODO: Power control cause regression, we should implement
+		 * it properly, for now just comment it.
+		 *
+		 * link_encoder_edp_wait_for_hpd_ready(
+			link_enc,
+			link_enc->connector,
+			false);
+
+		 * link_encoder_edp_power_control(
+				link_enc, false); */
+	}
+
+	return ENCODER_RESULT_OK;
+}
+
+enum encoder_result dce110_link_encoder_dp_set_lane_settings(
+	struct link_encoder *enc,
+	const struct link_training_settings *link_settings)
+{
+	union dpcd_training_lane_set training_lane_set = { { 0 } };
+
+	int32_t lane = 0;
+
+	struct bp_transmitter_control cntl = { 0 };
+
+	if (!link_settings) {
+		BREAK_TO_DEBUGGER();
+		return ENCODER_RESULT_ERROR;
+	}
+
+	cntl.action = TRANSMITTER_CONTROL_SET_VOLTAGE_AND_PREEMPASIS;
+	cntl.transmitter = enc->transmitter;
+	cntl.connector_obj_id = enc->connector;
+	cntl.lanes_number = link_settings->link_settings.lane_count;
+	cntl.hpd_sel = enc->hpd_source;
+	cntl.pixel_clock = link_settings->link_settings.link_rate *
+						LINK_RATE_REF_FREQ_IN_KHZ;
+
+	for (lane = 0; lane < link_settings->link_settings.lane_count; ++lane) {
+		/* translate lane settings */
+
+		training_lane_set.bits.VOLTAGE_SWING_SET =
+			link_settings->lane_settings[lane].VOLTAGE_SWING;
+		training_lane_set.bits.PRE_EMPHASIS_SET =
+			link_settings->lane_settings[lane].PRE_EMPHASIS;
+
+		/* post cursor 2 setting only applies to HBR2 link rate */
+		if (link_settings->link_settings.link_rate == LINK_RATE_HIGH2) {
+			/* this is passed to VBIOS
+			 * to program post cursor 2 level */
+
+			training_lane_set.bits.POST_CURSOR2_SET =
+				link_settings->lane_settings[lane].POST_CURSOR2;
+		}
+
+		cntl.lane_select = lane;
+		cntl.lane_settings = training_lane_set.raw;
+
+		/* call VBIOS table to set voltage swing and pre-emphasis */
+
+		dal_bios_parser_transmitter_control(
+			dal_adapter_service_get_bios_parser(
+				enc->adapter_service), &cntl);
+	}
+
+	return ENCODER_RESULT_OK;
+}
+
+void dce110_link_encoder_set_dp_phy_pattern(
+	struct link_encoder *enc,
+	const struct encoder_set_dp_phy_pattern_param *param)
+{
+	const int32_t offset = enc->be_engine_offset;
+
+
+	switch (param->dp_phy_pattern) {
+	case DP_TEST_PATTERN_TRAINING_PATTERN1:
+		set_dp_phy_pattern_training_pattern(enc->ctx,
+			offset, 0);
+		break;
+	case DP_TEST_PATTERN_TRAINING_PATTERN2:
+		set_dp_phy_pattern_training_pattern(enc->ctx,
+			offset, 1);
+		break;
+	case DP_TEST_PATTERN_TRAINING_PATTERN3:
+		set_dp_phy_pattern_training_pattern(enc->ctx,
+			offset, 2);
+		break;
+	case DP_TEST_PATTERN_D102:
+		set_dp_phy_pattern_d102(enc->ctx, offset);
+		break;
+	case DP_TEST_PATTERN_SYMBOL_ERROR:
+		set_dp_phy_pattern_symbol_error(enc->ctx, offset);
+		break;
+	case DP_TEST_PATTERN_PRBS7:
+		set_dp_phy_pattern_prbs7(enc->ctx, offset);
+		break;
+	case DP_TEST_PATTERN_80BIT_CUSTOM:
+		set_dp_phy_pattern_80bit_custom(
+				enc->ctx,
+			offset, param->custom_pattern);
+		break;
+	case DP_TEST_PATTERN_HBR2_COMPLIANCE_EYE:
+		set_dp_phy_pattern_hbr2_compliance(
+			enc, offset);
+		break;
+	case DP_TEST_PATTERN_VIDEO_MODE: {
+		set_dp_phy_pattern_passthrough_mode(
+			enc->ctx,
+			offset,
+			param->dp_panel_mode);
+		break;
+	}
+
+
+	default:
+		/* invalid phy pattern */
+		ASSERT_CRITICAL(false);
+		break;
+	}
+}
+
 /*
  * get_supported_stream_engines
  *
@@ -1640,6 +1640,128 @@ union supported_stream_engines dce110_get_supported_stream_engines(
 
 	return result;
 }
+
+void dce110_link_encoder_update_mst_stream_allocation_table(
+	struct link_encoder *enc,
+	const struct dp_mst_stream_allocation_table *table,
+	bool is_removal)
+{
+	int32_t addr_offset = enc->be_engine_offset;
+	uint32_t value0;
+	uint32_t value1;
+	uint32_t retries = 0;
+
+	/* For CZ, there are only 3 pipes. So Virtual channel is up 3.*/
+
+	/* --- Set MSE Stream Attribute -
+	 * Setup VC Payload Table on Tx Side,
+	 * Issue allocation change trigger
+	 * to commit payload on both tx and rx side */
+
+	value0 = dal_read_reg(enc->ctx, mmDP_MSE_SAT0 + addr_offset);
+	value1 = dal_read_reg(enc->ctx, mmDP_MSE_SAT1 + addr_offset);
+
+	if (table->stream_count >= 1) {
+		set_reg_field_value(
+			value0,
+			table->stream_allocations[0].engine,
+			DP_MSE_SAT0,
+			DP_MSE_SAT_SRC0);
+
+		set_reg_field_value(
+			value0,
+			table->stream_allocations[0].slot_count,
+			DP_MSE_SAT0,
+			DP_MSE_SAT_SLOT_COUNT0);
+	}
+
+	if (table->stream_count >= 2) {
+		set_reg_field_value(
+			value0,
+			table->stream_allocations[1].engine,
+			DP_MSE_SAT0,
+			DP_MSE_SAT_SRC1);
+
+		set_reg_field_value(
+			value0,
+			table->stream_allocations[1].slot_count,
+			DP_MSE_SAT0,
+			DP_MSE_SAT_SLOT_COUNT1);
+	}
+
+	if (table->stream_count >= 3) {
+		set_reg_field_value(
+			value1,
+			table->stream_allocations[2].engine,
+			DP_MSE_SAT1,
+			DP_MSE_SAT_SRC2);
+
+		set_reg_field_value(
+			value1,
+			table->stream_allocations[2].slot_count,
+			DP_MSE_SAT1,
+			DP_MSE_SAT_SLOT_COUNT2);
+	}
+
+	/* update ASIC MSE stream allocation table */
+	dal_write_reg(enc->ctx, mmDP_MSE_SAT0 + addr_offset, value0);
+	dal_write_reg(enc->ctx, mmDP_MSE_SAT1 + addr_offset, value1);
+
+	/* --- wait for transaction finish */
+
+	/* send allocation change trigger (ACT) ?
+	 * this step first sends the ACT,
+	 * then double buffers the SAT into the hardware
+	 * making the new allocation active on the DP MST mode link */
+
+	value0 = dal_read_reg(enc->ctx, mmDP_MSE_SAT_UPDATE + addr_offset);
+
+	/* DP_MSE_SAT_UPDATE:
+	 * 0 - No Action
+	 * 1 - Update SAT with trigger
+	 * 2 - Update SAT without trigger */
+
+	set_reg_field_value(
+		value0,
+		1,
+		DP_MSE_SAT_UPDATE,
+		DP_MSE_SAT_UPDATE);
+
+	dal_write_reg(enc->ctx, mmDP_MSE_SAT_UPDATE + addr_offset, value0);
+
+	/* wait for update to complete
+	 * (i.e. DP_MSE_SAT_UPDATE field is reset to 0)
+	 * then wait for the transmission
+	 * of at least 16 MTP headers on immediate local link.
+	 * i.e. DP_MSE_16_MTP_KEEPOUT field (read only) is reset to 0
+	 * a value of 1 indicates that DP MST mode
+	 * is in the 16 MTP keepout region after a VC has been added.
+	 * MST stream bandwidth (VC rate) can be configured
+	 * after this bit is cleared */
+
+	do {
+		dc_service_delay_in_microseconds(enc->ctx, 10);
+
+		value0 = dal_read_reg(enc->ctx,
+				mmDP_MSE_SAT_UPDATE + addr_offset);
+
+		value1 = get_reg_field_value(
+				value0,
+				DP_MSE_SAT_UPDATE,
+				DP_MSE_16_MTP_KEEPOUT);
+
+		/* bit field DP_MSE_SAT_UPDATE is set to 1 already */
+		if (value1)
+			break;
+		++retries;
+	} while (retries < DP_MST_UPDATE_MAX_RETRY);
+
+	/* TODO should not need. clean this after light up
+	 * if (is_removal)
+	 * dal_write_reg(enc->ctx, addr, value);
+	 */
+}
+
 
 void dce110_link_encoder_set_lcd_backlight_level(
 	struct link_encoder *enc,
@@ -1829,127 +1951,6 @@ void dce110_set_afmt_memory_power_state(
 	}
 
 	dal_write_reg(ctx, mmDCO_MEM_PWR_CTRL, value);
-}
-
-void dce110_link_encoder_update_mst_stream_allocation_table(
-	struct link_encoder *enc,
-	const struct dp_mst_stream_allocation_table *table,
-	bool is_removal)
-{
-	int32_t addr_offset = enc->be_engine_offset;
-	uint32_t value0;
-	uint32_t value1;
-	uint32_t retries = 0;
-
-	/* For CZ, there are only 3 pipes. So Virtual channel is up 3.*/
-
-	/* --- Set MSE Stream Attribute -
-	 * Setup VC Payload Table on Tx Side,
-	 * Issue allocation change trigger
-	 * to commit payload on both tx and rx side */
-
-	value0 = dal_read_reg(enc->ctx, mmDP_MSE_SAT0 + addr_offset);
-	value1 = dal_read_reg(enc->ctx, mmDP_MSE_SAT1 + addr_offset);
-
-	if (table->stream_count >= 1) {
-		set_reg_field_value(
-			value0,
-			table->stream_allocations[0].engine,
-			DP_MSE_SAT0,
-			DP_MSE_SAT_SRC0);
-
-		set_reg_field_value(
-			value0,
-			table->stream_allocations[0].slot_count,
-			DP_MSE_SAT0,
-			DP_MSE_SAT_SLOT_COUNT0);
-	}
-
-	if (table->stream_count >= 2) {
-		set_reg_field_value(
-			value0,
-			table->stream_allocations[1].engine,
-			DP_MSE_SAT0,
-			DP_MSE_SAT_SRC1);
-
-		set_reg_field_value(
-			value0,
-			table->stream_allocations[1].slot_count,
-			DP_MSE_SAT0,
-			DP_MSE_SAT_SLOT_COUNT1);
-	}
-
-	if (table->stream_count >= 3) {
-		set_reg_field_value(
-			value1,
-			table->stream_allocations[2].engine,
-			DP_MSE_SAT1,
-			DP_MSE_SAT_SRC2);
-
-		set_reg_field_value(
-			value1,
-			table->stream_allocations[2].slot_count,
-			DP_MSE_SAT1,
-			DP_MSE_SAT_SLOT_COUNT2);
-	}
-
-	/* update ASIC MSE stream allocation table */
-	dal_write_reg(enc->ctx, mmDP_MSE_SAT0 + addr_offset, value0);
-	dal_write_reg(enc->ctx, mmDP_MSE_SAT1 + addr_offset, value1);
-
-	/* --- wait for transaction finish */
-
-	/* send allocation change trigger (ACT) ?
-	 * this step first sends the ACT,
-	 * then double buffers the SAT into the hardware
-	 * making the new allocation active on the DP MST mode link */
-
-	value0 = dal_read_reg(enc->ctx, mmDP_MSE_SAT_UPDATE + addr_offset);
-
-	/* DP_MSE_SAT_UPDATE:
-	 * 0 - No Action
-	 * 1 - Update SAT with trigger
-	 * 2 - Update SAT without trigger */
-
-	set_reg_field_value(
-		value0,
-		1,
-		DP_MSE_SAT_UPDATE,
-		DP_MSE_SAT_UPDATE);
-
-	dal_write_reg(enc->ctx, mmDP_MSE_SAT_UPDATE + addr_offset, value0);
-
-	/* wait for update to complete
-	 * (i.e. DP_MSE_SAT_UPDATE field is reset to 0)
-	 * then wait for the transmission
-	 * of at least 16 MTP headers on immediate local link.
-	 * i.e. DP_MSE_16_MTP_KEEPOUT field (read only) is reset to 0
-	 * a value of 1 indicates that DP MST mode
-	 * is in the 16 MTP keepout region after a VC has been added.
-	 * MST stream bandwidth (VC rate) can be configured
-	 * after this bit is cleared */
-
-	do {
-		dc_service_delay_in_microseconds(enc->ctx, 10);
-
-		value0 = dal_read_reg(enc->ctx,
-				mmDP_MSE_SAT_UPDATE + addr_offset);
-
-		value1 = get_reg_field_value(
-				value0,
-				DP_MSE_SAT_UPDATE,
-				DP_MSE_16_MTP_KEEPOUT);
-
-		/* bit field DP_MSE_SAT_UPDATE is set to 1 already */
-		if (value1)
-			break;
-		++retries;
-	} while (retries < DP_MST_UPDATE_MAX_RETRY);
-
-	/* TODO should not need. clean this after light up
-	 * if (is_removal)
-	 * dal_write_reg(enc->ctx, addr, value);
-	 */
 }
 
 void dce110_link_encoder_set_mst_bandwidth(
