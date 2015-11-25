@@ -624,7 +624,6 @@ bool dce110_construct_resource_pool(
 		struct stream_enc_init_data enc_init_data = { 0 };
 		/* TODO: rework fragile code*/
 		enc_init_data.stream_engine_id = i;
-		enc_init_data.adapter_service = adapter_serv;
 		enc_init_data.ctx = dc->ctx;
 		if (pool->stream_engines.u_all & 1 << i) {
 			pool->stream_enc[i] = dce110_stream_encoder_create(

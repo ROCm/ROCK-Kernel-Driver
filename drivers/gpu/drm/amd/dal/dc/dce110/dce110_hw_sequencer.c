@@ -634,10 +634,14 @@ static void update_bios_scratch_critical_state(struct adapter_service *as,
 
 static void update_info_frame(struct core_stream *stream)
 {
-	dce110_stream_encoder_update_info_packets(
-		stream->stream_enc,
-		stream->signal,
-		&stream->encoder_info_frame);
+	if (dc_is_hdmi_signal(stream->signal))
+		dce110_stream_encoder_update_hdmi_info_packets(
+			stream->stream_enc,
+			&stream->encoder_info_frame);
+	else if (dc_is_dp_signal(stream->signal))
+		dce110_stream_encoder_update_dp_info_packets(
+			stream->stream_enc,
+			&stream->encoder_info_frame);
 }
 
 
@@ -690,10 +694,15 @@ static void disable_stream(struct core_stream *stream)
 {
 	struct core_link *link = stream->sink->link;
 
-	dce110_stream_encoder_stop_info_packets(
-		stream->stream_enc,
-		stream->stream_enc->id,
-		stream->signal);
+	if (dc_is_hdmi_signal(stream->signal))
+		dce110_stream_encoder_stop_hdmi_info_packets(
+			stream->stream_enc->ctx,
+			stream->stream_enc->id);
+
+	if (dc_is_dp_signal(stream->signal))
+		dce110_stream_encoder_stop_dp_info_packets(
+			stream->stream_enc->ctx,
+			stream->stream_enc->id);
 
 	if (stream->audio) {
 		/* mute audio */
@@ -708,7 +717,9 @@ static void disable_stream(struct core_stream *stream)
 	}
 
 	/* blank at encoder level */
-	dce110_stream_encoder_blank(stream->stream_enc, stream->signal);
+	if (dc_is_dp_signal(stream->signal))
+		dce110_stream_encoder_dp_blank(stream->stream_enc);
+
 	dce110_link_encoder_connect_dig_be_to_fe(
 			link->link_enc,
 			stream->stream_enc->id,
@@ -725,8 +736,7 @@ static void unblank_stream(struct core_stream *stream,
 	params.crtc_timing.pixel_clock =
 		stream->public.timing.pix_clk_khz;
 	params.link_settings.link_rate = link_settings->link_rate;
-	params.signal = stream->signal;
-	dce110_stream_encoder_unblank(
+	dce110_stream_encoder_dp_unblank(
 		stream->stream_enc, &params);
 }
 
@@ -787,8 +797,7 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 
 	dce110_link_encoder_update_mst_stream_allocation_table(
 		link_encoder,
-		&table,
-		false);
+		&table);
 
 	dc_helpers_dp_mst_poll_for_allocation_change_trigger(
 			stream->ctx,
@@ -803,8 +812,8 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 			table.stream_allocations[0].pbn,
 			table.stream_allocations[0].pbn_per_slot);
 
-	dce110_link_encoder_set_mst_bandwidth(
-		link_encoder,
+	dce110_stream_encoder_set_mst_bandwidth(
+		stream_encoder,
 		stream_encoder->id,
 		avg_time_slots_per_mtp);
 
@@ -823,8 +832,8 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 	table.stream_count = 1;
 	table.stream_allocations[0].slot_count = 0;
 
-	dce110_link_encoder_set_mst_bandwidth(
-		link_encoder,
+	dce110_stream_encoder_set_mst_bandwidth(
+		stream_encoder,
 		stream_encoder->id,
 		avg_time_slots_per_mtp);
 
@@ -836,8 +845,7 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 
 	dce110_link_encoder_update_mst_stream_allocation_table(
 		link_encoder,
-		&table,
-		false);
+		&table);
 
 	dc_helpers_dp_mst_poll_for_allocation_change_trigger(
 			stream->ctx,
@@ -859,7 +867,6 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 {
 	struct core_stream *stream =
 			context->res_ctx.controller_ctx[controller_idx].stream;
-
 	struct output_pixel_processor *opp =
 		context->res_ctx.pool.opps[controller_idx];
 	bool timing_changed = context->res_ctx.controller_ctx[controller_idx]
@@ -921,14 +928,31 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 	dce110_link_encoder_setup(
 		stream->sink->link->link_enc,
 		stream->signal);
-	if (ENCODER_RESULT_OK != dce110_stream_encoder_setup(
+
+	if (!dc_is_dp_signal(stream->signal))
+		if (ENCODER_RESULT_OK != dce110_stream_encoder_setup(
+				stream->stream_enc,
+				&stream->public.timing,
+				stream->signal,
+				stream->audio != NULL)) {
+			BREAK_TO_DEBUGGER();
+			return DC_ERROR_UNEXPECTED;
+		}
+
+	if (dc_is_dp_signal(stream->signal))
+		dce110_stream_encoder_dp_set_stream_attribute(
 			stream->stream_enc,
-			&stream->public.timing,
-			stream->signal,
-			stream->audio != NULL)) {
-		BREAK_TO_DEBUGGER();
-		return DC_ERROR_UNEXPECTED;
-	}
+			&stream->public.timing);
+
+	if (dc_is_hdmi_signal(stream->signal))
+		dce110_stream_encoder_hdmi_set_stream_attribute(
+		stream->stream_enc,
+		&stream->public.timing);
+
+	if (dc_is_dvi_signal(stream->signal))
+		dce110_stream_encoder_dvi_set_stream_attribute(
+		stream->stream_enc,
+		&stream->public.timing);
 
 	if (stream->audio != NULL) {
 		if (AUDIO_RESULT_OK != dal_audio_setup(
@@ -968,7 +992,8 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 
 	}
 
-	unblank_stream(stream, &stream->sink->link->cur_link_settings);
+	if (dc_is_dp_signal(stream->signal))
+		unblank_stream(stream, &stream->sink->link->cur_link_settings);
 
 	return DC_OK;
 }
@@ -1810,7 +1835,8 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.destruct_resource_pool = dce110_destruct_resource_pool,
 	.validate_with_context = dce110_validate_with_context,
 	.validate_bandwidth = dce110_validate_bandwidth,
-	.set_afmt_memory_power_state = dce110_set_afmt_memory_power_state,
+	.set_afmt_memory_power_state =
+	  dce110_stream_encoder_set_afmt_memory_power_state,
 	.enable_display_pipe_clock_gating = dce110_enable_display_pipe_clock_gating,
 	.enable_display_power_gating = dce110_enable_display_power_gating,
 	.program_bw = dce110_program_bw

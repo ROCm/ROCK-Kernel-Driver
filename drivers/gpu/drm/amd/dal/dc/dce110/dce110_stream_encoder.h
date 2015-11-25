@@ -28,7 +28,6 @@
 
 struct stream_enc_init_data {
 	enum engine_id stream_engine_id;
-	struct adapter_service *adapter_service;
 	struct dc_context *ctx;
 };
 
@@ -37,27 +36,62 @@ struct stream_encoder *dce110_stream_encoder_create(
 
 void dce110_stream_encoder_destroy(struct stream_encoder **enc);
 
+/***** HW programming ***********/
 enum encoder_result dce110_stream_encoder_setup(
 	struct stream_encoder *enc,
 	struct dc_crtc_timing *crtc_timing,
 	enum signal_type signal,
 	bool enable_audio);
 
-void dce110_stream_encoder_update_info_packets(
-	struct stream_encoder *enc,
-	enum signal_type signal,
-	const struct encoder_info_frame *info_frame);
+void dce110_stream_encoder_stop_hdmi_info_packets(
+	struct dc_context *ctx,
+	enum engine_id engine);
 
-void dce110_stream_encoder_stop_info_packets(
+void dce110_stream_encoder_stop_dp_info_packets(
+	struct dc_context *ctx,
+	enum engine_id engine);
+
+
+/* setup stream encoder in dp mode */
+void dce110_stream_encoder_dp_set_stream_attribute(
+	struct stream_encoder *enc,
+	struct dc_crtc_timing *crtc_timing);
+
+/* setup stream encoder in hdmi mode */
+void dce110_stream_encoder_hdmi_set_stream_attribute(
+	struct stream_encoder *enc,
+	struct dc_crtc_timing *crtc_timing);
+
+/* setup stream encoder in dvi mode */
+void dce110_stream_encoder_dvi_set_stream_attribute(
+	struct stream_encoder *enc,
+	struct dc_crtc_timing *crtc_timing);
+
+/* set throttling for DP MST */
+void dce110_stream_encoder_set_mst_bandwidth(
 	struct stream_encoder *enc,
 	enum engine_id engine,
-	enum signal_type signal);
+	struct fixed31_32 avg_time_slots_per_mtp);
 
-enum encoder_result dce110_stream_encoder_blank(
+void dce110_stream_encoder_set_afmt_memory_power_state(
+	const struct dc_context *ctx,
+	enum engine_id id,
+	bool enable);
+
+void dce110_stream_encoder_update_hdmi_info_packets(
 	struct stream_encoder *enc,
-	enum signal_type signal);
+	const struct encoder_info_frame *info_frame);
 
-enum encoder_result dce110_stream_encoder_unblank(
+void dce110_stream_encoder_update_dp_info_packets(
+	struct stream_encoder *enc,
+	const struct encoder_info_frame *info_frame);
+
+/* output blank/idle stream to link encoder */
+void dce110_stream_encoder_dp_blank(
+	struct stream_encoder *enc);
+
+/* output video stream to link encoder */
+void dce110_stream_encoder_dp_unblank(
 	struct stream_encoder *enc,
 	const struct encoder_unblank_param *param);
 
