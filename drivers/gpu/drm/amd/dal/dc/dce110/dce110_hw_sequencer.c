@@ -897,7 +897,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 	}
 
 	/*TODO: mst support - use total stream count*/
-	dce110_allocate_dmif_buffer(stream->mi,
+	dce110_mem_input_allocate_dmif_buffer(stream->mi,
 			&stream->public.timing,
 			context->target_count);
 
@@ -1259,17 +1259,17 @@ static void set_displaymarks(
 		for (j = 0; j < target->stream_count; j++) {
 			struct core_stream *stream = target->streams[j];
 
-			dce110_program_nbp_watermark(
+			dce110_mem_input_program_nbp_watermark(
 				stream->mi,
 				context->bw_results
 				.nbp_state_change_watermark[total_streams]);
 
-			dce110_program_stutter_watermark(
+			dce110_mem_input_program_stutter_watermark(
 				stream->mi,
 				context->bw_results
 					.stutter_exit_watermark[total_streams]);
 
-			dce110_program_urgency_watermark(
+			dce110_mem_input_program_urgency_watermark(
 				stream->mi,
 				context->bw_results
 					.urgent_watermark[total_streams],
@@ -1293,7 +1293,7 @@ static void set_safe_displaymarks(struct validate_context *context)
 		for (j = 0; j < target->stream_count; j++) {
 			struct core_stream *stream = target->streams[j];
 
-			dce110_program_safe_display_marks(stream->mi);
+			dce110_mem_input_program_safe_display_marks(stream->mi);
 		}
 	}
 }
@@ -1588,7 +1588,7 @@ static bool set_plane_config(
 			PIPE_LOCK_CONTROL_SURFACE,
 			true);
 
-	dce110_program_pix_dur(mi, dc_crtc_timing->pix_clk_khz);
+	dce110_mem_input_program_pix_dur(mi, dc_crtc_timing->pix_clk_khz);
 
 	dce110_timing_generator_program_blanking(tg, dc_crtc_timing);
 
@@ -1679,7 +1679,7 @@ static void reset_single_stream_hw_ctx(struct core_stream *stream,
 	core_link_disable(stream);
 	dce110_timing_generator_blank_crtc(stream->tg);
 	dce110_timing_generator_disable_crtc(stream->tg);
-	dce110_deallocate_dmif_buffer(stream->mi, context->target_count);
+	dce110_mem_input_deallocate_dmif_buffer(stream->mi, context->target_count);
 	dce110_transform_set_scaler_bypass(stream->xfm);
 	disable_stereo_mixer(stream->ctx);
 	unreference_clock_source(&context->res_ctx, stream->clock_source);
