@@ -55,6 +55,7 @@ static void construct(
 {
 	enc->ctx = init->ctx;
 	enc->id = init->stream_engine_id;
+	enc->adapter_service = init->adapter_service;
 }
 
 static void update_avi_info_packet(
