@@ -237,6 +237,7 @@ struct log_major_mask_info {
 		(1 << LOG_MINOR_HW_TRACE_HPD_IRQ)
 #define LG_HW_TR_PLANES_MSK (1 << LOG_MINOR_HW_TRACE_MPO)
 #define LG_ALL_MSK 0xffffffff
+#define LG_DCP_MSK ~(1 << LOG_MINOR_DCP_SCALER)
 
 #define LG_SYNC_MSK (1 << LOG_MINOR_SYNC_TIMING)
 
@@ -254,7 +255,7 @@ static const struct log_major_mask_info log_major_mask_info_tbl[] = {
 								hw_trace_minor_info_tbl,     NUM_ELEMENTS(hw_trace_minor_info_tbl)},
 	{{LOG_MAJOR_MST,             "MST"         }, LG_ALL_MSK, mst_minor_info_tbl,          NUM_ELEMENTS(mst_minor_info_tbl)},
 	{{LOG_MAJOR_DCS,             "DCS"         }, LG_ALL_MSK, dcs_minor_info_tbl,          NUM_ELEMENTS(dcs_minor_info_tbl)},
-	{{LOG_MAJOR_DCP,             "DCP"         }, LG_ALL_MSK, dcp_minor_info_tbl,          NUM_ELEMENTS(dcp_minor_info_tbl)},
+	{{LOG_MAJOR_DCP,             "DCP"         }, LG_DCP_MSK, dcp_minor_info_tbl,          NUM_ELEMENTS(dcp_minor_info_tbl)},
 	{{LOG_MAJOR_BIOS,            "Bios"        }, LG_ALL_MSK, bios_minor_info_tbl,         NUM_ELEMENTS(bios_minor_info_tbl)},
 	{{LOG_MAJOR_REGISTER,        "Register"    }, LG_ALL_MSK, reg_minor_info_tbl,          NUM_ELEMENTS(reg_minor_info_tbl)},
 	{{LOG_MAJOR_INFO_PACKETS,    "InfoPacket"  }, LG_ALL_MSK, info_packet_minor_info_tbl,  NUM_ELEMENTS(info_packet_minor_info_tbl)},

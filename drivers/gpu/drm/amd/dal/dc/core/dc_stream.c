@@ -168,5 +168,13 @@ alloc_fail:
 	return NULL;
 }
 
+void dc_update_stream(const struct dc_stream *dc_stream,
+		struct rect *src,
+		struct rect *dst)
+{
+	struct core_stream *stream = DC_STREAM_TO_CORE(dc_stream);
 
+	stream->public.src = *src;
+	stream->public.dst = *dst;
+}
 

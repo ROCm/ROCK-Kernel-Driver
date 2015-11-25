@@ -568,9 +568,59 @@ struct amdgpu_connector *aconnector_from_drm_crtc_id(
 	return NULL;
 }
 
+static void calculate_stream_scaling_settings(
+		const struct drm_display_mode *mode,
+		const struct dc_stream *stream,
+		struct dm_connector_state *dm_state)
+{
+	enum amdgpu_rmx_type rmx_type;
+
+	struct rect src = { 0 }; /* viewport in target space*/
+	struct rect dst = { 0 }; /* stream addressable area */
+
+	/* Full screen scaling by default */
+	src.width = mode->hdisplay;
+	src.height = mode->vdisplay;
+	dst.width = stream->timing.h_addressable;
+	dst.height = stream->timing.v_addressable;
+
+	rmx_type = dm_state->scaling;
+	if (rmx_type == RMX_ASPECT || rmx_type == RMX_OFF) {
+		if (src.width * dst.height <
+				src.height * dst.width) {
+			/* height needs less upscaling/more downscaling */
+			dst.width = src.width *
+					dst.height / src.height;
+		} else {
+			/* width needs less upscaling/more downscaling */
+			dst.height = src.height *
+					dst.width / src.width;
+		}
+	} else if (rmx_type == RMX_CENTER) {
+		dst = src;
+	}
+
+	dst.x = (stream->timing.h_addressable - dst.width) / 2;
+	dst.y = (stream->timing.v_addressable - dst.height) / 2;
+
+	if (dm_state->underscan_enable) {
+		dst.x += dm_state->underscan_hborder / 2;
+		dst.y += dm_state->underscan_vborder / 2;
+		dst.width -= dm_state->underscan_hborder;
+		dst.height -= dm_state->underscan_vborder;
+	}
+
+	dc_update_stream(stream, &src, &dst);
+
+	DRM_DEBUG_KMS("Destination Rectangle x:%d  y:%d  width:%d  height:%d\n",
+			dst.x, dst.y, dst.width, dst.height);
+
+}
+
 static void dm_dc_surface_commit(
 		struct dc *dc,
-		struct drm_crtc *crtc)
+		struct drm_crtc *crtc,
+		struct dm_connector_state *dm_state)
 {
 	struct dc_surface *dc_surface;
 	const struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
@@ -593,8 +643,11 @@ static void dm_dc_surface_commit(
 		goto fail;
 	}
 
-	/* Surface programming */
+	calculate_stream_scaling_settings(&crtc->state->mode,
+			dc_target->streams[0],
+			dm_state);
 
+	/* Surface programming */
 	fill_plane_attributes(dc_surface, crtc);
 	if (crtc->mode.private_flags &
 		AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET) {
@@ -753,47 +806,6 @@ static void fill_audio_info(
 /*TODO: move these defines elsewhere*/
 #define DAL_MAX_CONTROLLERS 4
 
-static void calculate_stream_scaling_settings(
-		const struct drm_display_mode *mode,
-		enum amdgpu_rmx_type rmx_type,
-		struct dc_stream *stream,
-		uint8_t underscan_vborder,
-		uint8_t underscan_hborder,
-		bool underscan_enable)
-{
-	/* Full screen scaling by default */
-	stream->src.width = mode->hdisplay;
-	stream->src.height = mode->vdisplay;
-	stream->dst.width = stream->timing.h_addressable;
-	stream->dst.height = stream->timing.v_addressable;
-
-	if (rmx_type == RMX_ASPECT || rmx_type == RMX_OFF) {
-		if (stream->src.width * stream->dst.height <
-				stream->src.height * stream->dst.width) {
-			/* height needs less upscaling/more downscaling */
-			stream->dst.width = stream->src.width *
-					stream->dst.height / stream->src.height;
-		} else {
-			/* width needs less upscaling/more downscaling */
-			stream->dst.height = stream->src.height *
-					stream->dst.width / stream->src.width;
-		}
-	} else if (rmx_type == RMX_CENTER) {
-		stream->dst = stream->src;
-	}
-
-	stream->dst.x = (stream->timing.h_addressable - stream->dst.width) / 2;
-	stream->dst.y = (stream->timing.v_addressable - stream->dst.height) / 2;
-
-	if (underscan_enable) {
-		stream->dst.x += underscan_hborder / 2;
-		stream->dst.y += underscan_vborder / 2;
-		stream->dst.width -= underscan_hborder;
-		stream->dst.height -= underscan_vborder;
-	}
-}
-
-
 static void copy_crtc_timing_for_drm_display_mode(
 		const struct drm_display_mode *src_mode,
 		struct drm_display_mode *dst_mode)
@@ -876,12 +888,6 @@ static struct dc_target *create_target_for_sink(
 
 	dc_timing_from_drm_display_mode(&stream->timing,
 			&mode, &aconnector->base);
-
-	calculate_stream_scaling_settings(&mode, dm_state->scaling, stream,
-			dm_state->underscan_vborder,
-			dm_state->underscan_hborder,
-			dm_state->underscan_enable);
-
 
 	fill_audio_info(
 		&stream->audio_info,
@@ -1079,8 +1085,6 @@ int amdgpu_dm_connector_atomic_set_property(
 			if (crtc == state->crtc) {
 				struct drm_plane_state *plane_state;
 
-				new_crtc_state->mode_changed = true;
-
 				/*
 				 * Bit of magic done here. We need to ensure
 				 * that planes get update after mode is set.
@@ -1122,6 +1126,9 @@ void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector)
 
 	if (state) {
 		state->scaling = RMX_OFF;
+		state->underscan_enable = false;
+		state->underscan_hborder = 0;
+		state->underscan_vborder = 0;
 
 		connector->state = &state->base;
 		connector->state->connector = connector;
@@ -2180,10 +2187,10 @@ int amdgpu_dm_atomic_commit(
 		struct drm_plane_state *plane_state = plane->state;
 		struct drm_crtc *crtc = plane_state->crtc;
 		struct drm_framebuffer *fb = plane_state->fb;
+		struct drm_connector *connector;
 
-		if (fb && crtc) {
-			if (!crtc->state->planes_changed)
-				continue;
+		if (fb && crtc && crtc->state->planes_changed) {
+			struct dm_connector_state *dm_state = NULL;
 
 			if (page_flip_needed(
 				plane_state,
@@ -2193,8 +2200,20 @@ int amdgpu_dm_atomic_commit(
 					fb,
 					crtc->state->event,
 					0);
-			else
-				dm_dc_surface_commit(dm->dc, crtc);
+			else {
+				list_for_each_entry(connector,
+						&dev->mode_config.connector_list, head)	{
+					if (connector->state->crtc == crtc) {
+						dm_state = to_dm_connector_state(connector->state);
+						break;
+					}
+				}
+
+				dm_dc_surface_commit(
+					dm->dc,
+					crtc,
+					dm_state);
+			}
 		}
 	}
 

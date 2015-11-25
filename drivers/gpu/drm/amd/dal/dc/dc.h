@@ -258,6 +258,9 @@ struct dc_stream *dc_create_stream_for_sink(const struct dc_sink *dc_sink);
 void dc_stream_retain(struct dc_stream *dc_stream);
 void dc_stream_release(struct dc_stream *dc_stream);
 
+void dc_update_stream(const struct dc_stream *dc_stream,
+		struct rect *src, struct rect *dst);
+
 /*******************************************************************************
  * Link Interfaces
  ******************************************************************************/

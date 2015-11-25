@@ -330,6 +330,27 @@ void build_scaling_params(
 		stream->taps.v_taps_c = 1;
 	else
 		stream->taps.v_taps_c = surface->scaling_quality.v_taps_c;
+
+	dal_logger_write(stream->ctx->logger,
+				LOG_MAJOR_DCP,
+				LOG_MINOR_DCP_SCALER,
+				"%s: Overscan:\n bot:%d left:%d right:%d "
+				"top:%d\nViewport:\nheight:%d width:%d x:%d "
+				"y:%d\n dst_rect:\nheight:%d width:%d x:%d "
+				"y:%d\n",
+				__func__,
+				stream->overscan.bottom,
+				stream->overscan.left,
+				stream->overscan.right,
+				stream->overscan.top,
+				stream->viewport.height,
+				stream->viewport.width,
+				stream->viewport.x,
+				stream->viewport.y,
+				surface->dst_rect.height,
+				surface->dst_rect.width,
+				surface->dst_rect.x,
+				surface->dst_rect.y);
 }
 
 void build_scaling_params_for_context(
