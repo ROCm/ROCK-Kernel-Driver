@@ -263,6 +263,65 @@ error_unlock:
 	return r;
 }
 
+static int amdgpu_gem_get_handle_from_object(struct drm_file *filp,
+					     struct drm_gem_object *obj)
+{
+	int i;
+	struct drm_gem_object *tmp;
+	spin_lock(&filp->table_lock);
+	idr_for_each_entry(&filp->object_idr, tmp, i) {
+		if (obj == tmp) {
+			drm_gem_object_reference(obj);
+			spin_unlock(&filp->table_lock);
+			return i;
+		}
+	}
+	spin_unlock(&filp->table_lock);
+	return 0;
+}
+
+
+int amdgpu_gem_find_bo_by_cpu_mapping_ioctl(struct drm_device *dev, void *data,
+					    struct drm_file *filp)
+{
+	struct drm_amdgpu_gem_find_bo *args = data;
+	struct drm_gem_object *gobj;
+	struct amdgpu_bo *bo;
+	struct ttm_buffer_object *tbo;
+	struct vm_area_struct *vma;
+	uint32_t handle;
+	int r;
+
+	if (offset_in_page(args->addr | args->size))
+		return -EINVAL;
+
+	down_read(&current->mm->mmap_sem);
+	vma = find_vma(current->mm, args->addr);
+	if (!vma || vma->vm_file != filp->filp ||
+	    (args->size > (vma->vm_end - args->addr))) {
+		args->handle = 0;
+		up_read(&current->mm->mmap_sem);
+		return -EINVAL;
+	}
+	tbo = vma->vm_private_data;
+	bo = container_of(tbo, struct amdgpu_bo, tbo);
+	amdgpu_bo_ref(bo);
+	gobj = &bo->gem_base;
+	handle = amdgpu_gem_get_handle_from_object(filp, gobj);
+	if (handle == 0) {
+		r = drm_gem_handle_create(filp, gobj, &handle);
+		if (r) {
+			DRM_ERROR("create gem handle failed\n");
+			up_read(&current->mm->mmap_sem);
+			return r;
+		}
+	}
+	args->handle = handle;
+	args->offset = args->addr - vma->vm_start;
+	up_read(&current->mm->mmap_sem);
+	return 0;
+}
+
 int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 			     struct drm_file *filp)
 {

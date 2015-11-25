@@ -1210,6 +1210,8 @@ int amdgpu_gem_info_ioctl(struct drm_device *dev, void *data,
 			  struct drm_file *filp);
 int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 			struct drm_file *filp);
+int amdgpu_gem_find_bo_by_cpu_mapping_ioctl(struct drm_device *dev, void *data,
+					    struct drm_file *filp);
 int amdgpu_gem_mmap_ioctl(struct drm_device *dev, void *data,
 			  struct drm_file *filp);
 int amdgpu_gem_wait_idle_ioctl(struct drm_device *dev, void *data,

@@ -55,6 +55,7 @@ extern "C" {
 
 /* hybrid specific ioctls */
 #define DRM_AMDGPU_GEM_DGMA            0x5c
+#define DRM_AMDGPU_GEM_FIND_BO		0x5f
 
 #define DRM_IOCTL_AMDGPU_GEM_CREATE	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_CREATE, union drm_amdgpu_gem_create)
 #define DRM_IOCTL_AMDGPU_GEM_MMAP	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_MMAP, union drm_amdgpu_gem_mmap)
@@ -73,6 +74,7 @@ extern "C" {
 
 /* hybrid specific ioctls */
 #define DRM_IOCTL_AMDGPU_GEM_DGMA	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_DGMA, struct drm_amdgpu_gem_dgma)
+#define DRM_IOCTL_AMDGPU_GEM_FIND_BO	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_FIND_BO, struct drm_amdgpu_gem_find_bo)
 
 #define AMDGPU_GEM_DOMAIN_CPU		0x1
 #define AMDGPU_GEM_DOMAIN_GTT		0x2
@@ -230,6 +232,15 @@ struct drm_amdgpu_gem_dgma {
 	__u64		size;
 	__u32		op;
 	__u32		handle;
+};
+struct drm_amdgpu_gem_find_bo {
+	uint64_t		addr;
+	uint64_t		size;
+	uint32_t		flags;
+	/* Resulting GEM handle */
+	uint32_t		handle;
+	/* offset in bo */
+	uint64_t		offset;
 };
 
 /* same meaning as the GB_TILE_MODE and GL_MACRO_TILE_MODE fields */
