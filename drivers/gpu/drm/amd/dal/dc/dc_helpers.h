@@ -1,0 +1,75 @@
+/*
+ * Copyright 2012-15 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE COPYRIGHT HOLDER(S) OR AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Authors: AMD
+ *
+ */
+
+/**
+ * This file defines helper functions provided by the Display Manager to
+ * Display Core.
+ */
+#ifndef __DC_HELPERS__
+#define __DC_HELPERS__
+
+#include "dc_types.h"
+#include "dc.h"
+
+enum dc_edid_status dc_helpers_parse_edid_caps(
+	struct dc_context *ctx,
+	const struct dc_edid *edid,
+	struct dc_edid_caps *edid_caps);
+
+/*
+ * Writes payload allocation table in immediate downstream device.
+ */
+bool dc_helpers_dp_mst_write_payload_allocation_table(
+		struct dc_context *ctx,
+		const struct dc_sink *sink,
+		struct dp_mst_stream_allocation *alloc_entity,
+		bool enable);
+
+/*
+ * Polls for ACT (allocation change trigger) handled and
+ */
+bool dc_helpers_dp_mst_poll_for_allocation_change_trigger(
+		struct dc_context *ctx,
+		const struct dc_sink *sink);
+/*
+ * Sends ALLOCATE_PAYLOAD message.
+ */
+bool dc_helpers_dp_mst_send_payload_allocation(
+		struct dc_context *ctx,
+		const struct dc_sink *sink,
+		bool enable);
+
+void dc_helpers_dp_mst_handle_mst_hpd_rx_irq(
+		void *param);
+
+bool dc_helpers_dp_mst_start_top_mgr(
+		struct dc_context *ctx,
+		const struct dc_link *link);
+
+void dc_helpers_dp_mst_stop_top_mgr(
+		struct dc_context *ctx,
+		const struct dc_link *link);
+
+#endif /* __DC_HELPERS__ */
