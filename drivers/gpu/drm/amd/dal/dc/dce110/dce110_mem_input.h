@@ -48,6 +48,34 @@ struct mem_input *dce110_mem_input_create(
 
 void dce110_mem_input_destroy(struct mem_input **mem_input);
 
+void dce110_mem_input_program_safe_display_marks(struct mem_input *mi);
+
+void dce110_mem_input_program_nbp_watermark(
+	struct mem_input *mem_input,
+	struct bw_watermarks marks);
+
+void dce110_mem_input_program_stutter_watermark(
+	struct mem_input *mem_input,
+	struct bw_watermarks marks);
+
+void dce110_mem_input_program_urgency_watermark(
+	struct mem_input *mem_input,
+	struct bw_watermarks marks,
+	uint32_t h_total,
+	uint32_t pixel_clk_in_khz,
+	uint32_t pstate_blackout_duration_ns);
+
+void dce110_mem_input_allocate_dmif_buffer(
+		struct mem_input *mem_input,
+		struct dc_crtc_timing *timing,
+		uint32_t paths_num);
+
+void dce110_mem_input_deallocate_dmif_buffer(
+	struct mem_input *mem_input, uint32_t paths_num);
+
+void dce110_mem_input_program_pix_dur(
+	struct mem_input *mem_input, uint32_t pix_clk_khz);
+
 bool dce110_mem_input_program_surface_flip_and_addr(
 	struct mem_input *mem_input,
 	const struct dc_plane_address *address,
@@ -57,32 +85,5 @@ bool  dce110_mem_input_program_surface_config(
 	struct mem_input *mem_input,
 	const struct dc_surface *surface);
 
-void dce110_program_nbp_watermark(
-	struct mem_input *mem_input,
-	struct bw_watermarks marks);
-
-void dce110_program_stutter_watermark(
-	struct mem_input *mem_input,
-	struct bw_watermarks marks);
-
-void dce110_program_urgency_watermark(
-	struct mem_input *mem_input,
-	struct bw_watermarks marks,
-	uint32_t h_total,
-	uint32_t pixel_clk_in_khz,
-	uint32_t pstate_blackout_duration_ns);
-
-void dce110_program_safe_display_marks(struct mem_input *mi);
-
-void dce110_allocate_dmif_buffer(
-		struct mem_input *mem_input,
-		struct dc_crtc_timing *timing,
-		uint32_t paths_num);
-
-void dce110_deallocate_dmif_buffer(
-	struct mem_input *mem_input, uint32_t paths_num);
-
-void dce110_program_pix_dur(
-	struct mem_input *mem_input, uint32_t pix_clk_khz);
 
 #endif

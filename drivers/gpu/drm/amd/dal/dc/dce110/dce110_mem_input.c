@@ -533,7 +533,7 @@ static void program_urgency_watermark(
 	dal_write_reg(ctx, urgency_addr, urgency_cntl);
 }
 
-void dce110_program_stutter_watermark(
+void dce110_mem_input_program_stutter_watermark(
 	struct mem_input *mi,
 	struct bw_watermarks marks)
 {
@@ -599,7 +599,7 @@ void dce110_program_stutter_watermark(
 	dal_write_reg(ctx, stutter_addr, stutter_cntl);
 }
 
-void dce110_program_nbp_watermark(
+void dce110_mem_input_program_nbp_watermark(
 	struct mem_input *mi,
 	struct bw_watermarks marks)
 {
@@ -684,7 +684,7 @@ void dce110_program_nbp_watermark(
 	dal_write_reg(ctx, addr, value);
 }
 
-void dce110_program_safe_display_marks(struct mem_input *mi)
+void dce110_mem_input_program_safe_display_marks(struct mem_input *mi)
 {
 	struct dce110_mem_input *bm_dce110 = TO_DCE110_MEM_INPUT(mi);
 	struct bw_watermarks max_marks = { MAX_WATERMARK, MAX_WATERMARK };
@@ -692,12 +692,12 @@ void dce110_program_safe_display_marks(struct mem_input *mi)
 
 	program_urgency_watermark(
 		mi->ctx, bm_dce110->offsets.dmif, max_marks, MAX_WATERMARK);
-	dce110_program_stutter_watermark(mi, max_marks);
-	dce110_program_nbp_watermark(mi, nbp_marks);
+	dce110_mem_input_program_stutter_watermark(mi, max_marks);
+	dce110_mem_input_program_nbp_watermark(mi, nbp_marks);
 
 }
 
-void dce110_program_urgency_watermark(
+void dce110_mem_input_program_urgency_watermark(
 	struct mem_input *mi,
 	struct bw_watermarks marks,
 	uint32_t h_total,
@@ -758,7 +758,7 @@ static uint32_t get_dmif_switch_time_us(struct dc_crtc_timing *timing)
 	return frame_time;
 }
 
-void dce110_allocate_dmif_buffer(
+void dce110_mem_input_allocate_dmif_buffer(
 		struct mem_input *mi,
 		struct dc_crtc_timing *timing,
 		uint32_t paths_num)
@@ -863,7 +863,8 @@ static void deallocate_dmif_buffer_helper(
 			DMIF_BUFFERS_ALLOCATION_COMPLETED));
 }
 
-void dce110_deallocate_dmif_buffer(struct mem_input *mi, uint32_t paths_num)
+void dce110_mem_input_deallocate_dmif_buffer(
+	struct mem_input *mi, uint32_t paths_num)
 {
 	struct dce110_mem_input *bm_dce110 = TO_DCE110_MEM_INPUT(mi);
 	uint32_t value;
@@ -896,7 +897,8 @@ void dce110_deallocate_dmif_buffer(struct mem_input *mi, uint32_t paths_num)
 	dal_write_reg(mi->ctx, mmMC_HUB_RDREQ_DMIF_LIMIT, value);
 }
 
-void dce110_program_pix_dur(struct mem_input *mi, uint32_t pix_clk_khz)
+void dce110_mem_input_program_pix_dur(
+	struct mem_input *mi, uint32_t pix_clk_khz)
 {
 	uint64_t pix_dur;
 	uint32_t addr = mmDMIF_PG0_DPG_PIPE_ARBITRATION_CONTROL1
