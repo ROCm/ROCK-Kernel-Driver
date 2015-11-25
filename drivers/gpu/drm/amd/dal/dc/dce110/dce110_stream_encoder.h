@@ -28,6 +28,7 @@
 
 struct stream_enc_init_data {
 	enum engine_id stream_engine_id;
+	struct adapter_service *adapter_service;
 	struct dc_context *ctx;
 };
 
