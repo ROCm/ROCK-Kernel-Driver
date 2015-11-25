@@ -1597,7 +1597,7 @@ static int cz_dpm_set_deep_sleep_sclk_threshold(struct amdgpu_device *adev)
 	return 0;
 }
 
-/* ?? without dal support, is this still needed in setpowerstate list*/
+/* ?? without dc support, is this still needed in setpowerstate list*/
 static int cz_dpm_set_watermark_threshold(struct amdgpu_device *adev)
 {
 	struct cz_power_info *pi = cz_get_pi(adev);
@@ -1614,7 +1614,7 @@ static int cz_dpm_enable_nbdpm(struct amdgpu_device *adev)
 	int ret = 0;
 	struct cz_power_info *pi = cz_get_pi(adev);
 
-	/* also depend on dal NBPStateDisableRequired */
+	/* also depend on dc NBPStateDisableRequired */
 	if (pi->nb_dpm_enabled_by_driver && !pi->nb_dpm_enabled) {
 		ret = cz_send_msg_to_smc_with_parameter(adev,
 				PPSMC_MSG_EnableAllSmuFeatures,
@@ -2047,7 +2047,7 @@ static int cz_dpm_force_dpm_level(struct amdgpu_device *adev,
 }
 
 /* fix me, display configuration change lists here
- * mostly dal related*/
+ * mostly dc related*/
 static void cz_dpm_display_configuration_changed(struct amdgpu_device *adev)
 {
 }
