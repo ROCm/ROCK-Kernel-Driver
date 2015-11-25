@@ -134,7 +134,6 @@ struct encoder_pre_enable_output_param {
 struct encoder_unblank_param {
 	struct hw_crtc_timing crtc_timing;
 	struct link_settings link_settings;
-	enum signal_type signal;
 };
 
 /*

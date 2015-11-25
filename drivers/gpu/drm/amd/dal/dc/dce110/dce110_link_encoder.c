@@ -1377,69 +1377,39 @@ void dce110_link_encoder_setup(
 	dal_write_reg(enc->ctx, addr, value);
 }
 
-/*
- * @brief
- * Configure digital transmitter and enable both encoder and transmitter
- * Actual output will be available after calling unblank()
- */
-enum encoder_result dce110_link_encoder_enable_output(
+enum encoder_result dce110_link_encoder_enable_tmds_output(
 	struct link_encoder *enc,
-	const struct link_settings *link_settings,
-	enum engine_id engine,
 	enum clock_source_id clock_source,
-	enum signal_type signal,
 	enum dc_color_depth color_depth,
 	uint32_t pixel_clock)
 {
-	struct bp_transmitter_control cntl = { 0 };
+	return ENCODER_RESULT_OK;
+}
 
-	if (enc->connector.id == CONNECTOR_ID_EDP) {
-		/* power up eDP panel */
+enum encoder_result dce110_link_encoder_enable_dual_link_tmds_output(
+	struct link_encoder *enc,
+	enum clock_source_id clock_source,
+	enum dc_color_depth color_depth,
+	uint32_t pixel_clock)
+{
+	return ENCODER_RESULT_OK;
+}
 
-		link_encoder_edp_power_control(
-			enc, true);
+/* enables DP PHY output */
+enum encoder_result dce110_link_encoder_enable_dp_output(
+	struct link_encoder *enc,
+	const struct link_settings *link_settings,
+	enum clock_source_id clock_source)
+{
+	return ENCODER_RESULT_OK;
+}
 
-		link_encoder_edp_wait_for_hpd_ready(
-			enc, enc->connector, true);
-
-		/* have to turn off the backlight
-		 * before power down eDP panel */
-		link_encoder_edp_backlight_control(
-				enc, true);
-	}
-
-	/* Enable the PHY */
-
-	/* number_of_lanes is used for pixel clock adjust,
-	 * but it's not passed to asic_control.
-	 * We need to set number of lanes manually. */
-	if (dc_is_dp_signal(signal))
-		configure_encoder(enc, engine, link_settings);
-
-	cntl.action = TRANSMITTER_CONTROL_ENABLE;
-	cntl.engine_id = engine;
-	cntl.transmitter = enc->transmitter;
-	cntl.pll_id = clock_source;
-	cntl.signal = signal;
-	cntl.lanes_number = link_settings->lane_count;
-	cntl.hpd_sel = enc->hpd_source;
-	if (dc_is_dp_signal(signal))
-		cntl.pixel_clock = link_settings->link_rate
-						* LINK_RATE_REF_FREQ_IN_KHZ;
-	else
-		cntl.pixel_clock = pixel_clock;
-	cntl.color_depth = color_depth;
-
-	if (DELAY_AFTER_PIXEL_FORMAT_CHANGE)
-		dc_service_sleep_in_milliseconds(
-			enc->ctx,
-			DELAY_AFTER_PIXEL_FORMAT_CHANGE);
-
-	dal_bios_parser_transmitter_control(
-		dal_adapter_service_get_bios_parser(
-			enc->adapter_service),
-		&cntl);
-
+/* enables DP PHY output in MST mode */
+enum encoder_result dce110_link_encoder_enable_dp_mst_output(
+	struct link_encoder *enc,
+	const struct link_settings *link_settings,
+	enum clock_source_id clock_source)
+{
 	return ENCODER_RESULT_OK;
 }
 
@@ -1560,6 +1530,7 @@ enum encoder_result dce110_link_encoder_dp_set_lane_settings(
 	return ENCODER_RESULT_OK;
 }
 
+/* set DP PHY test and training patterns */
 void dce110_link_encoder_set_dp_phy_pattern(
 	struct link_encoder *enc,
 	const struct encoder_set_dp_phy_pattern_param *param)
@@ -1614,37 +1585,10 @@ void dce110_link_encoder_set_dp_phy_pattern(
 	}
 }
 
-/*
- * get_supported_stream_engines
- *
- * @brief
- * get a list of supported engine
- *
- * @param
- * const struct encoder_impl *enc - not used.
- *
- * @return
- * list of engines with supported ones enabled.
- */
-union supported_stream_engines dce110_get_supported_stream_engines(
-	const struct link_encoder *enc)
-{
-	union supported_stream_engines result = {.u_all = 0};
-
-	result.engine.ENGINE_ID_DIGA = 1;
-	result.engine.ENGINE_ID_DIGB = 1;
-	result.engine.ENGINE_ID_DIGC = 1;
-
-	if (enc->connector.id == CONNECTOR_ID_EDP /*|| wireless*/)
-		result.u_all = (1 << enc->preferred_engine);
-
-	return result;
-}
-
+/* programs DP MST VC payload allocation */
 void dce110_link_encoder_update_mst_stream_allocation_table(
 	struct link_encoder *enc,
-	const struct dp_mst_stream_allocation_table *table,
-	bool is_removal)
+	const struct dp_mst_stream_allocation_table *table)
 {
 	int32_t addr_offset = enc->be_engine_offset;
 	uint32_t value0;
@@ -1755,14 +1699,9 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 			break;
 		++retries;
 	} while (retries < DP_MST_UPDATE_MAX_RETRY);
-
-	/* TODO should not need. clean this after light up
-	 * if (is_removal)
-	 * dal_write_reg(enc->ctx, addr, value);
-	 */
 }
 
-
+/* black light programming */
 void dce110_link_encoder_set_lcd_backlight_level(
 	struct link_encoder *enc,
 	uint32_t level)
@@ -1895,125 +1834,70 @@ void dce110_link_encoder_set_lcd_backlight_level(
 	}
 }
 
-/*TODO: move to correct dce specific file*/
-/**
-* set_afmt_memory_power_state
-*
-* @brief
-*  Power up audio formatter memory that is mapped to specified DIG
-*/
-void dce110_set_afmt_memory_power_state(
-	const struct dc_context *ctx,
-	enum engine_id id,
-	bool enable)
-{
-	uint32_t value;
-	uint32_t mem_pwr_force;
-
-	value = dal_read_reg(ctx, mmDCO_MEM_PWR_CTRL);
-
-	if (enable)
-		mem_pwr_force = 0;
-	else
-		mem_pwr_force = 3;
-
-	/* force shutdown mode for appropriate AFMT memory */
-	switch (id) {
-	case ENGINE_ID_DIGA:
-		set_reg_field_value(
-			value,
-			mem_pwr_force,
-			DCO_MEM_PWR_CTRL,
-			HDMI0_MEM_PWR_FORCE);
-		break;
-	case ENGINE_ID_DIGB:
-		set_reg_field_value(
-			value,
-			mem_pwr_force,
-			DCO_MEM_PWR_CTRL,
-			HDMI1_MEM_PWR_FORCE);
-		break;
-	case ENGINE_ID_DIGC:
-		set_reg_field_value(
-			value,
-			mem_pwr_force,
-			DCO_MEM_PWR_CTRL,
-			HDMI2_MEM_PWR_FORCE);
-		break;
-	default:
-		dal_logger_write(
-			ctx->logger,
-			LOG_MAJOR_WARNING,
-			LOG_MINOR_COMPONENT_ENCODER,
-			"%s: Invalid Engine Id\n",
-			__func__);
-		break;
-	}
-
-	dal_write_reg(ctx, mmDCO_MEM_PWR_CTRL, value);
-}
-
-void dce110_link_encoder_set_mst_bandwidth(
+/*
+ * @brief
+ * Configure digital transmitter and enable both encoder and transmitter
+ * Actual output will be available after calling unblank()
+ */
+enum encoder_result dce110_link_encoder_enable_output(
 	struct link_encoder *enc,
+	const struct link_settings *link_settings,
 	enum engine_id engine,
-	struct fixed31_32 avg_time_slots_per_mtp)
+	enum clock_source_id clock_source,
+	enum signal_type signal,
+	enum dc_color_depth color_depth,
+	uint32_t pixel_clock)
 {
-	uint32_t x = dal_fixed31_32_floor(
-		avg_time_slots_per_mtp);
+	struct bp_transmitter_control cntl = { 0 };
 
-	uint32_t y = dal_fixed31_32_ceil(
-		dal_fixed31_32_shl(
-			dal_fixed31_32_sub_int(
-				avg_time_slots_per_mtp,
-				x),
-			26));
+	if (enc->connector.id == CONNECTOR_ID_EDP) {
+		/* power up eDP panel */
 
-	{
-		const uint32_t addr = mmDP_MSE_RATE_CNTL +
-				fe_engine_offsets[engine];
-		uint32_t value = dal_read_reg(enc->ctx, addr);
+		link_encoder_edp_power_control(
+			enc, true);
 
-		set_reg_field_value(
-			value,
-			x,
-			DP_MSE_RATE_CNTL,
-			DP_MSE_RATE_X);
+		link_encoder_edp_wait_for_hpd_ready(
+			enc, enc->connector, true);
 
-		set_reg_field_value(
-			value,
-			y,
-			DP_MSE_RATE_CNTL,
-			DP_MSE_RATE_Y);
-
-		dal_write_reg(enc->ctx, addr, value);
+		/* have to turn off the backlight
+		 * before power down eDP panel */
+		link_encoder_edp_backlight_control(
+				enc, true);
 	}
 
-	/* wait for update to be completed on the link
-	 * i.e. DP_MSE_RATE_UPDATE_PENDING field (read only)
-	 * is reset to 0 (not pending) */
-	{
-		const uint32_t addr = mmDP_MSE_RATE_UPDATE +
-			fe_engine_offsets[engine];
-		uint32_t value, field;
-		uint32_t retries = 0;
+	/* Enable the PHY */
 
-		do {
-			value = dal_read_reg(enc->ctx, addr);
+	/* number_of_lanes is used for pixel clock adjust,
+	 * but it's not passed to asic_control.
+	 * We need to set number of lanes manually. */
+	if (dc_is_dp_signal(signal))
+		configure_encoder(enc, engine, link_settings);
 
-			field = get_reg_field_value(
-					value,
-					DP_MSE_RATE_UPDATE,
-					DP_MSE_RATE_UPDATE_PENDING);
+	cntl.action = TRANSMITTER_CONTROL_ENABLE;
+	cntl.engine_id = engine;
+	cntl.transmitter = enc->transmitter;
+	cntl.pll_id = clock_source;
+	cntl.signal = signal;
+	cntl.lanes_number = link_settings->lane_count;
+	cntl.hpd_sel = enc->hpd_source;
+	if (dc_is_dp_signal(signal))
+		cntl.pixel_clock = link_settings->link_rate
+						* LINK_RATE_REF_FREQ_IN_KHZ;
+	else
+		cntl.pixel_clock = pixel_clock;
+	cntl.color_depth = color_depth;
 
-			if (!(field &
-			DP_MSE_RATE_UPDATE__DP_MSE_RATE_UPDATE_PENDING_MASK))
-				break;
+	if (DELAY_AFTER_PIXEL_FORMAT_CHANGE)
+		dc_service_sleep_in_milliseconds(
+			enc->ctx,
+			DELAY_AFTER_PIXEL_FORMAT_CHANGE);
 
-			dc_service_delay_in_microseconds(enc->ctx, 10);
+	dal_bios_parser_transmitter_control(
+		dal_adapter_service_get_bios_parser(
+			enc->adapter_service),
+		&cntl);
 
-			++retries;
-		} while (retries < DP_MST_UPDATE_MAX_RETRY);
-	}
+	return ENCODER_RESULT_OK;
 }
 
 void dce110_link_encoder_connect_dig_be_to_fe(
