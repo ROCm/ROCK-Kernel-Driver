@@ -461,15 +461,17 @@ bool dce110_mem_input_program_surface_flip_and_addr(
 
 bool dce110_mem_input_program_surface_config(
 	struct mem_input *mem_input,
-	const struct dc_surface *surface)
+	enum surface_pixel_format format,
+	union plane_tiling_info *tiling_info,
+	union plane_size *plane_size,
+	enum dc_rotation_angle rotation)
 {
 	struct dce110_mem_input *mem_input110 = TO_DCE110_MEM_INPUT(mem_input);
 
 	enable(mem_input110);
-	program_tiling(mem_input110, &surface->tiling_info, surface->format);
-	program_size_and_rotation(
-		mem_input110, surface->rotation, &surface->plane_size);
-	program_pixel_format(mem_input110, surface->format);
+	program_tiling(mem_input110, tiling_info, format);
+	program_size_and_rotation(mem_input110, rotation, plane_size);
+	program_pixel_format(mem_input110, format);
 
 	return true;
 }

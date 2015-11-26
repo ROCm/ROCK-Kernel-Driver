@@ -108,7 +108,10 @@ bool dce110_mem_input_program_surface_flip_and_addr(
  */
 bool  dce110_mem_input_program_surface_config(
 	struct mem_input *mem_input,
-	const struct dc_surface *surface);
+	enum surface_pixel_format format,
+	union plane_tiling_info *tiling_info,
+	union plane_size *plane_size,
+	enum dc_rotation_angle rotation);
 
 
 #endif

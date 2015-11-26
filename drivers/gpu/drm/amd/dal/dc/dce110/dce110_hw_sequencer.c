@@ -1624,7 +1624,10 @@ static bool set_plane_config(
 
 	dce110_mem_input_program_surface_config(
 			mi,
-			&surface->public);
+			surface->public.format,
+			&surface->public.tiling_info,
+			&surface->public.plane_size,
+			surface->public.rotation);
 
 	pipe_control_lock(
 			ctx,
