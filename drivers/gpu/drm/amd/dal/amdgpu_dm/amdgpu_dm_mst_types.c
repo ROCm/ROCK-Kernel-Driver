@@ -257,7 +257,6 @@ static struct drm_connector *dm_dp_add_mst_connector(struct drm_dp_mst_topology_
 {
 	struct amdgpu_connector *master = container_of(mgr, struct amdgpu_connector, mst_mgr);
 	struct drm_device *dev = master->base.dev;
-	struct amdgpu_device *adev = dev->dev_private;
 	struct amdgpu_connector *aconnector;
 	struct drm_connector *connector;
 
@@ -281,11 +280,6 @@ static struct drm_connector *dm_dp_add_mst_connector(struct drm_dp_mst_topology_
 	drm_object_attach_property(&connector->base, dev->mode_config.path_property, 0);
 	drm_mode_connector_set_path_property(connector, pathprop);
 
-	mutex_lock(&dev->mode_config.mutex);
-	drm_fb_helper_add_one_connector(&adev->mode_info.rfbdev->helper, connector);
-	mutex_unlock(&dev->mode_config.mutex);
-
-	drm_connector_register(connector);
 
 	DRM_DEBUG_KMS(":%d\n", connector->base.id);
 
@@ -323,10 +317,24 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 	drm_kms_helper_hotplug_event(dev);
 }
 
+static void dm_dp_mst_register_connector(struct drm_connector *connector)
+{
+	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = dev->dev_private;
+
+	mutex_lock(&dev->mode_config.mutex);
+	drm_fb_helper_add_one_connector(&adev->mode_info.rfbdev->helper, connector);
+	mutex_unlock(&dev->mode_config.mutex);
+
+	drm_connector_register(connector);
+
+}
+
 struct drm_dp_mst_topology_cbs dm_mst_cbs = {
 	.add_connector = dm_dp_add_mst_connector,
 	.destroy_connector = dm_dp_destroy_mst_connector,
 	.hotplug = dm_dp_mst_hotplug,
+	.register_connector = dm_dp_mst_register_connector
 };
 
 void amdgpu_dm_initialize_mst_connector(
