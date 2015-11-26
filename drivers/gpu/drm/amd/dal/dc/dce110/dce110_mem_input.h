@@ -48,39 +48,64 @@ struct mem_input *dce110_mem_input_create(
 
 void dce110_mem_input_destroy(struct mem_input **mem_input);
 
+/*
+ * dce110_mem_input_program_display_marks
+ *
+ * This function will program nbp stutter and urgency watermarks to maximum
+ * safe values
+ */
 void dce110_mem_input_program_safe_display_marks(struct mem_input *mi);
 
-void dce110_mem_input_program_nbp_watermark(
+/*
+ * dce110_mem_input_program_display_marks
+ *
+ * This function will program nbp stutter and urgency watermarks to minimum
+ * allowable values
+ */
+void dce110_mem_input_program_display_marks(
 	struct mem_input *mem_input,
-	struct bw_watermarks marks);
-
-void dce110_mem_input_program_stutter_watermark(
-	struct mem_input *mem_input,
-	struct bw_watermarks marks);
-
-void dce110_mem_input_program_urgency_watermark(
-	struct mem_input *mem_input,
-	struct bw_watermarks marks,
+	struct bw_watermarks nbp,
+	struct bw_watermarks stutter,
+	struct bw_watermarks urgent,
 	uint32_t h_total,
 	uint32_t pixel_clk_in_khz,
 	uint32_t pstate_blackout_duration_ns);
 
+/*
+ * dce110_mem_input_allocate_dmif_buffer
+ *
+ * This function will allocate a dmif buffer and program required
+ * pixel duration for pipe
+ */
 void dce110_mem_input_allocate_dmif_buffer(
 		struct mem_input *mem_input,
 		struct dc_crtc_timing *timing,
 		uint32_t paths_num);
 
+/*
+ * dce110_mem_input_deallocate_dmif_buffer
+ *
+ * This function will deallocate a dmif buffer from pipe
+ */
 void dce110_mem_input_deallocate_dmif_buffer(
 	struct mem_input *mem_input, uint32_t paths_num);
 
-void dce110_mem_input_program_pix_dur(
-	struct mem_input *mem_input, uint32_t pix_clk_khz);
-
+/*
+ * dce110_mem_input_program_surface_flip_and_addr
+ *
+ * This function programs hsync/vsync mode and surface address
+ */
 bool dce110_mem_input_program_surface_flip_and_addr(
 	struct mem_input *mem_input,
 	const struct dc_plane_address *address,
 	bool flip_immediate);
 
+/*
+ * dce110_mem_input_program_surface_config
+ *
+ * This function will program surface tiling, size, rotation and pixel format
+ * to corresponding dcp registers.
+ */
 bool  dce110_mem_input_program_surface_config(
 	struct mem_input *mem_input,
 	const struct dc_surface *surface);
