@@ -55,7 +55,7 @@ static void construct(
 {
 	enc->ctx = init->ctx;
 	enc->id = init->stream_engine_id;
-	enc->adapter_service = init->adapter_service;
+	enc->bp = init->bp;
 }
 
 static void update_avi_info_packet(
@@ -854,8 +854,7 @@ enum encoder_result dce110_stream_encoder_setup(
 	cntl.color_depth = crtc_timing->display_color_depth;
 
 	if (dal_bios_parser_encoder_control(
-			dal_adapter_service_get_bios_parser(
-			enc->adapter_service), &cntl) != BP_RESULT_OK)
+			enc->bp, &cntl) != BP_RESULT_OK)
 		return ENCODER_RESULT_ERROR;
 
 	return ENCODER_RESULT_OK;

@@ -9,7 +9,7 @@
 
 struct stream_encoder {
 	enum engine_id id;
-	struct adapter_service *adapter_service;
+	struct bios_parser *bp;
 	struct dc_context *ctx;
 };
 
