@@ -318,7 +318,7 @@ static inline uint32_t get_sdma_base_addr(struct vi_sdma_mqd *m)
 
 	retval = m->sdma_engine_id * SDMA1_REGISTER_OFFSET +
 		m->sdma_queue_id * KFD_VI_SDMA_QUEUE_OFFSET;
-	pr_err("kfd: sdma base address: 0x%x\n", retval);
+	pr_debug("kfd: sdma base address: 0x%x\n", retval);
 
 	return retval;
 }
@@ -410,16 +410,37 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd)
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct vi_sdma_mqd *m;
 	uint32_t sdma_base_addr;
+	uint32_t temp, timeout = 2000;
 
 	m = get_sdma_mqd(mqd);
 	sdma_base_addr = get_sdma_base_addr(m);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL,
+		m->sdmax_rlcx_rb_cntl & (~SDMA0_RLC0_RB_CNTL__RB_ENABLE_MASK));
 
+	while (true) {
+		temp = RREG32(sdma_base_addr + mmSDMA0_RLC0_CONTEXT_STATUS);
+		if (temp & SDMA0_RLC0_CONTEXT_STATUS__IDLE_MASK)
+			break;
+		if (timeout == 0)
+			return -ETIME;
+		msleep(10);
+		timeout -= 10;
+	}
+	if (m->sdma_engine_id)
+		REG_SET_FIELD(RREG32(mmSDMA1_GFX_CONTEXT_CNTL),
+			SDMA1_GFX_CONTEXT_CNTL, RESUME_CTX, 0);
+	else
+		REG_SET_FIELD(RREG32(mmSDMA0_GFX_CONTEXT_CNTL),
+			SDMA0_GFX_CONTEXT_CNTL, RESUME_CTX, 0);
+
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL, m->sdmax_rlcx_doorbell);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR, 0);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_WPTR, 0);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_VIRTUAL_ADDR, m->sdmax_rlcx_virtual_addr);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_BASE, m->sdmax_rlcx_rb_base);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_BASE_HI, m->sdmax_rlcx_rb_base_hi);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR_ADDR_LO, m->sdmax_rlcx_rb_rptr_addr_lo);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR_ADDR_HI, m->sdmax_rlcx_rb_rptr_addr_hi);
-	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL, m->sdmax_rlcx_doorbell);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL, m->sdmax_rlcx_rb_cntl);
 
 	return 0;
@@ -511,7 +532,7 @@ static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 
 	while (true) {
 		temp = RREG32(sdma_base_addr + mmSDMA0_RLC0_CONTEXT_STATUS);
-		if (temp & SDMA0_STATUS_REG__RB_CMD_IDLE__SHIFT)
+		if (temp & SDMA0_RLC0_CONTEXT_STATUS__IDLE_MASK)
 			break;
 		if (timeout == 0)
 			return -ETIME;
@@ -520,9 +541,9 @@ static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 	}
 
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL, 0);
-	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR, 0);
-	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_WPTR, 0);
-	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_BASE, 0);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL,
+		RREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL) |
+		SDMA0_RLC0_RB_CNTL__RB_ENABLE_MASK);
 
 	return 0;
 }
