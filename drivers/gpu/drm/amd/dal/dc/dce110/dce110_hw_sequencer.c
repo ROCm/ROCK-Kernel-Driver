@@ -696,13 +696,11 @@ static void disable_stream(struct core_stream *stream)
 
 	if (dc_is_hdmi_signal(stream->signal))
 		dce110_stream_encoder_stop_hdmi_info_packets(
-			stream->stream_enc->ctx,
-			stream->stream_enc->id);
+			stream->stream_enc);
 
 	if (dc_is_dp_signal(stream->signal))
 		dce110_stream_encoder_stop_dp_info_packets(
-			stream->stream_enc->ctx,
-			stream->stream_enc->id);
+			stream->stream_enc);
 
 	if (stream->audio) {
 		/* mute audio */
@@ -822,7 +820,6 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 
 	dce110_stream_encoder_set_mst_bandwidth(
 		stream_encoder,
-		stream_encoder->id,
 		avg_time_slots_per_mtp);
 
 	return DC_OK;
@@ -845,7 +842,6 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 	/* slot X.Y */
 	dce110_stream_encoder_set_mst_bandwidth(
 		stream_encoder,
-		stream_encoder->id,
 		avg_time_slots_per_mtp);
 
 	/* TODO: which component is responsible for remove payload table? */
@@ -941,16 +937,6 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 		stream->sink->link->link_enc,
 		stream->signal);
 
-	if (!dc_is_dp_signal(stream->signal))
-		if (ENCODER_RESULT_OK != dce110_stream_encoder_setup(
-				stream->stream_enc,
-				&stream->public.timing,
-				stream->signal,
-				stream->audio != NULL)) {
-			BREAK_TO_DEBUGGER();
-			return DC_ERROR_UNEXPECTED;
-		}
-
 	if (dc_is_dp_signal(stream->signal))
 		dce110_stream_encoder_dp_set_stream_attribute(
 			stream->stream_enc,
@@ -959,12 +945,15 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 	if (dc_is_hdmi_signal(stream->signal))
 		dce110_stream_encoder_hdmi_set_stream_attribute(
 		stream->stream_enc,
-		&stream->public.timing);
+		&stream->public.timing,
+		stream->audio != NULL);
 
 	if (dc_is_dvi_signal(stream->signal))
 		dce110_stream_encoder_dvi_set_stream_attribute(
 		stream->stream_enc,
-		&stream->public.timing);
+		&stream->public.timing,
+		(stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK) ?
+		true : false);
 
 	if (stream->audio != NULL) {
 		if (AUDIO_RESULT_OK != dal_audio_setup(
@@ -1842,8 +1831,6 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.destruct_resource_pool = dce110_destruct_resource_pool,
 	.validate_with_context = dce110_validate_with_context,
 	.validate_bandwidth = dce110_validate_bandwidth,
-	.set_afmt_memory_power_state =
-	  dce110_stream_encoder_set_afmt_memory_power_state,
 	.enable_display_pipe_clock_gating = dce110_enable_display_pipe_clock_gating,
 	.enable_display_power_gating = dce110_enable_display_power_gating,
 	.program_bw = dce110_program_bw
