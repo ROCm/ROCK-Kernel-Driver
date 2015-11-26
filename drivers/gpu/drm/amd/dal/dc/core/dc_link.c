@@ -1014,8 +1014,6 @@ enum dc_status core_link_enable(struct core_stream *stream)
 	}
 
 	if (stream->audio) {
-		stream->ctx->dc->hwss.set_afmt_memory_power_state(
-				stream->ctx, stream->stream_enc->id, true);
 		/* notify audio driver for audio modes of monitor */
 		dal_audio_enable_azalia_audio_jack_presence(stream->audio,
 				stream->stream_enc->id);
@@ -1053,11 +1051,6 @@ enum dc_status core_link_disable(struct core_stream *stream)
 	else if (ENCODER_RESULT_OK != dc->hwss.encoder_disable_output(
 					stream->sink->link->link_enc, stream->signal))
 		status = DC_ERROR_UNEXPECTED;
-
-	if (stream->audio) {
-		dc->hwss.set_afmt_memory_power_state(
-				stream->ctx, stream->stream_enc->id, false);
-	}
 
 	return status;
 }

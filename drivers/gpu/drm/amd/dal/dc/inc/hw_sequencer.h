@@ -134,11 +134,6 @@ struct hw_sequencer_funcs {
 					struct bios_parser *bp,
 					enum pipe_gating_control power_gating);
 
-	void (*set_afmt_memory_power_state)(
-					const struct dc_context *ctx,
-					enum engine_id id,
-					bool enable);
-
 	/* resource management and validation*/
 	bool (*construct_resource_pool)(
 					struct adapter_service *adapter_serv,

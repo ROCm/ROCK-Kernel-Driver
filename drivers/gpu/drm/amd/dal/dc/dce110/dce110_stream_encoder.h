@@ -38,21 +38,6 @@ struct stream_encoder *dce110_stream_encoder_create(
 void dce110_stream_encoder_destroy(struct stream_encoder **enc);
 
 /***** HW programming ***********/
-enum encoder_result dce110_stream_encoder_setup(
-	struct stream_encoder *enc,
-	struct dc_crtc_timing *crtc_timing,
-	enum signal_type signal,
-	bool enable_audio);
-
-void dce110_stream_encoder_stop_hdmi_info_packets(
-	struct dc_context *ctx,
-	enum engine_id engine);
-
-void dce110_stream_encoder_stop_dp_info_packets(
-	struct dc_context *ctx,
-	enum engine_id engine);
-
-
 /* setup stream encoder in dp mode */
 void dce110_stream_encoder_dp_set_stream_attribute(
 	struct stream_encoder *enc,
@@ -61,31 +46,33 @@ void dce110_stream_encoder_dp_set_stream_attribute(
 /* setup stream encoder in hdmi mode */
 void dce110_stream_encoder_hdmi_set_stream_attribute(
 	struct stream_encoder *enc,
-	struct dc_crtc_timing *crtc_timing);
+	struct dc_crtc_timing *crtc_timing,
+	bool enable_audio);
 
 /* setup stream encoder in dvi mode */
 void dce110_stream_encoder_dvi_set_stream_attribute(
 	struct stream_encoder *enc,
-	struct dc_crtc_timing *crtc_timing);
+	struct dc_crtc_timing *crtc_timing,
+	bool is_dual_link);
 
 /* set throttling for DP MST */
 void dce110_stream_encoder_set_mst_bandwidth(
 	struct stream_encoder *enc,
-	enum engine_id engine,
 	struct fixed31_32 avg_time_slots_per_mtp);
-
-void dce110_stream_encoder_set_afmt_memory_power_state(
-	const struct dc_context *ctx,
-	enum engine_id id,
-	bool enable);
 
 void dce110_stream_encoder_update_hdmi_info_packets(
 	struct stream_encoder *enc,
 	const struct encoder_info_frame *info_frame);
 
+void dce110_stream_encoder_stop_hdmi_info_packets(
+	struct stream_encoder *enc);
+
 void dce110_stream_encoder_update_dp_info_packets(
 	struct stream_encoder *enc,
 	const struct encoder_info_frame *info_frame);
+
+void dce110_stream_encoder_stop_dp_info_packets(
+	struct stream_encoder *enc);
 
 /* output blank/idle stream to link encoder */
 void dce110_stream_encoder_dp_blank(

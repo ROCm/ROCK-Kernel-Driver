@@ -60,9 +60,9 @@ static void construct(
 
 static void update_avi_info_packet(
 	struct stream_encoder *enc,
-	enum engine_id engine,
 	const struct encoder_info_packet *info_packet)
 {
+	enum engine_id engine = enc->id;
 	const int32_t offset = fe_engine_offsets[engine];
 	uint32_t regval;
 	uint32_t addr;
@@ -165,10 +165,10 @@ static void update_avi_info_packet(
 
 static void update_generic_info_packet(
 	struct stream_encoder *enc,
-	enum engine_id engine,
 	uint32_t packet_index,
 	const struct encoder_info_packet *info_packet)
 {
+	enum engine_id engine = enc->id;
 	uint32_t addr;
 	uint32_t regval;
 	/* choose which generic packet to use */
@@ -267,10 +267,10 @@ static void update_generic_info_packet(
 
 static void update_hdmi_info_packet(
 	struct stream_encoder *enc,
-	enum engine_id engine,
 	uint32_t packet_index,
 	const struct encoder_info_packet *info_packet)
 {
+	enum engine_id engine = enc->id;
 	uint32_t cont, send, line;
 	uint32_t addr = fe_engine_offsets[engine];
 	uint32_t regval;
@@ -278,7 +278,6 @@ static void update_hdmi_info_packet(
 	if (info_packet->valid) {
 		update_generic_info_packet(
 			enc,
-			engine,
 			packet_index,
 			info_packet);
 
@@ -372,10 +371,10 @@ static void update_hdmi_info_packet(
 
 static void update_dp_info_packet(
 	struct stream_encoder *enc,
-	enum engine_id engine,
 	uint32_t packet_index,
 	const struct encoder_info_packet *info_packet)
 {
+	enum engine_id engine = enc->id;
 	const uint32_t addr = mmDP_SEC_CNTL + fe_engine_offsets[engine];
 
 	uint32_t value;
@@ -383,7 +382,6 @@ static void update_dp_info_packet(
 	if (info_packet->valid)
 		update_generic_info_packet(
 			enc,
-			engine,
 			packet_index,
 			info_packet);
 
@@ -445,10 +443,11 @@ static void update_dp_info_packet(
 }
 
 static void dp_steer_fifo_reset(
-	struct dc_context *ctx,
-	enum engine_id engine,
+	struct stream_encoder *enc,
 	bool reset)
 {
+	struct dc_context *ctx = enc->ctx;
+	enum engine_id engine = enc->id;
 	const uint32_t addr = mmDP_STEER_FIFO + fe_engine_offsets[engine];
 
 	uint32_t value = dal_read_reg(ctx, addr);
@@ -459,9 +458,9 @@ static void dp_steer_fifo_reset(
 }
 
 static void unblank_dp_output(
-	struct stream_encoder *enc,
-	enum engine_id engine)
+	struct stream_encoder *enc)
 {
+	enum engine_id engine = enc->id;
 	uint32_t addr;
 	uint32_t value;
 
@@ -472,7 +471,7 @@ static void unblank_dp_output(
 	dal_write_reg(enc->ctx, addr, value);
 
 	/* switch DP encoder to CRTC data */
-	dp_steer_fifo_reset(enc->ctx, engine, false);
+	dp_steer_fifo_reset(enc, false);
 
 	/* wait 100us for DIG/DP logic to prime
 	 * (i.e. a few video lines) */
@@ -497,10 +496,10 @@ static void unblank_dp_output(
 
 static void setup_vid_stream(
 	struct stream_encoder *enc,
-	enum engine_id engine,
 	uint32_t m_vid,
 	uint32_t n_vid)
 {
+	enum engine_id engine = enc->id;
 	uint32_t addr;
 	uint32_t value;
 
@@ -530,11 +529,11 @@ static void setup_vid_stream(
 
 static void set_tmds_stream_attributes(
 	struct stream_encoder *enc,
-	enum engine_id engine,
 	const struct dc_crtc_timing *timing,
 	bool is_dvi
 	)
 {
+	enum engine_id engine = enc->id;
 	uint32_t addr = mmDIG_FE_CNTL + fe_engine_offsets[engine];
 	uint32_t value = dal_read_reg(enc->ctx, addr);
 
@@ -572,9 +571,9 @@ static void set_tmds_stream_attributes(
 
 static void set_dp_stream_attributes(
 	struct stream_encoder *enc,
-	enum engine_id engine,
 	const struct dc_crtc_timing *timing)
 {
+	enum engine_id engine = enc->id;
 	const uint32_t addr = mmDP_PIXEL_FORMAT + fe_engine_offsets[engine];
 	uint32_t value = dal_read_reg(enc->ctx, addr);
 
@@ -660,9 +659,9 @@ static void set_dp_stream_attributes(
 
 static void setup_hdmi(
 	struct stream_encoder *enc,
-	enum engine_id engine,
 	const struct dc_crtc_timing *timing)
 {
+	enum engine_id engine = enc->id;
 	uint32_t output_pixel_clock = timing->pix_clk_khz;
 	uint32_t value;
 	uint32_t addr;
@@ -830,40 +829,147 @@ void dce110_stream_encoder_destroy(struct stream_encoder **enc)
 	*enc = NULL;
 }
 
-/*
- * @brief
- * Associate digital encoder with specified output transmitter
- * and configure to output signal.
- * Encoder will be activated later in enable_output()
- */
-enum encoder_result dce110_stream_encoder_setup(
+/* setup stream encoder in dp mode */
+void dce110_stream_encoder_dp_set_stream_attribute(
+	struct stream_encoder *enc,
+	struct dc_crtc_timing *crtc_timing)
+{
+	set_dp_stream_attributes(enc, crtc_timing);
+}
+
+/* setup stream encoder in hdmi mode */
+void dce110_stream_encoder_hdmi_set_stream_attribute(
 	struct stream_encoder *enc,
 	struct dc_crtc_timing *crtc_timing,
-	enum signal_type signal,
 	bool enable_audio)
 {
-	struct bp_encoder_control cntl;
+	struct bp_encoder_control cntl = {0};
 
 	cntl.action = ENCODER_CONTROL_SETUP;
 	cntl.engine_id = enc->id;
-	cntl.signal = signal;
+	cntl.signal = SIGNAL_TYPE_HDMI_TYPE_A;
 	cntl.enable_dp_audio = enable_audio;
 	cntl.pixel_clock = crtc_timing->pix_clk_khz;
-	cntl.lanes_number = (signal == SIGNAL_TYPE_DVI_DUAL_LINK) ?
+	cntl.lanes_number = LANE_COUNT_FOUR;
+	cntl.color_depth = crtc_timing->display_color_depth;
+
+	if (dal_bios_parser_encoder_control(
+			enc->bp, &cntl) != BP_RESULT_OK)
+		return;
+
+
+	set_tmds_stream_attributes(enc, crtc_timing, false);
+
+	/* setup HDMI engine */
+	setup_hdmi(enc, crtc_timing);
+}
+
+/* setup stream encoder in dvi mode */
+void dce110_stream_encoder_dvi_set_stream_attribute(
+	struct stream_encoder *enc,
+	struct dc_crtc_timing *crtc_timing,
+	bool is_dual_link)
+{
+	struct bp_encoder_control cntl = {0};
+
+	cntl.action = ENCODER_CONTROL_SETUP;
+	cntl.engine_id = enc->id;
+	cntl.signal = is_dual_link ?
+		SIGNAL_TYPE_DVI_DUAL_LINK :
+		SIGNAL_TYPE_DVI_SINGLE_LINK;
+	cntl.enable_dp_audio = false;
+	cntl.pixel_clock = crtc_timing->pix_clk_khz;
+	cntl.lanes_number = (is_dual_link) ?
 				LANE_COUNT_EIGHT : LANE_COUNT_FOUR;
 	cntl.color_depth = crtc_timing->display_color_depth;
 
 	if (dal_bios_parser_encoder_control(
 			enc->bp, &cntl) != BP_RESULT_OK)
-		return ENCODER_RESULT_ERROR;
+		return;
 
-	return ENCODER_RESULT_OK;
+	set_tmds_stream_attributes(enc, crtc_timing, true);
+}
+
+void dce110_stream_encoder_set_mst_bandwidth(
+	struct stream_encoder *enc,
+	struct fixed31_32 avg_time_slots_per_mtp)
+{
+	uint32_t x = dal_fixed31_32_floor(
+		avg_time_slots_per_mtp);
+
+	uint32_t y = dal_fixed31_32_ceil(
+		dal_fixed31_32_shl(
+			dal_fixed31_32_sub_int(
+				avg_time_slots_per_mtp,
+				x),
+			26));
+	enum engine_id engine = enc->id;
+
+	{
+		const uint32_t addr = mmDP_MSE_RATE_CNTL +
+				fe_engine_offsets[engine];
+		uint32_t value = dal_read_reg(enc->ctx, addr);
+
+		set_reg_field_value(
+			value,
+			x,
+			DP_MSE_RATE_CNTL,
+			DP_MSE_RATE_X);
+
+		set_reg_field_value(
+			value,
+			y,
+			DP_MSE_RATE_CNTL,
+			DP_MSE_RATE_Y);
+
+		dal_write_reg(enc->ctx, addr, value);
+	}
+
+	/* wait for update to be completed on the link */
+	/* i.e. DP_MSE_RATE_UPDATE_PENDING field (read only) */
+	/* is reset to 0 (not pending) */
+	{
+		const uint32_t addr = mmDP_MSE_RATE_UPDATE +
+			fe_engine_offsets[engine];
+		uint32_t value, field;
+		uint32_t retries = 0;
+
+		do {
+			value = dal_read_reg(enc->ctx, addr);
+
+			field = get_reg_field_value(
+					value,
+					DP_MSE_RATE_UPDATE,
+					DP_MSE_RATE_UPDATE_PENDING);
+
+			if (!(field &
+			DP_MSE_RATE_UPDATE__DP_MSE_RATE_UPDATE_PENDING_MASK))
+				break;
+
+			dc_service_delay_in_microseconds(enc->ctx, 10);
+
+			++retries;
+		} while (retries < DP_MST_UPDATE_MAX_RETRY);
+	}
+}
+
+void dce110_stream_encoder_update_hdmi_info_packets(
+	struct stream_encoder *enc,
+	const struct encoder_info_frame *info_frame)
+{
+	update_avi_info_packet(
+		enc,
+		&info_frame->avi);
+	update_hdmi_info_packet(enc, 0, &info_frame->vendor);
+	update_hdmi_info_packet(enc, 1, &info_frame->gamut);
+	update_hdmi_info_packet(enc, 2, &info_frame->spd);
 }
 
 void dce110_stream_encoder_stop_hdmi_info_packets(
-	struct dc_context *ctx,
-	enum engine_id engine)
+	struct stream_encoder *enc)
 {
+	struct dc_context *ctx = enc->ctx;
+	enum engine_id engine = enc->id;
 	uint32_t addr = 0;
 	uint32_t value = 0;
 	uint32_t offset = fe_engine_offsets[engine];
@@ -962,12 +1068,19 @@ void dce110_stream_encoder_stop_hdmi_info_packets(
 
 	dal_write_reg(ctx, addr, value);
 }
+void dce110_stream_encoder_update_dp_info_packets(
+	struct stream_encoder *enc,
+	const struct encoder_info_frame *info_frame)
+{
+	update_dp_info_packet(enc, 0, &info_frame->vsc);
+}
 
 void dce110_stream_encoder_stop_dp_info_packets(
-	struct dc_context *ctx,
-	enum engine_id engine)
+	struct stream_encoder *enc)
 {
 	/* stop generic packets on DP */
+	struct dc_context *ctx = enc->ctx;
+	enum engine_id engine = enc->id;
 	uint32_t offset = fe_engine_offsets[engine];
 	const uint32_t addr = mmDP_SEC_CNTL + offset;
 	uint32_t value = dal_read_reg(ctx, addr);
@@ -992,175 +1105,6 @@ void dce110_stream_encoder_stop_dp_info_packets(
 			DP_SEC_STREAM_ENABLE);
 
 	dal_write_reg(ctx, addr, value);
-}
-
-/* setup stream encoder in dp mode */
-void dce110_stream_encoder_dp_set_stream_attribute(
-	struct stream_encoder *enc,
-	struct dc_crtc_timing *crtc_timing)
-{
-	set_dp_stream_attributes(enc, enc->id, crtc_timing);
-}
-
-/* setup stream encoder in hdmi mode */
-void dce110_stream_encoder_hdmi_set_stream_attribute(
-	struct stream_encoder *enc,
-	struct dc_crtc_timing *crtc_timing)
-{
-	set_tmds_stream_attributes(enc, enc->id, crtc_timing, false);
-
-	/* setup HDMI engine */
-	setup_hdmi(
-		enc, enc->id, crtc_timing);
-}
-
-/* setup stream encoder in dvi mode */
-void dce110_stream_encoder_dvi_set_stream_attribute(
-	struct stream_encoder *enc,
-	struct dc_crtc_timing *crtc_timing)
-{
-	set_tmds_stream_attributes(enc, enc->id, crtc_timing, true);
-}
-
-void dce110_stream_encoder_set_mst_bandwidth(
-	struct stream_encoder *enc,
-	enum engine_id engine,
-	struct fixed31_32 avg_time_slots_per_mtp)
-{
-	uint32_t x = dal_fixed31_32_floor(
-		avg_time_slots_per_mtp);
-
-	uint32_t y = dal_fixed31_32_ceil(
-		dal_fixed31_32_shl(
-			dal_fixed31_32_sub_int(
-				avg_time_slots_per_mtp,
-				x),
-			26));
-
-	{
-		const uint32_t addr = mmDP_MSE_RATE_CNTL +
-				fe_engine_offsets[engine];
-		uint32_t value = dal_read_reg(enc->ctx, addr);
-
-		set_reg_field_value(
-			value,
-			x,
-			DP_MSE_RATE_CNTL,
-			DP_MSE_RATE_X);
-
-		set_reg_field_value(
-			value,
-			y,
-			DP_MSE_RATE_CNTL,
-			DP_MSE_RATE_Y);
-
-		dal_write_reg(enc->ctx, addr, value);
-	}
-
-	/* wait for update to be completed on the link
-	 * i.e. DP_MSE_RATE_UPDATE_PENDING field (read only)
-	 * is reset to 0 (not pending) */
-	{
-		const uint32_t addr = mmDP_MSE_RATE_UPDATE +
-			fe_engine_offsets[engine];
-		uint32_t value, field;
-		uint32_t retries = 0;
-
-		do {
-			value = dal_read_reg(enc->ctx, addr);
-
-			field = get_reg_field_value(
-					value,
-					DP_MSE_RATE_UPDATE,
-					DP_MSE_RATE_UPDATE_PENDING);
-
-			if (!(field &
-			DP_MSE_RATE_UPDATE__DP_MSE_RATE_UPDATE_PENDING_MASK))
-				break;
-
-			dc_service_delay_in_microseconds(enc->ctx, 10);
-
-			++retries;
-		} while (retries < DP_MST_UPDATE_MAX_RETRY);
-	}
-}
-
-
-/**
-* set_afmt_memory_power_state
-*
-* @brief
-*  Power up audio formatter memory that is mapped to specified DIG
-*/
-void dce110_stream_encoder_set_afmt_memory_power_state(
-	const struct dc_context *ctx,
-	enum engine_id id,
-	bool enable)
-{
-	uint32_t value;
-	uint32_t mem_pwr_force;
-
-	value = dal_read_reg(ctx, mmDCO_MEM_PWR_CTRL);
-
-	if (enable)
-		mem_pwr_force = 0;
-	else
-		mem_pwr_force = 3;
-
-	/* force shutdown mode for appropriate AFMT memory */
-	switch (id) {
-	case ENGINE_ID_DIGA:
-		set_reg_field_value(
-			value,
-			mem_pwr_force,
-			DCO_MEM_PWR_CTRL,
-			HDMI0_MEM_PWR_FORCE);
-		break;
-	case ENGINE_ID_DIGB:
-		set_reg_field_value(
-			value,
-			mem_pwr_force,
-			DCO_MEM_PWR_CTRL,
-			HDMI1_MEM_PWR_FORCE);
-		break;
-	case ENGINE_ID_DIGC:
-		set_reg_field_value(
-			value,
-			mem_pwr_force,
-			DCO_MEM_PWR_CTRL,
-			HDMI2_MEM_PWR_FORCE);
-		break;
-	default:
-		dal_logger_write(
-			ctx->logger,
-			LOG_MAJOR_WARNING,
-			LOG_MINOR_COMPONENT_ENCODER,
-			"%s: Invalid Engine Id\n",
-			__func__);
-		break;
-	}
-
-	dal_write_reg(ctx, mmDCO_MEM_PWR_CTRL, value);
-}
-
-void dce110_stream_encoder_update_hdmi_info_packets(
-	struct stream_encoder *enc,
-	const struct encoder_info_frame *info_frame)
-{
-	update_avi_info_packet(
-		enc,
-		enc->id,
-		&info_frame->avi);
-	update_hdmi_info_packet(enc, enc->id, 0, &info_frame->vendor);
-	update_hdmi_info_packet(enc, enc->id, 1, &info_frame->gamut);
-	update_hdmi_info_packet(enc, enc->id, 2, &info_frame->spd);
-}
-
-void dce110_stream_encoder_update_dp_info_packets(
-	struct stream_encoder *enc,
-	const struct encoder_info_frame *info_frame)
-{
-	update_dp_info_packet(enc, enc->id, 0, &info_frame->vsc);
 }
 
 void dce110_stream_encoder_dp_blank(
@@ -1219,7 +1163,7 @@ void dce110_stream_encoder_dp_blank(
 	 * the polling. If we set DP_STEER_FIFO_RESET before DP stream blank is
 	 * complete, stream status will be stuck in video stream enabled state,
 	 * i.e. DP_VID_STREAM_STATUS stuck at 1. */
-	dp_steer_fifo_reset(enc->ctx, engine, true);
+	dp_steer_fifo_reset(enc, true);
 }
 
 /* output video stream to link encoder */
@@ -1243,10 +1187,9 @@ void dce110_stream_encoder_dp_unblank(
 
 		m_vid = (uint32_t) m_vid_l;
 
-		setup_vid_stream(enc,
-			enc->id, m_vid, n_vid);
+		setup_vid_stream(enc, m_vid, n_vid);
 	}
 
-	unblank_dp_output(enc, enc->id);
+	unblank_dp_output(enc);
 }
 
