@@ -1271,18 +1271,12 @@ static void set_displaymarks(
 		for (j = 0; j < target->stream_count; j++) {
 			struct core_stream *stream = target->streams[j];
 
-			dce110_mem_input_program_nbp_watermark(
+			dce110_mem_input_program_display_marks(
 				stream->mi,
 				context->bw_results
-				.nbp_state_change_watermark[total_streams]);
-
-			dce110_mem_input_program_stutter_watermark(
-				stream->mi,
+				.nbp_state_change_watermark[total_streams],
 				context->bw_results
-					.stutter_exit_watermark[total_streams]);
-
-			dce110_mem_input_program_urgency_watermark(
-				stream->mi,
+					.stutter_exit_watermark[total_streams],
 				context->bw_results
 					.urgent_watermark[total_streams],
 				stream->public.timing.h_total,
@@ -1599,8 +1593,6 @@ static bool set_plane_config(
 			PIPE_LOCK_CONTROL_BLENDER |
 			PIPE_LOCK_CONTROL_SURFACE,
 			true);
-
-	dce110_mem_input_program_pix_dur(mi, dc_crtc_timing->pix_clk_khz);
 
 	dce110_timing_generator_program_blanking(tg, dc_crtc_timing);
 

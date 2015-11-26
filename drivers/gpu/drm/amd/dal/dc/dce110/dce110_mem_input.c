@@ -467,8 +467,8 @@ bool dce110_mem_input_program_surface_config(
 
 	enable(mem_input110);
 	program_tiling(mem_input110, &surface->tiling_info, surface->format);
-	program_size_and_rotation(mem_input110,
-		surface->rotation, &surface->plane_size);
+	program_size_and_rotation(
+		mem_input110, surface->rotation, &surface->plane_size);
 	program_pixel_format(mem_input110, surface->format);
 
 	return true;
@@ -533,12 +533,11 @@ static void program_urgency_watermark(
 	dal_write_reg(ctx, urgency_addr, urgency_cntl);
 }
 
-void dce110_mem_input_program_stutter_watermark(
-	struct mem_input *mi,
+void program_stutter_watermark(
+	const struct dc_context *ctx,
+	const uint32_t offset,
 	struct bw_watermarks marks)
 {
-	const struct dc_context *ctx = mi->ctx;
-	const uint32_t offset = TO_DCE110_MEM_INPUT(mi)->offsets.dmif;
 	/* register value */
 	uint32_t stutter_cntl = 0;
 	uint32_t wm_mask_cntl = 0;
@@ -599,12 +598,11 @@ void dce110_mem_input_program_stutter_watermark(
 	dal_write_reg(ctx, stutter_addr, stutter_cntl);
 }
 
-void dce110_mem_input_program_nbp_watermark(
-	struct mem_input *mi,
+void program_nbp_watermark(
+	const struct dc_context *ctx,
+	const uint32_t offset,
 	struct bw_watermarks marks)
 {
-	const struct dc_context *ctx = mi->ctx;
-	const uint32_t offset = TO_DCE110_MEM_INPUT(mi)->offsets.dmif;
 	uint32_t value;
 	uint32_t addr;
 	/* Write mask to enable reading/writing of watermark set A */
@@ -692,27 +690,37 @@ void dce110_mem_input_program_safe_display_marks(struct mem_input *mi)
 
 	program_urgency_watermark(
 		mi->ctx, bm_dce110->offsets.dmif, max_marks, MAX_WATERMARK);
-	dce110_mem_input_program_stutter_watermark(mi, max_marks);
-	dce110_mem_input_program_nbp_watermark(mi, nbp_marks);
+	program_stutter_watermark(mi->ctx, bm_dce110->offsets.dmif, max_marks);
+	program_nbp_watermark(mi->ctx, bm_dce110->offsets.dmif, nbp_marks);
 
 }
 
-void dce110_mem_input_program_urgency_watermark(
-	struct mem_input *mi,
-	struct bw_watermarks marks,
+void dce110_mem_input_program_display_marks(
+	struct mem_input *mem_input,
+	struct bw_watermarks nbp,
+	struct bw_watermarks stutter,
+	struct bw_watermarks urgent,
 	uint32_t h_total,
 	uint32_t pixel_clk_in_khz,
 	uint32_t pstate_blackout_duration_ns)
 {
-	struct dce110_mem_input *bm_dce110 = TO_DCE110_MEM_INPUT(mi);
+	struct dce110_mem_input *bm_dce110 = TO_DCE110_MEM_INPUT(mem_input);
 	uint32_t total_dest_line_time_ns = 1000000UL * h_total
 		/ pixel_clk_in_khz + pstate_blackout_duration_ns;
 
 	program_urgency_watermark(
-		mi->ctx,
+		mem_input->ctx,
 		bm_dce110->offsets.dmif,
-		marks,
+		urgent,
 		total_dest_line_time_ns);
+	program_nbp_watermark(
+		mem_input->ctx,
+		bm_dce110->offsets.dmif,
+		nbp);
+	program_stutter_watermark(
+		mem_input->ctx,
+		bm_dce110->offsets.dmif,
+		stutter);
 }
 
 static uint32_t get_dmif_switch_time_us(struct dc_crtc_timing *timing)
@@ -770,6 +778,7 @@ void dce110_mem_input_allocate_dmif_buffer(
 	uint32_t addr = bm110->offsets.pipe + mmPIPE0_DMIF_BUFFER_CONTROL;
 	uint32_t value;
 	uint32_t field;
+	uint32_t pix_dur;
 
 	if (bm110->supported_stutter_mode
 			& STUTTER_MODE_NO_DMIF_BUFFER_ALLOCATION)
@@ -811,6 +820,21 @@ void dce110_mem_input_allocate_dmif_buffer(
 				LOG_MINOR_COMPONENT_GPU,
 				"%s: DMIF allocation failed",
 				__func__);
+
+
+	if (timing->pix_clk_khz != 0) {
+		addr = mmDPG_PIPE_ARBITRATION_CONTROL1 + bm110->offsets.dmif;
+		value = dal_read_reg(mi->ctx, addr);
+		pix_dur = 1000000000ULL / timing->pix_clk_khz;
+
+		set_reg_field_value(
+			value,
+			pix_dur,
+			DPG_PIPE_ARBITRATION_CONTROL1,
+			PIXEL_DURATION);
+
+		dal_write_reg(mi->ctx, addr, value);
+	}
 
 	/*
 	 * Stella Wong proposed the following change
@@ -895,28 +919,6 @@ void dce110_mem_input_deallocate_dmif_buffer(
 		set_reg_field_value(value, 3, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
 
 	dal_write_reg(mi->ctx, mmMC_HUB_RDREQ_DMIF_LIMIT, value);
-}
-
-void dce110_mem_input_program_pix_dur(
-	struct mem_input *mi, uint32_t pix_clk_khz)
-{
-	uint64_t pix_dur;
-	uint32_t addr = mmDMIF_PG0_DPG_PIPE_ARBITRATION_CONTROL1
-					+ TO_DCE110_MEM_INPUT(mi)->offsets.dmif;
-	uint32_t value = dal_read_reg(mi->ctx, addr);
-
-	if (pix_clk_khz == 0)
-		return;
-
-	pix_dur = 1000000000 / pix_clk_khz;
-
-	set_reg_field_value(
-		value,
-		pix_dur,
-		DPG_PIPE_ARBITRATION_CONTROL1,
-		PIXEL_DURATION);
-
-	dal_write_reg(mi->ctx, addr, value);
 }
 
 /*****************************************/
