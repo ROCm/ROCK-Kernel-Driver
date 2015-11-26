@@ -628,7 +628,8 @@ bool dce110_construct_resource_pool(
 		/* TODO: rework fragile code*/
 		enc_init_data.stream_engine_id = i;
 		enc_init_data.ctx = dc->ctx;
-		enc_init_data.adapter_service = adapter_serv;
+		enc_init_data.bp = dal_adapter_service_get_bios_parser(
+			adapter_serv);
 		if (pool->stream_engines.u_all & 1 << i) {
 			pool->stream_enc[i] = dce110_stream_encoder_create(
 					&enc_init_data);
