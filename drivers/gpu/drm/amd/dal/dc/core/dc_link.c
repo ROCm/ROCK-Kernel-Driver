@@ -918,11 +918,11 @@ static enum dc_status enable_link_dp(struct core_stream *stream)
 
 static enum dc_status enable_link_dp_mst(struct core_stream *stream)
 {
-	enum dc_status status;
-	bool skip_video_pattern;
 	struct core_link *link = stream->sink->link;
-	struct link_settings link_settings = {0};
-	enum dp_panel_mode panel_mode;
+
+	/* TODO MST link shared by stream. counter? */
+	if (link->stream_count < 4)
+		link->stream_count++;
 
 	/* sink signal type after MST branch is MST. Multiple MST sinks
 	 * share one link. Link DP PHY is enable or training only once.
@@ -930,35 +930,7 @@ static enum dc_status enable_link_dp_mst(struct core_stream *stream)
 	if (link->cur_link_settings.lane_count != LANE_COUNT_UNKNOWN)
 		return DC_OK;
 
-	/* get link settings for video mode timing */
-	decide_link_settings(stream, &link_settings);
-	status = dp_enable_link_phy(
-		stream->sink->link,
-		stream->signal,
-		stream->stream_enc->id,
-		&link_settings);
-
-	panel_mode = dp_get_panel_mode(link);
-	dpcd_configure_panel_mode(link, panel_mode);
-
-	skip_video_pattern = true;
-
-	if (link_settings.link_rate == LINK_RATE_LOW)
-			skip_video_pattern = false;
-
-	if (perform_link_training(link, &link_settings, skip_video_pattern)) {
-		link->cur_link_settings = link_settings;
-
-		/* TODO MST link shared by stream. counter? */
-		if (link->stream_count < 4)
-			link->stream_count++;
-
-		status = DC_OK;
-	}
-	else
-		status = DC_ERROR_UNEXPECTED;
-
-	return status;
+	return enable_link_dp(stream);
 }
 
 static enum dc_status enable_link_hdmi(struct core_stream *stream)
