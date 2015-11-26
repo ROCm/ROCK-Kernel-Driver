@@ -208,8 +208,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 
 	switch (type) {
 	case KFD_QUEUE_TYPE_SDMA:
-		if (dev->dqm->queue_count >=
-			CIK_SDMA_QUEUES_PER_ENGINE * CIK_SDMA_ENGINE_NUM) {
+		if (dev->dqm->sdma_queue_count >= CIK_SDMA_QUEUES) {
 			pr_err("kfd: over-subscription is not allowed for SDMA.\n");
 			retval = -EPERM;
 			goto err_create_queue;

@@ -1239,8 +1239,55 @@ out:
 static int process_termination_nocpsch(struct device_queue_manager *dqm,
 		struct qcm_process_device *qpd)
 {
+	struct queue *q, *next;
+	struct mqd_manager *mqd;
+	struct device_process_node *cur, *next_dpn;
+
+	mutex_lock(&dqm->lock);
+
+	/* Clear all user mode queues */
+	list_for_each_entry_safe(q, next, &qpd->queues_list, list) {
+		mqd = dqm->ops.get_mqd_manager(dqm,
+			get_mqd_type_from_queue_type(q->properties.type));
+		if (!mqd) {
+			mutex_unlock(&dqm->lock);
+			return -ENOMEM;
+		}
+
+		if (q->properties.type == KFD_QUEUE_TYPE_SDMA) {
+			dqm->sdma_queue_count--;
+			deallocate_sdma_queue(dqm, q->sdma_id);
+		}
+
+		list_del(&q->list);
+		if (q->properties.is_active)
+			dqm->queue_count--;
+
+		dqm->total_queue_count--;
+		mqd->destroy_mqd(mqd, q->mqd,
+				KFD_PREEMPT_TYPE_WAVEFRONT_RESET,
+				QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS,
+				q->pipe, q->queue);
+		mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
+		if (list_empty(&qpd->queues_list))
+			deallocate_vmid(dqm, qpd, q);
+	}
+
+	/* Unregister process */
+	list_for_each_entry_safe(cur, next_dpn, &dqm->queues, list) {
+		if (qpd == cur->qpd) {
+			list_del(&cur->list);
+			kfree(cur);
+			dqm->processes_count--;
+			break;
+		}
+	}
+
+	mutex_unlock(&dqm->lock);
+
 	return 0;
 }
+
 
 static int process_termination_cpsch(struct device_queue_manager *dqm,
 		struct qcm_process_device *qpd)
