@@ -1001,6 +1001,7 @@ enum dc_status core_link_enable(struct core_stream *stream)
 		break;
 	case SIGNAL_TYPE_DISPLAY_PORT_MST:
 		status = enable_link_dp_mst(stream);
+		dc_service_sleep_in_milliseconds(stream->ctx, 200);
 		break;
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
