@@ -90,7 +90,7 @@ void dp_disable_link_phy_mst(struct core_link *link, struct core_stream *stream)
 	for (i = 0; i < link->enabled_stream_count; i++) {
 		if (link->enabled_streams[i] == stream) {
 			link->enabled_stream_count--;
-			for (j = i; i < link->enabled_stream_count; j++)
+			for (j = i; j < link->enabled_stream_count; j++)
 				link->enabled_streams[j] = link->enabled_streams[j+1];
 		}
 	}
