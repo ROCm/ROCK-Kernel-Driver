@@ -14,6 +14,7 @@ ccflags-y := -Iinclude/drm -I$(FULL_AMD_PATH)/include/asic_reg \
 	-I$(FULL_AMD_PATH)/acp/include \
 	-I$(FULL_AMD_DAL_PATH) \
 	-I$(FULL_AMD_DAL_PATH)/include \
+	-I$(FULL_AMD_DAL_PATH)/dc \
 	-I$(FULL_AMD_DAL_PATH)/amdgpu_dm
 
 amdgpu-y := amdgpu_drv.o
