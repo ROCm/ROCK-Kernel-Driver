@@ -227,7 +227,8 @@ struct core_link {
 	union dp_wa dp_wa;
 
 	/* MST record stream using this link */
-	uint8_t stream_count;
+	const struct core_stream *enabled_streams[MAX_SINKS_PER_LINK];
+	uint8_t enabled_stream_count;
 };
 
 #define DC_LINK_TO_LINK(dc_link) container_of(dc_link, struct core_link, public)

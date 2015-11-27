@@ -919,10 +919,18 @@ static enum dc_status enable_link_dp(struct core_stream *stream)
 static enum dc_status enable_link_dp_mst(struct core_stream *stream)
 {
 	struct core_link *link = stream->sink->link;
+	bool already_enabled = false;
+	int i;
+
+
+	for (i = 0; i < link->enabled_stream_count; i++) {
+		if (link->enabled_streams[i] == stream)
+			already_enabled = true;
+	}
 
 	/* TODO MST link shared by stream. counter? */
-	if (link->stream_count < 4)
-		link->stream_count++;
+	if (!already_enabled)
+		link->enabled_streams[link->enabled_stream_count++] = stream;
 
 	/* sink signal type after MST branch is MST. Multiple MST sinks
 	 * share one link. Link DP PHY is enable or training only once.
@@ -1045,7 +1053,7 @@ enum dc_status core_link_disable(struct core_stream *stream)
 					stream->sink->link, stream->signal);
 		else {
 			dp_disable_link_phy_mst(
-					stream->sink->link, stream->signal);
+					stream->sink->link, stream);
 		}
 	}
 
