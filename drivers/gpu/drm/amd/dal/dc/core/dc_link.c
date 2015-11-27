@@ -363,6 +363,8 @@ static void link_unplug(struct core_link *link)
 
 	for (i = 0; i < link->public.sink_count; i++)
 		dc_link_remove_sink(&link->public, link->public.sink[i]);
+
+	link->dpcd_sink_count = 0;
 }
 
 static enum dc_edid_status read_edid(struct core_link *link)
