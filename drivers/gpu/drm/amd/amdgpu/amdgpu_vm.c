@@ -1082,6 +1082,11 @@ int amdgpu_vm_bo_map(struct amdgpu_device *adev,
 		if (r)
 			goto error_free;
 
+		/* Keep a reference to the page table to avoid freeing
+		 * them up in the wrong order.
+		 */
+		pt->parent = amdgpu_bo_ref(vm->page_directory);
+
 		r = amdgpu_vm_clear_bo(adev, pt);
 		if (r) {
 			amdgpu_bo_unref(&pt);
