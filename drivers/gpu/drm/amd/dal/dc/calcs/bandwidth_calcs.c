@@ -90,6 +90,7 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 	const uint32_t low = 0;
 
 	uint32_t i, j, k;
+	uint64_t remainder;
 	struct bw_fixed yclk[3];
 	struct bw_fixed sclk[3];
 	bool d0_underlay_enable;
@@ -1350,24 +1351,26 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 		results->inefficient_underlay_pitch_in_pixels = bw_div(
 			results->inefficient_linear_pitch_in_bytes,
 			int_to_fixed(2));
-	} else
-	// case else
-	{
+	} else {
 		results->inefficient_underlay_pitch_in_pixels = bw_div(
 			results->inefficient_linear_pitch_in_bytes,
 			int_to_fixed(4));
 	}
+
+	div64_u64_rem(mode_data->underlay_pitch_in_pixels.value,
+			results->inefficient_underlay_pitch_in_pixels.value,
+			&remainder);
+
 	if (mode_data->underlay_tiling_mode == linear
 		&& vbios->scatter_gather_enable == true
-		&& mode_data->underlay_pitch_in_pixels.value
-			% results->inefficient_underlay_pitch_in_pixels.value
-			== false) {
+		&& remainder == 0) {
 		results->minimum_underlay_pitch_padding_recommended_for_efficiency =
 			int_to_fixed(256);
 	} else {
 		results->minimum_underlay_pitch_padding_recommended_for_efficiency =
 			int_to_fixed(0);
 	}
+
 	results->cursor_total_data = int_to_fixed(0);
 	results->cursor_total_request_groups = int_to_fixed(0);
 	results->scatter_gather_total_pte_requests = int_to_fixed(0);
@@ -1410,6 +1413,13 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 		int_to_fixed(0);
 	for (i = 0; i <= maximum_number_of_surfaces - 1; i += 1) {
 		if (results->enable[i]) {
+			uint64_t arg1 = mul(results->pitch_in_pixels_after_surface_type[i],
+						results->bytes_per_pixel[i]).value;
+
+			div64_u64_rem(arg1,
+					results->inefficient_linear_pitch_in_bytes.value,
+					&remainder);
+
 			if (results->scatter_gather_enable_for_pipe[i] == true
 				&& tiling_mode[i] != def_linear) {
 				results->bytes_per_page_close_open =
@@ -1428,11 +1438,7 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 								results->scatter_gather_page_width[i])));
 			} else if (results->scatter_gather_enable_for_pipe[i]
 				== true && tiling_mode[i] == def_linear
-				&& (mul(
-					results->pitch_in_pixels_after_surface_type[i],
-					results->bytes_per_pixel[i])).value
-					% results->inefficient_linear_pitch_in_bytes.value
-					== false) {
+				&& remainder == 0) {
 				results->bytes_per_page_close_open =
 					dceip->linear_mode_line_request_alternation_slice;
 			} else {

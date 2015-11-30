@@ -92,8 +92,7 @@ struct bw_fixed frc_to_fixed(long long numerator, long long denominator)
 
 	arg1_value = abs_i64(numerator);
 	arg2_value = abs_i64(denominator);
-	remainder = arg1_value % arg2_value;
-	res_value = arg1_value / arg2_value;
+	res_value = div64_u64_rem(arg1_value, arg2_value, &remainder);
 
 	ASSERT(res_value <= MAX_I32);
 
@@ -144,7 +143,8 @@ struct bw_fixed bw_max(const struct bw_fixed arg1, const struct bw_fixed arg2)
 struct bw_fixed bw_floor(const struct bw_fixed arg, const struct bw_fixed significance)
 {
 	struct bw_fixed result;
-	signed long long multiplicand = arg.value / abs_i64(significance.value);
+	int64_t multiplicand;
+	multiplicand = div64_u64(arg.value, abs_i64(significance.value));
 	result.value = abs_i64(significance.value) * multiplicand;
 	ASSERT(abs_i64(result.value) <= abs_i64(arg.value));
 	return result;
@@ -153,7 +153,8 @@ struct bw_fixed bw_floor(const struct bw_fixed arg, const struct bw_fixed signif
 struct bw_fixed bw_ceil(const struct bw_fixed arg, const struct bw_fixed significance)
 {
 	struct bw_fixed result;
-	result.value = arg.value + arg.value % abs_i64(significance.value);
+	div64_u64_rem(arg.value, abs_i64(significance.value), &result.value);
+	result.value += arg.value;
 	if (result.value < significance.value)
 		result.value = significance.value;
 	return result;

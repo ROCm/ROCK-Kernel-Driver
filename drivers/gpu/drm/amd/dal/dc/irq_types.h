@@ -178,7 +178,7 @@ enum dc_interrupt_porlarity {
 	(int_polarity == INTERRUPT_POLARITY_BOTH) ? "Both" : "Invalid"
 
 struct dc_timer_interrupt_params {
-	uint64_t micro_sec_interval;
+	uint32_t micro_sec_interval;
 	enum dc_interrupt_context int_context;
 };
 
