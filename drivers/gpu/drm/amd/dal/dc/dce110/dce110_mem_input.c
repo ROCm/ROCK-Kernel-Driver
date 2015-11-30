@@ -705,7 +705,7 @@ void dce110_program_urgency_watermark(
 	uint32_t pstate_blackout_duration_ns)
 {
 	struct dce110_mem_input *bm_dce110 = TO_DCE110_MEM_INPUT(mi);
-	uint32_t total_dest_line_time_ns = 1000000ULL * h_total
+	uint32_t total_dest_line_time_ns = 1000000UL * h_total
 		/ pixel_clk_in_khz + pstate_blackout_duration_ns;
 
 	program_urgency_watermark(
