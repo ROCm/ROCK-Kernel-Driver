@@ -26,6 +26,7 @@
 #include "dal_services.h"
 #include "core_types.h"
 #include "link_encoder_types.h"
+#include "stream_encoder_types.h"
 #include "dce110_link_encoder.h"
 #include "i2caux_interface.h"
 #include "dce/dce_11_0_d.h"
@@ -1594,6 +1595,7 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	uint32_t value0;
 	uint32_t value1;
 	uint32_t retries = 0;
+	struct core_stream *core_stream = NULL;
 
 	/* For CZ, there are only 3 pipes. So Virtual channel is up 3.*/
 
@@ -1605,9 +1607,11 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	value1 = dal_read_reg(enc->ctx, mmDP_MSE_SAT1 + addr_offset);
 
 	if (table->stream_count >= 1) {
+		core_stream = DC_STREAM_TO_CORE(table->stream_allocations[0].engine);
+
 		set_reg_field_value(
 			value0,
-			table->stream_allocations[0].engine,
+			core_stream->stream_enc->id,
 			DP_MSE_SAT0,
 			DP_MSE_SAT_SRC0);
 
@@ -1619,9 +1623,11 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	}
 
 	if (table->stream_count >= 2) {
+		core_stream = DC_STREAM_TO_CORE(table->stream_allocations[1].engine);
+
 		set_reg_field_value(
 			value0,
-			table->stream_allocations[1].engine,
+			core_stream->stream_enc->id,
 			DP_MSE_SAT0,
 			DP_MSE_SAT_SRC1);
 
@@ -1633,9 +1639,11 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	}
 
 	if (table->stream_count >= 3) {
+		core_stream = DC_STREAM_TO_CORE(table->stream_allocations[2].engine);
+
 		set_reg_field_value(
 			value1,
-			table->stream_allocations[2].engine,
+			core_stream->stream_enc->id,
 			DP_MSE_SAT1,
 			DP_MSE_SAT_SRC2);
 
