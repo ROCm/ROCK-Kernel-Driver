@@ -31,9 +31,6 @@
 #include <drm/amdgpu_drm.h>
 #include <drm/drm_edid.h>
 
-#include "dc_types.h"
-#include "core_types.h"
-#include "stream_encoder_types.h"
 #include "amdgpu.h"
 #include "dc.h"
 #include "dc_services.h"
@@ -234,22 +231,27 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 	for (i = 0; i < mst_mgr->max_payloads; i++) {
 		if (mst_mgr->payloads[i].num_slots == 0)
 			break;
-		table->stream_count++;
 	}
+
+	table->stream_count = i;
 
 	for (i = 0; i < table->stream_count; i++) {
 		table->stream_allocations[i].slot_count =
 				mst_mgr->proposed_vcpis[i]->num_slots;
-		/* mst_mgr->pbn_div is fixed value after link training for
-		 * current link PHY */
+		/*
+		 * mst_mgr->pbn_div is fixed value after link training for
+		 * current link PHY
+		 */
 		table->stream_allocations[i].pbn_per_slot = mst_mgr->pbn_div;
 
-		/* find which payload is for current stream
-		 * after drm_dp_update_payload_part1, payload and proposed_vcpis
+		/*
+		 * find which payload is for current stream after
+		 * drm_dp_update_payload_part1, payload and proposed_vcpis
 		 * are sync to the same allocation sequence. vcpi is not saved
 		 * into payload by drm_dp_update_payload_part1. In order to
 		 * find sequence of a payload within allocation sequence, we
-		 * need check vcpi from proposed_vcpis*/
+		 * need check vcpi from proposed_vcpis
+		 */
 
 		table->stream_allocations[i].pbn =
 				mst_mgr->proposed_vcpis[i]->pbn;
@@ -259,59 +261,60 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 
 		find_stream_for_sink = false;
 
-		list_for_each_entry(connector,
-				&dev->mode_config.connector_list, head) {
+		list_for_each_entry(
+			connector,
+			&dev->mode_config.connector_list,
+			head) {
+			const struct dc_sink *dc_sink_connector;
+			struct dc_target *dc_target;
+			uint8_t j;
 
 			aconnector = to_amdgpu_connector(connector);
 
 			/* not mst connector */
 			if (!aconnector->mst_port)
 				continue;
+
 			mst_port = aconnector->port;
 
-			if (mst_port->vcpi.vcpi ==
-					mst_mgr->proposed_vcpis[i]->vcpi) {
-				/* find connector with same vcid as payload */
+			if (mst_port->vcpi.vcpi !=
+					mst_mgr->proposed_vcpis[i]->vcpi)
+				continue;
 
-				const struct dc_sink *dc_sink_connector;
-				struct core_sink *core_sink;
-				struct dc_target *dc_target;
-				struct core_target *core_target;
-				struct stream_encoder *stream_enc;
-				uint8_t j;
+			/* find connector with same vcid as payload */
 
-				dc_sink_connector = aconnector->dc_sink;
-				core_sink = DC_SINK_TO_CORE(dc_sink_connector);
+			dc_sink_connector = aconnector->dc_sink;
 
-				/* find stream to drive this sink
-				 * crtc -> target -> stream -> sink */
-				crtc = aconnector->base.state->crtc;
-				amdgpu_crtc = to_amdgpu_crtc(crtc);
-				dc_target = amdgpu_crtc->target;
-				core_target = DC_TARGET_TO_CORE(dc_target);
+			/*
+			 * find stream to drive this sink
+			 * crtc -> target -> stream -> sink
+			 */
+			crtc = aconnector->base.state->crtc;
+			amdgpu_crtc = to_amdgpu_crtc(crtc);
+			dc_target = amdgpu_crtc->target;
 
-				for (j = 0; j < core_target->stream_count;
-						j++) {
-					if (core_target->streams[j]->sink ==
-							core_sink)
-						break;
-				}
-
-				if (j < core_target->stream_count) {
-					/* find sink --> stream --> target -->
-					 * connector*/
-					stream_enc =
-					core_target->streams[j]->stream_enc;
-					table->stream_allocations[i].engine =
-							stream_enc->id;
-					/* exit loop connector */
-					find_stream_for_sink = true;
+			for (j = 0; j < dc_target->stream_count; j++) {
+				if (dc_target->streams[j]->sink ==
+					dc_sink_connector)
 					break;
-				}
+			}
+
+			if (j < dc_target->stream_count) {
+				/*
+				 * find sink --> stream --> target -->
+				 * connector
+				 */
+				table->stream_allocations[i].engine =
+					dc_target->streams[j];
+				/* exit loop connector */
+				find_stream_for_sink = true;
+				break;
 			}
 		}
+
 		if (!find_stream_for_sink) {
-			/* TODO: do not find stream for sink. This should not
+			/*
+			 * TODO: do not find stream for sink. This should not
 			 * happen
 			 */
 			ASSERT(0);

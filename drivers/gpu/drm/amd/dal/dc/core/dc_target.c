@@ -59,6 +59,7 @@ static void construct(
 
 	target->ctx = ctx;
 	target->stream_count = stream_count;
+	target->public.stream_count = stream_count;
 }
 
 static void destruct(struct core_target *core_target)
