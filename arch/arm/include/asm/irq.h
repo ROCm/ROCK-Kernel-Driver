@@ -2,10 +2,6 @@
 #define __ASM_ARM_IRQ_H
 
 #define NR_IRQS_LEGACY	16
-static inline int nr_legacy_irqs(void)
-{
-	return NR_IRQS_LEGACY;
-}
 
 #ifndef CONFIG_SPARSE_IRQ
 #include <mach/irqs.h>
@@ -43,6 +39,11 @@ extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
 extern void arch_trigger_all_cpu_backtrace(bool);
 #define arch_trigger_all_cpu_backtrace(x) arch_trigger_all_cpu_backtrace(x)
 #endif
+
+static inline int nr_legacy_irqs(void)
+{
+	return NR_IRQS_LEGACY;
+}
 
 #endif
 
