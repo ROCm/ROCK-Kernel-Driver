@@ -1134,7 +1134,7 @@ amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 	addr /= AMDGPU_GPU_PAGE_SIZE;
 
 	list_for_each_entry(reloc, &parser->validated, tv.head) {
-		if (!reloc->bo_va)
+		if (!reloc->bo_va || reloc->bo_va->bo->adev != parser->adev)
 			continue;
 
 		list_for_each_entry(mapping, &reloc->bo_va->valids, list) {
