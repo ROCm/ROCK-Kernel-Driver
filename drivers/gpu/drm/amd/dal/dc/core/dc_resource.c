@@ -88,12 +88,15 @@ struct clock_source *find_used_clk_src_for_sharing(
 	uint8_t i, j;
 	for (i = 0; i < context->target_count; i++) {
 		struct core_target *target = context->targets[i];
-		for (j = 0; j < target->stream_count; j++)
-		{
-			if (target->streams[j]->clock_source == NULL)
+		for (j = 0; j < target->public.stream_count; j++) {
+			struct core_stream *clock_source_stream =
+				DC_STREAM_TO_CORE(target->public.streams[j]);
+
+			if (clock_source_stream->clock_source == NULL)
 				continue;
-			if (is_sharable_clk_src(target->streams[j], stream))
-				return target->streams[j]->clock_source;
+
+			if (is_sharable_clk_src(clock_source_stream, stream))
+				return clock_source_stream->clock_source;
 		}
 	}
 
@@ -363,9 +366,12 @@ void build_scaling_params_for_context(
 		if (context->target_flags[i].unchanged)
 			continue;
 		for (j = 0; j < target->status.surface_count; j++) {
-			const struct dc_surface *surface = target->status.surfaces[j];
-			for (k = 0; k < target->stream_count; k++) {
-				struct core_stream *stream = target->streams[k];
+			const struct dc_surface *surface =
+				target->status.surfaces[j];
+			for (k = 0; k < target->public.stream_count; k++) {
+				struct core_stream *stream =
+					DC_STREAM_TO_CORE(
+						target->public.streams[k]);
 
 				build_scaling_params(surface, stream);
 			}

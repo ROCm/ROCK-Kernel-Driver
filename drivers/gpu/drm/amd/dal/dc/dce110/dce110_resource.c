@@ -876,35 +876,43 @@ static enum dc_status map_resources(
 	/* mark resources used for targets that are already active */
 	for (i = 0; i < context->target_count; i++) {
 		struct core_target *target = context->targets[i];
-		if (context->target_flags[i].unchanged)
-			for (j = 0; j < target->stream_count; j++) {
-				struct core_stream *stream = target->streams[j];
-				attach_stream_to_controller(
-						&context->res_ctx,
-						stream);
 
-				set_stream_engine_in_use(
-						&context->res_ctx,
-						stream->stream_enc);
+		if (!context->target_flags[i].unchanged)
+			continue;
 
-				reference_clock_source(
-						&context->res_ctx,
-						stream->clock_source);
+		for (j = 0; j < target->public.stream_count; j++) {
+			struct core_stream *stream =
+				DC_STREAM_TO_CORE(target->public.streams[j]);
 
-				if (stream->audio) {
-					set_audio_in_use(&context->res_ctx,
-							stream->audio);
-				}
+			attach_stream_to_controller(
+				&context->res_ctx,
+				stream);
+
+			set_stream_engine_in_use(
+				&context->res_ctx,
+				stream->stream_enc);
+
+			reference_clock_source(
+				&context->res_ctx,
+				stream->clock_source);
+
+			if (stream->audio) {
+				set_audio_in_use(&context->res_ctx,
+					stream->audio);
 			}
+		}
 	}
 
 	/* acquire new resources */
 	for (i = 0; i < context->target_count; i++) {
 		struct core_target *target = context->targets[i];
+
 		if (context->target_flags[i].unchanged)
 			continue;
-		for (j = 0; j < target->stream_count; j++) {
-			struct core_stream *stream = target->streams[j];
+
+		for (j = 0; j < target->public.stream_count; j++) {
+			struct core_stream *stream =
+				DC_STREAM_TO_CORE(target->public.streams[j]);
 			struct core_stream *curr_stream;
 
 			if (!assign_first_free_controller(
@@ -1103,9 +1111,11 @@ static enum dc_status validate_mapped_resource(
 		struct core_target *target = context->targets[i];
 		if (context->target_flags[i].unchanged)
 			continue;
-		for (j = 0; j < target->stream_count; j++) {
-			struct core_stream *stream = target->streams[j];
+		for (j = 0; j < target->public.stream_count; j++) {
+			struct core_stream *stream =
+				DC_STREAM_TO_CORE(target->public.streams[j]);
 			struct core_link *link = stream->sink->link;
+
 			status = build_stream_hw_param(stream);
 
 			if (status != DC_OK)
@@ -1152,8 +1162,9 @@ enum dc_status dce110_validate_bandwidth(
 
 	for (i = 0; i < context->target_count; i++) {
 		struct core_target *target = context->targets[i];
-		for (j = 0; j < target->stream_count; j++) {
-			struct core_stream *stream = target->streams[j];
+		for (j = 0; j < target->public.stream_count; j++) {
+			struct core_stream *stream =
+				DC_STREAM_TO_CORE(target->public.streams[j]);
 			struct bw_calcs_input_single_display *disp = &context->
 				bw_mode_data.displays_data[number_of_displays];
 
@@ -1241,8 +1252,10 @@ static void set_target_unchanged(
 	uint8_t i;
 	struct core_target *target = context->targets[target_idx];
 	context->target_flags[target_idx].unchanged = true;
-	for (i = 0; i < target->stream_count; i++) {
-		uint8_t index = target->streams[i]->controller_idx;
+	for (i = 0; i < target->public.stream_count; i++) {
+		struct core_stream *core_stream =
+			DC_STREAM_TO_CORE(target->public.streams[i]);
+		uint8_t index = core_stream->controller_idx;
 		context->res_ctx.controller_ctx[index].flags.unchanged = true;
 	}
 }

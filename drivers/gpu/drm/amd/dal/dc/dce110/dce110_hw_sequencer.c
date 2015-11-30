@@ -1010,7 +1010,7 @@ static void power_down_encoders(struct validate_context *context)
 
 	for (i = 0; i < context->target_count; i++) {
 		target = context->targets[i];
-		stream = target->streams[0];
+		stream = DC_STREAM_TO_CORE(target->public.streams[0]);
 		core_link_disable(stream);
 	}
 }
@@ -1023,7 +1023,7 @@ static void power_down_controllers(struct validate_context *context)
 
 	for (i = 0; i < context->target_count; i++) {
 		target = context->targets[i];
-		stream = target->streams[0];
+		stream = DC_STREAM_TO_CORE(target->public.streams[0]);
 
 		dce110_timing_generator_disable_crtc(stream->tg);
 	}
@@ -1037,7 +1037,7 @@ static void power_down_clock_sources(struct validate_context *context)
 
 	for (i = 0; i < context->target_count; i++) {
 		target = context->targets[i];
-		stream = target->streams[0];
+		stream = DC_STREAM_TO_CORE(target->public.streams[0]);
 
 		if (false == dal_clock_source_power_down_pll(
 				stream->clock_source,
@@ -1074,7 +1074,7 @@ static void disable_vga_and_power_gate_all_controllers(
 
 	for (i = 0; i < context->target_count; i++) {
 		target = context->targets[i];
-		stream = target->streams[0];
+		stream = DC_STREAM_TO_CORE(target->public.streams[0]);
 		tg = stream->tg;
 		ctx = stream->ctx;
 		controller_id = stream->controller_idx;
@@ -1257,8 +1257,9 @@ static void set_displaymarks(
 	for (i = 0; i < target_count; i++) {
 		struct core_target *target = context->targets[i];
 
-		for (j = 0; j < target->stream_count; j++) {
-			struct core_stream *stream = target->streams[j];
+		for (j = 0; j < target->public.stream_count; j++) {
+			struct core_stream *stream =
+				DC_STREAM_TO_CORE(target->public.streams[j]);
 
 			dce110_mem_input_program_display_marks(
 				stream->mi,
@@ -1285,8 +1286,9 @@ static void set_safe_displaymarks(struct validate_context *context)
 	for (i = 0; i < target_count; i++) {
 		struct core_target *target = context->targets[i];
 
-		for (j = 0; j < target->stream_count; j++) {
-			struct core_stream *stream = target->streams[j];
+		for (j = 0; j < target->public.stream_count; j++) {
+			struct core_stream *stream =
+				DC_STREAM_TO_CORE(target->public.streams[j]);
 
 			dce110_mem_input_program_safe_display_marks(stream->mi);
 		}
@@ -1348,8 +1350,9 @@ static void switch_dp_clock_sources(
 	uint8_t i, j;
 	for (i = 0; i < val_context->target_count; i++) {
 		struct core_target *target = val_context->targets[i];
-		for (j = 0; j < target->stream_count; j++) {
-			struct core_stream *stream = target->streams[j];
+		for (j = 0; j < target->public.stream_count; j++) {
+			struct core_stream *stream =
+				DC_STREAM_TO_CORE(target->public.streams[j]);
 
 			if (dc_is_dp_signal(stream->signal)) {
 				struct clock_source *clk_src =
@@ -1556,15 +1559,17 @@ static bool set_plane_config(
 	struct core_surface *surface,
 	struct core_target *target)
 {
+	const struct core_stream *core_stream =
+		DC_STREAM_TO_CORE(target->public.streams[0]);
 	const struct dc_crtc_timing *dc_crtc_timing =
-			&target->streams[0]->public.timing;
-	struct mem_input *mi = target->streams[0]->mi;
-	struct input_pixel_processor *ipp = target->streams[0]->ipp;
-	struct timing_generator *tg = target->streams[0]->tg;
-	struct transform *xfm = target->streams[0]->xfm;
-	struct output_pixel_processor *opp = target->streams[0]->opp;
-	struct dc_context *ctx = target->streams[0]->ctx;
-	uint8_t controller_idx = target->streams[0]->controller_idx;
+			&target->public.streams[0]->timing;
+	struct mem_input *mi = core_stream->mi;
+	struct input_pixel_processor *ipp = core_stream->ipp;
+	struct timing_generator *tg = core_stream->tg;
+	struct transform *xfm = core_stream->xfm;
+	struct output_pixel_processor *opp = core_stream->opp;
+	struct dc_context *ctx = core_stream->ctx;
+	uint8_t controller_idx = core_stream->controller_idx;
 
 	/* TODO: Clean up change, possibly change to use same type */
 	enum color_space input_color_space =
@@ -1590,14 +1595,14 @@ static bool set_plane_config(
 	set_default_colors(
 			ipp,
 			opp,
-			target->streams[0]->format,
+			core_stream->format,
 			input_color_space,
 			get_output_color_space(dc_crtc_timing),
 			dc_crtc_timing->display_color_depth);
 
 	/* program Scaler */
 	program_scaler(
-		controller_idx, tg, xfm, surface, target->streams[0]);
+		controller_idx, tg, xfm, surface, core_stream);
 
 	set_blender_mode(
 			ctx,
@@ -1634,9 +1639,11 @@ static bool update_plane_address(
 	const struct core_surface *surface,
 	struct core_target *target)
 {
-	struct dc_context *ctx = target->streams[0]->ctx;
-	struct mem_input *mi = target->streams[0]->mi;
-	uint8_t controller_id = target->streams[0]->controller_idx;
+	const struct core_stream *core_stream =
+		DC_STREAM_TO_CORE(target->public.streams[0]);
+	struct dc_context *ctx = core_stream->ctx;
+	struct mem_input *mi = core_stream->mi;
+	uint8_t controller_id = core_stream->controller_idx;
 
 	/* TODO: crtc should be per surface, NOT per-target */
 	pipe_control_lock(
@@ -1688,17 +1695,18 @@ static void reset_hw_ctx(struct dc *dc,
 	uint8_t i;
 	/* look up the targets that have been removed since last commit */
 	for (i = 0; i < dc->current_context.target_count; i++) {
-		uint8_t controller_idx = dc->current_context.targets[i]->
-						streams[0]->controller_idx;
+		const struct core_target *core_target =
+			dc->current_context.targets[i];
+		struct core_stream *core_stream =
+			DC_STREAM_TO_CORE(core_target->public.streams[0]);
+		uint8_t controller_idx = core_stream->controller_idx;
 
 		if (context->res_ctx.controller_ctx[controller_idx].stream &&
 				!context->res_ctx.controller_ctx[controller_idx]
 				.flags.timing_changed)
 			continue;
 
-		reset_single_stream_hw_ctx(
-			dc->current_context.targets[i]->streams[0],
-			&dc->current_context);
+		reset_single_stream_hw_ctx(core_stream, &dc->current_context);
 	}
 }
 

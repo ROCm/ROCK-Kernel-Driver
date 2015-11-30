@@ -46,8 +46,6 @@ struct core_target {
 	struct dc_target public;
 	struct dc_target_status status;
 
-	struct core_stream *streams[MAX_STREAMS];
-	uint8_t stream_count;
 	struct dc_context *ctx;
 };
 
