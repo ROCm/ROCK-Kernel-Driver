@@ -145,7 +145,7 @@ bool dc_commit_surfaces_to_target(
 #define MAX_STREAM_NUM 1
 
 struct dc_target {
-	uint32_t temp;
+	uint8_t stream_count;
 	const struct dc_stream *streams[MAX_STREAM_NUM];
 };
 
