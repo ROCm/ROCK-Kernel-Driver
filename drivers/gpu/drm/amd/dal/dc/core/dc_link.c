@@ -355,9 +355,7 @@ static bool is_dp_active_dongle(enum display_dongle_type dongle_type)
 		dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER);
 }
 
-/* TODO: To beretired because this call is wrong with
- * pluging in of active-dongle without display*/
-static void link_unplug(struct core_link *link)
+static void link_disconnect_all_sinks(struct core_link *link)
 {
 	int i;
 
@@ -476,7 +474,7 @@ void dc_link_detect(const struct dc_link *dc_link)
 						/* active dongle unplug
 						 * processing for short irq
 						 */
-						link_unplug(link);
+						link_disconnect_all_sinks(link);
 						return;
 					}
 
@@ -640,7 +638,7 @@ void dc_link_detect(const struct dc_link *dc_link)
 		default:
 			break;
 		}
-		link_unplug(link);
+		link_disconnect_all_sinks(link);
 	}
 
 	LINK_INFO("link=%d, dc_sink_in=%p is now %s\n",
