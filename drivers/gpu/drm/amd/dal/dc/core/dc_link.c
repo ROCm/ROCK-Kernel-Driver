@@ -35,8 +35,8 @@
 #include "core_status.h"
 #include "dc_link_dp.h"
 #include "link_hwss.h"
-#include "stream_encoder_types.h"
-#include "link_encoder_types.h"
+#include "stream_encoder.h"
+#include "link_encoder.h"
 #include "hw_sequencer.h"
 
 

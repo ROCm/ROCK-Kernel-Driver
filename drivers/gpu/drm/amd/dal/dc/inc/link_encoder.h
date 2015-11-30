@@ -1,23 +1,19 @@
 /*
- * link_encoder_types.h
+ * link_encoder.h
  *
  *  Created on: Oct 6, 2015
  *      Author: yonsun
  */
 
-#ifndef DRIVERS_GPU_DRM_AMD_DAL_DEV_INCLUDE_LINK_ENCODER_TYPES_H_
-#define DRIVERS_GPU_DRM_AMD_DAL_DEV_INCLUDE_LINK_ENCODER_TYPES_H_
-
-#include "encoder_interface.h"
+#ifndef LINK_ENCODER_H_
+#define LINK_ENCODER_H_
 
 struct link_enc_status {
 	int dummy; /*TODO*/
 };
 struct link_encoder {
 	struct adapter_service *adapter_service;
-	int32_t be_engine_offset;
 	int32_t aux_channel_offset;
-	int32_t transmitter_offset;
 	struct dc_context *ctx;
 	struct graphics_object_id id;
 	struct graphics_object_id connector;
@@ -29,4 +25,4 @@ struct link_encoder {
 	enum hpd_source_id hpd_source;
 };
 
-#endif /* DRIVERS_GPU_DRM_AMD_DAL_DEV_INCLUDE_LINK_ENCODER_TYPES_H_ */
+#endif /* LINK_ENCODER_H_ */

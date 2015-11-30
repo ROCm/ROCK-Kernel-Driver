@@ -26,14 +26,25 @@
 #ifndef __DC_STREAM_ENCODER_DCE110_H__
 #define __DC_STREAM_ENCODER_DCE110_H__
 
-struct stream_enc_init_data {
-	enum engine_id stream_engine_id;
-	struct bios_parser *bp;
-	struct dc_context *ctx;
+#include "inc/stream_encoder.h"
+
+#define TO_DCE110_STREAM_ENC(stream_encoder)\
+	container_of(stream_encoder, struct dce110_stream_encoder, base)
+
+struct dce110_stream_enc_offsets {
+	uint32_t dig_offset;
+	uint32_t dp_offset;
+};
+
+struct dce110_stream_encoder {
+	struct stream_encoder base;
+	struct dce110_stream_enc_offsets offsets;
 };
 
 struct stream_encoder *dce110_stream_encoder_create(
-	struct stream_enc_init_data *init);
+	enum engine_id eng_id,
+	struct dc_context *ctx,
+	struct bios_parser *bp);
 
 void dce110_stream_encoder_destroy(struct stream_encoder **enc);
 
