@@ -27,18 +27,18 @@
 #define BW_FIXED_H_
 
 struct bw_fixed {
-	signed long long value;
+	int64_t value;
 };
 
 struct bw_fixed bw_min3(struct bw_fixed v1, struct bw_fixed v2, struct bw_fixed v3);
 
 struct bw_fixed bw_max3(struct bw_fixed v1, struct bw_fixed v2, struct bw_fixed v3);
 
-struct bw_fixed int_to_fixed(long long value);
+struct bw_fixed int_to_fixed(int64_t value);
 
-struct bw_fixed frc_to_fixed(long long num, long long denum);
+struct bw_fixed frc_to_fixed(int64_t num, int64_t denum);
 
-struct bw_fixed fixed31_32_to_bw_fixed(long long raw);
+struct bw_fixed fixed31_32_to_bw_fixed(int64_t raw);
 
 struct bw_fixed add(const struct bw_fixed arg1, const struct bw_fixed arg2);
 struct bw_fixed sub(const struct bw_fixed arg1, const struct bw_fixed arg2);

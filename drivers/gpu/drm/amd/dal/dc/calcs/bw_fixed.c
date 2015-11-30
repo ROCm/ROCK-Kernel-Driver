@@ -29,16 +29,16 @@
 #define BITS_PER_FRACTIONAL_PART 24
 
 #define MIN_I32 \
-	(long long)(-(1LL << (63 - BITS_PER_FRACTIONAL_PART)))
+	(int64_t)(-(1LL << (63 - BITS_PER_FRACTIONAL_PART)))
 
 #define MAX_I32 \
-	(long long)((1ULL << (63 - BITS_PER_FRACTIONAL_PART)) - 1)
+	(int64_t)((1ULL << (63 - BITS_PER_FRACTIONAL_PART)) - 1)
 
 #define MIN_I64 \
-	(long long)(-(1LL << 63))
+	(int64_t)(-(1LL << 63))
 
 #define MAX_I64 \
-	(long long)((1ULL << 63) - 1)
+	(int64_t)((1ULL << 63) - 1)
 
 
 #define FRACTIONAL_PART_MASK \
@@ -50,12 +50,12 @@
 #define GET_FRACTIONAL_PART(x) \
 	(FRACTIONAL_PART_MASK & (x))
 
-static unsigned long long abs_i64(long long arg)
+static uint64_t abs_i64(int64_t arg)
 {
 	if (arg >= 0)
-		return (unsigned long long)(arg);
+		return (uint64_t)(arg);
 	else
-		return (unsigned long long)(-arg);
+		return (uint64_t)(-arg);
 }
 
 struct bw_fixed bw_min3(struct bw_fixed v1, struct bw_fixed v2, struct bw_fixed v3)
@@ -68,7 +68,7 @@ struct bw_fixed bw_max3(struct bw_fixed v1, struct bw_fixed v2, struct bw_fixed 
 	return bw_max(bw_max(v1, v2), v3);
 }
 
-struct bw_fixed int_to_fixed(long long value)
+struct bw_fixed int_to_fixed(int64_t value)
 {
 	struct bw_fixed res;
 	ASSERT(value < MAX_I32 && value > MIN_I32);
@@ -76,17 +76,17 @@ struct bw_fixed int_to_fixed(long long value)
 	return res;
 }
 
-struct bw_fixed frc_to_fixed(long long numerator, long long denominator)
+struct bw_fixed frc_to_fixed(int64_t numerator, int64_t denominator)
 {
 	struct bw_fixed res;
 	bool arg1_negative = numerator < 0;
 	bool arg2_negative = denominator < 0;
-	unsigned long long arg1_value;
-	unsigned long long arg2_value;
-	unsigned long long remainder;
+	uint64_t arg1_value;
+	uint64_t arg2_value;
+	uint64_t remainder;
 
 	/* determine integer part */
-	unsigned long long res_value;
+	uint64_t res_value;
 
 	ASSERT(denominator != 0);
 
@@ -98,7 +98,7 @@ struct bw_fixed frc_to_fixed(long long numerator, long long denominator)
 
 	/* determine fractional part */
 	{
-		unsigned int i = BITS_PER_FRACTIONAL_PART;
+		uint32_t i = BITS_PER_FRACTIONAL_PART;
 
 		do
 		{
@@ -116,14 +116,14 @@ struct bw_fixed frc_to_fixed(long long numerator, long long denominator)
 
 	/* round up LSB */
 	{
-		unsigned long long summand = (remainder << 1) >= arg2_value;
+		uint64_t summand = (remainder << 1) >= arg2_value;
 
 		ASSERT(res_value <= MAX_I64 - summand);
 
 		res_value += summand;
 	}
 
-	res.value = (signed long long)(res_value);
+	res.value = (int64_t)(res_value);
 
 	if (arg1_negative ^ arg2_negative)
 		res.value = -res.value;
@@ -185,16 +185,16 @@ struct bw_fixed mul(const struct bw_fixed arg1, const struct bw_fixed arg2)
 	bool arg1_negative = arg1.value < 0;
 	bool arg2_negative = arg2.value < 0;
 
-	unsigned long long arg1_value = abs_i64(arg1.value);
-	unsigned long long arg2_value = abs_i64(arg2.value);
+	uint64_t arg1_value = abs_i64(arg1.value);
+	uint64_t arg2_value = abs_i64(arg2.value);
 
-	unsigned long long arg1_int = GET_INTEGER_PART(arg1_value);
-	unsigned long long arg2_int = GET_INTEGER_PART(arg2_value);
+	uint64_t arg1_int = GET_INTEGER_PART(arg1_value);
+	uint64_t arg2_int = GET_INTEGER_PART(arg2_value);
 
-	unsigned long long arg1_fra = GET_FRACTIONAL_PART(arg1_value);
-	unsigned long long arg2_fra = GET_FRACTIONAL_PART(arg2_value);
+	uint64_t arg1_fra = GET_FRACTIONAL_PART(arg1_value);
+	uint64_t arg2_fra = GET_FRACTIONAL_PART(arg2_value);
 
-	unsigned long long tmp;
+	uint64_t tmp;
 
 	res.value = arg1_int * arg2_int;
 
@@ -204,22 +204,22 @@ struct bw_fixed mul(const struct bw_fixed arg1, const struct bw_fixed arg2)
 
 	tmp = arg1_int * arg2_fra;
 
-	ASSERT(tmp <= (unsigned long long)(MAX_I64 - res.value));
+	ASSERT(tmp <= (uint64_t)(MAX_I64 - res.value));
 
 	res.value += tmp;
 
 	tmp = arg2_int * arg1_fra;
 
-	ASSERT(tmp <= (unsigned long long)(MAX_I64 - res.value));
+	ASSERT(tmp <= (uint64_t)(MAX_I64 - res.value));
 
 	res.value += tmp;
 
 	tmp = arg1_fra * arg2_fra;
 
 	tmp = (tmp >> BITS_PER_FRACTIONAL_PART) +
-		(tmp >= (unsigned long long)(frc_to_fixed(1, 2).value));
+		(tmp >= (uint64_t)(frc_to_fixed(1, 2).value));
 
-	ASSERT(tmp <= (unsigned long long)(MAX_I64 - res.value));
+	ASSERT(tmp <= (uint64_t)(MAX_I64 - res.value));
 
 	res.value += tmp;
 
@@ -234,7 +234,7 @@ struct bw_fixed bw_div(const struct bw_fixed arg1, const struct bw_fixed arg2)
 	return res;
 }
 
-struct bw_fixed fixed31_32_to_bw_fixed(long long raw)
+struct bw_fixed fixed31_32_to_bw_fixed(int64_t raw)
 {
 	struct bw_fixed result = { 0 };
 
