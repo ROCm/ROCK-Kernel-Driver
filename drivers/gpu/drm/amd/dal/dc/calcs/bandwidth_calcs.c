@@ -1357,8 +1357,8 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 			int_to_fixed(4));
 	}
 
-	div64_u64_rem(mode_data->underlay_pitch_in_pixels.value,
-			results->inefficient_underlay_pitch_in_pixels.value,
+	div64_u64_rem((uint64_t)mode_data->underlay_pitch_in_pixels.value,
+			(uint64_t)results->inefficient_underlay_pitch_in_pixels.value,
 			&remainder);
 
 	if (mode_data->underlay_tiling_mode == linear
@@ -1413,11 +1413,11 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 		int_to_fixed(0);
 	for (i = 0; i <= maximum_number_of_surfaces - 1; i += 1) {
 		if (results->enable[i]) {
-			uint64_t arg1 = mul(results->pitch_in_pixels_after_surface_type[i],
+			uint64_t arg1 = (uint64_t)mul(results->pitch_in_pixels_after_surface_type[i],
 						results->bytes_per_pixel[i]).value;
 
 			div64_u64_rem(arg1,
-					results->inefficient_linear_pitch_in_bytes.value,
+					(uint64_t)results->inefficient_linear_pitch_in_bytes.value,
 					&remainder);
 
 			if (results->scatter_gather_enable_for_pipe[i] == true

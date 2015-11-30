@@ -280,9 +280,9 @@ static void calculate_scaling_ratios(
 					== PLANE_STEREO_FORMAT_TOP_AND_BOTTOM)
 		stream->ratios.vert.value *= 2;
 
-	stream->ratios.vert.value = div64_u64(stream->ratios.vert.value * in_h,
+	stream->ratios.vert.value = div64_s64(stream->ratios.vert.value * in_h,
 			out_h);
-	stream->ratios.horz.value = div64_u64(stream->ratios.horz.value * in_w ,
+	stream->ratios.horz.value = div64_s64(stream->ratios.horz.value * in_w ,
 			out_w);
 
 	stream->ratios.horz_c = stream->ratios.horz;
