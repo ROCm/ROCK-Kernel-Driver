@@ -843,11 +843,14 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 			struct ttm_mem_reg *mem)
 {
 	struct amdgpu_vm *vm = bo_va->vm;
+	struct amdgpu_bo *bo = bo_va->bo;
 	struct amdgpu_bo_va_mapping *mapping;
 	struct amdgpu_gart *gtt = NULL;
 	uint32_t flags;
 	uint64_t addr;
 	int r;
+
+	flags = amdgpu_ttm_tt_pte_flags(adev, bo->tbo.ttm, mem);
 
 	if (mem) {
 		addr = (u64)mem->start << PAGE_SHIFT;
@@ -857,7 +860,11 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 			break;
 
 		case TTM_PL_VRAM:
-			addr += adev->vm_manager.vram_base_offset;
+			if (bo->adev != adev) {
+				addr += bo->adev->mc.aper_base;
+				flags |= AMDGPU_PTE_SYSTEM;
+			} else
+				addr += adev->vm_manager.vram_base_offset;
 			break;
 
 		default:
@@ -866,8 +873,6 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	} else {
 		addr = 0;
 	}
-
-	flags = amdgpu_ttm_tt_pte_flags(adev, bo_va->bo->tbo.ttm, mem);
 
 	spin_lock(&vm->status_lock);
 	if (!list_empty(&bo_va->vm_status))
