@@ -24,14 +24,11 @@
  */
 
 #include "dal_services.h"
-
 #include "amdgpu.h"
-
 #include "amdgpu_dm_types.h"
-
 #include "amdgpu_dm_mst_types.h"
-
 #include "dc.h"
+#include "dc_helpers.h"
 
 static ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
 {
@@ -111,6 +108,7 @@ static const struct dc_sink *dm_dp_mst_add_mst_sink(
 	struct sink_init_data init_params = {
 			.link = dc_link,
 			.sink_signal = SIGNAL_TYPE_DISPLAY_PORT_MST};
+	enum dc_edid_status edid_status;
 
 	if (len > MAX_EDID_BUFFER_SIZE) {
 		DRM_ERROR("Max EDID buffer size breached!\n");
@@ -133,6 +131,13 @@ static const struct dc_sink *dm_dp_mst_add_mst_sink(
 	if (!dc_link_add_sink(
 			dc_link,
 			dc_sink))
+		goto fail;
+
+	edid_status = dc_helpers_parse_edid_caps(
+			NULL,
+			&dc_sink->dc_edid,
+			&dc_sink->edid_caps);
+	if (edid_status != EDID_OK)
 		goto fail;
 
 	/* dc_sink_retain(&core_sink->public); */
