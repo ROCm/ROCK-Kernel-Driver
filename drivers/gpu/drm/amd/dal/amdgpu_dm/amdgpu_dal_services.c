@@ -147,17 +147,20 @@ bool dal_get_platform_info(struct dc_context *ctx,
 	return false;
 }
 
-/* Next calls are to power component */
-bool dc_service_pp_pre_dce_clock_change(struct dc_context *ctx,
-				struct dal_to_power_info *input,
-				struct power_to_dal_info *output)
+/**** power component interfaces ****/
+
+bool dc_service_pp_pre_dce_clock_change(
+		struct dc_context *ctx,
+		struct dal_to_power_info *input,
+		struct power_to_dal_info *output)
 {
 	/*TODO*/
 	return false;
 }
 
-bool dc_service_pp_post_dce_clock_change(struct dc_context *ctx,
-	const struct dc_pp_display_configuration *pp_display_cfg)
+bool dc_service_pp_post_dce_clock_change(
+		struct dc_context *ctx,
+		const struct dc_pp_display_configuration *pp_display_cfg)
 {
 #ifdef CONFIG_DRM_AMD_POWERPLAY
 	struct amdgpu_device *adev = ctx->driver_context;
@@ -179,6 +182,11 @@ bool dc_service_pp_post_dce_clock_change(struct dc_context *ctx,
 		adev->pm.pm_display_cfg.nb_pstate_switch_disable =
 			pp_display_cfg->nb_pstate_switch_disable;
 
+		/* TODO: complete implementation of
+		 * amd_powerplay_display_configuration_change().
+		 * Follow example of:
+		 * PHM_StoreDALConfigurationData - powerplay\hwmgr\hardwaremanager.c
+		 * PP_IRI_DisplayConfigurationChange - powerplay\eventmgr\iri.c */
 		amd_powerplay_display_configuration_change(
 				adev->powerplay.pp_handle,
 				&adev->pm.pm_display_cfg);
@@ -192,8 +200,9 @@ bool dc_service_pp_post_dce_clock_change(struct dc_context *ctx,
 #endif
 }
 
-bool dc_service_get_system_clocks_range(struct dc_context *ctx,
-				struct dal_system_clock_range *sys_clks)
+bool dc_service_get_system_clocks_range(
+		struct dc_context *ctx,
+		struct dal_system_clock_range *sys_clks)
 {
 	struct amdgpu_device *adev = ctx->driver_context;
 
@@ -218,14 +227,35 @@ bool dc_service_get_system_clocks_range(struct dc_context *ctx,
 }
 
 
-bool dc_service_pp_set_display_clock(struct dc_context *ctx,
-			     struct dal_to_power_dclk *dclk)
+bool dc_service_get_clock_levels_by_type(
+		struct dc_context *ctx,
+		enum dc_pp_clock_type clk_type,
+		struct dc_pp_clock_levels *clk_level_info)
 {
-	/* TODO: need power component to provide appropriate interface */
+	/* TODO: follow implementation of:
+	 * PhwCz_GetClocksByType - powerplay\hwmgr\cz_hwmgr.c
+	 * PHM_GetClockByType - powerplay\hwmgr\hardwaremanager.c
+	 * PP_IRI_GetClockByType - powerplay\eventmgr\iri.c */
+
+	DRM_INFO("%s - not implemented\n", __func__);
 	return false;
 }
 
-/* end of calls to power component */
+bool dc_service_get_static_clocks(
+	struct dc_context *ctx,
+	struct dc_pp_static_clock_info *static_clk_info)
+{
+	/* TODO: follow implementation of:
+	 * PhwCz_GetDALPowerLevel - powerplay\hwmgr\cz_hwmgr.c
+	 * PHM_GetDALPowerLevel - powerplay\hwmgr\hardwaremanager.c
+	 * PP_IRI_GetStaticClocksInfo - powerplay\eventmgr\iri.c */
+
+	DRM_INFO("%s - not implemented\n", __func__);
+	return false;
+}
+
+/**** end of power component interfaces ****/
+
 
 /* Calls to notification */
 
