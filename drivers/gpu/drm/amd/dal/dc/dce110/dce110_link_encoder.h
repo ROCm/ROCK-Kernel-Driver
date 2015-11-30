@@ -26,19 +26,34 @@
 #ifndef __DC_LINK_ENCODER__DCE110_H__
 #define __DC_LINK_ENCODER__DCE110_H__
 
+#include "inc/link_encoder.h"
+
+#define TO_DCE110_LINK_ENC(link_encoder)\
+	container_of(link_encoder, struct dce110_link_encoder, base)
+
+struct dce110_link_enc_offsets {
+	uint32_t dig_offset;
+	uint32_t dp_offset;
+};
+
+struct dce110_link_encoder {
+	struct link_encoder base;
+	struct dce110_link_enc_offsets offsets;
+};
+
 struct link_encoder *dce110_link_encoder_create(
 	const struct encoder_init_data *init);
 
 void dce110_link_encoder_destroy(struct link_encoder **enc);
 
-enum encoder_result dce110_link_encoder_validate_output_with_stream(
+enum dc_encoder_result dce110_link_encoder_validate_output_with_stream(
 	struct link_encoder *enc,
 	const struct core_stream *stream);
 
 /****************** HW programming ************************/
 
 /* initialize HW */  /* why do we initialze aux in here? */
-enum encoder_result dce110_link_encoder_power_up(struct link_encoder *enc);
+enum dc_encoder_result dce110_link_encoder_power_up(struct link_encoder *enc);
 
 /* program DIG_MODE in DIG_BE */
 /* TODO can this be combined with enable_output? */
@@ -48,7 +63,7 @@ void dce110_link_encoder_setup(
 
 /* enables TMDS PHY output */
 /* TODO: still need depth or just pass in adjusted pixel clock? */
-enum encoder_result dce110_link_encoder_enable_tmds_output(
+enum dc_encoder_result dce110_link_encoder_enable_tmds_output(
 	struct link_encoder *enc,
 	enum clock_source_id clock_source,
 	enum dc_color_depth color_depth,
@@ -56,31 +71,31 @@ enum encoder_result dce110_link_encoder_enable_tmds_output(
 
 /* enables TMDS PHY output */
 /* TODO: still need this or just pass in adjusted pixel clock? */
-enum encoder_result dce110_link_encoder_enable_dual_link_tmds_output(
+enum dc_encoder_result dce110_link_encoder_enable_dual_link_tmds_output(
 	struct link_encoder *enc,
 	enum clock_source_id clock_source,
 	enum dc_color_depth color_depth,
 	uint32_t pixel_clock);
 
 /* enables DP PHY output */
-enum encoder_result dce110_link_encoder_enable_dp_output(
+enum dc_encoder_result dce110_link_encoder_enable_dp_output(
 	struct link_encoder *enc,
 	const struct link_settings *link_settings,
 	enum clock_source_id clock_source);
 
 /* enables DP PHY output in MST mode */
-enum encoder_result dce110_link_encoder_enable_dp_mst_output(
+enum dc_encoder_result dce110_link_encoder_enable_dp_mst_output(
 	struct link_encoder *enc,
 	const struct link_settings *link_settings,
 	enum clock_source_id clock_source);
 
 /* disable PHY output */
-enum encoder_result dce110_link_encoder_disable_output(
-	struct link_encoder *link_enc,
+enum dc_encoder_result dce110_link_encoder_disable_output(
+	struct link_encoder *enc,
 	enum signal_type signal);
 
 /* set DP lane settings */
-enum encoder_result dce110_link_encoder_dp_set_lane_settings(
+enum dc_encoder_result dce110_link_encoder_dp_set_lane_settings(
 	struct link_encoder *enc,
 	const struct link_training_settings *link_settings);
 
@@ -97,7 +112,7 @@ void dce110_link_encoder_set_lcd_backlight_level(
 	struct link_encoder *enc,
 	uint32_t level);
 
-enum encoder_result dce110_link_encoder_enable_output(
+enum dc_encoder_result dce110_link_encoder_enable_output(
 	struct link_encoder *enc,
 	const struct link_settings *link_settings,
 	enum engine_id engine,

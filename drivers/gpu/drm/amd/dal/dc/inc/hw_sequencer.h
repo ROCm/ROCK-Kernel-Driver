@@ -90,10 +90,10 @@ struct hw_sequencer_funcs {
 
 	void (*encoder_destroy)(struct link_encoder **enc);
 
-	enum encoder_result (*encoder_power_up)(
+	enum dc_encoder_result (*encoder_power_up)(
 					struct link_encoder *enc);
 
-	enum encoder_result (*encoder_enable_output)(
+	enum dc_encoder_result (*encoder_enable_output)(
 					struct link_encoder *enc,
 					const struct link_settings *link_settings,
 					enum engine_id engine,
@@ -102,7 +102,7 @@ struct hw_sequencer_funcs {
 					enum dc_color_depth color_depth,
 					uint32_t pixel_clock);
 
-	enum encoder_result (*encoder_disable_output)(
+	enum dc_encoder_result (*encoder_disable_output)(
 					struct link_encoder *enc,
 					enum signal_type signal);
 
@@ -110,7 +110,7 @@ struct hw_sequencer_funcs {
 					struct link_encoder *enc,
 					const struct encoder_set_dp_phy_pattern_param *param);
 
-	enum encoder_result (*encoder_dp_set_lane_settings)(
+	enum dc_encoder_result (*encoder_dp_set_lane_settings)(
 					struct link_encoder *enc,
 					const struct link_training_settings *link_settings);
 

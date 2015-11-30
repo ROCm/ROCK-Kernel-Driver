@@ -26,8 +26,8 @@
 
 #include "resource.h"
 #include "include/irq_service_interface.h"
-#include "link_encoder_types.h"
-#include "stream_encoder_types.h"
+#include "link_encoder.h"
+#include "stream_encoder.h"
 
 
 void unreference_clock_source(

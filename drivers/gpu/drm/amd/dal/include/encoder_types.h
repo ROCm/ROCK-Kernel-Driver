@@ -31,6 +31,16 @@
 #include "hw_sequencer_types.h"
 #include "link_service_types.h"
 
+struct encoder_init_data {
+	struct adapter_service *adapter_service;
+	enum channel_id channel;
+	struct graphics_object_id connector;
+	enum hpd_source_id hpd_source;
+	/* TODO: in DAL2, here was pointer to EventManagerInterface */
+	struct graphics_object_id encoder;
+	struct dc_context *ctx;
+};
+
 struct encoder_context {
 	/*
 	 * HW programming context
