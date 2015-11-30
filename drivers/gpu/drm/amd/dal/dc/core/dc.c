@@ -839,17 +839,17 @@ void dc_link_remove_sink(struct dc_link *link, const struct dc_sink *sink)
 	int i;
 
 	if (!link->sink_count) {
-	   BREAK_TO_DEBUGGER();
-	   return;
+		BREAK_TO_DEBUGGER();
+		return;
 	}
 
 	for (i = 0; i < link->sink_count; i++) {
-		   if (link->sink[i] == sink) {
-			   dc_sink_release(sink);
-			   link->sink[i] = NULL;
-			   link->sink_count--;
-			   return;
-		   }
+		if (link->sink[i] == sink) {
+			dc_sink_release(sink);
+			link->sink[i] = NULL;
+			link->sink_count--;
+			return;
+		}
 	}
 
 	BREAK_TO_DEBUGGER();
