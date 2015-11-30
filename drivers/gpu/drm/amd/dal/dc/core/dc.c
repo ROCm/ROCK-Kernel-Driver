@@ -690,12 +690,13 @@ const struct dc_target *dc_get_target_on_irq_source(
 		break;
 	default:
 		dal_error("%s: invalid irq source: %d\n!",__func__, src);
-		goto fail;
+		return NULL;
 	}
 
 	for (i = 0; i < dc->current_context.target_count; i++) {
-		const struct core_target *target =
-				dc->current_context.targets[i];
+		struct core_target *target = dc->current_context.targets[i];
+
+		struct dc_target *dc_target;
 
 		if (NULL == target) {
 			dal_error("%s: 'dc_target' is NULL for irq source: %d\n!",
@@ -703,14 +704,18 @@ const struct dc_target *dc_get_target_on_irq_source(
 			continue;
 		}
 
-		for (j = 0; j < target->stream_count; j++) {
-			const uint8_t controller_idx =
-					target->streams[j]->controller_idx;
+		dc_target = &target->public;
+
+		for (j = 0; j < target->public.stream_count; j++) {
+			const struct core_stream *stream =
+				DC_STREAM_TO_CORE(dc_target->streams[j]);
+			const uint8_t controller_idx = stream->controller_idx;
+
 			if (controller_idx == crtc_idx)
-				return &target->public;
+				return dc_target;
 		}
 	}
-fail:
+
 	return NULL;
 }
 
@@ -749,6 +754,7 @@ void dc_print_sync_report(
 {
 	uint32_t i;
 	const struct core_target *core_target;
+	const struct core_stream *core_stream;
 	struct dc_context *dc_ctx = dc->ctx;
 	struct dc_target_sync_report *target_sync_report;
 	struct dc_sync_report sync_report = { 0 };
@@ -767,9 +773,10 @@ void dc_print_sync_report(
 
 		core_target = dc->current_context.targets[i];
 		target_sync_report = &sync_report.trg_reports[i];
+		core_stream = DC_STREAM_TO_CORE(core_target->public.streams[0]);
 
 		dc->hwss.get_crtc_positions(
-			core_target->streams[0]->tg,
+			core_stream->tg,
 			&target_sync_report->h_count,
 			&target_sync_report->v_count);
 

@@ -52,13 +52,11 @@ static void construct(
 {
 	uint8_t i;
 	for (i = 0; i < stream_count; i++) {
-		target->streams[i] = DC_STREAM_TO_CORE(dc_streams[i]);
 		target->public.streams[i] = dc_streams[i];
 		dc_stream_retain(dc_streams[i]);
 	}
 
 	target->ctx = ctx;
-	target->stream_count = stream_count;
 	target->public.stream_count = stream_count;
 }
 
@@ -68,11 +66,12 @@ static void destruct(struct core_target *core_target)
 
 	for (i = 0; i < core_target->status.surface_count; i++) {
 		dc_surface_release(core_target->status.surfaces[i]);
-		core_target->status.surfaces[i] = 0;
+		core_target->status.surfaces[i] = NULL;
 	}
-	for (i = 0; i < core_target->stream_count; i++) {
-		dc_stream_release(&core_target->streams[i]->public);
-		core_target->streams[i] = 0;
+	for (i = 0; i < core_target->public.stream_count; i++) {
+		dc_stream_release(
+			(struct dc_stream *)core_target->public.streams[i]);
+		core_target->public.streams[i] = NULL;
 	}
 }
 
@@ -222,8 +221,10 @@ bool dc_commit_surfaces_to_target(
 	}
 
 	for (i = 0; i < surface_count; i++)
-		for (j = 0; j < target->stream_count; j++)
-			build_scaling_params(surfaces[i], target->streams[j]);
+		for (j = 0; j < target->public.stream_count; j++)
+			build_scaling_params(
+				surfaces[i],
+				DC_STREAM_TO_CORE(target->public.streams[j]));
 
 	if (dc->hwss.validate_bandwidth(dc, &dc->current_context) != DC_OK) {
 		BREAK_TO_DEBUGGER();
@@ -247,8 +248,8 @@ bool dc_commit_surfaces_to_target(
 		dc_surface_retain(surface);
 
 		program_gamma(dc->ctx, surface,
-				target->streams[0]->ipp,
-				target->streams[0]->opp);
+			DC_STREAM_TO_CORE(target->public.streams[0])->ipp,
+			DC_STREAM_TO_CORE(target->public.streams[0])->opp);
 
 		dc->hwss.set_plane_config(
 			core_surface,
@@ -277,8 +278,8 @@ bool dc_target_is_connected_to_sink(
 {
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
 	uint8_t i;
-	for (i = 0; i < target->stream_count; i++) {
-		if (&target->streams[i]->sink->public == dc_sink)
+	for (i = 0; i < target->public.stream_count; i++) {
+		if (target->public.streams[i]->sink == dc_sink)
 			return true;
 	}
 	return false;
@@ -288,9 +289,11 @@ void dc_target_enable_memory_requests(struct dc_target *target)
 {
 	uint8_t i;
 	struct core_target *core_target = DC_TARGET_TO_CORE(target);
-	for (i = 0; i < core_target->stream_count; i++) {
-	struct timing_generator *tg = core_target->streams[i]->tg;
-		if (false == core_target->ctx->dc->hwss.enable_memory_requests(tg)) {
+	for (i = 0; i < core_target->public.stream_count; i++) {
+		struct timing_generator *tg =
+			DC_STREAM_TO_CORE(core_target->public.streams[i])->tg;
+
+		if (!core_target->ctx->dc->hwss.enable_memory_requests(tg)) {
 			dal_error("DC: failed to unblank crtc!\n");
 			BREAK_TO_DEBUGGER();
 		}
@@ -301,8 +304,9 @@ void dc_target_disable_memory_requests(struct dc_target *target)
 {
 	uint8_t i;
 	struct core_target *core_target = DC_TARGET_TO_CORE(target);
-	for (i = 0; i < core_target->stream_count; i++) {
-	struct timing_generator *tg = core_target->streams[i]->tg;
+	for (i = 0; i < core_target->public.stream_count; i++) {
+	struct timing_generator *tg =
+		DC_STREAM_TO_CORE(core_target->public.streams[i])->tg;
 
 		if (NULL == tg) {
 			dal_error("DC: timing generator is NULL!\n");
@@ -334,7 +338,7 @@ bool dc_target_set_cursor_attributes(
 	}
 
 	core_target = DC_TARGET_TO_CORE(dc_target);
-	ipp = core_target->streams[0]->ipp;
+	ipp = DC_STREAM_TO_CORE(core_target->public.streams[0])->ipp;
 
 	if (NULL == ipp) {
 		dal_error("DC: input pixel processor is NULL!\n");
@@ -365,7 +369,7 @@ bool dc_target_set_cursor_position(
 	}
 
 	core_target = DC_TARGET_TO_CORE(dc_target);
-	ipp = core_target->streams[0]->ipp;
+	ipp = DC_STREAM_TO_CORE(core_target->public.streams[0])->ipp;
 
 	if (NULL == ipp) {
 		dal_error("DC: input pixel processor is NULL!\n");
@@ -383,14 +387,17 @@ bool dc_target_set_cursor_position(
 uint8_t dc_target_get_link_index(const struct dc_target *dc_target)
 {
 	const struct core_target *target = CONST_DC_TARGET_TO_CORE(dc_target);
+	const struct core_sink *sink =
+		DC_SINK_TO_CORE(target->public.streams[0]->sink);
 
-	return target->streams[0]->sink->link->link_index;
+	return sink->link->link_index;
 }
 
 uint32_t dc_target_get_vblank_counter(const struct dc_target *dc_target)
 {
 	struct core_target *core_target = DC_TARGET_TO_CORE(dc_target);
-	struct timing_generator *tg = core_target->streams[0]->tg;
+	struct timing_generator *tg =
+		DC_STREAM_TO_CORE(core_target->public.streams[0])->tg;
 
 	return core_target->ctx->dc->hwss.get_vblank_counter(tg);
 }
@@ -402,7 +409,9 @@ enum dc_irq_source dc_target_get_irq_src(
 
 	/* #TODO - Remove the assumption that the controller is always in the
 	 * first stream of a core target */
-	uint8_t controller_idx = core_target->streams[0]->controller_idx;
+	struct core_stream *stream =
+		DC_STREAM_TO_CORE(core_target->public.streams[0]);
+	uint8_t controller_idx = stream->controller_idx;
 
 	/* Get controller id */
 	enum controller_id crtc_id = controller_idx + 1;
@@ -434,10 +443,11 @@ void dc_target_log(
 			"core_target 0x%x: surface_count=%d, stream_count=%d",
 			core_target,
 			core_target->status.surface_count,
-			core_target->stream_count);
+			core_target->public.stream_count);
 
-	for (i = 0; i < core_target->stream_count; i++) {
-		const struct core_stream *core_stream = core_target->streams[i];
+	for (i = 0; i < core_target->public.stream_count; i++) {
+		const struct core_stream *core_stream =
+			DC_STREAM_TO_CORE(core_target->public.streams[i]);
 
 		dal_logger_write(dal_logger,
 			log_major,
