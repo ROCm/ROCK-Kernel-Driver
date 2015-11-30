@@ -1044,8 +1044,8 @@ static void build_audio_output(
 	audio_output->crtc_info.calculated_pixel_clock =
 			stream->pix_clk_params.requested_pix_clk;
 
-	/* TODO: This is needed for DP */
-	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT) {
+	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT ||
+			stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
 		audio_output->pll_info.dp_dto_source_clock_in_khz =
 			dal_display_clock_get_dp_ref_clk_frequency(
 				stream->dis_clk);

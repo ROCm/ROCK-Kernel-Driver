@@ -367,20 +367,12 @@ static void link_unplug(struct core_link *link)
 	link->dpcd_sink_count = 0;
 }
 
-static enum dc_edid_status read_edid(struct core_link *link)
+static enum dc_edid_status read_edid(
+	struct core_link *link,
+	struct core_sink *sink)
 {
 	uint32_t edid_retry = 3;
 	enum dc_edid_status edid_status;
-	const struct dc_sink *dc_sink = link->public.sink[0];
-	struct core_sink *sink = DC_SINK_TO_CORE(dc_sink);
-
-	if (link->public.sink[0]->sink_signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
-		dal_logger_write(link->ctx->logger,
-							LOG_MAJOR_WARNING,
-							LOG_MINOR_DETECTION_EDID_PARSER,
-							"MST EDID read is not done here!\n");
-		return EDID_BAD_INPUT;
-	}
 
 	/* some dongles read edid incorrectly the first time,
 	 * do check sum and retry to make sure read correct edid.
@@ -395,7 +387,7 @@ static enum dc_edid_status read_edid(struct core_link *link)
 		dal_ddc_service_get_edid_buf(link->ddc,
 				sink->public.dc_edid.raw_edid);
 		edid_status = dc_helpers_parse_edid_caps(
-				link->ctx,
+				NULL,
 				&sink->public.dc_edid,
 				&sink->public.edid_caps);
 		--edid_retry;
@@ -580,7 +572,7 @@ void dc_link_detect(const struct dc_link *dc_link)
 		if (!dc_link_add_sink(&link->public, &sink->public))
 				BREAK_TO_DEBUGGER();
 
-		edid_status = read_edid(link);
+		edid_status = read_edid(link, sink);
 
 		switch (edid_status) {
 		case EDID_BAD_CHECKSUM:
