@@ -1410,7 +1410,7 @@ amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 		struct amdgpu_bo_list_entry *lobj;
 
 		lobj = &parser->bo_list->array[i];
-		if (!lobj->bo_va)
+		if (!lobj->bo_va || lobj->bo_va->bo->adev != parser->adev)
 			continue;
 
 		list_for_each_entry(mapping, &lobj->bo_va->valids, list) {
