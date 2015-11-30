@@ -64,7 +64,7 @@ void dc_service_unregister_interrupt(
 	irq_handler_idx handler_idx);
 
 /**************************************
- * Calls to Power Play (PP) component
+ * Power Play (PP) interfaces
  **************************************/
 
 /* DAL calls this function to notify PP about clocks it needs for the Mode Set.
@@ -95,6 +95,47 @@ struct dc_pp_display_configuration {
 	uint32_t cpu_pstate_separation_time;
 };
 
+enum dc_pp_clock_type {
+	DC_PP_CLOCK_TYPE_DISPLAY_CLK = 1,
+	DC_PP_CLOCK_TYPE_ENGINE_CLK,
+	DC_PP_CLOCK_TYPE_MEMORY_CLK
+};
+
+#define DC_PP_MAX_CLOCK_LEVELS 8
+
+struct dc_pp_clock_levels {
+	enum dc_pp_clock_type clock_type;
+	uint32_t num_levels;
+	uint32_t clocks_in_hz[DC_PP_MAX_CLOCK_LEVELS];
+};
+
+enum dc_pp_clocks_state {
+	DC_PP_CLOCKS_STATE_INVALID = 0,
+	DC_PP_CLOCKS_STATE_ULTRA_LOW,
+	DC_PP_CLOCKS_STATE_LOW,
+	DC_PP_CLOCKS_STATE_NOMINAL,
+	DC_PP_CLOCKS_STATE_PERFORMANCE,
+
+	/* Starting from DCE11, Max 8 levels of DPM state supported. */
+	DC_PP_CLOCKS_DPM_STATE_LEVEL_INVALID = DC_PP_CLOCKS_STATE_INVALID,
+	DC_PP_CLOCKS_DPM_STATE_LEVEL_0 = DC_PP_CLOCKS_STATE_ULTRA_LOW,
+	DC_PP_CLOCKS_DPM_STATE_LEVEL_1 = DC_PP_CLOCKS_STATE_LOW,
+	DC_PP_CLOCKS_DPM_STATE_LEVEL_2 = DC_PP_CLOCKS_STATE_NOMINAL,
+	/* to be backward compatible */
+	DC_PP_CLOCKS_DPM_STATE_LEVEL_3 = DC_PP_CLOCKS_STATE_PERFORMANCE,
+	DC_PP_CLOCKS_DPM_STATE_LEVEL_4 = DC_PP_CLOCKS_DPM_STATE_LEVEL_3 + 1,
+	DC_PP_CLOCKS_DPM_STATE_LEVEL_5 = DC_PP_CLOCKS_DPM_STATE_LEVEL_4 + 1,
+	DC_PP_CLOCKS_DPM_STATE_LEVEL_6 = DC_PP_CLOCKS_DPM_STATE_LEVEL_5 + 1,
+	DC_PP_CLOCKS_DPM_STATE_LEVEL_7 = DC_PP_CLOCKS_DPM_STATE_LEVEL_6 + 1,
+};
+
+struct dc_pp_static_clock_info {
+	uint32_t max_engine_clock_hz;
+	uint32_t max_memory_clock_hz;
+	 /* max possible display block clocks state */
+	enum dc_pp_clocks_state max_clocks_state;
+};
+
 /* DAL calls this function to notify PP about completion of Mode Set.
  * For PP it means that current DCE clocks are those which were returned
  * by dc_service_pp_pre_dce_clock_change(), in the 'output' parameter.
@@ -120,10 +161,21 @@ bool dc_service_get_system_clocks_range(
 	struct dc_context *ctx,
 	struct dal_system_clock_range *sys_clks);
 
-/* for future use */
-bool dc_service_pp_set_display_clock(
+
+bool dc_service_get_clock_levels_by_type(
 	struct dc_context *ctx,
-	struct dal_to_power_dclk *dclk);
+	enum dc_pp_clock_type clk_type,
+	struct dc_pp_clock_levels *clk_level_info);
+
+/* Use this for mode validation.
+ * TODO: when this interface is implemented on Linux, should we remove
+ * dc_service_get_system_clocks_range() ?? */
+bool dc_service_get_static_clocks(
+	struct dc_context *ctx,
+	struct dc_pp_static_clock_info *static_clk_info);
+
+
+/****** end of PP interfaces ******/
 
 void dc_service_sleep_in_milliseconds(struct dc_context *ctx, uint32_t milliseconds);
 
