@@ -29,7 +29,6 @@
 #include <drm/drmP.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/amdgpu_drm.h>
-
 #include "amdgpu.h"
 #include "dal_services.h"
 #include "amdgpu_dm.h"
@@ -158,7 +157,7 @@ bool dc_service_pp_pre_dce_clock_change(
 	return false;
 }
 
-bool dc_service_pp_post_dce_clock_change(
+bool dc_service_pp_apply_display_requirements(
 		struct dc_context *ctx,
 		const struct dc_pp_display_configuration *pp_display_cfg)
 {
@@ -194,6 +193,7 @@ bool dc_service_pp_post_dce_clock_change(
 		/* TODO: replace by a separate call to 'apply display cfg'? */
 		amdgpu_pm_compute_clocks(adev);
 	}
+
 	return true;
 #else
 	return false;
@@ -229,31 +229,46 @@ bool dc_service_get_system_clocks_range(
 }
 
 
-bool dc_service_get_clock_levels_by_type(
+bool dc_service_pp_get_clock_levels_by_type(
 		struct dc_context *ctx,
 		enum dc_pp_clock_type clk_type,
-		struct dc_pp_clock_levels *clk_level_info)
+		struct dc_pp_clock_levels *clks)
 {
-	/* TODO: follow implementation of:
-	 * PhwCz_GetClocksByType - powerplay\hwmgr\cz_hwmgr.c
-	 * PHM_GetClockByType - powerplay\hwmgr\hardwaremanager.c
-	 * PP_IRI_GetClockByType - powerplay\eventmgr\iri.c */
+#ifdef CONFIG_DRM_AMD_POWERPLAY
+/* TODO: get clks from pplib.
+	struct amdgpu_device *adev = ctx->driver_context;
 
+	return (amd_powerplay_get_clocks_by_type(adev->powerplay.pp_handle,
+			(int)clk_type, (void *)clks) == 0);
+			*/
+	uint32_t disp_clks_in_hz[8] = {
+			30000, 41143, 48000, 53334, 62609, 62609, 62609, 62609 };
+	uint32_t sclks_in_hz[8] = {
+			20000, 26667, 34286, 41143, 45000, 51429, 57600, 62609 };
+	uint32_t mclks_in_hz[8] = { 33300, 80000, 0, 0, 0, 0, 0, 0 };
+
+	switch (clk_type) {
+	case DC_PP_CLOCK_TYPE_DISPLAY_CLK:
+		clks->num_levels = 8;
+		dc_service_memmove(clks->clocks_in_hz, disp_clks_in_hz, 8);
+		break;
+	case DC_PP_CLOCK_TYPE_ENGINE_CLK:
+		clks->num_levels = 8;
+		dc_service_memmove(clks->clocks_in_hz, sclks_in_hz, 8);
+		break;
+	case DC_PP_CLOCK_TYPE_MEMORY_CLK:
+		clks->num_levels = 2;
+		dc_service_memmove(clks->clocks_in_hz, mclks_in_hz, 8);
+		break;
+	default:
+		return false;
+	}
+
+	return true;
+#else
 	DRM_INFO("%s - not implemented\n", __func__);
 	return false;
-}
-
-bool dc_service_get_static_clocks(
-	struct dc_context *ctx,
-	struct dc_pp_static_clock_info *static_clk_info)
-{
-	/* TODO: follow implementation of:
-	 * PhwCz_GetDALPowerLevel - powerplay\hwmgr\cz_hwmgr.c
-	 * PHM_GetDALPowerLevel - powerplay\hwmgr\hardwaremanager.c
-	 * PP_IRI_GetStaticClocksInfo - powerplay\eventmgr\iri.c */
-
-	DRM_INFO("%s - not implemented\n", __func__);
-	return false;
+#endif
 }
 
 /**** end of power component interfaces ****/
