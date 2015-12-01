@@ -1093,7 +1093,7 @@ static bool validate_wireless_output(
 	return false;
 }
 
-bool dce110_link_encoder_construct(
+static bool construct(
 	struct dce110_link_encoder *enc110,
 	const struct encoder_init_data *init_data)
 {
@@ -1225,7 +1225,7 @@ struct link_encoder *dce110_link_encoder_create(
 	if (!enc110)
 		return NULL;
 
-	if (dce110_link_encoder_construct(enc110, init))
+	if (construct(enc110, init))
 		return &enc110->base;
 
 	BREAK_TO_DEBUGGER();

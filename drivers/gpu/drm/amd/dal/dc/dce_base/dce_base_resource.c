@@ -28,8 +28,8 @@
 
 #include "adjustment_types.h"
 #include "set_mode_types.h"
-#include "stream_encoder_types.h"
-#include "link_encoder_types.h"
+#include "stream_encoder.h"
+#include "link_encoder.h"
 
 #include "resource.h"
 
