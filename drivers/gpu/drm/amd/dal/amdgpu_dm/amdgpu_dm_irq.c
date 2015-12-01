@@ -466,7 +466,7 @@ void amdgpu_dm_irq_register_timer(
 	queue_delayed_work(adev->dm.timer_workqueue, &handler_data->d_work,
 			jf_delay);
 
-	DRM_DEBUG_KMS("DM_IRQ: added handler:%p with micro_sec_interval=%llu\n",
+	DRM_DEBUG_KMS("DM_IRQ: added handler:%p with micro_sec_interval=%u\n",
 			handler_data, int_params->micro_sec_interval);
 	return;
 }

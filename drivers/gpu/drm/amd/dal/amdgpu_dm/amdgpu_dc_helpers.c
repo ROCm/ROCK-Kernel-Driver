@@ -183,7 +183,7 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 	int bpp;
 	int pbn = 0;
 	uint8_t i;
-	uint8_t vcid;
+	uint8_t vcid = 0;
 	bool find_stream_for_sink;
 
 	aconnector = get_connector_for_sink(dev, sink);
