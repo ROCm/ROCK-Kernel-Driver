@@ -181,6 +181,36 @@ bool dc_service_pp_apply_display_requirements(
 		adev->pm.pm_display_cfg.nb_pstate_switch_disable =
 			pp_display_cfg->nb_pstate_switch_disable;
 
+		adev->pm.pm_display_cfg.num_display =
+				pp_display_cfg->display_count;
+		adev->pm.pm_display_cfg.num_path_including_non_display =
+				pp_display_cfg->display_count;
+
+		adev->pm.pm_display_cfg.min_core_set_clock =
+				pp_display_cfg->min_engine_clock_khz/10;
+		adev->pm.pm_display_cfg.min_core_set_clock_in_sr =
+				pp_display_cfg->min_engine_clock_deep_sleep_khz/10;
+		adev->pm.pm_display_cfg.min_mem_set_clock =
+				pp_display_cfg->min_memory_clock_khz/10;
+
+		adev->pm.pm_display_cfg.multi_monitor_in_sync =
+				pp_display_cfg->all_displays_in_sync;
+		adev->pm.pm_display_cfg.min_vblank_time =
+				pp_display_cfg->avail_mclk_switch_time_us;
+
+		adev->pm.pm_display_cfg.display_clk =
+				pp_display_cfg->disp_clk_khz/10;
+
+		adev->pm.pm_display_cfg.dce_tolerable_mclk_in_active_latency =
+				pp_display_cfg->avail_mclk_switch_time_in_disp_active_us;
+
+		adev->pm.pm_display_cfg.crtc_index = pp_display_cfg->crtc_index;
+		adev->pm.pm_display_cfg.line_time_in_us =
+				pp_display_cfg->line_time_in_us;
+
+		adev->pm.pm_display_cfg.crossfire_display_index = -1;
+		adev->pm.pm_display_cfg.min_bus_bandwidth = 0;
+
 		/* TODO: complete implementation of
 		 * amd_powerplay_display_configuration_change().
 		 * Follow example of:
