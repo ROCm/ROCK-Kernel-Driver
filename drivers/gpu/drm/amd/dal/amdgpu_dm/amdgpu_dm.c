@@ -349,7 +349,30 @@ static int dm_soft_reset(void *handle)
 	return 0;
 }
 
+static struct amdgpu_crtc *get_crtc_by_target(
+	struct amdgpu_device *adev,
+	const struct dc_target *dc_target)
+{
+	struct drm_device *dev = adev->ddev;
+	struct drm_crtc *crtc;
+	struct amdgpu_crtc *amdgpu_crtc;
 
+	/*
+	 * following if is check inherited from both functions where this one is
+	 * used now. Need to be checked why it could happen.
+	 */
+	if (dc_target == NULL)
+		return adev->mode_info.crtcs[0];
+
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+		amdgpu_crtc = to_amdgpu_crtc(crtc);
+
+		if (amdgpu_crtc->target == dc_target)
+			return amdgpu_crtc;
+	}
+
+	return NULL;
+}
 
 static void dm_pflip_high_irq(void *interrupt_params)
 {
@@ -361,13 +384,8 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	const struct dc *dc = irq_params->adev->dm.dc;
 	const struct dc_target *dc_target =
 			dc_get_target_on_irq_source(dc, irq_params->irq_src);
-	uint8_t link_index = 0;
 
-	/* TODO: #flip address all tags together*/
-	if (dc_target != NULL)
-		link_index = dc_target_get_link_index(dc_target);
-
-	amdgpu_crtc= adev->mode_info.crtcs[link_index];
+	amdgpu_crtc = get_crtc_by_target(adev, dc_target);
 
 	/* IRQ could occur when in initial stage */
 	if(amdgpu_crtc == NULL)
@@ -408,13 +426,13 @@ static void dm_crtc_high_irq(void *interrupt_params)
 	const struct dc *dc = irq_params->adev->dm.dc;
 	const struct dc_target *dc_target =
 			dc_get_target_on_irq_source(dc, irq_params->irq_src);
-	uint8_t link_index = 0;
+	uint8_t crtc_index = 0;
+	struct amdgpu_crtc *acrtc = get_crtc_by_target(adev, dc_target);
 
-	/* TODO: #flip fix all tags together*/
-	if (dc_target != NULL)
-		link_index = dc_target_get_link_index(dc_target);
+	if (acrtc)
+		crtc_index = acrtc->crtc_id;
 
-	drm_handle_vblank(adev->ddev, link_index);
+	drm_handle_vblank(adev->ddev, crtc_index);
 
 }
 
