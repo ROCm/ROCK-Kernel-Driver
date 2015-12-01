@@ -932,36 +932,28 @@ static void amdgpu_dm_atomic_crtc_gamma_set(
 
 static int dm_crtc_funcs_atomic_set_property(
 	struct drm_crtc *crtc,
-	struct drm_crtc_state *state,
+	struct drm_crtc_state *crtc_state,
 	struct drm_property *property,
 	uint64_t val)
 {
-	struct drm_crtc_state *new_crtc_state;
-	struct drm_crtc *new_crtc;
-	int i;
+	struct drm_plane_state *plane_state;
 
-	for_each_crtc_in_state(state->state, new_crtc, new_crtc_state, i) {
-		if (new_crtc == crtc) {
-			struct drm_plane_state *plane_state;
+	crtc_state->planes_changed = true;
 
-			new_crtc_state->planes_changed = true;
+	/*
+	 * Bit of magic done here. We need to ensure
+	 * that planes get update after mode is set.
+	 * So, we need to add primary plane to state,
+	 * and this way atomic_update would be called
+	 * for it
+	 */
+	plane_state =
+		drm_atomic_get_plane_state(
+			crtc_state->state,
+			crtc->primary);
 
-			/*
-			 * Bit of magic done here. We need to ensure
-			 * that planes get update after mode is set.
-			 * So, we need to add primary plane to state,
-			 * and this way atomic_update would be called
-			 * for it
-			 */
-			plane_state =
-				drm_atomic_get_plane_state(
-					state->state,
-					crtc->primary);
-
-			if (!plane_state)
-				return -EINVAL;
-		}
-	}
+	if (!plane_state)
+		return -EINVAL;
 
 	return 0;
 }
@@ -1007,7 +999,7 @@ amdgpu_dm_connector_detect(struct drm_connector *connector, bool force)
 
 int amdgpu_dm_connector_atomic_set_property(
 	struct drm_connector *connector,
-	struct drm_connector_state *state,
+	struct drm_connector_state *connector_state,
 	struct drm_property *property,
 	uint64_t val)
 {
@@ -1016,7 +1008,7 @@ int amdgpu_dm_connector_atomic_set_property(
 	struct dm_connector_state *dm_old_state =
 		to_dm_connector_state(connector->state);
 	struct dm_connector_state *dm_new_state =
-		to_dm_connector_state(state);
+		to_dm_connector_state(connector_state);
 
 	if (property == dev->mode_config.scaling_mode_property) {
 		struct drm_crtc_state *new_crtc_state;
@@ -1045,8 +1037,13 @@ int amdgpu_dm_connector_atomic_set_property(
 
 		dm_new_state->scaling = rmx_type;
 
-		for_each_crtc_in_state(state->state, crtc, new_crtc_state, i) {
-			if (crtc == state->crtc) {
+		for_each_crtc_in_state(
+			connector_state->state,
+			crtc,
+			new_crtc_state,
+			i) {
+
+			if (crtc == connector_state->crtc) {
 				struct drm_plane_state *plane_state;
 
 				new_crtc_state->mode_changed = true;
@@ -1060,7 +1057,7 @@ int amdgpu_dm_connector_atomic_set_property(
 				 */
 				plane_state =
 					drm_atomic_get_plane_state(
-						state->state,
+						connector_state->state,
 						crtc->primary);
 
 				if (!plane_state)
@@ -1081,8 +1078,14 @@ int amdgpu_dm_connector_atomic_set_property(
 		int i;
 
 		dm_new_state->underscan_enable = val;
-		for_each_crtc_in_state(state->state, crtc, new_crtc_state, i) {
-			if (crtc == state->crtc) {
+
+		for_each_crtc_in_state(
+			connector_state->state,
+			crtc,
+			new_crtc_state,
+			i) {
+
+			if (crtc == connector_state->crtc) {
 				struct drm_plane_state *plane_state;
 
 				/*
@@ -1094,7 +1097,7 @@ int amdgpu_dm_connector_atomic_set_property(
 				 */
 				plane_state =
 					drm_atomic_get_plane_state(
-						state->state,
+						connector_state->state,
 						crtc->primary);
 
 				if (!plane_state)
