@@ -1608,7 +1608,8 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	value1 = dal_read_reg(ctx, DP_REG(mmDP_MSE_SAT1));
 
 	if (table->stream_count >= 1) {
-		core_stream = DC_STREAM_TO_CORE(table->stream_allocations[0].engine);
+		core_stream =
+			DC_STREAM_TO_CORE(table->stream_allocations[0].stream);
 
 		set_reg_field_value(
 			value0,
@@ -1624,7 +1625,8 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	}
 
 	if (table->stream_count >= 2) {
-		core_stream = DC_STREAM_TO_CORE(table->stream_allocations[1].engine);
+		core_stream =
+			DC_STREAM_TO_CORE(table->stream_allocations[1].stream);
 
 		set_reg_field_value(
 			value0,
@@ -1640,7 +1642,8 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	}
 
 	if (table->stream_count >= 3) {
-		core_stream = DC_STREAM_TO_CORE(table->stream_allocations[2].engine);
+		core_stream =
+			DC_STREAM_TO_CORE(table->stream_allocations[2].stream);
 
 		set_reg_field_value(
 			value1,

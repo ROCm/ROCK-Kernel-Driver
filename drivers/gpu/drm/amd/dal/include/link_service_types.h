@@ -392,7 +392,7 @@ struct mst_device_info {
 /* DP MST stream allocation (payload bandwidth number) */
 struct dp_mst_stream_allocation {
 	/* stream engine id (DIG) */
-	const struct dc_stream *engine;
+	const struct dc_stream *stream;
 	/* number of slots required for the DP stream in
 	 * transport packet */
 	uint32_t slot_count;
