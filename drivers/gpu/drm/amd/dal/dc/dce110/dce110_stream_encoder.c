@@ -806,7 +806,7 @@ static void setup_hdmi(
 
 }
 
-bool dce110_stream_encoder_construct(
+static bool construct(
 	struct dce110_stream_encoder *enc110,
 	struct dc_context *ctx,
 	struct bios_parser *bp,
@@ -833,7 +833,8 @@ struct stream_encoder *dce110_stream_encoder_create(
 
 	if (!enc110)
 		return NULL;
-	if (dce110_stream_encoder_construct(enc110, ctx, bp, eng_id))
+
+	if (construct(enc110, ctx, bp, eng_id))
 		return &enc110->base;
 
 	BREAK_TO_DEBUGGER();
