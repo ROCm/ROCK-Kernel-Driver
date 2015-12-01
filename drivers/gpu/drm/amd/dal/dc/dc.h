@@ -270,7 +270,7 @@ void dc_update_stream(const struct dc_stream *dc_stream,
  * The currently active signal type (HDMI, DP-SST, DP-MST) is also reported.
  */
 struct dc_link {
-	const struct dc_sink *sink[MAX_SINKS_PER_LINK]; /* TODO: multiple sink support for MST */
+	const struct dc_sink *sink[MAX_SINKS_PER_LINK];
 	unsigned int sink_count;
 	enum dc_connection_type type;
 	enum signal_type connector_signal;
