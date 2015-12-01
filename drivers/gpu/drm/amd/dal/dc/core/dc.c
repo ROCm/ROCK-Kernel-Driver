@@ -528,7 +528,7 @@ static void pplib_post_set_mode(
 	pp_display_cfg.crtc_index = 0;
 	pp_display_cfg.line_time_in_us = 0;
 
-	dc_service_pp_post_dce_clock_change(dc->ctx, &pp_display_cfg);
+	dc_service_pp_apply_display_requirements(dc->ctx, &pp_display_cfg);
 }
 
 bool dc_commit_targets(

@@ -115,20 +115,6 @@ struct dc_pp_display_configuration {
 	uint32_t line_time_in_us;
 };
 
-enum dc_pp_clock_type {
-	DC_PP_CLOCK_TYPE_DISPLAY_CLK = 1,
-	DC_PP_CLOCK_TYPE_ENGINE_CLK,
-	DC_PP_CLOCK_TYPE_MEMORY_CLK
-};
-
-#define DC_PP_MAX_CLOCK_LEVELS 8
-
-struct dc_pp_clock_levels {
-	enum dc_pp_clock_type clock_type;
-	uint32_t num_levels;
-	uint32_t clocks_in_hz[DC_PP_MAX_CLOCK_LEVELS];
-};
-
 enum dc_pp_clocks_state {
 	DC_PP_CLOCKS_STATE_INVALID = 0,
 	DC_PP_CLOCKS_STATE_ULTRA_LOW,
@@ -156,6 +142,48 @@ struct dc_pp_static_clock_info {
 	enum dc_pp_clocks_state max_clocks_state;
 };
 
+/* The returned clocks range are 'static' system clocks which will be used for
+ * mode validation purposes.
+ *
+ * \returns	true - call is successful
+ *		false - call failed
+ */
+bool dc_service_get_system_clocks_range(
+	struct dc_context *ctx,
+	struct dal_system_clock_range *sys_clks);
+
+enum dc_pp_clock_type {
+	DC_PP_CLOCK_TYPE_DISPLAY_CLK = 1,
+	DC_PP_CLOCK_TYPE_ENGINE_CLK,
+	DC_PP_CLOCK_TYPE_MEMORY_CLK
+};
+
+#define DC_PP_MAX_CLOCK_LEVELS 8
+
+struct dc_pp_clock_levels {
+	uint32_t num_levels;
+	uint32_t clocks_in_hz[DC_PP_MAX_CLOCK_LEVELS];
+
+	/* TODO: add latency
+	 * do we need to know invalid (unsustainable boost) level for watermark
+	 * programming? if not we can just report less elements in array
+	 */
+};
+
+/* Gets valid clocks levels from pplib
+ *
+ * input: clk_type - display clk / sclk / mem clk
+ *
+ * output: array of valid clock levels for given type in ascending order,
+ * with invalid levels filtered out
+ *
+ */
+bool dc_service_pp_get_clock_levels_by_type(
+	struct dc_context *ctx,
+	enum dc_pp_clock_type clk_type,
+	struct dc_pp_clock_levels *clk_level_info);
+
+
 /* DAL calls this function to notify PP about completion of Mode Set.
  * For PP it means that current DCE clocks are those which were returned
  * by dc_service_pp_pre_dce_clock_change(), in the 'output' parameter.
@@ -167,32 +195,9 @@ struct dc_pp_static_clock_info {
  * \returns	true - call is successful
  *		false - call failed
  */
-bool dc_service_pp_post_dce_clock_change(
+bool dc_service_pp_apply_display_requirements(
 	struct dc_context *ctx,
 	const struct dc_pp_display_configuration *pp_display_cfg);
-
-/* The returned clocks range are 'static' system clocks which will be used for
- * mode validation purposes.
- *
- * \returns	true - call is successful
- *		false - call failed
- */
-bool dc_service_get_system_clocks_range(
-	struct dc_context *ctx,
-	struct dal_system_clock_range *sys_clks);
-
-
-bool dc_service_get_clock_levels_by_type(
-	struct dc_context *ctx,
-	enum dc_pp_clock_type clk_type,
-	struct dc_pp_clock_levels *clk_level_info);
-
-/* Use this for mode validation.
- * TODO: when this interface is implemented on Linux, should we remove
- * dc_service_get_system_clocks_range() ?? */
-bool dc_service_get_static_clocks(
-	struct dc_context *ctx,
-	struct dc_pp_static_clock_info *static_clk_info);
 
 
 /****** end of PP interfaces ******/
