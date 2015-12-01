@@ -847,6 +847,14 @@ void dc_link_remove_sink(struct dc_link *link, const struct dc_sink *sink)
 		if (link->sink[i] == sink) {
 			dc_sink_release(sink);
 			link->sink[i] = NULL;
+
+			/* shrink array to remove empty place */
+			dc_service_memmove(
+				&link->sink[i],
+				&link->sink[i + 1],
+				(link->sink_count - i - 1) *
+				sizeof(link->sink[i]));
+
 			link->sink_count--;
 			return;
 		}
