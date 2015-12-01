@@ -46,7 +46,7 @@ static const struct dce110_stream_enc_offsets reg_offsets[] = {
 },
 {
 	.dig_offset = (mmDIG2_DIG_FE_CNTL - mmDIG0_DIG_FE_CNTL),
-	.dp_offset = (mmDP1_DP_SEC_CNTL - mmDP0_DP_SEC_CNTL)
+	.dp_offset = (mmDP2_DP_SEC_CNTL - mmDP0_DP_SEC_CNTL)
 }
 };
 
