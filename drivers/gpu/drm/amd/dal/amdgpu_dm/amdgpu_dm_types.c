@@ -556,8 +556,7 @@ struct amdgpu_connector *aconnector_from_drm_crtc_id(
 
 		aconnector = to_amdgpu_connector(connector);
 
-		/* acrtc->crtc_id means display_index */
-		if (aconnector->connector_id != acrtc->crtc_id)
+		if (aconnector->base.state->crtc != &acrtc->base)
 			continue;
 
 		/* Found the connector */
