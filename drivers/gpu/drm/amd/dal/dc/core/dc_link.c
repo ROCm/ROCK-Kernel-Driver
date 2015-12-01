@@ -977,14 +977,14 @@ static enum dc_status enable_link_hdmi(struct core_stream *stream)
 		(stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK)
 					? LANE_COUNT_EIGHT : LANE_COUNT_FOUR;
 
-	if (link->ctx->dc->hwss.encoder_enable_output(
+	if (!link->ctx->dc->hwss.encoder_enable_output(
 			stream->sink->link->link_enc,
 			&stream->sink->link->cur_link_settings,
 			stream->stream_enc->id,
 			dal_clock_source_get_id(stream->clock_source),
 			stream->signal,
 			stream->public.timing.display_color_depth,
-			stream->public.timing.pix_clk_khz) != ENCODER_RESULT_OK)
+			stream->public.timing.pix_clk_khz))
 		status = DC_ERROR_UNEXPECTED;
 
 	if (stream->signal == SIGNAL_TYPE_HDMI_TYPE_A)
@@ -1052,8 +1052,8 @@ enum dc_status core_link_disable(struct core_stream *stream)
 		}
 	}
 
-	else if (ENCODER_RESULT_OK != dc->hwss.encoder_disable_output(
-					stream->sink->link->link_enc, stream->signal))
+	else if (!dc->hwss.encoder_disable_output(
+				stream->sink->link->link_enc, stream->signal))
 		status = DC_ERROR_UNEXPECTED;
 
 	return status;

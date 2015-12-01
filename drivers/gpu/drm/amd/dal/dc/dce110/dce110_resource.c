@@ -474,10 +474,9 @@ static enum dc_status validate_mapped_resource(
 				return DC_FAIL_CONTROLLER_VALIDATE;
 
 
-			if (dce110_link_encoder_validate_output_with_stream(
+			if (!dce110_link_encoder_validate_output_with_stream(
 					link->link_enc,
-					stream)
-							!= ENCODER_RESULT_OK)
+					stream))
 				return DC_FAIL_ENC_VALIDATE;
 
 			/* TODO: validate audio ASIC caps, encoder */
