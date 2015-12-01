@@ -672,14 +672,6 @@ struct dc_csc_adjustments {
 	struct fixed31_32 hue;
 };
 
-enum dc_encoder_result {
-	ENCODER_RESULT_OK,
-	ENCODER_RESULT_ERROR,
-	ENCODER_RESULT_NOBANDWIDTH,
-	ENCODER_RESULT_SINKCONNECTIVITYCHANGED
-#endif
-};
-
 #include "dc_temp.h"
 
 #endif /* DC_TYPES_H_ */

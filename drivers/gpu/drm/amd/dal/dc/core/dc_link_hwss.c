@@ -54,14 +54,14 @@ enum dc_status dp_enable_link_phy(
 {
 	enum dc_status status = DC_OK;
 
-	if (link->dc->hwss.encoder_enable_output(
+	if (!link->dc->hwss.encoder_enable_output(
 					link->link_enc,
 					link_settings,
 					engine,
 					CLOCK_SOURCE_ID_EXTERNAL,
 					signal,
 					COLOR_DEPTH_UNDEFINED,
-					0) != ENCODER_RESULT_OK)
+					0))
 		status = DC_ERROR_UNEXPECTED;
 
 	if (status == DC_OK)

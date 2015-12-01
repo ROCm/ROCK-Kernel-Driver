@@ -640,7 +640,7 @@ static bool is_panel_powered_on(struct dce110_link_encoder *enc110)
  * @brief
  * eDP only. Control the power of the eDP panel.
  */
-static enum dc_encoder_result link_encoder_edp_power_control(
+static bool link_encoder_edp_power_control(
 	struct dce110_link_encoder *enc110,
 	bool power_up)
 {
@@ -651,7 +651,7 @@ static enum dc_encoder_result link_encoder_edp_power_control(
 	if (dal_graphics_object_id_get_connector_id(enc110->base.connector) !=
 		CONNECTOR_ID_EDP) {
 		BREAK_TO_DEBUGGER();
-		return ENCODER_RESULT_ERROR;
+		return false;
 	}
 
 	if ((power_up && !is_panel_powered_on(enc110)) ||
@@ -694,7 +694,7 @@ static enum dc_encoder_result link_encoder_edp_power_control(
 				__func__, (power_up ? "On":"Off"));
 	}
 
-	return ENCODER_RESULT_OK;
+	return true;
 }
 
 /*
@@ -810,7 +810,7 @@ static bool is_panel_backlight_on(struct dce110_link_encoder *enc110)
  * @brief
  * eDP only. Control the backlight of the eDP panel
  */
-static enum dc_encoder_result link_encoder_edp_backlight_control(
+static bool link_encoder_edp_backlight_control(
 	struct dce110_link_encoder *enc110,
 	bool enable)
 {
@@ -820,7 +820,7 @@ static enum dc_encoder_result link_encoder_edp_backlight_control(
 	if (dal_graphics_object_id_get_connector_id(enc110->base.connector)
 		!= CONNECTOR_ID_EDP) {
 		BREAK_TO_DEBUGGER();
-		return ENCODER_RESULT_ERROR;
+		return false;
 	}
 
 	if (enable && is_panel_backlight_on(enc110)) {
@@ -829,7 +829,7 @@ static enum dc_encoder_result link_encoder_edp_backlight_control(
 				LOG_MINOR_HW_TRACE_RESUME_S3,
 				"%s: panel already powered up. Do nothing.\n",
 				__func__);
-		return ENCODER_RESULT_OK;
+		return true;
 	}
 
 	if (!enable && !is_panel_powered_on(enc110)) {
@@ -838,7 +838,7 @@ static enum dc_encoder_result link_encoder_edp_backlight_control(
 				LOG_MINOR_HW_TRACE_RESUME_S3,
 				"%s: panel already powered down. Do nothing.\n",
 				__func__);
-		return ENCODER_RESULT_OK;
+		return true;
 	}
 
 	/* Send VBIOS command to control eDP panel backlight */
@@ -875,7 +875,7 @@ static enum dc_encoder_result link_encoder_edp_backlight_control(
 		dal_adapter_service_get_bios_parser(
 			enc110->base.adapter_service), &cntl);
 
-	return ENCODER_RESULT_OK;
+	return true;
 }
 
 static bool is_dig_enabled(const struct dce110_link_encoder *enc110)
@@ -1239,7 +1239,7 @@ void dce110_link_encoder_destroy(struct link_encoder **enc)
 	*enc = NULL;
 }
 
-enum dc_encoder_result dce110_link_encoder_validate_output_with_stream(
+bool dce110_link_encoder_validate_output_with_stream(
 	struct link_encoder *enc,
 	const struct core_stream *stream)
 {
@@ -1282,10 +1282,10 @@ enum dc_encoder_result dce110_link_encoder_validate_output_with_stream(
 	break;
 	}
 
-	return is_valid ? ENCODER_RESULT_OK : ENCODER_RESULT_ERROR;
+	return is_valid;
 }
 
-enum dc_encoder_result dce110_link_encoder_power_up(
+bool dce110_link_encoder_power_up(
 	struct link_encoder *enc)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
@@ -1314,7 +1314,7 @@ enum dc_encoder_result dce110_link_encoder_power_up(
 			"%s: Failed to execute VBIOS command table!\n",
 			__func__);
 		BREAK_TO_DEBUGGER();
-		return ENCODER_RESULT_ERROR;
+		return false;
 	}
 
 	if (enc110->base.connector.id == CONNECTOR_ID_LVDS) {
@@ -1342,7 +1342,7 @@ enum dc_encoder_result dce110_link_encoder_power_up(
 	 * So this routine must be called first. */
 	hpd_initialize(enc110);
 
-	return ENCODER_RESULT_OK;
+	return true;
 }
 
 void dce110_link_encoder_setup(
@@ -1386,47 +1386,47 @@ void dce110_link_encoder_setup(
 	dal_write_reg(ctx, addr, value);
 }
 
-enum dc_encoder_result dce110_link_encoder_enable_tmds_output(
+bool dce110_link_encoder_enable_tmds_output(
 	struct link_encoder *enc,
 	enum clock_source_id clock_source,
 	enum dc_color_depth color_depth,
 	uint32_t pixel_clock)
 {
-	return ENCODER_RESULT_OK;
+	return true;
 }
 
-enum dc_encoder_result dce110_link_encoder_enable_dual_link_tmds_output(
+bool dce110_link_encoder_enable_dual_link_tmds_output(
 	struct link_encoder *enc,
 	enum clock_source_id clock_source,
 	enum dc_color_depth color_depth,
 	uint32_t pixel_clock)
 {
-	return ENCODER_RESULT_OK;
+	return true;
 }
 
 /* enables DP PHY output */
-enum dc_encoder_result dce110_link_encoder_enable_dp_output(
+bool dce110_link_encoder_enable_dp_output(
 	struct link_encoder *enc,
 	const struct link_settings *link_settings,
 	enum clock_source_id clock_source)
 {
-	return ENCODER_RESULT_OK;
+	return true;
 }
 
 /* enables DP PHY output in MST mode */
-enum dc_encoder_result dce110_link_encoder_enable_dp_mst_output(
+bool dce110_link_encoder_enable_dp_mst_output(
 	struct link_encoder *enc,
 	const struct link_settings *link_settings,
 	enum clock_source_id clock_source)
 {
-	return ENCODER_RESULT_OK;
+	return true;
 }
 
 /*
  * @brief
  * Disable transmitter and its encoder
  */
-enum dc_encoder_result dce110_link_encoder_disable_output(
+bool dce110_link_encoder_disable_output(
 	struct link_encoder *enc,
 	enum signal_type signal)
 {
@@ -1444,7 +1444,7 @@ enum dc_encoder_result dce110_link_encoder_disable_output(
 		dal_adapter_service_should_optimize(
 			enc110->base.adapter_service,
 			OF_SKIP_POWER_DOWN_INACTIVE_ENCODER)) {
-		return ENCODER_RESULT_OK;
+		return true;
 	}
 	/* Power-down RX and disable GPU PHY should be paired.
 	 * Disabling PHY without powering down RX may cause
@@ -1485,10 +1485,10 @@ enum dc_encoder_result dce110_link_encoder_disable_output(
 				link_enc, false); */
 	}
 
-	return ENCODER_RESULT_OK;
+	return true;
 }
 
-enum dc_encoder_result dce110_link_encoder_dp_set_lane_settings(
+bool dce110_link_encoder_dp_set_lane_settings(
 	struct link_encoder *enc,
 	const struct link_training_settings *link_settings)
 {
@@ -1499,7 +1499,7 @@ enum dc_encoder_result dce110_link_encoder_dp_set_lane_settings(
 
 	if (!link_settings) {
 		BREAK_TO_DEBUGGER();
-		return ENCODER_RESULT_ERROR;
+		return false;
 	}
 
 	cntl.action = TRANSMITTER_CONTROL_SET_VOLTAGE_AND_PREEMPASIS;
@@ -1537,7 +1537,7 @@ enum dc_encoder_result dce110_link_encoder_dp_set_lane_settings(
 				enc110->base.adapter_service), &cntl);
 	}
 
-	return ENCODER_RESULT_OK;
+	return true;
 }
 
 /* set DP PHY test and training patterns */
@@ -1848,7 +1848,7 @@ void dce110_link_encoder_set_lcd_backlight_level(
  * Configure digital transmitter and enable both encoder and transmitter
  * Actual output will be available after calling unblank()
  */
-enum dc_encoder_result dce110_link_encoder_enable_output(
+bool dce110_link_encoder_enable_output(
 	struct link_encoder *enc,
 	const struct link_settings *link_settings,
 	enum engine_id engine,
@@ -1905,7 +1905,7 @@ enum dc_encoder_result dce110_link_encoder_enable_output(
 			enc110->base.adapter_service),
 		&cntl);
 
-	return ENCODER_RESULT_OK;
+	return true;
 }
 
 void dce110_link_encoder_connect_dig_be_to_fe(
