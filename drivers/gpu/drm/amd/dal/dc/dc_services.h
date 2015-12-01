@@ -37,7 +37,6 @@
 #include "irq_types.h"
 #include "dal_power_interface_types.h"
 
-
 /* if the pointer is not NULL, the allocated memory is zeroed */
 void *dc_service_alloc(struct dc_context *ctx, uint32_t size);
 
@@ -93,6 +92,27 @@ struct dc_pp_display_configuration {
 	bool cpu_cc6_disable; /* controls CPU CState switch ( on or off) */
 	bool cpu_pstate_disable;
 	uint32_t cpu_pstate_separation_time;
+
+	uint32_t max_displays;
+	uint32_t active_displays;
+
+	/* 10khz steps */
+	uint32_t min_memory_clock_khz;
+	uint32_t min_engine_clock_khz;
+	uint32_t min_engine_clock_deep_sleep_khz;
+
+	uint32_t avail_mclk_switch_time_us;
+	uint32_t avail_mclk_switch_time_in_disp_active_us;
+
+	uint32_t disp_clk_khz;
+
+	bool all_displays_in_sync;
+
+	/*Controller Index of primary display - used in MCLK SMC switching hang
+	 * SW Workaround*/
+	uint32_t crtc_index;
+	/*htotal*1000/pixelclk - used in MCLK SMC switching hang SW Workaround*/
+	uint32_t line_time_in_us;
 };
 
 enum dc_pp_clock_type {
