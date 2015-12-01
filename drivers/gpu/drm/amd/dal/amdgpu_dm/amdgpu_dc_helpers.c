@@ -304,7 +304,7 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 				 * find sink --> stream --> target -->
 				 * connector
 				 */
-				table->stream_allocations[i].engine =
+				table->stream_allocations[i].stream =
 					dc_target->streams[j];
 				/* exit loop connector */
 				find_stream_for_sink = true;
