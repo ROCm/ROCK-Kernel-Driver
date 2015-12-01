@@ -783,10 +783,10 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 	struct fixed31_32 avg_time_slots_per_mtp;
 	uint8_t cur_stream_payload_idx;
 
-	if (stream_encoder->id == ENGINE_ID_UNKNOWN) {
-		/* TODO ASSERT */
-		return DC_ERROR_UNEXPECTED;
-	}
+	/* enable_link_dp_mst already check link->enabled_stream_count
+	 * and stream is in link->stream[]. This is called during set mode,
+	 * stream_enc is available.
+	 */
 
 	/* get calculate VC payload for stream: stream_alloc */
 	dc_helpers_dp_mst_write_payload_allocation_table(
@@ -831,11 +831,24 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 	struct stream_encoder *stream_encoder = stream->stream_enc;
 	struct dp_mst_stream_allocation_table table = {0};
 	struct fixed31_32 avg_time_slots_per_mtp = dal_fixed31_32_from_int(0);
+	uint8_t i;
 
-	if (stream_encoder->id == ENGINE_ID_UNKNOWN) {
-		/* TODO ASSERT */
-		return DC_ERROR_UNEXPECTED;
+	/* deallocate_mst_payload is called before disable link. When mode or
+	 * disable/enable monitor, new stream is created which is not in link
+	 * stream[] yet. For this, payload is not allocated yet, so de-alloc
+	 * should not done. For new mode set, map_resources will get engine
+	 * for new stream, so stream_enc->id should be validated until here.
+	 */
+	if (link->enabled_stream_count == 0)
+		return DC_OK;
+
+	for (i = 0; i < link->enabled_stream_count; i++) {
+		if (link->enabled_streams[i] == stream)
+			break;
 	}
+	/* stream is not in link stream list */
+	if (i == link->enabled_stream_count)
+		return DC_OK;
 
 	/* slot X.Y */
 	dce110_stream_encoder_set_mst_bandwidth(
@@ -862,9 +875,7 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 			&stream->sink->public,
 			false);
 
-
 	return DC_OK;
-
 }
 
 static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
@@ -1009,6 +1020,10 @@ static void power_down_encoders(struct validate_context *context)
 	for (i = 0; i < context->target_count; i++) {
 		target = context->targets[i];
 		stream = DC_STREAM_TO_CORE(target->public.streams[0]);
+
+		if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
+			deallocate_mst_payload(stream);
+
 		core_link_disable(stream);
 	}
 }

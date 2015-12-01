@@ -46,8 +46,6 @@ void dp_receiver_power_ctrl(struct core_link *link, bool on)
 			sizeof(state));
 }
 
-
-/* TODO: HBR2 need raise clock for DP link training */
 enum dc_status dp_enable_link_phy(
 	struct core_link *link,
 	enum signal_type signal,
@@ -66,7 +64,8 @@ enum dc_status dp_enable_link_phy(
 					0) != ENCODER_RESULT_OK)
 		status = DC_ERROR_UNEXPECTED;
 
-	dp_receiver_power_ctrl(link, true);
+	if (status == DC_OK)
+		dp_receiver_power_ctrl(link, true);
 
 	return status;
 }
