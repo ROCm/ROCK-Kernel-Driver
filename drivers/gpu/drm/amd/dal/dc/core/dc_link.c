@@ -385,7 +385,7 @@ static enum dc_edid_status read_edid(
 		dal_ddc_service_get_edid_buf(link->ddc,
 				sink->public.dc_edid.raw_edid);
 		edid_status = dc_helpers_parse_edid_caps(
-				NULL,
+				sink->ctx,
 				&sink->public.dc_edid,
 				&sink->public.edid_caps);
 		--edid_retry;
