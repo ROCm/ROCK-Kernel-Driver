@@ -3460,9 +3460,18 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_input_dceip *dceip,
 		calcs_output->dispclk_khz =
 				mul(bw_results_internal->dispclk,
 					int_to_fixed(1000)).value >> 24;
+		calcs_output->blackout_recovery_time_us =
+			mul(bw_results_internal->blackout_recovery_time,
+					int_to_fixed(1000)).value >> 24;
 		calcs_output->required_sclk =
 			mul(bw_results_internal->required_sclk,
 					int_to_fixed(1000)).value >> 24;
+		calcs_output->required_sclk_deep_sleep =
+			mul(bw_results_internal->sclk_deep_sleep,
+					int_to_fixed(1000)).value >> 24;
+		/*TODO:fix formula to unhardcode*/
+		calcs_output->required_yclk =
+				mul(high_yclk, int_to_fixed(1000)).value >> 24;
 
 		((struct bw_calcs_input_vbios *)vbios)->low_yclk = low_yclk;
 		((struct bw_calcs_input_vbios *)vbios)->high_yclk = high_yclk;

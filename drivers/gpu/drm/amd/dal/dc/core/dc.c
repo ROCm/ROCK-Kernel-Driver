@@ -465,23 +465,71 @@ static bool targets_changed(
 	return false;
 }
 
+
+static uint32_t get_min_vblank_time_us(const struct validate_context *context)
+{
+	uint8_t i, j;
+	uint32_t min_vertical_blank_time = -1;
+	for (i = 0; i < context->target_count; i++) {
+		const struct core_target *target = context->targets[i];
+		for (j = 0; j < target->public.stream_count; j++) {
+			const struct dc_stream *stream =
+						target->public.streams[j];
+			uint32_t vertical_blank_in_pixels = 0;
+			uint32_t vertical_blank_time = 0;
+
+			vertical_blank_in_pixels = stream->timing.h_total *
+				(stream->timing.v_total
+				- stream->timing.v_addressable);
+			/*TODO: - vertical timing overscan if we still support*/
+			vertical_blank_time = vertical_blank_in_pixels * 1000
+				/ stream->timing.pix_clk_khz;
+			/*TODO: doublescan doubles, pixel repetition mults*/
+
+			if (min_vertical_blank_time > vertical_blank_time)
+				min_vertical_blank_time = vertical_blank_time;
+		}
+	}
+
+	return min_vertical_blank_time;
+}
+
 static void pplib_post_set_mode(
 	struct dc *dc,
 	const struct validate_context *context)
 {
+	uint8_t i;
 	struct dc_pp_display_configuration pp_display_cfg = { 0 };
 
 	pp_display_cfg.nb_pstate_switch_disable =
 			context->bw_results.nbp_state_change_enable == false;
-
 	pp_display_cfg.cpu_cc6_disable =
 			context->bw_results.cpuc_state_change_enable == false;
-
 	pp_display_cfg.cpu_pstate_disable =
 			context->bw_results.cpup_state_change_enable == false;
+	pp_display_cfg.cpu_pstate_separation_time =
+			context->bw_results.blackout_recovery_time_us;
 
-	/* TODO: get cpu_pstate_separation_time from BW Calcs. */
-	pp_display_cfg.cpu_pstate_separation_time = 0;
+	pp_display_cfg.max_displays = dc->link_count;
+	for (i = 0; i < context->target_count; i++)
+		pp_display_cfg.active_displays +=
+				context->targets[i]->public.stream_count;
+
+	pp_display_cfg.min_memory_clock_khz = context->bw_results.required_yclk;
+	pp_display_cfg.min_engine_clock_khz = context->bw_results.required_sclk;
+	pp_display_cfg.min_engine_clock_deep_sleep_khz
+			= context->bw_results.required_sclk_deep_sleep;
+
+	pp_display_cfg.avail_mclk_switch_time_us =
+						get_min_vblank_time_us(context);
+	/* TODO: dce11.2*/
+	pp_display_cfg.avail_mclk_switch_time_in_disp_active_us = 0;
+
+	pp_display_cfg.disp_clk_khz = context->bw_results.dispclk_khz;
+
+	/* TODO: unhardcode, is this still applicable?*/
+	pp_display_cfg.crtc_index = 0;
+	pp_display_cfg.line_time_in_us = 0;
 
 	dc_service_pp_post_dce_clock_change(dc->ctx, &pp_display_cfg);
 }
