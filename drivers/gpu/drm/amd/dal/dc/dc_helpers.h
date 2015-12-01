@@ -43,7 +43,7 @@ enum dc_edid_status dc_helpers_parse_edid_caps(
  */
 bool dc_helpers_dp_mst_write_payload_allocation_table(
 		struct dc_context *ctx,
-		const struct dc_sink *sink,
+		const struct dc_stream *stream,
 		struct dp_mst_stream_allocation_table *table,
 		bool enable);
 
@@ -52,13 +52,13 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
  */
 bool dc_helpers_dp_mst_poll_for_allocation_change_trigger(
 		struct dc_context *ctx,
-		const struct dc_sink *sink);
+		const struct dc_stream *stream);
 /*
  * Sends ALLOCATE_PAYLOAD message.
  */
 bool dc_helpers_dp_mst_send_payload_allocation(
 		struct dc_context *ctx,
-		const struct dc_sink *sink,
+		const struct dc_stream *stream,
 		bool enable);
 
 void dc_helpers_dp_mst_handle_mst_hpd_rx_irq(

@@ -165,7 +165,7 @@ static struct amdgpu_connector *get_connector_for_link(
  */
 bool dc_helpers_dp_mst_write_payload_allocation_table(
 		struct dc_context *ctx,
-		const struct dc_sink *sink,
+		const struct dc_stream *stream,
 		struct dp_mst_stream_allocation_table *table,
 		bool enable)
 {
@@ -186,7 +186,7 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 	uint8_t vcid = 0;
 	bool find_stream_for_sink;
 
-	aconnector = get_connector_for_sink(dev, sink);
+	aconnector = get_connector_for_sink(dev, stream->sink);
 	crtc = aconnector->base.state->crtc;
 
 	if (!crtc)
@@ -265,7 +265,7 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 			connector,
 			&dev->mode_config.connector_list,
 			head) {
-			const struct dc_sink *dc_sink_connector;
+			const struct dc_sink *dc_sink;
 			struct dc_target *dc_target;
 			uint8_t j;
 
@@ -283,7 +283,7 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 
 			/* find connector with same vcid as payload */
 
-			dc_sink_connector = aconnector->dc_sink;
+			dc_sink = aconnector->dc_sink;
 
 			/*
 			 * find stream to drive this sink
@@ -295,7 +295,7 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 
 			for (j = 0; j < dc_target->stream_count; j++) {
 				if (dc_target->streams[j]->sink ==
-					dc_sink_connector)
+					dc_sink)
 					break;
 			}
 
@@ -335,7 +335,7 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
  */
 bool dc_helpers_dp_mst_poll_for_allocation_change_trigger(
 		struct dc_context *ctx,
-		const struct dc_sink *sink)
+		const struct dc_stream *stream)
 {
 	struct amdgpu_device *adev = ctx->driver_context;
 	struct drm_device *dev = adev->ddev;
@@ -343,7 +343,7 @@ bool dc_helpers_dp_mst_poll_for_allocation_change_trigger(
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	int ret;
 
-	aconnector = get_connector_for_sink(dev, sink);
+	aconnector = get_connector_for_sink(dev, stream->sink);
 
 	if (!aconnector->mst_port)
 		return false;
@@ -360,7 +360,7 @@ bool dc_helpers_dp_mst_poll_for_allocation_change_trigger(
 
 bool dc_helpers_dp_mst_send_payload_allocation(
 		struct dc_context *ctx,
-		const struct dc_sink *sink,
+		const struct dc_stream *stream,
 		bool enable)
 {
 	struct amdgpu_device *adev = ctx->driver_context;
@@ -370,7 +370,7 @@ bool dc_helpers_dp_mst_send_payload_allocation(
 	struct drm_dp_mst_port *mst_port;
 	int ret;
 
-	aconnector = get_connector_for_sink(dev, sink);
+	aconnector = get_connector_for_sink(dev, stream->sink);
 
 	mst_port = aconnector->port;
 

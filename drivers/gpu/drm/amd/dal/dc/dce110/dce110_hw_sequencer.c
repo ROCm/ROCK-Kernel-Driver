@@ -791,7 +791,7 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 	/* get calculate VC payload for stream: stream_alloc */
 	dc_helpers_dp_mst_write_payload_allocation_table(
 		stream->ctx,
-		&stream->sink->public,
+		&stream->public,
 		&table,
 		true);
 
@@ -803,11 +803,11 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 	/* send down message */
 	dc_helpers_dp_mst_poll_for_allocation_change_trigger(
 			stream->ctx,
-			&stream->sink->public);
+			&stream->public);
 
 	dc_helpers_dp_mst_send_payload_allocation(
 			stream->ctx,
-			&stream->sink->public,
+			&stream->public,
 			true);
 
 	/* slot X.Y for only current stream */
@@ -858,7 +858,7 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 	/* TODO: which component is responsible for remove payload table? */
 	dc_helpers_dp_mst_write_payload_allocation_table(
 		stream->ctx,
-		&stream->sink->public,
+		&stream->public,
 		&table,
 		false);
 
@@ -868,11 +868,11 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 
 	dc_helpers_dp_mst_poll_for_allocation_change_trigger(
 			stream->ctx,
-			&stream->sink->public);
+			&stream->public);
 
 	dc_helpers_dp_mst_send_payload_allocation(
 			stream->ctx,
-			&stream->sink->public,
+			&stream->public,
 			false);
 
 	return DC_OK;
