@@ -95,18 +95,10 @@ void dp_disable_link_phy_mst(struct core_link *link, struct core_stream *stream)
 		}
 	}
 	/* MST disable link only when no stream use the link */
-	if (link->enabled_stream_count > 0) {
+	if (link->enabled_stream_count > 0)
 		return;
-	}
 
-	if (!link->dp_wa.bits.KEEP_RECEIVER_POWERED)
-		dp_receiver_power_ctrl(link, false);
-
-	link->dc->hwss.encoder_disable_output(link->link_enc, stream->signal);
-
-	/* Clear current link setting.*/
-	dc_service_memset(&link->cur_link_settings, 0,
-			sizeof(link->cur_link_settings));
+	dp_disable_link_phy(link, stream->signal);
 }
 
 bool dp_set_hw_training_pattern(
