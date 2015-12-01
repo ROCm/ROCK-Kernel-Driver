@@ -890,6 +890,9 @@ static enum dc_status enable_link_dp(struct core_stream *stream)
 		stream->stream_enc->id,
 		&link_settings);
 
+	if (status == DC_ERROR_UNEXPECTED)
+		return status;
+
 	panel_mode = dp_get_panel_mode(link);
 	dpcd_configure_panel_mode(link, panel_mode);
 
@@ -914,15 +917,15 @@ static enum dc_status enable_link_dp_mst(struct core_stream *stream)
 	bool already_enabled = false;
 	int i;
 
-
 	for (i = 0; i < link->enabled_stream_count; i++) {
 		if (link->enabled_streams[i] == stream)
 			already_enabled = true;
 	}
 
-	/* TODO MST link shared by stream. counter? */
-	if (!already_enabled)
+	if (!already_enabled && link->enabled_stream_count < MAX_SINKS_PER_LINK)
 		link->enabled_streams[link->enabled_stream_count++] = stream;
+	else if (link->enabled_stream_count >= MAX_SINKS_PER_LINK)
+		return DC_ERROR_UNEXPECTED;
 
 	/* sink signal type after MST branch is MST. Multiple MST sinks
 	 * share one link. Link DP PHY is enable or training only once.
@@ -1014,7 +1017,7 @@ enum dc_status core_link_enable(struct core_stream *stream)
 		break;
 	}
 
-	if (stream->audio) {
+	if (stream->audio && status == DC_OK) {
 		/* notify audio driver for audio modes of monitor */
 		dal_audio_enable_azalia_audio_jack_presence(stream->audio,
 				stream->stream_enc->id);
