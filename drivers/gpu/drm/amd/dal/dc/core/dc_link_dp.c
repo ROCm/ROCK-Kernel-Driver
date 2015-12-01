@@ -1315,9 +1315,9 @@ static bool hpd_rx_irq_check_link_loss_status(
 	 */
 
 	dpcd_result = core_link_read_dpcd(link,
-	DPCD_ADDRESS_POWER_STATE,
-	&irq_reg_rx_power_state,
-	sizeof(irq_reg_rx_power_state));
+		DPCD_ADDRESS_POWER_STATE,
+		&irq_reg_rx_power_state,
+		sizeof(irq_reg_rx_power_state));
 
 	if (dpcd_result != DC_OK) {
 		irq_reg_rx_power_state = DP_PWR_STATE_D0;
@@ -1333,15 +1333,15 @@ static bool hpd_rx_irq_check_link_loss_status(
 		/*2. Check that Link Status changed, before re-training.*/
 
 		/*parse lane status*/
-		for (lane = 0; lane <
-			(uint32_t)(link->cur_link_settings.lane_count) &&
-			!sink_status_changed; lane++) {
+		for (lane = 0;
+			lane < link->cur_link_settings.lane_count;
+			lane++) {
 
 			/* check status of lanes 0,1
 			 * changed DpcdAddress_Lane01Status (0x202)*/
 			lane_status.raw = get_nibble_at_index(
-			&hpd_irq_dpcd_data->bytes.lane01_status.raw,
-			lane);
+				&hpd_irq_dpcd_data->bytes.lane01_status.raw,
+				lane);
 
 			if (!lane_status.bits.CHANNEL_EQ_DONE_0 ||
 				!lane_status.bits.CR_DONE_0 ||
