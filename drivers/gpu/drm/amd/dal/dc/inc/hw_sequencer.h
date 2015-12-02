@@ -157,6 +157,9 @@ struct hw_sequencer_funcs {
 	void (*enable_stream)(
 					struct core_stream *stream);
 
+	void (*disable_stream)(
+					struct core_stream *stream);
+
 	void (*update_mst_stream_allocation_table)(
 					struct link_encoder *enc,
 					const struct dp_mst_stream_allocation_table *table);

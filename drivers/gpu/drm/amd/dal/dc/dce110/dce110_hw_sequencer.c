@@ -774,60 +774,6 @@ static enum color_space get_output_color_space(
 	return color_space;
 }
 
-static enum dc_status deallocate_mst_payload(struct core_stream *stream)
-{
-	struct core_link *link = stream->sink->link;
-	struct link_encoder *link_encoder = link->link_enc;
-	struct stream_encoder *stream_encoder = stream->stream_enc;
-	struct dp_mst_stream_allocation_table table = {0};
-	struct fixed31_32 avg_time_slots_per_mtp = dal_fixed31_32_from_int(0);
-	uint8_t i;
-
-	/* deallocate_mst_payload is called before disable link. When mode or
-	 * disable/enable monitor, new stream is created which is not in link
-	 * stream[] yet. For this, payload is not allocated yet, so de-alloc
-	 * should not done. For new mode set, map_resources will get engine
-	 * for new stream, so stream_enc->id should be validated until here.
-	 */
-	if (link->enabled_stream_count == 0)
-		return DC_OK;
-
-	for (i = 0; i < link->enabled_stream_count; i++) {
-		if (link->enabled_streams[i] == stream)
-			break;
-	}
-	/* stream is not in link stream list */
-	if (i == link->enabled_stream_count)
-		return DC_OK;
-
-	/* slot X.Y */
-	dce110_stream_encoder_set_mst_bandwidth(
-		stream_encoder,
-		avg_time_slots_per_mtp);
-
-	/* TODO: which component is responsible for remove payload table? */
-	dc_helpers_dp_mst_write_payload_allocation_table(
-		stream->ctx,
-		&stream->public,
-		&table,
-		false);
-
-	dce110_link_encoder_update_mst_stream_allocation_table(
-		link_encoder,
-		&table);
-
-	dc_helpers_dp_mst_poll_for_allocation_change_trigger(
-			stream->ctx,
-			&stream->public);
-
-	dc_helpers_dp_mst_send_payload_allocation(
-			stream->ctx,
-			&stream->public,
-			false);
-
-	return DC_OK;
-}
-
 static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 		struct validate_context *context,
 		const struct dc *dc)
@@ -841,9 +787,8 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 	enum color_space color_space;
 
 	if (timing_changed) {
-
-		disable_stream(stream);
-		core_link_disable(stream);
+		core_link_disable_stream(
+				stream->sink->link, stream);
 
 		/*TODO: AUTO check if timing changed*/
 		if (false == dal_clock_source_program_pix_clk(
@@ -963,10 +908,7 @@ static void power_down_encoders(struct validate_context *context)
 		target = context->targets[i];
 		stream = DC_STREAM_TO_CORE(target->public.streams[0]);
 
-		if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
-			deallocate_mst_payload(stream);
-
-		core_link_disable(stream);
+		core_link_disable_stream(stream->sink->link, stream);
 	}
 }
 
@@ -1623,10 +1565,6 @@ static bool update_plane_address(
 static void reset_single_stream_hw_ctx(struct core_stream *stream,
 		struct validate_context *context)
 {
-	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
-		deallocate_mst_payload(stream);
-
-	disable_stream(stream);
 	if (stream->audio) {
 		dal_audio_disable_output(stream->audio,
 				stream->stream_enc->id,
@@ -1634,7 +1572,8 @@ static void reset_single_stream_hw_ctx(struct core_stream *stream,
 		stream->audio = NULL;
 	}
 
-	core_link_disable(stream);
+	core_link_disable_stream(stream->sink->link, stream);
+
 	dce110_timing_generator_blank_crtc(stream->tg);
 	dce110_timing_generator_disable_crtc(stream->tg);
 	dce110_mem_input_deallocate_dmif_buffer(stream->mi, context->target_count);
@@ -1798,6 +1737,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.enable_display_power_gating = dce110_enable_display_power_gating,
 	.program_bw = dce110_program_bw,
 	.enable_stream = enable_stream,
+	.disable_stream = disable_stream,
 	.update_mst_stream_allocation_table = dce110_link_encoder_update_mst_stream_allocation_table,
 	.set_mst_bandwidth = dce110_stream_encoder_set_mst_bandwidth
 };

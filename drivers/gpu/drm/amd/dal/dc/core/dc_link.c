@@ -983,7 +983,7 @@ static void enable_link_hdmi(struct core_stream *stream)
 }
 
 /****************************enable_link***********************************/
-enum dc_status core_link_enable(struct core_stream *stream)
+static enum dc_status enable_link(struct core_stream *stream)
 {
 	enum dc_status status;
 	switch (stream->signal) {
@@ -1020,7 +1020,7 @@ enum dc_status core_link_enable(struct core_stream *stream)
 	return status;
 }
 
-void core_link_disable(struct core_stream *stream)
+static void disable_link(struct core_stream *stream)
 {
 	/* TODO  dp_set_hw_test_pattern */
 	struct dc *dc = stream->ctx->dc;
@@ -1143,6 +1143,61 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 
 }
 
+static enum dc_status deallocate_mst_payload(struct core_stream *stream)
+{
+	struct core_link *link = stream->sink->link;
+	struct link_encoder *link_encoder = link->link_enc;
+	struct stream_encoder *stream_encoder = stream->stream_enc;
+	struct dp_mst_stream_allocation_table table = {0};
+	struct fixed31_32 avg_time_slots_per_mtp = dal_fixed31_32_from_int(0);
+	uint8_t i;
+	struct dc *dc = stream->ctx->dc;
+
+	/* deallocate_mst_payload is called before disable link. When mode or
+	 * disable/enable monitor, new stream is created which is not in link
+	 * stream[] yet. For this, payload is not allocated yet, so de-alloc
+	 * should not done. For new mode set, map_resources will get engine
+	 * for new stream, so stream_enc->id should be validated until here.
+	 */
+	if (link->enabled_stream_count == 0)
+		return DC_OK;
+
+	for (i = 0; i < link->enabled_stream_count; i++) {
+		if (link->enabled_streams[i] == stream)
+			break;
+	}
+	/* stream is not in link stream list */
+	if (i == link->enabled_stream_count)
+		return DC_OK;
+
+	/* slot X.Y */
+	dc->hwss.set_mst_bandwidth(
+		stream_encoder,
+		avg_time_slots_per_mtp);
+
+	/* TODO: which component is responsible for remove payload table? */
+	dc_helpers_dp_mst_write_payload_allocation_table(
+		stream->ctx,
+		&stream->public,
+		&table,
+		false);
+
+	dc->hwss.update_mst_stream_allocation_table(
+		link_encoder,
+		&table);
+
+	dc_helpers_dp_mst_poll_for_allocation_change_trigger(
+			stream->ctx,
+			&stream->public);
+
+	dc_helpers_dp_mst_send_payload_allocation(
+			stream->ctx,
+			&stream->public,
+			false);
+
+	return DC_OK;
+}
+
 void core_link_enable_stream(
 		struct core_link *link,
 		struct core_stream *stream)
@@ -1151,10 +1206,26 @@ void core_link_enable_stream(
 
 	dc->hwss.enable_stream(stream);
 
-	if (DC_OK != core_link_enable(stream)) {
+	if (DC_OK != enable_link(stream)) {
 			BREAK_TO_DEBUGGER();
 			return;
 	}
 	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 		allocate_mst_payload(stream);
 }
+
+void core_link_disable_stream(
+		struct core_link *link,
+		struct core_stream *stream)
+{
+	struct dc *dc = stream->ctx->dc;
+
+	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
+		deallocate_mst_payload(stream);
+
+	dc->hwss.disable_stream(stream);
+
+	disable_link(stream);
+
+}
+
