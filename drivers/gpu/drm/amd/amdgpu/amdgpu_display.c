@@ -210,6 +210,12 @@ int amdgpu_crtc_page_flip(struct drm_crtc *crtc,
 	obj = new_amdgpu_fb->obj;
 	new_rbo = gem_to_amdgpu_bo(obj);
 
+	if (new_rbo->adev != adev) {
+		DRM_ERROR("Foreign BOs not allowed in the display engine\n");
+		r = -EINVAL;
+		goto cleanup;
+	}
+
 	/* pin the new buffer */
 	r = amdgpu_bo_reserve(new_rbo, false);
 	if (unlikely(r != 0)) {
