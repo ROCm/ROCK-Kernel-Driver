@@ -214,6 +214,8 @@ static int unpin_bo(struct amdgpu_bo *bo, bool resv)
 			return ret;
 	}
 
+	amdgpu_bo_kunmap(bo);
+
 	ret = amdgpu_bo_unpin(bo);
 	if (ret != 0) {
 		if (resv)
