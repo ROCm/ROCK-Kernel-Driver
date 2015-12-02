@@ -1038,6 +1038,10 @@ static bool validate_hdmi_output(
 			PIXEL_ENCODING_RGB)
 			return false;
 
+	/* DCE11 HW does not support 420 */
+	if (crtc_timing->pixel_encoding == PIXEL_ENCODING_YCBCR420)
+		return false;
+
 	return true;
 }
 
