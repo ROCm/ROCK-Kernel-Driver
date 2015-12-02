@@ -40,7 +40,7 @@ enum dc_status core_link_write_dpcd(
 	const uint8_t *data,
 	uint32_t size);
 
-enum dc_status dp_enable_link_phy(
+void dp_enable_link_phy(
 	struct core_link *link,
 	enum signal_type signal,
 	enum engine_id engine,
@@ -56,7 +56,7 @@ bool dp_set_hw_training_pattern(
 	struct core_link *link,
 	enum hw_dp_training_pattern pattern);
 
-bool dp_set_hw_lane_settings(
+void dp_set_hw_lane_settings(
 	struct core_link *link,
 	const struct link_training_settings *link_settings);
 
