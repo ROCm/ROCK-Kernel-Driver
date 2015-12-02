@@ -525,18 +525,20 @@ static void fill_gamma_from_crtc(
 
 static void fill_plane_attributes(
 			struct dc_surface *surface,
-			const struct drm_crtc *crtc)
+			struct drm_plane_state *state)
 {
 	const struct amdgpu_framebuffer *amdgpu_fb =
-		to_amdgpu_framebuffer(crtc->primary->state->fb);
-	fill_rects_from_plane_state(crtc->primary->state, surface);
+		to_amdgpu_framebuffer(state->fb);
+	const struct drm_crtc *crtc = state->crtc;
+
+	fill_rects_from_plane_state(state, surface);
 	fill_plane_attributes_from_fb(
 		surface,
 		amdgpu_fb);
 
 	/* In case of gamma set, update gamma value */
 	if (crtc->mode.private_flags &
-			AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET) {
+		AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET) {
 		fill_gamma_from_crtc(crtc, surface);
 	}
 }
@@ -647,7 +649,7 @@ static void dm_dc_surface_commit(
 			dm_state);
 
 	/* Surface programming */
-	fill_plane_attributes(dc_surface, crtc);
+	fill_plane_attributes(dc_surface, crtc->primary->state);
 	if (crtc->mode.private_flags &
 		AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET) {
 		/* reset trigger of gamma */
@@ -2087,13 +2089,14 @@ int amdgpu_dm_atomic_commit(
 		 * aconnector as needed
 		 */
 		handle_headless_hotplug(acrtc, new_state, &aconnector);
-		if (!aconnector) {
+
+		action = get_dm_commit_action(new_state);
+
+		if (!aconnector && action != DM_COMMIT_ACTION_NOTHING) {
 			DRM_ERROR("Can't find connector for crtc %d\n",
 							acrtc->crtc_id);
 			break;
 		}
-
-		action = get_dm_commit_action(new_state);
 
 		switch (action) {
 		case DM_COMMIT_ACTION_DPMS_ON:
@@ -2318,7 +2321,11 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	struct drm_crtc_state *crtc_state;
 	struct drm_plane *plane;
 	struct drm_plane_state *plane_state;
-	int i, j, ret, set_count, new_target_count;
+	int i;
+	int j;
+	int ret;
+	int set_count;
+	int new_target_count;
 	struct dc_validation_set set[MAX_TARGET_NUM] = {{ 0 }};
 	struct dc_target *new_targets[MAX_TARGET_NUM] = { 0 };
 	struct amdgpu_device *adev = dev->dev_private;
@@ -2333,11 +2340,6 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	}
 
 	ret = -EINVAL;
-
-	if (state->num_connector > MAX_TARGET_NUM) {
-		DRM_ERROR("Exceeded max targets number !\n");
-		return ret;
-	}
 
 	/* copy existing configuration */
 	new_target_count = 0;
@@ -2381,14 +2383,27 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 			struct dc_target *new_target = NULL;
 
 			if (!aconnector) {
-				DRM_ERROR("Can't find connector for crtc %d\n",
-								acrtc->crtc_id);
+				DRM_ERROR(
+					"%s: Can't find connector for crtc %d\n",
+					__func__,
+					acrtc->crtc_id);
 				goto connector_not_found;
 			}
+
 			new_target =
 				create_target_for_sink(
 					aconnector,
 					&mode);
+
+			if (!new_target) {
+				DRM_ERROR(
+					"%s: Can't create target for crtc %d\n",
+					__func__,
+					acrtc->crtc_id);
+				goto connector_not_found;
+
+			}
+
 			new_targets[new_target_count] = new_target;
 
 			set_count = update_in_val_sets_target(
@@ -2420,12 +2435,13 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 		for_each_plane_in_state(state, plane, plane_state, j) {
 			struct drm_plane_state *old_plane_state = plane->state;
 			struct drm_framebuffer *fb = plane_state->fb;
-			struct amdgpu_crtc *acrtc =
-					to_amdgpu_crtc(plane_state->crtc);
+			struct drm_crtc *crtc = plane_state->crtc;
+			struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 
 			if (!fb || acrtc->target != set[i].target)
 				continue;
-			if (!plane_state->crtc->state->planes_changed)
+
+			if (!crtc->state->planes_changed)
 				continue;
 
 			if (!page_flip_needed(plane_state, old_plane_state)) {
@@ -2433,7 +2449,9 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 					dc_create_surface(dc);
 
 				fill_plane_attributes(
-						surface, plane_state->crtc);
+					surface,
+					plane_state);
+
 				add_val_sets_surface(
 					set,
 					set_count,
@@ -2450,8 +2468,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 connector_not_found:
 	for (i = 0; i < set_count; i++) {
 		for (j = 0; j < set[i].surface_count; j++) {
-			dc_surface_release(
-				(struct dc_surface *)set[i].surfaces[j]);
+			dc_surface_release(set[i].surfaces[j]);
 		}
 	}
 	for (i = 0; i < new_target_count; i++)
