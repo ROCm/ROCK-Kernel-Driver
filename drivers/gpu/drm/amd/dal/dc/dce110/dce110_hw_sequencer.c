@@ -1310,12 +1310,12 @@ static void set_safe_displaymarks(struct validate_context *context)
 
 static void dce110_program_bw(struct dc *dc, struct validate_context *context)
 {
-	set_safe_displaymarks(&dc->current_context);
+	set_safe_displaymarks(context);
 	/*TODO: when pplib works*/
 	/*dc_set_clocks_and_clock_state(context);*/
 
-	set_display_clock(&dc->current_context);
-	set_displaymarks(dc, &dc->current_context);
+	set_display_clock(context);
+	set_displaymarks(dc, context);
 }
 
 /*TODO: break out clock sources like timing gen/ encoder*/
