@@ -9,6 +9,10 @@
 #include "include/connector_interface.h"
 #include "hw_sequencer.h"
 #include "include/ddc_service_interface.h"
+#include "dc_helpers.h"
+#include "dce110/dce110_link_encoder.h"
+#include "dce110/dce110_stream_encoder.h"
+
 
 enum dc_status core_link_read_dpcd(
 	struct core_link* link,
@@ -191,4 +195,3 @@ void dp_set_hw_test_pattern(
 
 	link->ctx->dc->hwss.encoder_set_dp_phy_pattern(encoder, &pattern_param);
 }
-

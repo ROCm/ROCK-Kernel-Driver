@@ -154,7 +154,16 @@ struct hw_sequencer_funcs {
 	void (*program_bw)(
 					struct dc *dc,
 					struct validate_context *context);
+	void (*enable_stream)(
+					struct core_stream *stream);
 
+	void (*update_mst_stream_allocation_table)(
+					struct link_encoder *enc,
+					const struct dp_mst_stream_allocation_table *table);
+
+	void (*set_mst_bandwidth)(
+					struct stream_encoder *enc,
+					struct fixed31_32 avg_time_slots_per_mtp);
 };
 
 bool dc_construct_hw_sequencer(
