@@ -159,3 +159,62 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 
 	return drm_gem_prime_export(dev, gobj, flags);
 }
+
+static struct drm_gem_object *
+amdgpu_gem_prime_foreign_bo(struct amdgpu_device *adev, struct amdgpu_bo *bo)
+{
+	struct amdgpu_gem_object *gobj;
+	int r;
+
+	ww_mutex_lock(&bo->tbo.resv->lock, NULL);
+
+	list_for_each_entry(gobj, &bo->gem_objects, list) {
+		if (gobj->base.dev != adev->ddev)
+			continue;
+
+		ww_mutex_unlock(&bo->tbo.resv->lock);
+		drm_gem_object_reference(&gobj->base);
+		return &gobj->base;
+	}
+
+
+	gobj = kzalloc(sizeof(struct amdgpu_gem_object), GFP_KERNEL);
+	if (unlikely(!gobj)) {
+		ww_mutex_unlock(&bo->tbo.resv->lock);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	r = drm_gem_object_init(adev->ddev, &gobj->base, amdgpu_bo_size(bo));
+	if (unlikely(r)) {
+		kfree(gobj);
+		ww_mutex_unlock(&bo->tbo.resv->lock);
+		return ERR_PTR(r);
+	}
+
+	list_add(&gobj->list, &bo->gem_objects);
+	gobj->bo = amdgpu_bo_ref(bo);
+	bo->flags |= AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
+
+	ww_mutex_unlock(&bo->tbo.resv->lock);
+
+	return &gobj->base;
+}
+
+struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
+					       struct dma_buf *dma_buf)
+{
+	struct amdgpu_device *adev = dev->dev_private;
+
+	if (dma_buf->ops == &drm_gem_prime_dmabuf_ops) {
+		struct drm_gem_object *obj = dma_buf->priv;
+
+		if (obj->dev != dev && obj->dev->driver == dev->driver) {
+			/* It's a amdgpu_bo from a different driver instance */
+			struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
+
+			return amdgpu_gem_prime_foreign_bo(adev, bo);
+		}
+	}
+
+	return drm_gem_prime_import(dev, dma_buf);
+}
