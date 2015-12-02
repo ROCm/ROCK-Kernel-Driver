@@ -106,7 +106,7 @@ void dc_surface_release(const struct dc_surface *dc_surface);
  */
 struct dc_flip_addrs {
 	struct dc_plane_address address;
-
+	bool flip_immediate;
 	/* TODO: DCC format info */
 	/* TODO: add flip duration for FreeSync */
 };

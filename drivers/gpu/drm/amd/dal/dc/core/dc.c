@@ -683,6 +683,8 @@ void dc_flip_surface_addrs(struct dc* dc,
 		 * then we'll have to awkwardly bypass the "const" surface.
 		 */
 		surface->public.address = flip_addrs[i].address;
+		surface->public.flip_immediate = flip_addrs[i].flip_immediate;
+
 		dc->hwss.update_plane_address(
 			surface,
 			DC_TARGET_TO_CORE(surface->status.dc_target));
