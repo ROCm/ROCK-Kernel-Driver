@@ -884,14 +884,11 @@ static enum dc_status enable_link_dp(struct core_stream *stream)
 
 	/* get link settings for video mode timing */
 	decide_link_settings(stream, &link_settings);
-	status = dp_enable_link_phy(
+	dp_enable_link_phy(
 		stream->sink->link,
 		stream->signal,
 		stream->stream_enc->id,
 		&link_settings);
-
-	if (status == DC_ERROR_UNEXPECTED)
-		return status;
 
 	panel_mode = dp_get_panel_mode(link);
 	dpcd_configure_panel_mode(link, panel_mode);
@@ -936,20 +933,15 @@ static enum dc_status enable_link_dp_mst(struct core_stream *stream)
 	return enable_link_dp(stream);
 }
 
-static enum dc_status enable_link_hdmi(struct core_stream *stream)
+static void enable_link_hdmi(struct core_stream *stream)
 {
 	struct core_link *link = stream->sink->link;
-
-	/* TODO:Need to add missing use cases, reference
-	 * dal_hw_sequencer_enable_link_base*/
-	enum dc_status status = DC_OK;
 
 	/* enable video output */
 	/* here we need to specify that encoder output settings
 	 * need to be calculated as for the set mode,
 	 * it will lead to querying dynamic link capabilities
 	 * which should be done before enable output */
-
 	uint32_t normalized_pix_clk = stream->public.timing.pix_clk_khz;
 	switch (stream->public.timing.display_color_depth) {
 	case COLOR_DEPTH_888:
@@ -977,20 +969,17 @@ static enum dc_status enable_link_hdmi(struct core_stream *stream)
 		(stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK)
 					? LANE_COUNT_EIGHT : LANE_COUNT_FOUR;
 
-	if (!link->ctx->dc->hwss.encoder_enable_output(
+	link->ctx->dc->hwss.encoder_enable_output(
 			stream->sink->link->link_enc,
 			&stream->sink->link->cur_link_settings,
 			stream->stream_enc->id,
 			dal_clock_source_get_id(stream->clock_source),
 			stream->signal,
 			stream->public.timing.display_color_depth,
-			stream->public.timing.pix_clk_khz))
-		status = DC_ERROR_UNEXPECTED;
+			stream->public.timing.pix_clk_khz);
 
 	if (stream->signal == SIGNAL_TYPE_HDMI_TYPE_A)
 		dal_ddc_service_read_scdc_data(link->ddc);
-
-	return status;
 }
 
 /****************************enable_link***********************************/
@@ -1009,7 +998,8 @@ enum dc_status core_link_enable(struct core_stream *stream)
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
 	case SIGNAL_TYPE_HDMI_TYPE_A:
-		status = enable_link_hdmi(stream);
+		enable_link_hdmi(stream);
+		status = DC_OK;
 		break;
 
 	default:
@@ -1030,10 +1020,9 @@ enum dc_status core_link_enable(struct core_stream *stream)
 	return status;
 }
 
-enum dc_status core_link_disable(struct core_stream *stream)
+void core_link_disable(struct core_stream *stream)
 {
 	/* TODO  dp_set_hw_test_pattern */
-	enum dc_status status = DC_OK;
 	struct dc *dc = stream->ctx->dc;
 
 	/* here we need to specify that encoder output settings
@@ -1051,12 +1040,8 @@ enum dc_status core_link_disable(struct core_stream *stream)
 					stream->sink->link, stream);
 		}
 	}
-
-	else if (!dc->hwss.encoder_disable_output(
-				stream->sink->link->link_enc, stream->signal))
-		status = DC_ERROR_UNEXPECTED;
-
-	return status;
+	dc->hwss.encoder_disable_output(
+		stream->sink->link->link_enc, stream->signal);
 }
 
 enum dc_status dc_link_validate_mode_timing(

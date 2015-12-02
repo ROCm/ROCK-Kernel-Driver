@@ -235,7 +235,7 @@ struct core_link *link_create(const struct link_init_data *init_params);
 void link_destroy(struct core_link **link);
 enum dc_status core_link_enable(struct core_stream *stream);
 
-enum dc_status core_link_disable(struct core_stream *stream);
+void core_link_disable(struct core_stream *stream);
 
 enum dc_status dc_link_validate_mode_timing(
 		const struct core_sink *sink,

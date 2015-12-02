@@ -1071,32 +1071,34 @@ bool dp_hbr_verify_link_cap(
 		skip_video_pattern = true;
 		if (cur->link_rate == LINK_RATE_LOW)
 			skip_video_pattern = false;
-		if (dp_enable_link_phy(
+
+		dp_enable_link_phy(
 				link,
 				link->public.connector_signal,
 				ENGINE_ID_UNKNOWN,
-				cur)) {
-			if (skip_link_training)
-				success = true;
-			else {
-				uint8_t num_retries = 3;
-				uint8_t j;
-				uint8_t delay_between_retries = 10;
-				for (j = 0; j < num_retries; ++j) {
-					success = perform_link_training(
-						link,
-						cur,
-						skip_video_pattern);
+				cur);
 
-					if (success)
-						break;
+		if (skip_link_training)
+			success = true;
+		else {
+			uint8_t num_retries = 3;
+			uint8_t j;
+			uint8_t delay_between_retries = 10;
 
-					dc_service_sleep_in_milliseconds(
-						link->ctx,
-						delay_between_retries);
+			for (j = 0; j < num_retries; ++j) {
+				success = perform_link_training(
+					link,
+					cur,
+					skip_video_pattern);
 
-					delay_between_retries += 10;
-				}
+				if (success)
+					break;
+
+				dc_service_sleep_in_milliseconds(
+					link->ctx,
+					delay_between_retries);
+
+				delay_between_retries += 10;
 			}
 		}
 

@@ -640,7 +640,7 @@ static bool is_panel_powered_on(struct dce110_link_encoder *enc110)
  * @brief
  * eDP only. Control the power of the eDP panel.
  */
-static bool link_encoder_edp_power_control(
+static void link_encoder_edp_power_control(
 	struct dce110_link_encoder *enc110,
 	bool power_up)
 {
@@ -651,7 +651,7 @@ static bool link_encoder_edp_power_control(
 	if (dal_graphics_object_id_get_connector_id(enc110->base.connector) !=
 		CONNECTOR_ID_EDP) {
 		BREAK_TO_DEBUGGER();
-		return false;
+		return;
 	}
 
 	if ((power_up && !is_panel_powered_on(enc110)) ||
@@ -693,8 +693,6 @@ static bool link_encoder_edp_power_control(
 				"%s: Skipping Panel Power action: %s\n",
 				__func__, (power_up ? "On":"Off"));
 	}
-
-	return true;
 }
 
 /*
@@ -810,7 +808,7 @@ static bool is_panel_backlight_on(struct dce110_link_encoder *enc110)
  * @brief
  * eDP only. Control the backlight of the eDP panel
  */
-static bool link_encoder_edp_backlight_control(
+static void link_encoder_edp_backlight_control(
 	struct dce110_link_encoder *enc110,
 	bool enable)
 {
@@ -820,7 +818,7 @@ static bool link_encoder_edp_backlight_control(
 	if (dal_graphics_object_id_get_connector_id(enc110->base.connector)
 		!= CONNECTOR_ID_EDP) {
 		BREAK_TO_DEBUGGER();
-		return false;
+		return;
 	}
 
 	if (enable && is_panel_backlight_on(enc110)) {
@@ -829,7 +827,7 @@ static bool link_encoder_edp_backlight_control(
 				LOG_MINOR_HW_TRACE_RESUME_S3,
 				"%s: panel already powered up. Do nothing.\n",
 				__func__);
-		return true;
+		return;
 	}
 
 	if (!enable && !is_panel_powered_on(enc110)) {
@@ -838,7 +836,7 @@ static bool link_encoder_edp_backlight_control(
 				LOG_MINOR_HW_TRACE_RESUME_S3,
 				"%s: panel already powered down. Do nothing.\n",
 				__func__);
-		return true;
+		return;
 	}
 
 	/* Send VBIOS command to control eDP panel backlight */
@@ -874,8 +872,6 @@ static bool link_encoder_edp_backlight_control(
 	dal_bios_parser_transmitter_control(
 		dal_adapter_service_get_bios_parser(
 			enc110->base.adapter_service), &cntl);
-
-	return true;
 }
 
 static bool is_dig_enabled(const struct dce110_link_encoder *enc110)
@@ -1289,13 +1285,12 @@ bool dce110_link_encoder_validate_output_with_stream(
 	return is_valid;
 }
 
-bool dce110_link_encoder_power_up(
+void dce110_link_encoder_power_up(
 	struct link_encoder *enc)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
 	struct dc_context *ctx = enc110->base.ctx;
 	struct bp_transmitter_control cntl = { 0 };
-
 	enum bp_result result;
 
 	cntl.action = TRANSMITTER_CONTROL_INIT;
@@ -1318,7 +1313,7 @@ bool dce110_link_encoder_power_up(
 			"%s: Failed to execute VBIOS command table!\n",
 			__func__);
 		BREAK_TO_DEBUGGER();
-		return false;
+		return;
 	}
 
 	if (enc110->base.connector.id == CONNECTOR_ID_LVDS) {
@@ -1345,8 +1340,6 @@ bool dce110_link_encoder_power_up(
 	 * as DIG_FE id even caller pass DIG_FE id.
 	 * So this routine must be called first. */
 	hpd_initialize(enc110);
-
-	return true;
 }
 
 void dce110_link_encoder_setup(
@@ -1390,52 +1383,93 @@ void dce110_link_encoder_setup(
 	dal_write_reg(ctx, addr, value);
 }
 
-bool dce110_link_encoder_enable_tmds_output(
+/*
+ * @brief
+ * Configure digital transmitter and enable both encoder and transmitter
+ * Actual output will be available after calling unblank()
+ */
+void dce110_link_encoder_enable_output(
 	struct link_encoder *enc,
+	const struct link_settings *link_settings,
+	enum engine_id engine,
 	enum clock_source_id clock_source,
+	enum signal_type signal,
 	enum dc_color_depth color_depth,
 	uint32_t pixel_clock)
 {
-	return true;
-}
+	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
+	struct dc_context *ctx = enc110->base.ctx;
+	struct bp_transmitter_control cntl = { 0 };
+	enum bp_result result;
 
-bool dce110_link_encoder_enable_dual_link_tmds_output(
-	struct link_encoder *enc,
-	enum clock_source_id clock_source,
-	enum dc_color_depth color_depth,
-	uint32_t pixel_clock)
-{
-	return true;
-}
+	if (enc110->base.connector.id == CONNECTOR_ID_EDP) {
+		/* power up eDP panel */
 
-/* enables DP PHY output */
-bool dce110_link_encoder_enable_dp_output(
-	struct link_encoder *enc,
-	const struct link_settings *link_settings,
-	enum clock_source_id clock_source)
-{
-	return true;
-}
+		link_encoder_edp_power_control(enc110, true);
 
-/* enables DP PHY output in MST mode */
-bool dce110_link_encoder_enable_dp_mst_output(
-	struct link_encoder *enc,
-	const struct link_settings *link_settings,
-	enum clock_source_id clock_source)
-{
-	return true;
+		link_encoder_edp_wait_for_hpd_ready(enc110, true);
+
+		/* have to turn off the backlight
+		 * before power down eDP panel
+		 */
+		link_encoder_edp_backlight_control(enc110, true);
+	}
+
+	/* Enable the PHY */
+
+	/* number_of_lanes is used for pixel clock adjust,
+	 * but it's not passed to asic_control.
+	 * We need to set number of lanes manually.
+	 */
+	if (dc_is_dp_signal(signal))
+		configure_encoder(enc110, engine, link_settings);
+
+	cntl.action = TRANSMITTER_CONTROL_ENABLE;
+	cntl.engine_id = engine;
+	cntl.transmitter = enc110->base.transmitter;
+	cntl.pll_id = clock_source;
+	cntl.signal = signal;
+	cntl.lanes_number = link_settings->lane_count;
+	cntl.hpd_sel = enc110->base.hpd_source;
+	if (dc_is_dp_signal(signal))
+		cntl.pixel_clock = link_settings->link_rate
+						* LINK_RATE_REF_FREQ_IN_KHZ;
+	else
+		cntl.pixel_clock = pixel_clock;
+	cntl.color_depth = color_depth;
+
+	if (DELAY_AFTER_PIXEL_FORMAT_CHANGE)
+		dc_service_sleep_in_milliseconds(
+			ctx,
+			DELAY_AFTER_PIXEL_FORMAT_CHANGE);
+
+	result = dal_bios_parser_transmitter_control(
+		dal_adapter_service_get_bios_parser(
+			enc110->base.adapter_service),
+		&cntl);
+
+	if (result != BP_RESULT_OK) {
+		dal_logger_write(ctx->logger,
+			LOG_MAJOR_ERROR,
+			LOG_MINOR_COMPONENT_ENCODER,
+			"%s: Failed to execute VBIOS command table!\n",
+			__func__);
+		BREAK_TO_DEBUGGER();
+	}
 }
 
 /*
  * @brief
  * Disable transmitter and its encoder
  */
-bool dce110_link_encoder_disable_output(
+void dce110_link_encoder_disable_output(
 	struct link_encoder *enc,
 	enum signal_type signal)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
+	struct dc_context *ctx = enc110->base.ctx;
 	struct bp_transmitter_control cntl = { 0 };
+	enum bp_result result;
 
 	if (enc110->base.connector.id == CONNECTOR_ID_EDP) {
 		/* have to turn off the backlight
@@ -1448,7 +1482,7 @@ bool dce110_link_encoder_disable_output(
 		dal_adapter_service_should_optimize(
 			enc110->base.adapter_service,
 			OF_SKIP_POWER_DOWN_INACTIVE_ENCODER)) {
-		return true;
+		return;
 	}
 	/* Power-down RX and disable GPU PHY should be paired.
 	 * Disabling PHY without powering down RX may cause
@@ -1467,9 +1501,19 @@ bool dce110_link_encoder_disable_output(
 	cntl.signal = signal;
 	cntl.connector_obj_id = enc110->base.connector;
 
-	dal_bios_parser_transmitter_control(
+	result = dal_bios_parser_transmitter_control(
 		dal_adapter_service_get_bios_parser(
 			enc110->base.adapter_service), &cntl);
+
+	if (result != BP_RESULT_OK) {
+		dal_logger_write(ctx->logger,
+			LOG_MAJOR_ERROR,
+			LOG_MINOR_COMPONENT_ENCODER,
+			"%s: Failed to execute VBIOS command table!\n",
+			__func__);
+		BREAK_TO_DEBUGGER();
+		return;
+	}
 
 	/* disable encoder */
 	if (dc_is_dp_signal(signal))
@@ -1488,11 +1532,9 @@ bool dce110_link_encoder_disable_output(
 		 * link_encoder_edp_power_control(
 				link_enc, false); */
 	}
-
-	return true;
 }
 
-bool dce110_link_encoder_dp_set_lane_settings(
+void dce110_link_encoder_dp_set_lane_settings(
 	struct link_encoder *enc,
 	const struct link_training_settings *link_settings)
 {
@@ -1503,7 +1545,7 @@ bool dce110_link_encoder_dp_set_lane_settings(
 
 	if (!link_settings) {
 		BREAK_TO_DEBUGGER();
-		return false;
+		return;
 	}
 
 	cntl.action = TRANSMITTER_CONTROL_SET_VOLTAGE_AND_PREEMPASIS;
@@ -1540,8 +1582,6 @@ bool dce110_link_encoder_dp_set_lane_settings(
 			dal_adapter_service_get_bios_parser(
 				enc110->base.adapter_service), &cntl);
 	}
-
-	return true;
 }
 
 /* set DP PHY test and training patterns */
@@ -1848,71 +1888,6 @@ void dce110_link_encoder_set_lcd_backlight_level(
 
 		dc_service_delay_in_microseconds(ctx, 10);
 	}
-}
-
-/*
- * @brief
- * Configure digital transmitter and enable both encoder and transmitter
- * Actual output will be available after calling unblank()
- */
-bool dce110_link_encoder_enable_output(
-	struct link_encoder *enc,
-	const struct link_settings *link_settings,
-	enum engine_id engine,
-	enum clock_source_id clock_source,
-	enum signal_type signal,
-	enum dc_color_depth color_depth,
-	uint32_t pixel_clock)
-{
-	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
-	struct dc_context *ctx = enc110->base.ctx;
-	struct bp_transmitter_control cntl = { 0 };
-
-	if (enc110->base.connector.id == CONNECTOR_ID_EDP) {
-		/* power up eDP panel */
-
-		link_encoder_edp_power_control(enc110, true);
-
-		link_encoder_edp_wait_for_hpd_ready(enc110, true);
-
-		/* have to turn off the backlight
-		 * before power down eDP panel */
-		link_encoder_edp_backlight_control(enc110, true);
-	}
-
-	/* Enable the PHY */
-
-	/* number_of_lanes is used for pixel clock adjust,
-	 * but it's not passed to asic_control.
-	 * We need to set number of lanes manually. */
-	if (dc_is_dp_signal(signal))
-		configure_encoder(enc110, engine, link_settings);
-
-	cntl.action = TRANSMITTER_CONTROL_ENABLE;
-	cntl.engine_id = engine;
-	cntl.transmitter = enc110->base.transmitter;
-	cntl.pll_id = clock_source;
-	cntl.signal = signal;
-	cntl.lanes_number = link_settings->lane_count;
-	cntl.hpd_sel = enc110->base.hpd_source;
-	if (dc_is_dp_signal(signal))
-		cntl.pixel_clock = link_settings->link_rate
-						* LINK_RATE_REF_FREQ_IN_KHZ;
-	else
-		cntl.pixel_clock = pixel_clock;
-	cntl.color_depth = color_depth;
-
-	if (DELAY_AFTER_PIXEL_FORMAT_CHANGE)
-		dc_service_sleep_in_milliseconds(
-			ctx,
-			DELAY_AFTER_PIXEL_FORMAT_CHANGE);
-
-	dal_bios_parser_transmitter_control(
-		dal_adapter_service_get_bios_parser(
-			enc110->base.adapter_service),
-		&cntl);
-
-	return true;
 }
 
 void dce110_link_encoder_connect_dig_be_to_fe(

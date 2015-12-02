@@ -162,10 +162,7 @@ static void init_hw(struct dc *dc)
 		 * required signal (which may be different from the
 		 * default signal on connector). */
 		struct core_link *link = dc->links[i];
-		if (!dc->hwss.encoder_power_up(link->link_enc)) {
-			dal_error("Failed link encoder power up!\n");
-			return;
-		}
+		dc->hwss.encoder_power_up(link->link_enc);
 	}
 
 	dal_bios_parser_set_scratch_acc_mode_change(bp);

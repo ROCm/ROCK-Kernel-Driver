@@ -46,28 +46,22 @@ void dp_receiver_power_ctrl(struct core_link *link, bool on)
 			sizeof(state));
 }
 
-enum dc_status dp_enable_link_phy(
+void dp_enable_link_phy(
 	struct core_link *link,
 	enum signal_type signal,
 	enum engine_id engine,
 	const struct link_settings *link_settings)
 {
-	enum dc_status status = DC_OK;
-
-	if (!link->dc->hwss.encoder_enable_output(
+	link->dc->hwss.encoder_enable_output(
 					link->link_enc,
 					link_settings,
 					engine,
 					CLOCK_SOURCE_ID_EXTERNAL,
 					signal,
 					COLOR_DEPTH_UNDEFINED,
-					0))
-		status = DC_ERROR_UNEXPECTED;
+					0);
 
-	if (status == DC_OK)
-		dp_receiver_power_ctrl(link, true);
-
-	return status;
+	dp_receiver_power_ctrl(link, true);
 }
 
 void dp_disable_link_phy(struct core_link *link, enum signal_type signal)
@@ -133,7 +127,7 @@ bool dp_set_hw_training_pattern(
 }
 
 
-bool dp_set_hw_lane_settings(
+void dp_set_hw_lane_settings(
 	struct core_link *link,
 	const struct link_training_settings *link_settings)
 {
@@ -141,8 +135,6 @@ bool dp_set_hw_lane_settings(
 
 	/* call Encoder to set lane settings */
 	link->ctx->dc->hwss.encoder_dp_set_lane_settings(encoder, link_settings);
-
-	return true;
 }
 
 enum dp_panel_mode dp_get_panel_mode(struct core_link *link)

@@ -53,7 +53,7 @@ bool dce110_link_encoder_validate_output_with_stream(
 /****************** HW programming ************************/
 
 /* initialize HW */  /* why do we initialze aux in here? */
-bool dce110_link_encoder_power_up(struct link_encoder *enc);
+void dce110_link_encoder_power_up(struct link_encoder *enc);
 
 /* program DIG_MODE in DIG_BE */
 /* TODO can this be combined with enable_output? */
@@ -61,41 +61,13 @@ void dce110_link_encoder_setup(
 	struct link_encoder *enc,
 	enum signal_type signal);
 
-/* enables TMDS PHY output */
-/* TODO: still need depth or just pass in adjusted pixel clock? */
-bool dce110_link_encoder_enable_tmds_output(
-	struct link_encoder *enc,
-	enum clock_source_id clock_source,
-	enum dc_color_depth color_depth,
-	uint32_t pixel_clock);
-
-/* enables TMDS PHY output */
-/* TODO: still need this or just pass in adjusted pixel clock? */
-bool dce110_link_encoder_enable_dual_link_tmds_output(
-	struct link_encoder *enc,
-	enum clock_source_id clock_source,
-	enum dc_color_depth color_depth,
-	uint32_t pixel_clock);
-
-/* enables DP PHY output */
-bool dce110_link_encoder_enable_dp_output(
-	struct link_encoder *enc,
-	const struct link_settings *link_settings,
-	enum clock_source_id clock_source);
-
-/* enables DP PHY output in MST mode */
-bool dce110_link_encoder_enable_dp_mst_output(
-	struct link_encoder *enc,
-	const struct link_settings *link_settings,
-	enum clock_source_id clock_source);
-
 /* disable PHY output */
-bool dce110_link_encoder_disable_output(
+void dce110_link_encoder_disable_output(
 	struct link_encoder *enc,
 	enum signal_type signal);
 
 /* set DP lane settings */
-bool dce110_link_encoder_dp_set_lane_settings(
+void dce110_link_encoder_dp_set_lane_settings(
 	struct link_encoder *enc,
 	const struct link_training_settings *link_settings);
 
@@ -112,7 +84,7 @@ void dce110_link_encoder_set_lcd_backlight_level(
 	struct link_encoder *enc,
 	uint32_t level);
 
-bool dce110_link_encoder_enable_output(
+void dce110_link_encoder_enable_output(
 	struct link_encoder *enc,
 	const struct link_settings *link_settings,
 	enum engine_id engine,
