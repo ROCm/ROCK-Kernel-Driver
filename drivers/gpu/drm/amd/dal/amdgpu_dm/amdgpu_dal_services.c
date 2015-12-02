@@ -204,7 +204,9 @@ bool dc_service_get_system_clocks_range(
 		struct dc_context *ctx,
 		struct dal_system_clock_range *sys_clks)
 {
+#ifdef CONFIG_DRM_AMD_POWERPLAY
 	struct amdgpu_device *adev = ctx->driver_context;
+#endif
 
 	/* Default values, in case PPLib is not compiled-in. */
 	sys_clks->max_mclk = 80000;
