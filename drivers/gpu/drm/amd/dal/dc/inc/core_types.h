@@ -244,6 +244,10 @@ enum dc_status dc_link_validate_mode_timing(
 
 void core_link_resume(struct core_link *link);
 
+void core_link_enable_stream(
+		struct core_link *link,
+		struct core_stream *stream);
+
 /********** DAL Core*********************/
 #include "display_clock_interface.h"
 

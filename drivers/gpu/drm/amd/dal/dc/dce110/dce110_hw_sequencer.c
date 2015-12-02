@@ -774,56 +774,6 @@ static enum color_space get_output_color_space(
 	return color_space;
 }
 
-static enum dc_status allocate_mst_payload(struct core_stream *stream)
-{
-	struct core_link *link = stream->sink->link;
-	struct link_encoder *link_encoder = link->link_enc;
-	struct stream_encoder *stream_encoder = stream->stream_enc;
-	struct dp_mst_stream_allocation_table table = {0};
-	struct fixed31_32 avg_time_slots_per_mtp;
-	uint8_t cur_stream_payload_idx;
-
-	/* enable_link_dp_mst already check link->enabled_stream_count
-	 * and stream is in link->stream[]. This is called during set mode,
-	 * stream_enc is available.
-	 */
-
-	/* get calculate VC payload for stream: stream_alloc */
-	dc_helpers_dp_mst_write_payload_allocation_table(
-		stream->ctx,
-		&stream->public,
-		&table,
-		true);
-
-	/* program DP source TX for payload */
-	dce110_link_encoder_update_mst_stream_allocation_table(
-		link_encoder,
-		&table);
-
-	/* send down message */
-	dc_helpers_dp_mst_poll_for_allocation_change_trigger(
-			stream->ctx,
-			&stream->public);
-
-	dc_helpers_dp_mst_send_payload_allocation(
-			stream->ctx,
-			&stream->public,
-			true);
-
-	/* slot X.Y for only current stream */
-	cur_stream_payload_idx = table.cur_stream_payload_idx;
-	avg_time_slots_per_mtp = dal_fixed31_32_from_fraction(
-		table.stream_allocations[cur_stream_payload_idx].pbn,
-		table.stream_allocations[cur_stream_payload_idx].pbn_per_slot);
-
-	dce110_stream_encoder_set_mst_bandwidth(
-		stream_encoder,
-		avg_time_slots_per_mtp);
-
-	return DC_OK;
-
-}
-
 static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 {
 	struct core_link *link = stream->sink->link;
@@ -991,15 +941,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 			color_space);
 
 	if (timing_changed) {
-		enable_stream(stream);
-
-		if (DC_OK != core_link_enable(stream)) {
-				BREAK_TO_DEBUGGER();
-				return DC_ERROR_UNEXPECTED;
-		}
-		if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
-			allocate_mst_payload(stream);
-
+		core_link_enable_stream(stream->sink->link, stream);
 	}
 
 	if (dc_is_dp_signal(stream->signal))
@@ -1854,7 +1796,10 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.validate_bandwidth = dce110_validate_bandwidth,
 	.enable_display_pipe_clock_gating = dce110_enable_display_pipe_clock_gating,
 	.enable_display_power_gating = dce110_enable_display_power_gating,
-	.program_bw = dce110_program_bw
+	.program_bw = dce110_program_bw,
+	.enable_stream = enable_stream,
+	.update_mst_stream_allocation_table = dce110_link_encoder_update_mst_stream_allocation_table,
+	.set_mst_bandwidth = dce110_stream_encoder_set_mst_bandwidth
 };
 
 bool dce110_hw_sequencer_construct(struct dc *dc)

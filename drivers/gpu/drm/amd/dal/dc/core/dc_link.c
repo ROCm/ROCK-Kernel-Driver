@@ -1090,3 +1090,71 @@ void core_link_resume(struct core_link *link)
 		DELAY_ON_CONNECT_IN_MS,
 		DELAY_ON_DISCONNECT_IN_MS);
 }
+
+
+static enum dc_status allocate_mst_payload(struct core_stream *stream)
+{
+	struct core_link *link = stream->sink->link;
+	struct link_encoder *link_encoder = link->link_enc;
+	struct stream_encoder *stream_encoder = stream->stream_enc;
+	struct dp_mst_stream_allocation_table table = {0};
+	struct fixed31_32 avg_time_slots_per_mtp;
+	uint8_t cur_stream_payload_idx;
+	struct dc *dc = stream->ctx->dc;
+
+	/* enable_link_dp_mst already check link->enabled_stream_count
+	 * and stream is in link->stream[]. This is called during set mode,
+	 * stream_enc is available.
+	 */
+
+	/* get calculate VC payload for stream: stream_alloc */
+	dc_helpers_dp_mst_write_payload_allocation_table(
+		stream->ctx,
+		&stream->public,
+		&table,
+		true);
+
+	/* program DP source TX for payload */
+	dc->hwss.update_mst_stream_allocation_table(
+		link_encoder,
+		&table);
+
+	/* send down message */
+	dc_helpers_dp_mst_poll_for_allocation_change_trigger(
+			stream->ctx,
+			&stream->public);
+
+	dc_helpers_dp_mst_send_payload_allocation(
+			stream->ctx,
+			&stream->public,
+			true);
+
+	/* slot X.Y for only current stream */
+	cur_stream_payload_idx = table.cur_stream_payload_idx;
+	avg_time_slots_per_mtp = dal_fixed31_32_from_fraction(
+		table.stream_allocations[cur_stream_payload_idx].pbn,
+		table.stream_allocations[cur_stream_payload_idx].pbn_per_slot);
+
+	dc->hwss.set_mst_bandwidth(
+		stream_encoder,
+		avg_time_slots_per_mtp);
+
+	return DC_OK;
+
+}
+
+void core_link_enable_stream(
+		struct core_link *link,
+		struct core_stream *stream)
+{
+	struct dc *dc = stream->ctx->dc;
+
+	dc->hwss.enable_stream(stream);
+
+	if (DC_OK != core_link_enable(stream)) {
+			BREAK_TO_DEBUGGER();
+			return;
+	}
+	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
+		allocate_mst_payload(stream);
+}
