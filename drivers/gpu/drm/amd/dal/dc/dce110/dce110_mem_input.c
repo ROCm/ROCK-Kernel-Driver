@@ -535,7 +535,7 @@ static void program_urgency_watermark(
 	dal_write_reg(ctx, urgency_addr, urgency_cntl);
 }
 
-void program_stutter_watermark(
+static void program_stutter_watermark(
 	const struct dc_context *ctx,
 	const uint32_t offset,
 	struct bw_watermarks marks)
@@ -600,7 +600,7 @@ void program_stutter_watermark(
 	dal_write_reg(ctx, stutter_addr, stutter_cntl);
 }
 
-void program_nbp_watermark(
+static void program_nbp_watermark(
 	const struct dc_context *ctx,
 	const uint32_t offset,
 	struct bw_watermarks marks)
@@ -694,7 +694,6 @@ void dce110_mem_input_program_safe_display_marks(struct mem_input *mi)
 		mi->ctx, bm_dce110->offsets.dmif, max_marks, MAX_WATERMARK);
 	program_stutter_watermark(mi->ctx, bm_dce110->offsets.dmif, max_marks);
 	program_nbp_watermark(mi->ctx, bm_dce110->offsets.dmif, nbp_marks);
-
 }
 
 void dce110_mem_input_program_display_marks(
