@@ -1022,8 +1022,9 @@ static enum dc_status enable_link(struct core_stream *stream)
 
 static void disable_link(struct core_stream *stream)
 {
-	/* TODO  dp_set_hw_test_pattern */
 	struct dc *dc = stream->ctx->dc;
+
+	/* TODO  dp_set_hw_test_pattern */
 
 	/* here we need to specify that encoder output settings
 	 * need to be calculated as for the set mode,
@@ -1039,9 +1040,10 @@ static void disable_link(struct core_stream *stream)
 			dp_disable_link_phy_mst(
 					stream->sink->link, stream);
 		}
+	} else {
+		dc->hwss.encoder_disable_output(
+				stream->sink->link->link_enc, stream->signal);
 	}
-	dc->hwss.encoder_disable_output(
-		stream->sink->link->link_enc, stream->signal);
 }
 
 enum dc_status dc_link_validate_mode_timing(
