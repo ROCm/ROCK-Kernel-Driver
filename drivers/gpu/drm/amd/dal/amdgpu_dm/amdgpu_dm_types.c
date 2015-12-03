@@ -115,13 +115,24 @@ static int dm_crtc_unpin_cursor_bo_old(
 		ret  = amdgpu_bo_reserve(robj, false);
 
 		if (likely(ret == 0)) {
-			amdgpu_bo_unpin(robj);
+			ret = amdgpu_bo_unpin(robj);
+
+			if (unlikely(ret != 0)) {
+				DRM_ERROR(
+					"%s: unpin failed (ret=%d), bo %p\n",
+					__func__,
+					ret,
+					amdgpu_crtc->cursor_bo);
+			}
+
 			amdgpu_bo_unreserve(robj);
-		}
-	} else {
-		DRM_ERROR("dm_crtc_unpin_cursor_ob_old bo %x, leaked %p\n",
+		} else {
+			DRM_ERROR(
+				"%s: reserve failed (ret=%d), bo %p\n",
+				__func__,
 				ret,
 				amdgpu_crtc->cursor_bo);
+		}
 	}
 
 	drm_gem_object_unreference_unlocked(amdgpu_crtc->cursor_bo);
