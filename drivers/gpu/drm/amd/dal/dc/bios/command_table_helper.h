@@ -57,6 +57,9 @@ struct command_table_helper {
 	uint8_t (*phy_id_to_atom)(enum transmitter t);
 	uint8_t (*disp_power_gating_action_to_atom)(
 			enum bp_pipe_control_action action);
+	bool (*dc_clock_type_to_atom)(enum bp_dce_clock_type id,
+			uint32_t *atom_clock_type);
+    uint8_t (*transmitter_color_depth_to_atom)(enum transmitter_color_depth id);
 };
 
 bool dal_bios_parser_init_cmd_tbl_helper(const struct command_table_helper **h,

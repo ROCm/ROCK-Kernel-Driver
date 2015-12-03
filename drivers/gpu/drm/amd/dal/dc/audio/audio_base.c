@@ -30,7 +30,10 @@
 #include "audio.h"
 #include "hw_ctx_audio.h"
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 #include "dce110/audio_dce110.h"
+#include "dce110/hw_ctx_audio_dce110.h"
+#endif
 
 /***** static function : only used within audio.c *****/
 

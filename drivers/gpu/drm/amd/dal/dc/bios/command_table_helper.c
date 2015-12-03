@@ -42,8 +42,8 @@ bool dal_bios_parser_init_cmd_tbl_helper(
 	case DCE_VERSION_11_0:
 		*h = dal_cmd_tbl_helper_dce110_get_table();
 		return true;
-
 #endif
+
 	default:
 		/* Unsupported DCE */
 		BREAK_TO_DEBUGGER();

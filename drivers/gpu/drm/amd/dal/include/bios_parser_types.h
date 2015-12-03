@@ -248,6 +248,9 @@ struct bp_pixel_clock_parameters {
 	/* VBIOS returns a fixed display clock when DFS-bypass feature
 	 * is enabled (KHz) */
 	uint32_t dfs_bypass_display_clock;
+	/* color depth to support HDMI deep color */
+	enum transmitter_color_depth color_depth;
+
 	struct program_pixel_clock_flags {
 		uint32_t FORCE_PROGRAMMING_OF_PLL:1;
 		/* Use Engine Clock as source for Display Clock when
@@ -255,6 +258,14 @@ struct bp_pixel_clock_parameters {
 		uint32_t USE_E_CLOCK_AS_SOURCE_FOR_D_CLOCK:1;
 		/* Use external reference clock (refDivSrc for PLL) */
 		uint32_t SET_EXTERNAL_REF_DIV_SRC:1;
+		/* Force program PHY PLL only */
+		uint32_t PROGRAM_PHY_PLL_ONLY:1;
+		/* Support for YUV420 */
+		uint32_t SUPPORT_YUV_420:1;
+		/* Use XTALIN reference clock source */
+		uint32_t SET_XTALIN_REF_SRC:1;
+		/* Use GENLK reference clock source */
+		uint32_t SET_GENLOCK_REF_DIV_SRC:1;
 	} flags;
 };
 
@@ -264,6 +275,30 @@ struct bp_display_clock_parameters {
 	uint32_t actual_display_clock;
 	/* Actual Post Divider ID used to generate the actual clock */
 	uint32_t actual_post_divider_id;
+};
+
+enum bp_dce_clock_type {
+	DCECLOCK_TYPE_DISPLAY_CLOCK = 0,
+	DCECLOCK_TYPE_DPREFCLK      = 1
+};
+
+/* DCE Clock Parameters structure for SetDceClock Exec command table */
+struct bp_set_dce_clock_parameters {
+	enum clock_source_id pll_id; /* Clock Source Id */
+	/* Display clock or DPREFCLK value */
+	uint32_t target_clock_frequency;
+	/* Clock to set: =0: DISPCLK  =1: DPREFCLK  =2: PIXCLK */
+	enum bp_dce_clock_type clock_type;
+
+	struct set_dce_clock_flags {
+		uint32_t USE_GENERICA_AS_SOURCE_FOR_DPREFCLK:1;
+		/* Use XTALIN reference clock source */
+		uint32_t USE_XTALIN_AS_SOURCE_FOR_DPREFCLK:1;
+		/* Use PCIE reference clock source */
+		uint32_t USE_PCIE_AS_SOURCE_FOR_DPREFCLK:1;
+		/* Use GENLK reference clock source */
+		uint32_t USE_GENLOCK_AS_SOURCE_FOR_DPREFCLK:1;
+	} flags;
 };
 
 struct spread_spectrum_flags {
