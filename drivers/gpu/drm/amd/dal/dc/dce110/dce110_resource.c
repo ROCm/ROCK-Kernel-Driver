@@ -575,7 +575,7 @@ enum dc_status dce110_validate_bandwidth(
 		LOG_MINOR_BWM_REQUIRED_BANDWIDTH_CALCS,
 		"%s: Finish bandwidth calculations\n nbpMark: %d",
 		__func__,
-		context->bw_results.nbp_state_change_watermark[0].b_mark);
+		context->bw_results.nbp_state_change_wm_ns[0].b_mark);
 
 	return result;
 }

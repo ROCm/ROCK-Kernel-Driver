@@ -242,6 +242,7 @@ struct bw_calcs_input_mode_data {
  * Output data structure(s).
  ******************************************************************************/
 #define maximum_number_of_surfaces 12
+/*Units : MHz, us */
 struct bw_results_internal {
 	bool cpup_state_change_enable;
 	bool cpuc_state_change_enable;
@@ -430,14 +431,14 @@ struct bw_calcs_output {
 	bool cpup_state_change_enable;
 	bool stutter_mode_enable;
 	bool nbp_state_change_enable;
-	struct bw_watermarks urgent_watermark[4];
-	struct bw_watermarks stutter_exit_watermark[4];
-	struct bw_watermarks nbp_state_change_watermark[4];
+	struct bw_watermarks urgent_wm_ns[4];
+	struct bw_watermarks stutter_exit_wm_ns[4];
+	struct bw_watermarks nbp_state_change_wm_ns[4];
 	uint32_t required_sclk;
 	uint32_t required_sclk_deep_sleep;
 	uint32_t required_yclk;
 	uint32_t dispclk_khz;
-	uint32_t blackout_recovery_time_us;
+	uint32_t required_blackout_duration_us;
 };
 
 
