@@ -114,12 +114,12 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 	enum bw_defines mode_check;
 	uint32_t y_clk_level;
 	uint32_t sclk_level;
-	yclk[high] = vbios->high_yclk;
-	yclk[mid] = vbios->high_yclk;
-	yclk[low] = vbios->low_yclk;
-	sclk[high] = vbios->high_sclk;
-	sclk[mid] = vbios->mid_sclk;
-	sclk[low] = vbios->low_sclk;
+	yclk[high] = vbios->high_yclk_mhz;
+	yclk[mid] = vbios->high_yclk_mhz;
+	yclk[low] = vbios->low_yclk_mhz;
+	sclk[high] = vbios->high_sclk_mhz;
+	sclk[mid] = vbios->mid_sclk_mhz;
+	sclk[low] = vbios->low_sclk_mhz;
 	if (mode_data->d0_underlay_mode == ul_none) {
 		d0_underlay_enable = false;
 	} else {
@@ -2060,11 +2060,11 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 	if (gtn(results->blackout_duration_margin[high][high], int_to_fixed(0))
 		&& ltn(
 			results->dispclk_required_for_blackout_duration[high][high],
-			vbios->high_voltage_max_dispclk)) {
+			vbios->high_voltage_max_dispclk_mhz)) {
 		results->cpup_state_change_enable = true;
 		if (ltn(
 			results->dispclk_required_for_blackout_recovery[high][high],
-			vbios->high_voltage_max_dispclk)) {
+			vbios->high_voltage_max_dispclk_mhz)) {
 			results->cpuc_state_change_enable = true;
 		} else {
 			results->cpuc_state_change_enable = false;
@@ -2203,7 +2203,7 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 	if (gtn(results->dram_speed_change_margin[high][high], int_to_fixed(0))
 		&& ltn(
 			results->dispclk_required_for_dram_speed_change[high][high],
-			vbios->high_voltage_max_dispclk)) {
+			vbios->high_voltage_max_dispclk_mhz)) {
 		results->nbp_state_change_enable = true;
 	} else {
 		results->nbp_state_change_enable = false;
@@ -2260,7 +2260,7 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 		y_clk_level = high;
 		results->dram_bandwidth = mul(
 			bw_div(
-				mul(vbios->high_yclk,
+				mul(vbios->high_yclk_mhz,
 					vbios->dram_channel_width_in_bits),
 				int_to_fixed(8)),
 			vbios->number_of_dram_channels);
@@ -2274,7 +2274,7 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 		y_clk_level = high;
 		results->dram_bandwidth = mul(
 			bw_div(
-				mul(vbios->high_yclk,
+				mul(vbios->high_yclk_mhz,
 					vbios->dram_channel_width_in_bits),
 				int_to_fixed(8)),
 			vbios->number_of_dram_channels);
@@ -2288,7 +2288,7 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 				int_to_fixed(1000)),
 			mul(
 				bw_div(
-					mul(vbios->low_yclk,
+					mul(vbios->low_yclk_mhz,
 						vbios->dram_channel_width_in_bits),
 					int_to_fixed(8)),
 				vbios->number_of_dram_channels))
@@ -2298,28 +2298,28 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 					int_to_fixed(0))
 					&& ltn(
 						results->dispclk_required_for_blackout_duration[low][high],
-						vbios->high_voltage_max_dispclk)))
+						vbios->high_voltage_max_dispclk_mhz)))
 			&& (results->cpuc_state_change_enable == false
 				|| (gtn(
 					results->blackout_duration_margin[low][high],
 					int_to_fixed(0))
 					&& ltn(
 						results->dispclk_required_for_blackout_duration[low][high],
-						vbios->high_voltage_max_dispclk)
+						vbios->high_voltage_max_dispclk_mhz)
 					&& ltn(
 						results->dispclk_required_for_blackout_recovery[low][high],
-						vbios->high_voltage_max_dispclk)))
+						vbios->high_voltage_max_dispclk_mhz)))
 			&& gtn(results->dram_speed_change_margin[low][high],
 				int_to_fixed(0))
 			&& ltn(
 				results->dispclk_required_for_dram_speed_change[low][high],
-				vbios->high_voltage_max_dispclk)) {
+				vbios->high_voltage_max_dispclk_mhz)) {
 			yclk_message = def_low;
 			y_clk_level = low;
 			results->dram_bandwidth =
 				mul(
 					bw_div(
-						mul(vbios->low_yclk,
+						mul(vbios->low_yclk_mhz,
 							vbios->dram_channel_width_in_bits),
 						int_to_fixed(8)),
 					vbios->number_of_dram_channels);
@@ -2328,7 +2328,7 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 				int_to_fixed(1000)),
 			mul(
 				bw_div(
-					mul(vbios->high_yclk,
+					mul(vbios->high_yclk_mhz,
 						vbios->dram_channel_width_in_bits),
 					int_to_fixed(8)),
 				vbios->number_of_dram_channels))) {
@@ -2337,7 +2337,7 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 			results->dram_bandwidth =
 				mul(
 					bw_div(
-						mul(vbios->high_yclk,
+						mul(vbios->high_yclk_mhz,
 							vbios->dram_channel_width_in_bits),
 						int_to_fixed(8)),
 					vbios->number_of_dram_channels);
@@ -2347,7 +2347,7 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 			results->dram_bandwidth =
 				mul(
 					bw_div(
-						mul(vbios->high_yclk,
+						mul(vbios->high_yclk_mhz,
 							vbios->dram_channel_width_in_bits),
 						int_to_fixed(8)),
 					vbios->number_of_dram_channels);
@@ -2377,61 +2377,61 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 	} else {
 		results->required_sclk = bw_max(results->dmif_required_sclk,
 			results->mcifwr_required_sclk);
-		if (ltn(results->required_sclk, vbios->low_sclk)
+		if (ltn(results->required_sclk, vbios->low_sclk_mhz)
 			&& (results->cpup_state_change_enable == false
 				|| (gtn(
 					results->blackout_duration_margin[y_clk_level][low],
 					int_to_fixed(0))
 					&& ltn(
 						results->dispclk_required_for_blackout_duration[y_clk_level][low],
-						vbios->high_voltage_max_dispclk)))
+						vbios->high_voltage_max_dispclk_mhz)))
 			&& (results->cpuc_state_change_enable == false
 				|| (gtn(
 					results->blackout_duration_margin[y_clk_level][low],
 					int_to_fixed(0))
 					&& ltn(
 						results->dispclk_required_for_blackout_duration[y_clk_level][low],
-						vbios->high_voltage_max_dispclk)
+						vbios->high_voltage_max_dispclk_mhz)
 					&& ltn(
 						results->dispclk_required_for_blackout_recovery[y_clk_level][low],
-						vbios->high_voltage_max_dispclk)))
+						vbios->high_voltage_max_dispclk_mhz)))
 			&& (results->nbp_state_change_enable == false
 				|| (gtn(
 					results->dram_speed_change_margin[y_clk_level][low],
 					int_to_fixed(0))
 					&& leq(
 						results->dispclk_required_for_dram_speed_change[y_clk_level][low],
-						vbios->high_voltage_max_dispclk)))) {
+						vbios->high_voltage_max_dispclk_mhz)))) {
 			sclk_message = def_low;
 			sclk_level = low;
-		} else if (ltn(results->required_sclk, vbios->mid_sclk)
+		} else if (ltn(results->required_sclk, vbios->mid_sclk_mhz)
 			&& (results->cpup_state_change_enable == false
 				|| (gtn(
 					results->blackout_duration_margin[y_clk_level][mid],
 					int_to_fixed(0))
 					&& ltn(
 						results->dispclk_required_for_blackout_duration[y_clk_level][mid],
-						vbios->high_voltage_max_dispclk)))
+						vbios->high_voltage_max_dispclk_mhz)))
 			&& (results->cpuc_state_change_enable == false
 				|| (gtn(
 					results->blackout_duration_margin[y_clk_level][mid],
 					int_to_fixed(0))
 					&& ltn(
 						results->dispclk_required_for_blackout_duration[y_clk_level][mid],
-						vbios->high_voltage_max_dispclk)
+						vbios->high_voltage_max_dispclk_mhz)
 					&& ltn(
 						results->dispclk_required_for_blackout_recovery[y_clk_level][mid],
-						vbios->high_voltage_max_dispclk)))
+						vbios->high_voltage_max_dispclk_mhz)))
 			&& (results->nbp_state_change_enable == false
 				|| (gtn(
 					results->dram_speed_change_margin[y_clk_level][mid],
 					int_to_fixed(0))
 					&& leq(
 						results->dispclk_required_for_dram_speed_change[y_clk_level][mid],
-						vbios->high_voltage_max_dispclk)))) {
+						vbios->high_voltage_max_dispclk_mhz)))) {
 			sclk_message = def_mid;
 			sclk_level = mid;
-		} else if (ltn(results->required_sclk, vbios->high_sclk)) {
+		} else if (ltn(results->required_sclk, vbios->high_sclk_mhz)) {
 			sclk_message = def_high;
 			sclk_level = high;
 		} else {
@@ -2620,13 +2620,13 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 	}
 	if (ltn(
 		results->total_dispclk_required_with_ramping_with_request_bandwidth,
-		vbios->high_voltage_max_dispclk)) {
+		vbios->high_voltage_max_dispclk_mhz)) {
 		results->dispclk =
 			results->total_dispclk_required_with_ramping_with_request_bandwidth;
 	} else if (ltn(
 		results->total_dispclk_required_without_ramping_with_request_bandwidth,
-		vbios->high_voltage_max_dispclk)) {
-		results->dispclk = vbios->high_voltage_max_dispclk;
+		vbios->high_voltage_max_dispclk_mhz)) {
+		results->dispclk = vbios->high_voltage_max_dispclk_mhz;
 	} else {
 		results->dispclk =
 			results->total_dispclk_required_without_ramping_with_request_bandwidth;
@@ -2640,20 +2640,20 @@ static void calculate_bandwidth(const struct bw_calcs_input_dceip *dceip,
 		mode_background_color = def_notok_color;
 		mode_font_color = def_vb_black;
 	} else if (yclk_message == def_low && sclk_message == def_low
-		&& ltn(results->dispclk, vbios->low_voltage_max_dispclk)) {
+		&& ltn(results->dispclk, vbios->low_voltage_max_dispclk_mhz)) {
 		voltage = def_low;
 		mode_background_color = def_low_color;
 		mode_font_color = def_vb_black;
 	} else if (yclk_message == def_low
 		&& (sclk_message == def_low || sclk_message == def_mid)
-		&& ltn(results->dispclk, vbios->mid_voltage_max_dispclk)) {
+		&& ltn(results->dispclk, vbios->mid_voltage_max_dispclk_mhz)) {
 		voltage = def_mid;
 		mode_background_color = def_mid_color;
 		mode_font_color = def_vb_black;
 	} else if ((yclk_message == def_low || yclk_message == def_high)
 		&& (sclk_message == def_low || sclk_message == def_mid
 			|| sclk_message == def_high)
-		&& leq(results->dispclk, vbios->high_voltage_max_dispclk)) {
+		&& leq(results->dispclk, vbios->high_voltage_max_dispclk_mhz)) {
 		if (results->nbp_state_change_enable == true) {
 			voltage = def_high;
 			mode_background_color = def_high_color;
@@ -3161,14 +3161,14 @@ void bw_calcs_init(struct bw_calcs_input_dceip *bw_dceip,
 	vbios.number_of_dram_channels = int_to_fixed(2);
 	vbios.dram_channel_width_in_bits = int_to_fixed(64);
 	vbios.number_of_dram_banks = int_to_fixed(8);
-	vbios.high_yclk = int_to_fixed(1600);
-	vbios.low_yclk = frc_to_fixed(66666, 100);
-	vbios.low_sclk = int_to_fixed(200);
-	vbios.mid_sclk = int_to_fixed(300);
-	vbios.high_sclk = frc_to_fixed(62609, 100);
-	vbios.low_voltage_max_dispclk = int_to_fixed(352);
-	vbios.mid_voltage_max_dispclk = int_to_fixed(467);
-	vbios.high_voltage_max_dispclk = int_to_fixed(643);
+	vbios.high_yclk_mhz = int_to_fixed(1600);
+	vbios.low_yclk_mhz = frc_to_fixed(66666, 100);
+	vbios.low_sclk_mhz = int_to_fixed(200);
+	vbios.mid_sclk_mhz = int_to_fixed(300);
+	vbios.high_sclk_mhz = frc_to_fixed(62609, 100);
+	vbios.low_voltage_max_dispclk_mhz = int_to_fixed(352);
+	vbios.mid_voltage_max_dispclk_mhz = int_to_fixed(467);
+	vbios.high_voltage_max_dispclk_mhz = int_to_fixed(643);
 	vbios.data_return_bus_width = int_to_fixed(32);
 	vbios.trc = int_to_fixed(50);
 	vbios.dmifmc_urgent_latency = int_to_fixed(4);
@@ -3366,16 +3366,16 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_input_dceip *dceip,
 	}
 
 	if (bw_data_internal->number_of_displays != 0) {
-		struct bw_fixed high_sclk = vbios->high_sclk;
-		struct bw_fixed low_sclk = vbios->low_sclk;
-		struct bw_fixed high_yclk = vbios->high_yclk;
-		struct bw_fixed low_yclk = vbios->low_yclk;
+		struct bw_fixed high_sclk = vbios->high_sclk_mhz;
+		struct bw_fixed low_sclk = vbios->low_sclk_mhz;
+		struct bw_fixed high_yclk = vbios->high_yclk_mhz;
+		struct bw_fixed low_yclk = vbios->low_yclk_mhz;
 
-		((struct bw_calcs_input_vbios *)vbios)->low_yclk = low_yclk;
-		((struct bw_calcs_input_vbios *)vbios)->high_yclk = low_yclk;
-		((struct bw_calcs_input_vbios *)vbios)->low_sclk = low_sclk;
-		((struct bw_calcs_input_vbios *)vbios)->mid_sclk = low_sclk;
-		((struct bw_calcs_input_vbios *)vbios)->high_sclk = low_sclk;
+		((struct bw_calcs_input_vbios *)vbios)->low_yclk_mhz = low_yclk;
+		((struct bw_calcs_input_vbios *)vbios)->high_yclk_mhz = low_yclk;
+		((struct bw_calcs_input_vbios *)vbios)->low_sclk_mhz = low_sclk;
+		((struct bw_calcs_input_vbios *)vbios)->mid_sclk_mhz = low_sclk;
+		((struct bw_calcs_input_vbios *)vbios)->high_sclk_mhz = low_sclk;
 		calculate_bandwidth(dceip, vbios, bw_data_internal,
 							bw_results_internal);
 
@@ -3410,11 +3410,11 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_input_dceip *dceip,
 			mul(bw_results_internal->urgent_watermark[6],
 					int_to_fixed(1000)).value >> 24;
 
-		((struct bw_calcs_input_vbios *)vbios)->low_yclk = high_yclk;
-		((struct bw_calcs_input_vbios *)vbios)->high_yclk = high_yclk;
-		((struct bw_calcs_input_vbios *)vbios)->low_sclk = high_sclk;
-		((struct bw_calcs_input_vbios *)vbios)->mid_sclk = high_sclk;
-		((struct bw_calcs_input_vbios *)vbios)->high_sclk = high_sclk;
+		((struct bw_calcs_input_vbios *)vbios)->low_yclk_mhz = high_yclk;
+		((struct bw_calcs_input_vbios *)vbios)->high_yclk_mhz = high_yclk;
+		((struct bw_calcs_input_vbios *)vbios)->low_sclk_mhz = high_sclk;
+		((struct bw_calcs_input_vbios *)vbios)->mid_sclk_mhz = high_sclk;
+		((struct bw_calcs_input_vbios *)vbios)->high_sclk_mhz = high_sclk;
 
 		calculate_bandwidth(dceip, vbios, bw_data_internal,
 							bw_results_internal);
@@ -3473,11 +3473,12 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_input_dceip *dceip,
 		calcs_output->required_yclk =
 				mul(high_yclk, int_to_fixed(1000)).value >> 24;
 
-		((struct bw_calcs_input_vbios *)vbios)->low_yclk = low_yclk;
-		((struct bw_calcs_input_vbios *)vbios)->high_yclk = high_yclk;
-		((struct bw_calcs_input_vbios *)vbios)->low_sclk = low_sclk;
-		((struct bw_calcs_input_vbios *)vbios)->mid_sclk = high_sclk;
-		((struct bw_calcs_input_vbios *)vbios)->high_sclk = high_sclk;
+		((struct bw_calcs_input_vbios *)vbios)->low_yclk_mhz = low_yclk;
+		((struct bw_calcs_input_vbios *)vbios)->high_yclk_mhz =
+								high_yclk;
+		((struct bw_calcs_input_vbios *)vbios)->low_sclk_mhz = low_sclk;
+		((struct bw_calcs_input_vbios *)vbios)->mid_sclk_mhz = high_sclk;
+		((struct bw_calcs_input_vbios *)vbios)->high_sclk_mhz = high_sclk;
 	} else {
 		calcs_output->nbp_state_change_enable = true;
 		calcs_output->cpuc_state_change_enable = true;

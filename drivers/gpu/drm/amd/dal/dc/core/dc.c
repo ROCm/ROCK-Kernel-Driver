@@ -234,11 +234,11 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 			DC_PP_CLOCK_TYPE_ENGINE_CLK,
 			&clks);
 	/* convert all the clock fro kHz to fix point mHz */
-	dc->bw_vbios.high_sclk = frc_to_fixed(
+	dc->bw_vbios.high_sclk_mhz = frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels-1], 1000);
-	dc->bw_vbios.mid_sclk  = frc_to_fixed(
+	dc->bw_vbios.mid_sclk_mhz  = frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels>>1], 1000);
-	dc->bw_vbios.low_sclk  = frc_to_fixed(
+	dc->bw_vbios.low_sclk_mhz  = frc_to_fixed(
 			clks.clocks_in_khz[0], 1000);
 
 	/*do display clock*/
@@ -247,11 +247,11 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 			DC_PP_CLOCK_TYPE_DISPLAY_CLK,
 			&clks);
 
-	dc->bw_vbios.high_voltage_max_dispclk = frc_to_fixed(
+	dc->bw_vbios.high_voltage_max_dispclk_mhz = frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels-1], 1000);
-	dc->bw_vbios.mid_voltage_max_dispclk  = frc_to_fixed(
+	dc->bw_vbios.mid_voltage_max_dispclk_mhz  = frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels>>1], 1000);
-	dc->bw_vbios.low_voltage_max_dispclk  = frc_to_fixed(
+	dc->bw_vbios.low_voltage_max_dispclk_mhz  = frc_to_fixed(
 			clks.clocks_in_khz[0], 1000);
 
 	/*do memory clock*/
@@ -260,9 +260,9 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 			DC_PP_CLOCK_TYPE_MEMORY_CLK,
 			&clks);
 
-	dc->bw_vbios.low_yclk = frc_to_fixed(
+	dc->bw_vbios.low_yclk_mhz = frc_to_fixed(
 			clks.clocks_in_khz[0], 1000);
-	dc->bw_vbios.high_yclk = frc_to_fixed(
+	dc->bw_vbios.high_yclk_mhz = frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels-1], 1000);
 	return;
 
