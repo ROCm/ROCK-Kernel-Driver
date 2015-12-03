@@ -234,43 +234,58 @@ bool dc_service_pp_get_clock_levels_by_type(
 		enum dc_pp_clock_type clk_type,
 		struct dc_pp_clock_levels *clks)
 {
-#ifdef CONFIG_DRM_AMD_POWERPLAY
-/* TODO: get clks from pplib.
+
+/*
+ #ifdef CONFIG_DRM_AMD_POWERPLAY
+	if(amd_powerplay_get_clocks_by_type(adev->powerplay.pp_handle,
+		(int)clk_type, (void *)clks) == fail
+		PPlib return clocks in tens of kHz
+		divide by 10 & push to the clks which kHz
+#endif
+*/
+
 	struct amdgpu_device *adev = ctx->driver_context;
 
-	return (amd_powerplay_get_clocks_by_type(adev->powerplay.pp_handle,
-			(int)clk_type, (void *)clks) == 0);
-			*/
-	uint32_t disp_clks_in_hz[8] = {
-			30000, 41143, 48000, 53334, 62609, 62609, 62609, 62609 };
-	uint32_t sclks_in_hz[8] = {
-			20000, 26667, 34286, 41143, 45000, 51429, 57600, 62609 };
-	uint32_t mclks_in_hz[8] = { 33300, 80000, 0, 0, 0, 0, 0, 0 };
+	uint32_t disp_clks_in_khz[8] = {
+	300000, 411430, 480000, 533340, 626090, 626090, 626090, 626090 };
+	uint32_t sclks_in_khz[8] = {
+	200000, 266670, 342860, 411430, 450000, 514290, 576000, 626090 };
+	uint32_t mclks_in_khz[8] = { 333000, 800000 };
+
+	struct amd_pp_dal_clock_info info = {0};
 
 	switch (clk_type) {
 	case DC_PP_CLOCK_TYPE_DISPLAY_CLK:
 		clks->num_levels = 8;
-		dc_service_memmove(clks->clocks_in_hz, disp_clks_in_hz, 8);
+		dc_service_memmove(clks->clocks_in_khz, disp_clks_in_khz,
+				sizeof(disp_clks_in_khz));
 		break;
 	case DC_PP_CLOCK_TYPE_ENGINE_CLK:
 		clks->num_levels = 8;
-		dc_service_memmove(clks->clocks_in_hz, sclks_in_hz, 8);
+		dc_service_memmove(clks->clocks_in_khz, sclks_in_khz,
+				sizeof(sclks_in_khz));
 		break;
 	case DC_PP_CLOCK_TYPE_MEMORY_CLK:
 		clks->num_levels = 2;
-		dc_service_memmove(clks->clocks_in_hz, mclks_in_hz, 8);
+		dc_service_memmove(clks->clocks_in_khz, mclks_in_khz,
+				sizeof(mclks_in_khz));
 		break;
 	default:
 		return false;
 	}
-
-	return true;
-#else
-	DRM_INFO("%s - not implemented\n", __func__);
-	return false;
+#ifdef CONFIG_DRM_AMD_POWERPLAY
+	if (clk_type ==  DC_PP_CLOCK_TYPE_ENGINE_CLK ||
+		clk_type ==  DC_PP_CLOCK_TYPE_DISPLAY_CLK) {
+		if (0 == amd_powerplay_get_display_power_level(
+				adev->powerplay.pp_handle, &info) &&
+				info.level < clks->num_levels) {
+		/*if the max possible power level less then use smaller*/
+			clks->num_levels = info.level;
+		}
+	}
 #endif
+	return true;
 }
-
 /**** end of power component interfaces ****/
 
 
