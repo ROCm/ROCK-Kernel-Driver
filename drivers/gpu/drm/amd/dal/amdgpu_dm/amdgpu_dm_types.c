@@ -1860,19 +1860,40 @@ int amdgpu_dm_connector_init(
 	return 0;
 }
 
+int amdgpu_dm_get_encoder_crtc_mask(struct amdgpu_device *adev)
+{
+	switch (adev->mode_info.num_crtc) {
+	case 1:
+		return 0x1;
+	case 2:
+		return 0x3;
+	case 3:
+		return 0x7;
+	case 4:
+		return 0xf;
+	case 5:
+		return 0x1f;
+	case 6:
+	default:
+		return 0x3f;
+	}
+}
+
 int amdgpu_dm_encoder_init(
 	struct drm_device *dev,
 	struct amdgpu_encoder *aencoder,
 	uint32_t link_index,
 	struct amdgpu_crtc *acrtc)
 {
+	struct amdgpu_device *adev = dev->dev_private;
+
 	int res = drm_encoder_init(dev,
 				   &aencoder->base,
 				   &amdgpu_dm_encoder_funcs,
 				   DRM_MODE_ENCODER_TMDS,
 				   NULL);
 
-	aencoder->base.possible_crtcs = 1 << link_index;
+	aencoder->base.possible_crtcs = amdgpu_dm_get_encoder_crtc_mask(adev);
 
 	if (!res)
 		aencoder->encoder_id = link_index;
@@ -2204,32 +2225,49 @@ int amdgpu_dm_atomic_commit(
 		struct drm_crtc *crtc = plane_state->crtc;
 		struct drm_framebuffer *fb = plane_state->fb;
 		struct drm_connector *connector;
+		struct dm_connector_state *dm_state = NULL;
 
-		if (fb && crtc && crtc->state->planes_changed) {
-			struct dm_connector_state *dm_state = NULL;
+		if (!fb || !crtc || !crtc->state->planes_changed)
+			continue;
 
-			if (page_flip_needed(
-				plane_state,
-				old_plane_state))
-				amdgpu_crtc_page_flip(
-					crtc,
-					fb,
-					crtc->state->event,
-					0);
-			else {
-				list_for_each_entry(connector,
-						&dev->mode_config.connector_list, head)	{
-					if (connector->state->crtc == crtc) {
-						dm_state = to_dm_connector_state(connector->state);
-						break;
-					}
+		if (page_flip_needed(
+			plane_state,
+			old_plane_state))
+			amdgpu_crtc_page_flip(
+				crtc,
+				fb,
+				crtc->state->event,
+				0);
+		else {
+			list_for_each_entry(connector,
+				&dev->mode_config.connector_list, head)	{
+				if (connector->state->crtc == crtc) {
+					dm_state = to_dm_connector_state(connector->state);
+					break;
 				}
-
-				dm_dc_surface_commit(
-					dm->dc,
-					crtc,
-					dm_state);
 			}
+
+			/*
+			 * This situation happens in the following case:
+			 * we are about to get set mode for connector who's only
+			 * possible crtc (in encoder crtc mask) is used by
+			 * another connector, that is why it will try to
+			 * re-assing crtcs in order to make configuration
+			 * supported. For our implementation we need to make all
+			 * encoders support all crtcs, then this issue will
+			 * never arise again. But to guard code from this issue
+			 * check is left.
+			 *
+			 * Also it should be needed when used with actual
+			 * drm_atomic_commit ioctl in future
+			 */
+			if (!dm_state)
+				continue;
+
+			dm_dc_surface_commit(
+				dm->dc,
+				crtc,
+				dm_state);
 		}
 	}
 
