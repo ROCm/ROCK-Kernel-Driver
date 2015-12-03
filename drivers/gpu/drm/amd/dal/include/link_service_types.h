@@ -396,15 +396,12 @@ struct dp_mst_stream_allocation {
 	/* number of slots required for the DP stream in
 	 * transport packet */
 	uint32_t slot_count;
-	uint32_t pbn;
-	uint32_t pbn_per_slot;
 };
 
 /* DP MST stream allocation table */
 struct dp_mst_stream_allocation_table {
 	/* number of DP video streams */
 	uint8_t stream_count;
-	uint8_t cur_stream_payload_idx;
 	/* array of stream allocations */
 	struct dp_mst_stream_allocation stream_allocations[MAX_CONTROLLER_NUM];
 };
