@@ -160,6 +160,84 @@ static struct amdgpu_connector *get_connector_for_link(
 	return aconnector;
 }
 
+static const struct dc_stream *get_stream_for_vcid(
+		struct drm_device *dev,
+		struct amdgpu_connector *master_port,
+		int vcid)
+{
+	struct drm_connector *connector;
+	struct amdgpu_connector *aconnector;
+	struct drm_crtc *crtc;
+	struct amdgpu_crtc *acrtc;
+	struct dc_target *dc_target;
+
+	list_for_each_entry(
+		connector,
+		&dev->mode_config.connector_list,
+		head) {
+
+		aconnector = to_amdgpu_connector(connector);
+
+		/* Check whether mst connector */
+		if (!aconnector->mst_port)
+			continue;
+
+		/* Check whether same physical connector. */
+		if (master_port != aconnector->mst_port) {
+			continue;
+		}
+
+		if (aconnector->port->vcpi.vcpi == vcid) {
+			crtc = aconnector->base.state->crtc;
+			acrtc = to_amdgpu_crtc(crtc);
+			dc_target = acrtc->target;
+			return dc_target->streams[0];
+		}
+	}
+	return NULL;
+}
+
+static void get_payload_table(
+		struct drm_device *dev,
+		struct amdgpu_connector *aconnector,
+		struct dp_mst_stream_allocation_table *table)
+{
+	int i;
+	struct drm_dp_mst_topology_mgr *mst_mgr = &aconnector->mst_port->mst_mgr;
+	struct amdgpu_connector *master_port = aconnector->mst_port;
+
+	mutex_lock(&mst_mgr->payload_lock);
+
+	/* number of active streams */
+	for (i = 0; i < mst_mgr->max_payloads; i++) {
+		if (mst_mgr->payloads[i].num_slots == 0)
+			break;
+
+		if (mst_mgr->payloads[i].payload_state == DP_PAYLOAD_LOCAL ||
+				mst_mgr->payloads[i].payload_state == DP_PAYLOAD_REMOTE) {
+			table->stream_allocations[i].slot_count = mst_mgr->payloads[i].num_slots;
+			table->stream_allocations[i].stream =
+					get_stream_for_vcid(
+							dev,
+							master_port,
+							mst_mgr->payloads[i].vcpi);
+
+			if (mst_mgr->payloads[i].vcpi ==
+					aconnector->port->vcpi.vcpi)
+				table->cur_stream_payload_idx = i;
+
+			/* TODO remove the following and calculate in DC */
+			table->stream_allocations[i].pbn_per_slot = mst_mgr->pbn_div;
+			table->stream_allocations[i].pbn = mst_mgr->proposed_vcpis[i]->pbn;
+		}
+	}
+
+	table->stream_count = i;
+
+	mutex_unlock(&mst_mgr->payload_lock);
+
+}
+
 /*
  * Writes payload allocation table in immediate downstream device.
  */
@@ -172,28 +250,20 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 	struct amdgpu_device *adev = ctx->driver_context;
 	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector;
-	struct drm_connector *connector;
-	struct amdgpu_crtc *amdgpu_crtc;
-	struct drm_crtc *crtc;
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	struct drm_dp_mst_port *mst_port;
-	struct amdgpu_connector *master_port;
 	int slots = 0;
 	bool ret;
 	int clock;
 	int bpp = 0;
 	int pbn = 0;
-	uint8_t i;
-	uint8_t vcid = 0;
-	bool find_stream_for_sink;
 
 	aconnector = get_connector_for_sink(dev, stream->sink);
 
 	if (!aconnector->mst_port)
 		return false;
 
-	master_port = aconnector->mst_port;
-	mst_mgr = &master_port->mst_mgr;
+	mst_mgr = &aconnector->mst_port->mst_mgr;
 
 	if (!mst_mgr->mst_state)
 		return false;
@@ -235,8 +305,6 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 		pbn = drm_dp_calc_pbn_mode(clock, bpp);
 
 		ret = drm_dp_mst_allocate_vcpi(mst_mgr, mst_port, pbn, &slots);
-		/* mst_port->vcpi.vcpi is vc_id for this stream.*/
-		vcid = mst_port->vcpi.vcpi;
 
 		if (!ret)
 			return false;
@@ -252,116 +320,7 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 	 * stream. AMD ASIC stream slot allocation should follow the same
 	 * sequence. copy DRM MST allocation to dc */
 
-	mutex_lock(&mst_mgr->payload_lock);
-
-	/* number of active streams */
-	for (i = 0; i < mst_mgr->max_payloads; i++) {
-		if (mst_mgr->payloads[i].num_slots == 0)
-			break;
-	}
-
-	table->stream_count = i;
-
-	for (i = 0; i < table->stream_count; i++) {
-		table->stream_allocations[i].slot_count =
-				mst_mgr->proposed_vcpis[i]->num_slots;
-		/*
-		 * mst_mgr->pbn_div is fixed value after link training for
-		 * current link PHY
-		 */
-		table->stream_allocations[i].pbn_per_slot = mst_mgr->pbn_div;
-
-		/*
-		 * find which payload is for current stream after
-		 * drm_dp_update_payload_part1, payload and proposed_vcpis
-		 * are sync to the same allocation sequence. vcpi is not saved
-		 * into payload by drm_dp_update_payload_part1. In order to
-		 * find sequence of a payload within allocation sequence, we
-		 * need check vcpi from proposed_vcpis
-		 */
-
-		table->stream_allocations[i].pbn =
-				mst_mgr->proposed_vcpis[i]->pbn;
-
-		if (mst_mgr->proposed_vcpis[i]->vcpi == vcid)
-			table->cur_stream_payload_idx = i;
-
-		find_stream_for_sink = false;
-
-		list_for_each_entry(
-			connector,
-			&dev->mode_config.connector_list,
-			head) {
-			const struct dc_sink *dc_sink;
-			struct dc_target *dc_target;
-			uint8_t j;
-
-			aconnector = to_amdgpu_connector(connector);
-
-			/* not mst connector */
-			if (!aconnector->mst_port)
-				continue;
-
-			if (master_port != aconnector->mst_port) {
-				/* Not the same physical connector. */
-				continue;
-			}
-
-			mst_port = aconnector->port;
-
-			if (mst_port->vcpi.vcpi !=
-					mst_mgr->proposed_vcpis[i]->vcpi)
-				continue;
-
-			/* find connector with same vcid as payload */
-
-			dc_sink = aconnector->dc_sink;
-
-			/*
-			 * find stream to drive this sink
-			 * crtc -> target -> stream -> sink
-			 */
-			crtc = aconnector->base.state->crtc;
-
-			/*
-			 * this situation can happen when crtc moved from one
-			 * connector to another for any reason
-			 */
-			if (!crtc)
-				continue;
-
-			amdgpu_crtc = to_amdgpu_crtc(crtc);
-			dc_target = amdgpu_crtc->target;
-
-			for (j = 0; j < dc_target->stream_count; j++) {
-				if (dc_target->streams[j]->sink ==
-					dc_sink)
-					break;
-			}
-
-			if (j < dc_target->stream_count) {
-				/*
-				 * find sink --> stream --> target -->
-				 * connector
-				 */
-				table->stream_allocations[i].stream =
-					dc_target->streams[j];
-				/* exit loop connector */
-				find_stream_for_sink = true;
-				break;
-			}
-		}
-
-		if (!find_stream_for_sink) {
-			/*
-			 * TODO: do not find stream for sink. This should not
-			 * happen
-			 */
-			ASSERT(0);
-		}
-	}
-
-	mutex_unlock(&mst_mgr->payload_lock);
+	get_payload_table(dev, aconnector, table);
 
 	if (ret)
 		return false;
