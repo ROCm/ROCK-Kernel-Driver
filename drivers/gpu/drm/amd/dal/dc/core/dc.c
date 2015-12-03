@@ -226,9 +226,45 @@ static struct adapter_service *create_as(
 
 static void bw_calcs_data_update_from_pplib(struct dc *dc)
 {
-	struct dal_system_clock_range clk_range = { 0 };
+	struct dc_pp_clock_levels clks = {0};
 
-	dc_service_get_system_clocks_range(dc->ctx, &clk_range);
+	/*do system clock*/
+	dc_service_pp_get_clock_levels_by_type(
+			dc->ctx,
+			DC_PP_CLOCK_TYPE_ENGINE_CLK,
+			&clks);
+	/* convert all the clock fro kHz to fix point mHz */
+	dc->bw_vbios.high_sclk = frc_to_fixed(
+			clks.clocks_in_khz[clks.num_levels-1], 1000);
+	dc->bw_vbios.mid_sclk  = frc_to_fixed(
+			clks.clocks_in_khz[clks.num_levels>>1], 1000);
+	dc->bw_vbios.low_sclk  = frc_to_fixed(
+			clks.clocks_in_khz[0], 1000);
+
+	/*do display clock*/
+	dc_service_pp_get_clock_levels_by_type(
+			dc->ctx,
+			DC_PP_CLOCK_TYPE_DISPLAY_CLK,
+			&clks);
+
+	dc->bw_vbios.high_voltage_max_dispclk = frc_to_fixed(
+			clks.clocks_in_khz[clks.num_levels-1], 1000);
+	dc->bw_vbios.mid_voltage_max_dispclk  = frc_to_fixed(
+			clks.clocks_in_khz[clks.num_levels>>1], 1000);
+	dc->bw_vbios.low_voltage_max_dispclk  = frc_to_fixed(
+			clks.clocks_in_khz[0], 1000);
+
+	/*do memory clock*/
+	dc_service_pp_get_clock_levels_by_type(
+			dc->ctx,
+			DC_PP_CLOCK_TYPE_MEMORY_CLK,
+			&clks);
+
+	dc->bw_vbios.low_yclk = frc_to_fixed(
+			clks.clocks_in_khz[0], 1000);
+	dc->bw_vbios.high_yclk = frc_to_fixed(
+			clks.clocks_in_khz[clks.num_levels-1], 1000);
+	return;
 
 	/* on CZ Gardenia from PPLib we get:
 	 * clk_range.max_mclk:80000
@@ -238,11 +274,6 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 
 	/* The values for calcs are stored in units of MHz, so for example
 	 * 80000 will be stored as 800. */
-	dc->bw_vbios.high_sclk = frc_to_fixed(clk_range.max_sclk, 100);
-	dc->bw_vbios.low_sclk = frc_to_fixed(clk_range.min_sclk, 100);
-
-	dc->bw_vbios.high_yclk = frc_to_fixed(clk_range.max_mclk, 100);
-	dc->bw_vbios.low_yclk = frc_to_fixed(clk_range.min_mclk, 100);
 }
 
 static bool construct(struct dc *dc, const struct dal_init_data *init_params)

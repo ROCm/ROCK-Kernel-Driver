@@ -176,7 +176,7 @@ enum dc_pp_clock_type {
 
 struct dc_pp_clock_levels {
 	uint32_t num_levels;
-	uint32_t clocks_in_hz[DC_PP_MAX_CLOCK_LEVELS];
+	uint32_t clocks_in_khz[DC_PP_MAX_CLOCK_LEVELS];
 
 	/* TODO: add latency
 	 * do we need to know invalid (unsustainable boost) level for watermark
