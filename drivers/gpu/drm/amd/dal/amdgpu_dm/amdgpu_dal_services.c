@@ -158,7 +158,7 @@ bool dc_service_pp_pre_dce_clock_change(
 }
 
 bool dc_service_pp_apply_display_requirements(
-		struct dc_context *ctx,
+		const struct dc_context *ctx,
 		const struct dc_pp_display_configuration *pp_display_cfg)
 {
 #ifdef CONFIG_DRM_AMD_POWERPLAY
@@ -201,7 +201,7 @@ bool dc_service_pp_apply_display_requirements(
 }
 
 bool dc_service_get_system_clocks_range(
-		struct dc_context *ctx,
+		const struct dc_context *ctx,
 		struct dal_system_clock_range *sys_clks)
 {
 #ifdef CONFIG_DRM_AMD_POWERPLAY
@@ -230,7 +230,7 @@ bool dc_service_get_system_clocks_range(
 
 
 bool dc_service_pp_get_clock_levels_by_type(
-		struct dc_context *ctx,
+		const struct dc_context *ctx,
 		enum dc_pp_clock_type clk_type,
 		struct dc_pp_clock_levels *clks)
 {

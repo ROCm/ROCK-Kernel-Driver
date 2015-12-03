@@ -211,6 +211,8 @@ struct core_link {
 	struct link_encoder *link_enc;
 	struct ddc_service *ddc;
 	struct graphics_object_id link_id;
+	union ddi_channel_mapping ddi_channel_mapping;
+	struct connector_device_tag_info device_tag;
 	/* caps is the same as reported_link_cap. link_traing use
 	 * reported_link_cap. Will clean up.  TODO */
 	struct link_settings reported_link_cap;

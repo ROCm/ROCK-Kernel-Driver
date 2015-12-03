@@ -106,14 +106,14 @@ bool dce110_opp_construct(struct dce110_opp *opp110,
 	struct dc_context *ctx,
 	uint32_t inst)
 {
-	if ((inst < 1) || (inst > ARRAY_SIZE(reg_offsets)))
+	if (inst >= ARRAY_SIZE(reg_offsets))
 		return false;
 
 	opp110->base.ctx = ctx;
 
 	opp110->base.inst = inst;
 
-	opp110->offsets = reg_offsets[inst - 1];
+	opp110->offsets = reg_offsets[inst];
 
 	opp110->regamma.hw_points_num = 128;
 	opp110->regamma.coordinates_x = NULL;

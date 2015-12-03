@@ -931,14 +931,14 @@ bool dce110_mem_input_construct(
 	struct dc_context *ctx,
 	uint32_t inst)
 {
-	if ((inst < 1) || (inst > ARRAY_SIZE(reg_offsets)))
+	if (inst >= ARRAY_SIZE(reg_offsets))
 		return false;
 
 	mem_input110->base.ctx = ctx;
 
 	mem_input110->base.inst = inst;
 
-	mem_input110->offsets = reg_offsets[inst - 1];
+	mem_input110->offsets = reg_offsets[inst];
 
 	mem_input110->supported_stutter_mode = 0;
 	dal_adapter_service_get_feature_value(FEATURE_STUTTER_MODE,

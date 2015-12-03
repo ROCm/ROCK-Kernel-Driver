@@ -120,18 +120,14 @@ bool dce110_construct_resource_pool(
 
 	for (i = 0; i < pool->controller_count; i++) {
 		pool->timing_generators[i] = dce110_timing_generator_create(
-				adapter_serv,
-				ctx,
-				i + 1);
+				adapter_serv, ctx, i + 1);
 		if (pool->timing_generators[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dal_error("DC: failed to create tg!\n");
 			goto controller_create_fail;
 		}
 
-		pool->mis[i] = dce110_mem_input_create(
-			ctx,
-			i + 1);
+		pool->mis[i] = dce110_mem_input_create(ctx, i);
 		if (pool->mis[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dal_error(
@@ -139,9 +135,7 @@ bool dce110_construct_resource_pool(
 			goto controller_create_fail;
 		}
 
-		pool->ipps[i] = dce110_ipp_create(
-			ctx,
-			i + 1);
+		pool->ipps[i] = dce110_ipp_create(ctx, i);
 		if (pool->ipps[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dal_error(
@@ -149,9 +143,7 @@ bool dce110_construct_resource_pool(
 			goto controller_create_fail;
 		}
 
-		pool->transforms[i] = dce110_transform_create(
-				ctx,
-				i + 1);
+		pool->transforms[i] = dce110_transform_create(ctx, i);
 		if (pool->transforms[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dal_error(
@@ -162,9 +154,7 @@ bool dce110_construct_resource_pool(
 				pool->transforms[i],
 				pool->scaler_filter);
 
-		pool->opps[i] = dce110_opp_create(
-			ctx,
-			i + 1);
+		pool->opps[i] = dce110_opp_create(ctx, i);
 		if (pool->opps[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dal_error(
