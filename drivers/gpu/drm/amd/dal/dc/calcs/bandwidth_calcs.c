@@ -3367,85 +3367,79 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_input_dceip *dceip,
 
 	if (bw_data_internal->number_of_displays != 0) {
 		struct bw_fixed high_sclk = vbios->high_sclk_mhz;
+		struct bw_fixed mid_sclk = vbios->mid_sclk_mhz;
 		struct bw_fixed low_sclk = vbios->low_sclk_mhz;
 		struct bw_fixed high_yclk = vbios->high_yclk_mhz;
 		struct bw_fixed low_yclk = vbios->low_yclk_mhz;
 
-		((struct bw_calcs_input_vbios *)vbios)->low_yclk_mhz = low_yclk;
-		((struct bw_calcs_input_vbios *)vbios)->high_yclk_mhz = low_yclk;
-		((struct bw_calcs_input_vbios *)vbios)->low_sclk_mhz = low_sclk;
-		((struct bw_calcs_input_vbios *)vbios)->mid_sclk_mhz = low_sclk;
-		((struct bw_calcs_input_vbios *)vbios)->high_sclk_mhz = low_sclk;
 		calculate_bandwidth(dceip, vbios, bw_data_internal,
 							bw_results_internal);
 
 		/* units: nanosecond, 16bit storage. */
-		calcs_output->nbp_state_change_watermark[0].b_mark =
+		calcs_output->nbp_state_change_wm_ns[0].b_mark =
 			mul(bw_results_internal->nbp_state_change_watermark[4],
 					int_to_fixed(1000)).value >> 24;
-		calcs_output->nbp_state_change_watermark[1].b_mark =
+		calcs_output->nbp_state_change_wm_ns[1].b_mark =
 			mul(bw_results_internal->nbp_state_change_watermark[5],
 					int_to_fixed(1000)).value >> 24;
-		calcs_output->nbp_state_change_watermark[2].b_mark =
+		calcs_output->nbp_state_change_wm_ns[2].b_mark =
 			mul(bw_results_internal->nbp_state_change_watermark[6],
 					int_to_fixed(1000)).value >> 24;
 
-		calcs_output->stutter_exit_watermark[0].b_mark =
+		calcs_output->stutter_exit_wm_ns[0].b_mark =
 			mul(bw_results_internal->stutter_exit_watermark[4],
 					int_to_fixed(1000)).value >> 24;
-		calcs_output->stutter_exit_watermark[1].b_mark =
+		calcs_output->stutter_exit_wm_ns[1].b_mark =
 			mul(bw_results_internal->stutter_exit_watermark[5],
 					int_to_fixed(1000)).value >> 24;
-		calcs_output->stutter_exit_watermark[2].b_mark =
+		calcs_output->stutter_exit_wm_ns[2].b_mark =
 			mul(bw_results_internal->stutter_exit_watermark[6],
 					int_to_fixed(1000)).value >> 24;
 
-		calcs_output->urgent_watermark[0].b_mark =
+		calcs_output->urgent_wm_ns[0].b_mark =
 			mul(bw_results_internal->urgent_watermark[4],
 					int_to_fixed(1000)).value >> 24;
-		calcs_output->urgent_watermark[1].b_mark =
+		calcs_output->urgent_wm_ns[1].b_mark =
 			mul(bw_results_internal->urgent_watermark[5],
 					int_to_fixed(1000)).value >> 24;
-		calcs_output->urgent_watermark[2].b_mark =
+		calcs_output->urgent_wm_ns[2].b_mark =
 			mul(bw_results_internal->urgent_watermark[6],
 					int_to_fixed(1000)).value >> 24;
 
 		((struct bw_calcs_input_vbios *)vbios)->low_yclk_mhz = high_yclk;
-		((struct bw_calcs_input_vbios *)vbios)->high_yclk_mhz = high_yclk;
 		((struct bw_calcs_input_vbios *)vbios)->low_sclk_mhz = high_sclk;
 		((struct bw_calcs_input_vbios *)vbios)->mid_sclk_mhz = high_sclk;
-		((struct bw_calcs_input_vbios *)vbios)->high_sclk_mhz = high_sclk;
 
 		calculate_bandwidth(dceip, vbios, bw_data_internal,
 							bw_results_internal);
 
-		calcs_output->nbp_state_change_watermark[0].a_mark =
+		calcs_output->nbp_state_change_wm_ns[0].a_mark =
 			mul(bw_results_internal->nbp_state_change_watermark[4],
 					int_to_fixed(1000)).value >> 24;
-		calcs_output->nbp_state_change_watermark[1].a_mark =
+		calcs_output->nbp_state_change_wm_ns[1].a_mark =
 			mul(bw_results_internal->nbp_state_change_watermark[5],
 					int_to_fixed(1000)).value >> 24;
-		calcs_output->nbp_state_change_watermark[2].a_mark =
+		calcs_output->nbp_state_change_wm_ns[2].a_mark =
 			mul(bw_results_internal->nbp_state_change_watermark[6],
 					int_to_fixed(1000)).value >> 24;
 
-		calcs_output->stutter_exit_watermark[0].a_mark =
+		calcs_output->stutter_exit_wm_ns[0].a_mark =
 			mul(bw_results_internal->stutter_exit_watermark[4],
 					int_to_fixed(1000)).value >> 24;
-		calcs_output->stutter_exit_watermark[1].a_mark =
+		calcs_output->stutter_exit_wm_ns[1].a_mark =
 			mul(bw_results_internal->stutter_exit_watermark[5],
 					int_to_fixed(1000)).value >> 24;
-		calcs_output->stutter_exit_watermark[2].a_mark =
+		calcs_output->stutter_exit_wm_ns[2].a_mark =
 			mul(bw_results_internal->stutter_exit_watermark[6],
 					int_to_fixed(1000)).value >> 24;
 
-		calcs_output->urgent_watermark[0].a_mark =
+		calcs_output->urgent_wm_ns[0].a_mark =
 			mul(bw_results_internal->urgent_watermark[4],
 					int_to_fixed(1000)).value >> 24;
-		calcs_output->urgent_watermark[1].a_mark =
+		calcs_output->urgent_wm_ns[1].a_mark =
 			mul(bw_results_internal->urgent_watermark[5],
 					int_to_fixed(1000)).value >> 24;
-		calcs_output->urgent_watermark[2].a_mark =
+		calcs_output->urgent_wm_ns[2].a_mark =
 			mul(bw_results_internal->urgent_watermark[6],
 					int_to_fixed(1000)).value >> 24;
 
@@ -3460,25 +3454,23 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_input_dceip *dceip,
 		calcs_output->dispclk_khz =
 				mul(bw_results_internal->dispclk,
 					int_to_fixed(1000)).value >> 24;
-		calcs_output->blackout_recovery_time_us =
-			mul(bw_results_internal->blackout_recovery_time,
-					int_to_fixed(1000)).value >> 24;
+		/*TODO:fix formula to unhardcode use levels*/
+		calcs_output->required_blackout_duration_us =
+			add(bw_results_internal->blackout_duration_margin[2][2],
+					vbios->blackout_duration).value >> 24;
 		calcs_output->required_sclk =
 			mul(bw_results_internal->required_sclk,
 					int_to_fixed(1000)).value >> 24;
 		calcs_output->required_sclk_deep_sleep =
 			mul(bw_results_internal->sclk_deep_sleep,
 					int_to_fixed(1000)).value >> 24;
-		/*TODO:fix formula to unhardcode*/
+		/*TODO:fix formula to unhardcode use levels*/
 		calcs_output->required_yclk =
 				mul(high_yclk, int_to_fixed(1000)).value >> 24;
 
 		((struct bw_calcs_input_vbios *)vbios)->low_yclk_mhz = low_yclk;
-		((struct bw_calcs_input_vbios *)vbios)->high_yclk_mhz =
-								high_yclk;
 		((struct bw_calcs_input_vbios *)vbios)->low_sclk_mhz = low_sclk;
-		((struct bw_calcs_input_vbios *)vbios)->mid_sclk_mhz = high_sclk;
-		((struct bw_calcs_input_vbios *)vbios)->high_sclk_mhz = high_sclk;
+		((struct bw_calcs_input_vbios *)vbios)->mid_sclk_mhz = mid_sclk;
 	} else {
 		calcs_output->nbp_state_change_enable = true;
 		calcs_output->cpuc_state_change_enable = true;

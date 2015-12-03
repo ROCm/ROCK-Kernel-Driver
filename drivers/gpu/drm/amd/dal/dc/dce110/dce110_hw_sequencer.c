@@ -1155,11 +1155,11 @@ static void set_displaymarks(
 			dce110_mem_input_program_display_marks(
 				stream->mi,
 				context->bw_results
-				.nbp_state_change_watermark[total_streams],
+				.nbp_state_change_wm_ns[total_streams],
 				context->bw_results
-					.stutter_exit_watermark[total_streams],
+					.stutter_exit_wm_ns[total_streams],
 				context->bw_results
-					.urgent_watermark[total_streams],
+					.urgent_wm_ns[total_streams],
 				stream->public.timing.h_total,
 				stream->public.timing.pix_clk_khz,
 				1000 * dc->bw_vbios.blackout_duration
