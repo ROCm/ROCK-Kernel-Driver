@@ -37,6 +37,7 @@
 #include "stream_encoder.h"
 #include "link_encoder.h"
 #include "hw_sequencer.h"
+#include "fixed31_32.h"
 
 
 #define LINK_INFO(...) \
@@ -52,6 +53,10 @@
  * Private structures
  ******************************************************************************/
 
+enum {
+	LINK_RATE_REF_FREQ_IN_MHZ = 27,
+	PEAK_FACTOR_X1000 = 1006
+};
 
 /*******************************************************************************
  * Private functions
@@ -1275,6 +1280,59 @@ void core_link_resume(struct core_link *link)
 	program_hpd_filter(link);
 }
 
+static struct fixed31_32 get_pbn_per_slot(struct core_stream *stream)
+{
+	struct link_settings *link_settings = &stream->sink->link->cur_link_settings;
+	uint32_t link_rate_in_mbps = link_settings->link_rate * LINK_RATE_REF_FREQ_IN_MHZ;
+	struct fixed31_32 mbps = dal_fixed31_32_from_int(link_rate_in_mbps * link_settings->lane_count);
+
+	return dal_fixed31_32_div_int(mbps, 54);
+}
+
+static int get_color_depth(struct core_stream *stream)
+{
+	switch (stream->pix_clk_params.color_depth) {
+	case COLOR_DEPTH_666: return 6;
+	case COLOR_DEPTH_888: return 8;
+	case COLOR_DEPTH_101010: return 10;
+	case COLOR_DEPTH_121212: return 12;
+	case COLOR_DEPTH_141414: return 14;
+	case COLOR_DEPTH_161616: return 16;
+	default: return 0;
+	}
+}
+
+static struct fixed31_32 get_pbn_from_timing(struct core_stream *stream)
+{
+	uint32_t bpc;
+	uint64_t kbps;
+	struct fixed31_32 peak_kbps;
+	uint32_t numerator;
+	uint32_t denominator;
+
+	bpc = get_color_depth(stream);
+	kbps = stream->pix_clk_params.requested_pix_clk * bpc * 3;
+
+	/*
+	 * margin 5300ppm + 300ppm ~ 0.6% as per spec, factor is 1.006
+	 *
+	 * The unit of 54/64Mbytes/sec is an arbitrary unit chosen based on
+	 * common multiplier to render an integer PBN for all link rate/lane
+	 * counts combinations
+	 * 	 *
+	 * calculate
+	 * 	peak_kbps *= (1006/1000)
+	 * 	peak_kbps *= (64/54)
+	 * 	peak_kbps *= 8    convert to bytes
+	 */
+
+	numerator = 64 * PEAK_FACTOR_X1000;
+	denominator = 54 * 8 * 1000 * 1000;
+	kbps *= numerator;
+	peak_kbps = dal_fixed31_32_from_fraction(kbps, denominator);
+
+	return peak_kbps;
+}
 
 static enum dc_status allocate_mst_payload(struct core_stream *stream)
 {
@@ -1283,8 +1341,9 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 	struct stream_encoder *stream_encoder = stream->stream_enc;
 	struct dp_mst_stream_allocation_table table = {0};
 	struct fixed31_32 avg_time_slots_per_mtp;
-	uint8_t cur_stream_payload_idx;
 	struct dc *dc = stream->ctx->dc;
+	struct fixed31_32 pbn;
+	struct fixed31_32 pbn_per_slot;
 
 	/* enable_link_dp_mst already check link->enabled_stream_count
 	 * and stream is in link->stream[]. This is called during set mode,
@@ -1322,11 +1381,9 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 			&stream->public,
 			true);
 
-	/* slot X.Y for only current stream */
-	cur_stream_payload_idx = table.cur_stream_payload_idx;
-	avg_time_slots_per_mtp = dal_fixed31_32_from_fraction(
-		table.stream_allocations[cur_stream_payload_idx].pbn,
-		table.stream_allocations[cur_stream_payload_idx].pbn_per_slot);
+	pbn_per_slot = get_pbn_per_slot(stream);
+	pbn = get_pbn_from_timing(stream);
+	avg_time_slots_per_mtp = dal_fixed31_32_div(pbn, pbn_per_slot);
 
 	dc->hwss.set_mst_bandwidth(
 		stream_encoder,

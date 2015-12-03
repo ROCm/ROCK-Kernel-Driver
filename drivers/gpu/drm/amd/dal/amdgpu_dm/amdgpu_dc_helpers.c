@@ -221,14 +221,6 @@ static void get_payload_table(
 							dev,
 							master_port,
 							mst_mgr->payloads[i].vcpi);
-
-			if (mst_mgr->payloads[i].vcpi ==
-					aconnector->port->vcpi.vcpi)
-				table->cur_stream_payload_idx = i;
-
-			/* TODO remove the following and calculate in DC */
-			table->stream_allocations[i].pbn_per_slot = mst_mgr->pbn_div;
-			table->stream_allocations[i].pbn = mst_mgr->proposed_vcpis[i]->pbn;
 		}
 	}
 
