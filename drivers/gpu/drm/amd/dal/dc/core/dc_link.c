@@ -1116,6 +1116,15 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 		&table,
 		true);
 
+	/*
+	 * temporary fix. Unplug of MST chain happened (two displays),
+	 * table is empty on first reset mode, and cause 0 division in
+	 * avg_time_slots_per_mtp calculation
+	 */
+
+	if (table.stream_count == 0)
+		return DC_OK;
+
 	/* program DP source TX for payload */
 	dc->hwss.update_mst_stream_allocation_table(
 		link_encoder,
