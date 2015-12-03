@@ -125,12 +125,14 @@ static const enum gpio_ddc_line hw_ddc_lines[] = {
 	GPIO_DDC_LINE_DDC1,
 	GPIO_DDC_LINE_DDC2,
 	GPIO_DDC_LINE_DDC3,
+	GPIO_DDC_LINE_DDC4,
 };
 
 static const enum gpio_ddc_line hw_aux_lines[] = {
 	GPIO_DDC_LINE_DDC1,
 	GPIO_DDC_LINE_DDC2,
 	GPIO_DDC_LINE_DDC3,
+	GPIO_DDC_LINE_DDC4,
 };
 
 /* function table */

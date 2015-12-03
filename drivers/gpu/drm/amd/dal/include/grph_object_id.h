@@ -99,9 +99,16 @@ enum clock_source_id {
 	CLOCK_SOURCE_ID_DCPLL,
 	CLOCK_SOURCE_ID_DFS,	/* DENTIST */
 	CLOCK_SOURCE_ID_VCE,	/* VCE does not need a real PLL */
-	CLOCK_SOURCE_ID_DP_DTO,	/* Used to distinguish between */
-	/* programming pixel clock */
-	/* and ID (Phy) clock */
+	/* Used to distinguish between programming pixel clock and ID (Phy) clock */
+	CLOCK_SOURCE_ID_DP_DTO,
+
+	CLOCK_SOURCE_COMBO_PHY_PLL0, /*combo PHY PLL defines (DC 11.2 and up)*/
+	CLOCK_SOURCE_COMBO_PHY_PLL1,
+	CLOCK_SOURCE_COMBO_PHY_PLL2,
+	CLOCK_SOURCE_COMBO_PHY_PLL3,
+	CLOCK_SOURCE_COMBO_PHY_PLL4,
+	CLOCK_SOURCE_COMBO_PHY_PLL5,
+	CLOCK_SOURCE_COMBO_DISPLAY_PLL0
 };
 
 
@@ -224,6 +231,12 @@ union supported_stream_engines {
 	uint32_t u_all;
 };
 
+enum transmitter_color_depth {
+	TRANSMITTER_COLOR_DEPTH_24 = 0,  /* 8  bits */
+	TRANSMITTER_COLOR_DEPTH_30,      /* 10 bits */
+	TRANSMITTER_COLOR_DEPTH_36,      /* 12 bits */
+	TRANSMITTER_COLOR_DEPTH_48       /* 16 bits */
+};
 
 /*
  *****************************************************************************

@@ -243,6 +243,9 @@ enum bp_result dal_bios_parser_adjust_pixel_clock(
 enum bp_result dal_bios_parser_set_pixel_clock(
 	struct bios_parser *bp,
 	struct bp_pixel_clock_parameters *bp_params);
+enum bp_result dal_bios_parser_set_dce_clock(
+	struct bios_parser *bp,
+	struct bp_set_dce_clock_parameters *bp_params);
 enum bp_result dal_bios_parser_enable_spread_spectrum_on_ppll(
 	struct bios_parser *bp,
 	struct bp_spread_spectrum_parameters *bp_params,

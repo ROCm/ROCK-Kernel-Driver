@@ -40,7 +40,7 @@ struct core_stream;
 
 #define MAX_PIPES 6
 #define MAX_STREAMS 6
-#define MAX_CLOCK_SOURCES 4
+#define MAX_CLOCK_SOURCES 7
 
 struct core_target {
 	struct dc_target public;

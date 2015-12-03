@@ -75,6 +75,7 @@ struct clock_source *dal_clock_source_create(
 	}
 	break;
 #endif
+
 	default:
 		dal_logger_write(clk_src_init_data->ctx->logger,
 			LOG_MAJOR_ERROR,

@@ -684,6 +684,8 @@ enum dc_status dce110_validate_with_context(
 	context->res_ctx.pool = dc->res_pool;
 
 	result = dce_base_map_resources(dc, context);
+
+	if (result == DC_OK)
 	result = map_clock_resources(dc, context);
 
 	if (result == DC_OK)

@@ -110,6 +110,9 @@ struct cmd_tbl {
 		struct bios_parser *bp,
 		enum controller_id crtc_id,
 		enum bp_pipe_control_action action);
+	enum bp_result (*set_dce_clock)(
+		struct bios_parser *bp,
+		struct bp_set_dce_clock_parameters *bp_params);
 };
 
 void dal_bios_parser_init_cmd_tbl(struct bios_parser *bp);
