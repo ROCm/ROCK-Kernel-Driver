@@ -23,6 +23,7 @@
  *
  */
 
+#include <drm/drm_atomic_helper.h>
 #include "dal_services.h"
 #include "amdgpu.h"
 #include "amdgpu_dm_types.h"
@@ -82,14 +83,8 @@ dm_dp_mst_connector_destroy(struct drm_connector *connector)
 	kfree(amdgpu_connector);
 }
 
-static int dm_dp_mst_connector_dpms(struct drm_connector *connector, int mode)
-{
-	DRM_DEBUG_KMS("\n");
-	return 0;
-}
-
 static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
-	.dpms = dm_dp_mst_connector_dpms,
+	.dpms = drm_atomic_helper_connector_dpms,
 	.detect = dm_dp_mst_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.destroy = dm_dp_mst_connector_destroy,
