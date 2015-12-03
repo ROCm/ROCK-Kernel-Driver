@@ -67,14 +67,14 @@ bool dce110_transform_construct(
 	struct dc_context *ctx,
 	uint32_t inst)
 {
-	if ((inst < 1) || (inst > ARRAY_SIZE(reg_offsets)))
+	if (inst >= ARRAY_SIZE(reg_offsets))
 		return false;
 
 	xfm110->base.ctx = ctx;
 
 	xfm110->base.inst = inst;
 
-	xfm110->offsets = reg_offsets[inst - 1];
+	xfm110->offsets = reg_offsets[inst];
 
 	xfm110->lb_pixel_depth_supported =
 			LB_PIXEL_DEPTH_18BPP |

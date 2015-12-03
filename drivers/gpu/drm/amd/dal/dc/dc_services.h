@@ -32,10 +32,11 @@
 
 /* TODO: remove when DC is complete. */
 #include "dal_services_types.h"
-#include "include/dal_types.h"
 #include "logger_interface.h"
+#include "include/dal_types.h"
 #include "irq_types.h"
 #include "dal_power_interface_types.h"
+#include "link_service_types.h"
 
 /* if the pointer is not NULL, the allocated memory is zeroed */
 void *dc_service_alloc(struct dc_context *ctx, uint32_t size);
@@ -87,14 +88,24 @@ bool dc_service_pp_pre_dce_clock_change(
 	struct dal_to_power_info *input,
 	struct power_to_dal_info *output);
 
+struct dc_pp_single_disp_config
+{
+	enum signal_type signal;
+	uint8_t transmitter;
+	uint8_t ddi_channel_mapping;
+	uint8_t pipe_idx;
+	uint32_t src_height;
+	uint32_t src_width;
+	uint32_t v_refresh;
+	uint32_t sym_clock; /* HDMI only */
+	struct link_settings link_settings; /* DP only */
+};
+
 struct dc_pp_display_configuration {
 	bool nb_pstate_switch_disable;/* controls NB PState switch */
 	bool cpu_cc6_disable; /* controls CPU CState switch ( on or off) */
 	bool cpu_pstate_disable;
 	uint32_t cpu_pstate_separation_time;
-
-	uint32_t max_displays;
-	uint32_t active_displays;
 
 	/* 10khz steps */
 	uint32_t min_memory_clock_khz;
@@ -108,9 +119,12 @@ struct dc_pp_display_configuration {
 
 	bool all_displays_in_sync;
 
+	uint8_t display_count;
+	struct dc_pp_single_disp_config disp_configs[3];
+
 	/*Controller Index of primary display - used in MCLK SMC switching hang
 	 * SW Workaround*/
-	uint32_t crtc_index;
+	uint8_t crtc_index;
 	/*htotal*1000/pixelclk - used in MCLK SMC switching hang SW Workaround*/
 	uint32_t line_time_in_us;
 };
@@ -149,7 +163,7 @@ struct dc_pp_static_clock_info {
  *		false - call failed
  */
 bool dc_service_get_system_clocks_range(
-	struct dc_context *ctx,
+	const struct dc_context *ctx,
 	struct dal_system_clock_range *sys_clks);
 
 enum dc_pp_clock_type {
@@ -179,7 +193,7 @@ struct dc_pp_clock_levels {
  *
  */
 bool dc_service_pp_get_clock_levels_by_type(
-	struct dc_context *ctx,
+	const struct dc_context *ctx,
 	enum dc_pp_clock_type clk_type,
 	struct dc_pp_clock_levels *clk_level_info);
 
@@ -196,7 +210,7 @@ bool dc_service_pp_get_clock_levels_by_type(
  *		false - call failed
  */
 bool dc_service_pp_apply_display_requirements(
-	struct dc_context *ctx,
+	const struct dc_context *ctx,
 	const struct dc_pp_display_configuration *pp_display_cfg);
 
 

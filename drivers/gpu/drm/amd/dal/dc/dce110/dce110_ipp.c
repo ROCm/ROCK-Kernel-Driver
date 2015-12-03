@@ -48,14 +48,14 @@ bool dce110_ipp_construct(
 	struct dc_context *ctx,
 	uint32_t inst)
 {
-	if ((inst < 1) || (inst > ARRAY_SIZE(reg_offsets)))
+	if (inst >= ARRAY_SIZE(reg_offsets))
 		return false;
 
 	ipp->base.ctx = ctx;
 
 	ipp->base.inst = inst;
 
-	ipp->offsets = reg_offsets[inst-1];
+	ipp->offsets = reg_offsets[inst];
 
 	return true;
 }

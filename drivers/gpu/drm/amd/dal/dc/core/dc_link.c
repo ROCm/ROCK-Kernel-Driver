@@ -654,20 +654,23 @@ static bool construct(
 	struct core_link *link,
 	const struct link_init_data *init_params)
 {
+	uint8_t i;
+	struct adapter_service *as = init_params->adapter_srv;
 	struct irq *hpd_gpio = NULL;
 	struct ddc_service_init_data ddc_service_init_data = { 0 };
 	struct dc_context *dc_ctx = init_params->ctx;
 	struct encoder_init_data enc_init_data = { 0 };
 	struct connector_feature_support cfs = { 0 };
+	struct integrated_info info = {{{ 0 }}};
 
 	link->dc = init_params->dc;
-	link->adapter_srv = init_params->adapter_srv;
+	link->adapter_srv = as;
 	link->connector_index = init_params->connector_index;
 	link->ctx = dc_ctx;
 	link->link_index = init_params->link_index;
 
 	link->link_id = dal_adapter_service_get_connector_obj_id(
-			init_params->adapter_srv,
+			as,
 			init_params->connector_index);
 
 	if (link->link_id.type != OBJECT_TYPE_CONNECTOR) {
@@ -691,28 +694,28 @@ static bool construct(
 	case CONNECTOR_ID_DISPLAY_PORT:
 		link->public.connector_signal =	SIGNAL_TYPE_DISPLAY_PORT;
 		hpd_gpio = dal_adapter_service_obtain_hpd_irq(
-					init_params->adapter_srv,
+					as,
 					link->link_id);
 
 		if (hpd_gpio != NULL) {
 			link->public.irq_source_hpd_rx =
 					dal_irq_get_rx_source(hpd_gpio);
 			dal_adapter_service_release_irq(
-					init_params->adapter_srv, hpd_gpio);
+					as, hpd_gpio);
 		}
 
 		break;
 	case CONNECTOR_ID_EDP:
 		link->public.connector_signal = SIGNAL_TYPE_EDP;
 		hpd_gpio = dal_adapter_service_obtain_hpd_irq(
-					init_params->adapter_srv,
+					as,
 					link->link_id);
 
 		if (hpd_gpio != NULL) {
 			link->public.irq_source_hpd_rx =
 					dal_irq_get_rx_source(hpd_gpio);
 			dal_adapter_service_release_irq(
-					init_params->adapter_srv, hpd_gpio);
+					as, hpd_gpio);
 		}
 		break;
 	default:
@@ -726,26 +729,21 @@ static bool construct(
 	LINK_INFO("Connector[%d] description:\n",
 			init_params->connector_index);
 
-	link->connector = dal_connector_create(dc_ctx,
-			init_params->adapter_srv,
-			link->link_id);
+	link->connector = dal_connector_create(dc_ctx, as, link->link_id);
 	if (NULL == link->connector) {
 		DC_ERROR("Failed to create connector object!\n");
 		goto create_fail;
 	}
 
 
-	hpd_gpio = dal_adapter_service_obtain_hpd_irq(
-			init_params->adapter_srv,
-			link->link_id);
+	hpd_gpio = dal_adapter_service_obtain_hpd_irq(as, link->link_id);
 
 	if (hpd_gpio != NULL) {
 		link->public.irq_source_hpd = dal_irq_get_source(hpd_gpio);
-		dal_adapter_service_release_irq(
-					init_params->adapter_srv, hpd_gpio);
+		dal_adapter_service_release_irq(as, hpd_gpio);
 	}
 
-	ddc_service_init_data.as = link->adapter_srv;
+	ddc_service_init_data.as = as;
 	ddc_service_init_data.ctx = link->ctx;
 	ddc_service_init_data.id = link->link_id;
 	link->ddc = dal_ddc_service_create(&ddc_service_init_data);
@@ -757,10 +755,10 @@ static bool construct(
 
 	dal_connector_get_features(link->connector, &cfs);
 
-	enc_init_data.adapter_service = link->adapter_srv;
+	enc_init_data.adapter_service = as;
 	enc_init_data.ctx = dc_ctx;
 	enc_init_data.encoder = dal_adapter_service_get_src_obj(
-					link->adapter_srv, link->link_id, 0);
+							as, link->link_id, 0);
 	enc_init_data.connector = link->link_id;
 	enc_init_data.channel = cfs.ddc_line;
 	enc_init_data.hpd_source = cfs.hpd_line;
@@ -769,6 +767,50 @@ static bool construct(
 	if( link->link_enc == NULL) {
 		DC_ERROR("Failed to create link encoder!\n");
 		goto create_fail;
+	}
+
+	if (!dal_adapter_service_get_integrated_info(as, &info)) {
+		DC_ERROR("Failed to get integrated info!\n");
+		goto create_fail;
+	}
+
+	for (i = 0; ; i++) {
+		if (!dal_adapter_service_get_device_tag(
+				as, link->link_id, i, &link->device_tag)) {
+			DC_ERROR("Failed to find device tag!\n");
+			goto create_fail;
+		}
+
+		/* Look for device tag that matches connector signal,
+		 * CRT for rgb, LCD for other supported signal tyes
+		 */
+		if (!dal_adapter_service_is_device_id_supported(
+						as, link->device_tag.dev_id))
+			continue;
+		if (link->device_tag.dev_id.device_type == DEVICE_TYPE_CRT
+			&& link->public.connector_signal != SIGNAL_TYPE_RGB)
+			continue;
+		if (link->device_tag.dev_id.device_type == DEVICE_TYPE_LCD
+			&& link->public.connector_signal == SIGNAL_TYPE_RGB)
+			continue;
+		if (link->device_tag.dev_id.device_type == DEVICE_TYPE_WIRELESS
+			&& link->public.connector_signal != SIGNAL_TYPE_WIRELESS)
+			continue;
+		break;
+	}
+
+	/* Look for channel mapping corresponding to connector and device tag */
+	for (i = 0; i < MAX_NUMBER_OF_EXT_DISPLAY_PATH; i++) {
+		struct external_display_path *path =
+			&info.ext_disp_conn_info.path[i];
+		if (path->device_connector_id.enum_id == link->link_id.enum_id
+			&& path->device_connector_id.id == link->link_id.id
+			&& path->device_connector_id.type == link->link_id.type
+			&& path->device_acpi_enum
+					== link->device_tag.acpi_device) {
+			link->ddi_channel_mapping = path->channel_mapping;
+			break;
+		}
 	}
 
 	/*
