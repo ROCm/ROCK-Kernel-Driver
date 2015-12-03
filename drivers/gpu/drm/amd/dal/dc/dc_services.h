@@ -150,8 +150,8 @@ enum dc_pp_clocks_state {
 };
 
 struct dc_pp_static_clock_info {
-	uint32_t max_engine_clock_hz;
-	uint32_t max_memory_clock_hz;
+	uint32_t max_sclk_khz;
+	uint32_t max_mclk_khz;
 	 /* max possible display block clocks state */
 	enum dc_pp_clocks_state max_clocks_state;
 };
