@@ -228,21 +228,7 @@ dm_dp_create_fake_mst_encoder(struct amdgpu_connector *connector)
 		return NULL;
 
 	encoder = &amdgpu_encoder->base;
-	switch (adev->mode_info.num_crtc) {
-	case 1:
-		encoder->possible_crtcs = 0x1;
-		break;
-	case 2:
-	default:
-		encoder->possible_crtcs = 0x3;
-		break;
-	case 4:
-		encoder->possible_crtcs = 0xf;
-		break;
-	case 6:
-		encoder->possible_crtcs = 0x3f;
-		break;
-	}
+	encoder->possible_crtcs = amdgpu_dm_get_encoder_crtc_mask(adev);
 
 	drm_encoder_init(
 		dev,

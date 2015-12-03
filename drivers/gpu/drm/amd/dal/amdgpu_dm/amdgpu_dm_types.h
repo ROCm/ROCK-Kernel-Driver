@@ -83,6 +83,8 @@ int amdgpu_dm_connector_atomic_set_property(
 	struct drm_property *property,
 	uint64_t val);
 
+int amdgpu_dm_get_encoder_crtc_mask(struct amdgpu_device *adev);
+
 extern const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs;
 
 #endif		/* __AMDGPU_DM_TYPES_H__ */
