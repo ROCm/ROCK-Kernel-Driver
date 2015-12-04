@@ -465,6 +465,14 @@ static void detect_on_all_dc_links(struct amdgpu_display_manager *dm)
 	}
 }
 
+static void hotplug_notify_work_func(struct work_struct *work)
+{
+	struct amdgpu_display_manager *dm = container_of(work, struct amdgpu_display_manager, mst_hotplug_work);
+	struct drm_device *dev = dm->ddev;
+
+	drm_kms_helper_hotplug_event(dev);
+}
+
 /* Init display KMS
  *
  * Returns 0 on success
@@ -535,6 +543,8 @@ int amdgpu_dm_init(struct amdgpu_device *adev)
 
 	/* Display Core create. */
 	adev->dm.dc = dc_create(&init_data);
+
+	INIT_WORK(&adev->dm.mst_hotplug_work, hotplug_notify_work_func);
 
 	if (amdgpu_dm_initialize_drm_device(adev)) {
 		DRM_ERROR(
@@ -785,6 +795,10 @@ static void handle_hpd_rx_irq(void *param)
 	struct drm_connector *connector = &aconnector->base;
 	struct drm_device *dev = connector->dev;
 
+	if (aconnector->mst_mgr.mst_state) {
+		mutex_lock(&aconnector->mst_mgr.aux->hw_mutex);
+	}
+
 	if (dc_link_handle_hpd_rx_irq(aconnector->dc_link) &&
 			!aconnector->mst_mgr.mst_state) {
 		/* Downstream Port status changed. */
@@ -793,8 +807,10 @@ static void handle_hpd_rx_irq(void *param)
 		drm_helper_hpd_irq_event(dev);
 	}
 
-	if (aconnector->mst_mgr.mst_state)
+	if (aconnector->mst_mgr.mst_state) {
+		mutex_unlock(&aconnector->mst_mgr.aux->hw_mutex);
 		dc_helpers_dp_mst_handle_mst_hpd_rx_irq(param);
+	}
 }
 
 static void register_hpd_handlers(struct amdgpu_device *adev)

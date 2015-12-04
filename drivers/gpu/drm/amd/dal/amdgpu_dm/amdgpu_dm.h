@@ -123,6 +123,8 @@ struct amdgpu_display_manager {
 	struct backlight_device *backlight_dev;
 
 	const struct dc_link *backlight_link;
+
+	struct work_struct mst_hotplug_work;
 };
 
 
