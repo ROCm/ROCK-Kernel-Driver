@@ -152,6 +152,8 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 	const struct dc_sink *sink;
 	int ret = 0;
 
+	flush_work(&master->mst_mgr.work);
+
 	edid = drm_dp_mst_get_edid(connector, &master->mst_mgr, aconnector->port);
 
 	if (!edid) {
@@ -299,8 +301,9 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 {
 	struct amdgpu_connector *master = container_of(mgr, struct amdgpu_connector, mst_mgr);
 	struct drm_device *dev = master->base.dev;
+	struct amdgpu_device *adev = dev->dev_private;
 
-	drm_kms_helper_hotplug_event(dev);
+	schedule_work(&adev->dm.mst_hotplug_work);
 }
 
 static void dm_dp_mst_register_connector(struct drm_connector *connector)
