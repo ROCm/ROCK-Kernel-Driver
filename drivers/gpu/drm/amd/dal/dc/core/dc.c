@@ -167,8 +167,6 @@ static void init_hw(struct dc *dc)
 		dc->hwss.encoder_power_up(link->link_enc);
 	}
 
-	dal_bios_parser_set_scratch_acc_mode_change(bp);
-
 	for(i = 0; i < dc->res_pool.controller_count; i++) {
 		struct timing_generator *tg = dc->res_pool.timing_generators[i];
 
@@ -653,7 +651,7 @@ bool dc_commit_targets(
 
 	if (!dal_adapter_service_is_in_accelerated_mode(
 						dc->res_pool.adapter_srv)) {
-		dc->hwss.enable_accelerated_mode(context);
+		dc->hwss.enable_accelerated_mode(dc);
 	}
 
 	for (i = 0; i < dc->current_context.target_count; i++) {
@@ -859,7 +857,7 @@ void dc_set_power_state(
 		/* NULL means "reset/release all DC targets" */
 		dc_commit_targets(dc, NULL, 0);
 
-		dc->hwss.power_down(&dc->current_context);
+		dc->hwss.power_down(dc);
 		break;
 	}
 
