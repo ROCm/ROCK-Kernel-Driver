@@ -65,9 +65,9 @@ struct hw_sequencer_funcs {
 					const struct gamma_ramp *ramp,
 					const struct gamma_parameters *params);
 
-	void (*power_down)(struct validate_context *context);
+	void (*power_down)(struct dc *dc);
 
-	void (*enable_accelerated_mode)(struct validate_context *context);
+	void (*enable_accelerated_mode)(struct dc *dc);
 
 	void (*get_crtc_positions)(
 					struct timing_generator *tg,

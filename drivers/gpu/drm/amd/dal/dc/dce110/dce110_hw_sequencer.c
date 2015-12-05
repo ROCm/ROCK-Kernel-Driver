@@ -785,8 +785,21 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 	bool timing_changed = context->res_ctx.controller_ctx[controller_idx]
 			.flags.timing_changed;
 	enum color_space color_space;
+	struct bios_parser *bp;
+
+	bp = dal_adapter_service_get_bios_parser(
+			context->res_ctx.pool.adapter_srv);
 
 	if (timing_changed) {
+		dce110_enable_display_power_gating(
+				stream->ctx, controller_idx, bp,
+				PIPE_GATING_CONTROL_DISABLE);
+
+		/* Must blank CRTC after disabling power gating and before any
+		 * programming, otherwise CRTC will be hung in bad state
+		 */
+		dce110_timing_generator_blank_crtc(stream->tg);
+
 		core_link_disable_stream(
 				stream->sink->link, stream);
 
@@ -898,47 +911,34 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 
 /******************************************************************************/
 
-static void power_down_encoders(struct validate_context *context)
+static void power_down_encoders(struct dc *dc)
 {
 	int i;
-	struct core_target *target;
-	struct core_stream *stream;
 
-	for (i = 0; i < context->target_count; i++) {
-		target = context->targets[i];
-		stream = DC_STREAM_TO_CORE(target->public.streams[0]);
-
-		core_link_disable_stream(stream->sink->link, stream);
+	for (i = 0; i < dc->link_count; i++) {
+		dce110_link_encoder_disable_output(
+				dc->links[i]->link_enc, SIGNAL_TYPE_NONE);
 	}
 }
 
-static void power_down_controllers(struct validate_context *context)
+static void power_down_controllers(struct dc *dc)
 {
 	int i;
-	struct core_target *target;
-	struct core_stream *stream;
 
-	for (i = 0; i < context->target_count; i++) {
-		target = context->targets[i];
-		stream = DC_STREAM_TO_CORE(target->public.streams[0]);
-
-		dce110_timing_generator_disable_crtc(stream->tg);
+	for (i = 0; i < dc->res_pool.controller_count; i++) {
+		dce110_timing_generator_disable_crtc(
+				dc->res_pool.timing_generators[i]);
 	}
 }
 
-static void power_down_clock_sources(struct validate_context *context)
+static void power_down_clock_sources(struct dc *dc)
 {
 	int i;
-	struct core_target *target;
-	struct core_stream *stream;
 
-	for (i = 0; i < context->target_count; i++) {
-		target = context->targets[i];
-		stream = DC_STREAM_TO_CORE(target->public.streams[0]);
-
+	for (i = 0; i < dc->res_pool.clk_src_count; i++) {
 		if (false == dal_clock_source_power_down_pll(
-				stream->clock_source,
-				stream->controller_idx + 1)) {
+				dc->res_pool.clock_sources[i],
+				i+1)) {
 			dal_error(
 				"Failed to power down pll! (clk src index=%d)\n",
 				i);
@@ -946,35 +946,29 @@ static void power_down_clock_sources(struct validate_context *context)
 	}
 }
 
-static void power_down_all_hw_blocks(struct validate_context *context)
+static void power_down_all_hw_blocks(struct dc *dc)
 {
-	power_down_encoders(context);
+	power_down_encoders(dc);
 
-	power_down_controllers(context);
+	power_down_controllers(dc);
 
-	power_down_clock_sources(context);
+	power_down_clock_sources(dc);
 }
 
 static void disable_vga_and_power_gate_all_controllers(
-		struct validate_context *context)
+		struct dc *dc)
 {
 	int i;
-	struct core_target *target;
-	struct core_stream *stream;
 	struct timing_generator *tg;
 	struct bios_parser *bp;
 	struct dc_context *ctx;
-	uint8_t controller_id;
 
 	bp = dal_adapter_service_get_bios_parser(
-				context->res_ctx.pool.adapter_srv);
+			dc->res_pool.adapter_srv);
 
-	for (i = 0; i < context->target_count; i++) {
-		target = context->targets[i];
-		stream = DC_STREAM_TO_CORE(target->public.streams[0]);
-		tg = stream->tg;
-		ctx = stream->ctx;
-		controller_id = stream->controller_idx;
+	for (i = 0; i < dc->res_pool.controller_count; i++) {
+		tg = dc->res_pool.timing_generators[i];
+		ctx = dc->ctx;
 
 		dce110_timing_generator_disable_vga(tg);
 
@@ -982,7 +976,7 @@ static void disable_vga_and_power_gate_all_controllers(
 		 * powergating. */
 		dce110_enable_display_pipe_clock_gating(ctx,
 				true);
-		dce110_enable_display_power_gating(ctx, controller_id, bp,
+		dce110_enable_display_power_gating(ctx, i+1, bp,
 				PIPE_GATING_CONTROL_ENABLE);
 	}
 }
@@ -994,16 +988,16 @@ static void disable_vga_and_power_gate_all_controllers(
  *  3. Enable power gating for controller
  *  4. Set acc_mode_change bit (VBIOS will clear this bit when going to FSDOS)
  */
-static void enable_accelerated_mode(struct validate_context *context)
+static void enable_accelerated_mode(struct dc *dc)
 {
 	struct bios_parser *bp;
 
 	bp = dal_adapter_service_get_bios_parser(
-			context->res_ctx.pool.adapter_srv);
+			dc->res_pool.adapter_srv);
 
-	power_down_all_hw_blocks(context);
+	power_down_all_hw_blocks(dc);
 
-	disable_vga_and_power_gate_all_controllers(context);
+	disable_vga_and_power_gate_all_controllers(dc);
 
 	dal_bios_parser_set_scratch_acc_mode_change(bp);
 }
@@ -1565,6 +1559,10 @@ static bool update_plane_address(
 static void reset_single_stream_hw_ctx(struct core_stream *stream,
 		struct validate_context *context)
 {
+	struct bios_parser *bp;
+
+	bp = dal_adapter_service_get_bios_parser(
+			context->res_ctx.pool.adapter_srv);
 	if (stream->audio) {
 		dal_audio_disable_output(stream->audio,
 				stream->stream_enc->id,
@@ -1580,6 +1578,9 @@ static void reset_single_stream_hw_ctx(struct core_stream *stream,
 	dce110_transform_set_scaler_bypass(stream->xfm);
 	disable_stereo_mixer(stream->ctx);
 	unreference_clock_source(&context->res_ctx, stream->clock_source);
+	dce110_enable_display_power_gating(
+			stream->ctx, stream->controller_idx, bp,
+			PIPE_GATING_CONTROL_ENABLE);
 }
 
 static void reset_hw_ctx(struct dc *dc,
@@ -1604,10 +1605,10 @@ static void reset_hw_ctx(struct dc *dc,
 	}
 }
 
-static void power_down(struct validate_context *context)
+static void power_down(struct dc *dc)
 {
-	power_down_all_hw_blocks(context);
-	disable_vga_and_power_gate_all_controllers(context);
+	power_down_all_hw_blocks(dc);
+	disable_vga_and_power_gate_all_controllers(dc);
 
 }
 
