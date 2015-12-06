@@ -221,15 +221,27 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 
 static int amdgpu_verify_access(struct ttm_buffer_object *bo, struct file *filp)
 {
-	struct amdgpu_bo *rbo = container_of(bo, struct amdgpu_bo, tbo);
+	struct amdgpu_bo *abo = container_of(bo, struct amdgpu_bo, tbo);
+	struct drm_file *file_priv = filp->private_data;
+	struct amdgpu_gem_object *gobj;
 	if (filp == NULL)
 		return 0;
 
-	return drm_vma_node_verify_access(&rbo->gem_base.vma_node, filp);
+	ww_mutex_lock(&abo->tbo.resv->lock, NULL);
+	list_for_each_entry(gobj, &abo->gem_objects, list) {
+		if (gobj->base.dev != file_priv->minor->dev)
+			continue;
+
+		ww_mutex_unlock(&abo->tbo.resv->lock);
+		return drm_vma_node_verify_access(&gobj->base.vma_node, filp);
+	}
+	ww_mutex_unlock(&abo->tbo.resv->lock);
+
+	return -EPERM;
 }
 
 static void amdgpu_move_null(struct ttm_buffer_object *bo,
-			     struct ttm_mem_reg *new_mem)
+			struct ttm_mem_reg *new_mem)
 {
 	struct ttm_mem_reg *old_mem = &bo->mem;
 

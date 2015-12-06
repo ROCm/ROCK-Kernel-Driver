@@ -460,6 +460,12 @@ struct amdgpu_bo_va {
 
 #define AMDGPU_GEM_DOMAIN_MAX		0x3
 
+struct amdgpu_gem_object {
+	struct drm_gem_object		base;
+	struct list_head		list;
+	struct amdgpu_bo		*bo;
+};
+
 struct amdgpu_bo {
 	/* Protected by gem.mutex */
 	struct list_head		list;
@@ -477,13 +483,15 @@ struct amdgpu_bo {
 	u64				metadata_flags;
 	void				*metadata;
 	u32				metadata_size;
+	/* GEM objects refereing to this BO */
+	struct list_head	gem_objects;
+
 	/* list of all virtual address to which this bo
 	 * is associated to
 	 */
 	struct list_head		va;
 	/* Constant after initialization */
 	struct amdgpu_device		*adev;
-	struct drm_gem_object		gem_base;
 	struct amdgpu_bo		*parent;
 
 	struct ttm_bo_kmap_obj		dma_buf_vmap;
@@ -491,7 +499,7 @@ struct amdgpu_bo {
 	struct list_head		mn_list;
 	struct kfd_process_device	*pdd;
 };
-#define gem_to_amdgpu_bo(gobj) container_of((gobj), struct amdgpu_bo, gem_base)
+#define gem_to_amdgpu_bo(gobj) container_of((gobj), struct amdgpu_gem_object, base)->bo
 
 void amdgpu_gem_object_free(struct drm_gem_object *obj);
 int amdgpu_gem_object_open(struct drm_gem_object *obj,
