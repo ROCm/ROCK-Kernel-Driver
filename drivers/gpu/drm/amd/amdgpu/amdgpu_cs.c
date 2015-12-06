@@ -487,7 +487,7 @@ static void amdgpu_cs_parser_fini_late(struct amdgpu_cs_parser *parser)
 				amdgpu_ib_free(parser->adev, &parser->ibs[i]);
 		kfree(parser->ibs);
 		if (parser->uf.bo)
-			drm_gem_object_unreference_unlocked(&parser->uf.bo->gem_base);
+			amdgpu_bo_unref(&parser->uf.bo);
 	}
 
 	kfree(parser);
@@ -786,7 +786,7 @@ static int amdgpu_cs_free_job(struct amdgpu_job *job)
 			amdgpu_ib_free(job->adev, &job->ibs[i]);
 	kfree(job->ibs);
 	if (job->uf.bo)
-		drm_gem_object_unreference_unlocked(&job->uf.bo->gem_base);
+		amdgpu_bo_unref(&job->uf.bo);
 	return 0;
 }
 
