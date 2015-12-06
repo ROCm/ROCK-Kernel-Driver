@@ -252,21 +252,34 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 static int amdgpu_verify_access(struct ttm_buffer_object *bo, struct file *filp)
 {
 	struct amdgpu_bo *abo = container_of(bo, struct amdgpu_bo, tbo);
+	struct drm_file *file_priv = filp->private_data;
+	struct amdgpu_gem_object *gobj;
 	if (filp == NULL)
 		return 0;
 
 	if (amdgpu_ttm_tt_get_usermm(bo->ttm))
 		return -EPERM;
+
+	ww_mutex_lock(&abo->tbo.resv->lock, NULL);
+	list_for_each_entry(gobj, &abo->gem_objects, list) {
+		if (gobj->base.dev != file_priv->minor->dev)
+			continue;
+
+		ww_mutex_unlock(&abo->tbo.resv->lock);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
-	return drm_vma_node_verify_access(&abo->gem_base.vma_node, filp);
+		return drm_vma_node_verify_access(&gobj->base.vma_node, filp);
 #else
-	return drm_vma_node_verify_access(&abo->gem_base.vma_node,
-					  filp->private_data);
+		return drm_vma_node_verify_access(&gobj->base.vma_node,
+					filp->private_data);
 #endif
+	}
+	ww_mutex_unlock(&abo->tbo.resv->lock);
+
+	return -EPERM;
 }
 
 static void amdgpu_move_null(struct ttm_buffer_object *bo,
-			     struct ttm_mem_reg *new_mem)
+			struct ttm_mem_reg *new_mem)
 {
 	struct ttm_mem_reg *old_mem = &bo->mem;
 
