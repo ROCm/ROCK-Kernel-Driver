@@ -382,7 +382,14 @@ struct amdgpu_clock {
  */
 
 #define AMDGPU_GEM_DOMAIN_MAX		0x3
-#define gem_to_amdgpu_bo(gobj) container_of((gobj), struct amdgpu_bo, gem_base)
+
+struct amdgpu_gem_object {
+	struct drm_gem_object		base;
+	struct list_head		list;
+	struct amdgpu_bo		*bo;
+};
+
+#define gem_to_amdgpu_bo(gobj) container_of((gobj), struct amdgpu_gem_object, base)->bo
 
 void amdgpu_gem_object_free(struct drm_gem_object *obj);
 int amdgpu_gem_object_open(struct drm_gem_object *obj,

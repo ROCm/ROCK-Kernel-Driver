@@ -65,6 +65,7 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	struct reservation_object *resv = attach->dmabuf->resv;
 	struct amdgpu_device *adev = dev->dev_private;
 	struct amdgpu_bo *bo;
+	struct amdgpu_gem_object *gobj;
 	int ret;
 
 	ww_mutex_lock(&resv->lock, NULL);
@@ -75,7 +76,24 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 		return ERR_PTR(ret);
 
 	bo->prime_shared_count = 1;
-	return &bo->gem_base;
+
+	gobj = kzalloc(sizeof(struct amdgpu_gem_object), GFP_KERNEL);
+	if (unlikely(!gobj)) {
+		amdgpu_bo_unref(&bo);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	ret = drm_gem_object_init(adev->ddev, &gobj->base, amdgpu_bo_size(bo));
+	if (unlikely(ret)) {
+		kfree(gobj);
+		amdgpu_bo_unref(&bo);
+		return ERR_PTR(ret);
+	}
+
+	list_add(&gobj->list, &bo->gem_objects);
+	gobj->bo = amdgpu_bo_ref(bo);
+
+	return &gobj->base;
 }
 
 int amdgpu_gem_prime_pin(struct drm_gem_object *obj)
