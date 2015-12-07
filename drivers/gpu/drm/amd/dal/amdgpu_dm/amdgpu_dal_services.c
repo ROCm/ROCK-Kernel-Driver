@@ -234,7 +234,6 @@ bool dc_service_pp_get_clock_levels_by_type(
 		enum dc_pp_clock_type clk_type,
 		struct dc_pp_clock_levels *clks)
 {
-
 /*
  #ifdef CONFIG_DRM_AMD_POWERPLAY
 	if(amd_powerplay_get_clocks_by_type(adev->powerplay.pp_handle,
@@ -243,16 +242,11 @@ bool dc_service_pp_get_clock_levels_by_type(
 		divide by 10 & push to the clks which kHz
 #endif
 */
-
-	struct amdgpu_device *adev = ctx->driver_context;
-
 	uint32_t disp_clks_in_khz[8] = {
 	300000, 411430, 480000, 533340, 626090, 626090, 626090, 626090 };
 	uint32_t sclks_in_khz[8] = {
 	200000, 266670, 342860, 411430, 450000, 514290, 576000, 626090 };
 	uint32_t mclks_in_khz[8] = { 333000, 800000 };
-
-	struct amd_pp_dal_clock_info info = {0};
 
 	switch (clk_type) {
 	case DC_PP_CLOCK_TYPE_DISPLAY_CLK:
@@ -273,9 +267,14 @@ bool dc_service_pp_get_clock_levels_by_type(
 	default:
 		return false;
 	}
+
 #ifdef CONFIG_DRM_AMD_POWERPLAY
 	if (clk_type ==  DC_PP_CLOCK_TYPE_ENGINE_CLK ||
 		clk_type ==  DC_PP_CLOCK_TYPE_DISPLAY_CLK) {
+
+		struct amdgpu_device *adev = ctx->driver_context;
+		struct amd_pp_dal_clock_info info = {0};
+
 		if (0 == amd_powerplay_get_display_power_level(
 				adev->powerplay.pp_handle, &info) &&
 				info.level < clks->num_levels) {
