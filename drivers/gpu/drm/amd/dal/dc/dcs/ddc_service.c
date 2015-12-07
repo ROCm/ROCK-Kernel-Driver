@@ -564,6 +564,8 @@ static uint32_t query_edid_block(
 #define DDC_DPCD_EDID_TEST_MASK 0x04
 #define DDC_DPCD_TEST_REQUEST_ADDRESS 0x218
 
+/* AG TODO GO throug DM callback here like for DPCD */
+
 static void write_dp_edid_checksum(
 	struct ddc_service *ddc,
 	uint8_t checksum)

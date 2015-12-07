@@ -43,6 +43,8 @@
 #include "opp.h"
 #include "link_encoder.h"
 
+#include "dcs/ddc_service.h"
+
 /*******************************************************************************
  * Private structures
  ******************************************************************************/
@@ -912,6 +914,7 @@ void dc_print_sync_report(
 	 * data from Step 1). */
 }
 
+/*AG TODO Create callbacks for WIN DM */
 bool dc_read_dpcd(
 		struct dc *dc,
 		uint32_t link_index,
@@ -921,9 +924,13 @@ bool dc_read_dpcd(
 {
 	struct core_link *link =
 			DC_LINK_TO_LINK(dc_get_link_at_index(dc, link_index));
-	enum dc_status r = core_link_read_dpcd(link, address, data, size);
 
-	return r == DC_OK;
+	enum ddc_result r = dal_ddc_service_read_dpcd_data(
+			link->ddc,
+			address,
+			data,
+			size);
+	return r == DDC_RESULT_SUCESSFULL;
 }
 
 bool dc_write_dpcd(
@@ -935,9 +942,13 @@ bool dc_write_dpcd(
 {
 	struct core_link *link =
 			DC_LINK_TO_LINK(dc_get_link_at_index(dc, link_index));
-	enum dc_status r = core_link_write_dpcd(link, address, data, size);
 
-	return r == DC_OK;
+	enum ddc_result r = dal_ddc_service_write_dpcd_data(
+			link->ddc,
+			address,
+			data,
+			size);
+	return r == DDC_RESULT_SUCESSFULL;
 }
 
 bool dc_link_add_sink(

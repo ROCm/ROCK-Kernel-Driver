@@ -795,20 +795,15 @@ static void handle_hpd_rx_irq(void *param)
 	struct drm_connector *connector = &aconnector->base;
 	struct drm_device *dev = connector->dev;
 
-	if (aconnector->mst_mgr.mst_state) {
-		mutex_lock(&aconnector->mst_mgr.aux->hw_mutex);
-	}
-
 	if (dc_link_handle_hpd_rx_irq(aconnector->dc_link) &&
-			!aconnector->mst_mgr.mst_state) {
+			!aconnector->is_mst_connector) {
 		/* Downstream Port status changed. */
 		dc_link_detect(aconnector->dc_link);
 		amdgpu_dm_update_connector_after_detect(aconnector);
 		drm_helper_hpd_irq_event(dev);
 	}
 
-	if (aconnector->mst_mgr.mst_state) {
-		mutex_unlock(&aconnector->mst_mgr.aux->hw_mutex);
+	if (aconnector->is_mst_connector) {
 		dc_helpers_dp_mst_handle_mst_hpd_rx_irq(param);
 	}
 }

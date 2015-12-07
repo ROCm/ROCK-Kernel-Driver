@@ -457,3 +457,44 @@ void dc_helpers_dp_mst_stop_top_mgr(
 
 	aconnector->is_mst_connector = false;
 }
+
+bool dc_helper_dp_read_dpcd(
+		struct dc_context *ctx,
+		const struct dc_link *link,
+		uint32_t address,
+		uint8_t *data,
+		uint32_t size) {
+
+
+	struct amdgpu_device *adev = ctx->driver_context;
+	struct drm_device *dev = adev->ddev;
+	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
+
+	if (!aconnector) {
+		DRM_ERROR("Failed to found connector for link!");
+		return false;
+	}
+
+	return drm_dp_dpcd_read(&aconnector->dm_dp_aux.aux, address,
+			data, size) > 0;
+}
+
+bool dc_helper_dp_write_dpcd(
+		struct dc_context *ctx,
+		const struct dc_link *link,
+		uint32_t address,
+		const uint8_t *data,
+		uint32_t size) {
+
+	struct amdgpu_device *adev = ctx->driver_context;
+	struct drm_device *dev = adev->ddev;
+	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
+
+	if (!aconnector) {
+		DRM_ERROR("Failed to found connector for link!");
+		return false;
+	}
+
+	return drm_dp_dpcd_write(&aconnector->dm_dp_aux.aux, address,
+			(uint8_t *)data, size) > 0;
+}

@@ -72,4 +72,18 @@ void dc_helpers_dp_mst_stop_top_mgr(
 		struct dc_context *ctx,
 		const struct dc_link *link);
 
+bool dc_helper_dp_read_dpcd(
+		struct dc_context *ctx,
+		const struct dc_link *link,
+		uint32_t address,
+		uint8_t *data,
+		uint32_t size);
+
+bool dc_helper_dp_write_dpcd(
+		struct dc_context *ctx,
+		const struct dc_link *link,
+		uint32_t address,
+		const uint8_t *data,
+		uint32_t size);
+
 #endif /* __DC_HELPERS__ */

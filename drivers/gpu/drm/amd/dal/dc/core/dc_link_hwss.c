@@ -20,9 +20,9 @@ enum dc_status core_link_read_dpcd(
 	uint8_t *data,
 	uint32_t size)
 {
-	if (dal_ddc_service_read_dpcd_data(link->ddc, address, data, size)
-			!= DDC_RESULT_SUCESSFULL)
-		return DC_ERROR_UNEXPECTED;
+	if (!dc_helper_dp_read_dpcd(link->ctx,
+			&link->public, address, data, size))
+			return DC_ERROR_UNEXPECTED;
 
 	return DC_OK;
 }
@@ -33,9 +33,9 @@ enum dc_status core_link_write_dpcd(
 	const uint8_t *data,
 	uint32_t size)
 {
-	if (dal_ddc_service_write_dpcd_data(link->ddc, address, data, size)
-			!= DDC_RESULT_SUCESSFULL)
-		return DC_ERROR_UNEXPECTED;
+	if (!dc_helper_dp_write_dpcd(link->ctx,
+			&link->public, address, data, size))
+				return DC_ERROR_UNEXPECTED;
 
 	return DC_OK;
 }

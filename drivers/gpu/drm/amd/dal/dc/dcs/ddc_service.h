@@ -35,4 +35,15 @@ void dal_ddc_service_set_ddc_pin(
 struct ddc *dal_ddc_service_get_ddc_pin(struct ddc_service *ddc_service);
 void dal_ddc_service_reset_dp_receiver_id_info(struct ddc_service *ddc_service);
 
+enum ddc_result dal_ddc_service_read_dpcd_data(
+	struct ddc_service *ddc,
+	uint32_t address,
+	uint8_t *data,
+	uint32_t len);
+enum ddc_result dal_ddc_service_write_dpcd_data(
+	struct ddc_service *ddc,
+	uint32_t address,
+	const uint8_t *data,
+	uint32_t len);
+
 #endif /* __DAL_DDC_SERVICE_H__ */
