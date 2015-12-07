@@ -109,14 +109,16 @@ static inline void arch_unw_init_blocked(struct unwind_frame_info *info)
 	memset(&info->regs, 0, sizeof(info->regs));
 	info->regs.ip = (unsigned long)thread_return;
 	info->regs.cs = __KERNEL_CS;
-	probe_kernel_address(info->task->thread.sp, info->regs.bp);
+	probe_kernel_address((unsigned long *)info->task->thread.sp,
+			info->regs.bp);
 	info->regs.sp = info->task->thread.sp;
 	info->regs.ss = __KERNEL_DS;
 #else
 	memset(&info->regs, 0, sizeof(info->regs));
 	info->regs.ip = info->task->thread.ip;
 	info->regs.cs = __KERNEL_CS;
-	probe_kernel_address(info->task->thread.sp, info->regs.bp);
+	probe_kernel_address((unsigned long *)info->task->thread.sp,
+			info->regs.bp);
 	info->regs.sp = info->task->thread.sp;
 	info->regs.ss = __KERNEL_DS;
 	info->regs.ds = __USER_DS;

@@ -669,7 +669,7 @@ static unsigned long read_pointer(const u8 **pLoc,
 		return 0;
 	}
 	if ((ptrType & DW_EH_PE_indirect)
-	    && probe_kernel_address(value, value)) {
+	    && probe_kernel_address((unsigned long *)value, value)) {
 		dprintk(1, "Cannot read indirect value %lx (%p,%p).",
 		        value, *pLoc, end);
 		return 0;
@@ -939,6 +939,7 @@ static unsigned long evaluate(const u8 *expr, const u8 *end,
 	} ptr = { expr };
 	unsigned long stack[8], val1, val2;
 	unsigned int stidx = 0;
+	int ret;
 #define PUSH(v) ({ unsigned long v__ = (v); if (stidx >= ARRAY_SIZE(stack)) return 0; stack[stidx++] = v__; })
 #define POP() ({ if (!stidx) return 0; stack[--stidx]; })
 
@@ -947,7 +948,8 @@ static unsigned long evaluate(const u8 *expr, const u8 *end,
 		/*todo case DW_OP_addr: */
 		case DW_OP_deref:
 			val1 = POP();
-			if (probe_kernel_address(val1, val2)) {
+			ret = probe_kernel_address((unsigned long *)val1, val2);
+			if (ret) {
 				dprintk(1, "Cannot de-reference %lx (%p,%p).", val1, ptr.pu8 - 1, end);
 				return 0;
 			}
@@ -1197,6 +1199,7 @@ int unwind(struct unwind_frame_info *frame)
 	uleb128_t retAddrReg = 0;
 	const struct unwind_table *table;
 	struct unwind_state state;
+	int ret;
 
 	if (UNW_PC(frame) == 0)
 		return -EINVAL;
@@ -1405,7 +1408,9 @@ int unwind(struct unwind_frame_info *frame)
 # endif
 			return -ENXIO;
 
-		if (probe_kernel_address(fp + FRAME_LINK_OFFSET, link))
+		ret = probe_kernel_address((unsigned long *)(fp + FRAME_LINK_OFFSET),
+				link);
+		if (ret)
 			return -ENXIO;
 
 # if FRAME_RETADDR_OFFSET < 0
@@ -1419,7 +1424,8 @@ int unwind(struct unwind_frame_info *frame)
 			return -ENXIO;
 
 		fp += FRAME_RETADDR_OFFSET;
-		if (probe_kernel_address(fp, UNW_PC(frame)))
+		ret = probe_kernel_address((unsigned long *)fp, UNW_PC(frame));
+		if (ret)
 			return -ENXIO;
 
 		/* Ok, we can use it */
@@ -1560,8 +1566,9 @@ int unwind(struct unwind_frame_info *frame)
 				}
 				switch (reg_info[i].width) {
 #define CASE(n)			case sizeof(u##n): \
-					if (probe_kernel_address(addr, \
-								 FRAME_REG(i, u##n))) \
+					ret = probe_kernel_address((unsigned long *)addr, \
+								 FRAME_REG(i, u##n)); \
+					if (ret) \
 						return -EFAULT; \
 					break
 				CASES;
