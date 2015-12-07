@@ -1025,7 +1025,6 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 {
 	struct amdgpu_display_manager *dm = &adev->dm;
 	uint32_t link_index;
-	struct drm_connector *connector;
 	struct amdgpu_connector *aconnector;
 	struct amdgpu_encoder *aencoder;
 	struct amdgpu_crtc *acrtc;
@@ -1087,13 +1086,14 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 			DRM_ERROR("KMS: Failed to initialize connector\n");
 			goto fail;
 		}
+
+		dc_link_detect(dc_get_link_at_index(dm->dc, link_index));
+
+		amdgpu_dm_update_connector_after_detect(
+			aconnector);
 	}
 
 	dm->display_indexes_num = link_cnt;
-
-	detect_on_all_dc_links(&adev->dm);
-	list_for_each_entry(connector, &adev->ddev->mode_config.connector_list, head)
-		amdgpu_dm_update_connector_after_detect(to_amdgpu_connector(connector));
 
 	/* Software is initialized. Now we can register interrupt handlers. */
 	switch (adev->asic_type) {
