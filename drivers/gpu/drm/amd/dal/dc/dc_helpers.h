@@ -72,15 +72,23 @@ void dc_helpers_dp_mst_stop_top_mgr(
 		struct dc_context *ctx,
 		const struct dc_link *link);
 
+/**
+ * OS specific aux read callback.
+ */
 bool dc_helper_dp_read_dpcd(
 		struct dc_context *ctx,
+		uint8_t link_index,
 		const struct dc_link *link,
 		uint32_t address,
 		uint8_t *data,
 		uint32_t size);
 
+/**
+ * OS specific aux write callback.
+ */
 bool dc_helper_dp_write_dpcd(
 		struct dc_context *ctx,
+		uint8_t link_index,
 		const struct dc_link *link,
 		uint32_t address,
 		const uint8_t *data,

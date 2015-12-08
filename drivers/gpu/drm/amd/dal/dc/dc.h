@@ -436,7 +436,7 @@ bool dc_write_dpcd(
 		struct dc *dc,
 		uint32_t link_index,
 		uint32_t address,
-		uint8_t *data,
+		const uint8_t *data,
 	uint32_t size);
 
 #endif /* DC_INTERFACE_H_ */
