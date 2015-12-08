@@ -50,14 +50,12 @@ void dc_service_memmove(void *dst, const void *src, uint32_t size);
 /* TODO: rename to dc_memcmp*/
 int32_t dal_memcmp(const void *p1, const void *p2, uint32_t count);
 
-/* TODO: remove when windows_dm will start registering for IRQs */
 irq_handler_idx dc_service_register_interrupt(
 	struct dc_context *ctx,
 	struct dc_interrupt_params *int_params,
 	interrupt_handler ih,
 	void *handler_args);
 
-/* TODO: remove when windows_dm will start registering for IRQs */
 void dc_service_unregister_interrupt(
 	struct dc_context *ctx,
 	enum dc_irq_source irq_source,
