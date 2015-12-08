@@ -460,6 +460,7 @@ void dc_helpers_dp_mst_stop_top_mgr(
 
 bool dc_helper_dp_read_dpcd(
 		struct dc_context *ctx,
+		uint8_t link_index,
 		const struct dc_link *link,
 		uint32_t address,
 		uint8_t *data,
@@ -481,6 +482,7 @@ bool dc_helper_dp_read_dpcd(
 
 bool dc_helper_dp_write_dpcd(
 		struct dc_context *ctx,
+		uint8_t link_index,
 		const struct dc_link *link,
 		uint32_t address,
 		const uint8_t *data,
@@ -495,6 +497,6 @@ bool dc_helper_dp_write_dpcd(
 		return false;
 	}
 
-	return drm_dp_dpcd_write(&aconnector->dm_dp_aux.aux, address,
-			(uint8_t *)data, size) > 0;
+	return drm_dp_dpcd_write(&aconnector->dm_dp_aux.aux,
+			address, (uint8_t *)data, size) > 0;
 }
