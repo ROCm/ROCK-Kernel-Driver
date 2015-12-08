@@ -2772,7 +2772,7 @@ static enum bp_result enable_disp_power_gating_v2_1(
  ********************************************************************************
  *******************************************************************************/
 #ifdef LATEST_ATOM_BIOS_SUPPORT
-enum bp_result set_dce_clock_v2_1(
+static enum bp_result set_dce_clock_v2_1(
 	struct bios_parser *bp,
 	struct bp_set_dce_clock_parameters *bp_params);
 #endif
@@ -2801,10 +2801,9 @@ static enum bp_result set_dce_clock_v2_1(
 	SET_DCE_CLOCK_PS_ALLOCATION_V2_1 params;
 	uint32_t atom_pll_id;
 	uint32_t atom_clock_type;
+	const struct command_table_helper *cmd = bp->cmd_helper;
 
 	dc_service_memset(&params, 0, sizeof(params));
-
-	const struct command_table_helper *cmd = bp->cmd_helper;
 
 	if (!cmd->clock_source_id_to_atom(bp_params->pll_id, &atom_pll_id) ||
 			!cmd->dc_clock_type_to_atom(bp_params->clock_type, &atom_clock_type))
