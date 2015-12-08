@@ -769,10 +769,7 @@ static bool construct(
 		goto create_fail;
 	}
 
-	if (!dal_adapter_service_get_integrated_info(as, &info)) {
-		DC_ERROR("Failed to get integrated info!\n");
-		goto create_fail;
-	}
+	dal_adapter_service_get_integrated_info(as, &info);
 
 	for (i = 0; ; i++) {
 		if (!dal_adapter_service_get_device_tag(
