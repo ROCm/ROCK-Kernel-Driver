@@ -168,7 +168,7 @@ static bool adjust_dto_pixel_rate(
 /**
  * Retrieve Pixel Rate (in Hz) from HW registers already programmed.
  */
-uint32_t retrieve_dp_pixel_rate_from_display_pll(
+static uint32_t retrieve_dp_pixel_rate_from_display_pll(
 		struct clock_source *clk_src,
 		struct pixel_clk_params *params)
 {

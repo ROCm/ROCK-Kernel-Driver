@@ -88,6 +88,7 @@ struct registers {
 	uint32_t dp_dtox_phase;
 	uint32_t dp_dtox_modulo;
 	uint32_t crtcx_pixel_rate_cntl;
+	uint32_t crtcx_phypll_pixel_rate_cntl;
 	uint32_t combophyx_pll_wrap_cntl;
 	uint32_t combophyx_freq_cntl0;
 	uint32_t combophyx_freq_cntl2;
