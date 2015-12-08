@@ -274,7 +274,6 @@ union plane_size {
 	} video;
 };
 
-/* Windows only */
 enum dc_scaling_transform {
 	SCL_TRANS_CENTERED = 0,
 	SCL_TRANS_ASPECT_RATIO,
