@@ -165,14 +165,31 @@ const struct connector_signals default_signals[] = {
 		SIGNALS_ARRAY_ELEM(default_signals_single_link_dvid),
 		SIGNALS_ARRAY_ELEM(default_signals_dual_link_dvid),
 		SIGNALS_ARRAY_ELEM(default_signals_vga),
+		/* Composite */
+		SIGNALS_ARRAY_ELEM(default_signals_none),
+		/* S Video */
+		SIGNALS_ARRAY_ELEM(default_signals_none),
+		/* YPbPr */
+		SIGNALS_ARRAY_ELEM(default_signals_none),
+		/* DConnector */
+		SIGNALS_ARRAY_ELEM(default_signals_none),
+		/* 9pinDIN */
+		SIGNALS_ARRAY_ELEM(default_signals_none),
+		/* SCART */
+		SIGNALS_ARRAY_ELEM(default_signals_none),
 		SIGNALS_ARRAY_ELEM(default_signals_hdmi_type_a),
+		/* Not Used */
 		SIGNALS_ARRAY_ELEM(default_signals_none),
 		SIGNALS_ARRAY_ELEM(default_signals_lvds),
+		/* 7pin DIN*/
+		SIGNALS_ARRAY_ELEM(default_signals_none),
 		SIGNALS_ARRAY_ELEM(default_signals_pcie),
+		/* CrossFire */
+		SIGNALS_ARRAY_ELEM(default_signals_none),
 		SIGNALS_ARRAY_ELEM(default_signals_hardcode_dvi),
 		SIGNALS_ARRAY_ELEM(default_signals_displayport),
 		SIGNALS_ARRAY_ELEM(default_signals_edp),
-		/* MXM dummy connector */
+		/* MXM*/
 		SIGNALS_ARRAY_ELEM(default_signals_none),
 		SIGNALS_ARRAY_ELEM(default_signals_wireless),
 		SIGNALS_ARRAY_ELEM(default_signals_miracast)
@@ -188,14 +205,31 @@ const struct connector_signals supported_signals[] = {
 		SIGNALS_ARRAY_ELEM(signals_single_link_dvid),
 		SIGNALS_ARRAY_ELEM(signals_dual_link_dvid),
 		SIGNALS_ARRAY_ELEM(signals_vga),
+		/* Composite */
+		SIGNALS_ARRAY_ELEM(signals_none),
+		/* S Video */
+		SIGNALS_ARRAY_ELEM(signals_none),
+		/* YPbPr */
+		SIGNALS_ARRAY_ELEM(signals_none),
+		/* DConnector */
+		SIGNALS_ARRAY_ELEM(signals_none),
+		/* 9pinDIN */
+		SIGNALS_ARRAY_ELEM(signals_none),
+		/* SCART */
+		SIGNALS_ARRAY_ELEM(signals_none),
 		SIGNALS_ARRAY_ELEM(signals_hdmi_type_a),
+		/* Note Used */
 		SIGNALS_ARRAY_ELEM(signals_none),
 		SIGNALS_ARRAY_ELEM(signals_lvds),
+		/* 7pin DIN*/
+		SIGNALS_ARRAY_ELEM(signals_none),
 		SIGNALS_ARRAY_ELEM(signals_pcie),
+		/* CrossFire */
+		SIGNALS_ARRAY_ELEM(signals_none),
 		SIGNALS_ARRAY_ELEM(signals_hardcode_dvi),
 		SIGNALS_ARRAY_ELEM(signals_displayport),
 		SIGNALS_ARRAY_ELEM(signals_edp),
-		/* MXM dummy connector */
+		/* MXM */
 		SIGNALS_ARRAY_ELEM(signals_none),
 		SIGNALS_ARRAY_ELEM(signals_wireless),
 		SIGNALS_ARRAY_ELEM(signals_miracast)

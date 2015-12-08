@@ -1247,7 +1247,7 @@ static enum bp_result set_pixel_clock_v7(
 		clk.ucEncoderMode = (uint8_t) bp->cmd_helper->encoder_mode_bp_to_atom(bp_params->signal_type, false);
 
 		/* We need to convert from KHz units into 10KHz units */
-		clk.ulPixelClock = cpu_to_le32(bp_params->target_pixel_clock / 10);
+		clk.ulPixelClock = cpu_to_le32(bp_params->target_pixel_clock * 10);
 
 		clk.ucDeepColorRatio = (uint8_t) bp->cmd_helper->transmitter_color_depth_to_atom(bp_params->color_depth);
 
