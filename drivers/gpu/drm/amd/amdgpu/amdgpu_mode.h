@@ -557,6 +557,7 @@ struct amdgpu_connector {
 	struct amdgpu_connector *mst_port;
 	bool is_mst_connector;
 	struct amdgpu_encoder *mst_encoder;
+	struct semaphore mst_sem;
 };
 
 /* TODO: start to use this struct and remove same field from base one */
