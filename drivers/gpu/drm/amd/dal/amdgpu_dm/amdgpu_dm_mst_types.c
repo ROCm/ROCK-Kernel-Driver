@@ -274,6 +274,8 @@ static struct drm_connector *dm_dp_add_mst_connector(struct drm_dp_mst_topology_
 	aconnector->mst_port = master;
 	aconnector->dc_link = master->dc_link;
 
+	sema_init(&aconnector->mst_sem, 1);
+
 	/* Initialize connector state before adding the connectror to drm and framebuffer lists */
 	amdgpu_dm_connector_funcs_reset(connector);
 
@@ -296,8 +298,13 @@ static void dm_dp_destroy_mst_connector(
 {
 	struct amdgpu_connector *master =
 		container_of(mgr, struct amdgpu_connector, mst_mgr);
+	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
 	struct drm_device *dev = master->base.dev;
 	struct amdgpu_device *adev = dev->dev_private;
+
+	/* wait until reset mode occur */
+	down(&aconnector->mst_sem);
+
 	drm_connector_unregister(connector);
 	/* need to nuke the connector */
 	mutex_lock(&dev->mode_config.mutex);
