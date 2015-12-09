@@ -180,7 +180,7 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 	int slots = 0;
 	bool ret;
 	int clock;
-	int bpp;
+	int bpp = 0;
 	int pbn = 0;
 	uint8_t i;
 	uint8_t vcid = 0;
@@ -199,9 +199,34 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 	mst_port = aconnector->port;
 
 	if (enable) {
-		clock = crtc->state->mode.clock;
-		/* TODO remove following hardcode value */
-		bpp = 30;
+		clock = stream->timing.pix_clk_khz;
+
+		switch (stream->timing.display_color_depth) {
+
+		case COLOR_DEPTH_666:
+			bpp = 6;
+			break;
+		case COLOR_DEPTH_888:
+			bpp = 8;
+			break;
+		case COLOR_DEPTH_101010:
+			bpp = 10;
+			break;
+		case COLOR_DEPTH_121212:
+			bpp = 12;
+			break;
+		case COLOR_DEPTH_141414:
+			bpp = 14;
+			break;
+		case COLOR_DEPTH_161616:
+			bpp = 16;
+			break;
+		default:
+			ASSERT(bpp != 0);
+			break;
+		}
+
+		bpp = bpp * 3;
 
 		/* TODO need to know link rate */
 
