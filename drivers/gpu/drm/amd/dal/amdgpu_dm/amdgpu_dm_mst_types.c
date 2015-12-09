@@ -94,8 +94,8 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 	.atomic_set_property = amdgpu_dm_connector_atomic_set_property
 };
 
-static const struct dc_sink *dm_dp_mst_add_mst_sink(
-		struct dc_link *dc_link,
+static struct dc_sink *dm_dp_mst_add_mst_sink(
+		const struct dc_link *dc_link,
 		uint8_t *edid,
 		uint16_t len)
 {
@@ -107,6 +107,11 @@ static const struct dc_sink *dm_dp_mst_add_mst_sink(
 
 	if (len > MAX_EDID_BUFFER_SIZE) {
 		DRM_ERROR("Max EDID buffer size breached!\n");
+		return NULL;
+	}
+
+	if (!dc_link) {
+		BREAK_TO_DEBUGGER();
 		return NULL;
 	}
 
@@ -126,7 +131,7 @@ static const struct dc_sink *dm_dp_mst_add_mst_sink(
 	if (!dc_link_add_sink(
 			dc_link,
 			dc_sink))
-		goto fail;
+		goto fail_add_sink;
 
 	edid_status = dc_helpers_parse_edid_caps(
 			NULL,
@@ -138,9 +143,9 @@ static const struct dc_sink *dm_dp_mst_add_mst_sink(
 	/* dc_sink_retain(&core_sink->public); */
 
 	return dc_sink;
-
 fail:
 	dc_link_remove_sink(dc_link, dc_sink);
+fail_add_sink:
 	return NULL;
 }
 
@@ -168,10 +173,10 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 
 	if (!aconnector->dc_sink) {
 			sink = dm_dp_mst_add_mst_sink(
-			(struct dc_link *)aconnector->dc_link,
-			(uint8_t *)edid,
-			(edid->extensions + 1) * EDID_LENGTH);
-			aconnector->dc_sink = sink;
+				aconnector->dc_link,
+				(uint8_t *)edid,
+				(edid->extensions + 1) * EDID_LENGTH);
+				aconnector->dc_sink = sink;
 	}
 
 	DRM_DEBUG_KMS("edid retrieved %p\n", edid);
