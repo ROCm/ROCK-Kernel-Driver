@@ -303,12 +303,11 @@ void dc_link_detect(const struct dc_link *dc_link);
  * from DM. */
 bool dc_link_handle_hpd_rx_irq(const struct dc_link *dc_link);
 
-bool dc_link_add_sink(
-		struct dc_link *link,
-		struct dc_sink *sink
-		);
+bool dc_link_add_sink(const struct dc_link *link, struct dc_sink *sink);
 
-void dc_link_remove_sink(struct dc_link *link, const struct dc_sink *sink);
+void dc_link_remove_sink(
+	const struct dc_link *link,
+	const struct dc_sink *sink);
 
 /*******************************************************************************
  * Sink Interfaces - A sink corresponds to a display output device
@@ -330,7 +329,7 @@ const struct audio **dc_get_audios(struct dc *dc);
 
 struct sink_init_data {
 	enum signal_type sink_signal;
-	struct dc_link *link;
+	const struct dc_link *link;
 	uint32_t dongle_max_pix_clk;
 	bool converter_disable_audio;
 };

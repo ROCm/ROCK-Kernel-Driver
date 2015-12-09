@@ -950,43 +950,46 @@ bool dc_write_dpcd(
 	return r == DDC_RESULT_SUCESSFULL;
 }
 
-bool dc_link_add_sink(
-		struct dc_link *link,
-		struct dc_sink *sink)
+bool dc_link_add_sink(const struct dc_link *link, struct dc_sink *sink)
 {
-	if (link->sink_count >= MAX_SINKS_PER_LINK) {
+	struct core_link *core_link = DC_LINK_TO_LINK(link);
+	struct dc_link *dc_link = &core_link->public;
+
+	if (dc_link->sink_count >= MAX_SINKS_PER_LINK) {
 		BREAK_TO_DEBUGGER();
 		return false;
 	}
 
-	link->sink[link->sink_count] = sink;
-	link->sink_count++;
+	dc_link->sink[link->sink_count] = sink;
+	dc_link->sink_count++;
 
 	return true;
 }
 
 
-void dc_link_remove_sink(struct dc_link *link, const struct dc_sink *sink)
+void dc_link_remove_sink(const struct dc_link *link, const struct dc_sink *sink)
 {
 	int i;
+	struct core_link *core_link = DC_LINK_TO_LINK(link);
+	struct dc_link *dc_link = &core_link->public;
 
 	if (!link->sink_count) {
 		BREAK_TO_DEBUGGER();
 		return;
 	}
 
-	for (i = 0; i < link->sink_count; i++) {
-		if (link->sink[i] == sink) {
+	for (i = 0; i < dc_link->sink_count; i++) {
+		if (dc_link->sink[i] == sink) {
 			dc_sink_release(sink);
-			link->sink[i] = NULL;
+			dc_link->sink[i] = NULL;
 
 			/* shrink array to remove empty place */
-			while (i < link->sink_count - 1) {
-				link->sink[i] = link->sink[i+1];
+			while (i < dc_link->sink_count - 1) {
+				dc_link->sink[i] = dc_link->sink[i+1];
 				i++;
 			}
 
-			link->sink_count--;
+			dc_link->sink_count--;
 			return;
 		}
 	}
