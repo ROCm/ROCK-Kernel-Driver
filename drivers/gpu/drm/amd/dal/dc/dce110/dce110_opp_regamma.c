@@ -1027,42 +1027,42 @@ static bool build_regamma_curve(
 
 	uint32_t i;
 
-	if (!params->regamma.features.bits.GAMMA_RAMP_ARRAY &&
-		params->regamma.features.bits.APPLY_DEGAMMA) {
-		struct gamma_coefficients coeff;
+	struct gamma_coefficients coeff;
 
-		struct hw_x_point *coord_x =
-				opp110->regamma.coordinates_x;
+	struct hw_x_point *coord_x =
+		opp110->regamma.coordinates_x;
 
-		build_regamma_coefficients(
-			&params->regamma,
-			params->regamma.features.bits.GRAPHICS_DEGAMMA_SRGB,
-			&coeff);
+	build_regamma_coefficients(
+		&params->regamma,
+		params->regamma.features.bits.GRAPHICS_DEGAMMA_SRGB,
+		&coeff);
 
-		/* Use opp110->regamma.coordinates_x to retrieve
-		 * coordinates chosen base on given user curve (future task).
-		 * The x values are exponentially distributed and currently
-		 * it is hard-coded, the user curve shape is ignored.
-		 * The future task is to recalculate opp110-
-		 * regamma.coordinates_x based on input/user curve,
-		 * translation from 256/1025 to 128 pwl points.
-		 */
+	/* Use opp110->regamma.coordinates_x to retrieve
+	 * coordinates chosen base on given user curve (future task).
+	 * The x values are exponentially distributed and currently
+	 * it is hard-coded, the user curve shape is ignored.
+	 * The future task is to recalculate opp110-
+	 * regamma.coordinates_x based on input/user curve,
+	 * translation from 256/1025 to 128 pwl points.
+	 */
 
-		i = 0;
+	i = 0;
 
-		while (i != opp110->regamma.hw_points_num + 1) {
-			rgb->r = translate_from_linear_space_ex(
-				coord_x->adjusted_x, &coeff, 0);
-			rgb->g = translate_from_linear_space_ex(
-				coord_x->adjusted_x, &coeff, 1);
-			rgb->b = translate_from_linear_space_ex(
-				coord_x->adjusted_x, &coeff, 2);
+	while (i != opp110->regamma.hw_points_num + 1) {
+		rgb->r = translate_from_linear_space_ex(
+			coord_x->adjusted_x, &coeff, 0);
+		rgb->g = translate_from_linear_space_ex(
+			coord_x->adjusted_x, &coeff, 1);
+		rgb->b = translate_from_linear_space_ex(
+			coord_x->adjusted_x, &coeff, 2);
 
-			++coord_x;
-			++rgb;
-			++i;
-		}
-	} else {
+		++coord_x;
+		++rgb;
+		++i;
+	}
+
+	if (params->regamma.features.bits.GAMMA_RAMP_ARRAY &&
+			!params->regamma.features.bits.APPLY_DEGAMMA) {
 		const uint32_t max_entries =
 			RGB_256X3X16 + opp110->regamma.extra_points - 1;
 
