@@ -639,11 +639,27 @@ void dc_link_detect(const struct dc_link *dc_link)
 		switch (link->public.connector_signal) {
 		case SIGNAL_TYPE_DISPLAY_PORT:
 			dc_helpers_dp_mst_stop_top_mgr(link->ctx, &link->public);
+			/*
+			 * in this case sinks would be removed in outer level
+			 */
+
+			/*
+			 * TODO: this is the only way to understand that link
+			 * was in mst mode. Proposal for future to add
+			 * additional field to link that will show actual state.
+			 *
+			 * For the change: for mst we create sink outside, and
+			 * should remove them in the same place
+			 */
+			if (link->public.sink_count == 1 &&
+				link->public.sink[0]->sink_signal !=
+					SIGNAL_TYPE_DISPLAY_PORT_MST)
+				link_disconnect_all_sinks(link);
 			break;
 		default:
+			link_disconnect_all_sinks(link);
 			break;
 		}
-		link_disconnect_all_sinks(link);
 	}
 
 	LINK_INFO("link=%d, dc_sink_in=%p is now %s\n",
