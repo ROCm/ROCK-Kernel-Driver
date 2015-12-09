@@ -736,9 +736,17 @@ void amdgpu_dm_update_connector_after_detect(
 	/* MST handled by drm_mst framework */
 	if (aconnector->mst_mgr.mst_state)
 		return;
+
 	if (!dm_get_sink_from_link(dc_link, aconnector, &sink)) {
 		return;
 	}
+
+	/*
+	 * TODO: temporary guard to look for proper fix
+	 * if this sink is MST sink, we should not do anything
+	 */
+	if (sink && sink->sink_signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
+		return;
 
 	if (aconnector->dc_sink == sink) {
 		/* We got a DP short pulse (Link Loss, DP CTS, etc...).
