@@ -357,10 +357,13 @@ static bool is_dp_active_dongle(enum display_dongle_type dongle_type)
 
 static void link_disconnect_all_sinks(struct core_link *link)
 {
-	int i;
-
-	for (i = 0; i < link->public.sink_count; i++)
-		dc_link_remove_sink(&link->public, link->public.sink[i]);
+	/*
+	 * as sink_count changed inside dc_link_remove_sink, we should not
+	 * use it for range check for loop, because half of sinks will not
+	 * be removed
+	 */
+	while (link->public.sink_count)
+		dc_link_remove_sink(&link->public, link->public.sink[0]);
 
 	link->dpcd_sink_count = 0;
 }
@@ -516,7 +519,9 @@ void dc_link_detect(const struct dc_link *dc_link)
 					 * ->sink = NULL
 					 * TODO: s3 resume check*/
 
-					if (dc_helpers_dp_mst_start_top_mgr(link->ctx, &link->public)) {
+					if (dc_helpers_dp_mst_start_top_mgr(
+						link->ctx,
+						&link->public)) {
 						return;
 					} else {
 						/* MST not supported */
