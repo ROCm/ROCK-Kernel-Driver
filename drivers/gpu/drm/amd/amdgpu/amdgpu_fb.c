@@ -80,8 +80,10 @@ static struct fb_ops amdgpufb_ops = {
 	.fb_pan_display = drm_fb_helper_pan_display,
 	.fb_blank = drm_fb_helper_blank,
 	.fb_setcmap = drm_fb_helper_setcmap,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
 	.fb_debug_enter = drm_fb_helper_debug_enter,
 	.fb_debug_leave = drm_fb_helper_debug_leave,
+#endif
 };
 
 
@@ -229,7 +231,9 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	}
 
 	info->par = rfbdev;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
 	info->skip_vt_switch = true;
+#endif
 
 	ret = amdgpu_framebuffer_init(adev->ddev, &rfbdev->rfb, &mode_cmd, gobj);
 	if (ret) {
@@ -260,8 +264,13 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	drm_fb_helper_fill_var(info, &rfbdev->helper, sizes->fb_width, sizes->fb_height);
 
 	/* setup aperture base/size for vesafb takeover */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 35)
+	info->aperture_base = adev->ddev->mode_config.fb_base;
+	info->aperture_size = adev->mc.aper_size;
+#else
 	info->apertures->ranges[0].base = adev->ddev->mode_config.fb_base;
 	info->apertures->ranges[0].size = adev->mc.aper_size;
+#endif
 
 	/* Use default scratch pixmap (info->pixmap.flags = FB_PIXMAP_SYSTEM) */
 
