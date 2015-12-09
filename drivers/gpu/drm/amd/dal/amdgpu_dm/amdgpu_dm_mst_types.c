@@ -308,14 +308,14 @@ static void dm_dp_destroy_mst_connector(
 
 	drm_connector_unregister(connector);
 	/* need to nuke the connector */
-	mutex_lock(&dev->mode_config.mutex);
+	drm_modeset_lock_all(dev);
 	/* dpms off */
 	drm_fb_helper_remove_one_connector(
 		&adev->mode_info.rfbdev->helper,
 		connector);
 
 	drm_connector_cleanup(connector);
-	mutex_unlock(&dev->mode_config.mutex);
+	drm_modeset_unlock_all(dev);
 
 	kfree(connector);
 	DRM_DEBUG_KMS("\n");
@@ -335,9 +335,9 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = dev->dev_private;
 
-	mutex_lock(&dev->mode_config.mutex);
+	drm_modeset_lock_all(dev);
 	drm_fb_helper_add_one_connector(&adev->mode_info.rfbdev->helper, connector);
-	mutex_unlock(&dev->mode_config.mutex);
+	drm_modeset_unlock_all(dev);
 
 	drm_connector_register(connector);
 
