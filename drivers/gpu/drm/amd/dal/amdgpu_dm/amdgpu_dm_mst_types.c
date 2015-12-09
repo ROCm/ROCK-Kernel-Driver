@@ -68,7 +68,18 @@ dm_dp_mst_detect(struct drm_connector *connector, bool force)
 	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
 	struct amdgpu_connector *master = aconnector->mst_port;
 
-	return drm_dp_mst_detect_port(connector, &master->mst_mgr, aconnector->port);
+	enum drm_connector_status status =
+		drm_dp_mst_detect_port(
+			connector,
+			&master->mst_mgr,
+			aconnector->port);
+
+	if (status == connector_status_disconnected && aconnector->dc_sink) {
+		dc_link_remove_sink(aconnector->dc_link, aconnector->dc_sink);
+		aconnector->dc_sink = NULL;
+	}
+
+	return status;
 }
 
 static void
