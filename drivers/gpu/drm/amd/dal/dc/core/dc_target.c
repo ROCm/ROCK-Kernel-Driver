@@ -142,7 +142,7 @@ static void build_gamma_params(
 	gamma_param->regamma_adjust_type = GRAPHICS_REGAMMA_ADJUST_SW;
 	gamma_param->degamma_adjust_type = GRAPHICS_REGAMMA_ADJUST_SW;
 
-	gamma_param->selected_gamma_lut = GRAPHICS_GAMMA_LUT_LEGACY;
+	gamma_param->selected_gamma_lut = GRAPHICS_GAMMA_LUT_REGAMMA;
 
 	/* TODO support non-legacy gamma */
 	gamma_param->disable_adjustments = false;
@@ -151,8 +151,8 @@ static void build_gamma_params(
 	gamma_param->flag.bits.gamma_update = 1;
 
 	/* Set regamma */
-	gamma_param->regamma.features.bits.GRAPHICS_DEGAMMA_SRGB = 0;
-	gamma_param->regamma.features.bits.OVERLAY_DEGAMMA_SRGB = 0;
+	gamma_param->regamma.features.bits.GRAPHICS_DEGAMMA_SRGB = 1;
+	gamma_param->regamma.features.bits.OVERLAY_DEGAMMA_SRGB = 1;
 	gamma_param->regamma.features.bits.GAMMA_RAMP_ARRAY = 0;
 	gamma_param->regamma.features.bits.APPLY_DEGAMMA = 0;
 
