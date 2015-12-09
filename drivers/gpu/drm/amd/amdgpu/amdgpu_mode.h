@@ -540,6 +540,7 @@ struct amdgpu_connector {
 	 * The 'current' sink is in dc_link->sink. */
 	const struct dc_sink *dc_sink;
 	const struct dc_link *dc_link;
+	const struct dc_target *target;
 	void *con_priv;
 	bool dac_load_detect;
 	bool detected_by_load; /* if the connection status was determined by load */
