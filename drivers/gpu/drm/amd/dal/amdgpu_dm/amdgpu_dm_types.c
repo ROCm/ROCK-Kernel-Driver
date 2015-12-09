@@ -2115,6 +2115,16 @@ int amdgpu_dm_atomic_commit(
 				aconnector = to_amdgpu_connector(connector);
 				break;
 			}
+
+			/*
+			 * this is the case when reset occur, connector is
+			 * removed from new crtc state. We need to update
+			 * connector state anyway. Access it from old_con_state
+			 */
+			if (old_con_state->crtc == crtc) {
+				aconnector = to_amdgpu_connector(connector);
+				break;
+			}
 		}
 
 		/* handles headless hotplug case, updating new_state and
