@@ -273,6 +273,7 @@ static struct drm_connector *dm_dp_add_mst_connector(struct drm_dp_mst_topology_
 	aconnector->port = port;
 	aconnector->mst_port = master;
 	aconnector->dc_link = master->dc_link;
+	aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
 
 	sema_init(&aconnector->mst_sem, 1);
 
