@@ -1856,6 +1856,7 @@ int amdgpu_dm_connector_init(
 			dm->backlight_link = link;
 	}
 #endif
+	sema_init(&aconnector->mst_sem, 1);
 
 	return 0;
 }
@@ -2173,6 +2174,7 @@ int amdgpu_dm_atomic_commit(
 				/* this is the update mode case */
 				dc_target_release(acrtc->target);
 				acrtc->target = NULL;
+				up(&aconnector->mst_sem);
 			}
 
 			/*
@@ -2186,10 +2188,12 @@ int amdgpu_dm_atomic_commit(
 			acrtc->target = new_target;
 			acrtc->enabled = true;
 			acrtc->base.enabled = true;
+
 			connector_funcs = aconnector->base.helper_private;
 			aconnector->base.encoder =
 				connector_funcs->best_encoder(
 					&aconnector->base);
+			down(&aconnector->mst_sem);
 			break;
 		}
 
@@ -2208,6 +2212,7 @@ int amdgpu_dm_atomic_commit(
 				acrtc->enabled = false;
 				acrtc->base.enabled = false;
 				aconnector->base.encoder = NULL;
+				up(&aconnector->mst_sem);
 			}
 			break;
 		} /* switch() */
