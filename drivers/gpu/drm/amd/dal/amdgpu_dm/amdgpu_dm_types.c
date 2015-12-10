@@ -2113,6 +2113,8 @@ int amdgpu_dm_atomic_commit(
 	 * wait_for_fences(dev, state);
 	 */
 
+	drm_atomic_helper_update_legacy_modeset_state(dev, state);
+
 	/* update changed items */
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		struct amdgpu_crtc *acrtc;
@@ -2158,7 +2160,6 @@ int amdgpu_dm_atomic_commit(
 		switch (action) {
 		case DM_COMMIT_ACTION_DPMS_ON:
 		case DM_COMMIT_ACTION_SET: {
-			const struct drm_connector_helper_funcs *connector_funcs;
 			struct dc_target *new_target =
 				create_target_for_sink(
 					aconnector,
@@ -2202,12 +2203,7 @@ int amdgpu_dm_atomic_commit(
 
 			acrtc->target = new_target;
 			acrtc->enabled = true;
-			acrtc->base.enabled = true;
 
-			connector_funcs = aconnector->base.helper_private;
-			aconnector->base.encoder =
-				connector_funcs->best_encoder(
-					&aconnector->base);
 			down(&aconnector->mst_sem);
 			break;
 		}
@@ -2225,8 +2221,7 @@ int amdgpu_dm_atomic_commit(
 				dc_target_release(acrtc->target);
 				acrtc->target = NULL;
 				acrtc->enabled = false;
-				acrtc->base.enabled = false;
-				aconnector->base.encoder = NULL;
+
 				up(&aconnector->mst_sem);
 			}
 			break;
