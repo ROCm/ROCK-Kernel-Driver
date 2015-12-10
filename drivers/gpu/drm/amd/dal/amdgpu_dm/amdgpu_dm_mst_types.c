@@ -261,6 +261,7 @@ static struct drm_connector *dm_dp_add_mst_connector(struct drm_dp_mst_topology_
 {
 	struct amdgpu_connector *master = container_of(mgr, struct amdgpu_connector, mst_mgr);
 	struct drm_device *dev = master->base.dev;
+	struct amdgpu_device *adev = dev->dev_private;
 	struct amdgpu_connector *aconnector;
 	struct drm_connector *connector;
 
@@ -272,21 +273,41 @@ static struct drm_connector *dm_dp_add_mst_connector(struct drm_dp_mst_topology_
 	connector = &aconnector->base;
 	aconnector->port = port;
 	aconnector->mst_port = master;
-	aconnector->dc_link = master->dc_link;
-	aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
 
-	sema_init(&aconnector->mst_sem, 1);
-
-	/* Initialize connector state before adding the connectror to drm and framebuffer lists */
-	amdgpu_dm_connector_funcs_reset(connector);
-
-	drm_connector_init(dev, connector, &dm_dp_mst_connector_funcs, DRM_MODE_CONNECTOR_DisplayPort);
+	if (drm_connector_init(
+		dev,
+		connector,
+		&dm_dp_mst_connector_funcs,
+		DRM_MODE_CONNECTOR_DisplayPort)) {
+		kfree(aconnector);
+		return NULL;
+	}
 	drm_connector_helper_add(connector, &dm_dp_mst_connector_helper_funcs);
+
+	amdgpu_dm_connector_init_helper(
+		&adev->dm,
+		aconnector,
+		DRM_MODE_CONNECTOR_DisplayPort,
+		master->dc_link,
+		master->connector_id);
+
 	aconnector->mst_encoder = dm_dp_create_fake_mst_encoder(master);
 
-	drm_object_attach_property(&connector->base, dev->mode_config.path_property, 0);
+	/*
+	 * TODO: understand why this one is needed
+	 */
+	drm_object_attach_property(
+		&connector->base,
+		dev->mode_config.path_property,
+		0);
+
 	drm_mode_connector_set_path_property(connector, pathprop);
 
+	/*
+	 * Initialize connector state before adding the connectror to drm and
+	 * framebuffer lists
+	 */
+	amdgpu_dm_connector_funcs_reset(connector);
 
 	DRM_DEBUG_KMS(":%d\n", connector->base.id);
 
