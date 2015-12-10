@@ -3253,6 +3253,29 @@ void bw_calcs_init(struct bw_calcs_input_dceip *bw_dceip,
 }
 
 /**
+ * Compare calculated (required) clocks against the clocks available at
+ * maximum voltage (max Performance Level).
+ */
+static bool is_display_configuration_supported(
+	const struct bw_calcs_input_vbios *vbios,
+	const struct bw_calcs_output *calcs_output)
+{
+	uint32_t int_max_clk;
+
+	int_max_clk = fixed_to_int(vbios->high_voltage_max_dispclk_mhz);
+	int_max_clk *= 1000; /* MHz to kHz */
+	if (calcs_output->dispclk_khz > int_max_clk)
+		return false;
+
+	int_max_clk = fixed_to_int(vbios->high_sclk_mhz);
+	int_max_clk *= 1000; /* MHz to kHz */
+	if (calcs_output->required_sclk > int_max_clk)
+		return false;
+
+	return true;
+}
+
+/**
  * Return:
  *	true -	Display(s) configuration supported.
  *		In this case 'calcs_output' contains data for HW programming
@@ -3482,5 +3505,6 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_input_dceip *dceip,
 
 	dc_service_free(ctx, bw_data_internal);
 	dc_service_free(ctx, bw_results_internal);
-	return true;
+
+	return is_display_configuration_supported(vbios, calcs_output);
 }

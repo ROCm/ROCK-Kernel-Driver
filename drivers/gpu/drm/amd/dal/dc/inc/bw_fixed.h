@@ -36,6 +36,8 @@ struct bw_fixed bw_max3(struct bw_fixed v1, struct bw_fixed v2, struct bw_fixed 
 
 struct bw_fixed int_to_fixed(int64_t value);
 
+uint32_t fixed_to_int(struct bw_fixed value);
+
 struct bw_fixed frc_to_fixed(int64_t num, int64_t denum);
 
 struct bw_fixed fixed31_32_to_bw_fixed(int64_t raw);
