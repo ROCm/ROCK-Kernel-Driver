@@ -264,16 +264,6 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 			clks.clocks_in_khz[0], 1000);
 	dc->bw_vbios.high_yclk_mhz = frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels-1], 1000);
-	return;
-
-	/* on CZ Gardenia from PPLib we get:
-	 * clk_range.max_mclk:80000
-	 * clk_range.min_mclk:80000
-	 * clk_range.max_sclk:80000
-	 * clk_range.min_sclk:30000 */
-
-	/* The values for calcs are stored in units of MHz, so for example
-	 * 80000 will be stored as 800. */
 }
 
 static bool construct(struct dc *dc, const struct dal_init_data *init_params)

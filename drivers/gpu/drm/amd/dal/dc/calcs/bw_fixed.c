@@ -76,6 +76,11 @@ struct bw_fixed int_to_fixed(int64_t value)
 	return res;
 }
 
+uint32_t fixed_to_int(struct bw_fixed value)
+{
+	return GET_INTEGER_PART(value.value);
+}
+
 struct bw_fixed frc_to_fixed(int64_t numerator, int64_t denominator)
 {
 	struct bw_fixed res;

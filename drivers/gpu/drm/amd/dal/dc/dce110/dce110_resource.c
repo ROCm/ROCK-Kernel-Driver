@@ -47,9 +47,6 @@ enum dce110_clk_src_array_id {
 	DCE110_CLK_SRC_TOTAL
 };
 
-#define DCE110_MAX_DISPCLK 643000
-#define DCE110_MAX_SCLK 626000
-
 bool dce110_construct_resource_pool(
 	struct adapter_service *adapter_serv,
 	struct dc *dc,
@@ -557,11 +554,6 @@ enum dc_status dce110_validate_bandwidth(
 		result =  DC_FAIL_BANDWIDTH_VALIDATE;
 	else
 		result =  DC_OK;
-
-
-	if (context->bw_results.dispclk_khz > DCE110_MAX_DISPCLK
-		|| context->bw_results.required_sclk > DCE110_MAX_SCLK)
-		result =  DC_FAIL_BANDWIDTH_VALIDATE;
 
 	if (result == DC_FAIL_BANDWIDTH_VALIDATE)
 		dal_logger_write(dc->ctx->logger,
