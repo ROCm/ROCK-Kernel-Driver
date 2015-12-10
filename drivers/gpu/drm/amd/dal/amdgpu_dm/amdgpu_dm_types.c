@@ -1753,44 +1753,23 @@ int amdgpu_dm_connector_get_modes(struct drm_connector *connector)
 	return amdgpu_connector->num_modes;
 }
 
-/* Note: this function assumes that dc_link_detect() was called for the
- * dc_link which will be represented by this aconnector. */
-int amdgpu_dm_connector_init(
+void amdgpu_dm_connector_init_helper(
 	struct amdgpu_display_manager *dm,
 	struct amdgpu_connector *aconnector,
-	uint32_t link_index,
-	struct amdgpu_encoder *aencoder)
+	int connector_type,
+	const struct dc_link *link,
+	int link_index)
 {
-	int res, connector_type;
 	struct amdgpu_device *adev = dm->ddev->dev_private;
-	struct dc *dc = dm->dc;
-	const struct dc_link *link = dc_get_link_at_index(dc, link_index);
-
-	DRM_DEBUG_KMS("%s()\n", __func__);
-
-	connector_type = to_drm_connector_type(link->connector_signal);
-
-	res = drm_connector_init(
-			dm->ddev,
-			&aconnector->base,
-			&amdgpu_dm_connector_funcs,
-			connector_type);
-
-	if (res) {
-		DRM_ERROR("connector_init failed\n");
-		aconnector->connector_id = -1;
-		return res;
-	}
-
-	drm_connector_helper_add(
-			&aconnector->base,
-			&amdgpu_dm_connector_helper_funcs);
 
 	aconnector->connector_id = link_index;
 	aconnector->dc_link = link;
 	aconnector->base.interlace_allowed = true;
 	aconnector->base.doublescan_allowed = true;
+	aconnector->base.dpms = DRM_MODE_DPMS_OFF;
 	aconnector->hpd.hpd = link_index; /* maps to 'enum amdgpu_hpd_id' */
+
+
 
 	/*configure suport HPD hot plug connector_>polled default value is 0
 	 * which means HPD hot plug not supported*/
@@ -1822,14 +1801,50 @@ int amdgpu_dm_connector_init(
 				adev->mode_info.underscan_vborder_property,
 				0);
 
-	/* TODO: Don't do this manually anymore
-	aconnector->base.encoder = &aencoder->base;
-	*/
+	sema_init(&aconnector->mst_sem, 1);
+}
+
+/* Note: this function assumes that dc_link_detect() was called for the
+ * dc_link which will be represented by this aconnector. */
+int amdgpu_dm_connector_init(
+	struct amdgpu_display_manager *dm,
+	struct amdgpu_connector *aconnector,
+	uint32_t link_index,
+	struct amdgpu_encoder *aencoder)
+{
+	int res, connector_type;
+	struct dc *dc = dm->dc;
+	const struct dc_link *link = dc_get_link_at_index(dc, link_index);
+
+	DRM_DEBUG_KMS("%s()\n", __func__);
+
+	connector_type = to_drm_connector_type(link->connector_signal);
+
+	res = drm_connector_init(
+			dm->ddev,
+			&aconnector->base,
+			&amdgpu_dm_connector_funcs,
+			connector_type);
+
+	if (res) {
+		DRM_ERROR("connector_init failed\n");
+		aconnector->connector_id = -1;
+		return res;
+	}
+
+	drm_connector_helper_add(
+			&aconnector->base,
+			&amdgpu_dm_connector_helper_funcs);
+
+	amdgpu_dm_connector_init_helper(
+		dm,
+		aconnector,
+		connector_type,
+		link,
+		link_index);
 
 	drm_mode_connector_attach_encoder(
 		&aconnector->base, &aencoder->base);
-
-	/*drm_sysfs_connector_add(&dm_connector->base);*/
 
 	drm_connector_register(&aconnector->base);
 
@@ -1856,7 +1871,6 @@ int amdgpu_dm_connector_init(
 			dm->backlight_link = link;
 	}
 #endif
-	sema_init(&aconnector->mst_sem, 1);
 
 	return 0;
 }
