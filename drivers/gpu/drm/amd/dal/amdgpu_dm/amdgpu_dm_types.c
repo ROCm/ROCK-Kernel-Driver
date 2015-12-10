@@ -2118,7 +2118,8 @@ int amdgpu_dm_atomic_commit(
 	/* update changed items */
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		struct amdgpu_crtc *acrtc;
-		struct amdgpu_connector *aconnector = NULL;
+		struct amdgpu_connector *aconnector_new = NULL;
+		struct amdgpu_connector *aconnector_old = NULL;
 		enum dm_commit_action action;
 		struct drm_crtc_state *new_state = crtc->state;
 		struct drm_connector *connector;
@@ -2126,20 +2127,30 @@ int amdgpu_dm_atomic_commit(
 
 		acrtc = to_amdgpu_crtc(crtc);
 
-		for_each_connector_in_state(state,
-				connector, old_con_state, j) {
+		for_each_connector_in_state(
+			state,
+			connector,
+			old_con_state,
+			j) {
 			if (connector->state->crtc == crtc) {
-				aconnector = to_amdgpu_connector(connector);
+				aconnector_new = to_amdgpu_connector(connector);
 				break;
 			}
+		}
 
+		for_each_connector_in_state(
+			state,
+			connector,
+			old_con_state,
+			j) {
 			/*
-			 * this is the case when reset occur, connector is
-			 * removed from new crtc state. We need to update
-			 * connector state anyway. Access it from old_con_state
+			 * this is the case when reset occur, connector
+			 * is removed from new crtc state. We need to
+			 * update connector state anyway. Access it from
+			 * old_con_state
 			 */
 			if (old_con_state->crtc == crtc) {
-				aconnector = to_amdgpu_connector(connector);
+				aconnector_old = to_amdgpu_connector(connector);
 				break;
 			}
 		}
@@ -2147,24 +2158,20 @@ int amdgpu_dm_atomic_commit(
 		/* handles headless hotplug case, updating new_state and
 		 * aconnector as needed
 		 */
-		handle_headless_hotplug(acrtc, new_state, &aconnector);
+		handle_headless_hotplug(acrtc, new_state, &aconnector_new);
 
 		action = get_dm_commit_action(new_state);
-
-		if (!aconnector && action != DM_COMMIT_ACTION_NOTHING) {
-			DRM_ERROR("Can't find connector for crtc %d\n",
-							acrtc->crtc_id);
-			break;
-		}
 
 		switch (action) {
 		case DM_COMMIT_ACTION_DPMS_ON:
 		case DM_COMMIT_ACTION_SET: {
 			struct dc_target *new_target =
 				create_target_for_sink(
-					aconnector,
+					aconnector_new,
 					&crtc->state->mode);
+
 			DRM_DEBUG_KMS("Atomic commit: SET.\n");
+
 			if (!new_target) {
 				/*
 				 * this could happen because of issues with
@@ -2190,7 +2197,7 @@ int amdgpu_dm_atomic_commit(
 				/* this is the update mode case */
 				dc_target_release(acrtc->target);
 				acrtc->target = NULL;
-				up(&aconnector->mst_sem);
+				up(&aconnector_old->mst_sem);
 			}
 
 			/*
@@ -2204,7 +2211,7 @@ int amdgpu_dm_atomic_commit(
 			acrtc->target = new_target;
 			acrtc->enabled = true;
 
-			down(&aconnector->mst_sem);
+			down(&aconnector_new->mst_sem);
 			break;
 		}
 
@@ -2222,7 +2229,7 @@ int amdgpu_dm_atomic_commit(
 				acrtc->target = NULL;
 				acrtc->enabled = false;
 
-				up(&aconnector->mst_sem);
+				up(&aconnector_old->mst_sem);
 			}
 			break;
 		} /* switch() */
