@@ -187,10 +187,6 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 	bool find_stream_for_sink;
 
 	aconnector = get_connector_for_sink(dev, stream->sink);
-	crtc = aconnector->base.state->crtc;
-
-	if (!crtc)
-		return false;
 
 	if (!aconnector->mst_port)
 		return false;
