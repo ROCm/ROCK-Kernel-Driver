@@ -407,8 +407,7 @@ static int amdgpu_cs_parser_relocs(struct amdgpu_cs_parser *p)
 	}
 
 	INIT_LIST_HEAD(&duplicates);
-	p->vm_bos = amdgpu_vm_get_bos(p->adev, &fpriv->vm,
-				      &p->validated, &duplicates);
+	amdgpu_vm_get_pd_bo(&fpriv->vm, &p->validated, &p->vm_pd);
 
 	if (p->uf.bo)
 		list_add(&p->uf_entry.tv.head, &p->validated);
@@ -419,6 +418,12 @@ static int amdgpu_cs_parser_relocs(struct amdgpu_cs_parser *p)
 	r = ttm_eu_reserve_buffers(&p->ticket, &p->validated, true, &duplicates);
 	if (unlikely(r != 0))
 		goto error_reserve;
+
+	p->vm_bos = amdgpu_vm_get_pt_bos(&fpriv->vm, &duplicates);
+	if (!p->vm_bos) {
+		r = -ENOMEM;
+		goto error_validate;
+	}
 
 	r = amdgpu_cs_list_validate(p->adev, &fpriv->vm, &p->validated);
 	if (r)
