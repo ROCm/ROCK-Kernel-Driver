@@ -747,8 +747,10 @@ static bool construct(
 	}
 
 	/* TODO: #DAL3 Implement id to str function.*/
-	LINK_INFO("Connector[%d] description:\n",
-			init_params->connector_index);
+	LINK_INFO("Connector[%d] description:"
+			"signal %d\n",
+			init_params->connector_index,
+			link->public.connector_signal);
 
 	link->connector = dal_connector_create(dc_ctx, as, link->link_id);
 	if (NULL == link->connector) {
