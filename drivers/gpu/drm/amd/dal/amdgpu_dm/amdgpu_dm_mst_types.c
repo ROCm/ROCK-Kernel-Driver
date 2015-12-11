@@ -75,8 +75,7 @@ dm_dp_mst_detect(struct drm_connector *connector, bool force)
 			aconnector->port);
 
 	if (status == connector_status_disconnected && aconnector->dc_sink) {
-		dc_link_remove_sink(aconnector->dc_link, aconnector->dc_sink);
-		aconnector->dc_sink = NULL;
+		aconnector->edid = NULL;
 	}
 
 	return status;
@@ -170,25 +169,31 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 
 	flush_work(&master->mst_mgr.work);
 
-	edid = drm_dp_mst_get_edid(connector, &master->mst_mgr, aconnector->port);
+	if (!aconnector->edid) {
+		edid = drm_dp_mst_get_edid(connector, &master->mst_mgr, aconnector->port);
 
-	if (!edid) {
-		drm_mode_connector_update_edid_property(
-			&aconnector->base,
-			NULL);
+		if (!edid) {
+			drm_mode_connector_update_edid_property(
+				&aconnector->base,
+				NULL);
 
-		return ret;
-	}
+			return ret;
+		}
 
-	aconnector->edid = edid;
+		aconnector->edid = edid;
 
-	if (!aconnector->dc_sink) {
-			sink = dm_dp_mst_add_mst_sink(
+		if (aconnector->dc_sink)
+			dc_link_remove_sink(
 				aconnector->dc_link,
-				(uint8_t *)edid,
-				(edid->extensions + 1) * EDID_LENGTH);
-				aconnector->dc_sink = sink;
-	}
+				aconnector->dc_sink);
+
+		sink = dm_dp_mst_add_mst_sink(
+			aconnector->dc_link,
+			(uint8_t *)edid,
+			(edid->extensions + 1) * EDID_LENGTH);
+		aconnector->dc_sink = sink;
+	} else
+		edid = aconnector->edid;
 
 	DRM_DEBUG_KMS("edid retrieved %p\n", edid);
 
