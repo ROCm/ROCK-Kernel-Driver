@@ -1637,10 +1637,13 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
 	struct dc_context *ctx = enc110->base.ctx;
-	uint32_t value0;
-	uint32_t value1;
+	uint32_t value0 = 0;
+	uint32_t value1 = 0;
+	uint32_t slots = 0;
+	uint32_t src = 0;
 	uint32_t retries = 0;
 	struct core_stream *core_stream = NULL;
+
 
 	/* For CZ, there are only 3 pipes. So Virtual channel is up 3.*/
 
@@ -1648,6 +1651,8 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	 * Setup VC Payload Table on Tx Side,
 	 * Issue allocation change trigger
 	 * to commit payload on both tx and rx side */
+
+	/* we should clean-up table each time */
 	value0 = dal_read_reg(ctx, DP_REG(mmDP_MSE_SAT0));
 	value1 = dal_read_reg(ctx, DP_REG(mmDP_MSE_SAT1));
 
@@ -1655,52 +1660,70 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 		core_stream =
 			DC_STREAM_TO_CORE(table->stream_allocations[0].stream);
 
-		set_reg_field_value(
-			value0,
-			core_stream->stream_enc->id,
-			DP_MSE_SAT0,
-			DP_MSE_SAT_SRC0);
-
-		set_reg_field_value(
-			value0,
-			table->stream_allocations[0].slot_count,
-			DP_MSE_SAT0,
-			DP_MSE_SAT_SLOT_COUNT0);
+		src = core_stream->stream_enc->id;
+		slots = table->stream_allocations[0].slot_count;
+	} else {
+		src = 0;
+		slots = 0;
 	}
+
+	set_reg_field_value(
+		value0,
+		src,
+		DP_MSE_SAT0,
+		DP_MSE_SAT_SRC0);
+
+	set_reg_field_value(
+		value0,
+		slots,
+		DP_MSE_SAT0,
+		DP_MSE_SAT_SLOT_COUNT0);
 
 	if (table->stream_count >= 2) {
 		core_stream =
 			DC_STREAM_TO_CORE(table->stream_allocations[1].stream);
 
-		set_reg_field_value(
-			value0,
-			core_stream->stream_enc->id,
-			DP_MSE_SAT0,
-			DP_MSE_SAT_SRC1);
-
-		set_reg_field_value(
-			value0,
-			table->stream_allocations[1].slot_count,
-			DP_MSE_SAT0,
-			DP_MSE_SAT_SLOT_COUNT1);
+		src = core_stream->stream_enc->id;
+		slots = table->stream_allocations[1].slot_count;
+	} else {
+		src = 0;
+		slots = 0;
 	}
+
+	set_reg_field_value(
+		value0,
+		src,
+		DP_MSE_SAT0,
+		DP_MSE_SAT_SRC1);
+
+	set_reg_field_value(
+		value0,
+		slots,
+		DP_MSE_SAT0,
+		DP_MSE_SAT_SLOT_COUNT1);
 
 	if (table->stream_count >= 3) {
 		core_stream =
 			DC_STREAM_TO_CORE(table->stream_allocations[2].stream);
 
-		set_reg_field_value(
-			value1,
-			core_stream->stream_enc->id,
-			DP_MSE_SAT1,
-			DP_MSE_SAT_SRC2);
-
-		set_reg_field_value(
-			value1,
-			table->stream_allocations[2].slot_count,
-			DP_MSE_SAT1,
-			DP_MSE_SAT_SLOT_COUNT2);
+		src = core_stream->stream_enc->id;
+		slots = table->stream_allocations[2].slot_count;
+	} else {
+		src = 0;
+		slots = 0;
 	}
+
+	set_reg_field_value(
+		value1,
+		src,
+		DP_MSE_SAT1,
+		DP_MSE_SAT_SRC2);
+
+	set_reg_field_value(
+		value1,
+		slots,
+		DP_MSE_SAT1,
+		DP_MSE_SAT_SLOT_COUNT2);
 
 	/* update ASIC MSE stream allocation table */
 	dal_write_reg(ctx, DP_REG(mmDP_MSE_SAT0), value0);
