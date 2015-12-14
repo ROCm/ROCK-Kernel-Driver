@@ -311,6 +311,14 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 			 * crtc -> target -> stream -> sink
 			 */
 			crtc = aconnector->base.state->crtc;
+
+			/*
+			 * this situation can happen when crtc moved from one
+			 * connector to another for any reason
+			 */
+			if (!crtc)
+				continue;
+
 			amdgpu_crtc = to_amdgpu_crtc(crtc);
 			dc_target = amdgpu_crtc->target;
 
