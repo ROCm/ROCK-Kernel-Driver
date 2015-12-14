@@ -1768,9 +1768,7 @@ void amdgpu_dm_connector_init_helper(
 	aconnector->base.interlace_allowed = true;
 	aconnector->base.doublescan_allowed = true;
 	aconnector->base.dpms = DRM_MODE_DPMS_OFF;
-	aconnector->hpd.hpd = link_index; /* maps to 'enum amdgpu_hpd_id' */
-
-
+	aconnector->hpd.hpd = AMDGPU_HPD_NONE; /* not used */
 
 	/*configure suport HPD hot plug connector_>polled default value is 0
 	 * which means HPD hot plug not supported*/

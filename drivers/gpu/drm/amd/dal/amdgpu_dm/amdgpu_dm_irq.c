@@ -761,9 +761,7 @@ void amdgpu_dm_hpd_init(struct amdgpu_device *adev)
 	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
 		struct amdgpu_connector *amdgpu_connector =
 				to_amdgpu_connector(connector);
-		enum dc_irq_source src =
-			amdgpu_dm_hpd_to_dal_irq_source(
-				amdgpu_connector->hpd.hpd);
+
 		const struct dc_link *dc_link = amdgpu_connector->dc_link;
 
 		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP ||
@@ -777,8 +775,7 @@ void amdgpu_dm_hpd_init(struct amdgpu_device *adev)
 			continue;
 		}
 
-		dc_interrupt_set(adev->dm.dc, src, true);
-		amdgpu_irq_get(adev, &adev->hpd_irq, amdgpu_connector->hpd.hpd);
+		dc_interrupt_set(adev->dm.dc, dc_link->irq_source_hpd, true);
 
 		if (DC_IRQ_SOURCE_INVALID != dc_link->irq_source_hpd_rx) {
 			dc_interrupt_set(adev->dm.dc,
@@ -804,11 +801,14 @@ void amdgpu_dm_hpd_fini(struct amdgpu_device *adev)
 	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
 		struct amdgpu_connector *amdgpu_connector =
 				to_amdgpu_connector(connector);
-		enum dc_irq_source src =
-			amdgpu_dm_hpd_to_dal_irq_source(
-				amdgpu_connector->hpd.hpd);
+		const struct dc_link *dc_link = amdgpu_connector->dc_link;
 
-		dc_interrupt_set(adev->dm.dc, src, false);
-		amdgpu_irq_put(adev, &adev->hpd_irq, amdgpu_connector->hpd.hpd);
+		dc_interrupt_set(adev->dm.dc, dc_link->irq_source_hpd, false);
+
+		if (DC_IRQ_SOURCE_INVALID != dc_link->irq_source_hpd_rx) {
+			dc_interrupt_set(adev->dm.dc,
+					dc_link->irq_source_hpd_rx,
+					false);
+		}
 	}
 }
