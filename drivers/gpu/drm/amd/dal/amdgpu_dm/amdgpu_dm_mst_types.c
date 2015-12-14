@@ -208,13 +208,6 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 	return ret;
 }
 
-static enum drm_mode_status
-dm_dp_mst_mode_valid(struct drm_connector *connector,
-			struct drm_display_mode *mode)
-{
-	return MODE_OK;
-}
-
 static struct drm_encoder *dm_mst_best_encoder(struct drm_connector *connector)
 {
 	struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
@@ -224,7 +217,7 @@ static struct drm_encoder *dm_mst_best_encoder(struct drm_connector *connector)
 
 static const struct drm_connector_helper_funcs dm_dp_mst_connector_helper_funcs = {
 	.get_modes = dm_dp_mst_get_modes,
-	.mode_valid = dm_dp_mst_mode_valid,
+	.mode_valid = amdgpu_dm_connector_mode_valid,
 	.best_encoder = dm_mst_best_encoder,
 };
 

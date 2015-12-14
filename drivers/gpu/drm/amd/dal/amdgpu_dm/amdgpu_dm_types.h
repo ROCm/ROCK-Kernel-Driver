@@ -92,6 +92,10 @@ void amdgpu_dm_connector_init_helper(
 	const struct dc_link *link,
 	int link_index);
 
+int amdgpu_dm_connector_mode_valid(
+	struct drm_connector *connector,
+	struct drm_display_mode *mode);
+
 extern const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs;
 
 #endif		/* __AMDGPU_DM_TYPES_H__ */

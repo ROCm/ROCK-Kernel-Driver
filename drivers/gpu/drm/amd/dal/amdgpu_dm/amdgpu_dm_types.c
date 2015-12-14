@@ -1221,7 +1221,8 @@ static int get_modes(struct drm_connector *connector)
 	return amdgpu_connector->num_modes;
 }
 
-static int mode_valid(struct drm_connector *connector,
+int amdgpu_dm_connector_mode_valid(
+		struct drm_connector *connector,
 		struct drm_display_mode *mode)
 {
 	int result = MODE_ERROR;
@@ -1286,7 +1287,7 @@ amdgpu_dm_connector_helper_funcs = {
 	* in get_modes call back, not just return the modes count
 	*/
 	.get_modes = get_modes,
-	.mode_valid = mode_valid,
+	.mode_valid = amdgpu_dm_connector_mode_valid,
 	.best_encoder = best_encoder
 };
 
