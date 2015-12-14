@@ -693,7 +693,6 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 	struct amdgpu_bo_list_entry *vm_bos;
 	struct ww_acquire_ctx ticket;
 	struct list_head list, duplicates;
-	struct ttm_validate_buffer *entry;
 
 	INIT_LIST_HEAD(&list);
 	INIT_LIST_HEAD(&duplicates);
@@ -731,15 +730,6 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 	amdgpu_vm_clear_invalids(adev, vm, NULL);
 
 	mutex_unlock(&vm->mutex);
-
-	list_for_each_entry(entry, &list, head) {
-		ret = ttm_bo_wait(entry->bo, false, false, false);
-		if (ret != 0) {
-			pr_err("amdkfd: Failed to wait for PT/PD update (err == %d)\n",
-					ret);
-			goto err_failed_to_get_bos;
-		}
-	}
 
 	ttm_eu_backoff_reservation(&ticket, &list);
 	drm_free_large(vm_bos);
