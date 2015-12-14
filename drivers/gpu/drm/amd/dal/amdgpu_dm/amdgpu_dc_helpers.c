@@ -192,6 +192,10 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 		return false;
 
 	mst_mgr = &aconnector->mst_port->mst_mgr;
+
+	if (!mst_mgr->mst_state)
+		return false;
+
 	mst_port = aconnector->port;
 
 	if (enable) {
@@ -379,6 +383,9 @@ bool dc_helpers_dp_mst_poll_for_allocation_change_trigger(
 
 	mst_mgr = &aconnector->mst_port->mst_mgr;
 
+	if (!mst_mgr->mst_state)
+		return false;
+
 	ret = drm_dp_check_act_status(mst_mgr);
 
 	if (ret)
@@ -407,6 +414,9 @@ bool dc_helpers_dp_mst_send_payload_allocation(
 		return false;
 
 	mst_mgr = &aconnector->mst_port->mst_mgr;
+
+	if (!mst_mgr->mst_state)
+		return false;
 
 	ret = drm_dp_update_payload_part2(mst_mgr);
 
