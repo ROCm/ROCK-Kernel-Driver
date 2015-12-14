@@ -1630,6 +1630,24 @@ void dce110_link_encoder_set_dp_phy_pattern(
 	}
 }
 
+static void fill_stream_allocation_row_info(
+	const struct dp_mst_stream_allocation *stream_allocation,
+	uint32_t *src,
+	uint32_t *slots)
+{
+	const struct dc_stream *dc_stream = stream_allocation->stream;
+	struct core_stream *core_stream;
+
+	if (dc_stream) {
+		core_stream = DC_STREAM_TO_CORE(dc_stream);
+		*src = core_stream->stream_enc->id;
+		*slots = stream_allocation->slot_count;
+	} else {
+		*src = 0;
+		*slots = 0;
+	}
+}
+
 /* programs DP MST VC payload allocation */
 void dce110_link_encoder_update_mst_stream_allocation_table(
 	struct link_encoder *enc,
@@ -1642,8 +1660,6 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	uint32_t slots = 0;
 	uint32_t src = 0;
 	uint32_t retries = 0;
-	struct core_stream *core_stream = NULL;
-
 
 	/* For CZ, there are only 3 pipes. So Virtual channel is up 3.*/
 
@@ -1657,11 +1673,10 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	value1 = dal_read_reg(ctx, DP_REG(mmDP_MSE_SAT1));
 
 	if (table->stream_count >= 1) {
-		core_stream =
-			DC_STREAM_TO_CORE(table->stream_allocations[0].stream);
-
-		src = core_stream->stream_enc->id;
-		slots = table->stream_allocations[0].slot_count;
+		fill_stream_allocation_row_info(
+			&table->stream_allocations[0],
+			&src,
+			&slots);
 	} else {
 		src = 0;
 		slots = 0;
@@ -1680,11 +1695,10 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 		DP_MSE_SAT_SLOT_COUNT0);
 
 	if (table->stream_count >= 2) {
-		core_stream =
-			DC_STREAM_TO_CORE(table->stream_allocations[1].stream);
-
-		src = core_stream->stream_enc->id;
-		slots = table->stream_allocations[1].slot_count;
+		fill_stream_allocation_row_info(
+			&table->stream_allocations[1],
+			&src,
+			&slots);
 	} else {
 		src = 0;
 		slots = 0;
@@ -1703,11 +1717,10 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 		DP_MSE_SAT_SLOT_COUNT1);
 
 	if (table->stream_count >= 3) {
-		core_stream =
-			DC_STREAM_TO_CORE(table->stream_allocations[2].stream);
-
-		src = core_stream->stream_enc->id;
-		slots = table->stream_allocations[2].slot_count;
+		fill_stream_allocation_row_info(
+			&table->stream_allocations[2],
+			&src,
+			&slots);
 	} else {
 		src = 0;
 		slots = 0;
