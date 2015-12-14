@@ -2070,6 +2070,25 @@ static void handle_headless_hotplug(
 	}
 }
 
+static void update_connector_sem_state(struct drm_atomic_state *state)
+{
+	struct drm_connector *connector;
+	struct drm_connector_state *old_con_state;
+	struct amdgpu_connector *aconnector = NULL;
+	int i;
+
+	for_each_connector_in_state(state, connector, old_con_state, i) {
+		aconnector = to_amdgpu_connector(connector);
+		if (old_con_state->crtc) {
+			if (!connector->state->crtc)
+				up(&aconnector->mst_sem);
+		} else {
+			if (connector->state->crtc)
+				down(&aconnector->mst_sem);
+		}
+	}
+}
+
 int amdgpu_dm_atomic_commit(
 	struct drm_device *dev,
 	struct drm_atomic_state *state,
@@ -2118,8 +2137,7 @@ int amdgpu_dm_atomic_commit(
 	/* update changed items */
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		struct amdgpu_crtc *acrtc;
-		struct amdgpu_connector *aconnector_new = NULL;
-		struct amdgpu_connector *aconnector_old = NULL;
+		struct amdgpu_connector *aconnector = NULL;
 		enum dm_commit_action action;
 		struct drm_crtc_state *new_state = crtc->state;
 		struct drm_connector *connector;
@@ -2133,24 +2151,7 @@ int amdgpu_dm_atomic_commit(
 			old_con_state,
 			j) {
 			if (connector->state->crtc == crtc) {
-				aconnector_new = to_amdgpu_connector(connector);
-				break;
-			}
-		}
-
-		for_each_connector_in_state(
-			state,
-			connector,
-			old_con_state,
-			j) {
-			/*
-			 * this is the case when reset occur, connector
-			 * is removed from new crtc state. We need to
-			 * update connector state anyway. Access it from
-			 * old_con_state
-			 */
-			if (old_con_state->crtc == crtc) {
-				aconnector_old = to_amdgpu_connector(connector);
+				aconnector = to_amdgpu_connector(connector);
 				break;
 			}
 		}
@@ -2158,7 +2159,7 @@ int amdgpu_dm_atomic_commit(
 		/* handles headless hotplug case, updating new_state and
 		 * aconnector as needed
 		 */
-		handle_headless_hotplug(acrtc, new_state, &aconnector_new);
+		handle_headless_hotplug(acrtc, new_state, &aconnector);
 
 		action = get_dm_commit_action(new_state);
 
@@ -2167,7 +2168,7 @@ int amdgpu_dm_atomic_commit(
 		case DM_COMMIT_ACTION_SET: {
 			struct dc_target *new_target =
 				create_target_for_sink(
-					aconnector_new,
+					aconnector,
 					&crtc->state->mode);
 
 			DRM_DEBUG_KMS("Atomic commit: SET.\n");
@@ -2197,7 +2198,6 @@ int amdgpu_dm_atomic_commit(
 				/* this is the update mode case */
 				dc_target_release(acrtc->target);
 				acrtc->target = NULL;
-				up(&aconnector_old->mst_sem);
 			}
 
 			/*
@@ -2211,7 +2211,6 @@ int amdgpu_dm_atomic_commit(
 			acrtc->target = new_target;
 			acrtc->enabled = true;
 
-			down(&aconnector_new->mst_sem);
 			break;
 		}
 
@@ -2228,12 +2227,12 @@ int amdgpu_dm_atomic_commit(
 				dc_target_release(acrtc->target);
 				acrtc->target = NULL;
 				acrtc->enabled = false;
-
-				up(&aconnector_old->mst_sem);
 			}
 			break;
 		} /* switch() */
 	} /* for_each_crtc_in_state() */
+
+	update_connector_sem_state(state);
 
 	commit_targets_count = 0;
 
