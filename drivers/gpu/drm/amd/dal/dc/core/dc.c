@@ -741,7 +741,7 @@ const struct audio **dc_get_audios(struct dc *dc)
 
 void dc_get_caps(const struct dc *dc, struct dc_caps *caps)
 {
-    caps->max_targets = dal_min(dc->res_pool.controller_count, dc->link_count);
+    caps->max_targets = dc->res_pool.controller_count;
     caps->max_links = dc->link_count;
     caps->max_audios = dc->res_pool.audio_count;
 }
