@@ -167,8 +167,6 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 	const struct dc_sink *sink;
 	int ret = 0;
 
-	flush_work(&master->mst_mgr.work);
-
 	if (!aconnector->edid) {
 		edid = drm_dp_mst_get_edid(connector, &master->mst_mgr, aconnector->port);
 
