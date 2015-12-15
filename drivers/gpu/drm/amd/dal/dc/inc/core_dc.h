@@ -29,8 +29,8 @@ struct dc {
 	enum dc_video_power_state current_power_state;
 
 	/* Inputs into BW and WM calculations. */
-	struct bw_calcs_input_dceip bw_dceip;
-	struct bw_calcs_input_vbios bw_vbios;
+	struct bw_calcs_dceip bw_dceip;
+	struct bw_calcs_vbios bw_vbios;
 
 	/* HW functions */
 	struct hw_sequencer_funcs hwss;

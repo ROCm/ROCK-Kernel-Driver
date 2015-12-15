@@ -489,6 +489,8 @@ enum dc_status dce110_validate_bandwidth(
 	uint8_t i, j;
 	enum dc_status result = DC_ERROR_UNEXPECTED;
 	uint8_t number_of_displays = 0;
+	bool all_displays_in_sync = true;
+	struct dc_crtc_timing prev_timing;
 
 	memset(&context->bw_mode_data, 0, sizeof(context->bw_mode_data));
 
@@ -501,7 +503,7 @@ enum dc_status dce110_validate_bandwidth(
 				bw_mode_data.displays_data[number_of_displays];
 
 			if (target->status.surface_count == 0) {
-				disp->graphics_scale_ratio = int_to_fixed(1);
+				disp->graphics_scale_ratio = bw_int_to_fixed(1);
 				disp->graphics_h_taps = 4;
 				disp->graphics_v_taps = 4;
 
@@ -518,27 +520,39 @@ enum dc_status dce110_validate_bandwidth(
 			disp->graphics_src_height =
 					stream->public.timing.v_addressable;
 			disp->h_total = stream->public.timing.h_total;
-			disp->pixel_rate = frc_to_fixed(
+			disp->pixel_rate = bw_frc_to_fixed(
 				stream->public.timing.pix_clk_khz, 1000);
 
 			/*TODO: get from surface*/
 			disp->graphics_bytes_per_pixel = 4;
-			disp->graphics_tiling_mode = tiled;
+			disp->graphics_tiling_mode = bw_def_tiled;
 
 			/* DCE11 defaults*/
 			disp->graphics_lb_bpc = 10;
 			disp->graphics_interlace_mode = false;
 			disp->fbc_enable = false;
 			disp->lpt_enable = false;
-			disp->graphics_stereo_mode = mono;
-			disp->underlay_mode = ul_none;
+			disp->graphics_stereo_mode = bw_def_mono;
+			disp->underlay_mode = bw_def_none;
+
+			/*All displays will be synchronized if timings are all
+			 * the same
+			 */
+			if (number_of_displays != 0 && all_displays_in_sync)
+				if (dal_memcmp(&prev_timing,
+					&stream->public.timing,
+					sizeof(struct dc_crtc_timing))!= 0)
+					all_displays_in_sync = false;
+			if (number_of_displays == 0)
+				prev_timing = stream->public.timing;
 
 			number_of_displays++;
 		}
 	}
 
 	context->bw_mode_data.number_of_displays = number_of_displays;
-	context->bw_mode_data.display_synchronization_enabled = false;
+	context->bw_mode_data.display_synchronization_enabled =
+							all_displays_in_sync;
 
 	dal_logger_write(dc->ctx->logger,
 		LOG_MAJOR_BWM,
