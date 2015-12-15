@@ -234,11 +234,11 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 			DC_PP_CLOCK_TYPE_ENGINE_CLK,
 			&clks);
 	/* convert all the clock fro kHz to fix point mHz */
-	dc->bw_vbios.high_sclk_mhz = frc_to_fixed(
+	dc->bw_vbios.high_sclk = bw_frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels-1], 1000);
-	dc->bw_vbios.mid_sclk_mhz  = frc_to_fixed(
+	dc->bw_vbios.mid_sclk  = bw_frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels>>1], 1000);
-	dc->bw_vbios.low_sclk_mhz  = frc_to_fixed(
+	dc->bw_vbios.low_sclk  = bw_frc_to_fixed(
 			clks.clocks_in_khz[0], 1000);
 
 	/*do display clock*/
@@ -247,11 +247,11 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 			DC_PP_CLOCK_TYPE_DISPLAY_CLK,
 			&clks);
 
-	dc->bw_vbios.high_voltage_max_dispclk_mhz = frc_to_fixed(
+	dc->bw_vbios.high_voltage_max_dispclk = bw_frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels-1], 1000);
-	dc->bw_vbios.mid_voltage_max_dispclk_mhz  = frc_to_fixed(
+	dc->bw_vbios.mid_voltage_max_dispclk  = bw_frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels>>1], 1000);
-	dc->bw_vbios.low_voltage_max_dispclk_mhz  = frc_to_fixed(
+	dc->bw_vbios.low_voltage_max_dispclk  = bw_frc_to_fixed(
 			clks.clocks_in_khz[0], 1000);
 
 	/*do memory clock*/
@@ -260,9 +260,11 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 			DC_PP_CLOCK_TYPE_MEMORY_CLK,
 			&clks);
 
-	dc->bw_vbios.low_yclk_mhz = frc_to_fixed(
+	dc->bw_vbios.low_yclk = bw_frc_to_fixed(
 			clks.clocks_in_khz[0], 1000);
-	dc->bw_vbios.high_yclk_mhz = frc_to_fixed(
+	dc->bw_vbios.mid_yclk = bw_frc_to_fixed(
+			clks.clocks_in_khz[clks.num_levels-1], 1000);
+	dc->bw_vbios.high_yclk = bw_frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels-1], 1000);
 }
 
@@ -562,6 +564,8 @@ static void pplib_apply_display_requirements(
 {
 	struct dc_pp_display_configuration pp_display_cfg = { 0 };
 
+	pp_display_cfg.all_displays_in_sync =
+		context->bw_results.all_displays_in_sync;
 	pp_display_cfg.nb_pstate_switch_disable =
 			context->bw_results.nbp_state_change_enable == false;
 	pp_display_cfg.cpu_cc6_disable =

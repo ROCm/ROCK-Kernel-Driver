@@ -60,15 +60,15 @@ static uint64_t abs_i64(int64_t arg)
 
 struct bw_fixed bw_min3(struct bw_fixed v1, struct bw_fixed v2, struct bw_fixed v3)
 {
-	return bw_min(bw_min(v1, v2), v3);
+	return bw_min2(bw_min2(v1, v2), v3);
 }
 
 struct bw_fixed bw_max3(struct bw_fixed v1, struct bw_fixed v2, struct bw_fixed v3)
 {
-	return bw_max(bw_max(v1, v2), v3);
+	return bw_max2(bw_max2(v1, v2), v3);
 }
 
-struct bw_fixed int_to_fixed(int64_t value)
+struct bw_fixed bw_int_to_fixed(int64_t value)
 {
 	struct bw_fixed res;
 	ASSERT(value < MAX_I32 && value > MIN_I32);
@@ -76,12 +76,12 @@ struct bw_fixed int_to_fixed(int64_t value)
 	return res;
 }
 
-uint32_t fixed_to_int(struct bw_fixed value)
+int32_t bw_fixed_to_int(struct bw_fixed value)
 {
 	return GET_INTEGER_PART(value.value);
 }
 
-struct bw_fixed frc_to_fixed(int64_t numerator, int64_t denominator)
+struct bw_fixed bw_frc_to_fixed(int64_t numerator, int64_t denominator)
 {
 	struct bw_fixed res;
 	bool arg1_negative = numerator < 0;
@@ -135,17 +135,19 @@ struct bw_fixed frc_to_fixed(int64_t numerator, int64_t denominator)
 	return res;
 }
 
-struct bw_fixed bw_min(const struct bw_fixed arg1, const struct bw_fixed arg2)
+struct bw_fixed bw_min2(const struct bw_fixed arg1, const struct bw_fixed arg2)
 {
 	return (arg1.value <= arg2.value) ? arg1 : arg2;
 }
 
-struct bw_fixed bw_max(const struct bw_fixed arg1, const struct bw_fixed arg2)
+struct bw_fixed bw_max2(const struct bw_fixed arg1, const struct bw_fixed arg2)
 {
 	return (arg2.value <= arg1.value) ? arg1 : arg2;
 }
 
-struct bw_fixed bw_floor(const struct bw_fixed arg, const struct bw_fixed significance)
+struct bw_fixed bw_floor2(
+	const struct bw_fixed arg,
+	const struct bw_fixed significance)
 {
 	struct bw_fixed result;
 	int64_t multiplicand;
@@ -155,21 +157,25 @@ struct bw_fixed bw_floor(const struct bw_fixed arg, const struct bw_fixed signif
 	return result;
 }
 
-struct bw_fixed bw_ceil(const struct bw_fixed arg, const struct bw_fixed significance)
+struct bw_fixed bw_ceil2(
+	const struct bw_fixed arg,
+	const struct bw_fixed significance)
 {
 	struct bw_fixed result;
-	div64_u64_rem(
-			(uint64_t)arg.value,
-			(uint64_t)abs_i64(significance.value),
-			(uint64_t *)&result.value
-	);
-	result.value += arg.value;
-	if (result.value < significance.value)
-		result.value = significance.value;
+	int64_t multiplicand;
+
+	multiplicand = div64_s64(arg.value, abs_i64(significance.value));
+	result.value = abs_i64(significance.value) * multiplicand;
+	if (abs_i64(result.value) < abs_i64(arg.value)) {
+		if (arg.value < 0)
+			result.value -= abs_i64(significance.value);
+		else
+			result.value += abs_i64(significance.value);
+	}
 	return result;
 }
 
-struct bw_fixed add(const struct bw_fixed arg1, const struct bw_fixed arg2)
+struct bw_fixed bw_add(const struct bw_fixed arg1, const struct bw_fixed arg2)
 {
 	struct bw_fixed res;
 
@@ -178,7 +184,7 @@ struct bw_fixed add(const struct bw_fixed arg1, const struct bw_fixed arg2)
 	return res;
 }
 
-struct bw_fixed sub(const struct bw_fixed arg1, const struct bw_fixed arg2)
+struct bw_fixed bw_sub(const struct bw_fixed arg1, const struct bw_fixed arg2)
 {
 	struct bw_fixed res;
 
@@ -187,7 +193,7 @@ struct bw_fixed sub(const struct bw_fixed arg1, const struct bw_fixed arg2)
 	return res;
 }
 
-struct bw_fixed mul(const struct bw_fixed arg1, const struct bw_fixed arg2)
+struct bw_fixed bw_mul(const struct bw_fixed arg1, const struct bw_fixed arg2)
 {
 	struct bw_fixed res;
 
@@ -226,7 +232,7 @@ struct bw_fixed mul(const struct bw_fixed arg1, const struct bw_fixed arg2)
 	tmp = arg1_fra * arg2_fra;
 
 	tmp = (tmp >> BITS_PER_FRACTIONAL_PART) +
-		(tmp >= (uint64_t)(frc_to_fixed(1, 2).value));
+		(tmp >= (uint64_t)(bw_frc_to_fixed(1, 2).value));
 
 	ASSERT(tmp <= (uint64_t)(MAX_I64 - res.value));
 
@@ -239,10 +245,16 @@ struct bw_fixed mul(const struct bw_fixed arg1, const struct bw_fixed arg2)
 
 struct bw_fixed bw_div(const struct bw_fixed arg1, const struct bw_fixed arg2)
 {
-	struct bw_fixed res = frc_to_fixed(arg1.value, arg2.value);
+	struct bw_fixed res = bw_frc_to_fixed(arg1.value, arg2.value);
 	return res;
 }
 
+struct bw_fixed bw_mod(const struct bw_fixed arg1, const struct bw_fixed arg2)
+{
+	struct bw_fixed res;
+	div64_u64_rem(arg1.value, arg2.value, &res.value);
+	return res;
+}
 struct bw_fixed fixed31_32_to_bw_fixed(int64_t raw)
 {
 	struct bw_fixed result = { 0 };
@@ -257,32 +269,32 @@ struct bw_fixed fixed31_32_to_bw_fixed(int64_t raw)
 	return result;
 }
 
-bool equ(const struct bw_fixed arg1, const struct bw_fixed arg2)
+bool bw_equ(const struct bw_fixed arg1, const struct bw_fixed arg2)
 {
 	return arg1.value == arg2.value;
 }
 
-bool neq(const struct bw_fixed arg1, const struct bw_fixed arg2)
+bool bw_neq(const struct bw_fixed arg1, const struct bw_fixed arg2)
 {
 	return arg1.value != arg2.value;
 }
 
-bool leq(const struct bw_fixed arg1, const struct bw_fixed arg2)
+bool bw_leq(const struct bw_fixed arg1, const struct bw_fixed arg2)
 {
 	return arg1.value <= arg2.value;
 }
 
-bool geq(const struct bw_fixed arg1, const struct bw_fixed arg2)
+bool bw_meq(const struct bw_fixed arg1, const struct bw_fixed arg2)
 {
 	return arg1.value >= arg2.value;
 }
 
-bool ltn(const struct bw_fixed arg1, const struct bw_fixed arg2)
+bool bw_ltn(const struct bw_fixed arg1, const struct bw_fixed arg2)
 {
 	return arg1.value < arg2.value;
 }
 
-bool gtn(const struct bw_fixed arg1, const struct bw_fixed arg2)
+bool bw_mtn(const struct bw_fixed arg1, const struct bw_fixed arg2)
 {
 	return arg1.value > arg2.value;
 }
