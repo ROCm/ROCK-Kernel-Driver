@@ -43,10 +43,10 @@ int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
 			struct amdgpu_connector *amdgpu_connector,
 			uint32_t link_index,
 			struct amdgpu_encoder *amdgpu_encoder);
-int amdgpu_dm_encoder_init(struct drm_device *dev,
-			struct amdgpu_encoder *amdgpu_encoder,
-			uint32_t link_index,
-			struct amdgpu_crtc *amdgpu_crtc);
+int amdgpu_dm_encoder_init(
+	struct drm_device *dev,
+	struct amdgpu_encoder *aencoder,
+	uint32_t link_index);
 
 void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc);
 void amdgpu_dm_connector_destroy(struct drm_connector *connector);

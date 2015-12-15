@@ -578,10 +578,10 @@ error:
 
 void amdgpu_dm_fini(struct amdgpu_device *adev)
 {
+	amdgpu_dm_destroy_drm_device(&adev->dm);
 	/*
 	 * TODO: pageflip, vlank interrupt
 	 *
-	 * amdgpu_dm_destroy_drm_device(&adev->dm);
 	 * amdgpu_dm_irq_fini(adev);
 	 */
 
@@ -1024,7 +1024,7 @@ void amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm)
 int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 {
 	struct amdgpu_display_manager *dm = &adev->dm;
-	uint32_t link_index;
+	uint32_t i;
 	struct amdgpu_connector *aconnector;
 	struct amdgpu_encoder *aencoder;
 	struct amdgpu_crtc *acrtc;
@@ -1039,61 +1039,57 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		return -1;
 	}
 
-	/* loops over all connectors on the board */
-	for (link_index = 0; link_index < link_cnt; link_index++) {
+	for (i = 0; i < caps.max_targets; i++) {
+		acrtc = kzalloc(sizeof(struct amdgpu_crtc), GFP_KERNEL);
+		if (!acrtc)
+			goto fail;
 
-		if (link_index > AMDGPU_DM_MAX_DISPLAY_INDEX) {
+		if (amdgpu_dm_crtc_init(
+			dm,
+			acrtc,
+			i)) {
+			DRM_ERROR("KMS: Failed to initialize crtc\n");
+			kfree(acrtc);
+			goto fail;
+		}
+	}
+
+	dm->display_indexes_num = caps.max_targets;
+
+	/* loops over all connectors on the board */
+	for (i = 0; i < link_cnt; i++) {
+
+		if (i > AMDGPU_DM_MAX_DISPLAY_INDEX) {
 			DRM_ERROR(
-				"KMS: Cannot support more than %d display indeces\n",
+				"KMS: Cannot support more than %d display indexes\n",
 					AMDGPU_DM_MAX_DISPLAY_INDEX);
 			continue;
 		}
 
 		aconnector = kzalloc(sizeof(*aconnector), GFP_KERNEL);
 		if (!aconnector)
-			goto fail_connector;
+			goto fail;
 
 		aencoder = kzalloc(sizeof(*aencoder), GFP_KERNEL);
-		if (!aencoder)
-			goto fail_encoder;
-
-		acrtc = kzalloc(sizeof(struct amdgpu_crtc), GFP_KERNEL);
-		if (!acrtc)
-			goto fail_crtc;
-
-		if (amdgpu_dm_crtc_init(
-			dm,
-			acrtc,
-			link_index)) {
-			DRM_ERROR("KMS: Failed to initialize crtc\n");
-			goto fail;
+		if (!aencoder) {
+			goto fail_free_connector;
 		}
 
-		if (amdgpu_dm_encoder_init(
-			dm->ddev,
-			aencoder,
-			link_index,
-			acrtc)) {
+		if (amdgpu_dm_encoder_init(dm->ddev, aencoder, i)) {
 			DRM_ERROR("KMS: Failed to initialize encoder\n");
-			goto fail;
+			goto fail_free_encoder;
 		}
 
-		if (amdgpu_dm_connector_init(
-			dm,
-			aconnector,
-			link_index,
-			aencoder)) {
+		if (amdgpu_dm_connector_init(dm, aconnector, i, aencoder)) {
 			DRM_ERROR("KMS: Failed to initialize connector\n");
-			goto fail;
+			goto fail_free_connector;
 		}
 
-		dc_link_detect(dc_get_link_at_index(dm->dc, link_index));
+		dc_link_detect(dc_get_link_at_index(dm->dc, i));
 
 		amdgpu_dm_update_connector_after_detect(
 			aconnector);
 	}
-
-	dm->display_indexes_num = link_cnt;
 
 	/* Software is initialized. Now we can register interrupt handlers. */
 	switch (adev->asic_type) {
@@ -1111,28 +1107,17 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	drm_mode_config_reset(dm->ddev);
 
 	return 0;
-
+fail_free_encoder:
+	kfree(aencoder);
+fail_free_connector:
+	kfree(aconnector);
 fail:
-	/* clean any dongling drm structure for the last (corrupted)
-	display target */
-	amdgpu_dm_crtc_destroy(&acrtc->base);
-fail_crtc:
-	amdgpu_dm_encoder_destroy(&aencoder->base);
-fail_encoder:
-	amdgpu_dm_connector_destroy(&aconnector->base);
-fail_connector:
-	if (dm->backlight_dev) {
-		backlight_device_unregister(dm->backlight_dev);
-		dm->backlight_dev = NULL;
-	}
 	return -1;
 }
 
-void amdgpu_dm_destroy_drm_device(
-				struct amdgpu_display_manager *dm)
+void amdgpu_dm_destroy_drm_device(struct amdgpu_display_manager *dm)
 {
 	drm_mode_config_cleanup(dm->ddev);
-	/*switch_dev_unregister(&dm->hdmi_audio_dev);*/
 	return;
 }
 

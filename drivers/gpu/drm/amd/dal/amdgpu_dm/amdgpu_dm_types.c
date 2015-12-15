@@ -1125,7 +1125,24 @@ int amdgpu_dm_connector_atomic_set_property(
 
 void amdgpu_dm_connector_destroy(struct drm_connector *connector)
 {
-	/*drm_sysfs_connector_remove(connector);*/
+	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
+	const struct dc_link *link = aconnector->dc_link;
+	struct amdgpu_device *adev = connector->dev->dev_private;
+	struct amdgpu_display_manager *dm = &adev->dm;
+#if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) ||\
+	defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE)
+
+	if (link->connector_signal & (SIGNAL_TYPE_EDP | SIGNAL_TYPE_LVDS)) {
+		amdgpu_dm_register_backlight_device(dm);
+
+		if (dm->backlight_dev) {
+			backlight_device_unregister(dm->backlight_dev);
+			dm->backlight_dev = NULL;
+		}
+
+	}
+#endif
+	drm_connector_unregister(connector);
 	drm_connector_cleanup(connector);
 	kfree(connector);
 }
@@ -1530,7 +1547,7 @@ static uint32_t rgb_formats[] = {
 
 int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 			struct amdgpu_crtc *acrtc,
-			uint32_t link_index)
+			uint32_t crtc_index)
 {
 	int res = -ENOMEM;
 
@@ -1571,10 +1588,10 @@ int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	acrtc->max_cursor_width = 128;
 	acrtc->max_cursor_height = 128;
 
-	acrtc->crtc_id = link_index;
+	acrtc->crtc_id = crtc_index;
 	acrtc->base.enabled = false;
 
-	dm->adev->mode_info.crtcs[link_index] = acrtc;
+	dm->adev->mode_info.crtcs[crtc_index] = acrtc;
 	drm_mode_crtc_set_gamma_size(&acrtc->base, 256);
 
 	return 0;
@@ -1897,8 +1914,7 @@ int amdgpu_dm_get_encoder_crtc_mask(struct amdgpu_device *adev)
 int amdgpu_dm_encoder_init(
 	struct drm_device *dev,
 	struct amdgpu_encoder *aencoder,
-	uint32_t link_index,
-	struct amdgpu_crtc *acrtc)
+	uint32_t link_index)
 {
 	struct amdgpu_device *adev = dev->dev_private;
 
