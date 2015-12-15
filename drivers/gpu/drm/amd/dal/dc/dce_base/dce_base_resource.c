@@ -33,6 +33,9 @@
 
 #include "resource.h"
 
+/* Maximum TMDS single link pixel clock 165MHz */
+#define TMDS_MAX_PIXEL_CLOCK_IN_KHZ 165000
+
 static void attach_stream_to_controller(
 		struct resource_context *res_ctx,
 		struct core_stream *stream)
@@ -142,6 +145,26 @@ static bool check_timing_change(struct core_stream *cur_stream,
 					&new_stream->public.timing);
 }
 
+static void set_stream_signal(struct core_stream *stream)
+{
+	struct dc_sink *dc_sink = (struct dc_sink *)stream->public.sink;
+
+	/* For asic supports dual link DVI, we should adjust signal type
+	 * based on timing pixel clock. If pixel clock more than 165Mhz,
+	 * signal is dual link, otherwise, single link.
+	 */
+	if (dc_sink->sink_signal == SIGNAL_TYPE_DVI_SINGLE_LINK ||
+			dc_sink->sink_signal == SIGNAL_TYPE_DVI_DUAL_LINK) {
+		if (stream->public.timing.pix_clk_khz >
+			TMDS_MAX_PIXEL_CLOCK_IN_KHZ)
+			dc_sink->sink_signal = SIGNAL_TYPE_DVI_DUAL_LINK;
+		else
+			dc_sink->sink_signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
+	}
+
+	stream->signal = dc_sink->sink_signal;
+}
+
 enum dc_status dce_base_map_resources(
 		const struct dc *dc,
 		struct validate_context *context)
@@ -207,8 +230,8 @@ enum dc_status dce_base_map_resources(
 			set_stream_engine_in_use(
 					&context->res_ctx,
 					stream->stream_enc);
-			stream->signal =
-				stream->sink->public.sink_signal;
+
+			set_stream_signal(stream);
 
 			/* TODO: Add check if ASIC support and EDID audio */
 			if (!stream->sink->converter_disable_audio &&
