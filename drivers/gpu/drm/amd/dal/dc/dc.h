@@ -58,7 +58,7 @@ void dc_destroy(struct dc **dc);
  ******************************************************************************/
 
 struct dc_surface {
-	bool enabled;
+	bool visible;
 	bool flip_immediate;
 	struct dc_plane_address address;
 

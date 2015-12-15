@@ -492,7 +492,7 @@ static void fill_plane_attributes_from_fb(
 	surface->plane_size.grph.surface_pitch =
 		fb->pitches[0] / (fb->bits_per_pixel / 8);
 
-	surface->enabled = true;
+	surface->visible = true;
 	surface->scaling_quality.h_taps_c = 2;
 	surface->scaling_quality.v_taps_c = 2;
 

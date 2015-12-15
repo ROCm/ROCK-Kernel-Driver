@@ -194,36 +194,46 @@ gamma_param_fail:
 
 bool dc_commit_surfaces_to_target(
 		struct dc *dc,
-		struct dc_surface *surfaces[],
-		uint8_t surface_count,
+		struct dc_surface *new_surfaces[],
+		uint8_t new_surface_count,
 		struct dc_target *dc_target)
 
 {
 	uint8_t i, j;
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
-	bool need_blanking = (target->status.surface_count == 0);
+
+	bool current_enabled_surface_count = 0;
+	bool new_enabled_surface_count = 0;
+
+	for (i = 0; i < target->status.surface_count; i++)
+		if (target->status.surfaces[i]->visible)
+			current_enabled_surface_count++;
+
+	for (i = 0; i < new_surface_count; i++)
+		if (new_surfaces[i]->visible)
+			new_enabled_surface_count++;
 
 	dal_logger_write(dc->ctx->logger,
 				LOG_MAJOR_INTERFACE_TRACE,
 				LOG_MINOR_COMPONENT_DC,
 				"%s: commit %d surfaces to target 0x%x",
 				__func__,
-				surface_count,
+				new_surface_count,
 				dc_target);
 
 
 	if (!logical_attach_surfaces_to_target(
-						surfaces,
-						surface_count,
+						new_surfaces,
+						new_surface_count,
 						dc_target)) {
 		BREAK_TO_DEBUGGER();
 		goto unexpected_fail;
 	}
 
-	for (i = 0; i < surface_count; i++)
+	for (i = 0; i < new_surface_count; i++)
 		for (j = 0; j < target->public.stream_count; j++)
 			build_scaling_params(
-				surfaces[i],
+				new_surfaces[i],
 				DC_STREAM_TO_CORE(target->public.streams[j]));
 
 	if (dc->hwss.validate_bandwidth(dc, &dc->current_context) != DC_OK) {
@@ -233,11 +243,11 @@ bool dc_commit_surfaces_to_target(
 
 	dc->hwss.program_bw(dc, &dc->current_context);
 
-	if (need_blanking)
+	if (current_enabled_surface_count > 0 && new_enabled_surface_count == 0)
 		dc_target_disable_memory_requests(dc_target);
 
-	for (i = 0; i < surface_count; i++) {
-		struct dc_surface *surface = surfaces[i];
+	for (i = 0; i < new_surface_count; i++) {
+		struct dc_surface *surface = new_surfaces[i];
 		struct core_surface *core_surface = DC_SURFACE_TO_CORE(surface);
 
 		dal_logger_write(dc->ctx->logger,
@@ -258,13 +268,13 @@ bool dc_commit_surfaces_to_target(
 		dc->hwss.update_plane_address(core_surface, target);
 	}
 
-	if (surface_count > 0 && need_blanking)
+	if (current_enabled_surface_count == 0 && new_enabled_surface_count > 0)
 		dc_target_enable_memory_requests(dc_target);
 
 	return true;
 
 unexpected_fail:
-	for (i = 0; i < surface_count; i++) {
+	for (i = 0; i < new_surface_count; i++) {
 		target->status.surfaces[i] = NULL;
 	}
 	target->status.surface_count = 0;
