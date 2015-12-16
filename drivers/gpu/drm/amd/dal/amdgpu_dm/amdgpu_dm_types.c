@@ -1847,7 +1847,8 @@ int amdgpu_dm_connector_init(
 
 	drm_connector_register(&aconnector->base);
 
-	if (connector_type == DRM_MODE_CONNECTOR_DisplayPort)
+	if (connector_type == DRM_MODE_CONNECTOR_DisplayPort
+		|| connector_type == DRM_MODE_CONNECTOR_eDP)
 		amdgpu_dm_initialize_mst_connector(dm, aconnector);
 
 #if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) ||\
