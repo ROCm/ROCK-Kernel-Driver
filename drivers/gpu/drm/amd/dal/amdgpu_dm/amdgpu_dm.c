@@ -775,7 +775,6 @@ void amdgpu_dm_update_connector_after_detect(
 				(struct edid *) sink->dc_edid.raw_edid;
 			drm_mode_connector_update_edid_property(connector,
 					aconnector->edid);
-			amdgpu_dm_connector_get_modes(&aconnector->base);
 		}
 	} else {
 		drm_mode_connector_update_edid_property(connector, NULL);

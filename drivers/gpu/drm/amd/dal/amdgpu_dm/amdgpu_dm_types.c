@@ -1237,9 +1237,7 @@ static struct drm_encoder *best_encoder(struct drm_connector *connector)
 
 static int get_modes(struct drm_connector *connector)
 {
-	struct amdgpu_connector *amdgpu_connector =
-			to_amdgpu_connector(connector);
-	return amdgpu_connector->num_modes;
+	return amdgpu_dm_connector_get_modes(connector);
 }
 
 int amdgpu_dm_connector_mode_valid(
