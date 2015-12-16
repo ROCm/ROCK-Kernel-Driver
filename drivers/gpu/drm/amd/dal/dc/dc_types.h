@@ -665,6 +665,38 @@ enum dc_connection_type {
 	dc_connection_active_dongle
 };
 
+/*
+ * Gamma ramp representation in DC
+ *
+ * A gamma ramp is just a curve defined within the range of [min, max] with
+ * arbitrary precision.
+ *
+ * DM is responsible for providing DC with an interface to obtain any y value
+ * within that range with a selected precision.
+ *
+ * bit32 ------------------------------------------------- bit 0
+ *       [  padding  ][ exponent bits ][  fraction bits  ]
+ *
+ * DC specifies the input x value and precision to the callback function
+ * get_gamma_value as well as providing the context and DM returns the y
+ * value.
+ *
+ * If fraction_bits + exponent_bits exceed width of 32 bits, get_gamma_value
+ * returns 0.  If x is outside the bounds of [min, max], get_gamma_value
+ * returns 0.
+ *
+ */
+struct dc_gamma_ramp {
+	uint32_t (*get_gamma_value) (
+			void *context,
+			uint8_t exponent_bits,
+			uint8_t fraction_bits,
+			uint32_t x);
+	void *context;
+	uint32_t min;
+	uint32_t max;
+};
+
 struct dc_csc_adjustments {
 	struct fixed31_32 contrast;
 	struct fixed31_32 saturation;
