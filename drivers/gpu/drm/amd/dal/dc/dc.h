@@ -75,7 +75,8 @@ struct dc_surface {
 	enum dc_rotation_angle rotation;
 	enum plane_stereo_format stereo_format;
 
-	struct gamma_ramp gamma_correction;
+	struct gamma_ramp gamma_correction; /* deprecated */
+	struct dc_gamma_ramp gamma;
 };
 
 /*
