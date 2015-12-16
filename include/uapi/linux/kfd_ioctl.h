@@ -268,8 +268,10 @@ struct kfd_ioctl_map_memory_to_gpu_args {
 	uint64_t handle;	/* to KFD */
 };
 
+#define AMDKFD_MEM_EVENTS_PAGE	0x00000001 /* mem is used for events_page */
 struct kfd_ioctl_unmap_memory_from_gpu_args {
 	uint64_t handle;	/* to KFD */
+	uint32_t flags;		/* to KFD */
 };
 
 struct kfd_ioctl_open_graphic_handle_args {

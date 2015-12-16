@@ -63,6 +63,7 @@ struct kfd_event_waiter {
 struct signal_page {
 	struct list_head event_pages;	/* kfd_process.signal_event_pages */
 	uint64_t *kernel_address;
+	uint64_t handle;
 	uint64_t __user *user_address;
 	uint32_t page_index;		/* Index into the mmap aperture. */
 	unsigned int free_slots;
@@ -197,13 +198,12 @@ allocate_event_notification_slot(struct file *devkfd, struct kfd_process *p,
 
 static bool
 allocate_signal_page_dgpu(struct kfd_process *p,
-		struct signal_page **page,
-		uint64_t *kernel_address)
+		uint64_t *kernel_address, uint64_t handle)
 {
 	struct signal_page *my_page;
 
 	my_page = kzalloc(SIGNAL_PAGE_SIZE, GFP_KERNEL);
-	if (!page)
+	if (!my_page)
 		return false;
 
 	/* prevent user-mode info leaks */
@@ -211,6 +211,7 @@ allocate_signal_page_dgpu(struct kfd_process *p,
 			KFD_SIGNAL_EVENT_LIMIT * 8);
 
 	my_page->kernel_address = kernel_address;
+	my_page->handle = handle;
 	my_page->user_address = NULL;
 	my_page->free_slots = SLOTS_PER_PAGE;
 	if (list_empty(&p->signal_event_pages))
@@ -227,6 +228,20 @@ allocate_signal_page_dgpu(struct kfd_process *p,
 	list_add(&my_page->event_pages, &p->signal_event_pages);
 
 	return true;
+}
+
+void kfd_free_signal_page_dgpu(struct kfd_process *p, uint64_t handle)
+{
+	struct signal_page *page, *tmp;
+
+	list_for_each_entry_safe(page, tmp, &p->signal_event_pages,
+				event_pages) {
+		if (page->handle == handle) {
+			list_del(&page->event_pages);
+			kfree(page);
+			break;
+		}
+	}
 }
 
 static bool
@@ -503,12 +518,12 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 
 	INIT_LIST_HEAD(&ev->waiters);
 
-	*event_page_offset = 0;
-
 	mutex_lock(&p->event_mutex);
 
 	if (kern_addr && list_empty(&p->signal_event_pages))
-		allocate_signal_page_dgpu(p, &ev->signal_page, kern_addr);
+		allocate_signal_page_dgpu(p, kern_addr, *event_page_offset);
+
+	*event_page_offset = 0;
 
 	switch (event_type) {
 	case KFD_EVENT_TYPE_SIGNAL:

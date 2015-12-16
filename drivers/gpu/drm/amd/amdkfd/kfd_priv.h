@@ -837,6 +837,7 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 	     uint64_t *event_page_offset, uint32_t *event_slot_index,
 	     void *kern_addr);
 int kfd_event_destroy(struct kfd_process *p, uint32_t event_id);
+void kfd_free_signal_page_dgpu(struct kfd_process *p, uint64_t handle);
 
 void radeon_flush_tlb(struct kfd_dev *dev, uint32_t pasid);
 

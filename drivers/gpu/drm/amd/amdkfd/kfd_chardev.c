@@ -1317,6 +1317,9 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 
 	radeon_flush_tlb(dev, p->pasid);
 
+	if (args->flags & AMDKFD_MEM_EVENTS_PAGE)
+		kfd_free_signal_page_dgpu(p, args->handle);
+
 	mutex_unlock(&p->mutex);
 	return 0;
 
