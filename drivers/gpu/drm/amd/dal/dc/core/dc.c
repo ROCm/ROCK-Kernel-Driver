@@ -224,6 +224,8 @@ static struct adapter_service *create_as(
 	return as;
 }
 
+/* TODO unhardcode, 4 for CZ*/
+#define MEMORY_TYPE_MULTIPLIER 4
 static void bw_calcs_data_update_from_pplib(struct dc *dc)
 {
 	struct dc_pp_clock_levels clks = {0};
@@ -261,11 +263,13 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 			&clks);
 
 	dc->bw_vbios.low_yclk = bw_frc_to_fixed(
-			clks.clocks_in_khz[0], 1000);
+		clks.clocks_in_khz[0] * MEMORY_TYPE_MULTIPLIER, 1000);
 	dc->bw_vbios.mid_yclk = bw_frc_to_fixed(
-			clks.clocks_in_khz[clks.num_levels-1], 1000);
+		clks.clocks_in_khz[clks.num_levels>>1] * MEMORY_TYPE_MULTIPLIER,
+		1000);
 	dc->bw_vbios.high_yclk = bw_frc_to_fixed(
-			clks.clocks_in_khz[clks.num_levels-1], 1000);
+		clks.clocks_in_khz[clks.num_levels-1] * MEMORY_TYPE_MULTIPLIER,
+		1000);
 }
 
 static bool construct(struct dc *dc, const struct dal_init_data *init_params)
@@ -575,7 +579,8 @@ static void pplib_apply_display_requirements(
 	pp_display_cfg.cpu_pstate_separation_time =
 			context->bw_results.required_blackout_duration_us;
 
-	pp_display_cfg.min_memory_clock_khz = context->bw_results.required_yclk;
+	pp_display_cfg.min_memory_clock_khz = context->bw_results.required_yclk
+		/ MEMORY_TYPE_MULTIPLIER;
 	pp_display_cfg.min_engine_clock_khz = context->bw_results.required_sclk;
 	pp_display_cfg.min_engine_clock_deep_sleep_khz
 			= context->bw_results.required_sclk_deep_sleep;
