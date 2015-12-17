@@ -893,6 +893,10 @@ static struct dc_target *create_target_for_sink(
 				&aconnector->base.modes,
 				struct drm_display_mode,
 				head);
+	if (NULL == preferred_mode) {
+		DRM_ERROR("No preferred mode found\n");
+		goto stream_create_fail;
+	}
 
 	decide_crtc_timing_for_drm_display_mode(
 			&mode, preferred_mode,
