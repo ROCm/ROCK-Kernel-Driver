@@ -1250,7 +1250,8 @@ static void switch_dp_clock_sources(
 					find_used_clk_src_for_sharing(
 							val_context, stream);
 
-				if (clk_src != stream->clock_source) {
+				if (clk_src &&
+					clk_src != stream->clock_source) {
 					unreference_clock_source(
 							&val_context->res_ctx,
 							stream->clock_source);
