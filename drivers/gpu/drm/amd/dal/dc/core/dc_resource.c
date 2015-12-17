@@ -71,7 +71,7 @@ static bool is_sharable_clk_src(
 	if (stream_with_clk_src->clock_source == NULL)
 		return false;
 
-	if (!dc_is_dp_signal(stream->signal) && id == CLOCK_SOURCE_ID_EXTERNAL)
+	if (id == CLOCK_SOURCE_ID_EXTERNAL)
 		return false;
 
 	if(!is_same_timing(
