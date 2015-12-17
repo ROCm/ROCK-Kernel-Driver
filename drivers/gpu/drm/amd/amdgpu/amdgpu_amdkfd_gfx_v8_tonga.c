@@ -430,16 +430,10 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 
 	vm = bo_va->vm;
 
-	/* Pin BO*/
-	ret = try_pin_bo(bo, NULL, true, domain);
-	if (ret != 0) {
-		pr_err("amdkfd: Failed to pin BO\n");
-		return ret;
-	}
-
 	vm_bos = amdgpu_vm_get_bos(adev, vm, &list);
 	if (!vm_bos) {
 		pr_err("amdkfd: Failed to get bos from vm\n");
+		ret = -EINVAL;
 		goto err_failed_to_get_bos;
 	}
 
@@ -530,7 +524,6 @@ err_failed_to_pin_pts:
 err_failed_to_ttm_reserve:
 	drm_free_large(vm_bos);
 err_failed_to_get_bos:
-	unpin_bo(bo, true);
 
 	return ret;
 }
@@ -638,6 +631,13 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 	 * We need to pin the allocated BO, PD and appropriate PTs and to
 	 * create a mapping of virtual to MC address
 	 */
+	/* Pin BO*/
+	ret = try_pin_bo(bo, NULL, true, domain);
+	if (ret != 0) {
+		pr_err("amdkfd: Failed to pin BO\n");
+		return ret;
+	}
+
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
 		if (entry->bo_va->vm == vm && entry->is_mapped == false) {
 			pr_debug("amdkfd: Trying to map VA 0x%llx to vm %p\n",
@@ -645,13 +645,17 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 			ret = map_bo_to_gpuvm(adev, bo, entry->bo_va, domain);
 			if (ret != 0) {
 				pr_err("amdkfd: Failed to map radeon bo to gpuvm\n");
-				return ret;
+				goto map_bo_to_gpuvm_failed;
 			}
 			entry->is_mapped = true;
 		}
 	}
 	mem->data2.mapped_to_gpu_memory++;
 
+	return 0;
+
+map_bo_to_gpuvm_failed:
+	unpin_bo(bo, true);
 	return ret;
 }
 
