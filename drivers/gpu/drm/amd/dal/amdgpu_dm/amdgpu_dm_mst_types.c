@@ -74,7 +74,8 @@ dm_dp_mst_detect(struct drm_connector *connector, bool force)
 			&master->mst_mgr,
 			aconnector->port);
 
-	if (status == connector_status_disconnected && aconnector->dc_sink) {
+	if (status == connector_status_disconnected && aconnector->edid) {
+		kfree(aconnector->edid);
 		aconnector->edid = NULL;
 	}
 
@@ -334,7 +335,9 @@ static void dm_dp_destroy_mst_connector(
 	drm_connector_cleanup(connector);
 	drm_modeset_unlock_all(dev);
 
-	kfree(connector);
+	dc_link_remove_sink(aconnector->dc_link, aconnector->dc_sink);
+
+	kfree(aconnector);
 	DRM_DEBUG_KMS("\n");
 }
 

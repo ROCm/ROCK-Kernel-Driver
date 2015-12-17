@@ -992,6 +992,4 @@ void dc_link_remove_sink(const struct dc_link *link, const struct dc_sink *sink)
 			return;
 		}
 	}
-
-	BREAK_TO_DEBUGGER();
 }
