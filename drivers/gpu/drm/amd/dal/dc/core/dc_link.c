@@ -647,11 +647,13 @@ void dc_link_detect(const struct dc_link *dc_link)
 		link_disconnect_all_sinks(link);
 	}
 
-	LINK_INFO("link=%d, dc_sink_in=%p is now %s\n",
-		link->link_index, &sink->public,
-		(signal == SIGNAL_TYPE_NONE ? "Disconnected":"Connected"));
-
-	/* TODO: */
+	if (signal == SIGNAL_TYPE_NONE) {
+		LINK_INFO("link=%d is now Disconnected.\n",
+				link->link_index);
+	} else {
+		LINK_INFO("link=%d is now Connected. Sink ptr=%p Signal=%d\n",
+				link->link_index, &sink->public, signal);
+	}
 
 	return;
 }
