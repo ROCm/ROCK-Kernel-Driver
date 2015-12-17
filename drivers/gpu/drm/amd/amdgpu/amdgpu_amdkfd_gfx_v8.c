@@ -422,6 +422,8 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd)
 	struct vi_sdma_mqd *m;
 	uint32_t sdma_base_addr;
 	uint32_t temp, timeout = 2000;
+	uint32_t data;
+
 
 	m = get_sdma_mqd(mqd);
 	sdma_base_addr = get_sdma_base_addr(m);
@@ -437,12 +439,17 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd)
 		msleep(10);
 		timeout -= 10;
 	}
-	if (m->sdma_engine_id)
-		REG_SET_FIELD(RREG32(mmSDMA1_GFX_CONTEXT_CNTL),
-			SDMA1_GFX_CONTEXT_CNTL, RESUME_CTX, 0);
-	else
-		REG_SET_FIELD(RREG32(mmSDMA0_GFX_CONTEXT_CNTL),
-			SDMA0_GFX_CONTEXT_CNTL, RESUME_CTX, 0);
+	if (m->sdma_engine_id) {
+		data = RREG32(mmSDMA1_GFX_CONTEXT_CNTL);
+		data = REG_SET_FIELD(data, SDMA1_GFX_CONTEXT_CNTL,
+				RESUME_CTX, 0);
+		WREG32(mmSDMA1_GFX_CONTEXT_CNTL, data);
+	} else {
+		data = RREG32(mmSDMA0_GFX_CONTEXT_CNTL);
+		data = REG_SET_FIELD(data, SDMA0_GFX_CONTEXT_CNTL,
+				RESUME_CTX, 0);
+		WREG32(mmSDMA0_GFX_CONTEXT_CNTL, data);
+	}
 
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL, m->sdmax_rlcx_doorbell);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR, 0);
