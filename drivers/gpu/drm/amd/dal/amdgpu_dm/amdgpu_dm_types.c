@@ -941,7 +941,7 @@ static void amdgpu_dm_atomic_crtc_gamma_set(
 	struct drm_device *dev = crtc->dev;
 	struct drm_property *prop = dev->mode_config.prop_crtc_id;
 
-	crtc->mode.private_flags |= AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
+	crtc->state->mode.private_flags |= AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
 
 	drm_atomic_helper_crtc_set_property(crtc, prop, 0);
 }
