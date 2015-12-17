@@ -32,6 +32,7 @@
 #include <linux/spinlock.h>
 #include <linux/idr.h>
 #include <linux/kfd_ioctl.h>
+#include <linux/interval_tree.h>
 #include <kgd_kfd_interface.h>
 
 #define KFD_SYSFS_FILE_MODE 0444
@@ -257,6 +258,11 @@ struct kfd_dev {
 	struct page *cwsr_pages;
 	uint32_t cwsr_size;
 	uint32_t tma_offset;  /*Offset for TMA from the  start of cwsr_mem*/
+};
+
+struct kfd_bo {
+	void *mem;
+	struct interval_tree_node it;
 };
 
 /* KGD2KFD callbacks */
@@ -525,6 +531,8 @@ struct kfd_process_device {
 	/* The device that owns this data. */
 	struct kfd_dev *dev;
 
+	/* The process that owns this kfd_process_device. */
+	struct kfd_process *process;
 
 	/* per-process-per device QCM data structure */
 	struct qcm_process_device qpd;
@@ -611,6 +619,8 @@ struct kfd_process {
 	u32 next_nonsignal_event_id;
 	size_t signal_event_count;
 	size_t debug_event_count;
+
+	struct rb_root bo_interval_tree;
 };
 
 /**
@@ -648,9 +658,13 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 int kfd_reserved_mem_mmap(struct kfd_process *process, struct vm_area_struct *vma);
 
 /* KFD process API for creating and translating handles */
-int kfd_process_device_create_obj_handle(struct kfd_process_device *p, void *mem);
-void *kfd_process_device_translate_handle(struct kfd_process_device *p, int handle);
-void kfd_process_device_remove_obj_handle(struct kfd_process_device *p, int handle);
+int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
+					void *mem, uint64_t start,
+					uint64_t length);
+void *kfd_process_device_translate_handle(struct kfd_process_device *p,
+					int handle);
+void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
+					int handle);
 
 /* Process device data iterator */
 struct kfd_process_device *kfd_get_first_process_device_data(struct kfd_process *p);

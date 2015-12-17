@@ -1185,7 +1185,8 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	if (err != 0)
 		goto alloc_memory_of_gpu_failed;
 
-	idr_handle = kfd_process_device_create_obj_handle(pdd, mem);
+	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
+			args->va_addr, args->size);
 	if (idr_handle < 0) {
 		err = -EFAULT;
 		goto handle_creation_failed;
@@ -1244,7 +1245,8 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	if (err != 0)
 		goto alloc_memory_of_gpu_failed;
 
-	idr_handle = kfd_process_device_create_obj_handle(pdd, mem);
+	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
+			args->va_addr, args->size);
 	if (idr_handle < 0) {
 		err = -EFAULT;
 		goto handle_creation_failed;
@@ -1576,7 +1578,11 @@ static int kfd_ioctl_open_graphic_handle(struct file *filep,
 	if (err != 0)
 		goto gpuvm_alloc_failed;
 
-	idr_handle = kfd_process_device_create_obj_handle(pdd, mem);
+	/*TODO: When open_graphic_handle is implemented, we need to create
+	* the corresponding interval tree. We need to know the size of
+	* the buffer through open_graphic_handle(). We use 1 for now.*/
+	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
+			args->va_addr, 1);
 	if (idr_handle < 0)
 		goto handle_creation_failed;
 

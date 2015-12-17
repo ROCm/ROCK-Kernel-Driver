@@ -162,7 +162,7 @@ static void kfd_process_wq_release(struct work_struct *work)
 	struct kfd_process_release_work *my_work;
 	struct kfd_process_device *pdd, *temp, *peer_pdd;
 	struct kfd_process *p;
-	void *mem;
+	struct kfd_bo *buf_obj;
 	int id;
 
 	my_work = (struct kfd_process_release_work *) work;
@@ -186,16 +186,16 @@ static void kfd_process_wq_release(struct work_struct *work)
 		 * Remove all handles from idr and release appropriate
 		 * local memory object
 		 */
-		idr_for_each_entry(&pdd->alloc_idr, mem, id) {
-			idr_remove(&pdd->alloc_idr, id);
+		idr_for_each_entry(&pdd->alloc_idr, buf_obj, id) {
 			list_for_each_entry(peer_pdd,
 				&p->per_device_data, per_device_list) {
 					pdd->dev->kfd2kgd->unmap_memory_to_gpu(
 						peer_pdd->dev->kgd,
-						mem, peer_pdd->vm);
+						buf_obj->mem, peer_pdd->vm);
 			}
 			pdd->dev->kfd2kgd->free_memory_of_gpu(
-							pdd->dev->kgd, mem);
+					pdd->dev->kgd, buf_obj->mem);
+			kfd_process_device_remove_obj_handle(pdd, id);
 		}
 	}
 
@@ -304,6 +304,8 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	if (!process)
 		goto err_alloc_process;
 
+	process->bo_interval_tree = RB_ROOT;
+
 	process->queues = kmalloc_array(INITIAL_QUEUE_ARRAY_SIZE,
 					sizeof(process->queues[0]), GFP_KERNEL);
 	if (!process->queues)
@@ -387,6 +389,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 		pdd->qpd.pqm = &p->pqm;
 		pdd->qpd.evicted = 0;
 		pdd->reset_wavefronts = false;
+		pdd->process = p;
 		list_add(&pdd->per_device_list, &p->per_device_data);
 
 		/* Init idr used for memory handle translation */
@@ -513,44 +516,82 @@ bool kfd_has_process_device_data(struct kfd_process *p)
 
 /* Create specific handle mapped to mem from process local memory idr
  * Assumes that the process lock is held. */
-int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd, void *mem)
+int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
+					void *mem, uint64_t start,
+					uint64_t length)
 {
 	int handle;
+	struct kfd_bo *buf_obj;
+	struct kfd_process *p;
 
 	BUG_ON(pdd == NULL);
 	BUG_ON(mem == NULL);
 
+	p = pdd->process;
+
+	buf_obj = kmalloc(sizeof(*buf_obj), GFP_KERNEL);
+
+	buf_obj->it.start = start;
+	buf_obj->it.last = start + length - 1;
+	interval_tree_insert(&buf_obj->it, &p->bo_interval_tree);
+
+	buf_obj->mem = mem;
+
 	idr_preload(GFP_KERNEL);
 
-	handle = idr_alloc(&pdd->alloc_idr, mem, MIN_IDR_ID, MAX_IDR_ID, GFP_NOWAIT);
+	handle = idr_alloc(&pdd->alloc_idr, buf_obj, MIN_IDR_ID, MAX_IDR_ID,
+			GFP_NOWAIT);
 
 	idr_preload_end();
 
 	return handle;
 }
 
-/* Translate specific handle from process local memory idr
- * Assumes that the process lock is held. */
-void *kfd_process_device_translate_handle(struct kfd_process_device *pdd, int handle)
+static struct kfd_bo *kfd_process_device_find_bo(struct kfd_process_device *pdd,
+					int handle)
 {
 	BUG_ON(pdd == NULL);
 
 	if (handle < 0)
 		return NULL;
 
-	return idr_find(&pdd->alloc_idr, handle);
+	return (struct kfd_bo *)idr_find(&pdd->alloc_idr, handle);
+}
+
+/* Translate specific handle from process local memory idr
+ * Assumes that the process lock is held. */
+void *kfd_process_device_translate_handle(struct kfd_process_device *pdd,
+					int handle)
+{
+	struct kfd_bo *buf_obj;
+
+	buf_obj = kfd_process_device_find_bo(pdd, handle);
+
+	return buf_obj->mem;
 }
 
 /* Remove specific handle from process local memory idr
  * Assumes that the process lock is held. */
-void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd, int handle)
+void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
+					int handle)
 {
+	struct kfd_bo *buf_obj;
+	struct kfd_process *p;
+
 	BUG_ON(pdd == NULL);
+
+	p = pdd->process;
 
 	if (handle < 0)
 		return;
 
+	buf_obj = kfd_process_device_find_bo(pdd, handle);
+
 	idr_remove(&pdd->alloc_idr, handle);
+
+	interval_tree_remove(&buf_obj->it, &p->bo_interval_tree);
+
+	kfree(buf_obj);
 }
 
 /* This returns with process->mutex locked. */
