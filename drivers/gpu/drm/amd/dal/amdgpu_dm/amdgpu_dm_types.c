@@ -1804,8 +1804,6 @@ void amdgpu_dm_connector_init_helper(
 	drm_object_attach_property(&aconnector->base.base,
 				adev->mode_info.underscan_vborder_property,
 				0);
-
-	sema_init(&aconnector->mst_sem, 1);
 }
 
 /* Note: this function assumes that dc_link_detect() was called for the
@@ -2074,25 +2072,6 @@ static void handle_headless_hotplug(
 	}
 }
 
-static void update_connector_sem_state(struct drm_atomic_state *state)
-{
-	struct drm_connector *connector;
-	struct drm_connector_state *old_con_state;
-	struct amdgpu_connector *aconnector = NULL;
-	int i;
-
-	for_each_connector_in_state(state, connector, old_con_state, i) {
-		aconnector = to_amdgpu_connector(connector);
-		if (old_con_state->crtc) {
-			if (!connector->state->crtc)
-				up(&aconnector->mst_sem);
-		} else {
-			if (connector->state->crtc)
-				down(&aconnector->mst_sem);
-		}
-	}
-}
-
 int amdgpu_dm_atomic_commit(
 	struct drm_device *dev,
 	struct drm_atomic_state *state,
@@ -2250,8 +2229,6 @@ int amdgpu_dm_atomic_commit(
 
 	/* DC is optimized not to do anything if 'targets' didn't change. */
 	dc_commit_targets(dm->dc, commit_targets, commit_targets_count);
-
-	update_connector_sem_state(state);
 
 	/* update planes when needed */
 	for_each_plane_in_state(state, plane, old_plane_state, i) {

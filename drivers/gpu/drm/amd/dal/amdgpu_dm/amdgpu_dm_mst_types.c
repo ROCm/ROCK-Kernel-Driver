@@ -333,9 +333,6 @@ static void dm_dp_destroy_mst_connector(
 	struct drm_device *dev = master->base.dev;
 	struct amdgpu_device *adev = dev->dev_private;
 
-	/* wait until reset mode occur */
-	down(&aconnector->mst_sem);
-
 	drm_connector_unregister(connector);
 	/* need to nuke the connector */
 	drm_modeset_lock_all(dev);
