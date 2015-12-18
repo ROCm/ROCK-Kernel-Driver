@@ -2244,8 +2244,6 @@ int amdgpu_dm_atomic_commit(
 		} /* switch() */
 	} /* for_each_crtc_in_state() */
 
-	update_connector_sem_state(state);
-
 	commit_targets_count = 0;
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
@@ -2260,6 +2258,8 @@ int amdgpu_dm_atomic_commit(
 
 	/* DC is optimized not to do anything if 'targets' didn't change. */
 	dc_commit_targets(dm->dc, commit_targets, commit_targets_count);
+
+	update_connector_sem_state(state);
 
 	/* update planes when needed */
 	for_each_plane_in_state(state, plane, old_plane_state, i) {
