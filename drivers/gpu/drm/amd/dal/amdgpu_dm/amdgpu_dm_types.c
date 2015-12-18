@@ -37,12 +37,6 @@
 #undef FRAME_SIZE
 #undef DEPRECATED
 
-#include "mode_query_interface.h"
-#include "dcs_types.h"
-#include "mode_manager_types.h"
-
-/*#include "amdgpu_buffer.h"*/
-
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
 #include "dce/dce_11_0_enum.h"
@@ -504,6 +498,8 @@ static void fill_plane_attributes_from_fb(
 	surface->stereo_format = PLANE_STEREO_FORMAT_NONE;
 
 }
+
+#define NUM_OF_RAW_GAMMA_RAMP_RGB_256 256
 
 static void fill_gamma_from_crtc(
 	const struct drm_crtc *crtc,

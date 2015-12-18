@@ -27,7 +27,6 @@
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
 #include "include/fixed31_32.h"
-#include "include/hw_sequencer_types.h"
 #include "basics/conversion.h"
 #include "include/grph_object_id.h"
 

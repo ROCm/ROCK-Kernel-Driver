@@ -26,7 +26,9 @@
 #ifndef __DAL_TYPES_H__
 #define __DAL_TYPES_H__
 
-#include "dcs_types.h"
+#include "signal_types.h"
+#include "dc_types.h"
+
 struct dal_logger;
 
 enum dce_version {

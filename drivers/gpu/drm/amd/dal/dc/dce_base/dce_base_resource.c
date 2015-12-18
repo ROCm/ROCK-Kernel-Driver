@@ -26,7 +26,6 @@
 
 #include "dc_services.h"
 
-#include "adjustment_types.h"
 #include "set_mode_types.h"
 #include "stream_encoder.h"
 #include "link_encoder.h"

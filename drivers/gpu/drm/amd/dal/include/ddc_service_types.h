@@ -25,8 +25,6 @@
 #ifndef __DAL_DDC_SERVICE_TYPES_H__
 #define __DAL_DDC_SERVICE_TYPES_H__
 
-#include "include/hw_sequencer_types.h"
-
 #define DP_BRANCH_DEVICE_ID_1 0x0010FA
 #define DP_BRANCH_DEVICE_ID_2 0x0022B9
 #define DP_SINK_DEVICE_ID_1 0x4CE000
