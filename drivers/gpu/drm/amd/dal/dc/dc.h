@@ -273,6 +273,7 @@ void dc_update_stream(const struct dc_stream *dc_stream,
 struct dc_link {
 	const struct dc_sink *sink[MAX_SINKS_PER_LINK];
 	unsigned int sink_count;
+	unsigned int link_index;
 	enum dc_connection_type type;
 	enum signal_type connector_signal;
 	enum dc_irq_source irq_source_hpd;

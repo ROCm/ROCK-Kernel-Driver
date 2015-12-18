@@ -21,7 +21,6 @@ enum dc_status core_link_read_dpcd(
 	uint32_t size)
 {
 	if (!dc_helper_dp_read_dpcd(link->ctx,
-			link->link_index,
 			&link->public,
 			address, data, size))
 			return DC_ERROR_UNEXPECTED;
@@ -36,7 +35,6 @@ enum dc_status core_link_write_dpcd(
 	uint32_t size)
 {
 	if (!dc_helper_dp_write_dpcd(link->ctx,
-			link->link_index,
 			&link->public,
 			address, data, size))
 				return DC_ERROR_UNEXPECTED;

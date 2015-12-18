@@ -203,8 +203,6 @@ struct core_link {
 	struct dc_context *ctx; /* TODO: AUTO remove 'dal' when DC is complete*/
 
 	uint8_t connector_index; /* this will be mapped to the HPD pins */
-	uint8_t link_index; /* this is mapped to DAL display_index
-				TODO: #flip remove it as soon as possible. */
 
 	struct adapter_service *adapter_srv;
 	struct connector *connector;

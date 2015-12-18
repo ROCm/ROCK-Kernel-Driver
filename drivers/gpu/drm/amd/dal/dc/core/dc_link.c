@@ -647,13 +647,9 @@ void dc_link_detect(const struct dc_link *dc_link)
 		link_disconnect_all_sinks(link);
 	}
 
-	if (signal == SIGNAL_TYPE_NONE) {
-		LINK_INFO("link=%d is now Disconnected.\n",
-				link->link_index);
-	} else {
-		LINK_INFO("link=%d is now Connected. Sink ptr=%p Signal=%d\n",
-				link->link_index, &sink->public, signal);
-	}
+	LINK_INFO("link=%d, dc_sink_in=%p is now %s\n",
+		link->public.link_index, &sink->public,
+		(signal == SIGNAL_TYPE_NONE ? "Disconnected":"Connected"));
 
 	return;
 }
@@ -675,7 +671,7 @@ static bool construct(
 	link->adapter_srv = as;
 	link->connector_index = init_params->connector_index;
 	link->ctx = dc_ctx;
-	link->link_index = init_params->link_index;
+	link->public.link_index = init_params->link_index;
 
 	link->link_id = dal_adapter_service_get_connector_obj_id(
 			as,
