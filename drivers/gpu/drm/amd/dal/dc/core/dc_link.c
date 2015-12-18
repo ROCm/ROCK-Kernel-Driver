@@ -29,7 +29,6 @@
 #include "core_dc.h"
 #include "adapter_service_interface.h"
 #include "grph_object_id.h"
-#include "connector_interface.h"
 #include "gpio_service_interface.h"
 #include "ddc_service_interface.h"
 #include "core_status.h"
@@ -45,6 +44,10 @@
 		LOG_MAJOR_HW_TRACE, LOG_MINOR_HW_TRACE_HOTPLUG, \
 		__VA_ARGS__)
 
+#define DELAY_ON_CONNECT_IN_MS 500
+#define DELAY_ON_DISCONNECT_IN_MS 500
+
+
 /*******************************************************************************
  * Private structures
  ******************************************************************************/
@@ -55,14 +58,78 @@
  ******************************************************************************/
 static void destruct(struct core_link *link)
 {
-	if (link->connector)
-		dal_connector_destroy(&link->connector);
-
 	if (link->ddc)
 		dal_ddc_service_destroy(&link->ddc);
 
 	if(link->link_enc)
 		link->ctx->dc->hwss.encoder_destroy(&link->link_enc);
+}
+
+/*
+ *  Function: program_hpd_filter
+ *
+ *  @brief
+ *     Programs HPD filter on associated HPD line
+ *
+ *  @param [in] delay_on_connect_in_ms: Connect filter timeout
+ *  @param [in] delay_on_disconnect_in_ms: Disconnect filter timeout
+ *
+ *  @return
+ *     true on success, false otherwise
+ */
+static bool program_hpd_filter(
+	const struct core_link *link)
+{
+	bool result = false;
+
+	struct irq *hpd;
+
+	/* Verify feature is supported */
+
+	switch (link->public.connector_signal) {
+	case SIGNAL_TYPE_DVI_SINGLE_LINK:
+	case SIGNAL_TYPE_DVI_DUAL_LINK:
+	case SIGNAL_TYPE_HDMI_TYPE_A:
+	case SIGNAL_TYPE_LVDS:
+	case SIGNAL_TYPE_DISPLAY_PORT:
+	case SIGNAL_TYPE_DISPLAY_PORT_MST:
+	case SIGNAL_TYPE_EDP:
+		/* program hpd filter */
+		break;
+	default:
+		/* don't program hpd filter */
+		return false;
+	}
+
+	/* Obtain HPD handle */
+	hpd = dal_adapter_service_obtain_hpd_irq(
+		link->adapter_srv, link->link_id);
+
+	if (!hpd)
+		return result;
+
+	/* Setup HPD filtering */
+
+	if (dal_irq_open(hpd) == GPIO_RESULT_OK) {
+		struct gpio_hpd_config config;
+
+		config.delay_on_connect = DELAY_ON_CONNECT_IN_MS;
+		config.delay_on_disconnect = DELAY_ON_DISCONNECT_IN_MS;
+
+		dal_irq_setup_hpd_filter(hpd, &config);
+
+		dal_irq_close(hpd);
+
+		result = true;
+	} else {
+		ASSERT_CRITICAL(false);
+	}
+
+	/* Release HPD handle */
+
+	dal_adapter_service_release_irq(link->adapter_srv, hpd);
+
+	return result;
 }
 
 static bool detect_sink(struct core_link *link)
@@ -651,6 +718,91 @@ void dc_link_detect(const struct dc_link *dc_link)
 	return;
 }
 
+static enum hpd_source_id get_hpd_line(
+		struct core_link *link,
+		struct adapter_service *as)
+{
+	struct irq *hpd;
+	enum hpd_source_id hpd_id = HPD_SOURCEID_UNKNOWN;
+
+	hpd = dal_adapter_service_obtain_hpd_irq(as, link->link_id);
+
+	if (hpd) {
+		switch (dal_irq_get_source(hpd)) {
+		case DC_IRQ_SOURCE_HPD1:
+			hpd_id = HPD_SOURCEID1;
+		break;
+		case DC_IRQ_SOURCE_HPD2:
+			hpd_id = HPD_SOURCEID2;
+		break;
+		case DC_IRQ_SOURCE_HPD3:
+			hpd_id = HPD_SOURCEID3;
+		break;
+		case DC_IRQ_SOURCE_HPD4:
+			hpd_id = HPD_SOURCEID4;
+		break;
+		case DC_IRQ_SOURCE_HPD5:
+			hpd_id = HPD_SOURCEID5;
+		break;
+		case DC_IRQ_SOURCE_HPD6:
+			hpd_id = HPD_SOURCEID6;
+		break;
+		default:
+			BREAK_TO_DEBUGGER();
+		break;
+		}
+
+		dal_adapter_service_release_irq(as, hpd);
+	}
+
+	return hpd_id;
+}
+
+static enum channel_id get_ddc_line(struct core_link *link, struct adapter_service *as)
+{
+	struct ddc *ddc;
+	enum channel_id channel = CHANNEL_ID_UNKNOWN;
+
+	ddc = dal_adapter_service_obtain_ddc(as, link->link_id);
+
+	if (ddc) {
+		switch (dal_ddc_get_line(ddc)) {
+		case GPIO_DDC_LINE_DDC1:
+			channel = CHANNEL_ID_DDC1;
+			break;
+		case GPIO_DDC_LINE_DDC2:
+			channel = CHANNEL_ID_DDC2;
+			break;
+		case GPIO_DDC_LINE_DDC3:
+			channel = CHANNEL_ID_DDC3;
+			break;
+		case GPIO_DDC_LINE_DDC4:
+			channel = CHANNEL_ID_DDC4;
+			break;
+		case GPIO_DDC_LINE_DDC5:
+			channel = CHANNEL_ID_DDC5;
+			break;
+		case GPIO_DDC_LINE_DDC6:
+			channel = CHANNEL_ID_DDC6;
+			break;
+		case GPIO_DDC_LINE_DDC_VGA:
+			channel = CHANNEL_ID_DDC_VGA;
+			break;
+		case GPIO_DDC_LINE_I2C_PAD:
+			channel = CHANNEL_ID_I2C_PAD;
+			break;
+		default:
+			BREAK_TO_DEBUGGER();
+			break;
+		}
+
+		dal_adapter_service_release_ddc(as, ddc);
+	}
+
+	return channel;
+}
+
+
 static bool construct(
 	struct core_link *link,
 	const struct link_init_data *init_params)
@@ -661,7 +813,6 @@ static bool construct(
 	struct ddc_service_init_data ddc_service_init_data = { 0 };
 	struct dc_context *dc_ctx = init_params->ctx;
 	struct encoder_init_data enc_init_data = { 0 };
-	struct connector_feature_support cfs = { 0 };
 	struct integrated_info info = {{{ 0 }}};
 
 	link->dc = init_params->dc;
@@ -732,13 +883,6 @@ static bool construct(
 			init_params->connector_index,
 			link->public.connector_signal);
 
-	link->connector = dal_connector_create(dc_ctx, as, link->link_id);
-	if (NULL == link->connector) {
-		DC_ERROR("Failed to create connector object!\n");
-		goto create_fail;
-	}
-
-
 	hpd_gpio = dal_adapter_service_obtain_hpd_irq(as, link->link_id);
 
 	if (hpd_gpio != NULL) {
@@ -756,15 +900,13 @@ static bool construct(
 		goto create_fail;
 	}
 
-	dal_connector_get_features(link->connector, &cfs);
-
 	enc_init_data.adapter_service = as;
 	enc_init_data.ctx = dc_ctx;
 	enc_init_data.encoder = dal_adapter_service_get_src_obj(
 							as, link->link_id, 0);
 	enc_init_data.connector = link->link_id;
-	enc_init_data.channel = cfs.ddc_line;
-	enc_init_data.hpd_source = cfs.hpd_line;
+	enc_init_data.channel = get_ddc_line(link, as);
+	enc_init_data.hpd_source = get_hpd_line(link, as);
 	link->link_enc = dc_ctx->dc->hwss.encoder_create(&enc_init_data);
 
 	if( link->link_enc == NULL) {
@@ -819,13 +961,7 @@ static bool construct(
 	 * If GPIO isn't programmed correctly HPD might not rise or drain
 	 * fast enough, leading to bounces.
 	 */
-#define DELAY_ON_CONNECT_IN_MS 500
-#define DELAY_ON_DISCONNECT_IN_MS 500
-
-	dal_connector_program_hpd_filter(
-		link->connector,
-		DELAY_ON_CONNECT_IN_MS,
-		DELAY_ON_DISCONNECT_IN_MS);
+	program_hpd_filter(link);
 
 	return true;
 
@@ -1126,10 +1262,7 @@ bool dc_link_set_backlight_level(const struct dc_link *public, uint32_t level)
 
 void core_link_resume(struct core_link *link)
 {
-	dal_connector_program_hpd_filter(
-		link->connector,
-		DELAY_ON_CONNECT_IN_MS,
-		DELAY_ON_DISCONNECT_IN_MS);
+	program_hpd_filter(link);
 }
 
 
@@ -1279,4 +1412,3 @@ void core_link_disable_stream(
 	disable_link(stream);
 
 }
-

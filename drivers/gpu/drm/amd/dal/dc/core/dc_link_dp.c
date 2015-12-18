@@ -5,7 +5,6 @@
 #include "inc/core_types.h"
 #include "link_hwss.h"
 #include "ddc_service_interface.h"
-#include "connector_interface.h"
 #include "core_status.h"
 #include "dpcd_defs.h"
 

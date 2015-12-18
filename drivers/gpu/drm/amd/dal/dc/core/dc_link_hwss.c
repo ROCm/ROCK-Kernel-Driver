@@ -6,7 +6,6 @@
 #include "include/ddc_service_types.h"
 #include "include/i2caux_interface.h"
 #include "link_hwss.h"
-#include "include/connector_interface.h"
 #include "hw_sequencer.h"
 #include "include/ddc_service_interface.h"
 #include "dc_helpers.h"

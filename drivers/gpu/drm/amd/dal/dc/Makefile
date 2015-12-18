@@ -2,7 +2,7 @@
 # Makefile for Display Core (dc) component.
 #
 
-DC_LIBS = adapter asic_capability audio basics bios calcs connector \
+DC_LIBS = adapter asic_capability audio basics bios calcs \
 dcs gpio gpu i2caux irq dce_base
 
 ifdef CONFIG_DRM_AMD_DAL_DCE11_0
