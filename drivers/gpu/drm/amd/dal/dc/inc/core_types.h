@@ -205,7 +205,6 @@ struct core_link {
 	uint8_t connector_index; /* this will be mapped to the HPD pins */
 
 	struct adapter_service *adapter_srv;
-	struct connector *connector;
 	struct link_encoder *link_enc;
 	struct ddc_service *ddc;
 	struct graphics_object_id link_id;
