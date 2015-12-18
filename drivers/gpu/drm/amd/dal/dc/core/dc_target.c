@@ -400,7 +400,7 @@ uint8_t dc_target_get_link_index(const struct dc_target *dc_target)
 	const struct core_sink *sink =
 		DC_SINK_TO_CORE(target->public.streams[0]->sink);
 
-	return sink->link->link_index;
+	return sink->link->public.link_index;
 }
 
 uint32_t dc_target_get_vblank_counter(const struct dc_target *dc_target)
