@@ -321,6 +321,20 @@ struct kfd_ioctl_alloc_memory_of_gpu_new_args {
 	uint32_t flags;
 };
 
+struct kfd_ioctl_get_process_apertures_new_args {
+	/* User allocated. Pointer to struct kfd_process_device_apertures
+	 * filled in by Kernel */
+	uint64_t kfd_process_device_apertures_ptr;
+
+	/* to KFD - indicates amount of memory present in
+	 *  kfd_process_device_apertures_ptr
+	 * from KFD - Number of entries filled by KFD.
+	 */
+	uint32_t num_of_nodes;
+
+	uint32_t pad;
+};
+
 #define AMDKFD_IOCTL_BASE 'K'
 #define AMDKFD_IO(nr)			_IO(AMDKFD_IOCTL_BASE, nr)
 #define AMDKFD_IOR(nr, type)		_IOR(AMDKFD_IOCTL_BASE, nr, type)
@@ -411,7 +425,10 @@ struct kfd_ioctl_alloc_memory_of_gpu_new_args {
 #define AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU_NEW	\
 		AMDKFD_IOWR(0x1c, struct kfd_ioctl_unmap_memory_from_gpu_new_args)
 
+#define AMDKFD_IOC_GET_PROCESS_APERTURES_NEW	\
+	AMDKFD_IOWR(0x1d, struct kfd_ioctl_get_process_apertures_new_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x1d
+#define AMDKFD_COMMAND_END		0x1e
 
 #endif
