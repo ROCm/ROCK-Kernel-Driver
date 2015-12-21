@@ -33,6 +33,8 @@ struct amdgpu_device;
 struct kfd_bo_va_list {
 	struct list_head bo_list;
 	struct amdgpu_bo_va *bo_va;
+	void *kgd_dev;
+	bool is_mapped;
 };
 
 struct kgd_mem {
@@ -48,6 +50,7 @@ struct kgd_mem {
 			uint32_t domain;
 			bool mapped_to_gpu_memory;
 			void *kptr;
+			uint64_t va;
 		} data2;
 	};
 };
@@ -88,3 +91,4 @@ int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_tonga_get_functions(void);
 
 #endif /* AMDGPU_AMDKFD_H_INCLUDED */
+

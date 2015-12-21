@@ -85,6 +85,18 @@ static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
 	return (struct amdgpu_device *)kgd;
 }
 
+static bool check_if_add_bo_to_vm(struct amdgpu_vm *avm,
+		struct list_head *list_bo_va)
+{
+	struct kfd_bo_va_list *entry;
+
+	list_for_each_entry(entry, list_bo_va, bo_list)
+		if (entry->bo_va->vm == avm)
+			return false;
+
+	return true;
+}
+
 static int add_bo_to_vm(struct amdgpu_device *adev, uint64_t va,
 		struct amdgpu_vm *avm, struct amdgpu_bo *bo,
 		struct list_head *list_bo_va)
@@ -98,7 +110,8 @@ static int add_bo_to_vm(struct amdgpu_device *adev, uint64_t va,
 
 	BUG_ON(va == 0);
 
-	pr_debug("amdkfd: adding bo_va to bo %p and va 0x%llx\n", bo, va);
+	pr_debug("amdkfd: adding bo_va to bo %p and va 0x%llx id 0x%x\n",
+			bo, va, adev->dev->id);
 
 	amdgpu_bo_reserve(bo, true);
 
@@ -123,6 +136,8 @@ static int add_bo_to_vm(struct amdgpu_device *adev, uint64_t va,
 		goto err_vmsetaddr;
 	}
 
+	bo_va_entry->kgd_dev = (void *)adev;
+	bo_va_entry->is_mapped = false;
 	list_add(&bo_va_entry->bo_list, list_bo_va);
 
 	return 0;
@@ -329,6 +344,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 				ret);
 		goto err_bo_create;
 	}
+	bo->is_kfd_bo = true;
 
 	pr_debug("Created BO on GTT with size %zu bytes\n", size);
 
@@ -346,14 +362,13 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	pr_debug("Set BO to VA %p\n", (void *) va);
 
 	if (kptr) {
-		/* map the buffer */
 		ret = amdgpu_bo_reserve(bo, true);
 		if (ret) {
 			dev_err(adev->dev, "(%d) failed to reserve bo for amdkfd\n", ret);
 			goto allocate_mem_reserve_bo_failed;
 		}
 
-		ret = amdgpu_bo_pin(bo, AMDGPU_GEM_DOMAIN_GTT,
+		ret = amdgpu_bo_pin(bo, domain,
 					NULL);
 		if (ret) {
 			dev_err(adev->dev, "(%d) failed to pin bo for amdkfd\n", ret);
@@ -372,6 +387,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	}
 
 	(*mem)->data2.bo = bo;
+	(*mem)->data2.va = va;
 	(*mem)->data2.domain = domain;
 	(*mem)->data2.mapped_to_gpu_memory = 0;
 
@@ -519,8 +535,8 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 				uint64_t *offset, void **kptr, uint32_t flags)
 {
 	bool aql_queue;
-
 	aql_queue = (flags & ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM) ? true : false;
+	flags = flags & ~ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM;
 	/*
 	 * Check on which domain to allocate BO if we have mmap offset than
 	 * we should allocate BO on GTT domain other cases we should allocate
@@ -540,7 +556,8 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 			*offset = 0;
 		return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
 				NULL, kptr, AMDGPU_GEM_DOMAIN_VRAM,
-				AMDGPU_GEM_CREATE_NO_CPU_ACCESS, aql_queue);
+				AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED,
+				aql_queue);
 	default:
 		return -EINVAL;
 	}
@@ -556,11 +573,10 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 
 	adev = get_amdgpu_device(kgd);
 
-	if (mem->data2.mapped_to_gpu_memory == 1) {
+	if (mem->data2.mapped_to_gpu_memory > 0) {
 		pr_err("BO with size %lu bytes is mapped to GPU. Need to unmap it before release\n",
-		mem->data2.bo->tbo.mem.size);
-		unmap_memory_from_gpu(kgd, mem);
-		mem->data2.mapped_to_gpu_memory = 0;
+			mem->data2.bo->tbo.mem.size);
+		return -1;
 	}
 
 	/* Remove from VM internal data structures */
@@ -568,7 +584,8 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 		pr_debug("Releasing BO with VA %p, size %lu bytes\n",
 				entry->bo_va,
 				mem->data2.bo->tbo.mem.size);
-		remove_bo_from_vm(adev, mem->data2.bo, entry->bo_va);
+		remove_bo_from_vm((struct amdgpu_device *)entry->kgd_dev,
+				mem->data2.bo, entry->bo_va);
 		list_del(&entry->bo_list);
 		kfree(entry);
 	}
@@ -598,26 +615,35 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 
 	BUG_ON(bo == NULL);
 
-	if (mem->data2.mapped_to_gpu_memory == 1) {
-		pr_debug("BO with size %lu bytes already mapped to GPU memory\n",
-		mem->data2.bo->tbo.mem.size);
-		return 0;
-	}
-
 	domain = mem->data2.domain;
+
+	pr_debug("amdgpu: try to map VA 0x%llx domain %d\n",
+			mem->data2.va, domain);
+
+	if (check_if_add_bo_to_vm((struct amdgpu_vm *)vm,
+			&mem->data2.bo_va_list)) {
+		pr_debug("amdkfd: add new BO_VA to list 0x%llx\n",
+				mem->data2.va);
+		add_bo_to_vm(adev, mem->data2.va, (struct amdgpu_vm *)vm,
+				mem->data2.bo, &mem->data2.bo_va_list);
+	}
 	/*
 	 * We need to pin the allocated BO, PD and appropriate PTs and to
 	 * create a mapping of virtual to MC address
 	 */
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
-		pr_debug("amdkfd: Trying to map VA %p\n", entry->bo_va);
-		ret = map_bo_to_gpuvm(adev, bo, entry->bo_va, domain);
-		if (ret != 0) {
-			pr_err("amdkfd: Failed to map radeon bo to gpuvm\n");
-			return ret;
+		if (entry->bo_va->vm == vm && entry->is_mapped == false) {
+			pr_debug("amdkfd: Trying to map VA 0x%llx to vm %p\n",
+					mem->data2.va, vm);
+			ret = map_bo_to_gpuvm(adev, bo, entry->bo_va, domain);
+			if (ret != 0) {
+				pr_err("amdkfd: Failed to map radeon bo to gpuvm\n");
+				return ret;
+			}
+			entry->is_mapped = true;
 		}
 	}
-	mem->data2.mapped_to_gpu_memory = 1;
+	mem->data2.mapped_to_gpu_memory++;
 
 	return ret;
 }
@@ -638,6 +664,7 @@ static int create_process_vm(struct kgd_dev *kgd, void **vm)
 	/* Initialize the VM context, allocate the page directory and zero it */
 	ret = amdgpu_vm_init(adev, new_vm);
 	if (ret != 0) {
+		pr_err("amdgpu: failed init vm ret %d\n", ret);
 		/* Undo everything related to the new VM context */
 		amdgpu_vm_fini(adev, new_vm);
 		kfree(new_vm);
@@ -653,9 +680,10 @@ static int create_process_vm(struct kgd_dev *kgd, void **vm)
 	 */
 	ret = amdgpu_vm_clear_freed(adev, new_vm);
 	if (ret != 0)
-		pr_err("amdkfd: Failed to amdgpu_vm_clear_freed\n");
+		pr_err("amdgpu: Failed to amdgpu_vm_clear_freed\n");
 
-	pr_debug("Created process vm with address %p\n", *vm);
+	pr_debug("amdgpu: created process vm with address 0x%llx\n",
+			new_vm->ids[7].pd_gpu_addr);
 
 	return ret;
 }
@@ -746,35 +774,47 @@ err_failed_to_get_bos:
 static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 {
 	struct kfd_bo_va_list *entry;
-	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
+	struct amdgpu_device *adev;
 	int ret = 0;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
 
+	adev = (struct amdgpu_device *) kgd;
+
 	if (mem->data2.mapped_to_gpu_memory == 0) {
 		pr_debug("Unmapping BO with size %lu bytes from GPU memory is unnecessary\n",
 		mem->data2.bo->tbo.mem.size);
-		return 0;
+		return -EFAULT;
 	}
 
-	/* Unpin PTs */
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
-		pr_debug("Unmapping BO with VA %p, size %lu bytes from GPU memory\n",
-			entry->bo_va,
+		pr_debug("Unmapping BO with VA 0x%llx, size %lu bytes from GPU memory\n",
+			mem->data2.va,
 			mem->data2.bo->tbo.mem.size);
 		/* Unpin the PD directory*/
 		unpin_bo(entry->bo_va->vm->page_directory, true);
+		/* Unpin PTs */
 		unpin_pts(entry->bo_va, entry->bo_va->vm, true);
 	}
 
 	/* Unpin BO*/
 	unpin_bo(mem->data2.bo, true);
 
-	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list)
-		ret = unmap_bo_from_gpuvm(adev, entry->bo_va);
+	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
+		if (entry->kgd_dev == kgd) {
+			ret = unmap_bo_from_gpuvm(adev, entry->bo_va);
+			if (ret == 0) {
+				entry->is_mapped = false;
+			} else {
+				pr_err("amdgpu: failed unmap va 0x%llx\n",
+						mem->data2.va);
+				return ret;
+			}
+		}
+	}
 
-	mem->data2.mapped_to_gpu_memory = 0;
+	mem->data2.mapped_to_gpu_memory--;
 
 	return ret;
 }
