@@ -1224,7 +1224,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 					struct kfd_process *p, void *data)
 {
-	struct kfd_ioctl_map_memory_to_gpu_args *args = data;
+	struct kfd_ioctl_map_memory_to_gpu_new_args *args = data;
 	struct kfd_process_device *pdd;
 	void *mem;
 	struct kfd_dev *dev;
@@ -1279,10 +1279,23 @@ bind_process_to_device_failed:
 	return err;
 }
 
+static int kfd_ioctl_map_memory_to_gpu_wrapper(struct file *filep,
+					struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_map_memory_to_gpu_args *args = data;
+	struct kfd_ioctl_map_memory_to_gpu_new_args new_args;
+
+	new_args.handle = args->handle;
+	new_args.device_ids_array = NULL;
+	new_args.device_ids_array_size = 0;
+
+	return kfd_ioctl_map_memory_to_gpu(filep, p, &new_args);
+}
+
 static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 					struct kfd_process *p, void *data)
 {
-	struct kfd_ioctl_unmap_memory_from_gpu_args *args = data;
+	struct kfd_ioctl_unmap_memory_from_gpu_new_args *args = data;
 	struct kfd_process_device *pdd;
 	void *mem;
 	struct kfd_dev *dev;
@@ -1317,9 +1330,6 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 
 	radeon_flush_tlb(dev, p->pasid);
 
-	if (args->flags & AMDKFD_MEM_EVENTS_PAGE)
-		kfd_free_signal_page_dgpu(p, args->handle);
-
 	mutex_unlock(&p->mutex);
 	return 0;
 
@@ -1327,6 +1337,19 @@ get_mem_obj_from_handle_failed:
 bind_process_to_device_failed:
 	mutex_unlock(&p->mutex);
 	return err;
+}
+
+static int kfd_ioctl_unmap_memory_from_gpu_wrapper(struct file *filep,
+					struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_unmap_memory_from_gpu_args *args = data;
+	struct kfd_ioctl_unmap_memory_from_gpu_new_args new_args;
+
+	new_args.handle = args->handle;
+	new_args.device_ids_array = NULL;
+	new_args.device_ids_array_size = 0;
+
+	return kfd_ioctl_unmap_memory_from_gpu(filep, p, &new_args);
 }
 
 static int kfd_ioctl_open_graphic_handle(struct file *filep,
@@ -1457,10 +1480,10 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 			kfd_ioctl_free_memory_of_gpu, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_MAP_MEMORY_TO_GPU,
-			kfd_ioctl_map_memory_to_gpu, 0),
+			kfd_ioctl_map_memory_to_gpu_wrapper, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU,
-			kfd_ioctl_unmap_memory_from_gpu, 0),
+			kfd_ioctl_unmap_memory_from_gpu_wrapper, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_OPEN_GRAPHIC_HANDLE,
 			kfd_ioctl_open_graphic_handle, 0),
@@ -1480,6 +1503,11 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ALLOC_MEMORY_OF_GPU_NEW,
 				kfd_ioctl_alloc_memory_of_gpu_new, 0),
 
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_MAP_MEMORY_TO_GPU_NEW,
+				kfd_ioctl_map_memory_to_gpu, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU_NEW,
+				kfd_ioctl_unmap_memory_from_gpu, 0),
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
