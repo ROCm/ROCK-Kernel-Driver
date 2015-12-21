@@ -623,6 +623,7 @@ struct amdgpu_bo {
 	pid_t				pid;
 	struct amdgpu_mn		*mn;
 	struct list_head		mn_list;
+	bool				is_kfd_bo;
 };
 #define gem_to_amdgpu_bo(gobj) container_of((gobj), struct amdgpu_gem_object, base)->bo
 
@@ -2510,3 +2511,4 @@ amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 #include "amdgpu_object.h"
 
 #endif
+
