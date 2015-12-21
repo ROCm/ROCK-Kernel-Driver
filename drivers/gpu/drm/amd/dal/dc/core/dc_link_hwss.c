@@ -58,14 +58,16 @@ void dp_enable_link_phy(
 	enum engine_id engine,
 	const struct link_settings *link_settings)
 {
-	link->dc->hwss.encoder_enable_output(
-					link->link_enc,
-					link_settings,
-					engine,
-					CLOCK_SOURCE_ID_EXTERNAL,
-					signal,
-					COLOR_DEPTH_UNDEFINED,
-					0);
+	if (signal == SIGNAL_TYPE_DISPLAY_PORT)
+		link->dc->hwss.encoder_enable_dp_output(
+						link->link_enc,
+						link_settings,
+						CLOCK_SOURCE_ID_EXTERNAL);
+	else
+		link->dc->hwss.encoder_enable_dp_mst_output(
+						link->link_enc,
+						link_settings,
+						CLOCK_SOURCE_ID_EXTERNAL);
 
 	dp_receiver_power_ctrl(link, true);
 }

@@ -52,12 +52,12 @@ struct hw_sequencer_funcs {
 	bool (*transform_power_up)(struct transform *xfm);
 
 	bool (*cursor_set_attributes)(
-					struct input_pixel_processor *ipp,
-					const struct dc_cursor_attributes *attributes);
+				struct input_pixel_processor *ipp,
+				const struct dc_cursor_attributes *attributes);
 
 	bool (*cursor_set_position)(
-					struct input_pixel_processor *ipp,
-					const struct dc_cursor_position *position);
+				struct input_pixel_processor *ipp,
+				const struct dc_cursor_position *position);
 
 	bool (*set_gamma_ramp)(
 					struct input_pixel_processor *ipp,
@@ -86,33 +86,47 @@ struct hw_sequencer_funcs {
 
 
 	/* link encoder sequences */
-	struct link_encoder *(*encoder_create)(const struct encoder_init_data *init);
+	struct link_encoder *(*encoder_create)(
+			const struct encoder_init_data *init);
 
 	void (*encoder_destroy)(struct link_encoder **enc);
 
-	void (*encoder_power_up)(
+	void (*encoder_hw_init)(
 					struct link_encoder *enc);
 
-	void (*encoder_enable_output)(
+	void (*encoder_enable_tmds_output)(
 					struct link_encoder *enc,
-					const struct link_settings *link_settings,
-					enum engine_id engine,
 					enum clock_source_id clock_source,
-					enum signal_type signal,
 					enum dc_color_depth color_depth,
 					uint32_t pixel_clock);
+
+	void (*encoder_enable_dual_link_tmds_output)(
+					struct link_encoder *enc,
+					enum clock_source_id clock_source,
+					enum dc_color_depth color_depth,
+					uint32_t pixel_clock);
+
+	void (*encoder_enable_dp_output)(
+				struct link_encoder *enc,
+				const struct link_settings *link_settings,
+				enum clock_source_id clock_source);
+
+	void (*encoder_enable_dp_mst_output)(
+				struct link_encoder *enc,
+				const struct link_settings *link_settings,
+				enum clock_source_id clock_source);
 
 	void (*encoder_disable_output)(
 					struct link_encoder *enc,
 					enum signal_type signal);
 
 	void (*encoder_set_dp_phy_pattern)(
-					struct link_encoder *enc,
-					const struct encoder_set_dp_phy_pattern_param *param);
+			struct link_encoder *enc,
+			const struct encoder_set_dp_phy_pattern_param *param);
 
 	void (*encoder_dp_set_lane_settings)(
-					struct link_encoder *enc,
-					const struct link_training_settings *link_settings);
+			struct link_encoder *enc,
+			const struct link_training_settings *link_settings);
 
 	/* backlight control */
 	void (*encoder_set_lcd_backlight_level)(struct link_encoder *enc,

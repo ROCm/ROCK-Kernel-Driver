@@ -33,7 +33,6 @@
 #include "dce/dce_11_0_sh_mask.h"
 #include "dce/dce_11_0_enum.h"
 
-#define DELAY_AFTER_PIXEL_FORMAT_CHANGE 0 /* ms */
 /* For current ASICs pixel clock - 600MHz */
 #define MAX_ENCODER_CLK 600000
 
@@ -605,7 +604,6 @@ static uint8_t get_frontend_source(
 
 static void configure_encoder(
 	struct dce110_link_encoder *enc110,
-	enum engine_id engine,
 	const struct link_settings *link_settings)
 {
 	struct dc_context *ctx = enc110->base.ctx;
@@ -1285,7 +1283,7 @@ bool dce110_link_encoder_validate_output_with_stream(
 	return is_valid;
 }
 
-void dce110_link_encoder_power_up(
+void dce110_link_encoder_hw_init(
 	struct link_encoder *enc)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
@@ -1383,17 +1381,10 @@ void dce110_link_encoder_setup(
 	dal_write_reg(ctx, addr, value);
 }
 
-/*
- * @brief
- * Configure digital transmitter and enable both encoder and transmitter
- * Actual output will be available after calling unblank()
- */
-void dce110_link_encoder_enable_output(
+/* TODO: still need depth or just pass in adjusted pixel clock? */
+void dce110_link_encoder_enable_tmds_output(
 	struct link_encoder *enc,
-	const struct link_settings *link_settings,
-	enum engine_id engine,
 	enum clock_source_id clock_source,
-	enum signal_type signal,
 	enum dc_color_depth color_depth,
 	uint32_t pixel_clock)
 {
@@ -1401,6 +1392,87 @@ void dce110_link_encoder_enable_output(
 	struct dc_context *ctx = enc110->base.ctx;
 	struct bp_transmitter_control cntl = { 0 };
 	enum bp_result result;
+
+	/* Enable the PHY */
+
+	cntl.action = TRANSMITTER_CONTROL_ENABLE;
+	cntl.engine_id = enc->transmitter;
+	cntl.transmitter = enc110->base.transmitter;
+	cntl.pll_id = clock_source;
+	cntl.signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
+	cntl.lanes_number = 4;
+	cntl.hpd_sel = enc110->base.hpd_source;
+
+	cntl.pixel_clock = pixel_clock;
+	cntl.color_depth = color_depth;
+
+	result = dal_bios_parser_transmitter_control(
+		dal_adapter_service_get_bios_parser(
+			enc110->base.adapter_service),
+		&cntl);
+
+	if (result != BP_RESULT_OK) {
+		dal_logger_write(ctx->logger,
+			LOG_MAJOR_ERROR,
+			LOG_MINOR_COMPONENT_ENCODER,
+			"%s: Failed to execute VBIOS command table!\n",
+			__func__);
+		BREAK_TO_DEBUGGER();
+	}
+}
+
+/* enables TMDS PHY output */
+/* TODO: still need this or just pass in adjusted pixel clock? */
+void dce110_link_encoder_enable_dual_link_tmds_output(
+	struct link_encoder *enc,
+	enum clock_source_id clock_source,
+	enum dc_color_depth color_depth,
+	uint32_t pixel_clock)
+{
+	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
+	struct dc_context *ctx = enc110->base.ctx;
+	struct bp_transmitter_control cntl = { 0 };
+	enum bp_result result;
+
+	/* Enable the PHY */
+
+	cntl.action = TRANSMITTER_CONTROL_ENABLE;
+	cntl.engine_id = enc->transmitter;
+	cntl.transmitter = enc110->base.transmitter;
+	cntl.pll_id = clock_source;
+	cntl.signal = SIGNAL_TYPE_DVI_DUAL_LINK;
+	cntl.lanes_number = 8;
+	cntl.hpd_sel = enc110->base.hpd_source;
+
+	cntl.pixel_clock = pixel_clock;
+	cntl.color_depth = color_depth;
+
+	result = dal_bios_parser_transmitter_control(
+		dal_adapter_service_get_bios_parser(
+			enc110->base.adapter_service),
+		&cntl);
+
+	if (result != BP_RESULT_OK) {
+		dal_logger_write(ctx->logger,
+			LOG_MAJOR_ERROR,
+			LOG_MINOR_COMPONENT_ENCODER,
+			"%s: Failed to execute VBIOS command table!\n",
+			__func__);
+		BREAK_TO_DEBUGGER();
+	}
+}
+
+/* enables DP PHY output */
+void dce110_link_encoder_enable_dp_output(
+	struct link_encoder *enc,
+	const struct link_settings *link_settings,
+	enum clock_source_id clock_source)
+{
+	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
+	struct dc_context *ctx = enc110->base.ctx;
+	struct bp_transmitter_control cntl = { 0 };
+	enum bp_result result;
+	enum engine_id engine = enc->transmitter;
 
 	if (enc110->base.connector.id == CONNECTOR_ID_EDP) {
 		/* power up eDP panel */
@@ -1421,27 +1493,19 @@ void dce110_link_encoder_enable_output(
 	 * but it's not passed to asic_control.
 	 * We need to set number of lanes manually.
 	 */
-	if (dc_is_dp_signal(signal))
-		configure_encoder(enc110, engine, link_settings);
+	configure_encoder(enc110, link_settings);
 
 	cntl.action = TRANSMITTER_CONTROL_ENABLE;
 	cntl.engine_id = engine;
 	cntl.transmitter = enc110->base.transmitter;
 	cntl.pll_id = clock_source;
-	cntl.signal = signal;
+	cntl.signal = SIGNAL_TYPE_DISPLAY_PORT;
 	cntl.lanes_number = link_settings->lane_count;
 	cntl.hpd_sel = enc110->base.hpd_source;
-	if (dc_is_dp_signal(signal))
-		cntl.pixel_clock = link_settings->link_rate
+	cntl.pixel_clock = link_settings->link_rate
 						* LINK_RATE_REF_FREQ_IN_KHZ;
-	else
-		cntl.pixel_clock = pixel_clock;
-	cntl.color_depth = color_depth;
-
-	if (DELAY_AFTER_PIXEL_FORMAT_CHANGE)
-		dc_service_sleep_in_milliseconds(
-			ctx,
-			DELAY_AFTER_PIXEL_FORMAT_CHANGE);
+	/* TODO: check if undefined works */
+	cntl.color_depth = COLOR_DEPTH_UNDEFINED;
 
 	result = dal_bios_parser_transmitter_control(
 		dal_adapter_service_get_bios_parser(
@@ -1458,6 +1522,51 @@ void dce110_link_encoder_enable_output(
 	}
 }
 
+/* enables DP PHY output in MST mode */
+void dce110_link_encoder_enable_dp_mst_output(
+	struct link_encoder *enc,
+	const struct link_settings *link_settings,
+	enum clock_source_id clock_source)
+{
+	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
+	struct dc_context *ctx = enc110->base.ctx;
+	struct bp_transmitter_control cntl = { 0 };
+	enum bp_result result;
+	enum engine_id engine = enc->transmitter;
+	/* Enable the PHY */
+
+	/* number_of_lanes is used for pixel clock adjust,
+	 * but it's not passed to asic_control.
+	 * We need to set number of lanes manually.
+	 */
+	configure_encoder(enc110, link_settings);
+
+	cntl.action = TRANSMITTER_CONTROL_ENABLE;
+	cntl.engine_id = engine;
+	cntl.transmitter = enc110->base.transmitter;
+	cntl.pll_id = clock_source;
+	cntl.signal = SIGNAL_TYPE_DISPLAY_PORT_MST;
+	cntl.lanes_number = link_settings->lane_count;
+	cntl.hpd_sel = enc110->base.hpd_source;
+	cntl.pixel_clock = link_settings->link_rate
+						* LINK_RATE_REF_FREQ_IN_KHZ;
+	/* TODO: check if undefined works */
+	cntl.color_depth = COLOR_DEPTH_UNDEFINED;
+
+	result = dal_bios_parser_transmitter_control(
+		dal_adapter_service_get_bios_parser(
+			enc110->base.adapter_service),
+		&cntl);
+
+	if (result != BP_RESULT_OK) {
+		dal_logger_write(ctx->logger,
+			LOG_MAJOR_ERROR,
+			LOG_MINOR_COMPONENT_ENCODER,
+			"%s: Failed to execute VBIOS command table!\n",
+			__func__);
+		BREAK_TO_DEBUGGER();
+	}
+}
 /*
  * @brief
  * Disable transmitter and its encoder
