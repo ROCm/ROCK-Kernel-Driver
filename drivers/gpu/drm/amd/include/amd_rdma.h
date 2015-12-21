@@ -38,11 +38,11 @@ struct amd_p2p_page_table {
 	uint64_t	size;		/**< Specify total size of
 					  * allocation
 					  */
-	int		pid;		/**< Specify process id to which
-					  * virtual address is belongs
+	struct pid	*pid;		/**< Specify process pid to which
+					  * virtual address belongs
 					  */
 	struct sg_table *pages;		/**< Specify DMA/Bus addresses */
-	struct device  *dma_device;	/** DMA device requested access
+	struct device  *dma_device;	/**< DMA device requested access
 					 */
 	void		*priv;		/**< Pointer set by AMD kernel
 					  * driver

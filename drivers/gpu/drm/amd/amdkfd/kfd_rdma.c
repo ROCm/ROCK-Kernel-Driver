@@ -35,13 +35,13 @@
  * \param   address       - The start address in the Unified Virtual Address
  *			    space in the specified process
  * \param   length        - The length of requested mapping
- * \param   pid           - Pointer to structure id to which address belongs.
+ * \param   pid           - Pointer to structure pid to which address belongs.
  *			    Could be NULL for current process address space.
  * \param   dma_device    - Device structure of another device
  * \param   page_table    - On return: Pointer to structure describing
  *			    underlying pages/locations
  * \param   free_callback - Pointer to callback which will be called when access
- *			    to such memory must be stopped immidiately: Memory
+ *			    to such memory must be stopped immediately: Memory
  *			    was freed, GECC events, etc.
  *			    Client should  immediately stop any transfer
  *			    operations and returned as soon as possible.
