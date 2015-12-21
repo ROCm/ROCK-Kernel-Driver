@@ -166,7 +166,7 @@ static void init_hw(struct dc *dc)
 		 * required signal (which may be different from the
 		 * default signal on connector). */
 		struct core_link *link = dc->links[i];
-		dc->hwss.encoder_power_up(link->link_enc);
+		dc->hwss.encoder_hw_init(link->link_enc);
 	}
 
 	for(i = 0; i < dc->res_pool.controller_count; i++) {

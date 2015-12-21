@@ -1723,8 +1723,13 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.disable_vga = dce110_timing_generator_disable_vga,
 	.encoder_create = dce110_link_encoder_create,
 	.encoder_destroy = dce110_link_encoder_destroy,
-	.encoder_power_up = dce110_link_encoder_power_up,
-	.encoder_enable_output = dce110_link_encoder_enable_output,
+	.encoder_hw_init = dce110_link_encoder_hw_init,
+	.encoder_enable_tmds_output = dce110_link_encoder_enable_tmds_output,
+	.encoder_enable_dual_link_tmds_output =
+			dce110_link_encoder_enable_dual_link_tmds_output,
+	.encoder_enable_dp_output = dce110_link_encoder_enable_dp_output,
+	.encoder_enable_dp_mst_output =
+			dce110_link_encoder_enable_dp_mst_output,
 	.encoder_disable_output = dce110_link_encoder_disable_output,
 	.encoder_set_dp_phy_pattern = dce110_link_encoder_set_dp_phy_pattern,
 	.encoder_dp_set_lane_settings = dce110_link_encoder_dp_set_lane_settings,
