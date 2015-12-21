@@ -45,7 +45,8 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 		void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr, uint32_t flags);
 static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
-static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
+static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
+		void *vm);
 static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
 
 static int create_process_vm(struct kgd_dev *kgd, void **vm);
@@ -579,7 +580,8 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 	return 0;
 }
 
-static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
+static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
+		void *vm)
 {
 	struct amdgpu_device *adev;
 	int ret;

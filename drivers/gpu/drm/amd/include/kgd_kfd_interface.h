@@ -249,7 +249,8 @@ struct kfd2kgd_calls {
 			struct kgd_mem **mem, uint64_t *offset,
 			void **kptr, uint32_t flags);
 	int (*free_memory_of_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
-	int (*map_memory_to_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
+	int (*map_memory_to_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem,
+			void *vm);
 	int (*unmap_memory_to_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
 
 	uint16_t (*get_fw_version)(struct kgd_dev *kgd,

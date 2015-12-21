@@ -90,7 +90,8 @@ static void destroy_process_vm(struct kgd_dev *kgd, void *vm);
 static uint32_t get_process_page_dir(void *vm);
 
 static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm, int fd, uint32_t handle, struct kgd_mem **mem);
-static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
+static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
+		void *vm);
 static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
 static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 		void *vm, struct kgd_mem **mem,
@@ -750,7 +751,7 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 	return -EFAULT;
 }
 
-static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
+static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem, void *vm)
 {
 	return -EFAULT;
 }
@@ -847,3 +848,4 @@ static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 	}
 	WREG32(mmVM_CONTEXT8_PAGE_TABLE_BASE_ADDR + vmid - 8, page_table_base);
 }
+

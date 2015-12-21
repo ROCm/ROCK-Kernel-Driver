@@ -1255,7 +1255,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	}
 
 	err = dev->kfd2kgd->map_memory_to_gpu(
-		dev->kgd, (struct kgd_mem *) mem);
+		dev->kgd, (struct kgd_mem *) mem, NULL);
 
 	if (err != 0)
 		goto map_memory_to_gpu_failed;
