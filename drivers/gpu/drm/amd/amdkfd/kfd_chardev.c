@@ -927,51 +927,50 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 	struct kfd_ioctl_create_event_args *args = data;
 	struct kfd_dev *kfd;
 	struct kfd_process_device *pdd;
-	int err = -EINVAL, i;
-	void *mem, *kern_addr;
+	int err = -EINVAL;
+	void *mem, *kern_addr = NULL;
 
-	/* Map dGPU gtt BO to kernel */
-	if (args->event_page_offset != 0) {
-		i = 0;
-		while (kfd_topology_enum_kfd_devices(i, &kfd) == 0) {
-			i++;
-			if (!kfd)
-				continue; /* Skip non GPU devices */
-			if (KFD_IS_DGPU(kfd->device_info->asic_family)) {
-				mutex_lock(&p->mutex);
-				pdd = kfd_bind_process_to_device(kfd, p);
-				if (IS_ERR(pdd) < 0) {
-					err = PTR_ERR(pdd);
-					mutex_unlock(&p->mutex);
-					return -EFAULT;
-				}
-				mem = kfd_process_device_translate_handle(pdd,
-					GET_IDR_HANDLE(args->event_page_offset));
-				BUG_ON(!mem);
-				kfd->kfd2kgd->map_gtt_bo_to_kernel(kfd->kgd,
-						mem, &kern_addr);
-				mutex_unlock(&p->mutex);
-				err = kfd_event_create(filp, p,
-						args->event_type,
-						args->auto_reset != 0,
-						args->node_id,
-						&args->event_id,
-						&args->event_trigger_data,
-						&args->event_page_offset,
-						&args->event_slot_index,
-						kern_addr);
-			}
+	pr_debug("amdkfd: Event page offset 0x%llx\n", args->event_page_offset);
+
+	if (args->event_page_offset) {
+		kfd = kfd_device_by_id(GET_GPU_ID(args->event_page_offset));
+		if (!kfd) {
+			pr_err("amdkfd: can't find kfd device\n");
+			return -EFAULT;
 		}
-	} else {
-		err = kfd_event_create(filp, p, args->event_type,
-					args->auto_reset != 0,
-					args->node_id,
-					&args->event_id,
-					&args->event_trigger_data,
-					&args->event_page_offset,
-					&args->event_slot_index,
-					NULL);
+		if (KFD_IS_DGPU(kfd->device_info->asic_family)) {
+			mutex_lock(&p->mutex);
+			pdd = kfd_bind_process_to_device(kfd, p);
+			if (IS_ERR(pdd) < 0) {
+				err = PTR_ERR(pdd);
+				mutex_unlock(&p->mutex);
+				return -EFAULT;
+			}
+			mem = kfd_process_device_translate_handle(pdd,
+				GET_IDR_HANDLE(args->event_page_offset));
+			if (!mem) {
+				pr_err("amdkfd: can't find BO offset is 0x%llx\n",
+						args->event_page_offset);
+				mutex_unlock(&p->mutex);
+				return -EFAULT;
+			}
+
+			/* Map dGPU gtt BO to kernel */
+			kfd->kfd2kgd->map_gtt_bo_to_kernel(kfd->kgd,
+					mem, &kern_addr);
+			mutex_unlock(&p->mutex);
+		}
 	}
+
+	err = kfd_event_create(filp, p,
+			args->event_type,
+			args->auto_reset != 0,
+			args->node_id,
+			&args->event_id,
+			&args->event_trigger_data,
+			&args->event_page_offset,
+			&args->event_slot_index,
+			kern_addr);
 
 	return err;
 }
@@ -1635,3 +1634,4 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	return -EFAULT;
 }
+
