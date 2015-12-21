@@ -181,7 +181,6 @@ static void kfd_process_wq_release(struct work_struct *work)
 
 		if (pdd->dev->device_info->is_need_iommu_device)
 			amd_iommu_unbind_pasid(pdd->dev->pdev, p->pasid);
-		list_del(&pdd->per_device_list);
 
 		/*
 		 * Remove all handles from idr and release appropriate
@@ -192,14 +191,18 @@ static void kfd_process_wq_release(struct work_struct *work)
 			pdd->dev->kfd2kgd->unmap_memory_to_gpu(
 				pdd->dev->kgd, mem);
 			pdd->dev->kfd2kgd->free_memory_of_gpu(
-				pdd->dev->kgd, mem);
+						pdd->dev->kgd, mem);
 		}
+	}
 
+	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
+							per_device_list) {
+		radeon_flush_tlb(pdd->dev, p->pasid);
 		/* Destroy the GPUVM VM context */
 		if (pdd->vm)
 			pdd->dev->kfd2kgd->destroy_process_vm(
 				pdd->dev->kgd, pdd->vm);
-
+		list_del(&pdd->per_device_list);
 		kfree(pdd);
 	}
 

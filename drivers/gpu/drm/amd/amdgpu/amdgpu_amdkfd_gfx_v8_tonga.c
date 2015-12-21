@@ -58,6 +58,9 @@ static int mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma);
 static int map_gtt_bo_to_kernel_tonga(struct kgd_dev *kgd,
 		struct kgd_mem *mem, void **kptr);
 
+static bool is_mem_on_local_device(struct kgd_dev *kgd,
+		struct list_head *bo_va_list);
+
 static struct kfd2kgd_calls kfd2kgd;
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_tonga_get_functions()
@@ -584,7 +587,9 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 		pr_debug("Releasing BO with VA %p, size %lu bytes\n",
 				entry->bo_va,
 				mem->data2.bo->tbo.mem.size);
-		remove_bo_from_vm((struct amdgpu_device *)entry->kgd_dev,
+		if (entry->bo_va->vm != NULL)
+			remove_bo_from_vm(
+				(struct amdgpu_device *)entry->kgd_dev,
 				mem->data2.bo, entry->bo_va);
 		list_del(&entry->bo_list);
 		kfree(entry);
@@ -771,6 +776,19 @@ err_failed_to_get_bos:
 	return ret;
 }
 
+static bool is_mem_on_local_device(struct kgd_dev *kgd,
+		struct list_head *bo_va_list)
+{
+	struct kfd_bo_va_list *entry;
+
+	list_for_each_entry(entry, bo_va_list, bo_list) {
+		if (entry->kgd_dev == kgd)
+			return true;
+	}
+
+	return false;
+}
+
 static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 {
 	struct kfd_bo_va_list *entry;
@@ -782,20 +800,28 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 
 	adev = (struct amdgpu_device *) kgd;
 
+	/*
+	 * Make sure that this BO mapped on KGD before unmappping it
+	 */
+	if (!is_mem_on_local_device(kgd, &mem->data2.bo_va_list))
+		return -EINVAL;
+
 	if (mem->data2.mapped_to_gpu_memory == 0) {
-		pr_debug("Unmapping BO with size %lu bytes from GPU memory is unnecessary\n",
+		pr_err("Unmapping BO with size %lu bytes from GPU memory is unnecessary\n",
 		mem->data2.bo->tbo.mem.size);
 		return -EFAULT;
 	}
 
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
-		pr_debug("Unmapping BO with VA 0x%llx, size %lu bytes from GPU memory\n",
-			mem->data2.va,
-			mem->data2.bo->tbo.mem.size);
-		/* Unpin the PD directory*/
-		unpin_bo(entry->bo_va->vm->page_directory, true);
-		/* Unpin PTs */
-		unpin_pts(entry->bo_va, entry->bo_va->vm, true);
+		if (entry->kgd_dev == kgd) {
+			pr_debug("Unmapping BO with VA 0x%llx, size %lu bytes from GPU memory\n",
+				mem->data2.va,
+				mem->data2.bo->tbo.mem.size);
+			/* Unpin the PD directory*/
+			unpin_bo(entry->bo_va->vm->page_directory, true);
+			/* Unpin PTs */
+			unpin_pts(entry->bo_va, entry->bo_va->vm, true);
+		}
 	}
 
 	/* Unpin BO*/
