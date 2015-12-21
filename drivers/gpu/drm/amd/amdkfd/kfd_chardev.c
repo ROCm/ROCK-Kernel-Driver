@@ -1220,14 +1220,42 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	return 0;
 }
 
+static int _map_memory_to_gpu(struct kfd_dev *dev, void *mem,
+		struct kfd_process *p, struct kfd_process_device *pdd)
+{
+	int err;
+
+	BUG_ON(!dev);
+	BUG_ON(!pdd);
+
+	err = dev->kfd2kgd->map_memory_to_gpu(
+		dev->kgd, (struct kgd_mem *) mem, pdd->vm);
+
+	if (err != 0)
+		return err;
+
+	radeon_flush_tlb(dev, p->pasid);
+
+	err = dev->dqm->ops.set_page_directory_base(dev->dqm, &pdd->qpd);
+	if (err != 0) {
+		dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd,
+				(struct kgd_mem *) mem);
+		return err;
+	}
+
+	return 0;
+}
+
 static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 					struct kfd_process *p, void *data)
 {
 	struct kfd_ioctl_map_memory_to_gpu_new_args *args = data;
-	struct kfd_process_device *pdd;
+	struct kfd_process_device *pdd, *peer_pdd;
 	void *mem;
-	struct kfd_dev *dev;
+	struct kfd_dev *dev, *peer;
 	long err;
+	int ret, i, num_dev;
+	uint32_t *devices_arr = NULL;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (dev == NULL)
@@ -1236,6 +1264,34 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	if (dev->device_info->asic_family == CHIP_CARRIZO) {
 		pr_debug("kfd_ioctl_map_memory_to_gpu not supported on CZ\n");
 		return -EINVAL;
+	}
+
+	if (args->device_ids_array_size >= 8 * sizeof(uint32_t) ||
+			args->device_ids_array_size < 0) {
+		pr_err("amdkfd: err node IDs array size %u\n",
+				args->device_ids_array_size);
+		return -EFAULT;
+	}
+
+	if (args->device_ids_array_size > 0) {
+		if (!access_ok((uint32_t *), args->device_ids_array,
+				args->device_ids_array_size)) {
+			pr_err("amdkfd: bad pointer for node IDs array %p\n",
+					args->device_ids_array);
+			return -EFAULT;
+		}
+
+		devices_arr = kzalloc(args->device_ids_array_size, GFP_KERNEL);
+		if (!devices_arr)
+			return -ENOMEM;
+
+		ret = copy_from_user(devices_arr,
+				(void __user *)args->device_ids_array,
+				args->device_ids_array_size);
+		if (ret != 0) {
+			kfree(devices_arr);
+			return -EFAULT;
+		}
 	}
 
 	mutex_lock(&p->mutex);
@@ -1250,30 +1306,44 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 						GET_IDR_HANDLE(args->handle));
 	if (mem == NULL) {
 		err = PTR_ERR(mem);
+		kfree(devices_arr);
 		goto get_mem_obj_from_handle_failed;
 	}
 
-	err = dev->kfd2kgd->map_memory_to_gpu(
-		dev->kgd, (struct kgd_mem *) mem, NULL);
-
-	if (err != 0)
-		goto map_memory_to_gpu_failed;
-
-	radeon_flush_tlb(dev, p->pasid);
-
-	err = dev->dqm->ops.set_page_directory_base(dev->dqm, &pdd->qpd);
-	if (err != 0)
-		goto set_pd_base_failed;
+	if (args->device_ids_array_size > 0) {
+		num_dev = args->device_ids_array_size / sizeof(uint32_t);
+		for (i = 0 ; i < num_dev; i++) {
+			peer = kfd_device_by_id(args->device_ids_array[i]);
+			if (!peer) {
+				mutex_unlock(&p->mutex);
+				pr_err("amdkfd: didn't found kfd-dev for 0x%x\n",
+						args->device_ids_array[i]);
+				kfree(devices_arr);
+				return -EFAULT;
+			}
+			peer_pdd = kfd_bind_process_to_device(peer, p);
+			if (!peer_pdd) {
+				mutex_unlock(&p->mutex);
+				kfree(devices_arr);
+				return -EFAULT;
+			}
+			ret = _map_memory_to_gpu(peer, mem, p, peer_pdd);
+			if (ret != 0)
+				pr_err("amdkfd: failed to map\n");
+		}
+	} else
+		ret = _map_memory_to_gpu(dev, mem, p, pdd);
 
 	mutex_unlock(&p->mutex);
 
-	return 0;
+	if (args->device_ids_array_size > 0 && devices_arr)
+		kfree(devices_arr);
 
-set_pd_base_failed:
-	dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd, (struct kgd_mem *) mem);
-map_memory_to_gpu_failed:
+	return ret;
+
 get_mem_obj_from_handle_failed:
 bind_process_to_device_failed:
+	kfree(devices_arr);
 	mutex_unlock(&p->mutex);
 	return err;
 }
@@ -1297,8 +1367,10 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	struct kfd_ioctl_unmap_memory_from_gpu_new_args *args = data;
 	struct kfd_process_device *pdd;
 	void *mem;
-	struct kfd_dev *dev;
+	struct kfd_dev *dev, *peer;
 	long err;
+	uint32_t *devices_arr, num_dev, i;
+	int ret;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (dev == NULL)
@@ -1307,6 +1379,22 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	if (dev->device_info->asic_family == CHIP_CARRIZO) {
 		pr_debug("kfd_ioctl_unmap_memory_from_gpu not supported on CZ\n");
 		return -EINVAL;
+	}
+
+	if (args->device_ids_array_size > 0) {
+		if (!access_ok((uint32_t *), args->device_ids_array,
+				args->device_ids_array_size))
+			return -EFAULT;
+
+		devices_arr = kzalloc(args->device_ids_array_size, GFP_KERNEL);
+		if (!devices_arr)
+			return -ENOMEM;
+
+		ret = copy_from_user(devices_arr,
+				(void __user *)args->device_ids_array,
+				args->device_ids_array_size);
+		if (ret != 0)
+			return -EFAULT;
 	}
 
 	mutex_lock(&p->mutex);
@@ -1325,9 +1413,23 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 		goto get_mem_obj_from_handle_failed;
 	}
 
-	dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd, mem);
-
-	radeon_flush_tlb(dev, p->pasid);
+	if (args->device_ids_array_size > 0) {
+		num_dev = args->device_ids_array_size / sizeof(uint32_t);
+		for (i = 0 ; i < num_dev; i++) {
+			peer = kfd_device_by_id(args->device_ids_array[i]);
+			if (!peer) {
+				mutex_unlock(&p->mutex);
+				pr_err("amdkfd: didn't found kfd-dev for 0x%x\n",
+						args->device_ids_array[i]);
+				return -EFAULT;
+			}
+			peer->kfd2kgd->unmap_memory_to_gpu(peer->kgd, mem);
+			radeon_flush_tlb(peer, p->pasid);
+		}
+	} else {
+		dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd, mem);
+		radeon_flush_tlb(dev, p->pasid);
+	}
 
 	mutex_unlock(&p->mutex);
 	return 0;
