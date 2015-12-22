@@ -55,7 +55,6 @@ void dp_receiver_power_ctrl(struct core_link *link, bool on)
 void dp_enable_link_phy(
 	struct core_link *link,
 	enum signal_type signal,
-	enum engine_id engine,
 	const struct link_settings *link_settings)
 {
 	if (signal == SIGNAL_TYPE_DISPLAY_PORT)

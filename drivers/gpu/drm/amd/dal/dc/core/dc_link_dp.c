@@ -1075,7 +1075,6 @@ bool dp_hbr_verify_link_cap(
 		dp_enable_link_phy(
 				link,
 				link->public.connector_signal,
-				ENGINE_ID_UNKNOWN,
 				cur);
 
 		if (skip_link_training)
