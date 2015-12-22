@@ -1396,7 +1396,7 @@ void dce110_link_encoder_enable_tmds_output(
 	/* Enable the PHY */
 
 	cntl.action = TRANSMITTER_CONTROL_ENABLE;
-	cntl.engine_id = enc->transmitter;
+	cntl.engine_id = ENGINE_ID_UNKNOWN;
 	cntl.transmitter = enc110->base.transmitter;
 	cntl.pll_id = clock_source;
 	cntl.signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
@@ -1437,7 +1437,7 @@ void dce110_link_encoder_enable_dual_link_tmds_output(
 	/* Enable the PHY */
 
 	cntl.action = TRANSMITTER_CONTROL_ENABLE;
-	cntl.engine_id = enc->transmitter;
+	cntl.engine_id = ENGINE_ID_UNKNOWN;
 	cntl.transmitter = enc110->base.transmitter;
 	cntl.pll_id = clock_source;
 	cntl.signal = SIGNAL_TYPE_DVI_DUAL_LINK;
@@ -1472,7 +1472,6 @@ void dce110_link_encoder_enable_dp_output(
 	struct dc_context *ctx = enc110->base.ctx;
 	struct bp_transmitter_control cntl = { 0 };
 	enum bp_result result;
-	enum engine_id engine = enc->transmitter;
 
 	if (enc110->base.connector.id == CONNECTOR_ID_EDP) {
 		/* power up eDP panel */
@@ -1496,7 +1495,7 @@ void dce110_link_encoder_enable_dp_output(
 	configure_encoder(enc110, link_settings);
 
 	cntl.action = TRANSMITTER_CONTROL_ENABLE;
-	cntl.engine_id = engine;
+	cntl.engine_id = ENGINE_ID_UNKNOWN;
 	cntl.transmitter = enc110->base.transmitter;
 	cntl.pll_id = clock_source;
 	cntl.signal = SIGNAL_TYPE_DISPLAY_PORT;
@@ -1532,7 +1531,7 @@ void dce110_link_encoder_enable_dp_mst_output(
 	struct dc_context *ctx = enc110->base.ctx;
 	struct bp_transmitter_control cntl = { 0 };
 	enum bp_result result;
-	enum engine_id engine = enc->transmitter;
+
 	/* Enable the PHY */
 
 	/* number_of_lanes is used for pixel clock adjust,
@@ -1542,7 +1541,7 @@ void dce110_link_encoder_enable_dp_mst_output(
 	configure_encoder(enc110, link_settings);
 
 	cntl.action = TRANSMITTER_CONTROL_ENABLE;
-	cntl.engine_id = engine;
+	cntl.engine_id = ENGINE_ID_UNKNOWN;
 	cntl.transmitter = enc110->base.transmitter;
 	cntl.pll_id = clock_source;
 	cntl.signal = SIGNAL_TYPE_DISPLAY_PORT_MST;

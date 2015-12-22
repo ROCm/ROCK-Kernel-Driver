@@ -932,7 +932,6 @@ static enum dc_status enable_link_dp(struct core_stream *stream)
 	dp_enable_link_phy(
 		stream->sink->link,
 		stream->signal,
-		stream->stream_enc->id,
 		&link_settings);
 
 	panel_mode = dp_get_panel_mode(link);
@@ -1264,12 +1263,13 @@ void core_link_enable_stream(
 {
 	struct dc *dc = stream->ctx->dc;
 
-	dc->hwss.enable_stream(stream);
-
 	if (DC_OK != enable_link(stream)) {
 			BREAK_TO_DEBUGGER();
 			return;
 	}
+
+	dc->hwss.enable_stream(stream);
+
 	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 		allocate_mst_payload(stream);
 }
