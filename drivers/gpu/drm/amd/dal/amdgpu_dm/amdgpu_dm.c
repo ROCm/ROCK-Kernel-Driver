@@ -793,7 +793,7 @@ static void handle_hpd_irq(void *param)
 
 	dc_link_detect(aconnector->dc_link);
 	amdgpu_dm_update_connector_after_detect(aconnector);
-	drm_helper_hpd_irq_event(dev);
+	drm_kms_helper_hotplug_event(dev);
 }
 
 static void handle_hpd_rx_irq(void *param)
@@ -807,7 +807,7 @@ static void handle_hpd_rx_irq(void *param)
 		/* Downstream Port status changed. */
 		dc_link_detect(aconnector->dc_link);
 		amdgpu_dm_update_connector_after_detect(aconnector);
-		drm_helper_hpd_irq_event(dev);
+		drm_kms_helper_hotplug_event(dev);
 	}
 
 	if (aconnector->is_mst_connector) {
@@ -929,9 +929,6 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 	}
 
 	register_hpd_handlers(adev);
-
-	/* This is a part of HPD initialization. */
-	drm_kms_helper_poll_init(adev->ddev);
 
 	return 0;
 }
