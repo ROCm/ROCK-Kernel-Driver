@@ -988,23 +988,15 @@ static enum drm_connector_status
 amdgpu_dm_connector_detect(struct drm_connector *connector, bool force)
 {
 	bool connected;
-	struct amdgpu_connector *aconnector =
-			to_amdgpu_connector(connector);
+	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
 
-	/*
-	 * TODO: check whether we should lock here for mst_mgr.lock
-	 */
-	/* set root connector to disconnected */
-	if (aconnector->is_mst_connector) {
-		if (!aconnector->mst_mgr.mst_state)
-			drm_dp_mst_topology_mgr_set_mst(
-				&aconnector->mst_mgr,
-				true);
-
-		return connector_status_disconnected;
-	}
+	/* Notes:
+	 * 1. This interface is NOT called in context of HPD irq.
+	 * 2. This interface *is called* in context of user-mode ioctl. Which
+	 * makes it a bad place for *any* MST-related activit. */
 
 	connected = (NULL != aconnector->dc_sink);
+
 	return (connected ? connector_status_connected :
 			connector_status_disconnected);
 }
