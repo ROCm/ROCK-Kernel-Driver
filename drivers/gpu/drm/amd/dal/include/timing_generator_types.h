@@ -135,7 +135,6 @@ enum controller_dp_test_pattern {
 };
 
 struct timing_generator {
-	uint32_t *regs;
 	struct bios_parser *bp;
 	enum controller_id controller_id;
 	struct dc_context *ctx;

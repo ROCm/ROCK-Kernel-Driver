@@ -50,8 +50,14 @@
 #define CRTC_OVERSCAN_COLOR_BLACK_COLOR_G_RGB_LIMITED_RANGE 0x40
 #define CRTC_OVERSCAN_COLOR_BLACK_COLOR_R_RGB_LIMITED_RANGE 0X40
 
+struct dce110_timing_generator_offsets {
+	uint32_t crtc;
+	uint32_t dcp;
+};
+
 struct dce110_timing_generator {
 	struct timing_generator base;
+	struct dce110_timing_generator_offsets offsets;
 	enum sync_source cached_gsl_group;
 	bool advanced_request_enable;
 };
