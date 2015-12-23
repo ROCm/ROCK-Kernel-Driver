@@ -56,52 +56,102 @@ struct dce110_timing_generator {
 	bool advanced_request_enable;
 };
 
+/********** Create and destroy **********/
 struct timing_generator *dce110_timing_generator_create(
 	struct adapter_service *as,
 	struct dc_context *ctx,
 	enum controller_id id);
-
 void dce110_timing_generator_destroy(struct timing_generator **tg);
 
-bool dce110_timing_generator_construct(
-	struct timing_generator *tg,
-	enum controller_id id);
-
-void dce110_timing_generator_program_blank_color(
-	struct timing_generator *tg,
-	enum color_space color_space);
-
-bool dce110_timing_generator_blank_crtc(struct timing_generator *tg);
-
-bool dce110_timing_generator_enable_crtc(struct timing_generator *tg);
-
-bool dce110_timing_generator_disable_crtc(struct timing_generator *tg);
-
-bool dce110_timing_generator_is_in_vertical_blank(struct timing_generator *tg);
-
-void dce110_timing_generator_program_blanking(
-	struct timing_generator *tg,
-	const struct dc_crtc_timing *timing);
-
-bool dce110_timing_generator_program_timing_generator(
-	struct timing_generator *tg,
-	struct dc_crtc_timing *dc_crtc_timing);
-
-void dce110_timing_generator_set_early_control(
-		struct timing_generator *tg,
-		uint32_t early_cntl);
-
-bool dce110_timing_generator_unblank_crtc(struct timing_generator *tg);
-
+/* determine if given timing can be supported by TG */
 bool dce110_timing_generator_validate_timing(
 	struct timing_generator *tg,
 	const struct dc_crtc_timing *timing,
 	enum signal_type signal);
 
+/******** HW programming ************/
+
+/* Program timing generator with given timing */
+bool dce110_timing_generator_program_timing_generator(
+	struct timing_generator *tg,
+	struct dc_crtc_timing *dc_crtc_timing);
+
+/* Disable/Enable Timing Generator */
+bool dce110_timing_generator_enable_crtc(struct timing_generator *tg);
+bool dce110_timing_generator_disable_crtc(struct timing_generator *tg);
+
+void dce110_timing_generator_set_early_control(
+		struct timing_generator *tg,
+		uint32_t early_cntl);
+
+/**************** TG current status ******************/
+
+/* return the current frame counter. Used by Linux kernel DRM */
+uint32_t dce110_timing_generator_get_vblank_counter(
+		struct timing_generator *tg);
+
+/* Get current H and V position */
+void dce110_timing_generator_get_crtc_positions(
+	struct timing_generator *tg,
+	int32_t *h_position,
+	int32_t *v_position);
+
+/* return true if TG counter is moving. false if TG is stopped */
+bool dce110_timing_generator_is_counter_moving(struct timing_generator *tg);
+
+/* wait until TG is in beginning of vertical blank region */
 void dce110_timing_generator_wait_for_vblank(struct timing_generator *tg);
 
+/* wait until TG is in beginning of active region */
 void dce110_timing_generator_wait_for_vactive(struct timing_generator *tg);
 
+
+/*********** Timing Generator Synchronization routines ****/
+
+/* Setups Global Swap Lock group, TimingServer or TimingClient*/
+void dce110_timing_generator_setup_global_swap_lock(
+	struct timing_generator *tg,
+	const struct dcp_gsl_params *gsl_params);
+
+/* Clear all the register writes done by setup_global_swap_lock */
+void dce110_timing_generator_tear_down_global_swap_lock(
+	struct timing_generator *tg);
+
+/* Reset slave controllers on master VSync */
+void dce110_timing_generator_enable_reset_trigger(
+	struct timing_generator *tg,
+	const struct trigger_params *trigger_params);
+
+/* disabling trigger-reset */
+void dce110_timing_generator_disable_reset_trigger(
+	struct timing_generator *tg);
+
+/* Checks whether CRTC triggered reset occurred */
+bool dce110_timing_generator_did_triggered_reset_occur(
+	struct timing_generator *tg);
+
+/******** Stuff to move to other virtual HW objects *****************/
+/* TODO: Should we move it to mem_input interface? */
+bool dce110_timing_generator_blank_crtc(struct timing_generator *tg);
+bool dce110_timing_generator_unblank_crtc(struct timing_generator *tg);
+void dce110_timing_generator_disable_vga(struct timing_generator *tg);
+
+/* TODO: Should we move it to transform */
+void dce110_timing_generator_program_blanking(
+	struct timing_generator *tg,
+	const struct dc_crtc_timing *timing);
+
+/* TODO: Should we move it to opp? */
+void dce110_timing_generator_program_blank_color(
+	struct timing_generator *tg,
+	enum color_space color_space);
+void dce110_timing_generator_set_overscan_color_black(
+	struct timing_generator *tg,
+	enum color_space black_color);
+/*************** End-of-move ********************/
+
+
+/* Not called yet */
 void dce110_timing_generator_set_test_pattern(
 	struct timing_generator *tg,
 	/* TODO: replace 'controller_dp_test_pattern' by 'test_pattern_mode'
@@ -119,26 +169,6 @@ uint32_t dce110_timing_generator_get_crtc_scanoutpos(
 	int32_t *vbl,
 	int32_t *position);
 
-uint32_t dce110_timing_generator_get_vblank_counter(struct timing_generator *tg);
-
-void dce110_timing_generator_color_space_to_black_color(
-		enum color_space colorspace,
-		struct crtc_black_color *black_color);
-void dce110_timing_generator_apply_front_porch_workaround(
-	struct timing_generator *tg,
-	struct dc_crtc_timing *timing);
-int32_t dce110_timing_generator_get_vsynch_and_front_porch_size(
-	const struct dc_crtc_timing *timing);
-
-void dce110_timing_generator_get_crtc_positions(
-	struct timing_generator *tg,
-	int32_t *h_position,
-	int32_t *v_position);
-
-
-/* TODO: Figure out if we need these functions*/
-bool dce110_timing_generator_is_counter_moving(struct timing_generator *tg);
-
 void dce110_timing_generator_enable_advanced_request(
 	struct timing_generator *tg,
 	bool enable,
@@ -146,33 +176,5 @@ void dce110_timing_generator_enable_advanced_request(
 
 void dce110_timing_generator_set_lock_master(struct timing_generator *tg,
 		bool lock);
-
-void dce110_timing_generator_set_overscan_color_black(
-	struct timing_generator *tg,
-	enum color_space black_color);
-
-
-/**** Sync-related interfaces ****/
-void dce110_timing_generator_setup_global_swap_lock(
-	struct timing_generator *tg,
-	const struct dcp_gsl_params *gsl_params);
-void dce110_timing_generator_tear_down_global_swap_lock(
-	struct timing_generator *tg);
-
-
-void dce110_timing_generator_enable_reset_trigger(
-	struct timing_generator *tg,
-	const struct trigger_params *trigger_params);
-
-void dce110_timing_generator_disable_reset_trigger(
-	struct timing_generator *tg);
-
-bool dce110_timing_generator_did_triggered_reset_occur(
-	struct timing_generator *tg);
-
-void dce110_timing_generator_disable_vga(
-	struct timing_generator *tg);
-
-/**** End-of-Sync-related interfaces ****/
 
 #endif /* __DC_TIMING_GENERATOR_DCE110_H__ */

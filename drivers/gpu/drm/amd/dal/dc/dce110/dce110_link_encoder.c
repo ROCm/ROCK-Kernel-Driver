@@ -1399,7 +1399,7 @@ void dce110_link_encoder_enable_tmds_output(
 	cntl.engine_id = ENGINE_ID_UNKNOWN;
 	cntl.transmitter = enc110->base.transmitter;
 	cntl.pll_id = clock_source;
-	cntl.signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
+	cntl.signal = SIGNAL_TYPE_HDMI_TYPE_A;
 	cntl.lanes_number = 4;
 	cntl.hpd_sel = enc110->base.hpd_source;
 

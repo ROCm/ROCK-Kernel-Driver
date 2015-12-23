@@ -645,7 +645,8 @@ static void update_info_frame(struct core_stream *stream)
 
 static void enable_stream(struct core_stream *stream)
 {
-	enum lane_count lane_count = LANE_COUNT_ONE;
+	enum lane_count lane_count =
+			stream->sink->link->cur_link_settings.lane_count;
 
 	struct dc_crtc_timing *timing = &stream->public.timing;
 	struct core_link *link = stream->sink->link;
@@ -664,7 +665,8 @@ static void enable_stream(struct core_stream *stream)
 				+ timing->h_border_left
 				+ timing->h_border_right;
 
-	early_control = active_total_with_borders % lane_count;
+	if (lane_count != 0)
+		early_control = active_total_with_borders % lane_count;
 
 	if (early_control == 0)
 		early_control = lane_count;
