@@ -522,6 +522,7 @@ void dc_link_detect(const struct dc_link *dc_link)
 					if (dc_helpers_dp_mst_start_top_mgr(
 						link->ctx,
 						&link->public)) {
+						link->mst_enabled = true;
 						return;
 					} else {
 						/* MST not supported */
@@ -636,15 +637,11 @@ void dc_link_detect(const struct dc_link *dc_link)
 
 	} else {
 		/* From Connected-to-Disconnected. */
-		switch (link->public.connector_signal) {
-		case SIGNAL_TYPE_DISPLAY_PORT:
+		if (link->mst_enabled) {
 			dc_helpers_dp_mst_stop_top_mgr(link->ctx, &link->public);
-			break;
-		default:
-			break;
-		}
-
-		link_disconnect_all_sinks(link);
+			link->mst_enabled = false;
+		} else
+			link_disconnect_all_sinks(link);
 	}
 
 	LINK_INFO("link=%d, dc_sink_in=%p is now %s\n",

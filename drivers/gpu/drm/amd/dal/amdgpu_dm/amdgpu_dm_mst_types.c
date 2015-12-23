@@ -347,7 +347,8 @@ static void dm_dp_destroy_mst_connector(
 	drm_connector_cleanup(connector);
 	drm_modeset_unlock_all(dev);
 
-	dc_link_remove_sink(aconnector->dc_link, aconnector->dc_sink);
+	if (aconnector->dc_sink)
+		dc_link_remove_sink(aconnector->dc_link, aconnector->dc_sink);
 
 	kfree(aconnector);
 	DRM_DEBUG_KMS("\n");
