@@ -37,64 +37,6 @@
 #include "include/timing_generator_types.h"
 #include "dce110_timing_generator.h"
 
-
-enum tg_regs_idx {
-	IDX_CRTC_UPDATE_LOCK,
-	IDX_CRTC_MASTER_UPDATE_LOCK,
-	IDX_CRTC_MASTER_UPDATE_MODE,
-	IDX_CRTC_H_TOTAL,
-	IDX_CRTC_V_TOTAL,
-	IDX_CRTC_H_BLANK_START_END,
-	IDX_CRTC_V_BLANK_START_END,
-	IDX_CRTC_H_SYNC_A,
-	IDX_CRTC_V_SYNC_A,
-	IDX_CRTC_H_SYNC_A_CNTL,
-	IDX_CRTC_V_SYNC_A_CNTL,
-	IDX_CRTC_INTERLACE_CONTROL,
-	IDX_CRTC_BLANK_CONTROL,
-	IDX_PIPE_PG_STATUS,
-
-	IDX_CRTC_TEST_PATTERN_COLOR,
-	IDX_CRTC_TEST_PATTERN_CONTROL,
-	IDX_CRTC_TEST_PATTERN_PARAMETERS,
-	IDX_CRTC_FLOW_CONTROL,
-	IDX_CRTC_STATUS,
-	IDX_CRTC_STATUS_POSITION,
-	IDX_CRTC_STATUS_FRAME_COUNT,
-	IDX_CRTC_STEREO_CONTROL,
-	IDX_CRTC_STEREO_STATUS,
-	IDX_CRTC_STEREO_FORCE_NEXT_EYE,
-	IDX_CRTC_3D_STRUCTURE_CONTROL,
-	IDX_CRTC_DOUBLE_BUFFER_CONTROL,
-	IDX_CRTC_V_TOTAL_MIN,
-	IDX_CRTC_V_TOTAL_MAX,
-	IDX_CRTC_V_TOTAL_CONTROL,
-	IDX_CRTC_NOM_VERT_POSITION,
-	IDX_CRTC_STATIC_SCREEN_CONTROL,
-	IDX_CRTC_TRIGB_CNTL,
-	IDX_CRTC_FORCE_COUNT_CNTL,
-	IDX_CRTC_GSL_CONTROL,
-	IDX_CRTC_GSL_WINDOW,
-
-	IDX_CRTC_CONTROL,
-	IDX_CRTC_START_LINE_CONTROL,
-	IDX_CRTC_COUNT_CONTROL,
-
-	IDX_MODE_EXT_OVERSCAN_LEFT_RIGHT,
-	IDX_MODE_EXT_OVERSCAN_TOP_BOTTOM,
-	IDX_DCP_GSL_CONTROL,
-	IDX_GRPH_UPDATE,
-
-	IDX_CRTC_VBI_END,
-
-	IDX_BLND_UNDERFLOW_INTERRUPT,
-	IDX_CRTC_BLACK_COLOR,
-	IDX_CRTC_OVERSCAN_COLOR,
-	IDX_CRTC_BLANK_DATA_COLOR,
-
-	TG_REGS_IDX_SIZE
-};
-
 enum black_color_format {
 	BLACK_COLOR_FORMAT_RGB_FULLRANGE = 0,	/* used as index in array */
 	BLACK_COLOR_FORMAT_RGB_LIMITED,
@@ -105,61 +47,6 @@ enum black_color_format {
 	BLACK_COLOR_FORMAT_COUNT
 };
 
-#define regs_for_controller(id)\
-[CONTROLLER_ID_D ## id - 1] =\
-{[IDX_CRTC_UPDATE_LOCK] = mmCRTC ## id ## _CRTC_UPDATE_LOCK,\
-[IDX_CRTC_MASTER_UPDATE_LOCK] = mmCRTC ## id ## _CRTC_MASTER_UPDATE_LOCK,\
-[IDX_CRTC_MASTER_UPDATE_MODE] = mmCRTC ## id ## _CRTC_MASTER_UPDATE_MODE,\
-[IDX_CRTC_H_TOTAL] = mmCRTC ## id ## _CRTC_H_TOTAL,\
-[IDX_CRTC_V_TOTAL] = mmCRTC ## id ## _CRTC_V_TOTAL,\
-[IDX_CRTC_H_BLANK_START_END] = mmCRTC ## id ## _CRTC_H_BLANK_START_END,\
-[IDX_CRTC_V_BLANK_START_END] = mmCRTC ## id ## _CRTC_V_BLANK_START_END,\
-[IDX_CRTC_H_SYNC_A] = mmCRTC ## id ## _CRTC_H_SYNC_A,\
-[IDX_CRTC_V_SYNC_A] = mmCRTC ## id ## _CRTC_V_SYNC_A,\
-[IDX_CRTC_H_SYNC_A_CNTL] = mmCRTC ## id ## _CRTC_H_SYNC_A_CNTL,\
-[IDX_CRTC_V_SYNC_A_CNTL] = mmCRTC ## id ## _CRTC_V_SYNC_A_CNTL,\
-[IDX_CRTC_INTERLACE_CONTROL] = mmCRTC ## id ## _CRTC_INTERLACE_CONTROL,\
-[IDX_CRTC_BLANK_CONTROL] = mmCRTC ## id ## _CRTC_BLANK_CONTROL,\
-[IDX_PIPE_PG_STATUS] = mmPIPE ## id ## _PG_STATUS,\
-[IDX_CRTC_TEST_PATTERN_COLOR] = mmCRTC ## id ## _CRTC_TEST_PATTERN_COLOR,\
-[IDX_CRTC_TEST_PATTERN_CONTROL] = mmCRTC ## id ## _CRTC_TEST_PATTERN_CONTROL,\
-[IDX_CRTC_TEST_PATTERN_PARAMETERS] =\
-mmCRTC ## id ## _CRTC_TEST_PATTERN_PARAMETERS,\
-[IDX_CRTC_FLOW_CONTROL] = mmCRTC ## id ## _CRTC_FLOW_CONTROL,\
-[IDX_CRTC_STATUS] = mmCRTC ## id ## _CRTC_STATUS,\
-[IDX_CRTC_STATUS_POSITION] = mmCRTC ## id ## _CRTC_STATUS_POSITION,\
-[IDX_CRTC_STATUS_FRAME_COUNT] = mmCRTC ## id ## _CRTC_STATUS_FRAME_COUNT,\
-[IDX_CRTC_STEREO_CONTROL] = mmCRTC ## id ## _CRTC_STEREO_CONTROL,\
-[IDX_CRTC_STEREO_STATUS] = mmCRTC ## id ## _CRTC_STEREO_STATUS,\
-[IDX_CRTC_STEREO_FORCE_NEXT_EYE] = \
-mmCRTC ## id ## _CRTC_STEREO_FORCE_NEXT_EYE,\
-[IDX_CRTC_3D_STRUCTURE_CONTROL] = mmCRTC ## id ## _CRTC_3D_STRUCTURE_CONTROL,\
-[IDX_CRTC_DOUBLE_BUFFER_CONTROL] =\
-mmCRTC ## id ## _CRTC_DOUBLE_BUFFER_CONTROL,\
-[IDX_CRTC_V_TOTAL_MIN] = mmCRTC ## id ## _CRTC_V_TOTAL_MIN,\
-[IDX_CRTC_V_TOTAL_MAX] = mmCRTC ## id ## _CRTC_V_TOTAL_MAX,\
-[IDX_CRTC_V_TOTAL_CONTROL] = mmCRTC ## id ## _CRTC_V_TOTAL_CONTROL,\
-[IDX_CRTC_NOM_VERT_POSITION] = mmCRTC ## id ## _CRTC_NOM_VERT_POSITION,\
-[IDX_CRTC_STATIC_SCREEN_CONTROL] =\
-mmCRTC ## id ## _CRTC_STATIC_SCREEN_CONTROL,\
-[IDX_CRTC_TRIGB_CNTL] = mmCRTC ## id ## _CRTC_TRIGB_CNTL,\
-[IDX_CRTC_FORCE_COUNT_CNTL] = mmCRTC ## id ## _CRTC_FORCE_COUNT_NOW_CNTL,\
-[IDX_CRTC_GSL_CONTROL] = mmCRTC ## id ## _CRTC_GSL_CONTROL,\
-[IDX_CRTC_GSL_WINDOW] = mmCRTC ## id ## _CRTC_GSL_WINDOW,\
-[IDX_CRTC_CONTROL] = mmCRTC ## id ## _CRTC_CONTROL,\
-[IDX_CRTC_START_LINE_CONTROL] = mmCRTC ## id ## _CRTC_START_LINE_CONTROL,\
-[IDX_CRTC_COUNT_CONTROL] = mmCRTC ## id ## _CRTC_COUNT_CONTROL,\
-[IDX_MODE_EXT_OVERSCAN_LEFT_RIGHT] = mmSCL ## id ## _EXT_OVERSCAN_LEFT_RIGHT,\
-[IDX_MODE_EXT_OVERSCAN_TOP_BOTTOM] = mmSCL ## id ## _EXT_OVERSCAN_TOP_BOTTOM,\
-[IDX_DCP_GSL_CONTROL] = mmDCP ## id ## _DCP_GSL_CONTROL,\
-[IDX_GRPH_UPDATE] = mmDCP ## id ## _GRPH_UPDATE,\
-[IDX_CRTC_VBI_END] = mmCRTC ## id ## _CRTC_VBI_END,\
-[IDX_BLND_UNDERFLOW_INTERRUPT] = mmBLND ## id ## _BLND_UNDERFLOW_INTERRUPT,\
-[IDX_CRTC_BLACK_COLOR] = mmCRTC ## id ## _CRTC_BLACK_COLOR,\
-[IDX_CRTC_OVERSCAN_COLOR] = mmCRTC ## id ## _CRTC_OVERSCAN_COLOR,\
-[IDX_CRTC_BLANK_DATA_COLOR] = mmCRTC ## id ## _CRTC_BLANK_DATA_COLOR,\
-}
-
 #define NUMBER_OF_FRAME_TO_WAIT_ON_TRIGGERED_RESET 10
 
 #define MAX_H_TOTAL (CRTC_H_TOTAL__CRTC_H_TOTAL_MASK + 1)
@@ -169,12 +56,23 @@ mmCRTC ## id ## _CRTC_STATIC_SCREEN_CONTROL,\
 #define FROM_TIMING_GENERATOR(tg)\
 	container_of(tg, struct dce110_timing_generator, base)
 
-static uint32_t tg_regs[][TG_REGS_IDX_SIZE] = {
-	regs_for_controller(0),
-	regs_for_controller(1),
-	regs_for_controller(2),
-};
+#define CRTC_REG(reg) (reg + tg110->offsets.crtc)
+#define DCP_REG(reg) (reg + tg110->offsets.dcp)
 
+static const struct dce110_timing_generator_offsets reg_offsets[] = {
+	{
+		.crtc = 0,
+		.dcp = 0,
+	},
+	{
+		.crtc = (mmCRTC1_CRTC_CONTROL - mmCRTC0_CRTC_CONTROL),
+		.dcp = (mmDCP1_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+	},
+	{
+		.crtc = (mmCRTC2_CRTC_CONTROL - mmCRTC0_CRTC_CONTROL),
+		.dcp = (mmDCP2_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+	}
+};
 /*******************************************************************************
  * GSL Sync related values */
 
@@ -237,7 +135,10 @@ static bool dce110_timing_generator_construct(
 		struct timing_generator *tg,
 		enum controller_id id)
 {
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
+
 	tg->controller_id = id;
+	tg110->offsets = reg_offsets[id - 1];
 	return true;
 }
 
@@ -345,8 +246,9 @@ static bool dce110_timing_generator_is_in_vertical_blank(
 	uint32_t addr = 0;
 	uint32_t value = 0;
 	uint32_t field = 0;
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
 
-	addr = tg->regs[IDX_CRTC_STATUS];
+	addr = CRTC_REG(mmCRTC_STATUS);
 	value = dal_read_reg(tg->ctx, addr);
 	field = get_reg_field_value(value, CRTC_STATUS, CRTC_V_BLANK);
 	return field == 1;
@@ -357,7 +259,8 @@ void dce110_timing_generator_set_early_control(
 		uint32_t early_cntl)
 {
 	uint32_t regval;
-	uint32_t address = tg->regs[IDX_CRTC_CONTROL];
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
+	uint32_t address = CRTC_REG(mmCRTC_CONTROL);
 
 	regval = dal_read_reg(tg->ctx, address);
 	set_reg_field_value(regval, early_cntl,
@@ -376,13 +279,14 @@ bool dce110_timing_generator_enable_crtc(struct timing_generator *tg)
 	/* 0 value is needed by DRR and is also suggested default value for CZ
 	 */
 	uint32_t value;
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
 
 	value = dal_read_reg(tg->ctx,
-			tg->regs[IDX_CRTC_MASTER_UPDATE_MODE]);
+			CRTC_REG(mmCRTC_MASTER_UPDATE_MODE));
 	set_reg_field_value(value, 3,
 			CRTC_MASTER_UPDATE_MODE, MASTER_UPDATE_MODE);
 	dal_write_reg(tg->ctx,
-			tg->regs[IDX_CRTC_MASTER_UPDATE_MODE], value);
+			CRTC_REG(mmCRTC_MASTER_UPDATE_MODE), value);
 
 	result = dal_bios_parser_enable_crtc(tg->bp, tg->controller_id, true);
 
@@ -394,7 +298,8 @@ void dce110_timing_generator_program_blank_color(
 		enum color_space color_space)
 {
 	struct crtc_black_color black_color;
-	uint32_t addr = tg->regs[IDX_CRTC_BLACK_COLOR];
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
+	uint32_t addr = CRTC_REG(mmCRTC_BLACK_COLOR);
 	uint32_t value = dal_read_reg(tg->ctx, addr);
 
 	dce110_timing_generator_color_space_to_black_color(
@@ -427,7 +332,8 @@ void dce110_timing_generator_program_blank_color(
 
 bool dce110_timing_generator_blank_crtc(struct timing_generator *tg)
 {
-	uint32_t addr = tg->regs[IDX_CRTC_BLANK_CONTROL];
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
+	uint32_t addr = CRTC_REG(mmCRTC_BLANK_CONTROL);
 	uint32_t value = dal_read_reg(tg->ctx, addr);
 	uint8_t counter = 100;
 
@@ -479,7 +385,8 @@ bool dce110_timing_generator_blank_crtc(struct timing_generator *tg)
  */
 bool dce110_timing_generator_unblank_crtc(struct timing_generator *tg)
 {
-	uint32_t addr = tg->regs[IDX_CRTC_BLANK_CONTROL];
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
+	uint32_t addr = CRTC_REG(mmCRTC_BLANK_CONTROL);
 	uint32_t value = dal_read_reg(tg->ctx, addr);
 
 	set_reg_field_value(
@@ -512,7 +419,8 @@ bool dce110_timing_generator_unblank_crtc(struct timing_generator *tg)
 @TODOSTEREO
 static void disable_stereo(struct timing_generator *tg)
 {
-	uint32_t addr = tg->regs[IDX_CRTC_3D_STRUCTURE_CONTROL];
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
+	uint32_t addr = CRTC_REG(mmCRTC_3D_STRUCTURE_CONTROL);
 	uint32_t value = 0;
 	uint32_t test = 0;
 	uint32_t field = 0;
@@ -579,9 +487,10 @@ static void program_horz_count_by_2(
 	const struct dc_crtc_timing *timing)
 {
 	uint32_t regval;
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
 
 	regval = dal_read_reg(tg->ctx,
-			tg->regs[IDX_CRTC_COUNT_CONTROL]);
+			CRTC_REG(mmCRTC_COUNT_CONTROL));
 
 	set_reg_field_value(regval, 0, CRTC_COUNT_CONTROL,
 			CRTC_HORZ_COUNT_BY2_EN);
@@ -591,7 +500,7 @@ static void program_horz_count_by_2(
 					CRTC_HORZ_COUNT_BY2_EN);
 
 	dal_write_reg(tg->ctx,
-		tg->regs[IDX_CRTC_COUNT_CONTROL], regval);
+			CRTC_REG(mmCRTC_COUNT_CONTROL), regval);
 }
 
 /**
@@ -606,6 +515,7 @@ bool dce110_timing_generator_program_timing_generator(
 	enum bp_result result;
 	struct bp_hw_crtc_timing_parameters bp_params;
 	uint32_t regval;
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
 
 	uint32_t vsync_offset = dc_crtc_timing->v_border_bottom +
 			dc_crtc_timing->v_front_porch;
@@ -663,7 +573,7 @@ bool dce110_timing_generator_program_timing_generator(
 
 
 	regval = dal_read_reg(tg->ctx,
-			tg->regs[IDX_CRTC_START_LINE_CONTROL]);
+			CRTC_REG(mmCRTC_START_LINE_CONTROL));
 
 	if (dce110_timing_generator_get_vsynch_and_front_porch_size(dc_crtc_timing) <= 3) {
 		set_reg_field_value(regval, 3,
@@ -683,7 +593,7 @@ bool dce110_timing_generator_program_timing_generator(
 				CRTC_PREFETCH_EN);
 	}
 	dal_write_reg(tg->ctx,
-			tg->regs[IDX_CRTC_START_LINE_CONTROL], regval);
+			CRTC_REG(mmCRTC_START_LINE_CONTROL), regval);
 
 	/* Enable stereo - only when we need to pack 3D frame. Other types
 	 * of stereo handled in explicit call */
@@ -722,19 +632,20 @@ void dce110_timing_generator_program_drr(
 	uint32_t v_total_max = 0;
 	uint32_t v_total_cntl = 0;
 	uint32_t static_screen_cntl = 0;
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
 
 	uint32_t addr = 0;
 
-	addr = tg->regs[IDX_CRTC_V_TOTAL_MIN];
+	addr = CRTC_REG(mmCRTC_V_TOTAL_MIN);
 	v_total_min = dal_read_reg(tg->ctx, addr);
 
-	addr = tg->regs[IDX_CRTC_V_TOTAL_MAX];
+	addr = CRTC_REG(mmCRTC_V_TOTAL_MAX);
 	v_total_max = dal_read_reg(tg->ctx, addr);
 
-	addr = tg->regs[IDX_CRTC_V_TOTAL_CONTROL];
+	addr = CRTC_REG(mmCRTC_V_TOTAL_CONTROL);
 	v_total_cntl = dal_read_reg(tg->ctx, addr);
 
-	addr = tg->regs[IDX_CRTC_STATIC_SCREEN_CONTROL];
+	addr = CRTC_REG(mmCRTC_STATIC_SCREEN_CONTROL);
 	static_screen_cntl = dal_read_reg(tg->ctx, addr);
 
 	if (timing != NULL) {
@@ -856,16 +767,16 @@ void dce110_timing_generator_program_drr(
 				CRTC_FORCE_LOCK_TO_MASTER_VSYNC);
 	}
 
-	addr = tg->regs[IDX_CRTC_V_TOTAL_MIN];
+	addr = CRTC_REG(mmCRTC_V_TOTAL_MIN);
 	dal_write_reg(tg->ctx, addr, v_total_min);
 
-	addr = tg->regs[IDX_CRTC_V_TOTAL_MAX];
+	addr = CRTC_REG(mmCRTC_V_TOTAL_MAX);
 	dal_write_reg(tg->ctx, addr, v_total_max);
 
-	addr = tg->regs[IDX_CRTC_V_TOTAL_CONTROL];
+	addr = CRTC_REG(mmCRTC_V_TOTAL_CONTROL);
 	dal_write_reg(tg->ctx, addr, v_total_cntl);
 
-	addr = tg->regs[IDX_CRTC_STATIC_SCREEN_CONTROL];
+	addr = CRTC_REG(mmCRTC_STATIC_SCREEN_CONTROL);
 	dal_write_reg(tg->ctx, addr, static_screen_cntl);
 }
 
@@ -885,7 +796,8 @@ void dce110_timing_generator_program_drr(
  */
 uint32_t dce110_timing_generator_get_vblank_counter(struct timing_generator *tg)
 {
-	uint32_t addr = tg->regs[IDX_CRTC_STATUS_FRAME_COUNT];
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
+	uint32_t addr = CRTC_REG(mmCRTC_STATUS_FRAME_COUNT);
 	uint32_t value = dal_read_reg(tg->ctx, addr);
 	uint32_t field = get_reg_field_value(
 			value, CRTC_STATUS_FRAME_COUNT, CRTC_FRAME_COUNT);
@@ -910,8 +822,9 @@ void dce110_timing_generator_get_crtc_positions(
 	int32_t *v_position)
 {
 	uint32_t value;
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
 
-	value = dal_read_reg(tg->ctx, tg->regs[IDX_CRTC_STATUS_POSITION]);
+	value = dal_read_reg(tg->ctx, CRTC_REG(mmCRTC_STATUS_POSITION));
 
 	*h_position = get_reg_field_value(
 			value,
@@ -939,6 +852,7 @@ uint32_t dce110_timing_generator_get_crtc_scanoutpos(
 	int32_t *vbl,
 	int32_t *position)
 {
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
 	/* TODO 1: Update the implementation once caller is updated
 	 * WARNING!! This function is returning the whole register value
 	 * because the caller is expecting it instead of proper vertical and
@@ -948,10 +862,10 @@ uint32_t dce110_timing_generator_get_crtc_scanoutpos(
 	/* TODO 2: re-use dce110_timing_generator_get_crtc_positions() */
 
 	*vbl = dal_read_reg(tg->ctx,
-			tg->regs[IDX_CRTC_V_BLANK_START_END]);
+			CRTC_REG(mmCRTC_V_BLANK_START_END));
 
 	*position = dal_read_reg(tg->ctx,
-			tg->regs[IDX_CRTC_STATUS_POSITION]);
+			CRTC_REG(mmCRTC_STATUS_POSITION));
 
 	/* @TODO: return value should indicate if current
 	 * crtc is inside vblank*/
@@ -973,13 +887,14 @@ void dce110_timing_generator_program_blanking(
 	uint32_t hsync_offset = timing->h_border_right +
 			timing->h_front_porch;
 	uint32_t h_sync_start = timing->h_addressable + hsync_offset;
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
 
 	struct dc_context *ctx = tg->ctx;
 	uint32_t value = 0;
 	uint32_t addr = 0;
 	uint32_t tmp = 0;
 
-	addr = tg->regs[IDX_CRTC_H_TOTAL];
+	addr = CRTC_REG(mmCRTC_H_TOTAL);
 	value = dal_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
@@ -988,7 +903,7 @@ void dce110_timing_generator_program_blanking(
 		CRTC_H_TOTAL);
 	dal_write_reg(ctx, addr, value);
 
-	addr = tg->regs[IDX_CRTC_V_TOTAL];
+	addr = CRTC_REG(mmCRTC_V_TOTAL);
 	value = dal_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
@@ -997,7 +912,7 @@ void dce110_timing_generator_program_blanking(
 		CRTC_V_TOTAL);
 	dal_write_reg(ctx, addr, value);
 
-	addr = tg->regs[IDX_CRTC_H_BLANK_START_END];
+	addr = CRTC_REG(mmCRTC_H_BLANK_START_END);
 	value = dal_read_reg(ctx, addr);
 
 	tmp = timing->h_total -
@@ -1020,7 +935,7 @@ void dce110_timing_generator_program_blanking(
 
 	dal_write_reg(ctx, addr, value);
 
-	addr = tg->regs[IDX_CRTC_V_BLANK_START_END];
+	addr = CRTC_REG(mmCRTC_V_BLANK_START_END);
 	value = dal_read_reg(ctx, addr);
 
 	tmp = timing->v_total - (v_sync_start + timing->v_border_top);
@@ -1054,12 +969,13 @@ void dce110_timing_generator_set_test_pattern(
 	struct dc_context *ctx = tg->ctx;
 	uint32_t value;
 	uint32_t addr;
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
 
 	/* TODO: add support for other test patterns */
 	switch (test_pattern) {
 	default:
 		value = 0;
-		addr = tg->regs[IDX_CRTC_TEST_PATTERN_PARAMETERS];
+		addr = CRTC_REG(mmCRTC_TEST_PATTERN_PARAMETERS);
 
 		set_reg_field_value(
 			value,
@@ -1074,7 +990,7 @@ void dce110_timing_generator_set_test_pattern(
 
 		dal_write_reg(ctx, addr, value);
 
-		addr = tg->regs[IDX_CRTC_TEST_PATTERN_CONTROL];
+		addr = CRTC_REG(mmCRTC_TEST_PATTERN_CONTROL);
 		value = 0;
 
 		set_reg_field_value(
@@ -1221,7 +1137,6 @@ static bool timing_generator_dce110_construct(struct timing_generator *tg,
 
 	tg->ctx = ctx;
 	tg->bp = dal_adapter_service_get_bios_parser(as);
-	tg->regs = tg_regs[id-1];
 
 	tg->max_h_total = CRTC_H_TOTAL__CRTC_H_TOTAL_MASK + 1;
 	tg->max_v_total = CRTC_V_TOTAL__CRTC_V_TOTAL_MASK + 1;
@@ -1270,7 +1185,8 @@ void dce110_timing_generator_setup_global_swap_lock(
 	const struct dcp_gsl_params *gsl_params)
 {
 	uint32_t value;
-	uint32_t address = tg->regs[IDX_DCP_GSL_CONTROL];
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
+	uint32_t address = DCP_REG(mmDCP_GSL_CONTROL);
 	uint32_t check_point = FLIP_READY_BACK_LOOKUP;
 
 	value = dal_read_reg(tg->ctx, address);
@@ -1302,7 +1218,8 @@ void dce110_timing_generator_setup_global_swap_lock(
 	{
 		uint32_t value_crtc_vtotal;
 
-		value_crtc_vtotal = dal_read_reg(tg->ctx, tg->regs[IDX_CRTC_V_TOTAL]);
+		value_crtc_vtotal = dal_read_reg(tg->ctx,
+				CRTC_REG(mmCRTC_V_TOTAL));
 
 		set_reg_field_value(value,
 				gsl_params->gsl_purpose,
@@ -1314,7 +1231,7 @@ void dce110_timing_generator_setup_global_swap_lock(
 				CRTC_V_TOTAL,
 				CRTC_V_TOTAL);
 
-		dal_write_reg(tg->ctx, tg->regs[IDX_CRTC_GSL_WINDOW], 0);
+		dal_write_reg(tg->ctx, CRTC_REG(mmCRTC_GSL_WINDOW), 0);
 	}
 
 	set_reg_field_value(value,
@@ -1325,7 +1242,7 @@ void dce110_timing_generator_setup_global_swap_lock(
 	dal_write_reg(tg->ctx, address, value);
 
 	/********************************************************************/
-	address = tg->regs[IDX_CRTC_GSL_CONTROL];
+	address = CRTC_REG(mmCRTC_GSL_CONTROL);
 
 	value = 0;
 	set_reg_field_value(value,
@@ -1350,7 +1267,8 @@ void dce110_timing_generator_tear_down_global_swap_lock(
 	 */
 
 	uint32_t value;
-	uint32_t address = tg->regs[IDX_DCP_GSL_CONTROL];
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
+	uint32_t address = DCP_REG(mmDCP_GSL_CONTROL);
 
 	value = 0;
 
@@ -1381,7 +1299,8 @@ void dce110_timing_generator_tear_down_global_swap_lock(
 	{
 		uint32_t value_crtc_vtotal;
 
-		value_crtc_vtotal = dal_read_reg(tg->ctx, tg->regs[IDX_CRTC_V_TOTAL]);
+		value_crtc_vtotal = dal_read_reg(tg->ctx,
+				CRTC_REG(mmCRTC_V_TOTAL));
 
 		set_reg_field_value(value,
 				0,
@@ -1397,7 +1316,7 @@ void dce110_timing_generator_tear_down_global_swap_lock(
 	dal_write_reg(tg->ctx, address, value);
 
 	/********************************************************************/
-	address = tg->regs[IDX_CRTC_GSL_CONTROL];
+	address = CRTC_REG(mmCRTC_GSL_CONTROL);
 
 	value = 0;
 	set_reg_field_value(value,
@@ -1446,7 +1365,8 @@ void dce110_timing_generator_enable_advanced_request(
 	bool enable,
 	const struct dc_crtc_timing *timing)
 {
-	uint32_t addr = tg->regs[IDX_CRTC_START_LINE_CONTROL];
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
+	uint32_t addr = CRTC_REG(mmCRTC_START_LINE_CONTROL);
 	uint32_t value = dal_read_reg(tg->ctx, addr);
 
 	if (enable && FROM_TIMING_GENERATOR(tg)->advanced_request_enable) {
@@ -1507,7 +1427,8 @@ void dce110_timing_generator_set_lock_master(struct timing_generator *tg,
 		bool lock)
 {
 	struct dc_context *ctx = tg->ctx;
-	uint32_t addr = tg->regs[IDX_CRTC_MASTER_UPDATE_LOCK];
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
+	uint32_t addr = CRTC_REG(mmCRTC_MASTER_UPDATE_LOCK);
 	uint32_t value = dal_read_reg(ctx, addr);
 
 	set_reg_field_value(
@@ -1528,6 +1449,7 @@ void dce110_timing_generator_enable_reset_trigger(
 	uint32_t rising_edge = 0;
 	uint32_t falling_edge = 0;
 	enum trigger_source_select trig_src_select = TRIGGER_SOURCE_SELECT_LOGIC_ZERO;
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
 
 	/* Setup trigger edge */
 	switch (trigger_params->edge) {
@@ -1535,7 +1457,7 @@ void dce110_timing_generator_enable_reset_trigger(
 	case TRIGGER_EDGE_DEFAULT:
 		{
 			uint32_t pol_value = dal_read_reg(tg->ctx,
-					tg->regs[IDX_CRTC_V_SYNC_A_CNTL]);
+					CRTC_REG(mmCRTC_V_SYNC_A_CNTL));
 
 			/* Register spec has reversed definition:
 			 *	0 for positive, 1 for negative */
@@ -1563,7 +1485,7 @@ void dce110_timing_generator_enable_reset_trigger(
 		return;
 	}
 
-	value = dal_read_reg(tg->ctx, tg->regs[IDX_CRTC_TRIGB_CNTL]);
+	value = dal_read_reg(tg->ctx, CRTC_REG(mmCRTC_TRIGB_CNTL));
 
 	switch(trigger_params->source) {
 	/* Currently supporting only a single group, the group zero. */
@@ -1610,11 +1532,11 @@ void dce110_timing_generator_enable_reset_trigger(
 			CRTC_TRIGB_CNTL,
 			CRTC_TRIGB_CLEAR);
 
-	dal_write_reg(tg->ctx, tg->regs[IDX_CRTC_TRIGB_CNTL], value);
+	dal_write_reg(tg->ctx, CRTC_REG(mmCRTC_TRIGB_CNTL), value);
 
 	/**************************************************************/
 
-	value = dal_read_reg(tg->ctx, tg->regs[IDX_CRTC_FORCE_COUNT_CNTL]);
+	value = dal_read_reg(tg->ctx, CRTC_REG(mmCRTC_FORCE_COUNT_NOW_CNTL));
 
 	set_reg_field_value(value,
 			2, /* force H count to H_TOTAL and V count to V_TOTAL */
@@ -1631,15 +1553,16 @@ void dce110_timing_generator_enable_reset_trigger(
 			CRTC_FORCE_COUNT_NOW_CNTL,
 			CRTC_FORCE_COUNT_NOW_CLEAR);
 
-	dal_write_reg(tg->ctx, tg->regs[IDX_CRTC_FORCE_COUNT_CNTL], value);
+	dal_write_reg(tg->ctx, CRTC_REG(mmCRTC_FORCE_COUNT_NOW_CNTL), value);
 }
 
 void dce110_timing_generator_disable_reset_trigger(
 	struct timing_generator *tg)
 {
 	uint32_t value;
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
 
-	value = dal_read_reg(tg->ctx, tg->regs[IDX_CRTC_FORCE_COUNT_CNTL]);
+	value = dal_read_reg(tg->ctx, CRTC_REG(mmCRTC_FORCE_COUNT_NOW_CNTL));
 
 	set_reg_field_value(value,
 			0, /* force counter now mode is disabled */
@@ -1651,10 +1574,10 @@ void dce110_timing_generator_disable_reset_trigger(
 			CRTC_FORCE_COUNT_NOW_CNTL,
 			CRTC_FORCE_COUNT_NOW_CLEAR);
 
-	dal_write_reg(tg->ctx, tg->regs[IDX_CRTC_FORCE_COUNT_CNTL], value);
+	dal_write_reg(tg->ctx, CRTC_REG(mmCRTC_FORCE_COUNT_NOW_CNTL), value);
 
 	/********************************************************************/
-	value = dal_read_reg(tg->ctx, tg->regs[IDX_CRTC_TRIGB_CNTL]);
+	value = dal_read_reg(tg->ctx, CRTC_REG(mmCRTC_TRIGB_CNTL));
 
 	set_reg_field_value(value,
 			TRIGGER_SOURCE_SELECT_LOGIC_ZERO,
@@ -1671,7 +1594,7 @@ void dce110_timing_generator_disable_reset_trigger(
 			CRTC_TRIGB_CNTL,
 			CRTC_TRIGB_CLEAR);
 
-	dal_write_reg(tg->ctx, tg->regs[IDX_CRTC_TRIGB_CNTL], value);
+	dal_write_reg(tg->ctx, CRTC_REG(mmCRTC_TRIGB_CNTL), value);
 }
 
 /**
@@ -1686,7 +1609,9 @@ void dce110_timing_generator_disable_reset_trigger(
 bool dce110_timing_generator_did_triggered_reset_occur(
 	struct timing_generator *tg)
 {
-	uint32_t value = dal_read_reg(tg->ctx, tg->regs[IDX_CRTC_FORCE_COUNT_CNTL]);
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
+	uint32_t value = dal_read_reg(tg->ctx,
+			CRTC_REG(mmCRTC_FORCE_COUNT_NOW_CNTL));
 
 	return get_reg_field_value(value,
 			CRTC_FORCE_COUNT_NOW_CNTL,
@@ -1744,7 +1669,7 @@ void dce110_timing_generator_set_overscan_color_black(
 	struct dc_context *ctx = tg->ctx;
 	uint32_t value = 0;
 	uint32_t addr;
-
+	struct dce110_timing_generator *tg110 = FROM_TIMING_GENERATOR(tg);
 	/* Overscan Color for YUV display modes:
 	 * to achieve a black color for both the explicit and implicit overscan,
 	 * the overscan color registers should be programmed to: */
@@ -1842,15 +1767,15 @@ void dce110_timing_generator_set_overscan_color_black(
 		/* default is sRGB black 0. */
 		break;
 	}
-	addr = tg->regs[IDX_CRTC_OVERSCAN_COLOR];
+	addr = CRTC_REG(mmCRTC_OVERSCAN_COLOR);
 	dal_write_reg(ctx, addr, value);
-	addr = tg->regs[IDX_CRTC_BLACK_COLOR];
+	addr = CRTC_REG(mmCRTC_BLACK_COLOR);
 	dal_write_reg(ctx, addr, value);
 	/* This is desirable to have a constant DAC output voltage during the
 	 * blank time that is higher than the 0 volt reference level that the
 	 * DAC outputs when the NBLANK signal
 	 * is asserted low, such as for output to an analog TV. */
-	addr = tg->regs[IDX_CRTC_BLANK_DATA_COLOR];
+	addr = CRTC_REG(mmCRTC_BLANK_DATA_COLOR);
 	dal_write_reg(ctx, addr, value);
 
 	/* TO DO we have to program EXT registers and we need to know LB DATA
