@@ -1009,9 +1009,9 @@ static void enable_link_hdmi(struct core_stream *stream)
 			normalized_pix_clk,
 			stream->public.timing.flags.LTE_340MCSC_SCRAMBLE);
 
-	stream->sink->link->cur_link_settings.lane_count =
-		(stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK)
-					? LANE_COUNT_EIGHT : LANE_COUNT_FOUR;
+	dc_service_memset(&stream->sink->link->cur_link_settings, 0,
+			sizeof(struct link_settings));
+
 	if (stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK)
 		link->ctx->dc->hwss.encoder_enable_dual_link_tmds_output(
 				stream->sink->link->link_enc,

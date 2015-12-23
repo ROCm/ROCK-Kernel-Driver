@@ -233,7 +233,7 @@ enum trigger_polarity_select {
 
 /******************************************************************************/
 
-bool dce110_timing_generator_construct(
+static bool dce110_timing_generator_construct(
 		struct timing_generator *tg,
 		enum controller_id id)
 {
@@ -262,7 +262,32 @@ static const struct crtc_black_color black_color_format[] = {
 		CRTC_OVERSCAN_COLOR_BLACK_COLOR_R_CR_YUV_4SUPERAA}
 };
 
-void dce110_timing_generator_color_space_to_black_color(
+/**
+* apply_front_porch_workaround
+*
+* This is a workaround for a bug that has existed since R5xx and has not been
+* fixed keep Front porch at minimum 2 for Interlaced mode or 1 for progressive.
+*/
+static void dce110_timing_generator_apply_front_porch_workaround(
+	struct timing_generator *tg,
+	struct dc_crtc_timing *timing)
+{
+	if (timing->flags.INTERLACE == 1) {
+		if (timing->v_front_porch < 2)
+			timing->v_front_porch = 2;
+	} else {
+		if (timing->v_front_porch < 1)
+			timing->v_front_porch = 1;
+	}
+}
+
+static int32_t dce110_timing_generator_get_vsynch_and_front_porch_size(
+	const struct dc_crtc_timing *timing)
+{
+	return timing->v_sync_width + timing->v_front_porch;
+}
+
+static void dce110_timing_generator_color_space_to_black_color(
 		enum color_space colorspace,
 	struct crtc_black_color *black_color)
 {
@@ -302,30 +327,30 @@ void dce110_timing_generator_color_space_to_black_color(
 }
 
 /**
-* apply_front_porch_workaround
-*
-* This is a workaround for a bug that has existed since R5xx and has not been
-* fixed keep Front porch at minimum 2 for Interlaced mode or 1 for progressive.
-*/
-void dce110_timing_generator_apply_front_porch_workaround(
-	struct timing_generator *tg,
-	struct dc_crtc_timing *timing)
+ *****************************************************************************
+ *  Function: is_in_vertical_blank
+ *
+ *  @brief
+ *     check the current status of CRTC to check if we are in Vertical Blank
+ *     regioneased" state
+ *
+ *  @return
+ *     true if currently in blank region, false otherwise
+ *
+ *****************************************************************************
+ */
+static bool dce110_timing_generator_is_in_vertical_blank(
+		struct timing_generator *tg)
 {
-	if (timing->flags.INTERLACE == 1) {
-		if (timing->v_front_porch < 2)
-			timing->v_front_porch = 2;
-	} else {
-		if (timing->v_front_porch < 1)
-			timing->v_front_porch = 1;
-	}
-}
+	uint32_t addr = 0;
+	uint32_t value = 0;
+	uint32_t field = 0;
 
-int32_t dce110_timing_generator_get_vsynch_and_front_porch_size(
-	const struct dc_crtc_timing *timing)
-{
-	return timing->v_sync_width + timing->v_front_porch;
+	addr = tg->regs[IDX_CRTC_STATUS];
+	value = dal_read_reg(tg->ctx, addr);
+	field = get_reg_field_value(value, CRTC_STATUS, CRTC_V_BLANK);
+	return field == 1;
 }
-
 
 void dce110_timing_generator_set_early_control(
 		struct timing_generator *tg,
@@ -472,31 +497,6 @@ bool dce110_timing_generator_unblank_crtc(struct timing_generator *tg)
 	dal_write_reg(tg->ctx, addr, value);
 
 	return true;
-}
-
-/**
- *****************************************************************************
- *  Function: is_in_vertical_blank
- *
- *  @brief
- *     check the current status of CRTC to check if we are in Vertical Blank
- *     regioneased" state
- *
- *  @return
- *     true if currently in blank region, false otherwise
- *
- *****************************************************************************
- */
-bool dce110_timing_generator_is_in_vertical_blank(struct timing_generator *tg)
-{
-	uint32_t addr = 0;
-	uint32_t value = 0;
-	uint32_t field = 0;
-
-	addr = tg->regs[IDX_CRTC_STATUS];
-	value = dal_read_reg(tg->ctx, addr);
-	field = get_reg_field_value(value, CRTC_STATUS, CRTC_V_BLANK);
-	return field == 1;
 }
 
 /**
@@ -1424,33 +1424,20 @@ void dce110_timing_generator_tear_down_global_swap_lock(
  *
  *****************************************************************************
  */
-
 bool dce110_timing_generator_is_counter_moving(struct timing_generator *tg)
 {
-	uint32_t addr = 0;
-	uint32_t value_1 = 0;
-	uint32_t field_1 = 0;
-	uint32_t value_2 = 0;
-	uint32_t field_2 = 0;
+	uint32_t h1 = 0;
+	uint32_t h2 = 0;
+	uint32_t v1 = 0;
+	uint32_t v2 = 0;
 
-	addr = tg->regs[IDX_CRTC_STATUS_POSITION];
-	value_1 = dal_read_reg(tg->ctx, addr);
-	value_2 = dal_read_reg(tg->ctx, addr);
+	dce110_timing_generator_get_crtc_positions(tg, &h1, &v1);
+	dce110_timing_generator_get_crtc_positions(tg, &h2, &v2);
 
-	field_1 = get_reg_field_value(
-			value_1, CRTC_STATUS_POSITION, CRTC_HORZ_COUNT);
-	field_2 = get_reg_field_value(
-			value_2, CRTC_STATUS_POSITION, CRTC_HORZ_COUNT);
-
-	if (field_1 == field_2) {
-		field_1 = get_reg_field_value(
-			value_1, CRTC_STATUS_POSITION, CRTC_VERT_COUNT);
-		field_2 = get_reg_field_value(
-			value_2, CRTC_STATUS_POSITION, CRTC_VERT_COUNT);
-		return field_1 != field_2;
-	}
-
-	return true;
+	if (h1 == h2 && v1 == v2)
+		return false;
+	else
+		return true;
 }
 
 /*TODO: Figure out if we need this function. */
