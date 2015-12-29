@@ -28,6 +28,7 @@
 #include "amdgpu.h"
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_ucode.h"
+#include "amdgpu_amdkfd_gfx_v8.h"
 #include "gca/gfx_8_0_sh_mask.h"
 #include "gca/gfx_8_0_d.h"
 #include "gca/gfx_8_0_enum.h"
@@ -39,6 +40,15 @@
 #include "vid.h"
 
 #define VI_PIPE_PER_MEC	(4)
+
+
+static const uint32_t watchRegs[MAX_WATCH_ADDRESSES * ADDRESS_WATCH_REG_MAX] = {
+	mmTCP_WATCH0_ADDR_H, mmTCP_WATCH0_ADDR_L, mmTCP_WATCH0_CNTL,
+	mmTCP_WATCH1_ADDR_H, mmTCP_WATCH1_ADDR_L, mmTCP_WATCH1_CNTL,
+	mmTCP_WATCH2_ADDR_H, mmTCP_WATCH2_ADDR_L, mmTCP_WATCH2_CNTL,
+	mmTCP_WATCH3_ADDR_H, mmTCP_WATCH3_ADDR_L, mmTCP_WATCH3_CNTL
+};
+
 
 struct vi_sdma_mqd;
 
@@ -577,6 +587,21 @@ static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
 
 static int kgd_address_watch_disable(struct kgd_dev *kgd)
 {
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	union TCP_WATCH_CNTL_BITS cntl;
+	unsigned int i;
+
+	cntl.u32All = 0;
+
+	cntl.bitfields.valid = 0;
+	cntl.bitfields.mask = ADDRESS_WATCH_REG_CNTL_DEFAULT_MASK;
+	cntl.bitfields.atc = 1;
+
+	/* Turning off this address until we set all the registers */
+	for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
+		WREG32(watchRegs[i * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_CNTL],
+			cntl.u32All);
+
 	return 0;
 }
 
@@ -586,6 +611,28 @@ static int kgd_address_watch_execute(struct kgd_dev *kgd,
 					uint32_t addr_hi,
 					uint32_t addr_lo)
 {
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	union TCP_WATCH_CNTL_BITS cntl;
+
+	cntl.u32All = cntl_val;
+
+	/* Turning off this watch point until we set all the registers */
+	cntl.bitfields.valid = 0;
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_CNTL],
+			cntl.u32All);
+
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_ADDR_HI],
+			addr_hi);
+
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_ADDR_LO],
+			addr_lo);
+
+	/* Enable the watch point */
+	cntl.bitfields.valid = 1;
+
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_CNTL],
+			cntl.u32All);
+
 	return 0;
 }
 
@@ -618,7 +665,7 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
 					unsigned int reg_offset)
 {
-	return 0;
+	return watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + reg_offset];
 }
 
 static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,

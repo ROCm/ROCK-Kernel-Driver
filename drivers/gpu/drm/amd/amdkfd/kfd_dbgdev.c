@@ -236,7 +236,8 @@ static void dbgdev_address_watch_set_registers(
 			union TCP_WATCH_ADDR_H_BITS *addrHi,
 			union TCP_WATCH_ADDR_L_BITS *addrLo,
 			union TCP_WATCH_CNTL_BITS *cntl,
-			unsigned int index, unsigned int vmid)
+			unsigned int index, unsigned int vmid,
+			unsigned int asic_family)
 {
 	union ULARGE_INTEGER addr;
 
@@ -258,7 +259,9 @@ static void dbgdev_address_watch_set_registers(
 
 	cntl->bitfields.mode = adw_info->watch_mode[index];
 	cntl->bitfields.vmid = (uint32_t) vmid;
-	cntl->u32All |= ADDRESS_WATCH_REG_CNTL_ATC_BIT;	/*  for now assume it is an ATC address.  */
+	/*  for APU assume it is an ATC address.  */
+	if (KFD_IS_DGPU(asic_family) == false)
+		cntl->u32All |= ADDRESS_WATCH_REG_CNTL_ATC_BIT;
 	pr_debug("\t\t%20s %08x\n", "set reg mask :", cntl->bitfields.mask);
 	pr_debug("\t\t%20s %08x\n", "set reg add high :", addrHi->bitfields.addr);
 	pr_debug("\t\t%20s %08x\n", "set reg add low :", addrLo->bitfields.addr);
@@ -309,7 +312,15 @@ static int dbgdev_address_watch_nodiq(struct kfd_dbgdev *dbgdev,
 
 		for (i = 0; i < adw_info->num_watch_points; i++) {
 
-			dbgdev_address_watch_set_registers(adw_info, &addrHi, &addrLo, &cntl, i, vmid);
+			dbgdev_address_watch_set_registers(
+				adw_info,
+				&addrHi,
+				&addrLo,
+				&cntl,
+				i,
+				vmid,
+				dbgdev->dev->device_info->asic_family
+				);
 
 			pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
 			pr_debug("\t\t%20s %08x\n", "register index :", i);
@@ -400,12 +411,15 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 
 		for (i = 0; i < adw_info->num_watch_points; i++) {
 
-			dbgdev_address_watch_set_registers(adw_info,
-											&addrHi,
-											&addrLo,
-											&cntl,
-											i,
-											vmid);
+			dbgdev_address_watch_set_registers(
+					adw_info,
+					&addrHi,
+					&addrLo,
+					&cntl,
+					i,
+					vmid,
+					dbgdev->dev->device_info->asic_family
+					);
 
 			pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
 			pr_debug("\t\t%20s %08x\n", "register index :", i);
@@ -427,8 +441,6 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 						i,
 						ADDRESS_WATCH_REG_CNTL);
 
-			aw_reg_add_dword /= sizeof(uint32_t);
-
 			packets_vec[0].bitfields2.reg_offset = aw_reg_add_dword - CONFIG_REG_BASE;
 			packets_vec[0].reg_data[0] = cntl.u32All;
 
@@ -439,7 +451,6 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 						i,
 						ADDRESS_WATCH_REG_ADDR_HI);
 
-			aw_reg_add_dword /= sizeof(uint32_t);
 
 			packets_vec[1].bitfields2.reg_offset = aw_reg_add_dword - CONFIG_REG_BASE;
 			packets_vec[1].reg_data[0] = addrHi.u32All;
@@ -451,7 +462,6 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 						i,
 						ADDRESS_WATCH_REG_ADDR_LO);
 
-			aw_reg_add_dword /= sizeof(uint32_t);
 
 			packets_vec[2].bitfields2.reg_offset = aw_reg_add_dword - CONFIG_REG_BASE;
 			packets_vec[2].reg_data[0] = addrLo.u32All;
@@ -469,7 +479,6 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 						i,
 						ADDRESS_WATCH_REG_CNTL);
 
-			aw_reg_add_dword /= sizeof(uint32_t);
 
 			packets_vec[3].bitfields2.reg_offset = aw_reg_add_dword - CONFIG_REG_BASE;
 			packets_vec[3].reg_data[0] = cntl.u32All;
