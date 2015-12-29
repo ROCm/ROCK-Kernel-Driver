@@ -562,7 +562,6 @@ struct amdgpu_connector {
 	struct amdgpu_dm_dp_aux dm_dp_aux;
 	struct drm_dp_mst_port *port;
 	struct amdgpu_connector *mst_port;
-	bool is_mst_connector;
 	struct amdgpu_encoder *mst_encoder;
 	struct semaphore mst_sem;
 
