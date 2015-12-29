@@ -471,30 +471,6 @@ void dc_helpers_dp_mst_handle_mst_hpd_rx_irq(void *param)
 	}
 }
 
-/* Depending on Root connector state, update MST state of all connectors
- * belonging to it. */
-static void set_mst_topology_state(struct drm_device *dev)
-{
-	struct drm_connector *connector;
-	struct amdgpu_connector *aconnector = NULL;
-
-	mutex_lock(&dev->mode_config.mutex);
-
-	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
-		mutex_unlock(&dev->mode_config.mutex);
-
-		aconnector = to_amdgpu_connector(connector);
-
-		if (aconnector->is_mst_connector)
-			drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr,
-					aconnector->is_mst_connector);
-
-		mutex_lock(&dev->mode_config.mutex);
-	}
-
-	mutex_unlock(&dev->mode_config.mutex);
-}
-
 bool dc_helpers_dp_mst_start_top_mgr(
 		struct dc_context *ctx,
 		const struct dc_link *link)
@@ -503,8 +479,11 @@ bool dc_helpers_dp_mst_start_top_mgr(
 	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
 
-	aconnector->is_mst_connector = true;
-	set_mst_topology_state(dev);
+	DRM_INFO("DM_MST: starting TM on aconnector: %p [id: %d]\n",
+			aconnector, aconnector->base.base.id);
+
+	drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, true);
+
 	return true;
 }
 
@@ -516,8 +495,11 @@ void dc_helpers_dp_mst_stop_top_mgr(
 	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
 
-	aconnector->is_mst_connector = false;
-	set_mst_topology_state(dev);
+	DRM_INFO("DM_MST: stopping TM on aconnector: %p [id: %d]\n",
+			aconnector, aconnector->base.base.id);
+
+	if (aconnector->mst_mgr.mst_state == true)
+		drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, false);
 }
 
 bool dc_helper_dp_read_dpcd(
