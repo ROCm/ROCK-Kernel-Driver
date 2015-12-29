@@ -273,7 +273,6 @@ static struct drm_connector *dm_dp_add_mst_connector(struct drm_dp_mst_topology_
 	if (!aconnector)
 		return NULL;
 
-	aconnector->is_mst_connector = true;
 	connector = &aconnector->base;
 	aconnector->port = port;
 	aconnector->mst_port = master;
@@ -317,6 +316,9 @@ static struct drm_connector *dm_dp_add_mst_connector(struct drm_dp_mst_topology_
 	 */
 	amdgpu_dm_connector_funcs_reset(connector);
 
+	DRM_INFO("DM_MST: added connector: %p [id: %d] [master: %p]\n",
+			aconnector, connector->base.id, aconnector->mst_port);
+
 	DRM_DEBUG_KMS(":%d\n", connector->base.id);
 
 	return connector;
@@ -331,6 +333,9 @@ static void dm_dp_destroy_mst_connector(
 	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
 	struct drm_device *dev = master->base.dev;
 	struct amdgpu_device *adev = dev->dev_private;
+
+	DRM_INFO("DM_MST: destroying connector: %p [id: %d] [master: %p]\n",
+			aconnector, connector->base.id, aconnector->mst_port);
 
 	drm_connector_unregister(connector);
 	/* need to nuke the connector */

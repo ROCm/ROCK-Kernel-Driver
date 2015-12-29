@@ -734,12 +734,11 @@ void amdgpu_dm_update_connector_after_detect(
 	const struct dc_sink *sink;
 
 	/* MST handled by drm_mst framework */
-	if (aconnector->is_mst_connector)
+	if (aconnector->mst_mgr.mst_state == true)
 		return;
 
-	if (!dm_get_sink_from_link(dc_link, aconnector, &sink)) {
+	if (!dm_get_sink_from_link(dc_link, aconnector, &sink))
 		return;
-	}
 
 	/*
 	 * TODO: temporary guard to look for proper fix
@@ -801,18 +800,18 @@ static void handle_hpd_rx_irq(void *param)
 	struct amdgpu_connector *aconnector = (struct amdgpu_connector *)param;
 	struct drm_connector *connector = &aconnector->base;
 	struct drm_device *dev = connector->dev;
+	bool is_mst_root_connector = aconnector->mst_mgr.mst_state;
 
 	if (dc_link_handle_hpd_rx_irq(aconnector->dc_link) &&
-			!aconnector->is_mst_connector) {
+			!is_mst_root_connector) {
 		/* Downstream Port status changed. */
 		dc_link_detect(aconnector->dc_link);
 		amdgpu_dm_update_connector_after_detect(aconnector);
 		drm_kms_helper_hotplug_event(dev);
 	}
 
-	if (aconnector->is_mst_connector) {
+	if (is_mst_root_connector)
 		dc_helpers_dp_mst_handle_mst_hpd_rx_irq(param);
-	}
 }
 
 static void register_hpd_handlers(struct amdgpu_device *adev)
