@@ -67,14 +67,8 @@ void dce110_link_encoder_enable_tmds_output(
 	struct link_encoder *enc,
 	enum clock_source_id clock_source,
 	enum dc_color_depth color_depth,
-	uint32_t pixel_clock);
-
-/* enables TMDS PHY output */
-/* TODO: still need this or just pass in adjusted pixel clock? */
-void dce110_link_encoder_enable_dual_link_tmds_output(
-	struct link_encoder *enc,
-	enum clock_source_id clock_source,
-	enum dc_color_depth color_depth,
+	bool hdmi,
+	bool dual_link,
 	uint32_t pixel_clock);
 
 /* enables DP PHY output */

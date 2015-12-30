@@ -1727,8 +1727,6 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.encoder_destroy = dce110_link_encoder_destroy,
 	.encoder_hw_init = dce110_link_encoder_hw_init,
 	.encoder_enable_tmds_output = dce110_link_encoder_enable_tmds_output,
-	.encoder_enable_dual_link_tmds_output =
-			dce110_link_encoder_enable_dual_link_tmds_output,
 	.encoder_enable_dp_output = dce110_link_encoder_enable_dp_output,
 	.encoder_enable_dp_mst_output =
 			dce110_link_encoder_enable_dp_mst_output,
