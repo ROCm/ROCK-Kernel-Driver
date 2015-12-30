@@ -30,6 +30,7 @@
 #include "resource.h"
 #include "dce_base/dce_base_resource.h"
 #include "include/irq_service_interface.h"
+#include "include/timing_generator_interface.h"
 
 #include "dce110/dce110_timing_generator.h"
 #include "dce110/dce110_link_encoder.h"
@@ -39,6 +40,8 @@
 #include "dce110/dce110_stream_encoder.h"
 #include "dce110/dce110_opp.h"
 
+#include "dce/dce_11_0_d.h"
+
 enum dce110_clk_src_array_id {
 	DCE110_CLK_SRC_PLL0 = 0,
 	DCE110_CLK_SRC_PLL1,
@@ -46,6 +49,53 @@ enum dce110_clk_src_array_id {
 
 	DCE110_CLK_SRC_TOTAL
 };
+
+static const struct dce110_timing_generator_offsets dce110_tg_offsets[] = {
+		{
+			.crtc = (mmCRTC0_CRTC_CONTROL - mmCRTC_CONTROL),
+			.dcp =  (mmDCP0_GRPH_CONTROL - mmGRPH_CONTROL),
+		},
+		{
+			.crtc = (mmCRTC1_CRTC_CONTROL - mmCRTC_CONTROL),
+			.dcp = (mmDCP1_GRPH_CONTROL - mmGRPH_CONTROL),
+		},
+		{
+			.crtc = (mmCRTC2_CRTC_CONTROL - mmCRTC_CONTROL),
+			.dcp = (mmDCP2_GRPH_CONTROL - mmGRPH_CONTROL),
+		},
+		{
+			.crtc = (mmCRTC3_CRTC_CONTROL - mmCRTC_CONTROL),
+			.dcp = (mmDCP3_GRPH_CONTROL - mmGRPH_CONTROL),
+		},
+		{
+			.crtc = (mmCRTC4_CRTC_CONTROL - mmCRTC_CONTROL),
+			.dcp = (mmDCP4_GRPH_CONTROL - mmGRPH_CONTROL),
+		},
+		{
+			.crtc = (mmCRTC5_CRTC_CONTROL - mmCRTC_CONTROL),
+			.dcp = (mmDCP5_GRPH_CONTROL - mmGRPH_CONTROL),
+		}
+};
+
+static struct timing_generator *dce110_timing_generator_create(
+		struct adapter_service *as,
+		struct dc_context *ctx,
+		uint32_t instance,
+		const struct dce110_timing_generator_offsets *offsets)
+{
+	struct dce110_timing_generator *tg110 =
+		dc_service_alloc(ctx, sizeof(struct dce110_timing_generator));
+
+	if (!tg110)
+		return NULL;
+
+	if (dce110_timing_generator_construct(tg110, as, ctx, instance, offsets))
+		return &tg110->base;
+
+	BREAK_TO_DEBUGGER();
+	dc_service_free(ctx, tg110);
+	return NULL;
+}
 
 bool dce110_construct_resource_pool(
 	struct adapter_service *adapter_serv,
@@ -117,7 +167,7 @@ bool dce110_construct_resource_pool(
 
 	for (i = 0; i < pool->controller_count; i++) {
 		pool->timing_generators[i] = dce110_timing_generator_create(
-				adapter_serv, ctx, i + 1);
+				adapter_serv, ctx, i, &dce110_tg_offsets[i]);
 		if (pool->timing_generators[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dal_error("DC: failed to create tg!\n");
@@ -225,9 +275,10 @@ controller_create_fail:
 		if (pool->mis[i] != NULL)
 			dce110_mem_input_destroy(&pool->mis[i]);
 
-		if (pool->timing_generators[i] != NULL)
-			dce110_timing_generator_destroy(
-				&pool->timing_generators[i]);
+		if (pool->timing_generators[i] != NULL)	{
+			dc_service_free(pool->timing_generators[i]->ctx, DCE110TG_FROM_TG(pool->timing_generators[i]));
+			pool->timing_generators[i] = NULL;
+		}
 	}
 
 filter_create_fail:
@@ -262,9 +313,10 @@ void dce110_destruct_resource_pool(struct resource_pool *pool)
 		if (pool->mis[i] != NULL)
 			dce110_mem_input_destroy(&pool->mis[i]);
 
-		if (pool->timing_generators[i] != NULL)
-			dce110_timing_generator_destroy(
-				&pool->timing_generators[i]);
+		if (pool->timing_generators[i] != NULL)	{
+			dc_service_free(pool->timing_generators[i]->ctx, DCE110TG_FROM_TG(pool->timing_generators[i]));
+			pool->timing_generators[i] = NULL;
+		}
 	}
 
 	for (i = 0; i < pool->stream_enc_count; i++) {
@@ -454,10 +506,7 @@ static enum dc_status validate_mapped_resource(
 			if (status != DC_OK)
 				return status;
 
-			if (!dce110_timing_generator_validate_timing(
-					stream->tg,
-					&stream->public.timing,
-					SIGNAL_TYPE_HDMI_TYPE_A))
+			if (!stream->tg->funcs->validate_timing(stream->tg, &stream->public.timing))
 				return DC_FAIL_CONTROLLER_VALIDATE;
 
 
