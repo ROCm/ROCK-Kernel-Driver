@@ -102,11 +102,14 @@ static int pm_allocate_runlist_ib(struct packet_manager *pm,
 
 	pm_calc_rlib_size(pm, rl_buffer_size, is_over_subscription);
 
+	mutex_lock(&pm->lock);
+
 	retval = kfd_gtt_sa_allocate(pm->dqm->dev, *rl_buffer_size,
 					&pm->ib_buffer_obj);
 
 	if (retval != 0) {
 		pr_err("kfd: failed to allocate runlist IB\n");
+		mutex_unlock(&pm->lock);
 		return retval;
 	}
 
@@ -115,6 +118,8 @@ static int pm_allocate_runlist_ib(struct packet_manager *pm,
 
 	memset(*rl_buffer, 0, *rl_buffer_size);
 	pm->allocated = true;
+
+	mutex_unlock(&pm->lock);
 	return retval;
 }
 
@@ -674,8 +679,7 @@ fail_create_runlist:
 fail_acquire_packet_buffer:
 	mutex_unlock(&pm->lock);
 fail_create_runlist_ib:
-	if (pm->allocated == true)
-		pm_release_ib(pm);
+	pm_release_ib(pm);
 	return retval;
 }
 
@@ -813,3 +817,4 @@ void pm_release_ib(struct packet_manager *pm)
 	}
 	mutex_unlock(&pm->lock);
 }
+
