@@ -58,16 +58,29 @@ struct dce110_timing_generator_offsets {
 struct dce110_timing_generator {
 	struct timing_generator base;
 	struct dce110_timing_generator_offsets offsets;
+
+	enum controller_id controller_id;
+
+	uint32_t max_h_total;
+	uint32_t max_v_total;
+
+	uint32_t min_h_blank;
+	uint32_t min_h_front_porch;
+	uint32_t min_h_back_porch;
+
 	enum sync_source cached_gsl_group;
 	bool advanced_request_enable;
 };
 
-/********** Create and destroy **********/
-struct timing_generator *dce110_timing_generator_create(
+#define DCE110TG_FROM_TG(tg)\
+	container_of(tg, struct dce110_timing_generator, base)
+
+bool dce110_timing_generator_construct(
+	struct dce110_timing_generator *tg,
 	struct adapter_service *as,
 	struct dc_context *ctx,
-	enum controller_id id);
-void dce110_timing_generator_destroy(struct timing_generator **tg);
+	enum controller_id id,
+	const struct dce110_timing_generator_offsets *offsets);
 
 /* determine if given timing can be supported by TG */
 bool dce110_timing_generator_validate_timing(
@@ -80,7 +93,7 @@ bool dce110_timing_generator_validate_timing(
 /* Program timing generator with given timing */
 bool dce110_timing_generator_program_timing_generator(
 	struct timing_generator *tg,
-	struct dc_crtc_timing *dc_crtc_timing);
+	const struct dc_crtc_timing *dc_crtc_timing);
 
 /* Disable/Enable Timing Generator */
 bool dce110_timing_generator_enable_crtc(struct timing_generator *tg);
@@ -140,17 +153,20 @@ bool dce110_timing_generator_did_triggered_reset_occur(
 /* TODO: Should we move it to mem_input interface? */
 bool dce110_timing_generator_blank_crtc(struct timing_generator *tg);
 bool dce110_timing_generator_unblank_crtc(struct timing_generator *tg);
+/* Move to enable accelerated mode */
 void dce110_timing_generator_disable_vga(struct timing_generator *tg);
-
 /* TODO: Should we move it to transform */
+/* Fully program CRTC timing in timing generator */
 void dce110_timing_generator_program_blanking(
 	struct timing_generator *tg,
 	const struct dc_crtc_timing *timing);
 
 /* TODO: Should we move it to opp? */
+/* Combine with below and move YUV/RGB color conversion to SW layer */
 void dce110_timing_generator_program_blank_color(
 	struct timing_generator *tg,
 	enum color_space color_space);
+/* Combine with above and move YUV/RGB color conversion to SW layer */
 void dce110_timing_generator_set_overscan_color_black(
 	struct timing_generator *tg,
 	enum color_space black_color);
@@ -182,5 +198,32 @@ void dce110_timing_generator_enable_advanced_request(
 
 void dce110_timing_generator_set_lock_master(struct timing_generator *tg,
 		bool lock);
+
+void dce110_tg_program_blank_color(struct timing_generator *tg,
+	const struct crtc_black_color *black_color);
+
+void dce110_tg_set_overscan_color(struct timing_generator *tg,
+	const struct crtc_black_color *overscan_color);
+
+void dce110_tg_get_position(struct timing_generator *tg,
+	struct crtc_position *position);
+
+void dce110_tg_program_timing(struct timing_generator *tg,
+	const struct dc_crtc_timing *timing,
+	bool use_vbios);
+
+bool dce110_tg_set_blank(struct timing_generator *tg,
+		bool enable_blanking);
+
+bool dce110_tg_validate_timing(struct timing_generator *tg,
+	const struct dc_crtc_timing *timing);
+
+
+void dce110_tg_wait_for_state(struct timing_generator *tg,
+	enum crtc_state state);
+
+void dce110_tg_set_colors(struct timing_generator *tg,
+	const struct crtc_black_color *blank_color,
+	const struct crtc_black_color *overscan_color);
 
 #endif /* __DC_TIMING_GENERATOR_DCE110_H__ */

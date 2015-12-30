@@ -28,6 +28,7 @@
 
 #include "include/grph_csc_types.h"
 
+
 /**
  *  These parameters are required as input when doing blanking/Unblanking
 */
@@ -134,16 +135,53 @@ enum controller_dp_test_pattern {
 	CONTROLLER_DP_TEST_PATTERN_COLORSQUARES_CEA
 };
 
-struct timing_generator {
-	struct bios_parser *bp;
-	enum controller_id controller_id;
-	struct dc_context *ctx;
-	uint32_t max_h_total;
-	uint32_t max_v_total;
+enum crtc_state {
+	CRTC_STATE_VBLANK = 0,
+	CRTC_STATE_VACTIVE
+};
 
-	uint32_t min_h_blank;
-	uint32_t min_h_front_porch;
-	uint32_t min_h_back_porch;
+struct timing_generator {
+	struct timing_generator_funcs *funcs;
+	struct bios_parser *bp;
+	struct dc_context *ctx;
+};
+
+
+struct dc_crtc_timing;
+
+struct timing_generator_funcs {
+	bool (*validate_timing)(struct timing_generator *tg,
+							const struct dc_crtc_timing *timing);
+	void (*program_timing)(struct timing_generator *tg,
+							const struct dc_crtc_timing *timing,
+							bool use_vbios);
+	bool (*enable_crtc)(struct timing_generator *tg);
+	bool (*disable_crtc)(struct timing_generator *tg);
+	bool (*is_counter_moving)(struct timing_generator *tg);
+	void (*get_position)(struct timing_generator *tg,
+								int32_t *h_position,
+								int32_t *v_position);
+	uint32_t (*get_frame_count)(struct timing_generator *tg);
+	void (*set_early_control)(struct timing_generator *tg,
+							   uint32_t early_cntl);
+	void (*wait_for_state)(struct timing_generator *tg,
+							enum crtc_state state);
+	bool (*set_blank)(struct timing_generator *tg,
+					   bool enable_blanking);
+	void (*set_overscan_blank_color) (struct timing_generator *tg, enum color_space black_color);
+	void (*set_blank_color)(struct timing_generator *tg, enum color_space black_color);
+	void (*set_colors)(struct timing_generator *tg,
+						const struct crtc_black_color *blank_color,
+						const struct crtc_black_color *overscan_color);
+
+	void (*disable_vga)(struct timing_generator *tg);
+	bool (*did_triggered_reset_occur)(struct timing_generator *tg);
+	void (*setup_global_swap_lock)(struct timing_generator *tg,
+							const struct dcp_gsl_params *gsl_params);
+	void (*enable_reset_trigger)(struct timing_generator *tg,
+						const struct trigger_params *trigger_params);
+	void (*disable_reset_trigger)(struct timing_generator *tg);
+	void (*tear_down_global_swap_lock)(struct timing_generator *tg);
 };
 
 #endif

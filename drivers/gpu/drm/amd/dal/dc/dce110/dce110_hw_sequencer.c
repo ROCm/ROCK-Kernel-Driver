@@ -671,7 +671,7 @@ static void enable_stream(struct core_stream *stream)
 	if (early_control == 0)
 		early_control = lane_count;
 
-	dce110_timing_generator_set_early_control(tg, early_control);
+	tg->funcs->set_early_control(tg, early_control);
 
 	/* enable audio only within mode set */
 	if (stream->audio != NULL) {
@@ -800,7 +800,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 		/* Must blank CRTC after disabling power gating and before any
 		 * programming, otherwise CRTC will be hung in bad state
 		 */
-		dce110_timing_generator_blank_crtc(stream->tg);
+		stream->tg->funcs->set_blank(stream->tg, true);
 
 		core_link_disable_stream(
 				stream->sink->link, stream);
@@ -815,12 +815,10 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 		}
 
 
-		if (false == dce110_timing_generator_program_timing_generator(
+		stream->tg->funcs->program_timing(
 				stream->tg,
-				&stream->public.timing)) {
-			BREAK_TO_DEBUGGER();
-			return DC_ERROR_UNEXPECTED;
-		}
+				&stream->public.timing,
+				true);
 	}
 
 	/*TODO: mst support - use total stream count*/
@@ -829,7 +827,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 			context->target_count);
 
 	if (timing_changed) {
-		if (false == dce110_timing_generator_enable_crtc(
+		if (false == stream->tg->funcs->enable_crtc(
 				stream->tg)) {
 			BREAK_TO_DEBUGGER();
 			return DC_ERROR_UNEXPECTED;
@@ -896,7 +894,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 	color_space = get_output_color_space(
 			&stream->public.timing);
 
-	dce110_timing_generator_program_blank_color(
+	stream->tg->funcs->set_blank_color(
 			context->res_ctx.pool.timing_generators[controller_idx],
 			color_space);
 
@@ -928,7 +926,7 @@ static void power_down_controllers(struct dc *dc)
 	int i;
 
 	for (i = 0; i < dc->res_pool.controller_count; i++) {
-		dce110_timing_generator_disable_crtc(
+		dc->res_pool.timing_generators[i]->funcs->disable_crtc(
 				dc->res_pool.timing_generators[i]);
 	}
 }
@@ -972,7 +970,7 @@ static void disable_vga_and_power_gate_all_controllers(
 		tg = dc->res_pool.timing_generators[i];
 		ctx = dc->ctx;
 
-		dce110_timing_generator_disable_vga(tg);
+		tg->funcs->disable_vga(tg);
 
 		/* Enable CLOCK gating for each pipe BEFORE controller
 		 * powergating. */
@@ -1336,7 +1334,7 @@ static bool setup_line_buffer_pixel_depth(
 
 	if (current_depth != depth) {
 		if (blank)
-			dce110_timing_generator_wait_for_vblank(tg);
+			tg->funcs->wait_for_state(tg, CRTC_STATE_VBLANK);
 
 		return dce110_transform_set_pixel_storage_depth(xfm, depth);
 	}
@@ -1421,9 +1419,7 @@ static void program_scaler(
 		LB_PIXEL_DEPTH_24BPP,
 		false);
 
-	dce110_timing_generator_set_overscan_color_black(
-			tg,
-			surface->public.colorimetry.color_space);
+	tg->funcs->set_overscan_blank_color(tg, surface->public.colorimetry.color_space);
 
 	dce110_transform_set_scaler(xfm, &scaler_data);
 
@@ -1432,8 +1428,6 @@ static void program_scaler(
 			&scaler_data.viewport,
 			false);
 }
-
-
 
 static void configure_locking(struct dc_context *ctx, uint8_t controller_id)
 {
@@ -1484,7 +1478,7 @@ static bool set_plane_config(
 			PIPE_LOCK_CONTROL_SURFACE,
 			true);
 
-	dce110_timing_generator_program_blanking(tg, dc_crtc_timing);
+	tg->funcs->program_timing(tg, dc_crtc_timing, false);
 
 	enable_fe_clock(ctx, controller_idx, true);
 
@@ -1577,8 +1571,8 @@ static void reset_single_stream_hw_ctx(struct core_stream *stream,
 
 	core_link_disable_stream(stream->sink->link, stream);
 
-	dce110_timing_generator_blank_crtc(stream->tg);
-	dce110_timing_generator_disable_crtc(stream->tg);
+	stream->tg->funcs->set_blank(stream->tg, true);
+	stream->tg->funcs->disable_crtc(stream->tg);
 	dce110_mem_input_deallocate_dmif_buffer(stream->mi, context->target_count);
 	dce110_transform_set_scaler_bypass(stream->xfm);
 	disable_stereo_mixer(stream->ctx);
@@ -1630,12 +1624,12 @@ static bool wait_for_reset_trigger_to_occur(
 
 	for (i = 0; i < frames_to_wait_on_triggered_reset; i++) {
 
-		if (!dce110_timing_generator_is_counter_moving(tg)) {
+		if (!tg->funcs->is_counter_moving(tg)) {
 			DC_ERROR("TG counter is not moving!\n");
 			break;
 		}
 
-		if (dce110_timing_generator_did_triggered_reset_occur(tg)) {
+		if (tg->funcs->did_triggered_reset_occur(tg)) {
 			rc = true;
 			/* usually occurs at i=1 */
 			DC_SYNC_INFO("GSL: reset occurred at wait count: %d\n",
@@ -1644,8 +1638,8 @@ static bool wait_for_reset_trigger_to_occur(
 		}
 
 		/* Wait for one frame. */
-		dce110_timing_generator_wait_for_vactive(tg);
-		dce110_timing_generator_wait_for_vblank(tg);
+		tg->funcs->wait_for_state(tg, CRTC_STATE_VACTIVE);
+		tg->funcs->wait_for_state(tg, CRTC_STATE_VBLANK);
 	}
 
 	if (false == rc)
@@ -1675,8 +1669,7 @@ static void enable_timing_synchronization(
 		 * the 1st one in the group. */
 		gsl_params.timing_server = (0 == i ? true : false);
 
-		dce110_timing_generator_setup_global_swap_lock(tgs[i],
-				&gsl_params);
+		tgs[i]->funcs->setup_global_swap_lock(tgs[i], &gsl_params);
 	}
 
 	/* Reset slave controllers on master VSync */
@@ -1687,8 +1680,7 @@ static void enable_timing_synchronization(
 	trigger_params.source = SYNC_SOURCE_GSL_GROUP0;
 
 	for (i = 1 /* skip the master */; i < timing_generator_num; i++) {
-		dce110_timing_generator_enable_reset_trigger(tgs[i],
-				&trigger_params);
+		tgs[i]->funcs->enable_reset_trigger(tgs[i], &trigger_params);
 
 		DC_SYNC_INFO("GSL: waiting for reset to occur.\n");
 		wait_for_reset_trigger_to_occur(dc_ctx, tgs[i]);
@@ -1696,35 +1688,60 @@ static void enable_timing_synchronization(
 		/* Regardless of success of the wait above, remove the reset or
 		 * the driver will start timing out on Display requests. */
 		DC_SYNC_INFO("GSL: disabling trigger-reset.\n");
-		dce110_timing_generator_disable_reset_trigger(tgs[i]);
+		tgs[i]->funcs->disable_reset_trigger(tgs[i]);
 	}
 
 	/* GSL Vblank synchronization is a one time sync mechanism, assumption
 	 * is that the sync'ed displays will not drift out of sync over time*/
 	DC_SYNC_INFO("GSL: Restoring register states.\n");
 	for (i = 0; i < timing_generator_num; i++)
-		dce110_timing_generator_tear_down_global_swap_lock(tgs[i]);
+		tgs[i]->funcs->tear_down_global_swap_lock(tgs[i]);
 
 	DC_SYNC_INFO("GSL: Set-up complete.\n");
 }
 
+static void get_crtc_positions(struct timing_generator *tg,
+		int32_t *h_position, int32_t *v_position)
+{
+	tg->funcs->get_position(tg, h_position, v_position);
+}
+
+static bool enable_memory_request(struct timing_generator *tg)
+{
+	return tg->funcs->set_blank(tg, false);
+}
+
+static bool disable_memory_requests(struct timing_generator *tg)
+{
+	return tg->funcs->set_blank(tg, true);
+}
+
+static uint32_t get_vblank_counter(struct timing_generator *tg)
+{
+	return tg->funcs->get_frame_count(tg);
+}
+
+static void disable_vga(struct timing_generator *tg)
+{
+	tg->funcs->disable_vga(tg);
+}
 
 static const struct hw_sequencer_funcs dce110_funcs = {
 	.apply_ctx_to_hw = apply_ctx_to_hw,
 	.reset_hw_ctx = reset_hw_ctx,
 	.set_plane_config = set_plane_config,
 	.update_plane_address = update_plane_address,
-	.enable_memory_requests = dce110_timing_generator_unblank_crtc,
-	.disable_memory_requests = dce110_timing_generator_blank_crtc,
+	.enable_memory_requests = enable_memory_request,
+	.disable_memory_requests = disable_memory_requests,
 	.cursor_set_attributes = dce110_ipp_cursor_set_attributes,
 	.cursor_set_position = dce110_ipp_cursor_set_position,
 	.set_gamma_ramp = set_gamma_ramp,
 	.power_down = power_down,
 	.enable_accelerated_mode = enable_accelerated_mode,
-	.get_crtc_positions = dce110_timing_generator_get_crtc_positions,
-	.get_vblank_counter = dce110_timing_generator_get_vblank_counter,
+	.get_crtc_positions = get_crtc_positions,
+	.get_vblank_counter = get_vblank_counter,
 	.enable_timing_synchronization = enable_timing_synchronization,
-	.disable_vga = dce110_timing_generator_disable_vga,
+	.disable_vga = disable_vga,
 	.encoder_create = dce110_link_encoder_create,
 	.encoder_destroy = dce110_link_encoder_destroy,
 	.encoder_hw_init = dce110_link_encoder_hw_init,
