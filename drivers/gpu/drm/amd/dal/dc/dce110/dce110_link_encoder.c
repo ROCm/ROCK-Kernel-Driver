@@ -1386,6 +1386,8 @@ void dce110_link_encoder_enable_tmds_output(
 	struct link_encoder *enc,
 	enum clock_source_id clock_source,
 	enum dc_color_depth color_depth,
+	bool hdmi,
+	bool dual_link,
 	uint32_t pixel_clock)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
@@ -1399,49 +1401,16 @@ void dce110_link_encoder_enable_tmds_output(
 	cntl.engine_id = ENGINE_ID_UNKNOWN;
 	cntl.transmitter = enc110->base.transmitter;
 	cntl.pll_id = clock_source;
-	cntl.signal = SIGNAL_TYPE_HDMI_TYPE_A;
-	cntl.lanes_number = 4;
-	cntl.hpd_sel = enc110->base.hpd_source;
-
-	cntl.pixel_clock = pixel_clock;
-	cntl.color_depth = color_depth;
-
-	result = dal_bios_parser_transmitter_control(
-		dal_adapter_service_get_bios_parser(
-			enc110->base.adapter_service),
-		&cntl);
-
-	if (result != BP_RESULT_OK) {
-		dal_logger_write(ctx->logger,
-			LOG_MAJOR_ERROR,
-			LOG_MINOR_COMPONENT_ENCODER,
-			"%s: Failed to execute VBIOS command table!\n",
-			__func__);
-		BREAK_TO_DEBUGGER();
+	if (hdmi) {
+		cntl.signal = SIGNAL_TYPE_HDMI_TYPE_A;
+		cntl.lanes_number = 4;
+	} else if (dual_link) {
+		cntl.signal = SIGNAL_TYPE_DVI_DUAL_LINK;
+		cntl.lanes_number = 8;
+	} else {
+		cntl.signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
+		cntl.lanes_number = 4;
 	}
-}
-
-/* enables TMDS PHY output */
-/* TODO: still need this or just pass in adjusted pixel clock? */
-void dce110_link_encoder_enable_dual_link_tmds_output(
-	struct link_encoder *enc,
-	enum clock_source_id clock_source,
-	enum dc_color_depth color_depth,
-	uint32_t pixel_clock)
-{
-	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
-	struct dc_context *ctx = enc110->base.ctx;
-	struct bp_transmitter_control cntl = { 0 };
-	enum bp_result result;
-
-	/* Enable the PHY */
-
-	cntl.action = TRANSMITTER_CONTROL_ENABLE;
-	cntl.engine_id = ENGINE_ID_UNKNOWN;
-	cntl.transmitter = enc110->base.transmitter;
-	cntl.pll_id = clock_source;
-	cntl.signal = SIGNAL_TYPE_DVI_DUAL_LINK;
-	cntl.lanes_number = 8;
 	cntl.hpd_sel = enc110->base.hpd_source;
 
 	cntl.pixel_clock = pixel_clock;

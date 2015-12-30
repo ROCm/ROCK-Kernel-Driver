@@ -1009,19 +1009,13 @@ static void enable_link_hdmi(struct core_stream *stream)
 	dc_service_memset(&stream->sink->link->cur_link_settings, 0,
 			sizeof(struct link_settings));
 
-	if (stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK)
-		link->ctx->dc->hwss.encoder_enable_dual_link_tmds_output(
-				stream->sink->link->link_enc,
-				dal_clock_source_get_id(stream->clock_source),
-				stream->public.timing.display_color_depth,
-				stream->public.timing.pix_clk_khz);
-	else
-		link->ctx->dc->hwss.encoder_enable_tmds_output(
-				stream->sink->link->link_enc,
-				dal_clock_source_get_id(stream->clock_source),
-				stream->public.timing.display_color_depth,
-				stream->public.timing.pix_clk_khz);
-
+	link->ctx->dc->hwss.encoder_enable_tmds_output(
+			stream->sink->link->link_enc,
+			dal_clock_source_get_id(stream->clock_source),
+			stream->public.timing.display_color_depth,
+			stream->signal == SIGNAL_TYPE_HDMI_TYPE_A,
+			stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK,
+			stream->public.timing.pix_clk_khz);
 
 	if (stream->signal == SIGNAL_TYPE_HDMI_TYPE_A)
 		dal_ddc_service_read_scdc_data(link->ddc);

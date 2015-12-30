@@ -98,12 +98,8 @@ struct hw_sequencer_funcs {
 					struct link_encoder *enc,
 					enum clock_source_id clock_source,
 					enum dc_color_depth color_depth,
-					uint32_t pixel_clock);
-
-	void (*encoder_enable_dual_link_tmds_output)(
-					struct link_encoder *enc,
-					enum clock_source_id clock_source,
-					enum dc_color_depth color_depth,
+					bool hdmi,
+					bool dual_link,
 					uint32_t pixel_clock);
 
 	void (*encoder_enable_dp_output)(
