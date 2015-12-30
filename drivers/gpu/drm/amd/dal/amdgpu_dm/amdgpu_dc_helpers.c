@@ -177,6 +177,7 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 	struct drm_crtc *crtc;
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	struct drm_dp_mst_port *mst_port;
+	struct amdgpu_connector *master_port;
 	int slots = 0;
 	bool ret;
 	int clock;
@@ -191,7 +192,8 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 	if (!aconnector->mst_port)
 		return false;
 
-	mst_mgr = &aconnector->mst_port->mst_mgr;
+	master_port = aconnector->mst_port;
+	mst_mgr = &master_port->mst_mgr;
 
 	if (!mst_mgr->mst_state)
 		return false;
@@ -299,6 +301,11 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 			/* not mst connector */
 			if (!aconnector->mst_port)
 				continue;
+
+			if (master_port != aconnector->mst_port) {
+				/* Not the same physical connector. */
+				continue;
+			}
 
 			mst_port = aconnector->port;
 
