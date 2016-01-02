@@ -61,7 +61,8 @@ struct kfd_process_release_work {
 #define MIN_IDR_ID 1
 #define MAX_IDR_ID 0 /*0 - for unlimited*/
 
-static struct kfd_process *find_process(const struct task_struct *thread);
+static struct kfd_process *find_process(const struct task_struct *thread,
+		bool lock);
 static struct kfd_process *create_process(const struct task_struct *thread);
 
 void kfd_process_create_wq(void)
@@ -103,7 +104,7 @@ struct kfd_process *kfd_create_process(const struct task_struct *thread)
 	mutex_lock(&kfd_processes_mutex);
 
 	/* A prior open of /dev/kfd could have already created the process. */
-	process = find_process(thread);
+	process = find_process(thread, false);
 	if (process)
 		pr_debug("kfd: process already found\n");
 
@@ -128,7 +129,7 @@ struct kfd_process *kfd_get_process(const struct task_struct *thread)
 	if (thread->group_leader->mm != thread->mm)
 		return ERR_PTR(-EINVAL);
 
-	process = find_process(thread);
+	process = find_process(thread, false);
 
 	return process;
 }
@@ -145,14 +146,33 @@ static struct kfd_process *find_process_by_mm(const struct mm_struct *mm)
 	return NULL;
 }
 
-static struct kfd_process *find_process(const struct task_struct *thread)
+static struct kfd_process *find_process(const struct task_struct *thread,
+		bool lock)
 {
 	struct kfd_process *p;
 	int idx;
 
 	idx = srcu_read_lock(&kfd_processes_srcu);
 	p = find_process_by_mm(thread->mm);
+	if (lock)
+		mutex_lock(&p->mutex);
 	srcu_read_unlock(&kfd_processes_srcu, idx);
+
+	return p;
+}
+
+/* This returns with process->mutex locked. */
+struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid)
+{
+	struct task_struct *task = NULL;
+	struct kfd_process *p;
+
+	if (!pid)
+		task = current;
+	else
+		task = get_pid_task(pid, PIDTYPE_PID);
+
+	p = find_process(task, true);
 
 	return p;
 }
@@ -193,6 +213,8 @@ static void kfd_process_wq_release(struct work_struct *work)
 						peer_pdd->dev->kgd,
 						buf_obj->mem, peer_pdd->vm);
 			}
+
+			run_rdma_free_callback(buf_obj);
 			pdd->dev->kfd2kgd->free_memory_of_gpu(
 					pdd->dev->kgd, buf_obj->mem);
 			kfd_process_device_remove_obj_handle(pdd, id);
@@ -536,6 +558,9 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 	interval_tree_insert(&buf_obj->it, &p->bo_interval_tree);
 
 	buf_obj->mem = mem;
+	buf_obj->dev = pdd->dev;
+
+	INIT_LIST_HEAD(&buf_obj->cb_data_head);
 
 	idr_preload(GFP_KERNEL);
 
@@ -547,7 +572,7 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 	return handle;
 }
 
-static struct kfd_bo *kfd_process_device_find_bo(struct kfd_process_device *pdd,
+struct kfd_bo *kfd_process_device_find_bo(struct kfd_process_device *pdd,
 					int handle)
 {
 	BUG_ON(pdd == NULL);
@@ -568,6 +593,29 @@ void *kfd_process_device_translate_handle(struct kfd_process_device *pdd,
 	buf_obj = kfd_process_device_find_bo(pdd, handle);
 
 	return buf_obj->mem;
+}
+
+void *kfd_process_find_bo_from_interval(struct kfd_process *p,
+					uint64_t start_addr,
+					uint64_t last_addr)
+{
+	struct interval_tree_node *it_node;
+	struct kfd_bo *buf_obj;
+
+	it_node = interval_tree_iter_first(&p->bo_interval_tree,
+			start_addr, last_addr);
+	if (!it_node) {
+		pr_err("%llu - %llu does not relate to an existing buffer\n",
+				start_addr, last_addr);
+		return NULL;
+	}
+
+	BUG_ON(NULL != interval_tree_iter_next(it_node,
+			start_addr, last_addr));
+
+	buf_obj = container_of(it_node, struct kfd_bo, it);
+
+	return buf_obj;
 }
 
 /* Remove specific handle from process local memory idr

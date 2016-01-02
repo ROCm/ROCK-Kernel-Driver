@@ -62,6 +62,11 @@ static int map_gtt_bo_to_kernel_tonga(struct kgd_dev *kgd,
 static bool is_mem_on_local_device(struct kgd_dev *kgd,
 		struct list_head *bo_va_list, void *vm);
 
+static int pin_get_sg_table(struct kgd_dev *kgd,
+		struct kgd_mem *mem, uint64_t offset,
+		uint64_t size, struct sg_table **ret_sg);
+static void unpin_put_sg_table(struct kgd_mem *mem, struct sg_table *sg);
+
 static struct kfd2kgd_calls kfd2kgd;
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_tonga_get_functions()
@@ -80,6 +85,9 @@ struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_tonga_get_functions()
 	kfd2kgd.get_process_page_dir = get_process_page_dir;
 	kfd2kgd.mmap_bo = mmap_bo;
 	kfd2kgd.map_gtt_bo_to_kernel = map_gtt_bo_to_kernel_tonga;
+
+	kfd2kgd.pin_get_sg_table_bo = pin_get_sg_table;
+	kfd2kgd.unpin_put_sg_table_bo = unpin_put_sg_table;
 
 	return &kfd2kgd;
 }
@@ -905,3 +913,143 @@ static int map_gtt_bo_to_kernel_tonga(struct kgd_dev *kgd,
 	return 0;
 }
 
+static int pin_bo_wo_map(struct kgd_mem *mem)
+{
+	struct amdgpu_bo *bo = mem->data2.bo;
+	int ret = 0;
+
+	ret = amdgpu_bo_reserve(bo, false);
+	if (unlikely(ret != 0))
+		return ret;
+
+	ret = amdgpu_bo_pin(bo, mem->data2.domain, NULL);
+	amdgpu_bo_unreserve(bo);
+
+	return ret;
+}
+
+static void unpin_bo_wo_map(struct kgd_mem *mem)
+{
+	struct amdgpu_bo *bo = mem->data2.bo;
+	int ret = 0;
+
+	ret = amdgpu_bo_reserve(bo, false);
+	if (unlikely(ret != 0))
+		return;
+
+	amdgpu_bo_unpin(bo);
+	amdgpu_bo_unreserve(bo);
+}
+
+#define AMD_GPU_PAGE_SHIFT	PAGE_SHIFT
+#define AMD_GPU_PAGE_SIZE (_AC(1, UL) << AMD_GPU_PAGE_SHIFT)
+
+static int get_sg_table(struct amdgpu_device *adev,
+		struct kgd_mem *mem, uint64_t offset,
+		uint64_t size, struct sg_table **ret_sg)
+{
+	struct amdgpu_bo *bo = mem->data2.bo;
+	struct sg_table *sg = NULL;
+	unsigned long bus_addr;
+	unsigned int chunks;
+	unsigned int i;
+	struct scatterlist *s;
+	uint64_t offset_in_page;
+	unsigned int page_size;
+	int ret;
+
+	sg = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
+	if (!sg) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	if (bo->initial_domain == AMDGPU_GEM_DOMAIN_VRAM)
+		page_size = AMD_GPU_PAGE_SIZE;
+	else
+		page_size = PAGE_SIZE;
+
+
+	offset_in_page = offset & (page_size - 1);
+	chunks = (size  + offset_in_page + page_size - 1)
+			/ page_size;
+
+	ret = sg_alloc_table(sg, chunks, GFP_KERNEL);
+	if (unlikely(ret))
+		goto out;
+
+	if (bo->initial_domain == AMDGPU_GEM_DOMAIN_VRAM) {
+		bus_addr = bo->tbo.offset + adev->mc.aper_base + offset;
+
+		for_each_sg(sg->sgl, s, sg->orig_nents, i) {
+			uint64_t chunk_size, length;
+
+			chunk_size = page_size - offset_in_page;
+			length = min(size, chunk_size);
+
+			sg_set_page(s, NULL, length, offset_in_page);
+			s->dma_address = bus_addr;
+			s->dma_length = length;
+
+			size -= length;
+			offset_in_page = 0;
+			bus_addr += length;
+		}
+	} else {
+		struct page **pages;
+		unsigned int cur_page;
+
+		pages = bo->tbo.ttm->pages;
+
+		cur_page = offset / page_size;
+		for_each_sg(sg->sgl, s, sg->orig_nents, i) {
+			uint64_t chunk_size, length;
+
+			chunk_size = page_size - offset_in_page;
+			length = min(size, chunk_size);
+
+			sg_set_page(s, pages[cur_page], length, offset_in_page);
+			s->dma_address = page_to_phys(pages[cur_page]);
+			s->dma_length = length;
+
+			size -= length;
+			offset_in_page = 0;
+			cur_page++;
+		}
+	}
+
+	*ret_sg = sg;
+	return 0;
+out:
+	kfree(sg);
+	*ret_sg = NULL;
+	return ret;
+}
+
+static int pin_get_sg_table(struct kgd_dev *kgd,
+		struct kgd_mem *mem, uint64_t offset,
+		uint64_t size, struct sg_table **ret_sg)
+{
+	int ret;
+	struct amdgpu_device *adev;
+
+	ret = pin_bo_wo_map(mem);
+	if (unlikely(ret != 0))
+		return ret;
+
+	adev = get_amdgpu_device(kgd);
+
+	ret = get_sg_table(adev, mem, offset, size, ret_sg);
+	if (ret)
+		unpin_bo_wo_map(mem);
+
+	return ret;
+}
+
+static void unpin_put_sg_table(struct kgd_mem *mem, struct sg_table *sg)
+{
+	sg_free_table(sg);
+	kfree(sg);
+
+	unpin_bo_wo_map(mem);
+}

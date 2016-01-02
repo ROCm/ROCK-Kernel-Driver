@@ -30,7 +30,7 @@
  * Structure describing information needed to P2P access from another device
  * to specific location of GPU memory
  */
-struct amd_p2p_page_table {
+struct amd_p2p_info {
 	uint64_t	va;		/**< Specify user virt. address
 					  * which this page table
 					  * described
@@ -42,14 +42,10 @@ struct amd_p2p_page_table {
 					  * virtual address belongs
 					  */
 	struct sg_table *pages;		/**< Specify DMA/Bus addresses */
-	struct device  *dma_device;	/**< DMA device requested access
-					 */
 	void		*priv;		/**< Pointer set by AMD kernel
 					  * driver
 					  */
 };
-
-
 
 /**
  * Structure providing function pointers to support rdma/p2p requirements.
@@ -57,13 +53,10 @@ struct amd_p2p_page_table {
  */
 struct amd_rdma_interface {
 	int (*get_pages)(uint64_t address, uint64_t length, struct pid *pid,
-				struct device *dma_device,
-				struct amd_p2p_page_table  **page_table,
-				void  (*free_callback)(struct amd_p2p_page_table
-								*page_table,
-							void *client_priv),
+				struct amd_p2p_info  **amd_p2p_data,
+				void  (*free_callback)(void *client_priv),
 				void  *client_priv);
-	int (*put_pages)(struct amd_p2p_page_table *page_table);
+	int (*put_pages)(struct amd_p2p_info **amd_p2p_data);
 	int (*is_gpu_address)(uint64_t address, struct pid *pid);
 	int (*get_page_size)(uint64_t address, uint64_t length, struct pid *pid,
 				unsigned long *page_size);

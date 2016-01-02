@@ -24,9 +24,17 @@
 #include <linux/export.h>
 #include <linux/pid.h>
 #include <linux/err.h>
+#include <linux/slab.h>
 #include "amd_rdma.h"
 #include "kfd_priv.h"
 
+
+struct rdma_cb {
+	struct list_head node;
+	struct amd_p2p_info amd_p2p_data;
+	void  (*free_callback)(void *client_priv);
+	void  *client_priv;
+};
 
 /**
  * This function makes the pages underlying a range of GPU virtual memory
@@ -37,8 +45,7 @@
  * \param   length        - The length of requested mapping
  * \param   pid           - Pointer to structure pid to which address belongs.
  *			    Could be NULL for current process address space.
- * \param   dma_device    - Device structure of another device
- * \param   page_table    - On return: Pointer to structure describing
+ * \param   p2p_data    - On return: Pointer to structure describing
  *			    underlying pages/locations
  * \param   free_callback - Pointer to callback which will be called when access
  *			    to such memory must be stopped immediately: Memory
@@ -53,26 +60,152 @@
  * \return  0 if operation was successful
  */
 static int get_pages(uint64_t address, uint64_t length, struct pid *pid,
-		struct device *dma_device,
-		struct amd_p2p_page_table **page_table,
-		void  (*free_callback)(struct amd_p2p_page_table *page_table,
-					void *client_priv),
+		struct amd_p2p_info **amd_p2p_data,
+		void  (*free_callback)(void *client_priv),
 		void  *client_priv)
 {
-	return -ENOTSUPP;
+	struct kfd_bo *buf_obj;
+	struct kgd_mem *mem;
+	struct sg_table *sg_table_tmp;
+	struct kfd_dev *dev;
+	uint64_t last = address + length - 1;
+	uint64_t offset;
+	struct kfd_process *p;
+	struct rdma_cb *rdma_cb_data;
+	int ret = 0;
+
+	p = kfd_lookup_process_by_pid(pid);
+	if (!p) {
+		pr_err("could not find the process in %s.\n",
+				__func__);
+		return -EINVAL;
+	}
+
+	buf_obj = kfd_process_find_bo_from_interval(p, address, last);
+	if (!buf_obj) {
+		pr_err("can not find a kfd_bo for the range\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	rdma_cb_data = kmalloc(sizeof(*rdma_cb_data), GFP_KERNEL);
+	if (!rdma_cb_data) {
+		*amd_p2p_data = NULL;
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	mem = buf_obj->mem;
+	dev = buf_obj->dev;
+	offset = address - buf_obj->it.start;
+
+	ret = dev->kfd2kgd->pin_get_sg_table_bo(dev->kgd, mem,
+			offset, length, &sg_table_tmp);
+
+	if (ret) {
+		pr_err("pin_get_sg_table_bo failed.\n");
+		*amd_p2p_data = NULL;
+		goto free_mem;
+	}
+
+	rdma_cb_data->amd_p2p_data.va = address;
+	rdma_cb_data->amd_p2p_data.size = length;
+	rdma_cb_data->amd_p2p_data.pid = pid;
+	rdma_cb_data->amd_p2p_data.priv = buf_obj;
+	rdma_cb_data->amd_p2p_data.pages = sg_table_tmp;
+
+	rdma_cb_data->free_callback = free_callback;
+	rdma_cb_data->client_priv = client_priv;
+
+	list_add(&rdma_cb_data->node, &buf_obj->cb_data_head);
+
+	*amd_p2p_data = &rdma_cb_data->amd_p2p_data;
+
+	goto out;
+
+free_mem:
+	kfree(rdma_cb_data);
+out:
+	mutex_unlock(&p->mutex);
+
+	return ret;
 }
+
+static int put_pages_helper(struct amd_p2p_info *p2p_data)
+{
+	struct kfd_bo *buf_obj;
+	struct kfd_dev *dev;
+	struct sg_table *sg_table_tmp;
+	struct rdma_cb *rdma_cb_data;
+
+	if (!p2p_data) {
+		pr_err("amd_p2p_info pointer is invalid.\n");
+		return -EINVAL;
+	}
+
+	rdma_cb_data = container_of(p2p_data, struct rdma_cb, amd_p2p_data);
+
+	buf_obj = p2p_data->priv;
+	dev = buf_obj->dev;
+	sg_table_tmp = p2p_data->pages;
+
+	list_del(&rdma_cb_data->node);
+	kfree(rdma_cb_data);
+
+	dev->kfd2kgd->unpin_put_sg_table_bo(buf_obj->mem, sg_table_tmp);
+
+
+	return 0;
+}
+
+void run_rdma_free_callback(struct kfd_bo *buf_obj)
+{
+	struct rdma_cb *tmp, *rdma_cb_data;
+
+	list_for_each_entry_safe(rdma_cb_data, tmp,
+			&buf_obj->cb_data_head, node) {
+		if (rdma_cb_data->free_callback)
+			rdma_cb_data->free_callback(
+					rdma_cb_data->client_priv);
+
+		put_pages_helper(&rdma_cb_data->amd_p2p_data);
+	}
+}
+
 /**
  *
  * This function release resources previously allocated by get_pages() call.
  *
- * \param   page_table - A pointer to page table entries allocated by
- *			 get_pages() call.
+ * \param   p_p2p_data - A pointer to pointer to amd_p2p_info entries
+ * 			allocated by get_pages() call.
  *
  * \return  0 if operation was successful
  */
-static int put_pages(struct amd_p2p_page_table *page_table)
+static int put_pages(struct amd_p2p_info **p_p2p_data)
 {
-	return -ENOTSUPP;
+	struct kfd_process *p = NULL;
+	int ret = 0;
+
+	if (!(*p_p2p_data)) {
+		pr_err("amd_p2p_info pointer is invalid.\n");
+		return -EINVAL;
+	}
+
+	p = kfd_lookup_process_by_pid((*p_p2p_data)->pid);
+	if (!p) {
+		pr_err("could not find the process in %s\n",
+				__func__);
+		return -EINVAL;
+	}
+
+	ret = put_pages_helper(*p_p2p_data);
+
+	if (!ret)
+		*p_p2p_data = NULL;
+
+	mutex_unlock(&p->mutex);
+
+	return ret;
 }
 
 /**
@@ -87,7 +220,23 @@ static int put_pages(struct amd_p2p_page_table *page_table)
  */
 static int is_gpu_address(uint64_t address, struct pid *pid)
 {
-	return -ENOTSUPP;
+	struct kfd_bo *buf_obj;
+	struct kfd_process *p;
+
+	p = kfd_lookup_process_by_pid(pid);
+	if (!p) {
+		pr_err("could not find the process in %s.\n",
+				__func__);
+		return 0;
+	}
+
+	buf_obj = kfd_process_find_bo_from_interval(p, address, address);
+
+	mutex_unlock(&p->mutex);
+	if (!buf_obj)
+		return 0;
+	else
+		return 1;
 }
 
 /**
@@ -104,7 +253,15 @@ static int is_gpu_address(uint64_t address, struct pid *pid)
 static int get_page_size(uint64_t address, uint64_t length, struct pid *pid,
 			unsigned long *page_size)
 {
-	return -ENOTSUPP;
+	/*
+	 * As local memory is always consecutive, we can assume the local
+	 * memory page size to be arbitrary.
+	 * Currently we assume the local memory page size to be the same
+	 * as system memory, which is 4KB.
+	 */
+	*page_size = PAGE_SIZE;
+
+	return 0;
 }
 
 

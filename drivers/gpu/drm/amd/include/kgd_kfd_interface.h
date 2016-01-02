@@ -30,6 +30,7 @@
 
 #include <linux/types.h>
 #include <linux/mm_types.h>
+#include <linux/scatterlist.h>
 
 struct pci_dev;
 
@@ -271,6 +272,12 @@ struct kfd2kgd_calls {
 			struct kgd_mem *mem, void **kptr);
 	void (*set_vm_context_page_table_base)(struct kgd_dev *kgd, uint32_t vmid,
 			uint32_t page_table_base);
+
+	int (*pin_get_sg_table_bo)(struct kgd_dev *kgd,
+			struct kgd_mem *mem, uint64_t offset,
+			uint64_t size, struct sg_table **ret_sg);
+	void (*unpin_put_sg_table_bo)(struct kgd_mem *mem,
+			struct sg_table *sg);
 };
 
 /**

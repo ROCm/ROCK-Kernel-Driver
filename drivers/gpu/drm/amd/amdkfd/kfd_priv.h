@@ -32,8 +32,11 @@
 #include <linux/spinlock.h>
 #include <linux/idr.h>
 #include <linux/kfd_ioctl.h>
+#include <linux/pid.h>
 #include <linux/interval_tree.h>
 #include <kgd_kfd_interface.h>
+
+#include "amd_rdma.h"
 
 #define KFD_SYSFS_FILE_MODE 0444
 
@@ -263,6 +266,8 @@ struct kfd_dev {
 struct kfd_bo {
 	void *mem;
 	struct interval_tree_node it;
+	struct kfd_dev *dev;
+	struct list_head cb_data_head;
 };
 
 /* KGD2KFD callbacks */
@@ -663,8 +668,16 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 					uint64_t length);
 void *kfd_process_device_translate_handle(struct kfd_process_device *p,
 					int handle);
+struct kfd_bo *kfd_process_device_find_bo(struct kfd_process_device *pdd,
+					int handle);
+void *kfd_process_find_bo_from_interval(struct kfd_process *p,
+					uint64_t start_addr,
+					uint64_t last_addr);
 void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 					int handle);
+
+void run_rdma_free_callback(struct kfd_bo *buf_obj);
+struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid);
 
 /* Process device data iterator */
 struct kfd_process_device *kfd_get_first_process_device_data(struct kfd_process *p);
