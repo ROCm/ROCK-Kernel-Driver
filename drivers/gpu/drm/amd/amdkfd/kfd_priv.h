@@ -436,6 +436,7 @@ struct queue {
 	struct kfd_mem_obj *mqd_mem_obj;
 	uint64_t gart_mqd_addr;
 	struct queue_properties properties;
+	bool evicted; /* true -> queue is evicted */
 
 	uint32_t mec;
 	uint32_t pipe;
@@ -491,6 +492,7 @@ struct qcm_process_device {
 	unsigned int queue_count;
 	unsigned int vmid;
 	bool is_debug;
+	bool evicted; /* true -> process device is evicted,and can't be active*/
 	/*
 	 * All the memory management data should be here too
 	 */

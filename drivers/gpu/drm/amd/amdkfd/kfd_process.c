@@ -381,6 +381,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 		INIT_LIST_HEAD(&pdd->qpd.priv_queue_list);
 		pdd->qpd.dqm = dev->dqm;
 		pdd->qpd.pqm = &p->pqm;
+		pdd->qpd.evicted = 0;
 		pdd->reset_wavefronts = false;
 		list_add(&pdd->per_device_list, &p->per_device_data);
 
