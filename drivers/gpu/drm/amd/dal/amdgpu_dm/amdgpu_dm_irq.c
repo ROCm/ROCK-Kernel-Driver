@@ -770,18 +770,11 @@ void amdgpu_dm_hpd_init(struct amdgpu_device *adev)
 
 		const struct dc_link *dc_link = amdgpu_connector->dc_link;
 
-		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP ||
-			connector->connector_type == DRM_MODE_CONNECTOR_LVDS) {
-			/* don't try to enable hpd on eDP or LVDS avoid breaking
-			 * the aux dp channel on imac and help (but not
-			 * completely fix)
-			 * https://bugzilla.redhat.com/show_bug.cgi?id=726143
-			 * also avoid interrupt storms during dpms.
-			 */
-			continue;
+		if (DC_IRQ_SOURCE_INVALID != dc_link->irq_source_hpd) {
+			dc_interrupt_set(adev->dm.dc,
+					dc_link->irq_source_hpd,
+					true);
 		}
-
-		dc_interrupt_set(adev->dm.dc, dc_link->irq_source_hpd, true);
 
 		if (DC_IRQ_SOURCE_INVALID != dc_link->irq_source_hpd_rx) {
 			dc_interrupt_set(adev->dm.dc,

@@ -959,12 +959,14 @@ static void register_hpd_handlers(struct amdgpu_device *adev)
 		aconnector = to_amdgpu_connector(connector);
 		dc_link = aconnector->dc_link;
 
-		int_params.int_context = INTERRUPT_LOW_IRQ_CONTEXT;
-		int_params.irq_source = dc_link->irq_source_hpd;
+		if (DC_IRQ_SOURCE_INVALID != dc_link->irq_source_hpd) {
+			int_params.int_context = INTERRUPT_LOW_IRQ_CONTEXT;
+			int_params.irq_source = dc_link->irq_source_hpd;
 
-		amdgpu_dm_irq_register_interrupt(adev, &int_params,
-				handle_hpd_irq,
-				(void *) aconnector);
+			amdgpu_dm_irq_register_interrupt(adev, &int_params,
+					handle_hpd_irq,
+					(void *) aconnector);
+		}
 
 		if (DC_IRQ_SOURCE_INVALID != dc_link->irq_source_hpd_rx) {
 
