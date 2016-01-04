@@ -200,6 +200,7 @@ bool dc_commit_surfaces_to_target(
 
 {
 	uint8_t i, j;
+	uint32_t prev_disp_clk = dc->current_context.bw_results.dispclk_khz;
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
 
 	bool current_enabled_surface_count = 0;
@@ -241,7 +242,10 @@ bool dc_commit_surfaces_to_target(
 		goto unexpected_fail;
 	}
 
-	dc->hwss.program_bw(dc, &dc->current_context);
+	if (prev_disp_clk < dc->current_context.bw_results.dispclk_khz) {
+		dc->hwss.program_bw(dc, &dc->current_context);
+		pplib_apply_display_requirements(dc, &dc->current_context);
+	}
 
 	if (current_enabled_surface_count > 0 && new_enabled_surface_count == 0)
 		dc_target_disable_memory_requests(dc_target);
@@ -267,9 +271,14 @@ bool dc_commit_surfaces_to_target(
 
 		dc->hwss.update_plane_address(core_surface, target);
 	}
-
 	if (current_enabled_surface_count == 0 && new_enabled_surface_count > 0)
 		dc_target_enable_memory_requests(dc_target);
+
+	/* Lower display clock if necessary */
+	if (prev_disp_clk > dc->current_context.bw_results.dispclk_khz) {
+		dc->hwss.program_bw(dc, &dc->current_context);
+		pplib_apply_display_requirements(dc, &dc->current_context);
+	}
 
 	return true;
 
