@@ -29,6 +29,9 @@
 #include "core_status.h"
 #include "core_dc.h"
 
+/* TODO unhardcode, 4 for CZ*/
+#define MEMORY_TYPE_MULTIPLIER 4
+
 void build_scaling_params(
 	const struct dc_surface *surface,
 	struct core_stream *stream);
@@ -57,5 +60,9 @@ bool logical_attach_surfaces_to_target(
 		struct dc_surface *surfaces[],
 		uint8_t surface_count,
 		struct dc_target *dc_target);
+
+void pplib_apply_display_requirements(
+	const struct dc *dc,
+	const struct validate_context *context);
 
 #endif /* DRIVERS_GPU_DRM_AMD_DAL_DEV_DC_INC_RESOURCE_H_ */

@@ -28,6 +28,7 @@
 #include "include/irq_service_interface.h"
 #include "link_encoder.h"
 #include "stream_encoder.h"
+#include "opp.h"
 
 
 void unreference_clock_source(
@@ -404,4 +405,124 @@ bool logical_attach_surfaces_to_target(
 	target->status.surface_count = surface_count;
 
 	return true;
+}
+
+static uint32_t get_min_vblank_time_us(const struct validate_context *context)
+{
+	uint8_t i, j;
+	uint32_t min_vertical_blank_time = -1;
+
+	for (i = 0; i < context->target_count; i++) {
+		const struct core_target *target = context->targets[i];
+
+		for (j = 0; j < target->public.stream_count; j++) {
+			const struct dc_stream *stream =
+						target->public.streams[j];
+			uint32_t vertical_blank_in_pixels = 0;
+			uint32_t vertical_blank_time = 0;
+
+			vertical_blank_in_pixels = stream->timing.h_total *
+				(stream->timing.v_total
+					- stream->timing.v_addressable);
+			vertical_blank_time = vertical_blank_in_pixels
+				* 1000 / stream->timing.pix_clk_khz;
+			if (min_vertical_blank_time > vertical_blank_time)
+				min_vertical_blank_time = vertical_blank_time;
+		}
+	}
+	return min_vertical_blank_time;
+}
+
+static void fill_display_configs(
+	const struct validate_context *context,
+	struct dc_pp_display_configuration *pp_display_cfg)
+{
+	uint8_t i, j;
+	uint8_t num_cfgs = 0;
+
+	for (i = 0; i < context->target_count; i++) {
+		const struct core_target *target = context->targets[i];
+
+		for (j = 0; j < target->public.stream_count; j++) {
+			const struct core_stream *stream =
+			DC_STREAM_TO_CORE(target->public.streams[j]);
+			struct dc_pp_single_disp_config *cfg =
+					&pp_display_cfg->disp_configs[num_cfgs];
+
+			num_cfgs++;
+			cfg->signal = stream->signal;
+			cfg->pipe_idx = stream->opp->inst;
+			cfg->src_height = stream->public.src.height;
+			cfg->src_width = stream->public.src.width;
+			cfg->ddi_channel_mapping =
+				stream->sink->link->ddi_channel_mapping.raw;
+			cfg->transmitter =
+				stream->sink->link->link_enc->transmitter;
+			cfg->link_settings =
+					stream->sink->link->cur_link_settings;
+			cfg->sym_clock = stream->public.timing.pix_clk_khz;
+			switch (stream->public.timing.display_color_depth) {
+			case COLOR_DEPTH_101010:
+				cfg->sym_clock = (cfg->sym_clock * 30) / 24;
+				break;
+			case COLOR_DEPTH_121212:
+				cfg->sym_clock = (cfg->sym_clock * 36) / 24;
+				break;
+			case COLOR_DEPTH_161616:
+				cfg->sym_clock = (cfg->sym_clock * 48) / 24;
+				break;
+			default:
+				break;
+			}
+			/* TODO: unhardcode*/
+			cfg->v_refresh = 60;
+		}
+	}
+	pp_display_cfg->display_count = num_cfgs;
+}
+
+void pplib_apply_display_requirements(
+	const struct dc *dc,
+	const struct validate_context *context)
+{
+	struct dc_pp_display_configuration pp_display_cfg = { 0 };
+
+	pp_display_cfg.all_displays_in_sync =
+		context->bw_results.all_displays_in_sync;
+	pp_display_cfg.nb_pstate_switch_disable =
+			context->bw_results.nbp_state_change_enable == false;
+	pp_display_cfg.cpu_cc6_disable =
+			context->bw_results.cpuc_state_change_enable == false;
+	pp_display_cfg.cpu_pstate_disable =
+			context->bw_results.cpup_state_change_enable == false;
+	pp_display_cfg.cpu_pstate_separation_time =
+			context->bw_results.required_blackout_duration_us;
+
+	pp_display_cfg.min_memory_clock_khz = context->bw_results.required_yclk
+		/ MEMORY_TYPE_MULTIPLIER;
+	pp_display_cfg.min_engine_clock_khz = context->bw_results.required_sclk;
+	pp_display_cfg.min_engine_clock_deep_sleep_khz
+			= context->bw_results.required_sclk_deep_sleep;
+
+	pp_display_cfg.avail_mclk_switch_time_us =
+						get_min_vblank_time_us(context);
+	/* TODO: dce11.2*/
+	pp_display_cfg.avail_mclk_switch_time_in_disp_active_us = 0;
+
+	pp_display_cfg.disp_clk_khz = context->bw_results.dispclk_khz;
+
+	fill_display_configs(context, &pp_display_cfg);
+
+	/* TODO: is this still applicable?*/
+	if (pp_display_cfg.display_count == 1) {
+		const struct dc_crtc_timing *timing =
+			&context->targets[0]->public.streams[0]->timing;
+
+		pp_display_cfg.crtc_index =
+			pp_display_cfg.disp_configs[0].pipe_idx;
+		pp_display_cfg.line_time_in_us = timing->h_total * 1000
+							/ timing->pix_clk_khz;
+	}
+
+	dc_service_pp_apply_display_requirements(dc->ctx, &pp_display_cfg);
 }
