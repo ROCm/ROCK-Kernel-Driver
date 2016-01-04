@@ -125,6 +125,9 @@ struct display_sink_capability {
 	/* to check if we have queried the display capability
 	 * for eDP panel already. */
 	bool is_edp_sink_cap_valid;
+
+	enum ddc_transaction_type transaction_type;
+	enum signal_type signal;
 };
 
 struct dp_receiver_id_info {
