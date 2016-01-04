@@ -132,7 +132,7 @@ static bool program_hpd_filter(
 	return result;
 }
 
-static bool detect_sink(struct core_link *link)
+static bool detect_sink(struct core_link *link, enum dc_connection_type *type)
 {
 	uint32_t is_hpd_high = 0;
 	struct irq *hpd_pin;
@@ -152,10 +152,10 @@ static bool detect_sink(struct core_link *link)
 		hpd_pin);
 
 	if (is_hpd_high) {
-		link->public.type = dc_connection_single;
+		*type = dc_connection_single;
 		/* TODO: need to do the actual detection */
 	} else {
-		link->public.type = dc_connection_none;
+		*type = dc_connection_none;
 	}
 
 	return true;
@@ -470,14 +470,87 @@ static enum dc_edid_status read_edid(
 	return edid_status;
 }
 
+static void dc_link_detect_dp(
+	struct core_link *link,
+	struct display_sink_capability *sink_caps,
+	bool *converter_disable_audio,
+	union audio_support *audio_support)
+{
+	sink_caps->signal = link_detect_sink(link);
+	sink_caps->transaction_type =
+		get_ddc_transaction_type(sink_caps->signal);
+
+	if (sink_caps->transaction_type == DDC_TRANSACTION_TYPE_I2C_OVER_AUX) {
+		sink_caps->signal = SIGNAL_TYPE_DISPLAY_PORT;
+		detect_dp_sink_caps(link);
+
+		/* DP active dongles */
+		if (is_dp_active_dongle(link->dpcd_caps.dongle_type)) {
+			if (!link->dpcd_caps.sink_count.bits.SINK_COUNT) {
+				link->public.type = dc_connection_none;
+				/*
+				 * active dongle unplug processing for short irq
+				 */
+				link_disconnect_all_sinks(link);
+				return;
+			}
+
+			if (link->dpcd_caps.dongle_type !=
+			DISPLAY_DONGLE_DP_HDMI_CONVERTER) {
+				*converter_disable_audio = true;
+			}
+		}
+		if (is_mst_supported(link)) {
+			sink_caps->signal = SIGNAL_TYPE_DISPLAY_PORT_MST;
+
+			/*
+			 * This call will initiate MST topology discovery. Which
+			 * will detect MST ports and add new DRM connector DRM
+			 * framework. Then read EDID via remote i2c over aux. In
+			 * the end, will notify DRM detect result and save EDID
+			 * into DRM framework.
+			 *
+			 * .detect is called by .fill_modes.
+			 * .fill_modes is called by user mode ioctl
+			 * DRM_IOCTL_MODE_GETCONNECTOR.
+			 *
+			 * .get_modes is called by .fill_modes.
+			 *
+			 * call .get_modes, AMDGPU DM implementation will create
+			 * new dc_sink and add to dc_link. For long HPD plug
+			 * in/out, MST has its own handle.
+			 *
+			 * Therefore, just after dc_create, link->sink is not
+			 * created for MST until user mode app calls
+			 * DRM_IOCTL_MODE_GETCONNECTOR.
+			 *
+			 * Need check ->sink usages in case ->sink = NULL
+			 * TODO: s3 resume check
+			 */
+
+			if (dc_helpers_dp_mst_start_top_mgr(
+				link->ctx,
+				&link->public)) {
+				link->public.type = dc_connection_mst_branch;
+			} else {
+				/* MST not supported */
+				sink_caps->signal = SIGNAL_TYPE_DISPLAY_PORT;
+			}
+		}
+	} else {
+		/* DP passive dongles */
+		sink_caps->signal = dp_passive_dongle_detection(link->ddc,
+				sink_caps,
+				audio_support);
+	}
+}
+
 void dc_link_detect(const struct dc_link *dc_link)
 {
 	struct core_link *link = DC_LINK_TO_LINK(dc_link);
 	struct sink_init_data sink_init_data = { 0 };
-	enum ddc_transaction_type transaction_type = DDC_TRANSACTION_TYPE_NONE;
 	struct display_sink_capability sink_caps = { 0 };
 	uint8_t i;
-	enum signal_type signal = SIGNAL_TYPE_NONE;
 	bool converter_disable_audio = false;
 	union audio_support audio_support =
 		dal_adapter_service_get_audio_support(
@@ -486,123 +559,57 @@ void dc_link_detect(const struct dc_link *dc_link)
 	struct dc_context *dc_ctx = link->ctx;
 	struct dc_sink *dc_sink;
 	struct core_sink *sink = NULL;
+	enum dc_connection_type new_connection_type = dc_connection_none;
 
-	if (false == detect_sink(link)) {
+	if (false == detect_sink(link, &new_connection_type)) {
 		BREAK_TO_DEBUGGER();
 		return;
 	}
 
-	if (link->public.type != dc_connection_none) {
+	if (new_connection_type != dc_connection_none) {
+		link->public.type = new_connection_type;
+
 		/* From Disconnected-to-Connected. */
 		switch (link->public.connector_signal) {
 		case SIGNAL_TYPE_HDMI_TYPE_A: {
-			transaction_type = DDC_TRANSACTION_TYPE_I2C;
+			sink_caps.transaction_type = DDC_TRANSACTION_TYPE_I2C;
 			if (audio_support.bits.HDMI_AUDIO_NATIVE)
-				signal = SIGNAL_TYPE_HDMI_TYPE_A;
+				sink_caps.signal = SIGNAL_TYPE_HDMI_TYPE_A;
 			else
-				signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
+				sink_caps.signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
 			break;
 		}
 
 		case SIGNAL_TYPE_DVI_SINGLE_LINK: {
-			transaction_type = DDC_TRANSACTION_TYPE_I2C;
-			signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
+			sink_caps.transaction_type = DDC_TRANSACTION_TYPE_I2C;
+			sink_caps.signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
 			break;
 		}
 
 		case SIGNAL_TYPE_DVI_DUAL_LINK: {
-			transaction_type = DDC_TRANSACTION_TYPE_I2C;
-			signal = SIGNAL_TYPE_DVI_DUAL_LINK;
+			sink_caps.transaction_type = DDC_TRANSACTION_TYPE_I2C;
+			sink_caps.signal = SIGNAL_TYPE_DVI_DUAL_LINK;
 			break;
 		}
 
 		case SIGNAL_TYPE_EDP: {
 			detect_dp_sink_caps(link);
-			transaction_type = DDC_TRANSACTION_TYPE_I2C_OVER_AUX;
-			signal = SIGNAL_TYPE_EDP;
+			sink_caps.transaction_type =
+				DDC_TRANSACTION_TYPE_I2C_OVER_AUX;
+			sink_caps.signal = SIGNAL_TYPE_EDP;
 			break;
 		}
 
 		case SIGNAL_TYPE_DISPLAY_PORT: {
-			signal = link_detect_sink(link);
-			transaction_type = get_ddc_transaction_type(
-					signal);
+			dc_link_detect_dp(
+				link,
+				&sink_caps,
+				&converter_disable_audio,
+				&audio_support);
 
-			if (transaction_type ==
-				DDC_TRANSACTION_TYPE_I2C_OVER_AUX) {
-				signal =
-					SIGNAL_TYPE_DISPLAY_PORT;
-				detect_dp_sink_caps(link);
+			if (link->public.type == dc_connection_mst_branch)
+				return;
 
-				/* DP active dongles */
-				if (is_dp_active_dongle(
-					link->dpcd_caps.dongle_type)) {
-					if (!link->dpcd_caps.
-						sink_count.bits.SINK_COUNT) {
-						link->public.type =
-							dc_connection_none;
-						/* active dongle unplug
-						 * processing for short irq
-						 */
-						link_disconnect_all_sinks(link);
-						return;
-					}
-
-					if (link->dpcd_caps.dongle_type !=
-					DISPLAY_DONGLE_DP_HDMI_CONVERTER) {
-						converter_disable_audio = true;
-					}
-				}
-				if (is_mst_supported(link)) {
-					signal = SIGNAL_TYPE_DISPLAY_PORT_MST;
-
-					/*
-					 * This call will initiate MST topology
-					 * discovery. Which will detect
-					 * MST ports and add new DRM connector
-					 * DRM framework. Then read EDID via
-					 * remote i2c over aux.In the end, will
-					 * notify DRM detect result and save
-					 * EDID into DRM framework.
-					 *
-					 * .detect is called by .fill_modes.
-					 * .fill_modes is called by user mode
-					 *  ioctl DRM_IOCTL_MODE_GETCONNECTOR.
-					 *
-					 * .get_modes is called by .fill_modes.
-					 *
-					 * call .get_modes, AMDGPU DM
-					 * implementation will create new
-					 * dc_sink and add to dc_link.
-					 * For long HPD plug in/out, MST has its
-					 * own handle.
-					 *
-					 * Therefore, just after dc_create,
-					 * link->sink is not created for MST
-					 * until user mode app calls
-					 * DRM_IOCTL_MODE_GETCONNECTOR.
-					 *
-					 * Need check ->sink usages in case
-					 * ->sink = NULL
-					 * TODO: s3 resume check*/
-
-					if (dc_helpers_dp_mst_start_top_mgr(
-						link->ctx,
-						&link->public)) {
-						link->mst_enabled = true;
-						return;
-					} else {
-						/* MST not supported */
-						signal = SIGNAL_TYPE_DISPLAY_PORT;
-					}
-				}
-			}
-			else {
-				/* DP passive dongles */
-				signal = dp_passive_dongle_detection(link->ddc,
-						&sink_caps,
-						&audio_support);
-			}
 			break;
 		}
 
@@ -621,14 +628,14 @@ void dc_link_detect(const struct dc_link *dc_link)
 
 		dal_ddc_service_set_transaction_type(
 						link->ddc,
-						transaction_type);
+						sink_caps.transaction_type);
 
 		sink_init_data.link = &link->public;
-		sink_init_data.sink_signal = signal;
+		sink_init_data.sink_signal = sink_caps.signal;
 		sink_init_data.dongle_max_pix_clk =
 			sink_caps.max_hdmi_pixel_clock;
 		sink_init_data.converter_disable_audio =
-				converter_disable_audio;
+			converter_disable_audio;
 
 		dc_sink = sink_create(&sink_init_data);
 		if (!dc_sink) {
@@ -704,16 +711,19 @@ void dc_link_detect(const struct dc_link *dc_link)
 
 	} else {
 		/* From Connected-to-Disconnected. */
-		if (link->mst_enabled) {
+		if (link->public.type == dc_connection_mst_branch)
 			dc_helpers_dp_mst_stop_top_mgr(link->ctx, &link->public);
-			link->mst_enabled = false;
-		} else
+		else
 			link_disconnect_all_sinks(link);
+
+		link->public.type = dc_connection_none;
+		sink_caps.signal = SIGNAL_TYPE_NONE;
 	}
 
 	LINK_INFO("link=%d, dc_sink_in=%p is now %s\n",
 		link->public.link_index, &sink->public,
-		(signal == SIGNAL_TYPE_NONE ? "Disconnected":"Connected"));
+		(sink_caps.signal == SIGNAL_TYPE_NONE ?
+			"Disconnected":"Connected"));
 
 	return;
 }
