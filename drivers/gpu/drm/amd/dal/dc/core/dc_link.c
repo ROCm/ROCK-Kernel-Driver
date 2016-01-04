@@ -885,7 +885,6 @@ static enum transmitter translate_encoder_to_transmitter(
 	}
 }
 
-
 static bool construct(
 	struct core_link *link,
 	const struct link_init_data *init_params)
@@ -897,6 +896,9 @@ static bool construct(
 	struct dc_context *dc_ctx = init_params->ctx;
 	struct encoder_init_data enc_init_data = { 0 };
 	struct integrated_info info = {{{ 0 }}};
+
+	link->public.irq_source_hpd = DC_IRQ_SOURCE_INVALID;
+	link->public.irq_source_hpd_rx = DC_IRQ_SOURCE_INVALID;
 
 	link->dc = init_params->dc;
 	link->adapter_srv = as;
@@ -913,9 +915,15 @@ static bool construct(
 		goto create_fail;
 	}
 
+	hpd_gpio = dal_adapter_service_obtain_hpd_irq(as, link->link_id);
+
+	if (hpd_gpio != NULL)
+		link->public.irq_source_hpd = dal_irq_get_source(hpd_gpio);
+
 	switch (link->link_id.id) {
 	case CONNECTOR_ID_HDMI_TYPE_A:
 		link->public.connector_signal = SIGNAL_TYPE_HDMI_TYPE_A;
+
 		break;
 	case CONNECTOR_ID_SINGLE_LINK_DVID:
 	case CONNECTOR_ID_SINGLE_LINK_DVII:
@@ -927,29 +935,19 @@ static bool construct(
 		break;
 	case CONNECTOR_ID_DISPLAY_PORT:
 		link->public.connector_signal =	SIGNAL_TYPE_DISPLAY_PORT;
-		hpd_gpio = dal_adapter_service_obtain_hpd_irq(
-					as,
-					link->link_id);
 
-		if (hpd_gpio != NULL) {
+		if (hpd_gpio != NULL)
 			link->public.irq_source_hpd_rx =
 					dal_irq_get_rx_source(hpd_gpio);
-			dal_adapter_service_release_irq(
-					as, hpd_gpio);
-		}
 
 		break;
 	case CONNECTOR_ID_EDP:
 		link->public.connector_signal = SIGNAL_TYPE_EDP;
-		hpd_gpio = dal_adapter_service_obtain_hpd_irq(
-					as,
-					link->link_id);
 
 		if (hpd_gpio != NULL) {
+			link->public.irq_source_hpd = DC_IRQ_SOURCE_INVALID;
 			link->public.irq_source_hpd_rx =
 					dal_irq_get_rx_source(hpd_gpio);
-			dal_adapter_service_release_irq(
-					as, hpd_gpio);
 		}
 		break;
 	default:
@@ -959,18 +957,16 @@ static bool construct(
 		goto create_fail;
 	}
 
+	if (hpd_gpio != NULL) {
+		dal_adapter_service_release_irq(
+			as, hpd_gpio);
+	}
+
 	/* TODO: #DAL3 Implement id to str function.*/
 	LINK_INFO("Connector[%d] description:"
 			"signal %d\n",
 			init_params->connector_index,
 			link->public.connector_signal);
-
-	hpd_gpio = dal_adapter_service_obtain_hpd_irq(as, link->link_id);
-
-	if (hpd_gpio != NULL) {
-		link->public.irq_source_hpd = dal_irq_get_source(hpd_gpio);
-		dal_adapter_service_release_irq(as, hpd_gpio);
-	}
 
 	ddc_service_init_data.as = as;
 	ddc_service_init_data.ctx = link->ctx;
