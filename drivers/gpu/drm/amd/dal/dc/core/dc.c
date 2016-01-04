@@ -402,7 +402,6 @@ void dc_destroy(struct dc **dc)
 {
 	destruct(*dc);
 	dc_service_free((*dc)->ctx, *dc);
-	dc_service_free((*dc)->ctx, (*dc)->ctx);
 	*dc = NULL;
 }
 
