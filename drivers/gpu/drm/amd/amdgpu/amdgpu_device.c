@@ -1402,10 +1402,14 @@ static int amdgpu_resume(struct amdgpu_device *adev)
  */
 bool amdgpu_device_has_dal_support(struct amdgpu_device *adev)
 {
-
 	switch(adev->asic_type) {
-	case CHIP_CARRIZO:
+#if defined(CONFIG_DRM_AMD_DAL) && defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+	case CHIP_BONAIRE:
+	case CHIP_HAWAII:
+		return true;
+#endif
 #if defined(CONFIG_DRM_AMD_DAL) && defined(CONFIG_DRM_AMD_DAL_DCE11_0)
+	case CHIP_CARRIZO:
 		return true;
 #endif
 	default:
