@@ -65,6 +65,7 @@
 #include "oss/oss_2_0_d.h"
 #include "oss/oss_2_0_sh_mask.h"
 
+#include "amdgpu_dm.h"
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_powerplay.h"
 
@@ -1626,6 +1627,76 @@ static uint32_t cik_get_rev_id(struct amdgpu_device *adev)
 		>> CC_DRM_ID_STRAPS__ATI_REV_ID__SHIFT;
 }
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+static const struct amdgpu_ip_block_version bonaire_ip_blocks_dal[] =
+{
+	/* ORDER MATTERS! */
+	{
+		.type = AMD_IP_BLOCK_TYPE_COMMON,
+		.major = 1,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &cik_common_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_GMC,
+		.major = 7,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &gmc_v7_0_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_IH,
+		.major = 2,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &cik_ih_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_SMC,
+		.major = 7,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &amdgpu_pp_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_DCE,
+		.major = 8,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &amdgpu_dm_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_GFX,
+		.major = 7,
+		.minor = 2,
+		.rev = 0,
+		.funcs = &gfx_v7_0_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_SDMA,
+		.major = 2,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &cik_sdma_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_UVD,
+		.major = 4,
+		.minor = 2,
+		.rev = 0,
+		.funcs = &uvd_v4_2_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_VCE,
+		.major = 2,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &vce_v2_0_ip_funcs,
+	},
+};
+#endif
+
 static const struct amdgpu_ip_block_version bonaire_ip_blocks[] =
 {
 	/* ORDER MATTERS! */
@@ -1693,6 +1764,76 @@ static const struct amdgpu_ip_block_version bonaire_ip_blocks[] =
 		.funcs = &vce_v2_0_ip_funcs,
 	},
 };
+
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+static const struct amdgpu_ip_block_version hawaii_ip_blocks_dal[] =
+{
+	/* ORDER MATTERS! */
+	{
+		.type = AMD_IP_BLOCK_TYPE_COMMON,
+		.major = 1,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &cik_common_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_GMC,
+		.major = 7,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &gmc_v7_0_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_IH,
+		.major = 2,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &cik_ih_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_SMC,
+		.major = 7,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &amdgpu_pp_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_DCE,
+		.major = 8,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &amdgpu_dm_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_GFX,
+		.major = 7,
+		.minor = 3,
+		.rev = 0,
+		.funcs = &gfx_v7_0_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_SDMA,
+		.major = 2,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &cik_sdma_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_UVD,
+		.major = 4,
+		.minor = 2,
+		.rev = 0,
+		.funcs = &uvd_v4_2_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_VCE,
+		.major = 2,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &vce_v2_0_ip_funcs,
+	},
+};
+#endif
 
 static const struct amdgpu_ip_block_version hawaii_ip_blocks[] =
 {
@@ -1970,12 +2111,32 @@ int cik_set_ip_blocks(struct amdgpu_device *adev)
 {
 	switch (adev->asic_type) {
 	case CHIP_BONAIRE:
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+		if (amdgpu_dal && amdgpu_device_has_dal_support(adev)) {
+			adev->ip_blocks = bonaire_ip_blocks_dal;
+			adev->num_ip_blocks = ARRAY_SIZE(bonaire_ip_blocks_dal);
+		} else {
+			adev->ip_blocks = bonaire_ip_blocks;
+			adev->num_ip_blocks = ARRAY_SIZE(bonaire_ip_blocks);
+		}
+#else
 		adev->ip_blocks = bonaire_ip_blocks;
 		adev->num_ip_blocks = ARRAY_SIZE(bonaire_ip_blocks);
+#endif
 		break;
 	case CHIP_HAWAII:
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+		if (amdgpu_dal && amdgpu_device_has_dal_support(adev)) {
+			adev->ip_blocks = hawaii_ip_blocks_dal;
+			adev->num_ip_blocks = ARRAY_SIZE(hawaii_ip_blocks_dal);
+		} else {
+			adev->ip_blocks = hawaii_ip_blocks;
+			adev->num_ip_blocks = ARRAY_SIZE(hawaii_ip_blocks);
+		}
+#else
 		adev->ip_blocks = hawaii_ip_blocks;
 		adev->num_ip_blocks = ARRAY_SIZE(hawaii_ip_blocks);
+#endif
 		break;
 	case CHIP_KAVERI:
 		adev->ip_blocks = kaveri_ip_blocks;
