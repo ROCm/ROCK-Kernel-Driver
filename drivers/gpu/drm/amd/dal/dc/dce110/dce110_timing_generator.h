@@ -69,7 +69,7 @@ struct dce110_timing_generator {
 	uint32_t min_h_back_porch;
 
 	enum sync_source cached_gsl_group;
-	bool advanced_request_enable;
+	bool disable_advanced_request;
 };
 
 #define DCE110TG_FROM_TG(tg)\
@@ -79,7 +79,7 @@ bool dce110_timing_generator_construct(
 	struct dce110_timing_generator *tg,
 	struct adapter_service *as,
 	struct dc_context *ctx,
-	enum controller_id id,
+	uint32_t instance,
 	const struct dce110_timing_generator_offsets *offsets);
 
 /* determine if given timing can be supported by TG */
