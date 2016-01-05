@@ -144,6 +144,8 @@ static struct timing_generator_funcs dce110_tg_funcs = {
 		.disable_reset_trigger = dce110_timing_generator_disable_reset_trigger,
 		.tear_down_global_swap_lock =
 				dce110_timing_generator_tear_down_global_swap_lock,
+		.enable_advanced_request =
+				dce110_timing_generator_enable_advanced_request
 };
 
 static const struct crtc_black_color black_color_format[] = {
@@ -184,12 +186,6 @@ static void dce110_timing_generator_apply_front_porch_workaround(
 		if (timing->v_front_porch < 1)
 			timing->v_front_porch = 1;
 	}
-}
-
-static int32_t dce110_timing_generator_get_vsynch_and_front_porch_size(
-	const struct dc_crtc_timing *timing)
-{
-	return timing->v_sync_width + timing->v_front_porch;
 }
 
 static void dce110_timing_generator_color_space_to_black_color(
@@ -521,7 +517,6 @@ bool dce110_timing_generator_program_timing_generator(
 	enum bp_result result;
 	struct bp_hw_crtc_timing_parameters bp_params;
 	struct dc_crtc_timing patched_crtc_timing;
-	uint32_t regval;
 	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 
 	uint32_t vsync_offset = dc_crtc_timing->v_border_bottom +
@@ -581,28 +576,7 @@ bool dce110_timing_generator_program_timing_generator(
 
 	program_horz_count_by_2(tg, &patched_crtc_timing);
 
-	regval = dal_read_reg(tg->ctx,
-			CRTC_REG(mmCRTC_START_LINE_CONTROL));
-
-	if (dce110_timing_generator_get_vsynch_and_front_porch_size(&patched_crtc_timing) <= 3) {
-		set_reg_field_value(regval, 3,
-				CRTC_START_LINE_CONTROL,
-				CRTC_ADVANCED_START_LINE_POSITION);
-
-		set_reg_field_value(regval, 0,
-				CRTC_START_LINE_CONTROL,
-				CRTC_PREFETCH_EN);
-	} else {
-		set_reg_field_value(regval, 4,
-				CRTC_START_LINE_CONTROL,
-				CRTC_ADVANCED_START_LINE_POSITION);
-
-		set_reg_field_value(regval, 1,
-				CRTC_START_LINE_CONTROL,
-				CRTC_PREFETCH_EN);
-	}
-	dal_write_reg(tg->ctx,
-			CRTC_REG(mmCRTC_START_LINE_CONTROL), regval);
+	tg110->base.funcs->enable_advanced_request(tg, true, &patched_crtc_timing);
 
 	/* Enable stereo - only when we need to pack 3D frame. Other types
 	 * of stereo handled in explicit call */
@@ -1342,7 +1316,6 @@ bool dce110_timing_generator_is_counter_moving(struct timing_generator *tg)
 		return true;
 }
 
-/*TODO: Figure out if we need this function. */
 void dce110_timing_generator_enable_advanced_request(
 	struct timing_generator *tg,
 	bool enable,
@@ -1352,7 +1325,7 @@ void dce110_timing_generator_enable_advanced_request(
 	uint32_t addr = CRTC_REG(mmCRTC_START_LINE_CONTROL);
 	uint32_t value = dal_read_reg(tg->ctx, addr);
 
-	if (enable && DCE110TG_FROM_TG(tg)->advanced_request_enable) {
+	if (enable && !DCE110TG_FROM_TG(tg)->disable_advanced_request) {
 		set_reg_field_value(
 			value,
 			0,
@@ -1366,7 +1339,7 @@ void dce110_timing_generator_enable_advanced_request(
 			CRTC_LEGACY_REQUESTOR_EN);
 	}
 
-	if (dce110_timing_generator_get_vsynch_and_front_porch_size(timing) <= 3) {
+	if ((timing->v_sync_width + timing->v_front_porch) <= 3) {
 		set_reg_field_value(
 			value,
 			3,
@@ -1623,6 +1596,15 @@ void dce110_timing_generator_disable_vga(
 		break;
 	case CONTROLLER_ID_D2:
 		addr = mmD3VGA_CONTROL;
+		break;
+	case CONTROLLER_ID_D3:
+		addr = mmD4VGA_CONTROL;
+		break;
+	case CONTROLLER_ID_D4:
+		addr = mmD5VGA_CONTROL;
+		break;
+	case CONTROLLER_ID_D5:
+		addr = mmD6VGA_CONTROL;
 		break;
 	default:
 		break;

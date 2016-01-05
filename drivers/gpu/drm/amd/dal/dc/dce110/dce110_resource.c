@@ -811,7 +811,7 @@ enum dc_status dce110_validate_with_context(
 	result = dce_base_map_resources(dc, context);
 
 	if (result == DC_OK)
-	result = map_clock_resources(dc, context);
+		result = map_clock_resources(dc, context);
 
 	if (result == DC_OK)
 		result = validate_mapped_resource(dc, context);

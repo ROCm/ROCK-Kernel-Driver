@@ -182,6 +182,8 @@ struct timing_generator_funcs {
 						const struct trigger_params *trigger_params);
 	void (*disable_reset_trigger)(struct timing_generator *tg);
 	void (*tear_down_global_swap_lock)(struct timing_generator *tg);
+	void (*enable_advanced_request)(struct timing_generator *tg,
+					bool enable, const struct dc_crtc_timing *timing);
 };
 
 #endif
