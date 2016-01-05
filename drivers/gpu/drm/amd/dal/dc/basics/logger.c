@@ -241,7 +241,8 @@ struct log_major_mask_info {
 
 #define LG_SYNC_MSK (1 << LOG_MINOR_SYNC_TIMING)
 
-#define LG_BWM_MSK (1 << LOG_MINOR_BWM_MODE_VALIDATION)
+#define LG_BWM_MSK (1 << LOG_MINOR_BWM_MODE_VALIDATION) | \
+		(1 << LOG_MINOR_BWM_REQUIRED_BANDWIDTH_CALCS)
 
 
 static const struct log_major_mask_info log_major_mask_info_tbl[] = {
@@ -620,7 +621,8 @@ void dal_logger_write(
 			/* Concatenate onto end of entry buffer */
 			append_entry(&entry, buffer, size);
 		} else {
-			append_entry(&entry, "LOG_ERROR\n", 12);
+			append_entry(&entry,
+				"LOG_ERROR, line too long or null\n", 35);
 		}
 
 		dal_logger_close(&entry);
@@ -658,7 +660,12 @@ void dal_logger_append(
 
 		size = dal_log_to_buffer(
 			buffer, DAL_LOGGER_BUFFER_MAX_LOG_LINE_SIZE, msg, args);
-		append_entry(entry, buffer, size);
+
+		if (size < DAL_LOGGER_BUFFER_MAX_LOG_LINE_SIZE - 1) {
+			append_entry(entry, buffer, size);
+		} else {
+			append_entry(entry, "LOG_ERROR, line too long\n", 27);
+		}
 
 		va_end(args);
 	}
@@ -758,11 +765,10 @@ void dal_logger_open(
 
 	entry->buf = dc_service_alloc(
 		logger->ctx,
-		DAL_LOGGER_BUFFER_MAX_LOG_LINE_SIZE * sizeof(char));
+		DAL_LOGGER_BUFFER_MAX_SIZE * sizeof(char));
 
 	entry->buf_offset = 0;
-	entry->max_buf_bytes =
-			DAL_LOGGER_BUFFER_MAX_LOG_LINE_SIZE * sizeof(char);
+	entry->max_buf_bytes = DAL_LOGGER_BUFFER_MAX_SIZE * sizeof(char);
 
 	logger->open_count++;
 	entry->major = major;

@@ -1286,7 +1286,9 @@ static enum dc_status apply_ctx_to_hw(
 	/*TODO: when pplib works*/
 	/*dc_set_clocks_and_clock_state(context);*/
 
-	set_display_clock(context);
+	if (context->bw_results.dispclk_khz
+		> dc->current_context.bw_results.dispclk_khz)
+		set_display_clock(context);
 
 	for (i = 0; i < pool->controller_count; i++) {
 		struct controller_ctx *ctlr_ctx

@@ -489,6 +489,8 @@ enum dc_status dce110_validate_bandwidth(
 	uint8_t i, j;
 	enum dc_status result = DC_ERROR_UNEXPECTED;
 	uint8_t number_of_displays = 0;
+	uint8_t max_htaps = 1;
+	uint8_t max_vtaps = 1;
 	bool all_displays_in_sync = true;
 	struct dc_crtc_timing prev_timing;
 
@@ -504,8 +506,16 @@ enum dc_status dce110_validate_bandwidth(
 
 			if (target->status.surface_count == 0) {
 				disp->graphics_scale_ratio = bw_int_to_fixed(1);
-				disp->graphics_h_taps = 4;
-				disp->graphics_v_taps = 4;
+				disp->graphics_h_taps = 2;
+				disp->graphics_v_taps = 2;
+
+				/* TODO: remove when bw formula accepts taps per
+				 * display
+				 */
+				if (max_vtaps < 2)
+					max_vtaps = 2;
+				if (max_htaps < 2)
+					max_htaps = 2;
 
 			} else {
 				disp->graphics_scale_ratio =
@@ -513,6 +523,14 @@ enum dc_status dce110_validate_bandwidth(
 						stream->ratios.vert.value);
 				disp->graphics_h_taps = stream->taps.h_taps;
 				disp->graphics_v_taps = stream->taps.v_taps;
+
+				/* TODO: remove when bw formula accepts taps per
+				 * display
+				 */
+				if (max_vtaps < stream->taps.v_taps)
+					max_vtaps = stream->taps.v_taps;
+				if (max_htaps < stream->taps.h_taps)
+					max_htaps = stream->taps.h_taps;
 			}
 
 			disp->graphics_src_width =
@@ -550,15 +568,23 @@ enum dc_status dce110_validate_bandwidth(
 		}
 	}
 
+	/* TODO: remove when bw formula accepts taps per
+	 * display
+	 */
+	context->bw_mode_data.displays_data[0].graphics_v_taps = max_vtaps;
+	context->bw_mode_data.displays_data[0].graphics_h_taps = max_htaps;
+
 	context->bw_mode_data.number_of_displays = number_of_displays;
 	context->bw_mode_data.display_synchronization_enabled =
 							all_displays_in_sync;
 
-	dal_logger_write(dc->ctx->logger,
+	dal_logger_write(
+		dc->ctx->logger,
 		LOG_MAJOR_BWM,
 		LOG_MINOR_BWM_REQUIRED_BANDWIDTH_CALCS,
-		"%s: Start bandwidth calculations",
+		"%s: start",
 		__func__);
+
 	if (!bw_calcs(
 			dc->ctx,
 			&dc->bw_dceip,
@@ -576,13 +602,57 @@ enum dc_status dce110_validate_bandwidth(
 			"%s: Bandwidth validation failed!",
 			__func__);
 
-	dal_logger_write(dc->ctx->logger,
-		LOG_MAJOR_BWM,
-		LOG_MINOR_BWM_REQUIRED_BANDWIDTH_CALCS,
-		"%s: Finish bandwidth calculations\n nbpMark: %d",
-		__func__,
-		context->bw_results.nbp_state_change_wm_ns[0].b_mark);
-
+	if (dal_memcmp(&dc->current_context.bw_results,
+			&context->bw_results, sizeof(context->bw_results))) {
+		struct log_entry log_entry;
+		dal_logger_open(
+			dc->ctx->logger,
+			&log_entry,
+			LOG_MAJOR_BWM,
+			LOG_MINOR_BWM_REQUIRED_BANDWIDTH_CALCS);
+		dal_logger_append(&log_entry, "%s: finish, numDisplays: %d\n"
+			"nbpMark_b: %d nbpMark_a: %d urgentMark_b: %d urgentMark_a: %d\n"
+			"stutMark_b: %d stutMark_a: %d\n",
+			__func__, number_of_displays,
+			context->bw_results.nbp_state_change_wm_ns[0].b_mark,
+			context->bw_results.nbp_state_change_wm_ns[0].a_mark,
+			context->bw_results.urgent_wm_ns[0].b_mark,
+			context->bw_results.urgent_wm_ns[0].a_mark,
+			context->bw_results.stutter_exit_wm_ns[0].b_mark,
+			context->bw_results.stutter_exit_wm_ns[0].a_mark);
+		dal_logger_append(&log_entry,
+			"nbpMark_b: %d nbpMark_a: %d urgentMark_b: %d urgentMark_a: %d\n"
+			"stutMark_b: %d stutMark_a: %d\n",
+			context->bw_results.nbp_state_change_wm_ns[1].b_mark,
+			context->bw_results.nbp_state_change_wm_ns[1].a_mark,
+			context->bw_results.urgent_wm_ns[1].b_mark,
+			context->bw_results.urgent_wm_ns[1].a_mark,
+			context->bw_results.stutter_exit_wm_ns[1].b_mark,
+			context->bw_results.stutter_exit_wm_ns[1].a_mark);
+		dal_logger_append(&log_entry,
+			"nbpMark_b: %d nbpMark_a: %d urgentMark_b: %d urgentMark_a: %d\n"
+			"stutMark_b: %d stutMark_a: %d stutter_mode_enable: %d\n",
+			context->bw_results.nbp_state_change_wm_ns[2].b_mark,
+			context->bw_results.nbp_state_change_wm_ns[2].a_mark,
+			context->bw_results.urgent_wm_ns[2].b_mark,
+			context->bw_results.urgent_wm_ns[2].a_mark,
+			context->bw_results.stutter_exit_wm_ns[2].b_mark,
+			context->bw_results.stutter_exit_wm_ns[2].a_mark,
+			context->bw_results.stutter_mode_enable);
+		dal_logger_append(&log_entry,
+			"cstate: %d pstate: %d nbpstate: %d sync: %d dispclk: %d\n"
+			"sclk: %d sclk_sleep: %d yclk: %d blackout_duration: %d\n",
+			context->bw_results.cpuc_state_change_enable,
+			context->bw_results.cpup_state_change_enable,
+			context->bw_results.nbp_state_change_enable,
+			context->bw_results.all_displays_in_sync,
+			context->bw_results.dispclk_khz,
+			context->bw_results.required_sclk,
+			context->bw_results.required_sclk_deep_sleep,
+			context->bw_results.required_yclk,
+			context->bw_results.required_blackout_duration_us);
+		dal_logger_close(&log_entry);
+	}
 	return result;
 }
 
