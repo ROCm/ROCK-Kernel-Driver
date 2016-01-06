@@ -362,6 +362,7 @@ static void destruct(struct dc *dc)
 	dc_service_free(dc->ctx, dc->links);
 	dc->hwss.destruct_resource_pool(&dc->res_pool);
 	dal_logger_destroy(&dc->ctx->logger);
+	dc_service_free(dc->ctx, dc->ctx);
 }
 
 /*******************************************************************************
@@ -397,8 +398,9 @@ alloc_fail:
 
 void dc_destroy(struct dc **dc)
 {
+	struct dc_context ctx = *(*dc)->ctx;
 	destruct(*dc);
-	dc_service_free((*dc)->ctx, *dc);
+	dc_service_free(&ctx, *dc);
 	*dc = NULL;
 }
 
