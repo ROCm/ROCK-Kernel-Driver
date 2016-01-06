@@ -270,6 +270,24 @@ static struct drm_connector *dm_dp_add_mst_connector(struct drm_dp_mst_topology_
 	struct amdgpu_connector *aconnector;
 	struct drm_connector *connector;
 
+	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
+	drm_for_each_connector(connector, dev) {
+		aconnector = to_amdgpu_connector(connector);
+		if (aconnector->mst_port == master
+				&& !aconnector->port) {
+			DRM_INFO("DM_MST: reusing connector: %p [id: %d] [master: %p]\n",
+						aconnector, connector->base.id, aconnector->mst_port);
+
+			aconnector->port = port;
+			drm_mode_connector_set_path_property(connector, pathprop);
+
+			drm_modeset_unlock(&dev->mode_config.connection_mutex);
+			return &aconnector->base;
+		}
+	}
+	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+
+
 	aconnector = kzalloc(sizeof(*aconnector), GFP_KERNEL);
 	if (!aconnector)
 		return NULL;
@@ -329,31 +347,13 @@ static void dm_dp_destroy_mst_connector(
 	struct drm_dp_mst_topology_mgr *mgr,
 	struct drm_connector *connector)
 {
-	struct amdgpu_connector *master =
-		container_of(mgr, struct amdgpu_connector, mst_mgr);
 	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
-	struct drm_device *dev = master->base.dev;
-	struct amdgpu_device *adev = dev->dev_private;
 
-	DRM_INFO("DM_MST: destroying connector: %p [id: %d] [master: %p]\n",
-			aconnector, connector->base.id, aconnector->mst_port);
+	DRM_INFO("DM_MST: Disabling connector: %p [id: %d] [master: %p]\n",
+				aconnector, connector->base.id, aconnector->mst_port);
 
-	drm_connector_unregister(connector);
-	/* need to nuke the connector */
-	drm_modeset_lock_all(dev);
-	/* dpms off */
-	drm_fb_helper_remove_one_connector(
-		&adev->mode_info.rfbdev->helper,
-		connector);
-
-	drm_connector_cleanup(connector);
-	drm_modeset_unlock_all(dev);
-
-	if (aconnector->dc_sink)
-		dc_link_remove_sink(aconnector->dc_link, aconnector->dc_sink);
-
-	kfree(aconnector);
-	DRM_DEBUG_KMS("\n");
+	aconnector->port = NULL;
+	aconnector->edid = NULL;
 }
 
 static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
@@ -369,10 +369,21 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = dev->dev_private;
+	int i;
 
 	drm_modeset_lock_all(dev);
-	if (adev->mode_info.rfbdev)
+	if (adev->mode_info.rfbdev) {
+		/*Do not add if already registered in past*/
+		for (i = 0; i < adev->mode_info.rfbdev->helper.connector_count; i++) {
+			if (adev->mode_info.rfbdev->helper.connector_info[i]->connector
+					== connector) {
+				drm_modeset_unlock_all(dev);
+				return;
+			}
+		}
+
 		drm_fb_helper_add_one_connector(&adev->mode_info.rfbdev->helper, connector);
+	}
 	else
 		DRM_ERROR("adev->mode_info.rfbdev is NULL\n");
 
