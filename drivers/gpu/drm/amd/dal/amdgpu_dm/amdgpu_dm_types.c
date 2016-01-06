@@ -1970,22 +1970,27 @@ static void manage_dm_interrupts(
 	struct amdgpu_crtc *acrtc,
 	bool enable)
 {
+	/*
+	 * this is not correct translation but will work as soon as VBLANK
+	 * constant is the same as PFLIP
+	 */
+	int irq_type =
+		amdgpu_crtc_idx_to_irq_type(
+			adev,
+			acrtc->crtc_id);
+
 	if (enable) {
 		drm_crtc_vblank_on(&acrtc->base);
 		amdgpu_irq_get(
 			adev,
 			&adev->pageflip_irq,
-			amdgpu_crtc_idx_to_irq_type(
-				adev,
-				acrtc->crtc_id));
+			irq_type);
 	} else {
 		unsigned long flags;
 		amdgpu_irq_put(
 			adev,
 			&adev->pageflip_irq,
-			amdgpu_crtc_idx_to_irq_type(
-				adev,
-				acrtc->crtc_id));
+			irq_type);
 		drm_crtc_vblank_off(&acrtc->base);
 
 		/*
