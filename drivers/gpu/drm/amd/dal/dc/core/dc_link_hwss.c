@@ -56,7 +56,7 @@ void dp_enable_link_phy(
 	enum signal_type signal,
 	const struct link_settings *link_settings)
 {
-	if (signal == SIGNAL_TYPE_DISPLAY_PORT)
+	if (dc_is_dp_sst_signal(signal))
 		link->dc->hwss.encoder_enable_dp_output(
 						link->link_enc,
 						link_settings,
