@@ -259,7 +259,6 @@ bool dc_commit_surfaces_to_target(
 					LOG_MINOR_COMPONENT_DC,
 					"0x%x:",
 					surface);
-		dc_surface_retain(surface);
 
 		program_gamma(dc->ctx, surface,
 			DC_STREAM_TO_CORE(target->public.streams[0])->ipp,
@@ -271,6 +270,7 @@ bool dc_commit_surfaces_to_target(
 
 		dc->hwss.update_plane_address(core_surface, target);
 	}
+
 	if (current_enabled_surface_count == 0 && new_enabled_surface_count > 0)
 		dc_target_enable_memory_requests(dc_target);
 

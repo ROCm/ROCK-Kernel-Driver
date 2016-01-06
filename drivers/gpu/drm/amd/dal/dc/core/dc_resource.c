@@ -388,8 +388,9 @@ bool logical_attach_surfaces_to_target(
 	uint8_t i;
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
 
-	if (target->status.surface_count >= MAX_SURFACE_NUM) {
-		dal_error("Surface: this target has too many surfaces!\n");
+	if (surface_count > MAX_SURFACE_NUM) {
+		dal_error("Surface: can not attach %d surfaces! Maximum is: %d\n",
+			surface_count, MAX_SURFACE_NUM);
 		return false;
 	}
 
