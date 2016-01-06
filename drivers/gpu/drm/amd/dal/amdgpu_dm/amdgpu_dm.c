@@ -1330,7 +1330,7 @@ void amdgpu_dm_flip_cleanup(
 		} else
 			DRM_ERROR("failed to reserve buffer after flip\n");
 
-		drm_gem_object_unreference_unlocked(&works->old_rbo->gem_base);
+		amdgpu_bo_unref(&works->old_rbo);
 		kfree(works->shared);
 		kfree(works);
 	}
@@ -1380,13 +1380,11 @@ static void dm_page_flip(struct amdgpu_device *adev,
 	target = acrtc->target;
 
 	/*
-	 * Received a page flip call after the display has been reset. Make sure
-	 * we return the buffers.
+	 * Received a page flip call after the display has been reset.
+	 * Just return in this case. Everything should be clean-up on reset.
 	 */
-	if (!target) {
-		amdgpu_dm_flip_cleanup(adev, acrtc);
+	if (!target)
 		return;
-	}
 
 	addr.address.grph.addr.low_part = lower_32_bits(crtc_base);
 	addr.address.grph.addr.high_part = upper_32_bits(crtc_base);
