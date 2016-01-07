@@ -106,10 +106,19 @@ static struct stream_encoder *find_first_free_match_stream_enc_for_link(
 		}
 	}
 
-	/* TODO: Handle MST properly
-	 * Currently pick next available stream encoder if found*/
-	if (j >= 0 && link->public.sink[0]->sink_signal ==
-			SIGNAL_TYPE_DISPLAY_PORT_MST)
+	/*
+	 * below can happen in cases when stream encoder is acquired:
+	 * 1) for second MST display in chain, so preferred engine already
+	 * acquired;
+	 * 2) for another link, which preferred engine already acquired by any
+	 * MST configuration.
+	 *
+	 * If signal is of DP type and preferred engine not found, return last available
+	 *
+	 * TODO - This is just a patch up and a generic solution is
+	 * required for non DP connectors.
+	 */
+	if (j >= 0 &&  dc_is_dp_signal(link->public.sink[0]->sink_signal))
 		return res_ctx->pool.stream_enc[j];
 
 	return NULL;
