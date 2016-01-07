@@ -789,8 +789,13 @@ static void handle_hpd_irq(void *param)
 	struct amdgpu_connector *aconnector = (struct amdgpu_connector *)param;
 	struct drm_connector *connector = &aconnector->base;
 	struct drm_device *dev = connector->dev;
+	bool mst_connector = aconnector->mst_mgr.mst_state;
 
 	dc_link_detect(aconnector->dc_link);
+	/*Wait for complition of all MST connectors reset
+	 * so the link is clean from sinks. */
+	if (mst_connector && aconnector->dc_link->type == dc_connection_none)
+		flush_work(&aconnector->mst_mgr.destroy_connector_work);
 	amdgpu_dm_update_connector_after_detect(aconnector);
 	drm_kms_helper_hotplug_event(dev);
 }
