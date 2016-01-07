@@ -1106,18 +1106,6 @@ static enum dc_status enable_link_dp(struct core_stream *stream)
 static enum dc_status enable_link_dp_mst(struct core_stream *stream)
 {
 	struct core_link *link = stream->sink->link;
-	bool already_enabled = false;
-	int i;
-
-	for (i = 0; i < link->enabled_stream_count; i++) {
-		if (link->enabled_streams[i] == stream)
-			already_enabled = true;
-	}
-
-	if (!already_enabled && link->enabled_stream_count < MAX_SINKS_PER_LINK)
-		link->enabled_streams[link->enabled_stream_count++] = stream;
-	else if (link->enabled_stream_count >= MAX_SINKS_PER_LINK)
-		return DC_ERROR_UNEXPECTED;
 
 	/* sink signal type after MST branch is MST. Multiple MST sinks
 	 * share one link. Link DP PHY is enable or training only once.
@@ -1285,9 +1273,12 @@ void core_link_resume(struct core_link *link)
 
 static struct fixed31_32 get_pbn_per_slot(struct core_stream *stream)
 {
-	struct link_settings *link_settings = &stream->sink->link->cur_link_settings;
-	uint32_t link_rate_in_mbps = link_settings->link_rate * LINK_RATE_REF_FREQ_IN_MHZ;
-	struct fixed31_32 mbps = dal_fixed31_32_from_int(link_rate_in_mbps * link_settings->lane_count);
+	struct link_settings *link_settings =
+			&stream->sink->link->cur_link_settings;
+	uint32_t link_rate_in_mbps =
+			link_settings->link_rate * LINK_RATE_REF_FREQ_IN_MHZ;
+	struct fixed31_32 mbps = dal_fixed31_32_from_int(
+			link_rate_in_mbps * link_settings->lane_count);
 
 	return dal_fixed31_32_div_int(mbps, 54);
 }
@@ -1318,15 +1309,13 @@ static struct fixed31_32 get_pbn_from_timing(struct core_stream *stream)
 
 	/*
 	 * margin 5300ppm + 300ppm ~ 0.6% as per spec, factor is 1.006
-	 *
 	 * The unit of 54/64Mbytes/sec is an arbitrary unit chosen based on
 	 * common multiplier to render an integer PBN for all link rate/lane
 	 * counts combinations
-	 * 	 *
 	 * calculate
-	 * 	peak_kbps *= (1006/1000)
-	 * 	peak_kbps *= (64/54)
-	 * 	peak_kbps *= 8    convert to bytes
+	 * peak_kbps *= (1006/1000)
+	 * peak_kbps *= (64/54)
+	 * peak_kbps *= 8    convert to bytes
 	 */
 
 	numerator = 64 * PEAK_FACTOR_X1000;
@@ -1342,11 +1331,12 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 	struct core_link *link = stream->sink->link;
 	struct link_encoder *link_encoder = link->link_enc;
 	struct stream_encoder *stream_encoder = stream->stream_enc;
-	struct dp_mst_stream_allocation_table table = {0};
+	struct dp_mst_stream_allocation_table proposed_table = {0};
 	struct fixed31_32 avg_time_slots_per_mtp;
 	struct dc *dc = stream->ctx->dc;
 	struct fixed31_32 pbn;
 	struct fixed31_32 pbn_per_slot;
+	uint8_t i;
 
 	/* enable_link_dp_mst already check link->enabled_stream_count
 	 * and stream is in link->stream[]. This is called during set mode,
@@ -1357,8 +1347,36 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 	dc_helpers_dp_mst_write_payload_allocation_table(
 		stream->ctx,
 		&stream->public,
-		&table,
+		&link->stream_alloc_table,
+		&proposed_table,
 		true);
+
+	dal_logger_write(link->ctx->logger,
+			LOG_MAJOR_MST,
+			LOG_MINOR_MST_PROGRAMMING,
+			"%s  "
+			"stream_count: %d: \n ",
+			__func__,
+			proposed_table.stream_count);
+
+	for (i = 0; i < MAX_CONTROLLER_NUM; i++) {
+		dal_logger_write(link->ctx->logger,
+		LOG_MAJOR_MST,
+		LOG_MINOR_MST_PROGRAMMING,
+		"stream[%d]: 0x%x      "
+		"stream[%d].vcp_id: %d      "
+		"stream[%d].slot_count: %d\n",
+		i,
+		proposed_table.stream_allocations[i].stream,
+		i,
+		proposed_table.stream_allocations[i].vcp_id,
+		i,
+		proposed_table.stream_allocations[i].slot_count);
+	}
+
+	ASSERT(proposed_table.stream_count > 0);
+	ASSERT(proposed_table.stream_count -
+			link->stream_alloc_table.stream_count == 1);
 
 	/*
 	 * temporary fix. Unplug of MST chain happened (two displays),
@@ -1366,13 +1384,16 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 	 * avg_time_slots_per_mtp calculation
 	 */
 
-	if (table.stream_count == 0)
+	/* to be removed or debugged */
+	if (proposed_table.stream_count == 0)
 		return DC_OK;
 
 	/* program DP source TX for payload */
 	dc->hwss.update_mst_stream_allocation_table(
 		link_encoder,
-		&table);
+		&proposed_table);
+
+	link->stream_alloc_table = proposed_table;
 
 	/* send down message */
 	dc_helpers_dp_mst_poll_for_allocation_change_trigger(
@@ -1384,9 +1405,11 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 			&stream->public,
 			true);
 
+	/* slot X.Y for only current stream */
 	pbn_per_slot = get_pbn_per_slot(stream);
 	pbn = get_pbn_from_timing(stream);
 	avg_time_slots_per_mtp = dal_fixed31_32_div(pbn, pbn_per_slot);
+
 
 	dc->hwss.set_mst_bandwidth(
 		stream_encoder,
@@ -1401,10 +1424,10 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 	struct core_link *link = stream->sink->link;
 	struct link_encoder *link_encoder = link->link_enc;
 	struct stream_encoder *stream_encoder = stream->stream_enc;
-	struct dp_mst_stream_allocation_table table = {0};
+	struct dp_mst_stream_allocation_table proposed_table = {0};
 	struct fixed31_32 avg_time_slots_per_mtp = dal_fixed31_32_from_int(0);
-	uint8_t i;
 	struct dc *dc = stream->ctx->dc;
+	uint8_t i;
 
 	/* deallocate_mst_payload is called before disable link. When mode or
 	 * disable/enable monitor, new stream is created which is not in link
@@ -1412,16 +1435,6 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 	 * should not done. For new mode set, map_resources will get engine
 	 * for new stream, so stream_enc->id should be validated until here.
 	 */
-	if (link->enabled_stream_count == 0)
-		return DC_OK;
-
-	for (i = 0; i < link->enabled_stream_count; i++) {
-		if (link->enabled_streams[i] == stream)
-			break;
-	}
-	/* stream is not in link stream list */
-	if (i == link->enabled_stream_count)
-		return DC_OK;
 
 	/* slot X.Y */
 	dc->hwss.set_mst_bandwidth(
@@ -1432,12 +1445,41 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 	dc_helpers_dp_mst_write_payload_allocation_table(
 		stream->ctx,
 		&stream->public,
-		&table,
+		&link->stream_alloc_table,
+		&proposed_table,
 		false);
+
+	dal_logger_write(link->ctx->logger,
+			LOG_MAJOR_MST,
+			LOG_MINOR_MST_PROGRAMMING,
+			"%s"
+			"stream_count: %d: ",
+			__func__,
+			proposed_table.stream_count);
+
+	for (i = 0; i < MAX_CONTROLLER_NUM; i++) {
+		dal_logger_write(link->ctx->logger,
+		LOG_MAJOR_MST,
+		LOG_MINOR_MST_PROGRAMMING,
+		"stream[%d]: 0x%x"
+		"stream[%d].vcp_id: %d"
+		"stream[%d].slot_count: %d",
+		i,
+		proposed_table.stream_allocations[i].stream,
+		i,
+		proposed_table.stream_allocations[i].vcp_id,
+		i,
+		proposed_table.stream_allocations[i].slot_count);
+	}
+
+	ASSERT(link->stream_alloc_table.stream_count -
+			proposed_table.stream_count == 1);
 
 	dc->hwss.update_mst_stream_allocation_table(
 		link_encoder,
-		&table);
+		&proposed_table);
+
+	link->stream_alloc_table = proposed_table;
 
 	dc_helpers_dp_mst_poll_for_allocation_change_trigger(
 			stream->ctx,
@@ -1481,4 +1523,33 @@ void core_link_disable_stream(
 
 	disable_link(stream);
 
+}
+
+void core_link_update_stream(
+		struct core_link *link,
+		struct core_stream *stream)
+{
+	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
+		uint32_t i;
+
+		for (i = 0; i < link->stream_alloc_table.stream_count; i++) {
+			const struct core_stream *s;
+
+			s = DC_STREAM_TO_CORE(
+				link->stream_alloc_table.
+				stream_allocations[i].stream);
+
+			if (stream->stream_enc == s->stream_enc) {
+			link->stream_alloc_table.stream_allocations[i].stream =
+					&stream->public;
+
+			dal_logger_write(link->ctx->logger,
+					LOG_MAJOR_MST,
+					LOG_MINOR_MST_PROGRAMMING,
+					"%s  ",
+					__func__);
+			break;
+			}
+		}
+	}
 }

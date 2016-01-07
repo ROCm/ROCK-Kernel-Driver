@@ -224,8 +224,7 @@ struct core_link {
 	union dp_wa dp_wa;
 
 	/* MST record stream using this link */
-	const struct core_stream *enabled_streams[MAX_SINKS_PER_LINK];
-	uint8_t enabled_stream_count;
+	struct dp_mst_stream_allocation_table stream_alloc_table;
 };
 
 #define DC_LINK_TO_LINK(dc_link) container_of(dc_link, struct core_link, public)
@@ -245,6 +244,10 @@ void core_link_enable_stream(
 		struct core_stream *stream);
 
 void core_link_disable_stream(
+		struct core_link *link,
+		struct core_stream *stream);
+
+void core_link_update_stream(
 		struct core_link *link,
 		struct core_stream *stream);
 

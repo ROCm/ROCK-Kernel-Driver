@@ -900,6 +900,8 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 
 	if (timing_changed) {
 		core_link_enable_stream(stream->sink->link, stream);
+	} else {
+		core_link_update_stream(stream->sink->link, stream);
 	}
 
 	if (dc_is_dp_signal(stream->signal))
