@@ -353,6 +353,8 @@ static void dm_dp_destroy_mst_connector(
 				aconnector, connector->base.id, aconnector->mst_port);
 
 	aconnector->port = NULL;
+	if (aconnector->dc_sink)
+		dc_link_remove_sink(aconnector->dc_link, aconnector->dc_sink);
 }
 
 static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
