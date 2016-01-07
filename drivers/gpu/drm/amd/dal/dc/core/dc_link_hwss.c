@@ -84,17 +84,8 @@ void dp_disable_link_phy(struct core_link *link, enum signal_type signal)
 
 void dp_disable_link_phy_mst(struct core_link *link, struct core_stream *stream)
 {
-	int i, j;
-
-	for (i = 0; i < link->enabled_stream_count; i++) {
-		if (link->enabled_streams[i] == stream) {
-			link->enabled_stream_count--;
-			for (j = i; j < link->enabled_stream_count; j++)
-				link->enabled_streams[j] = link->enabled_streams[j+1];
-		}
-	}
 	/* MST disable link only when no stream use the link */
-	if (link->enabled_stream_count > 0)
+	if (link->stream_alloc_table.stream_count > 0)
 		return;
 
 	dp_disable_link_phy(link, stream->signal);

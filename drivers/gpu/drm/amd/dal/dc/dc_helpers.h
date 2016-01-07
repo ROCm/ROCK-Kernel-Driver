@@ -44,7 +44,8 @@ enum dc_edid_status dc_helpers_parse_edid_caps(
 bool dc_helpers_dp_mst_write_payload_allocation_table(
 		struct dc_context *ctx,
 		const struct dc_stream *stream,
-		struct dp_mst_stream_allocation_table *table,
+		const struct dp_mst_stream_allocation_table *cur_table,
+		struct dp_mst_stream_allocation_table *proposed_table,
 		bool enable);
 
 /*

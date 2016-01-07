@@ -160,74 +160,73 @@ static struct amdgpu_connector *get_connector_for_link(
 	return aconnector;
 }
 
-static const struct dc_stream *get_stream_for_vcid(
-		struct drm_device *dev,
-		struct amdgpu_connector *master_port,
-		int vcid)
+const struct dp_mst_stream_allocation *find_stream_with_matching_vcpi(
+	const struct dp_mst_stream_allocation_table *table,
+	uint32_t vcpi)
 {
-	struct drm_connector *connector;
-	struct amdgpu_connector *aconnector;
-	struct drm_crtc *crtc;
-	struct amdgpu_crtc *acrtc;
-	struct dc_target *dc_target;
+	int i;
 
-	list_for_each_entry(
-		connector,
-		&dev->mode_config.connector_list,
-		head) {
-
-		aconnector = to_amdgpu_connector(connector);
-
-		/* Check whether mst connector */
-		if (!aconnector->mst_port)
-			continue;
-
-		/* Check whether same physical connector. */
-		if (master_port != aconnector->mst_port) {
-			continue;
-		}
-
-		if (aconnector->port->vcpi.vcpi == vcid) {
-			crtc = aconnector->base.state->crtc;
-			acrtc = to_amdgpu_crtc(crtc);
-			dc_target = acrtc->target;
-			return dc_target->streams[0];
-		}
+	for (i = 0; i < table->stream_count; i++) {
+		const struct dp_mst_stream_allocation *sa =
+				&table->stream_allocations[i];
+		if (sa->vcp_id == vcpi)
+			return sa;
 	}
 	return NULL;
 }
 
+
 static void get_payload_table(
 		struct drm_device *dev,
 		struct amdgpu_connector *aconnector,
-		struct dp_mst_stream_allocation_table *table)
+		const struct dc_stream *stream,
+		const struct dp_mst_stream_allocation_table *cur_table,
+		struct dp_mst_stream_allocation_table *proposed_table)
 {
 	int i;
-	struct drm_dp_mst_topology_mgr *mst_mgr = &aconnector->mst_port->mst_mgr;
-	struct amdgpu_connector *master_port = aconnector->mst_port;
+	struct drm_dp_mst_topology_mgr *mst_mgr =
+			&aconnector->mst_port->mst_mgr;
 
 	mutex_lock(&mst_mgr->payload_lock);
+
+	proposed_table->stream_count = 0;
 
 	/* number of active streams */
 	for (i = 0; i < mst_mgr->max_payloads; i++) {
 		if (mst_mgr->payloads[i].num_slots == 0)
-			break;
+			break; /* end of vcp_id table */
+
+		ASSERT(mst_mgr->payloads[i].payload_state !=
+				DP_PAYLOAD_DELETE_LOCAL);
 
 		if (mst_mgr->payloads[i].payload_state == DP_PAYLOAD_LOCAL ||
-				mst_mgr->payloads[i].payload_state == DP_PAYLOAD_REMOTE) {
-			table->stream_allocations[i].slot_count = mst_mgr->payloads[i].num_slots;
-			table->stream_allocations[i].stream =
-					get_stream_for_vcid(
-							dev,
-							master_port,
-							mst_mgr->payloads[i].vcpi);
+			mst_mgr->payloads[i].payload_state ==
+					DP_PAYLOAD_REMOTE) {
+
+			const struct dp_mst_stream_allocation *sa_src
+				= find_stream_with_matching_vcpi(
+					cur_table,
+					mst_mgr->proposed_vcpis[i]->vcpi);
+
+			if (sa_src) {
+				proposed_table->stream_allocations[
+					proposed_table->stream_count] = *sa_src;
+				proposed_table->stream_count++;
+			} else {
+				struct dp_mst_stream_allocation *sa =
+					&proposed_table->stream_allocations[
+						proposed_table->stream_count];
+
+				sa->slot_count =
+						mst_mgr->payloads[i].num_slots;
+				sa->stream = stream;
+				sa->vcp_id = mst_mgr->proposed_vcpis[i]->vcpi;
+				proposed_table->stream_count++;
+			}
 		}
 	}
 
-	table->stream_count = i;
-
 	mutex_unlock(&mst_mgr->payload_lock);
-
 }
 
 /*
@@ -236,7 +235,8 @@ static void get_payload_table(
 bool dc_helpers_dp_mst_write_payload_allocation_table(
 		struct dc_context *ctx,
 		const struct dc_stream *stream,
-		struct dp_mst_stream_allocation_table *table,
+		const struct dp_mst_stream_allocation_table *cur_table,
+		struct dp_mst_stream_allocation_table *proposed_table,
 		bool enable)
 {
 	struct amdgpu_device *adev = ctx->driver_context;
@@ -312,7 +312,7 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 	 * stream. AMD ASIC stream slot allocation should follow the same
 	 * sequence. copy DRM MST allocation to dc */
 
-	get_payload_table(dev, aconnector, table);
+	get_payload_table(dev, aconnector, stream, cur_table, proposed_table);
 
 	if (ret)
 		return false;

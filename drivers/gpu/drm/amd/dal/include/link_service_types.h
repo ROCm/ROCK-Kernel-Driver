@@ -393,6 +393,7 @@ struct mst_device_info {
 struct dp_mst_stream_allocation {
 	/* stream engine id (DIG) */
 	const struct dc_stream *stream;
+	uint32_t vcp_id;
 	/* number of slots required for the DP stream in
 	 * transport packet */
 	uint32_t slot_count;
