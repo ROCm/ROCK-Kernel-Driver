@@ -24,7 +24,7 @@
  */
 
 #ifndef __DAL_TIMING_GENERATOR_INTERFACE_H__
-#define __DAL_TIMING_GENERATOR_TNTERFACE_H__
+#define __DAL_TIMING_GENERATOR_INTERFACE_H__
 #include "timing_generator_types.h"
 
 #endif /* AMD_DAL_DEV_INCLUDE_TIMING_GENERATOR_INTERFACE_H_ */
