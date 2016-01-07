@@ -241,9 +241,7 @@ struct log_major_mask_info {
 
 #define LG_SYNC_MSK (1 << LOG_MINOR_SYNC_TIMING)
 
-#define LG_BWM_MSK (1 << LOG_MINOR_BWM_MODE_VALIDATION) | \
-		(1 << LOG_MINOR_BWM_REQUIRED_BANDWIDTH_CALCS)
-
+#define LG_BWM_MSK (1 << LOG_MINOR_BWM_MODE_VALIDATION)
 
 static const struct log_major_mask_info log_major_mask_info_tbl[] = {
 	/* LogMajor                  major name       default     MinorTble                    tblElementCnt */
@@ -402,13 +400,15 @@ static void log_to_debug_console(struct log_entry *entry)
 	if (logger->flags.bits.ENABLE_CONSOLE == 0)
 		return;
 
-	switch (entry->major) {
-	case LOG_MAJOR_ERROR:
-		dal_error("%s", entry->buf);
-		break;
-	default:
-		dal_output_to_console("%s", entry->buf);
-		break;
+	if (entry->buf_offset) {
+		switch (entry->major) {
+		case LOG_MAJOR_ERROR:
+			dal_error("%s", entry->buf);
+			break;
+		default:
+			dal_output_to_console("%s", entry->buf);
+			break;
+		}
 	}
 }
 
