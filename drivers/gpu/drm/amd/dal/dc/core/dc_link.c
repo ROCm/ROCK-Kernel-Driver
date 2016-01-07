@@ -571,6 +571,11 @@ void dc_link_detect(const struct dc_link *dc_link)
 		return;
 	}
 
+	/* Free existing state before doing detection on SST
+	 * TODO: For MST, need to investigate if the same is required. */
+	if (link->public.type != dc_connection_mst_branch)
+		link_disconnect_all_sinks(link);
+
 	if (new_connection_type != dc_connection_none) {
 		link->public.type = new_connection_type;
 
@@ -718,8 +723,6 @@ void dc_link_detect(const struct dc_link *dc_link)
 		/* From Connected-to-Disconnected. */
 		if (link->public.type == dc_connection_mst_branch)
 			dc_helpers_dp_mst_stop_top_mgr(link->ctx, &link->public);
-		else
-			link_disconnect_all_sinks(link);
 
 		link->public.type = dc_connection_none;
 		sink_caps.signal = SIGNAL_TYPE_NONE;
