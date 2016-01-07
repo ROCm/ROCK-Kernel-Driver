@@ -1404,8 +1404,8 @@ bool dc_link_handle_hpd_rx_irq(const struct dc_link *dc_link)
 	dal_logger_write(link->ctx->logger,
 		LOG_MAJOR_HW_TRACE,
 		LOG_MINOR_HW_TRACE_HPD_IRQ,
-		"%s: Got short pulse HPD on connector %d\n",
-		__func__, link->connector_index);
+		"%s: Got short pulse HPD on link %d\n",
+		__func__, link->public.link_index);
 
 	 /* All the "handle_hpd_irq_xxx()" methods
 	 * should be called only after
@@ -1582,16 +1582,16 @@ static void dp_wa_power_up_0010FA(struct core_link *link, uint8_t *dpcd_data,
 		 * keep receiver powered all the time.*/
 		case DP_BRANCH_DEVICE_ID_1:
 		case DP_BRANCH_DEVICE_ID_4:
-			link->dp_wa.bits.KEEP_RECEIVER_POWERED = 1;
+			link->wa_flags.dp_keep_receiver_powered = true;
 			break;
 
 		/* TODO: May need work around for other dongles. */
 		default:
-			link->dp_wa.bits.KEEP_RECEIVER_POWERED = 0;
+			link->wa_flags.dp_keep_receiver_powered = false;
 			break;
 		}
 	} else
-		link->dp_wa.bits.KEEP_RECEIVER_POWERED = 0;
+		link->wa_flags.dp_keep_receiver_powered = false;
 }
 
 static void retrieve_link_cap(struct core_link *link)

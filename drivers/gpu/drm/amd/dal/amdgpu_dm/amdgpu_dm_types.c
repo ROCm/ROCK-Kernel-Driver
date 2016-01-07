@@ -1605,6 +1605,8 @@ static int to_drm_connector_type(enum signal_type st)
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
 		return DRM_MODE_CONNECTOR_DVID;
+	case SIGNAL_TYPE_VIRTUAL:
+		return DRM_MODE_CONNECTOR_VIRTUAL;
 
 	default:
 		return DRM_MODE_CONNECTOR_Unknown;

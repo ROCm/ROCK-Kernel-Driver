@@ -72,7 +72,7 @@ void dp_enable_link_phy(
 
 void dp_disable_link_phy(struct core_link *link, enum signal_type signal)
 {
-	if (!link->dp_wa.bits.KEEP_RECEIVER_POWERED)
+	if (!link->wa_flags.dp_keep_receiver_powered)
 		dp_receiver_power_ctrl(link, false);
 
 	link->dc->hwss.encoder_disable_output(link->link_enc, signal);

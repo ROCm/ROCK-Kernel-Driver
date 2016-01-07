@@ -37,8 +37,9 @@ enum signal_type {
 	SIGNAL_TYPE_DISPLAY_PORT_MST	= (1 << 6),
 	SIGNAL_TYPE_EDP			= (1 << 7),
 	SIGNAL_TYPE_WIRELESS		= (1 << 8),	/* Wireless Display */
+	SIGNAL_TYPE_VIRTUAL		= (1 << 9),	/* Virtual Display */
 
-	SIGNAL_TYPE_COUNT		= 9,
+	SIGNAL_TYPE_COUNT		= 10,
 	SIGNAL_TYPE_ALL			= (1 << SIGNAL_TYPE_COUNT) - 1
 };
 

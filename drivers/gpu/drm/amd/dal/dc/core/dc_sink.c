@@ -48,7 +48,7 @@ static void destruct(struct sink *sink)
 
 }
 
-static bool construct(struct sink *sink, const struct sink_init_data *init_params)
+static bool construct(struct sink *sink, const struct dc_sink_init_data *init_params)
 {
 
 	struct core_link *core_link = DC_LINK_TO_LINK(init_params->link);
@@ -87,12 +87,7 @@ void dc_sink_release(const struct dc_sink *dc_sink)
 	}
 }
 
-
-/*******************************************************************************
- * Protected functions - visible only inside of DC (not visible in DM)
- ******************************************************************************/
-
-struct dc_sink *sink_create(const struct sink_init_data *init_params)
+struct dc_sink *dc_sink_create(const struct dc_sink_init_data *init_params)
 {
 	struct core_link *core_link = DC_LINK_TO_LINK(init_params->link);
 
@@ -116,3 +111,6 @@ alloc_fail:
 	return NULL;
 }
 
+/*******************************************************************************
+ * Protected functions - visible only inside of DC (not visible in DM)
+ ******************************************************************************/

@@ -553,7 +553,7 @@ static void dc_link_detect_dp(
 void dc_link_detect(const struct dc_link *dc_link)
 {
 	struct core_link *link = DC_LINK_TO_LINK(dc_link);
-	struct sink_init_data sink_init_data = { 0 };
+	struct dc_sink_init_data sink_init_data = { 0 };
 	struct display_sink_capability sink_caps = { 0 };
 	uint8_t i;
 	bool converter_disable_audio = false;
@@ -565,6 +565,9 @@ void dc_link_detect(const struct dc_link *dc_link)
 	struct dc_sink *dc_sink;
 	struct core_sink *sink = NULL;
 	enum dc_connection_type new_connection_type = dc_connection_none;
+
+	if (link->public.connector_signal == SIGNAL_TYPE_VIRTUAL)
+		return;
 
 	if (false == detect_sink(link, &new_connection_type)) {
 		BREAK_TO_DEBUGGER();
@@ -647,7 +650,7 @@ void dc_link_detect(const struct dc_link *dc_link)
 		sink_init_data.converter_disable_audio =
 			converter_disable_audio;
 
-		dc_sink = sink_create(&sink_init_data);
+		dc_sink = dc_sink_create(&sink_init_data);
 		if (!dc_sink) {
 			DC_ERROR("Failed to create sink!\n");
 			return;
@@ -835,7 +838,6 @@ static bool construct(
 
 	link->dc = init_params->dc;
 	link->adapter_srv = as;
-	link->connector_index = init_params->connector_index;
 	link->ctx = dc_ctx;
 	link->public.link_index = init_params->link_index;
 
@@ -994,7 +996,6 @@ struct core_link *link_create(const struct link_init_data *init_params)
 {
 	struct core_link *link =
 			dc_service_alloc(init_params->ctx, sizeof(*link));
-	link->ctx = init_params->ctx;
 
 	if (NULL == link)
 		goto alloc_fail;
@@ -1063,9 +1064,9 @@ static void dpcd_configure_panel_mode(
 	}
 	dal_logger_write(link->ctx->logger, LOG_MAJOR_DETECTION,
 			LOG_MINOR_DETECTION_DP_CAPS,
-			"Connector: %d eDP panel mode supported: %d "
+			"Link: %d eDP panel mode supported: %d "
 			"eDP panel mode enabled: %d \n",
-			link->connector_index,
+			link->public.link_index,
 			link->dpcd_caps.panel_mode_edp,
 			panel_mode_edp);
 }
@@ -1268,7 +1269,8 @@ bool dc_link_set_backlight_level(const struct dc_link *public, uint32_t level)
 
 void core_link_resume(struct core_link *link)
 {
-	program_hpd_filter(link);
+	if (link->public.connector_signal != SIGNAL_TYPE_VIRTUAL)
+		program_hpd_filter(link);
 }
 
 static struct fixed31_32 get_pbn_per_slot(struct core_stream *stream)

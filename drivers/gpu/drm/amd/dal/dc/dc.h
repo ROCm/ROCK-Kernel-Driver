@@ -40,6 +40,7 @@
 struct dc_init_data {
 	struct dc_context *ctx;
 	struct adapter_service *adapter_srv;
+	uint8_t num_virtual_links;
 };
 
 struct dc_caps {
@@ -311,6 +312,7 @@ void dc_link_remove_sink(
 	const struct dc_link *link,
 	const struct dc_sink *sink);
 
+
 /*******************************************************************************
  * Sink Interfaces - A sink corresponds to a display output device
  ******************************************************************************/
@@ -329,14 +331,14 @@ void dc_sink_release(const struct dc_sink *sink);
 
 const struct audio **dc_get_audios(struct dc *dc);
 
-struct sink_init_data {
+struct dc_sink_init_data {
 	enum signal_type sink_signal;
 	const struct dc_link *link;
 	uint32_t dongle_max_pix_clk;
 	bool converter_disable_audio;
 };
 
-struct dc_sink *sink_create(const struct sink_init_data *init_params);
+struct dc_sink *dc_sink_create(const struct dc_sink_init_data *init_params);
 
 
 /*******************************************************************************

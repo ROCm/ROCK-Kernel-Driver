@@ -497,7 +497,7 @@ void dc_target_log(
 		dal_logger_write(dal_logger,
 			log_major,
 			log_minor,
-			"\tconnector: %d",
-			core_stream->sink->link->connector_index);
+			"\tlink: %d",
+			core_stream->sink->link->public.link_index);
 	}
 }
