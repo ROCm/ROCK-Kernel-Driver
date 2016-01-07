@@ -46,7 +46,7 @@
 		__VA_ARGS__)
 
 #define DELAY_ON_CONNECT_IN_MS 500
-#define DELAY_ON_DISCONNECT_IN_MS 500
+#define DELAY_ON_DISCONNECT_IN_MS 100
 
 
 /*******************************************************************************
@@ -95,12 +95,12 @@ static bool program_hpd_filter(
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
 	case SIGNAL_TYPE_HDMI_TYPE_A:
+		/* program hpd filter */
+		break;
 	case SIGNAL_TYPE_LVDS:
 	case SIGNAL_TYPE_DISPLAY_PORT:
 	case SIGNAL_TYPE_DISPLAY_PORT_MST:
 	case SIGNAL_TYPE_EDP:
-		/* program hpd filter */
-		break;
 	default:
 		/* don't program hpd filter */
 		return false;
