@@ -92,14 +92,6 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 	dal_output_to_console("%s: connectors_num:%d\n", __func__,
 			connectors_num);
 
-	dc->links = dc_service_alloc(
-		init_params->ctx, connectors_num * sizeof(struct core_link *));
-
-	if (NULL == dc->links) {
-		dal_error("DC: failed to allocate 'links' storage!\n");
-		goto allocate_dc_links_storage_fail;
-	}
-
 	for (i = 0; i < connectors_num; i++) {
 		struct link_init_data link_init_params = {0};
 		struct core_link *link;
@@ -121,14 +113,28 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 		}
 	}
 
-	if (!dc->link_count) {
-		dal_error("DC: no 'links' were created!\n");
-		goto allocate_dc_links_storage_fail;
+	for (i = 0; i < init_params->num_virtual_links; i++) {
+		struct core_link *link =
+			dc_service_alloc(dc->ctx, sizeof(*link));
+
+		if (link == NULL) {
+			BREAK_TO_DEBUGGER();
+			goto failed_alloc;
+		}
+
+		link->adapter_srv = init_params->adapter_srv;
+		link->ctx = init_params->ctx;
+		link->dc = dc;
+		link->public.connector_signal = SIGNAL_TYPE_VIRTUAL;
+
+		link->public.link_index = dc->link_count;
+		dc->links[dc->link_count] = link;
+		dc->link_count++;
 	}
 
 	return true;
 
-allocate_dc_links_storage_fail:
+failed_alloc:
 	return false;
 }
 
@@ -165,7 +171,8 @@ static void init_hw(struct dc *dc)
 		 * required signal (which may be different from the
 		 * default signal on connector). */
 		struct core_link *link = dc->links[i];
-		dc->hwss.encoder_hw_init(link->link_enc);
+		if (link->public.connector_signal != SIGNAL_TYPE_VIRTUAL)
+			dc->hwss.encoder_hw_init(link->link_enc);
 	}
 
 	for(i = 0; i < dc->res_pool.controller_count; i++) {
@@ -291,6 +298,7 @@ static bool construct(struct dc *dc, const struct dal_init_data *init_params)
 	}
 	dc_init_data.ctx->driver_context = init_params->driver;
 	dc_init_data.ctx->cgs_device = init_params->cgs_device;
+	dc_init_data.num_virtual_links = init_params->num_virtual_links;
 	dc_init_data.ctx->dc = dc;
 
 	/* Create logger */
@@ -359,7 +367,6 @@ ctx_fail:
 static void destruct(struct dc *dc)
 {
 	destroy_links(dc);
-	dc_service_free(dc->ctx, dc->links);
 	dc->hwss.destruct_resource_pool(&dc->res_pool);
 	dal_logger_destroy(&dc->ctx->logger);
 	dc_service_free(dc->ctx, dc->ctx);
@@ -623,9 +630,9 @@ const struct audio **dc_get_audios(struct dc *dc)
 
 void dc_get_caps(const struct dc *dc, struct dc_caps *caps)
 {
-    caps->max_targets = dc->res_pool.controller_count;
-    caps->max_links = dc->link_count;
-    caps->max_audios = dc->res_pool.audio_count;
+	caps->max_targets = dc->res_pool.controller_count;
+	caps->max_links = dc->link_count;
+	caps->max_audios = dc->res_pool.audio_count;
 }
 
 void dc_flip_surface_addrs(struct dc* dc,
@@ -843,6 +850,9 @@ bool dc_link_add_sink(const struct dc_link *link, struct dc_sink *sink)
 
 	dc_link->sink[link->sink_count] = sink;
 	dc_link->sink_count++;
+	if (sink->sink_signal == SIGNAL_TYPE_VIRTUAL
+		&& link->connector_signal == SIGNAL_TYPE_VIRTUAL)
+		dc_link->type = dc_connection_single;
 
 	return true;
 }

@@ -528,14 +528,17 @@ static enum dc_status validate_mapped_resource(
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 			struct core_link *link = stream->sink->link;
 
+			if (!stream->tg->funcs->validate_timing(
+					stream->tg, &stream->public.timing))
+				return DC_FAIL_CONTROLLER_VALIDATE;
+
+			if (stream->signal == SIGNAL_TYPE_VIRTUAL)
+				return status;
+
 			status = build_stream_hw_param(stream);
 
 			if (status != DC_OK)
 				return status;
-
-			if (!stream->tg->funcs->validate_timing(stream->tg, &stream->public.timing))
-				return DC_FAIL_CONTROLLER_VALIDATE;
-
 
 			if (!dce110_link_encoder_validate_output_with_stream(
 					link->link_enc,
@@ -781,7 +784,8 @@ static enum dc_status map_clock_resources(
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 
-			if (dc_is_dp_signal(stream->signal))
+			if (dc_is_dp_signal(stream->signal)
+				|| stream->signal == SIGNAL_TYPE_VIRTUAL)
 				stream->clock_source = context->res_ctx.
 					pool.clock_sources[DCE110_CLK_SRC_EXT];
 			else

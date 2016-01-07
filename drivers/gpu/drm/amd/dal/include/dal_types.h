@@ -136,6 +136,7 @@ struct dal_init_data {
 	struct dal_override_parameters display_param;
 	void *driver; /* ctx */
 	void *cgs_device;
+	uint8_t num_virtual_links;
 };
 
 struct dal_dc_init_data {

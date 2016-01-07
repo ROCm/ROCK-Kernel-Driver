@@ -457,8 +457,11 @@ static void fill_display_configs(
 			cfg->src_width = stream->public.src.width;
 			cfg->ddi_channel_mapping =
 				stream->sink->link->ddi_channel_mapping.raw;
-			cfg->transmitter =
+			if (stream->signal != SIGNAL_TYPE_VIRTUAL)
+				cfg->transmitter =
 				stream->sink->link->link_enc->transmitter;
+			else
+				cfg->transmitter = TRANSMITTER_UNKNOWN;
 			cfg->link_settings =
 					stream->sink->link->cur_link_settings;
 			cfg->sym_clock = stream->public.timing.pix_clk_khz;

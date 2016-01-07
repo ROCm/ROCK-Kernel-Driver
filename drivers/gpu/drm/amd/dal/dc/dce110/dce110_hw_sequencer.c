@@ -802,8 +802,8 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 		 */
 		stream->tg->funcs->set_blank(stream->tg, true);
 
-		core_link_disable_stream(
-				stream->sink->link, stream);
+		if (stream->signal != SIGNAL_TYPE_VIRTUAL)
+			core_link_disable_stream(stream->sink->link, stream);
 
 		/*TODO: AUTO check if timing changed*/
 		if (false == dal_clock_source_program_pix_clk(
@@ -822,9 +822,10 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 	}
 
 	/*TODO: mst support - use total stream count*/
-	dce110_mem_input_allocate_dmif_buffer(stream->mi,
-			&stream->public.timing,
-			context->target_count);
+	dce110_mem_input_allocate_dmif_buffer(
+					stream->mi,
+					&stream->public.timing,
+					context->target_count);
 
 	if (timing_changed) {
 		if (false == stream->tg->funcs->enable_crtc(
@@ -834,10 +835,11 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 		}
 	}
 
-	if (DC_OK != bios_parser_crtc_source_select(stream)) {
-		BREAK_TO_DEBUGGER();
-		return DC_ERROR_UNEXPECTED;
-	}
+	if (stream->signal != SIGNAL_TYPE_VIRTUAL)
+		if (DC_OK != bios_parser_crtc_source_select(stream)) {
+			BREAK_TO_DEBUGGER();
+			return DC_ERROR_UNEXPECTED;
+		}
 
 	dce110_opp_set_dyn_expansion(
 			opp,
@@ -845,14 +847,12 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 			stream->public.timing.display_color_depth,
 			stream->sink->public.sink_signal);
 
-	program_fmt(
-			opp,
-			&stream->fmt_bit_depth,
-			&stream->clamping);
+	program_fmt(opp, &stream->fmt_bit_depth, &stream->clamping);
 
-	dce110_link_encoder_setup(
-		stream->sink->link->link_enc,
-		stream->signal);
+	if (stream->signal != SIGNAL_TYPE_VIRTUAL)
+		dce110_link_encoder_setup(
+			stream->sink->link->link_enc,
+			stream->signal);
 
 	if (dc_is_dp_signal(stream->signal))
 		stream->stream_enc->funcs->dp_set_stream_attribute(
@@ -861,16 +861,16 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 
 	if (dc_is_hdmi_signal(stream->signal))
 		stream->stream_enc->funcs->hdmi_set_stream_attribute(
-		stream->stream_enc,
-		&stream->public.timing,
-		stream->audio != NULL);
+			stream->stream_enc,
+			&stream->public.timing,
+			stream->audio != NULL);
 
 	if (dc_is_dvi_signal(stream->signal))
 		stream->stream_enc->funcs->dvi_set_stream_attribute(
-		stream->stream_enc,
-		&stream->public.timing,
-		(stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK) ?
-		true : false);
+			stream->stream_enc,
+			&stream->public.timing,
+			(stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK) ?
+			true : false);
 
 	if (stream->audio != NULL) {
 		if (AUDIO_RESULT_OK != dal_audio_setup(
@@ -891,14 +891,12 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 				&stream->audio_output.pll_info);
 
 	/* program blank color */
-	color_space = get_output_color_space(
-			&stream->public.timing);
-
+	color_space = get_output_color_space(&stream->public.timing);
 	stream->tg->funcs->set_blank_color(
 			context->res_ctx.pool.timing_generators[controller_idx],
 			color_space);
 
-	if (timing_changed) {
+	if (timing_changed && stream->signal != SIGNAL_TYPE_VIRTUAL) {
 		core_link_enable_stream(stream->sink->link, stream);
 	} else {
 		core_link_update_stream(stream->sink->link, stream);
@@ -918,7 +916,8 @@ static void power_down_encoders(struct dc *dc)
 	int i;
 
 	for (i = 0; i < dc->link_count; i++) {
-		dce110_link_encoder_disable_output(
+		if (dc->links[i]->public.connector_signal != SIGNAL_TYPE_VIRTUAL)
+			dce110_link_encoder_disable_output(
 				dc->links[i]->link_enc, SIGNAL_TYPE_NONE);
 	}
 }
@@ -1571,7 +1570,8 @@ static void reset_single_stream_hw_ctx(struct core_stream *stream,
 		stream->audio = NULL;
 	}
 
-	core_link_disable_stream(stream->sink->link, stream);
+	if (stream->signal != SIGNAL_TYPE_VIRTUAL)
+		core_link_disable_stream(stream->sink->link, stream);
 
 	stream->tg->funcs->set_blank(stream->tg, true);
 	stream->tg->funcs->disable_crtc(stream->tg);

@@ -119,7 +119,7 @@ static struct dc_sink *dm_dp_mst_add_mst_sink(
 		uint16_t len)
 {
 	struct dc_sink *dc_sink;
-	struct sink_init_data init_params = {
+	struct dc_sink_init_data init_params = {
 			.link = dc_link,
 			.sink_signal = SIGNAL_TYPE_DISPLAY_PORT_MST};
 	enum dc_edid_status edid_status;
@@ -139,7 +139,7 @@ static struct dc_sink *dm_dp_mst_add_mst_sink(
 	 * dc_link->connector_signal;
 	 */
 
-	dc_sink = sink_create(&init_params);
+	dc_sink = dc_sink_create(&init_params);
 
 	if (!dc_sink)
 		return NULL;

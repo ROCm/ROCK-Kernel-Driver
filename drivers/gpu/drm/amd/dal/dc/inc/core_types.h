@@ -202,8 +202,6 @@ struct core_link {
 
 	struct dc_context *ctx; /* TODO: AUTO remove 'dal' when DC is complete*/
 
-	uint8_t connector_index; /* this will be mapped to the HPD pins */
-
 	struct adapter_service *adapter_srv;
 	struct link_encoder *link_enc;
 	struct ddc_service *ddc;
@@ -221,10 +219,13 @@ struct core_link {
 	unsigned int dpcd_sink_count;
 
 	enum edp_revision edp_revision;
-	union dp_wa dp_wa;
 
 	/* MST record stream using this link */
 	struct dp_mst_stream_allocation_table stream_alloc_table;
+
+	struct link_flags {
+		bool dp_keep_receiver_powered;
+	} wa_flags;
 };
 
 #define DC_LINK_TO_LINK(dc_link) container_of(dc_link, struct core_link, public)

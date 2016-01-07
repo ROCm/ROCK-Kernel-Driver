@@ -227,6 +227,23 @@ enum dc_status dce_base_map_resources(
 
 			attach_stream_to_controller(&context->res_ctx, stream);
 
+			set_stream_signal(stream);
+
+			curr_stream =
+				dc->current_context.res_ctx.controller_ctx
+				[stream->controller_idx].stream;
+			context->res_ctx.controller_ctx[stream->controller_idx]
+			.flags.timing_changed =
+				check_timing_change(curr_stream, stream);
+
+			/*
+			 * we do not need stream encoder or audio resources
+			 * when connecting to virtual link
+			 */
+			if (stream->sink->link->public.connector_signal ==
+							SIGNAL_TYPE_VIRTUAL)
+				continue;
+
 			stream->stream_enc =
 				find_first_free_match_stream_enc_for_link(
 					&context->res_ctx,
@@ -238,8 +255,6 @@ enum dc_status dce_base_map_resources(
 			set_stream_engine_in_use(
 					&context->res_ctx,
 					stream->stream_enc);
-
-			set_stream_signal(stream);
 
 			/* TODO: Add check if ASIC support and EDID audio */
 			if (!stream->sink->converter_disable_audio &&
@@ -254,13 +269,6 @@ enum dc_status dce_base_map_resources(
 				set_audio_in_use(&context->res_ctx,
 						stream->audio);
 			}
-			curr_stream =
-				dc->current_context.res_ctx.controller_ctx
-				[stream->controller_idx].stream;
-			context->res_ctx.controller_ctx[stream->controller_idx]
-			.flags.timing_changed =
-				check_timing_change(curr_stream, stream);
-
 		}
 	}
 
