@@ -1731,12 +1731,14 @@ int amdgpu_suspend_kms(struct drm_device *dev, bool suspend, bool fbcon)
 
 	drm_kms_helper_poll_disable(dev);
 
-	/* turn off display hw */
-	drm_modeset_lock_all(dev);
-	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
-		drm_helper_connector_dpms(connector, DRM_MODE_DPMS_OFF);
+	if (!amdgpu_has_dal_support(adev)) {
+		/* turn off display hw */
+		drm_modeset_lock_all(dev);
+		list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
+			drm_helper_connector_dpms(connector, DRM_MODE_DPMS_OFF);
+		}
+		drm_modeset_unlock_all(dev);
 	}
-	drm_modeset_unlock_all(dev);
 
 	/* unpin the front buffers and cursors */
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
@@ -1831,6 +1833,9 @@ int amdgpu_resume_kms(struct drm_device *dev, bool resume, bool fbcon)
 	if (r)
 		DRM_ERROR("amdgpu_resume failed (%d).\n", r);
 
+	if (r)
+		DRM_ERROR("amdgpu_resume failed (%d).\n", r);
+
 	amdgpu_fence_driver_resume(adev);
 
 	if (resume) {
@@ -1877,7 +1882,11 @@ int amdgpu_resume_kms(struct drm_device *dev, bool resume, bool fbcon)
 	}
 
 	drm_kms_helper_poll_enable(dev);
-	drm_helper_hpd_irq_event(dev);
+
+	if (!amdgpu_has_dal_support(adev))
+		 drm_helper_hpd_irq_event(dev);
+	else
+		drm_kms_helper_hotplug_event(dev);
 
 	if (fbcon) {
 		amdgpu_fbdev_set_suspend(adev, 0);
