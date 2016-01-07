@@ -353,7 +353,6 @@ static void dm_dp_destroy_mst_connector(
 				aconnector, connector->base.id, aconnector->mst_port);
 
 	aconnector->port = NULL;
-	aconnector->edid = NULL;
 }
 
 static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
