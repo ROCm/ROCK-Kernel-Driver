@@ -26,6 +26,7 @@
 #ifndef __DAL_BIOS_PARSER_H__
 #define __DAL_BIOS_PARSER_H__
 
+#include "dc_bios_types.h"
 #include "bios_parser_helper.h"
 
 struct atom_data_revision {
@@ -50,6 +51,7 @@ enum spread_spectrum_id {
 };
 
 struct bios_parser {
+	struct dc_bios base;
 	struct dc_context *ctx;
 	struct adapter_service *as;
 
@@ -74,5 +76,9 @@ struct bios_parser {
 	bool remap_device_tags;
 	bool headless_no_opm;
 };
+
+/* Bios Parser from DC Bios */
+#define BP_FROM_DCB(dc_bios) \
+	container_of(dc_bios, struct bios_parser, base)
 
 #endif

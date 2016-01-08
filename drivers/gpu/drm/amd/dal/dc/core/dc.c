@@ -34,6 +34,7 @@
 
 #include "adapter_service_interface.h"
 #include "clock_source_interface.h"
+#include "dc_bios_types.h"
 
 #include "include/irq_service_interface.h"
 #include "bandwidth_calcs.h"
@@ -77,12 +78,13 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 {
 	int i;
 	int connectors_num;
+	struct dc_bios *dcb;
 
 	dc->link_count = 0;
 
-	connectors_num = dal_bios_parser_get_connectors_number(
-			dal_adapter_service_get_bios_parser(
-					init_params->adapter_srv));
+	dcb = (struct dc_bios*)dal_adapter_service_get_bios_parser(init_params->adapter_srv);
+
+	connectors_num = dcb->funcs->get_connectors_number(dcb);
 
 	if (0 == connectors_num || connectors_num > ENUM_ID_COUNT) {
 		dal_error("DC: Invalid number of connectors!\n");
@@ -224,6 +226,7 @@ static struct adapter_service *create_as(
 	init_data.bdf_info = init->bdf_info;
 
 	init_data.display_param = &init->display_param;
+	init_data.vbios_override = init->vbios_override;
 
 	as = dal_adapter_service_create(&init_data);
 

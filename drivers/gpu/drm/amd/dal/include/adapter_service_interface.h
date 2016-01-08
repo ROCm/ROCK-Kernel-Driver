@@ -322,6 +322,7 @@ struct as_init_data {
 	struct dc_context *ctx;
 	struct bdf_info bdf_info;
 	const struct dal_override_parameters *display_param;
+	struct dc_bios *vbios_override;
 };
 
 /* Create adapter service */
