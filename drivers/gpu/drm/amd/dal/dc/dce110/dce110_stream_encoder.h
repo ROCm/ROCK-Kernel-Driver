@@ -28,12 +28,12 @@
 
 #include "inc/stream_encoder.h"
 
-#define TO_DCE110_STREAM_ENC(stream_encoder)\
+#define DCE110STRENC_FROM_STRENC(stream_encoder)\
 	container_of(stream_encoder, struct dce110_stream_encoder, base)
 
 struct dce110_stream_enc_offsets {
-	uint32_t dig_offset;
-	uint32_t dp_offset;
+	uint32_t dig;
+	uint32_t dp;
 };
 
 struct dce110_stream_encoder {
@@ -41,12 +41,12 @@ struct dce110_stream_encoder {
 	struct dce110_stream_enc_offsets offsets;
 };
 
-struct stream_encoder *dce110_stream_encoder_create(
-	enum engine_id eng_id,
+bool dce110_stream_encoder_construct(
+	struct dce110_stream_encoder *enc110,
 	struct dc_context *ctx,
-	struct bios_parser *bp);
-
-void dce110_stream_encoder_destroy(struct stream_encoder **enc);
+	struct bios_parser *bp,
+	enum engine_id eng_id,
+	const struct dce110_stream_enc_offsets *offsets);
 
 /***** HW programming ***********/
 /* setup stream encoder in dp mode */
