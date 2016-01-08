@@ -927,8 +927,8 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 
 	dev->node_props.vendor_id = gpu->pdev->vendor;
 	dev->node_props.device_id = gpu->pdev->device;
-	dev->node_props.location_id = (gpu->pdev->bus->number << 24) +
-			(gpu->pdev->devfn & 0xffffff);
+	dev->node_props.location_id = PCI_DEVID(gpu->pdev->bus->number,
+		gpu->pdev->devfn);
 	dev->node_props.max_engine_clk_fcompute =
 		dev->gpu->kfd2kgd->get_max_engine_clock_in_mhz(dev->gpu->kgd);
 	dev->node_props.max_engine_clk_ccompute =
