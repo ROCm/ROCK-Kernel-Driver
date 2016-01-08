@@ -272,8 +272,9 @@ void dc_update_stream(const struct dc_stream *dc_stream,
  * The currently active signal type (HDMI, DP-SST, DP-MST) is also reported.
  */
 struct dc_link {
-	const struct dc_sink *sink[MAX_SINKS_PER_LINK];
+	const struct dc_sink *remote_sinks[MAX_SINKS_PER_LINK];
 	unsigned int sink_count;
+	const struct dc_sink *local_sink;
 	unsigned int link_index;
 	enum dc_connection_type type;
 	enum signal_type connector_signal;
@@ -306,9 +307,9 @@ void dc_link_detect(const struct dc_link *dc_link);
  * from DM. */
 bool dc_link_handle_hpd_rx_irq(const struct dc_link *dc_link);
 
-bool dc_link_add_sink(const struct dc_link *link, struct dc_sink *sink);
+bool dc_link_add_remote_sink(const struct dc_link *link, struct dc_sink *sink);
 
-void dc_link_remove_sink(
+void dc_link_remove_remote_sink(
 	const struct dc_link *link,
 	const struct dc_sink *sink);
 

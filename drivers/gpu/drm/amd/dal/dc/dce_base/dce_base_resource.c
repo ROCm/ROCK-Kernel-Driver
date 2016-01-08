@@ -93,6 +93,7 @@ static struct stream_encoder *find_first_free_match_stream_enc_for_link(
 {
 	uint8_t i;
 	int8_t j = -1;
+	const struct dc_sink *sink = NULL;
 
 	for (i = 0; i < res_ctx->pool.stream_enc_count; i++) {
 		if (!res_ctx->is_stream_enc_acquired[i] &&
@@ -118,7 +119,10 @@ static struct stream_encoder *find_first_free_match_stream_enc_for_link(
 	 * TODO - This is just a patch up and a generic solution is
 	 * required for non DP connectors.
 	 */
-	if (j >= 0 &&  dc_is_dp_signal(link->public.sink[0]->sink_signal))
+
+	sink = link->public.local_sink ? link->public.local_sink : link->public.remote_sinks[0];
+
+	if (sink && j >= 0 &&  dc_is_dp_signal(sink->sink_signal))
 		return res_ctx->pool.stream_enc[j];
 
 	return NULL;

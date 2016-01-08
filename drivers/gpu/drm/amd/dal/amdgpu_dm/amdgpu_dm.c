@@ -698,47 +698,19 @@ static struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 	.atomic_commit = amdgpu_dm_atomic_commit
 };
 
-static bool dm_get_sink_from_link(const struct dc_link *link,
-						struct amdgpu_connector *aconnector,
-						const struct dc_sink **sink)
-{
-	int i;
-	*sink = NULL;
-
-	if (!link->sink_count) {
-		DRM_INFO("No sinks on link!\n");
-		return true;
-	} else if (link->sink_count > 1 && !aconnector) {
-		DRM_ERROR("Multi sink link but no connector given!\n");
-		return false;
-	}
-
-	if (link->sink_count == 1) {
-		*sink = link->sink[0];
-		return true;
-	}
-
-	for (i = 0; i < link->sink_count; i++)
-		if (aconnector->dc_sink == link->sink[i])
-			*sink =  aconnector->dc_sink;
-
-	return true;
-}
 
 void amdgpu_dm_update_connector_after_detect(
 	struct amdgpu_connector *aconnector)
 {
 	struct drm_connector *connector = &aconnector->base;
 	struct drm_device *dev = connector->dev;
-	const struct dc_link *dc_link = aconnector->dc_link;
 	const struct dc_sink *sink;
 
 	/* MST handled by drm_mst framework */
 	if (aconnector->mst_mgr.mst_state == true)
 		return;
 
-	if (!dm_get_sink_from_link(dc_link, aconnector, &sink))
-		return;
+	sink = aconnector->dc_link->local_sink;
 
 	/*
 	 * TODO: temporary guard to look for proper fix
@@ -789,13 +761,11 @@ static void handle_hpd_irq(void *param)
 	struct amdgpu_connector *aconnector = (struct amdgpu_connector *)param;
 	struct drm_connector *connector = &aconnector->base;
 	struct drm_device *dev = connector->dev;
-	bool mst_connector = aconnector->mst_mgr.mst_state;
 
 	dc_link_detect(aconnector->dc_link);
-	/*Wait for complition of all MST connectors reset
-	 * so the link is clean from sinks. */
-	if (mst_connector && aconnector->dc_link->type == dc_connection_none)
-		flush_work(&aconnector->mst_mgr.destroy_connector_work);
+	if (aconnector->dc_link->type == dc_connection_mst_branch)
+		return;
+
 	amdgpu_dm_update_connector_after_detect(aconnector);
 	drm_kms_helper_hotplug_event(dev);
 }
