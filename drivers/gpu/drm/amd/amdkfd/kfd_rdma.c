@@ -55,7 +55,7 @@
 static int get_pages(uint64_t address, uint64_t length, struct pid *pid,
 		struct device *dma_device,
 		struct amd_p2p_page_table **page_table,
-		void  *(free_callback)(struct amd_p2p_page_table *page_table,
+		void  (*free_callback)(struct amd_p2p_page_table *page_table,
 					void *client_priv),
 		void  *client_priv)
 {
