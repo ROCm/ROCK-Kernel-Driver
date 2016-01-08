@@ -57,14 +57,14 @@ struct bios_parser *dal_bios_parser_create(
 	struct adapter_service *as);
 void dal_bios_parser_destroy(
 	struct bios_parser **bp);
+
+
 void dal_bios_parser_power_down(
 	struct bios_parser *bp);
 void dal_bios_parser_power_up(
 	struct bios_parser *bp);
 
 uint8_t dal_bios_parser_get_encoders_number(
-	struct bios_parser *bp);
-uint8_t dal_bios_parser_get_connectors_number(
 	struct bios_parser *bp);
 uint32_t dal_bios_parser_get_oem_ddc_lines_number(
 	struct bios_parser *bp);
@@ -294,4 +294,7 @@ struct integrated_info *dal_bios_parser_create_integrated_info(
 
 /* Destroy provided integrated info */
 void dal_bios_parser_destroy_integrated_info(struct dc_context *ctx, struct integrated_info **info);
+
+
+
 #endif

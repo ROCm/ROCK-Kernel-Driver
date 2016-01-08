@@ -34,6 +34,7 @@
 #include "include/asic_capability_interface.h"
 #include "include/logger_interface.h"
 
+#include "dc_bios_types.h"
 #include "adapter_service.h"
 #include "hw_ctx_adapter_service.h"
 #include "wireless_data_source.h"
@@ -735,10 +736,16 @@ static bool adapter_service_construct(
 		goto failed_to_generate_features;
 	}
 
-	/* Create BIOS parser */
-	init_data->bp_init_data.ctx = init_data->ctx;
-	as->bios_parser =
-		dal_bios_parser_create(&init_data->bp_init_data, as);
+	if (init_data->vbios_override) {
+		/* TODO: remove the typecast */
+		as->bios_parser = (struct bios_parser *)init_data->vbios_override;
+	} else {
+		/* Create BIOS parser */
+		init_data->bp_init_data.ctx = init_data->ctx;
+
+		as->bios_parser =
+			dal_bios_parser_create(&init_data->bp_init_data, as);
+	}
 
 	if (!as->bios_parser) {
 		ASSERT_CRITICAL(false);
@@ -905,7 +912,6 @@ uint8_t dal_adapter_service_get_controllers_num(
 	return result;
 }
 
-
 /** Get total number of connectors.
  *
  * \param as	Adapter Service
@@ -918,9 +924,13 @@ uint8_t dal_adapter_service_get_connectors_num(
 {
 	uint8_t vbios_connectors_num = 0;
 	uint8_t wireless_connectors_num = 0;
+	struct dc_bios *dcb;
 
-	vbios_connectors_num = dal_bios_parser_get_connectors_number(
-			as->bios_parser);
+	/* TODO: remove type cast */
+	dcb = (struct dc_bios*)dal_adapter_service_get_bios_parser(as);
+
+	vbios_connectors_num = dcb->funcs->get_connectors_number(dcb);
+
 	wireless_connectors_num = wireless_get_connectors_num(as);
 
 	return vbios_connectors_num + wireless_connectors_num;
@@ -1004,8 +1014,13 @@ struct graphics_object_id dal_adapter_service_get_connector_obj_id(
 		struct adapter_service *as,
 		uint8_t connector_index)
 {
-	uint8_t bios_connectors_num =
-		dal_bios_parser_get_connectors_number(as->bios_parser);
+	struct dc_bios *dcb;
+	uint8_t bios_connectors_num;
+
+	/* TODO: remove type cast */
+	dcb = (struct dc_bios*)dal_adapter_service_get_bios_parser(as);
+
+	bios_connectors_num = dcb->funcs->get_connectors_number(dcb);
 
 	if (connector_index >= bios_connectors_num)
 		return wireless_get_connector_id(
@@ -1651,9 +1666,12 @@ uint32_t dal_adapter_service_get_memory_type_multiplier(
  *
  * Get BIOS parser handler
  */
+/* TODO: change return type to 'dc_bios'. */
 struct bios_parser *dal_adapter_service_get_bios_parser(
 	struct adapter_service *as)
 {
+	/* TODO: conditionally return 'override' or 'real'.
+	 * Works for now because 'base' is first member of 'bios parser' */
 	return as->bios_parser;
 }
 

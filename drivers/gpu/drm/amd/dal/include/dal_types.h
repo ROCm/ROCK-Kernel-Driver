@@ -30,6 +30,7 @@
 #include "dc_types.h"
 
 struct dal_logger;
+struct dc_bios;
 
 enum dce_version {
 	DCE_VERSION_UNKNOWN = (-1),
@@ -137,6 +138,9 @@ struct dal_init_data {
 	void *driver; /* ctx */
 	void *cgs_device;
 	uint8_t num_virtual_links;
+	/* If 'vbios_override' not NULL, it will be called instead
+	 * of the real VBIOS. Intended use is Diagnostics on FPGA. */
+	struct dc_bios *vbios_override;
 };
 
 struct dal_dc_init_data {

@@ -27,6 +27,7 @@
 
 #include "atom.h"
 
+#include "dc_bios_types.h"
 #include "include/adapter_service_interface.h"
 #include "include/grph_object_ctrl_defs.h"
 #include "include/bios_parser_interface.h"
@@ -98,6 +99,13 @@ static void process_ext_display_connection_info(struct bios_parser *bp);
 #define BIOS_IMAGE_SIZE_OFFSET 2
 #define BIOS_IMAGE_SIZE_UNIT 512
 
+/*****************************************************************************/
+static uint8_t bios_parser_get_connectors_number(struct dc_bios *dcb);
+
+const struct dc_vbios_funcs vbios_funcs = {
+	.get_connectors_number = bios_parser_get_connectors_number
+};
+
 static bool bios_parser_construct(
 	struct bios_parser *bp,
 	struct bp_init_data *init,
@@ -116,6 +124,8 @@ static bool bios_parser_construct(
 
 	if (!init->bios)
 		return false;
+
+	bp->base.funcs = &vbios_funcs;
 
 	dce_version = dal_adapter_service_get_dce_version(as);
 	bp->ctx = init->ctx;
@@ -255,8 +265,10 @@ uint8_t dal_bios_parser_get_encoders_number(struct bios_parser *bp)
 		le16_to_cpu(bp->object_info_tbl.v1_1->usEncoderObjectTableOffset));
 }
 
-uint8_t dal_bios_parser_get_connectors_number(struct bios_parser *bp)
+static uint8_t bios_parser_get_connectors_number(struct dc_bios *dcb)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	return get_number_of_objects(bp,
 		le16_to_cpu(bp->object_info_tbl.v1_1->usConnectorObjectTableOffset));
 }
