@@ -10,9 +10,42 @@
 #include "include/bios_parser_interface.h"
 
 struct stream_encoder {
+	struct stream_encoder_funcs *funcs;
 	struct dc_context *ctx;
 	struct bios_parser *bp;
 	enum engine_id id;
+};
+
+struct stream_encoder_funcs {
+	void (*dp_set_stream_attribute)(
+		struct stream_encoder *enc,
+		struct dc_crtc_timing *crtc_timing);
+	void (*hdmi_set_stream_attribute)(
+		struct stream_encoder *enc,
+		struct dc_crtc_timing *crtc_timing,
+		bool enable_audio);
+	void (*dvi_set_stream_attribute)(
+		struct stream_encoder *enc,
+		struct dc_crtc_timing *crtc_timing,
+		bool is_dual_link);
+	void (*set_mst_bandwidth)(
+		struct stream_encoder *enc,
+		struct fixed31_32 avg_time_slots_per_mtp);
+	void (*update_hdmi_info_packets)(
+		struct stream_encoder *enc,
+		const struct encoder_info_frame *info_frame);
+	void (*stop_hdmi_info_packets)(
+		struct stream_encoder *enc);
+	void (*update_dp_info_packets)(
+		struct stream_encoder *enc,
+		const struct encoder_info_frame *info_frame);
+	void (*stop_dp_info_packets)(
+		struct stream_encoder *enc);
+	void (*dp_blank)(
+		struct stream_encoder *enc);
+	void (*dp_unblank)(
+		struct stream_encoder *enc,
+		const struct encoder_unblank_param *param);
 };
 
 #endif /* STREAM_ENCODER_H_ */

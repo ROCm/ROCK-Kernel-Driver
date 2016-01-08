@@ -51,31 +51,35 @@ enum dce110_clk_src_array_id {
 };
 
 static const struct dce110_timing_generator_offsets dce110_tg_offsets[] = {
-		{
-			.crtc = (mmCRTC0_CRTC_CONTROL - mmCRTC_CONTROL),
-			.dcp =  (mmDCP0_GRPH_CONTROL - mmGRPH_CONTROL),
-		},
-		{
-			.crtc = (mmCRTC1_CRTC_CONTROL - mmCRTC_CONTROL),
-			.dcp = (mmDCP1_GRPH_CONTROL - mmGRPH_CONTROL),
-		},
-		{
-			.crtc = (mmCRTC2_CRTC_CONTROL - mmCRTC_CONTROL),
-			.dcp = (mmDCP2_GRPH_CONTROL - mmGRPH_CONTROL),
-		},
-		{
-			.crtc = (mmCRTC3_CRTC_CONTROL - mmCRTC_CONTROL),
-			.dcp = (mmDCP3_GRPH_CONTROL - mmGRPH_CONTROL),
-		},
-		{
-			.crtc = (mmCRTC4_CRTC_CONTROL - mmCRTC_CONTROL),
-			.dcp = (mmDCP4_GRPH_CONTROL - mmGRPH_CONTROL),
-		},
-		{
-			.crtc = (mmCRTC5_CRTC_CONTROL - mmCRTC_CONTROL),
-			.dcp = (mmDCP5_GRPH_CONTROL - mmGRPH_CONTROL),
-		}
+	{
+		.crtc = (mmCRTC0_CRTC_CONTROL - mmCRTC_CONTROL),
+		.dcp =  (mmDCP0_GRPH_CONTROL - mmGRPH_CONTROL),
+	},
+	{
+		.crtc = (mmCRTC1_CRTC_CONTROL - mmCRTC_CONTROL),
+		.dcp = (mmDCP1_GRPH_CONTROL - mmGRPH_CONTROL),
+	},
+	{
+		.crtc = (mmCRTC2_CRTC_CONTROL - mmCRTC_CONTROL),
+		.dcp = (mmDCP2_GRPH_CONTROL - mmGRPH_CONTROL),
+	}
 };
+
+static const struct dce110_stream_enc_offsets dce110_str_enc_offsets[] = {
+	{
+		.dig = (mmDIG0_DIG_FE_CNTL - mmDIG_FE_CNTL),
+		.dp  = (mmDP0_DP_SEC_CNTL - mmDP_SEC_CNTL)
+	},
+	{
+		.dig = (mmDIG1_DIG_FE_CNTL - mmDIG_FE_CNTL),
+		.dp  = (mmDP1_DP_SEC_CNTL - mmDP_SEC_CNTL)
+	},
+	{
+		.dig = (mmDIG2_DIG_FE_CNTL - mmDIG_FE_CNTL),
+		.dp  = (mmDP2_DP_SEC_CNTL - mmDP_SEC_CNTL)
+	}
+};
+
 
 static struct timing_generator *dce110_timing_generator_create(
 		struct adapter_service *as,
@@ -94,6 +98,26 @@ static struct timing_generator *dce110_timing_generator_create(
 
 	BREAK_TO_DEBUGGER();
 	dc_service_free(ctx, tg110);
+	return NULL;
+}
+
+static struct stream_encoder *dce110_stream_encoder_create(
+	enum engine_id eng_id,
+	struct dc_context *ctx,
+	struct bios_parser *bp,
+	const struct dce110_stream_enc_offsets *offsets)
+{
+	struct dce110_stream_encoder *enc110 =
+		dc_service_alloc(ctx, sizeof(struct dce110_stream_encoder));
+
+	if (!enc110)
+		return NULL;
+
+	if (dce110_stream_encoder_construct(enc110, ctx, bp, eng_id, offsets))
+		return &enc110->base;
+
+	BREAK_TO_DEBUGGER();
+	dc_service_free(ctx, enc110);
 	return NULL;
 }
 
@@ -238,7 +262,8 @@ bool dce110_construct_resource_pool(
 			pool->stream_enc[i] = dce110_stream_encoder_create(
 				i, dc->ctx,
 				dal_adapter_service_get_bios_parser(
-					adapter_serv));
+					adapter_serv),
+				&dce110_str_enc_offsets[i]);
 			if (pool->stream_enc[i] == NULL) {
 				BREAK_TO_DEBUGGER();
 				dal_error("DC: failed to create stream_encoder!\n");
@@ -252,7 +277,8 @@ bool dce110_construct_resource_pool(
 stream_enc_create_fail:
 	for (i = 0; i < pool->stream_enc_count; i++) {
 		if (pool->stream_enc[i] != NULL)
-			dce110_stream_encoder_destroy(&pool->stream_enc[i]);
+			dc_service_free(pool->stream_enc[i]->ctx,
+				DCE110STRENC_FROM_STRENC(pool->stream_enc[i]));
 	}
 
 audio_create_fail:
@@ -321,7 +347,8 @@ void dce110_destruct_resource_pool(struct resource_pool *pool)
 
 	for (i = 0; i < pool->stream_enc_count; i++) {
 		if (pool->stream_enc[i] != NULL)
-			dce110_stream_encoder_destroy(&pool->stream_enc[i]);
+			dc_service_free(pool->stream_enc[i]->ctx,
+				DCE110STRENC_FROM_STRENC(pool->stream_enc[i]));
 	}
 
 	for (i = 0; i < pool->clk_src_count; i++) {

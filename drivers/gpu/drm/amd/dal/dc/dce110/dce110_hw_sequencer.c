@@ -633,11 +633,11 @@ static void update_bios_scratch_critical_state(struct adapter_service *as,
 static void update_info_frame(struct core_stream *stream)
 {
 	if (dc_is_hdmi_signal(stream->signal))
-		dce110_stream_encoder_update_hdmi_info_packets(
+		stream->stream_enc->funcs->update_hdmi_info_packets(
 			stream->stream_enc,
 			&stream->encoder_info_frame);
 	else if (dc_is_dp_signal(stream->signal))
-		dce110_stream_encoder_update_dp_info_packets(
+		stream->stream_enc->funcs->update_dp_info_packets(
 			stream->stream_enc,
 			&stream->encoder_info_frame);
 }
@@ -695,11 +695,11 @@ static void disable_stream(struct core_stream *stream)
 	struct core_link *link = stream->sink->link;
 
 	if (dc_is_hdmi_signal(stream->signal))
-		dce110_stream_encoder_stop_hdmi_info_packets(
+		stream->stream_enc->funcs->stop_hdmi_info_packets(
 			stream->stream_enc);
 
 	if (dc_is_dp_signal(stream->signal))
-		dce110_stream_encoder_stop_dp_info_packets(
+		stream->stream_enc->funcs->stop_dp_info_packets(
 			stream->stream_enc);
 
 	if (stream->audio) {
@@ -716,7 +716,7 @@ static void disable_stream(struct core_stream *stream)
 
 	/* blank at encoder level */
 	if (dc_is_dp_signal(stream->signal))
-		dce110_stream_encoder_dp_blank(stream->stream_enc);
+		stream->stream_enc->funcs->dp_blank(stream->stream_enc);
 
 	dce110_link_encoder_connect_dig_be_to_fe(
 			link->link_enc,
@@ -734,7 +734,7 @@ static void unblank_stream(struct core_stream *stream,
 	params.crtc_timing.pixel_clock =
 		stream->public.timing.pix_clk_khz;
 	params.link_settings.link_rate = link_settings->link_rate;
-	dce110_stream_encoder_dp_unblank(
+	stream->stream_enc->funcs->dp_unblank(
 		stream->stream_enc, &params);
 }
 
@@ -855,18 +855,18 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 		stream->signal);
 
 	if (dc_is_dp_signal(stream->signal))
-		dce110_stream_encoder_dp_set_stream_attribute(
+		stream->stream_enc->funcs->dp_set_stream_attribute(
 			stream->stream_enc,
 			&stream->public.timing);
 
 	if (dc_is_hdmi_signal(stream->signal))
-		dce110_stream_encoder_hdmi_set_stream_attribute(
+		stream->stream_enc->funcs->hdmi_set_stream_attribute(
 		stream->stream_enc,
 		&stream->public.timing,
 		stream->audio != NULL);
 
 	if (dc_is_dvi_signal(stream->signal))
-		dce110_stream_encoder_dvi_set_stream_attribute(
+		stream->stream_enc->funcs->dvi_set_stream_attribute(
 		stream->stream_enc,
 		&stream->public.timing,
 		(stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK) ?
@@ -1728,6 +1728,13 @@ static void disable_vga(struct timing_generator *tg)
 	tg->funcs->disable_vga(tg);
 }
 
+static void set_mst_bandwidth(struct stream_encoder *stream_enc,
+	struct fixed31_32 avg_time_slots_per_mtp)
+{
+	stream_enc->funcs->set_mst_bandwidth(stream_enc,
+		avg_time_slots_per_mtp);
+}
+
 static const struct hw_sequencer_funcs dce110_funcs = {
 	.apply_ctx_to_hw = apply_ctx_to_hw,
 	.reset_hw_ctx = reset_hw_ctx,
@@ -1767,7 +1774,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.enable_stream = enable_stream,
 	.disable_stream = disable_stream,
 	.update_mst_stream_allocation_table = dce110_link_encoder_update_mst_stream_allocation_table,
-	.set_mst_bandwidth = dce110_stream_encoder_set_mst_bandwidth
+	.set_mst_bandwidth = set_mst_bandwidth
 };
 
 bool dce110_hw_sequencer_construct(struct dc *dc)
