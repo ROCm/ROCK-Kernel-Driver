@@ -427,15 +427,12 @@ static bool is_dp_active_dongle(enum display_dongle_type dongle_type)
 		dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER);
 }
 
-static void link_disconnect_all_sinks(struct core_link *link)
+static void link_disconnect_sink(struct core_link *link)
 {
-	/*
-	 * as sink_count changed inside dc_link_remove_sink, we should not
-	 * use it for range check for loop, because half of sinks will not
-	 * be removed
-	 */
-	while (link->public.sink_count)
-		dc_link_remove_sink(&link->public, link->public.sink[0]);
+	if (link->public.local_sink) {
+		dc_sink_release(link->public.local_sink);
+		link->public.local_sink = NULL;
+	}
 
 	link->dpcd_sink_count = 0;
 }
@@ -496,7 +493,7 @@ static void dc_link_detect_dp(
 				/*
 				 * active dongle unplug processing for short irq
 				 */
-				link_disconnect_all_sinks(link);
+				link_disconnect_sink(link);
 				return;
 			}
 
@@ -574,10 +571,7 @@ void dc_link_detect(const struct dc_link *dc_link)
 		return;
 	}
 
-	/* Free existing state before doing detection on SST
-	 * TODO: For MST, need to investigate if the same is required. */
-	if (link->public.type != dc_connection_mst_branch)
-		link_disconnect_all_sinks(link);
+	link_disconnect_sink(link);
 
 	if (new_connection_type != dc_connection_none) {
 		link->public.type = new_connection_type;
@@ -657,11 +651,7 @@ void dc_link_detect(const struct dc_link *dc_link)
 		}
 
 		sink = DC_SINK_TO_CORE(dc_sink);
-
-		/*AG TODO handle failure */
-		/*Only non MST case here */
-		if (!dc_link_add_sink(&link->public, &sink->public))
-				BREAK_TO_DEBUGGER();
+		link->public.local_sink = &sink->public;
 
 		edid_status = read_edid(link, sink);
 

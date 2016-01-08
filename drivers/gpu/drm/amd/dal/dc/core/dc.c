@@ -838,7 +838,7 @@ bool dc_write_dpcd(
 	return r == DDC_RESULT_SUCESSFULL;
 }
 
-bool dc_link_add_sink(const struct dc_link *link, struct dc_sink *sink)
+bool dc_link_add_remote_sink(const struct dc_link *link, struct dc_sink *sink)
 {
 	struct core_link *core_link = DC_LINK_TO_LINK(link);
 	struct dc_link *dc_link = &core_link->public;
@@ -848,7 +848,7 @@ bool dc_link_add_sink(const struct dc_link *link, struct dc_sink *sink)
 		return false;
 	}
 
-	dc_link->sink[link->sink_count] = sink;
+	dc_link->remote_sinks[link->sink_count] = sink;
 	dc_link->sink_count++;
 	if (sink->sink_signal == SIGNAL_TYPE_VIRTUAL
 		&& link->connector_signal == SIGNAL_TYPE_VIRTUAL)
@@ -858,7 +858,7 @@ bool dc_link_add_sink(const struct dc_link *link, struct dc_sink *sink)
 }
 
 
-void dc_link_remove_sink(const struct dc_link *link, const struct dc_sink *sink)
+void dc_link_remove_remote_sink(const struct dc_link *link, const struct dc_sink *sink)
 {
 	int i;
 	struct core_link *core_link = DC_LINK_TO_LINK(link);
@@ -870,13 +870,13 @@ void dc_link_remove_sink(const struct dc_link *link, const struct dc_sink *sink)
 	}
 
 	for (i = 0; i < dc_link->sink_count; i++) {
-		if (dc_link->sink[i] == sink) {
+		if (dc_link->remote_sinks[i] == sink) {
 			dc_sink_release(sink);
-			dc_link->sink[i] = NULL;
+			dc_link->remote_sinks[i] = NULL;
 
 			/* shrink array to remove empty place */
 			while (i < dc_link->sink_count - 1) {
-				dc_link->sink[i] = dc_link->sink[i+1];
+				dc_link->remote_sinks[i] = dc_link->remote_sinks[i+1];
 				i++;
 			}
 

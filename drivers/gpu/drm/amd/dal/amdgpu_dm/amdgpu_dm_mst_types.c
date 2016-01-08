@@ -147,7 +147,7 @@ static struct dc_sink *dm_dp_mst_add_mst_sink(
 	dc_service_memmove(dc_sink->dc_edid.raw_edid, edid, len);
 	dc_sink->dc_edid.length = len;
 
-	if (!dc_link_add_sink(
+	if (!dc_link_add_remote_sink(
 			dc_link,
 			dc_sink))
 		goto fail_add_sink;
@@ -163,7 +163,7 @@ static struct dc_sink *dm_dp_mst_add_mst_sink(
 
 	return dc_sink;
 fail:
-	dc_link_remove_sink(dc_link, dc_sink);
+	dc_link_remove_remote_sink(dc_link, dc_sink);
 fail_add_sink:
 	return NULL;
 }
@@ -190,7 +190,7 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 		aconnector->edid = edid;
 
 		if (aconnector->dc_sink)
-			dc_link_remove_sink(
+			dc_link_remove_remote_sink(
 				aconnector->dc_link,
 				aconnector->dc_sink);
 
@@ -354,7 +354,7 @@ static void dm_dp_destroy_mst_connector(
 
 	aconnector->port = NULL;
 	if (aconnector->dc_sink)
-		dc_link_remove_sink(aconnector->dc_link, aconnector->dc_sink);
+		dc_link_remove_remote_sink(aconnector->dc_link, aconnector->dc_sink);
 }
 
 static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
