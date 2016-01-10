@@ -540,7 +540,7 @@ static void detect_dp(
 	}
 }
 
-void dc_link_detect(const struct dc_link *dc_link)
+bool dc_link_detect(const struct dc_link *dc_link)
 {
 	struct core_link *link = DC_LINK_TO_LINK(dc_link);
 	struct dc_sink_init_data sink_init_data = { 0 };
@@ -557,11 +557,11 @@ void dc_link_detect(const struct dc_link *dc_link)
 	enum dc_connection_type new_connection_type = dc_connection_none;
 
 	if (link->public.connector_signal == SIGNAL_TYPE_VIRTUAL)
-		return;
+		return false;
 
 	if (false == detect_sink(link, &new_connection_type)) {
 		BREAK_TO_DEBUGGER();
-		return;
+		return false;
 	}
 
 	link_disconnect_sink(link);
@@ -608,7 +608,7 @@ void dc_link_detect(const struct dc_link *dc_link)
 				&audio_support);
 
 			if (link->public.type == dc_connection_mst_branch)
-				return;
+				return false;
 
 			break;
 		}
@@ -616,7 +616,7 @@ void dc_link_detect(const struct dc_link *dc_link)
 		default:
 			DC_ERROR("Invalid connector type! signal:%d\n",
 				link->public.connector_signal);
-			return;
+			return false;
 		} /* switch() */
 
 		if (link->dpcd_caps.sink_count.bits.SINK_COUNT)
@@ -640,7 +640,7 @@ void dc_link_detect(const struct dc_link *dc_link)
 		dc_sink = dc_sink_create(&sink_init_data);
 		if (!dc_sink) {
 			DC_ERROR("Failed to create sink!\n");
-			return;
+			return false;
 		}
 
 		sink = DC_SINK_TO_CORE(dc_sink);
@@ -660,7 +660,7 @@ void dc_link_detect(const struct dc_link *dc_link)
 				LOG_MAJOR_ERROR,
 				LOG_MINOR_DETECTION_EDID_PARSER,
 				"No EDID read.\n");
-			return;
+			return false;
 
 		default:
 			break;
@@ -719,7 +719,7 @@ void dc_link_detect(const struct dc_link *dc_link)
 		(sink_caps.signal == SIGNAL_TYPE_NONE ?
 			"Disconnected":"Connected"));
 
-	return;
+	return true;
 }
 
 static enum hpd_source_id get_hpd_line(

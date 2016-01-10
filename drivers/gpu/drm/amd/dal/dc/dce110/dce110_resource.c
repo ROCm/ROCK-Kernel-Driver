@@ -661,7 +661,7 @@ enum dc_status dce110_validate_bandwidth(
 		dc->ctx->logger,
 		LOG_MAJOR_BWM,
 		LOG_MINOR_BWM_REQUIRED_BANDWIDTH_CALCS,
-		"%s: start",
+		"%s: start\n",
 		__func__);
 
 	if (!bw_calcs(
