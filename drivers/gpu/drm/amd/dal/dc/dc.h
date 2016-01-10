@@ -296,8 +296,12 @@ const struct graphics_object_id dc_get_link_id_at_index(
 /* Set backlight level of an embedded panel (eDP, LVDS). */
 bool dc_link_set_backlight_level(const struct dc_link *dc_link, uint32_t level);
 
-/* Request DC to detect if there is a Panel connected. */
-void dc_link_detect(const struct dc_link *dc_link);
+/* Request DC to detect if there is a Panel connected.
+ * Return false for any type of detection failure or MST detection
+ * true otherwise. True meaning further action is required (status update
+ * and OS notification).
+ */
+bool dc_link_detect(const struct dc_link *dc_link);
 
 /* Notify DC about DP RX Interrupt (aka Short Pulse Interrupt).
  * Return:

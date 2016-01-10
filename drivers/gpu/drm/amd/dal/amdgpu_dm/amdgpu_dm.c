@@ -762,12 +762,13 @@ static void handle_hpd_irq(void *param)
 	struct drm_connector *connector = &aconnector->base;
 	struct drm_device *dev = connector->dev;
 
-	dc_link_detect(aconnector->dc_link);
-	if (aconnector->dc_link->type == dc_connection_mst_branch)
-		return;
-
-	amdgpu_dm_update_connector_after_detect(aconnector);
-	drm_kms_helper_hotplug_event(dev);
+	/* In case of failure or MST no need to update connector status or notify the OS
+	 * since (for MST case) MST does this in it's own context.
+	 */
+	if (dc_link_detect(aconnector->dc_link)) {
+		amdgpu_dm_update_connector_after_detect(aconnector);
+		drm_kms_helper_hotplug_event(dev);
+	}
 }
 
 static void handle_hpd_rx_irq(void *param)
@@ -780,9 +781,10 @@ static void handle_hpd_rx_irq(void *param)
 	if (dc_link_handle_hpd_rx_irq(aconnector->dc_link) &&
 			!is_mst_root_connector) {
 		/* Downstream Port status changed. */
-		dc_link_detect(aconnector->dc_link);
-		amdgpu_dm_update_connector_after_detect(aconnector);
-		drm_kms_helper_hotplug_event(dev);
+		if (dc_link_detect(aconnector->dc_link)) {
+			amdgpu_dm_update_connector_after_detect(aconnector);
+			drm_kms_helper_hotplug_event(dev);
+		}
 	}
 
 	if (is_mst_root_connector)
@@ -1055,10 +1057,9 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 			goto fail_free_connector;
 		}
 
-		dc_link_detect(dc_get_link_at_index(dm->dc, i));
-
-		amdgpu_dm_update_connector_after_detect(
-			aconnector);
+		if (dc_link_detect(dc_get_link_at_index(dm->dc, i)))
+			amdgpu_dm_update_connector_after_detect(
+				aconnector);
 	}
 
 	/* Software is initialized. Now we can register interrupt handlers. */
