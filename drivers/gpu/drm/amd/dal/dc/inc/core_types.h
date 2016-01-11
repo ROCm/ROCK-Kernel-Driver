@@ -196,6 +196,25 @@ union dp_wa {
 	uint32_t raw;
 };
 
+/* DP MST stream allocation (payload bandwidth number) */
+struct link_mst_stream_allocation {
+	/* DIG front */
+	const struct stream_encoder *stream_enc;
+	/* associate DRM payload table with DC stream encoder */
+	uint8_t vcp_id;
+	/* number of slots required for the DP stream in transport packet */
+	uint8_t slot_count;
+};
+
+/* DP MST stream allocation table */
+struct link_mst_stream_allocation_table {
+	/* number of DP video streams */
+	int stream_count;
+	/* array of stream allocations */
+	struct link_mst_stream_allocation
+	stream_allocations[MAX_CONTROLLER_NUM];
+};
+
 struct core_link {
 	struct dc_link public;
 	const struct dc *dc;
@@ -221,11 +240,10 @@ struct core_link {
 	enum edp_revision edp_revision;
 
 	/* MST record stream using this link */
-	struct dp_mst_stream_allocation_table stream_alloc_table;
-
 	struct link_flags {
 		bool dp_keep_receiver_powered;
 	} wa_flags;
+	struct link_mst_stream_allocation_table mst_stream_alloc_table;
 };
 
 #define DC_LINK_TO_LINK(dc_link) container_of(dc_link, struct core_link, public)
@@ -245,10 +263,6 @@ void core_link_enable_stream(
 		struct core_stream *stream);
 
 void core_link_disable_stream(
-		struct core_link *link,
-		struct core_stream *stream);
-
-void core_link_update_stream(
 		struct core_link *link,
 		struct core_stream *stream);
 

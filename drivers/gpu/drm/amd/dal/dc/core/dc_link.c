@@ -1390,6 +1390,58 @@ static struct fixed31_32 get_pbn_from_timing(struct core_stream *stream)
 	return peak_kbps;
 }
 
+static void update_mst_stream_alloc_table(
+	struct core_link *link,
+	struct core_stream *stream,
+	const struct dp_mst_stream_allocation_table *proposed_table)
+{
+	struct link_mst_stream_allocation work_table[MAX_CONTROLLER_NUM] = {
+			{ 0 } };
+	struct link_mst_stream_allocation *dc_alloc;
+
+	int i;
+	int j;
+
+	/* if DRM proposed_table has more than one new payload */
+	ASSERT(proposed_table->stream_count -
+			link->mst_stream_alloc_table.stream_count < 2);
+
+	/* copy proposed_table to core_link, add stream encoder */
+	for (i = 0; i < proposed_table->stream_count; i++) {
+
+		for (j = 0; j < link->mst_stream_alloc_table.stream_count; j++) {
+			dc_alloc =
+			&link->mst_stream_alloc_table.stream_allocations[j];
+
+			if (dc_alloc->vcp_id ==
+				proposed_table->stream_allocations[i].vcp_id) {
+
+				work_table[i] = *dc_alloc;
+				break; /* exit j loop */
+			}
+		}
+
+		/* new vcp_id */
+		if (j == link->mst_stream_alloc_table.stream_count) {
+			work_table[i].vcp_id =
+				proposed_table->stream_allocations[i].vcp_id;
+			work_table[i].slot_count =
+				proposed_table->stream_allocations[i].slot_count;
+			work_table[i].stream_enc = stream->stream_enc;
+		}
+	}
+
+	/* update link->mst_stream_alloc_table with work_table */
+	link->mst_stream_alloc_table.stream_count =
+			proposed_table->stream_count;
+	for (i = 0; i < MAX_CONTROLLER_NUM; i++)
+		link->mst_stream_alloc_table.stream_allocations[i] =
+				work_table[i];
+}
+
+/* convert link_mst_stream_alloc_table to dm dp_mst_stream_alloc_table
+ * because stream_encoder is not exposed to dm
+ */
 static enum dc_status allocate_mst_payload(struct core_stream *stream)
 {
 	struct core_link *link = stream->sink->link;
@@ -1411,9 +1463,10 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 	dc_helpers_dp_mst_write_payload_allocation_table(
 		stream->ctx,
 		&stream->public,
-		&link->stream_alloc_table,
 		&proposed_table,
 		true);
+
+	update_mst_stream_alloc_table(link, stream, &proposed_table);
 
 	dal_logger_write(link->ctx->logger,
 			LOG_MAJOR_MST,
@@ -1421,21 +1474,21 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 			"%s  "
 			"stream_count: %d: \n ",
 			__func__,
-			proposed_table.stream_count);
+			link->mst_stream_alloc_table.stream_count);
 
 	for (i = 0; i < MAX_CONTROLLER_NUM; i++) {
 		dal_logger_write(link->ctx->logger,
 		LOG_MAJOR_MST,
 		LOG_MINOR_MST_PROGRAMMING,
-		"stream[%d]: 0x%x      "
+		"stream_enc[%d]: 0x%x      "
 		"stream[%d].vcp_id: %d      "
 		"stream[%d].slot_count: %d\n",
 		i,
-		proposed_table.stream_allocations[i].stream,
+		link->mst_stream_alloc_table.stream_allocations[i].stream_enc,
 		i,
-		proposed_table.stream_allocations[i].vcp_id,
+		link->mst_stream_alloc_table.stream_allocations[i].vcp_id,
 		i,
-		proposed_table.stream_allocations[i].slot_count);
+		link->mst_stream_alloc_table.stream_allocations[i].slot_count);
 	}
 
 	ASSERT(proposed_table.stream_count > 0);
@@ -1453,9 +1506,7 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 	/* program DP source TX for payload */
 	link_encoder->funcs->update_mst_stream_allocation_table(
 		link_encoder,
-		&proposed_table);
-
-	link->stream_alloc_table = proposed_table;
+		&link->mst_stream_alloc_table);
 
 	/* send down message */
 	dc_helpers_dp_mst_poll_for_allocation_change_trigger(
@@ -1509,9 +1560,15 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 		dc_helpers_dp_mst_write_payload_allocation_table(
 				stream->ctx,
 				&stream->public,
-				&link->stream_alloc_table,
 				&proposed_table,
 				false);
+	dc_helpers_dp_mst_write_payload_allocation_table(
+		stream->ctx,
+		&stream->public,
+		&proposed_table,
+		false);
+
+	update_mst_stream_alloc_table(link, stream, &proposed_table);
 
 	dal_logger_write(link->ctx->logger,
 			LOG_MAJOR_MST,
@@ -1519,28 +1576,26 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 			"%s"
 			"stream_count: %d: ",
 			__func__,
-			proposed_table.stream_count);
+			link->mst_stream_alloc_table.stream_count);
 
 	for (i = 0; i < MAX_CONTROLLER_NUM; i++) {
 		dal_logger_write(link->ctx->logger,
 		LOG_MAJOR_MST,
 		LOG_MINOR_MST_PROGRAMMING,
-		"stream[%d]: 0x%x"
-		"stream[%d].vcp_id: %d"
-		"stream[%d].slot_count: %d",
+		"stream_enc[%d]: 0x%x      "
+		"stream[%d].vcp_id: %d      "
+		"stream[%d].slot_count: %d\n",
 		i,
-		proposed_table.stream_allocations[i].stream,
+		link->mst_stream_alloc_table.stream_allocations[i].stream_enc,
 		i,
-		proposed_table.stream_allocations[i].vcp_id,
+		link->mst_stream_alloc_table.stream_allocations[i].vcp_id,
 		i,
-		proposed_table.stream_allocations[i].slot_count);
+		link->mst_stream_alloc_table.stream_allocations[i].slot_count);
 	}
 
 	link_encoder->funcs->update_mst_stream_allocation_table(
 		link_encoder,
-		&proposed_table);
-
-	link->stream_alloc_table = proposed_table;
+		&link->mst_stream_alloc_table);
 
 	if (mst_mode) {
 		dc_helpers_dp_mst_poll_for_allocation_change_trigger(
@@ -1589,31 +1644,4 @@ void core_link_disable_stream(
 
 }
 
-void core_link_update_stream(
-		struct core_link *link,
-		struct core_stream *stream)
-{
-	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
-		uint32_t i;
 
-		for (i = 0; i < link->stream_alloc_table.stream_count; i++) {
-			const struct core_stream *s;
-
-			s = DC_STREAM_TO_CORE(
-				link->stream_alloc_table.
-				stream_allocations[i].stream);
-
-			if (stream->stream_enc == s->stream_enc) {
-			link->stream_alloc_table.stream_allocations[i].stream =
-					&stream->public;
-
-			dal_logger_write(link->ctx->logger,
-					LOG_MAJOR_MST,
-					LOG_MINOR_MST_PROGRAMMING,
-					"%s  ",
-					__func__);
-			break;
-			}
-		}
-	}
-}

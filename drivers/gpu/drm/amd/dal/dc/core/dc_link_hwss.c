@@ -96,7 +96,7 @@ void dp_disable_link_phy(struct core_link *link, enum signal_type signal)
 void dp_disable_link_phy_mst(struct core_link *link, struct core_stream *stream)
 {
 	/* MST disable link only when no stream use the link */
-	if (link->stream_alloc_table.stream_count > 0)
+	if (link->mst_stream_alloc_table.stream_count > 0)
 		return;
 
 	dp_disable_link_phy(link, stream->signal);

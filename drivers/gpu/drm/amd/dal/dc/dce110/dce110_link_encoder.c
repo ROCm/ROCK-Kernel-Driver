@@ -1592,16 +1592,14 @@ void dce110_link_encoder_dp_set_phy_pattern(
 }
 
 static void fill_stream_allocation_row_info(
-	const struct dp_mst_stream_allocation *stream_allocation,
+	const struct link_mst_stream_allocation *stream_allocation,
 	uint32_t *src,
 	uint32_t *slots)
 {
-	const struct dc_stream *dc_stream = stream_allocation->stream;
-	struct core_stream *core_stream;
+	const struct stream_encoder *stream_enc = stream_allocation->stream_enc;
 
-	if (dc_stream) {
-		core_stream = DC_STREAM_TO_CORE(dc_stream);
-		*src = core_stream->stream_enc->id;
+	if (stream_enc) {
+		*src = stream_enc->id;
 		*slots = stream_allocation->slot_count;
 	} else {
 		*src = 0;
@@ -1612,7 +1610,7 @@ static void fill_stream_allocation_row_info(
 /* programs DP MST VC payload allocation */
 void dce110_link_encoder_update_mst_stream_allocation_table(
 	struct link_encoder *enc,
-	const struct dp_mst_stream_allocation_table *table)
+	const struct link_mst_stream_allocation_table *table)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
 	struct dc_context *ctx = enc110->base.ctx;

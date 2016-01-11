@@ -391,18 +391,16 @@ struct mst_device_info {
 
 /* DP MST stream allocation (payload bandwidth number) */
 struct dp_mst_stream_allocation {
-	/* stream engine id (DIG) */
-	const struct dc_stream *stream;
-	uint32_t vcp_id;
+	uint8_t vcp_id;
 	/* number of slots required for the DP stream in
 	 * transport packet */
-	uint32_t slot_count;
+	uint8_t slot_count;
 };
 
 /* DP MST stream allocation table */
 struct dp_mst_stream_allocation_table {
 	/* number of DP video streams */
-	uint8_t stream_count;
+	int stream_count;
 	/* array of stream allocations */
 	struct dp_mst_stream_allocation stream_allocations[MAX_CONTROLLER_NUM];
 };

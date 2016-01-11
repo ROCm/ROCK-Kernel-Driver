@@ -55,7 +55,7 @@ struct link_encoder_funcs {
 		const struct encoder_set_dp_phy_pattern_param *para);
 	void (*update_mst_stream_allocation_table)(
 		struct link_encoder *enc,
-		const struct dp_mst_stream_allocation_table *table);
+		const struct link_mst_stream_allocation_table *table);
 	void (*set_lcd_backlight_level) (struct link_encoder *enc,
 		uint32_t level);
 	void (*backlight_control) (struct link_encoder *enc,
