@@ -1,6 +1,7 @@
 /* Copyright 2015 Advanced Micro Devices, Inc. */
 #include "dc_services.h"
 #include "dc.h"
+#include "dc_link_dp.h"
 #include "dc_helpers.h"
 #include "inc/core_types.h"
 #include "link_hwss.h"
@@ -1391,6 +1392,23 @@ static enum dc_status read_hpd_rx_irq_data(
 	sizeof(union hpd_irq_data));
 }
 
+static bool allow_hpd_rx_irq(const struct core_link *link)
+{
+	/*
+	 * Don't handle RX IRQ unless one of following is met:
+	 * 1) The link is established (cur_link_settings != unknown)
+	 * 2) We kicked off MST detection
+	 * 3) We know we're dealing with an active dongle
+	 */
+
+	if ((link->cur_link_settings.lane_count != LANE_COUNT_UNKNOWN) ||
+		(link->public.type == dc_connection_mst_branch) ||
+		is_dp_active_dongle(link))
+		return true;
+
+	return false;
+}
+
 bool dc_link_handle_hpd_rx_irq(const struct dc_link *dc_link)
 {
 	struct core_link *link = DC_LINK_TO_LINK(dc_link);
@@ -1406,6 +1424,15 @@ bool dc_link_handle_hpd_rx_irq(const struct dc_link *dc_link)
 		LOG_MINOR_HW_TRACE_HPD_IRQ,
 		"%s: Got short pulse HPD on link %d\n",
 		__func__, link->public.link_index);
+
+	if (!allow_hpd_rx_irq(link)) {
+		dal_logger_write(link->ctx->logger,
+			LOG_MAJOR_HW_TRACE,
+			LOG_MINOR_HW_TRACE_HPD_IRQ,
+			"%s: skipping HPD handling on %d\n",
+			__func__, link->public.link_index);
+		return false;
+	}
 
 	 /* All the "handle_hpd_irq_xxx()" methods
 	 * should be called only after
@@ -1478,6 +1505,15 @@ bool is_mst_supported(struct core_link *link)
 	}
 	return mst;
 
+}
+
+bool is_dp_active_dongle(const struct core_link *link)
+{
+	enum display_dongle_type dongle_type = link->dpcd_caps.dongle_type;
+
+	return (dongle_type == DISPLAY_DONGLE_DP_VGA_CONVERTER) ||
+			(dongle_type == DISPLAY_DONGLE_DP_DVI_CONVERTER) ||
+			(dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER);
 }
 
 static void get_active_converter_info(

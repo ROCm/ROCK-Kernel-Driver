@@ -26,6 +26,10 @@
 #ifndef __DC_LINK_DP_H__
 #define __DC_LINK_DP_H__
 
+struct core_link;
+struct core_stream;
+struct link_settings;
+
 bool dp_hbr_verify_link_cap(
 	struct core_link *link,
 	struct link_settings *known_limit_link_setting);
@@ -43,9 +47,10 @@ bool perform_link_training(
 	const struct link_settings *link_setting,
 	bool skip_video_pattern);
 
-/*dp mst functions*/
 bool is_mst_supported(struct core_link *link);
 
 void detect_dp_sink_caps(struct core_link *link);
+
+bool is_dp_active_dongle(const struct core_link *link);
 
 #endif /* __DC_LINK_DP_H__ */
