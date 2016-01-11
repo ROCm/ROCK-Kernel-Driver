@@ -160,27 +160,8 @@ static struct amdgpu_connector *get_connector_for_link(
 	return aconnector;
 }
 
-const struct dp_mst_stream_allocation *find_stream_with_matching_vcpi(
-	const struct dp_mst_stream_allocation_table *table,
-	uint32_t vcpi)
-{
-	int i;
-
-	for (i = 0; i < table->stream_count; i++) {
-		const struct dp_mst_stream_allocation *sa =
-				&table->stream_allocations[i];
-		if (sa->vcp_id == vcpi)
-			return sa;
-	}
-	return NULL;
-}
-
-
 static void get_payload_table(
-		struct drm_device *dev,
 		struct amdgpu_connector *aconnector,
-		const struct dc_stream *stream,
-		const struct dp_mst_stream_allocation_table *cur_table,
 		struct dp_mst_stream_allocation_table *proposed_table)
 {
 	int i;
@@ -203,26 +184,13 @@ static void get_payload_table(
 			mst_mgr->payloads[i].payload_state ==
 					DP_PAYLOAD_REMOTE) {
 
-			const struct dp_mst_stream_allocation *sa_src
-				= find_stream_with_matching_vcpi(
-					cur_table,
-					mst_mgr->proposed_vcpis[i]->vcpi);
-
-			if (sa_src) {
-				proposed_table->stream_allocations[
-					proposed_table->stream_count] = *sa_src;
-				proposed_table->stream_count++;
-			} else {
-				struct dp_mst_stream_allocation *sa =
+			struct dp_mst_stream_allocation *sa =
 					&proposed_table->stream_allocations[
 						proposed_table->stream_count];
 
-				sa->slot_count =
-						mst_mgr->payloads[i].num_slots;
-				sa->stream = stream;
-				sa->vcp_id = mst_mgr->proposed_vcpis[i]->vcpi;
-				proposed_table->stream_count++;
-			}
+			sa->slot_count = mst_mgr->payloads[i].num_slots;
+			sa->vcp_id = mst_mgr->proposed_vcpis[i]->vcpi;
+			proposed_table->stream_count++;
 		}
 	}
 
@@ -235,7 +203,6 @@ static void get_payload_table(
 bool dc_helpers_dp_mst_write_payload_allocation_table(
 		struct dc_context *ctx,
 		const struct dc_stream *stream,
-		const struct dp_mst_stream_allocation_table *cur_table,
 		struct dp_mst_stream_allocation_table *proposed_table,
 		bool enable)
 {
@@ -312,7 +279,7 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 	 * stream. AMD ASIC stream slot allocation should follow the same
 	 * sequence. copy DRM MST allocation to dc */
 
-	get_payload_table(dev, aconnector, stream, cur_table, proposed_table);
+	get_payload_table(aconnector, proposed_table);
 
 	if (ret)
 		return false;
