@@ -420,13 +420,6 @@ static enum signal_type dp_passive_dongle_detection(
 			audio_support);
 }
 
-static bool is_dp_active_dongle(enum display_dongle_type dongle_type)
-{
-	return (dongle_type == DISPLAY_DONGLE_DP_VGA_CONVERTER ||
-		dongle_type == DISPLAY_DONGLE_DP_DVI_CONVERTER ||
-		dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER);
-}
-
 static void link_disconnect_sink(struct core_link *link)
 {
 	if (link->public.local_sink) {
@@ -472,7 +465,7 @@ static enum dc_edid_status read_edid(
 	return edid_status;
 }
 
-static void dc_link_detect_dp(
+static void detect_dp(
 	struct core_link *link,
 	struct display_sink_capability *sink_caps,
 	bool *converter_disable_audio,
@@ -487,7 +480,7 @@ static void dc_link_detect_dp(
 		detect_dp_sink_caps(link);
 
 		/* DP active dongles */
-		if (is_dp_active_dongle(link->dpcd_caps.dongle_type)) {
+		if (is_dp_active_dongle(link)) {
 			if (!link->dpcd_caps.sink_count.bits.SINK_COUNT) {
 				link->public.type = dc_connection_none;
 				/*
@@ -608,7 +601,7 @@ void dc_link_detect(const struct dc_link *dc_link)
 		}
 
 		case SIGNAL_TYPE_DISPLAY_PORT: {
-			dc_link_detect_dp(
+			detect_dp(
 				link,
 				&sink_caps,
 				&converter_disable_audio,
