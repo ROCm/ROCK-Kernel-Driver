@@ -558,15 +558,21 @@ static void amdgpu_dm_irq_schedule_work(
 	enum dc_irq_source irq_source)
 {
 	unsigned long irq_table_flags;
+	struct work_struct *work = NULL;
 
 	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
 
-	/* Since the caller is interested in 'work_struct' then
-	 * the irq will be post-processed at "INTERRUPT_LOW_IRQ_CONTEXT". */
-
-	schedule_work(&adev->dm.irq_handler_list_low_tab[irq_source].work);
+	if (!list_empty(&adev->dm.irq_handler_list_low_tab[irq_source].head))
+		work = &adev->dm.irq_handler_list_low_tab[irq_source].work;
 
 	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
+
+	if (work) {
+		if (!schedule_work(work))
+			DRM_INFO("amdgpu_dm_irq_schedule_work FAILED src %d\n",
+						irq_source);
+	}
+
 }
 
 /** amdgpu_dm_irq_immediate_work
