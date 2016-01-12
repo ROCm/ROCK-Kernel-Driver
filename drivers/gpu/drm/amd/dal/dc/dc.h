@@ -27,9 +27,8 @@
 #define DC_INTERFACE_H_
 
 #include "dc_types.h"
-/* TODO: We should not include audio_interface.h here. Maybe just define
- * struct audio_info here */
-#include "audio_interface.h"
+#include "dal_types.h"
+#include "audio_types.h"
 #include "logger_types.h"
 
 #define MAX_SINKS_PER_LINK 4

@@ -27,6 +27,7 @@
 #define __DAL_ADAPTER_SERVICE_H__
 
 /* Include */
+#include "dc_bios_types.h"
 #include "include/adapter_service_interface.h"
 #include "wireless_data_source.h"
 
@@ -35,13 +36,13 @@
  */
 struct gpio_service;
 struct asic_cap;
-struct dc_bios;
+
 
 /* Adapter service */
 struct adapter_service {
 	struct dc_context *ctx;
 	struct asic_capability *asic_cap;
-	struct bios_parser *bios_parser;/* TODO: remove it. replace by struct dc_bios *dcb; */
+	struct dc_bios *dcb;
 	struct gpio_service *gpio_service;
 	struct i2caux *i2caux;
 	struct wireless_data wireless_data;

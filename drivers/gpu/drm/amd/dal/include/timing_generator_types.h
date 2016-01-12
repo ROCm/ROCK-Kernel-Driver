@@ -28,6 +28,7 @@
 
 #include "include/grph_csc_types.h"
 
+struct dc_bios;
 
 /**
  *  These parameters are required as input when doing blanking/Unblanking
@@ -142,7 +143,7 @@ enum crtc_state {
 
 struct timing_generator {
 	struct timing_generator_funcs *funcs;
-	struct bios_parser *bp;
+	struct dc_bios *bp;
 	struct dc_context *ctx;
 };
 

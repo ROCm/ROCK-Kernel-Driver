@@ -24,6 +24,7 @@
  */
 
 #include "dal_services.h"
+#include "dc_bios_types.h"
 #include "dce110_stream_encoder.h"
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
@@ -282,7 +283,7 @@ static void dce110_update_hdmi_info_packet(
 bool dce110_stream_encoder_construct(
 	struct dce110_stream_encoder *enc110,
 	struct dc_context *ctx,
-	struct bios_parser *bp,
+	struct dc_bios *bp,
 	enum engine_id eng_id,
 	const struct dce110_stream_enc_offsets *offsets)
 {
@@ -411,7 +412,7 @@ void dce110_stream_encoder_hdmi_set_stream_attribute(
 	cntl.lanes_number = LANE_COUNT_FOUR;
 	cntl.color_depth = crtc_timing->display_color_depth;
 
-	if (dal_bios_parser_encoder_control(
+	if (enc110->base.bp->funcs->encoder_control(
 			enc110->base.bp, &cntl) != BP_RESULT_OK)
 		return;
 
@@ -592,7 +593,7 @@ void dce110_stream_encoder_dvi_set_stream_attribute(
 				LANE_COUNT_EIGHT : LANE_COUNT_FOUR;
 	cntl.color_depth = crtc_timing->display_color_depth;
 
-	if (dal_bios_parser_encoder_control(
+	if (enc110->base.bp->funcs->encoder_control(
 			enc110->base.bp, &cntl) != BP_RESULT_OK)
 		return;
 

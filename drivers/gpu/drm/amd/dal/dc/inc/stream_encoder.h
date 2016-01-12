@@ -9,10 +9,12 @@
 #include "include/encoder_types.h"
 #include "include/bios_parser_interface.h"
 
+struct dc_bios;
+
 struct stream_encoder {
 	struct stream_encoder_funcs *funcs;
 	struct dc_context *ctx;
-	struct bios_parser *bp;
+	struct dc_bios *bp;
 	enum engine_id id;
 };
 

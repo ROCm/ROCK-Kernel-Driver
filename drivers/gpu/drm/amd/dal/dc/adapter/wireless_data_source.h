@@ -33,7 +33,7 @@
  * Forward declaration
  */
 struct adapter_service;
-struct bios_parser;
+struct dc_bios;
 
 /* Wireless data init structure */
 struct wireless_init_data {
@@ -55,7 +55,7 @@ struct wireless_data {
 /*construct wireless data*/
 bool wireless_data_init(
 	struct wireless_data *data,
-	struct bios_parser *bp,
+	struct dc_bios *dcb,
 	struct wireless_init_data *init_data);
 
 uint8_t wireless_get_clocks_num(

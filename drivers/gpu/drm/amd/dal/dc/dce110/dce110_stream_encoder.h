@@ -44,7 +44,7 @@ struct dce110_stream_encoder {
 bool dce110_stream_encoder_construct(
 	struct dce110_stream_encoder *enc110,
 	struct dc_context *ctx,
-	struct bios_parser *bp,
+	struct dc_bios *bp,
 	enum engine_id eng_id,
 	const struct dce110_stream_enc_offsets *offsets);
 

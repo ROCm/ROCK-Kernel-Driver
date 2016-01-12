@@ -24,6 +24,7 @@
  */
 #include "dc_services.h"
 #include "dc.h"
+#include "dc_bios_types.h"
 #include "core_types.h"
 #include "core_status.h"
 #include "resource.h"
@@ -146,7 +147,7 @@ static void dce110_enable_display_pipe_clock_gating(
 static bool dce110_enable_display_power_gating(
 	struct dc_context *ctx,
 	uint8_t controller_id,
-	struct bios_parser *bp,
+	struct dc_bios *dcb,
 	enum pipe_gating_control power_gating)
 {
 	enum bp_result bp_result = BP_RESULT_OK;
@@ -161,8 +162,8 @@ static bool dce110_enable_display_power_gating(
 
 	if (!(power_gating == PIPE_GATING_CONTROL_INIT &&
 					(controller_id + 1) != CONTROLLER_ID_D0))
-		bp_result = dal_bios_parser_enable_disp_power_gating(
-						bp, controller_id + 1, cntl);
+		bp_result = dcb->funcs->enable_disp_power_gating(
+						dcb, controller_id + 1, cntl);
 
 	if (power_gating != PIPE_GATING_CONTROL_ENABLE)
 		init_pte(ctx);
@@ -235,12 +236,13 @@ static bool set_gamma_ramp(
 static enum dc_status bios_parser_crtc_source_select(
 		struct core_stream *stream)
 {
+	struct dc_bios *dcb;
 	/* call VBIOS table to set CRTC source for the HW
 	 * encoder block
 	 * note: video bios clears all FMT setting here. */
-
 	struct bp_crtc_source_select crtc_source_select = {0};
 	const struct core_sink *sink = stream->sink;
+
 	crtc_source_select.engine_id = stream->stream_enc->id;
 	crtc_source_select.controller_id = stream->controller_idx + 1;
 	/*TODO: Need to un-hardcode color depth, dp_audio and account for
@@ -249,14 +251,16 @@ static enum dc_status bios_parser_crtc_source_select(
 	crtc_source_select.signal = sink->public.sink_signal;
 	crtc_source_select.enable_dp_audio = false;
 	crtc_source_select.sink_signal = sink->public.sink_signal;
-	crtc_source_select.display_output_bit_depth
-		= PANEL_8BIT_COLOR;
+	crtc_source_select.display_output_bit_depth = PANEL_8BIT_COLOR;
 
-	if (BP_RESULT_OK != dal_bios_parser_crtc_source_select(
-		dal_adapter_service_get_bios_parser(sink->link->adapter_srv),
+	dcb = dal_adapter_service_get_bios_parser(sink->link->adapter_srv);
+
+	if (BP_RESULT_OK != dcb->funcs->crtc_source_select(
+		dcb,
 		&crtc_source_select)) {
 		return DC_ERROR_UNEXPECTED;
 	}
+
 	return DC_OK;
 }
 
@@ -625,9 +629,9 @@ static void set_blender_mode(
 static void update_bios_scratch_critical_state(struct adapter_service *as,
 		bool state)
 {
-	dal_bios_parser_set_scratch_critical_state(
-		dal_adapter_service_get_bios_parser(as),
-		state);
+	struct dc_bios *dcb = dal_adapter_service_get_bios_parser(as);
+
+	dcb->funcs->set_scratch_critical_state(dcb, state);
 }
 
 static void update_info_frame(struct core_stream *stream)
@@ -787,14 +791,14 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 	bool timing_changed = context->res_ctx.controller_ctx[controller_idx]
 			.flags.timing_changed;
 	enum color_space color_space;
-	struct bios_parser *bp;
+	struct dc_bios *dcb;
 
-	bp = dal_adapter_service_get_bios_parser(
+	dcb = dal_adapter_service_get_bios_parser(
 			context->res_ctx.pool.adapter_srv);
 
 	if (timing_changed) {
 		dce110_enable_display_power_gating(
-				stream->ctx, controller_idx, bp,
+				stream->ctx, controller_idx, dcb,
 				PIPE_GATING_CONTROL_DISABLE);
 
 		/* Must blank CRTC after disabling power gating and before any
@@ -961,10 +965,10 @@ static void disable_vga_and_power_gate_all_controllers(
 {
 	int i;
 	struct timing_generator *tg;
-	struct bios_parser *bp;
+	struct dc_bios *dcb;
 	struct dc_context *ctx;
 
-	bp = dal_adapter_service_get_bios_parser(
+	dcb = dal_adapter_service_get_bios_parser(
 			dc->res_pool.adapter_srv);
 
 	for (i = 0; i < dc->res_pool.controller_count; i++) {
@@ -977,7 +981,7 @@ static void disable_vga_and_power_gate_all_controllers(
 		 * powergating. */
 		dce110_enable_display_pipe_clock_gating(ctx,
 				true);
-		dce110_enable_display_power_gating(ctx, i+1, bp,
+		dce110_enable_display_power_gating(ctx, i+1, dcb,
 				PIPE_GATING_CONTROL_ENABLE);
 	}
 }
@@ -991,16 +995,15 @@ static void disable_vga_and_power_gate_all_controllers(
  */
 static void enable_accelerated_mode(struct dc *dc)
 {
-	struct bios_parser *bp;
+	struct dc_bios *dcb;
 
-	bp = dal_adapter_service_get_bios_parser(
-			dc->res_pool.adapter_srv);
+	dcb = dal_adapter_service_get_bios_parser(dc->res_pool.adapter_srv);
 
 	power_down_all_hw_blocks(dc);
 
 	disable_vga_and_power_gate_all_controllers(dc);
 
-	dal_bios_parser_set_scratch_acc_mode_change(bp);
+	dcb->funcs->set_scratch_acc_mode_change(dcb);
 }
 
 #if 0
@@ -1559,9 +1562,9 @@ static bool update_plane_address(
 static void reset_single_stream_hw_ctx(struct core_stream *stream,
 		struct validate_context *context)
 {
-	struct bios_parser *bp;
+	struct dc_bios *dcb;
 
-	bp = dal_adapter_service_get_bios_parser(
+	dcb = dal_adapter_service_get_bios_parser(
 			context->res_ctx.pool.adapter_srv);
 	if (stream->audio) {
 		dal_audio_disable_output(stream->audio,
@@ -1580,7 +1583,7 @@ static void reset_single_stream_hw_ctx(struct core_stream *stream,
 	disable_stereo_mixer(stream->ctx);
 	unreference_clock_source(&context->res_ctx, stream->clock_source);
 	dce110_enable_display_power_gating(
-			stream->ctx, stream->controller_idx, bp,
+			stream->ctx, stream->controller_idx, dcb,
 			PIPE_GATING_CONTROL_ENABLE);
 }
 

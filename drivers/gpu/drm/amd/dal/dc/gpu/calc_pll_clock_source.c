@@ -326,7 +326,7 @@ static bool calc_pll_clock_source_max_vco_construct(
 			init_data->bp == NULL)
 		return false;
 
-	if (dal_bios_parser_get_firmware_info(
+	if (init_data->bp->funcs->get_firmware_info(
 				init_data->bp,
 				&fw_info) != BP_RESULT_OK)
 		return false;

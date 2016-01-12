@@ -104,7 +104,7 @@ static struct timing_generator *dce110_timing_generator_create(
 static struct stream_encoder *dce110_stream_encoder_create(
 	enum engine_id eng_id,
 	struct dc_context *ctx,
-	struct bios_parser *bp,
+	struct dc_bios *bp,
 	const struct dce110_stream_enc_offsets *offsets)
 {
 	struct dce110_stream_encoder *enc110 =

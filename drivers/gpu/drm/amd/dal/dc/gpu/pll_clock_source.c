@@ -40,7 +40,7 @@ bool dal_pll_clock_source_power_down_pll(
 	bp_pixel_clock_params.flags.FORCE_PROGRAMMING_OF_PLL = 1;
 
 	/*Call ASICControl to process ATOMBIOS Exec table*/
-	bp_result = dal_bios_parser_set_pixel_clock(
+	bp_result = clk_src->bios_parser->funcs->set_pixel_clock(
 			clk_src->bios_parser,
 			&bp_pixel_clock_params);
 
@@ -102,7 +102,7 @@ bool dal_pll_clock_source_adjust_pix_clk(
 		display_pll_config = pix_clk_params->disp_pll_cfg;
 	bp_adjust_pixel_clock_params.
 		ss_enable = pix_clk_params->flags.ENABLE_SS;
-	bp_result = dal_bios_parser_adjust_pixel_clock(
+	bp_result = pll_clk_src->base.bios_parser->funcs->adjust_pixel_clock(
 			pll_clk_src->base.bios_parser,
 			&bp_adjust_pixel_clock_params);
 	if (bp_result == BP_RESULT_OK) {
@@ -131,10 +131,11 @@ bool dal_pll_clock_source_construct(
 			clk_src_init_data))
 		return false;
 
-	if (dal_bios_parser_get_firmware_info(
+	if (pll_clk_src->base.bios_parser->funcs->get_firmware_info(
 			pll_clk_src->base.bios_parser,
 			&fw_info) != BP_RESULT_OK)
 		return false;
+
 	pll_clk_src->ref_freq_khz = fw_info.pll_info.crystal_frequency;
 
 	return true;
