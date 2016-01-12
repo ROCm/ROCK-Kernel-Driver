@@ -39,6 +39,7 @@ struct encoder_init_data {
 	/* TODO: in DAL2, here was pointer to EventManagerInterface */
 	struct graphics_object_id encoder;
 	struct dc_context *ctx;
+	enum transmitter transmitter;
 };
 
 struct encoder_context {

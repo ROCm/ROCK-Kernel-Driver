@@ -51,6 +51,9 @@
 #define DCE110_DIG_FE_SOURCE_SELECT_DIGA 0x1
 #define DCE110_DIG_FE_SOURCE_SELECT_DIGB 0x2
 #define DCE110_DIG_FE_SOURCE_SELECT_DIGC 0x4
+#define DCE110_DIG_FE_SOURCE_SELECT_DIGD 0x08
+#define DCE110_DIG_FE_SOURCE_SELECT_DIGE 0x10
+#define DCE110_DIG_FE_SOURCE_SELECT_DIGF 0x20
 
 /* all values are in milliseconds */
 /* For eDP, after power-up/power/down,
@@ -85,90 +88,29 @@ enum {
 
 
 #define DIG_REG(reg)\
-	(reg + enc110->offsets.dig_offset)
+	(reg + enc110->offsets.dig)
 
 #define DP_REG(reg)\
-	(reg + enc110->offsets.dp_offset)
+	(reg + enc110->offsets.dp)
 
-static const struct dce110_link_enc_offsets reg_offsets[] = {
-{
-	.dig_offset = (mmDIG0_DIG_FE_CNTL - mmDIG0_DIG_FE_CNTL),
-	.dp_offset = (mmDP0_DP_SEC_CNTL - mmDP0_DP_SEC_CNTL)
-},
-{
-	.dig_offset = (mmDIG1_DIG_FE_CNTL - mmDIG0_DIG_FE_CNTL),
-	.dp_offset = (mmDP1_DP_SEC_CNTL - mmDP0_DP_SEC_CNTL)
-},
-{
-	.dig_offset = (mmDIG2_DIG_FE_CNTL - mmDIG0_DIG_FE_CNTL),
-	.dp_offset = (mmDP2_DP_SEC_CNTL - mmDP0_DP_SEC_CNTL)
-}
+static struct link_encoder_funcs dce110_lnk_enc_funcs = {
+	.validate_output_with_stream =
+		dce110_link_encoder_validate_output_with_stream,
+	.hw_init = dce110_link_encoder_hw_init,
+	.setup = dce110_link_encoder_setup,
+	.enable_tmds_output = dce110_link_encoder_enable_tmds_output,
+	.enable_dp_output = dce110_link_encoder_enable_dp_output,
+	.enable_dp_mst_output = dce110_link_encoder_enable_dp_mst_output,
+	.disable_output = dce110_link_encoder_disable_output,
+	.dp_set_lane_settings = dce110_link_encoder_dp_set_lane_settings,
+	.dp_set_phy_pattern = dce110_link_encoder_dp_set_phy_pattern,
+	.update_mst_stream_allocation_table =
+		dce110_link_encoder_update_mst_stream_allocation_table,
+	.set_lcd_backlight_level = dce110_link_encoder_set_lcd_backlight_level,
+	.backlight_control = dce110_link_encoder_edp_backlight_control,
+	.power_control = dce110_link_encoder_edp_power_control,
+	.connect_dig_be_to_fe = dce110_link_encoder_connect_dig_be_to_fe
 };
-
-static enum transmitter translate_encoder_to_transmitter(
-	struct graphics_object_id encoder)
-{
-	switch (encoder.id) {
-	case ENCODER_ID_INTERNAL_UNIPHY:
-		switch (encoder.enum_id) {
-		case ENUM_ID_1:
-			return TRANSMITTER_UNIPHY_A;
-		case ENUM_ID_2:
-			return TRANSMITTER_UNIPHY_B;
-		default:
-			return TRANSMITTER_UNKNOWN;
-		}
-	break;
-	case ENCODER_ID_INTERNAL_UNIPHY1:
-		switch (encoder.enum_id) {
-		case ENUM_ID_1:
-			return TRANSMITTER_UNIPHY_C;
-		case ENUM_ID_2:
-			return TRANSMITTER_UNIPHY_D;
-		default:
-			return TRANSMITTER_UNKNOWN;
-		}
-	break;
-	case ENCODER_ID_INTERNAL_UNIPHY2:
-		switch (encoder.enum_id) {
-		case ENUM_ID_1:
-			return TRANSMITTER_UNIPHY_E;
-		case ENUM_ID_2:
-			return TRANSMITTER_UNIPHY_F;
-		default:
-			return TRANSMITTER_UNKNOWN;
-		}
-	break;
-	case ENCODER_ID_INTERNAL_UNIPHY3:
-		switch (encoder.enum_id) {
-		case ENUM_ID_1:
-			return TRANSMITTER_UNIPHY_G;
-		default:
-			return TRANSMITTER_UNKNOWN;
-		}
-	break;
-	case ENCODER_ID_EXTERNAL_NUTMEG:
-		switch (encoder.enum_id) {
-		case ENUM_ID_1:
-			return TRANSMITTER_NUTMEG_CRT;
-		default:
-			return TRANSMITTER_UNKNOWN;
-		}
-	break;
-	case ENCODER_ID_EXTERNAL_TRAVIS:
-		switch (encoder.enum_id) {
-		case ENUM_ID_1:
-			return TRANSMITTER_TRAVIS_CRT;
-		case ENUM_ID_2:
-			return TRANSMITTER_TRAVIS_LCD;
-		default:
-			return TRANSMITTER_UNKNOWN;
-		}
-	break;
-	default:
-		return TRANSMITTER_UNKNOWN;
-	}
-}
 
 static enum bp_result link_transmitter_control(
 	struct dce110_link_encoder *enc110,
@@ -503,7 +445,7 @@ static void set_dp_phy_pattern_hbr2_compliance(
 
 	/* Setup DIG encoder in DP SST mode */
 
-	dce110_link_encoder_setup(&enc110->base, SIGNAL_TYPE_DISPLAY_PORT);
+	enc110->base.funcs->setup(&enc110->base, SIGNAL_TYPE_DISPLAY_PORT);
 
 	/* program correct panel mode*/
 	{
@@ -611,6 +553,12 @@ static uint8_t get_frontend_source(
 		return DCE110_DIG_FE_SOURCE_SELECT_DIGB;
 	case ENGINE_ID_DIGC:
 		return DCE110_DIG_FE_SOURCE_SELECT_DIGC;
+	case ENGINE_ID_DIGD:
+		return DCE110_DIG_FE_SOURCE_SELECT_DIGD;
+	case ENGINE_ID_DIGE:
+		return DCE110_DIG_FE_SOURCE_SELECT_DIGE;
+	case ENGINE_ID_DIGF:
+		return DCE110_DIG_FE_SOURCE_SELECT_DIGF;
 	default:
 		ASSERT_CRITICAL(false);
 		return DCE110_DIG_FE_SOURCE_SELECT_INVALID;
@@ -647,63 +595,6 @@ static bool is_panel_powered_on(struct dce110_link_encoder *enc110)
 			LVTMA_PWRSEQ_STATE, LVTMA_PWRSEQ_TARGET_STATE_R);
 
 	return ret == 1;
-}
-
-/*
- * @brief
- * eDP only. Control the power of the eDP panel.
- */
-static void link_encoder_edp_power_control(
-	struct dce110_link_encoder *enc110,
-	bool power_up)
-{
-	struct dc_context *ctx = enc110->base.ctx;
-	struct bp_transmitter_control cntl = { 0 };
-	enum bp_result bp_result;
-
-	if (dal_graphics_object_id_get_connector_id(enc110->base.connector) !=
-		CONNECTOR_ID_EDP) {
-		BREAK_TO_DEBUGGER();
-		return;
-	}
-
-	if ((power_up && !is_panel_powered_on(enc110)) ||
-		(!power_up && is_panel_powered_on(enc110))) {
-
-		/* Send VBIOS command to prompt eDP panel power */
-
-		dal_logger_write(ctx->logger,
-				LOG_MAJOR_HW_TRACE,
-				LOG_MINOR_HW_TRACE_RESUME_S3,
-				"%s: Panel Power action: %s\n",
-				__func__, (power_up ? "On":"Off"));
-
-		cntl.action = power_up ?
-			TRANSMITTER_CONTROL_POWER_ON :
-			TRANSMITTER_CONTROL_POWER_OFF;
-		cntl.transmitter = enc110->base.transmitter;
-		cntl.connector_obj_id = enc110->base.connector;
-		cntl.coherent = false;
-		cntl.lanes_number = LANE_COUNT_FOUR;
-		cntl.hpd_sel = enc110->base.hpd_source;
-
-		bp_result = link_transmitter_control(enc110, &cntl);
-
-		if (BP_RESULT_OK != bp_result) {
-
-			dal_logger_write(ctx->logger,
-					LOG_MAJOR_ERROR,
-					LOG_MINOR_HW_TRACE_RESUME_S3,
-					"%s: Panel Power bp_result: %d\n",
-					__func__, bp_result);
-		}
-	} else {
-		dal_logger_write(ctx->logger,
-				LOG_MAJOR_HW_TRACE,
-				LOG_MINOR_HW_TRACE_RESUME_S3,
-				"%s: Skipping Panel Power action: %s\n",
-				__func__, (power_up ? "On":"Off"));
-	}
 }
 
 /*
@@ -778,6 +669,66 @@ static void link_encoder_edp_wait_for_hpd_ready(
 	}
 }
 
+/*
+ * @brief
+ * eDP only. Control the power of the eDP panel.
+ */
+void dce110_link_encoder_edp_power_control(
+	struct link_encoder *enc,
+	bool power_up)
+{
+	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
+	struct dc_context *ctx = enc110->base.ctx;
+	struct bp_transmitter_control cntl = { 0 };
+	enum bp_result bp_result;
+
+	if (dal_graphics_object_id_get_connector_id(enc110->base.connector) !=
+		CONNECTOR_ID_EDP) {
+		BREAK_TO_DEBUGGER();
+		return;
+	}
+
+	if ((power_up && !is_panel_powered_on(enc110)) ||
+		(!power_up && is_panel_powered_on(enc110))) {
+
+		/* Send VBIOS command to prompt eDP panel power */
+
+		dal_logger_write(ctx->logger,
+				LOG_MAJOR_HW_TRACE,
+				LOG_MINOR_HW_TRACE_RESUME_S3,
+				"%s: Panel Power action: %s\n",
+				__func__, (power_up ? "On":"Off"));
+
+		cntl.action = power_up ?
+			TRANSMITTER_CONTROL_POWER_ON :
+			TRANSMITTER_CONTROL_POWER_OFF;
+		cntl.transmitter = enc110->base.transmitter;
+		cntl.connector_obj_id = enc110->base.connector;
+		cntl.coherent = false;
+		cntl.lanes_number = LANE_COUNT_FOUR;
+		cntl.hpd_sel = enc110->base.hpd_source;
+
+		bp_result = link_transmitter_control(enc110, &cntl);
+
+		if (BP_RESULT_OK != bp_result) {
+
+			dal_logger_write(ctx->logger,
+					LOG_MAJOR_ERROR,
+					LOG_MINOR_HW_TRACE_RESUME_S3,
+					"%s: Panel Power bp_result: %d\n",
+					__func__, bp_result);
+		}
+	} else {
+		dal_logger_write(ctx->logger,
+				LOG_MAJOR_HW_TRACE,
+				LOG_MINOR_HW_TRACE_RESUME_S3,
+				"%s: Skipping Panel Power action: %s\n",
+				__func__, (power_up ? "On":"Off"));
+	}
+
+	link_encoder_edp_wait_for_hpd_ready(enc110, true);
+}
+
 static void aux_initialize(
 	struct dce110_link_encoder *enc110)
 {
@@ -819,10 +770,11 @@ static bool is_panel_backlight_on(struct dce110_link_encoder *enc110)
  * @brief
  * eDP only. Control the backlight of the eDP panel
  */
-static void link_encoder_edp_backlight_control(
-	struct dce110_link_encoder *enc110,
+void dce110_link_encoder_edp_backlight_control(
+	struct link_encoder *enc,
 	bool enable)
 {
+	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
 	struct dc_context *ctx = enc110->base.ctx;
 	struct bp_transmitter_control cntl = { 0 };
 
@@ -987,9 +939,13 @@ static bool validate_hdmi_output(
 	uint32_t max_hdmi_pixel_clock)
 {
 	enum dc_color_depth max_deep_color = max_hdmi_deep_color;
-
 	/* expressed in KHz */
 	uint32_t pixel_clock = 0;
+
+	/*TODO: unhardcode*/
+	max_tmds_clk_from_edid_in_mhz = 0;
+	max_hdmi_deep_color = COLOR_DEPTH_121212;
+	max_hdmi_pixel_clock = 600000;
 
 	if (max_deep_color > enc110->base.features.max_deep_color)
 		max_deep_color = enc110->base.features.max_deep_color;
@@ -1101,12 +1057,14 @@ static bool validate_wireless_output(
 	return false;
 }
 
-static bool construct(
+bool dce110_link_encoder_construct(
 	struct dce110_link_encoder *enc110,
-	const struct encoder_init_data *init_data)
+	const struct encoder_init_data *init_data,
+	const struct dce110_link_enc_offsets *offsets)
 {
 	struct graphics_object_encoder_cap_info enc_cap_info = {0};
 
+	enc110->base.funcs = &dce110_lnk_enc_funcs;
 	enc110->base.ctx = init_data->ctx;
 	enc110->base.id = init_data->encoder;
 
@@ -1120,8 +1078,7 @@ static bool construct(
 
 	enc110->base.features.flags.raw = 0;
 
-	enc110->base.transmitter = translate_encoder_to_transmitter(
-		init_data->encoder);
+	enc110->base.transmitter = init_data->transmitter;
 
 	enc110->base.features.flags.bits.IS_AUDIO_CAPABLE = true;
 
@@ -1157,6 +1114,8 @@ static bool construct(
 	 * This will let DCE 8.1 share DCE 8.0 as much as possible
 	 */
 
+	enc110->offsets = *offsets;
+
 	switch (enc110->base.transmitter) {
 	case TRANSMITTER_UNIPHY_A:
 		enc110->base.preferred_engine = ENGINE_ID_DIGA;
@@ -1171,8 +1130,6 @@ static bool construct(
 		ASSERT_CRITICAL(false);
 		enc110->base.preferred_engine = ENGINE_ID_UNKNOWN;
 	}
-
-	enc110->offsets = reg_offsets[enc110->base.transmitter];
 
 	dal_logger_write(init_data->ctx->logger,
 			LOG_MAJOR_I2C_AUX,
@@ -1224,32 +1181,9 @@ static bool construct(
 	return true;
 }
 
-struct link_encoder *dce110_link_encoder_create(
-	const struct encoder_init_data *init)
-{
-	struct dce110_link_encoder *enc110 =
-		dc_service_alloc(init->ctx, sizeof(struct dce110_link_encoder));
-
-	if (!enc110)
-		return NULL;
-
-	if (construct(enc110, init))
-		return &enc110->base;
-
-	BREAK_TO_DEBUGGER();
-	dc_service_free(init->ctx, enc110);
-	return NULL;
-}
-
-void dce110_link_encoder_destroy(struct link_encoder **enc)
-{
-	dc_service_free((*enc)->ctx, TO_DCE110_LINK_ENC(*enc));
-	*enc = NULL;
-}
-
 bool dce110_link_encoder_validate_output_with_stream(
 	struct link_encoder *enc,
-	const struct core_stream *stream)
+	struct core_stream *stream)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
 	bool is_valid;
@@ -1329,11 +1263,7 @@ void dce110_link_encoder_hw_init(
 		ASSERT(result == BP_RESULT_OK);
 
 	} else if (enc110->base.connector.id == CONNECTOR_ID_EDP) {
-		link_encoder_edp_power_control(enc110, true);
-
-		link_encoder_edp_wait_for_hpd_ready(
-			enc110, true);
-
+		enc->funcs->power_control(&enc110->base, true);
 	}
 	aux_initialize(enc110);
 
@@ -1444,19 +1374,6 @@ void dce110_link_encoder_enable_dp_output(
 	struct bp_transmitter_control cntl = { 0 };
 	enum bp_result result;
 
-	if (enc110->base.connector.id == CONNECTOR_ID_EDP) {
-		/* power up eDP panel */
-
-		link_encoder_edp_power_control(enc110, true);
-
-		link_encoder_edp_wait_for_hpd_ready(enc110, true);
-
-		/* have to turn off the backlight
-		 * before power down eDP panel
-		 */
-		link_encoder_edp_backlight_control(enc110, true);
-	}
-
 	/* Enable the PHY */
 
 	/* number_of_lanes is used for pixel clock adjust,
@@ -1543,13 +1460,6 @@ void dce110_link_encoder_disable_output(
 	struct dc_context *ctx = enc110->base.ctx;
 	struct bp_transmitter_control cntl = { 0 };
 	enum bp_result result;
-
-	if (enc110->base.connector.id == CONNECTOR_ID_EDP) {
-		/* have to turn off the backlight
-		 * before power down eDP panel */
-		link_encoder_edp_backlight_control(
-				enc110, false);
-	}
 
 	if (!is_dig_enabled(enc110) &&
 		dal_adapter_service_should_optimize(
@@ -1653,7 +1563,7 @@ void dce110_link_encoder_dp_set_lane_settings(
 }
 
 /* set DP PHY test and training patterns */
-void dce110_link_encoder_set_dp_phy_pattern(
+void dce110_link_encoder_dp_set_phy_pattern(
 	struct link_encoder *enc,
 	const struct encoder_set_dp_phy_pattern_param *param)
 {

@@ -79,6 +79,21 @@ static const struct dce110_stream_enc_offsets dce110_str_enc_offsets[] = {
 	}
 };
 
+static const struct dce110_link_enc_offsets dce110_lnk_enc_reg_offsets[] = {
+	{
+		.dig = (mmDIG0_DIG_FE_CNTL - mmDIG_FE_CNTL),
+		.dp  = (mmDP0_DP_SEC_CNTL - mmDP_SEC_CNTL)
+	},
+	{
+		.dig = (mmDIG1_DIG_FE_CNTL - mmDIG_FE_CNTL),
+		.dp  = (mmDP1_DP_SEC_CNTL - mmDP_SEC_CNTL)
+	},
+	{
+		.dig = (mmDIG2_DIG_FE_CNTL - mmDIG_FE_CNTL),
+		.dp  = (mmDP2_DP_SEC_CNTL - mmDP_SEC_CNTL)
+	}
+};
+
 static const struct dce110_mem_input_reg_offsets dce110_mi_reg_offsets[] = {
 	{
 		.dcp = (mmDCP0_GRPH_CONTROL - mmGRPH_CONTROL),
@@ -237,6 +252,34 @@ static struct input_pixel_processor *dce110_ipp_create(
 	BREAK_TO_DEBUGGER();
 	dc_service_free(ctx, ipp);
 	return NULL;
+}
+
+struct link_encoder *dce110_link_encoder_create(
+	const struct encoder_init_data *enc_init_data)
+{
+	struct dce110_link_encoder *enc110 =
+		dc_service_alloc(
+			enc_init_data->ctx,
+			sizeof(struct dce110_link_encoder));
+
+	if (!enc110)
+		return NULL;
+
+	if (dce110_link_encoder_construct(
+			enc110,
+			enc_init_data,
+			&dce110_lnk_enc_reg_offsets[enc_init_data->transmitter]))
+		return &enc110->base;
+
+	BREAK_TO_DEBUGGER();
+	dc_service_free(enc_init_data->ctx, enc110);
+	return NULL;
+}
+
+void dce110_link_encoder_destroy(struct link_encoder **enc)
+{
+	dc_service_free((*enc)->ctx, TO_DCE110_LINK_ENC(*enc));
+	*enc = NULL;
 }
 
 bool dce110_construct_resource_pool(
@@ -667,7 +710,7 @@ static enum dc_status validate_mapped_resource(
 			if (status != DC_OK)
 				return status;
 
-			if (!dce110_link_encoder_validate_output_with_stream(
+			if (!link->link_enc->funcs->validate_output_with_stream(
 					link->link_enc,
 					stream))
 				return DC_FAIL_ENC_VALIDATE;

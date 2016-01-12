@@ -83,39 +83,6 @@ struct hw_sequencer_funcs {
 
 	void (*encoder_destroy)(struct link_encoder **enc);
 
-	void (*encoder_hw_init)(
-					struct link_encoder *enc);
-
-	void (*encoder_enable_tmds_output)(
-					struct link_encoder *enc,
-					enum clock_source_id clock_source,
-					enum dc_color_depth color_depth,
-					bool hdmi,
-					bool dual_link,
-					uint32_t pixel_clock);
-
-	void (*encoder_enable_dp_output)(
-				struct link_encoder *enc,
-				const struct link_settings *link_settings,
-				enum clock_source_id clock_source);
-
-	void (*encoder_enable_dp_mst_output)(
-				struct link_encoder *enc,
-				const struct link_settings *link_settings,
-				enum clock_source_id clock_source);
-
-	void (*encoder_disable_output)(
-					struct link_encoder *enc,
-					enum signal_type signal);
-
-	void (*encoder_set_dp_phy_pattern)(
-			struct link_encoder *enc,
-			const struct encoder_set_dp_phy_pattern_param *param);
-
-	void (*encoder_dp_set_lane_settings)(
-			struct link_encoder *enc,
-			const struct link_training_settings *link_settings);
-
 	/* backlight control */
 	void (*encoder_set_lcd_backlight_level)(struct link_encoder *enc,
 					uint32_t level);
@@ -161,10 +128,6 @@ struct hw_sequencer_funcs {
 
 	void (*disable_stream)(
 					struct core_stream *stream);
-
-	void (*update_mst_stream_allocation_table)(
-					struct link_encoder *enc,
-					const struct dp_mst_stream_allocation_table *table);
 
 	void (*set_mst_bandwidth)(
 					struct stream_encoder *enc,

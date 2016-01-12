@@ -51,16 +51,17 @@
 #define CRTC_OVERSCAN_COLOR_BLACK_COLOR_R_RGB_LIMITED_RANGE 0X40
 
 struct dce110_timing_generator_offsets {
-	uint32_t crtc;
-	uint32_t dcp;
+	int32_t crtc;
+	int32_t dcp;
 
 	/* DCE80 use only */
-	uint32_t dmif;
+	int32_t dmif;
 };
 
 struct dce110_timing_generator {
 	struct timing_generator base;
 	struct dce110_timing_generator_offsets offsets;
+	struct dce110_timing_generator_offsets derived_offsets;
 
 	enum controller_id controller_id;
 
