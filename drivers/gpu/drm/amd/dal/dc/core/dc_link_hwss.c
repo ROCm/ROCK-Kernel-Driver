@@ -56,16 +56,24 @@ void dp_enable_link_phy(
 	enum signal_type signal,
 	const struct link_settings *link_settings)
 {
-	if (dc_is_dp_sst_signal(signal))
-		link->dc->hwss.encoder_enable_dp_output(
-						link->link_enc,
+	struct link_encoder *link_enc = link->link_enc;
+
+	if (dc_is_dp_sst_signal(signal)) {
+		if (signal == SIGNAL_TYPE_EDP) {
+			link_enc->funcs->power_control(link_enc, true);
+			link_enc->funcs->backlight_control(link_enc, true);
+		}
+
+		link_enc->funcs->enable_dp_output(
+						link_enc,
 						link_settings,
 						CLOCK_SOURCE_ID_EXTERNAL);
-	else
-		link->dc->hwss.encoder_enable_dp_mst_output(
-						link->link_enc,
+	} else {
+		link_enc->funcs->enable_dp_mst_output(
+						link_enc,
 						link_settings,
 						CLOCK_SOURCE_ID_EXTERNAL);
+	}
 
 	dp_receiver_power_ctrl(link, true);
 }
@@ -75,7 +83,10 @@ void dp_disable_link_phy(struct core_link *link, enum signal_type signal)
 	if (!link->wa_flags.dp_keep_receiver_powered)
 		dp_receiver_power_ctrl(link, false);
 
-	link->dc->hwss.encoder_disable_output(link->link_enc, signal);
+	if (signal == SIGNAL_TYPE_EDP)
+		link->link_enc->funcs->backlight_control(link->link_enc, false);
+
+	link->link_enc->funcs->disable_output(link->link_enc, signal);
 
 	/* Clear current link setting.*/
 	dc_service_memset(&link->cur_link_settings, 0,
@@ -118,7 +129,7 @@ bool dp_set_hw_training_pattern(
 	pattern_param.custom_pattern_size = 0;
 	pattern_param.dp_panel_mode = dp_get_panel_mode(link);
 
-	link->ctx->dc->hwss.encoder_set_dp_phy_pattern(encoder, &pattern_param);
+	encoder->funcs->dp_set_phy_pattern(encoder, &pattern_param);
 
 	return true;
 }
@@ -131,7 +142,7 @@ void dp_set_hw_lane_settings(
 	struct link_encoder *encoder = link->link_enc;
 
 	/* call Encoder to set lane settings */
-	link->ctx->dc->hwss.encoder_dp_set_lane_settings(encoder, link_settings);
+	encoder->funcs->dp_set_lane_settings(encoder, link_settings);
 }
 
 enum dp_panel_mode dp_get_panel_mode(struct core_link *link)
@@ -186,5 +197,5 @@ void dp_set_hw_test_pattern(
 	pattern_param.custom_pattern_size = 0;
 	pattern_param.dp_panel_mode = dp_get_panel_mode(link);
 
-	link->ctx->dc->hwss.encoder_set_dp_phy_pattern(encoder, &pattern_param);
+	encoder->funcs->dp_set_phy_pattern(encoder, &pattern_param);
 }

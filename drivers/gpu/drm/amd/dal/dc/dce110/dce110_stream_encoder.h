@@ -32,13 +32,14 @@
 	container_of(stream_encoder, struct dce110_stream_encoder, base)
 
 struct dce110_stream_enc_offsets {
-	uint32_t dig;
-	uint32_t dp;
+	int32_t dig;
+	int32_t dp;
 };
 
 struct dce110_stream_encoder {
 	struct stream_encoder base;
 	struct dce110_stream_enc_offsets offsets;
+	struct dce110_stream_enc_offsets derived_offsets;
 };
 
 bool dce110_stream_encoder_construct(

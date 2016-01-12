@@ -32,8 +32,8 @@
 	container_of(link_encoder, struct dce110_link_encoder, base)
 
 struct dce110_link_enc_offsets {
-	uint32_t dig_offset;
-	uint32_t dp_offset;
+	int32_t dig;
+	int32_t dp;
 };
 
 struct dce110_link_encoder {
@@ -41,14 +41,14 @@ struct dce110_link_encoder {
 	struct dce110_link_enc_offsets offsets;
 };
 
-struct link_encoder *dce110_link_encoder_create(
-	const struct encoder_init_data *init);
-
-void dce110_link_encoder_destroy(struct link_encoder **enc);
+bool dce110_link_encoder_construct(
+	struct dce110_link_encoder *enc110,
+	const struct encoder_init_data *init_data,
+	const struct dce110_link_enc_offsets *offsets);
 
 bool dce110_link_encoder_validate_output_with_stream(
 	struct link_encoder *enc,
-	const struct core_stream *stream);
+	struct core_stream *stream);
 
 /****************** HW programming ************************/
 
@@ -93,7 +93,7 @@ void dce110_link_encoder_dp_set_lane_settings(
 	struct link_encoder *enc,
 	const struct link_training_settings *link_settings);
 
-void dce110_link_encoder_set_dp_phy_pattern(
+void dce110_link_encoder_dp_set_phy_pattern(
 	struct link_encoder *enc,
 	const struct encoder_set_dp_phy_pattern_param *param);
 
@@ -105,6 +105,14 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 void dce110_link_encoder_set_lcd_backlight_level(
 	struct link_encoder *enc,
 	uint32_t level);
+
+void dce110_link_encoder_edp_backlight_control(
+	struct link_encoder *enc,
+	bool enable);
+
+void dce110_link_encoder_edp_power_control(
+	struct link_encoder *enc,
+	bool power_up);
 
 void dce110_link_encoder_connect_dig_be_to_fe(
 	struct link_encoder *enc,

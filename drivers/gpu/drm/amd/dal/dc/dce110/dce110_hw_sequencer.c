@@ -46,10 +46,10 @@
 #include "dce/dce_11_0_sh_mask.h"
 
 struct dce110_hw_seq_reg_offsets {
-	uint32_t dcfe_offset;
-	uint32_t blnd_offset;
-	uint32_t crtc_offset;
-	uint32_t dcp_offset;
+	uint32_t dcfe;
+	uint32_t blnd;
+	uint32_t crtc;
+	uint32_t dcp;
 };
 
 enum crtc_stereo_mixer_mode {
@@ -99,36 +99,36 @@ enum {
 
 static const struct dce110_hw_seq_reg_offsets reg_offsets[] = {
 {
-	.dcfe_offset = (mmDCFE0_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.blnd_offset = (mmBLND0_BLND_CONTROL - mmBLND0_BLND_CONTROL),
-	.crtc_offset = (mmCRTC0_CRTC_GSL_CONTROL - mmCRTC0_CRTC_GSL_CONTROL),
-	.dcp_offset = (mmDCP0_DVMM_PTE_CONTROL - mmDCP0_DVMM_PTE_CONTROL),
+	.dcfe = (mmDCFE0_DCFE_MEM_PWR_CTRL - mmDCFE_MEM_PWR_CTRL),
+	.blnd = (mmBLND0_BLND_CONTROL - mmBLND_CONTROL),
+	.crtc = (mmCRTC0_CRTC_GSL_CONTROL - mmCRTC_GSL_CONTROL),
+	.dcp = (mmDCP0_DVMM_PTE_CONTROL - mmDVMM_PTE_CONTROL),
 },
 {
-	.dcfe_offset = (mmDCFE1_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.blnd_offset = (mmBLND1_BLND_CONTROL - mmBLND0_BLND_CONTROL),
-	.crtc_offset = (mmCRTC1_CRTC_GSL_CONTROL - mmCRTC0_CRTC_GSL_CONTROL),
-	.dcp_offset = (mmDCP1_DVMM_PTE_CONTROL - mmDCP0_DVMM_PTE_CONTROL),
+	.dcfe = (mmDCFE1_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
+	.blnd = (mmBLND1_BLND_CONTROL - mmBLND0_BLND_CONTROL),
+	.crtc = (mmCRTC1_CRTC_GSL_CONTROL - mmCRTC0_CRTC_GSL_CONTROL),
+	.dcp = (mmDCP1_DVMM_PTE_CONTROL - mmDCP0_DVMM_PTE_CONTROL),
 },
 {
-	.dcfe_offset = (mmDCFE2_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.blnd_offset = (mmBLND2_BLND_CONTROL - mmBLND0_BLND_CONTROL),
-	.crtc_offset = (mmCRTC2_CRTC_GSL_CONTROL - mmCRTC0_CRTC_GSL_CONTROL),
-	.dcp_offset = (mmDCP2_DVMM_PTE_CONTROL - mmDCP0_DVMM_PTE_CONTROL),
+	.dcfe = (mmDCFE2_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
+	.blnd = (mmBLND2_BLND_CONTROL - mmBLND0_BLND_CONTROL),
+	.crtc = (mmCRTC2_CRTC_GSL_CONTROL - mmCRTC0_CRTC_GSL_CONTROL),
+	.dcp = (mmDCP2_DVMM_PTE_CONTROL - mmDCP0_DVMM_PTE_CONTROL),
 }
 };
 
 #define HW_REG_DCFE(reg, id)\
-	(reg + reg_offsets[id].dcfe_offset)
+	(reg + reg_offsets[id].dcfe)
 
 #define HW_REG_BLND(reg, id)\
-	(reg + reg_offsets[id].blnd_offset)
+	(reg + reg_offsets[id].blnd)
 
 #define HW_REG_CRTC(reg, id)\
-	(reg + reg_offsets[id].crtc_offset)
+	(reg + reg_offsets[id].crtc)
 
 #define HW_REG_DCP(reg, id)\
-	(reg + reg_offsets[id].dcp_offset)
+	(reg + reg_offsets[id].dcp)
 
 
 static void init_pte(struct dc_context *ctx);
@@ -689,7 +689,7 @@ static void enable_stream(struct core_stream *stream)
 	 * connect DIG back_end to front_end while enable_stream and
 	 * disconnect them during disable_stream
 	 * BY this, it is logic clean to separate stream and link */
-	dce110_link_encoder_connect_dig_be_to_fe(link->link_enc,
+	 link->link_enc->funcs->connect_dig_be_to_fe(link->link_enc,
 			stream->stream_enc->id, true);
 
 }
@@ -722,7 +722,7 @@ static void disable_stream(struct core_stream *stream)
 	if (dc_is_dp_signal(stream->signal))
 		stream->stream_enc->funcs->dp_blank(stream->stream_enc);
 
-	dce110_link_encoder_connect_dig_be_to_fe(
+	link->link_enc->funcs->connect_dig_be_to_fe(
 			link->link_enc,
 			stream->stream_enc->id,
 			false);
@@ -854,7 +854,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 	program_fmt(opp, &stream->fmt_bit_depth, &stream->clamping);
 
 	if (stream->signal != SIGNAL_TYPE_VIRTUAL)
-		dce110_link_encoder_setup(
+		stream->sink->link->link_enc->funcs->setup(
 			stream->sink->link->link_enc,
 			stream->signal);
 
@@ -921,7 +921,7 @@ static void power_down_encoders(struct dc *dc)
 
 	for (i = 0; i < dc->link_count; i++) {
 		if (dc->links[i]->public.connector_signal != SIGNAL_TYPE_VIRTUAL)
-			dce110_link_encoder_disable_output(
+			dc->links[i]->link_enc->funcs->disable_output(
 				dc->links[i]->link_enc, SIGNAL_TYPE_NONE);
 	}
 }
@@ -1758,28 +1758,19 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.disable_vga = disable_vga,
 	.encoder_create = dce110_link_encoder_create,
 	.encoder_destroy = dce110_link_encoder_destroy,
-	.encoder_hw_init = dce110_link_encoder_hw_init,
-	.encoder_enable_tmds_output = dce110_link_encoder_enable_tmds_output,
-	.encoder_enable_dp_output = dce110_link_encoder_enable_dp_output,
-	.encoder_enable_dp_mst_output =
-			dce110_link_encoder_enable_dp_mst_output,
-	.encoder_disable_output = dce110_link_encoder_disable_output,
-	.encoder_set_dp_phy_pattern = dce110_link_encoder_set_dp_phy_pattern,
-	.encoder_dp_set_lane_settings = dce110_link_encoder_dp_set_lane_settings,
-	.encoder_set_lcd_backlight_level = dce110_link_encoder_set_lcd_backlight_level,
 	.clock_gating_power_up = dal_dc_clock_gating_dce110_power_up,
 	.transform_power_up = dce110_transform_power_up,
 	.construct_resource_pool = dce110_construct_resource_pool,
 	.destruct_resource_pool = dce110_destruct_resource_pool,
 	.validate_with_context = dce110_validate_with_context,
 	.validate_bandwidth = dce110_validate_bandwidth,
-	.enable_display_pipe_clock_gating = dce110_enable_display_pipe_clock_gating,
+	.enable_display_pipe_clock_gating =
+		dce110_enable_display_pipe_clock_gating,
 	.enable_display_power_gating = dce110_enable_display_power_gating,
 	.program_bw = dce110_program_bw,
 	.enable_stream = enable_stream,
 	.disable_stream = disable_stream,
-	.update_mst_stream_allocation_table = dce110_link_encoder_update_mst_stream_allocation_table,
-	.set_mst_bandwidth = set_mst_bandwidth
+	.set_mst_bandwidth = set_mst_bandwidth,
 };
 
 bool dce110_hw_sequencer_construct(struct dc *dc)

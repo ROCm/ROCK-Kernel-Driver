@@ -51,5 +51,10 @@ enum dc_status dce110_validate_bandwidth(
 		const struct dc *dc,
 		struct validate_context *context);
 
+struct link_encoder *dce110_link_encoder_create(
+	const struct encoder_init_data *enc_init_data);
+
+void dce110_link_encoder_destroy(struct link_encoder **enc);
+
 #endif /* __DC_RESOURCE_DCE110_H__ */
 

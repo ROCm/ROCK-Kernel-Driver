@@ -817,6 +817,71 @@ static enum channel_id get_ddc_line(struct core_link *link, struct adapter_servi
 	return channel;
 }
 
+static enum transmitter translate_encoder_to_transmitter(
+	struct graphics_object_id encoder)
+{
+	switch (encoder.id) {
+	case ENCODER_ID_INTERNAL_UNIPHY:
+		switch (encoder.enum_id) {
+		case ENUM_ID_1:
+			return TRANSMITTER_UNIPHY_A;
+		case ENUM_ID_2:
+			return TRANSMITTER_UNIPHY_B;
+		default:
+			return TRANSMITTER_UNKNOWN;
+		}
+	break;
+	case ENCODER_ID_INTERNAL_UNIPHY1:
+		switch (encoder.enum_id) {
+		case ENUM_ID_1:
+			return TRANSMITTER_UNIPHY_C;
+		case ENUM_ID_2:
+			return TRANSMITTER_UNIPHY_D;
+		default:
+			return TRANSMITTER_UNKNOWN;
+		}
+	break;
+	case ENCODER_ID_INTERNAL_UNIPHY2:
+		switch (encoder.enum_id) {
+		case ENUM_ID_1:
+			return TRANSMITTER_UNIPHY_E;
+		case ENUM_ID_2:
+			return TRANSMITTER_UNIPHY_F;
+		default:
+			return TRANSMITTER_UNKNOWN;
+		}
+	break;
+	case ENCODER_ID_INTERNAL_UNIPHY3:
+		switch (encoder.enum_id) {
+		case ENUM_ID_1:
+			return TRANSMITTER_UNIPHY_G;
+		default:
+			return TRANSMITTER_UNKNOWN;
+		}
+	break;
+	case ENCODER_ID_EXTERNAL_NUTMEG:
+		switch (encoder.enum_id) {
+		case ENUM_ID_1:
+			return TRANSMITTER_NUTMEG_CRT;
+		default:
+			return TRANSMITTER_UNKNOWN;
+		}
+	break;
+	case ENCODER_ID_EXTERNAL_TRAVIS:
+		switch (encoder.enum_id) {
+		case ENUM_ID_1:
+			return TRANSMITTER_TRAVIS_CRT;
+		case ENUM_ID_2:
+			return TRANSMITTER_TRAVIS_LCD;
+		default:
+			return TRANSMITTER_UNKNOWN;
+		}
+	break;
+	default:
+		return TRANSMITTER_UNKNOWN;
+	}
+}
+
 
 static bool construct(
 	struct core_link *link,
@@ -921,6 +986,8 @@ static bool construct(
 	enc_init_data.connector = link->link_id;
 	enc_init_data.channel = get_ddc_line(link, as);
 	enc_init_data.hpd_source = get_hpd_line(link, as);
+	enc_init_data.transmitter =
+			translate_encoder_to_transmitter(enc_init_data.encoder);
 	link->link_enc = dc_ctx->dc->hwss.encoder_create(&enc_init_data);
 
 	if( link->link_enc == NULL) {
@@ -1146,8 +1213,8 @@ static void enable_link_hdmi(struct core_stream *stream)
 	dc_service_memset(&stream->sink->link->cur_link_settings, 0,
 			sizeof(struct link_settings));
 
-	link->ctx->dc->hwss.encoder_enable_tmds_output(
-			stream->sink->link->link_enc,
+	link->link_enc->funcs->enable_tmds_output(
+			link->link_enc,
 			dal_clock_source_get_id(stream->clock_source),
 			stream->public.timing.display_color_depth,
 			stream->signal == SIGNAL_TYPE_HDMI_TYPE_A,
@@ -1198,8 +1265,6 @@ static enum dc_status enable_link(struct core_stream *stream)
 
 static void disable_link(struct core_stream *stream)
 {
-	struct dc *dc = stream->ctx->dc;
-
 	/* TODO  dp_set_hw_test_pattern */
 
 	/* here we need to specify that encoder output settings
@@ -1217,8 +1282,10 @@ static void disable_link(struct core_stream *stream)
 					stream->sink->link, stream);
 		}
 	} else {
-		dc->hwss.encoder_disable_output(
-				stream->sink->link->link_enc, stream->signal);
+		struct link_encoder *encoder =
+				stream->sink->link->link_enc;
+
+		encoder->funcs->disable_output(encoder, stream->signal);
 	}
 }
 
@@ -1249,14 +1316,14 @@ enum dc_status dc_link_validate_mode_timing(
 
 bool dc_link_set_backlight_level(const struct dc_link *public, uint32_t level)
 {
-	struct core_link *protected = DC_LINK_TO_CORE(public);
-	struct dc_context *ctx = protected->ctx;
+	struct core_link *link = DC_LINK_TO_CORE(public);
+	struct dc_context *ctx = link->ctx;
 
 	dal_logger_write(ctx->logger, LOG_MAJOR_BACKLIGHT,
 			LOG_MINOR_BACKLIGHT_INTERFACE,
 			"New Backlight level: %d (0x%X)\n", level, level);
 
-	ctx->dc->hwss.encoder_set_lcd_backlight_level(protected->link_enc, level);
+	link->link_enc->funcs->set_lcd_backlight_level(link->link_enc, level);
 
 	return true;
 }
@@ -1383,7 +1450,7 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 		return DC_OK;
 
 	/* program DP source TX for payload */
-	dc->hwss.update_mst_stream_allocation_table(
+	link_encoder->funcs->update_mst_stream_allocation_table(
 		link_encoder,
 		&proposed_table);
 
@@ -1468,7 +1535,7 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 		proposed_table.stream_allocations[i].slot_count);
 	}
 
-	dc->hwss.update_mst_stream_allocation_table(
+	link_encoder->funcs->update_mst_stream_allocation_table(
 		link_encoder,
 		&proposed_table);
 

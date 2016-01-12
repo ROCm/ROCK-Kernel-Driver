@@ -175,7 +175,7 @@ static void init_hw(struct dc *dc)
 		 * default signal on connector). */
 		struct core_link *link = dc->links[i];
 		if (link->public.connector_signal != SIGNAL_TYPE_VIRTUAL)
-			dc->hwss.encoder_hw_init(link->link_enc);
+			link->link_enc->funcs->hw_init(link->link_enc);
 	}
 
 	for(i = 0; i < dc->res_pool.controller_count; i++) {
