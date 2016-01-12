@@ -451,20 +451,6 @@ static int dm_set_powergating_state(void *handle,
 /* Prototypes of private functions */
 static int dm_early_init(void* handle);
 
-static void detect_on_all_dc_links(struct amdgpu_display_manager *dm)
-{
-	uint32_t i;
-	const struct dc_link *dc_link;
-	struct dc_caps caps = { 0 };
-
-	dc_get_caps(dm->dc, &caps);
-
-	for (i = 0; i < caps.max_links; i++) {
-		dc_link = dc_get_link_at_index(dm->dc, i);
-		dc_link_detect(dc_link, false);
-	}
-}
-
 static void hotplug_notify_work_func(struct work_struct *work)
 {
 	struct amdgpu_display_manager *dm = container_of(work, struct amdgpu_display_manager, mst_hotplug_work);
@@ -663,11 +649,78 @@ static int dm_hw_fini(void *handle)
 	return 0;
 }
 
+static int dm_display_suspend(struct drm_device *ddev)
+{
+	struct drm_mode_config *config = &ddev->mode_config;
+	struct drm_modeset_acquire_ctx *ctx = config->acquire_ctx;
+	struct drm_atomic_state *state;
+	struct drm_crtc *crtc;
+	unsigned crtc_mask = 0;
+	int ret = 0;
+
+	if (WARN_ON(!ctx))
+		return 0;
+
+	lockdep_assert_held(&ctx->ww_ctx);
+
+	state = drm_atomic_state_alloc(ddev);
+	if (WARN_ON(!state))
+		return -ENOMEM;
+
+	state->acquire_ctx = ctx;
+	state->allow_modeset = true;
+
+	/* Set all active crtcs to inactive, to turn off displays*/
+	list_for_each_entry(crtc, &ddev->mode_config.crtc_list, head) {
+		struct drm_crtc_state *crtc_state =
+			drm_atomic_get_crtc_state(state, crtc);
+
+		ret = PTR_ERR_OR_ZERO(crtc_state);
+		if (ret)
+			goto free;
+
+		if (!crtc_state->active)
+			continue;
+
+		crtc_state->active = false;
+		crtc_mask |= (1 << drm_crtc_index(crtc));
+	}
+
+	if (crtc_mask) {
+		ret = drm_atomic_commit(state);
+
+		/* In case of failure, revert everything we did*/
+		if (!ret) {
+			list_for_each_entry(crtc, &ddev->mode_config.crtc_list, head)
+				if (crtc_mask & (1 << drm_crtc_index(crtc)))
+					crtc->state->active = true;
+
+			return ret;
+		}
+	}
+
+free:
+	if (ret) {
+		DRM_ERROR("Suspending crtc's failed with %i\n", ret);
+		drm_atomic_state_free(state);
+		return ret;
+	}
+
+	return 0;
+}
 static int dm_suspend(void *handle)
 {
 	struct amdgpu_device *adev = handle;
 	struct amdgpu_display_manager *dm = &adev->dm;
-	struct drm_crtc *crtc;
+	struct drm_device *ddev = adev->ddev;
+	int ret = 0;
+
+	drm_modeset_lock_all(ddev);
+	ret = dm_display_suspend(ddev);
+	drm_modeset_unlock_all(ddev);
+
+	if (ret)
+		goto fail;
 
 	dc_set_power_state(
 		dm->dc,
@@ -675,32 +728,95 @@ static int dm_suspend(void *handle)
 		DC_VIDEO_POWER_SUSPEND);
 
 	amdgpu_dm_irq_suspend(adev);
+fail:
+	return ret;
+}
 
-	list_for_each_entry(crtc, &dm->ddev->mode_config.crtc_list, head) {
-		crtc->mode.clock = 0;
+static int dm_display_resume(struct drm_device *ddev)
+{
+	int ret = 0;
+	struct drm_connector *connector;
+
+	struct drm_atomic_state *state = drm_atomic_state_alloc(ddev);
+	struct drm_plane *plane;
+	struct drm_crtc *crtc;
+
+	if (!state)
+		return ENOMEM;
+
+	state->acquire_ctx = ddev->mode_config.acquire_ctx;
+
+	/* Construct an atomic state to restore previous display setting*/
+	/* Attach crtcs to drm_atomic_state*/
+	list_for_each_entry(crtc, &ddev->mode_config.crtc_list, head) {
+		struct drm_crtc_state *crtc_state =
+			drm_atomic_get_crtc_state(state, crtc);
+
+		ret = PTR_ERR_OR_ZERO(crtc_state);
+		if (ret)
+			goto err;
+
+		/* force a restore */
+		crtc_state->mode_changed = true;
 	}
 
-	return 0;
+	/* Attach planes to drm_atomic_state*/
+	list_for_each_entry(plane, &ddev->mode_config.plane_list, head) {
+		ret = PTR_ERR_OR_ZERO(drm_atomic_get_plane_state(state, plane));
+		if (ret)
+			goto err;
+	}
+
+	/* Attach connectors to drm_atomic_state*/
+	list_for_each_entry(connector, &ddev->mode_config.connector_list, head) {
+		ret = PTR_ERR_OR_ZERO(drm_atomic_get_connector_state(state, connector));
+		if (ret)
+			goto err;
+	}
+
+	/* Call commit internally with the state we just constructed */
+	ret = drm_atomic_commit(state);
+	if (!ret)
+		return 0;
+
+err:
+	DRM_ERROR("Restoring old state failed with %i\n", ret);
+	drm_atomic_state_free(state);
+
+	return ret;
 }
 
 static int dm_resume(void *handle)
 {
-	int ret = 0;
 	struct amdgpu_device *adev = handle;
+	struct drm_device *ddev = adev->ddev;
 	struct amdgpu_display_manager *dm = &adev->dm;
+	struct amdgpu_connector *aconnector;
+	struct drm_connector *connector;
+	int ret = 0;
 
+	/* power on hardware */
 	dc_set_power_state(
 		dm->dc,
 		DC_ACPI_CM_POWER_STATE_D0,
 		DC_VIDEO_POWER_ON);
 
-	amdgpu_dm_irq_resume(adev);
-
+	/* program HPD filter*/
 	dc_resume(dm->dc);
+	/* resume IRQ */
+	amdgpu_dm_irq_resume(adev);
+	/* Do detection*/
+	list_for_each_entry(connector,
+			&ddev->mode_config.connector_list, head) {
+		aconnector = to_amdgpu_connector(connector);
+		dc_link_detect(aconnector->dc_link, false);
+		aconnector->dc_sink = NULL;
+		amdgpu_dm_update_connector_after_detect(aconnector);
+	}
 
-	detect_on_all_dc_links(dm);
-
-	drm_mode_config_reset(adev->ddev);
+	drm_modeset_lock_all(ddev);
+	ret = dm_display_resume(ddev);
+	drm_modeset_unlock_all(ddev);
 
 	return ret;
 }
