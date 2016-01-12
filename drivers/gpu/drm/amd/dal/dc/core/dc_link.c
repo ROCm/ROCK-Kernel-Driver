@@ -1501,7 +1501,8 @@ void core_link_disable_stream(
 {
 	struct dc *dc = stream->ctx->dc;
 
-	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
+	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST &&
+		link->public.type == dc_connection_mst_branch)
 		deallocate_mst_payload(stream);
 
 	dc->hwss.disable_stream(stream);
