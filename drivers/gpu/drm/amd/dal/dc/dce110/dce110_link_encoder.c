@@ -29,6 +29,8 @@
 #include "stream_encoder.h"
 #include "dce110_link_encoder.h"
 #include "i2caux_interface.h"
+#include "dc_bios_types.h"
+
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
 #include "dce/dce_11_0_enum.h"
@@ -166,6 +168,19 @@ static enum transmitter translate_encoder_to_transmitter(
 	default:
 		return TRANSMITTER_UNKNOWN;
 	}
+}
+
+static enum bp_result link_transmitter_control(
+	struct dce110_link_encoder *enc110,
+	struct bp_transmitter_control *cntl)
+{
+	enum bp_result result;
+	struct dc_bios *bp = dal_adapter_service_get_bios_parser(
+					enc110->base.adapter_service);
+
+	result = bp->funcs->transmitter_control(bp, cntl);
+
+	return result;
 }
 
 static void enable_phy_bypass_mode(
@@ -672,9 +687,7 @@ static void link_encoder_edp_power_control(
 		cntl.lanes_number = LANE_COUNT_FOUR;
 		cntl.hpd_sel = enc110->base.hpd_source;
 
-		bp_result = dal_bios_parser_transmitter_control(
-				dal_adapter_service_get_bios_parser(
-					enc110->base.adapter_service), &cntl);
+		bp_result = link_transmitter_control(enc110, &cntl);
 
 		if (BP_RESULT_OK != bp_result) {
 
@@ -866,10 +879,7 @@ static void link_encoder_edp_backlight_control(
 	 * Enable it in the future if necessary.
 	 */
 	/* dc_service_sleep_in_milliseconds(50); */
-
-	dal_bios_parser_transmitter_control(
-		dal_adapter_service_get_bios_parser(
-			enc110->base.adapter_service), &cntl);
+	link_transmitter_control(enc110, &cntl);
 }
 
 static bool is_dig_enabled(const struct dce110_link_encoder *enc110)
@@ -1299,10 +1309,7 @@ void dce110_link_encoder_hw_init(
 	cntl.coherent = false;
 	cntl.hpd_sel = enc110->base.hpd_source;
 
-	result = dal_bios_parser_transmitter_control(
-		dal_adapter_service_get_bios_parser(
-			enc110->base.adapter_service),
-		&cntl);
+	result = link_transmitter_control(enc110, &cntl);
 
 	if (result != BP_RESULT_OK) {
 		dal_logger_write(ctx->logger,
@@ -1317,10 +1324,8 @@ void dce110_link_encoder_hw_init(
 	if (enc110->base.connector.id == CONNECTOR_ID_LVDS) {
 		cntl.action = TRANSMITTER_CONTROL_BACKLIGHT_BRIGHTNESS;
 
-		result = dal_bios_parser_transmitter_control(
-			dal_adapter_service_get_bios_parser(
-				enc110->base.adapter_service),
-			&cntl);
+		result = link_transmitter_control(enc110, &cntl);
+
 		ASSERT(result == BP_RESULT_OK);
 
 	} else if (enc110->base.connector.id == CONNECTOR_ID_EDP) {
@@ -1416,10 +1421,7 @@ void dce110_link_encoder_enable_tmds_output(
 	cntl.pixel_clock = pixel_clock;
 	cntl.color_depth = color_depth;
 
-	result = dal_bios_parser_transmitter_control(
-		dal_adapter_service_get_bios_parser(
-			enc110->base.adapter_service),
-		&cntl);
+	result = link_transmitter_control(enc110, &cntl);
 
 	if (result != BP_RESULT_OK) {
 		dal_logger_write(ctx->logger,
@@ -1475,10 +1477,7 @@ void dce110_link_encoder_enable_dp_output(
 	/* TODO: check if undefined works */
 	cntl.color_depth = COLOR_DEPTH_UNDEFINED;
 
-	result = dal_bios_parser_transmitter_control(
-		dal_adapter_service_get_bios_parser(
-			enc110->base.adapter_service),
-		&cntl);
+	result = link_transmitter_control(enc110, &cntl);
 
 	if (result != BP_RESULT_OK) {
 		dal_logger_write(ctx->logger,
@@ -1521,10 +1520,7 @@ void dce110_link_encoder_enable_dp_mst_output(
 	/* TODO: check if undefined works */
 	cntl.color_depth = COLOR_DEPTH_UNDEFINED;
 
-	result = dal_bios_parser_transmitter_control(
-		dal_adapter_service_get_bios_parser(
-			enc110->base.adapter_service),
-		&cntl);
+	result = link_transmitter_control(enc110, &cntl);
 
 	if (result != BP_RESULT_OK) {
 		dal_logger_write(ctx->logger,
@@ -1578,9 +1574,7 @@ void dce110_link_encoder_disable_output(
 	cntl.signal = signal;
 	cntl.connector_obj_id = enc110->base.connector;
 
-	result = dal_bios_parser_transmitter_control(
-		dal_adapter_service_get_bios_parser(
-			enc110->base.adapter_service), &cntl);
+	result = link_transmitter_control(enc110, &cntl);
 
 	if (result != BP_RESULT_OK) {
 		dal_logger_write(ctx->logger,
@@ -1654,10 +1648,7 @@ void dce110_link_encoder_dp_set_lane_settings(
 		cntl.lane_settings = training_lane_set.raw;
 
 		/* call VBIOS table to set voltage swing and pre-emphasis */
-
-		dal_bios_parser_transmitter_control(
-			dal_adapter_service_get_bios_parser(
-				enc110->base.adapter_service), &cntl);
+		link_transmitter_control(enc110, &cntl);
 	}
 }
 

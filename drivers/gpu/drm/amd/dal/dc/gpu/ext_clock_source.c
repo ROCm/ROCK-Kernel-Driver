@@ -23,8 +23,9 @@
  */
 
 #include "dal_services.h"
-#include "include/clock_source_types.h"
+
 #include "include/bios_parser_interface.h"
+#include "include/clock_source_types.h"
 #include "include/logger_interface.h"
 #include "ext_clock_source.h"
 
@@ -71,11 +72,11 @@ bool dal_ext_clock_source_program_pix_clk(
 	bp_pix_clk_params.signal_type = pix_clk_params->signal_type;
 	bp_pix_clk_params.dvo_config = pix_clk_params->dvo_cfg;
 
-
-	if (dal_bios_parser_set_pixel_clock(
+	if (clk_src->bios_parser->funcs->set_pixel_clock(
 					clk_src->bios_parser,
 					&bp_pix_clk_params) == BP_RESULT_OK)
 		return true;
+
 	return false;
 
 }
@@ -108,11 +109,13 @@ bool dal_ext_clock_source_construct(
 			SIGNAL_TYPE_DISPLAY_PORT_MST |
 			SIGNAL_TYPE_EDP;
 
+
 	/*Get External clock frequency from ATOMBIOS Data table */
-	if (dal_bios_parser_get_firmware_info(
+	if (ext_clk_src->base.bios_parser->funcs->get_firmware_info(
 			ext_clk_src->base.bios_parser,
 			&fw_info) != BP_RESULT_OK)
 		return false;
+
 	ext_clk_src->ext_clk_freq_khz = fw_info.
 			external_clock_source_frequency_for_dp;
 	return true;

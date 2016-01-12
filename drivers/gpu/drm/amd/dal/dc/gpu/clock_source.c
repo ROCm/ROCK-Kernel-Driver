@@ -265,9 +265,10 @@ void dal_clock_source_get_ss_info_from_atombios(
 	spread_spectrum_data[0] = NULL;
 	*ss_entries_num = 0;
 
-	*ss_entries_num = dal_bios_parser_get_ss_entry_number(
+	*ss_entries_num = clk_src->bios_parser->funcs->get_ss_entry_number(
 			clk_src->bios_parser,
 			as_signal);
+
 	if (*ss_entries_num == 0)
 		return;
 
@@ -285,11 +286,13 @@ void dal_clock_source_get_ss_info_from_atombios(
 	for (i = 0, ss_info_cur = ss_info;
 		i < (*ss_entries_num);
 		++i, ++ss_info_cur) {
-		bp_result = dal_bios_parser_get_spread_spectrum_info(
+
+		bp_result = clk_src->bios_parser->funcs->get_spread_spectrum_info(
 				clk_src->bios_parser,
 				as_signal,
 				i,
 				ss_info_cur);
+
 		if (bp_result != BP_RESULT_OK)
 			goto out_free_data;
 	}

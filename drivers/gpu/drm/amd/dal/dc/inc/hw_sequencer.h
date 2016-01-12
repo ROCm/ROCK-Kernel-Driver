@@ -141,7 +141,7 @@ struct hw_sequencer_funcs {
 	bool (*enable_display_power_gating)(
 					struct dc_context *ctx,
 					uint8_t controller_id,
-					struct bios_parser *bp,
+					struct dc_bios *dcb,
 					enum pipe_gating_control power_gating);
 
 	/* resource management and validation*/

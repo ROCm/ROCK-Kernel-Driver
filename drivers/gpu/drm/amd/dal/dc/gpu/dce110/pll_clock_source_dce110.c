@@ -127,7 +127,7 @@ static bool disable_spread_spectrum(struct pll_clock_source_dce110 *clk_src)
 	bp_ss_params.pll_id = clock_source->clk_src_id;
 
 	/*Call ASICControl to process ATOMBIOS Exec table*/
-	result = dal_bios_parser_enable_spread_spectrum_on_ppll(
+	result = clock_source->bios_parser->funcs->enable_spread_spectrum_on_ppll(
 			clock_source->bios_parser,
 			&bp_ss_params,
 			false);
@@ -171,7 +171,7 @@ static bool enable_spread_spectrum(
 				bp_params.flags.EXTERNAL_SS = 1;
 
 			if (BP_RESULT_OK !=
-				dal_bios_parser_enable_spread_spectrum_on_ppll(
+				clock_source->bios_parser->funcs->enable_spread_spectrum_on_ppll(
 						clock_source->bios_parser,
 						&bp_params,
 						true))
@@ -283,7 +283,7 @@ static bool program_pix_clk(
 	bp_pc_params.flags.SET_EXTERNAL_REF_DIV_SRC =
 					pll_settings->use_external_clk;
 
-	if (dal_bios_parser_set_pixel_clock(clk_src->bios_parser,
+	if (clk_src->bios_parser->funcs->set_pixel_clock(clk_src->bios_parser,
 						&bp_pc_params) != BP_RESULT_OK)
 		return false;
 

@@ -36,7 +36,6 @@
 #include "asic_capability_types.h"
 
 /* forward declaration */
-struct bios_parser;
 struct i2caux;
 struct adapter_service;
 
@@ -481,7 +480,7 @@ bool dal_adapter_service_get_i2c_info(
 	struct graphics_object_i2c_info *i2c_info);
 
 /* Get bios parser handler */
-struct bios_parser *dal_adapter_service_get_bios_parser(
+struct dc_bios *dal_adapter_service_get_bios_parser(
 	struct adapter_service *as);
 
 /* Get i2c aux handler */

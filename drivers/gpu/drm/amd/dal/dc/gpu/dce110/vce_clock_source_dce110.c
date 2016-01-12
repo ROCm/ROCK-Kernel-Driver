@@ -79,7 +79,7 @@ static bool program_pix_clk(struct clock_source *clk_src,
 	bp_pix_clk_params.encoder_object_id = pix_clk_params->encoder_object_id;
 	bp_pix_clk_params.signal_type = pix_clk_params->signal_type;
 
-	if (dal_bios_parser_set_pixel_clock(clk_src->bios_parser,
+	if (clk_src->bios_parser->funcs->set_pixel_clock(clk_src->bios_parser,
 			&bp_pix_clk_params) == BP_RESULT_OK)
 		return true;
 
@@ -162,7 +162,7 @@ static bool construct(
 	/*Get Reference frequency, Input frequency range into PLL
 	 * and Output frequency range of the PLL
 	 * from ATOMBIOS Data table */
-	if (dal_bios_parser_get_firmware_info(
+	if (vce_clk_src->base.bios_parser->funcs->get_firmware_info(
 			vce_clk_src->base.bios_parser,
 			&fw_info) != BP_RESULT_OK)
 		return false;

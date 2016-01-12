@@ -774,7 +774,7 @@ static void set_clock(
 {
 	struct bp_pixel_clock_parameters pxl_clk_params;
 	struct display_clock_dce110 *dc = DCLCK110_FROM_BASE(base);
-	struct bios_parser *bp = dal_adapter_service_get_bios_parser(base->as);
+	struct dc_bios *bp = dal_adapter_service_get_bios_parser(base->as);
 
 	/* Prepare to program display clock*/
 	dc_service_memset(&pxl_clk_params, 0, sizeof(pxl_clk_params));
@@ -782,7 +782,7 @@ static void set_clock(
 	pxl_clk_params.target_pixel_clock = requested_clk_khz;
 	pxl_clk_params.pll_id = base->id;
 
-	dal_bios_parser_program_display_engine_pll(bp, &pxl_clk_params);
+	bp->funcs->program_display_engine_pll(bp, &pxl_clk_params);
 
 	if (dc->dfs_bypass_enabled) {
 

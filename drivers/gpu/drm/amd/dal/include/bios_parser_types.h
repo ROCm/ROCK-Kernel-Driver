@@ -28,7 +28,17 @@
 
 #include "include/signal_types.h"
 #include "include/grph_object_ctrl_defs.h"
-#include "link_service_types.h"
+#include "include/gpio_types.h"
+#include "include/adapter_service_types.h" /* for as_signal_type */
+
+enum bp_result {
+	BP_RESULT_OK = 0, /* There was no error */
+	BP_RESULT_BADINPUT, /*Bad input parameter */
+	BP_RESULT_BADBIOSTABLE, /* Bad BIOS table */
+	BP_RESULT_UNSUPPORTED, /* BIOS Table is not supported */
+	BP_RESULT_NORECORD, /* Record can't be found */
+	BP_RESULT_FAILURE
+};
 
 enum bp_encoder_control_action {
 	/* direct VBIOS translation! Just to simplify the translation */
@@ -337,4 +347,9 @@ struct bp_encoder_cap_info {
 	uint32_t RESERVED:30;
 };
 
-#endif
+struct bp_gpio_cntl_info {
+	uint32_t id;
+	enum gpio_pin_output_state state;
+};
+
+#endif /*__DAL_BIOS_PARSER_TYPES_H__ */

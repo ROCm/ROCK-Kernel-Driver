@@ -33,6 +33,8 @@
 #include "dc_types.h"
 #include "dc.h"
 
+struct dp_mst_stream_allocation_table;
+
 enum dc_edid_status dc_helpers_parse_edid_caps(
 	struct dc_context *ctx,
 	const struct dc_edid *edid,

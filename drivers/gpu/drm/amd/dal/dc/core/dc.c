@@ -143,7 +143,7 @@ failed_alloc:
 static void init_hw(struct dc *dc)
 {
 	int i;
-	struct bios_parser *bp;
+	struct dc_bios *bp;
 	struct transform *xfm;
 
 	bp = dal_adapter_service_get_bios_parser(dc->res_pool.adapter_srv);
@@ -164,7 +164,7 @@ static void init_hw(struct dc *dc)
 	}
 
 	dc->hwss.clock_gating_power_up(dc->ctx, false);
-	dal_bios_parser_power_up(bp);
+	bp->funcs->power_up(bp);
 	/***************************************/
 
 	for (i = 0; i < dc->link_count; i++) {

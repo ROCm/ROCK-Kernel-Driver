@@ -100,7 +100,7 @@ struct clock_source {
 	struct graphics_object_id id;
 	enum clock_source_id clk_src_id;
 	struct adapter_service *adapter_service;
-	struct bios_parser *bios_parser;
+	struct dc_bios *bios_parser;
 
 	struct spread_spectrum_data *ep_ss_params;
 	uint32_t ep_ss_params_cnt;

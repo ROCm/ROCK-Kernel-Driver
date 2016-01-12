@@ -40,6 +40,7 @@
 #endif
 #include "command_table_helper.h"
 #include "bios_parser.h"
+#include "bios_parser_interface.h"
 
 #define THREE_PERCENT_OF_10000 300
 
@@ -100,101 +101,21 @@ static void process_ext_display_connection_info(struct bios_parser *bp);
 #define BIOS_IMAGE_SIZE_UNIT 512
 
 /*****************************************************************************/
-static uint8_t bios_parser_get_connectors_number(struct dc_bios *dcb);
-
-const struct dc_vbios_funcs vbios_funcs = {
-	.get_connectors_number = bios_parser_get_connectors_number
-};
-
 static bool bios_parser_construct(
 	struct bios_parser *bp,
 	struct bp_init_data *init,
-	struct adapter_service *as)
-{
-	uint16_t *rom_header_offset = NULL;
-	ATOM_ROM_HEADER *rom_header = NULL;
-	ATOM_OBJECT_HEADER *object_info_tbl;
-	enum dce_version dce_version;
+	struct adapter_service *as);
 
-	if (!as)
-		return false;
+static uint8_t bios_parser_get_connectors_number(
+	struct dc_bios *dcb);
 
-	if (!init)
-		return false;
+static enum bp_result bios_parser_get_embedded_panel_info(
+	struct dc_bios *dcb,
+	struct embedded_panel_info *info);
 
-	if (!init->bios)
-		return false;
+/*****************************************************************************/
 
-	bp->base.funcs = &vbios_funcs;
-
-	dce_version = dal_adapter_service_get_dce_version(as);
-	bp->ctx = init->ctx;
-	bp->as = as;
-	bp->bios = init->bios;
-	bp->bios_size = bp->bios[BIOS_IMAGE_SIZE_OFFSET] * BIOS_IMAGE_SIZE_UNIT;
-	bp->bios_local_image = NULL;
-	bp->lcd_scale = LCD_SCALE_UNKNOWN;
-
-	rom_header_offset =
-	GET_IMAGE(uint16_t, OFFSET_TO_POINTER_TO_ATOM_ROM_HEADER);
-
-	if (!rom_header_offset)
-		return false;
-
-	rom_header = GET_IMAGE(ATOM_ROM_HEADER, *rom_header_offset);
-
-	if (!rom_header)
-		return false;
-
-	bp->master_data_tbl =
-	GET_IMAGE(ATOM_MASTER_DATA_TABLE,
-		rom_header->usMasterDataTableOffset);
-
-	if (!bp->master_data_tbl)
-		return false;
-
-	bp->object_info_tbl_offset = DATA_TABLES(Object_Header);
-
-	if (!bp->object_info_tbl_offset)
-		return false;
-
-	object_info_tbl =
-	GET_IMAGE(ATOM_OBJECT_HEADER, bp->object_info_tbl_offset);
-
-	if (!object_info_tbl)
-		return false;
-
-	get_atom_data_table_revision(&object_info_tbl->sHeader,
-		&bp->object_info_tbl.revision);
-
-	if (bp->object_info_tbl.revision.major == 1
-		&& bp->object_info_tbl.revision.minor >= 3) {
-		ATOM_OBJECT_HEADER_V3 *tbl_v3;
-
-		tbl_v3 = GET_IMAGE(ATOM_OBJECT_HEADER_V3,
-			bp->object_info_tbl_offset);
-		if (!tbl_v3)
-			return false;
-
-		bp->object_info_tbl.v1_3 = tbl_v3;
-	} else if (bp->object_info_tbl.revision.major == 1
-		&& bp->object_info_tbl.revision.minor >= 1)
-		bp->object_info_tbl.v1_1 = object_info_tbl;
-	else
-		return false;
-
-#if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)
-	bp->vbios_helper_data.active = 0;
-	bp->vbios_helper_data.requested = 0;
-	dal_bios_parser_init_bios_helper(bp, dce_version);
-#endif
-	dal_bios_parser_init_cmd_tbl(bp);
-	dal_bios_parser_init_cmd_tbl_helper(&bp->cmd_helper, dce_version);
-
-	return true;
-}
-
-struct bios_parser *dal_bios_parser_create(
+struct dc_bios *dal_bios_parser_create(
 	struct bp_init_data *init, struct adapter_service *as)
 {
 	struct bios_parser *bp = NULL;
@@ -204,7 +125,7 @@ struct bios_parser *dal_bios_parser_create(
 		return NULL;
 
 	if (bios_parser_construct(bp, init, as))
-		return bp;
+		return &bp->base;
 
 	dc_service_free(init->ctx, bp);
 	BREAK_TO_DEBUGGER();
@@ -217,29 +138,35 @@ static void destruct(struct bios_parser *bp)
 		dc_service_free(bp->ctx, bp->bios_local_image);
 }
 
-void dal_bios_parser_destroy(struct bios_parser **bp)
+void dal_bios_parser_destroy(struct dc_bios **dcb)
 {
-	if (!bp || !*bp) {
+	struct bios_parser *bp = BP_FROM_DCB(*dcb);
+
+	if (!bp) {
 		BREAK_TO_DEBUGGER();
 		return;
 	}
 
-	destruct(*bp);
+	destruct(bp);
 
-	dc_service_free((*bp)->ctx, *bp);
-	*bp = NULL;
+	dc_service_free((bp)->ctx, bp);
+	*dcb = NULL;
 }
 
-void dal_bios_parser_power_down(struct bios_parser *bp)
+static void bios_parser_power_down(struct dc_bios *dcb)
 {
 #if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	dal_bios_parser_set_scratch_lcd_scale(bp, bp->lcd_scale);
 #endif
 }
 
-void dal_bios_parser_power_up(struct bios_parser *bp)
+static void bios_parser_power_up(struct dc_bios *dcb)
 {
 #if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (bp->lcd_scale == LCD_SCALE_UNKNOWN)
 		bp->lcd_scale = dal_bios_parser_get_scratch_lcd_scale(bp);
 #endif
@@ -259,8 +186,10 @@ static uint8_t get_number_of_objects(struct bios_parser *bp, uint32_t offset)
 		return table->ucNumberOfObjects;
 }
 
-uint8_t dal_bios_parser_get_encoders_number(struct bios_parser *bp)
+static uint8_t bios_parser_get_encoders_number(struct dc_bios *dcb)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	return get_number_of_objects(bp,
 		le16_to_cpu(bp->object_info_tbl.v1_1->usEncoderObjectTableOffset));
 }
@@ -273,9 +202,10 @@ static uint8_t bios_parser_get_connectors_number(struct dc_bios *dcb)
 		le16_to_cpu(bp->object_info_tbl.v1_1->usConnectorObjectTableOffset));
 }
 
-uint32_t dal_bios_parser_get_oem_ddc_lines_number(struct bios_parser *bp)
+static uint32_t bios_parser_get_oem_ddc_lines_number(struct dc_bios *dcb)
 {
 	uint32_t number = 0;
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 	if (DATA_TABLES(OemInfo) != 0) {
 		ATOM_OEM_INFO *info;
@@ -296,9 +226,11 @@ uint32_t dal_bios_parser_get_oem_ddc_lines_number(struct bios_parser *bp)
 	return number;
 }
 
-struct graphics_object_id dal_bios_parser_get_encoder_id(struct bios_parser *bp,
+static struct graphics_object_id bios_parser_get_encoder_id(
+	struct dc_bios *dcb,
 	uint32_t i)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	struct graphics_object_id object_id = dal_graphics_object_id_init(
 		0, ENUM_ID_UNKNOWN, OBJECT_TYPE_UNKNOWN);
 
@@ -317,10 +249,11 @@ struct graphics_object_id dal_bios_parser_get_encoder_id(struct bios_parser *bp,
 	return object_id;
 }
 
-struct graphics_object_id dal_bios_parser_get_connector_id(
-	struct bios_parser *bp,
+static struct graphics_object_id bios_parser_get_connector_id(
+	struct dc_bios *dcb,
 	uint8_t i)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	struct graphics_object_id object_id = dal_graphics_object_id_init(
 		0, ENUM_ID_UNKNOWN, OBJECT_TYPE_UNKNOWN);
 
@@ -339,12 +272,13 @@ struct graphics_object_id dal_bios_parser_get_connector_id(
 	return object_id;
 }
 
-uint32_t dal_bios_parser_get_src_number(struct bios_parser *bp,
+static uint32_t bios_parser_get_src_number(struct dc_bios *dcb,
 	struct graphics_object_id id)
 {
 	uint32_t offset;
 	uint8_t *number;
 	ATOM_OBJECT *object;
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 	object = get_bios_object(bp, id);
 
@@ -363,21 +297,23 @@ uint32_t dal_bios_parser_get_src_number(struct bios_parser *bp,
 	return *number;
 }
 
-uint32_t dal_bios_parser_get_dst_number(struct bios_parser *bp,
+static uint32_t bios_parser_get_dst_number(struct dc_bios *dcb,
 	struct graphics_object_id id)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	ATOM_OBJECT *object = get_bios_object(bp, id);
 
 	return get_dst_number_from_object(bp, object);
 }
 
-enum bp_result dal_bios_parser_get_src_obj(struct bios_parser *bp,
+static enum bp_result bios_parser_get_src_obj(struct dc_bios *dcb,
 	struct graphics_object_id object_id, uint32_t index,
 	struct graphics_object_id *src_object_id)
 {
 	uint32_t number;
 	uint16_t *id;
 	ATOM_OBJECT *object;
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 	if (!src_object_id)
 		return BP_RESULT_BADINPUT;
@@ -399,13 +335,14 @@ enum bp_result dal_bios_parser_get_src_obj(struct bios_parser *bp,
 	return BP_RESULT_OK;
 }
 
-enum bp_result dal_bios_parser_get_dst_obj(struct bios_parser *bp,
+static enum bp_result bios_parser_get_dst_obj(struct dc_bios *dcb,
 	struct graphics_object_id object_id, uint32_t index,
 	struct graphics_object_id *dest_object_id)
 {
 	uint32_t number;
 	uint16_t *id;
 	ATOM_OBJECT *object;
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 	if (!dest_object_id)
 		return BP_RESULT_BADINPUT;
@@ -422,10 +359,11 @@ enum bp_result dal_bios_parser_get_dst_obj(struct bios_parser *bp,
 	return BP_RESULT_OK;
 }
 
-enum bp_result dal_bios_parser_get_oem_ddc_info(struct bios_parser *bp,
+static enum bp_result bios_parser_get_oem_ddc_info(struct dc_bios *dcb,
 	uint32_t index,
 	struct graphics_object_i2c_info *info)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 	if (!info)
 		return BP_RESULT_BADINPUT;
@@ -458,7 +396,7 @@ enum bp_result dal_bios_parser_get_oem_ddc_info(struct bios_parser *bp,
 	return BP_RESULT_NORECORD;
 }
 
-enum bp_result dal_bios_parser_get_i2c_info(struct bios_parser *bp,
+static enum bp_result bios_parser_get_i2c_info(struct dc_bios *dcb,
 	struct graphics_object_id id,
 	struct graphics_object_i2c_info *info)
 {
@@ -466,6 +404,7 @@ enum bp_result dal_bios_parser_get_i2c_info(struct bios_parser *bp,
 	ATOM_OBJECT *object;
 	ATOM_COMMON_RECORD_HEADER *header;
 	ATOM_I2C_RECORD *record;
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 	if (!info)
 		return BP_RESULT_BADINPUT;
@@ -563,7 +502,28 @@ static enum bp_result get_voltage_ddc_info_v3(uint8_t *i2c_line,
 	return result;
 }
 
-enum bp_result dal_bios_parser_get_voltage_ddc_info(struct bios_parser *bp,
+static enum bp_result bios_parser_get_thermal_ddc_info(
+	struct dc_bios *dcb,
+	uint32_t i2c_channel_id,
+	struct graphics_object_i2c_info *info)
+{
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+	ATOM_I2C_ID_CONFIG_ACCESS *config;
+	ATOM_I2C_RECORD record;
+
+	if (!info)
+		return BP_RESULT_BADINPUT;
+
+	config = (ATOM_I2C_ID_CONFIG_ACCESS *) &i2c_channel_id;
+
+	record.sucI2cId.bfHW_Capable = config->sbfAccess.bfHW_Capable;
+	record.sucI2cId.bfI2C_LineMux = config->sbfAccess.bfI2C_LineMux;
+	record.sucI2cId.bfHW_EngineID = config->sbfAccess.bfHW_EngineID;
+
+	return get_gpio_i2c_info(bp, &record, info);
+}
+
+static enum bp_result bios_parser_get_voltage_ddc_info(struct dc_bios *dcb,
 	uint32_t index,
 	struct graphics_object_i2c_info *info)
 {
@@ -572,6 +532,7 @@ enum bp_result dal_bios_parser_get_voltage_ddc_info(struct bios_parser *bp,
 	uint8_t *voltage_info_address;
 	ATOM_COMMON_TABLE_HEADER *header;
 	struct atom_data_revision revision = {0};
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 	if (!DATA_TABLES(VoltageObjectInfo))
 		return result;
@@ -599,34 +560,14 @@ enum bp_result dal_bios_parser_get_voltage_ddc_info(struct bios_parser *bp,
 	}
 
 	if (result == BP_RESULT_OK)
-		result = dal_bios_parser_get_thermal_ddc_info(bp,
+		result = bios_parser_get_thermal_ddc_info(dcb,
 			i2c_line, info);
 
 
 	return result;
 }
 
-enum bp_result dal_bios_parser_get_thermal_ddc_info(
-	struct bios_parser *bp,
-	uint32_t i2c_channel_id,
-	struct graphics_object_i2c_info *info)
-{
-	ATOM_I2C_ID_CONFIG_ACCESS *config;
-	ATOM_I2C_RECORD record;
-
-	if (!info)
-		return BP_RESULT_BADINPUT;
-
-	config = (ATOM_I2C_ID_CONFIG_ACCESS *) &i2c_channel_id;
-
-	record.sucI2cId.bfHW_Capable = config->sbfAccess.bfHW_Capable;
-	record.sucI2cId.bfI2C_LineMux = config->sbfAccess.bfI2C_LineMux;
-	record.sucI2cId.bfHW_EngineID = config->sbfAccess.bfHW_EngineID;
-
-	return get_gpio_i2c_info(bp, &record, info);
-}
-
-enum bp_result dal_bios_parser_get_ddc_info_for_i2c_line(struct bios_parser *bp,
+enum bp_result bios_parser_get_ddc_info_for_i2c_line(struct bios_parser *bp,
 	uint8_t i2c_line, struct graphics_object_i2c_info *info)
 {
 	uint32_t offset;
@@ -690,10 +631,11 @@ enum bp_result dal_bios_parser_get_ddc_info_for_i2c_line(struct bios_parser *bp,
 	return BP_RESULT_NORECORD;
 }
 
-enum bp_result dal_bios_parser_get_hpd_info(struct bios_parser *bp,
+static enum bp_result bios_parser_get_hpd_info(struct dc_bios *dcb,
 	struct graphics_object_id id,
 	struct graphics_object_hpd_info *info)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	ATOM_OBJECT *object;
 	ATOM_HPD_INT_RECORD *record = NULL;
 
@@ -716,12 +658,13 @@ enum bp_result dal_bios_parser_get_hpd_info(struct bios_parser *bp,
 	return BP_RESULT_NORECORD;
 }
 
-uint32_t dal_bios_parser_get_gpio_record(
-	struct bios_parser *bp,
+static uint32_t bios_parser_get_gpio_record(
+	struct dc_bios *dcb,
 	struct graphics_object_id id,
 	struct bp_gpio_cntl_info *gpio_record,
 	uint32_t record_size)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	ATOM_COMMON_RECORD_HEADER *header = NULL;
 	ATOM_OBJECT_GPIO_CNTL_RECORD *record = NULL;
 	ATOM_OBJECT *object = get_bios_object(bp, id);
@@ -789,7 +732,7 @@ uint32_t dal_bios_parser_get_gpio_record(
 	return pins_number;
 }
 
-enum bp_result dal_bios_parser_get_device_tag_record(
+enum bp_result bios_parser_get_device_tag_record(
 	struct bios_parser *bp,
 	ATOM_OBJECT *object,
 	ATOM_CONNECTOR_DEVICE_TAG_RECORD **record)
@@ -826,12 +769,13 @@ enum bp_result dal_bios_parser_get_device_tag_record(
 	return BP_RESULT_NORECORD;
 }
 
-enum bp_result dal_bios_parser_get_device_tag(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_get_device_tag(
+	struct dc_bios *dcb,
 	struct graphics_object_id connector_object_id,
 	uint32_t device_tag_index,
 	struct connector_device_tag_info *info)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	ATOM_OBJECT *object;
 	ATOM_CONNECTOR_DEVICE_TAG_RECORD *record = NULL;
 	ATOM_CONNECTOR_DEVICE_TAG *device_tag;
@@ -847,7 +791,7 @@ enum bp_result dal_bios_parser_get_device_tag(
 		return BP_RESULT_BADINPUT;
 	}
 
-	if (dal_bios_parser_get_device_tag_record(bp, object, &record)
+	if (bios_parser_get_device_tag_record(bp, object, &record)
 		!= BP_RESULT_OK)
 		return BP_RESULT_NORECORD;
 
@@ -873,10 +817,11 @@ static enum bp_result get_firmware_info_v2_2(
 	struct bios_parser *bp,
 	struct firmware_info *info);
 
-enum bp_result dal_bios_parser_get_firmware_info(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_get_firmware_info(
+	struct dc_bios *dcb,
 	struct firmware_info *info)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	enum bp_result result = BP_RESULT_BADBIOSTABLE;
 	ATOM_COMMON_TABLE_HEADER *header;
 	struct atom_data_revision revision;
@@ -1223,61 +1168,73 @@ static enum bp_result get_ss_info_v3_1(
 	return BP_RESULT_NORECORD;
 }
 
-enum bp_result dal_bios_parser_transmitter_control(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_transmitter_control(
+	struct dc_bios *dcb,
 	struct bp_transmitter_control *cntl)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.transmitter_control)
 		return BP_RESULT_FAILURE;
 
 	return bp->cmd_tbl.transmitter_control(bp, cntl);
 }
 
-enum bp_result dal_bios_parser_encoder_control(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_encoder_control(
+	struct dc_bios *dcb,
 	struct bp_encoder_control *cntl)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.dig_encoder_control)
 		return BP_RESULT_FAILURE;
 
 	return bp->cmd_tbl.dig_encoder_control(bp, cntl);
 }
 
-enum bp_result dal_bios_parser_adjust_pixel_clock(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_adjust_pixel_clock(
+	struct dc_bios *dcb,
 	struct bp_adjust_pixel_clock_parameters *bp_params)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.adjust_display_pll)
 		return BP_RESULT_FAILURE;
 
 	return bp->cmd_tbl.adjust_display_pll(bp, bp_params);
 }
 
-enum bp_result dal_bios_parser_set_pixel_clock(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_set_pixel_clock(
+	struct dc_bios *dcb,
 	struct bp_pixel_clock_parameters *bp_params)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.set_pixel_clock)
 		return BP_RESULT_FAILURE;
 
 	return bp->cmd_tbl.set_pixel_clock(bp, bp_params);
 }
 
-enum bp_result dal_bios_parser_set_dce_clock(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_set_dce_clock(
+	struct dc_bios *dcb,
 	struct bp_set_dce_clock_parameters *bp_params)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.set_dce_clock)
 		return BP_RESULT_FAILURE;
 
 	return bp->cmd_tbl.set_dce_clock(bp, bp_params);
 }
 
-enum bp_result dal_bios_parser_enable_spread_spectrum_on_ppll(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_enable_spread_spectrum_on_ppll(
+	struct dc_bios *dcb,
 	struct bp_spread_spectrum_parameters *bp_params,
 	bool enable)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.enable_spread_spectrum_on_ppll)
 		return BP_RESULT_FAILURE;
 
@@ -1286,20 +1243,23 @@ enum bp_result dal_bios_parser_enable_spread_spectrum_on_ppll(
 
 }
 
-enum bp_result dal_bios_parser_program_crtc_timing(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_program_crtc_timing(
+	struct dc_bios *dcb,
 	struct bp_hw_crtc_timing_parameters *bp_params)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.set_crtc_timing)
 		return BP_RESULT_FAILURE;
 
 	return bp->cmd_tbl.set_crtc_timing(bp, bp_params);
 }
 
-enum bp_result dal_bios_parser_program_display_engine_pll(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_program_display_engine_pll(
+	struct dc_bios *dcb,
 	struct bp_pixel_clock_parameters *bp_params)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 	if (!bp->cmd_tbl.program_clock)
 		return BP_RESULT_FAILURE;
@@ -1308,12 +1268,14 @@ enum bp_result dal_bios_parser_program_display_engine_pll(
 
 }
 
-enum signal_type dal_bios_parser_dac_load_detect(
-	struct bios_parser *bp,
+static enum signal_type bios_parser_dac_load_detect(
+	struct dc_bios *dcb,
 	struct graphics_object_id encoder,
 	struct graphics_object_id connector,
 	enum signal_type display_signal)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.dac_load_detection)
 		return SIGNAL_TYPE_NONE;
 
@@ -1321,62 +1283,73 @@ enum signal_type dal_bios_parser_dac_load_detect(
 		display_signal);
 }
 
-enum bp_result dal_bios_parser_get_divider_for_target_display_clock(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_get_divider_for_target_display_clock(
+	struct dc_bios *dcb,
 	struct bp_display_clock_parameters *bp_params)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.compute_memore_engine_pll)
 		return BP_RESULT_FAILURE;
 
 	return bp->cmd_tbl.compute_memore_engine_pll(bp, bp_params);
 }
 
-enum bp_result dal_bios_parser_dvo_encoder_control(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_dvo_encoder_control(
+	struct dc_bios *dcb,
 	struct bp_dvo_encoder_control *cntl)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.dvo_encoder_control)
 		return BP_RESULT_FAILURE;
 
 	return bp->cmd_tbl.dvo_encoder_control(bp, cntl);
 }
 
-enum bp_result dal_bios_parser_enable_crtc(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_enable_crtc(
+	struct dc_bios *dcb,
 	enum controller_id id,
 	bool enable)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.enable_crtc)
 		return BP_RESULT_FAILURE;
 
 	return bp->cmd_tbl.enable_crtc(bp, id, enable);
 }
 
-enum bp_result dal_bios_parser_blank_crtc(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_blank_crtc(
+	struct dc_bios *dcb,
 	struct bp_blank_crtc_parameters *bp_params,
 	bool blank)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.blank_crtc)
 		return BP_RESULT_FAILURE;
 
 	return bp->cmd_tbl.blank_crtc(bp, bp_params, blank);
 }
 
-enum bp_result dal_bios_parser_crtc_source_select(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_crtc_source_select(
+	struct dc_bios *dcb,
 	struct bp_crtc_source_select *bp_params)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.select_crtc_source)
 		return BP_RESULT_FAILURE;
 
 	return bp->cmd_tbl.select_crtc_source(bp, bp_params);
 }
 
-enum bp_result dal_bios_parser_set_overscan(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_set_overscan(
+	struct dc_bios *dcb,
 	struct bp_hw_crtc_overscan_parameters *bp_params)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 	if (!bp->cmd_tbl.set_crtc_overscan)
 		return BP_RESULT_FAILURE;
@@ -1384,32 +1357,38 @@ enum bp_result dal_bios_parser_set_overscan(
 	return bp->cmd_tbl.set_crtc_overscan(bp, bp_params);
 }
 
-enum bp_result dal_bios_parser_enable_memory_requests(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_enable_memory_requests(
+	struct dc_bios *dcb,
 	enum controller_id controller_id,
 	bool enable)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.enable_crtc_mem_req)
 		return BP_RESULT_FAILURE;
 
 	return bp->cmd_tbl.enable_crtc_mem_req(bp, controller_id, enable);
 }
 
-enum bp_result dal_bios_parser_external_encoder_control(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_external_encoder_control(
+	struct dc_bios *dcb,
 	struct bp_external_encoder_control *cntl)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.external_encoder_control)
 		return BP_RESULT_FAILURE;
 
 	return bp->cmd_tbl.external_encoder_control(bp, cntl);
 }
 
-enum bp_result dal_bios_parser_enable_disp_power_gating(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_enable_disp_power_gating(
+	struct dc_bios *dcb,
 	enum controller_id controller_id,
 	enum bp_pipe_control_action action)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (!bp->cmd_tbl.enable_disp_power_gating)
 		return BP_RESULT_FAILURE;
 
@@ -1417,21 +1396,24 @@ enum bp_result dal_bios_parser_enable_disp_power_gating(
 		action);
 }
 
-bool dal_bios_parser_is_device_id_supported(
-	struct bios_parser *bp,
+static bool bios_parser_is_device_id_supported(
+	struct dc_bios *dcb,
 	struct device_id id)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	uint32_t mask = get_support_mask_for_device_id(id);
 
 	return (le16_to_cpu(bp->object_info_tbl.v1_1->usDeviceSupport) & mask) != 0;
 }
 
-enum bp_result dal_bios_parser_crt_control(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_crt_control(
+	struct dc_bios *dcb,
 	enum engine_id engine_id,
 	bool enable,
 	uint32_t pixel_clock)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	uint8_t standard;
 
 	if (!bp->cmd_tbl.dac1_encoder_control &&
@@ -1568,7 +1550,7 @@ static enum bp_result get_ss_info_from_tbl(
 	uint32_t id,
 	struct spread_spectrum_info *ss_info);
 /**
- * dal_bios_parser_get_spread_spectrum_info
+ * bios_parser_get_spread_spectrum_info
  * Get spread spectrum information from the ASIC_InternalSS_Info(ver 2.1 or
  * ver 3.1) or SS_Info table from the VBIOS. Currently ASIC_InternalSS_Info
  * ver 2.1 can co-exist with SS_Info table. Expect ASIC_InternalSS_Info ver 3.1,
@@ -1580,12 +1562,13 @@ static enum bp_result get_ss_info_from_tbl(
  * @param [out] ss_info, sprectrum information structure,
  * @return Bios parser result code
  */
-enum bp_result dal_bios_parser_get_spread_spectrum_info(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_get_spread_spectrum_info(
+	struct dc_bios *dcb,
 	enum as_signal_type signal,
 	uint32_t index,
 	struct spread_spectrum_info *ss_info)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	enum bp_result result = BP_RESULT_UNSUPPORTED;
 	uint32_t clk_id_ss = 0;
 	ATOM_COMMON_TABLE_HEADER *header;
@@ -1777,7 +1760,7 @@ static enum bp_result get_ss_info_from_ss_info_table(
 	{
 		struct embedded_panel_info panel_info;
 
-		if (dal_bios_parser_get_embedded_panel_info(bp, &panel_info)
+		if (bios_parser_get_embedded_panel_info(&bp->base, &panel_info)
 				== BP_RESULT_OK)
 			id_local = panel_info.ss_id;
 		break;
@@ -1833,10 +1816,11 @@ static enum bp_result get_embedded_panel_info_v1_3(
 	struct bios_parser *bp,
 	struct embedded_panel_info *info);
 
-enum bp_result dal_bios_parser_get_embedded_panel_info(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_get_embedded_panel_info(
+	struct dc_bios *dcb,
 	struct embedded_panel_info *info)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	ATOM_COMMON_TABLE_HEADER *hdr;
 
 	if (!DATA_TABLES(LCD_Info))
@@ -2111,7 +2095,7 @@ static enum bp_result get_embedded_panel_info_v1_3(
 }
 
 /**
- * dal_bios_parser_get_encoder_cap_info
+ * bios_parser_get_encoder_cap_info
  *
  * @brief
  *  Get encoder capability information of input object id
@@ -2122,11 +2106,12 @@ static enum bp_result get_embedded_panel_info_v1_3(
  * @return Bios parser result code
  *
  */
-enum bp_result dal_bios_parser_get_encoder_cap_info(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_get_encoder_cap_info(
+	struct dc_bios *dcb,
 	struct graphics_object_id object_id,
 	struct bp_encoder_cap_info *info)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	ATOM_OBJECT *object;
 	ATOM_ENCODER_CAP_RECORD *record = NULL;
 
@@ -2198,7 +2183,7 @@ static ATOM_ENCODER_CAP_RECORD *get_encoder_cap_record(
 }
 
 /**
- * dal_bios_parser_get_din_connector_info
+ * bios_parser_get_din_connector_info
  * @brief
  *   Get GPIO record for the DIN connector, this GPIO tells whether there is a
  *    CV dumb dongle
@@ -2209,11 +2194,12 @@ static ATOM_ENCODER_CAP_RECORD *get_encoder_cap_record(
  * @param info             - GPIO record infor
  * @return Bios parser result code
  */
-enum bp_result dal_bios_parser_get_din_connector_info(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_get_din_connector_info(
+	struct dc_bios *dcb,
 	struct graphics_object_id id,
 	struct din_connector_info *info)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	ATOM_COMMON_RECORD_HEADER *header;
 	ATOM_CONNECTOR_CVTV_SHARE_DIN_RECORD *record = NULL;
 	ATOM_OBJECT *object;
@@ -2294,10 +2280,11 @@ static uint32_t get_ss_entry_number_from_ss_info_tbl(
  * @param[in] signal, ASSignalType to be converted to SSid
  * @return number of SS Entry that match the signal
  */
-uint32_t dal_bios_parser_get_ss_entry_number(
-	struct bios_parser *bp,
+static uint32_t bios_parser_get_ss_entry_number(
+	struct dc_bios *dcb,
 	enum as_signal_type signal)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	uint32_t ss_id = 0;
 	ATOM_COMMON_TABLE_HEADER *header;
 	struct atom_data_revision revision;
@@ -2381,7 +2368,7 @@ static uint32_t get_ss_entry_number_from_ss_info_tbl(
 	case ASIC_INTERNAL_SS_ON_LVDS: {
 		struct embedded_panel_info panel_info;
 
-		if (dal_bios_parser_get_embedded_panel_info(bp, &panel_info)
+		if (bios_parser_get_embedded_panel_info(&bp->base, &panel_info)
 				== BP_RESULT_OK)
 			id_local = panel_info.ss_id;
 		break;
@@ -2544,10 +2531,11 @@ static ATOM_FAKE_EDID_PATCH_RECORD *get_faked_edid_record(
 	return (ATOM_FAKE_EDID_PATCH_RECORD *)record;
 }
 
-enum bp_result dal_bios_parser_get_faked_edid_len(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_get_faked_edid_len(
+	struct dc_bios *dcb,
 	uint32_t *len)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	ATOM_FAKE_EDID_PATCH_RECORD *edid_record = get_faked_edid_record(bp);
 
 	if (!edid_record)
@@ -2558,11 +2546,12 @@ enum bp_result dal_bios_parser_get_faked_edid_len(
 	return BP_RESULT_OK;
 }
 
-enum bp_result dal_bios_parser_get_faked_edid_buf(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_get_faked_edid_buf(
+	struct dc_bios *dcb,
 	uint8_t *buff,
 	uint32_t len)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	ATOM_FAKE_EDID_PATCH_RECORD *edid_record = get_faked_edid_record(bp);
 	uint32_t edid_size;
 
@@ -2580,7 +2569,7 @@ enum bp_result dal_bios_parser_get_faked_edid_buf(
 }
 
 /**
- * dal_bios_parser_get_gpio_pin_info
+ * bios_parser_get_gpio_pin_info
  * Get GpioPin information of input gpio id
  *
  * @param gpio_id, GPIO ID
@@ -2592,11 +2581,12 @@ enum bp_result dal_bios_parser_get_faked_edid_buf(
  *  2. in DATA_TABLE.GPIO_Pin_LUT, search all records, to get the registerA
  *  offset/mask
  */
-enum bp_result dal_bios_parser_get_gpio_pin_info(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_get_gpio_pin_info(
+	struct dc_bios *dcb,
 	uint32_t gpio_id,
 	struct gpio_pin_info *info)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	ATOM_GPIO_PIN_LUT *header;
 	uint32_t count = 0;
 	uint32_t i = 0;
@@ -2648,11 +2638,12 @@ enum bp_result dal_bios_parser_get_gpio_pin_info(
  * @param info, embedded panel patch mode structure
  * @return Bios parser result code
  */
-enum bp_result dal_bios_parser_enum_embedded_panel_patch_mode(
-	struct bios_parser *bp,
+static enum bp_result bios_parser_enum_embedded_panel_patch_mode(
+	struct dc_bios *dcb,
 	uint32_t index,
 	struct embedded_panel_patch_mode *mode)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	uint32_t record_size;
 	uint32_t record_index;
 	uint8_t *record;
@@ -3711,7 +3702,7 @@ static void add_device_tag_from_ext_display_path(
 	ATOM_CONNECTOR_DEVICE_TAG *device_tag = NULL;
 	ATOM_CONNECTOR_DEVICE_TAG_RECORD *device_tag_record = NULL;
 	enum bp_result result =
-			dal_bios_parser_get_device_tag_record(
+			bios_parser_get_device_tag_record(
 					bp, object, &device_tag_record);
 
 	if ((le16_to_cpu(ext_display_path->usDeviceTag) != CONNECTOR_OBJECT_ID_NONE)
@@ -3958,7 +3949,7 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 				continue;
 
 			/* Remove support for all device tags. */
-			if (dal_bios_parser_get_device_tag_record(
+			if (bios_parser_get_device_tag_record(
 					bp, object, &dev_tag_record) != BP_RESULT_OK)
 				continue;
 
@@ -4212,14 +4203,18 @@ static void process_ext_display_connection_info(struct bios_parser *bp)
 	}
 }
 
-void dal_bios_parser_post_init(struct bios_parser *bp)
+static void bios_parser_post_init(struct dc_bios *dcb)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	process_ext_display_connection_info(bp);
 }
 
-bool dal_bios_parser_is_accelerated_mode(
-	struct bios_parser *bp)
+static bool bios_parser_is_accelerated_mode(
+	struct dc_bios *dcb)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 #ifdef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
 	return bp->bios_helper->is_accelerated_mode(
 			bp->ctx);
@@ -4233,7 +4228,7 @@ bool dal_bios_parser_is_accelerated_mode(
 }
 
 /**
- * dal_bios_parser_set_scratch_connected
+ * bios_parser_set_scratch_connected
  *
  * @brief
  *  update VBIOS scratch register about connected displays
@@ -4243,12 +4238,14 @@ bool dal_bios_parser_is_accelerated_mode(
  *  bool - connection state
  *  const ConnectorDeviceTagInfo* - pointer to device type and enum ID
  */
-void dal_bios_parser_set_scratch_connected(
-	struct bios_parser *bp,
+static void bios_parser_set_scratch_connected(
+	struct dc_bios *dcb,
 	struct graphics_object_id connector_id,
 	bool connected,
 	const struct connector_device_tag_info *device_tag)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 #ifdef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
 	bp->bios_helper->set_scratch_connected(
 			bp->ctx,
@@ -4262,7 +4259,7 @@ void dal_bios_parser_set_scratch_connected(
 }
 
 /**
- * dal_bios_parser_set_scratch_critical_state
+ * bios_parser_set_scratch_critical_state
  *
  * @brief
  *  update critical state bit in VBIOS scratch register
@@ -4270,10 +4267,12 @@ void dal_bios_parser_set_scratch_connected(
  * @param
  *  bool - to set or reset state
  */
-void dal_bios_parser_set_scratch_critical_state(
-	struct bios_parser *bp,
+static void bios_parser_set_scratch_critical_state(
+	struct dc_bios *dcb,
 	bool state)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 #ifdef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
 	bp->bios_helper->set_scratch_critical_state(
 			bp->ctx, state);
@@ -4285,9 +4284,11 @@ void dal_bios_parser_set_scratch_critical_state(
 #endif
 }
 
-void dal_bios_parser_set_scratch_acc_mode_change(
-	struct bios_parser *bp)
+static void bios_parser_set_scratch_acc_mode_change(
+	struct dc_bios *dcb)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 #ifdef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
 	bp->bios_helper->set_scratch_acc_mode_change(
 			bp->ctx);
@@ -4300,7 +4301,7 @@ void dal_bios_parser_set_scratch_acc_mode_change(
 }
 
 /**
- * dal_bios_parser_prepare_scratch_active_and_requested
+ * bios_parser_prepare_scratch_active_and_requested
  *
  * @brief
  *  update VBIOS scratch registers about active and requested displays
@@ -4311,12 +4312,14 @@ void dal_bios_parser_set_scratch_acc_mode_change(
  *  const struct connector_device_tag_info * - pointer to display type and
  *  enum Id
  */
-void dal_bios_parser_prepare_scratch_active_and_requested(
-	struct bios_parser *bp,
+static void bios_parser_prepare_scratch_active_and_requested(
+	struct dc_bios *dcb,
 	enum controller_id controller_id,
 	enum signal_type signal,
 	const struct connector_device_tag_info *device_tag)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 #ifdef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
 	bp->bios_helper->prepare_scratch_active_and_requested(
 			bp->ctx,
@@ -4332,9 +4335,11 @@ void dal_bios_parser_prepare_scratch_active_and_requested(
 #endif
 }
 
-void dal_bios_parser_set_scratch_active_and_requested(
-	struct bios_parser *bp)
+static void bios_parser_set_scratch_active_and_requested(
+	struct dc_bios *dcb)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 #ifdef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
 	bp->bios_helper->set_scratch_active_and_requested(
 			bp->ctx,
@@ -4726,21 +4731,11 @@ static enum bp_result construct_integrated_info(
 	return result;
 }
 
-/*
- * dal_bios_parser_create_integrated_info
- *
- * @brief
- * Create integrated info
- *
- * @param
- * bios_parser *bp - [in] BIOS  parser handler
- *
- * @return
- * struct integrated_info * - pointer to the newly created integrated info
- */
-struct integrated_info *dal_bios_parser_create_integrated_info(
-	struct bios_parser *bp)
+
+static struct integrated_info *bios_parser_create_integrated_info(
+	struct dc_bios *dcb)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	struct integrated_info *info = NULL;
 
 	info = dc_service_alloc(bp->ctx, sizeof(struct integrated_info));
@@ -4758,24 +4753,344 @@ struct integrated_info *dal_bios_parser_create_integrated_info(
 	return NULL;
 }
 
-/*
- * dal_bios_parser_destroy_integrated_info
- *
- * @brief
- * Destroy provided integrated info
- *
- * @param
- * struct integrated_info **info - [in] info to be destroied
- */
-void dal_bios_parser_destroy_integrated_info(struct dc_context *ctx, struct integrated_info **info)
+static void bios_parser_destroy_integrated_info(
+	struct dc_bios *dcb,
+	struct integrated_info **info)
 {
+	struct bios_parser *bp = BP_FROM_DCB(dcb);
+
 	if (info == NULL) {
 		ASSERT_CRITICAL(0);
 		return;
 	}
 
 	if (*info != NULL) {
-		dc_service_free(ctx, *info);
+		dc_service_free(bp->ctx, *info);
 		*info = NULL;
 	}
 }
+
+/******************************************************************************
+ * Stub-functions */
+static bool is_lid_open(
+	struct dc_bios *bios)
+{
+	BREAK_TO_DEBUGGER();
+	return false;
+}
+
+static bool is_lid_status_changed(
+	struct dc_bios *bios)
+{
+	BREAK_TO_DEBUGGER();
+	return false;
+}
+
+static bool is_display_config_changed(
+	struct dc_bios *bios)
+{
+	BREAK_TO_DEBUGGER();
+	return false;
+}
+
+static void set_scratch_lcd_scale(
+	struct dc_bios *bios,
+	enum lcd_scale scale)
+{
+	BREAK_TO_DEBUGGER();
+}
+
+static enum lcd_scale get_scratch_lcd_scale(
+	struct dc_bios *bios)
+{
+	BREAK_TO_DEBUGGER();
+	return LCD_SCALE_NONE;
+}
+
+static void get_bios_event_info(
+	struct dc_bios *bios,
+	struct bios_event_info *info)
+{
+	BREAK_TO_DEBUGGER();
+}
+
+static void update_requested_backlight_level(
+	struct dc_bios *bios,
+	uint32_t backlight_8bit)
+{
+	BREAK_TO_DEBUGGER();
+}
+
+static uint32_t get_requested_backlight_level(
+	struct dc_bios *bios)
+{
+	BREAK_TO_DEBUGGER();
+	return 0;
+}
+
+static void take_backlight_control(
+	struct dc_bios *bios,
+	bool cntl)
+{
+	BREAK_TO_DEBUGGER();
+}
+
+static bool is_active_display(
+	struct dc_bios *bios,
+	enum signal_type signal,
+	const struct connector_device_tag_info *device_tag)
+{
+	BREAK_TO_DEBUGGER();
+	return false;
+}
+
+static enum controller_id get_embedded_display_controller_id(
+	struct dc_bios *bios)
+{
+	BREAK_TO_DEBUGGER();
+	return CONTROLLER_ID_UNDEFINED;
+}
+
+static uint32_t get_embedded_display_refresh_rate(
+	struct dc_bios *bios)
+{
+	BREAK_TO_DEBUGGER();
+	return 0;
+}
+
+/******************************************************************************/
+
+static const struct dc_vbios_funcs vbios_funcs = {
+	.get_connectors_number = bios_parser_get_connectors_number,
+
+	.power_down = bios_parser_power_down,
+
+	.power_up = bios_parser_power_up,
+
+	.get_encoders_number = bios_parser_get_encoders_number,
+
+	.get_oem_ddc_lines_number = bios_parser_get_oem_ddc_lines_number,
+
+	.get_encoder_id = bios_parser_get_encoder_id,
+
+	.get_connector_id = bios_parser_get_connector_id,
+
+	.get_src_number = bios_parser_get_src_number,
+
+	.get_dst_number = bios_parser_get_dst_number,
+
+	.get_gpio_record = bios_parser_get_gpio_record,
+
+	.get_src_obj = bios_parser_get_src_obj,
+
+	.get_dst_obj = bios_parser_get_dst_obj,
+
+	.get_i2c_info = bios_parser_get_i2c_info,
+
+	.get_oem_ddc_info = bios_parser_get_oem_ddc_info,
+
+	.get_voltage_ddc_info = bios_parser_get_voltage_ddc_info,
+
+	.get_thermal_ddc_info = bios_parser_get_thermal_ddc_info,
+
+	.get_hpd_info = bios_parser_get_hpd_info,
+
+	.get_device_tag = bios_parser_get_device_tag,
+
+	.get_firmware_info = bios_parser_get_firmware_info,
+
+	.get_spread_spectrum_info = bios_parser_get_spread_spectrum_info,
+
+	.get_ss_entry_number = bios_parser_get_ss_entry_number,
+
+	.get_embedded_panel_info = bios_parser_get_embedded_panel_info,
+
+	.enum_embedded_panel_patch_mode = bios_parser_enum_embedded_panel_patch_mode,
+
+	.get_gpio_pin_info = bios_parser_get_gpio_pin_info,
+
+	.get_embedded_panel_info = bios_parser_get_embedded_panel_info,
+
+	.get_gpio_pin_info = bios_parser_get_gpio_pin_info,
+
+	.get_faked_edid_len = bios_parser_get_faked_edid_len,
+
+	.get_faked_edid_buf = bios_parser_get_faked_edid_buf,
+
+	.get_encoder_cap_info = bios_parser_get_encoder_cap_info,
+
+	.get_din_connector_info = bios_parser_get_din_connector_info,
+
+	.is_lid_open = is_lid_open,
+
+	.is_lid_status_changed = is_lid_status_changed,
+
+	.is_display_config_changed = is_display_config_changed,
+
+	.is_accelerated_mode = bios_parser_is_accelerated_mode,
+
+	.set_scratch_lcd_scale = set_scratch_lcd_scale,
+
+	.get_scratch_lcd_scale = get_scratch_lcd_scale,
+
+	.get_bios_event_info = get_bios_event_info,
+
+	.update_requested_backlight_level = update_requested_backlight_level,
+
+	.get_requested_backlight_level = get_requested_backlight_level,
+
+	.take_backlight_control = take_backlight_control,
+
+	.is_active_display = is_active_display,
+
+	.get_embedded_display_controller_id = get_embedded_display_controller_id,
+
+	.get_embedded_display_refresh_rate = get_embedded_display_refresh_rate,
+
+	.set_scratch_connected = bios_parser_set_scratch_connected,
+
+	.prepare_scratch_active_and_requested = bios_parser_prepare_scratch_active_and_requested,
+
+	.set_scratch_active_and_requested = bios_parser_set_scratch_active_and_requested,
+
+	.set_scratch_critical_state = bios_parser_set_scratch_critical_state,
+
+	.set_scratch_acc_mode_change = bios_parser_set_scratch_acc_mode_change,
+
+	.is_device_id_supported = bios_parser_is_device_id_supported,
+
+	/* COMMANDS */
+	.encoder_control = bios_parser_encoder_control,
+
+	.transmitter_control = bios_parser_transmitter_control,
+
+	.crt_control = bios_parser_crt_control,
+
+	.dvo_encoder_control = bios_parser_dvo_encoder_control,
+
+	.enable_crtc = bios_parser_enable_crtc,
+
+	.adjust_pixel_clock = bios_parser_adjust_pixel_clock,
+
+	.set_pixel_clock = bios_parser_set_pixel_clock,
+
+	.set_dce_clock = bios_parser_set_dce_clock,
+
+	.enable_spread_spectrum_on_ppll = bios_parser_enable_spread_spectrum_on_ppll,
+
+	.program_crtc_timing = bios_parser_program_crtc_timing,
+
+	.blank_crtc = bios_parser_blank_crtc,
+
+	.set_overscan = bios_parser_set_overscan,
+
+	.crtc_source_select = bios_parser_crtc_source_select,
+
+	.program_display_engine_pll = bios_parser_program_display_engine_pll,
+
+	.get_divider_for_target_display_clock = bios_parser_get_divider_for_target_display_clock,
+
+	.dac_load_detect = bios_parser_dac_load_detect,
+
+	.enable_memory_requests = bios_parser_enable_memory_requests,
+
+	.external_encoder_control = bios_parser_external_encoder_control,
+
+	.enable_disp_power_gating = bios_parser_enable_disp_power_gating,
+
+	.post_init = bios_parser_post_init,
+
+	.create_integrated_info = bios_parser_create_integrated_info,
+
+	.destroy_integrated_info = bios_parser_destroy_integrated_info,
+};
+
+static bool bios_parser_construct(
+	struct bios_parser *bp,
+	struct bp_init_data *init,
+	struct adapter_service *as)
+{
+	uint16_t *rom_header_offset = NULL;
+	ATOM_ROM_HEADER *rom_header = NULL;
+	ATOM_OBJECT_HEADER *object_info_tbl;
+	enum dce_version dce_version;
+
+	if (!as)
+		return false;
+
+	if (!init)
+		return false;
+
+	if (!init->bios)
+		return false;
+
+	bp->base.funcs = &vbios_funcs;
+
+	dce_version = dal_adapter_service_get_dce_version(as);
+	bp->ctx = init->ctx;
+	bp->as = as;
+	bp->bios = init->bios;
+	bp->bios_size = bp->bios[BIOS_IMAGE_SIZE_OFFSET] * BIOS_IMAGE_SIZE_UNIT;
+	bp->bios_local_image = NULL;
+	bp->lcd_scale = LCD_SCALE_UNKNOWN;
+
+	rom_header_offset =
+	GET_IMAGE(uint16_t, OFFSET_TO_POINTER_TO_ATOM_ROM_HEADER);
+
+	if (!rom_header_offset)
+		return false;
+
+	rom_header = GET_IMAGE(ATOM_ROM_HEADER, *rom_header_offset);
+
+	if (!rom_header)
+		return false;
+
+	bp->master_data_tbl =
+	GET_IMAGE(ATOM_MASTER_DATA_TABLE,
+		rom_header->usMasterDataTableOffset);
+
+	if (!bp->master_data_tbl)
+		return false;
+
+	bp->object_info_tbl_offset = DATA_TABLES(Object_Header);
+
+	if (!bp->object_info_tbl_offset)
+		return false;
+
+	object_info_tbl =
+	GET_IMAGE(ATOM_OBJECT_HEADER, bp->object_info_tbl_offset);
+
+	if (!object_info_tbl)
+		return false;
+
+	get_atom_data_table_revision(&object_info_tbl->sHeader,
+		&bp->object_info_tbl.revision);
+
+	if (bp->object_info_tbl.revision.major == 1
+		&& bp->object_info_tbl.revision.minor >= 3) {
+		ATOM_OBJECT_HEADER_V3 *tbl_v3;
+
+		tbl_v3 = GET_IMAGE(ATOM_OBJECT_HEADER_V3,
+			bp->object_info_tbl_offset);
+		if (!tbl_v3)
+			return false;
+
+		bp->object_info_tbl.v1_3 = tbl_v3;
+	} else if (bp->object_info_tbl.revision.major == 1
+		&& bp->object_info_tbl.revision.minor >= 1)
+		bp->object_info_tbl.v1_1 = object_info_tbl;
+	else
+		return false;
+
+#if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)
+	bp->vbios_helper_data.active = 0;
+	bp->vbios_helper_data.requested = 0;
+	dal_bios_parser_init_bios_helper(bp, dce_version);
+#endif
+	dal_bios_parser_init_cmd_tbl(bp);
+	dal_bios_parser_init_cmd_tbl_helper(&bp->cmd_helper, dce_version);
+
+	return true;
+}
+
+/******************************************************************************/

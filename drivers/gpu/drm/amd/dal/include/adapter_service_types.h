@@ -26,6 +26,7 @@
 #ifndef __DAL_ADAPTER_SERVICE_TYPES_H__
 #define __DAL_ADAPTER_SERVICE_TYPES_H__
 
+/* TODO: include signal_types.h and remove this enum */
 enum as_signal_type {
 	AS_SIGNAL_TYPE_NONE = 0L, /* no signal */
 	AS_SIGNAL_TYPE_DVI,

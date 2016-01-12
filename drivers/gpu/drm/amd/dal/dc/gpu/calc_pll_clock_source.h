@@ -24,10 +24,12 @@
 #ifndef __DAL_CALC_PLL_CLOCK_SOURCE_H__
 #define __DAL_CALC_PLL_CLOCK_SOURCE_H__
 
+#include "dc_bios_types.h"
+
 #include "include/clock_source_types.h"
 
 struct calc_pll_clock_source_init_data {
-	struct bios_parser *bp;
+	struct dc_bios *bp;
 	uint32_t min_pix_clk_pll_post_divider;
 	uint32_t max_pix_clk_pll_post_divider;
 	uint32_t min_pll_ref_divider;
