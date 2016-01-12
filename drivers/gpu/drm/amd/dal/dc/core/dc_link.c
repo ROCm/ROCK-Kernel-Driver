@@ -1360,8 +1360,6 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 	}
 
 	ASSERT(proposed_table.stream_count > 0);
-	ASSERT(proposed_table.stream_count -
-			link->stream_alloc_table.stream_count == 1);
 
 	/*
 	 * temporary fix. Unplug of MST chain happened (two displays),
@@ -1456,9 +1454,6 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 		i,
 		proposed_table.stream_allocations[i].slot_count);
 	}
-
-	ASSERT(link->stream_alloc_table.stream_count -
-			proposed_table.stream_count == 1);
 
 	dc->hwss.update_mst_stream_allocation_table(
 		link_encoder,
