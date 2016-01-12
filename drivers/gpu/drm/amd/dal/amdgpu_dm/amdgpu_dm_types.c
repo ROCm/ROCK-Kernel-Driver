@@ -2171,6 +2171,8 @@ int amdgpu_dm_atomic_commit(
 				 * during resume sequence ended
 				 */
 				new_state->planes_changed = false;
+				DRM_DEBUG_KMS("%s: Failed to create new target for crtc %d\n",
+						__func__, acrtc->base.base.id);
 				break;
 			}
 
@@ -2458,13 +2460,16 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 					aconnector,
 					&mode);
 
+			/*
+			 * we can have no target on ACTION_SET if a display
+			 * was disconnected during S3, in this case it not and
+			 * error, the OS will be updated after detection, and
+			 * do the right thing on next atomic commit
+			 */
 			if (!new_target) {
-				DRM_ERROR(
-					"%s: Can't create target for crtc %d\n",
-					__func__,
-					acrtc->crtc_id);
-				goto connector_not_found;
-
+				DRM_DEBUG_KMS("%s: Failed to create new target for crtc %d\n",
+						__func__, acrtc->base.base.id);
+				break;
 			}
 
 			new_targets[new_target_count] = new_target;
