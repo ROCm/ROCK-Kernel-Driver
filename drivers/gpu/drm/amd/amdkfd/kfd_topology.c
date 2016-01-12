@@ -862,6 +862,30 @@ static void kfd_notify_gpu_change(uint32_t gpu_id, int arrival)
 	 */
 }
 
+/* kfd_fill_mem_clk_max_info - Since CRAT doesn't have memory clock info,
+ *		patch this after CRAT parsing.
+ */
+static void kfd_fill_mem_clk_max_info(struct kfd_topology_device *dev)
+{
+	struct kfd_mem_properties *mem;
+	struct kfd_local_mem_info local_mem_info;
+
+	if (dev == NULL)
+		return;
+
+	/* Currently, amdgpu driver (amdgpu_mc) deals only with GPUs with
+	 * single bank of VRAM local memory.
+	 * for dGPUs - VCRAT reports only one bank of Local Memory
+	 * for APUs - If CRAT from ACPI reports more than one bank, then
+	 *	all the banks will report the same mem_clk_max information
+	 */
+	dev->gpu->kfd2kgd->get_local_mem_info(dev->gpu->kgd,
+		&local_mem_info);
+
+	list_for_each_entry(mem, &dev->mem_props, list)
+		mem->mem_clk_max = local_mem_info.mem_clk_max;
+}
+
 int kfd_topology_add_device(struct kfd_dev *gpu)
 {
 	uint32_t gpu_id;
@@ -933,6 +957,8 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 		dev->gpu->kfd2kgd->get_max_engine_clock_in_mhz(dev->gpu->kgd);
 	dev->node_props.max_engine_clk_ccompute =
 		cpufreq_quick_get_max(0) / 1000;
+
+	kfd_fill_mem_clk_max_info(dev);
 
 	switch (dev->gpu->device_info->asic_family) {
 	case CHIP_KAVERI:
