@@ -461,7 +461,7 @@ static void detect_on_all_dc_links(struct amdgpu_display_manager *dm)
 
 	for (i = 0; i < caps.max_links; i++) {
 		dc_link = dc_get_link_at_index(dm->dc, i);
-		dc_link_detect(dc_link);
+		dc_link_detect(dc_link, false);
 	}
 }
 
@@ -612,6 +612,31 @@ static int dm_sw_fini(void *handle)
 	return 0;
 }
 
+
+static void detect_link_for_all_connectors(struct drm_device *dev)
+{
+	struct amdgpu_connector *aconnector;
+	struct drm_connector *connector;
+
+	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
+
+	drm_for_each_connector(connector, dev) {
+		   aconnector = to_amdgpu_connector(connector);
+		   if (aconnector->dc_link->type == dc_connection_mst_branch) {
+			   DRM_INFO("DM_MST: starting TM on aconnector: %p [id: %d]\n",
+						aconnector, aconnector->base.base.id);
+
+				if (drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, true) < 0) {
+					DRM_ERROR("DM_MST: Failed to start MST\n");
+					((struct dc_link *)aconnector->dc_link)->type = dc_connection_single;
+				}
+		   }
+	}
+
+	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+}
+
+
 static int dm_hw_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
@@ -619,6 +644,10 @@ static int dm_hw_init(void *handle)
 	amdgpu_dm_init(adev);
 
 	amdgpu_dm_hpd_init(adev);
+
+	detect_link_for_all_connectors(adev->ddev);
+
+
 
 	return 0;
 }
@@ -765,7 +794,7 @@ static void handle_hpd_irq(void *param)
 	/* In case of failure or MST no need to update connector status or notify the OS
 	 * since (for MST case) MST does this in it's own context.
 	 */
-	if (dc_link_detect(aconnector->dc_link)) {
+	if (dc_link_detect(aconnector->dc_link, false)) {
 		amdgpu_dm_update_connector_after_detect(aconnector);
 		drm_kms_helper_hotplug_event(dev);
 	}
@@ -781,7 +810,7 @@ static void handle_hpd_rx_irq(void *param)
 	if (dc_link_handle_hpd_rx_irq(aconnector->dc_link) &&
 			!is_mst_root_connector) {
 		/* Downstream Port status changed. */
-		if (dc_link_detect(aconnector->dc_link)) {
+		if (dc_link_detect(aconnector->dc_link, false)) {
 			amdgpu_dm_update_connector_after_detect(aconnector);
 			drm_kms_helper_hotplug_event(dev);
 		}
@@ -1057,7 +1086,7 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 			goto fail_free_connector;
 		}
 
-		if (dc_link_detect(dc_get_link_at_index(dm->dc, i)))
+		if (dc_link_detect(dc_get_link_at_index(dm->dc, i), true))
 			amdgpu_dm_update_connector_after_detect(
 				aconnector);
 	}

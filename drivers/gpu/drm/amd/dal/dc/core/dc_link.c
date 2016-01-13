@@ -469,7 +469,8 @@ static void detect_dp(
 	struct core_link *link,
 	struct display_sink_capability *sink_caps,
 	bool *converter_disable_audio,
-	union audio_support *audio_support)
+	union audio_support *audio_support,
+	bool boot)
 {
 	sink_caps->signal = link_detect_sink(link);
 	sink_caps->transaction_type =
@@ -525,7 +526,7 @@ static void detect_dp(
 
 			if (dc_helpers_dp_mst_start_top_mgr(
 				link->ctx,
-				&link->public)) {
+				&link->public, boot)) {
 				link->public.type = dc_connection_mst_branch;
 			} else {
 				/* MST not supported */
@@ -540,7 +541,7 @@ static void detect_dp(
 	}
 }
 
-bool dc_link_detect(const struct dc_link *dc_link)
+bool dc_link_detect(const struct dc_link *dc_link, bool boot)
 {
 	struct core_link *link = DC_LINK_TO_LINK(dc_link);
 	struct dc_sink_init_data sink_init_data = { 0 };
@@ -605,7 +606,7 @@ bool dc_link_detect(const struct dc_link *dc_link)
 				link,
 				&sink_caps,
 				&converter_disable_audio,
-				&audio_support);
+				&audio_support, boot);
 
 			if (link->public.type == dc_connection_mst_branch)
 				return false;
