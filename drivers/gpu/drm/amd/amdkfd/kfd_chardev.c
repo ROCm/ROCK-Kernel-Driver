@@ -1328,7 +1328,7 @@ static int _map_memory_to_gpu(struct kfd_dev *dev, void *mem,
 	err = dev->dqm->ops.set_page_directory_base(dev->dqm, &pdd->qpd);
 	if (err != 0) {
 		dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd,
-				(struct kgd_mem *) mem);
+				(struct kgd_mem *) mem, pdd->vm);
 		return err;
 	}
 
@@ -1447,7 +1447,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 					struct kfd_process *p, void *data)
 {
 	struct kfd_ioctl_unmap_memory_from_gpu_new_args *args = data;
-	struct kfd_process_device *pdd;
+	struct kfd_process_device *pdd, *peer_pdd;
 	void *mem;
 	struct kfd_dev *dev, *peer;
 	long err = 0;
@@ -1500,11 +1500,17 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
 			}
-			peer->kfd2kgd->unmap_memory_to_gpu(peer->kgd, mem);
+			peer_pdd = kfd_get_process_device_data(peer, p);
+			if (!peer_pdd) {
+				err = -EFAULT;
+				goto get_mem_obj_from_handle_failed;
+			}
+			peer->kfd2kgd->unmap_memory_to_gpu(peer->kgd,
+					mem, peer_pdd->vm);
 			radeon_flush_tlb(peer, p->pasid);
 		}
 	} else {
-		dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd, mem);
+		dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd, mem, pdd->vm);
 		radeon_flush_tlb(dev, p->pasid);
 	}
 

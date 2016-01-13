@@ -47,7 +47,8 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
 static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 		void *vm);
-static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
+static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
+		void *vm);
 
 static int create_process_vm(struct kgd_dev *kgd, void **vm);
 static void destroy_process_vm(struct kgd_dev *kgd, void *vm);
@@ -59,7 +60,7 @@ static int map_gtt_bo_to_kernel_tonga(struct kgd_dev *kgd,
 		struct kgd_mem *mem, void **kptr);
 
 static bool is_mem_on_local_device(struct kgd_dev *kgd,
-		struct list_head *bo_va_list);
+		struct list_head *bo_va_list, void *vm);
 
 static struct kfd2kgd_calls kfd2kgd;
 
@@ -572,8 +573,8 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 	adev = get_amdgpu_device(kgd);
 
 	if (mem->data2.mapped_to_gpu_memory > 0) {
-		pr_err("BO with size %lu bytes is mapped to GPU. Need to unmap it before release\n",
-			mem->data2.bo->tbo.mem.size);
+		pr_err("BO with size %lu bytes is mapped to GPU. Need to unmap it before release va 0x%llx\n",
+			mem->data2.bo->tbo.mem.size, mem->data2.va);
 		return -1;
 	}
 
@@ -627,30 +628,33 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 		add_bo_to_vm(adev, mem->data2.va, (struct amdgpu_vm *)vm,
 				mem->data2.bo, &mem->data2.bo_va_list);
 	}
-	/*
-	 * We need to pin the allocated BO, PD and appropriate PTs and to
-	 * create a mapping of virtual to MC address
-	 */
-	/* Pin BO*/
-	ret = try_pin_bo(bo, NULL, true, domain);
-	if (ret != 0) {
-		pr_err("amdkfd: Failed to pin BO\n");
-		return ret;
-	}
 
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
 		if (entry->bo_va->vm == vm && entry->is_mapped == false) {
 			pr_debug("amdkfd: Trying to map VA 0x%llx to vm %p\n",
 					mem->data2.va, vm);
+			/*
+			 * We need to pin the allocated BO, PD and appropriate PTs and to
+			 * create a mapping of virtual to MC address
+			 */
+			/* Pin BO*/
+			ret = try_pin_bo(bo, NULL, true, domain);
+			if (ret != 0) {
+				pr_err("amdkfd: Failed to pin BO\n");
+				return ret;
+			}
+
 			ret = map_bo_to_gpuvm(adev, bo, entry->bo_va, domain);
 			if (ret != 0) {
 				pr_err("amdkfd: Failed to map radeon bo to gpuvm\n");
 				goto map_bo_to_gpuvm_failed;
 			}
 			entry->is_mapped = true;
+			mem->data2.mapped_to_gpu_memory++;
+				pr_debug("amdgpu: INC mapping count %d\n",
+					mem->data2.mapped_to_gpu_memory);
 		}
 	}
-	mem->data2.mapped_to_gpu_memory++;
 
 	return 0;
 
@@ -783,19 +787,20 @@ err_failed_to_get_bos:
 }
 
 static bool is_mem_on_local_device(struct kgd_dev *kgd,
-		struct list_head *bo_va_list)
+		struct list_head *bo_va_list, void *vm)
 {
 	struct kfd_bo_va_list *entry;
 
 	list_for_each_entry(entry, bo_va_list, bo_list) {
-		if (entry->kgd_dev == kgd)
+		if (entry->kgd_dev == kgd && entry->bo_va->vm == vm)
 			return true;
 	}
 
 	return false;
 }
 
-static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
+static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
+		void *vm)
 {
 	struct kfd_bo_va_list *entry;
 	struct amdgpu_device *adev;
@@ -809,32 +814,29 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 	/*
 	 * Make sure that this BO mapped on KGD before unmappping it
 	 */
-	if (!is_mem_on_local_device(kgd, &mem->data2.bo_va_list))
+	if (!is_mem_on_local_device(kgd, &mem->data2.bo_va_list, vm))
 		return -EINVAL;
 
 	if (mem->data2.mapped_to_gpu_memory == 0) {
-		pr_err("Unmapping BO with size %lu bytes from GPU memory is unnecessary\n",
-		mem->data2.bo->tbo.mem.size);
+		pr_err("Unmapping BO with size %lu bytes from GPU memory is unnecessary va 0x%llx\n",
+		mem->data2.bo->tbo.mem.size, mem->data2.va);
 		return -EFAULT;
 	}
 
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
-		if (entry->kgd_dev == kgd) {
-			pr_debug("Unmapping BO with VA 0x%llx, size %lu bytes from GPU memory\n",
+		if (entry->kgd_dev == kgd &&
+				entry->bo_va->vm == vm &&
+				entry->is_mapped) {
+			pr_debug("unmapping BO with VA 0x%llx, size %lu bytes from GPU memory\n",
 				mem->data2.va,
 				mem->data2.bo->tbo.mem.size);
 			/* Unpin the PD directory*/
 			unpin_bo(entry->bo_va->vm->page_directory, true);
 			/* Unpin PTs */
 			unpin_pts(entry->bo_va, entry->bo_va->vm, true);
-		}
-	}
 
-	/* Unpin BO*/
-	unpin_bo(mem->data2.bo, true);
-
-	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
-		if (entry->kgd_dev == kgd) {
+			/* Unpin BO*/
+			unpin_bo(mem->data2.bo, true);
 			ret = unmap_bo_from_gpuvm(adev, entry->bo_va);
 			if (ret == 0) {
 				entry->is_mapped = false;
@@ -843,10 +845,11 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 						mem->data2.va);
 				return ret;
 			}
+			mem->data2.mapped_to_gpu_memory--;
+			pr_debug("amdgpu: DEC mapping count %d\n",
+					mem->data2.mapped_to_gpu_memory);
 		}
 	}
-
-	mem->data2.mapped_to_gpu_memory--;
 
 	return ret;
 }
@@ -901,3 +904,4 @@ static int map_gtt_bo_to_kernel_tonga(struct kgd_dev *kgd,
 
 	return 0;
 }
+

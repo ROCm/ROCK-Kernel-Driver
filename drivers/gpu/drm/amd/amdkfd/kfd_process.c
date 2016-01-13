@@ -160,7 +160,7 @@ static struct kfd_process *find_process(const struct task_struct *thread)
 static void kfd_process_wq_release(struct work_struct *work)
 {
 	struct kfd_process_release_work *my_work;
-	struct kfd_process_device *pdd, *temp;
+	struct kfd_process_device *pdd, *temp, *peer_pdd;
 	struct kfd_process *p;
 	void *mem;
 	int id;
@@ -188,10 +188,14 @@ static void kfd_process_wq_release(struct work_struct *work)
 		 */
 		idr_for_each_entry(&pdd->alloc_idr, mem, id) {
 			idr_remove(&pdd->alloc_idr, id);
-			pdd->dev->kfd2kgd->unmap_memory_to_gpu(
-				pdd->dev->kgd, mem);
+			list_for_each_entry(peer_pdd,
+				&p->per_device_data, per_device_list) {
+					pdd->dev->kfd2kgd->unmap_memory_to_gpu(
+						peer_pdd->dev->kgd,
+						mem, peer_pdd->vm);
+			}
 			pdd->dev->kfd2kgd->free_memory_of_gpu(
-						pdd->dev->kgd, mem);
+							pdd->dev->kgd, mem);
 		}
 	}
 

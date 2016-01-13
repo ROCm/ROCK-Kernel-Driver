@@ -86,7 +86,8 @@ static uint32_t get_process_page_dir(void *vm);
 static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm, int fd, uint32_t handle, struct kgd_mem **mem);
 static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 		void *vm);
-static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
+static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
+		void *vm);
 static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 		void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr, uint32_t flags);
@@ -1430,7 +1431,7 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 		pr_debug("BO with VA %p, size %lu bytes is mapped to GPU. Need to unmap it before release\n",
 		(void *) (mem->data2.bo_va->it.start * RADEON_GPU_PAGE_SIZE),
 		mem->data2.bo->tbo.mem.size);
-		unmap_memory_from_gpu(kgd, mem);
+		unmap_memory_from_gpu(kgd, mem, NULL);
 	}
 
 	pr_debug("Releasing BO with VA %p, size %lu bytes\n",
@@ -1486,7 +1487,8 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem, void *vm)
 	return ret;
 }
 
-static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
+static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
+		void *vm)
 {
 	struct radeon_device *rdev = (struct radeon_device *) kgd;
 	struct radeon_bo_va *bo_va;

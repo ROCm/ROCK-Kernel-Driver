@@ -251,7 +251,8 @@ struct kfd2kgd_calls {
 	int (*free_memory_of_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
 	int (*map_memory_to_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem,
 			void *vm);
-	int (*unmap_memory_to_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
+	int (*unmap_memory_to_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem,
+			void *vm);
 
 	uint16_t (*get_fw_version)(struct kgd_dev *kgd,
 				enum kgd_engine_type type);

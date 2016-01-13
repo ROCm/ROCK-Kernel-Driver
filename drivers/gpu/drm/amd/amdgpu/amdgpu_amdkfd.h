@@ -48,7 +48,7 @@ struct kgd_mem {
 			struct amdgpu_bo *bo;
 			struct list_head bo_va_list;
 			uint32_t domain;
-			bool mapped_to_gpu_memory;
+			unsigned int mapped_to_gpu_memory;
 			void *kptr;
 			uint64_t va;
 		} data2;
