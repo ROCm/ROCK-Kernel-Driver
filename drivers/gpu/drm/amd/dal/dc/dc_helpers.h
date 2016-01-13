@@ -67,7 +67,8 @@ void dc_helpers_dp_mst_handle_mst_hpd_rx_irq(
 
 bool dc_helpers_dp_mst_start_top_mgr(
 		struct dc_context *ctx,
-		const struct dc_link *link);
+		const struct dc_link *link,
+		bool boot);
 
 void dc_helpers_dp_mst_stop_top_mgr(
 		struct dc_context *ctx,

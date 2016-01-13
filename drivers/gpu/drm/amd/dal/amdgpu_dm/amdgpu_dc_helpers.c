@@ -431,18 +431,23 @@ void dc_helpers_dp_mst_handle_mst_hpd_rx_irq(void *param)
 
 bool dc_helpers_dp_mst_start_top_mgr(
 		struct dc_context *ctx,
-		const struct dc_link *link)
+		const struct dc_link *link,
+		bool boot)
 {
 	struct amdgpu_device *adev = ctx->driver_context;
 	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
 
+	if (boot) {
+		DRM_INFO("DM_MST: Differing MST start on aconnector: %p [id: %d]\n",
+					aconnector, aconnector->base.base.id);
+		return true;
+	}
+
 	DRM_INFO("DM_MST: starting TM on aconnector: %p [id: %d]\n",
 			aconnector, aconnector->base.base.id);
 
-	drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, true);
-
-	return true;
+	return (drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, true) == 0);
 }
 
 void dc_helpers_dp_mst_stop_top_mgr(
