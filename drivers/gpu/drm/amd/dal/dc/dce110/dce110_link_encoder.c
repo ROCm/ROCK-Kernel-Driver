@@ -1725,6 +1725,7 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	struct dc_context *ctx = enc110->base.ctx;
 	uint32_t value0 = 0;
 	uint32_t value1 = 0;
+	uint32_t value2 = 0;
 	uint32_t slots = 0;
 	uint32_t src = 0;
 	uint32_t retries = 0;
@@ -1851,10 +1852,14 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 		value1 = get_reg_field_value(
 				value0,
 				DP_MSE_SAT_UPDATE,
+				DP_MSE_SAT_UPDATE);
+		value2 = get_reg_field_value(
+				value0,
+				DP_MSE_SAT_UPDATE,
 				DP_MSE_16_MTP_KEEPOUT);
 
 		/* bit field DP_MSE_SAT_UPDATE is set to 1 already */
-		if (value1)
+		if (!value1 && !value2)
 			break;
 		++retries;
 	} while (retries < DP_MST_UPDATE_MAX_RETRY);
