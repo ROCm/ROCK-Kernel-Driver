@@ -665,6 +665,7 @@ void kfd_process_destroy_wq(void);
 struct kfd_process *kfd_create_process(struct file *filep);
 struct kfd_process *kfd_get_process(const struct task_struct *);
 struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid);
+struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm);
 
 struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 							struct kfd_process *p);
@@ -806,6 +807,8 @@ int pqm_set_cu_mask(struct process_queue_manager *pqm, unsigned int qid,
 			struct queue_properties *p);
 struct kernel_queue *pqm_get_kernel_queue(struct process_queue_manager *pqm,
 						unsigned int qid);
+int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm);
+int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm);
 
 /* Packet Manager */
 

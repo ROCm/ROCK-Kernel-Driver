@@ -853,6 +853,22 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 	return p;
 }
 
+/* This returns with process->mutex locked. */
+struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
+{
+	struct kfd_process *p;
+
+	int idx = srcu_read_lock(&kfd_processes_srcu);
+
+	p = find_process_by_mm(mm);
+	if (p != NULL)
+		mutex_lock(&p->mutex);
+
+	srcu_read_unlock(&kfd_processes_srcu, idx);
+
+	return p;
+}
+
 int kfd_reserved_mem_mmap(struct kfd_process *process, struct vm_area_struct *vma)
 {
 	unsigned long pfn, i;
