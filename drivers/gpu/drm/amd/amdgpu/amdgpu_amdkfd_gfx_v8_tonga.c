@@ -555,7 +555,7 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 			*offset = 0;
 		return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
 				NULL, kptr, AMDGPU_GEM_DOMAIN_VRAM,
-				AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED,
+				AMDGPU_GEM_CREATE_NO_CPU_ACCESS,
 				aql_queue);
 	default:
 		return -EINVAL;
