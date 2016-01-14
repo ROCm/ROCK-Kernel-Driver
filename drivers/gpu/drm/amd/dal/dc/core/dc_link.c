@@ -608,6 +608,10 @@ bool dc_link_detect(const struct dc_link *dc_link, bool boot)
 				&converter_disable_audio,
 				&audio_support, boot);
 
+			/* Active dongle downstream unplug */
+			if (link->public.type == dc_connection_none)
+				return true;
+
 			if (link->public.type == dc_connection_mst_branch)
 				return false;
 
