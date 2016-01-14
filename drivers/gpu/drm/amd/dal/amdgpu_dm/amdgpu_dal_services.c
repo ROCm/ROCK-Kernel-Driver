@@ -157,6 +157,22 @@ bool dc_service_pp_pre_dce_clock_change(
 	return false;
 }
 
+bool dc_service_pp_apply_safe_state(
+		const struct dc_context *ctx)
+{
+#ifdef CONFIG_DRM_AMD_POWERPLAY
+	struct amdgpu_device *adev = ctx->driver_context;
+
+	if (adev->pm.dpm_enabled) {
+		/* TODO: Does this require PreModeChange event to PPLIB? */
+	}
+
+	return true;
+#else
+	return false;
+#endif
+}
+
 bool dc_service_pp_apply_display_requirements(
 		const struct dc_context *ctx,
 		const struct dc_pp_display_configuration *pp_display_cfg)

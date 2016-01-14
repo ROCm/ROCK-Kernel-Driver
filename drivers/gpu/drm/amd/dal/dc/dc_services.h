@@ -201,6 +201,9 @@ bool dc_service_pp_get_clock_levels_by_type(
 	struct dc_pp_clock_levels *clk_level_info);
 
 
+bool dc_service_pp_apply_safe_state(
+		const struct dc_context *ctx);
+
 /* DAL calls this function to notify PP about completion of Mode Set.
  * For PP it means that current DCE clocks are those which were returned
  * by dc_service_pp_pre_dce_clock_change(), in the 'output' parameter.

@@ -549,6 +549,8 @@ bool dc_commit_targets(
 		goto fail;
 	}
 
+	pplib_apply_safe_state(dc);
+
 	if (!dal_adapter_service_is_in_accelerated_mode(
 						dc->res_pool.adapter_srv)) {
 		dc->hwss.enable_accelerated_mode(dc);

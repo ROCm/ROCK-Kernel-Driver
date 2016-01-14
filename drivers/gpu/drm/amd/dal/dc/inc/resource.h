@@ -61,6 +61,8 @@ bool logical_attach_surfaces_to_target(
 		uint8_t surface_count,
 		struct dc_target *dc_target);
 
+void pplib_apply_safe_state(const struct dc *dc);
+
 void pplib_apply_display_requirements(
 	const struct dc *dc,
 	const struct validate_context *context);
