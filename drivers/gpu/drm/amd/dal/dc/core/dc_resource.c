@@ -485,6 +485,12 @@ static void fill_display_configs(
 	pp_display_cfg->display_count = num_cfgs;
 }
 
+void pplib_apply_safe_state(
+	const struct dc *dc)
+{
+	dc_service_pp_apply_safe_state(dc->ctx);
+}
+
 void pplib_apply_display_requirements(
 	const struct dc *dc,
 	const struct validate_context *context)
