@@ -509,7 +509,7 @@ struct qcm_process_device {
 	unsigned int queue_count;
 	unsigned int vmid;
 	bool is_debug;
-	bool evicted; /* true -> process device is evicted,and can't be active*/
+	unsigned evicted; /* eviction counter, 0=active */
 	/*
 	 * All the memory management data should be here too
 	 */
