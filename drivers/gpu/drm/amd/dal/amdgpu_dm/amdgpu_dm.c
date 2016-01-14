@@ -801,10 +801,6 @@ static int dm_resume(void *handle)
 		DC_ACPI_CM_POWER_STATE_D0,
 		DC_VIDEO_POWER_ON);
 
-	/* program HPD filter*/
-	dc_resume(dm->dc);
-	/* resume IRQ */
-	amdgpu_dm_irq_resume(adev);
 	/* Do detection*/
 	list_for_each_entry(connector,
 			&ddev->mode_config.connector_list, head) {
@@ -814,9 +810,17 @@ static int dm_resume(void *handle)
 		amdgpu_dm_update_connector_after_detect(aconnector);
 	}
 
+
 	drm_modeset_lock_all(ddev);
 	ret = dm_display_resume(ddev);
 	drm_modeset_unlock_all(ddev);
+
+	drm_kms_helper_hotplug_event(ddev);
+
+	/* program HPD filter*/
+	dc_resume(dm->dc);
+	/* resume IRQ */
+	amdgpu_dm_irq_resume(adev);
 
 	return ret;
 }
