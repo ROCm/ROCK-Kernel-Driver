@@ -1416,6 +1416,7 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 	struct fixed31_32 avg_time_slots_per_mtp = dal_fixed31_32_from_int(0);
 	struct dc *dc = stream->ctx->dc;
 	uint8_t i;
+	bool mst_mode = (link->public.type == dc_connection_mst_branch);
 
 	/* deallocate_mst_payload is called before disable link. When mode or
 	 * disable/enable monitor, new stream is created which is not in link
@@ -1430,12 +1431,13 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 		avg_time_slots_per_mtp);
 
 	/* TODO: which component is responsible for remove payload table? */
-	dc_helpers_dp_mst_write_payload_allocation_table(
-		stream->ctx,
-		&stream->public,
-		&link->stream_alloc_table,
-		&proposed_table,
-		false);
+	if (mst_mode)
+		dc_helpers_dp_mst_write_payload_allocation_table(
+				stream->ctx,
+				&stream->public,
+				&link->stream_alloc_table,
+				&proposed_table,
+				false);
 
 	dal_logger_write(link->ctx->logger,
 			LOG_MAJOR_MST,
@@ -1466,14 +1468,16 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 
 	link->stream_alloc_table = proposed_table;
 
-	dc_helpers_dp_mst_poll_for_allocation_change_trigger(
+	if (mst_mode) {
+		dc_helpers_dp_mst_poll_for_allocation_change_trigger(
 			stream->ctx,
 			&stream->public);
 
-	dc_helpers_dp_mst_send_payload_allocation(
+		dc_helpers_dp_mst_send_payload_allocation(
 			stream->ctx,
 			&stream->public,
 			false);
+	}
 
 	return DC_OK;
 }

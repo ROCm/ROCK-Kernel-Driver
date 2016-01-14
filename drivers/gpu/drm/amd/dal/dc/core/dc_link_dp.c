@@ -989,10 +989,12 @@ static bool perform_clock_recovery_sequence(
 	dal_logger_write(link->ctx->logger,
 		LOG_MAJOR_MST,
 		LOG_MINOR_MST_PROGRAMMING,
-		"Link training for %d lanes at %s rate %s\n",
+		"Link training for %d lanes at %s rate %s with PE %d, VS %d\n",
 		lt_settings.link_settings.lane_count,
 		link_rate,
-		status ? "succeeded" : "failed");
+		status ? "succeeded" : "failed",
+		lt_settings.lane_settings[0].PRE_EMPHASIS,
+		lt_settings.lane_settings[0].VOLTAGE_SWING);
 
 	return status;
 }
