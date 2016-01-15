@@ -612,8 +612,11 @@ bool dc_link_detect(const struct dc_link *dc_link, bool boot)
 			if (link->public.type == dc_connection_none)
 				return true;
 
-			if (link->public.type == dc_connection_mst_branch)
+			if (link->public.type == dc_connection_mst_branch) {
+				LINK_INFO("link=%d, mst branch is now Connected\n",
+					link->public.link_index);
 				return false;
+			}
 
 			break;
 		}
@@ -712,8 +715,11 @@ bool dc_link_detect(const struct dc_link *dc_link, bool boot)
 
 	} else {
 		/* From Connected-to-Disconnected. */
-		if (link->public.type == dc_connection_mst_branch)
+		if (link->public.type == dc_connection_mst_branch) {
+			LINK_INFO("link=%d, mst branch is now Disconnected\n",
+				link->public.link_index);
 			dc_helpers_dp_mst_stop_top_mgr(link->ctx, &link->public);
+		}
 
 		link->public.type = dc_connection_none;
 		sink_caps.signal = SIGNAL_TYPE_NONE;
