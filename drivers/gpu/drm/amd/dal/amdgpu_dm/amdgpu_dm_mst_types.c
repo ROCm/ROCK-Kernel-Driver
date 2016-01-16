@@ -31,16 +31,59 @@
 #include "dc.h"
 #include "dc_helpers.h"
 
+/* #define TRACE_DPCD */
+
+#ifdef TRACE_DPCD
+#define SIDE_BAND_MSG(address) (address >= DP_SIDEBAND_MSG_DOWN_REQ_BASE && address < DP_SINK_COUNT_ESI)
+
+static inline char *side_band_msg_type_to_str(uint32_t address)
+{
+	static char str[10] = {0};
+
+	if (address < DP_SIDEBAND_MSG_UP_REP_BASE)
+		strcpy(str, "DOWN_REQ");
+	else if (address < DP_SIDEBAND_MSG_DOWN_REP_BASE)
+		strcpy(str, "UP_REP");
+	else if (address < DP_SIDEBAND_MSG_UP_REQ_BASE)
+		strcpy(str, "DOWN_REP");
+	else
+		strcpy(str, "UP_REQ");
+
+	return str;
+}
+
+void log_dpcd(uint8_t type,
+		uint32_t address,
+		uint8_t *data,
+		uint32_t size,
+		bool res)
+{
+	DRM_DEBUG_KMS("Op: %s, addr: %04x, SideBand Msg: %s, Op res: %s\n",
+			(type == DP_AUX_NATIVE_READ) ||
+			(type == DP_AUX_I2C_READ) ?
+					"Read" : "Write",
+			address,
+			SIDE_BAND_MSG(address) ?
+					side_band_msg_type_to_str(address) : "Nop",
+			res ? "OK" : "Fail");
+
+	if (res) {
+		print_hex_dump(KERN_INFO, "Body: ", DUMP_PREFIX_NONE, 16, 1, data, size, false);
+	}
+}
+#endif
+
 static ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
 {
 	struct pci_dev *pdev = to_pci_dev(aux->dev);
 	struct drm_device *drm_dev = pci_get_drvdata(pdev);
 	struct amdgpu_device *adev = drm_dev->dev_private;
 	struct dc *dc = adev->dm.dc;
+	bool res;
 
 	switch (msg->request) {
 	case DP_AUX_NATIVE_READ:
-		dc_read_dpcd(
+		res = dc_read_dpcd(
 			dc,
 			TO_DM_AUX(aux)->link_index,
 			msg->address,
@@ -48,7 +91,7 @@ static ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg 
 			msg->size);
 		break;
 	case DP_AUX_NATIVE_WRITE:
-		dc_write_dpcd(
+		res = dc_write_dpcd(
 			dc,
 			TO_DM_AUX(aux)->link_index,
 			msg->address,
@@ -58,6 +101,14 @@ static ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg 
 	default:
 		return 0;
 	}
+
+#ifdef TRACE_DPCD
+	log_dpcd(msg->request,
+			msg->address,
+			msg->buffer,
+			msg->size,
+			res);
+#endif
 
 	return msg->size;
 }
