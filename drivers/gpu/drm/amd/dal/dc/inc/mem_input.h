@@ -30,8 +30,37 @@
 #include "dc.h"
 
 struct mem_input {
+	struct mem_input_funcs *funcs;
 	struct dc_context *ctx;
 	uint32_t inst;
+};
+
+struct mem_input_funcs {
+	void (*mem_input_program_safe_display_marks)(struct mem_input *mi);
+	void (*mem_input_program_display_marks)(
+		struct mem_input *mem_input,
+		struct bw_watermarks nbp,
+		struct bw_watermarks stutter,
+		struct bw_watermarks urgent,
+		uint32_t h_total,
+		uint32_t pixel_clk_in_khz,
+		uint32_t pstate_blackout_duration_ns);
+	void (*mem_input_allocate_dmif_buffer)(
+			struct mem_input *mem_input,
+			struct dc_crtc_timing *timing,
+			uint32_t paths_num);
+	void (*mem_input_deallocate_dmif_buffer)(
+		struct mem_input *mem_input, uint32_t paths_num);
+	bool (*mem_input_program_surface_flip_and_addr)(
+		struct mem_input *mem_input,
+		const struct dc_plane_address *address,
+		bool flip_immediate);
+	bool (*mem_input_program_surface_config)(
+		struct mem_input *mem_input,
+		enum surface_pixel_format format,
+		union plane_tiling_info *tiling_info,
+		union plane_size *plane_size,
+		enum dc_rotation_angle rotation);
 };
 
 enum stutter_mode_type {

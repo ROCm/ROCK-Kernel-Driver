@@ -53,6 +53,9 @@
 struct dce110_timing_generator_offsets {
 	uint32_t crtc;
 	uint32_t dcp;
+
+	/* DCE80 use only */
+	uint32_t dmif;
 };
 
 struct dce110_timing_generator {

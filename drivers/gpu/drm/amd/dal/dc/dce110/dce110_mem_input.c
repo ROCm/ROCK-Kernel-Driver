@@ -43,26 +43,6 @@
 #define DMIF_REG(reg) (reg + mem_input110->offsets.dmif)
 #define PIPE_REG(reg) (reg + mem_input110->offsets.pipe)
 
-static const struct dce110_mem_input_reg_offsets reg_offsets[] =  {
-{
-	.dcp = 0,
-	.dmif = 0,
-	.pipe = 0,
-},
-{
-	.dcp = (mmDCP1_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
-	.dmif = (mmDMIF_PG1_DPG_WATERMARK_MASK_CONTROL
-				- mmDMIF_PG0_DPG_WATERMARK_MASK_CONTROL),
-	.pipe = (mmPIPE1_DMIF_BUFFER_CONTROL - mmPIPE0_DMIF_BUFFER_CONTROL),
-},
-{
-	.dcp = (mmDCP2_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
-	.dmif = (mmDMIF_PG2_DPG_WATERMARK_MASK_CONTROL
-				- mmDMIF_PG0_DPG_WATERMARK_MASK_CONTROL),
-	.pipe = (mmPIPE2_DMIF_BUFFER_CONTROL - mmPIPE0_DMIF_BUFFER_CONTROL),
-}
-};
-
 static void set_flip_control(
 	struct dce110_mem_input *mem_input110,
 	bool immediate)
@@ -445,6 +425,19 @@ static void program_pixel_format(
 	}
 }
 
+static void wait_for_no_surface_update_pending(
+				struct dce110_mem_input *mem_input110)
+{
+	uint32_t value;
+
+	do  {
+		value = dal_read_reg(mem_input110->base.ctx,
+				DCP_REG(mmGRPH_UPDATE));
+
+	} while (get_reg_field_value(value, GRPH_UPDATE,
+			GRPH_SURFACE_UPDATE_PENDING));
+}
+
 bool dce110_mem_input_program_surface_flip_and_addr(
 	struct mem_input *mem_input,
 	const struct dc_plane_address *address,
@@ -455,6 +448,9 @@ bool dce110_mem_input_program_surface_flip_and_addr(
 	set_flip_control(mem_input110, flip_immediate);
 	program_addr(mem_input110,
 		address);
+
+	if (flip_immediate)
+		wait_for_no_surface_update_pending(mem_input110);
 
 	return true;
 }
@@ -922,6 +918,19 @@ void dce110_mem_input_deallocate_dmif_buffer(
 	dal_write_reg(mi->ctx, mmMC_HUB_RDREQ_DMIF_LIMIT, value);
 }
 
+static struct mem_input_funcs dce110_mem_input_funcs = {
+	.mem_input_program_safe_display_marks =
+			dce110_mem_input_program_safe_display_marks,
+	.mem_input_program_display_marks =
+			dce110_mem_input_program_display_marks,
+	.mem_input_allocate_dmif_buffer = dce110_mem_input_allocate_dmif_buffer,
+	.mem_input_deallocate_dmif_buffer =
+			dce110_mem_input_deallocate_dmif_buffer,
+	.mem_input_program_surface_flip_and_addr =
+			dce110_mem_input_program_surface_flip_and_addr,
+	.mem_input_program_surface_config =
+			dce110_mem_input_program_surface_config,
+};
 /*****************************************/
 /* Constructor, Destructor               */
 /*****************************************/
@@ -929,16 +938,15 @@ void dce110_mem_input_deallocate_dmif_buffer(
 bool dce110_mem_input_construct(
 	struct dce110_mem_input *mem_input110,
 	struct dc_context *ctx,
-	uint32_t inst)
+	uint32_t inst,
+	const struct dce110_mem_input_reg_offsets *offsets)
 {
-	if (inst >= ARRAY_SIZE(reg_offsets))
-		return false;
-
+	mem_input110->base.funcs = &dce110_mem_input_funcs;
 	mem_input110->base.ctx = ctx;
 
 	mem_input110->base.inst = inst;
 
-	mem_input110->offsets = reg_offsets[inst];
+	mem_input110->offsets = *offsets;
 
 	mem_input110->supported_stutter_mode = 0;
 	dal_adapter_service_get_feature_value(FEATURE_STUTTER_MODE,
@@ -952,23 +960,4 @@ void dce110_mem_input_destroy(struct mem_input **mem_input)
 {
 	dc_service_free((*mem_input)->ctx, TO_DCE110_MEM_INPUT(*mem_input));
 	*mem_input = NULL;
-}
-
-struct mem_input *dce110_mem_input_create(
-	struct dc_context *ctx,
-	uint32_t inst)
-{
-	struct dce110_mem_input *mem_input110 =
-		dc_service_alloc(ctx, sizeof(struct dce110_mem_input));
-
-	if (!mem_input110)
-		return NULL;
-
-	if (dce110_mem_input_construct(mem_input110,
-			ctx, inst))
-		return &mem_input110->base;
-
-	BREAK_TO_DEBUGGER();
-	dc_service_free(ctx, mem_input110);
-	return NULL;
 }

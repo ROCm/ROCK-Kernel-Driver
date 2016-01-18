@@ -826,7 +826,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 	}
 
 	/*TODO: mst support - use total stream count*/
-	dce110_mem_input_allocate_dmif_buffer(
+	stream->mi->funcs->mem_input_allocate_dmif_buffer(
 					stream->mi,
 					&stream->public.timing,
 					context->target_count);
@@ -1156,7 +1156,7 @@ static void set_displaymarks(
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 
-			dce110_mem_input_program_display_marks(
+			stream->mi->funcs->mem_input_program_display_marks(
 				stream->mi,
 				context->bw_results
 				.nbp_state_change_wm_ns[total_streams],
@@ -1185,7 +1185,8 @@ static void set_safe_displaymarks(struct validate_context *context)
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 
-			dce110_mem_input_program_safe_display_marks(stream->mi);
+			stream->mi->funcs->mem_input_program_safe_display_marks(
+					stream->mi);
 		}
 	}
 }
@@ -1510,7 +1511,7 @@ static bool set_plane_config(
 			path_mode->mode.timing.pixel_encoding);
 #endif
 
-	dce110_mem_input_program_surface_config(
+	mi->funcs->mem_input_program_surface_config(
 			mi,
 			surface->public.format,
 			&surface->public.tiling_info,
@@ -1546,7 +1547,8 @@ static bool update_plane_address(
 		PIPE_LOCK_CONTROL_SURFACE,
 		true);
 
-	if (false == dce110_mem_input_program_surface_flip_and_addr(
+	if (false ==
+		core_stream->mi->funcs->mem_input_program_surface_flip_and_addr(
 		mi, &surface->public.address, surface->public.flip_immediate))
 		return false;
 
@@ -1578,7 +1580,8 @@ static void reset_single_stream_hw_ctx(struct core_stream *stream,
 
 	stream->tg->funcs->set_blank(stream->tg, true);
 	stream->tg->funcs->disable_crtc(stream->tg);
-	dce110_mem_input_deallocate_dmif_buffer(stream->mi, context->target_count);
+	stream->mi->funcs->mem_input_deallocate_dmif_buffer(
+			stream->mi, context->target_count);
 	dce110_transform_set_scaler_bypass(stream->xfm);
 	disable_stereo_mixer(stream->ctx);
 	unreference_clock_source(&context->res_ctx, stream->clock_source);
