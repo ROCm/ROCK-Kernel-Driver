@@ -39,6 +39,7 @@
 #include "include/irq_service_interface.h"
 #include "bandwidth_calcs.h"
 #include "include/irq_service_interface.h"
+#include "inc/transform.h"
 
 #include "link_hwss.h"
 #include "link_encoder.h"
@@ -157,7 +158,7 @@ static void init_hw(struct dc *dc)
 				dc->ctx, i, bp,
 				PIPE_GATING_CONTROL_DISABLE);
 
-		dc->hwss.transform_power_up(xfm);
+		xfm->funcs->transform_power_up(xfm);
 		dc->hwss.enable_display_pipe_clock_gating(
 			dc->ctx,
 			true);

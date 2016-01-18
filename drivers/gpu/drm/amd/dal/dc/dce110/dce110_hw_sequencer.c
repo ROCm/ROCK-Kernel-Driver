@@ -1332,7 +1332,7 @@ static bool setup_line_buffer_pixel_depth(
 	struct timing_generator *tg = stream->tg;
 	struct transform *xfm = stream->xfm;
 
-	if (!dce110_transform_get_current_pixel_storage_depth(
+	if (!xfm->funcs->transform_get_current_pixel_storage_depth(
 		xfm,
 		&current_depth))
 		return false;
@@ -1341,7 +1341,7 @@ static bool setup_line_buffer_pixel_depth(
 		if (blank)
 			tg->funcs->wait_for_state(tg, CRTC_STATE_VBLANK);
 
-		return dce110_transform_set_pixel_storage_depth(xfm, depth);
+		return xfm->funcs->transform_set_pixel_storage_depth(xfm, depth);
 	}
 
 	return false;
@@ -1426,9 +1426,9 @@ static void program_scaler(
 
 	tg->funcs->set_overscan_blank_color(tg, surface->public.colorimetry.color_space);
 
-	dce110_transform_set_scaler(xfm, &scaler_data);
+	xfm->funcs->transform_set_scaler(xfm, &scaler_data);
 
-	dce110_transform_update_viewport(
+	xfm->funcs->transform_update_viewport(
 			xfm,
 			&scaler_data.viewport,
 			false);
@@ -1582,7 +1582,7 @@ static void reset_single_stream_hw_ctx(struct core_stream *stream,
 	stream->tg->funcs->disable_crtc(stream->tg);
 	stream->mi->funcs->mem_input_deallocate_dmif_buffer(
 			stream->mi, context->target_count);
-	dce110_transform_set_scaler_bypass(stream->xfm);
+	stream->xfm->funcs->transform_set_scaler_bypass(stream->xfm);
 	disable_stereo_mixer(stream->ctx);
 	unreference_clock_source(&context->res_ctx, stream->clock_source);
 	dce110_enable_display_power_gating(
