@@ -1412,6 +1412,11 @@ bool amdgpu_device_has_dal_support(struct amdgpu_device *adev)
 	case CHIP_CARRIZO:
 		return true;
 #endif
+#if defined(CONFIG_DRM_AMD_DAL) && defined(CONFIG_DRM_AMD_DAL_DCE10_0)
+	case CHIP_TONGA:
+	case CHIP_FIJI:
+		return true;
+#endif
 	default:
 		return false;
 	}
