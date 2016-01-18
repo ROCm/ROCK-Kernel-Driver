@@ -39,23 +39,23 @@
 #include "dce110_transform.h"
 #include "dce110_transform_bit_depth.h"
 
-static const struct dce110_transform_reg_offsets reg_offsets[] = {
-{
-	.scl_offset = (mmSCL0_SCL_CONTROL - mmSCL0_SCL_CONTROL),
-	.dcfe_offset = (mmDCFE0_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.dcp_offset = (mmDCP0_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
-	.lb_offset = (mmLB0_LB_DATA_FORMAT - mmLB0_LB_DATA_FORMAT),
-},
-{	.scl_offset = (mmSCL1_SCL_CONTROL - mmSCL0_SCL_CONTROL),
-	.dcfe_offset = (mmDCFE1_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.dcp_offset = (mmDCP1_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
-	.lb_offset = (mmLB1_LB_DATA_FORMAT - mmLB0_LB_DATA_FORMAT),
-},
-{	.scl_offset = (mmSCL2_SCL_CONTROL - mmSCL0_SCL_CONTROL),
-	.dcfe_offset = (mmDCFE2_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.dcp_offset = (mmDCP2_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
-	.lb_offset = (mmLB2_LB_DATA_FORMAT - mmLB0_LB_DATA_FORMAT),
-}
+static struct transform_funcs dce110_transform_funcs = {
+	.transform_power_up =
+		dce110_transform_power_up,
+	.transform_set_scaler =
+		dce110_transform_set_scaler,
+	.transform_set_scaler_bypass =
+		dce110_transform_set_scaler_bypass,
+	.transform_update_viewport =
+		dce110_transform_update_viewport,
+	.transform_set_scaler_filter =
+		dce110_transform_set_scaler_filter,
+	.transform_set_gamut_remap =
+		dce110_transform_set_gamut_remap,
+	.transform_set_pixel_storage_depth =
+		dce110_transform_set_pixel_storage_depth,
+	.transform_get_current_pixel_storage_depth =
+		dce110_transform_get_current_pixel_storage_depth
 };
 
 /*****************************************/
@@ -65,16 +65,15 @@ static const struct dce110_transform_reg_offsets reg_offsets[] = {
 bool dce110_transform_construct(
 	struct dce110_transform *xfm110,
 	struct dc_context *ctx,
-	uint32_t inst)
+	uint32_t inst,
+	const struct dce110_transform_reg_offsets *reg_offsets)
 {
-	if (inst >= ARRAY_SIZE(reg_offsets))
-		return false;
-
 	xfm110->base.ctx = ctx;
 
 	xfm110->base.inst = inst;
+	xfm110->base.funcs = &dce110_transform_funcs;
 
-	xfm110->offsets = reg_offsets[inst];
+	xfm110->offsets = *reg_offsets;
 
 	xfm110->lb_pixel_depth_supported =
 			LB_PIXEL_DEPTH_18BPP |
@@ -82,31 +81,6 @@ bool dce110_transform_construct(
 			LB_PIXEL_DEPTH_30BPP;
 
 	return true;
-}
-
-void dce110_transform_destroy(struct transform **xfm)
-{
-	dc_service_free((*xfm)->ctx, TO_DCE110_TRANSFORM(*xfm));
-	*xfm = NULL;
-}
-
-struct transform *dce110_transform_create(
-	struct dc_context *ctx,
-	uint32_t inst)
-{
-	struct dce110_transform *transform =
-		dc_service_alloc(ctx, sizeof(struct dce110_transform));
-
-	if (!transform)
-		return NULL;
-
-	if (dce110_transform_construct(transform,
-			ctx, inst))
-		return &transform->base;
-
-	BREAK_TO_DEBUGGER();
-	dc_service_free(ctx, transform);
-	return NULL;
 }
 
 bool dce110_transform_power_up(struct transform *xfm)

@@ -104,6 +104,25 @@ static const struct dce110_mem_input_reg_offsets dce110_mi_reg_offsets[] = {
 	}
 };
 
+static const struct dce110_transform_reg_offsets dce110_xfm_offsets[] = {
+{
+	.scl_offset = (mmSCL0_SCL_CONTROL - mmSCL0_SCL_CONTROL),
+	.dcfe_offset = (mmDCFE0_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
+	.dcp_offset = (mmDCP0_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+	.lb_offset = (mmLB0_LB_DATA_FORMAT - mmLB0_LB_DATA_FORMAT),
+},
+{	.scl_offset = (mmSCL1_SCL_CONTROL - mmSCL0_SCL_CONTROL),
+	.dcfe_offset = (mmDCFE1_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
+	.dcp_offset = (mmDCP1_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+	.lb_offset = (mmLB1_LB_DATA_FORMAT - mmLB0_LB_DATA_FORMAT),
+},
+{	.scl_offset = (mmSCL2_SCL_CONTROL - mmSCL0_SCL_CONTROL),
+	.dcfe_offset = (mmDCFE2_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
+	.dcp_offset = (mmDCP2_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+	.lb_offset = (mmLB2_LB_DATA_FORMAT - mmLB0_LB_DATA_FORMAT),
+}
+};
+
 static struct timing_generator *dce110_timing_generator_create(
 		struct adapter_service *as,
 		struct dc_context *ctx,
@@ -161,6 +180,31 @@ static struct mem_input *dce110_mem_input_create(
 
 	BREAK_TO_DEBUGGER();
 	dc_service_free(ctx, mem_input110);
+	return NULL;
+}
+
+static void dce110_transform_destroy(struct transform **xfm)
+{
+	dc_service_free((*xfm)->ctx, TO_DCE110_TRANSFORM(*xfm));
+	*xfm = NULL;
+}
+
+static struct transform *dce110_transform_create(
+	struct dc_context *ctx,
+	uint32_t inst,
+	const struct dce110_transform_reg_offsets *offsets)
+{
+	struct dce110_transform *transform =
+		dc_service_alloc(ctx, sizeof(struct dce110_transform));
+
+	if (!transform)
+		return NULL;
+
+	if (dce110_transform_construct(transform, ctx, inst, offsets))
+		return &transform->base;
+
+	BREAK_TO_DEBUGGER();
+	dc_service_free(ctx, transform);
 	return NULL;
 }
 
@@ -258,14 +302,15 @@ bool dce110_construct_resource_pool(
 			goto controller_create_fail;
 		}
 
-		pool->transforms[i] = dce110_transform_create(ctx, i);
+		pool->transforms[i] = dce110_transform_create(
+					ctx, i, &dce110_xfm_offsets[i]);
 		if (pool->transforms[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dal_error(
 				"DC: failed to create transform!\n");
 			goto controller_create_fail;
 		}
-		dce110_transform_set_scaler_filter(
+		pool->transforms[i]->funcs->transform_set_scaler_filter(
 				pool->transforms[i],
 				pool->scaler_filter);
 

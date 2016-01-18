@@ -27,6 +27,7 @@
 #define __DAL_TRANSFORM_H__
 
 #include "include/scaler_types.h"
+#include "include/grph_csc_types.h"
 #include "calcs/scaler_filter.h"
 #include "grph_object_id.h"
 
@@ -37,10 +38,12 @@ enum scaling_type {
 };
 
 struct transform {
+	struct transform_funcs *funcs;
 	struct dc_context *ctx;
 	uint32_t inst;
 	struct scaler_filter *filter;
 };
+
 
 struct scaler_taps_and_ratio {
 	uint32_t h_tap;
@@ -76,6 +79,37 @@ enum lb_pixel_depth {
 	LB_PIXEL_DEPTH_24BPP = 2,
 	LB_PIXEL_DEPTH_30BPP = 4,
 	LB_PIXEL_DEPTH_36BPP = 8
+};
+
+struct transform_funcs {
+	bool (*transform_power_up)(struct transform *xfm);
+
+	bool (*transform_set_scaler)(
+		struct transform *xfm,
+		const struct scaler_data *data);
+
+	void (*transform_set_scaler_bypass)(struct transform *xfm);
+
+	bool (*transform_update_viewport)(
+		struct transform *xfm,
+		const struct rect *view_port,
+		bool is_fbc_attached);
+
+	void (*transform_set_scaler_filter)(
+		struct transform *xfm,
+		struct scaler_filter *filter);
+
+	void (*transform_set_gamut_remap)(
+		struct transform *xfm,
+		const struct grph_csc_adjustment *adjust);
+
+	bool (*transform_set_pixel_storage_depth)(
+		struct transform *xfm,
+		enum lb_pixel_depth depth);
+
+	bool (*transform_get_current_pixel_storage_depth)(
+		struct transform *xfm,
+		enum lb_pixel_depth *depth);
 };
 
 #endif

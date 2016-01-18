@@ -47,13 +47,8 @@ struct dce110_transform {
 
 bool dce110_transform_construct(struct dce110_transform *xfm110,
 	struct dc_context *ctx,
-	uint32_t inst);
-
-void dce110_transform_destroy(struct transform **xfm);
-
-struct transform *dce110_transform_create(
-	struct dc_context *ctx,
-	uint32_t inst);
+	uint32_t inst,
+	const struct dce110_transform_reg_offsets *reg_offsets);
 
 bool dce110_transform_power_up(struct transform *xfm);
 
