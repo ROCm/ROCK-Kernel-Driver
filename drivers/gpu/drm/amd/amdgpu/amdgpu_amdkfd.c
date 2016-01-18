@@ -233,7 +233,7 @@ void get_local_mem_info(struct kgd_dev *kgd,
 	mem_info->vram_width = rdev->mc.vram_width;
 
 	if (amdgpu_powerplay || rdev->pm.funcs->get_mclk)
-		mem_info->mem_clk_max = amdgpu_dpm_get_mclk(rdev, false);
+		mem_info->mem_clk_max = amdgpu_dpm_get_mclk(rdev, false) / 100;
 }
 
 uint64_t get_gpu_clock_counter(struct kgd_dev *kgd)
