@@ -1066,6 +1066,142 @@ static const struct amdgpu_ip_block_version cz_ip_blocks_dal[] =
 	},
 #endif
 };
+
+static const struct amdgpu_ip_block_version tonga_ip_blocks_dal[] =
+{
+	/* ORDER MATTERS! */
+	{
+		.type = AMD_IP_BLOCK_TYPE_COMMON,
+		.major = 2,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &vi_common_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_GMC,
+		.major = 8,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &gmc_v8_0_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_IH,
+		.major = 3,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &tonga_ih_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_SMC,
+		.major = 7,
+		.minor = 1,
+		.rev = 0,
+		.funcs = &amdgpu_pp_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_DCE,
+		.major = 10,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &amdgpu_dm_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_GFX,
+		.major = 8,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &gfx_v8_0_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_SDMA,
+		.major = 3,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &sdma_v3_0_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_UVD,
+		.major = 5,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &uvd_v5_0_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_VCE,
+		.major = 3,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &vce_v3_0_ip_funcs,
+	},
+};
+
+static const struct amdgpu_ip_block_version fiji_ip_blocks_dal[] =
+{
+	/* ORDER MATTERS! */
+	{
+		.type = AMD_IP_BLOCK_TYPE_COMMON,
+		.major = 2,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &vi_common_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_GMC,
+		.major = 8,
+		.minor = 5,
+		.rev = 0,
+		.funcs = &gmc_v8_0_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_IH,
+		.major = 3,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &tonga_ih_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_SMC,
+		.major = 7,
+		.minor = 1,
+		.rev = 0,
+		.funcs = &amdgpu_pp_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_DCE,
+		.major = 10,
+		.minor = 1,
+		.rev = 0,
+		.funcs = &amdgpu_dm_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_GFX,
+		.major = 8,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &gfx_v8_0_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_SDMA,
+		.major = 3,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &sdma_v3_0_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_UVD,
+		.major = 6,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &uvd_v6_0_ip_funcs,
+	},
+	{
+		.type = AMD_IP_BLOCK_TYPE_VCE,
+		.major = 3,
+		.minor = 0,
+		.rev = 0,
+		.funcs = &vce_v3_0_ip_funcs,
+	},
+};
 #endif
 
 int vi_set_ip_blocks(struct amdgpu_device *adev)
@@ -1076,12 +1212,32 @@ int vi_set_ip_blocks(struct amdgpu_device *adev)
 		adev->num_ip_blocks = ARRAY_SIZE(topaz_ip_blocks);
 		break;
 	case CHIP_FIJI:
+#if defined(CONFIG_DRM_AMD_DAL)
+		if (amdgpu_dal && amdgpu_device_has_dal_support(adev)) {
+			adev->ip_blocks = fiji_ip_blocks_dal;
+			adev->num_ip_blocks = ARRAY_SIZE(fiji_ip_blocks_dal);
+		} else {
+			adev->ip_blocks = fiji_ip_blocks;
+			adev->num_ip_blocks = ARRAY_SIZE(fiji_ip_blocks);
+		}
+#else
 		adev->ip_blocks = fiji_ip_blocks;
 		adev->num_ip_blocks = ARRAY_SIZE(fiji_ip_blocks);
+#endif
 		break;
 	case CHIP_TONGA:
+#if defined(CONFIG_DRM_AMD_DAL)
+		if (amdgpu_dal && amdgpu_device_has_dal_support(adev)) {
+			adev->ip_blocks = tonga_ip_blocks_dal;
+			adev->num_ip_blocks = ARRAY_SIZE(tonga_ip_blocks_dal);
+		} else {
+			adev->ip_blocks = tonga_ip_blocks;
+			adev->num_ip_blocks = ARRAY_SIZE(tonga_ip_blocks);
+		}
+#else
 		adev->ip_blocks = tonga_ip_blocks;
 		adev->num_ip_blocks = ARRAY_SIZE(tonga_ip_blocks);
+#endif
 		break;
 	case CHIP_CARRIZO:
 	case CHIP_STONEY:
