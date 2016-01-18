@@ -42,11 +42,11 @@ struct dce110_mem_input {
 	uint32_t supported_stutter_mode;
 };
 
-struct mem_input *dce110_mem_input_create(
+bool dce110_mem_input_construct(
+	struct dce110_mem_input *mem_input110,
 	struct dc_context *ctx,
-	uint32_t inst);
-
-void dce110_mem_input_destroy(struct mem_input **mem_input);
+	uint32_t inst,
+	const struct dce110_mem_input_reg_offsets *offsets);
 
 /*
  * dce110_mem_input_program_display_marks

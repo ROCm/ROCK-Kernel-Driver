@@ -80,6 +80,29 @@ static const struct dce110_stream_enc_offsets dce110_str_enc_offsets[] = {
 	}
 };
 
+static const struct dce110_mem_input_reg_offsets dce110_mi_reg_offsets[] = {
+	{
+		.dcp = (mmDCP0_GRPH_CONTROL - mmGRPH_CONTROL),
+		.dmif = (mmDMIF_PG0_DPG_WATERMARK_MASK_CONTROL
+				- mmDPG_WATERMARK_MASK_CONTROL),
+		.pipe = (mmPIPE0_DMIF_BUFFER_CONTROL
+				- mmPIPE0_DMIF_BUFFER_CONTROL),
+	},
+	{
+		.dcp = (mmDCP1_GRPH_CONTROL - mmGRPH_CONTROL),
+		.dmif = (mmDMIF_PG1_DPG_WATERMARK_MASK_CONTROL
+				- mmDPG_WATERMARK_MASK_CONTROL),
+		.pipe = (mmPIPE1_DMIF_BUFFER_CONTROL
+				- mmPIPE0_DMIF_BUFFER_CONTROL),
+	},
+	{
+		.dcp = (mmDCP2_GRPH_CONTROL - mmGRPH_CONTROL),
+		.dmif = (mmDMIF_PG2_DPG_WATERMARK_MASK_CONTROL
+				- mmDPG_WATERMARK_MASK_CONTROL),
+		.pipe = (mmPIPE2_DMIF_BUFFER_CONTROL
+				- mmPIPE0_DMIF_BUFFER_CONTROL),
+	}
+};
 
 static struct timing_generator *dce110_timing_generator_create(
 		struct adapter_service *as,
@@ -118,6 +141,26 @@ static struct stream_encoder *dce110_stream_encoder_create(
 
 	BREAK_TO_DEBUGGER();
 	dc_service_free(ctx, enc110);
+	return NULL;
+}
+
+static struct mem_input *dce110_mem_input_create(
+	struct dc_context *ctx,
+	uint32_t inst,
+	const struct dce110_mem_input_reg_offsets *offset)
+{
+	struct dce110_mem_input *mem_input110 =
+		dc_service_alloc(ctx, sizeof(struct dce110_mem_input));
+
+	if (!mem_input110)
+		return NULL;
+
+	if (dce110_mem_input_construct(mem_input110,
+			ctx, inst, offset))
+		return &mem_input110->base;
+
+	BREAK_TO_DEBUGGER();
+	dc_service_free(ctx, mem_input110);
 	return NULL;
 }
 
@@ -198,7 +241,8 @@ bool dce110_construct_resource_pool(
 			goto controller_create_fail;
 		}
 
-		pool->mis[i] = dce110_mem_input_create(ctx, i);
+		pool->mis[i] = dce110_mem_input_create(ctx, i,
+				&dce110_mi_reg_offsets[i]);
 		if (pool->mis[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dal_error(
@@ -298,11 +342,15 @@ controller_create_fail:
 		if (pool->ipps[i] != NULL)
 			dce110_ipp_destroy(&pool->ipps[i]);
 
-		if (pool->mis[i] != NULL)
-			dce110_mem_input_destroy(&pool->mis[i]);
+		if (pool->mis[i] != NULL) {
+			dc_service_free(pool->mis[i]->ctx,
+					TO_DCE110_MEM_INPUT(pool->mis[i]));
+			pool->mis[i] = NULL;
+		}
 
 		if (pool->timing_generators[i] != NULL)	{
-			dc_service_free(pool->timing_generators[i]->ctx, DCE110TG_FROM_TG(pool->timing_generators[i]));
+			dc_service_free(pool->timing_generators[i]->ctx,
+				DCE110TG_FROM_TG(pool->timing_generators[i]));
 			pool->timing_generators[i] = NULL;
 		}
 	}
@@ -336,8 +384,11 @@ void dce110_destruct_resource_pool(struct resource_pool *pool)
 		if (pool->ipps[i] != NULL)
 			dce110_ipp_destroy(&pool->ipps[i]);
 
-		if (pool->mis[i] != NULL)
-			dce110_mem_input_destroy(&pool->mis[i]);
+		if (pool->mis[i] != NULL) {
+			dc_service_free(pool->mis[i]->ctx,
+					TO_DCE110_MEM_INPUT(pool->mis[i]));
+			pool->mis[i] = NULL;
+		}
 
 		if (pool->timing_generators[i] != NULL)	{
 			dc_service_free(pool->timing_generators[i]->ctx, DCE110TG_FROM_TG(pool->timing_generators[i]));
