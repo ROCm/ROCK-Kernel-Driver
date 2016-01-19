@@ -2395,6 +2395,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	struct dc_target *new_targets[MAX_TARGET_NUM] = { 0 };
 	struct amdgpu_device *adev = dev->dev_private;
 	struct dc *dc = adev->dm.dc;
+	bool need_to_validate = false;
 
 	ret = drm_atomic_helper_check(dev, state);
 
@@ -2480,6 +2481,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 					acrtc->target,
 					new_target);
 			new_target_count++;
+			need_to_validate = true;
 			break;
 		}
 
@@ -2525,12 +2527,14 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 					set_count,
 					acrtc->target,
 					surface);
+				need_to_validate = true;
 			}
 		}
 
 	}
 
-	if (set_count == 0 || dc_validate_resources(dc, set, set_count))
+	if (need_to_validate == false || set_count == 0
+				|| dc_validate_resources(dc, set, set_count))
 		ret = 0;
 
 connector_not_found:
