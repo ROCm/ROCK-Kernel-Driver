@@ -49,6 +49,7 @@ struct kgd_mem {
 			void *cpu_ptr;
 		} data1;
 		struct {
+			struct mutex lock;
 			struct radeon_bo *bo;
 			struct radeon_bo_va *bo_va;
 			bool mapped_to_gpu_memory;
@@ -503,6 +504,7 @@ static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm,
 		ret = -ENOMEM;
 		goto err;
 	}
+	mutex_init(&(*mem)->data2.lock);
 
 	/* Translate fd to file */
 	rcu_read_lock();
@@ -1414,6 +1416,7 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 		ret = -ENOMEM;
 		goto err;
 	}
+	mutex_init(&(*mem)->data2.lock);
 
 	/* Allocate buffer object on VRAM */
 	ret = radeon_bo_create(rdev, size, PAGE_SIZE, false,
@@ -1455,12 +1458,18 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
 
+	mutex_lock(&mem->data2.lock);
+
 	if (mem->data2.mapped_to_gpu_memory == 1) {
 		pr_debug("BO with VA %p, size %lu bytes is mapped to GPU. Need to unmap it before release\n",
 		(void *) (mem->data2.bo_va->it.start * RADEON_GPU_PAGE_SIZE),
 		mem->data2.bo->tbo.mem.size);
+		mutex_unlock(&mem->data2.lock);
 		unmap_memory_from_gpu(kgd, mem, NULL);
-	}
+	} else
+		mutex_unlock(&mem->data2.lock);
+	/* lock is not needed after this, since mem is unused and will
+	 * be freed anyway */
 
 	pr_debug("Releasing BO with VA %p, size %lu bytes\n",
 		(void *) (mem->data2.bo_va->it.start * RADEON_GPU_PAGE_SIZE),
@@ -1486,6 +1495,8 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem, void *vm)
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
 
+	mutex_lock(&mem->data2.lock);
+
 	bo = mem->data2.bo;
 	bo_va = mem->data2.bo_va;
 
@@ -1493,6 +1504,7 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem, void *vm)
 		pr_debug("BO with VA %p, size %lu bytes already mapped to GPU memory\n",
 		(void *) (mem->data2.bo_va->it.start * RADEON_GPU_PAGE_SIZE),
 		mem->data2.bo->tbo.mem.size);
+		mutex_unlock(&mem->data2.lock);
 		return 0;
 	}
 
@@ -1507,10 +1519,13 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem, void *vm)
 	ret = map_bo_to_gpuvm(rdev, bo, bo_va);
 	if (ret != 0) {
 		pr_err("amdkfd: Failed to map radeon bo to gpuvm\n");
+		mutex_unlock(&mem->data2.lock);
 		return ret;
 	}
 
 	mem->data2.mapped_to_gpu_memory = 1;
+
+	mutex_unlock(&mem->data2.lock);
 
 	return ret;
 }
@@ -1525,10 +1540,13 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
 
+	mutex_lock(&mem->data2.lock);
+
 	if (mem->data2.mapped_to_gpu_memory == 0) {
 		pr_debug("Unmapping BO with VA %p, size %lu bytes from GPU memory is unnecessary\n",
 		(void *) (mem->data2.bo_va->it.start * RADEON_GPU_PAGE_SIZE),
 		mem->data2.bo->tbo.mem.size);
+		mutex_lock(&mem->data2.lock);
 		return 0;
 	}
 
@@ -1550,6 +1568,8 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 	ret = unmap_bo_from_gpuvm(rdev, bo_va);
 
 	mem->data2.mapped_to_gpu_memory = 0;
+
+	mutex_unlock(&mem->data2.lock);
 
 	return ret;
 }
