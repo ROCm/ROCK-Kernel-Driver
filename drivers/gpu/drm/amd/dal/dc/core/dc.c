@@ -861,6 +861,17 @@ bool dc_link_add_remote_sink(const struct dc_link *link, struct dc_sink *sink)
 	return true;
 }
 
+void dc_link_add_sink(const struct dc_link *link, struct dc_sink *sink)
+{
+	struct core_link *core_link = DC_LINK_TO_LINK(link);
+	struct dc_link *dc_link = &core_link->public;
+
+	dc_link->local_sink = sink;
+	dc_link->sink_count = 1;
+	if (sink->sink_signal == SIGNAL_TYPE_VIRTUAL
+		&& link->connector_signal == SIGNAL_TYPE_VIRTUAL)
+		dc_link->type = dc_connection_single;
+}
 
 void dc_link_remove_remote_sink(const struct dc_link *link, const struct dc_sink *sink)
 {
