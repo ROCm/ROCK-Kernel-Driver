@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-15 Advanced Micro Devices, Inc.
+ * Copyright 2013-16 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,28 +23,12 @@
  *
  */
 
-#ifndef __DAL_HW_TRANSLATE_H__
-#define __DAL_HW_TRANSLATE_H__
+#ifndef __DAL_HW_TRANSLATE_DIAG_FPGA_H__
+#define __DAL_HW_TRANSLATE_DIAG_FPGA_H__
 
-struct hw_translate_funcs {
-	bool (*offset_to_id)(
-		uint32_t offset,
-		uint32_t mask,
-		enum gpio_id *id,
-		uint32_t *en);
-	bool (*id_to_offset)(
-		enum gpio_id id,
-		uint32_t en,
-		struct gpio_pin_info *info);
-};
+struct hw_translate;
 
-struct hw_translate {
-	const struct hw_translate_funcs *funcs;
-};
+/* Initialize Hw translate function pointers */
+void dal_hw_translate_diag_fpga_init(struct hw_translate *tr);
 
-bool dal_hw_translate_init(
-	struct hw_translate *translate,
-	enum dce_version dce_version,
-	enum dce_environment dce_environment);
-
-#endif
+#endif /* __DAL_HW_TRANSLATE_DIAG_FPGA_H__ */

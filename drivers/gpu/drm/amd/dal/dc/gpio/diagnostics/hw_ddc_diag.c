@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-15 Advanced Micro Devices, Inc.
+ * Copyright 2012-16 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -30,63 +30,69 @@
  */
 
 #include "include/gpio_types.h"
-
-/*
- * Header of this unit
- */
-
-#include "hw_factory.h"
-
-/*
- * Post-requisites: headers required by this unit
- */
-
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
-#include "dce110/hw_factory_dce110.h"
-#endif
-
-#include "diagnostics/hw_factory_diag.h"
+#include "../hw_gpio_pin.h"
+#include "../hw_gpio.h"
+#include "../hw_ddc.h"
 
 /*
  * This unit
  */
-
-bool dal_hw_factory_init(
-	struct hw_factory *factory,
-	enum dce_version dce_version,
-	enum dce_environment dce_environment)
+static void destruct(
+	struct hw_ddc *pin)
 {
-	switch (dce_environment) {
-	case DCE_ENV_DIAG_FPGA_MAXIMUS:
-		dal_hw_factory_diag_fpga_init(factory);
-		return true;
-	default:
-		break;
-	}
-
-	switch (dce_version) {
-
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
-	case DCE_VERSION_11_0:
-		dal_hw_factory_dce110_init(factory);
-		return true;
-#endif
-	default:
-		ASSERT_CRITICAL(false);
-		return false;
-	}
+	dal_hw_ddc_destruct(pin);
 }
 
-void dal_hw_factory_destroy(
-	struct dc_context *ctx,
-	struct hw_factory **factory)
+static void destroy(
+	struct hw_gpio_pin **ptr)
 {
-	if (!factory || !*factory) {
-		BREAK_TO_DEBUGGER();
-		return;
+	struct hw_ddc *pin = HW_DDC_FROM_BASE(*ptr);
+
+	destruct(pin);
+
+	dc_service_free((*ptr)->ctx, pin);
+
+	*ptr = NULL;
+}
+
+static const struct hw_gpio_pin_funcs funcs = {
+	.destroy = destroy,
+	.open = NULL,
+	.get_value = NULL,
+	.set_value = NULL,
+	.set_config = NULL,
+	.change_mode = NULL,
+	.close = NULL,
+};
+
+static bool construct(
+	struct hw_ddc *pin,
+	enum gpio_id id,
+	uint32_t en,
+	struct dc_context *ctx)
+{
+	pin->base.base.funcs = &funcs;
+	return true;
+}
+
+struct hw_gpio_pin *dal_hw_ddc_diag_fpga_create(
+	struct dc_context *ctx,
+	enum gpio_id id,
+	uint32_t en)
+{
+	struct hw_ddc *pin = dc_service_alloc(ctx, sizeof(struct hw_ddc));
+
+	if (!pin) {
+		ASSERT_CRITICAL(false);
+		return NULL;
 	}
 
-	dc_service_free(ctx, *factory);
+	if (construct(pin, id, en, ctx))
+		return &pin->base.base;
 
-	*factory = NULL;
+	ASSERT_CRITICAL(false);
+
+	dc_service_free(ctx, pin);
+
+	return NULL;
 }

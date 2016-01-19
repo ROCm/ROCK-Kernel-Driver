@@ -322,6 +322,7 @@ struct as_init_data {
 	struct bdf_info bdf_info;
 	const struct dal_override_parameters *display_param;
 	struct dc_bios *vbios_override;
+	enum dce_environment dce_environment;
 };
 
 /* Create adapter service */
@@ -334,6 +335,9 @@ void dal_adapter_service_destroy(
 
 /* Get the DCE version of current ASIC */
 enum dce_version dal_adapter_service_get_dce_version(
+	const struct adapter_service *as);
+
+enum dce_environment dal_adapter_service_get_dce_environment(
 	const struct adapter_service *as);
 
 /* Get firmware information from BIOS */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-15 Advanced Micro Devices, Inc.
+ * Copyright 2013-16 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,70 +23,48 @@
  *
  */
 
-#include "dal_services.h"
-
 /*
  * Pre-requisites: headers required by header of this unit
  */
 
+#include "dal_services.h"
 #include "include/gpio_types.h"
+#include "../hw_factory.h"
 
 /*
  * Header of this unit
  */
 
-#include "hw_factory.h"
+#include "../hw_gpio_pin.h"
+#include "../hw_gpio.h"
+#include "../hw_ddc.h"
+#include "../hw_hpd.h"
 
-/*
- * Post-requisites: headers required by this unit
- */
+/* function table */
+static const struct hw_factory_funcs funcs = {
+	.create_dvo = NULL,
+	.create_ddc_data = NULL,
+	.create_ddc_clock = NULL,
+	.create_generic = NULL,
+	.create_hpd = NULL,
+	.create_gpio_pad = NULL,
+	.create_sync = NULL,
+	.create_gsl = NULL,
+};
 
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
-#include "dce110/hw_factory_dce110.h"
-#endif
-
-#include "diagnostics/hw_factory_diag.h"
-
-/*
- * This unit
- */
-
-bool dal_hw_factory_init(
-	struct hw_factory *factory,
-	enum dce_version dce_version,
-	enum dce_environment dce_environment)
+void dal_hw_factory_diag_fpga_init(struct hw_factory *factory)
 {
-	switch (dce_environment) {
-	case DCE_ENV_DIAG_FPGA_MAXIMUS:
-		dal_hw_factory_diag_fpga_init(factory);
-		return true;
-	default:
-		break;
-	}
+	factory->number_of_pins[GPIO_ID_DVO1] = 24;
+	factory->number_of_pins[GPIO_ID_DVO12] = 2;
+	factory->number_of_pins[GPIO_ID_DVO24] = 1;
+	factory->number_of_pins[GPIO_ID_DDC_DATA] = 8;
+	factory->number_of_pins[GPIO_ID_DDC_CLOCK] = 8;
+	factory->number_of_pins[GPIO_ID_GENERIC] = 7;
+	factory->number_of_pins[GPIO_ID_HPD] = 6;
+	factory->number_of_pins[GPIO_ID_GPIO_PAD] = 31;
+	factory->number_of_pins[GPIO_ID_VIP_PAD] = 0;
+	factory->number_of_pins[GPIO_ID_SYNC] = 2;
+	factory->number_of_pins[GPIO_ID_GSL] = 4;
 
-	switch (dce_version) {
-
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
-	case DCE_VERSION_11_0:
-		dal_hw_factory_dce110_init(factory);
-		return true;
-#endif
-	default:
-		ASSERT_CRITICAL(false);
-		return false;
-	}
-}
-
-void dal_hw_factory_destroy(
-	struct dc_context *ctx,
-	struct hw_factory **factory)
-{
-	if (!factory || !*factory) {
-		BREAK_TO_DEBUGGER();
-		return;
-	}
-
-	dc_service_free(ctx, *factory);
-
-	*factory = NULL;
+	factory->funcs = &funcs;
 }

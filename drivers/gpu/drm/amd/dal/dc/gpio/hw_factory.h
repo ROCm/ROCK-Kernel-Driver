@@ -69,6 +69,7 @@ struct hw_factory {
 
 bool dal_hw_factory_init(
 	struct hw_factory *factory,
-	enum dce_version dce_version);
+	enum dce_version dce_version,
+	enum dce_environment dce_environment);
 
 #endif

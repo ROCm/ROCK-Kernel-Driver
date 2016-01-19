@@ -228,6 +228,7 @@ static struct adapter_service *create_as(
 
 	init_data.display_param = &init->display_param;
 	init_data.vbios_override = init->vbios_override;
+	init_data.dce_environment = init->dce_environment;
 
 	as = dal_adapter_service_create(&init_data);
 
@@ -333,6 +334,11 @@ static bool construct(struct dc *dc, const struct dal_init_data *init_params)
 	}
 
 	dc->ctx = dc_init_data.ctx;
+
+	dc->dce_version = dal_adapter_service_get_dce_version(
+			dc_init_data.adapter_srv);
+	dc->dce_environment = dal_adapter_service_get_dce_environment(
+			dc_init_data.adapter_srv);
 
 	/* Create hardware sequencer */
 	if (!dc_construct_hw_sequencer(dc_init_data.adapter_srv, dc))

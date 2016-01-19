@@ -527,6 +527,8 @@ int amdgpu_dm_init(struct amdgpu_device *adev)
 	init_data.display_param.bool_param_values |=
 		1 << DAL_PARAM_ENABLE_GPU_SCALING;
 
+	init_data.dce_environment = DCE_ENV_PRODUCTION_DRV;
+
 	/* Display Core create. */
 	adev->dm.dc = dc_create(&init_data);
 

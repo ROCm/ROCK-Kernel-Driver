@@ -63,7 +63,8 @@
  */
 
 struct gpio_service *dal_gpio_service_create(
-	enum dce_version dce_version,
+	enum dce_version dce_version_major,
+	enum dce_version dce_version_minor,
 	struct dc_context *ctx)
 {
 	struct gpio_service *service;
@@ -77,12 +78,14 @@ struct gpio_service *dal_gpio_service_create(
 		return NULL;
 	}
 
-	if (!dal_hw_translate_init(&service->translate, dce_version)) {
+	if (!dal_hw_translate_init(&service->translate, dce_version_major,
+			dce_version_minor)) {
 		BREAK_TO_DEBUGGER();
 		goto failure_1;
 	}
 
-	if (!dal_hw_factory_init(&service->factory, dce_version)) {
+	if (!dal_hw_factory_init(&service->factory, dce_version_major,
+			dce_version_minor)) {
 		BREAK_TO_DEBUGGER();
 		goto failure_1;
 	}

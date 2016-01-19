@@ -21,3 +21,13 @@ AMD_DAL_I2CAUX_DCE110 = $(addprefix $(AMDDALPATH)/dc/i2caux/dce110/,$(I2CAUX_DCE
 
 AMD_DAL_FILES += $(AMD_DAL_I2CAUX_DCE110)
 endif
+
+###############################################################################
+# Diagnostics on FPGA
+###############################################################################
+I2CAUX_DIAG = i2caux_diag.o
+
+AMD_DAL_I2CAUX_DIAG = $(addprefix $(AMDDALPATH)/dc/i2caux/diagnostics/,$(I2CAUX_DIAG))
+
+AMD_DAL_FILES += $(AMD_DAL_I2CAUX_DIAG)
+
