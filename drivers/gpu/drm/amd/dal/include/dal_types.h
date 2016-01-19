@@ -40,6 +40,12 @@ enum dce_version {
 	DCE_VERSION_MAX
 };
 
+enum dce_environment {
+	DCE_ENV_PRODUCTION_DRV = 0,
+	DCE_ENV_DIAG_FPGA_MAXIMUS, /* Emulation on FPGA, in Maximus System. */
+	DCE_ENV_DIAG_SILICON, /* Emulation on real HW */
+};
+
 /*
  * ASIC Runtime Flags
  */
@@ -141,6 +147,7 @@ struct dal_init_data {
 	/* If 'vbios_override' not NULL, it will be called instead
 	 * of the real VBIOS. Intended use is Diagnostics on FPGA. */
 	struct dc_bios *vbios_override;
+	enum dce_environment dce_environment;
 };
 
 struct dal_dc_init_data {

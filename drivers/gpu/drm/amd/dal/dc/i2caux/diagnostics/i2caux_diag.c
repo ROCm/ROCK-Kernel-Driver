@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-15 Advanced Micro Devices, Inc.
+ * Copyright 2012-16 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -29,64 +29,85 @@
  * Pre-requisites: headers required by header of this unit
  */
 
-#include "include/gpio_types.h"
+#include "include/i2caux_interface.h"
+#include "../i2caux.h"
+#include "../engine.h"
+#include "../i2c_engine.h"
+#include "../i2c_sw_engine.h"
+#include "../i2c_hw_engine.h"
 
 /*
  * Header of this unit
  */
-
-#include "hw_factory.h"
+#include "i2caux_diag.h"
 
 /*
  * Post-requisites: headers required by this unit
  */
 
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
-#include "dce110/hw_factory_dce110.h"
-#endif
-
-#include "diagnostics/hw_factory_diag.h"
-
 /*
  * This unit
  */
 
-bool dal_hw_factory_init(
-	struct hw_factory *factory,
-	enum dce_version dce_version,
-	enum dce_environment dce_environment)
+static void destruct(
+	struct i2caux *i2caux)
 {
-	switch (dce_environment) {
-	case DCE_ENV_DIAG_FPGA_MAXIMUS:
-		dal_hw_factory_diag_fpga_init(factory);
-		return true;
-	default:
-		break;
-	}
+	dal_i2caux_destruct(i2caux);
+}
 
-	switch (dce_version) {
+static void destroy(
+	struct i2caux **i2c_engine)
+{
+	destruct(*i2c_engine);
 
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
-	case DCE_VERSION_11_0:
-		dal_hw_factory_dce110_init(factory);
-		return true;
-#endif
-	default:
+	dc_service_free((*i2c_engine)->ctx, *i2c_engine);
+
+	*i2c_engine = NULL;
+}
+
+
+
+/* function table */
+static const struct i2caux_funcs i2caux_funcs = {
+	.destroy = destroy,
+	.acquire_i2c_hw_engine = NULL,
+	.release_engine = NULL,
+	.acquire_i2c_sw_engine = NULL,
+	.acquire_aux_engine = NULL,
+};
+
+static bool construct(
+	struct i2caux *i2caux,
+	struct adapter_service *as,
+	struct dc_context *ctx)
+{
+	if (!dal_i2caux_construct(i2caux, as, ctx)) {
 		ASSERT_CRITICAL(false);
 		return false;
 	}
+
+	i2caux->funcs = &i2caux_funcs;
+
+	return true;
 }
 
-void dal_hw_factory_destroy(
-	struct dc_context *ctx,
-	struct hw_factory **factory)
+struct i2caux *dal_i2caux_diag_fpga_create(
+	struct adapter_service *as,
+	struct dc_context *ctx)
 {
-	if (!factory || !*factory) {
-		BREAK_TO_DEBUGGER();
-		return;
+	struct i2caux *i2caux =	dc_service_alloc(ctx, sizeof(struct i2caux));
+
+	if (!i2caux) {
+		ASSERT_CRITICAL(false);
+		return NULL;
 	}
 
-	dc_service_free(ctx, *factory);
+	if (construct(i2caux, as, ctx))
+		return i2caux;
 
-	*factory = NULL;
+	ASSERT_CRITICAL(false);
+
+	dc_service_free(ctx, i2caux);
+
+	return NULL;
 }

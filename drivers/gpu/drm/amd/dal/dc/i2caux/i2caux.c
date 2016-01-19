@@ -53,6 +53,8 @@
 #include "dce110/i2caux_dce110.h"
 #endif
 
+#include "diagnostics/i2caux_diag.h"
+
 /*
  * @brief
  * Plain API, available publicly
@@ -63,6 +65,7 @@ struct i2caux *dal_i2caux_create(
 	struct dc_context *ctx)
 {
 	enum dce_version dce_version;
+	enum dce_environment dce_environment;
 
 	if (!as) {
 		BREAK_TO_DEBUGGER();
@@ -70,6 +73,14 @@ struct i2caux *dal_i2caux_create(
 	}
 
 	dce_version = dal_adapter_service_get_dce_version(as);
+	dce_environment = dal_adapter_service_get_dce_environment(as);
+
+	switch (dce_environment) {
+	case DCE_ENV_DIAG_FPGA_MAXIMUS:
+		return dal_i2caux_diag_fpga_create(as, ctx);
+	default:
+		break;
+	}
 
 	switch (dce_version) {
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)

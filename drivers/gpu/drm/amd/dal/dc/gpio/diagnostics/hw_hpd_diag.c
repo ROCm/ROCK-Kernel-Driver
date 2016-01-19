@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-15 Advanced Micro Devices, Inc.
+ * Copyright 2012-16 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -30,63 +30,73 @@
  */
 
 #include "include/gpio_types.h"
+#include "../hw_gpio_pin.h"
+#include "../hw_gpio.h"
+#include "../hw_hpd.h"
 
-/*
- * Header of this unit
- */
 
-#include "hw_factory.h"
-
-/*
- * Post-requisites: headers required by this unit
- */
-
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
-#include "dce110/hw_factory_dce110.h"
-#endif
-
-#include "diagnostics/hw_factory_diag.h"
-
-/*
- * This unit
- */
-
-bool dal_hw_factory_init(
-	struct hw_factory *factory,
-	enum dce_version dce_version,
-	enum dce_environment dce_environment)
+static void destruct(
+	struct hw_hpd *pin)
 {
-	switch (dce_environment) {
-	case DCE_ENV_DIAG_FPGA_MAXIMUS:
-		dal_hw_factory_diag_fpga_init(factory);
-		return true;
-	default:
-		break;
-	}
+	dal_hw_hpd_destruct(pin);
+}
 
-	switch (dce_version) {
+static void destroy(
+	struct hw_gpio_pin **ptr)
+{
+	struct hw_hpd *pin = HW_HPD_FROM_BASE(*ptr);
 
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
-	case DCE_VERSION_11_0:
-		dal_hw_factory_dce110_init(factory);
-		return true;
-#endif
-	default:
+	destruct(pin);
+
+	dc_service_free((*ptr)->ctx, pin);
+
+	*ptr = NULL;
+}
+
+static const struct hw_gpio_pin_funcs funcs = {
+	.destroy = destroy,
+	.open = NULL,
+	.get_value = NULL,
+	.set_value = NULL,
+	.set_config = NULL,
+	.change_mode = NULL,
+	.close = NULL,
+};
+
+static bool construct(
+	struct hw_hpd *pin,
+	enum gpio_id id,
+	uint32_t en,
+	struct dc_context *ctx)
+{
+	if (!dal_hw_hpd_construct(pin, id, en, ctx)) {
 		ASSERT_CRITICAL(false);
 		return false;
 	}
+
+	pin->base.base.funcs = &funcs;
+
+	return true;
 }
 
-void dal_hw_factory_destroy(
+struct hw_gpio_pin *dal_hw_hpd_diag_fpga_create(
 	struct dc_context *ctx,
-	struct hw_factory **factory)
+	enum gpio_id id,
+	uint32_t en)
 {
-	if (!factory || !*factory) {
-		BREAK_TO_DEBUGGER();
-		return;
+	struct hw_hpd *pin = dc_service_alloc(ctx, sizeof(struct hw_hpd));
+
+	if (!pin) {
+		ASSERT_CRITICAL(false);
+		return NULL;
 	}
 
-	dc_service_free(ctx, *factory);
+	if (construct(pin, id, en, ctx))
+		return &pin->base.base;
 
-	*factory = NULL;
+	ASSERT_CRITICAL(false);
+
+	dc_service_free(ctx, pin);
+
+	return NULL;
 }

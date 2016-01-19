@@ -42,7 +42,9 @@ struct asic_cap;
 struct adapter_service {
 	struct dc_context *ctx;
 	struct asic_capability *asic_cap;
-	struct dc_bios *dcb;
+	struct dc_bios *dcb_internal;/* created by DC */
+	struct dc_bios *dcb_override;/* supplied by creator of DC */
+	enum dce_environment dce_environment;
 	struct gpio_service *gpio_service;
 	struct i2caux *i2caux;
 	struct wireless_data wireless_data;

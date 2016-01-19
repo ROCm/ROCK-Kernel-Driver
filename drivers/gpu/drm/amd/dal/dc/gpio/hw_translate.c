@@ -45,14 +45,25 @@
 #include "dce110/hw_translate_dce110.h"
 #endif
 
+#include "diagnostics/hw_translate_diag.h"
+
 /*
  * This unit
  */
 
 bool dal_hw_translate_init(
 	struct hw_translate *translate,
-	enum dce_version dce_version)
+	enum dce_version dce_version,
+	enum dce_environment dce_environment)
 {
+	switch (dce_environment) {
+	case DCE_ENV_DIAG_FPGA_MAXIMUS:
+		dal_hw_translate_diag_fpga_init(translate);
+		return true;
+	default:
+		break;
+	}
+
 	switch (dce_version) {
 
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
