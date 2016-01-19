@@ -106,20 +106,20 @@ static const struct dce110_mem_input_reg_offsets dce110_mi_reg_offsets[] = {
 
 static const struct dce110_transform_reg_offsets dce110_xfm_offsets[] = {
 {
-	.scl_offset = (mmSCL0_SCL_CONTROL - mmSCL0_SCL_CONTROL),
-	.dcfe_offset = (mmDCFE0_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.dcp_offset = (mmDCP0_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
-	.lb_offset = (mmLB0_LB_DATA_FORMAT - mmLB0_LB_DATA_FORMAT),
+	.scl_offset = (mmSCL0_SCL_CONTROL - mmSCL_CONTROL),
+	.dcfe_offset = (mmDCFE0_DCFE_MEM_PWR_CTRL - mmDCFE_MEM_PWR_CTRL),
+	.dcp_offset = (mmDCP0_GRPH_CONTROL - mmGRPH_CONTROL),
+	.lb_offset = (mmLB0_LB_DATA_FORMAT - mmLB_DATA_FORMAT),
 },
-{	.scl_offset = (mmSCL1_SCL_CONTROL - mmSCL0_SCL_CONTROL),
-	.dcfe_offset = (mmDCFE1_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.dcp_offset = (mmDCP1_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
-	.lb_offset = (mmLB1_LB_DATA_FORMAT - mmLB0_LB_DATA_FORMAT),
+{	.scl_offset = (mmSCL1_SCL_CONTROL - mmSCL_CONTROL),
+	.dcfe_offset = (mmDCFE1_DCFE_MEM_PWR_CTRL - mmDCFE_MEM_PWR_CTRL),
+	.dcp_offset = (mmDCP1_GRPH_CONTROL - mmGRPH_CONTROL),
+	.lb_offset = (mmLB1_LB_DATA_FORMAT - mmLB_DATA_FORMAT),
 },
-{	.scl_offset = (mmSCL2_SCL_CONTROL - mmSCL0_SCL_CONTROL),
-	.dcfe_offset = (mmDCFE2_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.dcp_offset = (mmDCP2_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
-	.lb_offset = (mmLB2_LB_DATA_FORMAT - mmLB0_LB_DATA_FORMAT),
+{	.scl_offset = (mmSCL2_SCL_CONTROL - mmSCL_CONTROL),
+	.dcfe_offset = (mmDCFE2_DCFE_MEM_PWR_CTRL - mmDCFE_MEM_PWR_CTRL),
+	.dcp_offset = (mmDCP2_GRPH_CONTROL - mmGRPH_CONTROL),
+	.lb_offset = (mmLB2_LB_DATA_FORMAT - mmLB_DATA_FORMAT),
 }
 };
 
