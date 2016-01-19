@@ -41,6 +41,7 @@
 struct input_pixel_processor {
 	struct  dc_context *ctx;
 	uint32_t inst;
+	struct ipp_funcs *funcs;
 };
 
 enum wide_gamut_degamma_mode {
@@ -61,6 +62,44 @@ enum wide_gamut_degamma_mode {
 struct dcp_video_matrix {
 	enum ovl_color_space color_space;
 	int32_t value[MAXTRIX_COEFFICIENTS_NUMBER];
+};
+
+struct ipp_funcs {
+
+	/* CURSOR RELATED */
+	bool (*ipp_cursor_set_position)(
+		struct input_pixel_processor *ipp,
+		const struct dc_cursor_position *position);
+
+	bool (*ipp_cursor_set_attributes)(
+		struct input_pixel_processor *ipp,
+		const struct dc_cursor_attributes *attributes);
+
+	/* DEGAMMA RELATED */
+	bool (*ipp_set_degamma)(
+		struct input_pixel_processor *ipp,
+		const struct gamma_parameters *params,
+		bool force_bypass);
+
+	void (*ipp_program_prescale)(
+		struct input_pixel_processor *ipp,
+		enum pixel_format pixel_format);
+
+	void (*ipp_set_legacy_input_gamma_mode)(
+			struct input_pixel_processor *ipp,
+			bool is_legacy);
+
+	bool (*ipp_set_legacy_input_gamma_ramp)(
+		struct input_pixel_processor *ipp,
+		const struct gamma_ramp *gamma_ramp,
+		const struct gamma_parameters *params);
+
+	bool (*ipp_set_palette)(
+		struct input_pixel_processor *ipp,
+		const struct dev_c_lut *palette,
+		uint32_t start,
+		uint32_t length,
+		enum pixel_format surface_pixel_format);
 };
 
 #endif /* __DAL_IPP_H__ */
