@@ -317,6 +317,8 @@ void dc_link_remove_remote_sink(
 	const struct dc_link *link,
 	const struct dc_sink *sink);
 
+/* Used by diagnostics for virtual link at the moment */
+void dc_link_add_sink(const struct dc_link *link, struct dc_sink *sink);
 
 /*******************************************************************************
  * Sink Interfaces - A sink corresponds to a display output device
