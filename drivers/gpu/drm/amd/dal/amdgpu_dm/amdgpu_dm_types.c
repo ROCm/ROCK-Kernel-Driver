@@ -139,8 +139,7 @@ static int dm_crtc_pin_cursor_bo_new(
 	struct drm_crtc *crtc,
 	struct drm_file *file_priv,
 	uint32_t handle,
-	struct amdgpu_bo **ret_obj,
-	uint64_t *gpu_addr)
+	struct amdgpu_bo **ret_obj)
 {
 	struct amdgpu_crtc *amdgpu_crtc;
 	struct amdgpu_bo *robj;
@@ -148,6 +147,10 @@ static int dm_crtc_pin_cursor_bo_new(
 	int ret = EINVAL;
 
 	if (NULL != crtc) {
+		struct drm_device *dev = crtc->dev;
+		struct amdgpu_device *adev = dev->dev_private;
+		uint64_t gpu_addr;
+
 		amdgpu_crtc = to_amdgpu_crtc(crtc);
 
 		obj = drm_gem_object_lookup(crtc->dev, file_priv, handle);
@@ -170,10 +173,12 @@ static int dm_crtc_pin_cursor_bo_new(
 			goto release;
 		}
 
-		ret = amdgpu_bo_pin(robj, AMDGPU_GEM_DOMAIN_VRAM, NULL);
+		ret = amdgpu_bo_pin_restricted(robj, AMDGPU_GEM_DOMAIN_VRAM, 0,
+						adev->mc.visible_vram_size,
+						&gpu_addr);
 
 		if (ret == 0) {
-			*gpu_addr = amdgpu_bo_gpu_offset(robj);
+			amdgpu_crtc->cursor_addr = gpu_addr;
 			*ret_obj  = robj;
 		}
 		amdgpu_bo_unreserve(robj);
@@ -194,7 +199,6 @@ static int dm_crtc_cursor_set(
 	uint32_t height)
 {
 	struct amdgpu_bo *new_cursor_bo;
-	uint64_t gpu_addr;
 	struct dc_cursor_position position;
 
 	int ret;
@@ -203,7 +207,6 @@ static int dm_crtc_cursor_set(
 
 	ret		= EINVAL;
 	new_cursor_bo	= NULL;
-	gpu_addr	= 0;
 
 	DRM_DEBUG_KMS(
 	"%s: crtc_id=%d with handle %d and size %d to %d, bo_object %p\n",
@@ -243,14 +246,13 @@ static int dm_crtc_cursor_set(
 		goto release;
 	}
 	/*try to pin new cursor bo*/
-	ret = dm_crtc_pin_cursor_bo_new(crtc, file_priv, handle,
-			&new_cursor_bo, &gpu_addr);
+	ret = dm_crtc_pin_cursor_bo_new(crtc, file_priv, handle, &new_cursor_bo);
 	/*if map not successful then return an error*/
 	if (ret)
 		goto release;
 
 	/*program new cursor bo to hardware*/
-	dm_set_cursor(amdgpu_crtc, gpu_addr, width, height);
+	dm_set_cursor(amdgpu_crtc, amdgpu_crtc->cursor_addr, width, height);
 
 	/*un map old, not used anymore cursor bo ,
 	 * return memory and mapping back */
@@ -336,7 +338,7 @@ static void dm_crtc_cursor_reset(struct drm_crtc *crtc)
 	if (amdgpu_crtc->cursor_bo && amdgpu_crtc->target) {
 		dm_set_cursor(
 		amdgpu_crtc,
-		amdgpu_bo_gpu_offset(gem_to_amdgpu_bo(amdgpu_crtc->cursor_bo)),
+		amdgpu_crtc->cursor_addr,
 		amdgpu_crtc->cursor_width,
 		amdgpu_crtc->cursor_height);
 	}
