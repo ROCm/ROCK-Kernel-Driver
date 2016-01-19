@@ -1126,6 +1126,15 @@ bool dce110_link_encoder_construct(
 	case TRANSMITTER_UNIPHY_C:
 		enc110->base.preferred_engine = ENGINE_ID_DIGC;
 	break;
+	case TRANSMITTER_UNIPHY_D:
+		enc110->base.preferred_engine = ENGINE_ID_DIGD;
+	break;
+	case TRANSMITTER_UNIPHY_E:
+		enc110->base.preferred_engine = ENGINE_ID_DIGE;
+	break;
+	case TRANSMITTER_UNIPHY_F:
+		enc110->base.preferred_engine = ENGINE_ID_DIGF;
+	break;
 	default:
 		ASSERT_CRITICAL(false);
 		enc110->base.preferred_engine = ENGINE_ID_UNKNOWN;

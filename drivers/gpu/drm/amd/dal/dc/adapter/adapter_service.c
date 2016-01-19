@@ -677,6 +677,10 @@ static struct hw_ctx_adapter_service *create_hw_ctx(
 	}
 
 	switch (dce_version) {
+#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
+	case DCE_VERSION_10_0:
+		return dal_adapter_service_create_hw_ctx_dce110(ctx);
+#endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	case DCE_VERSION_11_0:
 		return dal_adapter_service_create_hw_ctx_dce110(ctx);

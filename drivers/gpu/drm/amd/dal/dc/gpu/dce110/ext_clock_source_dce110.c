@@ -314,7 +314,7 @@ static bool construct(
 	controllers_num = dal_adapter_service_get_controllers_num(
 			base->adapter_service);
 
-	if (controllers_num <= 0 || controllers_num > 3) {
+	if (controllers_num <= 0 || controllers_num > 6) {
 		ECS_ERROR("ECS110:Invalid number of controllers = %d!\n",
 				controllers_num);
 		return false;

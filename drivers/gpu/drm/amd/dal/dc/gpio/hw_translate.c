@@ -67,6 +67,9 @@ bool dal_hw_translate_init(
 	switch (dce_version) {
 
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
+#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
+	case DCE_VERSION_10_0:
+#endif
 	case DCE_VERSION_11_0:
 		dal_hw_translate_dce110_init(translate);
 		return true;

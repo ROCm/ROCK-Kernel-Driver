@@ -49,7 +49,7 @@
  * This unit
  */
 
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_0) || defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 #include "dce110/i2caux_dce110.h"
 #endif
 
@@ -84,6 +84,9 @@ struct i2caux *dal_i2caux_create(
 
 	switch (dce_version) {
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
+#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
+	case DCE_VERSION_10_0:
+#endif
 	case DCE_VERSION_11_0:
 		return dal_i2caux_dce110_create(as, ctx);
 #endif

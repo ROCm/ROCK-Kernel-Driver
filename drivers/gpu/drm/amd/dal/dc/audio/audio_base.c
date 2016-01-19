@@ -264,6 +264,10 @@ struct audio *dal_audio_create(
 
 	as = init_data->as;
 	switch (dal_adapter_service_get_dce_version(as)) {
+#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
+	case DCE_VERSION_10_0:
+		return dal_audio_create_dce110(init_data);
+#endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	case DCE_VERSION_11_0:
 		return dal_audio_create_dce110(init_data);

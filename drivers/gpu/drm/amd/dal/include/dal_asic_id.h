@@ -77,6 +77,17 @@
 #define ASIC_REV_IS_GODAVARI(rev) \
 	((rev >= ML_GODAVARI_A0) && (rev < KV_UNKNOWN))
 
+/* VI Family */
+/* DCE10 */
+#define VI_TONGA_P_A0 20
+#define VI_TONGA_P_A1 21
+#define VI_FIJI_P_A0 60
+
+#define ASIC_REV_IS_TONGA_P(eChipRev) ((eChipRev >= VI_TONGA_P_A0) && \
+		(eChipRev < 40))
+#define ASIC_REV_IS_FIJI_P(eChipRev) ((eChipRev >= VI_FIJI_P_A0) && \
+		(eChipRev < 80))
+
 /* DCE11 */
 #define CZ_CARRIZO_A0 0x01
 

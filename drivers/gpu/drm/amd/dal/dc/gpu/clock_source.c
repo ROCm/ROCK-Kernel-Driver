@@ -34,7 +34,7 @@
 #include "clock_source.h"
 #include "pll_clock_source.h"
 
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_0) || defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 #include "dce110/ext_clock_source_dce110.h"
 #include "dce110/pll_clock_source_dce110.h"
 #include "dce110/vce_clock_source_dce110.h"
@@ -53,6 +53,9 @@ struct clock_source *dal_clock_source_create(
 
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	break;
+#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
+	case DCE_VERSION_10_0:
+#endif
 	case DCE_VERSION_11_0:
 	{
 		switch (clk_src_id) {
