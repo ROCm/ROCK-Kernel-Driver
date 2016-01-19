@@ -9,6 +9,18 @@ AMD_DAL_ASIC_CAPABILITY = \
 
 AMD_DAL_FILES += $(AMD_DAL_ASIC_CAPABILITY)
 
+###############################################################################
+# DCE 10x
+###############################################################################
+ifdef CONFIG_DRM_AMD_DAL_DCE10_0
+ASIC_CAPABILITY_DCE10 = tonga_asic_capability.o
+
+AMD_DAL_ASIC_CAPABILITY_DCE10 = \
+	$(addprefix $(AMDDALPATH)/dc/asic_capability/,$(ASIC_CAPABILITY_DCE10))
+
+AMD_DAL_FILES += $(AMD_DAL_ASIC_CAPABILITY_DCE10)
+endif
+
 
 ###############################################################################
 # DCE 11x

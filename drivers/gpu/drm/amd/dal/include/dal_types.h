@@ -34,6 +34,9 @@ struct dc_bios;
 
 enum dce_version {
 	DCE_VERSION_UNKNOWN = (-1),
+#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
+	DCE_VERSION_10_0,
+#endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	DCE_VERSION_11_0,
 #endif

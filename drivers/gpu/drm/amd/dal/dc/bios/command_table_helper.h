@@ -26,7 +26,7 @@
 #ifndef __DAL_COMMAND_TABLE_HELPER_H__
 #define __DAL_COMMAND_TABLE_HELPER_H__
 
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_0) || defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 #include "dce110/command_table_helper_dce110.h"
 #endif
 

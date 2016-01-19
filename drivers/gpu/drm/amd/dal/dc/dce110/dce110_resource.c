@@ -61,6 +61,18 @@ static const struct dce110_timing_generator_offsets dce110_tg_offsets[] = {
 	{
 		.crtc = (mmCRTC2_CRTC_CONTROL - mmCRTC_CONTROL),
 		.dcp = (mmDCP2_GRPH_CONTROL - mmGRPH_CONTROL),
+	},
+	{
+		.crtc = (mmCRTC3_CRTC_CONTROL - mmCRTC_CONTROL),
+		.dcp =  (mmDCP3_GRPH_CONTROL - mmGRPH_CONTROL),
+	},
+	{
+		.crtc = (mmCRTC4_CRTC_CONTROL - mmCRTC_CONTROL),
+		.dcp = (mmDCP4_GRPH_CONTROL - mmGRPH_CONTROL),
+	},
+	{
+		.crtc = (mmCRTC5_CRTC_CONTROL - mmCRTC_CONTROL),
+		.dcp = (mmDCP5_GRPH_CONTROL - mmGRPH_CONTROL),
 	}
 };
 
@@ -146,9 +158,17 @@ static const struct dce110_ipp_reg_offsets dce110_ipp_reg_offsets[] = {
 },
 {
 	.dcp_offset = (mmDCP2_CUR_CONTROL - mmCUR_CONTROL),
+},
+{
+	.dcp_offset = (mmDCP3_CUR_CONTROL - mmCUR_CONTROL),
+},
+{
+	.dcp_offset = (mmDCP4_CUR_CONTROL - mmCUR_CONTROL),
+},
+{
+	.dcp_offset = (mmDCP5_CUR_CONTROL - mmCUR_CONTROL),
 }
 };
-
 
 static struct timing_generator *dce110_timing_generator_create(
 		struct adapter_service *as,
@@ -296,6 +316,9 @@ bool dce110_construct_resource_pool(
 	pool->stream_engines.engine.ENGINE_ID_DIGA = 1;
 	pool->stream_engines.engine.ENGINE_ID_DIGB = 1;
 	pool->stream_engines.engine.ENGINE_ID_DIGC = 1;
+	pool->stream_engines.engine.ENGINE_ID_DIGD = 1;
+	pool->stream_engines.engine.ENGINE_ID_DIGE = 1;
+	pool->stream_engines.engine.ENGINE_ID_DIGF = 1;
 
 	clk_src_init_data.as = adapter_serv;
 	clk_src_init_data.ctx = ctx;
@@ -342,7 +365,8 @@ bool dce110_construct_resource_pool(
 
 	pool->controller_count =
 		dal_adapter_service_get_func_controllers_num(adapter_serv);
-	pool->stream_enc_count = 3;
+	pool->stream_enc_count = dal_adapter_service_get_stream_engines_num(
+			adapter_serv);
 	pool->scaler_filter = dal_scaler_filter_create(ctx);
 	if (pool->scaler_filter == NULL) {
 		BREAK_TO_DEBUGGER();

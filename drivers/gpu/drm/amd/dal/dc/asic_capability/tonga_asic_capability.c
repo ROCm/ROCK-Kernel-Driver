@@ -28,12 +28,12 @@
 #include "include/asic_capability_interface.h"
 #include "include/asic_capability_types.h"
 
-#include "carrizo_asic_capability.h"
+#include "tonga_asic_capability.h"
 
 #include "atom.h"
-#include "dce/dce_11_0_d.h"
+#include "dce/dce_10_0_d.h"
 #include "smu/smu_8_0_d.h"
-#include "dce/dce_11_0_sh_mask.h"
+#include "dce/dce_10_0_sh_mask.h"
 #include "dal_asic_id.h"
 
 #define ixVCE_HARVEST_FUSE_MACRO__ADDRESS     0xC0014074
@@ -43,28 +43,33 @@
  *
  * Create and initiate Carrizo capability.
  */
-void carrizo_asic_capability_create(struct asic_capability *cap,
+void tonga_asic_capability_create(struct asic_capability *cap,
 	struct hw_asic_id *init)
 {
 	uint32_t e_fuse_setting;
 	/* ASIC data */
-	cap->data[ASIC_DATA_CONTROLLERS_NUM] = 3;
-	cap->data[ASIC_DATA_DIGFE_NUM] = 3;
-	cap->data[ASIC_DATA_FUNCTIONAL_CONTROLLERS_NUM] = 3;
-	cap->data[ASIC_DATA_LINEBUFFER_NUM] = 3;
-	cap->data[ASIC_DATA_PATH_NUM_PER_DPMST_CONNECTOR] = 4;
-	cap->data[ASIC_DATA_DCE_VERSION] = 0x110; /* DCE 11 */
+	cap->data[ASIC_DATA_CONTROLLERS_NUM] = 6;
+	cap->data[ASIC_DATA_FUNCTIONAL_CONTROLLERS_NUM] = 6;
+	cap->data[ASIC_DATA_DIGFE_NUM] = 6;
+	cap->data[ASIC_DATA_LINEBUFFER_NUM] = 6;
+
 	cap->data[ASIC_DATA_LINEBUFFER_SIZE] = 1712 * 144;
-	cap->data[ASIC_DATA_DRAM_BANDWIDTH_EFFICIENCY] = 45;
-	cap->data[ASIC_DATA_CLOCKSOURCES_NUM] = 2;
+	cap->data[ASIC_DATA_DRAM_BANDWIDTH_EFFICIENCY] = 70;
+	cap->data[ASIC_DATA_CLOCKSOURCES_NUM] = 3;
 	cap->data[ASIC_DATA_MC_LATENCY] = 5000;
-	cap->data[ASIC_DATA_STUTTERMODE] = 0x200A;
+	cap->data[ASIC_DATA_STUTTERMODE] = 0x2002;
+	cap->data[ASIC_DATA_PATH_NUM_PER_DPMST_CONNECTOR] = 4;
 	cap->data[ASIC_DATA_VIEWPORT_PIXEL_GRANULARITY] = 2;
-	cap->data[ASIC_DATA_MAX_COFUNC_NONDP_DISPLAYS] = 2;
-	cap->data[ASIC_DATA_MEMORYTYPE_MULTIPLIER] = 2;
-	cap->data[ASIC_DATA_DEFAULT_I2C_SPEED_IN_KHZ] = 100;
-	cap->data[ASIC_DATA_NUM_OF_VIDEO_PLANES] = 1;
 	cap->data[ASIC_DATA_SUPPORTED_HDMI_CONNECTION_NUM] = 3;
+	cap->data[ASIC_DATA_MIN_DISPCLK_FOR_UNDERSCAN] = 300000;
+
+	cap->data[ASIC_DATA_DCE_VERSION] = 0x100; /* DCE 11 */
+
+	cap->data[ASIC_DATA_MAX_COFUNC_NONDP_DISPLAYS] = 2;
+	cap->data[ASIC_DATA_MEMORYTYPE_MULTIPLIER] = 4;
+	cap->data[ASIC_DATA_DEFAULT_I2C_SPEED_IN_KHZ] = 40;
+	cap->data[ASIC_DATA_NUM_OF_VIDEO_PLANES] = 1;
+
 
 	/* ASIC basic capability */
 	cap->caps.IS_FUSION = true;
@@ -85,41 +90,49 @@ void carrizo_asic_capability_create(struct asic_capability *cap,
 	cap->stereo_3d_caps.DISPLAYPORT_FRAME_ALT = true;
 	cap->stereo_3d_caps.INTERLEAVE = true;
 
-    e_fuse_setting = dal_read_index_reg(cap->ctx,CGS_IND_REG__SMC,ixVCE_HARVEST_FUSE_MACRO__ADDRESS);
+	e_fuse_setting = dal_read_index_reg(cap->ctx, CGS_IND_REG__SMC,
+			ixVCE_HARVEST_FUSE_MACRO__ADDRESS);
 
 	/* Bits [28:27]*/
 	switch ((e_fuse_setting >> 27) & 0x3) {
 	case 0:
-		/*both VCE engine are working*/
+		/* both VCE engine are working*/
 		cap->caps.VCE_SUPPORTED = true;
 		cap->caps.WIRELESS_TIMING_ADJUSTMENT = false;
-		/*TODO:
-		cap->caps.wirelessLowVCEPerformance = false;
-		m_AsicCaps.vceInstance0Enabled = true;
-		m_AsicCaps.vceInstance1Enabled = true;*/
+		/*
+		 * TODO:
+		 * cap->caps.wirelessLowVCEPerformance = false;
+		 * m_AsicCaps.vceInstance0Enabled = true;
+		 * m_AsicCaps.vceInstance1Enabled = true;
+		 */
 		cap->caps.NEED_MC_TUNING = true;
 		break;
 
 	case 1:
 		cap->caps.VCE_SUPPORTED = true;
 		cap->caps.WIRELESS_TIMING_ADJUSTMENT = true;
-		/*TODO:
-		m_AsicCaps.wirelessLowVCEPerformance = false;
-		m_AsicCaps.vceInstance1Enabled = true;*/
+		/*
+		 * TODO:
+		 * m_AsicCaps.wirelessLowVCEPerformance = false;
+		 * m_AsicCaps.vceInstance1Enabled = true;
+		 */
 		cap->caps.NEED_MC_TUNING = true;
 		break;
 
 	case 2:
 		cap->caps.VCE_SUPPORTED = true;
 		cap->caps.WIRELESS_TIMING_ADJUSTMENT = true;
-		/*TODO:
-		m_AsicCaps.wirelessLowVCEPerformance = false;
-		m_AsicCaps.vceInstance0Enabled = true;*/
+		/*
+		 * TODO:
+		 * m_AsicCaps.wirelessLowVCEPerformance = false;
+		 * m_AsicCaps.vceInstance0Enabled = true;
+		 */
 		cap->caps.NEED_MC_TUNING = true;
 		break;
 
 	case 3:
-		/* VCE_DISABLE = 0x3  - both VCE
+		/*
+		 * VCE_DISABLE = 0x3  - both VCE
 		 * instances are in harvesting,
 		 * no VCE supported any more.
 		 */
@@ -128,19 +141,6 @@ void carrizo_asic_capability_create(struct asic_capability *cap,
 
 	default:
 		break;
-	}
-
-	if (ASIC_REV_IS_STONEY(init->hw_internal_rev))
-	{
-		/* Stoney is the same DCE11, but only two pipes, three  digs.
-		 * and HW added 64bit back for non SG */
-		cap->data[ASIC_DATA_CONTROLLERS_NUM] = 2;
-		cap->data[ASIC_DATA_FUNCTIONAL_CONTROLLERS_NUM] = 2;
-		cap->data[ASIC_DATA_LINEBUFFER_NUM] = 2;
-		/*3 DP MST per connector, limited by number of pipe and number
-		 * of Dig.*/
-		cap->data[ASIC_DATA_PATH_NUM_PER_DPMST_CONNECTOR] = 2;
-
 	}
 
 

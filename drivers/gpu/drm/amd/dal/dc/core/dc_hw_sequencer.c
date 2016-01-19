@@ -37,6 +37,10 @@ bool dc_construct_hw_sequencer(
 
 	switch (dce_ver)
 	{
+#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
+	case DCE_VERSION_10_0:
+		return dce110_hw_sequencer_construct(dc);
+#endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	case DCE_VERSION_11_0:
 		return dce110_hw_sequencer_construct(dc);

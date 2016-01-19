@@ -1216,6 +1216,8 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	/* Software is initialized. Now we can register interrupt handlers. */
 	switch (adev->asic_type) {
 	case CHIP_BONAIRE:
+	case CHIP_TONGA:
+	case CHIP_FIJI:
 	case CHIP_CARRIZO:
 		if (dce110_register_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
@@ -1434,6 +1436,12 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
+		break;
+	case CHIP_FIJI:
+	case CHIP_TONGA:
+		adev->mode_info.num_crtc = 6;
+		adev->mode_info.num_hpd = 6;
+		adev->mode_info.num_dig = 7;
 		break;
 	case CHIP_CARRIZO:
 		adev->mode_info.num_crtc = 3;
