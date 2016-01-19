@@ -76,8 +76,6 @@ static void set_lut_inc(
 	bool is_float,
 	bool is_signed);
 
-static void select_lut(struct dce110_ipp *ipp110);
-
 static void program_black_offsets(
 	struct dce110_ipp *ipp110,
 	struct dev_c_lut16 *offset);
@@ -85,10 +83,6 @@ static void program_black_offsets(
 static void program_white_offsets(
 	struct dce110_ipp *ipp110,
 	struct dev_c_lut16 *offset);
-
-static void program_black_white_offset(
-	struct dce110_ipp *ipp110,
-	enum pixel_format surface_pixel_format);
 
 static void program_lut_gamma(
 	struct dce110_ipp *ipp110,
@@ -264,7 +258,7 @@ static void set_lut_inc(
 	dal_write_reg(ipp110->base.ctx, addr, value);
 }
 
-static void select_lut(struct dce110_ipp *ipp110)
+void dce110_helper_select_lut(struct dce110_ipp *ipp110)
 {
 	uint32_t value = 0;
 
@@ -371,7 +365,7 @@ static void program_white_offsets(
 		offset->blue);
 }
 
-static void program_black_white_offset(
+void dce110_helper_program_black_white_offset(
 	struct dce110_ipp *ipp110,
 	enum pixel_format surface_pixel_format)
 {
@@ -482,9 +476,9 @@ static void program_lut_gamma(
 		}
 	}
 
-	program_black_white_offset(ipp110, params->surface_pixel_format);
+	dce110_helper_program_black_white_offset(ipp110, params->surface_pixel_format);
 
-	select_lut(ipp110);
+	dce110_helper_select_lut(ipp110);
 
 	if (params->surface_pixel_format == PIXEL_FORMAT_INDEX8) {
 		addr = DCP_REG(mmDC_LUT_SEQ_COLOR);

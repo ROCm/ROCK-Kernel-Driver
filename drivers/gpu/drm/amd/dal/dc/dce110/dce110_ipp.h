@@ -44,13 +44,10 @@ struct dce110_ipp {
 bool dce110_ipp_construct(
 	struct dce110_ipp* ipp,
 	struct dc_context *ctx,
-	enum controller_id id);
+	enum controller_id id,
+	const struct dce110_ipp_reg_offsets *offset);
 
 void dce110_ipp_destroy(struct input_pixel_processor **ipp);
-
-struct input_pixel_processor *dce110_ipp_create(
-	struct dc_context *ctx,
-	enum controller_id id);
 
 /* CURSOR RELATED */
 bool dce110_ipp_cursor_set_position(
@@ -85,6 +82,15 @@ bool dce110_ipp_set_palette(
 	const struct dev_c_lut *palette,
 	uint32_t start,
 	uint32_t length,
+	enum pixel_format surface_pixel_format);
+
+/*
+ * Helper functions to be resused in other ASICs
+ */
+void dce110_helper_select_lut(struct dce110_ipp *ipp110);
+
+void dce110_helper_program_black_white_offset(
+	struct dce110_ipp *ipp110,
 	enum pixel_format surface_pixel_format);
 
 #endif /*__DC_IPP_DCE110_H__*/

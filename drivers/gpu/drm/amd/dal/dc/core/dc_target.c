@@ -26,6 +26,7 @@
 #include "core_types.h"
 #include "hw_sequencer.h"
 #include "resource.h"
+#include "ipp.h"
 
 #define COEFF_RANGE	3
 #define REGAMMA_COEFF_A0	31308
@@ -364,7 +365,7 @@ bool dc_target_set_cursor_attributes(
 		return false;
 	}
 
-	if (true == core_target->ctx->dc->hwss.cursor_set_attributes(ipp, attributes))
+	if (true == ipp->funcs->ipp_cursor_set_attributes(ipp, attributes))
 		return true;
 
 	return false;
@@ -396,7 +397,7 @@ bool dc_target_set_cursor_position(
 	}
 
 
-	if (true == core_target->ctx->dc->hwss.cursor_set_position(ipp, position))
+	if (true == ipp->funcs->ipp_cursor_set_position(ipp, position))
 		return true;
 
 	return false;

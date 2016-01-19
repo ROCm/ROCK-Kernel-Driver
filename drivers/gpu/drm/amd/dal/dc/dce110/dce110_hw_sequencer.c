@@ -187,15 +187,15 @@ static bool set_gamma_ramp(
 	if (params->surface_pixel_format == PIXEL_FORMAT_INDEX8 ||
 		params->selected_gamma_lut == GRAPHICS_GAMMA_LUT_LEGACY) {
 		/* do legacy DCP for 256 colors if we are requested to do so */
-		dce110_ipp_set_legacy_input_gamma_ramp(
+		ipp->funcs->ipp_set_legacy_input_gamma_ramp(
 			ipp, ramp, params);
 
-		dce110_ipp_set_legacy_input_gamma_mode(ipp, true);
+		ipp->funcs->ipp_set_legacy_input_gamma_mode(ipp, true);
 
 		/* set bypass */
-		dce110_ipp_program_prescale(ipp, PIXEL_FORMAT_UNINITIALIZED);
+		ipp->funcs->ipp_program_prescale(ipp, PIXEL_FORMAT_UNINITIALIZED);
 
-		dce110_ipp_set_degamma(ipp, params, true);
+		ipp->funcs->ipp_set_degamma(ipp, params, true);
 
 		dce110_opp_set_regamma(opp, ramp, params, true);
 	} else if (params->selected_gamma_lut ==
@@ -208,21 +208,21 @@ static bool set_gamma_ramp(
 		}
 
 		/* do legacy DCP for 256 colors if we are requested to do so */
-		dce110_ipp_set_legacy_input_gamma_ramp(
+		ipp->funcs->ipp_set_legacy_input_gamma_ramp(
 			ipp, ramp, params);
 
-		dce110_ipp_set_legacy_input_gamma_mode(ipp, true);
+		ipp->funcs->ipp_set_legacy_input_gamma_mode(ipp, true);
 
 		/* set bypass */
-		dce110_ipp_program_prescale(ipp, PIXEL_FORMAT_UNINITIALIZED);
+		ipp->funcs->ipp_program_prescale(ipp, PIXEL_FORMAT_UNINITIALIZED);
 	} else {
-		dce110_ipp_set_legacy_input_gamma_mode(ipp, false);
+		ipp->funcs->ipp_set_legacy_input_gamma_mode(ipp, false);
 
-		dce110_ipp_program_prescale(ipp, params->surface_pixel_format);
+		ipp->funcs->ipp_program_prescale(ipp, params->surface_pixel_format);
 
 		/* Do degamma step : remove the given gamma value from FB.
 		 * For FP16 or no degamma do by pass */
-		dce110_ipp_set_degamma(ipp, params, false);
+		ipp->funcs->ipp_set_degamma(ipp, params, false);
 
 		dce110_opp_set_regamma(opp, ramp, params, false);
 	}
@@ -1741,6 +1741,7 @@ static void set_mst_bandwidth(struct stream_encoder *stream_enc,
 		avg_time_slots_per_mtp);
 }
 
+
 static const struct hw_sequencer_funcs dce110_funcs = {
 	.apply_ctx_to_hw = apply_ctx_to_hw,
 	.reset_hw_ctx = reset_hw_ctx,
@@ -1748,8 +1749,6 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.update_plane_address = update_plane_address,
 	.enable_memory_requests = enable_memory_request,
 	.disable_memory_requests = disable_memory_requests,
-	.cursor_set_attributes = dce110_ipp_cursor_set_attributes,
-	.cursor_set_position = dce110_ipp_cursor_set_position,
 	.set_gamma_ramp = set_gamma_ramp,
 	.power_down = power_down,
 	.enable_accelerated_mode = enable_accelerated_mode,

@@ -51,14 +51,6 @@ struct hw_sequencer_funcs {
 
 	bool (*transform_power_up)(struct transform *xfm);
 
-	bool (*cursor_set_attributes)(
-				struct input_pixel_processor *ipp,
-				const struct dc_cursor_attributes *attributes);
-
-	bool (*cursor_set_position)(
-				struct input_pixel_processor *ipp,
-				const struct dc_cursor_position *position);
-
 	bool (*set_gamma_ramp)(
 					struct input_pixel_processor *ipp,
 					struct output_pixel_processor *opp,

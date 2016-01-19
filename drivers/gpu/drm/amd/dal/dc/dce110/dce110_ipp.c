@@ -31,31 +31,29 @@
 
 #include "dce110_ipp.h"
 
-static const struct dce110_ipp_reg_offsets reg_offsets[] = {
-{
-	.dcp_offset = (mmDCP0_CUR_CONTROL - mmDCP0_CUR_CONTROL),
-},
-{
-	.dcp_offset = (mmDCP1_CUR_CONTROL - mmDCP0_CUR_CONTROL),
-},
-{
-	.dcp_offset = (mmDCP2_CUR_CONTROL - mmDCP0_CUR_CONTROL),
-}
+static struct ipp_funcs funcs = {
+		.ipp_cursor_set_attributes = dce110_ipp_cursor_set_attributes,
+		.ipp_cursor_set_position = dce110_ipp_cursor_set_position,
+		.ipp_program_prescale = dce110_ipp_program_prescale,
+		.ipp_set_degamma = dce110_ipp_set_degamma,
+		.ipp_set_legacy_input_gamma_mode = dce110_ipp_set_legacy_input_gamma_mode,
+		.ipp_set_legacy_input_gamma_ramp = dce110_ipp_set_legacy_input_gamma_ramp,
+		.ipp_set_palette = dce110_ipp_set_palette,
 };
 
 bool dce110_ipp_construct(
 	struct dce110_ipp* ipp,
 	struct dc_context *ctx,
-	uint32_t inst)
+	uint32_t inst,
+	const struct dce110_ipp_reg_offsets *offset)
 {
-	if (inst >= ARRAY_SIZE(reg_offsets))
-		return false;
-
 	ipp->base.ctx = ctx;
 
 	ipp->base.inst = inst;
 
-	ipp->offsets = reg_offsets[inst];
+	ipp->offsets = *offset;
+
+	ipp->base.funcs = &funcs;
 
 	return true;
 }
@@ -64,22 +62,4 @@ void dce110_ipp_destroy(struct input_pixel_processor **ipp)
 {
 	dc_service_free((*ipp)->ctx, TO_DCE110_IPP(*ipp));
 	*ipp = NULL;
-}
-
-struct input_pixel_processor *dce110_ipp_create(
-	struct dc_context *ctx,
-	uint32_t inst)
-{
-	struct dce110_ipp *ipp =
-		dc_service_alloc(ctx, sizeof(struct dce110_ipp));
-
-	if (!ipp)
-		return NULL;
-
-	if (dce110_ipp_construct(ipp, ctx, inst))
-			return &ipp->base;
-
-	BREAK_TO_DEBUGGER();
-	dc_service_free(ctx, ipp);
-	return NULL;
 }

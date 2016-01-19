@@ -122,6 +122,19 @@ static const struct dce110_transform_reg_offsets dce110_xfm_offsets[] = {
 }
 };
 
+static const struct dce110_ipp_reg_offsets dce110_ipp_reg_offsets[] = {
+{
+	.dcp_offset = (mmDCP0_CUR_CONTROL - mmCUR_CONTROL),
+},
+{
+	.dcp_offset = (mmDCP1_CUR_CONTROL - mmCUR_CONTROL),
+},
+{
+	.dcp_offset = (mmDCP2_CUR_CONTROL - mmCUR_CONTROL),
+}
+};
+
+
 static struct timing_generator *dce110_timing_generator_create(
 		struct adapter_service *as,
 		struct dc_context *ctx,
@@ -204,6 +217,25 @@ static struct transform *dce110_transform_create(
 
 	BREAK_TO_DEBUGGER();
 	dc_service_free(ctx, transform);
+	return NULL;
+}
+
+static struct input_pixel_processor *dce110_ipp_create(
+	struct dc_context *ctx,
+	uint32_t inst,
+	const struct dce110_ipp_reg_offsets *offsets)
+{
+	struct dce110_ipp *ipp =
+		dc_service_alloc(ctx, sizeof(struct dce110_ipp));
+
+	if (!ipp)
+		return NULL;
+
+	if (dce110_ipp_construct(ipp, ctx, inst, offsets))
+		return &ipp->base;
+
+	BREAK_TO_DEBUGGER();
+	dc_service_free(ctx, ipp);
 	return NULL;
 }
 
@@ -293,7 +325,7 @@ bool dce110_construct_resource_pool(
 			goto controller_create_fail;
 		}
 
-		pool->ipps[i] = dce110_ipp_create(ctx, i);
+		pool->ipps[i] = dce110_ipp_create(ctx, i, &dce110_ipp_reg_offsets[i]);
 		if (pool->ipps[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dal_error(
