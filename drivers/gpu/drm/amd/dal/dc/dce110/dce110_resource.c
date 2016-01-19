@@ -28,7 +28,6 @@
 #include "stream_encoder.h"
 
 #include "resource.h"
-#include "dce_base/dce_base_resource.h"
 #include "include/irq_service_interface.h"
 #include "include/timing_generator_interface.h"
 
@@ -650,7 +649,7 @@ static enum dc_status validate_mapped_resource(
 			if (status != DC_OK)
 				return status;
 
-			dce_base_build_info_frame(stream);
+			build_info_frame(stream);
 		}
 	}
 
@@ -935,7 +934,7 @@ enum dc_status dce110_validate_with_context(
 
 	context->res_ctx.pool = dc->res_pool;
 
-	result = dce_base_map_resources(dc, context);
+	result = map_resources(dc, context);
 
 	if (result == DC_OK)
 		result = map_clock_resources(dc, context);
