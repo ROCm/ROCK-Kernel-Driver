@@ -2321,14 +2321,14 @@ static inline struct amdgpu_sdma * amdgpu_get_sdma_instance(struct amdgpu_ring *
 #define amdgpu_dpm_get_fan_speed_percent(adev, s) (adev)->pm.funcs->get_fan_speed_percent((adev), (s))
 
 #define amdgpu_dpm_get_sclk(adev, l) \
-		amdgpu_powerplay ? \
+		(amdgpu_powerplay ? \
 		(adev)->powerplay.pp_funcs->get_sclk((adev)->powerplay.pp_handle, (l)) : \
-		(adev)->pm.funcs->get_sclk((adev), (l))
+		(adev)->pm.funcs->get_sclk((adev), (l)))
 
 #define amdgpu_dpm_get_mclk(adev, l)  \
-		amdgpu_powerplay ? \
+		(amdgpu_powerplay ? \
 		(adev)->powerplay.pp_funcs->get_mclk((adev)->powerplay.pp_handle, (l)) : \
-		(adev)->pm.funcs->get_mclk((adev), (l))
+		(adev)->pm.funcs->get_mclk((adev), (l)))
 
 
 #define amdgpu_dpm_force_performance_level(adev, l) \
