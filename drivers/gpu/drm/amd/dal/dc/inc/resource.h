@@ -65,4 +65,10 @@ void pplib_apply_display_requirements(
 	const struct dc *dc,
 	const struct validate_context *context);
 
+void build_info_frame(struct core_stream *stream);
+
+enum dc_status map_resources(
+	const struct dc *dc,
+	struct validate_context *context);
+
 #endif /* DRIVERS_GPU_DRM_AMD_DAL_DEV_DC_INC_RESOURCE_H_ */
