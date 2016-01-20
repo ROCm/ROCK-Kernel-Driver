@@ -981,7 +981,7 @@ static void disable_vga_and_power_gate_all_controllers(
 		 * powergating. */
 		dce110_enable_display_pipe_clock_gating(ctx,
 				true);
-		dce110_enable_display_power_gating(ctx, i+1, dcb,
+		dce110_enable_display_power_gating(ctx, i, dcb,
 				PIPE_GATING_CONTROL_ENABLE);
 	}
 }
