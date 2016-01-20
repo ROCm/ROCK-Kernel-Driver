@@ -193,6 +193,34 @@ gamma_param_fail:
 	return result;
 }
 
+static bool validate_surface_address(
+		struct dc_plane_address address)
+{
+	bool is_valid_address = false;
+
+	switch (address.type) {
+	case PLN_ADDR_TYPE_GRAPHICS:
+		if (address.grph.addr.quad_part != 0)
+			is_valid_address = true;
+		break;
+	case PLN_ADDR_TYPE_GRPH_STEREO:
+		if ((address.grph_stereo.left_addr.quad_part != 0) &&
+			(address.grph_stereo.right_addr.quad_part != 0)) {
+			is_valid_address = true;
+		}
+		break;
+	case PLN_ADDR_TYPE_VIDEO_PROGRESSIVE:
+	case PLN_ADDR_TYPE_VIDEO_INTERLACED:
+	case PLN_ADDR_TYPE_VIDEO_PROGRESSIVE_STEREO:
+	case PLN_ADDR_TYPE_VIDEO_INTERLACED_STEREO:
+	default:
+		/* not supported */
+		BREAK_TO_DEBUGGER();
+	}
+
+	return is_valid_address;
+}
+
 bool dc_commit_surfaces_to_target(
 		struct dc *dc,
 		struct dc_surface *new_surfaces[],
@@ -200,12 +228,17 @@ bool dc_commit_surfaces_to_target(
 		struct dc_target *dc_target)
 
 {
-	uint8_t i, j;
+	int i, j;
 	uint32_t prev_disp_clk = dc->current_context.bw_results.dispclk_khz;
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
 
-	bool current_enabled_surface_count = 0;
-	bool new_enabled_surface_count = 0;
+	int current_enabled_surface_count = 0;
+	int new_enabled_surface_count = 0;
+
+	if (!dal_adapter_service_is_in_accelerated_mode(
+						dc->res_pool.adapter_srv)) {
+		return false;
+	}
 
 	for (i = 0; i < target->status.surface_count; i++)
 		if (target->status.surfaces[i]->visible)
@@ -218,7 +251,7 @@ bool dc_commit_surfaces_to_target(
 	dal_logger_write(dc->ctx->logger,
 				LOG_MAJOR_INTERFACE_TRACE,
 				LOG_MINOR_COMPONENT_DC,
-				"%s: commit %d surfaces to target 0x%x",
+				"%s: commit %d surfaces to target 0x%x\n",
 				__func__,
 				new_surface_count,
 				dc_target);
@@ -254,6 +287,8 @@ bool dc_commit_surfaces_to_target(
 	for (i = 0; i < new_surface_count; i++) {
 		struct dc_surface *surface = new_surfaces[i];
 		struct core_surface *core_surface = DC_SURFACE_TO_CORE(surface);
+		bool is_valid_address =
+				validate_surface_address(surface->address);
 
 		dal_logger_write(dc->ctx->logger,
 					LOG_MAJOR_INTERFACE_TRACE,
@@ -269,7 +304,8 @@ bool dc_commit_surfaces_to_target(
 			core_surface,
 			target);
 
-		dc->hwss.update_plane_address(core_surface, target);
+		if (is_valid_address)
+			dc->hwss.update_plane_address(core_surface, target);
 	}
 
 	if (current_enabled_surface_count == 0 && new_enabled_surface_count > 0)
