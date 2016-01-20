@@ -797,10 +797,6 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 			context->res_ctx.pool.adapter_srv);
 
 	if (timing_changed) {
-		dce110_enable_display_power_gating(
-				stream->ctx, controller_idx, dcb,
-				PIPE_GATING_CONTROL_DISABLE);
-
 		/* Must blank CRTC after disabling power gating and before any
 		 * programming, otherwise CRTC will be hung in bad state
 		 */
@@ -1280,6 +1276,23 @@ static enum dc_status apply_ctx_to_hw(
 
 	update_bios_scratch_critical_state(context->res_ctx.pool.adapter_srv,
 			true);
+
+	for (i = 0; i < pool->controller_count; i++) {
+		struct controller_ctx *ctlr_ctx
+			= &context->res_ctx.controller_ctx[i];
+		struct dc_bios *dcb;
+
+		if (ctlr_ctx->flags.unchanged || !ctlr_ctx->stream)
+			continue;
+
+		dcb = dal_adapter_service_get_bios_parser(
+				context->res_ctx.pool.adapter_srv);
+
+		dce110_enable_display_power_gating(
+				dc->ctx, i, dcb,
+				PIPE_GATING_CONTROL_DISABLE);
+	}
+
 	set_safe_displaymarks(context);
 	/*TODO: when pplib works*/
 	/*dc_set_clocks_and_clock_state(context);*/
