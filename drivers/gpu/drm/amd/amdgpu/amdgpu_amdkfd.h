@@ -45,6 +45,7 @@ struct kgd_mem {
 			void *cpu_ptr;
 		} data1;
 		struct {
+			struct mutex lock;
 			struct amdgpu_bo *bo;
 			struct list_head bo_va_list;
 			uint32_t domain;

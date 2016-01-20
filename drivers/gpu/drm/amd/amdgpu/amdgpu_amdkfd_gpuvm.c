@@ -339,6 +339,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		goto err;
 	}
 	INIT_LIST_HEAD(&(*mem)->data2.bo_va_list);
+	mutex_init(&(*mem)->data2.lock);
 	(*mem)->data2.readonly = readonly;
 	(*mem)->data2.execute = execute;
 	(*mem)->data2.no_substitute = no_sub;
@@ -628,11 +629,18 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 
 	adev = get_amdgpu_device(kgd);
 
+	mutex_lock(&mem->data2.lock);
+
 	if (mem->data2.mapped_to_gpu_memory > 0) {
 		pr_err("BO with size %lu bytes is mapped to GPU. Need to unmap it before release va 0x%llx\n",
 			mem->data2.bo->tbo.mem.size, mem->data2.va);
+		mutex_unlock(&mem->data2.lock);
 		return -EBUSY;
 	}
+
+	mutex_unlock(&mem->data2.lock);
+	/* lock is not needed after this, since mem is unused and will
+	 * be freed anyway */
 
 	/* Remove from VM internal data structures */
 	list_for_each_entry_safe(entry, tmp, &mem->data2.bo_va_list, bo_list) {
@@ -677,6 +685,8 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 
 	adev = get_amdgpu_device(kgd);
 
+	mutex_lock(&mem->data2.lock);
+
 	bo = mem->data2.bo;
 
 	BUG_ON(bo == NULL);
@@ -719,7 +729,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 			ret = try_pin_bo(bo, NULL, true, domain);
 			if (ret != 0) {
 				pr_err("amdkfd: Failed to pin BO\n");
-				return ret;
+				goto pin_bo_failed;
 			}
 
 			ret = map_bo_to_gpuvm(adev, bo, entry->bo_va, domain);
@@ -734,10 +744,13 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 		}
 	}
 
+	mutex_unlock(&mem->data2.lock);
 	return 0;
 
 map_bo_to_gpuvm_failed:
 	unpin_bo(bo, true);
+pin_bo_failed:
+	mutex_unlock(&mem->data2.lock);
 	return ret;
 }
 
@@ -889,16 +902,21 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 
 	adev = (struct amdgpu_device *) kgd;
 
+	mutex_lock(&mem->data2.lock);
+
 	/*
 	 * Make sure that this BO mapped on KGD before unmappping it
 	 */
-	if (!is_mem_on_local_device(kgd, &mem->data2.bo_va_list, vm))
-		return -EINVAL;
+	if (!is_mem_on_local_device(kgd, &mem->data2.bo_va_list, vm)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	if (mem->data2.mapped_to_gpu_memory == 0) {
 		pr_err("Unmapping BO with size %lu bytes from GPU memory is unnecessary va 0x%llx\n",
 		mem->data2.bo->tbo.mem.size, mem->data2.va);
-		return -EFAULT;
+		ret = -EFAULT;
+		goto out;
 	}
 
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
@@ -921,7 +939,7 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 			} else {
 				pr_err("amdgpu: failed unmap va 0x%llx\n",
 						mem->data2.va);
-				return ret;
+				goto out;
 			}
 			mem->data2.mapped_to_gpu_memory--;
 			pr_debug("amdgpu: DEC mapping count %d\n",
@@ -929,6 +947,8 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 		}
 	}
 
+out:
+	mutex_unlock(&mem->data2.lock);
 	return ret;
 }
 
@@ -951,11 +971,14 @@ int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 
 	adev = get_amdgpu_device(kgd);
 
+	mutex_lock(&mem->data2.lock);
+
 	bo = mem->data2.bo;
 	/* map the buffer */
 	ret = amdgpu_bo_reserve(bo, true);
 	if (ret) {
 		dev_err(adev->dev, "(%d) failed to reserve bo for amdkfd\n", ret);
+		mutex_unlock(&mem->data2.lock);
 		return ret;
 	}
 
@@ -964,6 +987,7 @@ int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 	if (ret) {
 		dev_err(adev->dev, "(%d) failed to pin bo for amdkfd\n", ret);
 		amdgpu_bo_unreserve(bo);
+		mutex_unlock(&mem->data2.lock);
 		return ret;
 	}
 
@@ -973,12 +997,14 @@ int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 			"(%d) failed to map bo to kernel for amdkfd\n", ret);
 		amdgpu_bo_unpin(bo);
 		amdgpu_bo_unreserve(bo);
+		mutex_unlock(&mem->data2.lock);
 		return ret;
 	}
 
 	mem->data2.kptr = *kptr;
 
 	amdgpu_bo_unreserve(bo);
+	mutex_unlock(&mem->data2.lock);
 
 	return 0;
 }
@@ -1164,6 +1190,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 	}
 
 	INIT_LIST_HEAD(&(*mem)->data2.bo_va_list);
+	mutex_init(&(*mem)->data2.lock);
 	(*mem)->data2.execute = true; /* executable by default */
 
 	(*mem)->data2.bo = amdgpu_bo_ref(bo);
