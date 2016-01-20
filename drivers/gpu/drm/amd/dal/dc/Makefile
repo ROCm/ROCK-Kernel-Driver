@@ -9,6 +9,10 @@ ifdef CONFIG_DRM_AMD_DAL_DCE11_0
 DC_LIBS += dce110
 endif
 
+ifdef CONFIG_DRM_AMD_DAL_DCE10_0
+DC_LIBS += dce100
+endif
+
 AMD_DC = $(addsuffix /Makefile, $(addprefix $(FULL_AMD_DAL_PATH)/dc/,$(DC_LIBS)))
 
 include $(AMD_DC)
