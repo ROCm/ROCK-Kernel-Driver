@@ -399,6 +399,7 @@ struct queue_properties {
 	uint32_t __iomem *doorbell_ptr;
 	uint32_t doorbell_off;
 	bool is_interop;
+	bool is_evicted; /* true -> queue is evicted */
 	bool is_active;
 	/* Not relevant for user mode queues in cp scheduling */
 	unsigned int vmid;
@@ -453,7 +454,6 @@ struct queue {
 	struct kfd_mem_obj *mqd_mem_obj;
 	uint64_t gart_mqd_addr;
 	struct queue_properties properties;
-	bool evicted; /* true -> queue is evicted */
 
 	uint32_t mec;
 	uint32_t pipe;

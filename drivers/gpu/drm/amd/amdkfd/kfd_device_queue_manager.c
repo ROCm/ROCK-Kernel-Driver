@@ -140,7 +140,6 @@ static int create_queue_nocpsch(struct device_queue_manager *dqm,
 				int *allocated_vmid)
 {
 	int retval;
-	uint32_t queue_percent = 0;
 
 	BUG_ON(!dqm || !q || !qpd || !allocated_vmid);
 
@@ -166,23 +165,13 @@ static int create_queue_nocpsch(struct device_queue_manager *dqm,
 	*allocated_vmid = qpd->vmid;
 	q->properties.vmid = qpd->vmid;
 	/*
-	 * Eviction state logic
-	 * If caller provides properties of active queue, we
-	 * preserve this state via q->evicted, but force the queue
-	 * to be non active now.
+	 * Eviction state logic: we only mark active queues as evicted
+	 * to avoid the overhead of restoring inactive queues later
 	 */
-	queue_percent = q->properties.queue_percent;
-	if (qpd->evicted) {
-		if (q->properties.queue_size > 0 &&
-			q->properties.queue_percent > 0 &&
-			q->properties.queue_address != 0) {
-			/*can't be active now*/
-			q->evicted = true; /* should be restored */
-		}	else {
-			q->evicted = false; /* should not be restored */
-		}
-		q->properties.queue_percent = 0;/* will not be active*/
-	}
+	if (qpd->evicted)
+		q->properties.is_evicted = (q->properties.queue_size > 0 &&
+					    q->properties.queue_percent > 0 &&
+					    q->properties.queue_address != 0);
 
 	if (q->properties.type == KFD_QUEUE_TYPE_COMPUTE)
 		retval = create_compute_queue_nocpsch(dqm, q, qpd);
@@ -212,9 +201,6 @@ static int create_queue_nocpsch(struct device_queue_manager *dqm,
 	dqm->total_queue_count++;
 	pr_debug("Total of %d queues are accountable so far\n",
 			dqm->total_queue_count);
-
-	/* restore percent data */
-	q->properties.queue_percent = queue_percent;
 
 	mutex_unlock(&dqm->lock);
 	return 0;
@@ -374,7 +360,6 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 	int retval;
 	struct mqd_manager *mqd;
 	struct kfd_process_device *pdd;
-	uint32_t queue_percent = 0;
 
 	bool prev_active = false;
 
@@ -394,23 +379,14 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 		return -ENOMEM;
 	}
 	/*
-	 * Eviction state logic
-	 * If caller provides properties of active queue, we
-	 * preserve this state via q->evicted, but force the queue
-	 * to be non active now.
+	 * Eviction state logic: we only mark active queues as evicted
+	 * to avoid the overhead of restoring inactive queues later
 	 */
-	queue_percent = q->properties.queue_percent;
-	if (pdd->qpd.evicted > 0) {
-		if (q->properties.queue_size > 0 &&
-			q->properties.queue_percent > 0 &&
-			q->properties.queue_address != 0) {
-			;/*can't be active now*/
-			q->evicted = true; /* should be restored */
-		}	else {
-			q->evicted = false; /* should not be restored */
-		}
-		q->properties.queue_percent = 0;/* will not be active*/
-	}
+	if (pdd->qpd.evicted > 0)
+		q->properties.is_evicted = (q->properties.queue_size > 0 &&
+					    q->properties.queue_percent > 0 &&
+					    q->properties.queue_address != 0);
+
 	/* save previous activity state for counters */
 	if (q->properties.is_active == true)
 		prev_active = true;
@@ -430,8 +406,6 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 		dqm->queue_count++;
 	else if ((q->properties.is_active == false) && (prev_active == true))
 		dqm->queue_count--;
-	/* restore percent data */
-	q->properties.queue_percent = queue_percent;
 
 	if (sched_policy != KFD_SCHED_POLICY_NO_HWS)
 		retval = execute_queues_cpsch(dqm, false);
@@ -465,7 +439,6 @@ int process_evict_queues(struct device_queue_manager *dqm,
 {
 	struct queue *q, *next;
 	struct mqd_manager *mqd;
-	uint32_t queue_percent;
 	int retval = 0;
 
 	BUG_ON(!dqm || !qpd);
@@ -483,13 +456,9 @@ int process_evict_queues(struct device_queue_manager *dqm,
 			BUG();
 			continue;
 		}
-		/* save queue percent state */
-		queue_percent = q->properties.queue_percent;
 		/* if the queue is not active anyway, it is not evicted */
 		if (q->properties.is_active == true)
-			q->evicted = true;
-		/* make the queue inactive in any case */
-		q->properties.queue_percent = 0;
+			q->properties.is_evicted = true;
 
 		retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
 		if (sched_policy == KFD_SCHED_POLICY_NO_HWS &&
@@ -497,10 +466,8 @@ int process_evict_queues(struct device_queue_manager *dqm,
 			retval = mqd->load_mqd(mqd, q->mqd, q->pipe,
 				q->queue,
 				(uint32_t __user *)q->properties.write_ptr, 0);
-		if (q->evicted)
+		if (q->properties.is_evicted)
 			dqm->queue_count--;
-		/* restore percent data */
-		q->properties.queue_percent = queue_percent;
 	}
 	if (sched_policy != KFD_SCHED_POLICY_NO_HWS)
 		retval = execute_queues_cpsch(dqm, false);
@@ -540,7 +507,8 @@ int process_restore_queues(struct device_queue_manager *dqm,
 			BUG();
 			continue;
 		}
-		if (q->evicted) {
+		if (q->properties.is_evicted) {
+			q->properties.is_evicted = false;
 			retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
 			if (sched_policy == KFD_SCHED_POLICY_NO_HWS &&
 				q->properties.type == KFD_QUEUE_TYPE_COMPUTE)
@@ -552,7 +520,6 @@ int process_restore_queues(struct device_queue_manager *dqm,
 								q->queue,
 				(uint32_t __user *)q->properties.write_ptr,
 								0);
-			q->evicted = false;
 			dqm->queue_count++;
 		}
 	}
@@ -1026,7 +993,6 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 {
 	int retval;
 	struct mqd_manager *mqd;
-	uint32_t queue_percent = 0;
 
 	BUG_ON(!dqm || !q || !qpd);
 
@@ -1061,23 +1027,14 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 		return -ENOMEM;
 	}
 	/*
-	 * Eviction state logic
-	 * If caller provides properties of active queue, we
-	 * preserve this state via q->evicted, but force the queue
-	 * to be non active now.
+	 * Eviction state logic: we only mark active queues as evicted
+	 * to avoid the overhead of restoring inactive queues later
 	 */
-	queue_percent = q->properties.queue_percent;
-	if (qpd->evicted) {
-		if (q->properties.queue_size > 0 &&
-			q->properties.queue_percent > 0 &&
-			q->properties.queue_address != 0) {
-			/*can't be active now*/
-			q->evicted = true; /* should be restored */
-		}	else {
-			q->evicted = false; /* should not be restored */
-		}
-		q->properties.queue_percent = 0;/* will not be active*/
-	}
+	if (qpd->evicted)
+		q->properties.is_evicted = (q->properties.queue_size > 0 &&
+					    q->properties.queue_percent > 0 &&
+					    q->properties.queue_address != 0);
+
 	dqm->ops_asic_specific.init_sdma_vm(dqm, q, qpd);
 
 	q->properties.tba_addr = qpd->pqm->tba_addr;
@@ -1103,8 +1060,6 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 
 	pr_debug("Total of %d queues are accountable so far\n",
 			dqm->total_queue_count);
-	/* restore percent data */
-	q->properties.queue_percent = queue_percent;
 
 out:
 	mutex_unlock(&dqm->lock);

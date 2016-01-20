@@ -262,7 +262,8 @@ static int update_mqd(struct mqd_manager *mm, void *mqd,
 	q->is_active = false;
 	if (q->queue_size > 0 &&
 			q->queue_address != 0 &&
-			q->queue_percent > 0) {
+			q->queue_percent > 0 &&
+			!q->is_evicted) {
 		m->cp_hqd_active = 1;
 		q->is_active = true;
 	}
@@ -300,7 +301,8 @@ static int update_mqd_sdma(struct mqd_manager *mm, void *mqd,
 	q->is_active = false;
 	if (q->queue_size > 0 &&
 			q->queue_address != 0 &&
-			q->queue_percent > 0) {
+			q->queue_percent > 0 &&
+			!q->is_evicted) {
 		m->sdma_rlc_rb_cntl |=
 				1 << SDMA0_RLC0_RB_CNTL__RB_ENABLE__SHIFT;
 
@@ -449,7 +451,8 @@ static int update_mqd_hiq(struct mqd_manager *mm, void *mqd,
 	q->is_active = false;
 	if (q->queue_size > 0 &&
 			q->queue_address != 0 &&
-			q->queue_percent > 0) {
+			q->queue_percent > 0 &&
+			!q->is_evicted) {
 		m->cp_hqd_active = 1;
 		q->is_active = true;
 	}
