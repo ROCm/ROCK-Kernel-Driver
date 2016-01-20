@@ -28,6 +28,7 @@
 #include <linux/hash.h>
 #include <linux/cpufreq.h>
 #include <linux/log2.h>
+#include <linux/dmi.h>
 
 #include "kfd_priv.h"
 #include "kfd_crat.h"
@@ -737,12 +738,48 @@ static void kfd_update_system_properties(void)
 	up_read(&topology_lock);
 }
 
+static void find_system_memory(const struct dmi_header *dm,
+	void *private)
+{
+	struct kfd_mem_properties *mem;
+	u16 mem_width, mem_clock;
+	struct kfd_topology_device *kdev =
+		(struct kfd_topology_device *)private;
+	const u8 *dmi_data = (const u8 *)(dm + 1);
+
+	if (dm->type == DMI_ENTRY_MEM_DEVICE && dm->length >= 0x15) {
+		mem_width = (u16)(*(const u16 *)(dmi_data + 0x6));
+		mem_clock = (u16)(*(const u16 *)(dmi_data + 0x11));
+		list_for_each_entry(mem, &kdev->mem_props, list) {
+			if (mem_width != 0xFFFF && mem_width != 0)
+				mem->width = mem_width;
+			if (mem_clock != 0)
+				mem->mem_clk_max = mem_clock;
+		}
+	}
+}
+/* kfd_add_non_crat_information - Add information that is not currently
+ *	defined in CRAT but is necessary for KFD topology
+ * @dev - topology device to which addition info is added
+ */
+static void kfd_add_non_crat_information(struct kfd_topology_device *kdev)
+{
+	/* Check if CPU only node. */
+	if (kdev->gpu == NULL) {
+		/* Add system memory information */
+		dmi_walk(find_system_memory, kdev);
+	}
+	/* TODO: For GPU node, rearrange code from kfd_topology_add_device */
+}
+
 int kfd_topology_init(void)
 {
 	void *crat_image = NULL;
 	size_t image_size = 0;
 	int ret;
 	struct list_head temp_topology_device_list;
+	int cpu_only_node = 0;
+	struct kfd_topology_device *kdev;
 
 	/* topology_device_list - Master list of all topology devices
 	 * temp_topology_device_list - temporary list created while parsing CRAT
@@ -765,9 +802,11 @@ int kfd_topology_init(void)
 	 *	CRAT. If no CRAT is available, it is assumed to be a CPU
 	 */
 	ret = kfd_create_crat_image_acpi(&crat_image, &image_size);
-	if (ret != 0)
+	if (ret != 0) {
 		ret = kfd_create_crat_image_virtual(&crat_image, &image_size,
 				COMPUTE_UNIT_CPU, NULL);
+		cpu_only_node = 1;
+	}
 
 	if (ret == 0)
 		ret = kfd_parse_crat_table(crat_image, &temp_topology_device_list);
@@ -790,6 +829,17 @@ int kfd_topology_init(void)
 	}
 	else
 		pr_err("Failed to update topology in sysfs ret=%d\n", ret);
+
+	/* For nodes with GPU, this information gets added
+	 * when GPU is detected (kfd_topology_add_device). */
+	if (cpu_only_node) {
+		/* Add additional information to CPU only node created above */
+		down_write(&topology_lock);
+		kdev = list_first_entry(&topology_device_list,
+				struct kfd_topology_device, list);
+		up_write(&topology_lock);
+		kfd_add_non_crat_information(kdev);
+	}
 
 err:
 	kfd_destroy_crat_image(crat_image);
@@ -942,6 +992,9 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 
 	dev->gpu_id = gpu_id;
 	gpu->id = gpu_id;
+
+	/* TODO: Move the following lines to function
+	 *	kfd_add_non_crat_information */
 
 	/* Fill-in additional information that is not available in CRAT but
 	 * needed for the topology */
