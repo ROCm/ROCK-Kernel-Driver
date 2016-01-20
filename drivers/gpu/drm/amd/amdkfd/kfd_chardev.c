@@ -279,7 +279,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 		return -EINVAL;
 	}
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
@@ -303,7 +303,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	args->doorbell_offset = (KFD_MMAP_TYPE_DOORBELL | args->gpu_id);
 	args->doorbell_offset <<= PAGE_SHIFT;
 
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 
 	pr_debug("kfd: queue id %d was created successfully\n", args->queue_id);
 
@@ -320,7 +320,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 
 err_create_queue:
 err_bind_process:
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 	return err;
 }
 
@@ -334,11 +334,11 @@ static int kfd_ioctl_destroy_queue(struct file *filp, struct kfd_process *p,
 				args->queue_id,
 				p->pasid);
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	retval = pqm_destroy_queue(&p->pqm, args->queue_id);
 
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 	return retval;
 }
 
@@ -380,11 +380,11 @@ static int kfd_ioctl_update_queue(struct file *filp, struct kfd_process *p,
 	pr_debug("kfd: updating queue id %d for PASID %d\n",
 			args->queue_id, p->pasid);
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	retval = pqm_update_queue(&p->pqm, args->queue_id, &properties);
 
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 
 	return retval;
 }
@@ -402,11 +402,11 @@ static int kfd_ioctl_set_cu_mask(struct file *filp, struct kfd_process *p,
 	if (properties.cu_mask == 0)
 		return 0;
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	retval = pqm_set_cu_mask(&p->pqm, args->queue_id, &properties);
 
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 
 	return retval;
 }
@@ -434,7 +434,7 @@ static int kfd_ioctl_set_memory_policy(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
@@ -458,7 +458,7 @@ static int kfd_ioctl_set_memory_policy(struct file *filep,
 		err = -EINVAL;
 
 out:
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 
 	return err;
 }
@@ -475,7 +475,7 @@ static int kfd_ioctl_set_trap_handler(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
@@ -495,7 +495,7 @@ static int kfd_ioctl_set_trap_handler(struct file *filep,
 		err = -EINVAL;
 
 out:
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 
 	return err;
 }
@@ -518,14 +518,14 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
 		return status;
 	}
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 	mutex_lock(get_dbgmgr_mutex());
 
 	/* make sure that we have pdd, if this the first queue created for this process */
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd) < 0) {
 		mutex_unlock(get_dbgmgr_mutex());
-		mutex_unlock(&p->mutex);
+		up_write(&p->lock);
 		return PTR_ERR(pdd);
 	}
 
@@ -543,7 +543,7 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
 	}
 
 	mutex_unlock(get_dbgmgr_mutex());
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 
 	return status;
 }
@@ -867,7 +867,7 @@ static int kfd_ioctl_get_process_apertures(struct file *filp,
 
 	args->num_of_nodes = 0;
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	/*if the process-device list isn't empty*/
 	if (kfd_has_process_device_data(p)) {
@@ -906,7 +906,7 @@ static int kfd_ioctl_get_process_apertures(struct file *filp,
 				(args->num_of_nodes < NUM_OF_SUPPORTED_GPUS));
 	}
 
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 
 	return 0;
 }
@@ -925,10 +925,10 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 	if (args->num_of_nodes == 0) {
 		/* Return number of nodes, so that user space can alloacate
 		* sufficient memory */
-		mutex_lock(&p->mutex);
+		down_write(&p->lock);
 
 		if (!kfd_has_process_device_data(p)) {
-			mutex_unlock(&p->mutex);
+			up_write(&p->lock);
 			return 0;
 		}
 
@@ -939,7 +939,7 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 		} while ((pdd =
 			kfd_get_next_process_device_data(p, pdd)) != NULL);
 
-		mutex_unlock(&p->mutex);
+		up_write(&p->lock);
 		return 0;
 	}
 
@@ -951,10 +951,10 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 	if (!pa)
 		return -ENOMEM;
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	if (!kfd_has_process_device_data(p)) {
-		mutex_unlock(&p->mutex);
+		up_write(&p->lock);
 		args->num_of_nodes = 0;
 		kfree(pa);
 		return 0;
@@ -989,7 +989,7 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 	} while (
 		(pdd = kfd_get_next_process_device_data(p, pdd)) != NULL &&
 		(nodes < args->num_of_nodes));
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 
 	args->num_of_nodes = nodes;
 	ret = copy_to_user(
@@ -1018,11 +1018,11 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 			return -EFAULT;
 		}
 		if (KFD_IS_DGPU(kfd->device_info->asic_family)) {
-			mutex_lock(&p->mutex);
+			down_write(&p->lock);
 			pdd = kfd_bind_process_to_device(kfd, p);
 			if (IS_ERR(pdd) < 0) {
 				err = PTR_ERR(pdd);
-				mutex_unlock(&p->mutex);
+				up_write(&p->lock);
 				return -EFAULT;
 			}
 			mem = kfd_process_device_translate_handle(pdd,
@@ -1030,14 +1030,14 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 			if (!mem) {
 				pr_err("amdkfd: can't find BO offset is 0x%llx\n",
 						args->event_page_offset);
-				mutex_unlock(&p->mutex);
+				up_write(&p->lock);
 				return -EFAULT;
 			}
+			up_write(&p->lock);
 
 			/* Map dGPU gtt BO to kernel */
 			kfd->kfd2kgd->map_gtt_bo_to_kernel(kfd->kgd,
 					mem, &kern_addr);
-			mutex_unlock(&p->mutex);
 		}
 	}
 
@@ -1110,7 +1110,7 @@ static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd) < 0) {
@@ -1121,6 +1121,8 @@ static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
 	pdd->sh_hidden_private_base_vmid = args->va_addr;
 	pdd->qpd.sh_hidden_private_base = args->va_addr;
 
+	up_write(&p->lock);
+
 	if (sched_policy == KFD_SCHED_POLICY_NO_HWS && pdd->qpd.vmid != 0) {
 		err = dev->kfd2kgd->alloc_memory_of_scratch(
 			dev->kgd, args->va_addr, pdd->qpd.vmid);
@@ -1128,13 +1130,11 @@ static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
 			goto alloc_memory_of_scratch_failed;
 	}
 
-	mutex_unlock(&p->mutex);
-
 	return 0;
 
-alloc_memory_of_scratch_failed:
 bind_process_to_device_fail:
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
+alloc_memory_of_scratch_failed:
 	return -EFAULT;
 }
 
@@ -1155,40 +1155,32 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
-	mutex_lock(&p->mutex);
-
+	down_write(&p->lock);
 	pdd = kfd_bind_process_to_device(dev, p);
-	if (IS_ERR(pdd) < 0) {
-		err = PTR_ERR(pdd);
-		goto bind_process_to_device_failed;
-	}
+	up_write(&p->lock);
+	if (IS_ERR(pdd) < 0)
+		return PTR_ERR(pdd);
 
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
 		pdd->vm, (struct kgd_mem **) &mem, NULL, NULL, pdd, 0);
 
 	if (err != 0)
-		goto alloc_memory_of_gpu_failed;
+		return err;
 
+	down_write(&p->lock);
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
 			args->va_addr, args->size);
+	up_write(&p->lock);
 	if (idr_handle < 0) {
-		err = -EFAULT;
-		goto handle_creation_failed;
+		dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
+						 (struct kgd_mem *) mem);
+		return -EFAULT;
 	}
 
 	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
 
-	mutex_unlock(&p->mutex);
-
 	return 0;
-
-handle_creation_failed:
-	dev->kfd2kgd->free_memory_of_gpu(dev->kgd, (struct kgd_mem *) mem);
-alloc_memory_of_gpu_failed:
-bind_process_to_device_failed:
-	mutex_unlock(&p->mutex);
-	return err;
 }
 
 bool kfd_is_large_bar(struct kfd_dev *dev)
@@ -1287,13 +1279,11 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
-	mutex_lock(&p->mutex);
-
+	down_write(&p->lock);
 	pdd = kfd_bind_process_to_device(dev, p);
-	if (IS_ERR(pdd) < 0) {
-		err = PTR_ERR(pdd);
-		goto bind_process_to_device_failed;
-	}
+	up_write(&p->lock);
+	if (IS_ERR(pdd) < 0)
+		return PTR_ERR(pdd);
 
 	offset = args->mmap_offset;
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
@@ -1303,13 +1293,16 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 		kfd_convert_user_mem_alloction_flags(dev, args->flags));
 
 	if (err != 0)
-		goto alloc_memory_of_gpu_failed;
+		return err;
 
+	down_write(&p->lock);
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
 			args->va_addr, args->size);
+	up_write(&p->lock);
 	if (idr_handle < 0) {
-		err = -EFAULT;
-		goto handle_creation_failed;
+		dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
+						 (struct kgd_mem *) mem);
+		return -EFAULT;
 	}
 
 	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
@@ -1323,16 +1316,7 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 		args->mmap_offset |= offset;
 	}
 
-	mutex_unlock(&p->mutex);
-
 	return 0;
-
-handle_creation_failed:
-	dev->kfd2kgd->free_memory_of_gpu(dev->kgd, (struct kgd_mem *) mem);
-alloc_memory_of_gpu_failed:
-bind_process_to_device_failed:
-	mutex_unlock(&p->mutex);
-	return err;
 }
 
 static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
@@ -1348,7 +1332,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	pdd = kfd_get_process_device_data(dev, p);
 	if (!pdd) {
@@ -1358,18 +1342,23 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 
 	buf_obj = kfd_process_device_find_bo(pdd,
 					GET_IDR_HANDLE(args->handle));
-	BUG_ON(buf_obj == NULL);
-
+	BUG_ON(buf_obj == NULL); /* FIXME: invalid handle provided by user
+				  * mode can crash the kernel */
 	run_rdma_free_callback(buf_obj);
+
+	up_write(&p->lock);
+
 	ret = dev->kfd2kgd->free_memory_of_gpu(dev->kgd, buf_obj->mem);
 
 	/* If freeing the buffer failed, leave the handle in place for
 	 * clean-up during process tear-down. */
-	if (ret == 0)
+	if (ret == 0) {
+		down_write(&p->lock);
 		kfd_process_device_remove_obj_handle(
 			pdd, GET_IDR_HANDLE(args->handle));
+		up_write(&p->lock);
+	}
 
-	mutex_unlock(&p->mutex);
 	return ret;
 }
 
@@ -1409,6 +1398,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	long err = 0;
 	int i, num_dev;
 	uint32_t *devices_arr = NULL;
+	int bo_size;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (dev == NULL)
@@ -1435,7 +1425,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		}
 	}
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd) < 0) {
@@ -1445,6 +1435,8 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 
 	mem = kfd_process_device_translate_handle(pdd,
 						GET_IDR_HANDLE(args->handle));
+	up_write(&p->lock);
+
 	if (mem == NULL) {
 		err = PTR_ERR(mem);
 		goto get_mem_obj_from_handle_failed;
@@ -1460,7 +1452,9 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
 			}
+			down_write(&p->lock);
 			peer_pdd = kfd_bind_process_to_device(peer, p);
+			up_write(&p->lock);
 			if (!peer_pdd) {
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
@@ -1474,18 +1468,20 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		if (err != 0)
 			pr_err("amdkfd: failed to map\n");
 	}
-	pdd->mapped_size += dev->kfd2kgd->return_bo_size(dev->kgd, mem);
 
-	mutex_unlock(&p->mutex);
+	bo_size = dev->kfd2kgd->return_bo_size(dev->kgd, mem);
+	down_write(&p->lock);
+	pdd->mapped_size += bo_size;
+	up_write(&p->lock);
 
 	if (args->device_ids_array_size > 0 && devices_arr)
 		kfree(devices_arr);
 
 	return err;
 
-get_mem_obj_from_handle_failed:
 bind_process_to_device_failed:
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
+get_mem_obj_from_handle_failed:
 copy_from_user_failed:
 	kfree(devices_arr);
 	return err;
@@ -1513,6 +1509,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	struct kfd_dev *dev, *peer;
 	long err = 0;
 	uint32_t *devices_arr = NULL, num_dev, i;
+	int bo_size;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (dev == NULL)
@@ -1539,7 +1536,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 		}
 	}
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	pdd = kfd_get_process_device_data(dev, p);
 	if (!pdd) {
@@ -1550,6 +1547,8 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 
 	mem = kfd_process_device_translate_handle(pdd,
 						GET_IDR_HANDLE(args->handle));
+	up_write(&p->lock);
+
 	if (mem == NULL) {
 		err = PTR_ERR(mem);
 		goto get_mem_obj_from_handle_failed;
@@ -1563,7 +1562,9 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
 			}
+			down_write(&p->lock);
 			peer_pdd = kfd_get_process_device_data(peer, p);
+			up_write(&p->lock);
 			if (!peer_pdd) {
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
@@ -1577,13 +1578,16 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 		radeon_flush_tlb(dev, p->pasid);
 	}
 
-	pdd->mapped_size -= dev->kfd2kgd->return_bo_size(dev->kgd, mem);
-	mutex_unlock(&p->mutex);
+	bo_size = dev->kfd2kgd->return_bo_size(dev->kgd, mem);
+	down_write(&p->lock);
+	pdd->mapped_size -= bo_size;
+	up_write(&p->lock);
+
 	return 0;
 
-get_mem_obj_from_handle_failed:
 bind_process_to_device_failed:
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
+get_mem_obj_from_handle_failed:
 copy_from_user_failed:
 	kfree(devices_arr);
 	return err;
@@ -1622,13 +1626,11 @@ static int kfd_ioctl_open_graphic_handle(struct file *filep,
 		return -EINVAL;
 	}
 
-	mutex_lock(&p->mutex);
-
+	down_write(&p->lock);
 	pdd = kfd_bind_process_to_device(dev, p);
-	if (IS_ERR(pdd) < 0) {
-		err = PTR_ERR(pdd);
-		goto bind_process_to_device_failed;
-	}
+	up_write(&p->lock);
+	if (IS_ERR(pdd) < 0)
+		return PTR_ERR(pdd);
 
 	err = dev->kfd2kgd->open_graphic_handle(dev->kgd,
 			args->va_addr,
@@ -1638,29 +1640,25 @@ static int kfd_ioctl_open_graphic_handle(struct file *filep,
 			(struct kgd_mem **) &mem);
 
 	if (err != 0)
-		goto gpuvm_alloc_failed;
+		return err;
 
+	down_write(&p->lock);
 	/*TODO: When open_graphic_handle is implemented, we need to create
 	* the corresponding interval tree. We need to know the size of
 	* the buffer through open_graphic_handle(). We use 1 for now.*/
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
 			args->va_addr, 1);
-	if (idr_handle < 0)
-		goto handle_creation_failed;
+	up_write(&p->lock);
+	if (idr_handle < 0) {
+		/* FIXME: destroy_process_gpumem doesn't seem to be
+		 * implemented anywhere */
+		dev->kfd2kgd->destroy_process_gpumem(dev->kgd, mem);
+		return -EFAULT;
+	}
 
 	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
 
-	mutex_unlock(&p->mutex);
-
 	return 0;
-
-handle_creation_failed:
-	dev->kfd2kgd->destroy_process_gpumem(dev->kgd, mem);
-gpuvm_alloc_failed:
-bind_process_to_device_failed:
-	mutex_unlock(&p->mutex);
-
-	return err;
 }
 
 static int kfd_ioctl_set_process_dgpu_aperture(struct file *filep,
@@ -1675,7 +1673,7 @@ static int kfd_ioctl_set_process_dgpu_aperture(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd) < 0) {
@@ -1687,7 +1685,7 @@ static int kfd_ioctl_set_process_dgpu_aperture(struct file *filep,
 			args->dgpu_limit);
 
 exit:
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 	return err;
 }
 
@@ -1768,33 +1766,31 @@ static int kfd_ioctl_import_dmabuf(struct file *filep,
 	if (!dev || !dev->kfd2kgd->import_dmabuf)
 		return -EINVAL;
 
-	mutex_lock(&p->mutex);
-
+	down_write(&p->lock);
 	pdd = kfd_bind_process_to_device(dev, p);
-	if (IS_ERR(pdd) < 0) {
-		r = PTR_ERR(pdd);
-		goto out_unlock;
-	}
+	up_write(&p->lock);
+	if (IS_ERR(pdd) < 0)
+		return PTR_ERR(pdd);
 
 	r = dev->kfd2kgd->import_dmabuf(dev->kgd, args->dmabuf_fd,
 					args->va_addr, pdd->vm,
 					(struct kgd_mem **)&mem, &size);
 	if (r)
-		goto out_unlock;
+		return r;
 
+	down_write(&p->lock);
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
 			args->va_addr, size);
+	up_write(&p->lock);
 	if (idr_handle < 0) {
 		dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
 						 (struct kgd_mem *)mem);
-		r = -EFAULT;
-	} else {
-		args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
+		return -EFAULT;
 	}
 
-out_unlock:
-	mutex_unlock(&p->mutex);
-	return r;
+	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
+
+	return 0;
 }
 
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \

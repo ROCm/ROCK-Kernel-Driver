@@ -375,7 +375,6 @@ int kfd_init_apertures(struct kfd_process *process)
 	return 0;
 
 err:
-	mutex_unlock(&process->mutex);
 	return -1;
 }
 

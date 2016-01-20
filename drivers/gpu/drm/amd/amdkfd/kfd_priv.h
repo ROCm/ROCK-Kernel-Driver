@@ -594,7 +594,7 @@ struct kfd_process {
 
 	struct mm_struct *mm;
 
-	struct mutex mutex;
+	struct rw_semaphore lock;
 
 	/*
 	 * In any process, the thread that started main() is the lead

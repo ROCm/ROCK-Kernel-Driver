@@ -126,7 +126,7 @@ static int get_pages(uint64_t address, uint64_t length, struct pid *pid,
 free_mem:
 	kfree(rdma_cb_data);
 out:
-	mutex_unlock(&p->mutex);
+	up_read(&p->lock);
 
 	return ret;
 }
@@ -203,7 +203,7 @@ static int put_pages(struct amd_p2p_info **p_p2p_data)
 	if (!ret)
 		*p_p2p_data = NULL;
 
-	mutex_unlock(&p->mutex);
+	up_read(&p->lock);
 
 	return ret;
 }
@@ -232,7 +232,7 @@ static int is_gpu_address(uint64_t address, struct pid *pid)
 
 	buf_obj = kfd_process_find_bo_from_interval(p, address, address);
 
-	mutex_unlock(&p->mutex);
+	up_read(&p->lock);
 	if (!buf_obj)
 		return 0;
 	else

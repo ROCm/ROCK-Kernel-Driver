@@ -558,7 +558,7 @@ int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 
 	/* Because we are called from arbitrary context (workqueue) as opposed
 	 * to process context, kfd_process could attempt to exit while we are
-	 * running so the lookup function returns a locked process. */
+	 * running so the lookup function returns a read-locked process. */
 	p = kfd_lookup_process_by_mm(mm);
 	if (!p)
 		return -ENODEV;
@@ -568,7 +568,7 @@ int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 	if (pdd)
 		r = process_evict_queues(kfd->dqm, &pdd->qpd);
 
-	mutex_unlock(&p->mutex);
+	up_read(&p->lock);
 	return r;
 }
 
@@ -584,7 +584,7 @@ int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 
 	/* Because we are called from arbitrary context (workqueue) as opposed
 	 * to process context, kfd_process could attempt to exit while we are
-	 * running so the lookup function returns a locked process. */
+	 * running so the lookup function returns a read-locked process. */
 	p = kfd_lookup_process_by_mm(mm);
 	if (!p)
 		return -ENODEV;
@@ -594,7 +594,7 @@ int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 	if (pdd)
 		r = process_restore_queues(kfd->dqm, &pdd->qpd);
 
-	mutex_unlock(&p->mutex);
+	up_read(&p->lock);
 	return r;
 }
 

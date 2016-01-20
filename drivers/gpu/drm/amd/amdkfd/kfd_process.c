@@ -166,13 +166,13 @@ static struct kfd_process *find_process(const struct task_struct *thread,
 	idx = srcu_read_lock(&kfd_processes_srcu);
 	p = find_process_by_mm(thread->mm);
 	if (p && lock)
-		mutex_lock(&p->mutex);
+		down_read(&p->lock);
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 
 	return p;
 }
 
-/* This returns with process->mutex locked. */
+/* This returns with process->lock read-locked. */
 struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid)
 {
 	struct task_struct *task = NULL;
@@ -195,7 +195,7 @@ int evict_size(struct kfd_process *process, int size, int type)
 	struct kfd_process *p = process;
 	int temp = 0;
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	if (type == EVICT_FIRST_PDD) {
 
@@ -225,7 +225,7 @@ int evict_size(struct kfd_process *process, int size, int type)
 		}
 
 	}
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 	return 0;
 
 }
@@ -275,7 +275,7 @@ int restore(struct kfd_dev *kfd)
 	int id;
 
 	/* need to run on all processes*/
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		pr_debug("Releasing pdd (topology id %d) for process (pasid %d) in workqueue\n",
@@ -300,10 +300,14 @@ int restore(struct kfd_dev *kfd)
 			pdd->evicted = false;
 		}
 	}
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 	return 0;
 }
 
+/* No process locking is needed in this function, because the process
+ * is not findable any more. We must assume that no other thread is
+ * using it any more, otherwise we couldn't safely free the process
+ * stucture in the end. */
 static void kfd_process_wq_release(struct work_struct *work)
 {
 	struct kfd_process_release_work *my_work;
@@ -319,10 +323,7 @@ static void kfd_process_wq_release(struct work_struct *work)
 	pr_debug("Releasing process (pasid %d) in workqueue\n",
 			p->pasid);
 
-	mutex_lock(&p->mutex);
-
-	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
-							per_device_list) {
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		pr_debug("Releasing pdd (topology id %d) for process (pasid %d) in workqueue\n",
 				pdd->dev->id, p->pasid);
 
@@ -349,7 +350,7 @@ static void kfd_process_wq_release(struct work_struct *work)
 	}
 
 	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
-							per_device_list) {
+				 per_device_list) {
 		radeon_flush_tlb(pdd->dev, p->pasid);
 		/* Destroy the GPUVM VM context */
 		if (pdd->vm)
@@ -362,10 +363,6 @@ static void kfd_process_wq_release(struct work_struct *work)
 	kfd_event_free_process(p);
 
 	kfd_pasid_free(p->pasid);
-
-	mutex_unlock(&p->mutex);
-
-	mutex_destroy(&p->mutex);
 
 	kfree(p->queues);
 
@@ -415,7 +412,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	mutex_unlock(&kfd_processes_mutex);
 	synchronize_srcu(&kfd_processes_srcu);
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	/* Iterate over all process device data structures and if the pdd is in
 	 * debug mode,we should first force unregistration, then we will be
@@ -453,7 +450,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 			pdd->reset_wavefronts = false;
 		}
 	}
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 
 	/*
 	 * Because we drop mm_count inside kfd_process_destroy_delayed
@@ -477,7 +474,7 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 	void *mem = NULL;
 	struct kfd_dev *dev = NULL;
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
 				per_device_list) {
 		dev = pdd->dev;
@@ -485,6 +482,11 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 			continue;
 		if (pdd->cwsr_base) {
 			/* cwsr_base is only set for DGPU */
+
+			/* can't hold the process lock while
+			 * allocating from KGD */
+			up_write(&p->lock);
+
 			err = dev->kfd2kgd->alloc_memory_of_gpu(
 				dev->kgd, pdd->cwsr_base, dev->cwsr_size,
 				pdd->vm, (struct kgd_mem **)&mem,
@@ -493,20 +495,34 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 				ALLOC_MEM_FLAGS_NONPAGED |
 				ALLOC_MEM_FLAGS_EXECUTE_ACCESS |
 				ALLOC_MEM_FLAGS_NO_SUBSTITUTE);
-			if (err != 0)
-				goto exit_set_cwsr;
-			pdd->cwsr_mem_handle =
-				kfd_process_device_create_obj_handle(pdd, mem,
-					pdd->cwsr_base, dev->cwsr_size);
-			if (pdd->cwsr_mem_handle < 0)
-				goto exit_set_cwsr;
+			if (err)
+				goto err_alloc_tba;
 			err = kfd_map_memory_to_gpu(dev, mem, p, pdd);
 			if (err)
-				goto exit_set_cwsr;
-			memcpy(pdd->cwsr_kaddr,	kmap(dev->cwsr_pages),
-				PAGE_SIZE);
-			kunmap(dev->cwsr_pages);
-			p->pqm.tba_addr = pdd->cwsr_base;
+				goto err_map_tba;
+
+			down_write(&p->lock);
+			/* Check if someone else allocated the memory
+			 * while we weren't looking */
+			if (p->pqm.tba_addr) {
+				up_write(&p->lock);
+				dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd,
+					(struct kgd_mem *)mem, pdd->vm);
+				dev->kfd2kgd->free_memory_of_gpu(dev->kgd, mem);
+				down_write(&p->lock);
+			} else {
+				pdd->cwsr_mem_handle =
+					kfd_process_device_create_obj_handle(
+						pdd, mem, pdd->cwsr_base,
+						dev->cwsr_size);
+				if (pdd->cwsr_mem_handle < 0)
+					goto err_create_handle;
+
+				memcpy(pdd->cwsr_kaddr, kmap(dev->cwsr_pages),
+				       PAGE_SIZE);
+				kunmap(dev->cwsr_pages);
+				p->pqm.tba_addr = pdd->cwsr_base;
+			}
 		} else {
 			offset = (kfd_get_gpu_id(dev) |
 				KFD_MMAP_TYPE_RESERVED_MEM) << PAGE_SHIFT;
@@ -525,8 +541,14 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 			pr_debug("set tba :0x%llx, tma:0x%llx for pqm.\n",
 				p->pqm.tba_addr, p->pqm.tma_addr);
 	}
-exit_set_cwsr:
-	mutex_unlock(&p->mutex);
+
+err_create_handle:
+	up_write(&p->lock);
+	return err;
+
+err_map_tba:
+	dev->kfd2kgd->free_memory_of_gpu(dev->kgd, mem);
+err_alloc_tba:
 	return err;
 }
 
@@ -551,7 +573,7 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	if (process->pasid == 0)
 		goto err_alloc_pasid;
 
-	mutex_init(&process->mutex);
+	init_rwsem(&process->lock);
 
 	process->mm = thread->mm;
 
@@ -695,7 +717,7 @@ void kfd_unbind_process_from_device(struct kfd_dev *dev, unsigned int pasid)
 
 	BUG_ON(p->pasid != pasid);
 
-	mutex_lock(&p->mutex);
+	down_write(&p->lock);
 
 	mutex_lock(get_dbgmgr_mutex());
 
@@ -727,7 +749,7 @@ void kfd_unbind_process_from_device(struct kfd_dev *dev, unsigned int pasid)
 	if (pdd)
 		pdd->bound = false;
 
-	mutex_unlock(&p->mutex);
+	up_write(&p->lock);
 }
 
 struct kfd_process_device *kfd_get_first_process_device_data(struct kfd_process *p)
@@ -859,7 +881,7 @@ void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 	kfree(buf_obj);
 }
 
-/* This returns with process->mutex locked. */
+/* This returns with process->lock read-locked. */
 struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 {
 	struct kfd_process *p;
@@ -869,7 +891,7 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
 		if (p->pasid == pasid) {
-			mutex_lock(&p->mutex);
+			down_read(&p->lock);
 			break;
 		}
 	}
@@ -879,7 +901,7 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 	return p;
 }
 
-/* This returns with process->mutex locked. */
+/* This returns with process->lock read-locked. */
 struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
 {
 	struct kfd_process *p;
@@ -888,7 +910,7 @@ struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
 
 	p = find_process_by_mm(mm);
 	if (p != NULL)
-		mutex_lock(&p->mutex);
+		down_read(&p->lock);
 
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 
