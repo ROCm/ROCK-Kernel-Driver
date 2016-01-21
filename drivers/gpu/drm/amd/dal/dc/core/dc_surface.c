@@ -29,8 +29,7 @@
 
 /* DC core (private) */
 #include "core_dc.h"
-#include "adjustment_types.h"
-
+#include "inc/transform.h"
 
 /*******************************************************************************
  * Private structures

@@ -29,7 +29,7 @@
 #include "link_encoder.h"
 #include "stream_encoder.h"
 #include "opp.h"
-
+#include "transform.h"
 
 void unreference_clock_source(
 		struct resource_context *res_ctx,
