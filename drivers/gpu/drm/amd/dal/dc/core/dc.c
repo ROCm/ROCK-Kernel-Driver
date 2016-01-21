@@ -83,17 +83,23 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 
 	dc->link_count = 0;
 
-	dcb = (struct dc_bios*)dal_adapter_service_get_bios_parser(init_params->adapter_srv);
+	dcb = dal_adapter_service_get_bios_parser(init_params->adapter_srv);
 
 	connectors_num = dcb->funcs->get_connectors_number(dcb);
 
-	if (0 == connectors_num || connectors_num > ENUM_ID_COUNT) {
-		dal_error("DC: Invalid number of connectors!\n");
+	if (connectors_num > ENUM_ID_COUNT) {
+		dal_error("DC: Number of connectors %d exceeds maximum of %d!\n",
+				connectors_num, ENUM_ID_COUNT);
 		return false;
 	}
 
-	dal_output_to_console("%s: connectors_num:%d\n", __func__,
-			connectors_num);
+	if (connectors_num == 0 && init_params->num_virtual_links == 0) {
+		dal_error("DC: Number of connectors can not be zero!\n");
+		return false;
+	}
+
+	dal_output_to_console("DC: %s: connectors_num: physical:%d, virtual:%d\n",
+			__func__, connectors_num, init_params->num_virtual_links);
 
 	for (i = 0; i < connectors_num; i++) {
 		struct link_init_data link_init_params = {0};
@@ -335,8 +341,6 @@ static bool construct(struct dc *dc, const struct dal_init_data *init_params)
 
 	dc->ctx = dc_init_data.ctx;
 
-	dc->ctx->dce_version = dal_adapter_service_get_dce_version(
-			dc_init_data.adapter_srv);
 	dc->ctx->dce_environment = dal_adapter_service_get_dce_environment(
 			dc_init_data.adapter_srv);
 
@@ -522,7 +526,7 @@ bool dc_commit_targets(
 	dal_logger_write(dc->ctx->logger,
 				LOG_MAJOR_INTERFACE_TRACE,
 				LOG_MINOR_COMPONENT_DC,
-				"%s: %d targets",
+				"%s: %d targets\n",
 				__func__,
 				target_count);
 
