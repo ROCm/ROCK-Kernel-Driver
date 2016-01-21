@@ -179,8 +179,6 @@ struct dc_context {
 	struct dal_logger *logger;
 	void *cgs_device;
 
-	/* Diagnostics */
-	enum dce_version dce_version;
 	enum dce_environment dce_environment;
 };
 

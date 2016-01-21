@@ -460,7 +460,7 @@ void dc_target_log(
 	dal_logger_write(dal_logger,
 			log_major,
 			log_minor,
-			"core_target 0x%x: surface_count=%d, stream_count=%d",
+			"core_target 0x%x: surface_count=%d, stream_count=%d\n",
 			core_target,
 			core_target->status.surface_count,
 			core_target->public.stream_count);
@@ -472,7 +472,7 @@ void dc_target_log(
 		dal_logger_write(dal_logger,
 			log_major,
 			log_minor,
-			"core_stream 0x%x: src: %d, %d, %d, %d; dst: %d, %d, %d, %d;",
+			"core_stream 0x%x: src: %d, %d, %d, %d; dst: %d, %d, %d, %d;\n",
 			core_stream,
 			core_stream->public.src.x,
 			core_stream->public.src.y,
@@ -485,20 +485,20 @@ void dc_target_log(
 		dal_logger_write(dal_logger,
 			log_major,
 			log_minor,
-			"\tpix_clk_khz: %d, h_total: %d, v_total: %d",
+			"\tpix_clk_khz: %d, h_total: %d, v_total: %d\n",
 			core_stream->public.timing.pix_clk_khz,
 			core_stream->public.timing.h_total,
 			core_stream->public.timing.v_total);
 		dal_logger_write(dal_logger,
 			log_major,
 			log_minor,
-			"\tsink name: %s, serial: %d",
+			"\tsink name: %s, serial: %d\n",
 			core_stream->sink->public.edid_caps.display_name,
 			core_stream->sink->public.edid_caps.serial_number);
 		dal_logger_write(dal_logger,
 			log_major,
 			log_minor,
-			"\tlink: %d",
+			"\tlink: %d\n",
 			core_stream->sink->link->public.link_index);
 	}
 }
