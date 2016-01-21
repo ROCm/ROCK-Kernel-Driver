@@ -35,10 +35,19 @@
 #include "dce/dce_11_0_sh_mask.h"
 #include "dce/dce_11_0_enum.h"
 
+#define LINK_REG(reg)\
+	(enc110->link_regs->reg)
+
+#define AUX_REG(reg)\
+	(enc110->aux_regs->reg)
+
+#define BL_REG(reg)\
+	(enc110->bl_regs->reg)
+
 /* For current ASICs pixel clock - 600MHz */
 #define MAX_ENCODER_CLK 600000
 
-#define DCE11_UNIPHY_MAX_PIXEL_CLK_IN_KHZ 600000	
+#define DCE11_UNIPHY_MAX_PIXEL_CLK_IN_KHZ 600000
 
 #define DEFAULT_AUX_MAX_DATA_SIZE 16
 #define AUX_MAX_DEFER_WRITE_RETRY 20
@@ -72,20 +81,6 @@
 enum {
 	DP_MST_UPDATE_MAX_RETRY = 50
 };
-
-#ifndef mmDP_DPHY_INTERNAL_CTRL
-	#define mmDP_DPHY_INTERNAL_CTRL 0x4aa7
-	#define mmDP0_DP_DPHY_INTERNAL_CTRL 0x4aa7
-	#define mmDP1_DP_DPHY_INTERNAL_CTRL 0x4ba7
-	#define mmDP2_DP_DPHY_INTERNAL_CTRL 0x4ca7
-	#define mmDP3_DP_DPHY_INTERNAL_CTRL 0x4da7
-	#define mmDP4_DP_DPHY_INTERNAL_CTRL 0x4ea7
-	#define mmDP5_DP_DPHY_INTERNAL_CTRL 0x4fa7
-	#define mmDP6_DP_DPHY_INTERNAL_CTRL 0x54a7
-	#define mmDP7_DP_DPHY_INTERNAL_CTRL 0x56a7
-	#define mmDP8_DP_DPHY_INTERNAL_CTRL 0x57a7
-#endif
-
 
 #define DIG_REG(reg)\
 	(reg + enc110->offsets.dig)
@@ -133,7 +128,7 @@ static void enable_phy_bypass_mode(
 	 * transmitter is used for the offset */
 	struct dc_context *ctx = enc110->base.ctx;
 
-	const uint32_t addr = DP_REG(mmDP_DPHY_CNTL);
+	const uint32_t addr = LINK_REG(DP_DPHY_CNTL);
 
 	uint32_t value = dal_read_reg(ctx, addr);
 
@@ -150,7 +145,7 @@ static void disable_prbs_symbols(
 	 * transmitter is used for the offset */
 	struct dc_context *ctx = enc110->base.ctx;
 
-	const uint32_t addr = DP_REG(mmDP_DPHY_CNTL);
+	const uint32_t addr = LINK_REG(DP_DPHY_CNTL);
 
 	uint32_t value = dal_read_reg(ctx, addr);
 
@@ -176,7 +171,7 @@ static void disable_prbs_mode(
 	 * transmitter is used for the offset */
 	struct dc_context *ctx = enc110->base.ctx;
 
-	const uint32_t addr = DP_REG(mmDP_DPHY_PRBS_CNTL);
+	const uint32_t addr = LINK_REG(DP_DPHY_PRBS_CNTL);
 	uint32_t value;
 
 	value = dal_read_reg(ctx, addr);
@@ -197,7 +192,7 @@ static void program_pattern_symbols(
 	/* This register resides in DP back end block;
 	 * transmitter is used for the offset */
 
-	addr = DP_REG(mmDP_DPHY_SYM0);
+	addr = LINK_REG(DP_DPHY_SYM0);
 
 	value = 0;
 	set_reg_field_value(value, pattern_symbols[0],
@@ -211,7 +206,7 @@ static void program_pattern_symbols(
 	/* This register resides in DP back end block;
 	 * transmitter is used for the offset */
 
-	addr = DP_REG(mmDP_DPHY_SYM1);
+	addr = LINK_REG(DP_DPHY_SYM1);
 
 	value = 0;
 	set_reg_field_value(value, pattern_symbols[3],
@@ -224,7 +219,7 @@ static void program_pattern_symbols(
 
 	/* This register resides in DP back end block;
 	 * transmitter is used for the offset */
-	addr = DP_REG(mmDP_DPHY_SYM2);
+	addr = LINK_REG(DP_DPHY_SYM2);
 	value = 0;
 	set_reg_field_value(value, pattern_symbols[6],
 			DP_DPHY_SYM2, DPHY_SYM7);
@@ -274,7 +269,7 @@ static void set_link_training_complete(
 	/* This register resides in DP back end block;
 	 * transmitter is used for the offset */
 	struct dc_context *ctx = enc110->base.ctx;
-	const uint32_t addr = DP_REG(mmDP_LINK_CNTL);
+	const uint32_t addr = LINK_REG(DP_LINK_CNTL);
 	uint32_t value = dal_read_reg(ctx, addr);
 
 	set_reg_field_value(value, complete,
@@ -289,7 +284,7 @@ static void set_dp_phy_pattern_training_pattern(
 {
 	/* Write Training Pattern */
 	struct dc_context *ctx = enc110->base.ctx;
-	uint32_t addr = DP_REG(mmDP_DPHY_TRAINING_PATTERN_SEL);
+	uint32_t addr = LINK_REG(DP_DPHY_TRAINING_PATTERN_SEL);
 
 	dal_write_reg(ctx, addr, index);
 
@@ -317,7 +312,7 @@ static void set_dp_phy_pattern_symbol_error(
 
 	/* program correct panel mode*/
 	{
-		const uint32_t addr = DP_REG(mmDP_DPHY_INTERNAL_CTRL);
+		const uint32_t addr = LINK_REG(DP_DPHY_INTERNAL_CTRL);
 		uint32_t value = 0x0;
 		dal_write_reg(ctx, addr, value);
 	}
@@ -330,7 +325,7 @@ static void set_dp_phy_pattern_symbol_error(
 
 	/* For PRBS23 Set bit DPHY_PRBS_SEL=1 and Set bit DPHY_PRBS_EN=1 */
 	{
-		const uint32_t addr = DP_REG(mmDP_DPHY_PRBS_CNTL);
+		const uint32_t addr = LINK_REG(DP_DPHY_PRBS_CNTL);
 		uint32_t value = dal_read_reg(ctx, addr);
 
 		set_reg_field_value(value, 1,
@@ -361,7 +356,7 @@ static void set_dp_phy_pattern_prbs7(
 
 	/* For PRBS7 Set bit DPHY_PRBS_SEL=0 and Set bit DPHY_PRBS_EN=1 */
 	{
-		const uint32_t addr = DP_REG(mmDP_DPHY_PRBS_CNTL);
+		const uint32_t addr = LINK_REG(DP_DPHY_PRBS_CNTL);
 
 		uint32_t value = dal_read_reg(ctx, addr);
 
@@ -449,7 +444,7 @@ static void set_dp_phy_pattern_hbr2_compliance(
 
 	/* program correct panel mode*/
 	{
-		const uint32_t addr = DP_REG(mmDP_DPHY_INTERNAL_CTRL);
+		const uint32_t addr = LINK_REG(DP_DPHY_INTERNAL_CTRL);
 		uint32_t value = 0x0;
 		dal_write_reg(ctx, addr, value);
 	}
@@ -486,7 +481,7 @@ static void set_dp_phy_pattern_hbr2_compliance(
 	/* set link training complete */
 	set_link_training_complete(enc110, true);
 	/* do not enable video stream */
-	addr = DP_REG(mmDP_VID_STREAM_CNTL);
+	addr = LINK_REG(DP_VID_STREAM_CNTL);
 
 	value = dal_read_reg(ctx, addr);
 
@@ -507,7 +502,7 @@ static void set_dp_phy_pattern_passthrough_mode(
 
 	/* program correct panel mode */
 	{
-		const uint32_t addr = DP_REG(mmDP_DPHY_INTERNAL_CTRL);
+		const uint32_t addr = LINK_REG(DP_DPHY_INTERNAL_CTRL);
 
 		uint32_t value;
 
@@ -574,7 +569,7 @@ static void configure_encoder(
 	uint32_t value;
 
 	/* set number of lanes */
-	addr = DP_REG(mmDP_CONFIG);
+	addr = LINK_REG(DP_CONFIG);
 	value = dal_read_reg(ctx, addr);
 	set_reg_field_value(value, link_settings->lane_count - LANE_COUNT_ONE,
 			DP_CONFIG, DP_UDI_LANES);
@@ -589,7 +584,7 @@ static bool is_panel_powered_on(struct dce110_link_encoder *enc110)
 	bool ret;
 
 	value = dal_read_reg(ctx,
-			mmLVTMA_PWRSEQ_STATE);
+			BL_REG(LVTMA_PWRSEQ_STATE));
 
 	ret = get_reg_field_value(value,
 			LVTMA_PWRSEQ_STATE, LVTMA_PWRSEQ_TARGET_STATE_R);
@@ -734,23 +729,20 @@ static void aux_initialize(
 {
 	struct dc_context *ctx = enc110->base.ctx;
 	enum hpd_source_id hpd_source = enc110->base.hpd_source;
-	uint32_t addr = mmAUX_CONTROL + enc110->base.aux_channel_offset;
+	uint32_t addr = AUX_REG(AUX_CONTROL);
 	uint32_t value = dal_read_reg(ctx, addr);
 
 	set_reg_field_value(value, hpd_source, AUX_CONTROL, AUX_HPD_SEL);
 	set_reg_field_value(value, 0, AUX_CONTROL, AUX_LS_READ_EN);
 	dal_write_reg(ctx, addr, value);
 
-	addr = mmAUX_DPHY_RX_CONTROL0 + enc110->base.aux_channel_offset;
+	addr = AUX_REG(AUX_DPHY_RX_CONTROL0);
 	value = dal_read_reg(ctx, addr);
 
 	/* 1/4 window (the maximum allowed) */
 	set_reg_field_value(value, 1,
 			AUX_DPHY_RX_CONTROL0, AUX_RX_RECEIVE_WINDOW);
-	dal_write_reg(ctx,
-			mmAUX_DPHY_RX_CONTROL0 +
-			enc110->base.aux_channel_offset,
-			value);
+	dal_write_reg(ctx, addr, value);
 
 }
 
@@ -760,7 +752,7 @@ static bool is_panel_backlight_on(struct dce110_link_encoder *enc110)
 	struct dc_context *ctx = enc110->base.ctx;
 	uint32_t value;
 
-	value = dal_read_reg(ctx, mmLVTMA_PWRSEQ_CNTL);
+	value = dal_read_reg(ctx, BL_REG(LVTMA_PWRSEQ_CNTL));
 
 	return get_reg_field_value(value, LVTMA_PWRSEQ_CNTL, LVTMA_BLON);
 }
@@ -839,7 +831,7 @@ static bool is_dig_enabled(const struct dce110_link_encoder *enc110)
 	struct dc_context *ctx = enc110->base.ctx;
 	uint32_t value;
 
-	value = dal_read_reg(ctx, DIG_REG(mmDIG_BE_EN_CNTL));
+	value = dal_read_reg(ctx, LINK_REG(DIG_BE_EN_CNTL));
 
 	return get_reg_field_value(value, DIG_BE_EN_CNTL, DIG_ENABLE);
 }
@@ -851,7 +843,7 @@ static void link_encoder_disable(struct dce110_link_encoder *enc110)
 	uint32_t value;
 
 	/* reset training pattern */
-	addr = DP_REG(mmDP_DPHY_TRAINING_PATTERN_SEL);
+	addr = LINK_REG(DP_DPHY_TRAINING_PATTERN_SEL);
 	value = dal_read_reg(ctx, addr);
 	set_reg_field_value(value, 0,
 			DP_DPHY_TRAINING_PATTERN_SEL,
@@ -859,13 +851,13 @@ static void link_encoder_disable(struct dce110_link_encoder *enc110)
 	dal_write_reg(ctx, addr, value);
 
 	/* reset training complete */
-	addr = DP_REG(mmDP_LINK_CNTL);
+	addr = LINK_REG(DP_LINK_CNTL);
 	value = dal_read_reg(ctx, addr);
 	set_reg_field_value(value, 0, DP_LINK_CNTL, DP_LINK_TRAINING_COMPLETE);
 	dal_write_reg(ctx, addr, value);
 
 	/* reset panel mode */
-	addr = DP_REG(mmDP_DPHY_INTERNAL_CTRL);
+	addr = LINK_REG(DP_DPHY_INTERNAL_CTRL);
 	value = 0;
 	dal_write_reg(ctx, addr, value);
 }
@@ -876,7 +868,7 @@ static void hpd_initialize(
 	/* Associate HPD with DIG_BE */
 	struct dc_context *ctx = enc110->base.ctx;
 	enum hpd_source_id hpd_source = enc110->base.hpd_source;
-	const uint32_t addr = DIG_REG(mmDIG_BE_CNTL);
+	const uint32_t addr = LINK_REG(DIG_BE_CNTL);
 	uint32_t value = dal_read_reg(ctx, addr);
 
 	set_reg_field_value(value, hpd_source, DIG_BE_CNTL, DIG_HPD_SELECT);
@@ -1060,7 +1052,9 @@ static bool validate_wireless_output(
 bool dce110_link_encoder_construct(
 	struct dce110_link_encoder *enc110,
 	const struct encoder_init_data *init_data,
-	const struct dce110_link_enc_offsets *offsets)
+	const struct dce110_link_enc_registers *link_regs,
+	const struct dce110_link_enc_aux_registers *aux_regs,
+	const struct dce110_link_enc_bl_registers *bl_regs)
 {
 	struct graphics_object_encoder_cap_info enc_cap_info = {0};
 
@@ -1114,7 +1108,9 @@ bool dce110_link_encoder_construct(
 	 * This will let DCE 8.1 share DCE 8.0 as much as possible
 	 */
 
-	enc110->offsets = *offsets;
+	enc110->link_regs = link_regs;
+	enc110->aux_regs = aux_regs;
+	enc110->bl_regs = bl_regs;
 
 	switch (enc110->base.transmitter) {
 	case TRANSMITTER_UNIPHY_A:
@@ -1146,28 +1142,6 @@ bool dce110_link_encoder_construct(
 			"Using channel: %s [%d]\n",
 			DECODE_CHANNEL_ID(init_data->channel),
 			init_data->channel);
-
-	switch (init_data->channel) {
-	case CHANNEL_ID_DDC1:
-		enc110->base.aux_channel_offset = 0;
-		break;
-	case CHANNEL_ID_DDC2:
-		enc110->base.aux_channel_offset =
-			mmDP_AUX1_AUX_CONTROL - mmDP_AUX0_AUX_CONTROL;
-		break;
-	case CHANNEL_ID_DDC3:
-		enc110->base.aux_channel_offset =
-			mmDP_AUX2_AUX_CONTROL - mmDP_AUX0_AUX_CONTROL;
-		break;
-	default:
-		/* check BIOS object table ! */
-		dal_logger_write(init_data->ctx->logger,
-				LOG_MAJOR_WARNING,
-				LOG_MINOR_COMPONENT_ENCODER,
-				"%s: Invalid channel ID\n",
-				__func__);
-		enc110->base.aux_channel_offset = 0;
-	}
 
 	/* Override features with DCE-specific values */
 	if (dal_adapter_service_get_encoder_cap_info(
@@ -1290,7 +1264,7 @@ void dce110_link_encoder_setup(
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
 	struct dc_context *ctx = enc110->base.ctx;
-	const uint32_t addr = DIG_REG(mmDIG_BE_CNTL);
+	const uint32_t addr = LINK_REG(DIG_BE_CNTL);
 	uint32_t value = dal_read_reg(ctx, addr);
 
 	switch (signal) {
@@ -1392,7 +1366,7 @@ void dce110_link_encoder_enable_dp_output(
 	configure_encoder(enc110, link_settings);
 
 	cntl.action = TRANSMITTER_CONTROL_ENABLE;
-	cntl.engine_id = ENGINE_ID_UNKNOWN;
+	cntl.engine_id = enc->preferred_engine;
 	cntl.transmitter = enc110->base.transmitter;
 	cntl.pll_id = clock_source;
 	cntl.signal = SIGNAL_TYPE_DISPLAY_PORT;
@@ -1435,7 +1409,7 @@ void dce110_link_encoder_enable_dp_mst_output(
 	configure_encoder(enc110, link_settings);
 
 	cntl.action = TRANSMITTER_CONTROL_ENABLE;
-	cntl.engine_id = ENGINE_ID_UNKNOWN;
+	cntl.engine_id = enc->preferred_engine;
 	cntl.transmitter = enc110->base.transmitter;
 	cntl.pll_id = clock_source;
 	cntl.signal = SIGNAL_TYPE_DISPLAY_PORT_MST;
@@ -1657,8 +1631,8 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	 * to commit payload on both tx and rx side */
 
 	/* we should clean-up table each time */
-	value0 = dal_read_reg(ctx, DP_REG(mmDP_MSE_SAT0));
-	value1 = dal_read_reg(ctx, DP_REG(mmDP_MSE_SAT1));
+	value0 = dal_read_reg(ctx, LINK_REG(DP_MSE_SAT0));
+	value1 = dal_read_reg(ctx, LINK_REG(DP_MSE_SAT1));
 
 	if (table->stream_count >= 1) {
 		fill_stream_allocation_row_info(
@@ -1727,8 +1701,8 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 		DP_MSE_SAT_SLOT_COUNT2);
 
 	/* update ASIC MSE stream allocation table */
-	dal_write_reg(ctx, DP_REG(mmDP_MSE_SAT0), value0);
-	dal_write_reg(ctx, DP_REG(mmDP_MSE_SAT1), value1);
+	dal_write_reg(ctx, LINK_REG(DP_MSE_SAT0), value0);
+	dal_write_reg(ctx, LINK_REG(DP_MSE_SAT1), value1);
 
 	/* --- wait for transaction finish */
 
@@ -1737,7 +1711,7 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	 * then double buffers the SAT into the hardware
 	 * making the new allocation active on the DP MST mode link */
 
-	value0 = dal_read_reg(ctx, DP_REG(mmDP_MSE_SAT_UPDATE));
+	value0 = dal_read_reg(ctx, LINK_REG(DP_MSE_SAT_UPDATE));
 
 	/* DP_MSE_SAT_UPDATE:
 	 * 0 - No Action
@@ -1750,7 +1724,7 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 		DP_MSE_SAT_UPDATE,
 		DP_MSE_SAT_UPDATE);
 
-	dal_write_reg(ctx, DP_REG(mmDP_MSE_SAT_UPDATE), value0);
+	dal_write_reg(ctx, LINK_REG(DP_MSE_SAT_UPDATE), value0);
 
 	/* wait for update to complete
 	 * (i.e. DP_MSE_SAT_UPDATE field is reset to 0)
@@ -1766,7 +1740,7 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 		dc_service_delay_in_microseconds(ctx, 10);
 
 		value0 = dal_read_reg(ctx,
-				DP_REG(mmDP_MSE_SAT_UPDATE));
+				LINK_REG(DP_MSE_SAT_UPDATE));
 
 		value1 = get_reg_field_value(
 				value0,
@@ -1807,9 +1781,9 @@ void dce110_link_encoder_set_lcd_backlight_level(
 	uint8_t bit_count;
 	uint64_t active_duty_cycle;
 
-	backlight = dal_read_reg(ctx, mmBL_PWM_CNTL);
-	backlight_period = dal_read_reg(ctx, mmBL_PWM_PERIOD_CNTL);
-	backlight_lock = dal_read_reg(ctx, mmBL_PWM_GRP1_REG_LOCK);
+	backlight = dal_read_reg(ctx, BL_REG(BL_PWM_CNTL));
+	backlight_period = dal_read_reg(ctx, BL_REG(BL_PWM_PERIOD_CNTL));
+	backlight_lock = dal_read_reg(ctx, BL_REG(BL_PWM_GRP1_REG_LOCK));
 
 	/*
 	 * 1. Convert 8-bit value to 17 bit U1.16 format
@@ -1892,10 +1866,10 @@ void dce110_link_encoder_set_lcd_backlight_level(
 		1,
 		BL_PWM_GRP1_REG_LOCK,
 		BL_PWM_GRP1_REG_LOCK);
-	dal_write_reg(ctx, mmBL_PWM_GRP1_REG_LOCK, backlight_lock);
+	dal_write_reg(ctx, BL_REG(BL_PWM_GRP1_REG_LOCK), backlight_lock);
 
 	/* 3.2 Write new active duty cycle */
-	dal_write_reg(ctx, mmBL_PWM_CNTL, backlight);
+	dal_write_reg(ctx, BL_REG(BL_PWM_CNTL), backlight);
 
 	/* 3.3 Unlock group 2 backlight registers */
 	set_reg_field_value(
@@ -1903,11 +1877,11 @@ void dce110_link_encoder_set_lcd_backlight_level(
 		0,
 		BL_PWM_GRP1_REG_LOCK,
 		BL_PWM_GRP1_REG_LOCK);
-	dal_write_reg(ctx, mmBL_PWM_GRP1_REG_LOCK, backlight_lock);
+	dal_write_reg(ctx, BL_REG(BL_PWM_GRP1_REG_LOCK), backlight_lock);
 
 	/* 5.4.4 Wait for pending bit to be cleared */
 	for (i = 0; i < backlight_update_pending_max_retry; ++i) {
-		backlight_lock = dal_read_reg(ctx, mmBL_PWM_GRP1_REG_LOCK);
+		backlight_lock = dal_read_reg(ctx, BL_REG(BL_PWM_GRP1_REG_LOCK));
 		if (!get_reg_field_value(
 			backlight_lock,
 			BL_PWM_GRP1_REG_LOCK,
@@ -1930,7 +1904,7 @@ void dce110_link_encoder_connect_dig_be_to_fe(
 	uint32_t field;
 
 	if (engine != ENGINE_ID_UNKNOWN) {
-		addr = DIG_REG(mmDIG_BE_CNTL);
+		addr = LINK_REG(DIG_BE_CNTL);
 		value = dal_read_reg(ctx, addr);
 
 		field = get_reg_field_value(

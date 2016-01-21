@@ -31,20 +31,53 @@
 #define TO_DCE110_LINK_ENC(link_encoder)\
 	container_of(link_encoder, struct dce110_link_encoder, base)
 
-struct dce110_link_enc_offsets {
-	int32_t dig;
-	int32_t dp;
+struct dce110_link_enc_bl_registers {
+	uint32_t BL_PWM_CNTL;
+	uint32_t BL_PWM_GRP1_REG_LOCK;
+	uint32_t BL_PWM_PERIOD_CNTL;
+	uint32_t LVTMA_PWRSEQ_CNTL;
+	uint32_t LVTMA_PWRSEQ_STATE;
+};
+
+struct dce110_link_enc_aux_registers {
+	uint32_t AUX_CONTROL;
+	uint32_t AUX_DPHY_RX_CONTROL0;
+};
+
+struct dce110_link_enc_registers {
+	uint32_t DIG_BE_CNTL;
+	uint32_t DIG_BE_EN_CNTL;
+	uint32_t DP_CONFIG;
+	uint32_t DP_DPHY_CNTL;
+	uint32_t DP_DPHY_INTERNAL_CTRL;
+	uint32_t DP_DPHY_PRBS_CNTL;
+	uint32_t DP_DPHY_SYM0;
+	uint32_t DP_DPHY_SYM1;
+	uint32_t DP_DPHY_SYM2;
+	uint32_t DP_DPHY_TRAINING_PATTERN_SEL;
+	uint32_t DP_LINK_CNTL;
+	uint32_t DP_LINK_FRAMING_CNTL;
+	uint32_t DP_MSE_SAT0;
+	uint32_t DP_MSE_SAT1;
+	uint32_t DP_MSE_SAT2;
+	uint32_t DP_MSE_SAT_UPDATE;
+	uint32_t DP_SEC_CNTL;
+	uint32_t DP_VID_STREAM_CNTL;
 };
 
 struct dce110_link_encoder {
 	struct link_encoder base;
-	struct dce110_link_enc_offsets offsets;
+	const struct dce110_link_enc_registers *link_regs;
+	const struct dce110_link_enc_aux_registers *aux_regs;
+	const struct dce110_link_enc_bl_registers *bl_regs;
 };
 
 bool dce110_link_encoder_construct(
 	struct dce110_link_encoder *enc110,
 	const struct encoder_init_data *init_data,
-	const struct dce110_link_enc_offsets *offsets);
+	const struct dce110_link_enc_registers *link_regs,
+	const struct dce110_link_enc_aux_registers *aux_regs,
+	const struct dce110_link_enc_bl_registers *bl_regs);
 
 bool dce110_link_encoder_validate_output_with_stream(
 	struct link_encoder *enc,
