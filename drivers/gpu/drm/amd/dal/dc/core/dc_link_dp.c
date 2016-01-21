@@ -1527,8 +1527,9 @@ bool dc_link_handle_hpd_rx_irq(const struct dc_link *dc_link)
 		status = false;
 	}
 
-	if (hpd_irq_dpcd_data.bytes.sink_cnt.bits.SINK_COUNT
-				!= link->dpcd_sink_count)
+	if (link->public.type == dc_connection_active_dongle &&
+		hpd_irq_dpcd_data.bytes.sink_cnt.bits.SINK_COUNT
+			!= link->dpcd_sink_count)
 		status = true;
 
 	/* reasons for HPD RX:
