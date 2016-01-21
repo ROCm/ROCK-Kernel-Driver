@@ -806,8 +806,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 		 */
 		stream->tg->funcs->set_blank(stream->tg, true);
 
-		if (stream->signal != SIGNAL_TYPE_VIRTUAL)
-			core_link_disable_stream(stream->sink->link, stream);
+		core_link_disable_stream(stream->sink->link, stream);
 
 		/*TODO: AUTO check if timing changed*/
 		if (false == dal_clock_source_program_pix_clk(
@@ -817,7 +816,6 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 			BREAK_TO_DEBUGGER();
 			return DC_ERROR_UNEXPECTED;
 		}
-
 
 		stream->tg->funcs->program_timing(
 				stream->tg,
@@ -839,6 +837,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 		}
 	}
 
+	/* TODO: move to stream encoder */
 	if (stream->signal != SIGNAL_TYPE_VIRTUAL)
 		if (DC_OK != bios_parser_crtc_source_select(stream)) {
 			BREAK_TO_DEBUGGER();
@@ -853,10 +852,9 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 
 	program_fmt(opp, &stream->fmt_bit_depth, &stream->clamping);
 
-	if (stream->signal != SIGNAL_TYPE_VIRTUAL)
-		stream->sink->link->link_enc->funcs->setup(
-			stream->sink->link->link_enc,
-			stream->signal);
+	stream->sink->link->link_enc->funcs->setup(
+		stream->sink->link->link_enc,
+		stream->signal);
 
 	if (dc_is_dp_signal(stream->signal))
 		stream->stream_enc->funcs->dp_set_stream_attribute(
@@ -900,7 +898,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 			context->res_ctx.pool.timing_generators[controller_idx],
 			color_space);
 
-	if (timing_changed && stream->signal != SIGNAL_TYPE_VIRTUAL) {
+	if (timing_changed) {
 		core_link_enable_stream(stream->sink->link, stream);
 	} else {
 		core_link_update_stream(stream->sink->link, stream);
@@ -920,8 +918,7 @@ static void power_down_encoders(struct dc *dc)
 	int i;
 
 	for (i = 0; i < dc->link_count; i++) {
-		if (dc->links[i]->public.connector_signal != SIGNAL_TYPE_VIRTUAL)
-			dc->links[i]->link_enc->funcs->disable_output(
+		dc->links[i]->link_enc->funcs->disable_output(
 				dc->links[i]->link_enc, SIGNAL_TYPE_NONE);
 	}
 }
@@ -1575,8 +1572,7 @@ static void reset_single_stream_hw_ctx(struct core_stream *stream,
 		stream->audio = NULL;
 	}
 
-	if (stream->signal != SIGNAL_TYPE_VIRTUAL)
-		core_link_disable_stream(stream->sink->link, stream);
+	core_link_disable_stream(stream->sink->link, stream);
 
 	stream->tg->funcs->set_blank(stream->tg, true);
 	stream->tg->funcs->disable_crtc(stream->tg);

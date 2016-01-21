@@ -30,6 +30,7 @@
 #include "resource.h"
 #include "include/irq_service_interface.h"
 #include "include/timing_generator_interface.h"
+#include "../virtual/virtual_stream_encoder.h"
 
 #include "dce110/dce110_timing_generator.h"
 #include "dce110/dce110_link_encoder.h"
@@ -304,6 +305,7 @@ void dce110_link_encoder_destroy(struct link_encoder **enc)
 
 bool dce110_construct_resource_pool(
 	struct adapter_service *adapter_serv,
+	uint8_t num_virtual_links,
 	struct dc *dc,
 	struct resource_pool *pool)
 {
@@ -457,6 +459,19 @@ bool dce110_construct_resource_pool(
 				goto stream_enc_create_fail;
 			}
 		}
+	}
+
+	for (i = 0; i < num_virtual_links; i++) {
+		pool->stream_enc[pool->stream_enc_count] =
+			virtual_stream_encoder_create(
+				dc->ctx, dal_adapter_service_get_bios_parser(
+								adapter_serv));
+		if (pool->stream_enc[pool->stream_enc_count] == NULL) {
+			BREAK_TO_DEBUGGER();
+			dal_error("DC: failed to create stream_encoder!\n");
+			goto stream_enc_create_fail;
+		}
+		pool->stream_enc_count++;
 	}
 
 	return true;
@@ -725,9 +740,6 @@ static enum dc_status validate_mapped_resource(
 			if (!stream->tg->funcs->validate_timing(
 					stream->tg, &stream->public.timing))
 				return DC_FAIL_CONTROLLER_VALIDATE;
-
-			if (stream->signal == SIGNAL_TYPE_VIRTUAL)
-				return status;
 
 			status = build_stream_hw_param(stream);
 

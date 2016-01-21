@@ -106,6 +106,7 @@ struct hw_sequencer_funcs {
 	/* resource management and validation*/
 	bool (*construct_resource_pool)(
 					struct adapter_service *adapter_serv,
+					uint8_t num_virtual_links,
 					struct dc *dc,
 					struct resource_pool *pool);
 

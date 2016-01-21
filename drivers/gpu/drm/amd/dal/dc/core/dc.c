@@ -40,6 +40,7 @@
 #include "bandwidth_calcs.h"
 #include "include/irq_service_interface.h"
 #include "inc/transform.h"
+#include "../virtual/virtual_link_encoder.h"
 
 #include "link_hwss.h"
 #include "link_encoder.h"
@@ -125,6 +126,7 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 	for (i = 0; i < init_params->num_virtual_links; i++) {
 		struct core_link *link =
 			dc_service_alloc(dc->ctx, sizeof(*link));
+		struct encoder_init_data enc_init = { 0 };
 
 		if (link == NULL) {
 			BREAK_TO_DEBUGGER();
@@ -135,6 +137,22 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 		link->ctx = init_params->ctx;
 		link->dc = dc;
 		link->public.connector_signal = SIGNAL_TYPE_VIRTUAL;
+		link->link_id.type = OBJECT_TYPE_CONNECTOR;
+		link->link_id.id = CONNECTOR_ID_VIRTUAL;
+		link->link_id.enum_id = ENUM_ID_1;
+		link->link_enc =
+			dc_service_alloc(dc->ctx, sizeof(*link->link_enc));
+
+		enc_init.adapter_service = init_params->adapter_srv;
+		enc_init.ctx = init_params->ctx;
+		enc_init.channel = CHANNEL_ID_UNKNOWN;
+		enc_init.hpd_source = HPD_SOURCEID_UNKNOWN;
+		enc_init.transmitter = TRANSMITTER_UNKNOWN;
+		enc_init.connector = link->link_id;
+		enc_init.encoder.type = OBJECT_TYPE_ENCODER;
+		enc_init.encoder.id = ENCODER_ID_INTERNAL_VIRTUAL;
+		enc_init.encoder.enum_id = ENUM_ID_1;
+		virtual_link_encoder_construct(link->link_enc, &enc_init);
 
 		link->public.link_index = dc->link_count;
 		dc->links[dc->link_count] = link;
@@ -180,8 +198,7 @@ static void init_hw(struct dc *dc)
 		 * required signal (which may be different from the
 		 * default signal on connector). */
 		struct core_link *link = dc->links[i];
-		if (link->public.connector_signal != SIGNAL_TYPE_VIRTUAL)
-			link->link_enc->funcs->hw_init(link->link_enc);
+		link->link_enc->funcs->hw_init(link->link_enc);
 	}
 
 	for(i = 0; i < dc->res_pool.controller_count; i++) {
@@ -355,6 +372,7 @@ static bool construct(struct dc *dc, const struct dal_init_data *init_params)
 
 	if (!dc->hwss.construct_resource_pool(
 			dc_init_data.adapter_srv,
+			dc_init_data.num_virtual_links,
 			dc,
 			&dc->res_pool))
 		goto construct_resource_fail;
@@ -866,23 +884,24 @@ bool dc_link_add_remote_sink(const struct dc_link *link, struct dc_sink *sink)
 
 	dc_link->remote_sinks[link->sink_count] = sink;
 	dc_link->sink_count++;
-	if (sink->sink_signal == SIGNAL_TYPE_VIRTUAL
-		&& link->connector_signal == SIGNAL_TYPE_VIRTUAL)
-		dc_link->type = dc_connection_single;
 
 	return true;
 }
 
-void dc_link_add_sink(const struct dc_link *link, struct dc_sink *sink)
+void dc_link_set_sink(const struct dc_link *link, struct dc_sink *sink)
 {
 	struct core_link *core_link = DC_LINK_TO_LINK(link);
 	struct dc_link *dc_link = &core_link->public;
 
 	dc_link->local_sink = sink;
-	dc_link->sink_count = 1;
-	if (sink->sink_signal == SIGNAL_TYPE_VIRTUAL
-		&& link->connector_signal == SIGNAL_TYPE_VIRTUAL)
+
+	if (sink == NULL) {
+		dc_link->sink_count = 0;
+		dc_link->type = dc_connection_none;
+	} else {
+		dc_link->sink_count = 1;
 		dc_link->type = dc_connection_single;
+	}
 }
 
 void dc_link_remove_remote_sink(const struct dc_link *link, const struct dc_sink *sink)

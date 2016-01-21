@@ -3,7 +3,7 @@
 #
 
 DC_LIBS = adapter asic_capability audio basics bios calcs \
-dcs gpio gpu i2caux irq
+dcs gpio gpu i2caux irq virtual
 
 ifdef CONFIG_DRM_AMD_DAL_DCE11_0
 DC_LIBS += dce110
