@@ -81,6 +81,105 @@ enum lb_pixel_depth {
 	LB_PIXEL_DEPTH_36BPP = 8
 };
 
+
+struct raw_gamma_ramp_rgb {
+       uint32_t red;
+       uint32_t green;
+       uint32_t blue;
+};
+
+enum raw_gamma_ramp_type {
+       GAMMA_RAMP_TYPE_UNINITIALIZED,
+       GAMMA_RAMP_TYPE_DEFAULT,
+       GAMMA_RAMP_TYPE_RGB256,
+       GAMMA_RAMP_TYPE_FIXED_POINT
+};
+
+#define NUM_OF_RAW_GAMMA_RAMP_RGB_256 256
+struct raw_gamma_ramp {
+       enum raw_gamma_ramp_type type;
+       struct raw_gamma_ramp_rgb rgb_256[NUM_OF_RAW_GAMMA_RAMP_RGB_256];
+       uint32_t size;
+};
+
+
+/* Colorimetry */
+enum colorimetry {
+       COLORIMETRY_NO_DATA = 0,
+       COLORIMETRY_ITU601 = 1,
+       COLORIMETRY_ITU709 = 2,
+       COLORIMETRY_EXTENDED = 3
+};
+
+/* ColorimetryEx */
+enum colorimetry_ex {
+       COLORIMETRY_EX_XVYCC601 = 0,
+       COLORIMETRY_EX_XVYCC709 = 1,
+       COLORIMETRY_EX_SYCC601 = 2,
+       COLORIMETRY_EX_ADOBEYCC601 = 3,
+       COLORIMETRY_EX_ADOBERGB = 4,
+       COLORIMETRY_EX_RESERVED5 = 5,
+       COLORIMETRY_EX_RESERVED6 = 6,
+       COLORIMETRY_EX_RESERVED7 = 7
+};
+
+enum ds_color_space {
+       DS_COLOR_SPACE_UNKNOWN = 0,
+       DS_COLOR_SPACE_SRGB_FULLRANGE = 1,
+       DS_COLOR_SPACE_SRGB_LIMITEDRANGE,
+       DS_COLOR_SPACE_YPBPR601,
+       DS_COLOR_SPACE_YPBPR709,
+       DS_COLOR_SPACE_YCBCR601,
+       DS_COLOR_SPACE_YCBCR709,
+       DS_COLOR_SPACE_NMVPU_SUPERAA,
+       DS_COLOR_SPACE_YCBCR601_YONLY,
+       DS_COLOR_SPACE_YCBCR709_YONLY/*same as YCbCr, but Y in Full range*/
+};
+
+
+enum active_format_info {
+       ACTIVE_FORMAT_NO_DATA = 0,
+       ACTIVE_FORMAT_VALID = 1
+};
+
+/* Active format aspect ratio */
+enum active_format_aspect_ratio {
+       ACTIVE_FORMAT_ASPECT_RATIO_SAME_AS_PICTURE = 8,
+       ACTIVE_FORMAT_ASPECT_RATIO_4_3 = 9,
+       ACTIVE_FORMAT_ASPECT_RATIO_16_9 = 0XA,
+       ACTIVE_FORMAT_ASPECT_RATIO_14_9 = 0XB
+};
+
+enum bar_info {
+       BAR_INFO_NOT_VALID = 0,
+       BAR_INFO_VERTICAL_VALID = 1,
+       BAR_INFO_HORIZONTAL_VALID = 2,
+       BAR_INFO_BOTH_VALID = 3
+};
+
+enum picture_scaling {
+       PICTURE_SCALING_UNIFORM = 0,
+       PICTURE_SCALING_HORIZONTAL = 1,
+       PICTURE_SCALING_VERTICAL = 2,
+       PICTURE_SCALING_BOTH = 3
+};
+
+/* RGB quantization range */
+enum rgb_quantization_range {
+       RGB_QUANTIZATION_DEFAULT_RANGE = 0,
+       RGB_QUANTIZATION_LIMITED_RANGE = 1,
+       RGB_QUANTIZATION_FULL_RANGE = 2,
+       RGB_QUANTIZATION_RESERVED = 3
+};
+
+/* YYC quantization range */
+enum yyc_quantization_range {
+       YYC_QUANTIZATION_LIMITED_RANGE = 0,
+       YYC_QUANTIZATION_FULL_RANGE = 1,
+       YYC_QUANTIZATION_RESERVED2 = 2,
+       YYC_QUANTIZATION_RESERVED3 = 3
+};
+
 struct transform_funcs {
 	bool (*transform_power_up)(struct transform *xfm);
 

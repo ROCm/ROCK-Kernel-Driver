@@ -29,6 +29,7 @@
 
 #include "inc/timing_generator_types.h"
 #include "../include/grph_object_id.h"
+#include "../include/hw_sequencer_types.h"
 
 /* overscan in blank for YUV color space. For RGB, it is zero for black. */
 #define CRTC_OVERSCAN_COLOR_BLACK_COLOR_B_CB_YUV_4CV 0x1f4

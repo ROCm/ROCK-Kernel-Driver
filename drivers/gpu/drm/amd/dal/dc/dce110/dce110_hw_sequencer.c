@@ -1498,13 +1498,6 @@ static bool set_plane_config(
 			controller_idx,
 			BLENDER_MODE_CURRENT_PIPE);
 
-#if 0
-	program_alpha_mode(
-			crtc,
-			&pl_cfg->attributes.blend_flags,
-			path_mode->mode.timing.pixel_encoding);
-#endif
-
 	mi->funcs->mem_input_program_surface_config(
 			mi,
 			surface->public.format,
