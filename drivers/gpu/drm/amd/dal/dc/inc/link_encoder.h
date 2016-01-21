@@ -8,8 +8,8 @@
 #ifndef LINK_ENCODER_H_
 #define LINK_ENCODER_H_
 
-#include "include/encoder_types.h"
 #include "core_types.h"
+#include "encoder_types.h"
 
 struct link_enc_status {
 	int dummy; /*TODO*/

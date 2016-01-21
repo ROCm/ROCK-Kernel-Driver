@@ -6,7 +6,7 @@
 #ifndef STREAM_ENCODER_H_
 #define STREAM_ENCODER_H_
 
-#include "include/encoder_types.h"
+#include "encoder_types.h"
 #include "include/bios_parser_interface.h"
 
 struct dc_bios;
