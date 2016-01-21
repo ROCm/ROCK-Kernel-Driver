@@ -46,28 +46,6 @@ struct crtc_position {
 	uint32_t nominal_vcount;
 };
 
-/*
- * Parameters to enable/disable stereo 3D mode on CRTC
- *  - rightEyePolarity: if true, '0' means left eye image and '1' means right
- *    eye image.
- *	 if false, '0' means right eye image and '1' means left eye image
- *  - framePacked:      true when HDMI 1.4a FramePacking 3D format
- *    enabled/disabled
- */
-struct crtc_stereo_parameters {
-	uint8_t PROGRAM_STEREO:1;
-	uint8_t PROGRAM_POLARITY:1;
-	uint8_t RIGHT_EYE_POLARITY:1;
-	uint8_t FRAME_PACKED:1;
-};
-
-struct crtc_stereo_status {
-	uint8_t ENABLED:1;
-	uint8_t CURRENT_FRAME_IS_RIGHT_EYE:1;
-	uint8_t CURRENT_FRAME_IS_ODD_FIELD:1;
-	uint8_t FRAME_PACKED:1;
-	uint8_t PENDING_RESET:1;
-};
 
 enum dcp_gsl_purpose {
 	DCP_GSL_PURPOSE_SURFACE_FLIP = 0,
@@ -81,19 +59,6 @@ struct dcp_gsl_params {
 	bool timing_server;
 	bool overlay_present;
 	bool gsl_paused;
-};
-
-struct vbi_end_signal_setup {
-	uint32_t minimum_interval_in_us; /* microseconds */
-	uint32_t pixel_clock; /* in KHz */
-	bool scaler_enabled;
-	bool interlace;
-	uint32_t src_height;
-	uint32_t overscan_top;
-	uint32_t overscan_bottom;
-	uint32_t v_total;
-	uint32_t v_addressable;
-	uint32_t h_total;
 };
 
 #define LEFT_EYE_3D_PRIMARY_SURFACE 1

@@ -27,7 +27,7 @@
 #define __DC_TIMING_GENERATOR_DCE110_H__
 
 
-#include "../include/timing_generator_types.h"
+#include "inc/timing_generator_types.h"
 #include "../include/grph_object_id.h"
 
 /* overscan in blank for YUV color space. For RGB, it is zero for black. */

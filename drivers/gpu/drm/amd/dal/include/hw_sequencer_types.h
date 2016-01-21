@@ -74,8 +74,8 @@ enum hw_timing_standard {
 	HW_TIMING_STANDARD_EXPLICIT
 };
 
-/* identical to struct crtc_ranged_timing_control
- * defined in controller\timing_generator_types.h */
+/* TODO: identical to struct crtc_ranged_timing_control
+ * defined in inc\timing_generator_types.h */
 struct hw_ranged_timing_control {
 	/* set to 1 to force dynamic counter V_COUNT
 	 * to lock to constant rate counter V_COUNT_NOM
