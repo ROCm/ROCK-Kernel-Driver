@@ -69,11 +69,7 @@
  * makes it an int type.
  */
 
-static
-#if !defined(DAL_CZ_BRINGUP)
-const
-#endif
-struct feature_source_entry feature_entry_table[] = {
+static struct feature_source_entry feature_entry_table[] = {
 	/* Feature name | default value | is boolean type */
 	{FEATURE_ENABLE_HW_EDID_POLLING, false, true},
 	{FEATURE_DP_SINK_DETECT_POLL_DATA_PIN, false, true},
@@ -96,11 +92,7 @@ struct feature_source_entry feature_entry_table[] = {
 	 * Driver uses SW I2C.
 	 * Make Test uses HW I2C.
 	 */
-#if defined(DAL_CZ_BRINGUP)
 	{FEATURE_RESTORE_USAGE_I2C_SW_ENGINE, true, true},
-#else
-	{FEATURE_RESTORE_USAGE_I2C_SW_ENGINE, false, true},
-#endif
 	{FEATURE_USE_MAX_DISPLAY_CLK, false, true},
 	{FEATURE_ALLOW_EDP_RESOURCE_SHARING, false, true},
 	{FEATURE_SUPPORT_DP_YUV, false, true},
@@ -740,7 +732,6 @@ static bool adapter_service_construct(
 		return false;
 	}
 
-#if defined(DAL_CZ_BRINGUP)
 	if (dal_adapter_service_get_dce_version(as) == DCE_VERSION_11_0) {
 		uint32_t i;
 
@@ -753,7 +744,6 @@ static bool adapter_service_construct(
 				feature_entry_table[i].default_value = true;
 		}
 	}
-#endif
 
 	/* Generate feature set table */
 	if (!generate_feature_set(as, init_data->display_param)) {
