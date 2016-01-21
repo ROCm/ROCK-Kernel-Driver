@@ -311,6 +311,7 @@ uint8_t dal_cmd_table_helper_encoder_id_to_atom(
 		return ENCODER_OBJECT_ID_INTERNAL_VCE;
 	case ENCODER_ID_EXTERNAL_GENERIC_DVO:
 		return ENCODER_OBJECT_ID_GENERAL_EXTERNAL_DVO;
+	case ENCODER_ID_INTERNAL_VIRTUAL:
 	case ENCODER_ID_UNKNOWN:
 		return ENCODER_OBJECT_ID_NONE;
 	default:

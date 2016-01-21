@@ -1,5 +1,5 @@
 /*
-* Copyright 2012-15 Advanced Micro Devices, Inc.
+ * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,39 +23,17 @@
  *
  */
 
-#ifndef __DC_RESOURCE_DCE110_H__
-#define __DC_RESOURCE_DCE110_H__
+#ifndef __DC_VIRTUAL_STREAM_ENCODER_H__
+#define __DC_VIRTUAL_STREAM_ENCODER_H__
 
-#include "core_types.h"
+#include "inc/stream_encoder.h"
 
-struct adapter_service;
-struct dc;
-struct resource_pool;
-struct dc_validation_set;
+struct stream_encoder *virtual_stream_encoder_create(
+	struct dc_context *ctx, struct dc_bios *bp);
 
+bool virtual_stream_encoder_construct(
+	struct stream_encoder *enc,
+	struct dc_context *ctx,
+	struct dc_bios *bp);
 
-bool dce110_construct_resource_pool(
-	struct adapter_service *adapter_serv,
-	uint8_t num_virtual_links,
-	struct dc *dc,
-	struct resource_pool *pool);
-
-void dce110_destruct_resource_pool(struct resource_pool *pool);
-
-enum dc_status dce110_validate_with_context(
-		const struct dc *dc,
-		const struct dc_validation_set set[],
-		uint8_t set_count,
-		struct validate_context *context);
-
-enum dc_status dce110_validate_bandwidth(
-		const struct dc *dc,
-		struct validate_context *context);
-
-struct link_encoder *dce110_link_encoder_create(
-	const struct encoder_init_data *enc_init_data);
-
-void dce110_link_encoder_destroy(struct link_encoder **enc);
-
-#endif /* __DC_RESOURCE_DCE110_H__ */
-
+#endif /* __DC_VIRTUAL_STREAM_ENCODER_H__ */

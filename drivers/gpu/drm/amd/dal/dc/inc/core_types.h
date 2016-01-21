@@ -263,7 +263,7 @@ struct resource_pool {
 	struct transform *transforms[MAX_PIPES];
 	struct output_pixel_processor *opps[MAX_PIPES];
 	struct timing_generator *timing_generators[MAX_STREAMS];
-	struct stream_encoder *stream_enc[MAX_STREAMS];
+	struct stream_encoder *stream_enc[MAX_PIPES * 2];
 
 	uint8_t controller_count;
 	uint8_t stream_enc_count;
@@ -294,7 +294,7 @@ struct resource_context {
 	struct resource_pool pool;
 	struct controller_ctx controller_ctx[MAX_PIPES];
 	union supported_stream_engines used_stream_engines;
-	bool is_stream_enc_acquired[MAX_STREAMS];
+	bool is_stream_enc_acquired[MAX_PIPES * 2];
 	bool is_audio_acquired[MAX_STREAMS];
 	uint8_t clock_source_ref_count[MAX_CLOCK_SOURCES];
  };

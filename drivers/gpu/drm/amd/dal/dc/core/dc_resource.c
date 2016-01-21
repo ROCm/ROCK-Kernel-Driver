@@ -457,11 +457,8 @@ static void fill_display_configs(
 			cfg->src_width = stream->public.src.width;
 			cfg->ddi_channel_mapping =
 				stream->sink->link->ddi_channel_mapping.raw;
-			if (stream->signal != SIGNAL_TYPE_VIRTUAL)
-				cfg->transmitter =
+			cfg->transmitter =
 				stream->sink->link->link_enc->transmitter;
-			else
-				cfg->transmitter = TRANSMITTER_UNKNOWN;
 			cfg->link_settings =
 					stream->sink->link->cur_link_settings;
 			cfg->sym_clock = stream->public.timing.pix_clk_khz;
@@ -744,14 +741,6 @@ enum dc_status map_resources(
 			context->res_ctx.controller_ctx[stream->controller_idx]
 			.flags.timing_changed =
 				check_timing_change(curr_stream, stream);
-
-			/*
-			 * we do not need stream encoder or audio resources
-			 * when connecting to virtual link
-			 */
-			if (stream->sink->link->public.connector_signal ==
-							SIGNAL_TYPE_VIRTUAL)
-				continue;
 
 			stream->stream_enc =
 				find_first_free_match_stream_enc_for_link(

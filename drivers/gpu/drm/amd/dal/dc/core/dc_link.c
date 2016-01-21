@@ -1228,7 +1228,7 @@ static void enable_link_hdmi(struct core_stream *stream)
 /****************************enable_link***********************************/
 static enum dc_status enable_link(struct core_stream *stream)
 {
-	enum dc_status status;
+	enum dc_status status = DC_ERROR_UNEXPECTED;
 	switch (stream->signal) {
 	case SIGNAL_TYPE_DISPLAY_PORT:
 	case SIGNAL_TYPE_EDP:
@@ -1244,9 +1244,10 @@ static enum dc_status enable_link(struct core_stream *stream)
 		enable_link_hdmi(stream);
 		status = DC_OK;
 		break;
-
+	case SIGNAL_TYPE_VIRTUAL:
+		status = DC_OK;
+		break;
 	default:
-		status = DC_ERROR_UNEXPECTED;
 		break;
 	}
 

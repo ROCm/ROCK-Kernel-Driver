@@ -26,6 +26,8 @@
 #ifndef __DAL_GRPH_OBJECT_ID_H__
 #define __DAL_GRPH_OBJECT_ID_H__
 
+#include "dal_services_types.h"
+
 /* Types of graphics objects */
 enum object_type {
 	OBJECT_TYPE_UNKNOWN  = 0,
@@ -160,6 +162,7 @@ enum encoder_id {
 
 	ENCODER_ID_INTERNAL_WIRELESS,	/* Internal wireless display encoder */
 	ENCODER_ID_INTERNAL_UNIPHY3,
+	ENCODER_ID_INTERNAL_VIRTUAL,
 
 	ENCODER_ID_EXTERNAL_GENERIC_DVO = 0xFF
 };
@@ -183,7 +186,7 @@ enum connector_id {
 	CONNECTOR_ID_WIRELESS = 22,
 	CONNECTOR_ID_MIRACAST = 23,
 
-	CONNECTOR_ID_COUNT
+	CONNECTOR_ID_VIRTUAL = 100
 };
 
 
@@ -207,6 +210,7 @@ enum engine_id {
 	ENGINE_ID_DACA,
 	ENGINE_ID_DACB,
 	ENGINE_ID_VCE,	/* wireless display pseudo-encoder */
+	ENGINE_ID_VIRTUAL,
 
 	ENGINE_ID_COUNT,
 	ENGINE_ID_UNKNOWN = (-1L)
