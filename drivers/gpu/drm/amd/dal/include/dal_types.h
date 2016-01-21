@@ -178,7 +178,13 @@ struct dc_context {
 
 	struct dal_logger *logger;
 	void *cgs_device;
+
+	/* Diagnostics */
+	enum dce_version dce_version;
+	enum dce_environment dce_environment;
 };
+
+#define IS_DIAG_MAXIMUS_DC(dcctx) ((dcctx)->dce_environment == DCE_ENV_DIAG_FPGA_MAXIMUS)
 
 /* Wireless display structs */
 

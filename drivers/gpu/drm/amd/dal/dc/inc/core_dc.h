@@ -34,12 +34,6 @@ struct dc {
 
 	/* HW functions */
 	struct hw_sequencer_funcs hwss;
-
-	/* Diagnostics */
-	enum dce_version dce_version;
-	enum dce_environment dce_environment;
 };
-
-#define IS_DIAGNOSTICS_DC(dc) ((dc)->dce_environment == DCE_ENV_DIAG_FPGA_MAXIMUS)
 
 #endif /* __CORE_DC_H__ */
