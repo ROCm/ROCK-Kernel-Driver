@@ -26,6 +26,8 @@
 #ifndef __DAL_FIXED31_32_H__
 #define __DAL_FIXED31_32_H__
 
+#include "dal_services_types.h"
+
 /*
  * @brief
  * Arithmetic operations on real numbers

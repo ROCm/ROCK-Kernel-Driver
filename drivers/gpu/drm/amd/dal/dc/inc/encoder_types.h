@@ -63,24 +63,6 @@ struct encoder_context {
 	struct graphics_object_id downstream;
 };
 
-union encoder_flags {
-	struct {
-		/* enable audio (DP/eDP only) */
-		uint32_t ENABLE_AUDIO:1;
-		/* coherency */
-		uint32_t COHERENT:1;
-		/* delay after Pixel Format change before enable transmitter */
-		uint32_t DELAY_AFTER_PIXEL_FORMAT_CHANGE:1;
-		/* by default, do not turn off VCC when disabling output */
-		uint32_t TURN_OFF_VCC:1;
-		/* by default, do wait for HPD low after turn of panel VCC */
-		uint32_t NO_WAIT_FOR_HPD_LOW:1;
-		/* slow DP panels don't reset internal fifo */
-		uint32_t VID_STREAM_DIFFER_TO_SYNC:1;
-	} bits;
-	uint32_t raw;
-};
-
 struct encoder_info_packet {
 	bool valid;
 	uint8_t hb0;
@@ -101,73 +83,9 @@ struct encoder_info_frame {
 	struct encoder_info_packet vsc;
 };
 
-struct encoder_info_frame_param {
-	struct encoder_info_frame packets;
-	struct encoder_context enc_ctx;
-};
-
-/*TODO: cleanup pending encoder cleanup*/
-struct encoder_output {
-	/* encoder AC & HW programming context */
-	struct encoder_context enc_ctx;
-	/* requested timing */
-	struct hw_crtc_timing crtc_timing;
-	/* clock source id (PLL or external) */
-	enum clock_source_id clock_source;
-	/* link settings (DP/eDP only) */
-	struct link_settings link_settings;
-	/* info frame packets */
-	struct encoder_info_frame info_frame;
-	/* timing validation (HDMI only) */
-	uint32_t max_tmds_clk_from_edid_in_mhz;
-	/* edp panel mode */
-	enum dp_panel_mode dp_panel_mode;
-	/* delay in milliseconds after powering up DP receiver (DP/eDP only) */
-	uint32_t delay_after_dp_receiver_power_up;
-	/* various flags for features and workarounds */
-	union encoder_flags flags;
-	/* delay after pixel format change */
-	uint32_t delay_after_pixel_format_change;
-	/* controller id */
-	enum controller_id controller;
-	/* maximum supported deep color depth for HDMI */
-	enum dc_color_depth max_hdmi_deep_color;
-	/* maximum supported pixel clock for HDMI */
-	uint32_t max_hdmi_pixel_clock;
-};
-
-struct encoder_pre_enable_output_param {
-	struct hw_crtc_timing crtc_timing;
-	struct link_settings link_settings;
-	struct encoder_context enc_ctx;
-};
-
 struct encoder_unblank_param {
 	struct hw_crtc_timing crtc_timing;
 	struct link_settings link_settings;
-};
-
-/*
- * @brief
- * Parameters to setup stereo 3D mode in Encoder:
- * - source: used for side-band stereo sync (DVO/DAC);
- * - engine_id: defines engine for this Encoder;
- * - enable_inband: in-band stereo sync should be enabled;
- * - enable_sideband: side-band stereo sync should be enabled.
- */
-struct encoder_3d_setup {
-	enum engine_id engine;
-	enum sync_source source;
-	union {
-		struct {
-			uint32_t SETUP_SYNC_SOURCE:1;
-			uint32_t ENABLE_INBAND:1;
-			uint32_t ENABLE_SIDEBAND:1;
-			uint32_t DISABLE_INBAND:1;
-			uint32_t DISABLE_SIDEBAND:1;
-		} bits;
-		uint32_t raw;
-	} flags;
 };
 
 struct encoder_set_dp_phy_pattern_param {
@@ -205,21 +123,6 @@ struct encoder_feature_support {
 	enum dc_color_depth max_deep_color;
 	/* maximum supported clock */
 	uint32_t max_pixel_clock;
-};
-
-enum dig_encoder_mode {
-	DIG_ENCODER_MODE_DP,
-	DIG_ENCODER_MODE_LVDS,
-	DIG_ENCODER_MODE_DVI,
-	DIG_ENCODER_MODE_HDMI,
-	DIG_ENCODER_MODE_SDVO,
-	DIG_ENCODER_MODE_DP_WITH_AUDIO,
-	DIG_ENCODER_MODE_DP_MST,
-
-	/* direct HW translation ! */
-	DIG_ENCODER_MODE_TV = 13,
-	DIG_ENCODER_MODE_CV,
-	DIG_ENCODER_MODE_CRT
 };
 
 #endif
