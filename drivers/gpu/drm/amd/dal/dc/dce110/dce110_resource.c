@@ -91,21 +91,6 @@ static const struct dce110_timing_generator_offsets dce110_tg_offsets[] = {
 	}
 };
 
-static const struct dce110_stream_enc_offsets dce110_str_enc_offsets[] = {
-	{
-		.dig = (mmDIG0_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP0_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	},
-	{
-		.dig = (mmDIG1_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP1_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	},
-	{
-		.dig = (mmDIG2_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP2_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	}
-};
-
 static const struct dce110_mem_input_reg_offsets dce110_mi_reg_offsets[] = {
 	{
 		.dcp = (mmDCP0_GRPH_CONTROL - mmGRPH_CONTROL),
@@ -218,6 +203,43 @@ static const struct dce110_link_enc_registers link_enc_regs[] = {
 	link_regs(2)
 };
 
+#define stream_enc_regs(id)\
+[id] = {\
+	.AFMT_AVI_INFO0 = mmDIG ## id ## _AFMT_AVI_INFO0,\
+	.AFMT_AVI_INFO1 = mmDIG ## id ## _AFMT_AVI_INFO1,\
+	.AFMT_AVI_INFO2 = mmDIG ## id ## _AFMT_AVI_INFO2,\
+	.AFMT_AVI_INFO3 = mmDIG ## id ## _AFMT_AVI_INFO3,\
+	.AFMT_GENERIC_0 = mmDIG ## id ## _AFMT_GENERIC_0,\
+	.AFMT_GENERIC_7 = mmDIG ## id ## _AFMT_GENERIC_7,\
+	.AFMT_GENERIC_HDR = mmDIG ## id ## _AFMT_GENERIC_HDR,\
+	.AFMT_INFOFRAME_CONTROL0 = mmDIG ## id ## _AFMT_INFOFRAME_CONTROL0,\
+	.AFMT_VBI_PACKET_CONTROL = mmDIG ## id ## _AFMT_VBI_PACKET_CONTROL,\
+	.DIG_FE_CNTL = mmDIG ## id ## _DIG_FE_CNTL,\
+	.DP_MSE_RATE_CNTL = mmDP ## id ## _DP_MSE_RATE_CNTL,\
+	.DP_MSE_RATE_UPDATE = mmDP ## id ## _DP_MSE_RATE_UPDATE,\
+	.DP_PIXEL_FORMAT = mmDP ## id ## _DP_PIXEL_FORMAT,\
+	.DP_SEC_CNTL = mmDP ## id ## _DP_SEC_CNTL,\
+	.DP_STEER_FIFO = mmDP ## id ## _DP_STEER_FIFO,\
+	.DP_VID_M = mmDP ## id ## _DP_VID_M,\
+	.DP_VID_N = mmDP ## id ## _DP_VID_N,\
+	.DP_VID_STREAM_CNTL = mmDP ## id ## _DP_VID_STREAM_CNTL,\
+	.DP_VID_TIMING = mmDP ## id ## _DP_VID_TIMING,\
+	.HDMI_CONTROL = mmDIG ## id ## _HDMI_CONTROL,\
+	.HDMI_GC = mmDIG ## id ## _HDMI_GC,\
+	.HDMI_GENERIC_PACKET_CONTROL0 = mmDIG ## id ## _HDMI_GENERIC_PACKET_CONTROL0,\
+	.HDMI_GENERIC_PACKET_CONTROL1 = mmDIG ## id ## _HDMI_GENERIC_PACKET_CONTROL1,\
+	.HDMI_INFOFRAME_CONTROL0 = mmDIG ## id ## _HDMI_INFOFRAME_CONTROL0,\
+	.HDMI_INFOFRAME_CONTROL1 = mmDIG ## id ## _HDMI_INFOFRAME_CONTROL1,\
+	.HDMI_VBI_PACKET_CONTROL = mmDIG ## id ## _HDMI_VBI_PACKET_CONTROL,\
+	.TMDS_CNTL = mmDIG ## id ## _TMDS_CNTL\
+}
+
+static const struct dce110_stream_enc_registers stream_enc_regs[] = {
+	stream_enc_regs(0),
+	stream_enc_regs(1),
+	stream_enc_regs(2)
+};
+
 static struct timing_generator *dce110_timing_generator_create(
 		struct adapter_service *as,
 		struct dc_context *ctx,
@@ -242,7 +264,7 @@ static struct stream_encoder *dce110_stream_encoder_create(
 	enum engine_id eng_id,
 	struct dc_context *ctx,
 	struct dc_bios *bp,
-	const struct dce110_stream_enc_offsets *offsets)
+	const struct dce110_stream_enc_registers *regs)
 {
 	struct dce110_stream_encoder *enc110 =
 		dc_service_alloc(ctx, sizeof(struct dce110_stream_encoder));
@@ -250,7 +272,7 @@ static struct stream_encoder *dce110_stream_encoder_create(
 	if (!enc110)
 		return NULL;
 
-	if (dce110_stream_encoder_construct(enc110, ctx, bp, eng_id, offsets))
+	if (dce110_stream_encoder_construct(enc110, ctx, bp, eng_id, regs))
 		return &enc110->base;
 
 	BREAK_TO_DEBUGGER();
@@ -501,7 +523,7 @@ bool dce110_construct_resource_pool(
 				i, dc->ctx,
 				dal_adapter_service_get_bios_parser(
 					adapter_serv),
-				&dce110_str_enc_offsets[i]);
+				&stream_enc_regs[i]);
 			if (pool->stream_enc[i] == NULL) {
 				BREAK_TO_DEBUGGER();
 				dal_error("DC: failed to create stream_encoder!\n");
