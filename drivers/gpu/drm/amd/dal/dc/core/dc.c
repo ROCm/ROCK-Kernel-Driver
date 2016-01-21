@@ -335,9 +335,9 @@ static bool construct(struct dc *dc, const struct dal_init_data *init_params)
 
 	dc->ctx = dc_init_data.ctx;
 
-	dc->dce_version = dal_adapter_service_get_dce_version(
+	dc->ctx->dce_version = dal_adapter_service_get_dce_version(
 			dc_init_data.adapter_srv);
-	dc->dce_environment = dal_adapter_service_get_dce_environment(
+	dc->ctx->dce_environment = dal_adapter_service_get_dce_environment(
 			dc_init_data.adapter_srv);
 
 	/* Create hardware sequencer */

@@ -842,13 +842,16 @@ void dce110_mem_input_allocate_dmif_buffer(
 	 * 02 - enable DMIF rdreq limit, disable by DMIF stall = 1
 	 * 03 - force enable DMIF rdreq limit, ignore DMIF stall / urgent
 	 */
-	addr = mmMC_HUB_RDREQ_DMIF_LIMIT;
-	value = dal_read_reg(mi->ctx, addr);
-	if (paths_num > 1)
-		set_reg_field_value(value, 0, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
-	else
-		set_reg_field_value(value, 3, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
-	dal_write_reg(mi->ctx, addr, value);
+	if (!IS_DIAG_MAXIMUS_DC(mi->ctx)) {
+		addr = mmMC_HUB_RDREQ_DMIF_LIMIT;
+		value = dal_read_reg(mi->ctx, addr);
+
+		if (paths_num > 1)
+			set_reg_field_value(value, 0, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
+		else
+			set_reg_field_value(value, 3, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
+		dal_write_reg(mi->ctx, addr, value);
+	}
 
 register_underflow_int:
 	/*todo*/;
@@ -909,13 +912,15 @@ void dce110_mem_input_deallocate_dmif_buffer(
 	 * 02 - enable dmif rdreq limit, disable by dmif stall=1
 	 * 03 - force enable dmif rdreq limit, ignore dmif stall/urgent
 	 * Stella Wong proposed this change. */
-	value = dal_read_reg(mi->ctx, mmMC_HUB_RDREQ_DMIF_LIMIT);
-	if (paths_num > 1)
-		set_reg_field_value(value, 0, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
-	else
-		set_reg_field_value(value, 3, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
+	if (!IS_DIAG_MAXIMUS_DC(mi->ctx)) {
+		value = dal_read_reg(mi->ctx, mmMC_HUB_RDREQ_DMIF_LIMIT);
+		if (paths_num > 1)
+			set_reg_field_value(value, 0, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
+		else
+			set_reg_field_value(value, 3, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
 
-	dal_write_reg(mi->ctx, mmMC_HUB_RDREQ_DMIF_LIMIT, value);
+		dal_write_reg(mi->ctx, mmMC_HUB_RDREQ_DMIF_LIMIT, value);
+	}
 }
 
 static struct mem_input_funcs dce110_mem_input_funcs = {
