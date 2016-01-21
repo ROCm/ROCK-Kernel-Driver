@@ -29,8 +29,8 @@
 
 #include "resource.h"
 #include "include/irq_service_interface.h"
-#include "include/timing_generator_interface.h"
 #include "../virtual/virtual_stream_encoder.h"
+#include "inc/timing_generator_types.h"
 
 #include "dce110/dce110_timing_generator.h"
 #include "dce110/dce110_link_encoder.h"

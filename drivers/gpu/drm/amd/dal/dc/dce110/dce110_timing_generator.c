@@ -35,7 +35,7 @@
 #include "include/grph_object_id.h"
 #include "include/adapter_service_interface.h"
 #include "include/logger_interface.h"
-#include "include/timing_generator_types.h"
+#include "inc/timing_generator_types.h"
 #include "dce110_timing_generator.h"
 
 enum black_color_format {
@@ -581,17 +581,6 @@ bool dce110_timing_generator_program_timing_generator(
 
 	/* Enable stereo - only when we need to pack 3D frame. Other types
 	 * of stereo handled in explicit call */
-
-	/* TODOSTEREO
-	if (hw_crtc_timing->flags.PACK_3D_FRAME) {
-		struct crtc_stereo_parameters stereo_params = { false };
-		stereo_params.PROGRAM_STEREO = true;
-		stereo_params.PROGRAM_POLARITY = true;
-		stereo_params.FRAME_PACKED = true;
-		stereo_params.RIGHT_EYE_POLARITY =
-			hw_crtc_timing->flags.RIGHT_EYE_3D_POLARITY;
-		tg->funcs->enable_stereo(tg, &stereo_params);
-	}*/
 
 	return result == BP_RESULT_OK;
 }
