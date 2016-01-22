@@ -195,12 +195,54 @@ enum opp_regamma {
 struct output_pixel_processor {
 	struct dc_context *ctx;
 	uint32_t inst;
+	struct opp_funcs *funcs;
 };
 
 enum fmt_stereo_action {
 	FMT_STEREO_ACTION_ENABLE = 0,
 	FMT_STEREO_ACTION_DISABLE,
 	FMT_STEREO_ACTION_UPDATE_POLARITY
+};
+
+struct opp_funcs {
+	void (*opp_power_on_regamma_lut)(
+		struct output_pixel_processor *opp,
+		bool power_on);
+
+	bool (*opp_set_regamma)(
+		struct output_pixel_processor *opp,
+		const struct gamma_ramp *ramp,
+		const struct gamma_parameters *params,
+		bool force_bypass);
+
+	bool (*opp_map_legacy_and_regamma_hw_to_x_user)(
+		struct output_pixel_processor *opp,
+		const struct gamma_ramp *gamma_ramp,
+		const struct gamma_parameters *params);
+
+	void (*opp_set_csc_adjustment)(
+		struct output_pixel_processor *opp,
+		const struct grph_csc_adjustment *adjust);
+
+	void (*opp_set_csc_default)(
+		struct output_pixel_processor *opp,
+		const struct default_adjustment *default_adjust);
+
+	/* FORMATTER RELATED */
+	void (*opp_program_bit_depth_reduction)(
+		struct output_pixel_processor *opp,
+		const struct bit_depth_reduction_params *params);
+
+	void (*opp_program_clamping_and_pixel_encoding)(
+		struct output_pixel_processor *opp,
+		const struct clamping_and_pixel_encoding_params *params);
+
+
+	void (*opp_set_dyn_expansion)(
+		struct output_pixel_processor *opp,
+		enum color_space color_sp,
+		enum dc_color_depth color_dpth,
+		enum signal_type signal);
 };
 
 #endif

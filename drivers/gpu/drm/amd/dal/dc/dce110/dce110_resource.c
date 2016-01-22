@@ -240,6 +240,38 @@ static const struct dce110_stream_enc_registers stream_enc_regs[] = {
 	stream_enc_regs(2)
 };
 
+
+/* AG TBD Needs to be reduced back to 3 pipes once dce10 hw sequencer implemented. */
+static const struct dce110_opp_reg_offsets dce110_opp_reg_offsets[] = {
+{
+	.fmt_offset = (mmFMT0_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.dcfe_offset = (mmDCFE0_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
+	.dcp_offset = (mmDCP0_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+},
+{	.fmt_offset = (mmFMT1_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.dcfe_offset = (mmDCFE1_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
+	.dcp_offset = (mmDCP1_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+},
+{	.fmt_offset = (mmFMT2_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.dcfe_offset = (mmDCFE2_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
+	.dcp_offset = (mmDCP2_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+},
+{
+	.fmt_offset = (mmFMT3_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.dcfe_offset = (mmDCFE3_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
+	.dcp_offset = (mmDCP3_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+},
+{	.fmt_offset = (mmFMT4_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.dcfe_offset = (mmDCFE4_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
+	.dcp_offset = (mmDCP4_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+},
+{	.fmt_offset = (mmFMT5_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.dcfe_offset = (mmDCFE5_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
+	.dcp_offset = (mmDCP5_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+}
+};
+
+
 static struct timing_generator *dce110_timing_generator_create(
 		struct adapter_service *as,
 		struct dc_context *ctx,
@@ -374,6 +406,27 @@ void dce110_link_encoder_destroy(struct link_encoder **enc)
 	*enc = NULL;
 }
 
+
+static struct output_pixel_processor *dce110_opp_create(
+	struct dc_context *ctx,
+	uint32_t inst,
+	const struct dce110_opp_reg_offsets *offsets)
+{
+	struct dce110_opp *opp =
+		dc_service_alloc(ctx, sizeof(struct dce110_opp));
+
+	if (!opp)
+		return NULL;
+
+	if (dce110_opp_construct(opp,
+			ctx, inst, offsets))
+		return &opp->base;
+
+	BREAK_TO_DEBUGGER();
+	dc_service_free(ctx, opp);
+	return NULL;
+}
+
 bool dce110_construct_resource_pool(
 	struct adapter_service *adapter_serv,
 	uint8_t num_virtual_links,
@@ -485,7 +538,7 @@ bool dce110_construct_resource_pool(
 				pool->transforms[i],
 				pool->scaler_filter);
 
-		pool->opps[i] = dce110_opp_create(ctx, i);
+		pool->opps[i] = dce110_opp_create(ctx, i, &dce110_opp_reg_offsets[i]);
 		if (pool->opps[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dal_error(
