@@ -6,10 +6,45 @@
 #ifndef STREAM_ENCODER_H_
 #define STREAM_ENCODER_H_
 
-#include "encoder_types.h"
-#include "include/bios_parser_interface.h"
+#include "include/hw_sequencer_types.h"
 
 struct dc_bios;
+struct dc_context;
+struct dc_crtc_timing;
+
+
+struct encoder_info_packet {
+	bool valid;
+	uint8_t hb0;
+	uint8_t hb1;
+	uint8_t hb2;
+	uint8_t hb3;
+	uint8_t sb[28];
+};
+
+struct encoder_info_frame {
+	/* auxiliary video information */
+	struct encoder_info_packet avi;
+	struct encoder_info_packet gamut;
+	struct encoder_info_packet vendor;
+	/* source product description */
+	struct encoder_info_packet spd;
+	/* video stream configuration */
+	struct encoder_info_packet vsc;
+};
+
+struct encoder_unblank_param {
+	struct hw_crtc_timing crtc_timing;
+	struct link_settings link_settings;
+};
+
+struct encoder_set_dp_phy_pattern_param {
+	enum dp_test_pattern dp_phy_pattern;
+	const uint8_t *custom_pattern;
+	uint32_t custom_pattern_size;
+	enum dp_panel_mode dp_panel_mode;
+};
+
 
 struct stream_encoder {
 	struct stream_encoder_funcs *funcs;
