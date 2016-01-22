@@ -120,7 +120,7 @@ struct core_stream {
 	/*fmt*/
 	/*TODO: AUTO new codepath in apply_context to hw to
 	 * generate these bw unrelated/no fail params*/
-	struct bit_depth_reduction_params fmt_bit_depth;
+	struct bit_depth_reduction_params bit_depth_params;/* used by DCP and FMT */
 	struct clamping_and_pixel_encoding_params clamping;
 	struct hw_info_frame info_frame;
 	struct encoder_info_frame encoder_info_frame;

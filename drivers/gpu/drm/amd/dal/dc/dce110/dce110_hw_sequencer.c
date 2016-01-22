@@ -847,7 +847,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 			stream->public.timing.display_color_depth,
 			stream->sink->public.sink_signal);
 
-	program_fmt(opp, &stream->fmt_bit_depth, &stream->clamping);
+	program_fmt(opp, &stream->bit_depth_params, &stream->clamping);
 
 	stream->sink->link->link_enc->funcs->setup(
 		stream->sink->link->link_enc,
@@ -1350,7 +1350,8 @@ static bool setup_line_buffer_pixel_depth(
 		if (blank)
 			tg->funcs->wait_for_state(tg, CRTC_STATE_VBLANK);
 
-		return xfm->funcs->transform_set_pixel_storage_depth(xfm, depth);
+		return xfm->funcs->transform_set_pixel_storage_depth(xfm, depth,
+				&stream->bit_depth_params);
 	}
 
 	return false;

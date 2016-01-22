@@ -661,12 +661,8 @@ static struct hw_ctx_adapter_service *create_hw_ctx(
 	enum dce_environment dce_environment,
 	struct dc_context *ctx)
 {
-	switch (dce_environment) {
-	case DCE_ENV_DIAG_FPGA_MAXIMUS:
+	if (IS_FPGA_MAXIMUS_DC(dce_environment))
 		return dal_adapter_service_create_hw_ctx_diag(ctx);
-	default:
-		break;
-	}
 
 	switch (dce_version) {
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)

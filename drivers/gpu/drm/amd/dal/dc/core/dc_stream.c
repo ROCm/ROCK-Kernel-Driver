@@ -41,26 +41,33 @@ struct stream {
 /*******************************************************************************
  * Private functions
  ******************************************************************************/
-
 static void build_bit_depth_reduction_params(
+		const struct core_stream *stream,
 		struct bit_depth_reduction_params *fmt_bit_depth)
 {
+	dc_service_memset(fmt_bit_depth, 0, sizeof(*fmt_bit_depth));
+
 	/*TODO: Need to un-hardcode, refer to function with same name
 	 * in dal2 hw_sequencer*/
 
 	fmt_bit_depth->flags.TRUNCATE_ENABLED = 0;
 	fmt_bit_depth->flags.SPATIAL_DITHER_ENABLED = 0;
 	fmt_bit_depth->flags.FRAME_MODULATION_ENABLED = 0;
-	fmt_bit_depth->flags.SPATIAL_DITHER_DEPTH = 1;
 
-	fmt_bit_depth->flags.SPATIAL_DITHER_ENABLED = 1;
-	/* frame random is on by default */
-	fmt_bit_depth->flags.FRAME_RANDOM = 1;
-	/* apply RGB dithering */
-	fmt_bit_depth->flags.RGB_RANDOM = true;
+	/* Diagnostics need consistent CRC of the image, that means
+	 * dithering should not be enabled for Diagnostics. */
+	if (IS_DIAG_DC(stream->ctx->dce_environment) == false) {
+
+		fmt_bit_depth->flags.SPATIAL_DITHER_DEPTH = 1;
+		fmt_bit_depth->flags.SPATIAL_DITHER_ENABLED = 1;
+
+		/* frame random is on by default */
+		fmt_bit_depth->flags.FRAME_RANDOM = 1;
+		/* apply RGB dithering */
+		fmt_bit_depth->flags.RGB_RANDOM = true;
+	}
 
 	return;
-
 }
 
 static void setup_pixel_encoding(
@@ -85,7 +92,7 @@ static bool construct(struct core_stream *stream,
 
 	dc_sink_retain(dc_sink_data);
 
-	build_bit_depth_reduction_params(&stream->fmt_bit_depth);
+	build_bit_depth_reduction_params(stream, &stream->bit_depth_params);
 	setup_pixel_encoding(&stream->clamping);
 
 	/* Copy audio modes */

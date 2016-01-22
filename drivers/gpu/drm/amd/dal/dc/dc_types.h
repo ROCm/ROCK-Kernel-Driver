@@ -39,6 +39,29 @@ struct dc_link;
 struct dc_sink;
 struct dal;
 
+/********************************
+ * Environment definitions
+ ********************************/
+enum dce_environment {
+	DCE_ENV_PRODUCTION_DRV = 0,
+	/* Emulation on FPGA, in "Maximus" System.
+	 * This environment enforces that *only* DC registers accessed.
+	 * (access to non-DC registers will hang FPGA) */
+	DCE_ENV_FPGA_MAXIMUS,
+	/* Emulation on real HW or on FPGA. Used by Diagnostics, enforces
+	 * requirements of Diagnostics team. */
+	DCE_ENV_DIAG
+};
+
+/* Note: use these macro definitions instead of direct comparison! */
+#define IS_FPGA_MAXIMUS_DC(dce_environment) \
+	(dce_environment == DCE_ENV_FPGA_MAXIMUS)
+
+#define IS_DIAG_DC(dce_environment) \
+	(IS_FPGA_MAXIMUS_DC(dce_environment) || (dce_environment == DCE_ENV_DIAG))
+
+/********************************/
+
 #define MAX_EDID_BUFFER_SIZE 512
 
 /*Displayable pixel format in fb*/

@@ -76,7 +76,8 @@ void dce110_transform_set_gamut_remap(
 /* BIT DEPTH RELATED */
 bool dce110_transform_set_pixel_storage_depth(
 	struct transform *xfm,
-	enum lb_pixel_depth depth);
+	enum lb_pixel_depth depth,
+	const struct bit_depth_reduction_params *bit_depth_params);
 
 bool dce110_transform_get_current_pixel_storage_depth(
 	struct transform *xfm,
