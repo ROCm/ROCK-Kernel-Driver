@@ -774,7 +774,7 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	}
 
 	/* update too big for an IB */
-	if (ndw > 0xfffff)
+	if (ndw*4 > AMDGPU_IB_POOL_SIZE*64*1024)
 		return -ENOMEM;
 
 	ib = kzalloc(sizeof(struct amdgpu_ib), GFP_KERNEL);
