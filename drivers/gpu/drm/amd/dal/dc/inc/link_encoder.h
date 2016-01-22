@@ -8,8 +8,59 @@
 #ifndef LINK_ENCODER_H_
 #define LINK_ENCODER_H_
 
-#include "core_types.h"
-#include "encoder_types.h"
+#include "dal_services_types.h"
+#include "grph_object_defs.h"
+#include "signal_types.h"
+#include "dc_types.h"
+
+struct dc_context;
+struct adapter_service;
+struct encoder_set_dp_phy_pattern_param;
+struct link_mst_stream_allocation_table;
+struct link_settings;
+struct link_training_settings;
+struct core_stream;
+
+struct encoder_init_data {
+	struct adapter_service *adapter_service;
+	enum channel_id channel;
+	struct graphics_object_id connector;
+	enum hpd_source_id hpd_source;
+	/* TODO: in DAL2, here was pointer to EventManagerInterface */
+	struct graphics_object_id encoder;
+	struct dc_context *ctx;
+	enum transmitter transmitter;
+};
+
+struct encoder_feature_support {
+	union {
+		struct {
+			/* 1 - external encoder; 0 - internal encoder */
+			uint32_t EXTERNAL_ENCODER:1;
+			uint32_t ANALOG_ENCODER:1;
+			uint32_t STEREO_SYNC:1;
+			/* check the DDC data pin
+			 * when performing DP Sink detection */
+			uint32_t DP_SINK_DETECT_POLL_DATA_PIN:1;
+			/* CPLIB authentication
+			 * for external DP chip supported */
+			uint32_t CPLIB_DP_AUTHENTICATION:1;
+			uint32_t IS_HBR2_CAPABLE:1;
+			uint32_t IS_HBR2_VALIDATED:1;
+			uint32_t IS_TPS3_CAPABLE:1;
+			uint32_t IS_AUDIO_CAPABLE:1;
+			uint32_t IS_VCE_SUPPORTED:1;
+			uint32_t IS_CONVERTER:1;
+			uint32_t IS_Y_ONLY_CAPABLE:1;
+			uint32_t IS_YCBCR_CAPABLE:1;
+		} bits;
+		uint32_t raw;
+	} flags;
+	/* maximum supported deep color depth */
+	enum dc_color_depth max_deep_color;
+	/* maximum supported clock */
+	uint32_t max_pixel_clock;
+};
 
 struct link_enc_status {
 	int dummy; /*TODO*/

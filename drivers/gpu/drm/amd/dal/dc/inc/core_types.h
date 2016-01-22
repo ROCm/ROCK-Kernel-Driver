@@ -64,9 +64,12 @@ void enable_surface_flip_reporting(struct dc_surface *dc_surface,
 
 /********* core_stream ************/
 #include "grph_object_id.h"
-#include "encoder_types.h"
+#include "link_encoder.h"
+#include "stream_encoder.h"
 #include "clock_source_interface.h"
 #include "audio_interface.h"
+#include "scaler_types.h"
+#include "hw_sequencer_types.h"
 
 #define DC_STREAM_TO_CORE(dc_stream) container_of( \
 	dc_stream, struct core_stream, public)
