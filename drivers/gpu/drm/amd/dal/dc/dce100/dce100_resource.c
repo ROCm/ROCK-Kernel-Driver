@@ -29,7 +29,6 @@
 
 #include "resource.h"
 #include "include/irq_service_interface.h"
-#include "include/timing_generator_interface.h"
 
 #include "dce110/dce110_timing_generator.h"
 #include "dce110/dce110_link_encoder.h"
@@ -40,6 +39,20 @@
 #include "dce110/dce110_opp.h"
 
 #include "dce/dce_10_0_d.h"
+
+/* TODO remove these defines */
+#ifndef mmDP_DPHY_INTERNAL_CTRL
+	#define mmDP_DPHY_INTERNAL_CTRL 0x4aa7
+	#define mmDP0_DP_DPHY_INTERNAL_CTRL 0x4aa7
+	#define mmDP1_DP_DPHY_INTERNAL_CTRL 0x4ba7
+	#define mmDP2_DP_DPHY_INTERNAL_CTRL 0x4ca7
+	#define mmDP3_DP_DPHY_INTERNAL_CTRL 0x4da7
+	#define mmDP4_DP_DPHY_INTERNAL_CTRL 0x4ea7
+	#define mmDP5_DP_DPHY_INTERNAL_CTRL 0x4fa7
+	#define mmDP6_DP_DPHY_INTERNAL_CTRL 0x54a7
+	#define mmDP7_DP_DPHY_INTERNAL_CTRL 0x56a7
+	#define mmDP8_DP_DPHY_INTERNAL_CTRL 0x57a7
+#endif
 
 enum dce100_clk_src_array_id {
 	DCE100_CLK_SRC_PLL0 = 0,
@@ -73,68 +86,6 @@ static const struct dce110_timing_generator_offsets dce100_tg_offsets[] = {
 	{
 		.crtc = (mmCRTC5_CRTC_CONTROL - mmCRTC_CONTROL),
 		.dcp = (mmDCP5_GRPH_CONTROL - mmGRPH_CONTROL),
-	}
-};
-
-static const struct dce110_stream_enc_offsets dce100_str_enc_offsets[] = {
-	{
-		.dig = (mmDIG0_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP0_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	},
-	{
-		.dig = (mmDIG1_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP1_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	},
-	{
-		.dig = (mmDIG2_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP2_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	},
-	{
-		.dig = (mmDIG3_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP3_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	},
-	{
-		.dig = (mmDIG4_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP4_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	},
-	{
-		.dig = (mmDIG5_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP5_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	},
-	{
-		.dig = (mmDIG6_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP6_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	}
-};
-
-static const struct dce110_link_enc_offsets dce100_lnk_enc_reg_offsets[] = {
-	{
-		.dig = (mmDIG0_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP0_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	},
-	{
-		.dig = (mmDIG1_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP1_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	},
-	{
-		.dig = (mmDIG2_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP2_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	},
-	{
-		.dig = (mmDIG3_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP3_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	},
-	{
-		.dig = (mmDIG4_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP4_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	},
-	{
-		.dig = (mmDIG5_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP5_DP_SEC_CNTL - mmDP_SEC_CNTL)
-	},
-	{
-		.dig = (mmDIG6_DIG_FE_CNTL - mmDIG_FE_CNTL),
-		.dp  = (mmDP6_DP_SEC_CNTL - mmDP_SEC_CNTL)
 	}
 };
 
@@ -239,6 +190,92 @@ static const struct dce110_ipp_reg_offsets dce100_ipp_reg_offsets[] = {
 }
 };
 
+
+static const struct dce110_link_enc_bl_registers link_enc_bl_regs = {
+		.BL_PWM_CNTL = mmBL_PWM_CNTL,
+		.BL_PWM_GRP1_REG_LOCK = mmBL_PWM_GRP1_REG_LOCK,
+		.BL_PWM_PERIOD_CNTL = mmBL_PWM_PERIOD_CNTL,
+		.LVTMA_PWRSEQ_CNTL = mmLVTMA_PWRSEQ_CNTL,
+		.LVTMA_PWRSEQ_STATE = mmLVTMA_PWRSEQ_STATE
+};
+
+#define aux_regs(id)\
+[id] = {\
+	.AUX_CONTROL = mmDP_AUX ## id ## _AUX_CONTROL,\
+	.AUX_DPHY_RX_CONTROL0 = mmDP_AUX ## id ## _AUX_DPHY_RX_CONTROL0\
+}
+
+static const struct dce110_link_enc_aux_registers link_enc_aux_regs[] = {
+	aux_regs(0),
+	aux_regs(1),
+	aux_regs(2)
+};
+
+#define link_regs(id)\
+[id] = {\
+	.DIG_BE_CNTL = mmDIG ## id ## _DIG_BE_CNTL,\
+	.DIG_BE_EN_CNTL = mmDIG ## id ## _DIG_BE_EN_CNTL,\
+	.DP_CONFIG = mmDP ## id ## _DP_CONFIG,\
+	.DP_DPHY_CNTL = mmDP ## id ## _DP_DPHY_CNTL,\
+	.DP_DPHY_INTERNAL_CTRL = mmDP ## id ## _DP_DPHY_INTERNAL_CTRL,\
+	.DP_DPHY_PRBS_CNTL = mmDP ## id ## _DP_DPHY_PRBS_CNTL,\
+	.DP_DPHY_SYM0 = mmDP ## id ## _DP_DPHY_SYM0,\
+	.DP_DPHY_SYM1 = mmDP ## id ## _DP_DPHY_SYM1,\
+	.DP_DPHY_SYM2 = mmDP ## id ## _DP_DPHY_SYM2,\
+	.DP_DPHY_TRAINING_PATTERN_SEL = mmDP ## id ## _DP_DPHY_TRAINING_PATTERN_SEL,\
+	.DP_LINK_CNTL = mmDP ## id ## _DP_LINK_CNTL,\
+	.DP_LINK_FRAMING_CNTL = mmDP ## id ## _DP_LINK_FRAMING_CNTL,\
+	.DP_MSE_SAT0 = mmDP ## id ## _DP_MSE_SAT0,\
+	.DP_MSE_SAT1 = mmDP ## id ## _DP_MSE_SAT1,\
+	.DP_MSE_SAT2 = mmDP ## id ## _DP_MSE_SAT2,\
+	.DP_MSE_SAT_UPDATE = mmDP ## id ## _DP_MSE_SAT_UPDATE,\
+	.DP_SEC_CNTL = mmDP ## id ## _DP_SEC_CNTL,\
+	.DP_VID_STREAM_CNTL = mmDP ## id ## _DP_VID_STREAM_CNTL\
+}
+
+static const struct dce110_link_enc_registers link_enc_regs[] = {
+	link_regs(0),
+	link_regs(1),
+	link_regs(2)
+};
+
+#define stream_enc_regs(id)\
+[id] = {\
+	.AFMT_AVI_INFO0 = mmDIG ## id ## _AFMT_AVI_INFO0,\
+	.AFMT_AVI_INFO1 = mmDIG ## id ## _AFMT_AVI_INFO1,\
+	.AFMT_AVI_INFO2 = mmDIG ## id ## _AFMT_AVI_INFO2,\
+	.AFMT_AVI_INFO3 = mmDIG ## id ## _AFMT_AVI_INFO3,\
+	.AFMT_GENERIC_0 = mmDIG ## id ## _AFMT_GENERIC_0,\
+	.AFMT_GENERIC_7 = mmDIG ## id ## _AFMT_GENERIC_7,\
+	.AFMT_GENERIC_HDR = mmDIG ## id ## _AFMT_GENERIC_HDR,\
+	.AFMT_INFOFRAME_CONTROL0 = mmDIG ## id ## _AFMT_INFOFRAME_CONTROL0,\
+	.AFMT_VBI_PACKET_CONTROL = mmDIG ## id ## _AFMT_VBI_PACKET_CONTROL,\
+	.DIG_FE_CNTL = mmDIG ## id ## _DIG_FE_CNTL,\
+	.DP_MSE_RATE_CNTL = mmDP ## id ## _DP_MSE_RATE_CNTL,\
+	.DP_MSE_RATE_UPDATE = mmDP ## id ## _DP_MSE_RATE_UPDATE,\
+	.DP_PIXEL_FORMAT = mmDP ## id ## _DP_PIXEL_FORMAT,\
+	.DP_SEC_CNTL = mmDP ## id ## _DP_SEC_CNTL,\
+	.DP_STEER_FIFO = mmDP ## id ## _DP_STEER_FIFO,\
+	.DP_VID_M = mmDP ## id ## _DP_VID_M,\
+	.DP_VID_N = mmDP ## id ## _DP_VID_N,\
+	.DP_VID_STREAM_CNTL = mmDP ## id ## _DP_VID_STREAM_CNTL,\
+	.DP_VID_TIMING = mmDP ## id ## _DP_VID_TIMING,\
+	.HDMI_CONTROL = mmDIG ## id ## _HDMI_CONTROL,\
+	.HDMI_GC = mmDIG ## id ## _HDMI_GC,\
+	.HDMI_GENERIC_PACKET_CONTROL0 = mmDIG ## id ## _HDMI_GENERIC_PACKET_CONTROL0,\
+	.HDMI_GENERIC_PACKET_CONTROL1 = mmDIG ## id ## _HDMI_GENERIC_PACKET_CONTROL1,\
+	.HDMI_INFOFRAME_CONTROL0 = mmDIG ## id ## _HDMI_INFOFRAME_CONTROL0,\
+	.HDMI_INFOFRAME_CONTROL1 = mmDIG ## id ## _HDMI_INFOFRAME_CONTROL1,\
+	.HDMI_VBI_PACKET_CONTROL = mmDIG ## id ## _HDMI_VBI_PACKET_CONTROL,\
+	.TMDS_CNTL = mmDIG ## id ## _TMDS_CNTL\
+}
+
+static const struct dce110_stream_enc_registers stream_enc_regs[] = {
+	stream_enc_regs(0),
+	stream_enc_regs(1),
+	stream_enc_regs(2)
+};
+
 static struct timing_generator *dce100_timing_generator_create(
 		struct adapter_service *as,
 		struct dc_context *ctx,
@@ -264,7 +301,7 @@ static struct stream_encoder *dce100_stream_encoder_create(
 	enum engine_id eng_id,
 	struct dc_context *ctx,
 	struct dc_bios *bp,
-	const struct dce110_stream_enc_offsets *offsets)
+	const struct dce110_stream_enc_registers *regs)
 {
 	struct dce110_stream_encoder *enc110 =
 		dc_service_alloc(ctx, sizeof(struct dce110_stream_encoder));
@@ -272,7 +309,7 @@ static struct stream_encoder *dce100_stream_encoder_create(
 	if (!enc110)
 		return NULL;
 
-	if (dce110_stream_encoder_construct(enc110, ctx, bp, eng_id, offsets))
+	if (dce110_stream_encoder_construct(enc110, ctx, bp, eng_id, regs))
 		return &enc110->base;
 
 	BREAK_TO_DEBUGGER();
@@ -358,7 +395,9 @@ struct link_encoder *dce100_link_encoder_create(
 	if (dce110_link_encoder_construct(
 			enc110,
 			enc_init_data,
-			&dce100_lnk_enc_reg_offsets[enc_init_data->transmitter]))
+			&link_enc_regs[enc_init_data->transmitter],
+			&link_enc_aux_regs[enc_init_data->channel - 1],
+			&link_enc_bl_regs))
 		return &enc110->base;
 
 	BREAK_TO_DEBUGGER();
@@ -517,7 +556,7 @@ bool dce100_construct_resource_pool(
 				i, dc->ctx,
 				dal_adapter_service_get_bios_parser(
 					adapter_serv),
-				&dce100_str_enc_offsets[i]);
+				&stream_enc_regs[i]);
 			if (pool->stream_enc[i] == NULL) {
 				BREAK_TO_DEBUGGER();
 				dal_error("DC: failed to create stream_encoder!\n");
