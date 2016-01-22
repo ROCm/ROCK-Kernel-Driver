@@ -33,6 +33,8 @@
 #include <linux/mm.h>
 #include <uapi/asm-generic/mman-common.h>
 #include <asm/processor.h>
+#include <linux/highmem.h>
+
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_dbgmgr.h"
@@ -41,6 +43,8 @@
 static long kfd_ioctl(struct file *, unsigned int, unsigned long);
 static int kfd_open(struct inode *, struct file *);
 static int kfd_mmap(struct file *, struct vm_area_struct *);
+static int _map_memory_to_gpu(struct kfd_dev *dev, void *mem,
+		struct kfd_process *p, struct kfd_process_device *pdd);
 
 static const char kfd_dev_name[] = "kfd";
 
@@ -257,6 +261,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	unsigned int queue_id;
 	struct kfd_process_device *pdd;
 	struct queue_properties q_properties;
+	void *mem = NULL;
 
 	unsigned long  offset;
 	memset(&q_properties, 0, sizeof(struct queue_properties));
@@ -287,16 +292,40 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 			dev->id);
 
 	if (dev->cwsr_enabled && !p->pqm.tba_addr) {
-		pr_debug("amdkfd:Start vm_mmap, file :0x%p.\n", filep);
-		offset = (args->gpu_id | KFD_MMAP_TYPE_RESERVED_MEM)
-				<< PAGE_SHIFT;
-		p->pqm.tba_addr = (int64_t)vm_mmap(filep, 0,
-			dev->cwsr_size,
-			PROT_READ | PROT_EXEC,
-			MAP_SHARED,
-			offset);
+		if (pdd->cwsr_base) {
+			/* cwsr_base is only set for DGPU */
+			void *cwsr_addr = NULL;
+
+			err = dev->kfd2kgd->alloc_memory_of_gpu(
+				dev->kgd, pdd->cwsr_base, dev->cwsr_size,
+				pdd->vm, (struct kgd_mem **)&mem,
+				NULL, &cwsr_addr, ALLOC_MEM_FLAGS_DGPU_HOST);
+			if (err != 0)
+				goto err_create_queue;
+			pdd->cwsr_mem_handle =
+				kfd_process_device_create_obj_handle(pdd, mem,
+					pdd->cwsr_base, dev->cwsr_size);
+			if (pdd->cwsr_mem_handle < 0)
+				goto err_create_queue;
+			err = _map_memory_to_gpu(dev, mem, p, pdd);
+			if (err)
+				goto err_create_queue;
+			memcpy(cwsr_addr, kmap(dev->cwsr_pages), PAGE_SIZE);
+			kunmap(dev->cwsr_pages);
+			p->pqm.tba_addr = pdd->cwsr_base;
+
+		} else {
+			pr_debug("amdkfd:Start vm_mmap, file :0x%p.\n", filep);
+			offset = (args->gpu_id | KFD_MMAP_TYPE_RESERVED_MEM)
+					<< PAGE_SHIFT;
+			p->pqm.tba_addr = (int64_t)vm_mmap(filep, 0,
+				dev->cwsr_size,
+				PROT_READ | PROT_EXEC,
+				MAP_SHARED,
+				offset);
+		}
 		if (p->pqm.tba_addr < 0) {
-			pr_err("Something wrong during vm_mmap. error -%d.\n",
+			pr_err("Failure to set tba address. error -%d.\n",
 				(int)-p->pqm.tba_addr);
 			p->pqm.tba_addr = 0;
 		} else
@@ -334,6 +363,12 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	return 0;
 
 err_create_queue:
+	if (mem) {
+		pdd->dev->kfd2kgd->unmap_memory_to_gpu(
+				dev->kgd, mem, pdd->vm);
+		pdd->dev->kfd2kgd->free_memory_of_gpu(
+				dev->kgd, mem);
+	}
 err_bind_process:
 	mutex_unlock(&p->mutex);
 	return err;

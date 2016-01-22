@@ -293,12 +293,20 @@
 #define MAKE_LDS_APP_LIMIT(base) \
 	(((uint64_t)(base) & 0xFFFFFFFF00000000UL) | 0xFFFFFFFF)
 
+
+#define DGPU_VM_BASE_DEFAULT 0x100000
+
 int kfd_set_process_dgpu_aperture(struct kfd_process_device *pdd,
 					uint64_t base, uint64_t limit)
 {
+	if (base < (DGPU_VM_BASE_DEFAULT + pdd->dev->cwsr_size)) {
+		pr_err("Set dgpu vm base 0x%llx failed.\n", base);
+		return -EINVAL;
+	}
 	pdd->dgpu_base = base;
 	pdd->dgpu_limit = limit;
-	return  0;
+	pdd->cwsr_base = DGPU_VM_BASE_DEFAULT;
+	return 0;
 }
 
 int kfd_init_apertures(struct kfd_process *process)

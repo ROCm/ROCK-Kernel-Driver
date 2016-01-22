@@ -149,7 +149,6 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 			lower_32_bits(q->ctx_save_restore_area_address);
 		m->cp_hqd_ctx_save_base_addr_hi =
 			upper_32_bits(q->ctx_save_restore_area_address);
-		m->cp_hqd_ctx_save_control = 0x3;
 		m->cp_hqd_ctx_save_size = q->ctx_save_restore_area_size;
 		m->cp_hqd_cntl_stack_size = q->ctl_stack_size;
 		m->cp_hqd_cntl_stack_offset = q->ctl_stack_size;
@@ -231,6 +230,10 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 		m->cp_hqd_pq_control |= CP_HQD_PQ_CONTROL__NO_UPDATE_RPTR_MASK |
 				2 << CP_HQD_PQ_CONTROL__SLOT_BASED_WPTR__SHIFT;
 	}
+	if (q->tba_addr)
+		m->cp_hqd_ctx_save_control =
+			atc_bit << CP_HQD_CTX_SAVE_CONTROL__ATC__SHIFT |
+			mtype << CP_HQD_CTX_SAVE_CONTROL__MTYPE__SHIFT;
 
 	update_cu_mask(mm, mqd, q);
 

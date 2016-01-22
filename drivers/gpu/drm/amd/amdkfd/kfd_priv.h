@@ -553,6 +553,10 @@ struct kfd_process_device {
 	uint64_t dgpu_limit;
 
 	uint64_t sh_hidden_private_base_vmid;
+
+	uint64_t cwsr_base;
+	int  cwsr_mem_handle;
+
 	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
 	bool bound;
 

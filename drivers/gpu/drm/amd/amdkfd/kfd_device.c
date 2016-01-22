@@ -267,10 +267,9 @@ static int kfd_cwsr_init(struct kfd_dev *kfd)
 {
 	/*
 	 * Initialize the CWSR required memory for TBA and TMA
-	 * only support CWSR on CARRIZO with FW version >=625 for now.
+	 * only support CWSR on VI and up with FW version >=625.
 	 */
 	if (cwsr_enable &&
-		(kfd->device_info->asic_family == CHIP_CARRIZO) &&
 		(kfd->mec_fw_version >= KFD_CWSR_CZ_FW_VER)) {
 		void *cwsr_addr = NULL;
 		unsigned int size = sizeof(cwsr_trap_carrizo_hex);
