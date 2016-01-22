@@ -204,7 +204,8 @@ struct transform_funcs {
 
 	bool (*transform_set_pixel_storage_depth)(
 		struct transform *xfm,
-		enum lb_pixel_depth depth);
+		enum lb_pixel_depth depth,
+		const struct bit_depth_reduction_params *bit_depth_params);
 
 	bool (*transform_get_current_pixel_storage_depth)(
 		struct transform *xfm,

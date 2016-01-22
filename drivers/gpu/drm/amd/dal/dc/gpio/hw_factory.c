@@ -56,12 +56,9 @@ bool dal_hw_factory_init(
 	enum dce_version dce_version,
 	enum dce_environment dce_environment)
 {
-	switch (dce_environment) {
-	case DCE_ENV_DIAG_FPGA_MAXIMUS:
+	if (IS_FPGA_MAXIMUS_DC(dce_environment)) {
 		dal_hw_factory_diag_fpga_init(factory);
 		return true;
-	default:
-		break;
 	}
 
 	switch (dce_version) {

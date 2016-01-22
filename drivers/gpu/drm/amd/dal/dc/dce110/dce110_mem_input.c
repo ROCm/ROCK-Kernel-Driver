@@ -842,7 +842,7 @@ void dce110_mem_input_allocate_dmif_buffer(
 	 * 02 - enable DMIF rdreq limit, disable by DMIF stall = 1
 	 * 03 - force enable DMIF rdreq limit, ignore DMIF stall / urgent
 	 */
-	if (!IS_DIAG_MAXIMUS_DC(mi->ctx)) {
+	if (!IS_FPGA_MAXIMUS_DC(mi->ctx->dce_environment)) {
 		addr = mmMC_HUB_RDREQ_DMIF_LIMIT;
 		value = dal_read_reg(mi->ctx, addr);
 
@@ -912,7 +912,7 @@ void dce110_mem_input_deallocate_dmif_buffer(
 	 * 02 - enable dmif rdreq limit, disable by dmif stall=1
 	 * 03 - force enable dmif rdreq limit, ignore dmif stall/urgent
 	 * Stella Wong proposed this change. */
-	if (!IS_DIAG_MAXIMUS_DC(mi->ctx)) {
+	if (!IS_FPGA_MAXIMUS_DC(mi->ctx->dce_environment)) {
 		value = dal_read_reg(mi->ctx, mmMC_HUB_RDREQ_DMIF_LIMIT);
 		if (paths_num > 1)
 			set_reg_field_value(value, 0, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);

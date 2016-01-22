@@ -114,7 +114,8 @@ static bool set_dither(
  */
 static bool program_bit_depth_reduction(
 	struct dce110_transform *xfm110,
-	enum dc_color_depth depth)
+	enum dc_color_depth depth,
+	const struct bit_depth_reduction_params *bit_depth_params)
 {
 	enum dcp_bit_depth_reduction_mode depth_reduction_mode;
 	enum dcp_spatial_dither_mode spatial_dither_mode;
@@ -127,19 +128,27 @@ static bool program_bit_depth_reduction(
 		return false;
 	}
 
-	depth_reduction_mode = DCP_BIT_DEPTH_REDUCTION_MODE_DITHER;
+	if (bit_depth_params->flags.SPATIAL_DITHER_ENABLED) {
+		depth_reduction_mode = DCP_BIT_DEPTH_REDUCTION_MODE_DITHER;
+		frame_random_enable = true;
+		rgb_random_enable = true;
+		highpass_random_enable = true;
+
+	} else {
+		depth_reduction_mode = DCP_BIT_DEPTH_REDUCTION_MODE_DISABLED;
+		frame_random_enable = false;
+		rgb_random_enable = false;
+		highpass_random_enable = false;
+	}
 
 	spatial_dither_mode = DCP_SPATIAL_DITHER_MODE_A_AA_A;
-
-	frame_random_enable = true;
-	rgb_random_enable = true;
-	highpass_random_enable = true;
 
 	if (!set_clamp(xfm110, depth)) {
 		/* Failure in set_clamp() */
 		ASSERT_CRITICAL(false);
 		return false;
 	}
+
 	switch (depth_reduction_mode) {
 	case DCP_BIT_DEPTH_REDUCTION_MODE_DITHER:
 		/*  Spatial Dither: Set round/truncate to bypass (12bit),
@@ -754,7 +763,8 @@ static void set_denormalization(
 
 bool dce110_transform_set_pixel_storage_depth(
 	struct transform *xfm,
-	enum lb_pixel_depth depth)
+	enum lb_pixel_depth depth,
+	const struct bit_depth_reduction_params *bit_depth_params)
 {
 	struct dce110_transform *xfm110 = TO_DCE110_TRANSFORM(xfm);
 	bool ret = true;
@@ -792,7 +802,8 @@ bool dce110_transform_set_pixel_storage_depth(
 
 	if (ret == true) {
 		set_denormalization(xfm110, color_depth);
-		ret = program_bit_depth_reduction(xfm110, color_depth);
+		ret = program_bit_depth_reduction(xfm110, color_depth,
+				bit_depth_params);
 
 		set_reg_field_value(value, 0, LB_DATA_FORMAT, ALPHA_EN);
 		dal_write_reg(

@@ -44,12 +44,6 @@ enum dce_version {
 	DCE_VERSION_MAX
 };
 
-enum dce_environment {
-	DCE_ENV_PRODUCTION_DRV = 0,
-	DCE_ENV_DIAG_FPGA_MAXIMUS, /* Emulation on FPGA, in Maximus System. */
-	DCE_ENV_DIAG_SILICON, /* Emulation on real HW */
-};
-
 /*
  * ASIC Runtime Flags
  */
@@ -182,8 +176,6 @@ struct dc_context {
 
 	enum dce_environment dce_environment;
 };
-
-#define IS_DIAG_MAXIMUS_DC(dcctx) ((dcctx)->dce_environment == DCE_ENV_DIAG_FPGA_MAXIMUS)
 
 /* Wireless display structs */
 
