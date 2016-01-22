@@ -25,7 +25,6 @@
 #ifndef __DAL_MEM_INPUT_H__
 #define __DAL_MEM_INPUT_H__
 
-#include "include/plane_types.h"
 #include "include/grph_object_id.h"
 #include "dc.h"
 

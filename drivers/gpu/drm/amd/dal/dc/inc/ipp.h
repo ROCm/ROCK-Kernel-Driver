@@ -1,3 +1,4 @@
+
 /*
  * Copyright 2015 Advanced Micro Devices, Inc.
  *
@@ -26,7 +27,6 @@
 #ifndef __DAL_IPP_H__
 #define __DAL_IPP_H__
 
-#include "include/plane_types.h"
 #include "include/grph_object_id.h"
 #include "include/grph_csc_types.h"
 #include "include/video_csc_types.h"

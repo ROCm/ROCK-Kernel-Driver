@@ -29,7 +29,6 @@
 
 #include <drm/drmP.h>
 
-struct plane_addr_flip_info;
 struct amdgpu_framebuffer;
 struct amdgpu_display_manager;
 struct dc_validation_set;

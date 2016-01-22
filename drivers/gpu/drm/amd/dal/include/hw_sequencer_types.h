@@ -29,7 +29,6 @@
 #include "signal_types.h"
 #include "grph_object_defs.h"
 #include "link_service_types.h"
-#include "plane_types.h"
 
 struct color_quality {
 	uint32_t bpp_graphics;
