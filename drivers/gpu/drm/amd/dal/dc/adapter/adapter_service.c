@@ -732,6 +732,7 @@ static bool adapter_service_construct(
 		return false;
 	}
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	if (dal_adapter_service_get_dce_version(as) == DCE_VERSION_11_0) {
 		uint32_t i;
 
@@ -744,6 +745,7 @@ static bool adapter_service_construct(
 				feature_entry_table[i].default_value = true;
 		}
 	}
+#endif
 
 	/* Generate feature set table */
 	if (!generate_feature_set(as, init_data->display_param)) {
