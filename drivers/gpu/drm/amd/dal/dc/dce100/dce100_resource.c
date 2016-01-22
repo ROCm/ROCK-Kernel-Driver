@@ -276,6 +276,38 @@ static const struct dce110_stream_enc_registers stream_enc_regs[] = {
 	stream_enc_regs(2)
 };
 
+#define DCFE_MEM_PWR_CTRL_REG_BASE 0x1b03
+
+static const struct dce110_opp_reg_offsets dce100_opp_reg_offsets[] = {
+{
+	.fmt_offset = (mmFMT0_FMT_CONTROL - mmFMT_CONTROL),
+	.dcfe_offset = (mmCRTC0_DCFE_MEM_PWR_CTRL - DCFE_MEM_PWR_CTRL_REG_BASE),
+	.dcp_offset = (mmDCP0_GRPH_CONTROL - mmGRPH_CONTROL),
+},
+{	.fmt_offset = (mmFMT1_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.dcfe_offset = (mmCRTC1_DCFE_MEM_PWR_CTRL - DCFE_MEM_PWR_CTRL_REG_BASE),
+	.dcp_offset = (mmDCP1_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+},
+{	.fmt_offset = (mmFMT2_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.dcfe_offset = (mmCRTC2_DCFE_MEM_PWR_CTRL - DCFE_MEM_PWR_CTRL_REG_BASE),
+	.dcp_offset = (mmDCP2_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+},
+{
+	.fmt_offset = (mmFMT3_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.dcfe_offset = (mmCRTC3_DCFE_MEM_PWR_CTRL - DCFE_MEM_PWR_CTRL_REG_BASE),
+	.dcp_offset = (mmDCP3_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+},
+{	.fmt_offset = (mmFMT4_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.dcfe_offset = (mmCRTC4_DCFE_MEM_PWR_CTRL - DCFE_MEM_PWR_CTRL_REG_BASE),
+	.dcp_offset = (mmDCP4_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+},
+{	.fmt_offset = (mmFMT5_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.dcfe_offset = (mmCRTC5_DCFE_MEM_PWR_CTRL - DCFE_MEM_PWR_CTRL_REG_BASE),
+	.dcp_offset = (mmDCP5_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
+}
+};
+
+
 static struct timing_generator *dce100_timing_generator_create(
 		struct adapter_service *as,
 		struct dc_context *ctx,
@@ -405,8 +437,47 @@ struct link_encoder *dce100_link_encoder_create(
 	return NULL;
 }
 
+
+struct output_pixel_processor *dce100_opp_create(
+	struct dc_context *ctx,
+	uint32_t inst,
+	const struct dce110_opp_reg_offsets *offset)
+{
+	struct dce110_opp *opp =
+		dc_service_alloc(ctx, sizeof(struct dce110_opp));
+
+	if (!opp)
+		return NULL;
+
+	if (dce110_opp_construct(opp,
+			ctx, inst, offset))
+		return &opp->base;
+
+	BREAK_TO_DEBUGGER();
+	dc_service_free(ctx, opp);
+	return NULL;
+}
+
+
+void dce100_opp_destroy(struct output_pixel_processor **opp)
+{
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128_dx);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128_oem);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.axis_x_1025);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.axis_x_256);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coordinates_x);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_regamma);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_resulted);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_oem);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_user);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp));
+	*opp = NULL;
+}
+
 bool dce100_construct_resource_pool(
 	struct adapter_service *adapter_serv,
+	uint8_t num_virtual_links,
 	struct dc *dc,
 	struct resource_pool *pool)
 {
@@ -518,7 +589,7 @@ bool dce100_construct_resource_pool(
 				pool->transforms[i],
 				pool->scaler_filter);
 
-		pool->opps[i] = dce110_opp_create(ctx, i);
+		pool->opps[i] = dce100_opp_create(ctx, i, &dce100_opp_reg_offsets[i]);
 		if (pool->opps[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dal_error(
@@ -583,7 +654,7 @@ audio_create_fail:
 controller_create_fail:
 	for (i = 0; i < pool->controller_count; i++) {
 		if (pool->opps[i] != NULL)
-			dce110_opp_destroy(&pool->opps[i]);
+			dce100_opp_destroy(&pool->opps[i]);
 
 		if (pool->transforms[i] != NULL)
 			dce100_transform_destroy(&pool->transforms[i]);
@@ -625,7 +696,7 @@ void dce100_destruct_resource_pool(struct resource_pool *pool)
 
 	for (i = 0; i < pool->controller_count; i++) {
 		if (pool->opps[i] != NULL)
-			dce110_opp_destroy(&pool->opps[i]);
+			dce100_opp_destroy(&pool->opps[i]);
 
 		if (pool->transforms[i] != NULL)
 			dce100_transform_destroy(&pool->transforms[i]);

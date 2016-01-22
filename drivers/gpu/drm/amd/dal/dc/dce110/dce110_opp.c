@@ -31,41 +31,9 @@
 
 #include "dce110_opp.h"
 
-#define FROM_OPP(opp)\
-	container_of(opp, struct dce110_opp, base)
-
 enum {
 	MAX_LUT_ENTRY = 256,
 	MAX_NUMBER_OF_ENTRIES = 256
-};
-
-static const struct dce110_opp_reg_offsets reg_offsets[] = {
-{
-	.fmt_offset = (mmFMT0_FMT_CONTROL - mmFMT0_FMT_CONTROL),
-	.dcfe_offset = (mmDCFE0_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.dcp_offset = (mmDCP0_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
-},
-{	.fmt_offset = (mmFMT1_FMT_CONTROL - mmFMT0_FMT_CONTROL),
-	.dcfe_offset = (mmDCFE1_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.dcp_offset = (mmDCP1_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
-},
-{	.fmt_offset = (mmFMT2_FMT_CONTROL - mmFMT0_FMT_CONTROL),
-	.dcfe_offset = (mmDCFE2_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.dcp_offset = (mmDCP2_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
-},
-{
-	.fmt_offset = (mmFMT3_FMT_CONTROL - mmFMT0_FMT_CONTROL),
-	.dcfe_offset = (mmDCFE3_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.dcp_offset = (mmDCP3_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
-},
-{	.fmt_offset = (mmFMT4_FMT_CONTROL - mmFMT0_FMT_CONTROL),
-	.dcfe_offset = (mmDCFE4_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.dcp_offset = (mmDCP4_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
-},
-{	.fmt_offset = (mmFMT5_FMT_CONTROL - mmFMT0_FMT_CONTROL),
-	.dcfe_offset = (mmDCFE5_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.dcp_offset = (mmDCP5_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
-}
 };
 
 static void build_evenly_distributed_points(
@@ -115,18 +83,30 @@ static void build_evenly_distributed_points(
 /* Constructor, Destructor               */
 /*****************************************/
 
+struct opp_funcs funcs = {
+		.opp_map_legacy_and_regamma_hw_to_x_user = dce110_opp_map_legacy_and_regamma_hw_to_x_user,
+		.opp_power_on_regamma_lut = dce110_opp_power_on_regamma_lut,
+		.opp_program_bit_depth_reduction = dce110_opp_program_bit_depth_reduction,
+		.opp_program_clamping_and_pixel_encoding = dce110_opp_program_clamping_and_pixel_encoding,
+		.opp_set_csc_adjustment = dce110_opp_set_csc_adjustment,
+		.opp_set_csc_default = dce110_opp_set_csc_default,
+		.opp_set_dyn_expansion = dce110_opp_set_dyn_expansion,
+		.opp_set_regamma = dce110_opp_set_regamma
+};
+
 bool dce110_opp_construct(struct dce110_opp *opp110,
 	struct dc_context *ctx,
-	uint32_t inst)
+	uint32_t inst,
+	const struct dce110_opp_reg_offsets *offsets)
 {
-	if (inst >= ARRAY_SIZE(reg_offsets))
-		return false;
+
+	opp110->base.funcs = &funcs;
 
 	opp110->base.ctx = ctx;
 
 	opp110->base.inst = inst;
 
-	opp110->offsets = reg_offsets[inst];
+	opp110->offsets = *offsets;
 
 	opp110->regamma.hw_points_num = 128;
 	opp110->regamma.coordinates_x = NULL;
@@ -274,36 +254,17 @@ failure_1:
 
 void dce110_opp_destroy(struct output_pixel_processor **opp)
 {
-	dc_service_free((*opp)->ctx, FROM_OPP(*opp)->regamma.coeff128_dx);
-	dc_service_free((*opp)->ctx, FROM_OPP(*opp)->regamma.coeff128_oem);
-	dc_service_free((*opp)->ctx, FROM_OPP(*opp)->regamma.coeff128);
-	dc_service_free((*opp)->ctx, FROM_OPP(*opp)->regamma.axis_x_1025);
-	dc_service_free((*opp)->ctx, FROM_OPP(*opp)->regamma.axis_x_256);
-	dc_service_free((*opp)->ctx, FROM_OPP(*opp)->regamma.coordinates_x);
-	dc_service_free((*opp)->ctx, FROM_OPP(*opp)->regamma.rgb_regamma);
-	dc_service_free((*opp)->ctx, FROM_OPP(*opp)->regamma.rgb_resulted);
-	dc_service_free((*opp)->ctx, FROM_OPP(*opp)->regamma.rgb_oem);
-	dc_service_free((*opp)->ctx, FROM_OPP(*opp)->regamma.rgb_user);
-	dc_service_free((*opp)->ctx, FROM_OPP(*opp));
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128_dx);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128_oem);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.axis_x_1025);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.axis_x_256);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coordinates_x);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_regamma);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_resulted);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_oem);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_user);
+	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp));
 	*opp = NULL;
-}
-
-struct output_pixel_processor *dce110_opp_create(
-	struct dc_context *ctx,
-	uint32_t inst)
-{
-	struct dce110_opp *opp =
-		dc_service_alloc(ctx, sizeof(struct dce110_opp));
-
-	if (!opp)
-		return NULL;
-
-	if (dce110_opp_construct(opp,
-			ctx, inst))
-		return &opp->base;
-
-	BREAK_TO_DEBUGGER();
-	dc_service_free(ctx, opp);
-	return NULL;
 }
 

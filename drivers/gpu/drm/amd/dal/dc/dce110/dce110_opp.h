@@ -28,6 +28,10 @@
 #include "dc_types.h"
 #include "inc/opp.h"
 
+
+#define FROM_DCE11_OPP(opp)\
+	container_of(opp, struct dce110_opp, base)
+
 enum dce110_opp_reg_type {
 	DCE110_OPP_REG_DCP = 0,
 	DCE110_OPP_REG_DCFE,
@@ -89,13 +93,10 @@ struct dce110_opp {
 
 bool dce110_opp_construct(struct dce110_opp *opp110,
 	struct dc_context *ctx,
-	uint32_t inst);
+	uint32_t inst,
+	const struct dce110_opp_reg_offsets *offsets);
 
 void dce110_opp_destroy(struct output_pixel_processor **opp);
-
-struct output_pixel_processor *dce110_opp_create(
-	struct dc_context *ctx,
-	uint32_t inst);
 
 /* REGAMMA RELATED */
 void dce110_opp_power_on_regamma_lut(

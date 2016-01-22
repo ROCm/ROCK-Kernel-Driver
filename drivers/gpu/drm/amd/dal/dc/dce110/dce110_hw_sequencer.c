@@ -182,7 +182,8 @@ static bool set_gamma_ramp(
 	const struct gamma_parameters *params)
 {
 	/*Power on LUT memory*/
-	dce110_opp_power_on_regamma_lut(opp, true);
+	opp->funcs->opp_power_on_regamma_lut(opp, true);
+
 
 	if (params->surface_pixel_format == PIXEL_FORMAT_INDEX8 ||
 		params->selected_gamma_lut == GRAPHICS_GAMMA_LUT_LEGACY) {
@@ -197,10 +198,10 @@ static bool set_gamma_ramp(
 
 		ipp->funcs->ipp_set_degamma(ipp, params, true);
 
-		dce110_opp_set_regamma(opp, ramp, params, true);
+		opp->funcs->opp_set_regamma(opp, ramp, params, true);
 	} else if (params->selected_gamma_lut ==
 			GRAPHICS_GAMMA_LUT_LEGACY_AND_REGAMMA) {
-		if (!dce110_opp_map_legacy_and_regamma_hw_to_x_user(
+		if (!opp->funcs->opp_map_legacy_and_regamma_hw_to_x_user(
 			opp, ramp, params)) {
 			BREAK_TO_DEBUGGER();
 			/* invalid parameters or bug */
@@ -224,11 +225,11 @@ static bool set_gamma_ramp(
 		 * For FP16 or no degamma do by pass */
 		ipp->funcs->ipp_set_degamma(ipp, params, false);
 
-		dce110_opp_set_regamma(opp, ramp, params, false);
+		opp->funcs->opp_set_regamma(opp, ramp, params, false);
 	}
 
 	/*re-enable low power mode for LUT memory*/
-	dce110_opp_power_on_regamma_lut(opp, false);
+	opp->funcs->opp_power_on_regamma_lut(opp, false);
 
 	return true;
 }
@@ -299,11 +300,11 @@ static void program_fmt(
 	/* dithering is affected by <CrtcSourceSelect>, hence should be
 	 * programmed afterwards */
 
-	dce110_opp_program_bit_depth_reduction(
+	opp->funcs->opp_program_bit_depth_reduction(
 		opp,
 		fmt_bit_depth);
 
-	dce110_opp_program_clamping_and_pixel_encoding(
+	opp->funcs->opp_program_clamping_and_pixel_encoding(
 		opp,
 		clamping);
 
@@ -840,7 +841,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 			return DC_ERROR_UNEXPECTED;
 		}
 
-	dce110_opp_set_dyn_expansion(
+	opp->funcs->opp_set_dyn_expansion(
 			opp,
 			COLOR_SPACE_YCBCR601,
 			stream->public.timing.display_color_depth,
@@ -1411,7 +1412,7 @@ static void set_default_colors(
 			build_params->
 			line_buffer_params[path_id][plane_id].depth);*/
 
-	dce110_opp_set_csc_default(opp, &default_adjust);
+	opp->funcs->opp_set_csc_default(opp, &default_adjust);
 }
 
 static void program_scaler(
