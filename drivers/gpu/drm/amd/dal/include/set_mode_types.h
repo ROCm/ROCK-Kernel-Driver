@@ -26,7 +26,6 @@
 #ifndef __DAL_SET_MODE_TYPES_H__
 #define __DAL_SET_MODE_TYPES_H__
 
-#include "include/plane_types.h"
 #include "dc_types.h"
 
 
