@@ -26,6 +26,7 @@
 #ifndef __DAL_BIOS_PARSER_TYPES_H__
 #define __DAL_BIOS_PARSER_TYPES_H__
 
+#include "dc_services.h"
 #include "include/signal_types.h"
 #include "include/grph_object_ctrl_defs.h"
 #include "include/gpio_types.h"

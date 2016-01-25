@@ -1215,7 +1215,7 @@ static void enable_link_hdmi(struct core_stream *stream)
 
 	link->link_enc->funcs->enable_tmds_output(
 			link->link_enc,
-			dal_clock_source_get_id(stream->clock_source),
+			stream->clock_source->id,
 			stream->public.timing.display_color_depth,
 			stream->signal == SIGNAL_TYPE_HDMI_TYPE_A,
 			stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK,

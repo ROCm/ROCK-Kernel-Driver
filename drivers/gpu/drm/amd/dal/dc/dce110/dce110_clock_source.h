@@ -21,35 +21,44 @@
  * Authors: AMD
  *
  */
-#ifndef __DAL_PLL_CLOCK_SOURCE_DCE110_H__
-#define __DAL_PLL_CLOCK_SOURCE_DCE110_H__
 
-#include "../pll_clock_source.h"
-#include "../calc_pll_clock_source.h"
+#ifndef __DC_CLOCK_SOURCE_DCE110_H__
+#define __DC_CLOCK_SOURCE_DCE110_H__
 
-struct pll_clock_source_dce110 {
-	struct pll_clock_source base;
+#include "../inc/clock_source.h"
 
-	struct calc_pll_clock_source calc_pll_clock_source;
-/* object for normal circumstances, SS = 0 or SS >= 0.2% (LVDS or DP)
- * or even for SS =~0.02 (DVI) */
+#define TO_DCE110_CLK_SRC(clk_src)\
+	container_of(clk_src, struct dce110_clk_src, base)
 
-	struct calc_pll_clock_source calc_pll_clock_source_hdmi;
-/* object for HDMI no SS or SS <= 0.06% */
-
-	struct registers *registers;
-
-	uint32_t pixclkx_resync_cntl;
-	uint32_t ppll_fb_div;
-	uint32_t ppll_ref_div;
-	uint32_t ppll_post_div;
-	uint32_t pxpll_ds_cntl;
-	uint32_t pxpll_ss_cntl;
-	uint32_t pxpll_ss_dsfrac;
-	uint32_t pxpll_cntl;
+struct dce110_clk_src_reg_offsets {
+	uint32_t pll_cntl;
+	uint32_t pixclk_resync_cntl;
 };
 
-struct clock_source *dal_pll_clock_source_dce110_create(
-		struct clock_source_init_data *clk_src_init_data);
+struct dce110_clk_src {
+	struct clock_source base;
+	struct dce110_clk_src_reg_offsets offsets;
+	struct dc_bios *bios;
 
-#endif /*__DAL_PLL_CLOCK_SOURCE_DCE110__*/
+	struct spread_spectrum_data *dp_ss_params;
+	uint32_t dp_ss_params_cnt;
+	struct spread_spectrum_data *hdmi_ss_params;
+	uint32_t hdmi_ss_params_cnt;
+	struct spread_spectrum_data *dvi_ss_params;
+	uint32_t dvi_ss_params_cnt;
+
+	uint32_t ext_clk_khz;
+	uint32_t ref_freq_khz;
+
+	struct calc_pll_clock_source calc_pll;
+	struct calc_pll_clock_source calc_pll_hdmi;
+};
+
+bool dce110_clk_src_construct(
+	struct dce110_clk_src *clk_src,
+	struct dc_context *ctx,
+	struct dc_bios *bios,
+	enum clock_source_id,
+	const struct dce110_clk_src_reg_offsets *reg_offsets);
+
+#endif

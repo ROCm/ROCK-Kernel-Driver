@@ -23,21 +23,41 @@
  *
  */
 
-#ifndef __DAL_CLOCK_SOURCE_TYPES_H__
-#define __DAL_CLOCK_SOURCE_TYPES_H__
+#ifndef __DC_CLOCK_SOURCE_H__
+#define __DC_CLOCK_SOURCE_H__
 
-#include "include/signal_types.h"
-#include "include/grph_object_ctrl_defs.h"
+#include "dc_types.h"
+#include "include/grph_object_id.h"
+#include "include/bios_parser_types.h"
+
+struct clock_source;
+
+struct spread_spectrum_data {
+	uint32_t percentage;		/*> In unit of 0.01% or 0.001%*/
+	uint32_t percentage_divider;	/*> 100 or 1000	*/
+	uint32_t freq_range_khz;
+	uint32_t modulation_freq_hz;
+
+	struct spread_spectrum_flags flags;
+};
+
+struct delta_sigma_data {
+	uint32_t feedback_amount;
+	uint32_t nfrac_amount;
+	uint32_t ds_frac_size;
+	uint32_t ds_frac_amount;
+};
 
 /**
- *  ClockSharingLevel
- *  Enumeration for clock sharing support.
- *  Level <x> means sharing supported on all levels below and including <x>
+ *  Pixel Clock Parameters structure
+ *  These parameters are required as input
+ *  when calculating Pixel Clock Dividers for requested Pixel Clock
  */
-enum clock_sharing_level {
-	CLOCK_SHARING_LEVEL_NOT_SHAREABLE = 0,
-	CLOCK_SHARING_LEVEL_DP_MST_SHAREABLE,
-	CLOCK_SHARING_LEVEL_DISPLAY_PORT_SHAREABLE
+struct pixel_clk_flags {
+	uint32_t ENABLE_SS:1;
+	uint32_t DISPLAY_BLANKED:1;
+	uint32_t PROGRAM_PIXEL_CLOCK:1;
+	uint32_t PROGRAM_ID_CLOCK:1;
 };
 
 /**
@@ -54,18 +74,6 @@ struct csdp_ref_clk_ds_params {
  * (not to be mixed with DP IDCLK SS from PLL Settings)*/
 	uint32_t ss_percentage_divider;
 /* DP Reference clock SS percentage divider */
-};
-
-/**
- *  Pixel Clock Parameters structure
- *  These parameters are required as input
- *  when calculating Pixel Clock Dividers for requested Pixel Clock
- */
-struct pixel_clk_flags {
-	uint32_t ENABLE_SS:1;
-	uint32_t DISPLAY_BLANKED:1;
-	uint32_t PROGRAM_PIXEL_CLOCK:1;
-	uint32_t PROGRAM_ID_CLOCK:1;
 };
 
 struct pixel_clk_params {
@@ -108,6 +116,61 @@ struct pll_settings {
 	bool use_external_clk;
 };
 
-#define MAX_PLL_CALC_ERROR 0xFFFFFFFF
+struct calc_pll_clock_source_init_data {
+	struct dc_bios *bp;
+	uint32_t min_pix_clk_pll_post_divider;
+	uint32_t max_pix_clk_pll_post_divider;
+	uint32_t min_pll_ref_divider;
+	uint32_t max_pll_ref_divider;
+	uint32_t min_override_input_pxl_clk_pll_freq_khz;
+/* if not 0, override the firmware info */
+
+	uint32_t max_override_input_pxl_clk_pll_freq_khz;
+/* if not 0, override the firmware info */
+
+	uint32_t num_fract_fb_divider_decimal_point;
+/* number of decimal point for fractional feedback divider value */
+
+	uint32_t num_fract_fb_divider_decimal_point_precision;
+/* number of decimal point to round off for fractional feedback divider value*/
+	struct dc_context *ctx;
+
+};
+
+struct calc_pll_clock_source {
+	uint32_t ref_freq_khz;
+	uint32_t min_pix_clock_pll_post_divider;
+	uint32_t max_pix_clock_pll_post_divider;
+	uint32_t min_pll_ref_divider;
+	uint32_t max_pll_ref_divider;
+
+	uint32_t max_vco_khz;
+	uint32_t min_vco_khz;
+	uint32_t min_pll_input_freq_khz;
+	uint32_t max_pll_input_freq_khz;
+
+	uint32_t fract_fb_divider_decimal_points_num;
+	uint32_t fract_fb_divider_factor;
+	uint32_t fract_fb_divider_precision;
+	uint32_t fract_fb_divider_precision_factor;
+	struct dc_context *ctx;
+};
+
+struct clock_source_funcs {
+	bool (*cs_power_down)(
+			struct clock_source *, enum controller_id);
+	bool (*program_pix_clk)(struct clock_source *,
+			struct pixel_clk_params *, struct pll_settings *);
+	uint32_t (*get_pix_clk_dividers)(
+			struct clock_source *,
+			struct pixel_clk_params *,
+			struct pll_settings *);
+};
+
+struct clock_source {
+	struct clock_source_funcs *funcs;
+	struct dc_context *ctx;
+	enum clock_source_id id;
+};
 
 #endif

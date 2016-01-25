@@ -66,8 +66,7 @@ static bool is_sharable_clk_src(
 	const struct core_stream *stream_with_clk_src,
 	const struct core_stream *stream)
 {
-	enum clock_source_id id = dal_clock_source_get_id(
-					stream_with_clk_src->clock_source);
+	enum clock_source_id id = stream_with_clk_src->clock_source->id;
 
 	if (stream_with_clk_src->clock_source == NULL)
 		return false;

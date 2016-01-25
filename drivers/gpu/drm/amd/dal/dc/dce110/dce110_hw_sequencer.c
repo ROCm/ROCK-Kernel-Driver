@@ -33,13 +33,14 @@
 
 #include "dce110/dce110_resource.h"
 #include "dce110/dce110_timing_generator.h"
-#include "dce110/dce110_link_encoder.h"
-#include "dce110/dce110_stream_encoder.h"
 #include "dce110/dce110_mem_input.h"
-#include "dce110/dce110_ipp.h"
-#include "dce110/dce110_transform.h"
 #include "dce110/dce110_opp.h"
 #include "gpu/dce110/dc_clock_gating_dce110.h"
+#include "ipp.h"
+#include "transform.h"
+#include "stream_encoder.h"
+#include "link_encoder.h"
+#include "inc/clock_source.h"
 
 /* include DCE11 register header files */
 #include "dce/dce_11_0_d.h"
@@ -806,7 +807,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 		core_link_disable_stream(stream->sink->link, stream);
 
 		/*TODO: AUTO check if timing changed*/
-		if (false == dal_clock_source_program_pix_clk(
+		if (false == stream->clock_source->funcs->program_pix_clk(
 				stream->clock_source,
 				&stream->pix_clk_params,
 				&stream->pll_settings)) {
@@ -932,13 +933,9 @@ static void power_down_clock_sources(struct dc *dc)
 	int i;
 
 	for (i = 0; i < dc->res_pool.clk_src_count; i++) {
-		if (false == dal_clock_source_power_down_pll(
-				dc->res_pool.clock_sources[i],
-				i+1)) {
-			dal_error(
-				"Failed to power down pll! (clk src index=%d)\n",
-				i);
-		}
+		if (dc->res_pool.clock_sources[i]->funcs->cs_power_down(
+				dc->res_pool.clock_sources[i], i+1) == false)
+			dal_error("Failed to power down pll! (clk src index=%d)\n", i);
 	}
 }
 
@@ -1200,7 +1197,7 @@ static void dce110_switch_dp_clk_src(
 {
 	uint32_t pixel_rate_cntl_value;
 	uint32_t addr;
-	enum clock_source_id id = dal_clock_source_get_id(stream->clock_source);
+	enum clock_source_id id = stream->clock_source->id;
 
 	/*TODO: proper offset*/
 	addr = mmCRTC0_PIXEL_RATE_CNTL + stream->controller_idx *
@@ -1761,7 +1758,6 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.encoder_create = dce110_link_encoder_create,
 	.encoder_destroy = dce110_link_encoder_destroy,
 	.clock_gating_power_up = dal_dc_clock_gating_dce110_power_up,
-	.transform_power_up = dce110_transform_power_up,
 	.construct_resource_pool = dce110_construct_resource_pool,
 	.destruct_resource_pool = dce110_destruct_resource_pool,
 	.validate_with_context = dce110_validate_with_context,

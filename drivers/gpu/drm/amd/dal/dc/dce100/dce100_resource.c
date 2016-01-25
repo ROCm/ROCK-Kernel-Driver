@@ -37,6 +37,7 @@
 #include "dce110/dce110_transform.h"
 #include "dce110/dce110_stream_encoder.h"
 #include "dce110/dce110_opp.h"
+#include "dce110/dce110_clock_source.h"
 
 #include "dce/dce_10_0_d.h"
 
@@ -131,6 +132,18 @@ static const struct dce110_mem_input_reg_offsets dce100_mi_reg_offsets[] = {
 				- mmDPG_WATERMARK_MASK_CONTROL),
 		.pipe = (mmPIPE5_DMIF_BUFFER_CONTROL
 				- mmPIPE0_DMIF_BUFFER_CONTROL),
+	}
+};
+
+
+static const struct dce110_clk_src_reg_offsets dce100_clk_src_reg_offsets[] = {
+	{
+		.pll_cntl = mmBPHYC_PLL0_PLL_CNTL,
+		.pixclk_resync_cntl  = mmPIXCLK0_RESYNC_CNTL
+	},
+	{
+		.pll_cntl = mmBPHYC_PLL1_PLL_CNTL,
+		.pixclk_resync_cntl  = mmPIXCLK1_RESYNC_CNTL
 	}
 };
 
@@ -486,6 +499,31 @@ void dce100_opp_destroy(struct output_pixel_processor **opp)
 	*opp = NULL;
 }
 
+struct clock_source *dce100_clock_source_create(
+	struct dc_context *ctx,
+	struct dc_bios *bios,
+	enum clock_source_id id,
+	const struct dce110_clk_src_reg_offsets *offsets)
+{
+	struct dce110_clk_src *clk_src =
+		dc_service_alloc(ctx, sizeof(struct dce110_clk_src));
+
+	if (!clk_src)
+		return NULL;
+
+	if (dce110_clk_src_construct(clk_src, ctx, bios, id, offsets))
+		return &clk_src->base;
+
+	BREAK_TO_DEBUGGER();
+	return NULL;
+}
+
+void dce100_clock_source_destroy(struct clock_source **clk_src)
+{
+	dc_service_free((*clk_src)->ctx, TO_DCE110_CLK_SRC(*clk_src));
+	*clk_src = NULL;
+}
+
 bool dce100_construct_resource_pool(
 	struct adapter_service *adapter_serv,
 	uint8_t num_virtual_links,
@@ -493,7 +531,6 @@ bool dce100_construct_resource_pool(
 	struct resource_pool *pool)
 {
 	unsigned int i;
-	struct clock_source_init_data clk_src_init_data = { 0 };
 	struct audio_init_data audio_init_data = { 0 };
 	struct dc_context *ctx = dc->ctx;
 
@@ -506,21 +543,16 @@ bool dce100_construct_resource_pool(
 	pool->stream_engines.engine.ENGINE_ID_DIGE = 1;
 	pool->stream_engines.engine.ENGINE_ID_DIGF = 1;
 
-	clk_src_init_data.as = adapter_serv;
-	clk_src_init_data.ctx = ctx;
-	clk_src_init_data.clk_src_id.enum_id = ENUM_ID_1;
-	clk_src_init_data.clk_src_id.type = OBJECT_TYPE_CLOCK_SOURCE;
+	pool->clock_sources[DCE100_CLK_SRC_PLL0] = dce100_clock_source_create(
+		ctx, dal_adapter_service_get_bios_parser(adapter_serv),
+		CLOCK_SOURCE_ID_PLL0, &dce100_clk_src_reg_offsets[0]);
+	pool->clock_sources[DCE100_CLK_SRC_PLL1] = dce100_clock_source_create(
+		ctx, dal_adapter_service_get_bios_parser(adapter_serv),
+		CLOCK_SOURCE_ID_PLL1, &dce100_clk_src_reg_offsets[1]);
+	pool->clock_sources[DCE100_CLK_SRC_EXT] =  dce100_clock_source_create(
+		ctx, dal_adapter_service_get_bios_parser(adapter_serv),
+		CLOCK_SOURCE_ID_EXTERNAL, &dce100_clk_src_reg_offsets[0]);
 	pool->clk_src_count = DCE100_CLK_SRC_TOTAL;
-
-	clk_src_init_data.clk_src_id.id = CLOCK_SOURCE_ID_PLL0;
-	pool->clock_sources[DCE100_CLK_SRC_PLL0] = dal_clock_source_create(
-							&clk_src_init_data);
-	clk_src_init_data.clk_src_id.id = CLOCK_SOURCE_ID_PLL1;
-	pool->clock_sources[DCE100_CLK_SRC_PLL1] = dal_clock_source_create(
-							&clk_src_init_data);
-	clk_src_init_data.clk_src_id.id = CLOCK_SOURCE_ID_EXTERNAL;
-	pool->clock_sources[DCE100_CLK_SRC_EXT] = dal_clock_source_create(
-							&clk_src_init_data);
 
 	for (i = 0; i < pool->clk_src_count; i++) {
 		if (pool->clock_sources[i] == NULL) {
@@ -696,7 +728,7 @@ disp_clk_create_fail:
 clk_src_create_fail:
 	for (i = 0; i < pool->clk_src_count; i++) {
 		if (pool->clock_sources[i] != NULL)
-			dal_clock_source_destroy(&pool->clock_sources[i]);
+			dce100_clock_source_destroy(&pool->clock_sources[i]);
 	}
 	return false;
 }
@@ -736,7 +768,7 @@ void dce100_destruct_resource_pool(struct resource_pool *pool)
 
 	for (i = 0; i < pool->clk_src_count; i++) {
 		if (pool->clock_sources[i] != NULL)
-			dal_clock_source_destroy(&pool->clock_sources[i]);
+			dce100_clock_source_destroy(&pool->clock_sources[i]);
 	}
 
 	for (i = 0; i < pool->audio_count; i++)	{
@@ -883,7 +915,7 @@ static enum dc_status build_stream_hw_param(struct core_stream *stream)
 	stream->max_hdmi_pixel_clock = 600000;
 
 	get_pixel_clock_parameters(stream, &stream->pix_clk_params);
-	dal_clock_source_get_pix_clk_dividers(
+	stream->clock_source->funcs->get_pix_clk_dividers(
 		stream->clock_source,
 		&stream->pix_clk_params,
 		&stream->pll_settings);
