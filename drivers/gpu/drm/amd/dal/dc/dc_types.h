@@ -63,6 +63,17 @@ enum dce_environment {
 /********************************/
 
 #define MAX_EDID_BUFFER_SIZE 512
+#define MAX_SURFACE_NUM 2
+#define NUM_PIXEL_FORMATS 10
+
+enum surface_color_space {
+	SURFACE_COLOR_SPACE_SRGB = 0x0000,
+	SURFACE_COLOR_SPACE_BT601 = 0x0001,
+	SURFACE_COLOR_SPACE_BT709 = 0x0002,
+	SURFACE_COLOR_SPACE_XVYCC_BT601 = 0x0004,
+	SURFACE_COLOR_SPACE_XVYCC_BT709 = 0x0008,
+	SURFACE_COLOR_SPACE_XRRGB = 0x0010
+};
 
 /*Displayable pixel format in fb*/
 enum surface_pixel_format {
@@ -174,9 +185,6 @@ enum dc_pixel_encoding {
  *  Please increase if pixel_format enum increases
  * num  from  PIXEL_FORMAT_INDEX8 to PIXEL_FORMAT_444BPP32
  */
-#define NUM_PIXEL_FORMATS 10
-
-
 
 union large_integer {
 	struct {
@@ -209,6 +217,11 @@ enum dc_edid_status {
 	EDID_BAD_INPUT,
 	EDID_NO_RESPONSE,
 	EDID_BAD_CHECKSUM,
+};
+
+struct plane_colorimetry {
+	enum surface_color_space color_space;
+	bool limited_range;
 };
 
 /* audio capability from EDID*/
@@ -710,6 +723,47 @@ enum dc_connection_type {
  * returns 0.
  *
  */
+/* TODO: Deprecated */
+enum {
+	RGB_256X3X16 = 256,
+	DX_GAMMA_RAMP_MAX = 1025
+};
+
+enum gamma_ramp_type {
+	GAMMA_RAMP_UNINITIALIZED = 0,
+	GAMMA_RAMP_DEFAULT,
+	GAMMA_RAMP_RBG256X3X16,
+	GAMMA_RAMP_DXGI_1,
+};
+
+struct dxgi_rgb {
+	struct fixed32_32 red;
+	struct fixed32_32 green;
+	struct fixed32_32 blue;
+};
+
+struct gamma_ramp_dxgi_1 {
+	struct dxgi_rgb scale;
+	struct dxgi_rgb offset;
+	struct dxgi_rgb gamma_curve[DX_GAMMA_RAMP_MAX];
+};
+
+struct gamma_ramp_rgb256x3x16 {
+	uint16_t red[RGB_256X3X16];
+	uint16_t green[RGB_256X3X16];
+	uint16_t blue[RGB_256X3X16];
+};
+
+struct gamma_ramp {
+	enum gamma_ramp_type type;
+	union {
+		struct gamma_ramp_rgb256x3x16 gamma_ramp_rgb256x3x16;
+		struct gamma_ramp_dxgi_1 gamma_ramp_dxgi1;
+	};
+	uint32_t size;
+};
+
+
 struct dc_gamma_ramp {
 	uint32_t (*get_gamma_value) (
 			void *context,
@@ -728,6 +782,201 @@ struct dc_csc_adjustments {
 	struct fixed31_32 hue;
 };
 
-#include "dc_temp.h"
+
+enum {
+	MAX_LANES = 2,
+	MAX_COFUNC_PATH = 6,
+	LAYER_INDEX_PRIMARY = -1,
+};
+
+/* Scaling format */
+enum scaling_transformation {
+	SCALING_TRANSFORMATION_UNINITIALIZED,
+	SCALING_TRANSFORMATION_IDENTITY = 0x0001,
+	SCALING_TRANSFORMATION_CENTER_TIMING = 0x0002,
+	SCALING_TRANSFORMATION_FULL_SCREEN_SCALE = 0x0004,
+	SCALING_TRANSFORMATION_PRESERVE_ASPECT_RATIO_SCALE = 0x0008,
+	SCALING_TRANSFORMATION_DAL_DECIDE = 0x0010,
+	SCALING_TRANSFORMATION_INVALID = 0x80000000,
+
+	/* Flag the first and last */
+	SCALING_TRANSFORMATION_BEGING = SCALING_TRANSFORMATION_IDENTITY,
+	SCALING_TRANSFORMATION_END =
+		SCALING_TRANSFORMATION_PRESERVE_ASPECT_RATIO_SCALE
+};
+
+struct view_stereo_3d_support {
+	enum view_3d_format format;
+	struct {
+		uint32_t CLONE_MODE:1;
+		uint32_t SCALING:1;
+		uint32_t SINGLE_FRAME_SW_PACKED:1;
+	} features;
+};
+
+enum tiling_mode {
+	TILING_MODE_INVALID,
+	TILING_MODE_LINEAR,
+	TILING_MODE_TILED,
+	TILING_MODE_COUNT
+};
+
+struct view_position {
+	uint32_t x;
+	uint32_t y;
+};
+
+struct render_mode {
+	struct view view;
+	enum pixel_format pixel_format;
+};
+
+struct pixel_format_support {
+	bool INDEX8 :1;
+	bool RGB565 :1;
+	bool ARGB8888 :1;
+	bool ARGB2101010 :1;
+	bool ARGB2101010_XRBIAS :1;
+	bool FP16 :1;
+};
+
+struct stereo_3d_view {
+	enum view_3d_format view_3d_format;
+	union {
+		uint32_t raw;
+		struct /*stereo_3d_view_flags*/
+		{
+			bool SINGLE_FRAME_SW_PACKED :1;
+			bool EXCLUSIVE_3D :1;
+		} bits;
+	} flags;
+};
+
+/* TODO: Rename to dc_tiling_info */
+union dc_tiling_info {
+
+	struct {
+		/* Specifies the number of memory banks for tiling
+		 *	purposes.
+		 * Only applies to 2D and 3D tiling modes.
+		 *	POSSIBLE VALUES: 2,4,8,16
+		 */
+		uint32_t NUM_BANKS:5;
+		/* Specifies the number of tiles in the x direction
+		 *	to be incorporated into the same bank.
+		 * Only applies to 2D and 3D tiling modes.
+		 *	POSSIBLE VALUES: 1,2,4,8
+		 */
+		uint32_t BANK_WIDTH:4;
+		/* Specifies the number of tiles in the y direction to
+		 *	be incorporated into the same bank.
+		 * Only applies to 2D and 3D tiling modes.
+		 *	POSSIBLE VALUES: 1,2,4,8
+		 */
+		uint32_t BANK_HEIGHT:4;
+		/* Specifies the macro tile aspect ratio. Only applies
+		 * to 2D and 3D tiling modes.
+		 */
+		uint32_t TILE_ASPECT:3;
+		/* Specifies the number of bytes that will be stored
+		 *	contiguously for each tile.
+		 * If the tile data requires more storage than this
+		 *	amount, it is split into multiple slices.
+		 * This field must not be larger than
+		 *	GB_ADDR_CONFIG.DRAM_ROW_SIZE.
+		 * Only applies to 2D and 3D tiling modes.
+		 * For color render targets, TILE_SPLIT >= 256B.
+		 */
+		uint32_t TILE_SPLIT:3;
+		/* Specifies the addressing within a tile.
+		 *	0x0 - DISPLAY_MICRO_TILING
+		 *	0x1 - THIN_MICRO_TILING
+		 *	0x2 - DEPTH_MICRO_TILING
+		 *	0x3 - ROTATED_MICRO_TILING
+		 */
+		uint32_t TILE_MODE:2;
+		/* Specifies the number of pipes and how they are
+		 *	interleaved in the surface.
+		 * Refer to memory addressing document for complete
+		 *	details and constraints.
+		 */
+		uint32_t PIPE_CONFIG:5;
+		/* Specifies the tiling mode of the surface.
+		 * THIN tiles use an 8x8x1 tile size.
+		 * THICK tiles use an 8x8x4 tile size.
+		 * 2D tiling modes rotate banks for successive Z slices
+		 * 3D tiling modes rotate pipes and banks for Z slices
+		 * Refer to memory addressing document for complete
+		 *	details and constraints.
+		 */
+		uint32_t ARRAY_MODE:4;
+	} grph;
+
+
+	struct {
+		/*possible values: 2,4,8,16*/
+		uint32_t NUM_BANKS:5;
+		/*must use enum video_array_mode*/
+		uint32_t ARRAY_MODE:4;
+		/*must use enum addr_pipe_config*/
+		uint32_t PIPE_CONFIG:5;
+		/*possible values 1,2,4,8 */
+		uint32_t BANK_WIDTH_LUMA:4;
+		/*possible values 1,2,4,8 */
+		uint32_t BANK_HEIGHT_LUMA:4;
+		/*must use enum macro_tile_aspect*/
+		uint32_t TILE_ASPECT_LUMA:3;
+		/*must use enum tile_split*/
+		uint32_t TILE_SPLIT_LUMA:3;
+		/*must use micro_tile_mode */
+		uint32_t TILE_MODE_LUMA:2;
+		/*possible values: 1,2,4,8*/
+		uint32_t BANK_WIDTH_CHROMA:4;
+		/*possible values: 1,2,4,8*/
+		uint32_t BANK_HEIGHT_CHROMA:4;
+		/*must use enum macro_tile_aspect*/
+		uint32_t TILE_ASPECT_CHROMA:3;
+		/*must use enum tile_split*/
+		uint32_t TILE_SPLIT_CHROMA:3;
+		/*must use enum micro_tile_mode*/
+		uint32_t TILE_MODE_CHROMA:2;
+
+	} video;
+
+	uint64_t value;
+};
+
+union plane_size {
+	/* Grph or Video will be selected
+	 * based on format above:
+	 * Use Video structure if
+	 * format >= DalPixelFormat_VideoBegin
+	 * else use Grph structure
+	 */
+	struct {
+		struct rect surface_size;
+		/* Graphic surface pitch in pixels.
+		 * In LINEAR_GENERAL mode, pitch
+		 * is 32 pixel aligned.
+		 */
+		uint32_t surface_pitch;
+	} grph;
+
+	struct {
+		struct rect luma_size;
+		/* Graphic surface pitch in pixels.
+		 * In LINEAR_GENERAL mode, pitch is
+		 * 32 pixel aligned.
+		 */
+		uint32_t luma_pitch;
+
+		struct rect chroma_size;
+		/* Graphic surface pitch in pixels.
+		 * In LINEAR_GENERAL mode, pitch is
+		 * 32 pixel aligned.
+		 */
+		uint32_t chroma_pitch;
+	} video;
+};
 
 #endif /* DC_TYPES_H_ */

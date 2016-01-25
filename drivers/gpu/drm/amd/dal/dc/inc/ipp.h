@@ -32,6 +32,7 @@
 #include "include/video_csc_types.h"
 #include "include/hw_sequencer_types.h"
 
+struct dev_c_lut;
 
 #define MAXTRIX_COEFFICIENTS_NUMBER 12
 #define MAXTRIX_COEFFICIENTS_WRAP_NUMBER (MAXTRIX_COEFFICIENTS_NUMBER + 4)

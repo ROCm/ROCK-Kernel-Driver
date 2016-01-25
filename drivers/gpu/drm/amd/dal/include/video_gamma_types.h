@@ -27,6 +27,7 @@
 #define __DAL_VIDEO_GAMMA_TYPES_H__
 
 #include "set_mode_types.h"
+#include "gamma_types.h"
 
 enum overlay_gamma_adjust {
 	OVERLAY_GAMMA_ADJUST_BYPASS,

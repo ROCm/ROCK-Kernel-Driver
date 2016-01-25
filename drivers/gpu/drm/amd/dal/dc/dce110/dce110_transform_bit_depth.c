@@ -30,7 +30,7 @@
 #include "dce/dce_11_0_sh_mask.h"
 
 #include "dce110_transform.h"
-
+#include "opp.h"
 #include "include/logger_interface.h"
 #include "include/fixed32_32.h"
 

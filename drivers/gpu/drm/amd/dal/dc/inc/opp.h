@@ -26,13 +26,73 @@
 #ifndef __DAL_OPP_H__
 #define __DAL_OPP_H__
 
-#include "dc_temp.h"
+#include "dc_types.h"
 #include "grph_object_id.h"
 #include "grph_csc_types.h"
+#include "dc_services_types.h"
 
 struct fixed31_32;
+struct gamma_parameters;
 
 /* TODO: Need cleanup */
+
+enum clamping_range {
+	CLAMPING_FULL_RANGE = 0,	   /* No Clamping */
+	CLAMPING_LIMITED_RANGE_8BPC,   /* 8  bpc: Clamping 1  to FE */
+	CLAMPING_LIMITED_RANGE_10BPC, /* 10 bpc: Clamping 4  to 3FB */
+	CLAMPING_LIMITED_RANGE_12BPC, /* 12 bpc: Clamping 10 to FEF */
+	/* Use programmable clampping value on FMT_CLAMP_COMPONENT_R/G/B. */
+	CLAMPING_LIMITED_RANGE_PROGRAMMABLE
+};
+
+struct clamping_and_pixel_encoding_params {
+	enum dc_pixel_encoding pixel_encoding; /* Pixel Encoding */
+	enum clamping_range clamping_level; /* Clamping identifier */
+	enum dc_color_depth c_depth; /* Deep color use. */
+};
+
+struct bit_depth_reduction_params {
+	struct {
+		/* truncate/round */
+		/* trunc/round enabled*/
+		uint32_t TRUNCATE_ENABLED:1;
+		/* 2 bits: 0=6 bpc, 1=8 bpc, 2 = 10bpc*/
+		uint32_t TRUNCATE_DEPTH:2;
+		/* truncate or round*/
+		uint32_t TRUNCATE_MODE:1;
+
+		/* spatial dither */
+		/* Spatial Bit Depth Reduction enabled*/
+		uint32_t SPATIAL_DITHER_ENABLED:1;
+		/* 2 bits: 0=6 bpc, 1 = 8 bpc, 2 = 10bpc*/
+		uint32_t SPATIAL_DITHER_DEPTH:2;
+		/* 0-3 to select patterns*/
+		uint32_t SPATIAL_DITHER_MODE:2;
+		/* Enable RGB random dithering*/
+		uint32_t RGB_RANDOM:1;
+		/* Enable Frame random dithering*/
+		uint32_t FRAME_RANDOM:1;
+		/* Enable HighPass random dithering*/
+		uint32_t HIGHPASS_RANDOM:1;
+
+		/* temporal dither*/
+		 /* frame modulation enabled*/
+		uint32_t FRAME_MODULATION_ENABLED:1;
+		/* same as for trunc/spatial*/
+		uint32_t FRAME_MODULATION_DEPTH:2;
+		/* 2/4 gray levels*/
+		uint32_t TEMPORAL_LEVEL:1;
+		uint32_t FRC25:2;
+		uint32_t FRC50:2;
+		uint32_t FRC75:2;
+	} flags;
+
+	uint32_t r_seed_value;
+	uint32_t b_seed_value;
+	uint32_t g_seed_value;
+};
+
+
 
 enum wide_gamut_regamma_mode {
 	/*  0x0  - BITS2:0 Bypass */

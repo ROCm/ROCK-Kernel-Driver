@@ -30,6 +30,7 @@
 #include "dce/dce_11_0_sh_mask.h"
 
 #include "dce110_opp.h"
+#include "gamma_types.h"
 
 #define DCP_REG(reg)\
 	(reg + opp110->offsets.dcp_offset)

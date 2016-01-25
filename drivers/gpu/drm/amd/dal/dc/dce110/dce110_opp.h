@@ -27,7 +27,9 @@
 
 #include "dc_types.h"
 #include "inc/opp.h"
+#include "gamma_types.h"
 
+struct gamma_parameters;
 
 #define FROM_DCE11_OPP(opp)\
 	container_of(opp, struct dce110_opp, base)

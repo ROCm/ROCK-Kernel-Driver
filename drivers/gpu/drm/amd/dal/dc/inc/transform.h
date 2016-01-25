@@ -31,6 +31,8 @@
 #include "calcs/scaler_filter.h"
 #include "grph_object_id.h"
 
+struct bit_depth_reduction_params;
+
 enum scaling_type {
 	SCALING_TYPE_NO_SCALING = 0,
 	SCALING_TYPE_UPSCALING,

@@ -30,6 +30,7 @@
 #include "dce/dce_11_0_sh_mask.h"
 
 #include "dce110_opp.h"
+#include "gamma_types.h"
 
 enum {
 	MAX_LUT_ENTRY = 256,
