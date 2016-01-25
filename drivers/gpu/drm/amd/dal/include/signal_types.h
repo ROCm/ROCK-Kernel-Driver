@@ -26,8 +26,6 @@
 #ifndef __DC_SIGNAL_TYPES_H__
 #define __DC_SIGNAL_TYPES_H__
 
-#include "dal_services_types.h"
-
 enum signal_type {
 	SIGNAL_TYPE_NONE		= 0L,		/* no signal */
 	SIGNAL_TYPE_DVI_SINGLE_LINK	= (1 << 0),

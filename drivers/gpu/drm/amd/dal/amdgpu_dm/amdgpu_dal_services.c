@@ -30,7 +30,7 @@
 #include <drm/drm_crtc_helper.h>
 #include <drm/amdgpu_drm.h>
 #include "amdgpu.h"
-#include "dal_services.h"
+#include "dc_services.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_irq.h"
 #include "amdgpu_dm_types.h"

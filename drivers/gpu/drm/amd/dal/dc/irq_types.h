@@ -26,8 +26,6 @@
 #ifndef __DAL_IRQ_TYPES_H__
 #define __DAL_IRQ_TYPES_H__
 
-#include "dal_services_types.h"
-
 struct dc_context;
 
 typedef void (*interrupt_handler)(void *);

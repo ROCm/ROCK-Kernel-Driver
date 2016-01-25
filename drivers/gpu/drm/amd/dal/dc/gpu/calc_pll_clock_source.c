@@ -22,7 +22,7 @@
  *
  */
 
-#include "dal_services.h"
+#include "dc_services.h"
 
 #include "calc_pll_clock_source.h"
 #include "include/bios_parser_interface.h"

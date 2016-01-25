@@ -23,6 +23,8 @@
  *
  */
 
+#include "dc_services_types.h"
+
 #include "virtual_link_encoder.h"
 
 #define VIRTUAL_MAX_PIXEL_CLK_IN_KHZ 600000

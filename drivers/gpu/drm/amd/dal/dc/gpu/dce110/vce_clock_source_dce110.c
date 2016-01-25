@@ -21,7 +21,7 @@
  * Authors: AMD
  *
  */
-#include "dal_services.h"
+#include "dc_services.h"
 #include "vce_clock_source_dce110.h"
 #include "include/clock_source_types.h"
 #include "include/bios_parser_interface.h"

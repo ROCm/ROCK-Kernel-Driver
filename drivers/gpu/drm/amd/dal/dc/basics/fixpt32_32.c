@@ -23,7 +23,7 @@
  *
  */
 
-#include "dal_services.h"
+#include "dc_services.h"
 #include "include/fixed32_32.h"
 
 static uint64_t u64_div(uint64_t n, uint64_t d)

@@ -23,8 +23,9 @@
  *
  */
 
-#include "virtual_stream_encoder.h"
 #include "dc_services.h"
+
+#include "virtual_stream_encoder.h"
 
 static void virtual_stream_encoder_dp_set_stream_attribute(
 	struct stream_encoder *enc,

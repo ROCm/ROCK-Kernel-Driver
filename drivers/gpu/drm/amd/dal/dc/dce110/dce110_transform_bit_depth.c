@@ -23,7 +23,7 @@
  *
  */
 
-#include "dal_services.h"
+#include "dc_services.h"
 
 /* include DCE11 register header files */
 #include "dce/dce_11_0_d.h"

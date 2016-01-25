@@ -31,15 +31,19 @@
 #define __DC_SERVICES_H__
 
 /* TODO: remove when DC is complete. */
-#include "dal_services_types.h"
+#include "dc_services_types.h"
 #include "logger_interface.h"
 #include "include/dal_types.h"
 #include "irq_types.h"
-#include "dal_power_interface_types.h"
 #include "link_service_types.h"
+
+#undef DEPRECATED
 
 /* if the pointer is not NULL, the allocated memory is zeroed */
 void *dc_service_alloc(struct dc_context *ctx, uint32_t size);
+
+/* reallocate memory. The contents will remain unchanged.*/
+void *dc_service_realloc(struct dc_context *ctx, const void *ptr, uint32_t size);
 
 void dc_service_free(struct dc_context *ctx, void *p);
 
@@ -49,6 +53,8 @@ void dc_service_memmove(void *dst, const void *src, uint32_t size);
 
 /* TODO: rename to dc_memcmp*/
 int32_t dal_memcmp(const void *p1, const void *p2, uint32_t count);
+
+int32_t dal_strncmp(const int8_t *p1, const int8_t *p2, uint32_t count);
 
 irq_handler_idx dc_service_register_interrupt(
 	struct dc_context *ctx,
@@ -61,9 +67,181 @@ void dc_service_unregister_interrupt(
 	enum dc_irq_source irq_source,
 	irq_handler_idx handler_idx);
 
+/*
+ *
+ * GPU registers access
+ *
+ */
+static inline uint32_t dal_read_reg(
+	const struct dc_context *ctx,
+	uint32_t address)
+{
+	uint32_t value = cgs_read_register(ctx->cgs_device, address);
+
+#if defined(__DAL_REGISTER_LOGGER__)
+	if (true == dal_reg_logger_should_dump_register()) {
+		dal_reg_logger_rw_count_increment();
+		DRM_INFO("%s 0x%x 0x%x\n", __func__, address, value);
+	}
+#endif
+	return value;
+}
+
+static inline void dal_write_reg(
+	const struct dc_context *ctx,
+	uint32_t address,
+	uint32_t value)
+{
+#if defined(__DAL_REGISTER_LOGGER__)
+	if (true == dal_reg_logger_should_dump_register()) {
+		dal_reg_logger_rw_count_increment();
+		DRM_INFO("%s 0x%x 0x%x\n", __func__, address, value);
+	}
+#endif
+	cgs_write_register(ctx->cgs_device, address, value);
+}
+
+static inline uint32_t dal_read_index_reg(
+	const struct dc_context *ctx,
+	enum cgs_ind_reg addr_space,
+	uint32_t index)
+{
+	return cgs_read_ind_register(ctx->cgs_device, addr_space, index);
+}
+
+static inline void dal_write_index_reg(
+	const struct dc_context *ctx,
+	enum cgs_ind_reg addr_space,
+	uint32_t index,
+	uint32_t value)
+{
+	cgs_write_ind_register(ctx->cgs_device, addr_space, index, value);
+}
+
+static inline uint32_t get_reg_field_value_ex(
+	uint32_t reg_value,
+	uint32_t mask,
+	uint8_t shift)
+{
+	return (mask & reg_value) >> shift;
+}
+
+#define get_reg_field_value(reg_value, reg_name, reg_field)\
+	get_reg_field_value_ex(\
+		(reg_value),\
+		reg_name ## __ ## reg_field ## _MASK,\
+		reg_name ## __ ## reg_field ## __SHIFT)
+
+static inline uint32_t set_reg_field_value_ex(
+	uint32_t reg_value,
+	uint32_t value,
+	uint32_t mask,
+	uint8_t shift)
+{
+	return (reg_value & ~mask) | (mask & (value << shift));
+}
+
+#define set_reg_field_value(reg_value, value, reg_name, reg_field)\
+	(reg_value) = set_reg_field_value_ex(\
+		(reg_value),\
+		(value),\
+		reg_name ## __ ## reg_field ## _MASK,\
+		reg_name ## __ ## reg_field ## __SHIFT)
+
+/*
+ * atombios services
+ */
+
+bool dal_exec_bios_cmd_table(
+	struct dc_context *ctx,
+	uint32_t index,
+	void *params);
+
+#ifdef BUILD_DAL_TEST
+uint32_t dal_bios_cmd_table_para_revision(
+struct dc_context *ctx,
+	uint32_t index);
+
+bool dal_bios_cmd_table_revision(
+	struct dc_context *ctx,
+	uint32_t index,
+	uint8_t *frev,
+	uint8_t *crev);
+#endif
+
+#ifndef BUILD_DAL_TEST
+static inline uint32_t dal_bios_cmd_table_para_revision(
+	struct dc_context *ctx,
+	uint32_t index)
+{
+	uint8_t frev;
+	uint8_t crev;
+
+	if (cgs_atom_get_cmd_table_revs(
+			ctx->cgs_device,
+			index,
+			&frev,
+			&crev) != 0)
+		return 0;
+
+	return crev;
+}
+#else
+uint32_t dal_bios_cmd_table_para_revision(
+		struct dc_context *ctx,
+		uint32_t index);
+#endif
+
 /**************************************
  * Power Play (PP) interfaces
  **************************************/
+
+enum dal_to_power_clocks_state {
+	PP_CLOCKS_STATE_INVALID,
+	PP_CLOCKS_STATE_ULTRA_LOW,
+	PP_CLOCKS_STATE_LOW,
+	PP_CLOCKS_STATE_NOMINAL,
+	PP_CLOCKS_STATE_PERFORMANCE
+};
+
+/* clocks in khz */
+struct dal_to_power_info {
+	enum dal_to_power_clocks_state required_clock;
+	uint32_t min_sclk;
+	uint32_t min_mclk;
+	uint32_t min_deep_sleep_sclk;
+};
+
+/* clocks in khz */
+struct power_to_dal_info {
+	uint32_t min_sclk;
+	uint32_t max_sclk;
+	uint32_t min_mclk;
+	uint32_t max_mclk;
+};
+
+/* clocks in khz */
+struct dal_system_clock_range {
+	uint32_t min_sclk;
+	uint32_t max_sclk;
+
+	uint32_t min_mclk;
+	uint32_t max_mclk;
+
+	uint32_t min_dclk;
+	uint32_t max_dclk;
+
+	/* Wireless Display */
+	uint32_t min_eclk;
+	uint32_t max_eclk;
+};
+
+/* clocks in khz */
+struct dal_to_power_dclk {
+	uint32_t optimal; /* input: best optimizes for stutter efficiency */
+	uint32_t minimal; /* input: the lowest clk that DAL can support */
+	uint32_t established; /* output: the actually set one */
+};
 
 /* DAL calls this function to notify PP about clocks it needs for the Mode Set.
  * This is done *before* it changes DCE clock.
@@ -224,9 +402,50 @@ bool dc_service_pp_apply_display_requirements(
 
 void dc_service_sleep_in_milliseconds(struct dc_context *ctx, uint32_t milliseconds);
 
-/* end of power component calls */
-
 void dc_service_delay_in_microseconds(struct dc_context *ctx, uint32_t microseconds);
+
+enum platform_method {
+	PM_GET_AVAILABLE_METHODS = 1 << 0,
+	PM_GET_LID_STATE = 1 << 1,
+	PM_GET_EXTENDED_BRIGHNESS_CAPS = 1 << 2
+};
+
+struct platform_info_params {
+	enum platform_method method;
+	void *data;
+};
+
+struct platform_info_brightness_caps {
+	uint8_t ac_level_percentage;
+	uint8_t dc_level_percentage;
+};
+
+struct platform_info_ext_brightness_caps {
+	struct platform_info_brightness_caps basic_caps;
+	struct data_point {
+		uint8_t luminance;
+		uint8_t	signal_level;
+	} data_points[99];
+
+	uint8_t	data_points_num;
+	uint8_t	min_input_signal;
+	uint8_t	max_input_signal;
+};
+
+bool dal_get_platform_info(
+	struct dc_context *ctx,
+	struct platform_info_params *params);
+
+/*
+ *
+ * print-out services
+ *
+ */
+#define dal_log_to_buffer(buffer, size, fmt, args)\
+	vsnprintf(buffer, size, fmt, args)
+
+long dal_get_pid(void);
+long dal_get_tgid(void);
 
 /*
  *

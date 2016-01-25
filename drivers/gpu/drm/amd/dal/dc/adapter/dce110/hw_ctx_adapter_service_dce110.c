@@ -23,7 +23,7 @@
  *
  */
 
-#include "dal_services.h"
+#include "dc_services.h"
 #include "../hw_ctx_adapter_service.h"
 
 #include "hw_ctx_adapter_service_dce110.h"

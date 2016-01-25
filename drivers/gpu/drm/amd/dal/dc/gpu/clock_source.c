@@ -23,7 +23,7 @@
  *
  */
 
-#include "dal_services.h"
+#include "dc_services.h"
 
 #include "include/adapter_service_interface.h"
 #include "include/bios_parser_interface.h"
