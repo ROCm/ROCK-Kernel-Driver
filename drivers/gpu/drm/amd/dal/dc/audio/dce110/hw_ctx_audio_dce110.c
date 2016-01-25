@@ -23,7 +23,7 @@
  *
  */
 
-#include "dal_services.h"
+#include "dc_services.h"
 #include "include/logger_interface.h"
 #include "../hw_ctx_audio.h"
 #include "hw_ctx_audio_dce110.h"

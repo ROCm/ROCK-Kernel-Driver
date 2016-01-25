@@ -8,7 +8,6 @@
 #ifndef LINK_ENCODER_H_
 #define LINK_ENCODER_H_
 
-#include "dal_services_types.h"
 #include "grph_object_defs.h"
 #include "signal_types.h"
 #include "dc_types.h"

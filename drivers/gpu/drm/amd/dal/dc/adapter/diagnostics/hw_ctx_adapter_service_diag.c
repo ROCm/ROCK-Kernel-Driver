@@ -25,7 +25,7 @@
 
 /* FPGA Diagnostics version of AS HW CTX. */
 
-#include "dal_services.h"
+#include "dc_services.h"
 
 #include "../hw_ctx_adapter_service.h"
 

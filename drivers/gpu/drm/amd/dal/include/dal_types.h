@@ -26,7 +26,6 @@
 #ifndef __DAL_TYPES_H__
 #define __DAL_TYPES_H__
 
-#include "dal_services_types.h"
 #include "signal_types.h"
 #include "dc_types.h"
 

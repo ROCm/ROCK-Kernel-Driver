@@ -24,7 +24,7 @@
  */
 
 #include <drm/drm_atomic_helper.h>
-#include "dal_services.h"
+#include "dc_services.h"
 #include "amdgpu.h"
 #include "amdgpu_dm_types.h"
 #include "amdgpu_dm_mst_types.h"

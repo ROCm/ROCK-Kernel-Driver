@@ -23,7 +23,7 @@
  *
  */
 
-#include "dal_services.h"
+#include "dc_services.h"
 #include "core_types.h"
 #include "link_encoder.h"
 #include "stream_encoder.h"

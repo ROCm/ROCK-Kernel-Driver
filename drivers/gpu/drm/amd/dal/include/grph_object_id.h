@@ -26,8 +26,6 @@
 #ifndef __DAL_GRPH_OBJECT_ID_H__
 #define __DAL_GRPH_OBJECT_ID_H__
 
-#include "dal_services_types.h"
-
 /* Types of graphics objects */
 enum object_type {
 	OBJECT_TYPE_UNKNOWN  = 0,

@@ -23,6 +23,8 @@
  *
  */
 
+#include "dc_services.h"
+
 #include "dce110/dce110_hw_sequencer.h"
 
 #include "resource.h"

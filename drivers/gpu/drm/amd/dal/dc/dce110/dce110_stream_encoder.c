@@ -23,7 +23,7 @@
  *
  */
 
-#include "dal_services.h"
+#include "dc_services.h"
 #include "dc_bios_types.h"
 #include "dce110_stream_encoder.h"
 #include "dce/dce_11_0_d.h"

@@ -26,8 +26,6 @@
 #ifndef __DAL_LINK_SERVICE_TYPES_H__
 #define __DAL_LINK_SERVICE_TYPES_H__
 
-#include "dal_services_types.h"
-
 #include "grph_object_id.h"
 #include "dpcd_defs.h"
 #include "dal_types.h"

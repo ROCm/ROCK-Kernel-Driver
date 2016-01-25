@@ -27,7 +27,7 @@
  * Pre-requisites: headers required by header of this unit
  */
 
-#include "dal_services.h"
+#include "dc_services.h"
 #include "include/gpio_types.h"
 #include "../hw_factory.h"
 

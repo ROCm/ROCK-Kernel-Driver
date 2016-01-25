@@ -23,7 +23,8 @@
  *
  */
 
-#include "dal_services.h"
+#include "dc_services.h"
+
 #include "include/adapter_service_interface.h"
 #include "include/i2caux_interface.h"
 #include "include/ddc_service_interface.h"
@@ -33,7 +34,6 @@
 #include "include/logger_interface.h"
 #include "ddc_i2caux_helper.h"
 #include "ddc_service.h"
-#include "dal_services_types.h"
 
 #define AUX_POWER_UP_WA_DELAY 500
 #define I2C_OVER_AUX_DEFER_WA_DELAY 70

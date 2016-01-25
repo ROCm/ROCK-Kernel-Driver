@@ -23,7 +23,7 @@
  *
  */
 
-#include "dal_services.h"
+#include "dc_services.h"
 #include "atom.h"
 
 #include "include/bios_parser_types.h"

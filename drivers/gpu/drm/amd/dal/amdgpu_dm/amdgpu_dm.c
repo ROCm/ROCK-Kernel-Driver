@@ -23,7 +23,7 @@
  *
  */
 
-#include "dal_services_types.h"
+#include "dc_services_types.h"
 #include "dc.h"
 
 #include "vid.h"

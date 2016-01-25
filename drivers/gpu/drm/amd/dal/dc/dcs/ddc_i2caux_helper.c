@@ -23,7 +23,7 @@
  *
  */
 
-#include "dal_services.h"
+#include "dc_services.h"
 #include "ddc_i2caux_helper.h"
 #include "include/ddc_service_types.h"
 #include "include/vector.h"
