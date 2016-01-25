@@ -1599,11 +1599,28 @@ static int kfd_ioctl_set_process_dgpu_aperture(struct file *filep,
 		struct kfd_process *p, void *data)
 {
 	struct kfd_ioctl_set_process_dgpu_aperture_args *args = data;
+	struct kfd_dev *dev;
+	struct kfd_process_device *pdd;
+	long err;
 
-	kfd_set_process_dgpu_aperture(args->node_id, p, args->dgpu_base,
+	dev = kfd_device_by_id(args->gpu_id);
+	if (dev == NULL)
+		return -EINVAL;
+
+	mutex_lock(&p->mutex);
+
+	pdd = kfd_bind_process_to_device(dev, p);
+	if (IS_ERR(pdd) < 0) {
+		err = PTR_ERR(pdd);
+		goto exit;
+	}
+
+	err = kfd_set_process_dgpu_aperture(pdd, args->dgpu_base,
 			args->dgpu_limit);
 
-	return 0;
+exit:
+	mutex_unlock(&p->mutex);
+	return err;
 }
 
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \

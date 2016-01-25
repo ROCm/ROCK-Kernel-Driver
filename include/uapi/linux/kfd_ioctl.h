@@ -296,7 +296,7 @@ struct kfd_ioctl_open_graphic_handle_args {
 };
 
 struct kfd_ioctl_set_process_dgpu_aperture_args {
-	uint32_t node_id;
+	uint32_t gpu_id;
 	uint64_t dgpu_base;
 	uint64_t dgpu_limit;
 };

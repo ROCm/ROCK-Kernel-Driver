@@ -709,8 +709,8 @@ int kgd2kfd_resume(struct kfd_dev *kfd);
 
 /* amdkfd Apertures */
 int kfd_init_apertures(struct kfd_process *process);
-void kfd_set_process_dgpu_aperture(uint32_t node_id,
-		struct kfd_process *process, uint64_t base, uint64_t limit);
+int kfd_set_process_dgpu_aperture(struct kfd_process_device *pdd,
+				uint64_t base, uint64_t limit);
 
 /* Queue Context Management */
 inline uint32_t lower_32(uint64_t x);
