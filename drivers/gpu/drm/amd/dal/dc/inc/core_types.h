@@ -66,7 +66,7 @@ void enable_surface_flip_reporting(struct dc_surface *dc_surface,
 #include "grph_object_id.h"
 #include "link_encoder.h"
 #include "stream_encoder.h"
-#include "clock_source_interface.h"
+#include "clock_source.h"
 #include "audio_interface.h"
 #include "scaler_types.h"
 #include "hw_sequencer_types.h"

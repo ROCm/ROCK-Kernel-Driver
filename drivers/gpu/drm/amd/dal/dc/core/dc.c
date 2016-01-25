@@ -33,7 +33,7 @@
 #include "resource.h"
 
 #include "adapter_service_interface.h"
-#include "clock_source_interface.h"
+#include "clock_source.h"
 #include "dc_bios_types.h"
 
 #include "bandwidth_calcs.h"
