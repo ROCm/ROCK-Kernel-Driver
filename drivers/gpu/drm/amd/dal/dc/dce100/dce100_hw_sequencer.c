@@ -22,35 +22,19 @@
  * Authors: AMD
  *
  */
-#include "dc_services.h"
-#include "core_types.h"
 
-#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
-#include "dce100/dce100_hw_sequencer.h"
-#endif
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 #include "dce110/dce110_hw_sequencer.h"
-#endif
 
-bool dc_construct_hw_sequencer(
-				struct adapter_service *adapter_serv,
-				struct dc *dc)
+#include "resource.h"
+#include "hw_sequencer.h"
+#include "dce100_resource.h"
+
+bool dce100_hw_sequencer_construct(struct dc *dc)
 {
-	enum dce_version dce_ver = dal_adapter_service_get_dce_version(adapter_serv);
+	dce110_hw_sequencer_construct(dc);
+	dc->hwss.construct_resource_pool = dce100_construct_resource_pool;
+	dc->hwss.destruct_resource_pool = dce100_destruct_resource_pool;
 
-	switch (dce_ver)
-	{
-#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
-	case DCE_VERSION_10_0:
-		return dce100_hw_sequencer_construct(dc);
-#endif
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
-	case DCE_VERSION_11_0:
-		return dce110_hw_sequencer_construct(dc);
-#endif
-	default:
-		break;
-	}
-
-	return false;
+	return true;
 }
+
