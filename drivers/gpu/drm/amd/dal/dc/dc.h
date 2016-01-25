@@ -68,7 +68,7 @@ struct dc_surface {
 	struct rect clip_rect;
 
 	union plane_size plane_size;
-	union plane_tiling_info tiling_info;
+	union dc_tiling_info tiling_info;
 	struct plane_colorimetry colorimetry;
 
 	enum surface_pixel_format format;
@@ -351,6 +351,16 @@ struct dc_sink *dc_sink_create(const struct dc_sink_init_data *init_params);
 /*******************************************************************************
  * Cursor interfaces - To manages the cursor within a target
  ******************************************************************************/
+/* TODO: Deprecated once we switch to dc_set_cursor_position */
+bool dc_target_set_cursor_attributes(
+	struct dc_target *dc_target,
+	const struct dc_cursor_attributes *attributes);
+
+bool dc_target_set_cursor_position(
+	struct dc_target *dc_target,
+	const struct dc_cursor_position *position);
+
+/* Newer interfaces  */
 struct dc_cursor {
 	struct dc_plane_address address;
 	struct dc_cursor_attributes attributes;

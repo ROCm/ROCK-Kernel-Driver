@@ -59,6 +59,7 @@ struct dm_connector_state {
 	container_of((x), struct dm_connector_state, base)
 
 #define AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET 1
+#define MAX_TARGET_NUM 6
 
 void amdgpu_dm_encoder_destroy(struct drm_encoder *encoder)
 {
@@ -314,15 +315,6 @@ static int dm_crtc_cursor_move(struct drm_crtc *crtc,
 		return -EINVAL;
 	}
 
-#if BUILD_FEATURE_TIMING_SYNC
-	{
-		struct drm_device *dev = crtc->dev;
-		struct amdgpu_device *adev = dev->dev_private;
-		struct amdgpu_display_manager *dm = &adev->dm;
-
-		dc_print_sync_report(dm->dc);
-	}
-#endif
 	return 0;
 }
 

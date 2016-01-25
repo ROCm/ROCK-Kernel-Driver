@@ -27,6 +27,15 @@
 #define __DC_HW_SEQUENCER_H__
 #include "core_types.h"
 
+struct gamma_parameters;
+
+enum pipe_gating_control {
+	PIPE_GATING_CONTROL_DISABLE = 0,
+	PIPE_GATING_CONTROL_ENABLE,
+	PIPE_GATING_CONTROL_INIT
+};
+
+
 struct hw_sequencer_funcs {
 
 	enum dc_status (*apply_ctx_to_hw)(

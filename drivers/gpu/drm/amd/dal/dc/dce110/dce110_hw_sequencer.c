@@ -30,6 +30,7 @@
 #include "resource.h"
 #include "hw_sequencer.h"
 #include "dc_helpers.h"
+#include "gamma_types.h"
 
 #include "dce110/dce110_resource.h"
 #include "dce110/dce110_timing_generator.h"

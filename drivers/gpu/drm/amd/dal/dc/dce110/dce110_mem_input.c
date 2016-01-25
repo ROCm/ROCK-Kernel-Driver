@@ -179,7 +179,7 @@ static void enable(struct dce110_mem_input *mem_input110)
 
 static void program_tiling(
 	struct dce110_mem_input *mem_input110,
-	const union plane_tiling_info *info,
+	const union dc_tiling_info *info,
 	const enum surface_pixel_format pixel_format)
 {
 	uint32_t value = 0;
@@ -458,7 +458,7 @@ bool dce110_mem_input_program_surface_flip_and_addr(
 bool dce110_mem_input_program_surface_config(
 	struct mem_input *mem_input,
 	enum surface_pixel_format format,
-	union plane_tiling_info *tiling_info,
+	union dc_tiling_info *tiling_info,
 	union plane_size *plane_size,
 	enum dc_rotation_angle rotation)
 {

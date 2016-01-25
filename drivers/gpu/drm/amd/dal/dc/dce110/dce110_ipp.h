@@ -28,6 +28,10 @@
 
 #include "inc/ipp.h"
 
+
+struct gamma_parameters;
+struct dev_c_lut;
+
 #define TO_DCE110_IPP(input_pixel_processor)\
 	container_of(input_pixel_processor, struct dce110_ipp, base)
 

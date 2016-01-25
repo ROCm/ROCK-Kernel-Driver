@@ -55,11 +55,6 @@ struct dc_target_sync_report {
 	uint32_t v_count;
 };
 
-struct dc_sync_report {
-	uint32_t targets_num;
-	struct dc_target_sync_report trg_reports[MAX_TARGET_NUM];
-};
-
 /*******************************************************************************
  * Private functions
  ******************************************************************************/
@@ -794,46 +789,6 @@ void dc_resume(const struct dc *dc)
 		core_link_resume(dc->links[i]);
 }
 
-void dc_print_sync_report(
-	const struct dc *dc)
-{
-	uint32_t i;
-	const struct core_target *core_target;
-	const struct core_stream *core_stream;
-	struct dc_context *dc_ctx = dc->ctx;
-	struct dc_target_sync_report *target_sync_report;
-	struct dc_sync_report sync_report = { 0 };
-
-	if (dc->current_context.target_count > MAX_TARGET_NUM) {
-		DC_ERROR("Target count: %d > %d!\n",
-			dc->current_context.target_count,
-			MAX_TARGET_NUM);
-		return;
-	}
-
-	sync_report.targets_num = dc->current_context.target_count;
-
-	/* Step 1: get data for sync validation */
-	for (i = 0; i < dc->current_context.target_count; i++) {
-
-		core_target = dc->current_context.targets[i];
-		target_sync_report = &sync_report.trg_reports[i];
-		core_stream = DC_STREAM_TO_CORE(core_target->public.streams[0]);
-
-		dc->hwss.get_crtc_positions(
-			core_stream->tg,
-			&target_sync_report->h_count,
-			&target_sync_report->v_count);
-
-		DC_SYNC_INFO("GSL:target[%d]: h: %d\t v: %d\n",
-				i,
-				target_sync_report->h_count,
-				target_sync_report->v_count);
-	}
-
-	/* Step 2: validate that display pipes are synchronized (based on
-	 * data from Step 1). */
-}
 
 bool dc_read_dpcd(
 		struct dc *dc,

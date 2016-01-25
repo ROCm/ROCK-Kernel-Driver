@@ -70,6 +70,7 @@ void enable_surface_flip_reporting(struct dc_surface *dc_surface,
 #include "audio_interface.h"
 #include "scaler_types.h"
 #include "hw_sequencer_types.h"
+#include "opp.h"
 
 #define DC_STREAM_TO_CORE(dc_stream) container_of( \
 	dc_stream, struct core_stream, public)
