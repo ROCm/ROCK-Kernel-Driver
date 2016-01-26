@@ -236,9 +236,18 @@ bool dc_commit_surfaces_to_target(
 	int new_enabled_surface_count = 0;
 
 	if (!dal_adapter_service_is_in_accelerated_mode(
-						dc->res_pool.adapter_srv)) {
+						dc->res_pool.adapter_srv) ||
+			dc->current_context.target_count == 0) {
 		return false;
 	}
+
+	for (i = 0; i < dc->current_context.target_count; i++)
+		if (target == dc->current_context.targets[i])
+			break;
+
+	/* Cannot commit surface to a target that is not commited */
+	if (i == dc->current_context.target_count)
+		return false;
 
 	for (i = 0; i < target->status.surface_count; i++)
 		if (target->status.surfaces[i]->visible)
