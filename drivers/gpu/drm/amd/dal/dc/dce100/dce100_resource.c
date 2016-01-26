@@ -208,7 +208,10 @@ static const struct dce110_link_enc_bl_registers link_enc_bl_regs = {
 static const struct dce110_link_enc_aux_registers link_enc_aux_regs[] = {
 	aux_regs(0),
 	aux_regs(1),
-	aux_regs(2)
+	aux_regs(2),
+	aux_regs(3),
+	aux_regs(4),
+	aux_regs(5)
 };
 
 #define link_regs(id)\
@@ -236,7 +239,11 @@ static const struct dce110_link_enc_aux_registers link_enc_aux_regs[] = {
 static const struct dce110_link_enc_registers link_enc_regs[] = {
 	link_regs(0),
 	link_regs(1),
-	link_regs(2)
+	link_regs(2),
+	link_regs(3),
+	link_regs(4),
+	link_regs(5),
+	link_regs(6)
 };
 
 #define stream_enc_regs(id)\
@@ -273,7 +280,11 @@ static const struct dce110_link_enc_registers link_enc_regs[] = {
 static const struct dce110_stream_enc_registers stream_enc_regs[] = {
 	stream_enc_regs(0),
 	stream_enc_regs(1),
-	stream_enc_regs(2)
+	stream_enc_regs(2),
+	stream_enc_regs(3),
+	stream_enc_regs(4),
+	stream_enc_regs(5),
+	stream_enc_regs(6)
 };
 
 #define DCFE_MEM_PWR_CTRL_REG_BASE 0x1b03
