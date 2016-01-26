@@ -874,8 +874,12 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	mem->promixity_domain = 0;
 	kdev->kfd2kgd->get_local_mem_info(kdev->kgd, &local_mem_info);
 
-	mem->length_low = lower_32_bits(local_mem_info.local_mem_size);
-	mem->length_high = upper_32_bits(local_mem_info.local_mem_size);
+	mem->length_low = lower_32_bits(
+		local_mem_info.local_mem_size_private +
+		local_mem_info.local_mem_size_public);
+	mem->length_high = upper_32_bits(
+		local_mem_info.local_mem_size_private +
+		local_mem_info.local_mem_size_public);
 	mem->width = local_mem_info.vram_width;
 
 	crat_table->length += sub_type_hdr->length;

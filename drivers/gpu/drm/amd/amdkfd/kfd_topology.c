@@ -401,7 +401,8 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 			dev->gpu->kfd2kgd->get_local_mem_info(dev->gpu->kgd,
 				&local_mem_info);
 			sysfs_show_64bit_prop(buffer, "local_mem_size",
-					local_mem_info.local_mem_size);
+				local_mem_info.local_mem_size_private +
+				local_mem_info.local_mem_size_public);
 		}
 		else
 			sysfs_show_64bit_prop(buffer, "local_mem_size",
@@ -860,19 +861,23 @@ static uint32_t kfd_generate_gpu_id(struct kfd_dev *gpu)
 	uint32_t buf[7];
 	int i;
 	struct kfd_local_mem_info local_mem_info;
+	uint64_t local_mem_size;
 
 	if (!gpu)
 		return 0;
 
 	gpu->kfd2kgd->get_local_mem_info(gpu->kgd, &local_mem_info);
 
+	local_mem_size = local_mem_info.local_mem_size_private +
+			local_mem_info.local_mem_size_public;
+
 	buf[0] = gpu->pdev->devfn;
 	buf[1] = gpu->pdev->subsystem_vendor;
 	buf[2] = gpu->pdev->subsystem_device;
 	buf[3] = gpu->pdev->device;
 	buf[4] = gpu->pdev->bus->number;
-	buf[5] = lower_32_bits(local_mem_info.local_mem_size);
-	buf[6] = upper_32_bits(local_mem_info.local_mem_size);
+	buf[5] = lower_32_bits(local_mem_size);
+	buf[6] = upper_32_bits(local_mem_size);
 
 	for (i = 0, hashout = 0; i < 7; i++)
 		hashout ^= hash_32(buf[i], KFD_GPU_ID_HASH_WIDTH);

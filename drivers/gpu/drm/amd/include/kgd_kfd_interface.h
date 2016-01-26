@@ -56,7 +56,8 @@ struct kfd_cu_info {
 
 /* For getting GPU local memory information from KGD */
 struct kfd_local_mem_info {
-	uint64_t local_mem_size;
+	uint64_t local_mem_size_private;
+	uint64_t local_mem_size_public;
 	uint32_t vram_width;
 	uint32_t mem_clk_max;
 };

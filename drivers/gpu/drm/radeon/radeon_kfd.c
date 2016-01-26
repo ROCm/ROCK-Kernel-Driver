@@ -374,7 +374,10 @@ void get_local_mem_info(struct kgd_dev *kgd,
 	BUG_ON(kgd == NULL);
 
 	memset(mem_info, 0, sizeof(*mem_info));
-	mem_info->local_mem_size = rdev->mc.real_vram_size;
+	mem_info->local_mem_size_public = rdev->mc.visible_vram_size;
+			mem_info->local_mem_size_private =
+					rdev->mc.real_vram_size -
+					rdev->mc.visible_vram_size;
 	mem_info->vram_width = rdev->mc.vram_width;
 	mem_info->mem_clk_max = radeon_dpm_get_mclk(rdev, false);
 }
