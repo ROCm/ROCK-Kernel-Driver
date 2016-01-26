@@ -717,7 +717,9 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 	struct ttm_mem_type_manager *man = &bdev->man[mem_type];
 	struct ttm_buffer_object *bo;
 	int ret = -EBUSY, put_count;
+	bool call_try_evict_pinned_mem = true;
 
+try_evict_again:
 	spin_lock(&glob->lru_lock);
 	list_for_each_entry(bo, &man->lru, lru) {
 		ret = __ttm_bo_reserve(bo, false, true, false, NULL);
@@ -740,6 +742,14 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 
 	if (ret) {
 		spin_unlock(&glob->lru_lock);
+		if (call_try_evict_pinned_mem) {
+			call_try_evict_pinned_mem = false;
+			if (bdev->driver->try_evict_pinned_mem) {
+				if (bdev->driver->try_evict_pinned_mem(bdev,
+						place, mem_type))
+					goto try_evict_again;
+			}
+		}
 		return ret;
 	}
 

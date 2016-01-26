@@ -434,6 +434,22 @@ struct ttm_bo_driver {
 	 */
 	int (*io_mem_reserve)(struct ttm_bo_device *bdev, struct ttm_mem_reg *mem);
 	void (*io_mem_free)(struct ttm_bo_device *bdev, struct ttm_mem_reg *mem);
+
+	/**
+	 * try_evict_pinned_mem
+	 *
+	 * Notify driver when TTM failed to evict BOs from LRU.
+	 * this callback is used for drivers that allocates TTM memory that
+	 * pinned as long as the memory mapped to device translation table.
+	 * ttm_bo_driver should unpin BOs that always on pinned state and insert
+	 * those BOs to LRU.
+	 * @place should tell the ttm_bo_driver the amount of size and physical
+	 * place we're to evict memory.
+	 * @mem_type to evict.
+	 * return true if ttm_bo_driver succeeded eviction.
+	 */
+	bool (*try_evict_pinned_mem)(struct ttm_bo_device *bdev,
+			const struct ttm_place *place, uint32_t mem_type);
 };
 
 /**
