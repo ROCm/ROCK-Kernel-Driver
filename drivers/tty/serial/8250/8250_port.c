@@ -370,6 +370,18 @@ static void mem_serial_out(struct uart_port *p, int offset, int value)
 	writeb(value, p->membase + offset);
 }
 
+static void mem16_serial_out(struct uart_port *p, int offset, int value)
+{
+	offset = offset << p->regshift;
+	writew(value, p->membase + offset);
+}
+
+static unsigned int mem16_serial_in(struct uart_port *p, int offset)
+{
+	offset = offset << p->regshift;
+	return readw(p->membase + offset);
+}
+
 static void mem32_serial_out(struct uart_port *p, int offset, int value)
 {
 	offset = offset << p->regshift;
@@ -427,6 +439,11 @@ static void set_io_from_upio(struct uart_port *p)
 		p->serial_out = mem_serial_out;
 		break;
 
+	case UPIO_MEM16:
+		p->serial_in = mem16_serial_in;
+		p->serial_out = mem16_serial_out;
+		break;
+
 	case UPIO_MEM32:
 		p->serial_in = mem32_serial_in;
 		p->serial_out = mem32_serial_out;
@@ -461,6 +478,7 @@ serial_port_out_sync(struct uart_port *p, int offset, int value)
 {
 	switch (p->iotype) {
 	case UPIO_MEM:
+	case UPIO_MEM16:
 	case UPIO_MEM32:
 	case UPIO_MEM32BE:
 	case UPIO_AU:
@@ -2468,6 +2486,7 @@ static int serial8250_request_std_resource(struct uart_8250_port *up)
 	case UPIO_TSI:
 	case UPIO_MEM32:
 	case UPIO_MEM32BE:
+	case UPIO_MEM16:
 	case UPIO_MEM:
 		if (!port->mapbase)
 			break;
@@ -2505,6 +2524,7 @@ static void serial8250_release_std_resource(struct uart_8250_port *up)
 	case UPIO_TSI:
 	case UPIO_MEM32:
 	case UPIO_MEM32BE:
+	case UPIO_MEM16:
 	case UPIO_MEM:
 		if (!port->mapbase)
 			break;

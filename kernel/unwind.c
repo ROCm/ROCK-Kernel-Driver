@@ -431,11 +431,15 @@ void *unwind_add_table(struct module *module,
 
 	init_unwind_table(table, module->name,
 #ifdef CONFIG_DEBUG_SET_MODULE_RONX
-	                  module->module_core, module->core_text_size,
-	                  module->module_init, module->init_text_size,
+	                  module->core_layout.base,
+			  module->core_layout.text_size,
+	                  module->init_layout.base,
+			  module->init_layout.text_size,
 #else
-	                  module->module_core, module->core_size,
-	                  module->module_init, module->init_size,
+	                  module->core_layout.base,
+			  module->core_layout.size,
+	                  module->init_layout.base,
+			  module->init_layout.size,
 #endif
 	                  table_start, table_size,
 	                  NULL, 0);

@@ -272,7 +272,7 @@ static ssize_t mt_show_quirks(struct device *dev,
 			   struct device_attribute *attr,
 			   char *buf)
 {
-	struct hid_device *hdev = container_of(dev, struct hid_device, dev);
+	struct hid_device *hdev = to_hid_device(dev);
 	struct mt_device *td = hid_get_drvdata(hdev);
 
 	return sprintf(buf, "%u\n", td->mtclass.quirks);
@@ -282,7 +282,7 @@ static ssize_t mt_set_quirks(struct device *dev,
 			  struct device_attribute *attr,
 			  const char *buf, size_t count)
 {
-	struct hid_device *hdev = container_of(dev, struct hid_device, dev);
+	struct hid_device *hdev = to_hid_device(dev);
 	struct mt_device *td = hid_get_drvdata(hdev);
 
 	unsigned long val;
@@ -497,6 +497,11 @@ static int mt_touch_input_mapping(struct hid_device *hdev, struct hid_input *hi,
 			mt_store_field(usage, td, hi);
 			return 1;
 		case HID_DG_CONFIDENCE:
+			if (cls->name == MT_CLS_WIN_8 &&
+				field->application == HID_DG_TOUCHPAD) {
+				cls->quirks &= ~MT_QUIRK_ALWAYS_VALID;
+				cls->quirks |= MT_QUIRK_VALID_IS_CONFIDENCE;
+			}
 			mt_store_field(usage, td, hi);
 			return 1;
 		case HID_DG_TIPSWITCH:
