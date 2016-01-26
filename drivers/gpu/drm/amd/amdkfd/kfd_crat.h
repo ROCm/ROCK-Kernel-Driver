@@ -132,13 +132,14 @@ struct crat_subtype_memory {
 	uint8_t		length;
 	uint16_t	reserved;
 	uint32_t	flags;
-	uint32_t	promixity_domain;
+	uint32_t	proximity_domain;
 	uint32_t	base_addr_low;
 	uint32_t	base_addr_high;
 	uint32_t	length_low;
 	uint32_t	length_high;
 	uint32_t	width;
-	uint8_t		reserved2[CRAT_MEMORY_RESERVED_LENGTH];
+	uint8_t		visibility_type; /* for virtual (dGPU) CRAT */
+	uint8_t		reserved2[CRAT_MEMORY_RESERVED_LENGTH - 1];
 };
 
 /*
@@ -298,7 +299,9 @@ struct cdit_header {
 
 int kfd_create_crat_image_acpi(void **crat_image, size_t *size);
 void kfd_destroy_crat_image(void *crat_image);
-int kfd_parse_crat_table(void *crat_image, struct list_head *device_list);
+int kfd_parse_crat_table(void *crat_image,
+		struct list_head *device_list,
+		uint32_t proximity_domain);
 int kfd_create_crat_image_virtual(void **crat_image, size_t *size,
-					int flags, struct kfd_dev *kdev);
+		int flags, struct kfd_dev *kdev, uint32_t proximity_domain);
 #endif /* KFD_CRAT_H_INCLUDED */

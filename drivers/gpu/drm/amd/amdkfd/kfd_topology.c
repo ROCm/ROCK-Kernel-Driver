@@ -29,6 +29,7 @@
 #include <linux/cpufreq.h>
 #include <linux/log2.h>
 #include <linux/dmi.h>
+#include <linux/atomic.h>
 
 #include "kfd_priv.h"
 #include "kfd_crat.h"
@@ -39,6 +40,7 @@ struct list_head topology_device_list;
 static struct kfd_system_properties sys_props;
 
 static DECLARE_RWSEM(topology_lock);
+static atomic_t topology_crat_proximity_domain;
 
 struct kfd_dev *kfd_device_by_id(uint32_t gpu_id)
 {
@@ -401,8 +403,8 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 			dev->gpu->kfd2kgd->get_local_mem_info(dev->gpu->kgd,
 				&local_mem_info);
 			sysfs_show_64bit_prop(buffer, "local_mem_size",
-				local_mem_info.local_mem_size_private +
-				local_mem_info.local_mem_size_public);
+					local_mem_info.local_mem_size_private +
+					local_mem_info.local_mem_size_public);
 		}
 		else
 			sysfs_show_64bit_prop(buffer, "local_mem_size",
@@ -694,11 +696,16 @@ static void kfd_topology_release_sysfs(void)
 }
 
 /* Called with write topology_lock acquired */
-static void kfd_topology_update_device_list(struct list_head *temp_list,
+static int kfd_topology_update_device_list(struct list_head *temp_list,
 					struct list_head *master_list)
 {
-	while (!list_empty(temp_list))
+	int num = 0;
+
+	while (!list_empty(temp_list)) {
 		list_move_tail(temp_list->next, master_list);
+		num++;
+	}
+	return num;
 }
 
 static void kfd_debug_print_topology(void)
@@ -781,6 +788,8 @@ int kfd_topology_init(void)
 	struct list_head temp_topology_device_list;
 	int cpu_only_node = 0;
 	struct kfd_topology_device *kdev;
+	int proximity_domain;
+	int num_nodes;
 
 	/* topology_device_list - Master list of all topology devices
 	 * temp_topology_device_list - temporary list created while parsing CRAT
@@ -796,6 +805,12 @@ int kfd_topology_init(void)
 
 	memset(&sys_props, 0, sizeof(sys_props));
 
+	/* Proximity domains in ACPI CRAT tables start counting at
+	 * 0. The same should be true for virtual CRAT tables created
+	 * at this stage. GPUs added later in kfd_topology_add_device
+	 * use a counter. */
+	proximity_domain = 0;
+
 	/*
 	 * Get the CRAT image from the ACPI. If ACPI doesn't have one
 	 * create a virtual CRAT.
@@ -805,20 +820,24 @@ int kfd_topology_init(void)
 	ret = kfd_create_crat_image_acpi(&crat_image, &image_size);
 	if (ret != 0) {
 		ret = kfd_create_crat_image_virtual(&crat_image, &image_size,
-				COMPUTE_UNIT_CPU, NULL);
+				COMPUTE_UNIT_CPU, NULL,
+				proximity_domain);
 		cpu_only_node = 1;
 	}
 
 	if (ret == 0)
-		ret = kfd_parse_crat_table(crat_image, &temp_topology_device_list);
+		ret = kfd_parse_crat_table(crat_image,
+				&temp_topology_device_list,
+				proximity_domain);
 	else {
 		pr_err("Error getting/creating CRAT table\n");
 		goto err;
 	}
 
 	down_write(&topology_lock);
-	kfd_topology_update_device_list(&temp_topology_device_list,
-					&topology_device_list);
+	num_nodes = kfd_topology_update_device_list(&temp_topology_device_list,
+						    &topology_device_list);
+	atomic_set(&topology_crat_proximity_domain, num_nodes-1);
 	ret = kfd_topology_update_sysfs();
 	up_write(&topology_lock);
 
@@ -859,9 +878,9 @@ static uint32_t kfd_generate_gpu_id(struct kfd_dev *gpu)
 {
 	uint32_t hashout;
 	uint32_t buf[7];
+	uint64_t local_mem_size;
 	int i;
 	struct kfd_local_mem_info local_mem_info;
-	uint64_t local_mem_size;
 
 	if (!gpu)
 		return 0;
@@ -950,6 +969,7 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	struct list_head temp_topology_device_list;
 	void *crat_image = NULL;
 	size_t image_size = 0;
+	int proximity_domain;
 
 	BUG_ON(!gpu);
 
@@ -958,6 +978,9 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	gpu_id = kfd_generate_gpu_id(gpu);
 
 	pr_debug("kfd: Adding new GPU (ID: 0x%x) to topology\n", gpu_id);
+
+	proximity_domain = atomic_inc_return(&
+				topology_crat_proximity_domain);
 
 	/* Check to see if this gpu device exists in the topology_device_list.
 	 * If so, assign the gpu to that device,
@@ -968,9 +991,11 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	dev = kfd_assign_gpu(gpu);
 	if (!dev) {
 		res = kfd_create_crat_image_virtual(&crat_image, &image_size,
-								COMPUTE_UNIT_GPU, gpu);
+				COMPUTE_UNIT_GPU,
+				gpu, proximity_domain);
 		if (res == 0)
-			res = kfd_parse_crat_table(crat_image, &temp_topology_device_list);
+			res = kfd_parse_crat_table(crat_image,
+				&temp_topology_device_list, proximity_domain);
 		else {
 			pr_err("Error in VCRAT for GPU (ID: 0x%x)\n", gpu_id);
 			goto err;

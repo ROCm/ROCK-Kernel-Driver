@@ -141,6 +141,7 @@ struct kfd_iolink_properties {
 struct kfd_topology_device {
 	struct list_head		list;
 	uint32_t			gpu_id;
+	uint32_t			proximity_domain;
 	struct kfd_node_properties	node_props;
 	struct list_head		mem_props;
 	uint32_t			cache_count;
@@ -172,7 +173,8 @@ struct kfd_system_properties {
 	struct attribute	attr_props;
 };
 
-struct kfd_topology_device *kfd_create_topology_device(struct list_head *device_list);
+struct kfd_topology_device *kfd_create_topology_device(
+		struct list_head *device_list);
 void kfd_release_live_view(void);
 
 #endif /* __KFD_TOPOLOGY_H__ */
