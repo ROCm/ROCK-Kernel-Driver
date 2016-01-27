@@ -28,6 +28,15 @@ config DRM_AMD_DAL_DCE11_0
 	 CZ family
 	 for display engine
 
+config DRM_AMD_DAL_DCE10_0
+        bool "VI family"
+        depends on DRM_AMD_DAL
+        help
+         Choose this option
+	 if you want to have
+	 VI family for display
+	 engine.
+
 config DEBUG_KERNEL_DAL
         bool "Enable kgdb break in DAL"
         depends on DRM_AMD_DAL
