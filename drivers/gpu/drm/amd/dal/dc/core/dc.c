@@ -38,8 +38,9 @@
 
 #include "bandwidth_calcs.h"
 #include "include/irq_service_interface.h"
-#include "inc/transform.h"
-#include "../virtual/virtual_link_encoder.h"
+#include "transform.h"
+#include "timing_generator.h"
+#include "virtual/virtual_link_encoder.h"
 
 #include "link_hwss.h"
 #include "link_encoder.h"
@@ -63,12 +64,10 @@ static void destroy_links(struct dc *dc)
 	uint32_t i;
 
 	for (i = 0; i < dc->link_count; i++) {
-
 		if (NULL != dc->links[i])
 			link_destroy(&dc->links[i]);
 	}
 }
-
 
 static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 {
@@ -83,8 +82,10 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 	connectors_num = dcb->funcs->get_connectors_number(dcb);
 
 	if (connectors_num > ENUM_ID_COUNT) {
-		dal_error("DC: Number of connectors %d exceeds maximum of %d!\n",
-				connectors_num, ENUM_ID_COUNT);
+		dal_error(
+			"DC: Number of connectors %d exceeds maximum of %d!\n",
+			connectors_num,
+			ENUM_ID_COUNT);
 		return false;
 	}
 
@@ -93,8 +94,11 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 		return false;
 	}
 
-	dal_output_to_console("DC: %s: connectors_num: physical:%d, virtual:%d\n",
-			__func__, connectors_num, init_params->num_virtual_links);
+	dal_output_to_console(
+		"DC: %s: connectors_num: physical:%d, virtual:%d\n",
+		__func__,
+		connectors_num,
+		init_params->num_virtual_links);
 
 	for (i = 0; i < connectors_num; i++) {
 		struct link_init_data link_init_params = {0};
@@ -105,22 +109,22 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 		link_init_params.connector_index = i;
 		link_init_params.link_index = dc->link_count;
 		link_init_params.dc = dc;
-		link =  link_create(&link_init_params);
+		link = link_create(&link_init_params);
 
 		if (link) {
 			dc->links[dc->link_count] = link;
 			link->dc = dc;
 			++dc->link_count;
-		}
-		else {
+		} else {
 			dal_error("DC: failed to create link!\n");
 		}
 	}
 
 	for (i = 0; i < init_params->num_virtual_links; i++) {
-		struct core_link *link =
-			dc_service_alloc(dc->ctx, sizeof(*link));
-		struct encoder_init_data enc_init = { 0 };
+		struct core_link *link = dc_service_alloc(
+			dc->ctx,
+			sizeof(*link));
+		struct encoder_init_data enc_init = {0};
 
 		if (link == NULL) {
 			BREAK_TO_DEBUGGER();
@@ -134,8 +138,9 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 		link->link_id.type = OBJECT_TYPE_CONNECTOR;
 		link->link_id.id = CONNECTOR_ID_VIRTUAL;
 		link->link_id.enum_id = ENUM_ID_1;
-		link->link_enc =
-			dc_service_alloc(dc->ctx, sizeof(*link->link_enc));
+		link->link_enc = dc_service_alloc(
+			dc->ctx,
+			sizeof(*link->link_enc));
 
 		enc_init.adapter_service = init_params->adapter_srv;
 		enc_init.ctx = init_params->ctx;
@@ -158,6 +163,7 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 failed_alloc:
 	return false;
 }
+
 
 static void init_hw(struct dc *dc)
 {
@@ -198,11 +204,11 @@ static void init_hw(struct dc *dc)
 	for(i = 0; i < dc->res_pool.controller_count; i++) {
 		struct timing_generator *tg = dc->res_pool.timing_generators[i];
 
-		dc->hwss.disable_vga(tg);
+		tg->funcs->disable_vga(tg);
 
 		/* Blank controller using driver code instead of
 		 * command table. */
-		dc->hwss.disable_memory_requests(tg);
+		tg->funcs->set_blank(tg, true);
 	}
 
 	for(i = 0; i < dc->res_pool.audio_count; i++) {
@@ -359,18 +365,12 @@ static bool construct(struct dc *dc, const struct dal_init_data *init_params)
 	if (!dc_construct_hw_sequencer(dc_init_data.adapter_srv, dc))
 		goto hwss_fail;
 
-
-	/* TODO: create all the sub-objects of DC. */
-	if (false == create_links(dc, &dc_init_data))
-		goto create_links_fail;
-
-	if (!dc->hwss.construct_resource_pool(
-			dc_init_data.adapter_srv,
-			dc_init_data.num_virtual_links,
-			dc,
-			&dc->res_pool))
+	if (!dc_construct_resource_pool(
+		dc_init_data.adapter_srv, dc, dc_init_data.num_virtual_links))
 		goto construct_resource_fail;
 
+	if (!create_links(dc, &dc_init_data))
+		goto create_links_fail;
 
 	bw_calcs_init(&dc->bw_dceip, &dc->bw_vbios);
 
@@ -393,7 +393,7 @@ ctx_fail:
 static void destruct(struct dc *dc)
 {
 	destroy_links(dc);
-	dc->hwss.destruct_resource_pool(&dc->res_pool);
+	dc->res_pool.funcs->destruct(&dc->res_pool);
 	dal_logger_destroy(&dc->ctx->logger);
 	dc_service_free(dc->ctx, dc->ctx);
 }
@@ -449,7 +449,8 @@ bool dc_validate_resources(
 	if(context == NULL)
 		goto context_alloc_fail;
 
-	result = dc->hwss.validate_with_context(dc, set, set_count, context);
+	result = dc->res_pool.funcs->validate_with_context(
+						dc, set, set_count, context);
 
 	dc_service_free(dc->ctx, context);
 context_alloc_fail:
@@ -559,7 +560,7 @@ bool dc_commit_targets(
 	if (context == NULL)
 		goto context_alloc_fail;
 
-	result = dc->hwss.validate_with_context(dc, set, target_count, context);
+	result = dc->res_pool.funcs->validate_with_context(dc, set, target_count, context);
 	if (result != DC_OK){
 		BREAK_TO_DEBUGGER();
 		goto fail;
@@ -679,6 +680,7 @@ void dc_flip_surface_addrs(struct dc* dc,
 		surface->public.flip_immediate = flip_addrs[i].flip_immediate;
 
 		dc->hwss.update_plane_address(
+			dc,
 			surface,
 			DC_TARGET_TO_CORE(surface->status.dc_target));
 	}
@@ -788,7 +790,6 @@ void dc_resume(const struct dc *dc)
 	for (i = 0; i < dc->link_count; i++)
 		core_link_resume(dc->links[i]);
 }
-
 
 bool dc_read_dpcd(
 		struct dc *dc,

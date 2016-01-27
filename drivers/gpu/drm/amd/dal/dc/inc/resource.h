@@ -32,6 +32,10 @@
 /* TODO unhardcode, 4 for CZ*/
 #define MEMORY_TYPE_MULTIPLIER 4
 
+bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
+				struct dc *dc,
+				uint8_t num_virtual_links);
+
 void build_scaling_params(
 	const struct dc_surface *surface,
 	struct core_stream *stream);

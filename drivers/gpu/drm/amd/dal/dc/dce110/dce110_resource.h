@@ -31,8 +31,6 @@
 struct adapter_service;
 struct dc;
 struct resource_pool;
-struct dc_validation_set;
-
 
 bool dce110_construct_resource_pool(
 	struct adapter_service *adapter_serv,
@@ -41,19 +39,6 @@ bool dce110_construct_resource_pool(
 	struct resource_pool *pool);
 
 void dce110_destruct_resource_pool(struct resource_pool *pool);
-
-enum dc_status dce110_validate_with_context(
-		const struct dc *dc,
-		const struct dc_validation_set set[],
-		uint8_t set_count,
-		struct validate_context *context);
-
-enum dc_status dce110_validate_bandwidth(
-		const struct dc *dc,
-		struct validate_context *context);
-
-struct link_encoder *dce110_link_encoder_create(
-	const struct encoder_init_data *enc_init_data);
 
 void dce110_link_encoder_destroy(struct link_encoder **enc);
 

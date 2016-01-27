@@ -820,7 +820,6 @@ static bool dce110_clock_source_power_down(
 	return bp_result == BP_RESULT_OK;
 }
 
-
 /*****************************************/
 /* Constructor                           */
 /*****************************************/
