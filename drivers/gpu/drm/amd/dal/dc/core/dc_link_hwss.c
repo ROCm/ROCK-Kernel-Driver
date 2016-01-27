@@ -7,7 +7,7 @@
 #include "include/i2caux_interface.h"
 #include "link_hwss.h"
 #include "hw_sequencer.h"
-#include "include/ddc_service_interface.h"
+#include "dc_link_ddc.h"
 #include "dc_helpers.h"
 #include "dce110/dce110_link_encoder.h"
 #include "dce110/dce110_stream_encoder.h"

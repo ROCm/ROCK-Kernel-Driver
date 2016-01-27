@@ -45,7 +45,7 @@
 #include "link_hwss.h"
 #include "link_encoder.h"
 
-#include "dcs/ddc_service.h"
+#include "dc_link_ddc.h"
 
 /*******************************************************************************
  * Private structures
