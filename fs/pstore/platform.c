@@ -542,7 +542,7 @@ void pstore_get_records(unsigned flags)
 	int			count;
 	enum pstore_type_id	type;
 	struct timespec		time;
-	int			failed = 0, rc;
+	int			failed = 0, rc = 0;
 	bool			compressed;
 	int			unzipped_len = -1;
 
@@ -579,10 +579,8 @@ void pstore_get_records(unsigned flags)
 
 		if (type == PSTORE_TYPE_DMESG) {
 			if (flags & PGR_SYSLOG) {
-				char _fmt[32];
-				snprintf(_fmt, 32, KERN_NOTICE "%%%ds\\n", size);
 				pr_notice("---------- pstore: ----------\n");
-				printk(_fmt, buf);
+				pr_notice("%.*s\n", (int)size, buf);
 				pr_notice("-----------------------------\n");
 			}
 			if (flags & PGR_CLEAR && psi->erase)
