@@ -648,11 +648,12 @@ static bool display_clock_integrated_info_construct(
 {
 	struct integrated_info info;
 	uint32_t i;
-
 	struct display_clock *base = &disp_clk->disp_clk_base;
+	bool res;
 
-	if (!dal_adapter_service_get_integrated_info(as, &info))
-		return false;
+	dc_service_memset(&info, 0, sizeof(struct integrated_info));
+
+	res = dal_adapter_service_get_integrated_info(as, &info);
 
 	disp_clk->dentist_vco_freq_khz = info.dentist_vco_freq;
 	if (disp_clk->dentist_vco_freq_khz == 0)
@@ -660,6 +661,9 @@ static bool display_clock_integrated_info_construct(
 
 	base->min_display_clk_threshold_khz =
 		disp_clk->dentist_vco_freq_khz / 64;
+
+	if (!res)
+		return false;
 
 	/*update the maximum display clock for each power state*/
 	for (i = 0; i < NUMBER_OF_DISP_CLK_VOLTAGE; ++i) {
