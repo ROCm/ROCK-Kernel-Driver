@@ -30,18 +30,18 @@
 #include "resource.h"
 #include "hw_sequencer.h"
 #include "dc_helpers.h"
-#include "gamma_types.h"
+#include "dce110_hw_sequencer.h"
 
-#include "dce110/dce110_resource.h"
-#include "dce110/dce110_timing_generator.h"
-#include "dce110/dce110_mem_input.h"
-#include "dce110/dce110_opp.h"
 #include "gpu/dce110/dc_clock_gating_dce110.h"
+
+#include "timing_generator.h"
+#include "mem_input.h"
+#include "opp.h"
 #include "ipp.h"
 #include "transform.h"
 #include "stream_encoder.h"
 #include "link_encoder.h"
-#include "inc/clock_source.h"
+#include "clock_source.h"
 
 /* include DCE11 register header files */
 #include "dce/dce_11_0_d.h"
@@ -51,20 +51,6 @@ struct dce110_hw_seq_reg_offsets {
 	uint32_t dcfe;
 	uint32_t blnd;
 	uint32_t crtc;
-	uint32_t dcp;
-};
-
-enum crtc_stereo_mixer_mode {
-	HW_STEREO_MIXER_MODE_INACTIVE,
-	HW_STEREO_MIXER_MODE_ROW_INTERLEAVE,
-	HW_STEREO_MIXER_MODE_COLUMN_INTERLEAVE,
-	HW_STEREO_MIXER_MODE_PIXEL_INTERLEAVE,
-	HW_STEREO_MIXER_MODE_BLENDER
-};
-
-struct crtc_mixer_params {
-	bool sub_sampling;
-	enum crtc_stereo_mixer_mode mode;
 };
 
 enum pipe_lock_control {
@@ -82,41 +68,21 @@ enum blender_mode {
 	BLENDER_MODE_STEREO
 };
 
-enum blender_type {
-	BLENDER_TYPE_NON_SINGLE_PIPE = 0,
-	BLENDER_TYPE_SB_SINGLE_PIPE,
-	BLENDER_TYPE_TB_SINGLE_PIPE
-};
-
-enum dc_memory_sleep_state {
-	DC_MEMORY_SLEEP_DISABLE = 0,
-	DC_MEMORY_LIGHT_SLEEP,
-	DC_MEMORY_DEEP_SLEEP,
-	DC_MEMORY_SHUTDOWN
-};
-enum {
-	DCE110_PIPE_UPDATE_PENDING_DELAY = 1000,
-	DCE110_PIPE_UPDATE_PENDING_CHECKCOUNT = 5000
-};
-
 static const struct dce110_hw_seq_reg_offsets reg_offsets[] = {
 {
 	.dcfe = (mmDCFE0_DCFE_MEM_PWR_CTRL - mmDCFE_MEM_PWR_CTRL),
 	.blnd = (mmBLND0_BLND_CONTROL - mmBLND_CONTROL),
 	.crtc = (mmCRTC0_CRTC_GSL_CONTROL - mmCRTC_GSL_CONTROL),
-	.dcp = (mmDCP0_DVMM_PTE_CONTROL - mmDVMM_PTE_CONTROL),
 },
 {
-	.dcfe = (mmDCFE1_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.blnd = (mmBLND1_BLND_CONTROL - mmBLND0_BLND_CONTROL),
-	.crtc = (mmCRTC1_CRTC_GSL_CONTROL - mmCRTC0_CRTC_GSL_CONTROL),
-	.dcp = (mmDCP1_DVMM_PTE_CONTROL - mmDCP0_DVMM_PTE_CONTROL),
+	.dcfe = (mmDCFE1_DCFE_MEM_PWR_CTRL - mmDCFE_MEM_PWR_CTRL),
+	.blnd = (mmBLND1_BLND_CONTROL - mmBLND_CONTROL),
+	.crtc = (mmCRTC1_CRTC_GSL_CONTROL - mmCRTC_GSL_CONTROL),
 },
 {
-	.dcfe = (mmDCFE2_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
-	.blnd = (mmBLND2_BLND_CONTROL - mmBLND0_BLND_CONTROL),
-	.crtc = (mmCRTC2_CRTC_GSL_CONTROL - mmCRTC0_CRTC_GSL_CONTROL),
-	.dcp = (mmDCP2_DVMM_PTE_CONTROL - mmDCP0_DVMM_PTE_CONTROL),
+	.dcfe = (mmDCFE2_DCFE_MEM_PWR_CTRL - mmDCFE_MEM_PWR_CTRL),
+	.blnd = (mmBLND2_BLND_CONTROL - mmBLND_CONTROL),
+	.crtc = (mmCRTC2_CRTC_GSL_CONTROL - mmCRTC_GSL_CONTROL),
 }
 };
 
@@ -129,192 +95,12 @@ static const struct dce110_hw_seq_reg_offsets reg_offsets[] = {
 #define HW_REG_CRTC(reg, id)\
 	(reg + reg_offsets[id].crtc)
 
-#define HW_REG_DCP(reg, id)\
-	(reg + reg_offsets[id].dcp)
-
-
-static void init_pte(struct dc_context *ctx);
 
 /*******************************************************************************
  * Private definitions
  ******************************************************************************/
-
-static void dce110_enable_display_pipe_clock_gating(
-	struct dc_context *ctx,
-	bool clock_gating)
-{
-	/*TODO*/
-}
-
-static bool dce110_enable_display_power_gating(
-	struct dc_context *ctx,
-	uint8_t controller_id,
-	struct dc_bios *dcb,
-	enum pipe_gating_control power_gating)
-{
-	enum bp_result bp_result = BP_RESULT_OK;
-	enum bp_pipe_control_action cntl;
-
-	if (power_gating == PIPE_GATING_CONTROL_INIT)
-		cntl = ASIC_PIPE_INIT;
-	else if (power_gating == PIPE_GATING_CONTROL_ENABLE)
-		cntl = ASIC_PIPE_ENABLE;
-	else
-		cntl = ASIC_PIPE_DISABLE;
-
-	if (!(power_gating == PIPE_GATING_CONTROL_INIT &&
-					(controller_id + 1) != CONTROLLER_ID_D0))
-		bp_result = dcb->funcs->enable_disp_power_gating(
-						dcb, controller_id + 1, cntl);
-
-	if (power_gating != PIPE_GATING_CONTROL_ENABLE)
-		init_pte(ctx);
-
-	if (bp_result == BP_RESULT_OK)
-		return true;
-	else
-		return false;
-}
-
-
-static bool set_gamma_ramp(
-	struct input_pixel_processor *ipp,
-	struct output_pixel_processor *opp,
-	const struct gamma_ramp *ramp,
-	const struct gamma_parameters *params)
-{
-	/*Power on LUT memory*/
-	opp->funcs->opp_power_on_regamma_lut(opp, true);
-
-
-	if (params->surface_pixel_format == PIXEL_FORMAT_INDEX8 ||
-		params->selected_gamma_lut == GRAPHICS_GAMMA_LUT_LEGACY) {
-		/* do legacy DCP for 256 colors if we are requested to do so */
-		ipp->funcs->ipp_set_legacy_input_gamma_ramp(
-			ipp, ramp, params);
-
-		ipp->funcs->ipp_set_legacy_input_gamma_mode(ipp, true);
-
-		/* set bypass */
-		ipp->funcs->ipp_program_prescale(ipp, PIXEL_FORMAT_UNINITIALIZED);
-
-		ipp->funcs->ipp_set_degamma(ipp, params, true);
-
-		opp->funcs->opp_set_regamma(opp, ramp, params, true);
-	} else if (params->selected_gamma_lut ==
-			GRAPHICS_GAMMA_LUT_LEGACY_AND_REGAMMA) {
-		if (!opp->funcs->opp_map_legacy_and_regamma_hw_to_x_user(
-			opp, ramp, params)) {
-			BREAK_TO_DEBUGGER();
-			/* invalid parameters or bug */
-			return false;
-		}
-
-		/* do legacy DCP for 256 colors if we are requested to do so */
-		ipp->funcs->ipp_set_legacy_input_gamma_ramp(
-			ipp, ramp, params);
-
-		ipp->funcs->ipp_set_legacy_input_gamma_mode(ipp, true);
-
-		/* set bypass */
-		ipp->funcs->ipp_program_prescale(ipp, PIXEL_FORMAT_UNINITIALIZED);
-	} else {
-		ipp->funcs->ipp_set_legacy_input_gamma_mode(ipp, false);
-
-		ipp->funcs->ipp_program_prescale(ipp, params->surface_pixel_format);
-
-		/* Do degamma step : remove the given gamma value from FB.
-		 * For FP16 or no degamma do by pass */
-		ipp->funcs->ipp_set_degamma(ipp, params, false);
-
-		opp->funcs->opp_set_regamma(opp, ramp, params, false);
-	}
-
-	/*re-enable low power mode for LUT memory*/
-	opp->funcs->opp_power_on_regamma_lut(opp, false);
-
-	return true;
-}
-
-static enum dc_status bios_parser_crtc_source_select(
-		struct core_stream *stream)
-{
-	struct dc_bios *dcb;
-	/* call VBIOS table to set CRTC source for the HW
-	 * encoder block
-	 * note: video bios clears all FMT setting here. */
-	struct bp_crtc_source_select crtc_source_select = {0};
-	const struct core_sink *sink = stream->sink;
-
-	crtc_source_select.engine_id = stream->stream_enc->id;
-	crtc_source_select.controller_id = stream->controller_idx + 1;
-	/*TODO: Need to un-hardcode color depth, dp_audio and account for
-	 * the case where signal and sink signal is different (translator
-	 * encoder)*/
-	crtc_source_select.signal = sink->public.sink_signal;
-	crtc_source_select.enable_dp_audio = false;
-	crtc_source_select.sink_signal = sink->public.sink_signal;
-	crtc_source_select.display_output_bit_depth = PANEL_8BIT_COLOR;
-
-	dcb = dal_adapter_service_get_bios_parser(sink->link->adapter_srv);
-
-	if (BP_RESULT_OK != dcb->funcs->crtc_source_select(
-		dcb,
-		&crtc_source_select)) {
-		return DC_ERROR_UNEXPECTED;
-	}
-
-	return DC_OK;
-}
-
-static enum color_space surface_color_to_color_space(
-	struct plane_colorimetry *colorimetry)
-{
-	enum color_space color_space = COLOR_SPACE_UNKNOWN;
-
-	switch (colorimetry->color_space) {
-	case SURFACE_COLOR_SPACE_SRGB:
-	case SURFACE_COLOR_SPACE_XRRGB:
-		if (colorimetry->limited_range)
-			color_space = COLOR_SPACE_SRGB_LIMITED_RANGE;
-		else
-			color_space = COLOR_SPACE_SRGB_FULL_RANGE;
-		break;
-	case SURFACE_COLOR_SPACE_BT601:
-	case SURFACE_COLOR_SPACE_XVYCC_BT601:
-		color_space = COLOR_SPACE_YCBCR601;
-		break;
-	case SURFACE_COLOR_SPACE_BT709:
-	case SURFACE_COLOR_SPACE_XVYCC_BT709:
-		color_space = COLOR_SPACE_YCBCR709;
-		break;
-	}
-
-	return color_space;
-}
-
-/*******************************FMT**************************************/
-static void program_fmt(
-		struct output_pixel_processor *opp,
-		struct bit_depth_reduction_params *fmt_bit_depth,
-		struct clamping_and_pixel_encoding_params *clamping)
-{
-	/* dithering is affected by <CrtcSourceSelect>, hence should be
-	 * programmed afterwards */
-
-	opp->funcs->opp_program_bit_depth_reduction(
-		opp,
-		fmt_bit_depth);
-
-	opp->funcs->opp_program_clamping_and_pixel_encoding(
-		opp,
-		clamping);
-
-	return;
-}
-
 /***************************PIPE_CONTROL***********************************/
-static void enable_fe_clock(
+static void dce110_enable_fe_clock(
 	struct dc_context *ctx, uint8_t controller_id, bool enable)
 {
 	uint32_t value = 0;
@@ -333,21 +119,8 @@ static void enable_fe_clock(
 
 	dal_write_reg(ctx, addr, value);
 }
-/*
-static void enable_stereo_mixer(
-	struct dc_context *ctx,
-	const struct crtc_mixer_params *params)
-{
-	TODO
-}
-*/
-static void disable_stereo_mixer(
-	struct dc_context *ctx)
-{
-	/*TODO*/
-}
 
-static void init_pte(struct dc_context *ctx)
+static void dce110_init_pte(struct dc_context *ctx)
 {
 	uint32_t addr;
 	uint32_t value = 0;
@@ -414,21 +187,7 @@ static void init_pte(struct dc_context *ctx)
 	}
 }
 
-/**
- *****************************************************************************
- *  Function: enable_disp_power_gating
- *
- *  @brief
- *     enable or disable power gating
- *
- *  @param [in] enum pipe_gating_control power_gating true - power down,
- *  false - power up
- *****************************************************************************
- */
-
-
 /* this is a workaround for hw bug - it is a trigger on r/w */
-
 static void trigger_write_crtc_h_blank_start_end(
 	struct dc_context *ctx,
 	uint8_t controller_id)
@@ -441,7 +200,7 @@ static void trigger_write_crtc_h_blank_start_end(
 	dal_write_reg(ctx, addr, value);
 }
 
-static bool pipe_control_lock(
+static bool dce110_pipe_control_lock(
 	struct dc_context *ctx,
 	uint8_t controller_idx,
 	uint32_t control_mask,
@@ -586,10 +345,10 @@ static bool pipe_control_lock(
 	return true;
 }
 
-static void set_blender_mode(
+static void dce110_set_blender_mode(
 	struct dc_context *ctx,
 	uint8_t controller_id,
-	enum blender_mode mode)
+	uint32_t mode)
 {
 	uint32_t value;
 	uint32_t addr = HW_REG_BLND(mmBLND_CONTROL, controller_id);
@@ -628,7 +387,209 @@ static void set_blender_mode(
 
 	dal_write_reg(ctx, addr, value);
 }
+
+static void dce110_crtc_switch_to_clk_src(
+				struct clock_source *clk_src, uint8_t crtc_inst)
+{
+	uint32_t pixel_rate_cntl_value;
+	uint32_t addr;
+
+	addr = mmCRTC0_PIXEL_RATE_CNTL + crtc_inst *
+			(mmCRTC1_PIXEL_RATE_CNTL - mmCRTC0_PIXEL_RATE_CNTL);
+
+	pixel_rate_cntl_value = dal_read_reg(clk_src->ctx, addr);
+
+	if (clk_src->id == CLOCK_SOURCE_ID_EXTERNAL)
+		set_reg_field_value(pixel_rate_cntl_value, 1,
+			CRTC0_PIXEL_RATE_CNTL, DP_DTO0_ENABLE);
+	else {
+		set_reg_field_value(pixel_rate_cntl_value,
+				0,
+				CRTC0_PIXEL_RATE_CNTL,
+				DP_DTO0_ENABLE);
+
+		set_reg_field_value(pixel_rate_cntl_value,
+				clk_src->id - 1,
+				CRTC0_PIXEL_RATE_CNTL,
+				CRTC0_PIXEL_RATE_SOURCE);
+	}
+	dal_write_reg(clk_src->ctx, addr, pixel_rate_cntl_value);
+}
 /**************************************************************************/
+
+static void enable_display_pipe_clock_gating(
+	struct dc_context *ctx,
+	bool clock_gating)
+{
+	/*TODO*/
+}
+
+static bool dce110_enable_display_power_gating(
+	struct dc_context *ctx,
+	uint8_t controller_id,
+	struct dc_bios *dcb,
+	enum pipe_gating_control power_gating)
+{
+	enum bp_result bp_result = BP_RESULT_OK;
+	enum bp_pipe_control_action cntl;
+
+	if (power_gating == PIPE_GATING_CONTROL_INIT)
+		cntl = ASIC_PIPE_INIT;
+	else if (power_gating == PIPE_GATING_CONTROL_ENABLE)
+		cntl = ASIC_PIPE_ENABLE;
+	else
+		cntl = ASIC_PIPE_DISABLE;
+
+	if (!(power_gating == PIPE_GATING_CONTROL_INIT && controller_id != 0))
+		bp_result = dcb->funcs->enable_disp_power_gating(
+						dcb, controller_id + 1, cntl);
+
+	if (power_gating != PIPE_GATING_CONTROL_ENABLE)
+		dce110_init_pte(ctx);
+
+	if (bp_result == BP_RESULT_OK)
+		return true;
+	else
+		return false;
+}
+
+
+static bool set_gamma_ramp(
+	struct input_pixel_processor *ipp,
+	struct output_pixel_processor *opp,
+	const struct gamma_ramp *ramp,
+	const struct gamma_parameters *params)
+{
+	/*Power on LUT memory*/
+	opp->funcs->opp_power_on_regamma_lut(opp, true);
+
+
+	if (params->surface_pixel_format == PIXEL_FORMAT_INDEX8 ||
+		params->selected_gamma_lut == GRAPHICS_GAMMA_LUT_LEGACY) {
+		/* do legacy DCP for 256 colors if we are requested to do so */
+		ipp->funcs->ipp_set_legacy_input_gamma_ramp(
+			ipp, ramp, params);
+
+		ipp->funcs->ipp_set_legacy_input_gamma_mode(ipp, true);
+
+		/* set bypass */
+		ipp->funcs->ipp_program_prescale(ipp, PIXEL_FORMAT_UNINITIALIZED);
+
+		ipp->funcs->ipp_set_degamma(ipp, params, true);
+
+		opp->funcs->opp_set_regamma(opp, ramp, params, true);
+	} else if (params->selected_gamma_lut ==
+			GRAPHICS_GAMMA_LUT_LEGACY_AND_REGAMMA) {
+		if (!opp->funcs->opp_map_legacy_and_regamma_hw_to_x_user(
+			opp, ramp, params)) {
+			BREAK_TO_DEBUGGER();
+			/* invalid parameters or bug */
+			return false;
+		}
+
+		/* do legacy DCP for 256 colors if we are requested to do so */
+		ipp->funcs->ipp_set_legacy_input_gamma_ramp(
+			ipp, ramp, params);
+
+		ipp->funcs->ipp_set_legacy_input_gamma_mode(ipp, true);
+
+		/* set bypass */
+		ipp->funcs->ipp_program_prescale(ipp, PIXEL_FORMAT_UNINITIALIZED);
+	} else {
+		ipp->funcs->ipp_set_legacy_input_gamma_mode(ipp, false);
+
+		ipp->funcs->ipp_program_prescale(ipp, params->surface_pixel_format);
+
+		/* Do degamma step : remove the given gamma value from FB.
+		 * For FP16 or no degamma do by pass */
+		ipp->funcs->ipp_set_degamma(ipp, params, false);
+
+		opp->funcs->opp_set_regamma(opp, ramp, params, false);
+	}
+
+	/*re-enable low power mode for LUT memory*/
+	opp->funcs->opp_power_on_regamma_lut(opp, false);
+
+	return true;
+}
+
+static enum dc_status bios_parser_crtc_source_select(
+		struct core_stream *stream)
+{
+	struct dc_bios *dcb;
+	/* call VBIOS table to set CRTC source for the HW
+	 * encoder block
+	 * note: video bios clears all FMT setting here. */
+	struct bp_crtc_source_select crtc_source_select = {0};
+	const struct core_sink *sink = stream->sink;
+
+	crtc_source_select.engine_id = stream->stream_enc->id;
+	crtc_source_select.controller_id = stream->controller_idx + 1;
+	/*TODO: Need to un-hardcode color depth, dp_audio and account for
+	 * the case where signal and sink signal is different (translator
+	 * encoder)*/
+	crtc_source_select.signal = sink->public.sink_signal;
+	crtc_source_select.enable_dp_audio = false;
+	crtc_source_select.sink_signal = sink->public.sink_signal;
+	crtc_source_select.display_output_bit_depth = PANEL_8BIT_COLOR;
+
+	dcb = dal_adapter_service_get_bios_parser(sink->link->adapter_srv);
+
+	if (BP_RESULT_OK != dcb->funcs->crtc_source_select(
+		dcb,
+		&crtc_source_select)) {
+		return DC_ERROR_UNEXPECTED;
+	}
+
+	return DC_OK;
+}
+
+static enum color_space surface_color_to_color_space(
+	struct plane_colorimetry *colorimetry)
+{
+	enum color_space color_space = COLOR_SPACE_UNKNOWN;
+
+	switch (colorimetry->color_space) {
+	case SURFACE_COLOR_SPACE_SRGB:
+	case SURFACE_COLOR_SPACE_XRRGB:
+		if (colorimetry->limited_range)
+			color_space = COLOR_SPACE_SRGB_LIMITED_RANGE;
+		else
+			color_space = COLOR_SPACE_SRGB_FULL_RANGE;
+		break;
+	case SURFACE_COLOR_SPACE_BT601:
+	case SURFACE_COLOR_SPACE_XVYCC_BT601:
+		color_space = COLOR_SPACE_YCBCR601;
+		break;
+	case SURFACE_COLOR_SPACE_BT709:
+	case SURFACE_COLOR_SPACE_XVYCC_BT709:
+		color_space = COLOR_SPACE_YCBCR709;
+		break;
+	}
+
+	return color_space;
+}
+
+/*******************************FMT**************************************/
+static void program_fmt(
+		struct output_pixel_processor *opp,
+		struct bit_depth_reduction_params *fmt_bit_depth,
+		struct clamping_and_pixel_encoding_params *clamping)
+{
+	/* dithering is affected by <CrtcSourceSelect>, hence should be
+	 * programmed afterwards */
+
+	opp->funcs->opp_program_bit_depth_reduction(
+		opp,
+		fmt_bit_depth);
+
+	opp->funcs->opp_program_clamping_and_pixel_encoding(
+		opp,
+		clamping);
+
+	return;
+}
+
 static void update_bios_scratch_critical_state(struct adapter_service *as,
 		bool state)
 {
@@ -968,9 +929,9 @@ static void disable_vga_and_power_gate_all_controllers(
 
 		/* Enable CLOCK gating for each pipe BEFORE controller
 		 * powergating. */
-		dce110_enable_display_pipe_clock_gating(ctx,
+		enable_display_pipe_clock_gating(ctx,
 				true);
-		dce110_enable_display_power_gating(ctx, i, dcb,
+		dc->hwss.enable_display_power_gating(ctx, i, dcb,
 				PIPE_GATING_CONTROL_ENABLE);
 	}
 }
@@ -1181,7 +1142,7 @@ static void set_safe_displaymarks(struct validate_context *context)
 	}
 }
 
-static void dce110_program_bw(struct dc *dc, struct validate_context *context)
+static void program_bw(struct dc *dc, struct validate_context *context)
 {
 	set_safe_displaymarks(context);
 	/*TODO: when pplib works*/
@@ -1191,46 +1152,8 @@ static void dce110_program_bw(struct dc *dc, struct validate_context *context)
 	set_displaymarks(dc, context);
 }
 
-/*TODO: break out clock sources like timing gen/ encoder*/
-static void dce110_switch_dp_clk_src(
-	const struct dc_context *ctx,
-	const struct core_stream *stream)
-{
-	uint32_t pixel_rate_cntl_value;
-	uint32_t addr;
-	enum clock_source_id id = stream->clock_source->id;
-
-	/*TODO: proper offset*/
-	addr = mmCRTC0_PIXEL_RATE_CNTL + stream->controller_idx *
-			(mmCRTC1_PIXEL_RATE_CNTL - mmCRTC0_PIXEL_RATE_CNTL);
-
-	pixel_rate_cntl_value = dal_read_reg(ctx, addr);
-
-	if (id == CLOCK_SOURCE_ID_EXTERNAL) {
-
-		if (!get_reg_field_value(pixel_rate_cntl_value,
-				CRTC0_PIXEL_RATE_CNTL, DP_DTO0_ENABLE)) {
-
-			set_reg_field_value(pixel_rate_cntl_value, 1,
-				CRTC0_PIXEL_RATE_CNTL, DP_DTO0_ENABLE);
-		}
-
-	} else {
-		set_reg_field_value(pixel_rate_cntl_value,
-				0,
-				CRTC0_PIXEL_RATE_CNTL,
-				DP_DTO0_ENABLE);
-
-		set_reg_field_value(pixel_rate_cntl_value,
-				id - 1,
-				CRTC0_PIXEL_RATE_CNTL,
-				CRTC0_PIXEL_RATE_SOURCE);
-	}
-	dal_write_reg(ctx, addr, pixel_rate_cntl_value);
-}
-
 static void switch_dp_clock_sources(
-	const struct dc_context *ctx,
+	const struct dc *dc,
 	struct validate_context *val_context)
 {
 	uint8_t i, j;
@@ -1253,7 +1176,8 @@ static void switch_dp_clock_sources(
 					stream->clock_source = clk_src;
 					reference_clock_source(
 						&val_context->res_ctx, clk_src);
-					dce110_switch_dp_clk_src(ctx, stream);
+					dc->hwss.crtc_switch_to_clk_src(
+						clk_src, stream->opp->inst);
 				}
 			}
 		}
@@ -1287,7 +1211,7 @@ static enum dc_status apply_ctx_to_hw(
 		dcb = dal_adapter_service_get_bios_parser(
 				context->res_ctx.pool.adapter_srv);
 
-		dce110_enable_display_power_gating(
+		dc->hwss.enable_display_power_gating(
 				dc->ctx, i, dcb,
 				PIPE_GATING_CONTROL_DISABLE);
 	}
@@ -1319,7 +1243,7 @@ static enum dc_status apply_ctx_to_hw(
 	update_bios_scratch_critical_state(context->res_ctx.pool.adapter_srv,
 			false);
 
-	switch_dp_clock_sources(dc->ctx, context);
+	switch_dp_clock_sources(dc, context);
 
 	return DC_OK;
 }
@@ -1442,23 +1366,12 @@ static void program_scaler(
 			false);
 }
 
-static void configure_locking(struct dc_context *ctx, uint8_t controller_id)
-{
-	/* main controller should be in mode 0 (master pipe) */
-	pipe_control_lock(
-			ctx,
-			controller_id,
-			PIPE_LOCK_CONTROL_MODE,
-			false);
-
-	/* TODO: for MPO finish the non-root controllers */
-}
-
 /**
  * Program the Front End of the Pipe.
  * The Back End was already programmed by Set Mode.
  */
 static bool set_plane_config(
+	const struct dc *dc,
 	struct core_surface *surface,
 	struct core_target *target)
 {
@@ -1478,11 +1391,15 @@ static bool set_plane_config(
 	enum color_space input_color_space =
 					surface_color_to_color_space(&(surface->public.colorimetry));
 
-	configure_locking(ctx, controller_idx);
+	dc->hwss.pipe_control_lock(
+			ctx,
+			controller_idx,
+			PIPE_LOCK_CONTROL_MODE,
+			false);
 
 	/* While a non-root controller is programmed we
 	 * have to lock the root controller. */
-	pipe_control_lock(
+	dc->hwss.pipe_control_lock(
 			ctx,
 			controller_idx,
 			PIPE_LOCK_CONTROL_GRAPHICS |
@@ -1493,7 +1410,7 @@ static bool set_plane_config(
 
 	tg->funcs->program_timing(tg, dc_crtc_timing, false);
 
-	enable_fe_clock(ctx, controller_idx, true);
+	dc->hwss.enable_fe_clock(ctx, controller_idx, true);
 
 	set_default_colors(
 			ipp,
@@ -1507,7 +1424,7 @@ static bool set_plane_config(
 	program_scaler(
 		controller_idx, tg, xfm, surface, core_stream);
 
-	set_blender_mode(
+	dc->hwss.set_blender_mode(
 			ctx,
 			controller_idx,
 			BLENDER_MODE_CURRENT_PIPE);
@@ -1519,7 +1436,7 @@ static bool set_plane_config(
 			&surface->public.plane_size,
 			surface->public.rotation);
 
-	pipe_control_lock(
+	dc->hwss.pipe_control_lock(
 			ctx,
 			controller_idx,
 			PIPE_LOCK_CONTROL_GRAPHICS |
@@ -1532,6 +1449,7 @@ static bool set_plane_config(
 }
 
 static bool update_plane_address(
+	const struct dc *dc,
 	const struct core_surface *surface,
 	struct core_target *target)
 {
@@ -1542,7 +1460,7 @@ static bool update_plane_address(
 	uint8_t controller_id = core_stream->controller_idx;
 
 	/* TODO: crtc should be per surface, NOT per-target */
-	pipe_control_lock(
+	dc->hwss.pipe_control_lock(
 		ctx,
 		controller_id,
 		PIPE_LOCK_CONTROL_SURFACE,
@@ -1553,7 +1471,7 @@ static bool update_plane_address(
 		mi, &surface->public.address, surface->public.flip_immediate))
 		return false;
 
-	pipe_control_lock(
+	dc->hwss.pipe_control_lock(
 		ctx,
 		controller_id,
 		PIPE_LOCK_CONTROL_SURFACE,
@@ -1562,7 +1480,9 @@ static bool update_plane_address(
 	return true;
 }
 
-static void reset_single_stream_hw_ctx(struct core_stream *stream,
+static void reset_single_stream_hw_ctx(
+		const struct dc *dc,
+		struct core_stream *stream,
 		struct validate_context *context)
 {
 	struct dc_bios *dcb;
@@ -1583,9 +1503,8 @@ static void reset_single_stream_hw_ctx(struct core_stream *stream,
 	stream->mi->funcs->mem_input_deallocate_dmif_buffer(
 			stream->mi, context->target_count);
 	stream->xfm->funcs->transform_set_scaler_bypass(stream->xfm);
-	disable_stereo_mixer(stream->ctx);
 	unreference_clock_source(&context->res_ctx, stream->clock_source);
-	dce110_enable_display_power_gating(
+	dc->hwss.enable_display_power_gating(
 			stream->ctx, stream->controller_idx, dcb,
 			PIPE_GATING_CONTROL_ENABLE);
 }
@@ -1608,7 +1527,7 @@ static void reset_hw_ctx(struct dc *dc,
 				.flags.timing_changed)
 			continue;
 
-		reset_single_stream_hw_ctx(core_stream, &dc->current_context);
+		reset_single_stream_hw_ctx(dc, core_stream, &dc->current_context);
 	}
 }
 
@@ -1708,68 +1627,25 @@ static void enable_timing_synchronization(
 	DC_SYNC_INFO("GSL: Set-up complete.\n");
 }
 
-static void get_crtc_positions(struct timing_generator *tg,
-		int32_t *h_position, int32_t *v_position)
-{
-	tg->funcs->get_position(tg, h_position, v_position);
-}
-
-static bool enable_memory_request(struct timing_generator *tg)
-{
-	return tg->funcs->set_blank(tg, false);
-}
-
-static bool disable_memory_requests(struct timing_generator *tg)
-{
-	return tg->funcs->set_blank(tg, true);
-}
-
-static uint32_t get_vblank_counter(struct timing_generator *tg)
-{
-	return tg->funcs->get_frame_count(tg);
-}
-
-static void disable_vga(struct timing_generator *tg)
-{
-	tg->funcs->disable_vga(tg);
-}
-
-static void set_mst_bandwidth(struct stream_encoder *stream_enc,
-	struct fixed31_32 avg_time_slots_per_mtp)
-{
-	stream_enc->funcs->set_mst_bandwidth(stream_enc,
-		avg_time_slots_per_mtp);
-}
-
-
 static const struct hw_sequencer_funcs dce110_funcs = {
 	.apply_ctx_to_hw = apply_ctx_to_hw,
 	.reset_hw_ctx = reset_hw_ctx,
 	.set_plane_config = set_plane_config,
 	.update_plane_address = update_plane_address,
-	.enable_memory_requests = enable_memory_request,
-	.disable_memory_requests = disable_memory_requests,
 	.set_gamma_ramp = set_gamma_ramp,
 	.power_down = power_down,
 	.enable_accelerated_mode = enable_accelerated_mode,
-	.get_crtc_positions = get_crtc_positions,
-	.get_vblank_counter = get_vblank_counter,
 	.enable_timing_synchronization = enable_timing_synchronization,
-	.disable_vga = disable_vga,
-	.encoder_create = dce110_link_encoder_create,
-	.encoder_destroy = dce110_link_encoder_destroy,
-	.clock_gating_power_up = dal_dc_clock_gating_dce110_power_up,
-	.construct_resource_pool = dce110_construct_resource_pool,
-	.destruct_resource_pool = dce110_destruct_resource_pool,
-	.validate_with_context = dce110_validate_with_context,
-	.validate_bandwidth = dce110_validate_bandwidth,
-	.enable_display_pipe_clock_gating =
-		dce110_enable_display_pipe_clock_gating,
-	.enable_display_power_gating = dce110_enable_display_power_gating,
-	.program_bw = dce110_program_bw,
+	.program_bw = program_bw,
 	.enable_stream = enable_stream,
 	.disable_stream = disable_stream,
-	.set_mst_bandwidth = set_mst_bandwidth,
+	.enable_display_pipe_clock_gating = enable_display_pipe_clock_gating,
+	.crtc_switch_to_clk_src = dce110_crtc_switch_to_clk_src,
+	.enable_display_power_gating = dce110_enable_display_power_gating,
+	.enable_fe_clock = dce110_enable_fe_clock,
+	.pipe_control_lock = dce110_pipe_control_lock,
+	.set_blender_mode = dce110_set_blender_mode,
+	.clock_gating_power_up = dal_dc_clock_gating_dce110_power_up,/*todo*/
 };
 
 bool dce110_hw_sequencer_construct(struct dc *dc)

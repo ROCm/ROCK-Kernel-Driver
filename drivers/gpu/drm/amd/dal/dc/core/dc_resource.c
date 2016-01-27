@@ -31,6 +31,33 @@
 #include "opp.h"
 #include "transform.h"
 
+#include "dce100/dce100_resource.h"
+#include "dce110/dce110_resource.h"
+
+bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
+				struct dc *dc,
+				uint8_t num_virtual_links)
+{
+	enum dce_version dce_ver = dal_adapter_service_get_dce_version(adapter_serv);
+
+	switch (dce_ver) {
+#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
+	case DCE_VERSION_10_0:
+		return dce100_construct_resource_pool(
+			adapter_serv, num_virtual_links, dc, &dc->res_pool);
+#endif
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
+	case DCE_VERSION_11_0:
+		return dce110_construct_resource_pool(
+			adapter_serv, num_virtual_links, dc, &dc->res_pool);
+#endif
+	default:
+		break;
+	}
+
+	return false;
+}
+
 void unreference_clock_source(
 		struct resource_context *res_ctx,
 		struct clock_source *clock_source)
@@ -512,7 +539,6 @@ void pplib_apply_display_requirements(
 
 	pp_display_cfg.avail_mclk_switch_time_us =
 						get_min_vblank_time_us(context);
-	/* TODO: dce11.2*/
 	pp_display_cfg.avail_mclk_switch_time_in_disp_active_us = 0;
 
 	pp_display_cfg.disp_clk_khz = context->bw_results.dispclk_khz;

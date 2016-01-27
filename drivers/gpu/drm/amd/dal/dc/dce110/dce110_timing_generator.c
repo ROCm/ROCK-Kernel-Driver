@@ -35,8 +35,8 @@
 #include "include/grph_object_id.h"
 #include "include/adapter_service_interface.h"
 #include "include/logger_interface.h"
-#include "inc/timing_generator_types.h"
 #include "dce110_timing_generator.h"
+#include "../inc/timing_generator.h"
 
 enum black_color_format {
 	BLACK_COLOR_FORMAT_RGB_FULLRANGE = 0,	/* used as index in array */

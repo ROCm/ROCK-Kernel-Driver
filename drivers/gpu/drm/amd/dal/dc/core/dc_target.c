@@ -27,6 +27,7 @@
 #include "hw_sequencer.h"
 #include "resource.h"
 #include "ipp.h"
+#include "timing_generator.h"
 
 #define COEFF_RANGE	3
 #define REGAMMA_COEFF_A0	31308
@@ -280,7 +281,8 @@ bool dc_commit_surfaces_to_target(
 				new_surfaces[i],
 				DC_STREAM_TO_CORE(target->public.streams[j]));
 
-	if (dc->hwss.validate_bandwidth(dc, &dc->current_context) != DC_OK) {
+	if (dc->res_pool.funcs->validate_bandwidth(dc, &dc->current_context)
+								!= DC_OK) {
 		BREAK_TO_DEBUGGER();
 		goto unexpected_fail;
 	}
@@ -309,12 +311,10 @@ bool dc_commit_surfaces_to_target(
 			DC_STREAM_TO_CORE(target->public.streams[0])->ipp,
 			DC_STREAM_TO_CORE(target->public.streams[0])->opp);
 
-		dc->hwss.set_plane_config(
-			core_surface,
-			target);
+		dc->hwss.set_plane_config(dc, core_surface, target);
 
 		if (is_valid_address)
-			dc->hwss.update_plane_address(core_surface, target);
+			dc->hwss.update_plane_address(dc, core_surface, target);
 	}
 
 	if (current_enabled_surface_count == 0 && new_enabled_surface_count > 0)
@@ -358,7 +358,7 @@ void dc_target_enable_memory_requests(struct dc_target *target)
 		struct timing_generator *tg =
 			DC_STREAM_TO_CORE(core_target->public.streams[i])->tg;
 
-		if (!core_target->ctx->dc->hwss.enable_memory_requests(tg)) {
+		if (!tg->funcs->set_blank(tg, false)) {
 			dal_error("DC: failed to unblank crtc!\n");
 			BREAK_TO_DEBUGGER();
 		}
@@ -379,7 +379,7 @@ void dc_target_disable_memory_requests(struct dc_target *target)
 			continue;
 		}
 
-		if (false == core_target->ctx->dc->hwss.disable_memory_requests(tg)) {
+		if (false == tg->funcs->set_blank(tg, true)) {
 			dal_error("DC: failed to blank crtc!\n");
 			BREAK_TO_DEBUGGER();
 		}
@@ -464,7 +464,7 @@ uint32_t dc_target_get_vblank_counter(const struct dc_target *dc_target)
 	struct timing_generator *tg =
 		DC_STREAM_TO_CORE(core_target->public.streams[0])->tg;
 
-	return core_target->ctx->dc->hwss.get_vblank_counter(tg);
+	return tg->funcs->get_frame_count(tg);
 }
 
 enum dc_irq_source dc_target_get_irq_src(

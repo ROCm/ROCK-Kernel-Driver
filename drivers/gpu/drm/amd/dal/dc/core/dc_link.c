@@ -67,7 +67,7 @@ static void destruct(struct core_link *link)
 		dal_ddc_service_destroy(&link->ddc);
 
 	if(link->link_enc)
-		link->ctx->dc->hwss.encoder_destroy(&link->link_enc);
+		link->ctx->dc->res_pool.funcs->link_enc_destroy(&link->link_enc);
 }
 
 /*
@@ -988,7 +988,8 @@ static bool construct(
 	enc_init_data.hpd_source = get_hpd_line(link, as);
 	enc_init_data.transmitter =
 			translate_encoder_to_transmitter(enc_init_data.encoder);
-	link->link_enc = dc_ctx->dc->hwss.encoder_create(&enc_init_data);
+	link->link_enc = dc_ctx->dc->res_pool.funcs->link_enc_create(
+								&enc_init_data);
 
 	if( link->link_enc == NULL) {
 		DC_ERROR("Failed to create link encoder!\n");
@@ -1449,7 +1450,6 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 	struct stream_encoder *stream_encoder = stream->stream_enc;
 	struct dp_mst_stream_allocation_table proposed_table = {0};
 	struct fixed31_32 avg_time_slots_per_mtp;
-	struct dc *dc = stream->ctx->dc;
 	struct fixed31_32 pbn;
 	struct fixed31_32 pbn_per_slot;
 	uint8_t i;
@@ -1524,7 +1524,8 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 	avg_time_slots_per_mtp = dal_fixed31_32_div(pbn, pbn_per_slot);
 
 
-	dc->hwss.set_mst_bandwidth(
+
+	stream_encoder->funcs->set_mst_bandwidth(
 		stream_encoder,
 		avg_time_slots_per_mtp);
 
@@ -1539,7 +1540,6 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 	struct stream_encoder *stream_encoder = stream->stream_enc;
 	struct dp_mst_stream_allocation_table proposed_table = {0};
 	struct fixed31_32 avg_time_slots_per_mtp = dal_fixed31_32_from_int(0);
-	struct dc *dc = stream->ctx->dc;
 	uint8_t i;
 	bool mst_mode = (link->public.type == dc_connection_mst_branch);
 
@@ -1551,7 +1551,7 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 	 */
 
 	/* slot X.Y */
-	dc->hwss.set_mst_bandwidth(
+	stream_encoder->funcs->set_mst_bandwidth(
 		stream_encoder,
 		avg_time_slots_per_mtp);
 

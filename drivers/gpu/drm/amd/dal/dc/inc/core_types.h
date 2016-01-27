@@ -273,6 +273,25 @@ void core_link_disable_stream(
 /********** DAL Core*********************/
 #include "display_clock_interface.h"
 
+struct resource_pool;
+struct validate_context;
+
+struct resource_funcs {
+	void (*destruct)(struct resource_pool *pool);
+	struct link_encoder *(*link_enc_create)(
+			const struct encoder_init_data *init);
+	void (*link_enc_destroy)(struct link_encoder **enc);
+	enum dc_status (*validate_with_context)(
+					const struct dc *dc,
+					const struct dc_validation_set set[],
+					uint8_t set_count,
+					struct validate_context *context);
+
+	enum dc_status (*validate_bandwidth)(
+					const struct dc *dc,
+					struct validate_context *context);
+};
+
 struct resource_pool {
 	struct scaler_filter * scaler_filter;
 
@@ -297,6 +316,8 @@ struct resource_pool {
 	struct display_clock *display_clock;
 	struct adapter_service *adapter_srv;
 	struct irq_service *irqs;
+
+	struct resource_funcs *funcs;
 };
 
 struct controller_ctx {

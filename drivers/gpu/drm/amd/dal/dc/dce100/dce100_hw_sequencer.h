@@ -32,5 +32,5 @@ struct dc;
 
 bool dce100_hw_sequencer_construct(struct dc *dc);
 
-#endif /* __DC_HWSS_DCE110_H__ */
+#endif /* __DC_HWSS_DCE100_H__ */
 

@@ -39,68 +39,47 @@ enum pipe_gating_control {
 struct hw_sequencer_funcs {
 
 	enum dc_status (*apply_ctx_to_hw)(
-					const struct dc *dc,
-					struct validate_context *context);
+			const struct dc *dc, struct validate_context *context);
 
-	void (*reset_hw_ctx)(struct dc *dc,
-					struct validate_context *context,
-					uint8_t target_count);
+	void (*reset_hw_ctx)(
+				struct dc *dc,
+				struct validate_context *context,
+				uint8_t target_count);
 
 	bool (*set_plane_config)(
-					struct core_surface *surface,
-					struct core_target *target);
+				const struct dc *dc,
+				struct core_surface *surface,
+				struct core_target *target);
 
 	bool (*update_plane_address)(
-					const struct core_surface *surface,
-					struct core_target *target);
-
-	bool (*enable_memory_requests)(struct timing_generator *tg);
-
-	bool (*disable_memory_requests)(struct timing_generator *tg);
-
-	bool (*transform_power_up)(struct transform *xfm);
+				const struct dc *dc,
+				const struct core_surface *surface,
+				struct core_target *target);
 
 	bool (*set_gamma_ramp)(
-					struct input_pixel_processor *ipp,
-					struct output_pixel_processor *opp,
-					const struct gamma_ramp *ramp,
-					const struct gamma_parameters *params);
+				struct input_pixel_processor *ipp,
+				struct output_pixel_processor *opp,
+				const struct gamma_ramp *ramp,
+				const struct gamma_parameters *params);
 
 	void (*power_down)(struct dc *dc);
 
 	void (*enable_accelerated_mode)(struct dc *dc);
-
-	void (*get_crtc_positions)(
-					struct timing_generator *tg,
-					int32_t *h_position,
-					int32_t *v_position);
-
-	uint32_t (*get_vblank_counter)(struct timing_generator *tg);
 
 	void (*enable_timing_synchronization)(
 					struct dc_context *dc_ctx,
 					uint32_t timing_generator_num,
 					struct timing_generator *tgs[]);
 
-	void (*disable_vga)(struct timing_generator *tg);
-
-
-
-	/* link encoder sequences */
-	struct link_encoder *(*encoder_create)(
-			const struct encoder_init_data *init);
-
-	void (*encoder_destroy)(struct link_encoder **enc);
-
 	/* backlight control */
-	void (*encoder_set_lcd_backlight_level)(struct link_encoder *enc,
-					uint32_t level);
+	void (*encoder_set_lcd_backlight_level)(
+		struct link_encoder *enc, uint32_t level);
 
+
+	void (*crtc_switch_to_clk_src)(struct clock_source *, uint8_t);
 
 	/* power management */
-	void (*clock_gating_power_up)(
-					struct dc_context *ctx,
-					bool enable);
+	void (*clock_gating_power_up)(struct dc_context *ctx, bool enable);
 
 	void (*enable_display_pipe_clock_gating)(
 					struct dc_context *ctx,
@@ -112,36 +91,25 @@ struct hw_sequencer_funcs {
 					struct dc_bios *dcb,
 					enum pipe_gating_control power_gating);
 
-	/* resource management and validation*/
-	bool (*construct_resource_pool)(
-					struct adapter_service *adapter_serv,
-					uint8_t num_virtual_links,
-					struct dc *dc,
-					struct resource_pool *pool);
+	void (*program_bw)(struct dc *dc, struct validate_context *context);
 
-	void (*destruct_resource_pool)(struct resource_pool *pool);
+	void (*enable_stream)(struct core_stream *stream);
 
-	enum dc_status (*validate_with_context)(
-					const struct dc *dc,
-					const struct dc_validation_set set[],
-					uint8_t set_count,
-					struct validate_context *context);
+	void (*disable_stream)(struct core_stream *stream);
 
-	enum dc_status (*validate_bandwidth)(
-					const struct dc *dc,
-					struct validate_context *context);
-	void (*program_bw)(
-					struct dc *dc,
-					struct validate_context *context);
-	void (*enable_stream)(
-					struct core_stream *stream);
+	void (*enable_fe_clock)(
+		struct dc_context *ctx, uint8_t controller_id, bool enable);
 
-	void (*disable_stream)(
-					struct core_stream *stream);
+	bool (*pipe_control_lock)(
+				struct dc_context *ctx,
+				uint8_t controller_idx,
+				uint32_t control_mask,
+				bool lock);
 
-	void (*set_mst_bandwidth)(
-					struct stream_encoder *enc,
-					struct fixed31_32 avg_time_slots_per_mtp);
+	void (*set_blender_mode)(
+				struct dc_context *ctx,
+				uint8_t controller_id,
+				uint32_t mode);
 };
 
 bool dc_construct_hw_sequencer(

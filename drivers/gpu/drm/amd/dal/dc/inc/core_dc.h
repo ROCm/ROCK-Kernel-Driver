@@ -14,10 +14,8 @@
 struct dc {
 	struct dc_context *ctx;
 
-	/** link-related data - begin **/
 	uint8_t link_count;
 	struct core_link *links[MAX_PIPES * 2];
-	/** link-related data - end **/
 
 	/* TODO: determine max number of targets*/
 	struct validate_context current_context;
