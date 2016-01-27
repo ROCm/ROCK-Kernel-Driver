@@ -26,14 +26,13 @@
 #include "dc_services.h"
 
 #include "include/adapter_service_interface.h"
-#include "include/i2caux_interface.h"
-#include "include/ddc_service_interface.h"
 #include "include/ddc_service_types.h"
 #include "include/grph_object_id.h"
 #include "include/dpcd_defs.h"
 #include "include/logger_interface.h"
-#include "ddc_i2caux_helper.h"
-#include "ddc_service.h"
+#include "include/vector.h"
+
+#include "dc_link_ddc.h"
 
 #define AUX_POWER_UP_WA_DELAY 500
 #define I2C_OVER_AUX_DEFER_WA_DELAY 70
@@ -97,59 +96,51 @@ enum edid_read_result {
 #define HDMI_SCDC_TEST_CONFIG 0xC0
 
 
-union hdmi_scdc_update_read_data
-{
+union hdmi_scdc_update_read_data {
 	uint8_t byte[2];
-    struct
-    {
-        uint8_t STATUS_UPDATE:1;
-        uint8_t CED_UPDATE:1;
-        uint8_t RR_TEST:1;
-        uint8_t RESERVED:5;
+	struct {
+		uint8_t STATUS_UPDATE:1;
+		uint8_t CED_UPDATE:1;
+		uint8_t RR_TEST:1;
+		uint8_t RESERVED:5;
 		uint8_t RESERVED2:8;
-    } fields; 
+	} fields;
 };
 
-union hdmi_scdc_status_flags_data
-{
-    uint8_t byte[2];
-    struct
-    {
-        uint8_t CLOCK_DETECTED:1;
-        uint8_t CH0_LOCKED:1;
-        uint8_t CH1_LOCKED:1;
-        uint8_t CH2_LOCKED:1;
-        uint8_t RESERVED:4;
+union hdmi_scdc_status_flags_data {
+	uint8_t byte[2];
+	struct {
+		uint8_t CLOCK_DETECTED:1;
+		uint8_t CH0_LOCKED:1;
+		uint8_t CH1_LOCKED:1;
+		uint8_t CH2_LOCKED:1;
+		uint8_t RESERVED:4;
 		uint8_t RESERVED2:8;
-    } fields;
+	} fields;
 };
 
-union hdmi_scdc_ced_data
-{
-    uint8_t byte[7];
-    struct
-    {
-        uint8_t CH0_8LOW:8;
-        uint8_t CH0_7HIGH:7;
-        uint8_t CH0_VALID:1;
-        uint8_t CH1_8LOW:8;
-        uint8_t CH1_7HIGH:7;
-        uint8_t CH1_VALID:1;
-        uint8_t CH2_8LOW:8;
-        uint8_t CH2_7HIGH:7;
-        uint8_t CH2_VALID:1;
-        uint8_t CHECKSUM:8;
-    } fields;
+union hdmi_scdc_ced_data {
+	uint8_t byte[7];
+	struct {
+		uint8_t CH0_8LOW:8;
+		uint8_t CH0_7HIGH:7;
+		uint8_t CH0_VALID:1;
+		uint8_t CH1_8LOW:8;
+		uint8_t CH1_7HIGH:7;
+		uint8_t CH1_VALID:1;
+		uint8_t CH2_8LOW:8;
+		uint8_t CH2_7HIGH:7;
+		uint8_t CH2_VALID:1;
+		uint8_t CHECKSUM:8;
+	} fields;
 };
 
-union hdmi_scdc_test_config_Data
-{
-    uint8_t byte;
-    struct
-    {
-        uint8_t TEST_READ_REQUEST_DELAY:7;
-        uint8_t TEST_READ_REQUEST: 1;
-    } fields;
+union hdmi_scdc_test_config_Data {
+	uint8_t byte;
+	struct {
+		uint8_t TEST_READ_REQUEST_DELAY:7;
+		uint8_t TEST_READ_REQUEST: 1;
+	} fields;
 };
 
 
@@ -184,6 +175,135 @@ struct ddc_service {
 	uint32_t edid_buf_len;
 	uint8_t edid_buf[MAX_EDID_BUFFER_SIZE];
 };
+
+struct i2c_payloads {
+	struct vector payloads;
+};
+
+struct aux_payloads {
+	struct vector payloads;
+};
+
+struct i2c_payloads *dal_ddc_i2c_payloads_create(struct dc_context *ctx, uint32_t count)
+{
+	struct i2c_payloads *payloads;
+
+	payloads = dc_service_alloc(ctx, sizeof(struct i2c_payloads));
+
+	if (!payloads)
+		return NULL;
+
+	if (dal_vector_construct(
+		&payloads->payloads, ctx, count, sizeof(struct i2c_payload)))
+		return payloads;
+
+	dc_service_free(ctx, payloads);
+	return NULL;
+
+}
+
+struct i2c_payload *dal_ddc_i2c_payloads_get(struct i2c_payloads *p)
+{
+	return (struct i2c_payload *)p->payloads.container;
+}
+
+uint32_t  dal_ddc_i2c_payloads_get_count(struct i2c_payloads *p)
+{
+	return p->payloads.count;
+}
+
+void dal_ddc_i2c_payloads_destroy(struct i2c_payloads **p)
+{
+	if (!p || !*p)
+		return;
+	dal_vector_destruct(&(*p)->payloads);
+	dc_service_free((*p)->payloads.ctx, *p);
+	*p = NULL;
+
+}
+
+struct aux_payloads *dal_ddc_aux_payloads_create(struct dc_context *ctx, uint32_t count)
+{
+	struct aux_payloads *payloads;
+
+	payloads = dc_service_alloc(ctx, sizeof(struct aux_payloads));
+
+	if (!payloads)
+		return NULL;
+
+	if (dal_vector_construct(
+		&payloads->payloads, ctx, count, sizeof(struct aux_payloads)))
+		return payloads;
+
+	dc_service_free(ctx, payloads);
+	return NULL;
+}
+
+struct aux_payload *dal_ddc_aux_payloads_get(struct aux_payloads *p)
+{
+	return (struct aux_payload *)p->payloads.container;
+}
+
+uint32_t  dal_ddc_aux_payloads_get_count(struct aux_payloads *p)
+{
+	return p->payloads.count;
+}
+
+
+void dal_ddc_aux_payloads_destroy(struct aux_payloads **p)
+{
+	if (!p || !*p)
+		return;
+
+	dal_vector_destruct(&(*p)->payloads);
+	dc_service_free((*p)->payloads.ctx, *p);
+	*p = NULL;
+}
+
+#define DDC_MIN(a, b) (((a) < (b)) ? (a) : (b))
+
+void dal_ddc_i2c_payloads_add(
+	struct i2c_payloads *payloads,
+	uint32_t address,
+	uint32_t len,
+	uint8_t *data,
+	bool write)
+{
+	uint32_t payload_size = EDID_SEGMENT_SIZE;
+	uint32_t pos;
+
+	for (pos = 0; pos < len; pos += payload_size) {
+		struct i2c_payload payload = {
+			.write = write,
+			.address = address,
+			.length = DDC_MIN(payload_size, len - pos),
+			.data = data + pos };
+		dal_vector_append(&payloads->payloads, &payload);
+	}
+
+}
+
+void dal_ddc_aux_payloads_add(
+	struct aux_payloads *payloads,
+	uint32_t address,
+	uint32_t len,
+	uint8_t *data,
+	bool write)
+{
+	uint32_t payload_size = DEFAULT_AUX_MAX_DATA_SIZE;
+	uint32_t pos;
+
+	for (pos = 0; pos < len; pos += payload_size) {
+		struct aux_payload payload = {
+			.i2c_over_aux = true,
+			.write = write,
+			.address = address,
+			.length = DDC_MIN(payload_size, len - pos),
+			.data = data + pos };
+		dal_vector_append(&payloads->payloads, &payload);
+	}
+}
+
 
 static bool construct(
 	struct ddc_service *ddc_service,
@@ -770,8 +890,7 @@ void dal_ddc_service_i2c_query_dp_dual_mode_adaptor(
 				LOG_MINOR_DCS_DONGLE_DETECTION,
 				"Detected Type 1 DP-HDMI dongle.\n");
 			*dongle = DISPLAY_DONGLE_DP_HDMI_DONGLE;
-		}
-		else {
+		} else {
 			dal_logger_write(ddc->ctx->logger,
 				LOG_MAJOR_DCS,
 				LOG_MINOR_DCS_DONGLE_DETECTION,
@@ -996,16 +1115,11 @@ void dal_ddc_service_write_scdc_data(struct ddc_service *ddc_service,
 	}
 	write_buffer[0] = HDMI_SCDC_TMDS_CONFIG;
 
-	if (over_340_mhz)
-	{
+	if (over_340_mhz) {
 		write_buffer[1] = 3;
-	}
-	else if (lte_340_scramble)
-	{
+	} else if (lte_340_scramble) {
 		write_buffer[1] = 1;
-	}
-	else
-	{
+	} else {
 		write_buffer[1] = 0;
 	}
 	dal_ddc_service_query_ddc_data(ddc_service, slave_address, write_buffer,
@@ -1020,17 +1134,18 @@ void dal_ddc_service_read_scdc_data(struct ddc_service *ddc_service)
 
 	dal_ddc_service_query_ddc_data(ddc_service, slave_address, &offset,
 			sizeof(offset), &tmds_config, sizeof(tmds_config));
-	if (tmds_config & 0x1){
-		union hdmi_scdc_status_flags_data status_data = {{0}};
+	if (tmds_config & 0x1) {
+		union hdmi_scdc_status_flags_data status_data = { {0} };
 		uint8_t scramble_status = 0;
 
 		offset = HDMI_SCDC_SCRAMBLER_STATUS;
 		dal_ddc_service_query_ddc_data(ddc_service, slave_address,
-				&offset, sizeof(offset),&scramble_status,
+				&offset, sizeof(offset), &scramble_status,
 				sizeof(scramble_status));
 		offset = HDMI_SCDC_STATUS_FLAGS;
 		dal_ddc_service_query_ddc_data(ddc_service, slave_address,
-				&offset, sizeof(offset),status_data.byte,
+				&offset, sizeof(offset), status_data.byte,
 				sizeof(status_data.byte));
 	}
 }
+
