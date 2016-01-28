@@ -107,7 +107,7 @@ static int dm_crtc_unpin_cursor_bo_old(
 	if (NULL != amdgpu_crtc && NULL != amdgpu_crtc->cursor_bo) {
 		robj = gem_to_amdgpu_bo(amdgpu_crtc->cursor_bo);
 
-		ret  = amdgpu_bo_reserve(robj, false);
+		ret = amdgpu_bo_reserve(robj, false);
 
 		if (likely(ret == 0)) {
 			ret = amdgpu_bo_unpin(robj);
@@ -128,10 +128,10 @@ static int dm_crtc_unpin_cursor_bo_old(
 				ret,
 				amdgpu_crtc->cursor_bo);
 		}
-	}
 
-	drm_gem_object_unreference_unlocked(amdgpu_crtc->cursor_bo);
-	amdgpu_crtc->cursor_bo = NULL;
+		drm_gem_object_unreference_unlocked(amdgpu_crtc->cursor_bo);
+		amdgpu_crtc->cursor_bo = NULL;
+	}
 
 	return ret;
 }
@@ -145,7 +145,7 @@ static int dm_crtc_pin_cursor_bo_new(
 	struct amdgpu_crtc *amdgpu_crtc;
 	struct amdgpu_bo *robj;
 	struct drm_gem_object *obj;
-	int ret = EINVAL;
+	int ret = -EINVAL;
 
 	if (NULL != crtc) {
 		struct drm_device *dev = crtc->dev;
