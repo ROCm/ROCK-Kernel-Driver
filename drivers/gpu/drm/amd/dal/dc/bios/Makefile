@@ -11,7 +11,6 @@ AMD_DAL_FILES += $(AMD_DAL_BIOS)
 ifndef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
 AMD_DAL_FILES := $(filter-out $(AMDDALPATH)/dc/bios/bios_parser_helper.o,$(AMD_DAL_FILES))
 endif
-$(warning AMD_DAL_FILES=$(AMD_DAL_FILES))
 
 
 ###############################################################################
