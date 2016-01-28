@@ -335,6 +335,39 @@ static void dal_dc_clock_gating_dce100_power_up(struct dc_context *ctx, bool ena
 	}
 }
 
+/**
+ * Call display_engine_clock_dce80 to perform the Dclk programming.
+ */
+static void set_display_clock(struct validate_context *context)
+{
+	/* Program the display engine clock.
+	 * Check DFS bypass mode support or not. DFSbypass feature is only when
+	 * BIOS GPU info table reports support. */
+
+	if (/*dal_adapter_service_is_dfs_bypass_enabled()*/ false) {
+		/*TODO: set_display_clock_dfs_bypass(
+				hws,
+				path_set,
+				context->res_ctx.pool.display_clock,
+				context->res_ctx.min_clocks.min_dclk_khz);*/
+	} else
+		dal_display_clock_set_clock(context->res_ctx.pool.display_clock,
+				681000);
+
+	/* TODO: When changing display engine clock, DMCU WaitLoop must be
+	 * reconfigured in order to maintain the same delays within DMCU
+	 * programming sequences. */
+
+	/* TODO: Start GTC counter */
+}
+
+
+static void set_displaymarks(
+		const struct dc *dc, struct validate_context *context)
+{
+	/* Do nothing until we have proper bandwitdth calcs */
+}
+
 /**************************************************************************/
 
 bool dce100_hw_sequencer_construct(struct dc *dc)
@@ -348,7 +381,8 @@ bool dce100_hw_sequencer_construct(struct dc *dc)
 	dc->hwss.enable_fe_clock = dce100_enable_fe_clock;
 	dc->hwss.pipe_control_lock = dce100_pipe_control_lock;
 	dc->hwss.set_blender_mode = dce100_set_blender_mode;
-
+	dc->hwss.set_display_clock = set_display_clock;
+	dc->hwss.set_displaymarks = set_displaymarks;
 	return true;
 }
 

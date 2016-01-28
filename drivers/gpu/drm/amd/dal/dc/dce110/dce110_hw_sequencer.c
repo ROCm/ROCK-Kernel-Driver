@@ -1148,8 +1148,8 @@ static void program_bw(struct dc *dc, struct validate_context *context)
 	/*TODO: when pplib works*/
 	/*dc_set_clocks_and_clock_state(context);*/
 
-	set_display_clock(context);
-	set_displaymarks(dc, context);
+	dc->hwss.set_display_clock(context);
+	dc->hwss.set_displaymarks(dc, context);
 }
 
 static void switch_dp_clock_sources(
@@ -1238,7 +1238,7 @@ static enum dc_status apply_ctx_to_hw(
 		if (DC_OK != status)
 			return status;
 	}
-	set_displaymarks(dc, context);
+	dc->hwss.set_displaymarks(dc, context);
 
 	update_bios_scratch_critical_state(context->res_ctx.pool.adapter_srv,
 			false);
@@ -1646,6 +1646,8 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.pipe_control_lock = dce110_pipe_control_lock,
 	.set_blender_mode = dce110_set_blender_mode,
 	.clock_gating_power_up = dal_dc_clock_gating_dce110_power_up,/*todo*/
+	.set_display_clock = set_display_clock,
+	.set_displaymarks = set_displaymarks,
 };
 
 bool dce110_hw_sequencer_construct(struct dc *dc)
