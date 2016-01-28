@@ -110,6 +110,12 @@ struct hw_sequencer_funcs {
 				struct dc_context *ctx,
 				uint8_t controller_id,
 				uint32_t mode);
+
+	void (*set_displaymarks)(
+				const struct dc *dc,
+				struct validate_context *context);
+
+	void (*set_display_clock)(struct validate_context *context);
 };
 
 bool dc_construct_hw_sequencer(
