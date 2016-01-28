@@ -798,7 +798,7 @@ static bool dce110_program_pix_clk(
 }
 
 static bool dce110_clock_source_power_down(
-		struct clock_source *clk_src, enum controller_id controller_id)
+		struct clock_source *clk_src)
 {
 	struct dce110_clk_src *dce110_clk_src = TO_DCE110_CLK_SRC(clk_src);
 	enum bp_result bp_result;
@@ -808,7 +808,7 @@ static bool dce110_clock_source_power_down(
 		return true;
 
 	/* If Pixel Clock is 0 it means Power Down Pll*/
-	bp_pixel_clock_params.controller_id = controller_id;
+	bp_pixel_clock_params.controller_id = CONTROLLER_ID_UNDEFINED;
 	bp_pixel_clock_params.pll_id = clk_src->id;
 	bp_pixel_clock_params.flags.FORCE_PROGRAMMING_OF_PLL = 1;
 

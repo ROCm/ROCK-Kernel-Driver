@@ -896,7 +896,7 @@ static void power_down_clock_sources(struct dc *dc)
 
 	for (i = 0; i < dc->res_pool.clk_src_count; i++) {
 		if (dc->res_pool.clock_sources[i]->funcs->cs_power_down(
-				dc->res_pool.clock_sources[i], i+1) == false)
+				dc->res_pool.clock_sources[i]) == false)
 			dal_error("Failed to power down pll! (clk src index=%d)\n", i);
 	}
 }
