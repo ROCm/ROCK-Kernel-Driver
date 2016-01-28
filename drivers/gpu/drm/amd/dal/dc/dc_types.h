@@ -605,9 +605,6 @@ enum dc_plane_addr_type {
 	PLN_ADDR_TYPE_GRAPHICS = 0,
 	PLN_ADDR_TYPE_GRPH_STEREO,
 	PLN_ADDR_TYPE_VIDEO_PROGRESSIVE,
-	PLN_ADDR_TYPE_VIDEO_INTERLACED,
-	PLN_ADDR_TYPE_VIDEO_PROGRESSIVE_STEREO,
-	PLN_ADDR_TYPE_VIDEO_INTERLACED_STEREO
 };
 
 struct dc_plane_address {
@@ -628,35 +625,6 @@ struct dc_plane_address {
 			PHYSICAL_ADDRESS_LOC chroma_addr;
 			PHYSICAL_ADDRESS_LOC luma_addr;
 		} video_progressive;
-
-		/*video interlaced*/
-		struct {
-			PHYSICAL_ADDRESS_LOC chroma_addr;
-			PHYSICAL_ADDRESS_LOC luma_addr;
-			PHYSICAL_ADDRESS_LOC chroma_bottom_addr;
-			PHYSICAL_ADDRESS_LOC luma_bottom_addr;
-		} video_interlaced;
-
-		/*video Progressive Stereo*/
-		struct {
-			PHYSICAL_ADDRESS_LOC left_chroma_addr;
-			PHYSICAL_ADDRESS_LOC left_luma_addr;
-			PHYSICAL_ADDRESS_LOC right_chroma_addr;
-			PHYSICAL_ADDRESS_LOC right_luma_addr;
-		} video_progressive_stereo;
-
-		/*video  interlaced stereo*/
-		struct {
-			PHYSICAL_ADDRESS_LOC left_chroma_addr;
-			PHYSICAL_ADDRESS_LOC left_luma_addr;
-			PHYSICAL_ADDRESS_LOC left_chroma_bottom_addr;
-			PHYSICAL_ADDRESS_LOC left_luma_bottom_addr;
-
-			PHYSICAL_ADDRESS_LOC right_chroma_addr;
-			PHYSICAL_ADDRESS_LOC right_luma_addr;
-			PHYSICAL_ADDRESS_LOC right_chroma_bottom_addr;
-			PHYSICAL_ADDRESS_LOC right_luma_bottom_addr;
-		} video_interlaced_stereo;
 	};
 };
 
@@ -852,98 +820,84 @@ struct stereo_3d_view {
 	} flags;
 };
 
-/* TODO: Rename to dc_tiling_info */
-union dc_tiling_info {
-
-	struct {
-		/* Specifies the number of memory banks for tiling
-		 *	purposes.
-		 * Only applies to 2D and 3D tiling modes.
-		 *	POSSIBLE VALUES: 2,4,8,16
-		 */
-		uint32_t NUM_BANKS:5;
-		/* Specifies the number of tiles in the x direction
-		 *	to be incorporated into the same bank.
-		 * Only applies to 2D and 3D tiling modes.
-		 *	POSSIBLE VALUES: 1,2,4,8
-		 */
-		uint32_t BANK_WIDTH:4;
-		/* Specifies the number of tiles in the y direction to
-		 *	be incorporated into the same bank.
-		 * Only applies to 2D and 3D tiling modes.
-		 *	POSSIBLE VALUES: 1,2,4,8
-		 */
-		uint32_t BANK_HEIGHT:4;
-		/* Specifies the macro tile aspect ratio. Only applies
-		 * to 2D and 3D tiling modes.
-		 */
-		uint32_t TILE_ASPECT:3;
-		/* Specifies the number of bytes that will be stored
-		 *	contiguously for each tile.
-		 * If the tile data requires more storage than this
-		 *	amount, it is split into multiple slices.
-		 * This field must not be larger than
-		 *	GB_ADDR_CONFIG.DRAM_ROW_SIZE.
-		 * Only applies to 2D and 3D tiling modes.
-		 * For color render targets, TILE_SPLIT >= 256B.
-		 */
-		uint32_t TILE_SPLIT:3;
-		/* Specifies the addressing within a tile.
-		 *	0x0 - DISPLAY_MICRO_TILING
-		 *	0x1 - THIN_MICRO_TILING
-		 *	0x2 - DEPTH_MICRO_TILING
-		 *	0x3 - ROTATED_MICRO_TILING
-		 */
-		uint32_t TILE_MODE:2;
-		/* Specifies the number of pipes and how they are
-		 *	interleaved in the surface.
-		 * Refer to memory addressing document for complete
-		 *	details and constraints.
-		 */
-		uint32_t PIPE_CONFIG:5;
-		/* Specifies the tiling mode of the surface.
-		 * THIN tiles use an 8x8x1 tile size.
-		 * THICK tiles use an 8x8x4 tile size.
-		 * 2D tiling modes rotate banks for successive Z slices
-		 * 3D tiling modes rotate pipes and banks for Z slices
-		 * Refer to memory addressing document for complete
-		 *	details and constraints.
-		 */
-		uint32_t ARRAY_MODE:4;
-	} grph;
+/* TODO: These values come from hardware spec. We need to readdress this
+ * if they ever change.
+ */
+enum array_mode_values {
+	DC_ARRAY_UNDEFINED = 0,
+	DC_ARRAY_1D_TILED_THIN1 = 0x2,
+	DC_ARRAY_2D_TILED_THIN1 = 0x4,
+};
 
 
-	struct {
-		/*possible values: 2,4,8,16*/
-		uint32_t NUM_BANKS:5;
-		/*must use enum video_array_mode*/
-		uint32_t ARRAY_MODE:4;
-		/*must use enum addr_pipe_config*/
-		uint32_t PIPE_CONFIG:5;
-		/*possible values 1,2,4,8 */
-		uint32_t BANK_WIDTH_LUMA:4;
-		/*possible values 1,2,4,8 */
-		uint32_t BANK_HEIGHT_LUMA:4;
-		/*must use enum macro_tile_aspect*/
-		uint32_t TILE_ASPECT_LUMA:3;
-		/*must use enum tile_split*/
-		uint32_t TILE_SPLIT_LUMA:3;
-		/*must use micro_tile_mode */
-		uint32_t TILE_MODE_LUMA:2;
-		/*possible values: 1,2,4,8*/
-		uint32_t BANK_WIDTH_CHROMA:4;
-		/*possible values: 1,2,4,8*/
-		uint32_t BANK_HEIGHT_CHROMA:4;
-		/*must use enum macro_tile_aspect*/
-		uint32_t TILE_ASPECT_CHROMA:3;
-		/*must use enum tile_split*/
-		uint32_t TILE_SPLIT_CHROMA:3;
-		/*must use enum micro_tile_mode*/
-		uint32_t TILE_MODE_CHROMA:2;
+enum tile_mode_values {
+	DC_ADDR_SURF_MICRO_TILING_DISPLAY = 0x0,
+	DC_ADDR_SURF_MICRO_TILING_NON_DISPLAY = 0x1,
+};
 
-	} video;
+enum tile_split_values {
+	DC_DISPLAY_MICRO_TILING = 0x0,
+	DC_THIN_MICRO_TILING = 0x1,
+	DC_DEPTH_MICRO_TILING = 0x2,
+	DC_ROTATED_MICRO_TILING = 0x3,
+};
 
-	uint64_t value;
+struct dc_tiling_info {
+
+	/* Specifies the number of memory banks for tiling
+	 *	purposes.
+	 * Only applies to 2D and 3D tiling modes.
+	 *	POSSIBLE VALUES: 2,4,8,16
+	 */
+	unsigned int num_banks;
+	/* Specifies the number of tiles in the x direction
+	 *	to be incorporated into the same bank.
+	 * Only applies to 2D and 3D tiling modes.
+	 *	POSSIBLE VALUES: 1,2,4,8
+	 */
+	unsigned int bank_width;
+	/* Specifies the number of tiles in the y direction to
+	 *	be incorporated into the same bank.
+	 * Only applies to 2D and 3D tiling modes.
+	 *	POSSIBLE VALUES: 1,2,4,8
+	 */
+	unsigned int bank_height;
+	/* Specifies the macro tile aspect ratio. Only applies
+	 * to 2D and 3D tiling modes.
+	 */
+	unsigned int tile_aspect;
+	/* Specifies the number of bytes that will be stored
+	 *	contiguously for each tile.
+	 * If the tile data requires more storage than this
+	 *	amount, it is split into multiple slices.
+	 * This field must not be larger than
+	 *	GB_ADDR_CONFIG.DRAM_ROW_SIZE.
+	 * Only applies to 2D and 3D tiling modes.
+	 * For color render targets, TILE_SPLIT >= 256B.
+	 */
+	enum tile_split_values tile_split;
+	/* Specifies the addressing within a tile.
+	 *	0x0 - DISPLAY_MICRO_TILING
+	 *	0x1 - THIN_MICRO_TILING
+	 *	0x2 - DEPTH_MICRO_TILING
+	 *	0x3 - ROTATED_MICRO_TILING
+	 */
+	enum tile_mode_values tile_mode;
+	/* Specifies the number of pipes and how they are
+	 *	interleaved in the surface.
+	 * Refer to memory addressing document for complete
+	 *	details and constraints.
+	 */
+	unsigned int pipe_config;
+	/* Specifies the tiling mode of the surface.
+	 * THIN tiles use an 8x8x1 tile size.
+	 * THICK tiles use an 8x8x4 tile size.
+	 * 2D tiling modes rotate banks for successive Z slices
+	 * 3D tiling modes rotate pipes and banks for Z slices
+	 * Refer to memory addressing document for complete
+	 *	details and constraints.
+	 */
+	enum array_mode_values array_mode;
 };
 
 union plane_size {

@@ -37,10 +37,6 @@
 #undef FRAME_SIZE
 #undef DEPRECATED
 
-#include "dce/dce_11_0_d.h"
-#include "dce/dce_11_0_sh_mask.h"
-#include "dce/dce_11_0_enum.h"
-
 #include "dc.h"
 
 #include "amdgpu_dm_types.h"
@@ -442,9 +438,9 @@ static void fill_plane_attributes_from_fb(
 		return;
 	}
 
-	surface->tiling_info.value = 0;
+	memset(&surface->tiling_info, 0, sizeof(surface->tiling_info));
 
-	if (AMDGPU_TILING_GET(tiling_flags, ARRAY_MODE) == ARRAY_2D_TILED_THIN1)
+	if (AMDGPU_TILING_GET(tiling_flags, ARRAY_MODE) == DC_ARRAY_2D_TILED_THIN1)
 	{
 		unsigned bankw, bankh, mtaspect, tile_split, num_banks;
 
@@ -456,21 +452,21 @@ static void fill_plane_attributes_from_fb(
 
 
 		/* XXX fix me for VI */
-		surface->tiling_info.grph.NUM_BANKS = num_banks;
-		surface->tiling_info.grph.ARRAY_MODE =
-						ARRAY_2D_TILED_THIN1;
-		surface->tiling_info.grph.TILE_SPLIT = tile_split;
-		surface->tiling_info.grph.BANK_WIDTH = bankw;
-		surface->tiling_info.grph.BANK_HEIGHT = bankh;
-		surface->tiling_info.grph.TILE_ASPECT = mtaspect;
-		surface->tiling_info.grph.TILE_MODE =
-				ADDR_SURF_MICRO_TILING_DISPLAY;
+		surface->tiling_info.num_banks = num_banks;
+		surface->tiling_info.array_mode =
+				DC_ARRAY_2D_TILED_THIN1;
+		surface->tiling_info.tile_split = tile_split;
+		surface->tiling_info.bank_width = bankw;
+		surface->tiling_info.bank_height = bankh;
+		surface->tiling_info.tile_aspect = mtaspect;
+		surface->tiling_info.tile_mode =
+				DC_ADDR_SURF_MICRO_TILING_DISPLAY;
 	} else if (AMDGPU_TILING_GET(tiling_flags, ARRAY_MODE)
-			== ARRAY_1D_TILED_THIN1) {
-		surface->tiling_info.grph.ARRAY_MODE = ARRAY_1D_TILED_THIN1;
+			== DC_ARRAY_1D_TILED_THIN1) {
+		surface->tiling_info.array_mode = DC_ARRAY_1D_TILED_THIN1;
 	}
 
-	surface->tiling_info.grph.PIPE_CONFIG =
+	surface->tiling_info.pipe_config =
 			AMDGPU_TILING_GET(tiling_flags, PIPE_CONFIG);
 
 	surface->plane_size.grph.surface_size.x = 0;
@@ -484,7 +480,7 @@ static void fill_plane_attributes_from_fb(
 	surface->scaling_quality.h_taps_c = 2;
 	surface->scaling_quality.v_taps_c = 2;
 
-/* TODO: unhardcode */
+	/* TODO: unhardcode */
 	surface->colorimetry.limited_range = false;
 	surface->colorimetry.color_space = SURFACE_COLOR_SPACE_SRGB;
 	surface->scaling_quality.h_taps = 2;

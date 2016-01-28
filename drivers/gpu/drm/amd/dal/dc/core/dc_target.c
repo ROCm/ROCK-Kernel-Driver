@@ -211,12 +211,10 @@ static bool validate_surface_address(
 		}
 		break;
 	case PLN_ADDR_TYPE_VIDEO_PROGRESSIVE:
-	case PLN_ADDR_TYPE_VIDEO_INTERLACED:
-	case PLN_ADDR_TYPE_VIDEO_PROGRESSIVE_STEREO:
-	case PLN_ADDR_TYPE_VIDEO_INTERLACED_STEREO:
 	default:
 		/* not supported */
 		BREAK_TO_DEBUGGER();
+		break;
 	}
 
 	return is_valid_address;

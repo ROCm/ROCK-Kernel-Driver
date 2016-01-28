@@ -68,7 +68,7 @@ struct dc_surface {
 	struct rect clip_rect;
 
 	union plane_size plane_size;
-	union dc_tiling_info tiling_info;
+	struct dc_tiling_info tiling_info;
 	struct plane_colorimetry colorimetry;
 
 	enum surface_pixel_format format;

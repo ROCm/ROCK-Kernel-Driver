@@ -157,9 +157,6 @@ static void program_addr(
 			addr->grph_stereo.right_addr);
 		break;
 	case PLN_ADDR_TYPE_VIDEO_PROGRESSIVE:
-	case PLN_ADDR_TYPE_VIDEO_INTERLACED:
-	case PLN_ADDR_TYPE_VIDEO_PROGRESSIVE_STEREO:
-	case PLN_ADDR_TYPE_VIDEO_INTERLACED_STEREO:
 	default:
 		/* not supported */
 		BREAK_TO_DEBUGGER();
@@ -179,7 +176,7 @@ static void enable(struct dce110_mem_input *mem_input110)
 
 static void program_tiling(
 	struct dce110_mem_input *mem_input110,
-	const union dc_tiling_info *info,
+	const struct dc_tiling_info *info,
 	const enum surface_pixel_format pixel_format)
 {
 	uint32_t value = 0;
@@ -188,28 +185,28 @@ static void program_tiling(
 			mem_input110->base.ctx,
 			DCP_REG(mmGRPH_CONTROL));
 
-	set_reg_field_value(value, info->grph.NUM_BANKS,
+	set_reg_field_value(value, info->num_banks,
 		GRPH_CONTROL, GRPH_NUM_BANKS);
 
-	set_reg_field_value(value, info->grph.BANK_WIDTH,
+	set_reg_field_value(value, info->bank_width,
 		GRPH_CONTROL, GRPH_BANK_WIDTH);
 
-	set_reg_field_value(value, info->grph.BANK_HEIGHT,
+	set_reg_field_value(value, info->bank_height,
 		GRPH_CONTROL, GRPH_BANK_HEIGHT);
 
-	set_reg_field_value(value, info->grph.TILE_ASPECT,
+	set_reg_field_value(value, info->tile_aspect,
 		GRPH_CONTROL, GRPH_MACRO_TILE_ASPECT);
 
-	set_reg_field_value(value, info->grph.TILE_SPLIT,
+	set_reg_field_value(value, info->tile_split,
 		GRPH_CONTROL, GRPH_TILE_SPLIT);
 
-	set_reg_field_value(value, info->grph.TILE_MODE,
+	set_reg_field_value(value, info->tile_mode,
 		GRPH_CONTROL, GRPH_MICRO_TILE_MODE);
 
-	set_reg_field_value(value, info->grph.PIPE_CONFIG,
+	set_reg_field_value(value, info->pipe_config,
 		GRPH_CONTROL, GRPH_PIPE_CONFIG);
 
-	set_reg_field_value(value, info->grph.ARRAY_MODE,
+	set_reg_field_value(value, info->array_mode,
 		GRPH_CONTROL, GRPH_ARRAY_MODE);
 
 	set_reg_field_value(value, 1,
@@ -458,7 +455,7 @@ bool dce110_mem_input_program_surface_flip_and_addr(
 bool dce110_mem_input_program_surface_config(
 	struct mem_input *mem_input,
 	enum surface_pixel_format format,
-	union dc_tiling_info *tiling_info,
+	struct dc_tiling_info *tiling_info,
 	union plane_size *plane_size,
 	enum dc_rotation_angle rotation)
 {
