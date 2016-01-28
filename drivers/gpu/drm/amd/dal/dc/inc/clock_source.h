@@ -158,7 +158,7 @@ struct calc_pll_clock_source {
 
 struct clock_source_funcs {
 	bool (*cs_power_down)(
-			struct clock_source *, enum controller_id);
+			struct clock_source *);
 	bool (*program_pix_clk)(struct clock_source *,
 			struct pixel_clk_params *, struct pll_settings *);
 	uint32_t (*get_pix_clk_dividers)(

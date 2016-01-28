@@ -66,8 +66,13 @@ void unreference_clock_source(
 	for (i = 0; i < res_ctx->pool.clk_src_count; i++) {
 		if (res_ctx->pool.clock_sources[i] == clock_source) {
 			res_ctx->clock_source_ref_count[i]--;
+
+		if (res_ctx->clock_source_ref_count[i] == 0)
+			clock_source->funcs->cs_power_down(clock_source);
 		}
 	}
+
+
 }
 
 void reference_clock_source(
@@ -100,6 +105,11 @@ static bool is_sharable_clk_src(
 
 	if (id == CLOCK_SOURCE_ID_EXTERNAL)
 		return false;
+
+	/* Sharing dual link is not working */
+	if (stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK ||
+			stream_with_clk_src->signal == SIGNAL_TYPE_DVI_DUAL_LINK)
+			return false;
 
 	if(!is_same_timing(
 		&stream_with_clk_src->public.timing, &stream->public.timing))
