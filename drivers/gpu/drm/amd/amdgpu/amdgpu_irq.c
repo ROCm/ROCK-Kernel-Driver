@@ -218,10 +218,7 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 	int r = 0;
 
 	spin_lock_init(&adev->irq.lock);
-	r = drm_vblank_init(adev->ddev, adev->mode_info.num_crtc);
-	if (r) {
-		return r;
-	}
+
 	/* enable msi */
 	adev->irq.msi_enabled = false;
 
@@ -234,6 +231,10 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 	}
 
 	if (!amdgpu_has_dal_support(adev)) {
+		r = drm_vblank_init(adev->ddev, adev->mode_info.num_crtc);
+		if (r)
+			return r;
+
 		/* pre DCE11 */
 		INIT_WORK(&adev->hotplug_work,
 				amdgpu_hotplug_work_func);
