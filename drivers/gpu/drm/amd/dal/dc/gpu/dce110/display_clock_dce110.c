@@ -647,17 +647,24 @@ static bool display_clock_integrated_info_construct(
 	struct adapter_service *as)
 {
 	struct integrated_info info;
+	struct firmware_info fw_info;
 	uint32_t i;
 	struct display_clock *base = &disp_clk->disp_clk_base;
 	bool res;
 
 	dc_service_memset(&info, 0, sizeof(struct integrated_info));
+	dc_service_memset(&fw_info, 0, sizeof(struct firmware_info));
 
 	res = dal_adapter_service_get_integrated_info(as, &info);
 
 	disp_clk->dentist_vco_freq_khz = info.dentist_vco_freq;
-	if (disp_clk->dentist_vco_freq_khz == 0)
-		disp_clk->dentist_vco_freq_khz = 3600000;
+	if (disp_clk->dentist_vco_freq_khz == 0) {
+		dal_adapter_service_get_firmware_info(as, &fw_info);
+		disp_clk->dentist_vco_freq_khz =
+			fw_info.smu_gpu_pll_output_freq;
+		if (disp_clk->dentist_vco_freq_khz == 0)
+			disp_clk->dentist_vco_freq_khz = 3600000;
+	}
 
 	base->min_display_clk_threshold_khz =
 		disp_clk->dentist_vco_freq_khz / 64;
