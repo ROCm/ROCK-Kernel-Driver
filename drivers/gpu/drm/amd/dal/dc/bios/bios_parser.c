@@ -1295,18 +1295,6 @@ static enum bp_result bios_parser_get_divider_for_target_display_clock(
 	return bp->cmd_tbl.compute_memore_engine_pll(bp, bp_params);
 }
 
-static enum bp_result bios_parser_dvo_encoder_control(
-	struct dc_bios *dcb,
-	struct bp_dvo_encoder_control *cntl)
-{
-	struct bios_parser *bp = BP_FROM_DCB(dcb);
-
-	if (!bp->cmd_tbl.dvo_encoder_control)
-		return BP_RESULT_FAILURE;
-
-	return bp->cmd_tbl.dvo_encoder_control(bp, cntl);
-}
-
 static enum bp_result bios_parser_enable_crtc(
 	struct dc_bios *dcb,
 	enum controller_id id,
@@ -3143,41 +3131,8 @@ static enum encoder_id encoder_id_from_bios_object_id(uint32_t bios_object_id)
 	case ENCODER_OBJECT_ID_INTERNAL_DAC2:
 		id = ENCODER_ID_INTERNAL_DAC2;
 		break;
-	case ENCODER_OBJECT_ID_INTERNAL_SDVOA:
-		id = ENCODER_ID_INTERNAL_SDVOA;
-		break;
-	case ENCODER_OBJECT_ID_INTERNAL_SDVOB:
-		id = ENCODER_ID_INTERNAL_SDVOB;
-		break;
-	case ENCODER_OBJECT_ID_SI170B:
-		id = ENCODER_ID_EXTERNAL_SI170B;
-		break;
-	case ENCODER_OBJECT_ID_CH7303:
-		id = ENCODER_ID_EXTERNAL_CH7303;
-		break;
-	case ENCODER_OBJECT_ID_CH7301:
-		id = ENCODER_ID_EXTERNAL_CH7301;
-		break;
-	case ENCODER_OBJECT_ID_INTERNAL_DVO1:
-		id = ENCODER_ID_INTERNAL_DVO1;
-		break;
-	case ENCODER_OBJECT_ID_EXTERNAL_SDVOA:
-		id = ENCODER_ID_EXTERNAL_SDVOA;
-		break;
-	case ENCODER_OBJECT_ID_EXTERNAL_SDVOB:
-		id = ENCODER_ID_EXTERNAL_SDVOB;
-		break;
-	case ENCODER_OBJECT_ID_TITFP513:
-		id = ENCODER_ID_EXTERNAL_TITFP513;
-		break;
 	case ENCODER_OBJECT_ID_INTERNAL_LVTM1:
 		id = ENCODER_ID_INTERNAL_LVTM1;
-		break;
-	case ENCODER_OBJECT_ID_VT1623:
-		id = ENCODER_ID_EXTERNAL_VT1623;
-		break;
-	case ENCODER_OBJECT_ID_HDMI_SI1930:
-		id = ENCODER_ID_EXTERNAL_SI1930;
 		break;
 	case ENCODER_OBJECT_ID_HDMI_INTERNAL:
 		id = ENCODER_ID_INTERNAL_HDMI;
@@ -3185,35 +3140,17 @@ static enum encoder_id encoder_id_from_bios_object_id(uint32_t bios_object_id)
 	case ENCODER_OBJECT_ID_INTERNAL_KLDSCP_TMDS1:
 		id = ENCODER_ID_INTERNAL_KLDSCP_TMDS1;
 		break;
-	case ENCODER_OBJECT_ID_INTERNAL_KLDSCP_DVO1:
-		id = ENCODER_ID_INTERNAL_KLDSCP_DVO1;
-		break;
 	case ENCODER_OBJECT_ID_INTERNAL_KLDSCP_DAC1:
 		id = ENCODER_ID_INTERNAL_KLDSCP_DAC1;
 		break;
 	case ENCODER_OBJECT_ID_INTERNAL_KLDSCP_DAC2:
 		id = ENCODER_ID_INTERNAL_KLDSCP_DAC2;
 		break;
-	case ENCODER_OBJECT_ID_SI178:
-		id = ENCODER_ID_EXTERNAL_SI178;
-		break;
 	case ENCODER_OBJECT_ID_MVPU_FPGA:
 		id = ENCODER_ID_EXTERNAL_MVPU_FPGA;
 		break;
 	case ENCODER_OBJECT_ID_INTERNAL_DDI:
 		id = ENCODER_ID_INTERNAL_DDI;
-		break;
-	case ENCODER_OBJECT_ID_VT1625:
-		id = ENCODER_ID_EXTERNAL_VT1625;
-		break;
-	case ENCODER_OBJECT_ID_HDMI_SI1932:
-		id = ENCODER_ID_EXTERNAL_SI1932;
-		break;
-	case ENCODER_OBJECT_ID_DP_AN9801:
-		id = ENCODER_ID_EXTERNAL_AN9801;
-		break;
-	case ENCODER_OBJECT_ID_DP_DP501:
-		id = ENCODER_ID_EXTERNAL_DP501;
 		break;
 	case ENCODER_OBJECT_ID_INTERNAL_UNIPHY:
 		id = ENCODER_ID_INTERNAL_UNIPHY;
@@ -3227,9 +3164,6 @@ static enum encoder_id encoder_id_from_bios_object_id(uint32_t bios_object_id)
 	case ENCODER_OBJECT_ID_INTERNAL_UNIPHY2:
 		id = ENCODER_ID_INTERNAL_UNIPHY2;
 		break;
-	case ENCODER_OBJECT_ID_GENERAL_EXTERNAL_DVO:
-		id = ENCODER_ID_EXTERNAL_GENERIC_DVO;
-		break;
 	case ENCODER_OBJECT_ID_ALMOND: /* ENCODER_OBJECT_ID_NUTMEG */
 		id = ENCODER_ID_EXTERNAL_NUTMEG;
 		break;
@@ -3241,6 +3175,7 @@ static enum encoder_id encoder_id_from_bios_object_id(uint32_t bios_object_id)
 		break;
 	default:
 		id = ENCODER_ID_UNKNOWN;
+		ASSERT(0);
 		break;
 	}
 
@@ -4965,8 +4900,6 @@ static const struct dc_vbios_funcs vbios_funcs = {
 	.transmitter_control = bios_parser_transmitter_control,
 
 	.crt_control = bios_parser_crt_control,
-
-	.dvo_encoder_control = bios_parser_dvo_encoder_control,
 
 	.enable_crtc = bios_parser_enable_crtc,
 

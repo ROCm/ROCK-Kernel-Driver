@@ -30,8 +30,6 @@
 #include "dal_services.h"
 #include "include/gpio_interface.h"
 #include "include/ddc_interface.h"
-/* TODO remove dvo */
-#include "include/dvo_interface.h"
 #include "include/irq_interface.h"
 #include "include/gpio_service_interface.h"
 #include "hw_translate.h"
@@ -49,7 +47,6 @@
 
 #include "hw_gpio_pin.h"
 #include "gpio.h"
-#include "dvo.h"
 #include "ddc.h"
 #include "irq.h"
 
@@ -200,36 +197,6 @@ void dal_gpio_service_destroy_ddc(
 	dal_gpio_destroy_ddc(ddc);
 }
 
-struct dvo *dal_gpio_service_create_dvo(
-	struct gpio_service *service,
-	uint32_t offset,
-	uint32_t mask)
-{
-	enum gpio_id id;
-	uint32_t en;
-
-	if (!service->translate.funcs->offset_to_id(offset, mask, &id, &en)) {
-		BREAK_TO_DEBUGGER();
-		return NULL;
-	}
-
-	return dal_dvo_create(service, id, en);
-}
-
-struct dvo *dal_gpio_service_create_dvo_ex(
-	struct gpio_service *service,
-	enum gpio_id id,
-	uint32_t en)
-{
-	return dal_dvo_create(service, id, en);
-}
-
-void dal_gpio_service_destroy_dvo(
-	struct dvo **dvo)
-{
-	dal_dvo_destroy(dvo);
-}
-
 struct irq *dal_gpio_service_create_irq(
 	struct gpio_service *service,
 	uint32_t offset,
@@ -304,29 +271,6 @@ static bool is_pin_busy(
 	return 0 != (*slot & (1 << (en % bits_per_uint)));
 }
 
-static bool is_some_pin_busy(
-	const struct gpio_service *service,
-	enum gpio_id id)
-{
-	const uint32_t bits_per_uint = sizeof(uint32_t) << 3;
-
-	uint32_t index_of_uint = 0;
-
-	uint32_t number_of_uints =
-		service->factory.number_of_pins[id];
-
-	number_of_uints = (number_of_uints + bits_per_uint - 1) / bits_per_uint;
-
-	while (index_of_uint < number_of_uints) {
-		if (service->busyness[id][index_of_uint])
-			return true;
-
-		++index_of_uint;
-	};
-
-	return false;
-}
-
 static void set_pin_busy(
 	struct gpio_service *service,
 	enum gpio_id id,
@@ -370,38 +314,6 @@ enum gpio_result dal_gpio_service_open(
 	}
 
 	switch (id) {
-	case GPIO_ID_DVO1:
-		/* [anaumov] not implemented, commented with "to do" */
-		ASSERT_CRITICAL(false);
-		return GPIO_RESULT_NON_SPECIFIC_ERROR;
-	case GPIO_ID_DVO12:
-		if (!service->busyness[GPIO_ID_DVO24]) {
-			ASSERT_CRITICAL(false);
-			return GPIO_RESULT_OPEN_FAILED;
-		}
-
-		if (is_some_pin_busy(service, GPIO_ID_DVO24)) {
-			ASSERT_CRITICAL(false);
-			return GPIO_RESULT_DEVICE_BUSY;
-		}
-
-		pin = service->factory.funcs->create_dvo(
-			service->ctx, id, en);
-	break;
-	case GPIO_ID_DVO24:
-		if (!service->busyness[GPIO_ID_DVO12]) {
-			ASSERT_CRITICAL(false);
-			return GPIO_RESULT_OPEN_FAILED;
-		}
-
-		if (is_some_pin_busy(service, GPIO_ID_DVO12)) {
-			ASSERT_CRITICAL(false);
-			return GPIO_RESULT_DEVICE_BUSY;
-		}
-
-		pin = service->factory.funcs->create_dvo(
-			service->ctx, id, en);
-	break;
 	case GPIO_ID_DDC_DATA:
 		pin = service->factory.funcs->create_ddc_data(
 			service->ctx, id, en);

@@ -39,9 +39,6 @@ struct cmd_tbl {
 	enum bp_result (*encoder_control_dig2)(
 		struct bios_parser *bp,
 		struct bp_encoder_control *control);
-	enum bp_result (*dvo_encoder_control)(
-		struct bios_parser *bp,
-		struct bp_dvo_encoder_control *cntl);
 	enum bp_result (*transmitter_control)(
 		struct bios_parser *bp,
 		struct bp_transmitter_control *control);

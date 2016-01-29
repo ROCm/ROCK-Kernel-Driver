@@ -41,17 +41,16 @@
 	container_of(base, struct display_clock_dce110, disp_clk_base)
 
 static struct state_dependent_clocks max_clks_by_state[] = {
-/*( dvo not exist in KV)*/
 /*ClocksStateInvalid - should not be used*/
-{ .display_clk_khz = 0, .pixel_clk_khz = 0, .dvo_clk_khz = 0 },
+{ .display_clk_khz = 0, .pixel_clk_khz = 0 },
 /*ClocksStateUltraLow - currently by HW design team not supposed to be used*/
-{ .display_clk_khz = 352000, .pixel_clk_khz = 330000, .dvo_clk_khz = 0 },
+{ .display_clk_khz = 352000, .pixel_clk_khz = 330000 },
 /*ClocksStateLow*/
-{ .display_clk_khz = 352000, .pixel_clk_khz = 330000, .dvo_clk_khz = 0 },
+{ .display_clk_khz = 352000, .pixel_clk_khz = 330000 },
 /*ClocksStateNominal*/
-{ .display_clk_khz = 467000, .pixel_clk_khz = 400000, .dvo_clk_khz = 0 },
+{ .display_clk_khz = 467000, .pixel_clk_khz = 400000 },
 /*ClocksStatePerformance*/
-{ .display_clk_khz = 643000, .pixel_clk_khz = 400000, .dvo_clk_khz = 0 } };
+{ .display_clk_khz = 643000, .pixel_clk_khz = 400000 } };
 
 
 /* Starting point for each divider range.*/

@@ -279,7 +279,6 @@ static bool program_pix_clk(
 			pll_settings->pix_clk_post_divider;
 	bp_pc_params.encoder_object_id = pix_clk_params->encoder_object_id;
 	bp_pc_params.signal_type = pix_clk_params->signal_type;
-	bp_pc_params.dvo_config = pix_clk_params->dvo_cfg;
 	bp_pc_params.flags.SET_EXTERNAL_REF_DIV_SRC =
 					pll_settings->use_external_clk;
 
@@ -392,7 +391,8 @@ static uint32_t get_pix_clk_dividers(
 	/* Check if reference clock is external (not pcie/xtalin)
 	* HW Dce80 spec:
 	* 00 - PCIE_REFCLK, 01 - XTALIN,    02 - GENERICA,    03 - GENERICB
-	* 04 - HSYNCA,      05 - GENLK_CLK, 06 - PCIE_REFCLK, 07 - DVOCLK0 */
+	* 04 - HSYNCA,      05 - GENLK_CLK, 06 - PCIE_REFCLK
+	*/
 	addr = pll_cs_110->pxpll_cntl;
 	value = dal_read_reg(cs->ctx, addr);
 	field = get_reg_field_value(value, PLL_CNTL, PLL_REF_DIV_SRC);

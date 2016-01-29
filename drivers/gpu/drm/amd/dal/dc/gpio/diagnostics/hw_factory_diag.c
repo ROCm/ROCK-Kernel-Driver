@@ -42,7 +42,6 @@
 
 /* function table */
 static const struct hw_factory_funcs funcs = {
-	.create_dvo = NULL,
 	.create_ddc_data = NULL,
 	.create_ddc_clock = NULL,
 	.create_generic = NULL,
@@ -54,9 +53,6 @@ static const struct hw_factory_funcs funcs = {
 
 void dal_hw_factory_diag_fpga_init(struct hw_factory *factory)
 {
-	factory->number_of_pins[GPIO_ID_DVO1] = 24;
-	factory->number_of_pins[GPIO_ID_DVO12] = 2;
-	factory->number_of_pins[GPIO_ID_DVO24] = 1;
 	factory->number_of_pins[GPIO_ID_DDC_DATA] = 8;
 	factory->number_of_pins[GPIO_ID_DDC_CLOCK] = 8;
 	factory->number_of_pins[GPIO_ID_GENERIC] = 7;
@@ -65,6 +61,5 @@ void dal_hw_factory_diag_fpga_init(struct hw_factory *factory)
 	factory->number_of_pins[GPIO_ID_VIP_PAD] = 0;
 	factory->number_of_pins[GPIO_ID_SYNC] = 2;
 	factory->number_of_pins[GPIO_ID_GSL] = 4;
-
 	factory->funcs = &funcs;
 }

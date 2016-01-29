@@ -144,24 +144,6 @@ struct bp_transmitter_control {
 	bool single_pll_mode;
 };
 
-enum dvo_encoder_memory_rate {
-	DVO_ENCODER_MEMORY_RATE_DDR,
-	DVO_ENCODER_MEMORY_RATE_SDR
-};
-
-enum dvo_encoder_interface_width {
-	DVO_ENCODER_INTERFACE_WIDTH_LOW12BIT,
-	DVO_ENCODER_INTERFACE_WIDTH_HIGH12BIT,
-	DVO_ENCODER_INTERFACE_WIDTH_FULL24BIT
-};
-
-struct bp_dvo_encoder_control {
-	enum bp_encoder_control_action action;
-	enum dvo_encoder_memory_rate memory_rate;
-	enum dvo_encoder_interface_width interface_width;
-	uint32_t pixel_clock; /* in KHz */
-};
-
 struct bp_blank_crtc_parameters {
 	enum controller_id controller_id;
 	uint32_t black_color_rcr;
@@ -207,22 +189,12 @@ struct bp_hw_crtc_overscan_parameters {
 struct bp_adjust_pixel_clock_parameters {
 	/* Input: Signal Type - to be converted to Encoder mode */
 	enum signal_type signal_type;
-	/* Input: required by V3, display pll configure parameter defined as
-	 * following DISPPLL_CONFIG_XXXX */
-	enum disp_pll_config display_pll_config;
 	/* Input: Encoder object id */
 	struct graphics_object_id encoder_object_id;
 	/* Input: Pixel Clock (requested Pixel clock based on Video timing
 	 * standard used) in KHz
 	 */
 	uint32_t pixel_clock;
-	union {
-		/* Input: If DVO, need passing link rate and output 12bit low or
-		 * 24bit to VBIOS Exec table */
-		uint32_t dvo_config;
-		/* Input: If non DVO, not defined yet */
-		uint32_t non_dvo_undefined;
-	};
 	/* Output: Adjusted Pixel Clock (after VBIOS exec table) in KHz */
 	uint32_t adjusted_pixel_clock;
 	/* Output: If non-zero, this refDiv value should be used to calculate
@@ -252,9 +224,6 @@ struct bp_pixel_clock_parameters {
 	/* Calculated Pixel Clock Post divider of Display PLL */
 	uint32_t pixel_clock_post_divider;
 	struct graphics_object_id encoder_object_id; /* Encoder object id */
-	/* If DVO, need passing link rate and output 12bit low or
-	 * 24bit to VBIOS Exec table */
-	uint32_t dvo_config;
 	/* VBIOS returns a fixed display clock when DFS-bypass feature
 	 * is enabled (KHz) */
 	uint32_t dfs_bypass_display_clock;

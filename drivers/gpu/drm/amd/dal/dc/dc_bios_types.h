@@ -207,9 +207,6 @@ struct dc_vbios_funcs {
 		enum engine_id engine_id,
 		bool enable,
 		uint32_t pixel_clock);
-	enum bp_result (*dvo_encoder_control)(
-		struct dc_bios *bios,
-		struct bp_dvo_encoder_control *cntl);
 	enum bp_result (*enable_crtc)(
 		struct dc_bios *bios,
 		enum controller_id id,

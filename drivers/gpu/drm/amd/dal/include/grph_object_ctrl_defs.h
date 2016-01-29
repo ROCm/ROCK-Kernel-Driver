@@ -86,13 +86,6 @@ enum cv_standard {
 	CV_STANDARD_SD_SECAM_L1		/* SECAM L1 output 4009 */
 };
 
-enum disp_pll_config {
-	DISP_PLL_CONFIG_UNKNOWN = 0,
-	DISP_PLL_CONFIG_DVO_DDR_MODE_LOW_12BIT,
-	DISP_PLL_CONFIG_DVO_DDR_MODE_UPPER_12BIT,
-	DISP_PLL_CONFIG_DVO_DDR_MODE_24BIT
-};
-
 enum display_output_bit_depth {
 	PANEL_UNDEFINE = 0,
 	PANEL_6BIT_COLOR = 1,

@@ -86,11 +86,6 @@ struct pixel_clk_params {
 	struct csdp_ref_clk_ds_params de_spread_params;
 /*> de-spread info, relevant only for on-the-fly tune-up pixel rate*/
 
-	uint32_t dvo_cfg;
-/*> If DVO, need passing link rate
- * and output 12bit low or 24bit to VBIOS Exec table*/
-
-	enum disp_pll_config disp_pll_cfg;
 	struct pixel_clk_flags flags;
 };
 
