@@ -2,7 +2,7 @@
 # Makefile for the 'gpio' sub-component of DAL.
 # It provides the control and status of HW GPIO pins.
 
-GPIO = ddc.o dvo.o gpio_base.o gpio_service.o hw_ddc.o hw_dvo.o hw_factory.o \
+GPIO = ddc.o gpio_base.o gpio_service.o hw_ddc.o hw_factory.o \
        hw_gpio.o hw_gpio_pad.o hw_gpio_pin.o hw_hpd.o hw_translate.o irq.o
 
 AMD_DAL_GPIO = $(addprefix $(AMDDALPATH)/dc/gpio/,$(GPIO))

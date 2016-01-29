@@ -1090,7 +1090,8 @@ static bool dc_set_clocks_and_clock_state (
 	 * that state.
 	 *
 	 * Update the clock state here (prior to setting Pixel clock,
-	 * DVO clock, or Display clock) */
+	 * or Display clock)
+	 **/
 	if (!dal_display_clock_set_min_clocks_state(
 			disp_clk, context->res_ctx.required_clocks_state)) {
 		BREAK_TO_DEBUGGER();

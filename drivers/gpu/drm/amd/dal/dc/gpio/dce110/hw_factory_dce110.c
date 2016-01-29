@@ -46,7 +46,6 @@
 
 /* fucntion table */
 static const struct hw_factory_funcs funcs = {
-	.create_dvo = NULL,
 	.create_ddc_data = dal_hw_ddc_dce110_create,
 	.create_ddc_clock = dal_hw_ddc_dce110_create,
 	.create_generic = NULL,
@@ -68,9 +67,6 @@ static const struct hw_factory_funcs funcs = {
 void dal_hw_factory_dce110_init(struct hw_factory *factory)
 {
 	/*TODO check ASIC CAPs*/
-	factory->number_of_pins[GPIO_ID_DVO1] = 24;
-	factory->number_of_pins[GPIO_ID_DVO12] = 2;
-	factory->number_of_pins[GPIO_ID_DVO24] = 1;
 	factory->number_of_pins[GPIO_ID_DDC_DATA] = 8;
 	factory->number_of_pins[GPIO_ID_DDC_CLOCK] = 8;
 	factory->number_of_pins[GPIO_ID_GENERIC] = 7;

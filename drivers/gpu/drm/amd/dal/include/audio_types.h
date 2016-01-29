@@ -264,7 +264,6 @@ struct audio_feature_support {
 	uint32_t ENGINE_DIGE:1;
 	uint32_t ENGINE_DIGF:1;
 	uint32_t ENGINE_DIGG:1;
-	uint32_t ENGINE_DVO:1;
 	uint32_t MULTISTREAM_AUDIO:1;
 };
 

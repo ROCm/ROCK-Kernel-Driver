@@ -45,7 +45,6 @@
  */
 
 #include "../hw_gpio_pin.h"
-#include "../hw_dvo.h"
 
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
@@ -57,26 +56,6 @@ static bool offset_to_id(
 	uint32_t *en)
 {
 	switch (offset) {
-	/* DVO */
-	case mmDC_GPIO_DVODATA_A:
-		switch (mask) {
-		case BUNDLE_A_MASK:
-			*id = GPIO_ID_DVO12;
-			*en = GPIO_DVO12_A;
-			return true;
-		case BUNDLE_B_MASK:
-			*id = GPIO_ID_DVO12;
-			*en = GPIO_DVO12_B;
-			return true;
-		case DC_GPIO_DVODATA_A__DC_GPIO_DVODATA_A_MASK:
-			*id = GPIO_ID_DVO24;
-			*en = 0;
-			return true;
-		default:
-			ASSERT_CRITICAL(false);
-			return false;
-		}
-	break;
 	/* GENERIC */
 	case mmDC_GPIO_GENERIC_A:
 		*id = GPIO_ID_GENERIC;
@@ -220,20 +199,6 @@ static bool id_to_offset(
 	bool result = true;
 
 	switch (id) {
-	case GPIO_ID_DVO12:
-		info->offset = mmDC_GPIO_DVODATA_A;
-		switch (en) {
-		case GPIO_DVO12_A:
-			info->mask = BUNDLE_A_MASK;
-		break;
-		case GPIO_DVO12_B:
-			info->mask = BUNDLE_B_MASK;
-		break;
-		default:
-			ASSERT_CRITICAL(false);
-			result = false;
-		}
-	break;
 	case GPIO_ID_DDC_DATA:
 		info->mask = DC_GPIO_DDC6_A__DC_GPIO_DDC6DATA_A_MASK;
 		switch (en) {
@@ -394,11 +359,6 @@ static bool id_to_offset(
 			result = false;
 		}
 	break;
-	case GPIO_ID_DVO24:
-		info->offset = mmDC_GPIO_DVODATA_A;
-		info->mask = DC_GPIO_DVODATA_A__DC_GPIO_DVODATA_A_MASK;
-	break;
-	case GPIO_ID_DVO1:
 	case GPIO_ID_VIP_PAD:
 	default:
 		ASSERT_CRITICAL(false);

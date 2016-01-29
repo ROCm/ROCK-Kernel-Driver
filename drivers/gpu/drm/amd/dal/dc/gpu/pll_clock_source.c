@@ -97,9 +97,6 @@ bool dal_pll_clock_source_adjust_pix_clk(
 	bp_adjust_pixel_clock_params.
 		encoder_object_id = pix_clk_params->encoder_object_id;
 	bp_adjust_pixel_clock_params.signal_type = pix_clk_params->signal_type;
-	bp_adjust_pixel_clock_params.dvo_config = pix_clk_params->dvo_cfg;
-	bp_adjust_pixel_clock_params.
-		display_pll_config = pix_clk_params->disp_pll_cfg;
 	bp_adjust_pixel_clock_params.
 		ss_enable = pix_clk_params->flags.ENABLE_SS;
 	bp_result = pll_clk_src->base.bios_parser->funcs->adjust_pixel_clock(

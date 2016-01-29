@@ -70,7 +70,6 @@ bool dal_ext_clock_source_program_pix_clk(
 			pix_clk_params->requested_pix_clk;
 	bp_pix_clk_params.encoder_object_id = pix_clk_params->encoder_object_id;
 	bp_pix_clk_params.signal_type = pix_clk_params->signal_type;
-	bp_pix_clk_params.dvo_config = pix_clk_params->dvo_cfg;
 
 	if (clk_src->bios_parser->funcs->set_pixel_clock(
 					clk_src->bios_parser,

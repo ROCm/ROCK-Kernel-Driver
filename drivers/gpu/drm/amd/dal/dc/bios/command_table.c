@@ -49,7 +49,6 @@
 
 
 static void init_dig_encoder_control(struct bios_parser *bp);
-static void init_dvo_encoder_control(struct bios_parser *bp);
 static void init_transmitter_control(struct bios_parser *bp);
 static void init_set_pixel_clock(struct bios_parser *bp);
 static void init_enable_spread_spectrum_on_ppll(struct bios_parser *bp);
@@ -72,7 +71,6 @@ static void init_set_dce_clock(struct bios_parser *bp);
 void dal_bios_parser_init_cmd_tbl(struct bios_parser *bp)
 {
 	init_dig_encoder_control(bp);
-	init_dvo_encoder_control(bp);
 	init_transmitter_control(bp);
 	init_set_pixel_clock(bp);
 	init_enable_spread_spectrum_on_ppll(bp);
@@ -301,65 +299,6 @@ static enum bp_result encoder_control_digx_v4(
 		}
 
 	if (EXEC_BIOS_CMD_TABLE(DIGxEncoderControl, params))
-		result = BP_RESULT_OK;
-
-	return result;
-}
-
-/*******************************************************************************
- ********************************************************************************
- **
- **                 DVO ENCODER CONTROL
- **
- ********************************************************************************
- *******************************************************************************/
-
-static enum bp_result dvo_encoder_control_v3(
-	struct bios_parser *bp,
-	struct bp_dvo_encoder_control *cntl);
-
-static void init_dvo_encoder_control(struct bios_parser *bp)
-{
-	switch (BIOS_CMD_TABLE_PARA_REVISION(DVOEncoderControl)) {
-	case 3:
-		bp->cmd_tbl.dvo_encoder_control = dvo_encoder_control_v3;
-		break;
-	default:
-		bp->cmd_tbl.dvo_encoder_control = NULL;
-		break;
-	}
-}
-
-static enum bp_result dvo_encoder_control_v3(
-	struct bios_parser *bp,
-	struct bp_dvo_encoder_control *cntl)
-{
-	enum bp_result result = BP_RESULT_FAILURE;
-	DVO_ENCODER_CONTROL_PARAMETERS_V3 params;
-	uint8_t config = 0;
-
-	if (cntl->memory_rate == DVO_ENCODER_MEMORY_RATE_SDR)
-		config |= DVO_ENCODER_CONFIG_SDR_SPEED;
-
-	switch (cntl->interface_width) {
-	case DVO_ENCODER_INTERFACE_WIDTH_FULL24BIT:
-		config |= DVO_ENCODER_CONFIG_24BIT;
-		break;
-	case DVO_ENCODER_INTERFACE_WIDTH_HIGH12BIT:
-		config |= DVO_ENCODER_CONFIG_UPPER12BIT;
-		break;
-	default:
-		config |= DVO_ENCODER_CONFIG_LOW12BIT;
-		break;
-	}
-
-	/* We need to convert from KHz units into 10KHz units */
-	dc_service_memset(&params, 0, sizeof(params));
-	params.ucAction = (uint8_t) cntl->action;
-	params.usPixelClock = cpu_to_le16((uint16_t) (cntl->pixel_clock / 10));
-	params.ucDVOConfig = config;
-
-	if (EXEC_BIOS_CMD_TABLE(DVOEncoderControl, params))
 		result = BP_RESULT_OK;
 
 	return result;
@@ -1515,17 +1454,6 @@ static void init_adjust_display_pll(struct bios_parser *bp)
 	}
 }
 
-static bool adjust_display_pll_bug_patch(ADJUST_DISPLAY_PLL_PARAMETERS *params)
-{
-	/* vbios bug: pixel clock should not be doubled for DVO with 24bit
-	 * interface */
-	if ((params->ucTransmitterID == ENCODER_OBJECT_ID_INTERNAL_KLDSCP_DVO1)
-			&& (params->ucDVOConfig == DVO_ENCODER_CONFIG_24BIT))
-		/* the current pixel clock is good. no adjustment is required */
-		return true;
-	return false;
-}
-
 static enum bp_result adjust_display_pll_v2(
 	struct bios_parser *bp,
 	struct bp_adjust_pixel_clock_parameters *bp_params)
@@ -1545,23 +1473,6 @@ static enum bp_result adjust_display_pll_v2(
 	params.ucEncodeMode =
 			(uint8_t)bp->cmd_helper->encoder_mode_bp_to_atom(
 					bp_params->signal_type, false);
-	params.ucDVOConfig = (uint8_t)(bp_params->dvo_config);
-
-	if (adjust_display_pll_bug_patch(&params)
-			|| EXEC_BIOS_CMD_TABLE(AdjustDisplayPll, params)) {
-		/* Convert output pixel clock back 10KHz-->KHz: multiply
-		 * original pixel clock in KHz by ratio
-		 * [output pxlClk/input pxlClk] */
-		uint64_t pixel_clock_10KHz_out =
-				le16_to_cpu((uint64_t)params.usPixelClock);
-		uint64_t pixel_clock = (uint64_t)bp_params->pixel_clock;
-
-		bp_params->adjusted_pixel_clock =
-				div_u64(pixel_clock * pixel_clock_10KHz_out,
-						pixel_clock_10KHz_in);
-		result = BP_RESULT_OK;
-	}
-
 	return result;
 }
 
@@ -1585,25 +1496,6 @@ static enum bp_result adjust_display_pll_v3(
 	params.sInput.ucEncodeMode =
 			(uint8_t)bp->cmd_helper->encoder_mode_bp_to_atom(
 					bp_params->signal_type, false);
-
-	if (DISP_PLL_CONFIG_DVO_DDR_MODE_LOW_12BIT ==
-			bp_params->display_pll_config)
-		params.sInput.ucDispPllConfig =
-				DISPPLL_CONFIG_DVO_DDR_SPEED |
-				DISPPLL_CONFIG_DVO_LOW12BIT;
-	else if (DISP_PLL_CONFIG_DVO_DDR_MODE_UPPER_12BIT ==
-			bp_params->display_pll_config)
-		params.sInput.ucDispPllConfig =
-				DISPPLL_CONFIG_DVO_DDR_SPEED |
-				DISPPLL_CONFIG_DVO_UPPER12BIT;
-	else if (DISP_PLL_CONFIG_DVO_DDR_MODE_24BIT ==
-			bp_params->display_pll_config)
-		params.sInput.ucDispPllConfig =
-				DISPPLL_CONFIG_DVO_DDR_SPEED | DISPPLL_CONFIG_DVO_24BIT;
-	else
-		/* this does not mean anything here */
-		params.sInput.ucDispPllConfig =
-				(uint8_t)(bp_params->display_pll_config);
 
 	if (bp_params->ss_enable == true)
 		params.sInput.ucDispPllConfig |= DISPPLL_CONFIG_SS_ENABLE;
@@ -1872,9 +1764,6 @@ static enum signal_type dac_load_detection_v3(
 	case ENCODER_ID_INTERNAL_DAC2:
 	case ENCODER_ID_INTERNAL_KLDSCP_DAC2:
 		params.sDacload.ucDacType = ATOM_DAC_B;
-		break;
-	case ENCODER_ID_EXTERNAL_CH7303:
-		params.sDacload.ucDacType = ATOM_EXT_DAC;
 		break;
 	default:
 		return signal;

@@ -123,7 +123,6 @@ enum clocks_state {
 struct state_dependent_clocks {
 	uint32_t display_clk_khz;
 	uint32_t pixel_clk_khz;
-	uint32_t dvo_clk_khz;
 };
 
 struct display_clock_state {

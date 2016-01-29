@@ -270,10 +270,6 @@ static bool engine_bp_to_atom(enum engine_id id, uint32_t *atom_engine_id)
 			*atom_engine_id = ASIC_INT_DIG7_ENCODER_ID;
 			result = true;
 			break;
-		case ENGINE_ID_DVO:
-			*atom_engine_id = ASIC_EXT_DIG_ENCODER_ID;
-			result = true;
-			break;
 		case ENGINE_ID_DACA:
 			*atom_engine_id = ASIC_INT_DAC1_ENCODER_ID;
 			result = true;

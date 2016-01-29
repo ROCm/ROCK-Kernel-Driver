@@ -32,10 +32,6 @@ struct hw_factory {
 	uint32_t number_of_pins[GPIO_ID_COUNT];
 
 	const struct hw_factory_funcs {
-		struct hw_gpio_pin *(*create_dvo)(
-			struct dc_context *ctx,
-			enum gpio_id id,
-			uint32_t en);
 		struct hw_gpio_pin *(*create_ddc_data)(
 			struct dc_context *ctx,
 			enum gpio_id id,
