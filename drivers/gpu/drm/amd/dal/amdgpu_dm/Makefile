@@ -7,7 +7,7 @@
 AMDGPUDM = amdgpu_dm_types.o amdgpu_dm.o amdgpu_dm_irq.o amdgpu_dm_mst_types.o
 
 ifneq ($(CONFIG_DRM_AMD_DAL),)
-AMDGPUDM += amdgpu_dal_services.o amdgpu_dc_helpers.o
+AMDGPUDM += amdgpu_dm_services.o amdgpu_dm_helpers.o
 endif
 
 subdir-ccflags-y += -I$(FULL_AMD_DAL_PATH)/dc

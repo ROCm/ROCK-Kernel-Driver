@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 #include "include/dal_types.h"
 #include "include/logger_interface.h"
 #include "logger.h"
@@ -74,8 +74,8 @@ static bool is_reg_dump_process(void)
 		struct dal_reg_dump_stack_location *stack_location
 					= &reg_dump_stack.stack_locations[i];
 
-		if (stack_location->current_pid == dal_get_pid()
-			&& stack_location->current_tgid == dal_get_tgid())
+		if (stack_location->current_pid == dm_get_pid()
+			&& stack_location->current_tgid == dm_get_tgid())
 			return true;
 	}
 
@@ -96,7 +96,7 @@ static struct dal_reg_dump_stack_location *dal_reg_dump_stack_push(void)
 
 	if (reg_dump_stack.stack_pointer >= DAL_REG_DUMP_STACK_MAX_SIZE) {
 		/* stack is full */
-		dal_output_to_console("[REG_DUMP]: %s: stack is full!\n",
+		dm_output_to_console("[REG_DUMP]: %s: stack is full!\n",
 				__func__);
 	} else {
 		current_location =
@@ -113,7 +113,7 @@ static struct dal_reg_dump_stack_location *dal_reg_dump_stack_pop(void)
 
 	if (dal_reg_dump_stack_is_empty()) {
 		/* stack is empty */
-		dal_output_to_console("[REG_DUMP]: %s: stack is empty!\n",
+		dm_output_to_console("[REG_DUMP]: %s: stack is empty!\n",
 				__func__);
 	} else {
 		--reg_dump_stack.stack_pointer;
@@ -137,13 +137,13 @@ void dal_reg_logger_push(const char *caller_func)
 	if (NULL == free_stack_location)
 		return;
 
-	dc_service_memset(free_stack_location, 0, sizeof(*free_stack_location));
+	dm_memset(free_stack_location, 0, sizeof(*free_stack_location));
 
 	free_stack_location->current_caller_func = caller_func;
-	free_stack_location->current_pid = dal_get_pid();
-	free_stack_location->current_tgid = dal_get_tgid();
+	free_stack_location->current_pid = dm_get_pid();
+	free_stack_location->current_tgid = dm_get_tgid();
 
-	dal_output_to_console("[REG_DUMP]:%s - start (pid:%ld, tgid:%ld)\n",
+	dm_output_to_console("[REG_DUMP]:%s - start (pid:%ld, tgid:%ld)\n",
 		caller_func,
 		free_stack_location->current_pid,
 		free_stack_location->current_tgid);
@@ -156,21 +156,21 @@ void dal_reg_logger_pop(void)
 	top_stack_location = dal_reg_dump_stack_pop();
 
 	if (NULL == top_stack_location) {
-		dal_output_to_console("[REG_DUMP]:%s - Stack is Empty!\n",
+		dm_output_to_console("[REG_DUMP]:%s - Stack is Empty!\n",
 				__func__);
 		return;
 	}
 
-	dal_output_to_console(
+	dm_output_to_console(
 	"[REG_DUMP]:%s - end."\
 	" Reg R/W Count: Total=%d Function=%d. (pid:%ld, tgid:%ld)\n",
 			top_stack_location->current_caller_func,
 			reg_dump_stack.total_rw_count,
 			top_stack_location->rw_count,
-			dal_get_pid(),
-			dal_get_tgid());
+			dm_get_pid(),
+			dm_get_tgid());
 
-	dc_service_memset(top_stack_location, 0, sizeof(*top_stack_location));
+	dm_memset(top_stack_location, 0, sizeof(*top_stack_location));
 }
 
 void dal_reg_logger_rw_count_increment(void)

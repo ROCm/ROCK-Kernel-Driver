@@ -23,7 +23,8 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
+
 #include "../hw_ctx_adapter_service.h"
 
 #include "hw_ctx_adapter_service_dce110.h"
@@ -86,7 +87,7 @@ static void destroy(
 
 	destruct(hw_ctx);
 
-	dc_service_free(ptr->ctx, hw_ctx);
+	dm_free(ptr->ctx, hw_ctx);
 }
 
 /*
@@ -141,10 +142,10 @@ static uint32_t get_number_of_connected_audio_endpoints_multistream(
 			AZALIA_F0_CODEC_ENDPOINT_INDEX,
 			AZALIA_ENDPOINT_REG_INDEX);
 
-		dal_write_reg(ctx, audio_index_reg_offset[i], value);
+		dm_write_reg(ctx, audio_index_reg_offset[i], value);
 
 		value = 0;
-		value = dal_read_reg(ctx, audio_data_reg_offset[i]);
+		value = dm_read_reg(ctx, audio_data_reg_offset[i]);
 
 		/* 1 means not supported*/
 		if (get_reg_field_value(value,
@@ -173,7 +174,7 @@ static uint32_t get_number_of_connected_audio_endpoints(
 		/* audio straps indicate no audio supported */
 		return 0;
 
-	value = dal_read_reg(hw_ctx->ctx, addr);
+	value = dm_read_reg(hw_ctx->ctx, addr);
 
 	field = get_reg_field_value(
 			value, CC_DC_HDMI_STRAPS, AUDIO_STREAM_NUMBER);
@@ -216,14 +217,14 @@ static bool power_up(
 		uint32_t value = 0;
 		uint32_t field = 0;
 
-		value = dal_read_reg(hw_ctx->ctx, mmCC_DC_HDMI_STRAPS);
+		value = dm_read_reg(hw_ctx->ctx, mmCC_DC_HDMI_STRAPS);
 		field = get_reg_field_value(
 				value, CC_DC_HDMI_STRAPS, HDMI_DISABLE);
 
 		if (field == 0) {
 			hw_ctx->cached_audio_straps = AUDIO_STRAPS_DP_HDMI_AUDIO;
 		} else {
-			value = dal_read_reg(
+			value = dm_read_reg(
 					hw_ctx->ctx, mmDC_PINSTRAPS);
 			field = get_reg_field_value(
 						value,
@@ -285,7 +286,7 @@ struct hw_ctx_adapter_service *
 			struct dc_context *ctx)
 {
 	struct hw_ctx_adapter_service_dce110 *hw_ctx =
-			dc_service_alloc(ctx, sizeof(struct hw_ctx_adapter_service_dce110));
+			dm_alloc(ctx, sizeof(struct hw_ctx_adapter_service_dce110));
 
 	if (!hw_ctx) {
 		ASSERT_CRITICAL(false);
@@ -297,7 +298,7 @@ struct hw_ctx_adapter_service *
 
 	ASSERT_CRITICAL(false);
 
-	dc_service_free(ctx, hw_ctx);
+	dm_free(ctx, hw_ctx);
 
 	return NULL;
 }

@@ -22,7 +22,8 @@
  * Authors: AMD
  *
  */
-#include "dc_services.h"
+
+#include "dm_services.h"
 #include "dc.h"
 #include "core_types.h"
 #include "resource.h"
@@ -45,7 +46,7 @@ static void build_bit_depth_reduction_params(
 		const struct core_stream *stream,
 		struct bit_depth_reduction_params *fmt_bit_depth)
 {
-	dc_service_memset(fmt_bit_depth, 0, sizeof(*fmt_bit_depth));
+	dm_memset(fmt_bit_depth, 0, sizeof(*fmt_bit_depth));
 
 	/*TODO: Need to un-hardcode, refer to function with same name
 	 * in dal2 hw_sequencer*/
@@ -107,7 +108,7 @@ static bool construct(struct core_stream *stream,
 	stream->public.audio_info.mode_count = dc_sink_data->edid_caps.audio_mode_count;
 	stream->public.audio_info.audio_latency = dc_sink_data->edid_caps.audio_latency;
 	stream->public.audio_info.video_latency = dc_sink_data->edid_caps.video_latency;
-	dc_service_memmove(
+	dm_memmove(
 		stream->public.audio_info.display_name,
 		dc_sink_data->edid_caps.display_name,
 		AUDIO_INFO_DISPLAY_NAME_SIZE_IN_CHARS);
@@ -144,7 +145,7 @@ void dc_stream_release(struct dc_stream *public)
 
 	if (stream->ref_count == 0) {
 		destruct(protected);
-		dc_service_free(ctx, stream);
+		dm_free(ctx, stream);
 	}
 }
 
@@ -156,7 +157,7 @@ struct dc_stream *dc_create_stream_for_sink(const struct dc_sink *dc_sink)
 	if (sink == NULL)
 		goto alloc_fail;
 
-	stream = dc_service_alloc(sink->ctx, sizeof(struct stream));
+	stream = dm_alloc(sink->ctx, sizeof(struct stream));
 
 	if (NULL == stream)
 		goto alloc_fail;
@@ -169,7 +170,7 @@ struct dc_stream *dc_create_stream_for_sink(const struct dc_sink *dc_sink)
 	return &stream->protected.public;
 
 construct_fail:
-	dc_service_free(sink->ctx, stream);
+	dm_free(sink->ctx, stream);
 
 alloc_fail:
 	return NULL;

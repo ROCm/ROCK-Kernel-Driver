@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 #include "dce110_opp.h"
 #include "basics/conversion.h"
 
@@ -91,7 +91,7 @@ static void program_color_matrix(
 			OUTPUT_CSC_C11_C12,
 			OUTPUT_CSC_C12);
 
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 	{
 		uint32_t value = 0;
@@ -109,7 +109,7 @@ static void program_color_matrix(
 			OUTPUT_CSC_C13_C14,
 			OUTPUT_CSC_C14);
 
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 	{
 		uint32_t value = 0;
@@ -127,7 +127,7 @@ static void program_color_matrix(
 			OUTPUT_CSC_C21_C22,
 			OUTPUT_CSC_C22);
 
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 	{
 		uint32_t value = 0;
@@ -145,7 +145,7 @@ static void program_color_matrix(
 			OUTPUT_CSC_C23_C24,
 			OUTPUT_CSC_C24);
 
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 	{
 		uint32_t value = 0;
@@ -163,7 +163,7 @@ static void program_color_matrix(
 			OUTPUT_CSC_C31_C32,
 			OUTPUT_CSC_C32);
 
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 	{
 		uint32_t value = 0;
@@ -181,7 +181,7 @@ static void program_color_matrix(
 			OUTPUT_CSC_C33_C34,
 			OUTPUT_CSC_C34);
 
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 }
 
@@ -598,7 +598,7 @@ static void set_rgb_limited_range_adjustment(
 
 	calculate_adjustments(ideals, &adjustments, matrix);
 
-	dc_service_memmove(change_matrix, matrix, sizeof(matrix));
+	dm_memmove(change_matrix, matrix, sizeof(matrix));
 
 	/* from 1 -> 3 */
 	matrix[8] = change_matrix[0];
@@ -618,7 +618,7 @@ static void set_rgb_limited_range_adjustment(
 	matrix[6] = change_matrix[10];
 	matrix[7] = change_matrix[11];
 
-	dc_service_memset(&reg_matrix, 0, sizeof(struct out_csc_color_matrix));
+	dm_memset(&reg_matrix, 0, sizeof(struct out_csc_color_matrix));
 
 	setup_reg_format(matrix, reg_matrix.regval);
 
@@ -692,7 +692,7 @@ static void set_yuv_adjustment(
 		calculate_adjustments(
 			ideals, &adjustments, matrix);
 
-	dc_service_memset(&reg_matrix, 0, sizeof(struct out_csc_color_matrix));
+	dm_memset(&reg_matrix, 0, sizeof(struct out_csc_color_matrix));
 
 	setup_reg_format(matrix, reg_matrix.regval);
 
@@ -707,7 +707,7 @@ static bool configure_graphics_mode(
 {
 	struct dc_context *ctx = opp110->base.ctx;
 	uint32_t addr = DCP_REG(mmOUTPUT_CSC_CONTROL);
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -816,7 +816,7 @@ static bool configure_graphics_mode(
 			OUTPUT_CSC_GRPH_MODE);
 
 	addr = DCP_REG(mmOUTPUT_CSC_CONTROL);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	return true;
 }

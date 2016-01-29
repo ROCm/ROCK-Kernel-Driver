@@ -22,7 +22,7 @@
  * Authors: AMD
  *
  */
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
@@ -49,7 +49,7 @@ static void set_flip_control(
 {
 	uint32_t value = 0;
 
-	value = dal_read_reg(
+	value = dm_read_reg(
 			mem_input110->base.ctx,
 			DCP_REG(mmGRPH_FLIP_CONTROL));
 	set_reg_field_value(value, 0,
@@ -63,7 +63,7 @@ static void set_flip_control(
 			GRPH_FLIP_CONTROL,
 			GRPH_SURFACE_UPDATE_IMMEDIATE_EN);
 
-	dal_write_reg(
+	dm_write_reg(
 		mem_input110->base.ctx,
 		DCP_REG(mmGRPH_FLIP_CONTROL),
 		value);
@@ -83,7 +83,7 @@ GRPH_SECONDARY_SURFACE_ADDRESS_HIGH__GRPH_SECONDARY_SURFACE_ADDRESS_HIGH_MASK;
 		GRPH_SECONDARY_SURFACE_ADDRESS_HIGH,
 		GRPH_SECONDARY_SURFACE_ADDRESS_HIGH);
 
-	dal_write_reg(
+	dm_write_reg(
 			mem_input110->base.ctx,
 			DCP_REG(mmGRPH_SECONDARY_SURFACE_ADDRESS_HIGH),
 			value);
@@ -97,7 +97,7 @@ GRPH_SECONDARY_SURFACE_ADDRESS_HIGH__GRPH_SECONDARY_SURFACE_ADDRESS_HIGH_MASK;
 		GRPH_SECONDARY_SURFACE_ADDRESS,
 		GRPH_SECONDARY_SURFACE_ADDRESS);
 
-	dal_write_reg(
+	dm_write_reg(
 			mem_input110->base.ctx,
 			DCP_REG(mmGRPH_SECONDARY_SURFACE_ADDRESS),
 			value);
@@ -118,7 +118,7 @@ GRPH_PRIMARY_SURFACE_ADDRESS_HIGH__GRPH_PRIMARY_SURFACE_ADDRESS_HIGH_MASK;
 		GRPH_PRIMARY_SURFACE_ADDRESS_HIGH,
 		GRPH_PRIMARY_SURFACE_ADDRESS_HIGH);
 
-	dal_write_reg(
+	dm_write_reg(
 		mem_input110->base.ctx,
 		DCP_REG(mmGRPH_PRIMARY_SURFACE_ADDRESS_HIGH),
 		value);
@@ -132,7 +132,7 @@ GRPH_PRIMARY_SURFACE_ADDRESS_HIGH__GRPH_PRIMARY_SURFACE_ADDRESS_HIGH_MASK;
 		GRPH_PRIMARY_SURFACE_ADDRESS,
 		GRPH_PRIMARY_SURFACE_ADDRESS);
 
-	dal_write_reg(
+	dm_write_reg(
 		mem_input110->base.ctx,
 		DCP_REG(mmGRPH_PRIMARY_SURFACE_ADDRESS),
 		value);
@@ -167,9 +167,9 @@ static void enable(struct dce110_mem_input *mem_input110)
 {
 	uint32_t value = 0;
 
-	value = dal_read_reg(mem_input110->base.ctx, DCP_REG(mmGRPH_ENABLE));
+	value = dm_read_reg(mem_input110->base.ctx, DCP_REG(mmGRPH_ENABLE));
 	set_reg_field_value(value, 1, GRPH_ENABLE, GRPH_ENABLE);
-	dal_write_reg(mem_input110->base.ctx,
+	dm_write_reg(mem_input110->base.ctx,
 		DCP_REG(mmGRPH_ENABLE),
 		value);
 }
@@ -181,7 +181,7 @@ static void program_tiling(
 {
 	uint32_t value = 0;
 
-	value = dal_read_reg(
+	value = dm_read_reg(
 			mem_input110->base.ctx,
 			DCP_REG(mmGRPH_CONTROL));
 
@@ -215,7 +215,7 @@ static void program_tiling(
 	set_reg_field_value(value, 0,
 		GRPH_CONTROL, GRPH_Z);
 
-	dal_write_reg(
+	dm_write_reg(
 		mem_input110->base.ctx,
 		DCP_REG(mmGRPH_CONTROL),
 		value);
@@ -247,7 +247,7 @@ static void program_size_and_rotation(
 
 	set_reg_field_value(value, local_size.grph.surface_size.x,
 			GRPH_X_START, GRPH_X_START);
-	dal_write_reg(
+	dm_write_reg(
 		mem_input110->base.ctx,
 		DCP_REG(mmGRPH_X_START),
 		value);
@@ -255,7 +255,7 @@ static void program_size_and_rotation(
 	value = 0;
 	set_reg_field_value(value, local_size.grph.surface_size.y,
 			GRPH_Y_START, GRPH_Y_START);
-	dal_write_reg(
+	dm_write_reg(
 		mem_input110->base.ctx,
 		DCP_REG(mmGRPH_Y_START),
 		value);
@@ -263,7 +263,7 @@ static void program_size_and_rotation(
 	value = 0;
 	set_reg_field_value(value, local_size.grph.surface_size.width,
 			GRPH_X_END, GRPH_X_END);
-	dal_write_reg(
+	dm_write_reg(
 		mem_input110->base.ctx,
 		DCP_REG(mmGRPH_X_END),
 		value);
@@ -271,7 +271,7 @@ static void program_size_and_rotation(
 	value = 0;
 	set_reg_field_value(value, local_size.grph.surface_size.height,
 			GRPH_Y_END, GRPH_Y_END);
-	dal_write_reg(
+	dm_write_reg(
 		mem_input110->base.ctx,
 		DCP_REG(mmGRPH_Y_END),
 		value);
@@ -279,7 +279,7 @@ static void program_size_and_rotation(
 	value = 0;
 	set_reg_field_value(value, local_size.grph.surface_pitch,
 			GRPH_PITCH, GRPH_PITCH);
-	dal_write_reg(
+	dm_write_reg(
 		mem_input110->base.ctx,
 		DCP_REG(mmGRPH_PITCH),
 		value);
@@ -304,7 +304,7 @@ static void program_size_and_rotation(
 			HW_ROTATION, GRPH_ROTATION_ANGLE);
 		break;
 	}
-	dal_write_reg(
+	dm_write_reg(
 		mem_input110->base.ctx,
 		DCP_REG(mmHW_ROTATION),
 		value);
@@ -330,13 +330,13 @@ static void program_pixel_format(
 				value, 2, GRPH_SWAP_CNTL, GRPH_BLUE_CROSSBAR);
 		}
 
-		dal_write_reg(
+		dm_write_reg(
 			mem_input110->base.ctx,
 			DCP_REG(mmGRPH_SWAP_CNTL),
 			value);
 
 
-		value =	dal_read_reg(
+		value =	dm_read_reg(
 				mem_input110->base.ctx,
 				DCP_REG(mmGRPH_CONTROL));
 
@@ -378,13 +378,13 @@ static void program_pixel_format(
 		default:
 			break;
 		}
-		dal_write_reg(
+		dm_write_reg(
 			mem_input110->base.ctx,
 			DCP_REG(mmGRPH_CONTROL),
 			value);
 
 		/*TODO [hwentlan] MOVE THIS TO CONTROLLER GAMMA!!!!!*/
-		value = dal_read_reg(
+		value = dm_read_reg(
 			mem_input110->base.ctx,
 			DCP_REG(mmPRESCALE_GRPH_CONTROL));
 
@@ -415,7 +415,7 @@ static void program_pixel_format(
 				value, 0, PRESCALE_GRPH_CONTROL,
 				GRPH_PRESCALE_B_SIGN);
 		}
-		dal_write_reg(
+		dm_write_reg(
 			mem_input110->base.ctx,
 			DCP_REG(mmPRESCALE_GRPH_CONTROL),
 			value);
@@ -428,7 +428,7 @@ static void wait_for_no_surface_update_pending(
 	uint32_t value;
 
 	do  {
-		value = dal_read_reg(mem_input110->base.ctx,
+		value = dm_read_reg(mem_input110->base.ctx,
 				DCP_REG(mmGRPH_UPDATE));
 
 	} while (get_reg_field_value(value, GRPH_UPDATE,
@@ -483,14 +483,14 @@ static void program_urgency_watermark(
 	uint32_t wm_addr = offset + mmDPG_WATERMARK_MASK_CONTROL;
 
 	/*Write mask to enable reading/writing of watermark set A*/
-	wm_mask_cntl = dal_read_reg(ctx, wm_addr);
+	wm_mask_cntl = dm_read_reg(ctx, wm_addr);
 	set_reg_field_value(wm_mask_cntl,
 			1,
 			DPG_WATERMARK_MASK_CONTROL,
 			URGENCY_WATERMARK_MASK);
-	dal_write_reg(ctx, wm_addr, wm_mask_cntl);
+	dm_write_reg(ctx, wm_addr, wm_mask_cntl);
 
-	urgency_cntl = dal_read_reg(ctx, urgency_addr);
+	urgency_cntl = dm_read_reg(ctx, urgency_addr);
 
 	set_reg_field_value(
 		urgency_cntl,
@@ -503,18 +503,18 @@ static void program_urgency_watermark(
 		total_dest_line_time_ns,
 		DPG_PIPE_URGENCY_CONTROL,
 		URGENCY_HIGH_WATERMARK);
-	dal_write_reg(ctx, urgency_addr, urgency_cntl);
+	dm_write_reg(ctx, urgency_addr, urgency_cntl);
 
 
 	/*Write mask to enable reading/writing of watermark set B*/
-	wm_mask_cntl = dal_read_reg(ctx, wm_addr);
+	wm_mask_cntl = dm_read_reg(ctx, wm_addr);
 	set_reg_field_value(wm_mask_cntl,
 			2,
 			DPG_WATERMARK_MASK_CONTROL,
 			URGENCY_WATERMARK_MASK);
-	dal_write_reg(ctx, wm_addr, wm_mask_cntl);
+	dm_write_reg(ctx, wm_addr, wm_mask_cntl);
 
-	urgency_cntl = dal_read_reg(ctx, urgency_addr);
+	urgency_cntl = dm_read_reg(ctx, urgency_addr);
 
 	set_reg_field_value(urgency_cntl,
 		marks_low.b_mark,
@@ -525,7 +525,7 @@ static void program_urgency_watermark(
 		total_dest_line_time_ns,
 		DPG_PIPE_URGENCY_CONTROL,
 		URGENCY_HIGH_WATERMARK);
-	dal_write_reg(ctx, urgency_addr, urgency_cntl);
+	dm_write_reg(ctx, urgency_addr, urgency_cntl);
 }
 
 static void program_stutter_watermark(
@@ -542,14 +542,14 @@ static void program_stutter_watermark(
 
 	/*Write mask to enable reading/writing of watermark set A*/
 
-	wm_mask_cntl = dal_read_reg(ctx, wm_addr);
+	wm_mask_cntl = dm_read_reg(ctx, wm_addr);
 	set_reg_field_value(wm_mask_cntl,
 		1,
 		DPG_WATERMARK_MASK_CONTROL,
 		STUTTER_EXIT_SELF_REFRESH_WATERMARK_MASK);
-	dal_write_reg(ctx, wm_addr, wm_mask_cntl);
+	dm_write_reg(ctx, wm_addr, wm_mask_cntl);
 
-	stutter_cntl = dal_read_reg(ctx, stutter_addr);
+	stutter_cntl = dm_read_reg(ctx, stutter_addr);
 
 	set_reg_field_value(stutter_cntl,
 		1,
@@ -565,17 +565,17 @@ static void program_stutter_watermark(
 		marks.a_mark,
 		DPG_PIPE_STUTTER_CONTROL,
 		STUTTER_EXIT_SELF_REFRESH_WATERMARK);
-	dal_write_reg(ctx, stutter_addr, stutter_cntl);
+	dm_write_reg(ctx, stutter_addr, stutter_cntl);
 
 	/*Write mask to enable reading/writing of watermark set B*/
-	wm_mask_cntl = dal_read_reg(ctx, wm_addr);
+	wm_mask_cntl = dm_read_reg(ctx, wm_addr);
 	set_reg_field_value(wm_mask_cntl,
 		2,
 		DPG_WATERMARK_MASK_CONTROL,
 		STUTTER_EXIT_SELF_REFRESH_WATERMARK_MASK);
-	dal_write_reg(ctx, wm_addr, wm_mask_cntl);
+	dm_write_reg(ctx, wm_addr, wm_mask_cntl);
 
-	stutter_cntl = dal_read_reg(ctx, stutter_addr);
+	stutter_cntl = dm_read_reg(ctx, stutter_addr);
 	set_reg_field_value(stutter_cntl,
 		1,
 		DPG_PIPE_STUTTER_CONTROL,
@@ -590,7 +590,7 @@ static void program_stutter_watermark(
 		marks.b_mark,
 		DPG_PIPE_STUTTER_CONTROL,
 		STUTTER_EXIT_SELF_REFRESH_WATERMARK);
-	dal_write_reg(ctx, stutter_addr, stutter_cntl);
+	dm_write_reg(ctx, stutter_addr, stutter_cntl);
 }
 
 static void program_nbp_watermark(
@@ -602,16 +602,16 @@ static void program_nbp_watermark(
 	uint32_t addr;
 	/* Write mask to enable reading/writing of watermark set A */
 	addr = offset + mmDPG_WATERMARK_MASK_CONTROL;
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		1,
 		DPG_WATERMARK_MASK_CONTROL,
 		NB_PSTATE_CHANGE_WATERMARK_MASK);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	addr = offset + mmDPG_PIPE_NB_PSTATE_CHANGE_CONTROL;
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		1,
@@ -627,29 +627,29 @@ static void program_nbp_watermark(
 		1,
 		DPG_PIPE_NB_PSTATE_CHANGE_CONTROL,
 		NB_PSTATE_CHANGE_NOT_SELF_REFRESH_DURING_REQUEST);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* Write watermark set A */
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		marks.a_mark,
 		DPG_PIPE_NB_PSTATE_CHANGE_CONTROL,
 		NB_PSTATE_CHANGE_WATERMARK);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* Write mask to enable reading/writing of watermark set B */
 	addr = offset + mmDPG_WATERMARK_MASK_CONTROL;
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		2,
 		DPG_WATERMARK_MASK_CONTROL,
 		NB_PSTATE_CHANGE_WATERMARK_MASK);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	addr = offset + mmDPG_PIPE_NB_PSTATE_CHANGE_CONTROL;
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		1,
@@ -665,16 +665,16 @@ static void program_nbp_watermark(
 		1,
 		DPG_PIPE_NB_PSTATE_CHANGE_CONTROL,
 		NB_PSTATE_CHANGE_NOT_SELF_REFRESH_DURING_REQUEST);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* Write watermark set B */
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		marks.b_mark,
 		DPG_PIPE_NB_PSTATE_CHANGE_CONTROL,
 		NB_PSTATE_CHANGE_WATERMARK);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 void dce110_mem_input_program_safe_display_marks(struct mem_input *mi)
@@ -779,7 +779,7 @@ void dce110_mem_input_allocate_dmif_buffer(
 		goto register_underflow_int;
 
 	/*Allocate DMIF buffer*/
-	value = dal_read_reg(mi->ctx, addr);
+	value = dm_read_reg(mi->ctx, addr);
 	field = get_reg_field_value(
 		value, PIPE0_DMIF_BUFFER_CONTROL, DMIF_BUFFERS_ALLOCATED);
 	if (field == 2)
@@ -791,10 +791,10 @@ void dce110_mem_input_allocate_dmif_buffer(
 			PIPE0_DMIF_BUFFER_CONTROL,
 			DMIF_BUFFERS_ALLOCATED);
 
-	dal_write_reg(mi->ctx, addr, value);
+	dm_write_reg(mi->ctx, addr, value);
 
 	do {
-		value = dal_read_reg(mi->ctx, addr);
+		value = dm_read_reg(mi->ctx, addr);
 		field = get_reg_field_value(
 			value,
 			PIPE0_DMIF_BUFFER_CONTROL,
@@ -803,7 +803,7 @@ void dce110_mem_input_allocate_dmif_buffer(
 		if (field)
 			break;
 
-		dc_service_delay_in_microseconds(mi->ctx, retry_delay);
+		dm_delay_in_microseconds(mi->ctx, retry_delay);
 		retry_count--;
 
 	} while (retry_count > 0);
@@ -818,7 +818,7 @@ void dce110_mem_input_allocate_dmif_buffer(
 
 	if (timing->pix_clk_khz != 0) {
 		addr = mmDPG_PIPE_ARBITRATION_CONTROL1 + bm110->offsets.dmif;
-		value = dal_read_reg(mi->ctx, addr);
+		value = dm_read_reg(mi->ctx, addr);
 		pix_dur = 1000000000ULL / timing->pix_clk_khz;
 
 		set_reg_field_value(
@@ -827,7 +827,7 @@ void dce110_mem_input_allocate_dmif_buffer(
 			DPG_PIPE_ARBITRATION_CONTROL1,
 			PIXEL_DURATION);
 
-		dal_write_reg(mi->ctx, addr, value);
+		dm_write_reg(mi->ctx, addr, value);
 	}
 
 	/*
@@ -841,13 +841,13 @@ void dce110_mem_input_allocate_dmif_buffer(
 	 */
 	if (!IS_FPGA_MAXIMUS_DC(mi->ctx->dce_environment)) {
 		addr = mmMC_HUB_RDREQ_DMIF_LIMIT;
-		value = dal_read_reg(mi->ctx, addr);
+		value = dm_read_reg(mi->ctx, addr);
 
 		if (paths_num > 1)
 			set_reg_field_value(value, 0, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
 		else
 			set_reg_field_value(value, 3, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
-		dal_write_reg(mi->ctx, addr, value);
+		dm_write_reg(mi->ctx, addr, value);
 	}
 
 register_underflow_int:
@@ -861,7 +861,7 @@ static void deallocate_dmif_buffer_helper(
 	uint32_t value;
 	uint32_t count = 0xBB8; /* max retry count */
 
-	value = dal_read_reg(ctx, mmPIPE0_DMIF_BUFFER_CONTROL + offset);
+	value = dm_read_reg(ctx, mmPIPE0_DMIF_BUFFER_CONTROL + offset);
 
 	if (!get_reg_field_value(
 		value, PIPE0_DMIF_BUFFER_CONTROL, DMIF_BUFFERS_ALLOCATED))
@@ -870,12 +870,12 @@ static void deallocate_dmif_buffer_helper(
 	set_reg_field_value(
 		value, 0, PIPE0_DMIF_BUFFER_CONTROL, DMIF_BUFFERS_ALLOCATED);
 
-	dal_write_reg(
+	dm_write_reg(
 		ctx, mmPIPE0_DMIF_BUFFER_CONTROL + offset, value);
 
 	do {
-		value = dal_read_reg(ctx, mmPIPE0_DMIF_BUFFER_CONTROL + offset);
-		dc_service_delay_in_microseconds(ctx, 10);
+		value = dm_read_reg(ctx, mmPIPE0_DMIF_BUFFER_CONTROL + offset);
+		dm_delay_in_microseconds(ctx, 10);
 		count--;
 	} while (count > 0 &&
 		!get_reg_field_value(
@@ -910,13 +910,13 @@ void dce110_mem_input_deallocate_dmif_buffer(
 	 * 03 - force enable dmif rdreq limit, ignore dmif stall/urgent
 	 * Stella Wong proposed this change. */
 	if (!IS_FPGA_MAXIMUS_DC(mi->ctx->dce_environment)) {
-		value = dal_read_reg(mi->ctx, mmMC_HUB_RDREQ_DMIF_LIMIT);
+		value = dm_read_reg(mi->ctx, mmMC_HUB_RDREQ_DMIF_LIMIT);
 		if (paths_num > 1)
 			set_reg_field_value(value, 0, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
 		else
 			set_reg_field_value(value, 3, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
 
-		dal_write_reg(mi->ctx, mmMC_HUB_RDREQ_DMIF_LIMIT, value);
+		dm_write_reg(mi->ctx, mmMC_HUB_RDREQ_DMIF_LIMIT, value);
 	}
 }
 
@@ -960,6 +960,6 @@ bool dce110_mem_input_construct(
 
 void dce110_mem_input_destroy(struct mem_input **mem_input)
 {
-	dc_service_free((*mem_input)->ctx, TO_DCE110_MEM_INPUT(*mem_input));
+	dm_free((*mem_input)->ctx, TO_DCE110_MEM_INPUT(*mem_input));
 	*mem_input = NULL;
 }

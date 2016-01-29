@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 #include "include/signal_types.h"
 
 bool dc_is_hdmi_signal(enum signal_type signal)

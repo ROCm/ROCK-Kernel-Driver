@@ -22,7 +22,8 @@
  * Authors: AMD
  *
  */
-#include "dc_services.h"
+
+#include "dm_services.h"
 #include "core_types.h"
 #include "hw_sequencer.h"
 #include "resource.h"
@@ -93,7 +94,7 @@ void dc_target_release(struct dc_target *dc_target)
 	target->ref_count--;
 	if (target->ref_count == 0) {
 		destruct(protected);
-		dc_service_free(protected->ctx, target);
+		dm_free(protected->ctx, target);
 	}
 }
 
@@ -116,7 +117,7 @@ struct dc_target *dc_create_target_for_streams(
 
 	stream = DC_STREAM_TO_CORE(dc_streams[0]);
 
-	target = dc_service_alloc(stream->ctx, sizeof(struct target));
+	target = dm_alloc(stream->ctx, sizeof(struct target));
 
 	if (NULL == target)
 		goto target_alloc_fail;
@@ -177,7 +178,7 @@ static bool program_gamma(
 	struct gamma_parameters *gamma_param;
 	bool result= false;
 
-	gamma_param = dc_service_alloc(ctx, sizeof(struct gamma_parameters));
+	gamma_param = dm_alloc(ctx, sizeof(struct gamma_parameters));
 
 	if (!gamma_param)
 		goto gamma_param_fail;
@@ -188,7 +189,7 @@ static bool program_gamma(
 			&surface->gamma_correction,
 			gamma_param);
 
-	dc_service_free(ctx, gamma_param);
+	dm_free(ctx, gamma_param);
 
 gamma_param_fail:
 	return result;
@@ -357,7 +358,7 @@ void dc_target_enable_memory_requests(struct dc_target *target)
 			DC_STREAM_TO_CORE(core_target->public.streams[i])->tg;
 
 		if (!tg->funcs->set_blank(tg, false)) {
-			dal_error("DC: failed to unblank crtc!\n");
+			dm_error("DC: failed to unblank crtc!\n");
 			BREAK_TO_DEBUGGER();
 		}
 	}
@@ -372,13 +373,13 @@ void dc_target_disable_memory_requests(struct dc_target *target)
 		DC_STREAM_TO_CORE(core_target->public.streams[i])->tg;
 
 		if (NULL == tg) {
-			dal_error("DC: timing generator is NULL!\n");
+			dm_error("DC: timing generator is NULL!\n");
 			BREAK_TO_DEBUGGER();
 			continue;
 		}
 
 		if (false == tg->funcs->set_blank(tg, true)) {
-			dal_error("DC: failed to blank crtc!\n");
+			dm_error("DC: failed to blank crtc!\n");
 			BREAK_TO_DEBUGGER();
 		}
 	}
@@ -395,7 +396,7 @@ bool dc_target_set_cursor_attributes(
 	struct input_pixel_processor *ipp;
 
 	if (NULL == dc_target) {
-		dal_error("DC: dc_target is NULL!\n");
+		dm_error("DC: dc_target is NULL!\n");
 			return false;
 
 	}
@@ -404,7 +405,7 @@ bool dc_target_set_cursor_attributes(
 	ipp = DC_STREAM_TO_CORE(core_target->public.streams[0])->ipp;
 
 	if (NULL == ipp) {
-		dal_error("DC: input pixel processor is NULL!\n");
+		dm_error("DC: input pixel processor is NULL!\n");
 		return false;
 	}
 
@@ -422,12 +423,12 @@ bool dc_target_set_cursor_position(
 	struct input_pixel_processor *ipp;
 
 	if (NULL == dc_target) {
-		dal_error("DC: dc_target is NULL!\n");
+		dm_error("DC: dc_target is NULL!\n");
 		return false;
 	}
 
 	if (NULL == position) {
-		dal_error("DC: cursor position is NULL!\n");
+		dm_error("DC: cursor position is NULL!\n");
 		return false;
 	}
 
@@ -435,7 +436,7 @@ bool dc_target_set_cursor_position(
 	ipp = DC_STREAM_TO_CORE(core_target->public.streams[0])->ipp;
 
 	if (NULL == ipp) {
-		dal_error("DC: input pixel processor is NULL!\n");
+		dm_error("DC: input pixel processor is NULL!\n");
 		return false;
 	}
 

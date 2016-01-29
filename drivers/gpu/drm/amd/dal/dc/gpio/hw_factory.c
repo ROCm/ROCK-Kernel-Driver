@@ -23,12 +23,11 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
 #include "include/gpio_types.h"
 
 /*
@@ -88,7 +87,7 @@ void dal_hw_factory_destroy(
 		return;
 	}
 
-	dc_service_free(ctx, *factory);
+	dm_free(ctx, *factory);
 
 	*factory = NULL;
 }

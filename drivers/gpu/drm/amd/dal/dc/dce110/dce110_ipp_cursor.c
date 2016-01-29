@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 #include "include/logger_interface.h"
 
 #include "dce/dce_11_0_d.h"
@@ -137,9 +137,9 @@ static void enable(
 	uint32_t value = 0;
 	uint32_t addr = DCP_REG(mmCUR_CONTROL);
 
-	value = dal_read_reg(ipp110->base.ctx, addr);
+	value = dm_read_reg(ipp110->base.ctx, addr);
 	set_reg_field_value(value, enable, CUR_CONTROL, CURSOR_EN);
-	dal_write_reg(ipp110->base.ctx, addr, value);
+	dm_write_reg(ipp110->base.ctx, addr, value);
 }
 
 static void lock(
@@ -148,9 +148,9 @@ static void lock(
 	uint32_t value = 0;
 	uint32_t addr = DCP_REG(mmCUR_UPDATE);
 
-	value = dal_read_reg(ipp110->base.ctx, addr);
+	value = dm_read_reg(ipp110->base.ctx, addr);
 	set_reg_field_value(value, lock, CUR_UPDATE, CURSOR_UPDATE_LOCK);
-	dal_write_reg(ipp110->base.ctx, addr, value);
+	dm_write_reg(ipp110->base.ctx, addr, value);
 }
 
 static void program_position(
@@ -161,10 +161,10 @@ static void program_position(
 	uint32_t value = 0;
 	uint32_t addr = DCP_REG(mmCUR_POSITION);
 
-	value = dal_read_reg(ipp110->base.ctx, addr);
+	value = dm_read_reg(ipp110->base.ctx, addr);
 	set_reg_field_value(value, x, CUR_POSITION, CURSOR_X_POSITION);
 	set_reg_field_value(value, y, CUR_POSITION, CURSOR_Y_POSITION);
-	dal_write_reg(ipp110->base.ctx, addr, value);
+	dm_write_reg(ipp110->base.ctx, addr, value);
 }
 
 static bool program_control(
@@ -199,13 +199,13 @@ static bool program_control(
 			CUR_CONTROL, CURSOR_2X_MAGNIFY);
 	set_reg_field_value(value, inverse_transparent_clamping,
 			CUR_CONTROL, CUR_INV_TRANS_CLAMP);
-	dal_write_reg(ipp110->base.ctx, addr, value);
+	dm_write_reg(ipp110->base.ctx, addr, value);
 
 	if (color_format == CURSOR_MODE_MONO) {
 		addr = DCP_REG(mmCUR_COLOR1);
-		dal_write_reg(ipp110->base.ctx, addr, CURSOR_COLOR_BLACK);
+		dm_write_reg(ipp110->base.ctx, addr, CURSOR_COLOR_BLACK);
 		addr = DCP_REG(mmCUR_COLOR2);
-		dal_write_reg(ipp110->base.ctx, addr, CURSOR_COLOR_WHITE);
+		dm_write_reg(ipp110->base.ctx, addr, CURSOR_COLOR_WHITE);
 	}
 	return true;
 }
@@ -218,10 +218,10 @@ static void program_hotspot(
 	uint32_t value = 0;
 	uint32_t addr = DCP_REG(mmCUR_HOT_SPOT);
 
-	value = dal_read_reg(ipp110->base.ctx, addr);
+	value = dm_read_reg(ipp110->base.ctx, addr);
 	set_reg_field_value(value, x, CUR_HOT_SPOT, CURSOR_HOT_SPOT_X);
 	set_reg_field_value(value, y, CUR_HOT_SPOT, CURSOR_HOT_SPOT_Y);
-	dal_write_reg(ipp110->base.ctx, addr, value);
+	dm_write_reg(ipp110->base.ctx, addr, value);
 }
 
 static void program_size(
@@ -232,10 +232,10 @@ static void program_size(
 	uint32_t value = 0;
 	uint32_t addr = DCP_REG(mmCUR_SIZE);
 
-	value = dal_read_reg(ipp110->base.ctx, addr);
+	value = dm_read_reg(ipp110->base.ctx, addr);
 	set_reg_field_value(value, width, CUR_SIZE, CURSOR_WIDTH);
 	set_reg_field_value(value, height, CUR_SIZE, CURSOR_HEIGHT);
-	dal_write_reg(ipp110->base.ctx, addr, value);
+	dm_write_reg(ipp110->base.ctx, addr, value);
 }
 
 static void program_address(
@@ -248,9 +248,9 @@ static void program_address(
 	 * The correct way to program cursor surface address is to first write
 	 * to CUR_SURFACE_ADDRESS_HIGH, and then write to CUR_SURFACE_ADDRESS */
 
-	dal_write_reg(ipp110->base.ctx, addr, address.high_part);
+	dm_write_reg(ipp110->base.ctx, addr, address.high_part);
 
 	addr = DCP_REG(mmCUR_SURFACE_ADDRESS);
-	dal_write_reg(ipp110->base.ctx, addr, address.low_part);
+	dm_write_reg(ipp110->base.ctx, addr, address.low_part);
 }
 

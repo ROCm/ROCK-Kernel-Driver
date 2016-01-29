@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 #include "include/vector.h"
 
 bool dal_vector_construct(
@@ -40,7 +40,7 @@ bool dal_vector_construct(
 		return false;
 	}
 
-	vector->container = dc_service_alloc(ctx, struct_size * capacity);
+	vector->container = dm_alloc(ctx, struct_size * capacity);
 	if (vector->container == NULL)
 		return false;
 	vector->capacity = capacity;
@@ -67,7 +67,7 @@ bool dal_vector_presized_costruct(
 		return false;
 	}
 
-	vector->container = dc_service_alloc(ctx, struct_size * count);
+	vector->container = dm_alloc(ctx, struct_size * count);
 
 	if (vector->container == NULL)
 		return false;
@@ -77,7 +77,7 @@ bool dal_vector_presized_costruct(
 	 * initialises the memory to. */
 	if (NULL != initial_value) {
 		for (i = 0; i < count; ++i)
-			dc_service_memmove(
+			dm_memmove(
 				vector->container + i * struct_size,
 				initial_value,
 				struct_size);
@@ -95,7 +95,7 @@ struct vector *dal_vector_presized_create(
 	void *initial_value,
 	uint32_t struct_size)
 {
-	struct vector *vector = dc_service_alloc(ctx, sizeof(struct vector));
+	struct vector *vector = dm_alloc(ctx, sizeof(struct vector));
 
 	if (vector == NULL)
 		return NULL;
@@ -105,7 +105,7 @@ struct vector *dal_vector_presized_create(
 		return vector;
 
 	BREAK_TO_DEBUGGER();
-	dc_service_free(ctx, vector);
+	dm_free(ctx, vector);
 	return NULL;
 }
 
@@ -114,7 +114,7 @@ struct vector *dal_vector_create(
 	uint32_t capacity,
 	uint32_t struct_size)
 {
-	struct vector *vector = dc_service_alloc(ctx, sizeof(struct vector));
+	struct vector *vector = dm_alloc(ctx, sizeof(struct vector));
 
 	if (vector == NULL)
 		return NULL;
@@ -124,7 +124,7 @@ struct vector *dal_vector_create(
 
 
 	BREAK_TO_DEBUGGER();
-	dc_service_free(ctx, vector);
+	dm_free(ctx, vector);
 	return NULL;
 }
 
@@ -132,7 +132,7 @@ void dal_vector_destruct(
 	struct vector *vector)
 {
 	if (vector->container != NULL)
-		dc_service_free(vector->ctx, vector->container);
+		dm_free(vector->ctx, vector->container);
 	vector->count = 0;
 	vector->capacity = 0;
 }
@@ -143,7 +143,7 @@ void dal_vector_destroy(
 	if (vector == NULL || *vector == NULL)
 		return;
 	dal_vector_destruct(*vector);
-	dc_service_free((*vector)->ctx, *vector);
+	dm_free((*vector)->ctx, *vector);
 	*vector = NULL;
 }
 
@@ -170,7 +170,7 @@ bool dal_vector_remove_at_index(
 		return false;
 
 	if (index != vector->count - 1)
-		dc_service_memmove(
+		dm_memmove(
 			vector->container + (index * vector->struct_size),
 			vector->container + ((index + 1) * vector->struct_size),
 			(vector->count - index - 1) * vector->struct_size);
@@ -190,7 +190,7 @@ void dal_vector_set_at_index(
 		BREAK_TO_DEBUGGER();
 		return;
 	}
-	dc_service_memmove(
+	dm_memmove(
 		where,
 		what,
 		vector->struct_size);
@@ -219,12 +219,12 @@ bool dal_vector_insert_at(
 	insert_address = vector->container + (vector->struct_size * position);
 
 	if (vector->count && position < vector->count)
-		dc_service_memmove(
+		dm_memmove(
 			insert_address + vector->struct_size,
 			insert_address,
 			vector->struct_size * (vector->count - position));
 
-	dc_service_memmove(
+	dm_memmove(
 		insert_address,
 		what,
 		vector->struct_size);
@@ -273,7 +273,7 @@ struct vector *dal_vector_clone(
 	}
 
 	/* copy vector's data */
-	dc_service_memmove(vec_cloned->container, vector->container,
+	dm_memmove(vec_cloned->container, vector->container,
 			vec_cloned->struct_size * vec_cloned->capacity);
 
 	return vec_cloned;
@@ -291,7 +291,7 @@ bool dal_vector_reserve(struct vector *vector, uint32_t capacity)
 	if (capacity <= vector->capacity)
 		return true;
 
-	new_container = dc_service_realloc(vector->ctx, vector->container,
+	new_container = dm_realloc(vector->ctx, vector->container,
 		capacity * vector->struct_size);
 
 	if (new_container) {

@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "include/logger_interface.h"
 
@@ -152,7 +152,7 @@ static struct audio_feature_support get_supported_features(struct audio *audio)
 	/*DCE specific, must be implemented in derived*/
 	struct audio_feature_support features;
 
-	dc_service_memset(&features, 0, sizeof(features));
+	dm_memset(&features, 0, sizeof(features));
 
 	features.ENGINE_DIGA = 1;
 	features.ENGINE_DIGB = 1;

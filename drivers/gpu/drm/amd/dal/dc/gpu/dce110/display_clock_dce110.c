@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
@@ -165,7 +165,7 @@ static uint32_t get_dp_ref_clk_frequency(struct display_clock *dc)
 	struct display_clock_dce110 *disp_clk = FROM_DISPLAY_CLOCK(dc);
 
 	/* ASSERT DP Reference Clock source is from DFS*/
-	dp_ref_clk_cntl_value = dal_read_reg(dc->ctx,
+	dp_ref_clk_cntl_value = dm_read_reg(dc->ctx,
 			mmDPREFCLK_CNTL);
 
 	dp_ref_clk_cntl_src_sel_value =
@@ -177,7 +177,7 @@ static uint32_t get_dp_ref_clk_frequency(struct display_clock *dc)
 
 	/* Read the mmDENTIST_DISPCLK_CNTL to get the currently
 	 * programmed DID DENTIST_DPREFCLK_WDIVIDER*/
-	dispclk_cntl_value = dal_read_reg(dc->ctx,
+	dispclk_cntl_value = dm_read_reg(dc->ctx,
 			mmDENTIST_DISPCLK_CNTL);
 
 	/* Convert DENTIST_DPREFCLK_WDIVIDERto actual divider*/
@@ -233,7 +233,7 @@ static void destroy(struct display_clock **base)
 
 	dc110 = DCLCK110_FROM_BASE(*base);
 
-	dc_service_free((*base)->ctx, dc110);
+	dm_free((*base)->ctx, dc110);
 
 	*base = NULL;
 }
@@ -652,8 +652,8 @@ static bool display_clock_integrated_info_construct(
 	struct display_clock *base = &disp_clk->disp_clk_base;
 	bool res;
 
-	dc_service_memset(&info, 0, sizeof(struct integrated_info));
-	dc_service_memset(&fw_info, 0, sizeof(struct firmware_info));
+	dm_memset(&info, 0, sizeof(struct integrated_info));
+	dm_memset(&fw_info, 0, sizeof(struct firmware_info));
 
 	res = dal_adapter_service_get_integrated_info(as, &info);
 
@@ -728,7 +728,7 @@ static uint32_t get_clock(struct display_clock *dc)
 
 	/* Read the mmDENTIST_DISPCLK_CNTL to get the currently programmed
 	 DID DENTIST_DISPCLK_WDIVIDER.*/
-	value = dal_read_reg(dc->ctx, addr);
+	value = dm_read_reg(dc->ctx, addr);
 	field = get_reg_field_value(
 			value, DENTIST_DISPCLK_CNTL, DENTIST_DISPCLK_WDIVIDER);
 
@@ -787,7 +787,7 @@ static void set_clock(
 	struct dc_bios *bp = dal_adapter_service_get_bios_parser(base->as);
 
 	/* Prepare to program display clock*/
-	dc_service_memset(&pxl_clk_params, 0, sizeof(pxl_clk_params));
+	dm_memset(&pxl_clk_params, 0, sizeof(pxl_clk_params));
 
 	pxl_clk_params.target_pixel_clock = requested_clk_khz;
 	pxl_clk_params.pll_id = base->id;
@@ -910,7 +910,7 @@ static bool dal_display_clock_dce110_construct(
 			struct spread_spectrum_info info;
 			bool result;
 
-			dc_service_memset(&info, 0, sizeof(info));
+			dm_memset(&info, 0, sizeof(info));
 
 			result =
 				dal_adapter_service_get_ss_info(
@@ -954,7 +954,7 @@ struct display_clock *dal_display_clock_dce110_create(
 {
 	struct display_clock_dce110 *dc110;
 
-	dc110 = dc_service_alloc(ctx, sizeof(struct display_clock_dce110));
+	dc110 = dm_alloc(ctx, sizeof(struct display_clock_dce110));
 
 	if (dc110 == NULL)
 		return NULL;
@@ -962,7 +962,7 @@ struct display_clock *dal_display_clock_dce110_create(
 	if (dal_display_clock_dce110_construct(dc110, ctx, as))
 		return &dc110->disp_clk_base;
 
-	dc_service_free(ctx, dc110);
+	dm_free(ctx, dc110);
 
 	return NULL;
 }

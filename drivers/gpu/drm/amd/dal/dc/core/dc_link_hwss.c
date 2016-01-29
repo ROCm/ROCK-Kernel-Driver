@@ -1,6 +1,6 @@
 /* Copyright 2015 Advanced Micro Devices, Inc. */
 
-#include "dc_services.h"
+#include "dm_services.h"
 #include "dc.h"
 #include "inc/core_dc.h"
 #include "include/ddc_service_types.h"
@@ -8,7 +8,7 @@
 #include "link_hwss.h"
 #include "hw_sequencer.h"
 #include "dc_link_ddc.h"
-#include "dc_helpers.h"
+#include "dm_helpers.h"
 #include "dce110/dce110_link_encoder.h"
 #include "dce110/dce110_stream_encoder.h"
 
@@ -19,7 +19,7 @@ enum dc_status core_link_read_dpcd(
 	uint8_t *data,
 	uint32_t size)
 {
-	if (!dc_helper_dp_read_dpcd(link->ctx,
+	if (!dm_helper_dp_read_dpcd(link->ctx,
 			&link->public,
 			address, data, size))
 			return DC_ERROR_UNEXPECTED;
@@ -33,7 +33,7 @@ enum dc_status core_link_write_dpcd(
 	const uint8_t *data,
 	uint32_t size)
 {
-	if (!dc_helper_dp_write_dpcd(link->ctx,
+	if (!dm_helper_dp_write_dpcd(link->ctx,
 			&link->public,
 			address, data, size))
 				return DC_ERROR_UNEXPECTED;
@@ -89,7 +89,7 @@ void dp_disable_link_phy(struct core_link *link, enum signal_type signal)
 	link->link_enc->funcs->disable_output(link->link_enc, signal);
 
 	/* Clear current link setting.*/
-	dc_service_memset(&link->cur_link_settings, 0,
+	dm_memset(&link->cur_link_settings, 0,
 			sizeof(link->cur_link_settings));
 }
 

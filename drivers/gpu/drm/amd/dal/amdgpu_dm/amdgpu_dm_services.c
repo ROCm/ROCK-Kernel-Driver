@@ -29,8 +29,8 @@
 #include <drm/drmP.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/amdgpu_drm.h>
+#include "dm_services.h"
 #include "amdgpu.h"
-#include "dc_services.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_irq.h"
 #include "amdgpu_dm_types.h"
@@ -44,43 +44,43 @@
 */
 
 /* if the pointer is not NULL, the allocated memory is zeroed */
-void *dc_service_alloc(struct dc_context *ctx, uint32_t size)
+void *dm_alloc(struct dc_context *ctx, uint32_t size)
 {
 	return kzalloc(size, GFP_KERNEL);
 }
 
 /* Reallocate memory. The contents will remain unchanged.*/
-void *dc_service_realloc(struct dc_context *ctx, const void *ptr, uint32_t size)
+void *dm_realloc(struct dc_context *ctx, const void *ptr, uint32_t size)
 {
 	return krealloc(ptr, size, GFP_KERNEL);
 }
 
-void dc_service_memmove(void *dst, const void *src, uint32_t size)
+void dm_memmove(void *dst, const void *src, uint32_t size)
 {
 	memmove(dst, src, size);
 }
 
-void dc_service_free(struct dc_context *ctx, void *p)
+void dm_free(struct dc_context *ctx, void *p)
 {
 	kfree(p);
 }
 
-void dc_service_memset(void *p, int32_t c, uint32_t count)
+void dm_memset(void *p, int32_t c, uint32_t count)
 {
 	memset(p, c, count);
 }
 
-int32_t dal_memcmp(const void *p1, const void *p2, uint32_t count)
+int32_t dm_memcmp(const void *p1, const void *p2, uint32_t count)
 {
 	return memcmp(p1, p2, count);
 }
 
-int32_t dal_strncmp(const int8_t *p1, const int8_t *p2, uint32_t count)
+int32_t dm_strncmp(const int8_t *p1, const int8_t *p2, uint32_t count)
 {
 	return strncmp(p1, p2, count);
 }
 
-void dc_service_sleep_in_milliseconds(struct dc_context *ctx, uint32_t milliseconds)
+void dm_sleep_in_milliseconds(struct dc_context *ctx, uint32_t milliseconds)
 {
 	if (milliseconds >= 20)
 		msleep(milliseconds);
@@ -93,7 +93,7 @@ void dal_delay_in_nanoseconds(uint32_t nanoseconds)
 	ndelay(nanoseconds);
 }
 
-void dc_service_delay_in_microseconds(struct dc_context *ctx, uint32_t microseconds)
+void dm_delay_in_microseconds(struct dc_context *ctx, uint32_t microseconds)
 {
 	udelay(microseconds);
 }
@@ -139,7 +139,7 @@ void dal_isr_release_lock(struct dc_context *ctx)
  * End-of-IRQ Interfaces.
  *****************************************************************************/
 
-bool dal_get_platform_info(struct dc_context *ctx,
+bool dm_get_platform_info(struct dc_context *ctx,
 			struct platform_info_params *params)
 {
 	/*TODO*/
@@ -148,7 +148,7 @@ bool dal_get_platform_info(struct dc_context *ctx,
 
 /**** power component interfaces ****/
 
-bool dc_service_pp_pre_dce_clock_change(
+bool dm_pp_pre_dce_clock_change(
 		struct dc_context *ctx,
 		struct dal_to_power_info *input,
 		struct power_to_dal_info *output)
@@ -157,7 +157,7 @@ bool dc_service_pp_pre_dce_clock_change(
 	return false;
 }
 
-bool dc_service_pp_apply_safe_state(
+bool dm_pp_apply_safe_state(
 		const struct dc_context *ctx)
 {
 #ifdef CONFIG_DRM_AMD_POWERPLAY
@@ -173,7 +173,7 @@ bool dc_service_pp_apply_safe_state(
 #endif
 }
 
-bool dc_service_pp_apply_display_requirements(
+bool dm_pp_apply_display_requirements(
 		const struct dc_context *ctx,
 		const struct dc_pp_display_configuration *pp_display_cfg)
 {
@@ -287,17 +287,17 @@ static void get_default_clock_levels(
 	switch (clk_type) {
 	case DC_PP_CLOCK_TYPE_DISPLAY_CLK:
 		clks->num_levels = 6;
-		dc_service_memmove(clks->clocks_in_khz, disp_clks_in_khz,
+		dm_memmove(clks->clocks_in_khz, disp_clks_in_khz,
 				sizeof(disp_clks_in_khz));
 		break;
 	case DC_PP_CLOCK_TYPE_ENGINE_CLK:
 		clks->num_levels = 6;
-		dc_service_memmove(clks->clocks_in_khz, sclks_in_khz,
+		dm_memmove(clks->clocks_in_khz, sclks_in_khz,
 				sizeof(sclks_in_khz));
 		break;
 	case DC_PP_CLOCK_TYPE_MEMORY_CLK:
 		clks->num_levels = 2;
-		dc_service_memmove(clks->clocks_in_khz, mclks_in_khz,
+		dm_memmove(clks->clocks_in_khz, mclks_in_khz,
 				sizeof(mclks_in_khz));
 		break;
 	default:
@@ -359,7 +359,7 @@ static void pp_to_dc_clock_levels(
 }
 #endif
 
-bool dc_service_pp_get_clock_levels_by_type(
+bool dm_pp_get_clock_levels_by_type(
 		const struct dc_context *ctx,
 		enum dc_pp_clock_type clk_type,
 		struct dc_pp_clock_levels *dc_clks)
@@ -446,12 +446,12 @@ void dal_notify_setmode_complete(struct dc_context *ctx,
 }
 /* End of calls to notification */
 
-long dal_get_pid(void)
+long dm_get_pid(void)
 {
 	return current->pid;
 }
 
-long dal_get_tgid(void)
+long dm_get_tgid(void)
 {
 	return current->tgid;
 }

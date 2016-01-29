@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /* include DCE11 register header files */
 #include "dce/dce_11_0_d.h"
@@ -45,7 +45,7 @@ static void disable_enhanced_sharpness(struct dce110_transform *xfm110)
 {
 	uint32_t  value;
 
-	value = dal_read_reg(xfm110->base.ctx,
+	value = dm_read_reg(xfm110->base.ctx,
 			SCL_REG(mmSCL_F_SHARP_CONTROL));
 
 	set_reg_field_value(value, 0,
@@ -60,7 +60,7 @@ static void disable_enhanced_sharpness(struct dce110_transform *xfm110)
 	set_reg_field_value(value, 0,
 			SCL_F_SHARP_CONTROL, SCL_VF_SHARP_SCALE_FACTOR);
 
-	dal_write_reg(xfm110->base.ctx,
+	dm_write_reg(xfm110->base.ctx,
 			SCL_REG(mmSCL_F_SHARP_CONTROL), value);
 }
 
@@ -89,7 +89,7 @@ static bool setup_scaling_configuration(
 
 	{
 		addr = SCL_REG(mmSCL_MODE);
-		value = dal_read_reg(ctx, addr);
+		value = dm_read_reg(ctx, addr);
 
 		if (data->dal_pixel_format <= PIXEL_FORMAT_GRPH_END)
 			set_reg_field_value(value, 1, SCL_MODE, SCL_MODE);
@@ -98,11 +98,11 @@ static bool setup_scaling_configuration(
 
 		set_reg_field_value(value, 1, SCL_MODE, SCL_PSCL_EN);
 
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 	{
 		addr = SCL_REG(mmSCL_TAP_CONTROL);
-		value = dal_read_reg(ctx, addr);
+		value = dm_read_reg(ctx, addr);
 
 		set_reg_field_value(value, data->taps.h_taps - 1,
 				SCL_TAP_CONTROL, SCL_H_NUM_OF_TAPS);
@@ -110,16 +110,16 @@ static bool setup_scaling_configuration(
 		set_reg_field_value(value, data->taps.v_taps - 1,
 				SCL_TAP_CONTROL, SCL_V_NUM_OF_TAPS);
 
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 	{
 		addr = SCL_REG(mmSCL_CONTROL);
-		value = dal_read_reg(ctx, addr);
+		value = dm_read_reg(ctx, addr);
 		 /* 1 - Replaced out of bound pixels with edge */
 		set_reg_field_value(value, 1, SCL_CONTROL, SCL_BOUNDARY_MODE);
 
 		/* 1 - Replaced out of bound pixels with the edge pixel. */
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 
 	return true;
@@ -154,11 +154,11 @@ static void program_overscan(
 	set_reg_field_value(overscan_top_bottom, overscan->bottom,
 			EXT_OVERSCAN_TOP_BOTTOM, EXT_OVERSCAN_BOTTOM);
 
-	dal_write_reg(xfm110->base.ctx,
+	dm_write_reg(xfm110->base.ctx,
 			SCL_REG(mmEXT_OVERSCAN_LEFT_RIGHT),
 			overscan_left_right);
 
-	dal_write_reg(xfm110->base.ctx,
+	dm_write_reg(xfm110->base.ctx,
 			SCL_REG(mmEXT_OVERSCAN_TOP_BOTTOM),
 			overscan_top_bottom);
 }
@@ -175,7 +175,7 @@ static void program_two_taps_filter(
 	 */
 	if (vertical) {
 		addr = SCL_REG(mmSCL_VERT_FILTER_CONTROL);
-		value = dal_read_reg(xfm110->base.ctx, addr);
+		value = dm_read_reg(xfm110->base.ctx, addr);
 		set_reg_field_value(
 			value,
 			enable ? 1 : 0,
@@ -184,7 +184,7 @@ static void program_two_taps_filter(
 
 	} else {
 		addr = SCL_REG(mmSCL_HORZ_FILTER_CONTROL);
-		value = dal_read_reg(xfm110->base.ctx, addr);
+		value = dm_read_reg(xfm110->base.ctx, addr);
 		set_reg_field_value(
 			value,
 			enable ? 1 : 0,
@@ -192,7 +192,7 @@ static void program_two_taps_filter(
 			SCL_H_2TAP_HARDCODE_COEF_EN);
 	}
 
-	dal_write_reg(xfm110->base.ctx, addr, value);
+	dm_write_reg(xfm110->base.ctx, addr, value);
 }
 
 static void set_coeff_update_complete(struct dce110_transform *xfm110)
@@ -200,10 +200,10 @@ static void set_coeff_update_complete(struct dce110_transform *xfm110)
 	uint32_t value;
 	uint32_t addr = SCL_REG(mmSCL_UPDATE);
 
-	value = dal_read_reg(xfm110->base.ctx, addr);
+	value = dm_read_reg(xfm110->base.ctx, addr);
 	set_reg_field_value(value, 1,
 			SCL_UPDATE, SCL_COEF_UPDATE_COMPLETE);
-	dal_write_reg(xfm110->base.ctx, addr, value);
+	dm_write_reg(xfm110->base.ctx, addr, value);
 }
 
 static void program_filter(
@@ -231,30 +231,30 @@ static void program_filter(
 	uint32_t pwr_ctrl_off;
 
 	addr = DCFE_REG(mmDCFE_MEM_PWR_CTRL);
-	pwr_ctrl_orig = dal_read_reg(xfm110->base.ctx, addr);
+	pwr_ctrl_orig = dm_read_reg(xfm110->base.ctx, addr);
 	pwr_ctrl_off = pwr_ctrl_orig;
 	set_reg_field_value(
 		pwr_ctrl_off,
 		1,
 		DCFE_MEM_PWR_CTRL,
 		SCL_COEFF_MEM_PWR_DIS);
-	dal_write_reg(xfm110->base.ctx, addr, pwr_ctrl_off);
+	dm_write_reg(xfm110->base.ctx, addr, pwr_ctrl_off);
 
 	addr = DCFE_REG(mmDCFE_MEM_PWR_STATUS);
 	/* Wait to disable gating: */
 	for (i = 0;
 		i < 10 &&
 		get_reg_field_value(
-			dal_read_reg(xfm110->base.ctx, addr),
+			dm_read_reg(xfm110->base.ctx, addr),
 			DCFE_MEM_PWR_STATUS,
 			SCL_COEFF_MEM_PWR_STATE);
 		i++)
-		dc_service_delay_in_microseconds(xfm110->base.ctx, 1);
+		dm_delay_in_microseconds(xfm110->base.ctx, 1);
 
 	ASSERT(i < 10);
 
 	select_addr = SCL_REG(mmSCL_COEF_RAM_SELECT);
-	select = dal_read_reg(xfm110->base.ctx, select_addr);
+	select = dm_read_reg(xfm110->base.ctx, select_addr);
 
 	set_reg_field_value(
 		select,
@@ -292,7 +292,7 @@ static void program_filter(
 				pair,
 				SCL_COEF_RAM_SELECT,
 				SCL_C_RAM_TAP_PAIR_IDX);
-			dal_write_reg(xfm110->base.ctx, select_addr, select);
+			dm_write_reg(xfm110->base.ctx, select_addr, select);
 
 			/* even tap write enable */
 			set_reg_field_value(
@@ -341,7 +341,7 @@ static void program_filter(
 				array_idx += 2;
 			}
 
-			dal_write_reg(
+			dm_write_reg(
 				xfm110->base.ctx,
 				SCL_REG(mmSCL_COEF_RAM_TAP_DATA),
 				data);
@@ -351,7 +351,7 @@ static void program_filter(
 	ASSERT(coeffs_num == array_idx);
 
 	/* reset the power gating register */
-	dal_write_reg(
+	dm_write_reg(
 		xfm110->base.ctx,
 		DCFE_REG(mmDCFE_MEM_PWR_CTRL),
 		pwr_ctrl_orig);
@@ -505,7 +505,7 @@ static void program_viewport(
 	uint32_t addr = 0;
 
 	addr = SCL_REG(mmVIEWPORT_START);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		view_port->x,
@@ -516,10 +516,10 @@ static void program_viewport(
 		view_port->y,
 		VIEWPORT_START,
 		VIEWPORT_Y_START);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	addr = SCL_REG(mmVIEWPORT_SIZE);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		view_port->height,
@@ -530,7 +530,7 @@ static void program_viewport(
 		view_port->width,
 		VIEWPORT_SIZE,
 		VIEWPORT_WIDTH);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* TODO: add stereo support */
 }
@@ -598,7 +598,7 @@ static void program_scl_ratios_inits(
 		inits->h_int_scale_ratio,
 		SCL_HORZ_FILTER_SCALE_RATIO,
 		SCL_H_SCALE_RATIO);
-	dal_write_reg(xfm110->base.ctx, addr, value);
+	dm_write_reg(xfm110->base.ctx, addr, value);
 
 	addr = SCL_REG(mmSCL_VERT_FILTER_SCALE_RATIO);
 	value = 0;
@@ -607,7 +607,7 @@ static void program_scl_ratios_inits(
 		inits->v_int_scale_ratio,
 		SCL_VERT_FILTER_SCALE_RATIO,
 		SCL_V_SCALE_RATIO);
-	dal_write_reg(xfm110->base.ctx, addr, value);
+	dm_write_reg(xfm110->base.ctx, addr, value);
 
 	addr = SCL_REG(mmSCL_HORZ_FILTER_INIT);
 	value = 0;
@@ -621,7 +621,7 @@ static void program_scl_ratios_inits(
 		inits->h_init.fraction,
 		SCL_HORZ_FILTER_INIT,
 		SCL_H_INIT_FRAC);
-	dal_write_reg(xfm110->base.ctx, addr, value);
+	dm_write_reg(xfm110->base.ctx, addr, value);
 
 	addr = SCL_REG(mmSCL_VERT_FILTER_INIT);
 	value = 0;
@@ -635,7 +635,7 @@ static void program_scl_ratios_inits(
 		inits->v_init.fraction,
 		SCL_VERT_FILTER_INIT,
 		SCL_V_INIT_FRAC);
-	dal_write_reg(xfm110->base.ctx, addr, value);
+	dm_write_reg(xfm110->base.ctx, addr, value);
 
 	if (inits->bottom_enable) {
 		addr = SCL_REG(mmSCL_VERT_FILTER_INIT_BOT);
@@ -650,7 +650,7 @@ static void program_scl_ratios_inits(
 			inits->v_init_bottom.fraction,
 			SCL_VERT_FILTER_INIT_BOT,
 			SCL_V_INIT_FRAC_BOT);
-		dal_write_reg(xfm110->base.ctx, addr, value);
+		dm_write_reg(xfm110->base.ctx, addr, value);
 	}
 
 	addr = SCL_REG(mmSCL_AUTOMATIC_MODE_CONTROL);
@@ -665,7 +665,7 @@ static void program_scl_ratios_inits(
 		0,
 		SCL_AUTOMATIC_MODE_CONTROL,
 		SCL_H_CALC_AUTO_RATIO_EN);
-	dal_write_reg(xfm110->base.ctx, addr, value);
+	dm_write_reg(xfm110->base.ctx, addr, value);
 }
 
 static void get_viewport(
@@ -678,8 +678,8 @@ static void get_viewport(
 	if (current_view_port == NULL)
 		return;
 
-	value_start = dal_read_reg(xfm110->base.ctx, SCL_REG(mmVIEWPORT_START));
-	value_size = dal_read_reg(xfm110->base.ctx, SCL_REG(mmVIEWPORT_SIZE));
+	value_start = dm_read_reg(xfm110->base.ctx, SCL_REG(mmVIEWPORT_START));
+	value_size = dm_read_reg(xfm110->base.ctx, SCL_REG(mmVIEWPORT_SIZE));
 
 	current_view_port->x = get_reg_field_value(
 			value_start,
@@ -710,14 +710,14 @@ bool dce110_transform_set_scaler(
 
 	{
 		uint32_t addr = SCL_REG(mmSCL_BYPASS_CONTROL);
-		uint32_t value = dal_read_reg(xfm->ctx, addr);
+		uint32_t value = dm_read_reg(xfm->ctx, addr);
 
 		set_reg_field_value(
 			value,
 			0,
 			SCL_BYPASS_CONTROL,
 			SCL_BYPASS_MODE);
-		dal_write_reg(xfm->ctx, addr, value);
+		dm_write_reg(xfm->ctx, addr, value);
 	}
 
 	disable_enhanced_sharpness(xfm110);
@@ -774,10 +774,10 @@ void dce110_transform_set_scaler_bypass(struct transform *xfm)
 
 	disable_enhanced_sharpness(xfm110);
 
-	sclv_mode = dal_read_reg(xfm->ctx, SCL_REG(mmSCL_MODE));
+	sclv_mode = dm_read_reg(xfm->ctx, SCL_REG(mmSCL_MODE));
 	set_reg_field_value(sclv_mode, 0, SCL_MODE, SCL_MODE);
 	set_reg_field_value(sclv_mode, 0, SCL_MODE, SCL_PSCL_EN);
-	dal_write_reg(xfm->ctx, SCL_REG(mmSCL_MODE), sclv_mode);
+	dm_write_reg(xfm->ctx, SCL_REG(mmSCL_MODE), sclv_mode);
 }
 
 bool dce110_transform_update_viewport(

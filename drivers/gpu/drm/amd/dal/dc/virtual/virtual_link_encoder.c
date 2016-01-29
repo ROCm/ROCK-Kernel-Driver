@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services_types.h"
+#include "dm_services_types.h"
 
 #include "virtual_link_encoder.h"
 

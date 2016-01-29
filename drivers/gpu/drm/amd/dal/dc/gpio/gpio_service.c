@@ -27,7 +27,7 @@
  * Pre-requisites: headers required by header of this unit
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 #include "include/gpio_interface.h"
 #include "include/ddc_interface.h"
 #include "include/irq_interface.h"
@@ -68,7 +68,7 @@ struct gpio_service *dal_gpio_service_create(
 
 	uint32_t index_of_id;
 
-	service = dc_service_alloc(ctx, sizeof(struct gpio_service));
+	service = dm_alloc(ctx, sizeof(struct gpio_service));
 
 	if (!service) {
 		BREAK_TO_DEBUGGER();
@@ -107,7 +107,7 @@ struct gpio_service *dal_gpio_service_create(
 			if (number_of_bits) {
 				uint32_t index_of_uint = 0;
 
-				slot = dc_service_alloc(
+				slot = dm_alloc(
 					ctx,
 					number_of_uints * sizeof(uint32_t));
 
@@ -141,11 +141,11 @@ failure_2:
 		slot = service->busyness[index_of_id];
 
 		if (slot)
-			dc_service_free(ctx, slot);
+			dm_free(ctx, slot);
 	};
 
 failure_1:
-	dc_service_free(ctx, service);
+	dm_free(ctx, service);
 
 	return NULL;
 }
@@ -243,13 +243,13 @@ void dal_gpio_service_destroy(
 			uint32_t *slot = (*ptr)->busyness[index_of_id];
 
 			if (slot)
-				dc_service_free((*ptr)->ctx, slot);
+				dm_free((*ptr)->ctx, slot);
 
 			++index_of_id;
 		} while (index_of_id < GPIO_ID_COUNT);
 	}
 
-	dc_service_free((*ptr)->ctx, *ptr);
+	dm_free((*ptr)->ctx, *ptr);
 
 	*ptr = NULL;
 }

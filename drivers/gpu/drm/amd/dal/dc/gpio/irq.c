@@ -23,12 +23,11 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
 #include "include/gpio_interface.h"
 #include "include/irq_interface.h"
 #include "include/gpio_service_interface.h"
@@ -138,7 +137,7 @@ struct irq *dal_gpio_create_irq(
 		return NULL;
 	}
 
-	irq = dc_service_alloc(service->ctx, sizeof(struct irq));
+	irq = dm_alloc(service->ctx, sizeof(struct irq));
 
 	if (!irq) {
 		ASSERT_CRITICAL(false);
@@ -154,7 +153,7 @@ struct irq *dal_gpio_create_irq(
 
 	ASSERT_CRITICAL(false);
 
-	dc_service_free(service->ctx, irq);
+	dm_free(service->ctx, irq);
 
 	return NULL;
 }
@@ -175,7 +174,7 @@ void dal_gpio_destroy_irq(
 	}
 
 	destruct(*irq);
-	dc_service_free((*irq)->ctx, *irq);
+	dm_free((*irq)->ctx, *irq);
 
 	*irq = NULL;
 }

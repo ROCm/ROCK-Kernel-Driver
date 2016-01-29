@@ -23,12 +23,11 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
 #include "include/gpio_types.h"
 #include "../hw_gpio_pin.h"
 #include "../hw_gpio.h"
@@ -62,7 +61,7 @@ static void destroy(
 
 	destruct(pin);
 
-	dc_service_free((*ptr)->ctx, pin);
+	dm_free((*ptr)->ctx, pin);
 
 	*ptr = NULL;
 }
@@ -239,7 +238,7 @@ static enum gpio_result get_value(
 		uint32_t hpd_delayed = 0;
 		uint32_t hpd_sense = 0;
 
-		regval = dal_read_reg(
+		regval = dm_read_reg(
 				ptr->ctx,
 				pin->addr.DC_HPD_INT_STATUS);
 
@@ -274,7 +273,7 @@ static enum gpio_result set_config(
 	{
 		uint32_t value;
 
-		value = dal_read_reg(
+		value = dm_read_reg(
 			ptr->ctx,
 			pin->addr.DC_HPD_TOGGLE_FILT_CNTL);
 
@@ -290,7 +289,7 @@ static enum gpio_result set_config(
 			DC_HPD_TOGGLE_FILT_CNTL,
 			DC_HPD_DISCONNECT_INT_DELAY);
 
-		dal_write_reg(
+		dm_write_reg(
 			ptr->ctx,
 			pin->addr.DC_HPD_TOGGLE_FILT_CNTL,
 			value);
@@ -349,7 +348,7 @@ struct hw_gpio_pin *dal_hw_hpd_dce110_create(
 	enum gpio_id id,
 	uint32_t en)
 {
-	struct hw_hpd_dce110 *pin = dc_service_alloc(ctx, sizeof(struct hw_hpd_dce110));
+	struct hw_hpd_dce110 *pin = dm_alloc(ctx, sizeof(struct hw_hpd_dce110));
 
 	if (!pin) {
 		ASSERT_CRITICAL(false);
@@ -361,7 +360,7 @@ struct hw_gpio_pin *dal_hw_hpd_dce110_create(
 
 	ASSERT_CRITICAL(false);
 
-	dc_service_free(ctx, pin);
+	dm_free(ctx, pin);
 
 	return NULL;
 }

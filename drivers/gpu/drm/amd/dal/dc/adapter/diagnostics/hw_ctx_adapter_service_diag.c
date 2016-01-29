@@ -25,7 +25,7 @@
 
 /* FPGA Diagnostics version of AS HW CTX. */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "../hw_ctx_adapter_service.h"
 
@@ -112,7 +112,7 @@ static bool construct(
 struct hw_ctx_adapter_service *dal_adapter_service_create_hw_ctx_diag(
 	struct dc_context *ctx)
 {
-	struct hw_ctx_adapter_service *hw_ctx = dc_service_alloc(ctx,
+	struct hw_ctx_adapter_service *hw_ctx = dm_alloc(ctx,
 			sizeof(*hw_ctx));
 
 	if (!hw_ctx) {
@@ -125,7 +125,7 @@ struct hw_ctx_adapter_service *dal_adapter_service_create_hw_ctx_diag(
 
 	ASSERT_CRITICAL(false);
 
-	dc_service_free(ctx, hw_ctx);
+	dm_free(ctx, hw_ctx);
 
 	return NULL;
 }

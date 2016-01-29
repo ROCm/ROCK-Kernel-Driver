@@ -23,12 +23,11 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
 #include "include/i2caux_interface.h"
 #include "../engine.h"
 #include "../aux_engine.h"
@@ -72,7 +71,7 @@ static void release_engine(
 
 	const uint32_t addr = aux_engine->addr.aux_arb_control;
 
-	uint32_t value = dal_read_reg(engine->ctx, addr);
+	uint32_t value = dm_read_reg(engine->ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -80,7 +79,7 @@ static void release_engine(
 		AUX_ARB_CONTROL,
 		AUX_SW_DONE_USING_AUX_REG);
 
-	dal_write_reg(engine->ctx, addr, value);
+	dm_write_reg(engine->ctx, addr, value);
 }
 
 static void destruct(
@@ -93,7 +92,7 @@ static void destroy(
 
 	destruct(engine);
 
-	dc_service_free((*aux_engine)->base.ctx, engine);
+	dm_free((*aux_engine)->base.ctx, engine);
 
 	*aux_engine = NULL;
 }
@@ -111,7 +110,7 @@ static bool acquire_engine(
 	{
 		const uint32_t addr = aux_engine->addr.aux_control;
 
-		value = dal_read_reg(engine->base.ctx, addr);
+		value = dm_read_reg(engine->base.ctx, addr);
 
 		field = get_reg_field_value(
 				value,
@@ -134,13 +133,13 @@ static bool acquire_engine(
 				AUX_CONTROL,
 				AUX_RESET);
 
-			dal_write_reg(engine->base.ctx, addr, value);
+			dm_write_reg(engine->base.ctx, addr, value);
 
 			/*poll HW to make sure reset it done*/
 			do {
-				dc_service_delay_in_microseconds(engine->base.ctx, 1);
+				dm_delay_in_microseconds(engine->base.ctx, 1);
 
-				value = dal_read_reg(engine->base.ctx, addr);
+				value = dm_read_reg(engine->base.ctx, addr);
 
 				field = get_reg_field_value(
 						value,
@@ -157,14 +156,14 @@ static bool acquire_engine(
 				AUX_CONTROL,
 				AUX_RESET);
 
-			dal_write_reg(engine->base.ctx, addr, value);
+			dm_write_reg(engine->base.ctx, addr, value);
 
 			counter = 0;
 
 			do {
-				dc_service_delay_in_microseconds(engine->base.ctx, 1);
+				dm_delay_in_microseconds(engine->base.ctx, 1);
 
-				value = dal_read_reg(engine->base.ctx, addr);
+				value = dm_read_reg(engine->base.ctx, addr);
 
 				field = get_reg_field_value(
 						value,
@@ -181,7 +180,7 @@ static bool acquire_engine(
 	{
 		const uint32_t addr = aux_engine->addr.aux_arb_control;
 
-		value = dal_read_reg(engine->base.ctx, addr);
+		value = dm_read_reg(engine->base.ctx, addr);
 
 		set_reg_field_value(
 			value,
@@ -189,9 +188,9 @@ static bool acquire_engine(
 			AUX_ARB_CONTROL,
 			AUX_SW_USE_AUX_REG_REQ);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 
-		value = dal_read_reg(engine->base.ctx, addr);
+		value = dm_read_reg(engine->base.ctx, addr);
 
 		field = get_reg_field_value(
 				value,
@@ -210,7 +209,7 @@ static void configure(
 
 	const uint32_t addr = aux_engine->addr.aux_control;
 
-	uint32_t value = dal_read_reg(engine->base.ctx, addr);
+	uint32_t value = dm_read_reg(engine->base.ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -218,7 +217,7 @@ static void configure(
 		AUX_CONTROL,
 		AUX_IGNORE_HPD_DISCON);
 
-	dal_write_reg(engine->base.ctx, addr, value);
+	dm_write_reg(engine->base.ctx, addr, value);
 }
 
 static bool start_gtc_sync(
@@ -262,7 +261,7 @@ static void submit_channel_request(
 	{
 		const uint32_t addr = mmAUXN_IMPCAL;
 
-		value = dal_read_reg(engine->base.ctx, addr);
+		value = dm_read_reg(engine->base.ctx, addr);
 
 		set_reg_field_value(
 			value,
@@ -270,7 +269,7 @@ static void submit_channel_request(
 			AUXN_IMPCAL,
 			AUXN_CALOUT_ERROR_AK);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 
 		set_reg_field_value(
 			value,
@@ -278,12 +277,12 @@ static void submit_channel_request(
 			AUXN_IMPCAL,
 			AUXN_CALOUT_ERROR_AK);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 	}
 	{
 		const uint32_t addr = mmAUXP_IMPCAL;
 
-		value = dal_read_reg(engine->base.ctx, addr);
+		value = dm_read_reg(engine->base.ctx, addr);
 
 		set_reg_field_value(
 			value,
@@ -291,7 +290,7 @@ static void submit_channel_request(
 			AUXP_IMPCAL,
 			AUXP_CALOUT_ERROR_AK);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 
 		set_reg_field_value(
 			value,
@@ -299,14 +298,14 @@ static void submit_channel_request(
 			AUXP_IMPCAL,
 			AUXP_CALOUT_ERROR_AK);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 	}
 
 	/* force_default_calibrate */
 	{
 		const uint32_t addr = mmAUXN_IMPCAL;
 
-		value = dal_read_reg(engine->base.ctx, addr);
+		value = dm_read_reg(engine->base.ctx, addr);
 
 		set_reg_field_value(
 			value,
@@ -314,7 +313,7 @@ static void submit_channel_request(
 			AUXN_IMPCAL,
 			AUXN_IMPCAL_ENABLE);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 
 		set_reg_field_value(
 			value,
@@ -322,12 +321,12 @@ static void submit_channel_request(
 			AUXN_IMPCAL,
 			AUXN_IMPCAL_OVERRIDE_ENABLE);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 	}
 	{
 		const uint32_t addr = mmAUXP_IMPCAL;
 
-		value = dal_read_reg(engine->base.ctx, addr);
+		value = dm_read_reg(engine->base.ctx, addr);
 
 		set_reg_field_value(
 			value,
@@ -335,7 +334,7 @@ static void submit_channel_request(
 			AUXP_IMPCAL,
 			AUXP_IMPCAL_OVERRIDE_ENABLE);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 
 		set_reg_field_value(
 			value,
@@ -343,14 +342,14 @@ static void submit_channel_request(
 			AUXP_IMPCAL,
 			AUXP_IMPCAL_OVERRIDE_ENABLE);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 	}
 
 	/* set the delay and the number of bytes to write */
 	{
 		const uint32_t addr = aux_engine->addr.aux_sw_control;
 
-		value = dal_read_reg(engine->base.ctx, addr);
+		value = dm_read_reg(engine->base.ctx, addr);
 
 		set_reg_field_value(
 			value,
@@ -374,14 +373,14 @@ static void submit_channel_request(
 			AUX_SW_CONTROL,
 			AUX_SW_WR_BYTES);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 	}
 
 	/* program action and address and payload data (if 'is_write') */
 	{
 		const uint32_t addr = aux_engine->addr.aux_sw_data;
 
-		value = dal_read_reg(engine->base.ctx, addr);
+		value = dm_read_reg(engine->base.ctx, addr);
 
 		set_reg_field_value(
 			value,
@@ -408,7 +407,7 @@ static void submit_channel_request(
 			AUX_SW_DATA,
 			AUX_SW_DATA);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 
 		set_reg_field_value(
 			value,
@@ -422,7 +421,7 @@ static void submit_channel_request(
 			AUX_SW_DATA,
 			AUX_SW_DATA);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 
 		set_reg_field_value(
 			value,
@@ -430,7 +429,7 @@ static void submit_channel_request(
 			AUX_SW_DATA,
 			AUX_SW_DATA);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 
 		if (request->length) {
 			set_reg_field_value(
@@ -439,7 +438,7 @@ static void submit_channel_request(
 				AUX_SW_DATA,
 				AUX_SW_DATA);
 
-			dal_write_reg(engine->base.ctx, addr, value);
+			dm_write_reg(engine->base.ctx, addr, value);
 		}
 
 		if (is_write) {
@@ -457,7 +456,7 @@ static void submit_channel_request(
 					AUX_SW_DATA,
 					AUX_SW_DATA);
 
-				dal_write_reg(
+				dm_write_reg(
 					engine->base.ctx, addr, value);
 
 				++i;
@@ -468,7 +467,7 @@ static void submit_channel_request(
 	{
 		const uint32_t addr = aux_engine->addr.aux_interrupt_control;
 
-		value = dal_read_reg(engine->base.ctx, addr);
+		value = dm_read_reg(engine->base.ctx, addr);
 
 		set_reg_field_value(
 			value,
@@ -476,13 +475,13 @@ static void submit_channel_request(
 			AUX_INTERRUPT_CONTROL,
 			AUX_SW_DONE_ACK);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 	}
 
 	{
 		const uint32_t addr = aux_engine->addr.aux_sw_control;
 
-		value = dal_read_reg(engine->base.ctx, addr);
+		value = dm_read_reg(engine->base.ctx, addr);
 
 		set_reg_field_value(
 			value,
@@ -490,7 +489,7 @@ static void submit_channel_request(
 			AUX_SW_CONTROL,
 			AUX_SW_GO);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 	}
 }
 
@@ -510,7 +509,7 @@ static void process_channel_reply(
 	{
 		const uint32_t addr = aux_engine->addr.aux_sw_status;
 
-		value = dal_read_reg(engine->base.ctx, addr);
+		value = dm_read_reg(engine->base.ctx, addr);
 
 		bytes_replied = get_reg_field_value(
 				value,
@@ -523,7 +522,7 @@ static void process_channel_reply(
 
 		const uint32_t addr = aux_engine->addr.aux_sw_data;
 
-		value = dal_read_reg(engine->base.ctx, addr);
+		value = dm_read_reg(engine->base.ctx, addr);
 
 		set_reg_field_value(
 			value,
@@ -531,7 +530,7 @@ static void process_channel_reply(
 			AUX_SW_DATA,
 			AUX_SW_INDEX);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 
 		set_reg_field_value(
 			value,
@@ -539,7 +538,7 @@ static void process_channel_reply(
 			AUX_SW_DATA,
 			AUX_SW_AUTOINCREMENT_DISABLE);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 
 		set_reg_field_value(
 			value,
@@ -547,9 +546,9 @@ static void process_channel_reply(
 			AUX_SW_DATA,
 			AUX_SW_DATA_RW);
 
-		dal_write_reg(engine->base.ctx, addr, value);
+		dm_write_reg(engine->base.ctx, addr, value);
 
-		value = dal_read_reg(engine->base.ctx, addr);
+		value = dm_read_reg(engine->base.ctx, addr);
 
 		reply_result = get_reg_field_value(
 				value,
@@ -567,7 +566,7 @@ static void process_channel_reply(
 			--bytes_replied;
 
 			while (i < bytes_replied) {
-				value = dal_read_reg(
+				value = dm_read_reg(
 					engine->base.ctx, addr);
 
 				reply->data[i] = get_reg_field_value(
@@ -631,7 +630,7 @@ static enum aux_channel_operation_result get_channel_status(
 		uint32_t time_elapsed = 0;
 
 		do {
-			value = dal_read_reg(engine->base.ctx, addr);
+			value = dm_read_reg(engine->base.ctx, addr);
 
 			aux_sw_done = get_reg_field_value(
 					value,
@@ -641,7 +640,7 @@ static enum aux_channel_operation_result get_channel_status(
 			if (aux_sw_done)
 				break;
 
-			dc_service_delay_in_microseconds(engine->base.ctx, 10);
+			dm_delay_in_microseconds(engine->base.ctx, 10);
 
 			time_elapsed += 10;
 		} while (time_elapsed < aux_engine->timeout_period);
@@ -771,7 +770,7 @@ struct aux_engine *dal_aux_engine_dce110_create(
 		return NULL;
 	}
 
-	engine = dc_service_alloc(aux_init_data->ctx, sizeof(*engine));
+	engine = dm_alloc(aux_init_data->ctx, sizeof(*engine));
 
 	if (!engine) {
 		ASSERT_CRITICAL(false);
@@ -783,7 +782,7 @@ struct aux_engine *dal_aux_engine_dce110_create(
 
 	ASSERT_CRITICAL(false);
 
-	dc_service_free(aux_init_data->ctx, engine);
+	dm_free(aux_init_data->ctx, engine);
 
 	return NULL;
 }

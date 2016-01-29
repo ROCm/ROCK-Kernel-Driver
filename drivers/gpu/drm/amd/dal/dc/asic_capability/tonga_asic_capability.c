@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "include/asic_capability_interface.h"
 #include "include/asic_capability_types.h"
@@ -90,8 +90,7 @@ void tonga_asic_capability_create(struct asic_capability *cap,
 	cap->stereo_3d_caps.DISPLAYPORT_FRAME_ALT = true;
 	cap->stereo_3d_caps.INTERLEAVE = true;
 
-	e_fuse_setting = dal_read_index_reg(cap->ctx, CGS_IND_REG__SMC,
-			ixVCE_HARVEST_FUSE_MACRO__ADDRESS);
+	e_fuse_setting = dm_read_index_reg(cap->ctx, CGS_IND_REG__SMC, ixVCE_HARVEST_FUSE_MACRO__ADDRESS);
 
 	/* Bits [28:27]*/
 	switch ((e_fuse_setting >> 27) & 0x3) {

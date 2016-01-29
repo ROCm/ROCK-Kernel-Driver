@@ -22,7 +22,7 @@
  * Authors: AMD
  *
  */
-#include "dc_services.h"
+#include "dm_services.h"
 #include "dc.h"
 #include "core_dc.h"
 #include "core_types.h"
@@ -88,7 +88,7 @@ static void dce100_enable_fe_clock(
 
 	addr = HW_REG_CRTC(mmDCFE_CLOCK_CONTROL, controller_id);
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -96,7 +96,7 @@ static void dce100_enable_fe_clock(
 		DCFE_CLOCK_CONTROL,
 		DCFE_CLOCK_ENABLE);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static bool dce100_pipe_control_lock(
@@ -106,7 +106,7 @@ static bool dce100_pipe_control_lock(
 	bool lock)
 {
 	uint32_t addr = HW_REG_BLND(mmBLND_V_UPDATE_LOCK, controller_idx);
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 	bool need_to_wait = false;
 
 	if (control_mask & PIPE_LOCK_CONTROL_GRAPHICS)
@@ -146,7 +146,7 @@ static bool dce100_pipe_control_lock(
 			BLND_V_UPDATE_LOCK,
 			BLND_V_UPDATE_LOCK_MODE);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	if (!lock && need_to_wait) {
 		uint8_t counter = 0;
@@ -159,7 +159,7 @@ static bool dce100_pipe_control_lock(
 				controller_idx);
 
 		while (counter < counter_limit) {
-			value = dal_read_reg(ctx, addr);
+			value = dm_read_reg(ctx, addr);
 
 			pipe_pending = 0;
 
@@ -214,7 +214,7 @@ static bool dce100_pipe_control_lock(
 				break;
 
 			counter++;
-			dc_service_delay_in_microseconds(ctx, delay_us);
+			dm_delay_in_microseconds(ctx, delay_us);
 		}
 
 		if (counter == counter_limit) {
@@ -267,7 +267,7 @@ static void dce100_set_blender_mode(
 		break;
 	}
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -281,7 +281,7 @@ static void dce100_set_blender_mode(
 		BLND_CONTROL,
 		BLND_MODE);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static bool dce100_enable_display_power_gating(

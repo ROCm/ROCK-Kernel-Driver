@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "include/adapter_service_interface.h"
 #include "include/ddc_service_types.h"
@@ -188,7 +188,7 @@ struct i2c_payloads *dal_ddc_i2c_payloads_create(struct dc_context *ctx, uint32_
 {
 	struct i2c_payloads *payloads;
 
-	payloads = dc_service_alloc(ctx, sizeof(struct i2c_payloads));
+	payloads = dm_alloc(ctx, sizeof(struct i2c_payloads));
 
 	if (!payloads)
 		return NULL;
@@ -197,7 +197,7 @@ struct i2c_payloads *dal_ddc_i2c_payloads_create(struct dc_context *ctx, uint32_
 		&payloads->payloads, ctx, count, sizeof(struct i2c_payload)))
 		return payloads;
 
-	dc_service_free(ctx, payloads);
+	dm_free(ctx, payloads);
 	return NULL;
 
 }
@@ -217,7 +217,7 @@ void dal_ddc_i2c_payloads_destroy(struct i2c_payloads **p)
 	if (!p || !*p)
 		return;
 	dal_vector_destruct(&(*p)->payloads);
-	dc_service_free((*p)->payloads.ctx, *p);
+	dm_free((*p)->payloads.ctx, *p);
 	*p = NULL;
 
 }
@@ -226,7 +226,7 @@ struct aux_payloads *dal_ddc_aux_payloads_create(struct dc_context *ctx, uint32_
 {
 	struct aux_payloads *payloads;
 
-	payloads = dc_service_alloc(ctx, sizeof(struct aux_payloads));
+	payloads = dm_alloc(ctx, sizeof(struct aux_payloads));
 
 	if (!payloads)
 		return NULL;
@@ -235,7 +235,7 @@ struct aux_payloads *dal_ddc_aux_payloads_create(struct dc_context *ctx, uint32_
 		&payloads->payloads, ctx, count, sizeof(struct aux_payloads)))
 		return payloads;
 
-	dc_service_free(ctx, payloads);
+	dm_free(ctx, payloads);
 	return NULL;
 }
 
@@ -256,7 +256,7 @@ void dal_ddc_aux_payloads_destroy(struct aux_payloads **p)
 		return;
 
 	dal_vector_destruct(&(*p)->payloads);
-	dc_service_free((*p)->payloads.ctx, *p);
+	dm_free((*p)->payloads.ctx, *p);
 	*p = NULL;
 }
 
@@ -341,7 +341,7 @@ struct ddc_service *dal_ddc_service_create(
 {
 	struct ddc_service *ddc_service;
 
-	ddc_service = dc_service_alloc(init_data->ctx, sizeof(struct ddc_service));
+	ddc_service = dm_alloc(init_data->ctx, sizeof(struct ddc_service));
 
 	if (!ddc_service)
 		return NULL;
@@ -349,7 +349,7 @@ struct ddc_service *dal_ddc_service_create(
 	if (construct(ddc_service, init_data))
 		return ddc_service;
 
-	dc_service_free(init_data->ctx, ddc_service);
+	dm_free(init_data->ctx, ddc_service);
 	return NULL;
 }
 
@@ -366,7 +366,7 @@ void dal_ddc_service_destroy(struct ddc_service **ddc)
 		return;
 	}
 	destruct(*ddc);
-	dc_service_free((*ddc)->ctx, *ddc);
+	dm_free((*ddc)->ctx, *ddc);
 	*ddc = NULL;
 }
 
@@ -409,7 +409,7 @@ static uint32_t defer_delay_converter_wa(
 
 	if (dal_ddc_service_get_dp_receiver_id_info(ddc, &dp_rec_info) &&
 		(dp_rec_info.branch_id == DP_BRANCH_DEVICE_ID_4) &&
-		!dal_strncmp(dp_rec_info.branch_name,
+		!dm_strncmp(dp_rec_info.branch_name,
 			DP_DVI_CONVERTER_ID_4,
 			sizeof(dp_rec_info.branch_name)))
 		return defer_delay > I2C_OVER_AUX_DEFER_WA_DELAY ?
@@ -781,7 +781,7 @@ uint32_t dal_ddc_service_get_edid_buf_len(struct ddc_service *ddc)
 
 void dal_ddc_service_get_edid_buf(struct ddc_service *ddc, uint8_t *edid_buf)
 {
-	dc_service_memmove(edid_buf,
+	dm_memmove(edid_buf,
 			ddc->edid_buf, ddc->edid_buf_len);
 }
 
@@ -1088,7 +1088,7 @@ struct ddc *dal_ddc_service_get_ddc_pin(struct ddc_service *ddc_service)
 
 void dal_ddc_service_reset_dp_receiver_id_info(struct ddc_service *ddc_service)
 {
-	dc_service_memset(&ddc_service->dp_receiver_id_info,
+	dm_memset(&ddc_service->dp_receiver_id_info,
 		0, sizeof(struct dp_receiver_id_info));
 }
 

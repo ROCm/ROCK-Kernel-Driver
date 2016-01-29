@@ -26,7 +26,7 @@
 #ifndef __DAL_FIXED32_32_H__
 #define __DAL_FIXED32_32_H__
 
-#include "dc_services_types.h"
+#include "dm_services_types.h"
 
 struct fixed32_32 {
 	uint64_t value;

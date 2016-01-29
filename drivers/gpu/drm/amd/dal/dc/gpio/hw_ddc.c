@@ -23,12 +23,11 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
 #include "include/gpio_types.h"
 #include "hw_gpio_pin.h"
 #include "hw_gpio.h"

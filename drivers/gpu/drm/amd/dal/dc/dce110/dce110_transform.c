@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /* include DCE11 register header files */
 #include "dce/dce_11_0_d.h"
@@ -37,6 +37,7 @@
 #include "include/logger_interface.h"
 
 #include "dce110_transform.h"
+
 #include "dce110_transform_bit_depth.h"
 
 static struct transform_funcs dce110_transform_funcs = {

@@ -23,12 +23,11 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
 #include "include/i2caux_interface.h"
 #include "engine.h"
 
@@ -204,7 +203,7 @@ static void process_read_request(
 				I2CAUX_TRANSACTION_STATUS_FAILED_PROTOCOL_ERROR;
 			ctx->operation_succeeded = false;
 		} else
-			dc_service_delay_in_microseconds(engine->base.ctx, 400);
+			dm_delay_in_microseconds(engine->base.ctx, 400);
 	break;
 	case AUX_CHANNEL_OPERATION_FAILED_TIMEOUT:
 		++ctx->timed_out_retry_aux;
@@ -265,7 +264,7 @@ static bool read_command(
 	ctx.request.delay = 0;
 
 	do {
-		dc_service_memset(ctx.buffer + ctx.offset, 0, ctx.current_read_length);
+		dm_memset(ctx.buffer + ctx.offset, 0, ctx.current_read_length);
 
 		ctx.request.data = ctx.buffer + ctx.offset;
 		ctx.request.length = ctx.current_read_length;
@@ -276,7 +275,7 @@ static bool read_command(
 
 		if (ctx.operation_succeeded && !ctx.transaction_complete)
 			if (ctx.request.type == AUX_TRANSACTION_TYPE_I2C)
-				dc_service_sleep_in_milliseconds(engine->base.ctx, engine->delay);
+				dm_sleep_in_milliseconds(engine->base.ctx, engine->delay);
 	} while (ctx.operation_succeeded && !ctx.transaction_complete);
 
 	return ctx.operation_succeeded;
@@ -331,7 +330,7 @@ static void process_write_reply(
 				I2CAUX_TRANSACTION_STATUS_FAILED_TIMEOUT;
 				ctx->operation_succeeded = false;
 			} else
-				dc_service_delay_in_microseconds(engine->base.ctx, 300);
+				dm_delay_in_microseconds(engine->base.ctx, 300);
 		} else {
 			ctx->status = I2CAUX_TRANSACTION_STATUS_SUCCEEDED;
 			ctx->defer_retry_aux = 0;
@@ -402,7 +401,7 @@ static void process_write_request(
 				I2CAUX_TRANSACTION_STATUS_FAILED_PROTOCOL_ERROR;
 			ctx->operation_succeeded = false;
 		} else
-			dc_service_delay_in_microseconds(engine->base.ctx, 400);
+			dm_delay_in_microseconds(engine->base.ctx, 400);
 	break;
 	case AUX_CHANNEL_OPERATION_FAILED_TIMEOUT:
 		++ctx->timed_out_retry_aux;
@@ -476,7 +475,7 @@ static bool write_command(
 
 		if (ctx.operation_succeeded && !ctx.transaction_complete)
 			if (ctx.request.type == AUX_TRANSACTION_TYPE_I2C)
-				dc_service_sleep_in_milliseconds(engine->base.ctx, engine->delay);
+				dm_sleep_in_milliseconds(engine->base.ctx, engine->delay);
 	} while (ctx.operation_succeeded && !ctx.transaction_complete);
 
 	return ctx.operation_succeeded;

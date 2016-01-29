@@ -22,7 +22,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 #include "dce110_transform.h"
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
@@ -76,7 +76,7 @@ static void program_gamut_remap(
 	uint32_t addr = DCP_REG(mmGAMUT_REMAP_CONTROL);
 
 	/* the register controls ovl also */
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	if (reg_val) {
 		{
@@ -96,7 +96,7 @@ static void program_gamut_remap(
 				GAMUT_REMAP_C11_C12,
 				GAMUT_REMAP_C12);
 
-			dal_write_reg(ctx, addr, reg_data);
+			dm_write_reg(ctx, addr, reg_data);
 		}
 		{
 			uint32_t reg_data = 0;
@@ -116,7 +116,7 @@ static void program_gamut_remap(
 				GAMUT_REMAP_C13_C14,
 				GAMUT_REMAP_C14);
 
-			dal_write_reg(ctx, addr, reg_data);
+			dm_write_reg(ctx, addr, reg_data);
 		}
 		{
 			uint32_t reg_data = 0;
@@ -136,7 +136,7 @@ static void program_gamut_remap(
 				GAMUT_REMAP_C21_C22,
 				GAMUT_REMAP_C22);
 
-			dal_write_reg(ctx, addr, reg_data);
+			dm_write_reg(ctx, addr, reg_data);
 		}
 		{
 			uint32_t reg_data = 0;
@@ -156,7 +156,7 @@ static void program_gamut_remap(
 				GAMUT_REMAP_C23_C24,
 				GAMUT_REMAP_C24);
 
-			dal_write_reg(ctx, addr, reg_data);
+			dm_write_reg(ctx, addr, reg_data);
 		}
 		{
 			uint32_t reg_data = 0;
@@ -176,7 +176,7 @@ static void program_gamut_remap(
 				GAMUT_REMAP_C31_C32,
 				GAMUT_REMAP_C32);
 
-			dal_write_reg(ctx, addr, reg_data);
+			dm_write_reg(ctx, addr, reg_data);
 		}
 		{
 			uint32_t reg_data = 0;
@@ -196,7 +196,7 @@ static void program_gamut_remap(
 				GAMUT_REMAP_C33_C34,
 				GAMUT_REMAP_C34);
 
-			dal_write_reg(ctx, addr, reg_data);
+			dm_write_reg(ctx, addr, reg_data);
 		}
 
 		set_reg_field_value(
@@ -213,7 +213,7 @@ static void program_gamut_remap(
 			GRPH_GAMUT_REMAP_MODE);
 
 	addr = DCP_REG(mmGAMUT_REMAP_CONTROL);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 }
 

@@ -22,7 +22,7 @@
  * Authors: AMD
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "dc.h"
 
@@ -82,7 +82,7 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 	connectors_num = dcb->funcs->get_connectors_number(dcb);
 
 	if (connectors_num > ENUM_ID_COUNT) {
-		dal_error(
+		dm_error(
 			"DC: Number of connectors %d exceeds maximum of %d!\n",
 			connectors_num,
 			ENUM_ID_COUNT);
@@ -90,11 +90,11 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 	}
 
 	if (connectors_num == 0 && init_params->num_virtual_links == 0) {
-		dal_error("DC: Number of connectors can not be zero!\n");
+		dm_error("DC: Number of connectors can not be zero!\n");
 		return false;
 	}
 
-	dal_output_to_console(
+	dm_output_to_console(
 		"DC: %s: connectors_num: physical:%d, virtual:%d\n",
 		__func__,
 		connectors_num,
@@ -116,12 +116,12 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 			link->dc = dc;
 			++dc->link_count;
 		} else {
-			dal_error("DC: failed to create link!\n");
+			dm_error("DC: failed to create link!\n");
 		}
 	}
 
 	for (i = 0; i < init_params->num_virtual_links; i++) {
-		struct core_link *link = dc_service_alloc(
+		struct core_link *link = dm_alloc(
 			dc->ctx,
 			sizeof(*link));
 		struct encoder_init_data enc_init = {0};
@@ -138,7 +138,7 @@ static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
 		link->link_id.type = OBJECT_TYPE_CONNECTOR;
 		link->link_id.id = CONNECTOR_ID_VIRTUAL;
 		link->link_id.enum_id = ENUM_ID_1;
-		link->link_enc = dc_service_alloc(
+		link->link_enc = dm_alloc(
 			dc->ctx,
 			sizeof(*link->link_enc));
 
@@ -215,7 +215,7 @@ static void init_hw(struct dc *dc)
 		struct audio *audio = dc->res_pool.audios[i];
 
 		if (dal_audio_power_up(audio) != AUDIO_RESULT_OK)
-			dal_error("Failed audio power up!\n");
+			dm_error("Failed audio power up!\n");
 	}
 
 }
@@ -227,7 +227,7 @@ static struct adapter_service *create_as(
 	struct adapter_service *as = NULL;
 	struct as_init_data init_data;
 
-	dc_service_memset(&init_data, 0, sizeof(init_data));
+	dm_memset(&init_data, 0, sizeof(init_data));
 
 	init_data.ctx = dc_init_data->ctx;
 
@@ -263,7 +263,7 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 	struct dc_pp_clock_levels clks = {0};
 
 	/*do system clock*/
-	dc_service_pp_get_clock_levels_by_type(
+	dm_pp_get_clock_levels_by_type(
 			dc->ctx,
 			DC_PP_CLOCK_TYPE_ENGINE_CLK,
 			&clks);
@@ -276,7 +276,7 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 			clks.clocks_in_khz[0], 1000);
 
 	/*do display clock*/
-	dc_service_pp_get_clock_levels_by_type(
+	dm_pp_get_clock_levels_by_type(
 			dc->ctx,
 			DC_PP_CLOCK_TYPE_DISPLAY_CLK,
 			&clks);
@@ -289,7 +289,7 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 			clks.clocks_in_khz[0], 1000);
 
 	/*do memory clock*/
-	dc_service_pp_get_clock_levels_by_type(
+	dm_pp_get_clock_levels_by_type(
 			dc->ctx,
 			DC_PP_CLOCK_TYPE_MEMORY_CLK,
 			&clks);
@@ -319,9 +319,9 @@ static bool construct(struct dc *dc, const struct dal_init_data *init_params)
 	ctx.cgs_device = init_params->cgs_device;
 	ctx.dc = dc;
 
-	dc_init_data.ctx = dc_service_alloc(&ctx, sizeof(*dc_init_data.ctx));
+	dc_init_data.ctx = dm_alloc(&ctx, sizeof(*dc_init_data.ctx));
 	if (!dc_init_data.ctx) {
-		dal_error("%s: failed to create ctx\n", __func__);
+		dm_error("%s: failed to create ctx\n", __func__);
 		goto ctx_fail;
 	}
 	dc_init_data.ctx->driver_context = init_params->driver;
@@ -334,7 +334,7 @@ static bool construct(struct dc *dc, const struct dal_init_data *init_params)
 
 	if (!logger) {
 		/* can *not* call logger. call base driver 'print error' */
-		dal_error("%s: failed to create Logger!\n", __func__);
+		dm_error("%s: failed to create Logger!\n", __func__);
 		goto logger_fail;
 	}
 	dc_init_data.ctx->logger = logger;
@@ -343,14 +343,14 @@ static bool construct(struct dc *dc, const struct dal_init_data *init_params)
 	dc_init_data.adapter_srv = create_as(&dc_init_data, init_params);
 
 	if (!dc_init_data.adapter_srv) {
-		dal_error("%s: create_as() failed!\n", __func__);
+		dm_error("%s: create_as() failed!\n", __func__);
 		goto as_fail;
 	}
 
 	/* Initialize HW controlled by Adapter Service */
 	if (false == dal_adapter_service_initialize_hw_data(
 			dc_init_data.adapter_srv)) {
-		dal_error("%s: dal_adapter_service_initialize_hw_data()"\
+		dm_error("%s: dal_adapter_service_initialize_hw_data()"\
 				"  failed!\n", __func__);
 		/* Note that AS exist, so have to destroy it.*/
 		goto as_fail;
@@ -385,7 +385,7 @@ as_fail:
 	dal_logger_destroy(&dc_init_data.ctx->logger);
 logger_fail:
 hwss_fail:
-	dc_service_free(&ctx, dc_init_data.ctx);
+	dm_free(&ctx, dc_init_data.ctx);
 ctx_fail:
 	return false;
 }
@@ -395,7 +395,7 @@ static void destruct(struct dc *dc)
 	destroy_links(dc);
 	dc->res_pool.funcs->destruct(&dc->res_pool);
 	dal_logger_destroy(&dc->ctx->logger);
-	dc_service_free(dc->ctx, dc->ctx);
+	dm_free(dc->ctx, dc->ctx);
 }
 
 /*******************************************************************************
@@ -408,7 +408,7 @@ struct dc *dc_create(const struct dal_init_data *init_params)
 		.driver_context = init_params->driver,
 		.cgs_device = init_params->cgs_device
 	};
-	struct dc *dc = dc_service_alloc(&ctx, sizeof(*dc));
+	struct dc *dc = dm_alloc(&ctx, sizeof(*dc));
 
 	if (NULL == dc)
 		goto alloc_fail;
@@ -423,7 +423,7 @@ struct dc *dc_create(const struct dal_init_data *init_params)
 	return dc;
 
 construct_fail:
-	dc_service_free(&ctx, dc);
+	dm_free(&ctx, dc);
 
 alloc_fail:
 	return NULL;
@@ -433,7 +433,7 @@ void dc_destroy(struct dc **dc)
 {
 	struct dc_context ctx = *(*dc)->ctx;
 	destruct(*dc);
-	dc_service_free(&ctx, *dc);
+	dm_free(&ctx, *dc);
 	*dc = NULL;
 }
 
@@ -445,14 +445,14 @@ bool dc_validate_resources(
 	enum dc_status result = DC_ERROR_UNEXPECTED;
 	struct validate_context *context;
 
-	context = dc_service_alloc(dc->ctx, sizeof(struct validate_context));
+	context = dm_alloc(dc->ctx, sizeof(struct validate_context));
 	if(context == NULL)
 		goto context_alloc_fail;
 
 	result = dc->res_pool.funcs->validate_with_context(
 						dc, set, set_count, context);
 
-	dc_service_free(dc->ctx, context);
+	dm_free(dc->ctx, context);
 context_alloc_fail:
 
 	return (result == DC_OK);
@@ -556,7 +556,7 @@ bool dc_commit_targets(
 
 	}
 
-	context = dc_service_alloc(dc->ctx, sizeof(struct validate_context));
+	context = dm_alloc(dc->ctx, sizeof(struct validate_context));
 	if (context == NULL)
 		goto context_alloc_fail;
 
@@ -611,7 +611,7 @@ bool dc_commit_targets(
 
 	/* TODO: disable unused plls*/
 fail:
-	dc_service_free(dc->ctx, context);
+	dm_free(dc->ctx, context);
 
 context_alloc_fail:
 	return (result == DC_OK);
@@ -731,7 +731,7 @@ const struct dc_target *dc_get_target_on_irq_source(
 		crtc_idx = src - DC_IRQ_SOURCE_PFLIP1;
 		break;
 	default:
-		dal_error("%s: invalid irq source: %d\n!",__func__, src);
+		dm_error("%s: invalid irq source: %d\n!" ,__func__, src);
 		return NULL;
 	}
 
@@ -741,7 +741,7 @@ const struct dc_target *dc_get_target_on_irq_source(
 		struct dc_target *dc_target;
 
 		if (NULL == target) {
-			dal_error("%s: 'dc_target' is NULL for irq source: %d\n!",
+			dm_error("%s: 'dc_target' is NULL for irq source: %d\n!",
 					__func__, src);
 			continue;
 		}

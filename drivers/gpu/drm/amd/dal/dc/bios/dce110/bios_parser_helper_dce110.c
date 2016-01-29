@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "atom.h"
 
@@ -52,11 +52,11 @@ static void set_scratch_acc_mode_change(
 	uint32_t addr = mmBIOS_SCRATCH_6;
 	uint32_t value = 0;
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	value |= ATOM_S6_ACC_MODE;
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 /*
@@ -79,32 +79,32 @@ static void set_scratch_active_and_requested(
 	/* mmBIOS_SCRATCH_3 = mmBIOS_SCRATCH_0 + ATOM_ACTIVE_INFO_DEF */
 	addr = mmBIOS_SCRATCH_3;
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	value &= ~ATOM_S3_DEVICE_ACTIVE_MASK;
 	value |= (d->active & ATOM_S3_DEVICE_ACTIVE_MASK);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* mmBIOS_SCRATCH_6 =  mmBIOS_SCRATCH_0 + ATOM_ACC_CHANGE_INFO_DEF */
 	addr = mmBIOS_SCRATCH_6;
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	value &= ~ATOM_S6_ACC_REQ_MASK;
 	value |= (d->requested & ATOM_S6_ACC_REQ_MASK);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* mmBIOS_SCRATCH_5 =  mmBIOS_SCRATCH_0 + ATOM_DOS_REQ_INFO_DEF */
 	addr = mmBIOS_SCRATCH_5;
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	value &= ~ATOM_S5_DOS_REQ_DEVICEw0;
 	value |= (d->active & ATOM_S5_DOS_REQ_DEVICEw0);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	d->active = 0;
 	d->requested = 0;
@@ -119,7 +119,7 @@ static enum lcd_scale get_scratch_lcd_scale(
 	uint32_t addr = mmBIOS_SCRATCH_6;
 	uint32_t value = 0;
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	if (value & ATOM_S6_REQ_LCD_EXPANSION_FULL)
 		return LCD_SCALE_FULLPANEL;
@@ -235,7 +235,7 @@ static bool is_accelerated_mode(
 	struct dc_context *ctx)
 {
 	uint32_t addr = mmBIOS_SCRATCH_6;
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 
 	return (value & ATOM_S6_ACC_MODE) ? true : false;
 }
@@ -275,7 +275,7 @@ static enum signal_type detect_sink(
 		return SIGNAL_TYPE_NONE;
 	}
 
-	bios_scratch0 = dal_read_reg(ctx,
+	bios_scratch0 = dm_read_reg(ctx,
 		mmBIOS_SCRATCH_0 + ATOM_DEVICE_CONNECT_INFO_DEF);
 
 	/* In further processing we use DACB masks. If we want detect load on
@@ -390,14 +390,14 @@ static void set_scratch_connected(
 	/* update scratch register */
 	addr = mmBIOS_SCRATCH_0 + ATOM_DEVICE_CONNECT_INFO_DEF;
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	if (connected)
 		value |= update;
 	else
 		value &= ~update;
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static void set_scratch_critical_state(
@@ -405,14 +405,14 @@ static void set_scratch_critical_state(
 	bool state)
 {
 	uint32_t addr = mmBIOS_SCRATCH_6;
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 
 	if (state)
 		value |= ATOM_S6_CRITICAL_STATE;
 	else
 		value &= ~ATOM_S6_CRITICAL_STATE;
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static void set_scratch_lcd_scale(
@@ -430,7 +430,7 @@ static bool is_lid_open(struct dc_context *ctx)
 	uint32_t bios_scratch6;
 
 	bios_scratch6 =
-		dal_read_reg(
+		dm_read_reg(
 			ctx,
 			mmBIOS_SCRATCH_0 + ATOM_ACC_CHANGE_INFO_DEF);
 

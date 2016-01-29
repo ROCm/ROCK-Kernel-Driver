@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 #include "include/logger_interface.h"
 
 #include "dce/dce_11_0_d.h"
@@ -60,6 +60,6 @@ bool dce110_ipp_construct(
 
 void dce110_ipp_destroy(struct input_pixel_processor **ipp)
 {
-	dc_service_free((*ipp)->ctx, TO_DCE110_IPP(*ipp));
+	dm_free((*ipp)->ctx, TO_DCE110_IPP(*ipp));
 	*ipp = NULL;
 }

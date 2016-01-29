@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /* include DCE11 register header files */
 #include "dce/dce_11_0_d.h"
@@ -1797,7 +1797,7 @@ static void regamma_config_regions_and_segments(
 			REGAMMA_CNTLA_START_CNTL,
 			REGAMMA_CNTLA_EXP_REGION_START_SEGMENT);
 
-		dal_write_reg(opp110->base.ctx,
+		dm_write_reg(opp110->base.ctx,
 				DCP_REG(mmREGAMMA_CNTLA_START_CNTL),
 				value);
 	}
@@ -1809,7 +1809,7 @@ static void regamma_config_regions_and_segments(
 			REGAMMA_CNTLA_SLOPE_CNTL,
 			REGAMMA_CNTLA_EXP_REGION_LINEAR_SLOPE);
 
-		dal_write_reg(opp110->base.ctx,
+		dm_write_reg(opp110->base.ctx,
 			DCP_REG(mmREGAMMA_CNTLA_SLOPE_CNTL), value);
 	}
 	{
@@ -1820,7 +1820,7 @@ static void regamma_config_regions_and_segments(
 			REGAMMA_CNTLA_END_CNTL1,
 			REGAMMA_CNTLA_EXP_REGION_END);
 
-		dal_write_reg(opp110->base.ctx,
+		dm_write_reg(opp110->base.ctx,
 			DCP_REG(mmREGAMMA_CNTLA_END_CNTL1), value);
 	}
 	{
@@ -1837,7 +1837,7 @@ static void regamma_config_regions_and_segments(
 			REGAMMA_CNTLA_END_CNTL2,
 			REGAMMA_CNTLA_EXP_REGION_END_SLOPE);
 
-		dal_write_reg(opp110->base.ctx,
+		dm_write_reg(opp110->base.ctx,
 			DCP_REG(mmREGAMMA_CNTLA_END_CNTL2), value);
 	}
 
@@ -1869,7 +1869,7 @@ static void regamma_config_regions_and_segments(
 			REGAMMA_CNTLA_REGION_0_1,
 			REGAMMA_CNTLA_EXP_REGION1_NUM_SEGMENTS);
 
-		dal_write_reg(
+		dm_write_reg(
 			opp110->base.ctx,
 			DCP_REG(mmREGAMMA_CNTLA_REGION_0_1),
 			value);
@@ -1902,7 +1902,7 @@ static void regamma_config_regions_and_segments(
 			REGAMMA_CNTLA_REGION_2_3,
 			REGAMMA_CNTLA_EXP_REGION3_NUM_SEGMENTS);
 
-		dal_write_reg(opp110->base.ctx,
+		dm_write_reg(opp110->base.ctx,
 			DCP_REG(mmREGAMMA_CNTLA_REGION_2_3),
 			value);
 	}
@@ -1934,7 +1934,7 @@ static void regamma_config_regions_and_segments(
 			REGAMMA_CNTLA_REGION_4_5,
 			REGAMMA_CNTLA_EXP_REGION5_NUM_SEGMENTS);
 
-		dal_write_reg(opp110->base.ctx,
+		dm_write_reg(opp110->base.ctx,
 			DCP_REG(mmREGAMMA_CNTLA_REGION_4_5),
 			value);
 	}
@@ -1966,7 +1966,7 @@ static void regamma_config_regions_and_segments(
 			REGAMMA_CNTLA_REGION_6_7,
 			REGAMMA_CNTLA_EXP_REGION7_NUM_SEGMENTS);
 
-		dal_write_reg(opp110->base.ctx,
+		dm_write_reg(opp110->base.ctx,
 			DCP_REG(mmREGAMMA_CNTLA_REGION_6_7),
 			value);
 	}
@@ -1998,7 +1998,7 @@ static void regamma_config_regions_and_segments(
 			REGAMMA_CNTLA_REGION_8_9,
 			REGAMMA_CNTLA_EXP_REGION9_NUM_SEGMENTS);
 
-		dal_write_reg(opp110->base.ctx,
+		dm_write_reg(opp110->base.ctx,
 			DCP_REG(mmREGAMMA_CNTLA_REGION_8_9),
 			value);
 	}
@@ -2030,7 +2030,7 @@ static void regamma_config_regions_and_segments(
 			REGAMMA_CNTLA_REGION_10_11,
 			REGAMMA_CNTLA_EXP_REGION11_NUM_SEGMENTS);
 
-		dal_write_reg(opp110->base.ctx,
+		dm_write_reg(opp110->base.ctx,
 			DCP_REG(mmREGAMMA_CNTLA_REGION_10_11),
 			value);
 	}
@@ -2062,7 +2062,7 @@ static void regamma_config_regions_and_segments(
 			REGAMMA_CNTLA_REGION_12_13,
 			REGAMMA_CNTLA_EXP_REGION13_NUM_SEGMENTS);
 
-		dal_write_reg(opp110->base.ctx,
+		dm_write_reg(opp110->base.ctx,
 			DCP_REG(mmREGAMMA_CNTLA_REGION_12_13),
 			value);
 	}
@@ -2094,7 +2094,7 @@ static void regamma_config_regions_and_segments(
 			REGAMMA_CNTLA_REGION_14_15,
 			REGAMMA_CNTLA_EXP_REGION15_NUM_SEGMENTS);
 
-		dal_write_reg(opp110->base.ctx,
+		dm_write_reg(opp110->base.ctx,
 			DCP_REG(mmREGAMMA_CNTLA_REGION_14_15),
 			value);
 	}
@@ -2111,7 +2111,7 @@ static void program_pwl(
 		uint8_t counter = 0;
 
 		/* Power on LUT memory */
-		value = dal_read_reg(opp110->base.ctx,
+		value = dm_read_reg(opp110->base.ctx,
 				DCFE_REG(mmDCFE_MEM_PWR_CTRL));
 
 		set_reg_field_value(
@@ -2120,12 +2120,12 @@ static void program_pwl(
 			DCFE_MEM_PWR_CTRL,
 			DCP_REGAMMA_MEM_PWR_DIS);
 
-		dal_write_reg(opp110->base.ctx,
+		dm_write_reg(opp110->base.ctx,
 				DCFE_REG(mmDCFE_MEM_PWR_CTRL), value);
 
 		while (counter < max_tries) {
 			value =
-				dal_read_reg(
+				dm_read_reg(
 					opp110->base.ctx,
 					DCFE_REG(mmDCFE_MEM_PWR_STATUS));
 
@@ -2157,9 +2157,9 @@ static void program_pwl(
 		REGAMMA_LUT_WRITE_EN_MASK,
 		REGAMMA_LUT_WRITE_EN_MASK);
 
-	dal_write_reg(opp110->base.ctx,
+	dm_write_reg(opp110->base.ctx,
 		DCP_REG(mmREGAMMA_LUT_WRITE_EN_MASK), value);
-	dal_write_reg(opp110->base.ctx,
+	dm_write_reg(opp110->base.ctx,
 		DCP_REG(mmREGAMMA_LUT_INDEX), 0);
 
 	/* Program REGAMMA_LUT_DATA */
@@ -2172,15 +2172,15 @@ static void program_pwl(
 				opp110->regamma.rgb_resulted;
 
 		while (i != opp110->regamma.hw_points_num) {
-			dal_write_reg(opp110->base.ctx, addr, rgb->red_reg);
-			dal_write_reg(opp110->base.ctx, addr, rgb->green_reg);
-			dal_write_reg(opp110->base.ctx, addr, rgb->blue_reg);
+			dm_write_reg(opp110->base.ctx, addr, rgb->red_reg);
+			dm_write_reg(opp110->base.ctx, addr, rgb->green_reg);
+			dm_write_reg(opp110->base.ctx, addr, rgb->blue_reg);
 
-			dal_write_reg(opp110->base.ctx, addr,
+			dm_write_reg(opp110->base.ctx, addr,
 				rgb->delta_red_reg);
-			dal_write_reg(opp110->base.ctx, addr,
+			dm_write_reg(opp110->base.ctx, addr,
 				rgb->delta_green_reg);
-			dal_write_reg(opp110->base.ctx, addr,
+			dm_write_reg(opp110->base.ctx, addr,
 				rgb->delta_blue_reg);
 
 			++rgb;
@@ -2189,7 +2189,7 @@ static void program_pwl(
 	}
 
 	/*  we are done with DCP LUT memory; re-enable low power mode */
-	value = dal_read_reg(opp110->base.ctx, DCFE_REG(mmDCFE_MEM_PWR_CTRL));
+	value = dm_read_reg(opp110->base.ctx, DCFE_REG(mmDCFE_MEM_PWR_CTRL));
 
 	set_reg_field_value(
 		value,
@@ -2197,7 +2197,7 @@ static void program_pwl(
 		DCFE_MEM_PWR_CTRL,
 		DCP_REGAMMA_MEM_PWR_DIS);
 
-	dal_write_reg(opp110->base.ctx, DCFE_REG(mmDCFE_MEM_PWR_CTRL), value);
+	dm_write_reg(opp110->base.ctx, DCFE_REG(mmDCFE_MEM_PWR_CTRL), value);
 }
 
 void dce110_opp_power_on_regamma_lut(
@@ -2207,7 +2207,7 @@ void dce110_opp_power_on_regamma_lut(
 	struct dce110_opp *opp110 = TO_DCE110_OPP(opp);
 
 	uint32_t value =
-		dal_read_reg(opp->ctx, DCFE_REG(mmDCFE_MEM_PWR_CTRL));
+		dm_read_reg(opp->ctx, DCFE_REG(mmDCFE_MEM_PWR_CTRL));
 
 	set_reg_field_value(
 		value,
@@ -2221,7 +2221,7 @@ void dce110_opp_power_on_regamma_lut(
 		DCFE_MEM_PWR_CTRL,
 		DCP_LUT_MEM_PWR_DIS);
 
-	dal_write_reg(opp->ctx, DCFE_REG(mmDCFE_MEM_PWR_CTRL), value);
+	dm_write_reg(opp->ctx, DCFE_REG(mmDCFE_MEM_PWR_CTRL), value);
 }
 
 static bool scale_gamma(
@@ -2328,7 +2328,7 @@ static void configure_regamma_mode(
 	enum wide_gamut_regamma_mode mode =
 		WIDE_GAMUT_REGAMMA_MODE_GRAPHICS_MATRIX_A;
 
-	uint32_t value = dal_read_reg(opp110->base.ctx, addr);
+	uint32_t value = dm_read_reg(opp110->base.ctx, addr);
 
 	if (force_bypass) {
 
@@ -2338,7 +2338,7 @@ static void configure_regamma_mode(
 			REGAMMA_CONTROL,
 			GRPH_REGAMMA_MODE);
 
-		dal_write_reg(opp110->base.ctx, addr, value);
+		dm_write_reg(opp110->base.ctx, addr, value);
 
 		return;
 	}
@@ -2392,7 +2392,7 @@ static void configure_regamma_mode(
 		break;
 	}
 
-	dal_write_reg(opp110->base.ctx, addr, value);
+	dm_write_reg(opp110->base.ctx, addr, value);
 }
 
 bool dce110_opp_set_regamma(

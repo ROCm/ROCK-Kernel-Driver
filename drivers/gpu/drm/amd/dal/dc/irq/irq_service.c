@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "include/irq_service_interface.h"
 #include "include/logger_interface.h"
@@ -70,7 +70,7 @@ void dal_irq_service_destroy(struct irq_service **irq_service)
 		return;
 	}
 
-	dc_service_free((*irq_service)->ctx, *irq_service);
+	dm_free((*irq_service)->ctx, *irq_service);
 
 	*irq_service = NULL;
 }
@@ -91,11 +91,11 @@ void dal_irq_service_set_generic(
 	bool enable)
 {
 	uint32_t addr = info->enable_reg;
-	uint32_t value = dal_read_reg(irq_service->ctx, addr);
+	uint32_t value = dm_read_reg(irq_service->ctx, addr);
 
 	value = (value & ~info->enable_mask) |
 		(info->enable_value[enable ? 0 : 1] & info->enable_mask);
-	dal_write_reg(irq_service->ctx, addr, value);
+	dm_write_reg(irq_service->ctx, addr, value);
 }
 
 bool dal_irq_service_set(
@@ -132,11 +132,11 @@ void dal_irq_service_ack_generic(
 	const struct irq_source_info *info)
 {
 	uint32_t addr = info->ack_reg;
-	uint32_t value = dal_read_reg(irq_service->ctx, addr);
+	uint32_t value = dm_read_reg(irq_service->ctx, addr);
 
 	value = (value & ~info->ack_mask) |
 		(info->ack_value & info->ack_mask);
-	dal_write_reg(irq_service->ctx, addr, value);
+	dm_write_reg(irq_service->ctx, addr, value);
 }
 
 bool dal_irq_service_ack(

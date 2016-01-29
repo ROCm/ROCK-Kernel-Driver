@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
@@ -313,13 +313,13 @@ static void wait_for_fbc_state_changed(
 	uint32_t value;
 
 	while (counter < 10) {
-		value = dal_read_reg(cp110->base.ctx, addr);
+		value = dm_read_reg(cp110->base.ctx, addr);
 		if (get_reg_field_value(
 			value,
 			FBC_STATUS,
 			FBC_ENABLE_STATUS) == enabled)
 			break;
-		dc_service_delay_in_microseconds(cp110->base.ctx, 10);
+		dm_delay_in_microseconds(cp110->base.ctx, 10);
 		counter++;
 	}
 
@@ -339,7 +339,7 @@ void dce110_compressor_power_up_fbc(struct compressor *compressor)
 	uint32_t addr;
 
 	addr = mmFBC_CNTL;
-	value = dal_read_reg(compressor->ctx, addr);
+	value = dm_read_reg(compressor->ctx, addr);
 	set_reg_field_value(value, 0, FBC_CNTL, FBC_GRPH_COMP_EN);
 	set_reg_field_value(value, 1, FBC_CNTL, FBC_EN);
 	set_reg_field_value(value, 2, FBC_CNTL, FBC_COHERENCY_MODE);
@@ -351,32 +351,32 @@ void dce110_compressor_power_up_fbc(struct compressor *compressor)
 			FBC_CNTL,
 			FBC_COMP_CLK_GATE_EN);
 	}
-	dal_write_reg(compressor->ctx, addr, value);
+	dm_write_reg(compressor->ctx, addr, value);
 
 	addr = mmFBC_COMP_MODE;
-	value = dal_read_reg(compressor->ctx, addr);
+	value = dm_read_reg(compressor->ctx, addr);
 	set_reg_field_value(value, 1, FBC_COMP_MODE, FBC_RLE_EN);
 	set_reg_field_value(value, 1, FBC_COMP_MODE, FBC_DPCM4_RGB_EN);
 	set_reg_field_value(value, 1, FBC_COMP_MODE, FBC_IND_EN);
-	dal_write_reg(compressor->ctx, addr, value);
+	dm_write_reg(compressor->ctx, addr, value);
 
 	addr = mmFBC_COMP_CNTL;
-	value = dal_read_reg(compressor->ctx, addr);
+	value = dm_read_reg(compressor->ctx, addr);
 	set_reg_field_value(value, 1, FBC_COMP_CNTL, FBC_DEPTH_RGB08_EN);
-	dal_write_reg(compressor->ctx, addr, value);
+	dm_write_reg(compressor->ctx, addr, value);
 	/*FBC_MIN_COMPRESSION 0 ==> 2:1 */
 	/*                    1 ==> 4:1 */
 	/*                    2 ==> 8:1 */
 	/*                  0xF ==> 1:1 */
 	set_reg_field_value(value, 0xF, FBC_COMP_CNTL, FBC_MIN_COMPRESSION);
-	dal_write_reg(compressor->ctx, addr, value);
+	dm_write_reg(compressor->ctx, addr, value);
 	compressor->min_compress_ratio = FBC_COMPRESS_RATIO_1TO1;
 
 	value = 0;
-	dal_write_reg(compressor->ctx, mmFBC_IND_LUT0, value);
+	dm_write_reg(compressor->ctx, mmFBC_IND_LUT0, value);
 
 	value = 0xFFFFFF;
-	dal_write_reg(compressor->ctx, mmFBC_IND_LUT1, value);
+	dm_write_reg(compressor->ctx, mmFBC_IND_LUT1, value);
 }
 
 void dce110_compressor_enable_fbc(
@@ -408,13 +408,13 @@ void dce110_compressor_enable_fbc(
 		}
 
 		addr = mmFBC_CNTL;
-		value = dal_read_reg(compressor->ctx, addr);
+		value = dm_read_reg(compressor->ctx, addr);
 		set_reg_field_value(value, 1, FBC_CNTL, FBC_GRPH_COMP_EN);
 		set_reg_field_value(
 			value,
 			params->inst,
 			FBC_CNTL, FBC_SRC_SEL);
-		dal_write_reg(compressor->ctx, addr, value);
+		dm_write_reg(compressor->ctx, addr, value);
 
 		/* Keep track of enum controller_id FBC is attached to */
 		compressor->is_enabled = true;
@@ -423,9 +423,9 @@ void dce110_compressor_enable_fbc(
 
 		/*Toggle it as there is bug in HW */
 		set_reg_field_value(value, 0, FBC_CNTL, FBC_GRPH_COMP_EN);
-		dal_write_reg(compressor->ctx, addr, value);
+		dm_write_reg(compressor->ctx, addr, value);
 		set_reg_field_value(value, 1, FBC_CNTL, FBC_GRPH_COMP_EN);
-		dal_write_reg(compressor->ctx, addr, value);
+		dm_write_reg(compressor->ctx, addr, value);
 
 		wait_for_fbc_state_changed(cp110, true);
 	}
@@ -439,9 +439,9 @@ void dce110_compressor_disable_fbc(struct compressor *compressor)
 		dce110_compressor_is_fbc_enabled_in_hw(compressor, NULL)) {
 		uint32_t reg_data;
 		/* Turn off compression */
-		reg_data = dal_read_reg(compressor->ctx, mmFBC_CNTL);
+		reg_data = dm_read_reg(compressor->ctx, mmFBC_CNTL);
 		set_reg_field_value(reg_data, 0, FBC_CNTL, FBC_GRPH_COMP_EN);
-		dal_write_reg(compressor->ctx, mmFBC_CNTL, reg_data);
+		dm_write_reg(compressor->ctx, mmFBC_CNTL, reg_data);
 
 		/* Reset enum controller_id to undefined */
 		compressor->attached_inst = 0;
@@ -463,16 +463,16 @@ bool dce110_compressor_is_fbc_enabled_in_hw(
 	/* Check the hardware register */
 	uint32_t value;
 
-	value = dal_read_reg(compressor->ctx, mmFBC_STATUS);
+	value = dm_read_reg(compressor->ctx, mmFBC_STATUS);
 	if (get_reg_field_value(value, FBC_STATUS, FBC_ENABLE_STATUS)) {
 		if (inst != NULL)
 			*inst = compressor->attached_inst;
 		return true;
 	}
 
-	value = dal_read_reg(compressor->ctx, mmFBC_MISC);
+	value = dm_read_reg(compressor->ctx, mmFBC_MISC);
 	if (get_reg_field_value(value, FBC_MISC, FBC_STOP_ON_HFLIP_EVENT)) {
-		value = dal_read_reg(compressor->ctx, mmFBC_CNTL);
+		value = dm_read_reg(compressor->ctx, mmFBC_CNTL);
 
 		if (get_reg_field_value(value, FBC_CNTL, FBC_GRPH_COMP_EN)) {
 			if (inst != NULL)
@@ -487,7 +487,7 @@ bool dce110_compressor_is_fbc_enabled_in_hw(
 bool dce110_compressor_is_lpt_enabled_in_hw(struct compressor *compressor)
 {
 	/* Check the hardware register */
-	uint32_t value = dal_read_reg(compressor->ctx,
+	uint32_t value = dm_read_reg(compressor->ctx,
 		mmLOW_POWER_TILING_CONTROL);
 
 	return get_reg_field_value(
@@ -507,11 +507,11 @@ void dce110_compressor_program_compressed_surface_address_and_pitch(
 		compressor->compr_surface_address.addr.low_part;
 
 	/* Clear content first. */
-	dal_write_reg(
+	dm_write_reg(
 		compressor->ctx,
 		DCP_REG(mmGRPH_COMPRESS_SURFACE_ADDRESS_HIGH),
 		0);
-	dal_write_reg(compressor->ctx,
+	dm_write_reg(compressor->ctx,
 		DCP_REG(mmGRPH_COMPRESS_SURFACE_ADDRESS), 0);
 
 	if (compressor->options.bits.LPT_SUPPORT) {
@@ -526,10 +526,10 @@ void dce110_compressor_program_compressed_surface_address_and_pitch(
 	}
 
 	/* Write address, HIGH has to be first. */
-	dal_write_reg(compressor->ctx,
+	dm_write_reg(compressor->ctx,
 		DCP_REG(mmGRPH_COMPRESS_SURFACE_ADDRESS_HIGH),
 		compressor->compr_surface_address.addr.high_part);
-	dal_write_reg(compressor->ctx,
+	dm_write_reg(compressor->ctx,
 		DCP_REG(mmGRPH_COMPRESS_SURFACE_ADDRESS),
 		compressed_surf_address_low_part);
 
@@ -548,7 +548,7 @@ void dce110_compressor_program_compressed_surface_address_and_pitch(
 			__func__);
 
 	/* Clear content first. */
-	dal_write_reg(compressor->ctx, DCP_REG(mmGRPH_COMPRESS_PITCH), 0);
+	dm_write_reg(compressor->ctx, DCP_REG(mmGRPH_COMPRESS_PITCH), 0);
 
 	/* Write FBC Pitch. */
 	set_reg_field_value(
@@ -556,7 +556,7 @@ void dce110_compressor_program_compressed_surface_address_and_pitch(
 		fbc_pitch,
 		GRPH_COMPRESS_PITCH,
 		GRPH_COMPRESS_PITCH);
-	dal_write_reg(compressor->ctx, DCP_REG(mmGRPH_COMPRESS_PITCH), value);
+	dm_write_reg(compressor->ctx, DCP_REG(mmGRPH_COMPRESS_PITCH), value);
 
 }
 
@@ -570,7 +570,7 @@ void dce110_compressor_disable_lpt(struct compressor *compressor)
 	/* Disable all pipes LPT Stutter */
 	for (inx = 0; inx < 3; inx++) {
 		value =
-			dal_read_reg(
+			dm_read_reg(
 				compressor->ctx,
 				DMIF_REG(mmDPG_PIPE_STUTTER_CONTROL_NONLPTCH));
 		set_reg_field_value(
@@ -578,40 +578,40 @@ void dce110_compressor_disable_lpt(struct compressor *compressor)
 			0,
 			DPG_PIPE_STUTTER_CONTROL_NONLPTCH,
 			STUTTER_ENABLE_NONLPTCH);
-		dal_write_reg(
+		dm_write_reg(
 			compressor->ctx,
 			DMIF_REG(mmDPG_PIPE_STUTTER_CONTROL_NONLPTCH),
 			value);
 	}
 	/* Disable Underlay pipe LPT Stutter */
 	addr = mmDPGV0_PIPE_STUTTER_CONTROL_NONLPTCH;
-	value = dal_read_reg(compressor->ctx, addr);
+	value = dm_read_reg(compressor->ctx, addr);
 	set_reg_field_value(
 		value,
 		0,
 		DPGV0_PIPE_STUTTER_CONTROL_NONLPTCH,
 		STUTTER_ENABLE_NONLPTCH);
-	dal_write_reg(compressor->ctx, addr, value);
+	dm_write_reg(compressor->ctx, addr, value);
 
 	/* Disable LPT */
 	addr = mmLOW_POWER_TILING_CONTROL;
-	value = dal_read_reg(compressor->ctx, addr);
+	value = dm_read_reg(compressor->ctx, addr);
 	set_reg_field_value(
 		value,
 		0,
 		LOW_POWER_TILING_CONTROL,
 		LOW_POWER_TILING_ENABLE);
-	dal_write_reg(compressor->ctx, addr, value);
+	dm_write_reg(compressor->ctx, addr, value);
 
 	/* Clear selection of Channel(s) containing Compressed Surface */
 	addr = mmGMCON_LPT_TARGET;
-	value = dal_read_reg(compressor->ctx, addr);
+	value = dm_read_reg(compressor->ctx, addr);
 	set_reg_field_value(
 		value,
 		0xFFFFFFFF,
 		GMCON_LPT_TARGET,
 		STCTRL_LPT_TARGET);
-	dal_write_reg(compressor->ctx, mmGMCON_LPT_TARGET, value);
+	dm_write_reg(compressor->ctx, mmGMCON_LPT_TARGET, value);
 }
 
 void dce110_compressor_enable_lpt(struct compressor *compressor)
@@ -623,54 +623,54 @@ void dce110_compressor_enable_lpt(struct compressor *compressor)
 	uint32_t channels;
 
 	/* Enable LPT Stutter from Display pipe */
-	value = dal_read_reg(compressor->ctx,
+	value = dm_read_reg(compressor->ctx,
 		DMIF_REG(mmDPG_PIPE_STUTTER_CONTROL_NONLPTCH));
 	set_reg_field_value(
 		value,
 		1,
 		DPG_PIPE_STUTTER_CONTROL_NONLPTCH,
 		STUTTER_ENABLE_NONLPTCH);
-	dal_write_reg(compressor->ctx,
+	dm_write_reg(compressor->ctx,
 		DMIF_REG(mmDPG_PIPE_STUTTER_CONTROL_NONLPTCH), value);
 
 	/* Enable Underlay pipe LPT Stutter */
 	addr = mmDPGV0_PIPE_STUTTER_CONTROL_NONLPTCH;
-	value = dal_read_reg(compressor->ctx, addr);
+	value = dm_read_reg(compressor->ctx, addr);
 	set_reg_field_value(
 		value,
 		1,
 		DPGV0_PIPE_STUTTER_CONTROL_NONLPTCH,
 		STUTTER_ENABLE_NONLPTCH);
-	dal_write_reg(compressor->ctx, addr, value);
+	dm_write_reg(compressor->ctx, addr, value);
 
 	/* Selection of Channel(s) containing Compressed Surface: 0xfffffff
 	 * will disable LPT.
 	 * STCTRL_LPT_TARGETn corresponds to channel n. */
 	addr = mmLOW_POWER_TILING_CONTROL;
-	value_control = dal_read_reg(compressor->ctx, addr);
+	value_control = dm_read_reg(compressor->ctx, addr);
 	channels = get_reg_field_value(value_control,
 			LOW_POWER_TILING_CONTROL,
 			LOW_POWER_TILING_MODE);
 
 	addr = mmGMCON_LPT_TARGET;
-	value = dal_read_reg(compressor->ctx, addr);
+	value = dm_read_reg(compressor->ctx, addr);
 	set_reg_field_value(
 		value,
 		channels + 1, /* not mentioned in programming guide,
 				but follow DCE8.1 */
 		GMCON_LPT_TARGET,
 		STCTRL_LPT_TARGET);
-	dal_write_reg(compressor->ctx, addr, value);
+	dm_write_reg(compressor->ctx, addr, value);
 
 	/* Enable LPT */
 	addr = mmLOW_POWER_TILING_CONTROL;
-	value = dal_read_reg(compressor->ctx, addr);
+	value = dm_read_reg(compressor->ctx, addr);
 	set_reg_field_value(
 		value,
 		1,
 		LOW_POWER_TILING_CONTROL,
 		LOW_POWER_TILING_ENABLE);
-	dal_write_reg(compressor->ctx, addr, value);
+	dm_write_reg(compressor->ctx, addr, value);
 }
 
 void dce110_compressor_program_lpt_control(
@@ -687,7 +687,7 @@ void dce110_compressor_program_lpt_control(
 	if (!compressor->options.bits.LPT_SUPPORT)
 		return;
 
-	lpt_control = dal_read_reg(compressor->ctx,
+	lpt_control = dm_read_reg(compressor->ctx,
 		mmLOW_POWER_TILING_CONTROL);
 
 	/* POSSIBLE VALUES for Low Power Tiling Mode:
@@ -745,7 +745,7 @@ void dce110_compressor_program_lpt_control(
 		LOW_POWER_TILING_CONTROL,
 		LOW_POWER_TILING_ROWS_PER_CHAN);
 
-	dal_write_reg(compressor->ctx,
+	dm_write_reg(compressor->ctx,
 		mmLOW_POWER_TILING_CONTROL, lpt_control);
 }
 
@@ -762,14 +762,14 @@ void dce110_compressor_set_fbc_invalidation_triggers(
 	 * for DCE 11 regions cannot be used - does not work with S/G
 	 */
 	uint32_t addr = mmFBC_CLIENT_REGION_MASK;
-	uint32_t value = dal_read_reg(compressor->ctx, addr);
+	uint32_t value = dm_read_reg(compressor->ctx, addr);
 
 	set_reg_field_value(
 		value,
 		0,
 		FBC_CLIENT_REGION_MASK,
 		FBC_MEMORY_REGION_MASK);
-	dal_write_reg(compressor->ctx, addr, value);
+	dm_write_reg(compressor->ctx, addr, value);
 
 	/* Setup events when to clear all CSM entries (effectively marking
 	 * current compressed data invalid)
@@ -796,7 +796,7 @@ void dce110_compressor_set_fbc_invalidation_triggers(
 	 *      - Bit 7 - FBC_FORCE_COPY_TO_COMP_BUF register updated
 	 */
 	addr = mmFBC_IDLE_FORCE_CLEAR_MASK;
-	value = dal_read_reg(compressor->ctx, addr);
+	value = dm_read_reg(compressor->ctx, addr);
 	set_reg_field_value(
 		value,
 		fbc_trigger |
@@ -808,7 +808,7 @@ void dce110_compressor_set_fbc_invalidation_triggers(
 		FBC_IDLE_FORCE_FORCE_COPY_TO_COMP_BUF,
 		FBC_IDLE_FORCE_CLEAR_MASK,
 		FBC_IDLE_FORCE_CLEAR_MASK);
-	dal_write_reg(compressor->ctx, addr, value);
+	dm_write_reg(compressor->ctx, addr, value);
 }
 
 bool dce110_compressor_construct(struct dce110_compressor *compressor,
@@ -866,7 +866,7 @@ struct compressor *dce110_compressor_create(struct dc_context *ctx,
 	struct adapter_service *as)
 {
 	struct dce110_compressor *cp110 =
-		dc_service_alloc(ctx, sizeof(struct dce110_compressor));
+		dm_alloc(ctx, sizeof(struct dce110_compressor));
 
 	if (!cp110)
 		return NULL;
@@ -875,12 +875,12 @@ struct compressor *dce110_compressor_create(struct dc_context *ctx,
 		return &cp110->base;
 
 	BREAK_TO_DEBUGGER();
-	dc_service_free(ctx, cp110);
+	dm_free(ctx, cp110);
 	return NULL;
 }
 
 void dce110_compressor_destroy(struct compressor **compressor)
 {
-	dc_service_free((*compressor)->ctx, TO_DCE110_COMPRESSOR(*compressor));
+	dm_free((*compressor)->ctx, TO_DCE110_COMPRESSOR(*compressor));
 	*compressor = NULL;
 }

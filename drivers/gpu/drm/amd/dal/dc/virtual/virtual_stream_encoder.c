@@ -23,8 +23,7 @@
  *
  */
 
-#include "dc_services.h"
-
+#include "dm_services.h"
 #include "virtual_stream_encoder.h"
 
 static void virtual_stream_encoder_dp_set_stream_attribute(
@@ -110,7 +109,7 @@ bool virtual_stream_encoder_construct(
 struct stream_encoder *virtual_stream_encoder_create(
 	struct dc_context *ctx, struct dc_bios *bp)
 {
-	struct stream_encoder *enc = dc_service_alloc(ctx, sizeof(*enc));
+	struct stream_encoder *enc = dm_alloc(ctx, sizeof(*enc));
 
 	if (!enc)
 		return NULL;
@@ -119,7 +118,7 @@ struct stream_encoder *virtual_stream_encoder_create(
 		return enc;
 
 	BREAK_TO_DEBUGGER();
-	dc_service_free(ctx, enc);
+	dm_free(ctx, enc);
 	return NULL;
 }
 

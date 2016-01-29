@@ -23,12 +23,11 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
 #include "include/gpio_types.h"
 #include "../hw_gpio_pin.h"
 #include "../hw_gpio.h"
@@ -50,7 +49,7 @@ static void destroy(
 
 	destruct(pin);
 
-	dc_service_free((*ptr)->ctx, pin);
+	dm_free((*ptr)->ctx, pin);
 
 	*ptr = NULL;
 }
@@ -80,7 +79,7 @@ struct hw_gpio_pin *dal_hw_ddc_diag_fpga_create(
 	enum gpio_id id,
 	uint32_t en)
 {
-	struct hw_ddc *pin = dc_service_alloc(ctx, sizeof(struct hw_ddc));
+	struct hw_ddc *pin = dm_alloc(ctx, sizeof(struct hw_ddc));
 
 	if (!pin) {
 		ASSERT_CRITICAL(false);
@@ -92,7 +91,7 @@ struct hw_gpio_pin *dal_hw_ddc_diag_fpga_create(
 
 	ASSERT_CRITICAL(false);
 
-	dc_service_free(ctx, pin);
+	dm_free(ctx, pin);
 
 	return NULL;
 }

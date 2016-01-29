@@ -27,15 +27,15 @@
  * This file defines helper functions provided by the Display Manager to
  * Display Core.
  */
-#ifndef __DC_HELPERS__
-#define __DC_HELPERS__
+#ifndef __DM_HELPERS__
+#define __DM_HELPERS__
 
 #include "dc_types.h"
 #include "dc.h"
 
 struct dp_mst_stream_allocation_table;
 
-enum dc_edid_status dc_helpers_parse_edid_caps(
+enum dc_edid_status dm_helpers_parse_edid_caps(
 	struct dc_context *ctx,
 	const struct dc_edid *edid,
 	struct dc_edid_caps *edid_caps);
@@ -43,7 +43,7 @@ enum dc_edid_status dc_helpers_parse_edid_caps(
 /*
  * Writes payload allocation table in immediate downstream device.
  */
-bool dc_helpers_dp_mst_write_payload_allocation_table(
+bool dm_helpers_dp_mst_write_payload_allocation_table(
 		struct dc_context *ctx,
 		const struct dc_stream *stream,
 		struct dp_mst_stream_allocation_table *proposed_table,
@@ -52,33 +52,33 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
 /*
  * Polls for ACT (allocation change trigger) handled and
  */
-bool dc_helpers_dp_mst_poll_for_allocation_change_trigger(
+bool dm_helpers_dp_mst_poll_for_allocation_change_trigger(
 		struct dc_context *ctx,
 		const struct dc_stream *stream);
 /*
  * Sends ALLOCATE_PAYLOAD message.
  */
-bool dc_helpers_dp_mst_send_payload_allocation(
+bool dm_helpers_dp_mst_send_payload_allocation(
 		struct dc_context *ctx,
 		const struct dc_stream *stream,
 		bool enable);
 
-void dc_helpers_dp_mst_handle_mst_hpd_rx_irq(
+void dm_helpers_dp_mst_handle_mst_hpd_rx_irq(
 		void *param);
 
-bool dc_helpers_dp_mst_start_top_mgr(
+bool dm_helpers_dp_mst_start_top_mgr(
 		struct dc_context *ctx,
 		const struct dc_link *link,
 		bool boot);
 
-void dc_helpers_dp_mst_stop_top_mgr(
+void dm_helpers_dp_mst_stop_top_mgr(
 		struct dc_context *ctx,
 		const struct dc_link *link);
 
 /**
  * OS specific aux read callback.
  */
-bool dc_helper_dp_read_dpcd(
+bool dm_helper_dp_read_dpcd(
 		struct dc_context *ctx,
 		const struct dc_link *link,
 		uint32_t address,
@@ -88,11 +88,11 @@ bool dc_helper_dp_read_dpcd(
 /**
  * OS specific aux write callback.
  */
-bool dc_helper_dp_write_dpcd(
+bool dm_helper_dp_write_dpcd(
 		struct dc_context *ctx,
 		const struct dc_link *link,
 		uint32_t address,
 		const uint8_t *data,
 		uint32_t size);
 
-#endif /* __DC_HELPERS__ */
+#endif /* __DM_HELPERS__ */

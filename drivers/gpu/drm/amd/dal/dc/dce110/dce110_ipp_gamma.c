@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 #include "include/logger_interface.h"
 #include "include/fixed31_32.h"
 #include "basics/conversion.h"
@@ -200,7 +200,7 @@ static void set_lut_inc(
 {
 	const uint32_t addr = DCP_REG(mmDC_LUT_CONTROL);
 
-	uint32_t value = dal_read_reg(ipp110->base.ctx, addr);
+	uint32_t value = dm_read_reg(ipp110->base.ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -256,7 +256,7 @@ static void set_lut_inc(
 		DC_LUT_CONTROL,
 		DC_LUT_DATA_B_SIGNED_EN);
 
-	dal_write_reg(ipp110->base.ctx, addr, value);
+	dm_write_reg(ipp110->base.ctx, addr, value);
 }
 
 void dce110_helper_select_lut(struct dce110_ipp *ipp110)
@@ -268,7 +268,7 @@ void dce110_helper_select_lut(struct dce110_ipp *ipp110)
 	{
 		const uint32_t addr = DCP_REG(mmDC_LUT_WRITE_EN_MASK);
 
-		value = dal_read_reg(ipp110->base.ctx, addr);
+		value = dm_read_reg(ipp110->base.ctx, addr);
 
 		/* enable all */
 		set_reg_field_value(
@@ -277,13 +277,13 @@ void dce110_helper_select_lut(struct dce110_ipp *ipp110)
 			DC_LUT_WRITE_EN_MASK,
 			DC_LUT_WRITE_EN_MASK);
 
-		dal_write_reg(ipp110->base.ctx, addr, value);
+		dm_write_reg(ipp110->base.ctx, addr, value);
 	}
 
 	{
 		const uint32_t addr = DCP_REG(mmDC_LUT_RW_MODE);
 
-		value = dal_read_reg(ipp110->base.ctx, addr);
+		value = dm_read_reg(ipp110->base.ctx, addr);
 
 		set_reg_field_value(
 			value,
@@ -291,13 +291,13 @@ void dce110_helper_select_lut(struct dce110_ipp *ipp110)
 			DC_LUT_RW_MODE,
 			DC_LUT_RW_MODE);
 
-		dal_write_reg(ipp110->base.ctx, addr, value);
+		dm_write_reg(ipp110->base.ctx, addr, value);
 	}
 
 	{
 		const uint32_t addr = DCP_REG(mmDC_LUT_CONTROL);
 
-		value = dal_read_reg(ipp110->base.ctx, addr);
+		value = dm_read_reg(ipp110->base.ctx, addr);
 
 		/* 00 - new u0.12 */
 		set_reg_field_value(
@@ -318,13 +318,13 @@ void dce110_helper_select_lut(struct dce110_ipp *ipp110)
 			DC_LUT_CONTROL,
 			DC_LUT_DATA_B_FORMAT);
 
-		dal_write_reg(ipp110->base.ctx, addr, value);
+		dm_write_reg(ipp110->base.ctx, addr, value);
 	}
 
 	{
 		const uint32_t addr = DCP_REG(mmDC_LUT_RW_INDEX);
 
-		value = dal_read_reg(ipp110->base.ctx, addr);
+		value = dm_read_reg(ipp110->base.ctx, addr);
 
 		set_reg_field_value(
 			value,
@@ -332,7 +332,7 @@ void dce110_helper_select_lut(struct dce110_ipp *ipp110)
 			DC_LUT_RW_INDEX,
 			DC_LUT_RW_INDEX);
 
-		dal_write_reg(ipp110->base.ctx, addr, value);
+		dm_write_reg(ipp110->base.ctx, addr, value);
 	}
 }
 
@@ -340,13 +340,13 @@ static void program_black_offsets(
 	struct dce110_ipp *ipp110,
 	struct dev_c_lut16 *offset)
 {
-	dal_write_reg(ipp110->base.ctx,
+	dm_write_reg(ipp110->base.ctx,
 		DCP_REG(mmDC_LUT_BLACK_OFFSET_RED),
 		offset->red);
-	dal_write_reg(ipp110->base.ctx,
+	dm_write_reg(ipp110->base.ctx,
 		DCP_REG(mmDC_LUT_BLACK_OFFSET_GREEN),
 		offset->green);
-	dal_write_reg(ipp110->base.ctx,
+	dm_write_reg(ipp110->base.ctx,
 		DCP_REG(mmDC_LUT_BLACK_OFFSET_BLUE),
 		offset->blue);
 }
@@ -355,13 +355,13 @@ static void program_white_offsets(
 	struct dce110_ipp *ipp110,
 	struct dev_c_lut16 *offset)
 {
-	dal_write_reg(ipp110->base.ctx,
+	dm_write_reg(ipp110->base.ctx,
 		DCP_REG(mmDC_LUT_WHITE_OFFSET_RED),
 		offset->red);
-	dal_write_reg(ipp110->base.ctx,
+	dm_write_reg(ipp110->base.ctx,
 		DCP_REG(mmDC_LUT_WHITE_OFFSET_GREEN),
 		offset->green);
-	dal_write_reg(ipp110->base.ctx,
+	dm_write_reg(ipp110->base.ctx,
 		DCP_REG(mmDC_LUT_WHITE_OFFSET_BLUE),
 		offset->blue);
 }
@@ -441,7 +441,7 @@ static void program_lut_gamma(
 		uint8_t counter = 0;
 
 		/* Power on LUT memory */
-		value = dal_read_reg(
+		value = dm_read_reg(
 				ipp110->base.ctx, DCP_REG(mmDCFE_MEM_PWR_CTRL));
 
 		set_reg_field_value(
@@ -450,12 +450,12 @@ static void program_lut_gamma(
 			DCFE_MEM_PWR_CTRL,
 			DCP_REGAMMA_MEM_PWR_DIS);
 
-		dal_write_reg(
+		dm_write_reg(
 			ipp110->base.ctx, DCP_REG(mmDCFE_MEM_PWR_CTRL), value);
 
 		while (counter < max_tries) {
 			value =
-				dal_read_reg(
+				dm_read_reg(
 					ipp110->base.ctx,
 					DCP_REG(mmDCFE_MEM_PWR_STATUS));
 
@@ -493,7 +493,7 @@ static void program_lut_gamma(
 				gamma[index->red].red,
 				DC_LUT_SEQ_COLOR,
 				DC_LUT_SEQ_COLOR);
-			dal_write_reg(ipp110->base.ctx, addr, value);
+			dm_write_reg(ipp110->base.ctx, addr, value);
 
 
 			set_reg_field_value(
@@ -501,7 +501,7 @@ static void program_lut_gamma(
 				gamma[index->green].green,
 				DC_LUT_SEQ_COLOR,
 				DC_LUT_SEQ_COLOR);
-			dal_write_reg(ipp110->base.ctx, addr, value);
+			dm_write_reg(ipp110->base.ctx, addr, value);
 
 
 			set_reg_field_value(
@@ -509,7 +509,7 @@ static void program_lut_gamma(
 				gamma[index->blue].blue,
 				DC_LUT_SEQ_COLOR,
 				DC_LUT_SEQ_COLOR);
-			dal_write_reg(ipp110->base.ctx, addr, value);
+			dm_write_reg(ipp110->base.ctx, addr, value);
 
 			++i;
 		} while (i != RGB_256X3X16);
@@ -522,7 +522,7 @@ static void program_lut_gamma(
 				gamma[i].red,
 				DC_LUT_SEQ_COLOR,
 				DC_LUT_SEQ_COLOR);
-			dal_write_reg(ipp110->base.ctx, addr, value);
+			dm_write_reg(ipp110->base.ctx, addr, value);
 
 
 			set_reg_field_value(
@@ -530,7 +530,7 @@ static void program_lut_gamma(
 				gamma[i].green,
 				DC_LUT_SEQ_COLOR,
 				DC_LUT_SEQ_COLOR);
-			dal_write_reg(ipp110->base.ctx, addr, value);
+			dm_write_reg(ipp110->base.ctx, addr, value);
 
 
 			set_reg_field_value(
@@ -538,14 +538,14 @@ static void program_lut_gamma(
 				gamma[i].blue,
 				DC_LUT_SEQ_COLOR,
 				DC_LUT_SEQ_COLOR);
-			dal_write_reg(ipp110->base.ctx, addr, value);
+			dm_write_reg(ipp110->base.ctx, addr, value);
 
 			++i;
 		} while (i != RGB_256X3X16);
 	}
 
 	/*  we are done with DCP LUT memory; re-enable low power mode */
-	value = dal_read_reg(ipp110->base.ctx, DCP_REG(mmDCFE_MEM_PWR_CTRL));
+	value = dm_read_reg(ipp110->base.ctx, DCP_REG(mmDCFE_MEM_PWR_CTRL));
 
 	set_reg_field_value(
 		value,
@@ -553,7 +553,7 @@ static void program_lut_gamma(
 		DCFE_MEM_PWR_CTRL,
 		DCP_REGAMMA_MEM_PWR_DIS);
 
-	dal_write_reg(ipp110->base.ctx, DCP_REG(mmDCFE_MEM_PWR_CTRL), value);
+	dm_write_reg(ipp110->base.ctx, DCP_REG(mmDCFE_MEM_PWR_CTRL), value);
 }
 
 static void program_prescale(
@@ -574,7 +574,7 @@ static void program_prescale(
 
 	const uint32_t addr_control = DCP_REG(mmPRESCALE_GRPH_CONTROL);
 
-	prescale_control = dal_read_reg(ipp110->base.ctx, addr_control);
+	prescale_control = dm_read_reg(ipp110->base.ctx, addr_control);
 
 	set_reg_field_value(
 		prescale_control,
@@ -670,23 +670,23 @@ static void program_prescale(
 		PRESCALE_VALUES_GRPH_B,
 		GRPH_PRESCALE_BIAS_B);
 
-	dal_write_reg(ipp110->base.ctx,
+	dm_write_reg(ipp110->base.ctx,
 		addr_control, prescale_control);
 
 	{
-		dal_write_reg(ipp110->base.ctx,
+		dm_write_reg(ipp110->base.ctx,
 				DCP_REG(mmPRESCALE_VALUES_GRPH_R),
 				prescale_values_grph_r);
 	}
 
 	{
-		dal_write_reg(ipp110->base.ctx,
+		dm_write_reg(ipp110->base.ctx,
 				DCP_REG(mmPRESCALE_VALUES_GRPH_G),
 				prescale_values_grph_g);
 	}
 
 	{
-		dal_write_reg(ipp110->base.ctx,
+		dm_write_reg(ipp110->base.ctx,
 				DCP_REG(mmPRESCALE_VALUES_GRPH_B),
 				prescale_values_grph_b);
 	}
@@ -697,7 +697,7 @@ static void set_legacy_input_gamma_mode(
 	bool is_legacy)
 {
 	const uint32_t addr = DCP_REG(mmINPUT_GAMMA_CONTROL);
-	uint32_t value = dal_read_reg(ipp110->base.ctx, addr);
+	uint32_t value = dm_read_reg(ipp110->base.ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -705,7 +705,7 @@ static void set_legacy_input_gamma_mode(
 		INPUT_GAMMA_CONTROL,
 		GRPH_INPUT_GAMMA_MODE);
 
-	dal_write_reg(ipp110->base.ctx, addr, value);
+	dm_write_reg(ipp110->base.ctx, addr, value);
 }
 
 static bool set_legacy_input_gamma_ramp_rgb256x3x16(
@@ -714,7 +714,7 @@ static bool set_legacy_input_gamma_ramp_rgb256x3x16(
 	const struct gamma_parameters *params)
 {
 	struct dev_c_lut16 *gamma16 =
-		dc_service_alloc(
+		dm_alloc(
 			ipp110->base.ctx,
 			sizeof(struct dev_c_lut16) * MAX_INPUT_LUT_ENTRY);
 
@@ -729,12 +729,12 @@ static bool set_legacy_input_gamma_ramp_rgb256x3x16(
 			PIXEL_FORMAT_ARGB2101010_XRBIAS) &&
 		(params->surface_pixel_format != PIXEL_FORMAT_FP16)) {
 		program_lut_gamma(ipp110, gamma16, params);
-		dc_service_free(ipp110->base.ctx, gamma16);
+		dm_free(ipp110->base.ctx, gamma16);
 		return true;
 	}
 
 	/* TODO process DirectX-specific formats*/
-	dc_service_free(ipp110->base.ctx, gamma16);
+	dm_free(ipp110->base.ctx, gamma16);
 	return false;
 }
 
@@ -744,7 +744,7 @@ static bool set_legacy_input_gamma_ramp_dxgi1(
 	const struct gamma_parameters *params)
 {
 	struct dev_c_lut16 *gamma16 =
-		dc_service_alloc(
+		dm_alloc(
 			ipp110->base.ctx,
 			sizeof(struct dev_c_lut16) * MAX_INPUT_LUT_ENTRY);
 
@@ -759,12 +759,12 @@ static bool set_legacy_input_gamma_ramp_dxgi1(
 			PIXEL_FORMAT_ARGB2101010_XRBIAS) &&
 		(params->surface_pixel_format != PIXEL_FORMAT_FP16)) {
 		program_lut_gamma(ipp110, gamma16, params);
-		dc_service_free(ipp110->base.ctx, gamma16);
+		dm_free(ipp110->base.ctx, gamma16);
 		return true;
 	}
 
 	/* TODO process DirectX-specific formats*/
-	dc_service_free(ipp110->base.ctx, gamma16);
+	dm_free(ipp110->base.ctx, gamma16);
 	return false;
 }
 
@@ -777,17 +777,17 @@ static bool set_default_gamma(
 	struct dev_c_lut16 *gamma16 = NULL;
 	struct gamma_parameters *params = NULL;
 
-	gamma16 = dc_service_alloc(
+	gamma16 = dm_alloc(
 			ipp110->base.ctx,
 			sizeof(struct dev_c_lut16) * MAX_INPUT_LUT_ENTRY);
 
 	if (!gamma16)
 		return false;
 
-	params = dc_service_alloc(ipp110->base.ctx, sizeof(*params));
+	params = dm_alloc(ipp110->base.ctx, sizeof(*params));
 
 	if (!params) {
-		dc_service_free(ipp110->base.ctx, gamma16);
+		dm_free(ipp110->base.ctx, gamma16);
 		return false;
 	}
 
@@ -819,8 +819,8 @@ static bool set_default_gamma(
 
 	program_lut_gamma(ipp110, gamma16, params);
 
-	dc_service_free(ipp110->base.ctx, gamma16);
-	dc_service_free(ipp110->base.ctx, params);
+	dm_free(ipp110->base.ctx, gamma16);
+	dm_free(ipp110->base.ctx, params);
 
 	return true;
 }
@@ -836,7 +836,7 @@ static void set_degamma(
 		params->regamma.features.bits.GRAPHICS_DEGAMMA_SRGB == 1 ?
 			1 : 2;
 
-	value = dal_read_reg(ipp110->base.ctx, addr);
+	value = dm_read_reg(ipp110->base.ctx, addr);
 
 	/* if by pass - no degamma
 	 * when legacy and regamma LUT's we do degamma */
@@ -867,6 +867,6 @@ static void set_degamma(
 		DEGAMMA_CONTROL,
 		CURSOR2_DEGAMMA_MODE);
 
-	dal_write_reg(ipp110->base.ctx, addr, value);
+	dm_write_reg(ipp110->base.ctx, addr, value);
 }
 

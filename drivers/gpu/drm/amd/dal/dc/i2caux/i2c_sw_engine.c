@@ -23,12 +23,11 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
 #include "include/i2caux_interface.h"
 #include "engine.h"
 #include "i2c_engine.h"
@@ -85,7 +84,7 @@ static bool wait_for_scl_high(
 	uint32_t scl_retry = 0;
 	uint32_t scl_retry_max = I2C_SW_TIMEOUT_DELAY / clock_delay_div_4;
 
-	dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+	dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 	/* 3 milliseconds delay
 	 * to wake up some displays from "low power" state.
@@ -95,7 +94,7 @@ static bool wait_for_scl_high(
 		if (read_bit_from_ddc(ddc, SCL))
 			return true;
 
-		dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+		dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 		++scl_retry;
 	} while (scl_retry <= scl_retry_max);
@@ -115,7 +114,7 @@ static bool start_sync(
 
 	write_bit_to_ddc(ddc_handle, SCL, true);
 
-	dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+	dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 	do {
 		write_bit_to_ddc(ddc_handle, SDA, true);
@@ -125,7 +124,7 @@ static bool start_sync(
 			continue;
 		}
 
-		dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+		dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 		write_bit_to_ddc(ddc_handle, SCL, true);
 
@@ -134,11 +133,11 @@ static bool start_sync(
 
 		write_bit_to_ddc(ddc_handle, SDA, false);
 
-		dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+		dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 		write_bit_to_ddc(ddc_handle, SCL, false);
 
-		dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+		dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 		return true;
 	} while (retry <= I2C_SW_RETRIES);
@@ -158,11 +157,11 @@ static bool stop_sync(
 
 	write_bit_to_ddc(ddc_handle, SCL, false);
 
-	dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+	dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 	write_bit_to_ddc(ddc_handle, SDA, false);
 
-	dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+	dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 	write_bit_to_ddc(ddc_handle, SCL, true);
 
@@ -172,7 +171,7 @@ static bool stop_sync(
 	write_bit_to_ddc(ddc_handle, SDA, true);
 
 	do {
-		dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+		dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 		if (read_bit_from_ddc(ddc_handle, SDA))
 			return true;
@@ -195,11 +194,11 @@ static bool write_byte(
 	/* bits are transmitted serially, starting from MSB */
 
 	do {
-		dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+		dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 		write_bit_to_ddc(ddc_handle, SDA, (byte >> shift) & 1);
 
-		dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+		dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 		write_bit_to_ddc(ddc_handle, SCL, true);
 
@@ -215,11 +214,11 @@ static bool write_byte(
 	 * after the SCL pulse we use to send our last data bit.
 	 * If the SDA goes high after that bit, it's a NACK */
 
-	dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+	dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 	write_bit_to_ddc(ddc_handle, SDA, true);
 
-	dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+	dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 	write_bit_to_ddc(ddc_handle, SCL, true);
 
@@ -230,11 +229,11 @@ static bool write_byte(
 
 	ack = !read_bit_from_ddc(ddc_handle, SDA);
 
-	dc_service_delay_in_microseconds(ctx, clock_delay_div_4 << 1);
+	dm_delay_in_microseconds(ctx, clock_delay_div_4 << 1);
 
 	write_bit_to_ddc(ddc_handle, SCL, false);
 
-	dc_service_delay_in_microseconds(ctx, clock_delay_div_4 << 1);
+	dm_delay_in_microseconds(ctx, clock_delay_div_4 << 1);
 
 	return ack;
 }
@@ -264,7 +263,7 @@ static bool read_byte(
 
 		write_bit_to_ddc(ddc_handle, SCL, false);
 
-		dc_service_delay_in_microseconds(ctx, clock_delay_div_4 << 1);
+		dm_delay_in_microseconds(ctx, clock_delay_div_4 << 1);
 
 		--shift;
 	} while (shift >= 0);
@@ -273,14 +272,14 @@ static bool read_byte(
 
 	*byte = data;
 
-	dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+	dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 	/* send the acknowledge bit:
 	 * SDA low means ACK, SDA high means NACK */
 
 	write_bit_to_ddc(ddc_handle, SDA, !more);
 
-	dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+	dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 	write_bit_to_ddc(ddc_handle, SCL, true);
 
@@ -289,11 +288,11 @@ static bool read_byte(
 
 	write_bit_to_ddc(ddc_handle, SCL, false);
 
-	dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+	dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 	write_bit_to_ddc(ddc_handle, SDA, true);
 
-	dc_service_delay_in_microseconds(ctx, clock_delay_div_4);
+	dm_delay_in_microseconds(ctx, clock_delay_div_4);
 
 	return true;
 }
@@ -543,7 +542,7 @@ static void destroy(
 {
 	dal_i2c_sw_engine_destruct(FROM_I2C_ENGINE(*ptr));
 
-	dc_service_free((*ptr)->base.ctx, *ptr);
+	dm_free((*ptr)->base.ctx, *ptr);
 	*ptr = NULL;
 }
 
@@ -597,7 +596,7 @@ struct i2c_engine *dal_i2c_sw_engine_create(
 		return NULL;
 	}
 
-	engine = dc_service_alloc(arg->ctx, sizeof(struct i2c_sw_engine));
+	engine = dm_alloc(arg->ctx, sizeof(struct i2c_sw_engine));
 
 	if (!engine) {
 		BREAK_TO_DEBUGGER();
@@ -609,7 +608,7 @@ struct i2c_engine *dal_i2c_sw_engine_create(
 
 	BREAK_TO_DEBUGGER();
 
-	dc_service_free(arg->ctx, engine);
+	dm_free(arg->ctx, engine);
 
 	return NULL;
 }

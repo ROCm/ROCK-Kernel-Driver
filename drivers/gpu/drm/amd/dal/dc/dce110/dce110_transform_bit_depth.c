@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /* include DCE11 register header files */
 #include "dce/dce_11_0_d.h"
@@ -264,7 +264,7 @@ static bool set_clamp(
 			OUT_CLAMP_CONTROL_B_CB,
 			OUT_CLAMP_MAX_B_CB);
 
-		dal_write_reg(xfm110->base.ctx,
+		dm_write_reg(xfm110->base.ctx,
 			DCP_REG(mmOUT_CLAMP_CONTROL_B_CB),
 			value);
 	}
@@ -284,7 +284,7 @@ static bool set_clamp(
 			OUT_CLAMP_CONTROL_G_Y,
 			OUT_CLAMP_MAX_G_Y);
 
-		dal_write_reg(xfm110->base.ctx,
+		dm_write_reg(xfm110->base.ctx,
 			DCP_REG(mmOUT_CLAMP_CONTROL_G_Y),
 			value);
 	}
@@ -304,7 +304,7 @@ static bool set_clamp(
 			OUT_CLAMP_CONTROL_R_CR,
 			OUT_CLAMP_MAX_R_CR);
 
-		dal_write_reg(xfm110->base.ctx,
+		dm_write_reg(xfm110->base.ctx,
 			DCP_REG(mmOUT_CLAMP_CONTROL_R_CR),
 			value);
 	}
@@ -416,7 +416,7 @@ static bool set_round(
 		OUT_ROUND_TRUNC_MODE);
 
 	/*  write the register */
-	dal_write_reg(xfm110->base.ctx,
+	dm_write_reg(xfm110->base.ctx,
 				DCP_REG(mmOUT_ROUND_CONTROL),
 				value);
 
@@ -530,7 +530,7 @@ static bool set_dither(
 			DCP_HIGHPASS_RANDOM_ENABLE);
 
 	/*  write the register */
-	dal_write_reg(xfm110->base.ctx,
+	dm_write_reg(xfm110->base.ctx,
 				DCP_REG(mmDCP_SPATIAL_DITHER_CNTL),
 				value);
 
@@ -595,7 +595,7 @@ void dce110_transform_enable_alpha(
 	uint32_t value;
 	uint32_t addr = LB_REG(mmLB_DATA_FORMAT);
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	if (enable == 1)
 		set_reg_field_value(
@@ -610,7 +610,7 @@ void dce110_transform_enable_alpha(
 				LB_DATA_FORMAT,
 				ALPHA_EN);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static enum lb_pixel_depth translate_display_bpp_to_lb_depth(
@@ -658,7 +658,7 @@ bool dce110_transform_get_next_lower_pixel_storage_depth(
 bool dce110_transform_is_prefetch_enabled(
 	struct dce110_transform *xfm110)
 {
-	uint32_t value = dal_read_reg(
+	uint32_t value = dm_read_reg(
 			xfm110->base.ctx, LB_REG(mmLB_DATA_FORMAT));
 
 	if (get_reg_field_value(value, LB_DATA_FORMAT, PREFETCH) == 1)
@@ -677,7 +677,7 @@ bool dce110_transform_get_current_pixel_storage_depth(
 	if (depth == NULL)
 		return false;
 
-	value = dal_read_reg(
+	value = dm_read_reg(
 			xfm->ctx,
 			LB_REG(mmLB_DATA_FORMAT));
 
@@ -711,7 +711,7 @@ static void set_denormalization(
 	struct dce110_transform *xfm110,
 	enum dc_color_depth depth)
 {
-	uint32_t value = dal_read_reg(xfm110->base.ctx,
+	uint32_t value = dm_read_reg(xfm110->base.ctx,
 			DCP_REG(mmDENORM_CONTROL));
 
 	switch (depth) {
@@ -755,7 +755,7 @@ static void set_denormalization(
 		break;
 	}
 
-	dal_write_reg(xfm110->base.ctx,
+	dm_write_reg(xfm110->base.ctx,
 			DCP_REG(mmDENORM_CONTROL),
 			value);
 
@@ -771,7 +771,7 @@ bool dce110_transform_set_pixel_storage_depth(
 	uint32_t value;
 	enum dc_color_depth color_depth;
 
-	value = dal_read_reg(
+	value = dm_read_reg(
 			xfm->ctx,
 			LB_REG(mmLB_DATA_FORMAT));
 	switch (depth) {
@@ -806,7 +806,7 @@ bool dce110_transform_set_pixel_storage_depth(
 				bit_depth_params);
 
 		set_reg_field_value(value, 0, LB_DATA_FORMAT, ALPHA_EN);
-		dal_write_reg(
+		dm_write_reg(
 				xfm->ctx, LB_REG(mmLB_DATA_FORMAT), value);
 		if (!(xfm110->lb_pixel_depth_supported & depth)) {
 			/*we should use unsupported capabilities
@@ -836,7 +836,7 @@ bool dce110_transform_power_up_line_buffer(struct transform *xfm)
 	struct dce110_transform *xfm110 = TO_DCE110_TRANSFORM(xfm);
 	uint32_t value;
 
-	value = dal_read_reg(xfm110->base.ctx, LB_REG(mmLB_MEMORY_CTRL));
+	value = dm_read_reg(xfm110->base.ctx, LB_REG(mmLB_MEMORY_CTRL));
 
 	/*Use all three pieces of memory always*/
 	set_reg_field_value(value, 0, LB_MEMORY_CTRL, LB_MEMORY_CONFIG);
@@ -844,7 +844,7 @@ bool dce110_transform_power_up_line_buffer(struct transform *xfm)
 	set_reg_field_value(value, LB_TOTAL_NUMBER_OF_ENTRIES, LB_MEMORY_CTRL,
 			LB_MEMORY_SIZE);
 
-	dal_write_reg(xfm110->base.ctx, LB_REG(mmLB_MEMORY_CTRL), value);
+	dm_write_reg(xfm110->base.ctx, LB_REG(mmLB_MEMORY_CTRL), value);
 
 	return true;
 }

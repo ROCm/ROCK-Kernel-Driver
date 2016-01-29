@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "atom.h"
 
@@ -120,14 +120,14 @@ struct dc_bios *dal_bios_parser_create(
 {
 	struct bios_parser *bp = NULL;
 
-	bp = dc_service_alloc(init->ctx, sizeof(struct bios_parser));
+	bp = dm_alloc(init->ctx, sizeof(struct bios_parser));
 	if (!bp)
 		return NULL;
 
 	if (bios_parser_construct(bp, init, as))
 		return &bp->base;
 
-	dc_service_free(init->ctx, bp);
+	dm_free(init->ctx, bp);
 	BREAK_TO_DEBUGGER();
 	return NULL;
 }
@@ -135,7 +135,7 @@ struct dc_bios *dal_bios_parser_create(
 static void destruct(struct bios_parser *bp)
 {
 	if (bp->bios_local_image)
-		dc_service_free(bp->ctx, bp->bios_local_image);
+		dm_free(bp->ctx, bp->bios_local_image);
 }
 
 void dal_bios_parser_destroy(struct dc_bios **dcb)
@@ -149,7 +149,7 @@ void dal_bios_parser_destroy(struct dc_bios **dcb)
 
 	destruct(bp);
 
-	dc_service_free((bp)->ctx, bp);
+	dm_free((bp)->ctx, bp);
 	*dcb = NULL;
 }
 
@@ -378,7 +378,7 @@ static enum bp_result bios_parser_get_oem_ddc_info(struct dc_bios *dcb,
 			ATOM_I2C_RECORD record;
 			ATOM_I2C_ID_CONFIG_ACCESS *config;
 
-			dc_service_memset(&record, 0, sizeof(record));
+			dm_memset(&record, 0, sizeof(record));
 
 			config = &tbl->sucI2cId + index - 1;
 
@@ -875,7 +875,7 @@ static enum bp_result get_firmware_info_v1_4(
 	if (!firmware_info)
 		return BP_RESULT_BADBIOSTABLE;
 
-	dc_service_memset(info, 0, sizeof(*info));
+	dm_memset(info, 0, sizeof(*info));
 
 	/* Pixel clock pll information. We need to convert from 10KHz units into
 	 * KHz units */
@@ -926,7 +926,7 @@ static enum bp_result get_firmware_info_v2_1(
 	if (!firmwareInfo)
 		return BP_RESULT_BADBIOSTABLE;
 
-	dc_service_memset(info, 0, sizeof(*info));
+	dm_memset(info, 0, sizeof(*info));
 
 	/* Pixel clock pll information. We need to convert from 10KHz units into
 	 * KHz units */
@@ -1012,7 +1012,7 @@ static enum bp_result get_firmware_info_v2_2(
 	if (!firmware_info)
 		return BP_RESULT_BADBIOSTABLE;
 
-	dc_service_memset(info, 0, sizeof(*info));
+	dm_memset(info, 0, sizeof(*info));
 
 	/* Pixel clock pll information. We need to convert from 10KHz units into
 	 * KHz units */
@@ -1117,7 +1117,7 @@ static enum bp_result get_ss_info_v3_1(
 	tbl = (ATOM_ASIC_SS_ASSIGNMENT_V3 *)
 				&ss_table_header_include->asSpreadSpectrum[0];
 
-	dc_service_memset(ss_info, 0, sizeof(struct spread_spectrum_info));
+	dm_memset(ss_info, 0, sizeof(struct spread_spectrum_info));
 
 	for (i = 0; i < table_size; i++) {
 		if (tbl[i].ucClockIndication != (uint8_t) id)
@@ -1664,7 +1664,7 @@ static enum bp_result get_ss_info_from_internal_ss_info_tbl_V2_1(
 	header = GET_IMAGE(ATOM_ASIC_INTERNAL_SS_INFO_V2,
 		DATA_TABLES(ASIC_InternalSS_Info));
 
-	dc_service_memset(info, 0, sizeof(struct spread_spectrum_info));
+	dm_memset(info, 0, sizeof(struct spread_spectrum_info));
 
 	tbl_size = (le16_to_cpu(header->sHeader.usStructureSize)
 			- sizeof(ATOM_COMMON_TABLE_HEADER))
@@ -1768,7 +1768,7 @@ static enum bp_result get_ss_info_from_ss_info_table(
 		if (id_local != (uint32_t)tbl->asSS_Info[i].ucSS_Id)
 			continue;
 
-		dc_service_memset(ss_info, 0, sizeof(struct spread_spectrum_info));
+		dm_memset(ss_info, 0, sizeof(struct spread_spectrum_info));
 
 		if (ATOM_EXTERNAL_SS_MASK &
 				tbl->asSS_Info[i].ucSpreadSpectrumType)
@@ -1860,7 +1860,7 @@ static enum bp_result get_embedded_panel_info_v1_2(
 		|| 2 > lvds->sHeader.ucTableContentRevision)
 		return BP_RESULT_UNSUPPORTED;
 
-	dc_service_memset(info, 0, sizeof(struct embedded_panel_info));
+	dm_memset(info, 0, sizeof(struct embedded_panel_info));
 
 	/* We need to convert from 10KHz units into KHz units*/
 	info->lcd_timing.pixel_clk =
@@ -1978,7 +1978,7 @@ static enum bp_result get_embedded_panel_info_v1_3(
 			&& (3 <= lvds->sHeader.ucTableContentRevision)))
 		return BP_RESULT_UNSUPPORTED;
 
-	dc_service_memset(info, 0, sizeof(struct embedded_panel_info));
+	dm_memset(info, 0, sizeof(struct embedded_panel_info));
 
 	/* We need to convert from 10KHz units into KHz units */
 	info->lcd_timing.pixel_clk =
@@ -2551,7 +2551,7 @@ static enum bp_result bios_parser_get_faked_edid_buf(
 	if (len < edid_size)
 		return BP_RESULT_BADINPUT; /* buffer not big enough to fill */
 
-	dc_service_memmove(buff, &edid_record->ucFakeEDIDString, edid_size);
+	dm_memmove(buff, &edid_record->ucFakeEDIDString, edid_size);
 
 	return BP_RESULT_OK;
 }
@@ -3540,7 +3540,7 @@ static uint32_t enum_first_device_id(uint32_t dev_id)
 
 	/* No group found for this device ID. */
 
-	dal_error("%s: incorrect input %d\n", __func__, dev_id);
+	dm_error("%s: incorrect input %d\n", __func__, dev_id);
 	/* No matching support flag for given device ID */
 	return 0;
 }
@@ -3830,7 +3830,7 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 	if (!opm_object)
 		return BP_RESULT_UNSUPPORTED;
 
-	dc_service_memset(&ext_display_connection_info_tbl, 0,
+	dm_memset(&ext_display_connection_info_tbl, 0,
 			sizeof(ATOM_EXTERNAL_DISPLAY_CONNECTION_INFO));
 
 	connector_tbl_offset = bp->object_info_tbl_offset
@@ -4088,14 +4088,14 @@ static void process_ext_display_connection_info(struct bios_parser *bp)
 		uint8_t *original_bios;
 		/* Step 1: Replace bios image with the new copy which will be
 		 * patched */
-		bp->bios_local_image = dc_service_alloc(bp->ctx, bp->bios_size);
+		bp->bios_local_image = dm_alloc(bp->ctx, bp->bios_size);
 		if (bp->bios_local_image == NULL) {
 			BREAK_TO_DEBUGGER();
 			/* Failed to alloc bp->bios_local_image */
 			return;
 		}
 
-		dc_service_memmove(bp->bios_local_image, bp->bios, bp->bios_size);
+		dm_memmove(bp->bios_local_image, bp->bios, bp->bios_size);
 		original_bios = bp->bios;
 		bp->bios = bp->bios_local_image;
 		connector_tbl =
@@ -4109,7 +4109,7 @@ static void process_ext_display_connection_info(struct bios_parser *bp)
 			/* Patching the bios image has failed. We will copy
 			 * again original image provided and afterwards
 			 * only remove null entries */
-			dc_service_memmove(
+			dm_memmove(
 					bp->bios_local_image,
 					original_bios,
 					bp->bios_size);
@@ -4126,7 +4126,7 @@ static void process_ext_display_connection_info(struct bios_parser *bp)
 				continue;
 
 			if (i != connectors_num) {
-				dc_service_memmove(
+				dm_memmove(
 						&connector_tbl->
 						asObjects[connectors_num],
 						object,
@@ -4673,7 +4673,7 @@ static struct integrated_info *bios_parser_create_integrated_info(
 	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	struct integrated_info *info = NULL;
 
-	info = dc_service_alloc(bp->ctx, sizeof(struct integrated_info));
+	info = dm_alloc(bp->ctx, sizeof(struct integrated_info));
 
 	if (info == NULL) {
 		ASSERT_CRITICAL(0);
@@ -4683,7 +4683,7 @@ static struct integrated_info *bios_parser_create_integrated_info(
 	if (construct_integrated_info(bp, info) == BP_RESULT_OK)
 		return info;
 
-	dc_service_free(bp->ctx, info);
+	dm_free(bp->ctx, info);
 
 	return NULL;
 }
@@ -4700,7 +4700,7 @@ static void bios_parser_destroy_integrated_info(
 	}
 
 	if (*info != NULL) {
-		dc_service_free(bp->ctx, *info);
+		dm_free(bp->ctx, *info);
 		*info = NULL;
 	}
 }
