@@ -433,6 +433,9 @@ static bool dce110_enable_display_power_gating(
 	enum bp_result bp_result = BP_RESULT_OK;
 	enum bp_pipe_control_action cntl;
 
+	if (IS_FPGA_MAXIMUS_DC(ctx->dce_environment))
+		return true;
+
 	if (power_gating == PIPE_GATING_CONTROL_INIT)
 		cntl = ASIC_PIPE_INIT;
 	else if (power_gating == PIPE_GATING_CONTROL_ENABLE)
@@ -755,10 +758,6 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 	bool timing_changed = context->res_ctx.controller_ctx[controller_idx]
 			.flags.timing_changed;
 	enum color_space color_space;
-	struct dc_bios *dcb;
-
-	dcb = dal_adapter_service_get_bios_parser(
-			context->res_ctx.pool.adapter_srv);
 
 	if (timing_changed) {
 		/* Must blank CRTC after disabling power gating and before any
