@@ -23,7 +23,8 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
+
 #include "include/logger_interface.h"
 
 #include "audio_dce110.h"
@@ -52,7 +53,7 @@ static void destroy(struct audio **ptr)
 	destruct(audio);
 
 	/* release memory allocated for audio_dce110*/
-	dc_service_free((*ptr)->ctx, audio);
+	dm_free((*ptr)->ctx, audio);
 	*ptr = NULL;
 }
 
@@ -425,7 +426,7 @@ struct audio *dal_audio_create_dce110(
 	const struct audio_init_data *init_data)
 {
 	/*allocate memory for audio_dce110 */
-	struct audio_dce110 *audio = dc_service_alloc(init_data->ctx, sizeof(*audio));
+	struct audio_dce110 *audio = dm_alloc(init_data->ctx, sizeof(*audio));
 
 	if (audio == NULL) {
 		ASSERT_CRITICAL(audio);
@@ -442,7 +443,7 @@ struct audio *dal_audio_create_dce110(
 		"Failed to create audio object for DCE11\n");
 
 	 /*release memory allocated if fail */
-	dc_service_free(init_data->ctx, audio);
+	dm_free(init_data->ctx, audio);
 	return NULL;
 }
 

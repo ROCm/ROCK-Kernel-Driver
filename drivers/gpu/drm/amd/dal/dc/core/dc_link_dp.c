@@ -1,8 +1,9 @@
 /* Copyright 2015 Advanced Micro Devices, Inc. */
-#include "dc_services.h"
+#include "dm_services.h"
 #include "dc.h"
 #include "dc_link_dp.h"
-#include "dc_helpers.h"
+#include "dm_helpers.h"
+
 #include "inc/core_types.h"
 #include "link_hwss.h"
 #include "dc_link_ddc.h"
@@ -69,7 +70,7 @@ static void wait_for_training_aux_rd_interval(
 			default_wait_in_micro_secs;
 	}
 
-	dc_service_delay_in_microseconds(link->ctx, default_wait_in_micro_secs);
+	dm_delay_in_microseconds(link->ctx, default_wait_in_micro_secs);
 
 	dal_logger_write(link->ctx->logger,
 		LOG_MAJOR_HW_TRACE,
@@ -231,7 +232,7 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 	size_in_bytes = lt_settings->link_settings.lane_count * sizeof(dpcd_lane[0]);
 
 	 // 0x00103 - 0x00102
-	dc_service_memmove(
+	dm_memmove(
 		&dpcd_lt_buffer[DPCD_ADDRESS_LANE0_SET - dpcd_base_lt_offset],
 		dpcd_lane,
 		size_in_bytes);
@@ -458,7 +459,7 @@ static void get_lane_status_and_drive_settings(
 	struct link_training_settings request_settings = {{0}};
 	uint32_t lane;
 
-	dc_service_memset(req_settings, '\0', sizeof(struct link_training_settings));
+	dm_memset(req_settings, '\0', sizeof(struct link_training_settings));
 
 	core_link_read_dpcd(
 		link,
@@ -694,7 +695,7 @@ static bool perform_post_lt_adj_req_sequence(
 				break;
 			}
 
-			dc_service_sleep_in_milliseconds(link->ctx, 1);
+			dm_sleep_in_milliseconds(link->ctx, 1);
 		}
 
 		if (!req_drv_setting_changed) {
@@ -818,8 +819,8 @@ static bool perform_clock_recovery_sequence(
 	while ((retries_cr < LINK_TRAINING_MAX_RETRY_COUNT) &&
 	(retry_count < LINK_TRAINING_MAX_CR_RETRY)) {
 
-		dc_service_memset(&dpcd_lane_status, '\0', sizeof(dpcd_lane_status));
-		dc_service_memset(&dpcd_lane_status_updated, '\0',
+		dm_memset(&dpcd_lane_status, '\0', sizeof(dpcd_lane_status));
+		dm_memset(&dpcd_lane_status_updated, '\0',
 		sizeof(dpcd_lane_status_updated));
 
 		/* 1. call HWSS to set lane settings*/
@@ -908,7 +909,7 @@ static bool perform_clock_recovery_sequence(
 	struct link_training_settings lt_settings;
 
 	status = false;
-	dc_service_memset(&lt_settings, '\0', sizeof(lt_settings));
+	dm_memset(&lt_settings, '\0', sizeof(lt_settings));
 
 	lt_settings.link_settings.link_rate = link_setting->link_rate;
 	lt_settings.link_settings.lane_count = link_setting->lane_count;
@@ -1095,7 +1096,7 @@ bool dp_hbr_verify_link_cap(
 				if (success)
 					break;
 
-				dc_service_sleep_in_milliseconds(
+				dm_sleep_in_milliseconds(
 					link->ctx,
 					delay_between_retries);
 
@@ -1643,12 +1644,12 @@ static void retrieve_link_cap(struct core_link *link)
 	union max_down_spread max_down_spread;
 	union dp_downstream_port_present ds_port = { 0 };
 
-	dc_service_memset(dpcd_data, '\0', sizeof(dpcd_data));
-	dc_service_memset(&down_strm_port_count,
+	dm_memset(dpcd_data, '\0', sizeof(dpcd_data));
+	dm_memset(&down_strm_port_count,
 		'\0', sizeof(union down_stream_port_count));
-	dc_service_memset(&edp_config_cap, '\0',
+	dm_memset(&edp_config_cap, '\0',
 		sizeof(union edp_configuration_cap));
-	dc_service_memset(&max_down_spread, '\0',
+	dm_memset(&max_down_spread, '\0',
 		sizeof(union max_down_spread));
 
 	core_link_read_dpcd(link, DPCD_ADDRESS_DPCD_REV,

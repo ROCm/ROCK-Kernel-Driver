@@ -23,8 +23,7 @@
  *
  */
 
-#include "dc_services.h"
-
+#include "dm_services.h"
 #include "bandwidth_calcs.h"
 
 /*******************************************************************************
@@ -3704,10 +3703,10 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 	const struct bw_calcs_mode_data *mode_data,
 	struct bw_calcs_output *calcs_output)
 {
-	struct bw_calcs_results *bw_results_internal = dc_service_alloc(
+	struct bw_calcs_results *bw_results_internal = dm_alloc(
 				ctx, sizeof(struct bw_calcs_results));
 	struct bw_calcs_mode_data_internal *bw_data_internal =
-		dc_service_alloc(
+		dm_alloc(
 			ctx, sizeof(struct bw_calcs_mode_data_internal));
 	switch (mode_data->number_of_displays) {
 	case (3):
@@ -3935,8 +3934,8 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->required_sclk = 0;
 	}
 
-	dc_service_free(ctx, bw_data_internal);
-	dc_service_free(ctx, bw_results_internal);
+	dm_free(ctx, bw_data_internal);
+	dm_free(ctx, bw_results_internal);
 
 	return is_display_configuration_supported(vbios, calcs_output);
 }

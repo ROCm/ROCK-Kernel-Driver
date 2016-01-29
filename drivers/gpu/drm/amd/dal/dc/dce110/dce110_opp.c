@@ -23,13 +23,14 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /* include DCE11 register header files */
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
 
 #include "dce110_opp.h"
+
 #include "gamma_types.h"
 
 enum {
@@ -129,70 +130,70 @@ bool dce110_opp_construct(struct dce110_opp *opp110,
 	opp110->regamma.divider2 = dal_fixed31_32_from_int(2);
 	opp110->regamma.divider3 = dal_fixed31_32_from_fraction(5, 2);
 
-	opp110->regamma.rgb_user = dc_service_alloc(
+	opp110->regamma.rgb_user = dm_alloc(
 		ctx,
 		sizeof(struct pwl_float_data) *
 		(DX_GAMMA_RAMP_MAX + opp110->regamma.extra_points));
 	if (!opp110->regamma.rgb_user)
 		goto failure_1;
 
-	opp110->regamma.rgb_oem = dc_service_alloc(
+	opp110->regamma.rgb_oem = dm_alloc(
 		ctx,
 		sizeof(struct pwl_float_data) *
 		(DX_GAMMA_RAMP_MAX + opp110->regamma.extra_points));
 	if (!opp110->regamma.rgb_oem)
 		goto failure_2;
 
-	opp110->regamma.rgb_resulted = dc_service_alloc(
+	opp110->regamma.rgb_resulted = dm_alloc(
 		ctx,
 		sizeof(struct pwl_result_data) *
 		(MAX_NUMBER_OF_ENTRIES + opp110->regamma.extra_points));
 	if (!opp110->regamma.rgb_resulted)
 		goto failure_3;
 
-	opp110->regamma.rgb_regamma = dc_service_alloc(
+	opp110->regamma.rgb_regamma = dm_alloc(
 		ctx,
 		sizeof(struct pwl_float_data_ex) *
 		(MAX_NUMBER_OF_ENTRIES + opp110->regamma.extra_points));
 	if (!opp110->regamma.rgb_regamma)
 		goto failure_4;
 
-	opp110->regamma.coordinates_x = dc_service_alloc(
+	opp110->regamma.coordinates_x = dm_alloc(
 		ctx,
 		sizeof(struct hw_x_point) *
 		(MAX_NUMBER_OF_ENTRIES + opp110->regamma.extra_points));
 	if (!opp110->regamma.coordinates_x)
 		goto failure_5;
 
-	opp110->regamma.axis_x_256 = dc_service_alloc(
+	opp110->regamma.axis_x_256 = dm_alloc(
 		ctx,
 		sizeof(struct gamma_pixel) *
 		(MAX_LUT_ENTRY + opp110->regamma.extra_points));
 	if (!opp110->regamma.axis_x_256)
 		goto failure_6;
 
-	opp110->regamma.axis_x_1025 = dc_service_alloc(
+	opp110->regamma.axis_x_1025 = dm_alloc(
 		ctx,
 		sizeof(struct gamma_pixel) *
 		(DX_GAMMA_RAMP_MAX + opp110->regamma.extra_points));
 	if (!opp110->regamma.axis_x_1025)
 		goto failure_7;
 
-	opp110->regamma.coeff128 = dc_service_alloc(
+	opp110->regamma.coeff128 = dm_alloc(
 		ctx,
 		sizeof(struct pixel_gamma_point) *
 		(MAX_NUMBER_OF_ENTRIES + opp110->regamma.extra_points));
 	if (!opp110->regamma.coeff128)
 		goto failure_8;
 
-	opp110->regamma.coeff128_oem = dc_service_alloc(
+	opp110->regamma.coeff128_oem = dm_alloc(
 		ctx,
 		sizeof(struct pixel_gamma_point) *
 		(MAX_NUMBER_OF_ENTRIES + opp110->regamma.extra_points));
 	if (!opp110->regamma.coeff128_oem)
 		goto failure_9;
 
-	opp110->regamma.coeff128_dx = dc_service_alloc(
+	opp110->regamma.coeff128_dx = dm_alloc(
 		ctx,
 		sizeof(struct pixel_gamma_point) *
 		(MAX_NUMBER_OF_ENTRIES + opp110->regamma.extra_points));
@@ -231,23 +232,23 @@ bool dce110_opp_construct(struct dce110_opp *opp110,
 	return true;
 
 failure_10:
-	dc_service_free(ctx, opp110->regamma.coeff128_oem);
+	dm_free(ctx, opp110->regamma.coeff128_oem);
 failure_9:
-	dc_service_free(ctx, opp110->regamma.coeff128);
+	dm_free(ctx, opp110->regamma.coeff128);
 failure_8:
-	dc_service_free(ctx, opp110->regamma.axis_x_1025);
+	dm_free(ctx, opp110->regamma.axis_x_1025);
 failure_7:
-	dc_service_free(ctx, opp110->regamma.axis_x_256);
+	dm_free(ctx, opp110->regamma.axis_x_256);
 failure_6:
-	dc_service_free(ctx, opp110->regamma.coordinates_x);
+	dm_free(ctx, opp110->regamma.coordinates_x);
 failure_5:
-	dc_service_free(ctx, opp110->regamma.rgb_regamma);
+	dm_free(ctx, opp110->regamma.rgb_regamma);
 failure_4:
-	dc_service_free(ctx, opp110->regamma.rgb_resulted);
+	dm_free(ctx, opp110->regamma.rgb_resulted);
 failure_3:
-	dc_service_free(ctx, opp110->regamma.rgb_oem);
+	dm_free(ctx, opp110->regamma.rgb_oem);
 failure_2:
-	dc_service_free(ctx, opp110->regamma.rgb_user);
+	dm_free(ctx, opp110->regamma.rgb_user);
 failure_1:
 
 	return true;
@@ -255,17 +256,17 @@ failure_1:
 
 void dce110_opp_destroy(struct output_pixel_processor **opp)
 {
-	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128_dx);
-	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128_oem);
-	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128);
-	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.axis_x_1025);
-	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.axis_x_256);
-	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coordinates_x);
-	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_regamma);
-	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_resulted);
-	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_oem);
-	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_user);
-	dc_service_free((*opp)->ctx, FROM_DCE11_OPP(*opp));
+	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128_dx);
+	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128_oem);
+	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128);
+	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.axis_x_1025);
+	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.axis_x_256);
+	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coordinates_x);
+	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_regamma);
+	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_resulted);
+	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_oem);
+	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_user);
+	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp));
 	*opp = NULL;
 }
 

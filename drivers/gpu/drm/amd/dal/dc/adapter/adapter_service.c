@@ -23,8 +23,7 @@
  *
  */
 
-
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "dc_bios_types.h"
 
@@ -36,6 +35,7 @@
 #include "include/logger_interface.h"
 
 #include "adapter_service.h"
+
 #include "hw_ctx_adapter_service.h"
 #include "wireless_data_source.h"
 
@@ -203,7 +203,7 @@ static void get_platform_info_methods(
 	params.data = &mask;
 	params.method = PM_GET_AVAILABLE_METHODS;
 
-	if (dal_get_platform_info(as->ctx, &params))
+	if (dm_get_platform_info(as->ctx, &params))
 		as->platform_methods_mask = mask;
 
 
@@ -235,7 +235,7 @@ static void initialize_backlight_caps(
 	params.data = &caps;
 	params.method = PM_GET_EXTENDED_BRIGHNESS_CAPS;
 
-	if (dal_get_platform_info(as->ctx, &params)) {
+	if (dm_get_platform_info(as->ctx, &params)) {
 		as->ac_level_percentage = caps.basic_caps.ac_level_percentage;
 		as->dc_level_percentage = caps.basic_caps.dc_level_percentage;
 		custom_curve_present = (caps.data_points_num > 0);
@@ -608,7 +608,7 @@ static bool generate_feature_set(
 	uint32_t entry_num = 0;
 	const struct feature_source_entry *entry = NULL;
 
-	dc_service_memset(adapter_feature_set, 0, sizeof(adapter_feature_set));
+	dm_memset(adapter_feature_set, 0, sizeof(adapter_feature_set));
 	entry_num = get_feature_entries_num();
 
 
@@ -850,7 +850,7 @@ struct adapter_service *dal_adapter_service_create(
 {
 	struct adapter_service *as;
 
-	as = dc_service_alloc(init_data->ctx, sizeof(struct adapter_service));
+	as = dm_alloc(init_data->ctx, sizeof(struct adapter_service));
 
 	if (!as) {
 		ASSERT_CRITICAL(false);
@@ -862,7 +862,7 @@ struct adapter_service *dal_adapter_service_create(
 
 	ASSERT_CRITICAL(false);
 
-	dc_service_free(init_data->ctx, as);
+	dm_free(init_data->ctx, as);
 
 	return NULL;
 }
@@ -887,7 +887,7 @@ void dal_adapter_service_destroy(
 
 	adapter_service_destruct(*as);
 
-	dc_service_free((*as)->ctx, *as);
+	dm_free((*as)->ctx, *as);
 
 	*as = NULL;
 }
@@ -1367,7 +1367,7 @@ bool dal_adapter_service_get_integrated_info(
 	if (info == NULL || as->integrated_info == NULL)
 		return false;
 
-	dc_service_memmove(info, as->integrated_info, sizeof(struct integrated_info));
+	dm_memmove(info, as->integrated_info, sizeof(struct integrated_info));
 
 	return true;
 }
@@ -1974,7 +1974,7 @@ bool dal_adapter_service_is_lid_open(struct adapter_service *as)
 	params.method = PM_GET_LID_STATE;
 
 	if ((PM_GET_LID_STATE & as->platform_methods_mask) &&
-		dal_get_platform_info(as->ctx, &params))
+		dm_get_platform_info(as->ctx, &params))
 		return is_lid_open;
 
 #if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)

@@ -25,7 +25,7 @@
 
 #include <drm/drmP.h>
 
-#include "dc_services_types.h"
+#include "dm_services_types.h"
 #include "dc.h"
 
 #include "amdgpu.h"

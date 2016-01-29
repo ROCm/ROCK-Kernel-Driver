@@ -23,9 +23,10 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 #include "dc_bios_types.h"
 #include "dce110_stream_encoder.h"
+
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
 #include "dce/dce_11_0_enum.h"
@@ -81,7 +82,7 @@ static void dce110_update_generic_info_packet(
 	{
 		addr = LINK_REG(AFMT_VBI_PACKET_CONTROL);
 
-		regval = dal_read_reg(ctx, addr);
+		regval = dm_read_reg(ctx, addr);
 
 		set_reg_field_value(
 			regval,
@@ -89,7 +90,7 @@ static void dce110_update_generic_info_packet(
 			AFMT_VBI_PACKET_CONTROL,
 			AFMT_GENERIC_INDEX);
 
-		dal_write_reg(ctx, addr, regval);
+		dm_write_reg(ctx, addr, regval);
 	}
 
 	/* write generic packet header
@@ -123,7 +124,7 @@ static void dce110_update_generic_info_packet(
 			AFMT_GENERIC_HDR,
 			AFMT_GENERIC_HB3);
 
-		dal_write_reg(ctx, addr, regval);
+		dm_write_reg(ctx, addr, regval);
 	}
 
 	/* write generic packet contents
@@ -138,7 +139,7 @@ static void dce110_update_generic_info_packet(
 		addr = LINK_REG(AFMT_GENERIC_0);
 
 		do {
-			dal_write_reg(ctx, addr++, *content++);
+			dm_write_reg(ctx, addr++, *content++);
 
 			++counter;
 		} while (counter < 7);
@@ -146,7 +147,7 @@ static void dce110_update_generic_info_packet(
 
 	addr = LINK_REG(AFMT_GENERIC_7);
 
-	dal_write_reg(
+	dm_write_reg(
 		ctx,
 		addr,
 		0);
@@ -155,7 +156,7 @@ static void dce110_update_generic_info_packet(
 	{
 		addr = LINK_REG(AFMT_VBI_PACKET_CONTROL);
 
-		regval = dal_read_reg(ctx, addr);
+		regval = dm_read_reg(ctx, addr);
 
 		set_reg_field_value(
 			regval,
@@ -169,7 +170,7 @@ static void dce110_update_generic_info_packet(
 			AFMT_VBI_PACKET_CONTROL,
 			AFMT_GENERIC2_UPDATE);
 
-		dal_write_reg(ctx, addr, regval);
+		dm_write_reg(ctx, addr, regval);
 	}
 }
 
@@ -224,7 +225,7 @@ static void dce110_update_hdmi_info_packet(
 		return;
 	}
 
-	regval = dal_read_reg(ctx, addr);
+	regval = dm_read_reg(ctx, addr);
 
 	switch (packet_index) {
 	case 0:
@@ -274,7 +275,7 @@ static void dce110_update_hdmi_info_packet(
 		return;
 	}
 
-	dal_write_reg(ctx, addr, regval);
+	dm_write_reg(ctx, addr, regval);
 }
 
 bool dce110_stream_encoder_construct(
@@ -306,7 +307,7 @@ void dce110_stream_encoder_dp_set_stream_attribute(
 	struct dce110_stream_encoder *enc110 = DCE110STRENC_FROM_STRENC(enc);
 	struct dc_context *ctx = enc110->base.ctx;
 	const uint32_t addr = LINK_REG(DP_PIXEL_FORMAT);
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 
 	/* set pixel encoding */
 	switch (crtc_timing->pixel_encoding) {
@@ -385,7 +386,7 @@ void dce110_stream_encoder_dp_set_stream_attribute(
 	set_reg_field_value(value, 0, DP_PIXEL_FORMAT, DP_DYN_RANGE);
 	set_reg_field_value(value, 0, DP_PIXEL_FORMAT, DP_YCBCR_RANGE);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 /* setup stream encoder in hdmi mode */
@@ -414,7 +415,7 @@ void dce110_stream_encoder_hdmi_set_stream_attribute(
 		return;
 
 	addr = LINK_REG(DIG_FE_CNTL);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	switch (crtc_timing->pixel_encoding) {
 	case PIXEL_ENCODING_YCBCR422:
@@ -425,11 +426,11 @@ void dce110_stream_encoder_hdmi_set_stream_attribute(
 		break;
 	}
 	set_reg_field_value(value, 0, DIG_FE_CNTL, TMDS_COLOR_FORMAT);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* setup HDMI engine */
 	addr = LINK_REG(HDMI_CONTROL);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(value, 1, HDMI_CONTROL, HDMI_PACKET_GEN_VERSION);
 	set_reg_field_value(value, 1, HDMI_CONTROL, HDMI_KEEPOUT_MODE);
 	set_reg_field_value(value, 0, HDMI_CONTROL, HDMI_DEEP_COLOR_ENABLE);
@@ -523,48 +524,48 @@ void dce110_stream_encoder_hdmi_set_stream_attribute(
 			HDMI_CLOCK_CHANNEL_RATE);
 	}
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	addr = LINK_REG(HDMI_VBI_PACKET_CONTROL);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(value, 1, HDMI_VBI_PACKET_CONTROL, HDMI_GC_CONT);
 	set_reg_field_value(value, 1, HDMI_VBI_PACKET_CONTROL, HDMI_GC_SEND);
 	set_reg_field_value(value, 1, HDMI_VBI_PACKET_CONTROL, HDMI_NULL_SEND);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* following belongs to audio */
 	addr = LINK_REG(HDMI_INFOFRAME_CONTROL0);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		1,
 		HDMI_INFOFRAME_CONTROL0,
 		HDMI_AUDIO_INFO_SEND);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	addr = LINK_REG(AFMT_INFOFRAME_CONTROL0);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		1,
 		AFMT_INFOFRAME_CONTROL0,
 		AFMT_AUDIO_INFO_UPDATE);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	addr = LINK_REG(HDMI_INFOFRAME_CONTROL1);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		VBI_LINE_0 + 2,
 		HDMI_INFOFRAME_CONTROL1,
 		HDMI_AUDIO_INFO_LINE);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	addr = LINK_REG(HDMI_GC);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(value, 0, HDMI_GC, HDMI_GC_AVMUTE);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 /* setup stream encoder in dvi mode */
@@ -576,7 +577,7 @@ void dce110_stream_encoder_dvi_set_stream_attribute(
 	struct dce110_stream_encoder *enc110 = DCE110STRENC_FROM_STRENC(enc);
 	struct dc_context *ctx = enc110->base.ctx;
 	uint32_t addr = LINK_REG(DIG_FE_CNTL);
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 	struct bp_encoder_control cntl = {0};
 
 	cntl.action = ENCODER_CONTROL_SETUP;
@@ -622,7 +623,7 @@ void dce110_stream_encoder_dvi_set_stream_attribute(
 		set_reg_field_value(value, 0, DIG_FE_CNTL, TMDS_COLOR_FORMAT);
 		break;
 	}
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 void dce110_stream_encoder_set_mst_bandwidth(
@@ -646,7 +647,7 @@ void dce110_stream_encoder_set_mst_bandwidth(
 
 	{
 		addr = LINK_REG(DP_MSE_RATE_CNTL);
-		value = dal_read_reg(ctx, addr);
+		value = dm_read_reg(ctx, addr);
 
 		set_reg_field_value(
 			value,
@@ -660,7 +661,7 @@ void dce110_stream_encoder_set_mst_bandwidth(
 			DP_MSE_RATE_CNTL,
 			DP_MSE_RATE_Y);
 
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 
 	/* wait for update to be completed on the link */
@@ -670,7 +671,7 @@ void dce110_stream_encoder_set_mst_bandwidth(
 		addr = LINK_REG(DP_MSE_RATE_UPDATE);
 
 		do {
-			value = dal_read_reg(ctx, addr);
+			value = dm_read_reg(ctx, addr);
 
 			field = get_reg_field_value(
 					value,
@@ -681,7 +682,7 @@ void dce110_stream_encoder_set_mst_bandwidth(
 			DP_MSE_RATE_UPDATE__DP_MSE_RATE_UPDATE_PENDING_MASK))
 				break;
 
-			dc_service_delay_in_microseconds(ctx, 10);
+			dm_delay_in_microseconds(ctx, 10);
 
 			++retries;
 		} while (retries < DP_MST_UPDATE_MAX_RETRY);
@@ -705,21 +706,21 @@ void dce110_stream_encoder_update_hdmi_info_packets(
 
 		addr = LINK_REG(AFMT_AVI_INFO0);
 		regval = content[0];
-		dal_write_reg(
+		dm_write_reg(
 			ctx,
 			addr,
 			regval);
 		regval = content[1];
 
 		addr = LINK_REG(AFMT_AVI_INFO1);
-		dal_write_reg(
+		dm_write_reg(
 			ctx,
 			addr,
 			regval);
 		regval = content[2];
 
 		addr = LINK_REG(AFMT_AVI_INFO2);
-		dal_write_reg(
+		dm_write_reg(
 			ctx,
 			addr,
 			regval);
@@ -733,14 +734,14 @@ void dce110_stream_encoder_update_hdmi_info_packets(
 			AFMT_AVI_INFO3,
 			AFMT_AVI_INFO_VERSION);
 
-		dal_write_reg(
+		dm_write_reg(
 			ctx,
 			addr,
 			regval);
 
 		addr = LINK_REG(HDMI_INFOFRAME_CONTROL0);
 
-		control0val = dal_read_reg(ctx, addr);
+		control0val = dm_read_reg(ctx, addr);
 
 		set_reg_field_value(
 			control0val,
@@ -754,11 +755,11 @@ void dce110_stream_encoder_update_hdmi_info_packets(
 			HDMI_INFOFRAME_CONTROL0,
 			HDMI_AVI_INFO_CONT);
 
-		dal_write_reg(ctx, addr, control0val);
+		dm_write_reg(ctx, addr, control0val);
 
 		addr = LINK_REG(HDMI_INFOFRAME_CONTROL1);
 
-		control1val = dal_read_reg(ctx, addr);
+		control1val = dm_read_reg(ctx, addr);
 
 		set_reg_field_value(
 			control1val,
@@ -766,11 +767,11 @@ void dce110_stream_encoder_update_hdmi_info_packets(
 			HDMI_INFOFRAME_CONTROL1,
 			HDMI_AVI_INFO_LINE);
 
-		dal_write_reg(ctx, addr, control1val);
+		dm_write_reg(ctx, addr, control1val);
 	} else {
 		addr = LINK_REG(HDMI_INFOFRAME_CONTROL0);
 
-		regval = dal_read_reg(ctx, addr);
+		regval = dm_read_reg(ctx, addr);
 
 		set_reg_field_value(
 			regval,
@@ -784,7 +785,7 @@ void dce110_stream_encoder_update_hdmi_info_packets(
 			HDMI_INFOFRAME_CONTROL0,
 			HDMI_AVI_INFO_CONT);
 
-		dal_write_reg(ctx, addr, regval);
+		dm_write_reg(ctx, addr, regval);
 	}
 
 	dce110_update_hdmi_info_packet(enc110, 0, &info_frame->vendor);
@@ -803,7 +804,7 @@ void dce110_stream_encoder_stop_hdmi_info_packets(
 	/* stop generic packets 0 & 1 on HDMI */
 	addr = LINK_REG(HDMI_GENERIC_PACKET_CONTROL0);
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -836,12 +837,12 @@ void dce110_stream_encoder_stop_hdmi_info_packets(
 		HDMI_GENERIC_PACKET_CONTROL0,
 		HDMI_GENERIC0_SEND);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* stop generic packets 2 & 3 on HDMI */
 	addr = LINK_REG(HDMI_GENERIC_PACKET_CONTROL1);
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -874,12 +875,12 @@ void dce110_stream_encoder_stop_hdmi_info_packets(
 		HDMI_GENERIC_PACKET_CONTROL1,
 		HDMI_GENERIC3_SEND);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* stop AVI packet on HDMI */
 	addr = LINK_REG(HDMI_INFOFRAME_CONTROL0);
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -892,7 +893,7 @@ void dce110_stream_encoder_stop_hdmi_info_packets(
 		HDMI_INFOFRAME_CONTROL0,
 		HDMI_AVI_INFO_CONT);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 void dce110_stream_encoder_update_dp_info_packets(
 	struct stream_encoder *enc,
@@ -913,7 +914,7 @@ void dce110_stream_encoder_update_dp_info_packets(
 	*  If enabled, packet transmission begins on the next frame
 	*/
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -934,7 +935,7 @@ void dce110_stream_encoder_update_dp_info_packets(
 			DP_SEC_CNTL,
 			DP_SEC_STREAM_ENABLE);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 void dce110_stream_encoder_stop_dp_info_packets(
@@ -944,7 +945,7 @@ void dce110_stream_encoder_stop_dp_info_packets(
 	struct dce110_stream_encoder *enc110 = DCE110STRENC_FROM_STRENC(enc);
 	struct dc_context *ctx = enc110->base.ctx;
 	uint32_t addr = LINK_REG(DP_SEC_CNTL);
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(value, 0, DP_SEC_CNTL, DP_SEC_GSP0_ENABLE);
 	set_reg_field_value(value, 0, DP_SEC_CNTL, DP_SEC_GSP1_ENABLE);
@@ -965,7 +966,7 @@ void dce110_stream_encoder_stop_dp_info_packets(
 			DP_SEC_CNTL,
 			DP_SEC_STREAM_ENABLE);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 void dce110_stream_encoder_dp_blank(
@@ -974,7 +975,7 @@ void dce110_stream_encoder_dp_blank(
 	struct dce110_stream_encoder *enc110 = DCE110STRENC_FROM_STRENC(enc);
 	struct dc_context *ctx = enc110->base.ctx;
 	uint32_t addr = LINK_REG(DP_VID_STREAM_CNTL);
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 	uint32_t retries = 0;
 	uint32_t max_retries = DP_BLANK_MAX_RETRY * 10;
 
@@ -1000,7 +1001,7 @@ void dce110_stream_encoder_dp_blank(
 
 	/* disable DP stream */
 	set_reg_field_value(value, 0, DP_VID_STREAM_CNTL, DP_VID_STREAM_ENABLE);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* the encoder stops sending the video stream
 	* at the start of the vertical blanking.
@@ -1008,7 +1009,7 @@ void dce110_stream_encoder_dp_blank(
 	*/
 
 	do {
-		value = dal_read_reg(ctx, addr);
+		value = dm_read_reg(ctx, addr);
 
 		if (!get_reg_field_value(
 			value,
@@ -1016,7 +1017,7 @@ void dce110_stream_encoder_dp_blank(
 			DP_VID_STREAM_STATUS))
 			break;
 
-		dc_service_delay_in_microseconds(ctx, 10);
+		dm_delay_in_microseconds(ctx, 10);
 
 		++retries;
 	} while (retries < max_retries);
@@ -1029,9 +1030,9 @@ void dce110_stream_encoder_dp_blank(
 	* i.e. DP_VID_STREAM_STATUS stuck at 1.
 	*/
 	addr = LINK_REG(DP_STEER_FIFO);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(value, true, DP_STEER_FIFO, DP_STEER_FIFO_RESET);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 /* output video stream to link encoder */
@@ -1063,45 +1064,45 @@ void dce110_stream_encoder_dp_unblank(
 
 		/* enable auto measurement */
 		addr = LINK_REG(DP_VID_TIMING);
-		value = dal_read_reg(ctx, addr);
+		value = dm_read_reg(ctx, addr);
 		set_reg_field_value(value, 0, DP_VID_TIMING, DP_VID_M_N_GEN_EN);
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 
 		/* auto measurement need 1 full 0x8000 symbol cycle to kick in,
 		* therefore program initial value for Mvid and Nvid
 		*/
 		addr = LINK_REG(DP_VID_N);
-		value = dal_read_reg(ctx, addr);
+		value = dm_read_reg(ctx, addr);
 		set_reg_field_value(value, n_vid, DP_VID_N, DP_VID_N);
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 
 		addr = LINK_REG(DP_VID_M);
-		value = dal_read_reg(ctx, addr);
+		value = dm_read_reg(ctx, addr);
 		set_reg_field_value(value, m_vid, DP_VID_M, DP_VID_M);
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 
 		addr = LINK_REG(DP_VID_TIMING);
-		value = dal_read_reg(ctx, addr);
+		value = dm_read_reg(ctx, addr);
 		set_reg_field_value(value, 1, DP_VID_TIMING, DP_VID_M_N_GEN_EN);
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 
 	/* set DIG_START to 0x1 to resync FIFO */
 	addr = LINK_REG(DIG_FE_CNTL);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(value, 1, DIG_FE_CNTL, DIG_START);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* switch DP encoder to CRTC data */
 	addr = LINK_REG(DP_STEER_FIFO);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(value, 0, DP_STEER_FIFO, DP_STEER_FIFO_RESET);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* wait 100us for DIG/DP logic to prime
 	* (i.e. a few video lines)
 	*/
-	dc_service_delay_in_microseconds(ctx, 100);
+	dm_delay_in_microseconds(ctx, 100);
 
 	/* the hardware would start sending video at the start of the next DP
 	* frame (i.e. rising edge of the vblank).
@@ -1111,12 +1112,12 @@ void dce110_stream_encoder_dp_unblank(
 	* programmable
 	*/
 	addr = LINK_REG(DP_VID_STREAM_CNTL);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		true,
 		DP_VID_STREAM_CNTL,
 		DP_VID_STREAM_ENABLE);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 

@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "include/asic_capability_interface.h"
 #include "include/asic_capability_types.h"
@@ -36,7 +36,7 @@
 #include "dce/dce_11_0_sh_mask.h"
 #include "dal_asic_id.h"
 
-#define ixVCE_HARVEST_FUSE_MACRO__ADDRESS     0xC0014074
+#define ixVCE_HARVEST_FUSE_MACRO__ADDRESS 0xC0014074
 
 /*
  * carrizo_asic_capability_create
@@ -85,7 +85,7 @@ void carrizo_asic_capability_create(struct asic_capability *cap,
 	cap->stereo_3d_caps.DISPLAYPORT_FRAME_ALT = true;
 	cap->stereo_3d_caps.INTERLEAVE = true;
 
-    e_fuse_setting = dal_read_index_reg(cap->ctx,CGS_IND_REG__SMC,ixVCE_HARVEST_FUSE_MACRO__ADDRESS);
+	e_fuse_setting = dm_read_index_reg(cap->ctx,CGS_IND_REG__SMC, ixVCE_HARVEST_FUSE_MACRO__ADDRESS);
 
 	/* Bits [28:27]*/
 	switch ((e_fuse_setting >> 27) & 0x3) {

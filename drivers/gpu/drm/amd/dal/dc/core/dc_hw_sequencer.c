@@ -22,7 +22,7 @@
  * Authors: AMD
  *
  */
-#include "dc_services.h"
+#include "dm_services.h"
 #include "core_types.h"
 
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)

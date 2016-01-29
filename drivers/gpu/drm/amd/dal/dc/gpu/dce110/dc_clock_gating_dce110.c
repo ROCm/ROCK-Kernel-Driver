@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "include/logger_interface.h"
 
@@ -50,7 +50,7 @@ static void force_hw_base_light_sleep(struct dc_context *ctx)
 	addr = mmDC_MEM_GLOBAL_PWR_REQ_CNTL;
 	/* Read the mmDC_MEM_GLOBAL_PWR_REQ_CNTL to get the currently
 	 * programmed DC_MEM_GLOBAL_PWR_REQ_DIS*/
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(
 			value,
@@ -58,7 +58,7 @@ static void force_hw_base_light_sleep(struct dc_context *ctx)
 			DC_MEM_GLOBAL_PWR_REQ_CNTL,
 			DC_MEM_GLOBAL_PWR_REQ_DIS);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 }
 

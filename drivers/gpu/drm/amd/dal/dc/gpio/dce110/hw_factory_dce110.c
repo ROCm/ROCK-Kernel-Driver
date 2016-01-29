@@ -27,7 +27,7 @@
  * Pre-requisites: headers required by header of this unit
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 #include "include/gpio_types.h"
 #include "../hw_factory.h"
 
@@ -41,6 +41,7 @@
 #include "../hw_hpd.h"
 
 #include "hw_factory_dce110.h"
+
 #include "hw_hpd_dce110.h"
 #include "hw_ddc_dce110.h"
 

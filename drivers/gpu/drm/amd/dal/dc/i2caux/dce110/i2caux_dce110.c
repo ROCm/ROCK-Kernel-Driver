@@ -23,12 +23,11 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
 #include "include/i2caux_interface.h"
 #include "../i2caux.h"
 #include "../engine.h"
@@ -40,6 +39,7 @@
  * Header of this unit
  */
 #include "i2caux_dce110.h"
+
 #include "i2c_sw_engine_dce110.h"
 #include "i2c_hw_engine_dce110.h"
 #include "aux_engine_dce110.h"
@@ -68,7 +68,7 @@ static void destroy(
 
 	destruct(i2caux_dce110);
 
-	dc_service_free((*i2c_engine)->ctx, i2caux_dce110);
+	dm_free((*i2c_engine)->ctx, i2caux_dce110);
 
 	*i2c_engine = NULL;
 }
@@ -248,7 +248,7 @@ struct i2caux *dal_i2caux_dce110_create(
 	struct dc_context *ctx)
 {
 	struct i2caux_dce110 *i2caux_dce110 =
-		dc_service_alloc(ctx, sizeof(struct i2caux_dce110));
+		dm_alloc(ctx, sizeof(struct i2caux_dce110));
 
 	if (!i2caux_dce110) {
 		ASSERT_CRITICAL(false);
@@ -260,7 +260,7 @@ struct i2caux *dal_i2caux_dce110_create(
 
 	ASSERT_CRITICAL(false);
 
-	dc_service_free(ctx, i2caux_dce110);
+	dm_free(ctx, i2caux_dce110);
 
 	return NULL;
 }

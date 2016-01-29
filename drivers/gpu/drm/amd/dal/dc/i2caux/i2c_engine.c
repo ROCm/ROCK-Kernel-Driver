@@ -23,12 +23,11 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
 #include "include/i2caux_interface.h"
 #include "engine.h"
 
@@ -67,7 +66,7 @@ bool dal_i2c_engine_acquire(
 
 		/* i2c_engine is busy by VBios, lets wait and retry */
 
-		dc_service_delay_in_microseconds(engine->ctx, 10);
+		dm_delay_in_microseconds(engine->ctx, 10);
 
 		++counter;
 	} while (counter < 2);

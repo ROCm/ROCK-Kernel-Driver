@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef __DC_SERVICES_TYPES_H__
-#define __DC_SERVICES_TYPES_H__
+#ifndef __DM_SERVICES_TYPES_H__
+#define __DM_SERVICES_TYPES_H__
 
 #define INVALID_DISPLAY_INDEX 0xffffffff
 
@@ -46,16 +46,16 @@
 #undef WRITE
 #undef FRAME_SIZE
 
-#define dal_output_to_console(fmt, ...) DRM_INFO(fmt, ##__VA_ARGS__)
+#define dm_output_to_console(fmt, ...) DRM_INFO(fmt, ##__VA_ARGS__)
 
-#define dal_error(fmt, ...) DRM_ERROR(fmt, ##__VA_ARGS__)
+#define dm_error(fmt, ...) DRM_ERROR(fmt, ##__VA_ARGS__)
 
-#define dal_debug(fmt, ...) DRM_DEBUG_KMS(fmt, ##__VA_ARGS__)
+#define dm_debug(fmt, ...) DRM_DEBUG_KMS(fmt, ##__VA_ARGS__)
 
-#define dal_vlog(fmt, args) vprintk(fmt, args)
+#define dm_vlog(fmt, args) vprintk(fmt, args)
 
-#define dal_min(x, y) min(x, y)
-#define dal_max(x, y) max(x, y)
+#define dm_min(x, y) min(x, y)
+#define dm_max(x, y) max(x, y)
 
 #elif defined BUILD_DAL_TEST
 
@@ -94,30 +94,30 @@ enum { false, true };
 #define dal_test_not_implemented() \
 	printf("[DAL_TEST_NOT_IMPL]:%s\n", __func__)
 
-#define dal_output_to_console(fmt, ...) do { \
+#define dm_output_to_console(fmt, ...) do { \
 	printf("[DAL_LOG]" fmt, ##__VA_ARGS__); } \
 	while (false)
 
-#define dal_error(fmt, ...) printf("[DAL_ERROR]" fmt, ##__VA_ARGS__)
+#define dm_error(fmt, ...) printf("[DAL_ERROR]" fmt, ##__VA_ARGS__)
 
-#define dal_output_to_console(fmt, ...) do { \
+#define dm_output_to_console(fmt, ...) do { \
 			printf("[DAL_LOG]" fmt, ##__VA_ARGS__); } \
 				while (false)
 
 
-#define dal_debug(fmt, ...) printf("[DAL_DBG]" fmt, ##__VA_ARGS__)
+#define dm_debug(fmt, ...) printf("[DAL_DBG]" fmt, ##__VA_ARGS__)
 
-#define dal_vlog(fmt, args) vprintf(fmt, args)
+#define dm_vlog(fmt, args) vprintf(fmt, args)
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
-#define dal_min(x, y) ({\
+#define dm_min(x, y) ({\
 	typeof(x) _min1 = (x);\
 	typeof(y) _min2 = (y);\
 	(void) (&_min1 == &_min2);\
 	_min1 < _min2 ? _min1 : _min2; })
 
-#define dal_max(x, y) ({\
+#define dm_max(x, y) ({\
 	typeof(x) _max1 = (x);\
 	typeof(y) _max2 = (y);\
 	(void) (&_max1 == &_max2);\

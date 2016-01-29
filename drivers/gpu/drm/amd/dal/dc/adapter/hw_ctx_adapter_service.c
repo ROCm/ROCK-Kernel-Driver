@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 #include "include/adapter_service_types.h"
 #include "include/grph_object_id.h"
 #include "hw_ctx_adapter_service.h"

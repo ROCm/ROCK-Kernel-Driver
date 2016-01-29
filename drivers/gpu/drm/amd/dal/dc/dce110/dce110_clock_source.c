@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /* include DCE11 register header files */
 #include "dce/dce_11_0_d.h"
@@ -476,7 +476,7 @@ static uint32_t dce110_get_pix_clk_dividers(
 		return pll_calc_error;
 	}
 
-	dc_service_memset(pll_settings, 0, sizeof(*pll_settings));
+	dm_memset(pll_settings, 0, sizeof(*pll_settings));
 
 	if (cs->id == CLOCK_SOURCE_ID_EXTERNAL) {
 		pll_settings->adjusted_pix_clk = clk_src->ext_clk_khz;
@@ -492,7 +492,7 @@ static uint32_t dce110_get_pix_clk_dividers(
 	* 00 - PCIE_REFCLK, 01 - XTALIN,    02 - GENERICA,    03 - GENERICB
 	* 04 - HSYNCA,      05 - GENLK_CLK, 06 - PCIE_REFCLK, 07 - DVOCLK0 */
 	addr = clk_src->offsets.pll_cntl;
-	value = dal_read_reg(clk_src->base.ctx, addr);
+	value = dm_read_reg(clk_src->base.ctx, addr);
 	field = get_reg_field_value(value, PLL_CNTL, PLL_REF_DIV_SRC);
 	pll_settings->use_external_clk = (field > 1);
 
@@ -583,7 +583,7 @@ static bool calculate_ss(
 		return false;
 
 
-	dc_service_memset(ds_data, 0, sizeof(struct delta_sigma_data));
+	dm_memset(ds_data, 0, sizeof(struct delta_sigma_data));
 
 
 
@@ -683,7 +683,7 @@ static void program_pixel_clk_resync(
 {
 	uint32_t value = 0;
 
-	value = dal_read_reg(clk_src->base.ctx, clk_src->offsets.pixclk_resync_cntl);
+	value = dm_read_reg(clk_src->base.ctx, clk_src->offsets.pixclk_resync_cntl);
 
 	set_reg_field_value(
 		value,
@@ -733,7 +733,7 @@ static void program_pixel_clk_resync(
 		break;
 	}
 
-	dal_write_reg(
+	dm_write_reg(
 		clk_src->base.ctx,
 		clk_src->offsets.pixclk_resync_cntl,
 		value);
@@ -868,13 +868,13 @@ static void get_ss_info_from_atombios(
 	if (*ss_entries_num == 0)
 		return;
 
-	ss_info = dc_service_alloc(clk_src->base.ctx, sizeof(struct spread_spectrum_info)
+	ss_info = dm_alloc(clk_src->base.ctx, sizeof(struct spread_spectrum_info)
 				* (*ss_entries_num));
 	ss_info_cur = ss_info;
 	if (ss_info == NULL)
 		return;
 
-	ss_data = dc_service_alloc(clk_src->base.ctx, sizeof(struct spread_spectrum_data) *
+	ss_data = dm_alloc(clk_src->base.ctx, sizeof(struct spread_spectrum_data) *
 							(*ss_entries_num));
 	if (ss_data == NULL)
 		goto out_free_info;
@@ -949,14 +949,14 @@ static void get_ss_info_from_atombios(
 	}
 
 	*spread_spectrum_data = ss_data;
-	dc_service_free(clk_src->base.ctx, ss_info);
+	dm_free(clk_src->base.ctx, ss_info);
 	return;
 
 out_free_data:
-	dc_service_free(clk_src->base.ctx, ss_data);
+	dm_free(clk_src->base.ctx, ss_data);
 	*ss_entries_num = 0;
 out_free_info:
-	dc_service_free(clk_src->base.ctx, ss_info);
+	dm_free(clk_src->base.ctx, ss_info);
 }
 
 static void ss_info_from_atombios_create(

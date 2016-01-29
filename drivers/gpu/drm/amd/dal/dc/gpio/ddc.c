@@ -27,7 +27,7 @@
  * Pre-requisites: headers required by header of this unit
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "include/gpio_interface.h"
 #include "include/ddc_interface.h"
@@ -229,7 +229,7 @@ struct ddc *dal_gpio_create_ddc(
 	if (!service->translate.funcs->offset_to_id(offset, mask, &id, &en))
 		return NULL;
 
-	ddc = dc_service_alloc(service->ctx, sizeof(struct ddc));
+	ddc = dm_alloc(service->ctx, sizeof(struct ddc));
 
 	if (!ddc) {
 		BREAK_TO_DEBUGGER();
@@ -262,7 +262,7 @@ failure_2:
 	dal_gpio_service_destroy_gpio(&ddc->pin_data);
 
 failure_1:
-	dc_service_free(service->ctx, ddc);
+	dm_free(service->ctx, ddc);
 
 	return NULL;
 }
@@ -284,7 +284,7 @@ void dal_gpio_destroy_ddc(
 	}
 
 	destruct(*ddc);
-	dc_service_free((*ddc)->ctx, *ddc);
+	dm_free((*ddc)->ctx, *ddc);
 
 	*ddc = NULL;
 }

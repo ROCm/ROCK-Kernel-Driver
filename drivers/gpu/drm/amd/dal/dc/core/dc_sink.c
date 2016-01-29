@@ -23,8 +23,8 @@
  *
  */
 
-#include "dc_services.h"
-#include "dc_helpers.h"
+#include "dm_services.h"
+#include "dm_helpers.h"
 #include "core_types.h"
 
 /*******************************************************************************
@@ -83,7 +83,7 @@ void dc_sink_release(const struct dc_sink *dc_sink)
 
 	if (sink->ref_count == 0) {
 		destruct(sink);
-		dc_service_free(core_sink->ctx, sink);
+		dm_free(core_sink->ctx, sink);
 	}
 }
 
@@ -91,7 +91,7 @@ struct dc_sink *dc_sink_create(const struct dc_sink_init_data *init_params)
 {
 	struct core_link *core_link = DC_LINK_TO_LINK(init_params->link);
 
-	struct sink *sink = dc_service_alloc(core_link->ctx, sizeof(*sink));
+	struct sink *sink = dm_alloc(core_link->ctx, sizeof(*sink));
 
 	if (NULL == sink)
 		goto alloc_fail;
@@ -105,7 +105,7 @@ struct dc_sink *dc_sink_create(const struct dc_sink_init_data *init_params)
 	return &sink->protected.public;
 
 construct_fail:
-	dc_service_free(core_link->ctx, sink);
+	dm_free(core_link->ctx, sink);
 
 alloc_fail:
 	return NULL;

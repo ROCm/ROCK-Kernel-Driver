@@ -23,12 +23,11 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
 #include "include/i2caux_interface.h"
 #include "../i2caux.h"
 #include "../engine.h"
@@ -60,7 +59,7 @@ static void destroy(
 {
 	destruct(*i2c_engine);
 
-	dc_service_free((*i2c_engine)->ctx, *i2c_engine);
+	dm_free((*i2c_engine)->ctx, *i2c_engine);
 
 	*i2c_engine = NULL;
 }
@@ -95,7 +94,7 @@ struct i2caux *dal_i2caux_diag_fpga_create(
 	struct adapter_service *as,
 	struct dc_context *ctx)
 {
-	struct i2caux *i2caux =	dc_service_alloc(ctx, sizeof(struct i2caux));
+	struct i2caux *i2caux =	dm_alloc(ctx, sizeof(struct i2caux));
 
 	if (!i2caux) {
 		ASSERT_CRITICAL(false);
@@ -107,7 +106,7 @@ struct i2caux *dal_i2caux_diag_fpga_create(
 
 	ASSERT_CRITICAL(false);
 
-	dc_service_free(ctx, i2caux);
+	dm_free(ctx, i2caux);
 
 	return NULL;
 }

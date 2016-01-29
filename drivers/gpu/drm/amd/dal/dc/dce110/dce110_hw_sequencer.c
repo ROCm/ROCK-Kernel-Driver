@@ -22,14 +22,14 @@
  * Authors: AMD
  *
  */
-#include "dc_services.h"
+#include "dm_services.h"
 #include "dc.h"
 #include "dc_bios_types.h"
 #include "core_types.h"
 #include "core_status.h"
 #include "resource.h"
 #include "hw_sequencer.h"
-#include "dc_helpers.h"
+#include "dm_helpers.h"
 #include "dce110_hw_sequencer.h"
 
 #include "gpu/dce110/dc_clock_gating_dce110.h"
@@ -109,7 +109,7 @@ static void dce110_enable_fe_clock(
 	/*TODO: proper offset*/
 	addr = HW_REG_DCFE(mmDCFE_CLOCK_CONTROL, controller_id);
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -117,7 +117,7 @@ static void dce110_enable_fe_clock(
 		DCFE_CLOCK_CONTROL,
 		DCFE_CLOCK_ENABLE);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static void dce110_init_pte(struct dc_context *ctx)
@@ -128,7 +128,7 @@ static void dce110_init_pte(struct dc_context *ctx)
 	uint32_t chunk_mul = 0;
 
 	addr = mmUNP_DVMM_PTE_CONTROL;
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -148,10 +148,10 @@ static void dce110_init_pte(struct dc_context *ctx)
 		DVMM_PTE_CONTROL,
 		DVMM_PTE_BUFFER_MODE1);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	addr = mmDVMM_PTE_REQ;
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	chunk_int = get_reg_field_value(
 		value,
@@ -183,7 +183,7 @@ static void dce110_init_pte(struct dc_context *ctx)
 			DVMM_PTE_REQ,
 			HFLIP_PTEREQ_PER_CHUNK_MULTIPLIER);
 
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 }
 
@@ -196,8 +196,8 @@ static void trigger_write_crtc_h_blank_start_end(
 	uint32_t addr;
 
 	addr =  HW_REG_CRTC(mmCRTC_H_BLANK_START_END, controller_id);
-	value = dal_read_reg(ctx, addr);
-	dal_write_reg(ctx, addr, value);
+	value = dm_read_reg(ctx, addr);
+	dm_write_reg(ctx, addr, value);
 }
 
 static bool dce110_pipe_control_lock(
@@ -207,7 +207,7 @@ static bool dce110_pipe_control_lock(
 	bool lock)
 {
 	uint32_t addr = HW_REG_BLND(mmBLND_V_UPDATE_LOCK, controller_idx);
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 	bool need_to_wait = false;
 
 	if (control_mask & PIPE_LOCK_CONTROL_GRAPHICS)
@@ -247,7 +247,7 @@ static bool dce110_pipe_control_lock(
 			BLND_V_UPDATE_LOCK,
 			BLND_V_UPDATE_LOCK_MODE);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	if (!lock && need_to_wait) {
 		uint8_t counter = 0;
@@ -260,7 +260,7 @@ static bool dce110_pipe_control_lock(
 				controller_idx);
 
 		while (counter < counter_limit) {
-			value = dal_read_reg(ctx, addr);
+			value = dm_read_reg(ctx, addr);
 
 			pipe_pending = 0;
 
@@ -315,7 +315,7 @@ static bool dce110_pipe_control_lock(
 				break;
 
 			counter++;
-			dc_service_delay_in_microseconds(ctx, delay_us);
+			dm_delay_in_microseconds(ctx, delay_us);
 		}
 
 		if (counter == counter_limit) {
@@ -371,7 +371,7 @@ static void dce110_set_blender_mode(
 		break;
 	}
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -385,7 +385,7 @@ static void dce110_set_blender_mode(
 		BLND_CONTROL,
 		BLND_MODE);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static void dce110_crtc_switch_to_clk_src(
@@ -397,7 +397,7 @@ static void dce110_crtc_switch_to_clk_src(
 	addr = mmCRTC0_PIXEL_RATE_CNTL + crtc_inst *
 			(mmCRTC1_PIXEL_RATE_CNTL - mmCRTC0_PIXEL_RATE_CNTL);
 
-	pixel_rate_cntl_value = dal_read_reg(clk_src->ctx, addr);
+	pixel_rate_cntl_value = dm_read_reg(clk_src->ctx, addr);
 
 	if (clk_src->id == CLOCK_SOURCE_ID_EXTERNAL)
 		set_reg_field_value(pixel_rate_cntl_value, 1,
@@ -413,7 +413,7 @@ static void dce110_crtc_switch_to_clk_src(
 				CRTC0_PIXEL_RATE_CNTL,
 				CRTC0_PIXEL_RATE_SOURCE);
 	}
-	dal_write_reg(clk_src->ctx, addr, pixel_rate_cntl_value);
+	dm_write_reg(clk_src->ctx, addr, pixel_rate_cntl_value);
 }
 /**************************************************************************/
 
@@ -897,7 +897,7 @@ static void power_down_clock_sources(struct dc *dc)
 	for (i = 0; i < dc->res_pool.clk_src_count; i++) {
 		if (dc->res_pool.clock_sources[i]->funcs->cs_power_down(
 				dc->res_pool.clock_sources[i]) == false)
-			dal_error("Failed to power down pll! (clk src index=%d)\n", i);
+			dm_error("Failed to power down pll! (clk src index=%d)\n", i);
 	}
 }
 
@@ -1011,7 +1011,7 @@ static bool dc_pre_clock_change(
 	}
 
 	if (!dc_service_pp_pre_dce_clock_change(ctx, &input, output)) {
-		dal_error("DC: dc_service_pp_pre_dce_clock_change failed!\n");
+		dm_error("DC: dc_service_pp_pre_dce_clock_change failed!\n");
 		return false;
 	}
 
@@ -1051,7 +1051,7 @@ static bool dc_set_clocks_and_clock_state (
 	if (!dal_display_clock_set_min_clocks_state(
 			disp_clk, context->res_ctx.required_clocks_state)) {
 		BREAK_TO_DEBUGGER();
-		dal_error("DC: failed to set minimum clock state!\n");
+		dm_error("DC: failed to set minimum clock state!\n");
 	}
 
 
@@ -1601,7 +1601,7 @@ static void enable_timing_synchronization(
 
 	/* Reset slave controllers on master VSync */
 	DC_SYNC_INFO("GSL: enabling trigger-reset\n");
-	dc_service_memset(&trigger_params, 0, sizeof(trigger_params));
+	dm_memset(&trigger_params, 0, sizeof(trigger_params));
 
 	trigger_params.edge = TRIGGER_EDGE_DEFAULT;
 	trigger_params.source = SYNC_SOURCE_GSL_GROUP0;

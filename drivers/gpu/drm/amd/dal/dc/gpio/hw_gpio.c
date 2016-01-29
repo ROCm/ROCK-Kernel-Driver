@@ -23,12 +23,11 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
 #include "include/gpio_types.h"
 #include "hw_gpio_pin.h"
 
@@ -51,7 +50,7 @@ enum gpio_result dal_hw_gpio_get_reg_value(
 	const struct addr_mask *reg,
 	uint32_t *value)
 {
-	*value = dal_read_reg(ctx, reg->addr);
+	*value = dm_read_reg(ctx, reg->addr);
 
 	*value &= reg->mask;
 
@@ -70,12 +69,12 @@ enum gpio_result dal_hw_gpio_set_reg_value(
 		return GPIO_RESULT_INVALID_DATA;
 	}
 
-	prev_value = dal_read_reg(ctx, reg->addr);
+	prev_value = dm_read_reg(ctx, reg->addr);
 
 	prev_value &= ~reg->mask;
 	prev_value |= (value & reg->mask);
 
-	dal_write_reg(ctx, reg->addr, prev_value);
+	dm_write_reg(ctx, reg->addr, prev_value);
 
 	return GPIO_RESULT_OK;
 }

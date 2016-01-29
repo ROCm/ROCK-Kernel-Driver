@@ -31,15 +31,14 @@
 #include <drm/amdgpu_drm.h>
 #include <drm/drm_edid.h>
 
+#include "dm_services.h"
 #include "amdgpu.h"
 #include "dc.h"
-#include "dc_services.h"
-
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_irq.h"
 #include "amdgpu_dm_types.h"
 
-/* dc_helpers_parse_edid_caps
+/* dm_helpers_parse_edid_caps
  *
  * Parse edid caps
  *
@@ -48,7 +47,7 @@
  * @return
  *	void
  * */
-enum dc_edid_status dc_helpers_parse_edid_caps(
+enum dc_edid_status dm_helpers_parse_edid_caps(
 		struct dc_context *ctx,
 		const struct dc_edid *edid,
 		struct dc_edid_caps *edid_caps)
@@ -200,7 +199,7 @@ static void get_payload_table(
 /*
  * Writes payload allocation table in immediate downstream device.
  */
-bool dc_helpers_dp_mst_write_payload_allocation_table(
+bool dm_helpers_dp_mst_write_payload_allocation_table(
 		struct dc_context *ctx,
 		const struct dc_stream *stream,
 		struct dp_mst_stream_allocation_table *proposed_table,
@@ -291,7 +290,7 @@ bool dc_helpers_dp_mst_write_payload_allocation_table(
  * Polls for ACT (allocation change trigger) handled and sends
  * ALLOCATE_PAYLOAD message.
  */
-bool dc_helpers_dp_mst_poll_for_allocation_change_trigger(
+bool dm_helpers_dp_mst_poll_for_allocation_change_trigger(
 		struct dc_context *ctx,
 		const struct dc_stream *stream)
 {
@@ -319,7 +318,7 @@ bool dc_helpers_dp_mst_poll_for_allocation_change_trigger(
 	return true;
 }
 
-bool dc_helpers_dp_mst_send_payload_allocation(
+bool dm_helpers_dp_mst_send_payload_allocation(
 		struct dc_context *ctx,
 		const struct dc_stream *stream,
 		bool enable)
@@ -354,7 +353,7 @@ bool dc_helpers_dp_mst_send_payload_allocation(
 	return true;
 }
 
-void dc_helpers_dp_mst_handle_mst_hpd_rx_irq(void *param)
+void dm_helpers_dp_mst_handle_mst_hpd_rx_irq(void *param)
 {
 	uint8_t esi[8] = { 0 };
 	uint8_t dret;
@@ -396,7 +395,7 @@ void dc_helpers_dp_mst_handle_mst_hpd_rx_irq(void *param)
 	}
 }
 
-bool dc_helpers_dp_mst_start_top_mgr(
+bool dm_helpers_dp_mst_start_top_mgr(
 		struct dc_context *ctx,
 		const struct dc_link *link,
 		bool boot)
@@ -417,7 +416,7 @@ bool dc_helpers_dp_mst_start_top_mgr(
 	return (drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, true) == 0);
 }
 
-void dc_helpers_dp_mst_stop_top_mgr(
+void dm_helpers_dp_mst_stop_top_mgr(
 		struct dc_context *ctx,
 		const struct dc_link *link)
 {
@@ -432,7 +431,7 @@ void dc_helpers_dp_mst_stop_top_mgr(
 		drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, false);
 }
 
-bool dc_helper_dp_read_dpcd(
+bool dm_helper_dp_read_dpcd(
 		struct dc_context *ctx,
 		const struct dc_link *link,
 		uint32_t address,
@@ -453,7 +452,7 @@ bool dc_helper_dp_read_dpcd(
 			data, size) > 0;
 }
 
-bool dc_helper_dp_write_dpcd(
+bool dm_helper_dp_write_dpcd(
 		struct dc_context *ctx,
 		const struct dc_link *link,
 		uint32_t address,

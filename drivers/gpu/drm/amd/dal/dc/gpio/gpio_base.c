@@ -27,7 +27,7 @@
  * Pre-requisites: headers required by header of this unit
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "include/gpio_interface.h"
 #include "include/gpio_service_interface.h"
@@ -246,7 +246,7 @@ struct gpio *dal_gpio_create(
 	uint32_t en,
 	enum gpio_pin_output_state output_state)
 {
-	struct gpio *gpio = dc_service_alloc(service->ctx, sizeof(struct gpio));
+	struct gpio *gpio = dm_alloc(service->ctx, sizeof(struct gpio));
 
 	if (!gpio) {
 		ASSERT_CRITICAL(false);
@@ -273,7 +273,7 @@ void dal_gpio_destroy(
 
 	dal_gpio_close(*gpio);
 
-	dc_service_free((*gpio)->service->ctx, *gpio);
+	dm_free((*gpio)->service->ctx, *gpio);
 
 	*gpio = NULL;
 }

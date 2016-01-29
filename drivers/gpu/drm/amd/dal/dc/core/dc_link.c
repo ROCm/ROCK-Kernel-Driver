@@ -23,8 +23,8 @@
  *
  */
 
-#include "dc_services.h"
-#include "dc_helpers.h"
+#include "dm_services.h"
+#include "dm_helpers.h"
 #include "dc.h"
 #include "core_dc.h"
 #include "adapter_service_interface.h"
@@ -449,7 +449,7 @@ static enum dc_edid_status read_edid(
 
 		dal_ddc_service_get_edid_buf(link->ddc,
 				sink->public.dc_edid.raw_edid);
-		edid_status = dc_helpers_parse_edid_caps(
+		edid_status = dm_helpers_parse_edid_caps(
 				sink->ctx,
 				&sink->public.dc_edid,
 				&sink->public.edid_caps);
@@ -524,7 +524,7 @@ static void detect_dp(
 			 * TODO: s3 resume check
 			 */
 
-			if (dc_helpers_dp_mst_start_top_mgr(
+			if (dm_helpers_dp_mst_start_top_mgr(
 				link->ctx,
 				&link->public, boot)) {
 				link->public.type = dc_connection_mst_branch;
@@ -718,7 +718,7 @@ bool dc_link_detect(const struct dc_link *dc_link, bool boot)
 		if (link->public.type == dc_connection_mst_branch) {
 			LINK_INFO("link=%d, mst branch is now Disconnected\n",
 				link->public.link_index);
-			dc_helpers_dp_mst_stop_top_mgr(link->ctx, &link->public);
+			dm_helpers_dp_mst_stop_top_mgr(link->ctx, &link->public);
 		}
 
 		link->public.type = dc_connection_none;
@@ -905,7 +905,7 @@ static bool construct(
 			init_params->connector_index);
 
 	if (link->link_id.type != OBJECT_TYPE_CONNECTOR) {
-		dal_error("%s: Invalid Connector ObjectID from Adapter Service for connector index:%d!\n",
+		dm_error("%s: Invalid Connector ObjectID from Adapter Service for connector index:%d!\n",
 				__func__, init_params->connector_index);
 		goto create_fail;
 	}
@@ -1057,7 +1057,7 @@ create_fail:
 struct core_link *link_create(const struct link_init_data *init_params)
 {
 	struct core_link *link =
-			dc_service_alloc(init_params->ctx, sizeof(*link));
+			dm_alloc(init_params->ctx, sizeof(*link));
 
 	if (NULL == link)
 		goto alloc_fail;
@@ -1068,7 +1068,7 @@ struct core_link *link_create(const struct link_init_data *init_params)
 	return link;
 
 construct_fail:
-	dc_service_free(init_params->ctx, link);
+	dm_free(init_params->ctx, link);
 
 alloc_fail:
 	return NULL;
@@ -1077,7 +1077,7 @@ alloc_fail:
 void link_destroy(struct core_link **link)
 {
 	destruct(*link);
-	dc_service_free((*link)->ctx, *link);
+	dm_free((*link)->ctx, *link);
 	*link = NULL;
 }
 
@@ -1088,7 +1088,7 @@ static void dpcd_configure_panel_mode(
 	union dpcd_edp_config edp_config_set;
 	bool panel_mode_edp = false;
 
-	dc_service_memset(&edp_config_set, '\0', sizeof(union dpcd_edp_config));
+	dm_memset(&edp_config_set, '\0', sizeof(union dpcd_edp_config));
 
 	if (DP_PANEL_MODE_DEFAULT != panel_mode) {
 
@@ -1211,7 +1211,7 @@ static void enable_link_hdmi(struct core_stream *stream)
 			normalized_pix_clk,
 			stream->public.timing.flags.LTE_340MCSC_SCRAMBLE);
 
-	dc_service_memset(&stream->sink->link->cur_link_settings, 0,
+	dm_memset(&stream->sink->link->cur_link_settings, 0,
 			sizeof(struct link_settings));
 
 	link->link_enc->funcs->enable_tmds_output(
@@ -1237,7 +1237,7 @@ static enum dc_status enable_link(struct core_stream *stream)
 		break;
 	case SIGNAL_TYPE_DISPLAY_PORT_MST:
 		status = enable_link_dp_mst(stream);
-		dc_service_sleep_in_milliseconds(stream->ctx, 200);
+		dm_sleep_in_milliseconds(stream->ctx, 200);
 		break;
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
@@ -1460,7 +1460,7 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 	 */
 
 	/* get calculate VC payload for stream: stream_alloc */
-	dc_helpers_dp_mst_write_payload_allocation_table(
+	dm_helpers_dp_mst_write_payload_allocation_table(
 		stream->ctx,
 		&stream->public,
 		&proposed_table,
@@ -1509,11 +1509,11 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 		&link->mst_stream_alloc_table);
 
 	/* send down message */
-	dc_helpers_dp_mst_poll_for_allocation_change_trigger(
+	dm_helpers_dp_mst_poll_for_allocation_change_trigger(
 			stream->ctx,
 			&stream->public);
 
-	dc_helpers_dp_mst_send_payload_allocation(
+	dm_helpers_dp_mst_send_payload_allocation(
 			stream->ctx,
 			&stream->public,
 			true);
@@ -1557,12 +1557,12 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 
 	/* TODO: which component is responsible for remove payload table? */
 	if (mst_mode)
-		dc_helpers_dp_mst_write_payload_allocation_table(
+		dm_helpers_dp_mst_write_payload_allocation_table(
 				stream->ctx,
 				&stream->public,
 				&proposed_table,
 				false);
-	dc_helpers_dp_mst_write_payload_allocation_table(
+	dm_helpers_dp_mst_write_payload_allocation_table(
 		stream->ctx,
 		&stream->public,
 		&proposed_table,
@@ -1598,11 +1598,11 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 		&link->mst_stream_alloc_table);
 
 	if (mst_mode) {
-		dc_helpers_dp_mst_poll_for_allocation_change_trigger(
+		dm_helpers_dp_mst_poll_for_allocation_change_trigger(
 			stream->ctx,
 			&stream->public);
 
-		dc_helpers_dp_mst_send_payload_allocation(
+		dm_helpers_dp_mst_send_payload_allocation(
 			stream->ctx,
 			&stream->public,
 			false);

@@ -23,15 +23,16 @@
  *
  */
 
-#include "dc_services_types.h"
-
 #include <linux/types.h>
 #include <drm/drmP.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_atomic.h>
+
 #include "amdgpu.h"
 #include "amdgpu_pm.h"
+#include "dm_services_types.h"
+
 // We need to #undef FRAME_SIZE and DEPRECATED because they conflict
 // with ptrace-abi.h's #define's of them.
 #undef FRAME_SIZE
@@ -625,7 +626,7 @@ static void dm_dc_surface_commit(
 	struct dc_target *dc_target = acrtc->target;
 
 	if (!dc_target) {
-		dal_error(
+		dm_error(
 			"%s: Failed to obtain target on crtc (%d)!\n",
 			__func__,
 			acrtc->crtc_id);
@@ -635,7 +636,7 @@ static void dm_dc_surface_commit(
 	dc_surface = dc_create_surface(dc);
 
 	if (!dc_surface) {
-		dal_error(
+		dm_error(
 			"%s: Failed to create a surface!\n",
 			__func__);
 		goto fail;
@@ -659,7 +660,7 @@ static void dm_dc_surface_commit(
 			&dc_surface,
 			1,
 			dc_target)) {
-		dal_error(
+		dm_error(
 			"%s: Failed to attach surface!\n",
 			__func__);
 	}

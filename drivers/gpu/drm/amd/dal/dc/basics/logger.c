@@ -23,7 +23,7 @@
  *
  */
 #include <stdarg.h>
-#include "dc_services.h"
+#include "dm_services.h"
 #include "include/dal_types.h"
 #include "include/logger_interface.h"
 #include "logger.h"
@@ -283,7 +283,7 @@ static bool construct(struct dc_context *ctx, struct dal_logger *logger)
 	/* malloc buffer and init offsets */
 
 	logger->log_buffer_size = DAL_LOGGER_BUFFER_MAX_SIZE;
-	logger->log_buffer = (char *)dc_service_alloc(ctx,
+	logger->log_buffer = (char *)dm_alloc(ctx,
 		logger->log_buffer_size *
 		sizeof(char));
 
@@ -307,7 +307,7 @@ static bool construct(struct dc_context *ctx, struct dal_logger *logger)
 
 	/* malloc and init minor mask array */
 	logger->log_enable_mask_minors =
-			(uint32_t *)dc_service_alloc(
+			(uint32_t *)dm_alloc(
 				ctx,
 				NUM_ELEMENTS(log_major_mask_info_tbl)
 				* sizeof(uint32_t));
@@ -329,12 +329,12 @@ static bool construct(struct dc_context *ctx, struct dal_logger *logger)
 static void destruct(struct dal_logger *logger)
 {
 	if (logger->log_buffer) {
-		dc_service_free(logger->ctx, logger->log_buffer);
+		dm_free(logger->ctx, logger->log_buffer);
 		logger->log_buffer = NULL;
 	}
 
 	if (logger->log_enable_mask_minors) {
-		dc_service_free(logger->ctx, logger->log_enable_mask_minors);
+		dm_free(logger->ctx, logger->log_enable_mask_minors);
 		logger->log_enable_mask_minors = NULL;
 	}
 }
@@ -342,12 +342,12 @@ static void destruct(struct dal_logger *logger)
 struct dal_logger *dal_logger_create(struct dc_context *ctx)
 {
 	/* malloc struct */
-	struct dal_logger *logger = dc_service_alloc(ctx, sizeof(struct dal_logger));
+	struct dal_logger *logger = dm_alloc(ctx, sizeof(struct dal_logger));
 
 	if (!logger)
 		return NULL;
 	if (!construct(ctx, logger)) {
-		dc_service_free(ctx, logger);
+		dm_free(ctx, logger);
 		return NULL;
 	}
 
@@ -359,7 +359,7 @@ uint32_t dal_logger_destroy(struct dal_logger **logger)
 	if (logger == NULL || *logger == NULL)
 		return 1;
 	destruct(*logger);
-	dc_service_free((*logger)->ctx, *logger);
+	dm_free((*logger)->ctx, *logger);
 	*logger = NULL;
 
 	return 0;
@@ -403,10 +403,10 @@ static void log_to_debug_console(struct log_entry *entry)
 	if (entry->buf_offset) {
 		switch (entry->major) {
 		case LOG_MAJOR_ERROR:
-			dal_error("%s", entry->buf);
+			dm_error("%s", entry->buf);
 			break;
 		default:
-			dal_output_to_console("%s", entry->buf);
+			dm_output_to_console("%s", entry->buf);
 			break;
 		}
 	}
@@ -418,17 +418,17 @@ static void flush_to_debug_console(struct dal_logger *logger)
 	int i = logger->buffer_read_offset;
 	char *string_start = &logger->log_buffer[i];
 
-	dal_output_to_console(
+	dm_output_to_console(
 		"---------------- FLUSHING LOG BUFFER ----------------\n");
 	while (i < logger->buffer_write_offset)	{
 
 		if (logger->log_buffer[i] == '\0') {
-			dal_output_to_console("%s", string_start);
+			dm_output_to_console("%s", string_start);
 			string_start = (char *)logger->log_buffer + i + 1;
 		}
 		i++;
 	}
-	dal_output_to_console(
+	dm_output_to_console(
 		"-------------- END FLUSHING LOG BUFFER --------------\n\n");
 }
 
@@ -481,7 +481,7 @@ static void log_to_internal_buffer(struct log_entry *entry)
 			/* No wrap around, copy 'size' bytes
 			 * from 'entry->buf' to 'log_buffer'
 			 */
-			dc_service_memmove(logger->log_buffer +
+			dm_memmove(logger->log_buffer +
 					logger->buffer_write_offset,
 					entry->buf, size);
 			logger->buffer_write_offset += size;
@@ -493,10 +493,10 @@ static void log_to_internal_buffer(struct log_entry *entry)
 			int space_after_wrap = total_free_space -
 					space_before_wrap;
 
-			dc_service_memmove(logger->log_buffer +
+			dm_memmove(logger->log_buffer +
 					logger->buffer_write_offset,
 					entry->buf, space_before_wrap);
-			dc_service_memmove(logger->log_buffer, entry->buf +
+			dm_memmove(logger->log_buffer, entry->buf +
 					space_before_wrap, space_after_wrap);
 
 			logger->buffer_write_offset = space_after_wrap;
@@ -510,7 +510,7 @@ static void log_to_internal_buffer(struct log_entry *entry)
 			flush_to_debug_console(logger);
 
 			/* Start writing to beginning of buffer */
-			dc_service_memmove(logger->log_buffer, entry->buf, size);
+			dm_memmove(logger->log_buffer, entry->buf, size);
 			logger->buffer_write_offset = size;
 			logger->buffer_read_offset = 0;
 		}
@@ -581,7 +581,7 @@ static void append_entry(
 	}
 
 	/* Todo: check if off by 1 byte due to \0 anywhere */
-	dc_service_memmove(entry->buf + entry->buf_offset, buffer, buf_size);
+	dm_memmove(entry->buf + entry->buf_offset, buffer, buf_size);
 	entry->buf_offset += buf_size;
 }
 
@@ -609,7 +609,7 @@ void dal_logger_write(
 		dal_logger_open(logger, &entry, major, minor);
 
 
-		size = dal_log_to_buffer(
+		size = dm_log_to_buffer(
 			buffer, DAL_LOGGER_BUFFER_MAX_LOG_LINE_SIZE, msg, args);
 
 		if (size > 0 && size <
@@ -658,7 +658,7 @@ void dal_logger_append(
 
 		va_start(args, msg);
 
-		size = dal_log_to_buffer(
+		size = dm_log_to_buffer(
 			buffer, DAL_LOGGER_BUFFER_MAX_LOG_LINE_SIZE, msg, args);
 
 		if (size < DAL_LOGGER_BUFFER_MAX_LOG_LINE_SIZE - 1) {
@@ -763,7 +763,7 @@ void dal_logger_open(
 	entry->minor = 0;
 	entry->logger = logger;
 
-	entry->buf = dc_service_alloc(
+	entry->buf = dm_alloc(
 		logger->ctx,
 		DAL_LOGGER_BUFFER_MAX_SIZE * sizeof(char));
 
@@ -799,7 +799,7 @@ void dal_logger_close(struct log_entry *entry)
 
 cleanup:
 	if (entry->buf) {
-		dc_service_free(entry->logger->ctx, entry->buf);
+		dm_free(entry->logger->ctx, entry->buf);
 		entry->buf = NULL;
 		entry->buf_offset = 0;
 		entry->max_buf_bytes = 0;

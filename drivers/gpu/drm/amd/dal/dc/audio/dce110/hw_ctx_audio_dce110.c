@@ -23,7 +23,8 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
+
 #include "include/logger_interface.h"
 #include "../hw_ctx_audio.h"
 #include "hw_ctx_audio_dce110.h"
@@ -70,7 +71,7 @@ static void destroy(
 
 	destruct(hw_ctx_dce110);
 	/* release memory allocated for struct hw_ctx_audio_dce110 */
-	dc_service_free((*ptr)->ctx, hw_ctx_dce110);
+	dm_free((*ptr)->ctx, hw_ctx_dce110);
 
 	*ptr = NULL;
 }
@@ -93,7 +94,7 @@ static void write_indirect_azalia_reg(
 			AZALIA_F0_CODEC_ENDPOINT_INDEX,
 			AZALIA_ENDPOINT_REG_INDEX);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/* AZALIA_F0_CODEC_ENDPOINT_DATA  endpoint data  */
@@ -106,7 +107,7 @@ static void write_indirect_azalia_reg(
 		set_reg_field_value(value, reg_data,
 			AZALIA_F0_CODEC_ENDPOINT_DATA,
 			AZALIA_ENDPOINT_REG_DATA);
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	dal_logger_write(
@@ -136,7 +137,7 @@ static uint32_t read_indirect_azalia_reg(
 			AZALIA_F0_CODEC_ENDPOINT_INDEX,
 			AZALIA_ENDPOINT_REG_INDEX);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/* AZALIA_F0_CODEC_ENDPOINT_DATA  endpoint data  */
@@ -145,7 +146,7 @@ static uint32_t read_indirect_azalia_reg(
 			FROM_BASE(hw_ctx)->az_mm_reg_offsets.
 			azf0endpointx_azalia_f0_codec_endpoint_data;
 
-		value = dal_read_reg(hw_ctx->ctx, addr);
+		value = dm_read_reg(hw_ctx->ctx, addr);
 		ret_val = value;
 	}
 
@@ -349,7 +350,7 @@ static void setup_audio_wall_dto(
 {
 	struct azalia_clock_info clock_info = { 0 };
 
-	uint32_t value = dal_read_reg(hw_ctx->ctx, mmDCCG_AUDIO_DTO_SOURCE);
+	uint32_t value = dm_read_reg(hw_ctx->ctx, mmDCCG_AUDIO_DTO_SOURCE);
 
 	/* TODO: GraphicsObject\inc\GraphicsObjectDefs.hpp(131):
 	 *inline bool isHdmiSignal(SignalType signal)
@@ -387,19 +388,19 @@ static void setup_audio_wall_dto(
 				DCCG_AUDIO_DTO_SOURCE,
 				DCCG_AUDIO_DTO_SEL);
 
-			dal_write_reg(hw_ctx->ctx,
+			dm_write_reg(hw_ctx->ctx,
 					mmDCCG_AUDIO_DTO_SOURCE, value);
 		}
 
 		/* module */
 		{
-			value = dal_read_reg(hw_ctx->ctx,
+			value = dm_read_reg(hw_ctx->ctx,
 					mmDCCG_AUDIO_DTO0_MODULE);
 			set_reg_field_value(value,
 				clock_info.audio_dto_module,
 				DCCG_AUDIO_DTO0_MODULE,
 				DCCG_AUDIO_DTO0_MODULE);
-			dal_write_reg(hw_ctx->ctx,
+			dm_write_reg(hw_ctx->ctx,
 					mmDCCG_AUDIO_DTO0_MODULE, value);
 		}
 
@@ -407,14 +408,14 @@ static void setup_audio_wall_dto(
 		{
 			value = 0;
 
-			value = dal_read_reg(hw_ctx->ctx,
+			value = dm_read_reg(hw_ctx->ctx,
 					mmDCCG_AUDIO_DTO0_PHASE);
 			set_reg_field_value(value,
 				clock_info.audio_dto_phase,
 				DCCG_AUDIO_DTO0_PHASE,
 				DCCG_AUDIO_DTO0_PHASE);
 
-			dal_write_reg(hw_ctx->ctx,
+			dm_write_reg(hw_ctx->ctx,
 					mmDCCG_AUDIO_DTO0_PHASE, value);
 		}
 
@@ -448,7 +449,7 @@ static void setup_audio_wall_dto(
 				DCCG_AUDIO_DTO2_USE_512FBR_DTO);
 			*/
 
-			dal_write_reg(hw_ctx->ctx,
+			dm_write_reg(hw_ctx->ctx,
 					mmDCCG_AUDIO_DTO_SOURCE, value);
 		}
 
@@ -456,7 +457,7 @@ static void setup_audio_wall_dto(
 		{
 			value = 0;
 
-			value = dal_read_reg(hw_ctx->ctx,
+			value = dm_read_reg(hw_ctx->ctx,
 					mmDCCG_AUDIO_DTO1_MODULE);
 
 			set_reg_field_value(value,
@@ -464,7 +465,7 @@ static void setup_audio_wall_dto(
 				DCCG_AUDIO_DTO1_MODULE,
 				DCCG_AUDIO_DTO1_MODULE);
 
-			dal_write_reg(hw_ctx->ctx,
+			dm_write_reg(hw_ctx->ctx,
 					mmDCCG_AUDIO_DTO1_MODULE, value);
 		}
 
@@ -472,7 +473,7 @@ static void setup_audio_wall_dto(
 		{
 			value = 0;
 
-			value = dal_read_reg(hw_ctx->ctx,
+			value = dm_read_reg(hw_ctx->ctx,
 					mmDCCG_AUDIO_DTO1_PHASE);
 
 			set_reg_field_value(value,
@@ -480,7 +481,7 @@ static void setup_audio_wall_dto(
 				DCCG_AUDIO_DTO1_PHASE,
 				DCCG_AUDIO_DTO1_PHASE);
 
-			dal_write_reg(hw_ctx->ctx,
+			dm_write_reg(hw_ctx->ctx,
 					mmDCCG_AUDIO_DTO1_PHASE, value);
 		}
 
@@ -515,7 +516,7 @@ static void setup_hdmi_audio(
 		addr =
 			mmHDMI_AUDIO_PACKET_CONTROL + engine_offset[engine_id];
 
-		value = dal_read_reg(hw_ctx->ctx, addr);
+		value = dm_read_reg(hw_ctx->ctx, addr);
 
 		set_reg_field_value(value, max_packets_per_line,
 			HDMI_AUDIO_PACKET_CONTROL,
@@ -525,27 +526,27 @@ static void setup_hdmi_audio(
 			HDMI_AUDIO_PACKET_CONTROL,
 			HDMI_AUDIO_DELAY_EN);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/* AFMT_AUDIO_PACKET_CONTROL */
 	{
 		addr = mmAFMT_AUDIO_PACKET_CONTROL + engine_offset[engine_id];
 
-		value = dal_read_reg(hw_ctx->ctx, addr);
+		value = dm_read_reg(hw_ctx->ctx, addr);
 
 		set_reg_field_value(value, 1,
 			AFMT_AUDIO_PACKET_CONTROL,
 			AFMT_60958_CS_UPDATE);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/* AFMT_AUDIO_PACKET_CONTROL2 */
 	{
 		addr = mmAFMT_AUDIO_PACKET_CONTROL2 + engine_offset[engine_id];
 
-		value = dal_read_reg(hw_ctx->ctx, addr);
+		value = dm_read_reg(hw_ctx->ctx, addr);
 
 		set_reg_field_value(value, 0,
 				AFMT_AUDIO_PACKET_CONTROL2,
@@ -556,14 +557,14 @@ static void setup_hdmi_audio(
 			AFMT_AUDIO_PACKET_CONTROL2,
 			AFMT_60958_OSF_OVRD);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/* HDMI_ACR_PACKET_CONTROL */
 	{
 		addr = mmHDMI_ACR_PACKET_CONTROL + engine_offset[engine_id];
 
-		value = dal_read_reg(hw_ctx->ctx, addr);
+		value = dm_read_reg(hw_ctx->ctx, addr);
 		set_reg_field_value(value, 1,
 			HDMI_ACR_PACKET_CONTROL,
 			HDMI_ACR_AUTO_SEND);
@@ -580,7 +581,7 @@ static void setup_hdmi_audio(
 			HDMI_ACR_PACKET_CONTROL,
 			HDMI_ACR_AUDIO_PRIORITY);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/* Program audio clock sample/regeneration parameters */
@@ -595,73 +596,73 @@ static void setup_hdmi_audio(
 		{
 			addr = mmHDMI_ACR_32_0 + engine_offset[engine_id];
 
-			value = dal_read_reg(hw_ctx->ctx, addr);
+			value = dm_read_reg(hw_ctx->ctx, addr);
 
 			set_reg_field_value(value, audio_clock_info.cts_32khz,
 				HDMI_ACR_32_0,
 				HDMI_ACR_CTS_32);
 
-			dal_write_reg(hw_ctx->ctx, addr, value);
+			dm_write_reg(hw_ctx->ctx, addr, value);
 		}
 
 		/* HDMI_ACR_32_1__HDMI_ACR_N_32_MASK */
 		{
 			addr = mmHDMI_ACR_32_1 + engine_offset[engine_id];
 
-			value = dal_read_reg(hw_ctx->ctx, addr);
+			value = dm_read_reg(hw_ctx->ctx, addr);
 			set_reg_field_value(value, audio_clock_info.n_32khz,
 				HDMI_ACR_32_1,
 				HDMI_ACR_N_32);
 
-			dal_write_reg(hw_ctx->ctx, addr, value);
+			dm_write_reg(hw_ctx->ctx, addr, value);
 		}
 
 		/* HDMI_ACR_44_0__HDMI_ACR_CTS_44_MASK */
 		{
 			addr = mmHDMI_ACR_44_0 + engine_offset[engine_id];
 
-			value = dal_read_reg(hw_ctx->ctx, addr);
+			value = dm_read_reg(hw_ctx->ctx, addr);
 			set_reg_field_value(value, audio_clock_info.cts_44khz,
 				HDMI_ACR_44_0,
 				HDMI_ACR_CTS_44);
 
-			dal_write_reg(hw_ctx->ctx, addr, value);
+			dm_write_reg(hw_ctx->ctx, addr, value);
 		}
 
 		/* HDMI_ACR_44_1__HDMI_ACR_N_44_MASK */
 		{
 			addr = mmHDMI_ACR_44_1 + engine_offset[engine_id];
 
-			value = dal_read_reg(hw_ctx->ctx, addr);
+			value = dm_read_reg(hw_ctx->ctx, addr);
 			set_reg_field_value(value, audio_clock_info.n_44khz,
 				HDMI_ACR_44_1,
 				HDMI_ACR_N_44);
 
-			dal_write_reg(hw_ctx->ctx, addr, value);
+			dm_write_reg(hw_ctx->ctx, addr, value);
 		}
 
 		/* HDMI_ACR_48_0__HDMI_ACR_CTS_48_MASK */
 		{
 			addr = mmHDMI_ACR_48_0 + engine_offset[engine_id];
 
-			value = dal_read_reg(hw_ctx->ctx, addr);
+			value = dm_read_reg(hw_ctx->ctx, addr);
 			set_reg_field_value(value, audio_clock_info.cts_48khz,
 				HDMI_ACR_48_0,
 				HDMI_ACR_CTS_48);
 
-			dal_write_reg(hw_ctx->ctx, addr, value);
+			dm_write_reg(hw_ctx->ctx, addr, value);
 		}
 
 		/* HDMI_ACR_48_1__HDMI_ACR_N_48_MASK */
 		{
 			addr = mmHDMI_ACR_48_1 + engine_offset[engine_id];
 
-			value = dal_read_reg(hw_ctx->ctx, addr);
+			value = dm_read_reg(hw_ctx->ctx, addr);
 			set_reg_field_value(value, audio_clock_info.n_48khz,
 				HDMI_ACR_48_1,
 				HDMI_ACR_N_48);
 
-			dal_write_reg(hw_ctx->ctx, addr, value);
+			dm_write_reg(hw_ctx->ctx, addr, value);
 		}
 
 		/* Video driver cannot know in advance which sample rate will
@@ -675,7 +676,7 @@ static void setup_hdmi_audio(
 	{
 		addr = mmAFMT_60958_0 + engine_offset[engine_id];
 
-		value = dal_read_reg(hw_ctx->ctx, addr);
+		value = dm_read_reg(hw_ctx->ctx, addr);
 		set_reg_field_value(value, 1,
 			AFMT_60958_0,
 			AFMT_60958_CS_CHANNEL_NUMBER_L);
@@ -685,19 +686,19 @@ static void setup_hdmi_audio(
 			AFMT_60958_0,
 			AFMT_60958_CS_CLOCK_ACCURACY);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/* AFMT_60958_1 AFMT_60958_CS_CHALNNEL_NUMBER_R */
 	{
 		addr = mmAFMT_60958_1 + engine_offset[engine_id];
 
-		value = dal_read_reg(hw_ctx->ctx, addr);
+		value = dm_read_reg(hw_ctx->ctx, addr);
 		set_reg_field_value(value, 2,
 			AFMT_60958_1,
 			AFMT_60958_CS_CHANNEL_NUMBER_R);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/*AFMT_60958_2 now keep this settings until
@@ -705,7 +706,7 @@ static void setup_hdmi_audio(
 	{
 		addr = mmAFMT_60958_2 + engine_offset[engine_id];
 
-		value = dal_read_reg(hw_ctx->ctx, addr);
+		value = dm_read_reg(hw_ctx->ctx, addr);
 		set_reg_field_value(value, 3,
 			AFMT_60958_2,
 			AFMT_60958_CS_CHANNEL_NUMBER_2);
@@ -730,7 +731,7 @@ static void setup_hdmi_audio(
 			AFMT_60958_2,
 			AFMT_60958_CS_CHANNEL_NUMBER_7);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 }
 
@@ -751,7 +752,7 @@ static void setup_dp_audio(
 			DP_SEC_AUD_N__DP_SEC_AUD_N__DEFAULT,
 			DP_SEC_AUD_N,
 			DP_SEC_AUD_N);
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/* Async/auto-calc timestamp mode */
@@ -766,7 +767,7 @@ static void setup_dp_audio(
 			DP_SEC_TIMESTAMP,
 			DP_SEC_TIMESTAMP_MODE);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/* --- The following are the registers
@@ -780,13 +781,13 @@ static void setup_dp_audio(
 
 		value = 0;
 
-		value = dal_read_reg(hw_ctx->ctx, addr);
+		value = dm_read_reg(hw_ctx->ctx, addr);
 		set_reg_field_value(value,
 			1,
 			AFMT_AUDIO_PACKET_CONTROL,
 			AFMT_60958_CS_UPDATE);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/* AFMT_AUDIO_PACKET_CONTROL2 */
@@ -796,7 +797,7 @@ static void setup_dp_audio(
 
 		value = 0;
 
-		value = dal_read_reg(hw_ctx->ctx, addr);
+		value = dm_read_reg(hw_ctx->ctx, addr);
 		set_reg_field_value(value,
 			0,
 			AFMT_AUDIO_PACKET_CONTROL2,
@@ -807,7 +808,7 @@ static void setup_dp_audio(
 			AFMT_AUDIO_PACKET_CONTROL2,
 			AFMT_60958_OSF_OVRD);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/* AFMT_INFOFRAME_CONTROL0 */
@@ -817,14 +818,14 @@ static void setup_dp_audio(
 
 		value = 0;
 
-		value = dal_read_reg(hw_ctx->ctx, addr);
+		value = dm_read_reg(hw_ctx->ctx, addr);
 
 		set_reg_field_value(value,
 			1,
 			AFMT_INFOFRAME_CONTROL0,
 			AFMT_AUDIO_INFO_UPDATE);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/* AFMT_60958_0__AFMT_60958_CS_CLOCK_ACCURACY_MASK */
@@ -833,13 +834,13 @@ static void setup_dp_audio(
 
 		value = 0;
 
-		value = dal_read_reg(hw_ctx->ctx, addr);
+		value = dm_read_reg(hw_ctx->ctx, addr);
 		set_reg_field_value(value,
 			0,
 			AFMT_60958_0,
 			AFMT_60958_CS_CLOCK_ACCURACY);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 }
 
@@ -878,12 +879,12 @@ static void enable_afmt_clock(
 	uint32_t enable = enable_flag ? 1:0;
 
 	/* Enable Audio packets*/
-	value = dal_read_reg(hw_ctx->ctx, mmAFMT_CNTL + engine_offs);
+	value = dm_read_reg(hw_ctx->ctx, mmAFMT_CNTL + engine_offs);
 
 	/*enable AFMT clock*/
 	set_reg_field_value(value, enable,
 		AFMT_CNTL, AFMT_AUDIO_CLOCK_EN);
-	dal_write_reg(hw_ctx->ctx, mmAFMT_CNTL + engine_offs, value);
+	dm_write_reg(hw_ctx->ctx, mmAFMT_CNTL + engine_offs, value);
 
 	/*wait for AFMT clock to turn on,
 	 * the expectation is that this
@@ -891,8 +892,8 @@ static void enable_afmt_clock(
 	 */
 	do {
 		/* Wait for 1us between subsequent register reads.*/
-		dc_service_delay_in_microseconds(hw_ctx->ctx, 1);
-		value = dal_read_reg(hw_ctx->ctx,
+		dm_delay_in_microseconds(hw_ctx->ctx, 1);
+		value = dm_read_reg(hw_ctx->ctx,
 				mmAFMT_CNTL + engine_offs);
 	} while (get_reg_field_value(value,
 				AFMT_CNTL, AFMT_AUDIO_CLOCK_ON) !=
@@ -954,12 +955,12 @@ static void enable_dp_audio(
 	uint32_t value;
 
 	/* Enable Audio packets */
-	value = dal_read_reg(hw_ctx->ctx, addr);
+	value = dm_read_reg(hw_ctx->ctx, addr);
 	set_reg_field_value(value, 1,
 		DP_SEC_CNTL,
 		DP_SEC_ASP_ENABLE);
 
-	dal_write_reg(hw_ctx->ctx, addr, value);
+	dm_write_reg(hw_ctx->ctx, addr, value);
 
 	/* Program the ATP and AIP next */
 	set_reg_field_value(value, 1,
@@ -970,14 +971,14 @@ static void enable_dp_audio(
 		DP_SEC_CNTL,
 		DP_SEC_AIP_ENABLE);
 
-	dal_write_reg(hw_ctx->ctx, addr, value);
+	dm_write_reg(hw_ctx->ctx, addr, value);
 
 	/* Program STREAM_ENABLE after all the other enables. */
 	set_reg_field_value(value, 1,
 		DP_SEC_CNTL,
 		DP_SEC_STREAM_ENABLE);
 
-	dal_write_reg(hw_ctx->ctx, addr, value);
+	dm_write_reg(hw_ctx->ctx, addr, value);
 }
 
 /* disable DP audio */
@@ -990,7 +991,7 @@ static void disable_dp_audio(
 	uint32_t value;
 
 	/* Disable Audio packets */
-	value = dal_read_reg(hw_ctx->ctx, addr);
+	value = dm_read_reg(hw_ctx->ctx, addr);
 
 	set_reg_field_value(value, 0,
 		DP_SEC_CNTL,
@@ -1019,7 +1020,7 @@ static void disable_dp_audio(
 			DP_SEC_CNTL,
 			DP_SEC_STREAM_ENABLE);
 
-	dal_write_reg(hw_ctx->ctx, addr, value);
+	dm_write_reg(hw_ctx->ctx, addr, value);
 }
 
 static void configure_azalia(
@@ -1232,7 +1233,7 @@ static void configure_azalia(
 	} /* for */
 
 	if (is_ac3_supported)
-		dal_write_reg(hw_ctx->ctx,
+		dm_write_reg(hw_ctx->ctx,
 		mmAZALIA_F0_CODEC_FUNCTION_PARAMETER_STREAM_FORMATS,
 		0x05);
 
@@ -1454,21 +1455,21 @@ static void setup_azalia(
 			AFMT_AUDIO_SRC_CONTROL,
 			AFMT_AUDIO_SRC_SELECT);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/* Channel allocation */
 	{
 		const uint32_t addr =
 			mmAFMT_AUDIO_PACKET_CONTROL2 + engine_offset[engine_id];
-		uint32_t value = dal_read_reg(hw_ctx->ctx, addr);
+		uint32_t value = dm_read_reg(hw_ctx->ctx, addr);
 
 		set_reg_field_value(value,
 			channels,
 			AFMT_AUDIO_PACKET_CONTROL2,
 			AFMT_AUDIO_CHANNEL_ENABLE);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	configure_azalia(hw_ctx, signal, crtc_info, audio_info);
@@ -1484,12 +1485,12 @@ static void unmute_azalia_audio(
 
 	uint32_t value = 0;
 
-	value = dal_read_reg(hw_ctx->ctx, addr);
+	value = dm_read_reg(hw_ctx->ctx, addr);
 
 	set_reg_field_value(value, 1,
 		AFMT_AUDIO_PACKET_CONTROL, AFMT_AUDIO_SAMPLE_SEND);
 
-	dal_write_reg(hw_ctx->ctx, addr, value);
+	dm_write_reg(hw_ctx->ctx, addr, value);
 }
 
 /* mute audio */
@@ -1502,12 +1503,12 @@ static void mute_azalia_audio(
 
 	uint32_t value = 0;
 
-	value = dal_read_reg(hw_ctx->ctx, addr);
+	value = dm_read_reg(hw_ctx->ctx, addr);
 
 	set_reg_field_value(value, 0,
 		AFMT_AUDIO_PACKET_CONTROL, AFMT_AUDIO_SAMPLE_SEND);
 
-	dal_write_reg(hw_ctx->ctx, addr, value);
+	dm_write_reg(hw_ctx->ctx, addr, value);
 }
 
 /* enable channel splitting mapping */
@@ -1646,13 +1647,13 @@ static void hw_initialize(
 	{
 		uint32_t value;
 
-		value = dal_read_reg(hw_ctx->ctx, addr);
+		value = dm_read_reg(hw_ctx->ctx, addr);
 
 		set_reg_field_value(value, 0x70,
 		AZALIA_F0_CODEC_FUNCTION_PARAMETER_SUPPORTED_SIZE_RATES,
 		AUDIO_RATE_CAPABILITIES);
 
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 
 	/*Keep alive bit to verify HW block in BU. */
@@ -1660,7 +1661,7 @@ static void hw_initialize(
 	{
 		uint32_t value;
 
-		value = dal_read_reg(hw_ctx->ctx, addr);
+		value = dm_read_reg(hw_ctx->ctx, addr);
 
 		set_reg_field_value(value, 1,
 		AZALIA_F0_CODEC_FUNCTION_PARAMETER_POWER_STATES,
@@ -1669,7 +1670,7 @@ static void hw_initialize(
 		set_reg_field_value(value, 1,
 		AZALIA_F0_CODEC_FUNCTION_PARAMETER_POWER_STATES,
 		EPSS);
-		dal_write_reg(hw_ctx->ctx, addr, value);
+		dm_write_reg(hw_ctx->ctx, addr, value);
 	}
 }
 
@@ -1904,7 +1905,7 @@ struct hw_ctx_audio *dal_hw_ctx_audio_dce110_create(
 {
 	/* allocate memory for struc hw_ctx_audio_dce110 */
 	struct hw_ctx_audio_dce110 *hw_ctx_dce110 =
-			dc_service_alloc(ctx, sizeof(struct hw_ctx_audio_dce110));
+			dm_alloc(ctx, sizeof(struct hw_ctx_audio_dce110));
 
 	if (!hw_ctx_dce110) {
 		ASSERT_CRITICAL(hw_ctx_dce110);
@@ -1923,7 +1924,7 @@ struct hw_ctx_audio *dal_hw_ctx_audio_dce110_create(
 		"Failed to create hw_ctx_audio for DCE11\n");
 
 
-	dc_service_free(ctx, hw_ctx_dce110);
+	dm_free(ctx, hw_ctx_dce110);
 
 	return NULL;
 }

@@ -24,7 +24,7 @@
  */
 
 /* DC interface (public) */
-#include "dc_services.h"
+#include "dm_services.h"
 #include "dc.h"
 
 /* DC core (private) */
@@ -85,7 +85,7 @@ void enable_surface_flip_reporting(struct dc_surface *dc_surface,
 
 struct dc_surface *dc_create_surface(const struct dc *dc)
 {
-	struct surface *surface = dc_service_alloc(dc->ctx, sizeof(*surface));
+	struct surface *surface = dm_alloc(dc->ctx, sizeof(*surface));
 
 	if (NULL == surface)
 		goto alloc_fail;
@@ -98,7 +98,7 @@ struct dc_surface *dc_create_surface(const struct dc *dc)
 	return &surface->protected.public;
 
 construct_fail:
-	dc_service_free(dc->ctx, surface);
+	dm_free(dc->ctx, surface);
 
 alloc_fail:
 	return NULL;
@@ -118,6 +118,6 @@ void dc_surface_release(const struct dc_surface *dc_surface)
 
 	if (surface->ref_count == 0) {
 		destruct(surface);
-		dc_service_free(surface->protected.ctx, surface);
+		dm_free(surface->protected.ctx, surface);
 	}
 }

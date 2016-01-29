@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services_types.h"
+#include "dm_services_types.h"
 #include "dc.h"
 
 #include "vid.h"
@@ -34,7 +34,7 @@
 
 #include "amd_shared.h"
 #include "amdgpu_dm_irq.h"
-#include "dc_helpers.h"
+#include "dm_helpers.h"
 
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
@@ -939,7 +939,7 @@ static void handle_hpd_rx_irq(void *param)
 	}
 
 	if (is_mst_root_connector)
-		dc_helpers_dp_mst_handle_mst_hpd_rx_irq(param);
+		dm_helpers_dp_mst_handle_mst_hpd_rx_irq(param);
 }
 
 static void register_hpd_handlers(struct amdgpu_device *adev)

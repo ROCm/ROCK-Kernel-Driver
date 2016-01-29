@@ -23,12 +23,11 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
 #include "include/i2caux_interface.h"
 #include "engine.h"
 #include "i2c_engine.h"
@@ -221,7 +220,7 @@ enum i2c_channel_operation_result dal_i2c_hw_engine_wait_on_operation_result(
 		if (result != expected_result)
 			break;
 
-		dc_service_delay_in_microseconds(engine->base.base.ctx, 1);
+		dm_delay_in_microseconds(engine->base.base.ctx, 1);
 
 		++i;
 	} while (i < timeout);

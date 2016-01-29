@@ -23,11 +23,12 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 #include "core_types.h"
 #include "link_encoder.h"
 #include "stream_encoder.h"
 #include "dce110_link_encoder.h"
+
 #include "i2caux_interface.h"
 #include "dc_bios_types.h"
 
@@ -130,11 +131,11 @@ static void enable_phy_bypass_mode(
 
 	const uint32_t addr = LINK_REG(DP_DPHY_CNTL);
 
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(value, enable, DP_DPHY_CNTL, DPHY_BYPASS);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static void disable_prbs_symbols(
@@ -147,7 +148,7 @@ static void disable_prbs_symbols(
 
 	const uint32_t addr = LINK_REG(DP_DPHY_CNTL);
 
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(value, disable,
 			DP_DPHY_CNTL, DPHY_ATEST_SEL_LANE0);
@@ -161,7 +162,7 @@ static void disable_prbs_symbols(
 	set_reg_field_value(value, disable,
 			DP_DPHY_CNTL, DPHY_ATEST_SEL_LANE3);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static void disable_prbs_mode(
@@ -174,11 +175,11 @@ static void disable_prbs_mode(
 	const uint32_t addr = LINK_REG(DP_DPHY_PRBS_CNTL);
 	uint32_t value;
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(value, 0, DP_DPHY_PRBS_CNTL, DPHY_PRBS_EN);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static void program_pattern_symbols(
@@ -201,7 +202,7 @@ static void program_pattern_symbols(
 			DP_DPHY_SYM0, DPHY_SYM2);
 	set_reg_field_value(value, pattern_symbols[2],
 			DP_DPHY_SYM0, DPHY_SYM3);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* This register resides in DP back end block;
 	 * transmitter is used for the offset */
@@ -215,7 +216,7 @@ static void program_pattern_symbols(
 			DP_DPHY_SYM1, DPHY_SYM5);
 	set_reg_field_value(value, pattern_symbols[5],
 			DP_DPHY_SYM1, DPHY_SYM6);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* This register resides in DP back end block;
 	 * transmitter is used for the offset */
@@ -226,7 +227,7 @@ static void program_pattern_symbols(
 	set_reg_field_value(value, pattern_symbols[6],
 			DP_DPHY_SYM2, DPHY_SYM8);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static void set_dp_phy_pattern_d102(
@@ -270,12 +271,12 @@ static void set_link_training_complete(
 	 * transmitter is used for the offset */
 	struct dc_context *ctx = enc110->base.ctx;
 	const uint32_t addr = LINK_REG(DP_LINK_CNTL);
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(value, complete,
 			DP_LINK_CNTL, DP_LINK_TRAINING_COMPLETE);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static void set_dp_phy_pattern_training_pattern(
@@ -286,7 +287,7 @@ static void set_dp_phy_pattern_training_pattern(
 	struct dc_context *ctx = enc110->base.ctx;
 	uint32_t addr = LINK_REG(DP_DPHY_TRAINING_PATTERN_SEL);
 
-	dal_write_reg(ctx, addr, index);
+	dm_write_reg(ctx, addr, index);
 
 	/* Set HW Register Training Complete to false */
 
@@ -314,7 +315,7 @@ static void set_dp_phy_pattern_symbol_error(
 	{
 		const uint32_t addr = LINK_REG(DP_DPHY_INTERNAL_CTRL);
 		uint32_t value = 0x0;
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 
 	/* A PRBS23 pattern is used for most DP electrical measurements. */
@@ -326,13 +327,13 @@ static void set_dp_phy_pattern_symbol_error(
 	/* For PRBS23 Set bit DPHY_PRBS_SEL=1 and Set bit DPHY_PRBS_EN=1 */
 	{
 		const uint32_t addr = LINK_REG(DP_DPHY_PRBS_CNTL);
-		uint32_t value = dal_read_reg(ctx, addr);
+		uint32_t value = dm_read_reg(ctx, addr);
 
 		set_reg_field_value(value, 1,
 				DP_DPHY_PRBS_CNTL, DPHY_PRBS_SEL);
 		set_reg_field_value(value, 1,
 				DP_DPHY_PRBS_CNTL, DPHY_PRBS_EN);
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 
 	/* Enable phy bypass mode to enable the test pattern */
@@ -358,7 +359,7 @@ static void set_dp_phy_pattern_prbs7(
 	{
 		const uint32_t addr = LINK_REG(DP_DPHY_PRBS_CNTL);
 
-		uint32_t value = dal_read_reg(ctx, addr);
+		uint32_t value = dm_read_reg(ctx, addr);
 
 		set_reg_field_value(value, 0,
 				DP_DPHY_PRBS_CNTL, DPHY_PRBS_SEL);
@@ -366,7 +367,7 @@ static void set_dp_phy_pattern_prbs7(
 		set_reg_field_value(value, 1,
 				DP_DPHY_PRBS_CNTL, DPHY_PRBS_EN);
 
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 
 	/* Enable phy bypass mode to enable the test pattern */
@@ -446,7 +447,7 @@ static void set_dp_phy_pattern_hbr2_compliance(
 	{
 		const uint32_t addr = LINK_REG(DP_DPHY_INTERNAL_CTRL);
 		uint32_t value = 0x0;
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 
 	/* no vbid after BS (SR)
@@ -462,7 +463,7 @@ static void set_dp_phy_pattern_hbr2_compliance(
 	/* TODO: do we still need this, find out at compliance test
 	addr = mmDP_LINK_FRAMING_CNTL + fe_addr_offset;
 
-	value = dal_read_reg(ctx, addr);
+	value = (ctx, addr);
 
 	set_reg_field_value(value, 0xFC,
 			DP_LINK_FRAMING_CNTL, DP_IDLE_BS_INTERVAL);
@@ -483,11 +484,11 @@ static void set_dp_phy_pattern_hbr2_compliance(
 	/* do not enable video stream */
 	addr = LINK_REG(DP_VID_STREAM_CNTL);
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(value, 0, DP_VID_STREAM_CNTL, DP_VID_STREAM_ENABLE);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* Disable PHY Bypass mode to setup the test pattern */
 
@@ -506,7 +507,7 @@ static void set_dp_phy_pattern_passthrough_mode(
 
 		uint32_t value;
 
-		value = dal_read_reg(ctx, addr);
+		value = dm_read_reg(ctx, addr);
 
 		switch (panel_mode) {
 		case DP_PANEL_MODE_EDP:
@@ -520,7 +521,7 @@ static void set_dp_phy_pattern_passthrough_mode(
 			break;
 		}
 
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 
 	/* set link training complete */
@@ -570,10 +571,10 @@ static void configure_encoder(
 
 	/* set number of lanes */
 	addr = LINK_REG(DP_CONFIG);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(value, link_settings->lane_count - LANE_COUNT_ONE,
 			DP_CONFIG, DP_UDI_LANES);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 }
 
@@ -583,7 +584,7 @@ static bool is_panel_powered_on(struct dce110_link_encoder *enc110)
 	uint32_t value;
 	bool ret;
 
-	value = dal_read_reg(ctx,
+	value = dm_read_reg(ctx,
 			BL_REG(LVTMA_PWRSEQ_STATE));
 
 	ret = get_reg_field_value(value,
@@ -647,7 +648,7 @@ static void link_encoder_edp_wait_for_hpd_ready(
 			break;
 		}
 
-		dc_service_sleep_in_milliseconds(ctx, HPD_CHECK_INTERVAL);
+		dm_sleep_in_milliseconds(ctx, HPD_CHECK_INTERVAL);
 
 		time_elapsed += HPD_CHECK_INTERVAL;
 	} while (time_elapsed < timeout);
@@ -730,19 +731,19 @@ static void aux_initialize(
 	struct dc_context *ctx = enc110->base.ctx;
 	enum hpd_source_id hpd_source = enc110->base.hpd_source;
 	uint32_t addr = AUX_REG(AUX_CONTROL);
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(value, hpd_source, AUX_CONTROL, AUX_HPD_SEL);
 	set_reg_field_value(value, 0, AUX_CONTROL, AUX_LS_READ_EN);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	addr = AUX_REG(AUX_DPHY_RX_CONTROL0);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	/* 1/4 window (the maximum allowed) */
 	set_reg_field_value(value, 1,
 			AUX_DPHY_RX_CONTROL0, AUX_RX_RECEIVE_WINDOW);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 }
 
@@ -752,7 +753,7 @@ static bool is_panel_backlight_on(struct dce110_link_encoder *enc110)
 	struct dc_context *ctx = enc110->base.ctx;
 	uint32_t value;
 
-	value = dal_read_reg(ctx, BL_REG(LVTMA_PWRSEQ_CNTL));
+	value = dm_read_reg(ctx, BL_REG(LVTMA_PWRSEQ_CNTL));
 
 	return get_reg_field_value(value, LVTMA_PWRSEQ_CNTL, LVTMA_BLON);
 }
@@ -831,7 +832,7 @@ static bool is_dig_enabled(const struct dce110_link_encoder *enc110)
 	struct dc_context *ctx = enc110->base.ctx;
 	uint32_t value;
 
-	value = dal_read_reg(ctx, LINK_REG(DIG_BE_EN_CNTL));
+	value = dm_read_reg(ctx, LINK_REG(DIG_BE_EN_CNTL));
 
 	return get_reg_field_value(value, DIG_BE_EN_CNTL, DIG_ENABLE);
 }
@@ -844,22 +845,22 @@ static void link_encoder_disable(struct dce110_link_encoder *enc110)
 
 	/* reset training pattern */
 	addr = LINK_REG(DP_DPHY_TRAINING_PATTERN_SEL);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(value, 0,
 			DP_DPHY_TRAINING_PATTERN_SEL,
 			DPHY_TRAINING_PATTERN_SEL);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* reset training complete */
 	addr = LINK_REG(DP_LINK_CNTL);
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(value, 0, DP_LINK_CNTL, DP_LINK_TRAINING_COMPLETE);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	/* reset panel mode */
 	addr = LINK_REG(DP_DPHY_INTERNAL_CTRL);
 	value = 0;
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static void hpd_initialize(
@@ -869,10 +870,10 @@ static void hpd_initialize(
 	struct dc_context *ctx = enc110->base.ctx;
 	enum hpd_source_id hpd_source = enc110->base.hpd_source;
 	const uint32_t addr = LINK_REG(DIG_BE_CNTL);
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(value, hpd_source, DIG_BE_CNTL, DIG_HPD_SELECT);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static bool validate_dvi_output(
@@ -1265,7 +1266,7 @@ void dce110_link_encoder_setup(
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
 	struct dc_context *ctx = enc110->base.ctx;
 	const uint32_t addr = LINK_REG(DIG_BE_CNTL);
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 
 	switch (signal) {
 	case SIGNAL_TYPE_EDP:
@@ -1296,7 +1297,7 @@ void dce110_link_encoder_setup(
 		break;
 	}
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 /* TODO: still need depth or just pass in adjusted pixel clock? */
@@ -1629,8 +1630,8 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	 * to commit payload on both tx and rx side */
 
 	/* we should clean-up table each time */
-	value0 = dal_read_reg(ctx, LINK_REG(DP_MSE_SAT0));
-	value1 = dal_read_reg(ctx, LINK_REG(DP_MSE_SAT1));
+	value0 = dm_read_reg(ctx, LINK_REG(DP_MSE_SAT0));
+	value1 = dm_read_reg(ctx, LINK_REG(DP_MSE_SAT1));
 
 	if (table->stream_count >= 1) {
 		fill_stream_allocation_row_info(
@@ -1699,8 +1700,8 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 		DP_MSE_SAT_SLOT_COUNT2);
 
 	/* update ASIC MSE stream allocation table */
-	dal_write_reg(ctx, LINK_REG(DP_MSE_SAT0), value0);
-	dal_write_reg(ctx, LINK_REG(DP_MSE_SAT1), value1);
+	dm_write_reg(ctx, LINK_REG(DP_MSE_SAT0), value0);
+	dm_write_reg(ctx, LINK_REG(DP_MSE_SAT1), value1);
 
 	/* --- wait for transaction finish */
 
@@ -1709,7 +1710,7 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	 * then double buffers the SAT into the hardware
 	 * making the new allocation active on the DP MST mode link */
 
-	value0 = dal_read_reg(ctx, LINK_REG(DP_MSE_SAT_UPDATE));
+	value0 = dm_read_reg(ctx, LINK_REG(DP_MSE_SAT_UPDATE));
 
 	/* DP_MSE_SAT_UPDATE:
 	 * 0 - No Action
@@ -1722,7 +1723,7 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 		DP_MSE_SAT_UPDATE,
 		DP_MSE_SAT_UPDATE);
 
-	dal_write_reg(ctx, LINK_REG(DP_MSE_SAT_UPDATE), value0);
+	dm_write_reg(ctx, LINK_REG(DP_MSE_SAT_UPDATE), value0);
 
 	/* wait for update to complete
 	 * (i.e. DP_MSE_SAT_UPDATE field is reset to 0)
@@ -1735,9 +1736,9 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	 * after this bit is cleared */
 
 	do {
-		dc_service_delay_in_microseconds(ctx, 10);
+		dm_delay_in_microseconds(ctx, 10);
 
-		value0 = dal_read_reg(ctx,
+		value0 = dm_read_reg(ctx,
 				LINK_REG(DP_MSE_SAT_UPDATE));
 
 		value1 = get_reg_field_value(
@@ -1779,9 +1780,9 @@ void dce110_link_encoder_set_lcd_backlight_level(
 	uint8_t bit_count;
 	uint64_t active_duty_cycle;
 
-	backlight = dal_read_reg(ctx, BL_REG(BL_PWM_CNTL));
-	backlight_period = dal_read_reg(ctx, BL_REG(BL_PWM_PERIOD_CNTL));
-	backlight_lock = dal_read_reg(ctx, BL_REG(BL_PWM_GRP1_REG_LOCK));
+	backlight = dm_read_reg(ctx, BL_REG(BL_PWM_CNTL));
+	backlight_period = dm_read_reg(ctx, BL_REG(BL_PWM_PERIOD_CNTL));
+	backlight_lock = dm_read_reg(ctx, BL_REG(BL_PWM_GRP1_REG_LOCK));
 
 	/*
 	 * 1. Convert 8-bit value to 17 bit U1.16 format
@@ -1864,10 +1865,10 @@ void dce110_link_encoder_set_lcd_backlight_level(
 		1,
 		BL_PWM_GRP1_REG_LOCK,
 		BL_PWM_GRP1_REG_LOCK);
-	dal_write_reg(ctx, BL_REG(BL_PWM_GRP1_REG_LOCK), backlight_lock);
+	dm_write_reg(ctx, BL_REG(BL_PWM_GRP1_REG_LOCK), backlight_lock);
 
 	/* 3.2 Write new active duty cycle */
-	dal_write_reg(ctx, BL_REG(BL_PWM_CNTL), backlight);
+	dm_write_reg(ctx, BL_REG(BL_PWM_CNTL), backlight);
 
 	/* 3.3 Unlock group 2 backlight registers */
 	set_reg_field_value(
@@ -1875,18 +1876,18 @@ void dce110_link_encoder_set_lcd_backlight_level(
 		0,
 		BL_PWM_GRP1_REG_LOCK,
 		BL_PWM_GRP1_REG_LOCK);
-	dal_write_reg(ctx, BL_REG(BL_PWM_GRP1_REG_LOCK), backlight_lock);
+	dm_write_reg(ctx, BL_REG(BL_PWM_GRP1_REG_LOCK), backlight_lock);
 
 	/* 5.4.4 Wait for pending bit to be cleared */
 	for (i = 0; i < backlight_update_pending_max_retry; ++i) {
-		backlight_lock = dal_read_reg(ctx, BL_REG(BL_PWM_GRP1_REG_LOCK));
+		backlight_lock = dm_read_reg(ctx, BL_REG(BL_PWM_GRP1_REG_LOCK));
 		if (!get_reg_field_value(
 			backlight_lock,
 			BL_PWM_GRP1_REG_LOCK,
 			BL_PWM_GRP1_REG_UPDATE_PENDING))
 			break;
 
-		dc_service_delay_in_microseconds(ctx, 10);
+		dm_delay_in_microseconds(ctx, 10);
 	}
 }
 
@@ -1903,7 +1904,7 @@ void dce110_link_encoder_connect_dig_be_to_fe(
 
 	if (engine != ENGINE_ID_UNKNOWN) {
 		addr = LINK_REG(DIG_BE_CNTL);
-		value = dal_read_reg(ctx, addr);
+		value = dm_read_reg(ctx, addr);
 
 		field = get_reg_field_value(
 				value,
@@ -1920,7 +1921,7 @@ void dce110_link_encoder_connect_dig_be_to_fe(
 			field,
 			DIG_BE_CNTL,
 			DIG_FE_SOURCE_SELECT);
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 }
 

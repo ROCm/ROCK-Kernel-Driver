@@ -23,8 +23,7 @@
  *
  */
 
-
-#include "dc_services.h"
+#include "dm_services.h"
 #include "include/gpio_types.h"
 
 #include "../hw_translate.h"

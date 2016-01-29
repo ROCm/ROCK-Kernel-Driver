@@ -22,7 +22,7 @@
  * Authors: AMD
  *
  */
-#include "dc_services.h"
+#include "dm_services.h"
 #include "divider_range.h"
 
 bool dal_divider_range_construct(

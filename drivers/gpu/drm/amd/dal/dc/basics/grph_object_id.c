@@ -23,8 +23,7 @@
  *
  */
 
-#include "dc_services.h"
-
+#include "dm_services.h"
 #include "include/grph_object_id.h"
 
 bool dal_graphics_object_id_is_valid(struct graphics_object_id id)
@@ -55,13 +54,13 @@ bool dal_graphics_object_id_is_equal(
 	struct graphics_object_id id2)
 {
 	if (false == dal_graphics_object_id_is_valid(id1)) {
-		dal_output_to_console(
+		dm_output_to_console(
 		"%s: Warning: comparing invalid object 'id1'!\n", __func__);
 		return false;
 	}
 
 	if (false == dal_graphics_object_id_is_valid(id2)) {
-		dal_output_to_console(
+		dm_output_to_console(
 		"%s: Warning: comparing invalid object 'id2'!\n", __func__);
 		return false;
 	}

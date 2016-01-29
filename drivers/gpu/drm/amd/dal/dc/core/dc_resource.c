@@ -22,7 +22,7 @@
  * Authors: AMD
  *
  */
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "resource.h"
 #include "include/irq_service_interface.h"
@@ -91,7 +91,7 @@ bool is_same_timing(
 	const struct dc_crtc_timing *timing1,
 	const struct dc_crtc_timing *timing2)
 {
-	return dal_memcmp(timing1, timing2, sizeof(struct dc_crtc_timing)) == 0;
+	return dm_memcmp(timing1, timing2, sizeof(struct dc_crtc_timing)) == 0;
 }
 
 static bool is_sharable_clk_src(
@@ -425,7 +425,7 @@ bool logical_attach_surfaces_to_target(
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
 
 	if (surface_count > MAX_SURFACE_NUM) {
-		dal_error("Surface: can not attach %d surfaces! Maximum is: %d\n",
+		dm_error("Surface: can not attach %d surfaces! Maximum is: %d\n",
 			surface_count, MAX_SURFACE_NUM);
 		return false;
 	}
@@ -521,7 +521,7 @@ static void fill_display_configs(
 void pplib_apply_safe_state(
 	const struct dc *dc)
 {
-	dc_service_pp_apply_safe_state(dc->ctx);
+	dm_pp_apply_safe_state(dc->ctx);
 }
 
 void pplib_apply_display_requirements(
@@ -566,7 +566,7 @@ void pplib_apply_display_requirements(
 							/ timing->pix_clk_khz;
 	}
 
-	dc_service_pp_apply_display_requirements(dc->ctx, &pp_display_cfg);
+	dm_pp_apply_display_requirements(dc->ctx, &pp_display_cfg);
 }
 
 /* Maximum TMDS single link pixel clock 165MHz */
@@ -872,7 +872,7 @@ static enum ds_color_space build_default_color_space(
 static void translate_info_frame(const struct hw_info_frame *hw_info_frame,
 	struct encoder_info_frame *encoder_info_frame)
 {
-	dc_service_memset(
+	dm_memset(
 		encoder_info_frame, 0, sizeof(struct encoder_info_frame));
 
 	/* For gamut we recalc checksum */
@@ -881,7 +881,7 @@ static void translate_info_frame(const struct hw_info_frame *hw_info_frame,
 		uint8_t *ptr;
 		uint8_t i;
 
-		dc_service_memmove(
+		dm_memmove(
 						&encoder_info_frame->gamut,
 						&hw_info_frame->gamut_packet,
 						sizeof(struct hw_info_packet));
@@ -896,28 +896,28 @@ static void translate_info_frame(const struct hw_info_frame *hw_info_frame,
 	}
 
 	if (hw_info_frame->avi_info_packet.valid) {
-		dc_service_memmove(
+		dm_memmove(
 						&encoder_info_frame->avi,
 						&hw_info_frame->avi_info_packet,
 						sizeof(struct hw_info_packet));
 	}
 
 	if (hw_info_frame->vendor_info_packet.valid) {
-		dc_service_memmove(
+		dm_memmove(
 						&encoder_info_frame->vendor,
 						&hw_info_frame->vendor_info_packet,
 						sizeof(struct hw_info_packet));
 	}
 
 	if (hw_info_frame->spd_packet.valid) {
-		dc_service_memmove(
+		dm_memmove(
 						&encoder_info_frame->spd,
 						&hw_info_frame->spd_packet,
 						sizeof(struct hw_info_packet));
 	}
 
 	if (hw_info_frame->vsc_packet.valid) {
-		dc_service_memmove(
+		dm_memmove(
 						&encoder_info_frame->vsc,
 						&hw_info_frame->vsc_packet,
 						sizeof(struct hw_info_packet));

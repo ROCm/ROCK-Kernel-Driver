@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "include/logger_interface.h"
 
@@ -38,7 +38,7 @@ static bool hpd_ack(
 	const struct irq_source_info *info)
 {
 	uint32_t addr = info->status_reg;
-	uint32_t value = dal_read_reg(irq_service->ctx, addr);
+	uint32_t value = dm_read_reg(irq_service->ctx, addr);
 	uint32_t current_status =
 		get_reg_field_value(
 			value,
@@ -47,7 +47,7 @@ static bool hpd_ack(
 
 	dal_irq_service_ack_generic(irq_service, info);
 
-	value = dal_read_reg(irq_service->ctx, info->enable_reg);
+	value = dm_read_reg(irq_service->ctx, info->enable_reg);
 
 	set_reg_field_value(
 		value,
@@ -55,7 +55,7 @@ static bool hpd_ack(
 		DC_HPD_INT_CONTROL,
 		DC_HPD_INT_POLARITY);
 
-	dal_write_reg(irq_service->ctx, info->enable_reg, value);
+	dm_write_reg(irq_service->ctx, info->enable_reg, value);
 
 	return true;
 }
@@ -376,7 +376,7 @@ bool construct(
 struct irq_service *dal_irq_service_dce110_create(
 	struct irq_service_init_data *init_data)
 {
-	struct irq_service *irq_service = dc_service_alloc(init_data->ctx, sizeof(*irq_service));
+	struct irq_service *irq_service = dm_alloc(init_data->ctx, sizeof(*irq_service));
 
 	if (!irq_service)
 		return NULL;
@@ -384,6 +384,6 @@ struct irq_service *dal_irq_service_dce110_create(
 	if (construct(irq_service, init_data))
 		return irq_service;
 
-	dc_service_free(init_data->ctx, irq_service);
+	dm_free(init_data->ctx, irq_service);
 	return NULL;
 }

@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
@@ -47,7 +47,7 @@ static void set_truncation(
 	uint32_t addr = FMT_REG(mmFMT_BIT_DEPTH_CONTROL);
 
 	/*Disable truncation*/
-	value = dal_read_reg(opp110->base.ctx, addr);
+	value = dm_read_reg(opp110->base.ctx, addr);
 	set_reg_field_value(value, 0,
 		FMT_BIT_DEPTH_CONTROL, FMT_TRUNCATE_EN);
 	set_reg_field_value(value, 0,
@@ -55,7 +55,7 @@ static void set_truncation(
 	set_reg_field_value(value, 0,
 		FMT_BIT_DEPTH_CONTROL, FMT_TRUNCATE_MODE);
 
-	dal_write_reg(opp110->base.ctx, addr, value);
+	dm_write_reg(opp110->base.ctx, addr, value);
 
 	/* no 10bpc trunc on DCE11*/
 	if (params->flags.TRUNCATE_ENABLED == 0 ||
@@ -70,7 +70,7 @@ static void set_truncation(
 	set_reg_field_value(value, params->flags.TRUNCATE_DEPTH,
 		FMT_BIT_DEPTH_CONTROL, FMT_TRUNCATE_DEPTH);
 
-	dal_write_reg(opp110->base.ctx, addr, value);
+	dm_write_reg(opp110->base.ctx, addr, value);
 
 }
 
@@ -101,7 +101,7 @@ static void set_spatial_dither(
 	uint32_t dither_b_value = 0;
 
 	/*Disable spatial (random) dithering*/
-	depth_cntl_value = dal_read_reg(opp110->base.ctx, addr);
+	depth_cntl_value = dm_read_reg(opp110->base.ctx, addr);
 	set_reg_field_value(depth_cntl_value, 0,
 		FMT_BIT_DEPTH_CONTROL, FMT_SPATIAL_DITHER_EN);
 	set_reg_field_value(depth_cntl_value, 0,
@@ -117,7 +117,7 @@ static void set_spatial_dither(
 	set_reg_field_value(depth_cntl_value, 0,
 		FMT_BIT_DEPTH_CONTROL, FMT_RGB_RANDOM_ENABLE);
 
-	dal_write_reg(opp110->base.ctx, addr, depth_cntl_value);
+	dm_write_reg(opp110->base.ctx, addr, depth_cntl_value);
 
 	/* no 10bpc on DCE11*/
 	if (params->flags.SPATIAL_DITHER_ENABLED == 0 ||
@@ -125,7 +125,7 @@ static void set_spatial_dither(
 		return;
 
 	addr = FMT_REG(mmFMT_CONTROL);
-	fmt_cntl_value = dal_read_reg(opp110->base.ctx, addr);
+	fmt_cntl_value = dm_read_reg(opp110->base.ctx, addr);
 	/* only use FRAME_COUNTER_MAX if frameRandom == 1*/
 	if (params->flags.FRAME_RANDOM == 1) {
 		if (params->flags.SPATIAL_DITHER_DEPTH == 0 ||
@@ -154,7 +154,7 @@ static void set_spatial_dither(
 			FMT_SPATIAL_DITHER_FRAME_COUNTER_BIT_SWAP);
 	}
 
-	dal_write_reg(opp110->base.ctx, addr, fmt_cntl_value);
+	dm_write_reg(opp110->base.ctx, addr, fmt_cntl_value);
 
 	/*Set seed for random values for
 	 * spatial dithering for R,G,B channels*/
@@ -162,20 +162,20 @@ static void set_spatial_dither(
 	set_reg_field_value(dither_r_value, params->r_seed_value,
 		FMT_DITHER_RAND_R_SEED,
 		FMT_RAND_R_SEED);
-	dal_write_reg(opp110->base.ctx, addr, dither_r_value);
+	dm_write_reg(opp110->base.ctx, addr, dither_r_value);
 
 	addr = FMT_REG(mmFMT_DITHER_RAND_G_SEED);
 	set_reg_field_value(dither_g_value,
 		params->g_seed_value,
 		FMT_DITHER_RAND_G_SEED,
 		FMT_RAND_G_SEED);
-	dal_write_reg(opp110->base.ctx, addr, dither_g_value);
+	dm_write_reg(opp110->base.ctx, addr, dither_g_value);
 
 	addr = FMT_REG(mmFMT_DITHER_RAND_B_SEED);
 	set_reg_field_value(dither_b_value, params->b_seed_value,
 		FMT_DITHER_RAND_B_SEED,
 		FMT_RAND_B_SEED);
-	dal_write_reg(opp110->base.ctx, addr, dither_b_value);
+	dm_write_reg(opp110->base.ctx, addr, dither_b_value);
 
 	/* FMT_OFFSET_R_Cr  31:16 0x0 Setting the zero
 	 * offset for the R/Cr channel, lower 4LSB
@@ -232,7 +232,7 @@ static void set_spatial_dither(
 		FMT_SPATIAL_DITHER_EN);
 
 	addr = FMT_REG(mmFMT_BIT_DEPTH_CONTROL);
-	dal_write_reg(opp110->base.ctx, addr, depth_cntl_value);
+	dm_write_reg(opp110->base.ctx, addr, depth_cntl_value);
 
 }
 
@@ -254,7 +254,7 @@ static void set_temporal_dither(
 	uint32_t value;
 
 	/*Disable temporal (frame modulation) dithering first*/
-	value = dal_read_reg(opp110->base.ctx, addr);
+	value = dm_read_reg(opp110->base.ctx, addr);
 
 	set_reg_field_value(value,
 		0,
@@ -292,7 +292,7 @@ static void set_temporal_dither(
 		FMT_BIT_DEPTH_CONTROL,
 		FMT_75FRC_SEL);
 
-	dal_write_reg(opp110->base.ctx, addr, value);
+	dm_write_reg(opp110->base.ctx, addr, value);
 
 	/* no 10bpc dither on DCE11*/
 	if (params->flags.FRAME_MODULATION_ENABLED == 0 ||
@@ -317,15 +317,15 @@ static void set_temporal_dither(
 
 	/*Select legacy pattern based on FRC and Temporal level*/
 	addr = FMT_REG(mmFMT_TEMPORAL_DITHER_PATTERN_CONTROL);
-	dal_write_reg(opp110->base.ctx, addr, 0);
+	dm_write_reg(opp110->base.ctx, addr, 0);
 	/*Set s matrix*/
 	addr = FMT_REG(
 		mmFMT_TEMPORAL_DITHER_PROGRAMMABLE_PATTERN_S_MATRIX);
-	dal_write_reg(opp110->base.ctx, addr, 0);
+	dm_write_reg(opp110->base.ctx, addr, 0);
 	/*Set t matrix*/
 	addr = FMT_REG(
 		mmFMT_TEMPORAL_DITHER_PROGRAMMABLE_PATTERN_T_MATRIX);
-	dal_write_reg(opp110->base.ctx, addr, 0);
+	dm_write_reg(opp110->base.ctx, addr, 0);
 
 	/*Select patterns for 0.25, 0.5 and 0.75 grey level*/
 	set_reg_field_value(value,
@@ -355,7 +355,7 @@ static void set_temporal_dither(
 		FMT_TEMPORAL_DITHER_EN);
 
 	addr = FMT_REG(mmFMT_BIT_DEPTH_CONTROL);
-	dal_write_reg(opp110->base.ctx, addr, value);
+	dm_write_reg(opp110->base.ctx, addr, value);
 
 }
 
@@ -378,7 +378,7 @@ static void set_clamping(
 	uint32_t blue_clamp_value = 0;
 	uint32_t addr = FMT_REG(mmFMT_CLAMP_CNTL);
 
-	clamp_cntl_value = dal_read_reg(opp110->base.ctx, addr);
+	clamp_cntl_value = dm_read_reg(opp110->base.ctx, addr);
 
 	set_reg_field_value(clamp_cntl_value,
 		0,
@@ -454,7 +454,7 @@ static void set_clamping(
 			FMT_CLAMP_UPPER_R);
 
 		addr = FMT_REG(mmFMT_CLAMP_COMPONENT_R);
-		dal_write_reg(opp110->base.ctx, addr, red_clamp_value);
+		dm_write_reg(opp110->base.ctx, addr, red_clamp_value);
 
 		set_reg_field_value(green_clamp_value,
 			0x10,
@@ -467,7 +467,7 @@ static void set_clamping(
 			FMT_CLAMP_UPPER_G);
 
 		addr = FMT_REG(mmFMT_CLAMP_COMPONENT_G);
-		dal_write_reg(opp110->base.ctx, addr, green_clamp_value);
+		dm_write_reg(opp110->base.ctx, addr, green_clamp_value);
 
 		set_reg_field_value(blue_clamp_value,
 			0x10,
@@ -480,7 +480,7 @@ static void set_clamping(
 			FMT_CLAMP_UPPER_B);
 
 		addr = FMT_REG(mmFMT_CLAMP_COMPONENT_B);
-		dal_write_reg(opp110->base.ctx, addr, blue_clamp_value);
+		dm_write_reg(opp110->base.ctx, addr, blue_clamp_value);
 
 		break;
 
@@ -490,7 +490,7 @@ static void set_clamping(
 
 	addr = FMT_REG(mmFMT_CLAMP_CNTL);
 	/*Set clamp control*/
-	dal_write_reg(opp110->base.ctx, addr, clamp_cntl_value);
+	dm_write_reg(opp110->base.ctx, addr, clamp_cntl_value);
 
 }
 
@@ -509,7 +509,7 @@ static void set_pixel_encoding(
 	uint32_t addr = FMT_REG(mmFMT_CONTROL);
 
 	/*RGB 4:4:4 or YCbCr 4:4:4 - 0; YCbCr 4:2:2 -1.*/
-	fmt_cntl_value = dal_read_reg(opp110->base.ctx, addr);
+	fmt_cntl_value = dm_read_reg(opp110->base.ctx, addr);
 
 	set_reg_field_value(fmt_cntl_value,
 		0,
@@ -534,7 +534,7 @@ static void set_pixel_encoding(
 			FMT_CONTROL,
 			FMT_SUBSAMPLING_ORDER);
 	}
-	dal_write_reg(opp110->base.ctx, addr, fmt_cntl_value);
+	dm_write_reg(opp110->base.ctx, addr, fmt_cntl_value);
 
 }
 
@@ -570,7 +570,7 @@ void dce110_opp_set_dyn_expansion(
 	bool enable_dyn_exp = false;
 	uint32_t addr = FMT_REG(mmFMT_DYNAMIC_EXP_CNTL);
 
-	value = dal_read_reg(opp->ctx, addr);
+	value = dm_read_reg(opp->ctx, addr);
 
 	set_reg_field_value(value, 0,
 		FMT_DYNAMIC_EXP_CNTL, FMT_DYNAMIC_EXP_EN);
@@ -606,5 +606,5 @@ void dce110_opp_set_dyn_expansion(
 		}
 	}
 
-	dal_write_reg(opp->ctx, addr, value);
+	dm_write_reg(opp->ctx, addr, value);
 }

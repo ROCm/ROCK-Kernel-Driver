@@ -23,7 +23,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "include/logger_interface.h"
 
@@ -51,7 +51,7 @@ static bool construct(
 	bool asic_supported = false;
 
 	cap->ctx = ctx;
-	dc_service_memset(cap->data, 0, sizeof(cap->data));
+	dm_memset(cap->data, 0, sizeof(cap->data));
 
 	/* ASIC data */
 	cap->data[ASIC_DATA_VRAM_TYPE] = init->vram_type;
@@ -147,7 +147,7 @@ struct asic_capability *dal_asic_capability_create(
 		return NULL;
 	}
 
-	cap = dc_service_alloc(ctx, sizeof(struct asic_capability));
+	cap = dm_alloc(ctx, sizeof(struct asic_capability));
 
 	if (!cap) {
 		BREAK_TO_DEBUGGER();
@@ -159,7 +159,7 @@ struct asic_capability *dal_asic_capability_create(
 
 	BREAK_TO_DEBUGGER();
 
-	dc_service_free(ctx, cap);
+	dm_free(ctx, cap);
 
 	return NULL;
 }
@@ -184,7 +184,7 @@ void dal_asic_capability_destroy(
 
 	destruct(*cap);
 
-	dc_service_free((*cap)->ctx, *cap);
+	dm_free((*cap)->ctx, *cap);
 
 	*cap = NULL;
 }

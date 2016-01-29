@@ -22,7 +22,8 @@
  * Authors: AMD
  *
  */
-#include "dc_services.h"
+
+#include "dm_services.h"
 
 #include "link_encoder.h"
 #include "stream_encoder.h"
@@ -299,7 +300,7 @@ static struct timing_generator *dce110_timing_generator_create(
 		const struct dce110_timing_generator_offsets *offsets)
 {
 	struct dce110_timing_generator *tg110 =
-		dc_service_alloc(ctx, sizeof(struct dce110_timing_generator));
+		dm_alloc(ctx, sizeof(struct dce110_timing_generator));
 
 	if (!tg110)
 		return NULL;
@@ -308,7 +309,7 @@ static struct timing_generator *dce110_timing_generator_create(
 		return &tg110->base;
 
 	BREAK_TO_DEBUGGER();
-	dc_service_free(ctx, tg110);
+	dm_free(ctx, tg110);
 	return NULL;
 }
 
@@ -319,7 +320,7 @@ static struct stream_encoder *dce110_stream_encoder_create(
 	const struct dce110_stream_enc_registers *regs)
 {
 	struct dce110_stream_encoder *enc110 =
-		dc_service_alloc(ctx, sizeof(struct dce110_stream_encoder));
+		dm_alloc(ctx, sizeof(struct dce110_stream_encoder));
 
 	if (!enc110)
 		return NULL;
@@ -328,7 +329,7 @@ static struct stream_encoder *dce110_stream_encoder_create(
 		return &enc110->base;
 
 	BREAK_TO_DEBUGGER();
-	dc_service_free(ctx, enc110);
+	dm_free(ctx, enc110);
 	return NULL;
 }
 
@@ -338,7 +339,7 @@ static struct mem_input *dce110_mem_input_create(
 	const struct dce110_mem_input_reg_offsets *offset)
 {
 	struct dce110_mem_input *mem_input110 =
-		dc_service_alloc(ctx, sizeof(struct dce110_mem_input));
+		dm_alloc(ctx, sizeof(struct dce110_mem_input));
 
 	if (!mem_input110)
 		return NULL;
@@ -348,13 +349,13 @@ static struct mem_input *dce110_mem_input_create(
 		return &mem_input110->base;
 
 	BREAK_TO_DEBUGGER();
-	dc_service_free(ctx, mem_input110);
+	dm_free(ctx, mem_input110);
 	return NULL;
 }
 
 static void dce110_transform_destroy(struct transform **xfm)
 {
-	dc_service_free((*xfm)->ctx, TO_DCE110_TRANSFORM(*xfm));
+	dm_free((*xfm)->ctx, TO_DCE110_TRANSFORM(*xfm));
 	*xfm = NULL;
 }
 
@@ -364,7 +365,7 @@ static struct transform *dce110_transform_create(
 	const struct dce110_transform_reg_offsets *offsets)
 {
 	struct dce110_transform *transform =
-		dc_service_alloc(ctx, sizeof(struct dce110_transform));
+		dm_alloc(ctx, sizeof(struct dce110_transform));
 
 	if (!transform)
 		return NULL;
@@ -373,7 +374,7 @@ static struct transform *dce110_transform_create(
 		return &transform->base;
 
 	BREAK_TO_DEBUGGER();
-	dc_service_free(ctx, transform);
+	dm_free(ctx, transform);
 	return NULL;
 }
 
@@ -383,7 +384,7 @@ static struct input_pixel_processor *dce110_ipp_create(
 	const struct dce110_ipp_reg_offsets *offsets)
 {
 	struct dce110_ipp *ipp =
-		dc_service_alloc(ctx, sizeof(struct dce110_ipp));
+		dm_alloc(ctx, sizeof(struct dce110_ipp));
 
 	if (!ipp)
 		return NULL;
@@ -392,7 +393,7 @@ static struct input_pixel_processor *dce110_ipp_create(
 		return &ipp->base;
 
 	BREAK_TO_DEBUGGER();
-	dc_service_free(ctx, ipp);
+	dm_free(ctx, ipp);
 	return NULL;
 }
 
@@ -400,7 +401,7 @@ struct link_encoder *dce110_link_encoder_create(
 	const struct encoder_init_data *enc_init_data)
 {
 	struct dce110_link_encoder *enc110 =
-		dc_service_alloc(
+		dm_alloc(
 			enc_init_data->ctx,
 			sizeof(struct dce110_link_encoder));
 
@@ -416,13 +417,13 @@ struct link_encoder *dce110_link_encoder_create(
 		return &enc110->base;
 
 	BREAK_TO_DEBUGGER();
-	dc_service_free(enc_init_data->ctx, enc110);
+	dm_free(enc_init_data->ctx, enc110);
 	return NULL;
 }
 
 void dce110_link_encoder_destroy(struct link_encoder **enc)
 {
-	dc_service_free((*enc)->ctx, TO_DCE110_LINK_ENC(*enc));
+	dm_free((*enc)->ctx, TO_DCE110_LINK_ENC(*enc));
 	*enc = NULL;
 }
 
@@ -433,7 +434,7 @@ static struct output_pixel_processor *dce110_opp_create(
 	const struct dce110_opp_reg_offsets *offsets)
 {
 	struct dce110_opp *opp =
-		dc_service_alloc(ctx, sizeof(struct dce110_opp));
+		dm_alloc(ctx, sizeof(struct dce110_opp));
 
 	if (!opp)
 		return NULL;
@@ -443,7 +444,7 @@ static struct output_pixel_processor *dce110_opp_create(
 		return &opp->base;
 
 	BREAK_TO_DEBUGGER();
-	dc_service_free(ctx, opp);
+	dm_free(ctx, opp);
 	return NULL;
 }
 
@@ -454,7 +455,7 @@ struct clock_source *dce110_clock_source_create(
 	const struct dce110_clk_src_reg_offsets *offsets)
 {
 	struct dce110_clk_src *clk_src =
-		dc_service_alloc(ctx, sizeof(struct dce110_clk_src));
+		dm_alloc(ctx, sizeof(struct dce110_clk_src));
 
 	if (!clk_src)
 		return NULL;
@@ -468,7 +469,7 @@ struct clock_source *dce110_clock_source_create(
 
 void dce110_clock_source_destroy(struct clock_source **clk_src)
 {
-	dc_service_free((*clk_src)->ctx, TO_DCE110_CLK_SRC(*clk_src));
+	dm_free((*clk_src)->ctx, TO_DCE110_CLK_SRC(*clk_src));
 	*clk_src = NULL;
 }
 
@@ -487,20 +488,20 @@ void dce110_destruct_resource_pool(struct resource_pool *pool)
 			dce110_ipp_destroy(&pool->ipps[i]);
 
 		if (pool->mis[i] != NULL) {
-			dc_service_free(pool->mis[i]->ctx,
+			dm_free(pool->mis[i]->ctx,
 					TO_DCE110_MEM_INPUT(pool->mis[i]));
 			pool->mis[i] = NULL;
 		}
 
 		if (pool->timing_generators[i] != NULL)	{
-			dc_service_free(pool->timing_generators[i]->ctx, DCE110TG_FROM_TG(pool->timing_generators[i]));
+			dm_free(pool->timing_generators[i]->ctx, DCE110TG_FROM_TG(pool->timing_generators[i]));
 			pool->timing_generators[i] = NULL;
 		}
 	}
 
 	for (i = 0; i < pool->stream_enc_count; i++) {
 		if (pool->stream_enc[i] != NULL)
-			dc_service_free(pool->stream_enc[i]->ctx,
+			dm_free(pool->stream_enc[i]->ctx,
 				DCE110STRENC_FROM_STRENC(pool->stream_enc[i]));
 	}
 
@@ -787,7 +788,7 @@ enum dc_status dce110_validate_bandwidth(
 			 * the same
 			 */
 			if (number_of_displays != 0 && all_displays_in_sync)
-				if (dal_memcmp(&prev_timing,
+				if (dm_memcmp(&prev_timing,
 					&stream->public.timing,
 					sizeof(struct dc_crtc_timing))!= 0)
 					all_displays_in_sync = false;
@@ -832,7 +833,7 @@ enum dc_status dce110_validate_bandwidth(
 			"%s: Bandwidth validation failed!",
 			__func__);
 
-	if (dal_memcmp(&dc->current_context.bw_results,
+	if (dm_memcmp(&dc->current_context.bw_results,
 			&context->bw_results, sizeof(context->bw_results))) {
 		struct log_entry log_entry;
 		dal_logger_open(
@@ -1047,7 +1048,7 @@ bool dce110_construct_resource_pool(
 
 	for (i = 0; i < pool->clk_src_count; i++) {
 		if (pool->clock_sources[i] == NULL) {
-			dal_error("DC: failed to create clock sources!\n");
+			dm_error("DC: failed to create clock sources!\n");
 			BREAK_TO_DEBUGGER();
 			goto clk_src_create_fail;
 		}
@@ -1055,7 +1056,7 @@ bool dce110_construct_resource_pool(
 
 	pool->display_clock = dal_display_clock_dce110_create(ctx, adapter_serv);
 	if (pool->display_clock == NULL) {
-		dal_error("DC: failed to create display clock!\n");
+		dm_error("DC: failed to create display clock!\n");
 		BREAK_TO_DEBUGGER();
 		goto disp_clk_create_fail;
 	}
@@ -1079,7 +1080,7 @@ bool dce110_construct_resource_pool(
 	pool->scaler_filter = dal_scaler_filter_create(ctx);
 	if (pool->scaler_filter == NULL) {
 		BREAK_TO_DEBUGGER();
-		dal_error("DC: failed to create filter!\n");
+		dm_error("DC: failed to create filter!\n");
 		goto filter_create_fail;
 	}
 
@@ -1088,7 +1089,7 @@ bool dce110_construct_resource_pool(
 				adapter_serv, ctx, i, &dce110_tg_offsets[i]);
 		if (pool->timing_generators[i] == NULL) {
 			BREAK_TO_DEBUGGER();
-			dal_error("DC: failed to create tg!\n");
+			dm_error("DC: failed to create tg!\n");
 			goto controller_create_fail;
 		}
 
@@ -1096,7 +1097,7 @@ bool dce110_construct_resource_pool(
 				&dce110_mi_reg_offsets[i]);
 		if (pool->mis[i] == NULL) {
 			BREAK_TO_DEBUGGER();
-			dal_error(
+			dm_error(
 				"DC: failed to create memory input!\n");
 			goto controller_create_fail;
 		}
@@ -1104,7 +1105,7 @@ bool dce110_construct_resource_pool(
 		pool->ipps[i] = dce110_ipp_create(ctx, i, &dce110_ipp_reg_offsets[i]);
 		if (pool->ipps[i] == NULL) {
 			BREAK_TO_DEBUGGER();
-			dal_error(
+			dm_error(
 				"DC: failed to create input pixel processor!\n");
 			goto controller_create_fail;
 		}
@@ -1113,7 +1114,7 @@ bool dce110_construct_resource_pool(
 					ctx, i, &dce110_xfm_offsets[i]);
 		if (pool->transforms[i] == NULL) {
 			BREAK_TO_DEBUGGER();
-			dal_error(
+			dm_error(
 				"DC: failed to create transform!\n");
 			goto controller_create_fail;
 		}
@@ -1124,7 +1125,7 @@ bool dce110_construct_resource_pool(
 		pool->opps[i] = dce110_opp_create(ctx, i, &dce110_opp_reg_offsets[i]);
 		if (pool->opps[i] == NULL) {
 			BREAK_TO_DEBUGGER();
-			dal_error(
+			dm_error(
 				"DC: failed to create output pixel processor!\n");
 			goto controller_create_fail;
 		}
@@ -1146,7 +1147,7 @@ bool dce110_construct_resource_pool(
 		pool->audios[i] = dal_audio_create(&audio_init_data);
 		if (pool->audios[i] == NULL) {
 			BREAK_TO_DEBUGGER();
-			dal_error("DC: failed to create DPPs!\n");
+			dm_error("DC: failed to create DPPs!\n");
 			goto audio_create_fail;
 		}
 		pool->audio_count++;
@@ -1162,7 +1163,7 @@ bool dce110_construct_resource_pool(
 				&stream_enc_regs[i]);
 			if (pool->stream_enc[i] == NULL) {
 				BREAK_TO_DEBUGGER();
-				dal_error("DC: failed to create stream_encoder!\n");
+				dm_error("DC: failed to create stream_encoder!\n");
 				goto stream_enc_create_fail;
 			}
 		}
@@ -1175,7 +1176,7 @@ bool dce110_construct_resource_pool(
 								adapter_serv));
 		if (pool->stream_enc[pool->stream_enc_count] == NULL) {
 			BREAK_TO_DEBUGGER();
-			dal_error("DC: failed to create stream_encoder!\n");
+			dm_error("DC: failed to create stream_encoder!\n");
 			goto stream_enc_create_fail;
 		}
 		pool->stream_enc_count++;
@@ -1186,7 +1187,7 @@ bool dce110_construct_resource_pool(
 stream_enc_create_fail:
 	for (i = 0; i < pool->stream_enc_count; i++) {
 		if (pool->stream_enc[i] != NULL)
-			dc_service_free(pool->stream_enc[i]->ctx,
+			dm_free(pool->stream_enc[i]->ctx,
 				DCE110STRENC_FROM_STRENC(pool->stream_enc[i]));
 	}
 
@@ -1208,13 +1209,13 @@ controller_create_fail:
 			dce110_ipp_destroy(&pool->ipps[i]);
 
 		if (pool->mis[i] != NULL) {
-			dc_service_free(pool->mis[i]->ctx,
+			dm_free(pool->mis[i]->ctx,
 					TO_DCE110_MEM_INPUT(pool->mis[i]));
 			pool->mis[i] = NULL;
 		}
 
 		if (pool->timing_generators[i] != NULL)	{
-			dc_service_free(pool->timing_generators[i]->ctx,
+			dm_free(pool->timing_generators[i]->ctx,
 				DCE110TG_FROM_TG(pool->timing_generators[i]));
 			pool->timing_generators[i] = NULL;
 		}

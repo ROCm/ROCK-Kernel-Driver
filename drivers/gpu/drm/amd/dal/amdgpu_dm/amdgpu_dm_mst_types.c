@@ -24,12 +24,13 @@
  */
 
 #include <drm/drm_atomic_helper.h>
-#include "dc_services.h"
+#include "dm_services.h"
 #include "amdgpu.h"
 #include "amdgpu_dm_types.h"
 #include "amdgpu_dm_mst_types.h"
+
 #include "dc.h"
-#include "dc_helpers.h"
+#include "dm_helpers.h"
 
 /* #define TRACE_DPCD */
 
@@ -195,7 +196,7 @@ static struct dc_sink *dm_dp_mst_add_mst_sink(
 	if (!dc_sink)
 		return NULL;
 
-	dc_service_memmove(dc_sink->dc_edid.raw_edid, edid, len);
+	dm_memmove(dc_sink->dc_edid.raw_edid, edid, len);
 	dc_sink->dc_edid.length = len;
 
 	if (!dc_link_add_remote_sink(
@@ -203,7 +204,7 @@ static struct dc_sink *dm_dp_mst_add_mst_sink(
 			dc_sink))
 		goto fail_add_sink;
 
-	edid_status = dc_helpers_parse_edid_caps(
+	edid_status = dm_helpers_parse_edid_caps(
 			NULL,
 			&dc_sink->dc_edid,
 			&dc_sink->edid_caps);

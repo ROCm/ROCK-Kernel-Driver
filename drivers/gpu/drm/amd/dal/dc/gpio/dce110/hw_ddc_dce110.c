@@ -23,12 +23,11 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
  */
-
 #include "include/gpio_types.h"
 #include "../hw_gpio_pin.h"
 #include "../hw_gpio.h"
@@ -63,7 +62,7 @@ static void destroy(
 
 	destruct(pin);
 
-	dc_service_free((*ptr)->ctx, pin);
+	dm_free((*ptr)->ctx, pin);
 
 	*ptr = NULL;
 }
@@ -602,7 +601,7 @@ static void setup_i2c_polling(
 {
 	uint32_t value;
 
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(
 		value,
@@ -623,7 +622,7 @@ static void setup_i2c_polling(
 			DC_I2C_DDC1_SETUP,
 			DC_I2C_DDC1_EDID_DETECT_MODE);
 
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 static enum gpio_result set_config(
@@ -649,7 +648,7 @@ static enum gpio_result set_config(
 
 	addr = hw_gpio->pin_reg.DC_GPIO_DATA_MASK.addr;
 
-	regval = dal_read_reg(ptr->ctx, addr);
+	regval = dm_read_reg(ptr->ctx, addr);
 
 	ddc_data_pd_en = get_reg_field_value(
 			regval,
@@ -686,14 +685,14 @@ static enum gpio_result set_config(
 					DC_GPIO_DDC1_MASK,
 					DC_GPIO_DDC1CLK_PD_EN);
 
-				dal_write_reg(ptr->ctx, addr, regval);
+				dm_write_reg(ptr->ctx, addr, regval);
 
 				if (config_data->type ==
 					GPIO_CONFIG_TYPE_I2C_AUX_DUAL_MODE)
 					/* should not affect normal I2C R/W */
 					/* [anaumov] in DAL2, there was
 					 * dc_service_delay_in_microseconds(2500); */
-					dc_service_sleep_in_milliseconds(ptr->ctx, 3);
+					dm_sleep_in_milliseconds(ptr->ctx, 3);
 			}
 		} else {
 			uint32_t reg2 = regval;
@@ -713,27 +712,27 @@ static enum gpio_result set_config(
 			if (sda_pd_dis) {
 				sda_pd_dis = 0;
 
-				dal_write_reg(ptr->ctx, addr, reg2);
+				dm_write_reg(ptr->ctx, addr, reg2);
 
 				if (config_data->type ==
 					GPIO_CONFIG_TYPE_I2C_AUX_DUAL_MODE)
 					/* should not affect normal I2C R/W */
 					/* [anaumov] in DAL2, there was
 					 * dc_service_delay_in_microseconds(2500); */
-					dc_service_sleep_in_milliseconds(ptr->ctx, 3);
+					dm_sleep_in_milliseconds(ptr->ctx, 3);
 			}
 
 			if (!scl_pd_dis) {
 				scl_pd_dis = 1;
 
-				dal_write_reg(ptr->ctx, addr, reg2);
+				dm_write_reg(ptr->ctx, addr, reg2);
 
 				if (config_data->type ==
 					GPIO_CONFIG_TYPE_I2C_AUX_DUAL_MODE)
 					/* should not affect normal I2C R/W */
 					/* [anaumov] in DAL2, there was
 					 * dc_service_delay_in_microseconds(2500); */
-					dc_service_sleep_in_milliseconds(ptr->ctx, 3);
+					dm_sleep_in_milliseconds(ptr->ctx, 3);
 			}
 		}
 
@@ -744,12 +743,12 @@ static enum gpio_result set_config(
 				config_data->config.ddc.clock_en_bit_present)
 				/* [anaumov] in DAL2, there was
 				 * dc_service_delay_in_microseconds(2000); */
-				dc_service_sleep_in_milliseconds(ptr->ctx, 2);
+				dm_sleep_in_milliseconds(ptr->ctx, 2);
 
 			/* set the I2C pad mode */
 			/* read the register again,
 			 * some bits may have been changed */
-			regval = dal_read_reg(ptr->ctx, addr);
+			regval = dm_read_reg(ptr->ctx, addr);
 
 			set_reg_field_value(
 				regval,
@@ -757,7 +756,7 @@ static enum gpio_result set_config(
 				DC_GPIO_DDC1_MASK,
 				AUX_PAD1_MODE);
 
-			dal_write_reg(ptr->ctx, addr, regval);
+			dm_write_reg(ptr->ctx, addr, regval);
 		}
 
 		return GPIO_RESULT_OK;
@@ -770,7 +769,7 @@ static enum gpio_result set_config(
 				DC_GPIO_DDC1_MASK,
 				AUX_PAD1_MODE);
 
-			dal_write_reg(ptr->ctx, addr, regval);
+			dm_write_reg(ptr->ctx, addr, regval);
 		}
 
 		return GPIO_RESULT_OK;
@@ -865,7 +864,7 @@ struct hw_gpio_pin *dal_hw_ddc_dce110_create(
 	enum gpio_id id,
 	uint32_t en)
 {
-	struct hw_ddc_dce110 *pin = dc_service_alloc(ctx, sizeof(struct hw_ddc_dce110));
+	struct hw_ddc_dce110 *pin = dm_alloc(ctx, sizeof(struct hw_ddc_dce110));
 
 	if (!pin) {
 		ASSERT_CRITICAL(false);
@@ -877,7 +876,7 @@ struct hw_gpio_pin *dal_hw_ddc_dce110_create(
 
 	ASSERT_CRITICAL(false);
 
-	dc_service_free(ctx, pin);
+	dm_free(ctx, pin);
 
 	return NULL;
 }

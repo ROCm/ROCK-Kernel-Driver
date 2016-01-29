@@ -22,7 +22,7 @@
  *
  */
 
-#include "dc_services.h"
+#include "dm_services.h"
 
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
@@ -101,7 +101,7 @@ static void program_viewport(
 			luma_view_port->y,
 			SCLV_VIEWPORT_START,
 			VIEWPORT_Y_START);
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 
 		addr = mmSCLV_VIEWPORT_SIZE;
 		value = 0;
@@ -115,7 +115,7 @@ static void program_viewport(
 			luma_view_port->width,
 			SCLV_VIEWPORT_SIZE,
 			VIEWPORT_WIDTH);
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 
 	if (chroma_view_port->width != 0 && chroma_view_port->height != 0) {
@@ -131,7 +131,7 @@ static void program_viewport(
 			chroma_view_port->y,
 			SCLV_VIEWPORT_START_C,
 			VIEWPORT_Y_START_C);
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 
 		addr = mmSCLV_VIEWPORT_SIZE_C;
 		value = 0;
@@ -145,7 +145,7 @@ static void program_viewport(
 			chroma_view_port->width,
 			SCLV_VIEWPORT_SIZE_C,
 			VIEWPORT_WIDTH_C);
-		dal_write_reg(ctx, addr, value);
+		dm_write_reg(ctx, addr, value);
 	}
 	/* TODO: add stereo support */
 }
@@ -211,10 +211,10 @@ static bool setup_scaling_configuration(
 		set_reg_field_value(value, 0, SCLV_MODE, SCL_MODE_C);
 		set_reg_field_value(value, 0, SCLV_MODE, SCL_PSCL_EN_C);
 	}
-	dal_write_reg(ctx, mmSCLV_MODE, value);
+	dm_write_reg(ctx, mmSCLV_MODE, value);
 
 	{
-		value = dal_read_reg(ctx, mmSCLV_TAP_CONTROL);
+		value = dm_read_reg(ctx, mmSCLV_TAP_CONTROL);
 
 		set_reg_field_value(value, data->taps.h_taps - 1,
 				SCLV_TAP_CONTROL, SCL_H_NUM_OF_TAPS);
@@ -228,19 +228,19 @@ static bool setup_scaling_configuration(
 		set_reg_field_value(value, data->taps.v_taps_c - 1,
 				SCLV_TAP_CONTROL, SCL_V_NUM_OF_TAPS_C);
 
-		dal_write_reg(ctx, mmSCLV_TAP_CONTROL, value);
+		dm_write_reg(ctx, mmSCLV_TAP_CONTROL, value);
 	}
 
 	{
 		/* we can ignore this register because we are ok with hw
 		 * default 0 -- change to 1 according to dal2 code*/
-		value = dal_read_reg(ctx, mmSCLV_CONTROL);
+		value = dm_read_reg(ctx, mmSCLV_CONTROL);
 		 /* 0 - Replaced out of bound pixels with black pixel
 		  * (or any other required color) */
 		set_reg_field_value(value, 1, SCLV_CONTROL, SCL_BOUNDARY_MODE);
 
 		/* 1 - Replaced out of bound pixels with the edge pixel. */
-		dal_write_reg(ctx, mmSCLV_CONTROL, value);
+		dm_write_reg(ctx, mmSCLV_CONTROL, value);
 	}
 
 	return is_scaling_needed;
@@ -275,11 +275,11 @@ static void program_overscan(
 	set_reg_field_value(overscan_top_bottom, overscan->bottom,
 		SCLV_EXT_OVERSCAN_TOP_BOTTOM, EXT_OVERSCAN_BOTTOM);
 
-	dal_write_reg(xfm110->base.ctx,
+	dm_write_reg(xfm110->base.ctx,
 			mmSCLV_EXT_OVERSCAN_LEFT_RIGHT,
 			overscan_left_right);
 
-	dal_write_reg(xfm110->base.ctx,
+	dm_write_reg(xfm110->base.ctx,
 			mmSCLV_EXT_OVERSCAN_TOP_BOTTOM,
 			overscan_top_bottom);
 }
@@ -310,7 +310,7 @@ static void program_two_taps_filter_horz(
 				SCLV_HORZ_FILTER_CONTROL,
 				SCL_H_2TAP_HARDCODE_COEF_EN);
 
-	dal_write_reg(xfm110->base.ctx,
+	dm_write_reg(xfm110->base.ctx,
 			mmSCLV_HORZ_FILTER_CONTROL,
 			value);
 }
@@ -325,7 +325,7 @@ static void program_two_taps_filter_vert(
 		set_reg_field_value(value, 1, SCLV_VERT_FILTER_CONTROL,
 				SCL_V_2TAP_HARDCODE_COEF_EN);
 
-	dal_write_reg(xfm110->base.ctx,
+	dm_write_reg(xfm110->base.ctx,
 			mmSCLV_VERT_FILTER_CONTROL,
 			value);
 }
@@ -384,58 +384,58 @@ static void program_scl_ratios_inits(
 {
 	struct dc_context *ctx = xfm110->base.ctx;
 	uint32_t addr = mmSCLV_HORZ_FILTER_SCALE_RATIO;
-	uint32_t value = dal_read_reg(ctx, addr);
+	uint32_t value = dm_read_reg(ctx, addr);
 
 	set_reg_field_value(
 		value,
 		inits->h_int_scale_ratio_luma,
 		SCLV_HORZ_FILTER_SCALE_RATIO,
 		SCL_H_SCALE_RATIO);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	addr = mmSCLV_VERT_FILTER_SCALE_RATIO;
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		inits->v_int_scale_ratio_luma,
 		SCLV_VERT_FILTER_SCALE_RATIO,
 		SCL_V_SCALE_RATIO);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	addr = mmSCLV_HORZ_FILTER_SCALE_RATIO_C;
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		inits->h_int_scale_ratio_chroma,
 		SCLV_HORZ_FILTER_SCALE_RATIO_C,
 		SCL_H_SCALE_RATIO_C);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 
 	addr = mmSCLV_VERT_FILTER_SCALE_RATIO_C;
-	value = dal_read_reg(ctx, addr);
+	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
 		inits->v_int_scale_ratio_chroma,
 		SCLV_VERT_FILTER_SCALE_RATIO_C,
 		SCL_V_SCALE_RATIO_C);
-	dal_write_reg(ctx, addr, value);
+	dm_write_reg(ctx, addr, value);
 }
 
 void dce110_transform_underlay_set_scalerv_bypass(struct transform *xfm)
 {
 	uint32_t addr = mmSCLV_MODE;
-	uint32_t value = dal_read_reg(xfm->ctx, addr);
+	uint32_t value = dm_read_reg(xfm->ctx, addr);
 
 	set_reg_field_value(value, 0, SCLV_MODE, SCL_MODE);
 	set_reg_field_value(value, 0, SCLV_MODE, SCL_MODE_C);
 	set_reg_field_value(value, 0, SCLV_MODE, SCL_PSCL_EN);
 	set_reg_field_value(value, 0, SCLV_MODE, SCL_PSCL_EN_C);
-	dal_write_reg(xfm->ctx, addr, value);
+	dm_write_reg(xfm->ctx, addr, value);
 }
 
 bool dce110_transform_underlay_is_scaling_enabled(struct transform *xfm)
 {
-	uint32_t value = dal_read_reg(xfm->ctx, mmSCLV_MODE);
+	uint32_t value = dm_read_reg(xfm->ctx, mmSCLV_MODE);
 	uint8_t scl_mode = get_reg_field_value(value, SCLV_MODE, SCL_MODE);
 
 	return scl_mode == 0;

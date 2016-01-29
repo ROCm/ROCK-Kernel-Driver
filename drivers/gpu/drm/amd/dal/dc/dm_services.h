@@ -27,11 +27,12 @@
  * This file defines external dependencies of Display Core.
  */
 
-#ifndef __DC_SERVICES_H__
-#define __DC_SERVICES_H__
+#ifndef __DM_SERVICES_H__
+
+#define __DM_SERVICES_H__
 
 /* TODO: remove when DC is complete. */
-#include "dc_services_types.h"
+#include "dm_services_types.h"
 #include "logger_interface.h"
 #include "include/dal_types.h"
 #include "irq_types.h"
@@ -40,29 +41,28 @@
 #undef DEPRECATED
 
 /* if the pointer is not NULL, the allocated memory is zeroed */
-void *dc_service_alloc(struct dc_context *ctx, uint32_t size);
+void *dm_alloc(struct dc_context *ctx, uint32_t size);
 
 /* reallocate memory. The contents will remain unchanged.*/
-void *dc_service_realloc(struct dc_context *ctx, const void *ptr, uint32_t size);
+void *dm_realloc(struct dc_context *ctx, const void *ptr, uint32_t size);
 
-void dc_service_free(struct dc_context *ctx, void *p);
+void dm_free(struct dc_context *ctx, void *p);
 
-void dc_service_memset(void *p, int32_t c, uint32_t count);
+void dm_memset(void *p, int32_t c, uint32_t count);
 
-void dc_service_memmove(void *dst, const void *src, uint32_t size);
+void dm_memmove(void *dst, const void *src, uint32_t size);
 
-/* TODO: rename to dc_memcmp*/
-int32_t dal_memcmp(const void *p1, const void *p2, uint32_t count);
+int32_t dm_memcmp(const void *p1, const void *p2, uint32_t count);
 
-int32_t dal_strncmp(const int8_t *p1, const int8_t *p2, uint32_t count);
+int32_t dm_strncmp(const int8_t *p1, const int8_t *p2, uint32_t count);
 
-irq_handler_idx dc_service_register_interrupt(
+irq_handler_idx dm_register_interrupt(
 	struct dc_context *ctx,
 	struct dc_interrupt_params *int_params,
 	interrupt_handler ih,
 	void *handler_args);
 
-void dc_service_unregister_interrupt(
+void dm_unregister_interrupt(
 	struct dc_context *ctx,
 	enum dc_irq_source irq_source,
 	irq_handler_idx handler_idx);
@@ -72,7 +72,7 @@ void dc_service_unregister_interrupt(
  * GPU registers access
  *
  */
-static inline uint32_t dal_read_reg(
+static inline uint32_t dm_read_reg(
 	const struct dc_context *ctx,
 	uint32_t address)
 {
@@ -87,7 +87,7 @@ static inline uint32_t dal_read_reg(
 	return value;
 }
 
-static inline void dal_write_reg(
+static inline void dm_write_reg(
 	const struct dc_context *ctx,
 	uint32_t address,
 	uint32_t value)
@@ -101,7 +101,7 @@ static inline void dal_write_reg(
 	cgs_write_register(ctx->cgs_device, address, value);
 }
 
-static inline uint32_t dal_read_index_reg(
+static inline uint32_t dm_read_index_reg(
 	const struct dc_context *ctx,
 	enum cgs_ind_reg addr_space,
 	uint32_t index)
@@ -109,7 +109,7 @@ static inline uint32_t dal_read_index_reg(
 	return cgs_read_ind_register(ctx->cgs_device, addr_space, index);
 }
 
-static inline void dal_write_index_reg(
+static inline void dm_write_index_reg(
 	const struct dc_context *ctx,
 	enum cgs_ind_reg addr_space,
 	uint32_t index,
@@ -152,17 +152,17 @@ static inline uint32_t set_reg_field_value_ex(
  * atombios services
  */
 
-bool dal_exec_bios_cmd_table(
+bool dm_exec_bios_cmd_table(
 	struct dc_context *ctx,
 	uint32_t index,
 	void *params);
 
 #ifdef BUILD_DAL_TEST
-uint32_t dal_bios_cmd_table_para_revision(
+uint32_t dm_bios_cmd_table_para_revision(
 struct dc_context *ctx,
 	uint32_t index);
 
-bool dal_bios_cmd_table_revision(
+bool dm_bios_cmd_table_revision(
 	struct dc_context *ctx,
 	uint32_t index,
 	uint8_t *frev,
@@ -170,7 +170,7 @@ bool dal_bios_cmd_table_revision(
 #endif
 
 #ifndef BUILD_DAL_TEST
-static inline uint32_t dal_bios_cmd_table_para_revision(
+static inline uint32_t dm_bios_cmd_table_para_revision(
 	struct dc_context *ctx,
 	uint32_t index)
 {
@@ -187,7 +187,7 @@ static inline uint32_t dal_bios_cmd_table_para_revision(
 	return crev;
 }
 #else
-uint32_t dal_bios_cmd_table_para_revision(
+uint32_t dm_bios_cmd_table_para_revision(
 		struct dc_context *ctx,
 		uint32_t index);
 #endif
@@ -259,13 +259,12 @@ struct dal_to_power_dclk {
  * \returns	true - call is successful
  *		false - call failed
  */
-bool dc_service_pp_pre_dce_clock_change(
+bool dm_pp_pre_dce_clock_change(
 	struct dc_context *ctx,
 	struct dal_to_power_info *input,
 	struct power_to_dal_info *output);
 
-struct dc_pp_single_disp_config
-{
+struct dc_pp_single_disp_config {
 	enum signal_type signal;
 	uint8_t transmitter;
 	uint8_t ddi_channel_mapping;
@@ -358,11 +357,6 @@ enum dc_pp_clock_type {
 struct dc_pp_clock_levels {
 	uint32_t num_levels;
 	uint32_t clocks_in_khz[DC_PP_MAX_CLOCK_LEVELS];
-
-	/* TODO: add latency
-	 * do we need to know invalid (unsustainable boost) level for watermark
-	 * programming? if not we can just report less elements in array
-	 */
 };
 
 /* Gets valid clocks levels from pplib
@@ -373,13 +367,13 @@ struct dc_pp_clock_levels {
  * with invalid levels filtered out
  *
  */
-bool dc_service_pp_get_clock_levels_by_type(
+bool dm_pp_get_clock_levels_by_type(
 	const struct dc_context *ctx,
 	enum dc_pp_clock_type clk_type,
 	struct dc_pp_clock_levels *clk_level_info);
 
 
-bool dc_service_pp_apply_safe_state(
+bool dm_pp_apply_safe_state(
 		const struct dc_context *ctx);
 
 /* DAL calls this function to notify PP about completion of Mode Set.
@@ -393,16 +387,16 @@ bool dc_service_pp_apply_safe_state(
  * \returns	true - call is successful
  *		false - call failed
  */
-bool dc_service_pp_apply_display_requirements(
+bool dm_pp_apply_display_requirements(
 	const struct dc_context *ctx,
 	const struct dc_pp_display_configuration *pp_display_cfg);
 
 
 /****** end of PP interfaces ******/
 
-void dc_service_sleep_in_milliseconds(struct dc_context *ctx, uint32_t milliseconds);
+void dm_sleep_in_milliseconds(struct dc_context *ctx, uint32_t milliseconds);
 
-void dc_service_delay_in_microseconds(struct dc_context *ctx, uint32_t microseconds);
+void dm_delay_in_microseconds(struct dc_context *ctx, uint32_t microseconds);
 
 enum platform_method {
 	PM_GET_AVAILABLE_METHODS = 1 << 0,
@@ -432,7 +426,7 @@ struct platform_info_ext_brightness_caps {
 	uint8_t	max_input_signal;
 };
 
-bool dal_get_platform_info(
+bool dm_get_platform_info(
 	struct dc_context *ctx,
 	struct platform_info_params *params);
 
@@ -441,11 +435,11 @@ bool dal_get_platform_info(
  * print-out services
  *
  */
-#define dal_log_to_buffer(buffer, size, fmt, args)\
+#define dm_log_to_buffer(buffer, size, fmt, args)\
 	vsnprintf(buffer, size, fmt, args)
 
-long dal_get_pid(void);
-long dal_get_tgid(void);
+long dm_get_pid(void);
+long dm_get_tgid(void);
 
 /*
  *
@@ -477,14 +471,6 @@ long dal_get_tgid(void);
 
 #define BREAK_TO_DEBUGGER() ASSERT(0)
 
-#else
-
-#define ASSERT_CRITICAL(expr)  do {if (expr)/* Do nothing */; } while (0)
-
-#define ASSERT(expr) do {if (expr)/* Do nothing */; } while (0)
-
-#define BREAK_TO_DEBUGGER() do {} while (0)
-
 #endif /* CONFIG_DEBUG_KERNEL || CONFIG_DEBUG_DRIVER */
 
-#endif /* __DC_SERVICES_H__ */
+#endif /* __DM_SERVICES_H__ */
