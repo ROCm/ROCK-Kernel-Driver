@@ -848,7 +848,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 
 	addr += mapping->offset;
 
-	if ((gtt == &adev->gart) && (flags == gtt_flags))
+	if (!gtt || ((gtt == &adev->gart) && (flags == gtt_flags)))
 		return amdgpu_vm_bo_update_mapping(adev, gtt, gtt_flags, vm,
 						   start, mapping->it.last,
 						   flags, addr, fence);
@@ -864,6 +864,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 			return r;
 
 		start = last + 1;
+		addr += max_size;
 	}
 
 	return 0;
