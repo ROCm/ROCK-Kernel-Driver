@@ -127,25 +127,28 @@ struct audio_mode {
 	};
 };
 
+struct audio_speaker_flags {
+    uint32_t FL_FR:1;
+    uint32_t LFE:1;
+    uint32_t FC:1;
+    uint32_t RL_RR:1;
+    uint32_t RC:1;
+    uint32_t FLC_FRC:1;
+    uint32_t RLC_RRC:1;
+    uint32_t SUPPORT_AI:1;
+};
+
+struct audio_speaker_info {
+    uint32_t ALLSPEAKERS:7;
+    uint32_t SUPPORT_AI:1;
+};
+
 struct audio_info_flags {
 
 	union {
 
-		struct audio_speaker_flags {
-			uint32_t FL_FR:1;
-			uint32_t LFE:1;
-			uint32_t FC:1;
-			uint32_t RL_RR:1;
-			uint32_t RC:1;
-			uint32_t FLC_FRC:1;
-			uint32_t RLC_RRC:1;
-			uint32_t SUPPORT_AI:1;
-		} speaker_flags;
-
-		struct audio_speaker_info {
-			uint32_t ALLSPEAKERS:7;
-			uint32_t SUPPORT_AI:1;
-		} info;
+		struct audio_speaker_flags speaker_flags;
+		struct audio_speaker_info   info;
 
 		uint8_t all;
 	};
