@@ -550,6 +550,8 @@ int amdgpu_copy_buffer(struct amdgpu_ring *ring,
 		       struct reservation_object *resv,
 		       struct fence **fence);
 int amdgpu_mmap(struct file *filp, struct vm_area_struct *vma);
+int amdgpu_bo_mmap(struct file *filp, struct vm_area_struct *vma,
+		   struct ttm_bo_device *bdev);
 
 struct amdgpu_bo_list_entry {
 	struct amdgpu_bo		*robj;
