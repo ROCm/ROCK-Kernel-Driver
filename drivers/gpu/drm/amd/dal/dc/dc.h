@@ -235,8 +235,8 @@ struct dc_target *dc_create_target_for_streams(
 const struct dc_target_status *dc_target_get_status(
 					const struct dc_target* dc_target);
 
-void dc_target_retain(struct dc_target *dc_target);
-void dc_target_release(struct dc_target *dc_target);
+void dc_target_retain(const struct dc_target *dc_target);
+void dc_target_release(const struct dc_target *dc_target);
 void dc_target_log(
 	const struct dc_target *dc_target,
 	struct dal_logger *dal_logger,

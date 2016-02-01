@@ -67,14 +67,14 @@ static void destruct(struct core_target *core_target)
 	}
 }
 
-void dc_target_retain(struct dc_target *dc_target)
+void dc_target_retain(const struct dc_target *dc_target)
 {
 	struct target *target = DC_TARGET_TO_TARGET(dc_target);
 
 	target->ref_count++;
 }
 
-void dc_target_release(struct dc_target *dc_target)
+void dc_target_release(const struct dc_target *dc_target)
 {
 	struct target *target = DC_TARGET_TO_TARGET(dc_target);
 	struct core_target *protected = DC_TARGET_TO_CORE(dc_target);
