@@ -608,7 +608,7 @@ static void detect_link_for_all_connectors(struct drm_device *dev)
 
 	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
 
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
 		   aconnector = to_amdgpu_connector(connector);
 		   if (aconnector->dc_link->type == dc_connection_mst_branch) {
 			   DRM_INFO("DM_MST: starting TM on aconnector: %p [id: %d]\n",
