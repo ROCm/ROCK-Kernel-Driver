@@ -72,30 +72,39 @@ void dm_unregister_interrupt(
  * GPU registers access
  *
  */
-static inline uint32_t dm_read_reg(
+
+#define dm_read_reg(ctx, address)	\
+		dm_read_reg_func(ctx, address, __func__)
+
+static inline uint32_t dm_read_reg_func(
 	const struct dc_context *ctx,
-	uint32_t address)
+	uint32_t address,
+	const char *func_name)
 {
 	uint32_t value = cgs_read_register(ctx->cgs_device, address);
 
 #if defined(__DAL_REGISTER_LOGGER__)
 	if (true == dal_reg_logger_should_dump_register()) {
 		dal_reg_logger_rw_count_increment();
-		DRM_INFO("%s 0x%x 0x%x\n", __func__, address, value);
+		DRM_INFO("%s DC_READ_REG: 0x%x 0x%x\n", func_name, address, value);
 	}
 #endif
 	return value;
 }
 
-static inline void dm_write_reg(
+#define dm_write_reg(ctx, address, value)	\
+	dm_write_reg_func(ctx, address, value, __func__)
+
+static inline void dm_write_reg_func(
 	const struct dc_context *ctx,
 	uint32_t address,
-	uint32_t value)
+	uint32_t value,
+	const char *func_name)
 {
 #if defined(__DAL_REGISTER_LOGGER__)
 	if (true == dal_reg_logger_should_dump_register()) {
 		dal_reg_logger_rw_count_increment();
-		DRM_INFO("%s 0x%x 0x%x\n", __func__, address, value);
+		DRM_INFO("%s DC_WRITE_REG: 0x%x 0x%x\n", func_name, address, value);
 	}
 #endif
 	cgs_write_register(ctx->cgs_device, address, value);
