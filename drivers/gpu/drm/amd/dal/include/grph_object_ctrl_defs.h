@@ -259,6 +259,12 @@ struct analog_tv_info {
 	union tv_standard_support tv_boot_up_default;
 };
 
+struct step_and_delay_info {
+    uint32_t step;
+    uint32_t delay;
+    uint32_t recommended_ref_div;
+};
+
 struct spread_spectrum_info {
 	struct spread_spectrum_type {
 		bool CENTER_MODE:1;
@@ -273,11 +279,7 @@ struct spread_spectrum_info {
 	uint32_t spread_spectrum_range; /* modulation freq (HZ)*/
 
 	union {
-		struct step_and_delay_info {
-			uint32_t step;
-			uint32_t delay;
-			uint32_t recommended_ref_div;
-		} step_and_delay_info;
+		struct step_and_delay_info step_and_delay_info;
 		/* For mem/engine/uvd, Clock Out frequence (VCO ),
 		in unit of kHz. For TMDS/HDMI/LVDS, it is pixel clock,
 		for DP, it is link clock ( 270000 or 162000 ) */
