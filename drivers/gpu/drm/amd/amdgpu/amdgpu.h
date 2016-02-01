@@ -1191,7 +1191,6 @@ struct amdgpu_cs_parser {
 	uint64_t			bytes_moved;
 
 	/* user fence */
-	struct amdgpu_user_fence	uf;
 	struct amdgpu_bo_list_entry	uf_entry;
 };
 
