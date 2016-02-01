@@ -1266,6 +1266,123 @@ void amdgpu_ttm_set_active_vram_size(struct amdgpu_device *adev, u64 size)
 	man->size = size >> PAGE_SHIFT;
 }
 
+static struct vm_operations_struct amdgpu_ttm_vm_ops;
+static const struct vm_operations_struct *ttm_vm_ops /* = NULL;
+						      * (appease checkpatch) */;
+static int amdgpu_ttm_bo_access_vram(struct amdgpu_bo *abo,
+				     unsigned long offset,
+				     void *buf, int len, int write)
+{
+	struct amdgpu_device *adev = abo->adev;
+	uint64_t pos = amdgpu_bo_gpu_offset(abo) + offset;
+	uint32_t value = 0;
+	unsigned long flags;
+	int result = 0;
+
+	while (len && pos < adev->mc.mc_vram_size) {
+		uint64_t aligned_pos = pos & ~(uint64_t)3;
+		uint32_t bytes = 4 - (pos & 3);
+		uint32_t shift = (pos & 3) * 8;
+		uint32_t mask = 0xffffffff << shift;
+
+		if (len < bytes) {
+			mask &= 0xffffffff >> (bytes - len) * 8;
+			bytes = len;
+		}
+
+		spin_lock_irqsave(&adev->mmio_idx_lock, flags);
+		WREG32(mmMM_INDEX, ((uint32_t)aligned_pos) | 0x80000000);
+		WREG32(mmMM_INDEX_HI, aligned_pos >> 31);
+		if (!write || mask != 0xffffffff)
+			value = RREG32(mmMM_DATA);
+		if (write) {
+			value &= ~mask;
+			value |= (*(uint32_t *)buf << shift) & mask;
+			WREG32(mmMM_DATA, value);
+		}
+		spin_unlock_irqrestore(&adev->mmio_idx_lock, flags);
+		if (!write) {
+			value = (value & mask) >> shift;
+			memcpy(buf, &value, bytes);
+		}
+
+		result += bytes;
+		buf = (uint8_t *)buf + bytes;
+		pos += bytes;
+		len -= bytes;
+	}
+
+	return result;
+}
+
+static int amdgpu_ttm_bo_access_kmap(struct amdgpu_bo *abo,
+				     unsigned long offset,
+				     void *buf, int len, int write)
+{
+	struct ttm_buffer_object *bo = &abo->tbo;
+	struct ttm_bo_kmap_obj map;
+	void *ptr;
+	bool is_iomem;
+	int r;
+
+	r = ttm_bo_kmap(bo, 0, bo->num_pages, &map);
+	if (r)
+		return r;
+	ptr = (uint8_t *)ttm_kmap_obj_virtual(&map, &is_iomem) + offset;
+	WARN_ON(is_iomem);
+	if (write)
+		memcpy(ptr, buf, len);
+	else
+		memcpy(buf, ptr, len);
+	ttm_bo_kunmap(&map);
+
+	return len;
+}
+
+static int amdgpu_ttm_vm_access(struct vm_area_struct *vma, unsigned long addr,
+				void *buf, int len, int write)
+{
+	unsigned long offset = (addr) - vma->vm_start;
+	struct ttm_buffer_object *bo = vma->vm_private_data;
+	struct amdgpu_bo *abo = container_of(bo, struct amdgpu_bo, tbo);
+	unsigned domain;
+	int result;
+
+	result = amdgpu_bo_reserve(abo, false);
+	if (result != 0)
+		return result;
+
+	domain = amdgpu_mem_type_to_domain(bo->mem.mem_type);
+	if (domain == AMDGPU_GEM_DOMAIN_VRAM)
+		result = amdgpu_ttm_bo_access_vram(abo, offset,
+						   buf, len, write);
+	else
+		result = amdgpu_ttm_bo_access_kmap(abo, offset,
+						   buf, len, write);
+	amdgpu_bo_unreserve(abo);
+
+	return len;
+}
+
+int amdgpu_bo_mmap(struct file *filp, struct vm_area_struct *vma,
+		   struct ttm_bo_device *bdev)
+{
+	int r;
+
+	r = ttm_bo_mmap(filp, vma, bdev);
+	if (unlikely(r != 0))
+		return r;
+
+	if (unlikely(ttm_vm_ops == NULL)) {
+		ttm_vm_ops = vma->vm_ops;
+		amdgpu_ttm_vm_ops = *ttm_vm_ops;
+		amdgpu_ttm_vm_ops.access = &amdgpu_ttm_vm_access;
+	}
+	vma->vm_ops = &amdgpu_ttm_vm_ops;
+
+	return 0;
+}
+
 int amdgpu_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	struct drm_file *file_priv;
@@ -1279,7 +1396,7 @@ int amdgpu_mmap(struct file *filp, struct vm_area_struct *vma)
 	if (adev == NULL)
 		return -EINVAL;
 
-	return ttm_bo_mmap(filp, vma, &adev->mman.bdev);
+	return amdgpu_bo_mmap(filp, vma, &adev->mman.bdev);
 }
 
 int amdgpu_copy_buffer(struct amdgpu_ring *ring,
