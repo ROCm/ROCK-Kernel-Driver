@@ -31,8 +31,12 @@
 #include "opp.h"
 #include "transform.h"
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 #include "dce100/dce100_resource.h"
+#endif
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 #include "dce110/dce110_resource.h"
+#endif
 
 bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
 				struct dc *dc,
