@@ -903,6 +903,10 @@ enum dce_version dal_adapter_service_get_dce_version(
 	uint32_t version = as->asic_cap->data[ASIC_DATA_DCE_VERSION];
 
 	switch (version) {
+#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
+	case 0x100:
+		return DCE_VERSION_10_0;
+#endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	case 0x110:
 		return DCE_VERSION_11_0;
