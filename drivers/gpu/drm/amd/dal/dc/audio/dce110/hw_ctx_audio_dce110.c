@@ -52,7 +52,9 @@ static const uint32_t engine_offset[] = {
 	0,
 	mmDIG1_DIG_FE_CNTL - mmDIG0_DIG_FE_CNTL,
 	mmDIG2_DIG_FE_CNTL - mmDIG0_DIG_FE_CNTL,
-	mmDIG3_DIG_FE_CNTL - mmDIG0_DIG_FE_CNTL
+	mmDIG3_DIG_FE_CNTL - mmDIG0_DIG_FE_CNTL,
+	mmDIG4_DIG_FE_CNTL - mmDIG0_DIG_FE_CNTL,
+	mmDIG5_DIG_FE_CNTL - mmDIG0_DIG_FE_CNTL
 };
 
 static void destruct(
