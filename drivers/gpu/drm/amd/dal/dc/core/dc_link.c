@@ -45,9 +45,6 @@
 		LOG_MAJOR_HW_TRACE, LOG_MINOR_HW_TRACE_HOTPLUG, \
 		__VA_ARGS__)
 
-#define DELAY_ON_CONNECT_IN_MS 500
-#define DELAY_ON_DISCONNECT_IN_MS 100
-
 
 /*******************************************************************************
  * Private structures
@@ -89,20 +86,28 @@ static bool program_hpd_filter(
 
 	struct irq *hpd;
 
-	/* Verify feature is supported */
+	int delay_on_connect_in_ms = 0;
+	int delay_on_disconnect_in_ms = 0;
 
+	/* Verify feature is supported */
 	switch (link->public.connector_signal) {
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
 	case SIGNAL_TYPE_HDMI_TYPE_A:
-		/* program hpd filter */
+		/* Program hpd filter */
+		delay_on_connect_in_ms = 500;
+		delay_on_disconnect_in_ms = 100;
 		break;
-	case SIGNAL_TYPE_LVDS:
 	case SIGNAL_TYPE_DISPLAY_PORT:
 	case SIGNAL_TYPE_DISPLAY_PORT_MST:
+		/* Program hpd filter to allow DP signal to settle */
+		delay_on_connect_in_ms = 20;
+		delay_on_disconnect_in_ms = 0;
+		break;
+	case SIGNAL_TYPE_LVDS:
 	case SIGNAL_TYPE_EDP:
 	default:
-		/* don't program hpd filter */
+		/* Don't program hpd filter */
 		return false;
 	}
 
@@ -114,12 +119,11 @@ static bool program_hpd_filter(
 		return result;
 
 	/* Setup HPD filtering */
-
 	if (dal_irq_open(hpd) == GPIO_RESULT_OK) {
 		struct gpio_hpd_config config;
 
-		config.delay_on_connect = DELAY_ON_CONNECT_IN_MS;
-		config.delay_on_disconnect = DELAY_ON_DISCONNECT_IN_MS;
+		config.delay_on_connect = delay_on_connect_in_ms;
+		config.delay_on_disconnect = delay_on_disconnect_in_ms;
 
 		dal_irq_setup_hpd_filter(hpd, &config);
 
@@ -131,7 +135,6 @@ static bool program_hpd_filter(
 	}
 
 	/* Release HPD handle */
-
 	dal_adapter_service_release_irq(link->adapter_srv, hpd);
 
 	return result;
