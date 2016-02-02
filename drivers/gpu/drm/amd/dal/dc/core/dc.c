@@ -886,3 +886,47 @@ void dc_link_remove_remote_sink(const struct dc_link *link, const struct dc_sink
 		}
 	}
 }
+
+uint8_t dc_get_dig_index(const struct dc_stream *stream)
+{
+
+	struct core_stream *core_stream = DC_STREAM_TO_CORE(stream);
+
+	switch (core_stream->stream_enc->id) {
+	case ENGINE_ID_DIGA:
+		return 0;
+	case ENGINE_ID_DIGB:
+		return 1;
+	case ENGINE_ID_DIGC:
+		return 2;
+	case ENGINE_ID_DIGD:
+		return 3;
+	case ENGINE_ID_DIGE:
+		return 4;
+	case ENGINE_ID_DIGF:
+		return 5;
+	case ENGINE_ID_DIGG:
+		return 6;
+	default:
+		return -1;
+	}
+
+	return 0;
+}
+
+enum gpio_ddc_line dc_get_ddc_line(
+		const struct dc_stream *stream)
+{
+
+	struct core_sink *core_sink = DC_SINK_TO_CORE(stream->sink);
+	struct ddc *ddc_line = dal_ddc_service_get_ddc_pin(
+			core_sink->link->ddc);
+
+	return dal_ddc_get_line(ddc_line);
+}
+
+enum signal_type dc_get_display_signal(
+		const struct dc_stream *stream)
+{
+	return stream->sink->sink_signal;
+}

@@ -430,20 +430,10 @@ void dc_resume(const struct dc *dc);
 
 const struct ddc_service *dc_get_ddc_at_index(
 		struct dc *dc, uint32_t link_index);
-const struct dc_ddc* dc_get_ddc_from_sink(const struct dc_sink* sink);
-const struct dc_ddc* dc_get_ddc_from_link(const struct dc_link* link);
-bool dc_ddc_query_i2c(const struct dc_ddc* ddc,
-		uint32_t address,
-		uint8_t* write_buf,
-		uint32_t write_size,
-		uint8_t* read_buf,
-		uint32_t read_size);
-bool dc_ddc_dpcd_read(const struct dc_ddc* ddc, uint32_t address,
-		uint8_t* data, uint32_t len);
-bool dc_ddc_dpcd_write(const struct dc_ddc* ddc, uint32_t address,
-		const uint8_t* data, uint32_t len);
 
-
+/*
+ * DPCD access interfaces
+ */
 
 bool dc_read_dpcd(
 		struct dc *dc,
@@ -458,5 +448,15 @@ bool dc_write_dpcd(
 		uint32_t address,
 		const uint8_t *data,
 	uint32_t size);
+
+
+uint8_t dc_get_dig_index(const struct dc_stream *stream);
+
+enum signal_type  dc_get_display_signal(
+		const struct dc_stream *stream);
+
+enum gpio_ddc_line dc_get_ddc_line(
+		const struct dc_stream *stream);
+
 
 #endif /* DC_INTERFACE_H_ */
