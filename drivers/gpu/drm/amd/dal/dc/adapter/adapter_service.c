@@ -92,7 +92,7 @@ static struct feature_source_entry feature_entry_table[] = {
 	 * Driver uses SW I2C.
 	 * Make Test uses HW I2C.
 	 */
-	{FEATURE_RESTORE_USAGE_I2C_SW_ENGINE, true, true},
+	{FEATURE_RESTORE_USAGE_I2C_SW_ENGINE, false, true},
 	{FEATURE_USE_MAX_DISPLAY_CLK, false, true},
 	{FEATURE_ALLOW_EDP_RESOURCE_SHARING, false, true},
 	{FEATURE_SUPPORT_DP_YUV, false, true},
