@@ -1562,11 +1562,6 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 				&stream->public,
 				&proposed_table,
 				false);
-	dm_helpers_dp_mst_write_payload_allocation_table(
-		stream->ctx,
-		&stream->public,
-		&proposed_table,
-		false);
 
 	update_mst_stream_alloc_table(link, stream, &proposed_table);
 
