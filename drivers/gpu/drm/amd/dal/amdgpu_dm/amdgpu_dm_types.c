@@ -24,6 +24,8 @@
  */
 
 #include <linux/types.h>
+#include <linux/version.h>
+
 #include <drm/drmP.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_fb_helper.h>
@@ -1536,8 +1538,10 @@ int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	if (!primary_plane)
 		goto fail_plane;
 
-	/* this flag is used in legacy code only */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
+	/* this flag doesn't exist in older kernels */
 	primary_plane->format_default = true;
+#endif
 
 	res = drm_universal_plane_init(
 		dm->adev->ddev,
