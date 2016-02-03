@@ -175,6 +175,9 @@ void dce110_timing_generator_program_blank_color(
 void dce110_timing_generator_set_overscan_color_black(
 	struct timing_generator *tg,
 	enum color_space black_color);
+void dce110_timing_generator_color_space_to_black_color(
+		enum color_space colorspace,
+	struct crtc_black_color *black_color);
 /*************** End-of-move ********************/
 
 
