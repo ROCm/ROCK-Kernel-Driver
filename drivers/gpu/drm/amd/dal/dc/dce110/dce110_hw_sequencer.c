@@ -753,6 +753,8 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 {
 	struct core_stream *stream =
 			context->res_ctx.controller_ctx[controller_idx].stream;
+	struct core_stream *old_stream =
+		dc->current_context.res_ctx.controller_ctx[controller_idx].stream;
 	struct output_pixel_processor *opp =
 		context->res_ctx.pool.opps[controller_idx];
 	bool timing_changed = context->res_ctx.controller_ctx[controller_idx]
@@ -765,7 +767,13 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 		 */
 		stream->tg->funcs->set_blank(stream->tg, true);
 
-		core_link_disable_stream(stream->sink->link, stream);
+		/*
+		 * only disable stream in case it was ever enabled
+		 */
+		if (old_stream)
+			core_link_disable_stream(
+				old_stream->sink->link,
+				old_stream);
 
 		/*TODO: AUTO check if timing changed*/
 		if (false == stream->clock_source->funcs->program_pix_clk(
