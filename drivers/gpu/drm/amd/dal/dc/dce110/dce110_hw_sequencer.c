@@ -791,7 +791,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 	}
 
 	/*TODO: mst support - use total stream count*/
-	stream->mi->funcs->mem_input_allocate_dmif_buffer(
+	stream->mi->funcs->allocate_mem_input(
 					stream->mi,
 					&stream->public.timing,
 					context->target_count);
@@ -1507,7 +1507,7 @@ static void reset_single_stream_hw_ctx(
 
 	stream->tg->funcs->set_blank(stream->tg, true);
 	stream->tg->funcs->disable_crtc(stream->tg);
-	stream->mi->funcs->mem_input_deallocate_dmif_buffer(
+	stream->mi->funcs->free_mem_input(
 			stream->mi, context->target_count);
 	stream->xfm->funcs->transform_set_scaler_bypass(stream->xfm);
 	unreference_clock_source(&context->res_ctx, stream->clock_source);

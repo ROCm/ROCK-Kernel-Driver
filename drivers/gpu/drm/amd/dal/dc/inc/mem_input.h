@@ -44,11 +44,11 @@ struct mem_input_funcs {
 		uint32_t h_total,
 		uint32_t pixel_clk_in_khz,
 		uint32_t pstate_blackout_duration_ns);
-	void (*mem_input_allocate_dmif_buffer)(
+	void (*allocate_mem_input)(
 			struct mem_input *mem_input,
 			struct dc_crtc_timing *timing,
 			uint32_t paths_num);
-	void (*mem_input_deallocate_dmif_buffer)(
+	void (*free_mem_input)(
 		struct mem_input *mem_input, uint32_t paths_num);
 	bool (*mem_input_program_surface_flip_and_addr)(
 		struct mem_input *mem_input,

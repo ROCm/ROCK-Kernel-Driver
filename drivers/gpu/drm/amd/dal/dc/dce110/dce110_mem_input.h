@@ -72,22 +72,22 @@ void dce110_mem_input_program_display_marks(
 	uint32_t pstate_blackout_duration_ns);
 
 /*
- * dce110_mem_input_allocate_dmif_buffer
+ * dce110_allocate_mem_input
  *
  * This function will allocate a dmif buffer and program required
  * pixel duration for pipe
  */
-void dce110_mem_input_allocate_dmif_buffer(
+void dce110_allocate_mem_input(
 		struct mem_input *mem_input,
 		struct dc_crtc_timing *timing,
 		uint32_t paths_num);
 
 /*
- * dce110_mem_input_deallocate_dmif_buffer
+ * dce110_free_mem_input
  *
  * This function will deallocate a dmif buffer from pipe
  */
-void dce110_mem_input_deallocate_dmif_buffer(
+void dce110_free_mem_input(
 	struct mem_input *mem_input, uint32_t paths_num);
 
 /*
