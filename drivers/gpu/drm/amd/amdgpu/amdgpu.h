@@ -106,9 +106,6 @@ extern unsigned amdgpu_pcie_lane_cap;
 /* max number of IP instances */
 #define AMDGPU_MAX_SDMA_INSTANCES		2
 
-/* number of hw syncs before falling back on blocking */
-#define AMDGPU_NUM_SYNCS			4
-
 /* hardcode that limit for now */
 #define AMDGPU_VA_RESERVED_SIZE			(8 << 20)
 
