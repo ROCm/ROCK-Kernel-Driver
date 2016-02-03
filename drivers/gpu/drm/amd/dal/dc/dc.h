@@ -30,6 +30,7 @@
 #include "dal_types.h"
 #include "audio_types.h"
 #include "logger_types.h"
+#include "gpio_types.h"
 
 #define MAX_SINKS_PER_LINK 4
 
