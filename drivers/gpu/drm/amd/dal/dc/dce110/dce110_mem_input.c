@@ -760,7 +760,7 @@ static uint32_t get_dmif_switch_time_us(struct dc_crtc_timing *timing)
 	return frame_time;
 }
 
-void dce110_mem_input_allocate_dmif_buffer(
+void dce110_allocate_mem_input(
 		struct mem_input *mi,
 		struct dc_crtc_timing *timing,
 		uint32_t paths_num)
@@ -884,7 +884,7 @@ static void deallocate_dmif_buffer_helper(
 			DMIF_BUFFERS_ALLOCATION_COMPLETED));
 }
 
-void dce110_mem_input_deallocate_dmif_buffer(
+void dce110_free_mem_input(
 	struct mem_input *mi, uint32_t paths_num)
 {
 	struct dce110_mem_input *bm_dce110 = TO_DCE110_MEM_INPUT(mi);
@@ -925,9 +925,8 @@ static struct mem_input_funcs dce110_mem_input_funcs = {
 			dce110_mem_input_program_safe_display_marks,
 	.mem_input_program_display_marks =
 			dce110_mem_input_program_display_marks,
-	.mem_input_allocate_dmif_buffer = dce110_mem_input_allocate_dmif_buffer,
-	.mem_input_deallocate_dmif_buffer =
-			dce110_mem_input_deallocate_dmif_buffer,
+	.allocate_mem_input = dce110_allocate_mem_input,
+	.free_mem_input = dce110_free_mem_input,
 	.mem_input_program_surface_flip_and_addr =
 			dce110_mem_input_program_surface_flip_and_addr,
 	.mem_input_program_surface_config =
