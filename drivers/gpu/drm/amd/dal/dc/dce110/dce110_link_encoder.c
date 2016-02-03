@@ -279,12 +279,13 @@ static void set_link_training_complete(
 	dm_write_reg(ctx, addr, value);
 }
 
-static void set_dp_phy_pattern_training_pattern(
-	struct dce110_link_encoder *enc110,
+void dce110_link_encoder_set_dp_phy_pattern_training_pattern(
+	struct link_encoder *enc,
 	uint32_t index)
 {
+	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
 	/* Write Training Pattern */
-	struct dc_context *ctx = enc110->base.ctx;
+	struct dc_context *ctx = enc->ctx;
 	uint32_t addr = LINK_REG(DP_DPHY_TRAINING_PATTERN_SEL);
 
 	dm_write_reg(ctx, addr, index);
@@ -1555,13 +1556,13 @@ void dce110_link_encoder_dp_set_phy_pattern(
 
 	switch (param->dp_phy_pattern) {
 	case DP_TEST_PATTERN_TRAINING_PATTERN1:
-		set_dp_phy_pattern_training_pattern(enc110, 0);
+		dce110_link_encoder_set_dp_phy_pattern_training_pattern(enc, 0);
 		break;
 	case DP_TEST_PATTERN_TRAINING_PATTERN2:
-		set_dp_phy_pattern_training_pattern(enc110, 1);
+		dce110_link_encoder_set_dp_phy_pattern_training_pattern(enc, 1);
 		break;
 	case DP_TEST_PATTERN_TRAINING_PATTERN3:
-		set_dp_phy_pattern_training_pattern(enc110, 2);
+		dce110_link_encoder_set_dp_phy_pattern_training_pattern(enc, 2);
 		break;
 	case DP_TEST_PATTERN_D102:
 		set_dp_phy_pattern_d102(enc110);
