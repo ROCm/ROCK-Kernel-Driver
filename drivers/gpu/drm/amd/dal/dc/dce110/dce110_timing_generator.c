@@ -190,7 +190,7 @@ static void dce110_timing_generator_apply_front_porch_workaround(
 	}
 }
 
-static void dce110_timing_generator_color_space_to_black_color(
+void dce110_timing_generator_color_space_to_black_color(
 		enum color_space colorspace,
 	struct crtc_black_color *black_color)
 {
