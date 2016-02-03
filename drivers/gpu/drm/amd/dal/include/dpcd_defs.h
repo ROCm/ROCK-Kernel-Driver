@@ -241,7 +241,8 @@ enum dpcd_address {
 enum dpcd_revision {
 	DPCD_REV_10 = 0x10,
 	DPCD_REV_11 = 0x11,
-	DPCD_REV_12 = 0x12
+	DPCD_REV_12 = 0x12,
+	DPCD_REV_13 = 0x13
 };
 
 enum dp_pwr_state {
@@ -341,7 +342,8 @@ enum dpcd_training_patterns {
 	DPCD_TRAINING_PATTERN_VIDEOIDLE = 0,/* direct HW translation! */
 	DPCD_TRAINING_PATTERN_1,
 	DPCD_TRAINING_PATTERN_2,
-	DPCD_TRAINING_PATTERN_3
+	DPCD_TRAINING_PATTERN_3,
+	DPCD_TRAINING_PATTERN_4 = 7
 };
 
 /* This enum is for use with PsrSinkPsrStatus.bits.sinkSelfRefreshStatus
@@ -394,7 +396,7 @@ union max_down_spread {
 		uint8_t MAX_DOWN_SPREAD:1;
 		uint8_t RESERVED:5;
 		uint8_t NO_AUX_HANDSHAKE_LINK_TRAINING:1;
-		uint8_t RESERVED1:1;
+		uint8_t TPS4_SUPPORTED:1;
 	} bits;
 	uint8_t raw;
 };

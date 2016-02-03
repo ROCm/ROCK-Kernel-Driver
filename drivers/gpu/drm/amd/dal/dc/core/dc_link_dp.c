@@ -162,6 +162,9 @@ static enum dpcd_training_patterns
 	case HW_DP_TRAINING_PATTERN_3:
 		dpcd_tr_pattern = DPCD_TRAINING_PATTERN_3;
 		break;
+	case HW_DP_TRAINING_PATTERN_4:
+		dpcd_tr_pattern = DPCD_TRAINING_PATTERN_4;
+		break;
 	default:
 		ASSERT(0);
 		dal_logger_write(link->ctx->logger,
@@ -720,6 +723,29 @@ static bool perform_post_lt_adj_req_sequence(
 
 }
 
+static enum hw_dp_training_pattern get_supported_tp(struct core_link *link)
+{
+	enum hw_dp_training_pattern highest_tp = HW_DP_TRAINING_PATTERN_2;
+	struct encoder_feature_support *features = &link->link_enc->features;
+	struct dpcd_caps *dpcd_caps = &link->dpcd_caps;
+
+	if (features->flags.bits.IS_TPS3_CAPABLE)
+		highest_tp = HW_DP_TRAINING_PATTERN_3;
+
+	if (features->flags.bits.IS_TPS4_CAPABLE)
+		highest_tp = HW_DP_TRAINING_PATTERN_4;
+
+	if (dpcd_caps->max_down_spread.bits.TPS4_SUPPORTED &&
+		highest_tp >= HW_DP_TRAINING_PATTERN_4)
+		return HW_DP_TRAINING_PATTERN_4;
+
+	if (dpcd_caps->max_ln_count.bits.TPS3_SUPPORTED &&
+		highest_tp >= HW_DP_TRAINING_PATTERN_3)
+		return HW_DP_TRAINING_PATTERN_3;
+
+	return HW_DP_TRAINING_PATTERN_2;
+}
+
 static bool perform_channel_equalization_sequence(
 	struct core_link *link,
 	struct link_training_settings *lt_settings)
@@ -731,8 +757,7 @@ static bool perform_channel_equalization_sequence(
 	union lane_align_status_updated dpcd_lane_status_updated = {{0}};
 	union lane_status dpcd_lane_status[LANE_COUNT_DP_MAX] = {{{0}}};;
 
-	/*TODO hw_tr_pattern = HW_DP_TRAINING_PATTERN_3;*/
-	hw_tr_pattern = HW_DP_TRAINING_PATTERN_2;
+	hw_tr_pattern = get_supported_tp(link);
 
 	dp_set_hw_training_pattern(link, hw_tr_pattern);
 
@@ -1031,6 +1056,18 @@ static bool exceeded_limit_link_setting(const struct link_settings *link_setting
 				 true : false);
 }
 
+static enum link_rate get_max_link_rate(struct core_link *link)
+{
+	enum link_rate max_link_rate = LINK_RATE_HIGH;
+
+	if (link->link_enc->features.flags.bits.IS_HBR2_CAPABLE)
+		max_link_rate = LINK_RATE_HIGH2;
+
+	if (link->link_enc->features.flags.bits.IS_HBR3_CAPABLE)
+		max_link_rate = LINK_RATE_HIGH3;
+
+	return max_link_rate;
+}
 
 bool dp_hbr_verify_link_cap(
 	struct core_link *link,
@@ -1048,7 +1085,7 @@ bool dp_hbr_verify_link_cap(
 
 	/* TODO confirm this is correct for cz */
 	max_link_cap.lane_count = LANE_COUNT_FOUR;
-	max_link_cap.link_rate = LINK_RATE_HIGH2;
+	max_link_cap.link_rate = get_max_link_rate(link);
 	max_link_cap.link_spread = LINK_SPREAD_05_DOWNSPREAD_30KHZ;
 
 	/* TODO implement override and monitor patch later */
@@ -1641,7 +1678,6 @@ static void retrieve_link_cap(struct core_link *link)
 
 	union down_stream_port_count down_strm_port_count;
 	union edp_configuration_cap edp_config_cap;
-	union max_down_spread max_down_spread;
 	union dp_downstream_port_present ds_port = { 0 };
 
 	dm_memset(dpcd_data, '\0', sizeof(dpcd_data));
@@ -1649,8 +1685,6 @@ static void retrieve_link_cap(struct core_link *link)
 		'\0', sizeof(union down_stream_port_count));
 	dm_memset(&edp_config_cap, '\0',
 		sizeof(union edp_configuration_cap));
-	dm_memset(&max_down_spread, '\0',
-		sizeof(union max_down_spread));
 
 	core_link_read_dpcd(link, DPCD_ADDRESS_DPCD_REV,
 			dpcd_data, sizeof(dpcd_data));
@@ -1671,7 +1705,7 @@ static void retrieve_link_cap(struct core_link *link)
 	link->dpcd_caps.max_ln_count.raw = dpcd_data[
 		DPCD_ADDRESS_MAX_LANE_COUNT - DPCD_ADDRESS_DPCD_REV];
 
-	max_down_spread.raw = dpcd_data[
+	link->dpcd_caps.max_down_spread.raw = dpcd_data[
 		DPCD_ADDRESS_MAX_DOWNSPREAD - DPCD_ADDRESS_DPCD_REV];
 
 	link->reported_link_cap.lane_count =
@@ -1679,7 +1713,7 @@ static void retrieve_link_cap(struct core_link *link)
 	link->reported_link_cap.link_rate = dpcd_data[
 		DPCD_ADDRESS_MAX_LINK_RATE - DPCD_ADDRESS_DPCD_REV];
 	link->reported_link_cap.link_spread =
-		max_down_spread.bits.MAX_DOWN_SPREAD ?
+		link->dpcd_caps.max_down_spread.bits.MAX_DOWN_SPREAD ?
 		LINK_SPREAD_05_DOWNSPREAD_30KHZ : LINK_SPREAD_DISABLED;
 
 	edp_config_cap.raw = dpcd_data[

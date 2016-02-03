@@ -120,6 +120,9 @@ bool dp_set_hw_training_pattern(
 	case HW_DP_TRAINING_PATTERN_3:
 		test_pattern = DP_TEST_PATTERN_TRAINING_PATTERN3;
 		break;
+	case HW_DP_TRAINING_PATTERN_4:
+		test_pattern = DP_TEST_PATTERN_TRAINING_PATTERN4;
+		break;
 	default:
 		break;
 	}

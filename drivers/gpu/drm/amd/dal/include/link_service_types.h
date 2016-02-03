@@ -123,13 +123,15 @@ enum lane_count {
  * 270MBps for 2.70GHz,
  * 324MBps for 3.24Ghz,
  * 540MBps for 5.40GHz
+ * 810MBps for 8.10GHz
  */
 enum link_rate {
 	LINK_RATE_UNKNOWN = 0,
 	LINK_RATE_LOW = 0x06,
 	LINK_RATE_HIGH = 0x0A,
 	LINK_RATE_RBR2 = 0x0C,
-	LINK_RATE_HIGH2 = 0x14
+	LINK_RATE_HIGH2 = 0x14,
+	LINK_RATE_HIGH3 = 0x1E
 };
 
 enum {
@@ -205,7 +207,8 @@ struct link_training_settings {
 enum hw_dp_training_pattern {
 	HW_DP_TRAINING_PATTERN_1 = 0,
 	HW_DP_TRAINING_PATTERN_2,
-	HW_DP_TRAINING_PATTERN_3
+	HW_DP_TRAINING_PATTERN_3,
+	HW_DP_TRAINING_PATTERN_4
 };
 
 /*TODO: Move this enum test harness*/
@@ -226,6 +229,7 @@ enum dp_test_pattern {
 	DP_TEST_PATTERN_TRAINING_PATTERN1,
 	DP_TEST_PATTERN_TRAINING_PATTERN2,
 	DP_TEST_PATTERN_TRAINING_PATTERN3,
+	DP_TEST_PATTERN_TRAINING_PATTERN4,
 
 	/* link test patterns*/
 	DP_TEST_PATTERN_COLOR_SQUARES,

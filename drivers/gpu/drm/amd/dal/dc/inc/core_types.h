@@ -174,6 +174,7 @@ struct link_caps {
 struct dpcd_caps {
 	union dpcd_rev dpcd_rev;
 	union max_lane_count max_ln_count;
+	union max_down_spread max_down_spread;
 
 	/* dongle type (DP converter, CV smart dongle) */
 	enum display_dongle_type dongle_type;

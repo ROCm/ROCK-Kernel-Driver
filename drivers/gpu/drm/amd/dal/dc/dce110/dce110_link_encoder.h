@@ -152,5 +152,9 @@ void dce110_link_encoder_connect_dig_be_to_fe(
 	enum engine_id engine,
 	bool connect);
 
+void dce110_link_encoder_set_dp_phy_pattern_training_pattern(
+	struct link_encoder *enc,
+	uint32_t index);
+
 
 #endif /* __DC_LINK_ENCODER__DCE110_H__ */

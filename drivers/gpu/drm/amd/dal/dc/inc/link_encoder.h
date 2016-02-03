@@ -45,8 +45,10 @@ struct encoder_feature_support {
 			 * for external DP chip supported */
 			uint32_t CPLIB_DP_AUTHENTICATION:1;
 			uint32_t IS_HBR2_CAPABLE:1;
+			uint32_t IS_HBR3_CAPABLE:1;
 			uint32_t IS_HBR2_VALIDATED:1;
 			uint32_t IS_TPS3_CAPABLE:1;
+			uint32_t IS_TPS4_CAPABLE:1;
 			uint32_t IS_AUDIO_CAPABLE:1;
 			uint32_t IS_VCE_SUPPORTED:1;
 			uint32_t IS_CONVERTER:1;
