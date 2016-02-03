@@ -30,6 +30,7 @@
 #include "dce/dce_11_0_sh_mask.h"
 
 #include "dce110_transform.h"
+#include "dce110_transform_v.h"
 #include "opp.h"
 #include "include/logger_interface.h"
 #include "include/fixed32_32.h"
@@ -847,5 +848,119 @@ bool dce110_transform_power_up_line_buffer(struct transform *xfm)
 	dm_write_reg(xfm110->base.ctx, LB_REG(mmLB_MEMORY_CTRL), value);
 
 	return true;
+}
+
+/* Underlay pipe functions*/
+
+bool dce110_transform_v_get_current_pixel_storage_depth(
+	struct transform *xfm,
+	enum lb_pixel_depth *depth)
+{
+	uint32_t value = 0;
+
+	if (depth == NULL)
+		return false;
+
+	value = dm_read_reg(
+			xfm->ctx,
+			mmLBV_DATA_FORMAT);
+
+	switch (get_reg_field_value(value, LBV_DATA_FORMAT, PIXEL_DEPTH)) {
+	case 0:
+		*depth = LB_PIXEL_DEPTH_30BPP;
+		break;
+	case 1:
+		*depth = LB_PIXEL_DEPTH_24BPP;
+		break;
+	case 2:
+		*depth = LB_PIXEL_DEPTH_18BPP;
+		break;
+	case 3:
+		*depth = LB_PIXEL_DEPTH_36BPP;
+		break;
+	default:
+		dal_logger_write(xfm->ctx->logger,
+			LOG_MAJOR_WARNING,
+			LOG_MINOR_COMPONENT_GPU,
+			"%s: Invalid LB pixel depth",
+			__func__);
+		*depth = LB_PIXEL_DEPTH_30BPP;
+		break;
+	}
+	return true;
+
+}
+
+bool dce110_transform_v_set_pixel_storage_depth(
+	struct transform *xfm,
+	enum lb_pixel_depth depth,
+	const struct bit_depth_reduction_params *bit_depth_params)
+{
+	struct dce110_transform *xfm110 = TO_DCE110_TRANSFORM(xfm);
+	bool ret = true;
+	uint32_t value;
+	enum dc_color_depth color_depth;
+
+	value = dm_read_reg(
+			xfm->ctx,
+			LB_REG(mmLBV_DATA_FORMAT));
+	switch (depth) {
+	case LB_PIXEL_DEPTH_18BPP:
+		color_depth = COLOR_DEPTH_666;
+		set_reg_field_value(value, 2, LBV_DATA_FORMAT, PIXEL_DEPTH);
+		set_reg_field_value(value, 1, LBV_DATA_FORMAT, PIXEL_EXPAN_MODE);
+		set_reg_field_value(value, 1, LBV_DATA_FORMAT, PIXEL_REDUCE_MODE);
+		set_reg_field_value(value, 1, LBV_DATA_FORMAT, DITHER_EN);
+		set_reg_field_value(value, 1, LBV_DATA_FORMAT, DOWNSCALE_PREFETCH_EN);
+		break;
+	case LB_PIXEL_DEPTH_24BPP:
+		color_depth = COLOR_DEPTH_888;
+		set_reg_field_value(value, 1, LBV_DATA_FORMAT, PIXEL_DEPTH);
+		set_reg_field_value(value, 1, LBV_DATA_FORMAT, PIXEL_EXPAN_MODE);
+		set_reg_field_value(value, 1, LBV_DATA_FORMAT, PIXEL_REDUCE_MODE);
+		set_reg_field_value(value, 0, LBV_DATA_FORMAT, DITHER_EN);
+		set_reg_field_value(value, 1, LBV_DATA_FORMAT, DOWNSCALE_PREFETCH_EN);
+		break;
+	case LB_PIXEL_DEPTH_30BPP:
+		color_depth = COLOR_DEPTH_101010;
+		set_reg_field_value(value, 0, LBV_DATA_FORMAT, PIXEL_DEPTH);
+		set_reg_field_value(value, 1, LBV_DATA_FORMAT, PIXEL_EXPAN_MODE);
+		set_reg_field_value(value, 1, LBV_DATA_FORMAT, PIXEL_REDUCE_MODE);
+		set_reg_field_value(value, 0, LBV_DATA_FORMAT, DITHER_EN);
+		set_reg_field_value(value, 1, LBV_DATA_FORMAT, DOWNSCALE_PREFETCH_EN);
+		break;
+	case LB_PIXEL_DEPTH_36BPP:
+		color_depth = COLOR_DEPTH_121212;
+		set_reg_field_value(value, 3, LBV_DATA_FORMAT, PIXEL_DEPTH);
+		set_reg_field_value(value, 0, LBV_DATA_FORMAT, PIXEL_EXPAN_MODE);
+		set_reg_field_value(value, 0, LBV_DATA_FORMAT, PIXEL_REDUCE_MODE);
+		set_reg_field_value(value, 0, LBV_DATA_FORMAT, DITHER_EN);
+		set_reg_field_value(value, 1, LBV_DATA_FORMAT, DOWNSCALE_PREFETCH_EN);
+		break;
+	default:
+		ret = false;
+		break;
+	}
+
+	if (ret == true) {
+		set_denormalization(xfm110, color_depth);
+		ret = program_bit_depth_reduction(xfm110, color_depth,
+				bit_depth_params);
+
+		set_reg_field_value(value, 0, LB_DATA_FORMAT, ALPHA_EN);
+		dm_write_reg(
+				xfm->ctx, LB_REG(mmLB_DATA_FORMAT), value);
+		if (!(xfm110->lb_pixel_depth_supported & depth)) {
+			/*we should use unsupported capabilities
+			 *  unless it is required by w/a*/
+			dal_logger_write(xfm->ctx->logger,
+				LOG_MAJOR_WARNING,
+				LOG_MINOR_COMPONENT_GPU,
+				"%s: Capability not supported",
+				__func__);
+		}
+	}
+
+	return ret;
 }
 

@@ -1,4 +1,5 @@
-/* Copyright 2012-15 Advanced Micro Devices, Inc.
+/*
+ * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,16 +23,19 @@
  *
  */
 
-#include "dm_services.h"
+
+#include "dc_types.h"
+#include "core_types.h"
+
+#include "dce110_transform.h"
+#include "dce110_transform_v.h"
 
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
 
-#include "dce110_transform.h"
-
 #define NOT_IMPLEMENTED()  DAL_LOGGER_NOT_IMPL(LOG_MINOR_COMPONENT_CONTROLLER,\
 			"TRANSFORM SCALER:%s()\n", __func__)
-
+#define LB_TOTAL_NUMBER_OF_ENTRIES 1712
 /*
 *****************************************************************************
 *  Function: calculateViewport
@@ -151,7 +155,8 @@ static void program_viewport(
 }
 
 
-/* Until and For MPO video play story, to reduce time for implementation,
+/*
+ * Until and For MPO video play story, to reduce time for implementation,
  * below limits are applied for now: 2_TAPS only
  * Use auto-calculated filter values
  * Following routines will be empty for now:
@@ -164,16 +169,16 @@ static void program_viewport(
  * validateRequestedScaleRatio - used by GetOptimalNumberOfTaps internally
  */
 
-/**
-* Function:
-* void setup_scaling_configuration
-*
-* Purpose: setup scaling mode : bypass, RGb, YCbCr and nummber of taps
-* Input:   data
-*
-* Output:
-   void
-*/
+/*
+ * Function:
+ * void setup_scaling_configuration
+ *
+ * Purpose: setup scaling mode : bypass, RGb, YCbCr and nummber of taps
+ * Input:   data
+ *
+ * Output:
+ *  void
+ */
 static bool setup_scaling_configuration(
 	struct dce110_transform *xfm110,
 	const struct scaler_data *data)
@@ -232,11 +237,15 @@ static bool setup_scaling_configuration(
 	}
 
 	{
-		/* we can ignore this register because we are ok with hw
-		 * default 0 -- change to 1 according to dal2 code*/
+		/*
+		 * we can ignore this register because we are ok with hw
+		 * default 0 -- change to 1 according to dal2 code
+		 */
 		value = dm_read_reg(ctx, mmSCLV_CONTROL);
-		 /* 0 - Replaced out of bound pixels with black pixel
-		  * (or any other required color) */
+		 /*
+		  * 0 - Replaced out of bound pixels with black pixel
+		  * (or any other required color)
+		  */
 		set_reg_field_value(value, 1, SCLV_CONTROL, SCL_BOUNDARY_MODE);
 
 		/* 1 - Replaced out of bound pixels with the edge pixel. */
@@ -283,19 +292,6 @@ static void program_overscan(
 			mmSCLV_EXT_OVERSCAN_TOP_BOTTOM,
 			overscan_top_bottom);
 }
-/*
-static void setup_auto_scaling(struct dce110_transform *xfm110)
-{
-	uint32_t value = 0;
-	set_reg_field_value(value, 1, SCLV_AUTOMATIC_MODE_CONTROL,
-			SCL_V_CALC_AUTO_RATIO_EN);
-	set_reg_field_value(value, 1, SCLV_AUTOMATIC_MODE_CONTROL,
-			SCL_H_CALC_AUTO_RATIO_EN);
-	dal_write_reg(xfm->ctx,
-			xfm->regs[IDX_SCL_AUTOMATIC_MODE_CONTROL],
-			value);
-}
-*/
 
 static void program_two_taps_filter_horz(
 	struct dce110_transform *xfm110,
@@ -421,7 +417,7 @@ static void program_scl_ratios_inits(
 	dm_write_reg(ctx, addr, value);
 }
 
-void dce110_transform_underlay_set_scalerv_bypass(struct transform *xfm)
+static void dce110_transform_v_set_scalerv_bypass(struct transform *xfm)
 {
 	uint32_t addr = mmSCLV_MODE;
 	uint32_t value = dm_read_reg(xfm->ctx, addr);
@@ -433,16 +429,8 @@ void dce110_transform_underlay_set_scalerv_bypass(struct transform *xfm)
 	dm_write_reg(xfm->ctx, addr, value);
 }
 
-bool dce110_transform_underlay_is_scaling_enabled(struct transform *xfm)
-{
-	uint32_t value = dm_read_reg(xfm->ctx, mmSCLV_MODE);
-	uint8_t scl_mode = get_reg_field_value(value, SCLV_MODE, SCL_MODE);
-
-	return scl_mode == 0;
-}
-
 /* TODO: sync this one with DAL2 */
-bool dce110_transform_underlay_set_scaler(
+static bool dce110_transform_v_set_scaler(
 	struct transform *xfm,
 	const struct scaler_data *data)
 {
@@ -516,10 +504,11 @@ bool dce110_transform_underlay_set_scaler(
 	if (data->flags.bits.SHOULD_PROGRAM_VIEWPORT)
 		program_viewport(xfm110, &luma_viewport, &chroma_viewport);
 
-	/* 9. Unlock the Scaler TODO: enable?*/
-	/* Every call to "set_scaler_update_lock(xfm, TRUE)"
+	/* 9. Unlock the Scaler TODO: enable?
+	 * Every call to "set_scaler_update_lock(xfm, TRUE)"
 	 * must have a corresponding call to
 	 * "set_scaler_update_lock(xfm, FALSE)" */
+
 	/*set_scaler_update_lock(xfm, false);*/
 
 	/* TODO: investigate purpose/need of SHOULD_UNLOCK */
@@ -529,3 +518,157 @@ bool dce110_transform_underlay_set_scaler(
 	return true;
 }
 
+static bool dce110_transform_v_power_up_line_buffer(struct transform *xfm)
+{
+	struct dce110_transform *xfm110 = TO_DCE110_TRANSFORM(xfm);
+	uint32_t value;
+
+	value = dm_read_reg(xfm110->base.ctx, mmLBV_MEMORY_CTRL);
+
+	/*Use all three pieces of memory always*/
+	set_reg_field_value(value, 0, LBV_MEMORY_CTRL, LB_MEMORY_CONFIG);
+	/*hard coded number DCE11 1712(0x6B0) Partitions: 720/960/1712*/
+	set_reg_field_value(value, LB_TOTAL_NUMBER_OF_ENTRIES, LBV_MEMORY_CTRL,
+			LB_MEMORY_SIZE);
+
+	dm_write_reg(xfm110->base.ctx, mmLBV_MEMORY_CTRL, value);
+
+	return true;
+}
+
+static void get_viewport(
+		struct dce110_transform *xfm110,
+		struct rect *current_view_port)
+{
+	uint32_t value_start;
+	uint32_t value_size;
+
+	if (current_view_port == NULL)
+		return;
+
+	value_start = dm_read_reg(xfm110->base.ctx, mmSCLV_VIEWPORT_START);
+	value_size = dm_read_reg(xfm110->base.ctx, mmSCLV_VIEWPORT_SIZE);
+
+	current_view_port->x = get_reg_field_value(
+			value_start,
+			SCLV_VIEWPORT_START,
+			VIEWPORT_X_START);
+	current_view_port->y = get_reg_field_value(
+			value_start,
+			SCLV_VIEWPORT_START,
+			VIEWPORT_Y_START);
+	current_view_port->height = get_reg_field_value(
+			value_size,
+			SCLV_VIEWPORT_SIZE,
+			VIEWPORT_HEIGHT);
+	current_view_port->width = get_reg_field_value(
+			value_size,
+			SCLV_VIEWPORT_SIZE,
+			VIEWPORT_WIDTH);
+}
+
+static void program_luma_viewport(
+	struct dce110_transform *xfm110,
+	const struct rect *view_port)
+{
+	struct dc_context *ctx = xfm110->base.ctx;
+	uint32_t value = 0;
+	uint32_t addr = 0;
+
+	addr = mmSCLV_VIEWPORT_START;
+	value = dm_read_reg(ctx, addr);
+	set_reg_field_value(
+		value,
+		view_port->x,
+		SCLV_VIEWPORT_START,
+		VIEWPORT_X_START);
+	set_reg_field_value(
+		value,
+		view_port->y,
+		SCLV_VIEWPORT_START,
+		VIEWPORT_Y_START);
+	dm_write_reg(ctx, addr, value);
+
+	addr = mmSCLV_VIEWPORT_SIZE;
+	value = dm_read_reg(ctx, addr);
+	set_reg_field_value(
+		value,
+		view_port->height,
+		SCLV_VIEWPORT_SIZE,
+		VIEWPORT_HEIGHT);
+	set_reg_field_value(
+		value,
+		view_port->width,
+		SCLV_VIEWPORT_SIZE,
+		VIEWPORT_WIDTH);
+	dm_write_reg(ctx, addr, value);
+
+	/* TODO: add stereo support */
+}
+
+static bool dce110_transform_v_update_viewport(
+	struct transform *xfm,
+	const struct rect *view_port,
+	bool is_fbc_attached)
+{
+	struct dce110_transform *xfm110 = TO_DCE110_TRANSFORM(xfm);
+	bool program_req = false;
+	struct rect current_view_port;
+
+	if (view_port == NULL)
+		return program_req;
+
+	get_viewport(xfm110, &current_view_port);
+
+	if (current_view_port.x != view_port->x ||
+			current_view_port.y != view_port->y ||
+			current_view_port.height != view_port->height ||
+			current_view_port.width != view_port->width)
+		program_req = true;
+
+	if (program_req) {
+		/*underlay viewport is programmed with scaler
+		 *program_viewport function pointer is not exposed*/
+		program_luma_viewport(xfm110, view_port);
+	}
+
+	return program_req;
+}
+
+static struct transform_funcs dce110_transform_v_funcs = {
+	.transform_power_up =
+		dce110_transform_v_power_up_line_buffer,
+	.transform_set_scaler =
+		dce110_transform_v_set_scaler,
+	.transform_set_scaler_bypass =
+		dce110_transform_v_set_scalerv_bypass,
+	.transform_update_viewport =
+		dce110_transform_v_update_viewport,
+	.transform_set_scaler_filter =
+		dce110_transform_set_scaler_filter,
+	.transform_set_gamut_remap =
+		dce110_transform_set_gamut_remap,
+	.transform_set_pixel_storage_depth =
+		dce110_transform_v_set_pixel_storage_depth,
+	.transform_get_current_pixel_storage_depth =
+		dce110_transform_v_get_current_pixel_storage_depth
+};
+/*****************************************/
+/* Constructor, Destructor               */
+/*****************************************/
+
+bool dce110_transform_v_construct(
+	struct dce110_transform *xfm110,
+	struct dc_context *ctx)
+{
+	xfm110->base.ctx = ctx;
+
+	xfm110->base.funcs = &dce110_transform_v_funcs;
+
+	xfm110->lb_pixel_depth_supported =
+			LB_PIXEL_DEPTH_18BPP |
+			LB_PIXEL_DEPTH_24BPP |
+			LB_PIXEL_DEPTH_30BPP;
+
+	return true;
+}
