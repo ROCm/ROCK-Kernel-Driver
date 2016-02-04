@@ -335,6 +335,9 @@ int drm_pcie_get_speed_cap_mask(struct drm_device *dev, u32 *mask)
 
 	root = dev->pdev->bus->self;
 
+	if (!root)
+		return -EINVAL;
+
 	/* we've been informed via and serverworks don't make the cut */
 	if (root->vendor == PCI_VENDOR_ID_VIA ||
 	    root->vendor == PCI_VENDOR_ID_SERVERWORKS)
@@ -372,6 +375,8 @@ int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw)
 		return -EINVAL;
 
 	root = dev->pdev->bus->self;
+	if (!root)
+		return -EINVAL;
 
 	pcie_capability_read_dword(root, PCI_EXP_LNKCAP, &lnkcap);
 
