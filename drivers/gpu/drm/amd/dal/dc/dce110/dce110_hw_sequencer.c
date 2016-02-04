@@ -42,6 +42,7 @@
 #include "stream_encoder.h"
 #include "link_encoder.h"
 #include "clock_source.h"
+#include "gamma_calcs.h"
 
 /* include DCE11 register header files */
 #include "dce/dce_11_0_d.h"
@@ -476,64 +477,83 @@ static bool dce110_enable_display_power_gating(
 		return false;
 }
 
+static void build_prescale_params(struct ipp_prescale_params *prescale_params,
+		const struct core_surface *surface)
+{
+	prescale_params->mode = IPP_PRESCALE_MODE_FIXED_UNSIGNED;
+
+	switch (surface->public.format) {
+	case SURFACE_PIXEL_FORMAT_GRPH_ARGB8888:
+	case SURFACE_PIXEL_FORMAT_GRPH_BGRA8888:
+		prescale_params->scale = 0x2000;
+		break;
+	case SURFACE_PIXEL_FORMAT_GRPH_ARGB2101010:
+	case SURFACE_PIXEL_FORMAT_GRPH_ABGR2101010:
+		/* TODO */
+		break;
+	case SURFACE_PIXEL_FORMAT_GRPH_ARGB16161616:
+	case SURFACE_PIXEL_FORMAT_GRPH_ABGR16161616F:
+		/* TODO */
+		break;
+	default:
+		ASSERT(false);
+	}
+}
+
 
 static bool set_gamma_ramp(
 	struct input_pixel_processor *ipp,
 	struct output_pixel_processor *opp,
-	const struct gamma_ramp *ramp,
-	const struct gamma_parameters *params)
+	const struct core_gamma *ramp,
+	const struct core_surface *surface)
 {
-	/*Power on LUT memory*/
+	struct ipp_prescale_params *prescale_params;
+	struct regamma_params *regamma_params;
+	struct temp_params *temp_params;
+	bool result = false;
+
+	prescale_params = dm_alloc(opp->ctx,
+			sizeof(struct ipp_prescale_params));
+
+	if (prescale_params == NULL)
+		goto prescale_alloc_fail;
+
+	regamma_params = dm_alloc(opp->ctx,
+			sizeof(struct regamma_params));
+	if (regamma_params == NULL)
+		goto regamma_alloc_fail;
+
+	temp_params = dm_alloc(opp->ctx, sizeof(struct temp_params));
+
+	if (temp_params == NULL)
+		goto temp_alloc_fail;
+
+	regamma_params->hw_points_num = GAMMA_HW_POINTS_NUM;
+
 	opp->funcs->opp_power_on_regamma_lut(opp, true);
 
+	build_prescale_params(prescale_params, surface);
 
-	if (params->surface_pixel_format == PIXEL_FORMAT_INDEX8 ||
-		params->selected_gamma_lut == GRAPHICS_GAMMA_LUT_LEGACY) {
-		/* do legacy DCP for 256 colors if we are requested to do so */
-		ipp->funcs->ipp_set_legacy_input_gamma_ramp(
-			ipp, ramp, params);
+	ipp->funcs->ipp_program_prescale(ipp, prescale_params);
 
-		ipp->funcs->ipp_set_legacy_input_gamma_mode(ipp, true);
+	ipp->funcs->ipp_set_degamma(ipp, IPP_DEGAMMA_MODE_sRGB);
 
-		/* set bypass */
-		ipp->funcs->ipp_program_prescale(ipp, PIXEL_FORMAT_UNINITIALIZED);
+	calculate_regamma_params(regamma_params, temp_params, ramp, surface);
 
-		ipp->funcs->ipp_set_degamma(ipp, params, true);
+	opp->funcs->opp_set_regamma(opp, regamma_params);
 
-		opp->funcs->opp_set_regamma(opp, ramp, params, true);
-	} else if (params->selected_gamma_lut ==
-			GRAPHICS_GAMMA_LUT_LEGACY_AND_REGAMMA) {
-		if (!opp->funcs->opp_map_legacy_and_regamma_hw_to_x_user(
-			opp, ramp, params)) {
-			BREAK_TO_DEBUGGER();
-			/* invalid parameters or bug */
-			return false;
-		}
-
-		/* do legacy DCP for 256 colors if we are requested to do so */
-		ipp->funcs->ipp_set_legacy_input_gamma_ramp(
-			ipp, ramp, params);
-
-		ipp->funcs->ipp_set_legacy_input_gamma_mode(ipp, true);
-
-		/* set bypass */
-		ipp->funcs->ipp_program_prescale(ipp, PIXEL_FORMAT_UNINITIALIZED);
-	} else {
-		ipp->funcs->ipp_set_legacy_input_gamma_mode(ipp, false);
-
-		ipp->funcs->ipp_program_prescale(ipp, params->surface_pixel_format);
-
-		/* Do degamma step : remove the given gamma value from FB.
-		 * For FP16 or no degamma do by pass */
-		ipp->funcs->ipp_set_degamma(ipp, params, false);
-
-		opp->funcs->opp_set_regamma(opp, ramp, params, false);
-	}
-
-	/*re-enable low power mode for LUT memory*/
 	opp->funcs->opp_power_on_regamma_lut(opp, false);
 
-	return true;
+	dm_free(opp->ctx, temp_params);
+
+	result = true;
+
+temp_alloc_fail:
+	dm_free(opp->ctx, regamma_params);
+regamma_alloc_fail:
+	dm_free(opp->ctx, prescale_params);
+prescale_alloc_fail:
+	return result;
 }
 
 static enum dc_status bios_parser_crtc_source_select(
@@ -1662,7 +1682,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.reset_hw_ctx = reset_hw_ctx,
 	.set_plane_config = set_plane_config,
 	.update_plane_address = update_plane_address,
-	.set_gamma_ramp = set_gamma_ramp,
+	.set_gamma_correction = set_gamma_ramp,
 	.power_down = power_down,
 	.enable_accelerated_mode = enable_accelerated_mode,
 	.enable_timing_synchronization = enable_timing_synchronization,

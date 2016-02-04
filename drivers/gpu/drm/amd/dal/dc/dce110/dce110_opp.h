@@ -27,7 +27,9 @@
 
 #include "dc_types.h"
 #include "inc/opp.h"
-#include "gamma_types.h"
+#include "core_types.h"
+
+#include "gamma_types.h" /* decprecated */
 
 struct gamma_parameters;
 
@@ -107,14 +109,11 @@ void dce110_opp_power_on_regamma_lut(
 
 bool dce110_opp_set_regamma(
 	struct output_pixel_processor *opp,
-	const struct gamma_ramp *ramp,
-	const struct gamma_parameters *params,
-	bool force_bypass);
+	const struct regamma_params *params);
 
-bool dce110_opp_map_legacy_and_regamma_hw_to_x_user(
+void dce110_opp_power_on_regamma_lut(
 	struct output_pixel_processor *opp,
-	const struct gamma_ramp *gamma_ramp,
-	const struct gamma_parameters *params);
+	bool power_on);
 
 void dce110_opp_set_csc_adjustment(
 	struct output_pixel_processor *opp,

@@ -499,16 +499,20 @@ static void fill_gamma_from_crtc(
 	struct dc_surface *dc_surface)
 {
 	int i;
-	struct gamma_ramp *gamma;
+	struct dc_gamma *gamma;
 	uint16_t *red, *green, *blue;
 	int end = (crtc->gamma_size > NUM_OF_RAW_GAMMA_RAMP_RGB_256) ?
 			NUM_OF_RAW_GAMMA_RAMP_RGB_256 : crtc->gamma_size;
+	struct amdgpu_device *adev = crtc->dev->dev_private;
 
 	red = crtc->gamma_store;
 	green = red + crtc->gamma_size;
 	blue = green + crtc->gamma_size;
 
-	gamma = &dc_surface->gamma_correction;
+	gamma = dc_create_gamma(adev->dm.dc);
+
+	if (gamma == NULL)
+		return;
 
 	for (i = 0; i < end; i++) {
 		gamma->gamma_ramp_rgb256x3x16.red[i] =
@@ -521,6 +525,8 @@ static void fill_gamma_from_crtc(
 
 	gamma->type = GAMMA_RAMP_RBG256X3X16;
 	gamma->size = sizeof(gamma->gamma_ramp_rgb256x3x16);
+
+	dc_surface->gamma_correction = gamma;
 }
 
 static void fill_plane_attributes(

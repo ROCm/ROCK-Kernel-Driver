@@ -49,7 +49,6 @@ struct overlay_gamma_parameters {
 	int32_t ovl_gamma_cont;
 	enum overlay_gamma_adjust adjust_type;
 	enum pixel_format desktop_surface;
-	struct regamma_lut regamma;
 
 	/* here we grow with parameters if necessary */
 };

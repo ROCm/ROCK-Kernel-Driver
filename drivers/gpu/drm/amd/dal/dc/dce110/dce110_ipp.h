@@ -42,7 +42,6 @@ struct dce110_ipp_reg_offsets {
 struct dce110_ipp {
 	struct input_pixel_processor base;
 	struct dce110_ipp_reg_offsets offsets;
-	struct dev_c_lut saved_palette[RGB_256X3X16];
 };
 
 bool dce110_ipp_construct(
@@ -65,29 +64,11 @@ bool dce110_ipp_cursor_set_attributes(
 /* DEGAMMA RELATED */
 bool dce110_ipp_set_degamma(
 	struct input_pixel_processor *ipp,
-	const struct gamma_parameters *params,
-	bool force_bypass);
+	enum ipp_degamma_mode mode);
 
 void dce110_ipp_program_prescale(
 	struct input_pixel_processor *ipp,
-	enum pixel_format pixel_format);
-
-void dce110_ipp_set_legacy_input_gamma_mode(
-		struct input_pixel_processor *ipp,
-		bool is_legacy);
-
-bool dce110_ipp_set_legacy_input_gamma_ramp(
-	struct input_pixel_processor *ipp,
-	const struct gamma_ramp *gamma_ramp,
-	const struct gamma_parameters *params);
-
-bool dce110_ipp_set_palette(
-	struct input_pixel_processor *ipp,
-	const struct dev_c_lut *palette,
-	uint32_t start,
-	uint32_t length,
-	enum pixel_format surface_pixel_format);
-
+	struct ipp_prescale_params *params);
 /*
  * Helper functions to be resused in other ASICs
  */

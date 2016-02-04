@@ -133,68 +133,6 @@ target_alloc_fail:
 	return NULL;
 }
 
-static void build_gamma_params(
-		enum pixel_format pixel_format,
-		struct gamma_parameters *gamma_param)
-{
-	uint32_t i;
-
-	/* translate parameters */
-	gamma_param->surface_pixel_format = pixel_format;
-
-	gamma_param->regamma_adjust_type = GRAPHICS_REGAMMA_ADJUST_SW;
-	gamma_param->degamma_adjust_type = GRAPHICS_REGAMMA_ADJUST_SW;
-
-	gamma_param->selected_gamma_lut = GRAPHICS_GAMMA_LUT_REGAMMA;
-
-	/* TODO support non-legacy gamma */
-	gamma_param->disable_adjustments = false;
-	gamma_param->flag.bits.config_is_changed = 0;
-	gamma_param->flag.bits.regamma_update = 1;
-	gamma_param->flag.bits.gamma_update = 1;
-
-	/* Set regamma */
-	gamma_param->regamma.features.bits.GRAPHICS_DEGAMMA_SRGB = 1;
-	gamma_param->regamma.features.bits.OVERLAY_DEGAMMA_SRGB = 1;
-	gamma_param->regamma.features.bits.GAMMA_RAMP_ARRAY = 0;
-	gamma_param->regamma.features.bits.APPLY_DEGAMMA = 0;
-
-	for (i = 0; i < COEFF_RANGE; i++) {
-		gamma_param->regamma.gamma_coeff.a0[i] = REGAMMA_COEFF_A0;
-		gamma_param->regamma.gamma_coeff.a1[i] = REGAMMA_COEFF_A1;
-		gamma_param->regamma.gamma_coeff.a2[i] = REGAMMA_COEFF_A2;
-		gamma_param->regamma.gamma_coeff.a3[i] = REGAMMA_COEFF_A3;
-		gamma_param->regamma.gamma_coeff.gamma[i] = REGAMMA_COEFF_GAMMA;
-	}
-}
-
-
-static bool program_gamma(
-		struct dc_context *ctx,
-		struct dc_surface *surface,
-		struct input_pixel_processor *ipp,
-		struct output_pixel_processor *opp)
-{
-	struct gamma_parameters *gamma_param;
-	bool result= false;
-
-	gamma_param = dm_alloc(ctx, sizeof(struct gamma_parameters));
-
-	if (!gamma_param)
-		goto gamma_param_fail;
-
-	build_gamma_params(surface->format, gamma_param);
-
-	result = ctx->dc->hwss.set_gamma_ramp(ipp, opp,
-			&surface->gamma_correction,
-			gamma_param);
-
-	dm_free(ctx, gamma_param);
-
-gamma_param_fail:
-	return result;
-}
-
 static bool validate_surface_address(
 		struct dc_plane_address address)
 {
@@ -298,8 +236,11 @@ bool dc_commit_surfaces_to_target(
 	for (i = 0; i < new_surface_count; i++) {
 		struct dc_surface *surface = new_surfaces[i];
 		struct core_surface *core_surface = DC_SURFACE_TO_CORE(surface);
+		struct core_stream *stream =
+				DC_STREAM_TO_CORE(target->public.streams[0]);
 		bool is_valid_address =
 				validate_surface_address(surface->address);
+
 
 		dal_logger_write(dc->ctx->logger,
 					LOG_MAJOR_INTERFACE_TRACE,
@@ -307,9 +248,15 @@ bool dc_commit_surfaces_to_target(
 					"0x%x:",
 					surface);
 
-		program_gamma(dc->ctx, surface,
-			DC_STREAM_TO_CORE(target->public.streams[0])->ipp,
-			DC_STREAM_TO_CORE(target->public.streams[0])->opp);
+		if (surface->gamma_correction) {
+			struct core_gamma *gamma = DC_GAMMA_TO_CORE(
+						surface->gamma_correction);
+
+			dc->hwss.set_gamma_correction(
+					stream->ipp,
+					stream->opp,
+					gamma, core_surface);
+		}
 
 		dc->hwss.set_plane_config(dc, core_surface, target);
 

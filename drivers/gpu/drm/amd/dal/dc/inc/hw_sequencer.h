@@ -56,11 +56,11 @@ struct hw_sequencer_funcs {
 				const struct core_surface *surface,
 				struct core_target *target);
 
-	bool (*set_gamma_ramp)(
+	bool (*set_gamma_correction)(
 				struct input_pixel_processor *ipp,
 				struct output_pixel_processor *opp,
-				const struct gamma_ramp *ramp,
-				const struct gamma_parameters *params);
+				const struct core_gamma *ramp,
+				const struct core_surface *surface);
 
 	void (*power_down)(struct dc *dc);
 

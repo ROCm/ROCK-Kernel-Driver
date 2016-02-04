@@ -108,7 +108,6 @@ struct ovl_csc_adjustment {
 	uint32_t matrix_divider;
 
 	/* DCE50 parameters */
-	struct regamma_lut regamma;
 	enum overlay_gamma_adjust adjust_gamma_type;
 	enum overlay_csc_adjust_type adjust_csc_type;
 	enum overlay_gamut_adjust_type adjust_gamut_type;

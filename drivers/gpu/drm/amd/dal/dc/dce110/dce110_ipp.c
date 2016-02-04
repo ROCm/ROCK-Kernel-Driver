@@ -36,9 +36,6 @@ static struct ipp_funcs funcs = {
 		.ipp_cursor_set_position = dce110_ipp_cursor_set_position,
 		.ipp_program_prescale = dce110_ipp_program_prescale,
 		.ipp_set_degamma = dce110_ipp_set_degamma,
-		.ipp_set_legacy_input_gamma_mode = dce110_ipp_set_legacy_input_gamma_mode,
-		.ipp_set_legacy_input_gamma_ramp = dce110_ipp_set_legacy_input_gamma_ramp,
-		.ipp_set_palette = dce110_ipp_set_palette,
 };
 
 bool dce110_ipp_construct(
