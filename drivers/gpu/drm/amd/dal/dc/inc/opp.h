@@ -263,6 +263,14 @@ enum fmt_stereo_action {
 	FMT_STEREO_ACTION_UPDATE_POLARITY
 };
 
+struct regamma_params {
+	uint32_t *data;
+	struct gamma_curve arr_curve_points[16];
+	struct curve_points arr_points[3];
+	struct pwl_result_data rgb_resulted[256 + 3];
+	uint32_t hw_points_num;
+};
+
 struct opp_funcs {
 	void (*opp_power_on_regamma_lut)(
 		struct output_pixel_processor *opp,
@@ -270,14 +278,7 @@ struct opp_funcs {
 
 	bool (*opp_set_regamma)(
 		struct output_pixel_processor *opp,
-		const struct gamma_ramp *ramp,
-		const struct gamma_parameters *params,
-		bool force_bypass);
-
-	bool (*opp_map_legacy_and_regamma_hw_to_x_user)(
-		struct output_pixel_processor *opp,
-		const struct gamma_ramp *gamma_ramp,
-		const struct gamma_parameters *params);
+		const struct regamma_params *params);
 
 	void (*opp_set_csc_adjustment)(
 		struct output_pixel_processor *opp,

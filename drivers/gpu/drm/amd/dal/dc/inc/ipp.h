@@ -45,6 +45,25 @@ struct input_pixel_processor {
 	struct ipp_funcs *funcs;
 };
 
+enum ipp_prescale_mode {
+	IPP_PRESCALE_MODE_BYPASS,
+	IPP_PRESCALE_MODE_FIXED_SIGNED,
+	IPP_PRESCALE_MODE_FLOAT_SIGNED,
+	IPP_PRESCALE_MODE_FIXED_UNSIGNED,
+	IPP_PRESCALE_MODE_FLOAT_UNSIGNED
+};
+
+struct ipp_prescale_params {
+	enum ipp_prescale_mode mode;
+	uint16_t bias;
+	uint16_t scale;
+};
+
+enum ipp_degamma_mode {
+	IPP_DEGAMMA_MODE_BYPASS,
+	IPP_DEGAMMA_MODE_sRGB
+};
+
 enum wide_gamut_degamma_mode {
 	/*  00  - BITS1:0 Bypass */
 	WIDE_GAMUT_DEGAMMA_MODE_GRAPHICS_BYPASS,
@@ -79,21 +98,11 @@ struct ipp_funcs {
 	/* DEGAMMA RELATED */
 	bool (*ipp_set_degamma)(
 		struct input_pixel_processor *ipp,
-		const struct gamma_parameters *params,
-		bool force_bypass);
+		enum ipp_degamma_mode mode);
 
 	void (*ipp_program_prescale)(
 		struct input_pixel_processor *ipp,
-		enum pixel_format pixel_format);
-
-	void (*ipp_set_legacy_input_gamma_mode)(
-			struct input_pixel_processor *ipp,
-			bool is_legacy);
-
-	bool (*ipp_set_legacy_input_gamma_ramp)(
-		struct input_pixel_processor *ipp,
-		const struct gamma_ramp *gamma_ramp,
-		const struct gamma_parameters *params);
+		struct ipp_prescale_params *params);
 
 	bool (*ipp_set_palette)(
 		struct input_pixel_processor *ipp,

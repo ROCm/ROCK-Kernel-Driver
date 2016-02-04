@@ -40,36 +40,33 @@ struct surface {
 	int ref_count;
 };
 
+struct gamma {
+	struct core_gamma protected;
+	int ref_count;
+};
+
 #define DC_SURFACE_TO_SURFACE(dc_surface) container_of(dc_surface, struct surface, protected.public)
 #define CORE_SURFACE_TO_SURFACE(core_surface) container_of(core_surface, struct surface, protected)
+
+#define DC_GAMMA_TO_GAMMA(dc_gamma) \
+	container_of(dc_gamma, struct gamma, protected.public)
+#define CORE_GAMMA_TO_GAMMA(core_gamma) \
+	container_of(core_gamma, struct gamma, protected)
+
 
 /*******************************************************************************
  * Private functions
  ******************************************************************************/
 static bool construct(struct dc_context *ctx, struct surface *surface)
 {
-	uint32_t i;
-	struct gamma_ramp *gamma =
-			&surface->protected.public.gamma_correction;
-
-	/* construct gamma default value. */
-	for (i = 0; i < NUM_OF_RAW_GAMMA_RAMP_RGB_256; i++) {
-		gamma->gamma_ramp_rgb256x3x16.red[i] =
-				(unsigned short) (i << 8);
-		gamma->gamma_ramp_rgb256x3x16.green[i] =
-				(unsigned short) (i << 8);
-		gamma->gamma_ramp_rgb256x3x16.blue[i] =
-				(unsigned short) (i << 8);
-	}
-	gamma->type = GAMMA_RAMP_TYPE_RGB256;
-	gamma->size = sizeof(gamma->gamma_ramp_rgb256x3x16);
-
 	surface->protected.ctx = ctx;
 	return true;
 }
 
 static void destruct(struct surface *surface)
 {
+	if (surface->protected.public.gamma_correction)
+		dc_gamma_release(surface->protected.public.gamma_correction);
 }
 
 /*******************************************************************************
@@ -121,3 +118,54 @@ void dc_surface_release(const struct dc_surface *dc_surface)
 		dm_free(surface->protected.ctx, surface);
 	}
 }
+
+static bool construct_gamma(struct dc_context *ctx, struct gamma *gamma)
+{
+	return true;
+}
+
+static void destruct_gamma(struct gamma *gamma)
+{
+
+}
+
+void dc_gamma_retain(const struct dc_gamma *dc_gamma)
+{
+	struct gamma *gamma = DC_GAMMA_TO_GAMMA(dc_gamma);
+
+	++gamma->ref_count;
+}
+
+void dc_gamma_release(const struct dc_gamma *dc_gamma)
+{
+	struct gamma *gamma = DC_GAMMA_TO_GAMMA(dc_gamma);
+	--gamma->ref_count;
+
+	if (gamma->ref_count == 0) {
+		destruct_gamma(gamma);
+		dm_free(gamma->protected.ctx, gamma);
+	}
+}
+
+
+struct dc_gamma *dc_create_gamma(const struct dc *dc)
+{
+	struct gamma *gamma = dm_alloc(dc->ctx, sizeof(*gamma));
+
+	if (gamma == NULL)
+		goto alloc_fail;
+
+	if (false == construct_gamma(dc->ctx, gamma))
+		goto construct_fail;
+
+	dc_gamma_retain(&gamma->protected.public);
+
+	return &gamma->protected.public;
+
+construct_fail:
+	dm_free(dc->ctx, gamma);
+
+alloc_fail:
+	return NULL;
+}
+

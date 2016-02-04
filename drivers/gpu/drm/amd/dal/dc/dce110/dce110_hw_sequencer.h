@@ -28,6 +28,7 @@
 
 #include "core_types.h"
 
+#define GAMMA_HW_POINTS_NUM 256
 struct dc;
 
 bool dce110_hw_sequencer_construct(struct dc *dc);

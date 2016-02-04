@@ -1,5 +1,4 @@
-/*
- * Copyright 2012-15 Advanced Micro Devices, Inc.
+/* Copyright 2012-15 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,48 +21,38 @@
  * Authors: AMD
  *
  */
-#ifndef GAMMA_TYPES_H_
 
-#define GAMMA_TYPES_H_
+#ifndef _DCE110_TYPES_H_
+#define __DCE110_TYPES_H_
 
-#include "dc_types.h"
-
-/* TODO: Used in IPP and OPP */
-struct dev_c_lut {
-	uint8_t red;
-	uint8_t green;
-	uint8_t blue;
+#define GAMMA_SEGMENTS_NUM 16
+struct end_point {
+	uint32_t x_value;
+	uint32_t y_value;
+	uint32_t slope;
 };
 
-struct dev_c_lut16 {
-	uint16_t red;
-	uint16_t green;
-	uint16_t blue;
+struct pwl_segment {
+	uint32_t r_value;
+	uint32_t g_value;
+	uint32_t b_value;
+	uint32_t r_delta;
+	uint32_t g_delta;
+	uint32_t b_delta;
 };
 
-/* used by Graphics and Overlay gamma */
-struct gamma_coeff {
-	int32_t gamma[3];
-	int32_t a0[3]; /* index 0 for red, 1 for green, 2 for blue */
-	int32_t a1[3];
-	int32_t a2[3];
-	int32_t a3[3];
+struct dce110_opp_regamma_params {
+	struct {
+		uint8_t num_segments[GAMMA_SEGMENTS_NUM];
+		uint16_t offsets[GAMMA_SEGMENTS_NUM];
+		struct end_point first;
+		struct end_point last;
+	} region_config;
+
+	struct {
+		struct pwl_segment *segments;
+		int num_pwl_segments;
+	} pwl_config;
 };
 
-enum graphics_regamma_adjust {
-	GRAPHICS_REGAMMA_ADJUST_BYPASS = 0, GRAPHICS_REGAMMA_ADJUST_HW, /* without adjustments */
-	GRAPHICS_REGAMMA_ADJUST_SW /* use adjustments */
-};
-
-enum graphics_gamma_lut {
-	GRAPHICS_GAMMA_LUT_LEGACY = 0, /* use only legacy LUT */
-	GRAPHICS_GAMMA_LUT_REGAMMA, /* use only regamma LUT */
-	GRAPHICS_GAMMA_LUT_LEGACY_AND_REGAMMA /* use legacy & regamma LUT's */
-};
-
-enum graphics_degamma_adjust {
-	GRAPHICS_DEGAMMA_ADJUST_BYPASS = 0, GRAPHICS_DEGAMMA_ADJUST_HW, /*without adjustments */
-	GRAPHICS_DEGAMMA_ADJUST_SW /* use adjustments */
-};
-
-#endif
+#endif /* DRIVERS_GPU_DRM_AMD_DAL_DEV_DC_DCE110_DCE110_TYPES_H_ */
