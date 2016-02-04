@@ -773,7 +773,8 @@ enum dc_status dce100_validate_bandwidth(
 	const struct dc *dc,
 	struct validate_context *context)
 {
-	/* TODO implement when needed */
+	/* TODO implement when needed but for now hardcode max value*/
+	context->bw_results.dispclk_khz = 681000;
 
 	return DC_OK;
 }
