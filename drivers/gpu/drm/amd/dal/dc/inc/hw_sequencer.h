@@ -39,22 +39,19 @@ enum pipe_gating_control {
 struct hw_sequencer_funcs {
 
 	enum dc_status (*apply_ctx_to_hw)(
-			const struct dc *dc, struct validate_context *context);
+			struct dc *dc, struct validate_context *context);
 
-	void (*reset_hw_ctx)(
-				struct dc *dc,
-				struct validate_context *context,
-				uint8_t target_count);
+	void (*reset_hw_ctx)(struct dc *dc, struct validate_context *context);
 
-	bool (*set_plane_config)(
+	void (*set_plane_config)(
 				const struct dc *dc,
 				struct core_surface *surface,
-				struct core_target *target);
+				struct pipe_ctx *pipe_ctx);
 
-	bool (*update_plane_address)(
-				const struct dc *dc,
-				const struct core_surface *surface,
-				struct core_target *target);
+	void (*update_plane_addrs)(
+		struct dc *dc,
+		struct resource_context *res_ctx,
+		const struct core_surface *surface);
 
 	bool (*set_gamma_correction)(
 				struct input_pixel_processor *ipp,
@@ -93,9 +90,9 @@ struct hw_sequencer_funcs {
 
 	void (*program_bw)(struct dc *dc, struct validate_context *context);
 
-	void (*enable_stream)(struct core_stream *stream);
+	void (*enable_stream)(struct pipe_ctx *pipe_ctx);
 
-	void (*disable_stream)(struct core_stream *stream);
+	void (*disable_stream)(struct pipe_ctx *pipe_ctx);
 
 	void (*enable_fe_clock)(
 		struct dc_context *ctx, uint8_t controller_id, bool enable);

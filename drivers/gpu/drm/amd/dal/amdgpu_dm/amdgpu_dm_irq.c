@@ -688,7 +688,7 @@ static inline int dm_irq_state(
 		return 0;
 	}
 
-	irq_source = dc_target_get_irq_src(acrtc->target, dal_irq_type);
+	irq_source = dc_target_get_irq_src(adev->dm.dc, acrtc->target, dal_irq_type);
 
 	st = (state == AMDGPU_IRQ_STATE_ENABLE);
 

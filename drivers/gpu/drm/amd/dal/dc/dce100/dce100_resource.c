@@ -530,7 +530,7 @@ void dce100_destruct_resource_pool(struct resource_pool *pool)
 {
 	unsigned int i;
 
-	for (i = 0; i < pool->controller_count; i++) {
+	for (i = 0; i < pool->pipe_count; i++) {
 		if (pool->opps[i] != NULL)
 			dce100_opp_destroy(&pool->opps[i]);
 
@@ -615,12 +615,13 @@ static enum audio_dto_source translate_to_dto_source(enum controller_id crtc_id)
 }
 
 static void build_audio_output(
-	const struct core_stream *stream,
+	const struct pipe_ctx *pipe_ctx,
 	struct audio_output *audio_output)
 {
-	audio_output->engine_id = stream->stream_enc->id;
+	const struct core_stream *stream = pipe_ctx->stream;
+	audio_output->engine_id = pipe_ctx->stream_enc->id;
 
-	audio_output->signal = stream->signal;
+	audio_output->signal = pipe_ctx->signal;
 
 	/* audio_crtc_info  */
 
@@ -654,44 +655,45 @@ static void build_audio_output(
 		stream->public.timing.display_color_depth;
 
 	audio_output->crtc_info.requested_pixel_clock =
-			stream->pix_clk_params.requested_pix_clk;
+			pipe_ctx->pix_clk_params.requested_pix_clk;
 
 	/*
 	 * TODO - Investigate why calculated pixel clk has to be
 	 * requested pixel clk
 	 */
 	audio_output->crtc_info.calculated_pixel_clock =
-			stream->pix_clk_params.requested_pix_clk;
+			pipe_ctx->pix_clk_params.requested_pix_clk;
 
-	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT ||
-			stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
+	if (pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT ||
+			pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
 		audio_output->pll_info.dp_dto_source_clock_in_khz =
 			dal_display_clock_get_dp_ref_clk_frequency(
-				stream->dis_clk);
+				pipe_ctx->dis_clk);
 	}
 
 	audio_output->pll_info.feed_back_divider =
-			stream->pll_settings.feedback_divider;
+			pipe_ctx->pll_settings.feedback_divider;
 
 	audio_output->pll_info.dto_source =
 		translate_to_dto_source(
-			stream->controller_idx + 1);
+			pipe_ctx->pipe_idx + 1);
 
 	/* TODO hard code to enable for now. Need get from stream */
 	audio_output->pll_info.ss_enabled = true;
 
 	audio_output->pll_info.ss_percentage =
-			stream->pll_settings.ss_percentage;
+			pipe_ctx->pll_settings.ss_percentage;
 }
 
 static void get_pixel_clock_parameters(
-	const struct core_stream *stream,
+	const struct pipe_ctx *pipe_ctx,
 	struct pixel_clk_params *pixel_clk_params)
 {
+	const struct core_stream *stream = pipe_ctx->stream;
 	pixel_clk_params->requested_pix_clk = stream->public.timing.pix_clk_khz;
 	pixel_clk_params->encoder_object_id = stream->sink->link->link_enc->id;
 	pixel_clk_params->signal_type = stream->sink->public.sink_signal;
-	pixel_clk_params->controller_id = stream->controller_idx + 1;
+	pixel_clk_params->controller_id = pipe_ctx->pipe_idx + 1;
 	/* TODO: un-hardcode*/
 	pixel_clk_params->requested_sym_clk = LINK_RATE_LOW *
 		LINK_RATE_REF_FREQ_IN_KHZ;
@@ -701,20 +703,20 @@ static void get_pixel_clock_parameters(
 	pixel_clk_params->flags.DISPLAY_BLANKED = 1;
 }
 
-static enum dc_status build_stream_hw_param(struct core_stream *stream)
+static enum dc_status build_pipe_hw_param(struct pipe_ctx *pipe_ctx)
 {
 	/*TODO: unhardcode*/
-	stream->max_tmds_clk_from_edid_in_mhz = 0;
-	stream->max_hdmi_deep_color = COLOR_DEPTH_121212;
-	stream->max_hdmi_pixel_clock = 600000;
+	pipe_ctx->max_tmds_clk_from_edid_in_mhz = 0;
+	pipe_ctx->max_hdmi_deep_color = COLOR_DEPTH_121212;
+	pipe_ctx->max_hdmi_pixel_clock = 600000;
 
-	get_pixel_clock_parameters(stream, &stream->pix_clk_params);
-	stream->clock_source->funcs->get_pix_clk_dividers(
-		stream->clock_source,
-		&stream->pix_clk_params,
-		&stream->pll_settings);
+	get_pixel_clock_parameters(pipe_ctx, &pipe_ctx->pix_clk_params);
+	pipe_ctx->clock_source->funcs->get_pix_clk_dividers(
+		pipe_ctx->clock_source,
+		&pipe_ctx->pix_clk_params,
+		&pipe_ctx->pll_settings);
 
-	build_audio_output(stream, &stream->audio_output);
+	build_audio_output(pipe_ctx, &pipe_ctx->audio_output);
 
 	return DC_OK;
 }
@@ -724,7 +726,7 @@ static enum dc_status validate_mapped_resource(
 		struct validate_context *context)
 {
 	enum dc_status status = DC_OK;
-	uint8_t i, j;
+	uint8_t i, j, k;
 
 	for (i = 0; i < context->target_count; i++) {
 		struct core_target *target = context->targets[i];
@@ -736,33 +738,44 @@ static enum dc_status validate_mapped_resource(
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 			struct core_link *link = stream->sink->link;
 
-			if (!stream->tg->funcs->validate_timing(
-					stream->tg, &stream->public.timing))
-				return DC_FAIL_CONTROLLER_VALIDATE;
+			for (k = 0; k < MAX_PIPES; k++) {
+				struct pipe_ctx *pipe_ctx =
+					&context->res_ctx.pipe_ctx[k];
 
-			if (stream->signal == SIGNAL_TYPE_VIRTUAL)
-				return status;
+				if (context->res_ctx.pipe_ctx[k].stream != stream)
+					continue;
 
-			status = build_stream_hw_param(stream);
+				if (!pipe_ctx->tg->funcs->validate_timing(
+						pipe_ctx->tg, &stream->public.timing))
+					return DC_FAIL_CONTROLLER_VALIDATE;
 
-			if (status != DC_OK)
-				return status;
+				if (pipe_ctx->signal == SIGNAL_TYPE_VIRTUAL)
+					return status;
 
-			if (!link->link_enc->funcs->validate_output_with_stream(
-					link->link_enc,
-					stream))
-				return DC_FAIL_ENC_VALIDATE;
+				status = build_pipe_hw_param(pipe_ctx);
 
-			/* TODO: validate audio ASIC caps, encoder */
+				if (status != DC_OK)
+					return status;
 
-			status = dc_link_validate_mode_timing(stream->sink,
-					link,
-					&stream->public.timing);
+				if (!link->link_enc->funcs->validate_output_with_stream(
+						link->link_enc,
+						pipe_ctx))
+					return DC_FAIL_ENC_VALIDATE;
 
-			if (status != DC_OK)
-				return status;
+				/* TODO: validate audio ASIC caps, encoder */
 
-			build_info_frame(stream);
+				status = dc_link_validate_mode_timing(stream->sink,
+						link,
+						&stream->public.timing);
+
+				if (status != DC_OK)
+					return status;
+
+				build_info_frame(pipe_ctx);
+
+				/* do not need to validate non root pipes */
+				break;
+			}
 		}
 	}
 
@@ -783,16 +796,17 @@ static void set_target_unchanged(
 		struct validate_context *context,
 		uint8_t target_idx)
 {
-	uint8_t i;
+	uint8_t i, j;
 	struct core_target *target = context->targets[target_idx];
-
 	context->target_flags[target_idx].unchanged = true;
 	for (i = 0; i < target->public.stream_count; i++) {
-		struct core_stream *core_stream =
+		struct core_stream *stream =
 			DC_STREAM_TO_CORE(target->public.streams[i]);
-		uint8_t index = core_stream->controller_idx;
-
-		context->res_ctx.controller_ctx[index].flags.unchanged = true;
+		for (j = 0; j < MAX_PIPES; j++) {
+			if (context->res_ctx.pipe_ctx[j].stream == stream)
+				context->res_ctx.pipe_ctx[j].flags.unchanged =
+									true;
+		}
 	}
 }
 
@@ -800,24 +814,7 @@ static enum dc_status map_clock_resources(
 		const struct dc *dc,
 		struct validate_context *context)
 {
-	uint8_t i, j;
-
-	/* mark resources used for targets that are already active */
-	for (i = 0; i < context->target_count; i++) {
-		struct core_target *target = context->targets[i];
-
-		if (!context->target_flags[i].unchanged)
-			continue;
-
-		for (j = 0; j < target->public.stream_count; j++) {
-			struct core_stream *stream =
-				DC_STREAM_TO_CORE(target->public.streams[j]);
-
-			reference_clock_source(
-				&context->res_ctx,
-				stream->clock_source);
-		}
-	}
+	uint8_t i, j, k;
 
 	/* acquire new resources */
 	for (i = 0; i < context->target_count; i++) {
@@ -830,24 +827,35 @@ static enum dc_status map_clock_resources(
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 
-			if (dc_is_dp_signal(stream->signal)
-				|| stream->signal == SIGNAL_TYPE_VIRTUAL)
-				stream->clock_source = context->res_ctx.
-					pool.clock_sources[DCE100_CLK_SRC_EXT];
-			else
-				stream->clock_source =
-					find_used_clk_src_for_sharing(
-							context, stream);
-			if (stream->clock_source == NULL)
-				stream->clock_source =
-					find_first_free_pll(&context->res_ctx);
+			for (k = 0; k < MAX_PIPES; k++) {
+				struct pipe_ctx *pipe_ctx =
+					&context->res_ctx.pipe_ctx[k];
 
-			if (stream->clock_source == NULL)
-				return DC_NO_CLOCK_SOURCE_RESOURCE;
+				if (context->res_ctx.pipe_ctx[k].stream != stream)
+					continue;
 
-			reference_clock_source(
-					&context->res_ctx,
-					stream->clock_source);
+				if (dc_is_dp_signal(pipe_ctx->signal)
+					|| pipe_ctx->signal == SIGNAL_TYPE_VIRTUAL)
+					pipe_ctx->clock_source = context->res_ctx.
+						pool.clock_sources[DCE100_CLK_SRC_EXT];
+				else
+					pipe_ctx->clock_source =
+						find_used_clk_src_for_sharing(
+							&context->res_ctx, pipe_ctx);
+				if (pipe_ctx->clock_source == NULL)
+					pipe_ctx->clock_source =
+						find_first_free_pll(&context->res_ctx);
+
+				if (pipe_ctx->clock_source == NULL)
+					return DC_NO_CLOCK_SOURCE_RESOURCE;
+
+				reference_clock_source(
+						&context->res_ctx,
+						pipe_ctx->clock_source);
+
+				/* only one cs per stream regardless of mpo */
+				break;
+			}
 		}
 	}
 
@@ -865,23 +873,29 @@ enum dc_status dce100_validate_with_context(
 	struct dc_context *dc_ctx = dc->ctx;
 
 	for (i = 0; i < set_count; i++) {
+		bool unchanged = false;
+
 		context->targets[i] = DC_TARGET_TO_CORE(set[i].target);
+		context->target_count++;
 
 		for (j = 0; j < dc->current_context.target_count; j++)
-			if (dc->current_context.targets[j] == context->targets[i])
+			if (dc->current_context.targets[j]
+						== context->targets[i]) {
+				unchanged = true;
 				set_target_unchanged(context, i);
-
-		if (!context->target_flags[i].unchanged)
-			if (!logical_attach_surfaces_to_target(
+				context->target_status[i] =
+					dc->current_context.target_status[j];
+			}
+		if (!unchanged)
+			if (!attach_surfaces_to_context(
 					(struct dc_surface **)set[i].surfaces,
 					set[i].surface_count,
-					&context->targets[i]->public)) {
+					&context->targets[i]->public,
+					context)) {
 				DC_ERROR("Failed to attach surface to target!\n");
 				return DC_FAIL_ATTACH_SURFACES;
 			}
 	}
-
-	context->target_count = set_count;
 
 	context->res_ctx.pool = dc->res_pool;
 
@@ -969,7 +983,7 @@ bool dce100_construct_resource_pool(
 
 	}
 
-	pool->controller_count =
+	pool->pipe_count =
 		dal_adapter_service_get_func_controllers_num(adapter_serv);
 	pool->stream_enc_count = dal_adapter_service_get_stream_engines_num(
 			adapter_serv);
@@ -980,7 +994,7 @@ bool dce100_construct_resource_pool(
 		goto filter_create_fail;
 	}
 
-	for (i = 0; i < pool->controller_count; i++) {
+	for (i = 0; i < pool->pipe_count; i++) {
 		pool->timing_generators[i] = dce100_timing_generator_create(
 				adapter_serv, ctx, i, &dce100_tg_offsets[i]);
 		if (pool->timing_generators[i] == NULL) {
@@ -1031,7 +1045,7 @@ bool dce100_construct_resource_pool(
 	audio_init_data.as = adapter_serv;
 	audio_init_data.ctx = ctx;
 	pool->audio_count = 0;
-	for (i = 0; i < pool->controller_count; i++) {
+	for (i = 0; i < pool->pipe_count; i++) {
 		struct graphics_object_id obj_id;
 
 		obj_id = dal_adapter_service_enum_audio_object(adapter_serv, i);
@@ -1089,13 +1103,13 @@ stream_enc_create_fail:
 	}
 
 audio_create_fail:
-	for (i = 0; i < pool->controller_count; i++) {
+	for (i = 0; i < pool->pipe_count; i++) {
 		if (pool->audios[i] != NULL)
 			dal_audio_destroy(&pool->audios[i]);
 	}
 
 controller_create_fail:
-	for (i = 0; i < pool->controller_count; i++) {
+	for (i = 0; i < pool->pipe_count; i++) {
 		if (pool->opps[i] != NULL)
 			dce100_opp_destroy(&pool->opps[i]);
 

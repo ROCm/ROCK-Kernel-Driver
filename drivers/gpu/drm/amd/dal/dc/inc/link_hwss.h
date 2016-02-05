@@ -49,7 +49,7 @@ void dp_receiver_power_ctrl(struct core_link *link, bool on);
 
 void dp_disable_link_phy(struct core_link *link, enum signal_type signal);
 
-void dp_disable_link_phy_mst(struct core_link *link, struct core_stream *stream);
+void dp_disable_link_phy_mst(struct core_link *link, enum signal_type signal);
 
 bool dp_set_hw_training_pattern(
 	struct core_link *link,

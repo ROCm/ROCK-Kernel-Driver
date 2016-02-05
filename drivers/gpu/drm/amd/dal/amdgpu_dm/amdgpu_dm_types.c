@@ -484,8 +484,7 @@ static void fill_plane_attributes_from_fb(
 	surface->scaling_quality.v_taps_c = 2;
 
 	/* TODO: unhardcode */
-	surface->colorimetry.limited_range = false;
-	surface->colorimetry.color_space = SURFACE_COLOR_SPACE_SRGB;
+	surface->color_space = COLOR_SPACE_SRGB_FULL_RANGE;
 	surface->scaling_quality.h_taps = 2;
 	surface->scaling_quality.v_taps = 2;
 	surface->stereo_format = PLANE_STEREO_FORMAT_NONE;

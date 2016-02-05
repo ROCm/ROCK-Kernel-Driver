@@ -172,7 +172,7 @@ static void init_hw(struct dc *dc)
 	struct transform *xfm;
 
 	bp = dal_adapter_service_get_bios_parser(dc->res_pool.adapter_srv);
-	for(i = 0; i < dc->res_pool.controller_count; i++) {
+	for (i = 0; i < dc->res_pool.pipe_count; i++) {
 		xfm = dc->res_pool.transforms[i];
 
 		dc->hwss.enable_display_power_gating(
@@ -201,7 +201,7 @@ static void init_hw(struct dc *dc)
 		link->link_enc->funcs->hw_init(link->link_enc);
 	}
 
-	for(i = 0; i < dc->res_pool.controller_count; i++) {
+	for (i = 0; i < dc->res_pool.pipe_count; i++) {
 		struct timing_generator *tg = dc->res_pool.timing_generators[i];
 
 		tg->funcs->disable_vga(tg);
@@ -466,11 +466,11 @@ static void program_timing_sync(
 	uint8_t i;
 	uint8_t j;
 	uint8_t group_size = 0;
-	uint8_t tg_count = ctx->res_ctx.pool.controller_count;
+	uint8_t tg_count = ctx->res_ctx.pool.pipe_count;
 	struct timing_generator *tg_set[3];
 
 	for (i = 0; i < tg_count; i++) {
-		if (!ctx->res_ctx.controller_ctx[i].stream)
+		if (!ctx->res_ctx.pipe_ctx[i].stream)
 			continue;
 
 		tg_set[0] = ctx->res_ctx.pool.timing_generators[i];
@@ -480,13 +480,13 @@ static void program_timing_sync(
 		 * same timing, add all tgs with same timing to the group
 		 */
 		for (j = i + 1; j < tg_count; j++) {
-			if (!ctx->res_ctx.controller_ctx[j].stream)
+			if (!ctx->res_ctx.pipe_ctx[j].stream)
 				continue;
 
 			if (is_same_timing(
-				&ctx->res_ctx.controller_ctx[j].stream->public
+				&ctx->res_ctx.pipe_ctx[j].stream->public
 								.timing,
-				&ctx->res_ctx.controller_ctx[i].stream->public
+				&ctx->res_ctx.pipe_ctx[i].stream->public
 								.timing)) {
 				tg_set[group_size] =
 					ctx->res_ctx.pool.timing_generators[j];
@@ -580,7 +580,7 @@ bool dc_commit_targets(
 	}
 
 	if (result == DC_OK) {
-		dc->hwss.reset_hw_ctx(dc, context, target_count);
+		dc->hwss.reset_hw_ctx(dc, context);
 
 		if (context->target_count > 0)
 			result = dc->hwss.apply_ctx_to_hw(dc, context);
@@ -588,7 +588,7 @@ bool dc_commit_targets(
 
 	for (i = 0; i < context->target_count; i++) {
 		struct dc_target *dc_target = &context->targets[i]->public;
-		if (context->targets[i]->status.surface_count > 0)
+		if (context->target_status[i].surface_count > 0)
 			dc_target_enable_memory_requests(dc_target);
 	}
 
@@ -609,7 +609,6 @@ bool dc_commit_targets(
 
 	pplib_apply_display_requirements(dc, context, &context->pp_display_cfg);
 
-	/* TODO: disable unused plls*/
 fail:
 	dm_free(dc->ctx, context);
 
@@ -659,12 +658,13 @@ const struct audio **dc_get_audios(struct dc *dc)
 
 void dc_get_caps(const struct dc *dc, struct dc_caps *caps)
 {
-	caps->max_targets = dc->res_pool.controller_count;
+	caps->max_targets = dc->res_pool.pipe_count;
 	caps->max_links = dc->link_count;
 	caps->max_audios = dc->res_pool.audio_count;
 }
 
-void dc_flip_surface_addrs(struct dc* dc,
+void dc_flip_surface_addrs(
+		struct dc *dc,
 		const struct dc_surface *const surfaces[],
 		struct dc_flip_addrs flip_addrs[],
 		uint32_t count)
@@ -679,10 +679,8 @@ void dc_flip_surface_addrs(struct dc* dc,
 		surface->public.address = flip_addrs[i].address;
 		surface->public.flip_immediate = flip_addrs[i].flip_immediate;
 
-		dc->hwss.update_plane_address(
-			dc,
-			surface,
-			DC_TARGET_TO_CORE(surface->status.dc_target));
+		dc->hwss.update_plane_addrs(
+				dc, &dc->current_context.res_ctx, surface);
 	}
 }
 
@@ -737,27 +735,19 @@ const struct dc_target *dc_get_target_on_irq_source(
 
 	for (i = 0; i < dc->current_context.target_count; i++) {
 		struct core_target *target = dc->current_context.targets[i];
-
-		struct dc_target *dc_target;
-
-		if (NULL == target) {
-			dm_error("%s: 'dc_target' is NULL for irq source: %d\n!",
-					__func__, src);
-			continue;
-		}
-
-		dc_target = &target->public;
+		struct dc_target *dc_target = &target->public;
 
 		for (j = 0; j < target->public.stream_count; j++) {
 			const struct core_stream *stream =
 				DC_STREAM_TO_CORE(dc_target->streams[j]);
-			const uint8_t controller_idx = stream->controller_idx;
 
-			if (controller_idx == crtc_idx)
+			if (dc->current_context.res_ctx.
+					pipe_ctx[crtc_idx].stream == stream)
 				return dc_target;
 		}
 	}
 
+	dm_error("%s: 'dc_target' is NULL for irq source: %d\n!", __func__, src);
 	return NULL;
 }
 

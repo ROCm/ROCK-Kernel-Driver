@@ -93,13 +93,13 @@ void dp_disable_link_phy(struct core_link *link, enum signal_type signal)
 			sizeof(link->public.cur_link_settings));
 }
 
-void dp_disable_link_phy_mst(struct core_link *link, struct core_stream *stream)
+void dp_disable_link_phy_mst(struct core_link *link, enum signal_type signal)
 {
 	/* MST disable link only when no stream use the link */
 	if (link->mst_stream_alloc_table.stream_count > 0)
 		return;
 
-	dp_disable_link_phy(link, stream->signal);
+	dp_disable_link_phy(link, signal);
 }
 
 bool dp_set_hw_training_pattern(

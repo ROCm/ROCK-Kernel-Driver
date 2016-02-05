@@ -19,6 +19,7 @@ struct link_mst_stream_allocation_table;
 struct dc_link_settings;
 struct link_training_settings;
 struct core_stream;
+struct pipe_ctx;
 
 struct encoder_init_data {
 	struct adapter_service *adapter_service;
@@ -82,8 +83,8 @@ struct link_encoder {
 };
 
 struct link_encoder_funcs {
-	bool (*validate_output_with_stream)(struct link_encoder *enc,
-		struct core_stream *stream);
+	bool (*validate_output_with_stream)(
+		struct link_encoder *enc, struct pipe_ctx *pipe_ctx);
 	void (*hw_init)(struct link_encoder *enc);
 	void (*setup)(struct link_encoder *enc,
 		enum signal_type signal);
