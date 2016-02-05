@@ -232,13 +232,6 @@ struct core_link {
 	struct graphics_object_id link_id;
 	union ddi_channel_mapping ddi_channel_mapping;
 	struct connector_device_tag_info device_tag;
-	/* caps is the same as reported_link_cap. link_traing use
-	 * reported_link_cap. Will clean up.  TODO */
-	struct link_settings reported_link_cap;
-	struct link_settings verified_link_cap;
-	struct link_settings max_link_setting;
-	struct link_settings cur_link_settings;
-	struct lane_settings ln_setting;
 	struct dpcd_caps dpcd_caps;
 	unsigned int dpcd_sink_count;
 
