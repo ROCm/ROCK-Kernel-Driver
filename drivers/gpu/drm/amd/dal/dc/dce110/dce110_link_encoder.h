@@ -107,13 +107,13 @@ void dce110_link_encoder_enable_tmds_output(
 /* enables DP PHY output */
 void dce110_link_encoder_enable_dp_output(
 	struct link_encoder *enc,
-	const struct link_settings *link_settings,
+	const struct dc_link_settings *link_settings,
 	enum clock_source_id clock_source);
 
 /* enables DP PHY output in MST mode */
 void dce110_link_encoder_enable_dp_mst_output(
 	struct link_encoder *enc,
-	const struct link_settings *link_settings,
+	const struct dc_link_settings *link_settings,
 	enum clock_source_id clock_source);
 
 /* disable PHY output */

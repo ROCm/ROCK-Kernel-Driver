@@ -43,7 +43,7 @@ enum dc_status core_link_write_dpcd(
 void dp_enable_link_phy(
 	struct core_link *link,
 	enum signal_type signal,
-	const struct link_settings *link_settings);
+	const struct dc_link_settings *link_settings);
 
 void dp_receiver_power_ctrl(struct core_link *link, bool on);
 

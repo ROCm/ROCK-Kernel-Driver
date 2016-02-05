@@ -35,7 +35,7 @@ struct encoder_info_frame {
 
 struct encoder_unblank_param {
 	struct hw_crtc_timing crtc_timing;
-	struct link_settings link_settings;
+	struct dc_link_settings link_settings;
 };
 
 struct encoder_set_dp_phy_pattern_param {

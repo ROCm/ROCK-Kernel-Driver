@@ -564,7 +564,7 @@ static uint8_t get_frontend_source(
 
 static void configure_encoder(
 	struct dce110_link_encoder *enc110,
-	const struct link_settings *link_settings)
+	const struct dc_link_settings *link_settings)
 {
 	struct dc_context *ctx = enc110->base.ctx;
 	uint32_t addr;
@@ -1351,7 +1351,7 @@ void dce110_link_encoder_enable_tmds_output(
 /* enables DP PHY output */
 void dce110_link_encoder_enable_dp_output(
 	struct link_encoder *enc,
-	const struct link_settings *link_settings,
+	const struct dc_link_settings *link_settings,
 	enum clock_source_id clock_source)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
@@ -1394,7 +1394,7 @@ void dce110_link_encoder_enable_dp_output(
 /* enables DP PHY output in MST mode */
 void dce110_link_encoder_enable_dp_mst_output(
 	struct link_encoder *enc,
-	const struct link_settings *link_settings,
+	const struct dc_link_settings *link_settings,
 	enum clock_source_id clock_source)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);

@@ -1141,7 +1141,7 @@ static enum dc_status enable_link_dp(struct core_stream *stream)
 	enum dc_status status;
 	bool skip_video_pattern;
 	struct core_link *link = stream->sink->link;
-	struct link_settings link_settings = {0};
+	struct dc_link_settings link_settings = {0};
 	enum dp_panel_mode panel_mode;
 
 	/* get link settings for video mode timing */
@@ -1215,7 +1215,7 @@ static void enable_link_hdmi(struct core_stream *stream)
 			stream->public.timing.flags.LTE_340MCSC_SCRAMBLE);
 
 	dm_memset(&stream->sink->link->public.cur_link_settings, 0,
-			sizeof(struct link_settings));
+			sizeof(struct dc_link_settings));
 
 	link->link_enc->funcs->enable_tmds_output(
 			link->link_enc,
@@ -1341,7 +1341,7 @@ void core_link_resume(struct core_link *link)
 
 static struct fixed31_32 get_pbn_per_slot(struct core_stream *stream)
 {
-	struct link_settings *link_settings =
+	struct dc_link_settings *link_settings =
 			&stream->sink->link->public.cur_link_settings;
 	uint32_t link_rate_in_mbps =
 			link_settings->link_rate * LINK_RATE_REF_FREQ_IN_MHZ;

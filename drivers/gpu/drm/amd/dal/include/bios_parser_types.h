@@ -96,7 +96,7 @@ struct bp_encoder_control {
 	enum engine_id engine_id;
 	enum transmitter transmitter;
 	enum signal_type signal;
-	enum lane_count lanes_number;
+	enum dc_lane_count lanes_number;
 	enum dc_color_depth color_depth;
 	bool enable_dp_audio;
 	uint32_t pixel_clock; /* khz */
@@ -105,8 +105,8 @@ struct bp_encoder_control {
 struct bp_external_encoder_control {
 	enum bp_external_encoder_control_action action;
 	enum engine_id engine_id;
-	enum link_rate link_rate;
-	enum lane_count lanes_number;
+	enum dc_link_rate link_rate;
+	enum dc_lane_count lanes_number;
 	enum signal_type signal;
 	enum dc_color_depth color_depth;
 	bool coherent;
@@ -130,7 +130,7 @@ struct bp_transmitter_control {
 	enum bp_transmitter_control_action action;
 	enum engine_id engine_id;
 	enum transmitter transmitter; /* PhyId */
-	enum lane_count lanes_number;
+	enum dc_lane_count lanes_number;
 	enum clock_source_id pll_id; /* needed for DCE 4.0 */
 	enum signal_type signal;
 	enum dc_color_depth color_depth; /* not used for DCE6.0 */

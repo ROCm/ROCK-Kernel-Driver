@@ -284,11 +284,11 @@ struct dc_link {
 	/* caps is the same as reported_link_cap. link_traing use
 	 * reported_link_cap. Will clean up.  TODO
 	 */
-	struct link_settings reported_link_cap;
-	struct link_settings verified_link_cap;
-	struct link_settings max_link_setting;
-	struct link_settings cur_link_settings;
-	struct lane_settings ln_setting;
+	struct dc_link_settings reported_link_cap;
+	struct dc_link_settings verified_link_cap;
+	struct dc_link_settings max_link_setting;
+	struct dc_link_settings cur_link_settings;
+	struct dc_lane_settings cur_lane_setting;
 };
 
 /*

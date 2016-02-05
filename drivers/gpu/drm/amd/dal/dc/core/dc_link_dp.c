@@ -11,7 +11,7 @@
 #include "dpcd_defs.h"
 
 /* maximum pre emphasis level allowed for each voltage swing level*/
-static const enum pre_emphasis voltage_swing_to_pre_emphasis[] = {
+static const enum dc_pre_emphasis voltage_swing_to_pre_emphasis[] = {
 		PRE_EMPHASIS_LEVEL3,
 		PRE_EMPHASIS_LEVEL2,
 		PRE_EMPHASIS_LEVEL1,
@@ -30,7 +30,7 @@ enum {
 	LINK_TRAINING_MAX_CR_RETRY = 100
 };
 
-static const struct link_settings link_training_fallback_table[] = {
+static const struct dc_link_settings link_training_fallback_table[] = {
 /* 2160 Mbytes/sec*/
 { LANE_COUNT_FOUR, LINK_RATE_HIGH2, LINK_SPREAD_DISABLED },
 /* 1080 Mbytes/sec*/
@@ -277,10 +277,10 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 				dpcd_lt_buffer,
 				size_in_bytes + sizeof(dpcd_pattern.raw) );
 
-	link->public.ln_setting = lt_settings->lane_settings[0];
+	link->public.cur_lane_setting = lt_settings->lane_settings[0];
 }
 
-static bool is_cr_done(enum lane_count ln_count,
+static bool is_cr_done(enum dc_lane_count ln_count,
 	union lane_status *dpcd_lane_status)
 {
 	bool done = true;
@@ -294,7 +294,7 @@ static bool is_cr_done(enum lane_count ln_count,
 
 }
 
-static bool is_ch_eq_done(enum lane_count ln_count,
+static bool is_ch_eq_done(enum dc_lane_count ln_count,
 	union lane_status *dpcd_lane_status,
 	union lane_align_status_updated *lane_status_updated)
 {
@@ -342,10 +342,10 @@ static uint8_t get_nibble_at_index(const uint8_t *buf,
 	return nibble;
 }
 
-static enum pre_emphasis get_max_pre_emphasis_for_voltage_swing(
-	enum voltage_swing voltage)
+static enum dc_pre_emphasis get_max_pre_emphasis_for_voltage_swing(
+	enum dc_voltage_swing voltage)
 {
-	enum pre_emphasis pre_emphasis;
+	enum dc_pre_emphasis pre_emphasis;
 	pre_emphasis = PRE_EMPHASIS_MAX_LEVEL;
 
 	if (voltage <= VOLTAGE_SWING_MAX_LEVEL)
@@ -360,7 +360,7 @@ static void find_max_drive_settings(
 	struct link_training_settings *max_lt_setting)
 {
 	uint32_t lane;
-	struct lane_settings max_requested;
+	struct dc_lane_settings max_requested;
 
 	max_requested.VOLTAGE_SWING =
 		link_training_setting->
@@ -514,10 +514,10 @@ static void get_lane_status_and_drive_settings(
 		lane++) {
 
 		request_settings.lane_settings[lane].VOLTAGE_SWING =
-			(enum voltage_swing)(dpcd_lane_adjust[lane].bits.
+			(enum dc_voltage_swing)(dpcd_lane_adjust[lane].bits.
 				VOLTAGE_SWING_LANE);
 		request_settings.lane_settings[lane].PRE_EMPHASIS =
-			(enum pre_emphasis)(dpcd_lane_adjust[lane].bits.
+			(enum dc_pre_emphasis)(dpcd_lane_adjust[lane].bits.
 				PRE_EMPHASIS_LANE);
 	}
 
@@ -599,7 +599,7 @@ static void dpcd_set_lane_settings(
 		dpcd_lane[0].bits.MAX_SWING_REACHED,
 		dpcd_lane[0].bits.MAX_PRE_EMPHASIS_REACHED);
 
-	link->public.ln_setting = link_training_setting->lane_settings[0];
+	link->public.cur_lane_setting = link_training_setting->lane_settings[0];
 
 }
 
@@ -633,7 +633,7 @@ static bool perform_post_lt_adj_req_sequence(
 	struct core_link *link,
 	struct link_training_settings *lt_settings)
 {
-	enum lane_count lane_count =
+	enum dc_lane_count lane_count =
 	lt_settings->link_settings.lane_count;
 
 	uint32_t adj_req_count;
@@ -753,7 +753,7 @@ static bool perform_channel_equalization_sequence(
 	struct link_training_settings req_settings;
 	enum hw_dp_training_pattern hw_tr_pattern;
 	uint32_t retries_ch_eq;
-	enum lane_count lane_count = lt_settings->link_settings.lane_count;
+	enum dc_lane_count lane_count = lt_settings->link_settings.lane_count;
 	union lane_align_status_updated dpcd_lane_status_updated = {{0}};
 	union lane_status dpcd_lane_status[LANE_COUNT_DP_MAX] = {{{0}}};;
 
@@ -816,7 +816,7 @@ static bool perform_clock_recovery_sequence(
 	uint32_t retry_count;
 	uint32_t lane;
 	struct link_training_settings req_settings;
-	enum lane_count lane_count =
+	enum dc_lane_count lane_count =
 	lt_settings->link_settings.lane_count;
 	enum hw_dp_training_pattern hw_tr_pattern = HW_DP_TRAINING_PATTERN_1;
 	union lane_status dpcd_lane_status[LANE_COUNT_DP_MAX];
@@ -924,7 +924,7 @@ static bool perform_clock_recovery_sequence(
 
  bool perform_link_training(
 	struct core_link *link,
-	const struct link_settings *link_setting,
+	const struct dc_link_settings *link_setting,
 	bool skip_video_pattern)
 {
 	bool status;
@@ -1027,8 +1027,8 @@ static bool perform_clock_recovery_sequence(
 
 /*TODO add more check to see if link support request link configuration */
 static bool is_link_setting_supported(
-	const struct link_settings *link_setting,
-	const struct link_settings *max_link_setting)
+	const struct dc_link_settings *link_setting,
+	const struct dc_link_settings *max_link_setting)
 {
 	if (link_setting->lane_count > max_link_setting->lane_count ||
 		link_setting->link_rate > max_link_setting->link_rate)
@@ -1042,23 +1042,24 @@ static const uint32_t get_link_training_fallback_table_len(
 	return ARRAY_SIZE(link_training_fallback_table);
 }
 
-static const struct link_settings *get_link_training_fallback_table(
+static const struct dc_link_settings *get_link_training_fallback_table(
 	struct core_link *link, uint32_t i)
 {
 	return &link_training_fallback_table[i];
 }
 
-static bool exceeded_limit_link_setting(const struct link_settings *link_setting,
-			const struct link_settings *limit_link_setting)
+static bool exceeded_limit_link_setting(
+	const struct dc_link_settings *link_setting,
+	const struct dc_link_settings *limit_link_setting)
 {
 	return (link_setting->lane_count * link_setting->link_rate
 		 > limit_link_setting->lane_count * limit_link_setting->link_rate ?
 				 true : false);
 }
 
-static enum link_rate get_max_link_rate(struct core_link *link)
+static enum dc_link_rate get_max_link_rate(struct core_link *link)
 {
-	enum link_rate max_link_rate = LINK_RATE_HIGH;
+	enum dc_link_rate max_link_rate = LINK_RATE_HIGH;
 
 	if (link->link_enc->features.flags.bits.IS_HBR2_CAPABLE)
 		max_link_rate = LINK_RATE_HIGH2;
@@ -1071,12 +1072,12 @@ static enum link_rate get_max_link_rate(struct core_link *link)
 
 bool dp_hbr_verify_link_cap(
 	struct core_link *link,
-	struct link_settings *known_limit_link_setting)
+	struct dc_link_settings *known_limit_link_setting)
 {
-	struct link_settings max_link_cap = {0};
+	struct dc_link_settings max_link_cap = {0};
 	bool success;
 	bool skip_link_training;
-	const struct link_settings *cur;
+	const struct dc_link_settings *cur;
 	bool skip_video_pattern;
 	uint32_t i;
 
@@ -1212,7 +1213,7 @@ static uint32_t bandwidth_in_kbps_from_timing(
 }
 
 static uint32_t bandwidth_in_kbps_from_link_settings(
-	const struct link_settings *link_setting)
+	const struct dc_link_settings *link_setting)
 {
 	uint32_t link_rate_in_kbps = link_setting->link_rate *
 		LINK_RATE_REF_FREQ_IN_KHZ;
@@ -1233,7 +1234,7 @@ bool dp_validate_mode_timing(
 	uint32_t req_bw;
 	uint32_t max_bw;
 
-	const struct link_settings *link_setting;
+	const struct dc_link_settings *link_setting;
 
 	/*always DP fail safe mode*/
 	if (timing->pix_clk_khz == (uint32_t)25175 &&
@@ -1275,10 +1276,10 @@ bool dp_validate_mode_timing(
 }
 
 void decide_link_settings(struct core_stream *stream,
-	struct link_settings *link_setting)
+	struct dc_link_settings *link_setting)
 {
 
-	const struct link_settings *cur_ls;
+	const struct dc_link_settings *cur_ls;
 	struct core_link* link;
 	uint32_t req_bw;
 	uint32_t link_bw;

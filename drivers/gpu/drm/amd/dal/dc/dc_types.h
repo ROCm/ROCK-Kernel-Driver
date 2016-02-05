@@ -28,6 +28,7 @@
 #include "fixed32_32.h"
 #include "fixed31_32.h"
 #include "irq_types.h"
+#include "dc_dp_types.h"
 
 /* forward declarations */
 struct dc;
