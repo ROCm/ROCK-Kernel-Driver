@@ -749,7 +749,6 @@ struct dc_csc_adjustments {
 	struct fixed31_32 hue;
 };
 
-
 enum {
 	MAX_LANES = 2,
 	MAX_COFUNC_PATH = 6,

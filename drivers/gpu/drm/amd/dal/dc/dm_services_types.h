@@ -26,8 +26,6 @@
 #ifndef __DM_SERVICES_TYPES_H__
 #define __DM_SERVICES_TYPES_H__
 
-#define INVALID_DISPLAY_INDEX 0xffffffff
-
 #if defined __KERNEL__
 
 #include <asm/byteorder.h>
