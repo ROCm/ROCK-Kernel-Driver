@@ -92,7 +92,8 @@ static uint32_t get_process_page_dir(void *vm);
 static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm, int fd, uint32_t handle, struct kgd_mem **mem);
 static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 		void *vm);
-static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
+static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
+		void *vm);
 static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 		void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr, uint32_t flags);
@@ -756,7 +757,8 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem, void *vm)
 	return -EFAULT;
 }
 
-static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
+static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
+		void *vm)
 {
 	return -EFAULT;
 }
