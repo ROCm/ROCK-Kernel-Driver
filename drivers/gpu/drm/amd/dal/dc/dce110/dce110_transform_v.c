@@ -22,7 +22,7 @@
  * Authors: AMD
  *
  */
-
+#include "dm_services.h"
 
 #include "dc_types.h"
 #include "core_types.h"
