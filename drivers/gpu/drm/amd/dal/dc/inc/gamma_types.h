@@ -27,7 +27,6 @@
 #define GAMMA_TYPES_H_
 
 #include "dc_types.h"
-#include "dm_services_types.h"
 
 /* TODO: Used in IPP and OPP */
 struct dev_c_lut {
