@@ -47,6 +47,7 @@
 */
 
 #include "irq_types.h"
+#include "signal_types.h"
 
 /* Forward declarations */
 struct amdgpu_device;

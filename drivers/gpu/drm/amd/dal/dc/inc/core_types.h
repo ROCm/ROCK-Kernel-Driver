@@ -128,6 +128,8 @@ struct core_stream {
 
 	struct audio_output audio_output;
 	struct dc_context *ctx;
+
+	struct dc_stream_status status;
 };
 
 

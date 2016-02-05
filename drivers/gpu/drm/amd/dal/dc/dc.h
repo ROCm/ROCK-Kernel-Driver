@@ -264,6 +264,16 @@ void dc_stream_release(struct dc_stream *dc_stream);
 void dc_update_stream(const struct dc_stream *dc_stream,
 		struct rect *src, struct rect *dst);
 
+struct dc_stream_status {
+	/*
+	 * link this stream passes through
+	 */
+	const struct dc_link *link;
+};
+
+const struct dc_stream_status *dc_stream_get_status(
+	const struct dc_stream *dc_stream);
+
 /*******************************************************************************
  * Link Interfaces
  ******************************************************************************/
@@ -289,6 +299,9 @@ struct dc_link {
 	struct dc_link_settings max_link_setting;
 	struct dc_link_settings cur_link_settings;
 	struct dc_lane_settings cur_lane_setting;
+
+	uint8_t ddc_hw_inst;
+	uint8_t link_enc_hw_inst;
 };
 
 /*
@@ -458,15 +471,6 @@ bool dc_write_dpcd(
 		uint32_t address,
 		const uint8_t *data,
 	uint32_t size);
-
-
-uint8_t dc_get_dig_index(const struct dc_stream *stream);
-
-enum signal_type  dc_get_display_signal(
-		const struct dc_stream *stream);
-
-enum gpio_ddc_line dc_get_ddc_line(
-		const struct dc_stream *stream);
 
 
 #endif /* DC_INTERFACE_H_ */

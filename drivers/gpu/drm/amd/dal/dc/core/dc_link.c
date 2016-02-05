@@ -977,6 +977,10 @@ static bool construct(
 	ddc_service_init_data.id = link->link_id;
 	link->ddc = dal_ddc_service_create(&ddc_service_init_data);
 
+	link->public.ddc_hw_inst =
+		dal_ddc_get_line(
+			dal_ddc_service_get_ddc_pin(link->ddc));
+
 	if (NULL == link->ddc) {
 		DC_ERROR("Failed to create ddc_service!\n");
 		goto create_fail;
@@ -998,6 +1002,8 @@ static bool construct(
 		DC_ERROR("Failed to create link encoder!\n");
 		goto create_fail;
 	}
+
+	link->public.link_enc_hw_inst = link->link_enc->transmitter;
 
 	dal_adapter_service_get_integrated_info(as, &info);
 
@@ -1621,6 +1627,7 @@ void core_link_enable_stream(
 	}
 
 	dc->hwss.enable_stream(stream);
+	stream->status.link = &link->public;
 
 	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 		allocate_mst_payload(stream);
@@ -1635,6 +1642,7 @@ void core_link_disable_stream(
 	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 		deallocate_mst_payload(stream);
 
+	stream->status.link = NULL;
 	dc->hwss.disable_stream(stream);
 
 	disable_link(stream);
