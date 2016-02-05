@@ -3706,9 +3706,15 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 	struct bw_calcs_results *bw_results_internal = dm_alloc(
 				ctx, sizeof(struct bw_calcs_results));
 	struct bw_calcs_mode_data_internal *bw_data_internal =
-		dm_alloc(
-			ctx, sizeof(struct bw_calcs_mode_data_internal));
+		dm_alloc(ctx, sizeof(struct bw_calcs_mode_data_internal));
+
 	switch (mode_data->number_of_displays) {
+	case (6):
+		/* fall through */
+	case (5):
+		/* fall through */
+	case (4):
+		/* fall through */
 	case (3):
 		bw_data_internal->d2_htotal =
 			mode_data->displays_data[2].h_total;
@@ -3722,6 +3728,7 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 			mode_data->displays_data[2].graphics_scale_ratio;
 		bw_data_internal->d2_graphics_stereo_mode =
 			mode_data->displays_data[2].graphics_stereo_mode;
+		/* fall through */
 	case (2):
 		bw_data_internal->d1_display_write_back_dwb_enable = false;
 		bw_data_internal->d1_underlay_mode = bw_def_none;
@@ -3738,7 +3745,7 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 			mode_data->displays_data[1].graphics_scale_ratio;
 		bw_data_internal->d1_graphics_stereo_mode =
 			mode_data->displays_data[1].graphics_stereo_mode;
-
+		/* fall through */
 	case (1):
 		bw_data_internal->d0_fbc_enable =
 			mode_data->displays_data[0].fbc_enable;
@@ -3759,7 +3766,7 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 			mode_data->displays_data[0].graphics_scale_ratio;
 		bw_data_internal->d0_graphics_stereo_mode =
 			mode_data->displays_data[0].graphics_stereo_mode;
-
+		/* fall through */
 	default:
 		/* data for all displays */
 		bw_data_internal->number_of_displays =

@@ -607,7 +607,7 @@ bool dc_commit_targets(
 
 	program_timing_sync(dc->ctx, context);
 
-	pplib_apply_display_requirements(dc, context);
+	pplib_apply_display_requirements(dc, context, &context->pp_display_cfg);
 
 	/* TODO: disable unused plls*/
 fail:

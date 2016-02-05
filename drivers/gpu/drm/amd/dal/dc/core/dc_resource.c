@@ -530,47 +530,47 @@ void pplib_apply_safe_state(
 
 void pplib_apply_display_requirements(
 	const struct dc *dc,
-	const struct validate_context *context)
+	const struct validate_context *context,
+	struct dc_pp_display_configuration *pp_display_cfg)
 {
-	struct dc_pp_display_configuration pp_display_cfg = { 0 };
 
-	pp_display_cfg.all_displays_in_sync =
+	pp_display_cfg->all_displays_in_sync =
 		context->bw_results.all_displays_in_sync;
-	pp_display_cfg.nb_pstate_switch_disable =
+	pp_display_cfg->nb_pstate_switch_disable =
 			context->bw_results.nbp_state_change_enable == false;
-	pp_display_cfg.cpu_cc6_disable =
+	pp_display_cfg->cpu_cc6_disable =
 			context->bw_results.cpuc_state_change_enable == false;
-	pp_display_cfg.cpu_pstate_disable =
+	pp_display_cfg->cpu_pstate_disable =
 			context->bw_results.cpup_state_change_enable == false;
-	pp_display_cfg.cpu_pstate_separation_time =
+	pp_display_cfg->cpu_pstate_separation_time =
 			context->bw_results.required_blackout_duration_us;
 
-	pp_display_cfg.min_memory_clock_khz = context->bw_results.required_yclk
+	pp_display_cfg->min_memory_clock_khz = context->bw_results.required_yclk
 		/ MEMORY_TYPE_MULTIPLIER;
-	pp_display_cfg.min_engine_clock_khz = context->bw_results.required_sclk;
-	pp_display_cfg.min_engine_clock_deep_sleep_khz
+	pp_display_cfg->min_engine_clock_khz = context->bw_results.required_sclk;
+	pp_display_cfg->min_engine_clock_deep_sleep_khz
 			= context->bw_results.required_sclk_deep_sleep;
 
-	pp_display_cfg.avail_mclk_switch_time_us =
+	pp_display_cfg->avail_mclk_switch_time_us =
 						get_min_vblank_time_us(context);
-	pp_display_cfg.avail_mclk_switch_time_in_disp_active_us = 0;
+	pp_display_cfg->avail_mclk_switch_time_in_disp_active_us = 0;
 
-	pp_display_cfg.disp_clk_khz = context->bw_results.dispclk_khz;
+	pp_display_cfg->disp_clk_khz = context->bw_results.dispclk_khz;
 
-	fill_display_configs(context, &pp_display_cfg);
+	fill_display_configs(context, pp_display_cfg);
 
 	/* TODO: is this still applicable?*/
-	if (pp_display_cfg.display_count == 1) {
+	if (pp_display_cfg->display_count == 1) {
 		const struct dc_crtc_timing *timing =
 			&context->targets[0]->public.streams[0]->timing;
 
-		pp_display_cfg.crtc_index =
-			pp_display_cfg.disp_configs[0].pipe_idx;
-		pp_display_cfg.line_time_in_us = timing->h_total * 1000
+		pp_display_cfg->crtc_index =
+			pp_display_cfg->disp_configs[0].pipe_idx;
+		pp_display_cfg->line_time_in_us = timing->h_total * 1000
 							/ timing->pix_clk_khz;
 	}
 
-	dm_pp_apply_display_requirements(dc->ctx, &pp_display_cfg);
+	dm_pp_apply_display_requirements(dc->ctx, pp_display_cfg);
 }
 
 /* Maximum TMDS single link pixel clock 165MHz */

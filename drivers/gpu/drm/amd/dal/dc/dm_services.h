@@ -303,7 +303,7 @@ struct dc_pp_display_configuration {
 	bool all_displays_in_sync;
 
 	uint8_t display_count;
-	struct dc_pp_single_disp_config disp_configs[3];
+	struct dc_pp_single_disp_config disp_configs[MAX_COFUNC_PATH];
 
 	/*Controller Index of primary display - used in MCLK SMC switching hang
 	 * SW Workaround*/

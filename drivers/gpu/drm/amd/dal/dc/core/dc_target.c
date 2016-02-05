@@ -288,7 +288,8 @@ bool dc_commit_surfaces_to_target(
 
 	if (prev_disp_clk < dc->current_context.bw_results.dispclk_khz) {
 		dc->hwss.program_bw(dc, &dc->current_context);
-		pplib_apply_display_requirements(dc, &dc->current_context);
+		pplib_apply_display_requirements(dc, &dc->current_context,
+				&dc->current_context.pp_display_cfg);
 	}
 
 	if (current_enabled_surface_count > 0 && new_enabled_surface_count == 0)
@@ -322,7 +323,8 @@ bool dc_commit_surfaces_to_target(
 	/* Lower display clock if necessary */
 	if (prev_disp_clk > dc->current_context.bw_results.dispclk_khz) {
 		dc->hwss.program_bw(dc, &dc->current_context);
-		pplib_apply_display_requirements(dc, &dc->current_context);
+		pplib_apply_display_requirements(dc, &dc->current_context,
+				&dc->current_context.pp_display_cfg);
 	}
 
 	return true;
