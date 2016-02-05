@@ -33,46 +33,11 @@
 
 struct bit_depth_reduction_params;
 
-enum scaling_type {
-	SCALING_TYPE_NO_SCALING = 0,
-	SCALING_TYPE_UPSCALING,
-	SCALING_TYPE_DOWNSCALING
-};
-
 struct transform {
 	struct transform_funcs *funcs;
 	struct dc_context *ctx;
 	uint32_t inst;
 	struct scaler_filter *filter;
-};
-
-
-struct scaler_taps_and_ratio {
-	uint32_t h_tap;
-	uint32_t v_tap;
-	uint32_t lo_ratio;
-	uint32_t hi_ratio;
-};
-
-struct scaler_taps {
-	uint32_t h_tap;
-	uint32_t v_tap;
-};
-
-struct sclv_ratios_inits {
-	uint32_t chroma_enable;
-	uint32_t h_int_scale_ratio_luma;
-	uint32_t h_int_scale_ratio_chroma;
-	uint32_t v_int_scale_ratio_luma;
-	uint32_t v_int_scale_ratio_chroma;
-	struct init_int_and_frac h_init_luma;
-	struct init_int_and_frac h_init_chroma;
-	struct init_int_and_frac v_init_luma;
-	struct init_int_and_frac v_init_chroma;
-	struct init_int_and_frac h_init_lumabottom;
-	struct init_int_and_frac h_init_chromabottom;
-	struct init_int_and_frac v_init_lumabottom;
-	struct init_int_and_frac v_init_chromabottom;
 };
 
 enum lb_pixel_depth {
@@ -84,12 +49,6 @@ enum lb_pixel_depth {
 };
 
 
-struct raw_gamma_ramp_rgb {
-       uint32_t red;
-       uint32_t green;
-       uint32_t blue;
-};
-
 enum raw_gamma_ramp_type {
        GAMMA_RAMP_TYPE_UNINITIALIZED,
        GAMMA_RAMP_TYPE_DEFAULT,
@@ -98,12 +57,6 @@ enum raw_gamma_ramp_type {
 };
 
 #define NUM_OF_RAW_GAMMA_RAMP_RGB_256 256
-struct raw_gamma_ramp {
-       enum raw_gamma_ramp_type type;
-       struct raw_gamma_ramp_rgb rgb_256[NUM_OF_RAW_GAMMA_RAMP_RGB_256];
-       uint32_t size;
-};
-
 
 /* Colorimetry */
 enum colorimetry {
@@ -111,18 +64,6 @@ enum colorimetry {
        COLORIMETRY_ITU601 = 1,
        COLORIMETRY_ITU709 = 2,
        COLORIMETRY_EXTENDED = 3
-};
-
-/* ColorimetryEx */
-enum colorimetry_ex {
-       COLORIMETRY_EX_XVYCC601 = 0,
-       COLORIMETRY_EX_XVYCC709 = 1,
-       COLORIMETRY_EX_SYCC601 = 2,
-       COLORIMETRY_EX_ADOBEYCC601 = 3,
-       COLORIMETRY_EX_ADOBERGB = 4,
-       COLORIMETRY_EX_RESERVED5 = 5,
-       COLORIMETRY_EX_RESERVED6 = 6,
-       COLORIMETRY_EX_RESERVED7 = 7
 };
 
 enum ds_color_space {
@@ -137,7 +78,6 @@ enum ds_color_space {
        DS_COLOR_SPACE_YCBCR601_YONLY,
        DS_COLOR_SPACE_YCBCR709_YONLY/*same as YCbCr, but Y in Full range*/
 };
-
 
 enum active_format_info {
        ACTIVE_FORMAT_NO_DATA = 0,
