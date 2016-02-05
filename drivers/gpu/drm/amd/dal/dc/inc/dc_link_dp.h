@@ -28,11 +28,11 @@
 
 struct core_link;
 struct core_stream;
-struct link_settings;
+struct dc_link_settings;
 
 bool dp_hbr_verify_link_cap(
 	struct core_link *link,
-	struct link_settings *known_limit_link_setting);
+	struct dc_link_settings *known_limit_link_setting);
 
 bool dp_validate_mode_timing(
 	struct core_link *link,
@@ -40,11 +40,11 @@ bool dp_validate_mode_timing(
 
 void decide_link_settings(
 	struct core_stream *stream,
-	struct link_settings *link_setting);
+	struct dc_link_settings *link_setting);
 
 bool perform_link_training(
 	struct core_link *link,
-	const struct link_settings *link_setting,
+	const struct dc_link_settings *link_setting,
 	bool skip_video_pattern);
 
 bool is_mst_supported(struct core_link *link);

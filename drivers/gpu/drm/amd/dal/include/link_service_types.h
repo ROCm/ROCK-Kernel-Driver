@@ -52,33 +52,6 @@ struct link_validation_flags {
 	uint32_t START_OF_VALIDATION:1;
 };
 
-/* Post Cursor 2 is optional for transmitter
- * and it applies only to the main link operating at HBR2
- */
-enum post_cursor2 {
-	POST_CURSOR2_DISABLED = 0,	/* direct HW translation! */
-	POST_CURSOR2_LEVEL1,
-	POST_CURSOR2_LEVEL2,
-	POST_CURSOR2_LEVEL3,
-	POST_CURSOR2_MAX_LEVEL = POST_CURSOR2_LEVEL3,
-};
-
-enum voltage_swing {
-	VOLTAGE_SWING_LEVEL0 = 0,	/* direct HW translation! */
-	VOLTAGE_SWING_LEVEL1,
-	VOLTAGE_SWING_LEVEL2,
-	VOLTAGE_SWING_LEVEL3,
-	VOLTAGE_SWING_MAX_LEVEL = VOLTAGE_SWING_LEVEL3
-};
-
-enum pre_emphasis {
-	PRE_EMPHASIS_DISABLED = 0,	/* direct HW translation! */
-	PRE_EMPHASIS_LEVEL1,
-	PRE_EMPHASIS_LEVEL2,
-	PRE_EMPHASIS_LEVEL3,
-	PRE_EMPHASIS_MAX_LEVEL = PRE_EMPHASIS_LEVEL3
-};
-
 enum dpcd_value_mask {
 	DPCD_VALUE_MASK_MAX_LANE_COUNT_LANE_COUNT = 0x1F,
 	DPCD_VALUE_MASK_MAX_LANE_COUNT_TPS3_SUPPORTED = 0x40,
@@ -107,43 +80,6 @@ enum edp_revision {
 	EDP_REVISION_12 = 0x01,
 	/* eDP version 1.3 */
 	EDP_REVISION_13 = 0x02
-};
-
-enum lane_count {
-	LANE_COUNT_UNKNOWN = 0,
-	LANE_COUNT_ONE = 1,
-	LANE_COUNT_TWO = 2,
-	LANE_COUNT_FOUR = 4,
-	LANE_COUNT_EIGHT = 8,
-	LANE_COUNT_DP_MAX = LANE_COUNT_FOUR
-};
-
-/* This is actually a reference clock (27MHz) multiplier
- * 162MBps bandwidth for 1.62GHz like rate,
- * 270MBps for 2.70GHz,
- * 324MBps for 3.24Ghz,
- * 540MBps for 5.40GHz
- * 810MBps for 8.10GHz
- */
-enum link_rate {
-	LINK_RATE_UNKNOWN = 0,
-	LINK_RATE_LOW = 0x06,
-	LINK_RATE_HIGH = 0x0A,
-	LINK_RATE_RBR2 = 0x0C,
-	LINK_RATE_HIGH2 = 0x14,
-	LINK_RATE_HIGH3 = 0x1E
-};
-
-enum {
-	LINK_RATE_REF_FREQ_IN_KHZ = 27000 /*27MHz*/
-};
-
-enum link_spread {
-	LINK_SPREAD_DISABLED = 0x00,
-	/* 0.5 % downspread 30 kHz */
-	LINK_SPREAD_05_DOWNSPREAD_30KHZ = 0x10,
-	/* 0.5 % downspread 33 kHz */
-	LINK_SPREAD_05_DOWNSPREAD_33KHZ = 0x11
 };
 
 /* DPCD_ADDR_DOWNSTREAM_PORT_PRESENT register value */
@@ -186,21 +122,13 @@ union dpcd_sink_count {
 	uint8_t raw;
 };
 
-struct link_settings {
-	enum lane_count lane_count;
-	enum link_rate link_rate;
-	enum link_spread link_spread;
-};
-
-struct lane_settings {
-	enum voltage_swing VOLTAGE_SWING;
-	enum pre_emphasis PRE_EMPHASIS;
-	enum post_cursor2 POST_CURSOR2;
+enum {
+	LINK_RATE_REF_FREQ_IN_KHZ = 27000 /*27MHz*/
 };
 
 struct link_training_settings {
-	struct link_settings link_settings;
-	struct lane_settings lane_settings[LANE_COUNT_DP_MAX];
+	struct dc_link_settings link_settings;
+	struct dc_lane_settings lane_settings[LANE_COUNT_DP_MAX];
 	bool allow_invalid_msa_timing_param;
 };
 

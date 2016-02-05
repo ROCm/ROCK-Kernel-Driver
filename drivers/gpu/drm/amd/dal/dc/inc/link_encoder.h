@@ -16,7 +16,7 @@ struct dc_context;
 struct adapter_service;
 struct encoder_set_dp_phy_pattern_param;
 struct link_mst_stream_allocation_table;
-struct link_settings;
+struct dc_link_settings;
 struct link_training_settings;
 struct core_stream;
 
@@ -94,10 +94,10 @@ struct link_encoder_funcs {
 		bool dual_link,
 		uint32_t pixel_clock);
 	void (*enable_dp_output)(struct link_encoder *enc,
-		const struct link_settings *link_settings,
+		const struct dc_link_settings *link_settings,
 		enum clock_source_id clock_source);
 	void (*enable_dp_mst_output)(struct link_encoder *enc,
-		const struct link_settings *link_settings,
+		const struct dc_link_settings *link_settings,
 		enum clock_source_id clock_source);
 	void (*disable_output)(struct link_encoder *link_enc,
 		enum signal_type signal);

@@ -282,7 +282,7 @@ struct dc_pp_single_disp_config {
 	uint32_t src_width;
 	uint32_t v_refresh;
 	uint32_t sym_clock; /* HDMI only */
-	struct link_settings link_settings; /* DP only */
+	struct dc_link_settings link_settings; /* DP only */
 };
 
 struct dc_pp_display_configuration {

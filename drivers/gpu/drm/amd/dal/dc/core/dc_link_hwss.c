@@ -54,7 +54,7 @@ void dp_receiver_power_ctrl(struct core_link *link, bool on)
 void dp_enable_link_phy(
 	struct core_link *link,
 	enum signal_type signal,
-	const struct link_settings *link_settings)
+	const struct dc_link_settings *link_settings)
 {
 	struct link_encoder *link_enc = link->link_enc;
 

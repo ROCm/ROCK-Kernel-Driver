@@ -616,7 +616,7 @@ static void update_info_frame(struct core_stream *stream)
 
 static void enable_stream(struct core_stream *stream)
 {
-	enum lane_count lane_count =
+	enum dc_lane_count lane_count =
 			stream->sink->link->public.cur_link_settings.lane_count;
 
 	struct dc_crtc_timing *timing = &stream->public.timing;
@@ -697,7 +697,7 @@ static void disable_stream(struct core_stream *stream)
 }
 
 static void unblank_stream(struct core_stream *stream,
-		struct link_settings *link_settings)
+		struct dc_link_settings *link_settings)
 {
 	struct encoder_unblank_param params = { { 0 } };
 
