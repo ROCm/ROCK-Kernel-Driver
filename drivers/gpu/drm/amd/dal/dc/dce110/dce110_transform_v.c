@@ -36,6 +36,24 @@
 #define NOT_IMPLEMENTED()  DAL_LOGGER_NOT_IMPL(LOG_MINOR_COMPONENT_CONTROLLER,\
 			"TRANSFORM SCALER:%s()\n", __func__)
 #define LB_TOTAL_NUMBER_OF_ENTRIES 1712
+
+
+struct sclv_ratios_inits {
+	uint32_t chroma_enable;
+	uint32_t h_int_scale_ratio_luma;
+	uint32_t h_int_scale_ratio_chroma;
+	uint32_t v_int_scale_ratio_luma;
+	uint32_t v_int_scale_ratio_chroma;
+	struct init_int_and_frac h_init_luma;
+	struct init_int_and_frac h_init_chroma;
+	struct init_int_and_frac v_init_luma;
+	struct init_int_and_frac v_init_chroma;
+	struct init_int_and_frac h_init_lumabottom;
+	struct init_int_and_frac h_init_chromabottom;
+	struct init_int_and_frac v_init_lumabottom;
+	struct init_int_and_frac v_init_chromabottom;
+};
+
 /*
 *****************************************************************************
 *  Function: calculateViewport
