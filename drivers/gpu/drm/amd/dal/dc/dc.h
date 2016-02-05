@@ -108,7 +108,7 @@ struct dc_surface {
 
 	union plane_size plane_size;
 	struct dc_tiling_info tiling_info;
-	struct plane_colorimetry colorimetry;
+	enum color_space color_space;
 
 	enum surface_pixel_format format;
 	enum dc_rotation_angle rotation;
@@ -125,7 +125,6 @@ struct dc_surface {
 struct dc_surface_status {
 	struct dc_plane_address requested_address;
 	struct dc_plane_address current_address;
-	const struct dc_target *dc_target;
 };
 
 /*
@@ -228,12 +227,13 @@ bool dc_target_is_connected_to_sink(
 		const struct dc_target *dc_target,
 		const struct dc_sink *dc_sink);
 
-uint8_t dc_target_get_link_index(const struct dc_target *dc_target);
 uint8_t dc_target_get_controller_id(const struct dc_target *dc_target);
 
 uint32_t dc_target_get_vblank_counter(const struct dc_target *dc_target);
 enum dc_irq_source dc_target_get_irq_src(
-	const struct dc_target *dc_target, const enum irq_type irq_type);
+	const struct dc *dc,
+	const struct dc_target *dc_target,
+	const enum irq_type irq_type);
 
 void dc_target_enable_memory_requests(struct dc_target *target);
 void dc_target_disable_memory_requests(struct dc_target *target);

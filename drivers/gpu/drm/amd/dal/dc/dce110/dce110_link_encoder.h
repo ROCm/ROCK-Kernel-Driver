@@ -81,7 +81,7 @@ bool dce110_link_encoder_construct(
 
 bool dce110_link_encoder_validate_output_with_stream(
 	struct link_encoder *enc,
-	struct core_stream *stream);
+	struct pipe_ctx *pipe_ctx);
 
 /****************** HW programming ************************/
 

@@ -39,12 +39,10 @@ struct core_stream;
 	container_of(dc_target, struct core_target, public)
 
 #define MAX_PIPES 6
-#define MAX_STREAMS 6
 #define MAX_CLOCK_SOURCES 7
 
 struct core_target {
 	struct dc_target public;
-	struct dc_target_status status;
 
 	struct dc_context *ctx;
 };
@@ -90,53 +88,12 @@ struct core_stream {
 	struct dc_stream public;
 
 	/* field internal to DC */
+	struct dc_context *ctx;
 	const struct core_sink *sink;
 
-	struct clock_source *clock_source;
-
-	struct mem_input *mi;
-	struct input_pixel_processor *ipp;
-	struct transform *xfm;
-	struct output_pixel_processor *opp;
-	struct timing_generator *tg;
-	struct stream_encoder *stream_enc;
-	struct display_clock *dis_clk;
-
-	struct overscan_info overscan;
-	struct scaling_ratios ratios;
-	struct rect viewport;
-	struct scaling_taps taps;
-	enum pixel_format format;
-
-	uint8_t controller_idx;
-
-	struct audio *audio;
-
-	enum signal_type signal;
-
-	/* TODO: move these members into appropriate places (work in progress)*/
-	/* timing validation (HDMI only) */
-	uint32_t max_tmds_clk_from_edid_in_mhz;
-	/* maximum supported deep color depth for HDMI */
-	enum dc_color_depth max_hdmi_deep_color;
-	/* maximum supported pixel clock for HDMI */
-	uint32_t max_hdmi_pixel_clock;
-	/* end of TODO */
-
-	/*TODO: AUTO merge if possible*/
-	struct pixel_clk_params pix_clk_params;
-	struct pll_settings pll_settings;
-
-	/*fmt*/
-	/*TODO: AUTO new codepath in apply_context to hw to
-	 * generate these bw unrelated/no fail params*/
-	struct bit_depth_reduction_params bit_depth_params;/* used by DCP and FMT */
+	/* used by DCP and FMT */
+	struct bit_depth_reduction_params bit_depth_params;
 	struct clamping_and_pixel_encoding_params clamping;
-	struct hw_info_frame info_frame;
-	struct encoder_info_frame encoder_info_frame;
-
-	struct audio_output audio_output;
-	struct dc_context *ctx;
 
 	struct dc_stream_status status;
 };
@@ -267,13 +224,9 @@ enum dc_status dc_link_validate_mode_timing(
 
 void core_link_resume(struct core_link *link);
 
-void core_link_enable_stream(
-		struct core_link *link,
-		struct core_stream *stream);
+void core_link_enable_stream(struct pipe_ctx *pipe_ctx);
 
-void core_link_disable_stream(
-		struct core_link *link,
-		struct core_stream *stream);
+void core_link_disable_stream(struct pipe_ctx *pipe_ctx);
 
 /********** DAL Core*********************/
 #include "display_clock_interface.h"
@@ -304,10 +257,10 @@ struct resource_pool {
 	struct input_pixel_processor *ipps[MAX_PIPES];
 	struct transform *transforms[MAX_PIPES];
 	struct output_pixel_processor *opps[MAX_PIPES];
-	struct timing_generator *timing_generators[MAX_STREAMS];
+	struct timing_generator *timing_generators[MAX_PIPES];
 	struct stream_encoder *stream_enc[MAX_PIPES * 2];
 
-	uint8_t controller_count;
+	uint8_t pipe_count;
 	uint8_t stream_enc_count;
 
 	union supported_stream_engines stream_engines;
@@ -315,7 +268,7 @@ struct resource_pool {
 	struct clock_source *clock_sources[MAX_CLOCK_SOURCES];
 	uint8_t clk_src_count;
 
-	struct audio *audios[MAX_STREAMS];
+	struct audio *audios[MAX_PIPES];
 	uint8_t audio_count;
 
 	struct display_clock *display_clock;
@@ -325,9 +278,46 @@ struct resource_pool {
 	struct resource_funcs *funcs;
 };
 
-struct controller_ctx {
+struct pipe_ctx {
 	struct core_surface *surface;
 	struct core_stream *stream;
+
+	struct mem_input *mi;
+	struct input_pixel_processor *ipp;
+	struct transform *xfm;
+	struct output_pixel_processor *opp;
+	struct timing_generator *tg;
+
+	struct overscan_info overscan;
+	struct scaling_ratios ratios;
+	struct rect viewport;
+	struct scaling_taps taps;
+	enum pixel_format format;
+
+	struct stream_encoder *stream_enc;
+	struct display_clock *dis_clk;
+	struct clock_source *clock_source;
+
+	struct audio *audio;
+	struct audio_output audio_output;
+
+	enum signal_type signal;
+
+	/* timing validation (HDMI only) */
+	uint32_t max_tmds_clk_from_edid_in_mhz;
+	/* maximum supported deep color depth for HDMI */
+	enum dc_color_depth max_hdmi_deep_color;
+	/* maximum supported pixel clock for HDMI */
+	uint32_t max_hdmi_pixel_clock;
+
+	struct pixel_clk_params pix_clk_params;
+	struct pll_settings pll_settings;
+
+	/*fmt*/
+	struct encoder_info_frame encoder_info_frame;
+
+	uint8_t pipe_idx;
+
 	struct flags {
 		bool unchanged;
 		bool timing_changed;
@@ -336,10 +326,10 @@ struct controller_ctx {
 
 struct resource_context {
 	struct resource_pool pool;
-	struct controller_ctx controller_ctx[MAX_PIPES];
+	struct pipe_ctx pipe_ctx[MAX_PIPES];
 	union supported_stream_engines used_stream_engines;
 	bool is_stream_enc_acquired[MAX_PIPES * 2];
-	bool is_audio_acquired[MAX_STREAMS];
+	bool is_audio_acquired[MAX_PIPES];
 	uint8_t clock_source_ref_count[MAX_CLOCK_SOURCES];
  };
 
@@ -348,6 +338,7 @@ struct target_flags {
 };
 struct validate_context {
 	struct core_target *targets[MAX_PIPES];
+	struct dc_target_status target_status[MAX_PIPES];
 	struct target_flags target_flags[MAX_PIPES];
 	uint8_t target_count;
 

@@ -1168,27 +1168,28 @@ bool dce110_link_encoder_construct(
 
 bool dce110_link_encoder_validate_output_with_stream(
 	struct link_encoder *enc,
-	struct core_stream *stream)
+	struct pipe_ctx *pipe_ctx)
 {
+	struct core_stream *stream = pipe_ctx->stream;
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
 	bool is_valid;
 
-	switch (stream->signal) {
+	switch (pipe_ctx->signal) {
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
 		is_valid = validate_dvi_output(
 			enc110,
 			stream->sink->link->public.connector_signal,
-			stream->signal,
+			pipe_ctx->signal,
 			&stream->public.timing);
 	break;
 	case SIGNAL_TYPE_HDMI_TYPE_A:
 		is_valid = validate_hdmi_output(
 				enc110,
 				&stream->public.timing,
-				stream->max_tmds_clk_from_edid_in_mhz,
-				stream->max_hdmi_deep_color,
-				stream->max_hdmi_pixel_clock);
+				pipe_ctx->max_tmds_clk_from_edid_in_mhz,
+				pipe_ctx->max_hdmi_deep_color,
+				pipe_ctx->max_hdmi_pixel_clock);
 	break;
 	case SIGNAL_TYPE_RGB:
 		is_valid = validate_rgb_output(

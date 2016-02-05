@@ -1142,8 +1142,9 @@ static void dpcd_configure_panel_mode(
 			panel_mode_edp);
 }
 
-static enum dc_status enable_link_dp(struct core_stream *stream)
+static enum dc_status enable_link_dp(struct pipe_ctx *pipe_ctx)
 {
+	struct core_stream *stream = pipe_ctx->stream;
 	enum dc_status status;
 	bool skip_video_pattern;
 	struct core_link *link = stream->sink->link;
@@ -1154,7 +1155,7 @@ static enum dc_status enable_link_dp(struct core_stream *stream)
 	decide_link_settings(stream, &link_settings);
 	dp_enable_link_phy(
 		stream->sink->link,
-		stream->signal,
+		pipe_ctx->signal,
 		&link_settings);
 
 	panel_mode = dp_get_panel_mode(link);
@@ -1175,9 +1176,9 @@ static enum dc_status enable_link_dp(struct core_stream *stream)
 	return status;
 }
 
-static enum dc_status enable_link_dp_mst(struct core_stream *stream)
+static enum dc_status enable_link_dp_mst(struct pipe_ctx *pipe_ctx)
 {
-	struct core_link *link = stream->sink->link;
+	struct core_link *link = pipe_ctx->stream->sink->link;
 
 	/* sink signal type after MST branch is MST. Multiple MST sinks
 	 * share one link. Link DP PHY is enable or training only once.
@@ -1185,11 +1186,12 @@ static enum dc_status enable_link_dp_mst(struct core_stream *stream)
 	if (link->public.cur_link_settings.lane_count != LANE_COUNT_UNKNOWN)
 		return DC_OK;
 
-	return enable_link_dp(stream);
+	return enable_link_dp(pipe_ctx);
 }
 
-static void enable_link_hdmi(struct core_stream *stream)
+static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 {
+	struct core_stream *stream = pipe_ctx->stream;
 	struct core_link *link = stream->sink->link;
 
 	/* enable video output */
@@ -1214,7 +1216,7 @@ static void enable_link_hdmi(struct core_stream *stream)
 		break;
 	}
 
-	if (stream->signal == SIGNAL_TYPE_HDMI_TYPE_A)
+	if (pipe_ctx->signal == SIGNAL_TYPE_HDMI_TYPE_A)
 		dal_ddc_service_write_scdc_data(
 			stream->sink->link->ddc,
 			normalized_pix_clk,
@@ -1225,33 +1227,33 @@ static void enable_link_hdmi(struct core_stream *stream)
 
 	link->link_enc->funcs->enable_tmds_output(
 			link->link_enc,
-			stream->clock_source->id,
+			pipe_ctx->clock_source->id,
 			stream->public.timing.display_color_depth,
-			stream->signal == SIGNAL_TYPE_HDMI_TYPE_A,
-			stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK,
+			pipe_ctx->signal == SIGNAL_TYPE_HDMI_TYPE_A,
+			pipe_ctx->signal == SIGNAL_TYPE_DVI_DUAL_LINK,
 			stream->public.timing.pix_clk_khz);
 
-	if (stream->signal == SIGNAL_TYPE_HDMI_TYPE_A)
+	if (pipe_ctx->signal == SIGNAL_TYPE_HDMI_TYPE_A)
 		dal_ddc_service_read_scdc_data(link->ddc);
 }
 
 /****************************enable_link***********************************/
-static enum dc_status enable_link(struct core_stream *stream)
+static enum dc_status enable_link(struct pipe_ctx *pipe_ctx)
 {
 	enum dc_status status = DC_ERROR_UNEXPECTED;
-	switch (stream->signal) {
+	switch (pipe_ctx->signal) {
 	case SIGNAL_TYPE_DISPLAY_PORT:
 	case SIGNAL_TYPE_EDP:
-		status = enable_link_dp(stream);
+		status = enable_link_dp(pipe_ctx);
 		break;
 	case SIGNAL_TYPE_DISPLAY_PORT_MST:
-		status = enable_link_dp_mst(stream);
-		dm_sleep_in_milliseconds(stream->ctx, 200);
+		status = enable_link_dp_mst(pipe_ctx);
+		dm_sleep_in_milliseconds(pipe_ctx->stream->ctx, 200);
 		break;
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
 	case SIGNAL_TYPE_HDMI_TYPE_A:
-		enable_link_hdmi(stream);
+		enable_link_hdmi(pipe_ctx);
 		status = DC_OK;
 		break;
 	case SIGNAL_TYPE_VIRTUAL:
@@ -1261,20 +1263,20 @@ static enum dc_status enable_link(struct core_stream *stream)
 		break;
 	}
 
-	if (stream->audio && status == DC_OK) {
+	if (pipe_ctx->audio && status == DC_OK) {
 		/* notify audio driver for audio modes of monitor */
-		dal_audio_enable_azalia_audio_jack_presence(stream->audio,
-				stream->stream_enc->id);
+		dal_audio_enable_azalia_audio_jack_presence(pipe_ctx->audio,
+				pipe_ctx->stream_enc->id);
 
 		/* un-mute audio */
-		dal_audio_unmute(stream->audio, stream->stream_enc->id,
-				stream->signal);
+		dal_audio_unmute(pipe_ctx->audio, pipe_ctx->stream_enc->id,
+				pipe_ctx->signal);
 	}
 
 	return status;
 }
 
-static void disable_link(struct core_stream *stream)
+static void disable_link(struct core_link *link, enum signal_type signal)
 {
 	/*
 	 * TODO: implement call for dp_set_hw_test_pattern
@@ -1286,21 +1288,14 @@ static void disable_link(struct core_stream *stream)
 	 * it will lead to querying dynamic link capabilities
 	 * which should be done before enable output */
 
-	if (dc_is_dp_signal(stream->signal)) {
+	if (dc_is_dp_signal(signal)) {
 		/* SST DP, eDP */
-		if (dc_is_dp_sst_signal(stream->signal))
-			dp_disable_link_phy(
-					stream->sink->link, stream->signal);
-		else {
-			dp_disable_link_phy_mst(
-					stream->sink->link, stream);
-		}
-	} else {
-		struct link_encoder *encoder =
-				stream->sink->link->link_enc;
-
-		encoder->funcs->disable_output(encoder, stream->signal);
-	}
+		if (dc_is_dp_sst_signal(signal))
+			dp_disable_link_phy(link, signal);
+		else
+			dp_disable_link_phy_mst(link, signal);
+	} else
+		link->link_enc->funcs->disable_output(link->link_enc, signal);
 }
 
 enum dc_status dc_link_validate_mode_timing(
@@ -1360,9 +1355,9 @@ static struct fixed31_32 get_pbn_per_slot(struct core_stream *stream)
 	return dal_fixed31_32_div_int(mbps, 54);
 }
 
-static int get_color_depth(struct core_stream *stream)
+static int get_color_depth(enum dc_color_depth color_depth)
 {
-	switch (stream->pix_clk_params.color_depth) {
+	switch (color_depth) {
 	case COLOR_DEPTH_666: return 6;
 	case COLOR_DEPTH_888: return 8;
 	case COLOR_DEPTH_101010: return 10;
@@ -1373,7 +1368,7 @@ static int get_color_depth(struct core_stream *stream)
 	}
 }
 
-static struct fixed31_32 get_pbn_from_timing(struct core_stream *stream)
+static struct fixed31_32 get_pbn_from_timing(struct pipe_ctx *pipe_ctx)
 {
 	uint32_t bpc;
 	uint64_t kbps;
@@ -1381,8 +1376,8 @@ static struct fixed31_32 get_pbn_from_timing(struct core_stream *stream)
 	uint32_t numerator;
 	uint32_t denominator;
 
-	bpc = get_color_depth(stream);
-	kbps = stream->pix_clk_params.requested_pix_clk * bpc * 3;
+	bpc = get_color_depth(pipe_ctx->pix_clk_params.color_depth);
+	kbps = pipe_ctx->pix_clk_params.requested_pix_clk * bpc * 3;
 
 	/*
 	 * margin 5300ppm + 300ppm ~ 0.6% as per spec, factor is 1.006
@@ -1405,7 +1400,7 @@ static struct fixed31_32 get_pbn_from_timing(struct core_stream *stream)
 
 static void update_mst_stream_alloc_table(
 	struct core_link *link,
-	struct core_stream *stream,
+	struct stream_encoder *stream_enc,
 	const struct dp_mst_stream_allocation_table *proposed_table)
 {
 	struct link_mst_stream_allocation work_table[MAX_CONTROLLER_NUM] = {
@@ -1440,7 +1435,7 @@ static void update_mst_stream_alloc_table(
 				proposed_table->stream_allocations[i].vcp_id;
 			work_table[i].slot_count =
 				proposed_table->stream_allocations[i].slot_count;
-			work_table[i].stream_enc = stream->stream_enc;
+			work_table[i].stream_enc = stream_enc;
 		}
 	}
 
@@ -1455,11 +1450,12 @@ static void update_mst_stream_alloc_table(
 /* convert link_mst_stream_alloc_table to dm dp_mst_stream_alloc_table
  * because stream_encoder is not exposed to dm
  */
-static enum dc_status allocate_mst_payload(struct core_stream *stream)
+static enum dc_status allocate_mst_payload(struct pipe_ctx *pipe_ctx)
 {
+	struct core_stream *stream = pipe_ctx->stream;
 	struct core_link *link = stream->sink->link;
 	struct link_encoder *link_encoder = link->link_enc;
-	struct stream_encoder *stream_encoder = stream->stream_enc;
+	struct stream_encoder *stream_encoder = pipe_ctx->stream_enc;
 	struct dp_mst_stream_allocation_table proposed_table = {0};
 	struct fixed31_32 avg_time_slots_per_mtp;
 	struct fixed31_32 pbn;
@@ -1478,7 +1474,8 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 		&proposed_table,
 		true);
 
-	update_mst_stream_alloc_table(link, stream, &proposed_table);
+	update_mst_stream_alloc_table(
+				link, pipe_ctx->stream_enc, &proposed_table);
 
 	dal_logger_write(link->ctx->logger,
 			LOG_MAJOR_MST,
@@ -1532,7 +1529,7 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 
 	/* slot X.Y for only current stream */
 	pbn_per_slot = get_pbn_per_slot(stream);
-	pbn = get_pbn_from_timing(stream);
+	pbn = get_pbn_from_timing(pipe_ctx);
 	avg_time_slots_per_mtp = dal_fixed31_32_div(pbn, pbn_per_slot);
 
 
@@ -1545,11 +1542,12 @@ static enum dc_status allocate_mst_payload(struct core_stream *stream)
 
 }
 
-static enum dc_status deallocate_mst_payload(struct core_stream *stream)
+static enum dc_status deallocate_mst_payload(struct pipe_ctx *pipe_ctx)
 {
+	struct core_stream *stream = pipe_ctx->stream;
 	struct core_link *link = stream->sink->link;
 	struct link_encoder *link_encoder = link->link_enc;
-	struct stream_encoder *stream_encoder = stream->stream_enc;
+	struct stream_encoder *stream_encoder = pipe_ctx->stream_enc;
 	struct dp_mst_stream_allocation_table proposed_table = {0};
 	struct fixed31_32 avg_time_slots_per_mtp = dal_fixed31_32_from_int(0);
 	uint8_t i;
@@ -1575,7 +1573,8 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 				&proposed_table,
 				false);
 
-	update_mst_stream_alloc_table(link, stream, &proposed_table);
+	update_mst_stream_alloc_table(
+		link, pipe_ctx->stream_enc, &proposed_table);
 
 	dal_logger_write(link->ctx->logger,
 			LOG_MAJOR_MST,
@@ -1618,38 +1617,32 @@ static enum dc_status deallocate_mst_payload(struct core_stream *stream)
 	return DC_OK;
 }
 
-void core_link_enable_stream(
-		struct core_link *link,
-		struct core_stream *stream)
+void core_link_enable_stream(struct pipe_ctx *pipe_ctx)
 {
-	struct dc *dc = stream->ctx->dc;
+	struct dc *dc = pipe_ctx->stream->ctx->dc;
 
-	if (DC_OK != enable_link(stream)) {
+	if (DC_OK != enable_link(pipe_ctx)) {
 			BREAK_TO_DEBUGGER();
 			return;
 	}
 
-	dc->hwss.enable_stream(stream);
-	stream->status.link = &link->public;
+	dc->hwss.enable_stream(pipe_ctx);
 
-	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
-		allocate_mst_payload(stream);
+	if (pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
+		allocate_mst_payload(pipe_ctx);
 }
 
-void core_link_disable_stream(
-		struct core_link *link,
-		struct core_stream *stream)
+void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 {
-	struct dc *dc = stream->ctx->dc;
+	struct dc *dc = pipe_ctx->stream->ctx->dc;
 
-	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
-		deallocate_mst_payload(stream);
+	pipe_ctx->stream->status.link = NULL;
+	if (pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
+		deallocate_mst_payload(pipe_ctx);
 
-	stream->status.link = NULL;
-	dc->hwss.disable_stream(stream);
+	dc->hwss.disable_stream(pipe_ctx);
 
-	disable_link(stream);
-
+	disable_link(pipe_ctx->stream->sink->link, pipe_ctx->signal);
 }
 
 

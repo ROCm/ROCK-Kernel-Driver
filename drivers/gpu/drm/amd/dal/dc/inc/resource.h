@@ -38,7 +38,7 @@ bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
 
 void build_scaling_params(
 	const struct dc_surface *surface,
-	struct core_stream *stream);
+	struct pipe_ctx *pipe_ctx);
 
 void build_scaling_params_for_context(
 	const struct dc *dc,
@@ -57,13 +57,14 @@ bool is_same_timing(
 	const struct dc_crtc_timing *timing2);
 
 struct clock_source *find_used_clk_src_for_sharing(
-		struct validate_context *context,
-		struct core_stream *stream);
+	struct resource_context *res_ctx,
+	struct pipe_ctx *pipe_ctx);
 
-bool logical_attach_surfaces_to_target(
+bool attach_surfaces_to_context(
 		struct dc_surface *surfaces[],
 		uint8_t surface_count,
-		struct dc_target *dc_target);
+		struct dc_target *dc_target,
+		struct validate_context *context);
 
 void pplib_apply_safe_state(const struct dc *dc);
 
@@ -72,7 +73,7 @@ void pplib_apply_display_requirements(
 	const struct validate_context *context,
 	struct dc_pp_display_configuration *pp_display_cfg);
 
-void build_info_frame(struct core_stream *stream);
+void build_info_frame(struct pipe_ctx *pipe_ctx);
 
 enum dc_status map_resources(
 	const struct dc *dc,
