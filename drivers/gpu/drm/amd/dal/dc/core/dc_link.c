@@ -1160,7 +1160,7 @@ static enum dc_status enable_link_dp(struct core_stream *stream)
 			skip_video_pattern = false;
 
 	if (perform_link_training(link, &link_settings, skip_video_pattern)) {
-		link->cur_link_settings = link_settings;
+		link->public.cur_link_settings = link_settings;
 		status = DC_OK;
 	}
 	else
@@ -1176,7 +1176,7 @@ static enum dc_status enable_link_dp_mst(struct core_stream *stream)
 	/* sink signal type after MST branch is MST. Multiple MST sinks
 	 * share one link. Link DP PHY is enable or training only once.
 	 */
-	if (link->cur_link_settings.lane_count != LANE_COUNT_UNKNOWN)
+	if (link->public.cur_link_settings.lane_count != LANE_COUNT_UNKNOWN)
 		return DC_OK;
 
 	return enable_link_dp(stream);
@@ -1214,7 +1214,7 @@ static void enable_link_hdmi(struct core_stream *stream)
 			normalized_pix_clk,
 			stream->public.timing.flags.LTE_340MCSC_SCRAMBLE);
 
-	dm_memset(&stream->sink->link->cur_link_settings, 0,
+	dm_memset(&stream->sink->link->public.cur_link_settings, 0,
 			sizeof(struct link_settings));
 
 	link->link_enc->funcs->enable_tmds_output(
@@ -1342,7 +1342,7 @@ void core_link_resume(struct core_link *link)
 static struct fixed31_32 get_pbn_per_slot(struct core_stream *stream)
 {
 	struct link_settings *link_settings =
-			&stream->sink->link->cur_link_settings;
+			&stream->sink->link->public.cur_link_settings;
 	uint32_t link_rate_in_mbps =
 			link_settings->link_rate * LINK_RATE_REF_FREQ_IN_MHZ;
 	struct fixed31_32 mbps = dal_fixed31_32_from_int(

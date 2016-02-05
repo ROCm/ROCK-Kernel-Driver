@@ -31,6 +31,7 @@
 #include "audio_types.h"
 #include "logger_types.h"
 #include "gpio_types.h"
+#include "link_service_types.h"
 
 #define MAX_SINKS_PER_LINK 4
 
@@ -280,6 +281,14 @@ struct dc_link {
 	enum signal_type connector_signal;
 	enum dc_irq_source irq_source_hpd;
 	enum dc_irq_source irq_source_hpd_rx;/* aka DP Short Pulse  */
+	/* caps is the same as reported_link_cap. link_traing use
+	 * reported_link_cap. Will clean up.  TODO
+	 */
+	struct link_settings reported_link_cap;
+	struct link_settings verified_link_cap;
+	struct link_settings max_link_setting;
+	struct link_settings cur_link_settings;
+	struct lane_settings ln_setting;
 };
 
 /*

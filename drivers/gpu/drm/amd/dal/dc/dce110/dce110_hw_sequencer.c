@@ -617,7 +617,7 @@ static void update_info_frame(struct core_stream *stream)
 static void enable_stream(struct core_stream *stream)
 {
 	enum lane_count lane_count =
-			stream->sink->link->cur_link_settings.lane_count;
+			stream->sink->link->public.cur_link_settings.lane_count;
 
 	struct dc_crtc_timing *timing = &stream->public.timing;
 	struct core_link *link = stream->sink->link;
@@ -869,7 +869,8 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 		core_link_enable_stream(stream->sink->link, stream);
 
 	if (dc_is_dp_signal(stream->signal))
-		unblank_stream(stream, &stream->sink->link->cur_link_settings);
+		unblank_stream(stream,
+			&stream->sink->link->public.cur_link_settings);
 
 	return DC_OK;
 }

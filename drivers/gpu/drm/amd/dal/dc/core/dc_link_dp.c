@@ -277,7 +277,7 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 				dpcd_lt_buffer,
 				size_in_bytes + sizeof(dpcd_pattern.raw) );
 
-	link->ln_setting = lt_settings->lane_settings[0];
+	link->public.ln_setting = lt_settings->lane_settings[0];
 }
 
 static bool is_cr_done(enum lane_count ln_count,
@@ -599,7 +599,7 @@ static void dpcd_set_lane_settings(
 		dpcd_lane[0].bits.MAX_SWING_REACHED,
 		dpcd_lane[0].bits.MAX_PRE_EMPHASIS_REACHED);
 
-	link->ln_setting = link_training_setting->lane_settings[0];
+	link->public.ln_setting = link_training_setting->lane_settings[0];
 
 }
 
@@ -1142,7 +1142,7 @@ bool dp_hbr_verify_link_cap(
 		}
 
 		if (success)
-			link->verified_link_cap = *cur;
+			link->public.verified_link_cap = *cur;
 
 		/* always disable the link before trying another
 		 * setting or before returning we'll enable it later
@@ -1158,14 +1158,14 @@ bool dp_hbr_verify_link_cap(
 		/* If all LT fails for all settings,
 		 * set verified = failed safe (1 lane low)
 		 */
-		link->verified_link_cap.lane_count = LANE_COUNT_ONE;
-		link->verified_link_cap.link_rate = LINK_RATE_LOW;
+		link->public.verified_link_cap.lane_count = LANE_COUNT_ONE;
+		link->public.verified_link_cap.link_rate = LINK_RATE_LOW;
 
-		link->verified_link_cap.link_spread =
+		link->public.verified_link_cap.link_spread =
 		LINK_SPREAD_DISABLED;
 	}
 
-	link->max_link_setting = link->verified_link_cap;
+	link->public.max_link_setting = link->public.verified_link_cap;
 
 	return success;
 }
@@ -1244,12 +1244,12 @@ bool dp_validate_mode_timing(
 	/* For static validation we always use reported
 	 * link settings for other cases, when no modelist
 	 * changed we can use verified link setting*/
-	link_setting = &link->reported_link_cap;
+	link_setting = &link->public.reported_link_cap;
 
 	/* TODO: DYNAMIC_VALIDATION needs to be implemented */
 	/*if (flags.DYNAMIC_VALIDATION == 1 &&
-		link->verified_link_cap.lane_count != LANE_COUNT_UNKNOWN)
-		link_setting = &link->verified_link_cap;
+		link->public.verified_link_cap.lane_count != LANE_COUNT_UNKNOWN)
+		link_setting = &link->public.verified_link_cap;
 	*/
 
 	req_bw = bandwidth_in_kbps_from_timing(timing);
@@ -1292,15 +1292,15 @@ void decide_link_settings(struct core_stream *stream,
 	 */
 	link = stream->sink->link;
 
-	if ((link->reported_link_cap.lane_count != LANE_COUNT_UNKNOWN) &&
-		(link->reported_link_cap.link_rate <=
-				link->verified_link_cap.link_rate)) {
+	if ((link->public.reported_link_cap.lane_count != LANE_COUNT_UNKNOWN) &&
+		(link->public.reported_link_cap.link_rate <=
+				link->public.verified_link_cap.link_rate)) {
 
 		link_bw = bandwidth_in_kbps_from_link_settings(
-				&link->reported_link_cap);
+				&link->public.reported_link_cap);
 
 		if (req_bw < link_bw) {
-			*link_setting = link->reported_link_cap;
+			*link_setting = link->public.reported_link_cap;
 			return;
 		}
 	}
@@ -1319,7 +1319,7 @@ void decide_link_settings(struct core_stream *stream,
 		if (req_bw < link_bw) {
 			if (is_link_setting_supported(
 				cur_ls,
-				&link->max_link_setting)) {
+				&link->public.max_link_setting)) {
 				*link_setting = *cur_ls;
 				return;
 			}
@@ -1327,10 +1327,10 @@ void decide_link_settings(struct core_stream *stream,
 	}
 
 	BREAK_TO_DEBUGGER();
-	ASSERT(link->verified_link_cap.lane_count !=
+	ASSERT(link->public.verified_link_cap.lane_count !=
 		LANE_COUNT_UNKNOWN);
 
-	*link_setting = link->verified_link_cap;
+	*link_setting = link->public.verified_link_cap;
 }
 
 /*************************Short Pulse IRQ***************************/
@@ -1349,7 +1349,7 @@ static bool hpd_rx_irq_check_link_loss_status(
 	sink_status_changed = false;
 	return_code = false;
 
-	if (link->cur_link_settings.lane_count == 0)
+	if (link->public.cur_link_settings.lane_count == 0)
 		return return_code;
 	/*1. Check that we can handle interrupt: Not in FS DOS,
 	 *  Not in "Display Timeout" state, Link is trained.
@@ -1375,7 +1375,7 @@ static bool hpd_rx_irq_check_link_loss_status(
 
 		/*parse lane status*/
 		for (lane = 0;
-			lane < link->cur_link_settings.lane_count;
+			lane < link->public.cur_link_settings.lane_count;
 			lane++) {
 
 			/* check status of lanes 0,1
@@ -1441,7 +1441,7 @@ static bool allow_hpd_rx_irq(const struct core_link *link)
 	 * 3) We know we're dealing with an active dongle
 	 */
 
-	if ((link->cur_link_settings.lane_count != LANE_COUNT_UNKNOWN) ||
+	if ((link->public.cur_link_settings.lane_count != LANE_COUNT_UNKNOWN) ||
 		(link->public.type == dc_connection_mst_branch) ||
 		is_dp_active_dongle(link))
 		return true;
@@ -1502,7 +1502,8 @@ bool dc_link_handle_hpd_rx_irq(const struct dc_link *dc_link)
 	if (hpd_rx_irq_check_link_loss_status(
 		link,
 		&hpd_irq_dpcd_data)) {
-		perform_link_training(link, &link->cur_link_settings, true);
+		perform_link_training(link,
+			&link->public.cur_link_settings, true);
 		status = false;
 	}
 
@@ -1708,11 +1709,11 @@ static void retrieve_link_cap(struct core_link *link)
 	link->dpcd_caps.max_down_spread.raw = dpcd_data[
 		DPCD_ADDRESS_MAX_DOWNSPREAD - DPCD_ADDRESS_DPCD_REV];
 
-	link->reported_link_cap.lane_count =
+	link->public.reported_link_cap.lane_count =
 		link->dpcd_caps.max_ln_count.bits.MAX_LANE_COUNT;
-	link->reported_link_cap.link_rate = dpcd_data[
+	link->public.reported_link_cap.link_rate = dpcd_data[
 		DPCD_ADDRESS_MAX_LINK_RATE - DPCD_ADDRESS_DPCD_REV];
-	link->reported_link_cap.link_spread =
+	link->public.reported_link_cap.link_spread =
 		link->dpcd_caps.max_down_spread.bits.MAX_DOWN_SPREAD ?
 		LINK_SPREAD_05_DOWNSPREAD_30KHZ : LINK_SPREAD_DISABLED;
 
@@ -1753,10 +1754,10 @@ void detect_dp_sink_caps(struct core_link *link)
 	 */
 
 	if (is_mst_supported(link)) {
-		link->verified_link_cap = link->reported_link_cap;
+		link->public.verified_link_cap = link->public.reported_link_cap;
 	} else {
 		dp_hbr_verify_link_cap(link,
-			&link->reported_link_cap);
+			&link->public.reported_link_cap);
 	}
 	/* TODO save sink caps in link->sink */
 }

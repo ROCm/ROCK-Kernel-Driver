@@ -500,7 +500,7 @@ static void fill_display_configs(
 			cfg->transmitter =
 				stream->sink->link->link_enc->transmitter;
 			cfg->link_settings =
-					stream->sink->link->cur_link_settings;
+				stream->sink->link->public.cur_link_settings;
 			cfg->sym_clock = stream->public.timing.pix_clk_khz;
 			switch (stream->public.timing.display_color_depth) {
 			case COLOR_DEPTH_101010:
