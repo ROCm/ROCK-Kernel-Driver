@@ -105,17 +105,20 @@ struct kgd2kfd_shared_resources {
 };
 
 /*
- * alloc_memory_of_gpu memory flags should be identical to the flags
- * on kfd_ioctl.h
+ * Allocation flag domains currently only VRAM and GTT domain supported
  */
+#define ALLOC_MEM_FLAGS_VRAM			(1 << 0)
+#define ALLOC_MEM_FLAGS_GTT				(1 << 1)
 
-#define ALLOC_MEM_FLAGS_DGPU_HOST		(1 << 0)
-#define ALLOC_MEM_FLAGS_DGPU_DEVICE		(1 << 1)
-#define ALLOC_MEM_FLAGS_DGPU_SCRATCH	(1 << 2)
-#define ALLOC_MEM_FLAGS_APU_DEVICE		(1 << 3)
-#define ALLOC_MEM_FLAGS_APU_SCRATCH		(1 << 4)
-
-#define ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM	(1 << 5)
+/*
+ * Allocation flags attributes/access options.
+ */
+#define ALLOC_MEM_FLAGS_NONPAGED		(1 << 31)
+#define ALLOC_MEM_FLAGS_READONLY		(1 << 30)
+#define ALLOC_MEM_FLAGS_PUBLIC			(1 << 29)
+#define ALLOC_MEM_FLAGS_NO_SUBSTITUTE	(1 << 28)
+#define ALLOC_MEM_FLAGS_AQL_QUEUE_MEM	(1 << 27)
+#define ALLOC_MEM_FLAGS_EXECUTE_ACCESS	(1 << 26)
 
 /**
  * struct kfd2kgd_calls

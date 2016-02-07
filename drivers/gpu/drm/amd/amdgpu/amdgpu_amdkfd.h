@@ -51,6 +51,9 @@ struct kgd_mem {
 			unsigned int mapped_to_gpu_memory;
 			void *kptr;
 			uint64_t va;
+			bool readonly;
+			bool execute;
+			bool no_substitute;
 		} data2;
 	};
 };

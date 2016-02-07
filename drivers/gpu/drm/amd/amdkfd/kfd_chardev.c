@@ -45,6 +45,9 @@ static int kfd_open(struct inode *, struct file *);
 static int kfd_mmap(struct file *, struct vm_area_struct *);
 static int _map_memory_to_gpu(struct kfd_dev *dev, void *mem,
 		struct kfd_process *p, struct kfd_process_device *pdd);
+static uint32_t kfd_convert_user_mem_alloction_flags(
+		struct kfd_dev *dev,
+		uint32_t userspace_flags);
 
 static const char kfd_dev_name[] = "kfd";
 
@@ -299,7 +302,9 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 			err = dev->kfd2kgd->alloc_memory_of_gpu(
 				dev->kgd, pdd->cwsr_base, dev->cwsr_size,
 				pdd->vm, (struct kgd_mem **)&mem,
-				NULL, &cwsr_addr, ALLOC_MEM_FLAGS_DGPU_HOST);
+				NULL, &cwsr_addr,
+				kfd_convert_user_mem_alloction_flags(dev,
+					KFD_IOC_ALLOC_MEM_FLAGS_DGPU_HOST));
 			if (err != 0)
 				goto err_create_queue;
 			pdd->cwsr_mem_handle =
@@ -1241,6 +1246,62 @@ bind_process_to_device_failed:
 	return err;
 }
 
+static uint32_t kfd_convert_user_mem_alloction_flags(
+		struct kfd_dev *dev,
+		uint32_t userspace_flags)
+{
+	uint32_t kernel_allocation_flags;
+	struct kfd_local_mem_info mem_info;
+
+	kernel_allocation_flags = 0;
+
+	/* Allocate VRAM bo */
+	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE ||
+			userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_APU_DEVICE) {
+		kernel_allocation_flags = ALLOC_MEM_FLAGS_VRAM;
+		if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE &&
+				KFD_IS_DGPU(dev->device_info->asic_family)) {
+			dev->kfd2kgd->get_local_mem_info(dev->kgd, &mem_info);
+			if (mem_info.local_mem_size_private == 0 &&
+					mem_info.local_mem_size_public > 0)
+				kernel_allocation_flags |= ALLOC_MEM_FLAGS_PUBLIC;
+		}
+		goto out;
+	}
+	/*
+	 * Since currently user space library doesn't uses scratch
+	 * allocation flag I route it to VRAM
+	 */
+	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_SCRATCH ||
+			userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_APU_SCRATCH) {
+		kernel_allocation_flags = ALLOC_MEM_FLAGS_VRAM;
+		goto out;
+	}
+	/*
+	 * The current usage for *_HOST allocation flags are for GTT memory
+	 * Need to verify if we're node zero or we want to allocate bo on
+	 * public domain for P2P buffers.
+	 */
+	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_HOST) {
+		kernel_allocation_flags = ALLOC_MEM_FLAGS_GTT;
+		goto out;
+	}
+
+out:
+	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM)
+		kernel_allocation_flags |= ALLOC_MEM_FLAGS_AQL_QUEUE_MEM;
+	/* Current HW doesn't support non paged memory */
+	kernel_allocation_flags |= ALLOC_MEM_FLAGS_NONPAGED;
+	/*
+	 *  Set by default execute access as this buffer might be allocated
+	 * for CP's ring buffer
+	 */
+	kernel_allocation_flags |= ALLOC_MEM_FLAGS_EXECUTE_ACCESS;
+	kernel_allocation_flags |= ALLOC_MEM_FLAGS_NO_SUBSTITUTE;
+
+	return kernel_allocation_flags;
+}
+
 static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 					struct kfd_process *p, void *data)
 {
@@ -1275,7 +1336,8 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
 		pdd->vm, (struct kgd_mem **) &mem, &offset,
-		NULL, args->flags);
+		NULL,
+		kfd_convert_user_mem_alloction_flags(dev, args->flags));
 
 	if (err != 0)
 		goto alloc_memory_of_gpu_failed;

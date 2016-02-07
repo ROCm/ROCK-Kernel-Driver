@@ -111,10 +111,12 @@ static bool check_if_add_bo_to_vm(struct amdgpu_vm *avm,
 
 static int add_bo_to_vm(struct amdgpu_device *adev, uint64_t va,
 		struct amdgpu_vm *avm, struct amdgpu_bo *bo,
-		struct list_head *list_bo_va)
+		struct list_head *list_bo_va,
+		bool readonly, bool execute)
 {
 	int ret;
 	struct kfd_bo_va_list *bo_va_entry;
+	uint32_t flags;
 
 	bo_va_entry = kzalloc(sizeof(*bo_va_entry), GFP_KERNEL);
 	if (!bo_va_entry)
@@ -136,12 +138,17 @@ static int add_bo_to_vm(struct amdgpu_device *adev, uint64_t va,
 		goto err_vmadd;
 	}
 
+	flags = AMDGPU_PTE_READABLE | AMDGPU_PTE_WRITEABLE;
+	if (readonly)
+		flags = AMDGPU_PTE_READABLE;
+	if (execute)
+		flags |= AMDGPU_PTE_EXECUTABLE;
+
 	/* Set virtual address for the allocation, allocate PTs,
 	 * if needed, and zero them */
 	ret = amdgpu_vm_bo_map(adev, bo_va_entry->bo_va,
 			va, 0, amdgpu_bo_size(bo),
-			AMDGPU_PTE_READABLE | AMDGPU_PTE_WRITEABLE |
-			AMDGPU_PTE_EXECUTABLE | AMDGPU_PTE_VALID);
+			flags | AMDGPU_PTE_VALID);
 	if (ret != 0) {
 		pr_err("amdkfd: Failed to set virtual address for BO. ret == %d\n",
 				ret);
@@ -325,7 +332,8 @@ static void unpin_pts(struct amdgpu_bo_va *bo_va, struct amdgpu_vm *vm,
 static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		size_t size, void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr,
-		u32 domain, u64 flags, bool aql_queue)
+		u32 domain, u64 flags, bool aql_queue,
+		bool readonly, bool execute, bool no_sub)
 {
 	struct amdgpu_device *adev;
 	int ret;
@@ -347,6 +355,9 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		goto err;
 	}
 	INIT_LIST_HEAD(&(*mem)->data2.bo_va_list);
+	(*mem)->data2.readonly = readonly;
+	(*mem)->data2.execute = execute;
+	(*mem)->data2.no_substitute = no_sub;
 
 	pr_debug("amdkfd: allocating GTT BO size %lu\n", size);
 
@@ -362,13 +373,15 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 
 	pr_debug("Created BO on GTT with size %zu bytes\n", size);
 
-	ret = add_bo_to_vm(adev, va, vm, bo, &(*mem)->data2.bo_va_list);
+	ret = add_bo_to_vm(adev, va, vm, bo, &(*mem)->data2.bo_va_list,
+			(*mem)->data2.readonly, (*mem)->data2.execute);
 	if (ret != 0)
 		goto err_map;
 
 	if (aql_queue) {
 		ret = add_bo_to_vm(adev, va + size,
-				vm, bo, &(*mem)->data2.bo_va_list);
+				vm, bo, &(*mem)->data2.bo_va_list,
+				(*mem)->data2.readonly, (*mem)->data2.execute);
 		if (ret != 0)
 			goto err_map;
 	}
@@ -541,33 +554,49 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 				void *vm, struct kgd_mem **mem,
 				uint64_t *offset, void **kptr, uint32_t flags)
 {
-	bool aql_queue;
-	aql_queue = (flags & ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM) ? true : false;
-	flags = flags & ~ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM;
+	bool aql_queue, public, readonly, execute, no_sub;
+	u64 alloc_flag;
+	uint32_t domain;
+	uint64_t *temp_offset;
+
+	if (!(flags & ALLOC_MEM_FLAGS_NONPAGED)) {
+		pr_err("amdgpu: current hw doesn't support paged memory\n");
+		return -EINVAL;
+	}
+
+	domain = 0;
+	alloc_flag = 0;
+	temp_offset = NULL;
+
+	aql_queue = (flags & ALLOC_MEM_FLAGS_AQL_QUEUE_MEM) ? true : false;
+	public = (flags & ALLOC_MEM_FLAGS_PUBLIC) ? true : false;
+	readonly = (flags & ALLOC_MEM_FLAGS_READONLY) ? true : false;
+	execute = (flags & ALLOC_MEM_FLAGS_EXECUTE_ACCESS) ? true : false;
+	no_sub = (flags & ALLOC_MEM_FLAGS_NO_SUBSTITUTE) ? true : false;
+
 	/*
 	 * Check on which domain to allocate BO if we have mmap offset than
 	 * we should allocate BO on GTT domain other cases we should allocate
 	 * on VRAM domain.
 	 */
-	switch (flags) {
-	case ALLOC_MEM_FLAGS_DGPU_HOST:
-	case ALLOC_MEM_FLAGS_APU_SCRATCH:
-	case ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM:
-		return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
-				offset, kptr, AMDGPU_GEM_DOMAIN_GTT,
-				0, aql_queue);
-	case ALLOC_MEM_FLAGS_DGPU_DEVICE:
-	case ALLOC_MEM_FLAGS_DGPU_SCRATCH:
-	case ALLOC_MEM_FLAGS_APU_DEVICE:
-		if (offset)
-			*offset = 0;
-		return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
-				NULL, kptr, AMDGPU_GEM_DOMAIN_VRAM,
-				AMDGPU_GEM_CREATE_NO_CPU_ACCESS,
-				aql_queue);
-	default:
-		return -EINVAL;
+	if (offset)
+		*offset = 0;
+	if (flags & ALLOC_MEM_FLAGS_VRAM) {
+		domain = AMDGPU_GEM_DOMAIN_VRAM;
+		alloc_flag = AMDGPU_GEM_CREATE_NO_CPU_ACCESS;
+		if (public)
+			alloc_flag = AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
+	} else if (flags & ALLOC_MEM_FLAGS_GTT) {
+		domain = AMDGPU_GEM_DOMAIN_GTT;
+		alloc_flag = 0;
+		temp_offset = offset;
 	}
+
+	return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
+			temp_offset, kptr, domain,
+			alloc_flag,
+			aql_queue, readonly, execute,
+			no_sub);
 }
 
 static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
@@ -634,7 +663,8 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 		pr_debug("amdkfd: add new BO_VA to list 0x%llx\n",
 				mem->data2.va);
 		add_bo_to_vm(adev, mem->data2.va, (struct amdgpu_vm *)vm,
-				mem->data2.bo, &mem->data2.bo_va_list);
+				mem->data2.bo, &mem->data2.bo_va_list,
+				mem->data2.readonly, mem->data2.execute);
 	}
 
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
