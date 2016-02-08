@@ -107,8 +107,6 @@ bool dp_set_hw_training_pattern(
 	enum hw_dp_training_pattern pattern)
 {
 	enum dp_test_pattern test_pattern = DP_TEST_PATTERN_UNSUPPORTED;
-	struct encoder_set_dp_phy_pattern_param pattern_param = {0};
-	struct link_encoder *encoder = link->link_enc;
 
 	switch (pattern) {
 	case HW_DP_TRAINING_PATTERN_1:
@@ -127,12 +125,7 @@ bool dp_set_hw_training_pattern(
 		break;
 	}
 
-	pattern_param.dp_phy_pattern = test_pattern;
-	pattern_param.custom_pattern = NULL;
-	pattern_param.custom_pattern_size = 0;
-	pattern_param.dp_panel_mode = dp_get_panel_mode(link);
-
-	encoder->funcs->dp_set_phy_pattern(encoder, &pattern_param);
+	dp_set_hw_test_pattern(link, test_pattern);
 
 	return true;
 }

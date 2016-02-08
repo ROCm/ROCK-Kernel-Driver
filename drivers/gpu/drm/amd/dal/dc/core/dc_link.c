@@ -1276,7 +1276,10 @@ static enum dc_status enable_link(struct core_stream *stream)
 
 static void disable_link(struct core_stream *stream)
 {
-	/* TODO  dp_set_hw_test_pattern */
+	/*
+	 * TODO: implement call for dp_set_hw_test_pattern
+	 * it is needed for compliance testing
+	 */
 
 	/* here we need to specify that encoder output settings
 	 * need to be calculated as for the set mode,

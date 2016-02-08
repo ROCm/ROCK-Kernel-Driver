@@ -188,6 +188,7 @@ enum dpcd_address {
 	DPCD_ADDRESS_EDP_GENERAL_CAP2 = 0x0703,
 
 	DPCD_ADDRESS_EDP_DISPLAY_CONTROL = 0x0720,
+	DPCD_ADDRESS_SUPPORTED_LINK_RATES = 0x00010, /* edp 1.4 */
 	DPCD_ADDRESS_EDP_BACKLIGHT_SET = 0x0721,
 	DPCD_ADDRESS_EDP_BACKLIGHT_BRIGHTNESS_MSB = 0x0722,
 	DPCD_ADDRESS_EDP_BACKLIGHT_BRIGHTNESS_LSB = 0x0723,
@@ -232,6 +233,9 @@ enum dpcd_address {
 	DPCD_ADDRESS_PSR_DBG_REGISTER0 = 0x2009,
 	DPCD_ADDRESS_PSR_DBG_REGISTER1 = 0x200A,
 
+	DPCD_ADDRESS_DP13_DPCD_REV = 0x2200,
+	DPCD_ADDRESS_DP13_MAX_LINK_RATE = 0x2201,
+
 	/* Travis specific addresses */
 	DPCD_ADDRESS_TRAVIS_SINK_DEV_SEL = 0x5f0,
 	DPCD_ADDRESS_TRAVIS_SINK_ACCESS_OFFSET	= 0x5f1,
@@ -242,7 +246,8 @@ enum dpcd_revision {
 	DPCD_REV_10 = 0x10,
 	DPCD_REV_11 = 0x11,
 	DPCD_REV_12 = 0x12,
-	DPCD_REV_13 = 0x13
+	DPCD_REV_13 = 0x13,
+	DPCD_REV_14 = 0x14
 };
 
 enum dp_pwr_state {
@@ -595,7 +600,7 @@ union audio_test_mode {
 	uint8_t raw;
 };
 
-union audio_tes_tpattern_period {
+union audio_test_pattern_period {
 	struct {
 		uint8_t PATTERN_PERIOD:4;
 		uint8_t RESERVED:4;
@@ -609,12 +614,16 @@ struct audio_test_pattern_type {
 
 union dpcd_training_pattern {
 	struct {
-		uint8_t TRAINING_PATTERN_SET:2;
-		uint8_t LINK_QUAL_PATTERN_SET:2;
+		uint8_t TRAINING_PATTERN_SET:4;
 		uint8_t RECOVERED_CLOCK_OUT_EN:1;
 		uint8_t SCRAMBLING_DISABLE:1;
-		uint8_t RESERVED:2;
-	} bits;
+		uint8_t SYMBOL_ERROR_COUNT_SEL:2;
+	} v1_4;
+	struct {
+		uint8_t TRAINING_PATTERN_SET:2;
+		uint8_t LINK_QUAL_PATTERN_SET:2;
+		uint8_t RESERVED:4;
+	} v1_3;
 	uint8_t raw;
 };
 
@@ -868,6 +877,14 @@ union psr_capabilities {
 		uint8_t EXIT_LT_NOT_REQ:1;
 		uint8_t RFB_SETUP_TIME:3;
 		uint8_t RESERVED:4;
+	} bits;
+	uint8_t raw;
+};
+
+union training_aux_rd_interval {
+	struct {
+		uint8_t TRAINIG_AUX_RD_INTERVAL:7;
+		uint8_t EXT_RECIEVER_CAP_FIELD_PRESENT:1;
 	} bits;
 	uint8_t raw;
 };

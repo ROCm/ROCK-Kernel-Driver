@@ -291,6 +291,9 @@ struct spread_spectrum_info {
 struct graphics_object_encoder_cap_info {
 	uint32_t dp_hbr2_cap:1;
 	uint32_t dp_hbr2_validated:1;
+	/*
+	 * TODO: added MST and HDMI 6G capable flags
+	 */
 	uint32_t reserved:15;
 };
 
