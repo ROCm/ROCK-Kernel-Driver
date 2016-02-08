@@ -717,7 +717,10 @@ void dce110_mem_input_program_display_marks(
 		stutter);
 }
 
-static uint32_t get_dmif_switch_time_us(struct dc_crtc_timing *timing)
+static uint32_t get_dmif_switch_time_us(
+	uint32_t h_total,
+	uint32_t v_total,
+	uint32_t pix_clk_khz)
 {
 	uint32_t frame_time;
 	uint32_t pixels_per_second;
@@ -728,12 +731,12 @@ static uint32_t get_dmif_switch_time_us(struct dc_crtc_timing *timing)
 	/*return double of frame time*/
 	const uint32_t single_frame_time_multiplier = 2;
 
-	if (timing == NULL)
+	if (!h_total || v_total || !pix_clk_khz)
 		return single_frame_time_multiplier * min_single_frame_time_us;
 
 	/*TODO: should we use pixel format normalized pixel clock here?*/
-	pixels_per_second = timing->pix_clk_khz * 1000;
-	pixels_per_frame = timing->h_total * timing->v_total;
+	pixels_per_second = pix_clk_khz * 1000;
+	pixels_per_frame = h_total * v_total;
 
 	if (!pixels_per_second || !pixels_per_frame) {
 		/* avoid division by zero */
@@ -761,12 +764,17 @@ static uint32_t get_dmif_switch_time_us(struct dc_crtc_timing *timing)
 }
 
 void dce110_allocate_mem_input(
-		struct mem_input *mi,
-		struct dc_crtc_timing *timing,
-		uint32_t paths_num)
+	struct mem_input *mi,
+	uint32_t h_total,/* for current stream */
+	uint32_t v_total,/* for current stream */
+	uint32_t pix_clk_khz,/* for current stream */
+	uint32_t total_stream_num)
 {
 	const uint32_t retry_delay = 10;
-	uint32_t retry_count = get_dmif_switch_time_us(timing) / retry_delay;
+	uint32_t retry_count = get_dmif_switch_time_us(
+			h_total,
+			v_total,
+			pix_clk_khz) / retry_delay;
 
 	struct dce110_mem_input *bm110 = TO_DCE110_MEM_INPUT(mi);
 	uint32_t addr = bm110->offsets.pipe + mmPIPE0_DMIF_BUFFER_CONTROL;
@@ -816,10 +824,10 @@ void dce110_allocate_mem_input(
 				__func__);
 
 
-	if (timing->pix_clk_khz != 0) {
+	if (pix_clk_khz != 0) {
 		addr = mmDPG_PIPE_ARBITRATION_CONTROL1 + bm110->offsets.dmif;
 		value = dm_read_reg(mi->ctx, addr);
-		pix_dur = 1000000000ULL / timing->pix_clk_khz;
+		pix_dur = 1000000000ULL / pix_clk_khz;
 
 		set_reg_field_value(
 			value,
@@ -843,7 +851,7 @@ void dce110_allocate_mem_input(
 		addr = mmMC_HUB_RDREQ_DMIF_LIMIT;
 		value = dm_read_reg(mi->ctx, addr);
 
-		if (paths_num > 1)
+		if (total_stream_num > 1)
 			set_reg_field_value(value, 0, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
 		else
 			set_reg_field_value(value, 3, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
@@ -885,7 +893,8 @@ static void deallocate_dmif_buffer_helper(
 }
 
 void dce110_free_mem_input(
-	struct mem_input *mi, uint32_t paths_num)
+	struct mem_input *mi,
+	uint32_t total_stream_num)
 {
 	struct dce110_mem_input *bm_dce110 = TO_DCE110_MEM_INPUT(mi);
 	uint32_t value;
@@ -911,7 +920,7 @@ void dce110_free_mem_input(
 	 * Stella Wong proposed this change. */
 	if (!IS_FPGA_MAXIMUS_DC(mi->ctx->dce_environment)) {
 		value = dm_read_reg(mi->ctx, mmMC_HUB_RDREQ_DMIF_LIMIT);
-		if (paths_num > 1)
+		if (total_stream_num > 1)
 			set_reg_field_value(value, 0, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);
 		else
 			set_reg_field_value(value, 3, MC_HUB_RDREQ_DMIF_LIMIT, ENABLE);

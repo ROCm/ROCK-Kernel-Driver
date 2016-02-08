@@ -78,9 +78,11 @@ void dce110_mem_input_program_display_marks(
  * pixel duration for pipe
  */
 void dce110_allocate_mem_input(
-		struct mem_input *mem_input,
-		struct dc_crtc_timing *timing,
-		uint32_t paths_num);
+	struct mem_input *mem_input,
+	uint32_t h_total,/* for current stream */
+	uint32_t v_total,/* for current stream */
+	uint32_t pix_clk_khz,/* for current stream */
+	uint32_t total_stream_num);
 
 /*
  * dce110_free_mem_input
@@ -88,7 +90,8 @@ void dce110_allocate_mem_input(
  * This function will deallocate a dmif buffer from pipe
  */
 void dce110_free_mem_input(
-	struct mem_input *mem_input, uint32_t paths_num);
+	struct mem_input *mem_input,
+	uint32_t total_stream_num);
 
 /*
  * dce110_mem_input_program_surface_flip_and_addr
