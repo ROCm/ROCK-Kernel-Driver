@@ -793,7 +793,9 @@ static enum dc_status apply_single_controller_ctx_to_hw(uint8_t controller_idx,
 	/*TODO: mst support - use total stream count*/
 	stream->mi->funcs->allocate_mem_input(
 					stream->mi,
-					&stream->public.timing,
+					stream->public.timing.h_total,
+					stream->public.timing.v_total,
+					stream->public.timing.pix_clk_khz,
 					context->target_count);
 
 	if (timing_changed) {

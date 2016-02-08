@@ -123,13 +123,15 @@ enum yyc_quantization_range {
 };
 
 struct transform_funcs {
-	bool (*transform_power_up)(struct transform *xfm);
+	bool (*transform_power_up)(
+		struct transform *xfm);
 
 	bool (*transform_set_scaler)(
 		struct transform *xfm,
 		const struct scaler_data *data);
 
-	void (*transform_set_scaler_bypass)(struct transform *xfm);
+	void (*transform_set_scaler_bypass)(
+		struct transform *xfm);
 
 	bool (*transform_update_viewport)(
 		struct transform *xfm,

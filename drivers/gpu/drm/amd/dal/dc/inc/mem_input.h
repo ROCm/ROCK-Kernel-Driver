@@ -35,7 +35,9 @@ struct mem_input {
 };
 
 struct mem_input_funcs {
-	void (*mem_input_program_safe_display_marks)(struct mem_input *mi);
+	void (*mem_input_program_safe_display_marks)(
+		struct mem_input *mi);
+
 	void (*mem_input_program_display_marks)(
 		struct mem_input *mem_input,
 		struct bw_watermarks nbp,
@@ -44,16 +46,23 @@ struct mem_input_funcs {
 		uint32_t h_total,
 		uint32_t pixel_clk_in_khz,
 		uint32_t pstate_blackout_duration_ns);
+
 	void (*allocate_mem_input)(
-			struct mem_input *mem_input,
-			struct dc_crtc_timing *timing,
-			uint32_t paths_num);
+		struct mem_input *mem_input,
+		uint32_t h_total,/* for current target */
+		uint32_t v_total,/* for current target */
+		uint32_t pix_clk_khz,/* for current target */
+		uint32_t total_streams_num);
+
 	void (*free_mem_input)(
-		struct mem_input *mem_input, uint32_t paths_num);
+		struct mem_input *mem_input,
+		uint32_t paths_num);
+
 	bool (*mem_input_program_surface_flip_and_addr)(
 		struct mem_input *mem_input,
 		const struct dc_plane_address *address,
 		bool flip_immediate);
+
 	bool (*mem_input_program_surface_config)(
 		struct mem_input *mem_input,
 		enum surface_pixel_format format,
