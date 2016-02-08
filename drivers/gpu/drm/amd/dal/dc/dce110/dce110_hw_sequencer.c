@@ -351,7 +351,7 @@ static void dce110_set_blender_mode(
 	uint32_t mode)
 {
 	uint32_t value;
-	uint32_t addr = HW_REG_BLND(mmBLND_CONTROL, controller_id);
+	uint32_t addr = 0;
 	uint32_t blnd_mode;
 	uint32_t feedthrough = 0;
 
@@ -371,19 +371,39 @@ static void dce110_set_blender_mode(
 		break;
 	}
 
-	value = dm_read_reg(ctx, addr);
+	if (controller_id == CONTROLLER_ID_UNDERLAY0) {
+		addr = mmBLNDV_CONTROL;
+		value = dm_read_reg(ctx, addr);
 
-	set_reg_field_value(
-		value,
-		feedthrough,
-		BLND_CONTROL,
-		BLND_FEEDTHROUGH_EN);
+			set_reg_field_value(
+				value,
+				feedthrough,
+				BLNDV_CONTROL,
+				BLND_FEEDTHROUGH_EN);
 
-	set_reg_field_value(
-		value,
-		blnd_mode,
-		BLND_CONTROL,
-		BLND_MODE);
+			set_reg_field_value(
+				value,
+				blnd_mode,
+				BLNDV_CONTROL,
+				BLND_MODE);
+
+
+	} else {
+		addr = HW_REG_BLND(mmBLND_CONTROL, controller_id);
+		value = dm_read_reg(ctx, addr);
+
+		set_reg_field_value(
+			value,
+			feedthrough,
+			BLND_CONTROL,
+			BLND_FEEDTHROUGH_EN);
+
+		set_reg_field_value(
+			value,
+			blnd_mode,
+			BLND_CONTROL,
+			BLND_MODE);
+	}
 
 	dm_write_reg(ctx, addr, value);
 }
