@@ -797,7 +797,6 @@ struct amdgpu_ring {
 	struct amdgpu_ctx	*current_ctx;
 	enum amdgpu_ring_type	type;
 	char			name[16];
-	bool                    is_pte_ring;
 };
 
 /*
