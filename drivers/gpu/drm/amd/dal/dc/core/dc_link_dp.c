@@ -54,7 +54,7 @@ static void wait_for_training_aux_rd_interval(
 	struct core_link* link,
 	uint32_t default_wait_in_micro_secs)
 {
-	uint8_t training_rd_interval;
+	union training_aux_rd_interval training_rd_interval;
 
 	/* overwrite the delay if rev > 1.1*/
 	if (link->dpcd_caps.dpcd_rev.raw >= DPCD_REV_12) {
@@ -63,11 +63,12 @@ static void wait_for_training_aux_rd_interval(
 		core_link_read_dpcd(
 			link,
 			DPCD_ADDRESS_TRAINING_AUX_RD_INTERVAL,
-			&training_rd_interval,
+			(uint8_t *)&training_rd_interval,
 			sizeof(training_rd_interval));
-		default_wait_in_micro_secs = training_rd_interval ?
-			(training_rd_interval * 4000) :
-			default_wait_in_micro_secs;
+
+		if (training_rd_interval.bits.TRAINIG_AUX_RD_INTERVAL)
+			default_wait_in_micro_secs =
+				training_rd_interval.bits.TRAINIG_AUX_RD_INTERVAL * 4000;
 	}
 
 	dm_delay_in_microseconds(link->ctx, default_wait_in_micro_secs);
@@ -96,7 +97,7 @@ static void dpcd_set_training_pattern(
 		"%s\n %x pattern = %x\n",
 		__func__,
 		DPCD_ADDRESS_TRAINING_PATTERN_SET,
-		dpcd_pattern.bits.TRAINING_PATTERN_SET);
+		dpcd_pattern.v1_4.TRAINING_PATTERN_SET);
 }
 
 static void dpcd_set_link_settings(
@@ -196,7 +197,7 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 	/*****************************************************************
 	* DpcdAddress_TrainingPatternSet
 	*****************************************************************/
-	dpcd_pattern.bits.TRAINING_PATTERN_SET =
+	dpcd_pattern.v1_4.TRAINING_PATTERN_SET =
 		hw_training_pattern_to_dpcd_training_pattern(link, pattern);
 
 	dpcd_lt_buffer[DPCD_ADDRESS_TRAINING_PATTERN_SET - dpcd_base_lt_offset]
@@ -208,7 +209,7 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 		"%s\n %x pattern = %x\n",
 		__func__,
 		DPCD_ADDRESS_TRAINING_PATTERN_SET,
-		dpcd_pattern.bits.TRAINING_PATTERN_SET);
+		dpcd_pattern.v1_4.TRAINING_PATTERN_SET);
 
 
 	/*****************************************************************
@@ -922,14 +923,54 @@ static bool perform_clock_recovery_sequence(
 	return false;
 }
 
- bool perform_link_training(
+static inline bool perform_link_training_int(
+	struct core_link *link,
+	struct link_training_settings *lt_settings,
+	bool status)
+{
+	union lane_count_set lane_count_set = { {0} };
+	union dpcd_training_pattern dpcd_pattern = { {0} };
+
+	/* 3. set training not in progress*/
+	dpcd_pattern.v1_4.TRAINING_PATTERN_SET = DPCD_TRAINING_PATTERN_VIDEOIDLE;
+	dpcd_set_training_pattern(link, dpcd_pattern);
+
+	/* 4. mainlink output idle pattern*/
+	dp_set_hw_test_pattern(link, DP_TEST_PATTERN_VIDEO_MODE);
+
+	/*
+	 * 5. post training adjust if required
+	 * If the upstream DPTX and downstream DPRX both support TPS4,
+	 * TPS4 must be used instead of POST_LT_ADJ_REQ.
+	 */
+	if (link->dpcd_caps.max_ln_count.bits.POST_LT_ADJ_REQ_SUPPORTED != 1 &&
+		get_supported_tp(link) == HW_DP_TRAINING_PATTERN_4)
+		return status;
+
+	if (status &&
+		perform_post_lt_adj_req_sequence(link, lt_settings) == false)
+		status = false;
+
+	lane_count_set.bits.LANE_COUNT_SET = lt_settings->link_settings.lane_count;
+	lane_count_set.bits.ENHANCED_FRAMING = 1;
+	lane_count_set.bits.POST_LT_ADJ_REQ_GRANTED = 0;
+
+	core_link_write_dpcd(
+		link,
+		DPCD_ADDRESS_LANE_COUNT_SET,
+		&lane_count_set.raw,
+		sizeof(lane_count_set));
+
+	return status;
+}
+
+bool perform_link_training(
 	struct core_link *link,
 	const struct dc_link_settings *link_setting,
 	bool skip_video_pattern)
 {
 	bool status;
-	union dpcd_training_pattern dpcd_pattern = {{0}};
-	union lane_count_set lane_count_set = {{0}};
+
 	const int8_t *link_rate = "Unknown";
 	struct link_training_settings lt_settings;
 
@@ -961,37 +1002,8 @@ static bool perform_clock_recovery_sequence(
 			status = true;
 	}
 
-	if (status || !skip_video_pattern) {
-
-		/* 3. set training not in progress*/
-		dpcd_pattern.bits.TRAINING_PATTERN_SET =
-			DPCD_TRAINING_PATTERN_VIDEOIDLE;
-		dpcd_set_training_pattern(link, dpcd_pattern);
-
-		/* 4. mainlink output idle pattern*/
-		dp_set_hw_test_pattern(link, DP_TEST_PATTERN_VIDEO_MODE);
-
-		/* 5. post training adjust if required*/
-		if (link->dpcd_caps.max_ln_count.bits.POST_LT_ADJ_REQ_SUPPORTED
-			== 1) {
-			if (status == true) {
-				if (perform_post_lt_adj_req_sequence(
-					link, &lt_settings) == false)
-					status = false;
-			}
-
-			lane_count_set.bits.LANE_COUNT_SET =
-				lt_settings.link_settings.lane_count;
-			lane_count_set.bits.ENHANCED_FRAMING = 1;
-			lane_count_set.bits.POST_LT_ADJ_REQ_GRANTED = 0;
-
-			core_link_write_dpcd(
-				link,
-				DPCD_ADDRESS_LANE_COUNT_SET,
-				&lane_count_set.raw,
-				sizeof(lane_count_set));
-		}
-	}
+	if (status || !skip_video_pattern)
+		status = perform_link_training_int(link, &lt_settings, status);
 
 	/* 6. print status message*/
 	switch (lt_settings.link_settings.link_rate) {
@@ -1007,6 +1019,9 @@ static bool perform_clock_recovery_sequence(
 		break;
 	case LINK_RATE_RBR2:
 		link_rate = "RBR2";
+		break;
+	case LINK_RATE_HIGH3:
+		link_rate = "High3";
 		break;
 	default:
 		break;
@@ -1674,9 +1689,7 @@ static void dp_wa_power_up_0010FA(struct core_link *link, uint8_t *dpcd_data,
 
 static void retrieve_link_cap(struct core_link *link)
 {
-	uint8_t dpcd_data[
-			DPCD_ADDRESS_EDP_CONFIG_CAP -
-			DPCD_ADDRESS_DPCD_REV + 1];
+	uint8_t dpcd_data[DPCD_ADDRESS_TRAINING_AUX_RD_INTERVAL - DPCD_ADDRESS_DPCD_REV + 1];
 
 	union down_stream_port_count down_strm_port_count;
 	union edp_configuration_cap edp_config_cap;
@@ -1688,11 +1701,29 @@ static void retrieve_link_cap(struct core_link *link)
 	dm_memset(&edp_config_cap, '\0',
 		sizeof(union edp_configuration_cap));
 
-	core_link_read_dpcd(link, DPCD_ADDRESS_DPCD_REV,
-			dpcd_data, sizeof(dpcd_data));
-	link->dpcd_caps.dpcd_rev.raw = dpcd_data[
-		DPCD_ADDRESS_DPCD_REV -
-		DPCD_ADDRESS_DPCD_REV];
+	core_link_read_dpcd(
+		link,
+		DPCD_ADDRESS_DPCD_REV,
+		dpcd_data,
+		sizeof(dpcd_data));
+
+	link->dpcd_caps.dpcd_rev.raw =
+		dpcd_data[DPCD_ADDRESS_DPCD_REV - DPCD_ADDRESS_DPCD_REV];
+
+	{
+		union training_aux_rd_interval aux_rd_interval;
+
+		aux_rd_interval.raw =
+			dpcd_data[DPCD_ADDRESS_TRAINING_AUX_RD_INTERVAL];
+
+		if (aux_rd_interval.bits.EXT_RECIEVER_CAP_FIELD_PRESENT == 1) {
+			core_link_read_dpcd(
+				link,
+				DPCD_ADDRESS_DP13_DPCD_REV,
+				dpcd_data,
+				sizeof(dpcd_data));
+		}
+	}
 
 	ds_port.byte = dpcd_data[DPCD_ADDRESS_DOWNSTREAM_PORT_PRESENT -
 				 DPCD_ADDRESS_DPCD_REV];
