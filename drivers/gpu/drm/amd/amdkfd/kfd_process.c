@@ -154,7 +154,7 @@ static struct kfd_process *find_process(const struct task_struct *thread,
 
 	idx = srcu_read_lock(&kfd_processes_srcu);
 	p = find_process_by_mm(thread->mm);
-	if (lock)
+	if (p && lock)
 		mutex_lock(&p->mutex);
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 
