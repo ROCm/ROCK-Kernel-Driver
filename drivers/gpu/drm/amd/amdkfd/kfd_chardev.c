@@ -368,12 +368,6 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	return 0;
 
 err_create_queue:
-	if (mem) {
-		pdd->dev->kfd2kgd->unmap_memory_to_gpu(
-				dev->kgd, mem, pdd->vm);
-		pdd->dev->kfd2kgd->free_memory_of_gpu(
-				dev->kgd, mem);
-	}
 err_bind_process:
 	mutex_unlock(&p->mutex);
 	return err;
