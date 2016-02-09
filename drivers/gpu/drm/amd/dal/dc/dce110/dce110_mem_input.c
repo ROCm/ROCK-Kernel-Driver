@@ -36,8 +36,6 @@
 
 #include "dce110_mem_input.h"
 
-#define MAX_WATERMARK 0xFFFF
-#define SAFE_NBP_MARK 0x7FFF
 
 #define DCP_REG(reg) (reg + mem_input110->offsets.dcp)
 #define DMIF_REG(reg) (reg + mem_input110->offsets.dmif)
@@ -677,40 +675,26 @@ static void program_nbp_watermark(
 	dm_write_reg(ctx, addr, value);
 }
 
-void dce110_mem_input_program_safe_display_marks(struct mem_input *mi)
-{
-	struct dce110_mem_input *bm_dce110 = TO_DCE110_MEM_INPUT(mi);
-	struct bw_watermarks max_marks = { MAX_WATERMARK, MAX_WATERMARK };
-	struct bw_watermarks nbp_marks = { SAFE_NBP_MARK, SAFE_NBP_MARK };
-
-	program_urgency_watermark(
-		mi->ctx, bm_dce110->offsets.dmif, max_marks, MAX_WATERMARK);
-	program_stutter_watermark(mi->ctx, bm_dce110->offsets.dmif, max_marks);
-	program_nbp_watermark(mi->ctx, bm_dce110->offsets.dmif, nbp_marks);
-}
-
 void dce110_mem_input_program_display_marks(
 	struct mem_input *mem_input,
 	struct bw_watermarks nbp,
 	struct bw_watermarks stutter,
 	struct bw_watermarks urgent,
-	uint32_t h_total,
-	uint32_t pixel_clk_in_khz,
-	uint32_t pstate_blackout_duration_ns)
+	uint32_t total_dest_line_time_ns)
 {
 	struct dce110_mem_input *bm_dce110 = TO_DCE110_MEM_INPUT(mem_input);
-	uint32_t total_dest_line_time_ns = 1000000UL * h_total
-		/ pixel_clk_in_khz + pstate_blackout_duration_ns;
 
 	program_urgency_watermark(
 		mem_input->ctx,
 		bm_dce110->offsets.dmif,
 		urgent,
 		total_dest_line_time_ns);
+
 	program_nbp_watermark(
 		mem_input->ctx,
 		bm_dce110->offsets.dmif,
 		nbp);
+
 	program_stutter_watermark(
 		mem_input->ctx,
 		bm_dce110->offsets.dmif,
@@ -930,8 +914,6 @@ void dce110_free_mem_input(
 }
 
 static struct mem_input_funcs dce110_mem_input_funcs = {
-	.mem_input_program_safe_display_marks =
-			dce110_mem_input_program_safe_display_marks,
 	.mem_input_program_display_marks =
 			dce110_mem_input_program_display_marks,
 	.allocate_mem_input = dce110_allocate_mem_input,

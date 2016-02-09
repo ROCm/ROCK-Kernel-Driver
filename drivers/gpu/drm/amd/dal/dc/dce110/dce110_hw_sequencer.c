@@ -102,6 +102,9 @@ static const struct dce110_hw_seq_reg_offsets reg_offsets[] = {
 	(reg + reg_offsets[id].crtc)
 
 
+#define MAX_WATERMARK 0xFFFF
+#define SAFE_NBP_MARK 0x7FFF
+
 /*******************************************************************************
  * Private definitions
  ******************************************************************************/
@@ -1129,12 +1132,64 @@ static void set_display_clock(struct validate_context *context)
 	/* TODO: Start GTC counter */
 }
 
+static uint32_t compute_pstate_blackout_duration(
+	const struct dc *dc,
+	const struct core_stream *stream)
+{
+	uint32_t total_dest_line_time_ns;
+	uint32_t pstate_blackout_duration_ns;
+
+	pstate_blackout_duration_ns = 1000 *
+		dc->bw_vbios.blackout_duration.value >> 24;
+
+	total_dest_line_time_ns = 1000000UL *
+		stream->public.timing.h_total /
+		stream->public.timing.pix_clk_khz +
+		pstate_blackout_duration_ns;
+
+	return total_dest_line_time_ns;
+}
+
 static void set_displaymarks(
-	const struct dc *dc, struct validate_context *context)
+	const struct dc *dc,
+	struct validate_context *context)
 {
 	uint8_t i, j;
 	uint8_t total_streams = 0;
 	uint8_t target_count = context->target_count;
+	uint32_t pstate_blackout_duration_ns;
+
+	for (i = 0; i < target_count; i++) {
+		const struct core_target *target = context->targets[i];
+
+		for (j = 0; j < target->public.stream_count; j++) {
+			const struct core_stream *stream =
+				DC_STREAM_TO_CORE(target->public.streams[j]);
+
+			pstate_blackout_duration_ns =
+				compute_pstate_blackout_duration(dc, stream);
+
+			stream->mi->funcs->mem_input_program_display_marks(
+				stream->mi,
+				context->bw_results
+					.nbp_state_change_wm_ns[total_streams],
+				context->bw_results
+					.stutter_exit_wm_ns[total_streams],
+				context->bw_results.
+					urgent_wm_ns[total_streams],
+				pstate_blackout_duration_ns);
+
+			total_streams++;
+		} /* for ()*/
+	} /* for() */
+}
+
+static void set_safe_displaymarks(const struct dc *dc, struct validate_context *context)
+{
+	uint8_t i, j;
+	uint8_t target_count = context->target_count;
+	struct bw_watermarks max_marks = { MAX_WATERMARK, MAX_WATERMARK };
+	struct bw_watermarks nbp_marks = { SAFE_NBP_MARK, SAFE_NBP_MARK };
 
 	for (i = 0; i < target_count; i++) {
 		struct core_target *target = context->targets[i];
@@ -1145,42 +1200,17 @@ static void set_displaymarks(
 
 			stream->mi->funcs->mem_input_program_display_marks(
 				stream->mi,
-				context->bw_results
-				.nbp_state_change_wm_ns[total_streams],
-				context->bw_results
-					.stutter_exit_wm_ns[total_streams],
-				context->bw_results
-					.urgent_wm_ns[total_streams],
-				stream->public.timing.h_total,
-				stream->public.timing.pix_clk_khz,
-				1000 * dc->bw_vbios.blackout_duration
-								.value >> 24);
-			total_streams++;
-		}
-	}
-}
-
-static void set_safe_displaymarks(struct validate_context *context)
-{
-	uint8_t i, j;
-	uint8_t target_count = context->target_count;
-
-	for (i = 0; i < target_count; i++) {
-		struct core_target *target = context->targets[i];
-
-		for (j = 0; j < target->public.stream_count; j++) {
-			struct core_stream *stream =
-				DC_STREAM_TO_CORE(target->public.streams[j]);
-
-			stream->mi->funcs->mem_input_program_safe_display_marks(
-					stream->mi);
+				nbp_marks,
+				max_marks,
+				max_marks,
+				MAX_WATERMARK);
 		}
 	}
 }
 
 static void program_bw(struct dc *dc, struct validate_context *context)
 {
-	set_safe_displaymarks(context);
+	set_safe_displaymarks(dc, context);
 	/*TODO: when pplib works*/
 	/*dc_set_clocks_and_clock_state(context);*/
 
@@ -1252,7 +1282,7 @@ static enum dc_status apply_ctx_to_hw(
 				PIPE_GATING_CONTROL_DISABLE);
 	}
 
-	set_safe_displaymarks(context);
+	set_safe_displaymarks(dc, context);
 	/*TODO: when pplib works*/
 	/*dc_set_clocks_and_clock_state(context);*/
 
