@@ -29,6 +29,8 @@
 #include "dc_types.h"
 #include "grph_object_id.h"
 #include "grph_csc_types.h"
+#include "video_csc_types.h"
+#include "hw_sequencer_types.h"
 
 struct fixed31_32;
 struct gamma_parameters;
@@ -303,6 +305,19 @@ struct opp_funcs {
 		enum color_space color_sp,
 		enum dc_color_depth color_dpth,
 		enum signal_type signal);
+
+	/* underlay related */
+	void (*opp_get_underlay_adjustment_range)(
+			struct output_pixel_processor *opp,
+			enum ovl_csc_adjust_item overlay_adjust_item,
+			struct hw_adjustment_range *range);
+
+	void (*opp_set_ovl_csc_adjustment)(
+			struct output_pixel_processor *opp,
+			const struct ovl_csc_adjustment *adjust,
+			enum color_space c_space);
+
+	void (*opp_destroy)(struct output_pixel_processor **opp);
 };
 
 #endif

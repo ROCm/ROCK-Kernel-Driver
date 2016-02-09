@@ -1229,7 +1229,7 @@ audio_create_fail:
 controller_create_fail:
 	for (i = 0; i < pool->pipe_count; i++) {
 		if (pool->opps[i] != NULL)
-			dce110_opp_destroy(&pool->opps[i]);
+			pool->opps[i]->funcs->opp_destroy(&pool->opps[i]);
 
 		if (pool->transforms[i] != NULL)
 			dce110_transform_destroy(&pool->transforms[i]);
