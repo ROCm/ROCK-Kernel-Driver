@@ -103,6 +103,16 @@ static bool is_sharable_clk_src(
 	const struct core_stream *stream)
 {
 	enum clock_source_id id = stream_with_clk_src->clock_source->id;
+#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
+	enum dce_version dce_ver = dal_adapter_service_get_dce_version(
+			stream->sink->link->adapter_srv);
+
+	/* Currently no clocks are shared for DCE 10 until VBIOS behaviour
+	 * is verified for this use case
+	 */
+	if (dce_ver == DCE_VERSION_10_0)
+		return false;
+#endif
 
 	if (stream_with_clk_src->clock_source == NULL)
 		return false;
@@ -110,10 +120,6 @@ static bool is_sharable_clk_src(
 	if (id == CLOCK_SOURCE_ID_EXTERNAL)
 		return false;
 
-	/* Sharing dual link is not working */
-	if (stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK ||
-			stream_with_clk_src->signal == SIGNAL_TYPE_DVI_DUAL_LINK)
-			return false;
 
 	if(!is_same_timing(
 		&stream_with_clk_src->public.timing, &stream->public.timing))
