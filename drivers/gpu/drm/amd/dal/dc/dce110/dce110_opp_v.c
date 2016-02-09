@@ -30,30 +30,31 @@
 #include "dce/dce_11_0_sh_mask.h"
 
 #include "dce110_opp.h"
+#include "dce110_opp_v.h"
 
 #include "gamma_types.h"
-
-enum {
-	MAX_LUT_ENTRY = 256,
-	MAX_NUMBER_OF_ENTRIES = 256
-};
 
 /*****************************************/
 /* Constructor, Destructor               */
 /*****************************************/
 
 struct opp_funcs funcs = {
-		.opp_power_on_regamma_lut = dce110_opp_power_on_regamma_lut,
-		.opp_program_bit_depth_reduction = dce110_opp_program_bit_depth_reduction,
-		.opp_program_clamping_and_pixel_encoding = dce110_opp_program_clamping_and_pixel_encoding,
-		.opp_set_csc_adjustment = dce110_opp_set_csc_adjustment,
-		.opp_set_csc_default = dce110_opp_set_csc_default,
+		.opp_set_regamma = dce110_opp_set_regamma_v,
+
+		.opp_set_csc_default = dce110_opp_v_set_csc_default,
+
+		.opp_set_csc_adjustment = dce110_opp_v_set_csc_adjustment,
+
+		.opp_program_bit_depth_reduction =
+				dce110_opp_program_bit_depth_reduction,
+		.opp_program_clamping_and_pixel_encoding =
+				dce110_opp_program_clamping_and_pixel_encoding,
+
 		.opp_set_dyn_expansion = dce110_opp_set_dyn_expansion,
-		.opp_set_regamma = dce110_opp_set_regamma,
 		.opp_destroy = dce110_opp_destroy,
 };
 
-bool dce110_opp_construct(struct dce110_opp *opp110,
+bool dce110_opp_v_construct(struct dce110_opp *opp110,
 	struct dc_context *ctx,
 	uint32_t inst,
 	const struct dce110_opp_reg_offsets *offsets)
@@ -69,9 +70,6 @@ bool dce110_opp_construct(struct dce110_opp *opp110,
 	return true;
 }
 
-void dce110_opp_destroy(struct output_pixel_processor **opp)
-{
-	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp));
-	*opp = NULL;
-}
+
+
 
