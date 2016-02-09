@@ -35,17 +35,12 @@ struct mem_input {
 };
 
 struct mem_input_funcs {
-	void (*mem_input_program_safe_display_marks)(
-		struct mem_input *mi);
-
 	void (*mem_input_program_display_marks)(
 		struct mem_input *mem_input,
 		struct bw_watermarks nbp,
 		struct bw_watermarks stutter,
 		struct bw_watermarks urgent,
-		uint32_t h_total,
-		uint32_t pixel_clk_in_khz,
-		uint32_t pstate_blackout_duration_ns);
+		uint32_t total_dest_line_time_ns);
 
 	void (*allocate_mem_input)(
 		struct mem_input *mem_input,

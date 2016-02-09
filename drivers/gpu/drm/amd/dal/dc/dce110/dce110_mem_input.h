@@ -51,14 +51,6 @@ bool dce110_mem_input_construct(
 /*
  * dce110_mem_input_program_display_marks
  *
- * This function will program nbp stutter and urgency watermarks to maximum
- * safe values
- */
-void dce110_mem_input_program_safe_display_marks(struct mem_input *mi);
-
-/*
- * dce110_mem_input_program_display_marks
- *
  * This function will program nbp stutter and urgency watermarks to minimum
  * allowable values
  */
@@ -67,9 +59,7 @@ void dce110_mem_input_program_display_marks(
 	struct bw_watermarks nbp,
 	struct bw_watermarks stutter,
 	struct bw_watermarks urgent,
-	uint32_t h_total,
-	uint32_t pixel_clk_in_khz,
-	uint32_t pstate_blackout_duration_ns);
+	uint32_t total_dest_line_time_ns);
 
 /*
  * dce110_allocate_mem_input
