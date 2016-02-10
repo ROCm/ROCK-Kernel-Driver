@@ -36,7 +36,6 @@ static bool dce110_timing_generator_v_enable_crtc(struct timing_generator *tg)
      */
 
 	uint32_t value;
-	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 
 	value = dm_read_reg(tg->ctx,
 			mmCRTCV_MASTER_UPDATE_MODE);
@@ -58,7 +57,6 @@ static bool dce110_timing_generator_v_enable_crtc(struct timing_generator *tg)
 static bool dce110_timing_generator_v_disable_crtc(struct timing_generator *tg)
 {
 	uint32_t value;
-	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 
 	value = dm_read_reg(tg->ctx,
 			mmCRTCV_CONTROL);
@@ -126,7 +124,6 @@ static bool dce110_timing_generator_v_blank_crtc(struct timing_generator *tg)
 
 static bool dce110_timing_generator_v_unblank_crtc(struct timing_generator *tg)
 {
-	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 	uint32_t addr = mmCRTCV_BLANK_CONTROL;
 	uint32_t value = dm_read_reg(tg->ctx, addr);
 
@@ -153,7 +150,6 @@ static bool dce110_timing_generator_v_is_in_vertical_blank(
 	uint32_t addr = 0;
 	uint32_t value = 0;
 	uint32_t field = 0;
-	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 
 	addr = mmCRTCV_STATUS;
 	value = dm_read_reg(tg->ctx, addr);
@@ -164,8 +160,6 @@ static bool dce110_timing_generator_v_is_in_vertical_blank(
 static bool dce110_timing_generator_v_is_counter_moving(struct timing_generator *tg)
 {
 	uint32_t value;
-	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
-
 	uint32_t h1 = 0;
 	uint32_t h2 = 0;
 	uint32_t v1 = 0;
@@ -263,7 +257,6 @@ static void dce110_timing_generator_v_program_blanking(
 	uint32_t hsync_offset = timing->h_border_right +
 			timing->h_front_porch;
 	uint32_t h_sync_start = timing->h_addressable + hsync_offset;
-	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 
 	struct dc_context *ctx = tg->ctx;
 	uint32_t value = 0;
@@ -339,7 +332,6 @@ static void dce110_timing_generator_v_enable_advanced_request(
 	bool enable,
 	const struct dc_crtc_timing *timing)
 {
-	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 	uint32_t addr = mmCRTCV_START_LINE_CONTROL;
 	uint32_t value = dm_read_reg(tg->ctx, addr);
 
@@ -402,7 +394,6 @@ static void dce110_timing_generator_v_program_blank_color(
 		enum color_space color_space)
 {
 	struct crtc_black_color black_color;
-	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 	uint32_t addr = mmCRTCV_BLACK_COLOR;
 	uint32_t value = dm_read_reg(tg->ctx, addr);
 
@@ -436,7 +427,7 @@ static void dce110_timing_generator_v_set_overscan_color_black(
 	struct dc_context *ctx = tg->ctx;
 	uint32_t value = 0;
 	uint32_t addr;
-	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
+
 	/* Overscan Color for YUV display modes:
 	 * to achieve a black color for both the explicit and implicit overscan,
 	 * the overscan color registers should be programmed to: */
@@ -558,7 +549,6 @@ static void dce110_timing_generator_v_set_overscan_color_black(
 static void dce110_tg_v_program_blank_color(struct timing_generator *tg,
 		const struct crtc_black_color *black_color)
 {
-	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 	uint32_t addr = mmCRTCV_BLACK_COLOR;
 	uint32_t value = dm_read_reg(tg->ctx, addr);
 
@@ -590,7 +580,6 @@ static void dce110_timing_generator_v_set_overscan_color(struct timing_generator
 	struct dc_context *ctx = tg->ctx;
 	uint32_t value = 0;
 	uint32_t addr;
-	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 
 	set_reg_field_value(
 		value,
@@ -630,7 +619,6 @@ static void dce110_timing_generator_v_set_early_control(
 		uint32_t early_cntl)
 {
 	uint32_t regval;
-	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 	uint32_t address = mmCRTC_CONTROL;
 
 	regval = dm_read_reg(tg->ctx, address);
@@ -645,7 +633,6 @@ static void dce110_timing_generator_v_get_crtc_positions(
 	int32_t *v_position)
 {
 	uint32_t value;
-	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 
 	value = dm_read_reg(tg->ctx, mmCRTCV_STATUS_POSITION);
 
@@ -662,7 +649,6 @@ static void dce110_timing_generator_v_get_crtc_positions(
 
 static uint32_t dce110_timing_generator_v_get_vblank_counter(struct timing_generator *tg)
 {
-	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 	uint32_t addr = mmCRTCV_STATUS_FRAME_COUNT;
 	uint32_t value = dm_read_reg(tg->ctx, addr);
 	uint32_t field = get_reg_field_value(

@@ -32,10 +32,12 @@
 #include "include/irq_service_interface.h"
 #include "../virtual/virtual_stream_encoder.h"
 #include "dce110/dce110_timing_generator.h"
+#include "dce110/dce110_timing_generator_v.h"
 #include "dce110/dce110_link_encoder.h"
 #include "dce110/dce110_mem_input.h"
 #include "dce110/dce110_ipp.h"
 #include "dce110/dce110_transform.h"
+#include "dce110/dce110_transform_v.h"
 #include "dce110/dce110_stream_encoder.h"
 #include "dce110/dce110_opp.h"
 #include "dce110/dce110_clock_source.h"
@@ -305,8 +307,14 @@ static struct timing_generator *dce110_timing_generator_create(
 	if (!tg110)
 		return NULL;
 
-	if (dce110_timing_generator_construct(tg110, as, ctx, instance, offsets))
-		return &tg110->base;
+	if (instance == 3) {
+		/* This is the Underlay instance. */
+		if (dce110_timing_generator_v_construct(tg110, as, ctx))
+			return &tg110->base;
+	} else {
+		if (dce110_timing_generator_construct(tg110, as, ctx, instance, offsets))
+			return &tg110->base;
+	}
 
 	BREAK_TO_DEBUGGER();
 	dm_free(ctx, tg110);
@@ -370,8 +378,14 @@ static struct transform *dce110_transform_create(
 	if (!transform)
 		return NULL;
 
-	if (dce110_transform_construct(transform, ctx, inst, offsets))
-		return &transform->base;
+	if (inst == 3) {
+		/* Underlay */
+		if (dce110_transform_v_construct(transform, ctx))
+			return &transform->base;
+	} else {
+		if (dce110_transform_construct(transform, ctx, inst, offsets))
+			return &transform->base;
+	}
 
 	BREAK_TO_DEBUGGER();
 	dm_free(ctx, transform);
