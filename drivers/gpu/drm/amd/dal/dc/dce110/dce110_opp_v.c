@@ -39,7 +39,7 @@
 /*****************************************/
 
 struct opp_funcs funcs = {
-		.opp_set_regamma = dce110_opp_set_regamma_v,
+		.opp_program_regamma_pwl = dce110_opp_program_regamma_pwl_v,
 
 		.opp_set_csc_default = dce110_opp_v_set_csc_default,
 

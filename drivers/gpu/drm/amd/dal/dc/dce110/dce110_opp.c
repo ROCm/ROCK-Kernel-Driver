@@ -49,7 +49,8 @@ struct opp_funcs funcs = {
 		.opp_set_csc_adjustment = dce110_opp_set_csc_adjustment,
 		.opp_set_csc_default = dce110_opp_set_csc_default,
 		.opp_set_dyn_expansion = dce110_opp_set_dyn_expansion,
-		.opp_set_regamma = dce110_opp_set_regamma,
+		.opp_program_regamma_pwl = dce110_opp_program_regamma_pwl,
+		.opp_set_regamma_mode = dce110_opp_set_regamma_mode,
 		.opp_destroy = dce110_opp_destroy,
 };
 

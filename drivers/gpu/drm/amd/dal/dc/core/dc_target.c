@@ -258,6 +258,7 @@ bool dc_commit_surfaces_to_target(
 						DC_SURFACE_TO_CORE(dc_surface);
 			struct pipe_ctx *pipe_ctx =
 						&context->res_ctx.pipe_ctx[j];
+			struct core_gamma *gamma = NULL;
 
 			if (pipe_ctx->surface !=
 					DC_SURFACE_TO_CORE(new_surfaces[i]))
@@ -279,15 +280,14 @@ bool dc_commit_surfaces_to_target(
 						dc_surface->dst_rect.width,
 						dc_surface->dst_rect.height);
 
-			if (dc_surface->gamma_correction) {
-				struct core_gamma *gamma = DC_GAMMA_TO_CORE(
-						dc_surface->gamma_correction);
+		if (surface->public.gamma_correction)
+			gamma = DC_GAMMA_TO_CORE(
+					surface->public.gamma_correction);
 
-				dc->hwss.set_gamma_correction(
-							pipe_ctx->ipp,
-							pipe_ctx->opp,
-							gamma, surface);
-			}
+		dc->hwss.set_gamma_correction(
+				pipe_ctx->ipp,
+				pipe_ctx->opp,
+			gamma, surface);
 
 			dc->hwss.set_plane_config(dc, surface, pipe_ctx);
 
