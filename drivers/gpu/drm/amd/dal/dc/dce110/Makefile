@@ -8,7 +8,8 @@ dce110_opp_formatter.o dce110_opp_regamma.o dce110_stream_encoder.o \
 dce110_timing_generator.o dce110_transform.o dce110_transform_v.o \
 dce110_transform_gamut.o dce110_transform_scl.o dce110_opp_csc.o\
 dce110_compressor.o dce110_mem_input.o dce110_hw_sequencer.o \
-dce110_resource.o dce110_transform_bit_depth.o dce110_clock_source.o
+dce110_resource.o dce110_transform_bit_depth.o dce110_clock_source.o \
+dce110_timing_generator_v.o
 
 AMD_DAL_DCE110 = $(addprefix $(AMDDALPATH)/dc/dce110/,$(DCE110))
 
