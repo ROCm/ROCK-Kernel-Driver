@@ -65,19 +65,7 @@ static void construct(
 
 static void destruct(struct core_target *core_target)
 {
-	int i, j;
-	struct validate_context *context =
-				&core_target->ctx->dc->current_context;
-
-	for (i = 0; i < context->target_count; i++) {
-		if (context->targets[i] != core_target)
-			continue;
-		for (j = 0; j < context->target_status[i].surface_count; j++)
-			dc_surface_release(
-				context->target_status[i].surfaces[j]);
-		context->target_status[i].surface_count = 0;
-		break;
-	}
+	int i;
 
 	for (i = 0; i < core_target->public.stream_count; i++) {
 		dc_stream_release(
@@ -148,30 +136,45 @@ target_alloc_fail:
 	return NULL;
 }
 
-static bool validate_surface_address(
-		struct dc_plane_address address)
+static int8_t acquire_first_free_underlay(
+		struct resource_context *res_ctx,
+		struct core_stream *stream)
 {
-	bool is_valid_address = false;
+	BREAK_TO_DEBUGGER();
+	if (!res_ctx->pipe_ctx[3].stream) {
+		struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[DCE110_UNDERLAY_IDX];
 
-	switch (address.type) {
-	case PLN_ADDR_TYPE_GRAPHICS:
-		if (address.grph.addr.quad_part != 0)
-			is_valid_address = true;
-		break;
-	case PLN_ADDR_TYPE_GRPH_STEREO:
-		if ((address.grph_stereo.left_addr.quad_part != 0) &&
-			(address.grph_stereo.right_addr.quad_part != 0)) {
-			is_valid_address = true;
+		pipe_ctx->tg = res_ctx->pool.timing_generators[DCE110_UNDERLAY_IDX];
+		pipe_ctx->mi = res_ctx->pool.mis[DCE110_UNDERLAY_IDX];
+		/*pipe_ctx->ipp = res_ctx->pool.ipps[DCE110_UNDERLAY_IDX];*/
+		pipe_ctx->xfm = res_ctx->pool.transforms[DCE110_UNDERLAY_IDX];
+		pipe_ctx->opp = res_ctx->pool.opps[DCE110_UNDERLAY_IDX];
+		pipe_ctx->dis_clk = res_ctx->pool.display_clock;
+		pipe_ctx->pipe_idx = DCE110_UNDERLAY_IDX;
+
+		if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
+			dm_error("DC: failed to blank crtc!\n");
+			BREAK_TO_DEBUGGER();
+		} else
+			pipe_ctx->flags.blanked = true;
+
+		pipe_ctx->tg->funcs->program_timing(
+				pipe_ctx->tg,
+				&stream->public.timing,
+				true);
+
+		if (!pipe_ctx->tg->funcs->enable_crtc(pipe_ctx->tg)) {
+			BREAK_TO_DEBUGGER();
 		}
-		break;
-	case PLN_ADDR_TYPE_VIDEO_PROGRESSIVE:
-	default:
-		/* not supported */
-		BREAK_TO_DEBUGGER();
-		break;
-	}
 
-	return is_valid_address;
+		pipe_ctx->tg->funcs->set_blank_color(
+				pipe_ctx->tg,
+				COLOR_SPACE_SRGB_FULL_RANGE);/* TODO unhardcode*/
+
+		pipe_ctx->stream = stream;
+		return DCE110_UNDERLAY_IDX;
+	}
+	return -1;
 }
 
 bool dc_commit_surfaces_to_target(
@@ -184,7 +187,7 @@ bool dc_commit_surfaces_to_target(
 	int i, j;
 	uint32_t prev_disp_clk = dc->current_context.bw_results.dispclk_khz;
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
-	struct dc_target_status *status = NULL;
+	struct dc_target_status *target_status = NULL;
 	struct validate_context *context;
 	int current_enabled_surface_count = 0;
 	int new_enabled_surface_count = 0;
@@ -196,7 +199,7 @@ bool dc_commit_surfaces_to_target(
 	for (i = 0; i < context->target_count; i++)
 		if (target == context->targets[i])
 			break;
-	status = &context->target_status[i];
+	target_status = &context->target_status[i];
 	if (!dal_adapter_service_is_in_accelerated_mode(
 						dc->res_pool.adapter_srv)
 		|| i == context->target_count) {
@@ -204,13 +207,22 @@ bool dc_commit_surfaces_to_target(
 		goto unexpected_fail;
 	}
 
-	for (i = 0; i < status->surface_count; i++)
-		if (status->surfaces[i]->visible)
+	for (i = 0; i < target_status->surface_count; i++)
+		if (target_status->surfaces[i]->visible)
 			current_enabled_surface_count++;
 
 	for (i = 0; i < new_surface_count; i++)
 		if (new_surfaces[i]->visible)
 			new_enabled_surface_count++;
+
+	/* TODO unhack mpo */
+	if (new_surface_count == 2 && target_status->surface_count < 2)
+		acquire_first_free_underlay(&context->res_ctx,
+				DC_STREAM_TO_CORE(dc_target->streams[0]));
+	else if (new_surface_count < 2 && target_status->surface_count == 2) {
+		context->res_ctx.pipe_ctx[DCE110_UNDERLAY_IDX].stream = NULL;
+		context->res_ctx.pipe_ctx[DCE110_UNDERLAY_IDX].surface = NULL;
+	}
 
 	dal_logger_write(dc->ctx->logger,
 				LOG_MAJOR_INTERFACE_TRACE,
@@ -280,24 +292,20 @@ bool dc_commit_surfaces_to_target(
 						dc_surface->dst_rect.width,
 						dc_surface->dst_rect.height);
 
-		if (surface->public.gamma_correction)
-			gamma = DC_GAMMA_TO_CORE(
+			if (surface->public.gamma_correction)
+				gamma = DC_GAMMA_TO_CORE(
 					surface->public.gamma_correction);
 
-		dc->hwss.set_gamma_correction(
-				pipe_ctx->ipp,
-				pipe_ctx->opp,
-			gamma, surface);
+			dc->hwss.set_gamma_correction(
+					pipe_ctx->ipp,
+					pipe_ctx->opp,
+					gamma, surface);
 
-			dc->hwss.set_plane_config(dc, surface, pipe_ctx);
-
-			if (validate_surface_address(dc_surface->address))
-				dc->hwss.update_plane_addrs(
-					dc, &context->res_ctx, surface);
+			dc->hwss.set_plane_config(
+				dc, pipe_ctx, &context->res_ctx);
 		}
 
-	if (current_enabled_surface_count == 0 && new_enabled_surface_count > 0)
-		dc_target_enable_memory_requests(dc_target);
+	dc->hwss.update_plane_addrs(dc, &context->res_ctx);
 
 	/* Lower display clock if necessary */
 	if (prev_disp_clk > context->bw_results.dispclk_khz) {
@@ -311,11 +319,9 @@ bool dc_commit_surfaces_to_target(
 	return true;
 
 unexpected_fail:
-	for (i = 0; i < new_surface_count; i++) {
-		status->surfaces[i] = NULL;
-	}
-	status->surface_count = 0;
 
+	destruct_val_ctx(context);
+	dm_free(dc->ctx, context);
 	return false;
 }
 
@@ -350,7 +356,8 @@ void dc_target_enable_memory_requests(struct dc_target *dc_target)
 			if (!tg->funcs->set_blank(tg, false)) {
 				dm_error("DC: failed to unblank crtc!\n");
 				BREAK_TO_DEBUGGER();
-			}
+			} else
+				res_ctx->pipe_ctx[j].flags.blanked = false;
 		}
 	}
 }
@@ -373,7 +380,8 @@ void dc_target_disable_memory_requests(struct dc_target *dc_target)
 			if (!tg->funcs->set_blank(tg, true)) {
 				dm_error("DC: failed to blank crtc!\n");
 				BREAK_TO_DEBUGGER();
-			}
+			} else
+				res_ctx->pipe_ctx[j].flags.blanked = true;
 		}
 	}
 }
@@ -407,6 +415,9 @@ bool dc_target_set_cursor_attributes(
 		for (j = 0; j < MAX_PIPES; j++) {
 			struct input_pixel_processor *ipp =
 						res_ctx->pipe_ctx[j].ipp;
+
+			if (j == DCE110_UNDERLAY_IDX)
+				continue;
 
 			if (res_ctx->pipe_ctx[j].stream !=
 				DC_STREAM_TO_CORE(target->public.streams[i]))
@@ -450,6 +461,9 @@ bool dc_target_set_cursor_position(
 		for (j = 0; j < MAX_PIPES; j++) {
 			struct input_pixel_processor *ipp =
 						res_ctx->pipe_ctx[j].ipp;
+
+			if (j == DCE110_UNDERLAY_IDX)
+				continue;
 
 			if (res_ctx->pipe_ctx[j].stream !=
 				DC_STREAM_TO_CORE(target->public.streams[i]))

@@ -57,21 +57,15 @@ struct opp_funcs funcs = {
 
 		.opp_set_regamma_mode = dce110_opp_set_regamma_mode,
 
-		.opp_destroy = dce110_opp_destroy,
+		.opp_destroy = dce110_opp_destroy
 };
 
 bool dce110_opp_v_construct(struct dce110_opp *opp110,
-	struct dc_context *ctx,
-	uint32_t inst,
-	const struct dce110_opp_reg_offsets *offsets)
+	struct dc_context *ctx)
 {
 	opp110->base.funcs = &funcs;
 
 	opp110->base.ctx = ctx;
-
-	opp110->base.inst = inst;
-
-	opp110->offsets = *offsets;
 
 	return true;
 }

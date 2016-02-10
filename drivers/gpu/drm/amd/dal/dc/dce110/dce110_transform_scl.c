@@ -64,16 +64,14 @@ static void disable_enhanced_sharpness(struct dce110_transform *xfm110)
 			SCL_REG(mmSCL_F_SHARP_CONTROL), value);
 }
 
-/**
-* Function:
-* void setup_scaling_configuration
-*
-* Purpose: setup scaling mode : bypass, RGb, YCbCr and nummber of taps
-* Input:   data
-*
-* Output:
-   void
-*/
+/*
+ *	@Function:
+ *		void setup_scaling_configuration
+ *	@Purpose: setup scaling mode : bypass, RGb, YCbCr and number of taps
+ *	@Input:   data
+ *
+ *	@Output: void
+ */
 static bool setup_scaling_configuration(
 	struct dce110_transform *xfm110,
 	const struct scaler_data *data)
@@ -82,45 +80,44 @@ static bool setup_scaling_configuration(
 	uint32_t addr;
 	uint32_t value;
 
+	addr = SCL_REG(mmSCL_BYPASS_CONTROL);
+	value = dm_read_reg(ctx, addr);
+	set_reg_field_value(
+		value,
+		0,
+		SCL_BYPASS_CONTROL,
+		SCL_BYPASS_MODE);
+	dm_write_reg(ctx, addr, value);
+
 	if (data->taps.h_taps + data->taps.v_taps <= 2) {
 		dce110_transform_set_scaler_bypass(&xfm110->base);
 		return false;
 	}
 
-	{
-		addr = SCL_REG(mmSCL_MODE);
-		value = dm_read_reg(ctx, addr);
+	addr = SCL_REG(mmSCL_MODE);
+	value = dm_read_reg(ctx, addr);
+	if (data->format <= PIXEL_FORMAT_GRPH_END)
+		set_reg_field_value(value, 1, SCL_MODE, SCL_MODE);
+	else
+		set_reg_field_value(value, 2, SCL_MODE, SCL_MODE);
+	set_reg_field_value(value, 1, SCL_MODE, SCL_PSCL_EN);
+	dm_write_reg(ctx, addr, value);
 
-		if (data->dal_pixel_format <= PIXEL_FORMAT_GRPH_END)
-			set_reg_field_value(value, 1, SCL_MODE, SCL_MODE);
-		else
-			set_reg_field_value(value, 2, SCL_MODE, SCL_MODE);
 
-		set_reg_field_value(value, 1, SCL_MODE, SCL_PSCL_EN);
+	addr = SCL_REG(mmSCL_TAP_CONTROL);
+	value = dm_read_reg(ctx, addr);
+	set_reg_field_value(value, data->taps.h_taps - 1,
+			SCL_TAP_CONTROL, SCL_H_NUM_OF_TAPS);
+	set_reg_field_value(value, data->taps.v_taps - 1,
+			SCL_TAP_CONTROL, SCL_V_NUM_OF_TAPS);
+	dm_write_reg(ctx, addr, value);
 
-		dm_write_reg(ctx, addr, value);
-	}
-	{
-		addr = SCL_REG(mmSCL_TAP_CONTROL);
-		value = dm_read_reg(ctx, addr);
 
-		set_reg_field_value(value, data->taps.h_taps - 1,
-				SCL_TAP_CONTROL, SCL_H_NUM_OF_TAPS);
-
-		set_reg_field_value(value, data->taps.v_taps - 1,
-				SCL_TAP_CONTROL, SCL_V_NUM_OF_TAPS);
-
-		dm_write_reg(ctx, addr, value);
-	}
-	{
-		addr = SCL_REG(mmSCL_CONTROL);
-		value = dm_read_reg(ctx, addr);
-		 /* 1 - Replaced out of bound pixels with edge */
-		set_reg_field_value(value, 1, SCL_CONTROL, SCL_BOUNDARY_MODE);
-
-		/* 1 - Replaced out of bound pixels with the edge pixel. */
-		dm_write_reg(ctx, addr, value);
-	}
+	addr = SCL_REG(mmSCL_CONTROL);
+	value = dm_read_reg(ctx, addr);
+	 /* 1 - Replaced out of bound pixels with edge */
+	set_reg_field_value(value, 1, SCL_CONTROL, SCL_BOUNDARY_MODE);
+	dm_write_reg(ctx, addr, value);
 
 	return true;
 }
@@ -425,7 +422,7 @@ static bool program_multi_taps_filter(
 
 	if (horizontal) {
 		filter_params.taps = data->taps.h_taps;
-		filter_params.sharpness = data->h_sharpness;
+		filter_params.sharpness = 0; /* TODO */
 		filter_params.flags.bits.HORIZONTAL = 1;
 
 		src_size = data->viewport.width;
@@ -434,12 +431,12 @@ static bool program_multi_taps_filter(
 				dal_fixed31_32_div(
 					dal_fixed31_32_from_int(
 						data->viewport.width),
-					data->ratios->horz));
+					data->ratios.horz));
 
 		filter_type = FILTER_TYPE_RGB_Y_HORIZONTAL;
 	} else {
 		filter_params.taps = data->taps.v_taps;
-		filter_params.sharpness = data->v_sharpness;
+		filter_params.sharpness = 0; /* TODO */
 		filter_params.flags.bits.HORIZONTAL = 0;
 
 		src_size = data->viewport.height;
@@ -448,7 +445,7 @@ static bool program_multi_taps_filter(
 				dal_fixed31_32_div(
 					dal_fixed31_32_from_int(
 						data->viewport.height),
-					data->ratios->vert));
+					data->ratios.vert));
 
 		filter_type = FILTER_TYPE_RGB_Y_VERTICAL;
 	}
@@ -478,20 +475,18 @@ static bool program_multi_taps_filter(
 		filter_data,
 		filter_data_size);
 
-	/* 4. Program the alpha if necessary */
-	if (data->flags.bits.SHOULD_PROGRAM_ALPHA) {
-		if (horizontal)
-			filter_type = FILTER_TYPE_ALPHA_HORIZONTAL;
-		else
-			filter_type = FILTER_TYPE_ALPHA_VERTICAL;
+	/* 4. Program the alpha*/
+	if (horizontal)
+		filter_type = FILTER_TYPE_ALPHA_HORIZONTAL;
+	else
+		filter_type = FILTER_TYPE_ALPHA_VERTICAL;
 
-		program_filter(
-			xfm110,
-			filter_type,
-			&filter_params,
-			filter_data,
-			filter_data_size);
-	}
+	program_filter(
+		xfm110,
+		filter_type,
+		&filter_params,
+		filter_data,
+		filter_data_size);
 
 	return true;
 }
@@ -542,18 +537,16 @@ static void calculate_inits(
 {
 	struct fixed31_32 h_init;
 	struct fixed31_32 v_init;
-	struct fixed31_32 v_init_bot;
 
-	inits->bottom_enable = 0;
 	inits->h_int_scale_ratio =
-		dal_fixed31_32_u2d19(data->ratios->horz) << 5;
+		dal_fixed31_32_u2d19(data->ratios.horz) << 5;
 	inits->v_int_scale_ratio =
-		dal_fixed31_32_u2d19(data->ratios->vert) << 5;
+		dal_fixed31_32_u2d19(data->ratios.vert) << 5;
 
 	h_init =
 		dal_fixed31_32_div_int(
 			dal_fixed31_32_add(
-				data->ratios->horz,
+				data->ratios.horz,
 				dal_fixed31_32_from_int(data->taps.h_taps + 1)),
 				2);
 	inits->h_init.integer = dal_fixed31_32_floor(h_init);
@@ -562,28 +555,11 @@ static void calculate_inits(
 	v_init =
 		dal_fixed31_32_div_int(
 			dal_fixed31_32_add(
-				data->ratios->vert,
+				data->ratios.vert,
 				dal_fixed31_32_from_int(data->taps.v_taps + 1)),
 				2);
 	inits->v_init.integer = dal_fixed31_32_floor(v_init);
 	inits->v_init.fraction = dal_fixed31_32_u0d19(v_init) << 5;
-
-	if (data->flags.bits.INTERLACED) {
-		v_init_bot =
-			dal_fixed31_32_add(
-				dal_fixed31_32_div_int(
-					dal_fixed31_32_add(
-						data->ratios->vert,
-						dal_fixed31_32_from_int(
-							data->taps.v_taps + 1)),
-					2),
-				data->ratios->vert);
-		inits->v_init_bottom.integer = dal_fixed31_32_floor(v_init_bot);
-		inits->v_init_bottom.fraction =
-			dal_fixed31_32_u0d19(v_init_bot) << 5;
-
-		inits->bottom_enable = 1;
-	}
 }
 
 static void program_scl_ratios_inits(
@@ -637,22 +613,6 @@ static void program_scl_ratios_inits(
 		SCL_V_INIT_FRAC);
 	dm_write_reg(xfm110->base.ctx, addr, value);
 
-	if (inits->bottom_enable) {
-		addr = SCL_REG(mmSCL_VERT_FILTER_INIT_BOT);
-		value = 0;
-		set_reg_field_value(
-			value,
-			inits->v_init_bottom.integer,
-			SCL_VERT_FILTER_INIT_BOT,
-			SCL_V_INIT_INT_BOT);
-		set_reg_field_value(
-			value,
-			inits->v_init_bottom.fraction,
-			SCL_VERT_FILTER_INIT_BOT,
-			SCL_V_INIT_FRAC_BOT);
-		dm_write_reg(xfm110->base.ctx, addr, value);
-	}
-
 	addr = SCL_REG(mmSCL_AUTOMATIC_MODE_CONTROL);
 	value = 0;
 	set_reg_field_value(
@@ -668,38 +628,6 @@ static void program_scl_ratios_inits(
 	dm_write_reg(xfm110->base.ctx, addr, value);
 }
 
-static void get_viewport(
-		struct dce110_transform *xfm110,
-		struct rect *current_view_port)
-{
-	uint32_t value_start;
-	uint32_t value_size;
-
-	if (current_view_port == NULL)
-		return;
-
-	value_start = dm_read_reg(xfm110->base.ctx, SCL_REG(mmVIEWPORT_START));
-	value_size = dm_read_reg(xfm110->base.ctx, SCL_REG(mmVIEWPORT_SIZE));
-
-	current_view_port->x = get_reg_field_value(
-			value_start,
-			VIEWPORT_START,
-			VIEWPORT_X_START);
-	current_view_port->y = get_reg_field_value(
-			value_start,
-			VIEWPORT_START,
-			VIEWPORT_Y_START);
-	current_view_port->height = get_reg_field_value(
-			value_size,
-			VIEWPORT_SIZE,
-			VIEWPORT_HEIGHT);
-	current_view_port->width = get_reg_field_value(
-			value_size,
-			VIEWPORT_SIZE,
-			VIEWPORT_WIDTH);
-}
-
-
 bool dce110_transform_set_scaler(
 	struct transform *xfm,
 	const struct scaler_data *data)
@@ -707,18 +635,6 @@ bool dce110_transform_set_scaler(
 	struct dce110_transform *xfm110 = TO_DCE110_TRANSFORM(xfm);
 	bool is_scaling_required;
 	struct dc_context *ctx = xfm->ctx;
-
-	{
-		uint32_t addr = SCL_REG(mmSCL_BYPASS_CONTROL);
-		uint32_t value = dm_read_reg(xfm->ctx, addr);
-
-		set_reg_field_value(
-			value,
-			0,
-			SCL_BYPASS_CONTROL,
-			SCL_BYPASS_MODE);
-		dm_write_reg(xfm->ctx, addr, value);
-	}
 
 	disable_enhanced_sharpness(xfm110);
 
@@ -764,6 +680,9 @@ bool dce110_transform_set_scaler(
 			program_two_taps_filter(xfm110, true, false);
 	}
 
+	/* 7. Program the viewport */
+	program_viewport(xfm110, &data->viewport);
+
 	return true;
 }
 
@@ -778,35 +697,6 @@ void dce110_transform_set_scaler_bypass(struct transform *xfm)
 	set_reg_field_value(sclv_mode, 0, SCL_MODE, SCL_MODE);
 	set_reg_field_value(sclv_mode, 0, SCL_MODE, SCL_PSCL_EN);
 	dm_write_reg(xfm->ctx, SCL_REG(mmSCL_MODE), sclv_mode);
-}
-
-bool dce110_transform_update_viewport(
-	struct transform *xfm,
-	const struct rect *view_port,
-	bool is_fbc_attached)
-{
-	struct dce110_transform *xfm110 = TO_DCE110_TRANSFORM(xfm);
-	bool program_req = false;
-	struct rect current_view_port;
-
-	if (view_port == NULL)
-		return program_req;
-
-	get_viewport(xfm110, &current_view_port);
-
-	if (current_view_port.x != view_port->x ||
-			current_view_port.y != view_port->y ||
-			current_view_port.height != view_port->height ||
-			current_view_port.width != view_port->width)
-		program_req = true;
-
-	if (program_req) {
-		/*underlay viewport is programmed with scaler
-		 *program_viewport function pointer is not exposed*/
-		program_viewport(xfm110, view_port);
-	}
-
-	return program_req;
 }
 
 void dce110_transform_set_scaler_filter(

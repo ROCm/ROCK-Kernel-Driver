@@ -133,11 +133,6 @@ struct transform_funcs {
 	void (*transform_set_scaler_bypass)(
 		struct transform *xfm);
 
-	bool (*transform_update_viewport)(
-		struct transform *xfm,
-		const struct rect *view_port,
-		bool is_fbc_attached);
-
 	void (*transform_set_scaler_filter)(
 		struct transform *xfm,
 		struct scaler_filter *filter);

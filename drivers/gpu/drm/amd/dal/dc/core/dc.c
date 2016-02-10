@@ -175,13 +175,14 @@ static void init_hw(struct dc *dc)
 	for (i = 0; i < dc->res_pool.pipe_count; i++) {
 		xfm = dc->res_pool.transforms[i];
 
-		dc->hwss.enable_display_power_gating(
-				dc->ctx, i, bp,
-				PIPE_GATING_CONTROL_INIT);
-		dc->hwss.enable_display_power_gating(
-				dc->ctx, i, bp,
-				PIPE_GATING_CONTROL_DISABLE);
-
+		if (i != DCE110_UNDERLAY_IDX) {
+			dc->hwss.enable_display_power_gating(
+					dc->ctx, i, bp,
+					PIPE_GATING_CONTROL_INIT);
+			dc->hwss.enable_display_power_gating(
+					dc->ctx, i, bp,
+					PIPE_GATING_CONTROL_DISABLE);
+		}
 		xfm->funcs->transform_power_up(xfm);
 		dc->hwss.enable_display_pipe_clock_gating(
 			dc->ctx,
@@ -392,6 +393,7 @@ ctx_fail:
 
 static void destruct(struct dc *dc)
 {
+	destruct_val_ctx(&dc->current_context);
 	destroy_links(dc);
 	dc->res_pool.funcs->destruct(&dc->res_pool);
 	dal_logger_destroy(&dc->ctx->logger);
@@ -452,6 +454,7 @@ bool dc_validate_resources(
 	result = dc->res_pool.funcs->validate_with_context(
 						dc, set, set_count, context);
 
+	destruct_val_ctx(context);
 	dm_free(dc->ctx, context);
 context_alloc_fail:
 
@@ -678,10 +681,8 @@ void dc_flip_surface_addrs(
 		 */
 		surface->public.address = flip_addrs[i].address;
 		surface->public.flip_immediate = flip_addrs[i].flip_immediate;
-
-		dc->hwss.update_plane_addrs(
-				dc, &dc->current_context.res_ctx, surface);
 	}
+	dc->hwss.update_plane_addrs(dc, &dc->current_context.res_ctx);
 }
 
 enum dc_irq_source dc_interrupt_to_irq_source(

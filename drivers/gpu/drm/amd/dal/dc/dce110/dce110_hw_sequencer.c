@@ -86,7 +86,7 @@ static const struct dce110_hw_seq_reg_offsets reg_offsets[] = {
 	.crtc = (mmCRTC2_CRTC_GSL_CONTROL - mmCRTC_GSL_CONTROL),
 },
 {
-	.dcfe = (mmDCFEV_MEM_PWR_CTRL - mmDCFE_MEM_PWR_CTRL),
+	.dcfe = (mmDCFEV_CLOCK_CONTROL - mmDCFE_CLOCK_CONTROL),
 	.blnd = (mmBLNDV_CONTROL - mmBLND_CONTROL),
 	.crtc = (mmCRTCV_GSL_CONTROL - mmCRTC_GSL_CONTROL),
 }
@@ -375,7 +375,10 @@ static void dce110_set_blender_mode(
 		break;
 	case BLENDER_MODE_CURRENT_PIPE:
 	default:
-		feedthrough = 1;
+		if (controller_id == DCE110_UNDERLAY_IDX)
+			feedthrough = 0;
+		else
+			feedthrough = 1;
 		blnd_mode = 0;
 		break;
 	}
@@ -453,7 +456,7 @@ static bool dce110_enable_display_power_gating(
 	else
 		cntl = ASIC_PIPE_DISABLE;
 
-	if (!(power_gating == PIPE_GATING_CONTROL_INIT && controller_id != 0))
+	if (power_gating != PIPE_GATING_CONTROL_INIT || controller_id == 0)
 		bp_result = dcb->funcs->enable_disp_power_gating(
 						dcb, controller_id + 1, cntl);
 
@@ -523,16 +526,19 @@ static bool set_gamma_ramp(
 
 	build_prescale_params(prescale_params, surface);
 
-	ipp->funcs->ipp_program_prescale(ipp, prescale_params);
+	if (ipp)
+		ipp->funcs->ipp_program_prescale(ipp, prescale_params);
 
 	if (ramp) {
 		calculate_regamma_params(regamma_params,
 				temp_params, ramp, surface);
 		opp->funcs->opp_program_regamma_pwl(opp, regamma_params);
-		ipp->funcs->ipp_set_degamma(ipp, IPP_DEGAMMA_MODE_sRGB);
+		if (ipp)
+			ipp->funcs->ipp_set_degamma(ipp, IPP_DEGAMMA_MODE_sRGB);
 		opp->funcs->opp_set_regamma_mode(opp, OPP_REGAMMA_USER);
 	} else {
-		ipp->funcs->ipp_set_degamma(ipp, IPP_DEGAMMA_MODE_BYPASS);
+		if (ipp)
+			ipp->funcs->ipp_set_degamma(ipp, IPP_DEGAMMA_MODE_BYPASS);
 		opp->funcs->opp_set_regamma_mode(opp, OPP_REGAMMA_BYPASS);
 	}
 
@@ -772,6 +778,8 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		 * programming, otherwise CRTC will be hung in bad state
 		 */
 		pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true);
+		pipe_ctx->flags.blanked = true;
+
 
 		/*
 		 * only disable stream in case it was ever enabled
@@ -949,6 +957,8 @@ static void disable_vga_and_power_gate_all_controllers(
 		 * powergating. */
 		enable_display_pipe_clock_gating(ctx,
 				true);
+		if (i == DCE110_UNDERLAY_IDX)
+			continue;
 		dc->hwss.enable_display_power_gating(ctx, i, dcb,
 				PIPE_GATING_CONTROL_ENABLE);
 	}
@@ -1138,7 +1148,8 @@ static void set_displaymarks(
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 		uint32_t total_dest_line_time_ns;
 
-		if (pipe_ctx->stream == NULL)
+		if (pipe_ctx->stream == NULL
+			|| pipe_ctx->pipe_idx == DCE110_UNDERLAY_IDX)
 			continue;
 
 		total_dest_line_time_ns = compute_pstate_blackout_duration(
@@ -1304,38 +1315,6 @@ static bool setup_line_buffer_pixel_depth(
 	return false;
 }
 
-static void hw_sequencer_build_scaler_parameter_plane(
-		const struct pipe_ctx *pipe_ctx,
-		struct scaler_data *scaler_data)
-{
-	/*TODO: per pipe not per stream*/
-	/*TODO: get from feature from adapterservice*/
-	scaler_data->flags.bits.SHOW_COLOURED_BORDER = false;
-
-	scaler_data->flags.bits.SHOULD_PROGRAM_ALPHA = 1;
-
-	scaler_data->flags.bits.SHOULD_PROGRAM_VIEWPORT = 0;
-
-	scaler_data->flags.bits.SHOULD_UNLOCK = 0;
-
-	scaler_data->flags.bits.INTERLACED = 0;
-
-	scaler_data->dal_pixel_format = pipe_ctx->format;
-
-	scaler_data->taps = pipe_ctx->taps;
-
-	scaler_data->viewport = pipe_ctx->viewport;
-
-	scaler_data->overscan = pipe_ctx->overscan;
-
-	scaler_data->ratios = &pipe_ctx->ratios;
-
-	/*TODO rotation and adjustment */
-	scaler_data->h_sharpness = 0;
-	scaler_data->v_sharpness = 0;
-
-}
-
 static void set_default_colors(struct pipe_ctx *pipe_ctx)
 {
 	struct default_adjustment default_adjust = { 0 };
@@ -1344,7 +1323,7 @@ static void set_default_colors(struct pipe_ctx *pipe_ctx)
 	default_adjust.color_space = get_output_color_space(
 					&pipe_ctx->stream->public.timing);
 	default_adjust.csc_adjust_type = GRAPHICS_CSC_ADJUST_TYPE_SW;
-	default_adjust.surface_pixel_format = pipe_ctx->format;
+	default_adjust.surface_pixel_format = pipe_ctx->scl_data.format;
 
 	/* display color depth */
 	default_adjust.color_depth =
@@ -1360,28 +1339,17 @@ static void set_default_colors(struct pipe_ctx *pipe_ctx)
 					pipe_ctx->opp, &default_adjust);
 }
 
-static void program_scaler(
-	const struct core_surface *surface,
-	const struct pipe_ctx *pipe_ctx)
+static void program_scaler(const struct pipe_ctx *pipe_ctx)
 {
-	struct scaler_data scaler_data = { { 0 } };
-
-	hw_sequencer_build_scaler_parameter_plane(
-		pipe_ctx,
-		&scaler_data);
-
 	setup_line_buffer_pixel_depth(
 		pipe_ctx,
 		LB_PIXEL_DEPTH_24BPP,
 		false);
 
 	pipe_ctx->tg->funcs->set_overscan_blank_color(
-		pipe_ctx->tg, surface->public.color_space);
+		pipe_ctx->tg, pipe_ctx->surface->public.color_space);
 
-	pipe_ctx->xfm->funcs->transform_set_scaler(pipe_ctx->xfm, &scaler_data);
-
-	pipe_ctx->xfm->funcs->transform_update_viewport(
-			pipe_ctx->xfm, &scaler_data.viewport, false);
+	pipe_ctx->xfm->funcs->transform_set_scaler(pipe_ctx->xfm, &pipe_ctx->scl_data);
 }
 
 /**
@@ -1390,14 +1358,17 @@ static void program_scaler(
  */
 static void set_plane_config(
 	const struct dc *dc,
-	struct core_surface *surface,
-	struct pipe_ctx *pipe_ctx)
+	struct pipe_ctx *pipe_ctx,
+	struct resource_context *res_ctx)
 {
+	int i;
 	const struct dc_crtc_timing *crtc_timing =
 				&pipe_ctx->stream->public.timing;
 	struct mem_input *mi = pipe_ctx->mi;
 	struct timing_generator *tg = pipe_ctx->tg;
 	struct dc_context *ctx = pipe_ctx->stream->ctx;
+	struct core_surface *surface = pipe_ctx->surface;
+	enum blender_mode blender_mode = BLENDER_MODE_CURRENT_PIPE;
 
 	dc->hwss.pipe_control_lock(
 		ctx, pipe_ctx->pipe_idx, PIPE_LOCK_CONTROL_MODE, false);
@@ -1419,11 +1390,19 @@ static void set_plane_config(
 
 	set_default_colors(pipe_ctx);
 
-	/* program Scaler */
-	program_scaler(surface, pipe_ctx);
+	program_scaler(pipe_ctx);
+
+	for (i = pipe_ctx->pipe_idx + 1; i < MAX_PIPES; i++)
+		if (res_ctx->pipe_ctx[i].stream == pipe_ctx->stream) {
+			if (surface->public.visible)
+				blender_mode = BLENDER_MODE_BLENDING;
+			else
+				blender_mode = BLENDER_MODE_OTHER_PIPE;
+			break;
+		}
 
 	dc->hwss.set_blender_mode(
-		ctx, pipe_ctx->pipe_idx, BLENDER_MODE_CURRENT_PIPE);
+		ctx, pipe_ctx->pipe_idx, blender_mode);
 
 	mi->funcs->mem_input_program_surface_config(
 			mi,
@@ -1431,28 +1410,20 @@ static void set_plane_config(
 			&surface->public.tiling_info,
 			&surface->public.plane_size,
 			surface->public.rotation);
-
-	dc->hwss.pipe_control_lock(
-			ctx,
-			pipe_ctx->pipe_idx,
-			PIPE_LOCK_CONTROL_GRAPHICS |
-			PIPE_LOCK_CONTROL_SCL |
-			PIPE_LOCK_CONTROL_BLENDER |
-			PIPE_LOCK_CONTROL_SURFACE,
-			false);
 }
 
-static void update_plane_addrs(
-	struct dc *dc,
-	struct resource_context *res_ctx,
-	const struct core_surface *surface)
+static void update_plane_addrs(struct dc *dc, struct resource_context *res_ctx)
 {
-	uint8_t j;
+	int j;
 
-	for (j = 0; j < MAX_PIPES; j++) {
+	/* Go through pipes in reverse order to avoid underflow on unlock */
+	for (j = MAX_PIPES - 1; j >= 0; j--) {
 		struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[j];
+		struct core_surface *surface = pipe_ctx->surface;
 
-		if (pipe_ctx->surface != surface)
+		if (surface == NULL ||
+			surface->status.requested_address.grph.addr.quad_part
+			== surface->public.address.grph.addr.quad_part)
 			continue;
 
 		dc->hwss.pipe_control_lock(
@@ -1466,13 +1437,24 @@ static void update_plane_addrs(
 			&surface->public.address,
 			surface->public.flip_immediate);
 
-		dc->hwss.pipe_control_lock(
-			dc->ctx,
-			j,
-			PIPE_LOCK_CONTROL_SURFACE,
-			false);
+		surface->status.requested_address = surface->public.address;
 
-		break;
+		dc->hwss.pipe_control_lock(
+					dc->ctx,
+					pipe_ctx->pipe_idx,
+					PIPE_LOCK_CONTROL_GRAPHICS |
+					PIPE_LOCK_CONTROL_SCL |
+					PIPE_LOCK_CONTROL_BLENDER |
+					PIPE_LOCK_CONTROL_SURFACE,
+					false);
+
+		if (pipe_ctx->flags.blanked) {
+			if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, false)) {
+				dm_error("DC: failed to unblank crtc!\n");
+				BREAK_TO_DEBUGGER();
+			} else
+				pipe_ctx->flags.blanked = false;
+		}
 	}
 }
 
@@ -1482,6 +1464,9 @@ static void reset_single_pipe_hw_ctx(
 		struct validate_context *context)
 {
 	struct dc_bios *dcb;
+
+	if (pipe_ctx->pipe_idx == DCE110_UNDERLAY_IDX)
+		return;
 
 	dcb = dal_adapter_service_get_bios_parser(
 			context->res_ctx.pool.adapter_srv);
@@ -1493,8 +1478,13 @@ static void reset_single_pipe_hw_ctx(
 	}
 
 	core_link_disable_stream(pipe_ctx);
-
-	pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true);
+	if (!pipe_ctx->flags.blanked) {
+		if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
+			dm_error("DC: failed to blank crtc!\n");
+			BREAK_TO_DEBUGGER();
+		} else
+			pipe_ctx->flags.blanked = true;
+	}
 	pipe_ctx->tg->funcs->disable_crtc(pipe_ctx->tg);
 	pipe_ctx->mi->funcs->free_mem_input(
 				pipe_ctx->mi, context->target_count);

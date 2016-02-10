@@ -47,8 +47,6 @@ static struct transform_funcs dce110_transform_funcs = {
 		dce110_transform_set_scaler,
 	.transform_set_scaler_bypass =
 		dce110_transform_set_scaler_bypass,
-	.transform_update_viewport =
-		dce110_transform_update_viewport,
 	.transform_set_scaler_filter =
 		dce110_transform_set_scaler_filter,
 	.transform_set_gamut_remap =

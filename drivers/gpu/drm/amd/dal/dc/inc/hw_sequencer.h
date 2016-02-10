@@ -44,14 +44,13 @@ struct hw_sequencer_funcs {
 	void (*reset_hw_ctx)(struct dc *dc, struct validate_context *context);
 
 	void (*set_plane_config)(
-				const struct dc *dc,
-				struct core_surface *surface,
-				struct pipe_ctx *pipe_ctx);
+			const struct dc *dc,
+			struct pipe_ctx *pipe_ctx,
+			struct resource_context *res_ctx);
 
 	void (*update_plane_addrs)(
 		struct dc *dc,
-		struct resource_context *res_ctx,
-		const struct core_surface *surface);
+		struct resource_context *res_ctx);
 
 	bool (*set_gamma_correction)(
 				struct input_pixel_processor *ipp,

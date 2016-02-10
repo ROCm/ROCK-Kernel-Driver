@@ -34,9 +34,7 @@
 struct gamma_parameters;
 
 bool dce110_opp_v_construct(struct dce110_opp *opp110,
-	struct dc_context *ctx,
-	uint32_t inst,
-	const struct dce110_opp_reg_offsets *offsets);
+	struct dc_context *ctx);
 
 /* underlay callbacks */
 void dce110_opp_v_set_csc_default(

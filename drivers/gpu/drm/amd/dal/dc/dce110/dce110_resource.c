@@ -35,11 +35,13 @@
 #include "dce110/dce110_timing_generator_v.h"
 #include "dce110/dce110_link_encoder.h"
 #include "dce110/dce110_mem_input.h"
+#include "dce110/dce110_mem_input_v.h"
 #include "dce110/dce110_ipp.h"
 #include "dce110/dce110_transform.h"
 #include "dce110/dce110_transform_v.h"
 #include "dce110/dce110_stream_encoder.h"
 #include "dce110/dce110_opp.h"
+#include "dce110/dce110_opp_v.h"
 #include "dce110/dce110_clock_source.h"
 
 #include "dce/dce_11_0_d.h"
@@ -307,14 +309,8 @@ static struct timing_generator *dce110_timing_generator_create(
 	if (!tg110)
 		return NULL;
 
-	if (instance == 3) {
-		/* This is the Underlay instance. */
-		if (dce110_timing_generator_v_construct(tg110, as, ctx))
-			return &tg110->base;
-	} else {
-		if (dce110_timing_generator_construct(tg110, as, ctx, instance, offsets))
-			return &tg110->base;
-	}
+	if (dce110_timing_generator_construct(tg110, as, ctx, instance, offsets))
+		return &tg110->base;
 
 	BREAK_TO_DEBUGGER();
 	dm_free(ctx, tg110);
@@ -378,14 +374,8 @@ static struct transform *dce110_transform_create(
 	if (!transform)
 		return NULL;
 
-	if (inst == 3) {
-		/* Underlay */
-		if (dce110_transform_v_construct(transform, ctx))
-			return &transform->base;
-	} else {
-		if (dce110_transform_construct(transform, ctx, inst, offsets))
-			return &transform->base;
-	}
+	if (dce110_transform_construct(transform, ctx, inst, offsets))
+		return &transform->base;
 
 	BREAK_TO_DEBUGGER();
 	dm_free(ctx, transform);
@@ -683,6 +673,18 @@ static enum dc_status build_pipe_hw_param(struct pipe_ctx *pipe_ctx)
 	return DC_OK;
 }
 
+static bool is_surface_pixel_format_supported(struct pipe_ctx *pipe_ctx)
+{
+	if (pipe_ctx->pipe_idx != DCE110_UNDERLAY_IDX)
+		return true;
+	if (pipe_ctx->surface && pipe_ctx->surface->public.format <
+					SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)
+		return false;
+	if (!pipe_ctx->surface)
+		return false;
+	return true;
+}
+
 static enum dc_status validate_mapped_resource(
 		const struct dc *dc,
 		struct validate_context *context)
@@ -706,8 +708,11 @@ static enum dc_status validate_mapped_resource(
 				if (context->res_ctx.pipe_ctx[k].stream != stream)
 					continue;
 
+				if (!is_surface_pixel_format_supported(pipe_ctx))
+					return DC_SURFACE_PIXEL_FORMAT_UNSUPPORTED;
+
 				if (!pipe_ctx->tg->funcs->validate_timing(
-						pipe_ctx->tg, &stream->public.timing))
+					pipe_ctx->tg, &stream->public.timing))
 					return DC_FAIL_CONTROLLER_VALIDATE;
 
 				status = build_pipe_hw_param(pipe_ctx);
@@ -762,7 +767,7 @@ enum dc_status dce110_validate_bandwidth(
 		if (pipe_ctx->stream == NULL)
 			continue;
 
-		if (pipe_ctx->ratios.vert.value == 0) {
+		if (pipe_ctx->scl_data.ratios.vert.value == 0) {
 			disp->graphics_scale_ratio = bw_int_to_fixed(1);
 			disp->graphics_h_taps = 2;
 			disp->graphics_v_taps = 2;
@@ -778,17 +783,17 @@ enum dc_status dce110_validate_bandwidth(
 		} else {
 			disp->graphics_scale_ratio =
 				fixed31_32_to_bw_fixed(
-					pipe_ctx->ratios.vert.value);
-			disp->graphics_h_taps = pipe_ctx->taps.h_taps;
-			disp->graphics_v_taps = pipe_ctx->taps.v_taps;
+					pipe_ctx->scl_data.ratios.vert.value);
+			disp->graphics_h_taps = pipe_ctx->scl_data.taps.h_taps;
+			disp->graphics_v_taps = pipe_ctx->scl_data.taps.v_taps;
 
 			/* TODO: remove when bw formula accepts taps per
 			 * display
 			 */
-			if (max_vtaps < pipe_ctx->taps.v_taps)
-				max_vtaps = pipe_ctx->taps.v_taps;
-			if (max_htaps < pipe_ctx->taps.h_taps)
-				max_htaps = pipe_ctx->taps.h_taps;
+			if (max_vtaps < pipe_ctx->scl_data.taps.v_taps)
+				max_vtaps = pipe_ctx->scl_data.taps.v_taps;
+			if (max_htaps < pipe_ctx->scl_data.taps.h_taps)
+				max_htaps = pipe_ctx->scl_data.taps.h_taps;
 		}
 
 		disp->graphics_src_width =
@@ -1004,10 +1009,16 @@ enum dc_status dce110_validate_with_context(
 						== context->targets[i]) {
 				unchanged = true;
 				set_target_unchanged(context, i);
+				attach_surfaces_to_context(
+					(struct dc_surface **)dc->current_context.
+						target_status[j].surfaces,
+					dc->current_context.target_status[j].surface_count,
+					&context->targets[i]->public,
+					context);
 				context->target_status[i] =
 					dc->current_context.target_status[j];
 			}
-		if (!unchanged)
+		if (!unchanged || set[i].surface_count != 0)
 			if (!attach_surfaces_to_context(
 					(struct dc_surface **)set[i].surfaces,
 					set[i].surface_count,
@@ -1044,6 +1055,29 @@ static struct resource_funcs dce110_res_pool_funcs = {
 	.validate_with_context = dce110_validate_with_context,
 	.validate_bandwidth = dce110_validate_bandwidth
 };
+
+static void underlay_create(struct dc_context *ctx, struct resource_pool *pool)
+{
+	struct dce110_timing_generator *dce110_tgv = dm_alloc(ctx, sizeof (*dce110_tgv));
+	struct dce110_transform *dce110_xfmv = dm_alloc(ctx, sizeof (*dce110_xfmv));
+	struct dce110_mem_input *dce110_miv = dm_alloc(ctx, sizeof (*dce110_miv));
+	struct dce110_opp *dce110_oppv = dm_alloc(ctx, sizeof (*dce110_oppv));
+
+	dce110_opp_v_construct(dce110_oppv, ctx);
+	dce110_timing_generator_v_construct(dce110_tgv, pool->adapter_srv, ctx);
+	dce110_mem_input_v_construct(dce110_miv, ctx);
+	dce110_transform_v_construct(dce110_xfmv, ctx);
+
+	pool->opps[pool->pipe_count] = &dce110_oppv->base;
+	pool->timing_generators[pool->pipe_count] = &dce110_tgv->base;
+	pool->mis[pool->pipe_count] = &dce110_miv->base;
+	pool->transforms[pool->pipe_count] = &dce110_xfmv->base;
+
+	pool->transforms[pool->pipe_count]->funcs->transform_set_scaler_filter(
+			pool->transforms[pool->pipe_count],
+			pool->scaler_filter);
+	pool->pipe_count++;
+}
 
 bool dce110_construct_resource_pool(
 	struct adapter_service *as,
@@ -1177,6 +1211,8 @@ bool dce110_construct_resource_pool(
 			goto controller_create_fail;
 		}
 	}
+	/* TODO: failure? */
+	underlay_create(ctx, pool);
 
 	audio_init_data.as = as;
 	audio_init_data.ctx = ctx;
