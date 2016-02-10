@@ -165,6 +165,7 @@ struct amdgpu_cs_parser;
 struct amdgpu_job;
 struct amdgpu_irq_src;
 struct amdgpu_fpriv;
+struct kfd_process_device;
 
 enum amdgpu_cp_irq {
 	AMDGPU_CP_IRQ_GFX_EOP = 0,
@@ -432,6 +433,7 @@ struct amdgpu_bo {
 	struct amdgpu_mn		*mn;
 	struct list_head		mn_list;
 	struct list_head		shadow_list;
+	struct kfd_process_device	*pdd;
 };
 #define gem_to_amdgpu_bo(gobj) container_of((gobj), struct amdgpu_bo, gem_base)
 
