@@ -107,13 +107,12 @@ void dce110_opp_power_on_regamma_lut(
 	struct output_pixel_processor *opp,
 	bool power_on);
 
-bool dce110_opp_set_regamma(
+bool dce110_opp_program_regamma_pwl(
 	struct output_pixel_processor *opp,
 	const struct regamma_params *params);
 
-void dce110_opp_power_on_regamma_lut(
-	struct output_pixel_processor *opp,
-	bool power_on);
+void dce110_opp_set_regamma_mode(struct output_pixel_processor *opp,
+		enum opp_regamma mode);
 
 void dce110_opp_set_csc_adjustment(
 	struct output_pixel_processor *opp,

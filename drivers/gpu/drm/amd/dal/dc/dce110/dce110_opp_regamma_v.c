@@ -491,7 +491,7 @@ static void program_pwl(struct dce110_opp *opp110,
 	}
 }
 
-bool dce110_opp_set_regamma_v(
+bool dce110_opp_program_regamma_pwl_v(
 	struct output_pixel_processor *opp,
 	const struct regamma_params *params)
 {

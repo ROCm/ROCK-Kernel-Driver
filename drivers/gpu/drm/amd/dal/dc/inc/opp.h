@@ -36,7 +36,6 @@ struct fixed31_32;
 struct gamma_parameters;
 
 /* TODO: Need cleanup */
-
 enum clamping_range {
 	CLAMPING_FULL_RANGE = 0,	   /* No Clamping */
 	CLAMPING_LIMITED_RANGE_8BPC,   /* 8  bpc: Clamping 1  to FE */
@@ -243,14 +242,11 @@ struct pwl_float_data {
 	struct fixed31_32 b;
 };
 
-
-/* TODO: Use when we redefine the OPP interface */
 enum opp_regamma {
 	OPP_REGAMMA_BYPASS = 0,
 	OPP_REGAMMA_SRGB,
 	OPP_REGAMMA_3_6,
-	OPP_REGAMMA_PQ,
-	OPP_REGAMMA_PQ_INTERIM,
+	OPP_REGAMMA_USER,
 };
 
 struct output_pixel_processor {
@@ -278,9 +274,12 @@ struct opp_funcs {
 		struct output_pixel_processor *opp,
 		bool power_on);
 
-	bool (*opp_set_regamma)(
+	bool (*opp_program_regamma_pwl)(
 		struct output_pixel_processor *opp,
 		const struct regamma_params *params);
+
+	void (*opp_set_regamma_mode)(struct output_pixel_processor *opp,
+			enum opp_regamma mode);
 
 	void (*opp_set_csc_adjustment)(
 		struct output_pixel_processor *opp,
@@ -298,7 +297,6 @@ struct opp_funcs {
 	void (*opp_program_clamping_and_pixel_encoding)(
 		struct output_pixel_processor *opp,
 		const struct clamping_and_pixel_encoding_params *params);
-
 
 	void (*opp_set_dyn_expansion)(
 		struct output_pixel_processor *opp,

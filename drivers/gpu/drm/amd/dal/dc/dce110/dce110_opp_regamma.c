@@ -393,18 +393,6 @@ static void program_pwl(
 		uint8_t max_tries = 10;
 		uint8_t counter = 0;
 
-		value = dm_read_reg(opp110->base.ctx,
-				DCP_REG(mmREGAMMA_CONTROL));
-
-		set_reg_field_value(
-			value,
-			3,
-			REGAMMA_CONTROL,
-			GRPH_REGAMMA_MODE);
-
-		dm_write_reg(opp110->base.ctx, DCP_REG(mmREGAMMA_CONTROL),
-				value);
-
 		/* Power on LUT memory */
 		value = dm_read_reg(opp110->base.ctx,
 				DCFE_REG(mmDCFE_MEM_PWR_CTRL));
@@ -495,7 +483,7 @@ static void program_pwl(
 }
 
 
-bool dce110_opp_set_regamma(
+bool dce110_opp_program_regamma_pwl(
 	struct output_pixel_processor *opp,
 	const struct regamma_params *params)
 {
@@ -532,4 +520,21 @@ void dce110_opp_power_on_regamma_lut(
 		DCP_LUT_MEM_PWR_DIS);
 
 	dm_write_reg(opp->ctx, DCFE_REG(mmDCFE_MEM_PWR_CTRL), value);
+}
+
+void dce110_opp_set_regamma_mode(struct output_pixel_processor *opp,
+		enum opp_regamma mode)
+{
+	struct dce110_opp *opp110 = TO_DCE110_OPP(opp);
+	uint32_t value = dm_read_reg(opp110->base.ctx,
+				DCP_REG(mmREGAMMA_CONTROL));
+
+	set_reg_field_value(
+		value,
+		mode,
+		REGAMMA_CONTROL,
+		GRPH_REGAMMA_MODE);
+
+	dm_write_reg(opp110->base.ctx, DCP_REG(mmREGAMMA_CONTROL),
+			value);
 }

@@ -525,11 +525,16 @@ static bool set_gamma_ramp(
 
 	ipp->funcs->ipp_program_prescale(ipp, prescale_params);
 
-	ipp->funcs->ipp_set_degamma(ipp, IPP_DEGAMMA_MODE_sRGB);
-
-	calculate_regamma_params(regamma_params, temp_params, ramp, surface);
-
-	opp->funcs->opp_set_regamma(opp, regamma_params);
+	if (ramp) {
+		calculate_regamma_params(regamma_params,
+				temp_params, ramp, surface);
+		opp->funcs->opp_program_regamma_pwl(opp, regamma_params);
+		ipp->funcs->ipp_set_degamma(ipp, IPP_DEGAMMA_MODE_sRGB);
+		opp->funcs->opp_set_regamma_mode(opp, OPP_REGAMMA_USER);
+	} else {
+		ipp->funcs->ipp_set_degamma(ipp, IPP_DEGAMMA_MODE_BYPASS);
+		opp->funcs->opp_set_regamma_mode(opp, OPP_REGAMMA_BYPASS);
+	}
 
 	opp->funcs->opp_power_on_regamma_lut(opp, false);
 
