@@ -243,17 +243,17 @@ static void calculate_viewport(
 	/* offset = src.ofs + (clip.ofs - dst.ofs) * scl_ratio
 	 * num_pixels = clip.num_pix * scl_ratio
 	 */
-	pipe_ctx->viewport.x = src.x + (clip.x - dst.x) * src.width / dst.width;
-	pipe_ctx->viewport.width = clip.width * src.width / dst.width;
+	pipe_ctx->scl_data.viewport.x = src.x + (clip.x - dst.x) * src.width / dst.width;
+	pipe_ctx->scl_data.viewport.width = clip.width * src.width / dst.width;
 
-	pipe_ctx->viewport.y = src.y + (clip.y - dst.y) * src.height / dst.height;
-	pipe_ctx->viewport.height = clip.height * src.height / dst.height;
+	pipe_ctx->scl_data.viewport.y = src.y + (clip.y - dst.y) * src.height / dst.height;
+	pipe_ctx->scl_data.viewport.height = clip.height * src.height / dst.height;
 
 	/* Minimum viewport such that 420/422 chroma vp is non 0 */
-	if (pipe_ctx->viewport.width < 2)
-		pipe_ctx->viewport.width = 2;
-	if (pipe_ctx->viewport.height < 2)
-		pipe_ctx->viewport.height = 2;
+	if (pipe_ctx->scl_data.viewport.width < 2)
+		pipe_ctx->scl_data.viewport.width = 2;
+	if (pipe_ctx->scl_data.viewport.height < 2)
+		pipe_ctx->scl_data.viewport.height = 2;
 }
 
 static void calculate_overscan(
@@ -262,40 +262,40 @@ static void calculate_overscan(
 {
 	struct core_stream *stream = pipe_ctx->stream;
 
-	pipe_ctx->overscan.left = stream->public.dst.x;
+	pipe_ctx->scl_data.overscan.left = stream->public.dst.x;
 	if (stream->public.src.x < surface->clip_rect.x)
-		pipe_ctx->overscan.left += (surface->clip_rect.x
+		pipe_ctx->scl_data.overscan.left += (surface->clip_rect.x
 			- stream->public.src.x) * stream->public.dst.width
 			/ stream->public.src.width;
 
-	pipe_ctx->overscan.right = stream->public.timing.h_addressable
+	pipe_ctx->scl_data.overscan.right = stream->public.timing.h_addressable
 		- stream->public.dst.x - stream->public.dst.width;
 	if (stream->public.src.x + stream->public.src.width
 		> surface->clip_rect.x + surface->clip_rect.width)
-		pipe_ctx->overscan.right = stream->public.timing.h_addressable -
+		pipe_ctx->scl_data.overscan.right = stream->public.timing.h_addressable -
 			dal_fixed31_32_floor(dal_fixed31_32_div(
 				dal_fixed31_32_from_int(
-						pipe_ctx->viewport.width),
-						pipe_ctx->ratios.horz)) -
-						pipe_ctx->overscan.left;
+						pipe_ctx->scl_data.viewport.width),
+						pipe_ctx->scl_data.ratios.horz)) -
+						pipe_ctx->scl_data.overscan.left;
 
 
-	pipe_ctx->overscan.top = stream->public.dst.y;
+	pipe_ctx->scl_data.overscan.top = stream->public.dst.y;
 	if (stream->public.src.y < surface->clip_rect.y)
-		pipe_ctx->overscan.top += (surface->clip_rect.y
+		pipe_ctx->scl_data.overscan.top += (surface->clip_rect.y
 			- stream->public.src.y) * stream->public.dst.height
 			/ stream->public.src.height;
 
-	pipe_ctx->overscan.bottom = stream->public.timing.v_addressable
+	pipe_ctx->scl_data.overscan.bottom = stream->public.timing.v_addressable
 		- stream->public.dst.y - stream->public.dst.height;
 	if (stream->public.src.y + stream->public.src.height
 		> surface->clip_rect.y + surface->clip_rect.height)
-		pipe_ctx->overscan.bottom = stream->public.timing.v_addressable -
+		pipe_ctx->scl_data.overscan.bottom = stream->public.timing.v_addressable -
 			dal_fixed31_32_floor(dal_fixed31_32_div(
 				dal_fixed31_32_from_int(
-						pipe_ctx->viewport.height),
-						pipe_ctx->ratios.vert)) -
-						pipe_ctx->overscan.top;
+						pipe_ctx->scl_data.viewport.height),
+						pipe_ctx->scl_data.ratios.vert)) -
+						pipe_ctx->scl_data.overscan.top;
 
 
 	/* TODO: Add timing overscan to finalize overscan calculation*/
@@ -311,32 +311,32 @@ static void calculate_scaling_ratios(
 	const uint32_t out_w = stream->public.dst.width;
 	const uint32_t out_h = stream->public.dst.height;
 
-	pipe_ctx->ratios.horz = dal_fixed31_32_from_fraction(
+	pipe_ctx->scl_data.ratios.horz = dal_fixed31_32_from_fraction(
 					surface->src_rect.width,
 					surface->dst_rect.width);
-	pipe_ctx->ratios.vert = dal_fixed31_32_from_fraction(
+	pipe_ctx->scl_data.ratios.vert = dal_fixed31_32_from_fraction(
 					surface->src_rect.height,
 					surface->dst_rect.height);
 
 	if (surface->stereo_format == PLANE_STEREO_FORMAT_SIDE_BY_SIDE)
-		pipe_ctx->ratios.horz.value *= 2;
+		pipe_ctx->scl_data.ratios.horz.value *= 2;
 	else if (surface->stereo_format
 					== PLANE_STEREO_FORMAT_TOP_AND_BOTTOM)
-		pipe_ctx->ratios.vert.value *= 2;
+		pipe_ctx->scl_data.ratios.vert.value *= 2;
 
-	pipe_ctx->ratios.vert.value = div64_s64(pipe_ctx->ratios.vert.value * in_h,
+	pipe_ctx->scl_data.ratios.vert.value = div64_s64(pipe_ctx->scl_data.ratios.vert.value * in_h,
 			out_h);
-	pipe_ctx->ratios.horz.value = div64_s64(pipe_ctx->ratios.horz.value * in_w,
+	pipe_ctx->scl_data.ratios.horz.value = div64_s64(pipe_ctx->scl_data.ratios.horz.value * in_w,
 			out_w);
 
-	pipe_ctx->ratios.horz_c = pipe_ctx->ratios.horz;
-	pipe_ctx->ratios.vert_c = pipe_ctx->ratios.vert;
+	pipe_ctx->scl_data.ratios.horz_c = pipe_ctx->scl_data.ratios.horz;
+	pipe_ctx->scl_data.ratios.vert_c = pipe_ctx->scl_data.ratios.vert;
 
-	if (pipe_ctx->format == PIXEL_FORMAT_420BPP12) {
-		pipe_ctx->ratios.horz_c.value /= 2;
-		pipe_ctx->ratios.vert_c.value /= 2;
-	} else if (pipe_ctx->format == PIXEL_FORMAT_422BPP16) {
-		pipe_ctx->ratios.horz_c.value /= 2;
+	if (pipe_ctx->scl_data.format == PIXEL_FORMAT_420BPP12) {
+		pipe_ctx->scl_data.ratios.horz_c.value /= 2;
+		pipe_ctx->scl_data.ratios.vert_c.value /= 2;
+	} else if (pipe_ctx->scl_data.format == PIXEL_FORMAT_422BPP16) {
+		pipe_ctx->scl_data.ratios.horz_c.value /= 2;
 	}
 }
 
@@ -348,7 +348,7 @@ void build_scaling_params(
 	 * overscan calculation requires scaling ratios and viewport
 	 * and lb depth/taps calculation requires overscan. Call sequence
 	 * is therefore important */
-	pipe_ctx->format = convert_pixel_format_to_dalsurface(surface->format);
+	pipe_ctx->scl_data.format = convert_pixel_format_to_dalsurface(surface->format);
 
 	calculate_viewport(surface, pipe_ctx);
 
@@ -357,25 +357,25 @@ void build_scaling_params(
 	calculate_overscan(surface, pipe_ctx);
 
 	/* Check if scaling is required update taps if not */
-	if (dal_fixed31_32_u2d19(pipe_ctx->ratios.horz) == 1 << 19)
-		pipe_ctx->taps.h_taps = 1;
+	if (dal_fixed31_32_u2d19(pipe_ctx->scl_data.ratios.horz) == 1 << 19)
+		pipe_ctx->scl_data.taps.h_taps = 1;
 	else
-		pipe_ctx->taps.h_taps = surface->scaling_quality.h_taps;
+		pipe_ctx->scl_data.taps.h_taps = surface->scaling_quality.h_taps;
 
-	if (dal_fixed31_32_u2d19(pipe_ctx->ratios.horz_c) == 1 << 19)
-		pipe_ctx->taps.h_taps_c = 1;
+	if (dal_fixed31_32_u2d19(pipe_ctx->scl_data.ratios.horz_c) == 1 << 19)
+		pipe_ctx->scl_data.taps.h_taps_c = 1;
 	else
-		pipe_ctx->taps.h_taps_c = surface->scaling_quality.h_taps_c;
+		pipe_ctx->scl_data.taps.h_taps_c = surface->scaling_quality.h_taps_c;
 
-	if (dal_fixed31_32_u2d19(pipe_ctx->ratios.vert) == 1 << 19)
-		pipe_ctx->taps.v_taps = 1;
+	if (dal_fixed31_32_u2d19(pipe_ctx->scl_data.ratios.vert) == 1 << 19)
+		pipe_ctx->scl_data.taps.v_taps = 1;
 	else
-		pipe_ctx->taps.v_taps = surface->scaling_quality.v_taps;
+		pipe_ctx->scl_data.taps.v_taps = surface->scaling_quality.v_taps;
 
-	if (dal_fixed31_32_u2d19(pipe_ctx->ratios.vert_c) == 1 << 19)
-		pipe_ctx->taps.v_taps_c = 1;
+	if (dal_fixed31_32_u2d19(pipe_ctx->scl_data.ratios.vert_c) == 1 << 19)
+		pipe_ctx->scl_data.taps.v_taps_c = 1;
 	else
-		pipe_ctx->taps.v_taps_c = surface->scaling_quality.v_taps_c;
+		pipe_ctx->scl_data.taps.v_taps_c = surface->scaling_quality.v_taps_c;
 
 	dal_logger_write(pipe_ctx->stream->ctx->logger,
 				LOG_MAJOR_DCP,
@@ -385,14 +385,14 @@ void build_scaling_params(
 				"y:%d\n dst_rect:\nheight:%d width:%d x:%d "
 				"y:%d\n",
 				__func__,
-				pipe_ctx->overscan.bottom,
-				pipe_ctx->overscan.left,
-				pipe_ctx->overscan.right,
-				pipe_ctx->overscan.top,
-				pipe_ctx->viewport.height,
-				pipe_ctx->viewport.width,
-				pipe_ctx->viewport.x,
-				pipe_ctx->viewport.y,
+				pipe_ctx->scl_data.overscan.bottom,
+				pipe_ctx->scl_data.overscan.left,
+				pipe_ctx->scl_data.overscan.right,
+				pipe_ctx->scl_data.overscan.top,
+				pipe_ctx->scl_data.viewport.height,
+				pipe_ctx->scl_data.viewport.width,
+				pipe_ctx->scl_data.viewport.x,
+				pipe_ctx->scl_data.viewport.y,
 				surface->dst_rect.height,
 				surface->dst_rect.width,
 				surface->dst_rect.x,
@@ -439,13 +439,15 @@ bool attach_surfaces_to_context(
 		return false;
 	}
 
+
+	for (i = 0; i < surface_count; i++)
+		dc_surface_retain(surfaces[i]);
+	/* Release after retain to account for surfaces remaining the same */
 	for (i = 0; i < target_status->surface_count; i++)
 		dc_surface_release(target_status->surfaces[i]);
-
-	for (i = 0; i < surface_count; i++) {
+	for (i = 0; i < surface_count; i++)
 		target_status->surfaces[i] = surfaces[i];
-		dc_surface_retain(target_status->surfaces[i]);
-	}
+
 	target_status->surface_count = surface_count;
 
 	for (i = 0; i < dc_target->stream_count; i++) {
@@ -503,7 +505,7 @@ static void fill_display_configs(
 	const struct validate_context *context,
 	struct dc_pp_display_configuration *pp_display_cfg)
 {
-	uint8_t i, j;
+	uint8_t i, j, k;
 	uint8_t num_cfgs = 0;
 
 	for (i = 0; i < context->target_count; i++) {
@@ -516,10 +518,10 @@ static void fill_display_configs(
 					&pp_display_cfg->disp_configs[num_cfgs];
 			const struct pipe_ctx *pipe_ctx = NULL;
 
-			for (j = 0; j < MAX_PIPES; j++)
+			for (k = 0; k < MAX_PIPES; k++)
 				if (stream ==
-					context->res_ctx.pipe_ctx[j].stream) {
-					pipe_ctx = &context->res_ctx.pipe_ctx[j];
+					context->res_ctx.pipe_ctx[k].stream) {
+					pipe_ctx = &context->res_ctx.pipe_ctx[k];
 					break;
 				}
 
@@ -1270,6 +1272,18 @@ static void set_vendor_info_packet(struct core_stream *stream,
 	info_packet->sb[0] = (uint8_t) (0x100 - checksum);
 
 	info_packet->valid = true;
+}
+
+void destruct_val_ctx(struct validate_context *context)
+{
+	int i, j;
+
+	for (i = 0; i < context->target_count; i++) {
+		for (j = 0; j < context->target_status[i].surface_count; j++)
+			dc_surface_release(
+				context->target_status[i].surfaces[j]);
+		context->target_status[i].surface_count = 0;
+	}
 }
 
 void build_info_frame(struct pipe_ctx *pipe_ctx)

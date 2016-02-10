@@ -764,7 +764,7 @@ enum dc_status dce80_validate_bandwidth(
 		if (pipe_ctx->stream == NULL)
 			continue;
 
-		if (pipe_ctx->ratios.vert.value == 0) {
+		if (pipe_ctx->scl_data.ratios.vert.value == 0) {
 			disp->graphics_scale_ratio = bw_int_to_fixed(1);
 			disp->graphics_h_taps = 2;
 			disp->graphics_v_taps = 2;
@@ -780,17 +780,17 @@ enum dc_status dce80_validate_bandwidth(
 		} else {
 			disp->graphics_scale_ratio =
 				fixed31_32_to_bw_fixed(
-					pipe_ctx->ratios.vert.value);
-			disp->graphics_h_taps = pipe_ctx->taps.h_taps;
-			disp->graphics_v_taps = pipe_ctx->taps.v_taps;
+					pipe_ctx->scl_data.ratios.vert.value);
+			disp->graphics_h_taps = pipe_ctx->scl_data.taps.h_taps;
+			disp->graphics_v_taps = pipe_ctx->scl_data.taps.v_taps;
 
 			/* TODO: remove when bw formula accepts taps per
 			 * display
 			 */
-			if (max_vtaps < pipe_ctx->taps.v_taps)
-				max_vtaps = pipe_ctx->taps.v_taps;
-			if (max_htaps < pipe_ctx->taps.h_taps)
-				max_htaps = pipe_ctx->taps.h_taps;
+			if (max_vtaps < pipe_ctx->scl_data.taps.v_taps)
+				max_vtaps = pipe_ctx->scl_data.taps.v_taps;
+			if (max_htaps < pipe_ctx->scl_data.taps.h_taps)
+				max_htaps = pipe_ctx->scl_data.taps.h_taps;
 		}
 
 		disp->graphics_src_width =

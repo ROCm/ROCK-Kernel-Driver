@@ -29,6 +29,7 @@
 #include "dc.h"
 #include "bandwidth_calcs.h"
 #include "ddc_service_types.h"
+#include "scaler_types.h"
 
 struct core_stream;
 /********* core_target *************/
@@ -288,11 +289,7 @@ struct pipe_ctx {
 	struct output_pixel_processor *opp;
 	struct timing_generator *tg;
 
-	struct overscan_info overscan;
-	struct scaling_ratios ratios;
-	struct rect viewport;
-	struct scaling_taps taps;
-	enum pixel_format format;
+	struct scaler_data scl_data;
 
 	struct stream_encoder *stream_enc;
 	struct display_clock *dis_clk;
@@ -319,6 +316,7 @@ struct pipe_ctx {
 	uint8_t pipe_idx;
 
 	struct flags {
+		bool blanked;
 		bool unchanged;
 		bool timing_changed;
 	} flags;

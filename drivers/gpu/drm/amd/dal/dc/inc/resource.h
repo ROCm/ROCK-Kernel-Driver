@@ -31,6 +31,7 @@
 
 /* TODO unhardcode, 4 for CZ*/
 #define MEMORY_TYPE_MULTIPLIER 4
+#define DCE110_UNDERLAY_IDX 3
 
 bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
 				struct dc *dc,
@@ -78,5 +79,7 @@ void build_info_frame(struct pipe_ctx *pipe_ctx);
 enum dc_status map_resources(
 	const struct dc *dc,
 	struct validate_context *context);
+
+void destruct_val_ctx(struct validate_context *context);
 
 #endif /* DRIVERS_GPU_DRM_AMD_DAL_DEV_DC_INC_RESOURCE_H_ */

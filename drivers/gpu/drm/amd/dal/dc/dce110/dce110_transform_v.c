@@ -39,7 +39,6 @@
 
 
 struct sclv_ratios_inits {
-	uint32_t chroma_enable;
 	uint32_t h_int_scale_ratio_luma;
 	uint32_t h_int_scale_ratio_chroma;
 	uint32_t v_int_scale_ratio_luma;
@@ -48,10 +47,6 @@ struct sclv_ratios_inits {
 	struct init_int_and_frac h_init_chroma;
 	struct init_int_and_frac v_init_luma;
 	struct init_int_and_frac v_init_chroma;
-	struct init_int_and_frac h_init_lumabottom;
-	struct init_int_and_frac h_init_chromabottom;
-	struct init_int_and_frac v_init_lumabottom;
-	struct init_int_and_frac v_init_chromabottom;
 };
 
 /*
@@ -80,14 +75,13 @@ static void calculate_viewport(
 		scl_data->viewport.width - scl_data->viewport.width % 2;
 	luma_viewport->height =
 		scl_data->viewport.height - scl_data->viewport.height % 2;
+	chroma_viewport->x = luma_viewport->x;
+	chroma_viewport->y = luma_viewport->y;
+	chroma_viewport->height = luma_viewport->height;
+	chroma_viewport->width = luma_viewport->width;
 
 
-	if (scl_data->dal_pixel_format == PIXEL_FORMAT_422BPP16) {
-		luma_viewport->width += luma_viewport->width % 2;
-
-		chroma_viewport->x = luma_viewport->x / 2;
-		chroma_viewport->width = luma_viewport->width / 2;
-	} else if (scl_data->dal_pixel_format == PIXEL_FORMAT_420BPP12) {
+	if (scl_data->format == PIXEL_FORMAT_420BPP12) {
 		luma_viewport->height += luma_viewport->height % 2;
 		luma_viewport->width += luma_viewport->width % 2;
 		/*for 420 video chroma is 1/4 the area of luma, scaled
@@ -169,23 +163,7 @@ static void program_viewport(
 			VIEWPORT_WIDTH_C);
 		dm_write_reg(ctx, addr, value);
 	}
-	/* TODO: add stereo support */
 }
-
-
-/*
- * Until and For MPO video play story, to reduce time for implementation,
- * below limits are applied for now: 2_TAPS only
- * Use auto-calculated filter values
- * Following routines will be empty for now:
- *
- * programSclRatiosInits -- calcualate scaler ratio manually
- * calculateInits --- calcualate scaler ratio manually
- * programFilter -- multi-taps
- * GetOptimalNumberOfTaps -- will hard coded to 2 TAPS
- * GetNextLowerNumberOfTaps -- will hard coded to 2TAPS
- * validateRequestedScaleRatio - used by GetOptimalNumberOfTaps internally
- */
 
 /*
  * Function:
@@ -218,8 +196,8 @@ static bool setup_scaling_configuration(
 		set_reg_field_value(value, 1, SCLV_MODE, SCL_MODE_C);
 		set_reg_field_value(value, 1, SCLV_MODE, SCL_PSCL_EN_C);
 		is_scaling_needed = true;
-	} else if (data->dal_pixel_format != PIXEL_FORMAT_420BPP12 &&
-		data->dal_pixel_format != PIXEL_FORMAT_422BPP16) {
+	} else if (data->format != PIXEL_FORMAT_420BPP12 &&
+		data->format != PIXEL_FORMAT_422BPP16) {
 		set_reg_field_value(
 			value,
 			get_reg_field_value(value, SCLV_MODE, SCL_MODE),
@@ -236,39 +214,25 @@ static bool setup_scaling_configuration(
 	}
 	dm_write_reg(ctx, mmSCLV_MODE, value);
 
-	{
-		value = dm_read_reg(ctx, mmSCLV_TAP_CONTROL);
+	value = 0;
+	set_reg_field_value(value, data->taps.h_taps - 1,
+			SCLV_TAP_CONTROL, SCL_H_NUM_OF_TAPS);
+	set_reg_field_value(value, data->taps.v_taps - 1,
+			SCLV_TAP_CONTROL, SCL_V_NUM_OF_TAPS);
+	set_reg_field_value(value, data->taps.h_taps_c - 1,
+			SCLV_TAP_CONTROL, SCL_H_NUM_OF_TAPS_C);
+	set_reg_field_value(value, data->taps.v_taps_c - 1,
+			SCLV_TAP_CONTROL, SCL_V_NUM_OF_TAPS_C);
+	dm_write_reg(ctx, mmSCLV_TAP_CONTROL, value);
 
-		set_reg_field_value(value, data->taps.h_taps - 1,
-				SCLV_TAP_CONTROL, SCL_H_NUM_OF_TAPS);
-
-		set_reg_field_value(value, data->taps.v_taps - 1,
-				SCLV_TAP_CONTROL, SCL_V_NUM_OF_TAPS);
-
-		set_reg_field_value(value, data->taps.h_taps_c - 1,
-				SCLV_TAP_CONTROL, SCL_H_NUM_OF_TAPS_C);
-
-		set_reg_field_value(value, data->taps.v_taps_c - 1,
-				SCLV_TAP_CONTROL, SCL_V_NUM_OF_TAPS_C);
-
-		dm_write_reg(ctx, mmSCLV_TAP_CONTROL, value);
-	}
-
-	{
-		/*
-		 * we can ignore this register because we are ok with hw
-		 * default 0 -- change to 1 according to dal2 code
-		 */
-		value = dm_read_reg(ctx, mmSCLV_CONTROL);
-		 /*
-		  * 0 - Replaced out of bound pixels with black pixel
-		  * (or any other required color)
-		  */
-		set_reg_field_value(value, 1, SCLV_CONTROL, SCL_BOUNDARY_MODE);
-
-		/* 1 - Replaced out of bound pixels with the edge pixel. */
-		dm_write_reg(ctx, mmSCLV_CONTROL, value);
-	}
+	value = 0;
+	/*
+	 * 0 - Replaced out of bound pixels with black pixel
+	 * (or any other required color)
+	 * 1 - Replaced out of bound pixels with the edge pixel
+	 */
+	set_reg_field_value(value, 1, SCLV_CONTROL, SCL_BOUNDARY_MODE);
+	dm_write_reg(ctx, mmSCLV_CONTROL, value);
 
 	return is_scaling_needed;
 }
@@ -379,17 +343,20 @@ static void calculate_inits(
 	struct rect *luma_viewport,
 	struct rect *chroma_viewport)
 {
-	if (data->dal_pixel_format == PIXEL_FORMAT_420BPP12 ||
-		data->dal_pixel_format == PIXEL_FORMAT_422BPP16)
-		inits->chroma_enable = true;
+	inits->h_int_scale_ratio_luma =
+		dal_fixed31_32_u2d19(data->ratios.horz) << 5;
+	inits->v_int_scale_ratio_luma =
+		dal_fixed31_32_u2d19(data->ratios.vert) << 5;
+	inits->h_int_scale_ratio_chroma =
+		dal_fixed31_32_u2d19(data->ratios.horz_c) << 5;
+	inits->v_int_scale_ratio_chroma =
+		dal_fixed31_32_u2d19(data->ratios.vert_c) << 5;
 
-	/* TODO: implement rest of this function properly */
-	if (inits->chroma_enable) {
-		inits->h_int_scale_ratio_luma = 0x1000000;
-		inits->v_int_scale_ratio_luma = 0x1000000;
-		inits->h_int_scale_ratio_chroma = 0x800000;
-		inits->v_int_scale_ratio_chroma = 0x800000;
-	}
+	inits->h_init_luma.integer = 1;
+	inits->v_init_luma.integer = 1;
+	inits->h_init_chroma.integer = 1;
+	inits->v_init_chroma.integer = 1;
+
 }
 
 static void program_scl_ratios_inits(
@@ -398,7 +365,7 @@ static void program_scl_ratios_inits(
 {
 	struct dc_context *ctx = xfm110->base.ctx;
 	uint32_t addr = mmSCLV_HORZ_FILTER_SCALE_RATIO;
-	uint32_t value = dm_read_reg(ctx, addr);
+	uint32_t value = 0;
 
 	set_reg_field_value(
 		value,
@@ -408,7 +375,7 @@ static void program_scl_ratios_inits(
 	dm_write_reg(ctx, addr, value);
 
 	addr = mmSCLV_VERT_FILTER_SCALE_RATIO;
-	value = dm_read_reg(ctx, addr);
+	value = 0;
 	set_reg_field_value(
 		value,
 		inits->v_int_scale_ratio_luma,
@@ -416,8 +383,9 @@ static void program_scl_ratios_inits(
 		SCL_V_SCALE_RATIO);
 	dm_write_reg(ctx, addr, value);
 
+
 	addr = mmSCLV_HORZ_FILTER_SCALE_RATIO_C;
-	value = dm_read_reg(ctx, addr);
+	value = 0;
 	set_reg_field_value(
 		value,
 		inits->h_int_scale_ratio_chroma,
@@ -426,12 +394,70 @@ static void program_scl_ratios_inits(
 	dm_write_reg(ctx, addr, value);
 
 	addr = mmSCLV_VERT_FILTER_SCALE_RATIO_C;
-	value = dm_read_reg(ctx, addr);
+	value = 0;
 	set_reg_field_value(
 		value,
 		inits->v_int_scale_ratio_chroma,
 		SCLV_VERT_FILTER_SCALE_RATIO_C,
 		SCL_V_SCALE_RATIO_C);
+	dm_write_reg(ctx, addr, value);
+
+
+	addr = mmSCLV_HORZ_FILTER_INIT;
+	value = 0;
+	set_reg_field_value(
+		value,
+		inits->h_init_luma.fraction,
+		SCLV_HORZ_FILTER_INIT,
+		SCL_H_INIT_FRAC);
+	set_reg_field_value(
+		value,
+		inits->h_init_luma.integer,
+		SCLV_HORZ_FILTER_INIT,
+		SCL_H_INIT_INT);
+	dm_write_reg(ctx, addr, value);
+
+	addr = mmSCLV_VERT_FILTER_INIT;
+	value = 0;
+	set_reg_field_value(
+		value,
+		inits->v_init_luma.fraction,
+		SCLV_VERT_FILTER_INIT,
+		SCL_V_INIT_FRAC);
+	set_reg_field_value(
+		value,
+		inits->v_init_luma.integer,
+		SCLV_VERT_FILTER_INIT,
+		SCL_V_INIT_INT);
+	dm_write_reg(ctx, addr, value);
+
+
+	addr = mmSCLV_HORZ_FILTER_INIT_C;
+	value = 0;
+	set_reg_field_value(
+		value,
+		inits->h_init_chroma.fraction,
+		SCLV_HORZ_FILTER_INIT_C,
+		SCL_H_INIT_FRAC_C);
+	set_reg_field_value(
+		value,
+		inits->h_init_chroma.integer,
+		SCLV_HORZ_FILTER_INIT_C,
+		SCL_H_INIT_INT_C);
+	dm_write_reg(ctx, addr, value);
+
+	addr = mmSCLV_VERT_FILTER_INIT_C;
+	value = 0;
+	set_reg_field_value(
+		value,
+		inits->v_init_chroma.fraction,
+		SCLV_VERT_FILTER_INIT_C,
+		SCL_V_INIT_FRAC_C);
+	set_reg_field_value(
+		value,
+		inits->v_init_chroma.integer,
+		SCLV_VERT_FILTER_INIT_C,
+		SCL_V_INIT_INT_C);
 	dm_write_reg(ctx, addr, value);
 }
 
@@ -447,34 +473,32 @@ static void dce110_transform_v_set_scalerv_bypass(struct transform *xfm)
 	dm_write_reg(xfm->ctx, addr, value);
 }
 
-/* TODO: sync this one with DAL2 */
 static bool dce110_transform_v_set_scaler(
 	struct transform *xfm,
 	const struct scaler_data *data)
 {
 	struct dce110_transform *xfm110 = TO_DCE110_TRANSFORM(xfm);
-	bool is_scaling_required;
+	bool is_scaling_required = false;
+	bool filter_updated = false;
 	struct rect luma_viewport = {0};
 	struct rect chroma_viewport = {0};
 	struct dc_context *ctx = xfm->ctx;
 
-	/* 1. Lock Scaler TODO: enable?*/
-	/*set_scaler_update_lock(xfm, true);*/
 
-	/* 2. Calculate viewport, viewport programming should happen after init
+	/* 1. Calculate viewport, viewport programming should happen after init
 	 * calculations as they may require an adjustment in the viewport.
 	 */
 
 	calculate_viewport(data, &luma_viewport, &chroma_viewport);
 
-	/* 3. Program overscan */
+	/* 2. Program overscan */
 	program_overscan(xfm110, &data->overscan);
 
-	/* 4. Program taps and configuration */
+	/* 3. Program taps and configuration */
 	is_scaling_required = setup_scaling_configuration(xfm110, data);
 
 	if (is_scaling_required) {
-		/* 5. Calculate and program ratio, filter initialization */
+		/* 4. Calculate and program ratio, filter initialization */
 
 		struct sclv_ratios_inits inits = { 0 };
 
@@ -489,7 +513,7 @@ static bool dce110_transform_v_set_scaler(
 
 		/*scaler coeff of 2-TAPS use hardware auto calculated value*/
 
-		/* 6. Program vertical filters */
+		/* 5. Program vertical filters */
 		if (data->taps.v_taps > 2) {
 			program_two_taps_filter_vert(xfm110, false);
 
@@ -500,10 +524,11 @@ static bool dce110_transform_v_set_scaler(
 					"Failed vertical taps programming\n");
 				return false;
 			}
+			filter_updated = true;
 		} else
 			program_two_taps_filter_vert(xfm110, true);
 
-		/* 7. Program horizontal filters */
+		/* 6. Program horizontal filters */
 		if (data->taps.h_taps > 2) {
 			program_two_taps_filter_horz(xfm110, false);
 
@@ -514,23 +539,16 @@ static bool dce110_transform_v_set_scaler(
 					"Failed horizontal taps programming\n");
 				return false;
 			}
+			filter_updated = true;
 		} else
 			program_two_taps_filter_horz(xfm110, true);
 	}
 
-	/* 8. Program the viewport */
-	if (data->flags.bits.SHOULD_PROGRAM_VIEWPORT)
-		program_viewport(xfm110, &luma_viewport, &chroma_viewport);
+	/* 7. Program the viewport */
+	program_viewport(xfm110, &luma_viewport, &chroma_viewport);
 
-	/* 9. Unlock the Scaler TODO: enable?
-	 * Every call to "set_scaler_update_lock(xfm, TRUE)"
-	 * must have a corresponding call to
-	 * "set_scaler_update_lock(xfm, FALSE)" */
-
-	/*set_scaler_update_lock(xfm, false);*/
-
-	/* TODO: investigate purpose/need of SHOULD_UNLOCK */
-	if (data->flags.bits.SHOULD_UNLOCK == false)
+	/* 8. Set bit to flip to new coefficient memory */
+	if (filter_updated)
 		set_coeff_update_complete(xfm110);
 
 	return true;
@@ -554,104 +572,6 @@ static bool dce110_transform_v_power_up_line_buffer(struct transform *xfm)
 	return true;
 }
 
-static void get_viewport(
-		struct dce110_transform *xfm110,
-		struct rect *current_view_port)
-{
-	uint32_t value_start;
-	uint32_t value_size;
-
-	if (current_view_port == NULL)
-		return;
-
-	value_start = dm_read_reg(xfm110->base.ctx, mmSCLV_VIEWPORT_START);
-	value_size = dm_read_reg(xfm110->base.ctx, mmSCLV_VIEWPORT_SIZE);
-
-	current_view_port->x = get_reg_field_value(
-			value_start,
-			SCLV_VIEWPORT_START,
-			VIEWPORT_X_START);
-	current_view_port->y = get_reg_field_value(
-			value_start,
-			SCLV_VIEWPORT_START,
-			VIEWPORT_Y_START);
-	current_view_port->height = get_reg_field_value(
-			value_size,
-			SCLV_VIEWPORT_SIZE,
-			VIEWPORT_HEIGHT);
-	current_view_port->width = get_reg_field_value(
-			value_size,
-			SCLV_VIEWPORT_SIZE,
-			VIEWPORT_WIDTH);
-}
-
-static void program_luma_viewport(
-	struct dce110_transform *xfm110,
-	const struct rect *view_port)
-{
-	struct dc_context *ctx = xfm110->base.ctx;
-	uint32_t value = 0;
-	uint32_t addr = 0;
-
-	addr = mmSCLV_VIEWPORT_START;
-	value = dm_read_reg(ctx, addr);
-	set_reg_field_value(
-		value,
-		view_port->x,
-		SCLV_VIEWPORT_START,
-		VIEWPORT_X_START);
-	set_reg_field_value(
-		value,
-		view_port->y,
-		SCLV_VIEWPORT_START,
-		VIEWPORT_Y_START);
-	dm_write_reg(ctx, addr, value);
-
-	addr = mmSCLV_VIEWPORT_SIZE;
-	value = dm_read_reg(ctx, addr);
-	set_reg_field_value(
-		value,
-		view_port->height,
-		SCLV_VIEWPORT_SIZE,
-		VIEWPORT_HEIGHT);
-	set_reg_field_value(
-		value,
-		view_port->width,
-		SCLV_VIEWPORT_SIZE,
-		VIEWPORT_WIDTH);
-	dm_write_reg(ctx, addr, value);
-
-	/* TODO: add stereo support */
-}
-
-static bool dce110_transform_v_update_viewport(
-	struct transform *xfm,
-	const struct rect *view_port,
-	bool is_fbc_attached)
-{
-	struct dce110_transform *xfm110 = TO_DCE110_TRANSFORM(xfm);
-	bool program_req = false;
-	struct rect current_view_port;
-
-	if (view_port == NULL)
-		return program_req;
-
-	get_viewport(xfm110, &current_view_port);
-
-	if (current_view_port.x != view_port->x ||
-			current_view_port.y != view_port->y ||
-			current_view_port.height != view_port->height ||
-			current_view_port.width != view_port->width)
-		program_req = true;
-
-	if (program_req) {
-		/*underlay viewport is programmed with scaler
-		 *program_viewport function pointer is not exposed*/
-		program_luma_viewport(xfm110, view_port);
-	}
-
-	return program_req;
-}
 
 static struct transform_funcs dce110_transform_v_funcs = {
 	.transform_power_up =
@@ -660,8 +580,6 @@ static struct transform_funcs dce110_transform_v_funcs = {
 		dce110_transform_v_set_scaler,
 	.transform_set_scaler_bypass =
 		dce110_transform_v_set_scalerv_bypass,
-	.transform_update_viewport =
-		dce110_transform_v_update_viewport,
 	.transform_set_scaler_filter =
 		dce110_transform_set_scaler_filter,
 	.transform_set_gamut_remap =

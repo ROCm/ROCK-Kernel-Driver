@@ -91,7 +91,7 @@ static bool setup_scaling_configuration(
 		addr = SCL_REG(mmSCL_MODE);
 		value = dm_read_reg(ctx, addr);
 
-		if (data->dal_pixel_format <= PIXEL_FORMAT_GRPH_END)
+		if (data->format <= PIXEL_FORMAT_GRPH_END)
 			set_reg_field_value(value, 1, SCL_MODE, SCL_MODE);
 		else
 			set_reg_field_value(value, 2, SCL_MODE, SCL_MODE);
@@ -422,7 +422,7 @@ static bool program_multi_taps_filter(
 
 	if (horizontal) {
 		filter_params.taps = data->taps.h_taps;
-		filter_params.sharpness = data->h_sharpness;
+		filter_params.sharpness = 0; /* TODO */
 		filter_params.flags.bits.HORIZONTAL = 1;
 
 		src_size = data->viewport.width;
@@ -431,12 +431,12 @@ static bool program_multi_taps_filter(
 				dal_fixed31_32_div(
 					dal_fixed31_32_from_int(
 						data->viewport.width),
-					data->ratios->horz));
+					data->ratios.horz));
 
 		filter_type = FILTER_TYPE_RGB_Y_HORIZONTAL;
 	} else {
 		filter_params.taps = data->taps.v_taps;
-		filter_params.sharpness = data->v_sharpness;
+		filter_params.sharpness = 0; /* TODO */
 		filter_params.flags.bits.HORIZONTAL = 0;
 
 		src_size = data->viewport.height;
@@ -445,7 +445,7 @@ static bool program_multi_taps_filter(
 				dal_fixed31_32_div(
 					dal_fixed31_32_from_int(
 						data->viewport.height),
-					data->ratios->vert));
+					data->ratios.vert));
 
 		filter_type = FILTER_TYPE_RGB_Y_VERTICAL;
 	}
@@ -474,21 +474,6 @@ static bool program_multi_taps_filter(
 		&filter_params,
 		filter_data,
 		filter_data_size);
-
-	/* 4. Program the alpha if necessary */
-	if (data->flags.bits.SHOULD_PROGRAM_ALPHA) {
-		if (horizontal)
-			filter_type = FILTER_TYPE_ALPHA_HORIZONTAL;
-		else
-			filter_type = FILTER_TYPE_ALPHA_VERTICAL;
-
-		program_filter(
-			xfm80,
-			filter_type,
-			&filter_params,
-			filter_data,
-			filter_data_size);
-	}
 
 	return true;
 }
@@ -539,18 +524,16 @@ static void calculate_inits(
 {
 	struct fixed31_32 h_init;
 	struct fixed31_32 v_init;
-	struct fixed31_32 v_init_bot;
 
-	inits->bottom_enable = 0;
 	inits->h_int_scale_ratio =
-		dal_fixed31_32_u2d19(data->ratios->horz) << 5;
+		dal_fixed31_32_u2d19(data->ratios.horz) << 5;
 	inits->v_int_scale_ratio =
-		dal_fixed31_32_u2d19(data->ratios->vert) << 5;
+		dal_fixed31_32_u2d19(data->ratios.vert) << 5;
 
 	h_init =
 		dal_fixed31_32_div_int(
 			dal_fixed31_32_add(
-				data->ratios->horz,
+				data->ratios.horz,
 				dal_fixed31_32_from_int(data->taps.h_taps + 1)),
 				2);
 	inits->h_init.integer = dal_fixed31_32_floor(h_init);
@@ -559,28 +542,11 @@ static void calculate_inits(
 	v_init =
 		dal_fixed31_32_div_int(
 			dal_fixed31_32_add(
-				data->ratios->vert,
+				data->ratios.vert,
 				dal_fixed31_32_from_int(data->taps.v_taps + 1)),
 				2);
 	inits->v_init.integer = dal_fixed31_32_floor(v_init);
 	inits->v_init.fraction = dal_fixed31_32_u0d19(v_init) << 5;
-
-	if (data->flags.bits.INTERLACED) {
-		v_init_bot =
-			dal_fixed31_32_add(
-				dal_fixed31_32_div_int(
-					dal_fixed31_32_add(
-						data->ratios->vert,
-						dal_fixed31_32_from_int(
-							data->taps.v_taps + 1)),
-					2),
-				data->ratios->vert);
-		inits->v_init_bottom.integer = dal_fixed31_32_floor(v_init_bot);
-		inits->v_init_bottom.fraction =
-			dal_fixed31_32_u0d19(v_init_bot) << 5;
-
-		inits->bottom_enable = 1;
-	}
 }
 
 static void program_scl_ratios_inits(
@@ -634,22 +600,6 @@ static void program_scl_ratios_inits(
 		SCL_V_INIT_FRAC);
 	dm_write_reg(xfm80->base.ctx, addr, value);
 
-	if (inits->bottom_enable) {
-		addr = SCL_REG(mmSCL_VERT_FILTER_INIT_BOT);
-		value = 0;
-		set_reg_field_value(
-			value,
-			inits->v_init_bottom.integer,
-			SCL_VERT_FILTER_INIT_BOT,
-			SCL_V_INIT_INT_BOT);
-		set_reg_field_value(
-			value,
-			inits->v_init_bottom.fraction,
-			SCL_VERT_FILTER_INIT_BOT,
-			SCL_V_INIT_FRAC_BOT);
-		dm_write_reg(xfm80->base.ctx, addr, value);
-	}
-
 	addr = SCL_REG(mmSCL_AUTOMATIC_MODE_CONTROL);
 	value = 0;
 	set_reg_field_value(
@@ -664,38 +614,6 @@ static void program_scl_ratios_inits(
 		SCL_H_CALC_AUTO_RATIO_EN);
 	dm_write_reg(xfm80->base.ctx, addr, value);
 }
-
-static void get_viewport(
-		struct dce80_transform *xfm80,
-		struct rect *current_view_port)
-{
-	uint32_t value_start;
-	uint32_t value_size;
-
-	if (current_view_port == NULL)
-		return;
-
-	value_start = dm_read_reg(xfm80->base.ctx, SCL_REG(mmVIEWPORT_START));
-	value_size = dm_read_reg(xfm80->base.ctx, SCL_REG(mmVIEWPORT_SIZE));
-
-	current_view_port->x = get_reg_field_value(
-			value_start,
-			VIEWPORT_START,
-			VIEWPORT_X_START);
-	current_view_port->y = get_reg_field_value(
-			value_start,
-			VIEWPORT_START,
-			VIEWPORT_Y_START);
-	current_view_port->height = get_reg_field_value(
-			value_size,
-			VIEWPORT_SIZE,
-			VIEWPORT_HEIGHT);
-	current_view_port->width = get_reg_field_value(
-			value_size,
-			VIEWPORT_SIZE,
-			VIEWPORT_WIDTH);
-}
-
 
 bool dce80_transform_set_scaler(
 	struct transform *xfm,
@@ -761,6 +679,9 @@ bool dce80_transform_set_scaler(
 			program_two_taps_filter(xfm80, true, false);
 	}
 
+	/* 7. Program the viewport */
+	program_viewport(xfm80, &data->viewport);
+
 	return true;
 }
 
@@ -774,35 +695,6 @@ void dce80_transform_set_scaler_bypass(struct transform *xfm)
 	sclv_mode = dm_read_reg(xfm->ctx, SCL_REG(mmSCL_MODE));
 	set_reg_field_value(sclv_mode, 0, SCL_MODE, SCL_MODE);
 	dm_write_reg(xfm->ctx, SCL_REG(mmSCL_MODE), sclv_mode);
-}
-
-bool dce80_transform_update_viewport(
-	struct transform *xfm,
-	const struct rect *view_port,
-	bool is_fbc_attached)
-{
-	struct dce80_transform *xfm80 = TO_DCE80_TRANSFORM(xfm);
-	bool program_req = false;
-	struct rect current_view_port;
-
-	if (view_port == NULL)
-		return program_req;
-
-	get_viewport(xfm80, &current_view_port);
-
-	if (current_view_port.x != view_port->x ||
-			current_view_port.y != view_port->y ||
-			current_view_port.height != view_port->height ||
-			current_view_port.width != view_port->width)
-		program_req = true;
-
-	if (program_req) {
-		/*underlay viewport is programmed with scaler
-		 *program_viewport function pointer is not exposed*/
-		program_viewport(xfm80, view_port);
-	}
-
-	return program_req;
 }
 
 void dce80_transform_set_scaler_filter(
