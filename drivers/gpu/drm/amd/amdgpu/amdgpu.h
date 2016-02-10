@@ -2371,8 +2371,6 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 
 #define amdgpu_gds_switch(adev, r, v, d, w, a) (adev)->gds.funcs->patch_gds_switch((r), (v), (d), (w), (a))
 
-#define amdgpu_has_dal_support(adev) (amdgpu_dal && amdgpu_device_has_dal_support(adev))
-
 /* Common functions */
 int amdgpu_gpu_reset(struct amdgpu_device *adev);
 void amdgpu_pci_config_reset(struct amdgpu_device *adev);

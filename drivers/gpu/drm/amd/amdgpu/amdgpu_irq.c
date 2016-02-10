@@ -231,7 +231,7 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 		}
 	}
 
-	if (!amdgpu_has_dal_support(adev)) {
+	if (!amdgpu_device_has_dal_support(adev)) {
 		r = drm_vblank_init(adev->ddev, adev->mode_info.num_crtc);
 		if (r)
 			return r;
