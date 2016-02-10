@@ -90,7 +90,8 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 		void *vm);
 static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 		void *vm, struct kgd_mem **mem,
-		uint64_t *offset, void **kptr, uint32_t flags);
+		uint64_t *offset, void **kptr,
+		struct kfd_process_device *pdd, uint32_t flags);
 static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
 
 static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
@@ -150,6 +151,9 @@ static int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 			struct kgd_mem *mem, void **kptr);
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 			uint32_t page_table_base);
+struct kfd_process_device *get_pdd_from_buffer_object(struct kgd_dev *kgd,
+		struct kgd_mem *mem);
+static int return_bo_size(struct kgd_dev *kgd, struct kgd_mem *mem);
 
 static const struct kfd2kgd_calls kfd2kgd = {
 	.init_gtt_mem_allocation = alloc_gtt_mem,
@@ -189,10 +193,30 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.write_config_static_mem = write_config_static_mem,
 	.mmap_bo = mmap_bo,
 	.map_gtt_bo_to_kernel = map_gtt_bo_to_kernel,
-	.set_vm_context_page_table_base = set_vm_context_page_table_base
+	.get_pdd_from_buffer_object = get_pdd_from_buffer_object,
+	.set_vm_context_page_table_base = set_vm_context_page_table_base,
+	.return_bo_size = return_bo_size
 };
 
 static const struct kgd2kfd_calls *kgd2kfd;
+
+static int return_bo_size(struct kgd_dev *kgd, struct kgd_mem *mem)
+{
+	struct radeon_bo *bo;
+
+	BUG_ON(mem == NULL);
+
+	bo = mem->data2.bo;
+	return bo->tbo.mem.size;
+
+}
+
+struct kfd_process_device *get_pdd_from_buffer_object(struct kgd_dev *kgd,
+		struct kgd_mem *mem)
+{
+
+	return mem->data2.bo->pdd;
+}
 
 bool radeon_kfd_init(void)
 {
@@ -1372,7 +1396,8 @@ static int alloc_memory_of_scratch(struct kgd_dev *kgd,
 
 static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 		void *vm, struct kgd_mem **mem,
-		uint64_t *offset, void **kptr, uint32_t flags)
+		uint64_t *offset, void **kptr,
+		struct kfd_process_device *pdd, uint32_t flags)
 {
 	struct radeon_device *rdev = (struct radeon_device *) kgd;
 	int ret;
@@ -1401,7 +1426,7 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 	}
 
 	pr_debug("Created BO on VRAM with size %zu bytes\n", size);
-
+	bo->pdd = pdd;
 	ret = add_bo_to_vm(rdev, va, vm, bo, &bo_va);
 	if (ret != 0)
 		goto err_map;

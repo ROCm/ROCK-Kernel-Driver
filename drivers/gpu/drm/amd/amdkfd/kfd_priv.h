@@ -551,6 +551,9 @@ struct kfd_process_device {
 	uint64_t scratch_limit;
 	uint64_t dgpu_base;
 	uint64_t dgpu_limit;
+	uint64_t mapped_size;
+	uint64_t last_eviction;
+	bool	 evicted;
 
 	uint64_t sh_hidden_private_base_vmid;
 
@@ -875,6 +878,11 @@ void kfd_free_signal_page_dgpu(struct kfd_process *p, uint64_t handle);
 void radeon_flush_tlb(struct kfd_dev *dev, uint32_t pasid);
 
 int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
+int kgd2kfd_evict_bo(struct kfd_dev *dev, void *mem);
+int kgd2kfd_restore(struct kfd_dev *kfd);
+int evict_size(struct kfd_process *p, int size, int type);
+int evict_bo(struct kfd_dev *dev, void *mem);
+int restore(struct kfd_dev *kfd);
 
 #define KFD_SCRATCH_CZ_FW_VER 600
 #define KFD_SCRATCH_KV_FW_VER 413

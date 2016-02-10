@@ -43,7 +43,8 @@
 
 static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 		void *vm, struct kgd_mem **mem,
-		uint64_t *offset, void **kptr, uint32_t flags);
+		uint64_t *offset, void **kptr,
+		struct kfd_process_device *pdd, uint32_t flags);
 static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
 static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 		void *vm);
@@ -61,6 +62,9 @@ static int map_gtt_bo_to_kernel_tonga(struct kgd_dev *kgd,
 
 static bool is_mem_on_local_device(struct kgd_dev *kgd,
 		struct list_head *bo_va_list, void *vm);
+struct kfd_process_device *get_pdd_from_buffer_object(struct kgd_dev *kgd,
+		struct kgd_mem *mem);
+static int return_bo_size(struct kgd_dev *kgd, struct kgd_mem *mem);
 
 static int pin_get_sg_table(struct kgd_dev *kgd,
 		struct kgd_mem *mem, uint64_t offset,
@@ -85,7 +89,8 @@ struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_tonga_get_functions()
 	kfd2kgd.get_process_page_dir = get_process_page_dir;
 	kfd2kgd.mmap_bo = mmap_bo;
 	kfd2kgd.map_gtt_bo_to_kernel = map_gtt_bo_to_kernel_tonga;
-
+	kfd2kgd.get_pdd_from_buffer_object = get_pdd_from_buffer_object;
+	kfd2kgd.return_bo_size = return_bo_size;
 	kfd2kgd.pin_get_sg_table_bo = pin_get_sg_table;
 	kfd2kgd.unpin_put_sg_table_bo = unpin_put_sg_table;
 
@@ -95,6 +100,12 @@ struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_tonga_get_functions()
 static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
 {
 	return (struct amdgpu_device *)kgd;
+}
+
+struct kfd_process_device *get_pdd_from_buffer_object(struct kgd_dev *kgd,
+		struct kgd_mem *mem)
+{
+	return mem->data2.bo->pdd;
 }
 
 static bool check_if_add_bo_to_vm(struct amdgpu_vm *avm,
@@ -350,7 +361,7 @@ static void unpin_pts(struct amdgpu_bo_va *bo_va, struct amdgpu_vm *vm,
 
 static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		size_t size, void *vm, struct kgd_mem **mem,
-		uint64_t *offset, void **kptr,
+		uint64_t *offset, void **kptr, struct kfd_process_device *pdd,
 		u32 domain, u64 flags, bool aql_queue,
 		bool readonly, bool execute, bool no_sub, bool userptr)
 {
@@ -397,6 +408,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		goto err_bo_create;
 	}
 	bo->is_kfd_bo = true;
+	bo->pdd = pdd;
 
 	pr_debug("Created BO on GTT with size %zu bytes\n", size);
 
@@ -591,8 +603,9 @@ err_failed_to_get_bos:
 #define BOOL_TO_STR(b)	(b == true) ? "true" : "false"
 
 static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
-				void *vm, struct kgd_mem **mem,
-				uint64_t *offset, void **kptr, uint32_t flags)
+		void *vm, struct kgd_mem **mem,
+		uint64_t *offset, void **kptr,
+		struct kfd_process_device *pdd, uint32_t flags)
 {
 	bool aql_queue, public, readonly, execute, no_sub, userptr;
 	u64 alloc_flag;
@@ -609,10 +622,10 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 	temp_offset = NULL;
 
 	aql_queue = (flags & ALLOC_MEM_FLAGS_AQL_QUEUE_MEM) ? true : false;
-	public = (flags & ALLOC_MEM_FLAGS_PUBLIC) ? true : false;
-	readonly = (flags & ALLOC_MEM_FLAGS_READONLY) ? true : false;
-	execute = (flags & ALLOC_MEM_FLAGS_EXECUTE_ACCESS) ? true : false;
-	no_sub = (flags & ALLOC_MEM_FLAGS_NO_SUBSTITUTE) ? true : false;
+	public    = (flags & ALLOC_MEM_FLAGS_PUBLIC) ? true : false;
+	readonly  = (flags & ALLOC_MEM_FLAGS_READONLY) ? true : false;
+	execute   = (flags & ALLOC_MEM_FLAGS_EXECUTE_ACCESS) ? true : false;
+	no_sub    = (flags & ALLOC_MEM_FLAGS_NO_SUBSTITUTE) ? true : false;
 	userptr = (flags & ALLOC_MEM_FLAGS_USERPTR) ? true : false;
 
 	if (userptr && kptr) {
@@ -646,7 +659,7 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 			va);
 
 	return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
-			temp_offset, kptr, domain,
+			temp_offset, kptr, pdd, domain,
 			alloc_flag,
 			aql_queue, readonly, execute,
 			no_sub, userptr);
@@ -687,7 +700,16 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 
 	return 0;
 }
+static int return_bo_size(struct kgd_dev *kgd, struct kgd_mem *mem)
+{
+	struct amdgpu_bo *bo;
 
+	BUG_ON(mem == NULL);
+
+	bo = mem->data2.bo;
+	return bo->tbo.mem.size;
+
+}
 static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 		void *vm)
 {

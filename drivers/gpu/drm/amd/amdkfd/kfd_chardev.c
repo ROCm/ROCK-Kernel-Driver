@@ -48,7 +48,7 @@ static int _map_memory_to_gpu(struct kfd_dev *dev, void *mem,
 static uint32_t kfd_convert_user_mem_alloction_flags(
 		struct kfd_dev *dev,
 		uint32_t userspace_flags);
-
+static int kfd_evict(struct file *filep, struct kfd_process *p, void *data);
 static const char kfd_dev_name[] = "kfd";
 
 static const struct file_operations kfd_fops = {
@@ -302,7 +302,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 			err = dev->kfd2kgd->alloc_memory_of_gpu(
 				dev->kgd, pdd->cwsr_base, dev->cwsr_size,
 				pdd->vm, (struct kgd_mem **)&mem,
-				NULL, &cwsr_addr,
+				NULL, &cwsr_addr, pdd,
 				kfd_convert_user_mem_alloction_flags(dev,
 					KFD_IOC_ALLOC_MEM_FLAGS_DGPU_HOST));
 			if (err != 0)
@@ -1214,7 +1214,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
-		pdd->vm, (struct kgd_mem **) &mem, NULL, NULL, 0);
+		pdd->vm, (struct kgd_mem **) &mem, NULL, NULL, pdd, 0);
 
 	if (err != 0)
 		goto alloc_memory_of_gpu_failed;
@@ -1343,7 +1343,7 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
 		pdd->vm, (struct kgd_mem **) &mem, &offset,
-		NULL,
+		NULL, pdd,
 		kfd_convert_user_mem_alloction_flags(dev, args->flags));
 
 	if (err != 0)
@@ -1521,6 +1521,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		if (err != 0)
 			pr_err("amdkfd: failed to map\n");
 	}
+	pdd->mapped_size += dev->kfd2kgd->return_bo_size(dev->kgd, mem);
 
 	mutex_unlock(&p->mutex);
 
@@ -1621,6 +1622,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 		radeon_flush_tlb(dev, p->pasid);
 	}
 
+	pdd->mapped_size -= dev->kfd2kgd->return_bo_size(dev->kgd, mem);
 	mutex_unlock(&p->mutex);
 	return 0;
 
@@ -1826,10 +1828,19 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_PROCESS_APERTURES_NEW,
 				kfd_ioctl_get_process_apertures_new, 0),
 
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_EVICT_MEMORY,
+				kfd_evict, 0)
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
 
+static int kfd_evict(struct file *filep, struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_eviction_args *args = data;
+
+	return evict_size(p, args->size, args->type);
+
+}
 static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 {
 	struct kfd_process *process;

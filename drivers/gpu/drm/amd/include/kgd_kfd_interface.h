@@ -40,6 +40,9 @@ struct kfd_dev;
 struct kgd_dev;
 
 struct kgd_mem;
+struct kfd_process_device;
+struct amdgpu_bo;
+
 
 struct kfd_cu_info {
 	uint32_t num_shader_engines;
@@ -253,7 +256,8 @@ struct kfd2kgd_calls {
 	int (*alloc_memory_of_gpu)(struct kgd_dev *kgd, uint64_t va,
 			size_t size, void *vm,
 			struct kgd_mem **mem, uint64_t *offset,
-			void **kptr, uint32_t flags);
+			void **kptr, struct kfd_process_device *pdd,
+			uint32_t flags);
 	int (*free_memory_of_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
 	int (*map_memory_to_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem,
 			void *vm);
@@ -276,6 +280,9 @@ struct kfd2kgd_calls {
 			struct kgd_mem *mem, void **kptr);
 	void (*set_vm_context_page_table_base)(struct kgd_dev *kgd, uint32_t vmid,
 			uint32_t page_table_base);
+	struct kfd_process_device* (*get_pdd_from_buffer_object)
+		(struct kgd_dev *kgd, struct kgd_mem *mem);
+	int (*return_bo_size)(struct kgd_dev *kgd, struct kgd_mem *mem);
 
 	int (*pin_get_sg_table_bo)(struct kgd_dev *kgd,
 			struct kgd_mem *mem, uint64_t offset,
@@ -314,6 +321,8 @@ struct kgd2kfd_calls {
 	void (*interrupt)(struct kfd_dev *kfd, const void *ih_ring_entry);
 	void (*suspend)(struct kfd_dev *kfd);
 	int (*resume)(struct kfd_dev *kfd);
+	int (*evict_bo)(struct kfd_dev *dev, void *ptr);
+	int (*restore)(struct kfd_dev *kfd);
 };
 
 bool kgd2kfd_init(unsigned interface_version,

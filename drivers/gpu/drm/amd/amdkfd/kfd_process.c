@@ -28,6 +28,7 @@
 #include <linux/notifier.h>
 #include <linux/compat.h>
 #include <linux/mm.h>
+#include <asm/tlb.h>
 
 struct mm_struct;
 
@@ -41,6 +42,7 @@ struct mm_struct;
  */
 #define INITIAL_QUEUE_ARRAY_SIZE 16
 
+static int evict_pdd(struct kfd_process_device *pdd);
 /*
  * List of struct kfd_process (field kfd_process).
  * Unique/indexed by mm_struct*
@@ -176,6 +178,121 @@ struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid)
 		p = find_process(task, true);
 
 	return p;
+}
+
+int evict_size(struct kfd_process *process, int size, int type)
+{
+	struct kfd_process_device *pdd, *temp_pdd = NULL;
+	struct kfd_process *p = process;
+	int temp = 0;
+
+	mutex_lock(&p->mutex);
+
+	if (type == EVICT_FIRST_PDD) {
+
+		list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+			pr_debug("Releasing pdd (topology id %d) for process (pasid %d) in workqueue\n",
+					pdd->dev->id, p->pasid);
+			if (pdd->mapped_size >= size) {
+				evict_pdd(pdd);
+				return 0;
+			}
+
+		}
+	} else if (type == EVICT_BIGGEST_PDD) {
+
+		list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+			pr_debug("Releasing pdd (topology id %d) for process (pasid %d) in workqueue\n",
+					pdd->dev->id, p->pasid);
+			if (pdd->mapped_size >= temp) {
+				temp = pdd->mapped_size;
+				temp_pdd = pdd;
+			}
+
+		}
+		if (temp_pdd->mapped_size > size) {
+			evict_pdd(temp_pdd);
+			return 0;
+		}
+
+	}
+	mutex_unlock(&p->mutex);
+	return 0;
+
+}
+
+int evict_bo(struct kfd_dev *dev, void *mem)
+{
+	struct kfd_process_device *pdd;
+
+	pdd =  dev->kfd2kgd->get_pdd_from_buffer_object(dev->kgd,
+			((struct kgd_mem *)mem));
+
+	if (pdd)
+		evict_pdd(pdd);
+
+	return 0;
+}
+
+static int evict_pdd(struct kfd_process_device *pdd)
+{
+	void *mem;
+	int id;
+
+	/*process_evict_queues(struct device_queue_manager *dqm, pdd->qpd)*/
+	/*
+	* Remove all handles from idr and release appropriate
+	* local memory object
+	*/
+	idr_for_each_entry(&pdd->alloc_idr, mem, id) {
+		pdd->dev->kfd2kgd->unmap_memory_to_gpu(
+			pdd->dev->kgd, mem, pdd->vm);
+	}
+	pdd->last_eviction = jiffies;
+	pdd->mapped_size = 0;
+	pdd->evicted = true;
+
+	/*flush_tlb_all();*/
+
+	return 0;
+}
+
+int restore(struct kfd_dev *kfd)
+{
+	struct kfd_process *p = NULL;
+	/*  TODO still working on how to get the process */
+	struct kfd_process_device *pdd = kfd_get_process_device_data(kfd, p);
+	void *mem;
+	int id;
+
+	/* need to run on all processes*/
+	mutex_lock(&p->mutex);
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		pr_debug("Releasing pdd (topology id %d) for process (pasid %d) in workqueue\n",
+				pdd->dev->id, p->pasid);
+
+		/*
+		 * Remove all handles from idr and release appropriate
+		 * local memory object
+		 */
+		if (pdd->evicted) {
+			idr_for_each_entry(&pdd->alloc_idr, mem, id) {
+				pdd->dev->kfd2kgd->map_memory_to_gpu(
+						pdd->dev->kgd,
+						mem, pdd->vm);
+				pdd->last_eviction = 0;
+				pdd->mapped_size = 0;
+			}
+
+			/*process_restore_queues
+			 * (struct device_queue_manager *dqm, pdd->qpd)*/
+		} else {
+			pdd->evicted = false;
+		}
+	}
+	mutex_unlock(&p->mutex);
+	return 0;
 }
 
 static void kfd_process_wq_release(struct work_struct *work)
