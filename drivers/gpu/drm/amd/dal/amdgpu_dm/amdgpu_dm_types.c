@@ -366,16 +366,16 @@ static bool fill_rects_from_plane_state(
 	surface->clip_rect = surface->dst_rect;
 
 	switch (state->rotation) {
-	case DRM_ROTATE_0:
+	case BIT(DRM_ROTATE_0):
 		surface->rotation = ROTATION_ANGLE_0;
 		break;
-	case DRM_ROTATE_90:
+	case BIT(DRM_ROTATE_90):
 		surface->rotation = ROTATION_ANGLE_90;
 		break;
-	case DRM_ROTATE_180:
+	case BIT(DRM_ROTATE_180):
 		surface->rotation = ROTATION_ANGLE_180;
 		break;
-	case DRM_ROTATE_270:
+	case BIT(DRM_ROTATE_270):
 		surface->rotation = ROTATION_ANGLE_270;
 		break;
 	default:
