@@ -36,6 +36,7 @@
 #include "dce110/dce110_timing_generator.h"
 #include "dce110/dce110_link_encoder.h"
 #include "dce110/dce110_mem_input.h"
+#include "dce110/dce110_mem_input_v.h"
 #include "dce110/dce110_ipp.h"
 #include "dce110/dce110_transform.h"
 #include "dce110/dce110_stream_encoder.h"
