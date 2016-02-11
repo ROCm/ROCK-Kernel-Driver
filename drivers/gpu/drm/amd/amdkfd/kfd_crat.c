@@ -795,7 +795,7 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 }
 
 static int kfd_fill_gpu_memory_affinity(int *avail_size,
-		struct kfd_dev *kdev, uint8_t type,
+		struct kfd_dev *kdev, uint8_t type, uint64_t size,
 		struct crat_subtype_memory *sub_type_hdr,
 		uint32_t proximity_domain)
 {
@@ -810,24 +810,13 @@ static int kfd_fill_gpu_memory_affinity(int *avail_size,
 	sub_type_hdr->flags |= CRAT_SUBTYPE_FLAGS_ENABLED;
 
 	sub_type_hdr->proximity_domain = proximity_domain;
-	kdev->kfd2kgd->get_local_mem_info(kdev->kgd, &local_mem_info);
 
-	pr_debug("amdkfd: fill gpu memory affinity - type 0x%x private 0x%llx public 0x%llx\n",
-			type,
-			local_mem_info.local_mem_size_private,
-			local_mem_info.local_mem_size_public);
+	pr_debug("amdkfd: fill gpu memory affinity - type 0x%x size 0x%llx\n",
+			type, size);
 
-	if (type & HSA_MEM_HEAP_TYPE_FB_PRIVATE) {
-		sub_type_hdr->length_low = lower_32_bits
-				(local_mem_info.local_mem_size_private);
-		sub_type_hdr->length_high = upper_32_bits
-				(local_mem_info.local_mem_size_private);
-	} else if (type & HSA_MEM_HEAP_TYPE_FB_PUBLIC) {
-		sub_type_hdr->length_low = lower_32_bits
-				(local_mem_info.local_mem_size_public);
-		sub_type_hdr->length_high = upper_32_bits
-				(local_mem_info.local_mem_size_public);
-	}
+	sub_type_hdr->length_low = lower_32_bits(size);
+	sub_type_hdr->length_high = upper_32_bits(size);
+
 	sub_type_hdr->width = local_mem_info.vram_width;
 	sub_type_hdr->visibility_type = type;
 
@@ -857,6 +846,7 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	const u32 required_iommu_flags = AMD_IOMMU_DEVICE_FLAG_ATS_SUP |
 								AMD_IOMMU_DEVICE_FLAG_PRI_SUP |
 								AMD_IOMMU_DEVICE_FLAG_PASID_SUP;
+	struct kfd_local_mem_info local_mem_info;
 
 	if (pcrat_image == NULL || avail_size < VCRAT_SIZE_FOR_GPU)
 		return -EINVAL;
@@ -922,35 +912,30 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	crat_table->length += sub_type_hdr->length;
 	crat_table->total_entries++;
 
-	/* Fill in Subtype: Memory
-	 * First fill in the sub type header and then sub type data
-	 */
+	/* Fill in Subtype: Memory. Only on systems with large BAR (no
+	 * private FB), report memory as public. On other systems
+	 * report the total FB size (public+private) as a single
+	 * private heap. */
+	kdev->kfd2kgd->get_local_mem_info(kdev->kgd, &local_mem_info);
 	avail_size -= sizeof(struct crat_subtype_memory);
 	if (avail_size < 0)
 		return -ENOMEM;
 	sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
 			sub_type_hdr->length);
 	memset((void *)sub_type_hdr, 0, sizeof(struct crat_subtype_memory));
-	ret = kfd_fill_gpu_memory_affinity(&avail_size,
-			kdev, HSA_MEM_HEAP_TYPE_FB_PRIVATE,
-			(struct crat_subtype_memory *)sub_type_hdr,
-			proximity_domain);
-	if (ret < 0)
-		return ret;
-
-	crat_table->length += sizeof(struct crat_subtype_memory);
-	crat_table->total_entries++;
-
-	avail_size -= sizeof(struct crat_subtype_memory);
-	if (avail_size < 0)
-		return -ENOMEM;
-	sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
-			sub_type_hdr->length);
-	memset((void *)sub_type_hdr, 0, sizeof(struct crat_subtype_memory));
-	ret = kfd_fill_gpu_memory_affinity(&avail_size,
-			kdev, HSA_MEM_HEAP_TYPE_FB_PUBLIC,
-			(struct crat_subtype_memory *)sub_type_hdr,
-			proximity_domain);
+	if (local_mem_info.local_mem_size_private == 0)
+		ret = kfd_fill_gpu_memory_affinity(&avail_size,
+				kdev, HSA_MEM_HEAP_TYPE_FB_PUBLIC,
+				local_mem_info.local_mem_size_public,
+				(struct crat_subtype_memory *)sub_type_hdr,
+				proximity_domain);
+	else
+		ret = kfd_fill_gpu_memory_affinity(&avail_size,
+				kdev, HSA_MEM_HEAP_TYPE_FB_PRIVATE,
+				local_mem_info.local_mem_size_public +
+				local_mem_info.local_mem_size_private,
+				(struct crat_subtype_memory *)sub_type_hdr,
+				proximity_domain);
 	if (ret < 0)
 		return ret;
 
