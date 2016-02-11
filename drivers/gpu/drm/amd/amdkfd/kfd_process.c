@@ -165,14 +165,15 @@ static struct kfd_process *find_process(const struct task_struct *thread,
 struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid)
 {
 	struct task_struct *task = NULL;
-	struct kfd_process *p;
+	struct kfd_process *p    = NULL;
 
 	if (!pid)
 		task = current;
 	else
 		task = get_pid_task(pid, PIDTYPE_PID);
 
-	p = find_process(task, true);
+	if (task)
+		p = find_process(task, true);
 
 	return p;
 }
@@ -552,6 +553,9 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 	p = pdd->process;
 
 	buf_obj = kmalloc(sizeof(*buf_obj), GFP_KERNEL);
+
+	if (!buf_obj)
+		return -ENOMEM;
 
 	buf_obj->it.start = start;
 	buf_obj->it.last = start + length - 1;
