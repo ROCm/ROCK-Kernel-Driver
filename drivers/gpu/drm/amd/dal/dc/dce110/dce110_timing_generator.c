@@ -347,7 +347,7 @@ bool dce110_timing_generator_blank_crtc(struct timing_generator *tg)
 
 	set_reg_field_value(
 		value,
-		1,
+		0,
 		CRTC_BLANK_CONTROL,
 		CRTC_BLANK_DE_MODE);
 
