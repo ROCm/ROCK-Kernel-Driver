@@ -1624,6 +1624,8 @@ void core_link_enable_stream(struct pipe_ctx *pipe_ctx)
 
 	dc->hwss.enable_stream(pipe_ctx);
 
+	pipe_ctx->stream->status.link = &pipe_ctx->stream->sink->link->public;
+
 	if (pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 		allocate_mst_payload(pipe_ctx);
 }
@@ -1637,6 +1639,8 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 		deallocate_mst_payload(pipe_ctx);
 
 	dc->hwss.disable_stream(pipe_ctx);
+
+	pipe_ctx->stream->status.link = NULL;
 
 	disable_link(pipe_ctx->stream->sink->link, pipe_ctx->signal);
 }
