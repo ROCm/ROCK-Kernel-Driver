@@ -776,8 +776,12 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		/*
 		 * only disable stream in case it was ever enabled
 		 */
-		if (old_pipe_ctx->stream)
+		if (old_pipe_ctx->stream) {
 			core_link_disable_stream(old_pipe_ctx);
+
+			ASSERT(old_pipe_ctx->clock_source);
+			unreference_clock_source(&dc->current_context.res_ctx, old_pipe_ctx->clock_source);
+		}
 
 		/*TODO: AUTO check if timing changed*/
 		if (false == pipe_ctx->clock_source->funcs->program_pix_clk(
@@ -1499,6 +1503,8 @@ static void reset_single_pipe_hw_ctx(
 	dc->hwss.enable_display_power_gating(
 		pipe_ctx->stream->ctx, pipe_ctx->pipe_idx, dcb,
 			PIPE_GATING_CONTROL_ENABLE);
+
+	pipe_ctx->stream = NULL;
 }
 
 static void reset_hw_ctx(
