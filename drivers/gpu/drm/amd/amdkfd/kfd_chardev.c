@@ -1259,6 +1259,10 @@ static uint32_t kfd_convert_user_mem_alloction_flags(
 			if (mem_info.local_mem_size_private == 0 &&
 					mem_info.local_mem_size_public > 0)
 				kernel_allocation_flags |= ALLOC_MEM_FLAGS_PUBLIC;
+			else if (debug_largebar) {
+				pr_debug("amdkfd: simulate large-bar allocation on non large-bar machine\n");
+				kernel_allocation_flags |= ALLOC_MEM_FLAGS_PUBLIC;
+			}
 		}
 		goto out;
 	}
@@ -1292,6 +1296,9 @@ out:
 	 */
 	kernel_allocation_flags |= ALLOC_MEM_FLAGS_EXECUTE_ACCESS;
 	kernel_allocation_flags |= ALLOC_MEM_FLAGS_NO_SUBSTITUTE;
+
+	pr_debug("amdkfd: user allocation flags 0x%x kernel allocation flags: 0x%x\n",
+			userspace_flags, kernel_allocation_flags);
 
 	return kernel_allocation_flags;
 }

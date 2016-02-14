@@ -150,8 +150,8 @@ static int add_bo_to_vm(struct amdgpu_device *adev, uint64_t va,
 			va, 0, amdgpu_bo_size(bo),
 			flags | AMDGPU_PTE_VALID);
 	if (ret != 0) {
-		pr_err("amdkfd: Failed to set virtual address for BO. ret == %d\n",
-				ret);
+		pr_err("amdkfd: Failed to set virtual address for BO. ret == %d (0x%llx)\n",
+				ret, va);
 		goto err_vmsetaddr;
 	}
 
@@ -550,6 +550,8 @@ err_failed_to_get_bos:
 	return ret;
 }
 
+#define BOOL_TO_STR(b)	(b == true) ? "true" : "false"
+
 static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 				void *vm, struct kgd_mem **mem,
 				uint64_t *offset, void **kptr, uint32_t flags)
@@ -591,6 +593,15 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 		alloc_flag = 0;
 		temp_offset = offset;
 	}
+
+	pr_debug("amdgpu: allocating BO domain %d alloc_flag 0x%llu public %s readonly %s execute %s no substitue %s va 0x%llx\n",
+			domain,
+			alloc_flag,
+			BOOL_TO_STR(public),
+			BOOL_TO_STR(readonly),
+			BOOL_TO_STR(execute),
+			BOOL_TO_STR(no_sub),
+			va);
 
 	return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
 			temp_offset, kptr, domain,

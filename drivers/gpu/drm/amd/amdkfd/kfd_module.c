@@ -69,6 +69,11 @@ module_param(send_sigterm, int, 0444);
 MODULE_PARM_DESC(send_sigterm,
 	"Send sigterm to HSA process on unhandled exception (0 = disable, 1 = enable)");
 
+int debug_largebar = 0;
+module_param(debug_largebar, int, 0444);
+MODULE_PARM_DESC(debug_largebar,
+	"Debug large-bar flag used to simulate large-bar capability on non-large bar machine (0 = disable, 1 = enable)");
+
 bool kgd2kfd_init(unsigned interface_version, const struct kgd2kfd_calls **g2f)
 {
 	/*

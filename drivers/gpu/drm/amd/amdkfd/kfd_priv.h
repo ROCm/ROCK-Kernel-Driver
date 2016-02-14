@@ -881,4 +881,10 @@ int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 #define KFD_MULTI_PROC_MAPPING_HWS_SUPPORT 600
 #define KFD_CWSR_CZ_FW_VER 625
 
+/*
+ * This kernel module is used to simulate large bar machine on non-large bar
+ * enabled machines.
+ */
+extern int debug_largebar;
+
 #endif
