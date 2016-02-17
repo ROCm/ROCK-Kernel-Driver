@@ -162,4 +162,106 @@ static inline uint64_t div_u64_rem(uint64_t x, uint32_t y, uint32_t *rem)
 
 #endif
 
+#include "dc_types.h"
+
+struct dm_pp_clock_range {
+	int min_khz;
+	int max_khz;
+};
+
+enum dm_pp_clocks_state {
+	DM_PP_CLOCKS_STATE_INVALID,
+	DM_PP_CLOCKS_STATE_ULTRA_LOW,
+	DM_PP_CLOCKS_STATE_LOW,
+	DM_PP_CLOCKS_STATE_NOMINAL,
+	DM_PP_CLOCKS_STATE_PERFORMANCE,
+
+	/* Starting from DCE11, Max 8 levels of DPM state supported. */
+	DM_PP_CLOCKS_DPM_STATE_LEVEL_INVALID = DM_PP_CLOCKS_STATE_INVALID,
+	DM_PP_CLOCKS_DPM_STATE_LEVEL_0 = DM_PP_CLOCKS_STATE_ULTRA_LOW,
+	DM_PP_CLOCKS_DPM_STATE_LEVEL_1 = DM_PP_CLOCKS_STATE_LOW,
+	DM_PP_CLOCKS_DPM_STATE_LEVEL_2 = DM_PP_CLOCKS_STATE_NOMINAL,
+	/* to be backward compatible */
+	DM_PP_CLOCKS_DPM_STATE_LEVEL_3 = DM_PP_CLOCKS_STATE_PERFORMANCE,
+	DM_PP_CLOCKS_DPM_STATE_LEVEL_4 = DM_PP_CLOCKS_DPM_STATE_LEVEL_3 + 1,
+	DM_PP_CLOCKS_DPM_STATE_LEVEL_5 = DM_PP_CLOCKS_DPM_STATE_LEVEL_4 + 1,
+	DM_PP_CLOCKS_DPM_STATE_LEVEL_6 = DM_PP_CLOCKS_DPM_STATE_LEVEL_5 + 1,
+	DM_PP_CLOCKS_DPM_STATE_LEVEL_7 = DM_PP_CLOCKS_DPM_STATE_LEVEL_6 + 1,
+};
+
+struct dm_pp_gpu_clock_range {
+	enum dm_pp_clocks_state clock_state;
+	struct dm_pp_clock_range sclk;
+	struct dm_pp_clock_range mclk;
+	struct dm_pp_clock_range eclk;
+	struct dm_pp_clock_range dclk;
+};
+
+enum dm_pp_clock_type {
+	DM_PP_CLOCK_TYPE_DISPLAY_CLK = 1,
+	DM_PP_CLOCK_TYPE_ENGINE_CLK, /* System clock */
+	DM_PP_CLOCK_TYPE_MEMORY_CLK
+};
+
+#define DC_DECODE_PP_CLOCK_TYPE(clk_type) \
+	(clk_type) == DM_PP_CLOCK_TYPE_DISPLAY_CLK ? "Display" : \
+	(clk_type) == DM_PP_CLOCK_TYPE_ENGINE_CLK ? "Engine" : \
+	(clk_type) == DM_PP_CLOCK_TYPE_MEMORY_CLK ? "Memory" : "Invalid"
+
+#define DM_PP_MAX_CLOCK_LEVELS 8
+
+struct dm_pp_clock_levels {
+	uint32_t num_levels;
+	uint32_t clocks_in_khz[DM_PP_MAX_CLOCK_LEVELS];
+};
+
+struct dm_pp_single_disp_config {
+	enum signal_type signal;
+	uint8_t transmitter;
+	uint8_t ddi_channel_mapping;
+	uint8_t pipe_idx;
+	uint32_t src_height;
+	uint32_t src_width;
+	uint32_t v_refresh;
+	uint32_t sym_clock; /* HDMI only */
+	struct dc_link_settings link_settings; /* DP only */
+};
+
+#define MAX_DISPLAY_CONFIGS 6
+
+struct dm_pp_display_configuration {
+	bool nb_pstate_switch_disable;/* controls NB PState switch */
+	bool cpu_cc6_disable; /* controls CPU CState switch ( on or off) */
+	bool cpu_pstate_disable;
+	uint32_t cpu_pstate_separation_time;
+
+	uint32_t min_memory_clock_khz;
+	uint32_t min_engine_clock_khz;
+	uint32_t min_engine_clock_deep_sleep_khz;
+
+	uint32_t avail_mclk_switch_time_us;
+	uint32_t avail_mclk_switch_time_in_disp_active_us;
+
+	uint32_t disp_clk_khz;
+
+	bool all_displays_in_sync;
+
+	uint8_t display_count;
+	struct dm_pp_single_disp_config disp_configs[MAX_DISPLAY_CONFIGS];
+
+	/*Controller Index of primary display - used in MCLK SMC switching hang
+	 * SW Workaround*/
+	uint8_t crtc_index;
+	/*htotal*1000/pixelclk - used in MCLK SMC switching hang SW Workaround*/
+	uint32_t line_time_in_us;
+};
+
+struct dm_pp_static_clock_info {
+	uint32_t max_sclk_khz;
+	uint32_t max_mclk_khz;
+
+	 /* max possible display block clocks state */
+	enum dm_pp_clocks_state max_clocks_state;
+};
+
 #endif

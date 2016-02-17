@@ -72,7 +72,7 @@ void pplib_apply_safe_state(const struct dc *dc);
 void pplib_apply_display_requirements(
 	const struct dc *dc,
 	const struct validate_context *context,
-	struct dc_pp_display_configuration *pp_display_cfg);
+	struct dm_pp_display_configuration *pp_display_cfg);
 
 void build_info_frame(struct pipe_ctx *pipe_ctx);
 

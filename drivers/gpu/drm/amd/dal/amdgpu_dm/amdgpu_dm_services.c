@@ -75,7 +75,7 @@ int32_t dm_memcmp(const void *p1, const void *p2, uint32_t count)
 	return memcmp(p1, p2, count);
 }
 
-int32_t dm_strncmp(const int8_t *p1, const int8_t *p2, uint32_t count)
+int32_t dm_strncmp(const char *p1, const char *p2, uint32_t count)
 {
 	return strncmp(p1, p2, count);
 }
@@ -150,8 +150,8 @@ bool dm_get_platform_info(struct dc_context *ctx,
 
 bool dm_pp_pre_dce_clock_change(
 		struct dc_context *ctx,
-		struct dal_to_power_info *input,
-		struct power_to_dal_info *output)
+		struct dm_pp_gpu_clock_range *requested_state,
+		struct dm_pp_gpu_clock_range *actual_state)
 {
 	/*TODO*/
 	return false;
@@ -175,7 +175,7 @@ bool dm_pp_apply_safe_state(
 
 bool dm_pp_apply_display_requirements(
 		const struct dc_context *ctx,
-		const struct dc_pp_display_configuration *pp_display_cfg)
+		const struct dm_pp_display_configuration *pp_display_cfg)
 {
 #ifdef CONFIG_DRM_AMD_POWERPLAY
 	struct amdgpu_device *adev = ctx->driver_context;
@@ -248,26 +248,26 @@ bool dm_pp_apply_display_requirements(
 
 bool dc_service_get_system_clocks_range(
 		const struct dc_context *ctx,
-		struct dal_system_clock_range *sys_clks)
+		struct dm_pp_gpu_clock_range *sys_clks)
 {
 #ifdef CONFIG_DRM_AMD_POWERPLAY
 	struct amdgpu_device *adev = ctx->driver_context;
 #endif
 
 	/* Default values, in case PPLib is not compiled-in. */
-	sys_clks->max_mclk = 80000;
-	sys_clks->min_mclk = 80000;
+	sys_clks->mclk.max_khz = 800000;
+	sys_clks->mclk.min_khz = 800000;
 
-	sys_clks->max_sclk = 60000;
-	sys_clks->min_sclk = 30000;
+	sys_clks->sclk.max_khz = 600000;
+	sys_clks->sclk.min_khz = 300000;
 
 #ifdef CONFIG_DRM_AMD_POWERPLAY
 	if (adev->pm.dpm_enabled) {
-		sys_clks->max_mclk = amdgpu_dpm_get_mclk(adev, false);
-		sys_clks->min_mclk = amdgpu_dpm_get_mclk(adev, true);
+		sys_clks->mclk.max_khz = amdgpu_dpm_get_mclk(adev, false);
+		sys_clks->mclk.min_khz = amdgpu_dpm_get_mclk(adev, true);
 
-		sys_clks->max_sclk = amdgpu_dpm_get_sclk(adev, false);
-		sys_clks->min_sclk = amdgpu_dpm_get_sclk(adev, true);
+		sys_clks->sclk.max_khz = amdgpu_dpm_get_sclk(adev, false);
+		sys_clks->sclk.min_khz = amdgpu_dpm_get_sclk(adev, true);
 	}
 #endif
 
@@ -275,8 +275,8 @@ bool dc_service_get_system_clocks_range(
 }
 
 static void get_default_clock_levels(
-		enum dc_pp_clock_type clk_type,
-		struct dc_pp_clock_levels *clks)
+		enum dm_pp_clock_type clk_type,
+		struct dm_pp_clock_levels *clks)
 {
 	uint32_t disp_clks_in_khz[6] = {
 			300000, 400000, 496560, 626090, 685720, 757900 };
@@ -285,17 +285,17 @@ static void get_default_clock_levels(
 	uint32_t mclks_in_khz[2] = { 333000, 800000 };
 
 	switch (clk_type) {
-	case DC_PP_CLOCK_TYPE_DISPLAY_CLK:
+	case DM_PP_CLOCK_TYPE_DISPLAY_CLK:
 		clks->num_levels = 6;
 		dm_memmove(clks->clocks_in_khz, disp_clks_in_khz,
 				sizeof(disp_clks_in_khz));
 		break;
-	case DC_PP_CLOCK_TYPE_ENGINE_CLK:
+	case DM_PP_CLOCK_TYPE_ENGINE_CLK:
 		clks->num_levels = 6;
 		dm_memmove(clks->clocks_in_khz, sclks_in_khz,
 				sizeof(sclks_in_khz));
 		break;
-	case DC_PP_CLOCK_TYPE_MEMORY_CLK:
+	case DM_PP_CLOCK_TYPE_MEMORY_CLK:
 		clks->num_levels = 2;
 		dm_memmove(clks->clocks_in_khz, mclks_in_khz,
 				sizeof(mclks_in_khz));
@@ -308,23 +308,23 @@ static void get_default_clock_levels(
 
 #ifdef CONFIG_DRM_AMD_POWERPLAY
 static enum amd_pp_clock_type dc_to_pp_clock_type(
-		enum dc_pp_clock_type dc_pp_clk_type)
+		enum dm_pp_clock_type dm_pp_clk_type)
 {
 	enum amd_pp_clock_type amd_pp_clk_type = 0;
 
-	switch (dc_pp_clk_type) {
-	case DC_PP_CLOCK_TYPE_DISPLAY_CLK:
+	switch (dm_pp_clk_type) {
+	case DM_PP_CLOCK_TYPE_DISPLAY_CLK:
 		amd_pp_clk_type = amd_pp_disp_clock;
 		break;
-	case DC_PP_CLOCK_TYPE_ENGINE_CLK:
+	case DM_PP_CLOCK_TYPE_ENGINE_CLK:
 		amd_pp_clk_type = amd_pp_sys_clock;
 		break;
-	case DC_PP_CLOCK_TYPE_MEMORY_CLK:
+	case DM_PP_CLOCK_TYPE_MEMORY_CLK:
 		amd_pp_clk_type = amd_pp_mem_clock;
 		break;
 	default:
 		DRM_ERROR("DM_PPLIB: invalid clock type: %d!\n",
-				dc_pp_clk_type);
+				dm_pp_clk_type);
 		break;
 	}
 
@@ -333,18 +333,18 @@ static enum amd_pp_clock_type dc_to_pp_clock_type(
 
 static void pp_to_dc_clock_levels(
 		const struct amd_pp_clocks *pp_clks,
-		struct dc_pp_clock_levels *dc_clks,
-		enum dc_pp_clock_type dc_clk_type)
+		struct dm_pp_clock_levels *dc_clks,
+		enum dm_pp_clock_type dc_clk_type)
 {
 	uint32_t i;
 
-	if (pp_clks->count > DC_PP_MAX_CLOCK_LEVELS) {
+	if (pp_clks->count > DM_PP_MAX_CLOCK_LEVELS) {
 		DRM_INFO("DM_PPLIB: Warning: %s clock: number of levels %d exceeds maximum of %d!\n",
 				DC_DECODE_PP_CLOCK_TYPE(dc_clk_type),
 				pp_clks->count,
-				DC_PP_MAX_CLOCK_LEVELS);
+				DM_PP_MAX_CLOCK_LEVELS);
 
-		dc_clks->num_levels = DC_PP_MAX_CLOCK_LEVELS;
+		dc_clks->num_levels = DM_PP_MAX_CLOCK_LEVELS;
 	} else
 		dc_clks->num_levels = pp_clks->count;
 
@@ -361,8 +361,8 @@ static void pp_to_dc_clock_levels(
 
 bool dm_pp_get_clock_levels_by_type(
 		const struct dc_context *ctx,
-		enum dc_pp_clock_type clk_type,
-		struct dc_pp_clock_levels *dc_clks)
+		enum dm_pp_clock_type clk_type,
+		struct dm_pp_clock_levels *dc_clks)
 {
 #ifdef CONFIG_DRM_AMD_POWERPLAY
 	struct amdgpu_device *adev = ctx->driver_context;
@@ -402,7 +402,7 @@ bool dm_pp_get_clock_levels_by_type(
 	validation_clks.memory_max_clock *= 10;
 
 	/* Determine the highest non-boosted level from the Validation Clocks */
-	if (clk_type == DC_PP_CLOCK_TYPE_ENGINE_CLK) {
+	if (clk_type == DM_PP_CLOCK_TYPE_ENGINE_CLK) {
 		for (i = 0; i < dc_clks->num_levels; i++) {
 			if (dc_clks->clocks_in_khz[i] > validation_clks.engine_max_clock) {
 				/* This clock is higher the validation clock.
@@ -414,7 +414,7 @@ bool dm_pp_get_clock_levels_by_type(
 				break;
 			}
 		}
-	} else if (clk_type == DC_PP_CLOCK_TYPE_MEMORY_CLK) {
+	} else if (clk_type == DM_PP_CLOCK_TYPE_MEMORY_CLK) {
 		for (i = 0; i < dc_clks->num_levels; i++) {
 			if (dc_clks->clocks_in_khz[i] > validation_clks.memory_max_clock) {
 				DRM_INFO("DM_PPLIB: reducing memory clock level from %d to %d\n",

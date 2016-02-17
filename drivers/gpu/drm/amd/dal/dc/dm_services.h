@@ -54,7 +54,7 @@ void dm_memmove(void *dst, const void *src, uint32_t size);
 
 int32_t dm_memcmp(const void *p1, const void *p2, uint32_t count);
 
-int32_t dm_strncmp(const int8_t *p1, const int8_t *p2, uint32_t count);
+int32_t dm_strncmp(const char *p1, const char *p2, uint32_t count);
 
 irq_handler_idx dm_register_interrupt(
 	struct dc_context *ctx,
@@ -205,53 +205,6 @@ uint32_t dm_bios_cmd_table_para_revision(
  * Power Play (PP) interfaces
  **************************************/
 
-enum dal_to_power_clocks_state {
-	PP_CLOCKS_STATE_INVALID,
-	PP_CLOCKS_STATE_ULTRA_LOW,
-	PP_CLOCKS_STATE_LOW,
-	PP_CLOCKS_STATE_NOMINAL,
-	PP_CLOCKS_STATE_PERFORMANCE
-};
-
-/* clocks in khz */
-struct dal_to_power_info {
-	enum dal_to_power_clocks_state required_clock;
-	uint32_t min_sclk;
-	uint32_t min_mclk;
-	uint32_t min_deep_sleep_sclk;
-};
-
-/* clocks in khz */
-struct power_to_dal_info {
-	uint32_t min_sclk;
-	uint32_t max_sclk;
-	uint32_t min_mclk;
-	uint32_t max_mclk;
-};
-
-/* clocks in khz */
-struct dal_system_clock_range {
-	uint32_t min_sclk;
-	uint32_t max_sclk;
-
-	uint32_t min_mclk;
-	uint32_t max_mclk;
-
-	uint32_t min_dclk;
-	uint32_t max_dclk;
-
-	/* Wireless Display */
-	uint32_t min_eclk;
-	uint32_t max_eclk;
-};
-
-/* clocks in khz */
-struct dal_to_power_dclk {
-	uint32_t optimal; /* input: best optimizes for stutter efficiency */
-	uint32_t minimal; /* input: the lowest clk that DAL can support */
-	uint32_t established; /* output: the actually set one */
-};
-
 /* DAL calls this function to notify PP about clocks it needs for the Mode Set.
  * This is done *before* it changes DCE clock.
  *
@@ -270,75 +223,8 @@ struct dal_to_power_dclk {
  */
 bool dm_pp_pre_dce_clock_change(
 	struct dc_context *ctx,
-	struct dal_to_power_info *input,
-	struct power_to_dal_info *output);
-
-struct dc_pp_single_disp_config {
-	enum signal_type signal;
-	uint8_t transmitter;
-	uint8_t ddi_channel_mapping;
-	uint8_t pipe_idx;
-	uint32_t src_height;
-	uint32_t src_width;
-	uint32_t v_refresh;
-	uint32_t sym_clock; /* HDMI only */
-	struct dc_link_settings link_settings; /* DP only */
-};
-
-struct dc_pp_display_configuration {
-	bool nb_pstate_switch_disable;/* controls NB PState switch */
-	bool cpu_cc6_disable; /* controls CPU CState switch ( on or off) */
-	bool cpu_pstate_disable;
-	uint32_t cpu_pstate_separation_time;
-
-	uint32_t min_memory_clock_khz;
-	uint32_t min_engine_clock_khz;
-	uint32_t min_engine_clock_deep_sleep_khz;
-
-	uint32_t avail_mclk_switch_time_us;
-	uint32_t avail_mclk_switch_time_in_disp_active_us;
-
-	uint32_t disp_clk_khz;
-
-	bool all_displays_in_sync;
-
-	uint8_t display_count;
-	struct dc_pp_single_disp_config disp_configs[MAX_COFUNC_PATH];
-
-	/*Controller Index of primary display - used in MCLK SMC switching hang
-	 * SW Workaround*/
-	uint8_t crtc_index;
-	/*htotal*1000/pixelclk - used in MCLK SMC switching hang SW Workaround*/
-	uint32_t line_time_in_us;
-};
-
-enum dc_pp_clocks_state {
-	DC_PP_CLOCKS_STATE_INVALID = 0,
-	DC_PP_CLOCKS_STATE_ULTRA_LOW,
-	DC_PP_CLOCKS_STATE_LOW,
-	DC_PP_CLOCKS_STATE_NOMINAL,
-	DC_PP_CLOCKS_STATE_PERFORMANCE,
-
-	/* Starting from DCE11, Max 8 levels of DPM state supported. */
-	DC_PP_CLOCKS_DPM_STATE_LEVEL_INVALID = DC_PP_CLOCKS_STATE_INVALID,
-	DC_PP_CLOCKS_DPM_STATE_LEVEL_0 = DC_PP_CLOCKS_STATE_ULTRA_LOW,
-	DC_PP_CLOCKS_DPM_STATE_LEVEL_1 = DC_PP_CLOCKS_STATE_LOW,
-	DC_PP_CLOCKS_DPM_STATE_LEVEL_2 = DC_PP_CLOCKS_STATE_NOMINAL,
-	/* to be backward compatible */
-	DC_PP_CLOCKS_DPM_STATE_LEVEL_3 = DC_PP_CLOCKS_STATE_PERFORMANCE,
-	DC_PP_CLOCKS_DPM_STATE_LEVEL_4 = DC_PP_CLOCKS_DPM_STATE_LEVEL_3 + 1,
-	DC_PP_CLOCKS_DPM_STATE_LEVEL_5 = DC_PP_CLOCKS_DPM_STATE_LEVEL_4 + 1,
-	DC_PP_CLOCKS_DPM_STATE_LEVEL_6 = DC_PP_CLOCKS_DPM_STATE_LEVEL_5 + 1,
-	DC_PP_CLOCKS_DPM_STATE_LEVEL_7 = DC_PP_CLOCKS_DPM_STATE_LEVEL_6 + 1,
-};
-
-struct dc_pp_static_clock_info {
-	uint32_t max_sclk_khz;
-	uint32_t max_mclk_khz;
-
-	 /* max possible display block clocks state */
-	enum dc_pp_clocks_state max_clocks_state;
-};
+	struct dm_pp_gpu_clock_range *requested_state,
+	struct dm_pp_gpu_clock_range *actual_state);
 
 /* The returned clocks range are 'static' system clocks which will be used for
  * mode validation purposes.
@@ -348,25 +234,7 @@ struct dc_pp_static_clock_info {
  */
 bool dc_service_get_system_clocks_range(
 	const struct dc_context *ctx,
-	struct dal_system_clock_range *sys_clks);
-
-enum dc_pp_clock_type {
-	DC_PP_CLOCK_TYPE_DISPLAY_CLK = 1,
-	DC_PP_CLOCK_TYPE_ENGINE_CLK, /* System clock */
-	DC_PP_CLOCK_TYPE_MEMORY_CLK
-};
-
-#define DC_DECODE_PP_CLOCK_TYPE(clk_type) \
-	(clk_type) == DC_PP_CLOCK_TYPE_DISPLAY_CLK ? "Display" : \
-	(clk_type) == DC_PP_CLOCK_TYPE_ENGINE_CLK ? "Engine" : \
-	(clk_type) == DC_PP_CLOCK_TYPE_MEMORY_CLK ? "Memory" : "Invalid"
-
-#define DC_PP_MAX_CLOCK_LEVELS 8
-
-struct dc_pp_clock_levels {
-	uint32_t num_levels;
-	uint32_t clocks_in_khz[DC_PP_MAX_CLOCK_LEVELS];
-};
+	struct dm_pp_gpu_clock_range *sys_clks);
 
 /* Gets valid clocks levels from pplib
  *
@@ -378,8 +246,8 @@ struct dc_pp_clock_levels {
  */
 bool dm_pp_get_clock_levels_by_type(
 	const struct dc_context *ctx,
-	enum dc_pp_clock_type clk_type,
-	struct dc_pp_clock_levels *clk_level_info);
+	enum dm_pp_clock_type clk_type,
+	struct dm_pp_clock_levels *clk_level_info);
 
 
 bool dm_pp_apply_safe_state(
@@ -398,7 +266,7 @@ bool dm_pp_apply_safe_state(
  */
 bool dm_pp_apply_display_requirements(
 	const struct dc_context *ctx,
-	const struct dc_pp_display_configuration *pp_display_cfg);
+	const struct dm_pp_display_configuration *pp_display_cfg);
 
 
 /****** end of PP interfaces ******/
