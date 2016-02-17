@@ -1263,10 +1263,8 @@ bool dp_validate_mode_timing(
 		timing->v_addressable == (uint32_t)480)
 		return true;
 
-	/* For static validation we always use reported
-	 * link settings for other cases, when no modelist
-	 * changed we can use verified link setting*/
-	link_setting = &link->public.reported_link_cap;
+	/* We always use verified link settings */
+	link_setting = &link->public.verified_link_cap;
 
 	/* TODO: DYNAMIC_VALIDATION needs to be implemented */
 	/*if (flags.DYNAMIC_VALIDATION == 1 &&
