@@ -78,7 +78,7 @@ void dm_helpers_dp_mst_stop_top_mgr(
 /**
  * OS specific aux read callback.
  */
-bool dm_helper_dp_read_dpcd(
+bool dm_helpers_dp_read_dpcd(
 		struct dc_context *ctx,
 		const struct dc_link *link,
 		uint32_t address,
@@ -88,7 +88,7 @@ bool dm_helper_dp_read_dpcd(
 /**
  * OS specific aux write callback.
  */
-bool dm_helper_dp_write_dpcd(
+bool dm_helpers_dp_write_dpcd(
 		struct dc_context *ctx,
 		const struct dc_link *link,
 		uint32_t address,
