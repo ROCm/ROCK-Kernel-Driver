@@ -143,6 +143,12 @@ struct display_clock *dal_display_clock_dce80_create(
 	struct adapter_service *as);
 #endif
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+struct display_clock *dal_display_clock_dce80_create(
+	struct dc_context *ctx,
+	struct adapter_service *as);
+#endif
+
 void dal_display_clock_destroy(struct display_clock **to_destroy);
 bool dal_display_clock_validate(
 	struct display_clock *disp_clk,

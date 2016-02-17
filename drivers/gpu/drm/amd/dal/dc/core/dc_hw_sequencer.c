@@ -25,6 +25,9 @@
 #include "dm_services.h"
 #include "core_types.h"
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+#include "dce80/dce80_hw_sequencer.h"
+#endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 #include "dce100/dce100_hw_sequencer.h"
 #endif
@@ -40,6 +43,10 @@ bool dc_construct_hw_sequencer(
 
 	switch (dce_ver)
 	{
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+	case DCE_VERSION_8_0:
+		return dce80_hw_sequencer_construct(dc);
+#endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 	case DCE_VERSION_10_0:
 		return dce100_hw_sequencer_construct(dc);

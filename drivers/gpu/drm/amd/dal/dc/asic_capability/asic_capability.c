@@ -32,6 +32,10 @@
 #include "include/dal_types.h"
 #include "include/dal_asic_id.h"
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+#include "hawaii_asic_capability.h"
+#endif
+
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 #include "tonga_asic_capability.h"
 #endif
@@ -85,6 +89,10 @@ static bool construct(
 
 	switch (init->chip_family) {
 	case FAMILY_CI:
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+		dal_hawaii_asic_capability_create(cap, init);
+		asic_supported = true;
+#endif
 		break;
 
 	case FAMILY_KV:

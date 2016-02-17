@@ -10,6 +10,19 @@ AMD_DAL_ASIC_CAPABILITY = \
 AMD_DAL_FILES += $(AMD_DAL_ASIC_CAPABILITY)
 
 ###############################################################################
+# DCE 8x
+###############################################################################
+ifdef CONFIG_DRM_AMD_DAL_DCE8_0
+ASIC_CAPABILITY_DCE80 = hawaii_asic_capability.o
+
+AMD_DAL_ASIC_CAPABILITY_DCE80 = \
+	$(addprefix $(AMDDALPATH)/dc/asic_capability/,$(ASIC_CAPABILITY_DCE80))
+
+AMD_DAL_FILES += $(AMD_DAL_ASIC_CAPABILITY_DCE80)
+endif
+
+
+###############################################################################
 # DCE 10x
 ###############################################################################
 ifdef CONFIG_DRM_AMD_DAL_DCE10_0

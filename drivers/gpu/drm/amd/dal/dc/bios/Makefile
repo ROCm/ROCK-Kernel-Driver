@@ -12,6 +12,19 @@ ifndef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
 AMD_DAL_FILES := $(filter-out $(AMDDALPATH)/dc/bios/bios_parser_helper.o,$(AMD_DAL_FILES))
 endif
 
+###############################################################################
+# DCE 8x
+###############################################################################
+# All DCE8.x are derived from DCE8.0, so 8.0 MUST be defined if ANY of
+# DCE8.x is compiled.
+ifdef CONFIG_DRM_AMD_DAL_DCE8_0
+
+ifdef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
+AMD_DAL_FILES += $(AMDDALPATH)/dc/bios/dce80/bios_parser_helper_dce80.o
+endif
+
+AMD_DAL_FILES += $(AMDDALPATH)/dc/bios/dce80/command_table_helper_dce80.o
+endif
 
 ###############################################################################
 # DCE 11x

@@ -26,6 +26,10 @@
 #ifndef __DAL_BIOS_PARSER_HELPER_H__
 #define __DAL_BIOS_PARSER_HELPER_H__
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+#include "dce80/bios_parser_helper_dce80.h"
+#endif
+
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0) || defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 #include "dce110/bios_parser_helper_dce110.h"
 #endif

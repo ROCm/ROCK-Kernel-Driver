@@ -19,14 +19,14 @@ config DRM_AMD_DAL_VBIOS_PRESENT
 	 x86 platforms and there is a VBIOS
 	 present in the system
 
-config DRM_AMD_DAL_DCE11_0
-        bool "Carrizo family"
+config DRM_AMD_DAL_DCE8_0
+        bool "CI family"
         depends on DRM_AMD_DAL
         help
          Choose this option
 	 if you want to have
-	 CZ family
-	 for display engine
+	 CI family
+	 for display engine.
 
 config DRM_AMD_DAL_DCE10_0
         bool "VI family"
@@ -36,6 +36,15 @@ config DRM_AMD_DAL_DCE10_0
 	 if you want to have
 	 VI family for display
 	 engine.
+
+config DRM_AMD_DAL_DCE11_0
+        bool "Carrizo family"
+        depends on DRM_AMD_DAL
+        help
+         Choose this option
+	 if you want to have
+	 CZ family
+	 for display engine
 
 config DEBUG_KERNEL_DAL
         bool "Enable kgdb break in DAL"
