@@ -30,6 +30,11 @@
 #include "audio.h"
 #include "hw_ctx_audio.h"
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+#include "dce80/audio_dce80.h"
+#include "dce80/hw_ctx_audio_dce80.h"
+#endif
+
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 #include "dce110/audio_dce110.h"
 #include "dce110/hw_ctx_audio_dce110.h"
@@ -264,6 +269,10 @@ struct audio *dal_audio_create(
 
 	as = init_data->as;
 	switch (dal_adapter_service_get_dce_version(as)) {
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+	case DCE_VERSION_8_0:
+		return dal_audio_create_dce80(init_data);
+#endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 	case DCE_VERSION_10_0:
 		return dal_audio_create_dce110(init_data);

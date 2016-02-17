@@ -37,6 +37,11 @@ bool dal_bios_parser_init_cmd_tbl_helper(
 	enum dce_version dce)
 {
 	switch (dce) {
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+	case DCE_VERSION_8_0:
+		*h = dal_cmd_tbl_helper_dce80_get_table();
+		return true;
+#endif
 
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 	case DCE_VERSION_10_0:

@@ -32,6 +32,13 @@
 #include "dce110/irq_service_dce110.h"
 #endif
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+	/*
+	 * TODO: implement DCE8.x IRQ service
+	 */
+#include "dce110/irq_service_dce110.h"
+#endif
+
 #include "irq_service.h"
 
 bool dal_irq_service_construct(
@@ -50,6 +57,10 @@ struct irq_service *dal_irq_service_create(
 	struct irq_service_init_data *init_data)
 {
 	switch (version) {
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+	case DCE_VERSION_8_0:
+		return dal_irq_service_dce110_create(init_data);
+#endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 	case DCE_VERSION_10_0:
 		return dal_irq_service_dce110_create(init_data);

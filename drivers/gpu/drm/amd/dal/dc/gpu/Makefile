@@ -9,6 +9,18 @@ AMD_DAL_GPU = $(addprefix $(AMDDALPATH)/dc/gpu/,$(GPU))
 
 AMD_DAL_FILES += $(AMD_DAL_GPU)
 
+###############################################################################
+# DCE 80 family
+###############################################################################
+
+ifdef CONFIG_DRM_AMD_DAL_DCE8_0
+GPU_DCE80 = display_clock_dce80.o dc_clock_gating_dce80.o
+
+AMD_DAL_GPU_DCE80 = $(addprefix $(AMDDALPATH)/dc/gpu/dce80/,$(GPU_DCE80))
+
+AMD_DAL_FILES += $(AMD_DAL_GPU_DCE80)
+endif
+
 
 ###############################################################################
 # DCE 110 family

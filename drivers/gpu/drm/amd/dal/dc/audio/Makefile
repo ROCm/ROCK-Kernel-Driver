@@ -11,6 +11,18 @@ AMD_DAL_FILES += $(AMD_DAL_AUDIO)
 
 
 ###############################################################################
+# DCE 8x
+###############################################################################
+ifdef CONFIG_DRM_AMD_DAL_DCE8_0
+AUDIO_DCE80 = audio_dce80.o hw_ctx_audio_dce80.o
+
+AMD_DAL_AUDIO_DCE80 = $(addprefix $(AMDDALPATH)/dc/audio/dce80/,$(AUDIO_DCE80))
+
+AMD_DAL_FILES += $(AMD_DAL_AUDIO_DCE80)
+endif
+
+
+###############################################################################
 # DCE 11x
 ###############################################################################
 ifdef CONFIG_DRM_AMD_DAL_DCE11_0

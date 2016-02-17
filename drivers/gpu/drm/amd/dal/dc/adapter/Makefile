@@ -8,6 +8,14 @@ AMD_DAL_ADAPTER = $(addprefix $(AMDDALPATH)/dc/adapter/,$(ADAPTER))
 
 AMD_DAL_FILES += $(AMD_DAL_ADAPTER)
 
+###############################################################################
+# DCE 8x
+###############################################################################
+
+ifdef CONFIG_DRM_AMD_DAL_DCE8_0
+AMD_DAL_FILES += $(AMDDALPATH)/dc/adapter/dce80/hw_ctx_adapter_service_dce80.o
+endif
+
 
 ###############################################################################
 # DCE 11x
