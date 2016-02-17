@@ -40,6 +40,8 @@
 #include "amdgpu_dm_irq.h"
 #include "amdgpu_dm_types.h"
 
+#include "dm_helpers.h"
+
 /* dm_helpers_parse_edid_caps
  *
  * Parse edid caps
@@ -459,12 +461,13 @@ void dm_helpers_dp_mst_stop_top_mgr(
 #endif
 }
 
-bool dm_helper_dp_read_dpcd(
+bool dm_helpers_dp_read_dpcd(
 		struct dc_context *ctx,
 		const struct dc_link *link,
 		uint32_t address,
 		uint8_t *data,
-		uint32_t size) {
+		uint32_t size)
+{
 
 
 	struct amdgpu_device *adev = ctx->driver_context;
@@ -480,12 +483,13 @@ bool dm_helper_dp_read_dpcd(
 			data, size) > 0;
 }
 
-bool dm_helper_dp_write_dpcd(
+bool dm_helpers_dp_write_dpcd(
 		struct dc_context *ctx,
 		const struct dc_link *link,
 		uint32_t address,
 		const uint8_t *data,
-		uint32_t size) {
+		uint32_t size)
+{
 
 	struct amdgpu_device *adev = ctx->driver_context;
 	struct drm_device *dev = adev->ddev;
