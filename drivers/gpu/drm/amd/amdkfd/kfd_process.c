@@ -29,6 +29,8 @@
 #include <linux/compat.h>
 #include <linux/mm.h>
 #include <asm/tlb.h>
+#include <linux/highmem.h>
+#include <uapi/asm-generic/mman-common.h>
 
 struct mm_struct;
 
@@ -66,6 +68,8 @@ struct kfd_process_release_work {
 static struct kfd_process *find_process(const struct task_struct *thread,
 		bool lock);
 static struct kfd_process *create_process(const struct task_struct *thread);
+static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep);
+
 
 void kfd_process_create_wq(void)
 {
@@ -82,9 +86,11 @@ void kfd_process_destroy_wq(void)
 	}
 }
 
-struct kfd_process *kfd_create_process(const struct task_struct *thread)
+struct kfd_process *kfd_create_process(struct file *filep)
 {
 	struct kfd_process *process;
+
+	struct task_struct *thread = current;
 
 	BUG_ON(!kfd_process_wq);
 
@@ -116,6 +122,7 @@ struct kfd_process *kfd_create_process(const struct task_struct *thread)
 	mutex_unlock(&kfd_processes_mutex);
 
 	up_write(&thread->mm->mmap_sem);
+	kfd_process_init_cwsr(process, filep);
 
 	return process;
 }
@@ -433,6 +440,67 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 static const struct mmu_notifier_ops kfd_process_mmu_notifier_ops = {
 	.release = kfd_process_notifier_release,
 };
+
+static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
+{
+	int err;
+	unsigned long  offset;
+	struct kfd_process_device *temp, *pdd = NULL;
+	void *mem = NULL;
+	struct kfd_dev *dev = NULL;
+
+	mutex_lock(&p->mutex);
+	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
+				per_device_list) {
+		dev = pdd->dev;
+		if (!dev->cwsr_enabled)
+			continue;
+		if (pdd->cwsr_base) {
+			/* cwsr_base is only set for DGPU */
+			err = dev->kfd2kgd->alloc_memory_of_gpu(
+				dev->kgd, pdd->cwsr_base, dev->cwsr_size,
+				pdd->vm, (struct kgd_mem **)&mem,
+				NULL, &pdd->cwsr_kaddr, pdd,
+				ALLOC_MEM_FLAGS_GTT |
+				ALLOC_MEM_FLAGS_NONPAGED |
+				ALLOC_MEM_FLAGS_EXECUTE_ACCESS |
+				ALLOC_MEM_FLAGS_NO_SUBSTITUTE);
+			if (err != 0)
+				goto exit_set_cwsr;
+			pdd->cwsr_mem_handle =
+				kfd_process_device_create_obj_handle(pdd, mem,
+					pdd->cwsr_base, dev->cwsr_size);
+			if (pdd->cwsr_mem_handle < 0)
+				goto exit_set_cwsr;
+			err = kfd_map_memory_to_gpu(dev, mem, p, pdd);
+			if (err)
+				goto exit_set_cwsr;
+			memcpy(pdd->cwsr_kaddr,	kmap(dev->cwsr_pages),
+				PAGE_SIZE);
+			kunmap(dev->cwsr_pages);
+			p->pqm.tba_addr = pdd->cwsr_base;
+		} else {
+			offset = (kfd_get_gpu_id(dev) |
+				KFD_MMAP_TYPE_RESERVED_MEM) << PAGE_SHIFT;
+			p->pqm.tba_addr = (int64_t)vm_mmap(filep, 0,
+				dev->cwsr_size,	PROT_READ | PROT_EXEC,
+				MAP_SHARED, offset);
+			pdd->cwsr_kaddr = (void *)p->pqm.tba_addr;
+		}
+		if (p->pqm.tba_addr < 0) {
+			pr_err("Failure to set tba address. error -%d.\n",
+				(int)-p->pqm.tba_addr);
+			p->pqm.tba_addr = 0;
+			pdd->cwsr_kaddr = NULL;
+		} else
+			p->pqm.tma_addr = p->pqm.tba_addr + dev->tma_offset;
+			pr_debug("set tba :0x%llx, tma:0x%llx for pqm.\n",
+				p->pqm.tba_addr, p->pqm.tma_addr);
+	}
+exit_set_cwsr:
+	mutex_unlock(&p->mutex);
+	return err;
+}
 
 static struct kfd_process *create_process(const struct task_struct *thread)
 {

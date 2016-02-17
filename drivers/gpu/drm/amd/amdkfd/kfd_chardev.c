@@ -33,7 +33,6 @@
 #include <linux/mm.h>
 #include <uapi/asm-generic/mman-common.h>
 #include <asm/processor.h>
-#include <linux/highmem.h>
 
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
@@ -43,8 +42,6 @@
 static long kfd_ioctl(struct file *, unsigned int, unsigned long);
 static int kfd_open(struct inode *, struct file *);
 static int kfd_mmap(struct file *, struct vm_area_struct *);
-static int _map_memory_to_gpu(struct kfd_dev *dev, void *mem,
-		struct kfd_process *p, struct kfd_process_device *pdd);
 static uint32_t kfd_convert_user_mem_alloction_flags(
 		struct kfd_dev *dev,
 		uint32_t userspace_flags);
@@ -127,7 +124,7 @@ static int kfd_open(struct inode *inode, struct file *filep)
 		return -EPERM;
 	}
 
-	process = kfd_create_process(current);
+	process = kfd_create_process(filep);
 	if (IS_ERR(process))
 		return PTR_ERR(process);
 
@@ -266,9 +263,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	unsigned int queue_id;
 	struct kfd_process_device *pdd;
 	struct queue_properties q_properties;
-	void *mem = NULL;
 
-	unsigned long  offset;
 	memset(&q_properties, 0, sizeof(struct queue_properties));
 
 	pr_debug("kfd: creating queue ioctl\n");
@@ -295,52 +290,6 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	pr_debug("kfd: creating queue for PASID %d on GPU 0x%x\n",
 			p->pasid,
 			dev->id);
-
-	if (dev->cwsr_enabled && !p->pqm.tba_addr) {
-		if (pdd->cwsr_base) {
-			/* cwsr_base is only set for DGPU */
-			void *cwsr_addr = NULL;
-
-			err = dev->kfd2kgd->alloc_memory_of_gpu(
-				dev->kgd, pdd->cwsr_base, dev->cwsr_size,
-				pdd->vm, (struct kgd_mem **)&mem,
-				NULL, &cwsr_addr, pdd,
-				kfd_convert_user_mem_alloction_flags(dev,
-					KFD_IOC_ALLOC_MEM_FLAGS_DGPU_HOST));
-			if (err != 0)
-				goto err_create_queue;
-			pdd->cwsr_mem_handle =
-				kfd_process_device_create_obj_handle(pdd, mem,
-					pdd->cwsr_base, dev->cwsr_size);
-			if (pdd->cwsr_mem_handle < 0)
-				goto err_create_queue;
-			err = _map_memory_to_gpu(dev, mem, p, pdd);
-			if (err)
-				goto err_create_queue;
-			memcpy(cwsr_addr, kmap(dev->cwsr_pages), PAGE_SIZE);
-			kunmap(dev->cwsr_pages);
-			p->pqm.tba_addr = pdd->cwsr_base;
-
-		} else {
-			pr_debug("amdkfd:Start vm_mmap, file :0x%p.\n", filep);
-			offset = (args->gpu_id | KFD_MMAP_TYPE_RESERVED_MEM)
-					<< PAGE_SHIFT;
-			p->pqm.tba_addr = (int64_t)vm_mmap(filep, 0,
-				dev->cwsr_size,
-				PROT_READ | PROT_EXEC,
-				MAP_SHARED,
-				offset);
-		}
-		if (p->pqm.tba_addr < 0) {
-			pr_err("Failure to set tba address. error -%d.\n",
-				(int)-p->pqm.tba_addr);
-			p->pqm.tba_addr = 0;
-		} else
-			p->pqm.tma_addr = p->pqm.tba_addr + dev->tma_offset;
-
-		pr_debug("set tba :0x%llx, tma:0x%llx for pqm.\n",
-			p->pqm.tba_addr, p->pqm.tma_addr);
-	}
 
 	err = pqm_create_queue(&p->pqm, dev, filep, &q_properties,
 				0, q_properties.type, &queue_id);
@@ -1429,7 +1378,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	return 0;
 }
 
-static int _map_memory_to_gpu(struct kfd_dev *dev, void *mem,
+int kfd_map_memory_to_gpu(struct kfd_dev *dev, void *mem,
 		struct kfd_process *p, struct kfd_process_device *pdd)
 {
 	int err;
@@ -1526,12 +1475,12 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
 			}
-			err = _map_memory_to_gpu(peer, mem, p, peer_pdd);
+			err = kfd_map_memory_to_gpu(peer, mem, p, peer_pdd);
 			if (err != 0)
 				pr_err("amdkfd: failed to map\n");
 		}
 	} else {
-		err = _map_memory_to_gpu(dev, mem, p, pdd);
+		err = kfd_map_memory_to_gpu(dev, mem, p, pdd);
 		if (err != 0)
 			pr_err("amdkfd: failed to map\n");
 	}

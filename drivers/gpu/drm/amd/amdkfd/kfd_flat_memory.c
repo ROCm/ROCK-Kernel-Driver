@@ -299,13 +299,12 @@
 int kfd_set_process_dgpu_aperture(struct kfd_process_device *pdd,
 					uint64_t base, uint64_t limit)
 {
-	if (base < (DGPU_VM_BASE_DEFAULT + pdd->dev->cwsr_size)) {
+	if (base < (pdd->cwsr_base + pdd->dev->cwsr_size)) {
 		pr_err("Set dgpu vm base 0x%llx failed.\n", base);
 		return -EINVAL;
 	}
 	pdd->dgpu_base = base;
 	pdd->dgpu_limit = limit;
-	pdd->cwsr_base = DGPU_VM_BASE_DEFAULT;
 	return 0;
 }
 
@@ -357,6 +356,10 @@ int kfd_init_apertures(struct kfd_process *process)
 
 			pdd->scratch_limit =
 				MAKE_SCRATCH_APP_LIMIT(pdd->scratch_base);
+
+			if (KFD_IS_DGPU(dev->device_info->asic_family))
+				pdd->cwsr_base = DGPU_VM_BASE_DEFAULT;
+
 		}
 
 		dev_dbg(kfd_device, "node id %u\n", id);

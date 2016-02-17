@@ -565,6 +565,7 @@ struct kfd_process_device {
 
 	uint64_t cwsr_base;
 	int  cwsr_mem_handle;
+	void *cwsr_kaddr;
 
 	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
 	bool bound;
@@ -661,7 +662,7 @@ struct amdkfd_ioctl_desc {
 
 void kfd_process_create_wq(void);
 void kfd_process_destroy_wq(void);
-struct kfd_process *kfd_create_process(const struct task_struct *);
+struct kfd_process *kfd_create_process(struct file *filep);
 struct kfd_process *kfd_get_process(const struct task_struct *);
 struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid);
 
@@ -691,6 +692,10 @@ void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 
 void run_rdma_free_callback(struct kfd_bo *buf_obj);
 struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid);
+
+/* kfd dgpu memory */
+int kfd_map_memory_to_gpu(struct kfd_dev *dev, void *mem,
+		struct kfd_process *p, struct kfd_process_device *pdd);
 
 /* Process device data iterator */
 struct kfd_process_device *kfd_get_first_process_device_data(struct kfd_process *p);
@@ -734,6 +739,7 @@ int kfd_topology_add_device(struct kfd_dev *gpu);
 int kfd_topology_remove_device(struct kfd_dev *gpu);
 struct kfd_dev *kfd_device_by_id(uint32_t gpu_id);
 struct kfd_dev *kfd_device_by_pci_dev(const struct pci_dev *pdev);
+uint32_t kfd_get_gpu_id(struct kfd_dev *dev);
 int kfd_topology_enum_kfd_devices(uint8_t idx, struct kfd_dev **kdev);
 
 /* Interrupts */

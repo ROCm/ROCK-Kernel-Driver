@@ -1371,7 +1371,13 @@ static int set_trap_handler(struct device_queue_manager *dqm,
 				uint64_t tba_addr,
 				uint64_t tma_addr)
 {
-	pr_err("kfd: second level trap handler still not supported. \n");
+	struct kfd_process_device *pdd;
+	uint64_t *tma;
+
+	pdd = qpd_to_pdd(qpd);
+	tma = (uint64_t *)(pdd->cwsr_kaddr + pdd->dev->tma_offset);
+	tma[0] = tba_addr;
+	tma[1] = tma_addr;
 	return 0;
 }
 
