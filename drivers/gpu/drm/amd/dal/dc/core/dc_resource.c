@@ -476,7 +476,7 @@ static uint32_t get_min_vblank_time_us(const struct validate_context *context)
 
 static void fill_display_configs(
 	const struct validate_context *context,
-	struct dc_pp_display_configuration *pp_display_cfg)
+	struct dm_pp_display_configuration *pp_display_cfg)
 {
 	uint8_t i, j, k;
 	uint8_t num_cfgs = 0;
@@ -487,7 +487,7 @@ static void fill_display_configs(
 		for (j = 0; j < target->public.stream_count; j++) {
 			const struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
-			struct dc_pp_single_disp_config *cfg =
+			struct dm_pp_single_disp_config *cfg =
 					&pp_display_cfg->disp_configs[num_cfgs];
 			const struct pipe_ctx *pipe_ctx = NULL;
 
@@ -507,8 +507,9 @@ static void fill_display_configs(
 				stream->sink->link->ddi_channel_mapping.raw;
 			cfg->transmitter =
 				stream->sink->link->link_enc->transmitter;
-			cfg->link_settings =
-				stream->sink->link->public.cur_link_settings;
+			cfg->link_settings.lane_count = stream->sink->link->public.cur_link_settings.lane_count;
+			cfg->link_settings.link_rate = stream->sink->link->public.cur_link_settings.link_rate;
+			cfg->link_settings.link_spread = stream->sink->link->public.cur_link_settings.link_spread;
 			cfg->sym_clock = stream->public.timing.pix_clk_khz;
 			switch (stream->public.timing.display_color_depth) {
 			case COLOR_DEPTH_101010:
@@ -539,7 +540,7 @@ void pplib_apply_safe_state(
 void pplib_apply_display_requirements(
 	const struct dc *dc,
 	const struct validate_context *context,
-	struct dc_pp_display_configuration *pp_display_cfg)
+	struct dm_pp_display_configuration *pp_display_cfg)
 {
 
 	pp_display_cfg->all_displays_in_sync =

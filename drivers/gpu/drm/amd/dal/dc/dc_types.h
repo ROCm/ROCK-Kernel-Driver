@@ -30,6 +30,7 @@
 #include "irq_types.h"
 #include "dc_dp_types.h"
 #include "dc_hw_types.h"
+#include "signal_types.h"
 
 /* forward declarations */
 struct dc;

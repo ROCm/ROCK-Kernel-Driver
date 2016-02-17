@@ -259,12 +259,12 @@ static struct adapter_service *create_as(
 
 static void bw_calcs_data_update_from_pplib(struct dc *dc)
 {
-	struct dc_pp_clock_levels clks = {0};
+	struct dm_pp_clock_levels clks = {0};
 
 	/*do system clock*/
 	dm_pp_get_clock_levels_by_type(
 			dc->ctx,
-			DC_PP_CLOCK_TYPE_ENGINE_CLK,
+			DM_PP_CLOCK_TYPE_ENGINE_CLK,
 			&clks);
 	/* convert all the clock fro kHz to fix point mHz */
 	dc->bw_vbios.high_sclk = bw_frc_to_fixed(
@@ -277,7 +277,7 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 	/*do display clock*/
 	dm_pp_get_clock_levels_by_type(
 			dc->ctx,
-			DC_PP_CLOCK_TYPE_DISPLAY_CLK,
+			DM_PP_CLOCK_TYPE_DISPLAY_CLK,
 			&clks);
 
 	dc->bw_vbios.high_voltage_max_dispclk = bw_frc_to_fixed(
@@ -290,7 +290,7 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 	/*do memory clock*/
 	dm_pp_get_clock_levels_by_type(
 			dc->ctx,
-			DC_PP_CLOCK_TYPE_MEMORY_CLK,
+			DM_PP_CLOCK_TYPE_MEMORY_CLK,
 			&clks);
 
 	dc->bw_vbios.low_yclk = bw_frc_to_fixed(
