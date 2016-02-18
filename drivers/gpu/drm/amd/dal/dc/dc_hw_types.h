@@ -193,16 +193,19 @@ struct dc_tiling_info {
 	 *	POSSIBLE VALUES: 1,2,4,8
 	 */
 	unsigned int bank_width;
+	unsigned int bank_width_c;
 	/* Specifies the number of tiles in the y direction to
 	 *	be incorporated into the same bank.
 	 * Only applies to 2D and 3D tiling modes.
 	 *	POSSIBLE VALUES: 1,2,4,8
 	 */
 	unsigned int bank_height;
+	unsigned int bank_height_c;
 	/* Specifies the macro tile aspect ratio. Only applies
 	 * to 2D and 3D tiling modes.
 	 */
 	unsigned int tile_aspect;
+	unsigned int tile_aspect_c;
 	/* Specifies the number of bytes that will be stored
 	 *	contiguously for each tile.
 	 * If the tile data requires more storage than this
@@ -213,6 +216,7 @@ struct dc_tiling_info {
 	 * For color render targets, TILE_SPLIT >= 256B.
 	 */
 	enum tile_split_values tile_split;
+	enum tile_split_values tile_split_c;
 	/* Specifies the addressing within a tile.
 	 *	0x0 - DISPLAY_MICRO_TILING
 	 *	0x1 - THIN_MICRO_TILING
@@ -220,6 +224,7 @@ struct dc_tiling_info {
 	 *	0x3 - ROTATED_MICRO_TILING
 	 */
 	enum tile_mode_values tile_mode;
+	enum tile_mode_values tile_mode_c;
 	/* Specifies the number of pipes and how they are
 	 *	interleaved in the surface.
 	 * Refer to memory addressing document for complete

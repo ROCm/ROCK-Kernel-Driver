@@ -317,7 +317,6 @@ struct pipe_ctx {
 	uint8_t pipe_idx;
 
 	struct flags {
-		bool blanked;
 		bool unchanged;
 		bool timing_changed;
 	} flags;

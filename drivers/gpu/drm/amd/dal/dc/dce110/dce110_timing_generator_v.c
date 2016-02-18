@@ -30,22 +30,24 @@
 
 static bool dce110_timing_generator_v_enable_crtc(struct timing_generator *tg)
 {
-    /*
-     * Set MASTER_UPDATE_MODE to 0
-     * This is needed for DRR, and also suggested to be default value by Syed.
-     */
+/*
+* Set MASTER_UPDATE_MODE to 0
+* This is needed for DRR, and also suggested to be default value by Syed.
+*/
 
 	uint32_t value;
 
-	value = dm_read_reg(tg->ctx,
-			mmCRTCV_MASTER_UPDATE_MODE);
+	value = 0;
 	set_reg_field_value(value, 0,
 			CRTCV_MASTER_UPDATE_MODE, MASTER_UPDATE_MODE);
 	dm_write_reg(tg->ctx,
 			mmCRTCV_MASTER_UPDATE_MODE, value);
 
-	value = dm_read_reg(tg->ctx,
-			mmCRTCV_MASTER_EN);
+	/* TODO: may want this on for looking for underflow */
+	value = 0;
+	dm_write_reg(tg->ctx, mmCRTCV_MASTER_UPDATE_MODE, value);
+
+	value = 0;
 	set_reg_field_value(value, 1,
 			CRTCV_MASTER_EN, CRTC_MASTER_EN);
 	dm_write_reg(tg->ctx,

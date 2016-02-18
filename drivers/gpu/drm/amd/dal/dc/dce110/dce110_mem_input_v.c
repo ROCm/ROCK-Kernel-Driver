@@ -183,10 +183,6 @@ static void program_tiling(
 {
 	uint32_t value = 0;
 
-	value = dm_read_reg(
-			mem_input110->base.ctx,
-			DCP_REG(mmUNP_GRPH_CONTROL));
-
 	set_reg_field_value(value, info->num_banks,
 		UNP_GRPH_CONTROL, GRPH_NUM_BANKS);
 
@@ -219,7 +215,29 @@ static void program_tiling(
 
 	dm_write_reg(
 		mem_input110->base.ctx,
-		DCP_REG(mmUNP_GRPH_CONTROL),
+		mmUNP_GRPH_CONTROL,
+		value);
+
+	value = 0;
+
+	set_reg_field_value(value, info->bank_width_c,
+		UNP_GRPH_CONTROL_C, GRPH_BANK_WIDTH_C);
+
+	set_reg_field_value(value, info->bank_height_c,
+		UNP_GRPH_CONTROL_C, GRPH_BANK_HEIGHT_C);
+
+	set_reg_field_value(value, info->tile_aspect_c,
+		UNP_GRPH_CONTROL_C, GRPH_MACRO_TILE_ASPECT_C);
+
+	set_reg_field_value(value, info->tile_split_c,
+		UNP_GRPH_CONTROL_C, GRPH_TILE_SPLIT_C);
+
+	set_reg_field_value(value, info->tile_mode_c,
+		UNP_GRPH_CONTROL_C, GRPH_MICRO_TILE_MODE_C);
+
+	dm_write_reg(
+		mem_input110->base.ctx,
+		mmUNP_GRPH_CONTROL_C,
 		value);
 }
 

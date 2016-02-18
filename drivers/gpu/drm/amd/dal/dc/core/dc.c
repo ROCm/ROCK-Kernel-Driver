@@ -175,14 +175,12 @@ static void init_hw(struct dc *dc)
 	for (i = 0; i < dc->res_pool.pipe_count; i++) {
 		xfm = dc->res_pool.transforms[i];
 
-		if (i != DCE110_UNDERLAY_IDX) {
-			dc->hwss.enable_display_power_gating(
-					dc->ctx, i, bp,
-					PIPE_GATING_CONTROL_INIT);
-			dc->hwss.enable_display_power_gating(
-					dc->ctx, i, bp,
-					PIPE_GATING_CONTROL_DISABLE);
-		}
+		dc->hwss.enable_display_power_gating(
+				dc->ctx, i, bp,
+				PIPE_GATING_CONTROL_INIT);
+		dc->hwss.enable_display_power_gating(
+				dc->ctx, i, bp,
+				PIPE_GATING_CONTROL_DISABLE);
 		xfm->funcs->transform_power_up(xfm);
 		dc->hwss.enable_display_pipe_clock_gating(
 			dc->ctx,

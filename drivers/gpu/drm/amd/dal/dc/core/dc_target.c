@@ -136,11 +136,35 @@ target_alloc_fail:
 	return NULL;
 }
 
+/*
+void ProgramPixelDurationV(unsigned int pixelClockInKHz )
+{
+	fixed31_32 pixel_duration = Fixed31_32(100000000, pixelClockInKHz) * 10;
+	unsigned int pixDurationInPico = round(pixel_duration);
+
+	DPG_PIPE_ARBITRATION_CONTROL1 arb_control;
+
+	arb_control.u32All = ReadReg (mmDPGV0_PIPE_ARBITRATION_CONTROL1);
+	arb_control.bits.PIXEL_DURATION = pixDurationInPico;
+	WriteReg (mmDPGV0_PIPE_ARBITRATION_CONTROL1, arb_control.u32All);
+
+	arb_control.u32All = ReadReg (mmDPGV1_PIPE_ARBITRATION_CONTROL1);
+	arb_control.bits.PIXEL_DURATION = pixDurationInPico;
+	WriteReg (mmDPGV1_PIPE_ARBITRATION_CONTROL1, arb_control.u32All);
+
+	WriteReg (mmDPGV0_PIPE_ARBITRATION_CONTROL2, 0x4000800);
+	WriteReg (mmDPGV0_REPEATER_PROGRAM, 0x11);
+
+	WriteReg (mmDPGV1_PIPE_ARBITRATION_CONTROL2, 0x4000800);
+	WriteReg (mmDPGV1_REPEATER_PROGRAM, 0x11);
+}
+*/
 static int8_t acquire_first_free_underlay(
 		struct resource_context *res_ctx,
 		struct core_stream *stream)
 {
-	if (!res_ctx->pipe_ctx[3].stream) {
+	if (!res_ctx->pipe_ctx[DCE110_UNDERLAY_IDX].stream) {
+		struct dc_bios *dcb;
 		struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[DCE110_UNDERLAY_IDX];
 
 		pipe_ctx->tg = res_ctx->pool.timing_generators[DCE110_UNDERLAY_IDX];
@@ -151,16 +175,18 @@ static int8_t acquire_first_free_underlay(
 		pipe_ctx->dis_clk = res_ctx->pool.display_clock;
 		pipe_ctx->pipe_idx = DCE110_UNDERLAY_IDX;
 
+		dcb = dal_adapter_service_get_bios_parser(
+						res_ctx->pool.adapter_srv);
+
+		stream->ctx->dc->hwss.enable_display_power_gating(
+			stream->ctx->dc->ctx,
+			DCE110_UNDERLAY_IDX,
+			dcb, PIPE_GATING_CONTROL_DISABLE);
+
 		if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
 			dm_error("DC: failed to blank crtc!\n");
 			BREAK_TO_DEBUGGER();
-		} else
-			pipe_ctx->flags.blanked = true;
-
-		pipe_ctx->tg->funcs->program_timing(
-				pipe_ctx->tg,
-				&stream->public.timing,
-				true);
+		}
 
 		if (!pipe_ctx->tg->funcs->enable_crtc(pipe_ctx->tg)) {
 			BREAK_TO_DEBUGGER();
@@ -190,6 +216,7 @@ bool dc_commit_surfaces_to_target(
 	struct validate_context *context;
 	int current_enabled_surface_count = 0;
 	int new_enabled_surface_count = 0;
+	bool is_mpo_turning_on = false;
 
 	context = dm_alloc(dc->ctx, sizeof(struct validate_context));
 	*context = dc->current_context;
@@ -215,10 +242,11 @@ bool dc_commit_surfaces_to_target(
 			new_enabled_surface_count++;
 
 	/* TODO unhack mpo */
-	if (new_surface_count == 2 && target_status->surface_count < 2)
+	if (new_surface_count == 2 && target_status->surface_count < 2) {
 		acquire_first_free_underlay(&context->res_ctx,
 				DC_STREAM_TO_CORE(dc_target->streams[0]));
-	else if (new_surface_count < 2 && target_status->surface_count == 2) {
+		is_mpo_turning_on = true;
+	} else if (new_surface_count < 2 && target_status->surface_count == 2) {
 		context->res_ctx.pipe_ctx[DCE110_UNDERLAY_IDX].stream = NULL;
 		context->res_ctx.pipe_ctx[DCE110_UNDERLAY_IDX].surface = NULL;
 	}
@@ -253,7 +281,9 @@ bool dc_commit_surfaces_to_target(
 		goto unexpected_fail;
 	}
 
-	if (prev_disp_clk < context->bw_results.dispclk_khz) {
+	if (prev_disp_clk < context->bw_results.dispclk_khz ||
+		(is_mpo_turning_on &&
+			prev_disp_clk == context->bw_results.dispclk_khz)) {
 		dc->hwss.program_bw(dc, context);
 		pplib_apply_display_requirements(dc, context,
 						&context->pp_display_cfg);
@@ -355,8 +385,7 @@ void dc_target_enable_memory_requests(struct dc_target *dc_target)
 			if (!tg->funcs->set_blank(tg, false)) {
 				dm_error("DC: failed to unblank crtc!\n");
 				BREAK_TO_DEBUGGER();
-			} else
-				res_ctx->pipe_ctx[j].flags.blanked = false;
+			}
 		}
 	}
 }
@@ -379,8 +408,7 @@ void dc_target_disable_memory_requests(struct dc_target *dc_target)
 			if (!tg->funcs->set_blank(tg, true)) {
 				dm_error("DC: failed to blank crtc!\n");
 				BREAK_TO_DEBUGGER();
-			} else
-				res_ctx->pipe_ctx[j].flags.blanked = true;
+			}
 		}
 	}
 }
