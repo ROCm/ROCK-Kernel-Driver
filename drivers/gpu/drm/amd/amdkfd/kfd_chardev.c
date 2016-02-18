@@ -48,6 +48,8 @@ static int _map_memory_to_gpu(struct kfd_dev *dev, void *mem,
 static uint32_t kfd_convert_user_mem_alloction_flags(
 		struct kfd_dev *dev,
 		uint32_t userspace_flags);
+static bool kfd_is_large_bar(struct kfd_dev *dev);
+
 static int kfd_evict(struct file *filep, struct kfd_process *p, void *data);
 static const char kfd_dev_name[] = "kfd";
 
@@ -1240,38 +1242,48 @@ bind_process_to_device_failed:
 	return err;
 }
 
+bool kfd_is_large_bar(struct kfd_dev *dev)
+{
+	struct kfd_local_mem_info mem_info;
+
+	if (debug_largebar) {
+		pr_debug("amdkfd: simulate large-bar allocation on non large-bar machine\n");
+		return true;
+	}
+
+	if (!KFD_IS_DGPU(dev->device_info->asic_family))
+		return false;
+
+	dev->kfd2kgd->get_local_mem_info(dev->kgd, &mem_info);
+	if (mem_info.local_mem_size_private == 0 &&
+			mem_info.local_mem_size_public > 0)
+		return true;
+	return false;
+}
+
 static uint32_t kfd_convert_user_mem_alloction_flags(
 		struct kfd_dev *dev,
 		uint32_t userspace_flags)
 {
 	uint32_t kernel_allocation_flags;
-	struct kfd_local_mem_info mem_info;
 
 	kernel_allocation_flags = 0;
 
 	/* Allocate VRAM bo */
-	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE ||
-			userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_APU_DEVICE) {
+	if ((userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE) ||
+		(userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_APU_DEVICE)) {
 		kernel_allocation_flags = ALLOC_MEM_FLAGS_VRAM;
-		if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE &&
-				KFD_IS_DGPU(dev->device_info->asic_family)) {
-			dev->kfd2kgd->get_local_mem_info(dev->kgd, &mem_info);
-			if (mem_info.local_mem_size_private == 0 &&
-					mem_info.local_mem_size_public > 0)
-				kernel_allocation_flags |= ALLOC_MEM_FLAGS_PUBLIC;
-			else if (debug_largebar) {
-				pr_debug("amdkfd: simulate large-bar allocation on non large-bar machine\n");
-				kernel_allocation_flags |= ALLOC_MEM_FLAGS_PUBLIC;
-			}
-		}
+		if ((userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE) &&
+				kfd_is_large_bar(dev))
+			kernel_allocation_flags |= ALLOC_MEM_FLAGS_PUBLIC;
 		goto out;
 	}
 	/*
 	 * Since currently user space library doesn't uses scratch
 	 * allocation flag I route it to VRAM
 	 */
-	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_SCRATCH ||
-			userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_APU_SCRATCH) {
+	if ((userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_SCRATCH) ||
+		(userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_APU_SCRATCH)) {
 		kernel_allocation_flags = ALLOC_MEM_FLAGS_VRAM;
 		goto out;
 	}
@@ -1357,7 +1369,8 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	}
 
 	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
-	if ((args->flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE) != 0) {
+	if ((args->flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE) != 0 &&
+			!kfd_is_large_bar(dev)) {
 		args->mmap_offset = 0;
 	} else {
 		args->mmap_offset = KFD_MMAP_TYPE_MAP_BO;
@@ -1462,7 +1475,8 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		return -EINVAL;
 	}
 
-	if (args->device_ids_array_size >= 8 * sizeof(uint32_t)) {
+	if (args->device_ids_array_size > 0 &&
+			(args->device_ids_array_size < sizeof(uint32_t))) {
 		pr_err("amdkfd: err node IDs array size %u\n",
 				args->device_ids_array_size);
 		return -EFAULT;
@@ -1568,6 +1582,13 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	if (dev->device_info->asic_family == CHIP_CARRIZO) {
 		pr_debug("kfd_ioctl_unmap_memory_from_gpu not supported on CZ\n");
 		return -EINVAL;
+	}
+
+	if (args->device_ids_array_size > 0 &&
+			(args->device_ids_array_size < sizeof(uint32_t))) {
+		pr_err("amdkfd: err node IDs array size %u\n",
+				args->device_ids_array_size);
+		return -EFAULT;
 	}
 
 	if (args->device_ids_array_size > 0) {

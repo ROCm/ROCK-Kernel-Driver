@@ -118,6 +118,12 @@ extern int hws_max_conc_proc;
  */
 extern int send_sigterm;
 
+/*
+ * This kernel module is used to simulate large bar machine on non-large bar
+ * enabled machines.
+ */
+extern int debug_largebar;
+
 /**
  * enum kfd_sched_policy
  *
@@ -888,11 +894,5 @@ int restore(struct kfd_dev *kfd);
 #define KFD_SCRATCH_KV_FW_VER 413
 #define KFD_MULTI_PROC_MAPPING_HWS_SUPPORT 600
 #define KFD_CWSR_CZ_FW_VER 625
-
-/*
- * This kernel module is used to simulate large bar machine on non-large bar
- * enabled machines.
- */
-extern int debug_largebar;
 
 #endif

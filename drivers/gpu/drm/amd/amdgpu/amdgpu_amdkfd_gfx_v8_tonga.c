@@ -641,8 +641,10 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 	if (flags & ALLOC_MEM_FLAGS_VRAM) {
 		domain = AMDGPU_GEM_DOMAIN_VRAM;
 		alloc_flag = AMDGPU_GEM_CREATE_NO_CPU_ACCESS;
-		if (public)
+		if (public) {
 			alloc_flag = AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
+			temp_offset = offset;
+		}
 	} else if (flags & (ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_USERPTR)) {
 		domain = AMDGPU_GEM_DOMAIN_GTT;
 		alloc_flag = 0;
