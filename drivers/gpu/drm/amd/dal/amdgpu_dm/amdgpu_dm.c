@@ -36,15 +36,11 @@
 #include "amdgpu_dm_irq.h"
 #include "dm_helpers.h"
 
-#include "dce/dce_11_0_d.h"
-#include "dce/dce_11_0_sh_mask.h"
-#include "dce/dce_11_0_enum.h"
-#include "ivsrcid/ivsrcid_vislands30.h"
+#include "dce_v8_0.h"
+#include "dce_v10_0.h"
+#include "dce_v11_0.h"
 
-#include "oss/oss_3_0_d.h"
-#include "oss/oss_3_0_sh_mask.h"
-#include "gmc/gmc_8_1_d.h"
-#include "gmc/gmc_8_1_sh_mask.h"
+#include "ivsrcid/ivsrcid_vislands30.h"
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -52,19 +48,6 @@
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_dp_mst_helper.h>
-
-/* TODO: Remove when mc access work around is removed */
-static const u32 crtc_offsets[] =
-{
-	CRTC0_REGISTER_OFFSET,
-	CRTC1_REGISTER_OFFSET,
-	CRTC2_REGISTER_OFFSET,
-	CRTC3_REGISTER_OFFSET,
-	CRTC4_REGISTER_OFFSET,
-	CRTC5_REGISTER_OFFSET,
-	CRTC6_REGISTER_OFFSET
-};
-/* TODO: End of when Remove mc access work around is removed */
 
 /* Define variables here
  * These values will be passed to DAL for feature enable purpose
@@ -122,184 +105,6 @@ static int dm_crtc_get_scanoutpos(struct amdgpu_device *adev, int crtc,
 	return 0;
 }
 
-static u32 dm_hpd_get_gpio_reg(struct amdgpu_device *adev)
-{
-	return mmDC_GPIO_HPD_A;
-}
-
-
-static bool dm_is_display_hung(struct amdgpu_device *adev)
-{
-	/* TODO: #DAL3 need to replace
-	u32 crtc_hung = 0;
-	u32 i, j, tmp;
-
-	crtc_hung = dal_get_connected_targets_vector(adev->dm.dal);
-
-	for (j = 0; j < 10; j++) {
-		for (i = 0; i < adev->mode_info.num_crtc; i++) {
-			if (crtc_hung & (1 << i)) {
-				int32_t vpos1, hpos1;
-				int32_t vpos2, hpos2;
-
-				tmp = dal_get_crtc_scanoutpos(
-					adev->dm.dal,
-					i,
-					&vpos1,
-					&hpos1);
-				udelay(10);
-				tmp = dal_get_crtc_scanoutpos(
-					adev->dm.dal,
-					i,
-					&vpos2,
-					&hpos2);
-
-				if (hpos1 != hpos2 && vpos1 != vpos2)
-					crtc_hung &= ~(1 << i);
-			}
-		}
-
-		if (crtc_hung == 0)
-			return false;
-	}
-*/
-	return true;
-}
-
-/* TODO: Remove mc access work around*/
-static void dm_stop_mc_access(struct amdgpu_device *adev,
-				     struct amdgpu_mode_mc_save *save)
-{
-
-	u32 crtc_enabled, tmp;
-	int i;
-
-	save->vga_render_control = RREG32(mmVGA_RENDER_CONTROL);
-	save->vga_hdp_control = RREG32(mmVGA_HDP_CONTROL);
-
-	/* disable VGA render */
-	tmp = RREG32(mmVGA_RENDER_CONTROL);
-	tmp = REG_SET_FIELD(tmp, VGA_RENDER_CONTROL, VGA_VSTATUS_CNTL, 0);
-	WREG32(mmVGA_RENDER_CONTROL, tmp);
-
-	/* blank the display controllers */
-	for (i = 0; i < adev->mode_info.num_crtc; i++) {
-		crtc_enabled = REG_GET_FIELD(RREG32(mmCRTC_CONTROL + crtc_offsets[i]),
-					     CRTC_CONTROL, CRTC_MASTER_EN);
-		if (crtc_enabled) {
-#if 0
-			u32 frame_count;
-			int j;
-
-			save->crtc_enabled[i] = true;
-			tmp = RREG32(mmCRTC_BLANK_CONTROL + crtc_offsets[i]);
-			if (REG_GET_FIELD(tmp, CRTC_BLANK_CONTROL, CRTC_BLANK_DATA_EN) == 0) {
-				amdgpu_display_vblank_wait(adev, i);
-				WREG32(mmCRTC_UPDATE_LOCK + crtc_offsets[i], 1);
-				tmp = REG_SET_FIELD(tmp, CRTC_BLANK_CONTROL, CRTC_BLANK_DATA_EN, 1);
-				WREG32(mmCRTC_BLANK_CONTROL + crtc_offsets[i], tmp);
-				WREG32(mmCRTC_UPDATE_LOCK + crtc_offsets[i], 0);
-			}
-			/* wait for the next frame */
-			frame_count = amdgpu_display_vblank_get_counter(adev, i);
-			for (j = 0; j < adev->usec_timeout; j++) {
-				if (amdgpu_display_vblank_get_counter(adev, i) != frame_count)
-					break;
-				udelay(1);
-			}
-			tmp = RREG32(mmGRPH_UPDATE + crtc_offsets[i]);
-			if (REG_GET_FIELD(tmp, GRPH_UPDATE, GRPH_UPDATE_LOCK) == 0) {
-				tmp = REG_SET_FIELD(tmp, GRPH_UPDATE, GRPH_UPDATE_LOCK, 1);
-				WREG32(mmGRPH_UPDATE + crtc_offsets[i], tmp);
-			}
-			tmp = RREG32(mmCRTC_MASTER_UPDATE_LOCK + crtc_offsets[i]);
-			if (REG_GET_FIELD(tmp, CRTC_MASTER_UPDATE_LOCK, MASTER_UPDATE_LOCK) == 0) {
-				tmp = REG_SET_FIELD(tmp, CRTC_MASTER_UPDATE_LOCK, MASTER_UPDATE_LOCK, 1);
-				WREG32(mmCRTC_MASTER_UPDATE_LOCK + crtc_offsets[i], tmp);
-			}
-#else
-			/* XXX this is a hack to avoid strange behavior with EFI on certain systems */
-			WREG32(mmCRTC_UPDATE_LOCK + crtc_offsets[i], 1);
-			tmp = RREG32(mmCRTC_CONTROL + crtc_offsets[i]);
-			tmp = REG_SET_FIELD(tmp, CRTC_CONTROL, CRTC_MASTER_EN, 0);
-			WREG32(mmCRTC_CONTROL + crtc_offsets[i], tmp);
-			WREG32(mmCRTC_UPDATE_LOCK + crtc_offsets[i], 0);
-			save->crtc_enabled[i] = false;
-			/* ***** */
-#endif
-		} else {
-			save->crtc_enabled[i] = false;
-		}
-	}
-}
-
-
-static void dm_resume_mc_access(struct amdgpu_device *adev,
-				       struct amdgpu_mode_mc_save *save)
-{
-
-	u32 tmp, frame_count;
-	int i, j;
-
-	/* update crtc base addresses */
-	for (i = 0; i < adev->mode_info.num_crtc; i++) {
-		WREG32(mmGRPH_PRIMARY_SURFACE_ADDRESS_HIGH + crtc_offsets[i],
-		       upper_32_bits(adev->mc.vram_start));
-		WREG32(mmGRPH_SECONDARY_SURFACE_ADDRESS_HIGH + crtc_offsets[i],
-		       upper_32_bits(adev->mc.vram_start));
-		WREG32(mmGRPH_PRIMARY_SURFACE_ADDRESS + crtc_offsets[i],
-		       (u32)adev->mc.vram_start);
-		WREG32(mmGRPH_SECONDARY_SURFACE_ADDRESS + crtc_offsets[i],
-		       (u32)adev->mc.vram_start);
-
-		if (save->crtc_enabled[i]) {
-			tmp = RREG32(mmCRTC_MASTER_UPDATE_MODE + crtc_offsets[i]);
-			if (REG_GET_FIELD(tmp, CRTC_MASTER_UPDATE_MODE, MASTER_UPDATE_MODE) != 3) {
-				tmp = REG_SET_FIELD(tmp, CRTC_MASTER_UPDATE_MODE, MASTER_UPDATE_MODE, 3);
-				WREG32(mmCRTC_MASTER_UPDATE_MODE + crtc_offsets[i], tmp);
-			}
-			tmp = RREG32(mmGRPH_UPDATE + crtc_offsets[i]);
-			if (REG_GET_FIELD(tmp, GRPH_UPDATE, GRPH_UPDATE_LOCK)) {
-				tmp = REG_SET_FIELD(tmp, GRPH_UPDATE, GRPH_UPDATE_LOCK, 0);
-				WREG32(mmGRPH_UPDATE + crtc_offsets[i], tmp);
-			}
-			tmp = RREG32(mmCRTC_MASTER_UPDATE_LOCK + crtc_offsets[i]);
-			if (REG_GET_FIELD(tmp, CRTC_MASTER_UPDATE_LOCK, MASTER_UPDATE_LOCK)) {
-				tmp = REG_SET_FIELD(tmp, CRTC_MASTER_UPDATE_LOCK, MASTER_UPDATE_LOCK, 0);
-				WREG32(mmCRTC_MASTER_UPDATE_LOCK + crtc_offsets[i], tmp);
-			}
-			for (j = 0; j < adev->usec_timeout; j++) {
-				tmp = RREG32(mmGRPH_UPDATE + crtc_offsets[i]);
-				if (REG_GET_FIELD(tmp, GRPH_UPDATE, GRPH_SURFACE_UPDATE_PENDING) == 0)
-					break;
-				udelay(1);
-			}
-			tmp = RREG32(mmCRTC_BLANK_CONTROL + crtc_offsets[i]);
-			tmp = REG_SET_FIELD(tmp, CRTC_BLANK_CONTROL, CRTC_BLANK_DATA_EN, 0);
-			WREG32(mmCRTC_UPDATE_LOCK + crtc_offsets[i], 1);
-			WREG32(mmCRTC_BLANK_CONTROL + crtc_offsets[i], tmp);
-			WREG32(mmCRTC_UPDATE_LOCK + crtc_offsets[i], 0);
-			/* wait for the next frame */
-			frame_count = amdgpu_display_vblank_get_counter(adev, i);
-			for (j = 0; j < adev->usec_timeout; j++) {
-				if (amdgpu_display_vblank_get_counter(adev, i) != frame_count)
-					break;
-				udelay(1);
-			}
-		}
-	}
-
-	WREG32(mmVGA_MEMORY_BASE_ADDRESS_HIGH, upper_32_bits(adev->mc.vram_start));
-	WREG32(mmVGA_MEMORY_BASE_ADDRESS, lower_32_bits(adev->mc.vram_start));
-
-	/* Unlock vga access */
-	WREG32(mmVGA_HDP_CONTROL, save->vga_hdp_control);
-	mdelay(1);
-	WREG32(mmVGA_RENDER_CONTROL, save->vga_render_control);
-}
-
-/* End of TODO: Remove mc access work around*/
-
 static bool dm_is_idle(void *handle)
 {
 	/* XXX todo */
@@ -315,37 +120,13 @@ static int dm_wait_for_idle(void *handle)
 static void dm_print_status(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	dev_info(adev->dev, "DCE 10.x registers\n");
+	dev_info(adev->dev, "DCE registers\n");
 	/* XXX todo */
 }
 
 static int dm_soft_reset(void *handle)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	u32 srbm_soft_reset = 0, tmp;
-
-	if (dm_is_display_hung(adev))
-		srbm_soft_reset |= SRBM_SOFT_RESET__SOFT_RESET_DC_MASK;
-
-	if (srbm_soft_reset) {
-		dm_print_status(adev);
-
-		tmp = RREG32(mmSRBM_SOFT_RESET);
-		tmp |= srbm_soft_reset;
-		dev_info(adev->dev, "SRBM_SOFT_RESET=0x%08X\n", tmp);
-		WREG32(mmSRBM_SOFT_RESET, tmp);
-		tmp = RREG32(mmSRBM_SOFT_RESET);
-
-		udelay(50);
-
-		tmp &= ~srbm_soft_reset;
-		WREG32(mmSRBM_SOFT_RESET, tmp);
-		tmp = RREG32(mmSRBM_SOFT_RESET);
-
-		/* Wait a little for things to settle down */
-		udelay(50);
-		dm_print_status(adev);
-	}
+	/* XXX todo */
 	return 0;
 }
 
@@ -1253,29 +1034,6 @@ void amdgpu_dm_destroy_drm_device(struct amdgpu_display_manager *dm)
  * amdgpu_display_funcs functions
  *****************************************************************************/
 
-
-static void dm_set_vga_render_state(struct amdgpu_device *adev,
-					   bool render)
-{
-	u32 tmp;
-
-	/* Lockout access through VGA aperture*/
-	tmp = RREG32(mmVGA_HDP_CONTROL);
-	if (render)
-		tmp = REG_SET_FIELD(tmp, VGA_HDP_CONTROL, VGA_MEMORY_DISABLE, 0);
-	else
-		tmp = REG_SET_FIELD(tmp, VGA_HDP_CONTROL, VGA_MEMORY_DISABLE, 1);
-	WREG32(mmVGA_HDP_CONTROL, tmp);
-
-	/* disable VGA render */
-	tmp = RREG32(mmVGA_RENDER_CONTROL);
-	if (render)
-		tmp = REG_SET_FIELD(tmp, VGA_RENDER_CONTROL, VGA_VSTATUS_CNTL, 1);
-	else
-		tmp = REG_SET_FIELD(tmp, VGA_RENDER_CONTROL, VGA_VSTATUS_CNTL, 0);
-	WREG32(mmVGA_RENDER_CONTROL, tmp);
-}
-
 /**
  * dm_bandwidth_update - program display watermarks
  *
@@ -1398,38 +1156,76 @@ static void dm_page_flip(struct amdgpu_device *adev,
 			&addr, 1);
 }
 
-static const struct amdgpu_display_funcs display_funcs = {
-	.set_vga_render_state = dm_set_vga_render_state,
+static const struct amdgpu_display_funcs dm_dce_v8_0_display_funcs = {
+	.set_vga_render_state = dce_v8_0_set_vga_render_state,
 	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
 	.vblank_get_counter = dm_vblank_get_counter,/* called unconditionally */
-	.vblank_wait = NULL, /* not called anywhere */
-	.is_display_hung = dm_is_display_hung,/* called unconditionally */
+	.vblank_wait = NULL,
+	.is_display_hung = NULL, /* not called anywhere */
 	.backlight_set_level =
 		dm_set_backlight_level,/* called unconditionally */
 	.backlight_get_level =
 		dm_get_backlight_level,/* called unconditionally */
 	.hpd_sense = NULL,/* called unconditionally */
 	.hpd_set_polarity = NULL, /* called unconditionally */
-	.hpd_get_gpio_reg = dm_hpd_get_gpio_reg,/* called unconditionally */
+	.hpd_get_gpio_reg = NULL, /* VBIOS parsing. DAL does it. */
 	.page_flip = dm_page_flip, /* called unconditionally */
 	.page_flip_get_scanoutpos =
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
 	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
-	.stop_mc_access = dm_stop_mc_access, /* called unconditionally */
-	.resume_mc_access = dm_resume_mc_access, /* called unconditionally */
+	.stop_mc_access = dce_v8_0_stop_mc_access, /* called unconditionally */
+	.resume_mc_access = dce_v8_0_resume_mc_access, /* called unconditionally */
 };
 
-static void set_display_funcs(struct amdgpu_device *adev)
-{
-	if (adev->mode_info.funcs == NULL)
-		adev->mode_info.funcs = &display_funcs;
-}
+static const struct amdgpu_display_funcs dm_dce_v10_0_display_funcs = {
+	.set_vga_render_state = dce_v10_0_set_vga_render_state,
+	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
+	.vblank_get_counter = dm_vblank_get_counter,/* called unconditionally */
+	.vblank_wait = NULL,
+	.is_display_hung = NULL, /* not called anywhere */
+	.backlight_set_level =
+		dm_set_backlight_level,/* called unconditionally */
+	.backlight_get_level =
+		dm_get_backlight_level,/* called unconditionally */
+	.hpd_sense = NULL,/* called unconditionally */
+	.hpd_set_polarity = NULL, /* called unconditionally */
+	.hpd_get_gpio_reg = NULL, /* VBIOS parsing. DAL does it. */
+	.page_flip = dm_page_flip, /* called unconditionally */
+	.page_flip_get_scanoutpos =
+		dm_crtc_get_scanoutpos,/* called unconditionally */
+	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
+	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
+	.stop_mc_access = dce_v10_0_stop_mc_access, /* called unconditionally */
+	.resume_mc_access = dce_v10_0_resume_mc_access, /* called unconditionally */
+};
+
+static const struct amdgpu_display_funcs dm_dce_v11_0_display_funcs = {
+	.set_vga_render_state = dce_v11_0_set_vga_render_state,
+	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
+	.vblank_get_counter = dm_vblank_get_counter,/* called unconditionally */
+	.vblank_wait = NULL,
+	.is_display_hung = NULL, /* not called anywhere */
+	.backlight_set_level =
+		dm_set_backlight_level,/* called unconditionally */
+	.backlight_get_level =
+		dm_get_backlight_level,/* called unconditionally */
+	.hpd_sense = NULL,/* called unconditionally */
+	.hpd_set_polarity = NULL, /* called unconditionally */
+	.hpd_get_gpio_reg = NULL, /* VBIOS parsing. DAL does it. */
+	.page_flip = dm_page_flip, /* called unconditionally */
+	.page_flip_get_scanoutpos =
+		dm_crtc_get_scanoutpos,/* called unconditionally */
+	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
+	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
+	.stop_mc_access = dce_v11_0_stop_mc_access, /* called unconditionally */
+	.resume_mc_access = dce_v11_0_resume_mc_access, /* called unconditionally */
+};
 
 static int dm_early_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	set_display_funcs(adev);
+
 	amdgpu_dm_set_irq_funcs(adev);
 
 	switch (adev->asic_type) {
@@ -1438,17 +1234,23 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
+		if (adev->mode_info.funcs == NULL)
+			adev->mode_info.funcs = &dm_dce_v8_0_display_funcs;
 		break;
 	case CHIP_FIJI:
 	case CHIP_TONGA:
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 7;
+		if (adev->mode_info.funcs == NULL)
+			adev->mode_info.funcs = &dm_dce_v10_0_display_funcs;
 		break;
 	case CHIP_CARRIZO:
 		adev->mode_info.num_crtc = 3;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 9;
+		if (adev->mode_info.funcs == NULL)
+			adev->mode_info.funcs = &dm_dce_v11_0_display_funcs;
 		break;
 	default:
 		DRM_ERROR("Usupported ASIC type: 0x%X\n", adev->asic_type);
