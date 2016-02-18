@@ -521,6 +521,12 @@ struct amdgpu_dm_dp_aux {
 	uint32_t link_index;
 };
 
+struct amdgpu_i2c_adapter {
+	struct i2c_adapter base;
+	struct amdgpu_display_manager *dm;
+	uint32_t link_index;
+};
+
 #define TO_DM_AUX(x) container_of((x), struct amdgpu_dm_dp_aux, aux)
 
 struct amdgpu_connector {
@@ -559,6 +565,9 @@ struct amdgpu_connector {
 	bool is_mst_connector;
 	struct amdgpu_encoder *mst_encoder;
 	struct semaphore mst_sem;
+
+	/* TODO see if we can merge with ddc_bus or make a dm_connector */
+	struct amdgpu_i2c_adapter *i2c;
 };
 
 /* TODO: start to use this struct and remove same field from base one */
