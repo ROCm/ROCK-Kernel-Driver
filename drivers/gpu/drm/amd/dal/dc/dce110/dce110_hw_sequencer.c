@@ -534,7 +534,7 @@ static bool set_gamma_ramp(
 				temp_params, ramp, surface);
 		opp->funcs->opp_program_regamma_pwl(opp, regamma_params);
 		if (ipp)
-			ipp->funcs->ipp_set_degamma(ipp, IPP_DEGAMMA_MODE_sRGB);
+			ipp->funcs->ipp_set_degamma(ipp, IPP_DEGAMMA_MODE_HW_sRGB);
 		opp->funcs->opp_set_regamma_mode(opp, OPP_REGAMMA_USER);
 	} else {
 		if (ipp)
