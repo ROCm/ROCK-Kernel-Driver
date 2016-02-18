@@ -1048,7 +1048,7 @@ static struct resource_funcs dce80_res_pool_funcs = {
 };
 
 bool dce80_construct_resource_pool(
-	struct adapter_service *adapter_serv,
+	struct adapter_service *as,
 	uint8_t num_virtual_links,
 	struct dc *dc,
 	struct resource_pool *pool)
@@ -1056,7 +1056,10 @@ bool dce80_construct_resource_pool(
 	unsigned int i;
 	struct audio_init_data audio_init_data = { 0 };
 	struct dc_context *ctx = dc->ctx;
-	pool->adapter_srv = adapter_serv;
+	struct firmware_info info;
+	struct dc_bios *bp;
+
+	pool->adapter_srv = as;
 	pool->funcs = &dce80_res_pool_funcs;
 
 	pool->stream_engines.engine.ENGINE_ID_DIGA = 1;
@@ -1066,19 +1069,41 @@ bool dce80_construct_resource_pool(
 	pool->stream_engines.engine.ENGINE_ID_DIGE = 1;
 	pool->stream_engines.engine.ENGINE_ID_DIGF = 1;
 
-	pool->clock_sources[DCE80_CLK_SRC_PLL0] = dce80_clock_source_create(
-		ctx, dal_adapter_service_get_bios_parser(adapter_serv),
-		CLOCK_SOURCE_ID_PLL0, &dce80_clk_src_reg_offsets[0]);
-	pool->clock_sources[DCE80_CLK_SRC_PLL1] = dce80_clock_source_create(
-		ctx, dal_adapter_service_get_bios_parser(adapter_serv),
-		CLOCK_SOURCE_ID_PLL1, &dce80_clk_src_reg_offsets[1]);
-	pool->clock_sources[DCE80_CLK_SRC_PLL2] = dce80_clock_source_create(
-		ctx, dal_adapter_service_get_bios_parser(adapter_serv),
-		CLOCK_SOURCE_ID_PLL2, &dce80_clk_src_reg_offsets[2]);
-	pool->clock_sources[DCE80_CLK_SRC_EXT] =  dce80_clock_source_create(
-		ctx, dal_adapter_service_get_bios_parser(adapter_serv),
-		CLOCK_SOURCE_ID_EXTERNAL, &dce80_clk_src_reg_offsets[0]);
-	pool->clk_src_count = DCE80_CLK_SRC_TOTAL;
+	bp = dal_adapter_service_get_bios_parser(as);
+
+	pool->clock_sources[DCE80_CLK_SRC_PLL0] =
+		dce80_clock_source_create(
+			ctx,
+			bp,
+			CLOCK_SOURCE_ID_PLL0,
+			&dce80_clk_src_reg_offsets[0]);
+
+	pool->clock_sources[DCE80_CLK_SRC_PLL1] =
+		dce80_clock_source_create(
+			ctx,
+			bp,
+			CLOCK_SOURCE_ID_PLL1,
+			&dce80_clk_src_reg_offsets[1]);
+
+	pool->clock_sources[DCE80_CLK_SRC_PLL2] =
+		dce80_clock_source_create(
+			ctx,
+			bp,
+			CLOCK_SOURCE_ID_PLL2,
+			&dce80_clk_src_reg_offsets[2]);
+
+	if (dal_adapter_service_get_firmware_info(as, &info) &&
+		info.external_clock_source_frequency_for_dp != 0) {
+		pool->clock_sources[DCE80_CLK_SRC_EXT] =
+			dce80_clock_source_create(
+				ctx,
+				bp,
+				CLOCK_SOURCE_ID_EXTERNAL,
+				NULL);
+
+		pool->clk_src_count = DCE80_CLK_SRC_TOTAL;
+	} else
+		pool->clk_src_count = DCE80_CLK_SRC_TOTAL - 1;
 
 	for (i = 0; i < pool->clk_src_count; i++) {
 		if (pool->clock_sources[i] == NULL) {
@@ -1088,7 +1113,7 @@ bool dce80_construct_resource_pool(
 		}
 	}
 
-	pool->display_clock = dal_display_clock_dce80_create(ctx, adapter_serv);
+	pool->display_clock = dal_display_clock_dce80_create(ctx, as);
 	if (pool->display_clock == NULL) {
 		dm_error("DC: failed to create display clock!\n");
 		BREAK_TO_DEBUGGER();
@@ -1107,10 +1132,8 @@ bool dce80_construct_resource_pool(
 
 	}
 
-	pool->pipe_count =
-		dal_adapter_service_get_func_controllers_num(adapter_serv);
-	pool->stream_enc_count =
-					dal_adapter_service_get_stream_engines_num(adapter_serv);
+	pool->pipe_count = dal_adapter_service_get_func_controllers_num(as);
+	pool->stream_enc_count = dal_adapter_service_get_stream_engines_num(as);
 	pool->scaler_filter = dal_scaler_filter_create(ctx);
 	if (pool->scaler_filter == NULL) {
 		BREAK_TO_DEBUGGER();
@@ -1120,7 +1143,7 @@ bool dce80_construct_resource_pool(
 
 	for (i = 0; i < pool->pipe_count; i++) {
 		pool->timing_generators[i] = dce80_timing_generator_create(
-				adapter_serv, ctx, i, &dce80_tg_offsets[i]);
+				as, ctx, i, &dce80_tg_offsets[i]);
 		if (pool->timing_generators[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dm_error("DC: failed to create tg!\n");
@@ -1161,13 +1184,13 @@ bool dce80_construct_resource_pool(
 		}
 	}
 
-	audio_init_data.as = adapter_serv;
+	audio_init_data.as = as;
 	audio_init_data.ctx = ctx;
 	pool->audio_count = 0;
 	for (i = 0; i < pool->pipe_count; i++) {
 		struct graphics_object_id obj_id;
 
-		obj_id = dal_adapter_service_enum_audio_object(adapter_serv, i);
+		obj_id = dal_adapter_service_enum_audio_object(as, i);
 		if (false == dal_graphics_object_id_is_valid(obj_id)) {
 			/* no more valid audio objects */
 			break;
@@ -1188,7 +1211,7 @@ bool dce80_construct_resource_pool(
 			pool->stream_enc[i] = dce80_stream_encoder_create(
 					i, dc->ctx,
 					dal_adapter_service_get_bios_parser(
-						adapter_serv),
+						as),
 					&stream_enc_regs[i]);
 
 			if (pool->stream_enc[i] == NULL) {
@@ -1203,7 +1226,7 @@ bool dce80_construct_resource_pool(
 		pool->stream_enc[pool->stream_enc_count] =
 			virtual_stream_encoder_create(
 				dc->ctx, dal_adapter_service_get_bios_parser(
-								adapter_serv));
+								as));
 		if (pool->stream_enc[pool->stream_enc_count] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dm_error("DC: failed to create stream_encoder!\n");
