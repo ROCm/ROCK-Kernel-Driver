@@ -68,7 +68,6 @@ struct dce110_regamma {
 	struct pwl_float_data *rgb_oem;
 	/* user supplied gamma */
 	struct pwl_float_data *rgb_user;
-	struct dev_c_lut saved_palette[RGB_256X3X16];
 	uint32_t extra_points;
 	bool use_half_points;
 	struct fixed31_32 x_max1;

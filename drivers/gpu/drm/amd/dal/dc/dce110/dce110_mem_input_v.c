@@ -371,8 +371,7 @@ static void program_pixel_format(
 	struct dce110_mem_input *mem_input110,
 	enum surface_pixel_format format)
 {
-	if (format >= SURFACE_PIXEL_FORMAT_VIDEO_444_BEGIN ||
-			format < SURFACE_PIXEL_FORMAT_VIDEO_BEGIN) {
+	if (format < SURFACE_PIXEL_FORMAT_VIDEO_BEGIN) {
 		uint32_t value;
 		uint8_t grph_depth;
 		uint8_t grph_format;
@@ -459,19 +458,8 @@ static void program_pixel_format(
 		case SURFACE_PIXEL_FORMAT_VIDEO_420_YCrCb:
 			video_format = 3;
 			break;
-		case SURFACE_PIXEL_FORMAT_VIDEO_422_YCb:
-			video_format = 4;
-			break;
-		case SURFACE_PIXEL_FORMAT_VIDEO_422_YCr:
-			video_format = 5;
-			break;
-		case SURFACE_PIXEL_FORMAT_VIDEO_422_CbY:
-			video_format = 6;
-			break;
-		case SURFACE_PIXEL_FORMAT_VIDEO_422_CrY:
-			video_format = 7;
-			break;
 		default:
+			video_format = 0;
 			break;
 		}
 
@@ -482,9 +470,9 @@ static void program_pixel_format(
 			VIDEO_FORMAT);
 
 		dm_write_reg(
-				mem_input110->base.ctx,
-				DCP_REG(mmUNP_GRPH_CONTROL_EXP),
-				value);
+			mem_input110->base.ctx,
+			DCP_REG(mmUNP_GRPH_CONTROL_EXP),
+			value);
 	}
 }
 

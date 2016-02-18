@@ -192,39 +192,7 @@ static enum pixel_format convert_pixel_format_to_dalsurface(
 	case SURFACE_PIXEL_FORMAT_VIDEO_420_YCrCb:
 		dal_pixel_format = PIXEL_FORMAT_420BPP12;
 		break;
-	case SURFACE_PIXEL_FORMAT_VIDEO_422_YCb:
-		dal_pixel_format = PIXEL_FORMAT_422BPP16;
-		break;
-	case SURFACE_PIXEL_FORMAT_VIDEO_422_YCr:
-		dal_pixel_format = PIXEL_FORMAT_422BPP16;
-		break;
-	case SURFACE_PIXEL_FORMAT_VIDEO_422_CbY:
-		dal_pixel_format = PIXEL_FORMAT_422BPP16;
-		break;
-	case SURFACE_PIXEL_FORMAT_VIDEO_422_CrY:
-		dal_pixel_format = PIXEL_FORMAT_422BPP16;
-		break;
-	case SURFACE_PIXEL_FORMAT_VIDEO_444_ACrYCb1555:
-		dal_pixel_format = PIXEL_FORMAT_444BPP16;
-		break;
-	case SURFACE_PIXEL_FORMAT_VIDEO_444_CrYCb565:
-		dal_pixel_format = PIXEL_FORMAT_444BPP16;
-		break;
-	case SURFACE_PIXEL_FORMAT_VIDEO_444_ACrYCb4444:
-		dal_pixel_format = PIXEL_FORMAT_444BPP16;
-		break;
-	case SURFACE_PIXEL_FORMAT_VIDEO_444_CbYCrA5551:
-		dal_pixel_format = PIXEL_FORMAT_444BPP16;
-		break;
-	case SURFACE_PIXEL_FORMAT_VIDEO_444_ACrYCb8888:
-		dal_pixel_format = PIXEL_FORMAT_444BPP32;
-		break;
-	case SURFACE_PIXEL_FORMAT_VIDEO_444_ACrYCb2101010:
-		dal_pixel_format = PIXEL_FORMAT_444BPP32;
-		break;
-	case SURFACE_PIXEL_FORMAT_VIDEO_444_CbYCrA1010102:
-		dal_pixel_format = PIXEL_FORMAT_444BPP32;
-		break;
+
 	default:
 		dal_pixel_format = PIXEL_FORMAT_UNKNOWN;
 		break;
@@ -335,8 +303,6 @@ static void calculate_scaling_ratios(
 	if (pipe_ctx->scl_data.format == PIXEL_FORMAT_420BPP12) {
 		pipe_ctx->scl_data.ratios.horz_c.value /= 2;
 		pipe_ctx->scl_data.ratios.vert_c.value /= 2;
-	} else if (pipe_ctx->scl_data.format == PIXEL_FORMAT_422BPP16) {
-		pipe_ctx->scl_data.ratios.horz_c.value /= 2;
 	}
 }
 
