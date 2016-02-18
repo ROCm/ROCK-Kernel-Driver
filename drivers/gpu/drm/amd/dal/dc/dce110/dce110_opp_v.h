@@ -43,7 +43,7 @@ void dce110_opp_v_set_csc_default(
 
 void dce110_opp_v_set_csc_adjustment(
 	struct output_pixel_processor *opp,
-	const struct grph_csc_adjustment *adjust);
+	const struct opp_grph_csc_adjustment *adjust);
 
 bool dce110_opp_program_regamma_pwl_v(
 	struct output_pixel_processor *opp,

@@ -28,7 +28,6 @@
 
 #include "dc_types.h"
 #include "grph_object_id.h"
-#include "grph_csc_types.h"
 #include "video_csc_types.h"
 #include "hw_sequencer_types.h"
 
@@ -269,6 +268,38 @@ struct regamma_params {
 	uint32_t hw_points_num;
 };
 
+enum graphics_csc_adjust_type {
+	GRAPHICS_CSC_ADJUST_TYPE_BYPASS = 0,
+	GRAPHICS_CSC_ADJUST_TYPE_HW, /* without adjustments */
+	GRAPHICS_CSC_ADJUST_TYPE_SW  /*use adjustments */
+};
+
+struct default_adjustment {
+	uint32_t lb_color_depth;
+	enum color_space color_space;
+	enum dc_color_depth color_depth;
+	enum pixel_format surface_pixel_format;
+	enum graphics_csc_adjust_type csc_adjust_type;
+	bool force_hw_default;
+};
+
+enum grph_color_adjust_option {
+	GRPH_COLOR_MATRIX_HW_DEFAULT = 1,
+	GRPH_COLOR_MATRIX_SW
+};
+
+struct opp_grph_csc_adjustment {
+	enum grph_color_adjust_option color_adjust_option;
+	enum color_space c_space;
+	enum dc_color_depth color_depth; /* clean up to uint32_t */
+	enum graphics_csc_adjust_type   csc_adjust_type;
+	int32_t adjust_divider;
+	int32_t grph_cont;
+	int32_t grph_sat;
+	int32_t grph_bright;
+	int32_t grph_hue;
+};
+
 struct opp_funcs {
 	void (*opp_power_on_regamma_lut)(
 		struct output_pixel_processor *opp,
@@ -283,7 +314,7 @@ struct opp_funcs {
 
 	void (*opp_set_csc_adjustment)(
 		struct output_pixel_processor *opp,
-		const struct grph_csc_adjustment *adjust);
+		const struct opp_grph_csc_adjustment *adjust);
 
 	void (*opp_set_csc_default)(
 		struct output_pixel_processor *opp,
@@ -310,10 +341,6 @@ struct opp_funcs {
 			enum ovl_csc_adjust_item overlay_adjust_item,
 			struct hw_adjustment_range *range);
 
-	void (*opp_set_ovl_csc_adjustment)(
-			struct output_pixel_processor *opp,
-			const struct ovl_csc_adjustment *adjust,
-			enum color_space c_space);
 
 	void (*opp_destroy)(struct output_pixel_processor **opp);
 };

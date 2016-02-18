@@ -193,7 +193,7 @@ static void program_color_matrix(
  * @return None
  */
 static void initialize_color_float_adj_reference_values(
-	const struct grph_csc_adjustment *adjust,
+	const struct opp_grph_csc_adjustment *adjust,
 	struct fixed31_32 *grph_cont,
 	struct fixed31_32 *grph_sat,
 	struct fixed31_32 *grph_bright,
@@ -291,7 +291,7 @@ static void setup_reg_format(
  *
  *****************************************************************************
  */
-static void setup_adjustments(const struct grph_csc_adjustment *adjust,
+static void setup_adjustments(const struct opp_grph_csc_adjustment *adjust,
 	struct dc_csc_adjustments *adjustments)
 {
 	if (adjust->adjust_divider != 0) {
@@ -343,7 +343,7 @@ static void prepare_tv_rgb_ideal(
  *****************************************************************************
  *  Function: dal_transform_wide_gamut_set_rgb_adjustment_legacy
  *
- *  @param [in] const struct grph_csc_adjustment *adjust
+ *  @param [in] const struct opp_grph_csc_adjustment *adjust
  *
  *  @return
  *     void
@@ -356,7 +356,7 @@ static void prepare_tv_rgb_ideal(
  */
 static void set_rgb_adjustment_legacy(
 	struct dce110_opp *opp110,
-	const struct grph_csc_adjustment *adjust)
+	const struct opp_grph_csc_adjustment *adjust)
 {
 	const struct fixed31_32 k1 =
 		dal_fixed31_32_from_fraction(701000, 1000000);
@@ -571,7 +571,7 @@ static void set_rgb_adjustment_legacy(
  *****************************************************************************
  *  Function: dal_transform_wide_gamut_set_rgb_limited_range_adjustment
  *
- *  @param [in] const struct grph_csc_adjustment *adjust
+ *  @param [in] const struct opp_grph_csc_adjustment *adjust
  *
  *  @return
  *     void
@@ -584,7 +584,7 @@ static void set_rgb_adjustment_legacy(
  */
 static void set_rgb_limited_range_adjustment(
 	struct dce110_opp *opp110,
-	const struct grph_csc_adjustment *adjust)
+	const struct opp_grph_csc_adjustment *adjust)
 {
 	struct out_csc_color_matrix reg_matrix;
 	struct fixed31_32 change_matrix[OUTPUT_CSC_MATRIX_SIZE];
@@ -657,7 +657,7 @@ static void prepare_yuv_ideal(
  *****************************************************************************
  *  Function: dal_transform_wide_gamut_set_yuv_adjustment
  *
- *  @param [in] const struct grph_csc_adjustment *adjust
+ *  @param [in] const struct opp_grph_csc_adjustment *adjust
  *
  *  @return
  *     void
@@ -670,7 +670,7 @@ static void prepare_yuv_ideal(
  */
 static void set_yuv_adjustment(
 	struct dce110_opp *opp110,
-	const struct grph_csc_adjustment *adjust)
+	const struct opp_grph_csc_adjustment *adjust)
 {
 	bool b601 = (adjust->c_space == COLOR_SPACE_YPBPR601) ||
 		(adjust->c_space == COLOR_SPACE_YCBCR601) ||
@@ -823,7 +823,7 @@ static bool configure_graphics_mode(
 
 void dce110_opp_set_csc_adjustment(
 	struct output_pixel_processor *opp,
-	const struct grph_csc_adjustment *adjust)
+	const struct opp_grph_csc_adjustment *adjust)
 {
 	struct dce110_opp *opp110 = TO_DCE110_OPP(opp);
 	enum csc_color_mode config =
