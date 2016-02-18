@@ -27,7 +27,6 @@
 #define __DAL_TRANSFORM_H__
 
 #include "include/scaler_types.h"
-#include "include/grph_csc_types.h"
 #include "calcs/scaler_filter.h"
 #include "grph_object_id.h"
 
@@ -122,6 +121,20 @@ enum yyc_quantization_range {
        YYC_QUANTIZATION_RESERVED3 = 3
 };
 
+enum graphics_gamut_adjust_type {
+	GRAPHICS_GAMUT_ADJUST_TYPE_BYPASS = 0,
+	GRAPHICS_GAMUT_ADJUST_TYPE_HW, /* without adjustments */
+	GRAPHICS_GAMUT_ADJUST_TYPE_SW  /* use adjustments */
+};
+
+#define CSC_TEMPERATURE_MATRIX_SIZE 9
+
+struct xfm_grph_csc_adjustment {
+	int32_t temperature_matrix[CSC_TEMPERATURE_MATRIX_SIZE];
+	int32_t temperature_divider;
+	enum graphics_gamut_adjust_type gamut_adjust_type;
+};
+
 struct transform_funcs {
 	bool (*transform_power_up)(
 		struct transform *xfm);
@@ -139,7 +152,7 @@ struct transform_funcs {
 
 	void (*transform_set_gamut_remap)(
 		struct transform *xfm,
-		const struct grph_csc_adjustment *adjust);
+		const struct xfm_grph_csc_adjustment *adjust);
 
 	bool (*transform_set_pixel_storage_depth)(
 		struct transform *xfm,

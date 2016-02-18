@@ -82,7 +82,6 @@ union ovl_csc_flag {
 };
 
 struct ovl_csc_adjustment {
-	enum ovl_color_space ovl_cs;
 	struct ovl_color_adjust_option ovl_option;
 	enum dc_color_depth display_color_depth;
 	uint32_t lb_color_depth;

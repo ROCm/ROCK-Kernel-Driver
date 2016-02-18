@@ -26,8 +26,6 @@
 #ifndef __DAL_TIMING_GENERATOR_TYPES_H__
 #define __DAL_TIMING_GENERATOR_TYPES_H__
 
-#include "include/grph_csc_types.h"
-
 struct dc_bios;
 
 /**

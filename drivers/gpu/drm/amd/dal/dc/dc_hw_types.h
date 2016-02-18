@@ -282,12 +282,6 @@ struct dc_cursor_position {
 
 /* Used by both ipp amd opp functions*/
 /* TODO: to be consolidated with enum color_space */
-enum ovl_color_space {
-	OVL_COLOR_SPACE_UNKNOWN = 0,
-	OVL_COLOR_SPACE_RGB,
-	OVL_COLOR_SPACE_YUV601,
-	OVL_COLOR_SPACE_YUV709
-};
 
 /*
  * This enum is for programming CURSOR_MODE register field. What this register
@@ -365,5 +359,40 @@ struct dev_c_lut {
 	uint8_t green;
 	uint8_t blue;
 };
+
+/* OPP */
+enum dc_pixel_encoding {
+	PIXEL_ENCODING_UNDEFINED,
+	PIXEL_ENCODING_RGB,
+	PIXEL_ENCODING_YCBCR422,
+	PIXEL_ENCODING_YCBCR444,
+	PIXEL_ENCODING_YCBCR420,
+	PIXEL_ENCODING_COUNT
+};
+
+enum color_space {
+	COLOR_SPACE_UNKNOWN,
+	COLOR_SPACE_SRGB_FULL_RANGE,
+	COLOR_SPACE_SRGB_LIMITED_RANGE,
+	COLOR_SPACE_YPBPR601,
+	COLOR_SPACE_YPBPR709,
+	COLOR_SPACE_YCBCR601,
+	COLOR_SPACE_YCBCR709,
+	COLOR_SPACE_YCBCR601_YONLY,
+	COLOR_SPACE_YCBCR709_YONLY,
+	COLOR_SPACE_N_MVPU_SUPER_AA,
+};
+
+enum dc_color_depth {
+	COLOR_DEPTH_UNDEFINED,
+	COLOR_DEPTH_666,
+	COLOR_DEPTH_888,
+	COLOR_DEPTH_101010,
+	COLOR_DEPTH_121212,
+	COLOR_DEPTH_141414,
+	COLOR_DEPTH_161616,
+	COLOR_DEPTH_COUNT
+};
+
 #endif /* DC_HW_TYPES_H */
 

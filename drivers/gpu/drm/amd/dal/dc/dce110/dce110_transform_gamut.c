@@ -221,7 +221,7 @@ static void program_gamut_remap(
  *****************************************************************************
  *  Function: dal_transform_wide_gamut_set_gamut_remap
  *
- *  @param [in] const struct grph_csc_adjustment *adjust
+ *  @param [in] const struct xfm_grph_csc_adjustment *adjust
  *
  *  @return
  *     void
@@ -234,7 +234,7 @@ static void program_gamut_remap(
  */
 void dce110_transform_set_gamut_remap(
 	struct transform *xfm,
-	const struct grph_csc_adjustment *adjust)
+	const struct xfm_grph_csc_adjustment *adjust)
 {
 	struct dce110_transform *xfm110 = TO_DCE110_TRANSFORM(xfm);
 

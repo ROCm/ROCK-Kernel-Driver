@@ -364,7 +364,7 @@ static void program_color_matrix_v(
  * @return None
  */
 static void initialize_color_float_adj_reference_values(
-	const struct grph_csc_adjustment *adjust,
+	const struct opp_grph_csc_adjustment *adjust,
 	struct fixed31_32 *grph_cont,
 	struct fixed31_32 *grph_sat,
 	struct fixed31_32 *grph_bright,
@@ -462,7 +462,7 @@ static void setup_reg_format(
  *
  *****************************************************************************
  */
-static void setup_adjustments(const struct grph_csc_adjustment *adjust,
+static void setup_adjustments(const struct opp_grph_csc_adjustment *adjust,
 	struct dc_csc_adjustments *adjustments)
 {
 	if (adjust->adjust_divider != 0) {
@@ -495,7 +495,7 @@ static void setup_adjustments(const struct grph_csc_adjustment *adjust,
  *****************************************************************************
  *  Function: dal_transform_wide_gamut_set_rgb_adjustment_legacy
  *
- *  @param [in] const struct grph_csc_adjustment *adjust
+ *  @param [in] const struct opp_grph_csc_adjustment *adjust
  *
  *  @return
  *     void
@@ -508,7 +508,7 @@ static void setup_adjustments(const struct grph_csc_adjustment *adjust,
  */
 static void set_rgb_adjustment_legacy(
 	struct dce110_opp *opp110,
-	const struct grph_csc_adjustment *adjust)
+	const struct opp_grph_csc_adjustment *adjust)
 {
 	const struct fixed31_32 k1 =
 		dal_fixed31_32_from_fraction(701000, 1000000);
@@ -769,7 +769,7 @@ static void prepare_yuv_ideal(
  *****************************************************************************
  *  Function: dal_transform_wide_gamut_set_yuv_adjustment
  *
- *  @param [in] const struct grph_csc_adjustment *adjust
+ *  @param [in] const struct opp_grph_csc_adjustment *adjust
  *
  *  @return
  *     void
@@ -782,7 +782,7 @@ static void prepare_yuv_ideal(
  */
 static void set_yuv_adjustment(
 	struct dce110_opp *opp110,
-	const struct grph_csc_adjustment *adjust)
+	const struct opp_grph_csc_adjustment *adjust)
 {
 	bool b601 = (adjust->c_space == COLOR_SPACE_YPBPR601) ||
 		(adjust->c_space == COLOR_SPACE_YCBCR601) ||
@@ -1014,7 +1014,7 @@ void dce110_opp_v_set_csc_default(
 
 void dce110_opp_v_set_csc_adjustment(
 	struct output_pixel_processor *opp,
-	const struct grph_csc_adjustment *adjust)
+	const struct opp_grph_csc_adjustment *adjust)
 {
 	struct dce110_opp *opp110 = TO_DCE110_OPP(opp);
 	enum csc_color_mode config =

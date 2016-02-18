@@ -105,7 +105,7 @@ void dce80_opp_set_regamma_mode(struct output_pixel_processor *opp,
 
 void dce80_opp_set_csc_adjustment(
 	struct output_pixel_processor *opp,
-	const struct grph_csc_adjustment *adjust);
+	const struct opp_grph_csc_adjustment *adjust);
 
 void dce80_opp_set_csc_default(
 	struct output_pixel_processor *opp,

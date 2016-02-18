@@ -26,7 +26,6 @@
 #define __DAL_TRANSFORM_DCE80_H__
 
 #include "inc/transform.h"
-#include "include/grph_csc_types.h"
 
 #define TO_DCE80_TRANSFORM(transform)\
 	container_of(transform, struct dce80_transform, base)
@@ -71,7 +70,7 @@ void dce80_transform_set_scaler_filter(
 /* GAMUT RELATED */
 void dce80_transform_set_gamut_remap(
 	struct transform *xfm,
-	const struct grph_csc_adjustment *adjust);
+	const struct xfm_grph_csc_adjustment *adjust);
 
 /* BIT DEPTH RELATED */
 bool dce80_transform_set_pixel_storage_depth(

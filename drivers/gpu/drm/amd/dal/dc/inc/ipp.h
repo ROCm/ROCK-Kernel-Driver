@@ -28,7 +28,6 @@
 #define __DAL_IPP_H__
 
 #include "include/grph_object_id.h"
-#include "include/grph_csc_types.h"
 #include "include/video_csc_types.h"
 #include "include/hw_sequencer_types.h"
 
@@ -77,6 +76,14 @@ enum wide_gamut_degamma_mode {
 	WIDE_GAMUT_DEGAMMA_MODE_OVL_PWL_ROM_A,
 	/*  0x2 - PWL gamma ROM B */
 	WIDE_GAMUT_DEGAMMA_MODE_OVL_PWL_ROM_B,
+};
+
+
+enum ovl_color_space {
+	OVL_COLOR_SPACE_UNKNOWN = 0,
+	OVL_COLOR_SPACE_RGB,
+	OVL_COLOR_SPACE_YUV601,
+	OVL_COLOR_SPACE_YUV709
 };
 
 struct dcp_video_matrix {
