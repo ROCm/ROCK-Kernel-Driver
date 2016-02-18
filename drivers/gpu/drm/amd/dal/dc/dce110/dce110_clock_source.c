@@ -1110,7 +1110,6 @@ bool dce110_clk_src_construct(
 	clk_src->bios = bios;
 	clk_src->base.id = id;
 	clk_src->base.funcs = &dce110_clk_src_funcs;
-	clk_src->offsets = *reg_offsets;
 
 	if (clk_src->bios->funcs->get_firmware_info(
 			clk_src->bios, &fw_info) != BP_RESULT_OK) {
@@ -1124,6 +1123,8 @@ bool dce110_clk_src_construct(
 
 	if (clk_src->base.id == CLOCK_SOURCE_ID_EXTERNAL)
 		return true;
+
+	clk_src->offsets = *reg_offsets;
 
 	/* PLL only from here on */
 	ss_info_from_atombios_create(clk_src);
