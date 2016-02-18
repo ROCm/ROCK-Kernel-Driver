@@ -42,7 +42,7 @@ enum {
 /* Constructor, Destructor               */
 /*****************************************/
 
-struct opp_funcs funcs = {
+static struct opp_funcs funcs = {
 		.opp_power_on_regamma_lut = dce110_opp_power_on_regamma_lut,
 		.opp_program_bit_depth_reduction = dce110_opp_program_bit_depth_reduction,
 		.opp_program_clamping_and_pixel_encoding = dce110_opp_program_clamping_and_pixel_encoding,
