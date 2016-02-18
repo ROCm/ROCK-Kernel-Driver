@@ -69,6 +69,7 @@ struct ddc_service_init_data {
 	struct adapter_service *as;
 	struct graphics_object_id id;
 	struct dc_context *ctx;
+	struct core_link *link;
 };
 
 struct ddc_service *dal_ddc_service_create(

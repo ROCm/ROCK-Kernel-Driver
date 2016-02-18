@@ -24,14 +24,14 @@
  */
 
 #include "dm_services.h"
-
+#include "dm_helpers.h"
 #include "include/adapter_service_interface.h"
 #include "include/ddc_service_types.h"
 #include "include/grph_object_id.h"
 #include "include/dpcd_defs.h"
 #include "include/logger_interface.h"
 #include "include/vector.h"
-
+#include "core_types.h"
 #include "dc_link_ddc.h"
 
 #define AUX_POWER_UP_WA_DELAY 500
@@ -144,37 +144,6 @@ union hdmi_scdc_test_config_Data {
 };
 
 
-
-union ddc_wa {
-	struct {
-		uint32_t DP_SKIP_POWER_OFF:1;
-		uint32_t DP_AUX_POWER_UP_WA_DELAY:1;
-	} bits;
-	uint32_t raw;
-};
-
-struct ddc_flags {
-	uint8_t EDID_QUERY_DONE_ONCE:1;
-	uint8_t IS_INTERNAL_DISPLAY:1;
-	uint8_t FORCE_READ_REPEATED_START:1;
-	uint8_t EDID_STRESS_READ:1;
-
-};
-
-struct ddc_service {
-	struct ddc *ddc_pin;
-	struct ddc_flags flags;
-	union ddc_wa wa;
-	enum ddc_transaction_type transaction_type;
-	enum display_dongle_type dongle_type;
-	struct dp_receiver_id_info dp_receiver_id_info;
-	struct adapter_service *as;
-	struct dc_context *ctx;
-
-	uint32_t address;
-	uint32_t edid_buf_len;
-	uint8_t edid_buf[MAX_EDID_BUFFER_SIZE];
-};
 
 struct i2c_payloads {
 	struct vector payloads;
@@ -312,6 +281,7 @@ static bool construct(
 	enum connector_id connector_id =
 		dal_graphics_object_id_get_connector_id(init_data->id);
 
+	ddc_service->link = init_data->link;
 	ddc_service->ctx = init_data->ctx;
 	ddc_service->as = init_data->as;
 	ddc_service->ddc_pin = dal_adapter_service_obtain_ddc(
@@ -474,10 +444,10 @@ static bool i2c_read(
 		.engine = DDC_I2C_COMMAND_ENGINE,
 		.speed = dal_adapter_service_get_sw_i2c_speed(ddc->as) };
 
-	return dal_i2caux_submit_i2c_command(
-		dal_adapter_service_get_i2caux(ddc->as),
-		ddc->ddc_pin,
-		&command);
+	return dm_helpers_submit_i2c(
+			ddc->ctx,
+			&ddc->link->public,
+			&command);
 }
 
 static uint8_t aux_read_edid_block(
@@ -614,18 +584,18 @@ static uint8_t i2c_read_edid_block(
 		cmd.payloads = &payloads[1];
 		cmd.number_of_payloads = 1;
 
-		if (dal_i2caux_submit_i2c_command(
-			dal_adapter_service_get_i2caux(ddc->as),
-			ddc->ddc_pin,
+		if (dm_helpers_submit_i2c(
+			ddc->ctx,
+			&ddc->link->public,
 			&cmd)) {
 
 			cmd.payloads = &payloads[2];
 			cmd.number_of_payloads = 1;
 
-			ret = dal_i2caux_submit_i2c_command(
-				dal_adapter_service_get_i2caux(ddc->as),
-				ddc->ddc_pin,
-				&cmd);
+			ret = dm_helpers_submit_i2c(
+					ddc->ctx,
+					&ddc->link->public,
+					&cmd);
 		}
 
 	} else {
@@ -644,10 +614,10 @@ static uint8_t i2c_read_edid_block(
 			cmd.number_of_payloads = 2;
 		}
 
-		ret = dal_i2caux_submit_i2c_command(
-			dal_adapter_service_get_i2caux(ddc->as),
-			ddc->ddc_pin,
-			&cmd);
+		ret = dm_helpers_submit_i2c(
+				ddc->ctx,
+				&ddc->link->public,
+				&cmd);
 	}
 
 	return ret ? DDC_EDID_BLOCK_SIZE : 0;
@@ -982,9 +952,9 @@ bool dal_ddc_service_query_ddc_data(
 		command.number_of_payloads =
 			dal_ddc_i2c_payloads_get_count(payloads);
 
-		ret = dal_i2caux_submit_i2c_command(
-				dal_adapter_service_get_i2caux(ddc->as),
-				ddc->ddc_pin,
+		ret = dm_helpers_submit_i2c(
+				ddc->ctx,
+				&ddc->link->public,
 				&command);
 
 		dal_ddc_i2c_payloads_destroy(&payloads);

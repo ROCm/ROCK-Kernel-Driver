@@ -1808,6 +1808,58 @@ void amdgpu_dm_connector_init_helper(
 				0);
 }
 
+int amdgpu_dm_i2c_xfer(struct i2c_adapter *i2c_adap,
+		      struct i2c_msg *msgs, int num)
+{
+	struct amdgpu_i2c_adapter *i2c = i2c_get_adapdata(i2c_adap);
+	struct i2c_command cmd;
+	int i;
+
+	cmd.payloads = kzalloc(num * sizeof(struct i2c_payload), GFP_KERNEL);
+	cmd.number_of_payloads = num;
+	cmd.engine = I2C_COMMAND_ENGINE_DEFAULT;
+	cmd.speed = 100;
+
+	for (i = 0; i < num; i++) {
+		cmd.payloads[i].write = (msgs[i].flags & I2C_M_RD);
+		cmd.payloads[i].address = msgs[i].addr;
+		cmd.payloads[i].length = msgs[i].len;
+		cmd.payloads[i].data = msgs[i].buf;
+	}
+
+	if (dc_submit_i2c(i2c->dm->dc, i2c->link_index, &cmd))
+		return num;
+	else
+		return -EIO;
+}
+
+u32 amdgpu_dm_i2c_func(struct i2c_adapter *adap)
+{
+	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
+}
+
+static const struct i2c_algorithm amdgpu_dm_i2c_algo = {
+	.master_xfer = amdgpu_dm_i2c_xfer,
+	.functionality = amdgpu_dm_i2c_func,
+};
+
+struct amdgpu_i2c_adapter *create_i2c(unsigned int link_index, struct amdgpu_display_manager *dm, int *res)
+{
+	struct amdgpu_i2c_adapter *i2c;
+
+	i2c = kzalloc(sizeof (struct amdgpu_i2c_adapter), GFP_KERNEL);
+	i2c->dm = dm;
+	i2c->base.owner = THIS_MODULE;
+	i2c->base.class = I2C_CLASS_DDC;
+	i2c->base.dev.parent = &dm->adev->pdev->dev;
+	i2c->base.algo = &amdgpu_dm_i2c_algo;
+	snprintf(i2c->base.name, sizeof (i2c->base.name), "AMDGPU DM i2c hw bus %d", link_index);
+	i2c->link_index = link_index;
+	i2c_set_adapdata(&i2c->base, i2c);
+
+	return i2c;
+}
+
 /* Note: this function assumes that dc_link_detect() was called for the
  * dc_link which will be represented by this aconnector. */
 int amdgpu_dm_connector_init(
@@ -1816,11 +1868,22 @@ int amdgpu_dm_connector_init(
 	uint32_t link_index,
 	struct amdgpu_encoder *aencoder)
 {
-	int res, connector_type;
+	int res = 0;
+	int connector_type;
 	struct dc *dc = dm->dc;
 	const struct dc_link *link = dc_get_link_at_index(dc, link_index);
+	struct amdgpu_i2c_adapter *i2c;
 
 	DRM_DEBUG_KMS("%s()\n", __func__);
+
+	i2c = create_i2c(link->link_index, dm, &res);
+	aconnector->i2c = i2c;
+	res = i2c_add_adapter(&i2c->base);
+
+	if (res) {
+		DRM_ERROR("Failed to register hw i2c %d\n", link->link_index);
+		goto out_free;
+	}
 
 	connector_type = to_drm_connector_type(link->connector_signal);
 
@@ -1833,7 +1896,7 @@ int amdgpu_dm_connector_init(
 	if (res) {
 		DRM_ERROR("connector_init failed\n");
 		aconnector->connector_id = -1;
-		return res;
+		goto out_free;
 	}
 
 	drm_connector_helper_add(
@@ -1877,7 +1940,12 @@ int amdgpu_dm_connector_init(
 	}
 #endif
 
-	return 0;
+out_free:
+	if (res) {
+		kfree(i2c);
+		aconnector->i2c = NULL;
+	}
+	return res;
 }
 
 int amdgpu_dm_get_encoder_crtc_mask(struct amdgpu_device *adev)

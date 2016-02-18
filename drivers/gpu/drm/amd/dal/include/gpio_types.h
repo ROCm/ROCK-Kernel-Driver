@@ -329,10 +329,6 @@ struct gpio_config_data {
 	} config;
 };
 
-struct gpio_ddc_hw_info {
-	bool hw_supported;
-	uint32_t ddc_channel;
-};
 
 struct gpio_ddc_open_options {
 	bool en_bit_present;

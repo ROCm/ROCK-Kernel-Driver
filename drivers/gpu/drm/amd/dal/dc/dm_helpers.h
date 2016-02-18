@@ -95,4 +95,9 @@ bool dm_helper_dp_write_dpcd(
 		const uint8_t *data,
 		uint32_t size);
 
+bool dm_helpers_submit_i2c(
+		struct dc_context *ctx,
+		const struct dc_link *link,
+		struct i2c_command *cmd);
+
 #endif /* __DM_HELPERS__ */

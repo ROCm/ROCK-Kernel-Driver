@@ -52,26 +52,6 @@ enum ddc_service_type {
 	DDC_SERVICE_TYPE_DISPLAY_PORT_MST,
 };
 
-enum ddc_transaction_type {
-	DDC_TRANSACTION_TYPE_NONE = 0,
-	DDC_TRANSACTION_TYPE_I2C,
-	DDC_TRANSACTION_TYPE_I2C_OVER_AUX,
-	DDC_TRANSACTION_TYPE_I2C_OVER_AUX_WITH_DEFER,
-	DDC_TRANSACTION_TYPE_I2C_OVER_AUX_RETRY_DEFER
-};
-
-enum display_dongle_type {
-	DISPLAY_DONGLE_NONE = 0,
-	/* Active converter types*/
-	DISPLAY_DONGLE_DP_VGA_CONVERTER,
-	DISPLAY_DONGLE_DP_DVI_CONVERTER,
-	DISPLAY_DONGLE_DP_HDMI_CONVERTER,
-	/* DP-HDMI/DVI passive dongles (Type 1 and Type 2)*/
-	DISPLAY_DONGLE_DP_DVI_DONGLE,
-	DISPLAY_DONGLE_DP_HDMI_DONGLE,
-	/* Other types of dongle*/
-	DISPLAY_DONGLE_DP_HDMI_MISMATCHED_DONGLE,
-};
 
 enum dcs_dpcd_revision {
 	DCS_DPCD_REV_10 = 0x10,
@@ -130,16 +110,6 @@ struct display_sink_capability {
 	enum signal_type signal;
 };
 
-struct dp_receiver_id_info {
-	uint32_t dpcd_rev;
-	uint32_t sink_id;
-	int8_t sink_id_str[6];
-	int8_t sink_hw_revision;
-	int8_t sink_fw_revision[2];
-	uint32_t branch_id;
-	int8_t branch_name[6];
-	enum display_dongle_type dongle_type;
-};
 
 struct av_sync_data {
 	uint8_t av_granularity;/* DPCD 00023h */

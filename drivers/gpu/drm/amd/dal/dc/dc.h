@@ -511,5 +511,9 @@ bool dc_write_dpcd(
 		const uint8_t *data,
 	uint32_t size);
 
+bool dc_submit_i2c(
+		struct dc *dc,
+		uint32_t link_index,
+		struct i2c_command *cmd);
 
 #endif /* DC_INTERFACE_H_ */
