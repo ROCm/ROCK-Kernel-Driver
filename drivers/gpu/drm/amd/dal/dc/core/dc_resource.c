@@ -838,10 +838,14 @@ enum dc_status map_resources(
 				pipe_ctx->audio = find_first_free_audio(
 						&context->res_ctx);
 
-				if (!pipe_ctx->audio)
-					return DC_NO_STREAM_AUDIO_RESOURCE;
-
-				set_audio_in_use(&context->res_ctx,
+				/*
+				 * Audio assigned in order first come first get.
+				 * There are asics which has number of audio
+				 * resources less then number of pipes
+				 */
+				if (pipe_ctx->audio)
+					set_audio_in_use(
+						&context->res_ctx,
 						pipe_ctx->audio);
 			}
 		}
