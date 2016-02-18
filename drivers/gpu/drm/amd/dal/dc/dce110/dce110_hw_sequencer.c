@@ -1448,13 +1448,11 @@ static void update_plane_addrs(struct dc *dc, struct resource_context *res_ctx)
 					PIPE_LOCK_CONTROL_SURFACE,
 					false);
 
-		if (pipe_ctx->flags.blanked) {
-			if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, false)) {
-				dm_error("DC: failed to unblank crtc!\n");
-				BREAK_TO_DEBUGGER();
-			} else
-				pipe_ctx->flags.blanked = false;
-		}
+		if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, false)) {
+			dm_error("DC: failed to unblank crtc!\n");
+			BREAK_TO_DEBUGGER();
+		} else
+			pipe_ctx->flags.blanked = false;
 	}
 }
 
