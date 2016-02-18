@@ -517,4 +517,35 @@ bool dce110_opp_program_regamma_pwl_v(
 	return true;
 }
 
+void dce110_opp_power_on_regamma_lut_v(
+	struct output_pixel_processor *opp,
+	bool power_on)
+{
+	uint32_t value = dm_read_reg(opp->ctx, mmDCFEV_MEM_PWR_CTRL);
 
+	set_reg_field_value(
+		value,
+		0,
+		DCFEV_MEM_PWR_CTRL,
+		COL_MAN_GAMMA_CORR_MEM_PWR_FORCE);
+
+	set_reg_field_value(
+		value,
+		power_on,
+		DCFEV_MEM_PWR_CTRL,
+		COL_MAN_GAMMA_CORR_MEM_PWR_DIS);
+
+	set_reg_field_value(
+		value,
+		0,
+		DCFEV_MEM_PWR_CTRL,
+		COL_MAN_INPUT_GAMMA_MEM_PWR_FORCE);
+
+	set_reg_field_value(
+		value,
+		power_on,
+		DCFEV_MEM_PWR_CTRL,
+		COL_MAN_INPUT_GAMMA_MEM_PWR_DIS);
+
+	dm_write_reg(opp->ctx, mmDCFEV_MEM_PWR_CTRL, value);
+}
