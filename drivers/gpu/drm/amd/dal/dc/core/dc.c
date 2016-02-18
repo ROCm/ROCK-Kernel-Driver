@@ -817,6 +817,21 @@ bool dc_write_dpcd(
 	return r == DDC_RESULT_SUCESSFULL;
 }
 
+bool dc_submit_i2c(
+		struct dc *dc,
+		uint32_t link_index,
+		struct i2c_command *cmd)
+{
+	struct core_link *link =
+			DC_LINK_TO_LINK(dc_get_link_at_index(dc, link_index));
+	struct ddc_service *ddc = link->ddc;
+
+	return dal_i2caux_submit_i2c_command(
+		dal_adapter_service_get_i2caux(ddc->as),
+		ddc->ddc_pin,
+		cmd);
+}
+
 bool dc_link_add_remote_sink(const struct dc_link *link, struct dc_sink *sink)
 {
 	struct core_link *core_link = DC_LINK_TO_LINK(link);

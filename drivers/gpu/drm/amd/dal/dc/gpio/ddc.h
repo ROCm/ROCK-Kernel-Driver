@@ -26,13 +26,6 @@
 #ifndef __DAL_DDC_H__
 #define __DAL_DDC_H__
 
-struct ddc {
-	struct gpio *pin_data;
-	struct gpio *pin_clock;
-	struct gpio_ddc_hw_info hw_info;
-	struct dc_context *ctx;
-};
-
 struct ddc *dal_gpio_create_ddc(
 	struct gpio_service *service,
 	uint32_t offset,

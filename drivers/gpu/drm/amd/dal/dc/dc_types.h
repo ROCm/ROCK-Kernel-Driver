@@ -67,6 +67,8 @@ enum dce_environment {
 #define MAX_SURFACE_NUM 2
 #define NUM_PIXEL_FORMATS 10
 
+#include "dc_ddc_types.h"
+
 enum tiling_mode {
 	TILING_MODE_INVALID,
 	TILING_MODE_LINEAR,
@@ -101,6 +103,7 @@ enum plane_stereo_format {
 	PLANE_STEREO_FORMAT_COLUMN_INTERLEAVED = 6,
 	PLANE_STEREO_FORMAT_CHECKER_BOARD = 7
 };
+
 
 /* TODO: Find way to calculate number of bits
  *  Please increase if pixel_format enum increases

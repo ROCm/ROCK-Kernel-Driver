@@ -26,6 +26,7 @@
 #include <linux/string.h>
 #include <linux/acpi.h>
 #include <linux/version.h>
+#include <linux/i2c.h>
 
 #include <drm/drmP.h>
 #include <drm/drm_crtc_helper.h>
@@ -498,3 +499,33 @@ bool dm_helper_dp_write_dpcd(
 	return drm_dp_dpcd_write(&aconnector->dm_dp_aux.aux,
 			address, (uint8_t *)data, size) > 0;
 }
+
+bool dm_helpers_submit_i2c(
+		struct dc_context *ctx,
+		const struct dc_link *link,
+		struct i2c_command *cmd)
+{
+	struct amdgpu_device *adev = ctx->driver_context;
+	struct drm_device *dev = adev->ddev;
+	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
+	struct i2c_msg *msgs;
+	int i = 0;
+	int num = cmd->number_of_payloads;
+
+	if (!aconnector) {
+		DRM_ERROR("Failed to found connector for link!");
+		return false;
+	}
+
+	msgs = kzalloc(num * sizeof(struct i2c_msg), GFP_KERNEL);
+
+	for (i = 0; i < num; i++) {
+		msgs[i].flags = cmd->payloads[i].write ? I2C_M_RD : 0;
+		msgs[i].addr = cmd->payloads[i].address;
+		msgs[i].len = cmd->payloads[i].length;
+		msgs[i].buf = cmd->payloads[i].data;
+	}
+
+	return i2c_transfer(&aconnector->i2c->base, msgs, num) == num;
+}
+

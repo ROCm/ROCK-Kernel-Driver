@@ -3432,6 +3432,7 @@ static bool i2c_read(
 		cmd.payloads = payloads;
 		cmd.number_of_payloads = ARRAY_SIZE(payloads);
 
+		/* TODO route this through drm i2c_adapter */
 		result = dal_i2caux_submit_i2c_command(
 				dal_adapter_service_get_i2caux(bp->as),
 				ddc,

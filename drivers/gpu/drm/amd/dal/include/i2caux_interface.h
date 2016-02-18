@@ -29,29 +29,6 @@
 #include "ddc_interface.h"
 #include "adapter_service_interface.h"
 
-struct i2c_payload {
-	bool write;
-	uint8_t address;
-	uint8_t length;
-	uint8_t *data;
-};
-
-enum i2c_command_engine {
-	I2C_COMMAND_ENGINE_DEFAULT,
-	I2C_COMMAND_ENGINE_SW,
-	I2C_COMMAND_ENGINE_HW
-};
-
-struct i2c_command {
-	struct i2c_payload *payloads;
-	uint8_t number_of_payloads;
-
-	enum i2c_command_engine engine;
-
-	/* expressed in KHz
-	 * zero means "use default value" */
-	uint32_t speed;
-};
 
 #define DEFAULT_AUX_MAX_DATA_SIZE 16
 #define AUX_MAX_DEFER_WRITE_RETRY 20

@@ -971,6 +971,7 @@ static bool construct(
 	ddc_service_init_data.as = as;
 	ddc_service_init_data.ctx = link->ctx;
 	ddc_service_init_data.id = link->link_id;
+	ddc_service_init_data.link = link;
 	link->ddc = dal_ddc_service_create(&ddc_service_init_data);
 
 	link->public.ddc_hw_inst =
