@@ -62,6 +62,21 @@ static void force_hw_base_light_sleep(struct dc_context *ctx)
 
 }
 
+static void underlay_clock_enable(struct dc_context *ctx)
+{
+	uint32_t value = 0;
+
+	value = dm_read_reg(ctx, mmDCFEV_CLOCK_CONTROL);
+
+	set_reg_field_value(
+			value,
+			1,
+			DCFEV_CLOCK_CONTROL,
+			DCFEV_CLOCK_ENABLE);
+
+	dm_write_reg(ctx, mmDCFEV_CLOCK_CONTROL, value);
+}
+
 static void enable_hw_base_light_sleep(struct dc_context *ctx)
 {
 	NOT_IMPLEMENTED();
@@ -86,5 +101,6 @@ void dal_dc_clock_gating_dce110_power_up(
 		disable_sw_manual_control_light_sleep(ctx);
 	} else {
 		force_hw_base_light_sleep(ctx);
+		underlay_clock_enable(ctx);
 	}
 }
