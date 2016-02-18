@@ -747,6 +747,17 @@ static void set_stream_signal(struct pipe_ctx *pipe_ctx)
 	}
 
 	pipe_ctx->signal = dc_sink->sink_signal;
+
+	/* Down-grade pipe_ctx signal instead of sink singal from HDMI to DVI
+	 * here based on audio info in stream. This allows DC to handle stream
+	 * with or without audio on a HDMI connector.
+	 *
+	 * On a HDMI to DVI passive dongle, audio info is not available from the
+	 * EDID and the signal is down-graded in pipe ctx.
+	 */
+	if (pipe_ctx->signal == SIGNAL_TYPE_HDMI_TYPE_A &&
+			pipe_ctx->stream->public.audio_info.mode_count == 0)
+		pipe_ctx->signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
 }
 
 enum dc_status map_resources(
