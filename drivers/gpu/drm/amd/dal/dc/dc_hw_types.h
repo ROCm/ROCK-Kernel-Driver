@@ -278,5 +278,92 @@ struct dc_cursor_position {
 	bool hot_spot_enable;
 };
 
+/* IPP related types */
+
+/* Used by both ipp amd opp functions*/
+/* TODO: to be consolidated with enum color_space */
+enum ovl_color_space {
+	OVL_COLOR_SPACE_UNKNOWN = 0,
+	OVL_COLOR_SPACE_RGB,
+	OVL_COLOR_SPACE_YUV601,
+	OVL_COLOR_SPACE_YUV709
+};
+
+/*
+ * This enum is for programming CURSOR_MODE register field. What this register
+ * should be programmed to depends on OS requested cursor shape flags and what
+ * we stored in the cursor surface.
+ */
+enum dc_cursor_color_format {
+	CURSOR_MODE_MONO,
+	CURSOR_MODE_COLOR_1BIT_AND,
+	CURSOR_MODE_COLOR_PRE_MULTIPLIED_ALPHA,
+	CURSOR_MODE_COLOR_UN_PRE_MULTIPLIED_ALPHA
+};
+
+/*
+ * This is all the parameters required by DAL in order to update the cursor
+ * attributes, including the new cursor image surface address, size, hotspot
+ * location, color format, etc.
+ */
+
+union dc_cursor_attribute_flags {
+	struct {
+		uint32_t ENABLE_MAGNIFICATION:1;
+		uint32_t INVERSE_TRANSPARENT_CLAMPING:1;
+		uint32_t HORIZONTAL_MIRROR:1;
+		uint32_t VERTICAL_MIRROR:1;
+		uint32_t RESERVED:28;
+	} bits;
+	uint32_t value;
+};
+
+struct dc_cursor_attributes {
+	PHYSICAL_ADDRESS_LOC address;
+
+	/* Width and height should correspond to cursor surface width x heigh */
+	uint32_t width;
+	uint32_t height;
+	uint32_t x_hot;
+	uint32_t y_hot;
+
+	enum dc_cursor_color_format color_format;
+
+	/* In case we support HW Cursor rotation in the future */
+	enum dc_rotation_angle rotation_angle;
+
+	union dc_cursor_attribute_flags attribute_flags;
+};
+
+/* Pixel format */
+enum pixel_format {
+	/*graph*/
+	PIXEL_FORMAT_UNINITIALIZED,
+	PIXEL_FORMAT_INDEX8,
+	PIXEL_FORMAT_RGB565,
+	PIXEL_FORMAT_ARGB8888,
+	PIXEL_FORMAT_ARGB2101010,
+	PIXEL_FORMAT_ARGB2101010_XRBIAS,
+	PIXEL_FORMAT_FP16,
+	/*video*/
+	PIXEL_FORMAT_420BPP12,
+	PIXEL_FORMAT_422BPP16,
+	PIXEL_FORMAT_444BPP16,
+	PIXEL_FORMAT_444BPP32,
+	/*end of pixel format definition*/
+	PIXEL_FORMAT_INVALID,
+
+	PIXEL_FORMAT_GRPH_BEGIN = PIXEL_FORMAT_INDEX8,
+	PIXEL_FORMAT_GRPH_END = PIXEL_FORMAT_FP16,
+	PIXEL_FORMAT_VIDEO_BEGIN = PIXEL_FORMAT_420BPP12,
+	PIXEL_FORMAT_VIDEO_END = PIXEL_FORMAT_444BPP32,
+	PIXEL_FORMAT_UNKNOWN
+};
+
+struct dev_c_lut {
+	uint8_t red;
+	uint8_t green;
+	uint8_t blue;
+};
 #endif /* DC_HW_TYPES_H */
 

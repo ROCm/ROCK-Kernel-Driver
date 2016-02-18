@@ -29,11 +29,6 @@
 #include "dc_types.h"
 
 /* TODO: Used in IPP and OPP */
-struct dev_c_lut {
-	uint8_t red;
-	uint8_t green;
-	uint8_t blue;
-};
 
 struct dev_c_lut16 {
 	uint16_t red;

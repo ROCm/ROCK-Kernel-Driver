@@ -33,13 +33,6 @@ enum ovl_alpha_blending_mode {
 	OVL_ALPHA_PER_PIXEL_OVL_ALPHA_MODE
 };
 
-enum ovl_color_space {
-	OVL_COLOR_SPACE_UNKNOWN = 0,
-	OVL_COLOR_SPACE_RGB,
-	OVL_COLOR_SPACE_YUV601,
-	OVL_COLOR_SPACE_YUV709
-};
-
 enum ovl_surface_format {
 	OVL_SURFACE_FORMAT_UNKNOWN = 0,
 	OVL_SURFACE_FORMAT_YUY2,
