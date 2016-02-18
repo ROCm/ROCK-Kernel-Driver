@@ -196,8 +196,7 @@ static bool setup_scaling_configuration(
 		set_reg_field_value(value, 1, SCLV_MODE, SCL_MODE_C);
 		set_reg_field_value(value, 1, SCLV_MODE, SCL_PSCL_EN_C);
 		is_scaling_needed = true;
-	} else if (data->format != PIXEL_FORMAT_420BPP12 &&
-		data->format != PIXEL_FORMAT_422BPP16) {
+	} else if (data->format != PIXEL_FORMAT_420BPP12) {
 		set_reg_field_value(
 			value,
 			get_reg_field_value(value, SCLV_MODE, SCL_MODE),
@@ -356,7 +355,6 @@ static void calculate_inits(
 	inits->v_init_luma.integer = 1;
 	inits->h_init_chroma.integer = 1;
 	inits->v_init_chroma.integer = 1;
-
 }
 
 static void program_scl_ratios_inits(

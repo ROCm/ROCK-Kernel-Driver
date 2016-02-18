@@ -111,12 +111,6 @@ struct ipp_funcs {
 		struct input_pixel_processor *ipp,
 		struct ipp_prescale_params *params);
 
-	bool (*ipp_set_palette)(
-		struct input_pixel_processor *ipp,
-		const struct dev_c_lut *palette,
-		uint32_t start,
-		uint32_t length,
-		enum pixel_format surface_pixel_format);
 };
 
 #endif /* __DAL_IPP_H__ */
