@@ -1218,6 +1218,7 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	/* Software is initialized. Now we can register interrupt handlers. */
 	switch (adev->asic_type) {
 	case CHIP_BONAIRE:
+	case CHIP_HAWAII:
 	case CHIP_TONGA:
 	case CHIP_FIJI:
 	case CHIP_CARRIZO:
@@ -1433,6 +1434,7 @@ static int dm_early_init(void *handle)
 
 	switch (adev->asic_type) {
 	case CHIP_BONAIRE:
+	case CHIP_HAWAII:
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
