@@ -26,4 +26,11 @@
 
 extern const struct amd_ip_funcs dce_v11_0_ip_funcs;
 
+void dce_v11_0_set_vga_render_state(struct amdgpu_device *adev,
+				    bool render);
+void dce_v11_0_stop_mc_access(struct amdgpu_device *adev,
+			      struct amdgpu_mode_mc_save *save);
+void dce_v11_0_resume_mc_access(struct amdgpu_device *adev,
+				struct amdgpu_mode_mc_save *save);
+
 #endif
