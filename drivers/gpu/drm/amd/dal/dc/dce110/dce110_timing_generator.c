@@ -285,10 +285,14 @@ bool dce110_timing_generator_enable_crtc(struct timing_generator *tg)
 
 	value = dm_read_reg(tg->ctx,
 			CRTC_REG(mmCRTC_MASTER_UPDATE_MODE));
-	set_reg_field_value(value, 3,
+	set_reg_field_value(value, 0,
 			CRTC_MASTER_UPDATE_MODE, MASTER_UPDATE_MODE);
 	dm_write_reg(tg->ctx,
 			CRTC_REG(mmCRTC_MASTER_UPDATE_MODE), value);
+
+	/* TODO: may want this on for looking for underflow */
+	value = 0;
+	dm_write_reg(tg->ctx, CRTC_REG(mmCRTC_MASTER_UPDATE_MODE), value);
 
 	result = tg->bp->funcs->enable_crtc(tg->bp, tg110->controller_id, true);
 

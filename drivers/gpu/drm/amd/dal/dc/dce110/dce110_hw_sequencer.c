@@ -71,17 +71,17 @@ enum blender_mode {
 
 static const struct dce110_hw_seq_reg_offsets reg_offsets[] = {
 {
-	.dcfe = (mmDCFE0_DCFE_MEM_PWR_CTRL - mmDCFE_MEM_PWR_CTRL),
+	.dcfe = (mmDCFE0_DCFE_CLOCK_CONTROL - mmDCFE_CLOCK_CONTROL),
 	.blnd = (mmBLND0_BLND_CONTROL - mmBLND_CONTROL),
 	.crtc = (mmCRTC0_CRTC_GSL_CONTROL - mmCRTC_GSL_CONTROL),
 },
 {
-	.dcfe = (mmDCFE1_DCFE_MEM_PWR_CTRL - mmDCFE_MEM_PWR_CTRL),
+	.dcfe = (mmDCFE1_DCFE_CLOCK_CONTROL - mmDCFE_CLOCK_CONTROL),
 	.blnd = (mmBLND1_BLND_CONTROL - mmBLND_CONTROL),
 	.crtc = (mmCRTC1_CRTC_GSL_CONTROL - mmCRTC_GSL_CONTROL),
 },
 {
-	.dcfe = (mmDCFE2_DCFE_MEM_PWR_CTRL - mmDCFE_MEM_PWR_CTRL),
+	.dcfe = (mmDCFE2_DCFE_CLOCK_CONTROL - mmDCFE_CLOCK_CONTROL),
 	.blnd = (mmBLND2_BLND_CONTROL - mmBLND_CONTROL),
 	.crtc = (mmCRTC2_CRTC_GSL_CONTROL - mmCRTC_GSL_CONTROL),
 },
@@ -115,7 +115,6 @@ static void dce110_enable_fe_clock(
 	uint32_t value = 0;
 	uint32_t addr;
 
-	/*TODO: proper offset*/
 	addr = HW_REG_DCFE(mmDCFE_CLOCK_CONTROL, controller_id);
 
 	value = dm_read_reg(ctx, addr);
@@ -258,6 +257,7 @@ static bool dce110_pipe_control_lock(
 
 	dm_write_reg(ctx, addr, value);
 
+	need_to_wait = false;/*todo: mpo optimization remove*/
 	if (!lock && need_to_wait) {
 		uint8_t counter = 0;
 		const uint8_t counter_limit = 100;
@@ -361,25 +361,27 @@ static void dce110_set_blender_mode(
 {
 	uint32_t value;
 	uint32_t addr = HW_REG_BLND(mmBLND_CONTROL, controller_id);
-	uint32_t blnd_mode;
-	uint32_t feedthrough = 0;
+	uint32_t alpha_mode = 2;
+	uint32_t blnd_mode = 0;
+	uint32_t feedthrough = 1;
+	uint32_t multiplied_mode = 0;
 
 	switch (mode) {
 	case BLENDER_MODE_OTHER_PIPE:
 		feedthrough = 0;
+		alpha_mode = 0;
 		blnd_mode = 1;
 		break;
 	case BLENDER_MODE_BLENDING:
 		feedthrough = 0;
+		alpha_mode = 0;
 		blnd_mode = 2;
+		multiplied_mode = 1;
 		break;
 	case BLENDER_MODE_CURRENT_PIPE:
 	default:
 		if (controller_id == DCE110_UNDERLAY_IDX)
 			feedthrough = 0;
-		else
-			feedthrough = 1;
-		blnd_mode = 0;
 		break;
 	}
 
@@ -390,12 +392,21 @@ static void dce110_set_blender_mode(
 		feedthrough,
 		BLND_CONTROL,
 		BLND_FEEDTHROUGH_EN);
-
+	set_reg_field_value(
+		value,
+		alpha_mode,
+		BLND_CONTROL,
+		BLND_ALPHA_MODE);
 	set_reg_field_value(
 		value,
 		blnd_mode,
 		BLND_CONTROL,
 		BLND_MODE);
+	set_reg_field_value(
+		value,
+		multiplied_mode,
+		BLND_CONTROL,
+		BLND_MULTIPLIED_MODE);
 
 
 	dm_write_reg(ctx, addr, value);
@@ -455,6 +466,9 @@ static bool dce110_enable_display_power_gating(
 		cntl = ASIC_PIPE_ENABLE;
 	else
 		cntl = ASIC_PIPE_DISABLE;
+
+	if (controller_id == DCE110_UNDERLAY_IDX)
+		controller_id = CONTROLLER_ID_UNDERLAY0 - 1;
 
 	if (power_gating != PIPE_GATING_CONTROL_INIT || controller_id == 0)
 		bp_result = dcb->funcs->enable_disp_power_gating(
@@ -524,10 +538,10 @@ static bool set_gamma_ramp(
 
 	opp->funcs->opp_power_on_regamma_lut(opp, true);
 
-	build_prescale_params(prescale_params, surface);
-
-	if (ipp)
+	if (ipp) {
+		build_prescale_params(prescale_params, surface);
 		ipp->funcs->ipp_program_prescale(ipp, prescale_params);
+	}
 
 	if (ramp) {
 		calculate_regamma_params(regamma_params,
@@ -778,8 +792,6 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		 * programming, otherwise CRTC will be hung in bad state
 		 */
 		pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true);
-		pipe_ctx->flags.blanked = true;
-
 
 		/*
 		 * only disable stream in case it was ever enabled
@@ -957,8 +969,6 @@ static void disable_vga_and_power_gate_all_controllers(
 		 * powergating. */
 		enable_display_pipe_clock_gating(ctx,
 				true);
-		if (i == DCE110_UNDERLAY_IDX)
-			continue;
 		dc->hwss.enable_display_power_gating(ctx, i, dcb,
 				PIPE_GATING_CONTROL_ENABLE);
 	}
@@ -1385,6 +1395,10 @@ static void set_plane_config(
 			true);
 
 	tg->funcs->program_timing(tg, crtc_timing, false);
+	tg->funcs->enable_advanced_request(
+			tg,
+			true,
+			&pipe_ctx->stream->public.timing);
 
 	dc->hwss.enable_fe_clock(ctx, pipe_ctx->pipe_idx, true);
 
@@ -1451,8 +1465,7 @@ static void update_plane_addrs(struct dc *dc, struct resource_context *res_ctx)
 		if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, false)) {
 			dm_error("DC: failed to unblank crtc!\n");
 			BREAK_TO_DEBUGGER();
-		} else
-			pipe_ctx->flags.blanked = false;
+		}
 	}
 }
 
@@ -1476,12 +1489,9 @@ static void reset_single_pipe_hw_ctx(
 	}
 
 	core_link_disable_stream(pipe_ctx);
-	if (!pipe_ctx->flags.blanked) {
-		if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
-			dm_error("DC: failed to blank crtc!\n");
-			BREAK_TO_DEBUGGER();
-		} else
-			pipe_ctx->flags.blanked = true;
+	if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
+		dm_error("DC: failed to blank crtc!\n");
+		BREAK_TO_DEBUGGER();
 	}
 	pipe_ctx->tg->funcs->disable_crtc(pipe_ctx->tg);
 	pipe_ctx->mi->funcs->free_mem_input(
