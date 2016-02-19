@@ -107,17 +107,6 @@ struct ovl_csc_adjustment {
 
 };
 
-enum ovl_csc_adjust_item {
-	OVERLAY_BRIGHTNESS = 0,
-	OVERLAY_GAMMA,
-	OVERLAY_CONTRAST,
-	OVERLAY_SATURATION,
-	OVERLAY_HUE,
-	OVERLAY_ALPHA,
-	OVERLAY_ALPHA_PER_PIX,
-	OVERLAY_COLOR_TEMPERATURE
-};
-
 struct input_csc_matrix {
 	enum color_space color_space;
 	uint16_t regval[12];

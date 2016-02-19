@@ -30,6 +30,7 @@
 #include "grph_object_id.h"
 #include "video_csc_types.h"
 #include "hw_sequencer_types.h"
+#include "hw_shared.h"
 
 struct fixed31_32;
 struct gamma_parameters;
@@ -116,45 +117,10 @@ enum wide_gamut_regamma_mode {
 	WIDE_GAMUT_REGAMMA_MODE_OVL_MATRIX_B
 };
 
-struct pwl_result_data {
-	struct fixed31_32 red;
-	struct fixed31_32 green;
-	struct fixed31_32 blue;
-
-	struct fixed31_32 delta_red;
-	struct fixed31_32 delta_green;
-	struct fixed31_32 delta_blue;
-
-	uint32_t red_reg;
-	uint32_t green_reg;
-	uint32_t blue_reg;
-
-	uint32_t delta_red_reg;
-	uint32_t delta_green_reg;
-	uint32_t delta_blue_reg;
-};
-
 struct gamma_pixel {
 	struct fixed31_32 r;
 	struct fixed31_32 g;
 	struct fixed31_32 b;
-};
-
-struct gamma_curve {
-	uint32_t offset;
-	uint32_t segments_num;
-};
-
-struct curve_points {
-	struct fixed31_32 x;
-	struct fixed31_32 y;
-	struct fixed31_32 offset;
-	struct fixed31_32 slope;
-
-	uint32_t custom_float_x;
-	uint32_t custom_float_y;
-	uint32_t custom_float_offset;
-	uint32_t custom_float_slope;
 };
 
 enum channel_name {
@@ -260,14 +226,6 @@ enum fmt_stereo_action {
 	FMT_STEREO_ACTION_UPDATE_POLARITY
 };
 
-struct regamma_params {
-	uint32_t *data;
-	struct gamma_curve arr_curve_points[16];
-	struct curve_points arr_points[3];
-	struct pwl_result_data rgb_resulted[256 + 3];
-	uint32_t hw_points_num;
-};
-
 enum graphics_csc_adjust_type {
 	GRAPHICS_CSC_ADJUST_TYPE_BYPASS = 0,
 	GRAPHICS_CSC_ADJUST_TYPE_HW, /* without adjustments */
@@ -300,6 +258,28 @@ struct opp_grph_csc_adjustment {
 	int32_t grph_hue;
 };
 
+
+/* Underlay related types */
+
+struct hw_adjustment_range {
+	int32_t hw_default;
+	int32_t min;
+	int32_t max;
+	int32_t step;
+	uint32_t divider; /* (actually HW range is min/divider; divider !=0) */
+};
+
+enum ovl_csc_adjust_item {
+	OVERLAY_BRIGHTNESS = 0,
+	OVERLAY_GAMMA,
+	OVERLAY_CONTRAST,
+	OVERLAY_SATURATION,
+	OVERLAY_HUE,
+	OVERLAY_ALPHA,
+	OVERLAY_ALPHA_PER_PIX,
+	OVERLAY_COLOR_TEMPERATURE
+};
+
 struct opp_funcs {
 	void (*opp_power_on_regamma_lut)(
 		struct output_pixel_processor *opp,
@@ -307,7 +287,7 @@ struct opp_funcs {
 
 	bool (*opp_program_regamma_pwl)(
 		struct output_pixel_processor *opp,
-		const struct regamma_params *params);
+		const struct pwl_params *params);
 
 	void (*opp_set_regamma_mode)(struct output_pixel_processor *opp,
 			enum opp_regamma mode);

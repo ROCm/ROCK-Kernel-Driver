@@ -1287,7 +1287,7 @@ static bool convert_to_custom_float(
 	return true;
 }
 
-void calculate_regamma_params(struct regamma_params *params,
+void calculate_regamma_params(struct pwl_params *params,
 		struct temp_params *temp_params,
 		const struct core_gamma *ramp,
 		const struct core_surface *surface)

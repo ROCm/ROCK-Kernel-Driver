@@ -108,7 +108,7 @@ void dce110_opp_power_on_regamma_lut(
 
 bool dce110_opp_program_regamma_pwl(
 	struct output_pixel_processor *opp,
-	const struct regamma_params *params);
+	const struct pwl_params *params);
 
 void dce110_opp_set_regamma_mode(struct output_pixel_processor *opp,
 		enum opp_regamma mode);
