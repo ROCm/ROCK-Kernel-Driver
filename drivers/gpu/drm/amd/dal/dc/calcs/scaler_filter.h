@@ -38,8 +38,6 @@ struct scaler_filter_params {
 	} flags;
 };
 
-struct q31_32;
-
 struct scaler_filter {
 	struct scaler_filter_params params;
 	uint32_t src_size;

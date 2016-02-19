@@ -172,20 +172,6 @@ struct dc_edid_caps {
 	uint8_t lte_340mcsc_scramble;
 };
 
-struct scaling_taps {
-	uint32_t v_taps;
-	uint32_t h_taps;
-	uint32_t v_taps_c;
-	uint32_t h_taps_c;
-};
-
-struct scaling_ratios {
-	struct fixed31_32 horz;
-	struct fixed31_32 vert;
-	struct fixed31_32 horz_c;
-	struct fixed31_32 vert_c;
-};
-
 struct view {
 	uint32_t width;
 	uint32_t height;

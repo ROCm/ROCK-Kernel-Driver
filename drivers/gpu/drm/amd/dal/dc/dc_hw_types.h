@@ -373,5 +373,15 @@ enum dc_color_depth {
 	COLOR_DEPTH_COUNT
 };
 
+/* XFM */
+
+/* used in  struct dc_surface */
+struct scaling_taps {
+	uint32_t v_taps;
+	uint32_t h_taps;
+	uint32_t v_taps_c;
+	uint32_t h_taps_c;
+};
+
 #endif /* DC_HW_TYPES_H */
 

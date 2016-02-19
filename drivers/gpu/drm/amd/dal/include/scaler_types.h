@@ -28,23 +28,6 @@
 
 #include "dc_types.h"
 
-/*overscan or window*/
-struct overscan_info {
-	uint32_t left;
-	uint32_t right;
-	uint32_t top;
-	uint32_t bottom;
-};
-
-struct scaler_data {
-	struct overscan_info overscan;
-	struct scaling_taps taps;
-	struct rect viewport;
-	struct scaling_ratios ratios;
-
-	enum pixel_format format;
-};
-
 struct init_int_and_frac {
 	uint32_t integer;
 	uint32_t fraction;
