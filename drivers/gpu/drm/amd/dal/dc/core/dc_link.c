@@ -1151,8 +1151,9 @@ static enum dc_status enable_link_dp(struct pipe_ctx *pipe_ctx)
 	/* get link settings for video mode timing */
 	decide_link_settings(stream, &link_settings);
 	dp_enable_link_phy(
-		stream->sink->link,
+		link,
 		pipe_ctx->signal,
+		pipe_ctx->clock_source->id,
 		&link_settings);
 
 	panel_mode = dp_get_panel_mode(link);

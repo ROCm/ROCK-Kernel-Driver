@@ -841,14 +841,20 @@ static enum dc_status map_clock_resources(
 				if (context->res_ctx.pipe_ctx[k].stream != stream)
 					continue;
 
+				/*
+				 * in this case if external clock source is not
+				 * available for DP, it will pick-up first
+				 * available pll from find_first_free_pll
+				 */
 				if (dc_is_dp_signal(pipe_ctx->signal)
 					|| pipe_ctx->signal == SIGNAL_TYPE_VIRTUAL)
-					pipe_ctx->clock_source = context->res_ctx.
-						pool.clock_sources[DCE100_CLK_SRC_EXT];
-				else
+					pipe_ctx->clock_source = context->res_ctx.pool.clock_sources[DCE100_CLK_SRC_EXT];
+
+				if (pipe_ctx->clock_source == NULL)
 					pipe_ctx->clock_source =
 						find_used_clk_src_for_sharing(
-							&context->res_ctx, pipe_ctx);
+							&context->res_ctx,
+							pipe_ctx);
 
 				if (pipe_ctx->clock_source == NULL)
 					pipe_ctx->clock_source =
