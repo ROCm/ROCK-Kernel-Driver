@@ -1006,10 +1006,16 @@ enum dc_status dce80_validate_with_context(
 						== context->targets[i]) {
 				unchanged = true;
 				set_target_unchanged(context, i);
+				attach_surfaces_to_context(
+					(struct dc_surface **)dc->current_context.
+						target_status[j].surfaces,
+					dc->current_context.target_status[j].surface_count,
+					&context->targets[i]->public,
+					context);
 				context->target_status[i] =
 					dc->current_context.target_status[j];
 			}
-		if (!unchanged)
+		if (!unchanged || set[i].surface_count != 0)
 			if (!attach_surfaces_to_context(
 					(struct dc_surface **)set[i].surfaces,
 					set[i].surface_count,
