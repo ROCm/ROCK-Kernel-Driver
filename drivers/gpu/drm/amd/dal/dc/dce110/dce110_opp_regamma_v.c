@@ -129,7 +129,7 @@ static void configure_regamma_mode(struct dce110_opp *opp110, uint32_t mode)
  *****************************************************************************
  */
 static void regamma_config_regions_and_segments(
-	struct dce110_opp *opp110, const struct regamma_params *params)
+	struct dce110_opp *opp110, const struct pwl_params *params)
 {
 	const struct gamma_curve *curve;
 	uint32_t value = 0;
@@ -450,7 +450,7 @@ static void regamma_config_regions_and_segments(
 }
 
 static void program_pwl(struct dce110_opp *opp110,
-		const struct regamma_params *params)
+		const struct pwl_params *params)
 {
 	uint32_t value = 0;
 
@@ -493,7 +493,7 @@ static void program_pwl(struct dce110_opp *opp110,
 
 bool dce110_opp_program_regamma_pwl_v(
 	struct output_pixel_processor *opp,
-	const struct regamma_params *params)
+	const struct pwl_params *params)
 {
 	struct dce110_opp *opp110 = TO_DCE110_OPP(opp);
 

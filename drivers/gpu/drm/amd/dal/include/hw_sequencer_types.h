@@ -293,12 +293,4 @@ enum channel_command_type {
 #define	TMDS_MAX_PIXEL_CLOCK_IN_KHZ 165000
 #define	NATIVE_HDMI_MAX_PIXEL_CLOCK_IN_KHZ 297000
 
-struct hw_adjustment_range {
-	int32_t hw_default;
-	int32_t min;
-	int32_t max;
-	int32_t step;
-	uint32_t divider; /* (actually HW range is min/divider; divider !=0) */
-};
-
 #endif

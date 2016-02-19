@@ -67,7 +67,7 @@ struct curve_config {
  *****************************************************************************
  */
 static void regamma_config_regions_and_segments(
-	struct dce80_opp *opp80, const struct regamma_params *params)
+	struct dce80_opp *opp80, const struct pwl_params *params)
 {
 	const struct gamma_curve *curve;
 	uint32_t value = 0;
@@ -390,7 +390,7 @@ static void regamma_config_regions_and_segments(
 
 static void program_pwl(
 	struct dce80_opp *opp80,
-	const struct regamma_params *params)
+	const struct pwl_params *params)
 {
 	uint32_t value;
 
@@ -517,7 +517,7 @@ void dce80_opp_power_on_regamma_lut(
 
 bool dce80_opp_program_regamma_pwl(
 	struct output_pixel_processor *opp,
-	const struct regamma_params *params)
+	const struct pwl_params *params)
 {
 
 	struct dce80_opp *opp80 = TO_DCE80_OPP(opp);

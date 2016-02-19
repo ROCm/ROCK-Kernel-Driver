@@ -500,7 +500,7 @@ static bool set_gamma_ramp(
 	const struct core_surface *surface)
 {
 	struct ipp_prescale_params *prescale_params;
-	struct regamma_params *regamma_params;
+	struct pwl_params *regamma_params;
 	struct temp_params *temp_params;
 	bool result = false;
 
@@ -511,7 +511,7 @@ static bool set_gamma_ramp(
 		goto prescale_alloc_fail;
 
 	regamma_params = dm_alloc(opp->ctx,
-			sizeof(struct regamma_params));
+			sizeof(struct pwl_params));
 	if (regamma_params == NULL)
 		goto regamma_alloc_fail;
 

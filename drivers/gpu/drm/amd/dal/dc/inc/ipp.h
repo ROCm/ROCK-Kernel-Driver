@@ -27,11 +27,7 @@
 #ifndef __DAL_IPP_H__
 #define __DAL_IPP_H__
 
-#include "include/grph_object_id.h"
-#include "include/video_csc_types.h"
-#include "include/hw_sequencer_types.h"
-
-struct dev_c_lut;
+#include "hw_shared.h"
 
 #define MAXTRIX_COEFFICIENTS_NUMBER 12
 #define MAXTRIX_COEFFICIENTS_WRAP_NUMBER (MAXTRIX_COEFFICIENTS_NUMBER + 4)
@@ -78,9 +74,20 @@ struct dcp_video_matrix {
 	int32_t value[MAXTRIX_COEFFICIENTS_NUMBER];
 };
 
+enum expansion_mode {
+	EXPANSION_MODE_ZERO,
+	EXPANSION_MODE_DYNAMIC
+};
+
+enum ipp_output_format {
+	IPP_OUTPUT_FORMAT_12_BIT_FIX,
+	IPP_OUTPUT_FORMAT_16_BIT_BYPASS,
+	IPP_OUTPUT_FORMAT_FLOAT
+};
+
 struct ipp_funcs {
 
-	/* CURSOR RELATED */
+	/*** cursor ***/
 	bool (*ipp_cursor_set_position)(
 		struct input_pixel_processor *ipp,
 		const struct dc_cursor_position *position);
@@ -89,14 +96,30 @@ struct ipp_funcs {
 		struct input_pixel_processor *ipp,
 		const struct dc_cursor_attributes *attributes);
 
-	/* DEGAMMA RELATED */
+	/*** setup input pixel processing ***/
+
+	/* put the entire pixel processor to bypass */
+	void (*ipp_full_bypass)(struct input_pixel_processor *ipp);
+
+	/* setup ipp to expand/convert input to pixel processor internal format */
+	void (*ipp_setup)(
+		enum surface_pixel_format input_format,
+		enum expansion_mode mode,
+		enum ipp_output_format output_format);
+
+	/* DCE function to setup IPP.  TODO: see if we can consolidate to setup */
+	void (*ipp_program_prescale)(
+			struct input_pixel_processor *ipp,
+			struct ipp_prescale_params *params);
+
+	/*** DEGAMMA RELATED ***/
 	bool (*ipp_set_degamma)(
 		struct input_pixel_processor *ipp,
 		enum ipp_degamma_mode mode);
 
-	void (*ipp_program_prescale)(
+	bool (*ipp_program_degamma_pwl)(
 		struct input_pixel_processor *ipp,
-		struct ipp_prescale_params *params);
+		const struct pwl_params *params);
 
 };
 
