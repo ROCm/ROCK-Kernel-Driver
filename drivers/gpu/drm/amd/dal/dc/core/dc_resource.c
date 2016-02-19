@@ -30,6 +30,7 @@
 #include "stream_encoder.h"
 #include "opp.h"
 #include "transform.h"
+#include "video_csc_types.h"
 
 #if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
 #include "dce80/dce80_resource.h"
