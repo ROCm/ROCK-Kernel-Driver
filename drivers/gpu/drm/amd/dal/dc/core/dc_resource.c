@@ -106,7 +106,6 @@ static bool is_sharable_clk_src(
 	const struct pipe_ctx *pipe_with_clk_src,
 	const struct pipe_ctx *pipe)
 {
-	enum clock_source_id id = pipe_with_clk_src->clock_source->id;
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 	enum dce_version dce_ver = dal_adapter_service_get_dce_version(
 		pipe->stream->sink->link->adapter_srv);
@@ -114,14 +113,18 @@ static bool is_sharable_clk_src(
 	/* Currently no clocks are shared for DCE 10 until VBIOS behaviour
 	 * is verified for this use case
 	 */
-	if (dce_ver == DCE_VERSION_10_0)
+	if (dce_ver == DCE_VERSION_10_0 && !dc_is_dp_signal(pipe->signal))
 		return false;
 #endif
 
 	if (pipe_with_clk_src->clock_source == NULL)
 		return false;
 
-	if (id == CLOCK_SOURCE_ID_EXTERNAL)
+	if (dc_is_dp_signal(pipe->signal) &&
+		dc_is_dp_signal(pipe_with_clk_src->signal))
+		return true;
+
+	if (pipe->signal != pipe_with_clk_src->signal)
 		return false;
 
 	if(!is_same_timing(
@@ -139,9 +142,6 @@ struct clock_source *find_used_clk_src_for_sharing(
 	uint8_t i;
 
 	for (i = 0; i < MAX_PIPES; i++) {
-		if (res_ctx->pipe_ctx[i].clock_source == NULL)
-			continue;
-
 		if (is_sharable_clk_src(&res_ctx->pipe_ctx[i], pipe_ctx))
 			return res_ctx->pipe_ctx[i].clock_source;
 	}

@@ -54,6 +54,7 @@ void dp_receiver_power_ctrl(struct core_link *link, bool on)
 void dp_enable_link_phy(
 	struct core_link *link,
 	enum signal_type signal,
+	enum clock_source_id clock_source,
 	const struct dc_link_settings *link_settings)
 {
 	struct link_encoder *link_enc = link->link_enc;
@@ -67,12 +68,12 @@ void dp_enable_link_phy(
 		link_enc->funcs->enable_dp_output(
 						link_enc,
 						link_settings,
-						CLOCK_SOURCE_ID_EXTERNAL);
+						clock_source);
 	} else {
 		link_enc->funcs->enable_dp_mst_output(
 						link_enc,
 						link_settings,
-						CLOCK_SOURCE_ID_EXTERNAL);
+						clock_source);
 	}
 
 	dp_receiver_power_ctrl(link, true);

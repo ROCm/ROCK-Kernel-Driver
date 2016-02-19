@@ -1137,6 +1137,7 @@ bool dp_hbr_verify_link_cap(
 		dp_enable_link_phy(
 				link,
 				link->public.connector_signal,
+				CLOCK_SOURCE_ID_UNDEFINED,
 				cur);
 
 		if (skip_link_training)
