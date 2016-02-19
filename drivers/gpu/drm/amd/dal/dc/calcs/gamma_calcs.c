@@ -25,7 +25,6 @@
 
 #include "dm_services.h"
 #include "gamma_calcs.h"
-#include "core_types.h"
 
 struct curve_config {
 	uint32_t offset;

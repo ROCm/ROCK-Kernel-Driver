@@ -28,7 +28,6 @@
 
 #include "include/scaler_types.h"
 #include "calcs/scaler_filter.h"
-#include "grph_object_id.h"
 
 struct bit_depth_reduction_params;
 
@@ -133,6 +132,30 @@ struct xfm_grph_csc_adjustment {
 	int32_t temperature_matrix[CSC_TEMPERATURE_MATRIX_SIZE];
 	int32_t temperature_divider;
 	enum graphics_gamut_adjust_type gamut_adjust_type;
+};
+
+/*overscan or window*/
+struct overscan_info {
+	uint32_t left;
+	uint32_t right;
+	uint32_t top;
+	uint32_t bottom;
+};
+
+struct scaling_ratios {
+	struct fixed31_32 horz;
+	struct fixed31_32 vert;
+	struct fixed31_32 horz_c;
+	struct fixed31_32 vert_c;
+};
+
+struct scaler_data {
+	struct overscan_info overscan;
+	struct scaling_taps taps;
+	struct rect viewport;
+	struct scaling_ratios ratios;
+
+	enum pixel_format format;
 };
 
 struct transform_funcs {
