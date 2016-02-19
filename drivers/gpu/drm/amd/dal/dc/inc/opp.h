@@ -26,10 +26,6 @@
 #ifndef __DAL_OPP_H__
 #define __DAL_OPP_H__
 
-#include "dc_types.h"
-#include "grph_object_id.h"
-#include "video_csc_types.h"
-#include "hw_sequencer_types.h"
 #include "hw_shared.h"
 
 struct fixed31_32;
