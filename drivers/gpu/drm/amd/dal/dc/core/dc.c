@@ -470,7 +470,7 @@ static void program_timing_sync(
 	uint8_t j;
 	uint8_t group_size = 0;
 	uint8_t tg_count = ctx->res_ctx.pool.pipe_count;
-	struct timing_generator *tg_set[3];
+	struct timing_generator *tg_set[MAX_PIPES];
 
 	for (i = 0; i < tg_count; i++) {
 		if (!ctx->res_ctx.pipe_ctx[i].stream)
@@ -487,8 +487,7 @@ static void program_timing_sync(
 				continue;
 
 			if (is_same_timing(
-				&ctx->res_ctx.pipe_ctx[j].stream->public
-								.timing,
+				&ctx->res_ctx.pipe_ctx[j].stream->public.timing,
 				&ctx->res_ctx.pipe_ctx[i].stream->public
 								.timing)) {
 				tg_set[group_size] =
