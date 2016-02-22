@@ -88,7 +88,7 @@ static int amdgpu_bo_list_set(struct amdgpu_device *adev,
 	struct amdgpu_bo *gws_obj = adev->gds.gws_gfx_bo;
 	struct amdgpu_bo *oa_obj = adev->gds.oa_gfx_bo;
 
-	bool has_userptr = false;
+	unsigned last_entry = 0, first_userptr = num_entries;
 	unsigned i;
 
 	array = drm_malloc_ab(num_entries, sizeof(struct amdgpu_bo_list_entry));
@@ -97,25 +97,30 @@ static int amdgpu_bo_list_set(struct amdgpu_device *adev,
 	memset(array, 0, num_entries * sizeof(struct amdgpu_bo_list_entry));
 
 	for (i = 0; i < num_entries; ++i) {
-		struct amdgpu_bo_list_entry *entry = &array[i];
+		struct amdgpu_bo_list_entry *entry;
 		struct drm_gem_object *gobj;
+		struct amdgpu_bo *bo;
 
 		gobj = drm_gem_object_lookup(adev->ddev, filp, info[i].bo_handle);
 		if (!gobj)
 			goto error_free;
 
-		entry->robj = amdgpu_bo_ref(gem_to_amdgpu_bo(gobj));
+		bo = amdgpu_bo_ref(gem_to_amdgpu_bo(gobj));
 		drm_gem_object_unreference_unlocked(gobj);
-		entry->priority = info[i].bo_priority;
-		entry->prefered_domains = entry->robj->initial_domain;
-		entry->allowed_domains = entry->prefered_domains;
-		if (entry->allowed_domains == AMDGPU_GEM_DOMAIN_VRAM)
-			entry->allowed_domains |= AMDGPU_GEM_DOMAIN_GTT;
-		if (amdgpu_ttm_tt_has_userptr(entry->robj->tbo.ttm)) {
-			has_userptr = true;
+		if (amdgpu_ttm_tt_has_userptr(bo->tbo.ttm)) {
+			entry = &array[--first_userptr];
 			entry->prefered_domains = AMDGPU_GEM_DOMAIN_GTT;
 			entry->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
+		} else {
+			entry = &array[last_entry++];
+			entry->prefered_domains = entry->robj->initial_domain;
+			entry->allowed_domains = entry->prefered_domains;
+			if (entry->allowed_domains == AMDGPU_GEM_DOMAIN_VRAM)
+				entry->allowed_domains |= AMDGPU_GEM_DOMAIN_GTT;
 		}
+
+		entry->robj = bo;
+		entry->priority = info[i].bo_priority;
 		entry->tv.bo = &entry->robj->tbo;
 		entry->tv.shared = true;
 
@@ -137,7 +142,7 @@ static int amdgpu_bo_list_set(struct amdgpu_device *adev,
 	list->gds_obj = gds_obj;
 	list->gws_obj = gws_obj;
 	list->oa_obj = oa_obj;
-	list->has_userptr = has_userptr;
+	list->first_userptr = first_userptr;
 	list->array = array;
 	list->num_entries = num_entries;
 

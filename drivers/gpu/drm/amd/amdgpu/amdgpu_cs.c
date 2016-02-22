@@ -382,7 +382,8 @@ static int amdgpu_cs_parser_relocs(struct amdgpu_cs_parser *p)
 	int i, r;
 
 	if (p->bo_list) {
-		need_mmap_lock = p->bo_list->has_userptr;
+		need_mmap_lock = p->bo_list->first_userptr !=
+			p->bo_list->num_entries;
 		amdgpu_cs_buckets_init(&buckets);
 		for (i = 0; i < p->bo_list->num_entries; i++)
 			amdgpu_cs_buckets_add(&buckets, &p->bo_list->array[i].tv.head,
