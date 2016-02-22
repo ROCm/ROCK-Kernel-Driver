@@ -143,5 +143,4 @@ void carrizo_asic_capability_create(struct asic_capability *cap,
 
 	}
 
-
 }

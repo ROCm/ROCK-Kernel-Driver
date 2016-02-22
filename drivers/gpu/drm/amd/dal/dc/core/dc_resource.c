@@ -80,7 +80,6 @@ void unreference_clock_source(
 		}
 	}
 
-
 }
 
 void reference_clock_source(
@@ -186,7 +185,6 @@ static enum pixel_format convert_pixel_format_to_dalsurface(
 		dal_pixel_format = PIXEL_FORMAT_FP16;
 		break;
 
-
 	case SURFACE_PIXEL_FORMAT_VIDEO_420_YCbCr:
 		dal_pixel_format = PIXEL_FORMAT_420BPP12;
 		break;
@@ -248,7 +246,6 @@ static void calculate_overscan(
 						pipe_ctx->scl_data.ratios.horz)) -
 						pipe_ctx->scl_data.overscan.left;
 
-
 	pipe_ctx->scl_data.overscan.top = stream->public.dst.y;
 	if (stream->public.src.y < surface->clip_rect.y)
 		pipe_ctx->scl_data.overscan.top += (surface->clip_rect.y
@@ -265,7 +262,6 @@ static void calculate_overscan(
 						pipe_ctx->scl_data.viewport.height),
 						pipe_ctx->scl_data.ratios.vert)) -
 						pipe_ctx->scl_data.overscan.top;
-
 
 	/* TODO: Add timing overscan to finalize overscan calculation*/
 }
@@ -405,7 +401,6 @@ bool attach_surfaces_to_context(
 		dm_error("Existing target not found; failed to attach surfaces\n");
 		return false;
 	}
-
 
 	/* retain new surfaces */
 	for (i = 0; i < surface_count; i++)
@@ -1011,7 +1006,6 @@ static void set_avi_info_frame(
 	info_frame.avi_info_packet.info_packet_hdmi.bits.Y0_Y1_Y2 =
 		pixel_encoding;
 
-
 	/* A0 = 1 Active Format Information valid */
 	info_frame.avi_info_packet.info_packet_hdmi.bits.A0 =
 		ACTIVE_FORMAT_VALID;
@@ -1038,7 +1032,6 @@ static void set_avi_info_frame(
 	else
 		info_frame.avi_info_packet.info_packet_hdmi.bits.C0_C1 =
 				COLORIMETRY_NO_DATA;
-
 
 	/* TODO: un-hardcode aspect ratio */
 	aspect = stream->public.timing.aspect_ratio;

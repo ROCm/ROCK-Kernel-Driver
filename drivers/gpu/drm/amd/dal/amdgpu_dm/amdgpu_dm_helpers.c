@@ -164,7 +164,6 @@ static struct amdgpu_connector *get_connector_for_link(
 	return aconnector;
 }
 
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 static void get_payload_table(
 		struct amdgpu_connector *aconnector,
@@ -468,7 +467,6 @@ bool dm_helpers_dp_read_dpcd(
 		uint8_t *data,
 		uint32_t size)
 {
-
 
 	struct amdgpu_device *adev = ctx->driver_context;
 	struct drm_device *dev = adev->ddev;

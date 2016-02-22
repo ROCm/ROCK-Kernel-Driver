@@ -28,7 +28,6 @@
 
 #include "../hw_translate.h"
 
-
 /* function table */
 static const struct hw_translate_funcs funcs = {
 	.offset_to_id = NULL,

@@ -31,7 +31,6 @@
 #define DAL_LOGGER_BUFFER_MAX_SIZE 2048
 #define DAL_LOGGER_BUFFER_MAX_LOG_LINE_SIZE 256
 
-
 #include "include/logger_types.h"
 
 struct dal_logger {

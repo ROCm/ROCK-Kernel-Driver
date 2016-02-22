@@ -37,7 +37,6 @@
 			"TRANSFORM SCALER:%s()\n", __func__)
 #define LB_TOTAL_NUMBER_OF_ENTRIES 1712
 
-
 struct sclv_ratios_inits {
 	uint32_t h_int_scale_ratio_luma;
 	uint32_t h_int_scale_ratio_chroma;
@@ -80,7 +79,6 @@ static void calculate_viewport(
 	chroma_viewport->height = luma_viewport->height;
 	chroma_viewport->width = luma_viewport->width;
 
-
 	if (scl_data->format == PIXEL_FORMAT_420BPP12) {
 		luma_viewport->height += luma_viewport->height % 2;
 		luma_viewport->width += luma_viewport->width % 2;
@@ -93,7 +91,6 @@ static void calculate_viewport(
 		chroma_viewport->width = luma_viewport->width / 2;
 	}
 }
-
 
 static void program_viewport(
 	struct dce110_transform *xfm110,
@@ -381,7 +378,6 @@ static void program_scl_ratios_inits(
 		SCL_V_SCALE_RATIO);
 	dm_write_reg(ctx, addr, value);
 
-
 	addr = mmSCLV_HORZ_FILTER_SCALE_RATIO_C;
 	value = 0;
 	set_reg_field_value(
@@ -399,7 +395,6 @@ static void program_scl_ratios_inits(
 		SCLV_VERT_FILTER_SCALE_RATIO_C,
 		SCL_V_SCALE_RATIO_C);
 	dm_write_reg(ctx, addr, value);
-
 
 	addr = mmSCLV_HORZ_FILTER_INIT;
 	value = 0;
@@ -428,7 +423,6 @@ static void program_scl_ratios_inits(
 		SCLV_VERT_FILTER_INIT,
 		SCL_V_INIT_INT);
 	dm_write_reg(ctx, addr, value);
-
 
 	addr = mmSCLV_HORZ_FILTER_INIT_C;
 	value = 0;
@@ -481,7 +475,6 @@ static bool dce110_transform_v_set_scaler(
 	struct rect luma_viewport = {0};
 	struct rect chroma_viewport = {0};
 	struct dc_context *ctx = xfm->ctx;
-
 
 	/* 1. Calculate viewport, viewport programming should happen after init
 	 * calculations as they may require an adjustment in the viewport.
@@ -569,7 +562,6 @@ static bool dce110_transform_v_power_up_line_buffer(struct transform *xfm)
 
 	return true;
 }
-
 
 static struct transform_funcs dce110_transform_v_funcs = {
 	.transform_power_up =

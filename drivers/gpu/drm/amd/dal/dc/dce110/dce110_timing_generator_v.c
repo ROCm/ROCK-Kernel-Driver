@@ -1,5 +1,3 @@
-
-
 #include "dm_services.h"
 
 /* include DCE11 register header files */
@@ -16,7 +14,6 @@
 #include "dce110_timing_generator_v.h"
 
 #include "timing_generator.h"
-
 
 /** ********************************************************************************
  *
@@ -590,7 +587,6 @@ static void dce110_timing_generator_v_set_colors(struct timing_generator *tg,
 	if (overscan_color != NULL)
 		dce110_timing_generator_v_set_overscan_color(tg, overscan_color);
 }
-
 
 static void dce110_timing_generator_v_set_early_control(
 		struct timing_generator *tg,

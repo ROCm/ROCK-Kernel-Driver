@@ -36,7 +36,6 @@ struct dce110_ipp_reg_offsets;
 struct gamma_parameters;
 struct dev_c_lut;
 
-
 bool dce80_ipp_construct(
 	struct dce110_ipp *ipp,
 	struct dc_context *ctx,
@@ -44,6 +43,5 @@ bool dce80_ipp_construct(
 	const struct dce110_ipp_reg_offsets *offset);
 
 void dce80_ipp_destroy(struct input_pixel_processor **ipp);
-
 
 #endif /*__DC_IPP_DCE80_H__*/

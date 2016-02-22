@@ -12,7 +12,6 @@
 #include "dce110/dce110_link_encoder.h"
 #include "dce110/dce110_stream_encoder.h"
 
-
 enum dc_status core_link_read_dpcd(
 	struct core_link* link,
 	uint32_t address,
@@ -130,7 +129,6 @@ bool dp_set_hw_training_pattern(
 
 	return true;
 }
-
 
 void dp_set_hw_lane_settings(
 	struct core_link *link,

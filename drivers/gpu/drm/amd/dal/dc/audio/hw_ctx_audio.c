@@ -85,7 +85,6 @@ static const struct audio_clock_info audio_clock_info_table_48bpc[12] = {
 	{14850, 4096, 297000, 6272, 330000, 6144, 297000}
 };
 
-
 /***** static function *****/
 
 /*
@@ -298,16 +297,7 @@ static bool get_azalia_clock_info_dp(
 	return false;
 }
 
-
-
-
-
-
-
-
-
 /*****SCOPE : within audio hw context dal-audio-hw-ctx *****/
-
 
 /* check whether specified sample rates can fit into a given timing */
 void dal_hw_ctx_audio_check_audio_bandwidth(
@@ -690,7 +680,6 @@ bool dal_audio_hw_ctx_get_audio_clock_info(
 			}
 		}
 	}
-
 
 	/* not found */
 	if (actual_pixel_clock_in_khz == 0)

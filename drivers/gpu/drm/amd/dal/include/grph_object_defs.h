@@ -215,7 +215,6 @@ struct static_screen_events {
 	};
 };
 
-
 /*
  * ***************************************************************
  * ********************* Register programming sequences ********

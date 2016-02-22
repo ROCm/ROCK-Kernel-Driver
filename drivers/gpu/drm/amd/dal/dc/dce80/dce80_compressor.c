@@ -292,8 +292,6 @@ static uint32_t lpt_memory_control_config(struct dce80_compressor *cp80,
 	return lpt_control;
 }
 
-
-
 static bool is_source_bigger_than_epanel_size(
 	struct dce80_compressor *cp80,
 	uint32_t source_view_width,
@@ -734,7 +732,6 @@ void dce80_compressor_program_lpt_control(
  * DCE 11 Frame Buffer Compression Implementation
  */
 
-
 void dce80_compressor_set_fbc_invalidation_triggers(
 	struct compressor *compressor,
 	uint32_t fbc_trigger)
@@ -847,7 +844,7 @@ struct compressor *dce80_compressor_create(struct dc_context *ctx,
 	struct adapter_service *as)
 {
 	struct dce80_compressor *cp80 =
-		dm_alloc(ctx, sizeof(struct dce80_compressor));
+		dm_alloc(sizeof(struct dce80_compressor));
 
 	if (!cp80)
 		return NULL;
@@ -856,12 +853,12 @@ struct compressor *dce80_compressor_create(struct dc_context *ctx,
 		return &cp80->base;
 
 	BREAK_TO_DEBUGGER();
-	dm_free(ctx, cp80);
+	dm_free(cp80);
 	return NULL;
 }
 
 void dce80_compressor_destroy(struct compressor **compressor)
 {
-	dm_free((*compressor)->ctx, TO_DCE80_COMPRESSOR(*compressor));
+	dm_free(TO_DCE80_COMPRESSOR(*compressor));
 	*compressor = NULL;
 }

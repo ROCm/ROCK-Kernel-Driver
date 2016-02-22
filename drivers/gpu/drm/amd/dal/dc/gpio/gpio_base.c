@@ -246,7 +246,7 @@ struct gpio *dal_gpio_create(
 	uint32_t en,
 	enum gpio_pin_output_state output_state)
 {
-	struct gpio *gpio = dm_alloc(service->ctx, sizeof(struct gpio));
+	struct gpio *gpio = dm_alloc(sizeof(struct gpio));
 
 	if (!gpio) {
 		ASSERT_CRITICAL(false);
@@ -273,7 +273,7 @@ void dal_gpio_destroy(
 
 	dal_gpio_close(*gpio);
 
-	dm_free((*gpio)->service->ctx, *gpio);
+	dm_free(*gpio);
 
 	*gpio = NULL;
 }

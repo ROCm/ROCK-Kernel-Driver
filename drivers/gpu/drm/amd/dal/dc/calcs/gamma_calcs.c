@@ -185,7 +185,6 @@ static bool setup_custom_float(
 	return true;
 }
 
-
 static bool convert_to_custom_float_format_ex(
 	struct fixed31_32 value,
 	const struct custom_float_format *format,
@@ -431,7 +430,6 @@ struct dividers {
 	struct fixed31_32 divider2;
 	struct fixed31_32 divider3;
 };
-
 
 static void build_regamma_coefficients(struct gamma_coefficients *coefficients)
 {
@@ -1337,5 +1335,4 @@ void calculate_regamma_params(struct pwl_params *params,
 	convert_to_custom_float(rgb_resulted, arr_points,
 			params->hw_points_num);
 }
-
 

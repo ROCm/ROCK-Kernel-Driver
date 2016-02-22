@@ -53,7 +53,6 @@ struct gamma {
 #define CORE_GAMMA_TO_GAMMA(core_gamma) \
 	container_of(core_gamma, struct gamma, protected)
 
-
 /*******************************************************************************
  * Private functions
  ******************************************************************************/
@@ -82,7 +81,7 @@ void enable_surface_flip_reporting(struct dc_surface *dc_surface,
 
 struct dc_surface *dc_create_surface(const struct core_dc *dc)
 {
-	struct surface *surface = dm_alloc(dc->ctx, sizeof(*surface));
+	struct surface *surface = dm_alloc(sizeof(*surface));
 
 	if (NULL == surface)
 		goto alloc_fail;
@@ -95,7 +94,7 @@ struct dc_surface *dc_create_surface(const struct core_dc *dc)
 	return &surface->protected.public;
 
 construct_fail:
-	dm_free(dc->ctx, surface);
+	dm_free(surface);
 
 alloc_fail:
 	return NULL;
@@ -115,7 +114,7 @@ void dc_surface_release(const struct dc_surface *dc_surface)
 
 	if (surface->ref_count == 0) {
 		destruct(surface);
-		dm_free(surface->protected.ctx, surface);
+		dm_free(surface);
 	}
 }
 
@@ -143,14 +142,13 @@ void dc_gamma_release(const struct dc_gamma *dc_gamma)
 
 	if (gamma->ref_count == 0) {
 		destruct_gamma(gamma);
-		dm_free(gamma->protected.ctx, gamma);
+		dm_free(gamma);
 	}
 }
 
-
 struct dc_gamma *dc_create_gamma(const struct core_dc *dc)
 {
-	struct gamma *gamma = dm_alloc(dc->ctx, sizeof(*gamma));
+	struct gamma *gamma = dm_alloc(sizeof(*gamma));
 
 	if (gamma == NULL)
 		goto alloc_fail;
@@ -163,7 +161,7 @@ struct dc_gamma *dc_create_gamma(const struct core_dc *dc)
 	return &gamma->protected.public;
 
 construct_fail:
-	dm_free(dc->ctx, gamma);
+	dm_free(gamma);
 
 alloc_fail:
 	return NULL;

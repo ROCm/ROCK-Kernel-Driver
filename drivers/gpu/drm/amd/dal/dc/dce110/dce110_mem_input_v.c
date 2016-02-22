@@ -36,11 +36,9 @@
 
 #include "dce110_mem_input.h"
 
-
 #define DCP_REG(reg) (reg + mem_input110->offsets.dcp)
 /*#define DMIF_REG(reg) (reg + mem_input110->offsets.dmif)*/
 /*#define PIPE_REG(reg) (reg + mem_input110->offsets.pipe)*/
-
 
 static const struct dce110_mem_input_reg_offsets dce110_mi_v_reg_offsets[] = {
 	{
@@ -575,7 +573,6 @@ static void program_urgency_watermark(
 		URGENCY_HIGH_WATERMARK);
 	dm_write_reg(ctx, urgency_addr, urgency_cntl);
 
-
 	/*Write mask to enable reading/writing of watermark set B*/
 	wm_mask_cntl = dm_read_reg(ctx, wm_addr);
 	set_reg_field_value(wm_mask_cntl,
@@ -727,7 +724,6 @@ static void program_nbp_watermark(
 		NB_PSTATE_CHANGE_WATERMARK_MASK);
 	dm_write_reg(ctx, wm_mask_ctrl_addr, value);
 
-
 	value = dm_read_reg(ctx, nbp_pstate_ctrl_addr);
 
 	set_reg_field_value(
@@ -847,7 +843,6 @@ void dce110_mem_input_v_program_display_marks(
 		stutter);
 }
 
-
 void dce110_allocate_mem_input_v(
 	struct mem_input *mi,
 	uint32_t h_total,/* for current stream */
@@ -899,7 +894,7 @@ bool dce110_mem_input_v_construct(
 #if 0
 void dce110_mem_input_v_destroy(struct mem_input **mem_input)
 {
-	dm_free((*mem_input)->ctx, TO_DCE110_MEM_INPUT(*mem_input));
+	dm_free(TO_DCE110_MEM_INPUT(*mem_input));
 	*mem_input = NULL;
 }
 #endif

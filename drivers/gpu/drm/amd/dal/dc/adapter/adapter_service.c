@@ -179,7 +179,6 @@ static struct feature_source_entry feature_entry_table[] = {
 	{FEATURE_8BPP_SUPPORTED, false, true}
 };
 
-
 /* Stores entire ASIC features by sets */
 uint32_t adapter_feature_set[FEATURE_MAXIMUM/32];
 
@@ -209,7 +208,6 @@ static void get_platform_info_methods(
 
 	if (dm_get_platform_info(as->ctx, &params))
 		as->platform_methods_mask = mask;
-
 
 }
 
@@ -602,7 +600,6 @@ static bool generate_feature_set(
 	dm_memset(adapter_feature_set, 0, sizeof(adapter_feature_set));
 	entry_num = get_feature_entries_num();
 
-
 	while (i != entry_num) {
 		entry = &feature_entry_table[i];
 
@@ -640,7 +637,6 @@ static bool generate_feature_set(
 
 	return true;
 }
-
 
 /*
  * create_hw_ctx
@@ -845,7 +841,7 @@ struct adapter_service *dal_adapter_service_create(
 {
 	struct adapter_service *as;
 
-	as = dm_alloc(init_data->ctx, sizeof(struct adapter_service));
+	as = dm_alloc(sizeof(struct adapter_service));
 
 	if (!as) {
 		ASSERT_CRITICAL(false);
@@ -857,7 +853,7 @@ struct adapter_service *dal_adapter_service_create(
 
 	ASSERT_CRITICAL(false);
 
-	dm_free(init_data->ctx, as);
+	dm_free(as);
 
 	return NULL;
 }
@@ -882,7 +878,7 @@ void dal_adapter_service_destroy(
 
 	adapter_service_destruct(*as);
 
-	dm_free((*as)->ctx, *as);
+	dm_free(*as);
 
 	*as = NULL;
 }
@@ -922,7 +918,6 @@ enum dce_environment dal_adapter_service_get_dce_environment(
 {
 	return as->dce_environment;
 }
-
 
 /*
  * dal_adapter_service_get_controllers_num
@@ -1257,7 +1252,6 @@ struct ddc *dal_adapter_service_obtain_ddc(
 	struct graphics_object_i2c_info i2c_info;
 	struct gpio_ddc_hw_info hw_info;
 
-
 	if (!dal_adapter_service_get_i2c_info(as, id, &i2c_info))
 		return NULL;
 
@@ -1450,7 +1444,6 @@ struct asic_bugs dal_adapter_service_get_asic_bugs(
 {
 	return as->asic_cap->bugs;
 }
-
 
 struct dal_asic_runtime_flags dal_adapter_service_get_asic_runtime_flags(
 		struct adapter_service *as)
@@ -1754,7 +1747,6 @@ struct graphics_object_id dal_adapter_service_enum_audio_object(
 	return as->hw_ctx->funcs->enum_audio_object(as->hw_ctx, index);
 }
 
-
 void dal_adapter_service_update_audio_connectivity(
 	struct adapter_service *as,
 	uint32_t number_of_audio_capable_display_path)
@@ -2014,7 +2006,6 @@ bool dal_adapter_service_get_panel_backlight_boundaries(
 	}
 	return false;
 }
-
 
 uint32_t dal_adapter_service_get_view_port_pixel_granularity(
 	struct adapter_service *as)

@@ -28,7 +28,6 @@
 
 #include "dc_types.h"
 
-
 /* GTC group number */
 enum gtc_group {
 	GTC_GROUP_DISABLED,
@@ -134,8 +133,6 @@ struct info_frame {
 	struct info_packet vendor_info_packet;
 	struct info_packet spd_info_packet;
 };
-
-
 
 #pragma pack(pop)
 

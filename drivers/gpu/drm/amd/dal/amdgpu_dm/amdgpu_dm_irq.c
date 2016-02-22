@@ -32,7 +32,6 @@
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_irq.h"
 
-
 /******************************************************************************
  * Private declarations.
  *****************************************************************************/
@@ -56,7 +55,6 @@ struct amdgpu_dm_timer_handler_data {
 	struct handler_common_data hcd;
 	struct delayed_work d_work;
 };
-
 
 #define DM_IRQ_TABLE_LOCK(adev, flags) \
 	spin_lock_irqsave(&adev->dm.irq_handler_list_table_lock, flags)
@@ -547,7 +545,6 @@ int amdgpu_dm_irq_resume(
 
 	return 0;
 }
-
 
 /**
  * amdgpu_dm_irq_schedule_work - schedule all work items registered for the

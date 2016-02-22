@@ -155,7 +155,7 @@ struct asic_capability *dal_asic_capability_create(
 		return NULL;
 	}
 
-	cap = dm_alloc(ctx, sizeof(struct asic_capability));
+	cap = dm_alloc(sizeof(struct asic_capability));
 
 	if (!cap) {
 		BREAK_TO_DEBUGGER();
@@ -167,7 +167,7 @@ struct asic_capability *dal_asic_capability_create(
 
 	BREAK_TO_DEBUGGER();
 
-	dm_free(ctx, cap);
+	dm_free(cap);
 
 	return NULL;
 }
@@ -192,7 +192,7 @@ void dal_asic_capability_destroy(
 
 	destruct(*cap);
 
-	dm_free((*cap)->ctx, *cap);
+	dm_free(*cap);
 
 	*cap = NULL;
 }

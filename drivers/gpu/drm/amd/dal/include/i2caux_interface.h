@@ -29,7 +29,6 @@
 #include "ddc_interface.h"
 #include "adapter_service_interface.h"
 
-
 #define DEFAULT_AUX_MAX_DATA_SIZE 16
 #define AUX_MAX_DEFER_WRITE_RETRY 20
 

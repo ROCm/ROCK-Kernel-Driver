@@ -80,5 +80,4 @@ bool  dce110_mem_input_v_program_surface_config(
 	union plane_size *plane_size,
 	enum dc_rotation_angle rotation);
 
-
 #endif

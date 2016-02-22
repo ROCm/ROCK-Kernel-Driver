@@ -96,7 +96,6 @@ static ATOM_ENCODER_CAP_RECORD *get_encoder_cap_record(
 	ATOM_OBJECT *object);
 static void process_ext_display_connection_info(struct bios_parser *bp);
 
-
 #define BIOS_IMAGE_SIZE_OFFSET 2
 #define BIOS_IMAGE_SIZE_UNIT 512
 
@@ -120,14 +119,14 @@ struct dc_bios *dal_bios_parser_create(
 {
 	struct bios_parser *bp = NULL;
 
-	bp = dm_alloc(init->ctx, sizeof(struct bios_parser));
+	bp = dm_alloc(sizeof(struct bios_parser));
 	if (!bp)
 		return NULL;
 
 	if (bios_parser_construct(bp, init, as))
 		return &bp->base;
 
-	dm_free(init->ctx, bp);
+	dm_free(bp);
 	BREAK_TO_DEBUGGER();
 	return NULL;
 }
@@ -135,7 +134,7 @@ struct dc_bios *dal_bios_parser_create(
 static void destruct(struct bios_parser *bp)
 {
 	if (bp->bios_local_image)
-		dm_free(bp->ctx, bp->bios_local_image);
+		dm_free(bp->bios_local_image);
 }
 
 void dal_bios_parser_destroy(struct dc_bios **dcb)
@@ -149,7 +148,7 @@ void dal_bios_parser_destroy(struct dc_bios **dcb)
 
 	destruct(bp);
 
-	dm_free((bp)->ctx, bp);
+	dm_free(bp);
 	*dcb = NULL;
 }
 
@@ -562,7 +561,6 @@ static enum bp_result bios_parser_get_voltage_ddc_info(struct dc_bios *dcb,
 	if (result == BP_RESULT_OK)
 		result = bios_parser_get_thermal_ddc_info(dcb,
 			i2c_line, info);
-
 
 	return result;
 }
@@ -1528,7 +1526,6 @@ static ATOM_I2C_RECORD *get_i2c_record(
 	return NULL;
 }
 
-
 static enum bp_result get_ss_info_from_ss_info_table(
 	struct bios_parser *bp,
 	uint32_t id,
@@ -2312,7 +2309,6 @@ static uint32_t bios_parser_get_ss_entry_number(
 	return 0;
 }
 
-
 /**
  * get_ss_entry_number_from_ss_info_tbl
  * Get Number of spread spectrum entry from the SS_Info table from the VBIOS.
@@ -2380,7 +2376,6 @@ static uint32_t get_ss_entry_number_from_ss_info_tbl(
 
 	return number;
 }
-
 
 /**
  * get_ss_entry_number
@@ -4089,7 +4084,7 @@ static void process_ext_display_connection_info(struct bios_parser *bp)
 		uint8_t *original_bios;
 		/* Step 1: Replace bios image with the new copy which will be
 		 * patched */
-		bp->bios_local_image = dm_alloc(bp->ctx, bp->bios_size);
+		bp->bios_local_image = dm_alloc(bp->bios_size);
 		if (bp->bios_local_image == NULL) {
 			BREAK_TO_DEBUGGER();
 			/* Failed to alloc bp->bios_local_image */
@@ -4667,14 +4662,13 @@ static enum bp_result construct_integrated_info(
 	return result;
 }
 
-
 static struct integrated_info *bios_parser_create_integrated_info(
 	struct dc_bios *dcb)
 {
 	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	struct integrated_info *info = NULL;
 
-	info = dm_alloc(bp->ctx, sizeof(struct integrated_info));
+	info = dm_alloc(sizeof(struct integrated_info));
 
 	if (info == NULL) {
 		ASSERT_CRITICAL(0);
@@ -4684,7 +4678,7 @@ static struct integrated_info *bios_parser_create_integrated_info(
 	if (construct_integrated_info(bp, info) == BP_RESULT_OK)
 		return info;
 
-	dm_free(bp->ctx, info);
+	dm_free(info);
 
 	return NULL;
 }
@@ -4693,15 +4687,13 @@ static void bios_parser_destroy_integrated_info(
 	struct dc_bios *dcb,
 	struct integrated_info **info)
 {
-	struct bios_parser *bp = BP_FROM_DCB(dcb);
-
 	if (info == NULL) {
 		ASSERT_CRITICAL(0);
 		return;
 	}
 
 	if (*info != NULL) {
-		dm_free(bp->ctx, *info);
+		dm_free(*info);
 		*info = NULL;
 	}
 }

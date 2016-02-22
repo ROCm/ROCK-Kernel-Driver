@@ -111,7 +111,6 @@ enum clock_source_id {
 	CLOCK_SOURCE_COMBO_DISPLAY_PLL0
 };
 
-
 /* Encoder object ids */
 enum encoder_id {
 	ENCODER_ID_UNKNOWN = 0,
@@ -145,7 +144,6 @@ enum encoder_id {
 	ENCODER_ID_INTERNAL_UNIPHY3,
 	ENCODER_ID_INTERNAL_VIRTUAL,
 };
-
 
 /* Connector object ids */
 enum connector_id {
@@ -260,7 +258,6 @@ bool dal_graphics_object_id_is_equal(
 	struct graphics_object_id id2);
 uint32_t dal_graphics_object_id_to_uint(
 	struct graphics_object_id id);
-
 
 enum controller_id dal_graphics_object_id_get_controller_id(
 	struct graphics_object_id id);

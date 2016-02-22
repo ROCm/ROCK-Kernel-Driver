@@ -225,7 +225,6 @@ static bool calc_fb_divider_checking_tolerance(
 	return false;
 }
 
-
 static bool calc_pll_dividers_in_range(
 		struct calc_pll_clock_source *calc_pll_cs,
 		struct pll_settings *pll_settings,
@@ -582,10 +581,7 @@ static bool calculate_ss(
 	if (pll_settings == NULL)
 		return false;
 
-
 	dm_memset(ds_data, 0, sizeof(struct delta_sigma_data));
-
-
 
 	/* compute SS_AMOUNT_FBDIV & SS_AMOUNT_NFRAC_SLIP & SS_AMOUNT_DSFRAC*/
 	/* 6 decimal point support in fractional feedback divider */
@@ -615,7 +611,6 @@ static bool calculate_ss(
 	modulation_time = dal_fixed32_32_from_fraction(
 		pll_settings->reference_freq * 1000,
 		pll_settings->reference_divider * ss_data->modulation_freq_hz);
-
 
 	if (ss_data->flags.CENTER_SPREAD)
 		modulation_time = dal_fixed32_32_div_int(modulation_time, 4);
@@ -829,7 +824,6 @@ static struct clock_source_funcs dce110_clk_src_funcs = {
 	.get_pix_clk_dividers = dce110_get_pix_clk_dividers
 };
 
-
 static void get_ss_info_from_atombios(
 		struct dce110_clk_src *clk_src,
 		enum as_signal_type as_signal,
@@ -868,14 +862,12 @@ static void get_ss_info_from_atombios(
 	if (*ss_entries_num == 0)
 		return;
 
-	ss_info = dm_alloc(clk_src->base.ctx, sizeof(struct spread_spectrum_info)
-				* (*ss_entries_num));
+	ss_info = dm_alloc(sizeof(struct spread_spectrum_info) * (*ss_entries_num));
 	ss_info_cur = ss_info;
 	if (ss_info == NULL)
 		return;
 
-	ss_data = dm_alloc(clk_src->base.ctx, sizeof(struct spread_spectrum_data) *
-							(*ss_entries_num));
+	ss_data = dm_alloc(sizeof(struct spread_spectrum_data) * (*ss_entries_num));
 	if (ss_data == NULL)
 		goto out_free_info;
 
@@ -949,14 +941,14 @@ static void get_ss_info_from_atombios(
 	}
 
 	*spread_spectrum_data = ss_data;
-	dm_free(clk_src->base.ctx, ss_info);
+	dm_free(ss_info);
 	return;
 
 out_free_data:
-	dm_free(clk_src->base.ctx, ss_data);
+	dm_free(ss_data);
 	*ss_entries_num = 0;
 out_free_info:
-	dm_free(clk_src->base.ctx, ss_info);
+	dm_free(ss_info);
 }
 
 static void ss_info_from_atombios_create(
@@ -1159,5 +1151,4 @@ bool dce110_clk_src_construct(
 unexpected_failure:
 	return false;
 }
-
 

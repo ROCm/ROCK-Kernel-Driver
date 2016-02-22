@@ -81,7 +81,7 @@ void dal_irq_service_destroy(struct irq_service **irq_service)
 		return;
 	}
 
-	dm_free((*irq_service)->ctx, *irq_service);
+	dm_free(*irq_service);
 
 	*irq_service = NULL;
 }

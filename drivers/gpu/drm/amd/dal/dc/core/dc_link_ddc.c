@@ -95,7 +95,6 @@ enum edid_read_result {
 #define HDMI_SCDC_ERR_DETECT 0x50
 #define HDMI_SCDC_TEST_CONFIG 0xC0
 
-
 union hdmi_scdc_update_read_data {
 	uint8_t byte[2];
 	struct {
@@ -143,8 +142,6 @@ union hdmi_scdc_test_config_Data {
 	} fields;
 };
 
-
-
 struct i2c_payloads {
 	struct vector payloads;
 };
@@ -157,7 +154,7 @@ struct i2c_payloads *dal_ddc_i2c_payloads_create(struct dc_context *ctx, uint32_
 {
 	struct i2c_payloads *payloads;
 
-	payloads = dm_alloc(ctx, sizeof(struct i2c_payloads));
+	payloads = dm_alloc(sizeof(struct i2c_payloads));
 
 	if (!payloads)
 		return NULL;
@@ -166,7 +163,7 @@ struct i2c_payloads *dal_ddc_i2c_payloads_create(struct dc_context *ctx, uint32_
 		&payloads->payloads, ctx, count, sizeof(struct i2c_payload)))
 		return payloads;
 
-	dm_free(ctx, payloads);
+	dm_free(payloads);
 	return NULL;
 
 }
@@ -186,7 +183,7 @@ void dal_ddc_i2c_payloads_destroy(struct i2c_payloads **p)
 	if (!p || !*p)
 		return;
 	dal_vector_destruct(&(*p)->payloads);
-	dm_free((*p)->payloads.ctx, *p);
+	dm_free(*p);
 	*p = NULL;
 
 }
@@ -195,7 +192,7 @@ struct aux_payloads *dal_ddc_aux_payloads_create(struct dc_context *ctx, uint32_
 {
 	struct aux_payloads *payloads;
 
-	payloads = dm_alloc(ctx, sizeof(struct aux_payloads));
+	payloads = dm_alloc(sizeof(struct aux_payloads));
 
 	if (!payloads)
 		return NULL;
@@ -204,7 +201,7 @@ struct aux_payloads *dal_ddc_aux_payloads_create(struct dc_context *ctx, uint32_
 		&payloads->payloads, ctx, count, sizeof(struct aux_payloads)))
 		return payloads;
 
-	dm_free(ctx, payloads);
+	dm_free(payloads);
 	return NULL;
 }
 
@@ -218,14 +215,13 @@ uint32_t  dal_ddc_aux_payloads_get_count(struct aux_payloads *p)
 	return p->payloads.count;
 }
 
-
 void dal_ddc_aux_payloads_destroy(struct aux_payloads **p)
 {
 	if (!p || !*p)
 		return;
 
 	dal_vector_destruct(&(*p)->payloads);
-	dm_free((*p)->payloads.ctx, *p);
+	dm_free(*p);
 	*p = NULL;
 }
 
@@ -273,7 +269,6 @@ void dal_ddc_aux_payloads_add(
 	}
 }
 
-
 static bool construct(
 	struct ddc_service *ddc_service,
 	struct ddc_service_init_data *init_data)
@@ -297,7 +292,6 @@ static bool construct(
 			dal_adapter_service_is_feature_supported(
 				FEATURE_EDID_STRESS_READ);
 
-
 	ddc_service->flags.IS_INTERNAL_DISPLAY =
 		connector_id == CONNECTOR_ID_EDP ||
 		connector_id == CONNECTOR_ID_LVDS;
@@ -311,7 +305,7 @@ struct ddc_service *dal_ddc_service_create(
 {
 	struct ddc_service *ddc_service;
 
-	ddc_service = dm_alloc(init_data->ctx, sizeof(struct ddc_service));
+	ddc_service = dm_alloc(sizeof(struct ddc_service));
 
 	if (!ddc_service)
 		return NULL;
@@ -319,7 +313,7 @@ struct ddc_service *dal_ddc_service_create(
 	if (construct(ddc_service, init_data))
 		return ddc_service;
 
-	dm_free(init_data->ctx, ddc_service);
+	dm_free(ddc_service);
 	return NULL;
 }
 
@@ -336,7 +330,7 @@ void dal_ddc_service_destroy(struct ddc_service **ddc)
 		return;
 	}
 	destruct(*ddc);
-	dm_free((*ddc)->ctx, *ddc);
+	dm_free(*ddc);
 	*ddc = NULL;
 }
 
@@ -1054,7 +1048,6 @@ struct ddc *dal_ddc_service_get_ddc_pin(struct ddc_service *ddc_service)
 {
 	return ddc_service->ddc_pin;
 }
-
 
 void dal_ddc_service_reset_dp_receiver_id_info(struct ddc_service *ddc_service)
 {

@@ -75,7 +75,6 @@ static const struct dce100_hw_seq_reg_offsets reg_offsets[] = {
 #define HW_REG_CRTC(reg, id)\
 	(reg + reg_offsets[id].crtc)
 
-
 /*******************************************************************************
  * Private definitions
  ******************************************************************************/

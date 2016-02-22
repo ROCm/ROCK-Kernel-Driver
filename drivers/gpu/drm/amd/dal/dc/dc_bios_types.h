@@ -38,7 +38,6 @@
 
 #include "include/bios_parser_types.h"
 
-
 struct dc_vbios_funcs {
 	uint8_t (*get_connectors_number)(struct dc_bios *bios);
 

@@ -119,7 +119,6 @@ static void dpcd_set_link_settings(
 	union lane_count_set lane_count_set = {{0}};
 	uint8_t link_set_buffer[2];
 
-
 	downspread.raw = (uint8_t)
 	(lt_settings->link_settings.link_spread);
 
@@ -219,7 +218,6 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 		DPCD_ADDRESS_TRAINING_PATTERN_SET,
 		dpcd_pattern.v1_4.TRAINING_PATTERN_SET);
 
-
 	/*****************************************************************
 	* DpcdAddress_Lane0Set -> DpcdAddress_Lane3Set
 	*****************************************************************/
@@ -260,7 +258,6 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 		dpcd_lane[0].bits.PRE_EMPHASIS_SET,
 		dpcd_lane[0].bits.MAX_SWING_REACHED,
 		dpcd_lane[0].bits.MAX_PRE_EMPHASIS_REACHED);
-
 
 	if (edp_workaround) {
 		/* for eDP write in 2 parts because the 5-byte burst is
@@ -390,7 +387,6 @@ static void find_max_drive_settings(
 			link_training_setting->
 			lane_settings[lane].VOLTAGE_SWING;
 
-
 		if (link_training_setting->lane_settings[lane].PRE_EMPHASIS >
 				max_requested.PRE_EMPHASIS)
 			max_requested.PRE_EMPHASIS =
@@ -478,7 +474,6 @@ static void get_lane_status_and_drive_settings(
 		DPCD_ADDRESS_LANE_01_STATUS,
 		(uint8_t *)(dpcd_buf),
 		sizeof(dpcd_buf));
-
 
 	for (lane = 0; lane <
 		(uint32_t)(link_training_setting->link_settings.lane_count);
@@ -875,7 +870,6 @@ static bool perform_clock_recovery_sequence(
 					link,
 					lt_settings);
 
-
 		/* 3. wait receiver to lock-on*/
 		wait_for_training_aux_rd_interval(
 				link,
@@ -890,7 +884,6 @@ static bool perform_clock_recovery_sequence(
 				dpcd_lane_status,
 				&dpcd_lane_status_updated,
 				&req_settings);
-
 
 		/* 5. check CR done*/
 		if (is_cr_done(lane_count, dpcd_lane_status))
@@ -908,7 +901,6 @@ static bool perform_clock_recovery_sequence(
 			retries_cr++;
 		else
 			retries_cr = 0;
-
 
 			/* 8. update VS/PE/PC2 in lt_settings*/
 			update_drive_settings(lt_settings, req_settings);
@@ -1125,7 +1117,7 @@ static enum clock_source_id get_clock_source_id_for_link_training(
 	set.surface_count = 0;
 	set.target = target;
 
-	context = dm_alloc(link->ctx, sizeof(struct validate_context));
+	context = dm_alloc(sizeof(struct validate_context));
 
 	if (!context)
 		goto fail_context;
@@ -1139,7 +1131,7 @@ static enum clock_source_id get_clock_source_id_for_link_training(
 	if (result)
 		id = context->res_ctx.pipe_ctx[0].clock_source->id;
 
-	dm_free(link->ctx, context);
+	dm_free(context);
 fail_context:
 	dc_target_release(target);
 fail_target:
@@ -1574,7 +1566,6 @@ bool dc_link_handle_hpd_rx_irq(const struct dc_link *dc_link)
 	if (hpd_irq_dpcd_data.bytes.device_service_irq.bits.DOWN_REP_MSG_RDY ||
 		hpd_irq_dpcd_data.bytes.device_service_irq.bits.UP_REQ_MSG_RDY)
 		return false;
-
 
 	/* For now we only handle 'Downstream port status' case. */
 	/* If we got sink count changed it means Downstream port status changed,

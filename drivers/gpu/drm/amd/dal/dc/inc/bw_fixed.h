@@ -60,5 +60,4 @@ bool bw_meq(const struct bw_fixed arg1, const struct bw_fixed arg2);
 bool bw_ltn(const struct bw_fixed arg1, const struct bw_fixed arg2);
 bool bw_mtn(const struct bw_fixed arg1, const struct bw_fixed arg2);
 
-
 #endif //BW_FIXED_H_

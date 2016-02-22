@@ -82,5 +82,4 @@ bool dce80_transform_get_current_pixel_storage_depth(
 	struct transform *xfm,
 	enum lb_pixel_depth *depth);
 
-
 #endif

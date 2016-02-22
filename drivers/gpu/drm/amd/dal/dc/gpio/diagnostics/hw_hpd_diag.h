@@ -26,7 +26,6 @@
 #ifndef __DAL_HW_HPD_DIAG_FPGA_H__
 #define __DAL_HW_HPD_DIAG_FPGA_H__
 
-
 struct hw_gpio_pin *dal_hw_hpd_diag_fpga_create(
 	struct dc_context *ctx,
 	enum gpio_id id,

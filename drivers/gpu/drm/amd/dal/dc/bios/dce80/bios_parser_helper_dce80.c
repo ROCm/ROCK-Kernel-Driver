@@ -38,7 +38,6 @@
 
 #include "../bios_parser_helper.h"
 
-
 static const uint8_t bios_scratch0_dacb_shift = 8;
 
 /**

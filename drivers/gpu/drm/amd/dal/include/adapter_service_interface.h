@@ -39,7 +39,6 @@
 struct i2caux;
 struct adapter_service;
 
-
 /*
  * enum adapter_feature_id
  *
@@ -345,7 +344,6 @@ bool dal_adapter_service_get_firmware_info(
 	struct adapter_service *as,
 	struct firmware_info *info);
 
-
 /* functions to get a total number of objects of specific type */
 uint8_t dal_adapter_service_get_connectors_num(
 	struct adapter_service *as);
@@ -584,7 +582,6 @@ struct ddc *dal_adapter_service_obtain_ddc_from_i2c_info(
 
 struct bdf_info dal_adapter_service_get_adapter_info(
 	struct adapter_service *as);
-
 
 /* Determine if this ASIC needs to wait on PLL lock bit */
 bool dal_adapter_service_should_psr_skip_wait_for_pll_lock(

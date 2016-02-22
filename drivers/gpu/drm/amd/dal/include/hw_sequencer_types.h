@@ -232,8 +232,6 @@ struct hw_stereo_mixer_params {
 	bool single_pipe;
 };
 
-
-
 struct hw_action_flags {
 	uint32_t RESYNC_PATH:1;
 	uint32_t TIMING_CHANGED:1;
@@ -281,13 +279,11 @@ struct hw_info_frame {
 	struct hw_info_packet vsc_packet;
 };
 
-
 enum channel_command_type {
 	CHANNEL_COMMAND_I2C,
 	CHANNEL_COMMAND_I2C_OVER_AUX,
 	CHANNEL_COMMAND_AUX
 };
-
 
 /* maximum TMDS transmitter pixel clock is 165 MHz. So it is KHz */
 #define	TMDS_MAX_PIXEL_CLOCK_IN_KHZ 165000

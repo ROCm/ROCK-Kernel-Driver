@@ -51,7 +51,6 @@ static struct state_dependent_clocks max_clks_by_state[] = {
 /* ClocksStatePerformance */
 { .display_clk_khz = 600000, .pixel_clk_khz = 400000 } };
 
-
 /* Starting point for each divider range.*/
 enum divider_range_start {
 	DIVIDER_RANGE_01_START = 200, /* 2.00*/
@@ -240,7 +239,6 @@ static uint32_t calc_single_display_min_clks(
 	uint32_t alt_disp_clk_khz;
 	struct display_clock_dce80 *dc = FROM_DISPLAY_CLOCK(base);
 
-
 	if (0 != params->dest_view.height && 0 != params->dest_view.width) {
 
 		h_scale = dal_fixed32_32_from_fraction(
@@ -257,7 +255,6 @@ static uint32_t calc_single_display_min_clks(
 		dal_fixed32_32_div_int(v_scale, 2));
 	v_filter_init = dal_fixed32_32_add(v_filter_init,
 		dal_fixed32_32_from_fraction(15, 10));
-
 
 	v_filter_init_trunc = dal_fixed32_32_floor(v_filter_init);
 
@@ -349,7 +346,6 @@ static uint32_t calc_cursor_bw_for_min_clks(struct min_clock_params *params)
 	struct fixed32_32 src_lines_per_dst_line;
 	struct fixed32_32 cursor_bw;
 
-
 	/*  DCE8 Mode Support and Mode Set Architecture Specification Rev 1.3
 	 6.3.3	Cursor data Throughput requirement on DISPCLK
 	 The MCIF to DCP cursor data return throughput is one pixel per DISPCLK
@@ -427,7 +423,6 @@ static uint32_t calculate_min_clock(
 	uint32_t max_clk_khz = 0;
 	uint32_t total_cursor_bw = 0;
 	struct display_clock_dce80 *disp_clk = FROM_DISPLAY_CLOCK(dc);
-
 
 	if (disp_clk->use_max_disp_clk)
 		return min_clk_khz;
@@ -635,7 +630,6 @@ static uint32_t get_dp_ref_clk_frequency(struct display_clock *dc)
 			DENTIST_DISPCLK_CNTL,
 			DENTIST_DPREFCLK_WDIVIDER));
 
-
 	if (target_div != INVALID_DIVIDER) {
 		/* Calculate the current DFS clock, in kHz.*/
 		dp_ref_clk_khz = (DIVIDER_RANGE_SCALE_FACTOR
@@ -812,7 +806,7 @@ static void destroy(struct display_clock **dc)
 	struct display_clock_dce80 *disp_clk;
 
 	disp_clk = FROM_DISPLAY_CLOCK(*dc);
-	dm_free((*dc)->ctx, disp_clk);
+	dm_free(disp_clk);
 	*dc = NULL;
 }
 
@@ -911,7 +905,7 @@ struct display_clock *dal_display_clock_dce80_create(
 {
 	struct display_clock_dce80 *disp_clk;
 
-	disp_clk = dm_alloc(ctx, sizeof(struct display_clock_dce80));
+	disp_clk = dm_alloc(sizeof(struct display_clock_dce80));
 
 	if (disp_clk == NULL)
 		return NULL;
@@ -919,7 +913,7 @@ struct display_clock *dal_display_clock_dce80_create(
 	if (display_clock_construct(ctx, disp_clk, as))
 		return &disp_clk->disp_clk;
 
-	dm_free(ctx, disp_clk);
+	dm_free(disp_clk);
 	return NULL;
 }
 

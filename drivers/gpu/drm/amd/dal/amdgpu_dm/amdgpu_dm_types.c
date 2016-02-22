@@ -397,7 +397,6 @@ static bool get_fb_info(
 		return false;
 	}
 
-
 	if (fb_location)
 		*fb_location = amdgpu_bo_gpu_offset(rbo);
 
@@ -452,7 +451,6 @@ static void fill_plane_attributes_from_fb(
 		mtaspect = AMDGPU_TILING_GET(tiling_flags, MACRO_TILE_ASPECT);
 		tile_split = AMDGPU_TILING_GET(tiling_flags, TILE_SPLIT);
 		num_banks = AMDGPU_TILING_GET(tiling_flags, NUM_BANKS);
-
 
 		/* XXX fix me for VI */
 		surface->tiling_info.num_banks = num_banks;
@@ -847,7 +845,6 @@ static void decide_crtc_timing_for_drm_display_mode(
 		/* no scaling nor amdgpu inserted, no need to patch */
 	}
 }
-
 
 static struct dc_target *create_target_for_sink(
 		const struct amdgpu_connector *aconnector,
@@ -1281,7 +1278,6 @@ stream_create_fail:
 	/* TODO: error handling*/
 	return result;
 }
-
 
 static const struct drm_connector_helper_funcs
 amdgpu_dm_connector_helper_funcs = {
@@ -2597,7 +2593,6 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 			break;
 		}
 	}
-
 
 	for (i = 0; i < set_count; i++) {
 		for_each_plane_in_state(state, plane, plane_state, j) {

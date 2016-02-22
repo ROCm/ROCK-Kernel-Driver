@@ -212,12 +212,10 @@ enum plane_stereo_format {
 	PLANE_STEREO_FORMAT_CHECKER_BOARD = 7
 };
 
-
 /* TODO: Find way to calculate number of bits
  *  Please increase if pixel_format enum increases
  * num  from  PIXEL_FORMAT_INDEX8 to PIXEL_FORMAT_444BPP32
  */
-
 
 enum dc_edid_connector_type {
 	EDID_CONNECTOR_UNKNOWN = 0,
@@ -292,7 +290,6 @@ struct dc_resolution {
 	uint32_t width;
 	uint32_t height;
 };
-
 
 struct dc_mode_flags {
 	/* note: part of refresh rate flag*/

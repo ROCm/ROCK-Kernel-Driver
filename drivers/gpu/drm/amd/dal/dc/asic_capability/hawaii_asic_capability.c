@@ -41,7 +41,6 @@
 #include "dce/dce_8_0_d.h"
 #include "gmc/gmc_7_1_d.h"
 
-
 /*
  * Sea Islands (CI) ASIC capability.
  *
@@ -123,7 +122,6 @@ void dal_hawaii_asic_capability_create(struct asic_capability *cap,
 
 	/* Report headless if no OPM attached (with MXM connectors present). */
 	cap->caps.HEADLESS_NO_OPM_SUPPORTED = true;
-
 
 	cap->caps.HPD_CHECK_FOR_EDID = true;
 	cap->caps.NO_VCC_OFF_HPD_POLLING = true;

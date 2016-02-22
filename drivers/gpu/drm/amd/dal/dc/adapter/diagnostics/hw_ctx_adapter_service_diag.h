@@ -26,7 +26,6 @@
 #ifndef __DAL_HW_CTX_ADAPTER_SERVICE_DIAG_H__
 #define __DAL_HW_CTX_ADAPTER_SERVICE_DIAG_H__
 
-
 struct hw_ctx_adapter_service *dal_adapter_service_create_hw_ctx_diag(
 		struct dc_context *ctx);
 

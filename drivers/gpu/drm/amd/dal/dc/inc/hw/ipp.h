@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2015 Advanced Micro Devices, Inc.
  *
@@ -60,7 +59,6 @@ enum ipp_degamma_mode {
 	IPP_DEGAMMA_MODE_HW_xvYCC,
 	IPP_DEGAMMA_MODE_USER_PWL
 };
-
 
 enum ovl_color_space {
 	OVL_COLOR_SPACE_UNKNOWN = 0,

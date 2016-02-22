@@ -36,7 +36,6 @@ struct dce110_mem_input_reg_offsets {
 	uint32_t pipe;
 };
 
-
 enum stutter_mode_type {
 /*	TODO: Clean up these enums, right now only one is being used
  *	STUTTER_MODE_LEGACY = 0X00000001,
@@ -128,6 +127,5 @@ bool  dce110_mem_input_program_surface_config(
 	struct dc_tiling_info *tiling_info,
 	union plane_size *plane_size,
 	enum dc_rotation_angle rotation);
-
 
 #endif

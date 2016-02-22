@@ -87,7 +87,7 @@ static void destroy(
 
 	destruct(hw_ctx);
 
-	dm_free(ptr->ctx, hw_ctx);
+	dm_free(hw_ctx);
 }
 
 /*
@@ -191,7 +191,6 @@ static uint32_t get_number_of_connected_audio_endpoints(
 	return field;
 }
 
-
 /*
  * power_up
  *
@@ -211,7 +210,6 @@ static bool power_up(
 			FROM_HW_CTX(hw_ctx);
 	/* Allow DP audio all the time
 	 * without additional pinstrap check on Fusion */
-
 
 	{
 		uint32_t value = 0;
@@ -286,7 +284,7 @@ struct hw_ctx_adapter_service *
 			struct dc_context *ctx)
 {
 	struct hw_ctx_adapter_service_dce110 *hw_ctx =
-			dm_alloc(ctx, sizeof(struct hw_ctx_adapter_service_dce110));
+			dm_alloc(sizeof(struct hw_ctx_adapter_service_dce110));
 
 	if (!hw_ctx) {
 		ASSERT_CRITICAL(false);
@@ -298,7 +296,7 @@ struct hw_ctx_adapter_service *
 
 	ASSERT_CRITICAL(false);
 
-	dm_free(ctx, hw_ctx);
+	dm_free(hw_ctx);
 
 	return NULL;
 }

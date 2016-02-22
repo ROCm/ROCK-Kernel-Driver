@@ -102,7 +102,6 @@ enum { false, true };
 			printf("[DAL_LOG]" fmt, ##__VA_ARGS__); } \
 				while (false)
 
-
 #define dm_debug(fmt, ...) printf("[DAL_DBG]" fmt, ##__VA_ARGS__)
 
 #define dm_vlog(fmt, args) vprintf(fmt, args)

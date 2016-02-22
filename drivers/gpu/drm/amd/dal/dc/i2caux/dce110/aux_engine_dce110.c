@@ -92,7 +92,7 @@ static void destroy(
 
 	destruct(engine);
 
-	dm_free((*aux_engine)->base.ctx, engine);
+	dm_free(engine);
 
 	*aux_engine = NULL;
 }
@@ -645,7 +645,6 @@ static enum aux_channel_operation_result get_channel_status(
 			time_elapsed += 10;
 		} while (time_elapsed < aux_engine->timeout_period);
 
-
 	}
 
 	/* Note that the following bits are set in 'status.bits'
@@ -770,7 +769,7 @@ struct aux_engine *dal_aux_engine_dce110_create(
 		return NULL;
 	}
 
-	engine = dm_alloc(aux_init_data->ctx, sizeof(*engine));
+	engine = dm_alloc(sizeof(*engine));
 
 	if (!engine) {
 		ASSERT_CRITICAL(false);
@@ -782,7 +781,7 @@ struct aux_engine *dal_aux_engine_dce110_create(
 
 	ASSERT_CRITICAL(false);
 
-	dm_free(aux_init_data->ctx, engine);
+	dm_free(engine);
 
 	return NULL;
 }

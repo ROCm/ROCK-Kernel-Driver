@@ -39,12 +39,10 @@
 #include "hw_sequencer.h"
 #include "fixed31_32.h"
 
-
 #define LINK_INFO(...) \
 	dal_logger_write(dc_ctx->logger, \
 		LOG_MAJOR_HW_TRACE, LOG_MINOR_HW_TRACE_HOTPLUG, \
 		__VA_ARGS__)
-
 
 /*******************************************************************************
  * Private structures
@@ -172,12 +170,10 @@ hpd_gpio_failure:
 	return false;
 }
 
-
 enum ddc_transaction_type get_ddc_transaction_type(
 		enum signal_type sink_signal)
 {
 	enum ddc_transaction_type transaction_type = DDC_TRANSACTION_TYPE_NONE;
-
 
 	switch (sink_signal) {
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
@@ -203,7 +199,6 @@ enum ddc_transaction_type get_ddc_transaction_type(
 	default:
 		break;
 	}
-
 
 	return transaction_type;
 }
@@ -636,7 +631,6 @@ bool dc_link_detect(const struct dc_link *dc_link, bool boot)
 			else
 				link->dpcd_sink_count = 1;
 
-
 		dal_ddc_service_set_transaction_type(
 						link->ddc,
 						sink_caps.transaction_type);
@@ -1063,7 +1057,7 @@ create_fail:
 struct core_link *link_create(const struct link_init_data *init_params)
 {
 	struct core_link *link =
-			dm_alloc(init_params->ctx, sizeof(*link));
+			dm_alloc(sizeof(*link));
 
 	if (NULL == link)
 		goto alloc_fail;
@@ -1074,7 +1068,7 @@ struct core_link *link_create(const struct link_init_data *init_params)
 	return link;
 
 construct_fail:
-	dm_free(init_params->ctx, link);
+	dm_free(link);
 
 alloc_fail:
 	return NULL;
@@ -1083,7 +1077,7 @@ alloc_fail:
 void link_destroy(struct core_link **link)
 {
 	destruct(*link);
-	dm_free((*link)->ctx, *link);
+	dm_free(*link);
 	*link = NULL;
 }
 
@@ -1530,8 +1524,6 @@ static enum dc_status allocate_mst_payload(struct pipe_ctx *pipe_ctx)
 	pbn = get_pbn_from_timing(pipe_ctx);
 	avg_time_slots_per_mtp = dal_fixed31_32_div(pbn, pbn_per_slot);
 
-
-
 	stream_encoder->funcs->set_mst_bandwidth(
 		stream_encoder,
 		avg_time_slots_per_mtp);
@@ -1646,5 +1638,4 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 
 	disable_link(pipe_ctx->stream->sink->link, pipe_ctx->signal);
 }
-
 

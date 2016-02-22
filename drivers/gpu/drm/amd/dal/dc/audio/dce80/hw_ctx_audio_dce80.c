@@ -58,7 +58,6 @@ static const uint32_t engine_offset[] = {
 /* static void dal_audio_destruct_hw_ctx_audio_dce80(
 	struct hw_ctx_audio_dce80 *ctx);*/
 
-
 static void destroy(
 	struct hw_ctx_audio **ptr)
 {
@@ -69,12 +68,10 @@ static void destroy(
 
 	dal_audio_destruct_hw_ctx_audio_dce80(hw_ctx_dce80);
 	/* release memory allocated for struct hw_ctx_audio_dce80 */
-	dm_free((*ptr)->ctx, hw_ctx_dce80);
+	dm_free(hw_ctx_dce80);
 
 	*ptr = NULL;
 }
-
-
 
 /* ---  helpers --- */
 
@@ -126,7 +123,6 @@ static uint32_t read_indirect_azalia_reg(
 	uint32_t ret_val = 0;
 	uint32_t addr = 0;
 	uint32_t value = 0;
-
 
 	/* AZALIA_F0_CODEC_ENDPOINT_INDEX  endpoint index  */
 	{
@@ -183,8 +179,6 @@ static void set_high_bit_rate_capable(
 		value);
 }
 
-
-
 /* set HBR channnel count */
 /*static void set_hbr_channel_count(
 	const struct hw_ctx_audio *hw_ctx,
@@ -235,7 +229,6 @@ static void set_video_latency(
 	if ((latency_in_ms < 0) || (latency_in_ms > 255))
 		return;
 
-
 	value = read_indirect_azalia_reg(
 		hw_ctx,
 		ixAZALIA_F0_CODEC_PIN_CONTROL_RESPONSE_LIPSYNC);
@@ -249,9 +242,6 @@ static void set_video_latency(
 		ixAZALIA_F0_CODEC_PIN_CONTROL_RESPONSE_LIPSYNC,
 		value);
 }
-
-
-
 
 /* set audio latency in in ms/2+1 */
 static void set_audio_latency(
@@ -280,8 +270,6 @@ static void set_audio_latency(
 		value);
 }
 
-
-
 /* enable HW/SW Sync */
 /*static void enable_hw_sw_sync(
 	const struct hw_ctx_audio *hw_ctx)
@@ -292,8 +280,6 @@ static void set_audio_latency(
 	value.bits.CYCLIC_BUFFER_SYNC_ENABLE = 1;
 	dal_write_reg(mmAZALIA_CYCLIC_BUFFER_SYNC, value.u32All);
 }*/
-
-
 
 /* disable HW/SW Sync */
 /*static void disable_hw_sw_sync(
@@ -307,7 +293,6 @@ static void set_audio_latency(
 	dal_write_reg(
 		mmAZALIA_CYCLIC_BUFFER_SYNC, value.u32All);
 }*/
-
 
 /* update hardware with software's current position in cyclic buffer */
 /*static void update_sw_write_ptr(
@@ -324,7 +309,6 @@ static void set_audio_latency(
 		value.u32All);
 }*/
 
-
 /* update Audio/Video association */
 /*static void update_av_association(
 	const struct hw_ctx_audio *hw_ctx,
@@ -334,10 +318,6 @@ static void set_audio_latency(
 {
 
 }*/
-
-
-
-
 
 /* ---  hook functions --- */
 
@@ -352,8 +332,6 @@ static bool get_azalia_clock_info_dp(
 	uint32_t requested_pixel_clock_in_khz,
 	const struct audio_pll_info *pll_info,
 	struct azalia_clock_info *azalia_clock_info);
-
-
 
 static void setup_audio_wall_dto(
 	const struct hw_ctx_audio *hw_ctx,
@@ -785,7 +763,6 @@ static void setup_dp_audio(
 	/* --- The following are the registers
 	 *  copied from the SetupHDMI --- */
 
-
 	/* AFMT_AUDIO_PACKET_CONTROL */
 	{
 		addr = mmAFMT_AUDIO_PACKET_CONTROL +
@@ -899,7 +876,6 @@ static void enable_azalia_audio(
 		ixAZALIA_F0_CODEC_PIN_CONTROL_HOT_PLUG_CONTROL,
 		value);
 }
-
 
 /* disable Azalia audio */
 static void disable_azalia_audio(
@@ -1218,7 +1194,6 @@ static void configure_azalia(
 		ixAZALIA_F0_CODEC_PIN_CONTROL_SINK_INFO0,
 		value);
 
-
 	value = 0;
 
 	/*get display name string length */
@@ -1235,7 +1210,6 @@ static void configure_azalia(
 		hw_ctx,
 		ixAZALIA_F0_CODEC_PIN_CONTROL_SINK_INFO1,
 		value);
-
 
 	/*
 	*write the port ID:
@@ -1288,7 +1262,6 @@ static void configure_azalia(
 		hw_ctx,
 		ixAZALIA_F0_CODEC_PIN_CONTROL_SINK_INFO4,
 		value);
-
 
 	value = 0;
 	set_reg_field_value(value, audio_info->display_name[4],
@@ -1355,7 +1328,6 @@ static void configure_azalia(
 		hw_ctx,
 		ixAZALIA_F0_CODEC_PIN_CONTROL_SINK_INFO7,
 		value);
-
 
 	value = 0;
 	set_reg_field_value(value, audio_info->display_name[16],
@@ -1474,7 +1446,6 @@ static void setup_channel_splitting_mapping(
 
 	if ((audio_mapping == NULL || audio_mapping->u32all == 0) && enable)
 		return;
-
 
 	value = audio_mapping->u32all;
 
@@ -1726,8 +1697,6 @@ static bool get_azalia_clock_info_hdmi(
 	return true;
 }
 
-
-
 /* search pixel clock value for Azalia DP Audio */
 static bool get_azalia_clock_info_dp(
 	const struct hw_ctx_audio *hw_ctx,
@@ -1888,7 +1857,6 @@ bool dal_audio_construct_hw_ctx_audio_dce80(
 	return true;
 }
 
-
 /* audio_dce80 is derived from audio directly, not via dce80  */
 
 void dal_audio_destruct_hw_ctx_audio_dce80(
@@ -1903,7 +1871,7 @@ struct hw_ctx_audio *dal_audio_create_hw_ctx_audio_dce80(
 {
 	/* allocate memory for struc hw_ctx_audio_dce80 */
 	struct hw_ctx_audio_dce80 *hw_ctx_dce80 =
-			dm_alloc(ctx, sizeof(struct hw_ctx_audio_dce80));
+			dm_alloc(sizeof(struct hw_ctx_audio_dce80));
 
 	if (!hw_ctx_dce80) {
 		BREAK_TO_DEBUGGER();
@@ -1917,10 +1885,8 @@ struct hw_ctx_audio *dal_audio_create_hw_ctx_audio_dce80(
 
 	BREAK_TO_DEBUGGER();
 
-	dm_free(ctx, hw_ctx_dce80);
+	dm_free(hw_ctx_dce80);
 
 	return NULL;
 }
-
-
 

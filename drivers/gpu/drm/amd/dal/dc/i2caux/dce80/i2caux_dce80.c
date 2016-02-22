@@ -51,7 +51,6 @@
 #include "../aux_engine.h"
 #include "aux_engine_dce80.h"
 
-
 /*
  * This unit
  */
@@ -72,7 +71,7 @@ static void destroy(
 
 	destruct(i2caux_dce80);
 
-	dm_free((*i2c_engine)->ctx, i2caux_dce80);
+	dm_free(i2caux_dce80);
 
 	*i2c_engine = NULL;
 }
@@ -246,7 +245,7 @@ struct i2caux *dal_i2caux_dce80_create(
 	struct dc_context *ctx)
 {
 	struct i2caux_dce80 *i2caux_dce80 =
-		dm_alloc(ctx, sizeof(struct i2caux_dce80));
+		dm_alloc(sizeof(struct i2caux_dce80));
 
 	if (!i2caux_dce80) {
 		BREAK_TO_DEBUGGER();
@@ -258,7 +257,7 @@ struct i2caux *dal_i2caux_dce80_create(
 
 	BREAK_TO_DEBUGGER();
 
-	dm_free(ctx, i2caux_dce80);
+	dm_free(i2caux_dce80);
 
 	return NULL;
 }

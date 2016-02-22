@@ -3601,7 +3601,6 @@ void bw_calcs_init(struct bw_calcs_dceip *bw_dceip,
 	vbios.blackout_duration = bw_int_to_fixed(18); /* us */
 	vbios.maximum_blackout_recovery_time = bw_int_to_fixed(20);
 
-
 	dceip.dmif_request_buffer_size = bw_int_to_fixed(768);
 	dceip.de_tiling_buffer = bw_int_to_fixed(0);
 	dceip.dcfclk_request_generation = 0;
@@ -3703,10 +3702,9 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 	const struct bw_calcs_mode_data *mode_data,
 	struct bw_calcs_output *calcs_output)
 {
-	struct bw_calcs_results *bw_results_internal = dm_alloc(
-				ctx, sizeof(struct bw_calcs_results));
+	struct bw_calcs_results *bw_results_internal = dm_alloc(sizeof(struct bw_calcs_results));
 	struct bw_calcs_mode_data_internal *bw_data_internal =
-		dm_alloc(ctx, sizeof(struct bw_calcs_mode_data_internal));
+		dm_alloc(sizeof(struct bw_calcs_mode_data_internal));
 
 	switch (mode_data->number_of_displays) {
 	case (6):
@@ -3941,8 +3939,8 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->required_sclk = 0;
 	}
 
-	dm_free(ctx, bw_data_internal);
-	dm_free(ctx, bw_results_internal);
+	dm_free(bw_data_internal);
+	dm_free(bw_results_internal);
 
 	return is_display_configuration_supported(vbios, calcs_output);
 }

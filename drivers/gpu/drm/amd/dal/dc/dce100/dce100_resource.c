@@ -139,7 +139,6 @@ static const struct dce110_mem_input_reg_offsets dce100_mi_reg_offsets[] = {
 	}
 };
 
-
 static const struct dce110_clk_src_reg_offsets dce100_clk_src_reg_offsets[] = {
 	{
 		.pll_cntl = mmBPHYC_PLL0_PLL_CNTL,
@@ -210,7 +209,6 @@ static const struct dce110_ipp_reg_offsets dce100_ipp_reg_offsets[] = {
 	.dcp_offset = (mmDCP5_CUR_CONTROL - mmCUR_CONTROL),
 }
 };
-
 
 static const struct dce110_link_enc_bl_registers link_enc_bl_regs = {
 		.BL_PWM_CNTL = mmBL_PWM_CNTL,
@@ -339,7 +337,6 @@ static const struct dce110_opp_reg_offsets dce100_opp_reg_offsets[] = {
 }
 };
 
-
 static struct timing_generator *dce100_timing_generator_create(
 		struct adapter_service *as,
 		struct dc_context *ctx,
@@ -347,7 +344,7 @@ static struct timing_generator *dce100_timing_generator_create(
 		const struct dce110_timing_generator_offsets *offsets)
 {
 	struct dce110_timing_generator *tg110 =
-		dm_alloc(ctx, sizeof(struct dce110_timing_generator));
+		dm_alloc(sizeof(struct dce110_timing_generator));
 
 	if (!tg110)
 		return NULL;
@@ -357,7 +354,7 @@ static struct timing_generator *dce100_timing_generator_create(
 		return &tg110->base;
 
 	BREAK_TO_DEBUGGER();
-	dm_free(ctx, tg110);
+	dm_free(tg110);
 	return NULL;
 }
 
@@ -368,7 +365,7 @@ static struct stream_encoder *dce100_stream_encoder_create(
 	const struct dce110_stream_enc_registers *regs)
 {
 	struct dce110_stream_encoder *enc110 =
-		dm_alloc(ctx, sizeof(struct dce110_stream_encoder));
+		dm_alloc(sizeof(struct dce110_stream_encoder));
 
 	if (!enc110)
 		return NULL;
@@ -377,7 +374,7 @@ static struct stream_encoder *dce100_stream_encoder_create(
 		return &enc110->base;
 
 	BREAK_TO_DEBUGGER();
-	dm_free(ctx, enc110);
+	dm_free(enc110);
 	return NULL;
 }
 
@@ -387,7 +384,7 @@ static struct mem_input *dce100_mem_input_create(
 	const struct dce110_mem_input_reg_offsets *offset)
 {
 	struct dce110_mem_input *mem_input110 =
-		dm_alloc(ctx, sizeof(struct dce110_mem_input));
+		dm_alloc(sizeof(struct dce110_mem_input));
 
 	if (!mem_input110)
 		return NULL;
@@ -397,13 +394,13 @@ static struct mem_input *dce100_mem_input_create(
 		return &mem_input110->base;
 
 	BREAK_TO_DEBUGGER();
-	dm_free(ctx, mem_input110);
+	dm_free(mem_input110);
 	return NULL;
 }
 
 static void dce100_transform_destroy(struct transform **xfm)
 {
-	dm_free((*xfm)->ctx, TO_DCE110_TRANSFORM(*xfm));
+	dm_free(TO_DCE110_TRANSFORM(*xfm));
 	*xfm = NULL;
 }
 
@@ -413,7 +410,7 @@ static struct transform *dce100_transform_create(
 	const struct dce110_transform_reg_offsets *offsets)
 {
 	struct dce110_transform *transform =
-		dm_alloc(ctx, sizeof(struct dce110_transform));
+		dm_alloc(sizeof(struct dce110_transform));
 
 	if (!transform)
 		return NULL;
@@ -422,7 +419,7 @@ static struct transform *dce100_transform_create(
 		return &transform->base;
 
 	BREAK_TO_DEBUGGER();
-	dm_free(ctx, transform);
+	dm_free(transform);
 	return NULL;
 }
 
@@ -432,7 +429,7 @@ static struct input_pixel_processor *dce100_ipp_create(
 	const struct dce110_ipp_reg_offsets *offsets)
 {
 	struct dce110_ipp *ipp =
-		dm_alloc(ctx, sizeof(struct dce110_ipp));
+		dm_alloc(sizeof(struct dce110_ipp));
 
 	if (!ipp)
 		return NULL;
@@ -441,7 +438,7 @@ static struct input_pixel_processor *dce100_ipp_create(
 		return &ipp->base;
 
 	BREAK_TO_DEBUGGER();
-	dm_free(ctx, ipp);
+	dm_free(ipp);
 	return NULL;
 }
 
@@ -449,9 +446,7 @@ struct link_encoder *dce100_link_encoder_create(
 	const struct encoder_init_data *enc_init_data)
 {
 	struct dce110_link_encoder *enc110 =
-		dm_alloc(
-			enc_init_data->ctx,
-			sizeof(struct dce110_link_encoder));
+		dm_alloc(sizeof(struct dce110_link_encoder));
 
 	if (!enc110)
 		return NULL;
@@ -465,10 +460,9 @@ struct link_encoder *dce100_link_encoder_create(
 		return &enc110->base;
 
 	BREAK_TO_DEBUGGER();
-	dm_free(enc_init_data->ctx, enc110);
+	dm_free(enc110);
 	return NULL;
 }
-
 
 struct output_pixel_processor *dce100_opp_create(
 	struct dc_context *ctx,
@@ -476,7 +470,7 @@ struct output_pixel_processor *dce100_opp_create(
 	const struct dce110_opp_reg_offsets *offset)
 {
 	struct dce110_opp *opp =
-		dm_alloc(ctx, sizeof(struct dce110_opp));
+		dm_alloc(sizeof(struct dce110_opp));
 
 	if (!opp)
 		return NULL;
@@ -486,24 +480,23 @@ struct output_pixel_processor *dce100_opp_create(
 		return &opp->base;
 
 	BREAK_TO_DEBUGGER();
-	dm_free(ctx, opp);
+	dm_free(opp);
 	return NULL;
 }
 
-
 void dce100_opp_destroy(struct output_pixel_processor **opp)
 {
-	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128_dx);
-	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128_oem);
-	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coeff128);
-	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.axis_x_1025);
-	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.axis_x_256);
-	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.coordinates_x);
-	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_regamma);
-	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_resulted);
-	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_oem);
-	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp)->regamma.rgb_user);
-	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp));
+	dm_free(FROM_DCE11_OPP(*opp)->regamma.coeff128_dx);
+	dm_free(FROM_DCE11_OPP(*opp)->regamma.coeff128_oem);
+	dm_free(FROM_DCE11_OPP(*opp)->regamma.coeff128);
+	dm_free(FROM_DCE11_OPP(*opp)->regamma.axis_x_1025);
+	dm_free(FROM_DCE11_OPP(*opp)->regamma.axis_x_256);
+	dm_free(FROM_DCE11_OPP(*opp)->regamma.coordinates_x);
+	dm_free(FROM_DCE11_OPP(*opp)->regamma.rgb_regamma);
+	dm_free(FROM_DCE11_OPP(*opp)->regamma.rgb_resulted);
+	dm_free(FROM_DCE11_OPP(*opp)->regamma.rgb_oem);
+	dm_free(FROM_DCE11_OPP(*opp)->regamma.rgb_user);
+	dm_free(FROM_DCE11_OPP(*opp));
 	*opp = NULL;
 }
 
@@ -514,7 +507,7 @@ struct clock_source *dce100_clock_source_create(
 	const struct dce110_clk_src_reg_offsets *offsets)
 {
 	struct dce110_clk_src *clk_src =
-		dm_alloc(ctx, sizeof(struct dce110_clk_src));
+		dm_alloc(sizeof(struct dce110_clk_src));
 
 	if (!clk_src)
 		return NULL;
@@ -528,7 +521,7 @@ struct clock_source *dce100_clock_source_create(
 
 void dce100_clock_source_destroy(struct clock_source **clk_src)
 {
-	dm_free((*clk_src)->ctx, TO_DCE110_CLK_SRC(*clk_src));
+	dm_free(TO_DCE110_CLK_SRC(*clk_src));
 	*clk_src = NULL;
 }
 
@@ -547,22 +540,19 @@ void dce100_destruct_resource_pool(struct resource_pool *pool)
 			dce110_ipp_destroy(&pool->ipps[i]);
 
 		if (pool->mis[i] != NULL) {
-			dm_free(pool->mis[i]->ctx,
-					TO_DCE110_MEM_INPUT(pool->mis[i]));
+			dm_free(TO_DCE110_MEM_INPUT(pool->mis[i]));
 			pool->mis[i] = NULL;
 		}
 
 		if (pool->timing_generators[i] != NULL)	{
-			dm_free(pool->timing_generators[i]->ctx,
-					DCE110TG_FROM_TG(pool->timing_generators[i]));
+			dm_free(DCE110TG_FROM_TG(pool->timing_generators[i]));
 			pool->timing_generators[i] = NULL;
 		}
 	}
 
 	for (i = 0; i < pool->stream_enc_count; i++) {
 		if (pool->stream_enc[i] != NULL)
-			dm_free(pool->stream_enc[i]->ctx,
-				DCE110STRENC_FROM_STRENC(pool->stream_enc[i]));
+			dm_free(DCE110STRENC_FROM_STRENC(pool->stream_enc[i]));
 	}
 
 	for (i = 0; i < pool->clk_src_count; i++) {
@@ -1147,8 +1137,7 @@ bool dce100_construct_resource_pool(
 stream_enc_create_fail:
 	for (i = 0; i < pool->stream_enc_count; i++) {
 		if (pool->stream_enc[i] != NULL)
-			dm_free(pool->stream_enc[i]->ctx,
-				DCE110STRENC_FROM_STRENC(pool->stream_enc[i]));
+			dm_free(DCE110STRENC_FROM_STRENC(pool->stream_enc[i]));
 	}
 
 audio_create_fail:
@@ -1169,14 +1158,12 @@ controller_create_fail:
 			dce110_ipp_destroy(&pool->ipps[i]);
 
 		if (pool->mis[i] != NULL) {
-			dm_free(pool->mis[i]->ctx,
-					TO_DCE110_MEM_INPUT(pool->mis[i]));
+			dm_free(TO_DCE110_MEM_INPUT(pool->mis[i]));
 			pool->mis[i] = NULL;
 		}
 
 		if (pool->timing_generators[i] != NULL)	{
-			dm_free(pool->timing_generators[i]->ctx,
-				DCE110TG_FROM_TG(pool->timing_generators[i]));
+			dm_free(DCE110TG_FROM_TG(pool->timing_generators[i]));
 			pool->timing_generators[i] = NULL;
 		}
 	}

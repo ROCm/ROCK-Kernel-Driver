@@ -88,8 +88,6 @@ struct bit_depth_reduction_params {
 	uint32_t g_seed_value;
 };
 
-
-
 enum wide_gamut_regamma_mode {
 	/*  0x0  - BITS2:0 Bypass */
 	WIDE_GAMUT_REGAMMA_MODE_GRAPHICS_BYPASS,
@@ -255,7 +253,6 @@ struct opp_grph_csc_adjustment {
 	int32_t grph_hue;
 };
 
-
 /* Underlay related types */
 
 struct hw_adjustment_range {
@@ -317,7 +314,6 @@ struct opp_funcs {
 			struct output_pixel_processor *opp,
 			enum ovl_csc_adjust_item overlay_adjust_item,
 			struct hw_adjustment_range *range);
-
 
 	void (*opp_destroy)(struct output_pixel_processor **opp);
 };

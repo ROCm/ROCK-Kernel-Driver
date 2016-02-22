@@ -70,7 +70,6 @@ static void program_address(
 	struct dce110_ipp *ipp110,
 	PHYSICAL_ADDRESS_LOC address);
 
-
 void dce110_ipp_cursor_set_position(
 	struct input_pixel_processor *ipp,
 	const struct dc_cursor_position *position)

@@ -37,7 +37,6 @@
 #include "../dce110/dce110_mem_input.h"
 #include "dce80_mem_input.h"
 
-
 #define MAX_WATERMARK 0xFFFF
 #define SAFE_NBP_MARK 0x7FFF
 

@@ -26,11 +26,9 @@
 #ifndef __DAL_LOGGER_TYPES_H__
 #define __DAL_LOGGER_TYPES_H__
 
-
 /*
  * TODO: This logger functionality needs to be implemented and reworked.
  */
-
 
 struct dal_logger;
 
@@ -74,7 +72,6 @@ enum log_major {
 * @brief defines minor switch for logging.  each of these define sub category
 *        of log message per LogMajor
 */
-
 
 enum log_minor {
 

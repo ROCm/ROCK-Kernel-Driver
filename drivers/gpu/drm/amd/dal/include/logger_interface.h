@@ -36,7 +36,6 @@ union logger_flags;
  * TODO: This logger functionality needs to be implemented and reworked.
  */
 
-
 /*
  *
  * DAL logger functionality

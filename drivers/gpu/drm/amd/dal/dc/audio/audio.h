@@ -191,5 +191,3 @@ void dal_audio_release_hw_base(
 
 #endif  /* __DAL_AUDIO__ */
 
-
-

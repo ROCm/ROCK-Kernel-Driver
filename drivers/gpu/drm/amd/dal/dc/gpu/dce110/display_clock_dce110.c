@@ -52,7 +52,6 @@ static struct state_dependent_clocks max_clks_by_state[] = {
 /*ClocksStatePerformance*/
 { .display_clk_khz = 643000, .pixel_clk_khz = 400000 } };
 
-
 /* Starting point for each divider range.*/
 enum divider_range_start {
 	DIVIDER_RANGE_01_START = 200, /* 2.00*/
@@ -188,7 +187,6 @@ static uint32_t get_dp_ref_clk_frequency(struct display_clock *dc)
 			DENTIST_DISPCLK_CNTL,
 			DENTIST_DPREFCLK_WDIVIDER));
 
-
 	if (target_div != INVALID_DIVIDER) {
 		/* Calculate the current DFS clock, in kHz.*/
 		dp_ref_clk_khz = (DIVIDER_RANGE_SCALE_FACTOR
@@ -226,14 +224,13 @@ static uint32_t get_dp_ref_clk_frequency(struct display_clock *dc)
 	return dp_ref_clk_khz;
 }
 
-
 static void destroy(struct display_clock **base)
 {
 	struct display_clock_dce110 *dc110;
 
 	dc110 = DCLCK110_FROM_BASE(*base);
 
-	dm_free((*base)->ctx, dc110);
+	dm_free(dc110);
 
 	*base = NULL;
 }
@@ -954,7 +951,7 @@ struct display_clock *dal_display_clock_dce110_create(
 {
 	struct display_clock_dce110 *dc110;
 
-	dc110 = dm_alloc(ctx, sizeof(struct display_clock_dce110));
+	dc110 = dm_alloc(sizeof(struct display_clock_dce110));
 
 	if (dc110 == NULL)
 		return NULL;
@@ -962,7 +959,7 @@ struct display_clock *dal_display_clock_dce110_create(
 	if (dal_display_clock_dce110_construct(dc110, ctx, as))
 		return &dc110->disp_clk_base;
 
-	dm_free(ctx, dc110);
+	dm_free(dc110);
 
 	return NULL;
 }

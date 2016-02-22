@@ -59,5 +59,4 @@ uint32_t dal_divider_range_get_did(
 	uint32_t ranges_num,
 	uint32_t divider);
 
-
 #endif /* __DAL_DIVIDER_RANGE_H__ */

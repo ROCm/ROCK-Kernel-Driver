@@ -26,7 +26,6 @@
 #ifndef __DC_TIMING_GENERATOR_DCE110_H__
 #define __DC_TIMING_GENERATOR_DCE110_H__
 
-
 #include "timing_generator.h"
 #include "../include/grph_object_id.h"
 #include "../include/hw_sequencer_types.h"
@@ -129,7 +128,6 @@ void dce110_timing_generator_wait_for_vblank(struct timing_generator *tg);
 /* wait until TG is in beginning of active region */
 void dce110_timing_generator_wait_for_vactive(struct timing_generator *tg);
 
-
 /*********** Timing Generator Synchronization routines ****/
 
 /* Setups Global Swap Lock group, TimingServer or TimingClient*/
@@ -180,7 +178,6 @@ void dce110_timing_generator_color_space_to_black_color(
 	struct crtc_black_color *black_color);
 /*************** End-of-move ********************/
 
-
 /* Not called yet */
 void dce110_timing_generator_set_test_pattern(
 	struct timing_generator *tg,
@@ -225,7 +222,6 @@ bool dce110_tg_set_blank(struct timing_generator *tg,
 
 bool dce110_tg_validate_timing(struct timing_generator *tg,
 	const struct dc_crtc_timing *timing);
-
 
 void dce110_tg_wait_for_state(struct timing_generator *tg,
 	enum crtc_state state);

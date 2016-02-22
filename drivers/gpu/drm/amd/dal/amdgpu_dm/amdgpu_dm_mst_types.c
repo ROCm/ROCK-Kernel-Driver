@@ -33,7 +33,6 @@
 #include "dc.h"
 #include "dm_helpers.h"
 
-
 /* #define TRACE_DPCD */
 
 #ifdef TRACE_DPCD
@@ -342,7 +341,6 @@ static struct drm_connector *dm_dp_add_mst_connector(struct drm_dp_mst_topology_
 	}
 	drm_modeset_unlock(&dev->mode_config.connection_mutex);
 
-
 	aconnector = kzalloc(sizeof(*aconnector), GFP_KERNEL);
 	if (!aconnector)
 		return NULL;
@@ -458,7 +456,6 @@ struct drm_dp_mst_topology_cbs dm_mst_cbs = {
 	.register_connector = dm_dp_mst_register_connector
 };
 #endif
-
 
 void amdgpu_dm_initialize_mst_connector(
 	struct amdgpu_display_manager *dm,

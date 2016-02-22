@@ -251,7 +251,6 @@ enum dc_rotation_angle {
 	ROTATION_ANGLE_COUNT
 };
 
-
 struct dc_cursor_position {
 	uint32_t x;
 	uint32_t y;
