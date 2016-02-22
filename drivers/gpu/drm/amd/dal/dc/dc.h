@@ -422,7 +422,6 @@ struct dc_sink_init_data {
 
 struct dc_sink *dc_sink_create(const struct dc_sink_init_data *init_params);
 
-
 /*******************************************************************************
  * Cursor interfaces - To manages the cursor within a target
  ******************************************************************************/
@@ -471,8 +470,6 @@ bool dc_set_cursor_position(
 		struct dc_cursor *cursor,
 		struct dc_cursor_position *pos);
 
-
-
 /*******************************************************************************
  * Interrupt interfaces
  ******************************************************************************/
@@ -487,7 +484,6 @@ const enum dc_irq_source dc_get_hpd_irq_source_at_index(
 const struct dc_target *dc_get_target_on_irq_source(
 		const struct core_dc *dc,
 		enum dc_irq_source src);
-
 
 /*******************************************************************************
  * Power Interfaces

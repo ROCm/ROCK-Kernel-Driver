@@ -60,7 +60,6 @@ static const uint32_t ddc_hw_status_addr[] = {
 	mmDC_I2C_DDCVGA_HW_STATUS
 };
 
-
 /*
  * @brief
  * Cast 'struct i2c_sw_engine *'
@@ -104,11 +103,10 @@ static void destroy(
 
 	destruct(sw_engine);
 
-	dm_free((*engine)->base.ctx, sw_engine);
+	dm_free(sw_engine);
 
 	*engine = NULL;
 }
-
 
 static bool acquire_engine(
 	struct i2c_engine *engine,
@@ -168,7 +166,7 @@ struct i2c_engine *dal_i2c_sw_engine_dce80_create(
 		return NULL;
 	}
 
-	engine = dm_alloc(arg->ctx, sizeof(struct i2c_sw_engine_dce80));
+	engine = dm_alloc(sizeof(struct i2c_sw_engine_dce80));
 
 	if (!engine) {
 		BREAK_TO_DEBUGGER();
@@ -180,7 +178,7 @@ struct i2c_engine *dal_i2c_sw_engine_dce80_create(
 
 	BREAK_TO_DEBUGGER();
 
-	dm_free(arg->ctx, engine);
+	dm_free(engine);
 
 	return NULL;
 }

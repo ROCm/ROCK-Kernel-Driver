@@ -83,7 +83,7 @@ void dc_target_release(struct dc_target *dc_target)
 	target->ref_count--;
 	if (target->ref_count == 0) {
 		destruct(protected);
-		dm_free(protected->ctx, target);
+		dm_free(target);
 	}
 }
 
@@ -113,7 +113,7 @@ struct dc_target *dc_create_target_for_streams(
 
 	stream = DC_STREAM_TO_CORE(dc_streams[0]);
 
-	target = dm_alloc(stream->ctx, sizeof(struct target));
+	target = dm_alloc(sizeof(struct target));
 
 	if (NULL == target)
 		goto target_alloc_fail;

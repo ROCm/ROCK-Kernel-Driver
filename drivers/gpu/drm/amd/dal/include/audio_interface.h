@@ -80,7 +80,6 @@ bool dal_audio_is_output_signal_supported(
 	struct audio *audio,
 	enum signal_type signal);
 
-
 /***** programming interface *****/
 
 /* perform power up sequence (boot up, resume, recovery) */
@@ -130,7 +129,6 @@ enum audio_result dal_audio_mute(
 	struct audio *audio,
 	enum engine_id engine_id,
 	enum signal_type signal);
-
 
 /***** information interface *****/
 

@@ -35,7 +35,6 @@ void dal_reg_logger_push(const char *caller_func);
 /* dal_reg_logger_pop - stop Register Logging */
 void dal_reg_logger_pop(void);
 
-
 /* for internal use of the Logger only */
 void dal_reg_logger_rw_count_increment(void);
 bool dal_reg_logger_should_dump_register(void);

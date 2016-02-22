@@ -53,10 +53,9 @@ static void destroy(struct audio **ptr)
 	destruct(audio);
 
 	/* release memory allocated for audio_dce80*/
-	dm_free(audio->base.ctx, audio);
+	dm_free(audio);
 	*ptr = NULL;
 }
-
 
 /* The inital call of hook function comes from audio object level.
  *The passing object handle "struct audio *audio" point to base object
@@ -407,14 +406,13 @@ static bool construct(
 	return true;
 }
 
-
 /* --- audio scope functions  --- */
 
 struct audio *dal_audio_create_dce80(
 	const struct audio_init_data *init_data)
 {
 	/*allocate memory for audio_dce80 */
-	struct audio_dce80 *audio = dm_alloc(init_data->ctx, sizeof(struct audio_dce80));
+	struct audio_dce80 *audio = dm_alloc(sizeof(struct audio_dce80));
 
 	if (audio == NULL)
 		return NULL;
@@ -424,7 +422,7 @@ struct audio *dal_audio_create_dce80(
 		return &audio->base;
 
 	 /*release memory allocated if fail */
-	dm_free(init_data->ctx, audio);
+	dm_free(audio);
 	return NULL;
 }
 

@@ -137,7 +137,7 @@ struct irq *dal_gpio_create_irq(
 		return NULL;
 	}
 
-	irq = dm_alloc(service->ctx, sizeof(struct irq));
+	irq = dm_alloc(sizeof(struct irq));
 
 	if (!irq) {
 		ASSERT_CRITICAL(false);
@@ -153,7 +153,7 @@ struct irq *dal_gpio_create_irq(
 
 	ASSERT_CRITICAL(false);
 
-	dm_free(service->ctx, irq);
+	dm_free(irq);
 
 	return NULL;
 }
@@ -174,7 +174,7 @@ void dal_gpio_destroy_irq(
 	}
 
 	destruct(*irq);
-	dm_free((*irq)->ctx, *irq);
+	dm_free(*irq);
 
 	*irq = NULL;
 }

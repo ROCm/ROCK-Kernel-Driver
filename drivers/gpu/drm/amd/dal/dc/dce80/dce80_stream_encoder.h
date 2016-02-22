@@ -81,5 +81,4 @@ void dce80_stream_encoder_dp_unblank(
 	struct stream_encoder *enc,
 	const struct encoder_unblank_param *param);
 
-
 #endif /* __DC_STREAM_ENCODER_DCE80_H__ */

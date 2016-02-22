@@ -101,7 +101,6 @@ static const struct dce110_hw_seq_reg_offsets reg_offsets[] = {
 #define HW_REG_CRTC(reg, id)\
 	(reg + reg_offsets[id].crtc)
 
-
 #define MAX_WATERMARK 0xFFFF
 #define SAFE_NBP_MARK 0x7FFF
 
@@ -408,7 +407,6 @@ static void dce110_set_blender_mode(
 		BLND_CONTROL,
 		BLND_MULTIPLIED_MODE);
 
-
 	dm_write_reg(ctx, addr, value);
 }
 
@@ -506,7 +504,6 @@ static void build_prescale_params(struct ipp_prescale_params *prescale_params,
 	}
 }
 
-
 static bool set_gamma_ramp(
 	struct input_pixel_processor *ipp,
 	struct output_pixel_processor *opp,
@@ -518,18 +515,16 @@ static bool set_gamma_ramp(
 	struct temp_params *temp_params;
 	bool result = false;
 
-	prescale_params = dm_alloc(opp->ctx,
-			sizeof(struct ipp_prescale_params));
+	prescale_params = dm_alloc(sizeof(struct ipp_prescale_params));
 
 	if (prescale_params == NULL)
 		goto prescale_alloc_fail;
 
-	regamma_params = dm_alloc(opp->ctx,
-			sizeof(struct pwl_params));
+	regamma_params = dm_alloc(sizeof(struct pwl_params));
 	if (regamma_params == NULL)
 		goto regamma_alloc_fail;
 
-	temp_params = dm_alloc(opp->ctx, sizeof(struct temp_params));
+	temp_params = dm_alloc(sizeof(struct temp_params));
 
 	if (temp_params == NULL)
 		goto temp_alloc_fail;
@@ -558,14 +553,14 @@ static bool set_gamma_ramp(
 
 	opp->funcs->opp_power_on_regamma_lut(opp, false);
 
-	dm_free(opp->ctx, temp_params);
+	dm_free(temp_params);
 
 	result = true;
 
 temp_alloc_fail:
-	dm_free(opp->ctx, regamma_params);
+	dm_free(regamma_params);
 regamma_alloc_fail:
-	dm_free(opp->ctx, prescale_params);
+	dm_free(prescale_params);
 prescale_alloc_fail:
 	return result;
 }
@@ -640,7 +635,6 @@ static void update_info_frame(struct pipe_ctx *pipe_ctx)
 			pipe_ctx->stream_enc,
 			&pipe_ctx->encoder_info_frame);
 }
-
 
 static void enable_stream(struct pipe_ctx *pipe_ctx)
 {
@@ -905,7 +899,6 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	return DC_OK;
 }
 
-
 /******************************************************************************/
 
 static void power_down_encoders(struct core_dc *dc)
@@ -1064,7 +1057,6 @@ static bool dc_set_clocks_and_clock_state (
 	struct display_clock *disp_clk = context->res_ctx.pool.display_clock;
 	struct dc_context *ctx = context->targets[0]->ctx;
 
-
 	if (!dc_pre_clock_change(
 			ctx,
 			&context->res_ctx.min_clocks,
@@ -1091,7 +1083,6 @@ static bool dc_set_clocks_and_clock_state (
 		BREAK_TO_DEBUGGER();
 		dm_error("DC: failed to set minimum clock state!\n");
 	}
-
 
 	/*bm_clk_info.max_mclk_khz = output.max_mclk;
 	bm_clk_info.min_mclk_khz = output.min_mclk;
@@ -1173,7 +1164,6 @@ static void set_displaymarks(
 		num_pipes++;
 	}
 }
-
 
 static void set_safe_displaymarks(struct resource_context *res_ctx)
 {
@@ -1293,7 +1283,6 @@ static enum dc_status apply_ctx_to_hw(
 
 	return DC_OK;
 }
-
 
 /*******************************************************************************
  * Front End programming

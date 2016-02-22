@@ -33,7 +33,6 @@
 #define MAX_HW_AUDIO_INFO_DISPLAY_NAME_SIZE_IN_CHARS 18
 #define MULTI_CHANNEL_SPLIT_NO_ASSO_INFO 0xFFFFFFFF
 
-
 struct audio_pll_hw_settings {
 	uint32_t feed_back_divider;
 	uint32_t step_size_integer;
@@ -153,7 +152,6 @@ struct audio_info_flags {
 		uint8_t all;
 	};
 };
-
 
 /*struct audio_info_flags {
 	struct audio_speaker_flags {

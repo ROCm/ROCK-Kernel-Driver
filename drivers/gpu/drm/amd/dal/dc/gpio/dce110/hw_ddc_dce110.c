@@ -62,7 +62,7 @@ static void destroy(
 
 	destruct(pin);
 
-	dm_free((*ptr)->ctx, pin);
+	dm_free(pin);
 
 	*ptr = NULL;
 }
@@ -814,7 +814,6 @@ static const struct hw_gpio_pin_funcs funcs = {
 	.close = dal_hw_gpio_close,
 };
 
-
 static bool construct(
 	struct hw_ddc_dce110 *pin,
 	enum gpio_id id,
@@ -864,7 +863,7 @@ struct hw_gpio_pin *dal_hw_ddc_dce110_create(
 	enum gpio_id id,
 	uint32_t en)
 {
-	struct hw_ddc_dce110 *pin = dm_alloc(ctx, sizeof(struct hw_ddc_dce110));
+	struct hw_ddc_dce110 *pin = dm_alloc(sizeof(struct hw_ddc_dce110));
 
 	if (!pin) {
 		ASSERT_CRITICAL(false);
@@ -876,7 +875,7 @@ struct hw_gpio_pin *dal_hw_ddc_dce110_create(
 
 	ASSERT_CRITICAL(false);
 
-	dm_free(ctx, pin);
+	dm_free(pin);
 
 	return NULL;
 }

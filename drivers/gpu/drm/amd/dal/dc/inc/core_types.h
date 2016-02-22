@@ -55,7 +55,6 @@ struct core_target {
 #define DC_GAMMA_TO_CORE(dc_gamma) \
 	container_of(dc_gamma, struct core_gamma, public)
 
-
 struct core_surface {
 	struct dc_surface public;
 	struct dc_surface_status status;
@@ -98,7 +97,6 @@ struct core_stream {
 
 	struct dc_stream_status status;
 };
-
 
 /************ core_sink *****************/
 
@@ -348,6 +346,5 @@ struct validate_context {
 	/* Note: this is a big structure, do *not* put on stack! */
 	struct dm_pp_display_configuration pp_display_cfg;
 };
-
 
 #endif /* _CORE_TYPES_H_ */

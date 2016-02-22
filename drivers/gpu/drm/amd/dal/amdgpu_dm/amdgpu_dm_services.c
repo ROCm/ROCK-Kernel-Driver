@@ -36,33 +36,13 @@
 #include "amdgpu_dm_types.h"
 #include "amdgpu_pm.h"
 
-/*
-#include "logger_interface.h"
-#include "acpimethod_atif.h"
-#include "amdgpu_powerplay.h"
-#include "amdgpu_notifications.h"
-*/
-
-/* if the pointer is not NULL, the allocated memory is zeroed */
-void *dm_alloc(struct dc_context *ctx, uint32_t size)
-{
-	return kzalloc(size, GFP_KERNEL);
-}
-
-/* Reallocate memory. The contents will remain unchanged.*/
-void *dm_realloc(struct dc_context *ctx, const void *ptr, uint32_t size)
-{
-	return krealloc(ptr, size, GFP_KERNEL);
-}
+#define dm_alloc(size) kzalloc(size, GFP_KERNEL)
+#define dm_realloc(ptr, size) krealloc(ptr, size, GFP_KERNEL)
+#define dm_free(ptr) kfree(ptr)
 
 void dm_memmove(void *dst, const void *src, uint32_t size)
 {
 	memmove(dst, src, size);
-}
-
-void dm_free(struct dc_context *ctx, void *p)
-{
-	kfree(p);
 }
 
 void dm_memset(void *p, int32_t c, uint32_t count)
@@ -431,7 +411,6 @@ bool dm_pp_get_clock_levels_by_type(
 }
 
 /**** end of power component interfaces ****/
-
 
 /* Calls to notification */
 

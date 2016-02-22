@@ -151,7 +151,6 @@ struct graphics_object_i2c_info {
 	uint32_t i2c_slave_address;
 };
 
-
 struct graphics_object_hpd_info {
 	uint8_t hpd_int_gpio_uid;
 	uint8_t hpd_active;
@@ -334,7 +333,6 @@ struct transmitter_configuration {
 	/* Secondary transmitter configuration for Dual-link DVI */
 	struct transmitter_configuration_info secondary_transmitter_config;
 };
-
 
 /* These size should be sufficient to store info coming from BIOS */
 #define NUMBER_OF_UCHAR_FOR_GUID 16

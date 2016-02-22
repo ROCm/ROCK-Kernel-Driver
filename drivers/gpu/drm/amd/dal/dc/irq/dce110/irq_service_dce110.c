@@ -376,7 +376,7 @@ bool construct(
 struct irq_service *dal_irq_service_dce110_create(
 	struct irq_service_init_data *init_data)
 {
-	struct irq_service *irq_service = dm_alloc(init_data->ctx, sizeof(*irq_service));
+	struct irq_service *irq_service = dm_alloc(sizeof(*irq_service));
 
 	if (!irq_service)
 		return NULL;
@@ -384,6 +384,6 @@ struct irq_service *dal_irq_service_dce110_create(
 	if (construct(irq_service, init_data))
 		return irq_service;
 
-	dm_free(init_data->ctx, irq_service);
+	dm_free(irq_service);
 	return NULL;
 }

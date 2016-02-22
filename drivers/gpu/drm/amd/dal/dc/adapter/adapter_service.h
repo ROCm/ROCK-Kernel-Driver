@@ -37,7 +37,6 @@
 struct gpio_service;
 struct asic_cap;
 
-
 /* Adapter service */
 struct adapter_service {
 	struct dc_context *ctx;

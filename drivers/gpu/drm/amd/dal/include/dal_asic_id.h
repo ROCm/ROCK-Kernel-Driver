@@ -105,7 +105,6 @@
 #define DEVICE_ID_TEMASH_9839 0x9839
 #define DEVICE_ID_TEMASH_983D 0x983D
 
-
 /* Asic Family IDs for different asic family. */
 #define FAMILY_CI 120 /* Sea Islands: Hawaii (P), Bonaire (M) */
 #define FAMILY_KV 125 /* Fusion => Kaveri: Spectre, Spooky; Kabini: Kalindi */

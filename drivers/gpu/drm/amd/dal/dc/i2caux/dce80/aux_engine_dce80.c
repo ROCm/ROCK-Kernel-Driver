@@ -45,7 +45,6 @@
 #include "dce/dce_8_0_d.h"
 #include "dce/dce_8_0_sh_mask.h"
 
-
 /*
  * This unit
  */
@@ -94,7 +93,7 @@ static void destroy(
 
 	destruct(engine);
 
-	dm_free((*aux_engine)->base.ctx, engine);
+	dm_free(engine);
 
 	*aux_engine = NULL;
 }
@@ -599,7 +598,6 @@ static enum aux_channel_operation_result get_channel_status(
 			time_elapsed += 10;
 		} while (time_elapsed < aux_engine->timeout_period);
 
-
 	}
 
 	/* Note that the following bits are set in 'status.bits'
@@ -722,7 +720,7 @@ struct aux_engine *dal_aux_engine_dce80_create(
 		return NULL;
 	}
 
-	engine = dm_alloc(arg->ctx, sizeof(struct aux_engine_dce80));
+	engine = dm_alloc(sizeof(struct aux_engine_dce80));
 
 	if (!engine) {
 		BREAK_TO_DEBUGGER();
@@ -734,7 +732,7 @@ struct aux_engine *dal_aux_engine_dce80_create(
 
 	BREAK_TO_DEBUGGER();
 
-	dm_free(arg->ctx, engine);
+	dm_free(engine);
 
 	return NULL;
 }

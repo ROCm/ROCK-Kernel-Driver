@@ -12,7 +12,6 @@ struct dc_bios;
 struct dc_context;
 struct dc_crtc_timing;
 
-
 struct encoder_info_packet {
 	bool valid;
 	uint8_t hb0;
@@ -44,7 +43,6 @@ struct encoder_set_dp_phy_pattern_param {
 	uint32_t custom_pattern_size;
 	enum dp_panel_mode dp_panel_mode;
 };
-
 
 struct stream_encoder {
 	struct stream_encoder_funcs *funcs;

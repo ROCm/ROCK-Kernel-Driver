@@ -35,7 +35,6 @@ enum pipe_gating_control {
 	PIPE_GATING_CONTROL_INIT
 };
 
-
 struct hw_sequencer_funcs {
 
 	enum dc_status (*apply_ctx_to_hw)(
@@ -70,7 +69,6 @@ struct hw_sequencer_funcs {
 	/* backlight control */
 	void (*encoder_set_lcd_backlight_level)(
 		struct link_encoder *enc, uint32_t level);
-
 
 	void (*crtc_switch_to_clk_src)(struct clock_source *, uint8_t);
 
@@ -117,6 +115,5 @@ struct hw_sequencer_funcs {
 bool dc_construct_hw_sequencer(
 				struct adapter_service *adapter_serv,
 				struct core_dc *dc);
-
 
 #endif /* __DC_HW_SEQUENCER_H__ */

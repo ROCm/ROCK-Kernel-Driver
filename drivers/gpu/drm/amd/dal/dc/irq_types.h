@@ -33,7 +33,6 @@ typedef void (*interrupt_handler)(void *);
 typedef void *irq_handler_idx;
 #define DAL_INVALID_IRQ_HANDLER_IDX NULL
 
-
 /* The order of the IRQ sources is important and MUST match the one's
 of base driver */
 enum dc_irq_source {

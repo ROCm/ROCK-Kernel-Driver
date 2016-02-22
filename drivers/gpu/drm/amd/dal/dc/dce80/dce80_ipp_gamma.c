@@ -43,15 +43,11 @@ enum {
 	MAX_INPUT_LUT_ENTRY = 256
 };
 
-
 /*PROTOTYPE DECLARATIONS*/
-
 
 static void set_legacy_input_gamma_mode(
 	struct dce110_ipp *ipp80,
 	bool is_legacy);
-
-
 
 void dce80_ipp_set_legacy_input_gamma_mode(
 		struct input_pixel_processor *ipp,
@@ -61,7 +57,6 @@ void dce80_ipp_set_legacy_input_gamma_mode(
 
 	set_legacy_input_gamma_mode(ipp80, is_legacy);
 }
-
 
 static void set_legacy_input_gamma_mode(
 	struct dce110_ipp *ipp80,
@@ -78,8 +73,4 @@ static void set_legacy_input_gamma_mode(
 
 	dm_write_reg(ipp80->base.ctx, addr, value);
 }
-
-
-
-
 

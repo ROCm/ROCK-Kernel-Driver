@@ -121,9 +121,7 @@ static bool create_links(struct core_dc *dc, const struct dc_init_data *init_par
 	}
 
 	for (i = 0; i < init_params->num_virtual_links; i++) {
-		struct core_link *link = dm_alloc(
-			dc->ctx,
-			sizeof(*link));
+		struct core_link *link = dm_alloc(sizeof(*link));
 		struct encoder_init_data enc_init = {0};
 
 		if (link == NULL) {
@@ -138,9 +136,7 @@ static bool create_links(struct core_dc *dc, const struct dc_init_data *init_par
 		link->link_id.type = OBJECT_TYPE_CONNECTOR;
 		link->link_id.id = CONNECTOR_ID_VIRTUAL;
 		link->link_id.enum_id = ENUM_ID_1;
-		link->link_enc = dm_alloc(
-			dc->ctx,
-			sizeof(*link->link_enc));
+		link->link_enc = dm_alloc(sizeof(*link->link_enc));
 
 		enc_init.adapter_service = init_params->adapter_srv;
 		enc_init.ctx = init_params->ctx;
@@ -163,7 +159,6 @@ static bool create_links(struct core_dc *dc, const struct dc_init_data *init_par
 failed_alloc:
 	return false;
 }
-
 
 static void init_hw(struct core_dc *dc)
 {
@@ -318,7 +313,7 @@ static bool construct(struct core_dc *dc, const struct dal_init_data *init_param
 	ctx.cgs_device = init_params->cgs_device;
 	ctx.dc = dc;
 
-	dc_init_data.ctx = dm_alloc(&ctx, sizeof(*dc_init_data.ctx));
+	dc_init_data.ctx = dm_alloc(sizeof(*dc_init_data.ctx));
 	if (!dc_init_data.ctx) {
 		dm_error("%s: failed to create ctx\n", __func__);
 		goto ctx_fail;
@@ -384,7 +379,7 @@ as_fail:
 	dal_logger_destroy(&dc_init_data.ctx->logger);
 logger_fail:
 hwss_fail:
-	dm_free(&ctx, dc_init_data.ctx);
+	dm_free(dc_init_data.ctx);
 ctx_fail:
 	return false;
 }
@@ -395,7 +390,7 @@ static void destruct(struct core_dc *dc)
 	destroy_links(dc);
 	dc->res_pool.funcs->destruct(&dc->res_pool);
 	dal_logger_destroy(&dc->ctx->logger);
-	dm_free(dc->ctx, dc->ctx);
+	dm_free(dc->ctx);
 }
 
 /*
@@ -474,7 +469,7 @@ struct core_dc *dc_create(const struct dal_init_data *init_params)
 		.driver_context = init_params->driver,
 		.cgs_device = init_params->cgs_device
 	};
-	struct core_dc *dc = dm_alloc(&ctx, sizeof(*dc));
+	struct core_dc *dc = dm_alloc(sizeof(*dc));
 
 	if (NULL == dc)
 		goto alloc_fail;
@@ -489,7 +484,7 @@ struct core_dc *dc_create(const struct dal_init_data *init_params)
 	return dc;
 
 construct_fail:
-	dm_free(&ctx, dc);
+	dm_free(dc);
 
 alloc_fail:
 	return NULL;
@@ -497,9 +492,8 @@ alloc_fail:
 
 void dc_destroy(struct core_dc **dc)
 {
-	struct dc_context ctx = *((*dc)->ctx);
 	destruct(*dc);
-	dm_free(&ctx, *dc);
+	dm_free(*dc);
 	*dc = NULL;
 }
 
@@ -511,7 +505,7 @@ bool dc_validate_resources(
 	enum dc_status result = DC_ERROR_UNEXPECTED;
 	struct validate_context *context;
 
-	context = dm_alloc(dc->ctx, sizeof(struct validate_context));
+	context = dm_alloc(sizeof(struct validate_context));
 	if(context == NULL)
 		goto context_alloc_fail;
 
@@ -519,7 +513,7 @@ bool dc_validate_resources(
 						dc, set, set_count, context);
 
 	val_ctx_destruct(context);
-	dm_free(dc->ctx, context);
+	dm_free(context);
 context_alloc_fail:
 
 	return (result == DC_OK);
@@ -668,7 +662,7 @@ bool dc_commit_targets(
 
 	}
 
-	context = dm_alloc(dc->ctx, sizeof(struct validate_context));
+	context = dm_alloc(sizeof(struct validate_context));
 	if (context == NULL)
 		goto context_alloc_fail;
 
@@ -714,7 +708,7 @@ bool dc_commit_targets(
 	dc->current_context = *context;
 
 fail:
-	dm_free(dc->ctx, context);
+	dm_free(context);
 
 context_alloc_fail:
 	return (result == DC_OK);
@@ -736,7 +730,7 @@ bool dc_commit_surfaces_to_target(
 	int new_enabled_surface_count = 0;
 	bool is_mpo_turning_on = false;
 
-	context = dm_alloc(dc->ctx, sizeof(struct validate_context));
+	context = dm_alloc(sizeof(struct validate_context));
 
 	val_ctx_copy_construct(&dc->current_context, context);
 
@@ -866,14 +860,14 @@ bool dc_commit_surfaces_to_target(
 
 	val_ctx_destruct(&dc->current_context);
 	dc->current_context = *context;
-	dm_free(dc->ctx, context);
+	dm_free(context);
 	return true;
 
 unexpected_fail:
 
 	val_ctx_destruct(context);
 
-	dm_free(dc->ctx, context);
+	dm_free(context);
 	return false;
 }
 
@@ -950,7 +944,6 @@ enum dc_irq_source dc_interrupt_to_irq_source(
 {
 	return dal_irq_service_to_irq_source(dc->res_pool.irqs, src_id, ext_id);
 }
-
 
 void dc_interrupt_set(const struct core_dc *dc, enum dc_irq_source src, bool enable)
 {

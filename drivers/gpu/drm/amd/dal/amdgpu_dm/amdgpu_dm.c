@@ -382,7 +382,6 @@ static int dm_sw_fini(void *handle)
 	return 0;
 }
 
-
 static void detect_link_for_all_connectors(struct drm_device *dev)
 {
 	struct amdgpu_connector *aconnector;
@@ -406,7 +405,6 @@ static void detect_link_for_all_connectors(struct drm_device *dev)
 	drm_modeset_unlock(&dev->mode_config.connection_mutex);
 }
 
-
 static int dm_hw_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
@@ -416,8 +414,6 @@ static int dm_hw_init(void *handle)
 	amdgpu_dm_hpd_init(adev);
 
 	detect_link_for_all_connectors(adev->ddev);
-
-
 
 	return 0;
 }
@@ -601,7 +597,6 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 		amdgpu_dm_update_connector_after_detect(aconnector);
 	}
 
-
 	drm_modeset_lock_all(ddev);
 	ret = dm_display_resume(ddev);
 	drm_modeset_unlock_all(ddev);
@@ -638,7 +633,6 @@ static struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 	.atomic_check = amdgpu_dm_atomic_check,
 	.atomic_commit = amdgpu_dm_atomic_commit
 };
-
 
 void amdgpu_dm_update_connector_after_detect(
 	struct amdgpu_connector *aconnector)
@@ -1276,11 +1270,8 @@ static int dm_early_init(void *handle)
 	 * adev->audio_endpt_wreg because they are initialised in
 	 * amdgpu_device_init() */
 
-
-
 	return 0;
 }
-
 
 bool amdgpu_dm_acquire_dal_lock(struct amdgpu_display_manager *dm)
 {

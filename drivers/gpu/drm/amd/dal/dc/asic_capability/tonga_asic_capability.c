@@ -70,7 +70,6 @@ void tonga_asic_capability_create(struct asic_capability *cap,
 	cap->data[ASIC_DATA_DEFAULT_I2C_SPEED_IN_KHZ] = 40;
 	cap->data[ASIC_DATA_NUM_OF_VIDEO_PLANES] = 1;
 
-
 	/* ASIC basic capability */
 	cap->caps.IS_FUSION = true;
 	cap->caps.DP_MST_SUPPORTED = true;
@@ -141,6 +140,5 @@ void tonga_asic_capability_create(struct asic_capability *cap,
 	default:
 		break;
 	}
-
 
 }

@@ -28,7 +28,6 @@
 
 #include "ipp.h"
 
-
 struct gamma_parameters;
 struct dev_c_lut;
 

@@ -482,7 +482,6 @@ static void program_pwl(
 	dm_write_reg(opp110->base.ctx, DCFE_REG(mmDCFE_MEM_PWR_CTRL), value);
 }
 
-
 bool dce110_opp_program_regamma_pwl(
 	struct output_pixel_processor *opp,
 	const struct pwl_params *params)

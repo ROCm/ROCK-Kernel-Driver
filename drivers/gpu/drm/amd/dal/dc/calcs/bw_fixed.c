@@ -25,7 +25,6 @@
 #include "dm_services.h"
 #include "bw_fixed.h"
 
-
 #define BITS_PER_FRACTIONAL_PART 24
 
 #define MIN_I32 \
@@ -39,7 +38,6 @@
 
 #define MAX_I64 \
 	(int64_t)((1ULL << 63) - 1)
-
 
 #define FRACTIONAL_PART_MASK \
 	((1ULL << BITS_PER_FRACTIONAL_PART) - 1)

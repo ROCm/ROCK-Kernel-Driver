@@ -55,7 +55,6 @@ struct asic_caps {
 	bool SUPPORT_8BPP:1;
 };
 
-
 /*
  * ASIC Stereo 3D Caps
  */
@@ -69,7 +68,6 @@ struct asic_stereo_3d_caps {
 	bool INTERLEAVE:1;
 };
 
-
 /*
  * ASIC Bugs
  */
@@ -80,7 +78,6 @@ struct asic_bugs {
 	bool ROM_REGISTER_ACCESS:1;
 	bool PSR_WA_OVERSCAN_CRC_ERROR:1;
 };
-
 
 /*
  * ASIC Data
@@ -114,7 +111,6 @@ enum asic_data {
 	ASIC_DATA_DEFAULT_I2C_SPEED_IN_KHZ,
 	ASIC_DATA_MAX_NUMBER /* end of enum */
 };
-
 
 /*
  * ASIC Feature Flags

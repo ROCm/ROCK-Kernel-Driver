@@ -116,7 +116,6 @@ static const struct log_minor_info info_packet_minor_info_tbl[] = {
 	{LOG_MINOR_INFO_PACKETS_HDMI, "Hdmi"},
 };
 
-
 static const struct log_minor_info dsat_minor_info_tbl[] = {
 	{LOG_MINOR_DSAT_LOGGER, "Logger"},
 	{LOG_MINOR_DSAT_EDID_OVERRIDE, "EDID_Override"},
@@ -180,7 +179,6 @@ static const struct log_minor_info backlight_minor_info_tbl[] = {
 	{LOG_MINOR_BACKLIGHT_LID, "Lid Status"}
 };
 
-
 static const struct log_minor_info override_feature_minor_info_tbl[] = {
 	{LOG_MINOR_FEATURE_OVERRIDE, "overriden feature"},
 };
@@ -209,7 +207,6 @@ static const struct log_minor_info ds_minor_info_tbl[] = {
 	{LOG_MINOR_DS_MODE_SETTING, "Mode_Setting"},
 };
 
-
 struct log_major_mask_info {
 	struct log_major_info major_info;
 	uint32_t default_mask;
@@ -230,7 +227,6 @@ struct log_major_mask_info {
 
 /* IFT - InterFaceTrace */
 #define LG_IFT_MSK (1 << LOG_MINOR_COMPONENT_DC)
-
 
 #define LG_HW_TR_AUD_MSK (1 << LOG_MINOR_HW_TRACE_AUDIO)
 #define LG_HW_TR_INTERRUPT_MSK (1 << LOG_MINOR_HW_TRACE_INTERRUPT) | \
@@ -283,8 +279,7 @@ static bool construct(struct dc_context *ctx, struct dal_logger *logger)
 	/* malloc buffer and init offsets */
 
 	logger->log_buffer_size = DAL_LOGGER_BUFFER_MAX_SIZE;
-	logger->log_buffer = (char *)dm_alloc(ctx,
-		logger->log_buffer_size *
+	logger->log_buffer = (char *)dm_alloc(logger->log_buffer_size *
 		sizeof(char));
 
 	if (!logger->log_buffer)
@@ -307,13 +302,10 @@ static bool construct(struct dc_context *ctx, struct dal_logger *logger)
 
 	/* malloc and init minor mask array */
 	logger->log_enable_mask_minors =
-			(uint32_t *)dm_alloc(
-				ctx,
-				NUM_ELEMENTS(log_major_mask_info_tbl)
+			(uint32_t *)dm_alloc(NUM_ELEMENTS(log_major_mask_info_tbl)
 				* sizeof(uint32_t));
 	if (!logger->log_enable_mask_minors)
 		return false;
-
 
 	/* Set default values for mask */
 	for (i = 0; i < NUM_ELEMENTS(log_major_mask_info_tbl); i++) {
@@ -329,12 +321,12 @@ static bool construct(struct dc_context *ctx, struct dal_logger *logger)
 static void destruct(struct dal_logger *logger)
 {
 	if (logger->log_buffer) {
-		dm_free(logger->ctx, logger->log_buffer);
+		dm_free(logger->log_buffer);
 		logger->log_buffer = NULL;
 	}
 
 	if (logger->log_enable_mask_minors) {
-		dm_free(logger->ctx, logger->log_enable_mask_minors);
+		dm_free(logger->log_enable_mask_minors);
 		logger->log_enable_mask_minors = NULL;
 	}
 }
@@ -342,12 +334,12 @@ static void destruct(struct dal_logger *logger)
 struct dal_logger *dal_logger_create(struct dc_context *ctx)
 {
 	/* malloc struct */
-	struct dal_logger *logger = dm_alloc(ctx, sizeof(struct dal_logger));
+	struct dal_logger *logger = dm_alloc(sizeof(struct dal_logger));
 
 	if (!logger)
 		return NULL;
 	if (!construct(ctx, logger)) {
-		dm_free(ctx, logger);
+		dm_free(logger);
 		return NULL;
 	}
 
@@ -359,7 +351,7 @@ uint32_t dal_logger_destroy(struct dal_logger **logger)
 	if (logger == NULL || *logger == NULL)
 		return 1;
 	destruct(*logger);
-	dm_free((*logger)->ctx, *logger);
+	dm_free(*logger);
 	*logger = NULL;
 
 	return 0;
@@ -474,9 +466,6 @@ static void log_to_internal_buffer(struct log_entry *entry)
 			logger->buffer_read_offset = 0;
 		}
 
-
-
-
 		if (space_before_wrap > size) {
 			/* No wrap around, copy 'size' bytes
 			 * from 'entry->buf' to 'log_buffer'
@@ -519,7 +508,6 @@ static void log_to_internal_buffer(struct log_entry *entry)
 
 	unlock(logger);
 }
-
 
 static void log_timestamp(struct log_entry *entry)
 {
@@ -567,7 +555,6 @@ static void log_heading(struct log_entry *entry,
 	log_major_minor(entry);
 }
 
-
 static void append_entry(
 		struct log_entry *entry,
 		char *buffer,
@@ -608,7 +595,6 @@ void dal_logger_write(
 		va_start(args, msg);
 		dal_logger_open(logger, &entry, major, minor);
 
-
 		size = dm_log_to_buffer(
 			buffer, DAL_LOGGER_BUFFER_MAX_LOG_LINE_SIZE, msg, args);
 
@@ -630,7 +616,6 @@ void dal_logger_write(
 
 	}
 }
-
 
 /* Same as dal_logger_write, except without open() and close(), which must
  * be done separately.
@@ -670,7 +655,6 @@ void dal_logger_append(
 		va_end(args);
 	}
 }
-
 
 uint32_t dal_logger_read(
 	struct dal_logger *logger, /* <[in] */
@@ -763,9 +747,7 @@ void dal_logger_open(
 	entry->minor = 0;
 	entry->logger = logger;
 
-	entry->buf = dm_alloc(
-		logger->ctx,
-		DAL_LOGGER_BUFFER_MAX_SIZE * sizeof(char));
+	entry->buf = dm_alloc(DAL_LOGGER_BUFFER_MAX_SIZE * sizeof(char));
 
 	entry->buf_offset = 0;
 	entry->max_buf_bytes = DAL_LOGGER_BUFFER_MAX_SIZE * sizeof(char);
@@ -780,7 +762,6 @@ void dal_logger_open(
 void dal_logger_close(struct log_entry *entry)
 {
 	struct dal_logger *logger = entry->logger;
-
 
 	if (logger && logger->open_count > 0) {
 		logger->open_count--;
@@ -799,7 +780,7 @@ void dal_logger_close(struct log_entry *entry)
 
 cleanup:
 	if (entry->buf) {
-		dm_free(entry->logger->ctx, entry->buf);
+		dm_free(entry->buf);
 		entry->buf = NULL;
 		entry->buf_offset = 0;
 		entry->max_buf_bytes = 0;
@@ -888,7 +869,6 @@ void dal_logger_set_flags(
 	logger->flags = flags;
 }
 
-
 uint32_t dal_logger_get_buffer_size(struct dal_logger *logger)
 {
 	return DAL_LOGGER_BUFFER_MAX_SIZE;
@@ -903,7 +883,6 @@ uint32_t dal_logger_set_buffer_size(
 	/* return new size */
 	return DAL_LOGGER_BUFFER_MAX_SIZE;
 }
-
 
 const struct log_major_info *dal_logger_enum_log_major_info(
 		struct dal_logger *logger,

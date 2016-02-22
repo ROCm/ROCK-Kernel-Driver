@@ -59,6 +59,6 @@ bool dce80_ipp_construct(
 
 void dce80_ipp_destroy(struct input_pixel_processor **ipp)
 {
-	dm_free((*ipp)->ctx, TO_DCE80_IPP(*ipp));
+	dm_free(TO_DCE80_IPP(*ipp));
 	*ipp = NULL;
 }

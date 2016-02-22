@@ -89,7 +89,7 @@ static void destroy(
 
 	destruct(hw_ctx);
 
-	dm_free(ptr->ctx, hw_ctx);
+	dm_free(hw_ctx);
 }
 
 static uint32_t get_number_of_connected_audio_endpoints_multistream(
@@ -304,7 +304,7 @@ struct hw_ctx_adapter_service *
 	dal_adapter_service_create_hw_ctx_dce80(struct dc_context *ctx)
 {
 	struct hw_ctx_adapter_service_dce80 *hw_ctx =
-			dm_alloc(ctx, sizeof(struct hw_ctx_adapter_service_dce80));
+			dm_alloc(sizeof(struct hw_ctx_adapter_service_dce80));
 
 	if (!hw_ctx) {
 		BREAK_TO_DEBUGGER();
@@ -316,7 +316,7 @@ struct hw_ctx_adapter_service *
 
 	BREAK_TO_DEBUGGER();
 
-	dm_free(ctx, hw_ctx);
+	dm_free(hw_ctx);
 
 	return NULL;
 }

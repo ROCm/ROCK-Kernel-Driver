@@ -68,7 +68,7 @@ static void destroy(
 
 	destruct(i2caux_dce110);
 
-	dm_free((*i2c_engine)->ctx, i2caux_dce110);
+	dm_free(i2caux_dce110);
 
 	*i2c_engine = NULL;
 }
@@ -248,7 +248,7 @@ struct i2caux *dal_i2caux_dce110_create(
 	struct dc_context *ctx)
 {
 	struct i2caux_dce110 *i2caux_dce110 =
-		dm_alloc(ctx, sizeof(struct i2caux_dce110));
+		dm_alloc(sizeof(struct i2caux_dce110));
 
 	if (!i2caux_dce110) {
 		ASSERT_CRITICAL(false);
@@ -260,7 +260,7 @@ struct i2caux *dal_i2caux_dce110_create(
 
 	ASSERT_CRITICAL(false);
 
-	dm_free(ctx, i2caux_dce110);
+	dm_free(i2caux_dce110);
 
 	return NULL;
 }

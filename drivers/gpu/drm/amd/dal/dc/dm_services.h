@@ -40,13 +40,9 @@
 
 #undef DEPRECATED
 
-/* if the pointer is not NULL, the allocated memory is zeroed */
-void *dm_alloc(struct dc_context *ctx, uint32_t size);
-
-/* reallocate memory. The contents will remain unchanged.*/
-void *dm_realloc(struct dc_context *ctx, const void *ptr, uint32_t size);
-
-void dm_free(struct dc_context *ctx, void *p);
+#define dm_alloc(size) kzalloc(size, GFP_KERNEL)
+#define dm_realloc(ptr, size) krealloc(ptr, size, GFP_KERNEL)
+#define dm_free(ptr) kfree(ptr)
 
 void dm_memset(void *p, int32_t c, uint32_t count);
 
@@ -249,7 +245,6 @@ bool dm_pp_get_clock_levels_by_type(
 	enum dm_pp_clock_type clk_type,
 	struct dm_pp_clock_levels *clk_level_info);
 
-
 bool dm_pp_apply_safe_state(
 		const struct dc_context *ctx);
 
@@ -267,7 +262,6 @@ bool dm_pp_apply_safe_state(
 bool dm_pp_apply_display_requirements(
 	const struct dc_context *ctx,
 	const struct dm_pp_display_configuration *pp_display_cfg);
-
 
 /****** end of PP interfaces ******/
 

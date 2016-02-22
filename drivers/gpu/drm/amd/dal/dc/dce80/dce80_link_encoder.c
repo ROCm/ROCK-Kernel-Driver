@@ -209,7 +209,6 @@ static struct link_encoder_funcs dce80_lnk_enc_funcs = {
 	.connect_dig_be_to_fe = dce110_link_encoder_connect_dig_be_to_fe
 };
 
-
 bool dce80_link_encoder_construct(
 	struct dce110_link_encoder *enc110,
 	const struct encoder_init_data *init_data,

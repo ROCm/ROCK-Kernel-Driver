@@ -329,7 +329,6 @@ struct gpio_config_data {
 	} config;
 };
 
-
 struct gpio_ddc_open_options {
 	bool en_bit_present;
 };

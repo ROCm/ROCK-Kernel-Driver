@@ -46,7 +46,6 @@
 #include "dce/dce_8_0_d.h"
 #include "dce/dce_8_0_sh_mask.h"
 
-
 /*
  * This unit
  */
@@ -73,7 +72,7 @@ static void destroy(
 
 	destruct(pin);
 
-	dm_free((*ptr)->ctx, pin);
+	dm_free(pin);
 
 	*ptr = NULL;
 }
@@ -360,7 +359,7 @@ struct hw_gpio_pin *dal_hw_hpd_dce80_create(
 	enum gpio_id id,
 	uint32_t en)
 {
-	struct hw_hpd_dce80 *pin = dm_alloc(ctx, sizeof(struct hw_hpd_dce80));
+	struct hw_hpd_dce80 *pin = dm_alloc(sizeof(struct hw_hpd_dce80));
 
 	if (!pin) {
 		BREAK_TO_DEBUGGER();
@@ -372,7 +371,7 @@ struct hw_gpio_pin *dal_hw_hpd_dce80_create(
 
 	BREAK_TO_DEBUGGER();
 
-	dm_free(ctx, pin);
+	dm_free(pin);
 
 	return NULL;
 }

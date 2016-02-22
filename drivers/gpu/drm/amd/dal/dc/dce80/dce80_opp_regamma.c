@@ -490,7 +490,6 @@ static void program_pwl(
 			value);
 }
 
-
 void dce80_opp_power_on_regamma_lut(
 	struct output_pixel_processor *opp,
 	bool power_on)

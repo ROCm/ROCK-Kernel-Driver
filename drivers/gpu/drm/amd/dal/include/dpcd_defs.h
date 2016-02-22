@@ -747,7 +747,6 @@ union dp_downstream_port_present {
 	} fields;
 };
 
-
 union dwnstream_port_caps_byte3_dvi {
 	struct {
 		uint8_t RESERVED1:1;

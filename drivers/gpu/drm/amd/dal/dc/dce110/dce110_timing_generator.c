@@ -444,7 +444,6 @@ static void disable_stereo(struct timing_generator *tg)
 	value = 0;
 	dm_write_reg(tg->ctx, addr, value);
 
-
 	addr = tg->regs[IDX_CRTC_STEREO_CONTROL];
 	dm_write_reg(tg->ctx, addr, value);
 }
@@ -1196,7 +1195,6 @@ void dce110_timing_generator_setup_global_swap_lock(
 	dm_write_reg(tg->ctx, address, value);
 }
 
-
 void dce110_timing_generator_tear_down_global_swap_lock(
 	struct timing_generator *tg)
 {
@@ -1226,7 +1224,6 @@ void dce110_timing_generator_tear_down_global_swap_lock(
 			0x2,
 			DCP_GSL_CONTROL,
 			DCP_GSL_HSYNC_FLIP_FORCE_DELAY);
-
 
 	set_reg_field_value(value,
 			0x6,
@@ -1806,7 +1803,6 @@ bool dce110_tg_validate_timing(struct timing_generator *tg,
 {
 	return dce110_timing_generator_validate_timing(tg, timing, SIGNAL_TYPE_NONE);
 }
-
 
 void dce110_tg_wait_for_state(struct timing_generator *tg,
 	enum crtc_state state)

@@ -91,7 +91,6 @@ enum {
 #define FROM_ENGINE(ptr) \
 	FROM_I2C_ENGINE(container_of((ptr), struct i2c_engine, base))
 
-
 static void disable_i2c_hw_engine(
 	struct i2c_hw_engine_dce110 *engine)
 {
@@ -241,7 +240,6 @@ static bool setup_engine(
 			engine->engine_id,
 			DC_I2C_CONTROL,
 			DC_I2C_DDC_SELECT);
-
 
 		dm_write_reg(i2c_engine->base.ctx, addr, value);
 	}
@@ -447,7 +445,6 @@ static bool process_transaction(
 			1,
 			DC_I2C_TRANSACTION0,
 			DC_I2C_START0);
-
 
 		if ((engine->transaction_count == 3) ||
 		(request->action == I2CAUX_TRANSACTION_ACTION_I2C_WRITE) ||
@@ -792,7 +789,7 @@ static void destroy(
 
 	dal_i2c_hw_engine_destruct(&engine_dce110->base);
 
-	dm_free((*i2c_engine)->base.ctx, engine_dce110);
+	dm_free(engine_dce110);
 
 	*i2c_engine = NULL;
 }
@@ -892,7 +889,6 @@ static bool construct(
 	engine_dce110->addr.DC_I2C_DDCX_SPEED =
 		mmDC_I2C_DDC1_SPEED + ddc_speed_offset[arg->engine_id];
 
-
 	value = dm_read_reg(
 		engine_dce110->base.base.base.ctx,
 		mmMICROSECOND_TIME_BASE_DIV);
@@ -922,7 +918,6 @@ static bool construct(
 	engine_dce110->reference_frequency =
 		(arg->reference_frequency * 2) / xtal_ref_div;
 
-
 	return true;
 }
 
@@ -936,7 +931,7 @@ struct i2c_engine *dal_i2c_hw_engine_dce110_create(
 		return NULL;
 	}
 
-	engine_dce10 = dm_alloc(arg->ctx, sizeof(struct i2c_hw_engine_dce110));
+	engine_dce10 = dm_alloc(sizeof(struct i2c_hw_engine_dce110));
 
 	if (!engine_dce10) {
 		ASSERT_CRITICAL(false);
@@ -948,7 +943,7 @@ struct i2c_engine *dal_i2c_hw_engine_dce110_create(
 
 	ASSERT_CRITICAL(false);
 
-	dm_free(arg->ctx, engine_dce10);
+	dm_free(engine_dce10);
 
 	return NULL;
 }

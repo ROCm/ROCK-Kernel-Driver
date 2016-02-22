@@ -194,5 +194,4 @@ uint32_t dal_display_clock_get_dfs_bypass_threshold(
 void dal_display_clock_invalid_clock_state(
 	struct display_clock *disp_clk);
 
-
 #endif /* __DISPLAY_CLOCK_INTERFACE_H__ */

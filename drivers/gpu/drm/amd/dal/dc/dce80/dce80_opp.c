@@ -76,8 +76,6 @@ static const struct dce80_opp_reg_offsets reg_offsets[] = {
 }
 };
 
-
-
 static struct opp_funcs funcs = {
 		.opp_power_on_regamma_lut = dce80_opp_power_on_regamma_lut,
 		.opp_program_bit_depth_reduction =
@@ -116,7 +114,7 @@ bool dce80_opp_construct(struct dce80_opp *opp80,
 
 void dce80_opp_destroy(struct output_pixel_processor **opp)
 {
-	dm_free((*opp)->ctx, FROM_OPP(*opp));
+	dm_free(FROM_OPP(*opp));
 	*opp = NULL;
 }
 
@@ -125,7 +123,7 @@ struct output_pixel_processor *dce80_opp_create(
 	uint32_t inst)
 {
 	struct dce80_opp *opp =
-		dm_alloc(ctx, sizeof(struct dce80_opp));
+		dm_alloc(sizeof(struct dce80_opp));
 
 	if (!opp)
 		return NULL;
@@ -135,7 +133,7 @@ struct output_pixel_processor *dce80_opp_create(
 		return &opp->base;
 
 	BREAK_TO_DEBUGGER();
-	dm_free(ctx, opp);
+	dm_free(opp);
 	return NULL;
 }
 

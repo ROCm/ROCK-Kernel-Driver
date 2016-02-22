@@ -23,7 +23,6 @@
  *
  */
 
-
 #ifndef __AMDGPU_DM_TYPES_H__
 #define __AMDGPU_DM_TYPES_H__
 

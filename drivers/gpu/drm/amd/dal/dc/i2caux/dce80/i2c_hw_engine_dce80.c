@@ -206,7 +206,7 @@ static void destroy(
 
 	destruct(engine);
 
-	dm_free((*i2c_engine)->base.ctx, engine);
+	dm_free(engine);
 
 	*i2c_engine = NULL;
 }
@@ -258,7 +258,6 @@ static bool setup_engine(
 			engine->engine_id,
 			DC_I2C_CONTROL,
 			DC_I2C_DDC_SELECT);
-
 
 		dm_write_reg(i2c_engine->base.ctx, addr, value);
 	}
@@ -449,7 +448,6 @@ static bool process_transaction(
 			1,
 			DC_I2C_TRANSACTION0,
 			DC_I2C_START0);
-
 
 		if ((engine->transaction_count == 3) ||
 		(request->action == I2CAUX_TRANSACTION_ACTION_I2C_WRITE) ||
@@ -883,7 +881,7 @@ struct i2c_engine *dal_i2c_hw_engine_dce80_create(
 		return NULL;
 	}
 
-	engine = dm_alloc(arg->ctx, sizeof(struct i2c_hw_engine_dce80));
+	engine = dm_alloc(sizeof(struct i2c_hw_engine_dce80));
 
 	if (!engine) {
 		BREAK_TO_DEBUGGER();
@@ -895,7 +893,7 @@ struct i2c_engine *dal_i2c_hw_engine_dce80_create(
 
 	BREAK_TO_DEBUGGER();
 
-	dm_free(arg->ctx, engine);
+	dm_free(engine);
 
 	return NULL;
 }

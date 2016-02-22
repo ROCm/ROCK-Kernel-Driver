@@ -36,7 +36,6 @@
 
 #include "dce110_mem_input.h"
 
-
 #define DCP_REG(reg) (reg + mem_input110->offsets.dcp)
 #define DMIF_REG(reg) (reg + mem_input110->offsets.dmif)
 #define PIPE_REG(reg) (reg + mem_input110->offsets.pipe)
@@ -287,7 +286,6 @@ static void program_size_and_rotation(
 		DCP_REG(mmGRPH_PITCH),
 		value);
 
-
 	value = 0;
 	switch (rotation) {
 	case ROTATION_ANGLE_90:
@@ -337,7 +335,6 @@ static void program_pixel_format(
 			mem_input110->base.ctx,
 			DCP_REG(mmGRPH_SWAP_CNTL),
 			value);
-
 
 		value =	dm_read_reg(
 				mem_input110->base.ctx,
@@ -507,7 +504,6 @@ static void program_urgency_watermark(
 		DPG_PIPE_URGENCY_CONTROL,
 		URGENCY_HIGH_WATERMARK);
 	dm_write_reg(ctx, urgency_addr, urgency_cntl);
-
 
 	/*Write mask to enable reading/writing of watermark set B*/
 	wm_mask_cntl = dm_read_reg(ctx, wm_addr);
@@ -812,7 +808,6 @@ void dce110_allocate_mem_input(
 				"%s: DMIF allocation failed",
 				__func__);
 
-
 	if (pix_clk_khz != 0) {
 		addr = mmDPG_PIPE_ARBITRATION_CONTROL1 + bm110->offsets.dmif;
 		value = dm_read_reg(mi->ctx, addr);
@@ -955,6 +950,6 @@ bool dce110_mem_input_construct(
 
 void dce110_mem_input_destroy(struct mem_input **mem_input)
 {
-	dm_free((*mem_input)->ctx, TO_DCE110_MEM_INPUT(*mem_input));
+	dm_free(TO_DCE110_MEM_INPUT(*mem_input));
 	*mem_input = NULL;
 }

@@ -61,7 +61,6 @@ struct ddc {
 	struct dc_context *ctx;
 };
 
-
 union ddc_wa {
 	struct {
 		uint32_t DP_SKIP_POWER_OFF:1;

@@ -32,7 +32,6 @@
 /* Forward declaration */
 struct hw_asic_id;
 
-
 /* ASIC capability */
 struct asic_capability {
 	struct dc_context *ctx;
@@ -42,7 +41,6 @@ struct asic_capability {
 	struct dal_asic_runtime_flags runtime_flags;
 	uint32_t data[ASIC_DATA_MAX_NUMBER];
 };
-
 
 /**
  * Interfaces

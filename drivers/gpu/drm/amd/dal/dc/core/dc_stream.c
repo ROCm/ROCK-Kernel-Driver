@@ -140,12 +140,11 @@ void dc_stream_release(struct dc_stream *public)
 {
 	struct stream *stream = DC_STREAM_TO_STREAM(public);
 	struct core_stream *protected = DC_STREAM_TO_CORE(public);
-	struct dc_context *ctx = protected->ctx;
 	stream->ref_count--;
 
 	if (stream->ref_count == 0) {
 		destruct(protected);
-		dm_free(ctx, stream);
+		dm_free(stream);
 	}
 }
 
@@ -157,7 +156,7 @@ struct dc_stream *dc_create_stream_for_sink(const struct dc_sink *dc_sink)
 	if (sink == NULL)
 		goto alloc_fail;
 
-	stream = dm_alloc(sink->ctx, sizeof(struct stream));
+	stream = dm_alloc(sizeof(struct stream));
 
 	if (NULL == stream)
 		goto alloc_fail;
@@ -170,7 +169,7 @@ struct dc_stream *dc_create_stream_for_sink(const struct dc_sink *dc_sink)
 	return &stream->protected.public;
 
 construct_fail:
-	dm_free(sink->ctx, stream);
+	dm_free(stream);
 
 alloc_fail:
 	return NULL;

@@ -23,7 +23,6 @@
  *
  */
 
-
 #include "dm_services.h"
 
 #define DIVIDER 10000

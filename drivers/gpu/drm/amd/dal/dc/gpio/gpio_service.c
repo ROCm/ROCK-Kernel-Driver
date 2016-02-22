@@ -68,7 +68,7 @@ struct gpio_service *dal_gpio_service_create(
 
 	uint32_t index_of_id;
 
-	service = dm_alloc(ctx, sizeof(struct gpio_service));
+	service = dm_alloc(sizeof(struct gpio_service));
 
 	if (!service) {
 		BREAK_TO_DEBUGGER();
@@ -107,9 +107,7 @@ struct gpio_service *dal_gpio_service_create(
 			if (number_of_bits) {
 				uint32_t index_of_uint = 0;
 
-				slot = dm_alloc(
-					ctx,
-					number_of_uints * sizeof(uint32_t));
+				slot = dm_alloc(number_of_uints * sizeof(uint32_t));
 
 				if (!slot) {
 					BREAK_TO_DEBUGGER();
@@ -141,11 +139,11 @@ failure_2:
 		slot = service->busyness[index_of_id];
 
 		if (slot)
-			dm_free(ctx, slot);
+			dm_free(slot);
 	};
 
 failure_1:
-	dm_free(ctx, service);
+	dm_free(service);
 
 	return NULL;
 }
@@ -243,13 +241,13 @@ void dal_gpio_service_destroy(
 			uint32_t *slot = (*ptr)->busyness[index_of_id];
 
 			if (slot)
-				dm_free((*ptr)->ctx, slot);
+				dm_free(slot);
 
 			++index_of_id;
 		} while (index_of_id < GPIO_ID_COUNT);
 	}
 
-	dm_free((*ptr)->ctx, *ptr);
+	dm_free(*ptr);
 
 	*ptr = NULL;
 }

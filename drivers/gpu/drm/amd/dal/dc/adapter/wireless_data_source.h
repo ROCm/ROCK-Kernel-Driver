@@ -51,7 +51,6 @@ struct wireless_data {
 	bool miracast_connector_enable;
 };
 
-
 /*construct wireless data*/
 bool wireless_data_init(
 	struct wireless_data *data,

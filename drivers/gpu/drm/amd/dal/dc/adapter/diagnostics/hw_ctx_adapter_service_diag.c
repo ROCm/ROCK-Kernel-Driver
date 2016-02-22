@@ -112,8 +112,7 @@ static bool construct(
 struct hw_ctx_adapter_service *dal_adapter_service_create_hw_ctx_diag(
 	struct dc_context *ctx)
 {
-	struct hw_ctx_adapter_service *hw_ctx = dm_alloc(ctx,
-			sizeof(*hw_ctx));
+	struct hw_ctx_adapter_service *hw_ctx = dm_alloc(sizeof(*hw_ctx));
 
 	if (!hw_ctx) {
 		ASSERT_CRITICAL(false);
@@ -125,7 +124,7 @@ struct hw_ctx_adapter_service *dal_adapter_service_create_hw_ctx_diag(
 
 	ASSERT_CRITICAL(false);
 
-	dm_free(ctx, hw_ctx);
+	dm_free(hw_ctx);
 
 	return NULL;
 }

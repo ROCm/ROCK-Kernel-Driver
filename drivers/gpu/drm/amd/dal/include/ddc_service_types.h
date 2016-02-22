@@ -52,7 +52,6 @@ enum ddc_service_type {
 	DDC_SERVICE_TYPE_DISPLAY_PORT_MST,
 };
 
-
 enum dcs_dpcd_revision {
 	DCS_DPCD_REV_10 = 0x10,
 	DCS_DPCD_REV_11 = 0x11,
@@ -109,7 +108,6 @@ struct display_sink_capability {
 	enum ddc_transaction_type transaction_type;
 	enum signal_type signal;
 };
-
 
 struct av_sync_data {
 	uint8_t av_granularity;/* DPCD 00023h */

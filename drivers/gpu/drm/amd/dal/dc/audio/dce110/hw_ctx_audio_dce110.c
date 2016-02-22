@@ -73,7 +73,7 @@ static void destroy(
 
 	destruct(hw_ctx_dce110);
 	/* release memory allocated for struct hw_ctx_audio_dce110 */
-	dm_free((*ptr)->ctx, hw_ctx_dce110);
+	dm_free(hw_ctx_dce110);
 
 	*ptr = NULL;
 }
@@ -127,7 +127,6 @@ static uint32_t read_indirect_azalia_reg(
 	uint32_t ret_val = 0;
 	uint32_t addr = 0;
 	uint32_t value = 0;
-
 
 	/* AZALIA_F0_CODEC_ENDPOINT_INDEX  endpoint index  */
 	{
@@ -237,7 +236,6 @@ static void set_video_latency(
 
 	if ((latency_in_ms < 0) || (latency_in_ms > 255))
 		return;
-
 
 	value = read_indirect_azalia_reg(
 		hw_ctx,
@@ -775,7 +773,6 @@ static void setup_dp_audio(
 	/* --- The following are the registers
 	 *  copied from the SetupHDMI --- */
 
-
 	/* AFMT_AUDIO_PACKET_CONTROL */
 	{
 		addr = mmAFMT_AUDIO_PACKET_CONTROL +
@@ -1269,7 +1266,6 @@ static void configure_azalia(
 		ixAZALIA_F0_CODEC_PIN_CONTROL_SINK_INFO0,
 		value);
 
-
 	value = 0;
 
 	/*get display name string length */
@@ -1286,7 +1282,6 @@ static void configure_azalia(
 		hw_ctx,
 		ixAZALIA_F0_CODEC_PIN_CONTROL_SINK_INFO1,
 		value);
-
 
 	/*
 	*write the port ID:
@@ -1339,7 +1334,6 @@ static void configure_azalia(
 		hw_ctx,
 		ixAZALIA_F0_CODEC_PIN_CONTROL_SINK_INFO4,
 		value);
-
 
 	value = 0;
 	set_reg_field_value(value, audio_info->display_name[4],
@@ -1406,7 +1400,6 @@ static void configure_azalia(
 		hw_ctx,
 		ixAZALIA_F0_CODEC_PIN_CONTROL_SINK_INFO7,
 		value);
-
 
 	value = 0;
 	set_reg_field_value(value, audio_info->display_name[16],
@@ -1525,7 +1518,6 @@ static void setup_channel_splitting_mapping(
 
 	if ((audio_mapping == NULL || audio_mapping->u32all == 0) && enable)
 		return;
-
 
 	value = audio_mapping->u32all;
 
@@ -1907,7 +1899,7 @@ struct hw_ctx_audio *dal_hw_ctx_audio_dce110_create(
 {
 	/* allocate memory for struc hw_ctx_audio_dce110 */
 	struct hw_ctx_audio_dce110 *hw_ctx_dce110 =
-			dm_alloc(ctx, sizeof(struct hw_ctx_audio_dce110));
+			dm_alloc(sizeof(struct hw_ctx_audio_dce110));
 
 	if (!hw_ctx_dce110) {
 		ASSERT_CRITICAL(hw_ctx_dce110);
@@ -1925,8 +1917,7 @@ struct hw_ctx_audio *dal_hw_ctx_audio_dce110_create(
 		LOG_MINOR_COMPONENT_AUDIO,
 		"Failed to create hw_ctx_audio for DCE11\n");
 
-
-	dm_free(ctx, hw_ctx_dce110);
+	dm_free(hw_ctx_dce110);
 
 	return NULL;
 }

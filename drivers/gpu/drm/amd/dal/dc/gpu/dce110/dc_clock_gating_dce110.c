@@ -46,7 +46,6 @@ static void force_hw_base_light_sleep(struct dc_context *ctx)
 	uint32_t addr = 0;
 	uint32_t value = 0;
 
-
 	addr = mmDC_MEM_GLOBAL_PWR_REQ_CNTL;
 	/* Read the mmDC_MEM_GLOBAL_PWR_REQ_CNTL to get the currently
 	 * programmed DC_MEM_GLOBAL_PWR_REQ_DIS*/

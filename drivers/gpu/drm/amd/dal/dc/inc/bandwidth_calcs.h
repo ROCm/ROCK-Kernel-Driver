@@ -230,7 +230,6 @@ struct bw_calcs_mode_data_internal {
 	enum bw_defines d2_graphics_stereo_mode;
 };
 
-
 struct bw_calcs_input_single_display {
 	uint32_t graphics_rotation_angle;
 	uint32_t underlay_rotation_angle;
@@ -484,7 +483,6 @@ struct bw_calcs_output {
 	int32_t required_blackout_duration_us;
 };
 
-
 /**
  * Initialize structures with data which will NOT change at runtime.
  */
@@ -504,7 +502,6 @@ bool bw_calcs(
 	const struct bw_calcs_vbios *vbios,
 	const struct bw_calcs_mode_data *mode_data,
 	struct bw_calcs_output *calcs_output);
-
 
 #endif /* __BANDWIDTH_CALCS_H__ */
 

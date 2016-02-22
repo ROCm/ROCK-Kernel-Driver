@@ -44,7 +44,6 @@ struct crtc_position {
 	uint32_t nominal_vcount;
 };
 
-
 enum dcp_gsl_purpose {
 	DCP_GSL_PURPOSE_SURFACE_FLIP = 0,
 	DCP_GSL_PURPOSE_STEREO3D_PHASE,
@@ -109,7 +108,6 @@ struct timing_generator {
 	struct dc_bios *bp;
 	struct dc_context *ctx;
 };
-
 
 struct dc_crtc_timing;
 

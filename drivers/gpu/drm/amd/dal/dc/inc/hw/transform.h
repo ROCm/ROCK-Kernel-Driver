@@ -46,7 +46,6 @@ enum lb_pixel_depth {
 	LB_PIXEL_DEPTH_36BPP = 8
 };
 
-
 enum raw_gamma_ramp_type {
        GAMMA_RAMP_TYPE_UNINITIALIZED,
        GAMMA_RAMP_TYPE_DEFAULT,

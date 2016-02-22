@@ -72,7 +72,7 @@ bool dce110_opp_construct(struct dce110_opp *opp110,
 
 void dce110_opp_destroy(struct output_pixel_processor **opp)
 {
-	dm_free((*opp)->ctx, FROM_DCE11_OPP(*opp));
+	dm_free(FROM_DCE11_OPP(*opp));
 	*opp = NULL;
 }
 

@@ -88,7 +88,7 @@ static void destroy(
 
 	destruct(sw_engine);
 
-	dm_free((*engine)->base.ctx, sw_engine);
+	dm_free(sw_engine);
 
 	*engine = NULL;
 }
@@ -154,7 +154,7 @@ struct i2c_engine *dal_i2c_sw_engine_dce110_create(
 		return NULL;
 	}
 
-	engine_dce110 = dm_alloc(arg->ctx, sizeof(struct i2c_sw_engine_dce110));
+	engine_dce110 = dm_alloc(sizeof(struct i2c_sw_engine_dce110));
 
 	if (!engine_dce110) {
 		ASSERT_CRITICAL(false);
@@ -166,7 +166,7 @@ struct i2c_engine *dal_i2c_sw_engine_dce110_create(
 
 	ASSERT_CRITICAL(false);
 
-	dm_free(arg->ctx, engine_dce110);
+	dm_free(engine_dce110);
 
 	return NULL;
 }

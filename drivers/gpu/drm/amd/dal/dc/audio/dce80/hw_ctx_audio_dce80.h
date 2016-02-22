@@ -40,7 +40,6 @@ struct hw_ctx_audio_dce80 {
 	/* audio encoder block MM register offset -- associate with DIG FRONT */
 };
 
-
 /* ---  helpers ---  all static functions*/
 /*set_high_bit_rate_capable
 set_hbr_channel_count
@@ -70,6 +69,4 @@ struct hw_ctx_audio *dal_audio_create_hw_ctx_audio_dce80(
 	uint32_t azalia_stream_id);
 
 #endif  /* __DAL_HW_CTX_AUDIO_DCE80_H__ */
-
-
 

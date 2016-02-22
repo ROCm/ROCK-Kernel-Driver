@@ -137,8 +137,6 @@ struct fixed32_32 dal_fixed32_32_mul_int(struct fixed32_32 lhs, uint32_t rhs)
 	return fx;
 }
 
-
-
 struct fixed32_32 dal_fixed32_32_div(
 	struct fixed32_32 lhs,
 	struct fixed32_32 rhs)

@@ -1099,9 +1099,7 @@ static bool allocate_3d_storage(
 	int32_t indexof_table = 0;
 	int32_t indexof_row = 0;
 
-	struct fixed31_32 ***tables = dm_alloc(
-		ctx,
-		numberof_tables * sizeof(struct fixed31_32 **));
+	struct fixed31_32 ***tables = dm_alloc(numberof_tables * sizeof(struct fixed31_32 **));
 
 	if (!tables) {
 		BREAK_TO_DEBUGGER();
@@ -1109,9 +1107,7 @@ static bool allocate_3d_storage(
 	}
 
 	while (indexof_table != numberof_tables) {
-		struct fixed31_32 **rows = dm_alloc(
-			ctx,
-			numberof_rows * sizeof(struct fixed31_32 *));
+		struct fixed31_32 **rows = dm_alloc(numberof_rows * sizeof(struct fixed31_32 *));
 
 		if (!rows) {
 			BREAK_TO_DEBUGGER();
@@ -1122,9 +1118,7 @@ static bool allocate_3d_storage(
 		tables[indexof_table] = rows;
 
 		while (indexof_row != numberof_rows) {
-			struct fixed31_32 *columns = dm_alloc(
-				ctx,
-				numberof_columns * sizeof(struct fixed31_32));
+			struct fixed31_32 *columns = dm_alloc(numberof_columns * sizeof(struct fixed31_32));
 
 			if (!columns) {
 				BREAK_TO_DEBUGGER();
@@ -1150,19 +1144,19 @@ failure:
 
 	while (indexof_table >= 0) {
 		while (indexof_row >= 0) {
-			dm_free(ctx, tables[indexof_table][indexof_row]);
+			dm_free(tables[indexof_table][indexof_row]);
 
 			--indexof_row;
 		}
 
 		indexof_row = numberof_rows - 1;
 
-		dm_free(ctx, tables[indexof_table]);
+		dm_free(tables[indexof_table]);
 
 		--indexof_table;
 	}
 
-	dm_free(ctx, tables);
+	dm_free(tables);
 
 	return false;
 }
@@ -1184,18 +1178,17 @@ static void destroy_3d_storage(
 		uint32_t indexof_row = 0;
 
 		while (indexof_row != numberof_rows) {
-			dm_free(
-				ctx, tables[indexof_table][indexof_row]);
+			dm_free(tables[indexof_table][indexof_row]);
 
 			++indexof_row;
 		};
 
-		dm_free(ctx, tables[indexof_table]);
+		dm_free(tables[indexof_table]);
 
 		++indexof_table;
 	};
 
-	dm_free(ctx, tables);
+	dm_free(tables);
 
 	*ptr = NULL;
 }
@@ -1627,15 +1620,13 @@ static bool generate_filter(
 
 	if (filter->coefficients_quantity < coefficients_quantity) {
 		if (filter->coefficients) {
-			dm_free(filter->ctx, filter->coefficients);
+			dm_free(filter->coefficients);
 
 			filter->coefficients = NULL;
 			filter->coefficients_quantity = 0;
 		}
 
-		filter->coefficients = dm_alloc(
-			filter->ctx,
-			coefficients_quantity * sizeof(struct fixed31_32));
+		filter->coefficients = dm_alloc(coefficients_quantity * sizeof(struct fixed31_32));
 
 		if (!filter->coefficients) {
 			BREAK_TO_DEBUGGER();
@@ -1655,15 +1646,13 @@ static bool generate_filter(
 
 	if (filter->coefficients_sum_quantity < coefficients_sum_quantity) {
 		if (filter->coefficients_sum) {
-			dm_free(filter->ctx, filter->coefficients_sum);
+			dm_free(filter->coefficients_sum);
 
 			filter->coefficients_sum = NULL;
 			filter->coefficients_sum_quantity = 0;
 		}
 
-		filter->coefficients_sum = dm_alloc(
-			filter->ctx,
-			coefficients_sum_quantity * sizeof(struct fixed31_32));
+		filter->coefficients_sum = dm_alloc(coefficients_sum_quantity * sizeof(struct fixed31_32));
 
 		if (!filter->coefficients_sum) {
 			BREAK_TO_DEBUGGER();
@@ -1831,16 +1820,16 @@ static void destruct_scaler_filter(
 	struct scaler_filter *filter)
 {
 	if (filter->coefficients_sum)
-		dm_free(filter->ctx, filter->coefficients_sum);
+		dm_free(filter->coefficients_sum);
 
 	if (filter->coefficients)
-		dm_free(filter->ctx, filter->coefficients);
+		dm_free(filter->coefficients);
 
 	if (filter->integer_filter)
-		dm_free(filter->ctx, filter->integer_filter);
+		dm_free(filter->integer_filter);
 
 	if (filter->filter)
-		dm_free(filter->ctx, filter->filter);
+		dm_free(filter->filter);
 
 	destroy_upscaling_table(filter);
 
@@ -1850,7 +1839,7 @@ static void destruct_scaler_filter(
 struct scaler_filter *dal_scaler_filter_create(struct dc_context *ctx)
 {
 	struct scaler_filter *filter =
-		dm_alloc(ctx, sizeof(struct scaler_filter));
+		dm_alloc(sizeof(struct scaler_filter));
 
 	if (!filter) {
 		BREAK_TO_DEBUGGER();
@@ -1862,7 +1851,7 @@ struct scaler_filter *dal_scaler_filter_create(struct dc_context *ctx)
 
 	BREAK_TO_DEBUGGER();
 
-	dm_free(ctx, filter);
+	dm_free(filter);
 
 	return NULL;
 }
@@ -1902,15 +1891,13 @@ bool dal_scaler_filter_generate(
 
 	if (filter_size_required > filter->filter_size_allocated) {
 		if (filter->filter) {
-			dm_free(filter->ctx, filter->filter);
+			dm_free(filter->filter);
 
 			filter->filter = 0;
 			filter->filter_size_allocated = 0;
 		}
 
-		filter->filter = dm_alloc(
-			filter->ctx,
-			filter_size_required * sizeof(struct fixed31_32));
+		filter->filter = dm_alloc(filter_size_required * sizeof(struct fixed31_32));
 
 		if (!filter->filter) {
 			BREAK_TO_DEBUGGER();
@@ -1918,14 +1905,12 @@ bool dal_scaler_filter_generate(
 		}
 
 		if (filter->integer_filter) {
-			dm_free(filter->ctx, filter->integer_filter);
+			dm_free(filter->integer_filter);
 
 			filter->integer_filter = 0;
 		}
 
-		filter->integer_filter = dm_alloc(
-			filter->ctx,
-			filter_size_required * sizeof(uint32_t));
+		filter->integer_filter = dm_alloc(filter_size_required * sizeof(uint32_t));
 
 		if (!filter->integer_filter) {
 			BREAK_TO_DEBUGGER();
@@ -1986,7 +1971,7 @@ void dal_scaler_filter_destroy(
 
 	destruct_scaler_filter(*filter);
 
-	dm_free((*filter)->ctx, *filter);
+	dm_free(*filter);
 
 	*filter = NULL;
 }

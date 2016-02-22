@@ -26,7 +26,6 @@
 #ifndef __DC_TIMING_GENERATOR_DCE80_H__
 #define __DC_TIMING_GENERATOR_DCE80_H__
 
-
 #include "timing_generator.h"
 #include "../include/grph_object_id.h"
 
@@ -43,7 +42,5 @@ void dce80_timing_generator_enable_advanced_request(
 	struct timing_generator *tg,
 	bool enable,
 	const struct dc_crtc_timing *timing);
-
-
 
 #endif /* __DC_TIMING_GENERATOR_DCE80_H__ */

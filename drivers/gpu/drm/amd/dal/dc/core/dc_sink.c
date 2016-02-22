@@ -76,22 +76,19 @@ void dc_sink_retain(const struct dc_sink *dc_sink)
 
 void dc_sink_release(const struct dc_sink *dc_sink)
 {
-	struct core_sink *core_sink = DC_SINK_TO_CORE(dc_sink);
 	struct sink *sink = DC_SINK_TO_SINK(dc_sink);
 
 	--sink->ref_count;
 
 	if (sink->ref_count == 0) {
 		destruct(sink);
-		dm_free(core_sink->ctx, sink);
+		dm_free(sink);
 	}
 }
 
 struct dc_sink *dc_sink_create(const struct dc_sink_init_data *init_params)
 {
-	struct core_link *core_link = DC_LINK_TO_LINK(init_params->link);
-
-	struct sink *sink = dm_alloc(core_link->ctx, sizeof(*sink));
+	struct sink *sink = dm_alloc(sizeof(*sink));
 
 	if (NULL == sink)
 		goto alloc_fail;
@@ -105,7 +102,7 @@ struct dc_sink *dc_sink_create(const struct dc_sink_init_data *init_params)
 	return &sink->protected.public;
 
 construct_fail:
-	dm_free(core_link->ctx, sink);
+	dm_free(sink);
 
 alloc_fail:
 	return NULL;

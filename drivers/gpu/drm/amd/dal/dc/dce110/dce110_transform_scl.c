@@ -103,7 +103,6 @@ static bool setup_scaling_configuration(
 	set_reg_field_value(value, 1, SCL_MODE, SCL_PSCL_EN);
 	dm_write_reg(ctx, addr, value);
 
-
 	addr = SCL_REG(mmSCL_TAP_CONTROL);
 	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(value, data->taps.h_taps - 1,
@@ -111,7 +110,6 @@ static bool setup_scaling_configuration(
 	set_reg_field_value(value, data->taps.v_taps - 1,
 			SCL_TAP_CONTROL, SCL_V_NUM_OF_TAPS);
 	dm_write_reg(ctx, addr, value);
-
 
 	addr = SCL_REG(mmSCL_CONTROL);
 	value = dm_read_reg(ctx, addr);

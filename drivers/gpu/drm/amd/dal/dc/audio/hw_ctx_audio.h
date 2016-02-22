@@ -31,7 +31,6 @@
 
 struct hw_ctx_audio;
 
-
 struct azalia_reg_offsets {
 	uint32_t azf0endpointx_azalia_f0_codec_endpoint_index;
 	uint32_t azf0endpointx_azalia_f0_codec_endpoint_data;
@@ -184,7 +183,6 @@ struct hw_ctx_audio_funcs {
 
 };
 
-
 struct hw_ctx_audio {
 	const struct hw_ctx_audio_funcs *funcs;
 	struct dc_context *ctx;
@@ -198,8 +196,6 @@ struct hw_ctx_audio {
 	 *not used by dce6 and after
 	 */
 };
-
-
 
 /* --- object construct, destruct --- */
 
@@ -218,13 +214,11 @@ void dal_audio_destruct_hw_ctx_audio(
  *Top base or interface object does not have implementation of creator.
  */
 
-
 /* --- functions called by audio hw context itself --- */
 
 /* MM register access */
 /*read_register  - dal_read_reg */
 /*write_register - dal_write_reg*/
-
 
 /*check whether specified sample rates can fit into a given timing */
 void dal_hw_ctx_audio_check_audio_bandwidth(
@@ -279,7 +273,6 @@ bool dal_audio_hw_ctx_get_audio_clock_info(
 	uint32_t crtc_pixel_clock_in_khz,
 	uint32_t actual_pixel_clock_in_khz,
 	struct audio_clock_info *audio_clock_info);
-
 
 #endif  /* __DAL_HW_CTX_AUDIO_H__ */
 

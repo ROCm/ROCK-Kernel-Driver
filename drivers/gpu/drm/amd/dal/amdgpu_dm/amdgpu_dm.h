@@ -128,7 +128,6 @@ struct amdgpu_display_manager {
 	struct work_struct mst_hotplug_work;
 };
 
-
 /* basic init/fini API */
 int amdgpu_dm_init(struct amdgpu_device *adev);
 

@@ -47,7 +47,6 @@
 	dm_bios_cmd_table_para_revision(bp->ctx, \
 		GetIndexIntoMasterTable(COMMAND, command))
 
-
 static void init_dig_encoder_control(struct bios_parser *bp);
 static void init_transmitter_control(struct bios_parser *bp);
 static void init_set_pixel_clock(struct bios_parser *bp);
@@ -267,7 +266,6 @@ static enum bp_result encoder_control_digx_v4(
 		params.acConfig.ucDPLinkRate = 1; /* dual link 2.7GHz */
 	else
 		params.acConfig.ucDPLinkRate = 0; /* single link 1.62GHz */
-
 
 	params.acConfig.ucDigSel = (uint8_t)(cntl->engine_id);
 
@@ -1907,7 +1905,6 @@ static enum bp_result set_crtc_timing_v1(
 	params.usV_SyncWidth =
 			cpu_to_le16((uint16_t)(bp_params->v_sync_width));
 
-
 	/* VBIOS does not expect any value except zero into this call, for
 	 * underscan use another entry ProgramOverscan call but when mode
 	 * 1776x1000 with the overscan 72x44 .e.i. 1920x1080 @30 DAL2 is ok,
@@ -2005,7 +2002,6 @@ static enum bp_result set_crtc_using_dtd_timing_v3(
 	if (0 == bp_params->flags.VSYNC_POSITIVE_POLARITY)
 		params.susModeMiscInfo.usAccess =
 				cpu_to_le16(le16_to_cpu(params.susModeMiscInfo.usAccess) | ATOM_VSYNC_POLARITY);
-
 
 	if (bp_params->flags.INTERLACE)	{
 		params.susModeMiscInfo.usAccess =
@@ -2651,7 +2647,6 @@ static enum bp_result enable_disp_power_gating_v2_1(
 
 	return result;
 }
-
 
 /*******************************************************************************
  ********************************************************************************
