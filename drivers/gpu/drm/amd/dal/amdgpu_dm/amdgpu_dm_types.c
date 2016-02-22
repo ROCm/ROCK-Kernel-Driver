@@ -304,8 +304,8 @@ static int dm_crtc_cursor_move(struct drm_crtc *crtc,
 	position.y = y;
 
 	position.hot_spot_enable = true;
-	position.x_origin = xorigin;
-	position.y_origin = yorigin;
+	position.x_hotspot = xorigin;
+	position.y_hotspot = yorigin;
 
 	if (!dc_target_set_cursor_position(
 				amdgpu_crtc->target,

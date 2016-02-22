@@ -71,7 +71,7 @@ static void program_address(
 	PHYSICAL_ADDRESS_LOC address);
 
 
-bool dce110_ipp_cursor_set_position(
+void dce110_ipp_cursor_set_position(
 	struct input_pixel_processor *ipp,
 	const struct dc_cursor_position *position)
 {
@@ -89,13 +89,11 @@ bool dce110_ipp_cursor_set_position(
 	if (position->hot_spot_enable)
 		program_hotspot(
 				ipp110,
-				position->x_origin,
-				position->y_origin);
+				position->x_hotspot,
+				position->y_hotspot);
 
 	/* unlock cursor registers */
 	lock(ipp110, false);
-
-	return true;
 }
 
 bool dce110_ipp_cursor_set_attributes(

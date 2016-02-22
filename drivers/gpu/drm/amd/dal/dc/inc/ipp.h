@@ -88,7 +88,7 @@ enum ipp_output_format {
 struct ipp_funcs {
 
 	/*** cursor ***/
-	bool (*ipp_cursor_set_position)(
+	void (*ipp_cursor_set_position)(
 		struct input_pixel_processor *ipp,
 		const struct dc_cursor_position *position);
 
