@@ -605,6 +605,8 @@ bool dc_commit_targets(
 		dc_target_retain(&context->targets[i]->public);
 	}
 
+	destruct_val_ctx(&dc->current_context);
+
 	dc->current_context = *context;
 
 	program_timing_sync(dc->ctx, context);
