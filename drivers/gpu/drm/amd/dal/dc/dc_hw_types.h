@@ -256,8 +256,8 @@ struct dc_cursor_position {
 	uint32_t x;
 	uint32_t y;
 
-	uint32_t x_origin;
-	uint32_t y_origin;
+	uint32_t x_hotspot;
+	uint32_t y_hotspot;
 
 	/*
 	 * This parameter indicates whether HW cursor should be enabled

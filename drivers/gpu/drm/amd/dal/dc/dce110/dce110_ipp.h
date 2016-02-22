@@ -53,7 +53,7 @@ bool dce110_ipp_construct(
 void dce110_ipp_destroy(struct input_pixel_processor **ipp);
 
 /* CURSOR RELATED */
-bool dce110_ipp_cursor_set_position(
+void dce110_ipp_cursor_set_position(
 	struct input_pixel_processor *ipp,
 	const struct dc_cursor_position *position);
 

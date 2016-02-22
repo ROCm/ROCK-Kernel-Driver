@@ -500,8 +500,8 @@ bool dc_target_set_cursor_position(
 			 * plane so we only need to set it on first pipe we
 			 * find. May need to make this code dce specific later.
 			 */
-			if (ipp->funcs->ipp_cursor_set_position(ipp, position))
-				return true;
+			ipp->funcs->ipp_cursor_set_position(ipp, position);
+			return true;
 		}
 	}
 
