@@ -286,7 +286,8 @@ int amdgpu_dm_init(struct amdgpu_device *adev)
 		adev->mode_info.atom_context->bios;
 	init_data.asic_id.runtime_flags.flags.bits.SKIP_POWER_DOWN_ON_RESUME = 1;
 
-	if (adev->asic_type == CHIP_CARRIZO)
+	if ((adev->asic_type == CHIP_CARRIZO) ||
+	    (adev->asic_type == CHIP_STONEY))
 		init_data.asic_id.runtime_flags.flags.bits.GNB_WAKEUP_SUPPORTED = 1;
 
 	init_data.driver = adev;
@@ -1003,6 +1004,7 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	case CHIP_TONGA:
 	case CHIP_FIJI:
 	case CHIP_CARRIZO:
+	case CHIP_STONEY:
 		if (dce110_register_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
 			return -1;
@@ -1246,6 +1248,7 @@ static int dm_early_init(void *handle)
 			adev->mode_info.funcs = &dm_dce_v10_0_display_funcs;
 		break;
 	case CHIP_CARRIZO:
+	case CHIP_STONEY:
 		adev->mode_info.num_crtc = 3;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 9;
