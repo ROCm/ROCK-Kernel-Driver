@@ -688,6 +688,90 @@ int kfd_create_crat_image_acpi(void **crat_image, size_t *size)
 #define VCRAT_SIZE_FOR_CPU	PAGE_SIZE
 #define VCRAT_SIZE_FOR_GPU	(3 * PAGE_SIZE)
 
+/* kfd_fill_cu_for_cpu - Fill in Compute info for the given CPU NUMA node
+ *
+ *  @numa_node_id: CPU NUMA node id
+ *  @avail_size: Available size in the memory
+ *  @sub_type_hdr: Memory into which compute info will be filled in
+ *
+ *  Return 0 if successful else return -ve value
+ */
+static int kfd_fill_cu_for_cpu(int numa_node_id, int *avail_size,
+				int proximity_domain,
+				struct crat_subtype_computeunit *sub_type_hdr)
+{
+	const struct cpumask *cpumask;
+	const struct cpuinfo_x86 *cpuinfo;
+	int first_cpu_of_nuna_node;
+
+	*avail_size -= sizeof(struct crat_subtype_computeunit);
+	if (*avail_size < 0)
+		return -ENOMEM;
+
+	memset(sub_type_hdr, 0, sizeof(struct crat_subtype_computeunit));
+
+	/* Fill in subtype header data */
+	sub_type_hdr->type = CRAT_SUBTYPE_COMPUTEUNIT_AFFINITY;
+	sub_type_hdr->length = sizeof(struct crat_subtype_computeunit);
+	sub_type_hdr->flags = CRAT_SUBTYPE_FLAGS_ENABLED;
+
+	cpumask = cpumask_of_node(numa_node_id);
+	first_cpu_of_nuna_node = cpumask_first(cpumask);
+	cpuinfo = &cpu_data(first_cpu_of_nuna_node);
+
+	/* Fill in CU data */
+	sub_type_hdr->flags |= CRAT_CU_FLAGS_CPU_PRESENT;
+	sub_type_hdr->proximity_domain = proximity_domain;
+	sub_type_hdr->processor_id_low = cpuinfo->apicid;
+	sub_type_hdr->num_cpu_cores = cpumask_weight(cpumask);
+
+	return 0;
+}
+
+/* kfd_fill_mem_info_for_cpu - Fill in Memory info for the given CPU NUMA node
+ *
+ *  @numa_node_id: CPU NUMA node id
+ *  @avail_size: Available size in the memory
+ *  @sub_type_hdr: Memory into which compute info will be filled in
+ *
+ *  Return 0 if successful else return -ve value
+ */
+static int kfd_fill_mem_info_for_cpu(int numa_node_id, int *avail_size,
+			int proximity_domain,
+			struct crat_subtype_memory *sub_type_hdr)
+{
+	uint64_t mem_in_bytes = 0;
+	pg_data_t *pgdat;
+	int zone_type;
+
+	*avail_size -= sizeof(struct crat_subtype_computeunit);
+	if (*avail_size < 0)
+		return -ENOMEM;
+
+	memset(sub_type_hdr, 0, sizeof(struct crat_subtype_memory));
+
+	/* Fill in subtype header data */
+	sub_type_hdr->type = CRAT_SUBTYPE_MEMORY_AFFINITY;
+	sub_type_hdr->length = sizeof(struct crat_subtype_memory);
+	sub_type_hdr->flags = CRAT_SUBTYPE_FLAGS_ENABLED;
+
+	/* Fill in Memory Subunit data */
+
+	/* Unlike si_meminfo, si_meminfo_node is not exported. So
+	 * the following lines are duplicated from si_meminfo_node
+	 * function */
+	pgdat = NODE_DATA(numa_node_id);
+	for (zone_type = 0; zone_type < MAX_NR_ZONES; zone_type++)
+		mem_in_bytes += pgdat->node_zones[zone_type].managed_pages;
+	mem_in_bytes <<= PAGE_SHIFT;
+
+	sub_type_hdr->length_low = lower_32_bits(mem_in_bytes);
+	sub_type_hdr->length_high = upper_32_bits(mem_in_bytes);
+	sub_type_hdr->proximity_domain = proximity_domain;
+
+	return 0;
+}
+
 /* kfd_create_vcrat_image_cpu - Create Virtual CRAT for CPU
  *
  *	@pcrat_image: Fill in VCRAT for CPU
@@ -700,12 +784,9 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 	struct acpi_table_header *acpi_table;
 	acpi_status status;
 	struct crat_subtype_generic *sub_type_hdr;
-	struct crat_subtype_computeunit *cu;
-	struct crat_subtype_memory *mem;
-	struct sysinfo meminfo;
-	uint64_t mem_in_bytes;
-	struct cpuinfo_x86 *cpuinfo = &cpu_data(0);
 	int avail_size = *size;
+	int numa_node_id;
+	int ret = 0;
 
 	if (pcrat_image == NULL || avail_size < VCRAT_SIZE_FOR_CPU)
 		return -EINVAL;
@@ -730,56 +811,37 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 		memcpy(crat_table->oem_table_id, acpi_table->oem_table_id, CRAT_OEMTABLEID_LENGTH);
 	}
 	crat_table->total_entries = 0;
-	crat_table->num_domains = 1;
-
-	/* Fill in Subtype: Compute Unit
-	 * First fill in the sub type header and then sub type data
-	 */
-	avail_size -= sizeof(struct crat_subtype_computeunit);
-	if (avail_size < 0)
-		return -ENOMEM;
+	crat_table->num_domains = 0;
 
 	sub_type_hdr = (struct crat_subtype_generic *)(crat_table+1);
-	memset(sub_type_hdr, 0, sizeof(struct crat_subtype_computeunit));
 
-	sub_type_hdr->type = CRAT_SUBTYPE_COMPUTEUNIT_AFFINITY;
-	sub_type_hdr->length = sizeof(struct crat_subtype_computeunit);
-	sub_type_hdr->flags = CRAT_SUBTYPE_FLAGS_ENABLED;
+	for_each_online_node(numa_node_id) {
+		/* Fill in Subtype: Compute Unit */
+		ret = kfd_fill_cu_for_cpu(numa_node_id, &avail_size,
+			crat_table->num_domains,
+			(struct crat_subtype_computeunit *)sub_type_hdr);
+		if (ret < 0)
+			return ret;
+		crat_table->length += sub_type_hdr->length;
+		crat_table->total_entries++;
 
-	/* Fill in CU data */
-	cu = (struct crat_subtype_computeunit *)sub_type_hdr;
-	cu->flags |= CRAT_CU_FLAGS_CPU_PRESENT;
-	cu->proximity_domain = 0;
-	cu->processor_id_low = cpuinfo->apicid;
-	cu->num_cpu_cores = num_online_cpus();
-	crat_table->length += sub_type_hdr->length;
-	crat_table->total_entries++;
+		sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
+			sub_type_hdr->length);
 
-	/* Fill in Subtype: Memory
-	 * First fill in the sub type header and then sub type data
-	 */
-	avail_size -= sizeof(struct crat_subtype_memory);
-	if (avail_size < 0)
-		return -ENOMEM;
+		/* Fill in Subtype: Memory */
+		ret = kfd_fill_mem_info_for_cpu(numa_node_id, &avail_size,
+			crat_table->num_domains,
+			(struct crat_subtype_memory *)sub_type_hdr);
+		if (ret < 0)
+			return ret;
+		crat_table->length += sub_type_hdr->length;
+		crat_table->total_entries++;
 
-	sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
-						sub_type_hdr->length);
-	memset(sub_type_hdr, 0, sizeof(struct crat_subtype_memory));
+		sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
+			sub_type_hdr->length);
 
-	sub_type_hdr->type = CRAT_SUBTYPE_MEMORY_AFFINITY;
-	sub_type_hdr->length = sizeof(struct crat_subtype_memory);
-	sub_type_hdr->flags = CRAT_SUBTYPE_FLAGS_ENABLED;
-
-	/* Fill in Memory Subunit data */
-	mem = (struct crat_subtype_memory *)sub_type_hdr;
-	si_meminfo(&meminfo);
-
-	mem_in_bytes = (meminfo.totalram * meminfo.mem_unit);
-	mem->length_low = lower_32_bits(mem_in_bytes);
-	mem->length_high = upper_32_bits(mem_in_bytes);
-	mem->proximity_domain = 0;
-	crat_table->length += sub_type_hdr->length;
-	crat_table->total_entries++;
+		crat_table->num_domains++;
+	}
 
 	/* TODO: Add cache Subtype for CPU.
 	 * Currently, CPU cache information is available in function
