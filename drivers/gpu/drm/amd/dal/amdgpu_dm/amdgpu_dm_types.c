@@ -2391,8 +2391,6 @@ int amdgpu_dm_atomic_commit(
 				0);
 	}
 
-	drm_atomic_helper_wait_for_vblanks(dev, state);
-
 	/* In this state all old framebuffers would be unpinned */
 
 	drm_atomic_helper_cleanup_planes(dev, state);
