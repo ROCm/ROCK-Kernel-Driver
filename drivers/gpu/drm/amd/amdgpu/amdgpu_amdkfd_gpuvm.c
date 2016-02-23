@@ -436,34 +436,212 @@ err:
 	return ret;
 }
 
+/* Reserving a BO and its page table BOs must happen atomically to
+ * avoid deadlocks. When updating userptrs we need to temporarily
+ * back-off the reservation and then reacquire it. Track all the
+ * reservation info in a context structure. Buffers can be mapped to
+ * multiple VMs simultaneously (buffers being restored on multiple
+ * GPUs). */
+struct bo_vm_reservation_context {
+	struct amdgpu_bo_list_entry kfd_bo;
+	unsigned n_vms;
+	struct amdgpu_bo_list_entry **vm_bos;
+	struct ww_acquire_ctx ticket;
+	struct list_head list, duplicates;
+	bool reserved;
+};
+
+static int reserve_bo_and_vms(struct amdgpu_device *adev, struct amdgpu_bo *bo,
+			      struct list_head *bo_va_list,
+			      struct amdgpu_vm *vm, bool is_mapped,
+			      struct bo_vm_reservation_context *ctx)
+{
+	struct kfd_bo_va_list *entry;
+	unsigned i;
+	int ret;
+
+	INIT_LIST_HEAD(&ctx->list);
+	INIT_LIST_HEAD(&ctx->duplicates);
+
+	ctx->kfd_bo.robj = bo;
+	ctx->kfd_bo.prefered_domains = bo->initial_domain;
+	ctx->kfd_bo.allowed_domains = bo->initial_domain;
+	ctx->kfd_bo.priority = 0;
+	ctx->kfd_bo.tv.bo = &bo->tbo;
+	ctx->kfd_bo.tv.shared = true;
+	ctx->kfd_bo.user_pages = NULL;
+	list_add(&ctx->kfd_bo.tv.head, &ctx->list);
+
+	ctx->reserved = false;
+
+	ctx->n_vms = 0;
+	list_for_each_entry(entry, bo_va_list, bo_list) {
+		if ((vm && vm != entry->bo_va->vm) ||
+		    entry->is_mapped != is_mapped)
+			continue;
+		ctx->n_vms++;
+	}
+	if (ctx->n_vms == 0)
+		ctx->vm_bos = NULL;
+	else {
+		ctx->vm_bos = kzalloc(sizeof(struct amdgpu_bo_list_entry *)
+				      * ctx->n_vms, GFP_KERNEL);
+		if (ctx->vm_bos == NULL)
+			return -ENOMEM;
+	}
+
+	i = 0;
+	list_for_each_entry(entry, bo_va_list, bo_list) {
+		if ((vm && vm != entry->bo_va->vm) ||
+		    entry->is_mapped != is_mapped)
+			continue;
+
+		ctx->vm_bos[i] = amdgpu_vm_get_bos(adev, entry->bo_va->vm,
+						   &ctx->list);
+		if (!ctx->vm_bos[i]) {
+			pr_err("amdkfd: Failed to get bos from vm\n");
+			ret = -ENOMEM;
+			goto out;
+		}
+		i++;
+	}
+
+	ret = ttm_eu_reserve_buffers(&ctx->ticket, &ctx->list,
+				     false, &ctx->duplicates);
+	if (!ret)
+		ctx->reserved = true;
+	else
+		pr_err("amdkfd: Failed to reserve buffers in ttm\n");
+
+out:
+	if (ret) {
+		for (i = 0; i < ctx->n_vms; i++) {
+			if (ctx->vm_bos[i])
+				drm_free_large(ctx->vm_bos[i]);
+		}
+		kfree(ctx->vm_bos);
+		ctx->vm_bos = NULL;
+	}
+
+	return ret;
+}
+
+static void unreserve_bo_and_vms(struct bo_vm_reservation_context *ctx,
+				 bool wait)
+{
+	if (wait) {
+		struct ttm_validate_buffer *entry;
+		int ret;
+
+		list_for_each_entry(entry, &ctx->list, head) {
+			ret = ttm_bo_wait(entry->bo, false, false, false);
+			if (ret != 0)
+				pr_err("amdkfd: Failed to wait for PT/PD update (err == %d)\n",
+				       ret);
+		}
+	}
+	if (ctx->reserved)
+		ttm_eu_backoff_reservation(&ctx->ticket, &ctx->list);
+	if (ctx->vm_bos) {
+		unsigned i;
+
+		for (i = 0; i < ctx->n_vms; i++) {
+			if (ctx->vm_bos[i])
+				drm_free_large(ctx->vm_bos[i]);
+		}
+		kfree(ctx->vm_bos);
+	}
+	ctx->reserved = false;
+	ctx->vm_bos = NULL;
+}
+
+/* Must be called with mem->data2.lock held and a BO/VM reservation
+ * context. Temporarily drops the lock and reservation for updating
+ * user pointers, to avoid circular lock dependencies between MM locks
+ * and buffer reservations. If user pages are invalidated while the
+ * lock and reservation are dropped, try again. */
+static int update_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
+			     struct bo_vm_reservation_context *ctx)
+{
+	struct amdgpu_bo *bo;
+	unsigned tries = 10;
+	int ret;
+
+	bo = mem->data2.bo;
+	if (!amdgpu_ttm_tt_has_userptr(bo->tbo.ttm))
+		return 0;
+
+	if (bo->tbo.ttm->state != tt_bound) {
+		struct page **pages;
+		int invalidated;
+
+		/* get user pages without locking the BO to avoid
+		 * circular lock dependency with MMU notifier. Retry
+		 * until we have the current version. */
+		ttm_eu_backoff_reservation(&ctx->ticket, &ctx->list);
+		ctx->reserved = false;
+		pages = drm_calloc_large(bo->tbo.ttm->num_pages,
+					 sizeof(struct page *));
+		if (!pages)
+			return -ENOMEM;
+
+		mutex_unlock(&mem->data2.lock);
+
+		while (true) {
+			down_read(&mm->mmap_sem);
+			ret = amdgpu_ttm_tt_get_user_pages(bo->tbo.ttm, pages);
+			up_read(&mm->mmap_sem);
+
+			mutex_lock(&mem->data2.lock);
+			if (ret != 0)
+				return ret;
+
+			BUG_ON(bo != mem->data2.bo);
+
+			ret = ttm_eu_reserve_buffers(&ctx->ticket, &ctx->list,
+						     false, &ctx->duplicates);
+			if (unlikely(ret != 0)) {
+				release_pages(pages, bo->tbo.ttm->num_pages, 0);
+				drm_free_large(pages);
+				return ret;
+			}
+			ctx->reserved = true;
+			if (!amdgpu_ttm_tt_userptr_invalidated(bo->tbo.ttm,
+							       &invalidated) ||
+			    bo->tbo.ttm->state == tt_bound ||
+			    --tries == 0)
+				break;
+
+			release_pages(pages, bo->tbo.ttm->num_pages, 0);
+			ttm_eu_backoff_reservation(&ctx->ticket, &ctx->list);
+			ctx->reserved = false;
+			mutex_unlock(&mem->data2.lock);
+		}
+
+		/* If someone else already bound it, release our pages
+		 * array, otherwise copy it into the ttm BO. */
+		if (bo->tbo.ttm->state == tt_bound || tries == 0)
+			release_pages(pages, bo->tbo.ttm->num_pages, 0);
+		else
+			memcpy(bo->tbo.ttm->pages, pages,
+			       sizeof(struct page *) * bo->tbo.ttm->num_pages);
+		drm_free_large(pages);
+	}
+
+	if (tries == 0) {
+		pr_err("Gave up trying to update user pages\n");
+		return -EDEADLK;
+	}
+
+	return 0;
+}
+
 static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
-		struct amdgpu_bo_va *bo_va, uint32_t domain)
+		struct amdgpu_bo_va *bo_va)
 {
 	struct amdgpu_vm_id *vm_id;
 	struct amdgpu_vm *vm;
 	int ret;
-	struct amdgpu_bo_list_entry *vm_bos;
-	struct ttm_validate_buffer *entry;
-	struct ww_acquire_ctx ticket;
-	struct list_head list, duplicates;
-
-	INIT_LIST_HEAD(&list);
-	INIT_LIST_HEAD(&duplicates);
-
-	vm = bo_va->vm;
-
-	vm_bos = amdgpu_vm_get_bos(adev, vm, &list);
-	if (!vm_bos) {
-		pr_err("amdkfd: Failed to get bos from vm\n");
-		ret = -EINVAL;
-		goto err_failed_to_get_bos;
-	}
-
-	ret = ttm_eu_reserve_buffers(&ticket, &list, false, &duplicates);
-	if (ret) {
-		pr_err("amdkfd: Failed to reserve buffers in ttm\n");
-		goto err_failed_to_ttm_reserve;
-	}
 
 	/* Pin PTs */
 	ret = try_pin_pts(bo_va, false);
@@ -473,6 +651,7 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	}
 
 	/* Pin the PD directory*/
+	vm = bo_va->vm;
 	vm_id = &vm->ids[7];
 	ret = try_pin_bo(vm->page_directory, &vm_id->pd_gpu_addr, false,
 			AMDGPU_GEM_DOMAIN_VRAM);
@@ -516,22 +695,8 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 
 	mutex_unlock(&vm->mutex);
 
-	list_for_each_entry(entry, &list, head) {
-		ret = ttm_bo_wait(entry->bo, false, false, false);
-		if (ret != 0) {
-			pr_err("amdkfd: Failed to wait for PT/PD update (err == %d)\n",
-					ret);
-			goto err_failed_to_wait_pt_pd_update;
-		}
-	}
-
-	ttm_eu_backoff_reservation(&ticket, &list);
-	drm_free_large(vm_bos);
-
 	return 0;
 
-err_failed_to_wait_pt_pd_update:
-	mutex_lock(&vm->mutex);
 err_failed_to_vm_clear_invalids:
 	amdgpu_vm_bo_update(adev, bo_va, NULL);
 err_failed_to_update_pts:
@@ -542,10 +707,6 @@ err_failed_to_update_pd:
 err_failed_to_pin_pd:
 	unpin_pts(bo_va, vm, false);
 err_failed_to_pin_pts:
-	ttm_eu_backoff_reservation(&ticket, &list);
-err_failed_to_ttm_reserve:
-	drm_free_large(vm_bos);
-err_failed_to_get_bos:
 
 	return ret;
 }
@@ -679,6 +840,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	struct amdgpu_bo *bo;
 	uint32_t domain;
 	struct kfd_bo_va_list *entry;
+	struct bo_vm_reservation_context ctx;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
@@ -704,7 +866,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 				   bo, &mem->data2.bo_va_list,
 				   mem->data2.readonly, mem->data2.execute);
 		if (ret != 0)
-			return ret;
+			goto add_bo_to_vm_failed;
 		if (mem->data2.aql_queue) {
 			ret = add_bo_to_vm(adev,
 					   mem->data2.va + bo->tbo.mem.size,
@@ -713,9 +875,18 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 					   mem->data2.readonly,
 					   mem->data2.execute);
 			if (ret != 0)
-				return ret;
+				goto add_bo_to_vm_failed;
 		}
 	}
+
+	ret = reserve_bo_and_vms(adev, bo, &mem->data2.bo_va_list,
+				 vm, false, &ctx);
+	if (unlikely(ret != 0))
+		goto bo_reserve_failed;
+
+	ret = update_user_pages(mem, current->mm, &ctx);
+	if (ret != 0)
+		goto update_user_pages_failed;
 
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
 		if (entry->bo_va->vm == vm && entry->is_mapped == false) {
@@ -726,13 +897,13 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 			 * create a mapping of virtual to MC address
 			 */
 			/* Pin BO*/
-			ret = try_pin_bo(bo, NULL, true, domain);
+			ret = try_pin_bo(bo, NULL, false, domain);
 			if (ret != 0) {
 				pr_err("amdkfd: Failed to pin BO\n");
 				goto pin_bo_failed;
 			}
 
-			ret = map_bo_to_gpuvm(adev, bo, entry->bo_va, domain);
+			ret = map_bo_to_gpuvm(adev, bo, entry->bo_va);
 			if (ret != 0) {
 				pr_err("amdkfd: Failed to map radeon bo to gpuvm\n");
 				goto map_bo_to_gpuvm_failed;
@@ -744,12 +915,17 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 		}
 	}
 
+	unreserve_bo_and_vms(&ctx, true);
 	mutex_unlock(&mem->data2.lock);
 	return 0;
 
 map_bo_to_gpuvm_failed:
-	unpin_bo(bo, true);
+	unpin_bo(bo, false);
 pin_bo_failed:
+update_user_pages_failed:
+	unreserve_bo_and_vms(&ctx, false);
+bo_reserve_failed:
+add_bo_to_vm_failed:
 	mutex_unlock(&mem->data2.lock);
 	return ret;
 }

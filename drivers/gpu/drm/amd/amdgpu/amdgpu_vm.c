@@ -105,6 +105,7 @@ struct amdgpu_bo_list_entry *amdgpu_vm_get_bos(struct amdgpu_device *adev,
 	list[0].priority = 0;
 	list[0].tv.bo = &vm->page_directory->tbo;
 	list[0].tv.shared = true;
+	list[0].user_pages = NULL;
 	list_add(&list[0].tv.head, head);
 
 	for (i = 0, idx = 1; i <= vm->max_pde_used; i++) {
@@ -117,6 +118,7 @@ struct amdgpu_bo_list_entry *amdgpu_vm_get_bos(struct amdgpu_device *adev,
 		list[idx].priority = 0;
 		list[idx].tv.bo = &list[idx].robj->tbo;
 		list[idx].tv.shared = true;
+		list[idx].user_pages = NULL;
 		list_add(&list[idx++].tv.head, head);
 	}
 	mutex_unlock(&vm->mutex);

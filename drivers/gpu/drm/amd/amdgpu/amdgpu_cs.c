@@ -337,6 +337,7 @@ int amdgpu_cs_list_validate(struct amdgpu_device *adev,
 			u32 domain = lobj->prefered_domains;
 			u32 current_domain =
 				amdgpu_mem_type_to_domain(bo->tbo.mem.mem_type);
+			bool binding_userptr = false;
 
 			/* Check if this buffer will be moved and don't move it
 			 * if we have moved too many buffers for this IB already.
@@ -353,6 +354,18 @@ int amdgpu_cs_list_validate(struct amdgpu_device *adev,
 				domain = current_domain;
 			}
 
+			/* Check if we have user pages and nobody bound
+			 * the BO already */
+			if (lobj->user_pages &&
+			    bo->tbo.ttm->state != tt_bound) {
+				size_t size = sizeof(struct page *);
+
+				size *= bo->tbo.ttm->num_pages;
+				memcpy(bo->tbo.ttm->pages, lobj->user_pages,
+				       size);
+				binding_userptr = true;
+			}
+
 		retry:
 			amdgpu_ttm_placement_from_domain(bo, domain);
 			initial_bytes_moved = atomic64_read(&adev->num_bytes_moved);
@@ -367,6 +380,11 @@ int amdgpu_cs_list_validate(struct amdgpu_device *adev,
 				}
 				return r;
 			}
+
+			if (binding_userptr) {
+				drm_free_large(lobj->user_pages);
+				lobj->user_pages = NULL;
+			}
 		}
 		lobj->bo_va = amdgpu_vm_bo_find(vm, bo);
 	}
@@ -377,17 +395,21 @@ static int amdgpu_cs_parser_relocs(struct amdgpu_cs_parser *p)
 {
 	struct amdgpu_fpriv *fpriv = p->filp->driver_priv;
 	struct amdgpu_cs_buckets buckets;
+	struct amdgpu_bo_list_entry *e;
 	struct list_head duplicates;
 	bool need_mmap_lock = false;
-	int i, r;
+	unsigned i, tries = 10;
+	int r;
 
 	if (p->bo_list) {
 		need_mmap_lock = p->bo_list->first_userptr !=
 			p->bo_list->num_entries;
 		amdgpu_cs_buckets_init(&buckets);
-		for (i = 0; i < p->bo_list->num_entries; i++)
+		for (i = 0; i < p->bo_list->num_entries; i++) {
+			p->bo_list->array[i].user_pages = NULL;
 			amdgpu_cs_buckets_add(&buckets, &p->bo_list->array[i].tv.head,
-								  p->bo_list->array[i].priority);
+					      p->bo_list->array[i].priority);
+		}
 
 		amdgpu_cs_buckets_get_list(&buckets, &p->validated);
 	}
@@ -399,9 +421,81 @@ static int amdgpu_cs_parser_relocs(struct amdgpu_cs_parser *p)
 		down_read(&current->mm->mmap_sem);
 
 	INIT_LIST_HEAD(&duplicates);
-	r = ttm_eu_reserve_buffers(&p->ticket, &p->validated, true, &duplicates);
-	if (unlikely(r != 0))
-		goto error_reserve;
+	while (1) {
+		struct list_head need_pages;
+		unsigned i;
+
+		r = ttm_eu_reserve_buffers(&p->ticket, &p->validated, true,
+					   &duplicates);
+		if (unlikely(r != 0))
+			goto error_free_pages;
+
+		/* Without a BO list we don't have userptr BOs */
+		if (!p->bo_list)
+			break;
+
+		INIT_LIST_HEAD(&need_pages);
+		for (i = p->bo_list->first_userptr;
+		     i < p->bo_list->num_entries; ++i) {
+
+			e = &p->bo_list->array[i];
+
+			if (amdgpu_ttm_tt_userptr_invalidated(e->robj->tbo.ttm,
+				 &e->user_invalidated) && e->user_pages) {
+
+				/* We acquired a page array, but somebody
+				 * invalidated it. Free it an try again
+				 */
+				release_pages(e->user_pages,
+					      e->robj->tbo.ttm->num_pages,
+					      false);
+				drm_free_large(e->user_pages);
+				e->user_pages = NULL;
+			}
+
+			if (e->robj->tbo.ttm->state != tt_bound &&
+			    !e->user_pages) {
+				list_del(&e->tv.head);
+				list_add(&e->tv.head, &need_pages);
+
+				amdgpu_bo_unreserve(e->robj);
+			}
+		}
+
+		if (list_empty(&need_pages))
+			break;
+
+		/* Unreserve everything again. */
+		ttm_eu_backoff_reservation(&p->ticket, &p->validated);
+
+		/* We tried to often, just abort */
+		if (!--tries) {
+			r = -EDEADLK;
+			goto error_free_pages;
+		}
+
+		/* Fill the page arrays for all useptrs. */
+		list_for_each_entry(e, &need_pages, tv.head) {
+			struct ttm_tt *ttm = e->robj->tbo.ttm;
+
+			e->user_pages = drm_calloc_large(ttm->num_pages,
+							 sizeof(struct page *));
+			if (!e->user_pages) {
+				r = -ENOMEM;
+				goto error_free_pages;
+			}
+
+			r = amdgpu_ttm_tt_get_user_pages(ttm, e->user_pages);
+			if (r) {
+				drm_free_large(e->user_pages);
+				e->user_pages = NULL;
+				goto error_free_pages;
+			}
+		}
+
+		/* And try again. */
+		list_splice(&need_pages, &p->validated);
+	}
 
 	r = amdgpu_cs_list_validate(p->adev, &fpriv->vm, &p->validated);
 	if (r)
@@ -413,9 +507,25 @@ error_validate:
 	if (r)
 		ttm_eu_backoff_reservation(&p->ticket, &p->validated);
 
-error_reserve:
+error_free_pages:
+
 	if (need_mmap_lock)
 		up_read(&current->mm->mmap_sem);
+
+	if (p->bo_list) {
+		for (i = p->bo_list->first_userptr;
+		     i < p->bo_list->num_entries; ++i) {
+			e = &p->bo_list->array[i];
+
+			if (!e->user_pages)
+				continue;
+
+			release_pages(e->user_pages,
+				      e->robj->tbo.ttm->num_pages,
+				      false);
+			drm_free_large(e->user_pages);
+		}
+	}
 
 	return r;
 }

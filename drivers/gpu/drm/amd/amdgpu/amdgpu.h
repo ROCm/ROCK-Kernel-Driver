@@ -558,6 +558,8 @@ struct amdgpu_bo_list_entry {
 	unsigned			prefered_domains;
 	unsigned			allowed_domains;
 	uint32_t			priority;
+	struct page			**user_pages;
+	int				user_invalidated;
 };
 
 struct amdgpu_bo_va_mapping {
@@ -2385,11 +2387,14 @@ int amdgpu_cs_get_ring(struct amdgpu_device *adev, u32 ip_type,
 		       struct amdgpu_ring **out_ring);
 void amdgpu_ttm_placement_from_domain(struct amdgpu_bo *rbo, u32 domain);
 bool amdgpu_ttm_bo_is_amdgpu_bo(struct ttm_buffer_object *bo);
+int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages);
 int amdgpu_ttm_tt_set_userptr(struct ttm_tt *ttm, uint64_t addr,
 				     uint32_t flags);
 bool amdgpu_ttm_tt_has_userptr(struct ttm_tt *ttm);
 bool amdgpu_ttm_tt_affect_userptr(struct ttm_tt *ttm, unsigned long start,
 				  unsigned long end);
+bool amdgpu_ttm_tt_userptr_invalidated(struct ttm_tt *ttm,
+				       int *last_invalidated);
 bool amdgpu_ttm_tt_is_readonly(struct ttm_tt *ttm);
 uint32_t amdgpu_ttm_tt_pte_flags(struct amdgpu_device *adev, struct ttm_tt *ttm,
 				 struct ttm_mem_reg *mem);
