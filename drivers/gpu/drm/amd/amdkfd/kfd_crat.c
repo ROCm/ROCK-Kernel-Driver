@@ -804,6 +804,7 @@ static int kfd_fill_gpu_memory_affinity(int *avail_size,
 	if (*avail_size < 0)
 		return -ENOMEM;
 
+	memset((void *)sub_type_hdr, 0, sizeof(struct crat_subtype_memory));
 	sub_type_hdr->type = CRAT_SUBTYPE_MEMORY_AFFINITY;
 	sub_type_hdr->length = sizeof(struct crat_subtype_memory);
 	sub_type_hdr->flags |= CRAT_SUBTYPE_FLAGS_ENABLED;
@@ -916,12 +917,9 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	 * report the total FB size (public+private) as a single
 	 * private heap. */
 	kdev->kfd2kgd->get_local_mem_info(kdev->kgd, &local_mem_info);
-	avail_size -= sizeof(struct crat_subtype_memory);
-	if (avail_size < 0)
-		return -ENOMEM;
 	sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
 			sub_type_hdr->length);
-	memset((void *)sub_type_hdr, 0, sizeof(struct crat_subtype_memory));
+
 	if (local_mem_info.local_mem_size_private == 0)
 		ret = kfd_fill_gpu_memory_affinity(&avail_size,
 				kdev, HSA_MEM_HEAP_TYPE_FB_PUBLIC,
