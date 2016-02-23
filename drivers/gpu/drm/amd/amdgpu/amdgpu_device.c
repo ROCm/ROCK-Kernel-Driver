@@ -1410,6 +1410,7 @@ bool amdgpu_device_has_dal_support(struct amdgpu_device *adev)
 #endif
 #if defined(CONFIG_DRM_AMD_DAL) && defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	case CHIP_CARRIZO:
+	case CHIP_STONEY:
 		return amdgpu_dal != 0;
 #endif
 #if defined(CONFIG_DRM_AMD_DAL) && defined(CONFIG_DRM_AMD_DAL_DCE10_0)
