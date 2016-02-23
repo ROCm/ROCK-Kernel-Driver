@@ -407,11 +407,17 @@ bool attach_surfaces_to_context(
 	}
 
 
+	/* retain new surfaces */
 	for (i = 0; i < surface_count; i++)
 		dc_surface_retain(surfaces[i]);
-	/* Release after retain to account for surfaces remaining the same */
-	for (i = 0; i < target_status->surface_count; i++)
+
+	/* release existing surfaces*/
+	for (i = 0; i < target_status->surface_count; i++) {
 		dc_surface_release(target_status->surfaces[i]);
+		target_status->surfaces[i] = NULL;
+	}
+
+	/* assign new surfaces*/
 	for (i = 0; i < surface_count; i++)
 		target_status->surfaces[i] = surfaces[i];
 
@@ -1241,7 +1247,7 @@ static void set_vendor_info_packet(struct core_stream *stream,
 	info_packet->valid = true;
 }
 
-void destruct_val_ctx(struct validate_context *context)
+void val_ctx_destruct(struct validate_context *context)
 {
 	int i, j;
 
@@ -1249,7 +1255,29 @@ void destruct_val_ctx(struct validate_context *context)
 		for (j = 0; j < context->target_status[i].surface_count; j++)
 			dc_surface_release(
 				context->target_status[i].surfaces[j]);
+
 		context->target_status[i].surface_count = 0;
+		dc_target_release(&context->targets[i]->public);
+	}
+}
+
+/*
+ * Copy src_ctx into dst_ctx and retain all surfaces and targets referenced
+ * by the src_ctx
+ */
+void val_ctx_copy_construct(
+		const struct validate_context *src_ctx,
+		struct validate_context *dst_ctx)
+{
+	int i, j;
+
+	*dst_ctx = *src_ctx;
+
+	for (i = 0; i < dst_ctx->target_count; i++) {
+		dc_target_retain(&dst_ctx->targets[i]->public);
+		for (j = 0; j < dst_ctx->target_status[i].surface_count; j++)
+			dc_surface_retain(
+				dst_ctx->target_status[i].surfaces[j]);
 	}
 }
 

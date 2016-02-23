@@ -391,7 +391,7 @@ ctx_fail:
 
 static void destruct(struct dc *dc)
 {
-	destruct_val_ctx(&dc->current_context);
+	val_ctx_destruct(&dc->current_context);
 	destroy_links(dc);
 	dc->res_pool.funcs->destruct(&dc->res_pool);
 	dal_logger_destroy(&dc->ctx->logger);
@@ -452,7 +452,7 @@ bool dc_validate_resources(
 	result = dc->res_pool.funcs->validate_with_context(
 						dc, set, set_count, context);
 
-	destruct_val_ctx(context);
+	val_ctx_destruct(context);
 	dm_free(dc->ctx, context);
 context_alloc_fail:
 
@@ -563,6 +563,7 @@ bool dc_commit_targets(
 	result = dc->res_pool.funcs->validate_with_context(dc, set, target_count, context);
 	if (result != DC_OK){
 		BREAK_TO_DEBUGGER();
+		val_ctx_destruct(context);
 		goto fail;
 	}
 
@@ -592,24 +593,13 @@ bool dc_commit_targets(
 			dc_target_enable_memory_requests(dc_target);
 	}
 
-	/* Release old targets */
-	for (i = 0; i < dc->current_context.target_count; i++) {
-		dc_target_release(
-				&dc->current_context.targets[i]->public);
-		dc->current_context.targets[i] = NULL;
-	}
-	/* Retain new targets*/
-	for (i = 0; i < context->target_count; i++) {
-		dc_target_retain(&context->targets[i]->public);
-	}
-
-	destruct_val_ctx(&dc->current_context);
-
-	dc->current_context = *context;
-
 	program_timing_sync(dc->ctx, context);
 
 	pplib_apply_display_requirements(dc, context, &context->pp_display_cfg);
+
+	val_ctx_destruct(&dc->current_context);
+
+	dc->current_context = *context;
 
 fail:
 	dm_free(dc->ctx, context);

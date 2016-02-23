@@ -1002,6 +1002,7 @@ enum dc_status dce110_validate_with_context(
 		bool unchanged = false;
 
 		context->targets[i] = DC_TARGET_TO_CORE(set[i].target);
+		dc_target_retain(&context->targets[i]->public);
 		context->target_count++;
 
 		for (j = 0; j < dc->current_context.target_count; j++)

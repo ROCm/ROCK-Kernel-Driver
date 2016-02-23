@@ -219,13 +219,16 @@ bool dc_commit_surfaces_to_target(
 	bool is_mpo_turning_on = false;
 
 	context = dm_alloc(dc->ctx, sizeof(struct validate_context));
-	*context = dc->current_context;
+
+	val_ctx_copy_construct(&dc->current_context, context);
 
 	/* Cannot commit surface to a target that is not commited */
 	for (i = 0; i < context->target_count; i++)
 		if (target == context->targets[i])
 			break;
+
 	target_status = &context->target_status[i];
+
 	if (!dal_adapter_service_is_in_accelerated_mode(
 						dc->res_pool.adapter_srv)
 		|| i == context->target_count) {
@@ -343,13 +346,15 @@ bool dc_commit_surfaces_to_target(
 						&context->pp_display_cfg);
 	}
 
+	val_ctx_destruct(&dc->current_context);
 	dc->current_context = *context;
 	dm_free(dc->ctx, context);
 	return true;
 
 unexpected_fail:
 
-	destruct_val_ctx(context);
+	val_ctx_destruct(context);
+
 	dm_free(dc->ctx, context);
 	return false;
 }

@@ -80,6 +80,10 @@ enum dc_status map_resources(
 	const struct dc *dc,
 	struct validate_context *context);
 
-void destruct_val_ctx(struct validate_context *context);
+void val_ctx_destruct(struct validate_context *context);
+
+void val_ctx_copy_construct(
+	const struct validate_context *src_ctx,
+	struct validate_context *dst_ctx);
 
 #endif /* DRIVERS_GPU_DRM_AMD_DAL_DEV_DC_INC_RESOURCE_H_ */
