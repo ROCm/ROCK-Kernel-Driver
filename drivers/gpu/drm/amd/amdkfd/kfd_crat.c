@@ -797,10 +797,9 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 static int kfd_fill_gpu_memory_affinity(int *avail_size,
 		struct kfd_dev *kdev, uint8_t type, uint64_t size,
 		struct crat_subtype_memory *sub_type_hdr,
-		uint32_t proximity_domain)
+		uint32_t proximity_domain,
+		const struct kfd_local_mem_info *local_mem_info)
 {
-	struct kfd_local_mem_info local_mem_info;
-
 	*avail_size -= sizeof(struct crat_subtype_memory);
 	if (*avail_size < 0)
 		return -ENOMEM;
@@ -817,7 +816,7 @@ static int kfd_fill_gpu_memory_affinity(int *avail_size,
 	sub_type_hdr->length_low = lower_32_bits(size);
 	sub_type_hdr->length_high = upper_32_bits(size);
 
-	sub_type_hdr->width = local_mem_info.vram_width;
+	sub_type_hdr->width = local_mem_info->vram_width;
 	sub_type_hdr->visibility_type = type;
 
 	return 0;
@@ -928,14 +927,16 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 				kdev, HSA_MEM_HEAP_TYPE_FB_PUBLIC,
 				local_mem_info.local_mem_size_public,
 				(struct crat_subtype_memory *)sub_type_hdr,
-				proximity_domain);
+				proximity_domain,
+				&local_mem_info);
 	else
 		ret = kfd_fill_gpu_memory_affinity(&avail_size,
 				kdev, HSA_MEM_HEAP_TYPE_FB_PRIVATE,
 				local_mem_info.local_mem_size_public +
 				local_mem_info.local_mem_size_private,
 				(struct crat_subtype_memory *)sub_type_hdr,
-				proximity_domain);
+				proximity_domain,
+				&local_mem_info);
 	if (ret < 0)
 		return ret;
 
