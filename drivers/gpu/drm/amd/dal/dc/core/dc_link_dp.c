@@ -10,6 +10,8 @@
 #include "core_status.h"
 #include "dpcd_defs.h"
 
+#include "core_dc.h"
+
 /* maximum pre emphasis level allowed for each voltage swing level*/
 static const enum dc_pre_emphasis voltage_swing_to_pre_emphasis[] = {
 		PRE_EMPHASIS_LEVEL3,
@@ -1091,6 +1093,63 @@ static enum dc_link_rate get_max_link_rate(struct core_link *link)
 	return max_link_rate;
 }
 
+static enum clock_source_id get_clock_source_id_for_link_training(
+	struct core_link *link)
+{
+	bool result;
+	struct dc_sink_init_data init_params = {0};
+	struct dc_sink *sink;
+	struct dc_stream *stream;
+	struct dc_target *target;
+	struct validate_context *context;
+	struct dc_validation_set set;
+	enum clock_source_id id = CLOCK_SOURCE_ID_UNDEFINED;
+
+	init_params.link = &link->public;
+	init_params.sink_signal = SIGNAL_TYPE_DISPLAY_PORT;
+	sink = dc_sink_create(&init_params);
+
+	if (!sink)
+		goto fail_sink;
+
+	stream = dc_create_stream_for_sink(sink);
+
+	if (!stream)
+		goto fail_stream;
+
+	target = dc_create_target_for_streams(&stream, 1);
+
+	if (!target)
+		goto fail_target;
+
+	set.surface_count = 0;
+	set.target = target;
+
+	context = dm_alloc(link->ctx, sizeof(struct validate_context));
+
+	if (!context)
+		goto fail_context;
+
+	result = link->dc->res_pool.funcs->validate_with_context(
+		link->dc,
+		&set,
+		1,
+		context);
+
+	if (result)
+		id = context->res_ctx.pipe_ctx[0].clock_source->id;
+
+	dm_free(link->ctx, context);
+fail_context:
+	dc_target_release(target);
+fail_target:
+	dc_stream_release(stream);
+fail_stream:
+	dc_sink_release(sink);
+fail_sink:
+	return id;
+}
+
 bool dp_hbr_verify_link_cap(
 	struct core_link *link,
 	struct dc_link_settings *known_limit_link_setting)
@@ -1137,7 +1196,7 @@ bool dp_hbr_verify_link_cap(
 		dp_enable_link_phy(
 				link,
 				link->public.connector_signal,
-				CLOCK_SOURCE_ID_UNDEFINED,
+				get_clock_source_id_for_link_training(link),
 				cur);
 
 		if (skip_link_training)
