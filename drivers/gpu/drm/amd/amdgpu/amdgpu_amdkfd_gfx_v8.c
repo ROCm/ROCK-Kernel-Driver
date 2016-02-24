@@ -322,13 +322,15 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 		uint32_t queue_id, uint32_t __user *wptr,
 		uint32_t page_table_base)
 {
-	struct vi_mqd *m;
-	uint32_t shadow_wptr, valid_wptr;
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	struct vi_mqd *m;
+	uint32_t wptr_shadow = 0, is_wptr_shadow_valid = 0;
 
 	m = get_mqd(mqd);
 
-	valid_wptr = copy_from_user(&shadow_wptr, wptr, sizeof(shadow_wptr));
+	if (wptr != NULL)
+		is_wptr_shadow_valid = !get_user(wptr_shadow, wptr);
+
 	acquire_queue(kgd, pipe_id, queue_id);
 
 	WREG32(mmCOMPUTE_STATIC_THREAD_MGMT_SE0,
@@ -354,10 +356,7 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 	WREG32(mmCP_HQD_PQ_RPTR_REPORT_ADDR, m->cp_hqd_pq_rptr_report_addr_lo);
 	WREG32(mmCP_HQD_PQ_RPTR_REPORT_ADDR_HI,
 			m->cp_hqd_pq_rptr_report_addr_hi);
-
-	if (valid_wptr > 0)
-		WREG32(mmCP_HQD_PQ_WPTR, shadow_wptr);
-
+	WREG32(mmCP_HQD_PQ_WPTR, (is_wptr_shadow_valid ? wptr_shadow : 0));
 	WREG32(mmCP_HQD_PQ_CONTROL, m->cp_hqd_pq_control);
 	WREG32(mmCP_HQD_PQ_DOORBELL_CONTROL, m->cp_hqd_pq_doorbell_control);
 
