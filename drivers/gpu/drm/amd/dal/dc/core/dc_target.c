@@ -140,7 +140,6 @@ static int8_t acquire_first_free_underlay(
 		struct resource_context *res_ctx,
 		struct core_stream *stream)
 {
-	BREAK_TO_DEBUGGER();
 	if (!res_ctx->pipe_ctx[3].stream) {
 		struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[DCE110_UNDERLAY_IDX];
 
