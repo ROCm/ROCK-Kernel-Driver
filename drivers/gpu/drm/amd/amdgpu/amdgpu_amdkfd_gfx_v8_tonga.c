@@ -394,6 +394,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	(*mem)->data2.readonly = readonly;
 	(*mem)->data2.execute = execute;
 	(*mem)->data2.no_substitute = no_sub;
+	(*mem)->data2.aql_queue = aql_queue;
 
 	pr_debug("amdkfd: allocating GTT BO size %lu\n", size);
 
@@ -739,9 +740,21 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 			&mem->data2.bo_va_list)) {
 		pr_debug("amdkfd: add new BO_VA to list 0x%llx\n",
 				mem->data2.va);
-		add_bo_to_vm(adev, mem->data2.va, (struct amdgpu_vm *)vm,
-				mem->data2.bo, &mem->data2.bo_va_list,
-				mem->data2.readonly, mem->data2.execute);
+		ret = add_bo_to_vm(adev, mem->data2.va, (struct amdgpu_vm *)vm,
+				   bo, &mem->data2.bo_va_list,
+				   mem->data2.readonly, mem->data2.execute);
+		if (ret != 0)
+			return ret;
+		if (mem->data2.aql_queue) {
+			ret = add_bo_to_vm(adev,
+					   mem->data2.va + bo->tbo.mem.size,
+					   (struct amdgpu_vm *)vm,
+					   bo, &mem->data2.bo_va_list,
+					   mem->data2.readonly,
+					   mem->data2.execute);
+			if (ret != 0)
+				return ret;
+		}
 	}
 
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
