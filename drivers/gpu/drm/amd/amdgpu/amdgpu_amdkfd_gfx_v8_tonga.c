@@ -681,7 +681,7 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 	if (mem->data2.mapped_to_gpu_memory > 0) {
 		pr_err("BO with size %lu bytes is mapped to GPU. Need to unmap it before release va 0x%llx\n",
 			mem->data2.bo->tbo.mem.size, mem->data2.va);
-		return -1;
+		return -EBUSY;
 	}
 
 	/* Remove from VM internal data structures */
