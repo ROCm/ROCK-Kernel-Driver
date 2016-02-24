@@ -416,12 +416,13 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 		uint32_t page_table_base)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-	uint32_t wptr_shadow, is_wptr_shadow_valid;
 	struct cik_mqd *m;
+	uint32_t wptr_shadow = 0, is_wptr_shadow_valid = 0;
 
 	m = get_mqd(mqd);
 
-	is_wptr_shadow_valid = !get_user(wptr_shadow, wptr);
+	if (wptr != NULL)
+		is_wptr_shadow_valid = !get_user(wptr_shadow, wptr);
 
 	acquire_queue(kgd, pipe_id, queue_id);
 
@@ -475,8 +476,7 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 
 	WREG32(mmCP_HQD_IQ_RPTR, m->cp_hqd_iq_rptr);
 
-	if (is_wptr_shadow_valid)
-		WREG32(mmCP_HQD_PQ_WPTR, wptr_shadow);
+	WREG32(mmCP_HQD_PQ_WPTR, (is_wptr_shadow_valid ? wptr_shadow : 0));
 
 	WREG32(mmCP_HQD_ACTIVE, m->cp_hqd_active);
 	release_queue(kgd);
