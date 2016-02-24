@@ -1347,6 +1347,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	struct kfd_process_device *pdd;
 	struct kfd_bo *buf_obj;
 	struct kfd_dev *dev;
+	int ret;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (dev == NULL)
@@ -1370,12 +1371,16 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	BUG_ON(buf_obj == NULL);
 
 	run_rdma_free_callback(buf_obj);
-	dev->kfd2kgd->free_memory_of_gpu(dev->kgd, buf_obj->mem);
+	ret = dev->kfd2kgd->free_memory_of_gpu(dev->kgd, buf_obj->mem);
 
-	kfd_process_device_remove_obj_handle(pdd, GET_IDR_HANDLE(args->handle));
+	/* If freeing the buffer failed, leave the handle in place for
+	 * clean-up during process tear-down. */
+	if (ret == 0)
+		kfd_process_device_remove_obj_handle(
+			pdd, GET_IDR_HANDLE(args->handle));
 
 	mutex_unlock(&p->mutex);
-	return 0;
+	return ret;
 }
 
 int kfd_map_memory_to_gpu(struct kfd_dev *dev, void *mem,
