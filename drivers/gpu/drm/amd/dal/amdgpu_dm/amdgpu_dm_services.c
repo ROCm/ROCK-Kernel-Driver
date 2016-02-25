@@ -40,14 +40,6 @@
 #define dm_realloc(ptr, size) krealloc(ptr, size, GFP_KERNEL)
 #define dm_free(ptr) kfree(ptr)
 
-void dm_sleep_in_milliseconds(struct dc_context *ctx, uint32_t milliseconds)
-{
-	if (milliseconds >= 20)
-		msleep(milliseconds);
-	else
-		usleep_range(milliseconds*1000, milliseconds*1000+1);
-}
-
 /******************************************************************************
  * IRQ Interfaces.
  *****************************************************************************/

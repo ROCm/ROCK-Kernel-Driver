@@ -1254,7 +1254,7 @@ static enum dc_status enable_link(struct pipe_ctx *pipe_ctx)
 		break;
 	case SIGNAL_TYPE_DISPLAY_PORT_MST:
 		status = enable_link_dp_mst(pipe_ctx);
-		dm_sleep_in_milliseconds(pipe_ctx->stream->ctx, 200);
+		msleep(200);
 		break;
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
 	case SIGNAL_TYPE_DVI_DUAL_LINK:

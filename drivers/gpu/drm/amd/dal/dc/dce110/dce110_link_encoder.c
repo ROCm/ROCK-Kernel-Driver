@@ -649,7 +649,7 @@ static void link_encoder_edp_wait_for_hpd_ready(
 			break;
 		}
 
-		dm_sleep_in_milliseconds(ctx, HPD_CHECK_INTERVAL);
+		msleep(HPD_CHECK_INTERVAL);
 
 		time_elapsed += HPD_CHECK_INTERVAL;
 	} while (time_elapsed < timeout);

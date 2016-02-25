@@ -176,7 +176,7 @@ static enum gpio_result set_config(
 					/* should not affect normal I2C R/W */
 					/* [anaumov] in DAL2, there was
 					 * dc_service_delay_in_microseconds(2500); */
-					dm_sleep_in_milliseconds(ptr->ctx, 3);
+					msleep(3);
 			}
 		} else {
 			uint32_t reg2 = regval;
@@ -203,7 +203,7 @@ static enum gpio_result set_config(
 					/* should not affect normal I2C R/W */
 					/* [anaumov] in DAL2, there was
 					 * dc_service_delay_in_microseconds(2500); */
-					dm_sleep_in_milliseconds(ptr->ctx, 3);
+					msleep(3);
 			}
 
 			if (!scl_pd_dis) {
@@ -216,7 +216,7 @@ static enum gpio_result set_config(
 					/* should not affect normal I2C R/W */
 					/* [anaumov] in DAL2, there was
 					 * dc_service_delay_in_microseconds(2500); */
-					dm_sleep_in_milliseconds(ptr->ctx, 3);
+					msleep(3);
 			}
 		}
 
@@ -227,7 +227,7 @@ static enum gpio_result set_config(
 				config_data->config.ddc.clock_en_bit_present)
 				/* [anaumov] in DAL2, there was
 				 * dc_service_delay_in_microseconds(2000); */
-				dm_sleep_in_milliseconds(ptr->ctx, 2);
+				msleep(2);
 
 			/* set the I2C pad mode */
 			/* read the register again,
