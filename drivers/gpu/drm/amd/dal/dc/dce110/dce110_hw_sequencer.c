@@ -925,6 +925,10 @@ static void power_down_clock_sources(struct core_dc *dc)
 {
 	int i;
 
+	if (dc->res_pool.dp_clock_source->funcs->cs_power_down(
+		dc->res_pool.dp_clock_source) == false)
+		dm_error("Failed to power down pll! (dp clk src)\n");
+
 	for (i = 0; i < dc->res_pool.clk_src_count; i++) {
 		if (dc->res_pool.clock_sources[i]->funcs->cs_power_down(
 				dc->res_pool.clock_sources[i]) == false)
@@ -1428,6 +1432,7 @@ static void update_plane_addrs(struct core_dc *dc, struct resource_context *res_
 					PIPE_LOCK_CONTROL_BLENDER |
 					PIPE_LOCK_CONTROL_SURFACE,
 					false);
+
 
 		if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, false)) {
 			dm_error("DC: failed to unblank crtc!\n");

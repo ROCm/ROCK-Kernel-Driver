@@ -72,14 +72,23 @@ void unreference_clock_source(
 {
 	int i;
 	for (i = 0; i < res_ctx->pool.clk_src_count; i++) {
-		if (res_ctx->pool.clock_sources[i] == clock_source) {
-			res_ctx->clock_source_ref_count[i]--;
+		if (res_ctx->pool.clock_sources[i] != clock_source)
+			continue;
+
+		res_ctx->clock_source_ref_count[i]--;
 
 		if (res_ctx->clock_source_ref_count[i] == 0)
 			clock_source->funcs->cs_power_down(clock_source);
-		}
+
+		break;
 	}
 
+	if (res_ctx->pool.dp_clock_source == clock_source) {
+		res_ctx->dp_clock_source_ref_count--;
+
+		if (res_ctx->dp_clock_source_ref_count == 0)
+			clock_source->funcs->cs_power_down(clock_source);
+	}
 }
 
 void reference_clock_source(
@@ -88,10 +97,15 @@ void reference_clock_source(
 {
 	int i;
 	for (i = 0; i < res_ctx->pool.clk_src_count; i++) {
-		if (res_ctx->pool.clock_sources[i] == clock_source) {
-			res_ctx->clock_source_ref_count[i]++;
-		}
+		if (res_ctx->pool.clock_sources[i] != clock_source)
+			continue;
+
+		res_ctx->clock_source_ref_count[i]++;
+		break;
 	}
+
+	if (res_ctx->pool.dp_clock_source == clock_source)
+		res_ctx->dp_clock_source_ref_count++;
 }
 
 bool is_same_timing(
@@ -109,21 +123,17 @@ static bool is_sharable_clk_src(
 	enum dce_version dce_ver = dal_adapter_service_get_dce_version(
 		pipe->stream->sink->link->adapter_srv);
 
-	/* Currently no clocks are shared for DCE 10 until VBIOS behaviour
+	/* Currently no clocks are shared for DCE 10 until VBIOS behavior
 	 * is verified for this use case
 	 */
-	if (dce_ver == DCE_VERSION_10_0 && !dc_is_dp_signal(pipe->signal))
+	if (dce_ver == DCE_VERSION_10_0)
 		return false;
 #endif
 
 	if (pipe_with_clk_src->clock_source == NULL)
 		return false;
 
-	if (dc_is_dp_signal(pipe->signal) &&
-		dc_is_dp_signal(pipe_with_clk_src->signal))
-		return true;
-
-	if (pipe->signal != pipe_with_clk_src->signal)
+	if (dc_is_dp_signal(pipe_with_clk_src->signal))
 		return false;
 
 	if(!is_same_timing(
@@ -1273,6 +1283,19 @@ void val_ctx_copy_construct(
 			dc_surface_retain(
 				dst_ctx->target_status[i].surfaces[j]);
 	}
+}
+
+struct clock_source *dc_resource_find_first_free_pll(
+		struct resource_context *res_ctx)
+{
+	int i;
+
+	for (i = 0; i < res_ctx->pool.clk_src_count; ++i) {
+		if (res_ctx->clock_source_ref_count[i] == 0)
+			return res_ctx->pool.clock_sources[i];
+	}
+
+	return NULL;
 }
 
 void build_info_frame(struct pipe_ctx *pipe_ctx)

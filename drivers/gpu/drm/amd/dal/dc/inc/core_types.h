@@ -265,6 +265,11 @@ struct resource_pool {
 
 	union supported_stream_engines stream_engines;
 
+	/*
+	 * reserved clock source for DP
+	 */
+	struct clock_source *dp_clock_source;
+
 	struct clock_source *clock_sources[MAX_CLOCK_SOURCES];
 	uint8_t clk_src_count;
 
@@ -327,6 +332,7 @@ struct resource_context {
 	bool is_stream_enc_acquired[MAX_PIPES * 2];
 	bool is_audio_acquired[MAX_PIPES];
 	uint8_t clock_source_ref_count[MAX_CLOCK_SOURCES];
+	uint8_t dp_clock_source_ref_count;
  };
 
 struct target_flags {

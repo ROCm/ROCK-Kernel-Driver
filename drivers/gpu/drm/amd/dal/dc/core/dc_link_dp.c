@@ -1085,63 +1085,6 @@ static enum dc_link_rate get_max_link_rate(struct core_link *link)
 	return max_link_rate;
 }
 
-static enum clock_source_id get_clock_source_id_for_link_training(
-	struct core_link *link)
-{
-	bool result;
-	struct dc_sink_init_data init_params = {0};
-	struct dc_sink *sink;
-	struct dc_stream *stream;
-	struct dc_target *target;
-	struct validate_context *context;
-	struct dc_validation_set set;
-	enum clock_source_id id = CLOCK_SOURCE_ID_UNDEFINED;
-
-	init_params.link = &link->public;
-	init_params.sink_signal = SIGNAL_TYPE_DISPLAY_PORT;
-	sink = dc_sink_create(&init_params);
-
-	if (!sink)
-		goto fail_sink;
-
-	stream = dc_create_stream_for_sink(sink);
-
-	if (!stream)
-		goto fail_stream;
-
-	target = dc_create_target_for_streams(&stream, 1);
-
-	if (!target)
-		goto fail_target;
-
-	set.surface_count = 0;
-	set.target = target;
-
-	context = dm_alloc(sizeof(struct validate_context));
-
-	if (!context)
-		goto fail_context;
-
-	result = link->dc->res_pool.funcs->validate_with_context(
-		link->dc,
-		&set,
-		1,
-		context);
-
-	if (result)
-		id = context->res_ctx.pipe_ctx[0].clock_source->id;
-
-	dm_free(context);
-fail_context:
-	dc_target_release(target);
-fail_target:
-	dc_stream_release(stream);
-fail_stream:
-	dc_sink_release(sink);
-fail_sink:
-	return id;
-}
-
 bool dp_hbr_verify_link_cap(
 	struct core_link *link,
 	struct dc_link_settings *known_limit_link_setting)
@@ -1152,11 +1095,12 @@ bool dp_hbr_verify_link_cap(
 	const struct dc_link_settings *cur;
 	bool skip_video_pattern;
 	uint32_t i;
+	struct clock_source *dp_cs;
+	enum clock_source_id dp_cs_id = CLOCK_SOURCE_ID_EXTERNAL;
 
 	success = false;
 	skip_link_training = false;
 
-	/* TODO confirm this is correct for cz */
 	max_link_cap.lane_count = LANE_COUNT_FOUR;
 	max_link_cap.link_rate = get_max_link_rate(link);
 	max_link_cap.link_spread = LINK_SPREAD_05_DOWNSPREAD_30KHZ;
@@ -1168,6 +1112,18 @@ bool dp_hbr_verify_link_cap(
 	 */
 	/* disable PHY done possible by BIOS, will be done by driver itself */
 	dp_disable_link_phy(link, link->public.connector_signal);
+
+	dp_cs = link->dc->res_pool.dp_clock_source;
+
+	if (dp_cs)
+		dp_cs_id = dp_cs->id;
+	else {
+		/*
+		 * dp clock source is not initialized for some reason.
+		 * Should not happen, CLOCK_SOURCE_ID_EXTERNAL will be used
+		 */
+		ASSERT(dp_cs);
+	}
 
 	for (i = 0; i < get_link_training_fallback_table_len(link) &&
 		!success; i++) {
@@ -1188,7 +1144,7 @@ bool dp_hbr_verify_link_cap(
 		dp_enable_link_phy(
 				link,
 				link->public.connector_signal,
-				get_clock_source_id_for_link_training(link),
+				dp_cs_id,
 				cur);
 
 		if (skip_link_training)
