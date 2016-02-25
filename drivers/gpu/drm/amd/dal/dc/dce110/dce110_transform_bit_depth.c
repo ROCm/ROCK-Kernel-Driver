@@ -772,9 +772,7 @@ bool dce110_transform_set_pixel_storage_depth(
 	uint32_t value;
 	enum dc_color_depth color_depth;
 
-	value = dm_read_reg(
-			xfm->ctx,
-			LB_REG(mmLB_DATA_FORMAT));
+	value = dm_read_reg(xfm->ctx, LB_REG(mmLB_DATA_FORMAT));
 	switch (depth) {
 	case LB_PIXEL_DEPTH_18BPP:
 		color_depth = COLOR_DEPTH_666;
@@ -806,9 +804,8 @@ bool dce110_transform_set_pixel_storage_depth(
 		ret = program_bit_depth_reduction(xfm110, color_depth,
 				bit_depth_params);
 
-		set_reg_field_value(value, 0, LB_DATA_FORMAT, ALPHA_EN);
-		dm_write_reg(
-				xfm->ctx, LB_REG(mmLB_DATA_FORMAT), value);
+		set_reg_field_value(value, 1, LB_DATA_FORMAT, ALPHA_EN);
+		dm_write_reg(xfm->ctx, LB_REG(mmLB_DATA_FORMAT), value);
 		if (!(xfm110->lb_pixel_depth_supported & depth)) {
 			/*we should use unsupported capabilities
 			 *  unless it is required by w/a*/
@@ -901,9 +898,7 @@ bool dce110_transform_v_set_pixel_storage_depth(
 	uint32_t value;
 	enum dc_color_depth color_depth;
 
-	value = dm_read_reg(
-			xfm->ctx,
-			LB_REG(mmLBV_DATA_FORMAT));
+	value = dm_read_reg(xfm->ctx, mmLBV_DATA_FORMAT);
 	switch (depth) {
 	case LB_PIXEL_DEPTH_18BPP:
 		color_depth = COLOR_DEPTH_666;
@@ -947,9 +942,8 @@ bool dce110_transform_v_set_pixel_storage_depth(
 		ret = program_bit_depth_reduction(xfm110, color_depth,
 				bit_depth_params);
 
-		set_reg_field_value(value, 0, LB_DATA_FORMAT, ALPHA_EN);
-		dm_write_reg(
-				xfm->ctx, LB_REG(mmLB_DATA_FORMAT), value);
+		set_reg_field_value(value, 0, LBV_DATA_FORMAT, ALPHA_EN);
+		dm_write_reg(xfm->ctx, mmLBV_DATA_FORMAT, value);
 		if (!(xfm110->lb_pixel_depth_supported & depth)) {
 			/*we should use unsupported capabilities
 			 *  unless it is required by w/a*/
