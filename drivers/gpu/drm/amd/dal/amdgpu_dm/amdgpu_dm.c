@@ -36,7 +36,9 @@
 #include "amdgpu_dm_irq.h"
 #include "dm_helpers.h"
 
+#ifdef CONFIG_DRM_AMDGPU_CIK
 #include "dce_v8_0.h"
+#endif
 #include "dce_v10_0.h"
 #include "dce_v11_0.h"
 
@@ -1158,6 +1160,7 @@ static void dm_page_flip(struct amdgpu_device *adev,
 			&addr, 1);
 }
 
+#ifdef CONFIG_DRM_AMDGPU_CIK
 static const struct amdgpu_display_funcs dm_dce_v8_0_display_funcs = {
 	.set_vga_render_state = dce_v8_0_set_vga_render_state,
 	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
@@ -1179,6 +1182,7 @@ static const struct amdgpu_display_funcs dm_dce_v8_0_display_funcs = {
 	.stop_mc_access = dce_v8_0_stop_mc_access, /* called unconditionally */
 	.resume_mc_access = dce_v8_0_resume_mc_access, /* called unconditionally */
 };
+#endif
 
 static const struct amdgpu_display_funcs dm_dce_v10_0_display_funcs = {
 	.set_vga_render_state = dce_v10_0_set_vga_render_state,
@@ -1236,8 +1240,10 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
+#ifdef CONFIG_DRM_AMDGPU_CIK
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v8_0_display_funcs;
+#endif
 		break;
 	case CHIP_FIJI:
 	case CHIP_TONGA:
