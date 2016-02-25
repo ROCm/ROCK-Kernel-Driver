@@ -59,10 +59,9 @@
 #endif
 
 enum dce100_clk_src_array_id {
-	DCE100_CLK_SRC_PLL0 = 0,
-	DCE100_CLK_SRC_PLL1,
-	DCE100_CLK_SRC_PLL2,
-	DCE100_CLK_SRC_EXT,
+	DCE100_CLK_SRC0 = 0,
+	DCE100_CLK_SRC1,
+	DCE100_CLK_SRC2,
 
 	DCE100_CLK_SRC_TOTAL
 };
@@ -560,6 +559,9 @@ void dce100_destruct_resource_pool(struct resource_pool *pool)
 			dce100_clock_source_destroy(&pool->clock_sources[i]);
 	}
 
+	if (pool->dp_clock_source != NULL)
+		dce100_clock_source_destroy(&pool->dp_clock_source);
+
 	for (i = 0; i < pool->audio_count; i++)	{
 		if (pool->audios[i] != NULL)
 			dal_audio_destroy(&pool->audios[i]);
@@ -576,19 +578,6 @@ void dce100_destruct_resource_pool(struct resource_pool *pool)
 
 	if (pool->adapter_srv != NULL)
 		dal_adapter_service_destroy(&pool->adapter_srv);
-}
-
-static struct clock_source *find_first_free_pll(
-		struct resource_context *res_ctx)
-{
-	int i;
-
-	for (i = 0; i < DCE100_CLK_SRC_EXT; ++i) {
-		if (res_ctx->clock_source_ref_count[i] == 0)
-			return res_ctx->pool.clock_sources[i];
-	}
-
-	return NULL;
 }
 
 static enum audio_dto_source translate_to_dto_source(enum controller_id crtc_id)
@@ -838,17 +827,18 @@ static enum dc_status map_clock_resources(
 				 */
 				if (dc_is_dp_signal(pipe_ctx->signal)
 					|| pipe_ctx->signal == SIGNAL_TYPE_VIRTUAL)
-					pipe_ctx->clock_source = context->res_ctx.pool.clock_sources[DCE100_CLK_SRC_EXT];
-
-				if (pipe_ctx->clock_source == NULL)
+					pipe_ctx->clock_source =
+						context->res_ctx.pool.dp_clock_source;
+				else {
 					pipe_ctx->clock_source =
 						find_used_clk_src_for_sharing(
 							&context->res_ctx,
 							pipe_ctx);
 
-				if (pipe_ctx->clock_source == NULL)
-					pipe_ctx->clock_source =
-						find_first_free_pll(&context->res_ctx);
+					if (pipe_ctx->clock_source == NULL)
+						pipe_ctx->clock_source =
+							dc_resource_find_first_free_pll(&context->res_ctx);
+				}
 
 				if (pipe_ctx->clock_source == NULL)
 					return DC_NO_CLOCK_SOURCE_RESOURCE;
@@ -946,6 +936,7 @@ bool dce100_construct_resource_pool(
 	struct dc_context *ctx = dc->ctx;
 	struct firmware_info info;
 	struct dc_bios *bp;
+	int regular_pll_offset = 0;
 
 	pool->adapter_srv = as;
 	pool->funcs = &dce100_res_pool_funcs;
@@ -959,38 +950,33 @@ bool dce100_construct_resource_pool(
 
 	bp = dal_adapter_service_get_bios_parser(as);
 
-	pool->clock_sources[DCE100_CLK_SRC_PLL0] =
-		dce100_clock_source_create(
-			ctx,
-			bp,
-			CLOCK_SOURCE_ID_PLL0,
-			&dce100_clk_src_reg_offsets[0]);
-
-	pool->clock_sources[DCE100_CLK_SRC_PLL1] =
-		dce100_clock_source_create(
-			ctx,
-			bp,
-			CLOCK_SOURCE_ID_PLL1,
-			&dce100_clk_src_reg_offsets[1]);
-
-	pool->clock_sources[DCE100_CLK_SRC_PLL2] =
-		dce100_clock_source_create(
-			ctx,
-			bp,
-			CLOCK_SOURCE_ID_PLL2,
-			&dce100_clk_src_reg_offsets[2]);
-
 	if (dal_adapter_service_get_firmware_info(as, &info) &&
 		info.external_clock_source_frequency_for_dp != 0) {
-		pool->clock_sources[DCE100_CLK_SRC_EXT] =
+		pool->dp_clock_source =
 			dce100_clock_source_create(
 				ctx,
 				bp,
 				CLOCK_SOURCE_ID_EXTERNAL,
 				NULL);
-		pool->clk_src_count = DCE100_CLK_SRC_TOTAL;
-	} else
-		pool->clk_src_count = DCE100_CLK_SRC_TOTAL - 1;
+	} else {
+		pool->dp_clock_source =
+			dce100_clock_source_create(
+				ctx,
+				bp,
+				CLOCK_SOURCE_ID_PLL0,
+				&dce100_clk_src_reg_offsets[0]);
+		regular_pll_offset = 1;
+	}
+
+	pool->clk_src_count = DCE100_CLK_SRC_TOTAL - regular_pll_offset;
+
+	for (i = 0; i < pool->clk_src_count; ++i, ++regular_pll_offset)
+		pool->clock_sources[i] =
+			dce100_clock_source_create(
+				ctx,
+				bp,
+				CLOCK_SOURCE_ID_PLL0 + regular_pll_offset,
+				&dce100_clk_src_reg_offsets[regular_pll_offset]);
 
 	for (i = 0; i < pool->clk_src_count; i++) {
 		if (pool->clock_sources[i] == NULL) {

@@ -61,6 +61,9 @@ struct clock_source *find_used_clk_src_for_sharing(
 	struct resource_context *res_ctx,
 	struct pipe_ctx *pipe_ctx);
 
+struct clock_source *dc_resource_find_first_free_pll(
+		struct resource_context *res_ctx);
+
 bool attach_surfaces_to_context(
 		struct dc_surface *surfaces[],
 		uint8_t surface_count,
