@@ -107,9 +107,4 @@ struct ovl_csc_adjustment {
 
 };
 
-struct input_csc_matrix {
-	enum color_space color_space;
-	uint16_t regval[12];
-};
-
 #endif

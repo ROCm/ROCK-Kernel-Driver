@@ -123,7 +123,7 @@ void dce80_opp_program_clamping_and_pixel_encoding(
 
 void dce80_opp_set_dyn_expansion(
 	struct output_pixel_processor *opp,
-	enum color_space color_sp,
+	enum dc_color_space color_sp,
 	enum dc_color_depth color_dpth,
 	enum signal_type signal);
 

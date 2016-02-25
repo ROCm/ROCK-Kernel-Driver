@@ -588,11 +588,10 @@ bool dce110_transform_get_max_num_of_supported_lines(
 	return true;
 }
 
-void dce110_transform_enable_alpha(
-	struct dce110_transform *xfm110,
-	bool enable)
+void dce110_transform_set_alpha(struct transform *xfm, bool enable)
 {
-	struct dc_context *ctx = xfm110->base.ctx;
+	struct dce110_transform *xfm110 = TO_DCE110_TRANSFORM(xfm);
+	struct dc_context *ctx = xfm->ctx;
 	uint32_t value;
 	uint32_t addr = LB_REG(mmLB_DATA_FORMAT);
 

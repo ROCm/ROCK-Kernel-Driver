@@ -737,10 +737,10 @@ static void unblank_stream(struct pipe_ctx *pipe_ctx,
 	pipe_ctx->stream_enc->funcs->dp_unblank(pipe_ctx->stream_enc, &params);
 }
 
-static enum color_space get_output_color_space(
+static enum dc_color_space get_output_color_space(
 				const struct dc_crtc_timing *dc_crtc_timing)
 {
-	enum color_space color_space = COLOR_SPACE_SRGB_FULL_RANGE;
+	enum dc_color_space color_space = COLOR_SPACE_SRGB;
 
 	switch (dc_crtc_timing->pixel_encoding)	{
 	case PIXEL_ENCODING_YCBCR422:
@@ -754,13 +754,13 @@ static enum color_space get_output_color_space(
 			if (dc_crtc_timing->pix_clk_khz > 27030) {
 				if (dc_crtc_timing->flags.Y_ONLY)
 					color_space =
-						COLOR_SPACE_YCBCR709_YONLY;
+						COLOR_SPACE_YCBCR709_LIMITED;
 				else
 					color_space = COLOR_SPACE_YCBCR709;
 			} else {
 				if (dc_crtc_timing->flags.Y_ONLY)
 					color_space =
-						COLOR_SPACE_YCBCR601_YONLY;
+						COLOR_SPACE_YCBCR601_LIMITED;
 				else
 					color_space = COLOR_SPACE_YCBCR601;
 			}
@@ -785,7 +785,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		&dc->current_context.res_ctx.pipe_ctx[pipe_ctx->pipe_idx];
 	bool timing_changed = context->res_ctx.pipe_ctx[pipe_ctx->pipe_idx]
 							.flags.timing_changed;
-	enum color_space color_space;
+	enum dc_color_space color_space;
 
 	if (timing_changed) {
 		/* Must blank CRTC after disabling power gating and before any
@@ -1298,39 +1298,13 @@ static enum dc_status apply_ctx_to_hw(
 /*******************************************************************************
  * Front End programming
  ******************************************************************************/
-
-static bool setup_line_buffer_pixel_depth(
-	const struct pipe_ctx *pipe_ctx,
-	enum lb_pixel_depth depth,
-	bool blank)
-{
-	enum lb_pixel_depth current_depth;
-
-	struct timing_generator *tg = pipe_ctx->tg;
-	struct transform *xfm = pipe_ctx->xfm;
-
-	if (!xfm->funcs->transform_get_current_pixel_storage_depth(
-		xfm,
-		&current_depth))
-		return false;
-
-	if (current_depth != depth) {
-		if (blank)
-			tg->funcs->wait_for_state(tg, CRTC_STATE_VBLANK);
-
-		return xfm->funcs->transform_set_pixel_storage_depth(xfm, depth,
-				&pipe_ctx->stream->bit_depth_params);
-	}
-
-	return false;
-}
-
 static void set_default_colors(struct pipe_ctx *pipe_ctx)
 {
 	struct default_adjustment default_adjust = { 0 };
 
 	default_adjust.force_hw_default = false;
-	default_adjust.color_space = get_output_color_space(
+	default_adjust.in_color_space = pipe_ctx->surface->public.color_space;
+	default_adjust.out_color_space = get_output_color_space(
 					&pipe_ctx->stream->public.timing);
 	default_adjust.csc_adjust_type = GRAPHICS_CSC_ADJUST_TYPE_SW;
 	default_adjust.surface_pixel_format = pipe_ctx->scl_data.format;
@@ -1340,7 +1314,7 @@ static void set_default_colors(struct pipe_ctx *pipe_ctx)
 		pipe_ctx->stream->public.timing.display_color_depth;
 
 	/* Lb color depth */
-	default_adjust.lb_color_depth = LB_PIXEL_DEPTH_24BPP;
+	default_adjust.lb_color_depth = LB_PIXEL_DEPTH_30BPP;
 	/*dal_hw_sequencer_translate_to_lb_color_depth(
 			build_params->
 			line_buffer_params[path_id][plane_id].depth);*/
@@ -1351,13 +1325,14 @@ static void set_default_colors(struct pipe_ctx *pipe_ctx)
 
 static void program_scaler(const struct pipe_ctx *pipe_ctx)
 {
-	setup_line_buffer_pixel_depth(
-		pipe_ctx,
-		LB_PIXEL_DEPTH_24BPP,
-		false);
+	pipe_ctx->xfm->funcs->transform_set_pixel_storage_depth(
+		pipe_ctx->xfm,
+		LB_PIXEL_DEPTH_30BPP,
+		&pipe_ctx->stream->bit_depth_params);
 
 	pipe_ctx->tg->funcs->set_overscan_blank_color(
-		pipe_ctx->tg, pipe_ctx->surface->public.color_space);
+		pipe_ctx->tg,
+		get_output_color_space(&pipe_ctx->stream->public.timing));
 
 	pipe_ctx->xfm->funcs->transform_set_scaler(pipe_ctx->xfm, &pipe_ctx->scl_data);
 }
@@ -1417,6 +1392,9 @@ static void set_plane_config(
 
 	dc->hwss.set_blender_mode(
 		ctx, pipe_ctx->pipe_idx, blender_mode);
+
+	if (blender_mode != BLENDER_MODE_CURRENT_PIPE)
+		pipe_ctx->xfm->funcs->transform_set_alpha(pipe_ctx->xfm, true);
 
 	mi->funcs->mem_input_program_surface_config(
 			mi,

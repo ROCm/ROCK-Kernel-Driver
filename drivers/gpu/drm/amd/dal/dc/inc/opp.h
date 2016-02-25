@@ -230,7 +230,8 @@ enum graphics_csc_adjust_type {
 
 struct default_adjustment {
 	uint32_t lb_color_depth;
-	enum color_space color_space;
+	enum dc_color_space out_color_space;
+	enum dc_color_space in_color_space;
 	enum dc_color_depth color_depth;
 	enum pixel_format surface_pixel_format;
 	enum graphics_csc_adjust_type csc_adjust_type;
@@ -244,7 +245,7 @@ enum grph_color_adjust_option {
 
 struct opp_grph_csc_adjustment {
 	enum grph_color_adjust_option color_adjust_option;
-	enum color_space c_space;
+	enum dc_color_space c_space;
 	enum dc_color_depth color_depth; /* clean up to uint32_t */
 	enum graphics_csc_adjust_type   csc_adjust_type;
 	int32_t adjust_divider;
@@ -307,7 +308,7 @@ struct opp_funcs {
 
 	void (*opp_set_dyn_expansion)(
 		struct output_pixel_processor *opp,
-		enum color_space color_sp,
+		enum dc_color_space color_sp,
 		enum dc_color_depth color_dpth,
 		enum signal_type signal);
 
