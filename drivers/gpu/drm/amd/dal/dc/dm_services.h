@@ -255,8 +255,6 @@ bool dm_pp_apply_display_requirements(
 
 /****** end of PP interfaces ******/
 
-void dm_sleep_in_milliseconds(struct dc_context *ctx, uint32_t milliseconds);
-
 enum platform_method {
 	PM_GET_AVAILABLE_METHODS = 1 << 0,
 	PM_GET_LID_STATE = 1 << 1,

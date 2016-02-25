@@ -170,8 +170,11 @@ static bool construct(
 	uint32_t reference_frequency =
 		dal_i2caux_get_reference_clock(as) >> 1;
 
-	bool use_i2c_sw_engine = dal_adapter_service_is_feature_supported(
-		FEATURE_RESTORE_USAGE_I2C_SW_ENGINE);
+	/*bool use_i2c_sw_engine = dal_adapter_service_is_feature_supported(
+		FEATURE_RESTORE_USAGE_I2C_SW_ENGINE);*/
+
+	/* Use SWI2C for dce8 currently, sicne we have bug with hwi2c */
+	bool use_i2c_sw_engine = true;
 
 	uint32_t i;
 

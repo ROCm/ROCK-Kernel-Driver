@@ -106,7 +106,7 @@ static bool dce110_timing_generator_v_blank_crtc(struct timing_generator *tg)
 			CRTC_CURRENT_BLANK_STATE) == 1)
 			break;
 
-		dm_sleep_in_milliseconds(tg->ctx, 1);
+		msleep(1);
 		counter--;
 	}
 

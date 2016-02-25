@@ -275,7 +275,7 @@ static bool read_command(
 
 		if (ctx.operation_succeeded && !ctx.transaction_complete)
 			if (ctx.request.type == AUX_TRANSACTION_TYPE_I2C)
-				dm_sleep_in_milliseconds(engine->base.ctx, engine->delay);
+				msleep(engine->delay);
 	} while (ctx.operation_succeeded && !ctx.transaction_complete);
 
 	return ctx.operation_succeeded;
@@ -475,7 +475,7 @@ static bool write_command(
 
 		if (ctx.operation_succeeded && !ctx.transaction_complete)
 			if (ctx.request.type == AUX_TRANSACTION_TYPE_I2C)
-				dm_sleep_in_milliseconds(engine->base.ctx, engine->delay);
+				msleep(engine->delay);
 	} while (ctx.operation_succeeded && !ctx.transaction_complete);
 
 	return ctx.operation_succeeded;

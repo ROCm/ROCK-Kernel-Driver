@@ -702,7 +702,7 @@ static bool perform_post_lt_adj_req_sequence(
 				break;
 			}
 
-			dm_sleep_in_milliseconds(link->ctx, 1);
+			msleep(1);
 		}
 
 		if (!req_drv_setting_changed) {
@@ -1163,9 +1163,7 @@ bool dp_hbr_verify_link_cap(
 				if (success)
 					break;
 
-				dm_sleep_in_milliseconds(
-					link->ctx,
-					delay_between_retries);
+				msleep(delay_between_retries);
 
 				delay_between_retries += 10;
 			}
