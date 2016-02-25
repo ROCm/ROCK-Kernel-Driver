@@ -742,8 +742,11 @@ static enum i2c_channel_operation_result get_channel_status(
 	else if (value & DC_I2C_SW_STATUS__DC_I2C_SW_DONE_MASK)
 		return I2C_CHANNEL_OPERATION_SUCCEEDED;
 
-	/* in DAL2, I2C_RESULT_OK was returned */
-	return I2C_CHANNEL_OPERATION_NOT_STARTED;
+	/*
+	 * this is the case when HW used for communication, I2C_SW_STATUS
+	 * could be zero
+	 */
+	return I2C_CHANNEL_OPERATION_SUCCEEDED;
 }
 
 static uint8_t get_hw_buffer_available_size(
