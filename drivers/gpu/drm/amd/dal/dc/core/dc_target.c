@@ -194,7 +194,7 @@ static int8_t acquire_first_free_underlay(
 
 		pipe_ctx->tg->funcs->set_blank_color(
 				pipe_ctx->tg,
-				COLOR_SPACE_SRGB_FULL_RANGE);/* TODO unhardcode*/
+				COLOR_SPACE_YCBCR601);/* TODO unhardcode*/
 
 		pipe_ctx->stream = stream;
 		return DCE110_UNDERLAY_IDX;

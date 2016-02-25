@@ -142,11 +142,16 @@ static void program_addr(
 {
 	switch (addr->type) {
 	case PLN_ADDR_TYPE_GRAPHICS:
+		if (addr->grph.addr.quad_part == 0)
+			break;
 		program_pri_addr(
 			mem_input110,
 			addr->grph.addr);
 		break;
 	case PLN_ADDR_TYPE_GRPH_STEREO:
+		if (addr->grph_stereo.left_addr.quad_part == 0
+			|| addr->grph_stereo.right_addr.quad_part == 0)
+			break;
 		program_pri_addr(
 			mem_input110,
 			addr->grph_stereo.left_addr);

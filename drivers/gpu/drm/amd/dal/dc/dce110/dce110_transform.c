@@ -54,7 +54,8 @@ static struct transform_funcs dce110_transform_funcs = {
 	.transform_set_pixel_storage_depth =
 		dce110_transform_set_pixel_storage_depth,
 	.transform_get_current_pixel_storage_depth =
-		dce110_transform_get_current_pixel_storage_depth
+		dce110_transform_get_current_pixel_storage_depth,
+	.transform_set_alpha = dce110_transform_set_alpha
 };
 
 /*****************************************/

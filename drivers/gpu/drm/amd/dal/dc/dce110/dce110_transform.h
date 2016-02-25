@@ -82,5 +82,6 @@ bool dce110_transform_get_current_pixel_storage_depth(
 	struct transform *xfm,
 	enum lb_pixel_depth *depth);
 
+void dce110_transform_set_alpha(struct transform *xfm, bool enable);
 
 #endif

@@ -528,7 +528,7 @@ void dce80_opp_program_clamping_and_pixel_encoding(
 
 void dce80_opp_set_dyn_expansion(
 	struct output_pixel_processor *opp,
-	enum color_space color_sp,
+	enum dc_color_space color_sp,
 	enum dc_color_depth color_dpth,
 	enum signal_type signal)
 {
@@ -547,7 +547,7 @@ void dce80_opp_set_dyn_expansion(
 	/* From HW programming guide:
 		FMT_DYNAMIC_EXP_EN = 0 for limited RGB or YCbCr output
 		FMT_DYNAMIC_EXP_EN = 1 for RGB full range only*/
-	if (color_sp == COLOR_SPACE_SRGB_FULL_RANGE)
+	if (color_sp == COLOR_SPACE_SRGB)
 		enable_dyn_exp = true;
 
 	/*00 - 10-bit -> 12-bit dynamic expansion*/

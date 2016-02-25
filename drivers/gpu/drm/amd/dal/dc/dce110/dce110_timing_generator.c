@@ -191,7 +191,7 @@ static void dce110_timing_generator_apply_front_porch_workaround(
 }
 
 void dce110_timing_generator_color_space_to_black_color(
-		enum color_space colorspace,
+		enum dc_color_space colorspace,
 	struct crtc_black_color *black_color)
 {
 	switch (colorspace) {
@@ -205,17 +205,7 @@ void dce110_timing_generator_color_space_to_black_color(
 		*black_color = black_color_format[BLACK_COLOR_FORMAT_YUV_CV];
 		break;
 
-	case COLOR_SPACE_N_MVPU_SUPER_AA:
-		/* In crossfire SuperAA mode, the slave overscan data is forced
-		 * to 0 in the pixel mixer on the master.  As a result, we need
-		 * to adjust the blank color so that after blending the
-		 * master+slave, it will appear black
-		 */
-		*black_color =
-			black_color_format[BLACK_COLOR_FORMAT_YUV_SUPER_AA];
-		break;
-
-	case COLOR_SPACE_SRGB_LIMITED_RANGE:
+	case COLOR_SPACE_SRGB_LIMITED:
 		*black_color =
 			black_color_format[BLACK_COLOR_FORMAT_RGB_LIMITED];
 		break;
@@ -301,7 +291,7 @@ bool dce110_timing_generator_enable_crtc(struct timing_generator *tg)
 
 void dce110_timing_generator_program_blank_color(
 		struct timing_generator *tg,
-		enum color_space color_space)
+		enum dc_color_space color_space)
 {
 	struct crtc_black_color black_color;
 	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
@@ -1625,7 +1615,7 @@ void dce110_timing_generator_disable_vga(
 
 void dce110_timing_generator_set_overscan_color_black(
 	struct timing_generator *tg,
-	enum color_space black_color)
+	enum dc_color_space black_color)
 {
 	struct dc_context *ctx = tg->ctx;
 	uint32_t value = 0;
@@ -1659,8 +1649,8 @@ void dce110_timing_generator_set_overscan_color_black(
 	case COLOR_SPACE_YPBPR709:
 	case COLOR_SPACE_YCBCR601:
 	case COLOR_SPACE_YCBCR709:
-	case COLOR_SPACE_YCBCR601_YONLY:
-	case COLOR_SPACE_YCBCR709_YONLY:
+	case COLOR_SPACE_YCBCR601_LIMITED:
+	case COLOR_SPACE_YCBCR709_LIMITED:
 		set_reg_field_value(
 			value,
 			CRTC_OVERSCAN_COLOR_BLACK_COLOR_B_CB_YUV_4CV,
@@ -1680,31 +1670,7 @@ void dce110_timing_generator_set_overscan_color_black(
 			CRTC_OVERSCAN_COLOR_RED);
 		break;
 
-	case COLOR_SPACE_N_MVPU_SUPER_AA:
-		/* In crossfire SuperAA mode, the slave overscan data is forced
-		 * to 0 in the pixel mixer on the master.  As a result, we need
-		 * to adjust the blank color so that after blending the
-		 * master+slave, it will appear black */
-		set_reg_field_value(
-			value,
-			CRTC_OVERSCAN_COLOR_BLACK_COLOR_B_CB_YUV_4SUPERAA,
-			CRTC_OVERSCAN_COLOR,
-			CRTC_OVERSCAN_COLOR_BLUE);
-
-		set_reg_field_value(
-			value,
-			CRTC_OVERSCAN_COLOR_BLACK_COLOR_G_Y_YUV_4SUPERAA,
-			CRTC_OVERSCAN_COLOR,
-			CRTC_OVERSCAN_COLOR_GREEN);
-
-		set_reg_field_value(
-			value,
-			CRTC_OVERSCAN_COLOR_BLACK_COLOR_R_CR_YUV_4SUPERAA,
-			CRTC_OVERSCAN_COLOR,
-			CRTC_OVERSCAN_COLOR_RED);
-		break;
-
-	case COLOR_SPACE_SRGB_LIMITED_RANGE:
+	case COLOR_SPACE_SRGB_LIMITED:
 		set_reg_field_value(
 			value,
 			CRTC_OVERSCAN_COLOR_BLACK_COLOR_B_RGB_LIMITED_RANGE,

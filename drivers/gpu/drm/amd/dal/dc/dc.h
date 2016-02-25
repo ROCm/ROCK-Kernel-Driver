@@ -108,7 +108,7 @@ struct dc_surface {
 
 	union plane_size plane_size;
 	struct dc_tiling_info tiling_info;
-	enum color_space color_space;
+	enum dc_color_space color_space;
 
 	enum surface_pixel_format format;
 	enum dc_rotation_angle rotation;

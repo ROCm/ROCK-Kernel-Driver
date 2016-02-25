@@ -40,24 +40,24 @@ enum {
 };
 
 struct out_csc_color_matrix {
-	enum color_space color_space;
+	enum dc_color_space color_space;
 	uint16_t regval[OUTPUT_CSC_MATRIX_SIZE];
 };
 
 static const struct out_csc_color_matrix global_color_matrix[] = {
-{ COLOR_SPACE_SRGB_FULL_RANGE,
+{ COLOR_SPACE_SRGB,
 	{ 0x2000, 0, 0, 0, 0, 0x2000, 0, 0, 0, 0, 0x2000, 0} },
-{ COLOR_SPACE_SRGB_LIMITED_RANGE,
+{ COLOR_SPACE_SRGB_LIMITED,
 	{ 0x1B60, 0, 0, 0x200, 0, 0x1B60, 0, 0x200, 0, 0, 0x1B60, 0x200} },
 { COLOR_SPACE_YCBCR601,
 	{ 0xE00, 0xF447, 0xFDB9, 0x1000, 0x82F, 0x1012, 0x31F, 0x200, 0xFB47,
 		0xF6B9, 0xE00, 0x1000} },
 { COLOR_SPACE_YCBCR709, { 0xE00, 0xF349, 0xFEB7, 0x1000, 0x5D2, 0x1394, 0x1FA,
 	0x200, 0xFCCB, 0xF535, 0xE00, 0x1000} },
-/*  YOnly same as YCbCr709 but Y in Full range -To do. */
-{ COLOR_SPACE_YCBCR601_YONLY, { 0xE00, 0xF447, 0xFDB9, 0x1000, 0x991,
+/* TODO: correct values below */
+{ COLOR_SPACE_YCBCR601_LIMITED, { 0xE00, 0xF447, 0xFDB9, 0x1000, 0x991,
 	0x12C9, 0x3A6, 0x200, 0xFB47, 0xF6B9, 0xE00, 0x1000} },
-{ COLOR_SPACE_YCBCR709_YONLY, { 0xE00, 0xF349, 0xFEB7, 0x1000, 0x6CE, 0x16E3,
+{ COLOR_SPACE_YCBCR709_LIMITED, { 0xE00, 0xF349, 0xFEB7, 0x1000, 0x6CE, 0x16E3,
 	0x24F, 0x200, 0xFCCB, 0xF535, 0xE00, 0x1000} }
 };
 
@@ -675,7 +675,7 @@ static void set_yuv_adjustment(
 {
 	bool b601 = (adjust->c_space == COLOR_SPACE_YPBPR601) ||
 		(adjust->c_space == COLOR_SPACE_YCBCR601) ||
-		(adjust->c_space == COLOR_SPACE_YCBCR601_YONLY);
+		(adjust->c_space == COLOR_SPACE_YCBCR601_LIMITED);
 	struct out_csc_color_matrix reg_matrix;
 	struct fixed31_32 matrix[OUTPUT_CSC_MATRIX_SIZE];
 	struct dc_csc_adjustments adjustments;
@@ -685,8 +685,8 @@ static void set_yuv_adjustment(
 
 	setup_adjustments(adjust, &adjustments);
 
-	if ((adjust->c_space == COLOR_SPACE_YCBCR601_YONLY) ||
-		(adjust->c_space == COLOR_SPACE_YCBCR709_YONLY))
+	if ((adjust->c_space == COLOR_SPACE_YCBCR601_LIMITED) ||
+		(adjust->c_space == COLOR_SPACE_YCBCR709_LIMITED))
 		calculate_adjustments_y_only(
 			ideals, &adjustments, matrix);
 	else
@@ -704,7 +704,7 @@ static bool configure_graphics_mode(
 	struct dce80_opp *opp80,
 	enum csc_color_mode config,
 	enum graphics_csc_adjust_type csc_adjust_type,
-	enum color_space color_space)
+	enum dc_color_space color_space)
 {
 	struct dc_context *ctx = opp80->base.ctx;
 	uint32_t addr = DCP_REG(mmOUTPUT_CSC_CONTROL);
@@ -726,7 +726,7 @@ static bool configure_graphics_mode(
 		} else {
 
 			switch (color_space) {
-			case COLOR_SPACE_SRGB_FULL_RANGE:
+			case COLOR_SPACE_SRGB:
 				/* by pass */
 				set_reg_field_value(
 					value,
@@ -734,7 +734,7 @@ static bool configure_graphics_mode(
 					OUTPUT_CSC_CONTROL,
 					OUTPUT_CSC_GRPH_MODE);
 				break;
-			case COLOR_SPACE_SRGB_LIMITED_RANGE:
+			case COLOR_SPACE_SRGB_LIMITED:
 				/* TV RGB */
 				set_reg_field_value(
 					value,
@@ -744,7 +744,7 @@ static bool configure_graphics_mode(
 				break;
 			case COLOR_SPACE_YCBCR601:
 			case COLOR_SPACE_YPBPR601:
-			case COLOR_SPACE_YCBCR601_YONLY:
+			case COLOR_SPACE_YCBCR601_LIMITED:
 				/* YCbCr601 */
 				set_reg_field_value(
 					value,
@@ -754,7 +754,7 @@ static bool configure_graphics_mode(
 				break;
 			case COLOR_SPACE_YCBCR709:
 			case COLOR_SPACE_YPBPR709:
-			case COLOR_SPACE_YCBCR709_YONLY:
+			case COLOR_SPACE_YCBCR709_LIMITED:
 				/* YCbCr709 */
 				set_reg_field_value(
 					value,
@@ -768,7 +768,7 @@ static bool configure_graphics_mode(
 		}
 	} else if (csc_adjust_type == GRAPHICS_CSC_ADJUST_TYPE_HW) {
 		switch (color_space) {
-		case COLOR_SPACE_SRGB_FULL_RANGE:
+		case COLOR_SPACE_SRGB:
 			/* by pass */
 			set_reg_field_value(
 				value,
@@ -776,7 +776,7 @@ static bool configure_graphics_mode(
 				OUTPUT_CSC_CONTROL,
 				OUTPUT_CSC_GRPH_MODE);
 			break;
-		case COLOR_SPACE_SRGB_LIMITED_RANGE:
+		case COLOR_SPACE_SRGB_LIMITED:
 			/* TV RGB */
 			set_reg_field_value(
 				value,
@@ -786,7 +786,7 @@ static bool configure_graphics_mode(
 			break;
 		case COLOR_SPACE_YCBCR601:
 		case COLOR_SPACE_YPBPR601:
-		case COLOR_SPACE_YCBCR601_YONLY:
+		case COLOR_SPACE_YCBCR601_LIMITED:
 			/* YCbCr601 */
 			set_reg_field_value(
 				value,
@@ -796,7 +796,7 @@ static bool configure_graphics_mode(
 			break;
 		case COLOR_SPACE_YCBCR709:
 		case COLOR_SPACE_YPBPR709:
-		case COLOR_SPACE_YCBCR709_YONLY:
+		case COLOR_SPACE_YCBCR709_LIMITED:
 			 /* YCbCr709 */
 			set_reg_field_value(
 				value,
@@ -835,17 +835,17 @@ void dce80_opp_set_csc_adjustment(
 	 * the ideal values only, but keep original design to allow quick switch
 	 * to the old legacy routines */
 	switch (adjust->c_space) {
-	case COLOR_SPACE_SRGB_FULL_RANGE:
+	case COLOR_SPACE_SRGB:
 		set_rgb_adjustment_legacy(opp80, adjust);
 		break;
-	case COLOR_SPACE_SRGB_LIMITED_RANGE:
+	case COLOR_SPACE_SRGB_LIMITED:
 		set_rgb_limited_range_adjustment(
 			opp80, adjust);
 		break;
 	case COLOR_SPACE_YCBCR601:
 	case COLOR_SPACE_YCBCR709:
-	case COLOR_SPACE_YCBCR601_YONLY:
-	case COLOR_SPACE_YCBCR709_YONLY:
+	case COLOR_SPACE_YCBCR601_LIMITED:
+	case COLOR_SPACE_YCBCR709_LIMITED:
 	case COLOR_SPACE_YPBPR601:
 	case COLOR_SPACE_YPBPR709:
 		set_yuv_adjustment(opp80, adjust);
@@ -884,7 +884,7 @@ void dce80_opp_set_csc_default(
 
 		for (i = 0; i < ARRAY_SIZE(global_color_matrix); ++i) {
 			elm = &global_color_matrix[i];
-			if (elm->color_space != default_adjust->color_space)
+			if (elm->color_space != default_adjust->out_color_space)
 				continue;
 			/* program the matrix with default values from this
 			 * file */
@@ -901,5 +901,5 @@ void dce80_opp_set_csc_default(
 
 	configure_graphics_mode(opp80, config,
 		default_adjust->csc_adjust_type,
-		default_adjust->color_space);
+		default_adjust->out_color_space);
 }
