@@ -2,6 +2,7 @@
 #include <linux/acpi.h>
 #include <linux/mm.h>
 #include <linux/amd-iommu.h>
+#include <linux/pci.h>
 #include "kfd_crat.h"
 #include "kfd_priv.h"
 #include "kfd_topology.h"
@@ -306,7 +307,7 @@ static int kfd_parse_subtype_iolink(struct crat_subtype_iolink *iolink,
 
 	pr_debug("Found IO link entry in CRAT table with id_from=%d\n", id_from);
 	list_for_each_entry(dev, device_list, list) {
-		if (id_from == i) {
+		if (id_from == dev->proximity_domain) {
 			props = kfd_alloc_struct(props);
 			if (props == NULL)
 				return -ENOMEM;
@@ -315,6 +316,7 @@ static int kfd_parse_subtype_iolink(struct crat_subtype_iolink *iolink,
 			props->node_to = id_to;
 			props->ver_maj = iolink->version_major;
 			props->ver_min = iolink->version_minor;
+			props->iolink_type = iolink->io_interface_type;
 
 			/*
 			 * weight factor (derived from CDIR), currently always 1
@@ -701,8 +703,6 @@ static int kfd_fill_cu_for_cpu(int numa_node_id, int *avail_size,
 				struct crat_subtype_computeunit *sub_type_hdr)
 {
 	const struct cpumask *cpumask;
-	const struct cpuinfo_x86 *cpuinfo;
-	int first_cpu_of_nuna_node;
 
 	*avail_size -= sizeof(struct crat_subtype_computeunit);
 	if (*avail_size < 0)
@@ -716,13 +716,14 @@ static int kfd_fill_cu_for_cpu(int numa_node_id, int *avail_size,
 	sub_type_hdr->flags = CRAT_SUBTYPE_FLAGS_ENABLED;
 
 	cpumask = cpumask_of_node(numa_node_id);
-	first_cpu_of_nuna_node = cpumask_first(cpumask);
-	cpuinfo = &cpu_data(first_cpu_of_nuna_node);
 
 	/* Fill in CU data */
 	sub_type_hdr->flags |= CRAT_CU_FLAGS_CPU_PRESENT;
 	sub_type_hdr->proximity_domain = proximity_domain;
-	sub_type_hdr->processor_id_low = cpuinfo->apicid;
+	sub_type_hdr->processor_id_low = kfd_numa_node_to_apic_id(numa_node_id);
+	if (sub_type_hdr->processor_id_low == -1)
+		return -EINVAL;
+
 	sub_type_hdr->num_cpu_cores = cpumask_weight(cpumask);
 
 	return 0;
@@ -885,6 +886,46 @@ static int kfd_fill_gpu_memory_affinity(int *avail_size,
 	return 0;
 }
 
+/* kfd_fill_gpu_direct_io_link - Fill in direct io link from GPU
+ *	to its NUMA node
+ *
+ *  @avail_size: Available size in the memory
+ *  @kdev - [IN] GPU device
+ *  @sub_type_hdr: Memory into which io link info will be filled in
+ *  @proximity_domain - proximity domain of the GPU node
+ *
+ *  Return 0 if successful else return -ve value
+ */
+static int kfd_fill_gpu_direct_io_link(int *avail_size,
+			struct kfd_dev *kdev,
+			struct crat_subtype_iolink *sub_type_hdr,
+			uint32_t proximity_domain)
+{
+	int proximity_domain_to;
+	*avail_size -= sizeof(struct crat_subtype_iolink);
+	if (*avail_size < 0)
+		return -ENOMEM;
+
+	memset((void *)sub_type_hdr, 0, sizeof(struct crat_subtype_iolink));
+
+	/* Fill in subtype header data */
+	sub_type_hdr->type = CRAT_SUBTYPE_IOLINK_AFFINITY;
+	sub_type_hdr->length = sizeof(struct crat_subtype_iolink);
+	sub_type_hdr->flags |= CRAT_SUBTYPE_FLAGS_ENABLED;
+
+	/* Fill in IOLINK subtype.
+	 * TODO: Fill-in other fields of iolink subtype */
+	sub_type_hdr->io_interface_type = CRAT_IOLINK_TYPE_PCIEXPRESS;
+	sub_type_hdr->proximity_domain_from = proximity_domain;
+	proximity_domain_to =
+		kfd_get_proximity_domain(kdev->pdev->bus);
+	if (proximity_domain_to == -1)
+		return -EINVAL;
+
+	sub_type_hdr->proximity_domain_to = proximity_domain_to;
+	return 0;
+}
+
 /* kfd_create_vcrat_image_gpu - Create Virtual CRAT for CPU
  *
  *	@pcrat_image: Fill in VCRAT for GPU
@@ -1019,12 +1060,22 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 
 	crat_table->length += cache_mem_filled;
 	crat_table->total_entries += num_of_cache_entries;
+	avail_size -= cache_mem_filled;
 
-	/* NOTE: When adding more subtype after this, make sure to adjust the
-	 *	the following variables as shown here
-	 *	avail_size -= cache_mem_filled;
-	 *	sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
-	 *				cache_mem_filled);*/
+	/* Fill in Subtype: IO_LINKS
+	 *  Only direct links are added here which is Link from GPU to
+	 *  to its NUMA node. Indirect links are added by userspace.
+	 */
+	sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
+		cache_mem_filled);
+	ret = kfd_fill_gpu_direct_io_link(&avail_size, kdev,
+		(struct crat_subtype_iolink *)sub_type_hdr, proximity_domain);
+
+	if (ret < 0)
+		return ret;
+
+	crat_table->length += sub_type_hdr->length;
+	crat_table->total_entries++;
 
 	*size = crat_table->length;
 	pr_info("Virtual CRAT table created for GPU\n");

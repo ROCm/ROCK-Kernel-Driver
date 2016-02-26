@@ -1156,3 +1156,54 @@ int kfd_topology_enum_kfd_devices(uint8_t idx, struct kfd_dev **kdev)
 	return -1;
 
 }
+
+static int kfd_cpumask_to_apic_id(const struct cpumask *cpumask)
+{
+	const struct cpuinfo_x86 *cpuinfo;
+	int first_cpu_of_nuna_node;
+
+	if (cpumask == NULL || cpumask == cpu_none_mask)
+		return -1;
+	first_cpu_of_nuna_node = cpumask_first(cpumask);
+	cpuinfo = &cpu_data(first_cpu_of_nuna_node);
+
+	return cpuinfo->apicid;
+}
+
+/* kfd_numa_node_to_apic_id - Returns the APIC ID of the first logical processor
+ *	of the given NUMA node (numa_node_id)
+ * Return -1 on failure
+ */
+int kfd_numa_node_to_apic_id(int numa_node_id)
+{
+	if (numa_node_id == -1) {
+		pr_warn("Invalid NUMA Node. Use online CPU mask\n");
+		return kfd_cpumask_to_apic_id(cpu_online_mask);
+	}
+	return kfd_cpumask_to_apic_id(cpumask_of_node(numa_node_id));
+}
+
+/* kfd_get_proximity_domain - Find proximity_domain (node id) to which
+ *  given PCI bus belongs to. CRAT table contains only the APIC ID
+ *  of the parent NUMA node. So use that as the search parameter.
+ * Return -1 on failure
+ */
+int kfd_get_proximity_domain(const struct pci_bus *bus)
+{
+	struct kfd_topology_device *dev;
+	int proximity_domain = -1;
+
+	down_read(&topology_lock);
+
+	list_for_each_entry(dev, &topology_device_list, list)
+		if (dev->node_props.cpu_cores_count &&
+			dev->node_props.cpu_core_id_base ==
+			kfd_cpumask_to_apic_id(cpumask_of_pcibus(bus))) {
+				proximity_domain = dev->proximity_domain;
+			break;
+		}
+
+	up_read(&topology_lock);
+
+	return proximity_domain;
+}
