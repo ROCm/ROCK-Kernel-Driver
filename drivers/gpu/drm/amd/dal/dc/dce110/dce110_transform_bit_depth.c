@@ -804,7 +804,7 @@ bool dce110_transform_set_pixel_storage_depth(
 		ret = program_bit_depth_reduction(xfm110, color_depth,
 				bit_depth_params);
 
-		set_reg_field_value(value, 1, LB_DATA_FORMAT, ALPHA_EN);
+		set_reg_field_value(value, 0, LB_DATA_FORMAT, ALPHA_EN);
 		dm_write_reg(xfm->ctx, LB_REG(mmLB_DATA_FORMAT), value);
 		if (!(xfm110->lb_pixel_depth_supported & depth)) {
 			/*we should use unsupported capabilities
