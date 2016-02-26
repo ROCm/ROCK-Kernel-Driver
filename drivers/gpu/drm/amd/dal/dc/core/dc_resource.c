@@ -438,13 +438,6 @@ bool resource_attach_surfaces_to_context(
 			if (context->res_ctx.pipe_ctx[j].stream !=
 				DC_STREAM_TO_CORE(dc_target->streams[i]))
 				continue;
-			if (k == surface_count) {
-				/* this means there are more pipes per stream
-				 * than there are planes and makes no sense
-				 */
-				BREAK_TO_DEBUGGER();
-				continue;
-			}
 
 			context->res_ctx.pipe_ctx[j].surface = surface;
 			k++;
