@@ -954,6 +954,8 @@ static bool construct(
 	if (hpd_gpio != NULL) {
 		dal_adapter_service_release_irq(
 			as, hpd_gpio);
+
+		hpd_gpio = NULL;
 	}
 
 	/* TODO: #DAL3 Implement id to str function.*/
@@ -968,14 +970,14 @@ static bool construct(
 	ddc_service_init_data.link = link;
 	link->ddc = dal_ddc_service_create(&ddc_service_init_data);
 
+	if (NULL == link->ddc) {
+		DC_ERROR("Failed to create ddc_service!\n");
+		goto ddc_create_fail;
+	}
+
 	link->public.ddc_hw_inst =
 		dal_ddc_get_line(
 			dal_ddc_service_get_ddc_pin(link->ddc));
-
-	if (NULL == link->ddc) {
-		DC_ERROR("Failed to create ddc_service!\n");
-		goto create_fail;
-	}
 
 	enc_init_data.adapter_service = as;
 	enc_init_data.ctx = dc_ctx;
@@ -991,7 +993,7 @@ static bool construct(
 
 	if( link->link_enc == NULL) {
 		DC_ERROR("Failed to create link encoder!\n");
-		goto create_fail;
+		goto link_enc_create_fail;
 	}
 
 	link->public.link_enc_hw_inst = link->link_enc->transmitter;
@@ -1002,7 +1004,7 @@ static bool construct(
 		if (!dal_adapter_service_get_device_tag(
 				as, link->link_id, i, &link->device_tag)) {
 			DC_ERROR("Failed to find device tag!\n");
-			goto create_fail;
+			goto device_tag_fail;
 		}
 
 		/* Look for device tag that matches connector signal,
@@ -1046,8 +1048,18 @@ static bool construct(
 	program_hpd_filter(link);
 
 	return true;
-
+device_tag_fail:
+	link->ctx->dc->res_pool.funcs->link_enc_destroy(&link->link_enc);
+link_enc_create_fail:
+	dal_ddc_service_destroy(&link->ddc);
+ddc_create_fail:
 create_fail:
+
+	if (hpd_gpio != NULL) {
+		dal_adapter_service_release_irq(
+			as, hpd_gpio);
+	}
+
 	return false;
 }
 
