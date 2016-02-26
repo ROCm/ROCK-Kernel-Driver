@@ -575,17 +575,24 @@ err:
 static int dm_resume(void *handle)
 {
 	struct amdgpu_device *adev = handle;
-	struct drm_device *ddev = adev->ddev;
 	struct amdgpu_display_manager *dm = &adev->dm;
-	struct amdgpu_connector *aconnector;
-	struct drm_connector *connector;
-	int ret = 0;
 
 	/* power on hardware */
 	dc_set_power_state(
 		dm->dc,
 		DC_ACPI_CM_POWER_STATE_D0,
 		DC_VIDEO_POWER_ON);
+
+	return 0;
+}
+
+int amdgpu_dm_display_resume(struct amdgpu_device *adev )
+{
+	struct drm_device *ddev = adev->ddev;
+	struct amdgpu_display_manager *dm = &adev->dm;
+	struct amdgpu_connector *aconnector;
+	struct drm_connector *connector;
+	int ret = 0;
 
 	/* Do detection*/
 	list_for_each_entry(connector,
@@ -610,6 +617,7 @@ static int dm_resume(void *handle)
 
 	return ret;
 }
+
 const struct amd_ip_funcs amdgpu_dm_funcs = {
 	.early_init = dm_early_init,
 	.late_init = NULL,
