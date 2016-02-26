@@ -448,9 +448,6 @@ bool dc_target_set_cursor_attributes(
 			struct input_pixel_processor *ipp =
 						res_ctx->pipe_ctx[j].ipp;
 
-			if (j == DCE110_UNDERLAY_IDX)
-				continue;
-
 			if (res_ctx->pipe_ctx[j].stream !=
 				DC_STREAM_TO_CORE(target->public.streams[i]))
 				continue;
@@ -493,9 +490,6 @@ bool dc_target_set_cursor_position(
 		for (j = 0; j < MAX_PIPES; j++) {
 			struct input_pixel_processor *ipp =
 						res_ctx->pipe_ctx[j].ipp;
-
-			if (j == DCE110_UNDERLAY_IDX)
-				continue;
 
 			if (res_ctx->pipe_ctx[j].stream !=
 				DC_STREAM_TO_CORE(target->public.streams[i]))
