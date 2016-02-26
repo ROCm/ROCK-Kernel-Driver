@@ -1884,6 +1884,14 @@ int amdgpu_resume_kms(struct drm_device *dev, bool resume, bool fbcon)
 				drm_helper_connector_dpms(connector, DRM_MODE_DPMS_ON);
 			}
 			drm_modeset_unlock_all(dev);
+		} else {
+			/*
+			 * There is no equivalent atomic helper to turn on
+			 * display, so we defined our own function for this,
+			 * once suspend resume is supported by the atomic
+			 * framework this will be reworked
+			 */
+			amdgpu_dm_display_resume(adev);
 		}
 	}
 
