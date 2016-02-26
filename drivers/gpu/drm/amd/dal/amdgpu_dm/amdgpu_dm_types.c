@@ -1814,8 +1814,13 @@ int amdgpu_dm_i2c_xfer(struct i2c_adapter *i2c_adap,
 	struct amdgpu_i2c_adapter *i2c = i2c_get_adapdata(i2c_adap);
 	struct i2c_command cmd;
 	int i;
+	int result = -EIO;
 
 	cmd.payloads = kzalloc(num * sizeof(struct i2c_payload), GFP_KERNEL);
+
+	if (!cmd.payloads)
+		return result;
+
 	cmd.number_of_payloads = num;
 	cmd.engine = I2C_COMMAND_ENGINE_DEFAULT;
 	cmd.speed = 100;
@@ -1828,9 +1833,11 @@ int amdgpu_dm_i2c_xfer(struct i2c_adapter *i2c_adap,
 	}
 
 	if (dc_submit_i2c(i2c->dm->dc, i2c->link_index, &cmd))
-		return num;
-	else
-		return -EIO;
+		result = num;
+
+	kfree(cmd.payloads);
+
+	return result;
 }
 
 u32 amdgpu_dm_i2c_func(struct i2c_adapter *adap)

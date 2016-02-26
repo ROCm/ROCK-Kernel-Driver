@@ -515,6 +515,7 @@ bool dm_helpers_submit_i2c(
 	struct i2c_msg *msgs;
 	int i = 0;
 	int num = cmd->number_of_payloads;
+	bool result;
 
 	if (!aconnector) {
 		DRM_ERROR("Failed to found connector for link!");
@@ -523,6 +524,9 @@ bool dm_helpers_submit_i2c(
 
 	msgs = kzalloc(num * sizeof(struct i2c_msg), GFP_KERNEL);
 
+	if (!msgs)
+		return false;
+
 	for (i = 0; i < num; i++) {
 		msgs[i].flags = cmd->payloads[i].write ? I2C_M_RD : 0;
 		msgs[i].addr = cmd->payloads[i].address;
@@ -530,6 +534,10 @@ bool dm_helpers_submit_i2c(
 		msgs[i].buf = cmd->payloads[i].data;
 	}
 
-	return i2c_transfer(&aconnector->i2c->base, msgs, num) == num;
+	result = i2c_transfer(&aconnector->i2c->base, msgs, num) == num;
+
+	kfree(msgs);
+
+	return result;
 }
 
