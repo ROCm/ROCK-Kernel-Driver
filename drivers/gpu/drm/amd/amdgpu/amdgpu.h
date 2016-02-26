@@ -111,7 +111,7 @@ extern int amdgpu_powerplay;
 #define AMDGPU_MAX_USEC_TIMEOUT			100000	/* 100 ms */
 #define AMDGPU_FENCE_JIFFIES_TIMEOUT		(HZ / 2)
 /* AMDGPU_IB_POOL_SIZE must be a power of 2 */
-#define AMDGPU_IB_POOL_SIZE			32
+#define AMDGPU_IB_POOL_SIZE			16
 #define AMDGPU_DEBUGFS_MAX_COMPONENTS		32
 #define AMDGPUFB_CONN_LIMIT			4
 #define AMDGPU_BIOS_NUM_SCRATCH			8
