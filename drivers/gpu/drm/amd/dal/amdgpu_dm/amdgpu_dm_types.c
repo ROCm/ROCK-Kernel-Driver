@@ -622,7 +622,7 @@ static void calculate_stream_scaling_settings(
 }
 
 static void dm_dc_surface_commit(
-		struct core_dc *dc,
+		struct dc *dc,
 		struct drm_crtc *crtc,
 		struct dm_connector_state *dm_state)
 {
@@ -1873,7 +1873,7 @@ int amdgpu_dm_connector_init(
 {
 	int res = 0;
 	int connector_type;
-	struct core_dc *dc = dm->dc;
+	struct dc *dc = dm->dc;
 	const struct dc_link *link = dc_get_link_at_index(dc, link_index);
 	struct amdgpu_i2c_adapter *i2c;
 
@@ -2488,7 +2488,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	struct dc_validation_set set[MAX_TARGET_NUM] = {{ 0 }};
 	struct dc_target *new_targets[MAX_TARGET_NUM] = { 0 };
 	struct amdgpu_device *adev = dev->dev_private;
-	struct core_dc *dc = adev->dm.dc;
+	struct dc *dc = adev->dm.dc;
 	bool need_to_validate = false;
 
 	ret = drm_atomic_helper_check(dev, state);

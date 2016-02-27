@@ -92,7 +92,7 @@ const struct dc_target_status *dc_target_get_status(
 {
 	uint8_t i;
 	struct core_target* target = DC_TARGET_TO_CORE(dc_target);
-    struct core_dc *dc = target->ctx->dc;
+    struct core_dc *dc = DC_TO_CORE(target->ctx->dc);
 
 	for (i = 0; i < dc->current_context.target_count; i++)
 		if (target == dc->current_context.targets[i])
@@ -151,6 +151,7 @@ bool dc_target_set_cursor_attributes(
 {
 	uint8_t i, j;
 	struct core_target *target;
+	struct core_dc *core_dc;
 	struct resource_context *res_ctx;
 
 	if (NULL == dc_target) {
@@ -165,7 +166,8 @@ bool dc_target_set_cursor_attributes(
 	}
 
 	target = DC_TARGET_TO_CORE(dc_target);
-	res_ctx = &target->ctx->dc->current_context.res_ctx;
+	core_dc = DC_TO_CORE(target->ctx->dc);
+	res_ctx = &core_dc->current_context.res_ctx;
 
 	for (i = 0; i < target->public.stream_count; i++) {
 		for (j = 0; j < MAX_PIPES; j++) {
@@ -195,6 +197,7 @@ bool dc_target_set_cursor_position(
 {
 	uint8_t i, j;
 	struct core_target *target;
+	struct core_dc *core_dc;
 	struct resource_context *res_ctx;
 
 	if (NULL == dc_target) {
@@ -208,7 +211,8 @@ bool dc_target_set_cursor_position(
 	}
 
 	target = DC_TARGET_TO_CORE(dc_target);
-	res_ctx = &target->ctx->dc->current_context.res_ctx;
+	core_dc = DC_TO_CORE(target->ctx->dc);
+	res_ctx = &core_dc->current_context.res_ctx;
 
 	for (i = 0; i < target->public.stream_count; i++) {
 		for (j = 0; j < MAX_PIPES; j++) {
@@ -235,8 +239,9 @@ uint32_t dc_target_get_vblank_counter(const struct dc_target *dc_target)
 {
 	uint8_t i, j;
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
+	struct core_dc *core_dc = DC_TO_CORE(target->ctx->dc);
 	struct resource_context *res_ctx =
-		&target->ctx->dc->current_context.res_ctx;
+		&core_dc->current_context.res_ctx;
 
 	for (i = 0; i < target->public.stream_count; i++) {
 		for (j = 0; j < MAX_PIPES; j++) {
@@ -254,17 +259,19 @@ uint32_t dc_target_get_vblank_counter(const struct dc_target *dc_target)
 }
 
 enum dc_irq_source dc_target_get_irq_src(
-	const struct core_dc *dc,
+	const struct dc *dc,
 	const struct dc_target *dc_target,
 	const enum irq_type irq_type)
 {
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+
 	uint8_t i;
 	struct core_target *core_target = DC_TARGET_TO_CORE(dc_target);
 	struct core_stream *stream =
 			DC_STREAM_TO_CORE(core_target->public.streams[0]);
 
 	for (i = 0; i < MAX_PIPES; i++)
-		if (dc->current_context.res_ctx.pipe_ctx[i].stream == stream)
+		if (core_dc->current_context.res_ctx.pipe_ctx[i].stream == stream)
 			return irq_type + i;
 
 	return irq_type;

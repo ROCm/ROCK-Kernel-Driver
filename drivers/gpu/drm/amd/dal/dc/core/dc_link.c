@@ -58,11 +58,13 @@ enum {
  ******************************************************************************/
 static void destruct(struct core_link *link)
 {
+	struct core_dc *core_dc = DC_TO_CORE(link->ctx->dc);
+
 	if (link->ddc)
 		dal_ddc_service_destroy(&link->ddc);
 
 	if(link->link_enc)
-		link->ctx->dc->res_pool.funcs->link_enc_destroy(&link->link_enc);
+		core_dc->res_pool.funcs->link_enc_destroy(&link->link_enc);
 }
 
 /*
@@ -988,7 +990,7 @@ static bool construct(
 	enc_init_data.hpd_source = get_hpd_line(link, as);
 	enc_init_data.transmitter =
 			translate_encoder_to_transmitter(enc_init_data.encoder);
-	link->link_enc = dc_ctx->dc->res_pool.funcs->link_enc_create(
+	link->link_enc = link->dc->res_pool.funcs->link_enc_create(
 								&enc_init_data);
 
 	if( link->link_enc == NULL) {
@@ -1049,7 +1051,7 @@ static bool construct(
 
 	return true;
 device_tag_fail:
-	link->ctx->dc->res_pool.funcs->link_enc_destroy(&link->link_enc);
+	link->dc->res_pool.funcs->link_enc_destroy(&link->link_enc);
 link_enc_create_fail:
 	dal_ddc_service_destroy(&link->ddc);
 ddc_create_fail:
@@ -1621,14 +1623,14 @@ static enum dc_status deallocate_mst_payload(struct pipe_ctx *pipe_ctx)
 
 void core_link_enable_stream(struct pipe_ctx *pipe_ctx)
 {
-    struct core_dc *dc = pipe_ctx->stream->ctx->dc;
+	struct core_dc *core_dc = DC_TO_CORE(pipe_ctx->stream->ctx->dc);
 
 	if (DC_OK != enable_link(pipe_ctx)) {
 			BREAK_TO_DEBUGGER();
 			return;
 	}
 
-	dc->hwss.enable_stream(pipe_ctx);
+	core_dc->hwss.enable_stream(pipe_ctx);
 
 	pipe_ctx->stream->status.link = &pipe_ctx->stream->sink->link->public;
 
@@ -1638,13 +1640,13 @@ void core_link_enable_stream(struct pipe_ctx *pipe_ctx)
 
 void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 {
-	struct core_dc *dc = pipe_ctx->stream->ctx->dc;
+	struct core_dc *core_dc = DC_TO_CORE(pipe_ctx->stream->ctx->dc);
 
 	pipe_ctx->stream->status.link = NULL;
 	if (pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 		deallocate_mst_payload(pipe_ctx);
 
-	dc->hwss.disable_stream(pipe_ctx);
+	core_dc->hwss.disable_stream(pipe_ctx);
 
 	pipe_ctx->stream->status.link = NULL;
 

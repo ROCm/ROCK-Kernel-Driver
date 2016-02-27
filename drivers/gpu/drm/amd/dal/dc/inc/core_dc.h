@@ -11,7 +11,11 @@
 #include "core_types.h"
 #include "hw_sequencer.h"
 
+#define DC_TO_CORE(dc)\
+	container_of(dc, struct core_dc, public)
+
 struct core_dc {
+	struct dc public;
 	struct dc_context *ctx;
 
 	uint8_t link_count;

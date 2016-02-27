@@ -80,7 +80,7 @@ static ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg 
 	struct pci_dev *pdev = to_pci_dev(aux->dev);
 	struct drm_device *drm_dev = pci_get_drvdata(pdev);
 	struct amdgpu_device *adev = drm_dev->dev_private;
-	struct core_dc *dc = adev->dm.dc;
+	struct dc *dc = adev->dm.dc;
 	bool res;
 
 	switch (msg->request) {
