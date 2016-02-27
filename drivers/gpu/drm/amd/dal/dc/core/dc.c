@@ -69,7 +69,10 @@ static void destroy_links(struct core_dc *dc)
 	}
 }
 
-static bool create_links(struct core_dc *dc, const struct dc_init_data *init_params)
+static bool create_links(
+		struct core_dc *dc,
+		struct adapter_service *as,
+		uint32_t num_virtual_links)
 {
 	int i;
 	int connectors_num;
@@ -77,7 +80,7 @@ static bool create_links(struct core_dc *dc, const struct dc_init_data *init_par
 
 	dc->link_count = 0;
 
-	dcb = dal_adapter_service_get_bios_parser(init_params->adapter_srv);
+	dcb = dal_adapter_service_get_bios_parser(as);
 
 	connectors_num = dcb->funcs->get_connectors_number(dcb);
 
@@ -89,7 +92,7 @@ static bool create_links(struct core_dc *dc, const struct dc_init_data *init_par
 		return false;
 	}
 
-	if (connectors_num == 0 && init_params->num_virtual_links == 0) {
+	if (connectors_num == 0 && num_virtual_links == 0) {
 		dm_error("DC: Number of connectors can not be zero!\n");
 		return false;
 	}
@@ -98,14 +101,14 @@ static bool create_links(struct core_dc *dc, const struct dc_init_data *init_par
 		"DC: %s: connectors_num: physical:%d, virtual:%d\n",
 		__func__,
 		connectors_num,
-		init_params->num_virtual_links);
+		num_virtual_links);
 
 	for (i = 0; i < connectors_num; i++) {
 		struct link_init_data link_init_params = {0};
 		struct core_link *link;
 
-		link_init_params.ctx = init_params->ctx;
-		link_init_params.adapter_srv = init_params->adapter_srv;
+		link_init_params.ctx = dc->ctx;
+		link_init_params.adapter_srv = as;
 		link_init_params.connector_index = i;
 		link_init_params.link_index = dc->link_count;
 		link_init_params.dc = dc;
@@ -120,7 +123,7 @@ static bool create_links(struct core_dc *dc, const struct dc_init_data *init_par
 		}
 	}
 
-	for (i = 0; i < init_params->num_virtual_links; i++) {
+	for (i = 0; i < num_virtual_links; i++) {
 		struct core_link *link = dm_alloc(sizeof(*link));
 		struct encoder_init_data enc_init = {0};
 
@@ -129,8 +132,8 @@ static bool create_links(struct core_dc *dc, const struct dc_init_data *init_par
 			goto failed_alloc;
 		}
 
-		link->adapter_srv = init_params->adapter_srv;
-		link->ctx = init_params->ctx;
+		link->adapter_srv = as;
+		link->ctx = dc->ctx;
 		link->dc = dc;
 		link->public.connector_signal = SIGNAL_TYPE_VIRTUAL;
 		link->link_id.type = OBJECT_TYPE_CONNECTOR;
@@ -138,8 +141,8 @@ static bool create_links(struct core_dc *dc, const struct dc_init_data *init_par
 		link->link_id.enum_id = ENUM_ID_1;
 		link->link_enc = dm_alloc(sizeof(*link->link_enc));
 
-		enc_init.adapter_service = init_params->adapter_srv;
-		enc_init.ctx = init_params->ctx;
+		enc_init.adapter_service = as;
+		enc_init.ctx = dc->ctx;
 		enc_init.channel = CHANNEL_ID_UNKNOWN;
 		enc_init.hpd_source = HPD_SOURCEID_UNKNOWN;
 		enc_init.transmitter = TRANSMITTER_UNKNOWN;
@@ -215,18 +218,18 @@ static void init_hw(struct core_dc *dc)
 }
 
 static struct adapter_service *create_as(
-		struct dc_init_data *dc_init_data,
-		const struct dal_init_data *init)
+		const struct dc_init_data *init,
+		struct dc_context *dc_ctx)
 {
 	struct adapter_service *as = NULL;
 	struct as_init_data init_data;
 
 	dm_memset(&init_data, 0, sizeof(init_data));
 
-	init_data.ctx = dc_init_data->ctx;
+	init_data.ctx = dc_ctx;
 
 	/* BIOS parser init data */
-	init_data.bp_init_data.ctx = dc_init_data->ctx;
+	init_data.bp_init_data.ctx = dc_ctx;
 	init_data.bp_init_data.bios = init->asic_id.atombios_base_address;
 
 	/* HW init data */
@@ -239,9 +242,6 @@ static struct adapter_service *create_as(
 	init_data.hw_init_data.runtime_flags = init->asic_id.runtime_flags;
 	init_data.hw_init_data.vram_width = init->asic_id.vram_width;
 	init_data.hw_init_data.vram_type = init->asic_id.vram_type;
-
-	/* bdf is BUS,DEVICE,FUNCTION*/
-	init_data.bdf_info = init->bdf_info;
 
 	init_data.display_param = &init->display_param;
 	init_data.vbios_override = init->vbios_override;
@@ -298,72 +298,63 @@ static void bw_calcs_data_update_from_pplib(struct core_dc *dc)
 		1000);
 }
 
-static bool construct(struct core_dc *dc, const struct dal_init_data *init_params)
+static bool construct(struct core_dc *dc, const struct dc_init_data *init_params)
 {
 	struct dal_logger *logger;
-	/* Tempory code
-	 * TODO: replace dal_init_data with dc_init_data when dal is removed
-	 */
-	struct dc_init_data dc_init_data = {0};
+	struct adapter_service *as;
+	struct dc_context *dc_ctx = dm_alloc(sizeof(*dc_ctx));
 
-	/* Create dc context */
-	/* A temp dc context is used only to allocate the memory for actual
-	 * dc context */
-	struct dc_context ctx = {0};
-	ctx.cgs_device = init_params->cgs_device;
-	ctx.dc = dc;
 
-	dc_init_data.ctx = dm_alloc(sizeof(*dc_init_data.ctx));
-	if (!dc_init_data.ctx) {
+	if (!dc_ctx) {
 		dm_error("%s: failed to create ctx\n", __func__);
 		goto ctx_fail;
 	}
-	dc_init_data.ctx->driver_context = init_params->driver;
-	dc_init_data.ctx->cgs_device = init_params->cgs_device;
-	dc_init_data.num_virtual_links = init_params->num_virtual_links;
-	dc_init_data.ctx->dc = dc;
+
+	dc_ctx->cgs_device = init_params->cgs_device;
+	dc_ctx->driver_context = init_params->driver;
+	dc_ctx->dc = dc;
 
 	/* Create logger */
-	logger = dal_logger_create(dc_init_data.ctx);
+	logger = dal_logger_create(dc_ctx);
 
 	if (!logger) {
 		/* can *not* call logger. call base driver 'print error' */
 		dm_error("%s: failed to create Logger!\n", __func__);
 		goto logger_fail;
 	}
-	dc_init_data.ctx->logger = logger;
+	dc_ctx->logger = logger;
 
 	/* Create adapter service */
-	dc_init_data.adapter_srv = create_as(&dc_init_data, init_params);
+	as = create_as(init_params, dc_ctx);
 
-	if (!dc_init_data.adapter_srv) {
+	if (!as) {
 		dm_error("%s: create_as() failed!\n", __func__);
 		goto as_fail;
 	}
 
 	/* Initialize HW controlled by Adapter Service */
 	if (false == dal_adapter_service_initialize_hw_data(
-			dc_init_data.adapter_srv)) {
+			as)) {
 		dm_error("%s: dal_adapter_service_initialize_hw_data()"\
 				"  failed!\n", __func__);
 		/* Note that AS exist, so have to destroy it.*/
 		goto as_fail;
 	}
 
-	dc->ctx = dc_init_data.ctx;
+	dc->ctx = dc_ctx;
 
 	dc->ctx->dce_environment = dal_adapter_service_get_dce_environment(
-			dc_init_data.adapter_srv);
+			as);
 
 	/* Create hardware sequencer */
-	if (!dc_construct_hw_sequencer(dc_init_data.adapter_srv, dc))
+	if (!dc_construct_hw_sequencer(as, dc))
 		goto hwss_fail;
 
 	if (!dc_construct_resource_pool(
-		dc_init_data.adapter_srv, dc, dc_init_data.num_virtual_links))
+		as, dc, init_params->num_virtual_links))
 		goto construct_resource_fail;
 
-	if (!create_links(dc, &dc_init_data))
+	if (!create_links(dc, as, init_params->num_virtual_links))
 		goto create_links_fail;
 
 	bw_calcs_init(&dc->bw_dceip, &dc->bw_vbios);
@@ -376,10 +367,10 @@ static bool construct(struct core_dc *dc, const struct dal_init_data *init_param
 construct_resource_fail:
 create_links_fail:
 as_fail:
-	dal_logger_destroy(&dc_init_data.ctx->logger);
+	dal_logger_destroy(&dc_ctx->logger);
 logger_fail:
 hwss_fail:
-	dm_free(dc_init_data.ctx);
+	dm_free(dc_ctx);
 ctx_fail:
 	return false;
 }
@@ -463,7 +454,7 @@ static int8_t acquire_first_free_underlay(
  * Public functions
  ******************************************************************************/
 
-struct core_dc *dc_create(const struct dal_init_data *init_params)
+struct core_dc *dc_create(const struct dc_init_data *init_params)
  {
 	struct dc_context ctx = {
 		.driver_context = init_params->driver,

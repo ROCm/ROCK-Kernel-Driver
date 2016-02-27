@@ -49,7 +49,6 @@ struct adapter_service {
 	struct wireless_data wireless_data;
 	struct hw_ctx_adapter_service *hw_ctx;
 	struct integrated_info *integrated_info;
-	struct bdf_info bdf_info;
 	uint32_t platform_methods_mask;
 	uint32_t ac_level_percentage;
 	uint32_t dc_level_percentage;

@@ -318,7 +318,6 @@ struct as_init_data {
 	struct hw_asic_id hw_init_data;
 	struct bp_init_data bp_init_data;
 	struct dc_context *ctx;
-	struct bdf_info bdf_info;
 	const struct dal_override_parameters *display_param;
 	struct dc_bios *vbios_override;
 	enum dce_environment dce_environment;
@@ -579,9 +578,6 @@ bool dal_adapter_service_is_in_accelerated_mode(struct adapter_service *as);
 struct ddc *dal_adapter_service_obtain_ddc_from_i2c_info(
 	struct adapter_service *as,
 	struct graphics_object_i2c_info *info);
-
-struct bdf_info dal_adapter_service_get_adapter_info(
-	struct adapter_service *as);
 
 /* Determine if this ASIC needs to wait on PLL lock bit */
 bool dal_adapter_service_should_psr_skip_wait_for_pll_lock(

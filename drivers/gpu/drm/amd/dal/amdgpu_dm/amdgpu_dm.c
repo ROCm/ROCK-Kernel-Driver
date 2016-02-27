@@ -246,8 +246,7 @@ static void hotplug_notify_work_func(struct work_struct *work)
  */
 int amdgpu_dm_init(struct amdgpu_device *adev)
 {
-	struct dal_init_data init_data;
-	struct drm_device *ddev = adev->ddev;
+	struct dc_init_data init_data;
 	adev->dm.ddev = adev->ddev;
 	adev->dm.adev = adev;
 
@@ -263,14 +262,6 @@ int amdgpu_dm_init(struct amdgpu_device *adev)
 	if(amdgpu_dm_irq_init(adev)) {
 		DRM_ERROR("amdgpu: failed to initialize DM IRQ support.\n");
 		goto error;
-	}
-
-	if (ddev->pdev) {
-		init_data.bdf_info.DEVICE_NUMBER = PCI_SLOT(ddev->pdev->devfn);
-		init_data.bdf_info.FUNCTION_NUMBER =
-			PCI_FUNC(ddev->pdev->devfn);
-		if (ddev->pdev->bus)
-			init_data.bdf_info.BUS_NUMBER = ddev->pdev->bus->number;
 	}
 
 	init_data.display_param = display_param;

@@ -120,14 +120,6 @@ struct hw_asic_id {
 	void *atombios_base_address;
 };
 
-/* this is pci information. BDF stands for BUS,DEVICE,FUNCTION*/
-
-struct bdf_info {
-	uint16_t BUS_NUMBER:8;
-	uint16_t DEVICE_NUMBER:5;
-	uint16_t FUNCTION_NUMBER:3;
-};
-
 /* array index for integer override parameters*/
 enum int_param_array_index {
 	DAL_PARAM_MAX_COFUNC_NON_DP_DISPLAYS = 0,
@@ -532,13 +524,6 @@ enum dc_acpi_cm_power_state {
 	DC_ACPI_CM_POWER_STATE_D1 = 2,
 	DC_ACPI_CM_POWER_STATE_D2 = 4,
 	DC_ACPI_CM_POWER_STATE_D3 = 8
-};
-
-struct view_port_alignment {
-	uint8_t x_width_size_alignment;
-	uint8_t y_height_size_alignment;
-	uint8_t x_start_alignment;
-	uint8_t y_start_alignment;
 };
 
 enum dc_connection_type {
