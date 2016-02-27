@@ -398,6 +398,72 @@ static void destruct(struct dc *dc)
 	dm_free(dc->ctx, dc->ctx);
 }
 
+/*
+void ProgramPixelDurationV(unsigned int pixelClockInKHz )
+{
+	fixed31_32 pixel_duration = Fixed31_32(100000000, pixelClockInKHz) * 10;
+	unsigned int pixDurationInPico = round(pixel_duration);
+
+	DPG_PIPE_ARBITRATION_CONTROL1 arb_control;
+
+	arb_control.u32All = ReadReg (mmDPGV0_PIPE_ARBITRATION_CONTROL1);
+	arb_control.bits.PIXEL_DURATION = pixDurationInPico;
+	WriteReg (mmDPGV0_PIPE_ARBITRATION_CONTROL1, arb_control.u32All);
+
+	arb_control.u32All = ReadReg (mmDPGV1_PIPE_ARBITRATION_CONTROL1);
+	arb_control.bits.PIXEL_DURATION = pixDurationInPico;
+	WriteReg (mmDPGV1_PIPE_ARBITRATION_CONTROL1, arb_control.u32All);
+
+	WriteReg (mmDPGV0_PIPE_ARBITRATION_CONTROL2, 0x4000800);
+	WriteReg (mmDPGV0_REPEATER_PROGRAM, 0x11);
+
+	WriteReg (mmDPGV1_PIPE_ARBITRATION_CONTROL2, 0x4000800);
+	WriteReg (mmDPGV1_REPEATER_PROGRAM, 0x11);
+}
+*/
+static int8_t acquire_first_free_underlay(
+		struct resource_context *res_ctx,
+		struct core_stream *stream)
+{
+	if (!res_ctx->pipe_ctx[DCE110_UNDERLAY_IDX].stream) {
+		struct dc_bios *dcb;
+		struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[DCE110_UNDERLAY_IDX];
+
+		pipe_ctx->tg = res_ctx->pool.timing_generators[DCE110_UNDERLAY_IDX];
+		pipe_ctx->mi = res_ctx->pool.mis[DCE110_UNDERLAY_IDX];
+		/*pipe_ctx->ipp = res_ctx->pool.ipps[DCE110_UNDERLAY_IDX];*/
+		pipe_ctx->xfm = res_ctx->pool.transforms[DCE110_UNDERLAY_IDX];
+		pipe_ctx->opp = res_ctx->pool.opps[DCE110_UNDERLAY_IDX];
+		pipe_ctx->dis_clk = res_ctx->pool.display_clock;
+		pipe_ctx->pipe_idx = DCE110_UNDERLAY_IDX;
+
+		dcb = dal_adapter_service_get_bios_parser(
+						res_ctx->pool.adapter_srv);
+
+		stream->ctx->dc->hwss.enable_display_power_gating(
+			stream->ctx->dc->ctx,
+			DCE110_UNDERLAY_IDX,
+			dcb, PIPE_GATING_CONTROL_DISABLE);
+
+		if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
+			dm_error("DC: failed to blank crtc!\n");
+			BREAK_TO_DEBUGGER();
+		}
+
+		if (!pipe_ctx->tg->funcs->enable_crtc(pipe_ctx->tg)) {
+			BREAK_TO_DEBUGGER();
+		}
+
+		pipe_ctx->tg->funcs->set_blank_color(
+				pipe_ctx->tg,
+				COLOR_SPACE_YCBCR601);/* TODO unhardcode*/
+
+		pipe_ctx->stream = stream;
+		return DCE110_UNDERLAY_IDX;
+	}
+	return -1;
+}
+
 /*******************************************************************************
  * Public functions
  ******************************************************************************/
@@ -523,6 +589,52 @@ static bool targets_changed(
 	return false;
 }
 
+static void target_enable_memory_requests(struct dc_target *dc_target)
+{
+	uint8_t i, j;
+	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
+	struct resource_context *res_ctx =
+		&target->ctx->dc->current_context.res_ctx;
+
+	for (i = 0; i < target->public.stream_count; i++) {
+		for (j = 0; j < MAX_PIPES; j++) {
+			struct timing_generator *tg = res_ctx->pipe_ctx[j].tg;
+
+			if (res_ctx->pipe_ctx[j].stream !=
+				DC_STREAM_TO_CORE(target->public.streams[i]))
+				continue;
+
+			if (!tg->funcs->set_blank(tg, false)) {
+				dm_error("DC: failed to unblank crtc!\n");
+				BREAK_TO_DEBUGGER();
+			}
+		}
+	}
+}
+
+static void target_disable_memory_requests(struct dc_target *dc_target)
+{
+	uint8_t i, j;
+	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
+	struct resource_context *res_ctx =
+		&target->ctx->dc->current_context.res_ctx;
+
+	for (i = 0; i < target->public.stream_count; i++) {
+		for (j = 0; j < MAX_PIPES; j++) {
+			struct timing_generator *tg = res_ctx->pipe_ctx[j].tg;
+
+			if (res_ctx->pipe_ctx[j].stream !=
+				DC_STREAM_TO_CORE(target->public.streams[i]))
+				continue;
+
+			if (!tg->funcs->set_blank(tg, true)) {
+				dm_error("DC: failed to blank crtc!\n");
+				BREAK_TO_DEBUGGER();
+			}
+		}
+	}
+}
+
 bool dc_commit_targets(
 	struct dc *dc,
 	struct dc_target *targets[],
@@ -576,7 +688,7 @@ bool dc_commit_targets(
 
 	for (i = 0; i < dc->current_context.target_count; i++) {
 		/*TODO: optimize this to happen only when necessary*/
-		dc_target_disable_memory_requests(
+		target_disable_memory_requests(
 				&dc->current_context.targets[i]->public);
 	}
 
@@ -590,7 +702,7 @@ bool dc_commit_targets(
 	for (i = 0; i < context->target_count; i++) {
 		struct dc_target *dc_target = &context->targets[i]->public;
 		if (context->target_status[i].surface_count > 0)
-			dc_target_enable_memory_requests(dc_target);
+			target_enable_memory_requests(dc_target);
 	}
 
 	program_timing_sync(dc->ctx, context);
@@ -606,6 +718,163 @@ fail:
 
 context_alloc_fail:
 	return (result == DC_OK);
+}
+
+bool dc_commit_surfaces_to_target(
+		struct dc *dc,
+		struct dc_surface *new_surfaces[],
+		uint8_t new_surface_count,
+		struct dc_target *dc_target)
+
+{
+	int i, j;
+	uint32_t prev_disp_clk = dc->current_context.bw_results.dispclk_khz;
+	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
+	struct dc_target_status *target_status = NULL;
+	struct validate_context *context;
+	int current_enabled_surface_count = 0;
+	int new_enabled_surface_count = 0;
+	bool is_mpo_turning_on = false;
+
+	context = dm_alloc(dc->ctx, sizeof(struct validate_context));
+
+	val_ctx_copy_construct(&dc->current_context, context);
+
+	/* Cannot commit surface to a target that is not commited */
+	for (i = 0; i < context->target_count; i++)
+		if (target == context->targets[i])
+			break;
+
+	target_status = &context->target_status[i];
+
+	if (!dal_adapter_service_is_in_accelerated_mode(
+						dc->res_pool.adapter_srv)
+		|| i == context->target_count) {
+		BREAK_TO_DEBUGGER();
+		goto unexpected_fail;
+	}
+
+	for (i = 0; i < target_status->surface_count; i++)
+		if (target_status->surfaces[i]->visible)
+			current_enabled_surface_count++;
+
+	for (i = 0; i < new_surface_count; i++)
+		if (new_surfaces[i]->visible)
+			new_enabled_surface_count++;
+
+	/* TODO unhack mpo */
+	if (new_surface_count == 2 && target_status->surface_count < 2) {
+		acquire_first_free_underlay(&context->res_ctx,
+				DC_STREAM_TO_CORE(dc_target->streams[0]));
+		is_mpo_turning_on = true;
+	} else if (new_surface_count < 2 && target_status->surface_count == 2) {
+		context->res_ctx.pipe_ctx[DCE110_UNDERLAY_IDX].stream = NULL;
+		context->res_ctx.pipe_ctx[DCE110_UNDERLAY_IDX].surface = NULL;
+	}
+
+	dal_logger_write(dc->ctx->logger,
+				LOG_MAJOR_INTERFACE_TRACE,
+				LOG_MINOR_COMPONENT_DC,
+				"%s: commit %d surfaces to target 0x%x\n",
+				__func__,
+				new_surface_count,
+				dc_target);
+
+
+	if (!attach_surfaces_to_context(
+			new_surfaces, new_surface_count, dc_target, context)) {
+		BREAK_TO_DEBUGGER();
+		goto unexpected_fail;
+	}
+
+	for (i = 0; i < new_surface_count; i++)
+		for (j = 0; j < MAX_PIPES; j++) {
+			if (context->res_ctx.pipe_ctx[j].surface !=
+					DC_SURFACE_TO_CORE(new_surfaces[i]))
+				continue;
+
+			build_scaling_params(
+				new_surfaces[i], &context->res_ctx.pipe_ctx[j]);
+		}
+
+	if (dc->res_pool.funcs->validate_bandwidth(dc, context) != DC_OK) {
+		BREAK_TO_DEBUGGER();
+		goto unexpected_fail;
+	}
+
+	if (prev_disp_clk < context->bw_results.dispclk_khz ||
+		(is_mpo_turning_on &&
+			prev_disp_clk == context->bw_results.dispclk_khz)) {
+		dc->hwss.program_bw(dc, context);
+		pplib_apply_display_requirements(dc, context,
+						&context->pp_display_cfg);
+	}
+
+	if (current_enabled_surface_count > 0 && new_enabled_surface_count == 0)
+		target_disable_memory_requests(dc_target);
+
+	for (i = 0; i < new_surface_count; i++)
+		for (j = 0; j < MAX_PIPES; j++) {
+			struct dc_surface *dc_surface = new_surfaces[i];
+			struct core_surface *surface =
+						DC_SURFACE_TO_CORE(dc_surface);
+			struct pipe_ctx *pipe_ctx =
+						&context->res_ctx.pipe_ctx[j];
+			struct core_gamma *gamma = NULL;
+
+			if (pipe_ctx->surface !=
+					DC_SURFACE_TO_CORE(new_surfaces[i]))
+				continue;
+
+			dal_logger_write(dc->ctx->logger,
+						LOG_MAJOR_INTERFACE_TRACE,
+						LOG_MINOR_COMPONENT_DC,
+						"Pipe:%d 0x%x: src: %d, %d, %d,"
+						" %d; dst: %d, %d, %d, %d;\n",
+						pipe_ctx->pipe_idx,
+						dc_surface,
+						dc_surface->src_rect.x,
+						dc_surface->src_rect.y,
+						dc_surface->src_rect.width,
+						dc_surface->src_rect.height,
+						dc_surface->dst_rect.x,
+						dc_surface->dst_rect.y,
+						dc_surface->dst_rect.width,
+						dc_surface->dst_rect.height);
+
+			if (surface->public.gamma_correction)
+				gamma = DC_GAMMA_TO_CORE(
+					surface->public.gamma_correction);
+
+			dc->hwss.set_gamma_correction(
+					pipe_ctx->ipp,
+					pipe_ctx->opp,
+					gamma, surface);
+
+			dc->hwss.set_plane_config(
+				dc, pipe_ctx, &context->res_ctx);
+		}
+
+	dc->hwss.update_plane_addrs(dc, &context->res_ctx);
+
+	/* Lower display clock if necessary */
+	if (prev_disp_clk > context->bw_results.dispclk_khz) {
+		dc->hwss.program_bw(dc, context);
+		pplib_apply_display_requirements(dc, context,
+						&context->pp_display_cfg);
+	}
+
+	val_ctx_destruct(&dc->current_context);
+	dc->current_context = *context;
+	dm_free(dc->ctx, context);
+	return true;
+
+unexpected_fail:
+
+	val_ctx_destruct(context);
+
+	dm_free(dc->ctx, context);
+	return false;
 }
 
 uint8_t dc_get_current_target_count(const struct dc *dc)

@@ -235,9 +235,6 @@ enum dc_irq_source dc_target_get_irq_src(
 	const struct dc_target *dc_target,
 	const enum irq_type irq_type);
 
-void dc_target_enable_memory_requests(struct dc_target *target);
-void dc_target_disable_memory_requests(struct dc_target *target);
-
 /*
  * Structure to store surface/target associations for validation
  */
