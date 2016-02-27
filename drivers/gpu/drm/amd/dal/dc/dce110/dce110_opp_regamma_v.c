@@ -78,7 +78,7 @@ static void power_on_lut(struct output_pixel_processor *opp,
 					COL_MAN_GAMMA_CORR_MEM_PWR_DIS))
 			break;
 
-		dm_delay_in_microseconds(opp->ctx, 2);
+		udelay(2);
 	}
 }
 

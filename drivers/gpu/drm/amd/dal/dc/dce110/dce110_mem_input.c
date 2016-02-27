@@ -744,7 +744,7 @@ void dce110_allocate_mem_input(
 		if (field)
 			break;
 
-		dm_delay_in_microseconds(mi->ctx, retry_delay);
+		udelay(retry_delay);
 		retry_count--;
 
 	} while (retry_count > 0);
@@ -815,7 +815,7 @@ static void deallocate_dmif_buffer_helper(
 
 	do {
 		value = dm_read_reg(ctx, mmPIPE0_DMIF_BUFFER_CONTROL + offset);
-		dm_delay_in_microseconds(ctx, 10);
+		udelay(10);
 		count--;
 	} while (count > 0 &&
 		!get_reg_field_value(

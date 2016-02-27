@@ -79,7 +79,7 @@ static void wait_for_training_aux_rd_interval(
 				training_rd_interval.bits.TRAINIG_AUX_RD_INTERVAL * 4000;
 	}
 
-	dm_delay_in_microseconds(link->ctx, default_wait_in_micro_secs);
+	udelay(default_wait_in_micro_secs);
 
 	dal_logger_write(link->ctx->logger,
 		LOG_MAJOR_HW_TRACE,

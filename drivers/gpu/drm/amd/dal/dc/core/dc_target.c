@@ -124,7 +124,6 @@ struct dc_target *dc_create_target_for_streams(
 
 	return &target->protected.public;
 
-
 target_alloc_fail:
 	return NULL;
 }

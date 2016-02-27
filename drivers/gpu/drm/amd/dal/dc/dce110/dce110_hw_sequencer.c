@@ -323,7 +323,7 @@ static bool dce110_pipe_control_lock(
 				break;
 
 			counter++;
-			dm_delay_in_microseconds(ctx, delay_us);
+			udelay(delay_us);
 		}
 
 		if (counter == counter_limit) {

@@ -137,7 +137,7 @@ static bool acquire_engine(
 
 			/*poll HW to make sure reset it done*/
 			do {
-				dm_delay_in_microseconds(engine->base.ctx, 1);
+				udelay(1);
 
 				value = dm_read_reg(engine->base.ctx, addr);
 
@@ -161,7 +161,7 @@ static bool acquire_engine(
 			counter = 0;
 
 			do {
-				dm_delay_in_microseconds(engine->base.ctx, 1);
+				udelay(1);
 
 				value = dm_read_reg(engine->base.ctx, addr);
 
@@ -640,7 +640,7 @@ static enum aux_channel_operation_result get_channel_status(
 			if (aux_sw_done)
 				break;
 
-			dm_delay_in_microseconds(engine->base.ctx, 10);
+			udelay(10);
 
 			time_elapsed += 10;
 		} while (time_elapsed < aux_engine->timeout_period);

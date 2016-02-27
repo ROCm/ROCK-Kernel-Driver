@@ -329,7 +329,7 @@ static void wait_for_fbc_state_changed(
 			FBC_STATUS,
 			FBC_ENABLE_STATUS) == enabled)
 			break;
-		dm_delay_in_microseconds(cp80->base.ctx, 10);
+		udelay(10);
 		counter++;
 	}
 

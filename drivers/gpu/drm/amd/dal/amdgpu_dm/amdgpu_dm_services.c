@@ -48,11 +48,6 @@ void dm_sleep_in_milliseconds(struct dc_context *ctx, uint32_t milliseconds)
 		usleep_range(milliseconds*1000, milliseconds*1000+1);
 }
 
-void dm_delay_in_microseconds(struct dc_context *ctx, uint32_t microseconds)
-{
-	udelay(microseconds);
-}
-
 /******************************************************************************
  * IRQ Interfaces.
  *****************************************************************************/

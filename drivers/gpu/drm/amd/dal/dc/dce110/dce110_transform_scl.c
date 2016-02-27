@@ -244,7 +244,7 @@ static void program_filter(
 			DCFE_MEM_PWR_STATUS,
 			SCL_COEFF_MEM_PWR_STATE);
 		i++)
-		dm_delay_in_microseconds(xfm110->base.ctx, 1);
+		udelay(1);
 
 	ASSERT(i < 10);
 

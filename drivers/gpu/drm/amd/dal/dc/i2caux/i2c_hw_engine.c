@@ -220,7 +220,7 @@ enum i2c_channel_operation_result dal_i2c_hw_engine_wait_on_operation_result(
 		if (result != expected_result)
 			break;
 
-		dm_delay_in_microseconds(engine->base.base.ctx, 1);
+		udelay(1);
 
 		++i;
 	} while (i < timeout);
