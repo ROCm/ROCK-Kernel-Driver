@@ -396,17 +396,6 @@ case FEATURE_ ## feature: \
 	} \
 	break
 
-#define check_int_feature(feature) \
-case FEATURE_ ## feature: \
-	if (param->int_param_values[DAL_PARAM_ ## feature] != \
-		DAL_PARAM_INVALID_INT) { \
-		*data = param->int_param_values[DAL_PARAM_ ## feature];\
-		ret = true;\
-		bool_feature = false;\
-		feature_name = "FEATURE_" #feature;\
-	} \
-	break
-
 /*
  * override_default_parameters
  *
@@ -429,8 +418,6 @@ static bool override_default_parameters(
 	}
 
 	switch (feature_entry_table[idx].feature_id) {
-	check_int_feature(MAX_COFUNC_NON_DP_DISPLAYS);
-	check_int_feature(DRR_SUPPORT);
 	check_bool_feature(LIGHT_SLEEP);
 	check_bool_feature(MAXIMIZE_STUTTER_MARKS);
 	check_bool_feature(MAXIMIZE_URGENCY_WATERMARKS);
