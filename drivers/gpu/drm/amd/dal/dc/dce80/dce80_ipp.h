@@ -26,7 +26,7 @@
 #ifndef __DC_IPP_DCE80_H__
 #define __DC_IPP_DCE80_H__
 
-#include "inc/ipp.h"
+#include "ipp.h"
 
 #define TO_DCE80_IPP(input_pixel_processor)\
 		container_of(input_pixel_processor, struct dce110_ipp, base)

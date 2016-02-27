@@ -26,7 +26,7 @@
 #ifndef __DC_IPP_DCE110_H__
 #define __DC_IPP_DCE110_H__
 
-#include "inc/ipp.h"
+#include "ipp.h"
 
 
 struct gamma_parameters;

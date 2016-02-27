@@ -25,7 +25,7 @@
 #ifndef __DAL_TRANSFORM_DCE80_H__
 #define __DAL_TRANSFORM_DCE80_H__
 
-#include "inc/transform.h"
+#include "transform.h"
 
 #define TO_DCE80_TRANSFORM(transform)\
 	container_of(transform, struct dce80_transform, base)

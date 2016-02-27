@@ -25,7 +25,7 @@
 #ifndef __DC_MEM_INPUT_V_DCE110_H__
 #define __DC_MEM_INPUT_V_DCE110_H__
 
-#include "inc/mem_input.h"
+#include "mem_input.h"
 #include "dce110_mem_input.h"
 
 bool dce110_mem_input_v_construct(

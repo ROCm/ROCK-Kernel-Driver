@@ -10,6 +10,7 @@ subdir-ccflags-y += -Werror
 subdir-ccflags-y += -I$(AMDDALPATH)/ -I$(AMDDALPATH)/include
 
 subdir-ccflags-y += -I$(FULL_AMD_DAL_PATH)/dc/inc/
+subdir-ccflags-y += -I$(FULL_AMD_DAL_PATH)/dc/inc/hw
 
 #TODO: remove when Timing Sync feature is complete
 subdir-ccflags-y += -DBUILD_FEATURE_TIMING_SYNC=0

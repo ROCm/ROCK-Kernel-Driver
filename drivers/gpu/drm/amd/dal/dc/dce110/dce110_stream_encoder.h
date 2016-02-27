@@ -26,7 +26,7 @@
 #ifndef __DC_STREAM_ENCODER_DCE110_H__
 #define __DC_STREAM_ENCODER_DCE110_H__
 
-#include "inc/stream_encoder.h"
+#include "stream_encoder.h"
 
 #define DCE110STRENC_FROM_STRENC(stream_encoder)\
 	container_of(stream_encoder, struct dce110_stream_encoder, base)

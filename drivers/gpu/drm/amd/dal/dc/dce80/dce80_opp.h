@@ -26,7 +26,7 @@
 #define __DC_OPP_DCE80_H__
 
 #include "dc_types.h"
-#include "inc/opp.h"
+#include "opp.h"
 #include "gamma_types.h"
 
 struct gamma_parameters;

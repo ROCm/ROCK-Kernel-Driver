@@ -29,7 +29,7 @@
 
 /* DC core (private) */
 #include "core_dc.h"
-#include "inc/transform.h"
+#include "transform.h"
 
 /*******************************************************************************
  * Private structures

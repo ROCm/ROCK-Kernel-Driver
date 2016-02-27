@@ -26,7 +26,7 @@
 #ifndef __DC_VIRTUAL_STREAM_ENCODER_H__
 #define __DC_VIRTUAL_STREAM_ENCODER_H__
 
-#include "inc/stream_encoder.h"
+#include "stream_encoder.h"
 
 struct stream_encoder *virtual_stream_encoder_create(
 	struct dc_context *ctx, struct dc_bios *bp);

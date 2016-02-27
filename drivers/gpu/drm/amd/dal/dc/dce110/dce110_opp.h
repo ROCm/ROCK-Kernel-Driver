@@ -26,7 +26,7 @@
 #define __DC_OPP_DCE110_H__
 
 #include "dc_types.h"
-#include "inc/opp.h"
+#include "opp.h"
 #include "core_types.h"
 
 #include "gamma_types.h" /* decprecated */
