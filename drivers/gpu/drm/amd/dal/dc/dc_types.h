@@ -33,7 +33,7 @@
 #include "signal_types.h"
 
 /* forward declarations */
-struct dc;
+struct core_dc;
 struct dc_surface;
 struct dc_target;
 struct dc_stream;
@@ -69,7 +69,7 @@ enum dce_environment {
 /********************************/
 
 struct dc_context {
-	struct dc *dc;
+	struct core_dc *dc;
 
 #if defined(BUILD_DAL_TEST)
 	struct test_driver_context *driver_context;

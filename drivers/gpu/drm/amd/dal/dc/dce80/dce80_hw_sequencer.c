@@ -293,7 +293,7 @@ static bool dce80_enable_display_power_gating(
 		return false;
 }
 
-bool dce80_hw_sequencer_construct(struct dc *dc)
+bool dce80_hw_sequencer_construct(struct core_dc *dc)
 {
 	dce110_hw_sequencer_construct(dc);
 

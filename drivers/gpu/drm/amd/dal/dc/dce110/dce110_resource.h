@@ -29,13 +29,13 @@
 #include "core_types.h"
 
 struct adapter_service;
-struct dc;
+struct core_dc;
 struct resource_pool;
 
 bool dce110_construct_resource_pool(
 	struct adapter_service *adapter_serv,
 	uint8_t num_virtual_links,
-	struct dc *dc,
+	struct core_dc *dc,
 	struct resource_pool *pool);
 
 void dce110_destruct_resource_pool(struct resource_pool *pool);

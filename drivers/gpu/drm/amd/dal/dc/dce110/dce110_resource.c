@@ -686,7 +686,7 @@ static bool is_surface_pixel_format_supported(struct pipe_ctx *pipe_ctx)
 }
 
 static enum dc_status validate_mapped_resource(
-		const struct dc *dc,
+		const struct core_dc *dc,
 		struct validate_context *context)
 {
 	enum dc_status status = DC_OK;
@@ -746,7 +746,7 @@ static enum dc_status validate_mapped_resource(
 }
 
 enum dc_status dce110_validate_bandwidth(
-	const struct dc *dc,
+	const struct core_dc *dc,
 	struct validate_context *context)
 {
 	uint8_t i;
@@ -937,7 +937,7 @@ static void set_target_unchanged(
 }
 
 static enum dc_status map_clock_resources(
-		const struct dc *dc,
+		const struct core_dc *dc,
 		struct validate_context *context)
 {
 	uint8_t i, j, k;
@@ -989,7 +989,7 @@ static enum dc_status map_clock_resources(
 }
 
 enum dc_status dce110_validate_with_context(
-		const struct dc *dc,
+		const struct core_dc *dc,
 		const struct dc_validation_set set[],
 		uint8_t set_count,
 		struct validate_context *context)
@@ -1083,7 +1083,7 @@ static void underlay_create(struct dc_context *ctx, struct resource_pool *pool)
 bool dce110_construct_resource_pool(
 	struct adapter_service *as,
 	uint8_t num_virtual_links,
-	struct dc *dc,
+	struct core_dc *dc,
 	struct resource_pool *pool)
 {
 	unsigned int i;

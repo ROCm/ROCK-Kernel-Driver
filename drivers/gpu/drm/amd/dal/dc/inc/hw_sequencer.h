@@ -39,17 +39,17 @@ enum pipe_gating_control {
 struct hw_sequencer_funcs {
 
 	enum dc_status (*apply_ctx_to_hw)(
-			struct dc *dc, struct validate_context *context);
+			struct core_dc *dc, struct validate_context *context);
 
-	void (*reset_hw_ctx)(struct dc *dc, struct validate_context *context);
+	void (*reset_hw_ctx)(struct core_dc *dc, struct validate_context *context);
 
 	void (*set_plane_config)(
-			const struct dc *dc,
+			const struct core_dc *dc,
 			struct pipe_ctx *pipe_ctx,
 			struct resource_context *res_ctx);
 
 	void (*update_plane_addrs)(
-		struct dc *dc,
+		struct core_dc *dc,
 		struct resource_context *res_ctx);
 
 	bool (*set_gamma_correction)(
@@ -58,9 +58,9 @@ struct hw_sequencer_funcs {
 				const struct core_gamma *ramp,
 				const struct core_surface *surface);
 
-	void (*power_down)(struct dc *dc);
+	void (*power_down)(struct core_dc *dc);
 
-	void (*enable_accelerated_mode)(struct dc *dc);
+	void (*enable_accelerated_mode)(struct core_dc *dc);
 
 	void (*enable_timing_synchronization)(
 					struct dc_context *dc_ctx,
@@ -87,7 +87,7 @@ struct hw_sequencer_funcs {
 					struct dc_bios *dcb,
 					enum pipe_gating_control power_gating);
 
-	void (*program_bw)(struct dc *dc, struct validate_context *context);
+	void (*program_bw)(struct core_dc *dc, struct validate_context *context);
 
 	void (*enable_stream)(struct pipe_ctx *pipe_ctx);
 
@@ -108,7 +108,7 @@ struct hw_sequencer_funcs {
 				uint32_t mode);
 
 	void (*set_displaymarks)(
-				const struct dc *dc,
+				const struct core_dc *dc,
 				struct validate_context *context);
 
 	void (*set_display_clock)(struct validate_context *context);
@@ -116,7 +116,7 @@ struct hw_sequencer_funcs {
 
 bool dc_construct_hw_sequencer(
 				struct adapter_service *adapter_serv,
-				struct dc *dc);
+				struct core_dc *dc);
 
 
 #endif /* __DC_HW_SEQUENCER_H__ */
