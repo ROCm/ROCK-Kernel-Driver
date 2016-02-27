@@ -58,8 +58,6 @@
 struct dal_override_parameters display_param = {
 	.bool_param_enable_mask = 0,
 	.bool_param_values = 0,
-	.int_param_values[DAL_PARAM_MAX_COFUNC_NON_DP_DISPLAYS] = DAL_PARAM_INVALID_INT,
-	.int_param_values[DAL_PARAM_DRR_SUPPORT] = DAL_PARAM_INVALID_INT,
 };
 
 /* Debug facilities */

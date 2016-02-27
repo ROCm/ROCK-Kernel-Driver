@@ -41,6 +41,10 @@ struct dc_link;
 struct dc_sink;
 struct dal;
 
+#if defined(BUILD_DAL_TEST)
+struct test_driver_context;
+#endif /* BUILD_DAL_TEST */
+
 /********************************
  * Environment definitions
  ********************************/
@@ -63,6 +67,109 @@ enum dce_environment {
 	(IS_FPGA_MAXIMUS_DC(dce_environment) || (dce_environment == DCE_ENV_DIAG))
 
 /********************************/
+
+struct dc_context {
+	struct dc *dc;
+
+#if defined(BUILD_DAL_TEST)
+	struct test_driver_context *driver_context;
+#else
+	void *driver_context; /* e.g. amdgpu_device */
+#endif
+
+	struct dal_logger *logger;
+	void *cgs_device;
+
+	enum dce_environment dce_environment;
+};
+
+/*
+ * ASIC Runtime Flags
+ */
+struct dal_asic_runtime_flags {
+	union {
+		uint32_t raw;
+		struct {
+			uint32_t EMULATE_REPLUG_ON_CAP_CHANGE:1;
+			uint32_t SUPPORT_XRBIAS:1;
+			uint32_t SKIP_POWER_DOWN_ON_RESUME:1;
+			uint32_t FULL_DETECT_ON_RESUME:1;
+			uint32_t GSL_FRAMELOCK:1;
+			uint32_t NO_LOW_BPP_MODES:1;
+			uint32_t BLOCK_ON_INITIAL_DETECTION:1;
+			uint32_t OPTIMIZED_DISPLAY_PROGRAMMING_ON_BOOT:1;
+			uint32_t DRIVER_CONTROLLED_BRIGHTNESS:1;
+			uint32_t MODIFIABLE_FRAME_DURATION:1;
+			uint32_t MIRACAST_SUPPORTED:1;
+			uint32_t CONNECTED_STANDBY_SUPPORTED:1;
+			uint32_t GNB_WAKEUP_SUPPORTED:1;
+		} bits;
+	} flags;
+};
+
+struct hw_asic_id {
+	uint32_t chip_id;
+	uint32_t chip_family;
+	uint32_t pci_revision_id;
+	uint32_t hw_internal_rev;
+	uint32_t vram_type;
+	uint32_t vram_width;
+	uint32_t feature_flags;
+	struct dal_asic_runtime_flags runtime_flags;
+	uint32_t fake_paths_num;
+	void *atombios_base_address;
+};
+
+/* this is pci information. BDF stands for BUS,DEVICE,FUNCTION*/
+
+struct bdf_info {
+	uint16_t BUS_NUMBER:8;
+	uint16_t DEVICE_NUMBER:5;
+	uint16_t FUNCTION_NUMBER:3;
+};
+
+/* array index for integer override parameters*/
+enum int_param_array_index {
+	DAL_PARAM_MAX_COFUNC_NON_DP_DISPLAYS = 0,
+	DAL_PARAM_DRR_SUPPORT,
+	DAL_INT_PARAM_MAX
+};
+
+struct dal_override_parameters {
+	uint32_t bool_param_enable_mask;
+	uint32_t bool_param_values;
+};
+
+/*
+ * shift values for bool override parameter mask
+ * bmask is for this struct,if we touch this feature
+ * bval indicates every bit fields for this struct too,1 is enable this feature
+ * amdgpu.disp_bval=1594, amdgpu.disp_bmask=1594 ,
+ * finally will show log like this:
+ * Overridden FEATURE_LIGHT_SLEEP is enabled now
+ * Overridden FEATURE_USE_MAX_DISPLAY_CLK is enabled now
+ * Overridden FEATURE_ENABLE_DFS_BYPASS is enabled now
+ * Overridden FEATURE_POWER_GATING_PIPE_IN_TILE is enabled now
+ * Overridden FEATURE_USE_PPLIB is enabled now
+ * Overridden FEATURE_DISABLE_LPT_SUPPORT is enabled now
+ * Overridden FEATURE_DUMMY_FBC_BACKEND is enabled now
+ * */
+enum bool_param_shift {
+	DAL_PARAM_MAXIMIZE_STUTTER_MARKS = 0,
+	DAL_PARAM_LIGHT_SLEEP,
+	DAL_PARAM_MAXIMIZE_URGENCY_WATERMARKS,
+	DAL_PARAM_USE_MAX_DISPLAY_CLK,
+	DAL_PARAM_ENABLE_DFS_BYPASS,
+	DAL_PARAM_POWER_GATING_PIPE_IN_TILE,
+	DAL_PARAM_POWER_GATING_LB_PORTION,
+	DAL_PARAM_PSR_ENABLE,
+	DAL_PARAM_VARI_BRIGHT_ENABLE,
+	DAL_PARAM_USE_PPLIB,
+	DAL_PARAM_DISABLE_LPT_SUPPORT,
+	DAL_PARAM_DUMMY_FBC_BACKEND,
+	DAL_PARAM_ENABLE_GPU_SCALING,
+	DAL_BOOL_PARAM_MAX
+};
 
 #define MAX_EDID_BUFFER_SIZE 512
 #define MAX_SURFACE_NUM 2

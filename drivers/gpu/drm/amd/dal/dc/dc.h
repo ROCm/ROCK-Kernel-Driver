@@ -52,6 +52,22 @@ struct dc_caps {
 
 void dc_get_caps(const struct dc *dc, struct dc_caps *caps);
 
+struct dal_init_data {
+	struct hw_asic_id asic_id;
+	struct view_port_alignment vp_alignment;
+	struct bdf_info bdf_info;
+	struct dal_override_parameters display_param;
+	void *driver; /* ctx */
+	void *cgs_device;
+	uint8_t num_virtual_links;
+	/*
+	 * If 'vbios_override' not NULL, it will be called instead
+	 * of the real VBIOS. Intended use is Diagnostics on FPGA.
+	 */
+	struct dc_bios *vbios_override;
+	enum dce_environment dce_environment;
+};
+
 struct dc *dc_create(const struct dal_init_data *init_params);
 void dc_destroy(struct dc **dc);
 
