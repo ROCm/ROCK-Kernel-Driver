@@ -98,7 +98,7 @@ bool is_same_timing(
 	const struct dc_crtc_timing *timing1,
 	const struct dc_crtc_timing *timing2)
 {
-	return dm_memcmp(timing1, timing2, sizeof(struct dc_crtc_timing)) == 0;
+	return memcmp(timing1, timing2, sizeof(struct dc_crtc_timing)) == 0;
 }
 
 static bool is_sharable_clk_src(

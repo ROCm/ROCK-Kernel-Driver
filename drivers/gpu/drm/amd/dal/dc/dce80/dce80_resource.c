@@ -811,7 +811,7 @@ enum dc_status dce80_validate_bandwidth(
 		 * the same
 		 */
 		if (number_of_displays != 0 && all_displays_in_sync)
-			if (dm_memcmp(&prev_timing,
+			if (memcmp(&prev_timing,
 				&pipe_ctx->stream->public.timing,
 				sizeof(struct dc_crtc_timing)) != 0)
 				all_displays_in_sync = false;
@@ -855,7 +855,7 @@ enum dc_status dce80_validate_bandwidth(
 			"%s: Bandwidth validation failed!",
 			__func__);
 
-	if (dm_memcmp(&dc->current_context.bw_results,
+	if (memcmp(&dc->current_context.bw_results,
 			&context->bw_results, sizeof(context->bw_results))) {
 		struct log_entry log_entry;
 		dal_logger_open(
