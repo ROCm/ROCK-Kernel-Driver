@@ -26,7 +26,7 @@
 #ifndef __DC_LINK_ENCODER__DCE110_H__
 #define __DC_LINK_ENCODER__DCE110_H__
 
-#include "inc/link_encoder.h"
+#include "link_encoder.h"
 
 #define TO_DCE110_LINK_ENC(link_encoder)\
 	container_of(link_encoder, struct dce110_link_encoder, base)

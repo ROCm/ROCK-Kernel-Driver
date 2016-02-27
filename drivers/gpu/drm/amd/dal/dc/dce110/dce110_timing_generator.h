@@ -27,7 +27,7 @@
 #define __DC_TIMING_GENERATOR_DCE110_H__
 
 
-#include "../inc/timing_generator.h"
+#include "timing_generator.h"
 #include "../include/grph_object_id.h"
 #include "../include/hw_sequencer_types.h"
 

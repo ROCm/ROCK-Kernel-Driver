@@ -25,7 +25,7 @@
 #ifndef __DAL_TRANSFORM_V_DCE110_H__
 #define __DAL_TRANSFORM_V_DCE110_H__
 
-#include "inc/transform.h"
+#include "transform.h"
 
 bool dce110_transform_v_construct(
 	struct dce110_transform *xfm110,

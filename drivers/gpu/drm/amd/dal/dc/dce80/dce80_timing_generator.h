@@ -27,7 +27,7 @@
 #define __DC_TIMING_GENERATOR_DCE80_H__
 
 
-#include "../inc/timing_generator.h"
+#include "timing_generator.h"
 #include "../include/grph_object_id.h"
 
 /* DCE8.0 implementation inherits from DCE11.0 */

@@ -25,7 +25,7 @@
 #ifndef __DC_MEM_INPUT_DCE110_H__
 #define __DC_MEM_INPUT_DCE110_H__
 
-#include "inc/mem_input.h"
+#include "mem_input.h"
 
 #define TO_DCE110_MEM_INPUT(mi)\
 	container_of(mi, struct dce110_mem_input, base)

@@ -26,7 +26,7 @@
 #ifndef __DC_LINK_ENCODER__DCE80_H__
 #define __DC_LINK_ENCODER__DCE80_H__
 
-#include "inc/link_encoder.h"
+#include "link_encoder.h"
 #include "../dce110/dce110_link_encoder.h"
 
 bool dce80_link_encoder_construct(

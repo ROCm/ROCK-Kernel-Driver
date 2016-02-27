@@ -37,7 +37,7 @@
 #include "../dce110/dce110_timing_generator.h"
 #include "dce80_timing_generator.h"
 
-#include "../inc/timing_generator.h"
+#include "timing_generator.h"
 
 enum black_color_format {
 	BLACK_COLOR_FORMAT_RGB_FULLRANGE = 0,	/* used as index in array */

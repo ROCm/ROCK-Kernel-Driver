@@ -23,7 +23,7 @@
  *
  */
 
-#include "inc/stream_encoder.h"
+#include "stream_encoder.h"
 
 #ifndef __DC_STREAM_ENCODER_DCE80_H__
 #define __DC_STREAM_ENCODER_DCE80_H__

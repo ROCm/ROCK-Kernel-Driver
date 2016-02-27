@@ -15,7 +15,7 @@
 #include "dce110_timing_generator.h"
 #include "dce110_timing_generator_v.h"
 
-#include "../inc/timing_generator.h"
+#include "timing_generator.h"
 
 
 /** ********************************************************************************
