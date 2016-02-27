@@ -923,17 +923,20 @@ void dc_flip_surface_addrs(
 		uint32_t count)
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
+	int i, j;
 
-	uint8_t i;
 	for (i = 0; i < count; i++) {
-		struct core_surface *surface = DC_SURFACE_TO_CORE(surfaces[i]);
-		/*
-		 * TODO figure out a good way to keep track of address. Until
-		 * then we'll have to awkwardly bypass the "const" surface.
-		 */
-		surface->public.address = flip_addrs[i].address;
-		surface->public.flip_immediate = flip_addrs[i].flip_immediate;
+		for (j = 0; j < MAX_PIPES; j++) {
+			struct core_surface *ctx_surface =
+				core_dc->current_context.res_ctx.pipe_ctx[j].surface;
+			if (DC_SURFACE_TO_CORE(surfaces[i]) == ctx_surface) {
+				ctx_surface->public.address = flip_addrs[i].address;
+				ctx_surface->public.flip_immediate = flip_addrs[i].flip_immediate;
+				break;
+			}
+		}
 	}
+
 	core_dc->hwss.update_plane_addrs(core_dc, &core_dc->current_context.res_ctx);
 }
 

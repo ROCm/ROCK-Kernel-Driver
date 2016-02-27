@@ -128,4 +128,14 @@ bool  dce110_mem_input_program_surface_config(
 	union plane_size *plane_size,
 	enum dc_rotation_angle rotation);
 
+/*
+ * dce110_mem_input_wait_for_no_surface_update_pending
+ *
+ * This function will wait until the surface update-pending bit is cleared.
+ * This is necessary when a flip immediate call is requested as we shouldn't
+ * return until the flip has actually occurred.
+ */
+void dce110_mem_input_wait_for_no_surface_update_pending(
+	struct mem_input *mem_input);
+
 #endif
