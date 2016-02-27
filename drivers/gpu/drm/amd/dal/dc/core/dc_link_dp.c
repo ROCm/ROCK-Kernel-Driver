@@ -467,7 +467,7 @@ static void get_lane_status_and_drive_settings(
 	struct link_training_settings request_settings = {{0}};
 	uint32_t lane;
 
-	dm_memset(req_settings, '\0', sizeof(struct link_training_settings));
+	memset(req_settings, '\0', sizeof(struct link_training_settings));
 
 	core_link_read_dpcd(
 		link,
@@ -848,8 +848,8 @@ static bool perform_clock_recovery_sequence(
 	while ((retries_cr < LINK_TRAINING_MAX_RETRY_COUNT) &&
 	(retry_count < LINK_TRAINING_MAX_CR_RETRY)) {
 
-		dm_memset(&dpcd_lane_status, '\0', sizeof(dpcd_lane_status));
-		dm_memset(&dpcd_lane_status_updated, '\0',
+		memset(&dpcd_lane_status, '\0', sizeof(dpcd_lane_status));
+		memset(&dpcd_lane_status_updated, '\0',
 		sizeof(dpcd_lane_status_updated));
 
 		/* 1. call HWSS to set lane settings*/
@@ -975,7 +975,7 @@ bool perform_link_training(
 	struct link_training_settings lt_settings;
 
 	status = false;
-	dm_memset(&lt_settings, '\0', sizeof(lt_settings));
+	memset(&lt_settings, '\0', sizeof(lt_settings));
 
 	lt_settings.link_settings.link_rate = link_setting->link_rate;
 	lt_settings.link_settings.lane_count = link_setting->lane_count;
@@ -1751,10 +1751,10 @@ static void retrieve_link_cap(struct core_link *link)
 	union edp_configuration_cap edp_config_cap;
 	union dp_downstream_port_present ds_port = { 0 };
 
-	dm_memset(dpcd_data, '\0', sizeof(dpcd_data));
-	dm_memset(&down_strm_port_count,
+	memset(dpcd_data, '\0', sizeof(dpcd_data));
+	memset(&down_strm_port_count,
 		'\0', sizeof(union down_stream_port_count));
-	dm_memset(&edp_config_cap, '\0',
+	memset(&edp_config_cap, '\0',
 		sizeof(union edp_configuration_cap));
 
 	core_link_read_dpcd(

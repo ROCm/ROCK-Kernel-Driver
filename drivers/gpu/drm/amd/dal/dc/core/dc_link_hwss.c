@@ -89,7 +89,7 @@ void dp_disable_link_phy(struct core_link *link, enum signal_type signal)
 	link->link_enc->funcs->disable_output(link->link_enc, signal);
 
 	/* Clear current link setting.*/
-	dm_memset(&link->public.cur_link_settings, 0,
+	memset(&link->public.cur_link_settings, 0,
 			sizeof(link->public.cur_link_settings));
 }
 

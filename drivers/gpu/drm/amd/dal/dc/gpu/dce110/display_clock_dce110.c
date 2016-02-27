@@ -649,8 +649,8 @@ static bool display_clock_integrated_info_construct(
 	struct display_clock *base = &disp_clk->disp_clk_base;
 	bool res;
 
-	dm_memset(&info, 0, sizeof(struct integrated_info));
-	dm_memset(&fw_info, 0, sizeof(struct firmware_info));
+	memset(&info, 0, sizeof(struct integrated_info));
+	memset(&fw_info, 0, sizeof(struct firmware_info));
 
 	res = dal_adapter_service_get_integrated_info(as, &info);
 
@@ -784,7 +784,7 @@ static void set_clock(
 	struct dc_bios *bp = dal_adapter_service_get_bios_parser(base->as);
 
 	/* Prepare to program display clock*/
-	dm_memset(&pxl_clk_params, 0, sizeof(pxl_clk_params));
+	memset(&pxl_clk_params, 0, sizeof(pxl_clk_params));
 
 	pxl_clk_params.target_pixel_clock = requested_clk_khz;
 	pxl_clk_params.pll_id = base->id;
@@ -907,7 +907,7 @@ static bool dal_display_clock_dce110_construct(
 			struct spread_spectrum_info info;
 			bool result;
 
-			dm_memset(&info, 0, sizeof(info));
+			memset(&info, 0, sizeof(info));
 
 			result =
 				dal_adapter_service_get_ss_info(

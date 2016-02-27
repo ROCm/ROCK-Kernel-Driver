@@ -365,7 +365,7 @@ static enum bp_result transmitter_control_v2(
 	enum connector_id connector_id =
 		dal_graphics_object_id_get_connector_id(cntl->connector_obj_id);
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 
 	switch (cntl->transmitter) {
 	case TRANSMITTER_UNIPHY_A:
@@ -489,7 +489,7 @@ static enum bp_result transmitter_control_v3(
 	bool dual_link_conn = (CONNECTOR_ID_DUAL_LINK_DVII == conn_id)
 					|| (CONNECTOR_ID_DUAL_LINK_DVID == conn_id);
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 
 	switch (cntl->transmitter) {
 	case TRANSMITTER_UNIPHY_A:
@@ -638,7 +638,7 @@ static enum bp_result transmitter_control_v4(
 			dal_graphics_object_id_get_connector_id(cntl->connector_obj_id);
 	const struct command_table_helper *cmd = bp->cmd_helper;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 
 	switch (cntl->transmitter) {
 	case TRANSMITTER_UNIPHY_A:
@@ -776,7 +776,7 @@ static enum bp_result transmitter_control_v1_5(
 	const struct command_table_helper *cmd = bp->cmd_helper;
 	DIG_TRANSMITTER_CONTROL_PARAMETERS_V1_5 params;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 	params.ucPhyId = cmd->phy_id_to_atom(cntl->transmitter);
 	params.ucAction = (uint8_t)cntl->action;
 	params.ucLaneNum = (uint8_t)cntl->lanes_number;
@@ -842,7 +842,7 @@ static enum bp_result transmitter_control_v1_6(
 	const struct command_table_helper *cmd = bp->cmd_helper;
 	DIG_TRANSMITTER_CONTROL_PARAMETERS_V1_6 params;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 	params.ucPhyId = cmd->phy_id_to_atom(cntl->transmitter);
 	params.ucAction = (uint8_t)cntl->action;
 
@@ -946,7 +946,7 @@ static enum bp_result set_pixel_clock_v3(
 	PIXEL_CLOCK_PARAMETERS_V3 *params;
 	SET_PIXEL_CLOCK_PS_ALLOCATION allocation;
 
-	dm_memset(&allocation, 0, sizeof(allocation));
+	memset(&allocation, 0, sizeof(allocation));
 
 	if (CLOCK_SOURCE_ID_PLL1 == bp_params->pll_id)
 		allocation.sPCLKInput.ucPpll = ATOM_PPLL1;
@@ -1019,7 +1019,7 @@ static enum bp_result set_pixel_clock_v5(
 	uint8_t controller_id;
 	uint32_t pll_id;
 
-	dm_memset(&clk, 0, sizeof(clk));
+	memset(&clk, 0, sizeof(clk));
 
 	if (bp->cmd_helper->clock_source_id_to_atom(bp_params->pll_id, &pll_id)
 			&& bp->cmd_helper->controller_id_to_atom(
@@ -1076,7 +1076,7 @@ static enum bp_result set_pixel_clock_v6(
 	uint8_t controller_id;
 	uint32_t pll_id;
 
-	dm_memset(&clk, 0, sizeof(clk));
+	memset(&clk, 0, sizeof(clk));
 
 	if (bp->cmd_helper->clock_source_id_to_atom(bp_params->pll_id, &pll_id)
 			&& bp->cmd_helper->controller_id_to_atom(
@@ -1155,7 +1155,7 @@ static enum bp_result set_pixel_clock_v7(
 	uint8_t controller_id;
 	uint32_t pll_id;
 
-	dm_memset(&clk, 0, sizeof(clk));
+	memset(&clk, 0, sizeof(clk));
 
 	if (bp->cmd_helper->clock_source_id_to_atom(bp_params->pll_id, &pll_id)
 			&& bp->cmd_helper->controller_id_to_atom(bp_params->controller_id, &controller_id)) {
@@ -1265,7 +1265,7 @@ static enum bp_result enable_spread_spectrum_on_ppll_v1(
 	enum bp_result result = BP_RESULT_FAILURE;
 	ENABLE_SPREAD_SPECTRUM_ON_PPLL params;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 
 	if ((enable == true) && (bp_params->percentage > 0))
 		params.ucEnable = ATOM_ENABLE;
@@ -1309,7 +1309,7 @@ static enum bp_result enable_spread_spectrum_on_ppll_v2(
 	enum bp_result result = BP_RESULT_FAILURE;
 	ENABLE_SPREAD_SPECTRUM_ON_PPLL_V2 params;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 
 	if (bp_params->pll_id == CLOCK_SOURCE_ID_PLL1)
 		params.ucSpreadSpectrumType = ATOM_PPLL_SS_TYPE_V2_P1PLL;
@@ -1361,7 +1361,7 @@ static enum bp_result enable_spread_spectrum_on_ppll_v3(
 	enum bp_result result = BP_RESULT_FAILURE;
 	ENABLE_SPREAD_SPECTRUM_ON_PPLL_V3 params;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 
 	switch (bp_params->pll_id) {
 	case CLOCK_SOURCE_ID_PLL0:
@@ -1482,7 +1482,7 @@ static enum bp_result adjust_display_pll_v3(
 	ADJUST_DISPLAY_PLL_PS_ALLOCATION_V3 params;
 	uint32_t pixel_clk_10_kHz_in = bp_params->pixel_clock / 10;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 
 	/* We need to convert from KHz units into 10KHz units and then convert
 	 * output pixel clock back 10KHz-->KHz */
@@ -1729,7 +1729,7 @@ static enum signal_type dac_load_detection_v3(
 	DAC_LOAD_DETECTION_PS_ALLOCATION params;
 	enum signal_type signal = SIGNAL_TYPE_NONE;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 
 	/* load detection is cupported for CRT, TV and CV */
 	switch (display_signal) {
@@ -2131,7 +2131,7 @@ static enum bp_result select_crtc_source_v2(
 	uint32_t atom_engine_id;
 	enum signal_type s = bp_params->signal;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 
 	/* set controller id */
 	if (bp->cmd_helper->controller_id_to_atom(
@@ -2172,7 +2172,7 @@ static enum bp_result select_crtc_source_v3(
 	uint32_t atom_engine_id;
 	enum signal_type s = bp_params->signal;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 
 	if (bp->cmd_helper->controller_id_to_atom(bp_params->controller_id,
 			&atom_controller_id))
@@ -2343,7 +2343,7 @@ static enum bp_result program_clock_v5(
 	SET_PIXEL_CLOCK_PS_ALLOCATION_V5 params;
 	uint32_t atom_pll_id;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 	if (!bp->cmd_helper->clock_source_id_to_atom(
 			bp_params->pll_id, &atom_pll_id)) {
 		BREAK_TO_DEBUGGER(); /* Invalid Inpute!! */
@@ -2374,7 +2374,7 @@ static enum bp_result program_clock_v6(
 	SET_PIXEL_CLOCK_PS_ALLOCATION_V6 params;
 	uint32_t atom_pll_id;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 
 	if (!bp->cmd_helper->clock_source_id_to_atom(
 			bp_params->pll_id, &atom_pll_id)) {
@@ -2433,7 +2433,7 @@ static enum bp_result compute_memore_engine_pll_v4(
 	enum bp_result result = BP_RESULT_FAILURE;
 	COMPUTE_MEMORY_ENGINE_PLL_PARAMETERS_V4 params;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 
 	params.ulClock = cpu_to_le32(bp_params->target_display_clock / 10);
 
@@ -2489,7 +2489,7 @@ static enum bp_result external_encoder_control_v3(
 	struct graphics_object_id encoder;
 	bool is_input_signal_dp = false;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 
 	cntl_params = &params.sExtEncoder;
 
@@ -2687,7 +2687,7 @@ static enum bp_result set_dce_clock_v2_1(
 	uint32_t atom_clock_type;
 	const struct command_table_helper *cmd = bp->cmd_helper;
 
-	dm_memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof(params));
 
 	if (!cmd->clock_source_id_to_atom(bp_params->pll_id, &atom_pll_id) ||
 			!cmd->dc_clock_type_to_atom(bp_params->clock_type, &atom_clock_type))

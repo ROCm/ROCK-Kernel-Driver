@@ -264,7 +264,7 @@ static bool read_command(
 	ctx.request.delay = 0;
 
 	do {
-		dm_memset(ctx.buffer + ctx.offset, 0, ctx.current_read_length);
+		memset(ctx.buffer + ctx.offset, 0, ctx.current_read_length);
 
 		ctx.request.data = ctx.buffer + ctx.offset;
 		ctx.request.length = ctx.current_read_length;

@@ -377,7 +377,7 @@ static enum bp_result bios_parser_get_oem_ddc_info(struct dc_bios *dcb,
 			ATOM_I2C_RECORD record;
 			ATOM_I2C_ID_CONFIG_ACCESS *config;
 
-			dm_memset(&record, 0, sizeof(record));
+			memset(&record, 0, sizeof(record));
 
 			config = &tbl->sucI2cId + index - 1;
 
@@ -873,7 +873,7 @@ static enum bp_result get_firmware_info_v1_4(
 	if (!firmware_info)
 		return BP_RESULT_BADBIOSTABLE;
 
-	dm_memset(info, 0, sizeof(*info));
+	memset(info, 0, sizeof(*info));
 
 	/* Pixel clock pll information. We need to convert from 10KHz units into
 	 * KHz units */
@@ -924,7 +924,7 @@ static enum bp_result get_firmware_info_v2_1(
 	if (!firmwareInfo)
 		return BP_RESULT_BADBIOSTABLE;
 
-	dm_memset(info, 0, sizeof(*info));
+	memset(info, 0, sizeof(*info));
 
 	/* Pixel clock pll information. We need to convert from 10KHz units into
 	 * KHz units */
@@ -1010,7 +1010,7 @@ static enum bp_result get_firmware_info_v2_2(
 	if (!firmware_info)
 		return BP_RESULT_BADBIOSTABLE;
 
-	dm_memset(info, 0, sizeof(*info));
+	memset(info, 0, sizeof(*info));
 
 	/* Pixel clock pll information. We need to convert from 10KHz units into
 	 * KHz units */
@@ -1115,7 +1115,7 @@ static enum bp_result get_ss_info_v3_1(
 	tbl = (ATOM_ASIC_SS_ASSIGNMENT_V3 *)
 				&ss_table_header_include->asSpreadSpectrum[0];
 
-	dm_memset(ss_info, 0, sizeof(struct spread_spectrum_info));
+	memset(ss_info, 0, sizeof(struct spread_spectrum_info));
 
 	for (i = 0; i < table_size; i++) {
 		if (tbl[i].ucClockIndication != (uint8_t) id)
@@ -1661,7 +1661,7 @@ static enum bp_result get_ss_info_from_internal_ss_info_tbl_V2_1(
 	header = GET_IMAGE(ATOM_ASIC_INTERNAL_SS_INFO_V2,
 		DATA_TABLES(ASIC_InternalSS_Info));
 
-	dm_memset(info, 0, sizeof(struct spread_spectrum_info));
+	memset(info, 0, sizeof(struct spread_spectrum_info));
 
 	tbl_size = (le16_to_cpu(header->sHeader.usStructureSize)
 			- sizeof(ATOM_COMMON_TABLE_HEADER))
@@ -1765,7 +1765,7 @@ static enum bp_result get_ss_info_from_ss_info_table(
 		if (id_local != (uint32_t)tbl->asSS_Info[i].ucSS_Id)
 			continue;
 
-		dm_memset(ss_info, 0, sizeof(struct spread_spectrum_info));
+		memset(ss_info, 0, sizeof(struct spread_spectrum_info));
 
 		if (ATOM_EXTERNAL_SS_MASK &
 				tbl->asSS_Info[i].ucSpreadSpectrumType)
@@ -1857,7 +1857,7 @@ static enum bp_result get_embedded_panel_info_v1_2(
 		|| 2 > lvds->sHeader.ucTableContentRevision)
 		return BP_RESULT_UNSUPPORTED;
 
-	dm_memset(info, 0, sizeof(struct embedded_panel_info));
+	memset(info, 0, sizeof(struct embedded_panel_info));
 
 	/* We need to convert from 10KHz units into KHz units*/
 	info->lcd_timing.pixel_clk =
@@ -1975,7 +1975,7 @@ static enum bp_result get_embedded_panel_info_v1_3(
 			&& (3 <= lvds->sHeader.ucTableContentRevision)))
 		return BP_RESULT_UNSUPPORTED;
 
-	dm_memset(info, 0, sizeof(struct embedded_panel_info));
+	memset(info, 0, sizeof(struct embedded_panel_info));
 
 	/* We need to convert from 10KHz units into KHz units */
 	info->lcd_timing.pixel_clk =
@@ -3826,7 +3826,7 @@ static enum bp_result patch_bios_image_from_ext_display_connection_info(
 	if (!opm_object)
 		return BP_RESULT_UNSUPPORTED;
 
-	dm_memset(&ext_display_connection_info_tbl, 0,
+	memset(&ext_display_connection_info_tbl, 0,
 			sizeof(ATOM_EXTERNAL_DISPLAY_CONNECTION_INFO));
 
 	connector_tbl_offset = bp->object_info_tbl_offset

@@ -224,7 +224,7 @@ static struct adapter_service *create_as(
 	struct adapter_service *as = NULL;
 	struct as_init_data init_data;
 
-	dm_memset(&init_data, 0, sizeof(init_data));
+	memset(&init_data, 0, sizeof(init_data));
 
 	init_data.ctx = dc_ctx;
 

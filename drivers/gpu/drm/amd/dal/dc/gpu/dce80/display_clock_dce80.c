@@ -473,7 +473,7 @@ static void set_clock(
 	struct dc_bios *bp = dal_adapter_service_get_bios_parser(dc->as);
 
 	/* Prepare to program display clock*/
-	dm_memset(&pxl_clk_params, 0, sizeof(pxl_clk_params));
+	memset(&pxl_clk_params, 0, sizeof(pxl_clk_params));
 
 	pxl_clk_params.target_pixel_clock = requested_clk_khz;
 	pxl_clk_params.pll_id = dc->id;
@@ -701,7 +701,7 @@ static void display_clock_ss_construct(
 		struct spread_spectrum_info ss_info;
 		bool res;
 
-		dm_memset(&ss_info, 0, sizeof(struct spread_spectrum_info));
+		memset(&ss_info, 0, sizeof(struct spread_spectrum_info));
 
 		res = dal_adapter_service_get_ss_info(as,
 			AS_SIGNAL_TYPE_GPU_PLL, 0, &ss_info);

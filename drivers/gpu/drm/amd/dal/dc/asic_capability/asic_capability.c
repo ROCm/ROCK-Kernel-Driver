@@ -55,7 +55,7 @@ static bool construct(
 	bool asic_supported = false;
 
 	cap->ctx = ctx;
-	dm_memset(cap->data, 0, sizeof(cap->data));
+	memset(cap->data, 0, sizeof(cap->data));
 
 	/* ASIC data */
 	cap->data[ASIC_DATA_VRAM_TYPE] = init->vram_type;

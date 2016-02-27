@@ -518,7 +518,7 @@ bool dce110_timing_generator_program_timing_generator(
 			dc_crtc_timing->h_front_porch;
 	uint32_t h_sync_start = dc_crtc_timing->h_addressable + hsync_offset;
 
-	dm_memset(&bp_params, 0, sizeof(struct bp_hw_crtc_timing_parameters));
+	memset(&bp_params, 0, sizeof(struct bp_hw_crtc_timing_parameters));
 
 	/* Due to an asic bug we need to apply the Front Porch workaround prior
 	 * to programming the timing.

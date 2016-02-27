@@ -597,7 +597,7 @@ static bool generate_feature_set(
 	uint32_t entry_num = 0;
 	const struct feature_source_entry *entry = NULL;
 
-	dm_memset(adapter_feature_set, 0, sizeof(adapter_feature_set));
+	memset(adapter_feature_set, 0, sizeof(adapter_feature_set));
 	entry_num = get_feature_entries_num();
 
 	while (i != entry_num) {

@@ -900,7 +900,7 @@ static enum ds_color_space build_default_color_space(
 static void translate_info_frame(const struct hw_info_frame *hw_info_frame,
 	struct encoder_info_frame *encoder_info_frame)
 {
-	dm_memset(
+	memset(
 		encoder_info_frame, 0, sizeof(struct encoder_info_frame));
 
 	/* For gamut we recalc checksum */

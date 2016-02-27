@@ -1051,7 +1051,7 @@ struct ddc *dal_ddc_service_get_ddc_pin(struct ddc_service *ddc_service)
 
 void dal_ddc_service_reset_dp_receiver_id_info(struct ddc_service *ddc_service)
 {
-	dm_memset(&ddc_service->dp_receiver_id_info,
+	memset(&ddc_service->dp_receiver_id_info,
 		0, sizeof(struct dp_receiver_id_info));
 }
 

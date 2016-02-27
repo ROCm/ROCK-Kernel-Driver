@@ -804,7 +804,7 @@ static void set_yuv_adjustment(
 		calculate_adjustments(
 			ideals, &adjustments, matrix);
 
-	dm_memset(&reg_matrix, 0, sizeof(struct out_csc_color_matrix));
+	memset(&reg_matrix, 0, sizeof(struct out_csc_color_matrix));
 
 	setup_reg_format(matrix, reg_matrix.regval);
 

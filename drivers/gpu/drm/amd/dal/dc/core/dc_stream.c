@@ -46,7 +46,7 @@ static void build_bit_depth_reduction_params(
 		const struct core_stream *stream,
 		struct bit_depth_reduction_params *fmt_bit_depth)
 {
-	dm_memset(fmt_bit_depth, 0, sizeof(*fmt_bit_depth));
+	memset(fmt_bit_depth, 0, sizeof(*fmt_bit_depth));
 
 	/*TODO: Need to un-hardcode, refer to function with same name
 	 * in dal2 hw_sequencer*/
