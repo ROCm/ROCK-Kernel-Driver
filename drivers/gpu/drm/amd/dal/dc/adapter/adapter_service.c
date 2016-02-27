@@ -1938,11 +1938,6 @@ struct ddc *dal_adapter_service_obtain_ddc_from_i2c_info(
 		(1 << info->gpio_info.clk_a_shift), &hw_info);
 }
 
-struct bdf_info dal_adapter_service_get_adapter_info(struct adapter_service *as)
-{
-	return as->bdf_info;
-}
-
 /*
  * dal_adapter_service_should_psr_skip_wait_for_pll_lock
  *
