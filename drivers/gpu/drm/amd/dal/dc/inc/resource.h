@@ -37,56 +37,50 @@ bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
 				struct core_dc *dc,
 				uint8_t num_virtual_links);
 
-void build_scaling_params(
-	const struct dc_surface *surface,
-	struct pipe_ctx *pipe_ctx);
-
-void build_scaling_params_for_context(
+enum dc_status resource_map_pool_resources(
 	const struct core_dc *dc,
 	struct validate_context *context);
 
-void unreference_clock_source(
+void resource_build_scaling_params(
+	const struct dc_surface *surface,
+	struct pipe_ctx *pipe_ctx);
+
+void resource_build_scaling_params_for_context(
+	const struct core_dc *dc,
+	struct validate_context *context);
+
+void resource_build_info_frame(struct pipe_ctx *pipe_ctx);
+
+void resource_unreference_clock_source(
 		struct resource_context *res_ctx,
 		struct clock_source *clock_source);
 
-void reference_clock_source(
+void resource_reference_clock_source(
 		struct resource_context *res_ctx,
 		struct clock_source *clock_source);
 
-bool is_same_timing(
+bool resource_is_same_timing(
 	const struct dc_crtc_timing *timing1,
 	const struct dc_crtc_timing *timing2);
 
-struct clock_source *find_used_clk_src_for_sharing(
+struct clock_source *resource_find_used_clk_src_for_sharing(
 	struct resource_context *res_ctx,
 	struct pipe_ctx *pipe_ctx);
 
 struct clock_source *dc_resource_find_first_free_pll(
 		struct resource_context *res_ctx);
 
-bool attach_surfaces_to_context(
+bool resource_attach_surfaces_to_context(
 		struct dc_surface *surfaces[],
 		uint8_t surface_count,
 		struct dc_target *dc_target,
 		struct validate_context *context);
 
-void pplib_apply_safe_state(const struct core_dc *dc);
-
-void pplib_apply_display_requirements(
-	const struct core_dc *dc,
-	const struct validate_context *context,
-	struct dm_pp_display_configuration *pp_display_cfg);
-
-void build_info_frame(struct pipe_ctx *pipe_ctx);
-
-enum dc_status map_resources(
-	const struct core_dc *dc,
-	struct validate_context *context);
-
-void val_ctx_destruct(struct validate_context *context);
-
-void val_ctx_copy_construct(
+void resource_validate_ctx_copy_construct(
 	const struct validate_context *src_ctx,
 	struct validate_context *dst_ctx);
+
+void resource_validate_ctx_destruct(struct validate_context *context);
+
 
 #endif /* DRIVERS_GPU_DRM_AMD_DAL_DEV_DC_INC_RESOURCE_H_ */

@@ -794,7 +794,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 			core_link_disable_stream(old_pipe_ctx);
 
 			ASSERT(old_pipe_ctx->clock_source);
-			unreference_clock_source(&dc->current_context.res_ctx, old_pipe_ctx->clock_source);
+			resource_unreference_clock_source(&dc->current_context.res_ctx, old_pipe_ctx->clock_source);
 		}
 
 		/*TODO: AUTO check if timing changed*/
@@ -1211,15 +1211,15 @@ static void switch_dp_clock_sources(
 
 		if (dc_is_dp_signal(pipe_ctx->signal)) {
 			struct clock_source *clk_src =
-				find_used_clk_src_for_sharing(
+				resource_find_used_clk_src_for_sharing(
 						res_ctx, pipe_ctx);
 
 			if (clk_src &&
 				clk_src != pipe_ctx->clock_source) {
-				unreference_clock_source(
+				resource_unreference_clock_source(
 					res_ctx, pipe_ctx->clock_source);
 				pipe_ctx->clock_source = clk_src;
-				reference_clock_source(res_ctx, clk_src);
+				resource_reference_clock_source(res_ctx, clk_src);
 				dc->hwss.crtc_switch_to_clk_src(clk_src, i);
 			}
 		}
@@ -1472,7 +1472,7 @@ static void reset_single_pipe_hw_ctx(
 	pipe_ctx->mi->funcs->free_mem_input(
 				pipe_ctx->mi, context->target_count);
 	pipe_ctx->xfm->funcs->transform_set_scaler_bypass(pipe_ctx->xfm);
-	unreference_clock_source(&context->res_ctx, pipe_ctx->clock_source);
+	resource_unreference_clock_source(&context->res_ctx, pipe_ctx->clock_source);
 	dc->hwss.enable_display_power_gating(
 		pipe_ctx->stream->ctx, pipe_ctx->pipe_idx, dcb,
 			PIPE_GATING_CONTROL_ENABLE);

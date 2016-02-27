@@ -66,7 +66,7 @@ bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
 	return false;
 }
 
-void unreference_clock_source(
+void resource_unreference_clock_source(
 		struct resource_context *res_ctx,
 		struct clock_source *clock_source)
 {
@@ -91,7 +91,7 @@ void unreference_clock_source(
 	}
 }
 
-void reference_clock_source(
+void resource_reference_clock_source(
 		struct resource_context *res_ctx,
 		struct clock_source *clock_source)
 {
@@ -108,7 +108,7 @@ void reference_clock_source(
 		res_ctx->dp_clock_source_ref_count++;
 }
 
-bool is_same_timing(
+bool resource_is_same_timing(
 	const struct dc_crtc_timing *timing1,
 	const struct dc_crtc_timing *timing2)
 {
@@ -136,7 +136,7 @@ static bool is_sharable_clk_src(
 	if (dc_is_dp_signal(pipe_with_clk_src->signal))
 		return false;
 
-	if(!is_same_timing(
+	if (!resource_is_same_timing(
 		&pipe_with_clk_src->stream->public.timing,
 		&pipe->stream->public.timing))
 		return false;
@@ -144,7 +144,7 @@ static bool is_sharable_clk_src(
 	return true;
 }
 
-struct clock_source *find_used_clk_src_for_sharing(
+struct clock_source *resource_find_used_clk_src_for_sharing(
 					struct resource_context *res_ctx,
 					struct pipe_ctx *pipe_ctx)
 {
@@ -313,7 +313,7 @@ static void calculate_scaling_ratios(
 	}
 }
 
-void build_scaling_params(
+void resource_build_scaling_params(
 	const struct dc_surface *surface,
 	struct pipe_ctx *pipe_ctx)
 {
@@ -372,7 +372,8 @@ void build_scaling_params(
 				surface->dst_rect.y);
 }
 
-void build_scaling_params_for_context(
+
+void resource_build_scaling_params_for_context(
 	const struct core_dc *dc,
 	struct validate_context *context)
 {
@@ -381,13 +382,13 @@ void build_scaling_params_for_context(
 	for (i = 0; i < MAX_PIPES; i++) {
 		if (context->res_ctx.pipe_ctx[i].surface != NULL &&
 				context->res_ctx.pipe_ctx[i].stream != NULL)
-			build_scaling_params(
+			resource_build_scaling_params(
 				&context->res_ctx.pipe_ctx[i].surface->public,
 				&context->res_ctx.pipe_ctx[i]);
 	}
 }
 
-bool attach_surfaces_to_context(
+bool resource_attach_surfaces_to_context(
 		struct dc_surface *surfaces[],
 		uint8_t surface_count,
 		struct dc_target *dc_target,
@@ -451,140 +452,6 @@ bool attach_surfaces_to_context(
 	}
 
 	return true;
-}
-
-static uint32_t get_min_vblank_time_us(const struct validate_context *context)
-{
-	uint8_t i, j;
-	uint32_t min_vertical_blank_time = -1;
-
-	for (i = 0; i < context->target_count; i++) {
-		const struct core_target *target = context->targets[i];
-
-		for (j = 0; j < target->public.stream_count; j++) {
-			const struct dc_stream *stream =
-						target->public.streams[j];
-			uint32_t vertical_blank_in_pixels = 0;
-			uint32_t vertical_blank_time = 0;
-
-			vertical_blank_in_pixels = stream->timing.h_total *
-				(stream->timing.v_total
-					- stream->timing.v_addressable);
-			vertical_blank_time = vertical_blank_in_pixels
-				* 1000 / stream->timing.pix_clk_khz;
-			if (min_vertical_blank_time > vertical_blank_time)
-				min_vertical_blank_time = vertical_blank_time;
-		}
-	}
-	return min_vertical_blank_time;
-}
-
-static void fill_display_configs(
-	const struct validate_context *context,
-	struct dm_pp_display_configuration *pp_display_cfg)
-{
-	uint8_t i, j, k;
-	uint8_t num_cfgs = 0;
-
-	for (i = 0; i < context->target_count; i++) {
-		const struct core_target *target = context->targets[i];
-
-		for (j = 0; j < target->public.stream_count; j++) {
-			const struct core_stream *stream =
-				DC_STREAM_TO_CORE(target->public.streams[j]);
-			struct dm_pp_single_disp_config *cfg =
-					&pp_display_cfg->disp_configs[num_cfgs];
-			const struct pipe_ctx *pipe_ctx = NULL;
-
-			for (k = 0; k < MAX_PIPES; k++)
-				if (stream ==
-					context->res_ctx.pipe_ctx[k].stream) {
-					pipe_ctx = &context->res_ctx.pipe_ctx[k];
-					break;
-				}
-
-			num_cfgs++;
-			cfg->signal = pipe_ctx->signal;
-			cfg->pipe_idx = pipe_ctx->pipe_idx;
-			cfg->src_height = stream->public.src.height;
-			cfg->src_width = stream->public.src.width;
-			cfg->ddi_channel_mapping =
-				stream->sink->link->ddi_channel_mapping.raw;
-			cfg->transmitter =
-				stream->sink->link->link_enc->transmitter;
-			cfg->link_settings.lane_count = stream->sink->link->public.cur_link_settings.lane_count;
-			cfg->link_settings.link_rate = stream->sink->link->public.cur_link_settings.link_rate;
-			cfg->link_settings.link_spread = stream->sink->link->public.cur_link_settings.link_spread;
-			cfg->sym_clock = stream->public.timing.pix_clk_khz;
-			switch (stream->public.timing.display_color_depth) {
-			case COLOR_DEPTH_101010:
-				cfg->sym_clock = (cfg->sym_clock * 30) / 24;
-				break;
-			case COLOR_DEPTH_121212:
-				cfg->sym_clock = (cfg->sym_clock * 36) / 24;
-				break;
-			case COLOR_DEPTH_161616:
-				cfg->sym_clock = (cfg->sym_clock * 48) / 24;
-				break;
-			default:
-				break;
-			}
-			/* TODO: unhardcode*/
-			cfg->v_refresh = 60;
-		}
-	}
-	pp_display_cfg->display_count = num_cfgs;
-}
-
-void pplib_apply_safe_state(
-	const struct core_dc *dc)
-{
-	dm_pp_apply_safe_state(dc->ctx);
-}
-
-void pplib_apply_display_requirements(
-	const struct core_dc *dc,
-	const struct validate_context *context,
-	struct dm_pp_display_configuration *pp_display_cfg)
-{
-
-	pp_display_cfg->all_displays_in_sync =
-		context->bw_results.all_displays_in_sync;
-	pp_display_cfg->nb_pstate_switch_disable =
-			context->bw_results.nbp_state_change_enable == false;
-	pp_display_cfg->cpu_cc6_disable =
-			context->bw_results.cpuc_state_change_enable == false;
-	pp_display_cfg->cpu_pstate_disable =
-			context->bw_results.cpup_state_change_enable == false;
-	pp_display_cfg->cpu_pstate_separation_time =
-			context->bw_results.required_blackout_duration_us;
-
-	pp_display_cfg->min_memory_clock_khz = context->bw_results.required_yclk
-		/ MEMORY_TYPE_MULTIPLIER;
-	pp_display_cfg->min_engine_clock_khz = context->bw_results.required_sclk;
-	pp_display_cfg->min_engine_clock_deep_sleep_khz
-			= context->bw_results.required_sclk_deep_sleep;
-
-	pp_display_cfg->avail_mclk_switch_time_us =
-						get_min_vblank_time_us(context);
-	pp_display_cfg->avail_mclk_switch_time_in_disp_active_us = 0;
-
-	pp_display_cfg->disp_clk_khz = context->bw_results.dispclk_khz;
-
-	fill_display_configs(context, pp_display_cfg);
-
-	/* TODO: is this still applicable?*/
-	if (pp_display_cfg->display_count == 1) {
-		const struct dc_crtc_timing *timing =
-			&context->targets[0]->public.streams[0]->timing;
-
-		pp_display_cfg->crtc_index =
-			pp_display_cfg->disp_configs[0].pipe_idx;
-		pp_display_cfg->line_time_in_us = timing->h_total * 1000
-							/ timing->pix_clk_khz;
-	}
-
-	dm_pp_apply_display_requirements(dc->ctx, pp_display_cfg);
 }
 
 /* Maximum TMDS single link pixel clock 165MHz */
@@ -704,7 +571,7 @@ static bool check_timing_change(struct core_stream *cur_stream,
 	if (cur_stream->sink != new_stream->sink)
 		return true;
 
-	return !is_same_timing(
+	return !resource_is_same_timing(
 					&cur_stream->public.timing,
 					&new_stream->public.timing);
 }
@@ -741,7 +608,7 @@ static void set_stream_signal(struct pipe_ctx *pipe_ctx)
 		pipe_ctx->signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
 }
 
-enum dc_status map_resources(
+enum dc_status resource_map_pool_resources(
 		const struct core_dc *dc,
 		struct validate_context *context)
 {
@@ -775,7 +642,7 @@ enum dc_status map_resources(
 					&context->res_ctx,
 					pipe_ctx->stream_enc);
 
-				reference_clock_source(
+				resource_reference_clock_source(
 					&context->res_ctx,
 					pipe_ctx->clock_source);
 
@@ -1251,7 +1118,7 @@ static void set_vendor_info_packet(struct core_stream *stream,
 	info_packet->valid = true;
 }
 
-void val_ctx_destruct(struct validate_context *context)
+void resource_validate_ctx_destruct(struct validate_context *context)
 {
 	int i, j;
 
@@ -1269,7 +1136,7 @@ void val_ctx_destruct(struct validate_context *context)
  * Copy src_ctx into dst_ctx and retain all surfaces and targets referenced
  * by the src_ctx
  */
-void val_ctx_copy_construct(
+void resource_validate_ctx_copy_construct(
 		const struct validate_context *src_ctx,
 		struct validate_context *dst_ctx)
 {
@@ -1298,7 +1165,7 @@ struct clock_source *dc_resource_find_first_free_pll(
 	return NULL;
 }
 
-void build_info_frame(struct pipe_ctx *pipe_ctx)
+void resource_build_info_frame(struct pipe_ctx *pipe_ctx)
 {
 	enum signal_type signal = SIGNAL_TYPE_NONE;
 	struct hw_info_frame info_frame = { { 0 } };

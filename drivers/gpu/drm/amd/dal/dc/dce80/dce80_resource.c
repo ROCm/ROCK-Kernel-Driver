@@ -703,7 +703,7 @@ static enum dc_status validate_mapped_resource(
 				if (status != DC_OK)
 					return status;
 
-				build_info_frame(pipe_ctx);
+				resource_build_info_frame(pipe_ctx);
 
 				/* do not need to validate non root pipes */
 				break;
@@ -934,7 +934,7 @@ static enum dc_status map_clock_resources(
 					pipe_ctx->clock_source = context->res_ctx.pool.dp_clock_source;
 				else {
 					pipe_ctx->clock_source =
-						find_used_clk_src_for_sharing(
+						resource_find_used_clk_src_for_sharing(
 							&context->res_ctx, pipe_ctx);
 
 					if (pipe_ctx->clock_source == NULL)
@@ -945,7 +945,7 @@ static enum dc_status map_clock_resources(
 				if (pipe_ctx->clock_source == NULL)
 					return DC_NO_CLOCK_SOURCE_RESOURCE;
 
-				reference_clock_source(
+				resource_reference_clock_source(
 						&context->res_ctx,
 						pipe_ctx->clock_source);
 
@@ -980,7 +980,7 @@ enum dc_status dce80_validate_with_context(
 						== context->targets[i]) {
 				unchanged = true;
 				set_target_unchanged(context, i);
-				attach_surfaces_to_context(
+				resource_attach_surfaces_to_context(
 					(struct dc_surface **)dc->current_context.
 						target_status[j].surfaces,
 					dc->current_context.target_status[j].surface_count,
@@ -990,7 +990,7 @@ enum dc_status dce80_validate_with_context(
 					dc->current_context.target_status[j];
 			}
 		if (!unchanged || set[i].surface_count != 0)
-			if (!attach_surfaces_to_context(
+			if (!resource_attach_surfaces_to_context(
 					(struct dc_surface **)set[i].surfaces,
 					set[i].surface_count,
 					&context->targets[i]->public,
@@ -1002,7 +1002,7 @@ enum dc_status dce80_validate_with_context(
 
 	context->res_ctx.pool = dc->res_pool;
 
-	result = map_resources(dc, context);
+	result = resource_map_pool_resources(dc, context);
 
 	if (result == DC_OK)
 		result = map_clock_resources(dc, context);
@@ -1011,7 +1011,7 @@ enum dc_status dce80_validate_with_context(
 		result = validate_mapped_resource(dc, context);
 
 	if (result == DC_OK)
-		build_scaling_params_for_context(dc, context);
+		resource_build_scaling_params_for_context(dc, context);
 
 	if (result == DC_OK)
 		result = dce80_validate_bandwidth(dc, context);
