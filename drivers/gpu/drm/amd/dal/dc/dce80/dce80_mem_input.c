@@ -22,10 +22,6 @@
  * Authors: AMD
  *
  */
-#ifndef __DC_MEM_INPUT_DCE80_H__
-
-#define __DC_MEM_INPUT_DCE80_H__
-
 #include "dm_services.h"
 
 #include "dce/dce_8_0_d.h"
@@ -214,4 +210,3 @@ bool dce80_mem_input_construct(
 	return true;
 }
 
-#endif
