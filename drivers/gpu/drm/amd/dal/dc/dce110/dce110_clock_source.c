@@ -475,7 +475,7 @@ static uint32_t dce110_get_pix_clk_dividers(
 		return pll_calc_error;
 	}
 
-	dm_memset(pll_settings, 0, sizeof(*pll_settings));
+	memset(pll_settings, 0, sizeof(*pll_settings));
 
 	if (cs->id == CLOCK_SOURCE_ID_EXTERNAL) {
 		pll_settings->adjusted_pix_clk = clk_src->ext_clk_khz;
@@ -581,7 +581,7 @@ static bool calculate_ss(
 	if (pll_settings == NULL)
 		return false;
 
-	dm_memset(ds_data, 0, sizeof(struct delta_sigma_data));
+	memset(ds_data, 0, sizeof(struct delta_sigma_data));
 
 	/* compute SS_AMOUNT_FBDIV & SS_AMOUNT_NFRAC_SLIP & SS_AMOUNT_DSFRAC*/
 	/* 6 decimal point support in fractional feedback divider */

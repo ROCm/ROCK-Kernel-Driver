@@ -580,7 +580,7 @@ static void get_bios_event_info(
 	uint32_t s2, s6;
 	uint32_t clear_mask;
 
-	dm_memset(info, 0, sizeof(struct bios_event_info));
+	memset(info, 0, sizeof(struct bios_event_info));
 
 	/* Handle backlight event ONLY. PPLib still handling other events */
 	s6 = dm_read_reg(ctx, mmBIOS_SCRATCH_6);

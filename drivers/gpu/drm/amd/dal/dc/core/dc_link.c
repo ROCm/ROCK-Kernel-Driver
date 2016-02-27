@@ -1100,7 +1100,7 @@ static void dpcd_configure_panel_mode(
 	union dpcd_edp_config edp_config_set;
 	bool panel_mode_edp = false;
 
-	dm_memset(&edp_config_set, '\0', sizeof(union dpcd_edp_config));
+	memset(&edp_config_set, '\0', sizeof(union dpcd_edp_config));
 
 	if (DP_PANEL_MODE_DEFAULT != panel_mode) {
 
@@ -1226,7 +1226,7 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 			normalized_pix_clk,
 			stream->public.timing.flags.LTE_340MCSC_SCRAMBLE);
 
-	dm_memset(&stream->sink->link->public.cur_link_settings, 0,
+	memset(&stream->sink->link->public.cur_link_settings, 0,
 			sizeof(struct dc_link_settings));
 
 	link->link_enc->funcs->enable_tmds_output(

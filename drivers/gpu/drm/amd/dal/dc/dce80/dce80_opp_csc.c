@@ -619,7 +619,7 @@ static void set_rgb_limited_range_adjustment(
 	matrix[6] = change_matrix[10];
 	matrix[7] = change_matrix[11];
 
-	dm_memset(&reg_matrix, 0, sizeof(struct out_csc_color_matrix));
+	memset(&reg_matrix, 0, sizeof(struct out_csc_color_matrix));
 
 	setup_reg_format(matrix, reg_matrix.regval);
 
@@ -693,7 +693,7 @@ static void set_yuv_adjustment(
 		calculate_adjustments(
 			ideals, &adjustments, matrix);
 
-	dm_memset(&reg_matrix, 0, sizeof(struct out_csc_color_matrix));
+	memset(&reg_matrix, 0, sizeof(struct out_csc_color_matrix));
 
 	setup_reg_format(matrix, reg_matrix.regval);
 

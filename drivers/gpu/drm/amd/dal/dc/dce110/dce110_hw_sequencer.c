@@ -1559,7 +1559,7 @@ static void enable_timing_synchronization(
 
 	/* Reset slave controllers on master VSync */
 	DC_SYNC_INFO("GSL: enabling trigger-reset\n");
-	dm_memset(&trigger_params, 0, sizeof(trigger_params));
+	memset(&trigger_params, 0, sizeof(trigger_params));
 
 	trigger_params.edge = TRIGGER_EDGE_DEFAULT;
 	trigger_params.source = SYNC_SOURCE_GSL_GROUP0;

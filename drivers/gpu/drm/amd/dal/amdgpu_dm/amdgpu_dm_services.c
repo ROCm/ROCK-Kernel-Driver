@@ -45,11 +45,6 @@ void dm_memmove(void *dst, const void *src, uint32_t size)
 	memmove(dst, src, size);
 }
 
-void dm_memset(void *p, int32_t c, uint32_t count)
-{
-	memset(p, c, count);
-}
-
 int32_t dm_memcmp(const void *p1, const void *p2, uint32_t count)
 {
 	return memcmp(p1, p2, count);

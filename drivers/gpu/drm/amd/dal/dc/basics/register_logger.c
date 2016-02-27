@@ -137,7 +137,7 @@ void dal_reg_logger_push(const char *caller_func)
 	if (NULL == free_stack_location)
 		return;
 
-	dm_memset(free_stack_location, 0, sizeof(*free_stack_location));
+	memset(free_stack_location, 0, sizeof(*free_stack_location));
 
 	free_stack_location->current_caller_func = caller_func;
 	free_stack_location->current_pid = dm_get_pid();
@@ -170,7 +170,7 @@ void dal_reg_logger_pop(void)
 			dm_get_pid(),
 			dm_get_tgid());
 
-	dm_memset(top_stack_location, 0, sizeof(*top_stack_location));
+	memset(top_stack_location, 0, sizeof(*top_stack_location));
 }
 
 void dal_reg_logger_rw_count_increment(void)
