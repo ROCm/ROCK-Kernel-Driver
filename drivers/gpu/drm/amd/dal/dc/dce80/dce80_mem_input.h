@@ -33,9 +33,4 @@ bool dce80_mem_input_construct(
 	uint32_t inst,
 	const struct dce110_mem_input_reg_offsets *offsets);
 
-
-enum dc_status dce_base_validate_mapped_resource(
-		const struct dc *dc,
-		struct validate_context *context);
-
 #endif
