@@ -599,7 +599,7 @@ static void set_rgb_limited_range_adjustment(
 
 	calculate_adjustments(ideals, &adjustments, matrix);
 
-	dm_memmove(change_matrix, matrix, sizeof(matrix));
+	memmove(change_matrix, matrix, sizeof(matrix));
 
 	/* from 1 -> 3 */
 	matrix[8] = change_matrix[0];

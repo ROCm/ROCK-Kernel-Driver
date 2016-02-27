@@ -44,8 +44,6 @@
 #define dm_realloc(ptr, size) krealloc(ptr, size, GFP_KERNEL)
 #define dm_free(ptr) kfree(ptr)
 
-void dm_memmove(void *dst, const void *src, uint32_t size);
-
 int32_t dm_memcmp(const void *p1, const void *p2, uint32_t count);
 
 int32_t dm_strncmp(const char *p1, const char *p2, uint32_t count);

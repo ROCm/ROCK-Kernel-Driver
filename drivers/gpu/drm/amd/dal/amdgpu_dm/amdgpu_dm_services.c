@@ -40,11 +40,6 @@
 #define dm_realloc(ptr, size) krealloc(ptr, size, GFP_KERNEL)
 #define dm_free(ptr) kfree(ptr)
 
-void dm_memmove(void *dst, const void *src, uint32_t size)
-{
-	memmove(dst, src, size);
-}
-
 int32_t dm_memcmp(const void *p1, const void *p2, uint32_t count)
 {
 	return memcmp(p1, p2, count);
@@ -262,17 +257,17 @@ static void get_default_clock_levels(
 	switch (clk_type) {
 	case DM_PP_CLOCK_TYPE_DISPLAY_CLK:
 		clks->num_levels = 6;
-		dm_memmove(clks->clocks_in_khz, disp_clks_in_khz,
+		memmove(clks->clocks_in_khz, disp_clks_in_khz,
 				sizeof(disp_clks_in_khz));
 		break;
 	case DM_PP_CLOCK_TYPE_ENGINE_CLK:
 		clks->num_levels = 6;
-		dm_memmove(clks->clocks_in_khz, sclks_in_khz,
+		memmove(clks->clocks_in_khz, sclks_in_khz,
 				sizeof(sclks_in_khz));
 		break;
 	case DM_PP_CLOCK_TYPE_MEMORY_CLK:
 		clks->num_levels = 2;
-		dm_memmove(clks->clocks_in_khz, mclks_in_khz,
+		memmove(clks->clocks_in_khz, mclks_in_khz,
 				sizeof(mclks_in_khz));
 		break;
 	default:

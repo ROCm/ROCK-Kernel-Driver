@@ -1365,7 +1365,7 @@ bool dal_adapter_service_get_integrated_info(
 	if (info == NULL || as->integrated_info == NULL)
 		return false;
 
-	dm_memmove(info, as->integrated_info, sizeof(struct integrated_info));
+	memmove(info, as->integrated_info, sizeof(struct integrated_info));
 
 	return true;
 }

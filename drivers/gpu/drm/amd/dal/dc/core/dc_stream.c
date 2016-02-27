@@ -108,7 +108,7 @@ static bool construct(struct core_stream *stream,
 	stream->public.audio_info.mode_count = dc_sink_data->edid_caps.audio_mode_count;
 	stream->public.audio_info.audio_latency = dc_sink_data->edid_caps.audio_latency;
 	stream->public.audio_info.video_latency = dc_sink_data->edid_caps.video_latency;
-	dm_memmove(
+	memmove(
 		stream->public.audio_info.display_name,
 		dc_sink_data->edid_caps.display_name,
 		AUDIO_INFO_DISPLAY_NAME_SIZE_IN_CHARS);

@@ -2546,7 +2546,7 @@ static enum bp_result bios_parser_get_faked_edid_buf(
 	if (len < edid_size)
 		return BP_RESULT_BADINPUT; /* buffer not big enough to fill */
 
-	dm_memmove(buff, &edid_record->ucFakeEDIDString, edid_size);
+	memmove(buff, &edid_record->ucFakeEDIDString, edid_size);
 
 	return BP_RESULT_OK;
 }
@@ -4091,7 +4091,7 @@ static void process_ext_display_connection_info(struct bios_parser *bp)
 			return;
 		}
 
-		dm_memmove(bp->bios_local_image, bp->bios, bp->bios_size);
+		memmove(bp->bios_local_image, bp->bios, bp->bios_size);
 		original_bios = bp->bios;
 		bp->bios = bp->bios_local_image;
 		connector_tbl =
@@ -4105,7 +4105,7 @@ static void process_ext_display_connection_info(struct bios_parser *bp)
 			/* Patching the bios image has failed. We will copy
 			 * again original image provided and afterwards
 			 * only remove null entries */
-			dm_memmove(
+			memmove(
 					bp->bios_local_image,
 					original_bios,
 					bp->bios_size);
@@ -4122,7 +4122,7 @@ static void process_ext_display_connection_info(struct bios_parser *bp)
 				continue;
 
 			if (i != connectors_num) {
-				dm_memmove(
+				memmove(
 						&connector_tbl->
 						asObjects[connectors_num],
 						object,
