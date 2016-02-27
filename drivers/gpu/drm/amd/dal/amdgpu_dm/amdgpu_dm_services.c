@@ -40,11 +40,6 @@
 #define dm_realloc(ptr, size) krealloc(ptr, size, GFP_KERNEL)
 #define dm_free(ptr) kfree(ptr)
 
-int32_t dm_strncmp(const char *p1, const char *p2, uint32_t count)
-{
-	return strncmp(p1, p2, count);
-}
-
 void dm_sleep_in_milliseconds(struct dc_context *ctx, uint32_t milliseconds)
 {
 	if (milliseconds >= 20)

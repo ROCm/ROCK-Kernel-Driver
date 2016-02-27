@@ -373,7 +373,7 @@ static uint32_t defer_delay_converter_wa(
 
 	if (dal_ddc_service_get_dp_receiver_id_info(ddc, &dp_rec_info) &&
 		(dp_rec_info.branch_id == DP_BRANCH_DEVICE_ID_4) &&
-		!dm_strncmp(dp_rec_info.branch_name,
+		!strncmp(dp_rec_info.branch_name,
 			DP_DVI_CONVERTER_ID_4,
 			sizeof(dp_rec_info.branch_name)))
 		return defer_delay > I2C_OVER_AUX_DEFER_WA_DELAY ?
