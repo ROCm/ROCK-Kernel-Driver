@@ -304,7 +304,6 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 	struct adapter_service *as;
 	struct dc_context *dc_ctx = dm_alloc(sizeof(*dc_ctx));
 
-
 	if (!dc_ctx) {
 		dm_error("%s: failed to create ctx\n", __func__);
 		goto ctx_fail;
@@ -312,7 +311,7 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 
 	dc_ctx->cgs_device = init_params->cgs_device;
 	dc_ctx->driver_context = init_params->driver;
-	dc_ctx->dc = dc;
+	dc_ctx->dc = &dc->public;
 
 	/* Create logger */
 	logger = dal_logger_create(dc_ctx);
@@ -409,7 +408,8 @@ void ProgramPixelDurationV(unsigned int pixelClockInKHz )
 */
 static int8_t acquire_first_free_underlay(
 		struct resource_context *res_ctx,
-		struct core_stream *stream)
+		struct core_stream *stream,
+		struct core_dc* core_dc)
 {
 	if (!res_ctx->pipe_ctx[DCE110_UNDERLAY_IDX].stream) {
 		struct dc_bios *dcb;
@@ -426,8 +426,8 @@ static int8_t acquire_first_free_underlay(
 		dcb = dal_adapter_service_get_bios_parser(
 						res_ctx->pool.adapter_srv);
 
-		stream->ctx->dc->hwss.enable_display_power_gating(
-			stream->ctx->dc->ctx,
+		core_dc->hwss.enable_display_power_gating(
+			core_dc->ctx,
 			DCE110_UNDERLAY_IDX,
 			dcb, PIPE_GATING_CONTROL_DISABLE);
 
@@ -454,7 +454,7 @@ static int8_t acquire_first_free_underlay(
  * Public functions
  ******************************************************************************/
 
-struct core_dc *dc_create(const struct dc_init_data *init_params)
+struct dc *dc_create(const struct dc_init_data *init_params)
  {
 	struct dc_context ctx = {
 		.driver_context = init_params->driver,
@@ -465,14 +465,18 @@ struct core_dc *dc_create(const struct dc_init_data *init_params)
 	if (NULL == dc)
 		goto alloc_fail;
 
-	ctx.dc = dc;
+	ctx.dc = &dc->public;
 	if (false == construct(dc, init_params))
 		goto construct_fail;
 
 	/*TODO: separate HW and SW initialization*/
 	init_hw(dc);
 
-	return dc;
+	dc->public.caps.max_targets = dc->res_pool.pipe_count;
+	dc->public.caps.max_links = dc->link_count;
+	dc->public.caps.max_audios = dc->res_pool.audio_count;
+
+	return &dc->public;
 
 construct_fail:
 	dm_free(dc);
@@ -481,18 +485,20 @@ alloc_fail:
 	return NULL;
 }
 
-void dc_destroy(struct core_dc **dc)
+void dc_destroy(struct dc **dc)
 {
-	destruct(*dc);
-	dm_free(*dc);
+	struct core_dc *core_dc = DC_TO_CORE(*dc);
+	destruct(core_dc);
+	dm_free(core_dc);
 	*dc = NULL;
 }
 
 bool dc_validate_resources(
-		const struct core_dc *dc,
+		const struct dc *dc,
 		const struct dc_validation_set set[],
 		uint8_t set_count)
 {
+	struct core_dc *core_dc = DC_TO_CORE(dc);
 	enum dc_status result = DC_ERROR_UNEXPECTED;
 	struct validate_context *context;
 
@@ -500,8 +506,8 @@ bool dc_validate_resources(
 	if(context == NULL)
 		goto context_alloc_fail;
 
-	result = dc->res_pool.funcs->validate_with_context(
-						dc, set, set_count, context);
+	result = core_dc->res_pool.funcs->validate_with_context(
+						core_dc, set, set_count, context);
 
 	val_ctx_destruct(context);
 	dm_free(context);
@@ -512,7 +518,7 @@ context_alloc_fail:
 }
 
 static void program_timing_sync(
-		struct dc_context *dc_ctx,
+		struct core_dc *core_dc,
 		struct validate_context *ctx)
 {
 	uint8_t i;
@@ -552,7 +558,7 @@ static void program_timing_sync(
 	}
 
 	if(group_size > 1) {
-		dc_ctx->dc->hwss.enable_timing_synchronization(dc_ctx, group_size, tg_set);
+		core_dc->hwss.enable_timing_synchronization(core_dc->ctx, group_size, tg_set);
 	}
 }
 
@@ -574,12 +580,11 @@ static bool targets_changed(
 	return false;
 }
 
-static void target_enable_memory_requests(struct dc_target *dc_target)
+static void target_enable_memory_requests(struct dc_target *dc_target,
+		struct resource_context *res_ctx)
 {
 	uint8_t i, j;
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
-	struct resource_context *res_ctx =
-		&target->ctx->dc->current_context.res_ctx;
 
 	for (i = 0; i < target->public.stream_count; i++) {
 		for (j = 0; j < MAX_PIPES; j++) {
@@ -597,12 +602,11 @@ static void target_enable_memory_requests(struct dc_target *dc_target)
 	}
 }
 
-static void target_disable_memory_requests(struct dc_target *dc_target)
+static void target_disable_memory_requests(struct dc_target *dc_target,
+		struct resource_context *res_ctx)
 {
 	uint8_t i, j;
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
-	struct resource_context *res_ctx =
-		&target->ctx->dc->current_context.res_ctx;
 
 	for (i = 0; i < target->public.stream_count; i++) {
 		for (j = 0; j < MAX_PIPES; j++) {
@@ -621,19 +625,20 @@ static void target_disable_memory_requests(struct dc_target *dc_target)
 }
 
 bool dc_commit_targets(
-	struct core_dc *dc,
+	struct dc *dc,
 	struct dc_target *targets[],
 	uint8_t target_count)
 {
+	struct core_dc *core_dc = DC_TO_CORE(dc);
 	enum dc_status result = DC_ERROR_UNEXPECTED;
 	struct validate_context *context;
 	struct dc_validation_set set[4];
 	uint8_t i;
 
-	if (false == targets_changed(dc, targets, target_count))
+	if (false == targets_changed(core_dc, targets, target_count))
 		return DC_OK;
 
-	dal_logger_write(dc->ctx->logger,
+	dal_logger_write(core_dc->ctx->logger,
 				LOG_MAJOR_INTERFACE_TRACE,
 				LOG_MINOR_COMPONENT_DC,
 				"%s: %d targets\n",
@@ -644,7 +649,7 @@ bool dc_commit_targets(
 		struct dc_target *target = targets[i];
 
 		dc_target_log(target,
-				dc->ctx->logger,
+				core_dc->ctx->logger,
 				LOG_MAJOR_INTERFACE_TRACE,
 				LOG_MINOR_COMPONENT_DC);
 
@@ -657,46 +662,46 @@ bool dc_commit_targets(
 	if (context == NULL)
 		goto context_alloc_fail;
 
-	result = dc->res_pool.funcs->validate_with_context(dc, set, target_count, context);
+	result = core_dc->res_pool.funcs->validate_with_context(core_dc, set, target_count, context);
 	if (result != DC_OK){
 		BREAK_TO_DEBUGGER();
 		val_ctx_destruct(context);
 		goto fail;
 	}
 
-	pplib_apply_safe_state(dc);
+	pplib_apply_safe_state(core_dc);
 
 	if (!dal_adapter_service_is_in_accelerated_mode(
-						dc->res_pool.adapter_srv)) {
-		dc->hwss.enable_accelerated_mode(dc);
+						core_dc->res_pool.adapter_srv)) {
+		core_dc->hwss.enable_accelerated_mode(core_dc);
 	}
 
-	for (i = 0; i < dc->current_context.target_count; i++) {
+	for (i = 0; i < core_dc->current_context.target_count; i++) {
 		/*TODO: optimize this to happen only when necessary*/
 		target_disable_memory_requests(
-				&dc->current_context.targets[i]->public);
+				&core_dc->current_context.targets[i]->public, &core_dc->current_context.res_ctx);
 	}
 
 	if (result == DC_OK) {
-		dc->hwss.reset_hw_ctx(dc, context);
+		core_dc->hwss.reset_hw_ctx(core_dc, context);
 
 		if (context->target_count > 0)
-			result = dc->hwss.apply_ctx_to_hw(dc, context);
+			result = core_dc->hwss.apply_ctx_to_hw(core_dc, context);
 	}
 
 	for (i = 0; i < context->target_count; i++) {
 		struct dc_target *dc_target = &context->targets[i]->public;
 		if (context->target_status[i].surface_count > 0)
-			target_enable_memory_requests(dc_target);
+			target_enable_memory_requests(dc_target, &core_dc->current_context.res_ctx);
 	}
 
-	program_timing_sync(dc->ctx, context);
+	program_timing_sync(core_dc, context);
 
-	pplib_apply_display_requirements(dc, context, &context->pp_display_cfg);
+	pplib_apply_display_requirements(core_dc, context, &context->pp_display_cfg);
 
-	val_ctx_destruct(&dc->current_context);
+	val_ctx_destruct(&core_dc->current_context);
 
-	dc->current_context = *context;
+	core_dc->current_context = *context;
 
 fail:
 	dm_free(context);
@@ -706,14 +711,16 @@ context_alloc_fail:
 }
 
 bool dc_commit_surfaces_to_target(
-		struct core_dc *dc,
+		struct dc *dc,
 		struct dc_surface *new_surfaces[],
 		uint8_t new_surface_count,
 		struct dc_target *dc_target)
 
 {
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+
 	int i, j;
-	uint32_t prev_disp_clk = dc->current_context.bw_results.dispclk_khz;
+	uint32_t prev_disp_clk = core_dc->current_context.bw_results.dispclk_khz;
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
 	struct dc_target_status *target_status = NULL;
 	struct validate_context *context;
@@ -723,7 +730,7 @@ bool dc_commit_surfaces_to_target(
 
 	context = dm_alloc(sizeof(struct validate_context));
 
-	val_ctx_copy_construct(&dc->current_context, context);
+	val_ctx_copy_construct(&core_dc->current_context, context);
 
 	/* Cannot commit surface to a target that is not commited */
 	for (i = 0; i < context->target_count; i++)
@@ -733,7 +740,7 @@ bool dc_commit_surfaces_to_target(
 	target_status = &context->target_status[i];
 
 	if (!dal_adapter_service_is_in_accelerated_mode(
-						dc->res_pool.adapter_srv)
+						core_dc->res_pool.adapter_srv)
 		|| i == context->target_count) {
 		BREAK_TO_DEBUGGER();
 		goto unexpected_fail;
@@ -750,14 +757,14 @@ bool dc_commit_surfaces_to_target(
 	/* TODO unhack mpo */
 	if (new_surface_count == 2 && target_status->surface_count < 2) {
 		acquire_first_free_underlay(&context->res_ctx,
-				DC_STREAM_TO_CORE(dc_target->streams[0]));
+				DC_STREAM_TO_CORE(dc_target->streams[0]), core_dc);
 		is_mpo_turning_on = true;
 	} else if (new_surface_count < 2 && target_status->surface_count == 2) {
 		context->res_ctx.pipe_ctx[DCE110_UNDERLAY_IDX].stream = NULL;
 		context->res_ctx.pipe_ctx[DCE110_UNDERLAY_IDX].surface = NULL;
 	}
 
-	dal_logger_write(dc->ctx->logger,
+	dal_logger_write(core_dc->ctx->logger,
 				LOG_MAJOR_INTERFACE_TRACE,
 				LOG_MINOR_COMPONENT_DC,
 				"%s: commit %d surfaces to target 0x%x\n",
@@ -782,7 +789,7 @@ bool dc_commit_surfaces_to_target(
 				new_surfaces[i], &context->res_ctx.pipe_ctx[j]);
 		}
 
-	if (dc->res_pool.funcs->validate_bandwidth(dc, context) != DC_OK) {
+	if (core_dc->res_pool.funcs->validate_bandwidth(core_dc, context) != DC_OK) {
 		BREAK_TO_DEBUGGER();
 		goto unexpected_fail;
 	}
@@ -790,13 +797,13 @@ bool dc_commit_surfaces_to_target(
 	if (prev_disp_clk < context->bw_results.dispclk_khz ||
 		(is_mpo_turning_on &&
 			prev_disp_clk == context->bw_results.dispclk_khz)) {
-		dc->hwss.program_bw(dc, context);
-		pplib_apply_display_requirements(dc, context,
+		core_dc->hwss.program_bw(core_dc, context);
+		pplib_apply_display_requirements(core_dc, context,
 						&context->pp_display_cfg);
 	}
 
 	if (current_enabled_surface_count > 0 && new_enabled_surface_count == 0)
-		target_disable_memory_requests(dc_target);
+		target_disable_memory_requests(dc_target, &core_dc->current_context.res_ctx);
 
 	for (i = 0; i < new_surface_count; i++)
 		for (j = 0; j < MAX_PIPES; j++) {
@@ -811,7 +818,7 @@ bool dc_commit_surfaces_to_target(
 					DC_SURFACE_TO_CORE(new_surfaces[i]))
 				continue;
 
-			dal_logger_write(dc->ctx->logger,
+			dal_logger_write(core_dc->ctx->logger,
 						LOG_MAJOR_INTERFACE_TRACE,
 						LOG_MINOR_COMPONENT_DC,
 						"Pipe:%d 0x%x: src: %d, %d, %d,"
@@ -831,26 +838,26 @@ bool dc_commit_surfaces_to_target(
 				gamma = DC_GAMMA_TO_CORE(
 					surface->public.gamma_correction);
 
-			dc->hwss.set_gamma_correction(
+			core_dc->hwss.set_gamma_correction(
 					pipe_ctx->ipp,
 					pipe_ctx->opp,
 					gamma, surface);
 
-			dc->hwss.set_plane_config(
-				dc, pipe_ctx, &context->res_ctx);
+			core_dc->hwss.set_plane_config(
+				core_dc, pipe_ctx, &context->res_ctx);
 		}
 
-	dc->hwss.update_plane_addrs(dc, &context->res_ctx);
+	core_dc->hwss.update_plane_addrs(core_dc, &context->res_ctx);
 
 	/* Lower display clock if necessary */
 	if (prev_disp_clk > context->bw_results.dispclk_khz) {
-		dc->hwss.program_bw(dc, context);
-		pplib_apply_display_requirements(dc, context,
+		core_dc->hwss.program_bw(core_dc, context);
+		pplib_apply_display_requirements(core_dc, context,
 						&context->pp_display_cfg);
 	}
 
-	val_ctx_destruct(&dc->current_context);
-	dc->current_context = *context;
+	val_ctx_destruct(&(core_dc->current_context));
+	core_dc->current_context = *context;
 	dm_free(context);
 	return true;
 
@@ -862,59 +869,61 @@ unexpected_fail:
 	return false;
 }
 
-uint8_t dc_get_current_target_count(const struct core_dc *dc)
+uint8_t dc_get_current_target_count(const struct dc *dc)
 {
-	return dc->current_context.target_count;
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	return core_dc->current_context.target_count;
 }
 
-struct dc_target *dc_get_target_at_index(const struct core_dc *dc, uint8_t i)
+struct dc_target *dc_get_target_at_index(const struct dc *dc, uint8_t i)
 {
-	if (i < dc->current_context.target_count)
-		return &dc->current_context.targets[i]->public;
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	if (i < core_dc->current_context.target_count)
+		return &(core_dc->current_context.targets[i]->public);
 	return NULL;
 }
 
-const struct dc_link *dc_get_link_at_index(struct core_dc *dc, uint32_t link_index)
+const struct dc_link *dc_get_link_at_index(struct dc *dc, uint32_t link_index)
 {
-	return &dc->links[link_index]->public;
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	return &core_dc->links[link_index]->public;
 }
 
 const struct graphics_object_id dc_get_link_id_at_index(
-	struct core_dc *dc, uint32_t link_index)
+	struct dc *dc, uint32_t link_index)
 {
-	return dc->links[link_index]->link_id;
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	return core_dc->links[link_index]->link_id;
 }
 
 const struct ddc_service *dc_get_ddc_at_index(
-	struct core_dc *dc, uint32_t link_index)
+	struct dc *dc, uint32_t link_index)
 {
-	return dc->links[link_index]->ddc;
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	return core_dc->links[link_index]->ddc;
 }
 
 const enum dc_irq_source dc_get_hpd_irq_source_at_index(
-	struct core_dc *dc, uint32_t link_index)
+	struct dc *dc, uint32_t link_index)
 {
-	return dc->links[link_index]->public.irq_source_hpd;
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	return core_dc->links[link_index]->public.irq_source_hpd;
 }
 
-const struct audio **dc_get_audios(struct core_dc *dc)
+const struct audio **dc_get_audios(struct dc *dc)
 {
-	return (const struct audio **)dc->res_pool.audios;
-}
-
-void dc_get_caps(const struct core_dc *dc, struct dc_caps *caps)
-{
-	caps->max_targets = dc->res_pool.pipe_count;
-	caps->max_links = dc->link_count;
-	caps->max_audios = dc->res_pool.audio_count;
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	return (const struct audio **)core_dc->res_pool.audios;
 }
 
 void dc_flip_surface_addrs(
-		struct core_dc *dc,
+		struct dc *dc,
 		const struct dc_surface *const surfaces[],
 		struct dc_flip_addrs flip_addrs[],
 		uint32_t count)
 {
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+
 	uint8_t i;
 	for (i = 0; i < count; i++) {
 		struct core_surface *surface = DC_SURFACE_TO_CORE(surfaces[i]);
@@ -925,31 +934,36 @@ void dc_flip_surface_addrs(
 		surface->public.address = flip_addrs[i].address;
 		surface->public.flip_immediate = flip_addrs[i].flip_immediate;
 	}
-	dc->hwss.update_plane_addrs(dc, &dc->current_context.res_ctx);
+	core_dc->hwss.update_plane_addrs(core_dc, &core_dc->current_context.res_ctx);
 }
 
 enum dc_irq_source dc_interrupt_to_irq_source(
-		struct core_dc *dc,
+		struct dc *dc,
 		uint32_t src_id,
 		uint32_t ext_id)
 {
-	return dal_irq_service_to_irq_source(dc->res_pool.irqs, src_id, ext_id);
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	return dal_irq_service_to_irq_source(core_dc->res_pool.irqs, src_id, ext_id);
 }
 
-void dc_interrupt_set(const struct core_dc *dc, enum dc_irq_source src, bool enable)
+void dc_interrupt_set(const struct dc *dc, enum dc_irq_source src, bool enable)
 {
-	dal_irq_service_set(dc->res_pool.irqs, src, enable);
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	dal_irq_service_set(core_dc->res_pool.irqs, src, enable);
 }
 
-void dc_interrupt_ack(struct core_dc *dc, enum dc_irq_source src)
+void dc_interrupt_ack(struct dc *dc, enum dc_irq_source src)
 {
-	dal_irq_service_ack(dc->res_pool.irqs, src);
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	dal_irq_service_ack(core_dc->res_pool.irqs, src);
 }
 
 const struct dc_target *dc_get_target_on_irq_source(
-		const struct core_dc *dc,
+		const struct dc *dc,
 		enum dc_irq_source src)
 {
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+
 	uint8_t i, j;
 	uint8_t crtc_idx;
 
@@ -976,15 +990,15 @@ const struct dc_target *dc_get_target_on_irq_source(
 		return NULL;
 	}
 
-	for (i = 0; i < dc->current_context.target_count; i++) {
-		struct core_target *target = dc->current_context.targets[i];
+	for (i = 0; i < core_dc->current_context.target_count; i++) {
+		struct core_target *target = core_dc->current_context.targets[i];
 		struct dc_target *dc_target = &target->public;
 
 		for (j = 0; j < target->public.stream_count; j++) {
 			const struct core_stream *stream =
 				DC_STREAM_TO_CORE(dc_target->streams[j]);
 
-			if (dc->current_context.res_ctx.
+			if (core_dc->current_context.res_ctx.
 					pipe_ctx[crtc_idx].stream == stream)
 				return dc_target;
 		}
@@ -995,44 +1009,49 @@ const struct dc_target *dc_get_target_on_irq_source(
 }
 
 void dc_set_power_state(
-	struct core_dc *dc,
+	struct dc *dc,
 	enum dc_acpi_cm_power_state power_state,
 	enum dc_video_power_state video_power_state)
 {
-	dc->previous_power_state = dc->current_power_state;
-	dc->current_power_state = video_power_state;
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+
+	core_dc->previous_power_state = core_dc->current_power_state;
+	core_dc->current_power_state = video_power_state;
 
 	switch (power_state) {
 	case DC_ACPI_CM_POWER_STATE_D0:
-		init_hw(dc);
+		init_hw(core_dc);
 		break;
 	default:
 		/* NULL means "reset/release all DC targets" */
 		dc_commit_targets(dc, NULL, 0);
 
-		dc->hwss.power_down(dc);
+		core_dc->hwss.power_down(core_dc);
 		break;
 	}
 
 }
 
-void dc_resume(const struct core_dc *dc)
+void dc_resume(const struct dc *dc)
 {
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+
 	uint32_t i;
 
-	for (i = 0; i < dc->link_count; i++)
-		core_link_resume(dc->links[i]);
+	for (i = 0; i < core_dc->link_count; i++)
+		core_link_resume(core_dc->links[i]);
 }
 
 bool dc_read_dpcd(
-		struct core_dc *dc,
+		struct dc *dc,
 		uint32_t link_index,
 		uint32_t address,
 		uint8_t *data,
 		uint32_t size)
 {
-	struct core_link *link = dc->links[link_index];
+	struct core_dc *core_dc = DC_TO_CORE(dc);
 
+	struct core_link *link = core_dc->links[link_index];
 	enum ddc_result r = dal_ddc_service_read_dpcd_data(
 			link->ddc,
 			address,
@@ -1042,13 +1061,15 @@ bool dc_read_dpcd(
 }
 
 bool dc_write_dpcd(
-		struct core_dc *dc,
+		struct dc *dc,
 		uint32_t link_index,
 		uint32_t address,
 		const uint8_t *data,
 		uint32_t size)
 {
-	struct core_link *link = dc->links[link_index];
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+
+	struct core_link *link = core_dc->links[link_index];
 
 	enum ddc_result r = dal_ddc_service_write_dpcd_data(
 			link->ddc,
@@ -1059,11 +1080,13 @@ bool dc_write_dpcd(
 }
 
 bool dc_submit_i2c(
-		struct core_dc *dc,
+		struct dc *dc,
 		uint32_t link_index,
 		struct i2c_command *cmd)
 {
-	struct core_link *link = dc->links[link_index];
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+
+	struct core_link *link = core_dc->links[link_index];
 	struct ddc_service *ddc = link->ddc;
 
 	return dal_i2caux_submit_i2c_command(

@@ -162,7 +162,7 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	struct common_irq_params *irq_params = interrupt_params;
 	struct amdgpu_device *adev = irq_params->adev;
 	unsigned long flags;
-	const struct core_dc *dc = irq_params->adev->dm.dc;
+	const struct dc *dc = irq_params->adev->dm.dc;
 	const struct dc_target *dc_target =
 			dc_get_target_on_irq_source(dc, irq_params->irq_src);
 
@@ -204,7 +204,7 @@ static void dm_crtc_high_irq(void *interrupt_params)
 {
 	struct common_irq_params *irq_params = interrupt_params;
 	struct amdgpu_device *adev = irq_params->adev;
-	const struct core_dc *dc = irq_params->adev->dm.dc;
+	const struct dc *dc = irq_params->adev->dm.dc;
 	const struct dc_target *dc_target =
 			dc_get_target_on_irq_source(dc, irq_params->irq_src);
 	uint8_t crtc_index = 0;
@@ -759,14 +759,11 @@ static void register_hpd_handlers(struct amdgpu_device *adev)
 /* Register IRQ sources and initialize IRQ callbacks */
 static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 {
-	struct core_dc *dc = adev->dm.dc;
+	struct dc *dc = adev->dm.dc;
 	struct common_irq_params *c_irq_params;
 	struct dc_interrupt_params int_params = {0};
 	int r;
 	int i;
-	struct dc_caps caps = { 0 };
-
-	dc_get_caps(dc, &caps);
 
 	int_params.requested_polarity = INTERRUPT_POLARITY_DEFAULT;
 	int_params.current_polarity = INTERRUPT_POLARITY_DEFAULT;
@@ -928,18 +925,16 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	struct amdgpu_connector *aconnector;
 	struct amdgpu_encoder *aencoder;
 	struct amdgpu_crtc *acrtc;
-	struct dc_caps caps = { 0 };
 	uint32_t link_cnt;
 
-	dc_get_caps(dm->dc, &caps);
-	link_cnt = caps.max_links;
+	link_cnt = dm->dc->caps.max_links;
 
 	if (amdgpu_dm_mode_config_init(dm->adev)) {
 		DRM_ERROR("DM: Failed to initialize mode config\n");
 		return -1;
 	}
 
-	for (i = 0; i < caps.max_targets; i++) {
+	for (i = 0; i < dm->dc->caps.max_targets; i++) {
 		acrtc = kzalloc(sizeof(struct amdgpu_crtc), GFP_KERNEL);
 		if (!acrtc)
 			goto fail;
@@ -954,7 +949,7 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		}
 	}
 
-	dm->display_indexes_num = caps.max_targets;
+	dm->display_indexes_num = dm->dc->caps.max_targets;
 
 	/* loops over all connectors on the board */
 	for (i = 0; i < link_cnt; i++) {

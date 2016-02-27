@@ -45,7 +45,9 @@ struct dc_caps {
     uint32_t max_audios;
 };
 
-void dc_get_caps(const struct core_dc *dc, struct dc_caps *caps);
+struct dc {
+	struct dc_caps caps;
+};
 
 struct dc_init_data {
 	struct hw_asic_id asic_id;
@@ -62,8 +64,8 @@ struct dc_init_data {
 	enum dce_environment dce_environment;
 };
 
-struct core_dc *dc_create(const struct dc_init_data *init_params);
-void dc_destroy(struct core_dc **dc);
+struct dc *dc_create(const struct dc_init_data *init_params);
+void dc_destroy(struct dc **dc);
 
 /*******************************************************************************
  * Surface Interfaces
@@ -140,7 +142,7 @@ struct dc_surface_status {
 /*
  * Create a new surface with default parameters;
  */
-struct dc_surface *dc_create_surface(const struct core_dc *dc);
+struct dc_surface *dc_create_surface(const struct dc *dc);
 const struct dc_surface_status* dc_surface_get_status(
 						struct dc_surface *dc_surface);
 
@@ -148,7 +150,7 @@ void dc_surface_retain(const struct dc_surface *dc_surface);
 void dc_surface_release(const struct dc_surface *dc_surface);
 
 void dc_gamma_release(const struct dc_gamma *dc_gamma);
-struct dc_gamma *dc_create_gamma(const struct core_dc *dc);
+struct dc_gamma *dc_create_gamma(const struct dc *dc);
 
 /*
  * This structure holds a surface address.  There could be multiple addresses
@@ -169,7 +171,7 @@ struct dc_flip_addrs {
  *   Surface addresses and flip attributes are programmed.
  *   Surface flip occur at next configured time (h_sync or v_sync flip)
  */
-void dc_flip_surface_addrs(struct core_dc *dc,
+void dc_flip_surface_addrs(struct dc *dc,
 		const struct dc_surface *const surfaces[],
 		struct dc_flip_addrs flip_addrs[],
 		uint32_t count);
@@ -185,7 +187,7 @@ void dc_flip_surface_addrs(struct core_dc *dc,
  *   This does not trigger a flip.  No surface address is programmed.
  */
 bool dc_commit_surfaces_to_target(
-		struct core_dc *dc,
+		struct dc *dc,
 		struct dc_surface *dc_surfaces[],
 		uint8_t surface_count,
 		struct dc_target *dc_target);
@@ -230,8 +232,8 @@ void dc_target_log(
 	enum log_major log_major,
 	enum log_minor log_minor);
 
-uint8_t dc_get_current_target_count(const struct core_dc *dc);
-struct dc_target *dc_get_target_at_index(const struct core_dc *dc, uint8_t i);
+uint8_t dc_get_current_target_count(const struct dc *dc);
+struct dc_target *dc_get_target_at_index(const struct dc *dc, uint8_t i);
 
 bool dc_target_is_connected_to_sink(
 		const struct dc_target *dc_target,
@@ -241,7 +243,7 @@ uint8_t dc_target_get_controller_id(const struct dc_target *dc_target);
 
 uint32_t dc_target_get_vblank_counter(const struct dc_target *dc_target);
 enum dc_irq_source dc_target_get_irq_src(
-	const struct core_dc *dc,
+	const struct dc *dc,
 	const struct dc_target *dc_target,
 	const enum irq_type irq_type);
 
@@ -261,7 +263,7 @@ struct dc_validation_set {
  *   No hardware is programmed for call.  Only validation is done.
  */
 bool dc_validate_resources(
-		const struct core_dc *dc,
+		const struct dc *dc,
 		const struct dc_validation_set set[],
 		uint8_t set_count);
 
@@ -274,7 +276,7 @@ bool dc_validate_resources(
  *   New targets are enabled with blank stream; no memory read.
  */
 bool dc_commit_targets(
-		struct core_dc *dc,
+		struct dc *dc,
 		struct dc_target *targets[],
 		uint8_t target_count);
 
@@ -355,11 +357,11 @@ struct dc_link {
  * boot time.  They cannot be created or destroyed.
  * Use dc_get_caps() to get number of links.
  */
-const struct dc_link *dc_get_link_at_index(struct core_dc *dc, uint32_t link_index);
+const struct dc_link *dc_get_link_at_index(struct dc *dc, uint32_t link_index);
 
 /* Return id of physical connector represented by a dc_link at link_index.*/
 const struct graphics_object_id dc_get_link_id_at_index(
-		struct core_dc *dc, uint32_t link_index);
+		struct dc *dc, uint32_t link_index);
 
 /* Set backlight level of an embedded panel (eDP, LVDS). */
 bool dc_link_set_backlight_level(const struct dc_link *dc_link, uint32_t level);
@@ -405,7 +407,7 @@ struct dc_sink {
 void dc_sink_retain(const struct dc_sink *sink);
 void dc_sink_release(const struct dc_sink *sink);
 
-const struct audio **dc_get_audios(struct core_dc *dc);
+const struct audio **dc_get_audios(struct dc *dc);
 
 struct dc_sink_init_data {
 	enum signal_type sink_signal;
@@ -438,7 +440,7 @@ struct dc_cursor {
  * Create a new cursor with default values for a given target.
  */
 struct dc_cursor *dc_create_cursor_for_target(
-		const struct core_dc *dc,
+		const struct dc *dc,
 		struct dc_target *dc_target);
 
 /**
@@ -450,7 +452,7 @@ struct dc_cursor *dc_create_cursor_for_target(
  *   Cursor position is unmodified.
  */
 bool dc_commit_cursor(
-		const struct core_dc *dc,
+		const struct dc *dc,
 		struct dc_cursor *cursor);
 
 /*
@@ -460,7 +462,7 @@ bool dc_commit_cursor(
  *   Cursor position will be programmed as well as enable/disable bit.
  */
 bool dc_set_cursor_position(
-		const struct core_dc *dc,
+		const struct dc *dc,
 		struct dc_cursor *cursor,
 		struct dc_cursor_position *pos);
 
@@ -468,15 +470,15 @@ bool dc_set_cursor_position(
  * Interrupt interfaces
  ******************************************************************************/
 enum dc_irq_source dc_interrupt_to_irq_source(
-		struct core_dc *dc,
+		struct dc *dc,
 		uint32_t src_id,
 		uint32_t ext_id);
-void dc_interrupt_set(const struct core_dc *dc, enum dc_irq_source src, bool enable);
-void dc_interrupt_ack(struct core_dc *dc, enum dc_irq_source src);
+void dc_interrupt_set(const struct dc *dc, enum dc_irq_source src, bool enable);
+void dc_interrupt_ack(struct dc *dc, enum dc_irq_source src);
 const enum dc_irq_source dc_get_hpd_irq_source_at_index(
-		struct core_dc *dc, uint32_t link_index);
+		struct dc *dc, uint32_t link_index);
 const struct dc_target *dc_get_target_on_irq_source(
-		const struct core_dc *dc,
+		const struct dc *dc,
 		enum dc_irq_source src);
 
 /*******************************************************************************
@@ -484,38 +486,38 @@ const struct dc_target *dc_get_target_on_irq_source(
  ******************************************************************************/
 
 void dc_set_power_state(
-		struct core_dc *dc,
+		struct dc *dc,
 		enum dc_acpi_cm_power_state power_state,
 		enum dc_video_power_state video_power_state);
-void dc_resume(const struct core_dc *dc);
+void dc_resume(const struct dc *dc);
 
 /*******************************************************************************
  * DDC Interfaces
  ******************************************************************************/
 
 const struct ddc_service *dc_get_ddc_at_index(
-		struct core_dc *dc, uint32_t link_index);
+		struct dc *dc, uint32_t link_index);
 
 /*
  * DPCD access interfaces
  */
 
 bool dc_read_dpcd(
-		struct core_dc *dc,
+		struct dc *dc,
 		uint32_t link_index,
 		uint32_t address,
 		uint8_t *data,
 		uint32_t size);
 
 bool dc_write_dpcd(
-		struct core_dc *dc,
+		struct dc *dc,
 		uint32_t link_index,
 		uint32_t address,
 		const uint8_t *data,
 	uint32_t size);
 
 bool dc_submit_i2c(
-		struct core_dc *dc,
+		struct dc *dc,
 		uint32_t link_index,
 		struct i2c_command *cmd);
 

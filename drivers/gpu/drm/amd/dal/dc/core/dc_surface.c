@@ -79,14 +79,16 @@ void enable_surface_flip_reporting(struct dc_surface *dc_surface,
 	/*register_flip_interrupt(surface);*/
 }
 
-struct dc_surface *dc_create_surface(const struct core_dc *dc)
+struct dc_surface *dc_create_surface(const struct dc *dc)
 {
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+
 	struct surface *surface = dm_alloc(sizeof(*surface));
 
 	if (NULL == surface)
 		goto alloc_fail;
 
-	if (false == construct(dc->ctx, surface))
+	if (false == construct(core_dc->ctx, surface))
 		goto construct_fail;
 
 	dc_surface_retain(&surface->protected.public);
@@ -146,14 +148,15 @@ void dc_gamma_release(const struct dc_gamma *dc_gamma)
 	}
 }
 
-struct dc_gamma *dc_create_gamma(const struct core_dc *dc)
+struct dc_gamma *dc_create_gamma(const struct dc *dc)
 {
+	struct core_dc *core_dc = DC_TO_CORE(dc);
 	struct gamma *gamma = dm_alloc(sizeof(*gamma));
 
 	if (gamma == NULL)
 		goto alloc_fail;
 
-	if (false == construct_gamma(dc->ctx, gamma))
+	if (false == construct_gamma(core_dc->ctx, gamma))
 		goto construct_fail;
 
 	dc_gamma_retain(&gamma->protected.public);
