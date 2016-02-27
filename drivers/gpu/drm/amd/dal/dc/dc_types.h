@@ -571,4 +571,105 @@ struct render_mode {
 	enum pixel_format pixel_format;
 };
 
+/* audio*/
+
+union audio_sample_rates {
+	struct sample_rates {
+		uint8_t RATE_32:1;
+		uint8_t RATE_44_1:1;
+		uint8_t RATE_48:1;
+		uint8_t RATE_88_2:1;
+		uint8_t RATE_96:1;
+		uint8_t RATE_176_4:1;
+		uint8_t RATE_192:1;
+	} rate;
+
+	uint8_t all;
+};
+
+struct audio_speaker_flags {
+    uint32_t FL_FR:1;
+    uint32_t LFE:1;
+    uint32_t FC:1;
+    uint32_t RL_RR:1;
+    uint32_t RC:1;
+    uint32_t FLC_FRC:1;
+    uint32_t RLC_RRC:1;
+    uint32_t SUPPORT_AI:1;
+};
+
+struct audio_speaker_info {
+	uint32_t ALLSPEAKERS:7;
+	uint32_t SUPPORT_AI:1;
+};
+
+
+struct audio_info_flags {
+
+	union {
+
+		struct audio_speaker_flags speaker_flags;
+		struct audio_speaker_info   info;
+
+		uint8_t all;
+	};
+};
+
+enum audio_format_code {
+	AUDIO_FORMAT_CODE_FIRST = 1,
+	AUDIO_FORMAT_CODE_LINEARPCM = AUDIO_FORMAT_CODE_FIRST,
+
+	AUDIO_FORMAT_CODE_AC3,
+	/*Layers 1 & 2 */
+	AUDIO_FORMAT_CODE_MPEG1,
+	/*MPEG1 Layer 3 */
+	AUDIO_FORMAT_CODE_MP3,
+	/*multichannel */
+	AUDIO_FORMAT_CODE_MPEG2,
+	AUDIO_FORMAT_CODE_AAC,
+	AUDIO_FORMAT_CODE_DTS,
+	AUDIO_FORMAT_CODE_ATRAC,
+	AUDIO_FORMAT_CODE_1BITAUDIO,
+	AUDIO_FORMAT_CODE_DOLBYDIGITALPLUS,
+	AUDIO_FORMAT_CODE_DTS_HD,
+	AUDIO_FORMAT_CODE_MAT_MLP,
+	AUDIO_FORMAT_CODE_DST,
+	AUDIO_FORMAT_CODE_WMAPRO,
+	AUDIO_FORMAT_CODE_LAST,
+	AUDIO_FORMAT_CODE_COUNT =
+		AUDIO_FORMAT_CODE_LAST - AUDIO_FORMAT_CODE_FIRST
+};
+
+struct audio_mode {
+	 /* ucData[0] [6:3] */
+	enum audio_format_code format_code;
+	/* ucData[0] [2:0] */
+	uint8_t channel_count;
+	/* ucData[1] */
+	union audio_sample_rates sample_rates;
+	union {
+		/* for LPCM */
+		uint8_t sample_size;
+		/* for Audio Formats 2-8 (Max bit rate divided by 8 kHz) */
+		uint8_t max_bit_rate;
+		/* for Audio Formats 9-15 */
+		uint8_t vendor_specific;
+	};
+};
+
+struct audio_info {
+	struct audio_info_flags flags;
+	uint32_t video_latency;
+	uint32_t audio_latency;
+	uint32_t display_index;
+	uint8_t display_name[AUDIO_INFO_DISPLAY_NAME_SIZE_IN_CHARS];
+	uint32_t manufacture_id;
+	uint32_t product_id;
+	/* PortID used for ContainerID when defined */
+	uint32_t port_id[2];
+	uint32_t mode_count;
+	/* this field must be last in this struct */
+	struct audio_mode modes[DC_MAX_AUDIO_DESC_COUNT];
+};
+
 #endif /* DC_TYPES_H_ */

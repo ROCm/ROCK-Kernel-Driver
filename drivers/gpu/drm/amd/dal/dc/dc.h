@@ -28,7 +28,7 @@
 
 #include "dc_types.h"
 #include "dal_types.h"
-#include "audio_types.h"
+#include "grph_object_defs.h"
 #include "logger_types.h"
 #include "gpio_types.h"
 #include "link_service_types.h"
