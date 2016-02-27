@@ -203,7 +203,7 @@ static void process_read_request(
 				I2CAUX_TRANSACTION_STATUS_FAILED_PROTOCOL_ERROR;
 			ctx->operation_succeeded = false;
 		} else
-			dm_delay_in_microseconds(engine->base.ctx, 400);
+			udelay(400);
 	break;
 	case AUX_CHANNEL_OPERATION_FAILED_TIMEOUT:
 		++ctx->timed_out_retry_aux;
@@ -330,7 +330,7 @@ static void process_write_reply(
 				I2CAUX_TRANSACTION_STATUS_FAILED_TIMEOUT;
 				ctx->operation_succeeded = false;
 			} else
-				dm_delay_in_microseconds(engine->base.ctx, 300);
+				udelay(300);
 		} else {
 			ctx->status = I2CAUX_TRANSACTION_STATUS_SUCCEEDED;
 			ctx->defer_retry_aux = 0;
@@ -401,7 +401,7 @@ static void process_write_request(
 				I2CAUX_TRANSACTION_STATUS_FAILED_PROTOCOL_ERROR;
 			ctx->operation_succeeded = false;
 		} else
-			dm_delay_in_microseconds(engine->base.ctx, 400);
+			udelay(400);
 	break;
 	case AUX_CHANNEL_OPERATION_FAILED_TIMEOUT:
 		++ctx->timed_out_retry_aux;

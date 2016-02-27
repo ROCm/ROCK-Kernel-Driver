@@ -593,7 +593,7 @@ static enum aux_channel_operation_result get_channel_status(
 			if (aux_sw_done)
 				break;
 
-			dm_delay_in_microseconds(engine->base.ctx, 10);
+			udelay(10);
 
 			time_elapsed += 10;
 		} while (time_elapsed < aux_engine->timeout_period);

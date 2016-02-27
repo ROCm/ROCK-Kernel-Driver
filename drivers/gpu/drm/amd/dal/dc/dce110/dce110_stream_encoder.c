@@ -682,7 +682,7 @@ void dce110_stream_encoder_set_mst_bandwidth(
 			DP_MSE_RATE_UPDATE__DP_MSE_RATE_UPDATE_PENDING_MASK))
 				break;
 
-			dm_delay_in_microseconds(ctx, 10);
+			udelay(10);
 
 			++retries;
 		} while (retries < DP_MST_UPDATE_MAX_RETRY);
@@ -1017,7 +1017,7 @@ void dce110_stream_encoder_dp_blank(
 			DP_VID_STREAM_STATUS))
 			break;
 
-		dm_delay_in_microseconds(ctx, 10);
+		udelay(10);
 
 		++retries;
 	} while (retries < max_retries);
@@ -1102,7 +1102,7 @@ void dce110_stream_encoder_dp_unblank(
 	/* wait 100us for DIG/DP logic to prime
 	* (i.e. a few video lines)
 	*/
-	dm_delay_in_microseconds(ctx, 100);
+	udelay(100);
 
 	/* the hardware would start sending video at the start of the next DP
 	* frame (i.e. rising edge of the vblank).

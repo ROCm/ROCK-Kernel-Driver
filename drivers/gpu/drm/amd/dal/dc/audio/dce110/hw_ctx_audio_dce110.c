@@ -891,7 +891,7 @@ static void enable_afmt_clock(
 	 */
 	do {
 		/* Wait for 1us between subsequent register reads.*/
-		dm_delay_in_microseconds(hw_ctx->ctx, 1);
+		udelay(1);
 		value = dm_read_reg(hw_ctx->ctx,
 				mmAFMT_CNTL + engine_offs);
 	} while (get_reg_field_value(value,

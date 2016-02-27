@@ -66,7 +66,7 @@ bool dal_i2c_engine_acquire(
 
 		/* i2c_engine is busy by VBios, lets wait and retry */
 
-		dm_delay_in_microseconds(engine->ctx, 10);
+		udelay(10);
 
 		++counter;
 	} while (counter < 2);

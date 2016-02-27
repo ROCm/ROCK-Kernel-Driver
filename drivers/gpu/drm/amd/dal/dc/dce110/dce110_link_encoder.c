@@ -1738,7 +1738,7 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 	 * after this bit is cleared */
 
 	do {
-		dm_delay_in_microseconds(ctx, 10);
+		udelay(10);
 
 		value0 = dm_read_reg(ctx,
 				LINK_REG(DP_MSE_SAT_UPDATE));
@@ -1889,7 +1889,7 @@ void dce110_link_encoder_set_lcd_backlight_level(
 			BL_PWM_GRP1_REG_UPDATE_PENDING))
 			break;
 
-		dm_delay_in_microseconds(ctx, 10);
+		udelay(10);
 	}
 }
 

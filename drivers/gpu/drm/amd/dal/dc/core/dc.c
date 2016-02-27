@@ -907,7 +907,6 @@ bool dc_commit_surfaces_to_target(
 				new_surface_count,
 				dc_target);
 
-
 	if (!resource_attach_surfaces_to_context(
 			new_surfaces, new_surface_count, dc_target, context)) {
 		BREAK_TO_DEBUGGER();

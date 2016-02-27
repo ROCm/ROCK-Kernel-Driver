@@ -137,7 +137,7 @@ static void allocate_mem_input(
 		if (field)
 			break;
 
-		dm_delay_in_microseconds(mi->ctx, retry_delay);
+		udelay(retry_delay);
 		retry_count--;
 
 	} while (retry_count > 0);

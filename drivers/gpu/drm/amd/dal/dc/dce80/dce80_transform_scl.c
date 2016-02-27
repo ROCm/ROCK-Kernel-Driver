@@ -246,7 +246,7 @@ static void program_filter(
 			DCFE_MEM_LIGHT_SLEEP_CNTL,
 			SCL_MEM_PWR_STATE);
 		i++)
-		dm_delay_in_microseconds(xfm80->base.ctx, 1);
+		udelay(1);
 
 	ASSERT(i < 10);
 
