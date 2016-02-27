@@ -1096,6 +1096,7 @@ bool dce110_construct_resource_pool(
 				bp,
 				CLOCK_SOURCE_ID_EXTERNAL,
 				NULL);
+		pool->clk_src_count = DCE110_CLK_SRC_TOTAL;
 	} else {
 		pool->dp_clock_source =
 			dce110_clock_source_create(
@@ -1103,6 +1104,7 @@ bool dce110_construct_resource_pool(
 				bp,
 				CLOCK_SOURCE_ID_PLL0,
 				&dce110_clk_src_reg_offsets[0]);
+		pool->clk_src_count = DCE110_CLK_SRC_TOTAL - 1;
 	}
 
 	pool->clock_sources[DCE110_CLK_SRC0] =
