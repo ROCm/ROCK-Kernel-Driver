@@ -28,9 +28,9 @@
 
 #include "core_types.h"
 
-struct dc;
+struct core_dc;
 
-bool dce100_hw_sequencer_construct(struct dc *dc);
+bool dce100_hw_sequencer_construct(struct core_dc *dc);
 
 #endif /* __DC_HWSS_DCE100_H__ */
 

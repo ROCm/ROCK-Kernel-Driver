@@ -336,14 +336,14 @@ static void dal_dc_clock_gating_dce100_power_up(struct dc_context *ctx, bool ena
 }
 
 static void set_displaymarks(
-		const struct dc *dc, struct validate_context *context)
+		const struct core_dc *dc, struct validate_context *context)
 {
 	/* Do nothing until we have proper bandwitdth calcs */
 }
 
 /**************************************************************************/
 
-bool dce100_hw_sequencer_construct(struct dc *dc)
+bool dce100_hw_sequencer_construct(struct core_dc *dc)
 {
 	dce110_hw_sequencer_construct(dc);
 

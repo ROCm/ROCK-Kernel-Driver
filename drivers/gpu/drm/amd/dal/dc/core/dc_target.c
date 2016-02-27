@@ -92,7 +92,7 @@ const struct dc_target_status *dc_target_get_status(
 {
 	uint8_t i;
 	struct core_target* target = DC_TARGET_TO_CORE(dc_target);
-	struct dc *dc = target->ctx->dc;
+    struct core_dc *dc = target->ctx->dc;
 
 	for (i = 0; i < dc->current_context.target_count; i++)
 		if (target == dc->current_context.targets[i])
@@ -254,7 +254,7 @@ uint32_t dc_target_get_vblank_counter(const struct dc_target *dc_target)
 }
 
 enum dc_irq_source dc_target_get_irq_src(
-	const struct dc *dc,
+	const struct core_dc *dc,
 	const struct dc_target *dc_target,
 	const enum irq_type irq_type)
 {

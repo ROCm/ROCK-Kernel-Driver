@@ -122,7 +122,7 @@ struct core_sink {
 #define DC_LINK_TO_CORE(dc_link) container_of(dc_link, struct core_link, public)
 
 struct link_init_data {
-	const struct dc *dc;
+	const struct core_dc *dc;
 	struct dc_context *ctx; /* TODO: remove 'dal' when DC is complete. */
 	uint32_t connector_index; /* this will be mapped to the HPD pins */
 	uint32_t link_index; /* this is mapped to DAL display_index
@@ -191,7 +191,7 @@ struct link_mst_stream_allocation_table {
 
 struct core_link {
 	struct dc_link public;
-	const struct dc *dc;
+	const struct core_dc *dc;
 
 	struct dc_context *ctx; /* TODO: AUTO remove 'dal' when DC is complete*/
 
@@ -242,13 +242,13 @@ struct resource_funcs {
 			const struct encoder_init_data *init);
 	void (*link_enc_destroy)(struct link_encoder **enc);
 	enum dc_status (*validate_with_context)(
-					const struct dc *dc,
+					const struct core_dc *dc,
 					const struct dc_validation_set set[],
 					uint8_t set_count,
 					struct validate_context *context);
 
 	enum dc_status (*validate_bandwidth)(
-					const struct dc *dc,
+					const struct core_dc *dc,
 					struct validate_context *context);
 };
 

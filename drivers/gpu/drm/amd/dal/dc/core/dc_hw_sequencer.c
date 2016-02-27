@@ -37,7 +37,7 @@
 
 bool dc_construct_hw_sequencer(
 				struct adapter_service *adapter_serv,
-				struct dc *dc)
+				struct core_dc *dc)
 {
 	enum dce_version dce_ver = dal_adapter_service_get_dce_version(adapter_serv);
 

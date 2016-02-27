@@ -59,7 +59,7 @@ struct dc_target_sync_report {
 /*******************************************************************************
  * Private functions
  ******************************************************************************/
-static void destroy_links(struct dc *dc)
+static void destroy_links(struct core_dc *dc)
 {
 	uint32_t i;
 
@@ -69,7 +69,7 @@ static void destroy_links(struct dc *dc)
 	}
 }
 
-static bool create_links(struct dc *dc, const struct dc_init_data *init_params)
+static bool create_links(struct core_dc *dc, const struct dc_init_data *init_params)
 {
 	int i;
 	int connectors_num;
@@ -165,7 +165,7 @@ failed_alloc:
 }
 
 
-static void init_hw(struct dc *dc)
+static void init_hw(struct core_dc *dc)
 {
 	int i;
 	struct dc_bios *bp;
@@ -257,7 +257,7 @@ static struct adapter_service *create_as(
 	return as;
 }
 
-static void bw_calcs_data_update_from_pplib(struct dc *dc)
+static void bw_calcs_data_update_from_pplib(struct core_dc *dc)
 {
 	struct dm_pp_clock_levels clks = {0};
 
@@ -303,7 +303,7 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 		1000);
 }
 
-static bool construct(struct dc *dc, const struct dal_init_data *init_params)
+static bool construct(struct core_dc *dc, const struct dal_init_data *init_params)
 {
 	struct dal_logger *logger;
 	/* Tempory code
@@ -389,7 +389,7 @@ ctx_fail:
 	return false;
 }
 
-static void destruct(struct dc *dc)
+static void destruct(struct core_dc *dc)
 {
 	val_ctx_destruct(&dc->current_context);
 	destroy_links(dc);
@@ -468,13 +468,13 @@ static int8_t acquire_first_free_underlay(
  * Public functions
  ******************************************************************************/
 
-struct dc *dc_create(const struct dal_init_data *init_params)
+struct core_dc *dc_create(const struct dal_init_data *init_params)
  {
 	struct dc_context ctx = {
 		.driver_context = init_params->driver,
 		.cgs_device = init_params->cgs_device
 	};
-	struct dc *dc = dm_alloc(&ctx, sizeof(*dc));
+	struct core_dc *dc = dm_alloc(&ctx, sizeof(*dc));
 
 	if (NULL == dc)
 		goto alloc_fail;
@@ -495,16 +495,16 @@ alloc_fail:
 	return NULL;
 }
 
-void dc_destroy(struct dc **dc)
+void dc_destroy(struct core_dc **dc)
 {
-	struct dc_context ctx = *(*dc)->ctx;
+	struct dc_context ctx = *((*dc)->ctx);
 	destruct(*dc);
 	dm_free(&ctx, *dc);
 	*dc = NULL;
 }
 
 bool dc_validate_resources(
-		const struct dc *dc,
+		const struct core_dc *dc,
 		const struct dc_validation_set set[],
 		uint8_t set_count)
 {
@@ -572,7 +572,7 @@ static void program_timing_sync(
 }
 
 static bool targets_changed(
-		struct dc *dc,
+		struct core_dc *dc,
 		struct dc_target *targets[],
 		uint8_t target_count)
 {
@@ -636,7 +636,7 @@ static void target_disable_memory_requests(struct dc_target *dc_target)
 }
 
 bool dc_commit_targets(
-	struct dc *dc,
+	struct core_dc *dc,
 	struct dc_target *targets[],
 	uint8_t target_count)
 {
@@ -721,7 +721,7 @@ context_alloc_fail:
 }
 
 bool dc_commit_surfaces_to_target(
-		struct dc *dc,
+		struct core_dc *dc,
 		struct dc_surface *new_surfaces[],
 		uint8_t new_surface_count,
 		struct dc_target *dc_target)
@@ -877,47 +877,47 @@ unexpected_fail:
 	return false;
 }
 
-uint8_t dc_get_current_target_count(const struct dc *dc)
+uint8_t dc_get_current_target_count(const struct core_dc *dc)
 {
 	return dc->current_context.target_count;
 }
 
-struct dc_target *dc_get_target_at_index(const struct dc *dc, uint8_t i)
+struct dc_target *dc_get_target_at_index(const struct core_dc *dc, uint8_t i)
 {
 	if (i < dc->current_context.target_count)
 		return &dc->current_context.targets[i]->public;
 	return NULL;
 }
 
-const struct dc_link *dc_get_link_at_index(struct dc *dc, uint32_t link_index)
+const struct dc_link *dc_get_link_at_index(struct core_dc *dc, uint32_t link_index)
 {
 	return &dc->links[link_index]->public;
 }
 
 const struct graphics_object_id dc_get_link_id_at_index(
-	struct dc *dc, uint32_t link_index)
+	struct core_dc *dc, uint32_t link_index)
 {
 	return dc->links[link_index]->link_id;
 }
 
 const struct ddc_service *dc_get_ddc_at_index(
-	struct dc *dc, uint32_t link_index)
+	struct core_dc *dc, uint32_t link_index)
 {
 	return dc->links[link_index]->ddc;
 }
 
 const enum dc_irq_source dc_get_hpd_irq_source_at_index(
-	struct dc *dc, uint32_t link_index)
+	struct core_dc *dc, uint32_t link_index)
 {
 	return dc->links[link_index]->public.irq_source_hpd;
 }
 
-const struct audio **dc_get_audios(struct dc *dc)
+const struct audio **dc_get_audios(struct core_dc *dc)
 {
 	return (const struct audio **)dc->res_pool.audios;
 }
 
-void dc_get_caps(const struct dc *dc, struct dc_caps *caps)
+void dc_get_caps(const struct core_dc *dc, struct dc_caps *caps)
 {
 	caps->max_targets = dc->res_pool.pipe_count;
 	caps->max_links = dc->link_count;
@@ -925,7 +925,7 @@ void dc_get_caps(const struct dc *dc, struct dc_caps *caps)
 }
 
 void dc_flip_surface_addrs(
-		struct dc *dc,
+		struct core_dc *dc,
 		const struct dc_surface *const surfaces[],
 		struct dc_flip_addrs flip_addrs[],
 		uint32_t count)
@@ -944,7 +944,7 @@ void dc_flip_surface_addrs(
 }
 
 enum dc_irq_source dc_interrupt_to_irq_source(
-		struct dc *dc,
+		struct core_dc *dc,
 		uint32_t src_id,
 		uint32_t ext_id)
 {
@@ -952,18 +952,18 @@ enum dc_irq_source dc_interrupt_to_irq_source(
 }
 
 
-void dc_interrupt_set(const struct dc *dc, enum dc_irq_source src, bool enable)
+void dc_interrupt_set(const struct core_dc *dc, enum dc_irq_source src, bool enable)
 {
 	dal_irq_service_set(dc->res_pool.irqs, src, enable);
 }
 
-void dc_interrupt_ack(struct dc *dc, enum dc_irq_source src)
+void dc_interrupt_ack(struct core_dc *dc, enum dc_irq_source src)
 {
 	dal_irq_service_ack(dc->res_pool.irqs, src);
 }
 
 const struct dc_target *dc_get_target_on_irq_source(
-		const struct dc *dc,
+		const struct core_dc *dc,
 		enum dc_irq_source src)
 {
 	uint8_t i, j;
@@ -1011,7 +1011,7 @@ const struct dc_target *dc_get_target_on_irq_source(
 }
 
 void dc_set_power_state(
-	struct dc *dc,
+	struct core_dc *dc,
 	enum dc_acpi_cm_power_state power_state,
 	enum dc_video_power_state video_power_state)
 {
@@ -1032,7 +1032,7 @@ void dc_set_power_state(
 
 }
 
-void dc_resume(const struct dc *dc)
+void dc_resume(const struct core_dc *dc)
 {
 	uint32_t i;
 
@@ -1041,14 +1041,13 @@ void dc_resume(const struct dc *dc)
 }
 
 bool dc_read_dpcd(
-		struct dc *dc,
+		struct core_dc *dc,
 		uint32_t link_index,
 		uint32_t address,
 		uint8_t *data,
 		uint32_t size)
 {
-	struct core_link *link =
-			DC_LINK_TO_LINK(dc_get_link_at_index(dc, link_index));
+	struct core_link *link = dc->links[link_index];
 
 	enum ddc_result r = dal_ddc_service_read_dpcd_data(
 			link->ddc,
@@ -1059,14 +1058,13 @@ bool dc_read_dpcd(
 }
 
 bool dc_write_dpcd(
-		struct dc *dc,
+		struct core_dc *dc,
 		uint32_t link_index,
 		uint32_t address,
 		const uint8_t *data,
 		uint32_t size)
 {
-	struct core_link *link =
-			DC_LINK_TO_LINK(dc_get_link_at_index(dc, link_index));
+	struct core_link *link = dc->links[link_index];
 
 	enum ddc_result r = dal_ddc_service_write_dpcd_data(
 			link->ddc,
@@ -1077,12 +1075,11 @@ bool dc_write_dpcd(
 }
 
 bool dc_submit_i2c(
-		struct dc *dc,
+		struct core_dc *dc,
 		uint32_t link_index,
 		struct i2c_command *cmd)
 {
-	struct core_link *link =
-			DC_LINK_TO_LINK(dc_get_link_at_index(dc, link_index));
+	struct core_link *link = dc->links[link_index];
 	struct ddc_service *ddc = link->ddc;
 
 	return dal_i2caux_submit_i2c_command(

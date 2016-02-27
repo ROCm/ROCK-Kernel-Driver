@@ -162,7 +162,7 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	struct common_irq_params *irq_params = interrupt_params;
 	struct amdgpu_device *adev = irq_params->adev;
 	unsigned long flags;
-	const struct dc *dc = irq_params->adev->dm.dc;
+	const struct core_dc *dc = irq_params->adev->dm.dc;
 	const struct dc_target *dc_target =
 			dc_get_target_on_irq_source(dc, irq_params->irq_src);
 
@@ -774,7 +774,7 @@ static void register_hpd_handlers(struct amdgpu_device *adev)
 /* Register IRQ sources and initialize IRQ callbacks */
 static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 {
-	struct dc *dc = adev->dm.dc;
+	struct core_dc *dc = adev->dm.dc;
 	struct common_irq_params *c_irq_params;
 	struct dc_interrupt_params int_params = {0};
 	int r;

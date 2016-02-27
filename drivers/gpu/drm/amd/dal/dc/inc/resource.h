@@ -34,7 +34,7 @@
 #define DCE110_UNDERLAY_IDX 3
 
 bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
-				struct dc *dc,
+				struct core_dc *dc,
 				uint8_t num_virtual_links);
 
 void build_scaling_params(
@@ -42,7 +42,7 @@ void build_scaling_params(
 	struct pipe_ctx *pipe_ctx);
 
 void build_scaling_params_for_context(
-	const struct dc *dc,
+	const struct core_dc *dc,
 	struct validate_context *context);
 
 void unreference_clock_source(
@@ -67,17 +67,17 @@ bool attach_surfaces_to_context(
 		struct dc_target *dc_target,
 		struct validate_context *context);
 
-void pplib_apply_safe_state(const struct dc *dc);
+void pplib_apply_safe_state(const struct core_dc *dc);
 
 void pplib_apply_display_requirements(
-	const struct dc *dc,
+	const struct core_dc *dc,
 	const struct validate_context *context,
 	struct dm_pp_display_configuration *pp_display_cfg);
 
 void build_info_frame(struct pipe_ctx *pipe_ctx);
 
 enum dc_status map_resources(
-	const struct dc *dc,
+	const struct core_dc *dc,
 	struct validate_context *context);
 
 void val_ctx_destruct(struct validate_context *context);

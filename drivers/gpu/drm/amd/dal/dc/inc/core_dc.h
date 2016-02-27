@@ -11,7 +11,7 @@
 #include "core_types.h"
 #include "hw_sequencer.h"
 
-struct dc {
+struct core_dc {
 	struct dc_context *ctx;
 
 	uint8_t link_count;

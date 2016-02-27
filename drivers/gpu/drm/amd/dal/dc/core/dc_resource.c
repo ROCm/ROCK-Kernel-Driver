@@ -43,7 +43,7 @@
 #endif
 
 bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
-				struct dc *dc,
+				struct core_dc *dc,
 				uint8_t num_virtual_links)
 {
 	enum dce_version dce_ver = dal_adapter_service_get_dce_version(adapter_serv);
@@ -367,7 +367,7 @@ void build_scaling_params(
 }
 
 void build_scaling_params_for_context(
-	const struct dc *dc,
+	const struct core_dc *dc,
 	struct validate_context *context)
 {
 	uint8_t i;
@@ -532,13 +532,13 @@ static void fill_display_configs(
 }
 
 void pplib_apply_safe_state(
-	const struct dc *dc)
+	const struct core_dc *dc)
 {
 	dm_pp_apply_safe_state(dc->ctx);
 }
 
 void pplib_apply_display_requirements(
-	const struct dc *dc,
+	const struct core_dc *dc,
 	const struct validate_context *context,
 	struct dm_pp_display_configuration *pp_display_cfg)
 {
@@ -737,7 +737,7 @@ static void set_stream_signal(struct pipe_ctx *pipe_ctx)
 }
 
 enum dc_status map_resources(
-		const struct dc *dc,
+		const struct core_dc *dc,
 		struct validate_context *context)
 {
 	uint8_t i, j, k;

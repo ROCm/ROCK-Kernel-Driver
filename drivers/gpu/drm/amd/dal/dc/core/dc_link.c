@@ -1617,7 +1617,7 @@ static enum dc_status deallocate_mst_payload(struct pipe_ctx *pipe_ctx)
 
 void core_link_enable_stream(struct pipe_ctx *pipe_ctx)
 {
-	struct dc *dc = pipe_ctx->stream->ctx->dc;
+    struct core_dc *dc = pipe_ctx->stream->ctx->dc;
 
 	if (DC_OK != enable_link(pipe_ctx)) {
 			BREAK_TO_DEBUGGER();
@@ -1634,7 +1634,7 @@ void core_link_enable_stream(struct pipe_ctx *pipe_ctx)
 
 void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 {
-	struct dc *dc = pipe_ctx->stream->ctx->dc;
+	struct core_dc *dc = pipe_ctx->stream->ctx->dc;
 
 	pipe_ctx->stream->status.link = NULL;
 	if (pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)

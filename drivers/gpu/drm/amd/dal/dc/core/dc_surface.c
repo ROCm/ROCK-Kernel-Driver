@@ -80,7 +80,7 @@ void enable_surface_flip_reporting(struct dc_surface *dc_surface,
 	/*register_flip_interrupt(surface);*/
 }
 
-struct dc_surface *dc_create_surface(const struct dc *dc)
+struct dc_surface *dc_create_surface(const struct core_dc *dc)
 {
 	struct surface *surface = dm_alloc(dc->ctx, sizeof(*surface));
 
@@ -148,7 +148,7 @@ void dc_gamma_release(const struct dc_gamma *dc_gamma)
 }
 
 
-struct dc_gamma *dc_create_gamma(const struct dc *dc)
+struct dc_gamma *dc_create_gamma(const struct core_dc *dc)
 {
 	struct gamma *gamma = dm_alloc(dc->ctx, sizeof(*gamma));
 

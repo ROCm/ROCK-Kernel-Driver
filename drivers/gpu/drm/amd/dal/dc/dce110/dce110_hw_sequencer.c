@@ -778,7 +778,7 @@ static enum dc_color_space get_output_color_space(
 static enum dc_status apply_single_controller_ctx_to_hw(
 		struct pipe_ctx *pipe_ctx,
 		struct validate_context *context,
-		struct dc *dc)
+		struct core_dc *dc)
 {
 	struct core_stream *stream = pipe_ctx->stream;
 	struct pipe_ctx *old_pipe_ctx =
@@ -908,7 +908,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 
 /******************************************************************************/
 
-static void power_down_encoders(struct dc *dc)
+static void power_down_encoders(struct core_dc *dc)
 {
 	int i;
 
@@ -918,7 +918,7 @@ static void power_down_encoders(struct dc *dc)
 	}
 }
 
-static void power_down_controllers(struct dc *dc)
+static void power_down_controllers(struct core_dc *dc)
 {
 	int i;
 
@@ -928,7 +928,7 @@ static void power_down_controllers(struct dc *dc)
 	}
 }
 
-static void power_down_clock_sources(struct dc *dc)
+static void power_down_clock_sources(struct core_dc *dc)
 {
 	int i;
 
@@ -939,7 +939,7 @@ static void power_down_clock_sources(struct dc *dc)
 	}
 }
 
-static void power_down_all_hw_blocks(struct dc *dc)
+static void power_down_all_hw_blocks(struct core_dc *dc)
 {
 	power_down_encoders(dc);
 
@@ -949,7 +949,7 @@ static void power_down_all_hw_blocks(struct dc *dc)
 }
 
 static void disable_vga_and_power_gate_all_controllers(
-		struct dc *dc)
+		struct core_dc *dc)
 {
 	int i;
 	struct timing_generator *tg;
@@ -981,7 +981,7 @@ static void disable_vga_and_power_gate_all_controllers(
  *  3. Enable power gating for controller
  *  4. Set acc_mode_change bit (VBIOS will clear this bit when going to FSDOS)
  */
-static void enable_accelerated_mode(struct dc *dc)
+static void enable_accelerated_mode(struct core_dc *dc)
 {
 	struct dc_bios *dcb;
 
@@ -1149,7 +1149,7 @@ static uint32_t compute_pstate_blackout_duration(
 }
 
 static void set_displaymarks(
-	const struct dc *dc,
+	const struct core_dc *dc,
 	struct validate_context *context)
 {
 	uint8_t i, num_pipes;
@@ -1194,7 +1194,7 @@ static void set_safe_displaymarks(struct resource_context *res_ctx)
 	}
 }
 
-static void program_bw(struct dc *dc, struct validate_context *context)
+static void program_bw(struct core_dc *dc, struct validate_context *context)
 {
 	set_safe_displaymarks(&context->res_ctx);
 	/*TODO: when pplib works*/
@@ -1205,7 +1205,7 @@ static void program_bw(struct dc *dc, struct validate_context *context)
 }
 
 static void switch_dp_clock_sources(
-	const struct dc *dc,
+	const struct core_dc *dc,
 	struct resource_context *res_ctx)
 {
 	uint8_t i;
@@ -1238,7 +1238,7 @@ static void switch_dp_clock_sources(
 
 /*TODO: const validate_context*/
 static enum dc_status apply_ctx_to_hw(
-		struct dc *dc,
+		struct core_dc *dc,
 		struct validate_context *context)
 {
 	enum dc_status status;
@@ -1342,7 +1342,7 @@ static void program_scaler(const struct pipe_ctx *pipe_ctx)
  * The Back End was already programmed by Set Mode.
  */
 static void set_plane_config(
-	const struct dc *dc,
+	const struct core_dc *dc,
 	struct pipe_ctx *pipe_ctx,
 	struct resource_context *res_ctx)
 {
@@ -1404,7 +1404,7 @@ static void set_plane_config(
 			surface->public.rotation);
 }
 
-static void update_plane_addrs(struct dc *dc, struct resource_context *res_ctx)
+static void update_plane_addrs(struct core_dc *dc, struct resource_context *res_ctx)
 {
 	int j;
 
@@ -1448,7 +1448,7 @@ static void update_plane_addrs(struct dc *dc, struct resource_context *res_ctx)
 }
 
 static void reset_single_pipe_hw_ctx(
-		const struct dc *dc,
+		const struct core_dc *dc,
 		struct pipe_ctx *pipe_ctx,
 		struct validate_context *context)
 {
@@ -1484,7 +1484,7 @@ static void reset_single_pipe_hw_ctx(
 }
 
 static void reset_hw_ctx(
-		struct dc *dc,
+		struct core_dc *dc,
 		struct validate_context *new_context)
 {
 	uint8_t i;
@@ -1501,7 +1501,7 @@ static void reset_hw_ctx(
 	}
 }
 
-static void power_down(struct dc *dc)
+static void power_down(struct core_dc *dc)
 {
 	power_down_all_hw_blocks(dc);
 	disable_vga_and_power_gate_all_controllers(dc);
@@ -1619,7 +1619,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.set_displaymarks = set_displaymarks,
 };
 
-bool dce110_hw_sequencer_construct(struct dc *dc)
+bool dce110_hw_sequencer_construct(struct core_dc *dc)
 {
 	dc->hwss = dce110_funcs;
 
