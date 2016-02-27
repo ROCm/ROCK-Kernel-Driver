@@ -81,30 +81,5 @@ union ovl_csc_flag {
 	} bits;
 };
 
-struct ovl_csc_adjustment {
-	struct ovl_color_adjust_option ovl_option;
-	enum dc_color_depth display_color_depth;
-	uint32_t lb_color_depth;
-	enum pixel_format desktop_surface_pixel_format;
-	enum ovl_surface_format ovl_sf;
-	/* API adjustment */
-	struct overlay_adjust_item overlay_brightness;
-	struct overlay_adjust_item overlay_gamma;
-	struct overlay_adjust_item overlay_contrast;
-	struct overlay_adjust_item overlay_saturation;
-	struct overlay_adjust_item overlay_hue; /* unit in degree from API. */
-	int32_t f_temperature[TEMPERATURE_MATRIX_SIZE];
-	uint32_t temperature_divider;
-	/* OEM/Application matrix related. */
-	int32_t matrix[MAXTRIX_SIZE_WITH_OFFSET];
-	uint32_t matrix_divider;
-
-	/* DCE50 parameters */
-	enum overlay_gamma_adjust adjust_gamma_type;
-	enum overlay_csc_adjust_type adjust_csc_type;
-	enum overlay_gamut_adjust_type adjust_gamut_type;
-	union ovl_csc_flag flag;
-
-};
 
 #endif
