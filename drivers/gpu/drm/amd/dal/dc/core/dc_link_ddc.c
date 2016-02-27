@@ -745,7 +745,7 @@ uint32_t dal_ddc_service_get_edid_buf_len(struct ddc_service *ddc)
 
 void dal_ddc_service_get_edid_buf(struct ddc_service *ddc, uint8_t *edid_buf)
 {
-	dm_memmove(edid_buf,
+	memmove(edid_buf,
 			ddc->edid_buf, ddc->edid_buf_len);
 }
 

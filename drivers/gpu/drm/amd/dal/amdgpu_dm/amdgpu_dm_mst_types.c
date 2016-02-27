@@ -198,7 +198,7 @@ static struct dc_sink *dm_dp_mst_add_mst_sink(
 	if (!dc_sink)
 		return NULL;
 
-	dm_memmove(dc_sink->dc_edid.raw_edid, edid, len);
+	memmove(dc_sink->dc_edid.raw_edid, edid, len);
 	dc_sink->dc_edid.length = len;
 
 	if (!dc_link_add_remote_sink(

@@ -242,7 +242,7 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 	size_in_bytes = lt_settings->link_settings.lane_count * sizeof(dpcd_lane[0]);
 
 	 // 0x00103 - 0x00102
-	dm_memmove(
+	memmove(
 		&dpcd_lt_buffer[DPCD_ADDRESS_LANE0_SET - dpcd_base_lt_offset],
 		dpcd_lane,
 		size_in_bytes);

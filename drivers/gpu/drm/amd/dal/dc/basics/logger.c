@@ -470,7 +470,7 @@ static void log_to_internal_buffer(struct log_entry *entry)
 			/* No wrap around, copy 'size' bytes
 			 * from 'entry->buf' to 'log_buffer'
 			 */
-			dm_memmove(logger->log_buffer +
+			memmove(logger->log_buffer +
 					logger->buffer_write_offset,
 					entry->buf, size);
 			logger->buffer_write_offset += size;
@@ -482,10 +482,10 @@ static void log_to_internal_buffer(struct log_entry *entry)
 			int space_after_wrap = total_free_space -
 					space_before_wrap;
 
-			dm_memmove(logger->log_buffer +
+			memmove(logger->log_buffer +
 					logger->buffer_write_offset,
 					entry->buf, space_before_wrap);
-			dm_memmove(logger->log_buffer, entry->buf +
+			memmove(logger->log_buffer, entry->buf +
 					space_before_wrap, space_after_wrap);
 
 			logger->buffer_write_offset = space_after_wrap;
@@ -499,7 +499,7 @@ static void log_to_internal_buffer(struct log_entry *entry)
 			flush_to_debug_console(logger);
 
 			/* Start writing to beginning of buffer */
-			dm_memmove(logger->log_buffer, entry->buf, size);
+			memmove(logger->log_buffer, entry->buf, size);
 			logger->buffer_write_offset = size;
 			logger->buffer_read_offset = 0;
 		}
@@ -568,7 +568,7 @@ static void append_entry(
 	}
 
 	/* Todo: check if off by 1 byte due to \0 anywhere */
-	dm_memmove(entry->buf + entry->buf_offset, buffer, buf_size);
+	memmove(entry->buf + entry->buf_offset, buffer, buf_size);
 	entry->buf_offset += buf_size;
 }
 

@@ -909,7 +909,7 @@ static void translate_info_frame(const struct hw_info_frame *hw_info_frame,
 		uint8_t *ptr;
 		uint8_t i;
 
-		dm_memmove(
+		memmove(
 						&encoder_info_frame->gamut,
 						&hw_info_frame->gamut_packet,
 						sizeof(struct hw_info_packet));
@@ -924,28 +924,28 @@ static void translate_info_frame(const struct hw_info_frame *hw_info_frame,
 	}
 
 	if (hw_info_frame->avi_info_packet.valid) {
-		dm_memmove(
+		memmove(
 						&encoder_info_frame->avi,
 						&hw_info_frame->avi_info_packet,
 						sizeof(struct hw_info_packet));
 	}
 
 	if (hw_info_frame->vendor_info_packet.valid) {
-		dm_memmove(
+		memmove(
 						&encoder_info_frame->vendor,
 						&hw_info_frame->vendor_info_packet,
 						sizeof(struct hw_info_packet));
 	}
 
 	if (hw_info_frame->spd_packet.valid) {
-		dm_memmove(
+		memmove(
 						&encoder_info_frame->spd,
 						&hw_info_frame->spd_packet,
 						sizeof(struct hw_info_packet));
 	}
 
 	if (hw_info_frame->vsc_packet.valid) {
-		dm_memmove(
+		memmove(
 						&encoder_info_frame->vsc,
 						&hw_info_frame->vsc_packet,
 						sizeof(struct hw_info_packet));

@@ -77,7 +77,7 @@ bool dal_vector_presized_costruct(
 	 * initialises the memory to. */
 	if (NULL != initial_value) {
 		for (i = 0; i < count; ++i)
-			dm_memmove(
+			memmove(
 				vector->container + i * struct_size,
 				initial_value,
 				struct_size);
@@ -169,7 +169,7 @@ bool dal_vector_remove_at_index(
 		return false;
 
 	if (index != vector->count - 1)
-		dm_memmove(
+		memmove(
 			vector->container + (index * vector->struct_size),
 			vector->container + ((index + 1) * vector->struct_size),
 			(vector->count - index - 1) * vector->struct_size);
@@ -189,7 +189,7 @@ void dal_vector_set_at_index(
 		BREAK_TO_DEBUGGER();
 		return;
 	}
-	dm_memmove(
+	memmove(
 		where,
 		what,
 		vector->struct_size);
@@ -218,12 +218,12 @@ bool dal_vector_insert_at(
 	insert_address = vector->container + (vector->struct_size * position);
 
 	if (vector->count && position < vector->count)
-		dm_memmove(
+		memmove(
 			insert_address + vector->struct_size,
 			insert_address,
 			vector->struct_size * (vector->count - position));
 
-	dm_memmove(
+	memmove(
 		insert_address,
 		what,
 		vector->struct_size);
@@ -272,7 +272,7 @@ struct vector *dal_vector_clone(
 	}
 
 	/* copy vector's data */
-	dm_memmove(vec_cloned->container, vector->container,
+	memmove(vec_cloned->container, vector->container,
 			vec_cloned->struct_size * vec_cloned->capacity);
 
 	return vec_cloned;
