@@ -61,14 +61,6 @@
 #define mmDP6_DP_DPHY_INTERNAL_CTRL                     0x4EDE
 #endif
 
-enum dce80_clk_src_array_id {
-	DCE80_CLK_SRC0 = 0,
-	DCE80_CLK_SRC1,
-	DCE80_CLK_SRC2,
-
-	DCE80_CLK_SRC_TOTAL
-};
-
 #define DCE11_DIG_FE_CNTL 0x4a00
 #define DCE11_DIG_BE_CNTL 0x4a47
 #define DCE11_DP_SEC 0x4ac3
@@ -1046,7 +1038,6 @@ bool dce80_construct_resource_pool(
 	struct dc_context *ctx = dc->ctx;
 	struct firmware_info info;
 	struct dc_bios *bp;
-	int regular_pll_offset = 0;
 
 	pool->adapter_srv = as;
 	pool->funcs = &dce80_res_pool_funcs;
@@ -1063,44 +1054,31 @@ bool dce80_construct_resource_pool(
 	if (dal_adapter_service_get_firmware_info(as, &info) &&
 		info.external_clock_source_frequency_for_dp != 0) {
 		pool->dp_clock_source =
-			dce80_clock_source_create(
-				ctx,
-				bp,
-				CLOCK_SOURCE_ID_EXTERNAL,
-				NULL);
+				dce80_clock_source_create(ctx, bp, CLOCK_SOURCE_ID_EXTERNAL, NULL);
+
+		pool->clock_sources[0] =
+				dce80_clock_source_create(ctx, bp, CLOCK_SOURCE_ID_PLL0, &dce80_clk_src_reg_offsets[0]);
+		pool->clock_sources[1] =
+				dce80_clock_source_create(ctx, bp, CLOCK_SOURCE_ID_PLL1, &dce80_clk_src_reg_offsets[1]);
+		pool->clock_sources[2] =
+				dce80_clock_source_create(ctx, bp, CLOCK_SOURCE_ID_PLL2, &dce80_clk_src_reg_offsets[2]);
+		pool->clk_src_count = 3;
+
 	} else {
 		pool->dp_clock_source =
-			dce80_clock_source_create(
-				ctx,
-				bp,
-				CLOCK_SOURCE_ID_PLL0,
-				&dce80_clk_src_reg_offsets[0]);
-		regular_pll_offset = 1;
+				dce80_clock_source_create(ctx, bp, CLOCK_SOURCE_ID_PLL0, &dce80_clk_src_reg_offsets[0]);
+		pool->clock_sources[0] =
+				dce80_clock_source_create(ctx, bp, CLOCK_SOURCE_ID_PLL1, &dce80_clk_src_reg_offsets[1]);
+		pool->clock_sources[1] =
+				dce80_clock_source_create(ctx, bp, CLOCK_SOURCE_ID_PLL2, &dce80_clk_src_reg_offsets[2]);
+		pool->clk_src_count = 2;
 	}
 
-	pool->clk_src_count = DCE80_CLK_SRC_TOTAL - regular_pll_offset;
-
-	for (i = 0; i < DCE80_CLK_SRC_TOTAL; ++i, ++regular_pll_offset)
-		pool->clock_sources[DCE80_CLK_SRC0 + i] =
-			dce80_clock_source_create(
-				ctx,
-				bp,
-				CLOCK_SOURCE_ID_PLL0 + regular_pll_offset,
-				&dce80_clk_src_reg_offsets[regular_pll_offset]);
-
-	pool->clock_sources[DCE80_CLK_SRC1] =
-		dce80_clock_source_create(
-			ctx,
-			bp,
-			CLOCK_SOURCE_ID_PLL1,
-			&dce80_clk_src_reg_offsets[1]);
-
-	pool->clock_sources[DCE80_CLK_SRC2] =
-		dce80_clock_source_create(
-			ctx,
-			bp,
-			CLOCK_SOURCE_ID_PLL2,
-			&dce80_clk_src_reg_offsets[2]);
+	if (pool->dp_clock_source == NULL) {
+		dm_error("DC: failed to create dp clock source!\n");
+		BREAK_TO_DEBUGGER();
+		goto clk_src_create_fail;
+	}
 
 	for (i = 0; i < pool->clk_src_count; i++) {
 		if (pool->clock_sources[i] == NULL) {

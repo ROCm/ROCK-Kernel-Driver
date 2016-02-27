@@ -59,13 +59,6 @@
 	#define mmDP8_DP_DPHY_INTERNAL_CTRL 0x57a7
 #endif
 
-enum dce110_clk_src_array_id {
-	DCE110_CLK_SRC0 = 0,
-	DCE110_CLK_SRC1,
-
-	DCE110_CLK_SRC_TOTAL
-};
-
 static const struct dce110_timing_generator_offsets dce110_tg_offsets[] = {
 	{
 		.crtc = (mmCRTC0_CRTC_CONTROL - mmCRTC_CONTROL),
@@ -291,6 +284,10 @@ static const struct dce110_clk_src_reg_offsets dce110_clk_src_reg_offsets[] = {
 	{
 		.pll_cntl = mmBPHYC_PLL1_PLL_CNTL,
 		.pixclk_resync_cntl  = mmPIXCLK1_RESYNC_CNTL
+	},
+	{
+		.pll_cntl = mmBPHYC_PLL2_PLL_CNTL,
+		.pixclk_resync_cntl  = mmPIXCLK2_RESYNC_CNTL
 	}
 };
 
@@ -1091,35 +1088,23 @@ bool dce110_construct_resource_pool(
 	if (dal_adapter_service_get_firmware_info(as, &info) &&
 		info.external_clock_source_frequency_for_dp != 0) {
 		pool->dp_clock_source =
-			dce110_clock_source_create(
-				ctx,
-				bp,
-				CLOCK_SOURCE_ID_EXTERNAL,
-				NULL);
-		pool->clk_src_count = DCE110_CLK_SRC_TOTAL;
-	} else {
-		pool->dp_clock_source =
-			dce110_clock_source_create(
-				ctx,
-				bp,
-				CLOCK_SOURCE_ID_PLL0,
-				&dce110_clk_src_reg_offsets[0]);
-		pool->clk_src_count = DCE110_CLK_SRC_TOTAL - 1;
+				dce110_clock_source_create(ctx, bp, CLOCK_SOURCE_ID_EXTERNAL, NULL);
+
+		pool->clock_sources[0] =
+				dce110_clock_source_create(ctx, bp, CLOCK_SOURCE_ID_PLL0, &dce110_clk_src_reg_offsets[0]);
+		pool->clock_sources[1] =
+				dce110_clock_source_create(ctx, bp, CLOCK_SOURCE_ID_PLL1, &dce110_clk_src_reg_offsets[1]);
+
+		pool->clk_src_count = 2;
+
+		/* TODO: find out if CZ support 3 PLLs */
 	}
 
-	pool->clock_sources[DCE110_CLK_SRC0] =
-		dce110_clock_source_create(
-			ctx,
-			bp,
-			CLOCK_SOURCE_ID_PLL0,
-			&dce110_clk_src_reg_offsets[0]);
-
-	pool->clock_sources[DCE110_CLK_SRC1] =
-		dce110_clock_source_create(
-			ctx,
-			bp,
-			CLOCK_SOURCE_ID_PLL1,
-			&dce110_clk_src_reg_offsets[1]);
+	if (pool->dp_clock_source == NULL) {
+		dm_error("DC: failed to create dp clock source!\n");
+		BREAK_TO_DEBUGGER();
+		goto clk_src_create_fail;
+	}
 
 	for (i = 0; i < pool->clk_src_count; i++) {
 		if (pool->clock_sources[i] == NULL) {
