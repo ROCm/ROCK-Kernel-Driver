@@ -181,6 +181,8 @@ static struct mem_input_funcs dce80_mem_input_funcs = {
 			dce110_mem_input_program_surface_flip_and_addr,
 	.mem_input_program_surface_config =
 			dce110_mem_input_program_surface_config,
+	.wait_for_no_surface_update_pending =
+			dce110_mem_input_wait_for_no_surface_update_pending
 };
 
 /*****************************************/

@@ -1434,6 +1434,9 @@ static void update_plane_addrs(struct core_dc *dc, struct resource_context *res_
 					false);
 
 
+		if (surface->public.flip_immediate)
+			pipe_ctx->mi->funcs->wait_for_no_surface_update_pending(pipe_ctx->mi);
+
 		if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, false)) {
 			dm_error("DC: failed to unblank crtc!\n");
 			BREAK_TO_DEBUGGER();

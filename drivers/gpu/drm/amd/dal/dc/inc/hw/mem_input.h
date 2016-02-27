@@ -64,6 +64,8 @@ struct mem_input_funcs {
 		struct dc_tiling_info *tiling_info,
 		union plane_size *plane_size,
 		enum dc_rotation_angle rotation);
+
+	void (*wait_for_no_surface_update_pending)(struct mem_input *mem_input);
 };
 
 #endif
