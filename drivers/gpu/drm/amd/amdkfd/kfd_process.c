@@ -122,7 +122,9 @@ struct kfd_process *kfd_create_process(struct file *filep)
 	mutex_unlock(&kfd_processes_mutex);
 
 	up_write(&thread->mm->mmap_sem);
-	kfd_process_init_cwsr(process, filep);
+
+	if (!process->pqm.tba_addr)
+		kfd_process_init_cwsr(process, filep);
 
 	return process;
 }
