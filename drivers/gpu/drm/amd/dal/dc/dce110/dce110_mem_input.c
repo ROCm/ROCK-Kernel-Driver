@@ -40,64 +40,30 @@
 #define DMIF_REG(reg) (reg + mem_input110->offsets.dmif)
 #define PIPE_REG(reg) (reg + mem_input110->offsets.pipe)
 
-static void set_flip_control(
-	struct dce110_mem_input *mem_input110,
-	bool immediate)
-{
-	uint32_t value = 0;
-
-	value = dm_read_reg(
-			mem_input110->base.ctx,
-			DCP_REG(mmGRPH_FLIP_CONTROL));
-	set_reg_field_value(value, 0,
-				GRPH_FLIP_CONTROL,
-				GRPH_SURFACE_UPDATE_IMMEDIATE_EN);
-	set_reg_field_value(value, 0,
-				GRPH_FLIP_CONTROL,
-				GRPH_SURFACE_UPDATE_H_RETRACE_EN);
-	if (immediate == true)
-		set_reg_field_value(value, 1,
-			GRPH_FLIP_CONTROL,
-			GRPH_SURFACE_UPDATE_IMMEDIATE_EN);
-
-	dm_write_reg(
-		mem_input110->base.ctx,
-		DCP_REG(mmGRPH_FLIP_CONTROL),
-		value);
-}
-
 static void program_sec_addr(
 	struct dce110_mem_input *mem_input110,
 	PHYSICAL_ADDRESS_LOC address)
 {
 	uint32_t value = 0;
-	uint32_t temp = 0;
+	uint32_t temp;
+
 	/*high register MUST be programmed first*/
 	temp = address.high_part &
-GRPH_SECONDARY_SURFACE_ADDRESS_HIGH__GRPH_SECONDARY_SURFACE_ADDRESS_HIGH_MASK;
-
+		GRPH_SECONDARY_SURFACE_ADDRESS_HIGH__GRPH_SECONDARY_SURFACE_ADDRESS_HIGH_MASK;
 	set_reg_field_value(value, temp,
 		GRPH_SECONDARY_SURFACE_ADDRESS_HIGH,
 		GRPH_SECONDARY_SURFACE_ADDRESS_HIGH);
+	dm_write_reg(mem_input110->base.ctx,
+				 DCP_REG(mmGRPH_SECONDARY_SURFACE_ADDRESS_HIGH), value);
 
-	dm_write_reg(
-			mem_input110->base.ctx,
-			DCP_REG(mmGRPH_SECONDARY_SURFACE_ADDRESS_HIGH),
-			value);
-
-	temp = 0;
 	value = 0;
 	temp = address.low_part >>
-	GRPH_SECONDARY_SURFACE_ADDRESS__GRPH_SECONDARY_SURFACE_ADDRESS__SHIFT;
-
+		GRPH_SECONDARY_SURFACE_ADDRESS__GRPH_SECONDARY_SURFACE_ADDRESS__SHIFT;
 	set_reg_field_value(value, temp,
 		GRPH_SECONDARY_SURFACE_ADDRESS,
 		GRPH_SECONDARY_SURFACE_ADDRESS);
-
-	dm_write_reg(
-			mem_input110->base.ctx,
-			DCP_REG(mmGRPH_SECONDARY_SURFACE_ADDRESS),
-			value);
+	dm_write_reg(mem_input110->base.ctx,
+				 DCP_REG(mmGRPH_SECONDARY_SURFACE_ADDRESS), value);
 }
 
 static void program_pri_addr(
@@ -105,64 +71,25 @@ static void program_pri_addr(
 	PHYSICAL_ADDRESS_LOC address)
 {
 	uint32_t value = 0;
-	uint32_t temp = 0;
+	uint32_t temp;
 
 	/*high register MUST be programmed first*/
 	temp = address.high_part &
-GRPH_PRIMARY_SURFACE_ADDRESS_HIGH__GRPH_PRIMARY_SURFACE_ADDRESS_HIGH_MASK;
-
+		GRPH_PRIMARY_SURFACE_ADDRESS_HIGH__GRPH_PRIMARY_SURFACE_ADDRESS_HIGH_MASK;
 	set_reg_field_value(value, temp,
 		GRPH_PRIMARY_SURFACE_ADDRESS_HIGH,
 		GRPH_PRIMARY_SURFACE_ADDRESS_HIGH);
+	dm_write_reg(mem_input110->base.ctx,
+				 DCP_REG(mmGRPH_PRIMARY_SURFACE_ADDRESS_HIGH), value);
 
-	dm_write_reg(
-		mem_input110->base.ctx,
-		DCP_REG(mmGRPH_PRIMARY_SURFACE_ADDRESS_HIGH),
-		value);
-
-	temp = 0;
 	value = 0;
 	temp = address.low_part >>
-	GRPH_PRIMARY_SURFACE_ADDRESS__GRPH_PRIMARY_SURFACE_ADDRESS__SHIFT;
-
+		GRPH_PRIMARY_SURFACE_ADDRESS__GRPH_PRIMARY_SURFACE_ADDRESS__SHIFT;
 	set_reg_field_value(value, temp,
 		GRPH_PRIMARY_SURFACE_ADDRESS,
 		GRPH_PRIMARY_SURFACE_ADDRESS);
-
-	dm_write_reg(
-		mem_input110->base.ctx,
-		DCP_REG(mmGRPH_PRIMARY_SURFACE_ADDRESS),
-		value);
-}
-
-static void program_addr(
-	struct dce110_mem_input *mem_input110,
-	const struct dc_plane_address *addr)
-{
-	switch (addr->type) {
-	case PLN_ADDR_TYPE_GRAPHICS:
-		if (addr->grph.addr.quad_part == 0)
-			break;
-		program_pri_addr(
-			mem_input110,
-			addr->grph.addr);
-		break;
-	case PLN_ADDR_TYPE_GRPH_STEREO:
-		if (addr->grph_stereo.left_addr.quad_part == 0
-			|| addr->grph_stereo.right_addr.quad_part == 0)
-			break;
-		program_pri_addr(
-			mem_input110,
-			addr->grph_stereo.left_addr);
-		program_sec_addr(
-			mem_input110,
-			addr->grph_stereo.right_addr);
-		break;
-	case PLN_ADDR_TYPE_VIDEO_PROGRESSIVE:
-	default:
-		/* not supported */
-		BREAK_TO_DEBUGGER();
-	}
+	dm_write_reg(mem_input110->base.ctx,
+				 DCP_REG(mmGRPH_PRIMARY_SURFACE_ADDRESS), value);
 }
 
 static void enable(struct dce110_mem_input *mem_input110)
@@ -439,9 +366,36 @@ bool dce110_mem_input_program_surface_flip_and_addr(
 {
 	struct dce110_mem_input *mem_input110 = TO_DCE110_MEM_INPUT(mem_input);
 
-	set_flip_control(mem_input110, flip_immediate);
-	program_addr(mem_input110,
-		address);
+	uint32_t value = 0;
+
+	value = dm_read_reg(mem_input110->base.ctx, DCP_REG(mmGRPH_FLIP_CONTROL));
+	if (flip_immediate) {
+		set_reg_field_value(value, 1, GRPH_FLIP_CONTROL, GRPH_SURFACE_UPDATE_IMMEDIATE_EN);
+		set_reg_field_value(value, 1, GRPH_FLIP_CONTROL, GRPH_SURFACE_UPDATE_H_RETRACE_EN);
+	} else {
+		set_reg_field_value(value, 0, GRPH_FLIP_CONTROL, GRPH_SURFACE_UPDATE_IMMEDIATE_EN);
+		set_reg_field_value(value, 0, GRPH_FLIP_CONTROL, GRPH_SURFACE_UPDATE_H_RETRACE_EN);
+	}
+	dm_write_reg(mem_input110->base.ctx, DCP_REG(mmGRPH_FLIP_CONTROL), value);
+
+	switch (address->type) {
+	case PLN_ADDR_TYPE_GRAPHICS:
+		if (address->grph.addr.quad_part == 0)
+			break;
+		program_pri_addr(mem_input110, address->grph.addr);
+		break;
+	case PLN_ADDR_TYPE_GRPH_STEREO:
+		if (address->grph_stereo.left_addr.quad_part == 0
+			|| address->grph_stereo.right_addr.quad_part == 0)
+			break;
+		program_pri_addr(mem_input110, address->grph_stereo.left_addr);
+		program_sec_addr(mem_input110, address->grph_stereo.right_addr);
+		break;
+	default:
+		/* not supported */
+		BREAK_TO_DEBUGGER();
+		break;
+	}
 
 	return true;
 }
