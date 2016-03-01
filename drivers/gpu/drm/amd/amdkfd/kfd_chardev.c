@@ -1150,11 +1150,6 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
-	if (dev->device_info->asic_family == CHIP_CARRIZO) {
-		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
-		return -EINVAL;
-	}
-
 	mutex_lock(&p->mutex);
 
 	pdd = kfd_bind_process_to_device(dev, p);
@@ -1287,11 +1282,6 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
-	if (dev->device_info->asic_family == CHIP_CARRIZO) {
-		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
-		return -EINVAL;
-	}
-
 	mutex_lock(&p->mutex);
 
 	pdd = kfd_bind_process_to_device(dev, p);
@@ -1352,11 +1342,6 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (dev == NULL)
 		return -EINVAL;
-
-	if (dev->device_info->asic_family == CHIP_CARRIZO) {
-		pr_debug("kfd_ioctl_free_memory_of_gpu not supported on CZ\n");
-		return -EINVAL;
-	}
 
 	mutex_lock(&p->mutex);
 
@@ -1423,11 +1408,6 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (dev == NULL)
 		return -EINVAL;
-
-	if (dev->device_info->asic_family == CHIP_CARRIZO) {
-		pr_debug("kfd_ioctl_map_memory_to_gpu not supported on CZ\n");
-		return -EINVAL;
-	}
 
 	if (args->device_ids_array_size > 0 &&
 			(args->device_ids_array_size < sizeof(uint32_t))) {
@@ -1533,11 +1513,6 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
-	if (dev->device_info->asic_family == CHIP_CARRIZO) {
-		pr_debug("kfd_ioctl_unmap_memory_from_gpu not supported on CZ\n");
-		return -EINVAL;
-	}
-
 	if (args->device_ids_array_size > 0 &&
 			(args->device_ids_array_size < sizeof(uint32_t))) {
 		pr_err("amdkfd: err node IDs array size %u\n",
@@ -1637,8 +1612,8 @@ static int kfd_ioctl_open_graphic_handle(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
-	if (dev->device_info->asic_family == CHIP_CARRIZO) {
-		pr_debug("kfd_ioctl_open_graphic_handle not supported on CZ\n");
+	if (dev->device_info->asic_family != CHIP_KAVERI) {
+		pr_debug("kfd_ioctl_open_graphic_handle only supported on KV\n");
 		return -EINVAL;
 	}
 
