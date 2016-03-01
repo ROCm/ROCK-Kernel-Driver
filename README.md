@@ -60,6 +60,11 @@ dGPU Config:
 
 #### Installing and configuring the kernel
 
+NOTE: We are aware that our current binary distribution mechanism is inadequate.
+This is an area where we have a lot of room for improvement and we'll be focusing
+some of our efforts in delivering a better user experience (and also cleaner source
+without binaries mixed in).
+
 * Downloading the kernel binaries from the repo
 `git clone https://github.com/RadeonOpenCompute/ROCK-Kernel-Driver.git`
 
