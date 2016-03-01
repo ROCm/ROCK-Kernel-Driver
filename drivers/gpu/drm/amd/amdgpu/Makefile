@@ -17,7 +17,7 @@ ccflags-y := -Iinclude/drm -I$(FULL_AMD_PATH)/include/asic_reg \
 		-I$(FULL_AMD_PATH)/scheduler \
 		-I$(FULL_AMD_DAL_PATH)/amdgpu_dm \
 		-I$(FULL_AMD_PATH)/powerplay/inc
-		
+
 amdgpu-y := amdgpu_drv.o
 
 # add KMS driver
@@ -109,7 +109,7 @@ amdgpu-y += \
 	 amdgpu_amdkfd.o \
 	 amdgpu_amdkfd_gfx_v7.o \
 	 amdgpu_amdkfd_gfx_v8.o \
-	 amdgpu_amdkfd_gfx_v8_tonga.o
+	 amdgpu_amdkfd_gpuvm.o
 
 amdgpu-$(CONFIG_COMPAT) += amdgpu_ioc32.o
 amdgpu-$(CONFIG_VGA_SWITCHEROO) += amdgpu_atpx_handler.o
