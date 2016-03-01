@@ -39,7 +39,9 @@
 #include "vi_structs.h"
 #include "vid.h"
 
-#define TONGA_BO_SIZE_ALIGN (0x8000)
+/* Special VM and GART address alignment needed for VI pre-Fiji due to
+ * a HW bug. */
+#define VI_BO_SIZE_ALIGN (0x8000)
 
 static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
 {
@@ -312,6 +314,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	int ret;
 	struct amdgpu_bo *bo;
 	uint64_t user_addr = 0;
+	int byte_align;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(size == 0);
@@ -327,6 +330,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	}
 
 	adev = get_amdgpu_device(kgd);
+	byte_align = adev->asic_type != CHIP_FIJI ? VI_BO_SIZE_ALIGN : 1;
 
 	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
 	if (*mem == NULL) {
@@ -343,7 +347,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 
 	/* Allocate buffer object. Userptr objects need to start out
 	 * in the CPU domain, get moved to GTT when pinned. */
-	ret = amdgpu_bo_create(adev, size, TONGA_BO_SIZE_ALIGN, false,
+	ret = amdgpu_bo_create(adev, size, byte_align, false,
 			       userptr ? AMDGPU_GEM_DOMAIN_CPU : domain,
 			       flags, NULL, NULL, &bo);
 	if (ret != 0) {
