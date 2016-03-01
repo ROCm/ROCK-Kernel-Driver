@@ -41,69 +41,13 @@
 
 #define TONGA_BO_SIZE_ALIGN (0x8000)
 
-static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
-		void *vm, struct kgd_mem **mem,
-		uint64_t *offset, void **kptr,
-		struct kfd_process_device *pdd, uint32_t flags);
-static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
-static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
-		void *vm);
-static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
-		void *vm);
-
-static int create_process_vm(struct kgd_dev *kgd, void **vm);
-static void destroy_process_vm(struct kgd_dev *kgd, void *vm);
-
-static uint32_t get_process_page_dir(void *vm);
-static int mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma);
-
-static int map_gtt_bo_to_kernel_tonga(struct kgd_dev *kgd,
-		struct kgd_mem *mem, void **kptr);
-
-static bool is_mem_on_local_device(struct kgd_dev *kgd,
-		struct list_head *bo_va_list, void *vm);
-struct kfd_process_device *get_pdd_from_buffer_object(struct kgd_dev *kgd,
-		struct kgd_mem *mem);
-static int return_bo_size(struct kgd_dev *kgd, struct kgd_mem *mem);
-
-static int pin_get_sg_table(struct kgd_dev *kgd,
-		struct kgd_mem *mem, uint64_t offset,
-		uint64_t size, struct sg_table **ret_sg);
-static void unpin_put_sg_table(struct kgd_mem *mem, struct sg_table *sg);
-
-static struct kfd2kgd_calls kfd2kgd;
-
-struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_tonga_get_functions()
-{
-	struct kfd2kgd_calls *cz;
-
-	cz = amdgpu_amdkfd_gfx_8_0_get_functions();
-	kfd2kgd = *cz;
-
-	kfd2kgd.alloc_memory_of_gpu = alloc_memory_of_gpu;
-	kfd2kgd.free_memory_of_gpu = free_memory_of_gpu;
-	kfd2kgd.map_memory_to_gpu = map_memory_to_gpu;
-	kfd2kgd.unmap_memory_to_gpu = unmap_memory_from_gpu;
-	kfd2kgd.create_process_vm = create_process_vm;
-	kfd2kgd.destroy_process_vm = destroy_process_vm;
-	kfd2kgd.get_process_page_dir = get_process_page_dir;
-	kfd2kgd.mmap_bo = mmap_bo;
-	kfd2kgd.map_gtt_bo_to_kernel = map_gtt_bo_to_kernel_tonga;
-	kfd2kgd.get_pdd_from_buffer_object = get_pdd_from_buffer_object;
-	kfd2kgd.return_bo_size = return_bo_size;
-	kfd2kgd.pin_get_sg_table_bo = pin_get_sg_table;
-	kfd2kgd.unpin_put_sg_table_bo = unpin_put_sg_table;
-
-	return &kfd2kgd;
-}
-
 static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
 {
 	return (struct amdgpu_device *)kgd;
 }
 
-struct kfd_process_device *get_pdd_from_buffer_object(struct kgd_dev *kgd,
-		struct kgd_mem *mem)
+struct kfd_process_device *amdgpu_amdkfd_gpuvm_get_pdd_from_buffer_object(
+		struct kgd_dev *kgd, struct kgd_mem *mem)
 {
 	return mem->data2.bo->pdd;
 }
@@ -602,7 +546,8 @@ err_failed_to_get_bos:
 
 #define BOOL_TO_STR(b)	(b == true) ? "true" : "false"
 
-static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
+int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
+		struct kgd_dev *kgd, uint64_t va, size_t size,
 		void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr,
 		struct kfd_process_device *pdd, uint32_t flags)
@@ -667,7 +612,8 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 			no_sub, userptr);
 }
 
-static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
+int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
+		struct kgd_dev *kgd, struct kgd_mem *mem)
 {
 	struct amdgpu_device *adev;
 	struct kfd_bo_va_list *entry, *tmp;
@@ -702,7 +648,7 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 
 	return 0;
 }
-static int return_bo_size(struct kgd_dev *kgd, struct kgd_mem *mem)
+int amdgpu_amdkfd_gpuvm_return_bo_size(struct kgd_dev *kgd, struct kgd_mem *mem)
 {
 	struct amdgpu_bo *bo;
 
@@ -712,8 +658,8 @@ static int return_bo_size(struct kgd_dev *kgd, struct kgd_mem *mem)
 	return bo->tbo.mem.size;
 
 }
-static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
-		void *vm)
+int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
+		struct kgd_dev *kgd, struct kgd_mem *mem, void *vm)
 {
 	struct amdgpu_device *adev;
 	int ret;
@@ -790,7 +736,7 @@ map_bo_to_gpuvm_failed:
 	return ret;
 }
 
-static int create_process_vm(struct kgd_dev *kgd, void **vm)
+int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm)
 {
 	int ret;
 	struct amdgpu_vm *new_vm;
@@ -830,7 +776,7 @@ static int create_process_vm(struct kgd_dev *kgd, void **vm)
 	return ret;
 }
 
-static void destroy_process_vm(struct kgd_dev *kgd, void *vm)
+void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
 	struct amdgpu_vm *avm = (struct amdgpu_vm *) vm;
@@ -845,7 +791,7 @@ static void destroy_process_vm(struct kgd_dev *kgd, void *vm)
 	kfree(vm);
 }
 
-static uint32_t get_process_page_dir(void *vm)
+uint32_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm)
 {
 	struct amdgpu_vm *avm = (struct amdgpu_vm *) vm;
 	struct amdgpu_vm_id *vm_id;
@@ -926,8 +872,8 @@ static bool is_mem_on_local_device(struct kgd_dev *kgd,
 	return false;
 }
 
-static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
-		void *vm)
+int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
+		struct kgd_dev *kgd, struct kgd_mem *mem, void *vm)
 {
 	struct kfd_bo_va_list *entry;
 	struct amdgpu_device *adev;
@@ -981,7 +927,7 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 	return ret;
 }
 
-static int mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma)
+int amdgpu_amdkfd_gpuvm_mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma)
 {
 	struct amdgpu_device *adev;
 
@@ -991,7 +937,7 @@ static int mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma)
 	return ttm_bo_mmap(NULL, vma, &adev->mman.bdev);
 }
 
-static int map_gtt_bo_to_kernel_tonga(struct kgd_dev *kgd,
+int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 		struct kgd_mem *mem, void **kptr)
 {
 	int ret;
@@ -1145,7 +1091,7 @@ out:
 	return ret;
 }
 
-static int pin_get_sg_table(struct kgd_dev *kgd,
+int amdgpu_amdkfd_gpuvm_pin_get_sg_table(struct kgd_dev *kgd,
 		struct kgd_mem *mem, uint64_t offset,
 		uint64_t size, struct sg_table **ret_sg)
 {
@@ -1165,7 +1111,8 @@ static int pin_get_sg_table(struct kgd_dev *kgd,
 	return ret;
 }
 
-static void unpin_put_sg_table(struct kgd_mem *mem, struct sg_table *sg)
+void amdgpu_amdkfd_gpuvm_unpin_put_sg_table(
+		struct kgd_mem *mem, struct sg_table *sg)
 {
 	sg_free_table(sg);
 	kfree(sg);

@@ -92,8 +92,40 @@ void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info);
 int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 		struct kgd_mem *mem, void **kptr);
 
-/* Tonga API */
-struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_tonga_get_functions(void);
+/* GPUVM API */
+int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
+		struct kgd_dev *kgd, uint64_t va, size_t size,
+		void *vm, struct kgd_mem **mem,
+		uint64_t *offset, void **kptr,
+		struct kfd_process_device *pdd, uint32_t flags);
+int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
+		struct kgd_dev *kgd, struct kgd_mem *mem);
+int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
+		struct kgd_dev *kgd, struct kgd_mem *mem, void *vm);
+int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
+		struct kgd_dev *kgd, struct kgd_mem *mem, void *vm);
+
+int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm);
+void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm);
+
+uint32_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm);
+int amdgpu_amdkfd_gpuvm_mmap_bo(
+		struct kgd_dev *kgd, struct vm_area_struct *vma);
+
+int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
+		struct kgd_mem *mem, void **kptr);
+
+struct kfd_process_device *amdgpu_amdkfd_gpuvm_get_pdd_from_buffer_object(
+		struct kgd_dev *kgd, struct kgd_mem *mem);
+int amdgpu_amdkfd_gpuvm_return_bo_size(
+		struct kgd_dev *kgd, struct kgd_mem *mem);
+
+int amdgpu_amdkfd_gpuvm_pin_get_sg_table(struct kgd_dev *kgd,
+		struct kgd_mem *mem, uint64_t offset,
+		uint64_t size, struct sg_table **ret_sg);
+void amdgpu_amdkfd_gpuvm_unpin_put_sg_table(
+		struct kgd_mem *mem, struct sg_table *sg);
+
 
 #endif /* AMDGPU_AMDKFD_H_INCLUDED */
 
