@@ -327,7 +327,7 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 	dc->ctx->dce_environment = init_params->dce_environment;
 
 
-	resource_parse_asic_id(dc, init_params->asic_id, &dc_version);
+	dc_version = resource_parse_asic_id(init_params->asic_id);
 
 
 /* TODO: Refactor DCE code to remove AS and asic caps */
