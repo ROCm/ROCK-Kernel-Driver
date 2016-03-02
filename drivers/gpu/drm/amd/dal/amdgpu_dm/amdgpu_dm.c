@@ -250,6 +250,7 @@ int amdgpu_dm_init(struct amdgpu_device *adev)
 	adev->dm.ddev = adev->ddev;
 	adev->dm.adev = adev;
 
+	DRM_INFO("DAL is enabled\n");
 	/* Zero all the fields */
 	memset(&init_data, 0, sizeof(init_data));
 
@@ -304,6 +305,9 @@ int amdgpu_dm_init(struct amdgpu_device *adev)
 
 	/* Display Core create. */
 	adev->dm.dc = dc_create(&init_data);
+
+	if (!adev->dm.dc)
+		DRM_INFO("Display Core failed to initialize!\n");
 
 	INIT_WORK(&adev->dm.mst_hotplug_work, hotplug_notify_work_func);
 

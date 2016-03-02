@@ -489,6 +489,11 @@ struct dc *dc_create(const struct dc_init_data *init_params)
 	dc->public.caps.max_links = dc->link_count;
 	dc->public.caps.max_audios = dc->res_pool.audio_count;
 
+	dal_logger_write(dc->ctx->logger,
+			LOG_MAJOR_INTERFACE_TRACE,
+			LOG_MINOR_COMPONENT_DC,
+			"Display Core initialized\n");
+
 	return &dc->public;
 
 construct_fail:
