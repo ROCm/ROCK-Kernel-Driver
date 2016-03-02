@@ -28,14 +28,20 @@
 #include "core_types.h"
 #include "core_status.h"
 #include "core_dc.h"
+#include "dal_asic_id.h"
 
 /* TODO unhardcode, 4 for CZ*/
 #define MEMORY_TYPE_MULTIPLIER 4
 #define DCE110_UNDERLAY_IDX 3
 
+bool resource_parse_asic_id(struct core_dc *dc,
+				struct hw_asic_id asic_id,
+				enum dce_version *dc_version);
+
 bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
 				struct core_dc *dc,
-				uint8_t num_virtual_links);
+				uint8_t num_virtual_links,
+				enum dce_version dc_version);
 
 enum dc_status resource_map_pool_resources(
 	const struct core_dc *dc,

@@ -303,6 +303,7 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 	struct dal_logger *logger;
 	struct adapter_service *as;
 	struct dc_context *dc_ctx = dm_alloc(sizeof(*dc_ctx));
+	enum dce_version dc_version = DCE_VERSION_UNKNOWN;
 
 	if (!dc_ctx) {
 		dm_error("%s: failed to create ctx\n", __func__);
@@ -322,7 +323,15 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 		goto logger_fail;
 	}
 	dc_ctx->logger = logger;
+	dc->ctx = dc_ctx;
+	dc->ctx->dce_environment = init_params->dce_environment;
 
+
+	resource_parse_asic_id(dc, init_params->asic_id, &dc_version);
+
+
+/* TODO: Refactor DCE code to remove AS and asic caps */
+if (dc_version < DCE_VERSION_MAX) {
 	/* Create adapter service */
 	as = create_as(init_params, dc_ctx);
 
@@ -340,17 +349,12 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 		goto as_fail;
 	}
 
-	dc->ctx = dc_ctx;
-
-	dc->ctx->dce_environment = dal_adapter_service_get_dce_environment(
-			as);
-
 	/* Create hardware sequencer */
 	if (!dc_construct_hw_sequencer(as, dc))
 		goto hwss_fail;
 
 	if (!dc_construct_resource_pool(
-		as, dc, init_params->num_virtual_links))
+		as, dc, init_params->num_virtual_links, dc_version))
 		goto construct_resource_fail;
 
 	if (!create_links(dc, as, init_params->num_virtual_links))
@@ -359,6 +363,15 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 	bw_calcs_init(&dc->bw_dceip, &dc->bw_vbios);
 
 	bw_calcs_data_update_from_pplib(dc);
+} else {
+
+	/* Resource should construct all asic specific resources.
+	 * This should be the only place where we need to parse the asic id
+	 */
+	if (!dc_construct_resource_pool(
+		NULL, dc, init_params->num_virtual_links, dc_version))
+		goto construct_resource_fail;
+}
 
 	return true;
 
