@@ -34,26 +34,26 @@
 #define MEMORY_TYPE_MULTIPLIER 4
 #define DCE110_UNDERLAY_IDX 3
 
-bool resource_parse_asic_id(struct core_dc *dc,
-				struct hw_asic_id asic_id,
-				enum dce_version *dc_version);
+enum dce_version resource_parse_asic_id(
+		struct hw_asic_id asic_id);
 
-bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
-				struct core_dc *dc,
-				uint8_t num_virtual_links,
-				enum dce_version dc_version);
+bool dc_construct_resource_pool(
+		struct adapter_service *adapter_serv,
+		struct core_dc *dc,
+		uint8_t num_virtual_links,
+		enum dce_version dc_version);
 
 enum dc_status resource_map_pool_resources(
-	const struct core_dc *dc,
-	struct validate_context *context);
+		const struct core_dc *dc,
+		struct validate_context *context);
 
 void resource_build_scaling_params(
-	const struct dc_surface *surface,
-	struct pipe_ctx *pipe_ctx);
+		const struct dc_surface *surface,
+		struct pipe_ctx *pipe_ctx);
 
 void resource_build_scaling_params_for_context(
-	const struct core_dc *dc,
-	struct validate_context *context);
+		const struct core_dc *dc,
+		struct validate_context *context);
 
 void resource_build_info_frame(struct pipe_ctx *pipe_ctx);
 
@@ -66,12 +66,12 @@ void resource_reference_clock_source(
 		struct clock_source *clock_source);
 
 bool resource_is_same_timing(
-	const struct dc_crtc_timing *timing1,
-	const struct dc_crtc_timing *timing2);
+		const struct dc_crtc_timing *timing1,
+		const struct dc_crtc_timing *timing2);
 
 struct clock_source *resource_find_used_clk_src_for_sharing(
-	struct resource_context *res_ctx,
-	struct pipe_ctx *pipe_ctx);
+		struct resource_context *res_ctx,
+		struct pipe_ctx *pipe_ctx);
 
 struct clock_source *dc_resource_find_first_free_pll(
 		struct resource_context *res_ctx);
@@ -83,8 +83,8 @@ bool resource_attach_surfaces_to_context(
 		struct validate_context *context);
 
 void resource_validate_ctx_copy_construct(
-	const struct validate_context *src_ctx,
-	struct validate_context *dst_ctx);
+		const struct validate_context *src_ctx,
+		struct validate_context *dst_ctx);
 
 void resource_validate_ctx_destruct(struct validate_context *context);
 

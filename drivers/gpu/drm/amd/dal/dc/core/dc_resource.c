@@ -42,21 +42,21 @@
 #include "dce110/dce110_resource.h"
 #endif
 
-bool resource_parse_asic_id(struct core_dc *dc,
-		struct hw_asic_id asic_id,
-		enum dce_version *dc_version)
-{
+enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
+ {
+	enum dce_version dc_version = DCE_VERSION_UNKNOWN;
+
 	switch (asic_id.chip_family) {
 
 #if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
 	case FAMILY_CI:
 	case FAMILY_KV:
-		*dc_version = DCE_VERSION_8_0;
+		dc_version = DCE_VERSION_8_0;
 		break;
 #endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	case FAMILY_CZ:
-		*dc_version = DCE_VERSION_11_0;
+		dc_version = DCE_VERSION_11_0;
 		break;
 #endif
 
@@ -64,16 +64,16 @@ bool resource_parse_asic_id(struct core_dc *dc,
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 		if (ASIC_REV_IS_TONGA_P(asic_id.hw_internal_rev) ||
 				ASIC_REV_IS_FIJI_P(asic_id.hw_internal_rev)) {
-			*dc_version = DCE_VERSION_10_0;
+			dc_version = DCE_VERSION_10_0;
 			break;
 		}
 #endif
 		break;
 	default:
-		*dc_version = DCE_VERSION_UNKNOWN;
-		return false;
+		dc_version = DCE_VERSION_UNKNOWN;
+		break;
 	}
-	return true;
+	return dc_version;
 }
 
 bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
