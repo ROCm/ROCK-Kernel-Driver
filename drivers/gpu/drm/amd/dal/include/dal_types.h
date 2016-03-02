@@ -43,7 +43,7 @@ enum dce_version {
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	DCE_VERSION_11_0,
 #endif
-	DCE_VERSION_MAX
+	DCE_VERSION_MAX,
 };
 
 /* Wireless display structs */
