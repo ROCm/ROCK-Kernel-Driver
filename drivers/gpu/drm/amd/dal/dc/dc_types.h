@@ -80,6 +80,8 @@ struct dc_context {
 	void *cgs_device;
 
 	enum dce_environment dce_environment;
+
+	struct dc_bios *dc_bios;
 };
 
 /*
