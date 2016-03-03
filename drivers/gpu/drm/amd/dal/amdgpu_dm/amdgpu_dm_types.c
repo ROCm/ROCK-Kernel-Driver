@@ -1430,7 +1430,6 @@ static int dm_plane_helper_prepare_fb(
 
 	afb = to_amdgpu_framebuffer(new_state->fb);
 
-	DRM_DEBUG_KMS("Pin new framebuffer: %p\n", afb);
 	obj = afb->obj;
 	rbo = gem_to_amdgpu_bo(obj);
 	r = amdgpu_bo_reserve(rbo, false);
@@ -1461,7 +1460,6 @@ static void dm_plane_helper_cleanup_fb(
 		return;
 
 	afb = to_amdgpu_framebuffer(old_state->fb);
-	DRM_DEBUG_KMS("Unpin old framebuffer: %p\n", afb);
 	rbo = gem_to_amdgpu_bo(afb->obj);
 	r = amdgpu_bo_reserve(rbo, false);
 	if (unlikely(r)) {
@@ -2273,7 +2271,8 @@ int amdgpu_dm_atomic_commit(
 		struct drm_connector *connector;
 		struct dm_connector_state *dm_state = NULL;
 
-		if (!fb || !crtc || !crtc->state->planes_changed)
+		if (!fb || !crtc || !crtc->state->planes_changed ||
+			!crtc->state->active)
 			continue;
 
 		if (page_flip_needed(
