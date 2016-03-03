@@ -105,7 +105,6 @@ struct dc_pp_display_configuration {
 	bool cpu_pstate_disable;
 	uint32_t cpu_pstate_separation_time;
 
-	/* 10khz steps */
 	uint32_t min_memory_clock_khz;
 	uint32_t min_engine_clock_khz;
 	uint32_t min_engine_clock_deep_sleep_khz;
@@ -167,9 +166,14 @@ bool dc_service_get_system_clocks_range(
 
 enum dc_pp_clock_type {
 	DC_PP_CLOCK_TYPE_DISPLAY_CLK = 1,
-	DC_PP_CLOCK_TYPE_ENGINE_CLK,
+	DC_PP_CLOCK_TYPE_ENGINE_CLK, /* System clock */
 	DC_PP_CLOCK_TYPE_MEMORY_CLK
 };
+
+#define DC_DECODE_PP_CLOCK_TYPE(clk_type) \
+	(clk_type) == DC_PP_CLOCK_TYPE_DISPLAY_CLK ? "Display" : \
+	(clk_type) == DC_PP_CLOCK_TYPE_ENGINE_CLK ? "Engine" : \
+	(clk_type) == DC_PP_CLOCK_TYPE_MEMORY_CLK ? "Memory" : "Invalid"
 
 #define DC_PP_MAX_CLOCK_LEVELS 8
 
