@@ -22,21 +22,21 @@ The packages/ folder contains packages for Ubuntu 14.04 and Fedora 22
 The kernel image is built from a source tree based on the 4.1 upstream
 release plus :
 
-* Features in the HSA kernel driver ("amdkfd") that are not yet 
+* Features in the HSA kernel driver ("amdkfd") that are not yet
   upstreamed to the mainline Linux kernel.
-* Changes in the AMDGPU kernel driver ("amdgpu") that may not yet be 
+* Changes in the AMDGPU kernel driver ("amdgpu") that may not yet be
   upstreamed to the mainline Linux kernel.
 
 ##### Note regarding libhsakmt compatibility
-Please note that the libhsakmt library in this repository is NOT compatible 
-with amdkfd that is distributed as part of the mainline Linux kernel 
+Please note that the libhsakmt library in this repository is NOT compatible
+with amdkfd that is distributed as part of the mainline Linux kernel
 from 3.19 and onward.
 
 #### Target Platform
 
 This release is intended for use with any hardware configuration that
 contains only a Kaveri or Carrizo APU, or configurations which contain
-an Intel Haswell or newer CPU plus Fiji dGPUs. 
+an Intel Haswell or newer CPU plus Fiji dGPUs.
 
 APU motherboards must support run latest BIOS version and have the IOMMU
 enabled in the BIOS.
@@ -60,31 +60,32 @@ dGPU Config:
 
 #### Installing and configuring the kernel
 
-* Downloading the kernel binaries from the repo  
+* Downloading the kernel binaries from the repo
 `git clone https://github.com/RadeonOpenCompute/ROCK-Kernel-Driver.git`
 
-* Go to the top of the repo:  
+* Go to the top of the repo:
 `cd ROCK-Kernel-Driver`
 
 * Configure udev to allow any user to access /dev/kfd. As root, use a text
 editor to create /etc/udev/rules.d/kfd.rules containing one line:
-KERNEL=="kfd", MODE="0666", Or you could use the following command:  
+KERNEL=="kfd", MODE="0666", Or you could use the following command:
 `echo  "KERNEL==\"kfd\", MODE=\"0666\"" | sudo tee /etc/udev/rules.d/kfd.rules`
 
-* For Ubuntu, install the kernel and libhsakmt packages using:  
+* For Ubuntu, install the kernel and libhsakmt packages using:
 `sudo dpkg -i packages/ubuntu/*.deb`
 
 * For Fedora, install the kernel and libhsakmt packages using:
 `sudo rpm -i packages/fedora/*.rpm`
 
-* Reboot the system to install the new kernel and enable the HSA kernel driver:  
+* Reboot the system to install the new kernel and enable the HSA kernel driver:
 `sudo reboot`
 
 
 ##### Obtaining kernel and libhsakmt source code
 
 * Source code used to build the kernel is in this repo. Source code to
-  build libhsakmt is in the ROCT-Thunk repository 
+  build libhsakmt is in the ROCT-Thunk-Interface repository:
+  https://github.com/RadeonOpenCompute/ROCT-Thunk-Interface
 
 ###LICENSE
 
