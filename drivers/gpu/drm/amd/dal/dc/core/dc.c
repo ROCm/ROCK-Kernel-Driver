@@ -80,7 +80,7 @@ static bool create_links(
 
 	dc->link_count = 0;
 
-	dcb = dal_adapter_service_get_bios_parser(as);
+	dcb = dc->ctx->dc_bios;
 
 	connectors_num = dcb->funcs->get_connectors_number(dcb);
 
@@ -169,7 +169,7 @@ static void init_hw(struct core_dc *dc)
 	struct dc_bios *bp;
 	struct transform *xfm;
 
-	bp = dal_adapter_service_get_bios_parser(dc->res_pool.adapter_srv);
+	bp = dc->ctx->dc_bios;
 	for (i = 0; i < dc->res_pool.pipe_count; i++) {
 		xfm = dc->res_pool.transforms[i];
 
@@ -330,48 +330,55 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 	dc_version = resource_parse_asic_id(init_params->asic_id);
 
 
-/* TODO: Refactor DCE code to remove AS and asic caps */
-if (dc_version < DCE_VERSION_MAX) {
-	/* Create adapter service */
-	as = create_as(init_params, dc_ctx);
+	/* TODO: Refactor DCE code to remove AS and asic caps */
+	if (dc_version < DCE_VERSION_MAX) {
+		/* Create adapter service */
+		as = create_as(init_params, dc_ctx);
 
-	if (!as) {
-		dm_error("%s: create_as() failed!\n", __func__);
-		goto as_fail;
+		if (!as) {
+			dm_error("%s: create_as() failed!\n", __func__);
+			goto as_fail;
+		}
+
+		/* Initialize HW controlled by Adapter Service */
+		if (false == dal_adapter_service_initialize_hw_data(
+				as)) {
+			dm_error("%s: dal_adapter_service_initialize_hw_data()"\
+					"  failed!\n", __func__);
+			/* Note that AS exist, so have to destroy it.*/
+			goto as_fail;
+		}
+
+		dc_ctx->dc_bios = dal_adapter_service_get_bios_parser(as);
+
+		/* Create hardware sequencer */
+		if (!dc_construct_hw_sequencer(as, dc))
+			goto hwss_fail;
+
+		if (!dc_construct_resource_pool(
+			as, dc, init_params->num_virtual_links, dc_version))
+			goto construct_resource_fail;
+
+		if (!create_links(dc, as, init_params->num_virtual_links))
+			goto create_links_fail;
+
+		bw_calcs_init(&dc->bw_dceip, &dc->bw_vbios);
+
+		bw_calcs_data_update_from_pplib(dc);
+	} else {
+
+		/* Resource should construct all asic specific resources.
+		 * This should be the only place where we need to parse the asic id
+		 */
+
+		dc_ctx->dc_bios = init_params->vbios_override;
+		if (!dc_construct_resource_pool(
+			NULL, dc, init_params->num_virtual_links, dc_version))
+			goto construct_resource_fail;
+
+		if (!create_links(dc, NULL, init_params->num_virtual_links))
+			goto create_links_fail;
 	}
-
-	/* Initialize HW controlled by Adapter Service */
-	if (false == dal_adapter_service_initialize_hw_data(
-			as)) {
-		dm_error("%s: dal_adapter_service_initialize_hw_data()"\
-				"  failed!\n", __func__);
-		/* Note that AS exist, so have to destroy it.*/
-		goto as_fail;
-	}
-
-	/* Create hardware sequencer */
-	if (!dc_construct_hw_sequencer(as, dc))
-		goto hwss_fail;
-
-	if (!dc_construct_resource_pool(
-		as, dc, init_params->num_virtual_links, dc_version))
-		goto construct_resource_fail;
-
-	if (!create_links(dc, as, init_params->num_virtual_links))
-		goto create_links_fail;
-
-	bw_calcs_init(&dc->bw_dceip, &dc->bw_vbios);
-
-	bw_calcs_data_update_from_pplib(dc);
-} else {
-
-	/* Resource should construct all asic specific resources.
-	 * This should be the only place where we need to parse the asic id
-	 */
-	if (!dc_construct_resource_pool(
-		NULL, dc, init_params->num_virtual_links, dc_version))
-		goto construct_resource_fail;
-}
 
 	return true;
 
