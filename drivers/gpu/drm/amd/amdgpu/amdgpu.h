@@ -2414,5 +2414,4 @@ static inline int amdgpu_dm_display_resume(struct amdgpu_device *adev) { return 
 #endif
 
 #include "amdgpu_object.h"
-
 #endif
