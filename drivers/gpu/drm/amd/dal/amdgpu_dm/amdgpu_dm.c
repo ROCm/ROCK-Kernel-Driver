@@ -697,8 +697,14 @@ static void handle_hpd_irq(void *param)
 	 */
 	if (dc_link_detect(aconnector->dc_link, false)) {
 		amdgpu_dm_update_connector_after_detect(aconnector);
+
+		drm_modeset_lock_all(dev);
+		dm_restore_drm_connector_state(dev, connector);
+		drm_modeset_unlock_all(dev);
+
 		drm_kms_helper_hotplug_event(dev);
 	}
+
 }
 
 static void handle_hpd_rx_irq(void *param)
