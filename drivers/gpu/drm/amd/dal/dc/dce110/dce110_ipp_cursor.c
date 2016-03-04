@@ -37,6 +37,18 @@
 #define DCP_REG(reg)\
 	(reg + ipp110->offsets.dcp_offset)
 
+#define  DCP_REG_UPDATE_N(reg_name, n, ...)	\
+		generic_reg_update(ipp110->base.ctx, ipp110->offsets.dcp_offset, reg_name, n, __VA_ARGS__)
+
+#define  DCP_REG_SET_N(reg_name, n, ...)	\
+		generic_reg_set(ipp110->base.ctx, ipp110->offsets.dcp_offset, reg_name, n, __VA_ARGS__)
+
+#define DCP_REG_UPDATE(reg, field, val)	\
+		DCP_REG_UPDATE_N(reg, 1, FD(reg##__##field), val)
+
+#define DCP_REG_SET_2(reg, field1, val1, field2, val2)	\
+		DCP_REG_SET_N(reg, 2, FD(reg##__##field1), val1, FD(reg##__##field2), val2)
+
 static void enable(
 	struct dce110_ipp *ipp110,
 	bool enable);
@@ -131,13 +143,9 @@ bool dce110_ipp_cursor_set_attributes(
 static void enable(
 	struct dce110_ipp *ipp110, bool enable)
 {
-	uint32_t value = 0;
-	uint32_t addr = DCP_REG(mmCUR_CONTROL);
-
-	value = dm_read_reg(ipp110->base.ctx, addr);
-	set_reg_field_value(value, enable, CUR_CONTROL, CURSOR_EN);
-	dm_write_reg(ipp110->base.ctx, addr, value);
+	DCP_REG_UPDATE(CUR_CONTROL, CURSOR_EN, enable);
 }
+
 
 static void lock(
 	struct dce110_ipp *ipp110, bool lock)
@@ -150,18 +158,16 @@ static void lock(
 	dm_write_reg(ipp110->base.ctx, addr, value);
 }
 
+
 static void program_position(
 	struct dce110_ipp *ipp110,
 	uint32_t x,
 	uint32_t y)
 {
-	uint32_t value = 0;
-	uint32_t addr = DCP_REG(mmCUR_POSITION);
 
-	value = dm_read_reg(ipp110->base.ctx, addr);
-	set_reg_field_value(value, x, CUR_POSITION, CURSOR_X_POSITION);
-	set_reg_field_value(value, y, CUR_POSITION, CURSOR_Y_POSITION);
-	dm_write_reg(ipp110->base.ctx, addr, value);
+	DCP_REG_SET_2(CUR_POSITION,
+			CURSOR_X_POSITION, x,
+			CURSOR_Y_POSITION, y);
 }
 
 static bool program_control(

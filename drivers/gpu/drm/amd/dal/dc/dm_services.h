@@ -35,6 +35,7 @@
 #include "dm_services_types.h"
 #include "logger_interface.h"
 #include "link_service_types.h"
+#include <stdarg.h>
 
 #undef DEPRECATED
 
@@ -142,6 +143,48 @@ static inline uint32_t set_reg_field_value_ex(
 		(value),\
 		reg_name ## __ ## reg_field ## _MASK,\
 		reg_name ## __ ## reg_field ## __SHIFT)
+
+
+static inline void generic_reg_update_ex(const struct dc_context *ctx,
+		uint32_t addr, uint32_t reg_val, int n, ...)
+{
+	int shift, mask, field_value;
+	int i = 0;
+
+	va_list ap;
+	va_start(ap, n);
+
+	 while (i < n) {
+		shift = va_arg(ap, int);
+		mask = va_arg(ap, int);
+		field_value = va_arg(ap, int);
+
+		reg_val = set_reg_field_value_ex(reg_val, field_value, mask, shift);
+		i++;
+	  }
+
+	 dm_write_reg(ctx, addr, reg_val);
+	 va_end(ap);
+
+
+}
+
+#define generic_reg_update(ctx, inst_offset, reg_name, n, ...)\
+		uint32_t reg_val = dm_read_reg(ctx, mm##reg_name + inst_offset);	\
+		generic_reg_update_ex(ctx, \
+		mm##reg_name + inst_offset, reg_val, n, \
+		__VA_ARGS__)
+
+#define generic_reg_set(ctx, inst_offset, reg_name, n, ...)\
+		generic_reg_update_ex(ctx, \
+		mm##reg_name + inst_offset, 0, n, \
+		__VA_ARGS__)
+
+
+
+#define FD(reg_field)	reg_field ## __SHIFT, \
+						reg_field ## _MASK
+
 
 /*
  * atombios services
