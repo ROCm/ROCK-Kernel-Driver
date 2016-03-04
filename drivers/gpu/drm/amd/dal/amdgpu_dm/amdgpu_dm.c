@@ -1244,8 +1244,14 @@ static int dm_early_init(void *handle)
 			adev->mode_info.funcs = &dm_dce_v10_0_display_funcs;
 		break;
 	case CHIP_CARRIZO:
-	case CHIP_STONEY:
 		adev->mode_info.num_crtc = 3;
+		adev->mode_info.num_hpd = 6;
+		adev->mode_info.num_dig = 9;
+		if (adev->mode_info.funcs == NULL)
+			adev->mode_info.funcs = &dm_dce_v11_0_display_funcs;
+		break;
+	case CHIP_STONEY:
+		adev->mode_info.num_crtc = 2;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 9;
 		if (adev->mode_info.funcs == NULL)
