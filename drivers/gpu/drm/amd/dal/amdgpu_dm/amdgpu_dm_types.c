@@ -884,14 +884,19 @@ static struct dc_target *create_target_for_sink(
 				&aconnector->base.modes,
 				struct drm_display_mode,
 				head);
-	if (NULL == preferred_mode) {
-		DRM_ERROR("No preferred mode found\n");
-		goto stream_create_fail;
-	}
 
-	decide_crtc_timing_for_drm_display_mode(
-			&mode, preferred_mode,
-			dm_state->scaling != RMX_OFF);
+	if (NULL == preferred_mode) {
+		/* This may not be an error, the use case is when we we have no
+		 * usermode calls to reset and set mode upon hotplug. In this
+		 * case, we call set mode ourselves to restore the previous mode
+		 * and the modelist may not be filled in in time.
+		 */
+		DRM_INFO("No preferred mode found\n");
+	} else {
+		decide_crtc_timing_for_drm_display_mode(
+				&mode, preferred_mode,
+				dm_state->scaling != RMX_OFF);
+	}
 
 	dc_timing_from_drm_display_mode(&stream->timing,
 			&mode, &aconnector->base);
@@ -2004,6 +2009,15 @@ static enum dm_commit_action get_dm_commit_action(struct drm_crtc_state *state)
 {
 	/* mode changed means either actually mode changed or enabled changed */
 	/* active changed means dpms changed */
+
+	DRM_DEBUG_KMS("crtc_state_flags: enable:%d, active:%d, planes_changed:%d, mode_changed:%d,active_changed:%d,connectors_changed:%d\n",
+			state->enable,
+			state->active,
+			state->planes_changed,
+			state->mode_changed,
+			state->active_changed,
+			state->connectors_changed);
+
 	if (state->mode_changed) {
 		/* if it is got disabled - call reset mode */
 		if (!state->enable)
@@ -2019,6 +2033,9 @@ static enum dm_commit_action get_dm_commit_action(struct drm_crtc_state *state)
 		/* if it is remain disable - skip it */
 		if (!state->enable)
 			return DM_COMMIT_ACTION_NOTHING;
+
+		if (state->active && state->connectors_changed)
+			return DM_COMMIT_ACTION_SET;
 
 		if (state->active_changed) {
 			if (state->active) {
@@ -2086,64 +2103,6 @@ static void manage_dm_interrupts(
 			amdgpu_dm_flip_cleanup(adev, acrtc);
 		}
 		spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
-	}
-}
-
-/*
- * Handle headless hotplug workaround
- *
- * In case of headless hotplug, if plugging the same monitor to the same
- * DDI, DRM consider it as mode unchanged. We should check whether the
- * sink pointer changed, and set mode_changed properly to
- * make sure commit is doing everything.
- */
-static void handle_headless_hotplug(
-		const struct amdgpu_crtc *acrtc,
-		struct drm_crtc_state *state,
-		struct amdgpu_connector **aconnector)
-{
-	struct amdgpu_connector *old_connector =
-			aconnector_from_drm_crtc_id(&acrtc->base);
-
-	/*
-	 * TODO Revisit this. This code is kinda hacky and might break things.
-	 */
-
-	if (!old_connector)
-		return;
-
-	if (!*aconnector)
-		*aconnector = old_connector;
-
-	if (acrtc->target && (*aconnector)->dc_sink) {
-		if ((*aconnector)->dc_sink !=
-				acrtc->target->streams[0]->sink) {
-			state->mode_changed = true;
-		}
-	}
-
-	if (!acrtc->target) {
-		/* In case of headless with DPMS on, when system waked up,
-		 * if no monitor connected, target is null and will not create
-		 * new target, on that condition, we should check
-		 * if any connector is connected, if connected,
-		 * it means a hot plug happened after wake up,
-		 * mode_changed should be set to true to make sure
-		 * commit targets will do everything.
-		 */
-		state->mode_changed =
-			(*aconnector)->base.status ==
-					connector_status_connected;
-	} else {
-		/* In case of headless hotplug, if plug same monitor to same
-		 * DDI, DRM consider it as mode unchanged, we should check
-		 * sink pointer changed, and set mode changed properly to
-		 * make sure commit doing everything.
-		 */
-		/* check if sink has changed from last commit */
-		if ((*aconnector)->dc_sink && (*aconnector)->dc_sink !=
-					acrtc->target->streams[0]->sink)
-			state->mode_changed = true;
 	}
 }
 
@@ -2217,7 +2176,6 @@ int amdgpu_dm_atomic_commit(
 		/* handles headless hotplug case, updating new_state and
 		 * aconnector as needed
 		 */
-		handle_headless_hotplug(acrtc, new_state, &aconnector);
 
 		action = get_dm_commit_action(new_state);
 
@@ -2229,7 +2187,7 @@ int amdgpu_dm_atomic_commit(
 					aconnector,
 					&crtc->state->mode);
 
-			DRM_DEBUG_KMS("Atomic commit: SET.\n");
+			DRM_INFO("Atomic commit: SET.\n");
 
 			if (!new_target) {
 				/*
@@ -2275,11 +2233,12 @@ int amdgpu_dm_atomic_commit(
 		}
 
 		case DM_COMMIT_ACTION_NOTHING:
+			DRM_DEBUG_KMS("Atomic commit: Nothing.\n");
 			break;
 
 		case DM_COMMIT_ACTION_DPMS_OFF:
 		case DM_COMMIT_ACTION_RESET:
-			DRM_DEBUG_KMS("Atomic commit: RESET.\n");
+			DRM_INFO("Atomic commit: RESET.\n");
 			/* i.e. reset mode */
 			if (acrtc->target) {
 				manage_dm_interrupts(adev, acrtc, false);
@@ -2398,6 +2357,75 @@ int amdgpu_dm_atomic_commit(
 	drm_atomic_state_free(state);
 
 	return 0;
+}
+/*
+ * This functions handle all cases when set mode does not come upon hotplug.
+ * This include when the same display is unplugged then plugged back into the
+ * same port and when we are running without usermode desktop manager supprot
+ */
+void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector *connector)
+{
+	struct drm_crtc *crtc;
+	struct amdgpu_device *adev = dev->dev_private;
+	struct dc *dc = adev->dm.dc;
+	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
+	struct amdgpu_crtc *disconnected_acrtc = to_amdgpu_crtc(connector->state->crtc);
+	const struct dc_sink *sink;
+	struct dc_target *commit_targets[6];
+	uint32_t commit_targets_count = 0;
+
+	if (!aconnector->dc_sink || !connector->state || !connector->state->crtc)
+		return;
+
+	if (!disconnected_acrtc->target)
+		return;
+
+	sink = disconnected_acrtc->target->streams[0]->sink;
+
+	/*
+	 * If the previous sink is not released and different from the current,
+	 * we deduce we are in a state where we can not rely on usermode call
+	 * to turn on the display, so we do it here
+	 */
+	if (sink != aconnector->dc_sink) {
+		struct dc_target *new_target =
+			create_target_for_sink(
+				aconnector,
+				&disconnected_acrtc->base.state->mode);
+		/*
+		 * we evade vblanks and pflips on crtc that
+		 * should be changed
+		 */
+		manage_dm_interrupts(adev, disconnected_acrtc, false);
+		/* this is the update mode case */
+		dc_target_release(disconnected_acrtc->target);
+
+		disconnected_acrtc->target = new_target;
+		disconnected_acrtc->enabled = true;
+		disconnected_acrtc->hw_mode = disconnected_acrtc->base.state->mode;
+
+		commit_targets_count = 0;
+
+		list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+			struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+
+			if (acrtc->target) {
+				commit_targets[commit_targets_count] = acrtc->target;
+				++commit_targets_count;
+			}
+		}
+
+		/* DC is optimized not to do anything if 'targets' didn't change. */
+		dc_commit_targets(dc, commit_targets, commit_targets_count);
+
+		dm_dc_surface_commit(dc, &disconnected_acrtc->base,
+				to_dm_connector_state(
+				connector->state));
+
+		manage_dm_interrupts(adev, disconnected_acrtc, true);
+		dm_crtc_cursor_reset(&disconnected_acrtc->base);
+
+	}
 }
 
 static uint32_t add_val_sets_surface(

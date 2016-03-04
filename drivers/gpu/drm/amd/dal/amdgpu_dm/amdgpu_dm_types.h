@@ -94,6 +94,8 @@ int amdgpu_dm_connector_mode_valid(
 	struct drm_connector *connector,
 	struct drm_display_mode *mode);
 
+void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector *connector);
+
 extern const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs;
 
 #endif		/* __AMDGPU_DM_TYPES_H__ */
