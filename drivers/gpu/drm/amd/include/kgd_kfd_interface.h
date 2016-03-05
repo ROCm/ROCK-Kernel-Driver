@@ -174,6 +174,12 @@ struct kgd2kfd_shared_resources {
  *
  * @get_cu_info: Retrieves activated cu info
  *
+ * @get_dmabuf_info: Returns information about a dmabuf if it was
+ * created by the GPU driver
+ *
+ * @import_dmabuf: Imports a DMA buffer, creating a new kgd_mem object
+ * Supports only DMA buffers created by GPU driver on the same GPU
+ *
  * This structure contains function pointers to services that the kgd driver
  * provides to amdkfd driver.
  *
@@ -289,6 +295,13 @@ struct kfd2kgd_calls {
 			uint64_t size, struct sg_table **ret_sg);
 	void (*unpin_put_sg_table_bo)(struct kgd_mem *mem,
 			struct sg_table *sg);
+
+	int (*get_dmabuf_info)(struct kgd_dev *kgd, int dma_buf_fd,
+			       struct kgd_dev **dma_buf_kgd, uint64_t *bo_size,
+			       void *metadata_buffer, size_t buffer_size,
+			       uint32_t *metadata_size, uint32_t *flags);
+	int (*import_dmabuf)(struct kgd_dev *kgd, int dma_buf_fd, uint64_t va,
+			     void *vm, struct kgd_mem **mem, uint64_t *size);
 };
 
 /**
