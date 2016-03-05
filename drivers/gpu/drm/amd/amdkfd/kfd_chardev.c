@@ -1686,6 +1686,112 @@ exit:
 	return err;
 }
 
+static int kfd_ioctl_get_dmabuf_info(struct file *filep,
+		struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_get_dmabuf_info_args *args = data;
+	struct kfd_dev *dev = NULL;
+	struct kgd_dev *dma_buf_kgd;
+	void *metadata_buffer = NULL;
+	uint32_t flags;
+	unsigned i;
+	int r;
+
+	/* Find a KFD GPU device that supports the get_dmabuf_info query */
+	for (i = 0; kfd_topology_enum_kfd_devices(i, &dev) == 0; i++)
+		if (dev && dev->kfd2kgd->get_dmabuf_info)
+			break;
+	if (!dev)
+		return -EINVAL;
+
+	if (args->metadata_ptr) {
+		metadata_buffer = kzalloc(args->metadata_size, GFP_KERNEL);
+		if (!metadata_buffer)
+			return -ENOMEM;
+	}
+
+	/* Get dmabuf info from KGD */
+	r = dev->kfd2kgd->get_dmabuf_info(dev->kgd, args->dmabuf_fd,
+					  &dma_buf_kgd, &args->size,
+					  metadata_buffer, args->metadata_size,
+					  &args->metadata_size, &flags);
+	if (r)
+		goto exit;
+
+	/* Reverse-lookup gpu_id from kgd pointer */
+	dev = kfd_device_by_kgd(dma_buf_kgd);
+	if (!dev) {
+		r = -EINVAL;
+		goto exit;
+	}
+	args->gpu_id = kfd_get_gpu_id(dev);
+
+	/* Translate flags */
+	if (flags & ALLOC_MEM_FLAGS_VRAM) {
+		args->flags = KFD_IS_DGPU(dev->device_info->asic_family) ?
+			KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE :
+			KFD_IOC_ALLOC_MEM_FLAGS_APU_DEVICE;
+	} else
+		args->flags = KFD_IOC_ALLOC_MEM_FLAGS_DGPU_HOST;
+
+	/* Copy metadata buffer to user mode */
+	if (metadata_buffer) {
+		r = copy_to_user((void __user *)args->metadata_ptr,
+				 metadata_buffer, args->metadata_size);
+		if (r != 0)
+			r = -EFAULT;
+	}
+
+exit:
+	kfree(metadata_buffer);
+
+	return r;
+}
+
+static int kfd_ioctl_import_dmabuf(struct file *filep,
+		struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_import_dmabuf_args *args = data;
+	struct kfd_dev *dev;
+	struct kfd_process_device *pdd;
+	void *mem;
+	uint64_t size;
+	int idr_handle;
+	int r;
+
+	dev = kfd_device_by_id(args->gpu_id);
+	if (!dev || !dev->kfd2kgd->import_dmabuf)
+		return -EINVAL;
+
+	mutex_lock(&p->mutex);
+
+	pdd = kfd_bind_process_to_device(dev, p);
+	if (IS_ERR(pdd) < 0) {
+		r = PTR_ERR(pdd);
+		goto out_unlock;
+	}
+
+	r = dev->kfd2kgd->import_dmabuf(dev->kgd, args->dmabuf_fd,
+					args->va_addr, pdd->vm,
+					(struct kgd_mem **)&mem, &size);
+	if (r)
+		goto out_unlock;
+
+	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
+			args->va_addr, size);
+	if (idr_handle < 0) {
+		dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
+						 (struct kgd_mem *)mem);
+		r = -EFAULT;
+	} else {
+		args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
+	}
+
+out_unlock:
+	mutex_unlock(&p->mutex);
+	return r;
+}
+
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, .cmd_drv = 0, .name = #ioctl}
 
@@ -1779,7 +1885,13 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 				kfd_ioctl_get_process_apertures_new, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_EVICT_MEMORY,
-				kfd_evict, 0)
+				kfd_evict, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_DMABUF_INFO,
+				kfd_ioctl_get_dmabuf_info, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IMPORT_DMABUF,
+				kfd_ioctl_import_dmabuf, 0)
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
