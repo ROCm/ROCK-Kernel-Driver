@@ -26,6 +26,7 @@
 #include <linux/firmware.h>
 #include <linux/list.h>
 #include <drm/drmP.h>
+#include <linux/dma-buf.h>
 #include "amdgpu.h"
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_ucode.h"
@@ -1122,4 +1123,65 @@ void amdgpu_amdkfd_gpuvm_unpin_put_sg_table(
 	kfree(sg);
 
 	unpin_bo_wo_map(mem);
+}
+
+int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
+				      uint64_t va, void *vm,
+				      struct kgd_mem **mem, uint64_t *size)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+	struct dma_buf *dma_buf;
+	struct drm_gem_object *obj;
+	struct amdgpu_bo *bo;
+	int r = -EINVAL;
+
+	dma_buf = dma_buf_get(dma_buf_fd);
+	if (IS_ERR(dma_buf))
+		return PTR_ERR(dma_buf);
+
+	if (dma_buf->ops != &drm_gem_prime_dmabuf_ops)
+		/* Can't handle non-graphics buffers */
+		goto out_put;
+
+	obj = dma_buf->priv;
+	if (obj->dev->dev_private != adev)
+		/* Can't handle buffers from other devices */
+		goto out_put;
+
+	bo = gem_to_amdgpu_bo(obj);
+	if (!(bo->initial_domain & (AMDGPU_GEM_DOMAIN_VRAM |
+				    AMDGPU_GEM_DOMAIN_GTT)))
+		/* Only VRAM and GTT BOs are supported */
+		goto out_put;
+
+	if (size)
+		*size = amdgpu_bo_size(bo);
+
+	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
+	if (*mem == NULL) {
+		r = -ENOMEM;
+		goto out_put;
+	}
+
+	INIT_LIST_HEAD(&(*mem)->data2.bo_va_list);
+	(*mem)->data2.execute = true; /* executable by default */
+
+	(*mem)->data2.bo = amdgpu_bo_ref(bo);
+	(*mem)->data2.va = va;
+	(*mem)->data2.domain = (bo->initial_domain & AMDGPU_GEM_DOMAIN_VRAM) ?
+		AMDGPU_GEM_DOMAIN_VRAM : AMDGPU_GEM_DOMAIN_GTT;
+	(*mem)->data2.mapped_to_gpu_memory = 0;
+
+	r = add_bo_to_vm(adev, va, vm, bo, &(*mem)->data2.bo_va_list,
+			 false, true);
+
+	if (r) {
+		amdgpu_bo_unref(&bo);
+		kfree(*mem);
+		*mem = NULL;
+	}
+
+out_put:
+	dma_buf_put(dma_buf);
+	return r;
 }

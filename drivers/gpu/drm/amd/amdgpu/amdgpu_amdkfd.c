@@ -21,6 +21,7 @@
  */
 
 #include "amdgpu_amdkfd.h"
+#include <linux/dma-buf.h>
 #include <drm/drmP.h>
 #include "amdgpu.h"
 #include <linux/module.h>
@@ -301,4 +302,60 @@ int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 		struct kgd_mem *mem, void **kptr)
 {
 	return 0;
+}
+
+int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
+				  struct kgd_dev **dma_buf_kgd,
+				  uint64_t *bo_size, void *metadata_buffer,
+				  size_t buffer_size, uint32_t *metadata_size,
+				  uint32_t *flags)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+	struct dma_buf *dma_buf;
+	struct drm_gem_object *obj;
+	struct amdgpu_bo *bo;
+	uint64_t metadata_flags;
+	int r = -EINVAL;
+
+	dma_buf = dma_buf_get(dma_buf_fd);
+	if (IS_ERR(dma_buf))
+		return PTR_ERR(dma_buf);
+
+	if (dma_buf->ops != &drm_gem_prime_dmabuf_ops)
+		/* Can't handle non-graphics buffers */
+		goto out_put;
+
+	obj = dma_buf->priv;
+	if (obj->dev->driver != adev->ddev->driver)
+		/* Can't handle buffers from different drivers */
+		goto out_put;
+
+	adev = obj->dev->dev_private;
+	bo = gem_to_amdgpu_bo(obj);
+	if (!(bo->initial_domain & (AMDGPU_GEM_DOMAIN_VRAM |
+				    AMDGPU_GEM_DOMAIN_GTT)))
+		/* Only VRAM and GTT BOs are supported */
+		goto out_put;
+
+	r = 0;
+	if (dma_buf_kgd)
+		*dma_buf_kgd = (struct kgd_dev *)adev;
+	if (bo_size)
+		*bo_size = amdgpu_bo_size(bo);
+	if (metadata_size)
+		*metadata_size = bo->metadata_size;
+	if (metadata_buffer)
+		r = amdgpu_bo_get_metadata(bo, metadata_buffer, buffer_size,
+					   metadata_size, &metadata_flags);
+	if (flags) {
+		*flags = (bo->initial_domain & AMDGPU_GEM_DOMAIN_VRAM) ?
+			ALLOC_MEM_FLAGS_VRAM : ALLOC_MEM_FLAGS_GTT;
+
+		if (bo->flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED)
+			*flags |= ALLOC_MEM_FLAGS_PUBLIC;
+	}
+
+out_put:
+	dma_buf_put(dma_buf);
+	return r;
 }

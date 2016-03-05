@@ -91,6 +91,11 @@ uint32_t get_max_engine_clock_in_mhz(struct kgd_dev *kgd);
 void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info);
 int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 		struct kgd_mem *mem, void **kptr);
+int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
+				  struct kgd_dev **dmabuf_kgd,
+				  uint64_t *bo_size, void *metadata_buffer,
+				  size_t buffer_size, uint32_t *metadata_size,
+				  uint32_t *flags);
 
 /* GPUVM API */
 int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
@@ -125,6 +130,9 @@ int amdgpu_amdkfd_gpuvm_pin_get_sg_table(struct kgd_dev *kgd,
 		uint64_t size, struct sg_table **ret_sg);
 void amdgpu_amdkfd_gpuvm_unpin_put_sg_table(
 		struct kgd_mem *mem, struct sg_table *sg);
+int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
+				      uint64_t va, void *vm,
+				      struct kgd_mem **mem, uint64_t *size);
 
 
 #endif /* AMDGPU_AMDKFD_H_INCLUDED */
