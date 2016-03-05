@@ -347,6 +347,23 @@ struct kfd_ioctl_get_process_apertures_new_args {
 	uint32_t pad;
 };
 
+struct kfd_ioctl_get_dmabuf_info_args {
+	uint64_t size;		/* from KFD */
+	uint64_t metadata_ptr;	/* to KFD */
+	uint32_t metadata_size;	/* to KFD (space allocated by user)
+				 * from KFD (actual metadata size) */
+	uint32_t gpu_id;	/* from KFD */
+	uint32_t flags;		/* from KFD (KFD_IOC_ALLOC_MEM_FLAGS) */
+	uint32_t dmabuf_fd;	/* to KFD */
+};
+
+struct kfd_ioctl_import_dmabuf_args {
+	uint64_t va_addr;	/* to KFD */
+	uint64_t handle;	/* from KFD */
+	uint32_t gpu_id;	/* to KFD */
+	uint32_t dmabuf_fd;	/* to KFD */
+};
+
 #define AMDKFD_IOCTL_BASE 'K'
 #define AMDKFD_IO(nr)			_IO(AMDKFD_IOCTL_BASE, nr)
 #define AMDKFD_IOR(nr, type)		_IOR(AMDKFD_IOCTL_BASE, nr, type)
@@ -443,7 +460,13 @@ struct kfd_ioctl_get_process_apertures_new_args {
 #define AMDKFD_IOC_EVICT_MEMORY		\
 	AMDKFD_IOWR(0x1e, struct kfd_ioctl_eviction_args)
 
+#define AMDKFD_IOC_GET_DMABUF_INFO		\
+	AMDKFD_IOWR(0x1f, struct kfd_ioctl_get_dmabuf_info_args)
+
+#define AMDKFD_IOC_IMPORT_DMABUF		\
+	AMDKFD_IOWR(0x20, struct kfd_ioctl_import_dmabuf_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x1f
+#define AMDKFD_COMMAND_END		0x21
 
 #endif
