@@ -733,6 +733,7 @@ bool dc_commit_targets(
 	uint8_t target_count)
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
+	struct dc_bios *dcb = core_dc->ctx->dc_bios;
 	enum dc_status result = DC_ERROR_UNEXPECTED;
 	struct validate_context *context;
 	struct dc_validation_set set[4];
@@ -774,8 +775,7 @@ bool dc_commit_targets(
 
 	pplib_apply_safe_state(core_dc);
 
-	if (!dal_adapter_service_is_in_accelerated_mode(
-						core_dc->res_pool.adapter_srv)) {
+	if (!dcb->funcs->is_accelerated_mode(dcb)) {
 		core_dc->hwss.enable_accelerated_mode(core_dc);
 	}
 
@@ -821,6 +821,7 @@ bool dc_commit_surfaces_to_target(
 
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
+	struct dc_bios *dcb = core_dc->ctx->dc_bios;
 
 	int i, j;
 	uint32_t prev_disp_clk = core_dc->current_context.bw_results.dispclk_khz;
@@ -842,9 +843,8 @@ bool dc_commit_surfaces_to_target(
 
 	target_status = &context->target_status[i];
 
-	if (!dal_adapter_service_is_in_accelerated_mode(
-						core_dc->res_pool.adapter_srv)
-		|| i == context->target_count) {
+	if (!dcb->funcs->is_accelerated_mode(dcb)
+			|| i == context->target_count) {
 		BREAK_TO_DEBUGGER();
 		goto unexpected_fail;
 	}
