@@ -489,6 +489,9 @@ static void gmc_v8_0_mc_program(struct amdgpu_device *adev)
  */
 static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 {
+	uint64_t gart_size_aligned;
+	struct sysinfo si;
+
 	adev->mc.vram_width = amdgpu_atombios_get_vram_width(adev);
 	if (!adev->mc.vram_width) {
 		u32 tmp;
@@ -553,12 +556,31 @@ static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 	if (adev->mc.visible_vram_size > adev->mc.real_vram_size)
 		adev->mc.visible_vram_size = adev->mc.real_vram_size;
 
-	/* unless the user had overridden it, set the gart
-	 * size equal to the 1024 or vram, whichever is larger.
-	 */
-	if (amdgpu_gart_size == -1)
-		adev->mc.gtt_size = max((AMDGPU_DEFAULT_GTT_SIZE_MB << 20),
-					adev->mc.mc_vram_size);
+	/* Unless the user has overridden it, compute the GART size */
+	if (amdgpu_gart_size == -1) {
+		si_meminfo(&si);
+		/* Set the GART to map the largest size between either
+		 * VRAM capacity or double the available physical RAM,
+		 * but no larger than 512GB.
+		 */
+		adev->mc.gtt_size = min(
+			max(
+				((uint64_t)si.totalram * si.mem_unit * 2),
+				adev->mc.mc_vram_size
+			),
+			1024ULL << 29
+		);
+
+		/* GART sizes computed from physical RAM capacity
+		 * may not always be perfect powers of two.
+		 * Round up starting from the minimum size of 1GB.
+		 */
+		gart_size_aligned = 1024ULL << 20;
+		while (adev->mc.gtt_size > gart_size_aligned)
+			gart_size_aligned <<= 1;
+
+		adev->mc.gtt_size = gart_size_aligned;
+	}
 	else
 		adev->mc.gtt_size = (uint64_t)amdgpu_gart_size << 20;
 

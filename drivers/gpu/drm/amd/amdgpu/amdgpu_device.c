@@ -1075,6 +1075,30 @@ def_value:
 
 static void amdgpu_check_vm_size(struct amdgpu_device *adev)
 {
+	struct sysinfo si;
+	int phys_ram_gb, amdgpu_vm_size_aligned;
+
+	/* Compute the GPU VM space only if the user
+	 * hasn't changed it from the default.
+	 */
+	if (amdgpu_vm_size == -1) {
+		/* Computation depends on the amount of physical RAM available.
+		 * Cannot exceed 1TB.
+		 */
+		si_meminfo(&si);
+		phys_ram_gb = ((uint64_t)si.totalram * si.mem_unit) >> 30;
+		amdgpu_vm_size = min(phys_ram_gb * 3 + 16, 1024);
+
+		/* GPUVM sizes are almost never perfect powers of two.
+		 * Round up to nearest power of two starting from
+		 * the minimum allowed but aligned size of 32GB */
+		amdgpu_vm_size_aligned = 32;
+		while (amdgpu_vm_size > amdgpu_vm_size_aligned)
+			amdgpu_vm_size_aligned *= 2;
+
+		amdgpu_vm_size = amdgpu_vm_size_aligned;
+	}
+
 	if (!amdgpu_check_pot_argument(amdgpu_vm_size)) {
 		dev_warn(adev->dev, "VM size (%d) must be a power of 2\n",
 			 amdgpu_vm_size);
