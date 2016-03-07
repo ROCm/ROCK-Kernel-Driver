@@ -88,5 +88,9 @@ void resource_validate_ctx_copy_construct(
 
 void resource_validate_ctx_destruct(struct validate_context *context);
 
+enum dc_status resource_map_clock_resources(
+		const struct core_dc *dc,
+		struct validate_context *context);
+
 
 #endif /* DRIVERS_GPU_DRM_AMD_DAL_DEV_DC_INC_RESOURCE_H_ */
