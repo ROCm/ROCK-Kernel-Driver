@@ -1593,7 +1593,62 @@ static void enable_timing_synchronization(
 	DC_SYNC_INFO("GSL: Set-up complete.\n");
 }
 
+static void init_hw(struct core_dc *dc)
+{
+	int i;
+	struct dc_bios *bp;
+	struct transform *xfm;
+
+	bp = dc->ctx->dc_bios;
+	for (i = 0; i < dc->res_pool.pipe_count; i++) {
+		xfm = dc->res_pool.transforms[i];
+
+		dc->hwss.enable_display_power_gating(
+				dc->ctx, i, bp,
+				PIPE_GATING_CONTROL_INIT);
+		dc->hwss.enable_display_power_gating(
+				dc->ctx, i, bp,
+				PIPE_GATING_CONTROL_DISABLE);
+		xfm->funcs->transform_power_up(xfm);
+		dc->hwss.enable_display_pipe_clock_gating(
+			dc->ctx,
+			true);
+	}
+
+	dc->hwss.clock_gating_power_up(dc->ctx, false);
+	bp->funcs->power_up(bp);
+	/***************************************/
+
+	for (i = 0; i < dc->link_count; i++) {
+		/****************************************/
+		/* Power up AND update implementation according to the
+		 * required signal (which may be different from the
+		 * default signal on connector). */
+		struct core_link *link = dc->links[i];
+		link->link_enc->funcs->hw_init(link->link_enc);
+	}
+
+	for (i = 0; i < dc->res_pool.pipe_count; i++) {
+		struct timing_generator *tg = dc->res_pool.timing_generators[i];
+
+		tg->funcs->disable_vga(tg);
+
+		/* Blank controller using driver code instead of
+		 * command table. */
+		tg->funcs->set_blank(tg, true);
+	}
+
+	for (i = 0; i < dc->res_pool.audio_count; i++) {
+		struct audio *audio = dc->res_pool.audios[i];
+
+		if (dal_audio_power_up(audio) != AUDIO_RESULT_OK)
+			dm_error("Failed audio power up!\n");
+	}
+
+}
+
 static const struct hw_sequencer_funcs dce110_funcs = {
+	.init_hw = init_hw,
 	.apply_ctx_to_hw = apply_ctx_to_hw,
 	.reset_hw_ctx = reset_hw_ctx,
 	.set_plane_config = set_plane_config,
@@ -1613,7 +1668,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.set_blender_mode = dce110_set_blender_mode,
 	.clock_gating_power_up = dal_dc_clock_gating_dce110_power_up,/*todo*/
 	.set_display_clock = set_display_clock,
-	.set_displaymarks = set_displaymarks,
+	.set_displaymarks = set_displaymarks
 };
 
 bool dce110_hw_sequencer_construct(struct core_dc *dc)

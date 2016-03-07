@@ -163,59 +163,7 @@ failed_alloc:
 	return false;
 }
 
-static void init_hw(struct core_dc *dc)
-{
-	int i;
-	struct dc_bios *bp;
-	struct transform *xfm;
 
-	bp = dc->ctx->dc_bios;
-	for (i = 0; i < dc->res_pool.pipe_count; i++) {
-		xfm = dc->res_pool.transforms[i];
-
-		dc->hwss.enable_display_power_gating(
-				dc->ctx, i, bp,
-				PIPE_GATING_CONTROL_INIT);
-		dc->hwss.enable_display_power_gating(
-				dc->ctx, i, bp,
-				PIPE_GATING_CONTROL_DISABLE);
-		xfm->funcs->transform_power_up(xfm);
-		dc->hwss.enable_display_pipe_clock_gating(
-			dc->ctx,
-			true);
-	}
-
-	dc->hwss.clock_gating_power_up(dc->ctx, false);
-	bp->funcs->power_up(bp);
-	/***************************************/
-
-	for (i = 0; i < dc->link_count; i++) {
-		/****************************************/
-		/* Power up AND update implementation according to the
-		 * required signal (which may be different from the
-		 * default signal on connector). */
-		struct core_link *link = dc->links[i];
-		link->link_enc->funcs->hw_init(link->link_enc);
-	}
-
-	for (i = 0; i < dc->res_pool.pipe_count; i++) {
-		struct timing_generator *tg = dc->res_pool.timing_generators[i];
-
-		tg->funcs->disable_vga(tg);
-
-		/* Blank controller using driver code instead of
-		 * command table. */
-		tg->funcs->set_blank(tg, true);
-	}
-
-	for(i = 0; i < dc->res_pool.audio_count; i++) {
-		struct audio *audio = dc->res_pool.audios[i];
-
-		if (dal_audio_power_up(audio) != AUDIO_RESULT_OK)
-			dm_error("Failed audio power up!\n");
-	}
-
-}
 
 static struct adapter_service *create_as(
 		const struct dc_init_data *init,
@@ -351,10 +299,6 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 
 		dc_ctx->dc_bios = dal_adapter_service_get_bios_parser(as);
 
-		/* Create hardware sequencer */
-		if (!dc_construct_hw_sequencer(as, dc))
-			goto hwss_fail;
-
 		if (!dc_construct_resource_pool(
 			as, dc, init_params->num_virtual_links, dc_version))
 			goto construct_resource_fail;
@@ -388,7 +332,6 @@ create_links_fail:
 as_fail:
 	dal_logger_destroy(&dc_ctx->logger);
 logger_fail:
-hwss_fail:
 	dm_free(dc_ctx);
 ctx_fail:
 	return false;
@@ -480,31 +423,31 @@ struct dc *dc_create(const struct dc_init_data *init_params)
 		.driver_context = init_params->driver,
 		.cgs_device = init_params->cgs_device
 	};
-	struct core_dc *dc = dm_alloc(sizeof(*dc));
+	struct core_dc *core_dc = dm_alloc(sizeof(*core_dc));
 
-	if (NULL == dc)
+	if (NULL == core_dc)
 		goto alloc_fail;
 
-	ctx.dc = &dc->public;
-	if (false == construct(dc, init_params))
+	ctx.dc = &core_dc->public;
+	if (false == construct(core_dc, init_params))
 		goto construct_fail;
 
 	/*TODO: separate HW and SW initialization*/
-	init_hw(dc);
+	core_dc->hwss.init_hw(core_dc);
 
-	dc->public.caps.max_targets = dc->res_pool.pipe_count;
-	dc->public.caps.max_links = dc->link_count;
-	dc->public.caps.max_audios = dc->res_pool.audio_count;
+	core_dc->public.caps.max_targets = core_dc->res_pool.pipe_count;
+	core_dc->public.caps.max_links = core_dc->link_count;
+	core_dc->public.caps.max_audios = core_dc->res_pool.audio_count;
 
-	dal_logger_write(dc->ctx->logger,
+	dal_logger_write(core_dc->ctx->logger,
 			LOG_MAJOR_INTERFACE_TRACE,
 			LOG_MINOR_COMPONENT_DC,
 			"Display Core initialized\n");
 
-	return &dc->public;
+	return &core_dc->public;
 
 construct_fail:
-	dm_free(dc);
+	dm_free(core_dc);
 
 alloc_fail:
 	return NULL;
@@ -1182,7 +1125,7 @@ void dc_set_power_state(
 
 	switch (power_state) {
 	case DC_ACPI_CM_POWER_STATE_D0:
-		init_hw(core_dc);
+		core_dc->hwss.init_hw(core_dc);
 		break;
 	default:
 		/* NULL means "reset/release all DC targets" */
