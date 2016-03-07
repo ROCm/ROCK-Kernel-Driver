@@ -1050,6 +1050,10 @@ bool dce100_construct_resource_pool(
 		pool->stream_enc_count++;
 	}
 
+	/* Create hardware sequencer */
+	if (!dc_construct_hw_sequencer(as, dc))
+		goto stream_enc_create_fail;
+
 	return true;
 
 stream_enc_create_fail:

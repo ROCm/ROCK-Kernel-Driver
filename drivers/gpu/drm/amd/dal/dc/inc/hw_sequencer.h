@@ -37,6 +37,8 @@ enum pipe_gating_control {
 
 struct hw_sequencer_funcs {
 
+	void (*init_hw)(struct core_dc *dc);
+
 	enum dc_status (*apply_ctx_to_hw)(
 			struct core_dc *dc, struct validate_context *context);
 
