@@ -788,66 +788,6 @@ static void set_target_unchanged(
 	}
 }
 
-static enum dc_status map_clock_resources(
-		const struct core_dc *dc,
-		struct validate_context *context)
-{
-	uint8_t i, j, k;
-
-	/* acquire new resources */
-	for (i = 0; i < context->target_count; i++) {
-		struct core_target *target = context->targets[i];
-
-		if (context->target_flags[i].unchanged)
-			continue;
-
-		for (j = 0; j < target->public.stream_count; j++) {
-			struct core_stream *stream =
-				DC_STREAM_TO_CORE(target->public.streams[j]);
-
-			for (k = 0; k < MAX_PIPES; k++) {
-				struct pipe_ctx *pipe_ctx =
-					&context->res_ctx.pipe_ctx[k];
-
-				if (context->res_ctx.pipe_ctx[k].stream != stream)
-					continue;
-
-				/*
-				 * in this case if external clock source is not
-				 * available for DP, it will pick-up first
-				 * available pll from find_first_free_pll
-				 */
-				if (dc_is_dp_signal(pipe_ctx->signal)
-					|| pipe_ctx->signal == SIGNAL_TYPE_VIRTUAL)
-					pipe_ctx->clock_source =
-						context->res_ctx.pool.dp_clock_source;
-				else {
-					pipe_ctx->clock_source =
-						resource_find_used_clk_src_for_sharing(
-							&context->res_ctx,
-							pipe_ctx);
-
-					if (pipe_ctx->clock_source == NULL)
-						pipe_ctx->clock_source =
-							dc_resource_find_first_free_pll(&context->res_ctx);
-				}
-
-				if (pipe_ctx->clock_source == NULL)
-					return DC_NO_CLOCK_SOURCE_RESOURCE;
-
-				resource_reference_clock_source(
-						&context->res_ctx,
-						pipe_ctx->clock_source);
-
-				/* only one cs per stream regardless of mpo */
-				break;
-			}
-		}
-	}
-
-	return DC_OK;
-}
-
 enum dc_status dce100_validate_with_context(
 		const struct core_dc *dc,
 		const struct dc_validation_set set[],
@@ -895,7 +835,7 @@ enum dc_status dce100_validate_with_context(
 	result = resource_map_pool_resources(dc, context);
 
 	if (result == DC_OK)
-		result = map_clock_resources(dc, context);
+		result = resource_map_clock_resources(dc, context);
 
 	if (result == DC_OK)
 		result = validate_mapped_resource(dc, context);
