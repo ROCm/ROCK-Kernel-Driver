@@ -58,13 +58,11 @@ enum {
  ******************************************************************************/
 static void destruct(struct core_link *link)
 {
-	struct core_dc *core_dc = DC_TO_CORE(link->ctx->dc);
-
 	if (link->ddc)
 		dal_ddc_service_destroy(&link->ddc);
 
 	if(link->link_enc)
-		core_dc->res_pool.funcs->link_enc_destroy(&link->link_enc);
+		link->link_enc->funcs->destroy(&link->link_enc);
 }
 
 /*
@@ -1051,7 +1049,7 @@ static bool construct(
 
 	return true;
 device_tag_fail:
-	link->dc->res_pool.funcs->link_enc_destroy(&link->link_enc);
+	link->link_enc->funcs->destroy(&link->link_enc);
 link_enc_create_fail:
 	dal_ddc_service_destroy(&link->ddc);
 ddc_create_fail:

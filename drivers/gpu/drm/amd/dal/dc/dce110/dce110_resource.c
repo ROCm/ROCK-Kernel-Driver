@@ -417,12 +417,6 @@ struct link_encoder *dce110_link_encoder_create(
 	return NULL;
 }
 
-void dce110_link_encoder_destroy(struct link_encoder **enc)
-{
-	dm_free(TO_DCE110_LINK_ENC(*enc));
-	*enc = NULL;
-}
-
 static struct output_pixel_processor *dce110_opp_create(
 	struct dc_context *ctx,
 	uint32_t inst,
@@ -979,7 +973,6 @@ enum dc_status dce110_validate_with_context(
 static struct resource_funcs dce110_res_pool_funcs = {
 	.destruct = dce110_destruct_resource_pool,
 	.link_enc_create = dce110_link_encoder_create,
-	.link_enc_destroy = dce110_link_encoder_destroy,
 	.validate_with_context = dce110_validate_with_context,
 	.validate_bandwidth = dce110_validate_bandwidth
 };

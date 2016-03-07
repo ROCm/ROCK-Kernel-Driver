@@ -238,7 +238,6 @@ struct resource_funcs {
 	void (*destruct)(struct resource_pool *pool);
 	struct link_encoder *(*link_enc_create)(
 			const struct encoder_init_data *init);
-	void (*link_enc_destroy)(struct link_encoder **enc);
 	enum dc_status (*validate_with_context)(
 					const struct core_dc *dc,
 					const struct dc_validation_set set[],

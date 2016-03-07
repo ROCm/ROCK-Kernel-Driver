@@ -40,7 +40,5 @@ bool dce110_construct_resource_pool(
 
 void dce110_destruct_resource_pool(struct resource_pool *pool);
 
-void dce110_link_encoder_destroy(struct link_encoder **enc);
-
 #endif /* __DC_RESOURCE_DCE110_H__ */
 

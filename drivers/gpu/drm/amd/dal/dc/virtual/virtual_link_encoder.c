@@ -23,6 +23,7 @@
  *
  */
 
+#include "dm_services.h"
 #include "dm_services_types.h"
 
 #include "virtual_link_encoder.h"
@@ -90,6 +91,13 @@ static void virtual_link_encoder_connect_dig_be_to_fe(
 	enum engine_id engine,
 	bool connect) {}
 
+static void virtual_link_encoder_destroy(struct link_encoder **enc)
+{
+	dm_free(*enc);
+	*enc = NULL;
+}
+
+
 static struct link_encoder_funcs virtual_lnk_enc_funcs = {
 	.validate_output_with_stream =
 		virtual_link_encoder_validate_output_with_stream,
@@ -106,7 +114,8 @@ static struct link_encoder_funcs virtual_lnk_enc_funcs = {
 	.set_lcd_backlight_level = virtual_link_encoder_set_lcd_backlight_level,
 	.backlight_control = virtual_link_encoder_edp_backlight_control,
 	.power_control = virtual_link_encoder_edp_power_control,
-	.connect_dig_be_to_fe = virtual_link_encoder_connect_dig_be_to_fe
+	.connect_dig_be_to_fe = virtual_link_encoder_connect_dig_be_to_fe,
+	.destroy = virtual_link_encoder_destroy
 };
 
 bool virtual_link_encoder_construct(
@@ -131,3 +140,5 @@ bool virtual_link_encoder_construct(
 
 	return true;
 }
+
+

@@ -852,7 +852,6 @@ enum dc_status dce100_validate_with_context(
 static struct resource_funcs dce100_res_pool_funcs = {
 	.destruct = dce100_destruct_resource_pool,
 	.link_enc_create = dce100_link_encoder_create,
-	.link_enc_destroy = dce110_link_encoder_destroy,
 	.validate_with_context = dce100_validate_with_context,
 	.validate_bandwidth = dce100_validate_bandwidth
 };

@@ -206,7 +206,8 @@ static struct link_encoder_funcs dce80_lnk_enc_funcs = {
 	.set_lcd_backlight_level = dce110_link_encoder_set_lcd_backlight_level,
 	.backlight_control = dce110_link_encoder_edp_backlight_control,
 	.power_control = dce110_link_encoder_edp_power_control,
-	.connect_dig_be_to_fe = dce110_link_encoder_connect_dig_be_to_fe
+	.connect_dig_be_to_fe = dce110_link_encoder_connect_dig_be_to_fe,
+	.destroy = dce110_link_encoder_destroy
 };
 
 bool dce80_link_encoder_construct(
