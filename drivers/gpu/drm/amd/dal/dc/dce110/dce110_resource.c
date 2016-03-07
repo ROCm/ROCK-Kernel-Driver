@@ -1000,6 +1000,52 @@ static void underlay_create(struct dc_context *ctx, struct resource_pool *pool)
 	pool->pipe_count++;
 }
 
+static void bw_calcs_data_update_from_pplib(struct core_dc *dc)
+{
+	struct dm_pp_clock_levels clks = {0};
+
+	/*do system clock*/
+	dm_pp_get_clock_levels_by_type(
+			dc->ctx,
+			DM_PP_CLOCK_TYPE_ENGINE_CLK,
+			&clks);
+	/* convert all the clock fro kHz to fix point mHz */
+	dc->bw_vbios.high_sclk = bw_frc_to_fixed(
+			clks.clocks_in_khz[clks.num_levels-1], 1000);
+	dc->bw_vbios.mid_sclk  = bw_frc_to_fixed(
+			clks.clocks_in_khz[clks.num_levels>>1], 1000);
+	dc->bw_vbios.low_sclk  = bw_frc_to_fixed(
+			clks.clocks_in_khz[0], 1000);
+
+	/*do display clock*/
+	dm_pp_get_clock_levels_by_type(
+			dc->ctx,
+			DM_PP_CLOCK_TYPE_DISPLAY_CLK,
+			&clks);
+
+	dc->bw_vbios.high_voltage_max_dispclk = bw_frc_to_fixed(
+			clks.clocks_in_khz[clks.num_levels-1], 1000);
+	dc->bw_vbios.mid_voltage_max_dispclk  = bw_frc_to_fixed(
+			clks.clocks_in_khz[clks.num_levels>>1], 1000);
+	dc->bw_vbios.low_voltage_max_dispclk  = bw_frc_to_fixed(
+			clks.clocks_in_khz[0], 1000);
+
+	/*do memory clock*/
+	dm_pp_get_clock_levels_by_type(
+			dc->ctx,
+			DM_PP_CLOCK_TYPE_MEMORY_CLK,
+			&clks);
+
+	dc->bw_vbios.low_yclk = bw_frc_to_fixed(
+		clks.clocks_in_khz[0] * MEMORY_TYPE_MULTIPLIER, 1000);
+	dc->bw_vbios.mid_yclk = bw_frc_to_fixed(
+		clks.clocks_in_khz[clks.num_levels>>1] * MEMORY_TYPE_MULTIPLIER,
+		1000);
+	dc->bw_vbios.high_yclk = bw_frc_to_fixed(
+		clks.clocks_in_khz[clks.num_levels-1] * MEMORY_TYPE_MULTIPLIER,
+		1000);
+}
+
 bool dce110_construct_resource_pool(
 	struct adapter_service *as,
 	uint8_t num_virtual_links,
@@ -1181,9 +1227,14 @@ bool dce110_construct_resource_pool(
 		pool->stream_enc_count++;
 	}
 
+
 	/* Create hardware sequencer */
 	if (!dc_construct_hw_sequencer(as, dc))
 		goto stream_enc_create_fail;
+
+	bw_calcs_init(&dc->bw_dceip, &dc->bw_vbios, BW_CALCS_VERSION_CARRIZO);
+
+	bw_calcs_data_update_from_pplib(dc);
 
 	return true;
 

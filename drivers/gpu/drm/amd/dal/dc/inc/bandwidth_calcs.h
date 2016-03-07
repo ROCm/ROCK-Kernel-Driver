@@ -483,12 +483,18 @@ struct bw_calcs_output {
 	int32_t required_blackout_duration_us;
 };
 
+enum bw_calcs_version {
+	BW_CALCS_VERSION_INVALID,
+	BW_CALCS_VERSION_CARRIZO
+};
+
 /**
  * Initialize structures with data which will NOT change at runtime.
  */
 void bw_calcs_init(
 	struct bw_calcs_dceip *bw_dceip,
-	struct bw_calcs_vbios *bw_vbios);
+	struct bw_calcs_vbios *bw_vbios,
+	enum bw_calcs_version version);
 
 /**
  * Return:
