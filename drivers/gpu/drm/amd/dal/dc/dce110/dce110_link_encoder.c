@@ -105,8 +105,10 @@ static struct link_encoder_funcs dce110_lnk_enc_funcs = {
 	.set_lcd_backlight_level = dce110_link_encoder_set_lcd_backlight_level,
 	.backlight_control = dce110_link_encoder_edp_backlight_control,
 	.power_control = dce110_link_encoder_edp_power_control,
-	.connect_dig_be_to_fe = dce110_link_encoder_connect_dig_be_to_fe
+	.connect_dig_be_to_fe = dce110_link_encoder_connect_dig_be_to_fe,
+	.destroy = dce110_link_encoder_destroy
 };
+
 
 static enum bp_result link_transmitter_control(
 	struct dce110_link_encoder *enc110,
@@ -1259,6 +1261,12 @@ void dce110_link_encoder_hw_init(
 	 * as DIG_FE id even caller pass DIG_FE id.
 	 * So this routine must be called first. */
 	hpd_initialize(enc110);
+}
+
+void dce110_link_encoder_destroy(struct link_encoder **enc)
+{
+	dm_free(TO_DCE110_LINK_ENC(*enc));
+	*enc = NULL;
 }
 
 void dce110_link_encoder_setup(

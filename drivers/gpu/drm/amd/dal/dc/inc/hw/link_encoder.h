@@ -118,6 +118,7 @@ struct link_encoder_funcs {
 	void (*connect_dig_be_to_fe)(struct link_encoder *enc,
 		enum engine_id engine,
 		bool connect);
+	void (*destroy)(struct link_encoder **enc);
 };
 
 #endif /* LINK_ENCODER_H_ */
