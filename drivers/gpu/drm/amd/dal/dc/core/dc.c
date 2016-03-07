@@ -200,52 +200,6 @@ static struct adapter_service *create_as(
 	return as;
 }
 
-static void bw_calcs_data_update_from_pplib(struct core_dc *dc)
-{
-	struct dm_pp_clock_levels clks = {0};
-
-	/*do system clock*/
-	dm_pp_get_clock_levels_by_type(
-			dc->ctx,
-			DM_PP_CLOCK_TYPE_ENGINE_CLK,
-			&clks);
-	/* convert all the clock fro kHz to fix point mHz */
-	dc->bw_vbios.high_sclk = bw_frc_to_fixed(
-			clks.clocks_in_khz[clks.num_levels-1], 1000);
-	dc->bw_vbios.mid_sclk  = bw_frc_to_fixed(
-			clks.clocks_in_khz[clks.num_levels>>1], 1000);
-	dc->bw_vbios.low_sclk  = bw_frc_to_fixed(
-			clks.clocks_in_khz[0], 1000);
-
-	/*do display clock*/
-	dm_pp_get_clock_levels_by_type(
-			dc->ctx,
-			DM_PP_CLOCK_TYPE_DISPLAY_CLK,
-			&clks);
-
-	dc->bw_vbios.high_voltage_max_dispclk = bw_frc_to_fixed(
-			clks.clocks_in_khz[clks.num_levels-1], 1000);
-	dc->bw_vbios.mid_voltage_max_dispclk  = bw_frc_to_fixed(
-			clks.clocks_in_khz[clks.num_levels>>1], 1000);
-	dc->bw_vbios.low_voltage_max_dispclk  = bw_frc_to_fixed(
-			clks.clocks_in_khz[0], 1000);
-
-	/*do memory clock*/
-	dm_pp_get_clock_levels_by_type(
-			dc->ctx,
-			DM_PP_CLOCK_TYPE_MEMORY_CLK,
-			&clks);
-
-	dc->bw_vbios.low_yclk = bw_frc_to_fixed(
-		clks.clocks_in_khz[0] * MEMORY_TYPE_MULTIPLIER, 1000);
-	dc->bw_vbios.mid_yclk = bw_frc_to_fixed(
-		clks.clocks_in_khz[clks.num_levels>>1] * MEMORY_TYPE_MULTIPLIER,
-		1000);
-	dc->bw_vbios.high_yclk = bw_frc_to_fixed(
-		clks.clocks_in_khz[clks.num_levels-1] * MEMORY_TYPE_MULTIPLIER,
-		1000);
-}
-
 static bool construct(struct core_dc *dc, const struct dc_init_data *init_params)
 {
 	struct dal_logger *logger;
@@ -305,10 +259,6 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 
 		if (!create_links(dc, as, init_params->num_virtual_links))
 			goto create_links_fail;
-
-		bw_calcs_init(&dc->bw_dceip, &dc->bw_vbios);
-
-		bw_calcs_data_update_from_pplib(dc);
 	} else {
 
 		/* Resource should construct all asic specific resources.
