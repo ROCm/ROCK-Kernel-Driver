@@ -1172,8 +1172,10 @@ static void set_displaymarks(
 static void set_safe_displaymarks(struct resource_context *res_ctx)
 {
 	uint8_t i;
-	struct bw_watermarks max_marks = { MAX_WATERMARK, MAX_WATERMARK };
-	struct bw_watermarks nbp_marks = { SAFE_NBP_MARK, SAFE_NBP_MARK };
+	struct bw_watermarks max_marks = {
+		MAX_WATERMARK, MAX_WATERMARK, MAX_WATERMARK, MAX_WATERMARK };
+	struct bw_watermarks nbp_marks = {
+		SAFE_NBP_MARK, SAFE_NBP_MARK, SAFE_NBP_MARK, SAFE_NBP_MARK };
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		if (res_ctx->pipe_ctx[i].stream == NULL)

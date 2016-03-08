@@ -32,7 +32,6 @@
 
 #include "include/logger_interface.h"
 #include "adapter_service_interface.h"
-#include "inc/bandwidth_calcs.h"
 
 #include "dce110_mem_input.h"
 
@@ -442,7 +441,7 @@ static void program_urgency_watermark(
 
 	set_reg_field_value(
 		urgency_cntl,
-		marks_low.a_mark,
+		marks_low.d_mark,
 		DPG_PIPE_URGENCY_CONTROL,
 		URGENCY_LOW_WATERMARK);
 
@@ -464,7 +463,7 @@ static void program_urgency_watermark(
 	urgency_cntl = dm_read_reg(ctx, urgency_addr);
 
 	set_reg_field_value(urgency_cntl,
-		marks_low.b_mark,
+		marks_low.a_mark,
 		DPG_PIPE_URGENCY_CONTROL,
 		URGENCY_LOW_WATERMARK);
 
@@ -509,7 +508,7 @@ static void program_stutter_watermark(
 
 	/*Write watermark set A*/
 	set_reg_field_value(stutter_cntl,
-		marks.a_mark,
+		marks.d_mark,
 		DPG_PIPE_STUTTER_CONTROL,
 		STUTTER_EXIT_SELF_REFRESH_WATERMARK);
 	dm_write_reg(ctx, stutter_addr, stutter_cntl);
@@ -534,7 +533,7 @@ static void program_stutter_watermark(
 
 	/*Write watermark set B*/
 	set_reg_field_value(stutter_cntl,
-		marks.b_mark,
+		marks.a_mark,
 		DPG_PIPE_STUTTER_CONTROL,
 		STUTTER_EXIT_SELF_REFRESH_WATERMARK);
 	dm_write_reg(ctx, stutter_addr, stutter_cntl);
@@ -580,7 +579,7 @@ static void program_nbp_watermark(
 	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
-		marks.a_mark,
+		marks.d_mark,
 		DPG_PIPE_NB_PSTATE_CHANGE_CONTROL,
 		NB_PSTATE_CHANGE_WATERMARK);
 	dm_write_reg(ctx, addr, value);
@@ -618,7 +617,7 @@ static void program_nbp_watermark(
 	value = dm_read_reg(ctx, addr);
 	set_reg_field_value(
 		value,
-		marks.b_mark,
+		marks.a_mark,
 		DPG_PIPE_NB_PSTATE_CHANGE_CONTROL,
 		NB_PSTATE_CHANGE_WATERMARK);
 	dm_write_reg(ctx, addr, value);
