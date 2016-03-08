@@ -310,89 +310,6 @@ struct dc_mode_flags {
 	uint32_t MIRACAST_REFRESH_DIVIDER;
 };
 
-struct dc_crtc_timing_flags {
-	uint32_t INTERLACE :1;
-	uint32_t HSYNC_POSITIVE_POLARITY :1; /* when set to 1,
-	 it is positive polarity --reversed with dal1 or video bios define*/
-	uint32_t VSYNC_POSITIVE_POLARITY :1; /* when set to 1,
-	 it is positive polarity --reversed with dal1 or video bios define*/
-
-	uint32_t HORZ_COUNT_BY_TWO:1;
-
-	uint32_t EXCLUSIVE_3D :1; /* if this bit set,
-	 timing can be driven in 3D format only
-	 and there is no corresponding 2D timing*/
-	uint32_t RIGHT_EYE_3D_POLARITY :1; /* 1 - means right eye polarity
-	 (right eye = '1', left eye = '0') */
-	uint32_t SUB_SAMPLE_3D :1; /* 1 - means left/right  images subsampled
-	 when mixed into 3D image. 0 - means summation (3D timing is doubled)*/
-	uint32_t USE_IN_3D_VIEW_ONLY :1; /* Do not use this timing in 2D View,
-	 because corresponding 2D timing also present in the list*/
-	uint32_t STEREO_3D_PREFERENCE :1; /* Means this is 2D timing
-	 and we want to match priority of corresponding 3D timing*/
-	uint32_t Y_ONLY :1;
-
-	uint32_t YCBCR420 :1; /* TODO: shouldn't need this flag, should be a separate pixel format */
-	uint32_t DTD_COUNTER :5; /* values 1 to 16 */
-
-	/* HDMI 2.0 - Support scrambling for TMDS character
-	 * rates less than or equal to 340Mcsc */
-	uint32_t LTE_340MCSC_SCRAMBLE:1;
-
-};
-
-enum dc_timing_standard {
-	TIMING_STANDARD_UNDEFINED,
-	TIMING_STANDARD_DMT,
-	TIMING_STANDARD_GTF,
-	TIMING_STANDARD_CVT,
-	TIMING_STANDARD_CVT_RB,
-	TIMING_STANDARD_CEA770,
-	TIMING_STANDARD_CEA861,
-	TIMING_STANDARD_HDMI,
-	TIMING_STANDARD_TV_NTSC,
-	TIMING_STANDARD_TV_NTSC_J,
-	TIMING_STANDARD_TV_PAL,
-	TIMING_STANDARD_TV_PAL_M,
-	TIMING_STANDARD_TV_PAL_CN,
-	TIMING_STANDARD_TV_SECAM,
-	TIMING_STANDARD_EXPLICIT,
-	/*!< For explicit timings from EDID, VBIOS, etc.*/
-	TIMING_STANDARD_USER_OVERRIDE,
-	/*!< For mode timing override by user*/
-	TIMING_STANDARD_MAX
-};
-
-enum dc_aspect_ratio {
-	ASPECT_RATIO_NO_DATA,
-	ASPECT_RATIO_4_3,
-	ASPECT_RATIO_16_9,
-	ASPECT_RATIO_64_27,
-	ASPECT_RATIO_256_135,
-	ASPECT_RATIO_FUTURE
-};
-
-enum dc_timing_3d_format {
-	TIMING_3D_FORMAT_NONE,
-	TIMING_3D_FORMAT_FRAME_ALTERNATE, /* No stereosync at all*/
-	TIMING_3D_FORMAT_INBAND_FA, /* Inband Frame Alternate (DVI/DP)*/
-	TIMING_3D_FORMAT_DP_HDMI_INBAND_FA, /* Inband FA to HDMI Frame Pack*/
-	/* for active DP-HDMI dongle*/
-	TIMING_3D_FORMAT_SIDEBAND_FA, /* Sideband Frame Alternate (eDP)*/
-	TIMING_3D_FORMAT_HW_FRAME_PACKING,
-	TIMING_3D_FORMAT_SW_FRAME_PACKING,
-	TIMING_3D_FORMAT_ROW_INTERLEAVE,
-	TIMING_3D_FORMAT_COLUMN_INTERLEAVE,
-	TIMING_3D_FORMAT_PIXEL_INTERLEAVE,
-	TIMING_3D_FORMAT_SIDE_BY_SIDE,
-	TIMING_3D_FORMAT_TOP_AND_BOTTOM,
-	TIMING_3D_FORMAT_SBS_SW_PACKED,
-	/* Side-by-side, packed by application/driver into 2D frame*/
-	TIMING_3D_FORMAT_TB_SW_PACKED,
-	/* Top-and-bottom, packed by application/driver into 2D frame*/
-
-	TIMING_3D_FORMAT_MAX,
-};
 
 enum dc_timing_source {
 	TIMING_SOURCE_UNDEFINED,
@@ -452,46 +369,6 @@ struct dc_mode_info {
 	enum dc_timing_standard timing_standard;
 	enum dc_timing_source timing_source;
 	struct dc_mode_flags flags;
-};
-
-/* TODO: assess necessity*/
-/*scanning type*/
-enum scanning_type {
-	SCANNING_TYPE_NODATA = 0,
-	SCANNING_TYPE_OVERSCAN,
-	SCANNING_TYPE_UNDERSCAN,
-	SCANNING_TYPE_FUTURE,
-	SCANNING_TYPE_UNDEFINED
-};
-
-struct dc_crtc_timing {
-
-	uint32_t h_total;
-	uint32_t h_border_left;
-	uint32_t h_addressable;
-	uint32_t h_border_right;
-	uint32_t h_front_porch;
-	uint32_t h_sync_width;
-
-	uint32_t v_total;
-	uint32_t v_border_top;
-	uint32_t v_addressable;
-	uint32_t v_border_bottom;
-	uint32_t v_front_porch;
-	uint32_t v_sync_width;
-
-	uint32_t pix_clk_khz;
-
-	uint32_t vic;
-	uint32_t hdmi_vic;
-	enum dc_timing_standard timing_standard;
-	enum dc_timing_3d_format timing_3d_format;
-	enum dc_color_depth display_color_depth;
-	enum dc_pixel_encoding pixel_encoding;
-	enum dc_aspect_ratio aspect_ratio;
-	enum scanning_type scan_type;
-
-	struct dc_crtc_timing_flags flags;
 };
 
 struct dc_mode_timing {
