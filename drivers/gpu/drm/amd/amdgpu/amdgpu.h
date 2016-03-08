@@ -841,13 +841,6 @@ struct amdgpu_vm_pt {
 	uint64_t			addr;
 };
 
-struct amdgpu_vm_id {
-	struct amdgpu_vm_manager_id	*mgr_id;
-	uint64_t			pd_gpu_addr;
-	/* last flushed PD/PT update */
-	struct fence			*flushed_updates;
-};
-
 struct amdgpu_vm {
 	/* tree of virtual addresses mapped */
 	struct rb_root		va;
@@ -873,7 +866,7 @@ struct amdgpu_vm {
 	struct amdgpu_vm_pt	*page_tables;
 
 	/* for id and flush management per ring */
-	struct amdgpu_vm_id	ids[AMDGPU_MAX_RINGS];
+	struct amdgpu_vm_id	*ids[AMDGPU_MAX_RINGS];
 
 	/* protecting freed */
 	spinlock_t		freed_lock;
@@ -882,10 +875,14 @@ struct amdgpu_vm {
 	struct amd_sched_entity	entity;
 };
 
-struct amdgpu_vm_manager_id {
+struct amdgpu_vm_id {
 	struct list_head	list;
 	struct fence		*active;
 	atomic_long_t		owner;
+
+	uint64_t		pd_gpu_addr;
+	/* last flushed PD/PT update */
+	struct fence		*flushed_updates;
 
 	uint32_t		gds_base;
 	uint32_t		gds_size;
@@ -900,7 +897,7 @@ struct amdgpu_vm_manager {
 	struct mutex				lock;
 	unsigned				num_ids;
 	struct list_head			ids_lru;
-	struct amdgpu_vm_manager_id		ids[AMDGPU_NUM_VM];
+	struct amdgpu_vm_id			ids[AMDGPU_NUM_VM];
 
 	uint32_t				max_pfn;
 	/* vram base address for page table entry  */
