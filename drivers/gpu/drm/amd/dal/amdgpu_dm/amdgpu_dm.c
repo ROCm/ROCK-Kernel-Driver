@@ -424,78 +424,11 @@ static int dm_hw_fini(void *handle)
 	return 0;
 }
 
-static int dm_display_suspend(struct drm_device *ddev)
-{
-	struct drm_mode_config *config = &ddev->mode_config;
-	struct drm_modeset_acquire_ctx *ctx = config->acquire_ctx;
-	struct drm_atomic_state *state;
-	struct drm_crtc *crtc;
-	unsigned crtc_mask = 0;
-	int ret = 0;
-
-	if (WARN_ON(!ctx))
-		return 0;
-
-	lockdep_assert_held(&ctx->ww_ctx);
-
-	state = drm_atomic_state_alloc(ddev);
-	if (WARN_ON(!state))
-		return -ENOMEM;
-
-	state->acquire_ctx = ctx;
-	state->allow_modeset = true;
-
-	/* Set all active crtcs to inactive, to turn off displays*/
-	list_for_each_entry(crtc, &ddev->mode_config.crtc_list, head) {
-		struct drm_crtc_state *crtc_state =
-			drm_atomic_get_crtc_state(state, crtc);
-
-		ret = PTR_ERR_OR_ZERO(crtc_state);
-		if (ret)
-			goto free;
-
-		if (!crtc_state->active)
-			continue;
-
-		crtc_state->active = false;
-		crtc_mask |= (1 << drm_crtc_index(crtc));
-	}
-
-	if (crtc_mask) {
-		ret = drm_atomic_commit(state);
-
-		/* In case of failure, revert everything we did*/
-		if (!ret) {
-			list_for_each_entry(crtc, &ddev->mode_config.crtc_list, head)
-				if (crtc_mask & (1 << drm_crtc_index(crtc)))
-					crtc->state->active = true;
-
-			return ret;
-		}
-	}
-
-free:
-	if (ret) {
-		DRM_ERROR("Suspending crtc's failed with %i\n", ret);
-		drm_atomic_state_free(state);
-		return ret;
-	}
-
-	return 0;
-}
 static int dm_suspend(void *handle)
 {
 	struct amdgpu_device *adev = handle;
 	struct amdgpu_display_manager *dm = &adev->dm;
-	struct drm_device *ddev = adev->ddev;
 	int ret = 0;
-
-	drm_modeset_lock_all(ddev);
-	ret = dm_display_suspend(ddev);
-	drm_modeset_unlock_all(ddev);
-
-	if (ret)
-		goto fail;
 
 	dc_set_power_state(
 		dm->dc,
@@ -503,7 +436,7 @@ static int dm_suspend(void *handle)
 		DC_VIDEO_POWER_SUSPEND);
 
 	amdgpu_dm_irq_suspend(adev);
-fail:
+
 	return ret;
 }
 
@@ -612,8 +545,6 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 	drm_modeset_lock_all(ddev);
 	ret = dm_display_resume(ddev);
 	drm_modeset_unlock_all(ddev);
-
-	drm_kms_helper_hotplug_event(ddev);
 
 	amdgpu_dm_irq_resume(adev);
 
