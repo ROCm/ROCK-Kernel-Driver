@@ -170,9 +170,8 @@ static inline void generic_reg_update_ex(const struct dc_context *ctx,
 }
 
 #define generic_reg_update(ctx, inst_offset, reg_name, n, ...)\
-		uint32_t reg_val = dm_read_reg(ctx, mm##reg_name + inst_offset);	\
 		generic_reg_update_ex(ctx, \
-		mm##reg_name + inst_offset, reg_val, n, \
+		mm##reg_name + inst_offset, dm_read_reg(ctx, mm##reg_name + inst_offset), n, \
 		__VA_ARGS__)
 
 #define generic_reg_set(ctx, inst_offset, reg_name, n, ...)\
