@@ -480,8 +480,8 @@ static void detect_dp(
 
 		/* DP active dongles */
 		if (is_dp_active_dongle(link)) {
+			link->public.type = dc_connection_active_dongle;
 			if (!link->dpcd_caps.sink_count.bits.SINK_COUNT) {
-				link->public.type = dc_connection_none;
 				/*
 				 * active dongle unplug processing for short irq
 				 */
@@ -607,7 +607,9 @@ bool dc_link_detect(const struct dc_link *dc_link, bool boot)
 				&audio_support, boot);
 
 			/* Active dongle downstream unplug */
-			if (link->public.type == dc_connection_none)
+			if (link->public.type == dc_connection_active_dongle
+					&& link->dpcd_caps.sink_count.
+					bits.SINK_COUNT == 0)
 				return true;
 
 			if (link->public.type == dc_connection_mst_branch) {
