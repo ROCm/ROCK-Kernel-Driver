@@ -587,6 +587,14 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 	list_for_each_entry(connector,
 			&ddev->mode_config.connector_list, head) {
 		aconnector = to_amdgpu_connector(connector);
+
+		/*
+		 * this is the case when traversing through already created
+		 * MST connectors, should be skipped
+		 */
+		if (aconnector->mst_port)
+			continue;
+
 		dc_link_detect(aconnector->dc_link, false);
 		aconnector->dc_sink = NULL;
 		amdgpu_dm_update_connector_after_detect(aconnector);
