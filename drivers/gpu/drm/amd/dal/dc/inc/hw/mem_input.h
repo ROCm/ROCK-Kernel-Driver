@@ -25,8 +25,9 @@
 #ifndef __DAL_MEM_INPUT_H__
 #define __DAL_MEM_INPUT_H__
 
-#include "include/grph_object_id.h"
 #include "dc.h"
+#include "include/grph_object_id.h"
+#include "inc/bandwidth_calcs.h"
 
 struct mem_input {
 	struct mem_input_funcs *funcs;

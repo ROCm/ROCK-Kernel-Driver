@@ -3879,6 +3879,41 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 				bw_mul(high_yclk, bw_int_to_fixed(1000)));
 
 		/* units: nanosecond, 16bit storage. */
+		calcs_output->nbp_state_change_wm_ns[0].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[4], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[1].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[5], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[2].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[6], bw_int_to_fixed(1000)));
+
+		calcs_output->stutter_exit_wm_ns[0].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[4], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[1].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[5], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[2].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[6], bw_int_to_fixed(1000)));
+
+		calcs_output->urgent_wm_ns[0].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[4], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[1].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[5], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[2].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[6], bw_int_to_fixed(1000)));
+
+		/*TODO check correctness*/
+		((struct bw_calcs_vbios *)vbios)->low_sclk = mid_sclk;
+		calculate_bandwidth(dceip, vbios, bw_data_internal,
+							bw_results_internal);
+
 		calcs_output->nbp_state_change_wm_ns[0].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[4],bw_int_to_fixed(1000)));
@@ -3909,6 +3944,42 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[6], bw_int_to_fixed(1000)));
 
+		/*TODO check correctness*/
+		((struct bw_calcs_vbios *)vbios)->low_sclk = low_sclk;
+		((struct bw_calcs_vbios *)vbios)->low_yclk = mid_yclk;
+		calculate_bandwidth(dceip, vbios, bw_data_internal,
+							bw_results_internal);
+
+		calcs_output->nbp_state_change_wm_ns[0].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[4], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[1].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[5], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[2].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[6], bw_int_to_fixed(1000)));
+
+		calcs_output->stutter_exit_wm_ns[0].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[4], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[1].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[5], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[2].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[6], bw_int_to_fixed(1000)));
+
+		calcs_output->urgent_wm_ns[0].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[4], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[1].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[5], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[2].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[6], bw_int_to_fixed(1000)));
+
 		((struct bw_calcs_vbios *)vbios)->low_yclk = high_yclk;
 		((struct bw_calcs_vbios *)vbios)->mid_yclk = high_yclk;
 		((struct bw_calcs_vbios *)vbios)->low_sclk = high_sclk;
@@ -3917,33 +3988,33 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calculate_bandwidth(dceip, vbios, bw_data_internal,
 							bw_results_internal);
 
-		calcs_output->nbp_state_change_wm_ns[0].a_mark =
+		calcs_output->nbp_state_change_wm_ns[0].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[4], bw_int_to_fixed(1000)));
-		calcs_output->nbp_state_change_wm_ns[1].a_mark =
+		calcs_output->nbp_state_change_wm_ns[1].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[5], bw_int_to_fixed(1000)));
-		calcs_output->nbp_state_change_wm_ns[2].a_mark =
+		calcs_output->nbp_state_change_wm_ns[2].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[6], bw_int_to_fixed(1000)));
 
-		calcs_output->stutter_exit_wm_ns[0].a_mark =
+		calcs_output->stutter_exit_wm_ns[0].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[4], bw_int_to_fixed(1000)));
-		calcs_output->stutter_exit_wm_ns[1].a_mark =
+		calcs_output->stutter_exit_wm_ns[1].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[5], bw_int_to_fixed(1000)));
-		calcs_output->stutter_exit_wm_ns[2].a_mark =
+		calcs_output->stutter_exit_wm_ns[2].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[6], bw_int_to_fixed(1000)));
 
-		calcs_output->urgent_wm_ns[0].a_mark =
+		calcs_output->urgent_wm_ns[0].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[4], bw_int_to_fixed(1000)));
-		calcs_output->urgent_wm_ns[1].a_mark =
+		calcs_output->urgent_wm_ns[1].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[5], bw_int_to_fixed(1000)));
-		calcs_output->urgent_wm_ns[2].a_mark =
+		calcs_output->urgent_wm_ns[2].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[6], bw_int_to_fixed(1000)));
 

@@ -465,6 +465,8 @@ struct bw_calcs_results {
 struct bw_watermarks {
 	uint32_t a_mark;
 	uint32_t b_mark;
+	uint32_t c_mark;
+	uint32_t d_mark;
 };
 
 struct bw_calcs_output {
