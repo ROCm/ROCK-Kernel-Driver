@@ -1284,22 +1284,47 @@ static bool convert_to_custom_float(
 	return true;
 }
 
-void calculate_regamma_params(struct pwl_params *params,
-		struct temp_params *temp_params,
+bool calculate_regamma_params(struct pwl_params *params,
 		const struct core_gamma *ramp,
 		const struct core_surface *surface)
 {
 	struct gamma_curve *arr_curve_points = params->arr_curve_points;
 	struct curve_points *arr_points = params->arr_points;
-	struct hw_x_point *coordinates_x = temp_params->coordinates_x;
-	struct pwl_float_data *rgb_user = temp_params->rgb_user;
-	struct pwl_float_data_ex *rgb_regamma = temp_params->rgb_regamma;
-	struct pwl_float_data *rgb_oem = temp_params->rgb_oem;
 	struct pwl_result_data *rgb_resulted = params->rgb_resulted;
 	struct dividers dividers;
-	struct gamma_pixel *axix_x_256 = temp_params->axix_x_256;
-	struct pixel_gamma_point *coeff128_oem = temp_params->coeff128_oem;
-	struct pixel_gamma_point *coeff128 = temp_params->coeff128;
+
+	struct hw_x_point *coordinates_x = NULL;
+	struct pwl_float_data *rgb_user = NULL ;
+	struct pwl_float_data_ex *rgb_regamma = NULL;
+	struct pwl_float_data *rgb_oem = NULL;
+	struct gamma_pixel *axix_x_256 = NULL;
+	struct pixel_gamma_point *coeff128_oem = NULL;
+	struct pixel_gamma_point *coeff128 = NULL;
+
+
+	bool ret = false;
+
+	coordinates_x = dm_alloc(sizeof(*coordinates_x)*(256 + 3));
+	if (!coordinates_x)
+		goto coordinates_x_alloc_fail;
+	rgb_user = dm_alloc(sizeof(*rgb_user) * (FLOAT_GAMMA_RAMP_MAX + 3));
+	if (!rgb_user)
+		goto rgb_user_alloc_fail;
+	rgb_regamma = dm_alloc(sizeof(*rgb_regamma) * (256 + 3));
+	if (!rgb_regamma)
+		goto rgb_regamma_alloc_fail;
+	rgb_oem = dm_alloc(sizeof(*rgb_oem) * (FLOAT_GAMMA_RAMP_MAX + 3));
+	if (!rgb_oem)
+		goto rgb_oem_alloc_fail;
+	axix_x_256 = dm_alloc(sizeof(*axix_x_256) * 256);
+	if (!axix_x_256)
+		goto axix_x_256_alloc_fail;
+	coeff128_oem = dm_alloc(sizeof(*coeff128_oem) * (256 + 3));
+	if (!coeff128_oem)
+		goto coeff128_oem_alloc_fail;
+	coeff128 = dm_alloc(sizeof(*coeff128) * (256 + 3));
+	if (!coeff128)
+		goto coeff128_alloc_fail;
 
 	dividers.divider1 = dal_fixed31_32_from_fraction(3, 2);
 	dividers.divider2 = dal_fixed31_32_from_int(2);
@@ -1334,5 +1359,24 @@ void calculate_regamma_params(struct pwl_params *params,
 
 	convert_to_custom_float(rgb_resulted, arr_points,
 			params->hw_points_num);
+
+	ret = true;
+
+	dm_free(coeff128);
+coeff128_alloc_fail:
+	dm_free(coeff128_oem);
+coeff128_oem_alloc_fail:
+	dm_free(axix_x_256);
+axix_x_256_alloc_fail:
+	dm_free(rgb_oem);
+rgb_oem_alloc_fail:
+	dm_free(rgb_regamma);
+rgb_regamma_alloc_fail:
+	dm_free(rgb_user);
+rgb_user_alloc_fail:
+	dm_free(coordinates_x);
+coordinates_x_alloc_fail:
+	return ret;
+
 }
 

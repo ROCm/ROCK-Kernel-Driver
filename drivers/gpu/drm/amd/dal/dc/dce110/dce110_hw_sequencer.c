@@ -512,7 +512,6 @@ static bool set_gamma_ramp(
 {
 	struct ipp_prescale_params *prescale_params;
 	struct pwl_params *regamma_params;
-	struct temp_params *temp_params;
 	bool result = false;
 
 	prescale_params = dm_alloc(sizeof(struct ipp_prescale_params));
@@ -524,11 +523,6 @@ static bool set_gamma_ramp(
 	if (regamma_params == NULL)
 		goto regamma_alloc_fail;
 
-	temp_params = dm_alloc(sizeof(struct temp_params));
-
-	if (temp_params == NULL)
-		goto temp_alloc_fail;
-
 	regamma_params->hw_points_num = GAMMA_HW_POINTS_NUM;
 
 	opp->funcs->opp_power_on_regamma_lut(opp, true);
@@ -538,9 +532,8 @@ static bool set_gamma_ramp(
 		ipp->funcs->ipp_program_prescale(ipp, prescale_params);
 	}
 
-	if (ramp) {
-		calculate_regamma_params(regamma_params,
-				temp_params, ramp, surface);
+	if (ramp && calculate_regamma_params(regamma_params, ramp, surface)) {
+
 		opp->funcs->opp_program_regamma_pwl(opp, regamma_params);
 		if (ipp)
 			ipp->funcs->ipp_set_degamma(ipp, IPP_DEGAMMA_MODE_HW_sRGB);
@@ -553,12 +546,10 @@ static bool set_gamma_ramp(
 
 	opp->funcs->opp_power_on_regamma_lut(opp, false);
 
-	dm_free(temp_params);
-
 	result = true;
 
-temp_alloc_fail:
 	dm_free(regamma_params);
+
 regamma_alloc_fail:
 	dm_free(prescale_params);
 prescale_alloc_fail:
