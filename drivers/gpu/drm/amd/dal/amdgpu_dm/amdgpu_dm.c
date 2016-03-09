@@ -583,6 +583,15 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 	struct drm_connector *connector;
 	int ret = 0;
 
+	/* program HPD filter */
+	dc_resume(dm->dc);
+
+	/*
+	 * early enable HPD Rx IRQ, should be done before set mode as short
+	 * pulse interrupts are used for MST
+	 */
+	amdgpu_dm_irq_resume_early(adev);
+
 	/* Do detection*/
 	list_for_each_entry(connector,
 			&ddev->mode_config.connector_list, head) {
@@ -606,9 +615,6 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 
 	drm_kms_helper_hotplug_event(ddev);
 
-	/* program HPD filter*/
-	dc_resume(dm->dc);
-	/* resume IRQ */
 	amdgpu_dm_irq_resume(adev);
 
 	return ret;
