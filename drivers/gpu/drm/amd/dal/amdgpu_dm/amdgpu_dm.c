@@ -1232,6 +1232,38 @@ static const struct amdgpu_display_funcs dm_dce_v11_0_display_funcs = {
 	.resume_mc_access = dce_v11_0_resume_mc_access, /* called unconditionally */
 };
 
+#if defined(CONFIG_DEBUG_KERNEL_DAL)
+
+static ssize_t s3_debug_store(
+	struct device *device,
+	struct device_attribute *attr,
+	const char *buf,
+	size_t count)
+{
+	int ret;
+	int s3_state;
+	struct pci_dev *pdev = to_pci_dev(device);
+	struct drm_device *drm_dev = pci_get_drvdata(pdev);
+	struct amdgpu_device *adev = drm_dev->dev_private;
+
+	ret = kstrtoint(buf, 0, &s3_state);
+
+	if (ret == 0) {
+		if (s3_state) {
+			dm_resume(adev);
+			amdgpu_dm_display_resume(adev);
+			drm_kms_helper_hotplug_event(adev->ddev);
+		} else
+			dm_suspend(adev);
+	}
+
+	return ret == 0 ? count : 0;
+}
+
+DEVICE_ATTR_WO(s3_debug);
+
+#endif
+
 static int dm_early_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
@@ -1279,6 +1311,11 @@ static int dm_early_init(void *handle)
 	/* Note: Do NOT change adev->audio_endpt_rreg and
 	 * adev->audio_endpt_wreg because they are initialised in
 	 * amdgpu_device_init() */
+#if defined(CONFIG_DEBUG_KERNEL_DAL)
+	device_create_file(
+		adev->ddev->dev,
+		&dev_attr_s3_debug);
+#endif
 
 	return 0;
 }
