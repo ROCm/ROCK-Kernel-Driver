@@ -90,16 +90,24 @@ void pqm_uninit(struct process_queue_manager *pqm)
 	int retval;
 	struct process_queue_node *pqn, *next;
 	struct kfd_process_device *pdd;
+	struct kfd_dev *dev = NULL;
 
 	BUG_ON(!pqm);
 
 	pr_debug("In func %s\n", __func__);
 
 	list_for_each_entry_safe(pqn, next, &pqm->queues, process_queue_list) {
-		pdd = kfd_get_process_device_data(pqn->q->device, pqm->process);
+		if (pqn->q)
+			dev = pqn->q->device;
+		else if (pqn->kq)
+			dev = pqn->kq->dev;
+		else
+			BUG();
+
+		pdd = kfd_get_process_device_data(dev, pqm->process);
 		if (pdd) {
-			retval = pqn->q->device->dqm->ops.process_termination
-				(pqn->q->device->dqm, &pdd->qpd);
+			retval = dev->dqm->ops.process_termination
+				(dev->dqm, &pdd->qpd);
 			if (retval != 0)
 				pdd->reset_wavefronts = true;
 		}

@@ -400,6 +400,8 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 {
 	struct kfd_process *p;
 	struct kfd_process_device *pdd = NULL;
+	struct kfd_dev *dev = NULL;
+	long status = -EFAULT;
 
 	/*
 	 * The kfd_process structure can not be free because the
@@ -415,18 +417,42 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 	mutex_lock(&p->mutex);
 
-	/* In case our notifier is called before IOMMU notifier */
+	/* Iterate over all process device data structures and if the pdd is in
+	 * debug mode,we should first force unregistration, then we will be
+	 * able to destroy the queues   */
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		dev = pdd->dev;
+		mutex_lock(get_dbgmgr_mutex());
+
+		if ((dev != NULL) &&
+			(dev->dbgmgr) &&
+			(dev->dbgmgr->pasid == p->pasid)) {
+
+			status = kfd_dbgmgr_unregister(dev->dbgmgr, p);
+			if (status == 0) {
+				kfd_dbgmgr_destroy(dev->dbgmgr);
+				dev->dbgmgr = NULL;
+			}
+		}
+		mutex_unlock(get_dbgmgr_mutex());
+	}
+
+
+	/* now we can uninit the pqm: */
+
 	pqm_uninit(&p->pqm);
 
 	/* Iterate over all process device data structure and check
 	 * if we should reset all wavefronts */
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+
 		if (pdd->reset_wavefronts) {
 			pr_warn("amdkfd: Resetting all wave fronts\n");
 			dbgdev_wave_reset_wavefronts(pdd->dev, p);
 			pdd->reset_wavefronts = false;
 		}
-
+	}
 	mutex_unlock(&p->mutex);
 
 	/*
