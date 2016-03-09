@@ -99,7 +99,13 @@ static bool program_hpd_filter(
 	case SIGNAL_TYPE_DISPLAY_PORT:
 	case SIGNAL_TYPE_DISPLAY_PORT_MST:
 		/* Program hpd filter to allow DP signal to settle */
-		delay_on_connect_in_ms = 20;
+		/* 500:	not able to detect MST <-> SST switch as HPD is low for
+		 * 	only 100ms on DELL U2413
+		 * 0:	some passive dongle still show aux mode instead of i2c
+		 * 20-50:not enough to hide bouncing HPD with passive dongle.
+		 * 	also see intermittent i2c read issues.
+		 */
+		delay_on_connect_in_ms = 80;
 		delay_on_disconnect_in_ms = 0;
 		break;
 	case SIGNAL_TYPE_LVDS:
