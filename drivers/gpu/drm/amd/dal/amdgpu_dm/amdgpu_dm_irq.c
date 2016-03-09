@@ -522,8 +522,30 @@ int amdgpu_dm_irq_suspend(
 	return 0;
 }
 
-int amdgpu_dm_irq_resume(
-	struct amdgpu_device *adev)
+int amdgpu_dm_irq_resume_early(struct amdgpu_device *adev)
+{
+	int src;
+	struct list_head *hnd_list_h, *hnd_list_l;
+	unsigned long irq_table_flags;
+
+	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
+
+	DRM_DEBUG_KMS("DM_IRQ: early resume\n");
+
+	/* re-enable short pulse interrupts HW interrupt */
+	for (src = DC_IRQ_SOURCE_HPD1RX; src < DC_IRQ_SOURCE_HPD6RX + 1; src++) {
+		hnd_list_l = &adev->dm.irq_handler_list_low_tab[src].head;
+		hnd_list_h = &adev->dm.irq_handler_list_high_tab[src];
+		if (!list_empty(hnd_list_l) || !list_empty(hnd_list_h))
+			dc_interrupt_set(adev->dm.dc, src, true);
+	}
+
+	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
+
+	return 0;
+}
+
+int amdgpu_dm_irq_resume(struct amdgpu_device *adev)
 {
 	int src;
 	struct list_head *hnd_list_h, *hnd_list_l;
