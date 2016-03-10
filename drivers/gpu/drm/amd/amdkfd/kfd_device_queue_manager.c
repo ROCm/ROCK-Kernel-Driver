@@ -46,7 +46,7 @@ static int create_compute_queue_nocpsch(struct device_queue_manager *dqm,
 
 static int execute_queues_cpsch(struct device_queue_manager *dqm, bool lock);
 static int destroy_queues_cpsch(struct device_queue_manager *dqm,
-		bool preempt_static_queues, bool lock, bool reset);
+		bool static_queues_included, bool lock, bool reset);
 
 static int create_sdma_queue_nocpsch(struct device_queue_manager *dqm,
 					struct queue *q,
@@ -1133,15 +1133,15 @@ static int destroy_sdma_queues(struct device_queue_manager *dqm,
 				unsigned int sdma_engine)
 {
 	return pm_send_unmap_queue(&dqm->packets, KFD_QUEUE_TYPE_SDMA,
-			KFD_PREEMPT_TYPE_FILTER_DYNAMIC_QUEUES, 0, false,
+			KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0, false,
 			sdma_engine);
 }
 
 static int destroy_queues_cpsch(struct device_queue_manager *dqm,
-		bool preempt_static_queues, bool lock, bool reset)
+		bool static_queues_included, bool lock, bool reset)
 {
 	int retval;
-	enum kfd_preempt_type_filter preempt_type;
+	enum kfd_unmap_queues_filter filter;
 
 	BUG_ON(!dqm);
 
@@ -1160,12 +1160,12 @@ static int destroy_queues_cpsch(struct device_queue_manager *dqm,
 		destroy_sdma_queues(dqm, 1);
 	}
 
-	preempt_type = preempt_static_queues ?
-			KFD_PREEMPT_TYPE_FILTER_ALL_QUEUES :
-			KFD_PREEMPT_TYPE_FILTER_DYNAMIC_QUEUES;
+	filter = static_queues_included ?
+			KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES :
+			KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES;
 
 	retval = pm_send_unmap_queue(&dqm->packets, KFD_QUEUE_TYPE_COMPUTE,
-			preempt_type, 0, reset, 0);
+			filter, 0, reset, 0);
 	if (retval != 0)
 		goto out;
 
