@@ -2115,7 +2115,7 @@ int amdgpu_dm_atomic_commit(
 	struct amdgpu_display_manager *dm = &adev->dm;
 	struct drm_plane *plane;
 	struct drm_plane_state *old_plane_state;
-	uint32_t i, j;
+	uint32_t i;
 	int32_t ret;
 	uint32_t commit_targets_count = 0;
 	uint32_t new_crtcs_count = 0;
@@ -2157,21 +2157,14 @@ int amdgpu_dm_atomic_commit(
 		struct amdgpu_connector *aconnector = NULL;
 		enum dm_commit_action action;
 		struct drm_crtc_state *new_state = crtc->state;
-		struct drm_connector *connector;
-		struct drm_connector_state *old_con_state;
 
 		acrtc = to_amdgpu_crtc(crtc);
 
-		for_each_connector_in_state(
-			state,
-			connector,
-			old_con_state,
-			j) {
-			if (connector->state->crtc == crtc) {
-				aconnector = to_amdgpu_connector(connector);
-				break;
-			}
-		}
+		aconnector =
+			amdgpu_dm_find_first_crct_matching_connector(
+				state,
+				crtc,
+				false);
 
 		/* handles headless hotplug case, updating new_state and
 		 * aconnector as needed
