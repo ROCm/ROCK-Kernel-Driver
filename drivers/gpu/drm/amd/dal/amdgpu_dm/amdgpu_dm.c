@@ -440,6 +440,33 @@ static int dm_suspend(void *handle)
 	return ret;
 }
 
+struct amdgpu_connector *amdgpu_dm_find_first_crct_matching_connector(
+	struct drm_atomic_state *state,
+	struct drm_crtc *crtc,
+	bool from_state_var)
+{
+	uint32_t i;
+	struct drm_connector_state *conn_state;
+	struct drm_connector *connector;
+	struct drm_crtc *crtc_from_state;
+
+	for_each_connector_in_state(
+		state,
+		connector,
+		conn_state,
+		i) {
+		crtc_from_state =
+			from_state_var ?
+				conn_state->crtc :
+				connector->state->crtc;
+
+		if (crtc_from_state == crtc)
+			return to_amdgpu_connector(connector);
+	}
+
+	return NULL;
+}
+
 static int dm_display_resume(struct drm_device *ddev)
 {
 	int ret = 0;
@@ -448,13 +475,38 @@ static int dm_display_resume(struct drm_device *ddev)
 	struct drm_atomic_state *state = drm_atomic_state_alloc(ddev);
 	struct drm_plane *plane;
 	struct drm_crtc *crtc;
+	struct amdgpu_connector *aconnector;
+	struct drm_connector_state *conn_state;
 
 	if (!state)
 		return ENOMEM;
 
 	state->acquire_ctx = ddev->mode_config.acquire_ctx;
 
-	/* Construct an atomic state to restore previous display setting*/
+	/* Construct an atomic state to restore previous display setting */
+
+	/*
+	 * Attach connectors to drm_atomic_state
+	 * Should be done in the first place in order to make connectors
+	 * available in state during crtc state processing. It is used for
+	 * making decision if crtc should be disabled in case sink got
+	 * disconnected.
+	 *
+	 * Connectors state crtc with NULL dc_sink should be cleared, because it
+	 * will fail validation during commit
+	 */
+	list_for_each_entry(connector, &ddev->mode_config.connector_list, head) {
+		aconnector = to_amdgpu_connector(connector);
+		conn_state = drm_atomic_get_connector_state(state, connector);
+
+		ret = PTR_ERR_OR_ZERO(conn_state);
+		if (ret)
+			goto err;
+
+		if (!aconnector->dc_sink)
+			conn_state->crtc = NULL;
+	}
+
 	/* Attach crtcs to drm_atomic_state*/
 	list_for_each_entry(crtc, &ddev->mode_config.crtc_list, head) {
 		struct drm_crtc_state *crtc_state =
@@ -464,20 +516,27 @@ static int dm_display_resume(struct drm_device *ddev)
 		if (ret)
 			goto err;
 
+		aconnector =
+			amdgpu_dm_find_first_crct_matching_connector(
+				state,
+				crtc,
+				true);
+
+		/*
+		 * this is the case when display disappear during sleep
+		 */
+		if (!aconnector) {
+			crtc_state->active = false;
+			crtc_state->enable = false;
+		}
+
 		/* force a restore */
 		crtc_state->mode_changed = true;
 	}
 
-	/* Attach planes to drm_atomic_state*/
+	/* Attach planes to drm_atomic_state */
 	list_for_each_entry(plane, &ddev->mode_config.plane_list, head) {
 		ret = PTR_ERR_OR_ZERO(drm_atomic_get_plane_state(state, plane));
-		if (ret)
-			goto err;
-	}
-
-	/* Attach connectors to drm_atomic_state*/
-	list_for_each_entry(connector, &ddev->mode_config.connector_list, head) {
-		ret = PTR_ERR_OR_ZERO(drm_atomic_get_connector_state(state, connector));
 		if (ret)
 			goto err;
 	}

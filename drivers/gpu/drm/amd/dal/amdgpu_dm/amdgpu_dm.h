@@ -165,4 +165,9 @@ extern const struct amd_ip_funcs amdgpu_dm_funcs;
 void amdgpu_dm_update_connector_after_detect(
 	struct amdgpu_connector *aconnector);
 
+struct amdgpu_connector *amdgpu_dm_find_first_crct_matching_connector(
+	struct drm_atomic_state *state,
+	struct drm_crtc *crtc,
+	bool from_state_var);
+
 #endif /* __AMDGPU_DM_H__ */
