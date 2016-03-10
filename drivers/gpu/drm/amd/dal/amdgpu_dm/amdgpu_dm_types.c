@@ -2634,8 +2634,8 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 	}
 
-	if (need_to_validate == false || set_count == 0
-				|| dc_validate_resources(dc, set, set_count))
+	if (need_to_validate == false || set_count == 0 ||
+		dc_validate_resources(dc, set, set_count))
 		ret = 0;
 
 connector_not_found:
