@@ -46,7 +46,8 @@ static int create_compute_queue_nocpsch(struct device_queue_manager *dqm,
 
 static int execute_queues_cpsch(struct device_queue_manager *dqm, bool lock);
 static int unmap_queues_cpsch(struct device_queue_manager *dqm,
-		bool static_queues_included, bool lock, bool reset);
+		enum kfd_unmap_queues_filter filter,
+		uint32_t filter_param, bool lock, bool reset);
 
 static int create_sdma_queue_nocpsch(struct device_queue_manager *dqm,
 					struct queue *q,
@@ -918,7 +919,8 @@ static int stop_cpsch(struct device_queue_manager *dqm)
 
 	BUG_ON(!dqm);
 
-	unmap_queues_cpsch(dqm, true, true, false);
+	unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0,
+			true, false);
 
 	list_for_each_entry(node, &dqm->queues, list) {
 		pdd = qpd_to_pdd(node->qpd);
@@ -973,7 +975,8 @@ static void destroy_kernel_queue_cpsch(struct device_queue_manager *dqm,
 
 	mutex_lock(&dqm->lock);
 	/* here we actually preempt the DIQ */
-	unmap_queues_cpsch(dqm, true, false, false);
+	unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0,
+			false, false);
 	list_del(&kq->list);
 	dqm->queue_count--;
 	qpd->is_debug = false;
@@ -1093,10 +1096,10 @@ static int unmap_sdma_queues(struct device_queue_manager *dqm,
 }
 
 static int unmap_queues_cpsch(struct device_queue_manager *dqm,
-		bool static_queues_included, bool lock, bool reset)
+		enum kfd_unmap_queues_filter filter,
+		uint32_t filter_param, bool lock, bool reset)
 {
 	int retval;
-	enum kfd_unmap_queues_filter filter;
 
 	BUG_ON(!dqm);
 
@@ -1115,12 +1118,8 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 		unmap_sdma_queues(dqm, 1);
 	}
 
-	filter = static_queues_included ?
-			KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES :
-			KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES;
-
 	retval = pm_send_unmap_queue(&dqm->packets, KFD_QUEUE_TYPE_COMPUTE,
-			filter, 0, reset, 0);
+			filter, filter_param, reset, 0);
 	if (retval != 0)
 		goto out;
 
@@ -1130,8 +1129,10 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 	/* should be timed out */
 	retval = amdkfd_fence_wait_timeout(dqm->fence_addr, KFD_FENCE_COMPLETED,
 				QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS);
-	if (retval != 0)
+	if (retval != 0) {
+		pr_err("kfd: unmapping queues failed.");
 		goto out;
+	}
 
 	pm_release_ib(&dqm->packets);
 	dqm->active_runlist = false;
@@ -1151,7 +1152,8 @@ static int execute_queues_cpsch(struct device_queue_manager *dqm, bool lock)
 	if (lock)
 		mutex_lock(&dqm->lock);
 
-	retval = unmap_queues_cpsch(dqm, false, false, false);
+	retval = unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES,
+			0, false, false);
 	if (retval != 0) {
 		pr_err("kfd: the cp might be in an unrecoverable state due to an unsuccessful queues preemption");
 		goto out;
@@ -1438,7 +1440,8 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 
 	mutex_lock(&dqm->lock);
 
-	retval = unmap_queues_cpsch(dqm, true, false, true);
+	retval = unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES,
+			0, false, true);
 
 	/* Clean all kernel queues */
 	list_for_each_entry_safe(kq, kq_next, &qpd->priv_queue_list, list) {
