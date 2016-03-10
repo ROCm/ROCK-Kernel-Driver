@@ -902,10 +902,10 @@ static bool perform_clock_recovery_sequence(
 		else
 			retries_cr = 0;
 
-			/* 8. update VS/PE/PC2 in lt_settings*/
-			update_drive_settings(lt_settings, req_settings);
+		/* 8. update VS/PE/PC2 in lt_settings*/
+		update_drive_settings(lt_settings, req_settings);
 
-			retry_count++;
+		retry_count++;
 	}
 
 	if (retry_count >= LINK_TRAINING_MAX_CR_RETRY) {

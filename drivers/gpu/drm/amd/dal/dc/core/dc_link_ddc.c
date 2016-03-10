@@ -630,8 +630,6 @@ static uint32_t query_edid_block(
 		return 0;
 
 	if (dal_ddc_service_is_in_aux_transaction_mode(ddc)) {
-
-		ASSERT(index < 2);
 		size_retrieved =
 			aux_read_edid_block(ddc, address, index, buf);
 	} else {

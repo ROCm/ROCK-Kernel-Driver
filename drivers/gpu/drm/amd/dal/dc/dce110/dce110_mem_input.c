@@ -353,8 +353,8 @@ void dce110_mem_input_wait_for_no_surface_update_pending(struct mem_input *mem_i
 	struct dce110_mem_input *mem_input110 = TO_DCE110_MEM_INPUT(mem_input);
 	uint32_t value;
 
-	do  {
-		value = dm_read_reg(mem_input110->base.ctx,	DCP_REG(mmGRPH_UPDATE));
+	do {
+		value = dm_read_reg(mem_input110->base.ctx, DCP_REG(mmGRPH_UPDATE));
 	} while (get_reg_field_value(value, GRPH_UPDATE, GRPH_SURFACE_UPDATE_PENDING));
 }
 
