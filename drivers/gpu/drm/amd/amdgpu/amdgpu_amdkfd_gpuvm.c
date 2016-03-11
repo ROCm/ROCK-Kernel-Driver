@@ -364,8 +364,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	pr_debug("Created BO on GTT with size %zu bytes\n", size);
 
 	if (userptr) {
-		ret = amdgpu_ttm_tt_set_userptr(bo->tbo.ttm, user_addr,
-						AMDGPU_GEM_USERPTR_ANONONLY);
+		ret = amdgpu_ttm_tt_set_userptr(bo->tbo.ttm, user_addr, 0);
 		if (ret) {
 			dev_err(adev->dev,
 				"(%d) failed to set userptr\n", ret);
