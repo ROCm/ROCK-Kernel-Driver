@@ -2075,7 +2075,6 @@ static void manage_dm_interrupts(
 			&adev->pageflip_irq,
 			irq_type);
 	} else {
-		unsigned long flags;
 		amdgpu_irq_put(
 			adev,
 			&adev->pageflip_irq,
@@ -2098,15 +2097,12 @@ static void manage_dm_interrupts(
 		 * lock and check to amdgpu_dm_flip_cleanup function
 		 */
 
-		spin_lock_irqsave(&adev->ddev->event_lock, flags);
-		if (acrtc->pflip_status != AMDGPU_FLIP_NONE) {
-			/*
-			 * this is the case when on reset, last pending pflip
-			 * interrupt did not not occur. Clean-up
-			 */
-			amdgpu_dm_flip_cleanup(adev, acrtc);
-		}
-		spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
+
+		/*
+		 * this is the case when on reset, last pending pflip
+		 * interrupt did not not occur. Clean-up
+		 */
+		amdgpu_dm_flip_cleanup(adev, acrtc);
 	}
 }
 

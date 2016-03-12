@@ -1073,31 +1073,40 @@ void amdgpu_dm_flip_cleanup(
 	struct amdgpu_crtc *acrtc)
 {
 	int r;
-	struct amdgpu_flip_work *works = acrtc->pflip_works;
+	unsigned long flags;
+	struct amdgpu_flip_work *works = NULL;
 
-	acrtc->pflip_works = NULL;
-	acrtc->pflip_status = AMDGPU_FLIP_NONE;
+	spin_lock_irqsave(&adev->ddev->event_lock, flags);
+	if (acrtc->pflip_status != AMDGPU_FLIP_NONE) {
+		works = acrtc->pflip_works;
+		acrtc->pflip_works = NULL;
+		acrtc->pflip_status = AMDGPU_FLIP_NONE;
 
-	if (works) {
-		if(works->event)
+		if (works && works->event) {
 			drm_send_vblank_event(
 				adev->ddev,
 				acrtc->crtc_id,
 				works->event);
+		}
+		spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 
-		r = amdgpu_bo_reserve(works->old_rbo, false);
-		if (likely(r == 0)) {
-			r = amdgpu_bo_unpin(works->old_rbo);
-			if (unlikely(r != 0)) {
-				DRM_ERROR("failed to unpin buffer after flip\n");
-			}
-			amdgpu_bo_unreserve(works->old_rbo);
-		} else
-			DRM_ERROR("failed to reserve buffer after flip\n");
+		if (works) {
+			r = amdgpu_bo_reserve(works->old_rbo, false);
+			if (likely(r == 0)) {
+				r = amdgpu_bo_unpin(works->old_rbo);
+				if (unlikely(r != 0)) {
+					DRM_ERROR("failed to unpin buffer after flip\n");
+				}
+				amdgpu_bo_unreserve(works->old_rbo);
+			} else
+				DRM_ERROR("failed to reserve buffer after flip\n");
 
-		amdgpu_bo_unref(&works->old_rbo);
-		kfree(works->shared);
-		kfree(works);
+			amdgpu_bo_unref(&works->old_rbo);
+			kfree(works->shared);
+			kfree(works);
+		}
+	} else {
+		spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 	}
 }
 
