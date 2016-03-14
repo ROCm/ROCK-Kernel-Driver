@@ -25,6 +25,7 @@
 #include "amdgpu.h"
 #include "gmc_v8_0.h"
 #include "amdgpu_ucode.h"
+#include "amdgpu_amdkfd.h"
 
 #include "gmc/gmc_8_1_d.h"
 #include "gmc/gmc_8_1_sh_mask.h"
@@ -854,6 +855,12 @@ static int gmc_v8_0_vm_init(struct amdgpu_device *adev)
 	} else
 		adev->vm_manager.vram_base_offset = 0;
 
+	adev->mc.vm_fault_info = kmalloc(sizeof(struct kfd_vm_fault_info),
+					GFP_KERNEL);
+	if (!adev->mc.vm_fault_info)
+		return -ENOMEM;
+	atomic_set(&adev->mc.vm_fault_info_updated, 0);
+
 	return 0;
 }
 
@@ -881,6 +888,7 @@ static void gmc_v8_0_vm_decode_fault(struct amdgpu_device *adev,
 				     u32 status, u32 addr, u32 mc_client)
 {
 	u32 mc_id;
+	struct kfd_vm_fault_info *info = adev->mc.vm_fault_info;
 	u32 vmid = REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS, VMID);
 	u32 protections = REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS,
 					PROTECTIONS);
@@ -895,6 +903,18 @@ static void gmc_v8_0_vm_decode_fault(struct amdgpu_device *adev,
 	       REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS,
 			     MEMORY_CLIENT_RW) ?
 	       "write" : "read", block, mc_client, mc_id);
+
+	if (!atomic_read(&adev->mc.vm_fault_info_updated)) {
+		info->vmid = vmid;
+		info->mc_id = mc_id;
+		info->page_addr = addr;
+		info->prot_valid = protections & 0x4 ? true : false;
+		info->prot_read = protections & 0x8 ? true : false;
+		info->prot_write = protections & 0x10 ? true : false;
+		info->prot_exec = protections & 0x20 ? true : false;
+		mb();
+		atomic_set(&adev->mc.vm_fault_info_updated, 1);
+	}
 }
 
 static int gmc_v8_0_convert_vram_type(int mc_seq_vram_type)
