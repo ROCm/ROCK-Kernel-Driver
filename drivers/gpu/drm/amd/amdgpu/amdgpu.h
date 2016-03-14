@@ -157,6 +157,7 @@ struct amdgpu_job;
 struct amdgpu_irq_src;
 struct amdgpu_fpriv;
 struct kfd_process_device;
+struct kfd_vm_fault_info;
 
 enum amdgpu_cp_irq {
 	AMDGPU_CP_IRQ_GFX_EOP = 0,
@@ -585,6 +586,8 @@ struct amdgpu_mc {
 	uint32_t                srbm_soft_reset;
 	struct amdgpu_mode_mc_save save;
 	bool			prt_warning;
+	struct kfd_vm_fault_info *vm_fault_info;
+	atomic_t		vm_fault_info_updated;
 };
 
 /*
