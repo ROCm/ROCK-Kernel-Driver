@@ -43,6 +43,16 @@ struct kgd_mem;
 struct kfd_process_device;
 struct amdgpu_bo;
 
+struct kfd_vm_fault_info {
+	uint64_t	page_addr;
+	uint32_t	vmid;
+	uint32_t	mc_id;
+	uint32_t	status;
+	bool		prot_valid;
+	bool		prot_read;
+	bool		prot_write;
+	bool		prot_exec;
+};
 
 struct kfd_cu_info {
 	uint32_t num_shader_engines;
@@ -302,6 +312,10 @@ struct kfd2kgd_calls {
 			       uint32_t *metadata_size, uint32_t *flags);
 	int (*import_dmabuf)(struct kgd_dev *kgd, int dma_buf_fd, uint64_t va,
 			     void *vm, struct kgd_mem **mem, uint64_t *size);
+
+	int (*get_vm_fault_info)(struct kgd_dev *kgd,
+			struct kfd_vm_fault_info *info);
+
 };
 
 /**
