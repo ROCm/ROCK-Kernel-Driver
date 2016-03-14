@@ -1081,6 +1081,13 @@ void dc_set_power_state(
 		/* NULL means "reset/release all DC targets" */
 		dc_commit_targets(dc, NULL, 0);
 
+		/* Zero out the current context so that on resume we start with
+		 * clean state, and dc hw programming optimizations will not
+		 * cause any trouble.
+		 */
+		memset(&core_dc->current_context, 0,
+				sizeof(core_dc->current_context));
+
 		core_dc->hwss.power_down(core_dc);
 		break;
 	}
