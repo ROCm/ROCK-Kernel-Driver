@@ -222,7 +222,7 @@ struct kfd_memory_exception_failure {
 	bool NotPresent;  /* Page not present or supervisor privilege */
 	bool ReadOnly;  /* Write access to a read-only page */
 	bool NoExecute;  /* Execute access to a page marked NX */
-	bool pad;
+	bool imprecise;  /* Can't determine the  exact fault address */
 };
 
 /* memory exception data*/

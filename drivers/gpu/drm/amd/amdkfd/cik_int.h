@@ -48,6 +48,8 @@ struct cik_ih_ring_entry {
 #define CIK_INTSRC_CP_END_OF_PIPE	0xB5
 #define CIK_INTSRC_CP_BAD_OPCODE	0xB7
 #define CIK_INTSRC_SQ_INTERRUPT_MSG	0xEF
+#define CIK_INTSRC_GFX_PAGE_INV_FAULT	0x92
+#define CIK_INTSRC_GFX_MEM_PROT_FAULT	0x93
 
 #endif
 
