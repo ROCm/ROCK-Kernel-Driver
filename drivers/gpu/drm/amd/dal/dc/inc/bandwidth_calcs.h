@@ -228,6 +228,24 @@ struct bw_calcs_mode_data_internal {
 	uint32_t d2_graphics_src_height;
 	struct bw_fixed d2_graphics_scale_ratio;
 	enum bw_defines d2_graphics_stereo_mode;
+	uint32_t d3_htotal;
+	struct bw_fixed d3_pixel_rate;
+	uint32_t d3_graphics_src_width;
+	uint32_t d3_graphics_src_height;
+	struct bw_fixed d3_graphics_scale_ratio;
+	enum bw_defines d3_graphics_stereo_mode;
+	uint32_t d4_htotal;
+	struct bw_fixed d4_pixel_rate;
+	uint32_t d4_graphics_src_width;
+	uint32_t d4_graphics_src_height;
+	struct bw_fixed d4_graphics_scale_ratio;
+	enum bw_defines d4_graphics_stereo_mode;
+	uint32_t d5_htotal;
+	struct bw_fixed d5_pixel_rate;
+	uint32_t d5_graphics_src_width;
+	uint32_t d5_graphics_src_height;
+	struct bw_fixed d5_graphics_scale_ratio;
+	enum bw_defines d5_graphics_stereo_mode;
 };
 
 struct bw_calcs_input_single_display {
@@ -475,9 +493,9 @@ struct bw_calcs_output {
 	bool stutter_mode_enable;
 	bool nbp_state_change_enable;
 	bool all_displays_in_sync;
-	struct bw_watermarks urgent_wm_ns[4];
-	struct bw_watermarks stutter_exit_wm_ns[4];
-	struct bw_watermarks nbp_state_change_wm_ns[4];
+	struct bw_watermarks urgent_wm_ns[6];
+	struct bw_watermarks stutter_exit_wm_ns[6];
+	struct bw_watermarks nbp_state_change_wm_ns[6];
 	uint32_t required_sclk;
 	uint32_t required_sclk_deep_sleep;
 	uint32_t required_yclk;
