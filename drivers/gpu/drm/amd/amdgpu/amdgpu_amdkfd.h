@@ -115,6 +115,10 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm);
 void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm);
 
 uint32_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm);
+
+int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
+					      struct kfd_vm_fault_info *info);
+
 int amdgpu_amdkfd_gpuvm_mmap_bo(
 		struct kgd_dev *kgd, struct vm_area_struct *vma);
 

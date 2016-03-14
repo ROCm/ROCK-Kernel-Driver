@@ -188,7 +188,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.mmap_bo = mmap_bo,
 	.map_gtt_bo_to_kernel = map_gtt_bo_to_kernel,
 	.set_vm_context_page_table_base = set_vm_context_page_table_base,
-	.get_dmabuf_info = amdgpu_amdkfd_get_dmabuf_info
+	.get_dmabuf_info = amdgpu_amdkfd_get_dmabuf_info,
+	.get_vm_fault_info = amdgpu_amdkfd_gpuvm_get_vm_fault_info
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions()

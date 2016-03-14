@@ -820,6 +820,21 @@ uint32_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm)
 	return vm_id->pd_gpu_addr >> AMDGPU_GPU_PAGE_SHIFT;
 }
 
+int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
+					      struct kfd_vm_fault_info *mem)
+{
+	struct amdgpu_device *adev;
+
+	BUG_ON(kgd == NULL);
+	adev = (struct amdgpu_device *) kgd;
+	if (atomic_read(&adev->mc.vm_fault_info_updated) == 1) {
+		*mem = *adev->mc.vm_fault_info;
+		mb();
+		atomic_set(&adev->mc.vm_fault_info_updated, 0);
+	}
+	return 0;
+}
+
 static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 				struct amdgpu_bo_va *bo_va)
 {

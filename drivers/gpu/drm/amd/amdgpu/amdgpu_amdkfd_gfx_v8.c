@@ -164,7 +164,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.pin_get_sg_table_bo = amdgpu_amdkfd_gpuvm_pin_get_sg_table,
 	.unpin_put_sg_table_bo = amdgpu_amdkfd_gpuvm_unpin_put_sg_table,
 	.get_dmabuf_info = amdgpu_amdkfd_get_dmabuf_info,
-	.import_dmabuf = amdgpu_amdkfd_gpuvm_import_dmabuf
+	.import_dmabuf = amdgpu_amdkfd_gpuvm_import_dmabuf,
+	.get_vm_fault_info = amdgpu_amdkfd_gpuvm_get_vm_fault_info
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions()
