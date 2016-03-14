@@ -357,7 +357,7 @@ static void calculate_bandwidth(
 			results->scale_ratio[i] =
 				mode_data->d1_graphics_scale_ratio;
 			stereo_mode[i] = mode_data->d1_graphics_stereo_mode;
-		} else {
+		} else if (i == 6) {
 			results->compression_rate[i] = bw_int_to_fixed(1);
 			results->access_one_channel_only[i] = 0;
 			results->h_total[i] = bw_int_to_fixed(
@@ -372,6 +372,51 @@ static void calculate_bandwidth(
 			results->scale_ratio[i] =
 				mode_data->d2_graphics_scale_ratio;
 			stereo_mode[i] = mode_data->d2_graphics_stereo_mode;
+		} else if (i == 7) {
+			results->compression_rate[i] = bw_int_to_fixed(1);
+			results->access_one_channel_only[i] = 0;
+			results->h_total[i] = bw_int_to_fixed(
+				mode_data->d3_htotal);
+			results->pixel_rate[i] = mode_data->d3_pixel_rate;
+			results->src_width[i] = bw_int_to_fixed(
+				mode_data->d3_graphics_src_width);
+			results->src_height[i] = bw_int_to_fixed(
+				mode_data->d3_graphics_src_height);
+			results->pitch_in_pixels[i] = bw_int_to_fixed(
+				mode_data->d3_graphics_src_width);
+			results->scale_ratio[i] =
+				mode_data->d3_graphics_scale_ratio;
+			stereo_mode[i] = mode_data->d3_graphics_stereo_mode;
+		} else if (i == 8) {
+			results->compression_rate[i] = bw_int_to_fixed(1);
+			results->access_one_channel_only[i] = 0;
+			results->h_total[i] = bw_int_to_fixed(
+				mode_data->d4_htotal);
+			results->pixel_rate[i] = mode_data->d4_pixel_rate;
+			results->src_width[i] = bw_int_to_fixed(
+				mode_data->d4_graphics_src_width);
+			results->src_height[i] = bw_int_to_fixed(
+				mode_data->d4_graphics_src_height);
+			results->pitch_in_pixels[i] = bw_int_to_fixed(
+				mode_data->d4_graphics_src_width);
+			results->scale_ratio[i] =
+				mode_data->d4_graphics_scale_ratio;
+			stereo_mode[i] = mode_data->d4_graphics_stereo_mode;
+		} else {
+			results->compression_rate[i] = bw_int_to_fixed(1);
+			results->access_one_channel_only[i] = 0;
+			results->h_total[i] = bw_int_to_fixed(
+				mode_data->d5_htotal);
+			results->pixel_rate[i] = mode_data->d5_pixel_rate;
+			results->src_width[i] = bw_int_to_fixed(
+				mode_data->d5_graphics_src_width);
+			results->src_height[i] = bw_int_to_fixed(
+				mode_data->d5_graphics_src_height);
+			results->pitch_in_pixels[i] = bw_int_to_fixed(
+				mode_data->d5_graphics_src_width);
+			results->scale_ratio[i] =
+				mode_data->d5_graphics_scale_ratio;
+			stereo_mode[i] = mode_data->d5_graphics_stereo_mode;
 		}
 		results->cursor_width_pixels[i] = bw_int_to_fixed(
 			vbios->cursor_width);
@@ -3729,10 +3774,46 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 
 	switch (mode_data->number_of_displays) {
 	case (6):
+		bw_data_internal->d5_htotal =
+			mode_data->displays_data[5].h_total;
+		bw_data_internal->d5_pixel_rate =
+			mode_data->displays_data[5].pixel_rate;
+		bw_data_internal->d5_graphics_src_width =
+			mode_data->displays_data[5].graphics_src_width;
+		bw_data_internal->d5_graphics_src_height =
+			mode_data->displays_data[5].graphics_src_height;
+		bw_data_internal->d5_graphics_scale_ratio =
+			mode_data->displays_data[5].graphics_scale_ratio;
+		bw_data_internal->d5_graphics_stereo_mode =
+			mode_data->displays_data[5].graphics_stereo_mode;
 		/* fall through */
 	case (5):
+		bw_data_internal->d4_htotal =
+			mode_data->displays_data[4].h_total;
+		bw_data_internal->d4_pixel_rate =
+			mode_data->displays_data[4].pixel_rate;
+		bw_data_internal->d4_graphics_src_width =
+			mode_data->displays_data[4].graphics_src_width;
+		bw_data_internal->d4_graphics_src_height =
+			mode_data->displays_data[4].graphics_src_height;
+		bw_data_internal->d4_graphics_scale_ratio =
+			mode_data->displays_data[4].graphics_scale_ratio;
+		bw_data_internal->d4_graphics_stereo_mode =
+			mode_data->displays_data[4].graphics_stereo_mode;
 		/* fall through */
 	case (4):
+		bw_data_internal->d3_htotal =
+			mode_data->displays_data[3].h_total;
+		bw_data_internal->d3_pixel_rate =
+			mode_data->displays_data[3].pixel_rate;
+		bw_data_internal->d3_graphics_src_width =
+			mode_data->displays_data[3].graphics_src_width;
+		bw_data_internal->d3_graphics_src_height =
+			mode_data->displays_data[3].graphics_src_height;
+		bw_data_internal->d3_graphics_scale_ratio =
+			mode_data->displays_data[3].graphics_scale_ratio;
+		bw_data_internal->d3_graphics_stereo_mode =
+			mode_data->displays_data[3].graphics_stereo_mode;
 		/* fall through */
 	case (3):
 		bw_data_internal->d2_htotal =
@@ -3888,6 +3969,15 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->nbp_state_change_wm_ns[2].a_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[6], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[3].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[7], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[4].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[8], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[5].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[9], bw_int_to_fixed(1000)));
 
 		calcs_output->stutter_exit_wm_ns[0].a_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -3898,6 +3988,15 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->stutter_exit_wm_ns[2].a_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[6], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[3].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[7], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[4].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[8], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[5].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[9], bw_int_to_fixed(1000)));
 
 		calcs_output->urgent_wm_ns[0].a_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -3908,6 +4007,15 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->urgent_wm_ns[2].a_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[6], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[3].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[7], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[4].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[8], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[5].a_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[9], bw_int_to_fixed(1000)));
 
 		/*TODO check correctness*/
 		((struct bw_calcs_vbios *)vbios)->low_sclk = mid_sclk;
@@ -3923,6 +4031,15 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->nbp_state_change_wm_ns[2].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[6], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[3].b_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[7], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[4].b_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[8], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[5].b_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[9], bw_int_to_fixed(1000)));
 
 		calcs_output->stutter_exit_wm_ns[0].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -3933,6 +4050,15 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->stutter_exit_wm_ns[2].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[6], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[3].b_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[7], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[4].b_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[8], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[5].b_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[9], bw_int_to_fixed(1000)));
 
 		calcs_output->urgent_wm_ns[0].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -3943,6 +4069,15 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->urgent_wm_ns[2].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[6], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[3].b_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[7], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[4].b_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[8], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[5].b_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[9], bw_int_to_fixed(1000)));
 
 		/*TODO check correctness*/
 		((struct bw_calcs_vbios *)vbios)->low_sclk = low_sclk;
@@ -3959,6 +4094,15 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->nbp_state_change_wm_ns[2].c_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[6], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[3].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[7], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[4].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[8], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[5].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[9], bw_int_to_fixed(1000)));
 
 		calcs_output->stutter_exit_wm_ns[0].c_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -3969,6 +4113,15 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->stutter_exit_wm_ns[2].c_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[6], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[3].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[7], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[4].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[8], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[5].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[9], bw_int_to_fixed(1000)));
 
 		calcs_output->urgent_wm_ns[0].c_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -3979,6 +4132,15 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->urgent_wm_ns[2].c_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[6], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[3].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[7], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[4].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[8], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[5].c_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[9], bw_int_to_fixed(1000)));
 
 		((struct bw_calcs_vbios *)vbios)->low_yclk = high_yclk;
 		((struct bw_calcs_vbios *)vbios)->mid_yclk = high_yclk;
@@ -3997,6 +4159,15 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->nbp_state_change_wm_ns[2].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[6], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[3].d_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[7], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[4].d_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[8], bw_int_to_fixed(1000)));
+		calcs_output->nbp_state_change_wm_ns[5].d_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				nbp_state_change_watermark[9], bw_int_to_fixed(1000)));
 
 		calcs_output->stutter_exit_wm_ns[0].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -4007,6 +4178,15 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->stutter_exit_wm_ns[2].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[6], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[3].d_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[7], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[4].d_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[8], bw_int_to_fixed(1000)));
+		calcs_output->stutter_exit_wm_ns[5].d_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				stutter_exit_watermark[9], bw_int_to_fixed(1000)));
 
 		calcs_output->urgent_wm_ns[0].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -4017,6 +4197,15 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->urgent_wm_ns[2].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[6], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[3].d_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[7], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[4].d_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[8], bw_int_to_fixed(1000)));
+		calcs_output->urgent_wm_ns[5].d_mark =
+			bw_fixed_to_int(bw_mul(bw_results_internal->
+				urgent_watermark[9], bw_int_to_fixed(1000)));
 
 		((struct bw_calcs_vbios *)vbios)->low_yclk = low_yclk;
 		((struct bw_calcs_vbios *)vbios)->mid_yclk = mid_yclk;
