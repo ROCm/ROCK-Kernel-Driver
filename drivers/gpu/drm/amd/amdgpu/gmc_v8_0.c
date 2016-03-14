@@ -26,6 +26,7 @@
 #include "amdgpu.h"
 #include "gmc_v8_0.h"
 #include "amdgpu_ucode.h"
+#include "amdgpu_amdkfd.h"
 
 #include "gmc/gmc_8_1_d.h"
 #include "gmc/gmc_8_1_sh_mask.h"
@@ -1181,6 +1182,12 @@ static int gmc_v8_0_sw_init(void *handle)
 		adev->vm_manager.vram_base_offset = 0;
 	}
 
+	adev->gmc.vm_fault_info = kmalloc(sizeof(struct kfd_vm_fault_info),
+					GFP_KERNEL);
+	if (!adev->gmc.vm_fault_info)
+		return -ENOMEM;
+	atomic_set(&adev->gmc.vm_fault_info_updated, 0);
+
 	return 0;
 }
 
@@ -1190,6 +1197,7 @@ static int gmc_v8_0_sw_fini(void *handle)
 
 	amdgpu_gem_force_release(adev);
 	amdgpu_vm_manager_fini(adev);
+	kfree(adev->gmc.vm_fault_info);
 	gmc_v8_0_gart_fini(adev);
 	amdgpu_bo_fini(adev);
 	release_firmware(adev->gmc.fw);
@@ -1425,7 +1433,7 @@ static int gmc_v8_0_process_interrupt(struct amdgpu_device *adev,
 				      struct amdgpu_irq_src *source,
 				      struct amdgpu_iv_entry *entry)
 {
-	u32 addr, status, mc_client;
+	u32 addr, status, mc_client, vmid;
 
 	if (amdgpu_sriov_vf(adev)) {
 		dev_err(adev->dev, "GPU fault detected: %d 0x%08x\n",
@@ -1455,6 +1463,29 @@ static int gmc_v8_0_process_interrupt(struct amdgpu_device *adev,
 			status);
 		gmc_v8_0_vm_decode_fault(adev, status, addr, mc_client,
 					 entry->pasid);
+	}
+
+	vmid = REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS,
+			     VMID);
+	if (amdgpu_amdkfd_is_kfd_vmid(adev, vmid)
+		&& !atomic_read(&adev->gmc.vm_fault_info_updated)) {
+		struct kfd_vm_fault_info *info = adev->gmc.vm_fault_info;
+		u32 protections = REG_GET_FIELD(status,
+					VM_CONTEXT1_PROTECTION_FAULT_STATUS,
+					PROTECTIONS);
+
+		info->vmid = vmid;
+		info->mc_id = REG_GET_FIELD(status,
+					    VM_CONTEXT1_PROTECTION_FAULT_STATUS,
+					    MEMORY_CLIENT_ID);
+		info->status = status;
+		info->page_addr = addr;
+		info->prot_valid = protections & 0x7 ? true : false;
+		info->prot_read = protections & 0x8 ? true : false;
+		info->prot_write = protections & 0x10 ? true : false;
+		info->prot_exec = protections & 0x20 ? true : false;
+		mb();
+		atomic_set(&adev->gmc.vm_fault_info_updated, 1);
 	}
 
 	return 0;
