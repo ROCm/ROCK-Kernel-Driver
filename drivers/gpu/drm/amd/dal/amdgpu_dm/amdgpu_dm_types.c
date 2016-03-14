@@ -2088,13 +2088,6 @@ static void manage_dm_interrupts(
 		}
 
 		/*
-		 * TODO: once Vitaly's change to adjust locking in
-		 * page_flip_work_func is submitted to base driver move
-		 * lock and check to amdgpu_dm_flip_cleanup function
-		 */
-
-
-		/*
 		 * this is the case when on reset, last pending pflip
 		 * interrupt did not not occur. Clean-up
 		 */
