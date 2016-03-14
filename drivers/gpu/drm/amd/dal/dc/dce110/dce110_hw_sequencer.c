@@ -1637,7 +1637,6 @@ static void init_hw(struct core_dc *dc)
 		if (dal_audio_power_up(audio) != AUDIO_RESULT_OK)
 			dm_error("Failed audio power up!\n");
 	}
-
 }
 
 static const struct hw_sequencer_funcs dce110_funcs = {
