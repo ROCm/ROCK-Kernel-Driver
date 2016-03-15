@@ -83,7 +83,7 @@ struct amdgpu_bo {
 
 	struct ttm_bo_kmap_obj		dma_buf_vmap;
 	struct amdgpu_mn		*mn;
-	bool				is_kfd_bo;
+	struct kgd_mem			*kfd_bo;
 	struct kfd_process_device	*pdd;
 
 	union {

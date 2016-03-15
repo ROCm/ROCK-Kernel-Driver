@@ -390,6 +390,8 @@ struct amdgpu_gem_object {
 	struct amdgpu_bo		*bo;
 };
 
+struct kgd_mem;
+
 #define gem_to_amdgpu_bo(gobj) container_of((gobj), struct amdgpu_gem_object, base)->bo
 
 void amdgpu_gem_object_free(struct drm_gem_object *obj);
