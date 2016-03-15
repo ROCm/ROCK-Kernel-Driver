@@ -26,7 +26,10 @@
 #define AMDGPU_AMDKFD_H_INCLUDED
 
 #include <linux/types.h>
+#include <linux/workqueue.h>
 #include <kgd_kfd_interface.h>
+
+extern const struct kgd2kfd_calls *kgd2kfd;
 
 struct amdgpu_device;
 
@@ -52,6 +55,9 @@ struct kgd_mem {
 			unsigned int mapped_to_gpu_memory;
 			void *kptr;
 			uint64_t va;
+			unsigned evicted; /* eviction counter */
+			struct delayed_work work; /* for restore evicted mem */
+			struct mm_struct *mm; /* for restore */
 			/* flags bitfield */
 			bool readonly      : 1;
 			bool execute       : 1;
@@ -73,6 +79,15 @@ void amdgpu_amdkfd_interrupt(struct amdgpu_device *rdev,
 void amdgpu_amdkfd_device_probe(struct amdgpu_device *rdev);
 void amdgpu_amdkfd_device_init(struct amdgpu_device *rdev);
 void amdgpu_amdkfd_device_fini(struct amdgpu_device *rdev);
+
+int amdgpu_amdkfd_evict_mem(struct amdgpu_device *adev, struct kgd_mem *mem,
+			    struct mm_struct *mm);
+int amdgpu_amdkfd_schedule_restore_mem(struct amdgpu_device *adev,
+				       struct kgd_mem *mem,
+				       struct mm_struct *mm,
+				       unsigned long delay);
+void amdgpu_amdkfd_cancel_restore_mem(struct amdgpu_device *adev,
+				      struct kgd_mem *mem);
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions(void);
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions(void);
@@ -138,7 +153,8 @@ void amdgpu_amdkfd_gpuvm_unpin_put_sg_table(
 int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 				      uint64_t va, void *vm,
 				      struct kgd_mem **mem, uint64_t *size);
-
+int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm);
+int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm);
 
 #endif /* AMDGPU_AMDKFD_H_INCLUDED */
 

@@ -357,8 +357,9 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 				ret);
 		goto err_bo_create;
 	}
-	bo->is_kfd_bo = true;
+	bo->kfd_bo = *mem;
 	bo->pdd = pdd;
+	(*mem)->data2.bo = bo;
 
 	pr_debug("Created BO on GTT with size %zu bytes\n", size);
 
@@ -368,6 +369,13 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		if (ret) {
 			dev_err(adev->dev,
 				"(%d) failed to set userptr\n", ret);
+			goto allocate_mem_set_userptr_failed;
+		}
+
+		ret = amdgpu_mn_register(bo, user_addr);
+		if (ret) {
+			dev_err(adev->dev,
+				"(%d) failed to register MMU notifier\n", ret);
 			goto allocate_mem_set_userptr_failed;
 		}
 	}
@@ -412,7 +420,6 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		amdgpu_bo_unreserve(bo);
 	}
 
-	(*mem)->data2.bo = bo;
 	(*mem)->data2.va = va;
 	(*mem)->data2.domain = domain;
 	(*mem)->data2.mapped_to_gpu_memory = 0;
@@ -426,9 +433,11 @@ allocate_mem_kmap_bo_failed:
 	amdgpu_bo_unpin(bo);
 allocate_mem_pin_bo_failed:
 	amdgpu_bo_unreserve(bo);
-allocate_mem_set_userptr_failed:
 allocate_mem_reserve_bo_failed:
 err_map:
+	if (userptr)
+		amdgpu_mn_unregister(bo);
+allocate_mem_set_userptr_failed:
 	amdgpu_bo_unref(&bo);
 err_bo_create:
 	kfree(*mem);
@@ -803,6 +812,10 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	/* lock is not needed after this, since mem is unused and will
 	 * be freed anyway */
 
+	amdgpu_mn_unregister(mem->data2.bo);
+	if (mem->data2.work.work.func)
+		cancel_delayed_work_sync(&mem->data2.work);
+
 	/* Remove from VM internal data structures */
 	list_for_each_entry_safe(entry, tmp, &mem->data2.bo_va_list, bo_list) {
 		pr_debug("Releasing BO with VA %p, size %lu bytes\n",
@@ -879,17 +892,32 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 		}
 	}
 
-	ret = reserve_bo_and_vms(adev, bo, &mem->data2.bo_va_list,
-				 vm, false, &ctx);
-	if (unlikely(ret != 0))
-		goto bo_reserve_failed;
+	if (!mem->data2.evicted) {
+		ret = reserve_bo_and_vms(adev, bo, &mem->data2.bo_va_list,
+					 vm, false, &ctx);
+		if (unlikely(ret != 0))
+			goto bo_reserve_failed;
 
-	ret = update_user_pages(mem, current->mm, &ctx);
-	if (ret != 0)
-		goto update_user_pages_failed;
+		ret = update_user_pages(mem, current->mm, &ctx);
+		if (ret != 0)
+			goto update_user_pages_failed;
+	}
 
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
 		if (entry->bo_va->vm == vm && entry->is_mapped == false) {
+			if (mem->data2.evicted) {
+				/* If the BO is evicted, just mark the
+				 * mapping as mapped and stop the GPU's
+				 * queues until the BO is restored. */
+				ret = kgd2kfd->quiesce_mm(adev->kfd,
+							  current->mm);
+				if (ret != 0)
+					goto quiesce_failed;
+				entry->is_mapped = true;
+				mem->data2.mapped_to_gpu_memory++;
+				continue;
+			}
+
 			pr_debug("amdkfd: Trying to map VA 0x%llx to vm %p\n",
 					mem->data2.va, vm);
 			/*
@@ -915,15 +943,18 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 		}
 	}
 
-	unreserve_bo_and_vms(&ctx, true);
+	if (!mem->data2.evicted)
+		unreserve_bo_and_vms(&ctx, true);
 	mutex_unlock(&mem->data2.lock);
 	return 0;
 
 map_bo_to_gpuvm_failed:
 	unpin_bo(bo, false);
 pin_bo_failed:
+quiesce_failed:
 update_user_pages_failed:
-	unreserve_bo_and_vms(&ctx, false);
+	if (!mem->data2.evicted)
+		unreserve_bo_and_vms(&ctx, false);
 bo_reserve_failed:
 add_bo_to_vm_failed:
 	mutex_unlock(&mem->data2.lock);
@@ -1114,6 +1145,19 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 		if (entry->kgd_dev == kgd &&
 				entry->bo_va->vm == vm &&
 				entry->is_mapped) {
+			if (mem->data2.evicted) {
+				/* If the BO is evicted, just mark the
+				 * mapping as unmapped and allow the
+				 * GPU's queues to resume. */
+				ret = kgd2kfd->resume_mm(adev->kfd,
+							 current->mm);
+				if (ret != 0)
+					goto out;
+				entry->is_mapped = false;
+				mem->data2.mapped_to_gpu_memory--;
+				continue;
+			}
+
 			pr_debug("unmapping BO with VA 0x%llx, size %lu bytes from GPU memory\n",
 				mem->data2.va,
 				mem->data2.bo->tbo.mem.size);
@@ -1402,4 +1446,165 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 out_put:
 	dma_buf_put(dma_buf);
 	return r;
+}
+
+/* Runs out of process context. mem->data2.lock must be held. */
+int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm)
+{
+	struct kfd_bo_va_list *entry;
+	unsigned n_evicted;
+	int r = 0;
+
+	pr_debug("Evicting buffer %p\n", mem);
+
+	if (mem->data2.mapped_to_gpu_memory == 0)
+		return 0;
+
+	/* Remove all GPU mappings of the buffer, but don't change any
+	 * of the is_mapped flags so we can restore it later. The
+	 * queues of the affected GPUs are quiesced first. Count the
+	 * number of evicted mappings so we can roll back if something
+	 * goes wrong. */
+	n_evicted = 0;
+	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
+		struct amdgpu_device *adev;
+
+		if (!entry->is_mapped)
+			continue;
+
+		adev = (struct amdgpu_device *)entry->kgd_dev;
+
+		r = kgd2kfd->quiesce_mm(adev->kfd, mm);
+		if (r != 0) {
+			pr_err("failed to quiesce KFD\n");
+			goto fail;
+		}
+
+		r = unmap_bo_from_gpuvm(adev, entry->bo_va);
+		if (r != 0) {
+			pr_err("failed unmap va 0x%llx\n",
+			       mem->data2.va);
+			kgd2kfd->resume_mm(adev->kfd, mm);
+			goto fail;
+		}
+
+		/* Unpin the PD directory*/
+		unpin_bo(entry->bo_va->vm->page_directory, true);
+		/* Unpin PTs */
+		unpin_pts(entry->bo_va, entry->bo_va->vm, true);
+
+		/* Unpin BO*/
+		unpin_bo(mem->data2.bo, true);
+
+		n_evicted++;
+	}
+
+	return 0;
+
+fail:
+	/* To avoid hangs and keep state consistent, roll back partial
+	 * eviction by restoring queues and marking mappings as
+	 * unmapped. Access to now unmapped buffers will fault. */
+	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
+		struct amdgpu_device *adev;
+
+		if (n_evicted == 0)
+			break;
+		if (!entry->is_mapped)
+			continue;
+
+		entry->is_mapped = false;
+
+		adev = (struct amdgpu_device *)entry->kgd_dev;
+		if (kgd2kfd->resume_mm(adev->kfd, mm))
+			pr_err("Failed to resume KFD\n");
+
+		n_evicted--;
+	}
+
+	return r;
+}
+
+/* Runs out of process context. mem->data2.lock must be held. */
+int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
+{
+	struct bo_vm_reservation_context ctx;
+	struct kfd_bo_va_list *entry;
+	uint32_t domain;
+	int r, ret = 0;
+	bool have_pages = false;
+
+	pr_debug("Restoring buffer %p\n", mem);
+
+	if (mem->data2.mapped_to_gpu_memory == 0)
+		return 0;
+
+	domain = mem->data2.domain;
+
+	ret = reserve_bo_and_vms(mem->data2.bo->adev, mem->data2.bo,
+				 &mem->data2.bo_va_list, NULL, true, &ctx);
+	if (likely(ret == 0)) {
+		ret = update_user_pages(mem, mm, &ctx);
+		have_pages = !ret;
+		if (!have_pages)
+			unreserve_bo_and_vms(&ctx, false);
+	}
+
+	/* update_user_pages drops the lock briefly. Check if someone
+	 * else evicted or restored the buffer in the mean time */
+	if (mem->data2.evicted != 1) {
+		unreserve_bo_and_vms(&ctx, false);
+		return 0;
+	}
+
+	/* Try to restore all mappings. Mappings that fail to restore
+	 * will be marked as unmapped. If we failed to get the user
+	 * pages, all mappings will be marked as unmapped. */
+	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
+		struct amdgpu_device *adev;
+
+		if (!entry->is_mapped)
+			continue;
+
+		adev = (struct amdgpu_device *)entry->kgd_dev;
+
+		if (unlikely(!have_pages)) {
+			entry->is_mapped = false;
+			goto resume_kfd;
+		}
+
+		r = try_pin_bo(mem->data2.bo, NULL, false, domain);
+		if (unlikely(r != 0)) {
+			pr_err("Failed to pin BO\n");
+			entry->is_mapped = false;
+			if (ret == 0)
+				ret = r;
+			goto resume_kfd;
+		}
+
+		r = map_bo_to_gpuvm(adev, mem->data2.bo, entry->bo_va);
+		if (unlikely(r != 0)) {
+			pr_err("Failed to map BO to gpuvm\n");
+			entry->is_mapped = false;
+			unpin_bo(mem->data2.bo, true);
+			if (ret == 0)
+				ret = r;
+		}
+
+		/* Resume queues even if restore failed. Worst case
+		 * the app will get a GPUVM fault. That's better than
+		 * hanging the queues indefinitely. */
+resume_kfd:
+		r = kgd2kfd->resume_mm(adev->kfd, mm);
+		if (ret != 0) {
+			pr_err("Failed to resume KFD\n");
+			if (ret == 0)
+				ret = r;
+		}
+	}
+
+	if (have_pages)
+		unreserve_bo_and_vms(&ctx, true);
+
+	return ret;
 }
