@@ -268,12 +268,19 @@ bool dce110_timing_generator_enable_crtc(struct timing_generator *tg)
 {
 	enum bp_result result;
 
-	/* 0 value is needed by DRR and is also suggested default value for CZ
-	 */
-	uint32_t value;
 	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
+	uint32_t value = 0;
 
-	value = 0;
+	/*
+	 * 3 is used to make sure V_UPDATE occurs at the beginning of the first
+	 * line of vertical front porch
+	 */
+	set_reg_field_value(
+		value,
+		3,
+		CRTC_MASTER_UPDATE_MODE,
+		MASTER_UPDATE_MODE);
+
 	dm_write_reg(tg->ctx, CRTC_REG(mmCRTC_MASTER_UPDATE_MODE), value);
 
 	/* TODO: may want this on to catch underflow */
