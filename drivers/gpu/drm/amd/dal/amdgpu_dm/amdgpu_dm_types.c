@@ -2036,8 +2036,10 @@ static enum dm_commit_action get_dm_commit_action(struct drm_crtc_state *state)
 		if (!state->enable)
 			return DM_COMMIT_ACTION_NOTHING;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 		if (state->active && state->connectors_changed)
 			return DM_COMMIT_ACTION_SET;
+#endif
 
 		if (state->active_changed) {
 			if (state->active) {
