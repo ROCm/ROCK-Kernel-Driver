@@ -2075,27 +2075,17 @@ static void manage_dm_interrupts(
 			&adev->pageflip_irq,
 			irq_type);
 	} else {
+		while (acrtc->pflip_status != AMDGPU_FLIP_NONE) {
+			/* Spin Wait*/
+
+			/* Todo: Use periodic polling rather than busy wait */
+		}
+
 		amdgpu_irq_put(
 			adev,
 			&adev->pageflip_irq,
 			irq_type);
 		drm_crtc_vblank_off(&acrtc->base);
-
-		/*
-		 * should be called here, to guarantee no works left in queue.
-		 * As this function sleeps it was bug to call it inside the
-		 * amdgpu_dm_flip_cleanup function under locked event_lock
-		 */
-		if (acrtc->pflip_works) {
-			flush_work(&acrtc->pflip_works->flip_work);
-			flush_work(&acrtc->pflip_works->unpin_work);
-		}
-
-		/*
-		 * this is the case when on reset, last pending pflip
-		 * interrupt did not not occur. Clean-up
-		 */
-		amdgpu_dm_flip_cleanup(adev, acrtc);
 	}
 }
 
