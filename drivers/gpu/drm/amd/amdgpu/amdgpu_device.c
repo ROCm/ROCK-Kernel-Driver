@@ -1911,9 +1911,6 @@ int amdgpu_resume_kms(struct drm_device *dev, bool resume, bool fbcon)
 	if (r)
 		DRM_ERROR("amdgpu_resume failed (%d).\n", r);
 
-	if (r)
-		DRM_ERROR("amdgpu_resume failed (%d).\n", r);
-
 	amdgpu_fence_driver_resume(adev);
 
 	if (resume) {
