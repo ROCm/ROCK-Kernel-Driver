@@ -46,6 +46,16 @@ config DRM_AMD_DAL_DCE11_0
 	 CZ family
 	 for display engine
 
+config DRM_AMD_DAL_DCE11_2
+        bool "Polaris11 family"
+        depends on DRM_AMD_DAL
+	select DRM_AMD_DAL_DCE11_0
+        help
+         Choose this option
+	 if you want to have
+	 BF family
+	 for display engine.
+
 config DEBUG_KERNEL_DAL
         bool "Enable kgdb break in DAL"
         depends on DRM_AMD_DAL
