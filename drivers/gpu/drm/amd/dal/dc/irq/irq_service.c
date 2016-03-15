@@ -65,6 +65,10 @@ struct irq_service *dal_irq_service_create(
 	case DCE_VERSION_10_0:
 		return dal_irq_service_dce110_create(init_data);
 #endif
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+	case DCE_VERSION_11_2:
+		return dal_irq_service_dce110_create(init_data);
+#endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	case DCE_VERSION_11_0:
 		return dal_irq_service_dce110_create(init_data);

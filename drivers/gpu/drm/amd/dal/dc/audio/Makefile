@@ -32,3 +32,11 @@ AMD_DAL_AUDIO_DCE11 = $(addprefix $(AMDDALPATH)/dc/audio/dce110/,$(AUDIO_DCE11))
 
 AMD_DAL_FILES += $(AMD_DAL_AUDIO_DCE11)
 endif
+
+ifdef CONFIG_DRM_AMD_DAL_DCE11_2
+AUDIO_DCE112 = audio_dce112.o hw_ctx_audio_dce112.o
+
+AMD_DAL_AUDIO_DCE112 = $(addprefix $(AMDDALPATH)/dc/audio/dce112/,$(AUDIO_DCE112))
+
+AMD_DAL_FILES += $(AMD_DAL_AUDIO_DCE112)
+endif

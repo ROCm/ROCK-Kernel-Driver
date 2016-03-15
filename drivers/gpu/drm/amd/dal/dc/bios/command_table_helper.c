@@ -55,6 +55,12 @@ bool dal_bios_parser_init_cmd_tbl_helper(
 		return true;
 #endif
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+	case DCE_VERSION_11_2:
+		*h = dal_cmd_tbl_helper_dce112_get_table();
+		return true;
+#endif
+
 	default:
 		/* Unsupported DCE */
 		BREAK_TO_DEBUGGER();

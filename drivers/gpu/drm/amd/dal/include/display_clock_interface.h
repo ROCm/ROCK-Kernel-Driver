@@ -131,6 +131,12 @@ struct display_clock_state {
 
 struct display_clock;
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+struct display_clock *dal_display_clock_dce112_create(
+	struct dc_context *ctx,
+	struct adapter_service *as);
+#endif
+
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 struct display_clock *dal_display_clock_dce110_create(
 	struct dc_context *ctx,

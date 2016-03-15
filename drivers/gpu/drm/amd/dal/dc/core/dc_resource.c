@@ -41,11 +41,13 @@
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 #include "dce110/dce110_resource.h"
 #endif
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+#include "dce112/dce112_resource.h"
+#endif
 
 enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
- {
+{
 	enum dce_version dc_version = DCE_VERSION_UNKNOWN;
-
 	switch (asic_id.chip_family) {
 
 #if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
@@ -68,6 +70,12 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 			break;
 		}
 #endif
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+		if (ASIC_REV_IS_POLARIS10_P(asic_id.hw_internal_rev) ||
+				ASIC_REV_IS_POLARIS11_M(asic_id.hw_internal_rev)) {
+			dc_version = DCE_VERSION_11_2;
+		}
+#endif
 		break;
 	default:
 		dc_version = DCE_VERSION_UNKNOWN;
@@ -83,6 +91,11 @@ bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
 {
 
 	switch (dc_version) {
+#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
+	case DCE_VERSION_8_0:
+		return dce80_construct_resource_pool(
+			adapter_serv, num_virtual_links, dc, &dc->res_pool);
+#endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 	case DCE_VERSION_10_0:
 		return dce100_construct_resource_pool(
@@ -91,6 +104,11 @@ bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	case DCE_VERSION_11_0:
 		return dce110_construct_resource_pool(
+			adapter_serv, num_virtual_links, dc, &dc->res_pool);
+#endif
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+	case DCE_VERSION_11_2:
+		return dce112_construct_resource_pool(
 			adapter_serv, num_virtual_links, dc, &dc->res_pool);
 #endif
 	default:

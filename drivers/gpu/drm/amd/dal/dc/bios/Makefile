@@ -37,3 +37,12 @@ endif
 
 AMD_DAL_FILES += $(AMDDALPATH)/dc/bios/dce110/command_table_helper_dce110.o
 endif
+
+ifdef CONFIG_DRM_AMD_DAL_DCE11_2
+ccflags-y += -DLATEST_ATOM_BIOS_SUPPORT
+ifdef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
+AMD_DAL_FILES += $(AMDDALPATH)/dc/bios/dce112/bios_parser_helper_dce112.o
+endif
+
+AMD_DAL_FILES += $(AMDDALPATH)/dc/bios/dce112/command_table_helper_dce112.o
+endif

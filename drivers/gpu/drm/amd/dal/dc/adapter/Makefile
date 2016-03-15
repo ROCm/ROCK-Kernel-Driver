@@ -25,6 +25,10 @@ ifdef CONFIG_DRM_AMD_DAL_DCE11_0
 AMD_DAL_FILES += $(AMDDALPATH)/dc/adapter/dce110/hw_ctx_adapter_service_dce110.o
 endif
 
+ifdef CONFIG_DRM_AMD_DAL_DCE11_2
+AMD_DAL_FILES += $(AMDDALPATH)/dc/adapter/dce112/hw_ctx_adapter_service_dce112.o
+endif
+
 ###############################################################################
 # FPGA Diagnositcs
 ###############################################################################

@@ -212,6 +212,11 @@ enum dm_pp_clock_type {
 struct dm_pp_clock_levels {
 	uint32_t num_levels;
 	uint32_t clocks_in_khz[DM_PP_MAX_CLOCK_LEVELS];
+
+	/* TODO: add latency for polaris11
+	 * do we need to know invalid (unsustainable boost) level for watermark
+	 * programming? if not we can just report less elements in array
+	 */
 };
 
 struct dm_pp_single_disp_config {

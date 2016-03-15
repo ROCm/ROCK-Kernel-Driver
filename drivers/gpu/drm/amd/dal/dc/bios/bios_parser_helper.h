@@ -34,6 +34,10 @@
 #include "dce110/bios_parser_helper_dce110.h"
 #endif
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+#include "dce112/bios_parser_helper_dce112.h"
+#endif
+
 struct bios_parser;
 
 struct vbios_helper_data {

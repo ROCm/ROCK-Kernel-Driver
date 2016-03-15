@@ -78,6 +78,9 @@ bool dal_hw_factory_init(
 #endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	case DCE_VERSION_11_0:
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+	case DCE_VERSION_11_2:
+#endif
 		dal_hw_factory_dce110_init(factory);
 		return true;
 #endif
