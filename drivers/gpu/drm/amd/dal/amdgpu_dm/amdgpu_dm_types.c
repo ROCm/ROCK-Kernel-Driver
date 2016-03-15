@@ -2230,6 +2230,7 @@ int amdgpu_dm_atomic_commit(
 
 			acrtc->target = new_target;
 			acrtc->enabled = true;
+			acrtc->hw_mode = crtc->state->mode;
 
 			break;
 		}
