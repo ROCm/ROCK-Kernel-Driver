@@ -88,10 +88,13 @@ struct i2caux *dal_i2caux_create(
 		return dal_i2caux_dce80_create(as, ctx);
 #endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
+	case DCE_VERSION_11_0:
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+	case DCE_VERSION_11_2:
+#endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 	case DCE_VERSION_10_0:
 #endif
-	case DCE_VERSION_11_0:
 		return dal_i2caux_dce110_create(as, ctx);
 #endif
 	default:

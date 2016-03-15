@@ -416,6 +416,7 @@ static void dce110_crtc_switch_to_clk_src(
 	uint32_t pixel_rate_cntl_value;
 	uint32_t addr;
 
+	/* These addresses are the same across DCE8 - DCE11.2 */
 	addr = mmCRTC0_PIXEL_RATE_CNTL + crtc_inst *
 			(mmCRTC1_PIXEL_RATE_CNTL - mmCRTC0_PIXEL_RATE_CNTL);
 

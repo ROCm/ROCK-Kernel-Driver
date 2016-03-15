@@ -43,6 +43,9 @@ enum dce_version {
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	DCE_VERSION_11_0,
 #endif
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+	DCE_VERSION_11_2,
+#endif
 	DCE_VERSION_MAX,
 };
 

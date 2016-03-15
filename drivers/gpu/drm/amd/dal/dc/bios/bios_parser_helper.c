@@ -55,6 +55,12 @@ bool dal_bios_parser_init_bios_helper(
 		return true;
 
 #endif
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+	case DCE_VERSION_11_2:
+		bp->bios_helper = dal_bios_parser_helper_dce112_get_table();
+		return true;
+
+#endif
 	default:
 		BREAK_TO_DEBUGGER();
 		return false;

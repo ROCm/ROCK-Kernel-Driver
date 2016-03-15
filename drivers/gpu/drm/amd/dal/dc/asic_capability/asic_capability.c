@@ -44,6 +44,10 @@
 #include "carrizo_asic_capability.h"
 #endif
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+#include "polaris10_asic_capability.h"
+#endif
+
 /*
  * Initializes asic_capability instance.
  */
@@ -108,7 +112,8 @@ static bool construct(
 		asic_supported = true;
 #endif
 		break;
- 	case FAMILY_VI:
+
+	case FAMILY_VI:
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 		if (ASIC_REV_IS_TONGA_P(init->hw_internal_rev) ||
 				ASIC_REV_IS_FIJI_P(init->hw_internal_rev)) {
@@ -117,7 +122,15 @@ static bool construct(
 			break;
 		}
 #endif
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+		if (ASIC_REV_IS_POLARIS10_P(init->hw_internal_rev) ||
+				ASIC_REV_IS_POLARIS11_M(init->hw_internal_rev)) {
+			polaris10_asic_capability_create(cap, init);
+			asic_supported = true;
+		}
+#endif
 		break;
+
 	default:
 		/* unsupported "chip_family" */
 		break;

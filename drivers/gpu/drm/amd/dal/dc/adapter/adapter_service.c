@@ -49,6 +49,10 @@
 #include "dce110/hw_ctx_adapter_service_dce110.h"
 #endif
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+#include "dce112/hw_ctx_adapter_service_dce112.h"
+#endif
+
 #include "diagnostics/hw_ctx_adapter_service_diag.h"
 
 /*
@@ -664,6 +668,10 @@ static struct hw_ctx_adapter_service *create_hw_ctx(
 	case DCE_VERSION_11_0:
 		return dal_adapter_service_create_hw_ctx_dce110(ctx);
 #endif
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+	case DCE_VERSION_11_2:
+		return dal_adapter_service_create_hw_ctx_dce112(ctx);
+#endif
 	default:
 		ASSERT_CRITICAL(false);
 		return NULL;
@@ -906,6 +914,10 @@ enum dce_version dal_adapter_service_get_dce_version(
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	case 0x110:
 		return DCE_VERSION_11_0;
+#endif
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+	case 0x112:
+		return DCE_VERSION_11_2;
 #endif
 	default:
 		ASSERT_CRITICAL(false);

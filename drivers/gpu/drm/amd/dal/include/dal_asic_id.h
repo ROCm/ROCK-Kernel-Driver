@@ -83,10 +83,24 @@
 #define VI_TONGA_P_A1 21
 #define VI_FIJI_P_A0 60
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+/* DCE112 */
+#define VI_POLARIS10_P_A0 80
+#define VI_POLARIS11_M_A0 90
+#endif
+
+#define VI_UNKNOWN 0xFF
+
 #define ASIC_REV_IS_TONGA_P(eChipRev) ((eChipRev >= VI_TONGA_P_A0) && \
 		(eChipRev < 40))
 #define ASIC_REV_IS_FIJI_P(eChipRev) ((eChipRev >= VI_FIJI_P_A0) && \
 		(eChipRev < 80))
+
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+#define ASIC_REV_IS_POLARIS10_P(eChipRev) ((eChipRev >= VI_POLARIS10_P_A0) && \
+		(eChipRev < VI_POLARIS11_M_A0))
+#define ASIC_REV_IS_POLARIS11_M(eChipRev) (eChipRev >= VI_POLARIS11_M_A0)
+#endif
 
 /* DCE11 */
 #define CZ_CARRIZO_A0 0x01

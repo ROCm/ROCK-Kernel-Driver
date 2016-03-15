@@ -59,7 +59,7 @@ enum black_color_format {
 
 /* Flowing register offsets are same in files of
  * dce/dce_11_0_d.h
- * dce/vi_ellesmere_p/vi_ellesmere_d.h
+ * dce/vi_polaris10_p/vi_polaris10_d.h
  *
  * So we can create dce110 timing generator to use it.
  */

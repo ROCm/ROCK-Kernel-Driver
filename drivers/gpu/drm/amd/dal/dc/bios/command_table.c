@@ -104,6 +104,13 @@ static enum bp_result encoder_control_digx_v3(
 static enum bp_result encoder_control_digx_v4(
 	struct bios_parser *bp,
 	struct bp_encoder_control *cntl);
+
+#ifdef LATEST_ATOM_BIOS_SUPPORT
+static enum bp_result encoder_control_digx_v5(
+	struct bios_parser *bp,
+	struct bp_encoder_control *cntl);
+#endif
+
 static void init_encoder_control_dig_v1(struct bios_parser *bp);
 
 static void init_dig_encoder_control(struct bios_parser *bp)
@@ -112,12 +119,19 @@ static void init_dig_encoder_control(struct bios_parser *bp)
 		BIOS_CMD_TABLE_PARA_REVISION(DIGxEncoderControl);
 
 	switch (version) {
-	case 4:
-		bp->cmd_tbl.dig_encoder_control = encoder_control_digx_v4;
-		break;
 	case 2:
 		bp->cmd_tbl.dig_encoder_control = encoder_control_digx_v3;
 		break;
+	case 4:
+		bp->cmd_tbl.dig_encoder_control = encoder_control_digx_v4;
+		break;
+
+#ifdef LATEST_ATOM_BIOS_SUPPORT
+	case 5:
+		bp->cmd_tbl.dig_encoder_control = encoder_control_digx_v5;
+		break;
+#endif
+
 	default:
 		init_encoder_control_dig_v1(bp);
 		break;
@@ -301,6 +315,66 @@ static enum bp_result encoder_control_digx_v4(
 
 	return result;
 }
+
+#ifdef LATEST_ATOM_BIOS_SUPPORT
+static enum bp_result encoder_control_digx_v5(
+	struct bios_parser *bp,
+	struct bp_encoder_control *cntl)
+{
+	enum bp_result result = BP_RESULT_FAILURE;
+	ENCODER_STREAM_SETUP_PARAMETERS_V5 params = {0};
+
+	params.ucDigId = (uint8_t)(cntl->engine_id);
+	params.ucAction = bp->cmd_helper->encoder_action_to_atom(cntl->action);
+
+	params.ulPixelClock = cntl->pixel_clock / 10;
+	params.ucDigMode =
+			(uint8_t)(bp->cmd_helper->encoder_mode_bp_to_atom(
+					cntl->signal,
+					cntl->enable_dp_audio));
+	params.ucLaneNum = (uint8_t)(cntl->lanes_number);
+
+	switch (cntl->color_depth) {
+	case COLOR_DEPTH_888:
+		params.ucBitPerColor = PANEL_8BIT_PER_COLOR;
+		break;
+	case COLOR_DEPTH_101010:
+		params.ucBitPerColor = PANEL_10BIT_PER_COLOR;
+		break;
+	case COLOR_DEPTH_121212:
+		params.ucBitPerColor = PANEL_12BIT_PER_COLOR;
+		break;
+	case COLOR_DEPTH_161616:
+		params.ucBitPerColor = PANEL_16BIT_PER_COLOR;
+		break;
+	default:
+		break;
+	}
+
+	if (cntl->signal == SIGNAL_TYPE_HDMI_TYPE_A)
+		switch (cntl->color_depth) {
+		case COLOR_DEPTH_101010:
+			params.ulPixelClock =
+				(params.ulPixelClock * 30) / 24;
+			break;
+		case COLOR_DEPTH_121212:
+			params.ulPixelClock =
+				(params.ulPixelClock * 36) / 24;
+			break;
+		case COLOR_DEPTH_161616:
+			params.ulPixelClock =
+				(params.ulPixelClock * 48) / 24;
+			break;
+		default:
+			break;
+		}
+
+	if (EXEC_BIOS_CMD_TABLE(DIGxEncoderControl, params))
+		result = BP_RESULT_OK;
+
+	return result;
+}
+#endif
 
 /*******************************************************************************
  ********************************************************************************

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Advanced Micro Devices, Inc.
+* Copyright 2012-15 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,49 +22,15 @@
  * Authors: AMD
  *
  */
-#include "dm_services.h"
+
+#ifndef __DC_HWSS_DCE112_H__
+#define __DC_HWSS_DCE112_H__
+
 #include "core_types.h"
 
-#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
-#include "dce80/dce80_hw_sequencer.h"
-#endif
-#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
-#include "dce100/dce100_hw_sequencer.h"
-#endif
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
-#include "dce110/dce110_hw_sequencer.h"
-#endif
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
-#include "dce112/dce112_hw_sequencer.h"
-#endif
+struct core_dc;
 
-bool dc_construct_hw_sequencer(
-				struct adapter_service *adapter_serv,
-				struct core_dc *dc)
-{
-	enum dce_version dce_ver = dal_adapter_service_get_dce_version(adapter_serv);
+bool dce112_hw_sequencer_construct(struct core_dc *dc);
 
-	switch (dce_ver)
-	{
-#if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
-	case DCE_VERSION_8_0:
-		return dce80_hw_sequencer_construct(dc);
-#endif
-#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
-	case DCE_VERSION_10_0:
-		return dce100_hw_sequencer_construct(dc);
-#endif
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
-	case DCE_VERSION_11_0:
-		return dce110_hw_sequencer_construct(dc);
-#endif
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
-	case DCE_VERSION_11_2:
-		return dce112_hw_sequencer_construct(dc);
-#endif
-	default:
-		break;
-	}
+#endif /* __DC_HWSS_DCE112_H__ */
 
-	return false;
-}
