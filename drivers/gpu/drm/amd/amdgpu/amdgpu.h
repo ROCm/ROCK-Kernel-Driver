@@ -467,6 +467,8 @@ struct amdgpu_gem_object {
 	struct amdgpu_bo		*bo;
 };
 
+struct kgd_mem;
+
 struct amdgpu_bo {
 	/* Protected by gem.mutex */
 	struct list_head		list;
@@ -498,7 +500,7 @@ struct amdgpu_bo {
 	struct ttm_bo_kmap_obj		dma_buf_vmap;
 	struct amdgpu_mn		*mn;
 	struct list_head		mn_list;
-	bool				is_kfd_bo;
+	struct kgd_mem			*kfd_bo;
 	struct kfd_process_device	*pdd;
 };
 #define gem_to_amdgpu_bo(gobj) container_of((gobj), struct amdgpu_gem_object, base)->bo
