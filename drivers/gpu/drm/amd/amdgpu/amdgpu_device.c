@@ -1404,9 +1404,11 @@ bool amdgpu_device_has_dal_support(struct amdgpu_device *adev)
 	case CHIP_HAWAII:
 		return amdgpu_dal != 0;
 #endif
-#if defined(CONFIG_DRM_AMD_DAL) && defined(CONFIG_DRM_AMD_DAL_DCE11_0)
+#if defined(CONFIG_DRM_AMD_DAL) && (defined(CONFIG_DRM_AMD_DAL_DCE11_0) || defined(CONFIG_DRM_AMD_DAL_DCE11_2))
 	case CHIP_CARRIZO:
 	case CHIP_STONEY:
+	case CHIP_POLARIS11:
+	case CHIP_POLARIS10:
 		return amdgpu_dal != 0;
 #endif
 #if defined(CONFIG_DRM_AMD_DAL) && defined(CONFIG_DRM_AMD_DAL_DCE10_0)
