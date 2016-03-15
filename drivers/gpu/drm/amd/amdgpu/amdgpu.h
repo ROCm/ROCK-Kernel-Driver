@@ -411,6 +411,8 @@ struct amdgpu_gem_object {
 	struct amdgpu_bo		*bo;
 };
 
+struct kgd_mem;
+
 struct amdgpu_bo {
 	/* Protected by tbo.reserved */
 	u32				prefered_domains;
@@ -442,7 +444,7 @@ struct amdgpu_bo {
 	struct amdgpu_mn		*mn;
 	struct list_head		mn_list;
 	struct list_head		shadow_list;
-	bool				is_kfd_bo;
+	struct kgd_mem			*kfd_bo;
 	struct kfd_process_device	*pdd;
 };
 #define gem_to_amdgpu_bo(gobj) container_of((gobj), struct amdgpu_gem_object, base)->bo

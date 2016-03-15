@@ -244,7 +244,7 @@ static int amdgpu_verify_access(struct ttm_buffer_object *bo, struct file *filp)
 	 * Don't verify access for KFD BO as it doesn't necessary has
 	 * KGD file pointer
 	 */
-	if (!abo || abo->is_kfd_bo || !filp)
+	if (!abo || abo->kfd_bo || !filp)
 		return 0;
 	file_priv = filp->private_data;
 
