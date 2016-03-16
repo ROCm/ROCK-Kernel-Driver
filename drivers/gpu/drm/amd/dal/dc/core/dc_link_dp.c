@@ -1009,33 +1009,31 @@ bool perform_link_training(
 	switch (lt_settings.link_settings.link_rate) {
 
 	case LINK_RATE_LOW:
-		link_rate = "Low";
+		link_rate = "RBR";
 		break;
 	case LINK_RATE_HIGH:
-		link_rate = "High";
+		link_rate = "HBR";
 		break;
 	case LINK_RATE_HIGH2:
-		link_rate = "High2";
+		link_rate = "HBR2";
 		break;
 	case LINK_RATE_RBR2:
 		link_rate = "RBR2";
 		break;
 	case LINK_RATE_HIGH3:
-		link_rate = "High3";
+		link_rate = "HBR3";
 		break;
 	default:
 		break;
 	}
 
-	dal_logger_write(link->ctx->logger,
-		LOG_MAJOR_MST,
-		LOG_MINOR_MST_PROGRAMMING,
-		"Link training for %d lanes at %s rate %s with PE %d, VS %d\n",
-		lt_settings.link_settings.lane_count,
-		link_rate,
-		status ? "succeeded" : "failed",
-		lt_settings.lane_settings[0].PRE_EMPHASIS,
-		lt_settings.lane_settings[0].VOLTAGE_SWING);
+	/* Connectivity log: link training */
+	CONN_MSG_LT(link, "%sx%d %s VS=%d, PE=%d",
+			link_rate,
+			lt_settings.link_settings.lane_count,
+			status ? "pass" : "fail",
+			lt_settings.lane_settings[0].VOLTAGE_SWING,
+			lt_settings.lane_settings[0].PRE_EMPHASIS);
 
 	return status;
 }
@@ -1540,8 +1538,15 @@ bool dc_link_handle_hpd_rx_irq(const struct dc_link *dc_link)
 	if (hpd_rx_irq_check_link_loss_status(
 		link,
 		&hpd_irq_dpcd_data)) {
+		/* Connectivity log: link loss */
+		CONN_DATA_LINK_LOSS(link,
+							hpd_irq_dpcd_data.raw,
+							sizeof(hpd_irq_dpcd_data),
+							"Status: ");
+
 		perform_link_training_with_retries(link,
 			&link->public.cur_link_settings, true, 3);
+
 		status = false;
 	}
 
@@ -1794,6 +1799,10 @@ static void retrieve_link_cap(struct core_link *link)
 			(uint8_t *)(&link->edp_revision),
 			sizeof(link->edp_revision));
 	}
+
+	/* Connectivity log: detection */
+	CONN_DATA_DETECT(link, dpcd_data, sizeof(dpcd_data), "Rx Caps: ");
+
 	/* TODO: Confirm if need retrieve_psr_link_cap */
 }
 

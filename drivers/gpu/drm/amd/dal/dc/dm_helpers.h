@@ -35,11 +35,42 @@
 
 struct dp_mst_stream_allocation_table;
 
+enum conn_event {
+	CONN_EVENT_MODE_SET,
+	CONN_EVENT_DETECTION,
+	CONN_EVENT_LINK_TRAINING,
+	CONN_EVENT_LINK_LOSS,
+	CONN_EVENT_UNDERFLOW,
+};
+
 enum dc_edid_status dm_helpers_parse_edid_caps(
 	struct dc_context *ctx,
 	const struct dc_edid *edid,
 	struct dc_edid_caps *edid_caps);
 
+
+/* Connectivity log format:
+ * [time stamp]   [drm] [Major_minor] [connector name] message.....
+ * eg:
+ * [   26.590965] [drm] [Conn_LKTN]	  [DP-1] HBRx4 pass VS=0, PE=0^
+ * [   26.881060] [drm] [Conn_Mode]	  [DP-1] {2560x1080, 2784x1111@185580Khz}^
+ */
+
+#define CONN_DATA_DETECT(link, hex_data, hex_len, ...) \
+		dm_helper_conn_log(link->ctx, &link->public, hex_data, hex_len, \
+				CONN_EVENT_DETECTION, ##__VA_ARGS__)
+
+#define CONN_DATA_LINK_LOSS(link, hex_data, hex_len, ...) \
+		dm_helper_conn_log(link->ctx, &link->public, hex_data, hex_len, \
+				CONN_EVENT_LINK_LOSS, ##__VA_ARGS__)
+
+#define CONN_MSG_LT(link, ...) \
+		dm_helper_conn_log(link->ctx, &link->public, NULL, 0, \
+				CONN_EVENT_LINK_TRAINING, ##__VA_ARGS__)
+
+#define CONN_MSG_MODE(link, ...) \
+		dm_helper_conn_log(link->ctx, &link->public, NULL, 0, \
+				CONN_EVENT_MODE_SET, ##__VA_ARGS__)
 /*
  * Writes payload allocation table in immediate downstream device.
  */
@@ -99,5 +130,13 @@ bool dm_helpers_submit_i2c(
 		struct dc_context *ctx,
 		const struct dc_link *link,
 		struct i2c_command *cmd);
+
+void dm_helper_conn_log(struct dc_context *ctx,
+		const struct dc_link *link,
+		uint8_t *hex_data,
+		int hex_data_count,
+		enum conn_event event,
+		const char *msg,
+		...);
 
 #endif /* __DM_HELPERS__ */

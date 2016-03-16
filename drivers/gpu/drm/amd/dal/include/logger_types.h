@@ -65,6 +65,7 @@ enum log_major {
 /*23*/  LOG_MAJOR_DISPLAY_SERVICE, /*< related to Display Service*/
 /*24*/	LOG_MAJOR_FEATURE_OVERRIDE,	/*< related to features*/
 /*25*/	LOG_MAJOR_DETECTION,	/*< related to detection*/
+/*26*/	LOG_MAJOR_CONNECTIVITY,	/*< related to connectivity*/
 	LOG_MAJOR_COUNT,	/*< count of the Major categories*/
 };
 
@@ -311,6 +312,18 @@ enum log_minor {
 */
 	LOG_MINOR_DETECTION_EDID_PARSER = 0,
 	LOG_MINOR_DETECTION_DP_CAPS,
+
+/**
+* @brief defines minor category for LOG_MAJOR_CONNECTIVITY
+*
+* @note define sub functionality related to connectivity
+*/
+	LOG_MINOR_CONNECTIVITY_MODE_SET = 0,
+	LOG_MINOR_CONNECTIVITY_DETECTION,
+	LOG_MINOR_CONNECTIVITY_LINK_TRAINING,
+	LOG_MINOR_CONNECTIVITY_LINK_LOSS,
+	LOG_MINOR_CONNECTIVITY_UNDERFLOW,
+
 };
 
 union logger_flags {

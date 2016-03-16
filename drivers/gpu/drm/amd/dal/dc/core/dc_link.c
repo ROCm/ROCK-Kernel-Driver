@@ -679,6 +679,12 @@ bool dc_link_detect(const struct dc_link *dc_link, bool boot)
 			break;
 		}
 
+		/* Connectivity log: detection */
+		CONN_DATA_DETECT(link, sink->public.dc_edid.raw_edid,
+				sink->public.dc_edid.length,
+				"%s: ",
+				sink->public.edid_caps.display_name);
+
 		dal_logger_write(link->ctx->logger,
 			LOG_MAJOR_DETECTION,
 			LOG_MINOR_DETECTION_EDID_PARSER,

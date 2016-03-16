@@ -207,6 +207,14 @@ static const struct log_minor_info ds_minor_info_tbl[] = {
 	{LOG_MINOR_DS_MODE_SETTING, "Mode_Setting"},
 };
 
+static const struct log_minor_info connectivity_minor_info_tbl[] = {
+	{LOG_MINOR_CONNECTIVITY_MODE_SET,  "Mode"},
+	{LOG_MINOR_CONNECTIVITY_DETECTION, "Detect"},
+	{LOG_MINOR_CONNECTIVITY_LINK_TRAINING, "LKTN"},
+	{LOG_MINOR_CONNECTIVITY_LINK_LOSS, "LinkLoss"},
+	{LOG_MINOR_CONNECTIVITY_UNDERFLOW, "Underflow"},
+};
+
 struct log_major_mask_info {
 	struct log_major_info major_info;
 	uint32_t default_mask;
@@ -270,6 +278,7 @@ static const struct log_major_mask_info log_major_mask_info_tbl[] = {
 	{{LOG_MAJOR_DISPLAY_SERVICE, "DS"          }, LG_ALL_MSK, ds_minor_info_tbl,           NUM_ELEMENTS(ds_minor_info_tbl)},
 	{{LOG_MAJOR_FEATURE_OVERRIDE, "FeatureOverride" }, LG_ALL_MSK, override_feature_minor_info_tbl, NUM_ELEMENTS(override_feature_minor_info_tbl)},
 	{{LOG_MAJOR_DETECTION,       "Detection"   }, LG_ALL_MSK,  detection_minor_info_tbl,    NUM_ELEMENTS(detection_minor_info_tbl)},
+	{{LOG_MAJOR_CONNECTIVITY,    "Conn"		   }, LG_ALL_MSK,  connectivity_minor_info_tbl, NUM_ELEMENTS(connectivity_minor_info_tbl)},
 };
 
 /* ----------- Object init and destruction ----------- */
@@ -511,7 +520,7 @@ static void log_to_internal_buffer(struct log_entry *entry)
 
 static void log_timestamp(struct log_entry *entry)
 {
-	dal_logger_append(entry, "00:00:00 ");
+/*	dal_logger_append(entry, "00:00:00 ");*/
 }
 
 static void log_major_minor(struct log_entry *entry)
