@@ -1040,6 +1040,31 @@ bool perform_link_training(
 	return status;
 }
 
+
+bool perform_link_training_with_retries(
+	struct core_link *link,
+	const struct dc_link_settings *link_setting,
+	bool skip_video_pattern,
+	unsigned int retires)
+{
+	uint8_t j;
+	uint8_t delay_between_retries = 10;
+
+	for (j = 0; j < retires; ++j) {
+
+		if (perform_link_training(
+				link,
+				link_setting,
+				skip_video_pattern))
+			return true;
+
+		msleep(delay_between_retries);
+		delay_between_retries += 10;
+	}
+
+	return false;
+}
+
 /*TODO add more check to see if link support request link configuration */
 static bool is_link_setting_supported(
 	const struct dc_link_settings *link_setting,
@@ -1150,23 +1175,11 @@ bool dp_hbr_verify_link_cap(
 		if (skip_link_training)
 			success = true;
 		else {
-			uint8_t num_retries = 3;
-			uint8_t j;
-			uint8_t delay_between_retries = 10;
-
-			for (j = 0; j < num_retries; ++j) {
-				success = perform_link_training(
-					link,
-					cur,
-					skip_video_pattern);
-
-				if (success)
-					break;
-
-				msleep(delay_between_retries);
-
-				delay_between_retries += 10;
-			}
+			success = perform_link_training_with_retries(
+								link,
+								cur,
+								skip_video_pattern,
+								3);
 		}
 
 		if (success)
@@ -1527,8 +1540,8 @@ bool dc_link_handle_hpd_rx_irq(const struct dc_link *dc_link)
 	if (hpd_rx_irq_check_link_loss_status(
 		link,
 		&hpd_irq_dpcd_data)) {
-		perform_link_training(link,
-			&link->public.cur_link_settings, true);
+		perform_link_training_with_retries(link,
+			&link->public.cur_link_settings, true, 3);
 		status = false;
 	}
 

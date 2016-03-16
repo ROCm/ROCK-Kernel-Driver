@@ -1178,7 +1178,11 @@ static enum dc_status enable_link_dp(struct pipe_ctx *pipe_ctx)
 	if (link_settings.link_rate == LINK_RATE_LOW)
 			skip_video_pattern = false;
 
-	if (perform_link_training(link, &link_settings, skip_video_pattern)) {
+	if (perform_link_training_with_retries(
+			link,
+			&link_settings,
+			skip_video_pattern,
+			3)) {
 		link->public.cur_link_settings = link_settings;
 		status = DC_OK;
 	}
