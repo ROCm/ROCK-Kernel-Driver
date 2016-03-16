@@ -46,6 +46,7 @@
 #include "link_encoder.h"
 
 #include "dc_link_ddc.h"
+#include "dm_helpers.h"
 
 /*******************************************************************************
  * Private structures
@@ -747,8 +748,17 @@ bool dc_commit_targets(
 
 	for (i = 0; i < context->target_count; i++) {
 		struct dc_target *dc_target = &context->targets[i]->public;
+		struct core_sink *sink = DC_SINK_TO_CORE(dc_target->streams[0]->sink);
+
 		if (context->target_status[i].surface_count > 0)
 			target_enable_memory_requests(dc_target, &core_dc->current_context.res_ctx);
+
+		CONN_MSG_MODE(sink->link, "{%dx%d, %dx%d@%dKhz}",
+				dc_target->streams[0]->timing.h_addressable,
+				dc_target->streams[0]->timing.v_addressable,
+				dc_target->streams[0]->timing.h_total,
+				dc_target->streams[0]->timing.v_total,
+				dc_target->streams[0]->timing.pix_clk_khz);
 	}
 
 	program_timing_sync(core_dc, context);

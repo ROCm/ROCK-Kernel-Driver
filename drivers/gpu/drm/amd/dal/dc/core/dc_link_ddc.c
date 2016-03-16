@@ -768,12 +768,12 @@ void dal_ddc_service_i2c_query_dp_dual_mode_adaptor(
 		DP_HDMI_DONGLE_ADDRESS,
 		type2_dongle_buf,
 		sizeof(type2_dongle_buf))) {
-		dal_logger_write(ddc->ctx->logger,
-			LOG_MAJOR_DCS,
-			LOG_MINOR_DCS_DONGLE_DETECTION,
-			"Detected DP-DVI dongle.\n");
 		*dongle = DISPLAY_DONGLE_DP_DVI_DONGLE;
 		sink_cap->max_hdmi_pixel_clock = DP_ADAPTOR_DVI_MAX_TMDS_CLK;
+
+		CONN_DATA_DETECT(ddc->link, type2_dongle_buf, sizeof(type2_dongle_buf),
+				"DP-DVI passive dongle %dMhz: ",
+				DP_ADAPTOR_DVI_MAX_TMDS_CLK / 1000);
 		return;
 	}
 
@@ -815,29 +815,28 @@ void dal_ddc_service_i2c_query_dp_dual_mode_adaptor(
 		if (0 == max_tmds_clk ||
 				max_tmds_clk < DP_ADAPTOR_TYPE2_MIN_TMDS_CLK ||
 				max_tmds_clk > DP_ADAPTOR_TYPE2_MAX_TMDS_CLK) {
-			dal_logger_write(ddc->ctx->logger,
-				LOG_MAJOR_DCS,
-				LOG_MINOR_DCS_DONGLE_DETECTION,
-				"Invalid Maximum TMDS clock");
 			*dongle = DISPLAY_DONGLE_DP_DVI_DONGLE;
+
+			CONN_DATA_DETECT(ddc->link, type2_dongle_buf,
+					sizeof(type2_dongle_buf),
+					"DP-DVI passive dongle %dMhz: ",
+					DP_ADAPTOR_DVI_MAX_TMDS_CLK / 1000);
 		} else {
 			if (is_valid_hdmi_signature == true) {
 				*dongle = DISPLAY_DONGLE_DP_HDMI_DONGLE;
-				dal_logger_write(ddc->ctx->logger,
-					LOG_MAJOR_DCS,
-					LOG_MINOR_DCS_DONGLE_DETECTION,
-					"Detected Type 2 DP-HDMI Maximum TMDS "
-					"clock, max TMDS clock: %d MHz",
-					max_tmds_clk);
+
+				CONN_DATA_DETECT(ddc->link, type2_dongle_buf,
+						sizeof(type2_dongle_buf),
+						"Type 2 DP-HDMI passive dongle %dMhz: ",
+						max_tmds_clk);
 			} else {
 				*dongle = DISPLAY_DONGLE_DP_HDMI_MISMATCHED_DONGLE;
-				dal_logger_write(ddc->ctx->logger,
-					LOG_MAJOR_DCS,
-					LOG_MINOR_DCS_DONGLE_DETECTION,
-					"Detected Type 2 DP-HDMI (no valid HDMI"
-					" signature) Maximum TMDS clock, max "
-					"TMDS clock: %d MHz",
-					max_tmds_clk);
+
+				CONN_DATA_DETECT(ddc->link, type2_dongle_buf,
+						sizeof(type2_dongle_buf),
+						"Type 2 DP-HDMI passive dongle (no signature) %dMhz: ",
+						max_tmds_clk);
+
 			}
 
 			/* Multiply by 1000 to convert to kHz. */
@@ -847,19 +846,19 @@ void dal_ddc_service_i2c_query_dp_dual_mode_adaptor(
 
 	} else {
 		if (is_valid_hdmi_signature == true) {
-			dal_logger_write(ddc->ctx->logger,
-				LOG_MAJOR_DCS,
-				LOG_MINOR_DCS_DONGLE_DETECTION,
-				"Detected Type 1 DP-HDMI dongle.\n");
 			*dongle = DISPLAY_DONGLE_DP_HDMI_DONGLE;
-		} else {
-			dal_logger_write(ddc->ctx->logger,
-				LOG_MAJOR_DCS,
-				LOG_MINOR_DCS_DONGLE_DETECTION,
-				"Detected Type 1 DP-HDMI dongle (no valid HDMI "
-				"signature).\n");
 
+			CONN_DATA_DETECT(ddc->link, type2_dongle_buf,
+					sizeof(type2_dongle_buf),
+					"Type 1 DP-HDMI passive dongle %dMhz: ",
+					sink_cap->max_hdmi_pixel_clock / 1000);
+		} else {
 			*dongle = DISPLAY_DONGLE_DP_HDMI_MISMATCHED_DONGLE;
+
+			CONN_DATA_DETECT(ddc->link, type2_dongle_buf,
+					sizeof(type2_dongle_buf),
+					"Type 1 DP-HDMI passive dongle (no signature) %dMhz: ",
+					sink_cap->max_hdmi_pixel_clock / 1000);
 		}
 	}
 

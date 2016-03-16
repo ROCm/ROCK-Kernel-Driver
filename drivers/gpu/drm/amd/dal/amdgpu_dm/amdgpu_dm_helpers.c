@@ -42,6 +42,12 @@
 
 #include "dm_helpers.h"
 
+/* Maximum line char number for connectivity log,
+ * in case of output EDID, needs at least 256x3 bytes plus some other
+ * message, so set line size to 896.
+ */
+#define CONN_MAX_LINE_SIZE 896
+
 /* dm_helpers_parse_edid_caps
  *
  * Parse edid caps
@@ -513,3 +519,48 @@ bool dm_helpers_submit_i2c(
 	return result;
 }
 
+void dm_helper_conn_log(struct dc_context *ctx,
+		const struct dc_link *link,
+		uint8_t *hex_data,
+		int hex_data_count,
+		enum conn_event event,
+		const char *msg,
+		...)
+{
+	struct amdgpu_device *adev = ctx->driver_context;
+	struct drm_device *dev = adev->ddev;
+	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
+	char buffer[CONN_MAX_LINE_SIZE] = { 0 };
+	va_list args;
+	int size;
+	enum log_minor minor = event;
+
+	va_start(args, msg);
+
+	sprintf(buffer, "[%s] ", aconnector->base.name);
+
+	size = strlen(buffer);
+
+	size += dm_log_to_buffer(
+		&buffer[size], CONN_MAX_LINE_SIZE, msg, args);
+
+	if (buffer[strlen(buffer) - 1] == '\n') {
+		buffer[strlen(buffer) - 1] = '\0';
+		size--;
+	}
+
+	if (hex_data) {
+		int i;
+
+		for (i = 0; i < hex_data_count; i++)
+			sprintf(&buffer[size + i * 3], "%2.2X ", hex_data[i]);
+	}
+
+	strcat(buffer, "^\n");
+
+	dal_logger_write(ctx->logger,
+					LOG_MAJOR_CONNECTIVITY,
+					minor,
+					buffer);
+	va_end(args);
+}

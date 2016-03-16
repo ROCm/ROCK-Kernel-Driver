@@ -29,7 +29,11 @@
 /* Structure for keeping track of offsets, buffer, etc */
 
 #define DAL_LOGGER_BUFFER_MAX_SIZE 2048
-#define DAL_LOGGER_BUFFER_MAX_LOG_LINE_SIZE 256
+
+/*Connectivity log needs to output EDID, which needs at lease 256x3 bytes,
+ * change log line size to 896 to meet the request.
+ */
+#define DAL_LOGGER_BUFFER_MAX_LOG_LINE_SIZE 896
 
 #include "include/logger_types.h"
 
