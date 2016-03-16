@@ -42,10 +42,11 @@ void decide_link_settings(
 	struct core_stream *stream,
 	struct dc_link_settings *link_setting);
 
-bool perform_link_training(
+bool perform_link_training_with_retries(
 	struct core_link *link,
 	const struct dc_link_settings *link_setting,
-	bool skip_video_pattern);
+	bool skip_video_pattern,
+	unsigned int  retires);
 
 bool is_mst_supported(struct core_link *link);
 
