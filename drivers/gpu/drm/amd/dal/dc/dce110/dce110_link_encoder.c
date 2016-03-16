@@ -929,19 +929,12 @@ static bool validate_dvi_output(
 
 static bool validate_hdmi_output(
 	const struct dce110_link_encoder *enc110,
-	const struct dc_crtc_timing *crtc_timing,
-	uint32_t max_tmds_clk_from_edid_in_mhz,
-	enum dc_color_depth max_hdmi_deep_color,
-	uint32_t max_hdmi_pixel_clock)
+	const struct dc_crtc_timing *crtc_timing)
 {
-	enum dc_color_depth max_deep_color = max_hdmi_deep_color;
+	enum dc_color_depth max_deep_color =
+			enc110->base.features.max_hdmi_deep_color;
 	/* expressed in KHz */
 	uint32_t pixel_clock = 0;
-
-	/*TODO: unhardcode*/
-	max_tmds_clk_from_edid_in_mhz = 0;
-	max_hdmi_deep_color = COLOR_DEPTH_121212;
-	max_hdmi_pixel_clock = 600000;
 
 	if (max_deep_color > enc110->base.features.max_deep_color)
 		max_deep_color = enc110->base.features.max_deep_color;
@@ -972,12 +965,8 @@ static bool validate_hdmi_output(
 	break;
 	}
 
-	if (max_tmds_clk_from_edid_in_mhz > 0)
-		if (pixel_clock > max_tmds_clk_from_edid_in_mhz * 1000)
-			return false;
-
 	if ((pixel_clock == 0) ||
-		(pixel_clock > max_hdmi_pixel_clock) ||
+		(pixel_clock > enc110->base.features.max_hdmi_pixel_clock) ||
 		(pixel_clock > enc110->base.features.max_pixel_clock))
 		return false;
 
@@ -1081,7 +1070,12 @@ bool dce110_link_encoder_construct(
 	enc110->base.features.flags.bits.IS_AUDIO_CAPABLE = true;
 
 	enc110->base.features.max_pixel_clock =
-		DCE11_UNIPHY_MAX_PIXEL_CLK_IN_KHZ;
+			MAX_ENCODER_CLK;
+
+	enc110->base.features.max_hdmi_pixel_clock =
+			DCE11_UNIPHY_MAX_PIXEL_CLK_IN_KHZ;
+	enc110->base.features.max_deep_color = COLOR_DEPTH_121212;
+	enc110->base.features.max_hdmi_deep_color = COLOR_DEPTH_121212;
 
 	/* set the flag to indicate whether driver poll the I2C data pin
 	 * while doing the DP sink detect
@@ -1156,7 +1150,6 @@ bool dce110_link_encoder_construct(
 
 	/* test pattern 3 support */
 	enc110->base.features.flags.bits.IS_TPS3_CAPABLE = true;
-	enc110->base.features.max_deep_color = COLOR_DEPTH_121212;
 
 	enc110->base.features.flags.bits.IS_Y_ONLY_CAPABLE =
 		dal_adapter_service_is_feature_supported(
@@ -1188,10 +1181,7 @@ bool dce110_link_encoder_validate_output_with_stream(
 	case SIGNAL_TYPE_HDMI_TYPE_A:
 		is_valid = validate_hdmi_output(
 				enc110,
-				&stream->public.timing,
-				pipe_ctx->max_tmds_clk_from_edid_in_mhz,
-				pipe_ctx->max_hdmi_deep_color,
-				pipe_ctx->max_hdmi_pixel_clock);
+				&stream->public.timing);
 	break;
 	case SIGNAL_TYPE_RGB:
 		is_valid = validate_rgb_output(

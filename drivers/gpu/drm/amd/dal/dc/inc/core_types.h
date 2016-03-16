@@ -303,13 +303,6 @@ struct pipe_ctx {
 
 	enum signal_type signal;
 
-	/* timing validation (HDMI only) */
-	uint32_t max_tmds_clk_from_edid_in_mhz;
-	/* maximum supported deep color depth for HDMI */
-	enum dc_color_depth max_hdmi_deep_color;
-	/* maximum supported pixel clock for HDMI */
-	uint32_t max_hdmi_pixel_clock;
-
 	struct pixel_clk_params pix_clk_params;
 	struct pll_settings pll_settings;
 

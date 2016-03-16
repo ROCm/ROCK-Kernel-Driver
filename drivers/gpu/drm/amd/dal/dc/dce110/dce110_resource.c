@@ -630,11 +630,6 @@ static void get_pixel_clock_parameters(
 
 static enum dc_status build_pipe_hw_param(struct pipe_ctx *pipe_ctx)
 {
-	/*TODO: unhardcode*/
-	pipe_ctx->max_tmds_clk_from_edid_in_mhz = 0;
-	pipe_ctx->max_hdmi_deep_color = COLOR_DEPTH_121212;
-	pipe_ctx->max_hdmi_pixel_clock = 600000;
-
 	get_pixel_clock_parameters(pipe_ctx, &pipe_ctx->pix_clk_params);
 	pipe_ctx->clock_source->funcs->get_pix_clk_dividers(
 		pipe_ctx->clock_source,

@@ -60,8 +60,10 @@ struct encoder_feature_support {
 	} flags;
 	/* maximum supported deep color depth */
 	enum dc_color_depth max_deep_color;
+	enum dc_color_depth max_hdmi_deep_color;
 	/* maximum supported clock */
-	uint32_t max_pixel_clock;
+	unsigned int max_pixel_clock;
+	unsigned int max_hdmi_pixel_clock;
 };
 
 struct link_enc_status {
