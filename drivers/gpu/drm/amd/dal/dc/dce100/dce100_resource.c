@@ -39,6 +39,7 @@
 #include "dce110/dce110_mem_input_v.h"
 #include "dce110/dce110_ipp.h"
 #include "dce110/dce110_transform.h"
+#include "dce100/dce100_link_encoder.h"
 #include "dce110/dce110_stream_encoder.h"
 #include "dce110/dce110_opp.h"
 #include "dce110/dce110_clock_source.h"
@@ -442,7 +443,7 @@ struct link_encoder *dce100_link_encoder_create(
 	if (!enc110)
 		return NULL;
 
-	if (dce110_link_encoder_construct(
+	if (dce100_link_encoder_construct(
 			enc110,
 			enc_init_data,
 			&link_enc_regs[enc_init_data->transmitter],
@@ -683,11 +684,6 @@ static void get_pixel_clock_parameters(
 
 static enum dc_status build_pipe_hw_param(struct pipe_ctx *pipe_ctx)
 {
-	/*TODO: unhardcode*/
-	pipe_ctx->max_tmds_clk_from_edid_in_mhz = 0;
-	pipe_ctx->max_hdmi_deep_color = COLOR_DEPTH_121212;
-	pipe_ctx->max_hdmi_pixel_clock = 600000;
-
 	get_pixel_clock_parameters(pipe_ctx, &pipe_ctx->pix_clk_params);
 	pipe_ctx->clock_source->funcs->get_pix_clk_dividers(
 		pipe_ctx->clock_source,
@@ -741,7 +737,6 @@ static enum dc_status validate_mapped_resource(
 					return DC_FAIL_ENC_VALIDATE;
 
 				/* TODO: validate audio ASIC caps, encoder */
-
 				status = dc_link_validate_mode_timing(stream->sink,
 						link,
 						&stream->public.timing);

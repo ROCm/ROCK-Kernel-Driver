@@ -239,6 +239,11 @@ bool dce80_link_encoder_construct(
 
 	enc110->base.features.max_pixel_clock = DCE8_UNIPHY_MAX_PIXEL_CLK_IN_KHZ;
 
+	enc110->base.features.max_hdmi_pixel_clock =
+			DCE8_UNIPHY_MAX_PIXEL_CLK_IN_KHZ;
+	enc110->base.features.max_deep_color = COLOR_DEPTH_121212;
+	enc110->base.features.max_hdmi_deep_color = COLOR_DEPTH_121212;
+
 	/* set the flag to indicate whether driver poll the I2C data pin
 	 * while doing the DP sink detect
 	 */
