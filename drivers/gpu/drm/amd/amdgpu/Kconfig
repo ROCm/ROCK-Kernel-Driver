@@ -16,5 +16,7 @@ config DRM_AMDGPU_USERPTR
 	  This option selects CONFIG_MMU_NOTIFIER if it isn't already
 	  selected to enabled full userptr support.
 
+source "drivers/gpu/drm/amd/powerplay/Kconfig"
+source "drivers/gpu/drm/amd/acp/Kconfig"
 source "drivers/gpu/drm/amd/dal/Kconfig"
 
