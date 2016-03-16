@@ -560,15 +560,14 @@ static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 	if (amdgpu_gart_size == -1) {
 		si_meminfo(&si);
 		/* Set the GART to map the largest size between either
-		 * VRAM capacity or double the available physical RAM,
-		 * but no larger than 512GB.
+		 * VRAM capacity or double the available physical RAM
 		 */
 		adev->mc.gtt_size = min(
 			max(
 				((uint64_t)si.totalram * si.mem_unit * 2),
 				adev->mc.mc_vram_size
 			),
-			1024ULL << 29
+			max_gtt_size
 		);
 
 		/* GART sizes computed from physical RAM capacity
