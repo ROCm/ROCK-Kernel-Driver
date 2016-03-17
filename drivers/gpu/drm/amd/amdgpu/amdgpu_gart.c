@@ -123,16 +123,30 @@ int amdgpu_gart_table_vram_alloc(struct amdgpu_device *adev)
 {
 	int r;
 
-	if (adev->gart.robj == NULL) {
-		r = amdgpu_bo_create(adev, adev->gart.table_size,
-				     PAGE_SIZE, true, AMDGPU_GEM_DOMAIN_VRAM,
-				     AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED,
-				     NULL, NULL, &adev->gart.robj);
-		if (r) {
-			return r;
-		}
-	}
+	if (adev->gart.robj != NULL)
+		return 0;
+
+	r = amdgpu_bo_create(adev, adev->gart.table_size,
+			     PAGE_SIZE, true, AMDGPU_GEM_DOMAIN_CPU,
+			     AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED,
+			     NULL, NULL, &adev->gart.robj);
+	if (r)
+		return r;
+
+	r = amdgpu_bo_reserve(adev->gart.robj, false);
+	if (r)
+		goto error_free;
+
+	r = amdgpu_bo_pin(adev->gart.robj, AMDGPU_GEM_DOMAIN_CPU, NULL);
+	amdgpu_bo_unreserve(adev->gart.robj);
+	if (r)
+		goto error_free;
+
 	return 0;
+
+error_free:
+	amdgpu_bo_unref(&adev->gart.robj);
+	return r;
 }
 
 /**
@@ -151,19 +165,27 @@ int amdgpu_gart_table_vram_pin(struct amdgpu_device *adev)
 	int r;
 
 	r = amdgpu_bo_reserve(adev->gart.robj, false);
-	if (unlikely(r != 0))
+	if (r)
 		return r;
-	r = amdgpu_bo_pin(adev->gart.robj,
-				AMDGPU_GEM_DOMAIN_VRAM, &gpu_addr);
-	if (r) {
-		amdgpu_bo_unreserve(adev->gart.robj);
-		return r;
-	}
+
+	amdgpu_bo_unpin(adev->gart.robj);
+	r = amdgpu_bo_pin(adev->gart.robj, AMDGPU_GEM_DOMAIN_VRAM, &gpu_addr);
+	if (r)
+		goto error_unreserve;
+
 	r = amdgpu_bo_kmap(adev->gart.robj, &adev->gart.ptr);
 	if (r)
-		amdgpu_bo_unpin(adev->gart.robj);
+		goto error_unpin;
+
 	amdgpu_bo_unreserve(adev->gart.robj);
 	adev->gart.table_addr = gpu_addr;
+	return r;
+
+error_unpin:
+	amdgpu_bo_unpin(adev->gart.robj);
+
+error_unreserve:
+	amdgpu_bo_unreserve(adev->gart.robj);
 	return r;
 }
 
@@ -179,16 +201,35 @@ void amdgpu_gart_table_vram_unpin(struct amdgpu_device *adev)
 {
 	int r;
 
-	if (adev->gart.robj == NULL) {
+	if (adev->gart.robj == NULL)
 		return;
-	}
+
 	r = amdgpu_bo_reserve(adev->gart.robj, false);
-	if (likely(r == 0)) {
-		amdgpu_bo_kunmap(adev->gart.robj);
-		amdgpu_bo_unpin(adev->gart.robj);
-		amdgpu_bo_unreserve(adev->gart.robj);
-		adev->gart.ptr = NULL;
-	}
+	if (r)
+		goto error_print;
+
+	amdgpu_bo_kunmap(adev->gart.robj);
+	amdgpu_bo_unpin(adev->gart.robj);
+
+	r = amdgpu_bo_pin(adev->gart.robj, AMDGPU_GEM_DOMAIN_CPU, NULL);
+	if (r)
+		goto error_unreserve;
+
+	r = amdgpu_bo_kmap(adev->gart.robj, &adev->gart.ptr);
+	if (r)
+		goto error_unpin;
+
+	amdgpu_bo_unreserve(adev->gart.robj);
+	return;
+
+error_unpin:
+	amdgpu_bo_unpin(adev->gart.robj);
+
+error_unreserve:
+	amdgpu_bo_unreserve(adev->gart.robj);
+
+error_print:
+	DRM_ERROR("Failed to unpin VRAM GTT (%d)\n", r);
 }
 
 /**
@@ -202,9 +243,20 @@ void amdgpu_gart_table_vram_unpin(struct amdgpu_device *adev)
  */
 void amdgpu_gart_table_vram_free(struct amdgpu_device *adev)
 {
-	if (adev->gart.robj == NULL) {
+	int r;
+
+	if (adev->gart.robj == NULL)
 		return;
+
+	r = amdgpu_bo_reserve(adev->gart.robj, false);
+	if (r) {
+		DRM_ERROR("Failed to unmap VRAM GTT (%d)\n", r);
+	} else {
+		amdgpu_bo_kunmap(adev->gart.robj);
+		amdgpu_bo_unpin(adev->gart.robj);
+		amdgpu_bo_unreserve(adev->gart.robj);
 	}
+
 	amdgpu_bo_unref(&adev->gart.robj);
 }
 
@@ -242,8 +294,6 @@ void amdgpu_gart_unbind(struct amdgpu_device *adev, unsigned offset,
 		adev->gart.pages[p] = NULL;
 #endif
 		page_base = adev->dummy_page.addr;
-		if (!adev->gart.ptr)
-			continue;
 
 		for (j = 0; j < (PAGE_SIZE / AMDGPU_GPU_PAGE_SIZE); j++, t++) {
 			amdgpu_gart_set_pte_pde(adev, adev->gart.ptr,
@@ -289,12 +339,10 @@ int amdgpu_gart_bind(struct amdgpu_device *adev, unsigned offset,
 #ifdef CONFIG_AMDGPU_GART_DEBUGFS
 		adev->gart.pages[p] = pagelist[i];
 #endif
-		if (adev->gart.ptr) {
-			page_base = dma_addr[i];
-			for (j = 0; j < (PAGE_SIZE / AMDGPU_GPU_PAGE_SIZE); j++, t++) {
-				amdgpu_gart_set_pte_pde(adev, adev->gart.ptr, t, page_base, flags);
-				page_base += AMDGPU_GPU_PAGE_SIZE;
-			}
+		page_base = dma_addr[i];
+		for (j = 0; j < (PAGE_SIZE / AMDGPU_GPU_PAGE_SIZE); j++, t++) {
+			amdgpu_gart_set_pte_pde(adev, adev->gart.ptr, t, page_base, flags);
+			page_base += AMDGPU_GPU_PAGE_SIZE;
 		}
 	}
 	mb();
