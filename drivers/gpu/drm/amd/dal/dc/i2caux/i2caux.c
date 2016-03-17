@@ -122,7 +122,15 @@ bool dal_i2caux_submit_i2c_command(
 		return false;
 	}
 
+	/*
+	 * default will be SW, however there is a feature flag in adapter
+	 * service that determines whether SW i2c_engine will be available or
+	 * not, if sw i2c is not available we will fallback to hw. This feature
+	 * flag is set to not creating sw i2c engine for every dce except dce80
+	 * currently
+	 */
 	switch (cmd->engine) {
+	case I2C_COMMAND_ENGINE_DEFAULT:
 	case I2C_COMMAND_ENGINE_SW:
 		/* try to acquire SW engine first,
 		 * acquire HW engine if SW engine not available */
@@ -133,7 +141,6 @@ bool dal_i2caux_submit_i2c_command(
 				i2caux, ddc);
 	break;
 	case I2C_COMMAND_ENGINE_HW:
-	case I2C_COMMAND_ENGINE_DEFAULT:
 	default:
 		/* try to acquire HW engine first,
 		 * acquire SW engine if HW engine not available */
