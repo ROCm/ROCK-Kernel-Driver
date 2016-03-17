@@ -50,7 +50,7 @@ static struct state_dependent_clocks max_clks_by_state[] = {
 /*ClocksStateNominal*/
 { .display_clk_khz = 467000, .pixel_clk_khz = 400000 },
 /*ClocksStatePerformance*/
-{ .display_clk_khz = 643000, .pixel_clk_khz = 4000000 } };
+{ .display_clk_khz = 643000, .pixel_clk_khz = 400000 } };
 
 /* Starting point for each divider range.*/
 enum divider_range_start {

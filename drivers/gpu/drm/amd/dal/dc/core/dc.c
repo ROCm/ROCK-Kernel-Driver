@@ -599,8 +599,11 @@ static void fill_display_configs(
 			default:
 				break;
 			}
-			/* TODO: unhardcode*/
-			cfg->v_refresh = 60;
+			/* Round v_refresh*/
+			cfg->v_refresh = stream->public.timing.pix_clk_khz * 1000;
+			cfg->v_refresh /= stream->public.timing.h_total;
+			cfg->v_refresh = (cfg->v_refresh + stream->public.timing.v_total / 2)
+						/ stream->public.timing.v_total;
 		}
 	}
 	pp_display_cfg->display_count = num_cfgs;
