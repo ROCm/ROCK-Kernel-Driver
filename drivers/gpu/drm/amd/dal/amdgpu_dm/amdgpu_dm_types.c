@@ -1539,10 +1539,7 @@ int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	if (!primary_plane)
 		goto fail_plane;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
-	/* this flag doesn't exist in older kernels */
 	primary_plane->format_default = true;
-#endif
 
 	res = drm_universal_plane_init(
 		dm->adev->ddev,

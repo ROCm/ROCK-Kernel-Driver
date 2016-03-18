@@ -130,7 +130,6 @@ enum dc_edid_status dm_helpers_parse_edid_caps(
 	return result;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 static struct amdgpu_connector *get_connector_for_sink(
 	struct drm_device *dev,
 	const struct dc_sink *sink)
@@ -146,7 +145,6 @@ static struct amdgpu_connector *get_connector_for_sink(
 
 	return aconnector;
 }
-#endif
 
 static struct amdgpu_connector *get_connector_for_link(
 	struct drm_device *dev,
@@ -164,7 +162,6 @@ static struct amdgpu_connector *get_connector_for_link(
 	return aconnector;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 static void get_payload_table(
 		struct amdgpu_connector *aconnector,
 		struct dp_mst_stream_allocation_table *proposed_table)
@@ -201,7 +198,6 @@ static void get_payload_table(
 
 	mutex_unlock(&mst_mgr->payload_lock);
 }
-#endif
 
 /*
  * Writes payload allocation table in immediate downstream device.
@@ -212,7 +208,6 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 		struct dp_mst_stream_allocation_table *proposed_table,
 		bool enable)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 	struct amdgpu_device *adev = ctx->driver_context;
 	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector;
@@ -292,9 +287,6 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 		return false;
 
 	return true;
-#else
-	return false;
-#endif
 }
 
 /*
@@ -305,7 +297,6 @@ bool dm_helpers_dp_mst_poll_for_allocation_change_trigger(
 		struct dc_context *ctx,
 		const struct dc_stream *stream)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 	struct amdgpu_device *adev = ctx->driver_context;
 	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector;
@@ -328,9 +319,6 @@ bool dm_helpers_dp_mst_poll_for_allocation_change_trigger(
 		return false;
 
 	return true;
-#else
-	return false;
-#endif
 }
 
 bool dm_helpers_dp_mst_send_payload_allocation(
@@ -338,7 +326,6 @@ bool dm_helpers_dp_mst_send_payload_allocation(
 		const struct dc_stream *stream,
 		bool enable)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 	struct amdgpu_device *adev = ctx->driver_context;
 	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector;
@@ -367,14 +354,10 @@ bool dm_helpers_dp_mst_send_payload_allocation(
 		drm_dp_mst_deallocate_vcpi(mst_mgr, mst_port);
 
 	return true;
-#else
-	return false;
-#endif
 }
 
 void dm_helpers_dp_mst_handle_mst_hpd_rx_irq(void *param)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 	uint8_t esi[8] = { 0 };
 	uint8_t dret;
 	bool new_irq_handled = true;
@@ -413,9 +396,6 @@ void dm_helpers_dp_mst_handle_mst_hpd_rx_irq(void *param)
 				DP_SINK_COUNT_ESI, esi, 8);
 		}
 	}
-#else
-	return false;
-#endif
 }
 
 bool dm_helpers_dp_mst_start_top_mgr(
@@ -423,7 +403,6 @@ bool dm_helpers_dp_mst_start_top_mgr(
 		const struct dc_link *link,
 		bool boot)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 	struct amdgpu_device *adev = ctx->driver_context;
 	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
@@ -438,16 +417,12 @@ bool dm_helpers_dp_mst_start_top_mgr(
 			aconnector, aconnector->base.base.id);
 
 	return (drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, true) == 0);
-#else
-	return false;
-#endif
 }
 
 void dm_helpers_dp_mst_stop_top_mgr(
 		struct dc_context *ctx,
 		const struct dc_link *link)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 	struct amdgpu_device *adev = ctx->driver_context;
 	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
@@ -457,7 +432,6 @@ void dm_helpers_dp_mst_stop_top_mgr(
 
 	if (aconnector->mst_mgr.mst_state == true)
 		drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, false);
-#endif
 }
 
 bool dm_helpers_dp_read_dpcd(

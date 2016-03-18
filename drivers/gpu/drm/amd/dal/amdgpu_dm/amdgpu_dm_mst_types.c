@@ -115,7 +115,6 @@ static ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg 
 	return msg->size;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 static enum drm_connector_status
 dm_dp_mst_detect(struct drm_connector *connector, bool force)
 {
@@ -455,7 +454,6 @@ struct drm_dp_mst_topology_cbs dm_mst_cbs = {
 	.hotplug = dm_dp_mst_hotplug,
 	.register_connector = dm_dp_mst_register_connector
 };
-#endif
 
 void amdgpu_dm_initialize_mst_connector(
 	struct amdgpu_display_manager *dm,
@@ -467,7 +465,6 @@ void amdgpu_dm_initialize_mst_connector(
 	aconnector->dm_dp_aux.link_index = aconnector->connector_id;
 
 	drm_dp_aux_register(&aconnector->dm_dp_aux.aux);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
 	aconnector->mst_mgr.cbs = &dm_mst_cbs;
 	drm_dp_mst_topology_mgr_init(
 		&aconnector->mst_mgr,
@@ -476,6 +473,5 @@ void amdgpu_dm_initialize_mst_connector(
 		16,
 		4,
 		aconnector->connector_id);
-#endif
 }
 
