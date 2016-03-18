@@ -1117,6 +1117,7 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 {
 	struct kfd_bo_va_list *entry;
 	struct amdgpu_device *adev;
+	unsigned mapped_before;
 	int ret = 0;
 
 	BUG_ON(kgd == NULL);
@@ -1135,11 +1136,12 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 	}
 
 	if (mem->data2.mapped_to_gpu_memory == 0) {
-		pr_err("Unmapping BO with size %lu bytes from GPU memory is unnecessary va 0x%llx\n",
-		mem->data2.bo->tbo.mem.size, mem->data2.va);
-		ret = -EFAULT;
+		pr_debug("BO size %lu bytes at va 0x%llx is not mapped\n",
+			 mem->data2.bo->tbo.mem.size, mem->data2.va);
+		ret = -EINVAL;
 		goto out;
 	}
+	mapped_before = mem->data2.mapped_to_gpu_memory;
 
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
 		if (entry->kgd_dev == kgd &&
@@ -1180,6 +1182,13 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 			pr_debug("amdgpu: DEC mapping count %d\n",
 					mem->data2.mapped_to_gpu_memory);
 		}
+	}
+	if (mapped_before == mem->data2.mapped_to_gpu_memory) {
+		pr_debug("BO size %lu bytes at va 0x%llx is not mapped on GPU %x:%x.%x\n",
+			 mem->data2.bo->tbo.mem.size, mem->data2.va,
+			 adev->pdev->bus->number, PCI_SLOT(adev->pdev->devfn),
+			 PCI_FUNC(adev->pdev->devfn));
+		ret = -EINVAL;
 	}
 
 out:
