@@ -156,12 +156,14 @@ struct kfd_ioctl_dbg_unregister_args {
 	uint32_t pad;
 };
 
+/* FIXME: This is not 32-on-64 safe, fixed upstream, we should match it */
 struct kfd_ioctl_dbg_address_watch_args {
 	uint32_t gpu_id;		/* to KFD */
 	uint32_t buf_size_in_bytes;	/*including gpu_id and buf_size */
 	void	*content_ptr;	/* a pointer to the actual content */
 };
 
+/* FIXME: This is not 32-on-64 safe, fixed upstream, we should match it */
 struct kfd_ioctl_dbg_wave_control_args {
 	uint32_t gpu_id;		/* to KFD */
 	uint32_t buf_size_in_bytes;	/*including gpu_id and buf_size */
@@ -217,7 +219,6 @@ struct kfd_ioctl_reset_event_args {
 	uint32_t pad;
 };
 
-
 struct kfd_memory_exception_failure {
 	bool NotPresent;  /* Page not present or supervisor privilege */
 	bool ReadOnly;  /* Write access to a read-only page */
@@ -226,6 +227,7 @@ struct kfd_memory_exception_failure {
 };
 
 /* memory exception data*/
+/* FIXME: Make this 32-on-64 safe. Will break ABI. */
 struct kfd_hsa_memory_exception_data {
 	uint64_t va;
 	uint32_t gpu_id;
@@ -252,7 +254,8 @@ struct kfd_ioctl_wait_events_args {
 	uint32_t wait_result;		/* from KFD */
 };
 
-struct kfd_ioctl_alloc_memory_of_gpu_args {
+/* FIXME: remove unused fields and make it 32-on-64 safe. Will break ABI. */
+struct kfd_ioctl_alloc_memory_of_scratch_args {
 	uint64_t va_addr;	/* to KFD */
 	uint64_t size;		/* to KFD */
 	uint64_t handle;	/* from KFD */
@@ -266,8 +269,12 @@ struct kfd_ioctl_free_memory_of_gpu_args {
 
 struct kfd_ioctl_map_memory_to_gpu_args {
 	uint64_t handle;			/* to KFD */
+	uint64_t device_ids_array_ptr;		/* to KFD */
+	uint32_t device_ids_array_size;		/* to KFD */
+	uint32_t pad;
 };
 
+/* TODO: remove this after KFD and Thunk have been updated */
 struct kfd_ioctl_map_memory_to_gpu_new_args {
 	uint64_t handle;			/* to KFD */
 	uint32_t *device_ids_array;		/* to KFD */
@@ -276,9 +283,13 @@ struct kfd_ioctl_map_memory_to_gpu_new_args {
 };
 
 struct kfd_ioctl_unmap_memory_from_gpu_args {
-	uint64_t handle;	/* to KFD */
+	uint64_t handle;			/* to KFD */
+	uint64_t device_ids_array_ptr;		/* to KFD */
+	uint32_t device_ids_array_size;		/* to KFD */
+	uint32_t pad;
 };
 
+/* TODO: remove this after KFD and Thunk have been updated */
 struct kfd_ioctl_unmap_memory_from_gpu_new_args {
 	uint64_t handle;	/* to KFD */
 	uint32_t *device_ids_array;             /* to KFD */
@@ -295,6 +306,7 @@ struct kfd_ioctl_open_graphic_handle_args {
 	uint32_t pad;
 };
 
+/* FIXME: Make this 32-on-64 safe. Will break ABI. */
 struct kfd_ioctl_set_process_dgpu_aperture_args {
 	uint32_t gpu_id;
 	uint64_t dgpu_base;
@@ -303,6 +315,7 @@ struct kfd_ioctl_set_process_dgpu_aperture_args {
 
 /*
  * GPU Memory allocation flags
+ * TODO: remove this after KFD and Thunk have been updated to use the new flags
  */
 #define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_HOST		(1 << 0)
 #define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE		(1 << 1)
@@ -311,10 +324,41 @@ struct kfd_ioctl_set_process_dgpu_aperture_args {
 #define KFD_IOC_ALLOC_MEM_FLAGS_APU_SCRATCH		(1 << 4)
 
 #define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM		(1 << 5)
-#define KFD_IOC_ALLOC_MEM_FLAGS_USERPTR			(1 << 6)
-#define KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL		(1 << 7)
-#define KFD_IOC_ALLOC_MEM_FLAGS_COHERENT		(1 << 8)
+#define KFD_IOC_ALLOC_MEM_FLAGS_USERPTR_OLD		(1 << 6)
+#define KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL_OLD		(1 << 7)
+#define KFD_IOC_ALLOC_MEM_FLAGS_COHERENT_OLD		(1 << 8)
 
+/* New GPU memory allocation flags aligned with the cleaner KFD2KGD
+ * interface. */
+/*
+ * Memory types
+ */
+#define KFD_IOC_ALLOC_MEM_FLAGS_VRAM		(1 << 0)
+#define KFD_IOC_ALLOC_MEM_FLAGS_GTT		(1 << 1)
+#define KFD_IOC_ALLOC_MEM_FLAGS_USERPTR		(1 << 2)
+#define KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL	(1 << 3)
+
+/*
+ * Allocation flags attributes/access options.
+ */
+#define KFD_IOC_ALLOC_MEM_FLAGS_NONPAGED	(1 << 31)
+#define KFD_IOC_ALLOC_MEM_FLAGS_READONLY	(1 << 30)
+#define KFD_IOC_ALLOC_MEM_FLAGS_PUBLIC		(1 << 29)
+#define KFD_IOC_ALLOC_MEM_FLAGS_NO_SUBSTITUTE	(1 << 28)
+#define KFD_IOC_ALLOC_MEM_FLAGS_AQL_QUEUE_MEM	(1 << 27)
+#define KFD_IOC_ALLOC_MEM_FLAGS_EXECUTE_ACCESS	(1 << 26)
+#define KFD_IOC_ALLOC_MEM_FLAGS_COHERENT	(1 << 25)
+
+struct kfd_ioctl_alloc_memory_of_gpu_args {
+	uint64_t va_addr;	/* to KFD */
+	uint64_t size;		/* to KFD */
+	uint64_t handle;	/* from KFD */
+	uint64_t mmap_offset;   /* to KFD (userptr), from KFD (mmap offset) */
+	uint32_t gpu_id;	/* to KFD */
+	uint32_t flags;
+};
+
+/* TODO: remove this after KFD and Thunk have been updated */
 struct kfd_ioctl_alloc_memory_of_gpu_new_args {
 	uint64_t va_addr;	/* to KFD */
 	uint64_t size;		/* to KFD */
@@ -495,7 +539,7 @@ struct kfd_ioctl_cross_memory_copy_args {
 		AMDKFD_IOWR(0x15, struct kfd_ioctl_open_graphic_handle_args)
 
 #define AMDKFD_IOC_ALLOC_MEMORY_OF_SCRATCH	\
-		AMDKFD_IOWR(0x16, struct kfd_ioctl_alloc_memory_of_gpu_args)
+		AMDKFD_IOWR(0x16, struct kfd_ioctl_alloc_memory_of_scratch_args)
 
 #define AMDKFD_IOC_SET_CU_MASK		\
 		AMDKFD_IOW(0x17, struct kfd_ioctl_set_cu_mask_args)
@@ -504,14 +548,18 @@ struct kfd_ioctl_cross_memory_copy_args {
 		AMDKFD_IOW(0x18,	\
 		struct kfd_ioctl_set_process_dgpu_aperture_args)
 
+/* TODO: Remove this after KFD and Thunk has been updated */
 #define AMDKFD_IOC_ALLOC_MEMORY_OF_GPU_NEW		\
 		AMDKFD_IOWR(0x19, struct kfd_ioctl_alloc_memory_of_gpu_new_args)
 
 #define AMDKFD_IOC_SET_TRAP_HANDLER		\
 		AMDKFD_IOW(0x1a, struct kfd_ioctl_set_trap_handler_args)
 
+/* TODO: Remove this after KFD and Thunk has been updated */
 #define AMDKFD_IOC_MAP_MEMORY_TO_GPU_NEW		\
 		AMDKFD_IOWR(0x1b, struct kfd_ioctl_map_memory_to_gpu_new_args)
+
+/* TODO: Remove this after KFD and Thunk has been updated */
 #define AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU_NEW	\
 		AMDKFD_IOWR(0x1c, struct kfd_ioctl_unmap_memory_from_gpu_new_args)
 
