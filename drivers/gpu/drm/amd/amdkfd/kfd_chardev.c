@@ -1337,13 +1337,16 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	pdd = kfd_get_process_device_data(dev, p);
 	if (!pdd) {
 		pr_err("Process device data doesn't exist\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_unlock;
 	}
 
 	buf_obj = kfd_process_device_find_bo(pdd,
 					GET_IDR_HANDLE(args->handle));
-	BUG_ON(buf_obj == NULL); /* FIXME: invalid handle provided by user
-				  * mode can crash the kernel */
+	if (buf_obj == NULL) {
+		ret = -EINVAL;
+		goto err_unlock;
+	}
 	run_rdma_free_callback(buf_obj);
 
 	up_write(&p->lock);
@@ -1359,6 +1362,10 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 		up_write(&p->lock);
 	}
 
+	return ret;
+
+err_unlock:
+	up_write(&p->lock);
 	return ret;
 }
 
