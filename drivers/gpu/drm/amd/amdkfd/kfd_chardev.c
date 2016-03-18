@@ -1116,8 +1116,7 @@ kfd_ioctl_wait_events(struct file *filp, struct kfd_process *p, void *data)
 static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
 					struct kfd_process *p, void *data)
 {
-	struct kfd_ioctl_alloc_memory_of_gpu_args *args =
-			(struct kfd_ioctl_alloc_memory_of_gpu_args *)data;
+	struct kfd_ioctl_alloc_memory_of_scratch_args *args = data;
 	struct kfd_process_device *pdd;
 	struct kfd_dev *dev;
 	long err;
@@ -1259,12 +1258,12 @@ static uint32_t kfd_convert_user_mem_alloction_flags(
 		goto out;
 	}
 	/* Allocate userptr BO */
-	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
+	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR_OLD) {
 		kernel_allocation_flags = ALLOC_MEM_FLAGS_USERPTR;
 		goto out;
 	}
 	/* Allocate doorbell BO */
-	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
+	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL_OLD) {
 		kernel_allocation_flags = ALLOC_MEM_FLAGS_DOORBELL;
 		goto out;
 	}
@@ -1272,7 +1271,7 @@ static uint32_t kfd_convert_user_mem_alloction_flags(
 out:
 	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM)
 		kernel_allocation_flags |= ALLOC_MEM_FLAGS_AQL_QUEUE_MEM;
-	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_COHERENT)
+	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_COHERENT_OLD)
 		kernel_allocation_flags |= ALLOC_MEM_FLAGS_COHERENT;
 	/* Current HW doesn't support non paged memory */
 	kernel_allocation_flags |= ALLOC_MEM_FLAGS_NONPAGED;
@@ -1314,7 +1313,7 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	if (IS_ERR(pdd))
 		return PTR_ERR(pdd);
 
-	if (args->flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
+	if (args->flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL_OLD) {
 		if (args->size != kfd_doorbell_process_slice(dev))
 			return -EINVAL;
 		offset = kfd_get_process_doorbells(dev, p);
