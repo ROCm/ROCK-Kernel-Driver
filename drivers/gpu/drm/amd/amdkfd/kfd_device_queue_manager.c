@@ -1440,9 +1440,6 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 
 	mutex_lock(&dqm->lock);
 
-	retval = unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES,
-			0, false, true);
-
 	/* Clean all kernel queues */
 	list_for_each_entry_safe(kq, kq_next, &qpd->priv_queue_list, list) {
 		list_del(&kq->list);
@@ -1452,25 +1449,16 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 	}
 
 	/* Clear all user mode queues */
-	list_for_each_entry_safe(q, next, &qpd->queues_list, list) {
-		mqd = dqm->ops.get_mqd_manager(dqm,
-			get_mqd_type_from_queue_type(q->properties.type));
-		if (!mqd) {
-			mutex_unlock(&dqm->lock);
-			return -ENOMEM;
-		}
-
+	list_for_each_entry(q, &qpd->queues_list, list) {
 		if (q->properties.type == KFD_QUEUE_TYPE_SDMA) {
 			dqm->sdma_queue_count--;
 			deallocate_sdma_queue(dqm, q->sdma_id);
 		}
 
-		list_del(&q->list);
 		if (q->properties.is_active)
 			dqm->queue_count--;
 
 		dqm->total_queue_count--;
-		mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
 	}
 
 	/* Unregister process */
@@ -1483,8 +1471,19 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 		}
 	}
 
-	if (retval == 0)
-		execute_queues_cpsch(dqm, false);
+	retval = execute_queues_cpsch(dqm, false);
+
+	/* lastly, free mqd resources */
+	list_for_each_entry_safe(q, next, &qpd->queues_list, list) {
+		mqd = dqm->ops.get_mqd_manager(dqm,
+			get_mqd_type_from_queue_type(q->properties.type));
+		if (!mqd) {
+			mutex_unlock(&dqm->lock);
+			return -ENOMEM;
+		}
+		list_del(&q->list);
+		mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
+	}
 
 	mutex_unlock(&dqm->lock);
 	return retval;
