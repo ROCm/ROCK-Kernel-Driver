@@ -785,6 +785,9 @@ bool dc_commit_surfaces_to_target(
 	int new_enabled_surface_count = 0;
 	bool is_mpo_turning_on = false;
 
+	if (core_dc->current_context.target_count == 0)
+		return false;
+
 	context = dm_alloc(sizeof(struct validate_context));
 
 	resource_validate_ctx_copy_construct(&core_dc->current_context, context);
