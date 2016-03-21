@@ -1037,8 +1037,8 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 
 	dqm->ops_asic_specific.init_sdma_vm(dqm, q, qpd);
 
-	q->properties.tba_addr = qpd->pqm->tba_addr;
-	q->properties.tma_addr = qpd->pqm->tma_addr;
+	q->properties.tba_addr = qpd->tba_addr;
+	q->properties.tma_addr = qpd->tma_addr;
 	retval = mqd->init_mqd(mqd, &q->mqd, &q->mqd_mem_obj,
 				&q->gart_mqd_addr, &q->properties);
 	if (retval != 0)
@@ -1326,11 +1326,9 @@ static int set_trap_handler(struct device_queue_manager *dqm,
 				uint64_t tba_addr,
 				uint64_t tma_addr)
 {
-	struct kfd_process_device *pdd;
 	uint64_t *tma;
 
-	pdd = qpd_to_pdd(qpd);
-	tma = (uint64_t *)(pdd->cwsr_kaddr + pdd->dev->tma_offset);
+	tma = (uint64_t *)(qpd->cwsr_kaddr + dqm->dev->tma_offset);
 	tma[0] = tba_addr;
 	tma[1] = tma_addr;
 	return 0;

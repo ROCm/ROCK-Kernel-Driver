@@ -492,10 +492,6 @@ struct process_queue_manager {
 	unsigned int		num_concurrent_processes;
 	struct list_head	queues;
 	unsigned long		*queue_slot_bitmap;
-
-	/*cwsr trap handler isa memory*/
-	int64_t		tba_addr;
-	int64_t		tma_addr;
 };
 
 struct qcm_process_device {
@@ -523,6 +519,13 @@ struct qcm_process_device {
 	uint32_t num_gws;
 	uint32_t num_oac;
 	uint32_t sh_hidden_private_base;
+
+	/*cwsr memory*/
+	int  cwsr_mem_handle;
+	uint64_t cwsr_base;
+	uint64_t tba_addr;
+	uint64_t tma_addr;
+	void *cwsr_kaddr;
 };
 
 /*8 byte handle containing GPU ID in the most significant 4 bytes and
@@ -562,10 +565,6 @@ struct kfd_process_device {
 	bool	 evicted;
 
 	uint64_t sh_hidden_private_base_vmid;
-
-	uint64_t cwsr_base;
-	int  cwsr_mem_handle;
-	void *cwsr_kaddr;
 
 	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
 	bool bound;

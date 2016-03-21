@@ -123,8 +123,7 @@ struct kfd_process *kfd_create_process(struct file *filep)
 
 	up_write(&thread->mm->mmap_sem);
 
-	if (!process->pqm.tba_addr)
-		kfd_process_init_cwsr(process, filep);
+	kfd_process_init_cwsr(process, filep);
 
 	return process;
 }
@@ -473,14 +472,16 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 	struct kfd_process_device *temp, *pdd = NULL;
 	void *mem = NULL;
 	struct kfd_dev *dev = NULL;
+	struct qcm_process_device *qpd = NULL;
 
 	down_write(&p->lock);
 	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
 				per_device_list) {
 		dev = pdd->dev;
-		if (!dev->cwsr_enabled)
+		qpd = &pdd->qpd;
+		if (!dev->cwsr_enabled || qpd->tba_addr)
 			continue;
-		if (pdd->cwsr_base) {
+		if (qpd->cwsr_base) {
 			/* cwsr_base is only set for DGPU */
 
 			/* can't hold the process lock while
@@ -488,9 +489,9 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 			up_write(&p->lock);
 
 			err = dev->kfd2kgd->alloc_memory_of_gpu(
-				dev->kgd, pdd->cwsr_base, dev->cwsr_size,
+				dev->kgd, qpd->cwsr_base, dev->cwsr_size,
 				pdd->vm, (struct kgd_mem **)&mem,
-				NULL, &pdd->cwsr_kaddr, pdd,
+				NULL, &qpd->cwsr_kaddr, pdd,
 				ALLOC_MEM_FLAGS_GTT |
 				ALLOC_MEM_FLAGS_NONPAGED |
 				ALLOC_MEM_FLAGS_EXECUTE_ACCESS |
@@ -504,42 +505,42 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 			down_write(&p->lock);
 			/* Check if someone else allocated the memory
 			 * while we weren't looking */
-			if (p->pqm.tba_addr) {
+			if (qpd->tba_addr) {
 				up_write(&p->lock);
 				dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd,
 					(struct kgd_mem *)mem, pdd->vm);
 				dev->kfd2kgd->free_memory_of_gpu(dev->kgd, mem);
 				down_write(&p->lock);
 			} else {
-				pdd->cwsr_mem_handle =
+				qpd->cwsr_mem_handle =
 					kfd_process_device_create_obj_handle(
-						pdd, mem, pdd->cwsr_base,
+						pdd, mem, qpd->cwsr_base,
 						dev->cwsr_size);
-				if (pdd->cwsr_mem_handle < 0)
+				if (qpd->cwsr_mem_handle < 0)
 					goto err_create_handle;
 
-				memcpy(pdd->cwsr_kaddr, kmap(dev->cwsr_pages),
+				memcpy(qpd->cwsr_kaddr, kmap(dev->cwsr_pages),
 				       PAGE_SIZE);
 				kunmap(dev->cwsr_pages);
-				p->pqm.tba_addr = pdd->cwsr_base;
+				qpd->tba_addr = qpd->cwsr_base;
 			}
 		} else {
 			offset = (kfd_get_gpu_id(dev) |
 				KFD_MMAP_TYPE_RESERVED_MEM) << PAGE_SHIFT;
-			p->pqm.tba_addr = (int64_t)vm_mmap(filep, 0,
+			qpd->tba_addr = (uint64_t)vm_mmap(filep, 0,
 				dev->cwsr_size,	PROT_READ | PROT_EXEC,
 				MAP_SHARED, offset);
-			pdd->cwsr_kaddr = (void *)p->pqm.tba_addr;
+			qpd->cwsr_kaddr = (void *)qpd->tba_addr;
 		}
-		if (p->pqm.tba_addr < 0) {
+		if (IS_ERR_VALUE(qpd->tba_addr)) {
 			pr_err("Failure to set tba address. error -%d.\n",
-				(int)-p->pqm.tba_addr);
-			p->pqm.tba_addr = 0;
-			pdd->cwsr_kaddr = NULL;
+				(int)qpd->tba_addr);
+			qpd->tba_addr = 0;
+			qpd->cwsr_kaddr = NULL;
 		} else
-			p->pqm.tma_addr = p->pqm.tba_addr + dev->tma_offset;
+			qpd->tma_addr = qpd->tba_addr + dev->tma_offset;
 			pr_debug("set tba :0x%llx, tma:0x%llx for pqm.\n",
-				p->pqm.tba_addr, p->pqm.tma_addr);
+				qpd->tba_addr, qpd->tma_addr);
 	}
 
 err_create_handle:

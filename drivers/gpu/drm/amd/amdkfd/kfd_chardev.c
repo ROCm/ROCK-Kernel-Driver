@@ -482,7 +482,7 @@ static int kfd_ioctl_set_trap_handler(struct file *filep,
 		err = -ESRCH;
 		goto out;
 	}
-	if (!dev->cwsr_enabled || !pdd->cwsr_kaddr) {
+	if (!dev->cwsr_enabled || !pdd->qpd.cwsr_kaddr) {
 		pr_err("kfd: CWSR is not enabled, can't set trap handler.\n");
 		err = -EINVAL;
 		goto out;
