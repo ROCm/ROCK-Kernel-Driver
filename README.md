@@ -85,6 +85,11 @@ KERNEL=="kfd", MODE="0666", Or you could use the following command:
 * Reboot the system to install the new kernel and enable the HSA kernel driver:
 `sudo reboot`
 
+Note: If there is driver installed already, please un-install it before installing
+the dirver.
+* For Ubuntu, using command
+`sudo dpkg -r PACKAGE_NAME.deb` before installing new driver.
+
 
 ##### Obtaining kernel and libhsakmt source code
 
