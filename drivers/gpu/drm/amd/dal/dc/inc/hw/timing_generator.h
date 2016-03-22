@@ -124,6 +124,10 @@ struct timing_generator_funcs {
 								int32_t *h_position,
 								int32_t *v_position);
 	uint32_t (*get_frame_count)(struct timing_generator *tg);
+	uint32_t (*get_scanoutpos)(
+		struct timing_generator *tg,
+		uint32_t *vbl,
+		uint32_t *position);
 	void (*set_early_control)(struct timing_generator *tg,
 							   uint32_t early_cntl);
 	void (*wait_for_state)(struct timing_generator *tg,

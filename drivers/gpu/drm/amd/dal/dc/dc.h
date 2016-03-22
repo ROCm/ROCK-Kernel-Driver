@@ -242,6 +242,16 @@ bool dc_target_is_connected_to_sink(
 uint8_t dc_target_get_controller_id(const struct dc_target *dc_target);
 
 uint32_t dc_target_get_vblank_counter(const struct dc_target *dc_target);
+
+/* TODO: Return parsed values rather than direct register read
+ * This has a dependency on the caller (amdgpu_get_crtc_scanoutpos)
+ * being refactored properly to be dce-specific
+ */
+uint32_t dc_target_get_scanoutpos(
+		const struct dc_target *dc_target,
+		uint32_t *vbl,
+		uint32_t *position);
+
 enum dc_irq_source dc_target_get_irq_src(
 	const struct dc *dc,
 	const struct dc_target *dc_target,

@@ -257,6 +257,32 @@ uint32_t dc_target_get_vblank_counter(const struct dc_target *dc_target)
 	return 0;
 }
 
+uint32_t dc_target_get_scanoutpos(
+		const struct dc_target *dc_target,
+		uint32_t *vbl,
+		uint32_t *position)
+{
+	uint8_t i, j;
+	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
+	struct core_dc *core_dc = DC_TO_CORE(target->ctx->dc);
+	struct resource_context *res_ctx =
+		&core_dc->current_context.res_ctx;
+
+	for (i = 0; i < target->public.stream_count; i++) {
+		for (j = 0; j < MAX_PIPES; j++) {
+			struct timing_generator *tg = res_ctx->pipe_ctx[j].tg;
+
+			if (res_ctx->pipe_ctx[j].stream !=
+				DC_STREAM_TO_CORE(target->public.streams[i]))
+				continue;
+
+			return tg->funcs->get_scanoutpos(tg, vbl, position);
+		}
+	}
+
+	return 0;
+}
+
 enum dc_irq_source dc_target_get_irq_src(
 	const struct dc *dc,
 	const struct dc_target *dc_target,

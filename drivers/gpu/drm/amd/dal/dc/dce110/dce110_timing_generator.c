@@ -130,6 +130,7 @@ static struct timing_generator_funcs dce110_tg_funcs = {
 		.is_counter_moving = dce110_timing_generator_is_counter_moving,
 		.get_position = dce110_timing_generator_get_crtc_positions,
 		.get_frame_count = dce110_timing_generator_get_vblank_counter,
+		.get_scanoutpos = dce110_timing_generator_get_crtc_scanoutpos,
 		.set_early_control = dce110_timing_generator_set_early_control,
 		.wait_for_state = dce110_tg_wait_for_state,
 		.set_blank = dce110_tg_set_blank,
@@ -819,8 +820,8 @@ void dce110_timing_generator_get_crtc_positions(
  */
 uint32_t dce110_timing_generator_get_crtc_scanoutpos(
 	struct timing_generator *tg,
-	int32_t *vbl,
-	int32_t *position)
+	uint32_t *vbl,
+	uint32_t *position)
 {
 	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 	/* TODO 1: Update the implementation once caller is updated
