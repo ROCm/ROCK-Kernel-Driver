@@ -757,6 +757,11 @@ static void dc_timing_from_drm_display_mode(
 		mode_in->crtc_vsync_end - mode_in->crtc_vsync_start;
 	timing_out->pix_clk_khz = mode_in->crtc_clock;
 	timing_out->aspect_ratio = get_aspect_ratio(mode_in);
+	if (mode_in->flags & DRM_MODE_FLAG_PHSYNC)
+		timing_out->flags.HSYNC_POSITIVE_POLARITY = 1;
+	if (mode_in->flags & DRM_MODE_FLAG_PVSYNC)
+		timing_out->flags.VSYNC_POSITIVE_POLARITY = 1;
+
 }
 
 static void fill_audio_info(
