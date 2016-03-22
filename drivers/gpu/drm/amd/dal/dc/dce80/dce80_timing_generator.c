@@ -124,6 +124,7 @@ static struct timing_generator_funcs dce80_tg_funcs = {
 		.is_counter_moving = dce110_timing_generator_is_counter_moving,
 		.get_position = dce110_timing_generator_get_crtc_positions,
 		.get_frame_count = dce110_timing_generator_get_vblank_counter,
+		.get_scanoutpos = dce110_timing_generator_get_crtc_scanoutpos,
 		.set_early_control = dce110_timing_generator_set_early_control,
 		.wait_for_state = dce110_tg_wait_for_state,
 		.set_blank = dce110_tg_set_blank,

@@ -193,8 +193,8 @@ void dce110_timing_generator_program_drr(
 
 uint32_t dce110_timing_generator_get_crtc_scanoutpos(
 	struct timing_generator *tg,
-	int32_t *vbl,
-	int32_t *position);
+	uint32_t *vbl,
+	uint32_t *position);
 
 void dce110_timing_generator_enable_advanced_request(
 	struct timing_generator *tg,

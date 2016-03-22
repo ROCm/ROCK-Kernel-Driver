@@ -98,10 +98,17 @@ static int dm_crtc_get_scanoutpos(struct amdgpu_device *adev, int crtc,
 {
 	if ((crtc < 0) || (crtc >= adev->mode_info.num_crtc))
 		return -EINVAL;
+	else {
+		struct amdgpu_crtc *acrtc = adev->mode_info.crtcs[crtc];
 
-/* TODO: #DAL3 Implement scanoutpos
-	dal_get_crtc_scanoutpos(adev->dm.dal, crtc, vbl, position);
-*/
+		if (NULL == acrtc->target) {
+			DRM_ERROR("dc_target is NULL for crtc '%d'!\n", crtc);
+			return 0;
+		}
+
+		return dc_target_get_scanoutpos(acrtc->target, vbl, position);
+	}
+
 	return 0;
 }
 
