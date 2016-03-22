@@ -2347,15 +2347,18 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 	struct amdgpu_device *adev = dev->dev_private;
 	struct dc *dc = adev->dm.dc;
 	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
-	struct amdgpu_crtc *disconnected_acrtc = to_amdgpu_crtc(connector->state->crtc);
+	struct amdgpu_crtc *disconnected_acrtc;
 	const struct dc_sink *sink;
 	struct dc_target *commit_targets[6];
 	uint32_t commit_targets_count = 0;
 
-	if (!aconnector->dc_sink || !connector->state || !connector->state->crtc)
+
+	if (!aconnector->dc_sink || !connector->state || !connector->encoder)
 		return;
 
-	if (!disconnected_acrtc->target)
+	disconnected_acrtc = to_amdgpu_crtc(connector->encoder->crtc);
+
+	if (!disconnected_acrtc || !disconnected_acrtc->target)
 		return;
 
 	sink = disconnected_acrtc->target->streams[0]->sink;
@@ -2370,6 +2373,8 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 			create_target_for_sink(
 				aconnector,
 				&disconnected_acrtc->base.state->mode);
+
+		DRM_INFO("Headless hotplug, restoring connector state\n");
 		/*
 		 * we evade vblanks and pflips on crtc that
 		 * should be changed
