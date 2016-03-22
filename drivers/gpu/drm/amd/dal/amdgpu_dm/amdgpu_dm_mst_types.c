@@ -226,42 +226,7 @@ fail_add_sink:
 static int dm_dp_mst_get_modes(struct drm_connector *connector)
 {
 	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
-	struct amdgpu_connector *master = aconnector->mst_port;
-	struct edid *edid;
-	const struct dc_sink *sink;
 	int ret = 0;
-
-	if (!aconnector->edid) {
-		edid = drm_dp_mst_get_edid(connector, &master->mst_mgr, aconnector->port);
-
-		if (!edid) {
-			drm_mode_connector_update_edid_property(
-				&aconnector->base,
-				NULL);
-
-			return ret;
-		}
-
-		aconnector->edid = edid;
-
-		if (aconnector->dc_sink)
-			dc_link_remove_remote_sink(
-				aconnector->dc_link,
-				aconnector->dc_sink);
-
-		sink = dm_dp_mst_add_mst_sink(
-			aconnector->dc_link,
-			(uint8_t *)edid,
-			(edid->extensions + 1) * EDID_LENGTH);
-		aconnector->dc_sink = sink;
-	} else
-		edid = aconnector->edid;
-
-	DRM_DEBUG_KMS("edid retrieved %p\n", edid);
-
-	drm_mode_connector_update_edid_property(
-		&aconnector->base,
-		aconnector->edid);
 
 	ret = drm_add_edid_modes(&aconnector->base, aconnector->edid);
 
@@ -417,6 +382,45 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 	struct amdgpu_connector *master = container_of(mgr, struct amdgpu_connector, mst_mgr);
 	struct drm_device *dev = master->base.dev;
 	struct amdgpu_device *adev = dev->dev_private;
+	struct drm_connector *connector;
+	struct amdgpu_connector *aconnector;
+	struct edid *edid;
+	const struct dc_sink *sink;
+
+	drm_modeset_lock_all(dev);
+	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
+		aconnector = to_amdgpu_connector(connector);
+		if (aconnector->mst_port && !aconnector->dc_sink) {
+			if (!aconnector->edid) {
+				edid = drm_dp_mst_get_edid(connector, &aconnector->mst_port->mst_mgr, aconnector->port);
+
+				if (!edid) {
+					drm_mode_connector_update_edid_property(
+						&aconnector->base,
+						NULL);
+					continue;
+				}
+
+				aconnector->edid = edid;
+
+				sink = dm_dp_mst_add_mst_sink(
+					aconnector->dc_link,
+					(uint8_t *)edid,
+					(edid->extensions + 1) * EDID_LENGTH);
+				aconnector->dc_sink = sink;
+
+				dm_restore_drm_connector_state(connector->dev, connector);
+			} else
+				edid = aconnector->edid;
+
+			DRM_DEBUG_KMS("edid retrieved %p\n", edid);
+
+			drm_mode_connector_update_edid_property(
+				&aconnector->base,
+				aconnector->edid);
+		}
+	}
+	drm_modeset_unlock_all(dev);
 
 	schedule_work(&adev->dm.mst_hotplug_work);
 }
