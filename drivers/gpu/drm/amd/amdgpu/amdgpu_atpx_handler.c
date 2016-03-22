@@ -541,7 +541,11 @@ static int amdgpu_atpx_get_client_id(struct pci_dev *pdev)
 		return VGA_SWITCHEROO_DIS;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+static struct vga_switcheroo_handler amdgpu_atpx_handler = {
+#else
 static const struct vga_switcheroo_handler amdgpu_atpx_handler = {
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) */
 	.switchto = amdgpu_atpx_switchto,
 	.power_state = amdgpu_atpx_power_state,
 	.get_client_id = amdgpu_atpx_get_client_id,
