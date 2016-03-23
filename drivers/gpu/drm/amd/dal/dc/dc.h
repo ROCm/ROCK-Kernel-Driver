@@ -40,13 +40,22 @@
  ******************************************************************************/
 
 struct dc_caps {
-    uint32_t max_targets;
-    uint32_t max_links;
-    uint32_t max_audios;
+	uint32_t max_targets;
+	uint32_t max_links;
+	uint32_t max_audios;
+};
+
+struct dc;
+struct dc_surface;
+
+struct dc_stream_funcs {
+	bool (*dc_stream_adjust_vmin_vmax)(struct dc *dc,
+			struct dc_stream *stream, int vmin, int vmax);
 };
 
 struct dc {
 	struct dc_caps caps;
+	struct dc_stream_funcs stream_funcs;
 };
 
 struct dc_init_data {
@@ -302,10 +311,11 @@ struct dc_stream {
 
 	struct audio_info audio_info;
 
+	bool enable_freesync;
+
 	/* TODO: dithering */
 	/* TODO: transfer function (CSC/regamma/gamut remap) */
 	/* TODO: custom INFO packets */
-	/* TODO: DRR/Freesync parameters */
 	/* TODO: ABM info (DMCU) */
 	/* TODO: PSR info */
 	/* TODO: CEA VIC */
