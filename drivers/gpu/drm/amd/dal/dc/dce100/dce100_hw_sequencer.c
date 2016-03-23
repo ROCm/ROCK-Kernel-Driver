@@ -66,6 +66,18 @@ static const struct dce100_hw_seq_reg_offsets reg_offsets[] = {
 {
 	.blnd = (mmBLND2_BLND_CONTROL - mmBLND_CONTROL),
 	.crtc = (mmCRTC2_CRTC_GSL_CONTROL - mmCRTC_GSL_CONTROL),
+},
+{
+	.blnd = (mmBLND3_BLND_CONTROL - mmBLND_CONTROL),
+	.crtc = (mmCRTC3_CRTC_GSL_CONTROL - mmCRTC_GSL_CONTROL),
+},
+{
+	.blnd = (mmBLND4_BLND_CONTROL - mmBLND_CONTROL),
+	.crtc = (mmCRTC4_CRTC_GSL_CONTROL - mmCRTC_GSL_CONTROL),
+},
+{
+	.blnd = (mmBLND5_BLND_CONTROL - mmBLND_CONTROL),
+	.crtc = (mmCRTC5_CRTC_GSL_CONTROL - mmCRTC_GSL_CONTROL),
 }
 };
 
