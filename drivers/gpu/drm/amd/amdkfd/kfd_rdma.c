@@ -225,7 +225,7 @@ static int is_gpu_address(uint64_t address, struct pid *pid)
 
 	p = kfd_lookup_process_by_pid(pid);
 	if (!p) {
-		pr_err("could not find the process in %s.\n",
+		pr_debug("could not find the process in %s.\n",
 				__func__);
 		return 0;
 	}
