@@ -189,23 +189,6 @@ struct firmware_info {
 	uint8_t remote_display_config;
 };
 
-/* direct HW (mmBIOS_SCRATCH_2) translation! */
-union tv_standard_support {
-	uint8_t u_all;
-	struct {
-		bool TV_SUPPORT_NTSC:1;
-		bool TV_SUPPORT_NTSCJ:1;
-
-		bool TV_SUPPORT_PAL:1;
-		bool TV_SUPPORT_PALM:1;
-		bool TV_SUPPORT_PALCN:1;
-		bool TV_SUPPORT_PALN:1;
-		bool TV_SUPPORT_PAL60:1;
-
-		bool TV_SUPPORT_SECAM:1;
-	} bits;
-};
-
 struct step_and_delay_info {
     uint32_t step;
     uint32_t delay;
@@ -406,47 +389,6 @@ struct bios_event_info {
 	bool backlight_changed;
 };
 
-union stereo_3d_support {
-	struct {
-		/* HW can alter left and right image sequentially */
-		uint32_t FRAME_ALTERNATE:1;
-		/* Frame Alternate + HW can integrate stereosync
-		signal into TMDS stream */
-		uint32_t DVI_FRAME_ALT:1;
-		/* Frame Alternate + HW can integrate stereosync
-		signal into DP stream */
-		uint32_t DISPLAY_PORT_FRAME_ALT:1;
-		/* Frame Alternate + HW can drive stereosync signal
-		on separate line */
-		uint32_t SIDEBAND_FRAME_ALT:1;
-		/* SW allowed to pack left and right image into single frame.
-		Used for HDMI only, DP has it's own flags. */
-		uint32_t SW_FRAME_PACK:1;
-		/* HW can pack left and right image into single HDMI frame */
-		uint32_t PROGRESSIVE_FRAME_PACK:1;
-		/* HW can pack left and right interlaced images into
-		single HDMI frame */
-		uint32_t INTERLACE_FRAME_PACK:1;
-		/* HW can pack left and right images into single DP frame */
-		uint32_t DISPLAY_PORT_FRAME_PACK:1;
-		/* SW can pack left and right images into single DP frame */
-		uint32_t DISPLAY_PORT_SW_FRAME_PACK:1;
-		/* HW can mix left and right images into single image */
-		uint32_t INTERLEAVE:1;
-		/* HW can mix left and right interlaced images
-		into single image */
-		uint32_t INTERLACE_INTERLEAVE:1;
-		/* Allow display-based formats (whatever supported)
-		in WS stereo mode */
-		uint32_t DISPLAY_3DIN_WS_MODE:1;
-		/* Side-by-side, packed by application/driver into 2D frame */
-		uint32_t SIDE_BY_SIDE_SW_PACKED:1;
-		/* Top-and-bottom, packed by application/driver into 2D frame */
-		uint32_t TOP_AND_BOTTOM_SW_PACKED:1;
-	} bits;
-	uint32_t u_all;
-};
-
 /* Bitvector and bitfields of possible optimizations
  #IMPORTANT# Keep bitfields match bitvector! */
 enum optimization_feature {
@@ -463,36 +405,8 @@ enum optimization_feature {
 	OF_SKIP_POWER_DOWN_INACTIVE_ENCODER = 0x80
 };
 
-union optimization_flags {
-	struct {
-		/* Don't do HW programming if panels were enabled by VBIOS */
-		uint32_t SKIP_HW_PROGRAMMING_ON_ENABLED_EMBEDDED_DISPLAY:1;
-		uint32_t SKIP_RESET_OF_ALL_HW_ON_S3RESUME:1;
-		uint32_t SKIP_HW_RESET_OF_EMBEDDED_DISPLAY_ON_S3RESUME:1;
-		uint32_t SKIP_POWER_UP_VBIOS_ENABLED_ENCODER:1;
-		/* Do not turn off VCC while powering down on boot or resume */
-		uint32_t KEEP_VCC_DURING_POWER_DOWN_ON_BOOT_OR_RESUME:1;
-		/* Do not turn off VCC while performing SetMode */
-		uint32_t KEEP_VCC_DURING_SET_MODE:1;
-		uint32_t DO_NOT_WAIT_FOR_HPD_LOW:1;
-	} bits;
-	uint32_t u_all;
-};
-
 /* Bitvector and bitfields of performance measurements
  #IMPORTANT# Keep bitfields match bitvector! */
-
-union perf_measure_flags {
-	struct {
-		uint32_t ADAPTER_POWER_STATE:1;
-		uint32_t DISPLAY_POWER_STATE:1;
-		uint32_t SET_MODE_SEQ:1;
-		uint32_t DETECT_AT_RESUME:1;
-		uint32_t MEMORY_READ_CONTROL:1;
-
-	} bits;
-	uint32_t u_all;
-};
 
 enum {
 	PERF_MEASURE_POWERCODE_OFFSET = 0x0,

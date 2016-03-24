@@ -129,21 +129,6 @@ struct dmcu_context {
 	uint32_t vsync_rate_hz;
 };
 
-union dmcu_psr_level {
-	struct {
-		bool SKIP_CRC:1;
-		bool SKIP_DP_VID_STREAM_DISABLE:1;
-		bool SKIP_PHY_POWER_DOWN:1;
-		bool SKIP_AUX_ACK_CHECK:1;
-		bool SKIP_CRTC_DISABLE:1;
-		bool SKIP_AUX_RFB_CAPTURE_CHECK:1;
-		bool SKIP_SMU_NOTIFICATION:1;
-		bool SKIP_AUTO_STATE_ADVANCE:1;
-		bool DISABLE_PSR_ENTRY_ABORT:1;
-	} bits;
-	uint32_t u32all;
-};
-
 enum varibright_command {
 	VARIBRIGHT_CMD_SET_VB_LEVEL = 0,
 	VARIBRIGHT_CMD_USER_ENABLE,

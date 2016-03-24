@@ -61,45 +61,6 @@ enum edid_screen_aspect_ratio {
 	EDID_SCREEN_AR_4X5
 };
 
-union cv_smart_dongle_modes {
-	uint8_t all;
-	struct cv_smart_dongle_switches {
-		uint8_t MODE_1080I:1;
-		uint8_t MODE_720P:1;
-		uint8_t MODE_540P:1;
-		uint8_t MODE_480P:1;
-		uint8_t MODE_480I:1;
-		uint8_t MODE_16_9:1;
-	} switches;
-};
-
-union cea_speaker_allocation_data_block {
-	struct {
-		uint32_t FL_FR:1;
-		uint32_t LFE:1;
-		uint32_t FC:1;
-		uint32_t RL_RR:1;
-		uint32_t RC:1;
-		uint32_t FLC_FRC:1;
-		uint32_t RLC_RRC:1;
-	} bits;
-	uint32_t raw;
-};
-
-union cea_video_capability_data_block {
-	struct {
-		uint8_t S_CE0:1;
-		uint8_t S_CE1:1;
-		uint8_t S_IT0:1;
-		uint8_t S_IT1:1;
-		uint8_t S_PT0:1;
-		uint8_t S_PT1:1;
-		uint8_t QS:1;
-		uint8_t QY:1;
-	} bits;
-	uint8_t raw;
-};
-
 enum stereo_3d_multi_presence {
 	STEREO_3D_MULTI_NOT_PRESENT = 0,
 	STEREO_3D_MULTI_ALL_FORMATS,
@@ -129,47 +90,6 @@ enum dcs_interface_type {
 	INTERFACE_TYPE_WIRELESS,
 	INTERFACE_TYPE_CF,
 	INTERFACE_TYPE_EDP
-};
-
-
-union panel_misc_info {
-	struct {
-		uint32_t H_CUT_OFF:1;
-		uint32_t H_SYNC_POLARITY:1;/*0=Active High, 1=Active Low*/
-		uint32_t V_SYNC_POLARITY:1; /*0=Active High, 1=Active Low*/
-		uint32_t V_CUT_OFF:1;
-		uint32_t H_REPLICATION_BY_2:1;
-		uint32_t V_REPLICATION_BY_2:1;
-		uint32_t COMPOSITE_SYNC:1;
-		uint32_t INTERLACE:1;
-		uint32_t DOUBLE_CLOCK:1;
-		uint32_t RGB888:1;
-		uint32_t GREY_LEVEL:2;
-		uint32_t SPATIAL:1;
-		uint32_t TEMPORAL:1;
-		uint32_t API_ENABLED:1;
-	} bits;
-	uint32_t raw;
-};
-
-union hdtv_mode_support {
-	struct {
-		uint32_t HDTV_SUPPORT_480I:1;
-		uint32_t HDTV_SUPPORT_480P:1;
-		uint32_t HDTV_SUPPORT_576I25:1;
-		uint32_t HDTV_SUPPORT_576P50:1;
-		uint32_t HDTV_SUPPORT_720P:1;
-		uint32_t HDTV_SUPPORT_720P50:1;
-		uint32_t HDTV_SUPPORT_1080I:1;
-		uint32_t HDTV_SUPPORT_1080I25:1;
-		uint32_t HDTV_SUPPORT_1080P:1;
-		uint32_t HDTV_SUPPORT_1080P50:1;
-		uint32_t HDTV_SUPPORT_1080P24:1;
-		uint32_t HDTV_SUPPORT_1080P25:1;
-		uint32_t HDTV_SUPPORT_1080P30:1;
-		uint32_t HDTV_SUPPORT_16X9:1;
-	} bits;
-	uint32_t raw;
 };
 
 enum edid_retrieve_status {
@@ -424,50 +344,4 @@ enum monitor_patch_type {
 	MONITOR_PATCH_TYPE_SINGLE_MODE_PACKED_PIXEL
 };
 
-union dcs_monitor_patch_flags {
-        struct {
-                bool ERROR_CHECKSUM:1;
-                bool HDTV_WITH_PURE_DFP_EDID:1;
-                bool DO_NOT_USE_DETAILED_TIMING:1;
-                bool DO_NOT_USE_RANGE_LIMITATION:1;
-                bool EDID_EXTENTION_ERROR_CHECKSUM:1;
-                bool TURN_OFF_DISPLAY_BEFORE_MODE_CHANGE:1;
-                bool RESTRICT_VESA_MODE_TIMING:1;
-                bool DO_NOT_USE_EDID_MAX_PIX_CLK:1;
-                bool VENDOR_0:1;
-                bool RANDOM_CRT:1;/* 10 bits used including this one-*/
-                bool VENDOR_1:1;
-                bool LIMIT_PANEL_SUPPORT_RGB_ONLY:1;
-                bool PACKED_PIXEL_FORMAT:1;
-                bool LARGE_PANEL:1;
-                bool STEREO_SUPPORT:1;
-                bool DUAL_EDID_PANEL:1;
-                bool IGNORE_19X12_STD_TIMING:1;
-                bool MULTIPLE_PACKED_TYPE:1;
-                bool RESET_TX_ON_DISPLAY_POWER_ON:1;
-                bool ALLOW_ONLY_CE_MODE:1;/* 20 bits used including this one*/
-                bool RESTRICT_PROT_DUAL_LINK_DVI:1;
-                bool FORCE_LINK_RATE:1;
-                bool DELAY_AFTER_DP_RECEIVER_POWER_UP:1;
-                bool KEEP_DP_RECEIVER_POWERED:1;
-                bool DELAY_BEFORE_READ_EDID:1;
-                bool DELAY_AFTER_PIXEL_FORMAT_CHANGE:1;
-                bool INCREASE_DEFER_WRITE_RETRY_I2C_OVER_AUX:1;
-                bool NO_DEFAULT_TIMINGS:1;
-                bool ADD_CEA861_DETAILED_TIMING_VIC16:1;
-                bool ADD_CEA861_DETAILED_TIMING_VIC31:1; /* 30 bits*/
-                bool DELAY_BEFORE_UNMUTE:1;
-                bool RETRY_LINK_TRAINING_ON_FAILURE:1;
-                bool ALLOW_AUX_WHEN_HPD_LOW:1;
-                bool TILED_DISPLAY:1;
-                bool DISABLE_PSR_ENTRY_ABORT:1;
-                bool INTERMITTENT_EDID_ERROR:1;/* 36 bits total*/
-                bool VID_STREAM_DIFFER_TO_SYNC:1;/* 37 bits total*/
-                bool EXTRA_DELAY_ON_DISCONNECT:1;/* 38 bits total*/
-                bool DELAY_AFTER_DISABLE_BACKLIGHT_DFS_BYPASS:1;/* 39 bits total*/
-        } flags;
-        uint64_t raw;
-};
-
 #endif /* __DAL_DCS_TYPES_H__ */
-

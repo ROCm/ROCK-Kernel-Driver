@@ -32,14 +32,4 @@
 #define MAXTRIX_SIZE TEMPERATURE_MAXTRIX_SIZE
 #define MAXTRIX_SIZE_WITH_OFFSET 12
 
-/* overlay adjustment input */
-union ovl_csc_flag {
-	uint32_t u_all;
-	struct {
-		uint32_t CONFIG_IS_CHANGED:1;
-		uint32_t RESERVED:31;
-	} bits;
-};
-
-
 #endif
