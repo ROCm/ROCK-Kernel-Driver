@@ -82,46 +82,6 @@ enum edp_revision {
 	EDP_REVISION_13 = 0x02
 };
 
-/* DPCD_ADDR_DOWNSTREAM_PORT_PRESENT register value */
-union dpcd_downstream_port {
-	struct {
-#if defined(LITTLEENDIAN_CPU)
-		uint8_t PRESENT:1;
-		uint8_t TYPE:2;
-		uint8_t FORMAT_CONV:1;
-		uint8_t RESERVED:4;
-#elif defined(BIGENDIAN_CPU)
-		uint8_t RESERVED:4;
-		uint8_t FORMAT_CONV:1;
-		uint8_t TYPE:2;
-		uint8_t PRESENT:1;
-#else
-	#error ARCH not defined!
-#endif
-	} bits;
-
-	uint8_t raw;
-};
-
-/* DPCD_ADDR_SINK_COUNT register value */
-union dpcd_sink_count {
-	struct {
-#if defined(LITTLEENDIAN_CPU)
-		uint8_t SINK_COUNT:6;
-		uint8_t CP_READY:1;
-		uint8_t RESERVED:1;
-#elif defined(BIGENDIAN_CPU)
-		uint8_t RESERVED:1;
-		uint8_t CP_READY:1;
-		uint8_t SINK_COUNT:6;
-#else
-	#error ARCH not defined!
-#endif
-	} bits;
-
-	uint8_t raw;
-};
-
 enum {
 	LINK_RATE_REF_FREQ_IN_KHZ = 27000 /*27MHz*/
 };
@@ -236,31 +196,6 @@ union dpcd_training_lane_set {
 		uint8_t PRE_EMPHASIS_SET:2;
 		uint8_t MAX_SWING_REACHED:1;
 		uint8_t VOLTAGE_SWING_SET:2;
-#else
-	#error ARCH not defined!
-#endif
-	} bits;
-
-	uint8_t raw;
-};
-
-/* DPCD_ADDR_TRAINING_LANEx_SET2 registers value - since DP 1.2 */
-union dpcd_training_lanes_set2 {
-	struct {
-#if defined(LITTLEENDIAN_CPU)
-		uint8_t LANE0_POST_CURSOR2_SET:2;
-		uint8_t LANE0_MAX_POST_CURSOR2_REACHED:1;
-		uint8_t LANE0_RESERVED:1;
-		uint8_t LANE1_POST_CURSOR2_SET:2;
-		uint8_t LANE1_MAX_POST_CURSOR2_REACHED:1;
-		uint8_t LANE1_RESERVED:1;
-#elif defined(BIGENDIAN_CPU)
-		uint8_t LANE1_RESERVED:1;
-		uint8_t LANE1_MAX_POST_CURSOR2_REACHED:1;
-		uint8_t LANE1_POST_CURSOR2_SET:2;
-		uint8_t LANE0_RESERVED:1;
-		uint8_t LANE0_MAX_POST_CURSOR2_REACHED:1;
-		uint8_t LANE0_POST_CURSOR2_SET:2;
 #else
 	#error ARCH not defined!
 #endif

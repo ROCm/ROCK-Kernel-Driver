@@ -29,12 +29,4 @@
 #include "set_mode_types.h"
 #include "gamma_types.h"
 
-union video_gamma_flag {
-	struct {
-		uint32_t CONFIG_IS_CHANGED:1;
-		uint32_t RESERVED:31;
-	} bits;
-	uint32_t u_all;
-};
-
 #endif

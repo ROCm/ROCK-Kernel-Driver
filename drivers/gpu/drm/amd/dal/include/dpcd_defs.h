@@ -414,60 +414,12 @@ union mstm_cap {
 	uint8_t raw;
 };
 
-union mstm_cntl {
-	struct {
-		uint8_t MST_EN:1;
-		uint8_t UP_REQ_EN:1;
-		uint8_t UPSTREAM_IS_SRC:1;
-		uint8_t RESERVED:5;
-	} bits;
-	uint8_t raw;
-};
-
 union lane_count_set {
 	struct {
 		uint8_t LANE_COUNT_SET:5;
 		uint8_t POST_LT_ADJ_REQ_GRANTED:1;
 		uint8_t RESERVED:1;
 		uint8_t ENHANCED_FRAMING:1;
-	} bits;
-	uint8_t raw;
-};
-
-/* for DPCD_ADDRESS_I2C_SPEED_CNTL_CAP
- * and DPCD_ADDRESS_I2C_SPEED_CNTL
- */
-union i2c_speed {
-	struct {
-		uint8_t _1KBPS:1;
-		uint8_t _5KBPS:1;
-		uint8_t _10KBPS:1;
-		uint8_t _100KBPS:1;
-		uint8_t _400KBPS:1;
-		uint8_t _1MBPS:1;
-		uint8_t reserved:2;
-	} bits;
-	uint8_t raw;
-};
-
-union payload_table_update_status {
-	struct {
-		uint8_t VC_PAYLOAD_TABLE_UPDATED:1;
-		uint8_t ACT_HANDLED:1;
-	} bits;
-	uint8_t raw;
-};
-
-union device_irq_esi_0 {
-	struct {
-		uint8_t REMOTE_CONTROL_CMD_PENDING:1;
-		uint8_t AUTOMATED_TEST_REQUEST:1;
-		uint8_t CP_IRQ:1;
-		uint8_t MCCS_IRQ:1;
-		uint8_t DOWN_REP_MSG_RDY:1;
-		uint8_t UP_REQ_MSG_RDY:1;
-		uint8_t SINK_SPECIFIC_IRQ:1;
-		uint8_t RESERVED:1;
 	} bits;
 	uint8_t raw;
 };
@@ -500,17 +452,6 @@ union device_service_irq {
 	uint8_t raw;
 };
 
-union downstream_port {
-	struct {
-		uint8_t PRESENT:1;
-		uint8_t TYPE:2;
-		uint8_t FORMAT_CONV:1;
-		uint8_t DETAILED_CAPS:1;
-		uint8_t RESERVED:3;
-	} bits;
-	uint8_t raw;
-};
-
 union sink_count {
 	struct {
 		uint8_t SINK_COUNT:6;
@@ -535,74 +476,6 @@ union lane_adjust {
 	struct {
 		uint8_t VOLTAGE_SWING_LANE:2;
 		uint8_t PRE_EMPHASIS_LANE:2;
-		uint8_t RESERVED:4;
-	} bits;
-	uint8_t raw;
-};
-
-/* Automated test structures */
-union test_request {
-	struct {
-		uint8_t LINK_TRAINING:1;
-		uint8_t LINK_TEST_PATTERN:1;
-		uint8_t EDID_READ:1;
-		uint8_t PHY_TEST_PATTERN:1;
-		uint8_t AUDIO_TEST_PATTERN:1;
-		uint8_t AUDIO_TEST_NO_VIDEO:1;
-		uint8_t RESERVED:1;
-		uint8_t TEST_STEREO_3D:1;
-	} bits;
-	uint8_t raw;
-};
-
-union test_response {
-	struct {
-		uint8_t ACK:1;
-		uint8_t NO_ACK:1;
-		uint8_t RESERVED:6;
-	} bits;
-	uint8_t raw;
-};
-
-union link_test_pattern {
-	struct {
-		uint8_t PATTERN:2;/*DpcdLinkTestPatterns*/
-		uint8_t RESERVED:6;
-	} bits;
-	uint8_t raw;
-};
-
-union test_misc {
-	struct dpcd_test_misc_bits {
-		uint8_t SYNC_CLOCK:1;
-		uint8_t CLR_FORMAT:2;/*DpcdTestColorFormat*/
-		uint8_t DYN_RANGE:1;/*DpcdTestDynRange*/
-		uint8_t YCBCR:1;/*DpcdTestYCbCrStandard*/
-		uint8_t BPC:3;/*DpcdTestBitDepth*/
-	} bits;
-	uint8_t raw;
-};
-
-union phy_test_pattern {
-	struct {
-		/* This field is 2 bits for DP1.1 and 3 bits for DP1.2.*/
-		uint8_t PATTERN:3;
-		uint8_t RESERVED:5;/* BY spec, bit7:2 is 0 for DP1.1.*/
-	} bits;
-	uint8_t raw;
-};
-
-union audio_test_mode {
-	struct {
-		uint8_t SAMPLING_RATE:4;
-		uint8_t CHANNEL_COUNT:4;
-	} bits;
-	uint8_t raw;
-};
-
-union audio_test_pattern_period {
-	struct {
-		uint8_t PATTERN_PERIOD:4;
 		uint8_t RESERVED:4;
 	} bits;
 	uint8_t raw;
@@ -641,68 +514,8 @@ union dpcd_training_lane {
 post cursor 2 level of Training Pattern 2 or 3*/
 /* The DPCD addresses are 0x10F (TRAINING_LANE0_1_SET2)
 and 0x110 (TRAINING_LANE2_3_SET2)*/
-union dpcd_training_lane_set2 {
-	struct {
-		uint8_t POST_CURSOR2_SET:2;
-		uint8_t MAX_POST_CURSOR2_REACHED:1;
-		uint8_t RESERVED:1;
-	} bits;
-	uint8_t raw;
-};
-
-union dpcd_psr_configuration {
-	struct {
-		uint8_t ENABLE:1;
-		uint8_t TRANSMITTER_ACTIVE_IN_PSR:1;
-		uint8_t CRC_VERIFICATION:1;
-		uint8_t FRAME_CAPTURE_INDICATION:1;
-		uint8_t LINE_CAPTURE_INDICATION:1;
-		uint8_t IRQ_HPD_WITH_CRC_ERROR:1;
-		uint8_t RESERVED:2;
-	} bits;
-	uint8_t raw;
-};
-
-union psr_error_status {
-	struct {
-		uint8_t LINK_CRC_ERROR:1;
-		uint8_t RFB_STORAGE_ERROR:1;
-		uint8_t RESERVED:6;
-	} bits;
-	uint8_t raw;
-};
-
-union psr_event_status_ind {
-	struct {
-		uint8_t SINK_PSR_CAP_CHANGE:1;
-		uint8_t RESERVED:7;
-	} bits;
-	uint8_t raw;
-};
-
-union psr_sink_psr_status {
-	struct {
-		uint8_t SINK_SELF_REFRESH_STATUS:3;
-		uint8_t RESERVED:5;
-	} bits;
-	uint8_t raw;
-};
 
 /* EDP related 0x701 */
-union edp_generial_cap1 {
-	struct {
-		uint8_t TCON_BACKLIGHT_ADJUSTMENT_CAPABLE:1;
-		uint8_t BACKLIGHT_PIN_ENABLE_CAPABLE:1;
-		uint8_t BACKLIGHT_AUX_ENABLE_CAPABLE:1;
-		uint8_t PANEL_SELFTEST_PIN_ENABLE_CAPABLE:1;
-		uint8_t BACKLIGHT_SELFTEST_AUX_ENABLE_CAPABLE:1;
-		uint8_t FRC_ENABLE_CAPABLE:1;
-		uint8_t COLOR_ENGINE_CAPABLE:1;
-		/*bit 7, pane can be controlled by 0x600*/
-		uint8_t SET_POWER_CAPABLE:1;
-	} bits;
-	uint8_t raw;
-};
 
 /* TMDS-converter related */
 union dwnstream_port_caps_byte0 {
@@ -763,19 +576,6 @@ union dwnstream_port_caps_byte3_hdmi {
 
 /*4-byte structure for detailed capabilities of a down-stream port
 (DP-to-TMDS converter).*/
-union dwnstream_portx_caps {
-	struct {
-		union dwnstream_port_caps_byte0 byte0;
-		uint8_t max_tmds_clk;/* byte1 */
-		union dwnstream_port_caps_byte2 byte2;
-
-		union {
-			union dwnstream_port_caps_byte3_dvi byte_dvi;
-			union dwnstream_port_caps_byte3_hdmi byte_hdmi;
-		} byte3;
-	} bytes;
-	uint8_t raw[4];
-};
 
 union sink_status {
 	struct {
@@ -858,15 +658,6 @@ union edp_configuration_cap {
 		uint8_t RESERVED:1;
 		uint8_t DPCD_DISPLAY_CONTROL_CAPABLE:1;
 		uint8_t RESERVED2:4;
-	} bits;
-	uint8_t raw;
-};
-
-union psr_capabilities {
-	struct {
-		uint8_t EXIT_LT_NOT_REQ:1;
-		uint8_t RFB_SETUP_TIME:3;
-		uint8_t RESERVED:4;
 	} bits;
 	uint8_t raw;
 };

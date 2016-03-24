@@ -148,16 +148,6 @@ struct dpcd_caps {
 	int8_t branch_dev_name[6];
 };
 
-union dp_wa {
-	struct {
-		/* keep DP receiver powered up on DisplayOutput */
-		uint32_t KEEP_RECEIVER_POWERED:1;
-
-		/* TODO: may add other member in.*/
-	} bits;
-	uint32_t raw;
-};
-
 /* DP MST stream allocation (payload bandwidth number) */
 struct link_mst_stream_allocation {
 	/* DIG front */
