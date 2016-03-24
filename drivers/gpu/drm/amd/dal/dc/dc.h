@@ -250,8 +250,6 @@ bool dc_target_is_connected_to_sink(
 		const struct dc_target *dc_target,
 		const struct dc_sink *dc_sink);
 
-uint8_t dc_target_get_controller_id(const struct dc_target *dc_target);
-
 uint32_t dc_target_get_vblank_counter(const struct dc_target *dc_target);
 
 /* TODO: Return parsed values rather than direct register read

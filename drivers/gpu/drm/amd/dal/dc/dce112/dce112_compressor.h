@@ -63,11 +63,6 @@ void dce112_compressor_program_compressed_surface_address_and_pitch(
 	struct compressor *cp,
 	struct compr_addr_and_pitch_params *params);
 
-bool dce112_compressor_get_required_compressed_surface_size(
-	struct compressor *cp,
-	struct fbc_input_info *input_info,
-	struct fbc_requested_compressed_size *size);
-
 bool dce112_compressor_is_fbc_enabled_in_hw(struct compressor *cp,
 	uint32_t *fbc_mapped_crtc_id);
 

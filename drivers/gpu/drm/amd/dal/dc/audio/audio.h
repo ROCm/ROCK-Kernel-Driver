@@ -186,8 +186,4 @@ bool dal_audio_construct_base(
 void dal_audio_destruct_base(
 	struct audio *audio);
 
-void dal_audio_release_hw_base(
-	struct audio *audio);
-
 #endif  /* __DAL_AUDIO__ */
-

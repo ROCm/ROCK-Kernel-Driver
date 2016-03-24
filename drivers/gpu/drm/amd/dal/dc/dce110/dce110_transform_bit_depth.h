@@ -35,10 +35,6 @@ bool dce110_transform_get_max_num_of_supported_lines(
 	uint32_t pixel_width,
 	uint32_t *lines);
 
-void dce110_transform_enable_alpha(
-	struct dce110_transform *xfm110,
-	bool enable);
-
 bool dce110_transform_get_next_lower_pixel_storage_depth(
 	struct dce110_transform *xfm110,
 	uint32_t display_bpp,

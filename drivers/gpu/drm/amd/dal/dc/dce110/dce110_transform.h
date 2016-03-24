@@ -58,11 +58,6 @@ bool dce110_transform_set_scaler(
 
 void dce110_transform_set_scaler_bypass(struct transform *xfm);
 
-bool dce110_transform_update_viewport(
-	struct transform *xfm,
-	const struct rect *view_port,
-	bool is_fbc_attached);
-
 void dce110_transform_set_scaler_filter(
 	struct transform *xfm,
 	struct scaler_filter *filter);
