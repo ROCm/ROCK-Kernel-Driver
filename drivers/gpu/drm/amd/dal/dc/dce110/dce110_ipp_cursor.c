@@ -117,7 +117,7 @@ bool dce110_ipp_cursor_set_attributes(
 	 * Program cursor size -- NOTE: HW spec specifies that HW register
 	 * stores size as (height - 1, width - 1)
 	 */
-	program_size(ipp110, attributes->width, attributes->height);
+	program_size(ipp110, attributes->width-1, attributes->height-1);
 
 	/* Program cursor surface address */
 	program_address(ipp110, attributes->address);

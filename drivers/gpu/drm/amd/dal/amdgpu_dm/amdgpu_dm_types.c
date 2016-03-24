@@ -82,8 +82,8 @@ static void dm_set_cursor(
 
 	attributes.address.high_part = upper_32_bits(gpu_addr);
 	attributes.address.low_part  = lower_32_bits(gpu_addr);
-	attributes.width             = width-1;
-	attributes.height            = height-1;
+	attributes.width             = width;
+	attributes.height            = height;
 	attributes.x_hot             = 0;
 	attributes.y_hot             = 0;
 	attributes.color_format      = CURSOR_MODE_COLOR_PRE_MULTIPLIED_ALPHA;
