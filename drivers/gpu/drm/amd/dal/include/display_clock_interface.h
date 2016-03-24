@@ -51,22 +51,6 @@ struct dc_scaling_params {
 	uint32_t v_taps;
 };
 
-/*Display Request Mode (1 and 2 valid when scaler is OFF)*/
-enum display_request_mode {
-	REQUEST_ONLY_AT_EVERY_READ_POINTER_INCREMENT = 0,
-	REQUEST_WAITING_FOR_THE_FIRST_READ_POINTER_ONLY,
-	REQUEST_WITHOUT_WAITING_FOR_READ_POINTER
-};
-
-/* FBC minimum CompressionRatio*/
-enum fbc_compression_ratio {
-	FBC_COMPRESSION_NOT_USED = 0,
-	FBC_MINIMUM_COMPRESSION_RATIO_1 = 1,
-	FBC_MINIMUM_COMPRESSION_RATIO_2 = 2,
-	FBC_MINIMUM_COMPRESSION_RATIO_4 = 4,
-	FBC_MINIMUM_COMPRESSION_RATIO_8 = 8
-};
-
 /* VScalerEfficiency */
 enum v_scaler_efficiency {
 	V_SCALER_EFFICIENCY_LB36BPP = 0,
@@ -90,13 +74,6 @@ struct min_clock_params {
 	enum dc_color_depth deep_color_depth;
 	enum v_scaler_efficiency scaler_efficiency;
 	bool line_buffer_prefetch_enabled;
-};
-
-/* Enumerations for Source selection of the Display clock */
-enum display_clock_source_select {
-	USE_PIXEL_CLOCK_PLL = 0,
-	USE_EXTERNAL_CLOCK,
-	USE_ENGINE_CLOCK
 };
 
 /* Result of Minimum System and Display clock calculations.

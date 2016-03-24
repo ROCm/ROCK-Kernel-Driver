@@ -49,57 +49,9 @@ struct compr_addr_and_pitch_params {
 	uint32_t source_view_height;
 };
 
-struct fbc_lpt_config {
-	uint32_t mem_channels_num;
-	uint32_t banks_num;
-	uint32_t chan_interleave_size;
-	uint32_t row_size;
-};
-
-struct fbc_input_info {
-	bool dynamic_fbc_buffer_alloc;
-	uint32_t source_view_width;
-	uint32_t source_view_height;
-	uint32_t active_targets_num;
-	struct fbc_lpt_config lpt_config;
-};
-
-struct fbc_requested_compressed_size {
-	uint32_t preferred_size;
-	uint32_t preferred_size_alignment;
-	uint32_t min_size;
-	uint32_t min_size_alignment;
-	union {
-		struct {
-			/*Above preferred_size must be allocated in FB pool */
-			uint32_t PREFERRED_MUST_BE_FRAME_BUFFER_POOL:1;
-			/*Above min_size must be allocated in FB pool */
-			uint32_t MIN_MUST_BE_FRAME_BUFFER_POOL:1;
-		} flags;
-		uint32_t bits;
-	};
-};
-
-struct fbc_compressed_surface_info {
-	union fbc_physical_address compressed_surface_address;
-	uint32_t allocated_size;
-	union {
-		struct {
-			uint32_t FB_POOL:1; /*Allocated in FB Pool */
-			uint32_t DYNAMIC_ALLOC:1; /*Dynamic allocation */
-		} allocation_flags;
-		uint32_t bits;
-	};
-};
-
 enum fbc_hw_max_resolution_supported {
 	FBC_MAX_X = 3840,
 	FBC_MAX_Y = 2400
-};
-
-struct fbc_max_resolution_supported {
-	uint32_t source_view_width;
-	uint32_t source_view_height;
 };
 
 struct compressor {

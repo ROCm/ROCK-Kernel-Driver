@@ -608,10 +608,6 @@ union audio_test_pattern_period {
 	uint8_t raw;
 };
 
-struct audio_test_pattern_type {
-	uint8_t value;
-};
-
 union dpcd_training_pattern {
 	struct {
 		uint8_t TRAINING_PATTERN_SET:4;
@@ -852,11 +848,6 @@ union dpcd_edp_config {
 struct dp_device_vendor_id {
 	uint8_t ieee_oui[3];/*24-bit IEEE OUI*/
 	uint8_t ieee_device_id[6];/*usually 6-byte ASCII name*/
-};
-
-struct dp_sink_hw_fw_revision {
-	uint8_t ieee_hw_rev;
-	uint8_t ieee_fw_rev[2];
 };
 
 /*DPCD register of DP receiver capability field bits-*/

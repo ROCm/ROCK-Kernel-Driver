@@ -128,16 +128,6 @@ struct link_init_data {
 	struct adapter_service *adapter_srv;
 };
 
-struct link_caps {
-	/* support for Spread Spectrum(SS) */
-	bool ss_supported;
-	/* DP link settings (laneCount, linkRate, Spread) */
-	uint32_t lane_count;
-	uint32_t rate;
-	uint32_t spread;
-	enum dpcd_revision dpcd_revision;
-};
-
 struct dpcd_caps {
 	union dpcd_rev dpcd_rev;
 	union max_lane_count max_ln_count;

@@ -187,15 +187,6 @@ enum view_3d_format {
 	VIEW_3D_FORMAT_FIRST = VIEW_3D_FORMAT_FRAME_SEQUENTIAL
 };
 
-struct view_stereo_3d_support {
-	enum view_3d_format format;
-	struct {
-		uint32_t CLONE_MODE :1;
-		uint32_t SCALING :1;
-		uint32_t SINGLE_FRAME_SW_PACKED :1;
-	} features;
-};
-
 enum plane_stereo_format {
 	PLANE_STEREO_FORMAT_NONE = 0,
 	PLANE_STEREO_FORMAT_SIDE_BY_SIDE = 1,
@@ -276,11 +267,6 @@ struct dc_edid_caps {
 };
 
 struct view {
-	uint32_t width;
-	uint32_t height;
-};
-
-struct dc_resolution {
 	uint32_t width;
 	uint32_t height;
 };
@@ -439,16 +425,6 @@ enum scaling_transformation {
 	SCALING_TRANSFORMATION_BEGING = SCALING_TRANSFORMATION_IDENTITY,
 	SCALING_TRANSFORMATION_END =
 		SCALING_TRANSFORMATION_PRESERVE_ASPECT_RATIO_SCALE
-};
-
-struct view_position {
-	uint32_t x;
-	uint32_t y;
-};
-
-struct render_mode {
-	struct view view;
-	enum pixel_format pixel_format;
 };
 
 /* audio*/

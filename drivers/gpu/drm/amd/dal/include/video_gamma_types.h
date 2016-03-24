@@ -29,28 +29,12 @@
 #include "set_mode_types.h"
 #include "gamma_types.h"
 
-enum overlay_gamma_adjust {
-	OVERLAY_GAMMA_ADJUST_BYPASS,
-	OVERLAY_GAMMA_ADJUST_HW, /* without adjustments */
-	OVERLAY_GAMMA_ADJUST_SW /* use adjustments */
-
-};
-
 union video_gamma_flag {
 	struct {
 		uint32_t CONFIG_IS_CHANGED:1;
 		uint32_t RESERVED:31;
 	} bits;
 	uint32_t u_all;
-};
-
-struct overlay_gamma_parameters {
-	union video_gamma_flag flag;
-	int32_t ovl_gamma_cont;
-	enum overlay_gamma_adjust adjust_type;
-	enum pixel_format desktop_surface;
-
-	/* here we grow with parameters if necessary */
 };
 
 #endif

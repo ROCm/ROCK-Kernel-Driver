@@ -28,46 +28,6 @@
 
 #include "video_gamma_types.h"
 
-enum ovl_alpha_blending_mode {
-	OVL_ALPHA_PER_PIXEL_GRPH_ALPHA_MODE = 0,
-	OVL_ALPHA_PER_PIXEL_OVL_ALPHA_MODE
-};
-
-enum ovl_surface_format {
-	OVL_SURFACE_FORMAT_UNKNOWN = 0,
-	OVL_SURFACE_FORMAT_YUY2,
-	OVL_SURFACE_FORMAT_UYVY,
-	OVL_SURFACE_FORMAT_RGB565,
-	OVL_SURFACE_FORMAT_RGB555,
-	OVL_SURFACE_FORMAT_RGB32,
-	OVL_SURFACE_FORMAT_YUV444,
-	OVL_SURFACE_FORMAT_RGB32_2101010
-};
-
-struct ovl_color_adjust_option {
-	uint32_t ALLOW_OVL_RGB_ADJUST:1;
-	uint32_t ALLOW_OVL_TEMPERATURE:1;
-	uint32_t FULL_RANGE:1; /* 0 for limited range it'is default for YUV */
-	uint32_t OVL_MATRIX:1;
-	uint32_t RESERVED:28;
-};
-
-struct overlay_adjust_item {
-	int32_t adjust; /* InInteger */
-	int32_t adjust_divider;
-};
-
-enum overlay_csc_adjust_type {
-	OVERLAY_CSC_ADJUST_TYPE_BYPASS = 0,
-	OVERLAY_CSC_ADJUST_TYPE_HW, /* without adjustments */
-	OVERLAY_CSC_ADJUST_TYPE_SW  /* use adjustments */
-};
-
-enum overlay_gamut_adjust_type {
-	OVERLAY_GAMUT_ADJUST_TYPE_BYPASS = 0,
-	OVERLAY_GAMUT_ADJUST_TYPE_SW /* use adjustments */
-};
-
 #define TEMPERATURE_MATRIX_SIZE 9
 #define MAXTRIX_SIZE TEMPERATURE_MAXTRIX_SIZE
 #define MAXTRIX_SIZE_WITH_OFFSET 12
