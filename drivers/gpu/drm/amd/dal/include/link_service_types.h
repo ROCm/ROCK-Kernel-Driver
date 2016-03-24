@@ -46,12 +46,6 @@ enum link_service_type {
 	LINK_SERVICE_TYPE_MAX
 };
 
-struct link_validation_flags {
-	uint32_t DYNAMIC_VALIDATION:1;
-	uint32_t CANDIDATE_TIMING:1;
-	uint32_t START_OF_VALIDATION:1;
-};
-
 enum dpcd_value_mask {
 	DPCD_VALUE_MASK_MAX_LANE_COUNT_LANE_COUNT = 0x1F,
 	DPCD_VALUE_MASK_MAX_LANE_COUNT_TPS3_SUPPORTED = 0x40,
@@ -173,13 +167,6 @@ struct link_service_init_data {
 	struct topology_mgr *tm;
 };
 
-/**
- * @brief LinkServiceInitOptions to set certain bits
- */
-struct LinkServiceInitOptions {
-	uint32_t APPLY_MISALIGNMENT_BUG_WORKAROUND:1;
-};
-
 /* DPCD_ADDR_TRAINING_LANEx_SET registers value */
 union dpcd_training_lane_set {
 	struct {
@@ -227,33 +214,6 @@ struct mst_rad {
 	int8_t rad_str[25];
 };
 
-/**
- * @brief this structure is used to report
- * properties associated to a sink device
- */
-struct mst_sink_info {
-	/* global unique identifier */
-	struct mst_guid guid;
-	/* relative address */
-	struct mst_rad  rad;
-	/* total bandwidth available on the DP connector */
-	uint32_t total_available_bandwidth_in_mbps;
-	/* bandwidth allocated to the sink device. */
-	uint32_t allocated_bandwidth_in_mbps;
-	/* bandwidth consumed to support for the current mode. */
-	uint32_t consumed_bandwidth_in_mbps;
-};
-
-/**
- * @brief represent device information in MST topology
- */
-struct mst_device_info {
-	/* global unique identifier*/
-	struct mst_guid guid;
-	/* relative address*/
-	struct mst_rad  rad;
-};
-
 /* DP MST stream allocation (payload bandwidth number) */
 struct dp_mst_stream_allocation {
 	uint8_t vcp_id;
@@ -268,27 +228,6 @@ struct dp_mst_stream_allocation_table {
 	int stream_count;
 	/* array of stream allocations */
 	struct dp_mst_stream_allocation stream_allocations[MAX_CONTROLLER_NUM];
-};
-
-struct dp_test_event_data {
-	/*size of parameters (starting from params) in bytes*/
-	uint32_t size;
-	/*parameters block*/
-	uint32_t params[1];
-};
-
-struct psr_caps {
-	/* These parameters are from PSR capabilities reported by Sink DPCD. */
-	uint8_t psr_version;
-	uint32_t psr_rfb_setup_time;
-	bool psr_exit_link_training_req;
-
-	/* These parameters are calculated in Driver, based on display timing
-	 * and Sink capabilities.
-	 * If VBLANK region is too small and Sink takes a long time to power up
-	 * Remote Frame Buffer, it may take an extra frame to enter PSR */
-	bool psr_frame_capture_indication_req;
-	uint32_t psr_sdp_transmit_line_num_deadline;
 };
 
 #endif /*__DAL_LINK_SERVICE_TYPES_H__*/
