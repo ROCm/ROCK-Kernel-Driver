@@ -51,8 +51,6 @@ bool dal_bios_parser_is_lid_status_changed(
 	struct bios_parser *bp);
 bool dal_bios_parser_is_display_config_changed(
 	struct bios_parser *bp);
-bool dal_bios_parser_is_accelerated_mode(
-	struct bios_parser *bp);
 void dal_bios_parser_set_scratch_lcd_scale(
 	struct bios_parser *bp,
 	enum lcd_scale scale);
@@ -76,23 +74,6 @@ bool dal_bios_parser_is_active_display(
 enum controller_id dal_bios_parser_get_embedded_display_controller_id(
 	struct bios_parser *bp);
 uint32_t dal_bios_parser_get_embedded_display_refresh_rate(
-	struct bios_parser *bp);
-void dal_bios_parser_set_scratch_connected(
-	struct bios_parser *bp,
-	struct graphics_object_id connector_id,
-	bool connected,
-	const struct connector_device_tag_info *device_tag);
-void dal_bios_parser_prepare_scratch_active_and_requested(
-	struct bios_parser *bp,
-	enum controller_id controller_id,
-	enum signal_type signal,
-	const struct connector_device_tag_info *device_tag);
-void dal_bios_parser_set_scratch_active_and_requested(
-	struct bios_parser *bp);
-void dal_bios_parser_set_scratch_critical_state(
-	struct bios_parser *bp,
-	bool state);
-void dal_bios_parser_set_scratch_acc_mode_change(
 	struct bios_parser *bp);
 
 #endif /* __DAL_BIOS_PARSER_INTERFACE_H__ */

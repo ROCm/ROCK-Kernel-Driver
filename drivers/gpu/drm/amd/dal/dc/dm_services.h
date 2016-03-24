@@ -49,10 +49,6 @@ irq_handler_idx dm_register_interrupt(
 	interrupt_handler ih,
 	void *handler_args);
 
-void dm_unregister_interrupt(
-	struct dc_context *ctx,
-	enum dc_irq_source irq_source,
-	irq_handler_idx handler_idx);
 
 /*
  *
@@ -198,12 +194,6 @@ bool dm_exec_bios_cmd_table(
 uint32_t dm_bios_cmd_table_para_revision(
 struct dc_context *ctx,
 	uint32_t index);
-
-bool dm_bios_cmd_table_revision(
-	struct dc_context *ctx,
-	uint32_t index,
-	uint8_t *frev,
-	uint8_t *crev);
 #endif
 
 #ifndef BUILD_DAL_TEST

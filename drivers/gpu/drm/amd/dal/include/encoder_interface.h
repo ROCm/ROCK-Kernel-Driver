@@ -62,20 +62,6 @@ const struct graphics_object_id dal_encoder_get_graphics_object_id(
  */
 uint32_t dal_encoder_enumerate_input_signals(
 	const struct encoder *enc);
-uint32_t dal_encoder_enumerate_output_signals(
-	const struct encoder *enc);
-bool dal_encoder_is_input_signal_supported(
-	const struct encoder *enc,
-	enum signal_type signal);
-bool dal_encoder_is_output_signal_supported(
-	const struct encoder *enc,
-	enum signal_type signal);
-void dal_encoder_set_input_signals(
-	struct encoder *enc,
-	uint32_t signals);
-void dal_encoder_set_output_signals(
-	struct encoder *enc,
-	uint32_t signals);
 
 /*
  * Programming interface
@@ -143,7 +129,6 @@ enum encoder_result dal_encoder_set_dp_phy_pattern(
 	struct encoder *enc,
 	const struct encoder_set_dp_phy_pattern_param *param);
 
-void dal_encoder_release_hw(struct encoder *enc);
 /*
  * Information interface
  */
@@ -238,7 +223,6 @@ enum encoder_result dal_encoder_enable_stream(
 enum encoder_result dal_encoder_disable_stream(
 	struct encoder *enc,
 	enum engine_id engine);
-void dal_encoder_set_multi_path(struct encoder *enc, bool is_multi_path);
 /*
  * Test harness
  */

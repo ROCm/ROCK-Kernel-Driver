@@ -61,13 +61,7 @@ void dal_register_timer_interrupt(
 /* Reallocate memory. The contents will remain unchanged.*/
 void *dc_service_realloc(struct dc_context *ctx, const void *ptr, uint32_t size);
 
-void dc_service_memmove(void *dst, const void *src, uint32_t size);
-
 void dc_service_memset(void *p, int32_t c, uint32_t count);
-
-int32_t dal_memcmp(const void *p1, const void *p2, uint32_t count);
-
-int32_t dal_strncmp(const int8_t *p1, const int8_t *p2, uint32_t count);
 
 /*
  *
@@ -178,11 +172,6 @@ struct platform_info_ext_brightness_caps {
 	uint8_t	max_input_signal;
 };
 
-bool dal_get_platform_info(
-	struct dc_context *ctx,
-	struct platform_info_params *params);
-
-
 static inline uint32_t dal_bios_cmd_table_para_revision(
 	struct dc_context *ctx,
 	uint32_t index)
@@ -255,7 +244,6 @@ bool dal_exec_bios_cmd_table(
 	vsnprintf(buffer, size, fmt, args)
 
 long dal_get_pid(void);
-long dal_get_tgid(void);
 
 /*
  *

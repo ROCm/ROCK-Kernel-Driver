@@ -50,11 +50,6 @@ void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc);
 void amdgpu_dm_connector_destroy(struct drm_connector *connector);
 void amdgpu_dm_encoder_destroy(struct drm_encoder *encoder);
 
-void dm_add_display_info(
-	struct drm_display_info *disp_info,
-	struct amdgpu_display_manager *dm,
-	uint32_t display_index);
-
 int amdgpu_dm_connector_get_modes(struct drm_connector *connector);
 
 int amdgpu_dm_atomic_commit(
