@@ -144,56 +144,11 @@ union dmcu_psr_level {
 	uint32_t u32all;
 };
 
-struct dmcu_config_data {
-	/* Command sent to DMCU. */
-	enum dmcu_action action;
-	/* PSR Level controls which HW blocks to power down during PSR active,
-	 * and also other sequence modifications. */
-	union dmcu_psr_level psr_level;
-	/* To indicate that first changed frame from active state should not
-	 * result in exit to inactive state, but instead perform an automatic
-	 * single frame RFB update. */
-	bool rfb_update_auto_en;
-	/* Number of consecutive static frames to detect before entering PSR
-	 * active state. */
-	uint32_t hyst_frames;
-	/* Partial frames before entering PSR active. Note this parameter is in
-	 * units of 100 lines. i.e. Wait a value of 5 means wait 500 additional
-	 * lines. */
-	uint32_t hyst_lines;
-	/* Number of repeated AUX retries before indicating failure to driver.
-	 * In a working case, first attempt to write/read AUX should pass. */
-	uint32_t aux_repeat;
-	/* Additional delay after remote frame capture before continuing to
-	 * power down. This is mainly for debug purposes to identify timing
-	 * issues. */
-	uint32_t frame_delay;
-	/* Controls how long the delay of a wait loop is. It should be tuned
-	 * to 1 us, and needs to be reconfigured every time DISPCLK changes. */
-	uint32_t wait_loop_num;
-};
-
-struct dmcu_output_data {
-	/* DMCU reply */
-	enum dmcu_output output;
-	/* The current PSR state. */
-	uint32_t psr_state;
-	/* The number of frames during PSR active state. */
-	uint32_t psr_count;
-};
-
 enum varibright_command {
 	VARIBRIGHT_CMD_SET_VB_LEVEL = 0,
 	VARIBRIGHT_CMD_USER_ENABLE,
 	VARIBRIGHT_CMD_POST_DISPLAY_CONFIG,
 	VARIBRIGHT_CMD_UNKNOWN
-};
-
-struct varibright_control {
-	enum varibright_command command;
-	uint8_t level;
-	bool enable;
-	bool activate;
 };
 
 #endif /* __DAL_DMCU_TYPES_H__ */

@@ -41,18 +41,6 @@ enum {
 	HW_OTHER_PIPE_INDEX = 1
 };
 
-struct hw_view_port_adjustment {
-	int32_t start_adjustment;
-	int32_t width;
-
-	enum controller_id controller_id;
-};
-
-struct hw_view_port_adjustments {
-	uint32_t view_ports_num;
-	struct hw_view_port_adjustment adjustments[HW_MAX_NUM_VIEWPORTS];
-};
-
 /* Timing standard */
 enum hw_timing_standard {
 	HW_TIMING_STANDARD_UNDEFINED,
@@ -156,12 +144,6 @@ struct hw_crtc_timing {
 	} flags;
 };
 
-struct hw_scaling_info {
-	struct view src;
-	struct view dst;
-	enum signal_type signal;
-};
-
 enum hw_color_space {
 	HW_COLOR_SPACE_UNKNOWN = 0,
 	HW_COLOR_SPACE_SRGB_FULL_RANGE,
@@ -223,19 +205,6 @@ enum hw_dithering_options {
 	HW_DITHERING_OPTION_DISABLE
 };
 
-struct hw_stereo_mixer_params {
-	bool sub_sampling;
-	bool single_pipe;
-};
-
-struct hw_action_flags {
-	uint32_t RESYNC_PATH:1;
-	uint32_t TIMING_CHANGED:1;
-	uint32_t PIXEL_ENCODING_CHANGED:1;
-	uint32_t GAMUT_CHANGED:1;
-	uint32_t TURN_OFF_VCC:1;
-};
-
 enum hw_sync_request {
 	HW_SYNC_REQUEST_NONE = 0,
 	HW_SYNC_REQUEST_SET_INTERPATH,
@@ -245,12 +214,6 @@ enum hw_sync_request {
 	HW_SYNC_REQUEST_RESET_GLSYNC,
 	HW_SYNC_REQUEST_RESYNC_GLSYNC,
 	HW_SYNC_REQUEST_SET_STEREO3D
-};
-
-struct hw_sync_info {
-	enum hw_sync_request sync_request;
-	uint32_t target_pixel_clock; /* in KHz */
-	enum sync_source sync_source;
 };
 
 /* TODO hw_info_frame and hw_info_packet structures are same as in encoder

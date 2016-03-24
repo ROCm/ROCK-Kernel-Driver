@@ -39,53 +39,6 @@
  * #####################################################
  */
 
-enum tv_standard {
-	TV_STANDARD_UNKNOWN = 0, /* direct HW (mmBIOS_SCRATCH_2) translation! */
-	TV_STANDARD_NTSC,
-	TV_STANDARD_NTSCJ,
-	TV_STANDARD_PAL,
-	TV_STANDARD_PALM,
-	TV_STANDARD_PALCN,
-	TV_STANDARD_PALN,
-	TV_STANDARD_PAL60,
-	TV_STANDARD_SECAM
-};
-
-enum cv_standard {
-	CV_STANDARD_UNKNOWN = 0x0000,
-	CV_STANDARD_HD_MASK = 0x0800,		/* Flag mask HDTV output */
-	CV_STANDARD_SD_NTSC_MASK = 0x1000,	/* Flag mask NTSC output */
-	CV_STANDARD_SD_NTSC_M,		/* NTSC (North America) output 1001 */
-	CV_STANDARD_SD_NTSC_J,		/* NTSC (Japan) output 1002 */
-	CV_STANDARD_SD_480I,		/* SDTV 480i output 1003 */
-	CV_STANDARD_SD_480P,		/* SDTV 480p output 1004 */
-	CV_STANDARD_HD_720_60P = 0x1800,/* HDTV 720/60p output 1800 */
-	CV_STANDARD_HD_1080_60I,	/* HDTV 1080/60i output 1801 */
-	CV_STANDARD_SD_PAL_MASK = 0x2000,/* Flag mask PAL output */
-	CV_STANDARD_SD_PAL_B,			/* PAL B output 2001 */
-	CV_STANDARD_SD_PAL_D,			/* PAL D output 2002 */
-	CV_STANDARD_SD_PAL_G,			/* PAL G output 2003 */
-	CV_STANDARD_SD_PAL_H,			/* PAL H output 2004 */
-	CV_STANDARD_SD_PAL_I,			/* PAL I output 2005 */
-	CV_STANDARD_SD_PAL_M,			/* PAL M output 2006 */
-	CV_STANDARD_SD_PAL_N,			/* PAL N output 2007 */
-	CV_STANDARD_SD_PAL_N_COMB,	/* PAL Combination N output 2008 */
-	CV_STANDARD_SD_PAL_60,		/* PAL 60 output (test mode) 2009 */
-	CV_STANDARD_SD_576I,		/* SDTV 576i output 2010 */
-	CV_STANDARD_SD_576P,		/* SDTV 576p output 2011 */
-	CV_STANDARD_HD_720_50P = 0x2800,/* HDTV 720/50p output 2800 */
-	CV_STANDARD_HD_1080_50I,	/* HDTV 1080/50i output 2801 */
-	CV_STANDARD_SD_SECAM_MASK = 0x4000, /* Flag mask SECAM output */
-	CV_STANDARD_SD_SECAM_B,		/* SECAM B output 4001 */
-	CV_STANDARD_SD_SECAM_D,		/* SECAM D output 4002 */
-	CV_STANDARD_SD_SECAM_G,		/* SECAM G output 4003 */
-	CV_STANDARD_SD_SECAM_H,		/* SECAM H output 4004 */
-	CV_STANDARD_SD_SECAM_K,		/* SECAM K output 4005 */
-	CV_STANDARD_SD_SECAM_K1,	/* SECAM K1 output 4006 */
-	CV_STANDARD_SD_SECAM_L,		/* SECAM L output 4007 */
-	CV_STANDARD_SD_SECAM_L1		/* SECAM L1 output 4009 */
-};
-
 enum display_output_bit_depth {
 	PANEL_UNDEFINE = 0,
 	PANEL_6BIT_COLOR = 1,
@@ -251,11 +204,6 @@ union tv_standard_support {
 
 		bool TV_SUPPORT_SECAM:1;
 	} bits;
-};
-
-struct analog_tv_info {
-	union tv_standard_support tv_suppported;
-	union tv_standard_support tv_boot_up_default;
 };
 
 struct step_and_delay_info {
@@ -533,13 +481,6 @@ union optimization_flags {
 
 /* Bitvector and bitfields of performance measurements
  #IMPORTANT# Keep bitfields match bitvector! */
-enum perf_measure {
-	PERF_MEASURE_ADAPTER_POWER_STATE = 0x1,
-	PERF_MEASURE_DISPLAY_POWER_STATE = 0x2,
-	PERF_MEASURE_SET_MODE_SEQ = 0x4,
-	PERF_MEASURE_DETECT_AT_RESUME = 0x8,
-	PERF_MEASURE_MEMORY_READ_CONTROL = 0x10,
-};
 
 union perf_measure_flags {
 	struct {
@@ -586,9 +527,5 @@ struct panel_backlight_boundaries {
 	uint32_t max_signal_level;
 };
 
-struct panel_backlight_default_levels {
-	uint32_t ac_level_percentage;
-	uint32_t dc_level_percentage;
-};
 
 #endif

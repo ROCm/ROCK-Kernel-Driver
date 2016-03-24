@@ -221,28 +221,6 @@ struct static_screen_events {
  * ***************************************************************
  */
 
-/* GPIO/Register access sequences */
-enum io_register_sequence {
-	/* GLSync sequences to access SwapReady & SwapRequest
-	GPIOs - GLSync Connector parameter */
-	IO_REG_SEQUENCE_SWAPREADY_SET = 0,
-	IO_REG_SEQUENCE_SWAPREADY_RESET,
-	IO_REG_SEQUENCE_SWAPREADY_READ,
-	IO_REG_SEQUENCE_SWAPREQUEST_SET,
-	IO_REG_SEQUENCE_SWAPREQUEST_RESET,
-	IO_REG_SEQUENCE_SWAPREQUEST_READ,
-
-	/* Frame synchronization start/stop - display index parameter */
-	IO_REG_SEQUENCE_FRAMELOCK_STOP,
-	IO_REG_SEQUENCE_FRAMELOCK_START,
-
-	/* Flip lock/unlock - GLSync Connector parameter */
-	IO_REG_SEQUENCE_GLOBALSWAP_LOCK,
-	IO_REG_SEQUENCE_GLOBALSWAP_UNLOCK,
-
-	IO_REG_SEQUENCEENUM_MAX
-};
-
 #define IO_REGISTER_SEQUENCE_MAX_LENGTH 5
 
 /*
@@ -274,54 +252,11 @@ enum io_register_sequence {
  *	security consideration.
  */
 
-/*
- * The generic sequence to program/access registers or GPIOs.
- * There could be 2 types of sequences - read and write.
- * Read sequence may have 0 or more writes and in the end one read
- * Write sequence may have 1 or more writes.
- */
-struct io_reg_sequence {
-	/* Ordered array of register to program */
-	struct {
-		/* Offset of memory mapped register or GPIO */
-		uint32_t register_offset;
-		/* Mask to use at AND operation (Mandatory, comes
-		before OR operation) */
-		uint32_t and_mask;
-		union {
-			/* Mask to use at OR operation (For write
-			sequence only, comes after AND operation) */
-			uint32_t or_mask;
-			/* Number of bits to shift to get the actual value
-			(For read  sequence only, comes after AND operation) */
-			uint32_t bit_shift;
-		};
-	} io_registers[IO_REGISTER_SEQUENCE_MAX_LENGTH];
-
-	uint32_t steps_num; /* Total number of r/w steps in the sequence */
-};
-
 /* Sequence ID - uniqly defines sequence on single adapter */
-struct io_reg_sequence_id {
-	enum io_register_sequence sequence; /* Sequence enumeration Index/ID */
-	union {
-		/* Refers to object to which the sequence applies.*/
-		uint32_t index;
-		uint32_t display_index;
-		uint32_t controller_index;
-		uint32_t glsync_connector_index;
-	};
-};
 
 struct fbc_info {
 	bool fbc_enable;
 	bool lpt_enable;
-};
-
-/* Event to request TM change IRQ registration state */
-struct hotplug_irq_data {
-	bool disable;
-	struct graphics_object_id connector;
 };
 
 #endif

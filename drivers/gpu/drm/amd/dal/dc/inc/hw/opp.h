@@ -188,13 +188,6 @@ struct gamma_coefficients {
 	struct fixed31_32 user_brightness;
 };
 
-struct csc_adjustments {
-	struct fixed31_32 contrast;
-	struct fixed31_32 saturation;
-	struct fixed31_32 brightness;
-	struct fixed31_32 hue;
-};
-
 struct pwl_float_data {
 	struct fixed31_32 r;
 	struct fixed31_32 g;

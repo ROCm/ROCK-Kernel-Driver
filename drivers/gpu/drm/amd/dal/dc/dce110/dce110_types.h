@@ -26,33 +26,5 @@
 #define __DCE110_TYPES_H_
 
 #define GAMMA_SEGMENTS_NUM 16
-struct end_point {
-	uint32_t x_value;
-	uint32_t y_value;
-	uint32_t slope;
-};
-
-struct pwl_segment {
-	uint32_t r_value;
-	uint32_t g_value;
-	uint32_t b_value;
-	uint32_t r_delta;
-	uint32_t g_delta;
-	uint32_t b_delta;
-};
-
-struct dce110_opp_regamma_params {
-	struct {
-		uint8_t num_segments[GAMMA_SEGMENTS_NUM];
-		uint16_t offsets[GAMMA_SEGMENTS_NUM];
-		struct end_point first;
-		struct end_point last;
-	} region_config;
-
-	struct {
-		struct pwl_segment *segments;
-		int num_pwl_segments;
-	} pwl_config;
-};
 
 #endif /* DRIVERS_GPU_DRM_AMD_DAL_DEV_DC_DCE110_DCE110_TYPES_H_ */

@@ -51,21 +51,6 @@ struct hws_init_data {
 
 /* TODO: below is three almost equal structures.
  * We should decide what to do with them */
-struct blank_stream_param {
-	struct display_path *display_path;
-	uint32_t link_idx;
-	struct hw_crtc_timing timing;
-	struct link_settings link_settings;
-};
-
-struct enable_stream_param {
-	struct display_path *display_path;
-	uint32_t link_idx;
-	struct hw_crtc_timing timing;
-	struct link_settings link_settings;
-
-	const struct hw_path_mode *path_mode;
-};
 
 struct enable_link_param {
 	struct display_path *display_path;

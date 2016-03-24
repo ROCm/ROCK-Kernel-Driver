@@ -67,11 +67,6 @@ enum ovl_color_space {
 	OVL_COLOR_SPACE_YUV709
 };
 
-struct dcp_video_matrix {
-	enum ovl_color_space color_space;
-	int32_t value[MAXTRIX_COEFFICIENTS_NUMBER];
-};
-
 enum expansion_mode {
 	EXPANSION_MODE_ZERO,
 	EXPANSION_MODE_DYNAMIC
