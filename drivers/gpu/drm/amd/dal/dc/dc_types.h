@@ -358,11 +358,6 @@ struct dc_mode_info {
 	struct dc_mode_flags flags;
 };
 
-struct dc_mode_timing {
-	struct dc_mode_info mode_info;
-	struct dc_crtc_timing crtc_timing;
-};
-
 enum dc_power_state {
 	DC_POWER_STATE_ON = 1,
 	DC_POWER_STATE_STANDBY,
