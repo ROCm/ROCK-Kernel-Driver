@@ -46,6 +46,7 @@
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
+#include <linux/version.h>
 
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
@@ -836,6 +837,55 @@ static void handle_hpd_irq(void *param)
 
 }
 
+static void dm_handle_hpd_rx_irq(struct amdgpu_connector *aconnector)
+{
+	uint8_t esi[8] = { 0 };
+	uint8_t dret;
+	bool new_irq_handled = false;
+	/* DPCD 0x2002 - 0x2008 for down stream IRQ from MST, eDP etc. */
+	dret = drm_dp_dpcd_read(
+		&aconnector->dm_dp_aux.aux,
+		DP_SINK_COUNT_ESI, esi, 8);
+
+	while (dret == 8) {
+		uint8_t retry;
+		dret = 0;
+
+		DRM_DEBUG_KMS("ESI %02x %02x %02x\n", esi[0], esi[1], esi[2]);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
+		/* handle HPD short pulse irq */
+		if (aconnector->mst_mgr.mst_state)
+			drm_dp_mst_hpd_irq(
+				&aconnector->mst_mgr,
+				esi,
+				&new_irq_handled);
+#endif
+
+		if (new_irq_handled) {
+			/* ACK at DPCD to notify down stream */
+			for (retry = 0; retry < 3; retry++) {
+				uint8_t wret;
+
+				wret = drm_dp_dpcd_write(
+					&aconnector->dm_dp_aux.aux,
+					DP_SINK_COUNT_ESI + 1,
+					&esi[1],
+					3);
+				if (wret == 3)
+					break;
+			}
+
+			/* check if there is new irq to be handle */
+			dret = drm_dp_dpcd_read(
+				&aconnector->dm_dp_aux.aux,
+				DP_SINK_COUNT_ESI, esi, 8);
+
+			new_irq_handled = false;
+		} else
+			break;
+	}
+}
+
 static void handle_hpd_rx_irq(void *param)
 {
 	struct amdgpu_connector *aconnector = (struct amdgpu_connector *)param;
@@ -858,8 +908,7 @@ static void handle_hpd_rx_irq(void *param)
 		}
 	}
 
-	if (is_mst_root_connector)
-		dm_helpers_dp_mst_handle_mst_hpd_rx_irq(param);
+	dm_handle_hpd_rx_irq(aconnector);
 }
 
 static void register_hpd_handlers(struct amdgpu_device *adev)

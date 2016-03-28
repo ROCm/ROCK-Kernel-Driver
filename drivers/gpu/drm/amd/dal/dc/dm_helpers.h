@@ -94,9 +94,6 @@ bool dm_helpers_dp_mst_send_payload_allocation(
 		const struct dc_stream *stream,
 		bool enable);
 
-void dm_helpers_dp_mst_handle_mst_hpd_rx_irq(
-		void *param);
-
 bool dm_helpers_dp_mst_start_top_mgr(
 		struct dc_context *ctx,
 		const struct dc_link *link,
