@@ -47,6 +47,8 @@
 
 static int amdgpu_debugfs_regs_init(struct amdgpu_device *adev);
 static void amdgpu_debugfs_regs_cleanup(struct amdgpu_device *adev);
+static int amdgpu_debugfs_status_init(struct amdgpu_device *adev);
+
 
 static const char *amdgpu_asic_name[] = {
 	"BONAIRE",
@@ -1118,6 +1120,15 @@ const struct amdgpu_ip_block_version * amdgpu_get_ip_block(
 	return NULL;
 }
 
+void amdgpu_print_status(struct amdgpu_device *adev)
+{
+	int i;
+
+	for (i = 0; i < adev->num_ip_blocks; i++)
+		if (adev->ip_blocks[i].funcs->print_status)
+			adev->ip_blocks[i].funcs->print_status(adev);
+}
+
 /**
  * amdgpu_ip_block_version_cmp
  *
@@ -1267,6 +1278,8 @@ static int amdgpu_init(struct amdgpu_device *adev)
 		}
 		adev->ip_block_status[i].hw = true;
 	}
+
+	amdgpu_debugfs_status_init(adev);
 
 	return 0;
 }
@@ -2236,3 +2249,32 @@ static int amdgpu_debugfs_regs_init(struct amdgpu_device *adev)
 }
 static void amdgpu_debugfs_regs_cleanup(struct amdgpu_device *adev) { }
 #endif
+
+/*
+ * Status debugfs
+ */
+#if defined(CONFIG_DEBUG_FS)
+static int amdgpu_debugfs_print_status(struct seq_file *m, void *data)
+{
+	struct drm_info_node *node = (struct drm_info_node *)m->private;
+	struct drm_device *dev = node->minor->dev;
+	struct amdgpu_device *adev = dev->dev_private;
+
+	amdgpu_print_status(adev);
+
+	return 0;
+}
+
+static struct drm_info_list amdgpu_debugfs_status_list[] = {
+	{"amdgpu_print_status", &amdgpu_debugfs_print_status, 0, NULL},
+};
+#endif
+
+static int amdgpu_debugfs_status_init(struct amdgpu_device *adev)
+{
+#if defined(CONFIG_DEBUG_FS)
+	return amdgpu_debugfs_add_files(adev, amdgpu_debugfs_status_list, 1);
+#else
+	return 0;
+#endif
+}
