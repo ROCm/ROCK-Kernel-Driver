@@ -113,7 +113,7 @@ static int amdgpu_bo_list_set(struct amdgpu_device *adev,
 			entry->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
 		} else {
 			entry = &array[last_entry++];
-			entry->prefered_domains = entry->robj->initial_domain;
+			entry->prefered_domains = bo->initial_domain;
 			entry->allowed_domains = entry->prefered_domains;
 			if (entry->allowed_domains == AMDGPU_GEM_DOMAIN_VRAM)
 				entry->allowed_domains |= AMDGPU_GEM_DOMAIN_GTT;
