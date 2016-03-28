@@ -786,8 +786,8 @@ static int create_sdma_queue_nocpsch(struct device_queue_manager *dqm,
 	if (retval != 0)
 		return retval;
 
-	q->properties.sdma_queue_id = q->sdma_id % CIK_SDMA_QUEUES_PER_ENGINE;
-	q->properties.sdma_engine_id = q->sdma_id / CIK_SDMA_ENGINE_NUM;
+	q->properties.sdma_queue_id = q->sdma_id / CIK_SDMA_QUEUES_PER_ENGINE;
+	q->properties.sdma_engine_id = q->sdma_id % CIK_SDMA_QUEUES_PER_ENGINE;
 
 	pr_debug("kfd: sdma id is:    %d\n", q->sdma_id);
 	pr_debug("     sdma queue id: %d\n", q->properties.sdma_queue_id);
@@ -1022,9 +1022,9 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 		if (retval != 0)
 			goto out;
 		q->properties.sdma_queue_id =
-			q->sdma_id % CIK_SDMA_QUEUES_PER_ENGINE;
+			q->sdma_id / CIK_SDMA_QUEUES_PER_ENGINE;
 		q->properties.sdma_engine_id =
-			q->sdma_id / CIK_SDMA_ENGINE_NUM;
+			q->sdma_id % CIK_SDMA_QUEUES_PER_ENGINE;
 	}
 	mqd = dqm->ops.get_mqd_manager(dqm,
 			get_mqd_type_from_queue_type(q->properties.type));
