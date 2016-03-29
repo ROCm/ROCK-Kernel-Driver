@@ -128,11 +128,6 @@ dm_dp_mst_detect(struct drm_connector *connector, bool force)
 			&master->mst_mgr,
 			aconnector->port);
 
-	if (status == connector_status_disconnected && aconnector->edid) {
-		kfree(aconnector->edid);
-		aconnector->edid = NULL;
-	}
-
 	/*
 	 * we do not want to make this connector connected until we have edid on
 	 * it
@@ -375,6 +370,14 @@ static void dm_dp_destroy_mst_connector(
 		dc_link_remove_remote_sink(aconnector->dc_link, aconnector->dc_sink);
 		aconnector->dc_sink = NULL;
 	}
+	if (aconnector->edid) {
+		kfree(aconnector->edid);
+		aconnector->edid = NULL;
+	}
+
+	drm_mode_connector_update_edid_property(
+			&aconnector->base,
+			NULL);
 }
 
 static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
@@ -390,7 +393,11 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 	drm_modeset_lock_all(dev);
 	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
 		aconnector = to_amdgpu_connector(connector);
-		if (aconnector->mst_port && !aconnector->dc_sink) {
+		if (aconnector->port && !aconnector->dc_sink) {
+			/*
+			 * This is plug in case, where port has been created but
+			 * sink hasn't been created yet
+			 */
 			if (!aconnector->edid) {
 				edid = drm_dp_mst_get_edid(connector, &aconnector->mst_port->mst_mgr, aconnector->port);
 
