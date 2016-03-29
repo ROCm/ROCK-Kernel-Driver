@@ -2077,9 +2077,7 @@ static void manage_dm_interrupts(
 			irq_type);
 	} else {
 		while (acrtc->pflip_status != AMDGPU_FLIP_NONE) {
-			/* Spin Wait*/
-
-			/* Todo: Use periodic polling rather than busy wait */
+			msleep(1);
 		}
 
 		amdgpu_irq_put(
