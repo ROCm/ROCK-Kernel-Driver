@@ -1224,6 +1224,43 @@ static void switch_dp_clock_sources(
  * Public functions
  ******************************************************************************/
 
+
+static void reset_single_pipe_hw_ctx(
+		const struct core_dc *dc,
+		struct pipe_ctx *pipe_ctx,
+		struct validate_context *context)
+{
+	struct dc_bios *dcb;
+
+	if (pipe_ctx->pipe_idx == DCE110_UNDERLAY_IDX)
+		return;
+
+	dcb = dal_adapter_service_get_bios_parser(
+			context->res_ctx.pool.adapter_srv);
+	if (pipe_ctx->audio) {
+		dal_audio_disable_output(pipe_ctx->audio,
+				pipe_ctx->stream_enc->id,
+				pipe_ctx->signal);
+		pipe_ctx->audio = NULL;
+	}
+
+	core_link_disable_stream(pipe_ctx);
+	if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
+		dm_error("DC: failed to blank crtc!\n");
+		BREAK_TO_DEBUGGER();
+	}
+	pipe_ctx->tg->funcs->disable_crtc(pipe_ctx->tg);
+	pipe_ctx->mi->funcs->free_mem_input(
+				pipe_ctx->mi, context->target_count);
+	pipe_ctx->xfm->funcs->transform_set_scaler_bypass(pipe_ctx->xfm);
+	resource_unreference_clock_source(&context->res_ctx, pipe_ctx->clock_source);
+	dc->hwss.enable_display_power_gating(
+		pipe_ctx->stream->ctx, pipe_ctx->pipe_idx, dcb,
+			PIPE_GATING_CONTROL_ENABLE);
+
+	pipe_ctx->stream = NULL;
+}
+
 /*TODO: const validate_context*/
 static enum dc_status apply_ctx_to_hw(
 		struct core_dc *dc,
@@ -1232,6 +1269,29 @@ static enum dc_status apply_ctx_to_hw(
 	enum dc_status status;
 	uint8_t i;
 
+	/* Reset old context */
+	/* look up the targets that have been removed since last commit */
+	for (i = 0; i < MAX_PIPES; i++) {
+		struct pipe_ctx *pipe_ctx_old =
+			&dc->current_context.res_ctx.pipe_ctx[i];
+		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
+
+		/* Note: We need to disable output if clock sources change,
+		 * since bios does optimization and doesn't apply if changing
+		 * PHY when not already disabled.
+		 */
+		if (pipe_ctx_old->stream && pipe_ctx_old->stream != pipe_ctx->stream)
+			reset_single_pipe_hw_ctx(
+				dc, pipe_ctx_old, &dc->current_context);
+		else if (pipe_ctx_old->clock_source != pipe_ctx->clock_source)
+			core_link_disable_stream(pipe_ctx);
+	}
+
+	/* Skip applying if no targets */
+	if (context->target_count <= 0)
+		return DC_OK;
+
+	/* Apply new context */
 	update_bios_scratch_critical_state(context->res_ctx.pool.adapter_srv,
 			true);
 
@@ -1438,59 +1498,6 @@ static void update_plane_addrs(struct core_dc *dc, struct resource_context *res_
 	}
 }
 
-static void reset_single_pipe_hw_ctx(
-		const struct core_dc *dc,
-		struct pipe_ctx *pipe_ctx,
-		struct validate_context *context)
-{
-	struct dc_bios *dcb;
-
-	if (pipe_ctx->pipe_idx == DCE110_UNDERLAY_IDX)
-		return;
-
-	dcb = dal_adapter_service_get_bios_parser(
-			context->res_ctx.pool.adapter_srv);
-	if (pipe_ctx->audio) {
-		dal_audio_disable_output(pipe_ctx->audio,
-				pipe_ctx->stream_enc->id,
-				pipe_ctx->signal);
-		pipe_ctx->audio = NULL;
-	}
-
-	core_link_disable_stream(pipe_ctx);
-	if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
-		dm_error("DC: failed to blank crtc!\n");
-		BREAK_TO_DEBUGGER();
-	}
-	pipe_ctx->tg->funcs->disable_crtc(pipe_ctx->tg);
-	pipe_ctx->mi->funcs->free_mem_input(
-				pipe_ctx->mi, context->target_count);
-	pipe_ctx->xfm->funcs->transform_set_scaler_bypass(pipe_ctx->xfm);
-	resource_unreference_clock_source(&context->res_ctx, pipe_ctx->clock_source);
-	dc->hwss.enable_display_power_gating(
-		pipe_ctx->stream->ctx, pipe_ctx->pipe_idx, dcb,
-			PIPE_GATING_CONTROL_ENABLE);
-
-	pipe_ctx->stream = NULL;
-}
-
-static void reset_hw_ctx(
-		struct core_dc *dc,
-		struct validate_context *new_context)
-{
-	uint8_t i;
-
-	/* look up the targets that have been removed since last commit */
-	for (i = 0; i < MAX_PIPES; i++) {
-		struct pipe_ctx *pipe_ctx_old =
-			&dc->current_context.res_ctx.pipe_ctx[i];
-		struct pipe_ctx *pipe_ctx = &new_context->res_ctx.pipe_ctx[i];
-
-		if (pipe_ctx_old->stream && !pipe_ctx->stream)
-			reset_single_pipe_hw_ctx(
-				dc, pipe_ctx_old, &dc->current_context);
-	}
-}
 
 static void power_down(struct core_dc *dc)
 {
@@ -1643,7 +1650,6 @@ static void init_hw(struct core_dc *dc)
 static const struct hw_sequencer_funcs dce110_funcs = {
 	.init_hw = init_hw,
 	.apply_ctx_to_hw = apply_ctx_to_hw,
-	.reset_hw_ctx = reset_hw_ctx,
 	.set_plane_config = set_plane_config,
 	.update_plane_addrs = update_plane_addrs,
 	.set_gamma_correction = set_gamma_ramp,

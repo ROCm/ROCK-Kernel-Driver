@@ -42,8 +42,6 @@ struct hw_sequencer_funcs {
 	enum dc_status (*apply_ctx_to_hw)(
 			struct core_dc *dc, struct validate_context *context);
 
-	void (*reset_hw_ctx)(struct core_dc *dc, struct validate_context *context);
-
 	void (*set_plane_config)(
 			const struct core_dc *dc,
 			struct pipe_ctx *pipe_ctx,

@@ -740,10 +740,7 @@ bool dc_commit_targets(
 	}
 
 	if (result == DC_OK) {
-		core_dc->hwss.reset_hw_ctx(core_dc, context);
-
-		if (context->target_count > 0)
-			result = core_dc->hwss.apply_ctx_to_hw(core_dc, context);
+		result = core_dc->hwss.apply_ctx_to_hw(core_dc, context);
 	}
 
 	for (i = 0; i < context->target_count; i++) {
