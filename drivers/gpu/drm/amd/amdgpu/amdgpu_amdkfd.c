@@ -440,7 +440,7 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 
 	adev = obj->dev->dev_private;
 	bo = gem_to_amdgpu_bo(obj);
-	if (!(bo->initial_domain & (AMDGPU_GEM_DOMAIN_VRAM |
+	if (!(bo->prefered_domains & (AMDGPU_GEM_DOMAIN_VRAM |
 				    AMDGPU_GEM_DOMAIN_GTT)))
 		/* Only VRAM and GTT BOs are supported */
 		goto out_put;
@@ -456,7 +456,7 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 		r = amdgpu_bo_get_metadata(bo, metadata_buffer, buffer_size,
 					   metadata_size, &metadata_flags);
 	if (flags) {
-		*flags = (bo->initial_domain & AMDGPU_GEM_DOMAIN_VRAM) ?
+		*flags = (bo->prefered_domains & AMDGPU_GEM_DOMAIN_VRAM) ?
 			ALLOC_MEM_FLAGS_VRAM : ALLOC_MEM_FLAGS_GTT;
 
 		if (bo->flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED)
