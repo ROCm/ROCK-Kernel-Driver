@@ -473,8 +473,6 @@ static int reserve_bo_and_vms(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	INIT_LIST_HEAD(&ctx->duplicates);
 
 	ctx->kfd_bo.robj = bo;
-	ctx->kfd_bo.prefered_domains = bo->initial_domain;
-	ctx->kfd_bo.allowed_domains = bo->initial_domain;
 	ctx->kfd_bo.priority = 0;
 	ctx->kfd_bo.tv.bo = &bo->tbo;
 	ctx->kfd_bo.tv.shared = true;
@@ -1304,7 +1302,7 @@ static int get_sg_table(struct amdgpu_device *adev,
 		goto out;
 	}
 
-	if (bo->initial_domain == AMDGPU_GEM_DOMAIN_VRAM)
+	if (bo->prefered_domains == AMDGPU_GEM_DOMAIN_VRAM)
 		page_size = AMD_GPU_PAGE_SIZE;
 	else
 		page_size = PAGE_SIZE;
@@ -1318,7 +1316,7 @@ static int get_sg_table(struct amdgpu_device *adev,
 	if (unlikely(ret))
 		goto out;
 
-	if (bo->initial_domain == AMDGPU_GEM_DOMAIN_VRAM) {
+	if (bo->prefered_domains == AMDGPU_GEM_DOMAIN_VRAM) {
 		bus_addr = bo->tbo.offset + adev->mc.aper_base + offset;
 
 		for_each_sg(sg->sgl, s, sg->orig_nents, i) {
@@ -1419,7 +1417,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 		goto out_put;
 
 	bo = gem_to_amdgpu_bo(obj);
-	if (!(bo->initial_domain & (AMDGPU_GEM_DOMAIN_VRAM |
+	if (!(bo->prefered_domains & (AMDGPU_GEM_DOMAIN_VRAM |
 				    AMDGPU_GEM_DOMAIN_GTT)))
 		/* Only VRAM and GTT BOs are supported */
 		goto out_put;
@@ -1439,7 +1437,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 
 	(*mem)->data2.bo = amdgpu_bo_ref(bo);
 	(*mem)->data2.va = va;
-	(*mem)->data2.domain = (bo->initial_domain & AMDGPU_GEM_DOMAIN_VRAM) ?
+	(*mem)->data2.domain = (bo->prefered_domains & AMDGPU_GEM_DOMAIN_VRAM) ?
 		AMDGPU_GEM_DOMAIN_VRAM : AMDGPU_GEM_DOMAIN_GTT;
 	(*mem)->data2.mapped_to_gpu_memory = 0;
 
