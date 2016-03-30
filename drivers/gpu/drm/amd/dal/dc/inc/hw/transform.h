@@ -166,7 +166,8 @@ struct transform_funcs {
 		const struct scaler_data *data);
 
 	void (*transform_set_scaler_bypass)(
-		struct transform *xfm);
+		struct transform *xfm,
+		struct rect *size);
 
 	void (*transform_set_scaler_filter)(
 		struct transform *xfm,

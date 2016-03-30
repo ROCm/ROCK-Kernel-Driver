@@ -453,7 +453,9 @@ static void program_scl_ratios_inits(
 	dm_write_reg(ctx, addr, value);
 }
 
-static void dce110_transform_v_set_scalerv_bypass(struct transform *xfm)
+static void dce110_transform_v_set_scalerv_bypass(
+		struct transform *xfm,
+		struct rect *size)
 {
 	uint32_t addr = mmSCLV_MODE;
 	uint32_t value = dm_read_reg(xfm->ctx, addr);

@@ -1150,7 +1150,7 @@ static void reset_single_pipe_hw_ctx(
 	pipe_ctx->tg->funcs->disable_crtc(pipe_ctx->tg);
 	pipe_ctx->mi->funcs->free_mem_input(
 				pipe_ctx->mi, context->target_count);
-	pipe_ctx->xfm->funcs->transform_set_scaler_bypass(pipe_ctx->xfm);
+	pipe_ctx->xfm->funcs->transform_set_scaler_bypass(pipe_ctx->xfm, NULL);
 	resource_unreference_clock_source(&context->res_ctx, pipe_ctx->clock_source);
 	dc->hwss.enable_display_power_gating(
 		pipe_ctx->stream->ctx, pipe_ctx->pipe_idx, dcb,

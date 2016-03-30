@@ -90,7 +90,7 @@ static bool setup_scaling_configuration(
 	dm_write_reg(ctx, addr, value);
 
 	if (data->taps.h_taps + data->taps.v_taps <= 2) {
-		dce110_transform_set_scaler_bypass(&xfm110->base);
+		dce110_transform_set_scaler_bypass(&xfm110->base, NULL);
 		return false;
 	}
 
@@ -684,7 +684,9 @@ bool dce110_transform_set_scaler(
 	return true;
 }
 
-void dce110_transform_set_scaler_bypass(struct transform *xfm)
+void dce110_transform_set_scaler_bypass(
+		struct transform *xfm,
+		struct rect *size)
 {
 	struct dce110_transform *xfm110 = TO_DCE110_TRANSFORM(xfm);
 	uint32_t sclv_mode;
