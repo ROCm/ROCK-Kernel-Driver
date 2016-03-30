@@ -613,7 +613,9 @@ struct amdgpu_gart {
 	unsigned			num_gpu_pages;
 	unsigned			num_cpu_pages;
 	unsigned			table_size;
+#ifdef CONFIG_DRM_AMDGPU_GART_DEBUGFS
 	struct page			**pages;
+#endif
 	bool				ready;
 	const struct amdgpu_gart_funcs *gart_funcs;
 };
