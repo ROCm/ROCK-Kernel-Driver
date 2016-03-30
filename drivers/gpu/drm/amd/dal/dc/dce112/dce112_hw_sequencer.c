@@ -122,19 +122,6 @@ static void dce112_enable_fe_clock(
 	dm_write_reg(ctx, addr, value);
 }
 
-/* this is a workaround for hw bug - it is a trigger on r/w */
-static void trigger_write_crtc_h_blank_start_end(
-	struct dc_context *ctx,
-	uint8_t controller_id)
-{
-	uint32_t value;
-	uint32_t addr;
-
-	addr =  HW_REG_CRTC(mmCRTC_H_BLANK_START_END, controller_id);
-	value = dm_read_reg(ctx, addr);
-	dm_write_reg(ctx, addr, value);
-}
-
 static bool dce112_pipe_control_lock(
 	struct dc_context *ctx,
 	uint8_t controller_idx,
@@ -143,7 +130,6 @@ static bool dce112_pipe_control_lock(
 {
 	uint32_t addr = HW_REG_BLND(mmBLND_V_UPDATE_LOCK, controller_idx);
 	uint32_t value = dm_read_reg(ctx, addr);
-	bool need_to_wait = false;
 
 	if (control_mask & PIPE_LOCK_CONTROL_GRAPHICS)
 		set_reg_field_value(
@@ -172,7 +158,6 @@ static bool dce112_pipe_control_lock(
 			lock,
 			BLND_V_UPDATE_LOCK,
 			BLND_BLND_V_UPDATE_LOCK);
-		need_to_wait = true;
 	}
 
 	if (control_mask & PIPE_LOCK_CONTROL_MODE)
@@ -183,100 +168,6 @@ static bool dce112_pipe_control_lock(
 			BLND_V_UPDATE_LOCK_MODE);
 
 	dm_write_reg(ctx, addr, value);
-
-	need_to_wait = false;/*todo: mpo optimization remove*/
-	if (!lock && need_to_wait) {
-		uint8_t counter = 0;
-		const uint8_t counter_limit = 100;
-		const uint16_t delay_us = 1000;
-
-		uint8_t pipe_pending;
-
-		addr = HW_REG_BLND(mmBLND_REG_UPDATE_STATUS,
-				controller_idx);
-
-		while (counter < counter_limit) {
-			value = dm_read_reg(ctx, addr);
-
-			pipe_pending = 0;
-
-			if (control_mask & PIPE_LOCK_CONTROL_BLENDER) {
-				pipe_pending |=
-					get_reg_field_value(
-						value,
-						BLND_REG_UPDATE_STATUS,
-						BLND_BLNDC_UPDATE_PENDING);
-				pipe_pending |= get_reg_field_value(
-					value,
-					BLND_REG_UPDATE_STATUS,
-					BLND_BLNDO_UPDATE_PENDING);
-			}
-
-			if (control_mask & PIPE_LOCK_CONTROL_SCL) {
-				pipe_pending |=
-					get_reg_field_value(
-						value,
-						BLND_REG_UPDATE_STATUS,
-						SCL_BLNDC_UPDATE_PENDING);
-				pipe_pending |=
-					get_reg_field_value(
-						value,
-						BLND_REG_UPDATE_STATUS,
-						SCL_BLNDO_UPDATE_PENDING);
-			}
-			if (control_mask & PIPE_LOCK_CONTROL_GRAPHICS) {
-				pipe_pending |=
-					get_reg_field_value(
-						value,
-						BLND_REG_UPDATE_STATUS,
-						DCP_BLNDC_GRPH_UPDATE_PENDING);
-				pipe_pending |=
-					get_reg_field_value(
-						value,
-						BLND_REG_UPDATE_STATUS,
-						DCP_BLNDO_GRPH_UPDATE_PENDING);
-			}
-			if (control_mask & PIPE_LOCK_CONTROL_SURFACE) {
-				pipe_pending |= get_reg_field_value(
-					value,
-					BLND_REG_UPDATE_STATUS,
-					DCP_BLNDC_GRPH_SURF_UPDATE_PENDING);
-				pipe_pending |= get_reg_field_value(
-					value,
-					BLND_REG_UPDATE_STATUS,
-					DCP_BLNDO_GRPH_SURF_UPDATE_PENDING);
-			}
-
-			if (pipe_pending == 0)
-				break;
-
-			counter++;
-			udelay(delay_us);
-		}
-
-		if (counter == counter_limit) {
-			dal_logger_write(
-				ctx->logger,
-				LOG_MAJOR_WARNING,
-				LOG_MINOR_COMPONENT_CONTROLLER,
-				"%s: wait for update exceeded (wait %d us)\n",
-				__func__,
-				counter * delay_us);
-			dal_logger_write(
-				ctx->logger,
-				LOG_MAJOR_WARNING,
-				LOG_MINOR_COMPONENT_CONTROLLER,
-				"%s: control %d, remain value %x\n",
-				__func__,
-				control_mask,
-				value);
-		} else {
-			/* OK. */
-		}
-	}
-
-	if (!lock && (control_mask & PIPE_LOCK_CONTROL_BLENDER))
-		trigger_write_crtc_h_blank_start_end(ctx, controller_idx);
 
 	return true;
 }
