@@ -39,8 +39,16 @@
 #define HSA_CAP_WATCH_POINTS_SUPPORTED		0x00000080
 #define HSA_CAP_WATCH_POINTS_TOTALBITS_MASK	0x00000f00
 #define HSA_CAP_WATCH_POINTS_TOTALBITS_SHIFT	8
-#define HSA_CAP_RESERVED			0xfffff000
+#define HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK	0x00003000
+#define HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT	12
+#define HSA_CAP_RESERVED			0xffffc000
+
+#define HSA_CAP_DOORBELL_TYPE_PRE_1_0		0x0
+#define HSA_CAP_DOORBELL_TYPE_1_0		0x1
+#define HSA_CAP_WATCH_POINTS_TOTALBITS_MASK	0x00000f00
+#define HSA_CAP_WATCH_POINTS_TOTALBITS_SHIFT	8
 #define HSA_CAP_DOORBELL_PACKET_TYPE		0x00001000
+#define HSA_CAP_AQL_QUEUE_DOUBLE_MAP		0x00004000
 
 struct kfd_node_properties {
 	uint32_t cpu_cores_count;
@@ -91,8 +99,6 @@ struct kfd_mem_properties {
 	struct attribute	attr;
 };
 
-#define KFD_TOPOLOGY_CPU_SIBLINGS 256
-
 #define HSA_CACHE_TYPE_DATA		0x00000001
 #define HSA_CACHE_TYPE_INSTRUCTION	0x00000002
 #define HSA_CACHE_TYPE_CPU		0x00000004
@@ -109,7 +115,7 @@ struct kfd_cache_properties {
 	uint32_t		cache_assoc;
 	uint32_t		cache_latency;
 	uint32_t		cache_type;
-	uint8_t			sibling_map[KFD_TOPOLOGY_CPU_SIBLINGS];
+	uint8_t			sibling_map[CRAT_SIBLINGMAP_SIZE];
 	struct kobject		*kobj;
 	struct attribute	attr;
 };
@@ -135,8 +141,8 @@ struct kfd_iolink_properties {
 struct kfd_topology_device {
 	struct list_head		list;
 	uint32_t			gpu_id;
+	uint32_t			proximity_domain;
 	struct kfd_node_properties	node_props;
-	uint32_t			mem_bank_count;
 	struct list_head		mem_props;
 	uint32_t			cache_count;
 	struct list_head		cache_props;
@@ -150,6 +156,9 @@ struct kfd_topology_device {
 	struct attribute		attr_gpuid;
 	struct attribute		attr_name;
 	struct attribute		attr_props;
+	uint8_t		oem_id[CRAT_OEMID_LENGTH];
+	uint8_t		oem_table_id[CRAT_OEMTABLEID_LENGTH];
+	uint32_t	oem_revision;
 };
 
 struct kfd_system_properties {
@@ -164,6 +173,8 @@ struct kfd_system_properties {
 	struct attribute	attr_props;
 };
 
-
+struct kfd_topology_device *kfd_create_topology_device(
+		struct list_head *device_list);
+void kfd_release_live_view(void);
 
 #endif /* __KFD_TOPOLOGY_H__ */

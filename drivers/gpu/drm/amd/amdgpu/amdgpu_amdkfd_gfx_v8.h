@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Advanced Micro Devices, Inc.
+ * Copyright 2015 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -18,23 +18,45 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
  */
 
-#include "kfd_priv.h"
+#ifndef AMDGPU_AMDKFD_GFX_V8_H_INCLUDED
+#define AMDGPU_AMDKFD_GFX_V8_H_INCLUDED
 
-struct mqd_manager *mqd_manager_init(enum KFD_MQD_TYPE type,
-					struct kfd_dev *dev)
-{
-	switch (dev->device_info->asic_family) {
-	case CHIP_KAVERI:
-		return mqd_manager_init_cik(type, dev);
-	case CHIP_CARRIZO:
-		return mqd_manager_init_vi(type, dev);
-	case CHIP_TONGA:
-	case CHIP_FIJI:
-		return mqd_manager_init_vi_tonga(type, dev);
-	}
+#include <linux/types.h>
 
-	return NULL;
-}
+enum {
+	MAX_TRAPID = 8,		/* 3 bits in the bitfield. */
+	MAX_WATCH_ADDRESSES = 4
+};
+
+enum {
+	ADDRESS_WATCH_REG_ADDR_HI = 0,
+	ADDRESS_WATCH_REG_ADDR_LO,
+	ADDRESS_WATCH_REG_CNTL,
+	ADDRESS_WATCH_REG_MAX
+};
+
+/*  not defined in the VI reg file  */
+enum {
+	ADDRESS_WATCH_REG_CNTL_ATC_BIT = 0x10000000UL,
+	ADDRESS_WATCH_REG_CNTL_DEFAULT_MASK = 0x00FFFFFF,
+	ADDRESS_WATCH_REG_ADDLOW_MASK_EXTENSION = 0x03000000,
+	/* extend the mask to 26 bits in order to match the low address field. */
+	ADDRESS_WATCH_REG_ADDLOW_SHIFT = 6,
+	ADDRESS_WATCH_REG_ADDHIGH_MASK = 0xFFFF
+};
+
+union TCP_WATCH_CNTL_BITS {
+	struct {
+		uint32_t mask:24;
+		uint32_t vmid:4;
+		uint32_t atc:1;
+		uint32_t mode:2;
+		uint32_t valid:1;
+	} bitfields, bits;
+	uint32_t u32All;
+	signed int i32All;
+	float f32All;
+};
+#endif
