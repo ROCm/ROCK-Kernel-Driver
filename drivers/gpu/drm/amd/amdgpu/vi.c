@@ -1359,7 +1359,7 @@ int vi_set_ip_blocks(struct amdgpu_device *adev)
 		break;
 	case CHIP_FIJI:
 #if defined(CONFIG_DRM_AMD_DAL)
-		if (amdgpu_dal && amdgpu_device_has_dal_support(adev)) {
+		if (amdgpu_device_has_dal_support(adev)) {
 			adev->ip_blocks = fiji_ip_blocks_dal;
 			adev->num_ip_blocks = ARRAY_SIZE(fiji_ip_blocks_dal);
 		} else {
@@ -1373,7 +1373,7 @@ int vi_set_ip_blocks(struct amdgpu_device *adev)
 		break;
 	case CHIP_TONGA:
 #if defined(CONFIG_DRM_AMD_DAL)
-		if (amdgpu_dal && amdgpu_device_has_dal_support(adev)) {
+		if (amdgpu_device_has_dal_support(adev)) {
 			adev->ip_blocks = tonga_ip_blocks_dal;
 			adev->num_ip_blocks = ARRAY_SIZE(tonga_ip_blocks_dal);
 		} else {
@@ -1388,7 +1388,7 @@ int vi_set_ip_blocks(struct amdgpu_device *adev)
 	case CHIP_POLARIS11:
 	case CHIP_POLARIS10:
 #if defined(CONFIG_DRM_AMD_DAL)
-		if (amdgpu_dal && amdgpu_device_has_dal_support(adev)) {
+		if (amdgpu_device_has_dal_support(adev)) {
 			adev->ip_blocks = polaris11_ip_blocks_dal;
 			adev->num_ip_blocks = ARRAY_SIZE(polaris11_ip_blocks_dal);
 		} else {
@@ -1403,7 +1403,7 @@ int vi_set_ip_blocks(struct amdgpu_device *adev)
 	case CHIP_CARRIZO:
 	case CHIP_STONEY:
 #if defined(CONFIG_DRM_AMD_DAL)
-		if (amdgpu_dal && amdgpu_device_has_dal_support(adev)) {
+		if (amdgpu_device_has_dal_support(adev)) {
 			adev->ip_blocks = cz_ip_blocks_dal;
 			adev->num_ip_blocks = ARRAY_SIZE(cz_ip_blocks_dal);
 		} else {

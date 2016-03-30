@@ -2112,7 +2112,7 @@ int cik_set_ip_blocks(struct amdgpu_device *adev)
 	switch (adev->asic_type) {
 	case CHIP_BONAIRE:
 #if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
-		if (amdgpu_dal && amdgpu_device_has_dal_support(adev)) {
+		if (amdgpu_device_has_dal_support(adev)) {
 			adev->ip_blocks = bonaire_ip_blocks_dal;
 			adev->num_ip_blocks = ARRAY_SIZE(bonaire_ip_blocks_dal);
 		} else {
@@ -2126,7 +2126,7 @@ int cik_set_ip_blocks(struct amdgpu_device *adev)
 		break;
 	case CHIP_HAWAII:
 #if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
-		if (amdgpu_dal && amdgpu_device_has_dal_support(adev)) {
+		if (amdgpu_device_has_dal_support(adev)) {
 			adev->ip_blocks = hawaii_ip_blocks_dal;
 			adev->num_ip_blocks = ARRAY_SIZE(hawaii_ip_blocks_dal);
 		} else {
