@@ -29,12 +29,9 @@
 #include "kfd_priv.h"
 #include "kfd_mqd_manager.h"
 
-#define QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS	(500)
+#define QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS	(9000)
 #define QUEUES_PER_PIPE				(8)
 #define PIPE_PER_ME_CP_SCHEDULING		(3)
-#define CIK_VMID_NUM				(8)
-#define KFD_VMID_START_OFFSET			(8)
-#define VMID_PER_DEVICE				CIK_VMID_NUM
 #define KFD_DQM_FIRST_PIPE			(0)
 #define CIK_SDMA_QUEUES				(4)
 #define CIK_SDMA_QUEUES_PER_ENGINE		(2)
@@ -81,6 +78,12 @@ struct device_process_node {
  * @set_cache_memory_policy: Sets memory policy (cached/ non cached) for the
  * memory apertures.
  *
+ * @set_page_directory_base: Sets the PD base address (GPU local memory)
+ * in all the queues of the relevant process running on the specified device.
+ * It preempts the queues, updates the value and execute the runlist again.
+ *
+ * @process_termination: Clears all process queues belongs to that device.
+ *
  */
 
 struct device_queue_manager_ops {
@@ -124,6 +127,16 @@ struct device_queue_manager_ops {
 					   enum cache_policy alternate_policy,
 					   void __user *alternate_aperture_base,
 					   uint64_t alternate_aperture_size);
+
+	int	(*set_trap_handler)(struct device_queue_manager *dqm,
+				    struct qcm_process_device *qpd,
+				    uint64_t tba_addr,
+				    uint64_t tma_addr);
+
+	int	(*set_page_directory_base)(struct device_queue_manager *dqm,
+					struct qcm_process_device *qpd);
+	int (*process_termination)(struct device_queue_manager *dqm,
+			struct qcm_process_device *qpd);
 };
 
 struct device_queue_manager_asic_ops {
@@ -180,12 +193,20 @@ struct device_queue_manager {
 
 void device_queue_manager_init_cik(struct device_queue_manager_asic_ops *ops);
 void device_queue_manager_init_vi(struct device_queue_manager_asic_ops *ops);
+void device_queue_manager_init_vi_tonga(
+		struct device_queue_manager_asic_ops *ops);
 void program_sh_mem_settings(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd);
 int init_pipelines(struct device_queue_manager *dqm,
 		unsigned int pipes_num, unsigned int first_pipe);
 unsigned int get_first_pipe(struct device_queue_manager *dqm);
 unsigned int get_pipes_num(struct device_queue_manager *dqm);
+
+int process_evict_queues(struct device_queue_manager *dqm,
+		struct qcm_process_device *qpd);
+int process_restore_queues(struct device_queue_manager *dqm,
+		struct qcm_process_device *qpd);
+
 
 static inline unsigned int get_sh_mem_bases_32(struct kfd_process_device *pdd)
 {

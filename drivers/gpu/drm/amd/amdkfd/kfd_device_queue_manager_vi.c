@@ -39,6 +39,31 @@ static int initialize_cpsch_vi(struct device_queue_manager *dqm);
 static void init_sdma_vm(struct device_queue_manager *dqm, struct queue *q,
 				struct qcm_process_device *qpd);
 
+/*
+ * Tonga device queue manager functions
+ */
+static bool set_cache_memory_policy_vi_tonga(struct device_queue_manager *dqm,
+			struct qcm_process_device *qpd,
+			enum cache_policy default_policy,
+			enum cache_policy alternate_policy,
+			void __user *alternate_aperture_base,
+			uint64_t alternate_aperture_size);
+static int register_process_vi_tonga(struct device_queue_manager *dqm,
+			struct qcm_process_device *qpd);
+static void init_sdma_vm_tonga(struct device_queue_manager *dqm,
+			struct queue *q,
+			struct qcm_process_device *qpd);
+
+void device_queue_manager_init_vi_tonga(
+		struct device_queue_manager_asic_ops *ops)
+{
+	ops->set_cache_memory_policy = set_cache_memory_policy_vi_tonga;
+	ops->register_process = register_process_vi_tonga;
+	ops->initialize = initialize_cpsch_vi;
+	ops->init_sdma_vm = init_sdma_vm_tonga;
+}
+
+
 void device_queue_manager_init_vi(struct device_queue_manager_asic_ops *ops)
 {
 	ops->set_cache_memory_policy = set_cache_memory_policy_vi;
@@ -104,6 +129,33 @@ static bool set_cache_memory_policy_vi(struct device_queue_manager *dqm,
 	return true;
 }
 
+static bool set_cache_memory_policy_vi_tonga(struct device_queue_manager *dqm,
+		struct qcm_process_device *qpd,
+		enum cache_policy default_policy,
+		enum cache_policy alternate_policy,
+		void __user *alternate_aperture_base,
+		uint64_t alternate_aperture_size)
+{
+	uint32_t default_mtype;
+	uint32_t ape1_mtype;
+
+	default_mtype = (default_policy == cache_policy_coherent) ?
+			MTYPE_UC :
+			MTYPE_NC_NV;
+
+	ape1_mtype = (alternate_policy == cache_policy_coherent) ?
+			MTYPE_UC :
+			MTYPE_NC_NV;
+
+	qpd->sh_mem_config =
+			SH_MEM_ALIGNMENT_MODE_UNALIGNED <<
+				   SH_MEM_CONFIG__ALIGNMENT_MODE__SHIFT |
+			default_mtype << SH_MEM_CONFIG__DEFAULT_MTYPE__SHIFT |
+			ape1_mtype << SH_MEM_CONFIG__APE1_MTYPE__SHIFT;
+
+	return true;
+}
+
 static int register_process_vi(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd)
 {
@@ -137,10 +189,47 @@ static int register_process_vi(struct device_queue_manager *dqm,
 		qpd->sh_mem_bases = compute_sh_mem_bases_64bit(temp);
 		qpd->sh_mem_config |= SH_MEM_ADDRESS_MODE_HSA64 <<
 			SH_MEM_CONFIG__ADDRESS_MODE__SHIFT;
+		qpd->sh_mem_config |= 1  <<
+			SH_MEM_CONFIG__PRIVATE_ATC__SHIFT;
 	}
 
 	pr_debug("kfd: is32bit process: %d sh_mem_bases nybble: 0x%X and register 0x%X\n",
 		qpd->pqm->process->is_32bit_user_mode, temp, qpd->sh_mem_bases);
+
+	return 0;
+}
+
+static int register_process_vi_tonga(struct device_queue_manager *dqm,
+			struct qcm_process_device *qpd)
+{
+	struct kfd_process_device *pdd;
+	unsigned int temp;
+
+	BUG_ON(!dqm || !qpd);
+
+	pdd = qpd_to_pdd(qpd);
+
+	/* check if sh_mem_config register already configured */
+	if (qpd->sh_mem_config == 0) {
+		qpd->sh_mem_config =
+				SH_MEM_ALIGNMENT_MODE_UNALIGNED <<
+					SH_MEM_CONFIG__ALIGNMENT_MODE__SHIFT |
+				MTYPE_UC <<
+					SH_MEM_CONFIG__DEFAULT_MTYPE__SHIFT |
+				MTYPE_UC <<
+					SH_MEM_CONFIG__APE1_MTYPE__SHIFT;
+
+		qpd->sh_mem_ape1_limit = 0;
+		qpd->sh_mem_ape1_base = 0;
+	}
+
+	/* On dGPU we're always in GPUVM64 addressing mode with 64-bit
+	 * aperture addresses. */
+	temp = get_sh_mem_bases_nybble_64(pdd);
+	qpd->sh_mem_bases = compute_sh_mem_bases_64bit(temp);
+
+	pr_debug("kfd: sh_mem_bases nybble: 0x%X and register 0x%X\n",
+		temp, qpd->sh_mem_bases);
 
 	return 0;
 }
@@ -160,6 +249,23 @@ static void init_sdma_vm(struct device_queue_manager *dqm, struct queue *q,
 
 	q->properties.sdma_vm_addr = value;
 }
+
+static void init_sdma_vm_tonga(struct device_queue_manager *dqm,
+			struct queue *q,
+			struct qcm_process_device *qpd)
+{
+	uint32_t value = 0;
+
+	if (q->process->is_32bit_user_mode)
+		value |= (1 << SDMA0_RLC0_VIRTUAL_ADDR__PTR32__SHIFT) |
+				get_sh_mem_bases_32(qpd_to_pdd(qpd));
+	else
+		value |= ((get_sh_mem_bases_nybble_64(qpd_to_pdd(qpd))) <<
+				SDMA0_RLC0_VIRTUAL_ADDR__SHARED_BASE__SHIFT) &
+				SDMA0_RLC0_VIRTUAL_ADDR__SHARED_BASE_MASK;
+	q->properties.sdma_vm_addr = value;
+}
+
 
 static int initialize_cpsch_vi(struct device_queue_manager *dqm)
 {

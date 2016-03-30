@@ -142,12 +142,11 @@ int kfd_doorbell_mmap(struct kfd_process *process, struct vm_area_struct *vma)
 
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-	pr_debug("kfd: mapping doorbell page in %s\n"
+	pr_debug("kfd: mapping doorbell page in kfd_doorbell_mmap\n"
 		 "     target user address == 0x%08llX\n"
 		 "     physical address    == 0x%08llX\n"
 		 "     vm_flags            == 0x%04lX\n"
 		 "     size                == 0x%04lX\n",
-		 __func__,
 		 (unsigned long long) vma->vm_start, address, vma->vm_flags,
 		 doorbell_process_allocation());
 

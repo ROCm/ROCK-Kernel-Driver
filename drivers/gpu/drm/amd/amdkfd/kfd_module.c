@@ -29,10 +29,11 @@
 #define KFD_DRIVER_AUTHOR	"AMD Inc. and others"
 
 #define KFD_DRIVER_DESC		"Standalone HSA driver for AMD's GPUs"
-#define KFD_DRIVER_DATE		"20150421"
-#define KFD_DRIVER_MAJOR	0
-#define KFD_DRIVER_MINOR	7
-#define KFD_DRIVER_PATCHLEVEL	2
+#define KFD_DRIVER_DATE		"20160129"
+#define KFD_DRIVER_MAJOR	1
+#define KFD_DRIVER_MINOR	8
+#define KFD_DRIVER_PATCHLEVEL	1
+#define KFD_DRIVER_RC_LEVEL	""
 
 static const struct kgd2kfd_calls kgd2kfd = {
 	.exit		= kgd2kfd_exit,
@@ -42,12 +43,25 @@ static const struct kgd2kfd_calls kgd2kfd = {
 	.interrupt	= kgd2kfd_interrupt,
 	.suspend	= kgd2kfd_suspend,
 	.resume		= kgd2kfd_resume,
+	.evict_bo	= kgd2kfd_evict_bo,
+	.restore	= kgd2kfd_restore,
+	.quiesce_mm	= kgd2kfd_quiesce_mm,
+	.resume_mm	= kgd2kfd_resume_mm,
 };
 
 int sched_policy = KFD_SCHED_POLICY_HWS;
 module_param(sched_policy, int, 0444);
 MODULE_PARM_DESC(sched_policy,
 	"Scheduling policy (0 = HWS (Default), 1 = HWS without over-subscription, 2 = Non-HWS (Used for debugging only)");
+
+int hws_max_conc_proc = 0;
+module_param(hws_max_conc_proc, int, 0444);
+MODULE_PARM_DESC(hws_max_conc_proc,
+	"Max # processes HWS can execute concurrently when sched_policy=0 (0 = no concurrency (Default), #VMIDs for KFD = Maximum)");
+
+int cwsr_enable = 1;
+module_param(cwsr_enable, int, 0444);
+MODULE_PARM_DESC(cwsr_enable, "CWSR enable (0 = Off, 1 = On (Default))");
 
 int max_num_of_queues_per_device = KFD_MAX_NUM_OF_QUEUES_PER_DEVICE_DEFAULT;
 module_param(max_num_of_queues_per_device, int, 0444);
@@ -60,6 +74,11 @@ MODULE_PARM_DESC(send_sigterm,
 	"Send sigterm to HSA process on unhandled exception (0 = disable, 1 = enable)");
 
 static int amdkfd_init_completed;
+
+int debug_largebar = 0;
+module_param(debug_largebar, int, 0444);
+MODULE_PARM_DESC(debug_largebar,
+	"Debug large-bar flag used to simulate large-bar capability on non-large bar machine (0 = disable, 1 = enable)");
 
 int kgd2kfd_init(unsigned interface_version, const struct kgd2kfd_calls **g2f)
 {
@@ -149,4 +168,5 @@ MODULE_DESCRIPTION(KFD_DRIVER_DESC);
 MODULE_LICENSE("GPL and additional rights");
 MODULE_VERSION(__stringify(KFD_DRIVER_MAJOR) "."
 	       __stringify(KFD_DRIVER_MINOR) "."
-	       __stringify(KFD_DRIVER_PATCHLEVEL));
+	       __stringify(KFD_DRIVER_PATCHLEVEL)
+	       KFD_DRIVER_RC_LEVEL);

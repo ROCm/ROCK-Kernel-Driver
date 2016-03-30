@@ -27,7 +27,7 @@
 #include <linux/ioctl.h>
 
 #define KFD_IOCTL_MAJOR_VERSION 1
-#define KFD_IOCTL_MINOR_VERSION 1
+#define KFD_IOCTL_MINOR_VERSION 2
 
 struct kfd_ioctl_get_version_args {
 	uint32_t major_version;	/* from KFD */
@@ -58,7 +58,8 @@ struct kfd_ioctl_create_queue_args {
 	uint64_t eop_buffer_address;	/* to KFD */
 	uint64_t eop_buffer_size;	/* to KFD */
 	uint64_t ctx_save_restore_address; /* to KFD */
-	uint64_t ctx_save_restore_size;	/* to KFD */
+	uint32_t ctx_save_restore_size;	/* to KFD */
+	uint32_t ctl_stack_size;	/* to KFD */
 };
 
 struct kfd_ioctl_destroy_queue_args {
@@ -75,6 +76,12 @@ struct kfd_ioctl_update_queue_args {
 	uint32_t queue_priority;	/* to KFD */
 };
 
+struct kfd_ioctl_set_cu_mask_args {
+	uint32_t queue_id;		/* to KFD */
+	uint32_t num_cu_mask;		/* to KFD */
+	uint64_t cu_mask_ptr;		/* to KFD */
+};
+
 /* For kfd_ioctl_set_memory_policy_args.default_policy and alternate_policy */
 #define KFD_IOC_CACHE_POLICY_COHERENT 0
 #define KFD_IOC_CACHE_POLICY_NONCOHERENT 1
@@ -86,6 +93,13 @@ struct kfd_ioctl_set_memory_policy_args {
 	uint32_t gpu_id;			/* to KFD */
 	uint32_t default_policy;		/* to KFD */
 	uint32_t alternate_policy;		/* to KFD */
+	uint32_t pad;
+};
+
+struct kfd_ioctl_set_trap_handler_args {
+	uint64_t tba_addr;
+	uint64_t tma_addr;
+	uint32_t gpu_id;			/* to KFD */
 	uint32_t pad;
 };
 
@@ -143,41 +157,47 @@ struct kfd_ioctl_dbg_unregister_args {
 };
 
 struct kfd_ioctl_dbg_address_watch_args {
-	uint64_t content_ptr;		/* a pointer to the actual content */
 	uint32_t gpu_id;		/* to KFD */
 	uint32_t buf_size_in_bytes;	/*including gpu_id and buf_size */
+	void	*content_ptr;	/* a pointer to the actual content */
 };
 
 struct kfd_ioctl_dbg_wave_control_args {
-	uint64_t content_ptr;		/* a pointer to the actual content */
 	uint32_t gpu_id;		/* to KFD */
 	uint32_t buf_size_in_bytes;	/*including gpu_id and buf_size */
+	void	*content_ptr;	/* a pointer to the actual content */
 };
 
 /* Matching HSA_EVENTTYPE */
-#define KFD_IOC_EVENT_SIGNAL			0
-#define KFD_IOC_EVENT_NODECHANGE		1
-#define KFD_IOC_EVENT_DEVICESTATECHANGE		2
-#define KFD_IOC_EVENT_HW_EXCEPTION		3
-#define KFD_IOC_EVENT_SYSTEM_EVENT		4
-#define KFD_IOC_EVENT_DEBUG_EVENT		5
-#define KFD_IOC_EVENT_PROFILE_EVENT		6
-#define KFD_IOC_EVENT_QUEUE_EVENT		7
-#define KFD_IOC_EVENT_MEMORY			8
+#define KFD_IOC_EVENT_SIGNAL		0
+#define KFD_IOC_EVENT_NODECHANGE	1
+#define KFD_IOC_EVENT_DEVICESTATECHANGE	2
+#define KFD_IOC_EVENT_HW_EXCEPTION	3
+#define KFD_IOC_EVENT_SYSTEM_EVENT	4
+#define KFD_IOC_EVENT_DEBUG_EVENT	5
+#define KFD_IOC_EVENT_PROFILE_EVENT	6
+#define KFD_IOC_EVENT_QUEUE_EVENT	7
+#define KFD_IOC_EVENT_MEMORY		8
 
-#define KFD_IOC_WAIT_RESULT_COMPLETE		0
-#define KFD_IOC_WAIT_RESULT_TIMEOUT		1
-#define KFD_IOC_WAIT_RESULT_FAIL		2
+#define KFD_IOC_WAIT_RESULT_COMPLETE	0
+#define KFD_IOC_WAIT_RESULT_TIMEOUT	1
+#define KFD_IOC_WAIT_RESULT_FAIL	2
 
-#define KFD_SIGNAL_EVENT_LIMIT			256
+/*
+ * The added 512 is because, currently, 8*(4096/256) signal events are
+ * reserved for debugger events, and we want to provide at least 4K signal
+ * events for EOP usage.
+ * We add 512 to make the allocated size (KFD_SIGNAL_EVENT_LIMIT * 8) be
+ * page aligned.
+ */
+#define KFD_SIGNAL_EVENT_LIMIT		(4096 + 512)
 
 struct kfd_ioctl_create_event_args {
 	uint64_t event_page_offset;	/* from KFD */
 	uint32_t event_trigger_data;	/* from KFD - signal events only */
 	uint32_t event_type;		/* to KFD */
 	uint32_t auto_reset;		/* to KFD */
-	uint32_t node_id;		/* to KFD - only valid for certain
-							event types */
+	uint32_t node_id;		/* to KFD - only valid for certain event types */
 	uint32_t event_id;		/* from KFD */
 	uint32_t event_slot_index;	/* from KFD */
 };
@@ -197,19 +217,19 @@ struct kfd_ioctl_reset_event_args {
 	uint32_t pad;
 };
 
+
 struct kfd_memory_exception_failure {
-	uint32_t NotPresent;	/* Page not present or supervisor privilege */
-	uint32_t ReadOnly;	/* Write access to a read-only page */
-	uint32_t NoExecute;	/* Execute access to a page marked NX */
-	uint32_t pad;
+	bool NotPresent;  /* Page not present or supervisor privilege */
+	bool ReadOnly;  /* Write access to a read-only page */
+	bool NoExecute;  /* Execute access to a page marked NX */
+	bool imprecise;  /* Can't determine the  exact fault address */
 };
 
 /* memory exception data*/
 struct kfd_hsa_memory_exception_data {
-	struct kfd_memory_exception_failure failure;
 	uint64_t va;
 	uint32_t gpu_id;
-	uint32_t pad;
+	struct kfd_memory_exception_failure failure;
 };
 
 /* Event data*/
@@ -218,7 +238,7 @@ struct kfd_event_data {
 		struct kfd_hsa_memory_exception_data memory_exception_data;
 	};				/* From KFD */
 	uint64_t kfd_event_data_ext;	/* pointer to an extension structure
-					   for future exception types */
+	 	 	 	 	   for future exception types */
 	uint32_t event_id;		/* to KFD */
 	uint32_t pad;
 };
@@ -230,6 +250,118 @@ struct kfd_ioctl_wait_events_args {
 	uint32_t wait_for_all;		/* to KFD */
 	uint32_t timeout;		/* to KFD */
 	uint32_t wait_result;		/* from KFD */
+};
+
+struct kfd_ioctl_alloc_memory_of_gpu_args {
+	uint64_t va_addr;	/* to KFD */
+	uint64_t size;		/* to KFD */
+	uint64_t handle;	/* from KFD */
+	uint32_t gpu_id;	/* to KFD */
+	uint64_t mmap_offset;   /* from KFD */
+};
+
+struct kfd_ioctl_free_memory_of_gpu_args {
+	uint64_t handle;	/* to KFD */
+};
+
+struct kfd_ioctl_map_memory_to_gpu_args {
+	uint64_t handle;			/* to KFD */
+};
+
+struct kfd_ioctl_map_memory_to_gpu_new_args {
+	uint64_t handle;			/* to KFD */
+	uint32_t *device_ids_array;		/* to KFD */
+	uint32_t device_ids_array_size;		/* to KFD */
+	uint32_t pad;
+};
+
+struct kfd_ioctl_unmap_memory_from_gpu_args {
+	uint64_t handle;	/* to KFD */
+};
+
+struct kfd_ioctl_unmap_memory_from_gpu_new_args {
+	uint64_t handle;	/* to KFD */
+	uint32_t *device_ids_array;             /* to KFD */
+	uint32_t device_ids_array_size;         /* to KFD */
+	uint32_t pad;
+};
+
+struct kfd_ioctl_open_graphic_handle_args {
+	uint64_t va_addr;		/* to KFD */
+	uint64_t handle;		/* from KFD */
+	uint32_t gpu_id;		/* to KFD */
+	int graphic_device_fd;		/* to KFD */
+	uint32_t graphic_handle;	/* to KFD */
+	uint32_t pad;
+};
+
+struct kfd_ioctl_set_process_dgpu_aperture_args {
+	uint32_t gpu_id;
+	uint64_t dgpu_base;
+	uint64_t dgpu_limit;
+};
+
+struct kfd_ioctl_eviction_args {
+	uint64_t size;
+	uint64_t type;
+};
+
+enum evict_type {
+	EVICT_FIRST_PDD = 0,
+	EVICT_BIGGEST_PDD
+};
+
+/*
+ * GPU Memory allocation flags
+ */
+#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_HOST		(1 << 0)
+#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE		(1 << 1)
+#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_SCRATCH	(1 << 2)
+#define KFD_IOC_ALLOC_MEM_FLAGS_APU_DEVICE		(1 << 3)
+#define KFD_IOC_ALLOC_MEM_FLAGS_APU_SCRATCH		(1 << 4)
+
+#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM		(1 << 5)
+
+#define KFD_IOC_ALLOC_MEM_FLAGS_USERPTR			(1 << 6)
+
+struct kfd_ioctl_alloc_memory_of_gpu_new_args {
+	uint64_t va_addr;	/* to KFD */
+	uint64_t size;		/* to KFD */
+	uint64_t handle;	/* from KFD */
+	uint32_t gpu_id;	/* to KFD */
+	uint64_t mmap_offset;   /* to KFD (userptr), from KFD (mmap offset) */
+	uint32_t flags;
+};
+
+struct kfd_ioctl_get_process_apertures_new_args {
+	/* User allocated. Pointer to struct kfd_process_device_apertures
+	 * filled in by Kernel */
+	uint64_t kfd_process_device_apertures_ptr;
+
+	/* to KFD - indicates amount of memory present in
+	 *  kfd_process_device_apertures_ptr
+	 * from KFD - Number of entries filled by KFD.
+	 */
+	uint32_t num_of_nodes;
+
+	uint32_t pad;
+};
+
+struct kfd_ioctl_get_dmabuf_info_args {
+	uint64_t size;		/* from KFD */
+	uint64_t metadata_ptr;	/* to KFD */
+	uint32_t metadata_size;	/* to KFD (space allocated by user)
+				 * from KFD (actual metadata size) */
+	uint32_t gpu_id;	/* from KFD */
+	uint32_t flags;		/* from KFD (KFD_IOC_ALLOC_MEM_FLAGS) */
+	uint32_t dmabuf_fd;	/* to KFD */
+};
+
+struct kfd_ioctl_import_dmabuf_args {
+	uint64_t va_addr;	/* to KFD */
+	uint64_t handle;	/* from KFD */
+	uint32_t gpu_id;	/* to KFD */
+	uint32_t dmabuf_fd;	/* to KFD */
 };
 
 #define AMDKFD_IOCTL_BASE 'K'
@@ -286,7 +418,55 @@ struct kfd_ioctl_wait_events_args {
 #define AMDKFD_IOC_DBG_WAVE_CONTROL		\
 		AMDKFD_IOW(0x10, struct kfd_ioctl_dbg_wave_control_args)
 
+#define AMDKFD_IOC_ALLOC_MEMORY_OF_GPU		\
+		AMDKFD_IOWR(0x11, struct kfd_ioctl_alloc_memory_of_gpu_args)
+
+#define AMDKFD_IOC_FREE_MEMORY_OF_GPU		\
+		AMDKFD_IOWR(0x12, struct kfd_ioctl_free_memory_of_gpu_args)
+
+#define AMDKFD_IOC_MAP_MEMORY_TO_GPU		\
+		AMDKFD_IOWR(0x13, struct kfd_ioctl_map_memory_to_gpu_args)
+
+#define AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU	\
+		AMDKFD_IOWR(0x14, struct kfd_ioctl_unmap_memory_from_gpu_args)
+
+#define AMDKFD_IOC_OPEN_GRAPHIC_HANDLE		\
+		AMDKFD_IOWR(0x15, struct kfd_ioctl_open_graphic_handle_args)
+
+#define AMDKFD_IOC_ALLOC_MEMORY_OF_SCRATCH	\
+		AMDKFD_IOWR(0x16, struct kfd_ioctl_alloc_memory_of_gpu_args)
+
+#define AMDKFD_IOC_SET_CU_MASK		\
+		AMDKFD_IOW(0x17, struct kfd_ioctl_set_cu_mask_args)
+
+#define AMDKFD_IOC_SET_PROCESS_DGPU_APERTURE   \
+		AMDKFD_IOW(0x18,	\
+		struct kfd_ioctl_set_process_dgpu_aperture_args)
+
+#define AMDKFD_IOC_ALLOC_MEMORY_OF_GPU_NEW		\
+		AMDKFD_IOWR(0x19, struct kfd_ioctl_alloc_memory_of_gpu_new_args)
+
+#define AMDKFD_IOC_SET_TRAP_HANDLER		\
+		AMDKFD_IOW(0x1a, struct kfd_ioctl_set_trap_handler_args)
+
+#define AMDKFD_IOC_MAP_MEMORY_TO_GPU_NEW		\
+		AMDKFD_IOWR(0x1b, struct kfd_ioctl_map_memory_to_gpu_new_args)
+#define AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU_NEW	\
+		AMDKFD_IOWR(0x1c, struct kfd_ioctl_unmap_memory_from_gpu_new_args)
+
+#define AMDKFD_IOC_GET_PROCESS_APERTURES_NEW	\
+	AMDKFD_IOWR(0x1d, struct kfd_ioctl_get_process_apertures_new_args)
+
+#define AMDKFD_IOC_EVICT_MEMORY		\
+	AMDKFD_IOWR(0x1e, struct kfd_ioctl_eviction_args)
+
+#define AMDKFD_IOC_GET_DMABUF_INFO		\
+	AMDKFD_IOWR(0x1f, struct kfd_ioctl_get_dmabuf_info_args)
+
+#define AMDKFD_IOC_IMPORT_DMABUF		\
+	AMDKFD_IOWR(0x20, struct kfd_ioctl_import_dmabuf_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x11
+#define AMDKFD_COMMAND_END		0x21
 
 #endif
