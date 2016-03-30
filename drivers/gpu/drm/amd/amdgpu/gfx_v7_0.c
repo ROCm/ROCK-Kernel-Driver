@@ -47,6 +47,8 @@
 #include "oss/oss_2_0_d.h"
 #include "oss/oss_2_0_sh_mask.h"
 
+#define NUM_SIMD_PER_CU 0x4
+
 #define GFX7_NUM_GFX_RINGS     1
 #define GFX7_NUM_COMPUTE_RINGS 8
 
