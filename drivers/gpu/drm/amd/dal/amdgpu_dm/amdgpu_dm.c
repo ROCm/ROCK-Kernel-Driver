@@ -149,8 +149,10 @@ static struct amdgpu_crtc *get_crtc_by_target(
 	 * following if is check inherited from both functions where this one is
 	 * used now. Need to be checked why it could happen.
 	 */
-	if (dc_target == NULL)
+	if (dc_target == NULL) {
+		WARN_ON(1);
 		return adev->mode_info.crtcs[0];
+	}
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		amdgpu_crtc = to_amdgpu_crtc(crtc);
@@ -176,16 +178,21 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	amdgpu_crtc = get_crtc_by_target(adev, dc_target);
 
 	/* IRQ could occur when in initial stage */
-	if(amdgpu_crtc == NULL)
+	/*TODO work and BO cleanup */
+	if (amdgpu_crtc == NULL) {
+		DRM_DEBUG_DRIVER("CRTC is null, returning.\n");
 		return;
+	}
 
 	spin_lock_irqsave(&adev->ddev->event_lock, flags);
 	works = amdgpu_crtc->pflip_works;
+
 	if (amdgpu_crtc->pflip_status != AMDGPU_FLIP_SUBMITTED){
-		DRM_DEBUG_DRIVER("amdgpu_crtc->pflip_status = %d != "
-						 "AMDGPU_FLIP_SUBMITTED(%d)\n",
+		DRM_DEBUG_DRIVER("amdgpu_crtc->pflip_status = %d !=AMDGPU_FLIP_SUBMITTED(%d) on crtc:%d[%p] \n",
 						 amdgpu_crtc->pflip_status,
-						 AMDGPU_FLIP_SUBMITTED);
+						 AMDGPU_FLIP_SUBMITTED,
+						 amdgpu_crtc->crtc_id,
+						 amdgpu_crtc);
 		spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 		return;
 	}
@@ -202,6 +209,9 @@ static void dm_pflip_high_irq(void *interrupt_params)
 			works->event);
 
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
+
+	DRM_DEBUG_DRIVER("%s - crtc :%d[%p], pflip_stat:AMDGPU_FLIP_NONE, work: %p,\n",
+					__func__, amdgpu_crtc->crtc_id, amdgpu_crtc, works);
 
 	drm_crtc_vblank_put(&amdgpu_crtc->base);
 	schedule_work(&works->unpin_work);
@@ -1131,11 +1141,19 @@ static void dm_page_flip(struct amdgpu_device *adev,
 	 * Received a page flip call after the display has been reset.
 	 * Just return in this case. Everything should be clean-up on reset.
 	 */
-	if (!target)
+
+	if (!target) {
+		WARN_ON(1);
 		return;
+	}
 
 	addr.address.grph.addr.low_part = lower_32_bits(crtc_base);
 	addr.address.grph.addr.high_part = upper_32_bits(crtc_base);
+
+	DRM_DEBUG_DRIVER("%s Flipping to hi: 0x%x, low: 0x%x \n",
+			 __func__,
+			 addr.address.grph.addr.high_part,
+			 addr.address.grph.addr.low_part);
 
 	dc_flip_surface_addrs(
 			adev->dm.dc,

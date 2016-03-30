@@ -624,7 +624,8 @@ static void calculate_stream_scaling_settings(
 static void dm_dc_surface_commit(
 		struct dc *dc,
 		struct drm_crtc *crtc,
-		struct dm_connector_state *dm_state)
+		struct dm_connector_state *dm_state
+		)
 {
 	struct dc_surface *dc_surface;
 	const struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
@@ -2027,6 +2028,38 @@ static enum dm_commit_action get_dm_commit_action(struct drm_crtc_state *state)
 	}
 }
 
+
+typedef bool (*predicate)(struct amdgpu_crtc *acrtc);
+
+static void wait_while_pflip_status(struct amdgpu_device *adev,
+		struct amdgpu_crtc *acrtc, predicate f) {
+	int count = 0;
+	while (f(acrtc)) {
+		/* Spin Wait*/
+		msleep(1);
+		count++;
+		if (count == 1000) {
+			DRM_ERROR("%s - crtc:%d[%p], pflip_stat:%d, probable hang!\n",
+										__func__, acrtc->crtc_id,
+										acrtc,
+										acrtc->pflip_status);
+			BUG_ON(1);
+		}
+	}
+
+	DRM_DEBUG_DRIVER("%s - Finished waiting for:%d msec, crtc:%d[%p], pflip_stat:%d \n",
+											__func__,
+											count,
+											acrtc->crtc_id,
+											acrtc,
+											acrtc->pflip_status);
+}
+
+static bool pflip_in_progress_predicate(struct amdgpu_crtc *acrtc)
+{
+	return acrtc->pflip_status != AMDGPU_FLIP_NONE;
+}
+
 static void manage_dm_interrupts(
 	struct amdgpu_device *adev,
 	struct amdgpu_crtc *acrtc,
@@ -2048,9 +2081,8 @@ static void manage_dm_interrupts(
 			&adev->pageflip_irq,
 			irq_type);
 	} else {
-		while (acrtc->pflip_status != AMDGPU_FLIP_NONE) {
-			msleep(1);
-		}
+		wait_while_pflip_status(adev, acrtc,
+				pflip_in_progress_predicate);
 
 		amdgpu_irq_put(
 			adev,
@@ -2058,6 +2090,12 @@ static void manage_dm_interrupts(
 			irq_type);
 		drm_crtc_vblank_off(&acrtc->base);
 	}
+}
+
+
+static bool pflip_pending_predicate(struct amdgpu_crtc *acrtc)
+{
+	return acrtc->pflip_status == AMDGPU_FLIP_PENDING;
 }
 
 int amdgpu_dm_atomic_commit(
@@ -2134,7 +2172,7 @@ int amdgpu_dm_atomic_commit(
 					aconnector,
 					&crtc->state->mode);
 
-			DRM_INFO("Atomic commit: SET.\n");
+			DRM_INFO("Atomic commit: SET crtc id %d: [%p]\n", acrtc->crtc_id, acrtc);
 
 			if (!new_target) {
 				/*
@@ -2186,7 +2224,7 @@ int amdgpu_dm_atomic_commit(
 
 		case DM_COMMIT_ACTION_DPMS_OFF:
 		case DM_COMMIT_ACTION_RESET:
-			DRM_INFO("Atomic commit: RESET.\n");
+			DRM_INFO("Atomic commit: RESET. crtc id %d:[%p]\n", acrtc->crtc_id, acrtc);
 			/* i.e. reset mode */
 			if (acrtc->target) {
 				manage_dm_interrupts(adev, acrtc, false);
@@ -2218,6 +2256,7 @@ int amdgpu_dm_atomic_commit(
 	for_each_plane_in_state(state, plane, old_plane_state, i) {
 		struct drm_plane_state *plane_state = plane->state;
 		struct drm_crtc *crtc = plane_state->crtc;
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 		struct drm_framebuffer *fb = plane_state->fb;
 		struct drm_connector *connector;
 		struct dm_connector_state *dm_state = NULL;
@@ -2261,6 +2300,14 @@ int amdgpu_dm_atomic_commit(
 			 */
 			if (!dm_state)
 				continue;
+
+			/*
+			 * if flip is pending (ie, still waiting for fence to return
+			 * before address is submitted) here, we cannot commit_surface
+			 * as commit_surface will pre-maturely write out the future
+			 * address. wait until flip is submitted before proceeding.
+			 */
+			wait_while_pflip_status(adev, acrtc, pflip_pending_predicate);
 
 			dm_dc_surface_commit(
 				dm->dc,
@@ -2370,6 +2417,7 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 
 		/* DC is optimized not to do anything if 'targets' didn't change. */
 		dc_commit_targets(dc, commit_targets, commit_targets_count);
+
 
 		dm_dc_surface_commit(dc, &disconnected_acrtc->base,
 				to_dm_connector_state(

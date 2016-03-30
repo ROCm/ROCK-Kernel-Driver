@@ -825,6 +825,7 @@ bool dc_commit_surfaces_to_target(
 	if (core_dc->current_context.target_count == 0)
 		return false;
 
+
 	context = dm_alloc(sizeof(struct validate_context));
 
 	resource_validate_ctx_copy_construct(&core_dc->current_context, context);
@@ -916,10 +917,14 @@ bool dc_commit_surfaces_to_target(
 			dal_logger_write(core_dc->ctx->logger,
 						LOG_MAJOR_INTERFACE_TRACE,
 						LOG_MINOR_COMPONENT_DC,
-						"Pipe:%d 0x%x: src: %d, %d, %d,"
+					   "Pipe:%d 0x%x: addr hi:0x%x, "
+					   "addr low:0x%x, "
+					   "src: %d, %d, %d,"
 						" %d; dst: %d, %d, %d, %d;\n",
 						pipe_ctx->pipe_idx,
 						dc_surface,
+					    dc_surface->address.grph.addr.high_part,
+					    dc_surface->address.grph.addr.low_part,
 						dc_surface->src_rect.x,
 						dc_surface->src_rect.y,
 						dc_surface->src_rect.width,
@@ -950,6 +955,7 @@ bool dc_commit_surfaces_to_target(
 		pplib_apply_display_requirements(core_dc, context,
 						&context->pp_display_cfg);
 	}
+
 
 	resource_validate_ctx_destruct(&(core_dc->current_context));
 	core_dc->current_context = *context;
