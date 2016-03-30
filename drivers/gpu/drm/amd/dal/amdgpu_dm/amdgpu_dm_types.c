@@ -1019,10 +1019,12 @@ int amdgpu_dm_connector_atomic_set_property(
 	struct dm_connector_state *dm_new_state =
 		to_dm_connector_state(connector_state);
 
+	struct drm_crtc_state *new_crtc_state;
+	struct drm_crtc *crtc;
+	int i;
+	int ret = -EINVAL;
+
 	if (property == dev->mode_config.scaling_mode_property) {
-		struct drm_crtc_state *new_crtc_state;
-		struct drm_crtc *crtc;
-		int i;
 		enum amdgpu_rmx_type rmx_type;
 
 		switch (val) {
@@ -1045,79 +1047,45 @@ int amdgpu_dm_connector_atomic_set_property(
 			return 0;
 
 		dm_new_state->scaling = rmx_type;
-
-		for_each_crtc_in_state(
-			connector_state->state,
-			crtc,
-			new_crtc_state,
-			i) {
-
-			if (crtc == connector_state->crtc) {
-				struct drm_plane_state *plane_state;
-
-				new_crtc_state->mode_changed = true;
-
-				/*
-				 * Bit of magic done here. We need to ensure
-				 * that planes get update after mode is set.
-				 * So, we need to add primary plane to state,
-				 * and this way atomic_update would be called
-				 * for it
-				 */
-				plane_state =
-					drm_atomic_get_plane_state(
-						connector_state->state,
-						crtc->primary);
-
-				if (!plane_state)
-					return -EINVAL;
-			}
-		}
-
-		return 0;
+		ret = 0;
 	} else if (property == adev->mode_info.underscan_hborder_property) {
 		dm_new_state->underscan_hborder = val;
-		return 0;
+		ret = 0;
 	} else if (property == adev->mode_info.underscan_vborder_property) {
 		dm_new_state->underscan_vborder = val;
-		return 0;
+		ret = 0;
 	} else if (property == adev->mode_info.underscan_property) {
-		struct drm_crtc_state *new_crtc_state;
-		struct drm_crtc *crtc;
-		int i;
-
 		dm_new_state->underscan_enable = val;
-
-		for_each_crtc_in_state(
-			connector_state->state,
-			crtc,
-			new_crtc_state,
-			i) {
-
-			if (crtc == connector_state->crtc) {
-				struct drm_plane_state *plane_state;
-
-				/*
-				 * Bit of magic done here. We need to ensure
-				 * that planes get update after mode is set.
-				 * So, we need to add primary plane to state,
-				 * and this way atomic_update would be called
-				 * for it
-				 */
-				plane_state =
-					drm_atomic_get_plane_state(
-						connector_state->state,
-						crtc->primary);
-
-				if (!plane_state)
-					return -EINVAL;
-			}
-		}
-
-		return 0;
+		ret = 0;
 	}
 
-	return -EINVAL;
+	for_each_crtc_in_state(
+		connector_state->state,
+		crtc,
+		new_crtc_state,
+		i) {
+
+		if (crtc == connector_state->crtc) {
+			struct drm_plane_state *plane_state;
+
+			/*
+			 * Bit of magic done here. We need to ensure
+			 * that planes get update after mode is set.
+			 * So, we need to add primary plane to state,
+			 * and this way atomic_update would be called
+			 * for it
+			 */
+			plane_state =
+				drm_atomic_get_plane_state(
+					connector_state->state,
+					crtc->primary);
+
+			if (!plane_state)
+				return -EINVAL;
+		}
+	}
+
+	return ret;
 }
 
 void amdgpu_dm_connector_destroy(struct drm_connector *connector)
