@@ -28,14 +28,72 @@
 #include "kfd_priv.h"
 #include "kfd_mqd_manager.h"
 #include "vi_structs.h"
-#include "gca/gfx_8_0_sh_mask.h"
-#include "gca/gfx_8_0_enum.h"
-
+#include "asic_reg/gca/gfx_8_0_sh_mask.h"
+#include "asic_reg/gca/gfx_8_0_enum.h"
+#include "oss/oss_3_0_sh_mask.h"
 #define CP_MQD_CONTROL__PRIV_STATE__SHIFT 0x8
 
 static inline struct vi_mqd *get_mqd(void *mqd)
 {
 	return (struct vi_mqd *)mqd;
+}
+
+static inline struct vi_sdma_mqd *get_sdma_mqd(void *mqd)
+{
+	return (struct vi_sdma_mqd *)mqd;
+}
+
+static void update_cu_mask(struct mqd_manager *mm, void *mqd,
+			struct queue_properties *q)
+{
+	struct vi_mqd *m;
+	struct kfd_cu_info cu_info;
+	uint32_t mgmt_se_mask;
+	uint32_t cu_sh_mask, cu_sh_shift;
+	uint32_t cu_mask;
+	int se, sh;
+
+	if (q->cu_mask == 0)
+		return;
+
+	m = get_mqd(mqd);
+	m->compute_static_thread_mgmt_se0 = 0;
+	m->compute_static_thread_mgmt_se1 = 0;
+	m->compute_static_thread_mgmt_se2 = 0;
+	m->compute_static_thread_mgmt_se3 = 0;
+
+	mm->dev->kfd2kgd->get_cu_info(mm->dev->kgd, &cu_info);
+	cu_mask = q->cu_mask;
+	for (se = 0; se < cu_info.num_shader_engines && cu_mask; se++) {
+		mgmt_se_mask = 0;
+		for (sh = 0; sh < 2 && cu_mask; sh++) {
+			cu_sh_shift = hweight32(cu_info.cu_bitmap[se][sh]);
+			cu_sh_mask = (1 << cu_sh_shift) - 1;
+			mgmt_se_mask |= (cu_mask & cu_sh_mask) << (sh * 16);
+			cu_mask >>= cu_sh_shift;
+		}
+		switch (se) {
+		case 0:
+			m->compute_static_thread_mgmt_se0 = mgmt_se_mask;
+			break;
+		case 1:
+			m->compute_static_thread_mgmt_se1 = mgmt_se_mask;
+			break;
+		case 2:
+			m->compute_static_thread_mgmt_se2 = mgmt_se_mask;
+			break;
+		case 3:
+			m->compute_static_thread_mgmt_se3 = mgmt_se_mask;
+			break;
+		default:
+			break;
+		}
+	}
+	pr_debug("kfd: update cu mask to %#x %#x %#x %#x\n",
+		m->compute_static_thread_mgmt_se0,
+		m->compute_static_thread_mgmt_se1,
+		m->compute_static_thread_mgmt_se2,
+		m->compute_static_thread_mgmt_se3);
 }
 
 static int init_mqd(struct mqd_manager *mm, void **mqd,
@@ -84,6 +142,25 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 	if (q->format == KFD_QUEUE_FORMAT_AQL)
 		m->cp_hqd_iq_rptr = 1;
 
+	if (q->tba_addr) {
+		m->cp_hqd_persistent_state |=
+			(1 << CP_HQD_PERSISTENT_STATE__QSWITCH_MODE__SHIFT);
+		m->compute_pgm_rsrc2 |=
+			(1 << COMPUTE_PGM_RSRC2__TRAP_PRESENT__SHIFT);
+		m->cp_hqd_ctx_save_base_addr_lo =
+			lower_32_bits(q->ctx_save_restore_area_address);
+		m->cp_hqd_ctx_save_base_addr_hi =
+			upper_32_bits(q->ctx_save_restore_area_address);
+		m->cp_hqd_ctx_save_size = q->ctx_save_restore_area_size;
+		m->cp_hqd_cntl_stack_size = q->ctl_stack_size;
+		m->cp_hqd_cntl_stack_offset = q->ctl_stack_size;
+		m->cp_hqd_wg_state_offset = q->ctl_stack_size;
+		m->compute_tba_lo = lower_32_bits(q->tba_addr >> 8);
+		m->compute_tba_hi = upper_32_bits(q->tba_addr >> 8);
+		m->compute_tma_lo = lower_32_bits(q->tma_addr >> 8);
+		m->compute_tma_hi = upper_32_bits(q->tma_addr >> 8);
+	}
+
 	*mqd = m;
 	if (gart_addr != NULL)
 		*gart_addr = addr;
@@ -94,10 +171,10 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 
 static int load_mqd(struct mqd_manager *mm, void *mqd,
 			uint32_t pipe_id, uint32_t queue_id,
-			uint32_t __user *wptr)
+			uint32_t __user *wptr, uint32_t page_table_base)
 {
 	return mm->dev->kfd2kgd->hqd_load
-		(mm->dev->kgd, mqd, pipe_id, queue_id, wptr);
+		(mm->dev->kgd, mqd, pipe_id, queue_id, wptr, page_table_base);
 }
 
 static int __update_mqd(struct mqd_manager *mm, void *mqd,
@@ -155,12 +232,19 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 		m->cp_hqd_pq_control |= CP_HQD_PQ_CONTROL__NO_UPDATE_RPTR_MASK |
 				2 << CP_HQD_PQ_CONTROL__SLOT_BASED_WPTR__SHIFT;
 	}
+	if (q->tba_addr)
+		m->cp_hqd_ctx_save_control =
+			atc_bit << CP_HQD_CTX_SAVE_CONTROL__ATC__SHIFT |
+			mtype << CP_HQD_CTX_SAVE_CONTROL__MTYPE__SHIFT;
+
+	update_cu_mask(mm, mqd, q);
 
 	m->cp_hqd_active = 0;
 	q->is_active = false;
 	if (q->queue_size > 0 &&
 			q->queue_address != 0 &&
-			q->queue_percent > 0) {
+			q->queue_percent > 0 &&
+			!q->is_evicted) {
 		m->cp_hqd_active = 1;
 		q->is_active = true;
 	}
@@ -173,6 +257,12 @@ static int update_mqd(struct mqd_manager *mm, void *mqd,
 			struct queue_properties *q)
 {
 	return __update_mqd(mm, mqd, q, MTYPE_CC, 1);
+}
+
+static int update_mqd_tonga(struct mqd_manager *mm, void *mqd,
+			struct queue_properties *q)
+{
+	return __update_mqd(mm, mqd, q, MTYPE_UC, 0);
 }
 
 static int destroy_mqd(struct mqd_manager *mm, void *mqd,
@@ -233,6 +323,111 @@ static int update_mqd_hiq(struct mqd_manager *mm, void *mqd,
 	return retval;
 }
 
+static int init_mqd_sdma(struct mqd_manager *mm, void **mqd,
+		struct kfd_mem_obj **mqd_mem_obj, uint64_t *gart_addr,
+		struct queue_properties *q)
+{
+	int retval;
+	struct vi_sdma_mqd *m;
+
+
+	BUG_ON(!mm || !mqd || !mqd_mem_obj);
+
+	retval = kfd_gtt_sa_allocate(mm->dev,
+			sizeof(struct vi_sdma_mqd),
+			mqd_mem_obj);
+
+	if (retval != 0)
+		return -ENOMEM;
+
+	m = (struct vi_sdma_mqd *) (*mqd_mem_obj)->cpu_ptr;
+
+	memset(m, 0, sizeof(struct vi_sdma_mqd));
+
+	*mqd = m;
+	if (gart_addr != NULL)
+		*gart_addr = (*mqd_mem_obj)->gpu_addr;
+
+	retval = mm->update_mqd(mm, m, q);
+
+	return retval;
+}
+
+static void uninit_mqd_sdma(struct mqd_manager *mm, void *mqd,
+		struct kfd_mem_obj *mqd_mem_obj)
+{
+	BUG_ON(!mm || !mqd);
+	kfd_gtt_sa_free(mm->dev, mqd_mem_obj);
+}
+
+static int load_mqd_sdma(struct mqd_manager *mm, void *mqd,
+		uint32_t pipe_id, uint32_t queue_id,
+		uint32_t __user *wptr, uint32_t page_table_base)
+{
+	return mm->dev->kfd2kgd->hqd_sdma_load(mm->dev->kgd, mqd);
+}
+
+static int update_mqd_sdma(struct mqd_manager *mm, void *mqd,
+		struct queue_properties *q)
+{
+	struct vi_sdma_mqd *m;
+	BUG_ON(!mm || !mqd || !q);
+
+	m = get_sdma_mqd(mqd);
+	m->sdmax_rlcx_rb_cntl = (ffs(q->queue_size / sizeof(unsigned int)) - 1)
+		<< SDMA0_RLC0_RB_CNTL__RB_SIZE__SHIFT |
+		q->vmid << SDMA0_RLC0_RB_CNTL__RB_VMID__SHIFT |
+		1 << SDMA0_RLC0_RB_CNTL__RPTR_WRITEBACK_ENABLE__SHIFT |
+		6 << SDMA0_RLC0_RB_CNTL__RPTR_WRITEBACK_TIMER__SHIFT;
+
+	m->sdmax_rlcx_rb_base = lower_32_bits(q->queue_address >> 8);
+	m->sdmax_rlcx_rb_base_hi = upper_32_bits(q->queue_address >> 8);
+	m->sdmax_rlcx_rb_rptr_addr_lo = lower_32_bits((uint64_t)q->read_ptr);
+	m->sdmax_rlcx_rb_rptr_addr_hi = upper_32_bits((uint64_t)q->read_ptr);
+	m->sdmax_rlcx_doorbell = q->doorbell_off <<
+		SDMA0_RLC0_DOORBELL__OFFSET__SHIFT |
+		1 << SDMA0_RLC0_DOORBELL__ENABLE__SHIFT;
+
+	m->sdmax_rlcx_virtual_addr = q->sdma_vm_addr;
+
+	m->sdma_engine_id = q->sdma_engine_id;
+	m->sdma_queue_id = q->sdma_queue_id;
+
+	q->is_active = false;
+	if (q->queue_size > 0 &&
+			q->queue_address != 0 &&
+			q->queue_percent > 0 &&
+			!q->is_evicted) {
+		m->sdmax_rlcx_rb_cntl |=
+			1 << SDMA0_RLC0_RB_CNTL__RB_ENABLE__SHIFT;
+
+		q->is_active = true;
+	}
+
+	return 0;
+}
+
+/*
+ *  * preempt type here is ignored because there is only one way
+ *  * to preempt sdma queue
+ */
+static int destroy_mqd_sdma(struct mqd_manager *mm, void *mqd,
+		enum kfd_preempt_type type,
+		unsigned int timeout, uint32_t pipe_id,
+		uint32_t queue_id)
+{
+	return mm->dev->kfd2kgd->hqd_sdma_destroy(mm->dev->kgd, mqd, timeout);
+}
+
+static bool is_occupied_sdma(struct mqd_manager *mm, void *mqd,
+		uint64_t queue_address, uint32_t pipe_id,
+		uint32_t queue_id)
+{
+	return mm->dev->kfd2kgd->hqd_sdma_is_occupied(mm->dev->kgd, mqd);
+}
+
+
+
 struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		struct kfd_dev *dev)
 {
@@ -268,6 +463,12 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		mqd->is_occupied = is_occupied;
 		break;
 	case KFD_MQD_TYPE_SDMA:
+		mqd->init_mqd = init_mqd_sdma;
+		mqd->uninit_mqd = uninit_mqd_sdma;
+		mqd->load_mqd = load_mqd_sdma;
+		mqd->update_mqd = update_mqd_sdma;
+		mqd->destroy_mqd = destroy_mqd_sdma;
+		mqd->is_occupied = is_occupied_sdma;
 		break;
 	default:
 		kfree(mqd);
@@ -276,3 +477,17 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 
 	return mqd;
 }
+
+struct mqd_manager *mqd_manager_init_vi_tonga(enum KFD_MQD_TYPE type,
+			struct kfd_dev *dev)
+{
+	struct mqd_manager *mqd;
+
+	mqd = mqd_manager_init_vi(type, dev);
+	if (!mqd)
+		return NULL;
+	if ((type == KFD_MQD_TYPE_CP) || (type == KFD_MQD_TYPE_COMPUTE))
+		mqd->update_mqd = update_mqd_tonga;
+	return mqd;
+}
+
