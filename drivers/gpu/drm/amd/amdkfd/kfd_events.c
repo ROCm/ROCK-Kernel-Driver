@@ -32,11 +32,10 @@
 #include "kfd_events.h"
 #include <linux/device.h>
 
-/*
- * A task can only be on a single wait_queue at a time, but we need to support
+/* A task can only be on a single wait_queue at a time, but we need to support
  * waiting on multiple events (any/all).
- * Instead of each event simply having a wait_queue with sleeping tasks, it
- * has a singly-linked list of tasks.
+ * Instead of each event simply having a wait_queue with sleeping tasks, it has a
+ * singly-linked list of tasks.
  * A thread that wants to sleep creates an array of these, one for each event
  * and adds one to each event's waiter chain.
  */
@@ -52,12 +51,11 @@ struct kfd_event_waiter {
 	uint32_t input_index;
 };
 
-/*
- * Over-complicated pooled allocator for event notification slots.
+/* Over-complicated pooled allocator for event notification slots.
  *
- * Each signal event needs a 64-bit signal slot where the signaler will write
- * a 1 before sending an interrupt.l (This is needed because some interrupts
- * do not contain enough spare data bits to identify an event.)
+ * Each signal event needs a 64-bit signal slot where the signaler will write a 1
+ * before sending an interrupt.l (This is needed because some interrupts do not
+ * contain enough spare data bits to identify an event.)
  * We get whole pages from vmalloc and map them to the process VA.
  * Individual signal events are then allocated a slot in a page.
  */
@@ -65,6 +63,7 @@ struct kfd_event_waiter {
 struct signal_page {
 	struct list_head event_pages;	/* kfd_process.signal_event_pages */
 	uint64_t *kernel_address;
+	uint64_t handle;
 	uint64_t __user *user_address;
 	uint32_t page_index;		/* Index into the mmap aperture. */
 	unsigned int free_slots;
@@ -74,8 +73,7 @@ struct signal_page {
 #define SLOTS_PER_PAGE KFD_SIGNAL_EVENT_LIMIT
 #define SLOT_BITMAP_SIZE BITS_TO_LONGS(SLOTS_PER_PAGE)
 #define BITS_PER_PAGE (ilog2(SLOTS_PER_PAGE)+1)
-#define SIGNAL_PAGE_SIZE (sizeof(struct signal_page) + \
-				SLOT_BITMAP_SIZE * sizeof(long))
+#define SIGNAL_PAGE_SIZE (sizeof(struct signal_page) + SLOT_BITMAP_SIZE * sizeof(long))
 
 /*
  * For signal events, the event ID is used as the interrupt user data.
@@ -85,23 +83,27 @@ struct signal_page {
 #define INTERRUPT_DATA_BITS 8
 #define SIGNAL_EVENT_ID_SLOT_SHIFT 0
 
+/* We can only create 8 debug events */
+
+#define KFD_DEBUG_EVENT_LIMIT 8
+#define KFD_DEBUG_EVENT_MASK 0x1F
+#define KFD_DEBUG_EVENT_SHIFT 5
+
 static uint64_t *page_slots(struct signal_page *page)
 {
 	return page->kernel_address;
 }
 
-static bool allocate_free_slot(struct kfd_process *process,
-				struct signal_page **out_page,
-				unsigned int *out_slot_index)
+static bool
+allocate_free_slot(struct kfd_process *process,
+		   struct signal_page **out_page,
+		   unsigned int *out_slot_index)
 {
 	struct signal_page *page;
 
 	list_for_each_entry(page, &process->signal_event_pages, event_pages) {
 		if (page->free_slots > 0) {
-			unsigned int slot =
-				find_first_zero_bit(page->used_slot_bitmap,
-							SLOTS_PER_PAGE);
-
+			unsigned int slot = find_first_zero_bit(page->used_slot_bitmap, SLOTS_PER_PAGE);
 			__set_bit(slot, page->used_slot_bitmap);
 			page->free_slots--;
 
@@ -130,6 +132,8 @@ static bool allocate_signal_page(struct file *devkfd, struct kfd_process *p)
 {
 	void *backing_store;
 	struct signal_page *page;
+	unsigned int slot;
+	int i;
 
 	page = kzalloc(SIGNAL_PAGE_SIZE, GFP_KERNEL);
 	if (!page)
@@ -137,16 +141,22 @@ static bool allocate_signal_page(struct file *devkfd, struct kfd_process *p)
 
 	page->free_slots = SLOTS_PER_PAGE;
 
-	backing_store = (void *) __get_free_pages(GFP_KERNEL | __GFP_ZERO,
+	backing_store = (void *) __get_free_pages(GFP_KERNEL | __GFP_ZERO, \
 					get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
 	if (!backing_store)
 		goto fail_alloc_signal_store;
 
 	/* prevent user-mode info leaks */
-	memset(backing_store, (uint8_t) UNSIGNALED_EVENT_SLOT,
-		KFD_SIGNAL_EVENT_LIMIT * 8);
-
+	memset(backing_store, (uint8_t) UNSIGNALED_EVENT_SLOT, KFD_SIGNAL_EVENT_LIMIT * 8);
 	page->kernel_address = backing_store;
+
+	/* Set bits of debug events to prevent allocation */
+	for (i = 0 ; i < KFD_DEBUG_EVENT_LIMIT ; i++) {
+		slot = (i << KFD_DEBUG_EVENT_SHIFT) |
+				KFD_DEBUG_EVENT_MASK;
+		__set_bit(slot, page->used_slot_bitmap);
+		page->free_slots--;
+	}
 
 	if (list_empty(&p->signal_event_pages))
 		page->page_index = 0;
@@ -169,10 +179,10 @@ fail_alloc_signal_page:
 	return false;
 }
 
-static bool allocate_event_notification_slot(struct file *devkfd,
-					struct kfd_process *p,
-					struct signal_page **page,
-					unsigned int *signal_slot_index)
+static bool
+allocate_event_notification_slot(struct file *devkfd, struct kfd_process *p,
+				 struct signal_page **page,
+				 unsigned int *signal_slot_index)
 {
 	bool ret;
 
@@ -184,6 +194,88 @@ static bool allocate_event_notification_slot(struct file *devkfd,
 	}
 
 	return ret;
+}
+
+static bool
+allocate_signal_page_dgpu(struct kfd_process *p,
+		uint64_t *kernel_address, uint64_t handle)
+{
+	struct signal_page *my_page;
+
+	my_page = kzalloc(SIGNAL_PAGE_SIZE, GFP_KERNEL);
+	if (!my_page)
+		return false;
+
+	/* prevent user-mode info leaks */
+	memset(kernel_address, (uint8_t) UNSIGNALED_EVENT_SLOT,
+			KFD_SIGNAL_EVENT_LIMIT * 8);
+
+	my_page->kernel_address = kernel_address;
+	my_page->handle = handle;
+	my_page->user_address = NULL;
+	my_page->free_slots = SLOTS_PER_PAGE;
+	if (list_empty(&p->signal_event_pages))
+			my_page->page_index = 0;
+	else
+		my_page->page_index = list_tail_entry(&p->signal_event_pages,
+		   struct signal_page,
+		   event_pages)->page_index + 1;
+
+	pr_debug("allocated new event signal page at %p, for process %p\n",
+			my_page, p);
+	pr_debug("page index is %d\n", my_page->page_index);
+
+	list_add(&my_page->event_pages, &p->signal_event_pages);
+
+	return true;
+}
+
+void kfd_free_signal_page_dgpu(struct kfd_process *p, uint64_t handle)
+{
+	struct signal_page *page, *tmp;
+
+	list_for_each_entry_safe(page, tmp, &p->signal_event_pages,
+				event_pages) {
+		if (page->handle == handle) {
+			list_del(&page->event_pages);
+			kfree(page);
+			break;
+		}
+	}
+}
+
+static bool
+allocate_debug_event_notification_slot(struct file *devkfd,
+				struct kfd_process *p,
+				struct signal_page **out_page,
+				unsigned int *out_slot_index)
+{
+	struct signal_page *page;
+	unsigned int slot;
+	bool ret;
+
+	if (list_empty(&p->signal_event_pages)) {
+		ret = allocate_signal_page(devkfd, p);
+		if (ret == false)
+			return ret;
+	}
+
+	page = list_entry((&p->signal_event_pages)->next, struct signal_page,
+				event_pages);
+	slot = (p->debug_event_count << KFD_DEBUG_EVENT_SHIFT) |
+			KFD_DEBUG_EVENT_MASK;
+
+	pr_debug("page == %p\n", page);
+	pr_debug("slot == %d\n", slot);
+
+	page_slots(page)[slot] = UNSIGNALED_EVENT_SLOT;
+	*out_page = page;
+	*out_slot_index = slot;
+
+	pr_debug("allocated debug event signal slot in page %p, slot %d\n",
+			page, slot);
+
+	return true;
 }
 
 /* Assumes that the process's event_mutex is locked. */
@@ -202,10 +294,7 @@ static struct signal_page *lookup_signal_page_by_index(struct kfd_process *p,
 {
 	struct signal_page *page;
 
-	/*
-	 * This is safe because we don't delete signal pages until the
-	 * process exits.
-	 */
+	/* This is safe because we don't delete signal pages until the process exits. */
 	list_for_each_entry(page, &p->signal_event_pages, event_pages)
 		if (page->page_index == page_index)
 			return page;
@@ -213,10 +302,7 @@ static struct signal_page *lookup_signal_page_by_index(struct kfd_process *p,
 	return NULL;
 }
 
-/*
- * Assumes that p->event_mutex is held and of course that p is not going
- * away (current or locked).
- */
+/* Assumes that p->event_mutex is held and of course that p is not going away (current or locked). */
 static struct kfd_event *lookup_event_by_id(struct kfd_process *p, uint32_t id)
 {
 	struct kfd_event *ev;
@@ -231,32 +317,27 @@ static struct kfd_event *lookup_event_by_id(struct kfd_process *p, uint32_t id)
 static u32 make_signal_event_id(struct signal_page *page,
 					 unsigned int signal_slot_index)
 {
-	return page->page_index |
-			(signal_slot_index << SIGNAL_EVENT_ID_SLOT_SHIFT);
+	return page->page_index | (signal_slot_index << SIGNAL_EVENT_ID_SLOT_SHIFT);
 }
 
-/*
- * Produce a kfd event id for a nonsignal event.
- * These are arbitrary numbers, so we do a sequential search through
- * the hash table for an unused number.
+/* Produce a kfd event id for a nonsignal event.
+ * These are arbitrary numbers, so we do a sequential search through the hash table
+ * for an unused number.
  */
 static u32 make_nonsignal_event_id(struct kfd_process *p)
 {
 	u32 id;
 
 	for (id = p->next_nonsignal_event_id;
-		id < KFD_LAST_NONSIGNAL_EVENT_ID &&
-		lookup_event_by_id(p, id) != NULL;
-		id++)
+	     id < KFD_LAST_NONSIGNAL_EVENT_ID && lookup_event_by_id(p, id) != NULL;
+	     id++)
 		;
 
 	if (id < KFD_LAST_NONSIGNAL_EVENT_ID) {
 
-		/*
-		 * What if id == LAST_NONSIGNAL_EVENT_ID - 1?
-		 * Then next_nonsignal_event_id = LAST_NONSIGNAL_EVENT_ID so
-		 * the first loop fails immediately and we proceed with the
-		 * wraparound loop below.
+		/* What if id == LAST_NONSIGNAL_EVENT_ID - 1?
+		 * Then next_nonsignal_event_id = LAST_NONSIGNAL_EVENT_ID so the first loop
+		 * fails immediately and we proceed with the wraparound loop below.
 		 */
 		p->next_nonsignal_event_id = id + 1;
 
@@ -264,54 +345,68 @@ static u32 make_nonsignal_event_id(struct kfd_process *p)
 	}
 
 	for (id = KFD_FIRST_NONSIGNAL_EVENT_ID;
-		id < KFD_LAST_NONSIGNAL_EVENT_ID &&
-		lookup_event_by_id(p, id) != NULL;
-		id++)
+	     id < KFD_LAST_NONSIGNAL_EVENT_ID && lookup_event_by_id(p, id) != NULL;
+	     id++)
 		;
 
 
 	if (id < KFD_LAST_NONSIGNAL_EVENT_ID) {
 		p->next_nonsignal_event_id = id + 1;
 		return id;
+	} else {
+		p->next_nonsignal_event_id = KFD_FIRST_NONSIGNAL_EVENT_ID;
+		return 0;
 	}
-
-	p->next_nonsignal_event_id = KFD_FIRST_NONSIGNAL_EVENT_ID;
-	return 0;
 }
 
-static struct kfd_event *lookup_event_by_page_slot(struct kfd_process *p,
-						struct signal_page *page,
-						unsigned int signal_slot)
+static struct kfd_event *
+lookup_event_by_page_slot(struct kfd_process *p,
+			  struct signal_page *page, unsigned int signal_slot)
 {
 	return lookup_event_by_id(p, make_signal_event_id(page, signal_slot));
 }
 
-static int create_signal_event(struct file *devkfd,
-				struct kfd_process *p,
-				struct kfd_event *ev)
+static int
+create_signal_event(struct file *devkfd, struct kfd_process *p, struct kfd_event *ev)
 {
-	if (p->signal_event_count == KFD_SIGNAL_EVENT_LIMIT) {
+	if ((ev->type == KFD_EVENT_TYPE_SIGNAL) &&
+			(p->signal_event_count == KFD_SIGNAL_EVENT_LIMIT)) {
 		pr_warn("amdkfd: Signal event wasn't created because limit was reached\n");
 		return -ENOMEM;
-	}
-
-	if (!allocate_event_notification_slot(devkfd, p, &ev->signal_page,
-						&ev->signal_slot_index)) {
-		pr_warn("amdkfd: Signal event wasn't created because out of kernel memory\n");
+	} else if ((ev->type == KFD_EVENT_TYPE_DEBUG) &&
+			(p->debug_event_count == KFD_DEBUG_EVENT_LIMIT)) {
+		pr_warn("amdkfd: Debug event wasn't created because limit was reached\n");
 		return -ENOMEM;
 	}
 
-	p->signal_event_count++;
+	if (ev->type == KFD_EVENT_TYPE_SIGNAL) {
+		if (!allocate_event_notification_slot(devkfd, p,
+						&ev->signal_page,
+						&ev->signal_slot_index)) {
+			pr_warn("amdkfd: Signal event wasn't created because out of kernel memory\n");
+			return -ENOMEM;
+		}
 
-	ev->user_signal_address =
-			&ev->signal_page->user_address[ev->signal_slot_index];
+		p->signal_event_count++;
 
-	ev->event_id = make_signal_event_id(ev->signal_page,
-						ev->signal_slot_index);
+		if ((p->signal_event_count & KFD_DEBUG_EVENT_MASK) ==
+				KFD_DEBUG_EVENT_MASK)
+			p->signal_event_count++;
 
-	pr_debug("signal event number %zu created with id %d, address %p\n",
-			p->signal_event_count, ev->event_id,
-			ev->user_signal_address);
+	} else if (ev->type == KFD_EVENT_TYPE_DEBUG) {
+		if (!allocate_debug_event_notification_slot(devkfd, p,
+						&ev->signal_page,
+						&ev->signal_slot_index)) {
+			pr_warn("amdkfd: Debug event wasn't created because out of kernel memory\n");
+			return -ENOMEM;
+		}
+
+		p->debug_event_count++;
+	}
+
+	ev->user_signal_address = &ev->signal_page->user_address[ev->signal_slot_index];
+
+	ev->event_id = make_signal_event_id(ev->signal_page, ev->signal_slot_index);
 
 	pr_debug("signal event number %zu created with id %d, address %p\n",
 			p->signal_event_count, ev->event_id,
@@ -320,12 +415,10 @@ static int create_signal_event(struct file *devkfd,
 	return 0;
 }
 
-/*
- * No non-signal events are supported yet.
- * We create them as events that never signal.
- * Set event calls from user-mode are failed.
- */
-static int create_other_event(struct kfd_process *p, struct kfd_event *ev)
+/* No non-signal events are supported yet.
+ * We create them as events that never signal. Set event calls from user-mode are failed. */
+static int
+create_other_event(struct kfd_process *p, struct kfd_event *ev)
 {
 	ev->event_id = make_nonsignal_event_id(p);
 	if (ev->event_id == 0)
@@ -341,20 +434,25 @@ void kfd_event_init_process(struct kfd_process *p)
 	INIT_LIST_HEAD(&p->signal_event_pages);
 	p->next_nonsignal_event_id = KFD_FIRST_NONSIGNAL_EVENT_ID;
 	p->signal_event_count = 0;
+	p->debug_event_count = 0;
 }
 
 static void destroy_event(struct kfd_process *p, struct kfd_event *ev)
 {
 	if (ev->signal_page != NULL) {
-		release_event_notification_slot(ev->signal_page,
-						ev->signal_slot_index);
-		p->signal_event_count--;
+		if (ev->type == KFD_EVENT_TYPE_SIGNAL) {
+			release_event_notification_slot(ev->signal_page,
+							ev->signal_slot_index);
+			p->signal_event_count--;
+			if ((p->signal_event_count & KFD_DEBUG_EVENT_MASK) ==
+					KFD_DEBUG_EVENT_MASK)
+				p->signal_event_count--;
+		} else if (ev->type == KFD_EVENT_TYPE_DEBUG) {
+			p->debug_event_count--;
+		}
 	}
 
-	/*
-	 * Abandon the list of waiters. Individual waiting threads will
-	 * clean up their own data.
-	 */
+	/* Abandon the list of waiters. Individual waiting threads will clean up their own data.*/
 	list_del(&ev->waiters);
 
 	hash_del(&ev->events);
@@ -371,18 +469,17 @@ static void destroy_events(struct kfd_process *p)
 		destroy_event(p, ev);
 }
 
-/*
- * We assume that the process is being destroyed and there is no need to
- * unmap the pages or keep bookkeeping data in order.
- */
+/* We assume that the process is being destroyed and there is no need to unmap the pages
+ * or keep bookkeeping data in order. */
 static void shutdown_signal_pages(struct kfd_process *p)
 {
 	struct signal_page *page, *tmp;
 
-	list_for_each_entry_safe(page, tmp, &p->signal_event_pages,
-					event_pages) {
-		free_pages((unsigned long)page->kernel_address,
-				get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
+	list_for_each_entry_safe(page, tmp, &p->signal_event_pages, event_pages) {
+		if (page->user_address) {
+			free_pages((unsigned long)page->kernel_address,
+					get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
+		}
 		kfree(page);
 	}
 }
@@ -395,8 +492,7 @@ void kfd_event_free_process(struct kfd_process *p)
 
 static bool event_can_be_gpu_signaled(const struct kfd_event *ev)
 {
-	return ev->type == KFD_EVENT_TYPE_SIGNAL ||
-					ev->type == KFD_EVENT_TYPE_DEBUG;
+	return ev->type == KFD_EVENT_TYPE_SIGNAL || ev->type == KFD_EVENT_TYPE_DEBUG;
 }
 
 static bool event_can_be_cpu_signaled(const struct kfd_event *ev)
@@ -407,11 +503,12 @@ static bool event_can_be_cpu_signaled(const struct kfd_event *ev)
 int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		     uint32_t event_type, bool auto_reset, uint32_t node_id,
 		     uint32_t *event_id, uint32_t *event_trigger_data,
-		     uint64_t *event_page_offset, uint32_t *event_slot_index)
+		     uint64_t *event_page_offset, uint32_t *event_slot_index,
+		     void *kern_addr)
 {
 	int ret = 0;
-	struct kfd_event *ev = kzalloc(sizeof(*ev), GFP_KERNEL);
 
+	struct kfd_event *ev = kzalloc(sizeof(*ev), GFP_KERNEL);
 	if (!ev)
 		return -ENOMEM;
 
@@ -421,9 +518,12 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 
 	INIT_LIST_HEAD(&ev->waiters);
 
-	*event_page_offset = 0;
-
 	mutex_lock(&p->event_mutex);
+
+	if (kern_addr && list_empty(&p->signal_event_pages))
+		allocate_signal_page_dgpu(p, kern_addr, *event_page_offset);
+
+	*event_page_offset = 0;
 
 	switch (event_type) {
 	case KFD_EVENT_TYPE_SIGNAL:
@@ -431,7 +531,7 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		ret = create_signal_event(devkfd, p, ev);
 		if (!ret) {
 			*event_page_offset = (ev->signal_page->page_index |
-					KFD_MMAP_EVENTS_MASK);
+					KFD_MMAP_TYPE_EVENTS);
 			*event_page_offset <<= PAGE_SHIFT;
 			*event_slot_index = ev->signal_slot_index;
 		}
@@ -538,8 +638,7 @@ int kfd_reset_event(struct kfd_process *p, uint32_t event_id)
 
 static void acknowledge_signal(struct kfd_process *p, struct kfd_event *ev)
 {
-	page_slots(ev->signal_page)[ev->signal_slot_index] =
-						UNSIGNALED_EVENT_SLOT;
+	page_slots(ev->signal_page)[ev->signal_slot_index] = UNSIGNALED_EVENT_SLOT;
 }
 
 static bool is_slot_signaled(struct signal_page *page, unsigned int index)
@@ -547,8 +646,7 @@ static bool is_slot_signaled(struct signal_page *page, unsigned int index)
 	return page_slots(page)[index] != UNSIGNALED_EVENT_SLOT;
 }
 
-static void set_event_from_interrupt(struct kfd_process *p,
-					struct kfd_event *ev)
+static void set_event_from_interrupt(struct kfd_process *p, struct kfd_event *ev)
 {
 	if (ev && event_can_be_gpu_signaled(ev)) {
 		acknowledge_signal(p, ev);
@@ -561,42 +659,39 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 {
 	struct kfd_event *ev;
 
-	/*
-	 * Because we are called from arbitrary context (workqueue) as opposed
+	/* Because we are called from arbitrary context (workqueue) as opposed
 	 * to process context, kfd_process could attempt to exit while we are
-	 * running so the lookup function returns a locked process.
-	 */
+	 * running so the lookup function returns a read-locked process. */
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
-
 	if (!p)
 		return; /* Presumably process exited. */
 
 	mutex_lock(&p->event_mutex);
 
-	if (valid_id_bits >= INTERRUPT_DATA_BITS) {
+	if ((valid_id_bits >= INTERRUPT_DATA_BITS) &&
+			((partial_id & KFD_DEBUG_EVENT_MASK) ==
+					KFD_DEBUG_EVENT_MASK)) {
 		/* Partial ID is a full ID. */
 		ev = lookup_event_by_id(p, partial_id);
 		set_event_from_interrupt(p, ev);
 	} else {
-		/*
-		 * Partial ID is in fact partial. For now we completely
-		 * ignore it, but we could use any bits we did receive to
-		 * search faster.
-		 */
+		/* Partial ID is in fact partial. For now we completely ignore it,
+		 * but we could use any bits we did receive to search faster. */
 		struct signal_page *page;
 		unsigned i;
 
-		list_for_each_entry(page, &p->signal_event_pages, event_pages)
-			for (i = 0; i < SLOTS_PER_PAGE; i++)
+		list_for_each_entry(page, &p->signal_event_pages, event_pages) {
+			for (i = 0; i < SLOTS_PER_PAGE; i++) {
 				if (is_slot_signaled(page, i)) {
-					ev = lookup_event_by_page_slot(p,
-								page, i);
+					ev = lookup_event_by_page_slot(p, page, i);
 					set_event_from_interrupt(p, ev);
 				}
+			}
+		}
 	}
 
 	mutex_unlock(&p->event_mutex);
-	mutex_unlock(&p->mutex);
+	up_read(&p->lock);
 }
 
 static struct kfd_event_waiter *alloc_event_waiters(uint32_t num_events)
@@ -604,20 +699,20 @@ static struct kfd_event_waiter *alloc_event_waiters(uint32_t num_events)
 	struct kfd_event_waiter *event_waiters;
 	uint32_t i;
 
-	event_waiters = kmalloc_array(num_events,
-					sizeof(struct kfd_event_waiter),
-					GFP_KERNEL);
+	event_waiters = kmalloc(num_events * sizeof(struct kfd_event_waiter), GFP_KERNEL);
 
-	for (i = 0; (event_waiters) && (i < num_events) ; i++) {
-		INIT_LIST_HEAD(&event_waiters[i].waiters);
-		event_waiters[i].sleeping_task = current;
-		event_waiters[i].activated = false;
+	if (event_waiters) {
+		for (i = 0; i < num_events; i++) {
+			INIT_LIST_HEAD(&event_waiters[i].waiters);
+			event_waiters[i].sleeping_task = current;
+			event_waiters[i].activated = false;
+		}
 	}
 
 	return event_waiters;
 }
 
-static int init_event_waiter(struct kfd_process *p,
+static int init_event_waiter_get_status(struct kfd_process *p,
 		struct kfd_event_waiter *waiter,
 		uint32_t event_id,
 		uint32_t input_index)
@@ -632,13 +727,21 @@ static int init_event_waiter(struct kfd_process *p,
 	waiter->activated = ev->signaled;
 	ev->signaled = ev->signaled && !ev->auto_reset;
 
-	list_add(&waiter->waiters, &ev->waiters);
-
 	return 0;
 }
 
+static void init_event_waiter_add_to_waitlist(struct kfd_event_waiter *waiter)
+{
+	struct kfd_event *ev = waiter->event;
+
+	/* Only add to the wait list if we actually need to
+	 * wait on this event. */
+	if (!waiter->activated)
+		list_add(&waiter->waiters, &ev->waiters);
+}
+
 static bool test_event_condition(bool all, uint32_t num_events,
-				struct kfd_event_waiter *event_waiters)
+		struct kfd_event_waiter *event_waiters)
 {
 	uint32_t i;
 	uint32_t activated_count = 0;
@@ -663,23 +766,15 @@ static bool copy_signaled_event_data(uint32_t num_events,
 		struct kfd_event_waiter *event_waiters,
 		struct kfd_event_data __user *data)
 {
-	struct kfd_hsa_memory_exception_data *src;
-	struct kfd_hsa_memory_exception_data __user *dst;
-	struct kfd_event_waiter *waiter;
-	struct kfd_event *event;
 	uint32_t i;
 
-	for (i = 0; i < num_events; i++) {
-		waiter = &event_waiters[i];
-		event = waiter->event;
-		if (waiter->activated && event->type == KFD_EVENT_TYPE_MEMORY) {
-			dst = &data[waiter->input_index].memory_exception_data;
-			src = &event->memory_exception_data;
-			if (copy_to_user(dst, src,
-				sizeof(struct kfd_hsa_memory_exception_data)))
+	for (i = 0; i < num_events; i++)
+		if (event_waiters[i].activated &&
+			event_waiters[i].event->type == KFD_EVENT_TYPE_MEMORY)
+			if (copy_to_user(&data[event_waiters[i].input_index].memory_exception_data,
+					&event_waiters[i].event->memory_exception_data,
+					sizeof(struct kfd_hsa_memory_exception_data)))
 				return false;
-		}
-	}
 
 	return true;
 
@@ -695,11 +790,9 @@ static long user_timeout_to_jiffies(uint32_t user_timeout_ms)
 	if (user_timeout_ms == KFD_EVENT_TIMEOUT_INFINITE)
 		return MAX_SCHEDULE_TIMEOUT;
 
-	/*
-	 * msecs_to_jiffies interprets all values above 2^31-1 as infinite,
+	/* msecs_to_jiffies interprets all values above 2^31-1 as infinite,
 	 * but we consider them finite.
-	 * This hack is wrong, but nobody is likely to notice.
-	 */
+	 * This hack is wrong, but nobody is likely to notice. */
 	user_timeout_ms = min_t(uint32_t, user_timeout_ms, 0x7FFFFFFF);
 
 	return msecs_to_jiffies(user_timeout_ms) + 1;
@@ -724,10 +817,15 @@ int kfd_wait_on_events(struct kfd_process *p,
 			(struct kfd_event_data __user *) data;
 	uint32_t i;
 	int ret = 0;
+
 	struct kfd_event_waiter *event_waiters = NULL;
 	long timeout = user_timeout_to_jiffies(user_timeout_ms);
 
 	mutex_lock(&p->event_mutex);
+
+	/* Set to something unreasonable - this is really
+	 * just a bool for now. */
+	*wait_result = KFD_WAIT_TIMEOUT;
 
 	event_waiters = alloc_event_waiters(num_events);
 	if (!event_waiters) {
@@ -744,13 +842,33 @@ int kfd_wait_on_events(struct kfd_process *p,
 			goto fail;
 		}
 
-		ret = init_event_waiter(p, &event_waiters[i],
+		ret = init_event_waiter_get_status(p, &event_waiters[i],
 				event_data.event_id, i);
 		if (ret)
 			goto fail;
 	}
 
+	/* Check condition once. */
+	if (test_event_condition(all, num_events, event_waiters)) {
+		if (copy_signaled_event_data(num_events,
+				event_waiters, events))
+			*wait_result = KFD_WAIT_COMPLETE;
+		else
+			*wait_result = KFD_WAIT_ERROR;
+		free_waiters(num_events, event_waiters);
+	} else {
+		/* Add to wait lists if we need to wait. */
+		for (i = 0; i < num_events; i++)
+			init_event_waiter_add_to_waitlist(&event_waiters[i]);
+	}
+
 	mutex_unlock(&p->event_mutex);
+
+	/* Return if all waits were already satisfied. */
+	if (*wait_result != KFD_WAIT_TIMEOUT) {
+		__set_current_state(TASK_RUNNING);
+		return ret;
+	}
 
 	while (true) {
 		if (fatal_signal_pending(current)) {
@@ -760,16 +878,16 @@ int kfd_wait_on_events(struct kfd_process *p,
 
 		if (signal_pending(current)) {
 			/*
-			 * This is wrong when a nonzero, non-infinite timeout
-			 * is specified. We need to use
-			 * ERESTARTSYS_RESTARTBLOCK, but struct restart_block
-			 * contains a union with data for each user and it's
-			 * in generic kernel code that I don't want to
-			 * touch yet.
+			 * This is wrong when a nonzero, non-infinite timeout is specified.
+			 * We need to use ERESTARTSYS_RESTARTBLOCK, but struct restart_block
+			 * contains a union with data for each user and it's in generic
+			 * kernel code that I don't want to touch yet.
 			 */
 			ret = -ERESTARTSYS;
 			break;
 		}
+
+		set_current_state(TASK_INTERRUPTIBLE);
 
 		if (test_event_condition(all, num_events, event_waiters)) {
 			if (copy_signaled_event_data(num_events,
@@ -785,7 +903,7 @@ int kfd_wait_on_events(struct kfd_process *p,
 			break;
 		}
 
-		timeout = schedule_timeout_interruptible(timeout);
+		timeout = schedule_timeout(timeout);
 	}
 	__set_current_state(TASK_RUNNING);
 
@@ -825,8 +943,7 @@ int kfd_event_mmap(struct kfd_process *p, struct vm_area_struct *vma)
 	page = lookup_signal_page_by_index(p, page_index);
 	if (!page) {
 		/* Probably KFD bug, but mmap is user-accessible. */
-		pr_debug("signal page could not be found for page_index %u\n",
-				page_index);
+		pr_debug("signal page could not be found for page_index %u\n", page_index);
 		return -EINVAL;
 	}
 
@@ -858,23 +975,29 @@ int kfd_event_mmap(struct kfd_process *p, struct vm_area_struct *vma)
 static void lookup_events_by_type_and_signal(struct kfd_process *p,
 		int type, void *event_data)
 {
-	struct kfd_hsa_memory_exception_data *ev_data;
 	struct kfd_event *ev;
 	int bkt;
 	bool send_signal = true;
 
-	ev_data = (struct kfd_hsa_memory_exception_data *) event_data;
-
-	hash_for_each(p->events, bkt, ev, events)
+	hash_for_each(p->events, bkt, ev, events) {
 		if (ev->type == type) {
 			send_signal = false;
 			dev_dbg(kfd_device,
 					"Event found: id %X type %d",
 					ev->event_id, ev->type);
 			set_event(ev);
-			if (ev->type == KFD_EVENT_TYPE_MEMORY && ev_data)
-				ev->memory_exception_data = *ev_data;
+			if (ev->type == KFD_EVENT_TYPE_MEMORY && event_data)
+				ev->memory_exception_data =
+						*(struct kfd_hsa_memory_exception_data *)event_data;
 		}
+	}
+
+	if (type == KFD_EVENT_TYPE_MEMORY) {
+		dev_warn(kfd_device,
+			"Sending SIGSEGV to HSA Process with PID %d ",
+				p->lead_thread->pid);
+		send_sig(SIGSEGV, p->lead_thread, 0);
+	}
 
 	/* Send SIGTERM no event of type "type" has been found*/
 	if (send_signal) {
@@ -901,7 +1024,7 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 	/*
 	 * Because we are called from arbitrary context (workqueue) as opposed
 	 * to process context, kfd_process could attempt to exit while we are
-	 * running so the lookup function returns a locked process.
+	 * running so the lookup function returns a read-locked process.
 	 */
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
 
@@ -916,24 +1039,24 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 	memory_exception_data.gpu_id = dev->id;
 	memory_exception_data.va = address;
 	/* Set failure reason */
-	memory_exception_data.failure.NotPresent = 1;
-	memory_exception_data.failure.NoExecute = 0;
-	memory_exception_data.failure.ReadOnly = 0;
+	memory_exception_data.failure.NotPresent = true;
+	memory_exception_data.failure.NoExecute = false;
+	memory_exception_data.failure.ReadOnly = false;
 	if (vma) {
 		if (vma->vm_start > address) {
-			memory_exception_data.failure.NotPresent = 1;
-			memory_exception_data.failure.NoExecute = 0;
-			memory_exception_data.failure.ReadOnly = 0;
+			memory_exception_data.failure.NotPresent = true;
+			memory_exception_data.failure.NoExecute = false;
+			memory_exception_data.failure.ReadOnly = false;
 		} else {
-			memory_exception_data.failure.NotPresent = 0;
+			memory_exception_data.failure.NotPresent = false;
 			if (is_write_requested && !(vma->vm_flags & VM_WRITE))
-				memory_exception_data.failure.ReadOnly = 1;
+				memory_exception_data.failure.ReadOnly = true;
 			else
-				memory_exception_data.failure.ReadOnly = 0;
+				memory_exception_data.failure.ReadOnly = false;
 			if (is_execute_requested && !(vma->vm_flags & VM_EXEC))
-				memory_exception_data.failure.NoExecute = 1;
+				memory_exception_data.failure.NoExecute = true;
 			else
-				memory_exception_data.failure.NoExecute = 0;
+				memory_exception_data.failure.NoExecute = false;
 		}
 	}
 
@@ -946,7 +1069,7 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 			&memory_exception_data);
 
 	mutex_unlock(&p->event_mutex);
-	mutex_unlock(&p->mutex);
+	up_read(&p->lock);
 }
 
 void kfd_signal_hw_exception_event(unsigned int pasid)
@@ -954,7 +1077,7 @@ void kfd_signal_hw_exception_event(unsigned int pasid)
 	/*
 	 * Because we are called from arbitrary context (workqueue) as opposed
 	 * to process context, kfd_process could attempt to exit while we are
-	 * running so the lookup function returns a locked process.
+	 * running so the lookup function returns a read-locked process.
 	 */
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
 
@@ -967,5 +1090,42 @@ void kfd_signal_hw_exception_event(unsigned int pasid)
 	lookup_events_by_type_and_signal(p, KFD_EVENT_TYPE_HW_EXCEPTION, NULL);
 
 	mutex_unlock(&p->event_mutex);
-	mutex_unlock(&p->mutex);
+	up_read(&p->lock);
 }
+
+void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
+				struct kfd_vm_fault_info *info)
+{
+	struct kfd_event *ev;
+	int bkt;
+	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
+	struct kfd_hsa_memory_exception_data memory_exception_data;
+
+	if (!p)
+		return; /* Presumably process exited. */
+	memset(&memory_exception_data, 0, sizeof(memory_exception_data));
+	memory_exception_data.gpu_id = dev->id;
+	/* Set failure reason */
+	if (info) {
+		memory_exception_data.va = (info->page_addr) << PAGE_SHIFT;
+		memory_exception_data.failure.NotPresent =
+			info->prot_valid ? true : false;
+		memory_exception_data.failure.NoExecute =
+			info->prot_exec ? true : false;
+		memory_exception_data.failure.ReadOnly =
+			info->prot_write ? true : false;
+	}
+	mutex_lock(&p->event_mutex);
+
+	hash_for_each(p->events, bkt, ev, events) {
+		if (ev->type == KFD_EVENT_TYPE_MEMORY) {
+			ev->memory_exception_data = memory_exception_data;
+			set_event(ev);
+		}
+	}
+
+	mutex_unlock(&p->event_mutex);
+	up_read(&p->lock);
+
+}
+
