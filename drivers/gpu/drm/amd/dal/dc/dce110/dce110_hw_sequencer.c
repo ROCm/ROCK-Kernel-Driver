@@ -867,14 +867,6 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		}
 	}
 
-	/* Setup audio rate clock source */
-	if (pipe_ctx->audio != NULL)
-		dal_audio_setup_audio_wall_dto(
-				pipe_ctx->audio,
-				pipe_ctx->signal,
-				&pipe_ctx->audio_output.crtc_info,
-				&pipe_ctx->audio_output.pll_info);
-
 	/* program blank color */
 	color_space = get_output_color_space(&stream->public.timing);
 	pipe_ctx->tg->funcs->set_blank_color(
@@ -1347,6 +1339,33 @@ static enum dc_status apply_ctx_to_hw(
 		if (DC_OK != status)
 			return status;
 	}
+
+	/* Setup audio rate clock source */
+	/* Issue:
+	 * Audio lag happened on DP monitor when unplug a HDMI monitor
+	 *
+	 * Cause:
+	 * In case of DP and HDMI connected or HDMI only, DCCG_AUDIO_DTO_SEL
+	 * is set to either dto0 or dto1, audio should work fine.
+	 * In case of DP connected only, DCCG_AUDIO_DTO_SEL should be dto1,
+	 * set to dto0 will cause audio lag.
+	 *
+	 * Solution:
+	 * Not optimized audio wall dto setup. When mode set, iterate pipe_ctx,
+	 * find first available pipe with audio, setup audio wall DTO per topology
+	 * instead of per pipe.
+	 */
+	for (i = 0; i < MAX_PIPES; i++) {
+		if (context->res_ctx.pipe_ctx[i].audio != NULL) {
+			dal_audio_setup_audio_wall_dto(
+					context->res_ctx.pipe_ctx[i].audio,
+					context->res_ctx.pipe_ctx[i].signal,
+					&context->res_ctx.pipe_ctx[i].audio_output.crtc_info,
+					&context->res_ctx.pipe_ctx[i].audio_output.pll_info);
+			break;
+		}
+	}
+
 	dc->hwss.set_displaymarks(dc, context);
 
 	update_bios_scratch_critical_state(context->res_ctx.pool.adapter_srv,
