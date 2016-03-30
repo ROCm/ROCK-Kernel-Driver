@@ -42,16 +42,41 @@ struct mod_freesync_params {
 	enum mod_freesync_mode mode;
 };
 
+struct mod_freesync_caps {
+	bool supported;
+	int minRefreshInMicroHz;
+	int maxRefreshInMicroHz;
+};
+
 struct mod_freesync *mod_freesync_create(struct dc *dc);
 void mod_freesync_destroy(struct mod_freesync *mod_freesync);
+
+/*
+ * Add sink to be tracked by module
+ */
+bool mod_freesync_add_sink(struct mod_freesync *mod_freesync,
+		const struct dc_sink *sink, struct mod_freesync_caps *caps);
+
+/*
+ * Remove sink to be tracked by module
+ */
+bool mod_freesync_remove_sink(struct mod_freesync *mod_freesync,
+		const struct dc_sink *sink);
+
+/*
+ * Build additional parameters for dc_stream when creating stream for
+ * sink to support freesync
+ */
+void mod_freesync_update_stream(struct mod_freesync *mod_freesync,
+		struct dc_stream *stream);
 
 /*
  * This interface sets the freesync mode on a stream.  Mode and associated
  * parameters required to set it are defined in mod_freesync_params.
  */
 bool mod_freesync_set_freesync_on_streams(struct mod_freesync *mod_freesync,
-		struct dc_stream **streams, int num_streams,
-		struct mod_freesync_params *params);
+		const struct dc_stream **streams, int num_streams,
+		const struct mod_freesync_params *params);
 
 /*
  * This interface must be called for on every VUPDATE event for every stream

@@ -111,6 +111,8 @@ struct timing_generator {
 
 struct dc_crtc_timing;
 
+struct drr_params;
+
 struct timing_generator_funcs {
 	bool (*validate_timing)(struct timing_generator *tg,
 							const struct dc_crtc_timing *timing);
@@ -150,6 +152,7 @@ struct timing_generator_funcs {
 	void (*tear_down_global_swap_lock)(struct timing_generator *tg);
 	void (*enable_advanced_request)(struct timing_generator *tg,
 					bool enable, const struct dc_crtc_timing *timing);
+	void (*set_drr)(struct timing_generator *tg, const struct drr_params *params);
 };
 
 #endif

@@ -1159,6 +1159,22 @@ static void dpcd_configure_panel_mode(
 			panel_mode_edp);
 }
 
+static void enable_stream_features(struct pipe_ctx *pipe_ctx)
+{
+	struct core_stream *stream = pipe_ctx->stream;
+	struct core_link *link = stream->sink->link;
+	union down_spread_ctrl downspread;
+
+	core_link_read_dpcd(link, DPCD_ADDRESS_DOWNSPREAD_CNTL,
+			&downspread.raw, sizeof(downspread));
+
+	downspread.bits.IGNORE_MSA_TIMING_PARAM =
+			(stream->public.ignore_msa_timing_param) ? 1 : 0;
+
+	core_link_write_dpcd(link, DPCD_ADDRESS_DOWNSPREAD_CNTL,
+			&downspread.raw, sizeof(downspread));
+}
+
 static enum dc_status enable_link_dp(struct pipe_ctx *pipe_ctx)
 {
 	struct core_stream *stream = pipe_ctx->stream;
@@ -1194,6 +1210,8 @@ static enum dc_status enable_link_dp(struct pipe_ctx *pipe_ctx)
 	}
 	else
 		status = DC_ERROR_UNEXPECTED;
+
+	enable_stream_features(pipe_ctx);
 
 	return status;
 }

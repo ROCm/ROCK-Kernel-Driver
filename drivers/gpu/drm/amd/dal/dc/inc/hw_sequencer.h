@@ -110,6 +110,8 @@ struct hw_sequencer_funcs {
 				struct validate_context *context);
 
 	void (*set_display_clock)(struct validate_context *context);
+
+	void (*set_drr)(struct pipe_ctx **pipe_ctx, int num_pipes, int vmin, int vmax);
 };
 
 bool dc_construct_hw_sequencer(

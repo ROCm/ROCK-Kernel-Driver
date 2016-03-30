@@ -1224,7 +1224,6 @@ static void switch_dp_clock_sources(
  * Public functions
  ******************************************************************************/
 
-
 static void reset_single_pipe_hw_ctx(
 		const struct core_dc *dc,
 		struct pipe_ctx *pipe_ctx,
@@ -1259,6 +1258,22 @@ static void reset_single_pipe_hw_ctx(
 			PIPE_GATING_CONTROL_ENABLE);
 
 	pipe_ctx->stream = NULL;
+}
+
+static void set_drr(struct pipe_ctx **pipe_ctx,
+		int num_pipes, int vmin, int vmax)
+{
+	int i = 0;
+	struct drr_params params = {0};
+
+	params.vertical_total_max = vmax;
+	params.vertical_total_min = vmin;
+
+	/* TODO: If multiple pipes are to be supported, you need some GSL stuff */
+
+	for (i = 0; i < num_pipes; i++) {
+		pipe_ctx[i]->tg->funcs->set_drr(pipe_ctx[i]->tg, &params);
+	}
 }
 
 /*TODO: const validate_context*/
@@ -1667,7 +1682,8 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.set_blender_mode = dce110_set_blender_mode,
 	.clock_gating_power_up = dal_dc_clock_gating_dce110_power_up,/*todo*/
 	.set_display_clock = set_display_clock,
-	.set_displaymarks = set_displaymarks
+	.set_displaymarks = set_displaymarks,
+	.set_drr = set_drr
 };
 
 bool dce110_hw_sequencer_construct(struct core_dc *dc)
