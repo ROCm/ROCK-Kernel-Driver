@@ -187,9 +187,9 @@ void dce110_timing_generator_set_test_pattern(
 	enum controller_dp_test_pattern test_pattern,
 	enum dc_color_depth color_depth);
 
-void dce110_timing_generator_program_drr(
+void dce110_timing_generator_set_drr(
 	struct timing_generator *tg,
-	const struct hw_ranged_timing *timing);
+	const struct drr_params *params);
 
 uint32_t dce110_timing_generator_get_crtc_scanoutpos(
 	struct timing_generator *tg,

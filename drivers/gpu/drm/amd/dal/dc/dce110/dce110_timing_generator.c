@@ -148,7 +148,10 @@ static struct timing_generator_funcs dce110_tg_funcs = {
 		.tear_down_global_swap_lock =
 				dce110_timing_generator_tear_down_global_swap_lock,
 		.enable_advanced_request =
-				dce110_timing_generator_enable_advanced_request
+				dce110_timing_generator_enable_advanced_request,
+		.set_drr =
+				dce110_timing_generator_set_drr
+
 };
 
 static const struct crtc_black_color black_color_format[] = {
@@ -585,7 +588,7 @@ bool dce110_timing_generator_program_timing_generator(
 
 /**
  *****************************************************************************
- *  Function: program_drr
+ *  Function: set_drr
  *
  *  @brief
  *     Program dynamic refresh rate registers m_DxCRTC_V_TOTAL_*.
@@ -594,9 +597,9 @@ bool dce110_timing_generator_program_timing_generator(
  *  wCrtcTiming struct
  *****************************************************************************
  */
-void dce110_timing_generator_program_drr(
+void dce110_timing_generator_set_drr(
 	struct timing_generator *tg,
-	const struct hw_ranged_timing *timing)
+	const struct drr_params *params)
 {
 	/* register values */
 	uint32_t v_total_min = 0;
@@ -619,90 +622,53 @@ void dce110_timing_generator_program_drr(
 	addr = CRTC_REG(mmCRTC_STATIC_SCREEN_CONTROL);
 	static_screen_cntl = dm_read_reg(tg->ctx, addr);
 
-	if (timing != NULL) {
-		/* Set Static Screen trigger events
-		 * If CRTC_SET_V_TOTAL_MIN_MASK_EN is set, use legacy event mask
-		 * register
-		 */
-		if (get_reg_field_value(
-			v_total_cntl,
-			CRTC_V_TOTAL_CONTROL,
-			CRTC_SET_V_TOTAL_MIN_MASK_EN)) {
-			set_reg_field_value(v_total_cntl,
-				/* TODO: add implementation
-				translate_to_dce_static_screen_events(
-					timing->control.event_mask.u_all),
-					*/ 0,
-				CRTC_V_TOTAL_CONTROL,
-				CRTC_SET_V_TOTAL_MIN_MASK);
-		} else {
-			set_reg_field_value(static_screen_cntl,
-				/* TODO: add implementation
-				translate_to_dce_static_screen_events(
-					timing->control.event_mask.u_all),
-					*/ 0,
-				CRTC_STATIC_SCREEN_CONTROL,
-				CRTC_STATIC_SCREEN_EVENT_MASK);
-		}
+	if (params != NULL &&
+		params->vertical_total_max > 0 &&
+		params->vertical_total_min > 0) {
 
-		/* Number of consecutive static screen frames before interrupt
-		 * is triggered. 0 is an invalid setting, which means we should
-		 * leaving HW setting unchanged. */
-		if (timing->control.static_frame_count != 0) {
-			set_reg_field_value(
-				static_screen_cntl,
-				timing->control.static_frame_count,
-				CRTC_STATIC_SCREEN_CONTROL,
-				CRTC_STATIC_SCREEN_FRAME_COUNT);
-		}
-
-		/* This value is reduced by 1 based on the register definition
-		 * of the VTOTAL value:
-		 * CRTC_V_TOTAL should be set to Vertical total minus one. (E.g.
-		 * for 525 lines, set to 524 = 0x20C)
-		 */
-		set_reg_field_value(v_total_min,
-				timing->vertical_total_min,
-				CRTC_V_TOTAL_MIN,
-				CRTC_V_TOTAL_MIN);
 		set_reg_field_value(v_total_max,
-				timing->vertical_total_max,
+				params->vertical_total_max - 1,
 				CRTC_V_TOTAL_MAX,
 				CRTC_V_TOTAL_MAX);
 
-		/* set VTotalControl value according to ranged timing control.
-		 */
+		set_reg_field_value(v_total_min,
+				params->vertical_total_min - 1,
+				CRTC_V_TOTAL_MIN,
+				CRTC_V_TOTAL_MIN);
 
-		if (timing->vertical_total_min != 0) {
-			set_reg_field_value(v_total_cntl,
-					1,
-					CRTC_V_TOTAL_CONTROL,
-					CRTC_V_TOTAL_MIN_SEL);
-		} else {
-			set_reg_field_value(v_total_cntl,
-					0,
-					CRTC_V_TOTAL_CONTROL,
-					CRTC_V_TOTAL_MIN_SEL);
-		}
-		if (timing->vertical_total_max != 0) {
-			set_reg_field_value(v_total_cntl,
-					1,
-					CRTC_V_TOTAL_CONTROL,
-					CRTC_V_TOTAL_MAX_SEL);
-		} else {
-			set_reg_field_value(v_total_cntl,
-					0,
-					CRTC_V_TOTAL_CONTROL,
-					CRTC_V_TOTAL_MAX_SEL);
-		}
 		set_reg_field_value(v_total_cntl,
-				timing->control.force_lock_on_event,
+				1,
+				CRTC_V_TOTAL_CONTROL,
+				CRTC_V_TOTAL_MIN_SEL);
+
+		set_reg_field_value(v_total_cntl,
+				1,
+				CRTC_V_TOTAL_CONTROL,
+				CRTC_V_TOTAL_MAX_SEL);
+
+		set_reg_field_value(v_total_cntl,
+				0,
 				CRTC_V_TOTAL_CONTROL,
 				CRTC_FORCE_LOCK_ON_EVENT);
 		set_reg_field_value(v_total_cntl,
-				timing->control.lock_to_master_vsync,
+				0,
 				CRTC_V_TOTAL_CONTROL,
 				CRTC_FORCE_LOCK_TO_MASTER_VSYNC);
+
+		set_reg_field_value(v_total_cntl,
+				0,
+				CRTC_V_TOTAL_CONTROL,
+				CRTC_SET_V_TOTAL_MIN_MASK_EN);
+
+		set_reg_field_value(v_total_cntl,
+				0,
+				CRTC_V_TOTAL_CONTROL,
+				CRTC_SET_V_TOTAL_MIN_MASK);
+
+		set_reg_field_value(static_screen_cntl,
+				0x180,
+			CRTC_STATIC_SCREEN_CONTROL,
+			CRTC_STATIC_SCREEN_EVENT_MASK);
 	} else {
 		set_reg_field_value(v_total_cntl,
 			0,

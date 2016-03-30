@@ -50,7 +50,7 @@ struct dc_surface;
 
 struct dc_stream_funcs {
 	bool (*dc_stream_adjust_vmin_vmax)(struct dc *dc,
-			struct dc_stream *stream, int vmin, int vmax);
+			const struct dc_stream **stream, int num_streams, int vmin, int vmax);
 };
 
 struct dc {
@@ -311,7 +311,7 @@ struct dc_stream {
 
 	struct audio_info audio_info;
 
-	bool enable_freesync;
+	bool ignore_msa_timing_param;
 
 	/* TODO: dithering */
 	/* TODO: transfer function (CSC/regamma/gamut remap) */

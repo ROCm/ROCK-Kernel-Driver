@@ -103,15 +103,13 @@ struct hw_ranged_timing_control {
 };
 
 /* define the structure of Dynamic Refresh Mode */
-struct hw_ranged_timing {
+struct drr_params {
 	/* defines the minimum possible vertical dimension of display timing
 	 * for CRTC as supported by the panel */
 	uint32_t vertical_total_min;
 	/* defines the maximum possible vertical dimension of display timing
 	 * for CRTC as supported by the panel */
 	uint32_t vertical_total_max;
-
-	struct hw_ranged_timing_control control;
 };
 
 /* CRTC timing structure */
@@ -129,8 +127,6 @@ struct hw_crtc_timing {
 	uint32_t v_overscan_bottom;
 	uint32_t v_sync_start;
 	uint32_t v_sync_width;
-
-	struct hw_ranged_timing ranged_timing;
 
 	/* in KHz */
 	uint32_t pixel_clock;

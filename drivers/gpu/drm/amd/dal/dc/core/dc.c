@@ -201,6 +201,34 @@ static struct adapter_service *create_as(
 	return as;
 }
 
+static bool dc_stream_adjust_vmin_vmax(struct dc *dc, const struct dc_stream **stream, int num_streams, int vmin, int vmax)
+{
+	/* TODO: Support multiple streams */
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	struct core_stream *core_stream = DC_STREAM_TO_CORE(stream[0]);
+	int i = 0;
+	bool ret = false;
+	struct pipe_ctx *pipes;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		if (core_dc->current_context.res_ctx.pipe_ctx[i].stream == core_stream) {
+			pipes = &core_dc->current_context.res_ctx.pipe_ctx[i];
+			core_dc->hwss.set_drr(&pipes, 1, vmin, vmax);
+
+			ret = true;
+		}
+	}
+
+	return ret;
+}
+
+static void allocate_dc_stream_funcs(struct core_dc *core_dc)
+{
+	if (core_dc->hwss.set_drr != NULL) {
+		core_dc->public.stream_funcs.dc_stream_adjust_vmin_vmax = dc_stream_adjust_vmin_vmax;
+	}
+}
+
 static bool construct(struct core_dc *dc, const struct dc_init_data *init_params)
 {
 	struct dal_logger *logger;
@@ -274,6 +302,8 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 		if (!create_links(dc, NULL, init_params->num_virtual_links))
 			goto create_links_fail;
 	}
+
+	allocate_dc_stream_funcs(dc);
 
 	return true;
 
