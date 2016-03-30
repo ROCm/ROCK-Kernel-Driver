@@ -34,8 +34,7 @@
 #define KFD_FIRST_NONSIGNAL_EVENT_ID KFD_EVENT_ID_NONSIGNAL_MASK
 #define KFD_LAST_NONSIGNAL_EVENT_ID UINT_MAX
 
-/*
- * Written into kfd_signal_slot_t to indicate that the event is not signaled.
+/* Written into kfd_signal_slot_t to indicate that the event is not signaled.
  * Since the event protocol may need to write the event ID into memory, this
  * must not be a valid event ID.
  * For the sake of easy memset-ing, this must be a byte pattern.
