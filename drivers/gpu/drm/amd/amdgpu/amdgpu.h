@@ -52,8 +52,9 @@
 #include "amdgpu_irq.h"
 #include "amdgpu_ucode.h"
 #include "amdgpu_gds.h"
-#include "amd_powerplay.h"
 #include "amdgpu_acp.h"
+#include "amdgpu_dm.h"
+#include "amd_powerplay.h"
 
 #include "gpu_scheduler.h"
 
@@ -82,6 +83,7 @@ extern int amdgpu_vm_size;
 extern int amdgpu_vm_block_size;
 extern int amdgpu_vm_fault_stop;
 extern int amdgpu_vm_debug;
+extern int amdgpu_dal;
 extern int amdgpu_sched_jobs;
 extern int amdgpu_sched_hw_submission;
 extern int amdgpu_powerplay;
@@ -2039,6 +2041,7 @@ struct amdgpu_device {
 
 	/* display */
 	struct amdgpu_mode_info		mode_info;
+	/* For pre-DCE11. DCE11 and later are in "struct amdgpu_device->dm" */
 	struct work_struct		hotplug_work;
 	struct amdgpu_irq_src		crtc_irq;
 	struct amdgpu_irq_src		pageflip_irq;
@@ -2085,6 +2088,9 @@ struct amdgpu_device {
 	/* GDS */
 	struct amdgpu_gds		gds;
 
+	/* display related functionality */
+	struct amdgpu_display_manager dm;
+
 	const struct amdgpu_ip_block_version *ip_blocks;
 	int				num_ip_blocks;
 	struct amdgpu_ip_block_status	*ip_block_status;
@@ -2119,7 +2125,7 @@ void amdgpu_io_wreg(struct amdgpu_device *adev, u32 reg, u32 v);
 
 u32 amdgpu_mm_rdoorbell(struct amdgpu_device *adev, u32 index);
 void amdgpu_mm_wdoorbell(struct amdgpu_device *adev, u32 index, u32 v);
-
+bool amdgpu_device_has_dal_support(struct amdgpu_device *adev);
 /*
  * Registers read & write functions.
  */
@@ -2364,6 +2370,8 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 	(adev)->powerplay.pp_funcs->dispatch_tasks((adev)->powerplay.pp_handle, (event_id), (input), (output))
 
 #define amdgpu_gds_switch(adev, r, v, d, w, a) (adev)->gds.funcs->patch_gds_switch((r), (v), (d), (w), (a))
+
+#define amdgpu_has_dal_support(adev) (amdgpu_dal && amdgpu_device_has_dal_support(adev))
 
 /* Common functions */
 int amdgpu_gpu_reset(struct amdgpu_device *adev);

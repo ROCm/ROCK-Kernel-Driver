@@ -42,11 +42,6 @@
    this contains a helper + a amdgpu fb
    the helper contains a pointer to amdgpu framebuffer baseclass.
 */
-struct amdgpu_fbdev {
-	struct drm_fb_helper helper;
-	struct amdgpu_framebuffer rfb;
-	struct amdgpu_device *adev;
-};
 
 static struct fb_ops amdgpufb_ops = {
 	.owner = THIS_MODULE,
