@@ -452,6 +452,17 @@ int amdgpu_bo_evict_vram(struct amdgpu_device *adev)
 	return ttm_bo_evict_mm(&adev->mman.bdev, TTM_PL_VRAM);
 }
 
+static const char *amdgpu_vram_names[] = {
+	"UNKNOWN",
+	"GDDR1",
+	"DDR2",
+	"GDDR3",
+	"GDDR4",
+	"GDDR5",
+	"HBM",
+	"DDR3"
+};
+
 void amdgpu_bo_force_delete(struct amdgpu_device *adev)
 {
 	struct amdgpu_bo *bo, *n;
@@ -484,8 +495,8 @@ int amdgpu_bo_init(struct amdgpu_device *adev)
 	DRM_INFO("Detected VRAM RAM=%lluM, BAR=%lluM\n",
 		adev->mc.mc_vram_size >> 20,
 		(unsigned long long)adev->mc.aper_size >> 20);
-	DRM_INFO("RAM width %dbits DDR\n",
-			adev->mc.vram_width);
+	DRM_INFO("RAM width %dbits %s\n",
+		adev->mc.vram_width, amdgpu_vram_names[adev->mc.vram_type]);
 	return amdgpu_ttm_init(adev);
 }
 
