@@ -339,7 +339,7 @@ static void dce110_crtc_switch_to_clk_src(
 				DP_DTO0_ENABLE);
 
 		set_reg_field_value(pixel_rate_cntl_value,
-				clk_src->id - 1,
+				clk_src->id - CLOCK_SOURCE_ID_PLL0,
 				CRTC0_PIXEL_RATE_CNTL,
 				CRTC0_PIXEL_RATE_SOURCE);
 	}
