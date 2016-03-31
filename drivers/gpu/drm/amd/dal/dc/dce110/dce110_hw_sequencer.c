@@ -1194,7 +1194,7 @@ static enum dc_status apply_ctx_to_hw(
 		 * since bios does optimization and doesn't apply if changing
 		 * PHY when not already disabled.
 		 */
-		if (pipe_ctx_old->stream && pipe_ctx_old->stream != pipe_ctx->stream)
+		if (pipe_ctx_old->stream && !pipe_ctx->stream)
 			reset_single_pipe_hw_ctx(
 				dc, pipe_ctx_old, &dc->current_context);
 		else if (pipe_ctx_old->clock_source != pipe_ctx->clock_source)
