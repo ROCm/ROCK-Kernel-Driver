@@ -607,6 +607,8 @@ struct drm_amdgpu_info_firmware {
 #define AMDGPU_VRAM_TYPE_HBM   6
 #define AMDGPU_VRAM_TYPE_DDR3  7
 
+#define AMDGPU_VRAM_TYPE_HBM_WIDTH 4096
+
 struct drm_amdgpu_info_device {
 	/** PCI Device ID */
 	uint32_t device_id;
