@@ -3357,6 +3357,45 @@ static int fiji_enable_thermal_auto_throttle(struct pp_hwmgr *hwmgr)
     return fiji_enable_auto_throttle_source(hwmgr, PHM_AutoThrottleSource_Thermal);
 }
 
+static int fiji_fan_ctrl_set_static_mode(struct pp_hwmgr *hwmgr, uint32_t mode)
+{
+	PHM_WRITE_VFPF_INDIRECT_FIELD(hwmgr->device, CGS_IND_REG__SMC,
+			CG_FDO_CTRL2, TMIN, 0);
+	PHM_WRITE_VFPF_INDIRECT_FIELD(hwmgr->device, CGS_IND_REG__SMC,
+			CG_FDO_CTRL2, FDO_PWM_MODE, mode);
+
+	return 0;
+}
+
+static int fiji_set_fan_speed_percent(struct pp_hwmgr *hwmgr,
+		uint32_t speed)
+{
+	uint32_t duty100;
+	uint32_t duty;
+	uint64_t tmp64;
+
+	if (hwmgr->thermal_controller.fanInfo.bNoFan)
+		return 0;
+
+	if (speed > 100)
+		speed = 100;
+
+	duty100 = PHM_READ_VFPF_INDIRECT_FIELD(hwmgr->device, CGS_IND_REG__SMC,
+			CG_FDO_CTRL1, FMAX_DUTY100);
+
+	if (duty100 == 0)
+		return -EINVAL;
+
+	tmp64 = (uint64_t)duty100 * speed;
+	do_div(tmp64, 100);
+	duty = (uint32_t)tmp64;
+
+	PHM_WRITE_VFPF_INDIRECT_FIELD(hwmgr->device, CGS_IND_REG__SMC,
+			CG_FDO_CTRL0, FDO_STATIC_DUTY, duty);
+
+	return fiji_fan_ctrl_set_static_mode(hwmgr, 1);
+}
+
 static int fiji_enable_dpm_tasks(struct pp_hwmgr *hwmgr)
 {
 	int tmp_result, result = 0;
@@ -3463,6 +3502,9 @@ static int fiji_enable_dpm_tasks(struct pp_hwmgr *hwmgr)
 	tmp_result = fiji_enable_thermal_auto_throttle(hwmgr);
 	PP_ASSERT_WITH_CODE((0 == tmp_result),
 			"Failed to enable thermal auto throttle!", result = tmp_result);
+
+	/* set fan speed to maximum */
+	fiji_set_fan_speed_percent(hwmgr, 100);
 
 	return result;
 }
