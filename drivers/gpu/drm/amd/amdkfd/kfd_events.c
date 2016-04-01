@@ -1105,6 +1105,7 @@ void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 		return; /* Presumably process exited. */
 	memset(&memory_exception_data, 0, sizeof(memory_exception_data));
 	memory_exception_data.gpu_id = dev->id;
+	memory_exception_data.failure.imprecise = true;
 	/* Set failure reason */
 	if (info) {
 		memory_exception_data.va = (info->page_addr) << PAGE_SHIFT;
@@ -1114,6 +1115,7 @@ void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 			info->prot_exec ? true : false;
 		memory_exception_data.failure.ReadOnly =
 			info->prot_write ? true : false;
+		memory_exception_data.failure.imprecise = false;
 	}
 	mutex_lock(&p->event_mutex);
 
