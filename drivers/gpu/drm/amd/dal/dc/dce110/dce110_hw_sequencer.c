@@ -673,12 +673,18 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		struct validate_context *context,
 		struct core_dc *dc)
 {
+	int i;
 	struct core_stream *stream = pipe_ctx->stream;
-	struct pipe_ctx *old_pipe_ctx =
-		&dc->current_context.res_ctx.pipe_ctx[pipe_ctx->pipe_idx];
 	bool timing_changed = context->res_ctx.pipe_ctx[pipe_ctx->pipe_idx]
 							.flags.timing_changed;
 	enum dc_color_space color_space;
+
+	struct pipe_ctx *pipe_ctx_old = NULL;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		if (dc->current_context.res_ctx.pipe_ctx[i].stream == pipe_ctx->stream)
+			pipe_ctx_old = &dc->current_context.res_ctx.pipe_ctx[i];
+	}
 
 	if (timing_changed) {
 		/* Must blank CRTC after disabling power gating and before any
@@ -686,14 +692,11 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		 */
 		pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true);
 
-		/*
-		 * only disable stream in case it was ever enabled
-		 */
-		if (old_pipe_ctx->stream) {
-			core_link_disable_stream(old_pipe_ctx);
-
-			ASSERT(old_pipe_ctx->clock_source);
-			resource_unreference_clock_source(&dc->current_context.res_ctx, old_pipe_ctx->clock_source);
+		if (pipe_ctx_old) {
+			core_link_disable_stream(pipe_ctx);
+			resource_unreference_clock_source(
+						&dc->current_context.res_ctx,
+						pipe_ctx_old->clock_source);
 		}
 
 		/*TODO: AUTO check if timing changed*/

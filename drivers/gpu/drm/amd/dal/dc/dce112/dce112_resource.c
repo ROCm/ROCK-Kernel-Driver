@@ -1022,6 +1022,9 @@ static enum dc_status map_clock_resources(
 						&context->res_ctx,
 						pipe_ctx->clock_source);
 
+				if (pipe_ctx->clock_source
+					!= dc->current_context.res_ctx.pipe_ctx[k].clock_source)
+					pipe_ctx->flags.timing_changed = true;
 				/* only one cs per stream regardless of mpo */
 				break;
 			}
