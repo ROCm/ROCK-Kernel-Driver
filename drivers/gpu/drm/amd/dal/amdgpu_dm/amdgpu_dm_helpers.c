@@ -549,6 +549,9 @@ void dm_helper_conn_log(struct dc_context *ctx,
 		size--;
 	}
 
+	if (hex_data_count > (CONN_MAX_LINE_SIZE - size))
+		return;
+
 	if (hex_data) {
 		int i;
 
