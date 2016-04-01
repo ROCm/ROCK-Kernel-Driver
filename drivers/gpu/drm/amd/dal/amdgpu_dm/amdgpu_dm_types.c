@@ -2416,7 +2416,14 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 		}
 
 		/* DC is optimized not to do anything if 'targets' didn't change. */
-		dc_commit_targets(dc, commit_targets, commit_targets_count);
+		if (!dc_commit_targets(dc, commit_targets,
+				commit_targets_count)) {
+			DRM_INFO("Failed to restore connector state!\n");
+			dc_target_release(disconnected_acrtc->target);
+			disconnected_acrtc->target = NULL;
+			disconnected_acrtc->enabled = false;
+			return;
+		}
 
 
 		dm_dc_surface_commit(dc, &disconnected_acrtc->base,
