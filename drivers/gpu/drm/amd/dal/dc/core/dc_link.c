@@ -680,10 +680,12 @@ bool dc_link_detect(const struct dc_link *dc_link, bool boot)
 		}
 
 		/* Connectivity log: detection */
-		CONN_DATA_DETECT(link, sink->public.dc_edid.raw_edid,
-				sink->public.dc_edid.length,
-				"%s: ",
-				sink->public.edid_caps.display_name);
+		for (i = 0; i < sink->public.dc_edid.length / EDID_BLOCK_SIZE; i++) {
+			CONN_DATA_DETECT(link,
+					&sink->public.dc_edid.raw_edid[i * EDID_BLOCK_SIZE],
+					EDID_BLOCK_SIZE,
+					"%s: [Block %d] ", sink->public.edid_caps.display_name, i);
+		}
 
 		dal_logger_write(link->ctx->logger,
 			LOG_MAJOR_DETECTION,
