@@ -70,8 +70,12 @@ static void cik_event_interrupt_wq(struct kfd_dev *dev,
 		ihre->source_id == CIK_INTSRC_GFX_MEM_PROT_FAULT) {
 		struct kfd_vm_fault_info info;
 
+		memset(&info, 0, sizeof(info));
 		dev->kfd2kgd->get_vm_fault_info(dev->kgd, &info);
 		kfd_process_vm_fault(dev->dqm, ihre->pasid);
+		if (!info.page_addr && !info.status)
+			return;
+
 		if (info.vmid == ihre->vmid)
 			kfd_signal_vm_fault_event(dev, ihre->pasid, &info);
 		else
