@@ -2367,6 +2367,7 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 	struct amdgpu_crtc *disconnected_acrtc;
 	const struct dc_sink *sink;
 	struct dc_target *commit_targets[6];
+	struct dc_target *current_target;
 	uint32_t commit_targets_count = 0;
 
 
@@ -2398,7 +2399,8 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 		 */
 		manage_dm_interrupts(adev, disconnected_acrtc, false);
 		/* this is the update mode case */
-		dc_target_release(disconnected_acrtc->target);
+
+		current_target = disconnected_acrtc->target;
 
 		disconnected_acrtc->target = new_target;
 		disconnected_acrtc->enabled = true;
@@ -2420,11 +2422,12 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 				commit_targets_count)) {
 			DRM_INFO("Failed to restore connector state!\n");
 			dc_target_release(disconnected_acrtc->target);
-			disconnected_acrtc->target = NULL;
-			disconnected_acrtc->enabled = false;
+			disconnected_acrtc->target = current_target;
+			manage_dm_interrupts(adev, disconnected_acrtc, true);
 			return;
 		}
 
+		dc_target_release(current_target);
 
 		dm_dc_surface_commit(dc, &disconnected_acrtc->base,
 				to_dm_connector_state(
