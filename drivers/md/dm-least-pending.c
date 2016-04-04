@@ -17,7 +17,6 @@
 struct path_info {
        struct list_head list;
        struct dm_path *path;
-       unsigned repeat_count;
        atomic_t io_count;
 };
 
@@ -95,8 +94,11 @@ static int lpp_status(struct path_selector *ps, struct dm_path *path,
 		pi = path->pscontext;
 		switch (type) {
 		case STATUSTYPE_INFO:
-			DMEMIT("%u:%u ", pi->repeat_count,
-					 atomic_read(&pi->io_count));
+			/*
+			 * Even though repeat_count isn't used anymore,
+			 * status info expects it. It's always 1.
+			 */
+			DMEMIT("1:%u ", atomic_read(&pi->io_count));
 		break;
 		case STATUSTYPE_TABLE:
 		break;
@@ -107,25 +109,32 @@ static int lpp_status(struct path_selector *ps, struct dm_path *path,
 }
 
 /*
- * Called during initialisation to register each path with an
- * optional repeat_count.
+ * Called during initialisation to register each path
  */
 static int lpp_add_path(struct path_selector *ps, struct dm_path *path,
 			int argc, char **argv, char **error)
 {
        struct selector *s = ps->context;
        struct path_info *pi;
-       unsigned repeat_count = LPP_MIN_IO;
 
 	if (argc > 1) {
 		*error = "least-pending ps: incorrect number of arguments";
 		return -EINVAL;
 	}
 
-       /* First path argument is number of I/Os before switching path */
-       if ((argc == 1) && (sscanf(argv[0], "%u", &repeat_count) != 1)) {
-		*error = "least-pending ps: invalid repeat count";
-		return -EINVAL;
+       /*
+        * Sanity check the optional repeat_count argument.  It must
+	* always be 1 and isn't actually variable.  We can just issue
+	* a warning and adjust automatically rather than error out.
+	*/
+       if (argc == 1) {
+		unsigned repeat_count = 1;
+	        if (sscanf(argv[0], "%u", &repeat_count) != 1) {
+			*error = "least-pending ps: invalid repeat count";
+			return -EINVAL;
+		}
+		if (repeat_count > 1)
+			DMWARN_LIMIT("repeat_count > 1 is deprecated, using 1 instead");
        }
 
        /* allocate the path */
@@ -136,7 +145,6 @@ static int lpp_add_path(struct path_selector *ps, struct dm_path *path,
        }
 
        pi->path = path;
-       pi->repeat_count = repeat_count;
        atomic_set(&pi->io_count, 0);
 
        path->pscontext = pi;
@@ -173,8 +181,7 @@ static int lpp_reinstate_path(struct path_selector *ps, struct dm_path *p)
 }
 
 static struct dm_path *lpp_select_path(struct path_selector *ps,
-					unsigned *repeat_count,
-					size_t nr_bytes)
+				       size_t nr_bytes)
 {
        struct selector *s = ps->context;
        struct path_info *pi, *next, *least_io_path = NULL;
@@ -196,7 +203,6 @@ static struct dm_path *lpp_select_path(struct path_selector *ps,
 		return NULL;
 
        atomic_inc(&least_io_path->io_count);
-       *repeat_count = least_io_path->repeat_count;
 
        return least_io_path->path;
 }
