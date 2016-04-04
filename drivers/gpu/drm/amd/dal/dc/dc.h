@@ -33,6 +33,8 @@
 #include "gpio_types.h"
 #include "link_service_types.h"
 
+#define MAX_TARGETS 6
+#define MAX_SURFACES 6
 #define MAX_SINKS_PER_LINK 4
 
 /*******************************************************************************
@@ -271,7 +273,7 @@ enum dc_irq_source dc_target_get_irq_src(
  */
 struct dc_validation_set {
 	const struct dc_target *target;
-	const struct dc_surface *surfaces[4];
+	const struct dc_surface *surfaces[MAX_SURFACES];
 	uint8_t surface_count;
 };
 
