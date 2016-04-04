@@ -153,7 +153,7 @@ static int try_pin_bo(struct amdgpu_bo *bo, uint64_t *mc_address, bool resv,
 			return ret;
 	}
 
-	if (!amdgpu_ttm_tt_has_userptr(bo->tbo.ttm)) {
+	if (!amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
 		ret = amdgpu_bo_pin(bo, domain, &temp);
 		if (mc_address)
 			*mc_address = temp;
@@ -201,7 +201,7 @@ static int unpin_bo(struct amdgpu_bo *bo, bool resv)
 
 	amdgpu_bo_kunmap(bo);
 
-	if (!amdgpu_ttm_tt_has_userptr(bo->tbo.ttm)) {
+	if (!amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
 		ret = amdgpu_bo_unpin(bo);
 		if (ret != 0)
 			goto error;
@@ -575,7 +575,7 @@ static int update_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 	int ret;
 
 	bo = mem->data2.bo;
-	if (!amdgpu_ttm_tt_has_userptr(bo->tbo.ttm))
+	if (!amdgpu_ttm_tt_get_usermm(bo->tbo.ttm))
 		return 0;
 
 	if (bo->tbo.ttm->state != tt_bound) {
