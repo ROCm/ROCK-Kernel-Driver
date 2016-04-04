@@ -454,7 +454,7 @@ err:
 struct bo_vm_reservation_context {
 	struct amdgpu_bo_list_entry kfd_bo;
 	unsigned n_vms;
-	struct amdgpu_bo_list_entry **vm_bos;
+	struct amdgpu_bo_list_entry *vm_pd;
 	struct ww_acquire_ctx ticket;
 	struct list_head list, duplicates;
 	bool reserved;
@@ -489,11 +489,11 @@ static int reserve_bo_and_vms(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		ctx->n_vms++;
 	}
 	if (ctx->n_vms == 0)
-		ctx->vm_bos = NULL;
+		ctx->vm_pd = NULL;
 	else {
-		ctx->vm_bos = kzalloc(sizeof(struct amdgpu_bo_list_entry *)
+		ctx->vm_pd = kzalloc(sizeof(struct amdgpu_bo_list_entry)
 				      * ctx->n_vms, GFP_KERNEL);
-		if (ctx->vm_bos == NULL)
+		if (ctx->vm_pd == NULL)
 			return -ENOMEM;
 	}
 
@@ -503,13 +503,9 @@ static int reserve_bo_and_vms(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		    entry->is_mapped != is_mapped)
 			continue;
 
-		ctx->vm_bos[i] = amdgpu_vm_get_bos(adev, entry->bo_va->vm,
-						   &ctx->list);
-		if (!ctx->vm_bos[i]) {
-			pr_err("amdkfd: Failed to get bos from vm\n");
-			ret = -ENOMEM;
-			goto out;
-		}
+		amdgpu_vm_get_pd_bo(entry->bo_va->vm, &ctx->list,
+				&ctx->vm_pd[i]);
+		amdgpu_vm_get_pt_bos(entry->bo_va->vm, &ctx->duplicates);
 		i++;
 	}
 
@@ -520,14 +516,9 @@ static int reserve_bo_and_vms(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	else
 		pr_err("amdkfd: Failed to reserve buffers in ttm\n");
 
-out:
 	if (ret) {
-		for (i = 0; i < ctx->n_vms; i++) {
-			if (ctx->vm_bos[i])
-				drm_free_large(ctx->vm_bos[i]);
-		}
-		kfree(ctx->vm_bos);
-		ctx->vm_bos = NULL;
+		kfree(ctx->vm_pd);
+		ctx->vm_pd = NULL;
 	}
 
 	return ret;
@@ -549,17 +540,11 @@ static void unreserve_bo_and_vms(struct bo_vm_reservation_context *ctx,
 	}
 	if (ctx->reserved)
 		ttm_eu_backoff_reservation(&ctx->ticket, &ctx->list);
-	if (ctx->vm_bos) {
-		unsigned i;
-
-		for (i = 0; i < ctx->n_vms; i++) {
-			if (ctx->vm_bos[i])
-				drm_free_large(ctx->vm_bos[i]);
-		}
-		kfree(ctx->vm_bos);
+	if (ctx->vm_pd) {
+		kfree(ctx->vm_pd);
 	}
 	ctx->reserved = false;
-	ctx->vm_bos = NULL;
+	ctx->vm_pd = NULL;
 }
 
 /* Must be called with mem->data2.lock held and a BO/VM reservation
@@ -667,8 +652,6 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		goto err_failed_to_pin_pd;
 	}
 
-	mutex_lock(&vm->mutex);
-
 	/* Update the page directory */
 	ret = amdgpu_vm_update_page_directory(adev, vm);
 	if (ret != 0) {
@@ -700,8 +683,6 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		goto err_failed_to_vm_clear_invalids;
 	}
 
-	mutex_unlock(&vm->mutex);
-
 	return 0;
 
 err_failed_to_vm_clear_invalids:
@@ -709,7 +690,6 @@ err_failed_to_vm_clear_invalids:
 err_failed_to_update_pts:
 err_failed_vm_clear_freed:
 err_failed_to_update_pd:
-	mutex_unlock(&vm->mutex);
 	unpin_bo(vm->page_directory, false);
 err_failed_to_pin_pd:
 	unpin_pts(bo_va, vm, false);
@@ -1046,8 +1026,8 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 	struct amdgpu_vm *vm;
 	int ret;
 	struct ttm_validate_buffer tv;
-	struct amdgpu_bo_list_entry *vm_bos;
 	struct ww_acquire_ctx ticket;
+	struct amdgpu_bo_list_entry vm_pd;
 	struct list_head list, duplicates;
 
 	INIT_LIST_HEAD(&list);
@@ -1058,20 +1038,15 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 	tv.shared = true;
 	list_add(&tv.head, &list);
 
-	vm_bos = amdgpu_vm_get_bos(adev, vm, &list);
-	if (!vm_bos) {
-		pr_err("amdkfd: Failed to get bos from vm\n");
-		ret = -ENOMEM;
-		goto err_failed_to_get_bos;
-	}
+	amdgpu_vm_get_pd_bo(vm, &list, &vm_pd);
 
 	ret = ttm_eu_reserve_buffers(&ticket, &list, false, &duplicates);
 	if (ret) {
 		pr_err("amdkfd: Failed to reserve buffers in ttm\n");
-		goto err_failed_to_ttm_reserve;
+		return ret;
 	}
 
-	mutex_lock(&vm->mutex);
+	amdgpu_vm_get_pt_bos(vm, &duplicates);
 
 	/*
 	 * The previously "released" BOs are really released and their VAs are
@@ -1085,16 +1060,9 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 
 	amdgpu_vm_clear_invalids(adev, vm, NULL);
 
-	mutex_unlock(&vm->mutex);
-
 	ttm_eu_backoff_reservation(&ticket, &list);
-	drm_free_large(vm_bos);
 
 	return 0;
-err_failed_to_ttm_reserve:
-	drm_free_large(vm_bos);
-err_failed_to_get_bos:
-	return ret;
 }
 
 static bool is_mem_on_local_device(struct kgd_dev *kgd,
