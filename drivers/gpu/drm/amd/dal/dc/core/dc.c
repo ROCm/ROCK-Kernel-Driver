@@ -720,7 +720,7 @@ bool dc_commit_targets(
 	struct dc_bios *dcb = core_dc->ctx->dc_bios;
 	enum dc_status result = DC_ERROR_UNEXPECTED;
 	struct validate_context *context;
-	struct dc_validation_set set[4];
+	struct dc_validation_set set[MAX_TARGETS];
 	uint8_t i;
 
 	if (false == targets_changed(core_dc, targets, target_count))

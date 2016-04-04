@@ -58,7 +58,6 @@ struct dm_connector_state {
 	container_of((x), struct dm_connector_state, base)
 
 #define AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET 1
-#define MAX_TARGET_NUM 6
 
 void amdgpu_dm_encoder_destroy(struct drm_encoder *encoder)
 {
@@ -812,9 +811,6 @@ static void fill_audio_info(
 	/* TODO: For DP, video and audio latency should be calculated from DPCD caps */
 
 }
-
-/*TODO: move these defines elsewhere*/
-#define DAL_MAX_CONTROLLERS 4
 
 static void copy_crtc_timing_for_drm_display_mode(
 		const struct drm_display_mode *src_mode,
@@ -2110,8 +2106,8 @@ int amdgpu_dm_atomic_commit(
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *old_crtc_state;
 
-	struct dc_target *commit_targets[DAL_MAX_CONTROLLERS];
-	struct amdgpu_crtc *new_crtcs[DAL_MAX_CONTROLLERS];
+	struct dc_target *commit_targets[MAX_TARGETS];
+	struct amdgpu_crtc *new_crtcs[MAX_TARGETS];
 
 	/* In this step all new fb would be pinned */
 
@@ -2516,8 +2512,8 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	int ret;
 	int set_count;
 	int new_target_count;
-	struct dc_validation_set set[MAX_TARGET_NUM] = {{ 0 }};
-	struct dc_target *new_targets[MAX_TARGET_NUM] = { 0 };
+	struct dc_validation_set set[MAX_TARGETS] = {{ 0 }};
+	struct dc_target *new_targets[MAX_TARGETS] = { 0 };
 	struct amdgpu_device *adev = dev->dev_private;
 	struct dc *dc = adev->dm.dc;
 	bool need_to_validate = false;
