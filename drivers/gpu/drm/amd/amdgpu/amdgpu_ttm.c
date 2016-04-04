@@ -990,7 +990,10 @@ struct mm_struct *amdgpu_ttm_tt_get_usermm(struct ttm_tt *ttm)
 	if (gtt == NULL)
 		return NULL;
 
-	return gtt->usermm;
+	if (gtt->usertask == NULL)
+		return NULL;
+
+	return gtt->usertask->mm;
 }
 
 bool amdgpu_ttm_tt_affect_userptr(struct ttm_tt *ttm, unsigned long start,
