@@ -112,6 +112,7 @@ void dc_surface_retain(const struct dc_surface *dc_surface)
 void dc_surface_release(const struct dc_surface *dc_surface)
 {
 	struct surface *surface = DC_SURFACE_TO_SURFACE(dc_surface);
+
 	--surface->ref_count;
 
 	if (surface->ref_count == 0) {

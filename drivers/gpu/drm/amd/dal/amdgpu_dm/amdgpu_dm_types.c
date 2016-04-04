@@ -2481,25 +2481,24 @@ static uint32_t remove_from_val_sets(
 	uint32_t set_count,
 	const struct dc_target *target)
 {
-	uint32_t i = 0;
+	int i;
 
-	while (i < set_count) {
+	for (i = 0; i < set_count; i++)
 		if (val_sets[i].target == target)
 			break;
-		++i;
-	}
 
 	if (i == set_count) {
 		/* nothing found */
 		return set_count;
 	}
 
-	memmove(
-		&val_sets[i],
-		&val_sets[i + 1],
-		sizeof(struct dc_validation_set *) * (set_count - i - 1));
+	set_count--;
 
-	return set_count - 1;
+	for (; i < set_count; i++) {
+		val_sets[i] = val_sets[i + 1];
+	}
+
+	return set_count;
 }
 
 int amdgpu_dm_atomic_check(struct drm_device *dev,
