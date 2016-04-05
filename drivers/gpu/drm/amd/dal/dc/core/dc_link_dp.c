@@ -1043,12 +1043,12 @@ bool perform_link_training_with_retries(
 	struct core_link *link,
 	const struct dc_link_settings *link_setting,
 	bool skip_video_pattern,
-	unsigned int retires)
+	int attempts)
 {
 	uint8_t j;
-	uint8_t delay_between_retries = 10;
+	uint8_t delay_between_attempts = LINK_TRAINING_RETRY_DELAY;
 
-	for (j = 0; j < retires; ++j) {
+	for (j = 0; j < attempts; ++j) {
 
 		if (perform_link_training(
 				link,
@@ -1056,8 +1056,8 @@ bool perform_link_training_with_retries(
 				skip_video_pattern))
 			return true;
 
-		msleep(delay_between_retries);
-		delay_between_retries += 10;
+		msleep(delay_between_attempts);
+		delay_between_attempts += LINK_TRAINING_RETRY_DELAY;
 	}
 
 	return false;
@@ -1177,7 +1177,7 @@ bool dp_hbr_verify_link_cap(
 								link,
 								cur,
 								skip_video_pattern,
-								3);
+								LINK_TRAINING_ATTEMPTS);
 		}
 
 		if (success)
@@ -1545,7 +1545,7 @@ bool dc_link_handle_hpd_rx_irq(const struct dc_link *dc_link)
 							"Status: ");
 
 		perform_link_training_with_retries(link,
-			&link->public.cur_link_settings, true, 3);
+			&link->public.cur_link_settings, true, LINK_TRAINING_ATTEMPTS);
 
 		status = false;
 	}

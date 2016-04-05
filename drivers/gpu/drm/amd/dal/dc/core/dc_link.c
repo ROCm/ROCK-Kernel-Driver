@@ -1206,7 +1206,7 @@ static enum dc_status enable_link_dp(struct pipe_ctx *pipe_ctx)
 			link,
 			&link_settings,
 			skip_video_pattern,
-			3)) {
+			LINK_TRAINING_ATTEMPTS)) {
 		link->public.cur_link_settings = link_settings;
 		status = DC_OK;
 	}

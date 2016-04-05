@@ -26,6 +26,9 @@
 #ifndef __DC_LINK_DP_H__
 #define __DC_LINK_DP_H__
 
+#define LINK_TRAINING_ATTEMPTS 4
+#define LINK_TRAINING_RETRY_DELAY 50 /* ms */
+
 struct core_link;
 struct core_stream;
 struct dc_link_settings;
@@ -46,7 +49,7 @@ bool perform_link_training_with_retries(
 	struct core_link *link,
 	const struct dc_link_settings *link_setting,
 	bool skip_video_pattern,
-	unsigned int  retires);
+	int attempts);
 
 bool is_mst_supported(struct core_link *link);
 
