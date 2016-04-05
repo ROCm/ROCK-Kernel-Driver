@@ -83,7 +83,7 @@ static bool setup_scaling_configuration(
 	uint32_t value;
 
 	if (data->taps.h_taps + data->taps.v_taps <= 2) {
-		dce80_transform_set_scaler_bypass(&xfm80->base, NULL);
+		dce80_transform_set_scaler_bypass(&xfm80->base, &data->viewport);
 		return false;
 	}
 
@@ -687,7 +687,7 @@ bool dce80_transform_set_scaler(
 
 void dce80_transform_set_scaler_bypass(
 		struct transform *xfm,
-		struct rect *size)
+		const struct rect *size)
 {
 	struct dce80_transform *xfm80 = TO_DCE80_TRANSFORM(xfm);
 	uint32_t sclv_mode;

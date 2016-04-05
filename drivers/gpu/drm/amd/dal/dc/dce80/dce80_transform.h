@@ -58,7 +58,7 @@ bool dce80_transform_set_scaler(
 
 void dce80_transform_set_scaler_bypass(
 		struct transform *xfm,
-		struct rect *size);
+		const struct rect *size);
 
 void dce80_transform_set_scaler_filter(
 	struct transform *xfm,
