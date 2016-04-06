@@ -934,6 +934,9 @@ bool dc_commit_surfaces_to_target(
 						dc_surface->dst_rect.width,
 						dc_surface->dst_rect.height);
 
+			core_dc->hwss.set_plane_config(
+				core_dc, pipe_ctx, &context->res_ctx);
+
 			if (surface->public.gamma_correction)
 				gamma = DC_GAMMA_TO_CORE(
 					surface->public.gamma_correction);
@@ -942,9 +945,6 @@ bool dc_commit_surfaces_to_target(
 					pipe_ctx->ipp,
 					pipe_ctx->opp,
 					gamma, surface);
-
-			core_dc->hwss.set_plane_config(
-				core_dc, pipe_ctx, &context->res_ctx);
 		}
 
 	core_dc->hwss.update_plane_addrs(core_dc, &context->res_ctx);
