@@ -113,6 +113,8 @@ static int add_bo_to_vm(struct amdgpu_device *adev, uint64_t va,
 		goto err_vmsetaddr;
 	}
 
+	amdgpu_bo_unreserve(bo);
+
 	bo_va_entry->kgd_dev = (void *)adev;
 	bo_va_entry->is_mapped = false;
 	list_add(&bo_va_entry->bo_list, list_bo_va);
@@ -120,7 +122,6 @@ static int add_bo_to_vm(struct amdgpu_device *adev, uint64_t va,
 	return 0;
 
 err_vmsetaddr:
-	amdgpu_bo_reserve(bo, true);
 	amdgpu_vm_bo_rmv(adev, bo_va_entry->bo_va);
 	/* This will put the bo_va_mapping on the vm->freed
 	 * list. amdgpu_vm_clear_freed needs the PTs to be reserved so
