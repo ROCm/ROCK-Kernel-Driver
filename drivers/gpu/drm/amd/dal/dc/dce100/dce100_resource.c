@@ -765,24 +765,6 @@ enum dc_status dce100_validate_bandwidth(
 	return DC_OK;
 }
 
-static void set_target_unchanged(
-		struct validate_context *context,
-		uint8_t target_idx)
-{
-	uint8_t i, j;
-	struct core_target *target = context->targets[target_idx];
-	context->target_flags[target_idx].unchanged = true;
-	for (i = 0; i < target->public.stream_count; i++) {
-		struct core_stream *stream =
-			DC_STREAM_TO_CORE(target->public.streams[i]);
-		for (j = 0; j < MAX_PIPES; j++) {
-			if (context->res_ctx.pipe_ctx[j].stream == stream)
-				context->res_ctx.pipe_ctx[j].flags.unchanged =
-									true;
-		}
-	}
-}
-
 enum dc_status dce100_validate_with_context(
 		const struct core_dc *dc,
 		const struct dc_validation_set set[],
@@ -804,7 +786,7 @@ enum dc_status dce100_validate_with_context(
 			if (dc->current_context.targets[j]
 						== context->targets[i]) {
 				unchanged = true;
-				set_target_unchanged(context, i);
+				context->target_flags[i].unchanged = true;
 				resource_attach_surfaces_to_context(
 					(struct dc_surface **)dc->current_context.
 						target_status[j].surfaces,

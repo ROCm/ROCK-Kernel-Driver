@@ -968,18 +968,7 @@ static void set_target_unchanged(
 		struct validate_context *context,
 		uint8_t target_idx)
 {
-	uint8_t i, j;
-	struct core_target *target = context->targets[target_idx];
 	context->target_flags[target_idx].unchanged = true;
-	for (i = 0; i < target->public.stream_count; i++) {
-		struct core_stream *stream =
-			DC_STREAM_TO_CORE(target->public.streams[i]);
-		for (j = 0; j < MAX_PIPES; j++) {
-			if (context->res_ctx.pipe_ctx[j].stream == stream)
-				context->res_ctx.pipe_ctx[j].flags.unchanged =
-									true;
-		}
-	}
 }
 
 static enum dc_status map_clock_resources(
@@ -1022,9 +1011,6 @@ static enum dc_status map_clock_resources(
 						&context->res_ctx,
 						pipe_ctx->clock_source);
 
-				if (pipe_ctx->clock_source
-					!= dc->current_context.res_ctx.pipe_ctx[k].clock_source)
-					pipe_ctx->flags.timing_changed = true;
 				/* only one cs per stream regardless of mpo */
 				break;
 			}

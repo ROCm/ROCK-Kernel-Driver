@@ -673,33 +673,17 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		struct validate_context *context,
 		struct core_dc *dc)
 {
-	int i;
 	struct core_stream *stream = pipe_ctx->stream;
-	bool timing_changed = context->res_ctx.pipe_ctx[pipe_ctx->pipe_idx]
-							.flags.timing_changed;
 	enum dc_color_space color_space;
+	struct pipe_ctx *pipe_ctx_old = &dc->current_context.res_ctx.
+			pipe_ctx[pipe_ctx->pipe_idx];
 
-	struct pipe_ctx *pipe_ctx_old = NULL;
-
-	for (i = 0; i < MAX_PIPES; i++) {
-		if (dc->current_context.res_ctx.pipe_ctx[i].stream == pipe_ctx->stream)
-			pipe_ctx_old = &dc->current_context.res_ctx.pipe_ctx[i];
-	}
-
-	if (timing_changed) {
+	if (!pipe_ctx_old->stream) {
 		/* Must blank CRTC after disabling power gating and before any
 		 * programming, otherwise CRTC will be hung in bad state
 		 */
 		pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true);
 
-		if (pipe_ctx_old) {
-			core_link_disable_stream(pipe_ctx);
-			resource_unreference_clock_source(
-						&dc->current_context.res_ctx,
-						pipe_ctx_old->clock_source);
-		}
-
-		/*TODO: AUTO check if timing changed*/
 		if (false == pipe_ctx->clock_source->funcs->program_pix_clk(
 				pipe_ctx->clock_source,
 				&pipe_ctx->pix_clk_params,
@@ -722,7 +706,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 					stream->public.timing.pix_clk_khz,
 					context->target_count);
 
-	if (timing_changed) {
+	if (!pipe_ctx_old->stream) {
 		if (false == pipe_ctx->tg->funcs->enable_crtc(
 				pipe_ctx->tg)) {
 			BREAK_TO_DEBUGGER();
@@ -783,12 +767,13 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 			pipe_ctx->tg,
 			color_space);
 
-	if (timing_changed)
+	if (!pipe_ctx_old->stream) {
 		core_link_enable_stream(pipe_ctx);
 
-	if (dc_is_dp_signal(pipe_ctx->signal))
-		unblank_stream(pipe_ctx,
-			&stream->sink->link->public.cur_link_settings);
+		if (dc_is_dp_signal(pipe_ctx->signal))
+			unblank_stream(pipe_ctx,
+				&stream->sink->link->public.cur_link_settings);
+	}
 
 	return DC_OK;
 }
@@ -1175,6 +1160,49 @@ static void set_drr(struct pipe_ctx **pipe_ctx,
 	}
 }
 
+static bool check_timing_change(struct core_stream *cur_stream,
+		struct core_stream *new_stream)
+{
+	if (cur_stream == NULL)
+		return true;
+
+	/* If sink pointer changed, it means this is a hotplug, we should do
+	 * full hw setting.
+	 */
+	if (cur_stream->sink != new_stream->sink)
+		return true;
+
+	return !resource_is_same_timing(
+					&cur_stream->public.timing,
+					&new_stream->public.timing);
+}
+
+static bool pipe_need_reprogram(
+		struct pipe_ctx *pipe_ctx_old,
+		struct pipe_ctx *pipe_ctx)
+{
+	if (pipe_ctx_old->stream->sink != pipe_ctx->stream->sink)
+		return true;
+
+	if (pipe_ctx_old->signal != pipe_ctx->signal)
+		return true;
+
+	if (pipe_ctx_old->audio != pipe_ctx->audio)
+		return true;
+
+	if (pipe_ctx_old->clock_source != pipe_ctx->clock_source)
+		return true;
+
+	if (pipe_ctx_old->stream_enc != pipe_ctx->stream_enc)
+		return true;
+
+	if (check_timing_change(pipe_ctx_old->stream, pipe_ctx->stream))
+		return true;
+
+
+	return false;
+}
+
 /*TODO: const validate_context*/
 static enum dc_status apply_ctx_to_hw(
 		struct core_dc *dc,
@@ -1194,7 +1222,12 @@ static enum dc_status apply_ctx_to_hw(
 		 * since bios does optimization and doesn't apply if changing
 		 * PHY when not already disabled.
 		 */
-		if (pipe_ctx_old->stream && !pipe_ctx->stream)
+
+		if (!pipe_ctx_old->stream)
+			continue;
+
+		if (!pipe_ctx->stream ||
+			pipe_need_reprogram(pipe_ctx_old, pipe_ctx))
 			reset_single_pipe_hw_ctx(
 				dc, pipe_ctx_old, &dc->current_context);
 	}
@@ -1208,10 +1241,15 @@ static enum dc_status apply_ctx_to_hw(
 			true);
 
 	for (i = 0; i < MAX_PIPES; i++) {
+		struct pipe_ctx *pipe_ctx_old =
+					&dc->current_context.res_ctx.pipe_ctx[i];
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 		struct dc_bios *dcb;
 
-		if (pipe_ctx->stream == NULL || pipe_ctx->flags.unchanged)
+		if (pipe_ctx->stream == NULL)
+			continue;
+
+		if (pipe_ctx->stream == pipe_ctx_old->stream)
 			continue;
 
 		dcb = dal_adapter_service_get_bios_parser(
@@ -1231,9 +1269,14 @@ static enum dc_status apply_ctx_to_hw(
 		set_display_clock(context);
 
 	for (i = 0; i < MAX_PIPES; i++) {
+		struct pipe_ctx *pipe_ctx_old =
+					&dc->current_context.res_ctx.pipe_ctx[i];
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 
-		if (pipe_ctx->stream == NULL || pipe_ctx->flags.unchanged)
+		if (pipe_ctx->stream == NULL)
+			continue;
+
+		if (pipe_ctx->stream == pipe_ctx_old->stream)
 			continue;
 
 		status = apply_single_controller_ctx_to_hw(

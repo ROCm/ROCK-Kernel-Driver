@@ -604,23 +604,6 @@ static struct audio *find_first_free_audio(struct resource_context *res_ctx)
 	return 0;
 }
 
-static bool check_timing_change(struct core_stream *cur_stream,
-		struct core_stream *new_stream)
-{
-	if (cur_stream == NULL)
-		return true;
-
-	/* If sink pointer changed, it means this is a hotplug, we should do
-	 * full hw setting.
-	 */
-	if (cur_stream->sink != new_stream->sink)
-		return true;
-
-	return !resource_is_same_timing(
-					&cur_stream->public.timing,
-					&new_stream->public.timing);
-}
-
 static void set_stream_signal(struct pipe_ctx *pipe_ctx)
 {
 	struct dc_sink *dc_sink =
@@ -680,8 +663,6 @@ enum dc_status resource_map_pool_resources(
 
 				*pipe_ctx =
 					dc->current_context.res_ctx.pipe_ctx[k];
-				pipe_ctx->flags.timing_changed = false;
-				pipe_ctx->flags.unchanged = true;
 
 				set_stream_engine_in_use(
 					&context->res_ctx,
@@ -720,8 +701,6 @@ enum dc_status resource_map_pool_resources(
 
 			curr_stream =
 				dc->current_context.res_ctx.pipe_ctx[pipe_idx].stream;
-			context->res_ctx.pipe_ctx[pipe_idx].flags.timing_changed =
-				check_timing_change(curr_stream, stream);
 
 			pipe_ctx->stream_enc =
 				find_first_free_match_stream_enc_for_link(
@@ -1282,9 +1261,6 @@ enum dc_status resource_map_clock_resources(
 						&context->res_ctx,
 						pipe_ctx->clock_source);
 
-				if (dc->current_context.res_ctx.pipe_ctx[k].clock_source
-					!= pipe_ctx->clock_source)
-					pipe_ctx->flags.timing_changed = true;
 				/* only one cs per stream regardless of mpo */
 				break;
 			}
