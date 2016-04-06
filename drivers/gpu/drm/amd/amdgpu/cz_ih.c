@@ -252,11 +252,13 @@ static void cz_ih_set_rptr(struct amdgpu_device *adev)
 static int cz_ih_early_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
 	int ret;
 
 	ret = amdgpu_irq_add_domain(adev);
 	if (ret)
 		return ret;
+#endif
 
 	cz_ih_set_interrupt_funcs(adev);
 
@@ -283,7 +285,9 @@ static int cz_ih_sw_fini(void *handle)
 
 	amdgpu_irq_fini(adev);
 	amdgpu_ih_ring_fini(adev);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
 	amdgpu_irq_remove_domain(adev);
+#endif
 
 	return 0;
 }
