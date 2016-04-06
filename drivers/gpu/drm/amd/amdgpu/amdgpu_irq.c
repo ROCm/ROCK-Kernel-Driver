@@ -377,6 +377,17 @@ void amdgpu_irq_dispatch(struct amdgpu_device *adev,
 		return;
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 1, 0)
+	src = adev->irq.client[client_id].sources[src_id];
+	if (!src) {
+		DRM_DEBUG("Unhandled interrupt src_id: %d\n", src_id);
+		return;
+	}
+
+	r = src->funcs->process(adev, src, entry);
+	if (r)
+		DRM_ERROR("error processing interrupt (%d)\n", r);
+#else
 	if (adev->irq.virq[src_id]) {
 		generic_handle_irq(irq_find_mapping(adev->irq.domain, src_id));
 	} else {
@@ -396,6 +407,7 @@ void amdgpu_irq_dispatch(struct amdgpu_device *adev,
 		if (r)
 			DRM_ERROR("error processing interrupt (%d)\n", r);
 	}
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3, 1, 0) */
 }
 
 /**
@@ -543,6 +555,7 @@ bool amdgpu_irq_enabled(struct amdgpu_device *adev, struct amdgpu_irq_src *src,
 	return !!atomic_read(&src->enabled_types[type]);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
 /* XXX: Generic IRQ handling */
 static void amdgpu_irq_mask(struct irq_data *irqd)
 {
@@ -648,3 +661,4 @@ unsigned amdgpu_irq_create_mapping(struct amdgpu_device *adev, unsigned src_id)
 
 	return adev->irq.virq[src_id];
 }
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0) */
