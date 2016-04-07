@@ -2854,7 +2854,11 @@ static int amdgpu_dm_backlight_get_brightness(struct backlight_device *bd)
 	return ret;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
+static struct backlight_ops amdgpu_dm_backlight_ops = {
+#else
 static const struct backlight_ops amdgpu_dm_backlight_ops = {
+#endif
 	.options = BL_CORE_SUSPENDRESUME,
 	.get_brightness = amdgpu_dm_backlight_get_brightness,
 	.update_status	= amdgpu_dm_backlight_update_status,
@@ -2864,6 +2868,7 @@ static void
 amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm)
 {
 	char bl_name[16];
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
 	struct backlight_properties props = { 0 };
 
 	amdgpu_dm_update_backlight_caps(dm);
@@ -2871,15 +2876,23 @@ amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm)
 	props.max_brightness = AMDGPU_MAX_BL_LEVEL;
 	props.brightness = AMDGPU_MAX_BL_LEVEL;
 	props.type = BACKLIGHT_RAW;
+#endif
 
 	snprintf(bl_name, sizeof(bl_name), "amdgpu_bl%d",
 			dm->adev->ddev->primary->index);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
 	dm->backlight_dev = backlight_device_register(bl_name,
 			dm->adev->ddev->dev,
 			dm,
 			&amdgpu_dm_backlight_ops,
 			&props);
+#else
+	dm->backlight_dev = backlight_device_register(bl_name,
+			dm->adev->ddev->dev,
+			dm,
+			&amdgpu_dm_backlight_ops);
+#endif
 
 	if (IS_ERR(dm->backlight_dev))
 		DRM_ERROR("DM: Backlight registration failed!\n");

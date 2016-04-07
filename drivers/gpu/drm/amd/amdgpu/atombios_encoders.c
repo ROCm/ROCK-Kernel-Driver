@@ -157,7 +157,11 @@ amdgpu_atombios_encoder_get_backlight_brightness(struct backlight_device *bd)
 	return amdgpu_atombios_encoder_get_backlight_level_from_reg(adev);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
+static struct backlight_ops amdgpu_atombios_encoder_backlight_ops = {
+#else
 static const struct backlight_ops amdgpu_atombios_encoder_backlight_ops = {
+#endif
 	.get_brightness = amdgpu_atombios_encoder_get_backlight_brightness,
 	.update_status	= amdgpu_atombios_encoder_update_backlight_status,
 };
