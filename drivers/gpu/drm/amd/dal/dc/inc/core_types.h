@@ -290,11 +290,6 @@ struct pipe_ctx {
 	struct encoder_info_frame encoder_info_frame;
 
 	uint8_t pipe_idx;
-
-	struct flags {
-		bool unchanged;
-		bool timing_changed;
-	} flags;
 };
 
 struct resource_context {

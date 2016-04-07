@@ -92,5 +92,9 @@ enum dc_status resource_map_clock_resources(
 		const struct core_dc *dc,
 		struct validate_context *context);
 
+bool pipe_need_reprogram(
+		struct pipe_ctx *pipe_ctx_old,
+		struct pipe_ctx *pipe_ctx);
+
 
 #endif /* DRIVERS_GPU_DRM_AMD_DAL_DEV_DC_INC_RESOURCE_H_ */

@@ -1160,49 +1160,6 @@ static void set_drr(struct pipe_ctx **pipe_ctx,
 	}
 }
 
-static bool check_timing_change(struct core_stream *cur_stream,
-		struct core_stream *new_stream)
-{
-	if (cur_stream == NULL)
-		return true;
-
-	/* If sink pointer changed, it means this is a hotplug, we should do
-	 * full hw setting.
-	 */
-	if (cur_stream->sink != new_stream->sink)
-		return true;
-
-	return !resource_is_same_timing(
-					&cur_stream->public.timing,
-					&new_stream->public.timing);
-}
-
-static bool pipe_need_reprogram(
-		struct pipe_ctx *pipe_ctx_old,
-		struct pipe_ctx *pipe_ctx)
-{
-	if (pipe_ctx_old->stream->sink != pipe_ctx->stream->sink)
-		return true;
-
-	if (pipe_ctx_old->signal != pipe_ctx->signal)
-		return true;
-
-	if (pipe_ctx_old->audio != pipe_ctx->audio)
-		return true;
-
-	if (pipe_ctx_old->clock_source != pipe_ctx->clock_source)
-		return true;
-
-	if (pipe_ctx_old->stream_enc != pipe_ctx->stream_enc)
-		return true;
-
-	if (check_timing_change(pipe_ctx_old->stream, pipe_ctx->stream))
-		return true;
-
-
-	return false;
-}
-
 /*TODO: const validate_context*/
 static enum dc_status apply_ctx_to_hw(
 		struct core_dc *dc,
