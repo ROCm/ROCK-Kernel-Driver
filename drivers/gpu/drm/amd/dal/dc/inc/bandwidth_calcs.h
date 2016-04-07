@@ -278,7 +278,7 @@ struct bw_calcs_input_single_display {
 	enum bw_defines underlay_mode;
 };
 
-#define BW_CALCS_MAX_NUM_DISPLAYS 3
+#define BW_CALCS_MAX_NUM_DISPLAYS 6
 
 struct bw_calcs_mode_data {
 	/* data for all displays */
