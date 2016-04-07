@@ -654,12 +654,14 @@ static enum dc_status validate_mapped_resource(
 
 	for (i = 0; i < context->target_count; i++) {
 		struct core_target *target = context->targets[i];
-		if (context->target_flags[i].unchanged)
-			continue;
+
 		for (j = 0; j < target->public.stream_count; j++) {
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 			struct core_link *link = stream->sink->link;
+
+			if (resource_is_stream_unchanged(&dc->current_context, stream))
+				continue;
 
 			for (k = 0; k < MAX_PIPES; k++) {
 				struct pipe_ctx *pipe_ctx =
@@ -875,13 +877,6 @@ enum dc_status dce112_validate_bandwidth(
 	return result;
 }
 
-static void set_target_unchanged(
-		struct validate_context *context,
-		uint8_t target_idx)
-{
-	context->target_flags[target_idx].unchanged = true;
-}
-
 static enum dc_status map_clock_resources(
 		const struct core_dc *dc,
 		struct validate_context *context)
@@ -892,12 +887,12 @@ static enum dc_status map_clock_resources(
 	for (i = 0; i < context->target_count; i++) {
 		struct core_target *target = context->targets[i];
 
-		if (context->target_flags[i].unchanged)
-			continue;
-
 		for (j = 0; j < target->public.stream_count; j++) {
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
+
+			if (resource_is_stream_unchanged(&dc->current_context, stream))
+				continue;
 
 			for (k = 0; k < MAX_PIPES; k++) {
 				struct pipe_ctx *pipe_ctx =
@@ -937,43 +932,16 @@ enum dc_status dce112_validate_with_context(
 		uint8_t set_count,
 		struct validate_context *context)
 {
-	enum dc_status result = DC_ERROR_UNEXPECTED;
-	uint8_t i, j;
 	struct dc_context *dc_ctx = dc->ctx;
-
-	for (i = 0; i < set_count; i++) {
-		bool unchanged = false;
-
-		context->targets[i] = DC_TARGET_TO_CORE(set[i].target);
-		dc_target_retain(&context->targets[i]->public);
-		context->target_count++;
-
-		for (j = 0; j < dc->current_context.target_count; j++)
-			if (dc->current_context.targets[j]
-						== context->targets[i]) {
-				unchanged = true;
-				set_target_unchanged(context, i);
-				resource_attach_surfaces_to_context(
-					(struct dc_surface **)dc->current_context.
-						target_status[j].surfaces,
-					dc->current_context.target_status[j].surface_count,
-					&context->targets[i]->public,
-					context);
-				context->target_status[i] =
-					dc->current_context.target_status[j];
-			}
-		if (!unchanged || set[i].surface_count != 0)
-			if (!resource_attach_surfaces_to_context(
-					(struct dc_surface **)set[i].surfaces,
-					set[i].surface_count,
-					&context->targets[i]->public,
-					context)) {
-				DC_ERROR("Failed to attach surface to target!\n");
-				return DC_FAIL_ATTACH_SURFACES;
-			}
-	}
+	enum dc_status result = DC_ERROR_UNEXPECTED;
 
 	context->res_ctx.pool = dc->res_pool;
+
+	if (!resource_validate_attach_surfaces(
+			set, set_count, &dc->current_context, context)) {
+		DC_ERROR("Failed to attach surface to target!\n");
+		return DC_FAIL_ATTACH_SURFACES;
+	}
 
 	result = resource_map_pool_resources(dc, context);
 

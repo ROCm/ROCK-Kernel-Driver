@@ -604,6 +604,8 @@ static void fill_display_configs(
 					break;
 				}
 
+			ASSERT(pipe_ctx != NULL);
+
 			num_cfgs++;
 			cfg->signal = pipe_ctx->signal;
 			cfg->pipe_idx = pipe_ctx->pipe_idx;

@@ -443,7 +443,7 @@ void resource_build_scaling_params_for_context(
 bool resource_attach_surfaces_to_context(
 		struct dc_surface *surfaces[],
 		uint8_t surface_count,
-		struct dc_target *dc_target,
+		const struct dc_target *dc_target,
 		struct validate_context *context)
 {
 	uint8_t i, j, k;
@@ -484,8 +484,10 @@ bool resource_attach_surfaces_to_context(
 	for (i = 0; i < dc_target->stream_count; i++) {
 		k = 0;
 		for (j = 0; j < MAX_PIPES; j++) {
-			struct core_surface *surface =
-					DC_SURFACE_TO_CORE(surfaces[k]);
+			struct core_surface *surface = NULL;
+
+			if (surface_count)
+				surface = DC_SURFACE_TO_CORE(surfaces[k]);
 
 			if (context->res_ctx.pipe_ctx[j].stream !=
 				DC_STREAM_TO_CORE(dc_target->streams[i]))
@@ -494,6 +496,83 @@ bool resource_attach_surfaces_to_context(
 			context->res_ctx.pipe_ctx[j].surface = surface;
 			k++;
 		}
+	}
+
+	return true;
+}
+
+static bool are_streams_same(
+	const struct core_stream *stream_a, const struct core_stream *stream_b)
+{
+	if (stream_a == stream_b)
+		return true;
+
+	if (stream_a == NULL || stream_b == NULL)
+		return false;
+
+	if (memcmp(stream_a, stream_b, sizeof(struct core_stream)) == 0)
+		return true;
+
+	return false;
+}
+
+static bool is_target_unchanged(
+	const struct core_target *old_target, const struct core_target *target)
+{
+	int i;
+
+	if (old_target == target)
+		return true;
+	if (old_target->public.stream_count != target->public.stream_count)
+		return false;
+
+	for (i = 0; i < old_target->public.stream_count; i++) {
+		const struct core_stream *old_stream = DC_STREAM_TO_CORE(
+				old_target->public.streams[i]);
+		const struct core_stream *stream = DC_STREAM_TO_CORE(
+				target->public.streams[i]);
+
+		if (!are_streams_same(old_stream, stream))
+			return false;
+	}
+
+	return true;
+}
+
+bool resource_validate_attach_surfaces(
+		const struct dc_validation_set set[],
+		uint8_t set_count,
+		const struct validate_context *old_context,
+		struct validate_context *context)
+{
+	uint8_t i, j;
+
+	for (i = 0; i < set_count; i++) {
+		context->targets[i] = DC_TARGET_TO_CORE(set[i].target);
+		dc_target_retain(&context->targets[i]->public);
+		context->target_count++;
+
+		for (j = 0; j < old_context->target_count; j++)
+			if (is_target_unchanged(
+					old_context->targets[j],
+					context->targets[i])) {
+				if (!resource_attach_surfaces_to_context(
+						(struct dc_surface **) old_context->
+							target_status[j].surfaces,
+						old_context->target_status[j].surface_count,
+						&context->targets[i]->public,
+						context))
+					return false;
+				context->target_status[i] = old_context->target_status[j];
+			}
+		if (set[i].surface_count != 0)
+			if (!resource_attach_surfaces_to_context(
+					(struct dc_surface **) set[i].surfaces,
+					set[i].surface_count,
+					&context->targets[i]->public,
+					context))
+				return false;
+
 	}
 
 	return true;
@@ -636,37 +715,107 @@ static void set_stream_signal(struct pipe_ctx *pipe_ctx)
 		pipe_ctx->signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
 }
 
+bool resource_is_stream_unchanged(
+	const struct validate_context *old_context, struct core_stream *stream)
+{
+	int i, j;
+
+	for (i = 0; i < old_context->target_count; i++) {
+		struct core_target *old_target = old_context->targets[i];
+
+		for (j = 0; j < old_target->public.stream_count; j++) {
+			struct core_stream *old_stream =
+				DC_STREAM_TO_CORE(old_target->public.streams[j]);
+
+			if (are_streams_same(old_stream, stream))
+				return true;
+		}
+	}
+
+	return false;
+}
+
+static void copy_pipe_ctx(
+	const struct pipe_ctx *from_pipe_ctx, struct pipe_ctx *to_pipe_ctx)
+{
+	struct core_surface *surface = to_pipe_ctx->surface;
+	struct core_stream *stream = to_pipe_ctx->stream;
+
+	*to_pipe_ctx = *from_pipe_ctx;
+	to_pipe_ctx->stream = stream;
+	if (surface != NULL)
+		to_pipe_ctx->surface = surface;
+}
+
+static struct core_stream *find_pll_stream_by_timing(
+		struct dc_crtc_timing *timing,
+		struct validate_context *context)
+{
+	uint8_t i, j;
+
+	for (i = 0; i < context->target_count; i++) {
+		struct core_target *target = context->targets[i];
+
+		for (j = 0; j < target->public.stream_count; j++) {
+			struct core_stream *stream =
+				DC_STREAM_TO_CORE(target->public.streams[j]);
+
+			/* We are looking for non dp, non virtual stream that
+			 * matches the timing provided
+			 */
+			if (resource_is_same_timing(timing, &stream->public.timing)
+				&& !dc_is_dp_signal(stream->sink->public.sink_signal)
+				&& stream->sink->link->public.connector_signal
+							!= SIGNAL_TYPE_VIRTUAL)
+					return stream;
+		}
+	}
+
+	return NULL;
+}
+
 enum dc_status resource_map_pool_resources(
 		const struct core_dc *dc,
 		struct validate_context *context)
 {
 	uint8_t i, j, k;
 
-	/* mark resources used for targets that are already active */
 	for (i = 0; i < context->target_count; i++) {
 		struct core_target *target = context->targets[i];
-
-		if (!context->target_flags[i].unchanged)
-			continue;
 
 		for (j = 0; j < target->public.stream_count; j++) {
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 
+			if (!resource_is_stream_unchanged(&dc->current_context, stream))
+				continue;
+
+			/* mark resources used for stream that is already active */
 			for (k = 0; k < MAX_PIPES; k++) {
 				struct pipe_ctx *pipe_ctx =
 					&context->res_ctx.pipe_ctx[k];
+				const struct pipe_ctx *old_pipe_ctx =
+					&dc->current_context.res_ctx.pipe_ctx[k];
 
-				if (dc->current_context.res_ctx.pipe_ctx[k].stream
-					!= stream)
+				if (!are_streams_same(old_pipe_ctx->stream, stream))
 					continue;
 
-				*pipe_ctx =
-					dc->current_context.res_ctx.pipe_ctx[k];
+				pipe_ctx->stream = stream;
+				copy_pipe_ctx(old_pipe_ctx, pipe_ctx);
 
 				set_stream_engine_in_use(
 					&context->res_ctx,
 					pipe_ctx->stream_enc);
+
+				/* Switch to dp clock source only if there is
+				 * no non dp stream that shares the same timing
+				 * with the dp stream.
+				 */
+				if (dc_is_dp_signal(pipe_ctx->signal) &&
+					!find_pll_stream_by_timing(
+						&stream->public.timing, context))
+					pipe_ctx->clock_source =
+						context->res_ctx.pool.dp_clock_source;
 
 				resource_reference_clock_source(
 					&context->res_ctx,
@@ -678,20 +827,20 @@ enum dc_status resource_map_pool_resources(
 		}
 	}
 
-	/* acquire new resources */
 	for (i = 0; i < context->target_count; i++) {
 		struct core_target *target = context->targets[i];
 
-		if (context->target_flags[i].unchanged)
-			continue;
-
 		for (j = 0; j < target->public.stream_count; j++) {
-			struct pipe_ctx *pipe_ctx = NULL;
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
-			struct core_stream *curr_stream;
+			struct core_stream *curr_stream = NULL;
+			struct pipe_ctx *pipe_ctx = NULL;
+			int pipe_idx = -1;
 
-			int8_t pipe_idx = acquire_first_free_pipe(
+			if (resource_is_stream_unchanged(&dc->current_context, stream))
+				continue;
+			/* acquire new resources */
+			pipe_idx = acquire_first_free_pipe(
 						&context->res_ctx, stream);
 			if (pipe_idx < 0)
 				return DC_NO_CONTROLLER_RESOURCE;
@@ -1225,12 +1374,12 @@ enum dc_status resource_map_clock_resources(
 	for (i = 0; i < context->target_count; i++) {
 		struct core_target *target = context->targets[i];
 
-		if (context->target_flags[i].unchanged)
-			continue;
-
 		for (j = 0; j < target->public.stream_count; j++) {
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
+
+			if (resource_is_stream_unchanged(&dc->current_context, stream))
+				continue;
 
 			for (k = 0; k < MAX_PIPES; k++) {
 				struct pipe_ctx *pipe_ctx =

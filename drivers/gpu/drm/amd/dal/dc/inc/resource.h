@@ -79,7 +79,16 @@ struct clock_source *dc_resource_find_first_free_pll(
 bool resource_attach_surfaces_to_context(
 		struct dc_surface *surfaces[],
 		uint8_t surface_count,
-		struct dc_target *dc_target,
+		const struct dc_target *dc_target,
+		struct validate_context *context);
+
+bool resource_is_stream_unchanged(
+	const struct validate_context *old_context, struct core_stream *stream);
+
+bool resource_validate_attach_surfaces(
+		const struct dc_validation_set set[],
+		uint8_t set_count,
+		const struct validate_context *old_context,
 		struct validate_context *context);
 
 void resource_validate_ctx_copy_construct(

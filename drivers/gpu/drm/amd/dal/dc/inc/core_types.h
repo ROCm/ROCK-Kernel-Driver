@@ -301,13 +301,9 @@ struct resource_context {
 	uint8_t dp_clock_source_ref_count;
  };
 
-struct target_flags {
-	bool unchanged;
-};
 struct validate_context {
 	struct core_target *targets[MAX_PIPES];
 	struct dc_target_status target_status[MAX_PIPES];
-	struct target_flags target_flags[MAX_PIPES];
 	uint8_t target_count;
 
 	struct resource_context res_ctx;
