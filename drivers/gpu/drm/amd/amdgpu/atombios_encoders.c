@@ -154,7 +154,11 @@ amdgpu_atombios_encoder_get_backlight_brightness(struct backlight_device *bd)
 	return amdgpu_atombios_encoder_get_backlight_level_from_reg(adev);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
+static struct backlight_ops amdgpu_atombios_encoder_backlight_ops = {
+#else
 static const struct backlight_ops amdgpu_atombios_encoder_backlight_ops = {
+#endif
 	.get_brightness = amdgpu_atombios_encoder_get_backlight_brightness,
 	.update_status	= amdgpu_atombios_encoder_update_backlight_status,
 };
@@ -165,7 +169,9 @@ void amdgpu_atombios_encoder_init_backlight(struct amdgpu_encoder *amdgpu_encode
 	struct drm_device *dev = amdgpu_encoder->base.dev;
 	struct amdgpu_device *adev = dev->dev_private;
 	struct backlight_device *bd;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
 	struct backlight_properties props;
+#endif
 	struct amdgpu_backlight_privdata *pdata;
 	struct amdgpu_encoder_atom_dig *dig;
 	u8 backlight_level;
@@ -190,9 +196,12 @@ void amdgpu_atombios_encoder_init_backlight(struct amdgpu_encoder *amdgpu_encode
 		goto error;
 	}
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
 	memset(&props, 0, sizeof(props));
 	props.max_brightness = AMDGPU_MAX_BL_LEVEL;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	props.type = BACKLIGHT_RAW;
+#endif
 	snprintf(bl_name, sizeof(bl_name),
 		 "amdgpu_bl%d", dev->primary->index);
 	bd = backlight_device_register(bl_name, drm_connector->kdev,
@@ -201,6 +210,17 @@ void amdgpu_atombios_encoder_init_backlight(struct amdgpu_encoder *amdgpu_encode
 		DRM_ERROR("Backlight registration failed\n");
 		goto error;
 	}
+#else
+	snprintf(bl_name, sizeof(bl_name),
+		 "amdgpu_bl%d", dev->primary->index);
+	bd = backlight_device_register(bl_name, drm_connector->kdev,
+				       pdata, &amdgpu_atombios_encoder_backlight_ops);
+	if (IS_ERR(bd)) {
+		DRM_ERROR("Backlight registration failed\n");
+		goto error;
+	}
+	bd->props.max_brightness = AMDGPU_MAX_BL_LEVEL;
+#endif
 
 	pdata->encoder = amdgpu_encoder;
 
