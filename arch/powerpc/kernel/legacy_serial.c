@@ -559,55 +559,6 @@ device_initcall(serial_dev_init);
 
 
 #ifdef CONFIG_SERIAL_8250_CONSOLE
-#if defined(CONFIG_PPC_PSERIES) && defined(CONFIG_SERIAL_8250_CONSOLE)
-/*
- * Handle the SysRq ^O Hack also via ttyS0 on POWER4 systems
- * but only on the system console, see asm/serial.h
- * If they run in FullSystemPartition mode, the firmware console comes in via ttyS0
- * But BREAK does not work via the HMC, to trigger sysrq.
- * The same is required for Cell blades
- */
-int do_sysrq_via_ctrl_o;
-static const char __initdata *need_ctrl_o[] = {
-	"IBM,079", /* QS2x */
-	"IBM,0792-32G", /* QS21 */
-	"IBM,0793-2RZ", /* QS22 */
-	"IBM,7040-681",	/* p690 */
-	"IBM,7040-671", /* p670 */
-	"IBM,7039-651", /* p655 */
-	"IBM,7038-6M2", /* p650 */
-	"IBM,7028-6E4", /* p630 tower */
-	"IBM,7028-6C4", /* p630 rack */
-	"IBM,7029-6E3", /* p615 tower */
-	"IBM,7029-6C3", /* p615 rack */
-	NULL
-};
-static void __init detect_need_for_ctrl_o(void)
-{
-	struct device_node *root;
-	const char *model, *p;
-	int i;
-
-	root = of_find_node_by_path("/");
-	if (!root)
-		return;
-	model = of_get_property(root, "model", NULL);
-	if (model) {
-		i = 0;
-		while (need_ctrl_o[i]) {
-			p = need_ctrl_o[i];
-			if (strncmp(p, model, strlen(p)) == 0) {
-				do_sysrq_via_ctrl_o = 1;
-				DBG("Enable sysrq via CTRL o on model %s\n", model);
-				break;
-			}
-			i++;
-		}
-	}
-	of_node_put(root);
-}
-#endif
-
 /*
  * This is called very early, as part of console_init() (typically just after
  * time_init()). This function is respondible for trying to find a good
@@ -676,9 +627,6 @@ static int __init check_legacy_serial_console(void)
 	if (i >= legacy_serial_count)
 		goto not_found;
 
-#if defined(CONFIG_PPC_PSERIES) && defined(CONFIG_SERIAL_8250_CONSOLE)
-	detect_need_for_ctrl_o();
-#endif
 	of_node_put(prom_stdout);
 
 	DBG("Found serial console at ttyS%d\n", offset);
