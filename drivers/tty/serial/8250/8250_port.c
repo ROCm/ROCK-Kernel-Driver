@@ -55,8 +55,6 @@
 
 #define BOTH_EMPTY	(UART_LSR_TEMT | UART_LSR_THRE)
 
-#define arch_8250_sysrq_via_ctrl_o(a,b) 0
-
 /*
  * Here we define the default xmit fifo size used for each type of UART.
  */
@@ -1630,11 +1628,9 @@ static void serial8250_read_char(struct uart_8250_port *up, unsigned char lsr)
 	unsigned char ch;
 	char flag = TTY_NORMAL;
 
-	if (likely(lsr & UART_LSR_DR)) {
+	if (likely(lsr & UART_LSR_DR))
 		ch = serial_in(up, UART_RX);
-		if (arch_8250_sysrq_via_ctrl_o(ch, &up->port))
-			return;
-	} else
+	else
 		/*
 		 * Intel 82571 has a Serial Over Lan device that will
 		 * set UART_LSR_BI without setting UART_LSR_DR when
