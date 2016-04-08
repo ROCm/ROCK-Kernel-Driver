@@ -2111,9 +2111,17 @@ int amdgpu_dm_atomic_commit(
 
 	/* In this step all new fb would be pinned */
 
-	ret = drm_atomic_helper_prepare_planes(dev, state);
-	if (ret)
-		return ret;
+	/*
+	 * TODO: Revisit when we support true asynchronous commit.
+	 * Right now we receive async commit only from pageflip, in which case
+	 * we should not pin/unpin the fb here, it should be done in
+	 * amdgpu_crtc_flip and from the vblank irq handler.
+	 */
+	if (!async) {
+		ret = drm_atomic_helper_prepare_planes(dev, state);
+		if (ret)
+			return ret;
+	}
 
 	/*
 	 * This is the point of no return - everything below never fails except
@@ -2339,7 +2347,9 @@ int amdgpu_dm_atomic_commit(
 
 	/* In this state all old framebuffers would be unpinned */
 
-	drm_atomic_helper_cleanup_planes(dev, state);
+	/* TODO: Revisit when we support true asynchronous commit.*/
+	if (!async)
+		drm_atomic_helper_cleanup_planes(dev, state);
 
 	drm_atomic_state_free(state);
 

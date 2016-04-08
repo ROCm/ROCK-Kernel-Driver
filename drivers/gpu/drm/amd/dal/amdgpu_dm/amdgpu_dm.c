@@ -546,10 +546,54 @@ static int dm_display_resume(struct drm_device *ddev)
 
 	/* Attach planes to drm_atomic_state */
 	list_for_each_entry(plane, &ddev->mode_config.plane_list, head) {
-		ret = PTR_ERR_OR_ZERO(drm_atomic_get_plane_state(state, plane));
+
+		struct drm_crtc *crtc;
+		struct drm_gem_object *obj;
+		struct drm_framebuffer *fb;
+		struct amdgpu_framebuffer *afb;
+		struct amdgpu_bo *rbo;
+		int r;
+		struct drm_plane_state *plane_state = drm_atomic_get_plane_state(state, plane);
+
+		ret = PTR_ERR_OR_ZERO(plane_state);
 		if (ret)
 			goto err;
+
+		crtc = plane_state->crtc;
+		fb = plane_state->fb;
+
+		if (!crtc || !crtc->state || !crtc->state->active)
+			continue;
+
+		if (!fb) {
+			DRM_DEBUG_KMS("No FB bound\n");
+			return 0;
+		}
+
+		/*
+		 * Pin back the front buffers, cursor buffer was already pinned
+		 * back in amdgpu_resume_kms
+		 */
+
+		afb = to_amdgpu_framebuffer(fb);
+
+		obj = afb->obj;
+		rbo = gem_to_amdgpu_bo(obj);
+		r = amdgpu_bo_reserve(rbo, false);
+		if (unlikely(r != 0))
+		       return r;
+
+		r = amdgpu_bo_pin(rbo, AMDGPU_GEM_DOMAIN_VRAM, NULL);
+
+		amdgpu_bo_unreserve(rbo);
+
+		if (unlikely(r != 0)) {
+			DRM_ERROR("Failed to pin framebuffer\n");
+			return r;
+		}
+
 	}
+
 
 	/* Call commit internally with the state we just constructed */
 	ret = drm_atomic_commit(state);
