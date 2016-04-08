@@ -1133,9 +1133,6 @@ static void reset_single_pipe_hw_ctx(
 {
 	struct dc_bios *dcb;
 
-	if (pipe_ctx->pipe_idx == DCE110_UNDERLAY_IDX)
-		return;
-
 	dcb = dal_adapter_service_get_bios_parser(
 			context->res_ctx.pool.adapter_srv);
 	if (pipe_ctx->audio) {
