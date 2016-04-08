@@ -410,6 +410,28 @@ static void detect_link_for_all_connectors(struct drm_device *dev)
 	drm_modeset_unlock(&dev->mode_config.connection_mutex);
 }
 
+static void s3_handle_mst(struct drm_device *dev, bool suspend)
+{
+	struct amdgpu_connector *aconnector;
+	struct drm_connector *connector;
+
+	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
+
+	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
+		   aconnector = to_amdgpu_connector(connector);
+		   if (aconnector->dc_link->type == dc_connection_mst_branch &&
+				   !aconnector->mst_port) {
+
+			   if (suspend)
+				   drm_dp_mst_topology_mgr_suspend(&aconnector->mst_mgr);
+			   else
+				   drm_dp_mst_topology_mgr_resume(&aconnector->mst_mgr);
+		   }
+	}
+
+	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+}
+
 static int dm_hw_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
@@ -439,6 +461,8 @@ static int dm_suspend(void *handle)
 	struct amdgpu_device *adev = handle;
 	struct amdgpu_display_manager *dm = &adev->dm;
 	int ret = 0;
+
+	s3_handle_mst(adev->ddev, true);
 
 	dc_set_power_state(
 		dm->dc,
@@ -527,6 +551,7 @@ static int dm_display_resume(struct drm_device *ddev)
 		crtc_state->mode_changed = true;
 	}
 
+
 	/* Attach planes to drm_atomic_state */
 	list_for_each_entry(plane, &ddev->mode_config.plane_list, head) {
 
@@ -614,6 +639,9 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 
 	/* program HPD filter */
 	dc_resume(dm->dc);
+
+	/* On resume we need to  rewrite the MSTM control bits to enamble MST*/
+	s3_handle_mst(ddev, false);
 
 	/*
 	 * early enable HPD Rx IRQ, should be done before set mode as short
