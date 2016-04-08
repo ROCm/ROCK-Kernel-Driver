@@ -2171,4 +2171,8 @@
 
 #define IH_VMID_0_LUT						0x3D40u
 
+#define ATC_ATS_DEBUG					0x3328
+#define NUM_REQUESTS_AT_ERR(x)				((x) << 10)
+#define NUM_REQUESTS_AT_ERR_MASK			(0x1F << 10)
+
 #endif
