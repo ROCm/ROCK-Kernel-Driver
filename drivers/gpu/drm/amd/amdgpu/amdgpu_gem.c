@@ -100,7 +100,6 @@ retry:
 		}
 		return r;
 	}
-	robj->pid = task_pid_nr(current);
 
 	gobj = kzalloc(sizeof(struct amdgpu_gem_object), GFP_KERNEL);
 	if (unlikely(!gobj)) {
