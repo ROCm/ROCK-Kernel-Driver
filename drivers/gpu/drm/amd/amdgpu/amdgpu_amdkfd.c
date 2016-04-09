@@ -347,11 +347,11 @@ void get_local_mem_info(struct kgd_dev *kgd,
 		mem_info->local_mem_size_public = rdev->mc.visible_vram_size;
 		mem_info->local_mem_size_private = rdev->mc.real_vram_size -
 				rdev->mc.visible_vram_size;
-		mem_info->vram_width = rdev->mc.vram_width;
 	} else {
-		pr_err("amdgpu: vram aperture is out of 40bit address base: 0x%llx limit 0x%llx\n",
-				rdev->mc.aper_base, aper_limit);
+		mem_info->local_mem_size_public = 0;
+		mem_info->local_mem_size_private = rdev->mc.real_vram_size;
 	}
+	mem_info->vram_width = rdev->mc.vram_width;
 
 	pr_debug("amdgpu: address base: 0x%llx limit 0x%llx public 0x%llx private 0x%llx\n",
 			rdev->mc.aper_base, aper_limit,
