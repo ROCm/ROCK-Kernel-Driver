@@ -2090,7 +2090,7 @@ void amdgpu_get_pcie_info(struct amdgpu_device *adev)
  * Debugfs
  */
 int amdgpu_debugfs_add_files(struct amdgpu_device *adev,
-			     struct drm_info_list *files,
+			     const struct drm_info_list *files,
 			     unsigned nfiles)
 {
 	unsigned i;
@@ -2261,7 +2261,7 @@ static int amdgpu_debugfs_print_status(struct seq_file *m, void *data)
 	return 0;
 }
 
-static struct drm_info_list amdgpu_debugfs_status_list[] = {
+static const struct drm_info_list amdgpu_debugfs_status_list[] = {
 	{"amdgpu_print_status", &amdgpu_debugfs_print_status, 0, NULL},
 };
 #endif
