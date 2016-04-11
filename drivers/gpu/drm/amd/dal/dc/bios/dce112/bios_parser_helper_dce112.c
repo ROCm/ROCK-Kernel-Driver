@@ -326,16 +326,6 @@ static void set_scratch_critical_state(
 	dm_write_reg(ctx, addr, value);
 }
 
-static void set_scratch_lcd_scale(
-	struct dc_context *ctx,
-	enum lcd_scale lcd_scale_request)
-{
-	DAL_LOGGER_NOT_IMPL(
-		LOG_MINOR_COMPONENT_BIOS,
-		"Bios Parser:%s\n",
-		__func__);
-}
-
 static bool is_lid_open(struct dc_context *ctx)
 {
 	uint32_t bios_scratch6;
@@ -372,7 +362,6 @@ static const struct bios_parser_helper bios_parser_helper_funcs = {
 	.set_scratch_acc_mode_change = set_scratch_acc_mode_change,
 	.set_scratch_active_and_requested = set_scratch_active_and_requested,
 	.set_scratch_critical_state = set_scratch_critical_state,
-	.set_scratch_lcd_scale = set_scratch_lcd_scale,
 	.take_backlight_control = NULL,
 	.update_requested_backlight_level = NULL,
 };

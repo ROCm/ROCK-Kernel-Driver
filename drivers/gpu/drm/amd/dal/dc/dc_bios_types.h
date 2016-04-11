@@ -41,7 +41,6 @@
 struct dc_vbios_funcs {
 	uint8_t (*get_connectors_number)(struct dc_bios *bios);
 
-	void (*power_down)(struct dc_bios *bios);
 	void (*power_up)(struct dc_bios *bios);
 
 	uint8_t (*get_encoders_number)(struct dc_bios *bios);
@@ -147,9 +146,6 @@ struct dc_vbios_funcs {
 		struct dc_bios *bios);
 	bool (*is_accelerated_mode)(
 		struct dc_bios *bios);
-	void (*set_scratch_lcd_scale)(
-		struct dc_bios *bios,
-		enum lcd_scale scale);
 	enum lcd_scale  (*get_scratch_lcd_scale)(
 		struct dc_bios *bios);
 	void (*get_bios_event_info)(

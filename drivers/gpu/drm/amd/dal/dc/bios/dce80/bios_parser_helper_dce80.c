@@ -352,34 +352,6 @@ static void set_scratch_active_and_requested(
 	d->requested = 0;
 }
 
-static void set_scratch_lcd_scale(
-	struct dc_context *ctx,
-	enum lcd_scale lcd_scale_request)
-{
-	uint32_t reg;
-
-	reg = dm_read_reg(ctx, mmBIOS_SCRATCH_6);
-
-	reg &= ~ATOM_S6_REQ_LCD_EXPANSION_FULL;
-	reg &= ~ATOM_S6_REQ_LCD_EXPANSION_ASPEC_RATIO;
-
-	switch (lcd_scale_request) {
-	case LCD_SCALE_FULLPANEL:
-		/* set Lcd Scale to Full Panel Mode */
-		reg |= ATOM_S6_REQ_LCD_EXPANSION_FULL;
-		break;
-	case LCD_SCALE_ASPECTRATIO:
-		/* set Lcd Scale to Aspect-Ratio Mode */
-		reg |= ATOM_S6_REQ_LCD_EXPANSION_ASPEC_RATIO;
-		break;
-	case LCD_SCALE_NONE:
-	default:
-		break;
-	}
-
-	dm_write_reg(ctx, mmBIOS_SCRATCH_6, reg);
-}
-
 static enum lcd_scale get_scratch_lcd_scale(
 	struct dc_context *ctx)
 {
@@ -665,7 +637,6 @@ static const struct bios_parser_helper bios_parser_helper_funcs = {
 	.set_scratch_acc_mode_change = set_scratch_acc_mode_change,
 	.set_scratch_active_and_requested = set_scratch_active_and_requested,
 	.set_scratch_critical_state = set_scratch_critical_state,
-	.set_scratch_lcd_scale = set_scratch_lcd_scale,
 	.take_backlight_control = take_backlight_control,
 	.update_requested_backlight_level = update_requested_backlight_level,
 };

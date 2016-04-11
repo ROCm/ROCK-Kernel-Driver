@@ -72,9 +72,6 @@ struct bios_parser_helper {
 	void (*set_scratch_active_and_requested)(
 		struct dc_context *ctx,
 		struct vbios_helper_data *d);
-	void (*set_scratch_lcd_scale)(
-		struct dc_context *ctx,
-		enum lcd_scale lcd_scale_request);
 	enum lcd_scale (*get_scratch_lcd_scale)(
 		struct dc_context *ctx);
 	uint32_t (*fmt_control)(

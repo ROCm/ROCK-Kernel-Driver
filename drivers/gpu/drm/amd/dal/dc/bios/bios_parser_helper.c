@@ -106,23 +106,6 @@ bool dal_bios_parser_is_display_config_changed(
 }
 
 /**
-* dal_bios_parser_set_scratch_lcd_scale
-*
-* @brief
-*  update VBIOS scratch pad registers about LCD scale
-*
-* @param
-*  bool - to set to full panel mode or aspect-ratio mode
-*/
-void dal_bios_parser_set_scratch_lcd_scale(
-	struct bios_parser *bp,
-	enum lcd_scale scale)
-{
-	bp->bios_helper->set_scratch_lcd_scale(
-		bp->ctx, scale);
-}
-
-/**
 * dal_bios_parser_get_scratch_lcd_scale
 *
 * @brief

@@ -153,15 +153,6 @@ void dal_bios_parser_destroy(struct dc_bios **dcb)
 	*dcb = NULL;
 }
 
-static void bios_parser_power_down(struct dc_bios *dcb)
-{
-#if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)
-	struct bios_parser *bp = BP_FROM_DCB(dcb);
-
-	dal_bios_parser_set_scratch_lcd_scale(bp, bp->lcd_scale);
-#endif
-}
-
 static void bios_parser_power_up(struct dc_bios *dcb)
 {
 #if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)
@@ -4693,13 +4684,6 @@ static bool is_display_config_changed(
 	return false;
 }
 
-static void set_scratch_lcd_scale(
-	struct dc_bios *bios,
-	enum lcd_scale scale)
-{
-	BREAK_TO_DEBUGGER();
-}
-
 static enum lcd_scale get_scratch_lcd_scale(
 	struct dc_bios *bios)
 {
@@ -4762,8 +4746,6 @@ static uint32_t get_embedded_display_refresh_rate(
 
 static const struct dc_vbios_funcs vbios_funcs = {
 	.get_connectors_number = bios_parser_get_connectors_number,
-
-	.power_down = bios_parser_power_down,
 
 	.power_up = bios_parser_power_up,
 
@@ -4828,8 +4810,6 @@ static const struct dc_vbios_funcs vbios_funcs = {
 	.is_display_config_changed = is_display_config_changed,
 
 	.is_accelerated_mode = bios_parser_is_accelerated_mode,
-
-	.set_scratch_lcd_scale = set_scratch_lcd_scale,
 
 	.get_scratch_lcd_scale = get_scratch_lcd_scale,
 
