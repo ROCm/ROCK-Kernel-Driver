@@ -129,89 +129,6 @@ static bool is_accelerated_mode(
 	return (value & ATOM_S6_ACC_MODE) ? true : false;
 }
 
-/**
- * prepare_scratch_active_and_requested
- *
- * @brief
- *  prepare and update VBIOS scratch pad registers about active and requested
- *  displays
- *
- * @param
- * data - helper's shared data
- * enum controller_ild - controller Id
- * enum signal_type - signal type used on display
- * const struct connector_device_tag_info* - pointer to display type and enum id
- */
-static void prepare_scratch_active_and_requested(
-	struct dc_context *ctx,
-	struct vbios_helper_data *data,
-	enum controller_id id,
-	enum signal_type s,
-	const struct connector_device_tag_info *dev_tag)
-{
-	switch (s) {
-	case SIGNAL_TYPE_DVI_SINGLE_LINK:
-	case SIGNAL_TYPE_DVI_DUAL_LINK:
-	case SIGNAL_TYPE_HDMI_TYPE_A:
-	case SIGNAL_TYPE_DISPLAY_PORT:
-	case SIGNAL_TYPE_DISPLAY_PORT_MST:
-		if (dev_tag->dev_id.device_type == DEVICE_TYPE_DFP)
-			switch (dev_tag->dev_id.enum_id) {
-			case 1:
-				data->requested |= ATOM_S6_ACC_REQ_DFP1;
-				data->active |= ATOM_S3_DFP1_ACTIVE;
-				break;
-			case 2:
-				data->requested |= ATOM_S6_ACC_REQ_DFP2;
-				data->active |= ATOM_S3_DFP2_ACTIVE;
-				break;
-			case 3:
-				data->requested |= ATOM_S6_ACC_REQ_DFP3;
-				data->active |= ATOM_S3_DFP3_ACTIVE;
-				break;
-			case 4:
-				data->requested |= ATOM_S6_ACC_REQ_DFP4;
-				data->active |= ATOM_S3_DFP4_ACTIVE;
-				break;
-			case 5:
-				data->requested |= ATOM_S6_ACC_REQ_DFP5;
-				data->active |= ATOM_S3_DFP5_ACTIVE;
-				break;
-			case 6:
-				data->requested |= ATOM_S6_ACC_REQ_DFP6;
-				data->active |= ATOM_S3_DFP6_ACTIVE;
-				break;
-			default:
-				break;
-			}
-		break;
-	case SIGNAL_TYPE_LVDS:
-	case SIGNAL_TYPE_EDP:
-		data->requested |= ATOM_S6_ACC_REQ_LCD1;
-		data->active |= ATOM_S3_LCD1_ACTIVE;
-		break;
-	case SIGNAL_TYPE_RGB:
-		if (dev_tag->dev_id.device_type == DEVICE_TYPE_CRT)
-			switch (dev_tag->dev_id.enum_id) {
-			case 1:
-				data->requested |= ATOM_S6_ACC_REQ_CRT1;
-				data->active |= ATOM_S3_CRT1_ACTIVE;
-				break;
-			case 2:
-				/* TODO: DALASSERT_MSG(false, ("%s: DCE 8.0 Does
-				 *  not support DAC2!", __FUNCTION__));
-				 */
-			default:
-				break;
-			}
-		break;
-	default:
-		BREAK_TO_DEBUGGER();
-		break;
-	}
-}
-
-
 static enum lcd_scale get_scratch_lcd_scale(
 	struct dc_context *ctx)
 {
@@ -232,8 +149,6 @@ static const struct bios_parser_helper bios_parser_helper_funcs = {
 	.detect_sink = detect_sink,
 	.get_scratch_lcd_scale = get_scratch_lcd_scale,
 	.is_accelerated_mode = is_accelerated_mode,
-	.prepare_scratch_active_and_requested =
-		prepare_scratch_active_and_requested,
 };
 
 const struct bios_parser_helper *dal_bios_parser_helper_dce80_get_table()

@@ -53,11 +53,6 @@ struct bios_parser_helper {
 		enum signal_type signal);
 	bool (*is_accelerated_mode)(
 		struct dc_context *ctx);
-	void (*prepare_scratch_active_and_requested)(
-		struct dc_context *ctx,
-		struct vbios_helper_data *data,
-		enum controller_id id, enum signal_type s,
-		const struct connector_device_tag_info *dev_tag);
 	enum lcd_scale (*get_scratch_lcd_scale)(
 		struct dc_context *ctx);
 };

@@ -157,6 +157,7 @@ struct dc_vbios_funcs {
 	void (*take_backlight_control)(
 		struct dc_bios *bios,
 		bool cntl);
+
 	bool (*is_active_display)(
 		struct dc_bios *bios,
 		enum signal_type signal,
@@ -165,11 +166,7 @@ struct dc_vbios_funcs {
 		struct dc_bios *bios);
 	uint32_t (*get_embedded_display_refresh_rate)(
 		struct dc_bios *bios);
-	void (*prepare_scratch_active_and_requested)(
-		struct dc_bios *bios,
-		enum controller_id controller_id,
-		enum signal_type signal,
-		const struct connector_device_tag_info *device_tag);
+
 	void (*set_scratch_critical_state)(
 		struct dc_bios *bios,
 		bool state);
