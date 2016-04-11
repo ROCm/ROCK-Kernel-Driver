@@ -63,7 +63,6 @@ struct bios_parser {
 
 #if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)
 	const struct bios_parser_helper *bios_helper;
-	struct vbios_helper_data vbios_helper_data;
 #endif /* CONFIG_DRM_AMD_DAL_VBIOS_PRESENT */
 
 	const struct command_table_helper *cmd_helper;

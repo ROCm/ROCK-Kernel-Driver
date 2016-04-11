@@ -4752,8 +4752,6 @@ static bool bios_parser_construct(
 		return false;
 
 #if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)
-	bp->vbios_helper_data.active = 0;
-	bp->vbios_helper_data.requested = 0;
 	dal_bios_parser_init_bios_helper(bp, dce_version);
 #endif
 	dal_bios_parser_init_cmd_tbl(bp);

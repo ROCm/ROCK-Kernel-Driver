@@ -40,11 +40,6 @@
 
 struct bios_parser;
 
-struct vbios_helper_data {
-	uint32_t active;
-	uint32_t requested;
-};
-
 struct bios_parser_helper {
 	enum signal_type (*detect_sink)(
 		struct dc_context *ctx,
