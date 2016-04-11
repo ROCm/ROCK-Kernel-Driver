@@ -49,7 +49,4 @@ bool dal_bios_parser_is_lid_open(
 	struct bios_parser *bp);
 bool dal_bios_parser_is_lid_status_changed(
 	struct bios_parser *bp);
-enum lcd_scale  dal_bios_parser_get_scratch_lcd_scale(
-	struct bios_parser *bp);
-
 #endif /* __DAL_BIOS_PARSER_INTERFACE_H__ */

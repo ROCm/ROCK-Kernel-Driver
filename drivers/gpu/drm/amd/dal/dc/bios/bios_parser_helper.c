@@ -97,20 +97,3 @@ bool dal_bios_parser_is_lid_status_changed(
 	return bp->bios_helper->is_lid_status_changed(
 			bp->ctx);
 }
-
-/**
-* dal_bios_parser_get_scratch_lcd_scale
-*
-* @brief
-*  get LCD Scale Mode from VBIOS scratch register
-*
-* @param
-*  NONE
-*/
-enum lcd_scale  dal_bios_parser_get_scratch_lcd_scale(
-	struct bios_parser *bp)
-{
-	return bp->bios_helper->get_scratch_lcd_scale(
-			bp->ctx);
-}
-

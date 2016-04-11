@@ -159,7 +159,7 @@ static void bios_parser_power_up(struct dc_bios *dcb)
 	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 	if (bp->lcd_scale == LCD_SCALE_UNKNOWN)
-		bp->lcd_scale = dal_bios_parser_get_scratch_lcd_scale(bp);
+		bp->lcd_scale = bp->bios_helper->get_scratch_lcd_scale(bp->ctx);
 #endif
 }
 
