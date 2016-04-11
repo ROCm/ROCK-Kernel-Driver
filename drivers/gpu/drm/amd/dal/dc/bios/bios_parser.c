@@ -4511,8 +4511,7 @@ static enum bp_result construct_integrated_info(
 	ATOM_COMMON_TABLE_HEADER *header;
 	struct atom_data_revision revision;
 
-	if (info != NULL &&
-			bp->master_data_tbl->ListOfDataTables.IntegratedSystemInfo) {
+	if (bp->master_data_tbl->ListOfDataTables.IntegratedSystemInfo) {
 		header = GET_IMAGE(ATOM_COMMON_TABLE_HEADER,
 				bp->master_data_tbl->ListOfDataTables.IntegratedSystemInfo);
 
