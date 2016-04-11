@@ -4229,23 +4229,6 @@ static void bios_parser_prepare_scratch_active_and_requested(
 #endif
 }
 
-static void bios_parser_set_scratch_active_and_requested(
-	struct dc_bios *dcb)
-{
-	struct bios_parser *bp = BP_FROM_DCB(dcb);
-
-#ifdef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
-	bp->bios_helper->set_scratch_active_and_requested(
-			bp->ctx,
-			&bp->vbios_helper_data);
-#else
-	dal_logger_write(bp->ctx->logger,
-			LOG_MAJOR_BIOS,
-			LOG_MINOR_BIOS_CMD_TABLE,
-			"%s: VBIOS is not supported", __func__);
-#endif
-}
-
 /*
  * get_integrated_info_v8
  *
@@ -4828,8 +4811,6 @@ static const struct dc_vbios_funcs vbios_funcs = {
 	.get_embedded_display_refresh_rate = get_embedded_display_refresh_rate,
 
 	.prepare_scratch_active_and_requested = bios_parser_prepare_scratch_active_and_requested,
-
-	.set_scratch_active_and_requested = bios_parser_set_scratch_active_and_requested,
 
 	.set_scratch_critical_state = bios_parser_set_scratch_critical_state,
 

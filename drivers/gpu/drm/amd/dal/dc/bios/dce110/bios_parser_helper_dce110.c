@@ -59,57 +59,6 @@ static void set_scratch_acc_mode_change(
 	dm_write_reg(ctx, addr, value);
 }
 
-/*
- * set_scratch_active_and_requested
- *
- * @brief
- * Set VBIOS scratch pad registers about active and requested displays
- *
- * @param
- * struct dc_context *ctx - [in] DAL context for register accessing
- * struct vbios_helper_data *d - [in] values to write
- */
-static void set_scratch_active_and_requested(
-	struct dc_context *ctx,
-	struct vbios_helper_data *d)
-{
-	uint32_t addr = 0;
-	uint32_t value = 0;
-
-	/* mmBIOS_SCRATCH_3 = mmBIOS_SCRATCH_0 + ATOM_ACTIVE_INFO_DEF */
-	addr = mmBIOS_SCRATCH_3;
-
-	value = dm_read_reg(ctx, addr);
-
-	value &= ~ATOM_S3_DEVICE_ACTIVE_MASK;
-	value |= (d->active & ATOM_S3_DEVICE_ACTIVE_MASK);
-
-	dm_write_reg(ctx, addr, value);
-
-	/* mmBIOS_SCRATCH_6 =  mmBIOS_SCRATCH_0 + ATOM_ACC_CHANGE_INFO_DEF */
-	addr = mmBIOS_SCRATCH_6;
-
-	value = dm_read_reg(ctx, addr);
-
-	value &= ~ATOM_S6_ACC_REQ_MASK;
-	value |= (d->requested & ATOM_S6_ACC_REQ_MASK);
-
-	dm_write_reg(ctx, addr, value);
-
-	/* mmBIOS_SCRATCH_5 =  mmBIOS_SCRATCH_0 + ATOM_DOS_REQ_INFO_DEF */
-	addr = mmBIOS_SCRATCH_5;
-
-	value = dm_read_reg(ctx, addr);
-
-	value &= ~ATOM_S5_DOS_REQ_DEVICEw0;
-	value |= (d->active & ATOM_S5_DOS_REQ_DEVICEw0);
-
-	dm_write_reg(ctx, addr, value);
-
-	d->active = 0;
-	d->requested = 0;
-}
-
 /**
  * get LCD Scale Mode from VBIOS scratch register
  */
@@ -360,7 +309,6 @@ static const struct bios_parser_helper bios_parser_helper_funcs = {
 	.prepare_scratch_active_and_requested =
 			prepare_scratch_active_and_requested,
 	.set_scratch_acc_mode_change = set_scratch_acc_mode_change,
-	.set_scratch_active_and_requested = set_scratch_active_and_requested,
 	.take_backlight_control = NULL,
 	.update_requested_backlight_level = NULL,
 };
