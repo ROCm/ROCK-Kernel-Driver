@@ -98,13 +98,6 @@ bool dal_bios_parser_is_lid_status_changed(
 			bp->ctx);
 }
 
-bool dal_bios_parser_is_display_config_changed(
-	struct bios_parser *bp)
-{
-	return bp->bios_helper->is_display_config_changed(
-			bp->ctx);
-}
-
 /**
 * dal_bios_parser_get_scratch_lcd_scale
 *
@@ -121,71 +114,3 @@ enum lcd_scale  dal_bios_parser_get_scratch_lcd_scale(
 			bp->ctx);
 }
 
-void dal_bios_parser_get_bios_event_info(
-	struct bios_parser *bp,
-	struct bios_event_info *info)
-{
-	bp->bios_helper->get_bios_event_info(
-		bp->ctx, info);
-}
-
-/* ABM related */
-
-void dal_bios_parser_update_requested_backlight_level(
-	struct bios_parser *bp,
-	uint32_t backlight_8bit)
-{
-	bp->bios_helper->update_requested_backlight_level(
-		bp->ctx,
-		backlight_8bit);
-}
-
-uint32_t dal_bios_parser_get_requested_backlight_level(
-	struct bios_parser *bp)
-{
-	return bp->bios_helper->get_requested_backlight_level(
-			bp->ctx);
-}
-
-void dal_bios_parser_take_backlight_control(
-	struct bios_parser *bp,
-	bool cntl)
-{
-	bp->bios_helper->take_backlight_control(
-		bp->ctx, cntl);
-}
-
-/**
- * dal_bios_parser_is_active_display
- *  Check video bios active display.
- */
-bool dal_bios_parser_is_active_display(
-	struct bios_parser *bp,
-	enum signal_type signal,
-	const struct connector_device_tag_info *device_tag)
-{
-	return bp->bios_helper->is_active_display(
-			bp->ctx, signal, device_tag);
-}
-
-/**
- * dal_bios_parser_get_embedded_display_controller_id
- * Get controller ID for embedded display from scratch registers
- */
-enum controller_id dal_bios_parser_get_embedded_display_controller_id(
-	struct bios_parser *bp)
-{
-	return bp->bios_helper->get_embedded_display_controller_id(
-			bp->ctx);
-}
-
-/**
- * dal_bios_parser_get_embedded_display_refresh_rate
- * Get refresh rate for embedded display from scratch registers
- */
-uint32_t dal_bios_parser_get_embedded_display_refresh_rate(
-	struct bios_parser *bp)
-{
-	return bp->bios_helper->get_embedded_display_refresh_rate(
-			bp->ctx);
-}

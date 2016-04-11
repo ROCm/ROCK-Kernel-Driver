@@ -4178,22 +4178,6 @@ static void bios_parser_set_scratch_critical_state(
 #endif
 }
 
-static void bios_parser_set_scratch_acc_mode_change(
-	struct dc_bios *dcb)
-{
-	struct bios_parser *bp = BP_FROM_DCB(dcb);
-
-#ifdef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
-	dce110_set_scratch_acc_mode_change(
-			bp->ctx);
-#else
-	dal_logger_write(bp->ctx->logger,
-			LOG_MAJOR_BIOS,
-			LOG_MINOR_BIOS_CMD_TABLE,
-			"%s: VBIOS is not supported", __func__);
-#endif
-}
-
 /**
  * bios_parser_prepare_scratch_active_and_requested
  *
@@ -4813,8 +4797,6 @@ static const struct dc_vbios_funcs vbios_funcs = {
 	.prepare_scratch_active_and_requested = bios_parser_prepare_scratch_active_and_requested,
 
 	.set_scratch_critical_state = bios_parser_set_scratch_critical_state,
-
-	.set_scratch_acc_mode_change = bios_parser_set_scratch_acc_mode_change,
 
 	.is_device_id_supported = bios_parser_is_device_id_supported,
 

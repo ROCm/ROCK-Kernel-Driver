@@ -295,22 +295,11 @@ static bool is_lid_open(struct dc_context *ctx)
 /* function table */
 static const struct bios_parser_helper bios_parser_helper_funcs = {
 	.detect_sink = detect_sink,
-	.fmt_bit_depth_control = NULL,
-	.fmt_control = NULL,
-	.get_bios_event_info = NULL,
-	.get_embedded_display_controller_id = NULL,
-	.get_embedded_display_refresh_rate = NULL,
-	.get_requested_backlight_level = NULL,
 	.get_scratch_lcd_scale = get_scratch_lcd_scale,
 	.is_accelerated_mode = is_accelerated_mode,
-	.is_active_display = NULL,
-	.is_display_config_changed = NULL,
 	.is_lid_open = is_lid_open,
-	.is_lid_status_changed = NULL,
 	.prepare_scratch_active_and_requested =
 			prepare_scratch_active_and_requested,
-	.take_backlight_control = NULL,
-	.update_requested_backlight_level = NULL,
 };
 
 /*

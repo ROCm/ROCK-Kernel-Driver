@@ -49,31 +49,7 @@ bool dal_bios_parser_is_lid_open(
 	struct bios_parser *bp);
 bool dal_bios_parser_is_lid_status_changed(
 	struct bios_parser *bp);
-bool dal_bios_parser_is_display_config_changed(
-	struct bios_parser *bp);
-void dal_bios_parser_set_scratch_lcd_scale(
-	struct bios_parser *bp,
-	enum lcd_scale scale);
 enum lcd_scale  dal_bios_parser_get_scratch_lcd_scale(
-	struct bios_parser *bp);
-void dal_bios_parser_get_bios_event_info(
-	struct bios_parser *bp,
-	struct bios_event_info *info);
-void dal_bios_parser_update_requested_backlight_level(
-	struct bios_parser *bp,
-	uint32_t backlight_8bit);
-uint32_t dal_bios_parser_get_requested_backlight_level(
-	struct bios_parser *bp);
-void dal_bios_parser_take_backlight_control(
-	struct bios_parser *bp,
-	bool cntl);
-bool dal_bios_parser_is_active_display(
-	struct bios_parser *bp,
-	enum signal_type signal,
-	const struct connector_device_tag_info *device_tag);
-enum controller_id dal_bios_parser_get_embedded_display_controller_id(
-	struct bios_parser *bp);
-uint32_t dal_bios_parser_get_embedded_display_refresh_rate(
 	struct bios_parser *bp);
 
 #endif /* __DAL_BIOS_PARSER_INTERFACE_H__ */

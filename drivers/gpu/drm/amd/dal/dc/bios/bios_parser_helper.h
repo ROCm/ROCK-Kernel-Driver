@@ -55,10 +55,6 @@ struct bios_parser_helper {
 		struct dc_context *ctx);
 	bool (*is_lid_status_changed)(
 		struct dc_context *ctx);
-	bool (*is_display_config_changed)(
-		struct dc_context *ctx);
-	void (*set_scratch_acc_mode_change)(
-		struct dc_context *ctx);
 	bool (*is_accelerated_mode)(
 		struct dc_context *ctx);
 	void (*prepare_scratch_active_and_requested)(
@@ -67,31 +63,6 @@ struct bios_parser_helper {
 		enum controller_id id, enum signal_type s,
 		const struct connector_device_tag_info *dev_tag);
 	enum lcd_scale (*get_scratch_lcd_scale)(
-		struct dc_context *ctx);
-	uint32_t (*fmt_control)(
-		struct dc_context *ctx,
-		enum controller_id id, uint32_t *value);
-	uint32_t (*fmt_bit_depth_control)(
-		struct dc_context *ctx,
-		enum controller_id id,
-		uint32_t *value);
-	void (*get_bios_event_info)(
-		struct dc_context *ctx,
-		struct bios_event_info *info);
-	void (*take_backlight_control)(
-		struct dc_context *ctx, bool control);
-	uint32_t (*get_requested_backlight_level)(
-		struct dc_context *ctx);
-	void (*update_requested_backlight_level)(
-		struct dc_context *ctx,
-		uint32_t backlight_8bit);
-	bool (*is_active_display)(
-		struct dc_context *ctx,
-		enum signal_type signal,
-		const struct connector_device_tag_info *dev_tag);
-	enum controller_id (*get_embedded_display_controller_id)(
-		struct dc_context *ctx);
-	uint32_t (*get_embedded_display_refresh_rate)(
 		struct dc_context *ctx);
 };
 
