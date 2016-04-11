@@ -37,6 +37,7 @@
 #include "command_table.h"
 #if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)
 #include "bios_parser_helper.h"
+#include "dce110/bios_dce110.h"
 #endif
 #include "command_table_helper.h"
 #include "bios_parser.h"
@@ -4176,7 +4177,7 @@ static void bios_parser_set_scratch_critical_state(
 	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 #ifdef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
-	bp->bios_helper->set_scratch_critical_state(
+	dce110_set_scratch_critical_state(
 			bp->ctx, state);
 #else
 	dal_logger_write(bp->ctx->logger,

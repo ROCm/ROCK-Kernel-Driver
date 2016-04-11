@@ -312,9 +312,8 @@ static enum signal_type detect_sink(
 	return SIGNAL_TYPE_NONE;
 }
 
-static void set_scratch_critical_state(
-	struct dc_context *ctx,
-	bool state)
+void dce110_set_scratch_critical_state(struct dc_context *ctx,
+				       bool state)
 {
 	uint32_t addr = mmBIOS_SCRATCH_6;
 	uint32_t value = dm_read_reg(ctx, addr);
@@ -372,7 +371,6 @@ static const struct bios_parser_helper bios_parser_helper_funcs = {
 			prepare_scratch_active_and_requested,
 	.set_scratch_acc_mode_change = set_scratch_acc_mode_change,
 	.set_scratch_active_and_requested = set_scratch_active_and_requested,
-	.set_scratch_critical_state = set_scratch_critical_state,
 	.set_scratch_lcd_scale = set_scratch_lcd_scale,
 	.take_backlight_control = NULL,
 	.update_requested_backlight_level = NULL,
