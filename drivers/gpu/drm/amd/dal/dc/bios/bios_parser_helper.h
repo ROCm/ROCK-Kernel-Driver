@@ -61,9 +61,6 @@ struct bios_parser_helper {
 		struct dc_context *ctx);
 	bool (*is_accelerated_mode)(
 		struct dc_context *ctx);
-	void (*set_scratch_critical_state)(
-		struct dc_context *ctx,
-		bool state);
 	void (*prepare_scratch_active_and_requested)(
 		struct dc_context *ctx,
 		struct vbios_helper_data *data,

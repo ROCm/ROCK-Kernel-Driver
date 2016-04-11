@@ -214,21 +214,6 @@ static bool is_accelerated_mode(
 	return (value & ATOM_S6_ACC_MODE) ? true : false;
 }
 
-static void set_scratch_critical_state(
-	struct dc_context *ctx,
-	bool state)
-{
-	uint32_t addr = mmBIOS_SCRATCH_6;
-	uint32_t value = dm_read_reg(ctx, addr);
-
-	if (state)
-		value |= ATOM_S6_CRITICAL_STATE;
-	else
-		value &= ~ATOM_S6_CRITICAL_STATE;
-
-	dm_write_reg(ctx, addr, value);
-}
-
 /**
  * prepare_scratch_active_and_requested
  *
@@ -636,7 +621,6 @@ static const struct bios_parser_helper bios_parser_helper_funcs = {
 		prepare_scratch_active_and_requested,
 	.set_scratch_acc_mode_change = set_scratch_acc_mode_change,
 	.set_scratch_active_and_requested = set_scratch_active_and_requested,
-	.set_scratch_critical_state = set_scratch_critical_state,
 	.take_backlight_control = take_backlight_control,
 	.update_requested_backlight_level = update_requested_backlight_level,
 };
