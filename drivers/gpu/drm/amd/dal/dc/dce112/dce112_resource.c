@@ -42,6 +42,7 @@
 #include "dce110/dce110_ipp.h"
 #include "dce112/dce112_clock_source.h"
 
+#include "dce112/dce112_hw_sequencer.h"
 #include "dce/dce_11_2_d.h"
 
 #ifndef mmDP_DPHY_INTERNAL_CTRL
@@ -1251,7 +1252,7 @@ static bool construct(
 	}
 
 	/* Create hardware sequencer */
-	if (!dc_construct_hw_sequencer(adapter_serv, dc))
+	if (!dce112_hw_sequencer_construct(dc))
 		goto stream_enc_create_fail;
 
 	bw_calcs_init(&dc->bw_dceip, &dc->bw_vbios, BW_CALCS_VERSION_BAFFIN);

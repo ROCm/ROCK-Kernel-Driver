@@ -132,8 +132,4 @@ struct hw_sequencer_funcs {
 		bool enable);
 };
 
-bool dc_construct_hw_sequencer(
-				struct adapter_service *adapter_serv,
-				struct core_dc *dc);
-
 #endif /* __DC_HW_SEQUENCER_H__ */
