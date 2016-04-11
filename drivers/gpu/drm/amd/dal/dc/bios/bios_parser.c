@@ -4196,142 +4196,136 @@ static enum bp_result get_integrated_info_v8(
 	struct bios_parser *bp,
 	struct integrated_info *info)
 {
-	enum bp_result result = BP_RESULT_BADBIOSTABLE;
 	ATOM_INTEGRATED_SYSTEM_INFO_V1_8 *info_v8;
 	uint32_t i;
 
 	info_v8 = GET_IMAGE(ATOM_INTEGRATED_SYSTEM_INFO_V1_8,
 			bp->master_data_tbl->ListOfDataTables.IntegratedSystemInfo);
 
-	if (info_v8 != NULL) {
-		info->boot_up_engine_clock =
-				le32_to_cpu(info_v8->ulBootUpEngineClock) * 10;
-		info->dentist_vco_freq =
-				le32_to_cpu(info_v8->ulDentistVCOFreq) * 10;
-		info->boot_up_uma_clock =
-				le32_to_cpu(info_v8->ulBootUpUMAClock) * 10;
+	if (info_v8 == NULL)
+		return BP_RESULT_BADBIOSTABLE;
+	info->boot_up_engine_clock = le32_to_cpu(info_v8->ulBootUpEngineClock) * 10;
+	info->dentist_vco_freq = le32_to_cpu(info_v8->ulDentistVCOFreq) * 10;
+	info->boot_up_uma_clock = le32_to_cpu(info_v8->ulBootUpUMAClock) * 10;
 
-		for (i = 0; i < NUMBER_OF_DISP_CLK_VOLTAGE; ++i) {
-			/* Convert [10KHz] into [KHz] */
-			info->disp_clk_voltage[i].max_supported_clk =
-					le32_to_cpu(info_v8->sDISPCLK_Voltage[i].
-							ulMaximumSupportedCLK) * 10;
-			info->disp_clk_voltage[i].voltage_index =
-					le32_to_cpu(info_v8->sDISPCLK_Voltage[i].ulVoltageIndex);
-		}
-
-		info->boot_up_req_display_vector =
-				le32_to_cpu(info_v8->ulBootUpReqDisplayVector);
-		info->gpu_cap_info =
-				le32_to_cpu(info_v8->ulGPUCapInfo);
-
-		/*
-		 * system_config: Bit[0] = 0 : PCIE power gating disabled
-		 *                       = 1 : PCIE power gating enabled
-		 *                Bit[1] = 0 : DDR-PLL shut down disabled
-		 *                       = 1 : DDR-PLL shut down enabled
-		 *                Bit[2] = 0 : DDR-PLL power down disabled
-		 *                       = 1 : DDR-PLL power down enabled
-		 */
-		info->system_config = le32_to_cpu(info_v8->ulSystemConfig);
-		info->cpu_cap_info = le32_to_cpu(info_v8->ulCPUCapInfo);
-		info->boot_up_nb_voltage =
-				le16_to_cpu(info_v8->usBootUpNBVoltage);
-		info->ext_disp_conn_info_offset =
-				le16_to_cpu(info_v8->usExtDispConnInfoOffset);
-		info->memory_type = info_v8->ucMemoryType;
-		info->ma_channel_number = info_v8->ucUMAChannelNumber;
-		info->gmc_restore_reset_time =
-				le32_to_cpu(info_v8->ulGMCRestoreResetTime);
-
-		info->minimum_n_clk =
-				le32_to_cpu(info_v8->ulNbpStateNClkFreq[0]);
-		for (i = 1; i < 4; ++i)
-			info->minimum_n_clk =
-					info->minimum_n_clk < le32_to_cpu(info_v8->ulNbpStateNClkFreq[i]) ?
-							info->minimum_n_clk : le32_to_cpu(info_v8->ulNbpStateNClkFreq[i]);
-
-		info->idle_n_clk = le32_to_cpu(info_v8->ulIdleNClk);
-		info->ddr_dll_power_up_time =
-				le32_to_cpu(info_v8->ulDDR_DLL_PowerUpTime);
-		info->ddr_pll_power_up_time =
-				le32_to_cpu(info_v8->ulDDR_PLL_PowerUpTime);
-		info->pcie_clk_ss_type = le16_to_cpu(info_v8->usPCIEClkSSType);
-		info->lvds_ss_percentage =
-				le16_to_cpu(info_v8->usLvdsSSPercentage);
-		info->lvds_sspread_rate_in_10hz =
-				le16_to_cpu(info_v8->usLvdsSSpreadRateIn10Hz);
-		info->hdmi_ss_percentage =
-				le16_to_cpu(info_v8->usHDMISSPercentage);
-		info->hdmi_sspread_rate_in_10hz =
-				le16_to_cpu(info_v8->usHDMISSpreadRateIn10Hz);
-		info->dvi_ss_percentage =
-				le16_to_cpu(info_v8->usDVISSPercentage);
-		info->dvi_sspread_rate_in_10_hz =
-				le16_to_cpu(info_v8->usDVISSpreadRateIn10Hz);
-
-		info->max_lvds_pclk_freq_in_single_link =
-				le16_to_cpu(info_v8->usMaxLVDSPclkFreqInSingleLink);
-		info->lvds_misc = info_v8->ucLvdsMisc;
-		info->lvds_pwr_on_seq_dig_on_to_de_in_4ms =
-				info_v8->ucLVDSPwrOnSeqDIGONtoDE_in4Ms;
-		info->lvds_pwr_on_seq_de_to_vary_bl_in_4ms =
-				info_v8->ucLVDSPwrOnSeqDEtoVARY_BL_in4Ms;
-		info->lvds_pwr_on_seq_vary_bl_to_blon_in_4ms =
-				info_v8->ucLVDSPwrOnSeqVARY_BLtoBLON_in4Ms;
-		info->lvds_pwr_off_seq_vary_bl_to_de_in4ms =
-				info_v8->ucLVDSPwrOffSeqVARY_BLtoDE_in4Ms;
-		info->lvds_pwr_off_seq_de_to_dig_on_in4ms =
-				info_v8->ucLVDSPwrOffSeqDEtoDIGON_in4Ms;
-		info->lvds_pwr_off_seq_blon_to_vary_bl_in_4ms =
-				info_v8->ucLVDSPwrOffSeqBLONtoVARY_BL_in4Ms;
-		info->lvds_off_to_on_delay_in_4ms =
-				info_v8->ucLVDSOffToOnDelay_in4Ms;
-		info->lvds_bit_depth_control_val =
-				le32_to_cpu(info_v8->ulLCDBitDepthControlVal);
-
-		for (i = 0; i < NUMBER_OF_AVAILABLE_SCLK; ++i) {
-			/* Convert [10KHz] into [KHz] */
-			info->avail_s_clk[i].supported_s_clk =
-					le32_to_cpu(info_v8->sAvail_SCLK[i].ulSupportedSCLK) * 10;
-			info->avail_s_clk[i].voltage_index =
-					le16_to_cpu(info_v8->sAvail_SCLK[i].usVoltageIndex);
-			info->avail_s_clk[i].voltage_id =
-					le16_to_cpu(info_v8->sAvail_SCLK[i].usVoltageID);
-		}
-
-		for (i = 0; i < NUMBER_OF_UCHAR_FOR_GUID; ++i) {
-			info->ext_disp_conn_info.gu_id[i] =
-					info_v8->sExtDispConnInfo.ucGuid[i];
-		}
-
-		for (i = 0; i < MAX_NUMBER_OF_EXT_DISPLAY_PATH; ++i) {
-			info->ext_disp_conn_info.path[i].device_connector_id =
-					object_id_from_bios_object_id(
-							le16_to_cpu(info_v8->sExtDispConnInfo.sPath[i].usDeviceConnector));
-
-			info->ext_disp_conn_info.path[i].ext_encoder_obj_id =
-					object_id_from_bios_object_id(
-							le16_to_cpu(info_v8->sExtDispConnInfo.sPath[i].usExtEncoderObjId));
-
-			info->ext_disp_conn_info.path[i].device_tag =
-					le16_to_cpu(info_v8->sExtDispConnInfo.sPath[i].usDeviceTag);
-			info->ext_disp_conn_info.path[i].device_acpi_enum =
-					le16_to_cpu(info_v8->sExtDispConnInfo.sPath[i].usDeviceACPIEnum);
-			info->ext_disp_conn_info.path[i].ext_aux_ddc_lut_index =
-					info_v8->sExtDispConnInfo.sPath[i].ucExtAUXDDCLutIndex;
-			info->ext_disp_conn_info.path[i].ext_hpd_pin_lut_index =
-					info_v8->sExtDispConnInfo.sPath[i].ucExtHPDPINLutIndex;
-			info->ext_disp_conn_info.path[i].channel_mapping.raw =
-					info_v8->sExtDispConnInfo.sPath[i].ucChannelMapping;
-		}
-		info->ext_disp_conn_info.checksum =
-				info_v8->sExtDispConnInfo.ucChecksum;
-
-		result = BP_RESULT_OK;
+	for (i = 0; i < NUMBER_OF_DISP_CLK_VOLTAGE; ++i) {
+		/* Convert [10KHz] into [KHz] */
+		info->disp_clk_voltage[i].max_supported_clk =
+			le32_to_cpu(info_v8->sDISPCLK_Voltage[i].
+				    ulMaximumSupportedCLK) * 10;
+		info->disp_clk_voltage[i].voltage_index =
+			le32_to_cpu(info_v8->sDISPCLK_Voltage[i].ulVoltageIndex);
 	}
 
-	return result;
+	info->boot_up_req_display_vector =
+		le32_to_cpu(info_v8->ulBootUpReqDisplayVector);
+	info->gpu_cap_info =
+		le32_to_cpu(info_v8->ulGPUCapInfo);
+
+	/*
+	 * system_config: Bit[0] = 0 : PCIE power gating disabled
+	 *                       = 1 : PCIE power gating enabled
+	 *                Bit[1] = 0 : DDR-PLL shut down disabled
+	 *                       = 1 : DDR-PLL shut down enabled
+	 *                Bit[2] = 0 : DDR-PLL power down disabled
+	 *                       = 1 : DDR-PLL power down enabled
+	 */
+	info->system_config = le32_to_cpu(info_v8->ulSystemConfig);
+	info->cpu_cap_info = le32_to_cpu(info_v8->ulCPUCapInfo);
+	info->boot_up_nb_voltage =
+		le16_to_cpu(info_v8->usBootUpNBVoltage);
+	info->ext_disp_conn_info_offset =
+		le16_to_cpu(info_v8->usExtDispConnInfoOffset);
+	info->memory_type = info_v8->ucMemoryType;
+	info->ma_channel_number = info_v8->ucUMAChannelNumber;
+	info->gmc_restore_reset_time =
+		le32_to_cpu(info_v8->ulGMCRestoreResetTime);
+
+	info->minimum_n_clk =
+		le32_to_cpu(info_v8->ulNbpStateNClkFreq[0]);
+	for (i = 1; i < 4; ++i)
+		info->minimum_n_clk =
+			info->minimum_n_clk < le32_to_cpu(info_v8->ulNbpStateNClkFreq[i]) ?
+			info->minimum_n_clk : le32_to_cpu(info_v8->ulNbpStateNClkFreq[i]);
+
+	info->idle_n_clk = le32_to_cpu(info_v8->ulIdleNClk);
+	info->ddr_dll_power_up_time =
+		le32_to_cpu(info_v8->ulDDR_DLL_PowerUpTime);
+	info->ddr_pll_power_up_time =
+		le32_to_cpu(info_v8->ulDDR_PLL_PowerUpTime);
+	info->pcie_clk_ss_type = le16_to_cpu(info_v8->usPCIEClkSSType);
+	info->lvds_ss_percentage =
+		le16_to_cpu(info_v8->usLvdsSSPercentage);
+	info->lvds_sspread_rate_in_10hz =
+		le16_to_cpu(info_v8->usLvdsSSpreadRateIn10Hz);
+	info->hdmi_ss_percentage =
+		le16_to_cpu(info_v8->usHDMISSPercentage);
+	info->hdmi_sspread_rate_in_10hz =
+		le16_to_cpu(info_v8->usHDMISSpreadRateIn10Hz);
+	info->dvi_ss_percentage =
+		le16_to_cpu(info_v8->usDVISSPercentage);
+	info->dvi_sspread_rate_in_10_hz =
+		le16_to_cpu(info_v8->usDVISSpreadRateIn10Hz);
+
+	info->max_lvds_pclk_freq_in_single_link =
+		le16_to_cpu(info_v8->usMaxLVDSPclkFreqInSingleLink);
+	info->lvds_misc = info_v8->ucLvdsMisc;
+	info->lvds_pwr_on_seq_dig_on_to_de_in_4ms =
+		info_v8->ucLVDSPwrOnSeqDIGONtoDE_in4Ms;
+	info->lvds_pwr_on_seq_de_to_vary_bl_in_4ms =
+		info_v8->ucLVDSPwrOnSeqDEtoVARY_BL_in4Ms;
+	info->lvds_pwr_on_seq_vary_bl_to_blon_in_4ms =
+		info_v8->ucLVDSPwrOnSeqVARY_BLtoBLON_in4Ms;
+	info->lvds_pwr_off_seq_vary_bl_to_de_in4ms =
+		info_v8->ucLVDSPwrOffSeqVARY_BLtoDE_in4Ms;
+	info->lvds_pwr_off_seq_de_to_dig_on_in4ms =
+		info_v8->ucLVDSPwrOffSeqDEtoDIGON_in4Ms;
+	info->lvds_pwr_off_seq_blon_to_vary_bl_in_4ms =
+		info_v8->ucLVDSPwrOffSeqBLONtoVARY_BL_in4Ms;
+	info->lvds_off_to_on_delay_in_4ms =
+		info_v8->ucLVDSOffToOnDelay_in4Ms;
+	info->lvds_bit_depth_control_val =
+		le32_to_cpu(info_v8->ulLCDBitDepthControlVal);
+
+	for (i = 0; i < NUMBER_OF_AVAILABLE_SCLK; ++i) {
+		/* Convert [10KHz] into [KHz] */
+		info->avail_s_clk[i].supported_s_clk =
+			le32_to_cpu(info_v8->sAvail_SCLK[i].ulSupportedSCLK) * 10;
+		info->avail_s_clk[i].voltage_index =
+			le16_to_cpu(info_v8->sAvail_SCLK[i].usVoltageIndex);
+		info->avail_s_clk[i].voltage_id =
+			le16_to_cpu(info_v8->sAvail_SCLK[i].usVoltageID);
+	}
+
+	for (i = 0; i < NUMBER_OF_UCHAR_FOR_GUID; ++i) {
+		info->ext_disp_conn_info.gu_id[i] =
+			info_v8->sExtDispConnInfo.ucGuid[i];
+	}
+
+	for (i = 0; i < MAX_NUMBER_OF_EXT_DISPLAY_PATH; ++i) {
+		info->ext_disp_conn_info.path[i].device_connector_id =
+			object_id_from_bios_object_id(
+				le16_to_cpu(info_v8->sExtDispConnInfo.sPath[i].usDeviceConnector));
+
+		info->ext_disp_conn_info.path[i].ext_encoder_obj_id =
+			object_id_from_bios_object_id(
+				le16_to_cpu(info_v8->sExtDispConnInfo.sPath[i].usExtEncoderObjId));
+
+		info->ext_disp_conn_info.path[i].device_tag =
+			le16_to_cpu(info_v8->sExtDispConnInfo.sPath[i].usDeviceTag);
+		info->ext_disp_conn_info.path[i].device_acpi_enum =
+			le16_to_cpu(info_v8->sExtDispConnInfo.sPath[i].usDeviceACPIEnum);
+		info->ext_disp_conn_info.path[i].ext_aux_ddc_lut_index =
+			info_v8->sExtDispConnInfo.sPath[i].ucExtAUXDDCLutIndex;
+		info->ext_disp_conn_info.path[i].ext_hpd_pin_lut_index =
+			info_v8->sExtDispConnInfo.sPath[i].ucExtHPDPINLutIndex;
+		info->ext_disp_conn_info.path[i].channel_mapping.raw =
+			info_v8->sExtDispConnInfo.sPath[i].ucChannelMapping;
+	}
+	info->ext_disp_conn_info.checksum =
+		info_v8->sExtDispConnInfo.ucChecksum;
+
+	return BP_RESULT_OK;
 }
 
 /*
@@ -4352,140 +4346,123 @@ static enum bp_result get_integrated_info_v9(
 	struct bios_parser *bp,
 	struct integrated_info *info)
 {
-	enum bp_result result = BP_RESULT_BADBIOSTABLE;
 	ATOM_INTEGRATED_SYSTEM_INFO_V1_9 *info_v9;
 	uint32_t i;
 
 	info_v9 = GET_IMAGE(ATOM_INTEGRATED_SYSTEM_INFO_V1_9,
 			bp->master_data_tbl->ListOfDataTables.IntegratedSystemInfo);
 
-	if (info_v9 != NULL) {
-		info->boot_up_engine_clock =
-				le32_to_cpu(info_v9->ulBootUpEngineClock) * 10;
-		info->dentist_vco_freq =
-				le32_to_cpu(info_v9->ulDentistVCOFreq) * 10;
-		info->boot_up_uma_clock =
-				le32_to_cpu(info_v9->ulBootUpUMAClock) * 10;
+	if (!info_v9)
+		return BP_RESULT_BADBIOSTABLE;
 
-		for (i = 0; i < NUMBER_OF_DISP_CLK_VOLTAGE; ++i) {
-			/* Convert [10KHz] into [KHz] */
-			info->disp_clk_voltage[i].max_supported_clk =
-					le32_to_cpu(info_v9->sDISPCLK_Voltage[i].ulMaximumSupportedCLK) * 10;
-			info->disp_clk_voltage[i].voltage_index =
-					le32_to_cpu(info_v9->sDISPCLK_Voltage[i].ulVoltageIndex);
-		}
+	info->boot_up_engine_clock = le32_to_cpu(info_v9->ulBootUpEngineClock) * 10;
+	info->dentist_vco_freq = le32_to_cpu(info_v9->ulDentistVCOFreq) * 10;
+	info->boot_up_uma_clock = le32_to_cpu(info_v9->ulBootUpUMAClock) * 10;
 
-		info->boot_up_req_display_vector =
-				le32_to_cpu(info_v9->ulBootUpReqDisplayVector);
-		info->gpu_cap_info = le32_to_cpu(info_v9->ulGPUCapInfo);
-
-		/*
-		 * system_config: Bit[0] = 0 : PCIE power gating disabled
-		 *                       = 1 : PCIE power gating enabled
-		 *                Bit[1] = 0 : DDR-PLL shut down disabled
-		 *                       = 1 : DDR-PLL shut down enabled
-		 *                Bit[2] = 0 : DDR-PLL power down disabled
-		 *                       = 1 : DDR-PLL power down enabled
-		 */
-		info->system_config = le32_to_cpu(info_v9->ulSystemConfig);
-		info->cpu_cap_info = le32_to_cpu(info_v9->ulCPUCapInfo);
-		info->boot_up_nb_voltage =
-				le16_to_cpu(info_v9->usBootUpNBVoltage);
-		info->ext_disp_conn_info_offset =
-				le16_to_cpu(info_v9->usExtDispConnInfoOffset);
-		info->memory_type = info_v9->ucMemoryType;
-		info->ma_channel_number = info_v9->ucUMAChannelNumber;
-		info->gmc_restore_reset_time =
-				le32_to_cpu(info_v9->ulGMCRestoreResetTime);
-
-		info->minimum_n_clk =
-				le32_to_cpu(info_v9->ulNbpStateNClkFreq[0]);
-		for (i = 1; i < 4; ++i)
-			info->minimum_n_clk =
-					info->minimum_n_clk < le32_to_cpu(info_v9->ulNbpStateNClkFreq[i]) ?
-							info->minimum_n_clk : le32_to_cpu(info_v9->ulNbpStateNClkFreq[i]);
-
-		info->idle_n_clk = le32_to_cpu(info_v9->ulIdleNClk);
-		info->ddr_dll_power_up_time =
-				le32_to_cpu(info_v9->ulDDR_DLL_PowerUpTime);
-		info->ddr_pll_power_up_time =
-				le32_to_cpu(info_v9->ulDDR_PLL_PowerUpTime);
-		info->pcie_clk_ss_type = le16_to_cpu(info_v9->usPCIEClkSSType);
-		info->lvds_ss_percentage =
-				le16_to_cpu(info_v9->usLvdsSSPercentage);
-		info->lvds_sspread_rate_in_10hz =
-				le16_to_cpu(info_v9->usLvdsSSpreadRateIn10Hz);
-		info->hdmi_ss_percentage =
-				le16_to_cpu(info_v9->usHDMISSPercentage);
-		info->hdmi_sspread_rate_in_10hz =
-				le16_to_cpu(info_v9->usHDMISSpreadRateIn10Hz);
-		info->dvi_ss_percentage =
-				le16_to_cpu(info_v9->usDVISSPercentage);
-		info->dvi_sspread_rate_in_10_hz =
-				le16_to_cpu(info_v9->usDVISSpreadRateIn10Hz);
-
-		info->max_lvds_pclk_freq_in_single_link =
-				le16_to_cpu(info_v9->usMaxLVDSPclkFreqInSingleLink);
-		info->lvds_misc = info_v9->ucLvdsMisc;
-		info->lvds_pwr_on_seq_dig_on_to_de_in_4ms =
-				info_v9->ucLVDSPwrOnSeqDIGONtoDE_in4Ms;
-		info->lvds_pwr_on_seq_de_to_vary_bl_in_4ms =
-				info_v9->ucLVDSPwrOnSeqDEtoVARY_BL_in4Ms;
-		info->lvds_pwr_on_seq_vary_bl_to_blon_in_4ms =
-				info_v9->ucLVDSPwrOnSeqVARY_BLtoBLON_in4Ms;
-		info->lvds_pwr_off_seq_vary_bl_to_de_in4ms =
-				info_v9->ucLVDSPwrOffSeqVARY_BLtoDE_in4Ms;
-		info->lvds_pwr_off_seq_de_to_dig_on_in4ms =
-				info_v9->ucLVDSPwrOffSeqDEtoDIGON_in4Ms;
-		info->lvds_pwr_off_seq_blon_to_vary_bl_in_4ms =
-				info_v9->ucLVDSPwrOffSeqBLONtoVARY_BL_in4Ms;
-		info->lvds_off_to_on_delay_in_4ms =
-				info_v9->ucLVDSOffToOnDelay_in4Ms;
-		info->lvds_bit_depth_control_val =
-				le32_to_cpu(info_v9->ulLCDBitDepthControlVal);
-
-		for (i = 0; i < NUMBER_OF_AVAILABLE_SCLK; ++i) {
-			/* Convert [10KHz] into [KHz] */
-			info->avail_s_clk[i].supported_s_clk =
-					le32_to_cpu(info_v9->sAvail_SCLK[i].ulSupportedSCLK) * 10;
-			info->avail_s_clk[i].voltage_index =
-					le16_to_cpu(info_v9->sAvail_SCLK[i].usVoltageIndex);
-			info->avail_s_clk[i].voltage_id =
-					le16_to_cpu(info_v9->sAvail_SCLK[i].usVoltageID);
-		}
-
-		for (i = 0; i < NUMBER_OF_UCHAR_FOR_GUID; ++i) {
-			info->ext_disp_conn_info.gu_id[i] =
-					info_v9->sExtDispConnInfo.ucGuid[i];
-		}
-
-		for (i = 0; i < MAX_NUMBER_OF_EXT_DISPLAY_PATH; ++i) {
-			info->ext_disp_conn_info.path[i].device_connector_id =
-					object_id_from_bios_object_id(
-							le16_to_cpu(info_v9->sExtDispConnInfo.sPath[i].usDeviceConnector));
-
-			info->ext_disp_conn_info.path[i].ext_encoder_obj_id =
-					object_id_from_bios_object_id(
-							le16_to_cpu(info_v9->sExtDispConnInfo.sPath[i].usExtEncoderObjId));
-
-			info->ext_disp_conn_info.path[i].device_tag =
-					le16_to_cpu(info_v9->sExtDispConnInfo.sPath[i].usDeviceTag);
-			info->ext_disp_conn_info.path[i].device_acpi_enum =
-					le16_to_cpu(info_v9->sExtDispConnInfo.sPath[i].usDeviceACPIEnum);
-			info->ext_disp_conn_info.path[i].ext_aux_ddc_lut_index =
-					info_v9->sExtDispConnInfo.sPath[i].ucExtAUXDDCLutIndex;
-			info->ext_disp_conn_info.path[i].ext_hpd_pin_lut_index =
-					info_v9->sExtDispConnInfo.sPath[i].ucExtHPDPINLutIndex;
-			info->ext_disp_conn_info.path[i].channel_mapping.raw =
-					info_v9->sExtDispConnInfo.sPath[i].ucChannelMapping;
-		}
-		info->ext_disp_conn_info.checksum =
-				info_v9->sExtDispConnInfo.ucChecksum;
-
-		result = BP_RESULT_OK;
+	for (i = 0; i < NUMBER_OF_DISP_CLK_VOLTAGE; ++i) {
+		/* Convert [10KHz] into [KHz] */
+		info->disp_clk_voltage[i].max_supported_clk =
+			le32_to_cpu(info_v9->sDISPCLK_Voltage[i].ulMaximumSupportedCLK) * 10;
+		info->disp_clk_voltage[i].voltage_index =
+			le32_to_cpu(info_v9->sDISPCLK_Voltage[i].ulVoltageIndex);
 	}
 
-	return result;
+	info->boot_up_req_display_vector =
+		le32_to_cpu(info_v9->ulBootUpReqDisplayVector);
+	info->gpu_cap_info = le32_to_cpu(info_v9->ulGPUCapInfo);
+
+	/*
+	 * system_config: Bit[0] = 0 : PCIE power gating disabled
+	 *                       = 1 : PCIE power gating enabled
+	 *                Bit[1] = 0 : DDR-PLL shut down disabled
+	 *                       = 1 : DDR-PLL shut down enabled
+	 *                Bit[2] = 0 : DDR-PLL power down disabled
+	 *                       = 1 : DDR-PLL power down enabled
+	 */
+	info->system_config = le32_to_cpu(info_v9->ulSystemConfig);
+	info->cpu_cap_info = le32_to_cpu(info_v9->ulCPUCapInfo);
+	info->boot_up_nb_voltage = le16_to_cpu(info_v9->usBootUpNBVoltage);
+	info->ext_disp_conn_info_offset = le16_to_cpu(info_v9->usExtDispConnInfoOffset);
+	info->memory_type = info_v9->ucMemoryType;
+	info->ma_channel_number = info_v9->ucUMAChannelNumber;
+	info->gmc_restore_reset_time = le32_to_cpu(info_v9->ulGMCRestoreResetTime);
+
+	info->minimum_n_clk = le32_to_cpu(info_v9->ulNbpStateNClkFreq[0]);
+	for (i = 1; i < 4; ++i)
+		info->minimum_n_clk =
+			info->minimum_n_clk < le32_to_cpu(info_v9->ulNbpStateNClkFreq[i]) ?
+			info->minimum_n_clk : le32_to_cpu(info_v9->ulNbpStateNClkFreq[i]);
+
+	info->idle_n_clk = le32_to_cpu(info_v9->ulIdleNClk);
+	info->ddr_dll_power_up_time = le32_to_cpu(info_v9->ulDDR_DLL_PowerUpTime);
+	info->ddr_pll_power_up_time = le32_to_cpu(info_v9->ulDDR_PLL_PowerUpTime);
+	info->pcie_clk_ss_type = le16_to_cpu(info_v9->usPCIEClkSSType);
+	info->lvds_ss_percentage = le16_to_cpu(info_v9->usLvdsSSPercentage);
+	info->lvds_sspread_rate_in_10hz = le16_to_cpu(info_v9->usLvdsSSpreadRateIn10Hz);
+	info->hdmi_ss_percentage = le16_to_cpu(info_v9->usHDMISSPercentage);
+	info->hdmi_sspread_rate_in_10hz = le16_to_cpu(info_v9->usHDMISSpreadRateIn10Hz);
+	info->dvi_ss_percentage = le16_to_cpu(info_v9->usDVISSPercentage);
+	info->dvi_sspread_rate_in_10_hz = le16_to_cpu(info_v9->usDVISSpreadRateIn10Hz);
+
+	info->max_lvds_pclk_freq_in_single_link =
+		le16_to_cpu(info_v9->usMaxLVDSPclkFreqInSingleLink);
+	info->lvds_misc = info_v9->ucLvdsMisc;
+	info->lvds_pwr_on_seq_dig_on_to_de_in_4ms =
+		info_v9->ucLVDSPwrOnSeqDIGONtoDE_in4Ms;
+	info->lvds_pwr_on_seq_de_to_vary_bl_in_4ms =
+		info_v9->ucLVDSPwrOnSeqDEtoVARY_BL_in4Ms;
+	info->lvds_pwr_on_seq_vary_bl_to_blon_in_4ms =
+		info_v9->ucLVDSPwrOnSeqVARY_BLtoBLON_in4Ms;
+	info->lvds_pwr_off_seq_vary_bl_to_de_in4ms =
+		info_v9->ucLVDSPwrOffSeqVARY_BLtoDE_in4Ms;
+	info->lvds_pwr_off_seq_de_to_dig_on_in4ms =
+		info_v9->ucLVDSPwrOffSeqDEtoDIGON_in4Ms;
+	info->lvds_pwr_off_seq_blon_to_vary_bl_in_4ms =
+		info_v9->ucLVDSPwrOffSeqBLONtoVARY_BL_in4Ms;
+	info->lvds_off_to_on_delay_in_4ms =
+		info_v9->ucLVDSOffToOnDelay_in4Ms;
+	info->lvds_bit_depth_control_val =
+		le32_to_cpu(info_v9->ulLCDBitDepthControlVal);
+
+	for (i = 0; i < NUMBER_OF_AVAILABLE_SCLK; ++i) {
+		/* Convert [10KHz] into [KHz] */
+		info->avail_s_clk[i].supported_s_clk =
+			le32_to_cpu(info_v9->sAvail_SCLK[i].ulSupportedSCLK) * 10;
+		info->avail_s_clk[i].voltage_index =
+			le16_to_cpu(info_v9->sAvail_SCLK[i].usVoltageIndex);
+		info->avail_s_clk[i].voltage_id =
+			le16_to_cpu(info_v9->sAvail_SCLK[i].usVoltageID);
+	}
+
+	for (i = 0; i < NUMBER_OF_UCHAR_FOR_GUID; ++i) {
+		info->ext_disp_conn_info.gu_id[i] =
+			info_v9->sExtDispConnInfo.ucGuid[i];
+	}
+
+	for (i = 0; i < MAX_NUMBER_OF_EXT_DISPLAY_PATH; ++i) {
+		info->ext_disp_conn_info.path[i].device_connector_id =
+			object_id_from_bios_object_id(
+				le16_to_cpu(info_v9->sExtDispConnInfo.sPath[i].usDeviceConnector));
+
+		info->ext_disp_conn_info.path[i].ext_encoder_obj_id =
+			object_id_from_bios_object_id(
+				le16_to_cpu(info_v9->sExtDispConnInfo.sPath[i].usExtEncoderObjId));
+
+		info->ext_disp_conn_info.path[i].device_tag =
+			le16_to_cpu(info_v9->sExtDispConnInfo.sPath[i].usDeviceTag);
+		info->ext_disp_conn_info.path[i].device_acpi_enum =
+			le16_to_cpu(info_v9->sExtDispConnInfo.sPath[i].usDeviceACPIEnum);
+		info->ext_disp_conn_info.path[i].ext_aux_ddc_lut_index =
+			info_v9->sExtDispConnInfo.sPath[i].ucExtAUXDDCLutIndex;
+		info->ext_disp_conn_info.path[i].ext_hpd_pin_lut_index =
+			info_v9->sExtDispConnInfo.sPath[i].ucExtHPDPINLutIndex;
+		info->ext_disp_conn_info.path[i].channel_mapping.raw =
+			info_v9->sExtDispConnInfo.sPath[i].ucChannelMapping;
+	}
+	info->ext_disp_conn_info.checksum =
+		info_v9->sExtDispConnInfo.ucChecksum;
+
+	return BP_RESULT_OK;
 }
 
 /*
