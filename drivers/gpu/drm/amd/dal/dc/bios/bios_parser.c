@@ -4184,7 +4184,7 @@ static void bios_parser_set_scratch_acc_mode_change(
 	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 #ifdef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
-	bp->bios_helper->set_scratch_acc_mode_change(
+	dce110_set_scratch_acc_mode_change(
 			bp->ctx);
 #else
 	dal_logger_write(bp->ctx->logger,

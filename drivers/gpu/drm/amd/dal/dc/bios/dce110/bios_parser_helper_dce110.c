@@ -46,9 +46,9 @@
  * @param
  *  struct dc_context *ctx - [in] DAL context
  */
-static void set_scratch_acc_mode_change(
-	struct dc_context *ctx)
+void dce110_set_scratch_acc_mode_change(struct dc_context *ctx)
 {
+#ifdef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
 	uint32_t addr = mmBIOS_SCRATCH_6;
 	uint32_t value = 0;
 
@@ -57,6 +57,7 @@ static void set_scratch_acc_mode_change(
 	value |= ATOM_S6_ACC_MODE;
 
 	dm_write_reg(ctx, addr, value);
+#endif
 }
 
 /**
@@ -308,7 +309,6 @@ static const struct bios_parser_helper bios_parser_helper_funcs = {
 	.is_lid_status_changed = NULL,
 	.prepare_scratch_active_and_requested =
 			prepare_scratch_active_and_requested,
-	.set_scratch_acc_mode_change = set_scratch_acc_mode_change,
 	.take_backlight_control = NULL,
 	.update_requested_backlight_level = NULL,
 };

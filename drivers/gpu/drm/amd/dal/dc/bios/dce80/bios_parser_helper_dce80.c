@@ -173,29 +173,6 @@ static bool is_display_config_changed(
 }
 
 /**
- * set_scratch_acc_mode_change
- *
- * @brief
- *  set Accelerated Mode in VBIOS scratch register, VBIOS will clean it when
- *  VGA/non-Accelerated mode is set
- *
- * @param
- *  NONE
- */
-static void set_scratch_acc_mode_change(
-	struct dc_context *ctx)
-{
-	uint32_t addr = mmBIOS_SCRATCH_6;
-	uint32_t value = 0;
-
-	value = dm_read_reg(ctx, addr);
-
-	value |= ATOM_S6_ACC_MODE;
-
-	dm_write_reg(ctx, addr, value);
-}
-
-/**
  * is_accelerated_mode
  *
  * @brief
@@ -579,7 +556,6 @@ static const struct bios_parser_helper bios_parser_helper_funcs = {
 	.is_lid_status_changed = is_lid_status_changed,
 	.prepare_scratch_active_and_requested =
 		prepare_scratch_active_and_requested,
-	.set_scratch_acc_mode_change = set_scratch_acc_mode_change,
 	.take_backlight_control = take_backlight_control,
 	.update_requested_backlight_level = update_requested_backlight_level,
 };
