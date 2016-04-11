@@ -4161,37 +4161,6 @@ static bool bios_parser_is_accelerated_mode(
 }
 
 /**
- * bios_parser_set_scratch_connected
- *
- * @brief
- *  update VBIOS scratch register about connected displays
- *
- * @param
- *  bool - update scratch register or just prepare info to be updated
- *  bool - connection state
- *  const ConnectorDeviceTagInfo* - pointer to device type and enum ID
- */
-static void bios_parser_set_scratch_connected(
-	struct dc_bios *dcb,
-	struct graphics_object_id connector_id,
-	bool connected,
-	const struct connector_device_tag_info *device_tag)
-{
-	struct bios_parser *bp = BP_FROM_DCB(dcb);
-
-#ifdef CONFIG_DRM_AMD_DAL_VBIOS_PRESENT
-	bp->bios_helper->set_scratch_connected(
-			bp->ctx,
-			connector_id, connected, device_tag);
-#else
-	dal_logger_write(bp->ctx->logger,
-			LOG_MAJOR_BIOS,
-			LOG_MINOR_BIOS_CMD_TABLE,
-			"%s: VBIOS is not supported", __func__);
-#endif
-}
-
-/**
  * bios_parser_set_scratch_critical_state
  *
  * @brief
@@ -4876,8 +4845,6 @@ static const struct dc_vbios_funcs vbios_funcs = {
 	.get_embedded_display_controller_id = get_embedded_display_controller_id,
 
 	.get_embedded_display_refresh_rate = get_embedded_display_refresh_rate,
-
-	.set_scratch_connected = bios_parser_set_scratch_connected,
 
 	.prepare_scratch_active_and_requested = bios_parser_prepare_scratch_active_and_requested,
 

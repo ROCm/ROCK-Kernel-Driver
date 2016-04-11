@@ -171,11 +171,6 @@ struct dc_vbios_funcs {
 		struct dc_bios *bios);
 	uint32_t (*get_embedded_display_refresh_rate)(
 		struct dc_bios *bios);
-	void (*set_scratch_connected)(
-		struct dc_bios *bios,
-		struct graphics_object_id connector_id,
-		bool connected,
-		const struct connector_device_tag_info *device_tag);
 	void (*prepare_scratch_active_and_requested)(
 		struct dc_bios *bios,
 		enum controller_id controller_id,

@@ -72,11 +72,6 @@ struct bios_parser_helper {
 	void (*set_scratch_active_and_requested)(
 		struct dc_context *ctx,
 		struct vbios_helper_data *d);
-	void (*set_scratch_connected)(
-		struct dc_context *ctx,
-		struct graphics_object_id id,
-		bool connected,
-		const struct connector_device_tag_info *device_tag);
 	void (*set_scratch_lcd_scale)(
 		struct dc_context *ctx,
 		enum lcd_scale lcd_scale_request);

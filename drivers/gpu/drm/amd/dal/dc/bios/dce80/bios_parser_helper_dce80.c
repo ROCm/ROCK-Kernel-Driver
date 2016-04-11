@@ -352,101 +352,6 @@ static void set_scratch_active_and_requested(
 	d->requested = 0;
 }
 
-/**
- * set_scratch_connected
- *
- * @brief
- *    update BIOS_SCRATCH_0 register about connected displays
- *
- * @param
- * bool - update scratch register or just prepare info to be updated
- * bool - connection state
- * const struct connector_device_tag_info * - pointer to device type and enum ID
- */
-static void set_scratch_connected(
-	struct dc_context *ctx,
-	struct graphics_object_id id,
-	bool connected,
-	const struct connector_device_tag_info *device_tag)
-{
-	uint32_t addr = 0;
-	uint32_t value = 0;
-	uint32_t update = 0;
-
-	switch (device_tag->dev_id.device_type) {
-	case DEVICE_TYPE_LCD:
-		/* For LCD VBIOS will update LCD Panel connected bit always and
-		 * Lid state bit based on SBIOS info do not do anything here
-		 * for LCD
-		 */
-		break;
-	case DEVICE_TYPE_CRT:
-		switch (device_tag->dev_id.enum_id) {
-		case 1:
-			update |= ATOM_S0_CRT1_COLOR;
-			break;
-		case 2:
-			update |= ATOM_S0_CRT2_COLOR;
-			break;
-		default:
-			break;
-		}
-		break;
-	case DEVICE_TYPE_DFP:
-		switch (device_tag->dev_id.enum_id) {
-		case 1:
-			update |= ATOM_S0_DFP1;
-			break;
-		case 2:
-			update |= ATOM_S0_DFP2;
-			break;
-		case 3:
-			update |= ATOM_S0_DFP3;
-			break;
-		case 4:
-			update |= ATOM_S0_DFP4;
-			break;
-		case 5:
-			update |= ATOM_S0_DFP5;
-			break;
-		case 6:
-			update |= ATOM_S0_DFP6;
-			break;
-		default:
-			break;
-		}
-		break;
-	case DEVICE_TYPE_CV:
-		/* DCE 8.0 does not support CV,
-		 * so don't do anything */
-		break;
-
-	case DEVICE_TYPE_TV:
-		/* For TV VBIOS will update S-Video or
-		 * Composite scratch bits on DAL_LoadDetect
-		 * when called by driver, do not do anything
-		 * here for TV
-		 */
-		break;
-
-	default:
-		break;
-
-	}
-
-	/* update scratch register */
-	addr = mmBIOS_SCRATCH_0 + ATOM_DEVICE_CONNECT_INFO_DEF;
-
-	value = dm_read_reg(ctx, addr);
-
-	if (connected)
-		value |= update;
-	else
-		value &= ~update;
-
-	dm_write_reg(ctx, addr, value);
-}
-
 static void set_scratch_lcd_scale(
 	struct dc_context *ctx,
 	enum lcd_scale lcd_scale_request)
@@ -759,7 +664,6 @@ static const struct bios_parser_helper bios_parser_helper_funcs = {
 		prepare_scratch_active_and_requested,
 	.set_scratch_acc_mode_change = set_scratch_acc_mode_change,
 	.set_scratch_active_and_requested = set_scratch_active_and_requested,
-	.set_scratch_connected = set_scratch_connected,
 	.set_scratch_critical_state = set_scratch_critical_state,
 	.set_scratch_lcd_scale = set_scratch_lcd_scale,
 	.take_backlight_control = take_backlight_control,
