@@ -69,7 +69,6 @@ struct min_clock_params {
 	struct view dest_view;
 	struct dc_timing_params timing_info;
 	struct dc_scaling_params scaling_info;
-	struct color_quality color_info;
 	enum signal_type signal_type;
 	enum dc_color_depth deep_color_depth;
 	enum v_scaler_efficiency scaler_efficiency;
