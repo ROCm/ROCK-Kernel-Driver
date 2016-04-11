@@ -51,10 +51,6 @@ struct bios_parser_helper {
 		struct graphics_object_id encoder,
 		struct graphics_object_id connector,
 		enum signal_type signal);
-	bool (*is_lid_open)(
-		struct dc_context *ctx);
-	bool (*is_lid_status_changed)(
-		struct dc_context *ctx);
 	bool (*is_accelerated_mode)(
 		struct dc_context *ctx);
 	void (*prepare_scratch_active_and_requested)(

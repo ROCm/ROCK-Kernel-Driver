@@ -276,28 +276,11 @@ void dce110_set_scratch_critical_state(struct dc_context *ctx,
 	dm_write_reg(ctx, addr, value);
 }
 
-static bool is_lid_open(struct dc_context *ctx)
-{
-	uint32_t bios_scratch6;
-
-	bios_scratch6 =
-		dm_read_reg(
-			ctx,
-			mmBIOS_SCRATCH_0 + ATOM_ACC_CHANGE_INFO_DEF);
-
-	/* lid is open if the bit is not set */
-	if (!(bios_scratch6 & ATOM_S6_LID_STATE))
-		return true;
-
-	return false;
-}
-
 /* function table */
 static const struct bios_parser_helper bios_parser_helper_funcs = {
 	.detect_sink = detect_sink,
 	.get_scratch_lcd_scale = get_scratch_lcd_scale,
 	.is_accelerated_mode = is_accelerated_mode,
-	.is_lid_open = is_lid_open,
 	.prepare_scratch_active_and_requested =
 			prepare_scratch_active_and_requested,
 };

@@ -43,10 +43,4 @@ struct dc_bios *dal_bios_parser_create(
 void dal_bios_parser_destroy(
 	struct dc_bios **dcb);
 
-/*****************************************************************************/
-/* Interfaces of BIOS Parser Helper */
-bool dal_bios_parser_is_lid_open(
-	struct bios_parser *bp);
-bool dal_bios_parser_is_lid_status_changed(
-	struct bios_parser *bp);
 #endif /* __DAL_BIOS_PARSER_INTERFACE_H__ */

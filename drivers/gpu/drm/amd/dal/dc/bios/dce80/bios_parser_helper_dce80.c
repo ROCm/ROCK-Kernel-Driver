@@ -110,45 +110,6 @@ static enum signal_type detect_sink(
 	return sink;
 }
 
-static bool is_lid_open(struct dc_context *ctx)
-{
-	bool result = false;
-
-	/* VBIOS does not provide bitfield definitions */
-	uint32_t reg;
-
-	reg = dm_read_reg(ctx,
-		mmBIOS_SCRATCH_0 + ATOM_ACC_CHANGE_INFO_DEF);
-
-	/* lid is open if the bit is not set */
-	result = !(reg & ATOM_S6_LID_STATE);
-
-	return result;
-}
-
-static bool is_lid_status_changed(
-	struct dc_context *ctx)
-{
-	bool result = false;
-
-	/* VBIOS does not provide bitfield definitions */
-	uint32_t reg;
-
-	reg = dm_read_reg(ctx,
-		mmBIOS_SCRATCH_6);
-
-	/* lid is open if the bit is not set */
-	if (reg & ATOM_S6_LID_CHANGE) {
-		reg &= ~ATOM_S6_LID_CHANGE;
-		dm_write_reg(ctx,
-				mmBIOS_SCRATCH_6, reg);
-
-		result = true;
-	}
-
-	return result;
-}
-
 /**
  * is_accelerated_mode
  *
@@ -271,8 +232,6 @@ static const struct bios_parser_helper bios_parser_helper_funcs = {
 	.detect_sink = detect_sink,
 	.get_scratch_lcd_scale = get_scratch_lcd_scale,
 	.is_accelerated_mode = is_accelerated_mode,
-	.is_lid_open = is_lid_open,
-	.is_lid_status_changed = is_lid_status_changed,
 	.prepare_scratch_active_and_requested =
 		prepare_scratch_active_and_requested,
 };

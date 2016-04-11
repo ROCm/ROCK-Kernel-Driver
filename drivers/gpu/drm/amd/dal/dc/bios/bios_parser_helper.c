@@ -66,34 +66,3 @@ bool dal_bios_parser_init_bios_helper(
 		return false;
 	}
 }
-
-bool dal_bios_parser_is_lid_open(
-	struct bios_parser *bp)
-{
-	const struct graphics_object_id encoder = dal_graphics_object_id_init(
-		ENCODER_ID_INTERNAL_UNIPHY,
-		ENUM_ID_UNKNOWN,
-		OBJECT_TYPE_UNKNOWN);
-	const struct graphics_object_id connector = dal_graphics_object_id_init(
-		CONNECTOR_ID_LVDS,
-		ENUM_ID_UNKNOWN,
-		OBJECT_TYPE_UNKNOWN);
-
-	enum signal_type signal;
-
-	/* check if VBIOS reported LCD as connected */
-	signal = bp->bios_helper->detect_sink(bp->ctx,
-		encoder, connector, SIGNAL_TYPE_LVDS);
-
-	if (signal == SIGNAL_TYPE_NONE)
-		return false;
-
-	return bp->bios_helper->is_lid_open(bp->ctx);
-}
-
-bool dal_bios_parser_is_lid_status_changed(
-	struct bios_parser *bp)
-{
-	return bp->bios_helper->is_lid_status_changed(
-			bp->ctx);
-}
