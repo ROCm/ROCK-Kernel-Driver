@@ -4628,15 +4628,6 @@ static void bios_parser_destroy_integrated_info(
 	}
 }
 
-/******************************************************************************
- * Stub-functions */
-static bool is_lid_open(
-	struct dc_bios *bios)
-{
-	BREAK_TO_DEBUGGER();
-	return false;
-}
-
 /******************************************************************************/
 
 static const struct dc_vbios_funcs vbios_funcs = {
@@ -4697,8 +4688,6 @@ static const struct dc_vbios_funcs vbios_funcs = {
 	.get_encoder_cap_info = bios_parser_get_encoder_cap_info,
 
 	.get_din_connector_info = bios_parser_get_din_connector_info,
-
-	.is_lid_open = is_lid_open,
 
 	.is_accelerated_mode = bios_parser_is_accelerated_mode,
 

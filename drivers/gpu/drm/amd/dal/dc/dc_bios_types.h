@@ -138,8 +138,6 @@ struct dc_vbios_funcs {
 		struct graphics_object_id id,
 		struct din_connector_info *info);
 
-	bool (*is_lid_open)(
-		struct dc_bios *bios);
 	bool (*is_lid_status_changed)(
 		struct dc_bios *bios);
 	bool (*is_display_config_changed)(

@@ -1973,9 +1973,6 @@ bool dal_adapter_service_is_lid_open(struct adapter_service *as)
 {
 	bool is_lid_open = false;
 	struct platform_info_params params;
-#if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)
-	struct dc_bios *dcb = dal_adapter_service_get_bios_parser(as);
-#endif
 
 	params.data = &is_lid_open;
 	params.method = PM_GET_LID_STATE;
@@ -1984,11 +1981,7 @@ bool dal_adapter_service_is_lid_open(struct adapter_service *as)
 		dm_get_platform_info(as->ctx, &params))
 		return is_lid_open;
 
-#if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)
-	return dcb->funcs->is_lid_open(dcb);
-#else
 	return false;
-#endif
 }
 
 bool dal_adapter_service_get_panel_backlight_default_levels(
