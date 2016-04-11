@@ -4637,78 +4637,6 @@ static bool is_lid_open(
 	return false;
 }
 
-static bool is_lid_status_changed(
-	struct dc_bios *bios)
-{
-	BREAK_TO_DEBUGGER();
-	return false;
-}
-
-static bool is_display_config_changed(
-	struct dc_bios *bios)
-{
-	BREAK_TO_DEBUGGER();
-	return false;
-}
-
-static enum lcd_scale get_scratch_lcd_scale(
-	struct dc_bios *bios)
-{
-	BREAK_TO_DEBUGGER();
-	return LCD_SCALE_NONE;
-}
-
-static void get_bios_event_info(
-	struct dc_bios *bios,
-	struct bios_event_info *info)
-{
-	BREAK_TO_DEBUGGER();
-}
-
-static void update_requested_backlight_level(
-	struct dc_bios *bios,
-	uint32_t backlight_8bit)
-{
-	BREAK_TO_DEBUGGER();
-}
-
-static uint32_t get_requested_backlight_level(
-	struct dc_bios *bios)
-{
-	BREAK_TO_DEBUGGER();
-	return 0;
-}
-
-static void take_backlight_control(
-	struct dc_bios *bios,
-	bool cntl)
-{
-	BREAK_TO_DEBUGGER();
-}
-
-static bool is_active_display(
-	struct dc_bios *bios,
-	enum signal_type signal,
-	const struct connector_device_tag_info *device_tag)
-{
-	BREAK_TO_DEBUGGER();
-	return false;
-}
-
-static enum controller_id get_embedded_display_controller_id(
-	struct dc_bios *bios)
-{
-	BREAK_TO_DEBUGGER();
-	return CONTROLLER_ID_UNDEFINED;
-}
-
-static uint32_t get_embedded_display_refresh_rate(
-	struct dc_bios *bios)
-{
-	BREAK_TO_DEBUGGER();
-	return 0;
-}
-
 /******************************************************************************/
 
 static const struct dc_vbios_funcs vbios_funcs = {
@@ -4772,27 +4700,7 @@ static const struct dc_vbios_funcs vbios_funcs = {
 
 	.is_lid_open = is_lid_open,
 
-	.is_lid_status_changed = is_lid_status_changed,
-
-	.is_display_config_changed = is_display_config_changed,
-
 	.is_accelerated_mode = bios_parser_is_accelerated_mode,
-
-	.get_scratch_lcd_scale = get_scratch_lcd_scale,
-
-	.get_bios_event_info = get_bios_event_info,
-
-	.update_requested_backlight_level = update_requested_backlight_level,
-
-	.get_requested_backlight_level = get_requested_backlight_level,
-
-	.take_backlight_control = take_backlight_control,
-
-	.is_active_display = is_active_display,
-
-	.get_embedded_display_controller_id = get_embedded_display_controller_id,
-
-	.get_embedded_display_refresh_rate = get_embedded_display_refresh_rate,
 
 	.prepare_scratch_active_and_requested = bios_parser_prepare_scratch_active_and_requested,
 
