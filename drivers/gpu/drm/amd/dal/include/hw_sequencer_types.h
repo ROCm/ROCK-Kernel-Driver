@@ -59,9 +59,6 @@ struct hw_crtc_timing {
 	/* in KHz */
 	uint32_t pixel_clock;
 
-	enum dc_color_depth color_depth;
-	enum dc_pixel_encoding pixel_encoding;
-
 	struct {
 		uint32_t INTERLACED:1;
 		uint32_t DOUBLESCAN:1;
