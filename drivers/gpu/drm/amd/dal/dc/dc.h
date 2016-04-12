@@ -64,7 +64,7 @@ struct dc_init_data {
 	struct hw_asic_id asic_id;
 	struct dal_override_parameters display_param;
 	void *driver; /* ctx */
-	void *cgs_device;
+	struct cgs_device *cgs_device;
 
 	uint8_t num_virtual_links;
 	/*

@@ -75,7 +75,7 @@ struct irq_list_head {
 struct amdgpu_display_manager {
 	struct dal *dal;
 	struct dc *dc;
-	void *cgs_device;
+	struct cgs_device *cgs_device;
 	/* lock to be used when DAL is called from SYNC IRQ context */
 	spinlock_t dal_lock;
 
