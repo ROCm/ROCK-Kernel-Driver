@@ -57,13 +57,7 @@ struct adapter_service {
 	uint32_t backlight_caps_initialized;
 	uint32_t backlight_8bit_lut[SIZEOF_BACKLIGHT_LUT];
 	uint32_t adapter_feature_set[FEATURE_MAXIMUM/32];
-};
-
-/* Type of feature with its runtime parameter and default value */
-struct feature_source_entry {
-	enum adapter_feature_id feature_id;
-	uint32_t default_value;
-	bool is_boolean_type;
+	uint32_t default_values[FEATURE_MAXIMUM];
 };
 
 #endif /* __DAL_ADAPTER_SERVICE_H__ */

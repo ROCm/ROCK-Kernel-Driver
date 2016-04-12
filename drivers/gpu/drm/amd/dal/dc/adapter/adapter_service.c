@@ -83,8 +83,14 @@
  * In this case, the default value is 0x1FF7 and not a boolean type, which
  * makes it an int type.
  */
+/* Type of feature with its runtime parameter and default value */
+struct feature_source_entry {
+	enum adapter_feature_id feature_id;
+	uint32_t default_value;
+	bool is_boolean_type;
+};
 
-static struct feature_source_entry feature_entry_table[] = {
+static const struct feature_source_entry feature_entry_table[] = {
 	/* Feature name | default value | is boolean type */
 	{FEATURE_ENABLE_HW_EDID_POLLING, false, true},
 	{FEATURE_DP_SINK_DETECT_POLL_DATA_PIN, false, true},
@@ -631,7 +637,7 @@ static bool generate_feature_set(
 				 * above data sources
 				 * Assign default value
 				 */
-				value = entry->default_value;
+				value = as->default_values[entry->feature_id];
 			}
 		}
 
@@ -719,6 +725,7 @@ static bool adapter_service_construct(
 {
 	struct dc_bios *dcb;
 	enum dce_version dce_version;
+	uint32_t i;
 
 	if (!init_data)
 		return false;
@@ -733,6 +740,13 @@ static bool adapter_service_construct(
 		return false;
 	}
 
+	for (i = 0; i < ARRAY_SIZE(feature_entry_table); i++) {
+		enum adapter_feature_id id =
+			feature_entry_table[i].feature_id;
+
+		as->default_values[id] = feature_entry_table[i].default_value;
+	}
+
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	if (dal_adapter_service_get_dce_version(as) == DCE_VERSION_11_0) {
 		uint32_t i;
@@ -740,10 +754,11 @@ static bool adapter_service_construct(
 		for (i = 0; i < ARRAY_SIZE(feature_entry_table); i++) {
 			enum adapter_feature_id id =
 				feature_entry_table[i].feature_id;
+
 			if (id == FEATURE_MAXIMIZE_URGENCY_WATERMARKS ||
 				id == FEATURE_MAXIMIZE_STUTTER_MARKS ||
 				id == FEATURE_MAXIMIZE_NBP_MARKS)
-				feature_entry_table[i].default_value = true;
+				as->default_values[id] = true;
 		}
 	}
 #endif
