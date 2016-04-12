@@ -35,30 +35,4 @@ struct dev_c_lut16 {
 	uint16_t green;
 	uint16_t blue;
 };
-
-/* used by Graphics and Overlay gamma */
-struct gamma_coeff {
-	int32_t gamma[3];
-	int32_t a0[3]; /* index 0 for red, 1 for green, 2 for blue */
-	int32_t a1[3];
-	int32_t a2[3];
-	int32_t a3[3];
-};
-
-enum graphics_regamma_adjust {
-	GRAPHICS_REGAMMA_ADJUST_BYPASS = 0, GRAPHICS_REGAMMA_ADJUST_HW, /* without adjustments */
-	GRAPHICS_REGAMMA_ADJUST_SW /* use adjustments */
-};
-
-enum graphics_gamma_lut {
-	GRAPHICS_GAMMA_LUT_LEGACY = 0, /* use only legacy LUT */
-	GRAPHICS_GAMMA_LUT_REGAMMA, /* use only regamma LUT */
-	GRAPHICS_GAMMA_LUT_LEGACY_AND_REGAMMA /* use legacy & regamma LUT's */
-};
-
-enum graphics_degamma_adjust {
-	GRAPHICS_DEGAMMA_ADJUST_BYPASS = 0, GRAPHICS_DEGAMMA_ADJUST_HW, /*without adjustments */
-	GRAPHICS_DEGAMMA_ADJUST_SW /* use adjustments */
-};
-
 #endif

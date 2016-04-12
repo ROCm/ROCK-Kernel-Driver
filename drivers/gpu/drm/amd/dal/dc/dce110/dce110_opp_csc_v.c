@@ -26,7 +26,6 @@
 #include "dm_services.h"
 #include "dce110_opp.h"
 #include "basics/conversion.h"
-#include "video_csc_types.h"
 
 /* include DCE11 register header files */
 #include "dce/dce_11_0_d.h"
