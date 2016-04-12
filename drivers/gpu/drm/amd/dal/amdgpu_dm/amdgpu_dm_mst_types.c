@@ -413,7 +413,7 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 
 }
 
-struct drm_dp_mst_topology_cbs dm_mst_cbs = {
+static const struct drm_dp_mst_topology_cbs dm_mst_cbs = {
 	.add_connector = dm_dp_add_mst_connector,
 	.destroy_connector = dm_dp_destroy_mst_connector,
 	.hotplug = dm_dp_mst_hotplug,
