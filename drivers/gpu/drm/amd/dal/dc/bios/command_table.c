@@ -44,7 +44,7 @@
 		GetIndexIntoMasterTable(COMMAND, command), &frev, &crev)
 
 #define BIOS_CMD_TABLE_PARA_REVISION(command)\
-	dm_bios_cmd_table_para_revision(bp->ctx, \
+	bios_cmd_table_para_revision(bp->ctx->cgs_device, \
 		GetIndexIntoMasterTable(COMMAND, command))
 
 static void init_dig_encoder_control(struct bios_parser *bp);
@@ -88,6 +88,18 @@ void dal_bios_parser_init_cmd_tbl(struct bios_parser *bp)
 	init_external_encoder_control(bp);
 	init_enable_disp_power_gating(bp);
 	init_set_dce_clock(bp);
+}
+
+static uint32_t bios_cmd_table_para_revision(void *cgs_device,
+					     uint32_t index)
+{
+	uint8_t frev, crev;
+
+	if (cgs_atom_get_cmd_table_revs(cgs_device,
+					index,
+					&frev, &crev) != 0)
+		return 0;
+	return crev;
 }
 
 /*******************************************************************************

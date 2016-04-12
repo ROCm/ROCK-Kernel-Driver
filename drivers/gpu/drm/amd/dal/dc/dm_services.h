@@ -139,32 +139,6 @@ static inline uint32_t set_reg_field_value_ex(
 		reg_name ## __ ## reg_field ## _MASK,\
 		reg_name ## __ ## reg_field ## __SHIFT)
 
-/*
- * atombios services
- */
-
-bool dm_exec_bios_cmd_table(
-	struct dc_context *ctx,
-	uint32_t index,
-	void *params);
-
-static inline uint32_t dm_bios_cmd_table_para_revision(
-	struct dc_context *ctx,
-	uint32_t index)
-{
-	uint8_t frev;
-	uint8_t crev;
-
-	if (cgs_atom_get_cmd_table_revs(
-			ctx->cgs_device,
-			index,
-			&frev,
-			&crev) != 0)
-		return 0;
-
-	return crev;
-}
-
 /**************************************
  * Power Play (PP) interfaces
  **************************************/
