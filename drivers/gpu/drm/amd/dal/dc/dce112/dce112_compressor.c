@@ -814,13 +814,13 @@ bool dce112_compressor_construct(struct dce112_compressor *compressor,
 	struct embedded_panel_info panel_info;
 
 	compressor->base.options.bits.FBC_SUPPORT = true;
-	if (!(dal_adapter_service_is_feature_supported(
+	if (!(dal_adapter_service_is_feature_supported(as,
 		FEATURE_DISABLE_LPT_SUPPORT)))
 		compressor->base.options.bits.LPT_SUPPORT = true;
 	 /* For DCE 11 always use one DRAM channel for LPT */
 	compressor->base.lpt_channels_num = 1;
 
-	if (dal_adapter_service_is_feature_supported(FEATURE_DUMMY_FBC_BACKEND))
+	if (dal_adapter_service_is_feature_supported(as, FEATURE_DUMMY_FBC_BACKEND))
 		compressor->base.options.bits.DUMMY_BACKEND = true;
 
 	/* Check if this system has more than 1 DRAM channel; if only 1 then LPT
@@ -828,7 +828,7 @@ bool dce112_compressor_construct(struct dce112_compressor *compressor,
 	if (compressor->base.memory_bus_width == 64)
 		compressor->base.options.bits.LPT_SUPPORT = false;
 
-	if (dal_adapter_service_is_feature_supported(
+	if (dal_adapter_service_is_feature_supported(as,
 		FEATURE_DISABLE_FBC_COMP_CLK_GATE))
 		compressor->base.options.bits.CLK_GATING_DISABLED = true;
 

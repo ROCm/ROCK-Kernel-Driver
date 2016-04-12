@@ -782,11 +782,11 @@ static bool display_clock_integrated_info_construct(
 
 	disp_clk->dfs_bypass_enabled =
 		dal_adapter_service_is_dfs_bypass_enabled(as) &&
-		dal_adapter_service_is_feature_supported(
+		dal_adapter_service_is_feature_supported(as,
 			FEATURE_ENABLE_DFS_BYPASS);
 
 	disp_clk->use_max_disp_clk =
-		dal_adapter_service_is_feature_supported(
+		dal_adapter_service_is_feature_supported(as,
 			FEATURE_USE_MAX_DISPLAY_CLK);
 	return true;
 }

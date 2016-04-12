@@ -30,7 +30,8 @@
 
 bool dce110_mem_input_v_construct(
 	struct dce110_mem_input *mem_input110,
-	struct dc_context *ctx);
+	struct dc_context *ctx,
+	struct adapter_service *as);
 
 /*
  * This function will program nbp stutter and urgency watermarks to minimum

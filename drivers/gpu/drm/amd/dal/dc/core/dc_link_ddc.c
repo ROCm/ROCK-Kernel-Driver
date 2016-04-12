@@ -285,11 +285,11 @@ static bool construct(
 	ddc_service->flags.EDID_QUERY_DONE_ONCE = false;
 
 	ddc_service->flags.FORCE_READ_REPEATED_START =
-		dal_adapter_service_is_feature_supported(
+		dal_adapter_service_is_feature_supported(ddc_service->as,
 			FEATURE_DDC_READ_FORCE_REPEATED_START);
 
 	ddc_service->flags.EDID_STRESS_READ =
-			dal_adapter_service_is_feature_supported(
+		dal_adapter_service_is_feature_supported(ddc_service->as,
 				FEATURE_EDID_STRESS_READ);
 
 	ddc_service->flags.IS_INTERNAL_DISPLAY =

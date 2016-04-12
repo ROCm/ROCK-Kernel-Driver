@@ -55,7 +55,6 @@
 
 #include "diagnostics/hw_ctx_adapter_service_diag.h"
 
-#define SIZEOF_BACKLIGHT_LUT 101
 #define ABSOLUTE_BACKLIGHT_MAX 255
 #define DEFAULT_MIN_BACKLIGHT 12
 #define DEFAULT_MAX_BACKLIGHT 255
@@ -1067,7 +1066,7 @@ uint8_t dal_adapter_service_get_clock_sources_num(
 	num += (uint32_t)wireless_get_clocks_num(as);
 
 	/* Check the "max number of clock sources" feature */
-	if (dal_adapter_service_get_feature_value(
+	if (dal_adapter_service_get_feature_value(as,
 			FEATURE_MAX_CLOCK_SOURCE_NUM,
 			&max_clk_src,
 			sizeof(uint32_t)))
@@ -1110,12 +1109,12 @@ uint8_t dal_adapter_service_get_func_controllers_num(
  * Return if a given feature is supported by the ASIC. The feature has to be
  * a boolean type.
  */
-bool dal_adapter_service_is_feature_supported(
-	enum adapter_feature_id feature_id)
+bool dal_adapter_service_is_feature_supported(struct adapter_service *as,
+					      enum adapter_feature_id feature_id)
 {
 	bool data = 0;
 
-	dal_adapter_service_get_feature_value(feature_id, &data, sizeof(bool));
+	dal_adapter_service_get_feature_value(as, feature_id, &data, sizeof(bool));
 
 	return data;
 }
@@ -1281,7 +1280,7 @@ bool dal_adapter_service_is_dfs_bypass_enabled(
 	if (as->integrated_info == NULL)
 		return false;
 	if ((as->integrated_info->gpu_cap_info & DFS_BYPASS_ENABLE) &&
-		dal_adapter_service_is_feature_supported(
+	    dal_adapter_service_is_feature_supported(as,
 			FEATURE_ENABLE_DFS_BYPASS))
 		return true;
 	else
@@ -1371,10 +1370,10 @@ uint8_t dal_adapter_service_get_stream_engines_num(
  * Get the cached value of a given feature. This value can be a boolean, int,
  * or characters.
  */
-bool dal_adapter_service_get_feature_value(
-	const enum adapter_feature_id feature_id,
-	void *data,
-	uint32_t size)
+bool dal_adapter_service_get_feature_value(struct adapter_service *as,
+					   const enum adapter_feature_id feature_id,
+					   void *data,
+					   uint32_t size)
 {
 	uint32_t entry_idx = 0;
 	uint32_t set_idx = 0;
@@ -1499,7 +1498,7 @@ bool dal_adapter_service_should_optimize(
 	uint32_t supported_optimization = 0;
 	struct dal_asic_runtime_flags flags;
 
-	if (!dal_adapter_service_get_feature_value(FEATURE_OPTIMIZATION,
+	if (!dal_adapter_service_get_feature_value(as, FEATURE_OPTIMIZATION,
 			&supported_optimization, sizeof(uint32_t)))
 		return false;
 

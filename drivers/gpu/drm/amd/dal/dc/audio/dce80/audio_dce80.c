@@ -275,7 +275,8 @@ static enum audio_result initialize(
 	/* override HW default settings */
 	audio->hw_ctx->funcs->hw_initialize(audio->hw_ctx);
 
-	if (dal_adapter_service_is_feature_supported(FEATURE_LIGHT_SLEEP))
+	if (dal_adapter_service_is_feature_supported(audio->adapter_service,
+						     FEATURE_LIGHT_SLEEP))
 		audio->hw_ctx->funcs->disable_az_clock_gating(audio->hw_ctx);
 
 	return AUDIO_RESULT_OK;

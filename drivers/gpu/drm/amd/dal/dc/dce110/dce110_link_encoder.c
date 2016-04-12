@@ -619,7 +619,7 @@ static void link_encoder_edp_wait_for_hpd_ready(
 		return;
 	}
 
-	if (!power_up && dal_adapter_service_is_feature_supported(
+	if (!power_up && dal_adapter_service_is_feature_supported(as,
 		FEATURE_NO_HPD_LOW_POLLING_VCC_OFF))
 		/* from KV, we will not HPD low after turning off VCC -
 		 * instead, we will check the SW timer in power_up(). */
@@ -1016,6 +1016,7 @@ bool dce110_link_encoder_construct(
 	const struct dce110_link_enc_bl_registers *bl_regs)
 {
 	struct graphics_object_encoder_cap_info enc_cap_info = {0};
+	struct adapter_service *as = init_data->adapter_service;
 
 	enc110->base.funcs = &dce110_lnk_enc_funcs;
 	enc110->base.ctx = init_data->ctx;
@@ -1025,7 +1026,7 @@ bool dce110_link_encoder_construct(
 	enc110->base.connector = init_data->connector;
 	enc110->base.input_signals = SIGNAL_TYPE_ALL;
 
-	enc110->base.adapter_service = init_data->adapter_service;
+	enc110->base.adapter_service = as;
 
 	enc110->base.preferred_engine = ENGINE_ID_UNKNOWN;
 
@@ -1047,7 +1048,7 @@ bool dce110_link_encoder_construct(
 	 * while doing the DP sink detect
 	 */
 
-	if (dal_adapter_service_is_feature_supported(
+	if (dal_adapter_service_is_feature_supported(as,
 		FEATURE_DP_SINK_DETECT_POLL_DATA_PIN))
 		enc110->base.features.flags.bits.
 			DP_SINK_DETECT_POLL_DATA_PIN = true;
@@ -1118,11 +1119,11 @@ bool dce110_link_encoder_construct(
 	enc110->base.features.flags.bits.IS_TPS3_CAPABLE = true;
 
 	enc110->base.features.flags.bits.IS_Y_ONLY_CAPABLE =
-		dal_adapter_service_is_feature_supported(
+		dal_adapter_service_is_feature_supported(as,
 			FEATURE_SUPPORT_DP_Y_ONLY);
 
 	enc110->base.features.flags.bits.IS_YCBCR_CAPABLE =
-		dal_adapter_service_is_feature_supported(
+		dal_adapter_service_is_feature_supported(as,
 			FEATURE_SUPPORT_DP_YUV);
 	return true;
 }

@@ -251,7 +251,7 @@ bool dce80_link_encoder_construct(
 	 * while doing the DP sink detect
 	 */
 
-	if (dal_adapter_service_is_feature_supported(
+	if (dal_adapter_service_is_feature_supported(enc110->base.adapter_service,
 		FEATURE_DP_SINK_DETECT_POLL_DATA_PIN))
 		enc110->base.features.flags.bits.
 			DP_SINK_DETECT_POLL_DATA_PIN = true;
@@ -325,11 +325,11 @@ bool dce80_link_encoder_construct(
 	enc110->base.features.max_deep_color = COLOR_DEPTH_121212;
 
 	enc110->base.features.flags.bits.IS_Y_ONLY_CAPABLE =
-		dal_adapter_service_is_feature_supported(
+		dal_adapter_service_is_feature_supported(enc110->base.adapter_service,
 			FEATURE_SUPPORT_DP_Y_ONLY);
 
 	enc110->base.features.flags.bits.IS_YCBCR_CAPABLE =
-		dal_adapter_service_is_feature_supported(
+		dal_adapter_service_is_feature_supported(enc110->base.adapter_service,
 			FEATURE_SUPPORT_DP_YUV);
 
 	return true;

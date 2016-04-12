@@ -384,11 +384,11 @@ bool dal_adapter_service_get_integrated_info(
 	struct integrated_info *info);
 
 /* Return if a given feature is supported by the ASIC */
-bool dal_adapter_service_is_feature_supported(
+bool dal_adapter_service_is_feature_supported(struct adapter_service *as,
 	enum adapter_feature_id feature_id);
 
 /* Get the cached value of a given feature */
-bool dal_adapter_service_get_feature_value(
+bool dal_adapter_service_get_feature_value(struct adapter_service *as,
 	const enum adapter_feature_id feature_id,
 	void *data,
 	uint32_t size);

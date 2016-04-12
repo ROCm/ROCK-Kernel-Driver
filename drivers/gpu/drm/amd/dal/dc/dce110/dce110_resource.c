@@ -335,6 +335,7 @@ static struct stream_encoder *dce110_stream_encoder_create(
 
 static struct mem_input *dce110_mem_input_create(
 	struct dc_context *ctx,
+	struct adapter_service *as,
 	uint32_t inst,
 	const struct dce110_mem_input_reg_offsets *offset)
 {
@@ -345,7 +346,7 @@ static struct mem_input *dce110_mem_input_create(
 		return NULL;
 
 	if (dce110_mem_input_construct(mem_input110,
-			ctx, inst, offset))
+				       ctx, as, inst, offset))
 		return &mem_input110->base;
 
 	BREAK_TO_DEBUGGER();
@@ -958,7 +959,7 @@ static void underlay_create(struct dc_context *ctx, struct resource_pool *pool)
 
 	dce110_opp_v_construct(dce110_oppv, ctx);
 	dce110_timing_generator_v_construct(dce110_tgv, pool->adapter_srv, ctx);
-	dce110_mem_input_v_construct(dce110_miv, ctx);
+	dce110_mem_input_v_construct(dce110_miv, ctx, pool->adapter_srv);
 	dce110_transform_v_construct(dce110_xfmv, ctx);
 
 	pool->opps[pool->pipe_count] = &dce110_oppv->base;
@@ -1122,7 +1123,7 @@ static bool construct(
 			goto controller_create_fail;
 		}
 
-		pool->base.mis[i] = dce110_mem_input_create(ctx, i,
+		pool->base.mis[i] = dce110_mem_input_create(ctx, as, i,
 				&dce110_mi_reg_offsets[i]);
 		if (pool->base.mis[i] == NULL) {
 			BREAK_TO_DEBUGGER();

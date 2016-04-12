@@ -871,7 +871,8 @@ static struct mem_input_funcs dce110_mem_input_v_funcs = {
 
 bool dce110_mem_input_v_construct(
 	struct dce110_mem_input *mem_input110,
-	struct dc_context *ctx)
+	struct dc_context *ctx,
+	struct adapter_service *as)
 {
 	mem_input110->base.funcs = &dce110_mem_input_v_funcs;
 	mem_input110->base.ctx = ctx;
@@ -881,7 +882,7 @@ bool dce110_mem_input_v_construct(
 	mem_input110->offsets = dce110_mi_v_reg_offsets[0];
 
 	mem_input110->supported_stutter_mode = 0;
-	dal_adapter_service_get_feature_value(FEATURE_STUTTER_MODE,
+	dal_adapter_service_get_feature_value(as, FEATURE_STUTTER_MODE,
 			&(mem_input110->supported_stutter_mode),
 			sizeof(mem_input110->supported_stutter_mode));
 

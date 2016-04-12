@@ -372,6 +372,7 @@ static struct stream_encoder *dce100_stream_encoder_create(
 
 static struct mem_input *dce100_mem_input_create(
 	struct dc_context *ctx,
+	struct adapter_service *as,
 	uint32_t inst,
 	const struct dce110_mem_input_reg_offsets *offset)
 {
@@ -382,7 +383,7 @@ static struct mem_input *dce100_mem_input_create(
 		return NULL;
 
 	if (dce110_mem_input_construct(mem_input110,
-			ctx, inst, offset))
+				       ctx, as, inst, offset))
 		return &mem_input110->base;
 
 	BREAK_TO_DEBUGGER();
@@ -849,7 +850,7 @@ static bool construct(
 			goto controller_create_fail;
 		}
 
-		pool->base.mis[i] = dce100_mem_input_create(ctx, i,
+		pool->base.mis[i] = dce100_mem_input_create(ctx, as, i,
 				&dce100_mi_reg_offsets[i]);
 		if (pool->base.mis[i] == NULL) {
 			BREAK_TO_DEBUGGER();

@@ -442,10 +442,11 @@ static void dce112_mem_input_program_display_marks(
 bool dce112_mem_input_construct(
 	struct dce110_mem_input *mem_input110,
 	struct dc_context *ctx,
+	struct adapter_service *as,
 	uint32_t inst,
 	const struct dce110_mem_input_reg_offsets *offsets)
 {
-	if (!dce110_mem_input_construct(mem_input110, ctx, inst, offsets))
+  if (!dce110_mem_input_construct(mem_input110, ctx, as, inst, offsets))
 		return false;
 
 	mem_input110->base.funcs->mem_input_program_display_marks =

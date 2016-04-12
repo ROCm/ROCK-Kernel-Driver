@@ -164,7 +164,7 @@ static bool construct(
 	reference_frequency =
 		dal_i2caux_get_reference_clock(as) >> 1;
 
-	use_i2c_sw_engine = dal_adapter_service_is_feature_supported(
+	use_i2c_sw_engine = dal_adapter_service_is_feature_supported(as,
 		FEATURE_RESTORE_USAGE_I2C_SW_ENGINE);
 
 	base = &i2caux_dce110->base;

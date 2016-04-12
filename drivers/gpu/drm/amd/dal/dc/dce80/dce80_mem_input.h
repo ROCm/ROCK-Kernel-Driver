@@ -30,6 +30,7 @@
 bool dce80_mem_input_construct(
 	struct dce110_mem_input *mem_input80,
 	struct dc_context *ctx,
+	struct adapter_service *as,
 	uint32_t inst,
 	const struct dce110_mem_input_reg_offsets *offsets);
 
