@@ -142,11 +142,9 @@ static void remove_bo_from_vm(struct amdgpu_device *adev,
 }
 
 
-static int try_pin_bo(struct amdgpu_bo *bo, uint64_t *mc_address, bool resv,
-		uint32_t domain)
+static int try_pin_bo(struct amdgpu_bo *bo, bool resv, uint32_t domain)
 {
 	int ret = 0;
-	uint64_t temp;
 
 	if (resv) {
 		ret = amdgpu_bo_reserve(bo, true);
@@ -155,9 +153,7 @@ static int try_pin_bo(struct amdgpu_bo *bo, uint64_t *mc_address, bool resv,
 	}
 
 	if (!amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
-		ret = amdgpu_bo_pin(bo, domain, &temp);
-		if (mc_address)
-			*mc_address = temp;
+		ret = amdgpu_bo_pin(bo, domain, NULL);
 		if (ret != 0)
 			goto error;
 		if (domain == AMDGPU_GEM_DOMAIN_GTT) {
@@ -239,7 +235,7 @@ static int try_pin_pts(struct amdgpu_bo_va *bo_va, bool resv)
 
 		/* walk over the address space and pin the page tables BOs*/
 		for (pt_idx = start; pt_idx <= last; pt_idx++) {
-			ret = try_pin_bo(vm->page_tables[pt_idx].entry.robj, NULL, resv,
+			ret = try_pin_bo(vm->page_tables[pt_idx].entry.robj, resv,
 					AMDGPU_GEM_DOMAIN_VRAM);
 			if (ret != 0) {
 				failed = pt_idx;
@@ -256,7 +252,7 @@ static int try_pin_pts(struct amdgpu_bo_va *bo_va, bool resv)
 
 		/* walk over the address space and pin the page tables BOs*/
 		for (pt_idx = start; pt_idx <= last; pt_idx++) {
-			ret = try_pin_bo(vm->page_tables[pt_idx].entry.robj, NULL, resv,
+			ret = try_pin_bo(vm->page_tables[pt_idx].entry.robj, resv,
 					AMDGPU_GEM_DOMAIN_VRAM);
 			if (ret != 0) {
 				failed = pt_idx;
@@ -632,7 +628,6 @@ static int update_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		struct amdgpu_bo_va *bo_va)
 {
-	struct amdgpu_vm_id *vm_id;
 	struct amdgpu_vm *vm;
 	int ret;
 
@@ -645,9 +640,7 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 
 	/* Pin the PD directory*/
 	vm = bo_va->vm;
-	vm_id = &vm->ids[7];
-	ret = try_pin_bo(vm->page_directory, &vm_id->pd_gpu_addr, false,
-			AMDGPU_GEM_DOMAIN_VRAM);
+	ret = try_pin_bo(vm->page_directory, false, AMDGPU_GEM_DOMAIN_VRAM);
 	if (ret != 0) {
 		pr_err("amdkfd: Failed to pin PD\n");
 		goto err_failed_to_pin_pd;
@@ -904,7 +897,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 			 * create a mapping of virtual to MC address
 			 */
 			/* Pin BO*/
-			ret = try_pin_bo(bo, NULL, false, domain);
+			ret = try_pin_bo(bo, false, domain);
 			if (ret != 0) {
 				pr_err("amdkfd: Failed to pin BO\n");
 				goto pin_bo_failed;
@@ -975,7 +968,7 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm)
 		pr_err("amdgpu: Failed to amdgpu_vm_clear_freed\n");
 
 	pr_debug("amdgpu: created process vm with address 0x%llx\n",
-			new_vm->ids[7].pd_gpu_addr);
+			amdgpu_bo_gpu_offset(new_vm->page_directory));
 
 	return ret;
 }
@@ -998,12 +991,11 @@ void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 uint32_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm)
 {
 	struct amdgpu_vm *avm = (struct amdgpu_vm *) vm;
-	struct amdgpu_vm_id *vm_id;
 
 	BUG_ON(avm == NULL);
 
-	vm_id = &avm->ids[7];
-	return vm_id->pd_gpu_addr >> AMDGPU_GPU_PAGE_SHIFT;
+	return amdgpu_bo_gpu_offset(avm->page_directory)
+			>> AMDGPU_GPU_PAGE_SHIFT;
 }
 
 int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
@@ -1549,7 +1541,7 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 			goto resume_kfd;
 		}
 
-		r = try_pin_bo(mem->data2.bo, NULL, false, domain);
+		r = try_pin_bo(mem->data2.bo, false, domain);
 		if (unlikely(r != 0)) {
 			pr_err("Failed to pin BO\n");
 			entry->is_mapped = false;
