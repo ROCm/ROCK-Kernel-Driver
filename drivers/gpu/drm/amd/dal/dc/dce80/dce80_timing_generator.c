@@ -116,7 +116,7 @@ static void program_timing(struct timing_generator *tg,
 	dce110_tg_program_timing(tg, timing, use_vbios);
 }
 
-static struct timing_generator_funcs dce80_tg_funcs = {
+static const struct timing_generator_funcs dce80_tg_funcs = {
 		.validate_timing = dce110_tg_validate_timing,
 		.program_timing = program_timing,
 		.enable_crtc = dce110_timing_generator_enable_crtc,

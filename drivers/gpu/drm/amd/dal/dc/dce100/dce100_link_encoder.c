@@ -41,7 +41,7 @@
 #define DCE10_UNIPHY_MAX_PIXEL_CLK_IN_KHZ 300000
 
 
-static struct link_encoder_funcs dce100_lnk_enc_funcs = {
+static const struct link_encoder_funcs dce100_lnk_enc_funcs = {
 	.validate_output_with_stream =
 		dce110_link_encoder_validate_output_with_stream,
 	.hw_init = dce110_link_encoder_hw_init,

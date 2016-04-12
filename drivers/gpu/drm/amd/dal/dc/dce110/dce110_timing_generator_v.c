@@ -688,7 +688,7 @@ static void dce110_timing_generator_v_disable_vga(
  * DCE11 Timing Generator Constructor / Destructor
  *
  *********************************************************************************************/
-static struct timing_generator_funcs dce110_tg_v_funcs = {
+static const struct timing_generator_funcs dce110_tg_v_funcs = {
 		.validate_timing = dce110_tg_validate_timing,
 		.program_timing = dce110_timing_generator_v_program_timing,
 		.enable_crtc = dce110_timing_generator_v_enable_crtc,

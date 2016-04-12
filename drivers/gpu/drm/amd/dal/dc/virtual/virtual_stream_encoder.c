@@ -66,7 +66,7 @@ static void virtual_stream_encoder_dp_unblank(
 	struct stream_encoder *enc,
 	const struct encoder_unblank_param *param) {}
 
-static struct stream_encoder_funcs virtual_str_enc_funcs = {
+static const struct stream_encoder_funcs virtual_str_enc_funcs = {
 	.dp_set_stream_attribute =
 		virtual_stream_encoder_dp_set_stream_attribute,
 	.hdmi_set_stream_attribute =

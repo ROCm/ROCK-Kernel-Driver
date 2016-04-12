@@ -67,7 +67,7 @@ struct encoder_feature_support {
 };
 
 struct link_encoder {
-	struct link_encoder_funcs *funcs;
+	const struct link_encoder_funcs *funcs;
 	struct adapter_service *adapter_service;
 	int32_t aux_channel_offset;
 	struct dc_context *ctx;

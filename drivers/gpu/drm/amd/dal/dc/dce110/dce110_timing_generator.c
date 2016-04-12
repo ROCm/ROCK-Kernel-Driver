@@ -122,7 +122,7 @@ enum trigger_polarity_select {
 
 /******************************************************************************/
 
-static struct timing_generator_funcs dce110_tg_funcs = {
+static const struct timing_generator_funcs dce110_tg_funcs = {
 		.validate_timing = dce110_tg_validate_timing,
 		.program_timing = dce110_tg_program_timing,
 		.enable_crtc = dce110_timing_generator_enable_crtc,

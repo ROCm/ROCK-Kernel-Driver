@@ -1053,7 +1053,7 @@ static void dce80_stream_encoder_dp_unblank(
 	dm_write_reg(ctx, addr, value);
 }
 
-static struct stream_encoder_funcs dce80_str_enc_funcs = {
+static const struct stream_encoder_funcs dce80_str_enc_funcs = {
 	.dp_set_stream_attribute =
 		dce80_stream_encoder_dp_set_stream_attribute,
 	.hdmi_set_stream_attribute =

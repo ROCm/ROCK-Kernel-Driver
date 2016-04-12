@@ -142,7 +142,7 @@ bool dce112_link_encoder_validate_output_with_stream(
 	return is_valid;
 }
 
-static struct link_encoder_funcs dce112_lnk_enc_funcs = {
+static const struct link_encoder_funcs dce112_lnk_enc_funcs = {
 	.validate_output_with_stream =
 		dce112_link_encoder_validate_output_with_stream,
 	.hw_init = dce110_link_encoder_hw_init,

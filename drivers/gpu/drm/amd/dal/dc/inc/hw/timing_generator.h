@@ -104,7 +104,7 @@ enum crtc_state {
 };
 
 struct timing_generator {
-	struct timing_generator_funcs *funcs;
+	const struct timing_generator_funcs *funcs;
 	struct dc_bios *bp;
 	struct dc_context *ctx;
 };

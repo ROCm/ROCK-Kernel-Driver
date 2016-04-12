@@ -89,7 +89,7 @@ enum {
 #define DP_REG(reg)\
 	(reg + enc110->offsets.dp)
 
-static struct link_encoder_funcs dce110_lnk_enc_funcs = {
+static const struct link_encoder_funcs dce110_lnk_enc_funcs = {
 	.validate_output_with_stream =
 		dce110_link_encoder_validate_output_with_stream,
 	.hw_init = dce110_link_encoder_hw_init,

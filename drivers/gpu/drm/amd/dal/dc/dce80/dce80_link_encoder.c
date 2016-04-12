@@ -193,7 +193,7 @@ static void dce80_link_encoder_enable_dp_output(
 	}
 }
 
-static struct link_encoder_funcs dce80_lnk_enc_funcs = {
+static const struct link_encoder_funcs dce80_lnk_enc_funcs = {
 	.validate_output_with_stream =
 		dce110_link_encoder_validate_output_with_stream,
 	.hw_init = dce110_link_encoder_hw_init,

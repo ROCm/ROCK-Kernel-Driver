@@ -45,7 +45,7 @@ struct encoder_set_dp_phy_pattern_param {
 };
 
 struct stream_encoder {
-	struct stream_encoder_funcs *funcs;
+	const struct stream_encoder_funcs *funcs;
 	struct dc_context *ctx;
 	struct dc_bios *bp;
 	enum engine_id id;
