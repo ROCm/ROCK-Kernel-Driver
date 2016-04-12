@@ -933,47 +933,6 @@ enum dce_environment dal_adapter_service_get_dce_environment(
 	return as->dce_environment;
 }
 
-/*
- * dal_adapter_service_get_controllers_num
- *
- * Get number of controllers
- */
-uint8_t dal_adapter_service_get_controllers_num(
-	struct adapter_service *as)
-{
-	uint32_t result = as->asic_cap->data[ASIC_DATA_CONTROLLERS_NUM];
-
-	/* Check the "max num of controllers" feature,
-	 * use it for debugging purposes only */
-	/* TODO implement
-	 * dal_adapter_service_get_feature_value(as, ) */
-
-	return result;
-}
-
-/** Get total number of connectors.
- *
- * \param as	Adapter Service
- *
- * \return Total number of connectors. It is up-to-the caller to decide
- *	if the number is valid.
- */
-uint8_t dal_adapter_service_get_connectors_num(
-	struct adapter_service *as)
-{
-	uint8_t vbios_connectors_num = 0;
-	uint8_t wireless_connectors_num = 0;
-	struct dc_bios *dcb;
-
-	dcb = dal_adapter_service_get_bios_parser(as);
-
-	vbios_connectors_num = dcb->funcs->get_connectors_number(dcb);
-
-	wireless_connectors_num = wireless_get_connectors_num(as);
-
-	return vbios_connectors_num + wireless_connectors_num;
-}
-
 static bool is_wireless_object(struct graphics_object_id id)
 {
 	if ((id.type == OBJECT_TYPE_ENCODER &&
@@ -984,27 +943,6 @@ static bool is_wireless_object(struct graphics_object_id id)
 			CONNECTOR_ID_MIRACAST))
 		return true;
 	return false;
-}
-
-/**
- * Get the number of source objects of an object
- *
- * \param [in] as: Adapter Service
- *
- * \param [in] id: The graphics object id
- *
- * \return
- *     The number of the source objects of an object
- */
-uint32_t dal_adapter_service_get_src_num(
-	struct adapter_service *as, struct graphics_object_id id)
-{
-	struct dc_bios *dcb = dal_adapter_service_get_bios_parser(as);
-
-	if (is_wireless_object(id))
-		return wireless_get_srcs_num(as, id);
-	else
-		return dcb->funcs->get_src_number(dcb, id);
 }
 
 /**
@@ -1092,29 +1030,6 @@ bool dal_adapter_service_is_device_id_supported(struct adapter_service *as,
 	return dcb->funcs->is_device_id_supported(dcb, id);
 }
 
-bool dal_adapter_service_is_meet_underscan_req(struct adapter_service *as)
-{
-	struct firmware_info fw_info;
-	enum bp_result bp_result = dal_adapter_service_get_firmware_info(
-		as, &fw_info);
-	uint32_t disp_clk_limit =
-		as->asic_cap->data[ASIC_DATA_MIN_DISPCLK_FOR_UNDERSCAN];
-	if (BP_RESULT_OK == bp_result) {
-		dal_logger_write(as->ctx->logger,
-			LOG_MAJOR_ERROR,
-			LOG_MINOR_COMPONENT_ADAPTER_SERVICE,
-			"Read firmware is NULL");
-		return false;
-	}
-	if (fw_info.default_display_engine_pll_frequency < disp_clk_limit)
-		return false;
-	return true;
-}
-
-bool dal_adapter_service_underscan_for_hdmi_only(struct adapter_service *as)
-{
-	return as->asic_cap->caps.UNDERSCAN_FOR_HDMI_ONLY;
-}
 /*
  * dal_adapter_service_get_clock_sources_num
  *
@@ -1195,43 +1110,6 @@ bool dal_adapter_service_is_feature_supported(
 	dal_adapter_service_get_feature_value(feature_id, &data, sizeof(bool));
 
 	return data;
-}
-
-/**
- * Reports maximum number of confunctional non-DP displays.
- * Value can be overriden if FEATURE_REPORT_SINGLE_SELECTED_TIMING feature is
- * enabled.
- *
- * \return
- *     Maximum number of confunctional non-DP displays
- */
-uint32_t dal_adapter_service_get_max_cofunc_non_dp_displays(void)
-{
-	uint32_t non_dp_displays = DEFAULT_NUM_COFUNC_NON_DP_DISPLAYS;
-
-	if (true == dal_adapter_service_get_feature_value(
-			FEATURE_MAX_COFUNC_NON_DP_DISPLAYS,
-			&non_dp_displays,
-			sizeof(non_dp_displays))) {
-		/* the cached value exist */
-		/* TODO: add more logic as per-DAL2 */
-	}
-
-	return non_dp_displays;
-}
-
-uint32_t dal_adapter_service_get_single_selected_timing_signals(void)
-{
-	uint32_t signals_bitmap = 0;
-
-	if (dal_adapter_service_is_feature_supported(
-			FEATURE_REPORT_SINGLE_SELECTED_TIMING)) {
-		/* the cached value exist */
-		/* TODO: add more logic as per-DAL2 */
-		signals_bitmap = 0;
-	}
-
-	return signals_bitmap;
 }
 
 /*
@@ -1427,17 +1305,6 @@ uint32_t dal_adapter_service_get_hw_i2c_speed(
 }
 
 /*
- * dal_adapter_service_get_mc_latency
- *
- * Get memory controller latency
- */
-uint32_t dal_adapter_service_get_mc_latency(
-	struct adapter_service *as)
-{
-	return as->asic_cap->data[ASIC_DATA_MC_LATENCY];
-}
-
-/*
  * dal_adapter_service_get_asic_vram_bit_width
  *
  * Get the video RAM bit width set on the ASIC
@@ -1448,159 +1315,10 @@ uint32_t dal_adapter_service_get_asic_vram_bit_width(
 	return as->asic_cap->data[ASIC_DATA_VRAM_BITWIDTH];
 }
 
-/*
- * dal_adapter_service_get_asic_bugs
- *
- * Get the bug flags set on this ASIC
- */
-struct asic_bugs dal_adapter_service_get_asic_bugs(
-	struct adapter_service *as)
-{
-	return as->asic_cap->bugs;
-}
-
 struct dal_asic_runtime_flags dal_adapter_service_get_asic_runtime_flags(
 		struct adapter_service *as)
 {
 	return as->asic_cap->runtime_flags;
-}
-
-/*
- * dal_adapter_service_get_line_buffer_size
- *
- * Get line buffer size
- */
-uint32_t dal_adapter_service_get_line_buffer_size(
-	struct adapter_service *as)
-{
-	return as->asic_cap->data[ASIC_DATA_LINEBUFFER_SIZE];
-}
-
-/*
- * dal_adapter_service_get_bandwidth_tuning_params
- *
- * Get parameters for bandwidth tuning
- */
-bool dal_adapter_service_get_bandwidth_tuning_params(
-	struct adapter_service *as,
-	union bandwidth_tuning_params *params)
-{
-	/* TODO: add implementation */
-	/* note: data comes from runtime parameters */
-	return false;
-}
-
-/*
- * dal_adapter_service_get_feature_flags
- *
- * Get a copy of ASIC feature flags
- */
-struct asic_feature_flags dal_adapter_service_get_feature_flags(
-	struct adapter_service *as)
-{
-	struct asic_feature_flags result = { { 0 } };
-
-	if (!as) {
-		ASSERT_CRITICAL(false);
-		return result;
-	}
-
-	result.raw = as->asic_cap->data[ASIC_DATA_FEATURE_FLAGS];
-
-	return result;
-}
-
-/*
- * dal_adapter_service_get_dram_bandwidth_efficiency
- *
- * Get efficiency of DRAM
- */
-uint32_t dal_adapter_service_get_dram_bandwidth_efficiency(
-	struct adapter_service *as)
-{
-	return as->asic_cap->data[ASIC_DATA_DRAM_BANDWIDTH_EFFICIENCY];
-}
-
-/*
- * dal_adapter_service_obtain_gpio
- *
- * Obtain GPIO
- */
-struct gpio *dal_adapter_service_obtain_gpio(
-	struct adapter_service *as,
-	enum gpio_id id,
-	uint32_t en)
-{
-	return dal_gpio_service_create_gpio_ex(
-		as->gpio_service, id, en,
-		GPIO_PIN_OUTPUT_STATE_DEFAULT);
-}
-
-/*
- * dal_adapter_service_obtain_stereo_gpio
- *
- * Obtain GPIO for stereo3D
- */
-struct gpio *dal_adapter_service_obtain_stereo_gpio(
-	struct adapter_service *as)
-{
-	const bool have_param_stereo_gpio = false;
-
-	struct asic_feature_flags result;
-
-	result.raw = as->asic_cap->data[ASIC_DATA_FEATURE_FLAGS];
-
-	/* Case 1 : Workstation stereo */
-	if (result.bits.WORKSTATION_STEREO) {
-		/* "active low" <--> "default 3d right eye polarity" = false */
-		return dal_gpio_service_create_gpio_ex(as->gpio_service,
-				GPIO_ID_GENERIC, GPIO_GENERIC_A,
-				GPIO_PIN_OUTPUT_STATE_ACTIVE_LOW);
-	/* Case 2 : runtime parameter override for sideband stereo */
-	} else if (have_param_stereo_gpio) {
-		/* TODO implement */
-		return NULL;
-		/* Case 3 : VBIOS gives us GPIO for sideband stereo */
-	} else {
-		const struct graphics_object_id id =
-				dal_graphics_object_id_init(GENERIC_ID_STEREO,
-						ENUM_ID_1, OBJECT_TYPE_GENERIC);
-
-		struct bp_gpio_cntl_info cntl_info;
-		struct gpio_pin_info pin_info;
-		struct dc_bios *dcb = dal_adapter_service_get_bios_parser(as);
-
-		/* Get GPIO record for this object.
-		 * Stereo GPIO record should have exactly one entry
-		 * where active state defines stereosync polarity */
-		if (1 != dcb->funcs->get_gpio_record(
-						dcb, id, &cntl_info,
-						1)) {
-			return NULL;
-		} else if (BP_RESULT_OK
-				!= dcb->funcs->get_gpio_pin_info(
-						dcb, cntl_info.id,
-						&pin_info)) {
-			/*ASSERT_CRITICAL(false);*/
-			return NULL;
-		} else {
-			return dal_gpio_service_create_gpio_ex(as->gpio_service,
-					pin_info.offset, pin_info.mask,
-					cntl_info.state);
-		}
-	}
-}
-
-/*
- * dal_adapter_service_release_gpio
- *
- * Release GPIO
- */
-void dal_adapter_service_release_gpio(
-	struct adapter_service *as,
-	struct gpio *gpio)
-{
-	dal_gpio_service_destroy_gpio(&gpio);
 }
 
 /*
@@ -1695,17 +1413,6 @@ bool dal_adapter_service_get_feature_value(
 }
 
 /*
- * dal_adapter_service_get_memory_type_multiplier
- *
- * Get multiplier for the memory type
- */
-uint32_t dal_adapter_service_get_memory_type_multiplier(
-	struct adapter_service *as)
-{
-	return as->asic_cap->data[ASIC_DATA_MEMORYTYPE_MULTIPLIER];
-}
-
-/*
  * dal_adapter_service_get_bios_parser
  *
  * Get BIOS parser handler
@@ -1733,65 +1440,11 @@ bool dal_adapter_service_initialize_hw_data(
 	return as->hw_ctx->funcs->power_up(as->hw_ctx);
 }
 
-struct graphics_object_id dal_adapter_service_enum_fake_path_resource(
-	struct adapter_service *as,
-	uint32_t index)
-{
-	return as->hw_ctx->funcs->enum_fake_path_resource(as->hw_ctx, index);
-}
-
-struct graphics_object_id dal_adapter_service_enum_stereo_sync_object(
-	struct adapter_service *as,
-	uint32_t index)
-{
-	return as->hw_ctx->funcs->enum_stereo_sync_object(as->hw_ctx, index);
-}
-
-struct graphics_object_id dal_adapter_service_enum_sync_output_object(
-	struct adapter_service *as,
-	uint32_t index)
-{
-	return as->hw_ctx->funcs->enum_sync_output_object(as->hw_ctx, index);
-}
-
 struct graphics_object_id dal_adapter_service_enum_audio_object(
 	struct adapter_service *as,
 	uint32_t index)
 {
 	return as->hw_ctx->funcs->enum_audio_object(as->hw_ctx, index);
-}
-
-void dal_adapter_service_update_audio_connectivity(
-	struct adapter_service *as,
-	uint32_t number_of_audio_capable_display_path)
-{
-	as->hw_ctx->funcs->update_audio_connectivity(
-		as->hw_ctx,
-		number_of_audio_capable_display_path,
-		dal_adapter_service_get_controllers_num(as));
-}
-
-bool dal_adapter_service_has_embedded_display_connector(
-	struct adapter_service *as)
-{
-	uint8_t index;
-	uint8_t num_connectors = dal_adapter_service_get_connectors_num(as);
-
-	if (num_connectors == 0 || num_connectors > ENUM_ID_COUNT)
-		return false;
-
-	for (index = 0; index < num_connectors; index++) {
-		struct graphics_object_id obj_id =
-			dal_adapter_service_get_connector_obj_id(as, index);
-		enum connector_id connector_id =
-			dal_graphics_object_id_get_connector_id(obj_id);
-
-		if ((connector_id == CONNECTOR_ID_LVDS) ||
-				(connector_id == CONNECTOR_ID_EDP))
-			return true;
-	}
-
-	return false;
 }
 
 bool dal_adapter_service_get_embedded_panel_info(
@@ -1808,59 +1461,6 @@ bool dal_adapter_service_get_embedded_panel_info(
 	result = dcb->funcs->get_embedded_panel_info(dcb, info);
 
 	return result == BP_RESULT_OK;
-}
-
-bool dal_adapter_service_enum_embedded_panel_patch_mode(
-	struct adapter_service *as,
-	uint32_t index,
-	struct embedded_panel_patch_mode *mode)
-{
-	enum bp_result result;
-	struct dc_bios *dcb = dal_adapter_service_get_bios_parser(as);
-
-	if (mode == NULL)
-		/*TODO: add DALASSERT_MSG here*/
-		return false;
-
-	result = dcb->funcs->enum_embedded_panel_patch_mode(dcb, index, mode);
-
-	return result == BP_RESULT_OK;
-}
-
-bool dal_adapter_service_get_faked_edid_len(
-	struct adapter_service *as,
-	uint32_t *len)
-{
-	enum bp_result result;
-	struct dc_bios *dcb = dal_adapter_service_get_bios_parser(as);
-
-	result = dcb->funcs->get_faked_edid_len(dcb, len);
-
-	return result == BP_RESULT_OK;
-}
-
-bool dal_adapter_service_get_faked_edid_buf(
-	struct adapter_service *as,
-	uint8_t *buf,
-	uint32_t len)
-{
-	enum bp_result result;
-	struct dc_bios *dcb = dal_adapter_service_get_bios_parser(as);
-
-	result = dcb->funcs->get_faked_edid_buf(dcb, buf, len);
-
-	return result == BP_RESULT_OK;
-
-}
-
-/*
- * dal_adapter_service_is_fusion
- *
- * Is this Fusion ASIC
- */
-bool dal_adapter_service_is_fusion(struct adapter_service *as)
-{
-	return as->asic_cap->caps.IS_FUSION;
 }
 
 /*
@@ -1922,24 +1522,6 @@ bool dal_adapter_service_should_optimize(
 	return (supported_optimization & feature) != 0;
 }
 
-/*
- * dal_adapter_service_is_in_accelerated_mode
- *
- * @brief Determine if driver is in accelerated mode
- *
- * @param
- * as: Adapter Service handler
- *
- * @out
- * True if driver is in accelerated mode, false otherwise.
- */
-bool dal_adapter_service_is_in_accelerated_mode(struct adapter_service *as)
-{
-	struct dc_bios *dcb = dal_adapter_service_get_bios_parser(as);
-
-	return dcb->funcs->is_accelerated_mode(dcb);
-}
-
 struct ddc *dal_adapter_service_obtain_ddc_from_i2c_info(
 	struct adapter_service *as,
 	struct graphics_object_i2c_info *info)
@@ -1950,97 +1532,6 @@ struct ddc *dal_adapter_service_obtain_ddc_from_i2c_info(
 	return dal_gpio_service_create_ddc(as->gpio_service,
 		info->gpio_info.clk_a_register_index,
 		(1 << info->gpio_info.clk_a_shift), &hw_info);
-}
-
-/*
- * dal_adapter_service_should_psr_skip_wait_for_pll_lock
- *
- * @brief Determine if this ASIC needs to wait on PLL lock bit
- *
- * @param
- * as: Adapter Service handle
- *
- * @out
- * True if ASIC does not need to wait for PLL lock bit, i.e. skip the wait.
- */
-bool dal_adapter_service_should_psr_skip_wait_for_pll_lock(
-	struct adapter_service *as)
-{
-	return as->asic_cap->caps.SKIP_PSR_WAIT_FOR_PLL_LOCK_BIT;
-}
-
-bool dal_adapter_service_is_lid_open(struct adapter_service *as)
-{
-	bool is_lid_open = false;
-	struct platform_info_params params;
-
-	params.data = &is_lid_open;
-	params.method = PM_GET_LID_STATE;
-
-	if ((PM_GET_LID_STATE & as->platform_methods_mask) &&
-		dm_get_platform_info(as->ctx, &params))
-		return is_lid_open;
-
-	return false;
-}
-
-bool dal_adapter_service_get_panel_backlight_default_levels(
-	struct adapter_service *as,
-	struct panel_backlight_levels *levels)
-{
-	if (!as->backlight_caps_initialized)
-		return false;
-
-	levels->ac_level_percentage = as->ac_level_percentage;
-	levels->dc_level_percentage = as->dc_level_percentage;
-	return true;
-}
-
-bool dal_adapter_service_get_panel_backlight_boundaries(
-	struct adapter_service *as,
-	struct panel_backlight_boundaries *boundaries)
-{
-	if (!as->backlight_caps_initialized)
-		return false;
-	if (boundaries != NULL) {
-		boundaries->min_signal_level = as->backlight_8bit_lut[0];
-		boundaries->max_signal_level =
-			as->backlight_8bit_lut[SIZEOF_BACKLIGHT_LUT - 1];
-		return true;
-	}
-	return false;
-}
-
-uint32_t dal_adapter_service_get_view_port_pixel_granularity(
-	struct adapter_service *as)
-{
-	return as->asic_cap->data[ASIC_DATA_VIEWPORT_PIXEL_GRANULARITY];
-}
-
-/**
- * Get number of paths per DP 1.2 connector from the runtime parameter if it
- * exists.
- * A check to see if MST is supported for the generation of ASIC is done
- *
- * \return
- *    Number of paths per DP 1.2 connector is exists in runtime parameters
- *    or ASIC cap
- */
-uint32_t dal_adapter_service_get_num_of_path_per_dp_mst_connector(
-		struct adapter_service *as)
-{
-	if (as->asic_cap->caps.DP_MST_SUPPORTED == 0) {
-		/* ASIC doesn't support DP MST at all */
-		return 0;
-	}
-
-	return as->asic_cap->data[ASIC_DATA_PATH_NUM_PER_DPMST_CONNECTOR];
-}
-
-uint32_t dal_adapter_service_get_num_of_underlays(
-		struct adapter_service *as)
-{
-	return as->asic_cap->data[ASIC_DATA_NUM_OF_VIDEO_PLANES];
 }
 
 uint32_t dal_adapter_service_get_downscale_limit(
@@ -2082,9 +1573,4 @@ bool dal_adapter_service_get_encoder_cap_info(
 	}
 
 	return false;
-}
-
-bool dal_adapter_service_is_mc_tuning_req(struct adapter_service *as)
-{
-	return as->asic_cap->caps.NEED_MC_TUNING ? true : false;
 }

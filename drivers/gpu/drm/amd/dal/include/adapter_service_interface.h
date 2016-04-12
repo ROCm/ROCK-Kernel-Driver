@@ -344,18 +344,6 @@ bool dal_adapter_service_get_firmware_info(
 	struct adapter_service *as,
 	struct firmware_info *info);
 
-/* functions to get a total number of objects of specific type */
-uint8_t dal_adapter_service_get_connectors_num(
-	struct adapter_service *as);
-
-/* Get number of controllers */
-uint8_t dal_adapter_service_get_controllers_num(
-	struct adapter_service *as);
-
-/* Get number of clock sources */
-uint8_t dal_adapter_service_get_clock_sources_num(
-	struct adapter_service *as);
-
 /* Get number of controllers */
 uint8_t dal_adapter_service_get_func_controllers_num(
 	struct adapter_service *as);
@@ -384,30 +372,11 @@ bool dal_adapter_service_get_ss_info(
 /* Check if DFS bypass is enabled */
 bool dal_adapter_service_is_dfs_bypass_enabled(struct adapter_service *as);
 
-/* Get memory controller latency */
-uint32_t dal_adapter_service_get_mc_latency(
-	struct adapter_service *as);
 
 /* Get the video RAM bit width set on the ASIC */
 uint32_t dal_adapter_service_get_asic_vram_bit_width(
 	struct adapter_service *as);
 
-/* Get the bug flags set on this ASIC */
-struct asic_bugs dal_adapter_service_get_asic_bugs(
-	struct adapter_service *as);
-
-/* Get efficiency of DRAM */
-uint32_t dal_adapter_service_get_dram_bandwidth_efficiency(
-	struct adapter_service *as);
-
-/* Get multiplier for the memory type */
-uint32_t dal_adapter_service_get_memory_type_multiplier(
-	struct adapter_service *as);
-
-/* Get parameters for bandwidth tuning */
-bool dal_adapter_service_get_bandwidth_tuning_params(
-	struct adapter_service *as,
-	union bandwidth_tuning_params *params);
 
 /* Get integrated information on BIOS */
 bool dal_adapter_service_get_integrated_info(
@@ -423,10 +392,6 @@ bool dal_adapter_service_get_feature_value(
 	const enum adapter_feature_id feature_id,
 	void *data,
 	uint32_t size);
-
-/* Get a copy of ASIC feature flags */
-struct asic_feature_flags dal_adapter_service_get_feature_flags(
-	struct adapter_service *as);
 
 /* Obtain DDC */
 struct ddc *dal_adapter_service_obtain_ddc(
@@ -448,28 +413,11 @@ void dal_adapter_service_release_irq(
 	struct adapter_service *as,
 	struct irq *irq);
 
-/* Obtain GPIO */
-struct gpio *dal_adapter_service_obtain_gpio(
-	struct adapter_service *as,
-	enum gpio_id id,
-	uint32_t en);
-
-/* Obtain GPIO for stereo3D*/
-struct gpio *dal_adapter_service_obtain_stereo_gpio(struct adapter_service *as);
-
-/* Release GPIO */
-void dal_adapter_service_release_gpio(
-		struct adapter_service *as,
-		struct gpio *gpio);
-
 /* Get SW I2C speed */
 uint32_t dal_adapter_service_get_sw_i2c_speed(struct adapter_service *as);
 
 /* Get HW I2C speed */
 uint32_t dal_adapter_service_get_hw_i2c_speed(struct adapter_service *as);
-
-/* Get line buffer size */
-uint32_t dal_adapter_service_get_line_buffer_size(struct adapter_service *as);
 
 /* Get information on audio support */
 union audio_support dal_adapter_service_get_audio_support(
@@ -495,50 +443,14 @@ struct dal_asic_runtime_flags dal_adapter_service_get_asic_runtime_flags(
 bool dal_adapter_service_initialize_hw_data(
 	struct adapter_service *as);
 
-struct graphics_object_id dal_adapter_service_enum_fake_path_resource(
-	struct adapter_service *as,
-	uint32_t index);
-
-struct graphics_object_id dal_adapter_service_enum_stereo_sync_object(
-	struct adapter_service *as,
-	uint32_t index);
-
-struct graphics_object_id dal_adapter_service_enum_sync_output_object(
-	struct adapter_service *as,
-	uint32_t index);
-
 struct graphics_object_id dal_adapter_service_enum_audio_object(
 	struct adapter_service *as,
 	uint32_t index);
-
-void dal_adapter_service_update_audio_connectivity(
-	struct adapter_service *as,
-	uint32_t number_of_audio_capable_display_path);
-
-bool dal_adapter_service_has_embedded_display_connector(
-	struct adapter_service *as);
 
 bool dal_adapter_service_get_embedded_panel_info(
 	struct adapter_service *as,
 	struct embedded_panel_info *info);
 
-bool dal_adapter_service_enum_embedded_panel_patch_mode(
-	struct adapter_service *as,
-	uint32_t index,
-	struct embedded_panel_patch_mode *mode);
-
-bool dal_adapter_service_get_faked_edid_len(
-	struct adapter_service *as,
-	uint32_t *len);
-
-bool dal_adapter_service_get_faked_edid_buf(
-	struct adapter_service *as,
-	uint8_t *buf,
-	uint32_t len);
-
-uint32_t dal_adapter_service_get_max_cofunc_non_dp_displays(void);
-
-uint32_t dal_adapter_service_get_single_selected_timing_signals(void);
 
 bool dal_adapter_service_get_device_tag(
 	struct adapter_service *as,
@@ -550,21 +462,11 @@ bool dal_adapter_service_is_device_id_supported(
 	struct adapter_service *as,
 	struct device_id id);
 
-bool dal_adapter_service_is_meet_underscan_req(struct adapter_service *as);
-
-bool dal_adapter_service_underscan_for_hdmi_only(struct adapter_service *as);
-
-uint32_t dal_adapter_service_get_src_num(
-	struct adapter_service *as,
-	struct graphics_object_id id);
-
 struct graphics_object_id dal_adapter_service_get_src_obj(
 	struct adapter_service *as,
 	struct graphics_object_id id,
 	uint32_t index);
 
-/* Is this Fusion ASIC */
-bool dal_adapter_service_is_fusion(struct adapter_service *as);
 
 /* Is this ASIC support dynamic DFSbypass switch */
 bool dal_adapter_service_is_dfsbyass_dynamic(struct adapter_service *as);
@@ -573,16 +475,9 @@ bool dal_adapter_service_is_dfsbyass_dynamic(struct adapter_service *as);
 bool dal_adapter_service_should_optimize(
 		struct adapter_service *as, enum optimization_feature feature);
 
-/* Determine if driver is in accelerated mode */
-bool dal_adapter_service_is_in_accelerated_mode(struct adapter_service *as);
-
 struct ddc *dal_adapter_service_obtain_ddc_from_i2c_info(
 	struct adapter_service *as,
 	struct graphics_object_i2c_info *info);
-
-/* Determine if this ASIC needs to wait on PLL lock bit */
-bool dal_adapter_service_should_psr_skip_wait_for_pll_lock(
-	struct adapter_service *as);
 
 #define SIZEOF_BACKLIGHT_LUT 101
 #define ABSOLUTE_BACKLIGHT_MAX 255
@@ -597,25 +492,6 @@ struct panel_backlight_levels {
 	uint32_t dc_level_percentage;
 };
 
-bool dal_adapter_service_is_lid_open(struct adapter_service *as);
-
-bool dal_adapter_service_get_panel_backlight_default_levels(
-	struct adapter_service *as,
-	struct panel_backlight_levels *levels);
-
-bool dal_adapter_service_get_panel_backlight_boundaries(
-	struct adapter_service *as,
-	struct panel_backlight_boundaries *boundaries);
-
-uint32_t dal_adapter_service_get_view_port_pixel_granularity(
-	struct adapter_service *as);
-
-uint32_t dal_adapter_service_get_num_of_path_per_dp_mst_connector(
-		struct adapter_service *as);
-
-uint32_t dal_adapter_service_get_num_of_underlays(
-		struct adapter_service *as);
-
 uint32_t dal_adapter_service_get_downscale_limit(
 		struct adapter_service *as);
 
@@ -623,7 +499,5 @@ bool dal_adapter_service_get_encoder_cap_info(
 		struct adapter_service *as,
 		struct graphics_object_id id,
 		struct graphics_object_encoder_cap_info *info);
-
-bool dal_adapter_service_is_mc_tuning_req(struct adapter_service *as);
 
 #endif /* __DAL_ADAPTER_SERVICE_INTERFACE_H__ */
