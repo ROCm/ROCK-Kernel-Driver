@@ -56,6 +56,7 @@ struct adapter_service {
 	uint32_t dc_level_percentage;
 	uint32_t backlight_caps_initialized;
 	uint32_t backlight_8bit_lut[SIZEOF_BACKLIGHT_LUT];
+	uint32_t adapter_feature_set[FEATURE_MAXIMUM/32];
 };
 
 /* Type of feature with its runtime parameter and default value */
@@ -64,8 +65,5 @@ struct feature_source_entry {
 	uint32_t default_value;
 	bool is_boolean_type;
 };
-
-/* Stores entire ASIC features by sets */
-extern uint32_t adapter_feature_set[];
 
 #endif /* __DAL_ADAPTER_SERVICE_H__ */

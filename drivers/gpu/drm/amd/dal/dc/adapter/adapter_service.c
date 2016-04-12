@@ -191,9 +191,6 @@ static struct feature_source_entry feature_entry_table[] = {
 	{FEATURE_DISABLE_CLOCK_SHARING, false, true}
 };
 
-/* Stores entire ASIC features by sets */
-uint32_t adapter_feature_set[FEATURE_MAXIMUM/32];
-
 enum {
 	LEGACY_MAX_NUM_OF_CONTROLLERS = 2,
 	DEFAULT_NUM_COFUNC_NON_DP_DISPLAYS = 2
@@ -557,8 +554,8 @@ static bool get_hpd_info(struct adapter_service *as,
  *
  * Find the entry index of a given feature in feature table
  */
-static uint32_t lookup_feature_entry(
-	enum adapter_feature_id feature_id)
+static uint32_t lookup_feature_entry(struct adapter_service *as,
+				     enum adapter_feature_id feature_id)
 {
 	uint32_t entries_num = get_feature_entries_num();
 	uint32_t i = 0;
@@ -610,7 +607,7 @@ static bool generate_feature_set(
 	uint32_t entry_num = 0;
 	const struct feature_source_entry *entry = NULL;
 
-	memset(adapter_feature_set, 0, sizeof(adapter_feature_set));
+	memset(as->adapter_feature_set, 0, sizeof(as->adapter_feature_set));
 	entry_num = get_feature_entries_num();
 
 	while (i != entry_num) {
@@ -639,11 +636,11 @@ static bool generate_feature_set(
 		}
 
 		if (entry->is_boolean_type)
-			set_bool_value(&adapter_feature_set[set_idx],
+			set_bool_value(&as->adapter_feature_set[set_idx],
 					internal_idx,
 					value != 0);
 		else
-			adapter_feature_set[set_idx] = value;
+			as->adapter_feature_set[set_idx] = value;
 
 		i++;
 	}
@@ -1389,7 +1386,7 @@ bool dal_adapter_service_get_feature_value(struct adapter_service *as,
 		return false;
 	}
 
-	entry_idx = lookup_feature_entry(feature_id);
+	entry_idx = lookup_feature_entry(as, feature_id);
 	set_idx = (uint32_t)((feature_id - 1)/32);
 	set_internal_idx = (uint32_t)((feature_id - 1) % 32);
 
@@ -1405,7 +1402,7 @@ bool dal_adapter_service_get_feature_value(struct adapter_service *as,
 			return false;
 		}
 
-		*(bool *)data = get_bool_value(adapter_feature_set[set_idx],
+		*(bool *)data = get_bool_value(as->adapter_feature_set[set_idx],
 				set_internal_idx);
 	} else {
 		if (size != sizeof(uint32_t)) {
@@ -1413,7 +1410,7 @@ bool dal_adapter_service_get_feature_value(struct adapter_service *as,
 			return false;
 		}
 
-		*(uint32_t *)data = adapter_feature_set[set_idx];
+		*(uint32_t *)data = as->adapter_feature_set[set_idx];
 	}
 
 	return true;
