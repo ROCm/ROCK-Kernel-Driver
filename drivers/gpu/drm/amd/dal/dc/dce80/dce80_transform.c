@@ -40,7 +40,7 @@
 
 #include "dce80_transform_bit_depth.h"
 
-static struct transform_funcs dce80_transform_funcs = {
+static const struct transform_funcs dce80_transform_funcs = {
 	.transform_power_up =
 		dce80_transform_power_up,
 	.transform_set_scaler =

@@ -32,7 +32,7 @@
 struct bit_depth_reduction_params;
 
 struct transform {
-	struct transform_funcs *funcs;
+	const struct transform_funcs *funcs;
 	struct dc_context *ctx;
 	uint32_t inst;
 	struct scaler_filter *filter;

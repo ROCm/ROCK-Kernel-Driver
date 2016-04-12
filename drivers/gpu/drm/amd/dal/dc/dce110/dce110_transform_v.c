@@ -577,7 +577,7 @@ static bool dce110_transform_v_power_up_line_buffer(struct transform *xfm)
 	return true;
 }
 
-static struct transform_funcs dce110_transform_v_funcs = {
+static const struct transform_funcs dce110_transform_v_funcs = {
 	.transform_power_up =
 		dce110_transform_v_power_up_line_buffer,
 	.transform_set_scaler =
