@@ -59,8 +59,6 @@ static const uint8_t ext_display_connection_guid[NUMBER_OF_UCHAR_FOR_GUID] = {
 
 static uint8_t *get_image(struct bios_parser *bp, uint32_t offset,
 	uint32_t size);
-static uint32_t get_record_size(uint8_t *record);
-static uint32_t get_edid_size(const ATOM_FAKE_EDID_PATCH_RECORD *edid);
 static enum object_type object_type_from_bios_object_id(
 	uint32_t bios_object_id);
 static struct graphics_object_id object_id_from_bios_object_id(
@@ -261,31 +259,6 @@ static struct graphics_object_id bios_parser_get_connector_id(
 	}
 
 	return object_id;
-}
-
-static uint32_t bios_parser_get_src_number(struct dc_bios *dcb,
-	struct graphics_object_id id)
-{
-	uint32_t offset;
-	uint8_t *number;
-	ATOM_OBJECT *object;
-	struct bios_parser *bp = BP_FROM_DCB(dcb);
-
-	object = get_bios_object(bp, id);
-
-	if (!object) {
-		BREAK_TO_DEBUGGER(); /* Invalid object id */
-		return 0;
-	}
-
-	offset = le16_to_cpu(object->usSrcDstTableOffset)
-			+ bp->object_info_tbl_offset;
-
-	number = GET_IMAGE(uint8_t, offset);
-	if (!number)
-		return 0;
-
-	return *number;
 }
 
 static uint32_t bios_parser_get_dst_number(struct dc_bios *dcb,
@@ -2460,89 +2433,6 @@ static uint32_t get_ss_entry_number_from_internal_ss_info_tbl_V3_1(
 	return number;
 }
 
-static ATOM_FAKE_EDID_PATCH_RECORD *get_faked_edid_record(
-	struct bios_parser *bp)
-{
-	uint32_t size;
-	uint8_t *record;
-	ATOM_LVDS_INFO_V12 *info;
-
-	if (!DATA_TABLES(LVDS_Info))
-		return NULL;
-
-	info = GET_IMAGE(ATOM_LVDS_INFO_V12, DATA_TABLES(LVDS_Info));
-
-	if (!info)
-		return NULL;
-
-	if (1 != info->sHeader.ucTableFormatRevision
-			|| 2 > info->sHeader.ucTableContentRevision)
-		return NULL;
-
-	if (!le16_to_cpu(info->usExtInfoTableOffset))
-		return NULL;
-
-	record = GET_IMAGE(uint8_t, DATA_TABLES(LVDS_Info)
-			+ le16_to_cpu(info->usExtInfoTableOffset));
-
-	if (!record)
-		return NULL;
-
-	for (;;) {
-		if (ATOM_RECORD_END_TYPE == *record)
-			return NULL;
-
-		if (LCD_FAKE_EDID_PATCH_RECORD_TYPE == *record)
-			break;
-
-		size = get_record_size(record);
-
-		if (!size)
-			return NULL;
-
-		record += size;
-	}
-
-	return (ATOM_FAKE_EDID_PATCH_RECORD *)record;
-}
-
-static enum bp_result bios_parser_get_faked_edid_len(
-	struct dc_bios *dcb,
-	uint32_t *len)
-{
-	struct bios_parser *bp = BP_FROM_DCB(dcb);
-	ATOM_FAKE_EDID_PATCH_RECORD *edid_record = get_faked_edid_record(bp);
-
-	if (!edid_record)
-		return BP_RESULT_NORECORD;
-
-	*len = get_edid_size(edid_record);
-
-	return BP_RESULT_OK;
-}
-
-static enum bp_result bios_parser_get_faked_edid_buf(
-	struct dc_bios *dcb,
-	uint8_t *buff,
-	uint32_t len)
-{
-	struct bios_parser *bp = BP_FROM_DCB(dcb);
-	ATOM_FAKE_EDID_PATCH_RECORD *edid_record = get_faked_edid_record(bp);
-	uint32_t edid_size;
-
-	if (!edid_record)
-		return BP_RESULT_NORECORD;
-
-	edid_size = get_edid_size(edid_record);
-
-	if (len < edid_size)
-		return BP_RESULT_BADINPUT; /* buffer not big enough to fill */
-
-	memmove(buff, &edid_record->ucFakeEDIDString, edid_size);
-
-	return BP_RESULT_OK;
-}
-
 /**
  * bios_parser_get_gpio_pin_info
  * Get GpioPin information of input gpio id
@@ -2603,78 +2493,6 @@ static enum bp_result bios_parser_get_gpio_pin_info(
 	}
 
 	return BP_RESULT_NORECORD;
-}
-
-/**
- * BiosParserObject::EnumEmbeddedPanelPatchMode
- * Get embedded panel patch mode
- *
- * @param index, mode index
- * @param info, embedded panel patch mode structure
- * @return Bios parser result code
- */
-static enum bp_result bios_parser_enum_embedded_panel_patch_mode(
-	struct dc_bios *dcb,
-	uint32_t index,
-	struct embedded_panel_patch_mode *mode)
-{
-	struct bios_parser *bp = BP_FROM_DCB(dcb);
-	uint32_t record_size;
-	uint32_t record_index;
-	uint8_t *record;
-	ATOM_LVDS_INFO_V12 *info;
-	ATOM_PATCH_RECORD_MODE *mode_record;
-	ATOM_MASTER_LIST_OF_DATA_TABLES *list_of_tables;
-
-	if (!mode)
-		return BP_RESULT_BADINPUT;
-
-	list_of_tables = &bp->master_data_tbl->ListOfDataTables;
-	if (!list_of_tables->LVDS_Info)
-		return BP_RESULT_UNSUPPORTED;
-
-	info = GET_IMAGE(ATOM_LVDS_INFO_V12, list_of_tables->LVDS_Info);
-
-	if (!info)
-		return BP_RESULT_BADBIOSTABLE;
-
-	if (1 != info->sHeader.ucTableFormatRevision
-			|| 2 > info->sHeader.ucTableContentRevision)
-		return BP_RESULT_UNSUPPORTED;
-
-	if (!le16_to_cpu(info->usExtInfoTableOffset))
-		return BP_RESULT_UNSUPPORTED;
-
-	record = GET_IMAGE(uint8_t, list_of_tables->LVDS_Info +
-			le16_to_cpu(info->usExtInfoTableOffset));
-
-	if (!record)
-		return BP_RESULT_BADBIOSTABLE;
-
-	for (record_index = 0;;) {
-		if (ATOM_RECORD_END_TYPE == *record)
-			return BP_RESULT_NORECORD;
-
-		if (LCD_MODE_PATCH_RECORD_MODE_TYPE == *record) {
-			if (record_index == index)
-				break;
-			record_index++;
-		}
-
-		record_size = get_record_size(record);
-
-		if (!record_size)
-			return BP_RESULT_NORECORD;
-
-		record += record_size;
-	}
-
-	mode_record = (ATOM_PATCH_RECORD_MODE *) record;
-
-	mode->width = le16_to_cpu(mode_record->usHDisp);
-	mode->height = le16_to_cpu(mode_record->usVDisp);
-
-	return BP_RESULT_OK;
 }
 
 static enum bp_result get_gpio_i2c_info(struct bios_parser *bp,
@@ -2897,45 +2715,6 @@ static uint8_t *get_image(struct bios_parser *bp,
 		return bp->bios + offset;
 	else
 		return NULL;
-}
-
-static uint32_t get_record_size(uint8_t *record)
-{
-	switch (*record) {
-	case LCD_MODE_PATCH_RECORD_MODE_TYPE:
-		return sizeof(ATOM_PATCH_RECORD_MODE);
-
-	case LCD_RTS_RECORD_TYPE:
-		return sizeof(ATOM_LCD_RTS_RECORD);
-
-	case LCD_CAP_RECORD_TYPE:
-		return sizeof(ATOM_LCD_MODE_CONTROL_CAP);
-
-	case LCD_FAKE_EDID_PATCH_RECORD_TYPE: {
-		ATOM_FAKE_EDID_PATCH_RECORD *fake_record =
-				(ATOM_FAKE_EDID_PATCH_RECORD *) record;
-		uint32_t edid_size = get_edid_size(fake_record);
-
-		return sizeof(ATOM_FAKE_EDID_PATCH_RECORD) + edid_size
-				- sizeof(fake_record->ucFakeEDIDString);
-	}
-
-	case LCD_PANEL_RESOLUTION_RECORD_TYPE:
-		return sizeof(ATOM_PANEL_RESOLUTION_PATCH_RECORD);
-
-	default:
-		return 0;
-	}
-}
-
-static uint32_t get_edid_size(const ATOM_FAKE_EDID_PATCH_RECORD *edid)
-{
-	uint32_t length = edid->ucFakeEDIDLength;
-
-	if (length < 128)
-		length = length * 128;
-
-	return length;
 }
 
 static struct graphics_object_id object_id_from_bios_object_id(
@@ -4584,8 +4363,6 @@ static const struct dc_vbios_funcs vbios_funcs = {
 
 	.get_connector_id = bios_parser_get_connector_id,
 
-	.get_src_number = bios_parser_get_src_number,
-
 	.get_dst_number = bios_parser_get_dst_number,
 
 	.get_gpio_record = bios_parser_get_gpio_record,
@@ -4614,17 +4391,11 @@ static const struct dc_vbios_funcs vbios_funcs = {
 
 	.get_embedded_panel_info = bios_parser_get_embedded_panel_info,
 
-	.enum_embedded_panel_patch_mode = bios_parser_enum_embedded_panel_patch_mode,
-
 	.get_gpio_pin_info = bios_parser_get_gpio_pin_info,
 
 	.get_embedded_panel_info = bios_parser_get_embedded_panel_info,
 
 	.get_gpio_pin_info = bios_parser_get_gpio_pin_info,
-
-	.get_faked_edid_len = bios_parser_get_faked_edid_len,
-
-	.get_faked_edid_buf = bios_parser_get_faked_edid_buf,
 
 	.get_encoder_cap_info = bios_parser_get_encoder_cap_info,
 

@@ -163,11 +163,6 @@ struct embedded_panel_info {
 	uint32_t min_drr_refresh_rate;
 };
 
-struct embedded_panel_patch_mode {
-	uint32_t width;
-	uint32_t height;
-};
-
 struct firmware_info {
 	struct pll_info {
 		uint32_t crystal_frequency; /* in KHz */

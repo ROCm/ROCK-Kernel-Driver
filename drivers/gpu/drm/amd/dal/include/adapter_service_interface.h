@@ -479,19 +479,6 @@ struct ddc *dal_adapter_service_obtain_ddc_from_i2c_info(
 	struct adapter_service *as,
 	struct graphics_object_i2c_info *info);
 
-#define SIZEOF_BACKLIGHT_LUT 101
-#define ABSOLUTE_BACKLIGHT_MAX 255
-#define DEFAULT_MIN_BACKLIGHT 12
-#define DEFAULT_MAX_BACKLIGHT 255
-#define BACKLIGHT_CURVE_COEFFB 100
-#define BACKLIGHT_CURVE_COEFFA_FACTOR 10000
-#define BACKLIGHT_CURVE_COEFFB_FACTOR 100
-
-struct panel_backlight_levels {
-	uint32_t ac_level_percentage;
-	uint32_t dc_level_percentage;
-};
-
 uint32_t dal_adapter_service_get_downscale_limit(
 		struct adapter_service *as);
 

@@ -31,6 +31,8 @@
 #include "include/adapter_service_interface.h"
 #include "wireless_data_source.h"
 
+#define SIZEOF_BACKLIGHT_LUT 101
+
 /*
  * Forward declaration
  */

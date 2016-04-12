@@ -55,6 +55,14 @@
 
 #include "diagnostics/hw_ctx_adapter_service_diag.h"
 
+#define SIZEOF_BACKLIGHT_LUT 101
+#define ABSOLUTE_BACKLIGHT_MAX 255
+#define DEFAULT_MIN_BACKLIGHT 12
+#define DEFAULT_MAX_BACKLIGHT 255
+#define BACKLIGHT_CURVE_COEFFB 100
+#define BACKLIGHT_CURVE_COEFFA_FACTOR 10000
+#define BACKLIGHT_CURVE_COEFFB_FACTOR 100
+
 /*
  * Adapter service feature entry table.
  *
