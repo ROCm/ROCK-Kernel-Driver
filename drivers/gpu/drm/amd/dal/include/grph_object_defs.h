@@ -89,21 +89,6 @@ enum transmitter {
 	TRANSMITTER_COUNT
 };
 
-enum physical_phy_id {
-	PHY_ID_UNKNOWN = (-1L),
-	PHY_ID_0,
-	PHY_ID_1,
-	PHY_ID_2,
-	PHY_ID_3,
-	PHY_ID_4,
-	PHY_ID_5,
-	PHY_ID_6,
-	PHY_ID_7,
-	PHY_ID_8,
-	PHY_ID_9,
-	PHY_ID_COUNT
-};
-
 /* Generic source of the synchronisation input/output signal */
 /* Can be used for flow control, stereo sync, timing sync, frame sync, etc */
 enum sync_source {
@@ -162,101 +147,6 @@ enum trigger_edge {
 struct trigger_params {
 	enum sync_source source;
 	enum trigger_edge edge;
-};
-
-/* CRTC Static Screen event triggers */
-struct static_screen_events {
-	union {
-		/* event mask to enable/disable various
-		   trigger sources for static screen detection */
-		struct {
-			/* Force event high */
-			uint32_t FRAME_START:1;
-			/* Cursor register change */
-			uint32_t CURSOR_MOVE:1;
-			/* Memory write to any client other than MCIF */
-			uint32_t MEM_WRITE:1;
-			/* Memory write to hit memory region 0 */
-			uint32_t MEM_REGION0_WRITE:1;
-			/* Memory write to hit memory region 1 */
-			uint32_t MEM_REGION1_WRITE:1;
-			/* Memory write to hit memory region 2 */
-			uint32_t MEM_REGION2_WRITE:1;
-			/* Memory write to hit memory region 3 */
-			uint32_t MEM_REGION3_WRITE:1;
-			/* Graphics Surface Update Pending */
-			uint32_t GFX_UPDATE:1;
-			/* Overlay Surface Update Pending */
-			uint32_t OVL_UPDATE:1;
-			/* Compressed surface invalidated in FBC */
-			uint32_t INVALIDATE_FBC_SURFACE:1;
-			/* Register pending update in any double buffered
-			register group in the display pipe
-			(i.e. Blender, DCP, or SCL) */
-			uint32_t REG_PENDING_UPDATE:1;
-			/* Crtc_trig_a: Based on signal from any other CRTC */
-			uint32_t CRTC_TRIG_A:1;
-			/* Crtc_trig_b: Based on signal from any other CRTC */
-			uint32_t CRTC_TRIG_B:1;
-			/* Readback of CRTC nominal vertical count register
-			by driver  indicates that OS may be trying to change
-			mode or contents of the display therefore need to
-			switch to higher refresh rate */
-			uint32_t READBACK_NOMINAL_VERTICAL:1;
-			/* Readback of CRTC dynamic vertical count register
-			by driver  indicates that OS may be trying to change
-			mode or contents of the display therefore need to
-			switch to higher refresh rate */
-			uint32_t READBACK_DYNAMIC_VERTICAL:1;
-			/* Reserved */
-			uint32_t RESERVED:1;
-		} bits;
-		uint32_t u_all;
-	};
-};
-
-/*
- * ***************************************************************
- * ********************* Register programming sequences ********
- * ***************************************************************
- */
-
-#define IO_REGISTER_SEQUENCE_MAX_LENGTH 5
-
-/*
- *****************************************************************************
- *                             struct io_register
- *****************************************************************************
- * Generic struct for read/write register or GPIO.
- * It allows controlling only some bit section of register, rather then the
- * whole one.
- * For write operation should be used as following:
- *   1. data  = READ(Base + RegisterOffset)
- *   2. data &= ANDMask
- *   3. data |= ORMask
- *   4. WRITE(Base + RegisterOffset, data)
- *
- * Note: In case of regular register, ANDMask will be typically 0.
- *	In case of GPIO, ANDMask will have typically all bits set
- *	except the specific GPIO bit.
- *
- * For read operation should be used as following:
- *   1. data   = READ(Base + RegisterOffset)
- *   2. data  &= ANDMask
- *   3. data >>= BitShift
- *
- * Note: In case of regular register, ANDMask will be typically 0xFFFFFFFF.
- *	In case of GPIO, ANDMask will have typically only specific GPIO bit set
- *
- * Note: Base Address is not exposed in this structure due to
- *	security consideration.
- */
-
-/* Sequence ID - uniqly defines sequence on single adapter */
-
-struct fbc_info {
-	bool fbc_enable;
-	bool lpt_enable;
 };
 
 #endif
