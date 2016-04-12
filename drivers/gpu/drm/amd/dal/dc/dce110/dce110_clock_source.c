@@ -818,7 +818,7 @@ static bool dce110_clock_source_power_down(
 /*****************************************/
 /* Constructor                           */
 /*****************************************/
-static struct clock_source_funcs dce110_clk_src_funcs = {
+static const struct clock_source_funcs dce110_clk_src_funcs = {
 	.cs_power_down = dce110_clock_source_power_down,
 	.program_pix_clk = dce110_program_pix_clk,
 	.get_pix_clk_dividers = dce110_get_pix_clk_dividers

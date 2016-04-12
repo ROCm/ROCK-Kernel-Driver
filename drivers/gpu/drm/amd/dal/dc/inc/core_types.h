@@ -269,7 +269,7 @@ struct resource_pool {
 	struct adapter_service *adapter_srv;
 	struct irq_service *irqs;
 
-	struct resource_funcs *funcs;
+	const struct resource_funcs *funcs;
 };
 
 struct pipe_ctx {

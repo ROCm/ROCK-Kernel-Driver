@@ -942,7 +942,7 @@ static void dce110_destroy_resource_pool(struct resource_pool **pool)
 }
 
 
-static struct resource_funcs dce110_res_pool_funcs = {
+static const struct resource_funcs dce110_res_pool_funcs = {
 	.destroy = dce110_destroy_resource_pool,
 	.link_enc_create = dce110_link_encoder_create,
 	.validate_with_context = dce110_validate_with_context,
