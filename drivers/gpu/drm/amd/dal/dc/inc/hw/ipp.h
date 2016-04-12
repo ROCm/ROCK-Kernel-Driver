@@ -36,7 +36,7 @@
 struct input_pixel_processor {
 	struct  dc_context *ctx;
 	uint32_t inst;
-	struct ipp_funcs *funcs;
+	const struct ipp_funcs *funcs;
 };
 
 enum ipp_prescale_mode {

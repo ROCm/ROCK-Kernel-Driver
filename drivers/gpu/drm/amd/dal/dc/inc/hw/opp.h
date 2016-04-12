@@ -204,7 +204,7 @@ enum opp_regamma {
 struct output_pixel_processor {
 	struct dc_context *ctx;
 	uint32_t inst;
-	struct opp_funcs *funcs;
+	const struct opp_funcs *funcs;
 };
 
 enum fmt_stereo_action {

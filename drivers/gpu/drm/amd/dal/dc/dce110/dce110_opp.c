@@ -42,7 +42,7 @@ enum {
 /* Constructor, Destructor               */
 /*****************************************/
 
-static struct opp_funcs funcs = {
+static const struct opp_funcs funcs = {
 		.opp_power_on_regamma_lut = dce110_opp_power_on_regamma_lut,
 		.opp_set_csc_adjustment = dce110_opp_set_csc_adjustment,
 		.opp_set_csc_default = dce110_opp_set_csc_default,
