@@ -1222,7 +1222,7 @@ bool dce112_construct_resource_pool(
 
 	pool->pipe_count =
 		dal_adapter_service_get_func_controllers_num(adapter_serv);
-	pool->stream_enc_count = 6;
+	pool->stream_enc_count = dal_adapter_service_get_stream_engines_num(adapter_serv);
 	pool->scaler_filter = dal_scaler_filter_create(ctx);
 	if (pool->scaler_filter == NULL) {
 		BREAK_TO_DEBUGGER();
