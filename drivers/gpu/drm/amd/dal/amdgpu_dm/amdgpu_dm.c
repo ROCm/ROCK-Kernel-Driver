@@ -512,9 +512,6 @@ static int dm_display_resume(struct drm_device *ddev)
 		ret = PTR_ERR_OR_ZERO(conn_state);
 		if (ret)
 			goto err;
-
-		if (!aconnector->dc_sink)
-			conn_state->crtc = NULL;
 	}
 
 	/* Attach crtcs to drm_atomic_state*/
@@ -525,20 +522,6 @@ static int dm_display_resume(struct drm_device *ddev)
 		ret = PTR_ERR_OR_ZERO(crtc_state);
 		if (ret)
 			goto err;
-
-		aconnector =
-			amdgpu_dm_find_first_crct_matching_connector(
-				state,
-				crtc,
-				true);
-
-		/*
-		 * this is the case when display disappear during sleep
-		 */
-		if (!aconnector) {
-			crtc_state->active = false;
-			crtc_state->enable = false;
-		}
 
 		/* force a restore */
 		crtc_state->mode_changed = true;

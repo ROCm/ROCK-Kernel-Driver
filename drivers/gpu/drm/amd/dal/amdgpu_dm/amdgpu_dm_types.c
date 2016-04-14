@@ -2185,8 +2185,11 @@ int amdgpu_dm_atomic_commit(
 				 *
 				 * This can also happen when unplug is done
 				 * during resume sequence ended
+				 *
+				 * In this case, we want to pretend we still
+				 * have a sink to keep the pipe running so that
+				 * hw state is consistent with the sw state
 				 */
-				new_state->planes_changed = false;
 				DRM_DEBUG_KMS("%s: Failed to create new target for crtc %d\n",
 						__func__, acrtc->base.base.id);
 				break;
@@ -2371,7 +2374,6 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 	struct dc_target *commit_targets[6];
 	struct dc_target *current_target;
 	uint32_t commit_targets_count = 0;
-
 
 	if (!aconnector->dc_sink || !connector->state || !connector->encoder)
 		return;
