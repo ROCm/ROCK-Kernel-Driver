@@ -38,7 +38,9 @@ int pem_task_update_allowed_performance_levels(struct pp_eventmgr *eventmgr, str
 	if (pem_is_hw_access_blocked(eventmgr))
 		return 0;
 
-	phm_force_dpm_levels(eventmgr->hwmgr, AMD_DPM_FORCED_LEVEL_AUTO);
+	if (eventmgr->hwmgr->dpm_level == AMD_DPM_FORCED_LEVEL_AUTO)
+		phm_force_dpm_levels(eventmgr->hwmgr,
+				AMD_DPM_FORCED_LEVEL_AUTO);
 
 	return 0;
 }
