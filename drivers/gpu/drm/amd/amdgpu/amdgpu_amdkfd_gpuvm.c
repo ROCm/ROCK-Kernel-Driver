@@ -441,7 +441,7 @@ struct bo_vm_reservation_context {
 	bool reserved;
 };
 
-static int reserve_bo_and_vms(struct amdgpu_device *adev, struct amdgpu_bo *bo,
+static int reserve_bo_and_vms(struct amdgpu_bo *bo,
 			      struct list_head *bo_va_list,
 			      struct amdgpu_vm *vm, bool is_mapped,
 			      struct bo_vm_reservation_context *ctx)
@@ -849,7 +849,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	}
 
 	if (!mem->data2.evicted) {
-		ret = reserve_bo_and_vms(adev, bo, &mem->data2.bo_va_list,
+		ret = reserve_bo_and_vms(bo, &mem->data2.bo_va_list,
 					 vm, false, &ctx);
 		if (unlikely(ret != 0))
 			goto bo_reserve_failed;
@@ -1493,7 +1493,7 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 
 	domain = mem->data2.domain;
 
-	ret = reserve_bo_and_vms(mem->data2.bo->adev, mem->data2.bo,
+	ret = reserve_bo_and_vms(mem->data2.bo,
 				 &mem->data2.bo_va_list, NULL, true, &ctx);
 	if (likely(ret == 0)) {
 		ret = update_user_pages(mem, mm, &ctx);
