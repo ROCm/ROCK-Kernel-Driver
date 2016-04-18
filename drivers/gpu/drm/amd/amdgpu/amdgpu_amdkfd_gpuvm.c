@@ -127,9 +127,9 @@ err_vmsetaddr:
 	 * list. amdgpu_vm_clear_freed needs the PTs to be reserved so
 	 * we don't call it here. That can wait until the next time
 	 * the page tables are updated for a map or unmap. */
-	kfree(bo_va_entry);
 err_vmadd:
 	amdgpu_bo_unreserve(bo);
+	kfree(bo_va_entry);
 	return ret;
 }
 
