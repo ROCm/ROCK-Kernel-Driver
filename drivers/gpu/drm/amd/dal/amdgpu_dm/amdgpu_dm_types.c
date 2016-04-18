@@ -138,7 +138,7 @@ static int dm_crtc_pin_cursor_bo_new(
 	struct drm_crtc *crtc,
 	struct drm_file *file_priv,
 	uint32_t handle,
-	struct amdgpu_bo **ret_obj)
+	struct drm_gem_object **ret_obj)
 {
 	struct amdgpu_crtc *amdgpu_crtc;
 	struct amdgpu_bo *robj;
@@ -178,7 +178,7 @@ static int dm_crtc_pin_cursor_bo_new(
 
 		if (ret == 0) {
 			amdgpu_crtc->cursor_addr = gpu_addr;
-			*ret_obj  = robj;
+			*ret_obj  = obj;
 		}
 		amdgpu_bo_unreserve(robj);
 		if (ret)
@@ -197,7 +197,7 @@ static int dm_crtc_cursor_set(
 	uint32_t width,
 	uint32_t height)
 {
-	struct amdgpu_bo *new_cursor_bo;
+	struct drm_gem_object *new_cursor_bo;
 	struct dc_cursor_position position;
 
 	int ret;
@@ -258,7 +258,7 @@ static int dm_crtc_cursor_set(
 	dm_crtc_unpin_cursor_bo_old(amdgpu_crtc);
 
 	/*assign new cursor bo to our internal cache*/
-	amdgpu_crtc->cursor_bo = &new_cursor_bo->gem_base;
+	amdgpu_crtc->cursor_bo = new_cursor_bo;
 
 release:
 	return ret;
