@@ -106,11 +106,9 @@ static int amdgpu_pp_early_init(void *handle)
 		break;
 	case CHIP_TONGA:
 	case CHIP_FIJI:
-		adev->pp_enabled = (amdgpu_powerplay == 0) ? false : true;
-		break;
 	case CHIP_CARRIZO:
 	case CHIP_STONEY:
-		adev->pp_enabled = (amdgpu_powerplay > 0) ? true : false;
+		adev->pp_enabled = (amdgpu_powerplay == 0) ? false : true;
 		break;
 	/* These chips don't have powerplay implemenations */
 	case CHIP_BONAIRE:
