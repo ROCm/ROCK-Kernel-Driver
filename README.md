@@ -7,6 +7,12 @@
 * multiple GPU support
 * host memory allocations are shared between GPUs
 
+#### Known Issues
+
+* On consumer grade products (Nano, Fury, Fury X), thermal control is not
+  working correctly. As a workaround, fans are hardcoded to 100% to prevent
+  overheating.
+
 #### Package Contents
 
 The kernel image is built from a source tree based on the 4.1 upstream
