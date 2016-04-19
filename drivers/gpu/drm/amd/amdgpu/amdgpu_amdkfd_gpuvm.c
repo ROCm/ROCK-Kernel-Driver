@@ -377,21 +377,6 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		}
 	}
 
-	ret = add_bo_to_vm(adev, va, vm, bo, &(*mem)->data2.bo_va_list,
-			(*mem)->data2.readonly, (*mem)->data2.execute);
-	if (ret != 0)
-		goto err_map;
-
-	if (aql_queue) {
-		ret = add_bo_to_vm(adev, va + size,
-				vm, bo, &(*mem)->data2.bo_va_list,
-				(*mem)->data2.readonly, (*mem)->data2.execute);
-		if (ret != 0)
-			goto err_map;
-	}
-
-	pr_debug("Set BO to VA %p\n", (void *) va);
-
 	if (kptr) {
 		ret = amdgpu_bo_reserve(bo, true);
 		if (ret) {
@@ -431,7 +416,6 @@ allocate_mem_kmap_bo_failed:
 allocate_mem_pin_bo_failed:
 	amdgpu_bo_unreserve(bo);
 allocate_mem_reserve_bo_failed:
-err_map:
 	if (userptr)
 		amdgpu_mn_unregister(bo);
 allocate_mem_set_userptr_failed:
