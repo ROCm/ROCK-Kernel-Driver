@@ -775,10 +775,10 @@ static enum ds_color_space build_default_color_space(
 	{
 		uint32_t pix_clk_khz;
 
-		if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR422 &&
-			timing->pixel_encoding == PIXEL_ENCODING_YCBCR444) {
+		if (timing->pixel_encoding != PIXEL_ENCODING_YCBCR422 &&
+			timing->pixel_encoding != PIXEL_ENCODING_YCBCR444) {
 			if (timing->timing_standard ==
-					TIMING_STANDARD_CEA770 &&
+					TIMING_STANDARD_CEA770 ||
 				timing->timing_standard ==
 						TIMING_STANDARD_CEA861)
 				color_space = DS_COLOR_SPACE_SRGB_FULLRANGE;
