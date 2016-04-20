@@ -40,10 +40,6 @@
 #include "dce110/hw_ctx_audio_dce110.h"
 #endif
 
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
-#include "dce112/audio_dce112.h"
-#include "dce112/hw_ctx_audio_dce112.h"
-#endif
 
 /***** static function : only used within audio.c *****/
 
@@ -288,7 +284,7 @@ struct audio *dal_audio_create(
 #endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
 	case DCE_VERSION_11_2:
-		return dal_audio_create_dce112(init_data);
+		return dal_audio_create_dce110(init_data);
 #endif
 	default:
 		BREAK_TO_DEBUGGER();
