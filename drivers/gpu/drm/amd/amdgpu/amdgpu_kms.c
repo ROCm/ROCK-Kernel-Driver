@@ -524,7 +524,9 @@ int amdgpu_driver_open_kms(struct drm_device *dev, struct drm_file *file_priv)
 	if (unlikely(!fpriv))
 		return -ENOMEM;
 
-	r = amdgpu_vm_init(adev, &fpriv->vm);
+	r = amdgpu_vm_init(adev, &fpriv->vm,
+		!!(amdgpu_vm_update_context &
+		AMDGPU_VM_USE_CPU_UPDATE_FOR_GRAPHICS_MASK));
 	if (r)
 		goto error_free;
 

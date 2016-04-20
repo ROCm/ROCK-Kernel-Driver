@@ -1374,7 +1374,8 @@ void amdgpu_vm_bo_invalidate(struct amdgpu_device *adev,
  *
  * Init @vm fields.
  */
-int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm)
+int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+		bool vm_update_mode)
 {
 	const unsigned align = min(AMDGPU_VM_PTB_ALIGN_SIZE,
 		AMDGPU_VM_PTE_COUNT * 8);
@@ -1413,6 +1414,9 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	if (r)
 		return r;
 
+	vm->is_vm_update_mode_cpu = vm_update_mode;
+	DRM_DEBUG_DRIVER("VM update mode is %s\n",
+			 vm_update_mode ? "CPU" : "SDMA");
 	vm->page_directory_fence = NULL;
 
 	r = amdgpu_bo_create(adev, pd_size, align, true,

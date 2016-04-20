@@ -83,6 +83,7 @@ extern int amdgpu_vm_size;
 extern int amdgpu_vm_block_size;
 extern int amdgpu_vm_fault_stop;
 extern int amdgpu_vm_debug;
+extern int amdgpu_vm_update_context;
 extern int amdgpu_dal;
 extern int amdgpu_sched_jobs;
 extern int amdgpu_sched_hw_submission;
@@ -864,6 +865,14 @@ struct amdgpu_vm_pt {
 	uint64_t			addr;
 };
 
+/* amdgpu_vm_update_context - User parameter that controls how VM pde/pte are
+ *  updated for Graphics and Compute. BIT0 controls Graphics and BIT1 Compute.
+ *  BIT0 [= 0] Graphics updated by SDMA [= 1] by CPU
+ *  BIT1 [= 0] Compute updated by SDMA [= 1] by CPU
+ */
+#define AMDGPU_VM_USE_CPU_UPDATE_FOR_GRAPHICS_MASK (1 << 0)
+#define AMDGPU_VM_USE_CPU_UPDATE_FOR_COMPUTE_MASK (1 << 1)
+
 struct amdgpu_vm {
 	/* tree of virtual addresses mapped */
 	struct rb_root		va;
@@ -896,6 +905,9 @@ struct amdgpu_vm {
 
 	/* Scheduler entity for page table updates */
 	struct amd_sched_entity	entity;
+
+	/* Flag to indicate if VM tables are updated by CPU or GPU (SDMA) */
+	bool is_vm_update_mode_cpu;
 };
 
 struct amdgpu_vm_id {
@@ -938,7 +950,8 @@ struct amdgpu_vm_manager {
 
 void amdgpu_vm_manager_init(struct amdgpu_device *adev);
 void amdgpu_vm_manager_fini(struct amdgpu_device *adev);
-int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm);
+int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+		bool vm_update_mode);
 void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm);
 void amdgpu_vm_get_pd_bo(struct amdgpu_vm *vm,
 			 struct list_head *validated,
