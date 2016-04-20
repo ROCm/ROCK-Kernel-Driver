@@ -493,17 +493,25 @@ struct output_pixel_processor *dce112_opp_create(
 
 void dce112_opp_destroy(struct output_pixel_processor **opp)
 {
-	dm_free(FROM_DCE11_OPP(*opp)->regamma.coeff128_dx);
-	dm_free(FROM_DCE11_OPP(*opp)->regamma.coeff128_oem);
-	dm_free(FROM_DCE11_OPP(*opp)->regamma.coeff128);
-	dm_free(FROM_DCE11_OPP(*opp)->regamma.axis_x_1025);
-	dm_free(FROM_DCE11_OPP(*opp)->regamma.axis_x_256);
-	dm_free(FROM_DCE11_OPP(*opp)->regamma.coordinates_x);
-	dm_free(FROM_DCE11_OPP(*opp)->regamma.rgb_regamma);
-	dm_free(FROM_DCE11_OPP(*opp)->regamma.rgb_resulted);
-	dm_free(FROM_DCE11_OPP(*opp)->regamma.rgb_oem);
-	dm_free(FROM_DCE11_OPP(*opp)->regamma.rgb_user);
-	dm_free(FROM_DCE11_OPP(*opp));
+	struct dce110_opp *dce110_opp;
+
+	if (!opp || !*opp)
+		return;
+
+	dce110_opp = FROM_DCE11_OPP(*opp);
+
+	dm_free(dce110_opp->regamma.coeff128_dx);
+	dm_free(dce110_opp->regamma.coeff128_oem);
+	dm_free(dce110_opp->regamma.coeff128);
+	dm_free(dce110_opp->regamma.axis_x_1025);
+	dm_free(dce110_opp->regamma.axis_x_256);
+	dm_free(dce110_opp->regamma.coordinates_x);
+	dm_free(dce110_opp->regamma.rgb_regamma);
+	dm_free(dce110_opp->regamma.rgb_resulted);
+	dm_free(dce110_opp->regamma.rgb_oem);
+	dm_free(dce110_opp->regamma.rgb_user);
+
+	dm_free(dce110_opp);
 	*opp = NULL;
 }
 
