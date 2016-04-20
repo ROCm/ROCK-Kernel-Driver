@@ -67,14 +67,20 @@ static bool check_if_add_bo_to_vm(struct amdgpu_vm *avm,
 	return true;
 }
 
-static int add_bo_to_vm(struct amdgpu_device *adev, uint64_t va,
-		struct amdgpu_vm *avm, struct amdgpu_bo *bo,
-		struct list_head *list_bo_va,
-		bool readonly, bool execute)
+static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
+		struct amdgpu_vm *avm, bool is_aql)
 {
 	int ret;
 	struct kfd_bo_va_list *bo_va_entry;
 	uint32_t flags;
+	struct amdgpu_bo *bo = mem->data2.bo;
+	uint64_t va = mem->data2.va;
+	struct list_head *list_bo_va = &mem->data2.bo_va_list;
+	bool readonly = mem->data2.readonly;
+	bool execute = mem->data2.execute;
+
+	if (is_aql)
+		va += bo->tbo.mem.size;
 
 	bo_va_entry = kzalloc(sizeof(*bo_va_entry), GFP_KERNEL);
 	if (!bo_va_entry)
@@ -831,18 +837,12 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 			&mem->data2.bo_va_list)) {
 		pr_debug("amdkfd: add new BO_VA to list 0x%llx\n",
 				mem->data2.va);
-		ret = add_bo_to_vm(adev, mem->data2.va, (struct amdgpu_vm *)vm,
-				   bo, &mem->data2.bo_va_list,
-				   mem->data2.readonly, mem->data2.execute);
+		ret = add_bo_to_vm(adev, mem, (struct amdgpu_vm *)vm, false);
 		if (ret != 0)
 			goto add_bo_to_vm_failed;
 		if (mem->data2.aql_queue) {
-			ret = add_bo_to_vm(adev,
-					   mem->data2.va + bo->tbo.mem.size,
-					   (struct amdgpu_vm *)vm,
-					   bo, &mem->data2.bo_va_list,
-					   mem->data2.readonly,
-					   mem->data2.execute);
+			ret = add_bo_to_vm(adev, mem, (struct amdgpu_vm *)vm,
+					true);
 			if (ret != 0)
 				goto add_bo_to_vm_failed;
 		}
@@ -1378,6 +1378,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 
 	INIT_LIST_HEAD(&(*mem)->data2.bo_va_list);
 	mutex_init(&(*mem)->data2.lock);
+	(*mem)->data2.readonly = false;
 	(*mem)->data2.execute = true; /* executable by default */
 
 	(*mem)->data2.bo = amdgpu_bo_ref(bo);
@@ -1386,8 +1387,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 		AMDGPU_GEM_DOMAIN_VRAM : AMDGPU_GEM_DOMAIN_GTT;
 	(*mem)->data2.mapped_to_gpu_memory = 0;
 
-	r = add_bo_to_vm(adev, va, vm, bo, &(*mem)->data2.bo_va_list,
-			 false, true);
+	r = add_bo_to_vm(adev, *mem, vm, false);
 
 	if (r) {
 		amdgpu_bo_unref(&bo);
