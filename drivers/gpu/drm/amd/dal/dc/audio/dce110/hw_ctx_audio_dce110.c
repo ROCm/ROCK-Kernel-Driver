@@ -57,12 +57,6 @@ static const uint32_t engine_offset[] = {
 	mmDIG5_DIG_FE_CNTL - mmDIG0_DIG_FE_CNTL
 };
 
-static void destruct(
-	struct hw_ctx_audio_dce110 *hw_ctx_dce110)
-{
-	dal_audio_destruct_hw_ctx_audio(&hw_ctx_dce110->base);
-}
-
 static void destroy(
 	struct hw_ctx_audio **ptr)
 {
@@ -71,7 +65,6 @@ static void destroy(
 	hw_ctx_dce110 = container_of(
 		*ptr, struct hw_ctx_audio_dce110, base);
 
-	destruct(hw_ctx_dce110);
 	/* release memory allocated for struct hw_ctx_audio_dce110 */
 	dm_free(hw_ctx_dce110);
 
@@ -1831,9 +1824,6 @@ static bool construct(
 	struct dc_context *ctx)
 {
 	struct hw_ctx_audio *base = &hw_ctx->base;
-
-	if (!dal_audio_construct_hw_ctx_audio(base))
-		return false;
 
 	base->funcs = &funcs;
 

@@ -206,9 +206,6 @@ struct hw_ctx_audio {
 bool dal_audio_construct_hw_ctx_audio(
 	struct hw_ctx_audio *hw_ctx);
 
-void dal_audio_destruct_hw_ctx_audio(
-	struct hw_ctx_audio *hw_ctx);
-
 /*
  *creator of audio HW context will be implemented by specific ASIC object only.
  *Top base or interface object does not have implementation of creator.

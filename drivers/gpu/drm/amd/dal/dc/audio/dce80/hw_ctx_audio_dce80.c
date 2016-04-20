@@ -66,7 +66,6 @@ static void destroy(
 	hw_ctx_dce80 = container_of(
 		*ptr, struct hw_ctx_audio_dce80, base);
 
-	dal_audio_destruct_hw_ctx_audio_dce80(hw_ctx_dce80);
 	/* release memory allocated for struct hw_ctx_audio_dce80 */
 	dm_free(hw_ctx_dce80);
 
@@ -1773,9 +1772,6 @@ bool dal_audio_construct_hw_ctx_audio_dce80(
 {
 	struct hw_ctx_audio *base = &hw_ctx->base;
 
-	if (!dal_audio_construct_hw_ctx_audio(base))
-		return false;
-
 	base->funcs = &funcs;
 
 	/* save audio endpoint or dig front for current dce80 audio object */
@@ -1855,14 +1851,6 @@ bool dal_audio_construct_hw_ctx_audio_dce80(
 	}
 
 	return true;
-}
-
-/* audio_dce80 is derived from audio directly, not via dce80  */
-
-void dal_audio_destruct_hw_ctx_audio_dce80(
-	struct hw_ctx_audio_dce80 *hw_ctx_dce80)
-{
-	dal_audio_destruct_hw_ctx_audio(&hw_ctx_dce80->base);
 }
 
 struct hw_ctx_audio *dal_audio_create_hw_ctx_audio_dce80(
