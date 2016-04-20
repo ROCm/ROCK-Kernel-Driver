@@ -534,93 +534,6 @@ void dce80_destruct_resource_pool(struct resource_pool *pool)
 	}
 }
 
-static enum audio_dto_source translate_to_dto_source(enum controller_id crtc_id)
-{
-	switch (crtc_id) {
-	case CONTROLLER_ID_D0:
-		return DTO_SOURCE_ID0;
-	case CONTROLLER_ID_D1:
-		return DTO_SOURCE_ID1;
-	case CONTROLLER_ID_D2:
-		return DTO_SOURCE_ID2;
-	case CONTROLLER_ID_D3:
-		return DTO_SOURCE_ID3;
-	case CONTROLLER_ID_D4:
-		return DTO_SOURCE_ID4;
-	case CONTROLLER_ID_D5:
-		return DTO_SOURCE_ID5;
-	default:
-		return DTO_SOURCE_UNKNOWN;
-	}
-}
-
-static void build_audio_output(
-	const struct pipe_ctx *pipe_ctx,
-	struct audio_output *audio_output)
-{
-	const struct core_stream *stream = pipe_ctx->stream;
-	audio_output->engine_id = pipe_ctx->stream_enc->id;
-
-	audio_output->signal = pipe_ctx->signal;
-
-	/* audio_crtc_info  */
-
-	audio_output->crtc_info.h_total =
-		stream->public.timing.h_total;
-
-	/* Audio packets are sent during actual CRTC blank physical signal, we
-	 * need to specify actual active signal portion */
-	audio_output->crtc_info.h_active =
-			stream->public.timing.h_addressable
-			+ stream->public.timing.h_border_left
-			+ stream->public.timing.h_border_right;
-
-	audio_output->crtc_info.v_active =
-			stream->public.timing.v_addressable
-			+ stream->public.timing.v_border_top
-			+ stream->public.timing.v_border_bottom;
-
-	audio_output->crtc_info.pixel_repetition = 1;
-
-	audio_output->crtc_info.interlaced =
-			stream->public.timing.flags.INTERLACE;
-
-	audio_output->crtc_info.refresh_rate =
-		(stream->public.timing.pix_clk_khz*1000)/
-		(stream->public.timing.h_total*stream->public.timing.v_total);
-
-	audio_output->crtc_info.color_depth =
-		stream->public.timing.display_color_depth;
-
-	audio_output->crtc_info.requested_pixel_clock =
-			pipe_ctx->pix_clk_params.requested_pix_clk;
-
-	/* TODO - Investigate why calculated pixel clk has to be
-	 * requested pixel clk */
-	audio_output->crtc_info.calculated_pixel_clock =
-			pipe_ctx->pix_clk_params.requested_pix_clk;
-
-	if (pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT ||
-			pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
-		audio_output->pll_info.dp_dto_source_clock_in_khz =
-			dal_display_clock_get_dp_ref_clk_frequency(
-				pipe_ctx->dis_clk);
-	}
-
-	audio_output->pll_info.feed_back_divider =
-			pipe_ctx->pll_settings.feedback_divider;
-
-	audio_output->pll_info.dto_source =
-		translate_to_dto_source(
-			pipe_ctx->pipe_idx + 1);
-
-	/* TODO hard code to enable for now. Need get from stream */
-	audio_output->pll_info.ss_enabled = true;
-
-	audio_output->pll_info.ss_percentage =
-			pipe_ctx->pll_settings.ss_percentage;
-}
-
 static void get_pixel_clock_parameters(
 	const struct pipe_ctx *pipe_ctx,
 	struct pixel_clk_params *pixel_clk_params)
@@ -646,8 +559,6 @@ static enum dc_status build_pipe_hw_param(struct pipe_ctx *pipe_ctx)
 		pipe_ctx->clock_source,
 		&pipe_ctx->pix_clk_params,
 		&pipe_ctx->pll_settings);
-
-	build_audio_output(pipe_ctx, &pipe_ctx->audio_output);
 
 	return DC_OK;
 }

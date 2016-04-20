@@ -668,6 +668,97 @@ static enum dc_color_space get_output_color_space(
 	return color_space;
 }
 
+static enum audio_dto_source translate_to_dto_source(enum controller_id crtc_id)
+{
+	switch (crtc_id) {
+	case CONTROLLER_ID_D0:
+		return DTO_SOURCE_ID0;
+	case CONTROLLER_ID_D1:
+		return DTO_SOURCE_ID1;
+	case CONTROLLER_ID_D2:
+		return DTO_SOURCE_ID2;
+	case CONTROLLER_ID_D3:
+		return DTO_SOURCE_ID3;
+	case CONTROLLER_ID_D4:
+		return DTO_SOURCE_ID4;
+	case CONTROLLER_ID_D5:
+		return DTO_SOURCE_ID5;
+	default:
+		return DTO_SOURCE_UNKNOWN;
+	}
+}
+
+static void build_audio_output(
+	const struct pipe_ctx *pipe_ctx,
+	struct audio_output *audio_output)
+{
+	const struct core_stream *stream = pipe_ctx->stream;
+	audio_output->engine_id = pipe_ctx->stream_enc->id;
+
+	audio_output->signal = pipe_ctx->signal;
+
+	/* audio_crtc_info  */
+
+	audio_output->crtc_info.h_total =
+		stream->public.timing.h_total;
+
+	/*
+	 * Audio packets are sent during actual CRTC blank physical signal, we
+	 * need to specify actual active signal portion
+	 */
+	audio_output->crtc_info.h_active =
+			stream->public.timing.h_addressable
+			+ stream->public.timing.h_border_left
+			+ stream->public.timing.h_border_right;
+
+	audio_output->crtc_info.v_active =
+			stream->public.timing.v_addressable
+			+ stream->public.timing.v_border_top
+			+ stream->public.timing.v_border_bottom;
+
+	audio_output->crtc_info.pixel_repetition = 1;
+
+	audio_output->crtc_info.interlaced =
+			stream->public.timing.flags.INTERLACE;
+
+	audio_output->crtc_info.refresh_rate =
+		(stream->public.timing.pix_clk_khz*1000)/
+		(stream->public.timing.h_total*stream->public.timing.v_total);
+
+	audio_output->crtc_info.color_depth =
+		stream->public.timing.display_color_depth;
+
+	audio_output->crtc_info.requested_pixel_clock =
+			pipe_ctx->pix_clk_params.requested_pix_clk;
+
+	/*
+	 * TODO - Investigate why calculated pixel clk has to be
+	 * requested pixel clk
+	 */
+	audio_output->crtc_info.calculated_pixel_clock =
+			pipe_ctx->pix_clk_params.requested_pix_clk;
+
+	if (pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT ||
+			pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
+		audio_output->pll_info.dp_dto_source_clock_in_khz =
+			dal_display_clock_get_dp_ref_clk_frequency(
+				pipe_ctx->dis_clk);
+	}
+
+	audio_output->pll_info.feed_back_divider =
+			pipe_ctx->pll_settings.feedback_divider;
+
+	audio_output->pll_info.dto_source =
+		translate_to_dto_source(
+			pipe_ctx->pipe_idx + 1);
+
+	/* TODO hard code to enable for now. Need get from stream */
+	audio_output->pll_info.ss_enabled = true;
+
+	audio_output->pll_info.ss_percentage =
+			pipe_ctx->pll_settings.ss_percentage;
+}
+
 static enum dc_status apply_single_controller_ctx_to_hw(
 		struct pipe_ctx *pipe_ctx,
 		struct validate_context *context,
@@ -679,7 +770,8 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 			pipe_ctx[pipe_ctx->pipe_idx];
 
 	if (!pipe_ctx_old->stream) {
-		/* Must blank CRTC after disabling power gating and before any
+		/*
+		 * Must blank CRTC after disabling power gating and before any
 		 * programming, otherwise CRTC will be hung in bad state
 		 */
 		pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true);
@@ -750,16 +842,6 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 			&stream->public.timing,
 			(pipe_ctx->signal == SIGNAL_TYPE_DVI_DUAL_LINK) ?
 			true : false);
-
-	if (pipe_ctx->audio != NULL) {
-		if (AUDIO_RESULT_OK != dal_audio_setup(
-				pipe_ctx->audio,
-				&pipe_ctx->audio_output,
-				&stream->public.audio_info)) {
-			BREAK_TO_DEBUGGER();
-			return DC_ERROR_UNEXPECTED;
-		}
-	}
 
 	/* program blank color */
 	color_space = get_output_color_space(&stream->public.timing);
@@ -1167,6 +1249,7 @@ static enum dc_status apply_ctx_to_hw(
 {
 	enum dc_status status;
 	uint8_t i;
+	bool programmed_audio_dto = false;
 
 	/* Reset old context */
 	/* look up the targets that have been removed since last commit */
@@ -1262,12 +1345,25 @@ static enum dc_status apply_ctx_to_hw(
 	 */
 	for (i = 0; i < MAX_PIPES; i++) {
 		if (context->res_ctx.pipe_ctx[i].audio != NULL) {
-			dal_audio_setup_audio_wall_dto(
-					context->res_ctx.pipe_ctx[i].audio,
-					context->res_ctx.pipe_ctx[i].signal,
-					&context->res_ctx.pipe_ctx[i].audio_output.crtc_info,
-					&context->res_ctx.pipe_ctx[i].audio_output.pll_info);
-			break;
+			struct audio_output audio_output;
+			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
+
+			build_audio_output(pipe_ctx, &audio_output);
+			if (AUDIO_RESULT_OK != dal_audio_setup(
+					pipe_ctx->audio,
+					&audio_output,
+					&pipe_ctx->stream->public.audio_info)) {
+				BREAK_TO_DEBUGGER();
+				return DC_ERROR_UNEXPECTED;
+			}
+			if (!programmed_audio_dto) {
+				dal_audio_setup_audio_wall_dto(
+					pipe_ctx->audio,
+					pipe_ctx->signal,
+					&audio_output.crtc_info,
+					&audio_output.pll_info);
+				programmed_audio_dto = true;
+			}
 		}
 	}
 

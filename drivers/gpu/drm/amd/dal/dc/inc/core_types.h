@@ -279,7 +279,6 @@ struct pipe_ctx {
 	struct clock_source *clock_source;
 
 	struct audio *audio;
-	struct audio_output audio_output;
 
 	enum signal_type signal;
 
