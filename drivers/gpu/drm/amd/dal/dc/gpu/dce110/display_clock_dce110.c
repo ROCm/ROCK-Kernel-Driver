@@ -786,6 +786,11 @@ static void set_clock(
 	/* Prepare to program display clock*/
 	memset(&pxl_clk_params, 0, sizeof(pxl_clk_params));
 
+	/* Make sure requested clock isn't lower than minimum threshold*/
+	if (requested_clk_khz > 0)
+		requested_clk_khz = dm_max(requested_clk_khz,
+				base->min_display_clk_threshold_khz);
+
 	pxl_clk_params.target_pixel_clock = requested_clk_khz;
 	pxl_clk_params.pll_id = base->id;
 

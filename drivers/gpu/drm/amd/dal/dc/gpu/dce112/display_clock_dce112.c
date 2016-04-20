@@ -772,6 +772,11 @@ static void set_clock(
 	/* Prepare to program display clock*/
 	memset(&dce_clk_params, 0, sizeof(dce_clk_params));
 
+	/* Make sure requested clock isn't lower than minimum threshold*/
+	if (requested_clk_khz > 0)
+		requested_clk_khz = dm_max(requested_clk_khz,
+				base->min_display_clk_threshold_khz);
+
 	dce_clk_params.target_clock_frequency = requested_clk_khz;
 	dce_clk_params.pll_id = dc->disp_clk_base.id;
 	dce_clk_params.clock_type = DCECLOCK_TYPE_DISPLAY_CLOCK;
