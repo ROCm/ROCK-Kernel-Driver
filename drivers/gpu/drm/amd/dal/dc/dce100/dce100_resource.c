@@ -630,9 +630,6 @@ static enum dc_status validate_mapped_resource(
 						pipe_ctx->tg, &stream->public.timing))
 					return DC_FAIL_CONTROLLER_VALIDATE;
 
-				if (pipe_ctx->signal == SIGNAL_TYPE_VIRTUAL)
-					return status;
-
 				status = build_pipe_hw_param(pipe_ctx);
 
 				if (status != DC_OK)
