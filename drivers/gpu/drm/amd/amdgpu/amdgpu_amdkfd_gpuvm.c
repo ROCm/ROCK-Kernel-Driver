@@ -56,11 +56,11 @@ struct kfd_process_device *amdgpu_amdkfd_gpuvm_get_pdd_from_buffer_object(
 }
 
 static bool check_if_add_bo_to_vm(struct amdgpu_vm *avm,
-		struct list_head *list_bo_va)
+		struct kgd_mem *mem)
 {
 	struct kfd_bo_va_list *entry;
 
-	list_for_each_entry(entry, list_bo_va, bo_list)
+	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list)
 		if (entry->bo_va->vm == avm)
 			return false;
 
@@ -833,8 +833,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	pr_debug("amdgpu: try to map VA 0x%llx domain %d\n",
 			mem->data2.va, domain);
 
-	if (check_if_add_bo_to_vm((struct amdgpu_vm *)vm,
-			&mem->data2.bo_va_list)) {
+	if (check_if_add_bo_to_vm((struct amdgpu_vm *)vm, mem)) {
 		pr_debug("amdkfd: add new BO_VA to list 0x%llx\n",
 				mem->data2.va);
 		ret = add_bo_to_vm(adev, mem, (struct amdgpu_vm *)vm, false);
