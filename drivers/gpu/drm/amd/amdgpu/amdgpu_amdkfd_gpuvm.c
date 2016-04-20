@@ -447,11 +447,11 @@ struct bo_vm_reservation_context {
 	bool reserved;
 };
 
-static int reserve_bo_and_vms(struct amdgpu_bo *bo,
-			      struct list_head *bo_va_list,
+static int reserve_bo_and_vms(struct kgd_mem *mem,
 			      struct amdgpu_vm *vm, bool is_mapped,
 			      struct bo_vm_reservation_context *ctx)
 {
+	struct amdgpu_bo *bo = mem->data2.bo;
 	struct kfd_bo_va_list *entry;
 	unsigned i;
 	int ret;
@@ -469,7 +469,7 @@ static int reserve_bo_and_vms(struct amdgpu_bo *bo,
 	ctx->reserved = false;
 
 	ctx->n_vms = 0;
-	list_for_each_entry(entry, bo_va_list, bo_list) {
+	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
 		if ((vm && vm != entry->bo_va->vm) ||
 		    entry->is_mapped != is_mapped)
 			continue;
@@ -485,7 +485,7 @@ static int reserve_bo_and_vms(struct amdgpu_bo *bo,
 	}
 
 	i = 0;
-	list_for_each_entry(entry, bo_va_list, bo_list) {
+	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
 		if ((vm && vm != entry->bo_va->vm) ||
 		    entry->is_mapped != is_mapped)
 			continue;
@@ -848,8 +848,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	}
 
 	if (!mem->data2.evicted) {
-		ret = reserve_bo_and_vms(bo, &mem->data2.bo_va_list,
-					 vm, false, &ctx);
+		ret = reserve_bo_and_vms(mem, vm, false, &ctx);
 		if (unlikely(ret != 0))
 			goto bo_reserve_failed;
 
@@ -1492,8 +1491,7 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 
 	domain = mem->data2.domain;
 
-	ret = reserve_bo_and_vms(mem->data2.bo,
-				 &mem->data2.bo_va_list, NULL, true, &ctx);
+	ret = reserve_bo_and_vms(mem, NULL, true, &ctx);
 	if (likely(ret == 0)) {
 		ret = update_user_pages(mem, mm, &ctx);
 		have_pages = !ret;
