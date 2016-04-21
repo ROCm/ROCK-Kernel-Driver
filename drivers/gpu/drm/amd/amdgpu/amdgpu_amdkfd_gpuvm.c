@@ -469,11 +469,14 @@ static int reserve_bo_and_vms(struct kgd_mem *mem,
 	ctx->reserved = false;
 
 	ctx->n_vms = 0;
-	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
-		if ((vm && vm != entry->bo_va->vm) ||
-		    entry->is_mapped != is_mapped)
-			continue;
-		ctx->n_vms++;
+
+	if (vm)
+		ctx->n_vms = 1;
+	else {
+		list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
+			if (entry->is_mapped == is_mapped)
+				ctx->n_vms++;
+		}
 	}
 	if (ctx->n_vms == 0)
 		ctx->vm_pd = NULL;
@@ -484,16 +487,21 @@ static int reserve_bo_and_vms(struct kgd_mem *mem,
 			return -ENOMEM;
 	}
 
-	i = 0;
-	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
-		if ((vm && vm != entry->bo_va->vm) ||
-		    entry->is_mapped != is_mapped)
-			continue;
+	if (vm) {
+		amdgpu_vm_get_pd_bo(vm, &ctx->list, &ctx->vm_pd[0]);
+		amdgpu_vm_get_pt_bos(vm, &ctx->duplicates);
+	} else {
+		i = 0;
+		list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
+			if (entry->is_mapped != is_mapped)
+				continue;
 
-		amdgpu_vm_get_pd_bo(entry->bo_va->vm, &ctx->list,
-				&ctx->vm_pd[i]);
-		amdgpu_vm_get_pt_bos(entry->bo_va->vm, &ctx->duplicates);
-		i++;
+			amdgpu_vm_get_pd_bo(entry->bo_va->vm, &ctx->list,
+					&ctx->vm_pd[i]);
+			amdgpu_vm_get_pt_bos(entry->bo_va->vm,
+					&ctx->duplicates);
+			i++;
+		}
 	}
 
 	ret = ttm_eu_reserve_buffers(&ctx->ticket, &ctx->list,
