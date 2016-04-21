@@ -64,7 +64,44 @@ struct amdgpu_vm_update_params {
 	dma_addr_t *pages_addr;
 	/* indirect buffer to fill with commands */
 	struct amdgpu_ib *ib;
+	/* Kernel pointer of PD/PT BO that needs to be updated */
+	void *kptr;
 };
+
+/**
+ * write_pte_using_cpu - update the page tables using CPU
+ *
+ * @adev: amdgpu_device pointer
+ * @vm_update_params: see structure definition
+ * @pe_start: offset from start of the page table
+ * @addr: dst addr to write into pe
+ * @count: number of page entries to update
+ * @incr: increase next addr by incr bytes
+ * @flags: hw access flags
+ *
+ */
+static void write_pte_using_cpu(struct amdgpu_device *adev,
+				struct amdgpu_vm_update_params
+					*vm_update_params,
+				uint64_t pe_start, uint64_t addr,
+				unsigned count, uint32_t incr,
+				uint32_t flags)
+{
+	unsigned int i;
+	uint64_t page_idx, value;
+
+	page_idx = pe_start / 8;
+
+	for (i = 0; i < count; i++) {
+		value = amdgpu_vm_map_gart(vm_update_params->pages_addr, addr);
+		amdgpu_gart_set_pte_pde(adev, vm_update_params->kptr,
+			page_idx, value, flags);
+		addr += incr;
+		page_idx++;
+	}
+	mb();
+	amdgpu_gart_flush_gpu_tlb(adev, 0);
+}
 
 /**
  * amdgpu_vm_num_pde - return the number of page directory entries
@@ -476,8 +513,9 @@ struct amdgpu_bo_va *amdgpu_vm_bo_find(struct amdgpu_vm *vm,
  * @incr: increase next addr by incr bytes
  * @flags: hw access flags
  *
- * Traces the parameters and calls the right asic functions
- * to setup the page table using the DMA.
+ * If kptr is available, then update pde/pte directly using CPU. Otherwise,
+ * assume ib is valid and call the right asic functions to setup the page table
+ * using the DMA. Also traces the parameters.
  */
 static void amdgpu_vm_update_pages(struct amdgpu_device *adev,
 				   struct amdgpu_vm_update_params
@@ -488,7 +526,10 @@ static void amdgpu_vm_update_pages(struct amdgpu_device *adev,
 {
 	trace_amdgpu_vm_set_page(pe, addr, count, incr, flags);
 
-	if (vm_update_params->src) {
+	if (vm_update_params->kptr) {
+		write_pte_using_cpu(adev, vm_update_params, pe, addr,
+			count, incr, flags);
+	} else if (vm_update_params->src) {
 		amdgpu_vm_copy_pte(adev, vm_update_params->ib,
 			pe, (vm_update_params->src + (addr >> 12) * 8), count);
 
@@ -614,7 +655,7 @@ int amdgpu_vm_update_page_directory(struct amdgpu_device *adev,
 {
 	struct amdgpu_ring *ring;
 	struct amdgpu_bo *pd = vm->page_directory;
-	uint64_t pd_addr = amdgpu_bo_gpu_offset(pd);
+	uint64_t pd_addr = 0;
 	uint32_t incr = AMDGPU_VM_PTE_COUNT * 8;
 	uint64_t last_pde = ~0, last_pt = ~0;
 	unsigned count = 0, pt_idx, ndw;
@@ -622,7 +663,7 @@ int amdgpu_vm_update_page_directory(struct amdgpu_device *adev,
 	struct amdgpu_vm_update_params vm_update_params;
 	struct fence *fence = NULL;
 
-	int r;
+	int r = 0;
 
 	memset(&vm_update_params, 0, sizeof(vm_update_params));
 	ring = container_of(vm->entity.sched, struct amdgpu_ring, sched);
@@ -633,11 +674,33 @@ int amdgpu_vm_update_page_directory(struct amdgpu_device *adev,
 	/* assume the worst case */
 	ndw += vm->max_pde_used * 6;
 
-	r = amdgpu_job_alloc_with_ib(adev, ndw * 4, &job);
-	if (r)
-		return r;
+	/* If is_vm_update_mode_cpu flag is set, then try to update PD table
+	 * using CPU. If failed, fallback to use SDMA
+	 */
+	if (vm->is_vm_update_mode_cpu) {
+		struct amdgpu_sync sync;
+		struct amdgpu_bo *pd = vm->page_directory;
 
-	vm_update_params.ib = &job->ibs[0];
+		r = amdgpu_bo_kmap(vm->page_directory,
+			&vm_update_params.kptr);
+		if (r)
+			dev_warn(adev->dev, "PD table update using CPU failed. Fallback to SDMA\n");
+		else {
+			amdgpu_sync_create(&sync);
+			amdgpu_sync_resv(adev, &sync, pd->tbo.resv,
+				AMDGPU_FENCE_OWNER_VM);
+			amdgpu_sync_wait(&sync);
+			amdgpu_sync_free(&sync);
+		}
+	}
+	if (r || !vm->is_vm_update_mode_cpu) {
+		r = amdgpu_job_alloc_with_ib(adev, ndw * 4, &job);
+		if (r)
+			return r;
+
+		vm_update_params.ib = &job->ibs[0];
+		pd_addr = amdgpu_bo_gpu_offset(pd);
+	}
 
 	/* walk over the address space and update the page directory */
 	for (pt_idx = 0; pt_idx <= vm->max_pde_used; ++pt_idx) {
@@ -676,25 +739,27 @@ int amdgpu_vm_update_page_directory(struct amdgpu_device *adev,
 					last_pde, last_pt,
 					count, incr, AMDGPU_PTE_VALID);
 
-	if (vm_update_params.ib->length_dw != 0) {
-		amdgpu_ring_pad_ib(ring, vm_update_params.ib);
-		amdgpu_sync_resv(adev, &job->sync, pd->tbo.resv,
-				 AMDGPU_FENCE_OWNER_VM);
-		WARN_ON(vm_update_params.ib->length_dw > ndw);
-		r = amdgpu_job_submit(job, ring, &vm->entity,
-				      AMDGPU_FENCE_OWNER_VM, &fence);
-		if (r)
-			goto error_free;
+	/* Submit IB if updating using SDMA */
+	if (vm_update_params.ib) {
+		if (vm_update_params.ib->length_dw != 0) {
+			amdgpu_ring_pad_ib(ring, vm_update_params.ib);
+			amdgpu_sync_resv(adev, &job->sync, pd->tbo.resv,
+					 AMDGPU_FENCE_OWNER_VM);
+			WARN_ON(vm_update_params.ib->length_dw > ndw);
+			r = amdgpu_job_submit(job, ring, &vm->entity,
+					      AMDGPU_FENCE_OWNER_VM, &fence);
+			if (r)
+				goto error_free;
 
-		amdgpu_bo_fence(pd, fence, true);
-		fence_put(vm->page_directory_fence);
-		vm->page_directory_fence = fence_get(fence);
-		fence_put(fence);
+			amdgpu_bo_fence(pd, fence, true);
+			fence_put(vm->page_directory_fence);
+			vm->page_directory_fence = fence_get(fence);
+			fence_put(fence);
 
-	} else {
-		amdgpu_job_free(job);
-	}
-
+		} else
+			amdgpu_job_free(job);
+	} else if (vm_update_params.kptr)
+		amdgpu_bo_kunmap(vm->page_directory);
 	return 0;
 
 error_free:
@@ -1550,7 +1615,9 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 
 	r = amdgpu_bo_create(adev, pd_size, align, true,
 			     AMDGPU_GEM_DOMAIN_VRAM,
-			     AMDGPU_GEM_CREATE_NO_CPU_ACCESS,
+			     vm->is_vm_update_mode_cpu ?
+				AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED :
+				AMDGPU_GEM_CREATE_NO_CPU_ACCESS,
 			     NULL, NULL, &vm->page_directory);
 	if (r)
 		goto error_free_sched_entity;
