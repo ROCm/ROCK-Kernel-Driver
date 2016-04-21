@@ -91,8 +91,6 @@ static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
 	pr_debug("amdkfd: adding bo_va to bo %p and va 0x%llx id 0x%x\n",
 			bo, va, adev->dev->id);
 
-	amdgpu_bo_reserve(bo, true);
-
 	/* Add BO to VM internal data structures*/
 	bo_va_entry->bo_va = amdgpu_vm_bo_add(adev, avm, bo);
 	if (bo_va_entry->bo_va == NULL) {
@@ -119,8 +117,6 @@ static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
 		goto err_vmsetaddr;
 	}
 
-	amdgpu_bo_unreserve(bo);
-
 	bo_va_entry->kgd_dev = (void *)adev;
 	bo_va_entry->is_mapped = false;
 	list_add(&bo_va_entry->bo_list, list_bo_va);
@@ -134,7 +130,6 @@ err_vmsetaddr:
 	 * we don't call it here. That can wait until the next time
 	 * the page tables are updated for a map or unmap. */
 err_vmadd:
-	amdgpu_bo_unreserve(bo);
 	kfree(bo_va_entry);
 	return ret;
 }
@@ -841,6 +836,10 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	pr_debug("amdgpu: try to map VA 0x%llx domain %d\n",
 			mem->data2.va, domain);
 
+	ret = reserve_bo_and_vms(mem, vm, false, &ctx);
+	if (unlikely(ret != 0))
+		goto bo_reserve_failed;
+
 	if (check_if_add_bo_to_vm((struct amdgpu_vm *)vm, mem)) {
 		pr_debug("amdkfd: add new BO_VA to list 0x%llx\n",
 				mem->data2.va);
@@ -856,10 +855,6 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	}
 
 	if (!mem->data2.evicted) {
-		ret = reserve_bo_and_vms(mem, vm, false, &ctx);
-		if (unlikely(ret != 0))
-			goto bo_reserve_failed;
-
 		ret = update_user_pages(mem, current->mm, &ctx);
 		if (ret != 0)
 			goto update_user_pages_failed;
@@ -905,8 +900,8 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 		}
 	}
 
-	if (!mem->data2.evicted)
-		unreserve_bo_and_vms(&ctx, true);
+	unreserve_bo_and_vms(&ctx, true);
+
 	mutex_unlock(&mem->data2.lock);
 	return 0;
 
@@ -915,10 +910,9 @@ map_bo_to_gpuvm_failed:
 pin_bo_failed:
 quiesce_failed:
 update_user_pages_failed:
-	if (!mem->data2.evicted)
-		unreserve_bo_and_vms(&ctx, false);
-bo_reserve_failed:
 add_bo_to_vm_failed:
+	unreserve_bo_and_vms(&ctx, false);
+bo_reserve_failed:
 	mutex_unlock(&mem->data2.lock);
 	return ret;
 }
