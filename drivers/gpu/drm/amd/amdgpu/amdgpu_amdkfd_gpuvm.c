@@ -135,11 +135,11 @@ err_vmadd:
 }
 
 static void remove_bo_from_vm(struct amdgpu_device *adev,
-		struct amdgpu_bo *bo, struct amdgpu_bo_va *bo_va)
+		struct kfd_bo_va_list *entry)
 {
-	amdgpu_bo_reserve(bo, true);
-	amdgpu_vm_bo_rmv(adev, bo_va);
-	amdgpu_bo_unreserve(bo);
+	amdgpu_vm_bo_rmv(adev, entry->bo_va);
+	list_del(&entry->bo_list);
+	kfree(entry);
 }
 
 
@@ -758,6 +758,8 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 {
 	struct amdgpu_device *adev;
 	struct kfd_bo_va_list *entry, *tmp;
+	struct bo_vm_reservation_context ctx;
+	int ret;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
@@ -781,18 +783,20 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	if (mem->data2.work.work.func)
 		cancel_delayed_work_sync(&mem->data2.work);
 
+	ret = reserve_bo_and_vms(mem, NULL, false, &ctx);
+	if (unlikely(ret != 0))
+		return ret;
+
 	/* Remove from VM internal data structures */
 	list_for_each_entry_safe(entry, tmp, &mem->data2.bo_va_list, bo_list) {
 		pr_debug("Releasing BO with VA %p, size %lu bytes\n",
 				entry->bo_va,
 				mem->data2.bo->tbo.mem.size);
-		if (entry->bo_va->vm != NULL)
-			remove_bo_from_vm(
-				(struct amdgpu_device *)entry->kgd_dev,
-				mem->data2.bo, entry->bo_va);
-		list_del(&entry->bo_list);
-		kfree(entry);
+		remove_bo_from_vm((struct amdgpu_device *)entry->kgd_dev,
+				entry);
 	}
+
+	unreserve_bo_and_vms(&ctx, true);
 
 	/* Free the BO*/
 	amdgpu_bo_unref(&mem->data2.bo);
