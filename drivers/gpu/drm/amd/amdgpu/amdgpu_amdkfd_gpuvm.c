@@ -68,7 +68,8 @@ static bool check_if_add_bo_to_vm(struct amdgpu_vm *avm,
 }
 
 static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
-		struct amdgpu_vm *avm, bool is_aql)
+		struct amdgpu_vm *avm, bool is_aql,
+		struct kfd_bo_va_list **p_bo_va_entry)
 {
 	int ret;
 	struct kfd_bo_va_list *bo_va_entry;
@@ -120,6 +121,9 @@ static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
 	bo_va_entry->kgd_dev = (void *)adev;
 	bo_va_entry->is_mapped = false;
 	list_add(&bo_va_entry->bo_list, list_bo_va);
+
+	if (p_bo_va_entry)
+		*p_bo_va_entry = bo_va_entry;
 
 	return 0;
 
@@ -823,6 +827,8 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	uint32_t domain;
 	struct kfd_bo_va_list *entry;
 	struct bo_vm_reservation_context ctx;
+	struct kfd_bo_va_list *bo_va_entry = NULL;
+	struct kfd_bo_va_list *bo_va_entry_aql = NULL;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
@@ -847,14 +853,15 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	if (check_if_add_bo_to_vm((struct amdgpu_vm *)vm, mem)) {
 		pr_debug("amdkfd: add new BO_VA to list 0x%llx\n",
 				mem->data2.va);
-		ret = add_bo_to_vm(adev, mem, (struct amdgpu_vm *)vm, false);
+		ret = add_bo_to_vm(adev, mem, (struct amdgpu_vm *)vm, false,
+				&bo_va_entry);
 		if (ret != 0)
 			goto add_bo_to_vm_failed;
 		if (mem->data2.aql_queue) {
 			ret = add_bo_to_vm(adev, mem, (struct amdgpu_vm *)vm,
-					true);
+					true, &bo_va_entry_aql);
 			if (ret != 0)
-				goto add_bo_to_vm_failed;
+				goto add_bo_to_vm_failed_aql;
 		}
 	}
 
@@ -914,6 +921,11 @@ map_bo_to_gpuvm_failed:
 pin_bo_failed:
 quiesce_failed:
 update_user_pages_failed:
+	if (bo_va_entry_aql)
+		remove_bo_from_vm(adev, bo_va_entry_aql);
+add_bo_to_vm_failed_aql:
+	if (bo_va_entry)
+		remove_bo_from_vm(adev, bo_va_entry);
 add_bo_to_vm_failed:
 	unreserve_bo_and_vms(&ctx, false);
 bo_reserve_failed:
@@ -1391,7 +1403,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 		AMDGPU_GEM_DOMAIN_VRAM : AMDGPU_GEM_DOMAIN_GTT;
 	(*mem)->data2.mapped_to_gpu_memory = 0;
 
-	r = add_bo_to_vm(adev, *mem, vm, false);
+	r = add_bo_to_vm(adev, *mem, vm, false, NULL);
 
 	if (r) {
 		amdgpu_bo_unref(&bo);
