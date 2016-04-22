@@ -66,6 +66,7 @@ bool amdgpu_amdkfd_load_interface(struct amdgpu_device *rdev)
 {
 	switch (rdev->asic_type) {
 	case CHIP_KAVERI:
+	case CHIP_HAWAII:
 		kfd2kgd = amdgpu_amdkfd_gfx_7_get_functions();
 		break;
 	case CHIP_CARRIZO:
@@ -398,12 +399,6 @@ void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 	cu_info->wave_front_size = acu_info.wave_front_size;
 	cu_info->max_scratch_slots_per_cu = acu_info.max_scratch_slots_per_cu;
 	cu_info->lds_size = acu_info.lds_size;
-}
-
-int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
-		struct kgd_mem *mem, void **kptr)
-{
-	return 0;
 }
 
 int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
