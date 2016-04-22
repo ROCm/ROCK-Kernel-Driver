@@ -152,7 +152,6 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.get_fw_version = get_fw_version,
 	.set_num_of_requests = set_num_of_requests,
 	.get_cu_info = get_cu_info,
-	.set_num_of_requests = set_num_of_requests,
 	.alloc_memory_of_scratch = alloc_memory_of_scratch,
 	.write_config_static_mem = write_config_static_mem,
 	.mmap_bo = amdgpu_amdkfd_gpuvm_mmap_bo,
