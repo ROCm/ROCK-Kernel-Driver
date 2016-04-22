@@ -103,6 +103,7 @@ static struct kfd_gpu_cache_info carrizo_cache_info[] = {
 
 /* NOTE: In future if more information is added to struct kfd_gpu_cache_info
  *	the following ASICs may need a separate table. */
+#define hawaii_cache_info kaveri_cache_info
 #define tonga_cache_info carrizo_cache_info
 #define fiji_cache_info  carrizo_cache_info
 
@@ -559,6 +560,10 @@ static int kfd_fill_gpu_cache_info(struct kfd_dev *kdev,
 	case CHIP_KAVERI:
 		pcache_info = kaveri_cache_info;
 		num_of_cache_types = ARRAY_SIZE(kaveri_cache_info);
+		break;
+	case CHIP_HAWAII:
+		pcache_info = hawaii_cache_info;
+		num_of_cache_types = ARRAY_SIZE(hawaii_cache_info);
 		break;
 	case CHIP_CARRIZO:
 		pcache_info = carrizo_cache_info;

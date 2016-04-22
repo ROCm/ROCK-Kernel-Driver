@@ -394,7 +394,7 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 
 
 	retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
-	if (sched_policy == KFD_SCHED_POLICY_NO_HWS &&
+	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
 		q->properties.type == KFD_QUEUE_TYPE_COMPUTE)
 		retval = mqd->load_mqd(mqd, q->mqd, q->pipe,
 			q->queue,
@@ -408,7 +408,7 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 	else if ((!q->properties.is_active) && (prev_active))
 		dqm->queue_count--;
 
-	if (sched_policy != KFD_SCHED_POLICY_NO_HWS)
+	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
 		retval = execute_queues_cpsch(dqm);
 
 	mutex_unlock(&dqm->lock);
@@ -462,7 +462,7 @@ int process_evict_queues(struct device_queue_manager *dqm,
 			q->properties.is_evicted = true;
 
 		retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
-		if (sched_policy == KFD_SCHED_POLICY_NO_HWS &&
+		if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
 				q->properties.type == KFD_QUEUE_TYPE_COMPUTE)
 			retval = mqd->load_mqd(mqd, q->mqd, q->pipe,
 				q->queue,
@@ -470,7 +470,7 @@ int process_evict_queues(struct device_queue_manager *dqm,
 		if (q->properties.is_evicted)
 			dqm->queue_count--;
 	}
-	if (sched_policy != KFD_SCHED_POLICY_NO_HWS)
+	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
 		retval = execute_queues_cpsch(dqm);
 
 	mutex_unlock(&dqm->lock);
@@ -511,7 +511,7 @@ int process_restore_queues(struct device_queue_manager *dqm,
 		if (q->properties.is_evicted) {
 			q->properties.is_evicted = false;
 			retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
-			if (sched_policy == KFD_SCHED_POLICY_NO_HWS &&
+			if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
 				q->properties.type == KFD_QUEUE_TYPE_COMPUTE)
 				retval =
 						mqd->load_mqd(
@@ -524,7 +524,7 @@ int process_restore_queues(struct device_queue_manager *dqm,
 			dqm->queue_count++;
 		}
 	}
-	if (sched_policy != KFD_SCHED_POLICY_NO_HWS)
+	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
 		retval = execute_queues_cpsch(dqm);
 
 	if (retval == 0)
@@ -1303,7 +1303,7 @@ static bool set_cache_memory_policy(struct device_queue_manager *dqm,
 			alternate_aperture_base,
 			alternate_aperture_size);
 
-	if ((sched_policy == KFD_SCHED_POLICY_NO_HWS) && (qpd->vmid != 0))
+	if ((dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) && (qpd->vmid != 0))
 		program_sh_mem_settings(dqm, qpd);
 
 	pr_debug("kfd: sh_mem_config: 0x%x, ape1_base: 0x%x, ape1_limit: 0x%x\n",
@@ -1360,7 +1360,7 @@ static int set_page_directory_base(struct device_queue_manager *dqm,
 	 * Preempt queues, destroy runlist and create new runlist. Queues
 	 * will have the update PD base address
 	 */
-	if (sched_policy != KFD_SCHED_POLICY_NO_HWS)
+	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
 		retval = execute_queues_cpsch(dqm);
 
 out:
@@ -1496,8 +1496,11 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 	if (!dqm)
 		return NULL;
 
+	dqm->sched_policy = (dev->device_info->asic_family == CHIP_HAWAII) ?
+		KFD_SCHED_POLICY_NO_HWS : sched_policy;
+
 	dqm->dev = dev;
-	switch (sched_policy) {
+	switch (dqm->sched_policy) {
 	case KFD_SCHED_POLICY_HWS:
 	case KFD_SCHED_POLICY_HWS_NO_OVERSUBSCRIPTION:
 		/* initialize dqm for cp scheduling */
@@ -1547,6 +1550,10 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 
 	case CHIP_KAVERI:
 		device_queue_manager_init_cik(&dqm->ops_asic_specific);
+		break;
+
+	case CHIP_HAWAII:
+		device_queue_manager_init_cik_hawaii(&dqm->ops_asic_specific);
 		break;
 
 	case CHIP_TONGA:

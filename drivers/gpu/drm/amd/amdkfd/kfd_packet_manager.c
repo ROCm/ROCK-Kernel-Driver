@@ -569,6 +569,7 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 
 	switch (pm->dqm->dev->device_info->asic_family) {
 	case CHIP_KAVERI:
+	case CHIP_HAWAII:
 		if (fw_ver >= KFD_SCRATCH_KV_FW_VER) {
 			pm->pmf->map_process = pm_create_map_process_scratch_kv;
 			pm->pmf->get_map_process_packet_size =
