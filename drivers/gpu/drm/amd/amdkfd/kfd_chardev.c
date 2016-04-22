@@ -1097,7 +1097,8 @@ static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
 
 	up_write(&p->lock);
 
-	if (sched_policy == KFD_SCHED_POLICY_NO_HWS && pdd->qpd.vmid != 0) {
+	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
+	    pdd->qpd.vmid != 0) {
 		err = dev->kfd2kgd->alloc_memory_of_scratch(
 			dev->kgd, args->va_addr, pdd->qpd.vmid);
 		if (err != 0)
