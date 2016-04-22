@@ -785,7 +785,11 @@ uint32_t amdgpu_display_supported_domains(struct amdgpu_device *adev,
 
 int amdgpu_display_framebuffer_init(struct drm_device *dev,
 				    struct amdgpu_framebuffer *rfb,
+#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0)
+				    struct drm_mode_fb_cmd2 *mode_cmd,
+#else
 				    const struct drm_mode_fb_cmd2 *mode_cmd,
+#endif
 				    struct drm_gem_object *obj)
 {
 	int ret;
@@ -802,7 +806,11 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 struct drm_framebuffer *
 amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 				       struct drm_file *file_priv,
+#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0)
+				       struct drm_mode_fb_cmd2 *mode_cmd)
+#else
 				       const struct drm_mode_fb_cmd2 *mode_cmd)
+#endif
 {
 	struct drm_gem_object *obj;
 	struct amdgpu_framebuffer *amdgpu_fb;
