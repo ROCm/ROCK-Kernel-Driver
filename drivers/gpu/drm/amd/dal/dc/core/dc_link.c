@@ -926,6 +926,8 @@ static bool construct(
 	link->public.irq_source_hpd = DC_IRQ_SOURCE_INVALID;
 	link->public.irq_source_hpd_rx = DC_IRQ_SOURCE_INVALID;
 
+	link->link_status.dpcd_caps = &link->dpcd_caps;
+
 	link->dc = init_params->dc;
 	link->adapter_srv = as;
 	link->ctx = dc_ctx;
@@ -1377,6 +1379,13 @@ bool dc_link_set_backlight_level(const struct dc_link *public, uint32_t level)
 	link->link_enc->funcs->set_lcd_backlight_level(link->link_enc, level);
 
 	return true;
+}
+
+const struct dc_link_status *dc_link_get_status(const struct dc_link *dc_link)
+{
+	struct core_link *link = DC_LINK_TO_CORE(dc_link);
+
+	return &link->link_status;
 }
 
 void core_link_resume(struct core_link *link)

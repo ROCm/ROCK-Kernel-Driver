@@ -129,26 +129,6 @@ struct link_init_data {
 	struct adapter_service *adapter_srv;
 };
 
-struct dpcd_caps {
-	union dpcd_rev dpcd_rev;
-	union max_lane_count max_ln_count;
-	union max_down_spread max_down_spread;
-
-	/* dongle type (DP converter, CV smart dongle) */
-	enum display_dongle_type dongle_type;
-	/* Dongle's downstream count. */
-	union sink_count sink_count;
-	/* If dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER,
-	indicates 'Frame Sequential-to-lllFrame Pack' conversion capability.*/
-	bool is_dp_hdmi_s3d_converter;
-
-	bool allow_invalid_MSA_timing_param;
-	bool panel_mode_edp;
-	uint32_t sink_dev_id;
-	uint32_t branch_dev_id;
-	int8_t branch_dev_name[6];
-};
-
 /* DP MST stream allocation (payload bandwidth number) */
 struct link_mst_stream_allocation {
 	/* DIG front */
@@ -190,6 +170,8 @@ struct core_link {
 		bool dp_keep_receiver_powered;
 	} wa_flags;
 	struct link_mst_stream_allocation_table mst_stream_alloc_table;
+
+	struct dc_link_status link_status;
 };
 
 #define DC_LINK_TO_LINK(dc_link) container_of(dc_link, struct core_link, public)

@@ -839,15 +839,31 @@ static void handle_hpd_irq(void *param)
 
 static void dm_handle_hpd_rx_irq(struct amdgpu_connector *aconnector)
 {
-	uint8_t esi[8] = { 0 };
+	uint8_t esi[DP_PSR_ERROR_STATUS - DP_SINK_COUNT_ESI] = { 0 };
 	uint8_t dret;
 	bool new_irq_handled = false;
-	/* DPCD 0x2002 - 0x2008 for down stream IRQ from MST, eDP etc. */
+	int dpcd_addr;
+	int dpcd_bytes_to_read;
+
+	const struct dc_link_status *link_status = dc_link_get_status(aconnector->dc_link);
+
+	if (link_status->dpcd_caps->dpcd_rev.raw < 0x12) {
+		dpcd_bytes_to_read = DP_LANE0_1_STATUS - DP_SINK_COUNT;
+		/* DPCD 0x200 - 0x201 for downstream IRQ */
+		dpcd_addr = DP_SINK_COUNT;
+	} else {
+		dpcd_bytes_to_read = DP_PSR_ERROR_STATUS - DP_SINK_COUNT_ESI;
+		/* DPCD 0x2002 - 0x2005 for downstream IRQ */
+		dpcd_addr = DP_SINK_COUNT_ESI;
+	}
+
 	dret = drm_dp_dpcd_read(
 		&aconnector->dm_dp_aux.aux,
-		DP_SINK_COUNT_ESI, esi, 8);
+		dpcd_addr,
+		esi,
+		dpcd_bytes_to_read);
 
-	while (dret == 8) {
+	while (dret == dpcd_bytes_to_read) {
 		uint8_t retry;
 		dret = 0;
 
@@ -863,22 +879,27 @@ static void dm_handle_hpd_rx_irq(struct amdgpu_connector *aconnector)
 
 		if (new_irq_handled) {
 			/* ACK at DPCD to notify down stream */
+			const int ack_dpcd_bytes_to_write =
+				dpcd_bytes_to_read - 1;
+
 			for (retry = 0; retry < 3; retry++) {
 				uint8_t wret;
 
 				wret = drm_dp_dpcd_write(
 					&aconnector->dm_dp_aux.aux,
-					DP_SINK_COUNT_ESI + 1,
+					dpcd_addr + 1,
 					&esi[1],
-					3);
-				if (wret == 3)
+					ack_dpcd_bytes_to_write);
+				if (wret == ack_dpcd_bytes_to_write)
 					break;
 			}
 
 			/* check if there is new irq to be handle */
 			dret = drm_dp_dpcd_read(
 				&aconnector->dm_dp_aux.aux,
-				DP_SINK_COUNT_ESI, esi, 8);
+				dpcd_addr,
+				esi,
+				dpcd_bytes_to_read);
 
 			new_irq_handled = false;
 		} else

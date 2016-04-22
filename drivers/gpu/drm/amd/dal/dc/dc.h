@@ -27,6 +27,7 @@
 #define DC_INTERFACE_H_
 
 #include "dc_types.h"
+#include "dpcd_defs.h"
 #include "grph_object_defs.h"
 #include "logger_types.h"
 #include "gpio_types.h"
@@ -407,6 +408,32 @@ struct dc_link {
 	uint8_t ddc_hw_inst;
 	uint8_t link_enc_hw_inst;
 };
+
+struct dpcd_caps {
+	union dpcd_rev dpcd_rev;
+	union max_lane_count max_ln_count;
+	union max_down_spread max_down_spread;
+
+	/* dongle type (DP converter, CV smart dongle) */
+	enum display_dongle_type dongle_type;
+	/* Dongle's downstream count. */
+	union sink_count sink_count;
+	/* If dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER,
+	indicates 'Frame Sequential-to-lllFrame Pack' conversion capability.*/
+	bool is_dp_hdmi_s3d_converter;
+
+	bool allow_invalid_MSA_timing_param;
+	bool panel_mode_edp;
+	uint32_t sink_dev_id;
+	uint32_t branch_dev_id;
+	int8_t branch_dev_name[6];
+};
+
+struct dc_link_status {
+	struct dpcd_caps *dpcd_caps;
+};
+
+const struct dc_link_status *dc_link_get_status(const struct dc_link *dc_link);
 
 /*
  * Return an enumerated dc_link.  dc_link order is constant and determined at
