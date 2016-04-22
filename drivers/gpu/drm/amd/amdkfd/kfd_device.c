@@ -44,6 +44,18 @@ static const struct kfd_device_info kaveri_device_info = {
 	.is_need_iommu_device = true
 };
 
+static const struct kfd_device_info hawaii_device_info = {
+	.asic_family = CHIP_HAWAII,
+	.max_pasid_bits = 16,
+	/* max num of queues for KV.TODO should be a dynamic value */
+	.max_no_of_hqd	= 24,
+	.ih_ring_entry_size = 4 * sizeof(uint32_t),
+	.event_interrupt_class = &event_interrupt_class_cik,
+	.num_of_watch_points = 4,
+	.mqd_size_aligned = MQD_SIZE_ALIGNED,
+	.is_need_iommu_device = false
+};
+
 static const struct kfd_device_info carrizo_device_info = {
 	.asic_family = CHIP_CARRIZO,
 	.max_pasid_bits = 16,
@@ -120,6 +132,18 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x131B, &kaveri_device_info },	/* Kaveri */
 	{ 0x131C, &kaveri_device_info },	/* Kaveri */
 	{ 0x131D, &kaveri_device_info },	/* Kaveri */
+	{ 0x67A0, &hawaii_device_info },	/* Hawaii */
+	{ 0x67A1, &hawaii_device_info },	/* Hawaii */
+	{ 0x67A2, &hawaii_device_info },	/* Hawaii */
+	{ 0x67A8, &hawaii_device_info },	/* Hawaii */
+	{ 0x67A9, &hawaii_device_info },	/* Hawaii */
+	{ 0x67AA, &hawaii_device_info },	/* Hawaii */
+	{ 0x67B0, &hawaii_device_info },	/* Hawaii */
+	{ 0x67B1, &hawaii_device_info },	/* Hawaii */
+	{ 0x67B8, &hawaii_device_info },	/* Hawaii */
+	{ 0x67B9, &hawaii_device_info },	/* Hawaii */
+	{ 0x67BA, &hawaii_device_info },	/* Hawaii */
+	{ 0x67BE, &hawaii_device_info },	/* Hawaii */
 	{ 0x9870, &carrizo_device_info },	/* Carrizo */
 	{ 0x9874, &carrizo_device_info },	/* Carrizo */
 	{ 0x9875, &carrizo_device_info },	/* Carrizo */
@@ -422,7 +446,7 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 		 kfd->pdev->device);
 
 	pr_debug("kfd: Starting kfd with the following scheduling policy %d\n",
-		sched_policy);
+		kfd->dqm->sched_policy);
 
 	goto out;
 

@@ -189,9 +189,12 @@ struct device_queue_manager {
 	unsigned int		*fence_addr;
 	struct kfd_mem_obj	*fence_mem;
 	bool			active_runlist;
+	int			sched_policy;
 };
 
 void device_queue_manager_init_cik(struct device_queue_manager_asic_ops *ops);
+void device_queue_manager_init_cik_hawaii(
+		struct device_queue_manager_asic_ops *ops);
 void device_queue_manager_init_vi(struct device_queue_manager_asic_ops *ops);
 void device_queue_manager_init_vi_tonga(
 		struct device_queue_manager_asic_ops *ops);
