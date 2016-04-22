@@ -158,13 +158,15 @@ enum cache_policy {
 
 enum asic_family_type {
 	CHIP_KAVERI = 0,
+	CHIP_HAWAII,
 	CHIP_CARRIZO,
 	CHIP_TONGA,
 	CHIP_FIJI
 };
 
 #define KFD_IS_VI(chip) ((chip) >= CHIP_CARRIZO && (chip) <= CHIP_FIJI)
-#define KFD_IS_DGPU(chip) ((chip) >= CHIP_TONGA && (chip) <= CHIP_FIJI)
+#define KFD_IS_DGPU(chip) (((chip) >= CHIP_TONGA && (chip) <= CHIP_FIJI) || \
+			   (chip) == CHIP_HAWAII)
 
 struct kfd_event_interrupt_class {
 	bool (*interrupt_isr)(struct kfd_dev *dev, const uint32_t *ih_ring_entry);
@@ -773,6 +775,8 @@ void print_queue(struct queue *q);
 struct mqd_manager *mqd_manager_init(enum KFD_MQD_TYPE type,
 					struct kfd_dev *dev);
 struct mqd_manager *mqd_manager_init_cik(enum KFD_MQD_TYPE type,
+		struct kfd_dev *dev);
+struct mqd_manager *mqd_manager_init_cik_hawaii(enum KFD_MQD_TYPE type,
 		struct kfd_dev *dev);
 struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		struct kfd_dev *dev);
