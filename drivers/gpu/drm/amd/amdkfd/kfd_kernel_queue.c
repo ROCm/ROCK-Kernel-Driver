@@ -311,6 +311,7 @@ struct kernel_queue *kernel_queue_init(struct kfd_dev *dev,
 		break;
 
 	case CHIP_KAVERI:
+	case CHIP_HAWAII:
 		kernel_queue_init_cik(&kq->ops_asic_specific);
 		break;
 	}

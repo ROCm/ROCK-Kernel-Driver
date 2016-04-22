@@ -138,10 +138,6 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 	m->cp_mqd_base_addr_lo        = lower_32_bits(addr);
 	m->cp_mqd_base_addr_hi        = upper_32_bits(addr);
 
-	m->cp_hqd_ib_control = DEFAULT_MIN_IB_AVAIL_SIZE | IB_ATC_EN;
-	/* Although WinKFD writes this, I suspect it should not be necessary */
-	m->cp_hqd_ib_control = IB_ATC_EN | DEFAULT_MIN_IB_AVAIL_SIZE;
-
 	m->cp_hqd_quantum = QUANTUM_EN | QUANTUM_SCALE_1MS |
 				QUANTUM_DURATION(10);
 
@@ -226,8 +222,8 @@ static int load_mqd_sdma(struct mqd_manager *mm, void *mqd,
 	return mm->dev->kfd2kgd->hqd_sdma_load(mm->dev->kgd, mqd);
 }
 
-static int update_mqd(struct mqd_manager *mm, void *mqd,
-			struct queue_properties *q)
+static int __update_mqd(struct mqd_manager *mm, void *mqd,
+			struct queue_properties *q, unsigned int atc_bit)
 {
 	struct cik_mqd *m;
 
@@ -237,7 +233,12 @@ static int update_mqd(struct mqd_manager *mm, void *mqd,
 
 	m = get_mqd(mqd);
 	m->cp_hqd_pq_control = DEFAULT_RPTR_BLOCK_SIZE |
-				DEFAULT_MIN_AVAIL_SIZE | PQ_ATC_EN;
+				DEFAULT_MIN_AVAIL_SIZE;
+	m->cp_hqd_ib_control = DEFAULT_MIN_IB_AVAIL_SIZE;
+        if (atc_bit) {
+		m->cp_hqd_pq_control |= PQ_ATC_EN;
+		m->cp_hqd_ib_control |= IB_ATC_EN;
+	}
 
 	/*
 	 * Calculating queue size which is log base 2 of actual queue size -1
@@ -271,6 +272,18 @@ static int update_mqd(struct mqd_manager *mm, void *mqd,
 	}
 
 	return 0;
+}
+
+static int update_mqd(struct mqd_manager *mm, void *mqd,
+			struct queue_properties *q)
+{
+	return __update_mqd(mm, mqd, q, 1);
+}
+
+static int update_mqd_hawaii(struct mqd_manager *mm, void *mqd,
+			struct queue_properties *q)
+{
+	return __update_mqd(mm, mqd, q, 0);
 }
 
 static int update_mqd_sdma(struct mqd_manager *mm, void *mqd,
@@ -513,3 +526,15 @@ struct mqd_manager *mqd_manager_init_cik(enum KFD_MQD_TYPE type,
 	return mqd;
 }
 
+struct mqd_manager *mqd_manager_init_cik_hawaii(enum KFD_MQD_TYPE type,
+			struct kfd_dev *dev)
+{
+	struct mqd_manager *mqd;
+
+	mqd = mqd_manager_init_cik(type, dev);
+	if (!mqd)
+		return NULL;
+	if ((type == KFD_MQD_TYPE_CP) || (type == KFD_MQD_TYPE_COMPUTE))
+		mqd->update_mqd = update_mqd_hawaii;
+	return mqd;
+}
