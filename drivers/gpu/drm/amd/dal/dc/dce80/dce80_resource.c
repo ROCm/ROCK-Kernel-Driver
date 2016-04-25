@@ -688,6 +688,17 @@ bool dce80_construct_resource_pool(
 	pool->adapter_srv = as;
 	pool->funcs = &dce80_res_pool_funcs;
 
+
+	/*************************************************
+	 *  Resource + asic cap harcoding                *
+	 *************************************************/
+	pool->pipe_count = dal_adapter_service_get_func_controllers_num(as);
+	pool->stream_enc_count = dal_adapter_service_get_stream_engines_num(as);
+
+	/*************************************************
+	 *  Create resources                             *
+	 *************************************************/
+
 	pool->stream_engines.engine.ENGINE_ID_DIGA = 1;
 	pool->stream_engines.engine.ENGINE_ID_DIGB = 1;
 	pool->stream_engines.engine.ENGINE_ID_DIGC = 1;
@@ -753,8 +764,6 @@ bool dce80_construct_resource_pool(
 
 	}
 
-	pool->pipe_count = dal_adapter_service_get_func_controllers_num(as);
-	pool->stream_enc_count = dal_adapter_service_get_stream_engines_num(as);
 	pool->scaler_filter = dal_scaler_filter_create(ctx);
 	if (pool->scaler_filter == NULL) {
 		BREAK_TO_DEBUGGER();

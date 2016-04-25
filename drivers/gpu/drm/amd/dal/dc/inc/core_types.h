@@ -239,8 +239,8 @@ struct resource_pool {
 	struct timing_generator *timing_generators[MAX_PIPES];
 	struct stream_encoder *stream_enc[MAX_PIPES * 2];
 
-	uint8_t pipe_count;
-	uint8_t stream_enc_count;
+	unsigned int pipe_count;
+	unsigned int stream_enc_count;
 
 	union supported_stream_engines stream_engines;
 
@@ -250,10 +250,10 @@ struct resource_pool {
 	struct clock_source *dp_clock_source;
 
 	struct clock_source *clock_sources[MAX_CLOCK_SOURCES];
-	uint8_t clk_src_count;
+	unsigned int clk_src_count;
 
 	struct audio *audios[MAX_PIPES];
-	uint8_t audio_count;
+	unsigned int audio_count;
 
 	struct display_clock *display_clock;
 	struct adapter_service *adapter_srv;

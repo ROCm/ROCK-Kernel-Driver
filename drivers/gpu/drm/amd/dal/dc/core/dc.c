@@ -416,7 +416,9 @@ struct dc *dc_create(const struct dc_init_data *init_params)
 	/*TODO: separate HW and SW initialization*/
 	core_dc->hwss.init_hw(core_dc);
 
-	core_dc->public.caps.max_targets = core_dc->res_pool.pipe_count;
+	core_dc->public.caps.max_targets = dm_min(
+			core_dc->res_pool.pipe_count,
+			core_dc->res_pool.stream_enc_count);
 	core_dc->public.caps.max_links = core_dc->link_count;
 	core_dc->public.caps.max_audios = core_dc->res_pool.audio_count;
 
