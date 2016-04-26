@@ -137,6 +137,9 @@ static int __init kfd_module_init(void)
 
 	amdkfd_init_completed = 1;
 
+	if (!kfd_init_peer_direct())
+		pr_info("PeerDirect support was enabled\n");
+
 	dev_info(kfd_device, "Initialized module\n");
 
 	return 0;
@@ -153,6 +156,7 @@ static void __exit kfd_module_exit(void)
 {
 	amdkfd_init_completed = 0;
 
+	kfd_close_peer_direct();
 	kfd_process_destroy_wq();
 	kfd_topology_shutdown();
 	kfd_chardev_exit();
