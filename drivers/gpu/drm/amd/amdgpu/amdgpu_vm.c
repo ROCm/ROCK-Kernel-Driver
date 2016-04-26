@@ -579,14 +579,26 @@ static int amdgpu_vm_clear_bo(struct amdgpu_device *adev,
 	if (r)
 		goto error;
 
-	addr = amdgpu_bo_gpu_offset(bo);
-	entries = amdgpu_bo_size(bo) / 8;
+	/* If update flag is set to CPU, clear memory and return */
+	if (vm->is_vm_update_mode_cpu) {
+		r = amdgpu_bo_kmap(bo, &vm_update_params.kptr);
+		if (!r) {
+			memset(vm_update_params.kptr, 0, amdgpu_bo_size(bo));
+			amdgpu_bo_kunmap(bo);
+			return 0;
+		}
+		dev_warn(adev->dev,
+			"PD/PT BO clear failed using CPU failed. Fallback to SDMA\n");
+	}
 
 	r = amdgpu_job_alloc_with_ib(adev, 64, &job);
 	if (r)
 		goto error;
 
 	vm_update_params.ib = &job->ibs[0];
+	addr = amdgpu_bo_gpu_offset(bo);
+	entries = amdgpu_bo_size(bo) / 8;
+
 	amdgpu_vm_update_pages(adev, &vm_update_params, addr, 0, entries,
 			       0, 0);
 	amdgpu_ring_pad_ib(ring, &job->ibs[0]);
@@ -1412,7 +1424,9 @@ int amdgpu_vm_bo_map(struct amdgpu_device *adev,
 		r = amdgpu_bo_create(adev, AMDGPU_VM_PTE_COUNT * 8,
 				     AMDGPU_GPU_PAGE_SIZE, true,
 				     AMDGPU_GEM_DOMAIN_VRAM,
-				     AMDGPU_GEM_CREATE_NO_CPU_ACCESS,
+				     vm->is_vm_update_mode_cpu ?
+					AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED :
+					AMDGPU_GEM_CREATE_NO_CPU_ACCESS,
 				     NULL, resv, &pt);
 		if (r)
 			goto error_free;
