@@ -630,44 +630,6 @@ static void unblank_stream(struct pipe_ctx *pipe_ctx,
 	pipe_ctx->stream_enc->funcs->dp_unblank(pipe_ctx->stream_enc, &params);
 }
 
-static enum dc_color_space get_output_color_space(
-				const struct dc_crtc_timing *dc_crtc_timing)
-{
-	enum dc_color_space color_space = COLOR_SPACE_SRGB;
-
-	switch (dc_crtc_timing->pixel_encoding)	{
-	case PIXEL_ENCODING_YCBCR422:
-	case PIXEL_ENCODING_YCBCR444:
-	case PIXEL_ENCODING_YCBCR420:
-	{
-		if ((dc_crtc_timing->timing_standard ==
-			TIMING_STANDARD_CEA770) ||
-			(dc_crtc_timing->timing_standard ==
-				TIMING_STANDARD_CEA861)) {
-			if (dc_crtc_timing->pix_clk_khz > 27030) {
-				if (dc_crtc_timing->flags.Y_ONLY)
-					color_space =
-						COLOR_SPACE_YCBCR709_LIMITED;
-				else
-					color_space = COLOR_SPACE_YCBCR709;
-			} else {
-				if (dc_crtc_timing->flags.Y_ONLY)
-					color_space =
-						COLOR_SPACE_YCBCR601_LIMITED;
-				else
-					color_space = COLOR_SPACE_YCBCR601;
-			}
-		}
-	}
-	break;
-
-	default:
-		break;
-	}
-
-	return color_space;
-}
-
 static enum audio_dto_source translate_to_dto_source(enum controller_id crtc_id)
 {
 	switch (crtc_id) {
@@ -765,7 +727,6 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		struct core_dc *dc)
 {
 	struct core_stream *stream = pipe_ctx->stream;
-	enum dc_color_space color_space;
 	struct pipe_ctx *pipe_ctx_old = &dc->current_context.res_ctx.
 			pipe_ctx[pipe_ctx->pipe_idx];
 
@@ -844,10 +805,9 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 			true : false);
 
 	/* program blank color */
-	color_space = get_output_color_space(&stream->public.timing);
 	pipe_ctx->tg->funcs->set_blank_color(
 			pipe_ctx->tg,
-			color_space);
+			stream->public.output_color_space);
 
 	if (!pipe_ctx_old->stream) {
 		core_link_enable_stream(pipe_ctx);
@@ -1386,8 +1346,7 @@ static void set_default_colors(struct pipe_ctx *pipe_ctx)
 
 	default_adjust.force_hw_default = false;
 	default_adjust.in_color_space = pipe_ctx->surface->public.color_space;
-	default_adjust.out_color_space = get_output_color_space(
-					&pipe_ctx->stream->public.timing);
+	default_adjust.out_color_space = pipe_ctx->stream->public.output_color_space;
 	default_adjust.csc_adjust_type = GRAPHICS_CSC_ADJUST_TYPE_SW;
 	default_adjust.surface_pixel_format = pipe_ctx->scl_data.format;
 
@@ -1414,7 +1373,7 @@ static void program_scaler(const struct pipe_ctx *pipe_ctx)
 
 	pipe_ctx->tg->funcs->set_overscan_blank_color(
 		pipe_ctx->tg,
-		get_output_color_space(&pipe_ctx->stream->public.timing));
+		pipe_ctx->stream->public.output_color_space);
 
 	pipe_ctx->xfm->funcs->transform_set_scaler(pipe_ctx->xfm, &pipe_ctx->scl_data);
 }

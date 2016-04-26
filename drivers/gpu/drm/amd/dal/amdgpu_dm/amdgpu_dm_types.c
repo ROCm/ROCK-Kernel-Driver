@@ -720,13 +720,58 @@ static enum dc_aspect_ratio get_aspect_ratio(
 		return ASPECT_RATIO_4_3;
 }
 
+static enum dc_color_space get_output_color_space(
+				const struct dc_crtc_timing *dc_crtc_timing)
+{
+	enum dc_color_space color_space = COLOR_SPACE_SRGB;
+
+	switch (dc_crtc_timing->pixel_encoding)	{
+	case PIXEL_ENCODING_YCBCR422:
+	case PIXEL_ENCODING_YCBCR444:
+	case PIXEL_ENCODING_YCBCR420:
+	{
+		/*
+		 * 27030khz is the separation point between HDTV and SDTV
+		 * according to HDMI spec, we use YCbCr709 and YCbCr601
+		 * respectively
+		 */
+		if (dc_crtc_timing->pix_clk_khz > 27030) {
+			if (dc_crtc_timing->flags.Y_ONLY)
+				color_space =
+					COLOR_SPACE_YCBCR709_LIMITED;
+			else
+				color_space = COLOR_SPACE_YCBCR709;
+		} else {
+			if (dc_crtc_timing->flags.Y_ONLY)
+				color_space =
+					COLOR_SPACE_YCBCR601_LIMITED;
+			else
+				color_space = COLOR_SPACE_YCBCR601;
+		}
+
+	}
+	break;
+	case PIXEL_ENCODING_RGB:
+		color_space = COLOR_SPACE_SRGB;
+		break;
+
+	default:
+		WARN_ON(1);
+		break;
+	}
+
+	return color_space;
+}
+
 /*****************************************************************************/
 
-static void dc_timing_from_drm_display_mode(
-	struct dc_crtc_timing *timing_out,
+static void fill_stream_properties_from_drm_display_mode(
+	struct dc_stream *stream,
 	const struct drm_display_mode *mode_in,
 	const struct drm_connector *connector)
 {
+	struct dc_crtc_timing *timing_out = &stream->timing;
+
 	memset(timing_out, 0, sizeof(struct dc_crtc_timing));
 
 	timing_out->h_border_left = 0;
@@ -734,8 +779,13 @@ static void dc_timing_from_drm_display_mode(
 	timing_out->v_border_top = 0;
 	timing_out->v_border_bottom = 0;
 	/* TODO: un-hardcode */
-	timing_out->pixel_encoding = PIXEL_ENCODING_RGB;
-	timing_out->timing_standard = TIMING_STANDARD_HDMI;
+
+	if (stream->sink->sink_signal == SIGNAL_TYPE_HDMI_TYPE_A &&
+			(connector->display_info.color_formats & DRM_COLOR_FORMAT_YCRCB444))
+		timing_out->pixel_encoding = PIXEL_ENCODING_YCBCR444;
+	else
+		timing_out->pixel_encoding = PIXEL_ENCODING_RGB;
+
 	timing_out->timing_3d_format = TIMING_3D_FORMAT_NONE;
 	timing_out->display_color_depth = convert_color_depth_from_display_info(
 			connector);
@@ -761,6 +811,8 @@ static void dc_timing_from_drm_display_mode(
 		timing_out->flags.HSYNC_POSITIVE_POLARITY = 1;
 	if (mode_in->flags & DRM_MODE_FLAG_PVSYNC)
 		timing_out->flags.VSYNC_POSITIVE_POLARITY = 1;
+
+	stream->output_color_space = get_output_color_space(timing_out);
 
 }
 
@@ -900,7 +952,7 @@ static struct dc_target *create_target_for_sink(
 				dm_state->scaling != RMX_OFF);
 	}
 
-	dc_timing_from_drm_display_mode(&stream->timing,
+	fill_stream_properties_from_drm_display_mode(stream,
 			&mode, &aconnector->base);
 
 	fill_audio_info(
@@ -1228,7 +1280,7 @@ int amdgpu_dm_connector_mode_valid(
 	}
 
 	drm_mode_set_crtcinfo(mode, 0);
-	dc_timing_from_drm_display_mode(&streams[0]->timing, mode, connector);
+	fill_stream_properties_from_drm_display_mode(streams[0], mode, connector);
 
 	target = dc_create_target_for_streams(streams, 1);
 	val_set.target = target;
@@ -1457,7 +1509,7 @@ int dm_create_validation_set_for_target(struct drm_connector *connector,
 	}
 
 	drm_mode_set_crtcinfo(mode, 0);
-	dc_timing_from_drm_display_mode(&streams[0]->timing, mode, connector);
+	fill_stream_properties_from_drm_display_mode(streams[0], mode, connector);
 
 	target = dc_create_target_for_streams(streams, 1);
 	val_set->target = target;

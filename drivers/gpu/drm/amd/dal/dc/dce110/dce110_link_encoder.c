@@ -970,19 +970,6 @@ static bool validate_hdmi_output(
 		(pixel_clock > enc110->base.features.max_pixel_clock))
 		return false;
 
-	/*
-	 * Restriction: allow non-CE mode (IT mode) to support RGB only.
-	 * When it is IT mode, the format mode will be 0,
-	 * but currently the code is broken,
-	 * VIDEO FORMAT is always 0 in validatepathMode().
-	 * Due to overscan change - need fix there and test the impact - to do.
-	 */
-	if (crtc_timing->timing_standard != TIMING_STANDARD_CEA861 &&
-		crtc_timing->timing_standard != TIMING_STANDARD_HDMI)
-		if (crtc_timing->pixel_encoding !=
-			PIXEL_ENCODING_RGB)
-			return false;
-
 	/* DCE11 HW does not support 420 */
 	if (crtc_timing->pixel_encoding == PIXEL_ENCODING_YCBCR420)
 		return false;

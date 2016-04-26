@@ -82,8 +82,6 @@ void enable_surface_flip_reporting(struct dc_surface *dc_surface,
 #define DC_STREAM_TO_CORE(dc_stream) container_of( \
 	dc_stream, struct core_stream, public)
 
-#define PIXEL_CLOCK	27030
-
 struct core_stream {
 	struct dc_stream public;
 

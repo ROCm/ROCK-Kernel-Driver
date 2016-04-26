@@ -63,19 +63,6 @@ enum colorimetry {
        COLORIMETRY_EXTENDED = 3
 };
 
-enum ds_color_space {
-       DS_COLOR_SPACE_UNKNOWN = 0,
-       DS_COLOR_SPACE_SRGB_FULLRANGE = 1,
-       DS_COLOR_SPACE_SRGB_LIMITEDRANGE,
-       DS_COLOR_SPACE_YPBPR601,
-       DS_COLOR_SPACE_YPBPR709,
-       DS_COLOR_SPACE_YCBCR601,
-       DS_COLOR_SPACE_YCBCR709,
-       DS_COLOR_SPACE_NMVPU_SUPERAA,
-       DS_COLOR_SPACE_YCBCR601_YONLY,
-       DS_COLOR_SPACE_YCBCR709_YONLY/*same as YCbCr, but Y in Full range*/
-};
-
 enum active_format_info {
        ACTIVE_FORMAT_NO_DATA = 0,
        ACTIVE_FORMAT_VALID = 1

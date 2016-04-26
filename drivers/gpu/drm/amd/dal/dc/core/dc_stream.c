@@ -71,17 +71,6 @@ static void build_bit_depth_reduction_params(
 	return;
 }
 
-static void setup_pixel_encoding(
-	struct clamping_and_pixel_encoding_params *clamping)
-{
-	/*TODO: Need to un-hardcode, refer to function with same name
-		 * in dal2 hw_sequencer*/
-
-	clamping->pixel_encoding = PIXEL_ENCODING_RGB;
-
-	return;
-}
-
 static bool construct(struct core_stream *stream,
 	const struct dc_sink *dc_sink_data)
 {
@@ -94,7 +83,8 @@ static bool construct(struct core_stream *stream,
 	dc_sink_retain(dc_sink_data);
 
 	build_bit_depth_reduction_params(stream, &stream->bit_depth_params);
-	setup_pixel_encoding(&stream->clamping);
+
+	stream->clamping.pixel_encoding = stream->public.timing.pixel_encoding;
 
 	/* Copy audio modes */
 	/* TODO - Remove this translation */

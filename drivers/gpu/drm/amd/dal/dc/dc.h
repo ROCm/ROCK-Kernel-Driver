@@ -306,6 +306,8 @@ struct dc_stream {
 	const struct dc_sink *sink;
 	struct dc_crtc_timing timing;
 
+	enum dc_color_space output_color_space;
+
 	struct rect src; /* viewport in target space*/
 	struct rect dst; /* stream addressable area */
 

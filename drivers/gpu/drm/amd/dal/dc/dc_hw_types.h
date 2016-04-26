@@ -345,7 +345,6 @@ struct dc_cursor_attributes {
 
 /* OPP */
 
-
 enum dc_color_space {
 	COLOR_SPACE_UNKNOWN,
 	COLOR_SPACE_SRGB,
@@ -358,8 +357,6 @@ enum dc_color_space {
 	COLOR_SPACE_YCBCR709_LIMITED
 };
 
-
-
 /* XFM */
 
 /* used in  struct dc_surface */
@@ -369,7 +366,6 @@ struct scaling_taps {
 	uint32_t v_taps_c;
 	uint32_t h_taps_c;
 };
-
 
 enum dc_timing_standard {
 	TIMING_STANDARD_UNDEFINED,
@@ -503,7 +499,6 @@ struct dc_crtc_timing {
 
 	uint32_t vic;
 	uint32_t hdmi_vic;
-	enum dc_timing_standard timing_standard;
 	enum dc_timing_3d_format timing_3d_format;
 	enum dc_color_depth display_color_depth;
 	enum dc_pixel_encoding pixel_encoding;

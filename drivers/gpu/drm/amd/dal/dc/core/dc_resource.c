@@ -886,67 +886,6 @@ enum dc_status resource_map_pool_resources(
 	return DC_OK;
 }
 
-static enum ds_color_space build_default_color_space(
-		struct pipe_ctx *pipe_ctx)
-{
-	enum ds_color_space color_space =
-			DS_COLOR_SPACE_SRGB_FULLRANGE;
-	struct dc_crtc_timing *timing = &pipe_ctx->stream->public.timing;
-
-	switch (pipe_ctx->signal) {
-	/* TODO: implement other signal color space setting */
-	case SIGNAL_TYPE_DISPLAY_PORT:
-	case SIGNAL_TYPE_DISPLAY_PORT_MST:
-	case SIGNAL_TYPE_EDP:
-		break;
-	case SIGNAL_TYPE_HDMI_TYPE_A:
-	{
-		uint32_t pix_clk_khz;
-
-		if (timing->pixel_encoding != PIXEL_ENCODING_YCBCR422 &&
-			timing->pixel_encoding != PIXEL_ENCODING_YCBCR444) {
-			if (timing->timing_standard ==
-					TIMING_STANDARD_CEA770 ||
-				timing->timing_standard ==
-						TIMING_STANDARD_CEA861)
-				color_space = DS_COLOR_SPACE_SRGB_FULLRANGE;
-
-			pix_clk_khz = timing->pix_clk_khz / 10;
-			if (timing->h_addressable == 640 &&
-				timing->v_addressable == 480 &&
-				(pix_clk_khz == 2520 || pix_clk_khz == 2517))
-				color_space = DS_COLOR_SPACE_SRGB_FULLRANGE;
-		} else {
-			if (timing->timing_standard ==
-					TIMING_STANDARD_CEA770 ||
-					timing->timing_standard ==
-					TIMING_STANDARD_CEA861) {
-
-				color_space =
-					(timing->pix_clk_khz > PIXEL_CLOCK) ?
-						DS_COLOR_SPACE_YCBCR709 :
-						DS_COLOR_SPACE_YCBCR601;
-			}
-		}
-		break;
-	}
-	default:
-		switch (timing->pixel_encoding) {
-		case PIXEL_ENCODING_YCBCR422:
-		case PIXEL_ENCODING_YCBCR444:
-			if (timing->pix_clk_khz > PIXEL_CLOCK)
-				color_space = DS_COLOR_SPACE_YCBCR709;
-			else
-				color_space = DS_COLOR_SPACE_YCBCR601;
-			break;
-		default:
-			break;
-		}
-		break;
-	}
-	return color_space;
-}
-
 static void translate_info_frame(const struct hw_info_frame *hw_info_frame,
 	struct encoder_info_frame *encoder_info_frame)
 {
@@ -1007,7 +946,7 @@ static void set_avi_info_frame(
 		struct pipe_ctx *pipe_ctx)
 {
 	struct core_stream *stream = pipe_ctx->stream;
-	enum ds_color_space color_space = DS_COLOR_SPACE_UNKNOWN;
+	enum dc_color_space color_space = COLOR_SPACE_UNKNOWN;
 	struct info_frame info_frame = { {0} };
 	uint32_t pixel_encoding = 0;
 	enum scanning_type scan_type = SCANNING_TYPE_NODATA;
@@ -1020,7 +959,7 @@ static void set_avi_info_frame(
 	if (info_packet == NULL)
 		return;
 
-	color_space = build_default_color_space(pipe_ctx);
+	color_space = pipe_ctx->stream->public.output_color_space;
 
 	/* Initialize header */
 	info_frame.avi_info_packet.info_packet_hdmi.bits.header.
@@ -1073,10 +1012,10 @@ static void set_avi_info_frame(
 	info_frame.avi_info_packet.info_packet_hdmi.bits.S0_S1 = scan_type;
 
 	/* C0, C1 : Colorimetry */
-	if (color_space == DS_COLOR_SPACE_YCBCR709)
+	if (color_space == COLOR_SPACE_YCBCR709)
 		info_frame.avi_info_packet.info_packet_hdmi.bits.C0_C1 =
 				COLORIMETRY_ITU709;
-	else if (color_space == DS_COLOR_SPACE_YCBCR601)
+	else if (color_space == COLOR_SPACE_YCBCR601)
 		info_frame.avi_info_packet.info_packet_hdmi.bits.C0_C1 =
 				COLORIMETRY_ITU601;
 	else
@@ -1114,10 +1053,10 @@ static void set_avi_info_frame(
 	}
 
 	/* TODO: un-hardcode q0_q1 */
-	if (color_space == DS_COLOR_SPACE_SRGB_FULLRANGE)
+	if (color_space == COLOR_SPACE_SRGB)
 		info_frame.avi_info_packet.info_packet_hdmi.bits.Q0_Q1 =
 						RGB_QUANTIZATION_FULL_RANGE;
-	else if (color_space == DS_COLOR_SPACE_SRGB_LIMITEDRANGE)
+	else if (color_space == COLOR_SPACE_SRGB_LIMITED)
 		info_frame.avi_info_packet.info_packet_hdmi.bits.Q0_Q1 =
 						RGB_QUANTIZATION_LIMITED_RANGE;
 	else
