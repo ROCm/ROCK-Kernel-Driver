@@ -130,6 +130,9 @@ static int __init kfd_module_init(void)
 
 	kfd_process_create_wq();
 
+	if (!kfd_init_peer_direct())
+		pr_info("PeerDirect support was enabled\n");
+
 	dev_info(kfd_device, "Initialized module\n");
 
 	return 0;
@@ -144,6 +147,7 @@ err_pasid:
 
 static void __exit kfd_module_exit(void)
 {
+	kfd_close_peer_direct();
 	kfd_process_destroy_wq();
 	kfd_topology_shutdown();
 	kfd_chardev_exit();
