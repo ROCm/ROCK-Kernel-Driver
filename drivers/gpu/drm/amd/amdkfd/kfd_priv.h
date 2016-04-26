@@ -913,4 +913,9 @@ int restore(struct kfd_dev *kfd);
 #define KFD_MULTI_PROC_MAPPING_HWS_SUPPORT 600
 #define KFD_CWSR_CZ_FW_VER 625
 
+/* PeerDirect support */
+int kfd_init_peer_direct(void);
+void kfd_close_peer_direct(void);
+
+
 #endif
