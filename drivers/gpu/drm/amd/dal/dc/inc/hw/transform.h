@@ -144,6 +144,117 @@ struct scaler_data {
 	enum pixel_format format;
 };
 
+
+// Enums
+// TODO: Recommend these enums to be added to .h file
+enum dscl_coef_filter_type_sel {
+	SCL_COEF_LUMA_VERT_FILTER,      // Luma (G/Y) Vertical filter
+	SCL_COEF_LUMA_HORZ_FILTER,      // Luma (G/Y) Horizontal filter
+	SCL_COEF_CHROMA_VERT_FILTER,    // Chroma (CbCr/RB) Vertical filter
+	SCL_COEF_CHROMA_HORZ_FILTER,    // Chroma (CbCr/RB) Horizontal filter
+	SCL_COEF_ALPHA_VERT_FILTER,     // Alpha Vertical filter
+	SCL_COEF_ALPHA_HORZ_FILTER      // Alpha Horizontal filter
+};
+
+enum scaling_mode_sel {
+	SCALING_AUTO_444,
+	SCALING_MANUAL_444,
+	SCALING_MANUAL_420,
+	SCALING_OFF_MANUAL_REPLICATION,             // Only 4:4:4
+	SCALING_OFF_AUTO_CENTER_NO_REPLICATION,     // Only 4:4:4
+	SCALING_OFF_AUTO_CENTER_AUTO_REPLICATION    // Only 4:4:4
+};
+
+enum color_space_sel {
+	COLOR_SPACE_RGB, COLOR_SPACE_YCBCR
+};
+
+enum dscl_mode_sel {
+	DSCL_MODE_SCALING_444_BYPASS, // Scaling bypass for both luma and chroma path in 4:4:4
+	DSCL_MODE_SCALING_444_RGB_ENABLE, // Scaling enable for both luma and chroma path in 4:4:4 RGB
+	DSCL_MODE_SCALING_444_YCBCR_ENABLE, // Scaling enable for both luma and chroma path in 4:4:4 YCbCr
+	DSCL_MODE_SCALING_420_YCBCR_ENABLE, // Scaling enable for both luma and chroma path in 4:2:0 YCbCr
+	DSCL_MODE_SCALING_420_LUMA_BYPASS, // Scaling bypass for the luma path but scaling enable for the chroma path in 4:2:0 YCbCr
+	DSCL_MODE_SCALING_420_CHROMA_BYPASS, // Scaling bypass for the chroma path but scaling enable for the luma path in 4:2:0
+	DSCL_MODE_DSCL_BYPASS,   // DSCL bypass without going through Line Buffer
+	DSCL_MODE_UNSUPPORTED
+};
+
+enum dscl_autocal_mode {
+	AUTOCAL_MODE_OFF,           // AutoCal off
+	AUTOCAL_MODE_AUTOSCALE, // Autocal calculate the scaling ratio and initial phase and the DSCL_MODE_SEL must be set to 1
+	AUTOCAL_MODE_AUTOCENTER, // Autocal perform auto centering without replication and the DSCL_MODE_SEL must be set to 0
+	AUTOCAL_MODE_AUTOREPLICATE, // Autocal perform auto centering and auto replication and the DSCL_MODE_SEL must be set to 0
+	AUTOCAL_MODE_UNSUPPORTED
+};
+
+enum lb_memory_config {
+	LB_MEMORY_CONFIG_0, // Enable all 3 pieces of memory
+	LB_MEMORY_CONFIG_1, // Enable only the first piece of memory
+	LB_MEMORY_CONFIG_2, // Enable only the second piece of memory
+	LB_MEMORY_CONFIG_3 // Only applicable in 4:2:0 mode, enable all 3 pieces of memory and the last piece of chroma memory used for the luma storage
+};
+
+// Structs
+// TODO: Recommend these structs to be added to .h file
+struct otg_blanking {
+	uint32_t h_blank_start;
+	uint32_t h_blank_end;
+	uint32_t v_blank_start;
+	uint32_t v_blank_end;
+};
+
+struct scaler_2tap_mode {
+	bool h_2tap_hardcode_coef_en;
+	bool v_2tap_hardcode_coef_en;
+	bool h_2tap_sharp_en;
+	bool v_2tap_sharp_en;
+	uint32_t h_2tap_sharp_factor;
+	uint32_t v_2tap_sharp_factor;
+};
+
+struct input_size_params {
+	uint32_t recin_width;
+	uint32_t recin_height;
+	uint32_t recin_width_c;
+	uint32_t recin_height_c;
+};
+
+struct output_size_params {
+	uint32_t recout_width;
+	uint32_t recout_height;
+	uint32_t recout_start_x;
+	uint32_t recout_start_y;
+	uint32_t otg_active_width; // MPC width:  OTG non-blank, includes overscan
+	uint32_t otg_active_height; // MPC height: OTG non-blank, includes overscan
+};
+
+struct line_buffer_params {
+	bool alpha_en;
+	bool pixel_expan_mode;
+	bool interleave_en;
+	uint32_t dynamic_pixel_depth;
+	enum lb_pixel_depth depth;
+	enum lb_memory_config memory_config;
+};
+
+struct replication_factors {
+	uint32_t h_manual_rep_factor;
+	uint32_t v_manual_rep_factor;
+};
+
+struct scaler_boundary_mode {
+	bool boundary_mode; // Default to repeat edge pixel
+	uint32_t black_offset_rgb_y;
+	uint32_t black_offset_cbcr;
+};
+
+struct autoscale_params {
+	uint32_t autocal_num_pipe;
+	uint32_t autocal_pipe_id;
+};
+
+
 struct transform_funcs {
 	bool (*transform_power_up)(
 		struct transform *xfm);
@@ -154,7 +265,7 @@ struct transform_funcs {
 
 	void (*transform_set_scaler_bypass)(
 		struct transform *xfm,
-		const struct rect *size);
+		const struct output_size_params *output_size);
 
 	void (*transform_set_scaler_filter)(
 		struct transform *xfm,
