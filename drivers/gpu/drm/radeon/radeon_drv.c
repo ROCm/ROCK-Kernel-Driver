@@ -286,6 +286,9 @@ MODULE_PARM_DESC(mst, "DisplayPort MST experimental support (1 = enable, 0 = dis
 module_param_named(mst, radeon_mst, int, 0444);
 
 static struct pci_device_id pciidlist[] = {
+#ifndef CONFIG_DRM_AMDGPU_CIK
+	radeon_CIK_PCI_IDS,
+#endif
 	radeon_PCI_IDS
 };
 
