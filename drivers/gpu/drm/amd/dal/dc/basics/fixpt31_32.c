@@ -665,8 +665,7 @@ static inline uint32_t ux_dy(
 	uint32_t fractional_bits)
 {
 	/* 1. create mask of integer part */
-	uint32_t result =
-		(1 << integer_bits) - 1;
+	uint32_t result = (1 << integer_bits) - 1;
 	/* 2. mask out fractional part */
 	uint32_t fractional_part = FRACTIONAL_PART_MASK & value;
 	/* 3. shrink fixed point integer part to be of integer_bits width*/

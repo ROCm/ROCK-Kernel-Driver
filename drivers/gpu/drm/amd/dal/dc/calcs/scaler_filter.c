@@ -1961,6 +1961,40 @@ const struct fixed31_32 *dal_scaler_filter_get(
 	return filter->filter;
 }
 
+const uint32_t *dal_scaler_filter_get_1s12(
+			const struct scaler_filter *filter, uint32_t *size)
+{
+	int i;
+
+	if (!filter) {
+		BREAK_TO_DEBUGGER();
+		return NULL;
+	}
+
+	for (i = 0; i < filter->filter_size_effective; i++) {
+		/* req. format sign fixed 1.1.12, the values are always between
+		 * [-1; 1]
+		 *
+		 * Each phase is mirrored as follows :
+		 * 0 : Phase 0
+		 * 1 : Phase 1 or Phase 64 - 1 / 128 - 1
+		 * N : Phase N or Phase 64 - N / 128 - N
+		 *
+		 * Convert from Fixed31_32 to 1.1.12 by using floor on value
+		 * shifted by number of required fractional bits(12)
+		 */
+		struct fixed31_32 coef = filter->filter[i];
+
+		filter->integer_filter[i] = 0x3FFC & dal_fixed31_32_floor(
+						dal_fixed31_32_shl(coef, 12));
+	}
+
+	if (size)
+		*size = filter->filter_size_effective;
+
+	return filter->integer_filter;
+}
+
 void dal_scaler_filter_destroy(
 	struct scaler_filter **filter)
 {

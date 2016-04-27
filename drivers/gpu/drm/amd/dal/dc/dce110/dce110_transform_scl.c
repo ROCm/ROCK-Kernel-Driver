@@ -686,7 +686,7 @@ bool dce110_transform_set_scaler(
 
 void dce110_transform_set_scaler_bypass(
 		struct transform *xfm,
-		const struct output_size_params *output_size)
+		const struct scaler_data *scl_data)
 {
 	struct dce110_transform *xfm110 = TO_DCE110_TRANSFORM(xfm);
 	uint32_t sclv_mode;

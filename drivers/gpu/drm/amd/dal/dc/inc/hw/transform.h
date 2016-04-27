@@ -135,27 +135,28 @@ struct scaling_ratios {
 	struct fixed31_32 vert_c;
 };
 
+struct sharpness_adj {
+	uint32_t horz;
+	uint32_t vert;
+};
+
 struct scaler_data {
 	struct overscan_info overscan;
 	struct scaling_taps taps;
 	struct rect viewport;
+	struct rect recout;
 	struct scaling_ratios ratios;
-
+	struct sharpness_adj sharpness;
 	enum pixel_format format;
 };
 
-
-
-struct output_size_params {
-	uint32_t recout_width;
-	uint32_t recout_height;
-	uint32_t recout_start_x;
-	uint32_t recout_start_y;
-	uint32_t otg_active_width; // MPC width:  OTG non-blank, includes overscan
-	uint32_t otg_active_height; // MPC height: OTG non-blank, includes overscan
+struct line_buffer_params {
+	bool alpha_en;
+	bool pixel_expan_mode;
+	bool interleave_en;
+	uint32_t dynamic_pixel_depth;
+	enum lb_pixel_depth depth;
 };
-
-
 
 struct transform_funcs {
 	bool (*transform_power_up)(
@@ -166,8 +167,7 @@ struct transform_funcs {
 		const struct scaler_data *data);
 
 	void (*transform_set_scaler_bypass)(
-		struct transform *xfm,
-		const struct output_size_params *output_size);
+		struct transform *xfm, const struct scaler_data *scl_data);
 
 	void (*transform_set_scaler_filter)(
 		struct transform *xfm,

@@ -328,6 +328,41 @@ static void calculate_overscan(
 	/* TODO: Add timing overscan to finalize overscan calculation*/
 }
 
+static void calculate_recout(
+		const struct dc_surface *surface,
+		struct pipe_ctx *pipe_ctx)
+{
+	struct core_stream *stream = pipe_ctx->stream;
+
+	pipe_ctx->scl_data.recout.x = 0;
+	if (stream->public.src.x < surface->clip_rect.x)
+		pipe_ctx->scl_data.recout.x = (surface->clip_rect.x
+			- stream->public.src.x) * stream->public.dst.width
+						/ stream->public.src.width;
+
+	pipe_ctx->scl_data.recout.width = surface->clip_rect.width *
+			stream->public.dst.width / stream->public.src.width;
+	if (pipe_ctx->scl_data.recout.width + pipe_ctx->scl_data.recout.x >
+			stream->public.dst.x + stream->public.dst.width)
+		pipe_ctx->scl_data.recout.width =
+			stream->public.dst.x + stream->public.dst.width
+						- pipe_ctx->scl_data.recout.x;
+
+	pipe_ctx->scl_data.recout.y = 0;
+	if (stream->public.src.y < surface->clip_rect.y)
+		pipe_ctx->scl_data.recout.y = (surface->clip_rect.y
+			- stream->public.src.y) * stream->public.dst.height
+						/ stream->public.src.height;
+
+	pipe_ctx->scl_data.recout.height = surface->clip_rect.height *
+			stream->public.dst.height / stream->public.src.height;
+	if (pipe_ctx->scl_data.recout.height + pipe_ctx->scl_data.recout.y >
+			stream->public.dst.y + stream->public.dst.height)
+		pipe_ctx->scl_data.recout.height =
+			stream->public.dst.y + stream->public.dst.height
+						- pipe_ctx->scl_data.recout.y;
+}
+
 static void calculate_scaling_ratios(
 		const struct dc_surface *surface,
 		struct pipe_ctx *pipe_ctx)
@@ -347,14 +382,13 @@ static void calculate_scaling_ratios(
 
 	if (surface->stereo_format == PLANE_STEREO_FORMAT_SIDE_BY_SIDE)
 		pipe_ctx->scl_data.ratios.horz.value *= 2;
-	else if (surface->stereo_format
-					== PLANE_STEREO_FORMAT_TOP_AND_BOTTOM)
+	else if (surface->stereo_format == PLANE_STEREO_FORMAT_TOP_AND_BOTTOM)
 		pipe_ctx->scl_data.ratios.vert.value *= 2;
 
-	pipe_ctx->scl_data.ratios.vert.value = div64_s64(pipe_ctx->scl_data.ratios.vert.value * in_h,
-			out_h);
-	pipe_ctx->scl_data.ratios.horz.value = div64_s64(pipe_ctx->scl_data.ratios.horz.value * in_w,
-			out_w);
+	pipe_ctx->scl_data.ratios.vert.value = div64_s64(
+		pipe_ctx->scl_data.ratios.vert.value * in_h, out_h);
+	pipe_ctx->scl_data.ratios.horz.value = div64_s64(
+		pipe_ctx->scl_data.ratios.horz.value * in_w, out_w);
 
 	pipe_ctx->scl_data.ratios.horz_c = pipe_ctx->scl_data.ratios.horz;
 	pipe_ctx->scl_data.ratios.vert_c = pipe_ctx->scl_data.ratios.vert;
@@ -380,6 +414,8 @@ void resource_build_scaling_params(
 	calculate_scaling_ratios(surface, pipe_ctx);
 
 	calculate_overscan(surface, pipe_ctx);
+
+	calculate_recout(surface, pipe_ctx);
 
 	/* Check if scaling is required update taps if not */
 	if (dal_fixed31_32_u2d19(pipe_ctx->scl_data.ratios.horz) == 1 << 19)

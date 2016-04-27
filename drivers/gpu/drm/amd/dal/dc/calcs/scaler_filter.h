@@ -69,4 +69,7 @@ const struct fixed31_32 *dal_scaler_filter_get(
 	uint32_t **data,
 	uint32_t *number);
 
+const uint32_t *dal_scaler_filter_get_1s12(
+			const struct scaler_filter *filter, uint32_t *size);
+
 #endif
