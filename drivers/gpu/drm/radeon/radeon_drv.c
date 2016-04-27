@@ -306,6 +306,9 @@ module_param_named(cik_support, radeon_cik_support, int, 0444);
 #endif
 
 static struct pci_device_id pciidlist[] = {
+#ifndef CONFIG_DRM_AMDGPU_CIK
+	radeon_CIK_PCI_IDS,
+#endif
 	radeon_PCI_IDS
 };
 
