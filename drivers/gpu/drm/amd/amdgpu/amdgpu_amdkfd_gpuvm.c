@@ -1122,13 +1122,7 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 			pr_debug("unmapping BO with VA 0x%llx, size %lu bytes from GPU memory\n",
 				mem->data2.va,
 				mem->data2.bo->tbo.mem.size);
-			/* Unpin the PD directory*/
-			unpin_bo(entry->bo_va->vm->page_directory, true);
-			/* Unpin PTs */
-			unpin_pts(entry->bo_va, entry->bo_va->vm, true);
 
-			/* Unpin BO*/
-			unpin_bo(mem->data2.bo, true);
 			ret = unmap_bo_from_gpuvm(adev, entry->bo_va);
 			if (ret == 0) {
 				entry->is_mapped = false;
@@ -1137,6 +1131,15 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 						mem->data2.va);
 				goto out;
 			}
+
+			/* Unpin the PD directory*/
+			unpin_bo(entry->bo_va->vm->page_directory, true);
+			/* Unpin PTs */
+			unpin_pts(entry->bo_va, entry->bo_va->vm, true);
+
+			/* Unpin BO*/
+			unpin_bo(mem->data2.bo, true);
+
 			mem->data2.mapped_to_gpu_memory--;
 			pr_debug("amdgpu: DEC mapping count %d\n",
 					mem->data2.mapped_to_gpu_memory);
