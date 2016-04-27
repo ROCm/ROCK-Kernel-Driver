@@ -623,10 +623,21 @@ static int update_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 }
 
 static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
-		struct amdgpu_bo_va *bo_va)
+		struct amdgpu_bo_va *bo_va, uint32_t domain)
 {
 	struct amdgpu_vm *vm;
 	int ret;
+
+	/*
+	 * We need to pin the allocated BO, PD and appropriate PTs and to
+	 * create a mapping of virtual to MC address
+	 */
+	/* Pin BO*/
+	ret = try_pin_bo(bo, false, domain);
+	if (ret != 0) {
+		pr_err("amdkfd: Failed to pin BO\n");
+		return ret;
+	}
 
 	/* Pin PTs */
 	ret = try_pin_pts(bo_va, false);
@@ -685,6 +696,7 @@ err_failed_to_update_pd:
 err_failed_to_pin_pd:
 	unpin_pts(bo_va, vm, false);
 err_failed_to_pin_pts:
+	unpin_bo(bo, false);
 
 	return ret;
 }
@@ -888,18 +900,8 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 
 			pr_debug("amdkfd: Trying to map VA 0x%llx to vm %p\n",
 					mem->data2.va, vm);
-			/*
-			 * We need to pin the allocated BO, PD and appropriate PTs and to
-			 * create a mapping of virtual to MC address
-			 */
-			/* Pin BO*/
-			ret = try_pin_bo(bo, false, domain);
-			if (ret != 0) {
-				pr_err("amdkfd: Failed to pin BO\n");
-				goto pin_bo_failed;
-			}
 
-			ret = map_bo_to_gpuvm(adev, bo, entry->bo_va);
+			ret = map_bo_to_gpuvm(adev, bo, entry->bo_va, domain);
 			if (ret != 0) {
 				pr_err("amdkfd: Failed to map radeon bo to gpuvm\n");
 				goto map_bo_to_gpuvm_failed;
@@ -917,8 +919,6 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	return 0;
 
 map_bo_to_gpuvm_failed:
-	unpin_bo(bo, false);
-pin_bo_failed:
 quiesce_failed:
 update_user_pages_failed:
 	if (bo_va_entry_aql)
@@ -1543,20 +1543,10 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 			goto resume_kfd;
 		}
 
-		r = try_pin_bo(mem->data2.bo, false, domain);
-		if (unlikely(r != 0)) {
-			pr_err("Failed to pin BO\n");
-			entry->is_mapped = false;
-			if (ret == 0)
-				ret = r;
-			goto resume_kfd;
-		}
-
-		r = map_bo_to_gpuvm(adev, mem->data2.bo, entry->bo_va);
+		r = map_bo_to_gpuvm(adev, mem->data2.bo, entry->bo_va, domain);
 		if (unlikely(r != 0)) {
 			pr_err("Failed to map BO to gpuvm\n");
 			entry->is_mapped = false;
-			unpin_bo(mem->data2.bo, true);
 			if (ret == 0)
 				ret = r;
 		}
