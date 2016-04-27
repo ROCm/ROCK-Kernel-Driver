@@ -302,6 +302,9 @@ MODULE_PARM_DESC(vce, "vce enable/disable vce support (1 = enable, 0 = disable)"
 module_param_named(vce, radeon_vce, int, 0444);
 
 static struct pci_device_id pciidlist[] = {
+#ifndef CONFIG_DRM_AMDGPU_CIK
+	radeon_CIK_PCI_IDS,
+#endif
 	radeon_PCI_IDS
 };
 
