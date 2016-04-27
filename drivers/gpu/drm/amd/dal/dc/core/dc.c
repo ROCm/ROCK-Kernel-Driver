@@ -464,6 +464,14 @@ bool dc_validate_resources(
 	dm_free(context);
 
 context_alloc_fail:
+	if (result != DC_OK) {
+		dal_logger_write(core_dc->ctx->logger,
+				LOG_MAJOR_INTERFACE_TRACE,
+				LOG_MINOR_COMPONENT_DC,
+				"%s:resource validation failed, dc_status:%d\n",
+				__func__,
+				result);
+	}
 
 	return (result == DC_OK);
 
@@ -756,6 +764,12 @@ bool dc_commit_targets(
 
 	result = core_dc->res_pool.funcs->validate_with_context(core_dc, set, target_count, context);
 	if (result != DC_OK){
+		dal_logger_write(core_dc->ctx->logger,
+					LOG_MAJOR_ERROR,
+					LOG_MINOR_COMPONENT_DC,
+					"%s: Context validation failed! dc_status:%d\n",
+					__func__,
+					result);
 		BREAK_TO_DEBUGGER();
 		resource_validate_ctx_destruct(context);
 		goto fail;
