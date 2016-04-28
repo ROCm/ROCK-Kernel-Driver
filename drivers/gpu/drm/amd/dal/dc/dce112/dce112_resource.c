@@ -38,7 +38,7 @@
 #include "dce110/dce110_link_encoder.h"
 #include "dce110/dce110_transform.h"
 #include "dce110/dce110_stream_encoder.h"
-#include "dce110/dce110_opp.h"
+#include "dce112/dce112_opp.h"
 #include "dce110/dce110_ipp.h"
 #include "dce112/dce112_clock_source.h"
 
@@ -293,27 +293,33 @@ static const struct dce110_stream_enc_registers stream_enc_regs[] = {
 static const struct dce110_opp_reg_offsets dce112_opp_reg_offsets[] = {
 {
 	.fmt_offset = (mmFMT0_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.fmt_mem_offset = (mmFMT_MEMORY0_CONTROL - mmFMT_MEMORY0_CONTROL),
 	.dcfe_offset = (mmDCFE0_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
 	.dcp_offset = (mmDCP0_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
 },
 {	.fmt_offset = (mmFMT1_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.fmt_mem_offset = (mmFMT_MEMORY1_CONTROL - mmFMT_MEMORY0_CONTROL),
 	.dcfe_offset = (mmDCFE1_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
 	.dcp_offset = (mmDCP1_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
 },
 {	.fmt_offset = (mmFMT2_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.fmt_mem_offset = (mmFMT_MEMORY2_CONTROL - mmFMT_MEMORY0_CONTROL),
 	.dcfe_offset = (mmDCFE2_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
 	.dcp_offset = (mmDCP2_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
 },
 {
 	.fmt_offset = (mmFMT3_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.fmt_mem_offset = (mmFMT_MEMORY3_CONTROL - mmFMT_MEMORY0_CONTROL),
 	.dcfe_offset = (mmDCFE3_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
 	.dcp_offset = (mmDCP3_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
 },
 {	.fmt_offset = (mmFMT4_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.fmt_mem_offset = (mmFMT_MEMORY4_CONTROL - mmFMT_MEMORY0_CONTROL),
 	.dcfe_offset = (mmDCFE4_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
 	.dcp_offset = (mmDCP4_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
 },
 {	.fmt_offset = (mmFMT5_FMT_CONTROL - mmFMT0_FMT_CONTROL),
+	.fmt_mem_offset = (mmFMT_MEMORY5_CONTROL - mmFMT_MEMORY0_CONTROL),
 	.dcfe_offset = (mmDCFE5_DCFE_MEM_PWR_CTRL - mmDCFE0_DCFE_MEM_PWR_CTRL),
 	.dcp_offset = (mmDCP5_GRPH_CONTROL - mmDCP0_GRPH_CONTROL),
 }
@@ -482,7 +488,7 @@ struct output_pixel_processor *dce112_opp_create(
 	if (!opp)
 		return NULL;
 
-	if (dce110_opp_construct(opp,
+	if (dce112_opp_construct(opp,
 			ctx, inst, offset))
 		return &opp->base;
 
@@ -624,35 +630,6 @@ static struct clock_source *find_matching_pll(struct resource_context *res_ctx,
 	return 0;
 }
 
-static void get_pixel_clock_parameters(
-	const struct pipe_ctx *pipe_ctx,
-	struct pixel_clk_params *pixel_clk_params)
-{
-	const struct core_stream *stream = pipe_ctx->stream;
-	pixel_clk_params->requested_pix_clk = stream->public.timing.pix_clk_khz;
-	pixel_clk_params->encoder_object_id = stream->sink->link->link_enc->id;
-	pixel_clk_params->signal_type = stream->sink->public.sink_signal;
-	pixel_clk_params->controller_id = pipe_ctx->pipe_idx + 1;
-	/* TODO: un-hardcode*/
-	pixel_clk_params->requested_sym_clk = LINK_RATE_LOW *
-		LINK_RATE_REF_FREQ_IN_KHZ;
-	pixel_clk_params->flags.ENABLE_SS = 0;
-	pixel_clk_params->color_depth =
-		stream->public.timing.display_color_depth;
-	pixel_clk_params->flags.DISPLAY_BLANKED = 1;
-}
-
-static enum dc_status build_pipe_hw_param(struct pipe_ctx *pipe_ctx)
-{
-	get_pixel_clock_parameters(pipe_ctx, &pipe_ctx->pix_clk_params);
-	pipe_ctx->clock_source->funcs->get_pix_clk_dividers(
-		pipe_ctx->clock_source,
-		&pipe_ctx->pix_clk_params,
-		&pipe_ctx->pll_settings);
-
-	return DC_OK;
-}
-
 static enum dc_status validate_mapped_resource(
 		const struct core_dc *dc,
 		struct validate_context *context)
@@ -682,7 +659,7 @@ static enum dc_status validate_mapped_resource(
 						pipe_ctx->tg, &stream->public.timing))
 					return DC_FAIL_CONTROLLER_VALIDATE;
 
-				status = build_pipe_hw_param(pipe_ctx);
+				status = dce110_resource_build_pipe_hw_param(pipe_ctx);
 
 				if (status != DC_OK)
 					return status;

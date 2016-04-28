@@ -288,13 +288,11 @@ struct opp_funcs {
 		const struct default_adjustment *default_adjust);
 
 	/* FORMATTER RELATED */
-	void (*opp_program_bit_depth_reduction)(
-		struct output_pixel_processor *opp,
-		const struct bit_depth_reduction_params *params);
 
-	void (*opp_program_clamping_and_pixel_encoding)(
-		struct output_pixel_processor *opp,
-		const struct clamping_and_pixel_encoding_params *params);
+	void (*opp_program_fmt)(
+			struct output_pixel_processor *opp,
+			struct bit_depth_reduction_params *fmt_bit_depth,
+			struct clamping_and_pixel_encoding_params *clamping);
 
 	void (*opp_set_dyn_expansion)(
 		struct output_pixel_processor *opp,

@@ -1249,20 +1249,28 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 	 * need to be calculated as for the set mode,
 	 * it will lead to querying dynamic link capabilities
 	 * which should be done before enable output */
-	uint32_t normalized_pix_clk = stream->public.timing.pix_clk_khz;
+	uint32_t pix_clk = stream->public.timing.pix_clk_khz;
+	uint32_t normalized_pix_clk = pix_clk;
+
+	if (stream->sink->public.sink_signal == SIGNAL_TYPE_HDMI_TYPE_A &&
+			stream->public.timing.pixel_encoding == PIXEL_ENCODING_YCBCR420)
+		pix_clk /= 2;
+
 	switch (stream->public.timing.display_color_depth) {
 	case COLOR_DEPTH_888:
+		normalized_pix_clk = pix_clk;
 		break;
 	case COLOR_DEPTH_101010:
-		normalized_pix_clk = (normalized_pix_clk * 30) / 24;
+		normalized_pix_clk = (pix_clk * 30) / 24;
 		break;
 	case COLOR_DEPTH_121212:
-		normalized_pix_clk = (normalized_pix_clk * 36) / 24;
+		normalized_pix_clk = (pix_clk * 36) / 24;
 		break;
 	case COLOR_DEPTH_161616:
-		normalized_pix_clk = (normalized_pix_clk * 48) / 24;
+		normalized_pix_clk = (pix_clk * 48) / 24;
 		break;
 	default:
+		ASSERT(0);
 		break;
 	}
 
@@ -1281,7 +1289,7 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 			stream->public.timing.display_color_depth,
 			pipe_ctx->signal == SIGNAL_TYPE_HDMI_TYPE_A,
 			pipe_ctx->signal == SIGNAL_TYPE_DVI_DUAL_LINK,
-			stream->public.timing.pix_clk_khz);
+			pix_clk);
 
 	if (pipe_ctx->signal == SIGNAL_TYPE_HDMI_TYPE_A)
 		dal_ddc_service_read_scdc_data(link->ddc);

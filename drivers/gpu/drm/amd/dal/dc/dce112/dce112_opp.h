@@ -1,5 +1,4 @@
-/*
- * Copyright 2012-15 Advanced Micro Devices, Inc.
+/* Copyright 2012-15 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,46 +22,27 @@
  *
  */
 
-#include "dm_services.h"
+#ifndef __DC_OPP_DCE112_H__
+#define __DC_OPP_DCE112_H__
 
-/* include DCE11 register header files */
-#include "dce/dce_11_0_d.h"
-#include "dce/dce_11_0_sh_mask.h"
+#include "dc_types.h"
+#include "opp.h"
+#include "../dce110/dce110_opp.h"
+#include "core_types.h"
 
-#include "dce110_opp.h"
-#include "dce110_opp_v.h"
+void dce112_opp_program_clamping_and_pixel_encoding(
+	struct output_pixel_processor *opp,
+	const struct clamping_and_pixel_encoding_params *params);
 
-#include "gamma_types.h"
+void dce112_opp_program_fmt(
+		struct output_pixel_processor *opp,
+		struct bit_depth_reduction_params *fmt_bit_depth,
+		struct clamping_and_pixel_encoding_params *clamping);
 
-/*****************************************/
-/* Constructor, Destructor               */
-/*****************************************/
+bool dce112_opp_construct(struct dce110_opp *opp110,
+	struct dc_context *ctx,
+	uint32_t inst,
+	const struct dce110_opp_reg_offsets *offsets);
 
-struct opp_funcs funcs = {
-		.opp_power_on_regamma_lut = dce110_opp_power_on_regamma_lut_v,
 
-		.opp_program_regamma_pwl = dce110_opp_program_regamma_pwl_v,
-
-		.opp_set_csc_default = dce110_opp_v_set_csc_default,
-
-		.opp_set_csc_adjustment = dce110_opp_v_set_csc_adjustment,
-
-		.opp_set_dyn_expansion = dce110_opp_set_dyn_expansion,
-
-		.opp_set_regamma_mode = dce110_opp_set_regamma_mode,
-
-		.opp_destroy = dce110_opp_destroy,
-
-		.opp_program_fmt = dce110_opp_program_fmt,
-};
-
-bool dce110_opp_v_construct(struct dce110_opp *opp110,
-	struct dc_context *ctx)
-{
-	opp110->base.funcs = &funcs;
-
-	opp110->base.ctx = ctx;
-
-	return true;
-}
-
+#endif

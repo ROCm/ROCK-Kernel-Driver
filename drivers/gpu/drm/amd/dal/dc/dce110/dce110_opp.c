@@ -44,14 +44,13 @@ enum {
 
 static struct opp_funcs funcs = {
 		.opp_power_on_regamma_lut = dce110_opp_power_on_regamma_lut,
-		.opp_program_bit_depth_reduction = dce110_opp_program_bit_depth_reduction,
-		.opp_program_clamping_and_pixel_encoding = dce110_opp_program_clamping_and_pixel_encoding,
 		.opp_set_csc_adjustment = dce110_opp_set_csc_adjustment,
 		.opp_set_csc_default = dce110_opp_set_csc_default,
 		.opp_set_dyn_expansion = dce110_opp_set_dyn_expansion,
 		.opp_program_regamma_pwl = dce110_opp_program_regamma_pwl,
 		.opp_set_regamma_mode = dce110_opp_set_regamma_mode,
 		.opp_destroy = dce110_opp_destroy,
+		.opp_program_fmt = dce110_opp_program_fmt,
 };
 
 bool dce110_opp_construct(struct dce110_opp *opp110,

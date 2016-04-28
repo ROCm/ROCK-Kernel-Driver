@@ -962,10 +962,10 @@ static void set_avi_info_frame(
 	info_frame.avi_info_packet.info_packet_hdmi.bits.header.length =
 			INFO_FRAME_SIZE_AVI;
 
-	/* IDO-defined (Y2,Y1,Y0 = 1,1,1) shall not be used by devices built
-	* according to HDMI 2.0 spec (Section 10.1)
-	* Add "case PixelEncoding_YCbCr420:    pixelEncoding = 3; break;"
-	* when YCbCr 4:2:0 is supported by DAL hardware. */
+	/*
+	 * IDO-defined (Y2,Y1,Y0 = 1,1,1) shall not be used by devices built
+	 * according to HDMI 2.0 spec (Section 10.1)
+	 */
 
 	switch (stream->public.timing.pixel_encoding) {
 	case PIXEL_ENCODING_YCBCR422:
@@ -974,6 +974,9 @@ static void set_avi_info_frame(
 
 	case PIXEL_ENCODING_YCBCR444:
 		pixel_encoding = 2;
+		break;
+	case PIXEL_ENCODING_YCBCR420:
+		pixel_encoding = 3;
 		break;
 
 	case PIXEL_ENCODING_RGB:

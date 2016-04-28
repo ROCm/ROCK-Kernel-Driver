@@ -771,7 +771,6 @@ static void fill_stream_properties_from_drm_display_mode(
 	const struct drm_connector *connector)
 {
 	struct dc_crtc_timing *timing_out = &stream->timing;
-
 	memset(timing_out, 0, sizeof(struct dc_crtc_timing));
 
 	timing_out->h_border_left = 0;
@@ -1509,6 +1508,7 @@ int dm_create_validation_set_for_target(struct drm_connector *connector,
 	}
 
 	drm_mode_set_crtcinfo(mode, 0);
+
 	fill_stream_properties_from_drm_display_mode(streams[0], mode, connector);
 
 	target = dc_create_target_for_streams(streams, 1);

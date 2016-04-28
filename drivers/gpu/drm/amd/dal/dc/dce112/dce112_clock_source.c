@@ -104,7 +104,8 @@ static uint32_t dce112_get_pix_clk_dividers(
 static void program_pixel_clk_resync(
 		struct dce112_clk_src *clk_src,
 		enum signal_type signal_type,
-		enum dc_color_depth colordepth)
+		enum dc_color_depth colordepth,
+		bool enable_ycbcr420)
 {
 	uint32_t value = 0;
 
@@ -159,6 +160,12 @@ static void program_pixel_clk_resync(
 		break;
 	}
 
+	set_reg_field_value(
+		value,
+		enable_ycbcr420,
+		PHYPLLA_PIXCLK_RESYNC_CNTL,
+		PHYPLLA_PIXCLK_DOUBLE_RATE_ENABLE);
+
 	dm_write_reg(
 		clk_src->base.ctx,
 		clk_src->offsets.pixclk_resync_cntl,
@@ -186,6 +193,12 @@ static bool dce112_program_pix_clk(
 		bp_pc_params.flags.SET_XTALIN_REF_SRC =
 						!pll_settings->use_external_clk;
 		bp_pc_params.flags.SUPPORT_YUV_420 = 0;
+
+		if (pix_clk_params->flags.SUPPORT_YCBCR420) {
+			bp_pc_params.target_pixel_clock = pll_settings->actual_pix_clk / 2;
+			bp_pc_params.flags.SUPPORT_YUV_420 = 1;
+		}
+
 	}
 
 	if (dce112_clk_src->bios->funcs->set_pixel_clock(
@@ -198,7 +211,8 @@ static bool dce112_program_pix_clk(
 	if (clk_src->id != CLOCK_SOURCE_ID_DP_DTO)
 		program_pixel_clk_resync(dce112_clk_src,
 					pix_clk_params->signal_type,
-					pix_clk_params->color_depth);
+					pix_clk_params->color_depth,
+					pix_clk_params->flags.SUPPORT_YCBCR420);
 
 	return true;
 }

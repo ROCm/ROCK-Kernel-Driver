@@ -78,16 +78,13 @@ static const struct dce80_opp_reg_offsets reg_offsets[] = {
 
 static struct opp_funcs funcs = {
 		.opp_power_on_regamma_lut = dce80_opp_power_on_regamma_lut,
-		.opp_program_bit_depth_reduction =
-				dce80_opp_program_bit_depth_reduction,
-		.opp_program_clamping_and_pixel_encoding =
-				dce80_opp_program_clamping_and_pixel_encoding,
 		.opp_set_csc_adjustment = dce80_opp_set_csc_adjustment,
 		.opp_set_csc_default = dce80_opp_set_csc_default,
 		.opp_set_dyn_expansion = dce80_opp_set_dyn_expansion,
 		.opp_program_regamma_pwl = dce80_opp_program_regamma_pwl,
 		.opp_set_regamma_mode = dce80_opp_set_regamma_mode,
 		.opp_destroy = dce80_opp_destroy,
+		.opp_program_fmt = dce110_opp_program_fmt,
 };
 
 /*****************************************/

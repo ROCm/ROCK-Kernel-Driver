@@ -84,6 +84,7 @@ struct dce110_regamma {
 
 struct dce110_opp_reg_offsets {
 	uint32_t fmt_offset;
+	uint32_t fmt_mem_offset;
 	uint32_t dcp_offset;
 	uint32_t dcfe_offset;
 };
@@ -135,5 +136,14 @@ void dce110_opp_set_dyn_expansion(
 	enum dc_color_space color_sp,
 	enum dc_color_depth color_dpth,
 	enum signal_type signal);
+
+void dce110_opp_program_fmt(
+	struct output_pixel_processor *opp,
+	struct bit_depth_reduction_params *fmt_bit_depth,
+	struct clamping_and_pixel_encoding_params *clamping);
+
+void dce110_opp_set_clamping(
+	struct dce110_opp *opp110,
+	const struct clamping_and_pixel_encoding_params *params);
 
 #endif

@@ -26,43 +26,45 @@
 #include "dm_services.h"
 
 /* include DCE11 register header files */
-#include "dce/dce_11_0_d.h"
-#include "dce/dce_11_0_sh_mask.h"
+#include "dce/dce_11_2_d.h"
+#include "dce/dce_11_2_sh_mask.h"
 
-#include "dce110_opp.h"
-#include "dce110_opp_v.h"
+#include "dce112_opp.h"
 
 #include "gamma_types.h"
+
+enum {
+	MAX_LUT_ENTRY = 256,
+	MAX_NUMBER_OF_ENTRIES = 256
+};
 
 /*****************************************/
 /* Constructor, Destructor               */
 /*****************************************/
 
-struct opp_funcs funcs = {
-		.opp_power_on_regamma_lut = dce110_opp_power_on_regamma_lut_v,
-
-		.opp_program_regamma_pwl = dce110_opp_program_regamma_pwl_v,
-
-		.opp_set_csc_default = dce110_opp_v_set_csc_default,
-
-		.opp_set_csc_adjustment = dce110_opp_v_set_csc_adjustment,
-
+static struct opp_funcs funcs = {
+		.opp_power_on_regamma_lut = dce110_opp_power_on_regamma_lut,
+		.opp_set_csc_adjustment = dce110_opp_set_csc_adjustment,
+		.opp_set_csc_default = dce110_opp_set_csc_default,
 		.opp_set_dyn_expansion = dce110_opp_set_dyn_expansion,
-
+		.opp_program_regamma_pwl = dce110_opp_program_regamma_pwl,
 		.opp_set_regamma_mode = dce110_opp_set_regamma_mode,
-
 		.opp_destroy = dce110_opp_destroy,
-
-		.opp_program_fmt = dce110_opp_program_fmt,
+		.opp_program_fmt = dce112_opp_program_fmt,
 };
 
-bool dce110_opp_v_construct(struct dce110_opp *opp110,
-	struct dc_context *ctx)
+bool dce112_opp_construct(struct dce110_opp *opp110,
+	struct dc_context *ctx,
+	uint32_t inst,
+	const struct dce110_opp_reg_offsets *offsets)
 {
 	opp110->base.funcs = &funcs;
 
 	opp110->base.ctx = ctx;
 
+	opp110->base.inst = inst;
+
+	opp110->offsets = *offsets;
+
 	return true;
 }
-

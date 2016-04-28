@@ -397,7 +397,9 @@ void dce110_stream_encoder_hdmi_set_stream_attribute(
 {
 	struct dce110_stream_encoder *enc110 = DCE110STRENC_FROM_STRENC(enc);
 	struct dc_context *ctx = enc110->base.ctx;
-	uint32_t output_pixel_clock = crtc_timing->pix_clk_khz;
+	uint32_t output_pixel_clock = (crtc_timing->pixel_encoding ==
+			PIXEL_ENCODING_YCBCR420) ?
+			crtc_timing->pix_clk_khz / 2 : crtc_timing->pix_clk_khz;
 	uint32_t value;
 	uint32_t addr;
 	struct bp_encoder_control cntl = {0};
@@ -406,7 +408,7 @@ void dce110_stream_encoder_hdmi_set_stream_attribute(
 	cntl.engine_id = enc110->base.id;
 	cntl.signal = SIGNAL_TYPE_HDMI_TYPE_A;
 	cntl.enable_dp_audio = enable_audio;
-	cntl.pixel_clock = crtc_timing->pix_clk_khz;
+	cntl.pixel_clock = output_pixel_clock;
 	cntl.lanes_number = LANE_COUNT_FOUR;
 	cntl.color_depth = crtc_timing->display_color_depth;
 
@@ -456,7 +458,7 @@ void dce110_stream_encoder_hdmi_set_stream_attribute(
 			1,
 			HDMI_CONTROL,
 			HDMI_DEEP_COLOR_ENABLE);
-		output_pixel_clock = (crtc_timing->pix_clk_khz * 30) / 24;
+		output_pixel_clock = (output_pixel_clock * 30) / 24;
 		break;
 	case COLOR_DEPTH_121212:
 		set_reg_field_value(
@@ -469,7 +471,7 @@ void dce110_stream_encoder_hdmi_set_stream_attribute(
 			1,
 			HDMI_CONTROL,
 			HDMI_DEEP_COLOR_ENABLE);
-		output_pixel_clock = (crtc_timing->pix_clk_khz * 36) / 24;
+		output_pixel_clock = (output_pixel_clock * 36) / 24;
 		break;
 	case COLOR_DEPTH_161616:
 		set_reg_field_value(
@@ -482,7 +484,7 @@ void dce110_stream_encoder_hdmi_set_stream_attribute(
 			1,
 			HDMI_CONTROL,
 			HDMI_DEEP_COLOR_ENABLE);
-		output_pixel_clock = (crtc_timing->pix_clk_khz * 48) / 24;
+		output_pixel_clock = (output_pixel_clock * 48) / 24;
 		break;
 	default:
 		break;

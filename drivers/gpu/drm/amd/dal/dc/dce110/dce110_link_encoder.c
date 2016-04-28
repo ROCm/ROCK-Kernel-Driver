@@ -879,7 +879,7 @@ static void hpd_initialize(
 	dm_write_reg(ctx, addr, value);
 }
 
-static bool validate_dvi_output(
+bool dce110_link_encoder_validate_dvi_output(
 	const struct dce110_link_encoder *enc110,
 	enum signal_type connector_signal,
 	enum signal_type signal,
@@ -927,7 +927,7 @@ static bool validate_dvi_output(
 	return true;
 }
 
-static bool validate_hdmi_output(
+static bool dce110_link_encoder_validate_hdmi_output(
 	const struct dce110_link_encoder *enc110,
 	const struct dc_crtc_timing *crtc_timing)
 {
@@ -977,7 +977,7 @@ static bool validate_hdmi_output(
 	return true;
 }
 
-static bool validate_rgb_output(
+bool dce110_link_encoder_validate_rgb_output(
 	const struct dce110_link_encoder *enc110,
 	const struct dc_crtc_timing *crtc_timing)
 {
@@ -990,7 +990,7 @@ static bool validate_rgb_output(
 	return true;
 }
 
-static bool validate_dp_output(
+bool dce110_link_encoder_validate_dp_output(
 	const struct dce110_link_encoder *enc110,
 	const struct dc_crtc_timing *crtc_timing)
 {
@@ -1014,7 +1014,7 @@ static bool validate_dp_output(
 	return false;
 }
 
-static bool validate_wireless_output(
+bool dce110_link_encoder_validate_wireless_output(
 	const struct dce110_link_encoder *enc110,
 	const struct dc_crtc_timing *crtc_timing)
 {
@@ -1159,29 +1159,29 @@ bool dce110_link_encoder_validate_output_with_stream(
 	switch (pipe_ctx->signal) {
 	case SIGNAL_TYPE_DVI_SINGLE_LINK:
 	case SIGNAL_TYPE_DVI_DUAL_LINK:
-		is_valid = validate_dvi_output(
+		is_valid = dce110_link_encoder_validate_dvi_output(
 			enc110,
 			stream->sink->link->public.connector_signal,
 			pipe_ctx->signal,
 			&stream->public.timing);
 	break;
 	case SIGNAL_TYPE_HDMI_TYPE_A:
-		is_valid = validate_hdmi_output(
+		is_valid = dce110_link_encoder_validate_hdmi_output(
 				enc110,
 				&stream->public.timing);
 	break;
 	case SIGNAL_TYPE_RGB:
-		is_valid = validate_rgb_output(
+		is_valid = dce110_link_encoder_validate_rgb_output(
 			enc110, &stream->public.timing);
 	break;
 	case SIGNAL_TYPE_DISPLAY_PORT:
 	case SIGNAL_TYPE_DISPLAY_PORT_MST:
 	case SIGNAL_TYPE_EDP:
-		is_valid = validate_dp_output(
+		is_valid = dce110_link_encoder_validate_dp_output(
 			enc110, &stream->public.timing);
 	break;
 	case SIGNAL_TYPE_WIRELESS:
-		is_valid = validate_wireless_output(
+		is_valid = dce110_link_encoder_validate_wireless_output(
 			enc110, &stream->public.timing);
 	break;
 	default:

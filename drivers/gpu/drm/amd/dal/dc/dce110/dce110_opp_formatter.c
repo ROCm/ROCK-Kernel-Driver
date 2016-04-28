@@ -32,7 +32,6 @@
 
 #define FMT_REG(reg)\
 	(reg + opp110->offsets.fmt_offset)
-
 /**
  *	set_truncation
  *	1) set truncation depth: 0 for 18 bpp or 1 for 24 bpp
@@ -368,7 +367,7 @@ static void set_temporal_dither(
  *		7 for programable
  *	2) Enable clamp if Limited range requested
  */
-static void set_clamping(
+void dce110_opp_set_clamping(
 	struct dce110_opp *opp110,
 	const struct clamping_and_pixel_encoding_params *params)
 {
@@ -555,7 +554,7 @@ void dce110_opp_program_clamping_and_pixel_encoding(
 {
 	struct dce110_opp *opp110 = TO_DCE110_OPP(opp);
 
-	set_clamping(opp110, params);
+	dce110_opp_set_clamping(opp110, params);
 	set_pixel_encoding(opp110, params);
 }
 
@@ -607,4 +606,22 @@ void dce110_opp_set_dyn_expansion(
 	}
 
 	dm_write_reg(opp->ctx, addr, value);
+}
+
+void dce110_opp_program_fmt(
+	struct output_pixel_processor *opp,
+	struct bit_depth_reduction_params *fmt_bit_depth,
+	struct clamping_and_pixel_encoding_params *clamping)
+{
+	/* dithering is affected by <CrtcSourceSelect>, hence should be
+	 * programmed afterwards */
+	dce110_opp_program_bit_depth_reduction(
+		opp,
+		fmt_bit_depth);
+
+	dce110_opp_program_clamping_and_pixel_encoding(
+		opp,
+		clamping);
+
+	return;
 }

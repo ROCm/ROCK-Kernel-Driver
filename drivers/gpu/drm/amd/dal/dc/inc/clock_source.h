@@ -58,6 +58,7 @@ struct pixel_clk_flags {
 	uint32_t DISPLAY_BLANKED:1;
 	uint32_t PROGRAM_PIXEL_CLOCK:1;
 	uint32_t PROGRAM_ID_CLOCK:1;
+	uint32_t SUPPORT_YCBCR420:1;
 };
 
 /**

@@ -42,34 +42,6 @@ struct stream {
 /*******************************************************************************
  * Private functions
  ******************************************************************************/
-static void build_bit_depth_reduction_params(
-		const struct core_stream *stream,
-		struct bit_depth_reduction_params *fmt_bit_depth)
-{
-	memset(fmt_bit_depth, 0, sizeof(*fmt_bit_depth));
-
-	/*TODO: Need to un-hardcode, refer to function with same name
-	 * in dal2 hw_sequencer*/
-
-	fmt_bit_depth->flags.TRUNCATE_ENABLED = 0;
-	fmt_bit_depth->flags.SPATIAL_DITHER_ENABLED = 0;
-	fmt_bit_depth->flags.FRAME_MODULATION_ENABLED = 0;
-
-	/* Diagnostics need consistent CRC of the image, that means
-	 * dithering should not be enabled for Diagnostics. */
-	if (IS_DIAG_DC(stream->ctx->dce_environment) == false) {
-
-		fmt_bit_depth->flags.SPATIAL_DITHER_DEPTH = 1;
-		fmt_bit_depth->flags.SPATIAL_DITHER_ENABLED = 1;
-
-		/* frame random is on by default */
-		fmt_bit_depth->flags.FRAME_RANDOM = 1;
-		/* apply RGB dithering */
-		fmt_bit_depth->flags.RGB_RANDOM = true;
-	}
-
-	return;
-}
 
 static bool construct(struct core_stream *stream,
 	const struct dc_sink *dc_sink_data)
@@ -81,10 +53,6 @@ static bool construct(struct core_stream *stream,
 	stream->public.sink = dc_sink_data;
 
 	dc_sink_retain(dc_sink_data);
-
-	build_bit_depth_reduction_params(stream, &stream->bit_depth_params);
-
-	stream->clamping.pixel_encoding = stream->public.timing.pixel_encoding;
 
 	/* Copy audio modes */
 	/* TODO - Remove this translation */
@@ -112,6 +80,7 @@ static bool construct(struct core_stream *stream,
 
 	/* EDID CAP translation for HDMI 2.0 */
 	stream->public.timing.flags.LTE_340MCSC_SCRAMBLE = dc_sink_data->edid_caps.lte_340mcsc_scramble;
+
 	return true;
 }
 
@@ -138,7 +107,8 @@ void dc_stream_release(struct dc_stream *public)
 	}
 }
 
-struct dc_stream *dc_create_stream_for_sink(const struct dc_sink *dc_sink)
+struct dc_stream *dc_create_stream_for_sink(
+		const struct dc_sink *dc_sink)
 {
 	struct core_sink *sink = DC_SINK_TO_CORE(dc_sink);
 	struct stream *stream;

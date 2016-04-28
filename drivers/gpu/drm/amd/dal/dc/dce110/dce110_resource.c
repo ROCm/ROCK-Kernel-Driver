@@ -540,15 +540,49 @@ static void get_pixel_clock_parameters(
 	pixel_clk_params->color_depth =
 		stream->public.timing.display_color_depth;
 	pixel_clk_params->flags.DISPLAY_BLANKED = 1;
+	pixel_clk_params->flags.SUPPORT_YCBCR420 = (stream->public.timing.pixel_encoding ==
+			PIXEL_ENCODING_YCBCR420);
 }
 
-static enum dc_status build_pipe_hw_param(struct pipe_ctx *pipe_ctx)
+void dce110_resource_build_bit_depth_reduction_params(
+		const struct core_stream *stream,
+		struct bit_depth_reduction_params *fmt_bit_depth)
+{
+	memset(fmt_bit_depth, 0, sizeof(*fmt_bit_depth));
+
+	/*TODO: Need to un-hardcode, refer to function with same name
+	 * in dal2 hw_sequencer*/
+
+	fmt_bit_depth->flags.TRUNCATE_ENABLED = 0;
+	fmt_bit_depth->flags.SPATIAL_DITHER_ENABLED = 0;
+	fmt_bit_depth->flags.FRAME_MODULATION_ENABLED = 0;
+
+	/* Diagnostics need consistent CRC of the image, that means
+	 * dithering should not be enabled for Diagnostics. */
+	if (IS_DIAG_DC(stream->ctx->dce_environment) == false) {
+
+		fmt_bit_depth->flags.SPATIAL_DITHER_DEPTH = 1;
+		fmt_bit_depth->flags.SPATIAL_DITHER_ENABLED = 1;
+
+		/* frame random is on by default */
+		fmt_bit_depth->flags.FRAME_RANDOM = 1;
+		/* apply RGB dithering */
+		fmt_bit_depth->flags.RGB_RANDOM = true;
+	}
+
+	return;
+}
+
+enum dc_status dce110_resource_build_pipe_hw_param(struct pipe_ctx *pipe_ctx)
 {
 	get_pixel_clock_parameters(pipe_ctx, &pipe_ctx->pix_clk_params);
 	pipe_ctx->clock_source->funcs->get_pix_clk_dividers(
 		pipe_ctx->clock_source,
 		&pipe_ctx->pix_clk_params,
 		&pipe_ctx->pll_settings);
+	dce110_resource_build_bit_depth_reduction_params(pipe_ctx->stream,
+			&pipe_ctx->stream->bit_depth_params);
+	pipe_ctx->stream->clamping.pixel_encoding = pipe_ctx->stream->public.timing.pixel_encoding;
 
 	return DC_OK;
 }
@@ -597,7 +631,7 @@ static enum dc_status validate_mapped_resource(
 					pipe_ctx->tg, &stream->public.timing))
 					return DC_FAIL_CONTROLLER_VALIDATE;
 
-				status = build_pipe_hw_param(pipe_ctx);
+				status = dce110_resource_build_pipe_hw_param(pipe_ctx);
 
 				if (status != DC_OK)
 					return status;

@@ -32,6 +32,8 @@ struct adapter_service;
 struct core_dc;
 struct resource_pool;
 
+enum dc_status dce110_resource_build_pipe_hw_param(struct pipe_ctx *pipe_ctx);
+
 bool dce110_construct_resource_pool(
 	struct adapter_service *adapter_serv,
 	uint8_t num_virtual_links,

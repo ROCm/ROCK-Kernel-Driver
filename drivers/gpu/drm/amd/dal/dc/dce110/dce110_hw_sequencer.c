@@ -495,25 +495,6 @@ static enum dc_status bios_parser_crtc_source_select(
 	return DC_OK;
 }
 
-/*******************************FMT**************************************/
-static void program_fmt(
-		struct output_pixel_processor *opp,
-		struct bit_depth_reduction_params *fmt_bit_depth,
-		struct clamping_and_pixel_encoding_params *clamping)
-{
-	/* dithering is affected by <CrtcSourceSelect>, hence should be
-	 * programmed afterwards */
-
-	opp->funcs->opp_program_bit_depth_reduction(
-		opp,
-		fmt_bit_depth);
-
-	opp->funcs->opp_program_clamping_and_pixel_encoding(
-		opp,
-		clamping);
-
-	return;
-}
 
 static void update_bios_scratch_critical_state(struct adapter_service *as,
 		bool state)
@@ -780,7 +761,10 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 			stream->public.timing.display_color_depth,
 			stream->sink->public.sink_signal);
 
-	program_fmt(pipe_ctx->opp, &stream->bit_depth_params, &stream->clamping);
+	pipe_ctx->opp->funcs->opp_program_fmt(
+			pipe_ctx->opp,
+			&stream->bit_depth_params,
+			&stream->clamping);
 
 	stream->sink->link->link_enc->funcs->setup(
 		stream->sink->link->link_enc,

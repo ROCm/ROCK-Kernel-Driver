@@ -78,6 +78,23 @@ bool dce110_link_encoder_construct(
 	const struct dce110_link_enc_registers *link_regs,
 	const struct dce110_link_enc_aux_registers *aux_regs,
 	const struct dce110_link_enc_bl_registers *bl_regs);
+bool dce110_link_encoder_validate_dvi_output(
+	const struct dce110_link_encoder *enc110,
+	enum signal_type connector_signal,
+	enum signal_type signal,
+	const struct dc_crtc_timing *crtc_timing);
+
+bool dce110_link_encoder_validate_rgb_output(
+	const struct dce110_link_encoder *enc110,
+	const struct dc_crtc_timing *crtc_timing);
+
+bool dce110_link_encoder_validate_dp_output(
+	const struct dce110_link_encoder *enc110,
+	const struct dc_crtc_timing *crtc_timing);
+
+bool dce110_link_encoder_validate_wireless_output(
+	const struct dce110_link_encoder *enc110,
+	const struct dc_crtc_timing *crtc_timing);
 
 bool dce110_link_encoder_validate_output_with_stream(
 	struct link_encoder *enc,

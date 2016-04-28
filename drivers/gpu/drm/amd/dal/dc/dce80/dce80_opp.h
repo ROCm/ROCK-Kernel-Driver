@@ -28,6 +28,7 @@
 #include "dc_types.h"
 #include "opp.h"
 #include "gamma_types.h"
+#include "../dce110/dce110_opp.h"
 
 struct gamma_parameters;
 

@@ -72,9 +72,99 @@ static void dce112_link_encoder_dp_set_phy_pattern(
 	}
 }
 
+static bool dce112_link_encoder_validate_hdmi_output(
+	const struct dce110_link_encoder *enc110,
+	const struct dc_crtc_timing *crtc_timing)
+{
+	enum dc_color_depth max_deep_color =
+			enc110->base.features.max_hdmi_deep_color;
+	/* expressed in KHz */
+	uint32_t pixel_clock = 0;
+
+	if (max_deep_color > enc110->base.features.max_deep_color)
+		max_deep_color = enc110->base.features.max_deep_color;
+
+	if (max_deep_color < crtc_timing->display_color_depth)
+		return false;
+
+	if (crtc_timing->pix_clk_khz < TMDS_MIN_PIXEL_CLOCK)
+		return false;
+
+	switch (crtc_timing->display_color_depth) {
+	case COLOR_DEPTH_666:
+		pixel_clock = (crtc_timing->pix_clk_khz * 3) >> 2;
+	break;
+	case COLOR_DEPTH_888:
+		pixel_clock = crtc_timing->pix_clk_khz;
+	break;
+	case COLOR_DEPTH_101010:
+		pixel_clock = (crtc_timing->pix_clk_khz * 10) >> 3;
+	break;
+	case COLOR_DEPTH_121212:
+		pixel_clock = (crtc_timing->pix_clk_khz * 3) >> 1;
+	break;
+	case COLOR_DEPTH_161616:
+		pixel_clock = crtc_timing->pix_clk_khz << 1;
+	break;
+	default:
+	break;
+	}
+
+	if ((pixel_clock == 0) ||
+		(pixel_clock > enc110->base.features.max_hdmi_pixel_clock) ||
+		(pixel_clock > enc110->base.features.max_pixel_clock))
+		return false;
+
+	return true;
+}
+
+bool dce112_link_encoder_validate_output_with_stream(
+	struct link_encoder *enc,
+	struct pipe_ctx *pipe_ctx)
+{
+	struct core_stream *stream = pipe_ctx->stream;
+	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
+	bool is_valid;
+
+	switch (pipe_ctx->signal) {
+	case SIGNAL_TYPE_DVI_SINGLE_LINK:
+	case SIGNAL_TYPE_DVI_DUAL_LINK:
+		is_valid = dce110_link_encoder_validate_dvi_output(
+			enc110,
+			stream->sink->link->public.connector_signal,
+			pipe_ctx->signal,
+			&stream->public.timing);
+	break;
+	case SIGNAL_TYPE_HDMI_TYPE_A:
+		is_valid = dce112_link_encoder_validate_hdmi_output(
+				enc110,
+				&stream->public.timing);
+	break;
+	case SIGNAL_TYPE_RGB:
+		is_valid = dce110_link_encoder_validate_rgb_output(
+			enc110, &stream->public.timing);
+	break;
+	case SIGNAL_TYPE_DISPLAY_PORT:
+	case SIGNAL_TYPE_DISPLAY_PORT_MST:
+	case SIGNAL_TYPE_EDP:
+		is_valid = dce110_link_encoder_validate_dp_output(
+			enc110, &stream->public.timing);
+	break;
+	case SIGNAL_TYPE_WIRELESS:
+		is_valid = dce110_link_encoder_validate_wireless_output(
+			enc110, &stream->public.timing);
+	break;
+	default:
+		is_valid = true;
+	break;
+	}
+
+	return is_valid;
+}
+
 static struct link_encoder_funcs dce112_lnk_enc_funcs = {
 	.validate_output_with_stream =
-		dce110_link_encoder_validate_output_with_stream,
+		dce112_link_encoder_validate_output_with_stream,
 	.hw_init = dce110_link_encoder_hw_init,
 	.setup = dce110_link_encoder_setup,
 	.enable_tmds_output = dce110_link_encoder_enable_tmds_output,

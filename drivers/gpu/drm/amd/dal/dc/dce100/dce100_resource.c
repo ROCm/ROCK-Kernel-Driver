@@ -580,35 +580,6 @@ void dce100_destruct_resource_pool(struct resource_pool *pool)
 		dal_adapter_service_destroy(&pool->adapter_srv);
 }
 
-static void get_pixel_clock_parameters(
-	const struct pipe_ctx *pipe_ctx,
-	struct pixel_clk_params *pixel_clk_params)
-{
-	const struct core_stream *stream = pipe_ctx->stream;
-	pixel_clk_params->requested_pix_clk = stream->public.timing.pix_clk_khz;
-	pixel_clk_params->encoder_object_id = stream->sink->link->link_enc->id;
-	pixel_clk_params->signal_type = stream->sink->public.sink_signal;
-	pixel_clk_params->controller_id = pipe_ctx->pipe_idx + 1;
-	/* TODO: un-hardcode*/
-	pixel_clk_params->requested_sym_clk = LINK_RATE_LOW *
-		LINK_RATE_REF_FREQ_IN_KHZ;
-	pixel_clk_params->flags.ENABLE_SS = 0;
-	pixel_clk_params->color_depth =
-		stream->public.timing.display_color_depth;
-	pixel_clk_params->flags.DISPLAY_BLANKED = 1;
-}
-
-static enum dc_status build_pipe_hw_param(struct pipe_ctx *pipe_ctx)
-{
-	get_pixel_clock_parameters(pipe_ctx, &pipe_ctx->pix_clk_params);
-	pipe_ctx->clock_source->funcs->get_pix_clk_dividers(
-		pipe_ctx->clock_source,
-		&pipe_ctx->pix_clk_params,
-		&pipe_ctx->pll_settings);
-
-	return DC_OK;
-}
-
 static enum dc_status validate_mapped_resource(
 		const struct core_dc *dc,
 		struct validate_context *context)
@@ -638,7 +609,7 @@ static enum dc_status validate_mapped_resource(
 						pipe_ctx->tg, &stream->public.timing))
 					return DC_FAIL_CONTROLLER_VALIDATE;
 
-				status = build_pipe_hw_param(pipe_ctx);
+				status = dce110_resource_build_pipe_hw_param(pipe_ctx);
 
 				if (status != DC_OK)
 					return status;
