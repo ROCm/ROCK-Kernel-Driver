@@ -428,17 +428,31 @@ struct bo_vm_reservation_context {
 	bool reserved;
 };
 
-static int reserve_bo_and_vms(struct kgd_mem *mem,
-			      struct amdgpu_vm *vm, bool is_mapped,
+/**
+ * reserve_bo_and_vm - reserve a BO and a VM unconditionally.
+ * @mem: KFD BO structure.
+ * @vm: the VM to reserve.
+ * @ctx: the struct that will be used in unreserve_bo_and_vms().
+ */
+static int reserve_bo_and_vm(struct kgd_mem *mem,
+			      struct amdgpu_vm *vm,
 			      struct bo_vm_reservation_context *ctx)
 {
 	struct amdgpu_bo *bo = mem->data2.bo;
-	struct kfd_bo_va_list *entry;
-	unsigned i;
 	int ret;
+
+	WARN_ON(!vm);
+
+	ctx->reserved = false;
+	ctx->n_vms = 1;
 
 	INIT_LIST_HEAD(&ctx->list);
 	INIT_LIST_HEAD(&ctx->duplicates);
+
+	ctx->vm_pd = kzalloc(sizeof(struct amdgpu_bo_list_entry)
+			      * ctx->n_vms, GFP_KERNEL);
+	if (ctx->vm_pd == NULL)
+		return -ENOMEM;
 
 	ctx->kfd_bo.robj = bo;
 	ctx->kfd_bo.priority = 0;
@@ -447,43 +461,91 @@ static int reserve_bo_and_vms(struct kgd_mem *mem,
 	ctx->kfd_bo.user_pages = NULL;
 	list_add(&ctx->kfd_bo.tv.head, &ctx->list);
 
+	amdgpu_vm_get_pd_bo(vm, &ctx->list, &ctx->vm_pd[0]);
+	amdgpu_vm_get_pt_bos(bo->adev, vm, &ctx->duplicates);
+
+	ret = ttm_eu_reserve_buffers(&ctx->ticket, &ctx->list,
+				     false, &ctx->duplicates);
+	if (!ret)
+		ctx->reserved = true;
+	else
+		pr_err("amdkfd: Failed to reserve buffers in ttm\n");
+
+	if (ret) {
+		kfree(ctx->vm_pd);
+		ctx->vm_pd = NULL;
+	}
+
+	return ret;
+}
+
+enum VA_TYPE {
+	VA_NOT_MAPPED = 0,
+	VA_MAPPED,
+	VA_DO_NOT_CARE,
+};
+
+/**
+ * reserve_bo_and_vm - reserve a BO and some VMs that the BO has been added
+ * to, conditionally based on map_type.
+ * @mem: KFD BO structure.
+ * @vm: the VM to reserve. If NULL, then all VMs associated with the BO
+ * is used. Otherwise, a single VM associated with the BO.
+ * @map_type: the mapping status that will be used to filter the VMs.
+ * @ctx: the struct that will be used in unreserve_bo_and_vms().
+ */
+static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
+			      struct amdgpu_vm *vm, enum VA_TYPE map_type,
+			      struct bo_vm_reservation_context *ctx)
+{
+	struct amdgpu_bo *bo = mem->data2.bo;
+	struct kfd_bo_va_list *entry;
+	unsigned i;
+	int ret;
+
 	ctx->reserved = false;
-
 	ctx->n_vms = 0;
+	ctx->vm_pd = NULL;
 
-	if (vm)
-		ctx->n_vms = 1;
-	else {
-		list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
-			if (entry->is_mapped == is_mapped)
-				ctx->n_vms++;
-		}
+	INIT_LIST_HEAD(&ctx->list);
+	INIT_LIST_HEAD(&ctx->duplicates);
+
+	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
+		if ((vm && vm != entry->bo_va->vm) ||
+			(entry->is_mapped != map_type
+			&& map_type != VA_DO_NOT_CARE))
+			continue;
+
+		ctx->n_vms++;
 	}
 
 	if (ctx->n_vms == 0)
-		ctx->vm_pd = NULL;
-	else {
-		ctx->vm_pd = kzalloc(sizeof(struct amdgpu_bo_list_entry)
-				      * ctx->n_vms, GFP_KERNEL);
-		if (ctx->vm_pd == NULL)
-			return -ENOMEM;
-	}
+		return 0;
 
-	if (vm) {
-		amdgpu_vm_get_pd_bo(vm, &ctx->list, &ctx->vm_pd[0]);
-		amdgpu_vm_get_pt_bos(vm, &ctx->duplicates);
-	} else {
-		i = 0;
-		list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
-			if (entry->is_mapped != is_mapped)
-				continue;
+	ctx->vm_pd = kzalloc(sizeof(struct amdgpu_bo_list_entry)
+			      * ctx->n_vms, GFP_KERNEL);
+	if (ctx->vm_pd == NULL)
+		return -ENOMEM;
 
-			amdgpu_vm_get_pd_bo(entry->bo_va->vm, &ctx->list,
-					&ctx->vm_pd[i]);
-			amdgpu_vm_get_pt_bos(entry->bo_va->vm,
-					&ctx->duplicates);
-			i++;
-		}
+	ctx->kfd_bo.robj = bo;
+	ctx->kfd_bo.priority = 0;
+	ctx->kfd_bo.tv.bo = &bo->tbo;
+	ctx->kfd_bo.tv.shared = true;
+	ctx->kfd_bo.user_pages = NULL;
+	list_add(&ctx->kfd_bo.tv.head, &ctx->list);
+
+	i = 0;
+	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
+		if ((vm && vm != entry->bo_va->vm) ||
+			(entry->is_mapped != map_type
+			&& map_type != VA_DO_NOT_CARE))
+			continue;
+
+		amdgpu_vm_get_pd_bo(entry->bo_va->vm, &ctx->list,
+				&ctx->vm_pd[i]);
+		amdgpu_vm_get_pt_bos(bo->adev, entry->bo_va->vm,
+				&ctx->duplicates);
+		i++;
 	}
 
 	ret = ttm_eu_reserve_buffers(&ctx->ticket, &ctx->list,
@@ -785,7 +847,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	if (mem->data2.work.work.func)
 		cancel_delayed_work_sync(&mem->data2.work);
 
-	ret = reserve_bo_and_vms(mem, NULL, false, &ctx);
+	ret = reserve_bo_and_cond_vms(mem, NULL, VA_DO_NOT_CARE, &ctx);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -844,7 +906,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	pr_debug("amdgpu: try to map VA 0x%llx domain %d\n",
 			mem->data2.va, domain);
 
-	ret = reserve_bo_and_vms(mem, vm, false, &ctx);
+	ret = reserve_bo_and_vm(mem, vm, &ctx);
 	if (unlikely(ret != 0))
 		goto bo_reserve_failed;
 
@@ -870,7 +932,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	}
 
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
-		if (entry->bo_va->vm == vm && entry->is_mapped == false) {
+		if (entry->bo_va->vm == vm && !entry->is_mapped) {
 			if (mem->data2.evicted) {
 				/* If the BO is evicted, just mark the
 				 * mapping as mapped and stop the GPU's
@@ -1072,14 +1134,12 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 	}
 	mapped_before = mem->data2.mapped_to_gpu_memory;
 
-	ret = reserve_bo_and_vms(mem, vm, true, &ctx);
+	ret = reserve_bo_and_cond_vms(mem, vm, VA_MAPPED, &ctx);
 	if (unlikely(ret != 0))
 		goto out;
 
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
-		if (entry->kgd_dev == kgd &&
-				entry->bo_va->vm == vm &&
-				entry->is_mapped) {
+		if (entry->bo_va->vm == vm && entry->is_mapped) {
 			if (mem->data2.evicted) {
 				/* If the BO is evicted, just mark the
 				 * mapping as unmapped and allow the
@@ -1409,7 +1469,7 @@ int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm)
 	 * goes wrong. */
 	n_evicted = 0;
 
-	r = reserve_bo_and_vms(mem, NULL, true, &ctx);
+	r = reserve_bo_and_cond_vms(mem, NULL, VA_MAPPED, &ctx);
 	if (unlikely(r != 0))
 		return r;
 
@@ -1483,7 +1543,7 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 
 	domain = mem->data2.domain;
 
-	ret = reserve_bo_and_vms(mem, NULL, true, &ctx);
+	ret = reserve_bo_and_cond_vms(mem, NULL, VA_MAPPED, &ctx);
 	if (likely(ret == 0)) {
 		ret = update_user_pages(mem, mm, &ctx);
 		have_pages = !ret;
