@@ -247,10 +247,12 @@ struct log_major_mask_info {
 
 #define LG_BWM_MSK (1 << LOG_MINOR_BWM_MODE_VALIDATION)
 
+#define LG_WARN_MSK ~(1 << LOG_MINOR_COMPONENT_TOPOLOGY_MANAGER)
+
 static const struct log_major_mask_info log_major_mask_info_tbl[] = {
 	/* LogMajor                  major name       default     MinorTble                    tblElementCnt */
 	{{LOG_MAJOR_ERROR,           "Error"       }, LG_ALL_MSK, component_minor_info_tbl,    NUM_ELEMENTS(component_minor_info_tbl)},
-	{{LOG_MAJOR_WARNING,         "Warning"     }, LG_ALL_MSK, component_minor_info_tbl,    NUM_ELEMENTS(component_minor_info_tbl)},
+	{{LOG_MAJOR_WARNING,         "Warning"     }, LG_WARN_MSK, component_minor_info_tbl,    NUM_ELEMENTS(component_minor_info_tbl)},
 	{{LOG_MAJOR_INTERFACE_TRACE, "IfTrace"     }, LG_ALL_MSK, component_minor_info_tbl,    NUM_ELEMENTS(component_minor_info_tbl)},
 	{{LOG_MAJOR_HW_TRACE,        "HwTrace"     }, (LG_ALL_MSK &
 			~((1 << LOG_MINOR_HW_TRACE_LINK_TRAINING) |

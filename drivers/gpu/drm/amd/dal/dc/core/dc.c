@@ -466,8 +466,8 @@ bool dc_validate_resources(
 context_alloc_fail:
 	if (result != DC_OK) {
 		dal_logger_write(core_dc->ctx->logger,
-				LOG_MAJOR_INTERFACE_TRACE,
-				LOG_MINOR_COMPONENT_DC,
+				LOG_MAJOR_WARNING,
+				LOG_MINOR_COMPONENT_TOPOLOGY_MANAGER,
 				"%s:resource validation failed, dc_status:%d\n",
 				__func__,
 				result);
