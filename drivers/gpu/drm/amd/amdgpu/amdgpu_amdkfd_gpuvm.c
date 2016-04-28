@@ -478,6 +478,7 @@ static int reserve_bo_and_vms(struct kgd_mem *mem,
 				ctx->n_vms++;
 		}
 	}
+
 	if (ctx->n_vms == 0)
 		ctx->vm_pd = NULL;
 	else {
@@ -1015,32 +1016,10 @@ int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
 }
 
 static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
+				struct amdgpu_bo *bo,
 				struct amdgpu_bo_va *bo_va)
 {
-	struct amdgpu_vm *vm;
-	int ret;
-	struct ttm_validate_buffer tv;
-	struct ww_acquire_ctx ticket;
-	struct amdgpu_bo_list_entry vm_pd;
-	struct list_head list, duplicates;
-
-	INIT_LIST_HEAD(&list);
-	INIT_LIST_HEAD(&duplicates);
-
-	vm = bo_va->vm;
-	tv.bo = &bo_va->bo->tbo;
-	tv.shared = true;
-	list_add(&tv.head, &list);
-
-	amdgpu_vm_get_pd_bo(vm, &list, &vm_pd);
-
-	ret = ttm_eu_reserve_buffers(&ticket, &list, false, &duplicates);
-	if (ret) {
-		pr_err("amdkfd: Failed to reserve buffers in ttm\n");
-		return ret;
-	}
-
-	amdgpu_vm_get_pt_bos(vm, &duplicates);
+	struct amdgpu_vm *vm = bo_va->vm;
 
 	/*
 	 * The previously "released" BOs are really released and their VAs are
@@ -1054,7 +1033,12 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 
 	amdgpu_vm_clear_invalids(adev, vm, NULL);
 
-	ttm_eu_backoff_reservation(&ticket, &list);
+	/* Unpin the PD directory*/
+	unpin_bo(bo_va->vm->page_directory, false);
+	/* Unpin PTs */
+	unpin_pts(bo_va, bo_va->vm, false);
+	/* Unpin BO*/
+	unpin_bo(bo, false);
 
 	return 0;
 }
@@ -1079,6 +1063,7 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 	struct amdgpu_device *adev;
 	unsigned mapped_before;
 	int ret = 0;
+	struct bo_vm_reservation_context ctx;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
@@ -1103,6 +1088,10 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 	}
 	mapped_before = mem->data2.mapped_to_gpu_memory;
 
+	ret = reserve_bo_and_vms(mem, vm, true, &ctx);
+	if (unlikely(ret != 0))
+		goto out;
+
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
 		if (entry->kgd_dev == kgd &&
 				entry->bo_va->vm == vm &&
@@ -1114,7 +1103,7 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 				ret = kgd2kfd->resume_mm(adev->kfd,
 							 current->mm);
 				if (ret != 0)
-					goto out;
+					goto unreserve_out;
 				entry->is_mapped = false;
 				mem->data2.mapped_to_gpu_memory--;
 				continue;
@@ -1124,28 +1113,22 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 				mem->data2.va,
 				mem->data2.bo->tbo.mem.size);
 
-			ret = unmap_bo_from_gpuvm(adev, entry->bo_va);
+			ret = unmap_bo_from_gpuvm(adev, mem->data2.bo,
+						entry->bo_va);
 			if (ret == 0) {
 				entry->is_mapped = false;
 			} else {
 				pr_err("amdgpu: failed unmap va 0x%llx\n",
 						mem->data2.va);
-				goto out;
+				goto unreserve_out;
 			}
-
-			/* Unpin the PD directory*/
-			unpin_bo(entry->bo_va->vm->page_directory, true);
-			/* Unpin PTs */
-			unpin_pts(entry->bo_va, entry->bo_va->vm, true);
-
-			/* Unpin BO*/
-			unpin_bo(mem->data2.bo, true);
 
 			mem->data2.mapped_to_gpu_memory--;
 			pr_debug("amdgpu: DEC mapping count %d\n",
 					mem->data2.mapped_to_gpu_memory);
 		}
 	}
+
 	if (mapped_before == mem->data2.mapped_to_gpu_memory) {
 		pr_debug("BO size %lu bytes at va 0x%llx is not mapped on GPU %x:%x.%x\n",
 			 mem->data2.bo->tbo.mem.size, mem->data2.va,
@@ -1154,6 +1137,8 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 		ret = -EINVAL;
 	}
 
+unreserve_out:
+	unreserve_bo_and_vms(&ctx, true);
 out:
 	mutex_unlock(&mem->data2.lock);
 	return ret;
@@ -1426,6 +1411,7 @@ int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm)
 	struct kfd_bo_va_list *entry;
 	unsigned n_evicted;
 	int r = 0;
+	struct bo_vm_reservation_context ctx;
 
 	pr_debug("Evicting buffer %p\n", mem);
 
@@ -1438,6 +1424,11 @@ int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm)
 	 * number of evicted mappings so we can roll back if something
 	 * goes wrong. */
 	n_evicted = 0;
+
+	r = reserve_bo_and_vms(mem, NULL, true, &ctx);
+	if (unlikely(r != 0))
+		return r;
+
 	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
 		struct amdgpu_device *adev;
 
@@ -1452,7 +1443,7 @@ int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm)
 			goto fail;
 		}
 
-		r = unmap_bo_from_gpuvm(adev, entry->bo_va);
+		r = unmap_bo_from_gpuvm(adev, mem->data2.bo, entry->bo_va);
 		if (r != 0) {
 			pr_err("failed unmap va 0x%llx\n",
 			       mem->data2.va);
@@ -1460,20 +1451,15 @@ int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm)
 			goto fail;
 		}
 
-		/* Unpin the PD directory*/
-		unpin_bo(entry->bo_va->vm->page_directory, true);
-		/* Unpin PTs */
-		unpin_pts(entry->bo_va, entry->bo_va->vm, true);
-
-		/* Unpin BO*/
-		unpin_bo(mem->data2.bo, true);
-
 		n_evicted++;
 	}
+
+	unreserve_bo_and_vms(&ctx, true);
 
 	return 0;
 
 fail:
+	unreserve_bo_and_vms(&ctx, true);
 	/* To avoid hangs and keep state consistent, roll back partial
 	 * eviction by restoring queues and marking mappings as
 	 * unmapped. Access to now unmapped buffers will fault. */
