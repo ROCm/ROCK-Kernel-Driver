@@ -92,7 +92,8 @@ struct ipp_funcs {
 	/*** setup input pixel processing ***/
 
 	/* put the entire pixel processor to bypass */
-	void (*ipp_full_bypass)(struct input_pixel_processor *ipp);
+	void (*ipp_full_bypass)(
+			struct input_pixel_processor *ipp);
 
 	/* setup ipp to expand/convert input to pixel processor internal format */
 	void (*ipp_setup)(
