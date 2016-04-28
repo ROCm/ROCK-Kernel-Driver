@@ -147,15 +147,9 @@ static void remove_bo_from_vm(struct amdgpu_device *adev,
 }
 
 
-static int try_pin_bo(struct amdgpu_bo *bo, bool resv, uint32_t domain)
+static int try_pin_bo(struct amdgpu_bo *bo, uint32_t domain)
 {
 	int ret = 0;
-
-	if (resv) {
-		ret = amdgpu_bo_reserve(bo, true);
-		if (ret != 0)
-			return ret;
-	}
 
 	if (!amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
 		ret = amdgpu_bo_pin(bo, domain, NULL);
@@ -185,21 +179,12 @@ static int try_pin_bo(struct amdgpu_bo *bo, bool resv, uint32_t domain)
 	}
 
 error:
-	if (resv)
-		amdgpu_bo_unreserve(bo);
-
 	return ret;
 }
 
-static int unpin_bo(struct amdgpu_bo *bo, bool resv)
+static int unpin_bo(struct amdgpu_bo *bo)
 {
 	int ret = 0;
-
-	if (resv) {
-		ret = amdgpu_bo_reserve(bo, true);
-		if (ret != 0)
-			return ret;
-	}
 
 	amdgpu_bo_kunmap(bo);
 
@@ -217,14 +202,11 @@ static int unpin_bo(struct amdgpu_bo *bo, bool resv)
 	}
 
 error:
-	if (resv)
-		amdgpu_bo_unreserve(bo);
-
 	return ret;
 }
 
 
-static int try_pin_pts(struct amdgpu_bo_va *bo_va, bool resv)
+static int try_pin_pts(struct amdgpu_bo_va *bo_va)
 {
 	int ret;
 	uint64_t pt_idx, start, last, failed;
@@ -240,7 +222,7 @@ static int try_pin_pts(struct amdgpu_bo_va *bo_va, bool resv)
 
 		/* walk over the address space and pin the page tables BOs*/
 		for (pt_idx = start; pt_idx <= last; pt_idx++) {
-			ret = try_pin_bo(vm->page_tables[pt_idx].bo, resv,
+			ret = try_pin_bo(vm->page_tables[pt_idx].bo,
 					AMDGPU_GEM_DOMAIN_VRAM);
 			if (ret != 0) {
 				failed = pt_idx;
@@ -257,7 +239,7 @@ static int try_pin_pts(struct amdgpu_bo_va *bo_va, bool resv)
 
 		/* walk over the address space and pin the page tables BOs*/
 		for (pt_idx = start; pt_idx <= last; pt_idx++) {
-			ret = try_pin_bo(vm->page_tables[pt_idx].bo, resv,
+			ret = try_pin_bo(vm->page_tables[pt_idx].bo,
 					AMDGPU_GEM_DOMAIN_VRAM);
 			if (ret != 0) {
 				failed = pt_idx;
@@ -273,13 +255,12 @@ err:
 	/* Unpin all already pinned BOs*/
 	if (failed > 0) {
 		for (pt_idx = start; pt_idx <= failed - 1; pt_idx++)
-			unpin_bo(vm->page_tables[pt_idx].bo, resv);
+			unpin_bo(vm->page_tables[pt_idx].bo);
 	}
 	return ret;
 }
 
-static void unpin_pts(struct amdgpu_bo_va *bo_va, struct amdgpu_vm *vm,
-			bool resv)
+static void unpin_pts(struct amdgpu_bo_va *bo_va, struct amdgpu_vm *vm)
 {
 	uint64_t pt_idx, start, last;
 	struct amdgpu_bo_va_mapping *mapping;
@@ -292,7 +273,7 @@ static void unpin_pts(struct amdgpu_bo_va *bo_va, struct amdgpu_vm *vm,
 
 		/* walk over the address space and unpin the page tables BOs*/
 		for (pt_idx = start; pt_idx <= last; pt_idx++)
-			unpin_bo(vm->page_tables[pt_idx].bo, resv);
+			unpin_bo(vm->page_tables[pt_idx].bo);
 	}
 
 	list_for_each_entry(mapping, &bo_va->invalids, list) {
@@ -303,7 +284,7 @@ static void unpin_pts(struct amdgpu_bo_va *bo_va, struct amdgpu_vm *vm,
 
 		/* walk over the address space and unpin the page tables BOs*/
 		for (pt_idx = start; pt_idx <= last; pt_idx++)
-			unpin_bo(vm->page_tables[pt_idx].bo, resv);
+			unpin_bo(vm->page_tables[pt_idx].bo);
 	}
 }
 
@@ -635,14 +616,14 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	 * create a mapping of virtual to MC address
 	 */
 	/* Pin BO*/
-	ret = try_pin_bo(bo, false, domain);
+	ret = try_pin_bo(bo, domain);
 	if (ret != 0) {
 		pr_err("amdkfd: Failed to pin BO\n");
 		return ret;
 	}
 
 	/* Pin PTs */
-	ret = try_pin_pts(bo_va, false);
+	ret = try_pin_pts(bo_va);
 	if (ret != 0) {
 		pr_err("amdkfd: Failed to pin PTs\n");
 		goto err_failed_to_pin_pts;
@@ -650,7 +631,7 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 
 	/* Pin the PD directory*/
 	vm = bo_va->vm;
-	ret = try_pin_bo(vm->page_directory, false, AMDGPU_GEM_DOMAIN_VRAM);
+	ret = try_pin_bo(vm->page_directory, AMDGPU_GEM_DOMAIN_VRAM);
 	if (ret != 0) {
 		pr_err("amdkfd: Failed to pin PD\n");
 		goto err_failed_to_pin_pd;
@@ -697,11 +678,11 @@ err_failed_to_vm_clear_invalids:
 err_failed_to_update_pts:
 err_failed_vm_clear_freed:
 err_failed_to_update_pd:
-	unpin_bo(vm->page_directory, false);
+	unpin_bo(vm->page_directory);
 err_failed_to_pin_pd:
-	unpin_pts(bo_va, vm, false);
+	unpin_pts(bo_va, vm);
 err_failed_to_pin_pts:
-	unpin_bo(bo, false);
+	unpin_bo(bo);
 
 	return ret;
 }
@@ -1037,11 +1018,11 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 	amdgpu_vm_clear_invalids(adev, vm, NULL);
 
 	/* Unpin the PD directory*/
-	unpin_bo(bo_va->vm->page_directory, false);
+	unpin_bo(bo_va->vm->page_directory);
 	/* Unpin PTs */
-	unpin_pts(bo_va, bo_va->vm, false);
+	unpin_pts(bo_va, bo_va->vm);
 	/* Unpin BO*/
-	unpin_bo(bo, false);
+	unpin_bo(bo);
 
 	return 0;
 }
