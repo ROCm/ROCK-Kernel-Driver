@@ -93,7 +93,13 @@ fail_alloc_context:
 void mod_freesync_destroy(struct mod_freesync *mod_freesync)
 {
 	if (mod_freesync != NULL) {
+		int i;
 		struct core_freesync *core_freesync = MOD_FREESYNC_TO_CORE(mod_freesync);
+
+		for (i = 0; i < core_freesync->num_sinks; i++)
+			dc_sink_release(core_freesync->caps[i].sink);
+
+		dm_free(core_freesync->caps);
 
 		dm_free(core_freesync);
 	}

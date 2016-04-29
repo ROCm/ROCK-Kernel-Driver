@@ -58,11 +58,19 @@ enum {
  ******************************************************************************/
 static void destruct(struct core_link *link)
 {
+	int i;
+
 	if (link->ddc)
 		dal_ddc_service_destroy(&link->ddc);
 
 	if(link->link_enc)
 		link->link_enc->funcs->destroy(&link->link_enc);
+
+	if (link->public.local_sink)
+		dc_sink_release(link->public.local_sink);
+
+	for (i = 0; i < link->public.sink_count; ++i)
+		dc_sink_release(link->public.remote_sinks[i]);
 }
 
 /*
