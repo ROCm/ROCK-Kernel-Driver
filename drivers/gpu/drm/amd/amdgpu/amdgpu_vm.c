@@ -861,7 +861,7 @@ static void amdgpu_vm_frag_ptes(struct amdgpu_device *adev,
 }
 
 /**
- * amdgpu_vm_update_ptes - make sure that page tables are valid
+ * amdgpu_vm_update_ptes_sdma - make sure that page tables are valid
  *
  * @adev: amdgpu_device pointer
  * @vm_update_params: see amdgpu_vm_update_params definition
@@ -871,14 +871,14 @@ static void amdgpu_vm_frag_ptes(struct amdgpu_device *adev,
  * @dst: destination address to map to, the next dst inside the function
  * @flags: mapping flags
  *
- * Update the page tables in the range @start - @end.
+ * Update the page tables in the range @start - @end using SDMA
  */
-static void amdgpu_vm_update_ptes(struct amdgpu_device *adev,
-				  struct amdgpu_vm_update_params
-					*vm_update_params,
-				  struct amdgpu_vm *vm,
-				  uint64_t start, uint64_t end,
-				  uint64_t dst, uint32_t flags)
+static void amdgpu_vm_update_ptes_sdma(struct amdgpu_device *adev,
+				       struct amdgpu_vm_update_params
+						*vm_update_params,
+				       struct amdgpu_vm *vm,
+				       uint64_t start, uint64_t end,
+				       uint64_t dst, uint32_t flags)
 {
 	const uint64_t mask = AMDGPU_VM_PTE_COUNT - 1;
 
@@ -947,6 +947,61 @@ static void amdgpu_vm_update_ptes(struct amdgpu_device *adev,
 }
 
 /**
+ * amdgpu_vm_update_ptes_cpu - make sure that page tables are valid
+ *
+ * @adev: amdgpu_device pointer
+ * @vm_update_params: see amdgpu_vm_update_params definition
+ * @vm: requested vm
+ * @start: start of GPU address range
+ * @end: end of GPU address range
+ * @dst: destination address to map to
+ * @flags: mapping flags
+ *
+ * Update the page tables in the range @start - @end using CPU
+ */
+static int amdgpu_vm_update_ptes_cpu(struct amdgpu_device *adev,
+				     struct amdgpu_vm_update_params
+					*vm_update_params,
+				     struct amdgpu_vm *vm,
+				     uint64_t start, uint64_t end,
+				     uint64_t dst, uint32_t flags)
+{
+	const uint64_t mask = AMDGPU_VM_PTE_COUNT - 1;
+	int r;
+	uint64_t addr;
+	struct amdgpu_bo *pt = NULL;
+
+	/* walk over the address space and update the page tables */
+	for (addr = start; addr < end; ) {
+		uint64_t pt_idx = addr >> amdgpu_vm_block_size;
+		unsigned nptes;
+		uint64_t pe_start;
+
+		pt = vm->page_tables[pt_idx].entry.robj;
+		r = amdgpu_bo_kmap(pt, &vm_update_params->kptr);
+		if (r)
+			return r;
+
+		if ((addr & ~mask) == (end & ~mask))
+			nptes = end - addr;
+		else
+			nptes = AMDGPU_VM_PTE_COUNT - (addr & mask);
+
+		pe_start = (addr & mask) * 8;
+
+		amdgpu_vm_frag_ptes(adev, vm_update_params,
+			pe_start, pe_start + 8 * nptes,
+			dst, flags);
+
+		addr += nptes;
+		dst += nptes * AMDGPU_GPU_PAGE_SIZE;
+
+		amdgpu_bo_kunmap(pt);
+	}
+	return 0;
+}
+
+/**
  * amdgpu_vm_bo_update_mapping - update a mapping in the vm page table
  *
  * @adev: amdgpu_device pointer
@@ -980,7 +1035,6 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	struct fence *f = NULL;
 	int r;
 
-	ring = container_of(vm->entity.sched, struct amdgpu_ring, sched);
 	memset(&vm_update_params, 0, sizeof(vm_update_params));
 	vm_update_params.src = src;
 	vm_update_params.pages_addr = pages_addr;
@@ -988,6 +1042,34 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	/* sync to everything on unmapping */
 	if (!(flags & AMDGPU_PTE_VALID))
 		owner = AMDGPU_FENCE_OWNER_UNDEFINED;
+
+	/* If update flag is set to CPU, then try to update PT entries directly
+	 * by CPU. If failed, fallback to SDMA update.
+	 */
+	if (vm->is_vm_update_mode_cpu) {
+		struct amdgpu_sync sync;
+
+		amdgpu_sync_create(&sync);
+		r = amdgpu_sync_resv(adev, &sync, vm->page_directory->tbo.resv,
+			owner);
+		if (r) {
+			dev_warn(adev->dev, "CPU pte update failed. Fallback to SDMA\n");
+			goto fallback_sdma_update;
+		}
+		amdgpu_sync_wait(&sync);
+		amdgpu_sync_free(&sync);
+
+		r = amdgpu_vm_update_ptes_cpu(adev, &vm_update_params,
+			vm, start, last + 1, addr, flags);
+		if (r) {
+			dev_info(adev->dev, "CPU pte update failed. Fallback to sdma\n");
+			goto fallback_sdma_update;
+		}
+		return r;
+	}
+
+fallback_sdma_update:
+	ring = container_of(vm->entity.sched, struct amdgpu_ring, sched);
 
 	nptes = last - start + 1;
 
@@ -1038,7 +1120,7 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	if (r)
 		goto error_free;
 
-	amdgpu_vm_update_ptes(adev, &vm_update_params, vm, start,
+	amdgpu_vm_update_ptes_sdma(adev, &vm_update_params, vm, start,
 			      last + 1, addr, flags);
 
 	amdgpu_ring_pad_ib(ring, vm_update_params.ib);
