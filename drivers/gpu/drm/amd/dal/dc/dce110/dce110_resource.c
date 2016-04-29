@@ -928,7 +928,7 @@ bool dce110_construct_resource_pool(
 	/*************************************************
 	 *  Resource + asic cap harcoding                *
 	 *************************************************/
-	pool->pipe_count = 4;
+	pool->pipe_count = 3;
 	pool->stream_enc_count = 3;
 
 	/*************************************************
