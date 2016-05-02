@@ -1248,10 +1248,8 @@ void dc_link_set_sink(const struct dc_link *link, struct dc_sink *sink)
 	dc_link->local_sink = sink;
 
 	if (sink == NULL) {
-		dc_link->sink_count = 0;
 		dc_link->type = dc_connection_none;
 	} else {
-		dc_link->sink_count = 1;
 		dc_link->type = dc_connection_single;
 	}
 }
