@@ -245,22 +245,34 @@ static bool setup_scaling_configuration(
 */
 static void program_overscan(
 		struct dce110_transform *xfm110,
-		const struct overscan_info *overscan)
+		const struct scaler_data *data)
 {
 	uint32_t overscan_left_right = 0;
 	uint32_t overscan_top_bottom = 0;
 
-	set_reg_field_value(overscan_left_right, overscan->left,
-		SCLV_EXT_OVERSCAN_LEFT_RIGHT, EXT_OVERSCAN_LEFT);
+	int overscan_right = data->h_active - data->recout.x - data->recout.width;
+	int overscan_bottom = data->v_active - data->recout.y - data->recout.height;
 
-	set_reg_field_value(overscan_left_right, overscan->right,
-		SCLV_EXT_OVERSCAN_LEFT_RIGHT, EXT_OVERSCAN_RIGHT);
+	if (overscan_right < 0) {
+		BREAK_TO_DEBUGGER();
+		overscan_right = 0;
+	}
+	if (overscan_bottom < 0) {
+		BREAK_TO_DEBUGGER();
+		overscan_bottom = 0;
+	}
 
-	set_reg_field_value(overscan_top_bottom, overscan->top,
-		SCLV_EXT_OVERSCAN_TOP_BOTTOM, EXT_OVERSCAN_TOP);
+	set_reg_field_value(overscan_left_right, data->recout.x,
+			EXT_OVERSCAN_LEFT_RIGHT, EXT_OVERSCAN_LEFT);
 
-	set_reg_field_value(overscan_top_bottom, overscan->bottom,
-		SCLV_EXT_OVERSCAN_TOP_BOTTOM, EXT_OVERSCAN_BOTTOM);
+	set_reg_field_value(overscan_left_right, overscan_right,
+			EXT_OVERSCAN_LEFT_RIGHT, EXT_OVERSCAN_RIGHT);
+
+	set_reg_field_value(overscan_top_bottom, data->recout.y,
+			EXT_OVERSCAN_TOP_BOTTOM, EXT_OVERSCAN_TOP);
+
+	set_reg_field_value(overscan_top_bottom, overscan_bottom,
+			EXT_OVERSCAN_TOP_BOTTOM, EXT_OVERSCAN_BOTTOM);
 
 	dm_write_reg(xfm110->base.ctx,
 			mmSCLV_EXT_OVERSCAN_LEFT_RIGHT,
@@ -485,7 +497,7 @@ static bool dce110_transform_v_set_scaler(
 	calculate_viewport(data, &luma_viewport, &chroma_viewport);
 
 	/* 2. Program overscan */
-	program_overscan(xfm110, &data->overscan);
+	program_overscan(xfm110, data);
 
 	/* 3. Program taps and configuration */
 	is_scaling_required = setup_scaling_configuration(xfm110, data);

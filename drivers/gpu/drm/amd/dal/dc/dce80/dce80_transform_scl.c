@@ -135,21 +135,33 @@ static bool setup_scaling_configuration(
 */
 static void program_overscan(
 		struct dce80_transform *xfm80,
-		const struct overscan_info *overscan)
+		const struct scaler_data *data)
 {
 	uint32_t overscan_left_right = 0;
 	uint32_t overscan_top_bottom = 0;
 
-	set_reg_field_value(overscan_left_right, overscan->left,
+	int overscan_right = data->h_active - data->recout.x - data->recout.width;
+	int overscan_bottom = data->v_active - data->recout.y - data->recout.height;
+
+	if (overscan_right < 0) {
+		BREAK_TO_DEBUGGER();
+		overscan_right = 0;
+	}
+	if (overscan_bottom < 0) {
+		BREAK_TO_DEBUGGER();
+		overscan_bottom = 0;
+	}
+
+	set_reg_field_value(overscan_left_right, data->recout.x,
 			EXT_OVERSCAN_LEFT_RIGHT, EXT_OVERSCAN_LEFT);
 
-	set_reg_field_value(overscan_left_right, overscan->right,
+	set_reg_field_value(overscan_left_right, overscan_right,
 			EXT_OVERSCAN_LEFT_RIGHT, EXT_OVERSCAN_RIGHT);
 
-	set_reg_field_value(overscan_top_bottom, overscan->top,
+	set_reg_field_value(overscan_top_bottom, data->recout.y,
 			EXT_OVERSCAN_TOP_BOTTOM, EXT_OVERSCAN_TOP);
 
-	set_reg_field_value(overscan_top_bottom, overscan->bottom,
+	set_reg_field_value(overscan_top_bottom, overscan_bottom,
 			EXT_OVERSCAN_TOP_BOTTOM, EXT_OVERSCAN_BOTTOM);
 
 	dm_write_reg(xfm80->base.ctx,
@@ -638,7 +650,7 @@ bool dce80_transform_set_scaler(
 	disable_enhanced_sharpness(xfm80);
 
 	/* 3. Program overscan */
-	program_overscan(xfm80, &data->overscan);
+	program_overscan(xfm80, data);
 
 	/* 4. Program taps and configuration */
 	is_scaling_required = setup_scaling_configuration(xfm80, data);

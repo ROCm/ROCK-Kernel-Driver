@@ -285,58 +285,15 @@ static void calculate_viewport(
 		pipe_ctx->scl_data.viewport.height = 2;
 }
 
-static void calculate_overscan(
-		const struct dc_surface *surface,
-		struct pipe_ctx *pipe_ctx)
-{
-	struct core_stream *stream = pipe_ctx->stream;
-
-	pipe_ctx->scl_data.overscan.left = stream->public.dst.x;
-	if (stream->public.src.x < surface->clip_rect.x)
-		pipe_ctx->scl_data.overscan.left += (surface->clip_rect.x
-			- stream->public.src.x) * stream->public.dst.width
-			/ stream->public.src.width;
-
-	pipe_ctx->scl_data.overscan.right = stream->public.timing.h_addressable
-		- stream->public.dst.x - stream->public.dst.width;
-	if (stream->public.src.x + stream->public.src.width
-		> surface->clip_rect.x + surface->clip_rect.width)
-		pipe_ctx->scl_data.overscan.right = stream->public.timing.h_addressable -
-			dal_fixed31_32_floor(dal_fixed31_32_div(
-				dal_fixed31_32_from_int(
-						pipe_ctx->scl_data.viewport.width),
-						pipe_ctx->scl_data.ratios.horz)) -
-						pipe_ctx->scl_data.overscan.left;
-
-	pipe_ctx->scl_data.overscan.top = stream->public.dst.y;
-	if (stream->public.src.y < surface->clip_rect.y)
-		pipe_ctx->scl_data.overscan.top += (surface->clip_rect.y
-			- stream->public.src.y) * stream->public.dst.height
-			/ stream->public.src.height;
-
-	pipe_ctx->scl_data.overscan.bottom = stream->public.timing.v_addressable
-		- stream->public.dst.y - stream->public.dst.height;
-	if (stream->public.src.y + stream->public.src.height
-		> surface->clip_rect.y + surface->clip_rect.height)
-		pipe_ctx->scl_data.overscan.bottom = stream->public.timing.v_addressable -
-			dal_fixed31_32_floor(dal_fixed31_32_div(
-				dal_fixed31_32_from_int(
-						pipe_ctx->scl_data.viewport.height),
-						pipe_ctx->scl_data.ratios.vert)) -
-						pipe_ctx->scl_data.overscan.top;
-
-	/* TODO: Add timing overscan to finalize overscan calculation*/
-}
-
 static void calculate_recout(
 		const struct dc_surface *surface,
 		struct pipe_ctx *pipe_ctx)
 {
 	struct core_stream *stream = pipe_ctx->stream;
 
-	pipe_ctx->scl_data.recout.x = 0;
+	pipe_ctx->scl_data.recout.x = stream->public.dst.x;
 	if (stream->public.src.x < surface->clip_rect.x)
-		pipe_ctx->scl_data.recout.x = (surface->clip_rect.x
+		pipe_ctx->scl_data.recout.x += (surface->clip_rect.x
 			- stream->public.src.x) * stream->public.dst.width
 						/ stream->public.src.width;
 
@@ -348,9 +305,9 @@ static void calculate_recout(
 			stream->public.dst.x + stream->public.dst.width
 						- pipe_ctx->scl_data.recout.x;
 
-	pipe_ctx->scl_data.recout.y = 0;
+	pipe_ctx->scl_data.recout.y = stream->public.dst.y;
 	if (stream->public.src.y < surface->clip_rect.y)
-		pipe_ctx->scl_data.recout.y = (surface->clip_rect.y
+		pipe_ctx->scl_data.recout.y += (surface->clip_rect.y
 			- stream->public.src.y) * stream->public.dst.height
 						/ stream->public.src.height;
 
@@ -390,6 +347,9 @@ static void calculate_scaling_ratios(
 	pipe_ctx->scl_data.ratios.horz.value = div64_s64(
 		pipe_ctx->scl_data.ratios.horz.value * in_w, out_w);
 
+	pipe_ctx->scl_data.ratios.horz.value++;
+	pipe_ctx->scl_data.ratios.vert.value++;
+
 	pipe_ctx->scl_data.ratios.horz_c = pipe_ctx->scl_data.ratios.horz;
 	pipe_ctx->scl_data.ratios.vert_c = pipe_ctx->scl_data.ratios.vert;
 
@@ -404,18 +364,18 @@ void resource_build_scaling_params(
 	struct pipe_ctx *pipe_ctx)
 {
 	/* Important: scaling ratio calculation requires pixel format,
-	 * overscan calculation requires scaling ratios and viewport
-	 * and lb depth/taps calculation requires overscan. Call sequence
-	 * is therefore important */
+	 * lb depth calculation requires recout and taps require scaling ratios.
+	 */
 	pipe_ctx->scl_data.format = convert_pixel_format_to_dalsurface(surface->format);
 
 	calculate_viewport(surface, pipe_ctx);
 
 	calculate_scaling_ratios(surface, pipe_ctx);
 
-	calculate_overscan(surface, pipe_ctx);
-
 	calculate_recout(surface, pipe_ctx);
+
+	pipe_ctx->scl_data.h_active = pipe_ctx->stream->public.timing.h_addressable;
+	pipe_ctx->scl_data.v_active = pipe_ctx->stream->public.timing.v_addressable;
 
 	/* Check if scaling is required update taps if not */
 	if (dal_fixed31_32_u2d19(pipe_ctx->scl_data.ratios.horz) == 1 << 19)
@@ -441,15 +401,10 @@ void resource_build_scaling_params(
 	dal_logger_write(pipe_ctx->stream->ctx->logger,
 				LOG_MAJOR_DCP,
 				LOG_MINOR_DCP_SCALER,
-				"%s: Overscan:\n bot:%d left:%d right:%d "
-				"top:%d\nViewport:\nheight:%d width:%d x:%d "
+				"%s: Viewport:\nheight:%d width:%d x:%d "
 				"y:%d\n dst_rect:\nheight:%d width:%d x:%d "
 				"y:%d\n",
 				__func__,
-				pipe_ctx->scl_data.overscan.bottom,
-				pipe_ctx->scl_data.overscan.left,
-				pipe_ctx->scl_data.overscan.right,
-				pipe_ctx->scl_data.overscan.top,
 				pipe_ctx->scl_data.viewport.height,
 				pipe_ctx->scl_data.viewport.width,
 				pipe_ctx->scl_data.viewport.x,

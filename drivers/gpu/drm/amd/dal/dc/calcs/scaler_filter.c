@@ -1873,6 +1873,7 @@ bool dal_scaler_filter_generate(
 		return false;
 	}
 
+	/* TODO: bilinear filter*/
 	if ((params->taps < 3) || (params->taps > 16)) {
 		BREAK_TO_DEBUGGER();
 		return false;

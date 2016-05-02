@@ -141,7 +141,8 @@ struct sharpness_adj {
 };
 
 struct scaler_data {
-	struct overscan_info overscan;
+	uint32_t h_active;
+	uint32_t v_active;
 	struct scaling_taps taps;
 	struct rect viewport;
 	struct rect recout;
