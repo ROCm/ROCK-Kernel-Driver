@@ -687,6 +687,9 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 		goto err_failed_to_vm_clear_invalids;
 	}
 
+	/* Remove PTs from LRU list (reservation removed PD only) */
+	amdgpu_vm_move_pt_bos_in_lru(adev, vm);
+
 	return 0;
 
 err_failed_to_vm_clear_invalids:
