@@ -35,6 +35,7 @@ struct mod_freesync {
 enum mod_freesync_mode {
 	FREESYNC_MODE_DISABLED,
 	FREESYNC_MODE_FIXED,
+	FREESYNC_MODE_STATIC_SCREEN,
 	FREESYNC_MODE_VARIABLE,
 };
 

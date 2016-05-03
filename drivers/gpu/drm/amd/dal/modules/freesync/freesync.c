@@ -201,8 +201,10 @@ bool mod_freesync_set_freesync_on_streams(struct mod_freesync *mod_freesync,
 		/* Disable freesync */
 		v_total_nominal = streams[0]->timing.v_total;
 
-		core_freesync->dc->stream_funcs.dc_stream_adjust_vmin_vmax(core_freesync->dc,
-				streams, num_streams, v_total_nominal, v_total_nominal);
+		core_freesync->dc->stream_funcs.
+			dc_stream_adjust_vmin_vmax(
+				core_freesync->dc, streams, num_streams,
+				v_total_nominal, v_total_nominal);
 
 		return true;
 	} else if (params->mode == FREESYNC_MODE_VARIABLE) {
@@ -211,10 +213,34 @@ bool mod_freesync_set_freesync_on_streams(struct mod_freesync *mod_freesync,
 			if (core_freesync->caps[i].sink == streams[0]->sink &&
 				core_freesync->caps[i].caps.supported) {
 
-				calc_vmin_vmax(streams[0], &core_freesync->caps[i].caps, &v_total_min, &v_total_max);
+				calc_vmin_vmax(streams[0],
+				               &core_freesync->caps[i].caps,
+				               &v_total_min, &v_total_max);
 
-				core_freesync->dc->stream_funcs.dc_stream_adjust_vmin_vmax(core_freesync->dc,
-									streams, num_streams, v_total_min, v_total_max);
+				core_freesync->dc->stream_funcs.
+					dc_stream_adjust_vmin_vmax(
+						core_freesync->dc, streams,
+						num_streams, v_total_min,
+						v_total_max);
+
+				return true;
+			}
+		}
+	} else if (params->mode == FREESYNC_MODE_STATIC_SCREEN) {
+		/* Enable Static Screen */
+		for (i = 0; i < core_freesync->num_sinks; i++) {
+			if (core_freesync->caps[i].sink == streams[0]->sink &&
+				core_freesync->caps[i].caps.supported) {
+
+				calc_vmin_vmax(streams[0],
+				               &core_freesync->caps[i].caps,
+				               &v_total_min, &v_total_max);
+
+				core_freesync->dc->stream_funcs.
+					dc_stream_adjust_vmin_vmax(
+						core_freesync->dc, streams,
+						num_streams, v_total_max,
+						v_total_max);
 
 				return true;
 			}
