@@ -2087,7 +2087,20 @@ static void wait_while_pflip_status(struct amdgpu_device *adev,
 										__func__, acrtc->crtc_id,
 										acrtc,
 										acrtc->pflip_status);
-			BUG_ON(1);
+
+			/* we do not expect to hit this case except on Polaris with PHY PLL
+			 * 1. DP to HDMI passive dongle connected
+			 * 2. unplug (headless)
+			 * 3. plug in DP
+			 * 3a. on plug in, DP will try verify link by training, and training
+			 * would disable PHY PLL which HDMI rely on to drive TG
+			 * 3b. this will cause flip interrupt cannot be generated, and we
+			 * exit when timeout expired.  however we do not have code to clean
+			 * up flip, flip clean up will happen when the address is written
+			 * with the restore mode change
+			 */
+			WARN_ON(1);
+			break;
 		}
 	}
 
