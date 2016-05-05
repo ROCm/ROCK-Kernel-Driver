@@ -103,10 +103,6 @@ bool dal_ddc_service_query_ddc_data(
 		uint8_t *read_buf,
 		uint32_t read_size);
 
-bool dal_ddc_service_get_dp_receiver_id_info(
-		struct ddc_service *ddc,
-		struct dp_receiver_id_info *info);
-
 enum ddc_result dal_ddc_service_read_dpcd_data(
 		struct ddc_service *ddc,
 		uint32_t address,
@@ -135,7 +131,6 @@ void dal_ddc_service_set_ddc_pin(
 		struct ddc *ddc);
 
 struct ddc *dal_ddc_service_get_ddc_pin(struct ddc_service *ddc_service);
-void dal_ddc_service_reset_dp_receiver_id_info(struct ddc_service *ddc_service);
 
 enum ddc_result dal_ddc_service_read_dpcd_data(
 		struct ddc_service *ddc,

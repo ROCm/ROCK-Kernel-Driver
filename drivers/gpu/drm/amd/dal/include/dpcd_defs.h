@@ -178,6 +178,8 @@ enum dpcd_address {
 	DPCD_ADDRESS_BRANCH_DEVICE_ID_END = 0x0502,
 	DPCD_ADDRESS_BRANCH_DEVICE_STR_START = 0x0503,
 	DPCD_ADDRESS_BRANCH_DEVICE_STR_END = 0x0508,
+	DPCD_ADDRESS_BRANCH_REVISION_START = 0x0509,
+	DPCD_ADDRESS_BRANCH_REVISION_END = 0x050B,
 
 	DPCD_ADDRESS_POWER_STATE = 0x0600,
 
@@ -641,6 +643,11 @@ union dpcd_edp_config {
 struct dp_device_vendor_id {
 	uint8_t ieee_oui[3];/*24-bit IEEE OUI*/
 	uint8_t ieee_device_id[6];/*usually 6-byte ASCII name*/
+};
+
+struct dp_sink_hw_fw_revision {
+	uint8_t ieee_hw_rev;
+	uint8_t ieee_fw_rev[2];
 };
 
 /*DPCD register of DP receiver capability field bits-*/

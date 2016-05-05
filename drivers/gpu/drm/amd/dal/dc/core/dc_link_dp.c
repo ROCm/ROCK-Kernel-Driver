@@ -1659,15 +1659,48 @@ static void get_active_converter_info(
 			break;
 		}
 	}
-	ddc_service_set_dongle_type(link->ddc,
-			link->dpcd_caps.dongle_type);
+
+	ddc_service_set_dongle_type(link->ddc, link->dpcd_caps.dongle_type);
+
+	{
+		struct dp_device_vendor_id dp_id;
+
+		/* read IEEE branch device id */
+		core_link_read_dpcd(
+			link,
+			DPCD_ADDRESS_BRANCH_DEVICE_ID_START,
+			(uint8_t *)&dp_id,
+			sizeof(dp_id));
+
+		link->dpcd_caps.branch_dev_id =
+			(dp_id.ieee_oui[0] << 16) +
+			(dp_id.ieee_oui[1] << 8) +
+			dp_id.ieee_oui[2];
+
+		memmove(
+			link->dpcd_caps.branch_dev_name,
+			dp_id.ieee_device_id,
+			sizeof(dp_id.ieee_device_id));
+	}
+
+	{
+		struct dp_sink_hw_fw_revision dp_hw_fw_revision;
+
+		core_link_read_dpcd(
+			link,
+			DPCD_ADDRESS_BRANCH_REVISION_START,
+			(uint8_t *)&dp_hw_fw_revision,
+			sizeof(dp_hw_fw_revision));
+
+		link->dpcd_caps.branch_hw_revision =
+			dp_hw_fw_revision.ieee_hw_rev;
+	}
 }
 
 static void dp_wa_power_up_0010FA(struct core_link *link, uint8_t *dpcd_data,
 		int length)
 {
 	int retry = 0;
-	struct dp_device_vendor_id dp_id;
 	union dp_downstream_port_present ds_port = { 0 };
 
 	if (!link->dpcd_caps.dpcd_rev.raw) {
@@ -1683,16 +1716,6 @@ static void dp_wa_power_up_0010FA(struct core_link *link, uint8_t *dpcd_data,
 
 	ds_port.byte = dpcd_data[DPCD_ADDRESS_DOWNSTREAM_PORT_PRESENT -
 				 DPCD_ADDRESS_DPCD_REV];
-
-	get_active_converter_info(ds_port.byte, link);
-
-	/* read IEEE branch device id */
-	core_link_read_dpcd(link, DPCD_ADDRESS_BRANCH_DEVICE_ID_START,
-			(uint8_t *)&dp_id, sizeof(dp_id));
-	link->dpcd_caps.branch_dev_id =
-			(dp_id.ieee_oui[0] << 16) +
-			(dp_id.ieee_oui[1] << 8) +
-			dp_id.ieee_oui[2];
 
 	if (link->dpcd_caps.dongle_type == DISPLAY_DONGLE_DP_VGA_CONVERTER) {
 		switch (link->dpcd_caps.branch_dev_id) {

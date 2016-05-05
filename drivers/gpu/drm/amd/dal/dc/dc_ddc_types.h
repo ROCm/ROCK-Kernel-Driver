@@ -98,24 +98,12 @@ enum display_dongle_type {
 	DISPLAY_DONGLE_DP_HDMI_MISMATCHED_DONGLE,
 };
 
-struct dp_receiver_id_info {
-	uint32_t dpcd_rev;
-	uint32_t sink_id;
-	int8_t sink_id_str[6];
-	int8_t sink_hw_revision;
-	int8_t sink_fw_revision[2];
-	uint32_t branch_id;
-	int8_t branch_name[6];
-	enum display_dongle_type dongle_type;
-};
-
 struct ddc_service {
 	struct ddc *ddc_pin;
 	struct ddc_flags flags;
 	union ddc_wa wa;
 	enum ddc_transaction_type transaction_type;
 	enum display_dongle_type dongle_type;
-	struct dp_receiver_id_info dp_receiver_id_info;
 	struct adapter_service *as;
 	struct dc_context *ctx;
 	struct core_link *link;

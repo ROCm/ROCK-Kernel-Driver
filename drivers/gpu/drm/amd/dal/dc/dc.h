@@ -427,6 +427,7 @@ struct dpcd_caps {
 	uint32_t sink_dev_id;
 	uint32_t branch_dev_id;
 	int8_t branch_dev_name[6];
+	int8_t branch_hw_revision;
 };
 
 struct dc_link_status {

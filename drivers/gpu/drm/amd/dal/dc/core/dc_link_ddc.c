@@ -369,18 +369,16 @@ static uint32_t defer_delay_converter_wa(
 	struct ddc_service *ddc,
 	uint32_t defer_delay)
 {
-	struct dp_receiver_id_info dp_rec_info = {0};
+	struct core_link *link = ddc->link;
 
-	if (dal_ddc_service_get_dp_receiver_id_info(ddc, &dp_rec_info) &&
-		(dp_rec_info.branch_id == DP_BRANCH_DEVICE_ID_4) &&
-		!strncmp(dp_rec_info.branch_name,
+	if (link->dpcd_caps.branch_dev_id == DP_BRANCH_DEVICE_ID_4 &&
+		!memcmp(link->dpcd_caps.branch_dev_name,
 			DP_DVI_CONVERTER_ID_4,
-			sizeof(dp_rec_info.branch_name)))
+			sizeof(link->dpcd_caps.branch_dev_name)))
 		return defer_delay > I2C_OVER_AUX_DEFER_WA_DELAY ?
 			defer_delay : I2C_OVER_AUX_DEFER_WA_DELAY;
 
 	return defer_delay;
-
 }
 
 #define DP_TRANSLATOR_DELAY 5
@@ -954,17 +952,6 @@ bool dal_ddc_service_query_ddc_data(
 	return ret;
 }
 
-bool dal_ddc_service_get_dp_receiver_id_info(
-	struct ddc_service *ddc,
-	struct dp_receiver_id_info *info)
-{
-	if (!info)
-		return false;
-
-	*info = ddc->dp_receiver_id_info;
-	return true;
-}
-
 enum ddc_result dal_ddc_service_read_dpcd_data(
 	struct ddc_service *ddc,
 	uint32_t address,
@@ -1044,12 +1031,6 @@ void dal_ddc_service_set_ddc_pin(
 struct ddc *dal_ddc_service_get_ddc_pin(struct ddc_service *ddc_service)
 {
 	return ddc_service->ddc_pin;
-}
-
-void dal_ddc_service_reset_dp_receiver_id_info(struct ddc_service *ddc_service)
-{
-	memset(&ddc_service->dp_receiver_id_info,
-		0, sizeof(struct dp_receiver_id_info));
 }
 
 void dal_ddc_service_write_scdc_data(struct ddc_service *ddc_service,
