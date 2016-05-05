@@ -845,6 +845,9 @@ static void dm_handle_hpd_rx_irq(struct amdgpu_connector *aconnector)
 	int dpcd_addr;
 	int dpcd_bytes_to_read;
 
+	const int max_process_count = 30;
+	int process_count = 0;
+
 	const struct dc_link_status *link_status = dc_link_get_status(aconnector->dc_link);
 
 	if (link_status->dpcd_caps->dpcd_rev.raw < 0x12) {
@@ -863,9 +866,12 @@ static void dm_handle_hpd_rx_irq(struct amdgpu_connector *aconnector)
 		esi,
 		dpcd_bytes_to_read);
 
-	while (dret == dpcd_bytes_to_read) {
+	while (dret == dpcd_bytes_to_read &&
+		process_count < max_process_count) {
 		uint8_t retry;
 		dret = 0;
+
+		process_count++;
 
 		DRM_DEBUG_KMS("ESI %02x %02x %02x\n", esi[0], esi[1], esi[2]);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
@@ -905,6 +911,9 @@ static void dm_handle_hpd_rx_irq(struct amdgpu_connector *aconnector)
 		} else
 			break;
 	}
+
+	if (process_count == max_process_count)
+		DRM_DEBUG_KMS("Loop exceeded max iterations\n");
 }
 
 static void handle_hpd_rx_irq(void *param)
