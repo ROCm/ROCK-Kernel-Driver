@@ -237,6 +237,12 @@ static void set_displaymarks(
 	/* Do nothing until we have proper bandwitdth calcs */
 }
 
+static void set_displaymarks(
+		const struct core_dc *dc, struct validate_context *context)
+{
+	/* Do nothing until we have proper bandwitdth calcs */
+}
+
 static void enable_hw_base_light_sleep(void)
 {
 	/* TODO: implement */
