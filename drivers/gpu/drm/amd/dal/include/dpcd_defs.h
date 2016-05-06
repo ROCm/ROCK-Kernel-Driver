@@ -510,13 +510,6 @@ union dpcd_training_lane {
 	uint8_t raw;
 };
 
-/*Training Lane Set 2 is used to configure downstream DP device's
-post cursor 2 level of Training Pattern 2 or 3*/
-/* The DPCD addresses are 0x10F (TRAINING_LANE0_1_SET2)
-and 0x110 (TRAINING_LANE2_3_SET2)*/
-
-/* EDP related 0x701 */
-
 /* TMDS-converter related */
 union dwnstream_port_caps_byte0 {
 	struct {

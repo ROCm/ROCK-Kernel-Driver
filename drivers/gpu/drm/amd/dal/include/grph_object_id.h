@@ -166,13 +166,11 @@ enum connector_id {
 	CONNECTOR_ID_VIRTUAL = 100
 };
 
-
 /* Audio object ids */
 enum audio_id {
 	AUDIO_ID_UNKNOWN = 0,
 	AUDIO_ID_INTERNAL_AZALIA
 };
-
 
 /* Engine object ids */
 enum engine_id {

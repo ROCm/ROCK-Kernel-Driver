@@ -40,10 +40,6 @@ struct dc_link;
 struct dc_sink;
 struct dal;
 
-#if defined(BUILD_DAL_TEST)
-struct test_driver_context;
-#endif /* BUILD_DAL_TEST */
-
 /********************************
  * Environment definitions
  ********************************/

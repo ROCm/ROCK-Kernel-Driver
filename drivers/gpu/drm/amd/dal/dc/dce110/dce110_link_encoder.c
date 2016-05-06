@@ -466,7 +466,7 @@ static void set_dp_phy_pattern_hbr2_compliance(
 	/* TODO: do we still need this, find out at compliance test
 	addr = mmDP_LINK_FRAMING_CNTL + fe_addr_offset;
 
-	value = (ctx, addr);
+	value = dal_read_reg(ctx, addr);
 
 	set_reg_field_value(value, 0xFC,
 			DP_LINK_FRAMING_CNTL, DP_IDLE_BS_INTERVAL);

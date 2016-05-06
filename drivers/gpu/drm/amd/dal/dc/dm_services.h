@@ -148,13 +148,6 @@ bool dm_exec_bios_cmd_table(
 	uint32_t index,
 	void *params);
 
-#ifdef BUILD_DAL_TEST
-uint32_t dm_bios_cmd_table_para_revision(
-struct dc_context *ctx,
-	uint32_t index);
-#endif
-
-#ifndef BUILD_DAL_TEST
 static inline uint32_t dm_bios_cmd_table_para_revision(
 	struct dc_context *ctx,
 	uint32_t index)
@@ -171,11 +164,6 @@ static inline uint32_t dm_bios_cmd_table_para_revision(
 
 	return crev;
 }
-#else
-uint32_t dm_bios_cmd_table_para_revision(
-		struct dc_context *ctx,
-		uint32_t index);
-#endif
 
 /**************************************
  * Power Play (PP) interfaces
