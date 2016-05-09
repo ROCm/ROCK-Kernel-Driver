@@ -1395,7 +1395,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 	struct dma_buf *dma_buf;
 	struct drm_gem_object *obj;
 	struct amdgpu_bo *bo;
-	int r = -EINVAL;
+	int r = 0;
 
 	dma_buf = dma_buf_get(dma_buf_fd);
 	if (IS_ERR(dma_buf))
@@ -1435,14 +1435,6 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 	(*mem)->data2.domain = (bo->prefered_domains & AMDGPU_GEM_DOMAIN_VRAM) ?
 		AMDGPU_GEM_DOMAIN_VRAM : AMDGPU_GEM_DOMAIN_GTT;
 	(*mem)->data2.mapped_to_gpu_memory = 0;
-
-	r = add_bo_to_vm(adev, *mem, vm, false, NULL);
-
-	if (r) {
-		amdgpu_bo_unref(&bo);
-		kfree(*mem);
-		*mem = NULL;
-	}
 
 out_put:
 	dma_buf_put(dma_buf);
