@@ -637,10 +637,44 @@ enum dc_status dce80_validate_with_context(
 	return result;
 }
 
+enum dc_status dce80_validate_guaranteed(
+		const struct core_dc *dc,
+		const struct dc_target *dc_target,
+		struct validate_context *context)
+{
+	enum dc_status result = DC_ERROR_UNEXPECTED;
+
+	context->res_ctx.pool = dc->res_pool;
+
+	context->targets[0] = DC_TARGET_TO_CORE(dc_target);
+	dc_target_retain(&context->targets[0]->public);
+	context->target_count++;
+
+	result = resource_map_pool_resources(dc, context);
+
+	if (result == DC_OK)
+		result = resource_map_clock_resources(dc, context);
+
+	if (result == DC_OK)
+		result = validate_mapped_resource(dc, context);
+
+	if (result == DC_OK) {
+		validate_guaranteed_copy_target(
+				context, dc->public.caps.max_targets);
+		resource_build_scaling_params_for_context(dc, context);
+	}
+
+	if (result == DC_OK)
+		result = dce80_validate_bandwidth(dc, context);
+
+	return result;
+}
+
 static struct resource_funcs dce80_res_pool_funcs = {
 	.destruct = dce80_destruct_resource_pool,
 	.link_enc_create = dce80_link_encoder_create,
 	.validate_with_context = dce80_validate_with_context,
+	.validate_guaranteed = dce80_validate_guaranteed,
 	.validate_bandwidth = dce80_validate_bandwidth
 };
 

@@ -288,6 +288,18 @@ bool dc_validate_resources(
 		uint8_t set_count);
 
 /*
+ * This function takes a target and checks if it is guaranteed to be supported.
+ * Guaranteed means that MAX_COFUNC*target is supported.
+ *
+ * After this call:
+ *   No hardware is programmed for call.  Only validation is done.
+ */
+
+bool dc_validate_guaranteed(
+		const struct dc *dc,
+		const struct dc_target *dc_target);
+
+/*
  * Set up streams and links associated to targets to drive sinks
  * The targets parameter is an absolute set of all active targets.
  *

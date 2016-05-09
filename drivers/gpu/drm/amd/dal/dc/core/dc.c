@@ -477,6 +477,37 @@ context_alloc_fail:
 
 }
 
+bool dc_validate_guaranteed(
+		const struct dc *dc,
+		const struct dc_target *dc_target)
+{
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	enum dc_status result = DC_ERROR_UNEXPECTED;
+	struct validate_context *context;
+
+	context = dm_alloc(sizeof(struct validate_context));
+	if (context == NULL)
+		goto context_alloc_fail;
+
+	result = core_dc->res_pool.funcs->validate_guaranteed(
+					core_dc, dc_target, context);
+
+	resource_validate_ctx_destruct(context);
+	dm_free(context);
+
+context_alloc_fail:
+	if (result != DC_OK) {
+		dal_logger_write(core_dc->ctx->logger,
+			LOG_MAJOR_WARNING,
+			LOG_MINOR_COMPONENT_TOPOLOGY_MANAGER,
+			"%s:guaranteed validation failed, dc_status:%d\n",
+			__func__,
+			result);
+		}
+
+	return (result == DC_OK);
+}
+
 static void program_timing_sync(
 		struct core_dc *core_dc,
 		struct validate_context *ctx)

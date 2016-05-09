@@ -91,6 +91,10 @@ bool resource_validate_attach_surfaces(
 		const struct validate_context *old_context,
 		struct validate_context *context);
 
+void validate_guaranteed_copy_target(
+		struct validate_context *context,
+		uint8_t max_targets);
+
 void resource_validate_ctx_copy_construct(
 		const struct validate_context *src_ctx,
 		struct validate_context *dst_ctx);

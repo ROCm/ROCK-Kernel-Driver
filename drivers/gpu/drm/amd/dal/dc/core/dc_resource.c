@@ -922,6 +922,27 @@ enum dc_status resource_map_pool_resources(
 	return DC_OK;
 }
 
+/* first target in the context is used to populate the rest */
+void validate_guaranteed_copy_target(
+		struct validate_context *context,
+		uint8_t max_targets)
+{
+	uint8_t i;
+
+	for (i = 1; i < max_targets; i++) {
+		context->targets[i] = context->targets[0];
+
+		copy_pipe_ctx(&context->res_ctx.pipe_ctx[0],
+			      &context->res_ctx.pipe_ctx[i]);
+		context->res_ctx.pipe_ctx[i].stream =
+				context->res_ctx.pipe_ctx[0].stream;
+
+		dc_target_retain(&context->targets[i]->public);
+		context->target_count++;
+	}
+}
+
+
 static void translate_info_frame(const struct hw_info_frame *hw_info_frame,
 	struct encoder_info_frame *encoder_info_frame)
 {

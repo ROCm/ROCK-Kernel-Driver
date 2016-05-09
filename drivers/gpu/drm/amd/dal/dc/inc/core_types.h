@@ -224,6 +224,11 @@ struct resource_funcs {
 					uint8_t set_count,
 					struct validate_context *context);
 
+	enum dc_status (*validate_guaranteed)(
+					const struct core_dc *dc,
+					const struct dc_target *dc_target,
+					struct validate_context *context);
+
 	enum dc_status (*validate_bandwidth)(
 					const struct core_dc *dc,
 					struct validate_context *context);
