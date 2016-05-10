@@ -65,9 +65,9 @@ void resource_reference_clock_source(
 		struct resource_context *res_ctx,
 		struct clock_source *clock_source);
 
-bool resource_is_same_timing(
-		const struct dc_crtc_timing *timing1,
-		const struct dc_crtc_timing *timing2);
+bool resource_are_streams_clk_sharable(
+		const struct core_stream *stream1,
+		const struct core_stream *stream2);
 
 struct clock_source *resource_find_used_clk_src_for_sharing(
 		struct resource_context *res_ctx,

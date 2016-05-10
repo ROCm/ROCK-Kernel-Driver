@@ -160,11 +160,21 @@ void resource_reference_clock_source(
 		res_ctx->dp_clock_source_ref_count++;
 }
 
-bool resource_is_same_timing(
-	const struct dc_crtc_timing *timing1,
-	const struct dc_crtc_timing *timing2)
+bool resource_are_streams_clk_sharable(
+	const struct core_stream *stream1,
+	const struct core_stream *stream2)
 {
-	return memcmp(timing1, timing2, sizeof(struct dc_crtc_timing)) == 0;
+
+	if (stream1->public.timing.h_total != stream2->public.timing.h_total)
+		return false;
+
+	if (stream1->public.timing.v_total != stream2->public.timing.v_total)
+		return false;
+
+	if (stream1->actual_pix_clk_khz != stream2->actual_pix_clk_khz)
+		return false;
+
+	return true;
 }
 
 static bool is_sharable_clk_src(
@@ -188,9 +198,8 @@ static bool is_sharable_clk_src(
 	if (dc_is_dp_signal(pipe_with_clk_src->signal))
 		return false;
 
-	if (!resource_is_same_timing(
-		&pipe_with_clk_src->stream->public.timing,
-		&pipe->stream->public.timing))
+	if (!resource_are_streams_clk_sharable(
+			pipe_with_clk_src->stream, pipe->stream))
 		return false;
 
 	return true;
@@ -738,31 +747,33 @@ static void copy_pipe_ctx(
 		to_pipe_ctx->surface = surface;
 }
 
-static struct core_stream *find_pll_stream_by_timing(
-		struct dc_crtc_timing *timing,
-		struct validate_context *context)
+static int get_norm_pix_clk(const struct dc_crtc_timing *timing)
 {
-	uint8_t i, j;
+	uint32_t pix_clk = timing->pix_clk_khz;
+	uint32_t normalized_pix_clk = pix_clk;
 
-	for (i = 0; i < context->target_count; i++) {
-		struct core_target *target = context->targets[i];
+	if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR420)
+		pix_clk /= 2;
 
-		for (j = 0; j < target->public.stream_count; j++) {
-			struct core_stream *stream =
-				DC_STREAM_TO_CORE(target->public.streams[j]);
-
-			/* We are looking for non dp, non virtual stream that
-			 * matches the timing provided
-			 */
-			if (resource_is_same_timing(timing, &stream->public.timing)
-				&& !dc_is_dp_signal(stream->sink->public.sink_signal)
-				&& stream->sink->link->public.connector_signal
-							!= SIGNAL_TYPE_VIRTUAL)
-					return stream;
-		}
+	switch (timing->display_color_depth) {
+	case COLOR_DEPTH_888:
+		normalized_pix_clk = pix_clk;
+		break;
+	case COLOR_DEPTH_101010:
+		normalized_pix_clk = (pix_clk * 30) / 24;
+		break;
+	case COLOR_DEPTH_121212:
+		normalized_pix_clk = (pix_clk * 36) / 24;
+		break;
+	case COLOR_DEPTH_161616:
+		normalized_pix_clk = (pix_clk * 48) / 24;
+		break;
+	default:
+		ASSERT(0);
+		break;
 	}
 
-	return NULL;
+	return normalized_pix_clk;
 }
 
 enum dc_status resource_map_pool_resources(
@@ -777,6 +788,14 @@ enum dc_status resource_map_pool_resources(
 		for (j = 0; j < target->public.stream_count; j++) {
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
+
+			/* update actual pixel clock on all streams */
+			if (dc_is_hdmi_signal(stream->sink->public.sink_signal))
+				stream->actual_pix_clk_khz = get_norm_pix_clk(
+					&stream->public.timing);
+			else
+				stream->actual_pix_clk_khz =
+					stream->public.timing.pix_clk_khz;
 
 			if (!resource_is_stream_unchanged(&dc->current_context, stream))
 				continue;
@@ -797,16 +816,6 @@ enum dc_status resource_map_pool_resources(
 				set_stream_engine_in_use(
 					&context->res_ctx,
 					pipe_ctx->stream_enc);
-
-				/* Switch to dp clock source only if there is
-				 * no non dp stream that shares the same timing
-				 * with the dp stream.
-				 */
-				if (dc_is_dp_signal(pipe_ctx->signal) &&
-					!find_pll_stream_by_timing(
-						&stream->public.timing, context))
-					pipe_ctx->clock_source =
-						context->res_ctx.pool.dp_clock_source;
 
 				resource_reference_clock_source(
 					&context->res_ctx,
@@ -1364,9 +1373,10 @@ static bool check_timing_change(struct core_stream *cur_stream,
 	if (cur_stream->sink != new_stream->sink)
 		return true;
 
-	return !resource_is_same_timing(
-					&cur_stream->public.timing,
-					&new_stream->public.timing);
+	return memcmp(
+		&cur_stream->public.timing,
+		&new_stream->public.timing,
+		sizeof(struct dc_crtc_timing)) != 0;
 }
 
 bool pipe_need_reprogram(

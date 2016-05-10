@@ -498,10 +498,9 @@ static void program_timing_sync(
 			if (!ctx->res_ctx.pipe_ctx[j].stream)
 				continue;
 
-			if (resource_is_same_timing(
-				&ctx->res_ctx.pipe_ctx[j].stream->public.timing,
-				&ctx->res_ctx.pipe_ctx[i].stream->public
-								.timing)) {
+			if (resource_are_streams_clk_sharable(
+					ctx->res_ctx.pipe_ctx[j].stream,
+					ctx->res_ctx.pipe_ctx[i].stream)) {
 				tg_set[group_size] =
 					ctx->res_ctx.pool.timing_generators[j];
 				group_size++;
@@ -621,20 +620,7 @@ static void fill_display_configs(
 			cfg->link_settings.lane_count = stream->sink->link->public.cur_link_settings.lane_count;
 			cfg->link_settings.link_rate = stream->sink->link->public.cur_link_settings.link_rate;
 			cfg->link_settings.link_spread = stream->sink->link->public.cur_link_settings.link_spread;
-			cfg->sym_clock = stream->public.timing.pix_clk_khz;
-			switch (stream->public.timing.display_color_depth) {
-			case COLOR_DEPTH_101010:
-				cfg->sym_clock = (cfg->sym_clock * 30) / 24;
-				break;
-			case COLOR_DEPTH_121212:
-				cfg->sym_clock = (cfg->sym_clock * 36) / 24;
-				break;
-			case COLOR_DEPTH_161616:
-				cfg->sym_clock = (cfg->sym_clock * 48) / 24;
-				break;
-			default:
-				break;
-			}
+			cfg->sym_clock = stream->actual_pix_clk_khz;
 			/* Round v_refresh*/
 			cfg->v_refresh = stream->public.timing.pix_clk_khz * 1000;
 			cfg->v_refresh /= stream->public.timing.h_total;
