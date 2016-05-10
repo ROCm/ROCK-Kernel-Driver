@@ -747,6 +747,33 @@ static void copy_pipe_ctx(
 		to_pipe_ctx->surface = surface;
 }
 
+static struct core_stream *find_pll_sharable_stream(
+		const struct core_stream *stream_needs_pll,
+		struct validate_context *context)
+{
+	uint8_t i, j;
+
+	for (i = 0; i < context->target_count; i++) {
+		struct core_target *target = context->targets[i];
+
+		for (j = 0; j < target->public.stream_count; j++) {
+			struct core_stream *stream_has_pll =
+				DC_STREAM_TO_CORE(target->public.streams[j]);
+
+			/* We are looking for non dp, non virtual stream */
+			if (resource_are_streams_clk_sharable(
+						stream_needs_pll, stream_has_pll)
+				&& !dc_is_dp_signal(
+					stream_has_pll->sink->public.sink_signal)
+				&& stream_has_pll->sink->link->public.connector_signal
+							!= SIGNAL_TYPE_VIRTUAL)
+					return stream_has_pll;
+		}
+	}
+
+	return NULL;
+}
+
 static int get_norm_pix_clk(const struct dc_crtc_timing *timing)
 {
 	uint32_t pix_clk = timing->pix_clk_khz;
@@ -816,6 +843,15 @@ enum dc_status resource_map_pool_resources(
 				set_stream_engine_in_use(
 					&context->res_ctx,
 					pipe_ctx->stream_enc);
+
+				/* Switch to dp clock source only if there is
+				 * no non dp stream that shares the same timing
+				 * with the dp stream.
+				 */
+				if (dc_is_dp_signal(pipe_ctx->signal) &&
+					!find_pll_sharable_stream(stream, context))
+					pipe_ctx->clock_source =
+						context->res_ctx.pool.dp_clock_source;
 
 				resource_reference_clock_source(
 					&context->res_ctx,
@@ -1392,7 +1428,8 @@ bool pipe_need_reprogram(
 	if (pipe_ctx_old->audio != pipe_ctx->audio)
 		return true;
 
-	if (pipe_ctx_old->clock_source != pipe_ctx->clock_source)
+	if (pipe_ctx_old->clock_source != pipe_ctx->clock_source
+			&& pipe_ctx_old->stream != pipe_ctx->stream)
 		return true;
 
 	if (pipe_ctx_old->stream_enc != pipe_ctx->stream_enc)

@@ -1234,8 +1234,12 @@ static enum dc_status apply_ctx_to_hw(
 		if (pipe_ctx->stream == NULL)
 			continue;
 
-		if (pipe_ctx->stream == pipe_ctx_old->stream)
+		if (pipe_ctx->stream == pipe_ctx_old->stream) {
+			if (pipe_ctx_old->clock_source != pipe_ctx->clock_source)
+				dc->hwss.crtc_switch_to_clk_src(
+						pipe_ctx->clock_source, i);
 			continue;
+		}
 
 		dcb = dal_adapter_service_get_bios_parser(
 				context->res_ctx.pool.adapter_srv);
