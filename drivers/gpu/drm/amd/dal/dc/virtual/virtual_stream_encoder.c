@@ -33,6 +33,7 @@ static void virtual_stream_encoder_dp_set_stream_attribute(
 static void virtual_stream_encoder_hdmi_set_stream_attribute(
 	struct stream_encoder *enc,
 	struct dc_crtc_timing *crtc_timing,
+	int actual_pix_clk_khz,
 	bool enable_audio) {}
 
 static void virtual_stream_encoder_dvi_set_stream_attribute(

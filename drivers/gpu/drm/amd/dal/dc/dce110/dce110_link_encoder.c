@@ -929,12 +929,11 @@ bool dce110_link_encoder_validate_dvi_output(
 
 static bool dce110_link_encoder_validate_hdmi_output(
 	const struct dce110_link_encoder *enc110,
-	const struct dc_crtc_timing *crtc_timing)
+	const struct dc_crtc_timing *crtc_timing,
+	int adjusted_pix_clk_khz)
 {
 	enum dc_color_depth max_deep_color =
 			enc110->base.features.max_hdmi_deep_color;
-	/* expressed in KHz */
-	uint32_t pixel_clock = 0;
 
 	if (max_deep_color > enc110->base.features.max_deep_color)
 		max_deep_color = enc110->base.features.max_deep_color;
@@ -942,32 +941,12 @@ static bool dce110_link_encoder_validate_hdmi_output(
 	if (max_deep_color < crtc_timing->display_color_depth)
 		return false;
 
-	if (crtc_timing->pix_clk_khz < TMDS_MIN_PIXEL_CLOCK)
+	if (adjusted_pix_clk_khz < TMDS_MIN_PIXEL_CLOCK)
 		return false;
 
-	switch (crtc_timing->display_color_depth) {
-	case COLOR_DEPTH_666:
-		pixel_clock = (crtc_timing->pix_clk_khz * 3) >> 2;
-	break;
-	case COLOR_DEPTH_888:
-		pixel_clock = crtc_timing->pix_clk_khz;
-	break;
-	case COLOR_DEPTH_101010:
-		pixel_clock = (crtc_timing->pix_clk_khz * 10) >> 3;
-	break;
-	case COLOR_DEPTH_121212:
-		pixel_clock = (crtc_timing->pix_clk_khz * 3) >> 1;
-	break;
-	case COLOR_DEPTH_161616:
-		pixel_clock = crtc_timing->pix_clk_khz << 1;
-	break;
-	default:
-	break;
-	}
-
-	if ((pixel_clock == 0) ||
-		(pixel_clock > enc110->base.features.max_hdmi_pixel_clock) ||
-		(pixel_clock > enc110->base.features.max_pixel_clock))
+	if ((adjusted_pix_clk_khz == 0) ||
+		(adjusted_pix_clk_khz > enc110->base.features.max_hdmi_pixel_clock) ||
+		(adjusted_pix_clk_khz > enc110->base.features.max_pixel_clock))
 		return false;
 
 	/* DCE11 HW does not support 420 */
@@ -1168,7 +1147,8 @@ bool dce110_link_encoder_validate_output_with_stream(
 	case SIGNAL_TYPE_HDMI_TYPE_A:
 		is_valid = dce110_link_encoder_validate_hdmi_output(
 				enc110,
-				&stream->public.timing);
+				&stream->public.timing,
+				stream->adjusted_pix_clk_khz);
 	break;
 	case SIGNAL_TYPE_RGB:
 		is_valid = dce110_link_encoder_validate_rgb_output(

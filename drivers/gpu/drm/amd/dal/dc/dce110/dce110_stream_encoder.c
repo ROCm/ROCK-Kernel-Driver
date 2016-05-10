@@ -47,29 +47,6 @@ enum {
 	DP_MST_UPDATE_MAX_RETRY = 50
 };
 
-static struct stream_encoder_funcs dce110_str_enc_funcs = {
-	.dp_set_stream_attribute =
-		dce110_stream_encoder_dp_set_stream_attribute,
-	.hdmi_set_stream_attribute =
-		dce110_stream_encoder_hdmi_set_stream_attribute,
-	.dvi_set_stream_attribute =
-		dce110_stream_encoder_dvi_set_stream_attribute,
-	.set_mst_bandwidth =
-		dce110_stream_encoder_set_mst_bandwidth,
-	.update_hdmi_info_packets =
-		dce110_stream_encoder_update_hdmi_info_packets,
-	.stop_hdmi_info_packets =
-		dce110_stream_encoder_stop_hdmi_info_packets,
-	.update_dp_info_packets =
-		dce110_stream_encoder_update_dp_info_packets,
-	.stop_dp_info_packets =
-		dce110_stream_encoder_stop_dp_info_packets,
-	.dp_blank =
-		dce110_stream_encoder_dp_blank,
-	.dp_unblank =
-		dce110_stream_encoder_dp_unblank,
-};
-
 static void dce110_update_generic_info_packet(
 	struct dce110_stream_encoder *enc110,
 	uint32_t packet_index,
@@ -278,29 +255,8 @@ static void dce110_update_hdmi_info_packet(
 	dm_write_reg(ctx, addr, regval);
 }
 
-bool dce110_stream_encoder_construct(
-	struct dce110_stream_encoder *enc110,
-	struct dc_context *ctx,
-	struct dc_bios *bp,
-	enum engine_id eng_id,
-	const struct dce110_stream_enc_registers *regs)
-{
-	if (!enc110)
-		return false;
-	if (!bp)
-		return false;
-
-	enc110->base.funcs = &dce110_str_enc_funcs;
-	enc110->base.ctx = ctx;
-	enc110->base.id = eng_id;
-	enc110->base.bp = bp;
-	enc110->regs = regs;
-
-	return true;
-}
-
 /* setup stream encoder in dp mode */
-void dce110_stream_encoder_dp_set_stream_attribute(
+static void dce110_stream_encoder_dp_set_stream_attribute(
 	struct stream_encoder *enc,
 	struct dc_crtc_timing *crtc_timing)
 {
@@ -390,16 +346,14 @@ void dce110_stream_encoder_dp_set_stream_attribute(
 }
 
 /* setup stream encoder in hdmi mode */
-void dce110_stream_encoder_hdmi_set_stream_attribute(
+static void dce110_stream_encoder_hdmi_set_stream_attribute(
 	struct stream_encoder *enc,
 	struct dc_crtc_timing *crtc_timing,
+	int actual_pix_clk_khz,
 	bool enable_audio)
 {
 	struct dce110_stream_encoder *enc110 = DCE110STRENC_FROM_STRENC(enc);
 	struct dc_context *ctx = enc110->base.ctx;
-	uint32_t output_pixel_clock = (crtc_timing->pixel_encoding ==
-			PIXEL_ENCODING_YCBCR420) ?
-			crtc_timing->pix_clk_khz / 2 : crtc_timing->pix_clk_khz;
 	uint32_t value;
 	uint32_t addr;
 	struct bp_encoder_control cntl = {0};
@@ -408,9 +362,8 @@ void dce110_stream_encoder_hdmi_set_stream_attribute(
 	cntl.engine_id = enc110->base.id;
 	cntl.signal = SIGNAL_TYPE_HDMI_TYPE_A;
 	cntl.enable_dp_audio = enable_audio;
-	cntl.pixel_clock = output_pixel_clock;
+	cntl.pixel_clock = actual_pix_clk_khz;
 	cntl.lanes_number = LANE_COUNT_FOUR;
-	cntl.color_depth = crtc_timing->display_color_depth;
 
 	if (enc110->base.bp->funcs->encoder_control(
 			enc110->base.bp, &cntl) != BP_RESULT_OK)
@@ -458,7 +411,6 @@ void dce110_stream_encoder_hdmi_set_stream_attribute(
 			1,
 			HDMI_CONTROL,
 			HDMI_DEEP_COLOR_ENABLE);
-		output_pixel_clock = (output_pixel_clock * 30) / 24;
 		break;
 	case COLOR_DEPTH_121212:
 		set_reg_field_value(
@@ -471,7 +423,6 @@ void dce110_stream_encoder_hdmi_set_stream_attribute(
 			1,
 			HDMI_CONTROL,
 			HDMI_DEEP_COLOR_ENABLE);
-		output_pixel_clock = (output_pixel_clock * 36) / 24;
 		break;
 	case COLOR_DEPTH_161616:
 		set_reg_field_value(
@@ -484,13 +435,12 @@ void dce110_stream_encoder_hdmi_set_stream_attribute(
 			1,
 			HDMI_CONTROL,
 			HDMI_DEEP_COLOR_ENABLE);
-		output_pixel_clock = (output_pixel_clock * 48) / 24;
 		break;
 	default:
 		break;
 	}
 
-	if (output_pixel_clock >= HDMI_CLOCK_CHANNEL_RATE_MORE_340M) {
+	if (actual_pix_clk_khz >= HDMI_CLOCK_CHANNEL_RATE_MORE_340M) {
 		/* enable HDMI data scrambler */
 		set_reg_field_value(
 			value,
@@ -571,7 +521,7 @@ void dce110_stream_encoder_hdmi_set_stream_attribute(
 }
 
 /* setup stream encoder in dvi mode */
-void dce110_stream_encoder_dvi_set_stream_attribute(
+static void dce110_stream_encoder_dvi_set_stream_attribute(
 	struct stream_encoder *enc,
 	struct dc_crtc_timing *crtc_timing,
 	bool is_dual_link)
@@ -585,13 +535,10 @@ void dce110_stream_encoder_dvi_set_stream_attribute(
 	cntl.action = ENCODER_CONTROL_SETUP;
 	cntl.engine_id = enc110->base.id;
 	cntl.signal = is_dual_link ?
-		SIGNAL_TYPE_DVI_DUAL_LINK :
-		SIGNAL_TYPE_DVI_SINGLE_LINK;
+			SIGNAL_TYPE_DVI_DUAL_LINK : SIGNAL_TYPE_DVI_SINGLE_LINK;
 	cntl.enable_dp_audio = false;
 	cntl.pixel_clock = crtc_timing->pix_clk_khz;
-	cntl.lanes_number = (is_dual_link) ?
-				LANE_COUNT_EIGHT : LANE_COUNT_FOUR;
-	cntl.color_depth = crtc_timing->display_color_depth;
+	cntl.lanes_number = (is_dual_link) ? LANE_COUNT_EIGHT : LANE_COUNT_FOUR;
 
 	if (enc110->base.bp->funcs->encoder_control(
 			enc110->base.bp, &cntl) != BP_RESULT_OK)
@@ -628,7 +575,7 @@ void dce110_stream_encoder_dvi_set_stream_attribute(
 	dm_write_reg(ctx, addr, value);
 }
 
-void dce110_stream_encoder_set_mst_bandwidth(
+static void dce110_stream_encoder_set_mst_bandwidth(
 	struct stream_encoder *enc,
 	struct fixed31_32 avg_time_slots_per_mtp)
 {
@@ -691,7 +638,7 @@ void dce110_stream_encoder_set_mst_bandwidth(
 	}
 }
 
-void dce110_stream_encoder_update_hdmi_info_packets(
+static void dce110_stream_encoder_update_hdmi_info_packets(
 	struct stream_encoder *enc,
 	const struct encoder_info_frame *info_frame)
 {
@@ -795,7 +742,7 @@ void dce110_stream_encoder_update_hdmi_info_packets(
 	dce110_update_hdmi_info_packet(enc110, 2, &info_frame->spd);
 }
 
-void dce110_stream_encoder_stop_hdmi_info_packets(
+static void dce110_stream_encoder_stop_hdmi_info_packets(
 	struct stream_encoder *enc)
 {
 	struct dce110_stream_encoder *enc110 = DCE110STRENC_FROM_STRENC(enc);
@@ -897,7 +844,8 @@ void dce110_stream_encoder_stop_hdmi_info_packets(
 
 	dm_write_reg(ctx, addr, value);
 }
-void dce110_stream_encoder_update_dp_info_packets(
+
+static void dce110_stream_encoder_update_dp_info_packets(
 	struct stream_encoder *enc,
 	const struct encoder_info_frame *info_frame)
 {
@@ -940,7 +888,7 @@ void dce110_stream_encoder_update_dp_info_packets(
 	dm_write_reg(ctx, addr, value);
 }
 
-void dce110_stream_encoder_stop_dp_info_packets(
+static void dce110_stream_encoder_stop_dp_info_packets(
 	struct stream_encoder *enc)
 {
 	/* stop generic packets on DP */
@@ -971,7 +919,7 @@ void dce110_stream_encoder_stop_dp_info_packets(
 	dm_write_reg(ctx, addr, value);
 }
 
-void dce110_stream_encoder_dp_blank(
+static void dce110_stream_encoder_dp_blank(
 	struct stream_encoder *enc)
 {
 	struct dce110_stream_encoder *enc110 = DCE110STRENC_FROM_STRENC(enc);
@@ -1038,7 +986,7 @@ void dce110_stream_encoder_dp_blank(
 }
 
 /* output video stream to link encoder */
-void dce110_stream_encoder_dp_unblank(
+static void dce110_stream_encoder_dp_unblank(
 	struct stream_encoder *enc,
 	const struct encoder_unblank_param *param)
 {
@@ -1123,3 +1071,46 @@ void dce110_stream_encoder_dp_unblank(
 	dm_write_reg(ctx, addr, value);
 }
 
+static struct stream_encoder_funcs dce110_str_enc_funcs = {
+	.dp_set_stream_attribute =
+		dce110_stream_encoder_dp_set_stream_attribute,
+	.hdmi_set_stream_attribute =
+		dce110_stream_encoder_hdmi_set_stream_attribute,
+	.dvi_set_stream_attribute =
+		dce110_stream_encoder_dvi_set_stream_attribute,
+	.set_mst_bandwidth =
+		dce110_stream_encoder_set_mst_bandwidth,
+	.update_hdmi_info_packets =
+		dce110_stream_encoder_update_hdmi_info_packets,
+	.stop_hdmi_info_packets =
+		dce110_stream_encoder_stop_hdmi_info_packets,
+	.update_dp_info_packets =
+		dce110_stream_encoder_update_dp_info_packets,
+	.stop_dp_info_packets =
+		dce110_stream_encoder_stop_dp_info_packets,
+	.dp_blank =
+		dce110_stream_encoder_dp_blank,
+	.dp_unblank =
+		dce110_stream_encoder_dp_unblank,
+};
+
+bool dce110_stream_encoder_construct(
+	struct dce110_stream_encoder *enc110,
+	struct dc_context *ctx,
+	struct dc_bios *bp,
+	enum engine_id eng_id,
+	const struct dce110_stream_enc_registers *regs)
+{
+	if (!enc110)
+		return false;
+	if (!bp)
+		return false;
+
+	enc110->base.funcs = &dce110_str_enc_funcs;
+	enc110->base.ctx = ctx;
+	enc110->base.id = eng_id;
+	enc110->base.bp = bp;
+	enc110->regs = regs;
+
+	return true;
+}

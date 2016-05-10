@@ -245,24 +245,6 @@ static enum bp_result encoder_control_digx_v3(
 					cntl->enable_dp_audio);
 	params.ucLaneNum = (uint8_t)(cntl->lanes_number);
 
-	if (cntl->signal == SIGNAL_TYPE_HDMI_TYPE_A)
-		switch (cntl->color_depth) {
-		case COLOR_DEPTH_101010:
-			params.usPixelClock =
-				cpu_to_le16((le32_to_cpu(params.usPixelClock) * 30) / 24);
-			break;
-		case COLOR_DEPTH_121212:
-			params.usPixelClock =
-				cpu_to_le16((le32_to_cpu(params.usPixelClock) * 36) / 24);
-			break;
-		case COLOR_DEPTH_161616:
-			params.usPixelClock =
-				cpu_to_le16((le32_to_cpu(params.usPixelClock) * 48) / 24);
-			break;
-		default:
-			break;
-		}
-
 	if (EXEC_BIOS_CMD_TABLE(DIGxEncoderControl, params))
 		result = BP_RESULT_OK;
 
@@ -291,24 +273,6 @@ static enum bp_result encoder_control_digx_v4(
 					cntl->signal,
 					cntl->enable_dp_audio));
 	params.ucLaneNum = (uint8_t)(cntl->lanes_number);
-
-	if (cntl->signal == SIGNAL_TYPE_HDMI_TYPE_A)
-		switch (cntl->color_depth) {
-		case COLOR_DEPTH_101010:
-			params.usPixelClock =
-				cpu_to_le16((le32_to_cpu(params.usPixelClock) * 30) / 24);
-			break;
-		case COLOR_DEPTH_121212:
-			params.usPixelClock =
-				cpu_to_le16((le32_to_cpu(params.usPixelClock) * 36) / 24);
-			break;
-		case COLOR_DEPTH_161616:
-			params.usPixelClock =
-				cpu_to_le16((le32_to_cpu(params.usPixelClock) * 48) / 24);
-			break;
-		default:
-			break;
-		}
 
 	if (EXEC_BIOS_CMD_TABLE(DIGxEncoderControl, params))
 		result = BP_RESULT_OK;
@@ -634,23 +598,6 @@ static enum bp_result transmitter_control_v3(
 			 */
 			params.usPixelClock =
 					cpu_to_le16((uint16_t)(cntl->pixel_clock / 10));
-			if (cntl->signal == SIGNAL_TYPE_HDMI_TYPE_A)
-				switch (cntl->color_depth) {
-				case COLOR_DEPTH_101010:
-					params.usPixelClock =
-							cpu_to_le16((le16_to_cpu(params.usPixelClock) * 30) / 24);
-					break;
-				case COLOR_DEPTH_121212:
-					params.usPixelClock =
-							cpu_to_le16((le16_to_cpu(params.usPixelClock) * 36) / 24);
-					break;
-				case COLOR_DEPTH_161616:
-					params.usPixelClock =
-							cpu_to_le16((le16_to_cpu(params.usPixelClock) * 48) / 24);
-					break;
-				default:
-					break;
-				}
 		}
 		break;
 	}
@@ -777,24 +724,6 @@ static enum bp_result transmitter_control_v4(
 			 */
 			params.usPixelClock =
 					cpu_to_le16((uint16_t)(cntl->pixel_clock / 10));
-
-			if (cntl->signal == SIGNAL_TYPE_HDMI_TYPE_A)
-				switch (cntl->color_depth) {
-				case COLOR_DEPTH_101010:
-					params.usPixelClock =
-							cpu_to_le16((le16_to_cpu(params.usPixelClock) * 30) / 24);
-					break;
-				case COLOR_DEPTH_121212:
-					params.usPixelClock =
-							cpu_to_le16((le16_to_cpu(params.usPixelClock) * 36) / 24);
-					break;
-				case COLOR_DEPTH_161616:
-					params.usPixelClock =
-							cpu_to_le16((le16_to_cpu(params.usPixelClock) * 48) / 24);
-					break;
-				default:
-					break;
-				}
 		}
 		break;
 	}
@@ -878,28 +807,6 @@ static enum bp_result transmitter_control_v1_5(
 	 * (=1: 8bpp, =1.25: 10bpp, =1.5:12bpp, =2: 16bpp)
 	 * LVDS mode: usPixelClock = pixel clock
 	 */
-	switch (cntl->signal) {
-	case SIGNAL_TYPE_HDMI_TYPE_A:
-		switch (cntl->color_depth) {
-		case COLOR_DEPTH_101010:
-			params.usSymClock =
-				cpu_to_le16((le16_to_cpu(params.usSymClock) * 30) / 24);
-			break;
-		case COLOR_DEPTH_121212:
-			params.usSymClock =
-				cpu_to_le16((le16_to_cpu(params.usSymClock) * 36) / 24);
-			break;
-		case COLOR_DEPTH_161616:
-			params.usSymClock =
-				cpu_to_le16((le16_to_cpu(params.usSymClock) * 48) / 24);
-			break;
-		default:
-			break;
-		}
-		break;
-		default:
-			break;
-	}
 
 	if (EXEC_BIOS_CMD_TABLE(UNIPHYTransmitterControl, params))
 		result = BP_RESULT_OK;

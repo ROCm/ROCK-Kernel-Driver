@@ -529,13 +529,18 @@ static void get_pixel_clock_parameters(
 	struct pixel_clk_params *pixel_clk_params)
 {
 	const struct core_stream *stream = pipe_ctx->stream;
+
+	/*TODO: is this halved for YCbCr 420? in that case we might want to move
+	 * the pixel clock normalization for hdmi up to here instead of doing it
+	 * in pll_adjust_pix_clk
+	 */
 	pixel_clk_params->requested_pix_clk = stream->public.timing.pix_clk_khz;
 	pixel_clk_params->encoder_object_id = stream->sink->link->link_enc->id;
 	pixel_clk_params->signal_type = stream->sink->public.sink_signal;
 	pixel_clk_params->controller_id = pipe_ctx->pipe_idx + 1;
 	/* TODO: un-hardcode*/
 	pixel_clk_params->requested_sym_clk = LINK_RATE_LOW *
-		LINK_RATE_REF_FREQ_IN_KHZ;
+						LINK_RATE_REF_FREQ_IN_KHZ;
 	pixel_clk_params->flags.ENABLE_SS = 0;
 	pixel_clk_params->color_depth =
 		stream->public.timing.display_color_depth;

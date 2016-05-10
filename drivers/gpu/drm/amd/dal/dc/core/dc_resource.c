@@ -171,7 +171,7 @@ bool resource_are_streams_clk_sharable(
 	if (stream1->public.timing.v_total != stream2->public.timing.v_total)
 		return false;
 
-	if (stream1->actual_pix_clk_khz != stream2->actual_pix_clk_khz)
+	if (stream1->adjusted_pix_clk_khz != stream2->adjusted_pix_clk_khz)
 		return false;
 
 	return true;
@@ -791,10 +791,10 @@ enum dc_status resource_map_pool_resources(
 
 			/* update actual pixel clock on all streams */
 			if (dc_is_hdmi_signal(stream->sink->public.sink_signal))
-				stream->actual_pix_clk_khz = get_norm_pix_clk(
+				stream->adjusted_pix_clk_khz = get_norm_pix_clk(
 					&stream->public.timing);
 			else
-				stream->actual_pix_clk_khz =
+				stream->adjusted_pix_clk_khz =
 					stream->public.timing.pix_clk_khz;
 
 			if (!resource_is_stream_unchanged(&dc->current_context, stream))

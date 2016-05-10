@@ -1244,40 +1244,10 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 	struct core_stream *stream = pipe_ctx->stream;
 	struct core_link *link = stream->sink->link;
 
-	/* enable video output */
-	/* here we need to specify that encoder output settings
-	 * need to be calculated as for the set mode,
-	 * it will lead to querying dynamic link capabilities
-	 * which should be done before enable output */
-	uint32_t pix_clk = stream->public.timing.pix_clk_khz;
-	uint32_t normalized_pix_clk = pix_clk;
-
-	if (stream->sink->public.sink_signal == SIGNAL_TYPE_HDMI_TYPE_A &&
-			stream->public.timing.pixel_encoding == PIXEL_ENCODING_YCBCR420)
-		pix_clk /= 2;
-
-	switch (stream->public.timing.display_color_depth) {
-	case COLOR_DEPTH_888:
-		normalized_pix_clk = pix_clk;
-		break;
-	case COLOR_DEPTH_101010:
-		normalized_pix_clk = (pix_clk * 30) / 24;
-		break;
-	case COLOR_DEPTH_121212:
-		normalized_pix_clk = (pix_clk * 36) / 24;
-		break;
-	case COLOR_DEPTH_161616:
-		normalized_pix_clk = (pix_clk * 48) / 24;
-		break;
-	default:
-		ASSERT(0);
-		break;
-	}
-
-	if (pipe_ctx->signal == SIGNAL_TYPE_HDMI_TYPE_A)
+	if (dc_is_hdmi_signal(pipe_ctx->signal))
 		dal_ddc_service_write_scdc_data(
 			stream->sink->link->ddc,
-			normalized_pix_clk,
+			stream->adjusted_pix_clk_khz,
 			stream->public.timing.flags.LTE_340MCSC_SCRAMBLE);
 
 	memset(&stream->sink->link->public.cur_link_settings, 0,
@@ -1289,7 +1259,7 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 			stream->public.timing.display_color_depth,
 			pipe_ctx->signal == SIGNAL_TYPE_HDMI_TYPE_A,
 			pipe_ctx->signal == SIGNAL_TYPE_DVI_DUAL_LINK,
-			pix_clk);
+			stream->adjusted_pix_clk_khz);
 
 	if (pipe_ctx->signal == SIGNAL_TYPE_HDMI_TYPE_A)
 		dal_ddc_service_read_scdc_data(link->ddc);

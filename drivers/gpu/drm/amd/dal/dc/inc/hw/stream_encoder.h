@@ -58,6 +58,7 @@ struct stream_encoder_funcs {
 	void (*hdmi_set_stream_attribute)(
 		struct stream_encoder *enc,
 		struct dc_crtc_timing *crtc_timing,
+		int actual_pix_clk_khz,
 		bool enable_audio);
 	void (*dvi_set_stream_attribute)(
 		struct stream_encoder *enc,

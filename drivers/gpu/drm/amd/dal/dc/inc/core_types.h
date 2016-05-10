@@ -93,7 +93,7 @@ struct core_stream {
 	struct bit_depth_reduction_params bit_depth_params;
 	struct clamping_and_pixel_encoding_params clamping;
 
-	int actual_pix_clk_khz;
+	int adjusted_pix_clk_khz;
 
 	struct dc_stream_status status;
 };
