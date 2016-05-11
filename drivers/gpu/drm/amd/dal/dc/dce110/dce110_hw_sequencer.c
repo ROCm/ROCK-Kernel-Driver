@@ -54,14 +54,6 @@ struct dce110_hw_seq_reg_offsets {
 	uint32_t crtc;
 };
 
-enum pipe_lock_control {
-	PIPE_LOCK_CONTROL_GRAPHICS = 1 << 0,
-	PIPE_LOCK_CONTROL_BLENDER = 1 << 1,
-	PIPE_LOCK_CONTROL_SCL = 1 << 2,
-	PIPE_LOCK_CONTROL_SURFACE = 1 << 3,
-	PIPE_LOCK_CONTROL_MODE = 1 << 4
-};
-
 enum blender_mode {
 	BLENDER_MODE_CURRENT_PIPE = 0,/* Data from current pipe only */
 	BLENDER_MODE_OTHER_PIPE, /* Data from other pipe only */
@@ -1385,20 +1377,6 @@ static void set_plane_config(
 	struct core_surface *surface = pipe_ctx->surface;
 	enum blender_mode blender_mode = BLENDER_MODE_CURRENT_PIPE;
 
-	dc->hwss.pipe_control_lock(
-		ctx, pipe_ctx->pipe_idx, PIPE_LOCK_CONTROL_MODE, false);
-
-	/* While a non-root controller is programmed we
-	 * have to lock the root controller. */
-	dc->hwss.pipe_control_lock(
-			ctx,
-			pipe_ctx->pipe_idx,
-			PIPE_LOCK_CONTROL_GRAPHICS |
-			PIPE_LOCK_CONTROL_SCL |
-			PIPE_LOCK_CONTROL_BLENDER |
-			PIPE_LOCK_CONTROL_SURFACE,
-			true);
-
 	tg->funcs->program_timing(tg, crtc_timing, false);
 	tg->funcs->enable_advanced_request(
 			tg,
@@ -1434,49 +1412,30 @@ static void set_plane_config(
 			surface->public.rotation);
 }
 
-static void update_plane_addrs(struct core_dc *dc, struct resource_context *res_ctx)
+static void update_plane_addr(struct core_dc *dc, struct pipe_ctx *pipe_ctx)
 {
-	int j;
+	struct core_surface *surface = pipe_ctx->surface;
 
-	/* Go through pipes in reverse order to avoid underflow on unlock */
-	for (j = MAX_PIPES - 1; j >= 0; j--) {
-		struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[j];
-		struct core_surface *surface = pipe_ctx->surface;
+	if (surface == NULL)
+		return;
 
-		if (surface == NULL ||
-			surface->status.requested_address.grph.addr.quad_part
-			== surface->public.address.grph.addr.quad_part)
-			continue;
-
-		dc->hwss.pipe_control_lock(
-			dc->ctx,
-			j,
-			PIPE_LOCK_CONTROL_SURFACE,
-			true);
-
-			pipe_ctx->mi->funcs->mem_input_program_surface_flip_and_addr(
+	pipe_ctx->mi->funcs->mem_input_program_surface_flip_and_addr(
 			pipe_ctx->mi,
 			&surface->public.address,
 			surface->public.flip_immediate);
 
-		surface->status.requested_address = surface->public.address;
+	surface->status.requested_address = surface->public.address;
 
+	pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, false);
+
+	if (surface->public.flip_immediate) {
 		dc->hwss.pipe_control_lock(
 					dc->ctx,
 					pipe_ctx->pipe_idx,
-					PIPE_LOCK_CONTROL_GRAPHICS |
-					PIPE_LOCK_CONTROL_SCL |
-					PIPE_LOCK_CONTROL_BLENDER |
 					PIPE_LOCK_CONTROL_SURFACE,
 					false);
-
-		if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, false)) {
-			dm_error("DC: failed to unblank crtc!\n");
-			BREAK_TO_DEBUGGER();
-		}
-
-		if (surface->public.flip_immediate)
-			pipe_ctx->mi->funcs->wait_for_no_surface_update_pending(pipe_ctx->mi);
+		pipe_ctx->mi->funcs->wait_for_no_surface_update_pending(
+								pipe_ctx->mi);
 	}
 }
 
@@ -1633,7 +1592,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.init_hw = init_hw,
 	.apply_ctx_to_hw = apply_ctx_to_hw,
 	.set_plane_config = set_plane_config,
-	.update_plane_addrs = update_plane_addrs,
+	.update_plane_addr = update_plane_addr,
 	.set_gamma_correction = set_gamma_ramp,
 	.power_down = power_down,
 	.enable_accelerated_mode = enable_accelerated_mode,

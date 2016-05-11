@@ -39,14 +39,6 @@ struct dce100_hw_seq_reg_offsets {
 	uint32_t crtc;
 };
 
-enum pipe_lock_control {
-	PIPE_LOCK_CONTROL_GRAPHICS = 1 << 0,
-	PIPE_LOCK_CONTROL_BLENDER = 1 << 1,
-	PIPE_LOCK_CONTROL_SCL = 1 << 2,
-	PIPE_LOCK_CONTROL_SURFACE = 1 << 3,
-	PIPE_LOCK_CONTROL_MODE = 1 << 4
-};
-
 enum blender_mode {
 	BLENDER_MODE_CURRENT_PIPE = 0,/* Data from current pipe only */
 	BLENDER_MODE_OTHER_PIPE, /* Data from other pipe only */

@@ -910,7 +910,7 @@ bool dc_commit_surfaces_to_target(
 				&core_dc->current_context.res_ctx);
 
 	for (i = 0; i < new_surface_count; i++)
-		for (j = 0; j < MAX_PIPES; j++) {
+		for (j = 0; j < context->res_ctx.pool.pipe_count; j++) {
 			struct dc_surface *dc_surface = new_surfaces[i];
 			struct core_surface *surface =
 						DC_SURFACE_TO_CORE(dc_surface);
@@ -923,27 +923,43 @@ bool dc_commit_surfaces_to_target(
 				continue;
 
 			dal_logger_write(core_dc->ctx->logger,
-						LOG_MAJOR_INTERFACE_TRACE,
-						LOG_MINOR_COMPONENT_DC,
-					   "Pipe:%d 0x%x: addr hi:0x%x, "
-					   "addr low:0x%x, "
-					   "src: %d, %d, %d,"
-						" %d; dst: %d, %d, %d, %d;\n",
-						pipe_ctx->pipe_idx,
-						dc_surface,
-					    dc_surface->address.grph.addr.high_part,
-					    dc_surface->address.grph.addr.low_part,
-						dc_surface->src_rect.x,
-						dc_surface->src_rect.y,
-						dc_surface->src_rect.width,
-						dc_surface->src_rect.height,
-						dc_surface->dst_rect.x,
-						dc_surface->dst_rect.y,
-						dc_surface->dst_rect.width,
-						dc_surface->dst_rect.height);
+					LOG_MAJOR_INTERFACE_TRACE,
+					LOG_MINOR_COMPONENT_DC,
+					"Pipe:%d 0x%x: addr hi:0x%x, "
+					"addr low:0x%x, "
+					"src: %d, %d, %d,"
+					" %d; dst: %d, %d, %d, %d;\n",
+					pipe_ctx->pipe_idx,
+					dc_surface,
+					dc_surface->address.grph.addr.high_part,
+					dc_surface->address.grph.addr.low_part,
+					dc_surface->src_rect.x,
+					dc_surface->src_rect.y,
+					dc_surface->src_rect.width,
+					dc_surface->src_rect.height,
+					dc_surface->dst_rect.x,
+					dc_surface->dst_rect.y,
+					dc_surface->dst_rect.width,
+					dc_surface->dst_rect.height);
+
+			core_dc->hwss.pipe_control_lock(
+					core_dc->ctx,
+					pipe_ctx->pipe_idx,
+					PIPE_LOCK_CONTROL_MODE,
+					false);
+			core_dc->hwss.pipe_control_lock(
+					core_dc->ctx,
+					pipe_ctx->pipe_idx,
+					PIPE_LOCK_CONTROL_GRAPHICS |
+					PIPE_LOCK_CONTROL_SCL |
+					PIPE_LOCK_CONTROL_BLENDER |
+					PIPE_LOCK_CONTROL_SURFACE,
+					true);
 
 			core_dc->hwss.set_plane_config(
-				core_dc, pipe_ctx, &context->res_ctx);
+					core_dc, pipe_ctx, &context->res_ctx);
+
+			core_dc->hwss.update_plane_addr(core_dc, pipe_ctx);
 
 			if (surface->public.gamma_correction)
 				gamma = DC_GAMMA_TO_CORE(
@@ -955,7 +971,28 @@ bool dc_commit_surfaces_to_target(
 					gamma, surface);
 		}
 
-	core_dc->hwss.update_plane_addrs(core_dc, &context->res_ctx);
+	/* Go in reverse order so that all pipes are unlocked simultaneously
+	 * when pipe 0 is unlocked
+	 * Need PIPE_LOCK_CONTROL_MODE to be 1 for this
+	 */
+	for (j = context->res_ctx.pool.pipe_count - 1; j >= 0; j--)
+		for (i = new_surface_count - 1; i >= 0; i--) {
+			struct pipe_ctx *pipe_ctx =
+						&context->res_ctx.pipe_ctx[j];
+
+			if (pipe_ctx->surface !=
+					DC_SURFACE_TO_CORE(new_surfaces[i]))
+				continue;
+
+			core_dc->hwss.pipe_control_lock(
+					core_dc->ctx,
+					pipe_ctx->pipe_idx,
+					PIPE_LOCK_CONTROL_GRAPHICS |
+					PIPE_LOCK_CONTROL_SCL |
+					PIPE_LOCK_CONTROL_BLENDER |
+					PIPE_LOCK_CONTROL_SURFACE,
+					false);
+		}
 
 	/* Lower display clock if necessary */
 	if (prev_disp_clk > context->bw_results.dispclk_khz) {
@@ -1033,20 +1070,44 @@ void dc_flip_surface_addrs(
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
 	int i, j;
+	int pipe_count = core_dc->current_context.res_ctx.pool.pipe_count;
 
-	for (i = 0; i < count; i++) {
-		for (j = 0; j < MAX_PIPES; j++) {
-			struct core_surface *ctx_surface =
-				core_dc->current_context.res_ctx.pipe_ctx[j].surface;
-			if (DC_SURFACE_TO_CORE(surfaces[i]) == ctx_surface) {
-				ctx_surface->public.address = flip_addrs[i].address;
-				ctx_surface->public.flip_immediate = flip_addrs[i].flip_immediate;
-				break;
-			}
+	for (i = 0; i < count; i++)
+		for (j = 0; j < pipe_count; j++) {
+			struct pipe_ctx *pipe_ctx =
+				&core_dc->current_context.res_ctx.pipe_ctx[j];
+			struct core_surface *ctx_surface = pipe_ctx->surface;
+
+			if (DC_SURFACE_TO_CORE(surfaces[i]) != ctx_surface)
+				continue;
+
+			ctx_surface->public.address = flip_addrs[i].address;
+			ctx_surface->public.flip_immediate = flip_addrs[i].flip_immediate;
+
+			core_dc->hwss.pipe_control_lock(
+					core_dc->ctx,
+					pipe_ctx->pipe_idx,
+					PIPE_LOCK_CONTROL_SURFACE,
+					true);
+
+			core_dc->hwss.update_plane_addr(core_dc, pipe_ctx);
 		}
-	}
 
-	core_dc->hwss.update_plane_addrs(core_dc, &core_dc->current_context.res_ctx);
+	for (j = pipe_count - 1; j >= 0; j--)
+		for (i = count - 1; i >= 0; i--) {
+			struct pipe_ctx *pipe_ctx =
+				&core_dc->current_context.res_ctx.pipe_ctx[j];
+			struct core_surface *ctx_surface = pipe_ctx->surface;
+
+			if (DC_SURFACE_TO_CORE(surfaces[i]) != ctx_surface)
+				continue;
+
+			core_dc->hwss.pipe_control_lock(
+					core_dc->ctx,
+					pipe_ctx->pipe_idx,
+					PIPE_LOCK_CONTROL_SURFACE,
+					false);
+		}
 }
 
 enum dc_irq_source dc_interrupt_to_irq_source(

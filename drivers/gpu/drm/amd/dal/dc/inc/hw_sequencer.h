@@ -35,6 +35,14 @@ enum pipe_gating_control {
 	PIPE_GATING_CONTROL_INIT
 };
 
+enum pipe_lock_control {
+	PIPE_LOCK_CONTROL_GRAPHICS = 1 << 0,
+	PIPE_LOCK_CONTROL_BLENDER = 1 << 1,
+	PIPE_LOCK_CONTROL_SCL = 1 << 2,
+	PIPE_LOCK_CONTROL_SURFACE = 1 << 3,
+	PIPE_LOCK_CONTROL_MODE = 1 << 4
+};
+
 struct hw_sequencer_funcs {
 
 	void (*init_hw)(struct core_dc *dc);
@@ -47,9 +55,9 @@ struct hw_sequencer_funcs {
 			struct pipe_ctx *pipe_ctx,
 			struct resource_context *res_ctx);
 
-	void (*update_plane_addrs)(
+	void (*update_plane_addr)(
 		struct core_dc *dc,
-		struct resource_context *res_ctx);
+		struct pipe_ctx *pipe_ctx);
 
 	bool (*set_gamma_correction)(
 				struct input_pixel_processor *ipp,
