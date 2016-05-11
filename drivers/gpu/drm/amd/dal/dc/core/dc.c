@@ -1046,6 +1046,71 @@ unexpected_fail:
 	return false;
 }
 
+bool dc_update_surfaces_for_target(
+		struct dc *dc,
+		struct dc_surface *new_surfaces[],
+		uint8_t new_surface_count,
+		struct dc_target *dc_target)
+
+{
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	struct dc_bios *dcb = core_dc->ctx->dc_bios;
+
+	int i, j;
+	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
+	struct dc_target_status *target_status = NULL;
+	struct validate_context *context;
+
+	if (core_dc->current_context.target_count == 0)
+		return false;
+
+	context = &core_dc->current_context;
+
+	/* Cannot commit surface to a target that is not committed */
+	for (i = 0; i < context->target_count; i++)
+		if (target == context->targets[i])
+			break;
+
+	target_status = &context->target_status[i];
+
+	if (!dcb->funcs->is_accelerated_mode(dcb)
+			|| i == context->target_count) {
+		BREAK_TO_DEBUGGER();
+		return false;
+	}
+
+	if (!resource_attach_surfaces_to_context(
+			new_surfaces, new_surface_count, dc_target, context)) {
+		BREAK_TO_DEBUGGER();
+		return false;
+	}
+
+	for (i = 0; i < new_surface_count; i++)
+		for (j = 0; j < MAX_PIPES; j++) {
+			if (context->res_ctx.pipe_ctx[j].surface !=
+					DC_SURFACE_TO_CORE(new_surfaces[i]))
+				continue;
+
+			resource_build_scaling_params(
+				new_surfaces[i], &context->res_ctx.pipe_ctx[j]);
+		}
+
+	for (i = 0; i < new_surface_count; i++)
+		for (j = 0; j < context->res_ctx.pool.pipe_count; j++) {
+			struct pipe_ctx *pipe_ctx =
+						&context->res_ctx.pipe_ctx[j];
+
+			if (pipe_ctx->surface !=
+					DC_SURFACE_TO_CORE(new_surfaces[i]))
+				continue;
+
+			core_dc->hwss.set_plane_config(
+				core_dc, pipe_ctx, &context->res_ctx);
+		}
+
+	return true;
+}
+
 uint8_t dc_get_current_target_count(const struct dc *dc)
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);

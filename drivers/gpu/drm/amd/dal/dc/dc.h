@@ -204,6 +204,12 @@ bool dc_commit_surfaces_to_target(
 		uint8_t surface_count,
 		struct dc_target *dc_target);
 
+bool dc_update_surfaces_for_target(
+		struct dc *dc,
+		struct dc_surface *dc_surfaces[],
+		uint8_t surface_count,
+		struct dc_target *dc_target);
+
 /*******************************************************************************
  * Target Interfaces
  ******************************************************************************/
