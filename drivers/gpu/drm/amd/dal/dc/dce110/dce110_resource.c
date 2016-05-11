@@ -901,6 +901,9 @@ static void underlay_create(struct dc_context *ctx, struct resource_pool *pool)
 			pool->transforms[pool->pipe_count],
 			pool->scaler_filter);
 	pool->pipe_count++;
+
+	// update the public caps to indicate an underlay is available
+	ctx->dc->caps.max_underlays = 1;
 }
 
 static void bw_calcs_data_update_from_pplib(struct core_dc *dc)

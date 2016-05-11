@@ -45,6 +45,7 @@ struct dc_caps {
 	uint32_t max_targets;
 	uint32_t max_links;
 	uint32_t max_audios;
+	uint32_t max_underlays;
 };
 
 struct dc;
