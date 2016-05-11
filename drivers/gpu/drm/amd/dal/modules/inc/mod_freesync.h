@@ -32,15 +32,9 @@ struct mod_freesync {
 	int dummy;
 };
 
-enum mod_freesync_mode {
-	FREESYNC_MODE_DISABLED,
-	FREESYNC_MODE_FIXED,
-	FREESYNC_MODE_STATIC_SCREEN,
-	FREESYNC_MODE_VARIABLE,
-};
-
-struct mod_freesync_params {
-	enum mod_freesync_mode mode;
+enum mod_freesync_state {
+    FREESYNC_STATE_FULLSCREEN,
+    FREESYNC_STATE_STATIC_SCREEN
 };
 
 struct mod_freesync_caps {
@@ -72,12 +66,13 @@ void mod_freesync_update_stream(struct mod_freesync *mod_freesync,
 		struct dc_stream *stream);
 
 /*
- * This interface sets the freesync mode on a stream.  Mode and associated
- * parameters required to set it are defined in mod_freesync_params.
+ * Update the freesync state flags for each display and program
+ * freesync accordingly
  */
-bool mod_freesync_set_freesync_on_streams(struct mod_freesync *mod_freesync,
+void mod_freesync_update_state(struct mod_freesync *mod_freesync,
 		const struct dc_stream **streams, int num_streams,
-		const struct mod_freesync_params *params);
+		unsigned int displayIndex,
+		enum mod_freesync_state freesyncState, bool enable);
 
 /*
  * This interface must be called for on every VUPDATE event for every stream
