@@ -1428,15 +1428,9 @@ static void update_plane_addr(struct core_dc *dc, struct pipe_ctx *pipe_ctx)
 
 	pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, false);
 
-	if (surface->public.flip_immediate) {
-		dc->hwss.pipe_control_lock(
-					dc->ctx,
-					pipe_ctx->pipe_idx,
-					PIPE_LOCK_CONTROL_SURFACE,
-					false);
+	if (surface->public.flip_immediate)
 		pipe_ctx->mi->funcs->wait_for_no_surface_update_pending(
 								pipe_ctx->mi);
-	}
 }
 
 

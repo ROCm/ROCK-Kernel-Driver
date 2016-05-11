@@ -917,6 +917,11 @@ bool dc_commit_surfaces_to_target(
 			struct pipe_ctx *pipe_ctx =
 						&context->res_ctx.pipe_ctx[j];
 			struct core_gamma *gamma = NULL;
+			int lock_mask =
+				PIPE_LOCK_CONTROL_GRAPHICS |
+				PIPE_LOCK_CONTROL_SCL |
+				PIPE_LOCK_CONTROL_BLENDER |
+				PIPE_LOCK_CONTROL_MODE;
 
 			if (pipe_ctx->surface !=
 					DC_SURFACE_TO_CORE(new_surfaces[i]))
@@ -942,18 +947,13 @@ bool dc_commit_surfaces_to_target(
 					dc_surface->dst_rect.width,
 					dc_surface->dst_rect.height);
 
+			if (!pipe_ctx->surface->public.flip_immediate)
+				lock_mask |= PIPE_LOCK_CONTROL_SURFACE;
+
 			core_dc->hwss.pipe_control_lock(
 					core_dc->ctx,
 					pipe_ctx->pipe_idx,
-					PIPE_LOCK_CONTROL_MODE,
-					false);
-			core_dc->hwss.pipe_control_lock(
-					core_dc->ctx,
-					pipe_ctx->pipe_idx,
-					PIPE_LOCK_CONTROL_GRAPHICS |
-					PIPE_LOCK_CONTROL_SCL |
-					PIPE_LOCK_CONTROL_BLENDER |
-					PIPE_LOCK_CONTROL_SURFACE,
+					lock_mask,
 					true);
 
 			core_dc->hwss.set_plane_config(
@@ -1084,11 +1084,13 @@ void dc_flip_surface_addrs(
 			ctx_surface->public.address = flip_addrs[i].address;
 			ctx_surface->public.flip_immediate = flip_addrs[i].flip_immediate;
 
-			core_dc->hwss.pipe_control_lock(
-					core_dc->ctx,
-					pipe_ctx->pipe_idx,
-					PIPE_LOCK_CONTROL_SURFACE,
-					true);
+			if (!ctx_surface->public.flip_immediate)
+				core_dc->hwss.pipe_control_lock(
+						core_dc->ctx,
+						pipe_ctx->pipe_idx,
+						PIPE_LOCK_CONTROL_SURFACE |
+						PIPE_LOCK_CONTROL_MODE,
+						true);
 
 			core_dc->hwss.update_plane_addr(core_dc, pipe_ctx);
 		}
@@ -1102,11 +1104,12 @@ void dc_flip_surface_addrs(
 			if (DC_SURFACE_TO_CORE(surfaces[i]) != ctx_surface)
 				continue;
 
-			core_dc->hwss.pipe_control_lock(
-					core_dc->ctx,
-					pipe_ctx->pipe_idx,
-					PIPE_LOCK_CONTROL_SURFACE,
-					false);
+			if (!ctx_surface->public.flip_immediate)
+				core_dc->hwss.pipe_control_lock(
+						core_dc->ctx,
+						pipe_ctx->pipe_idx,
+						PIPE_LOCK_CONTROL_SURFACE,
+						false);
 		}
 }
 
