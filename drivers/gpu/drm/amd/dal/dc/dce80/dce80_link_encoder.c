@@ -38,6 +38,9 @@
 #define LINK_REG(reg)\
 	(enc110->link_regs->reg)
 
+/* For current ASICs pixel clock - 600MHz */
+#define MAX_ENCODER_CLK 600000
+
 #define DCE8_UNIPHY_MAX_PIXEL_CLK_IN_KHZ 297000
 
 #define DEFAULT_AUX_MAX_DATA_SIZE 16
@@ -237,7 +240,7 @@ bool dce80_link_encoder_construct(
 
 	enc110->base.features.flags.bits.IS_AUDIO_CAPABLE = true;
 
-	enc110->base.features.max_pixel_clock = DCE8_UNIPHY_MAX_PIXEL_CLK_IN_KHZ;
+	enc110->base.features.max_pixel_clock = MAX_ENCODER_CLK;
 
 	enc110->base.features.max_hdmi_pixel_clock =
 			DCE8_UNIPHY_MAX_PIXEL_CLK_IN_KHZ;
