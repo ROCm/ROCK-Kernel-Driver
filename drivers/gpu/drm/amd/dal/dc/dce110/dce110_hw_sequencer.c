@@ -368,9 +368,23 @@ static bool dce110_enable_display_power_gating(
 	if (controller_id == DCE110_UNDERLAY_IDX)
 		controller_id = CONTROLLER_ID_UNDERLAY0 - 1;
 
-	if (power_gating != PIPE_GATING_CONTROL_INIT || controller_id == 0)
+	if (power_gating != PIPE_GATING_CONTROL_INIT || controller_id == 0){
+
 		bp_result = dcb->funcs->enable_disp_power_gating(
 						dcb, controller_id + 1, cntl);
+
+		/* Revert MASTER_UPDATE_MODE to 0 because bios sets it 2
+		 * by default when command table is called
+		 *
+		 * Bios parser accepts controller_id = 6 as indicative of
+		 * underlay pipe in dce110. But we do not support more
+		 * than 3.
+		 */
+		if (controller_id < CONTROLLER_ID_MAX - 1)
+			dm_write_reg(ctx,
+				HW_REG_CRTC(mmCRTC_MASTER_UPDATE_MODE, controller_id),
+				0);
+	}
 
 	if (power_gating != PIPE_GATING_CONTROL_ENABLE)
 		dce110_init_pte(ctx);

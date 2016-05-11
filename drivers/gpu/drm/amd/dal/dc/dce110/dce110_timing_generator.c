@@ -281,7 +281,7 @@ bool dce110_timing_generator_enable_crtc(struct timing_generator *tg)
 	 */
 	set_reg_field_value(
 		value,
-		3,
+		0,
 		CRTC_MASTER_UPDATE_MODE,
 		MASTER_UPDATE_MODE);
 
