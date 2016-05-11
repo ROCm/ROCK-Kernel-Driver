@@ -27,10 +27,12 @@
 
 #include "include/logger_interface.h"
 
-#include "irq_service_dce110.h"
+#include "irq_service_dce80.h"
+#include "../dce110/irq_service_dce110.h"
 
-#include "dce/dce_11_0_d.h"
-#include "dce/dce_11_0_sh_mask.h"
+#include "dce/dce_8_0_d.h"
+#include "dce/dce_8_0_sh_mask.h"
+
 #include "ivsrcid/ivsrcid_vislands30.h"
 
 static bool hpd_ack(
@@ -42,8 +44,8 @@ static bool hpd_ack(
 	uint32_t current_status =
 		get_reg_field_value(
 			value,
-			DC_HPD_INT_STATUS,
-			DC_HPD_SENSE_DELAYED);
+			DC_HPD1_INT_STATUS,
+			DC_HPD1_SENSE_DELAYED);
 
 	dal_irq_service_ack_generic(irq_service, info);
 
@@ -52,8 +54,8 @@ static bool hpd_ack(
 	set_reg_field_value(
 		value,
 		current_status ? 0 : 1,
-		DC_HPD_INT_CONTROL,
-		DC_HPD_INT_POLARITY);
+		DC_HPD1_INT_CONTROL,
+		DC_HPD1_INT_POLARITY);
 
 	dm_write_reg(irq_service->ctx, info->enable_reg, value);
 
@@ -80,34 +82,36 @@ static const struct irq_source_info_funcs vblank_irq_info_funcs = {
 	.ack = NULL
 };
 
+
 #define hpd_int_entry(reg_num)\
-	[DC_IRQ_SOURCE_HPD1 + reg_num] = {\
-		.enable_reg = mmHPD ## reg_num ## _DC_HPD_INT_CONTROL,\
-		.enable_mask = DC_HPD_INT_CONTROL__DC_HPD_INT_EN_MASK,\
+	[DC_IRQ_SOURCE_INVALID + reg_num] = {\
+		.enable_reg = mmDC_HPD ## reg_num ## _INT_CONTROL,\
+		.enable_mask = DC_HPD1_INT_CONTROL__DC_HPD1_INT_EN_MASK,\
 		.enable_value = {\
-			DC_HPD_INT_CONTROL__DC_HPD_INT_EN_MASK,\
-			~DC_HPD_INT_CONTROL__DC_HPD_INT_EN_MASK\
+			DC_HPD1_INT_CONTROL__DC_HPD1_INT_EN_MASK,\
+			~DC_HPD1_INT_CONTROL__DC_HPD1_INT_EN_MASK\
 		},\
-		.ack_reg = mmHPD ## reg_num ## _DC_HPD_INT_CONTROL,\
-		.ack_mask = DC_HPD_INT_CONTROL__DC_HPD_INT_ACK_MASK,\
-		.ack_value = DC_HPD_INT_CONTROL__DC_HPD_INT_ACK_MASK,\
-		.status_reg = mmHPD ## reg_num ## _DC_HPD_INT_STATUS,\
+		.ack_reg = mmDC_HPD ## reg_num ## _INT_CONTROL,\
+		.ack_mask = DC_HPD1_INT_CONTROL__DC_HPD1_INT_ACK_MASK,\
+		.ack_value = DC_HPD1_INT_CONTROL__DC_HPD1_INT_ACK_MASK,\
+		.status_reg = mmDC_HPD ## reg_num ## _INT_STATUS,\
 		.funcs = &hpd_irq_info_funcs\
 	}
 
 #define hpd_rx_int_entry(reg_num)\
-	[DC_IRQ_SOURCE_HPD1RX + reg_num] = {\
-		.enable_reg = mmHPD ## reg_num ## _DC_HPD_INT_CONTROL,\
-		.enable_mask = DC_HPD_INT_CONTROL__DC_HPD_RX_INT_EN_MASK,\
+	[DC_IRQ_SOURCE_HPD6 + reg_num] = {\
+		.enable_reg = mmDC_HPD ## reg_num ## _INT_CONTROL,\
+		.enable_mask = DC_HPD1_INT_CONTROL__DC_HPD1_RX_INT_EN_MASK,\
 		.enable_value = {\
-			DC_HPD_INT_CONTROL__DC_HPD_RX_INT_EN_MASK,\
-			~DC_HPD_INT_CONTROL__DC_HPD_RX_INT_EN_MASK },\
-		.ack_reg = mmHPD ## reg_num ## _DC_HPD_INT_CONTROL,\
-		.ack_mask = DC_HPD_INT_CONTROL__DC_HPD_RX_INT_ACK_MASK,\
-		.ack_value = DC_HPD_INT_CONTROL__DC_HPD_RX_INT_ACK_MASK,\
-		.status_reg = mmHPD ## reg_num ## _DC_HPD_INT_STATUS,\
+				DC_HPD1_INT_CONTROL__DC_HPD1_RX_INT_EN_MASK,\
+			~DC_HPD1_INT_CONTROL__DC_HPD1_RX_INT_EN_MASK },\
+		.ack_reg = mmDC_HPD ## reg_num ## _INT_CONTROL,\
+		.ack_mask = DC_HPD1_INT_CONTROL__DC_HPD1_RX_INT_ACK_MASK,\
+		.ack_value = DC_HPD1_INT_CONTROL__DC_HPD1_RX_INT_ACK_MASK,\
+		.status_reg = mmDC_HPD ## reg_num ## _INT_STATUS,\
 		.funcs = &hpd_rx_irq_info_funcs\
 	}
+
 #define pflip_int_entry(reg_num)\
 	[DC_IRQ_SOURCE_PFLIP1 + reg_num] = {\
 		.enable_reg = mmDCP ## reg_num ## _GRPH_INTERRUPT_CONTROL,\
@@ -121,7 +125,7 @@ static const struct irq_source_info_funcs vblank_irq_info_funcs = {
 		.ack_value = GRPH_INTERRUPT_STATUS__GRPH_PFLIP_INT_CLEAR_MASK,\
 		.status_reg = mmDCP ## reg_num ##_GRPH_INTERRUPT_STATUS,\
 		.funcs = &pflip_irq_info_funcs\
-	}
+ 	}
 
 #define vsync_int_entry(reg_num) \
 	[DC_IRQ_SOURCE_CRTC ## reg_num ## VSYNC] = dummy_irq_entry()
@@ -162,32 +166,6 @@ static const struct irq_source_info_funcs vblank_irq_info_funcs = {
 #define dc_underflow_int_entry(reg_num) \
 	[DC_IRQ_SOURCE_DC ## reg_num ## UNDERFLOW] = dummy_irq_entry()
 
-bool dal_irq_service_dummy_set(
-	struct irq_service *irq_service,
-	const struct irq_source_info *info,
-	bool enable)
-{
-	dal_logger_write(
-		irq_service->ctx->logger,
-		LOG_MAJOR_ERROR,
-		LOG_MINOR_COMPONENT_IRQ_SERVICE,
-		"%s: called for non-implemented irq source\n",
-		__func__);
-	return false;
-}
-
-bool dal_irq_service_dummy_ack(
-	struct irq_service *irq_service,
-	const struct irq_source_info *info)
-{
-	dal_logger_write(
-		irq_service->ctx->logger,
-		LOG_MAJOR_ERROR,
-		LOG_MINOR_COMPONENT_IRQ_SERVICE,
-		"%s: called for non-implemented irq source\n",
-		__func__);
-	return false;
-}
 
 static const struct irq_source_info_funcs dummy_irq_info_funcs = {
 	.set = dal_irq_service_dummy_set,
@@ -195,20 +173,20 @@ static const struct irq_source_info_funcs dummy_irq_info_funcs = {
 };
 
 static const struct irq_source_info
-irq_source_info_dce110[DAL_IRQ_SOURCES_NUMBER] = {
+irq_source_info_dce80[DAL_IRQ_SOURCES_NUMBER] = {
 	[DC_IRQ_SOURCE_INVALID] = dummy_irq_entry(),
-	hpd_int_entry(0),
 	hpd_int_entry(1),
 	hpd_int_entry(2),
 	hpd_int_entry(3),
 	hpd_int_entry(4),
 	hpd_int_entry(5),
-	hpd_rx_int_entry(0),
+	hpd_int_entry(6),
 	hpd_rx_int_entry(1),
 	hpd_rx_int_entry(2),
 	hpd_rx_int_entry(3),
 	hpd_rx_int_entry(4),
 	hpd_rx_int_entry(5),
+	hpd_rx_int_entry(6),
 	i2c_int_entry(1),
 	i2c_int_entry(2),
 	i2c_int_entry(3),
@@ -288,92 +266,24 @@ irq_source_info_dce110[DAL_IRQ_SOURCES_NUMBER] = {
 	vupdate_int_entry(5),
 };
 
-enum dc_irq_source to_dal_irq_source_dce110(
-		struct irq_service *irq_service,
-		uint32_t src_id,
-		uint32_t ext_id)
-{
-	switch (src_id) {
-	case VISLANDS30_IV_SRCID_D1_V_UPDATE_INT:
-		return DC_IRQ_SOURCE_VUPDATE1;
-	case VISLANDS30_IV_SRCID_D2_V_UPDATE_INT:
-		return DC_IRQ_SOURCE_VUPDATE2;
-	case VISLANDS30_IV_SRCID_D3_V_UPDATE_INT:
-		return DC_IRQ_SOURCE_VUPDATE3;
-	case VISLANDS30_IV_SRCID_D4_V_UPDATE_INT:
-		return DC_IRQ_SOURCE_VUPDATE4;
-	case VISLANDS30_IV_SRCID_D5_V_UPDATE_INT:
-		return DC_IRQ_SOURCE_VUPDATE5;
-	case VISLANDS30_IV_SRCID_D6_V_UPDATE_INT:
-		return DC_IRQ_SOURCE_VUPDATE6;
-	case VISLANDS30_IV_SRCID_D1_GRPH_PFLIP:
-		return DC_IRQ_SOURCE_PFLIP1;
-	case VISLANDS30_IV_SRCID_D2_GRPH_PFLIP:
-		return DC_IRQ_SOURCE_PFLIP2;
-	case VISLANDS30_IV_SRCID_D3_GRPH_PFLIP:
-		return DC_IRQ_SOURCE_PFLIP3;
-	case VISLANDS30_IV_SRCID_D4_GRPH_PFLIP:
-		return DC_IRQ_SOURCE_PFLIP4;
-	case VISLANDS30_IV_SRCID_D5_GRPH_PFLIP:
-		return DC_IRQ_SOURCE_PFLIP5;
-	case VISLANDS30_IV_SRCID_D6_GRPH_PFLIP:
-		return DC_IRQ_SOURCE_PFLIP6;
-
-	case VISLANDS30_IV_SRCID_HOTPLUG_DETECT_A:
-		/* generic src_id for all HPD and HPDRX interrupts */
-		switch (ext_id) {
-		case VISLANDS30_IV_EXTID_HOTPLUG_DETECT_A:
-			return DC_IRQ_SOURCE_HPD1;
-		case VISLANDS30_IV_EXTID_HOTPLUG_DETECT_B:
-			return DC_IRQ_SOURCE_HPD2;
-		case VISLANDS30_IV_EXTID_HOTPLUG_DETECT_C:
-			return DC_IRQ_SOURCE_HPD3;
-		case VISLANDS30_IV_EXTID_HOTPLUG_DETECT_D:
-			return DC_IRQ_SOURCE_HPD4;
-		case VISLANDS30_IV_EXTID_HOTPLUG_DETECT_E:
-			return DC_IRQ_SOURCE_HPD5;
-		case VISLANDS30_IV_EXTID_HOTPLUG_DETECT_F:
-			return DC_IRQ_SOURCE_HPD6;
-		case VISLANDS30_IV_EXTID_HPD_RX_A:
-			return DC_IRQ_SOURCE_HPD1RX;
-		case VISLANDS30_IV_EXTID_HPD_RX_B:
-			return DC_IRQ_SOURCE_HPD2RX;
-		case VISLANDS30_IV_EXTID_HPD_RX_C:
-			return DC_IRQ_SOURCE_HPD3RX;
-		case VISLANDS30_IV_EXTID_HPD_RX_D:
-			return DC_IRQ_SOURCE_HPD4RX;
-		case VISLANDS30_IV_EXTID_HPD_RX_E:
-			return DC_IRQ_SOURCE_HPD5RX;
-		case VISLANDS30_IV_EXTID_HPD_RX_F:
-			return DC_IRQ_SOURCE_HPD6RX;
-		default:
-			return DC_IRQ_SOURCE_INVALID;
-		}
-		break;
-
-	default:
-		return DC_IRQ_SOURCE_INVALID;
-	}
-}
-
-static const struct irq_service_funcs irq_service_funcs_dce110 = {
+static const struct irq_service_funcs irq_service_funcs_dce80 = {
 		.to_dal_irq_source = to_dal_irq_source_dce110
 };
 
-bool construct(
+static bool construct(
 	struct irq_service *irq_service,
 	struct irq_service_init_data *init_data)
 {
 	if (!dal_irq_service_construct(irq_service, init_data))
 		return false;
 
-	irq_service->info = irq_source_info_dce110;
-	irq_service->funcs = &irq_service_funcs_dce110;
+	irq_service->info = irq_source_info_dce80;
+	irq_service->funcs = &irq_service_funcs_dce80;
 
 	return true;
 }
 
-struct irq_service *dal_irq_service_dce110_create(
+struct irq_service *dal_irq_service_dce80_create(
 	struct irq_service_init_data *init_data)
 {
 	struct irq_service *irq_service = dm_alloc(sizeof(*irq_service));
@@ -387,3 +297,5 @@ struct irq_service *dal_irq_service_dce110_create(
 	dm_free(irq_service);
 	return NULL;
 }
+
+
