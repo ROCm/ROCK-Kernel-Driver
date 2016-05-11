@@ -499,7 +499,6 @@ int amdgpu_dm_irq_suspend(
 	struct list_head *hnd_list_h;
 	struct list_head *hnd_list_l;
 	unsigned long irq_table_flags;
-	struct drm_crtc *crtc;
 
 	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
 
@@ -519,13 +518,6 @@ int amdgpu_dm_irq_suspend(
 	}
 
 	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
-
-
-	drm_modeset_lock_all(adev->ddev);
-		drm_for_each_crtc(crtc, adev->ddev)
-			drm_crtc_vblank_off(crtc);
-	drm_modeset_unlock_all(adev->ddev);
-
 	return 0;
 }
 
@@ -557,7 +549,6 @@ int amdgpu_dm_irq_resume(struct amdgpu_device *adev)
 	int src;
 	struct list_head *hnd_list_h, *hnd_list_l;
 	unsigned long irq_table_flags;
-	struct drm_crtc *crtc;
 
 	DM_IRQ_TABLE_LOCK(adev, irq_table_flags);
 
@@ -572,12 +563,6 @@ int amdgpu_dm_irq_resume(struct amdgpu_device *adev)
 	}
 
 	DM_IRQ_TABLE_UNLOCK(adev, irq_table_flags);
-
-	drm_modeset_lock_all(adev->ddev);
-		drm_for_each_crtc(crtc, adev->ddev)
-			drm_crtc_vblank_on(crtc);
-	drm_modeset_unlock_all(adev->ddev);
-
 	return 0;
 }
 

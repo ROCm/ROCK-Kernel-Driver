@@ -461,15 +461,31 @@ static int dm_suspend(void *handle)
 	struct amdgpu_device *adev = handle;
 	struct amdgpu_display_manager *dm = &adev->dm;
 	int ret = 0;
+	struct drm_crtc *crtc;
 
 	s3_handle_mst(adev->ddev, true);
+
+	/* flash all pending vblank events and turn interrupt off
+	 * before disabling CRTCs. They will be enabled back in
+	 * dm_display_resume
+	 */
+	drm_modeset_lock_all(adev->ddev);
+	drm_for_each_crtc(crtc, adev->ddev) {
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+		if (acrtc->target) {
+				drm_crtc_vblank_off(crtc);
+				dc_target_release(acrtc->target);
+				acrtc->target = NULL;
+			}
+	}
+	drm_modeset_unlock_all(adev->ddev);
+
+	amdgpu_dm_irq_suspend(adev);
 
 	dc_set_power_state(
 		dm->dc,
 		DC_ACPI_CM_POWER_STATE_D3,
 		DC_VIDEO_POWER_SUSPEND);
-
-	amdgpu_dm_irq_suspend(adev);
 
 	return ret;
 }
