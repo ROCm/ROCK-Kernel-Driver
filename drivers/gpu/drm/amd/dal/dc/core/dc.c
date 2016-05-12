@@ -1288,6 +1288,8 @@ bool dc_link_add_remote_sink(const struct dc_link *link, struct dc_sink *sink)
 		return false;
 	}
 
+	dc_sink_retain(sink);
+
 	dc_link->remote_sinks[link->sink_count] = sink;
 	dc_link->sink_count++;
 

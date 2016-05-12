@@ -208,12 +208,11 @@ static struct dc_sink *dm_dp_mst_add_mst_sink(
 	if (edid_status != EDID_OK)
 		goto fail;
 
-	/* dc_sink_retain(&core_sink->public); */
-
 	return dc_sink;
 fail:
 	dc_link_remove_remote_sink(dc_link, dc_sink);
 fail_add_sink:
+	dc_sink_release(dc_sink);
 	return NULL;
 }
 
@@ -368,6 +367,7 @@ static void dm_dp_destroy_mst_connector(
 	aconnector->port = NULL;
 	if (aconnector->dc_sink) {
 		dc_link_remove_remote_sink(aconnector->dc_link, aconnector->dc_sink);
+		dc_sink_release(aconnector->dc_sink);
 		aconnector->dc_sink = NULL;
 	}
 	if (aconnector->edid) {
