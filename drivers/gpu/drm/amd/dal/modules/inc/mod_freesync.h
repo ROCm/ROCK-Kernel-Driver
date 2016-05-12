@@ -37,6 +37,18 @@ enum mod_freesync_state {
     FREESYNC_STATE_STATIC_SCREEN
 };
 
+enum mod_freesync_user_enable_mask {
+    FREESYNC_USER_ENABLE_STATIC = 0x1,
+    FREESYNC_USER_ENABLE_VIDEO = 0x2,
+    FREESYNC_USER_ENABLE_GAMING = 0x4
+};
+
+struct mod_freesync_user_enable {
+	bool enable_for_static;
+	bool enable_for_video;
+	bool enable_for_gaming;
+};
+
 struct mod_freesync_caps {
 	bool supported;
 	int minRefreshInMicroHz;
@@ -71,7 +83,6 @@ void mod_freesync_update_stream(struct mod_freesync *mod_freesync,
  */
 void mod_freesync_update_state(struct mod_freesync *mod_freesync,
 		const struct dc_stream **streams, int num_streams,
-		unsigned int displayIndex,
 		enum mod_freesync_state freesyncState, bool enable);
 
 /*
@@ -81,5 +92,16 @@ void mod_freesync_update_state(struct mod_freesync *mod_freesync,
  */
 void mod_freesync_vupdate_callback(struct mod_freesync *mod_freesync,
 	struct dc_stream *stream);
+
+bool mod_freesync_get_freesync_caps(struct mod_freesync *mod_freesync,
+		const struct dc_sink *sink, struct mod_freesync_caps *caps);
+
+bool mod_freesync_set_user_enable(struct mod_freesync *mod_freesync,
+		const struct dc_stream **streams, int num_streams,
+		struct mod_freesync_user_enable *user_enable);
+
+bool mod_freesync_get_user_enable(struct mod_freesync *mod_freesync,
+		const struct dc_sink *sink,
+		struct mod_freesync_user_enable *user_enable);
 
 #endif
