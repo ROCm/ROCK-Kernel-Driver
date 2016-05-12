@@ -115,7 +115,7 @@ retry:
 	}
 
 	list_add(&gobj->list, &robj->gem_objects);
-	gobj->bo = amdgpu_bo_ref(robj);
+	gobj->bo = robj;
 	*obj = &gobj->base;
 
 
