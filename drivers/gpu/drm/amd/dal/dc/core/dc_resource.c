@@ -489,6 +489,10 @@ bool resource_attach_surfaces_to_context(
 		for (j = 0; j < MAX_PIPES; j++) {
 			struct core_surface *surface = NULL;
 
+			/* Skip surface assignment for child pipes */
+			if (context->res_ctx.pipe_ctx[j].parent_pipe != NULL)
+				continue;
+
 			if (surface_count)
 				surface = DC_SURFACE_TO_CORE(surfaces[k]);
 
@@ -890,7 +894,9 @@ enum dc_status resource_map_pool_resources(
 			if (pipe_idx < 0)
 				return DC_NO_CONTROLLER_RESOURCE;
 
+
 			pipe_ctx = &context->res_ctx.pipe_ctx[pipe_idx];
+
 			set_stream_signal(pipe_ctx);
 
 			curr_stream =
@@ -951,6 +957,97 @@ void validate_guaranteed_copy_target(
 	}
 }
 
+
+enum dc_status resource_map_vmin_resources(
+		const struct core_dc *dc,
+		struct validate_context *context) {
+	/* TODO: Temporary hack. Forcing vmin here, one stream two pipes */
+	/* TODO: Lower  clock, change timing, etc? */
+	if (context->target_count == 1 && context->targets[0]->public.stream_count == 1) {
+
+		uint8_t i;
+		struct pipe_ctx *parent_pipe_ctx = NULL;
+		struct pipe_ctx *vmin_pipe_ctx = NULL;
+
+		/* Only enable for 4k@60 displays */
+		struct core_stream *stream = DC_STREAM_TO_CORE(context->targets[0]->public.streams[0]);
+
+		if (stream->phy_pix_clk < 500000)
+			return DC_OK;
+
+		/* Find first pipe, assume it already has viewport calculated */
+		for (i = 0; i < context->res_ctx.pool.pipe_count; i++) {
+			if (context->res_ctx.pipe_ctx[i].stream) {
+				parent_pipe_ctx = &context->res_ctx.pipe_ctx[i];
+				break;
+			}
+		}
+
+		if (parent_pipe_ctx == NULL) {
+			BREAK_TO_DEBUGGER();
+			return DC_NO_CONTROLLER_RESOURCE;
+		}
+
+		/* Determine if we've already acquired a vmin pipe previously */
+		for (i = 0; i < context->res_ctx.pool.pipe_count; i++) {
+			struct pipe_ctx *current_pipe_ctx = &context->res_ctx.pipe_ctx[i];
+			if (parent_pipe_ctx->stream == current_pipe_ctx->stream &&
+					current_pipe_ctx->parent_pipe == parent_pipe_ctx) {
+				vmin_pipe_ctx = current_pipe_ctx;
+
+				/* Use same back-end as original pipe */
+				*vmin_pipe_ctx = *parent_pipe_ctx;
+				vmin_pipe_ctx->pipe_idx = i;
+				vmin_pipe_ctx->parent_pipe = parent_pipe_ctx;
+				break;
+
+			}
+		}
+
+		/* Find the first available pipe to use for vmin if not already acquired */
+		if (vmin_pipe_ctx == NULL) {
+			for (i = 0; i < context->res_ctx.pool.pipe_count; i++) {
+				if (context->res_ctx.pipe_ctx[i].stream == NULL) {
+					vmin_pipe_ctx = &context->res_ctx.pipe_ctx[i];
+
+					/* Use same back-end as original pipe */
+					*vmin_pipe_ctx = *parent_pipe_ctx;
+					vmin_pipe_ctx->pipe_idx = i;
+					vmin_pipe_ctx->parent_pipe = parent_pipe_ctx;
+					break;
+				}
+			}
+		}
+
+		if (vmin_pipe_ctx == NULL) {
+			BREAK_TO_DEBUGGER();
+			return DC_NO_CONTROLLER_RESOURCE;
+		}
+
+		/* Only acquire different front end objects */
+		vmin_pipe_ctx->mi = context->res_ctx.pool.mis[vmin_pipe_ctx->pipe_idx];
+		vmin_pipe_ctx->ipp = context->res_ctx.pool.ipps[vmin_pipe_ctx->pipe_idx];
+		vmin_pipe_ctx->xfm = context->res_ctx.pool.transforms[vmin_pipe_ctx->pipe_idx];
+		vmin_pipe_ctx->opp = context->res_ctx.pool.opps[vmin_pipe_ctx->pipe_idx];
+
+		if (!vmin_pipe_ctx->stream_enc)
+			return DC_NO_STREAM_ENG_RESOURCE;
+
+		/* Todo: account for truncation error */
+		parent_pipe_ctx->scl_data.viewport.width /= 2;
+		parent_pipe_ctx->scl_data.recout.width /= 2;
+
+		vmin_pipe_ctx->scl_data = parent_pipe_ctx->scl_data;
+		vmin_pipe_ctx->scl_data.viewport.x =
+				parent_pipe_ctx->scl_data.viewport.width
+				+ parent_pipe_ctx->scl_data.viewport.x;
+		vmin_pipe_ctx->scl_data.recout.x =
+				parent_pipe_ctx->scl_data.recout.width
+				+ parent_pipe_ctx->scl_data.recout.x;
+
+	}
+	return DC_OK;
+}
 
 static void translate_info_frame(const struct hw_info_frame *hw_info_frame,
 	struct encoder_info_frame *encoder_info_frame)

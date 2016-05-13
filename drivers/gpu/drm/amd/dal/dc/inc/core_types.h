@@ -294,6 +294,8 @@ struct pipe_ctx {
 	struct encoder_info_frame encoder_info_frame;
 
 	uint8_t pipe_idx;
+
+	struct pipe_ctx *parent_pipe;
 };
 
 struct resource_context {

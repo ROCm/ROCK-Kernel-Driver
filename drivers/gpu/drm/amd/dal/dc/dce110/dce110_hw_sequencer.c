@@ -1199,7 +1199,7 @@ static enum dc_status apply_ctx_to_hw(
 		struct validate_context *context)
 {
 	enum dc_status status;
-	uint8_t i;
+	int i;
 	bool programmed_audio_dto = false;
 
 	/* Reset old context */

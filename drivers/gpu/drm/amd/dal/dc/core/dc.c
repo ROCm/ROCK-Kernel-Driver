@@ -928,6 +928,8 @@ bool dc_commit_surfaces_to_target(
 		goto unexpected_fail;
 	}
 
+	resource_map_vmin_resources(core_dc, context);
+
 	if (prev_disp_clk < context->bw_results.dispclk_khz ||
 		(is_mpo_turning_on &&
 			prev_disp_clk == context->bw_results.dispclk_khz)) {
