@@ -727,12 +727,11 @@ static bool display_clock_integrated_info_construct(
 	struct display_clock_dce80 *disp_clk,
 	struct adapter_service *as)
 {
-	struct integrated_info info;
-	struct firmware_info fw_info;
-	bool res;
+	struct integrated_info info = { { { 0 } } };
+	struct firmware_info fw_info = { { 0 } };
 	uint32_t i;
 
-	res = dal_adapter_service_get_integrated_info(as, &info);
+	dal_adapter_service_get_integrated_info(as, &info);
 
 	disp_clk->dentist_vco_freq_khz = info.dentist_vco_freq;
 	if (disp_clk->dentist_vco_freq_khz == 0) {
@@ -744,9 +743,6 @@ static bool display_clock_integrated_info_construct(
 		}
 	disp_clk->disp_clk.min_display_clk_threshold_khz =
 		disp_clk->dentist_vco_freq_khz / 64;
-
-	if (!res)
-		return false;
 
 	/* TODO: initialise disp_clk->dfs_bypass_disp_clk */
 
