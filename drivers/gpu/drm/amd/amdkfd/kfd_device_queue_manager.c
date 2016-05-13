@@ -1075,13 +1075,16 @@ out:
 
 int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
 				unsigned int fence_value,
-				unsigned long timeout)
+				unsigned long timeout_ms)
 {
+	unsigned long end_jiffies;
+
 	BUG_ON(!fence_addr);
-	timeout += jiffies;
+
+	end_jiffies = (timeout_ms * HZ / 1000) + jiffies;
 
 	while (*fence_addr != fence_value) {
-		if (time_after(jiffies, timeout)) {
+		if (time_after(jiffies, end_jiffies)) {
 			pr_err("kfd: qcm fence wait loop timeout expired\n");
 			return -ETIME;
 		}
