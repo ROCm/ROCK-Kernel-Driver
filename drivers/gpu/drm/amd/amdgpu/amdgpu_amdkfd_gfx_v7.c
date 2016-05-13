@@ -42,6 +42,12 @@
 
 #define AMDKFD_SKIP_UNCOMPILED_CODE 1
 
+enum hqd_dequeue_request_type {
+	NO_ACTION = 0,
+	DRAIN_PIPE,
+	RESET_WAVES
+};
+
 enum {
 	MAX_TRAPID = 8,		/* 3 bits in the bitfield. */
 	MAX_WATCH_ADDRESSES = 4
@@ -104,7 +110,8 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd);
 static bool kgd_hqd_is_occupied(struct kgd_dev *kgd, uint64_t queue_address,
 		uint32_t pipe_id, uint32_t queue_id);
 static bool kgd_hqd_sdma_is_occupied(struct kgd_dev *kgd, void *mqd);
-static int kgd_hqd_destroy(struct kgd_dev *kgd, uint32_t reset_type,
+static int kgd_hqd_destroy(struct kgd_dev *kgd,
+				enum kfd_preempt_type reset_type,
 				unsigned int utimeout, uint32_t pipe_id,
 				uint32_t queue_id);
 static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
@@ -467,18 +474,32 @@ static bool kgd_hqd_sdma_is_occupied(struct kgd_dev *kgd, void *mqd)
 	return false;
 }
 
-static int kgd_hqd_destroy(struct kgd_dev *kgd, uint32_t reset_type,
+static int kgd_hqd_destroy(struct kgd_dev *kgd,
+				enum kfd_preempt_type reset_type,
 				unsigned int utimeout, uint32_t pipe_id,
 				uint32_t queue_id)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	uint32_t temp;
 	int timeout = utimeout;
+	enum hqd_dequeue_request_type type;
 
 	acquire_queue(kgd, pipe_id, queue_id);
 	WREG32(mmCP_HQD_PQ_DOORBELL_CONTROL, 0);
 
-	WREG32(mmCP_HQD_DEQUEUE_REQUEST, reset_type);
+	switch (reset_type) {
+	case KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN:
+		type = DRAIN_PIPE;
+		break;
+	case KFD_PREEMPT_TYPE_WAVEFRONT_RESET:
+		type = RESET_WAVES;
+		break;
+	default:
+		type = DRAIN_PIPE;
+		break;
+	}
+
+	WREG32(mmCP_HQD_DEQUEUE_REQUEST, type);
 
 	while (true) {
 		temp = RREG32(mmCP_HQD_ACTIVE);

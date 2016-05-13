@@ -43,6 +43,11 @@ struct kgd_mem;
 struct kfd_process_device;
 struct amdgpu_bo;
 
+enum kfd_preempt_type {
+	KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN = 0,
+	KFD_PREEMPT_TYPE_WAVEFRONT_RESET,
+};
+
 struct kfd_vm_fault_info {
 	uint64_t	page_addr;
 	uint32_t	vmid;
