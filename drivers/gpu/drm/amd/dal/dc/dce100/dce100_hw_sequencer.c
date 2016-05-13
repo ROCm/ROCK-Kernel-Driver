@@ -212,9 +212,18 @@ static bool dce100_enable_display_power_gating(
 	else
 		cntl = ASIC_PIPE_DISABLE;
 
-	if (!(power_gating == PIPE_GATING_CONTROL_INIT && controller_id != 0))
+	if (!(power_gating == PIPE_GATING_CONTROL_INIT && controller_id != 0)){
+
 		bp_result = dcb->funcs->enable_disp_power_gating(
 						dcb, controller_id + 1, cntl);
+
+		/* Revert MASTER_UPDATE_MODE to 0 because bios sets it 2
+		 * by default when command table is called
+		 */
+		dm_write_reg(ctx,
+			HW_REG_CRTC(mmMASTER_UPDATE_MODE, controller_id),
+			0);
+	}
 
 	if (bp_result == BP_RESULT_OK)
 		return true;
