@@ -67,7 +67,7 @@ struct dc_init_data {
 	void *driver; /* ctx */
 	struct cgs_device *cgs_device;
 
-	uint8_t num_virtual_links;
+	int num_virtual_links;
 	/*
 	 * If 'vbios_override' not NULL, it will be called instead
 	 * of the real VBIOS. Intended use is Diagnostics on FPGA.

@@ -40,7 +40,7 @@ enum dce_version resource_parse_asic_id(
 bool dc_construct_resource_pool(
 		struct adapter_service *adapter_serv,
 		struct core_dc *dc,
-		uint8_t num_virtual_links,
+		int num_virtual_links,
 		enum dce_version dc_version);
 
 enum dc_status resource_map_pool_resources(
@@ -78,7 +78,7 @@ struct clock_source *dc_resource_find_first_free_pll(
 
 bool resource_attach_surfaces_to_context(
 		struct dc_surface *surfaces[],
-		uint8_t surface_count,
+		int surface_count,
 		const struct dc_target *dc_target,
 		struct validate_context *context);
 
@@ -87,13 +87,13 @@ bool resource_is_stream_unchanged(
 
 bool resource_validate_attach_surfaces(
 		const struct dc_validation_set set[],
-		uint8_t set_count,
+		int set_count,
 		const struct validate_context *old_context,
 		struct validate_context *context);
 
 void validate_guaranteed_copy_target(
 		struct validate_context *context,
-		uint8_t max_targets);
+		int max_targets);
 
 void resource_validate_ctx_copy_construct(
 		const struct validate_context *src_ctx,

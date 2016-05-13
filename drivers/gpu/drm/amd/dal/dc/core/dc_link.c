@@ -1247,7 +1247,7 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 	if (dc_is_hdmi_signal(pipe_ctx->signal))
 		dal_ddc_service_write_scdc_data(
 			stream->sink->link->ddc,
-			stream->adjusted_pix_clk_khz,
+			stream->phy_pix_clk,
 			stream->public.timing.flags.LTE_340MCSC_SCRAMBLE);
 
 	memset(&stream->sink->link->public.cur_link_settings, 0,
@@ -1259,7 +1259,7 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 			stream->public.timing.display_color_depth,
 			pipe_ctx->signal == SIGNAL_TYPE_HDMI_TYPE_A,
 			pipe_ctx->signal == SIGNAL_TYPE_DVI_DUAL_LINK,
-			stream->adjusted_pix_clk_khz);
+			stream->phy_pix_clk);
 
 	if (pipe_ctx->signal == SIGNAL_TYPE_HDMI_TYPE_A)
 		dal_ddc_service_read_scdc_data(link->ddc);

@@ -658,7 +658,7 @@ static void fill_display_configs(
 			cfg->link_settings.lane_count = stream->sink->link->public.cur_link_settings.lane_count;
 			cfg->link_settings.link_rate = stream->sink->link->public.cur_link_settings.link_rate;
 			cfg->link_settings.link_spread = stream->sink->link->public.cur_link_settings.link_spread;
-			cfg->sym_clock = stream->adjusted_pix_clk_khz;
+			cfg->sym_clock = stream->phy_pix_clk;
 			/* Round v_refresh*/
 			cfg->v_refresh = stream->public.timing.pix_clk_khz * 1000;
 			cfg->v_refresh /= stream->public.timing.h_total;

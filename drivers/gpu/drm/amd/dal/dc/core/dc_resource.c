@@ -86,7 +86,7 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 
 bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
 				struct core_dc *dc,
-				uint8_t num_virtual_links,
+				int num_virtual_links,
 				enum dce_version dc_version)
 {
 
@@ -171,7 +171,21 @@ bool resource_are_streams_clk_sharable(
 	if (stream1->public.timing.v_total != stream2->public.timing.v_total)
 		return false;
 
-	if (stream1->adjusted_pix_clk_khz != stream2->adjusted_pix_clk_khz)
+	if (stream1->public.timing.h_addressable
+				!= stream2->public.timing.h_addressable)
+		return false;
+
+	if (stream1->public.timing.v_addressable
+				!= stream2->public.timing.v_addressable)
+		return false;
+
+	if (stream1->public.timing.pix_clk_khz
+				!= stream2->public.timing.pix_clk_khz)
+		return false;
+
+	if (stream1->phy_pix_clk != stream2->phy_pix_clk
+			&& !dc_is_dp_signal(stream1->public.sink->sink_signal)
+			&& !dc_is_dp_signal(stream2->public.sink->sink_signal))
 		return false;
 
 	return true;
@@ -181,17 +195,6 @@ static bool is_sharable_clk_src(
 	const struct pipe_ctx *pipe_with_clk_src,
 	const struct pipe_ctx *pipe)
 {
-#if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
-	enum dce_version dce_ver = dal_adapter_service_get_dce_version(
-		pipe->stream->sink->link->adapter_srv);
-
-	/* Currently no clocks are shared for DCE 10 until VBIOS behavior
-	 * is verified for this use case
-	 */
-	if (dce_ver == DCE_VERSION_10_0)
-		return false;
-#endif
-
 	if (pipe_with_clk_src->clock_source == NULL)
 		return false;
 
@@ -209,7 +212,7 @@ struct clock_source *resource_find_used_clk_src_for_sharing(
 					struct resource_context *res_ctx,
 					struct pipe_ctx *pipe_ctx)
 {
-	uint8_t i;
+	int i;
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		if (is_sharable_clk_src(&res_ctx->pipe_ctx[i], pipe_ctx))
@@ -429,7 +432,7 @@ void resource_build_scaling_params_for_context(
 	const struct core_dc *dc,
 	struct validate_context *context)
 {
-	uint8_t i;
+	int i;
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		if (context->res_ctx.pipe_ctx[i].surface != NULL &&
@@ -442,11 +445,11 @@ void resource_build_scaling_params_for_context(
 
 bool resource_attach_surfaces_to_context(
 		struct dc_surface *surfaces[],
-		uint8_t surface_count,
+		int surface_count,
 		const struct dc_target *dc_target,
 		struct validate_context *context)
 {
-	uint8_t i, j, k;
+	int i, j, k;
 	struct dc_target_status *target_status = NULL;
 
 	if (surface_count > MAX_SURFACE_NUM) {
@@ -541,11 +544,11 @@ static bool is_target_unchanged(
 
 bool resource_validate_attach_surfaces(
 		const struct dc_validation_set set[],
-		uint8_t set_count,
+		int set_count,
 		const struct validate_context *old_context,
 		struct validate_context *context)
 {
-	uint8_t i, j;
+	int i, j;
 
 	for (i = 0; i < set_count; i++) {
 		context->targets[i] = DC_TARGET_TO_CORE(set[i].target);
@@ -606,11 +609,12 @@ static void set_audio_in_use(
 	}
 }
 
-static int8_t acquire_first_free_pipe(
+static int acquire_first_free_pipe(
 		struct resource_context *res_ctx,
 		struct core_stream *stream)
 {
-	uint8_t i;
+	int i;
+
 	for (i = 0; i < res_ctx->pool.pipe_count; i++) {
 		if (!res_ctx->pipe_ctx[i].stream) {
 			struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[i];
@@ -634,8 +638,8 @@ static struct stream_encoder *find_first_free_match_stream_enc_for_link(
 		struct resource_context *res_ctx,
 		struct core_link *link)
 {
-	uint8_t i;
-	int8_t j = -1;
+	int i;
+	int j = -1;
 	const struct dc_sink *sink = NULL;
 
 	for (i = 0; i < res_ctx->pool.stream_enc_count; i++) {
@@ -751,7 +755,7 @@ static struct core_stream *find_pll_sharable_stream(
 		const struct core_stream *stream_needs_pll,
 		struct validate_context *context)
 {
-	uint8_t i, j;
+	int i, j;
 
 	for (i = 0; i < context->target_count; i++) {
 		struct core_target *target = context->targets[i];
@@ -803,11 +807,11 @@ static int get_norm_pix_clk(const struct dc_crtc_timing *timing)
 	return normalized_pix_clk;
 }
 
-enum dc_status resource_map_pool_resources(
+static void calculate_phy_pix_clks(
 		const struct core_dc *dc,
 		struct validate_context *context)
 {
-	uint8_t i, j, k;
+	int i, j;
 
 	for (i = 0; i < context->target_count; i++) {
 		struct core_target *target = context->targets[i];
@@ -818,11 +822,29 @@ enum dc_status resource_map_pool_resources(
 
 			/* update actual pixel clock on all streams */
 			if (dc_is_hdmi_signal(stream->sink->public.sink_signal))
-				stream->adjusted_pix_clk_khz = get_norm_pix_clk(
+				stream->phy_pix_clk = get_norm_pix_clk(
 					&stream->public.timing);
 			else
-				stream->adjusted_pix_clk_khz =
-					stream->public.timing.pix_clk_khz;
+				stream->phy_pix_clk =
+						stream->public.timing.pix_clk_khz;
+		}
+	}
+}
+
+enum dc_status resource_map_pool_resources(
+		const struct core_dc *dc,
+		struct validate_context *context)
+{
+	int i, j, k;
+
+	calculate_phy_pix_clks(dc, context);
+
+	for (i = 0; i < context->target_count; i++) {
+		struct core_target *target = context->targets[i];
+
+		for (j = 0; j < target->public.stream_count; j++) {
+			struct core_stream *stream =
+				DC_STREAM_TO_CORE(target->public.streams[j]);
 
 			if (!resource_is_stream_unchanged(&dc->current_context, stream))
 				continue;
@@ -925,9 +947,9 @@ enum dc_status resource_map_pool_resources(
 /* first target in the context is used to populate the rest */
 void validate_guaranteed_copy_target(
 		struct validate_context *context,
-		uint8_t max_targets)
+		int max_targets)
 {
-	uint8_t i;
+	int i;
 
 	for (i = 1; i < max_targets; i++) {
 		context->targets[i] = context->targets[0];
@@ -1367,7 +1389,7 @@ enum dc_status resource_map_clock_resources(
 		const struct core_dc *dc,
 		struct validate_context *context)
 {
-	uint8_t i, j, k;
+	int i, j, k;
 
 	/* acquire new resources */
 	for (i = 0; i < context->target_count; i++) {

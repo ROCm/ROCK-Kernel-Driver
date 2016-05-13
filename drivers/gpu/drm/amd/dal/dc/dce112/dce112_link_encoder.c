@@ -118,7 +118,7 @@ bool dce112_link_encoder_validate_output_with_stream(
 		is_valid = dce112_link_encoder_validate_hdmi_output(
 				enc110,
 				&stream->public.timing,
-				stream->adjusted_pix_clk_khz);
+				stream->phy_pix_clk);
 	break;
 	case SIGNAL_TYPE_RGB:
 		is_valid = dce110_link_encoder_validate_rgb_output(

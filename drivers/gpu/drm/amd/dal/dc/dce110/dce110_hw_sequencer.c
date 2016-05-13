@@ -785,7 +785,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		pipe_ctx->stream_enc->funcs->hdmi_set_stream_attribute(
 			pipe_ctx->stream_enc,
 			&stream->public.timing,
-			stream->adjusted_pix_clk_khz,
+			stream->phy_pix_clk,
 			pipe_ctx->audio != NULL);
 
 	if (dc_is_dvi_signal(pipe_ctx->signal))
