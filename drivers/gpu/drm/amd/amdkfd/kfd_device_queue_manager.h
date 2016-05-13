@@ -29,7 +29,10 @@
 #include "kfd_priv.h"
 #include "kfd_mqd_manager.h"
 
-#define QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS	(9000)
+#define KFD_HIQ_TIMEOUT				(500)
+#define KFD_UNMAP_LATENCY_MS			(4000)
+#define QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS (2 * KFD_UNMAP_LATENCY_MS + 1000)
+
 #define QUEUES_PER_PIPE				(8)
 #define PIPE_PER_ME_CP_SCHEDULING		(3)
 #define KFD_DQM_FIRST_PIPE			(0)

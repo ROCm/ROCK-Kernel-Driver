@@ -330,7 +330,7 @@ static int destroy_queue_nocpsch(struct device_queue_manager *dqm,
 
 	retval = mqd->destroy_mqd(mqd, q->mqd,
 				KFD_PREEMPT_TYPE_WAVEFRONT_RESET,
-				QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS,
+				KFD_HIQ_TIMEOUT,
 				q->pipe, q->queue);
 
 	if (retval != 0)
@@ -1407,7 +1407,7 @@ static int process_termination_nocpsch(struct device_queue_manager *dqm,
 		dqm->total_queue_count--;
 		mqd->destroy_mqd(mqd, q->mqd,
 				KFD_PREEMPT_TYPE_WAVEFRONT_RESET,
-				QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS,
+				KFD_HIQ_TIMEOUT,
 				q->pipe, q->queue);
 		mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
 		if (list_empty(&qpd->queues_list))
