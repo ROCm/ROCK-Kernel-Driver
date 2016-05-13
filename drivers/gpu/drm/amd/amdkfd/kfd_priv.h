@@ -316,11 +316,6 @@ enum kfd_unmap_queues_filter {
 	KFD_UNMAP_QUEUES_FILTER_BY_PASID
 };
 
-enum kfd_preempt_type {
-	KFD_PREEMPT_TYPE_WAVEFRONT,
-	KFD_PREEMPT_TYPE_WAVEFRONT_RESET
-};
-
 /**
  * enum kfd_queue_type
  *
@@ -816,11 +811,8 @@ int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm);
 
 /* Packet Manager */
 
-#define KFD_HIQ_TIMEOUT (500)
-
 #define KFD_FENCE_COMPLETED (100)
 #define KFD_FENCE_INIT   (10)
-#define KFD_UNMAP_LATENCY (40)
 
 struct packet_manager_firmware;
 
