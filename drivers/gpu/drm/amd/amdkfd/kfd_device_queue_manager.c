@@ -44,7 +44,8 @@ static int create_compute_queue_nocpsch(struct device_queue_manager *dqm,
 					struct queue *q,
 					struct qcm_process_device *qpd);
 
-static int execute_queues_cpsch(struct device_queue_manager *dqm);
+static int execute_queues_cpsch(struct device_queue_manager *dqm,
+				bool static_queues_included);
 static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 		enum kfd_unmap_queues_filter filter,
 		uint32_t filter_param, bool reset);
@@ -409,7 +410,7 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 		dqm->queue_count--;
 
 	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
-		retval = execute_queues_cpsch(dqm);
+		retval = execute_queues_cpsch(dqm, false);
 
 	mutex_unlock(&dqm->lock);
 	return retval;
@@ -471,7 +472,7 @@ int process_evict_queues(struct device_queue_manager *dqm,
 			dqm->queue_count--;
 	}
 	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
-		retval = execute_queues_cpsch(dqm);
+		retval = execute_queues_cpsch(dqm, false);
 
 	mutex_unlock(&dqm->lock);
 	return retval;
@@ -525,7 +526,7 @@ int process_restore_queues(struct device_queue_manager *dqm,
 		}
 	}
 	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
-		retval = execute_queues_cpsch(dqm);
+		retval = execute_queues_cpsch(dqm, false);
 
 	if (retval == 0)
 		qpd->evicted = 0;
@@ -903,7 +904,7 @@ static int start_cpsch(struct device_queue_manager *dqm)
 						node->qpd->pqm->process);
 
 	mutex_lock(&dqm->lock);
-	execute_queues_cpsch(dqm);
+	execute_queues_cpsch(dqm, false);
 	mutex_unlock(&dqm->lock);
 
 	return 0;
@@ -964,7 +965,7 @@ static int create_kernel_queue_cpsch(struct device_queue_manager *dqm,
 	list_add(&kq->list, &qpd->priv_queue_list);
 	dqm->queue_count++;
 	qpd->is_debug = true;
-	execute_queues_cpsch(dqm);
+	execute_queues_cpsch(dqm, false);
 	mutex_unlock(&dqm->lock);
 
 	return 0;
@@ -980,11 +981,10 @@ static void destroy_kernel_queue_cpsch(struct device_queue_manager *dqm,
 
 	mutex_lock(&dqm->lock);
 	/* here we actually preempt the DIQ */
-	unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0, false);
 	list_del(&kq->list);
 	dqm->queue_count--;
 	qpd->is_debug = false;
-	execute_queues_cpsch(dqm);
+	execute_queues_cpsch(dqm, true);
 	/*
 	 * Unconditionally decrement this counter, regardless of the queue's
 	 * type.
@@ -1054,7 +1054,7 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 	list_add(&q->list, &qpd->queues_list);
 	if (q->properties.is_active) {
 		dqm->queue_count++;
-		retval = execute_queues_cpsch(dqm);
+		retval = execute_queues_cpsch(dqm, false);
 	}
 
 	if (q->properties.type == KFD_QUEUE_TYPE_SDMA)
@@ -1147,14 +1147,19 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 }
 
 /* dqm->lock mutex has to be locked before calling this function */
-static int execute_queues_cpsch(struct device_queue_manager *dqm)
+static int execute_queues_cpsch(struct device_queue_manager *dqm,
+				bool static_queues_included)
 {
 	int retval;
+	enum kfd_unmap_queues_filter filter;
 
 	BUG_ON(!dqm);
 
-	retval = unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES,
-			0, false);
+	filter = static_queues_included ?
+			KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES :
+			KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES;
+
+	retval = unmap_queues_cpsch(dqm, filter, 0, false);
 	if (retval != 0) {
 		pr_err("kfd: the cp might be in an unrecoverable state due to an unsuccessful queues preemption");
 		return retval;
@@ -1223,7 +1228,7 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 	if (q->properties.is_active)
 		dqm->queue_count--;
 
-	retval = execute_queues_cpsch(dqm);
+	retval = execute_queues_cpsch(dqm, false);
 
 	mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
 
@@ -1364,7 +1369,7 @@ static int set_page_directory_base(struct device_queue_manager *dqm,
 	 * will have the update PD base address
 	 */
 	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
-		retval = execute_queues_cpsch(dqm);
+		retval = execute_queues_cpsch(dqm, false);
 
 out:
 	mutex_unlock(&dqm->lock);
@@ -1469,7 +1474,7 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 		}
 	}
 
-	retval = execute_queues_cpsch(dqm);
+	retval = execute_queues_cpsch(dqm, false);
 
 	/* lastly, free mqd resources */
 	list_for_each_entry_safe(q, next, &qpd->queues_list, list) {
