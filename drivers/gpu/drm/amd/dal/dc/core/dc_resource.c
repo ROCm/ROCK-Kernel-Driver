@@ -689,9 +689,9 @@ static struct audio *find_first_free_audio(struct resource_context *res_ctx)
 
 static void set_stream_signal(struct pipe_ctx *pipe_ctx)
 {
-	struct dc_sink *dc_sink =
-		(struct dc_sink *) pipe_ctx->stream->public.sink;
+	const struct dc_sink *dc_sink = pipe_ctx->stream->public.sink;
 
+	pipe_ctx->signal = dc_sink->sink_signal;
 	/* For asic supports dual link DVI, we should adjust signal type
 	 * based on timing pixel clock. If pixel clock more than 165Mhz,
 	 * signal is dual link, otherwise, single link.
@@ -700,23 +700,10 @@ static void set_stream_signal(struct pipe_ctx *pipe_ctx)
 			dc_sink->sink_signal == SIGNAL_TYPE_DVI_DUAL_LINK) {
 		if (pipe_ctx->stream->public.timing.pix_clk_khz >
 						TMDS_MAX_PIXEL_CLOCK_IN_KHZ)
-			dc_sink->sink_signal = SIGNAL_TYPE_DVI_DUAL_LINK;
+			pipe_ctx->signal = SIGNAL_TYPE_DVI_DUAL_LINK;
 		else
-			dc_sink->sink_signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
+			pipe_ctx->signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
 	}
-
-	pipe_ctx->signal = dc_sink->sink_signal;
-
-	/* Down-grade pipe_ctx signal instead of sink singal from HDMI to DVI
-	 * here based on audio info in stream. This allows DC to handle stream
-	 * with or without audio on a HDMI connector.
-	 *
-	 * On a HDMI to DVI passive dongle, audio info is not available from the
-	 * EDID and the signal is down-graded in pipe ctx.
-	 */
-	if (pipe_ctx->signal == SIGNAL_TYPE_HDMI_TYPE_A &&
-			pipe_ctx->stream->public.audio_info.mode_count == 0)
-		pipe_ctx->signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
 }
 
 bool resource_is_stream_unchanged(
@@ -923,8 +910,8 @@ enum dc_status resource_map_pool_resources(
 
 			/* TODO: Add check if ASIC support and EDID audio */
 			if (!stream->sink->converter_disable_audio &&
-						dc_is_audio_capable_signal(
-						pipe_ctx->signal)) {
+						dc_is_audio_capable_signal(pipe_ctx->signal) &&
+						stream->public.audio_info.mode_count) {
 				pipe_ctx->audio = find_first_free_audio(
 						&context->res_ctx);
 

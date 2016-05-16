@@ -101,6 +101,9 @@ enum dc_edid_status dm_helpers_parse_edid_caps(
 		}
 	}
 
+	edid_caps->edid_hdmi = drm_detect_hdmi_monitor(
+			(struct edid *) edid->raw_edid);
+
 	sad_count = drm_edid_to_sad((struct edid *) edid->raw_edid, &sads);
 	if (sad_count <= 0) {
 		DRM_INFO("SADs count is: %d, don't need to read it\n",

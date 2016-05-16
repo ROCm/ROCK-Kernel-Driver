@@ -687,6 +687,11 @@ bool dc_link_detect(const struct dc_link *dc_link, bool boot)
 			break;
 		}
 
+		/* HDMI-DVI Dongle */
+		if (dc_sink->sink_signal == SIGNAL_TYPE_HDMI_TYPE_A &&
+				!dc_sink->edid_caps.edid_hdmi)
+			dc_sink->sink_signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
+
 		/* Connectivity log: detection */
 		for (i = 0; i < sink->public.dc_edid.length / EDID_BLOCK_SIZE; i++) {
 			CONN_DATA_DETECT(link,

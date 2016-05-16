@@ -259,7 +259,9 @@ struct dc_edid_caps {
 	uint32_t video_latency;
 
 	/*HDMI 2.0 caps*/
-	uint8_t lte_340mcsc_scramble;
+	bool lte_340mcsc_scramble;
+
+	bool edid_hdmi;
 };
 
 struct view {
