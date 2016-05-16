@@ -1669,14 +1669,13 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 {
 	struct core_dc *core_dc = DC_TO_CORE(pipe_ctx->stream->ctx->dc);
 
-	pipe_ctx->stream->status.link = NULL;
 	if (pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 		deallocate_mst_payload(pipe_ctx);
 
 	core_dc->hwss.disable_stream(pipe_ctx);
 
-	pipe_ctx->stream->status.link = NULL;
-
 	disable_link(pipe_ctx->stream->sink->link, pipe_ctx->signal);
+
+	pipe_ctx->stream->status.link = NULL;
 }
 
