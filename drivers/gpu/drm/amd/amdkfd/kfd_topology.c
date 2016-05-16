@@ -994,6 +994,21 @@ static void kfd_fill_mem_clk_max_info(struct kfd_topology_device *dev)
 		mem->mem_clk_max = local_mem_info.mem_clk_max;
 }
 
+static void kfd_fill_iolink_non_crat_info(struct kfd_topology_device *dev)
+{
+	struct kfd_iolink_properties *link;
+
+	if ((dev == NULL) || (dev->gpu == NULL))
+		return;
+
+	/* GPU only creates direck links so apply flags setting to all */
+	if (dev->gpu->device_info->asic_family == CHIP_HAWAII)
+		list_for_each_entry(link, &dev->io_link_props, list)
+			link->flags = CRAT_IOLINK_FLAGS_ENABLED |
+				CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
+				CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
+}
+
 int kfd_topology_add_device(struct kfd_dev *gpu)
 {
 	uint32_t gpu_id;
@@ -1076,6 +1091,7 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 		cpufreq_quick_get_max(0) / 1000;
 
 	kfd_fill_mem_clk_max_info(dev);
+	kfd_fill_iolink_non_crat_info(dev);
 
 	switch (dev->gpu->device_info->asic_family) {
 	case CHIP_KAVERI:
