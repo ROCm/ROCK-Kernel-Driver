@@ -1440,7 +1440,8 @@ static void update_plane_addr(struct core_dc *dc, struct pipe_ctx *pipe_ctx)
 
 	surface->status.requested_address = surface->public.address;
 
-	pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, false);
+	if (surface->public.visible)
+		pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, false);
 
 	if (surface->public.flip_immediate)
 		pipe_ctx->mi->funcs->wait_for_no_surface_update_pending(
