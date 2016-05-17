@@ -94,6 +94,7 @@ struct core_stream {
 	struct clamping_and_pixel_encoding_params clamping;
 
 	int phy_pix_clk;
+	enum signal_type signal;
 
 	struct dc_stream_status status;
 };
@@ -197,7 +198,7 @@ struct core_link *link_create(const struct link_init_data *init_params);
 void link_destroy(struct core_link **link);
 
 enum dc_status dc_link_validate_mode_timing(
-		const struct core_sink *sink,
+		const struct core_stream *stream,
 		struct core_link *link,
 		const struct dc_crtc_timing *timing);
 
@@ -284,8 +285,6 @@ struct pipe_ctx {
 	struct clock_source *clock_source;
 
 	struct audio *audio;
-
-	enum signal_type signal;
 
 	struct pixel_clk_params pix_clk_params;
 	struct pll_settings pll_settings;

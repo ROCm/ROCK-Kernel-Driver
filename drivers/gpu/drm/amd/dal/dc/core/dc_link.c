@@ -1203,7 +1203,7 @@ static enum dc_status enable_link_dp(struct pipe_ctx *pipe_ctx)
 	decide_link_settings(stream, &link_settings);
 	dp_enable_link_phy(
 		link,
-		pipe_ctx->signal,
+		pipe_ctx->stream->signal,
 		pipe_ctx->clock_source->id,
 		&link_settings);
 
@@ -1249,7 +1249,7 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 	struct core_stream *stream = pipe_ctx->stream;
 	struct core_link *link = stream->sink->link;
 
-	if (dc_is_hdmi_signal(pipe_ctx->signal))
+	if (dc_is_hdmi_signal(pipe_ctx->stream->signal))
 		dal_ddc_service_write_scdc_data(
 			stream->sink->link->ddc,
 			stream->phy_pix_clk,
@@ -1262,11 +1262,11 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 			link->link_enc,
 			pipe_ctx->clock_source->id,
 			stream->public.timing.display_color_depth,
-			pipe_ctx->signal == SIGNAL_TYPE_HDMI_TYPE_A,
-			pipe_ctx->signal == SIGNAL_TYPE_DVI_DUAL_LINK,
+			pipe_ctx->stream->signal == SIGNAL_TYPE_HDMI_TYPE_A,
+			pipe_ctx->stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK,
 			stream->phy_pix_clk);
 
-	if (pipe_ctx->signal == SIGNAL_TYPE_HDMI_TYPE_A)
+	if (pipe_ctx->stream->signal == SIGNAL_TYPE_HDMI_TYPE_A)
 		dal_ddc_service_read_scdc_data(link->ddc);
 }
 
@@ -1274,7 +1274,7 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 static enum dc_status enable_link(struct pipe_ctx *pipe_ctx)
 {
 	enum dc_status status = DC_ERROR_UNEXPECTED;
-	switch (pipe_ctx->signal) {
+	switch (pipe_ctx->stream->signal) {
 	case SIGNAL_TYPE_DISPLAY_PORT:
 	case SIGNAL_TYPE_EDP:
 		status = enable_link_dp(pipe_ctx);
@@ -1303,7 +1303,7 @@ static enum dc_status enable_link(struct pipe_ctx *pipe_ctx)
 
 		/* un-mute audio */
 		dal_audio_unmute(pipe_ctx->audio, pipe_ctx->stream_enc->id,
-				pipe_ctx->signal);
+				pipe_ctx->stream->signal);
 	}
 
 	return status;
@@ -1332,16 +1332,16 @@ static void disable_link(struct core_link *link, enum signal_type signal)
 }
 
 enum dc_status dc_link_validate_mode_timing(
-		const struct core_sink *sink,
+		const struct core_stream *stream,
 		struct core_link *link,
 		const struct dc_crtc_timing *timing)
 {
-	uint32_t max_pix_clk = sink->dongle_max_pix_clk;
+	uint32_t max_pix_clk = stream->sink->dongle_max_pix_clk;
 
 	if (0 != max_pix_clk && timing->pix_clk_khz > max_pix_clk)
 		return DC_EXCEED_DONGLE_MAX_CLK;
 
-	switch (sink->public.sink_signal) {
+	switch (stream->signal) {
 		case SIGNAL_TYPE_DISPLAY_PORT:
 			if(!dp_validate_mode_timing(
 					link,
@@ -1661,7 +1661,7 @@ void core_link_enable_stream(struct pipe_ctx *pipe_ctx)
 
 	pipe_ctx->stream->status.link = &pipe_ctx->stream->sink->link->public;
 
-	if (pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
+	if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 		allocate_mst_payload(pipe_ctx);
 }
 
@@ -1669,12 +1669,12 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 {
 	struct core_dc *core_dc = DC_TO_CORE(pipe_ctx->stream->ctx->dc);
 
-	if (pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
+	if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 		deallocate_mst_payload(pipe_ctx);
 
 	core_dc->hwss.disable_stream(pipe_ctx);
 
-	disable_link(pipe_ctx->stream->sink->link, pipe_ctx->signal);
+	disable_link(pipe_ctx->stream->sink->link, pipe_ctx->stream->signal);
 
 	pipe_ctx->stream->status.link = NULL;
 }

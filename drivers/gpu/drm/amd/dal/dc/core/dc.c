@@ -648,7 +648,7 @@ static void fill_display_configs(
 			ASSERT(pipe_ctx != NULL);
 
 			num_cfgs++;
-			cfg->signal = pipe_ctx->signal;
+			cfg->signal = pipe_ctx->stream->signal;
 			cfg->pipe_idx = pipe_ctx->pipe_idx;
 			cfg->src_height = stream->public.src.height;
 			cfg->src_width = stream->public.src.width;

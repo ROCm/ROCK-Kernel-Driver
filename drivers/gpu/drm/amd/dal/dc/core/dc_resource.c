@@ -184,8 +184,8 @@ bool resource_are_streams_clk_sharable(
 		return false;
 
 	if (stream1->phy_pix_clk != stream2->phy_pix_clk
-			&& !dc_is_dp_signal(stream1->public.sink->sink_signal)
-			&& !dc_is_dp_signal(stream2->public.sink->sink_signal))
+			&& !dc_is_dp_signal(stream1->signal)
+			&& !dc_is_dp_signal(stream2->signal))
 		return false;
 
 	return true;
@@ -198,7 +198,7 @@ static bool is_sharable_clk_src(
 	if (pipe_with_clk_src->clock_source == NULL)
 		return false;
 
-	if (dc_is_dp_signal(pipe_with_clk_src->signal))
+	if (dc_is_dp_signal(pipe_with_clk_src->stream->signal))
 		return false;
 
 	if (!resource_are_streams_clk_sharable(
@@ -640,11 +640,11 @@ static int acquire_first_free_pipe(
 
 static struct stream_encoder *find_first_free_match_stream_enc_for_link(
 		struct resource_context *res_ctx,
-		struct core_link *link)
+		struct core_stream *stream)
 {
 	int i;
 	int j = -1;
-	const struct dc_sink *sink = NULL;
+	struct core_link *link = stream->sink->link;
 
 	for (i = 0; i < res_ctx->pool.stream_enc_count; i++) {
 		if (!res_ctx->is_stream_enc_acquired[i] &&
@@ -671,9 +671,7 @@ static struct stream_encoder *find_first_free_match_stream_enc_for_link(
 	 * required for non DP connectors.
 	 */
 
-	sink = link->public.local_sink ? link->public.local_sink : link->public.remote_sinks[0];
-
-	if (sink && j >= 0 &&  dc_is_dp_signal(sink->sink_signal))
+	if (j >= 0 && dc_is_dp_signal(stream->signal))
 		return res_ctx->pool.stream_enc[j];
 
 	return NULL;
@@ -691,22 +689,22 @@ static struct audio *find_first_free_audio(struct resource_context *res_ctx)
 	return 0;
 }
 
-static void set_stream_signal(struct pipe_ctx *pipe_ctx)
+static void update_stream_signal(struct core_stream *stream)
 {
-	const struct dc_sink *dc_sink = pipe_ctx->stream->public.sink;
+	const struct dc_sink *dc_sink = stream->public.sink;
 
-	pipe_ctx->signal = dc_sink->sink_signal;
+	stream->signal = dc_sink->sink_signal;
 	/* For asic supports dual link DVI, we should adjust signal type
 	 * based on timing pixel clock. If pixel clock more than 165Mhz,
 	 * signal is dual link, otherwise, single link.
 	 */
 	if (dc_sink->sink_signal == SIGNAL_TYPE_DVI_SINGLE_LINK ||
 			dc_sink->sink_signal == SIGNAL_TYPE_DVI_DUAL_LINK) {
-		if (pipe_ctx->stream->public.timing.pix_clk_khz >
+		if (stream->public.timing.pix_clk_khz >
 						TMDS_MAX_PIXEL_CLOCK_IN_KHZ)
-			pipe_ctx->signal = SIGNAL_TYPE_DVI_DUAL_LINK;
+			stream->signal = SIGNAL_TYPE_DVI_DUAL_LINK;
 		else
-			pipe_ctx->signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
+			stream->signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
 	}
 }
 
@@ -758,8 +756,7 @@ static struct core_stream *find_pll_sharable_stream(
 			/* We are looking for non dp, non virtual stream */
 			if (resource_are_streams_clk_sharable(
 						stream_needs_pll, stream_has_pll)
-				&& !dc_is_dp_signal(
-					stream_has_pll->sink->public.sink_signal)
+				&& !dc_is_dp_signal(stream_has_pll->signal)
 				&& stream_has_pll->sink->link->public.connector_signal
 							!= SIGNAL_TYPE_VIRTUAL)
 					return stream_has_pll;
@@ -811,8 +808,10 @@ static void calculate_phy_pix_clks(
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 
+			update_stream_signal(stream);
+
 			/* update actual pixel clock on all streams */
-			if (dc_is_hdmi_signal(stream->sink->public.sink_signal))
+			if (dc_is_hdmi_signal(stream->signal))
 				stream->phy_pix_clk = get_norm_pix_clk(
 					&stream->public.timing);
 			else
@@ -861,7 +860,7 @@ enum dc_status resource_map_pool_resources(
 				 * no non dp stream that shares the same timing
 				 * with the dp stream.
 				 */
-				if (dc_is_dp_signal(pipe_ctx->signal) &&
+				if (dc_is_dp_signal(pipe_ctx->stream->signal) &&
 					!find_pll_sharable_stream(stream, context))
 					pipe_ctx->clock_source =
 						context->res_ctx.pool.dp_clock_source;
@@ -896,12 +895,9 @@ enum dc_status resource_map_pool_resources(
 
 			pipe_ctx = &context->res_ctx.pipe_ctx[pipe_idx];
 
-			set_stream_signal(pipe_ctx);
-
 			pipe_ctx->stream_enc =
 				find_first_free_match_stream_enc_for_link(
-					&context->res_ctx,
-					stream->sink->link);
+					&context->res_ctx, stream);
 
 			if (!pipe_ctx->stream_enc)
 				return DC_NO_STREAM_ENG_RESOURCE;
@@ -912,7 +908,7 @@ enum dc_status resource_map_pool_resources(
 
 			/* TODO: Add check if ASIC support and EDID audio */
 			if (!stream->sink->converter_disable_audio &&
-						dc_is_audio_capable_signal(pipe_ctx->signal) &&
+						dc_is_audio_capable_signal(pipe_ctx->stream->signal) &&
 						stream->public.audio_info.mode_count) {
 				pipe_ctx->audio = find_first_free_audio(
 						&context->res_ctx);
@@ -1465,7 +1461,7 @@ void resource_build_info_frame(struct pipe_ctx *pipe_ctx)
 	info_frame.spd_packet.valid = false;
 	info_frame.vsc_packet.valid = false;
 
-	signal = pipe_ctx->stream->sink->public.sink_signal;
+	signal = pipe_ctx->stream->signal;
 
 	/* HDMi and DP have different info packets*/
 	if (signal == SIGNAL_TYPE_HDMI_TYPE_A) {
@@ -1503,8 +1499,8 @@ enum dc_status resource_map_clock_resources(
 				if (context->res_ctx.pipe_ctx[k].stream != stream)
 					continue;
 
-				if (dc_is_dp_signal(pipe_ctx->signal)
-					|| pipe_ctx->signal == SIGNAL_TYPE_VIRTUAL)
+				if (dc_is_dp_signal(pipe_ctx->stream->signal)
+					|| pipe_ctx->stream->signal == SIGNAL_TYPE_VIRTUAL)
 					pipe_ctx->clock_source =
 						context->res_ctx.pool.dp_clock_source;
 				else {
@@ -1559,7 +1555,7 @@ bool pipe_need_reprogram(
 	if (pipe_ctx_old->stream->sink != pipe_ctx->stream->sink)
 		return true;
 
-	if (pipe_ctx_old->signal != pipe_ctx->signal)
+	if (pipe_ctx_old->stream->signal != pipe_ctx->stream->signal)
 		return true;
 
 	if (pipe_ctx_old->audio != pipe_ctx->audio)

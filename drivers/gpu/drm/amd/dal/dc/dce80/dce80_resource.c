@@ -575,7 +575,7 @@ static enum dc_status validate_mapped_resource(
 
 				/* TODO: validate audio ASIC caps, encoder */
 
-				status = dc_link_validate_mode_timing(stream->sink,
+				status = dc_link_validate_mode_timing(stream,
 						link,
 						&stream->public.timing);
 

@@ -485,9 +485,9 @@ static enum dc_status bios_parser_crtc_source_select(
 	/*TODO: Need to un-hardcode color depth, dp_audio and account for
 	 * the case where signal and sink signal is different (translator
 	 * encoder)*/
-	crtc_source_select.signal = sink->public.sink_signal;
+	crtc_source_select.signal = pipe_ctx->stream->signal;
 	crtc_source_select.enable_dp_audio = false;
-	crtc_source_select.sink_signal = sink->public.sink_signal;
+	crtc_source_select.sink_signal = pipe_ctx->stream->signal;
 	crtc_source_select.display_output_bit_depth = PANEL_8BIT_COLOR;
 
 	dcb = dal_adapter_service_get_bios_parser(sink->link->adapter_srv);
@@ -512,11 +512,11 @@ static void update_bios_scratch_critical_state(struct adapter_service *as,
 
 static void update_info_frame(struct pipe_ctx *pipe_ctx)
 {
-	if (dc_is_hdmi_signal(pipe_ctx->signal))
+	if (dc_is_hdmi_signal(pipe_ctx->stream->signal))
 		pipe_ctx->stream_enc->funcs->update_hdmi_info_packets(
 			pipe_ctx->stream_enc,
 			&pipe_ctx->encoder_info_frame);
-	else if (dc_is_dp_signal(pipe_ctx->signal))
+	else if (dc_is_dp_signal(pipe_ctx->stream->signal))
 		pipe_ctx->stream_enc->funcs->update_dp_info_packets(
 			pipe_ctx->stream_enc,
 			&pipe_ctx->encoder_info_frame);
@@ -557,7 +557,7 @@ static void enable_stream(struct pipe_ctx *pipe_ctx)
 		dal_audio_enable_output(
 			pipe_ctx->audio,
 			pipe_ctx->stream_enc->id,
-			pipe_ctx->signal);
+			pipe_ctx->stream->signal);
 	}
 
 	/* For MST, there are multiply stream go to only one link.
@@ -574,18 +574,18 @@ static void disable_stream(struct pipe_ctx *pipe_ctx)
 	struct core_stream *stream = pipe_ctx->stream;
 	struct core_link *link = stream->sink->link;
 
-	if (dc_is_hdmi_signal(pipe_ctx->signal))
+	if (dc_is_hdmi_signal(pipe_ctx->stream->signal))
 		pipe_ctx->stream_enc->funcs->stop_hdmi_info_packets(
 			pipe_ctx->stream_enc);
 
-	if (dc_is_dp_signal(pipe_ctx->signal))
+	if (dc_is_dp_signal(pipe_ctx->stream->signal))
 		pipe_ctx->stream_enc->funcs->stop_dp_info_packets(
 			pipe_ctx->stream_enc);
 
 	if (pipe_ctx->audio) {
 		/* mute audio */
 		dal_audio_mute(pipe_ctx->audio, pipe_ctx->stream_enc->id,
-				pipe_ctx->signal);
+				pipe_ctx->stream->signal);
 
 		/* TODO: notify audio driver for if audio modes list changed
 		 * add audio mode list change flag */
@@ -595,7 +595,7 @@ static void disable_stream(struct pipe_ctx *pipe_ctx)
 	}
 
 	/* blank at encoder level */
-	if (dc_is_dp_signal(pipe_ctx->signal))
+	if (dc_is_dp_signal(pipe_ctx->stream->signal))
 		pipe_ctx->stream_enc->funcs->dp_blank(pipe_ctx->stream_enc);
 
 	link->link_enc->funcs->connect_dig_be_to_fe(
@@ -644,7 +644,7 @@ static void build_audio_output(
 	const struct core_stream *stream = pipe_ctx->stream;
 	audio_output->engine_id = pipe_ctx->stream_enc->id;
 
-	audio_output->signal = pipe_ctx->signal;
+	audio_output->signal = pipe_ctx->stream->signal;
 
 	/* audio_crtc_info  */
 
@@ -687,8 +687,8 @@ static void build_audio_output(
 	audio_output->crtc_info.calculated_pixel_clock =
 			pipe_ctx->pix_clk_params.requested_pix_clk;
 
-	if (pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT ||
-			pipe_ctx->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
+	if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT ||
+			pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
 		audio_output->pll_info.dp_dto_source_clock_in_khz =
 			dal_display_clock_get_dp_ref_clk_frequency(
 				pipe_ctx->dis_clk);
@@ -755,7 +755,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	}
 
 	/* TODO: move to stream encoder */
-	if (pipe_ctx->signal != SIGNAL_TYPE_VIRTUAL)
+	if (pipe_ctx->stream->signal != SIGNAL_TYPE_VIRTUAL)
 		if (DC_OK != bios_parser_crtc_source_select(pipe_ctx)) {
 			BREAK_TO_DEBUGGER();
 			return DC_ERROR_UNEXPECTED;
@@ -765,7 +765,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 			pipe_ctx->opp,
 			COLOR_SPACE_YCBCR601,
 			stream->public.timing.display_color_depth,
-			stream->sink->public.sink_signal);
+			pipe_ctx->stream->signal);
 
 	pipe_ctx->opp->funcs->opp_program_fmt(
 			pipe_ctx->opp,
@@ -774,25 +774,25 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 
 	stream->sink->link->link_enc->funcs->setup(
 		stream->sink->link->link_enc,
-		pipe_ctx->signal);
+		pipe_ctx->stream->signal);
 
-	if (dc_is_dp_signal(pipe_ctx->signal))
+	if (dc_is_dp_signal(pipe_ctx->stream->signal))
 		pipe_ctx->stream_enc->funcs->dp_set_stream_attribute(
 			pipe_ctx->stream_enc,
 			&stream->public.timing);
 
-	if (dc_is_hdmi_signal(pipe_ctx->signal))
+	if (dc_is_hdmi_signal(pipe_ctx->stream->signal))
 		pipe_ctx->stream_enc->funcs->hdmi_set_stream_attribute(
 			pipe_ctx->stream_enc,
 			&stream->public.timing,
 			stream->phy_pix_clk,
 			pipe_ctx->audio != NULL);
 
-	if (dc_is_dvi_signal(pipe_ctx->signal))
+	if (dc_is_dvi_signal(pipe_ctx->stream->signal))
 		pipe_ctx->stream_enc->funcs->dvi_set_stream_attribute(
 			pipe_ctx->stream_enc,
 			&stream->public.timing,
-			(pipe_ctx->signal == SIGNAL_TYPE_DVI_DUAL_LINK) ?
+			(pipe_ctx->stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK) ?
 			true : false);
 
 	/* program blank color */
@@ -803,7 +803,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	if (!pipe_ctx_old->stream) {
 		core_link_enable_stream(pipe_ctx);
 
-		if (dc_is_dp_signal(pipe_ctx->signal))
+		if (dc_is_dp_signal(pipe_ctx->stream->signal))
 			unblank_stream(pipe_ctx,
 				&stream->sink->link->public.cur_link_settings);
 	}
@@ -1123,7 +1123,7 @@ static void switch_dp_clock_sources(
 		if (pipe_ctx->stream == NULL)
 			continue;
 
-		if (dc_is_dp_signal(pipe_ctx->signal)) {
+		if (dc_is_dp_signal(pipe_ctx->stream->signal)) {
 			struct clock_source *clk_src =
 				resource_find_used_clk_src_for_sharing(
 						res_ctx, pipe_ctx);
@@ -1156,7 +1156,7 @@ static void reset_single_pipe_hw_ctx(
 	if (pipe_ctx->audio) {
 		dal_audio_disable_output(pipe_ctx->audio,
 				pipe_ctx->stream_enc->id,
-				pipe_ctx->signal);
+				pipe_ctx->stream->signal);
 		pipe_ctx->audio = NULL;
 	}
 
@@ -1314,7 +1314,7 @@ static enum dc_status apply_ctx_to_hw(
 			if (!programmed_audio_dto) {
 				dal_audio_setup_audio_wall_dto(
 					pipe_ctx->audio,
-					pipe_ctx->signal,
+					pipe_ctx->stream->signal,
 					&audio_output.crtc_info,
 					&audio_output.pll_info);
 				programmed_audio_dto = true;

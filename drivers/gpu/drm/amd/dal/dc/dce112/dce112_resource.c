@@ -671,7 +671,7 @@ static enum dc_status validate_mapped_resource(
 
 				/* TODO: validate audio ASIC caps, encoder */
 
-				status = dc_link_validate_mode_timing(stream->sink,
+				status = dc_link_validate_mode_timing(stream,
 						link,
 						&stream->public.timing);
 
@@ -886,8 +886,8 @@ static enum dc_status map_clock_resources(
 				if (context->res_ctx.pipe_ctx[k].stream != stream)
 					continue;
 
-				if (dc_is_dp_signal(pipe_ctx->signal)
-					|| pipe_ctx->signal == SIGNAL_TYPE_VIRTUAL)
+				if (dc_is_dp_signal(pipe_ctx->stream->signal)
+					|| pipe_ctx->stream->signal == SIGNAL_TYPE_VIRTUAL)
 					pipe_ctx->clock_source =
 						context->res_ctx.pool.dp_clock_source;
 				else

@@ -536,7 +536,7 @@ static void get_pixel_clock_parameters(
 	 */
 	pixel_clk_params->requested_pix_clk = stream->public.timing.pix_clk_khz;
 	pixel_clk_params->encoder_object_id = stream->sink->link->link_enc->id;
-	pixel_clk_params->signal_type = stream->sink->public.sink_signal;
+	pixel_clk_params->signal_type = pipe_ctx->stream->signal;
 	pixel_clk_params->controller_id = pipe_ctx->pipe_idx + 1;
 	/* TODO: un-hardcode*/
 	pixel_clk_params->requested_sym_clk = LINK_RATE_LOW *
@@ -648,7 +648,7 @@ static enum dc_status validate_mapped_resource(
 
 				/* TODO: validate audio ASIC caps, encoder */
 
-				status = dc_link_validate_mode_timing(stream->sink,
+				status = dc_link_validate_mode_timing(stream,
 						link,
 						&stream->public.timing);
 
