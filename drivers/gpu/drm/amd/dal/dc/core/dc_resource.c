@@ -963,6 +963,14 @@ enum dc_status resource_map_vmin_resources(
 		struct validate_context *context) {
 	/* TODO: Temporary hack. Forcing vmin here, one stream two pipes */
 	/* TODO: Lower  clock, change timing, etc? */
+
+	/* This function is called dc_validate_resources, dc_commit_targets,
+	 * by dc_commit_surfaces_to_target, each of them will
+	 * re-allocation buffer using
+	 * context = dm_alloc(sizeof(struct validate_context));
+	 * so pointer to buffer may be changed. In case save pointer to buffer
+	 * , handle will be needed
+	 */
 	if (context->target_count == 1 && context->targets[0]->public.stream_count == 1) {
 
 		uint8_t i;
@@ -991,8 +999,14 @@ enum dc_status resource_map_vmin_resources(
 		/* Determine if we've already acquired a vmin pipe previously */
 		for (i = 0; i < context->res_ctx.pool.pipe_count; i++) {
 			struct pipe_ctx *current_pipe_ctx = &context->res_ctx.pipe_ctx[i];
+
+			/* TODO: This workaround need rework  */
 			if (parent_pipe_ctx->stream == current_pipe_ctx->stream &&
-					current_pipe_ctx->parent_pipe == parent_pipe_ctx) {
+					current_pipe_ctx->parent_pipe != NULL) {
+				/* pointer to buffer may change. need update
+				 * when context be re-allocate
+				 */
+				current_pipe_ctx->parent_pipe = parent_pipe_ctx;
 				vmin_pipe_ctx = current_pipe_ctx;
 
 				/* Use same back-end as original pipe */

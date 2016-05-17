@@ -602,7 +602,8 @@ static void target_disable_memory_requests(struct dc_target *dc_target,
 		for (j = 0; j < MAX_PIPES; j++) {
 			struct timing_generator *tg = res_ctx->pipe_ctx[j].tg;
 
-			if (res_ctx->pipe_ctx[j].stream !=
+			if (res_ctx->pipe_ctx[j].parent_pipe != NULL ||
+				res_ctx->pipe_ctx[j].stream !=
 				DC_STREAM_TO_CORE(target->public.streams[i]))
 				continue;
 
