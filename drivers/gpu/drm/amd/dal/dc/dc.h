@@ -318,6 +318,14 @@ bool dc_commit_targets(
 		struct dc_target *targets[],
 		uint8_t target_count);
 
+struct dc_sink_init_data;
+
+struct dc_sink *dc_add_remote_sink(
+		struct dc *dc,
+		const uint8_t *edid,
+		int len,
+		struct dc_sink_init_data *init_data);
+
 /*******************************************************************************
  * Stream Interfaces
  ******************************************************************************/

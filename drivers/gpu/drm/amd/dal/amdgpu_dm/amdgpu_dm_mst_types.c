@@ -162,60 +162,6 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 	.atomic_set_property = amdgpu_dm_connector_atomic_set_property
 };
 
-static struct dc_sink *dm_dp_mst_add_mst_sink(
-		const struct dc_link *dc_link,
-		uint8_t *edid,
-		uint16_t len)
-{
-	struct dc_sink *dc_sink;
-	struct dc_sink_init_data init_params = {
-			.link = dc_link,
-			.sink_signal = SIGNAL_TYPE_DISPLAY_PORT_MST};
-	enum dc_edid_status edid_status;
-
-	if (len > MAX_EDID_BUFFER_SIZE) {
-		DRM_ERROR("Max EDID buffer size breached!\n");
-		return NULL;
-	}
-
-	if (!dc_link) {
-		BREAK_TO_DEBUGGER();
-		return NULL;
-	}
-
-	/*
-	 * TODO make dynamic-ish?
-	 * dc_link->connector_signal;
-	 */
-
-	dc_sink = dc_sink_create(&init_params);
-
-	if (!dc_sink)
-		return NULL;
-
-	memmove(dc_sink->dc_edid.raw_edid, edid, len);
-	dc_sink->dc_edid.length = len;
-
-	if (!dc_link_add_remote_sink(
-			dc_link,
-			dc_sink))
-		goto fail_add_sink;
-
-	edid_status = dm_helpers_parse_edid_caps(
-			NULL,
-			&dc_sink->dc_edid,
-			&dc_sink->edid_caps);
-	if (edid_status != EDID_OK)
-		goto fail;
-
-	return dc_sink;
-fail:
-	dc_link_remove_remote_sink(dc_link, dc_sink);
-fail_add_sink:
-	dc_sink_release(dc_sink);
-	return NULL;
-}
-
 static int dm_dp_mst_get_modes(struct drm_connector *connector)
 {
 	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
@@ -388,7 +334,6 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 	struct drm_connector *connector;
 	struct amdgpu_connector *aconnector;
 	struct edid *edid;
-	const struct dc_sink *sink;
 
 	drm_modeset_lock_all(dev);
 	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
@@ -399,6 +344,9 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 			 * sink hasn't been created yet
 			 */
 			if (!aconnector->edid) {
+				struct dc_sink_init_data init_params = {
+						.link = aconnector->dc_link,
+						.sink_signal = SIGNAL_TYPE_DISPLAY_PORT_MST};
 				edid = drm_dp_mst_get_edid(connector, &aconnector->mst_port->mst_mgr, aconnector->port);
 
 				if (!edid) {
@@ -410,11 +358,11 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 
 				aconnector->edid = edid;
 
-				sink = dm_dp_mst_add_mst_sink(
-					aconnector->dc_link,
+				aconnector->dc_sink = dc_add_remote_sink(
+					adev->dm.dc,
 					(uint8_t *)edid,
-					(edid->extensions + 1) * EDID_LENGTH);
-				aconnector->dc_sink = sink;
+					(edid->extensions + 1) * EDID_LENGTH,
+					&init_params);
 
 				dm_restore_drm_connector_state(connector->dev, connector);
 			} else
