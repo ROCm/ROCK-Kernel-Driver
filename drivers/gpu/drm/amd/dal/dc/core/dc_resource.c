@@ -882,7 +882,6 @@ enum dc_status resource_map_pool_resources(
 		for (j = 0; j < target->public.stream_count; j++) {
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
-			struct core_stream *curr_stream = NULL;
 			struct pipe_ctx *pipe_ctx = NULL;
 			int pipe_idx = -1;
 
@@ -898,9 +897,6 @@ enum dc_status resource_map_pool_resources(
 			pipe_ctx = &context->res_ctx.pipe_ctx[pipe_idx];
 
 			set_stream_signal(pipe_ctx);
-
-			curr_stream =
-				dc->current_context.res_ctx.pipe_ctx[pipe_idx].stream;
 
 			pipe_ctx->stream_enc =
 				find_first_free_match_stream_enc_for_link(
