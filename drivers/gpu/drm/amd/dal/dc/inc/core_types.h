@@ -222,7 +222,7 @@ struct resource_funcs {
 	enum dc_status (*validate_with_context)(
 					const struct core_dc *dc,
 					const struct dc_validation_set set[],
-					uint8_t set_count,
+					int set_count,
 					struct validate_context *context);
 
 	enum dc_status (*validate_guaranteed)(
@@ -294,7 +294,8 @@ struct pipe_ctx {
 
 	uint8_t pipe_idx;
 
-	struct pipe_ctx *parent_pipe;
+	struct pipe_ctx *primary_pipe;
+	struct pipe_ctx *secondary_pipe;
 };
 
 struct resource_context {

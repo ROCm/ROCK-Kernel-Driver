@@ -490,7 +490,7 @@ bool resource_attach_surfaces_to_context(
 			struct core_surface *surface = NULL;
 
 			/* Skip surface assignment for child pipes */
-			if (context->res_ctx.pipe_ctx[j].parent_pipe != NULL)
+			if (context->res_ctx.pipe_ctx[j].primary_pipe != NULL)
 				continue;
 
 			if (surface_count)
@@ -949,6 +949,40 @@ void validate_guaranteed_copy_target(
 	}
 }
 
+static void split_stream_across_pipes(
+		struct validate_context *context,
+		struct pipe_ctx *primary_pipe,
+		struct pipe_ctx *secondary_pipe)
+{
+	int secondary_pipe_idx = secondary_pipe->pipe_idx;
+	/* Use same back-end as original pipe */
+	*secondary_pipe = *primary_pipe;
+	secondary_pipe->primary_pipe = primary_pipe;
+	secondary_pipe->secondary_pipe = NULL;
+	primary_pipe->secondary_pipe = secondary_pipe;
+	primary_pipe->primary_pipe = NULL;
+	secondary_pipe->pipe_idx = secondary_pipe_idx;
+
+	/* Only acquire different front end objects */
+	secondary_pipe->mi = context->res_ctx.pool.mis[secondary_pipe->pipe_idx];
+	secondary_pipe->ipp = context->res_ctx.pool.ipps[secondary_pipe->pipe_idx];
+	secondary_pipe->xfm = context->res_ctx.pool.transforms[secondary_pipe->pipe_idx];
+	secondary_pipe->opp = context->res_ctx.pool.opps[secondary_pipe->pipe_idx];
+
+	if (primary_pipe->surface) {
+		/* Todo: account for truncation error */
+		primary_pipe->scl_data.viewport.width /= 2;
+		primary_pipe->scl_data.recout.width /= 2;
+
+		secondary_pipe->scl_data = primary_pipe->scl_data;
+		secondary_pipe->scl_data.viewport.x =
+				primary_pipe->scl_data.viewport.width
+				+ primary_pipe->scl_data.viewport.x;
+		secondary_pipe->scl_data.recout.x =
+				primary_pipe->scl_data.recout.width
+				+ primary_pipe->scl_data.recout.x;
+	}
+}
 
 enum dc_status resource_map_vmin_resources(
 		const struct core_dc *dc,
@@ -965,9 +999,9 @@ enum dc_status resource_map_vmin_resources(
 	 */
 	if (context->target_count == 1 && context->targets[0]->public.stream_count == 1) {
 
-		uint8_t i;
-		struct pipe_ctx *parent_pipe_ctx = NULL;
-		struct pipe_ctx *vmin_pipe_ctx = NULL;
+		int i;
+		struct pipe_ctx *primary_pipe = NULL;
+		struct pipe_ctx *secondary_pipe = NULL;
 
 		/* Only enable for 4k@60 displays */
 		struct core_stream *stream = DC_STREAM_TO_CORE(context->targets[0]->public.streams[0]);
@@ -978,78 +1012,41 @@ enum dc_status resource_map_vmin_resources(
 		/* Find first pipe, assume it already has viewport calculated */
 		for (i = 0; i < context->res_ctx.pool.pipe_count; i++) {
 			if (context->res_ctx.pipe_ctx[i].stream) {
-				parent_pipe_ctx = &context->res_ctx.pipe_ctx[i];
+				primary_pipe = &context->res_ctx.pipe_ctx[i];
 				break;
 			}
 		}
 
-		if (parent_pipe_ctx == NULL) {
+		if (primary_pipe == NULL) {
 			BREAK_TO_DEBUGGER();
 			return DC_NO_CONTROLLER_RESOURCE;
 		}
 
 		/* Determine if we've already acquired a vmin pipe previously */
-		for (i = 0; i < context->res_ctx.pool.pipe_count; i++) {
-			struct pipe_ctx *current_pipe_ctx = &context->res_ctx.pipe_ctx[i];
-
-			/* TODO: This workaround need rework  */
-			if (parent_pipe_ctx->stream == current_pipe_ctx->stream &&
-					current_pipe_ctx->parent_pipe != NULL) {
-				/* pointer to buffer may change. need update
-				 * when context be re-allocate
-				 */
-				current_pipe_ctx->parent_pipe = parent_pipe_ctx;
-				vmin_pipe_ctx = current_pipe_ctx;
-
-				/* Use same back-end as original pipe */
-				*vmin_pipe_ctx = *parent_pipe_ctx;
-				vmin_pipe_ctx->pipe_idx = i;
-				vmin_pipe_ctx->parent_pipe = parent_pipe_ctx;
-				break;
-
-			}
-		}
-
-		/* Find the first available pipe to use for vmin if not already acquired */
-		if (vmin_pipe_ctx == NULL) {
+		if (primary_pipe->secondary_pipe)
+			secondary_pipe = primary_pipe->secondary_pipe;
+		else {
 			for (i = 0; i < context->res_ctx.pool.pipe_count; i++) {
 				if (context->res_ctx.pipe_ctx[i].stream == NULL) {
-					vmin_pipe_ctx = &context->res_ctx.pipe_ctx[i];
-
-					/* Use same back-end as original pipe */
-					*vmin_pipe_ctx = *parent_pipe_ctx;
-					vmin_pipe_ctx->pipe_idx = i;
-					vmin_pipe_ctx->parent_pipe = parent_pipe_ctx;
+					secondary_pipe = &context->res_ctx.pipe_ctx[i];
+					secondary_pipe->pipe_idx = i;
 					break;
 				}
 			}
+
 		}
 
-		if (vmin_pipe_ctx == NULL) {
-			BREAK_TO_DEBUGGER();
-			return DC_NO_CONTROLLER_RESOURCE;
+		if (secondary_pipe == NULL) {
+			dal_logger_write(dc->ctx->logger,
+						LOG_MAJOR_TM,
+						LOG_MINOR_TM_RESOURCES,
+						"%s: Failed to find additional pipe resource, driving one pipe\n",
+						__func__);
+			return DC_OK;
 		}
 
-		/* Only acquire different front end objects */
-		vmin_pipe_ctx->mi = context->res_ctx.pool.mis[vmin_pipe_ctx->pipe_idx];
-		vmin_pipe_ctx->ipp = context->res_ctx.pool.ipps[vmin_pipe_ctx->pipe_idx];
-		vmin_pipe_ctx->xfm = context->res_ctx.pool.transforms[vmin_pipe_ctx->pipe_idx];
-		vmin_pipe_ctx->opp = context->res_ctx.pool.opps[vmin_pipe_ctx->pipe_idx];
-
-		if (!vmin_pipe_ctx->stream_enc)
-			return DC_NO_STREAM_ENG_RESOURCE;
-
-		/* Todo: account for truncation error */
-		parent_pipe_ctx->scl_data.viewport.width /= 2;
-		parent_pipe_ctx->scl_data.recout.width /= 2;
-
-		vmin_pipe_ctx->scl_data = parent_pipe_ctx->scl_data;
-		vmin_pipe_ctx->scl_data.viewport.x =
-				parent_pipe_ctx->scl_data.viewport.width
-				+ parent_pipe_ctx->scl_data.viewport.x;
-		vmin_pipe_ctx->scl_data.recout.x =
-				parent_pipe_ctx->scl_data.recout.width
-				+ parent_pipe_ctx->scl_data.recout.x;
+		split_stream_across_pipes(context, primary_pipe,
+				secondary_pipe);
 
 	}
 	return DC_OK;
@@ -1427,6 +1424,17 @@ void resource_validate_ctx_copy_construct(
 	int i, j;
 
 	*dst_ctx = *src_ctx;
+
+	for (i = 0; i < dst_ctx->res_ctx.pool.pipe_count; i++) {
+		struct pipe_ctx *cur_pipe = &dst_ctx->res_ctx.pipe_ctx[i];
+
+		if (cur_pipe->primary_pipe)
+			cur_pipe->primary_pipe =  &dst_ctx->res_ctx.pipe_ctx[cur_pipe->primary_pipe->pipe_idx];
+
+		if (cur_pipe->secondary_pipe)
+			cur_pipe->secondary_pipe = &dst_ctx->res_ctx.pipe_ctx[cur_pipe->secondary_pipe->pipe_idx];
+
+	}
 
 	for (i = 0; i < dst_ctx->target_count; i++) {
 		dc_target_retain(&dst_ctx->targets[i]->public);

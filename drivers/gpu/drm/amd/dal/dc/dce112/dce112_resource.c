@@ -914,7 +914,7 @@ static enum dc_status map_clock_resources(
 enum dc_status dce112_validate_with_context(
 		const struct core_dc *dc,
 		const struct dc_validation_set set[],
-		uint8_t set_count,
+		int set_count,
 		struct validate_context *context)
 {
 	struct dc_context *dc_ctx = dc->ctx;

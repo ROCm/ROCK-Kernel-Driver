@@ -595,14 +595,14 @@ static void target_enable_memory_requests(struct dc_target *dc_target,
 static void target_disable_memory_requests(struct dc_target *dc_target,
 		struct resource_context *res_ctx)
 {
-	uint8_t i, j;
+	int i, j;
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
 
 	for (i = 0; i < target->public.stream_count; i++) {
-		for (j = 0; j < MAX_PIPES; j++) {
+		for (j = 0; j < res_ctx->pool.pipe_count; j++) {
 			struct timing_generator *tg = res_ctx->pipe_ctx[j].tg;
 
-			if (res_ctx->pipe_ctx[j].parent_pipe != NULL ||
+			if (res_ctx->pipe_ctx[j].primary_pipe != NULL ||
 				res_ctx->pipe_ctx[j].stream !=
 				DC_STREAM_TO_CORE(target->public.streams[i]))
 				continue;

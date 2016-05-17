@@ -226,7 +226,7 @@ struct log_major_mask_info {
  * Use a mask or zero. */
 #define LG_ERR_MSK 0xffffffff
 #define LG_WRN_MSK 0xffffffff
-#define LG_TM_MSK (1 << LOG_MINOR_TM_INFO)
+#define LG_TM_MSK (1 << LOG_MINOR_TM_RESOURCES)
 #define LG_FO_MSK (1 << LOG_MINOR_FEATURE_OVERRIDE)
 #define LG_EC_MSK ((1 << LOG_MINOR_EC_PPLIB_NOTIFY) | \
 			(1 << LOG_MINOR_EC_PPLIB_QUERY))
@@ -276,7 +276,7 @@ static const struct log_major_mask_info log_major_mask_info_tbl[] = {
 	{{LOG_MAJOR_SYNC,            "Sync"        }, LG_SYNC_MSK,sync_minor_info_tbl,         NUM_ELEMENTS(sync_minor_info_tbl)},
 	{{LOG_MAJOR_BACKLIGHT,       "Backlight"   }, LG_ALL_MSK, backlight_minor_info_tbl,    NUM_ELEMENTS(backlight_minor_info_tbl)},
 	{{LOG_MAJOR_INTERRUPTS,      "Interrupts"  }, LG_ALL_MSK, component_minor_info_tbl,    NUM_ELEMENTS(component_minor_info_tbl)},
-	{{LOG_MAJOR_TM,              "TM"          }, 0,          tm_minor_info_tbl,           NUM_ELEMENTS(tm_minor_info_tbl)},
+	{{LOG_MAJOR_TM,              "TM"          }, LG_TM_MSK,  tm_minor_info_tbl,           NUM_ELEMENTS(tm_minor_info_tbl)},
 	{{LOG_MAJOR_DISPLAY_SERVICE, "DS"          }, LG_ALL_MSK, ds_minor_info_tbl,           NUM_ELEMENTS(ds_minor_info_tbl)},
 	{{LOG_MAJOR_FEATURE_OVERRIDE, "FeatureOverride" }, LG_ALL_MSK, override_feature_minor_info_tbl, NUM_ELEMENTS(override_feature_minor_info_tbl)},
 	{{LOG_MAJOR_DETECTION,       "Detection"   }, LG_ALL_MSK,  detection_minor_info_tbl,    NUM_ELEMENTS(detection_minor_info_tbl)},
