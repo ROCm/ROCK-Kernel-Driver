@@ -33,14 +33,15 @@ struct mod_freesync {
 };
 
 enum mod_freesync_state {
-    FREESYNC_STATE_FULLSCREEN,
-    FREESYNC_STATE_STATIC_SCREEN
+	FREESYNC_STATE_FULLSCREEN,
+	FREESYNC_STATE_STATIC_SCREEN,
+	FREESYNC_STATE_VIDEO
 };
 
 enum mod_freesync_user_enable_mask {
-    FREESYNC_USER_ENABLE_STATIC = 0x1,
-    FREESYNC_USER_ENABLE_VIDEO = 0x2,
-    FREESYNC_USER_ENABLE_GAMING = 0x4
+	FREESYNC_USER_ENABLE_STATIC = 0x1,
+	FREESYNC_USER_ENABLE_VIDEO = 0x2,
+	FREESYNC_USER_ENABLE_GAMING = 0x4
 };
 
 struct mod_freesync_user_enable {
@@ -51,8 +52,14 @@ struct mod_freesync_user_enable {
 
 struct mod_freesync_caps {
 	bool supported;
-	int minRefreshInMicroHz;
-	int maxRefreshInMicroHz;
+	int min_refresh_in_micro_hz;
+	int max_refresh_in_micro_hz;
+};
+
+struct mod_freesync_params {
+	enum mod_freesync_state state;
+	bool enable;
+	unsigned int duration_in_ns;
 };
 
 struct mod_freesync *mod_freesync_create(struct dc *dc);
@@ -83,7 +90,7 @@ void mod_freesync_update_stream(struct mod_freesync *mod_freesync,
  */
 void mod_freesync_update_state(struct mod_freesync *mod_freesync,
 		const struct dc_stream **streams, int num_streams,
-		enum mod_freesync_state freesyncState, bool enable);
+		struct mod_freesync_params *freesync_params);
 
 /*
  * This interface must be called for on every VUPDATE event for every stream

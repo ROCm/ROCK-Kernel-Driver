@@ -37,6 +37,8 @@ struct sink_caps {
 struct freesync_state {
 	bool fullscreen;
 	bool static_screen;
+	bool video;
+	unsigned int duration_in_ns;
 };
 
 struct core_freesync {
@@ -207,25 +209,34 @@ static void calc_vmin_vmax (const struct dc_stream *stream,
 	unsigned int min_frame_duration_in_ns = 0, max_frame_duration_in_ns = 0;
 
 	min_frame_duration_in_ns = (unsigned int)
-			((1000000000ULL * 1000000) / caps->maxRefreshInMicroHz);
+		((1000000000ULL * 1000000) / caps->max_refresh_in_micro_hz);
 	max_frame_duration_in_ns = (unsigned int)
-			((1000000000ULL * 1000000) / caps->minRefreshInMicroHz);
+		((1000000000ULL * 1000000) / caps->min_refresh_in_micro_hz);
 
 	*vmax = (unsigned long long)(max_frame_duration_in_ns) *
 		stream->timing.pix_clk_khz / stream->timing.h_total / 1000000;
 	*vmin = (unsigned long long)(min_frame_duration_in_ns) *
 		stream->timing.pix_clk_khz / stream->timing.h_total / 1000000;
 
+	/* Field rate might not be the maximum rate
+	 * in which case we should adjust our vmin
+	 */
 	if (*vmin < stream->timing.v_total)
 		*vmin = stream->timing.v_total;
 }
 
+static void calc_v_total_from_duration(const struct dc_stream *stream,
+		unsigned int duration_in_ns, int *v_total_nominal)
+{
+	*v_total_nominal = (unsigned long long)(duration_in_ns) *
+		stream->timing.pix_clk_khz / stream->timing.h_total / 1000000;
 
+}
 /*
  * Sets freesync mode on a stream depending on current freesync state.
  */
 static bool set_freesync_on_streams(struct core_freesync *core_freesync,
-		const struct dc_stream **streams,	int num_streams)
+		const struct dc_stream **streams, int num_streams)
 {
 	int v_total_nominal = 0, v_total_min = 0, v_total_max = 0;
 	int i = 0;
@@ -280,6 +291,29 @@ static bool set_freesync_on_streams(struct core_freesync *core_freesync,
 				return true;
 			}
 		}
+	}  else if ( core_freesync->user_enable->enable_for_video == true &&
+			core_freesync->state->video == true)	{
+		/* Enable 48Hz feature */
+		for (i = 0; i < core_freesync->num_sinks; i++) {
+			if (core_freesync->caps[i].sink == streams[0]->sink &&
+					core_freesync->caps[i].caps.supported) {
+
+				calc_v_total_from_duration(streams[0],
+					core_freesync->state->duration_in_ns,
+					&v_total_nominal);
+
+				/* Program only if v_total_nominal is in range*/
+				if (v_total_nominal >=
+						streams[0]->timing.v_total)
+					core_freesync->dc->stream_funcs.
+					dc_stream_adjust_vmin_vmax(
+						core_freesync->dc, streams,
+						num_streams, v_total_nominal,
+						v_total_nominal);
+
+				return true;
+			}
+		}
 	} else {
 		/* Disable freesync */
 		v_total_nominal = streams[0]->timing.v_total;
@@ -314,32 +348,45 @@ static unsigned int sink_index_from_sink(struct core_freesync *core_freesync,
 
 void mod_freesync_update_state(struct mod_freesync *mod_freesync,
 		const struct dc_stream **streams, int num_streams,
-		enum mod_freesync_state freesyncState, bool enable)
+		struct mod_freesync_params *freesync_params)
 {
 	struct core_freesync *core_freesync =
 			MOD_FREESYNC_TO_CORE(mod_freesync);
-
+	bool freesync_program_required = false;
 	unsigned int stream_index;
 
-	for(stream_index = 0; stream_index < num_streams;
-			stream_index++){
-
+	for(stream_index = 0; stream_index < num_streams; stream_index++) {
 		unsigned int sink_index = sink_index_from_sink(core_freesync,
 				streams[stream_index]->sink);
 
-		switch (freesyncState){
+		switch (freesync_params->state){
 		case FREESYNC_STATE_FULLSCREEN:
-			core_freesync->state[sink_index].fullscreen = enable;
+			core_freesync->state[sink_index].fullscreen =
+					freesync_params->enable;
+			freesync_program_required = true;
 			break;
-
 		case FREESYNC_STATE_STATIC_SCREEN:
-			core_freesync->state[sink_index].static_screen = enable;
+			core_freesync->state[sink_index].static_screen =
+					freesync_params->enable;
+			freesync_program_required = true;
+			break;
+		case FREESYNC_STATE_VIDEO:
+			if(freesync_params->duration_in_ns != core_freesync->
+					state[sink_index].duration_in_ns) {
+				core_freesync->state[sink_index].video =
+						freesync_params->enable;
+				core_freesync->
+					state[sink_index].duration_in_ns =
+					freesync_params->duration_in_ns;
+				freesync_program_required = true;
+			}
 			break;
 		}
 	}
 
-	/* Program freesync according to current state*/
-	set_freesync_on_streams(core_freesync, streams, num_streams);
+	if (freesync_program_required)
+		/* Program freesync according to current state*/
+		set_freesync_on_streams(core_freesync, streams, num_streams);
 }
 
 void mod_freesync_vupdate_callback(struct mod_freesync *mod_freesync,
