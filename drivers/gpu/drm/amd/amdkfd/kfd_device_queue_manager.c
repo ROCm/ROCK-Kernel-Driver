@@ -279,6 +279,9 @@ static int create_compute_queue_nocpsch(struct device_queue_manager *dqm,
 	dqm->dev->kfd2kgd->alloc_memory_of_scratch(
 			dqm->dev->kgd, qpd->sh_hidden_private_base, qpd->vmid);
 
+	if (!q->properties.is_active)
+		return 0;
+
 	retval = mqd->load_mqd(mqd, q->mqd, q->pipe,
 			q->queue, (uint32_t __user *) q->properties.write_ptr,
 			qpd->page_table_base);
@@ -396,10 +399,17 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 
 	retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
 	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
-		q->properties.type == KFD_QUEUE_TYPE_COMPUTE)
-		retval = mqd->load_mqd(mqd, q->mqd, q->pipe,
-			q->queue,
-			(uint32_t __user *)q->properties.write_ptr, 0);
+		q->properties.type == KFD_QUEUE_TYPE_COMPUTE) {
+		/* FIXME: Handle SDMA queues as well */
+		if (q->properties.is_active)
+			retval = mqd->load_mqd(mqd, q->mqd, q->pipe,
+				q->queue,
+				(uint32_t __user *)q->properties.write_ptr, 0);
+		else if (prev_active)
+			retval = mqd->destroy_mqd(mqd, q->mqd,
+				KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN,
+				KFD_UNMAP_LATENCY_MS, q->pipe, q->queue);
+	}
 	/*
 		 * check active state vs. the previous state
 		 * and modify counter accordingly
