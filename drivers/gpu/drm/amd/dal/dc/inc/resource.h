@@ -47,10 +47,6 @@ enum dc_status resource_map_pool_resources(
 		const struct core_dc *dc,
 		struct validate_context *context);
 
-enum dc_status resource_map_vmin_resources(
-		const struct core_dc *dc,
-		struct validate_context *context);
-
 void resource_build_scaling_params(
 		const struct dc_surface *surface,
 		struct pipe_ctx *pipe_ctx);

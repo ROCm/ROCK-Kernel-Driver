@@ -1453,6 +1453,11 @@ static bool check_timing_change(struct core_stream *cur_stream,
 		sizeof(struct dc_crtc_timing)) != 0;
 }
 
+/*
+ * Note: We need to disable output if clock sources change,
+ * since bios does optimization and doesn't apply if changing
+ * PHY when not already disabled.
+ */
 bool pipe_need_reprogram(
 		struct pipe_ctx *pipe_ctx_old,
 		struct pipe_ctx *pipe_ctx)
