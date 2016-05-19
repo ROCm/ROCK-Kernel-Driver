@@ -1148,7 +1148,7 @@ const struct ddc_service *dc_get_ddc_at_index(
 	return core_dc->links[link_index]->ddc;
 }
 
-const enum dc_irq_source dc_get_hpd_irq_source_at_index(
+enum dc_irq_source dc_get_hpd_irq_source_at_index(
 	struct dc *dc, uint32_t link_index)
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);

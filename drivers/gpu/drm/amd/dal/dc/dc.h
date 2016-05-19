@@ -516,7 +516,7 @@ enum dc_irq_source dc_interrupt_to_irq_source(
 		uint32_t ext_id);
 void dc_interrupt_set(const struct dc *dc, enum dc_irq_source src, bool enable);
 void dc_interrupt_ack(struct dc *dc, enum dc_irq_source src);
-const enum dc_irq_source dc_get_hpd_irq_source_at_index(
+enum dc_irq_source dc_get_hpd_irq_source_at_index(
 		struct dc *dc, uint32_t link_index);
 const struct dc_target *dc_get_target_on_irq_source(
 		const struct dc *dc,
