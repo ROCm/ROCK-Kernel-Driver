@@ -472,11 +472,8 @@ static int dm_suspend(void *handle)
 	drm_modeset_lock_all(adev->ddev);
 	drm_for_each_crtc(crtc, adev->ddev) {
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
-		if (acrtc->target) {
+		if (acrtc->target)
 				drm_crtc_vblank_off(crtc);
-				dc_target_release(acrtc->target);
-				acrtc->target = NULL;
-			}
 	}
 	drm_modeset_unlock_all(adev->ddev);
 
@@ -652,6 +649,7 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 	struct amdgpu_connector *aconnector;
 	struct drm_connector *connector;
 	int ret = 0;
+	struct drm_crtc *crtc;
 
 	/* program HPD filter */
 	dc_resume(dm->dc);
@@ -664,6 +662,14 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 	 * pulse interrupts are used for MST
 	 */
 	amdgpu_dm_irq_resume_early(adev);
+
+	drm_modeset_lock_all(ddev);
+	drm_for_each_crtc(crtc, ddev) {
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+		if (acrtc->target)
+				drm_crtc_vblank_on(crtc);
+	}
+	drm_modeset_unlock_all(ddev);
 
 	/* Do detection*/
 	list_for_each_entry(connector,
