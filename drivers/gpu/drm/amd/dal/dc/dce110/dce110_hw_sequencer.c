@@ -714,7 +714,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		struct core_dc *dc)
 {
 	struct core_stream *stream = pipe_ctx->stream;
-	struct pipe_ctx *pipe_ctx_old = &dc->current_context.res_ctx.
+	struct pipe_ctx *pipe_ctx_old = &dc->current_context->res_ctx.
 			pipe_ctx[pipe_ctx->pipe_idx];
 
 	if (!pipe_ctx_old->stream) {
@@ -1206,7 +1206,7 @@ static enum dc_status apply_ctx_to_hw(
 	/* look up the targets that have been removed since last commit */
 	for (i = 0; i < MAX_PIPES; i++) {
 		struct pipe_ctx *pipe_ctx_old =
-			&dc->current_context.res_ctx.pipe_ctx[i];
+			&dc->current_context->res_ctx.pipe_ctx[i];
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 
 		/* Note: We need to disable output if clock sources change,
@@ -1220,7 +1220,7 @@ static enum dc_status apply_ctx_to_hw(
 		if (!pipe_ctx->stream ||
 			pipe_need_reprogram(pipe_ctx_old, pipe_ctx))
 			reset_single_pipe_hw_ctx(
-				dc, pipe_ctx_old, &dc->current_context);
+				dc, pipe_ctx_old, dc->current_context);
 	}
 
 	/* Skip applying if no targets */
@@ -1233,7 +1233,7 @@ static enum dc_status apply_ctx_to_hw(
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		struct pipe_ctx *pipe_ctx_old =
-					&dc->current_context.res_ctx.pipe_ctx[i];
+					&dc->current_context->res_ctx.pipe_ctx[i];
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 		struct dc_bios *dcb;
 
@@ -1260,12 +1260,12 @@ static enum dc_status apply_ctx_to_hw(
 	/*dc_set_clocks_and_clock_state(context);*/
 
 	if (context->bw_results.dispclk_khz
-		> dc->current_context.bw_results.dispclk_khz)
+		> dc->current_context->bw_results.dispclk_khz)
 		set_display_clock(context);
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		struct pipe_ctx *pipe_ctx_old =
-					&dc->current_context.res_ctx.pipe_ctx[i];
+					&dc->current_context->res_ctx.pipe_ctx[i];
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 
 		if (pipe_ctx->stream == NULL)

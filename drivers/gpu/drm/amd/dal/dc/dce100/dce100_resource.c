@@ -595,7 +595,7 @@ static enum dc_status validate_mapped_resource(
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 			struct core_link *link = stream->sink->link;
 
-			if (resource_is_stream_unchanged(&dc->current_context, stream))
+			if (resource_is_stream_unchanged(dc->current_context, stream))
 				continue;
 
 			for (k = 0; k < MAX_PIPES; k++) {
@@ -660,7 +660,7 @@ enum dc_status dce100_validate_with_context(
 	context->res_ctx.pool = dc->res_pool;
 
 	if (!resource_validate_attach_surfaces(
-			set, set_count, &dc->current_context, context)) {
+			set, set_count, dc->current_context, context)) {
 		DC_ERROR("Failed to attach surface to target!\n");
 		return DC_FAIL_ATTACH_SURFACES;
 	}

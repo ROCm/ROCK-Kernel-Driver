@@ -211,8 +211,8 @@ static bool dc_stream_adjust_vmin_vmax(struct dc *dc, const struct dc_stream **s
 	struct pipe_ctx *pipes;
 
 	for (i = 0; i < MAX_PIPES; i++) {
-		if (core_dc->current_context.res_ctx.pipe_ctx[i].stream == core_stream) {
-			pipes = &core_dc->current_context.res_ctx.pipe_ctx[i];
+		if (core_dc->current_context->res_ctx.pipe_ctx[i].stream == core_stream) {
+			pipes = &core_dc->current_context->res_ctx.pipe_ctx[i];
 			core_dc->hwss.set_drr(&pipes, 1, vmin, vmax);
 
 			ret = true;
@@ -239,6 +239,13 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 	if (!dc_ctx) {
 		dm_error("%s: failed to create ctx\n", __func__);
 		goto ctx_fail;
+	}
+
+	dc->current_context = dm_alloc(sizeof(*dc->current_context));
+
+	if (!dc->current_context) {
+		dm_error("%s: failed to create validate ctx\n", __func__);
+		goto val_ctx_fail;
 	}
 
 	dc_ctx->cgs_device = init_params->cgs_device;
@@ -313,6 +320,8 @@ create_links_fail:
 as_fail:
 	dal_logger_destroy(&dc_ctx->logger);
 logger_fail:
+	dm_free(dc->current_context);
+val_ctx_fail:
 	dm_free(dc_ctx);
 ctx_fail:
 	return false;
@@ -320,11 +329,14 @@ ctx_fail:
 
 static void destruct(struct core_dc *dc)
 {
-	resource_validate_ctx_destruct(&dc->current_context);
+	resource_validate_ctx_destruct(dc->current_context);
+	dm_free(dc->current_context);
+	dc->current_context = NULL;
 	destroy_links(dc);
 	dc->res_pool.funcs->destruct(&dc->res_pool);
 	dal_logger_destroy(&dc->ctx->logger);
 	dm_free(dc->ctx);
+	dc->ctx = NULL;
 }
 
 /*
@@ -559,11 +571,11 @@ static bool targets_changed(
 {
 	uint8_t i;
 
-	if (target_count != dc->current_context.target_count)
+	if (target_count != dc->current_context->target_count)
 		return true;
 
-	for (i = 0; i < dc->current_context.target_count; i++) {
-		if (&dc->current_context.targets[i]->public != targets[i])
+	for (i = 0; i < dc->current_context->target_count; i++) {
+		if (&dc->current_context->targets[i]->public != targets[i])
 			return true;
 	}
 
@@ -799,11 +811,11 @@ bool dc_commit_targets(
 		core_dc->hwss.enable_accelerated_mode(core_dc);
 	}
 
-	for (i = 0; i < core_dc->current_context.target_count; i++) {
+	for (i = 0; i < core_dc->current_context->target_count; i++) {
 		/*TODO: optimize this to happen only when necessary*/
 		target_disable_memory_requests(
-				&core_dc->current_context.targets[i]->public,
-				&core_dc->current_context.res_ctx);
+				&core_dc->current_context->targets[i]->public,
+				&core_dc->current_context->res_ctx);
 	}
 
 	if (result == DC_OK) {
@@ -816,7 +828,7 @@ bool dc_commit_targets(
 
 		if (context->target_status[i].surface_count > 0)
 			target_enable_memory_requests(dc_target,
-					&core_dc->current_context.res_ctx);
+					&core_dc->current_context->res_ctx);
 
 		CONN_MSG_MODE(sink->link, "{%dx%d, %dx%d@%dKhz}",
 				dc_target->streams[0]->timing.h_addressable,
@@ -831,9 +843,12 @@ bool dc_commit_targets(
 	pplib_apply_display_requirements(core_dc,
 			context, &context->pp_display_cfg);
 
-	resource_validate_ctx_destruct(&core_dc->current_context);
+	resource_validate_ctx_destruct(core_dc->current_context);
 
-	core_dc->current_context = *context;
+	dm_free(core_dc->current_context);
+	core_dc->current_context = context;
+
+	return (result == DC_OK);
 
 fail:
 	dm_free(context);
@@ -853,7 +868,7 @@ bool dc_commit_surfaces_to_target(
 	struct dc_bios *dcb = core_dc->ctx->dc_bios;
 
 	int i, j;
-	uint32_t prev_disp_clk = core_dc->current_context.bw_results.dispclk_khz;
+	uint32_t prev_disp_clk = core_dc->current_context->bw_results.dispclk_khz;
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
 	struct dc_target_status *target_status = NULL;
 	struct validate_context *context;
@@ -861,13 +876,18 @@ bool dc_commit_surfaces_to_target(
 	int new_enabled_surface_count = 0;
 	bool is_mpo_turning_on = false;
 
-	if (core_dc->current_context.target_count == 0)
+	if (core_dc->current_context->target_count == 0)
 		return false;
 
 
 	context = dm_alloc(sizeof(struct validate_context));
 
-	resource_validate_ctx_copy_construct(&core_dc->current_context, context);
+	if (!context) {
+		dm_error("%s: failed to create validate ctx\n", __func__);
+		goto val_ctx_fail;
+	}
+
+	resource_validate_ctx_copy_construct(core_dc->current_context, context);
 
 	/* Cannot commit surface to a target that is not commited */
 	for (i = 0; i < context->target_count; i++)
@@ -941,7 +961,7 @@ bool dc_commit_surfaces_to_target(
 
 	if (current_enabled_surface_count > 0 && new_enabled_surface_count == 0)
 		target_disable_memory_requests(dc_target,
-				&core_dc->current_context.res_ctx);
+				&core_dc->current_context->res_ctx);
 
 	for (i = 0; i < new_surface_count; i++)
 		for (j = 0; j < context->res_ctx.pool.pipe_count; j++) {
@@ -1035,17 +1055,17 @@ bool dc_commit_surfaces_to_target(
 						&context->pp_display_cfg);
 	}
 
+	resource_validate_ctx_destruct(core_dc->current_context);
+	dm_free(core_dc->current_context);
+	core_dc->current_context = context;
 
-	resource_validate_ctx_destruct(&(core_dc->current_context));
-	core_dc->current_context = *context;
-	dm_free(context);
 	return true;
 
 unexpected_fail:
-
 	resource_validate_ctx_destruct(context);
-
 	dm_free(context);
+val_ctx_fail:
+
 	return false;
 }
 
@@ -1064,10 +1084,10 @@ bool dc_update_surfaces_for_target(
 	struct dc_target_status *target_status = NULL;
 	struct validate_context *context;
 
-	if (core_dc->current_context.target_count == 0)
+	if (core_dc->current_context->target_count == 0)
 		return false;
 
-	context = &core_dc->current_context;
+	context = core_dc->current_context;
 
 	/* Cannot commit surface to a target that is not committed */
 	for (i = 0; i < context->target_count; i++)
@@ -1117,14 +1137,14 @@ bool dc_update_surfaces_for_target(
 uint8_t dc_get_current_target_count(const struct dc *dc)
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
-	return core_dc->current_context.target_count;
+	return core_dc->current_context->target_count;
 }
 
 struct dc_target *dc_get_target_at_index(const struct dc *dc, uint8_t i)
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
-	if (i < core_dc->current_context.target_count)
-		return &(core_dc->current_context.targets[i]->public);
+	if (i < core_dc->current_context->target_count)
+		return &(core_dc->current_context->targets[i]->public);
 	return NULL;
 }
 
@@ -1169,12 +1189,12 @@ void dc_flip_surface_addrs(
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
 	int i, j;
-	int pipe_count = core_dc->current_context.res_ctx.pool.pipe_count;
+	int pipe_count = core_dc->current_context->res_ctx.pool.pipe_count;
 
 	for (i = 0; i < count; i++)
 		for (j = 0; j < pipe_count; j++) {
 			struct pipe_ctx *pipe_ctx =
-				&core_dc->current_context.res_ctx.pipe_ctx[j];
+				&core_dc->current_context->res_ctx.pipe_ctx[j];
 			struct core_surface *ctx_surface = pipe_ctx->surface;
 
 			if (DC_SURFACE_TO_CORE(surfaces[i]) != ctx_surface)
@@ -1197,7 +1217,7 @@ void dc_flip_surface_addrs(
 	for (j = pipe_count - 1; j >= 0; j--)
 		for (i = count - 1; i >= 0; i--) {
 			struct pipe_ctx *pipe_ctx =
-				&core_dc->current_context.res_ctx.pipe_ctx[j];
+				&core_dc->current_context->res_ctx.pipe_ctx[j];
 			struct core_surface *ctx_surface = pipe_ctx->surface;
 
 			if (DC_SURFACE_TO_CORE(surfaces[i]) != ctx_surface)
@@ -1265,15 +1285,15 @@ const struct dc_target *dc_get_target_on_irq_source(
 		return NULL;
 	}
 
-	for (i = 0; i < core_dc->current_context.target_count; i++) {
-		struct core_target *target = core_dc->current_context.targets[i];
+	for (i = 0; i < core_dc->current_context->target_count; i++) {
+		struct core_target *target = core_dc->current_context->targets[i];
 		struct dc_target *dc_target = &target->public;
 
 		for (j = 0; j < target->public.stream_count; j++) {
 			const struct core_stream *stream =
 				DC_STREAM_TO_CORE(dc_target->streams[j]);
 
-			if (core_dc->current_context.res_ctx.
+			if (core_dc->current_context->res_ctx.
 					pipe_ctx[crtc_idx].stream == stream)
 				return dc_target;
 		}
@@ -1307,8 +1327,8 @@ void dc_set_power_state(
 		 * clean state, and dc hw programming optimizations will not
 		 * cause any trouble.
 		 */
-		memset(&core_dc->current_context, 0,
-				sizeof(core_dc->current_context));
+		memset(core_dc->current_context, 0,
+				sizeof(*core_dc->current_context));
 		break;
 	}
 

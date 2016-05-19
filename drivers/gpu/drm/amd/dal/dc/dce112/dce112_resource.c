@@ -645,7 +645,7 @@ static enum dc_status validate_mapped_resource(
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 			struct core_link *link = stream->sink->link;
 
-			if (resource_is_stream_unchanged(&dc->current_context, stream))
+			if (resource_is_stream_unchanged(dc->current_context, stream))
 				continue;
 
 			for (k = 0; k < MAX_PIPES; k++) {
@@ -808,7 +808,7 @@ enum dc_status dce112_validate_bandwidth(
 			"%s: Bandwidth validation failed!",
 			__func__);
 
-	if (memcmp(&dc->current_context.bw_results,
+	if (memcmp(&dc->current_context->bw_results,
 			&context->bw_results, sizeof(context->bw_results))) {
 		struct log_entry log_entry;
 		dal_logger_open(
@@ -876,7 +876,7 @@ static enum dc_status map_clock_resources(
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 
-			if (resource_is_stream_unchanged(&dc->current_context, stream))
+			if (resource_is_stream_unchanged(dc->current_context, stream))
 				continue;
 
 			for (k = 0; k < MAX_PIPES; k++) {
@@ -923,7 +923,7 @@ enum dc_status dce112_validate_with_context(
 	context->res_ctx.pool = dc->res_pool;
 
 	if (!resource_validate_attach_surfaces(
-			set, set_count, &dc->current_context, context)) {
+			set, set_count, dc->current_context, context)) {
 		DC_ERROR("Failed to attach surface to target!\n");
 		return DC_FAIL_ATTACH_SURFACES;
 	}

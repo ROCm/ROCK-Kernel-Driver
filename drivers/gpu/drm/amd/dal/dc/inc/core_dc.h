@@ -22,7 +22,7 @@ struct core_dc {
 	struct core_link *links[MAX_PIPES * 2];
 
 	/* TODO: determine max number of targets*/
-	struct validate_context current_context;
+	struct validate_context *current_context;
 	struct resource_pool res_pool;
 
 	/*Power State*/

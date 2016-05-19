@@ -94,9 +94,9 @@ const struct dc_target_status *dc_target_get_status(
 	struct core_target* target = DC_TARGET_TO_CORE(dc_target);
     struct core_dc *dc = DC_TO_CORE(target->ctx->dc);
 
-	for (i = 0; i < dc->current_context.target_count; i++)
-		if (target == dc->current_context.targets[i])
-			return &dc->current_context.target_status[i];
+	for (i = 0; i < dc->current_context->target_count; i++)
+		if (target == dc->current_context->targets[i])
+			return &dc->current_context->target_status[i];
 
 	return NULL;
 }
@@ -166,7 +166,7 @@ bool dc_target_set_cursor_attributes(
 
 	target = DC_TARGET_TO_CORE(dc_target);
 	core_dc = DC_TO_CORE(target->ctx->dc);
-	res_ctx = &core_dc->current_context.res_ctx;
+	res_ctx = &core_dc->current_context->res_ctx;
 
 	for (i = 0; i < target->public.stream_count; i++) {
 		for (j = 0; j < MAX_PIPES; j++) {
@@ -211,7 +211,7 @@ bool dc_target_set_cursor_position(
 
 	target = DC_TARGET_TO_CORE(dc_target);
 	core_dc = DC_TO_CORE(target->ctx->dc);
-	res_ctx = &core_dc->current_context.res_ctx;
+	res_ctx = &core_dc->current_context->res_ctx;
 
 	for (i = 0; i < target->public.stream_count; i++) {
 		for (j = 0; j < MAX_PIPES; j++) {
@@ -240,7 +240,7 @@ uint32_t dc_target_get_vblank_counter(const struct dc_target *dc_target)
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
 	struct core_dc *core_dc = DC_TO_CORE(target->ctx->dc);
 	struct resource_context *res_ctx =
-		&core_dc->current_context.res_ctx;
+		&core_dc->current_context->res_ctx;
 
 	for (i = 0; i < target->public.stream_count; i++) {
 		for (j = 0; j < MAX_PIPES; j++) {
@@ -266,7 +266,7 @@ uint32_t dc_target_get_scanoutpos(
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
 	struct core_dc *core_dc = DC_TO_CORE(target->ctx->dc);
 	struct resource_context *res_ctx =
-		&core_dc->current_context.res_ctx;
+		&core_dc->current_context->res_ctx;
 
 	for (i = 0; i < target->public.stream_count; i++) {
 		for (j = 0; j < MAX_PIPES; j++) {
@@ -296,7 +296,7 @@ enum dc_irq_source dc_target_get_irq_src(
 			DC_STREAM_TO_CORE(core_target->public.streams[0]);
 
 	for (i = 0; i < MAX_PIPES; i++)
-		if (core_dc->current_context.res_ctx.pipe_ctx[i].stream == stream)
+		if (core_dc->current_context->res_ctx.pipe_ctx[i].stream == stream)
 			return irq_type + i;
 
 	return irq_type;

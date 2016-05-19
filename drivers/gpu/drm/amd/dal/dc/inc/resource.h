@@ -99,6 +99,10 @@ void validate_guaranteed_copy_target(
 		struct validate_context *context,
 		int max_targets);
 
+void resource_validate_ctx_update_pointer_after_copy(
+		const struct validate_context *src_ctx,
+		struct validate_context *dst_ctx);
+
 void resource_validate_ctx_copy_construct(
 		const struct validate_context *src_ctx,
 		struct validate_context *dst_ctx);

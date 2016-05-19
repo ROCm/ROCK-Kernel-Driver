@@ -836,7 +836,7 @@ enum dc_status resource_map_pool_resources(
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 
-			if (!resource_is_stream_unchanged(&dc->current_context, stream))
+			if (!resource_is_stream_unchanged(dc->current_context, stream))
 				continue;
 
 			/* mark resources used for stream that is already active */
@@ -844,7 +844,7 @@ enum dc_status resource_map_pool_resources(
 				struct pipe_ctx *pipe_ctx =
 					&context->res_ctx.pipe_ctx[k];
 				const struct pipe_ctx *old_pipe_ctx =
-					&dc->current_context.res_ctx.pipe_ctx[k];
+					&dc->current_context->res_ctx.pipe_ctx[k];
 
 				if (!are_streams_same(old_pipe_ctx->stream, stream))
 					continue;
@@ -884,7 +884,7 @@ enum dc_status resource_map_pool_resources(
 			struct pipe_ctx *pipe_ctx = NULL;
 			int pipe_idx = -1;
 
-			if (resource_is_stream_unchanged(&dc->current_context, stream))
+			if (resource_is_stream_unchanged(dc->current_context, stream))
 				continue;
 			/* acquire new resources */
 			pipe_idx = acquire_first_free_pipe(
@@ -1497,7 +1497,7 @@ enum dc_status resource_map_clock_resources(
 			struct core_stream *stream =
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 
-			if (resource_is_stream_unchanged(&dc->current_context, stream))
+			if (resource_is_stream_unchanged(dc->current_context, stream))
 				continue;
 
 			for (k = 0; k < MAX_PIPES; k++) {
