@@ -318,14 +318,6 @@ bool dc_commit_targets(
 		struct dc_target *targets[],
 		uint8_t target_count);
 
-struct dc_sink_init_data;
-
-struct dc_sink *dc_add_remote_sink(
-		struct dc *dc,
-		const uint8_t *edid,
-		int len,
-		struct dc_sink_init_data *init_data);
-
 /*******************************************************************************
  * Stream Interfaces
  ******************************************************************************/
@@ -431,7 +423,13 @@ bool dc_link_detect(const struct dc_link *dc_link, bool boot);
  * from DM. */
 bool dc_link_handle_hpd_rx_irq(const struct dc_link *dc_link);
 
-bool dc_link_add_remote_sink(const struct dc_link *link, struct dc_sink *sink);
+struct dc_sink_init_data;
+
+struct dc_sink *dc_link_add_remote_sink(
+		const struct dc_link *dc_link,
+		const uint8_t *edid,
+		int len,
+		struct dc_sink_init_data *init_data);
 
 void dc_link_remove_remote_sink(
 	const struct dc_link *link,

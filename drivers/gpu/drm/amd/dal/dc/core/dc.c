@@ -1377,9 +1377,8 @@ bool dc_submit_i2c(
 		cmd);
 }
 
-bool dc_link_add_remote_sink(const struct dc_link *link, struct dc_sink *sink)
+static bool link_add_remote_sink_helper(struct core_link *core_link, struct dc_sink *sink)
 {
-	struct core_link *core_link = DC_LINK_TO_LINK(link);
 	struct dc_link *dc_link = &core_link->public;
 
 	if (dc_link->sink_count >= MAX_SINKS_PER_LINK) {
@@ -1389,10 +1388,64 @@ bool dc_link_add_remote_sink(const struct dc_link *link, struct dc_sink *sink)
 
 	dc_sink_retain(sink);
 
-	dc_link->remote_sinks[link->sink_count] = sink;
+	dc_link->remote_sinks[dc_link->sink_count] = sink;
 	dc_link->sink_count++;
 
 	return true;
+}
+
+struct dc_sink *dc_link_add_remote_sink(
+		const struct dc_link *link,
+		const uint8_t *edid,
+		int len,
+		struct dc_sink_init_data *init_data)
+{
+	struct dc_sink *dc_sink;
+	enum dc_edid_status edid_status;
+	struct core_link *core_link = DC_LINK_TO_LINK(link);
+
+	if (len > MAX_EDID_BUFFER_SIZE) {
+		dm_error("Max EDID buffer size breached!\n");
+		return NULL;
+	}
+
+	if (!init_data) {
+		BREAK_TO_DEBUGGER();
+		return NULL;
+	}
+
+	if (!init_data->link) {
+		BREAK_TO_DEBUGGER();
+		return NULL;
+	}
+
+	dc_sink = dc_sink_create(init_data);
+
+	if (!dc_sink)
+		return NULL;
+
+	memmove(dc_sink->dc_edid.raw_edid, edid, len);
+	dc_sink->dc_edid.length = len;
+
+	if (!link_add_remote_sink_helper(
+			core_link,
+			dc_sink))
+		goto fail_add_sink;
+
+	edid_status = dm_helpers_parse_edid_caps(
+			core_link->ctx,
+			&dc_sink->dc_edid,
+			&dc_sink->edid_caps);
+
+	if (edid_status != EDID_OK)
+		goto fail;
+
+	return dc_sink;
+fail:
+	dc_link_remove_remote_sink(link, dc_sink);
+fail_add_sink:
+	dc_sink_release(dc_sink);
+	return NULL;
 }
 
 void dc_link_set_sink(const struct dc_link *link, struct dc_sink *sink)
@@ -1443,58 +1496,4 @@ const struct dc_stream_status *dc_stream_get_status(
 	struct core_stream *stream = DC_STREAM_TO_CORE(dc_stream);
 
 	return &stream->status;
-}
-
-struct dc_sink *dc_add_remote_sink(
-		struct dc *dc,
-		const uint8_t *edid,
-		int len,
-		struct dc_sink_init_data *init_data)
-{
-	struct dc_sink *dc_sink;
-	enum dc_edid_status edid_status;
-	struct core_dc *core_dc = DC_TO_CORE(dc);
-
-	if (len > MAX_EDID_BUFFER_SIZE) {
-		dm_error("Max EDID buffer size breached!\n");
-		return NULL;
-	}
-
-	if (!init_data) {
-		BREAK_TO_DEBUGGER();
-		return NULL;
-	}
-
-	if (!init_data->link) {
-		BREAK_TO_DEBUGGER();
-		return NULL;
-	}
-
-	dc_sink = dc_sink_create(init_data);
-
-	if (!dc_sink)
-		return NULL;
-
-	memmove(dc_sink->dc_edid.raw_edid, edid, len);
-	dc_sink->dc_edid.length = len;
-
-	if (!dc_link_add_remote_sink(
-			init_data->link,
-			dc_sink))
-		goto fail_add_sink;
-
-	edid_status = dm_helpers_parse_edid_caps(
-			core_dc->ctx,
-			&dc_sink->dc_edid,
-			&dc_sink->edid_caps);
-
-	if (edid_status != EDID_OK)
-		goto fail;
-
-	return dc_sink;
-fail:
-	dc_link_remove_remote_sink(init_data->link, dc_sink);
-fail_add_sink:
-	dc_sink_release(dc_sink);
-	return NULL;
 }

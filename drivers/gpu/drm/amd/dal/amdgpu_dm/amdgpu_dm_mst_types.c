@@ -358,8 +358,8 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 
 				aconnector->edid = edid;
 
-				aconnector->dc_sink = dc_add_remote_sink(
-					adev->dm.dc,
+				aconnector->dc_sink = dc_link_add_remote_sink(
+					aconnector->dc_link,
 					(uint8_t *)edid,
 					(edid->extensions + 1) * EDID_LENGTH,
 					&init_params);
