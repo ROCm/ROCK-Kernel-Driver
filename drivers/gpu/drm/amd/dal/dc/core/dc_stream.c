@@ -81,6 +81,8 @@ static bool construct(struct core_stream *stream,
 	/* EDID CAP translation for HDMI 2.0 */
 	stream->public.timing.flags.LTE_340MCSC_SCRAMBLE = dc_sink_data->edid_caps.lte_340mcsc_scramble;
 
+	stream->status.link = &stream->sink->link->public;
+
 	return true;
 }
 
