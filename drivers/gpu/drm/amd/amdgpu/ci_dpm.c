@@ -3639,6 +3639,10 @@ static int ci_setup_default_dpm_tables(struct amdgpu_device *adev)
 
 	ci_setup_default_pcie_tables(adev);
 
+	/* save a copy of the default DPM table */
+	memcpy(&(pi->golden_dpm_table), &(pi->dpm_table),
+			sizeof(struct ci_dpm_table));
+
 	return 0;
 }
 
@@ -6733,6 +6737,44 @@ static int ci_dpm_force_clock_level(struct amdgpu_device *adev,
 	return 0;
 }
 
+static int ci_dpm_get_sclk_od(struct amdgpu_device *adev)
+{
+	struct ci_power_info *pi = ci_get_pi(adev);
+	struct ci_single_dpm_table *sclk_table =
+			&(pi->dpm_table.sclk_table);
+	struct ci_single_dpm_table *golden_sclk_table =
+			&(pi->golden_dpm_table.sclk_table);
+	int value;
+
+	value = (sclk_table->dpm_levels[sclk_table->count - 1].value -
+			golden_sclk_table->dpm_levels
+			[golden_sclk_table->count - 1].value) * 100 /
+			golden_sclk_table->dpm_levels
+			[golden_sclk_table->count - 1].value;
+
+	return value;
+}
+
+static int ci_dpm_set_sclk_od(struct amdgpu_device *adev, uint32_t value)
+{
+	struct ci_power_info *pi = ci_get_pi(adev);
+	struct ci_ps *ps = ci_get_ps(adev->pm.dpm.requested_ps);
+	struct ci_single_dpm_table *golden_sclk_table =
+			&(pi->golden_dpm_table.sclk_table);
+
+	if (value > 20)
+		value = 20;
+
+	ps->performance_levels[ps->performance_level_count - 1].sclk =
+			golden_sclk_table->dpm_levels
+			[golden_sclk_table->count - 1].value *
+			value / 100 +
+			golden_sclk_table->dpm_levels
+			[golden_sclk_table->count - 1].value;
+
+	return 0;
+}
+
 const struct amd_ip_funcs ci_dpm_ip_funcs = {
 	.early_init = ci_dpm_early_init,
 	.late_init = ci_dpm_late_init,
@@ -6769,6 +6811,8 @@ static const struct amdgpu_dpm_funcs ci_dpm_funcs = {
 	.get_fan_speed_percent = &ci_dpm_get_fan_speed_percent,
 	.print_clock_levels = ci_dpm_print_clock_levels,
 	.force_clock_level = ci_dpm_force_clock_level,
+	.get_sclk_od = ci_dpm_get_sclk_od,
+	.set_sclk_od = ci_dpm_set_sclk_od,
 };
 
 static void ci_dpm_set_dpm_funcs(struct amdgpu_device *adev)
