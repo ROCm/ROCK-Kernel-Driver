@@ -233,6 +233,10 @@ struct resource_funcs {
 	enum dc_status (*validate_bandwidth)(
 					const struct core_dc *dc,
 					struct validate_context *context);
+
+	enum dc_status (*map_vmin_resources)(
+					const struct core_dc *dc,
+					struct validate_context *context);
 };
 
 struct resource_pool {
