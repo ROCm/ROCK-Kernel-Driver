@@ -1501,14 +1501,22 @@ static enum dc_status allocate_mst_payload(struct pipe_ctx *pipe_ctx)
 	 */
 
 	/* get calculate VC payload for stream: stream_alloc */
-	dm_helpers_dp_mst_write_payload_allocation_table(
+	if (dm_helpers_dp_mst_write_payload_allocation_table(
 		stream->ctx,
 		&stream->public,
 		&proposed_table,
-		true);
-
-	update_mst_stream_alloc_table(
-				link, pipe_ctx->stream_enc, &proposed_table);
+		true)) {
+		update_mst_stream_alloc_table(
+					link, pipe_ctx->stream_enc, &proposed_table);
+	}
+	else
+		dal_logger_write(link->ctx->logger,
+				LOG_MAJOR_WARNING,
+				LOG_MINOR_COMPONENT_DC,
+				"Failed to update"
+				"MST allocation table for"
+				"pipe idx:%d\n",
+				pipe_ctx->pipe_idx);
 
 	dal_logger_write(link->ctx->logger,
 			LOG_MAJOR_MST,
@@ -1534,16 +1542,6 @@ static enum dc_status allocate_mst_payload(struct pipe_ctx *pipe_ctx)
 	}
 
 	ASSERT(proposed_table.stream_count > 0);
-
-	/*
-	 * temporary fix. Unplug of MST chain happened (two displays),
-	 * table is empty on first reset mode, and cause 0 division in
-	 * avg_time_slots_per_mtp calculation
-	 */
-
-	/* to be removed or debugged */
-	if (proposed_table.stream_count == 0)
-		return DC_OK;
 
 	/* program DP source TX for payload */
 	link_encoder->funcs->update_mst_stream_allocation_table(
@@ -1597,15 +1595,26 @@ static enum dc_status deallocate_mst_payload(struct pipe_ctx *pipe_ctx)
 		avg_time_slots_per_mtp);
 
 	/* TODO: which component is responsible for remove payload table? */
-	if (mst_mode)
-		dm_helpers_dp_mst_write_payload_allocation_table(
+	if (mst_mode) {
+		if (dm_helpers_dp_mst_write_payload_allocation_table(
 				stream->ctx,
 				&stream->public,
 				&proposed_table,
-				false);
+				false)) {
 
-	update_mst_stream_alloc_table(
-		link, pipe_ctx->stream_enc, &proposed_table);
+			update_mst_stream_alloc_table(
+				link, pipe_ctx->stream_enc, &proposed_table);
+		}
+		else {
+				dal_logger_write(link->ctx->logger,
+						LOG_MAJOR_WARNING,
+						LOG_MINOR_COMPONENT_DC,
+						"Failed to update"
+						"MST allocation table for"
+						"pipe idx:%d\n",
+						pipe_ctx->pipe_idx);
+		}
+	}
 
 	dal_logger_write(link->ctx->logger,
 			LOG_MAJOR_MST,
