@@ -1673,14 +1673,15 @@ static int storvsc_probe(struct hv_device *device,
 	/* max cmd length */
 	host->max_cmd_len = STORVSC_MAX_CMD_LEN;
 
+#if IS_ENABLED(64BIT)
 	/*
 	 * set the table size based on the info we got
 	 * from the host.
 	 */
 	host->sg_tablesize = (stor_device->max_transfer_bytes >> PAGE_SHIFT);
-#if defined(CONFIG_X86_32)
+#else
 	dev_warn(&device->device, "adjusting sg_tablesize 0x%x -> 0x%x",
-			host->sg_tablesize, MAX_MULTIPAGE_BUFFER_COUNT);
+		 host->sg_tablesize, MAX_MULTIPAGE_BUFFER_COUNT);
 	host->sg_tablesize = MAX_MULTIPAGE_BUFFER_COUNT;
 #endif
 
