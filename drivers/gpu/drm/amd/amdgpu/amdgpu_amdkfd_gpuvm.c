@@ -155,13 +155,6 @@ static int try_pin_bo(struct amdgpu_bo *bo, uint32_t domain)
 		ret = amdgpu_bo_pin(bo, domain, NULL);
 		if (ret != 0)
 			goto error;
-		if (domain == AMDGPU_GEM_DOMAIN_GTT) {
-			ret = amdgpu_bo_kmap(bo, NULL);
-			if (ret != 0) {
-				pr_err("amdgpu: failed kmap GTT BO\n");
-				goto error;
-			}
-		}
 	} else {
 		/* amdgpu_bo_pin doesn't support userptr. Therefore we
 		 * can use the bo->pin_count for our version of
@@ -185,8 +178,6 @@ error:
 static int unpin_bo(struct amdgpu_bo *bo)
 {
 	int ret = 0;
-
-	amdgpu_bo_kunmap(bo);
 
 	if (!amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
 		ret = amdgpu_bo_unpin(bo);
