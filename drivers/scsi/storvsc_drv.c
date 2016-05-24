@@ -1673,7 +1673,7 @@ static int storvsc_probe(struct hv_device *device,
 	/* max cmd length */
 	host->max_cmd_len = STORVSC_MAX_CMD_LEN;
 
-#if IS_ENABLED(64BIT)
+#ifdef CONFIG_64BIT
 	/*
 	 * set the table size based on the info we got
 	 * from the host.
