@@ -877,6 +877,9 @@ bool dc_commit_surfaces_to_target(
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
 	struct dc_target_status *target_status = NULL;
 	struct validate_context *context;
+#ifdef DIAGS_BUILD
+	struct validate_context *temp_context;
+#endif
 	int current_enabled_surface_count = 0;
 	int new_enabled_surface_count = 0;
 	bool is_mpo_turning_on = false;
@@ -954,9 +957,21 @@ bool dc_commit_surfaces_to_target(
 		goto unexpected_fail;
 	}
 
-	if (core_dc->res_pool->funcs->map_vmin_resources) {
-		core_dc->res_pool->funcs->map_vmin_resources(core_dc, context);
+#ifdef DIAGS_BUILD
+	if (core_dc->res_pool->funcs->apply_clk_constraints) {
+		temp_context = core_dc->res_pool->funcs->apply_clk_constraints(
+				core_dc,
+				context);
+		if (!temp_context) {
+			dm_error("%s:failed apply clk constraints\n", __func__);
+			BREAK_TO_DEBUGGER();
+			goto unexpected_fail;
+		}
+		resource_validate_ctx_destruct(context);
+		dm_free(context);
+		context = temp_context;
 	}
+#endif
 
 	if (prev_disp_clk < context->bw_results.dispclk_khz ||
 		(is_mpo_turning_on &&
@@ -1007,6 +1022,23 @@ bool dc_commit_surfaces_to_target(
 					dc_surface->dst_rect.y,
 					dc_surface->dst_rect.width,
 					dc_surface->dst_rect.height);
+
+
+			dal_logger_write(core_dc->ctx->logger,
+					LOG_MAJOR_HW_TRACE,
+					LOG_MINOR_HW_TRACE_SET_MODE,
+					"Pipe %d: width, height, x, y\n"
+					"viewport:%d, %d, %d, %d\n"
+					"recout:  %d, %d, %d, %d\n",
+					pipe_ctx->pipe_idx,
+					pipe_ctx->scl_data.viewport.width,
+					pipe_ctx->scl_data.viewport.height,
+					pipe_ctx->scl_data.viewport.x,
+					pipe_ctx->scl_data.viewport.y,
+					pipe_ctx->scl_data.recout.width,
+					pipe_ctx->scl_data.recout.height,
+					pipe_ctx->scl_data.recout.x,
+					pipe_ctx->scl_data.recout.y);
 
 			if (!pipe_ctx->surface->public.flip_immediate)
 				lock_mask |= PIPE_LOCK_CONTROL_SURFACE;

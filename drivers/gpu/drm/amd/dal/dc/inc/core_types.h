@@ -234,7 +234,7 @@ struct resource_funcs {
 					const struct core_dc *dc,
 					struct validate_context *context);
 
-	enum dc_status (*map_vmin_resources)(
+	struct validate_context *(*apply_clk_constraints)(
 					const struct core_dc *dc,
 					struct validate_context *context);
 };
