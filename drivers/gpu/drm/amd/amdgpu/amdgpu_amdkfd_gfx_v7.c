@@ -552,8 +552,8 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd,
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	uint32_t temp;
-	int timeout = utimeout;
 	enum hqd_dequeue_request_type type;
+	unsigned long end_jiffies = (utimeout * HZ / 1000) + jiffies;
 
 	acquire_queue(kgd, pipe_id, queue_id);
 	WREG32(mmCP_HQD_PQ_DOORBELL_CONTROL, 0);
@@ -576,14 +576,12 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd,
 		temp = RREG32(mmCP_HQD_ACTIVE);
 		if (!(temp & CP_HQD_ACTIVE__ACTIVE_MASK))
 			break;
-		if (timeout <= 0) {
-			pr_err("kfd: cp queue preemption time out (%dms)\n",
-					temp);
+		if (time_after(jiffies, end_jiffies)) {
+			pr_err("kfd: cp queue preemption time out\n");
 			release_queue(kgd);
 			return -ETIME;
 		}
-		msleep(20);
-		timeout -= 20;
+		usleep_range(500, 1000);
 	}
 
 	release_queue(kgd);
@@ -597,7 +595,7 @@ static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 	struct cik_sdma_rlc_registers *m;
 	uint32_t sdma_base_addr;
 	uint32_t temp;
-	int timeout = utimeout;
+	unsigned long end_jiffies = (utimeout * HZ / 1000) + jiffies;
 
 	m = get_sdma_mqd(mqd);
 	sdma_base_addr = get_sdma_base_addr(m);
@@ -610,10 +608,9 @@ static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 		temp = RREG32(sdma_base_addr + mmSDMA0_RLC0_CONTEXT_STATUS);
 		if (temp & SDMA0_RLC0_CONTEXT_STATUS__IDLE_MASK)
 			break;
-		if (timeout <= 0)
+		if (time_after(jiffies, end_jiffies))
 			return -ETIME;
-		msleep(20);
-		timeout -= 20;
+		usleep_range(500, 1000);
 	}
 
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL, 0);
