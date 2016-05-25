@@ -143,9 +143,9 @@ struct device_queue_manager_ops {
 };
 
 struct device_queue_manager_asic_ops {
-	int	(*register_process)(struct device_queue_manager *dqm,
+	int	(*update_qpd)(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd);
-	int	(*initialize)(struct device_queue_manager *dqm);
+	int	(*init_cpsch)(struct device_queue_manager *dqm);
 	bool	(*set_cache_memory_policy)(struct device_queue_manager *dqm,
 					   struct qcm_process_device *qpd,
 					   enum cache_policy default_policy,
@@ -171,7 +171,7 @@ struct device_queue_manager_asic_ops {
 
 struct device_queue_manager {
 	struct device_queue_manager_ops ops;
-	struct device_queue_manager_asic_ops ops_asic_specific;
+	struct device_queue_manager_asic_ops asic_ops;
 
 	struct mqd_manager	*mqds[KFD_MQD_TYPE_MAX];
 	struct packet_manager	packets;
@@ -195,12 +195,14 @@ struct device_queue_manager {
 	int			sched_policy;
 };
 
-void device_queue_manager_init_cik(struct device_queue_manager_asic_ops *ops);
+void device_queue_manager_init_cik(
+		struct device_queue_manager_asic_ops *asic_ops);
 void device_queue_manager_init_cik_hawaii(
-		struct device_queue_manager_asic_ops *ops);
-void device_queue_manager_init_vi(struct device_queue_manager_asic_ops *ops);
+		struct device_queue_manager_asic_ops *asic_ops);
+void device_queue_manager_init_vi(
+		struct device_queue_manager_asic_ops *asic_ops);
 void device_queue_manager_init_vi_tonga(
-		struct device_queue_manager_asic_ops *ops);
+		struct device_queue_manager_asic_ops *asic_ops);
 void program_sh_mem_settings(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd);
 int init_pipelines(struct device_queue_manager *dqm,
