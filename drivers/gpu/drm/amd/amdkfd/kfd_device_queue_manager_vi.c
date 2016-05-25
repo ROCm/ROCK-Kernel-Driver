@@ -33,7 +33,7 @@ static bool set_cache_memory_policy_vi(struct device_queue_manager *dqm,
 				   enum cache_policy alternate_policy,
 				   void __user *alternate_aperture_base,
 				   uint64_t alternate_aperture_size);
-static int register_process_vi(struct device_queue_manager *dqm,
+static int update_qpd_vi(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd);
 static int initialize_cpsch_vi(struct device_queue_manager *dqm);
 static void init_sdma_vm(struct device_queue_manager *dqm, struct queue *q,
@@ -48,28 +48,29 @@ static bool set_cache_memory_policy_vi_tonga(struct device_queue_manager *dqm,
 			enum cache_policy alternate_policy,
 			void __user *alternate_aperture_base,
 			uint64_t alternate_aperture_size);
-static int register_process_vi_tonga(struct device_queue_manager *dqm,
+static int update_qpd_vi_tonga(struct device_queue_manager *dqm,
 			struct qcm_process_device *qpd);
 static void init_sdma_vm_tonga(struct device_queue_manager *dqm,
 			struct queue *q,
 			struct qcm_process_device *qpd);
 
 void device_queue_manager_init_vi_tonga(
-		struct device_queue_manager_asic_ops *ops)
+		struct device_queue_manager_asic_ops *asic_ops)
 {
-	ops->set_cache_memory_policy = set_cache_memory_policy_vi_tonga;
-	ops->register_process = register_process_vi_tonga;
-	ops->initialize = initialize_cpsch_vi;
-	ops->init_sdma_vm = init_sdma_vm_tonga;
+	asic_ops->set_cache_memory_policy = set_cache_memory_policy_vi_tonga;
+	asic_ops->update_qpd = update_qpd_vi_tonga;
+	asic_ops->init_cpsch = initialize_cpsch_vi;
+	asic_ops->init_sdma_vm = init_sdma_vm_tonga;
 }
 
 
-void device_queue_manager_init_vi(struct device_queue_manager_asic_ops *ops)
+void device_queue_manager_init_vi(
+		struct device_queue_manager_asic_ops *asic_ops)
 {
-	ops->set_cache_memory_policy = set_cache_memory_policy_vi;
-	ops->register_process = register_process_vi;
-	ops->initialize = initialize_cpsch_vi;
-	ops->init_sdma_vm = init_sdma_vm;
+	asic_ops->set_cache_memory_policy = set_cache_memory_policy_vi;
+	asic_ops->update_qpd = update_qpd_vi;
+	asic_ops->init_cpsch = initialize_cpsch_vi;
+	asic_ops->init_sdma_vm = init_sdma_vm;
 }
 
 static uint32_t compute_sh_mem_bases_64bit(unsigned int top_address_nybble)
@@ -156,7 +157,7 @@ static bool set_cache_memory_policy_vi_tonga(struct device_queue_manager *dqm,
 	return true;
 }
 
-static int register_process_vi(struct device_queue_manager *dqm,
+static int update_qpd_vi(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd)
 {
 	struct kfd_process_device *pdd;
@@ -199,7 +200,7 @@ static int register_process_vi(struct device_queue_manager *dqm,
 	return 0;
 }
 
-static int register_process_vi_tonga(struct device_queue_manager *dqm,
+static int update_qpd_vi_tonga(struct device_queue_manager *dqm,
 			struct qcm_process_device *qpd)
 {
 	struct kfd_process_device *pdd;
