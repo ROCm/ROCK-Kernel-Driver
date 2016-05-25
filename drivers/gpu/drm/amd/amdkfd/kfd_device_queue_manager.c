@@ -569,7 +569,7 @@ static int register_process_nocpsch(struct device_queue_manager *dqm,
 		dqm->dev->kfd2kgd->get_process_page_dir(pdd->vm);
 	pr_debug("Retrieved PD address == 0x%08u\n", qpd->page_table_base);
 
-	retval = dqm->ops_asic_specific.register_process(dqm, qpd);
+	retval = dqm->asic_ops.update_qpd(dqm, qpd);
 
 	dqm->processes_count++;
 
@@ -803,7 +803,7 @@ static int create_sdma_queue_nocpsch(struct device_queue_manager *dqm,
 	pr_debug("     sdma queue id: %d\n", q->properties.sdma_queue_id);
 	pr_debug("     sdma engine id: %d\n", q->properties.sdma_engine_id);
 
-	dqm->ops_asic_specific.init_sdma_vm(dqm, q, qpd);
+	dqm->asic_ops.init_sdma_vm(dqm, q, qpd);
 	retval = mqd->init_mqd(mqd, &q->mqd, &q->mqd_mem_obj,
 				&q->gart_mqd_addr, &q->properties);
 	if (retval != 0) {
@@ -865,7 +865,7 @@ static int initialize_cpsch(struct device_queue_manager *dqm)
 	dqm->sdma_queue_count = 0;
 	dqm->active_runlist = false;
 	dqm->sdma_bitmap = (1 << CIK_SDMA_QUEUES) - 1;
-	retval = dqm->ops_asic_specific.initialize(dqm);
+	retval = dqm->asic_ops.init_cpsch(dqm);
 	if (retval != 0)
 		goto fail_init_pipelines;
 
@@ -1051,7 +1051,7 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 					    q->properties.queue_percent > 0 &&
 					    q->properties.queue_address != 0);
 
-	dqm->ops_asic_specific.init_sdma_vm(dqm, q, qpd);
+	dqm->asic_ops.init_sdma_vm(dqm, q, qpd);
 
 	q->properties.tba_addr = qpd->tba_addr;
 	q->properties.tma_addr = qpd->tma_addr;
@@ -1312,7 +1312,7 @@ static bool set_cache_memory_policy(struct device_queue_manager *dqm,
 		qpd->sh_mem_ape1_limit = limit >> 16;
 	}
 
-	retval = dqm->ops_asic_specific.set_cache_memory_policy(
+	retval = dqm->asic_ops.set_cache_memory_policy(
 			dqm,
 			qpd,
 			default_policy,
@@ -1541,20 +1541,20 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 
 	switch (dev->device_info->asic_family) {
 	case CHIP_CARRIZO:
-		device_queue_manager_init_vi(&dqm->ops_asic_specific);
+		device_queue_manager_init_vi(&dqm->asic_ops);
 		break;
 
 	case CHIP_KAVERI:
-		device_queue_manager_init_cik(&dqm->ops_asic_specific);
+		device_queue_manager_init_cik(&dqm->asic_ops);
 		break;
 
 	case CHIP_HAWAII:
-		device_queue_manager_init_cik_hawaii(&dqm->ops_asic_specific);
+		device_queue_manager_init_cik_hawaii(&dqm->asic_ops);
 		break;
 
 	case CHIP_TONGA:
 	case CHIP_FIJI:
-		device_queue_manager_init_vi_tonga(&dqm->ops_asic_specific);
+		device_queue_manager_init_vi_tonga(&dqm->asic_ops);
 		break;
 	}
 
