@@ -778,9 +778,8 @@ static bool display_clock_integrated_info_construct(
 			max_clks_by_state[clk_state].display_clk_khz =
 				info.disp_clk_voltage[i].max_supported_clk;
 		}
-		/*invalid input from bios*/
-		ASSERT(info.disp_clk_voltage[i].max_supported_clk >= 100000);
 	}
+
 	disp_clk->dfs_bypass_enabled =
 		dal_adapter_service_is_dfs_bypass_enabled(as) &&
 		dal_adapter_service_is_feature_supported(
