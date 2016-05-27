@@ -2531,9 +2531,13 @@ static uint32_t add_val_sets_surface(
 
 static uint32_t update_in_val_sets_target(
 	struct dc_validation_set *val_sets,
+	struct drm_crtc **crtcs,
+	struct drm_display_mode **modes,
 	uint32_t set_count,
 	const struct dc_target *old_target,
-	const struct dc_target *new_target)
+	const struct dc_target *new_target,
+	struct drm_crtc *crtc,
+	struct drm_display_mode *mode)
 {
 	uint32_t i = 0;
 
@@ -2544,6 +2548,8 @@ static uint32_t update_in_val_sets_target(
 	}
 
 	val_sets[i].target = new_target;
+	crtcs[i] = crtc;
+	modes[i] = mode;
 
 	if (i == set_count) {
 		/* nothing found. add new one to the end */
@@ -2587,11 +2593,14 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	struct drm_plane_state *plane_state;
 	int i;
 	int j;
+	int k;
 	int ret;
 	int set_count;
 	int new_target_count;
 	struct dc_validation_set set[MAX_TARGETS] = {{ 0 }};
 	struct dc_target *new_targets[MAX_TARGETS] = { 0 };
+	struct drm_display_mode *mode_set[MAX_TARGETS] = { 0 };
+	struct drm_crtc *crtc_set[MAX_TARGETS] = { 0 };
 	struct amdgpu_device *adev = dev->dev_private;
 	struct dc *dc = adev->dm.dc;
 	bool need_to_validate = false;
@@ -2615,6 +2624,8 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 		if (acrtc->target) {
 			set[set_count].target = acrtc->target;
+			mode_set[set_count] = &crtc->mode;
+			crtc_set[set_count] = crtc;
 			++set_count;
 		}
 	}
@@ -2673,12 +2684,16 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 			}
 
 			new_targets[new_target_count] = new_target;
-
 			set_count = update_in_val_sets_target(
 					set,
+					crtc_set,
+					mode_set,
 					set_count,
 					acrtc->target,
-					new_target);
+					new_target,
+					crtc,
+					&mode);
+
 			new_target_count++;
 			need_to_validate = true;
 			break;
@@ -2704,15 +2719,33 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 			struct drm_plane_state *old_plane_state = plane->state;
 			struct drm_framebuffer *fb = plane_state->fb;
 			struct drm_crtc *crtc = plane_state->crtc;
-			struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+			struct drm_connector *connector;
+			struct drm_connector_state *con_state;
+			struct dm_connector_state *dm_state = NULL;
 
-			if (!fb || acrtc->target != set[i].target)
+			if (!fb)
+				continue;
+
+			if (crtc_set[i] != crtc)
 				continue;
 
 			if (!crtc->state->planes_changed)
 				continue;
 
-			if (!page_flip_needed(plane_state, old_plane_state)) {
+			for_each_connector_in_state(state, connector, con_state, k) {
+				if (con_state->crtc == crtc) {
+					dm_state = to_dm_connector_state(con_state);
+					break;
+				}
+			}
+
+			if (dm_state) {
+					calculate_stream_scaling_settings(mode_set[i],
+						set[i].target->streams[0],
+						dm_state);
+			}
+
+			if (!page_flip_needed(plane_state, old_plane_state) || dm_state) {
 				struct dc_surface *surface =
 					dc_create_surface(dc);
 
@@ -2721,14 +2754,14 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 					plane_state);
 
 				add_val_sets_surface(
-					set,
-					set_count,
-					acrtc->target,
-					surface);
+							set,
+							set_count,
+							set[i].target,
+							surface);
+
 				need_to_validate = true;
 			}
 		}
-
 	}
 
 	if (need_to_validate == false || set_count == 0 ||

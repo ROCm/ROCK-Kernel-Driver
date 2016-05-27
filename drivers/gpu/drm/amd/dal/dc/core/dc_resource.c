@@ -565,10 +565,6 @@ bool resource_validate_attach_surfaces(
 	int i, j;
 
 	for (i = 0; i < set_count; i++) {
-		context->targets[i] = DC_TARGET_TO_CORE(set[i].target);
-		dc_target_retain(&context->targets[i]->public);
-		context->target_count++;
-
 		for (j = 0; j < old_context->target_count; j++)
 			if (is_target_unchanged(
 					old_context->targets[j],

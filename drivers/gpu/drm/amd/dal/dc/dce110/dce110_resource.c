@@ -864,16 +864,23 @@ enum dc_status dce110_validate_with_context(
 {
 	struct dc_context *dc_ctx = dc->ctx;
 	enum dc_status result = DC_ERROR_UNEXPECTED;
+	int i;
 
 	context->res_ctx.pool = dc->res_pool;
+
+	for (i = 0; i < set_count; i++) {
+		context->targets[i] = DC_TARGET_TO_CORE(set[i].target);
+		dc_target_retain(&context->targets[i]->public);
+		context->target_count++;
+	}
+
+	result = resource_map_pool_resources(dc, context);
 
 	if (!resource_validate_attach_surfaces(
 			set, set_count, dc->current_context, context)) {
 		DC_ERROR("Failed to attach surface to target!\n");
 		return DC_FAIL_ATTACH_SURFACES;
 	}
-
-	result = resource_map_pool_resources(dc, context);
 
 	if (result == DC_OK)
 		result = resource_map_clock_resources(dc, context);
