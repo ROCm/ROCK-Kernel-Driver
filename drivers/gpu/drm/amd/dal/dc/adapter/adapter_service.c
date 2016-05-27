@@ -180,7 +180,8 @@ static struct feature_source_entry feature_entry_table[] = {
 	{FEATURE_DPMS_AUDIO_ENDPOINT_CONTROL, true, true},
 	{FEATURE_DISABLE_FBC_COMP_CLK_GATE, false, true},
 	{FEATURE_PIXEL_PERFECT_OUTPUT, false, true},
-	{FEATURE_8BPP_SUPPORTED, false, true}
+	{FEATURE_8BPP_SUPPORTED, false, true},
+	{FEATURE_DISABLE_CLOCK_SHARING, false, true}
 };
 
 /* Stores entire ASIC features by sets */
@@ -433,6 +434,7 @@ static bool override_default_parameters(
 	check_bool_feature(DISABLE_LPT_SUPPORT);
 	check_bool_feature(DUMMY_FBC_BACKEND);
 	check_bool_feature(ENABLE_GPU_SCALING);
+	check_bool_feature(DISABLE_CLOCK_SHARING);
 	default:
 		return false;
 	}

@@ -219,11 +219,14 @@ struct clock_source *resource_find_used_clk_src_for_sharing(
 					struct resource_context *res_ctx,
 					struct pipe_ctx *pipe_ctx)
 {
-	int i;
+	if (!dal_adapter_service_is_feature_supported
+			(FEATURE_DISABLE_CLOCK_SHARING)) {
+		int i;
 
-	for (i = 0; i < MAX_PIPES; i++) {
-		if (is_sharable_clk_src(&res_ctx->pipe_ctx[i], pipe_ctx))
-			return res_ctx->pipe_ctx[i].clock_source;
+		for (i = 0; i < MAX_PIPES; i++) {
+			if (is_sharable_clk_src(&res_ctx->pipe_ctx[i], pipe_ctx))
+				return res_ctx->pipe_ctx[i].clock_source;
+		}
 	}
 
 	return NULL;
