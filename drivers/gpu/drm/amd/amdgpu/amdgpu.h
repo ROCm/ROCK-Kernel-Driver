@@ -799,6 +799,9 @@ struct amdgpu_ring {
 	u64				cond_exe_gpu_addr;
 	volatile u32	*cond_exe_cpu_addr;
 	int                     vmid;
+#if defined(CONFIG_DEBUG_FS)
+	struct dentry *ent;
+#endif
 };
 
 /*
