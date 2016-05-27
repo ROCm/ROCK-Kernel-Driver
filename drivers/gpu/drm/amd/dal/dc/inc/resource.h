@@ -65,7 +65,7 @@ void resource_reference_clock_source(
 		struct resource_context *res_ctx,
 		struct clock_source *clock_source);
 
-bool resource_are_streams_clk_sharable(
+bool resource_are_streams_timing_synchronizable(
 		const struct core_stream *stream1,
 		const struct core_stream *stream2);
 

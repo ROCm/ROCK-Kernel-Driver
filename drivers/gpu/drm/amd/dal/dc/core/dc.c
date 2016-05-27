@@ -544,7 +544,7 @@ static void program_timing_sync(
 			if (!ctx->res_ctx.pipe_ctx[j].stream)
 				continue;
 
-			if (resource_are_streams_clk_sharable(
+			if (resource_are_streams_timing_synchronizable(
 					ctx->res_ctx.pipe_ctx[j].stream,
 					ctx->res_ctx.pipe_ctx[i].stream)) {
 				tg_set[group_size] =

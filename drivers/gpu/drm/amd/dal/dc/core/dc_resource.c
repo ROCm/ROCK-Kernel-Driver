@@ -160,11 +160,10 @@ void resource_reference_clock_source(
 		res_ctx->dp_clock_source_ref_count++;
 }
 
-bool resource_are_streams_clk_sharable(
+bool resource_are_streams_timing_synchronizable(
 	const struct core_stream *stream1,
 	const struct core_stream *stream2)
 {
-
 	if (stream1->public.timing.h_total != stream2->public.timing.h_total)
 		return false;
 
@@ -201,7 +200,15 @@ static bool is_sharable_clk_src(
 	if (dc_is_dp_signal(pipe_with_clk_src->stream->signal))
 		return false;
 
-	if (!resource_are_streams_clk_sharable(
+	if (dc_is_hdmi_signal(pipe_with_clk_src->stream->signal)
+			&& dc_is_dvi_signal(pipe->stream->signal))
+		return false;
+
+	if (dc_is_hdmi_signal(pipe->stream->signal)
+			&& dc_is_dvi_signal(pipe_with_clk_src->stream->signal))
+		return false;
+
+	if (!resource_are_streams_timing_synchronizable(
 			pipe_with_clk_src->stream, pipe->stream))
 		return false;
 
@@ -754,7 +761,7 @@ static struct core_stream *find_pll_sharable_stream(
 				DC_STREAM_TO_CORE(target->public.streams[j]);
 
 			/* We are looking for non dp, non virtual stream */
-			if (resource_are_streams_clk_sharable(
+			if (resource_are_streams_timing_synchronizable(
 						stream_needs_pll, stream_has_pll)
 				&& !dc_is_dp_signal(stream_has_pll->signal)
 				&& stream_has_pll->sink->link->public.connector_signal
