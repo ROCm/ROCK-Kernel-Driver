@@ -216,7 +216,7 @@ struct resource_pool;
 struct validate_context;
 
 struct resource_funcs {
-	void (*destruct)(struct resource_pool *pool);
+	void (*destroy)(struct resource_pool **pool);
 	struct link_encoder *(*link_enc_create)(
 			const struct encoder_init_data *init);
 	enum dc_status (*validate_with_context)(
@@ -303,7 +303,7 @@ struct pipe_ctx {
 };
 
 struct resource_context {
-	struct resource_pool pool;
+	struct resource_pool *pool;
 	struct pipe_ctx pipe_ctx[MAX_PIPES];
 	union supported_stream_engines used_stream_engines;
 	bool is_stream_enc_acquired[MAX_PIPES * 2];

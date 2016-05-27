@@ -827,9 +827,9 @@ static void power_down_controllers(struct core_dc *dc)
 {
 	int i;
 
-	for (i = 0; i < dc->res_pool.pipe_count; i++) {
-		dc->res_pool.timing_generators[i]->funcs->disable_crtc(
-				dc->res_pool.timing_generators[i]);
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
+		dc->res_pool->timing_generators[i]->funcs->disable_crtc(
+				dc->res_pool->timing_generators[i]);
 	}
 }
 
@@ -837,13 +837,13 @@ static void power_down_clock_sources(struct core_dc *dc)
 {
 	int i;
 
-	if (dc->res_pool.dp_clock_source->funcs->cs_power_down(
-		dc->res_pool.dp_clock_source) == false)
+	if (dc->res_pool->dp_clock_source->funcs->cs_power_down(
+		dc->res_pool->dp_clock_source) == false)
 		dm_error("Failed to power down pll! (dp clk src)\n");
 
-	for (i = 0; i < dc->res_pool.clk_src_count; i++) {
-		if (dc->res_pool.clock_sources[i]->funcs->cs_power_down(
-				dc->res_pool.clock_sources[i]) == false)
+	for (i = 0; i < dc->res_pool->clk_src_count; i++) {
+		if (dc->res_pool->clock_sources[i]->funcs->cs_power_down(
+				dc->res_pool->clock_sources[i]) == false)
 			dm_error("Failed to power down pll! (clk src index=%d)\n", i);
 	}
 }
@@ -866,10 +866,10 @@ static void disable_vga_and_power_gate_all_controllers(
 	struct dc_context *ctx;
 
 	dcb = dal_adapter_service_get_bios_parser(
-			dc->res_pool.adapter_srv);
+			dc->res_pool->adapter_srv);
 
-	for (i = 0; i < dc->res_pool.pipe_count; i++) {
-		tg = dc->res_pool.timing_generators[i];
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
+		tg = dc->res_pool->timing_generators[i];
 		ctx = dc->ctx;
 
 		tg->funcs->disable_vga(tg);
@@ -894,7 +894,7 @@ static void enable_accelerated_mode(struct core_dc *dc)
 {
 	struct dc_bios *dcb;
 
-	dcb = dal_adapter_service_get_bios_parser(dc->res_pool.adapter_srv);
+	dcb = dal_adapter_service_get_bios_parser(dc->res_pool->adapter_srv);
 
 	power_down_all_hw_blocks(dc);
 
@@ -970,14 +970,14 @@ static bool dc_set_clocks_and_clock_state (
 {
 	struct power_to_dal_info output = {0};
 
-	struct display_clock *disp_clk = context->res_ctx.pool.display_clock;
+	struct display_clock *disp_clk = context->res_ctx.pool->display_clock;
 	struct dc_context *ctx = context->targets[0]->ctx;
 
 	if (!dc_pre_clock_change(
 			ctx,
 			&context->res_ctx.min_clocks,
 			get_required_clocks_state(
-					context->res_ctx.pool.display_clock,
+					context->res_ctx.pool->display_clock,
 					&context->res_ctx.state_clocks),
 			&output)) {
 		/* "output" was not updated by PPLib.
@@ -1025,10 +1025,10 @@ static void set_display_clock(struct validate_context *context)
 		/*TODO: set_display_clock_dfs_bypass(
 				hws,
 				path_set,
-				context->res_ctx.pool.display_clock,
+				context->res_ctx.pool->display_clock,
 				context->res_ctx.min_clocks.min_dclk_khz);*/
 	} else
-		dal_display_clock_set_clock(context->res_ctx.pool.display_clock,
+		dal_display_clock_set_clock(context->res_ctx.pool->display_clock,
 				context->bw_results.dispclk_khz);
 
 	/* TODO: When changing display engine clock, DMCU WaitLoop must be
@@ -1152,7 +1152,7 @@ static void reset_single_pipe_hw_ctx(
 	struct dc_bios *dcb;
 
 	dcb = dal_adapter_service_get_bios_parser(
-			context->res_ctx.pool.adapter_srv);
+			context->res_ctx.pool->adapter_srv);
 	if (pipe_ctx->audio) {
 		dal_audio_disable_output(pipe_ctx->audio,
 				pipe_ctx->stream_enc->id,
@@ -1228,7 +1228,7 @@ static enum dc_status apply_ctx_to_hw(
 		return DC_OK;
 
 	/* Apply new context */
-	update_bios_scratch_critical_state(context->res_ctx.pool.adapter_srv,
+	update_bios_scratch_critical_state(context->res_ctx.pool->adapter_srv,
 			true);
 
 	for (i = 0; i < MAX_PIPES; i++) {
@@ -1248,7 +1248,7 @@ static enum dc_status apply_ctx_to_hw(
 		}
 
 		dcb = dal_adapter_service_get_bios_parser(
-				context->res_ctx.pool.adapter_srv);
+				context->res_ctx.pool->adapter_srv);
 
 		dc->hwss.enable_display_power_gating(
 				dc->ctx, i, dcb,
@@ -1324,7 +1324,7 @@ static enum dc_status apply_ctx_to_hw(
 
 	dc->hwss.set_displaymarks(dc, context);
 
-	update_bios_scratch_critical_state(context->res_ctx.pool.adapter_srv,
+	update_bios_scratch_critical_state(context->res_ctx.pool->adapter_srv,
 			false);
 
 	switch_dp_clock_sources(dc, &context->res_ctx);
@@ -1551,8 +1551,8 @@ static void init_hw(struct core_dc *dc)
 	struct transform *xfm;
 
 	bp = dc->ctx->dc_bios;
-	for (i = 0; i < dc->res_pool.pipe_count; i++) {
-		xfm = dc->res_pool.transforms[i];
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
+		xfm = dc->res_pool->transforms[i];
 
 		dc->hwss.enable_display_power_gating(
 				dc->ctx, i, bp,
@@ -1579,8 +1579,8 @@ static void init_hw(struct core_dc *dc)
 		link->link_enc->funcs->hw_init(link->link_enc);
 	}
 
-	for (i = 0; i < dc->res_pool.pipe_count; i++) {
-		struct timing_generator *tg = dc->res_pool.timing_generators[i];
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
+		struct timing_generator *tg = dc->res_pool->timing_generators[i];
 
 		tg->funcs->disable_vga(tg);
 
@@ -1589,8 +1589,8 @@ static void init_hw(struct core_dc *dc)
 		tg->funcs->set_blank(tg, true);
 	}
 
-	for (i = 0; i < dc->res_pool.audio_count; i++) {
-		struct audio *audio = dc->res_pool.audios[i];
+	for (i = 0; i < dc->res_pool->audio_count; i++) {
+		struct audio *audio = dc->res_pool->audios[i];
 
 		if (dal_audio_power_up(audio) != AUDIO_RESULT_OK)
 			dm_error("Failed audio power up!\n");

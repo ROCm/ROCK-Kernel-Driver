@@ -84,7 +84,7 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 	return dc_version;
 }
 
-bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
+struct resource_pool *dc_create_resource_pool(struct adapter_service *adapter_serv,
 				struct core_dc *dc,
 				int num_virtual_links,
 				enum dce_version dc_version)
@@ -93,23 +93,23 @@ bool dc_construct_resource_pool(struct adapter_service *adapter_serv,
 	switch (dc_version) {
 #if defined(CONFIG_DRM_AMD_DAL_DCE8_0)
 	case DCE_VERSION_8_0:
-		return dce80_construct_resource_pool(
-			adapter_serv, num_virtual_links, dc, &dc->res_pool);
+		return dce80_create_resource_pool(
+			adapter_serv, num_virtual_links, dc);
 #endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 	case DCE_VERSION_10_0:
-		return dce100_construct_resource_pool(
-			adapter_serv, num_virtual_links, dc, &dc->res_pool);
+		return dce100_create_resource_pool(
+			adapter_serv, num_virtual_links, dc);
 #endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
 	case DCE_VERSION_11_0:
-		return dce110_construct_resource_pool(
-			adapter_serv, num_virtual_links, dc, &dc->res_pool);
+		return dce110_create_resource_pool(
+			adapter_serv, num_virtual_links, dc);
 #endif
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
 	case DCE_VERSION_11_2:
-		return dce112_construct_resource_pool(
-			adapter_serv, num_virtual_links, dc, &dc->res_pool);
+		return dce112_create_resource_pool(
+			adapter_serv, num_virtual_links, dc);
 #endif
 	default:
 		break;
@@ -123,8 +123,8 @@ void resource_unreference_clock_source(
 		struct clock_source *clock_source)
 {
 	int i;
-	for (i = 0; i < res_ctx->pool.clk_src_count; i++) {
-		if (res_ctx->pool.clock_sources[i] != clock_source)
+	for (i = 0; i < res_ctx->pool->clk_src_count; i++) {
+		if (res_ctx->pool->clock_sources[i] != clock_source)
 			continue;
 
 		res_ctx->clock_source_ref_count[i]--;
@@ -135,7 +135,7 @@ void resource_unreference_clock_source(
 		break;
 	}
 
-	if (res_ctx->pool.dp_clock_source == clock_source) {
+	if (res_ctx->pool->dp_clock_source == clock_source) {
 		res_ctx->dp_clock_source_ref_count--;
 
 		if (res_ctx->dp_clock_source_ref_count == 0)
@@ -148,15 +148,15 @@ void resource_reference_clock_source(
 		struct clock_source *clock_source)
 {
 	int i;
-	for (i = 0; i < res_ctx->pool.clk_src_count; i++) {
-		if (res_ctx->pool.clock_sources[i] != clock_source)
+	for (i = 0; i < res_ctx->pool->clk_src_count; i++) {
+		if (res_ctx->pool->clock_sources[i] != clock_source)
 			continue;
 
 		res_ctx->clock_source_ref_count[i]++;
 		break;
 	}
 
-	if (res_ctx->pool.dp_clock_source == clock_source)
+	if (res_ctx->pool->dp_clock_source == clock_source)
 		res_ctx->dp_clock_source_ref_count++;
 }
 
@@ -604,8 +604,8 @@ static void set_stream_engine_in_use(
 {
 	int i;
 
-	for (i = 0; i < res_ctx->pool.stream_enc_count; i++) {
-		if (res_ctx->pool.stream_enc[i] == stream_enc)
+	for (i = 0; i < res_ctx->pool->stream_enc_count; i++) {
+		if (res_ctx->pool->stream_enc[i] == stream_enc)
 			res_ctx->is_stream_enc_acquired[i] = true;
 	}
 }
@@ -616,8 +616,8 @@ static void set_audio_in_use(
 		struct audio *audio)
 {
 	int i;
-	for (i = 0; i < res_ctx->pool.audio_count; i++) {
-		if (res_ctx->pool.audios[i] == audio) {
+	for (i = 0; i < res_ctx->pool->audio_count; i++) {
+		if (res_ctx->pool->audios[i] == audio) {
 			res_ctx->is_audio_acquired[i] = true;
 		}
 	}
@@ -629,16 +629,16 @@ static int acquire_first_free_pipe(
 {
 	int i;
 
-	for (i = 0; i < res_ctx->pool.pipe_count; i++) {
+	for (i = 0; i < res_ctx->pool->pipe_count; i++) {
 		if (!res_ctx->pipe_ctx[i].stream) {
 			struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[i];
 
-			pipe_ctx->tg = res_ctx->pool.timing_generators[i];
-			pipe_ctx->mi = res_ctx->pool.mis[i];
-			pipe_ctx->ipp = res_ctx->pool.ipps[i];
-			pipe_ctx->xfm = res_ctx->pool.transforms[i];
-			pipe_ctx->opp = res_ctx->pool.opps[i];
-			pipe_ctx->dis_clk = res_ctx->pool.display_clock;
+			pipe_ctx->tg = res_ctx->pool->timing_generators[i];
+			pipe_ctx->mi = res_ctx->pool->mis[i];
+			pipe_ctx->ipp = res_ctx->pool->ipps[i];
+			pipe_ctx->xfm = res_ctx->pool->transforms[i];
+			pipe_ctx->opp = res_ctx->pool->opps[i];
+			pipe_ctx->dis_clk = res_ctx->pool->display_clock;
 			pipe_ctx->pipe_idx = i;
 
 			pipe_ctx->stream = stream;
@@ -656,15 +656,15 @@ static struct stream_encoder *find_first_free_match_stream_enc_for_link(
 	int j = -1;
 	struct core_link *link = stream->sink->link;
 
-	for (i = 0; i < res_ctx->pool.stream_enc_count; i++) {
+	for (i = 0; i < res_ctx->pool->stream_enc_count; i++) {
 		if (!res_ctx->is_stream_enc_acquired[i] &&
-					res_ctx->pool.stream_enc[i]) {
+					res_ctx->pool->stream_enc[i]) {
 			/* Store first available for MST second display
 			 * in daisy chain use case */
 			j = i;
-			if (res_ctx->pool.stream_enc[i]->id ==
+			if (res_ctx->pool->stream_enc[i]->id ==
 					link->link_enc->preferred_engine)
-				return res_ctx->pool.stream_enc[i];
+				return res_ctx->pool->stream_enc[i];
 		}
 	}
 
@@ -682,7 +682,7 @@ static struct stream_encoder *find_first_free_match_stream_enc_for_link(
 	 */
 
 	if (j >= 0 && dc_is_dp_signal(stream->signal))
-		return res_ctx->pool.stream_enc[j];
+		return res_ctx->pool->stream_enc[j];
 
 	return NULL;
 }
@@ -690,9 +690,9 @@ static struct stream_encoder *find_first_free_match_stream_enc_for_link(
 static struct audio *find_first_free_audio(struct resource_context *res_ctx)
 {
 	int i;
-	for (i = 0; i < res_ctx->pool.audio_count; i++) {
+	for (i = 0; i < res_ctx->pool->audio_count; i++) {
 		if (res_ctx->is_audio_acquired[i] == false) {
-			return res_ctx->pool.audios[i];
+			return res_ctx->pool->audios[i];
 		}
 	}
 
@@ -873,7 +873,7 @@ enum dc_status resource_map_pool_resources(
 				if (dc_is_dp_signal(pipe_ctx->stream->signal) &&
 					!find_pll_sharable_stream(stream, context))
 					pipe_ctx->clock_source =
-						context->res_ctx.pool.dp_clock_source;
+						context->res_ctx.pool->dp_clock_source;
 
 				resource_reference_clock_source(
 					&context->res_ctx,
@@ -1332,7 +1332,7 @@ void resource_validate_ctx_copy_construct(
 
 	*dst_ctx = *src_ctx;
 
-	for (i = 0; i < dst_ctx->res_ctx.pool.pipe_count; i++) {
+	for (i = 0; i < dst_ctx->res_ctx.pool->pipe_count; i++) {
 		struct pipe_ctx *cur_pipe = &dst_ctx->res_ctx.pipe_ctx[i];
 
 		if (cur_pipe->primary_pipe)
@@ -1356,9 +1356,9 @@ struct clock_source *dc_resource_find_first_free_pll(
 {
 	int i;
 
-	for (i = 0; i < res_ctx->pool.clk_src_count; ++i) {
+	for (i = 0; i < res_ctx->pool->clk_src_count; ++i) {
 		if (res_ctx->clock_source_ref_count[i] == 0)
-			return res_ctx->pool.clock_sources[i];
+			return res_ctx->pool->clock_sources[i];
 	}
 
 	return NULL;
@@ -1417,7 +1417,7 @@ enum dc_status resource_map_clock_resources(
 				if (dc_is_dp_signal(pipe_ctx->stream->signal)
 					|| pipe_ctx->stream->signal == SIGNAL_TYPE_VIRTUAL)
 					pipe_ctx->clock_source =
-						context->res_ctx.pool.dp_clock_source;
+						context->res_ctx.pool->dp_clock_source;
 				else {
 					pipe_ctx->clock_source =
 						resource_find_used_clk_src_for_sharing(

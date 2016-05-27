@@ -32,11 +32,10 @@ struct adapter_service;
 struct core_dc;
 struct resource_pool;
 
-bool dce112_construct_resource_pool(
-	struct adapter_service *adapter_serv,
+struct resource_pool *dce112_create_resource_pool(
+	struct adapter_service *as,
 	uint8_t num_virtual_links,
-	struct core_dc *dc,
-	struct resource_pool *pool);
+	struct core_dc *dc);
 
 #endif /* __DC_RESOURCE_DCE112_H__ */
 

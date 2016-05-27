@@ -23,7 +23,7 @@ struct core_dc {
 
 	/* TODO: determine max number of targets*/
 	struct validate_context *current_context;
-	struct resource_pool res_pool;
+	struct resource_pool *res_pool;
 
 	/*Power State*/
 	enum dc_video_power_state previous_power_state;

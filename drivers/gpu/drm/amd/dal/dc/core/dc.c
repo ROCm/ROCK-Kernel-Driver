@@ -289,9 +289,10 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 
 		dc_ctx->dc_bios = dal_adapter_service_get_bios_parser(as);
 
-		if (!dc_construct_resource_pool(
-			as, dc, init_params->num_virtual_links, dc_version))
-			goto construct_resource_fail;
+		dc->res_pool = dc_create_resource_pool(as, dc,
+				init_params->num_virtual_links, dc_version);
+		if (!dc->res_pool)
+			goto create_resource_fail;
 
 		if (!create_links(dc, as, init_params->num_virtual_links))
 			goto create_links_fail;
@@ -302,9 +303,10 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 		 */
 
 		dc_ctx->dc_bios = init_params->vbios_override;
-		if (!dc_construct_resource_pool(
-			NULL, dc, init_params->num_virtual_links, dc_version))
-			goto construct_resource_fail;
+		dc->res_pool = dc_create_resource_pool(NULL, dc,
+				init_params->num_virtual_links, dc_version);
+		if (!dc->res_pool)
+			goto create_resource_fail;
 
 		if (!create_links(dc, NULL, init_params->num_virtual_links))
 			goto create_links_fail;
@@ -315,8 +317,11 @@ static bool construct(struct core_dc *dc, const struct dc_init_data *init_params
 	return true;
 
 	/**** error handling here ****/
-construct_resource_fail:
 create_links_fail:
+	dc->res_pool->funcs->destroy(&dc->res_pool);
+create_resource_fail:
+	if (as)
+		dal_adapter_service_destroy(&as);
 as_fail:
 	dal_logger_destroy(&dc_ctx->logger);
 logger_fail:
@@ -333,7 +338,7 @@ static void destruct(struct core_dc *dc)
 	dm_free(dc->current_context);
 	dc->current_context = NULL;
 	destroy_links(dc);
-	dc->res_pool.funcs->destruct(&dc->res_pool);
+	dc->res_pool->funcs->destroy(&dc->res_pool);
 	dal_logger_destroy(&dc->ctx->logger);
 	dm_free(dc->ctx);
 	dc->ctx = NULL;
@@ -371,16 +376,16 @@ static int8_t acquire_first_free_underlay(
 		struct dc_bios *dcb;
 		struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[DCE110_UNDERLAY_IDX];
 
-		pipe_ctx->tg = res_ctx->pool.timing_generators[DCE110_UNDERLAY_IDX];
-		pipe_ctx->mi = res_ctx->pool.mis[DCE110_UNDERLAY_IDX];
-		/*pipe_ctx->ipp = res_ctx->pool.ipps[DCE110_UNDERLAY_IDX];*/
-		pipe_ctx->xfm = res_ctx->pool.transforms[DCE110_UNDERLAY_IDX];
-		pipe_ctx->opp = res_ctx->pool.opps[DCE110_UNDERLAY_IDX];
-		pipe_ctx->dis_clk = res_ctx->pool.display_clock;
+		pipe_ctx->tg = res_ctx->pool->timing_generators[DCE110_UNDERLAY_IDX];
+		pipe_ctx->mi = res_ctx->pool->mis[DCE110_UNDERLAY_IDX];
+		/*pipe_ctx->ipp = res_ctx->pool->ipps[DCE110_UNDERLAY_IDX];*/
+		pipe_ctx->xfm = res_ctx->pool->transforms[DCE110_UNDERLAY_IDX];
+		pipe_ctx->opp = res_ctx->pool->opps[DCE110_UNDERLAY_IDX];
+		pipe_ctx->dis_clk = res_ctx->pool->display_clock;
 		pipe_ctx->pipe_idx = DCE110_UNDERLAY_IDX;
 
 		dcb = dal_adapter_service_get_bios_parser(
-						res_ctx->pool.adapter_srv);
+						res_ctx->pool->adapter_srv);
 
 		core_dc->hwss.enable_display_power_gating(
 			core_dc->ctx,
@@ -429,10 +434,10 @@ struct dc *dc_create(const struct dc_init_data *init_params)
 	core_dc->hwss.init_hw(core_dc);
 
 	core_dc->public.caps.max_targets = dm_min(
-			core_dc->res_pool.pipe_count,
-			core_dc->res_pool.stream_enc_count);
+			core_dc->res_pool->pipe_count,
+			core_dc->res_pool->stream_enc_count);
 	core_dc->public.caps.max_links = core_dc->link_count;
-	core_dc->public.caps.max_audios = core_dc->res_pool.audio_count;
+	core_dc->public.caps.max_audios = core_dc->res_pool->audio_count;
 
 	dal_logger_write(core_dc->ctx->logger,
 			LOG_MAJOR_INTERFACE_TRACE,
@@ -469,7 +474,7 @@ bool dc_validate_resources(
 	if(context == NULL)
 		goto context_alloc_fail;
 
-	result = core_dc->res_pool.funcs->validate_with_context(
+	result = core_dc->res_pool->funcs->validate_with_context(
 						core_dc, set, set_count, context);
 
 	resource_validate_ctx_destruct(context);
@@ -501,7 +506,7 @@ bool dc_validate_guaranteed(
 	if (context == NULL)
 		goto context_alloc_fail;
 
-	result = core_dc->res_pool.funcs->validate_guaranteed(
+	result = core_dc->res_pool->funcs->validate_guaranteed(
 					core_dc, dc_target, context);
 
 	resource_validate_ctx_destruct(context);
@@ -527,14 +532,14 @@ static void program_timing_sync(
 	uint8_t i;
 	uint8_t j;
 	uint8_t group_size = 0;
-	uint8_t tg_count = ctx->res_ctx.pool.pipe_count;
+	uint8_t tg_count = ctx->res_ctx.pool->pipe_count;
 	struct timing_generator *tg_set[MAX_PIPES];
 
 	for (i = 0; i < tg_count; i++) {
 		if (!ctx->res_ctx.pipe_ctx[i].stream)
 			continue;
 
-		tg_set[0] = ctx->res_ctx.pool.timing_generators[i];
+		tg_set[0] = ctx->res_ctx.pool->timing_generators[i];
 		group_size = 1;
 
 		/* Add tg to the set, search rest of the tg's for ones with
@@ -548,7 +553,7 @@ static void program_timing_sync(
 					ctx->res_ctx.pipe_ctx[j].stream,
 					ctx->res_ctx.pipe_ctx[i].stream)) {
 				tg_set[group_size] =
-					ctx->res_ctx.pool.timing_generators[j];
+					ctx->res_ctx.pool->timing_generators[j];
 				group_size++;
 			}
 		}
@@ -611,7 +616,7 @@ static void target_disable_memory_requests(struct dc_target *dc_target,
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
 
 	for (i = 0; i < target->public.stream_count; i++) {
-		for (j = 0; j < res_ctx->pool.pipe_count; j++) {
+		for (j = 0; j < res_ctx->pool->pipe_count; j++) {
 			struct timing_generator *tg = res_ctx->pipe_ctx[j].tg;
 
 			if (res_ctx->pipe_ctx[j].primary_pipe != NULL ||
@@ -792,7 +797,7 @@ bool dc_commit_targets(
 	if (context == NULL)
 		goto context_alloc_fail;
 
-	result = core_dc->res_pool.funcs->validate_with_context(core_dc, set, target_count, context);
+	result = core_dc->res_pool->funcs->validate_with_context(core_dc, set, target_count, context);
 	if (result != DC_OK){
 		dal_logger_write(core_dc->ctx->logger,
 					LOG_MAJOR_ERROR,
@@ -944,13 +949,13 @@ bool dc_commit_surfaces_to_target(
 				new_surfaces[i], &context->res_ctx.pipe_ctx[j]);
 		}
 
-	if (core_dc->res_pool.funcs->validate_bandwidth(core_dc, context) != DC_OK) {
+	if (core_dc->res_pool->funcs->validate_bandwidth(core_dc, context) != DC_OK) {
 		BREAK_TO_DEBUGGER();
 		goto unexpected_fail;
 	}
 
-	if (core_dc->res_pool.funcs->map_vmin_resources) {
-		core_dc->res_pool.funcs->map_vmin_resources(core_dc, context);
+	if (core_dc->res_pool->funcs->map_vmin_resources) {
+		core_dc->res_pool->funcs->map_vmin_resources(core_dc, context);
 	}
 
 	if (prev_disp_clk < context->bw_results.dispclk_khz ||
@@ -966,7 +971,7 @@ bool dc_commit_surfaces_to_target(
 				&core_dc->current_context->res_ctx);
 
 	for (i = 0; i < new_surface_count; i++)
-		for (j = 0; j < context->res_ctx.pool.pipe_count; j++) {
+		for (j = 0; j < context->res_ctx.pool->pipe_count; j++) {
 			struct dc_surface *dc_surface = new_surfaces[i];
 			struct core_surface *surface =
 						DC_SURFACE_TO_CORE(dc_surface);
@@ -1031,7 +1036,7 @@ bool dc_commit_surfaces_to_target(
 	 * when pipe 0 is unlocked
 	 * Need PIPE_LOCK_CONTROL_MODE to be 1 for this
 	 */
-	for (j = context->res_ctx.pool.pipe_count - 1; j >= 0; j--)
+	for (j = context->res_ctx.pool->pipe_count - 1; j >= 0; j--)
 		for (i = new_surface_count - 1; i >= 0; i--) {
 			struct pipe_ctx *pipe_ctx =
 						&context->res_ctx.pipe_ctx[j];
@@ -1121,7 +1126,7 @@ bool dc_update_surfaces_for_target(
 		}
 
 	for (i = 0; i < new_surface_count; i++)
-		for (j = 0; j < context->res_ctx.pool.pipe_count; j++) {
+		for (j = 0; j < context->res_ctx.pool->pipe_count; j++) {
 			struct pipe_ctx *pipe_ctx =
 						&context->res_ctx.pipe_ctx[j];
 
@@ -1180,7 +1185,7 @@ enum dc_irq_source dc_get_hpd_irq_source_at_index(
 const struct audio **dc_get_audios(struct dc *dc)
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
-	return (const struct audio **)core_dc->res_pool.audios;
+	return (const struct audio **)core_dc->res_pool->audios;
 }
 
 void dc_flip_surface_addrs(
@@ -1191,7 +1196,7 @@ void dc_flip_surface_addrs(
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
 	int i, j;
-	int pipe_count = core_dc->current_context->res_ctx.pool.pipe_count;
+	int pipe_count = core_dc->current_context->res_ctx.pool->pipe_count;
 
 	for (i = 0; i < count; i++)
 		for (j = 0; j < pipe_count; j++) {
@@ -1240,19 +1245,19 @@ enum dc_irq_source dc_interrupt_to_irq_source(
 		uint32_t ext_id)
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
-	return dal_irq_service_to_irq_source(core_dc->res_pool.irqs, src_id, ext_id);
+	return dal_irq_service_to_irq_source(core_dc->res_pool->irqs, src_id, ext_id);
 }
 
 void dc_interrupt_set(const struct dc *dc, enum dc_irq_source src, bool enable)
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
-	dal_irq_service_set(core_dc->res_pool.irqs, src, enable);
+	dal_irq_service_set(core_dc->res_pool->irqs, src, enable);
 }
 
 void dc_interrupt_ack(struct dc *dc, enum dc_irq_source src)
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
-	dal_irq_service_ack(core_dc->res_pool.irqs, src);
+	dal_irq_service_ack(core_dc->res_pool->irqs, src);
 }
 
 const struct dc_target *dc_get_target_on_irq_source(

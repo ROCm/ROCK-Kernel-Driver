@@ -1136,7 +1136,7 @@ bool dp_hbr_verify_link_cap(
 	/* disable PHY done possible by BIOS, will be done by driver itself */
 	dp_disable_link_phy(link, link->public.connector_signal);
 
-	dp_cs = link->dc->res_pool.dp_clock_source;
+	dp_cs = link->dc->res_pool->dp_clock_source;
 
 	if (dp_cs)
 		dp_cs_id = dp_cs->id;

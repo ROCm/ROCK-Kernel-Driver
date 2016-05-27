@@ -32,15 +32,21 @@ struct adapter_service;
 struct core_dc;
 struct resource_pool;
 
+#define TO_DCE110_RES_POOL(pool)\
+	container_of(pool, struct dce110_resource_pool, base)
+
+struct dce110_resource_pool {
+	struct resource_pool base;
+};
+
 enum dc_status dce110_resource_build_pipe_hw_param(struct pipe_ctx *pipe_ctx);
 
-bool dce110_construct_resource_pool(
-	struct adapter_service *adapter_serv,
-	uint8_t num_virtual_links,
-	struct core_dc *dc,
-	struct resource_pool *pool);
 
-void dce110_destruct_resource_pool(struct resource_pool *pool);
+
+struct resource_pool *dce110_create_resource_pool(
+	struct adapter_service *as,
+	uint8_t num_virtual_links,
+	struct core_dc *dc);
 
 #endif /* __DC_RESOURCE_DCE110_H__ */
 

@@ -1017,7 +1017,7 @@ static bool construct(
 	enc_init_data.hpd_source = get_hpd_line(link, as);
 	enc_init_data.transmitter =
 			translate_encoder_to_transmitter(enc_init_data.encoder);
-	link->link_enc = link->dc->res_pool.funcs->link_enc_create(
+	link->link_enc = link->dc->res_pool->funcs->link_enc_create(
 								&enc_init_data);
 
 	if( link->link_enc == NULL) {

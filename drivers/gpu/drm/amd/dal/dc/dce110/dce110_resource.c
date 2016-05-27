@@ -29,6 +29,7 @@
 #include "stream_encoder.h"
 
 #include "resource.h"
+#include "dce110/dce110_resource.h"
 #include "include/irq_service_interface.h"
 #include "../virtual/virtual_stream_encoder.h"
 #include "dce110/dce110_timing_generator.h"
@@ -462,64 +463,64 @@ void dce110_clock_source_destroy(struct clock_source **clk_src)
 	*clk_src = NULL;
 }
 
-void dce110_destruct_resource_pool(struct resource_pool *pool)
+static void destruct(struct dce110_resource_pool *pool)
 {
 	unsigned int i;
 
-	for (i = 0; i < pool->pipe_count; i++) {
-		if (pool->opps[i] != NULL)
-			dce110_opp_destroy(&pool->opps[i]);
+	for (i = 0; i < pool->base.pipe_count; i++) {
+		if (pool->base.opps[i] != NULL)
+			dce110_opp_destroy(&pool->base.opps[i]);
 
-		if (pool->transforms[i] != NULL)
-			dce110_transform_destroy(&pool->transforms[i]);
+		if (pool->base.transforms[i] != NULL)
+			dce110_transform_destroy(&pool->base.transforms[i]);
 
-		if (pool->ipps[i] != NULL)
-			dce110_ipp_destroy(&pool->ipps[i]);
+		if (pool->base.ipps[i] != NULL)
+			dce110_ipp_destroy(&pool->base.ipps[i]);
 
-		if (pool->mis[i] != NULL) {
-			dm_free(TO_DCE110_MEM_INPUT(pool->mis[i]));
-			pool->mis[i] = NULL;
+		if (pool->base.mis[i] != NULL) {
+			dm_free(TO_DCE110_MEM_INPUT(pool->base.mis[i]));
+			pool->base.mis[i] = NULL;
 		}
 
-		if (pool->timing_generators[i] != NULL)	{
-			dm_free(DCE110TG_FROM_TG(pool->timing_generators[i]));
-			pool->timing_generators[i] = NULL;
-		}
-	}
-
-	for (i = 0; i < pool->stream_enc_count; i++) {
-		if (pool->stream_enc[i] != NULL)
-			dm_free(DCE110STRENC_FROM_STRENC(pool->stream_enc[i]));
-	}
-
-	for (i = 0; i < pool->clk_src_count; i++) {
-		if (pool->clock_sources[i] != NULL) {
-			dce110_clock_source_destroy(&pool->clock_sources[i]);
+		if (pool->base.timing_generators[i] != NULL)	{
+			dm_free(DCE110TG_FROM_TG(pool->base.timing_generators[i]));
+			pool->base.timing_generators[i] = NULL;
 		}
 	}
 
-	if (pool->dp_clock_source != NULL)
-		dce110_clock_source_destroy(&pool->dp_clock_source);
+	for (i = 0; i < pool->base.stream_enc_count; i++) {
+		if (pool->base.stream_enc[i] != NULL)
+			dm_free(DCE110STRENC_FROM_STRENC(pool->base.stream_enc[i]));
+	}
 
-	for (i = 0; i < pool->audio_count; i++)	{
-		if (pool->audios[i] != NULL) {
-			dal_audio_destroy(&pool->audios[i]);
+	for (i = 0; i < pool->base.clk_src_count; i++) {
+		if (pool->base.clock_sources[i] != NULL) {
+			dce110_clock_source_destroy(&pool->base.clock_sources[i]);
 		}
 	}
 
-	if (pool->display_clock != NULL) {
-		dal_display_clock_destroy(&pool->display_clock);
+	if (pool->base.dp_clock_source != NULL)
+		dce110_clock_source_destroy(&pool->base.dp_clock_source);
+
+	for (i = 0; i < pool->base.audio_count; i++)	{
+		if (pool->base.audios[i] != NULL) {
+			dal_audio_destroy(&pool->base.audios[i]);
+		}
 	}
 
-	if (pool->scaler_filter != NULL) {
-		dal_scaler_filter_destroy(&pool->scaler_filter);
-	}
-	if (pool->irqs != NULL) {
-		dal_irq_service_destroy(&pool->irqs);
+	if (pool->base.display_clock != NULL) {
+		dal_display_clock_destroy(&pool->base.display_clock);
 	}
 
-	if (pool->adapter_srv != NULL) {
-		dal_adapter_service_destroy(&pool->adapter_srv);
+	if (pool->base.scaler_filter != NULL) {
+		dal_scaler_filter_destroy(&pool->base.scaler_filter);
+	}
+	if (pool->base.irqs != NULL) {
+		dal_irq_service_destroy(&pool->base.irqs);
+	}
+
+	if (pool->base.adapter_srv != NULL) {
+		dal_adapter_service_destroy(&pool->base.adapter_srv);
 	}
 }
 
@@ -906,8 +907,18 @@ enum dc_status dce110_validate_guaranteed(
 	return result;
 }
 
+static void dce110_destroy_resource_pool(struct resource_pool **pool)
+{
+	struct dce110_resource_pool *dce110_pool = TO_DCE110_RES_POOL(*pool);
+
+	destruct(dce110_pool);
+	dm_free(dce110_pool);
+	*pool = NULL;
+}
+
+
 static struct resource_funcs dce110_res_pool_funcs = {
-	.destruct = dce110_destruct_resource_pool,
+	.destroy = dce110_destroy_resource_pool,
 	.link_enc_create = dce110_link_encoder_create,
 	.validate_with_context = dce110_validate_with_context,
 	.validate_guaranteed = dce110_validate_guaranteed,
@@ -986,11 +997,11 @@ static void bw_calcs_data_update_from_pplib(struct core_dc *dc)
 		1000);
 }
 
-bool dce110_construct_resource_pool(
+static bool construct(
 	struct adapter_service *as,
 	uint8_t num_virtual_links,
 	struct core_dc *dc,
-	struct resource_pool *pool)
+	struct dce110_resource_pool *pool)
 {
 	unsigned int i;
 	struct audio_init_data audio_init_data = { 0 };
@@ -998,60 +1009,60 @@ bool dce110_construct_resource_pool(
 	struct firmware_info info;
 	struct dc_bios *bp;
 
-	pool->adapter_srv = as;
-	pool->funcs = &dce110_res_pool_funcs;
+	pool->base.adapter_srv = as;
+	pool->base.funcs = &dce110_res_pool_funcs;
 
 	/*************************************************
 	 *  Resource + asic cap harcoding                *
 	 *************************************************/
-	pool->pipe_count = 3;
-	pool->stream_enc_count = 3;
+	pool->base.pipe_count = 3;
+	pool->base.stream_enc_count = 3;
 
 	/*************************************************
 	 *  Create resources                             *
 	 *************************************************/
 
 
-	pool->stream_engines.engine.ENGINE_ID_DIGA = 1;
-	pool->stream_engines.engine.ENGINE_ID_DIGB = 1;
-	pool->stream_engines.engine.ENGINE_ID_DIGC = 1;
-	pool->stream_engines.engine.ENGINE_ID_DIGD = 1;
-	pool->stream_engines.engine.ENGINE_ID_DIGE = 1;
-	pool->stream_engines.engine.ENGINE_ID_DIGF = 1;
+	pool->base.stream_engines.engine.ENGINE_ID_DIGA = 1;
+	pool->base.stream_engines.engine.ENGINE_ID_DIGB = 1;
+	pool->base.stream_engines.engine.ENGINE_ID_DIGC = 1;
+	pool->base.stream_engines.engine.ENGINE_ID_DIGD = 1;
+	pool->base.stream_engines.engine.ENGINE_ID_DIGE = 1;
+	pool->base.stream_engines.engine.ENGINE_ID_DIGF = 1;
 
 	bp = dal_adapter_service_get_bios_parser(as);
 
 	if (dal_adapter_service_get_firmware_info(as, &info) &&
 		info.external_clock_source_frequency_for_dp != 0) {
-		pool->dp_clock_source =
+		pool->base.dp_clock_source =
 				dce110_clock_source_create(ctx, bp, CLOCK_SOURCE_ID_EXTERNAL, NULL);
 
-		pool->clock_sources[0] =
+		pool->base.clock_sources[0] =
 				dce110_clock_source_create(ctx, bp, CLOCK_SOURCE_ID_PLL0, &dce110_clk_src_reg_offsets[0]);
-		pool->clock_sources[1] =
+		pool->base.clock_sources[1] =
 				dce110_clock_source_create(ctx, bp, CLOCK_SOURCE_ID_PLL1, &dce110_clk_src_reg_offsets[1]);
 
-		pool->clk_src_count = 2;
+		pool->base.clk_src_count = 2;
 
 		/* TODO: find out if CZ support 3 PLLs */
 	}
 
-	if (pool->dp_clock_source == NULL) {
+	if (pool->base.dp_clock_source == NULL) {
 		dm_error("DC: failed to create dp clock source!\n");
 		BREAK_TO_DEBUGGER();
 		goto clk_src_create_fail;
 	}
 
-	for (i = 0; i < pool->clk_src_count; i++) {
-		if (pool->clock_sources[i] == NULL) {
+	for (i = 0; i < pool->base.clk_src_count; i++) {
+		if (pool->base.clock_sources[i] == NULL) {
 			dm_error("DC: failed to create clock sources!\n");
 			BREAK_TO_DEBUGGER();
 			goto clk_src_create_fail;
 		}
 	}
 
-	pool->display_clock = dal_display_clock_dce110_create(ctx, as);
-	if (pool->display_clock == NULL) {
+	pool->base.display_clock = dal_display_clock_dce110_create(ctx, as);
+	if (pool->base.display_clock == NULL) {
 		dm_error("DC: failed to create display clock!\n");
 		BREAK_TO_DEBUGGER();
 		goto disp_clk_create_fail;
@@ -1060,62 +1071,62 @@ bool dce110_construct_resource_pool(
 	{
 		struct irq_service_init_data init_data;
 		init_data.ctx = dc->ctx;
-		pool->irqs = dal_irq_service_create(
+		pool->base.irqs = dal_irq_service_create(
 				dal_adapter_service_get_dce_version(
-					dc->res_pool.adapter_srv),
+					pool->base.adapter_srv),
 				&init_data);
-		if (!pool->irqs)
+		if (!pool->base.irqs)
 			goto irqs_create_fail;
 
 	}
 
-	pool->scaler_filter = dal_scaler_filter_create(ctx);
-	if (pool->scaler_filter == NULL) {
+	pool->base.scaler_filter = dal_scaler_filter_create(ctx);
+	if (pool->base.scaler_filter == NULL) {
 		BREAK_TO_DEBUGGER();
 		dm_error("DC: failed to create filter!\n");
 		goto filter_create_fail;
 	}
 
-	for (i = 0; i < pool->pipe_count; i++) {
-		pool->timing_generators[i] = dce110_timing_generator_create(
+	for (i = 0; i < pool->base.pipe_count; i++) {
+		pool->base.timing_generators[i] = dce110_timing_generator_create(
 				as, ctx, i, &dce110_tg_offsets[i]);
-		if (pool->timing_generators[i] == NULL) {
+		if (pool->base.timing_generators[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dm_error("DC: failed to create tg!\n");
 			goto controller_create_fail;
 		}
 
-		pool->mis[i] = dce110_mem_input_create(ctx, i,
+		pool->base.mis[i] = dce110_mem_input_create(ctx, i,
 				&dce110_mi_reg_offsets[i]);
-		if (pool->mis[i] == NULL) {
+		if (pool->base.mis[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dm_error(
 				"DC: failed to create memory input!\n");
 			goto controller_create_fail;
 		}
 
-		pool->ipps[i] = dce110_ipp_create(ctx, i, &dce110_ipp_reg_offsets[i]);
-		if (pool->ipps[i] == NULL) {
+		pool->base.ipps[i] = dce110_ipp_create(ctx, i, &dce110_ipp_reg_offsets[i]);
+		if (pool->base.ipps[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dm_error(
 				"DC: failed to create input pixel processor!\n");
 			goto controller_create_fail;
 		}
 
-		pool->transforms[i] = dce110_transform_create(
+		pool->base.transforms[i] = dce110_transform_create(
 					ctx, i, &dce110_xfm_offsets[i]);
-		if (pool->transforms[i] == NULL) {
+		if (pool->base.transforms[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dm_error(
 				"DC: failed to create transform!\n");
 			goto controller_create_fail;
 		}
-		pool->transforms[i]->funcs->transform_set_scaler_filter(
-				pool->transforms[i],
-				pool->scaler_filter);
+		pool->base.transforms[i]->funcs->transform_set_scaler_filter(
+				pool->base.transforms[i],
+				pool->base.scaler_filter);
 
-		pool->opps[i] = dce110_opp_create(ctx, i, &dce110_opp_reg_offsets[i]);
-		if (pool->opps[i] == NULL) {
+		pool->base.opps[i] = dce110_opp_create(ctx, i, &dce110_opp_reg_offsets[i]);
+		if (pool->base.opps[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dm_error(
 				"DC: failed to create output pixel processor!\n");
@@ -1123,12 +1134,12 @@ bool dce110_construct_resource_pool(
 		}
 	}
 	/* TODO: failure? */
-	underlay_create(ctx, pool);
+	underlay_create(ctx, &pool->base);
 
 	audio_init_data.as = as;
 	audio_init_data.ctx = ctx;
-	pool->audio_count = 0;
-	for (i = 0; i < pool->pipe_count; i++) {
+	pool->base.audio_count = 0;
+	for (i = 0; i < pool->base.pipe_count; i++) {
 		struct graphics_object_id obj_id;
 
 		obj_id = dal_adapter_service_enum_audio_object(as, i);
@@ -1138,23 +1149,23 @@ bool dce110_construct_resource_pool(
 		}
 
 		audio_init_data.audio_stream_id = obj_id;
-		pool->audios[i] = dal_audio_create(&audio_init_data);
-		if (pool->audios[i] == NULL) {
+		pool->base.audios[i] = dal_audio_create(&audio_init_data);
+		if (pool->base.audios[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dm_error("DC: failed to create DPPs!\n");
 			goto audio_create_fail;
 		}
-		pool->audio_count++;
+		pool->base.audio_count++;
 	}
 
-	for (i = 0; i < pool->stream_enc_count; i++) {
+	for (i = 0; i < pool->base.stream_enc_count; i++) {
 		/* TODO: rework fragile code*/
-		if (pool->stream_engines.u_all & 1 << i) {
-			pool->stream_enc[i] = dce110_stream_encoder_create(
+		if (pool->base.stream_engines.u_all & 1 << i) {
+			pool->base.stream_enc[i] = dce110_stream_encoder_create(
 				i, dc->ctx,
 				dal_adapter_service_get_bios_parser(as),
 				&stream_enc_regs[i]);
-			if (pool->stream_enc[i] == NULL) {
+			if (pool->base.stream_enc[i] == NULL) {
 				BREAK_TO_DEBUGGER();
 				dm_error("DC: failed to create stream_encoder!\n");
 				goto stream_enc_create_fail;
@@ -1163,17 +1174,17 @@ bool dce110_construct_resource_pool(
 	}
 
 	for (i = 0; i < num_virtual_links; i++) {
-		pool->stream_enc[pool->stream_enc_count] =
+		pool->base.stream_enc[pool->base.stream_enc_count] =
 			virtual_stream_encoder_create(
 				dc->ctx,
 				dal_adapter_service_get_bios_parser(as));
 
-		if (pool->stream_enc[pool->stream_enc_count] == NULL) {
+		if (pool->base.stream_enc[pool->base.stream_enc_count] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dm_error("DC: failed to create stream_encoder!\n");
 			goto stream_enc_create_fail;
 		}
-		pool->stream_enc_count++;
+		pool->base.stream_enc_count++;
 	}
 
 
@@ -1188,51 +1199,69 @@ bool dce110_construct_resource_pool(
 	return true;
 
 stream_enc_create_fail:
-	for (i = 0; i < pool->stream_enc_count; i++) {
-		if (pool->stream_enc[i] != NULL)
-			dm_free(DCE110STRENC_FROM_STRENC(pool->stream_enc[i]));
+	for (i = 0; i < pool->base.stream_enc_count; i++) {
+		if (pool->base.stream_enc[i] != NULL)
+			dm_free(DCE110STRENC_FROM_STRENC(pool->base.stream_enc[i]));
 	}
 
 audio_create_fail:
-	for (i = 0; i < pool->pipe_count; i++) {
-		if (pool->audios[i] != NULL)
-			dal_audio_destroy(&pool->audios[i]);
+	for (i = 0; i < pool->base.pipe_count; i++) {
+		if (pool->base.audios[i] != NULL)
+			dal_audio_destroy(&pool->base.audios[i]);
 	}
 
 controller_create_fail:
-	for (i = 0; i < pool->pipe_count; i++) {
-		if (pool->opps[i] != NULL)
-			pool->opps[i]->funcs->opp_destroy(&pool->opps[i]);
+	for (i = 0; i < pool->base.pipe_count; i++) {
+		if (pool->base.opps[i] != NULL)
+			pool->base.opps[i]->funcs->opp_destroy(&pool->base.opps[i]);
 
-		if (pool->transforms[i] != NULL)
-			dce110_transform_destroy(&pool->transforms[i]);
+		if (pool->base.transforms[i] != NULL)
+			dce110_transform_destroy(&pool->base.transforms[i]);
 
-		if (pool->ipps[i] != NULL)
-			dce110_ipp_destroy(&pool->ipps[i]);
+		if (pool->base.ipps[i] != NULL)
+			dce110_ipp_destroy(&pool->base.ipps[i]);
 
-		if (pool->mis[i] != NULL) {
-			dm_free(TO_DCE110_MEM_INPUT(pool->mis[i]));
-			pool->mis[i] = NULL;
+		if (pool->base.mis[i] != NULL) {
+			dm_free(TO_DCE110_MEM_INPUT(pool->base.mis[i]));
+			pool->base.mis[i] = NULL;
 		}
 
-		if (pool->timing_generators[i] != NULL)	{
-			dm_free(DCE110TG_FROM_TG(pool->timing_generators[i]));
-			pool->timing_generators[i] = NULL;
+		if (pool->base.timing_generators[i] != NULL)	{
+			dm_free(DCE110TG_FROM_TG(pool->base.timing_generators[i]));
+			pool->base.timing_generators[i] = NULL;
 		}
 	}
 
 filter_create_fail:
-	dal_irq_service_destroy(&pool->irqs);
+	dal_irq_service_destroy(&pool->base.irqs);
 
 irqs_create_fail:
-	dal_display_clock_destroy(&pool->display_clock);
+	dal_display_clock_destroy(&pool->base.display_clock);
 
 disp_clk_create_fail:
 clk_src_create_fail:
-	for (i = 0; i < pool->clk_src_count; i++) {
-		if (pool->clock_sources[i] != NULL)
-			dce110_clock_source_destroy(&pool->clock_sources[i]);
+	for (i = 0; i < pool->base.clk_src_count; i++) {
+		if (pool->base.clock_sources[i] != NULL)
+			dce110_clock_source_destroy(&pool->base.clock_sources[i]);
 	}
 
 	return false;
+}
+
+struct resource_pool *dce110_create_resource_pool(
+	struct adapter_service *as,
+	uint8_t num_virtual_links,
+	struct core_dc *dc)
+{
+	struct dce110_resource_pool *pool =
+		dm_alloc(sizeof(struct dce110_resource_pool));
+
+	if (!pool)
+		return NULL;
+
+	if (construct(as, num_virtual_links, dc, pool))
+		return &pool->base;
+
+	BREAK_TO_DEBUGGER();
+	return NULL;
 }

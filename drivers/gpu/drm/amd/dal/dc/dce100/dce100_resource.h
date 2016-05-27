@@ -13,12 +13,9 @@ struct core_dc;
 struct resource_pool;
 struct dc_validation_set;
 
-bool dce100_construct_resource_pool(
-	struct adapter_service *adapter_serv,
+struct resource_pool *dce100_create_resource_pool(
+	struct adapter_service *as,
 	uint8_t num_virtual_links,
-	struct core_dc *dc,
-	struct resource_pool *pool);
-
-void dce100_destruct_resource_pool(struct resource_pool *pool);
+	struct core_dc *dc);
 
 #endif /* DCE100_RESOURCE_H_ */
