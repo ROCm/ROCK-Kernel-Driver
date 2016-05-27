@@ -73,8 +73,4 @@ void dce110_ipp_program_prescale(
  */
 void dce110_helper_select_lut(struct dce110_ipp *ipp110);
 
-void dce110_helper_program_black_white_offset(
-	struct dce110_ipp *ipp110,
-	enum pixel_format surface_pixel_format);
-
 #endif /*__DC_IPP_DCE110_H__*/

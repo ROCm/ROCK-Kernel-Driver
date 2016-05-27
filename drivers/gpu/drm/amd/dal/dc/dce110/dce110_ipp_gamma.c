@@ -48,14 +48,6 @@ static void set_lut_inc(
 	bool is_float,
 	bool is_signed);
 
-static void program_black_offsets(
-	struct dce110_ipp *ipp110,
-	struct dev_c_lut16 *offset);
-
-static void program_white_offsets(
-	struct dce110_ipp *ipp110,
-	struct dev_c_lut16 *offset);
-
 bool dce110_ipp_set_degamma(
 	struct input_pixel_processor *ipp,
 	enum ipp_degamma_mode mode)
@@ -308,95 +300,4 @@ void dce110_helper_select_lut(struct dce110_ipp *ipp110)
 
 		dm_write_reg(ipp110->base.ctx, addr, value);
 	}
-}
-
-static void program_black_offsets(
-	struct dce110_ipp *ipp110,
-	struct dev_c_lut16 *offset)
-{
-	dm_write_reg(ipp110->base.ctx,
-		DCP_REG(mmDC_LUT_BLACK_OFFSET_RED),
-		offset->red);
-	dm_write_reg(ipp110->base.ctx,
-		DCP_REG(mmDC_LUT_BLACK_OFFSET_GREEN),
-		offset->green);
-	dm_write_reg(ipp110->base.ctx,
-		DCP_REG(mmDC_LUT_BLACK_OFFSET_BLUE),
-		offset->blue);
-}
-
-static void program_white_offsets(
-	struct dce110_ipp *ipp110,
-	struct dev_c_lut16 *offset)
-{
-	dm_write_reg(ipp110->base.ctx,
-		DCP_REG(mmDC_LUT_WHITE_OFFSET_RED),
-		offset->red);
-	dm_write_reg(ipp110->base.ctx,
-		DCP_REG(mmDC_LUT_WHITE_OFFSET_GREEN),
-		offset->green);
-	dm_write_reg(ipp110->base.ctx,
-		DCP_REG(mmDC_LUT_WHITE_OFFSET_BLUE),
-		offset->blue);
-}
-
-void dce110_helper_program_black_white_offset(
-	struct dce110_ipp *ipp110,
-	enum pixel_format surface_pixel_format)
-{
-	struct dev_c_lut16 black_offset;
-	struct dev_c_lut16 white_offset;
-
-	/* get black offset */
-
-	switch (surface_pixel_format) {
-	case PIXEL_FORMAT_FP16:
-		/* sRGB gamut, [0.0...1.0] */
-		black_offset.red = 0;
-		black_offset.green = 0;
-		black_offset.blue = 0;
-	break;
-
-	case PIXEL_FORMAT_ARGB2101010_XRBIAS:
-		/* [-1.0...3.0] */
-		black_offset.red = 0x100;
-		black_offset.green = 0x100;
-		black_offset.blue = 0x100;
-	break;
-
-	default:
-		black_offset.red = 0;
-		black_offset.green = 0;
-		black_offset.blue = 0;
-	}
-
-	/* get white offset */
-
-	switch (surface_pixel_format) {
-	case PIXEL_FORMAT_FP16:
-		white_offset.red = 0x3BFF;
-		white_offset.green = 0x3BFF;
-		white_offset.blue = 0x3BFF;
-	break;
-
-	case PIXEL_FORMAT_ARGB2101010_XRBIAS:
-		white_offset.red = 0x37E;
-		white_offset.green = 0x37E;
-		white_offset.blue = 0x37E;
-		break;
-
-	case PIXEL_FORMAT_ARGB8888:
-		white_offset.red = 0xFF;
-		white_offset.green = 0xFF;
-		white_offset.blue = 0xFF;
-		break;
-
-	default:
-		white_offset.red = 0x3FF;
-		white_offset.green = 0x3FF;
-		white_offset.blue = 0x3FF;
-	}
-
-	program_black_offsets(ipp110, &black_offset);
-	program_white_offsets(ipp110, &white_offset);
 }
