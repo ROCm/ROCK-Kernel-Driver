@@ -68,7 +68,7 @@ void tonga_asic_capability_create(struct asic_capability *cap,
 	cap->data[ASIC_DATA_MAX_COFUNC_NONDP_DISPLAYS] = 2;
 	cap->data[ASIC_DATA_MEMORYTYPE_MULTIPLIER] = 4;
 	cap->data[ASIC_DATA_DEFAULT_I2C_SPEED_IN_KHZ] = 40;
-	cap->data[ASIC_DATA_NUM_OF_VIDEO_PLANES] = 1;
+	cap->data[ASIC_DATA_NUM_OF_VIDEO_PLANES] = 0;
 
 	/* ASIC basic capability */
 	cap->caps.IS_FUSION = true;
