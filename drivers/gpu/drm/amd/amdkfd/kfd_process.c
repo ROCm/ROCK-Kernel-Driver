@@ -715,8 +715,6 @@ void kfd_unbind_process_from_device(struct kfd_dev *dev, unsigned int pasid)
 
 	mutex_unlock(get_dbgmgr_mutex());
 
-	pqm_uninit(&p->pqm);
-
 	pdd = kfd_get_process_device_data(dev, p);
 	if (pdd->reset_wavefronts) {
 		dbgdev_wave_reset_wavefronts(pdd->dev, p);
