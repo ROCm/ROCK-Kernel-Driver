@@ -303,7 +303,7 @@ struct pipe_ctx {
 };
 
 struct resource_context {
-	struct resource_pool *pool;
+	const struct resource_pool *pool;
 	struct pipe_ctx pipe_ctx[MAX_PIPES];
 	union supported_stream_engines used_stream_engines;
 	bool is_stream_enc_acquired[MAX_PIPES * 2];
