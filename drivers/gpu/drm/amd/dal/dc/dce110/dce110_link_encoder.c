@@ -1666,6 +1666,28 @@ void dce110_link_encoder_update_mst_stream_allocation_table(
 		DP_MSE_SAT1,
 		DP_MSE_SAT_SLOT_COUNT2);
 
+	if (table->stream_count >= 4) {
+		fill_stream_allocation_row_info(
+			&table->stream_allocations[3],
+			&src,
+			&slots);
+	} else {
+		src = 0;
+		slots = 0;
+	}
+
+	set_reg_field_value(
+		value1,
+		src,
+		DP_MSE_SAT1,
+		DP_MSE_SAT_SRC3);
+
+	set_reg_field_value(
+		value1,
+		slots,
+		DP_MSE_SAT1,
+		DP_MSE_SAT_SLOT_COUNT3);
+
 	/* update ASIC MSE stream allocation table */
 	dm_write_reg(ctx, LINK_REG(DP_MSE_SAT0), value0);
 	dm_write_reg(ctx, LINK_REG(DP_MSE_SAT1), value1);
