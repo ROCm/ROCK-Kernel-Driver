@@ -878,7 +878,6 @@ fail_init_pipelines:
 
 static int start_cpsch(struct device_queue_manager *dqm)
 {
-	struct device_process_node *node;
 	int retval;
 
 	BUG_ON(!dqm);
@@ -907,11 +906,6 @@ static int start_cpsch(struct device_queue_manager *dqm)
 
 	init_interrupts(dqm);
 
-	list_for_each_entry(node, &dqm->queues, list)
-		if (node->qpd->pqm->process && dqm->dev)
-			kfd_bind_process_to_device(dqm->dev,
-						node->qpd->pqm->process);
-
 	mutex_lock(&dqm->lock);
 	execute_queues_cpsch(dqm, false);
 	mutex_unlock(&dqm->lock);
@@ -926,9 +920,6 @@ fail_packet_manager_init:
 
 static int stop_cpsch(struct device_queue_manager *dqm)
 {
-	struct device_process_node *node;
-	struct kfd_process_device *pdd;
-
 	BUG_ON(!dqm);
 
 	mutex_lock(&dqm->lock);
@@ -937,10 +928,6 @@ static int stop_cpsch(struct device_queue_manager *dqm)
 
 	mutex_unlock(&dqm->lock);
 
-	list_for_each_entry(node, &dqm->queues, list) {
-		pdd = qpd_to_pdd(node->qpd);
-		pdd->bound = false;
-	}
 	kfd_gtt_sa_free(dqm->dev, dqm->fence_mem);
 	pm_uninit(&dqm->packets);
 
