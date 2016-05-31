@@ -2050,6 +2050,12 @@ uint32_t dal_adapter_service_get_num_of_underlays(
 	return as->asic_cap->data[ASIC_DATA_NUM_OF_VIDEO_PLANES];
 }
 
+uint32_t dal_adapter_service_get_downscale_limit(
+		struct adapter_service *as)
+{
+	return as->asic_cap->data[ASIC_DATA_DOWNSCALE_LIMIT];
+}
+
 bool dal_adapter_service_get_encoder_cap_info(
 		struct adapter_service *as,
 		struct graphics_object_id id,

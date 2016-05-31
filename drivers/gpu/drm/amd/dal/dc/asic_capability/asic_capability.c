@@ -72,6 +72,7 @@ static bool construct(
 	cap->data[ASIC_DATA_SUPPORTED_HDMI_CONNECTION_NUM] = 1;
 	cap->data[ASIC_DATA_NUM_OF_VIDEO_PLANES] = 0;
 	cap->data[ASIC_DATA_DEFAULT_I2C_SPEED_IN_KHZ] = 25;
+	cap->data[ASIC_DATA_DOWNSCALE_LIMIT] = 200;
 
 	/* ASIC basic capability */
 	cap->caps.UNDERSCAN_FOR_HDMI_ONLY = true;

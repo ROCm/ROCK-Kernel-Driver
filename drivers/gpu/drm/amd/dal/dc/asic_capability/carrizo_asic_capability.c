@@ -65,6 +65,7 @@ void carrizo_asic_capability_create(struct asic_capability *cap,
 	cap->data[ASIC_DATA_DEFAULT_I2C_SPEED_IN_KHZ] = 100;
 	cap->data[ASIC_DATA_NUM_OF_VIDEO_PLANES] = 1;
 	cap->data[ASIC_DATA_SUPPORTED_HDMI_CONNECTION_NUM] = 3;
+	cap->data[ASIC_DATA_DOWNSCALE_LIMIT] = 150;
 
 	/* ASIC basic capability */
 	cap->caps.IS_FUSION = true;

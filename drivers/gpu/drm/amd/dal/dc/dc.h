@@ -46,6 +46,7 @@ struct dc_caps {
 	uint32_t max_links;
 	uint32_t max_audios;
 	uint32_t max_underlays;
+	uint32_t max_downscale_ratio;
 };
 
 struct dc;
