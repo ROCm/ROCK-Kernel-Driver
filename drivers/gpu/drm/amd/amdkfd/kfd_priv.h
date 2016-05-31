@@ -531,6 +531,12 @@ struct qcm_process_device {
 #define GET_GPU_ID(handle) (handle >> 32)
 #define GET_IDR_HANDLE(handle) (handle & 0xFFFFFFFF)
 
+enum kfd_pdd_bound {
+	PDD_UNBOUND = 0,
+	PDD_BOUND,
+	PDD_BOUND_SUSPENDED,
+};
+
 /* Data that is per-process-per device. */
 struct kfd_process_device {
 	/*
@@ -564,7 +570,7 @@ struct kfd_process_device {
 	uint64_t sh_hidden_private_base_vmid;
 
 	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
-	bool bound;
+	enum kfd_pdd_bound bound;
 
 	/* VM context for GPUVM allocations */
 	void *vm;
@@ -658,8 +664,10 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid);
 struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm);
 
 struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
-							struct kfd_process *p);
-void kfd_unbind_process_from_device(struct kfd_dev *dev, unsigned int pasid);
+						struct kfd_process *p);
+int kfd_bind_processes_to_device(struct kfd_dev *dev);
+void kfd_unbind_processes_from_device(struct kfd_dev *dev);
+void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid);
 struct kfd_process_device *kfd_get_process_device_data(struct kfd_dev *dev,
 							struct kfd_process *p);
 struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
