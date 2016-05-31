@@ -459,7 +459,23 @@ struct clock_source *dce110_clock_source_create(
 
 void dce110_clock_source_destroy(struct clock_source **clk_src)
 {
-	dm_free(TO_DCE110_CLK_SRC(*clk_src));
+	struct dce110_clk_src *dce110_clk_src;
+
+	if (!clk_src)
+		return;
+
+	dce110_clk_src = TO_DCE110_CLK_SRC(*clk_src);
+
+	if (dce110_clk_src->dp_ss_params)
+		dm_free(dce110_clk_src->dp_ss_params);
+
+	if (dce110_clk_src->hdmi_ss_params)
+		dm_free(dce110_clk_src->hdmi_ss_params);
+
+	if (dce110_clk_src->dvi_ss_params)
+		dm_free(dce110_clk_src->dvi_ss_params);
+
+	dm_free(dce110_clk_src);
 	*clk_src = NULL;
 }
 
