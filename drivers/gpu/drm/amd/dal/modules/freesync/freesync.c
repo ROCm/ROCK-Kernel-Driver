@@ -27,7 +27,7 @@
 #include "dc.h"
 #include "mod_freesync.h"
 
-static const MOD_FREESYNC_MAX_CONCURRENT_SINKS = 32;
+#define MOD_FREESYNC_MAX_CONCURRENT_SINKS  32
 
 struct sink_caps {
 	const struct dc_sink *sink;
@@ -143,7 +143,6 @@ void mod_freesync_destroy(struct mod_freesync *mod_freesync)
 bool mod_freesync_add_sink(struct mod_freesync *mod_freesync,
 		const struct dc_sink *sink, struct mod_freesync_caps *caps)
 {
-	int i = 0;
 	struct core_freesync *core_freesync =
 			MOD_FREESYNC_TO_CORE(mod_freesync);
 
