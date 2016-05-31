@@ -51,6 +51,8 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_dp_mst_helper.h>
 
+#include "modules/inc/mod_freesync.h"
+
 /* Define variables here
  * These values will be passed to DAL for feature enable purpose
  * Disable ALL for HDMI light up
@@ -321,6 +323,14 @@ int amdgpu_dm_init(struct amdgpu_device *adev)
 
 	INIT_WORK(&adev->dm.mst_hotplug_work, hotplug_notify_work_func);
 
+	adev->dm.freesync_module = mod_freesync_create(adev->dm.dc);
+	if (!adev->dm.freesync_module) {
+		DRM_ERROR(
+		"amdgpu: failed to initialize freesync_module.\n");
+	} else
+		DRM_INFO("amdgpu: freesync_module init done %p.\n",
+				adev->dm.freesync_module);
+
 	if (amdgpu_dm_initialize_drm_device(adev)) {
 		DRM_ERROR(
 		"amdgpu: failed to initialize sw for display support.\n");
@@ -364,7 +374,10 @@ void amdgpu_dm_fini(struct amdgpu_device *adev)
 		amdgpu_cgs_destroy_device(adev->dm.cgs_device);
 		adev->dm.cgs_device = NULL;
 	}
-
+	if (adev->dm.freesync_module) {
+		mod_freesync_destroy(adev->dm.freesync_module);
+		adev->dm.freesync_module = NULL;
+	}
 	/* DC Destroy TODO: Replace destroy DAL */
 	{
 		dc_destroy(&adev->dm.dc);
@@ -765,10 +778,15 @@ void amdgpu_dm_update_connector_after_detect(
 		else {
 			aconnector->edid =
 				(struct edid *) sink->dc_edid.raw_edid;
+
+			amdgpu_dm_add_sink_to_freesync_module(
+					connector, aconnector->edid);
+
 			drm_mode_connector_update_edid_property(connector,
 					aconnector->edid);
 		}
 	} else {
+		amdgpu_dm_remove_sink_from_freesync_module(connector);
 		drm_mode_connector_update_edid_property(connector, NULL);
 		aconnector->num_modes = 0;
 		aconnector->dc_sink = NULL;
@@ -1231,6 +1249,39 @@ static void dm_page_flip(struct amdgpu_device *adev,
 			&addr, 1);
 }
 
+static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
+				struct drm_file *filp)
+{
+	struct mod_freesync_params freesync_params;
+	uint8_t num_targets;
+	uint8_t i;
+	struct dc_target *target;
+
+	struct amdgpu_device *adev = dev->dev_private;
+	struct drm_amdgpu_freesync *args = data;
+	int r = 0;
+
+	freesync_params.state  = FREESYNC_STATE_FULLSCREEN;
+	if (args->op == AMDGPU_FREESYNC_FULLSCREEN_ENTER)
+		freesync_params.enable = true;
+	else
+		freesync_params.enable = false;
+
+	num_targets = dc_get_current_target_count(adev->dm.dc);
+
+	for (i = 0; i < num_targets; i++) {
+
+		target = dc_get_target_at_index(adev->dm.dc, i);
+
+		mod_freesync_update_state(adev->dm.freesync_module,
+						target->streams,
+						target->stream_count,
+						&freesync_params);
+	}
+
+	return r;
+}
+
 #ifdef CONFIG_DRM_AMDGPU_CIK
 static const struct amdgpu_display_funcs dm_dce_v8_0_display_funcs = {
 	.set_vga_render_state = dce_v8_0_set_vga_render_state,
@@ -1252,6 +1303,7 @@ static const struct amdgpu_display_funcs dm_dce_v8_0_display_funcs = {
 	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
 	.stop_mc_access = dce_v8_0_stop_mc_access, /* called unconditionally */
 	.resume_mc_access = dce_v8_0_resume_mc_access, /* called unconditionally */
+	.notify_freesync = amdgpu_notify_freesync,
 };
 #endif
 
@@ -1275,6 +1327,8 @@ static const struct amdgpu_display_funcs dm_dce_v10_0_display_funcs = {
 	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
 	.stop_mc_access = dce_v10_0_stop_mc_access, /* called unconditionally */
 	.resume_mc_access = dce_v10_0_resume_mc_access, /* called unconditionally */
+	.notify_freesync = amdgpu_notify_freesync,
+
 };
 
 static const struct amdgpu_display_funcs dm_dce_v11_0_display_funcs = {
@@ -1297,6 +1351,8 @@ static const struct amdgpu_display_funcs dm_dce_v11_0_display_funcs = {
 	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
 	.stop_mc_access = dce_v11_0_stop_mc_access, /* called unconditionally */
 	.resume_mc_access = dce_v11_0_resume_mc_access, /* called unconditionally */
+	.notify_freesync = amdgpu_notify_freesync,
+
 };
 
 #if defined(CONFIG_DEBUG_KERNEL_DAL)

@@ -312,6 +312,7 @@ static void dm_dp_destroy_mst_connector(
 
 	aconnector->port = NULL;
 	if (aconnector->dc_sink) {
+		amdgpu_dm_remove_sink_from_freesync_module(connector);
 		dc_link_remove_remote_sink(aconnector->dc_link, aconnector->dc_sink);
 		dc_sink_release(aconnector->dc_sink);
 		aconnector->dc_sink = NULL;
@@ -363,6 +364,10 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 					(uint8_t *)edid,
 					(edid->extensions + 1) * EDID_LENGTH,
 					&init_params);
+				if (aconnector->dc_sink)
+					amdgpu_dm_add_sink_to_freesync_module(
+							connector,
+							edid);
 
 				dm_restore_drm_connector_state(connector->dev, connector);
 			} else

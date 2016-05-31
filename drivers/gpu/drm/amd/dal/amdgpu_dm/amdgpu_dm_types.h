@@ -91,6 +91,13 @@ int amdgpu_dm_connector_mode_valid(
 
 void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector *connector);
 
+void amdgpu_dm_add_sink_to_freesync_module(
+		struct drm_connector *connector,
+		struct edid *edid);
+
+void amdgpu_dm_remove_sink_from_freesync_module(
+		struct drm_connector *connector);
+
 extern const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs;
 
 #endif		/* __AMDGPU_DM_TYPES_H__ */

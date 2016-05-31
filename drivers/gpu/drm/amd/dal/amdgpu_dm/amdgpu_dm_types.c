@@ -35,6 +35,8 @@
 #include "amdgpu_pm.h"
 #include "dm_services_types.h"
 
+#include "drm_edid.h"
+
 // We need to #undef FRAME_SIZE and DEPRECATED because they conflict
 // with ptrace-abi.h's #define's of them.
 #undef FRAME_SIZE
@@ -44,6 +46,8 @@
 
 #include "amdgpu_dm_types.h"
 #include "amdgpu_dm_mst_types.h"
+
+#include "modules/inc/mod_freesync.h"
 
 struct dm_connector_state {
 	struct drm_connector_state base;
@@ -2781,4 +2785,87 @@ connector_not_found:
 		DRM_ERROR("Atomic check failed.\n");
 
 	return ret;
+}
+
+void amdgpu_dm_add_sink_to_freesync_module(
+		struct drm_connector *connector,
+		struct edid *edid)
+{
+	int i;
+	struct detailed_timing *timing;
+	struct detailed_non_pixel *data;
+	struct detailed_data_monitor_range *range;
+	struct mod_freesync_caps caps = {0};
+	struct amdgpu_connector *amdgpu_connector =
+			to_amdgpu_connector(connector);
+
+	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = dev->dev_private;
+
+	if (!amdgpu_connector->dc_sink) {
+		DRM_ERROR("dc_sink NULL, could not add free_sync module.\n");
+		return;
+	}
+	if (!adev->dm.freesync_module)
+		return;
+	if (edid->version > 1 || (edid->version == 1 && edid->revision > 1)) {
+		for (i = 0; i < 4; i++) {
+
+			timing	= &edid->detailed_timings[i];
+			data	= &timing->data.other_data;
+			range	= &data->data.range;
+			/*
+			 * Check if monitor has continuous frequency mode
+			 */
+			if (data->type != EDID_DETAIL_MONITOR_RANGE)
+				continue;
+			/*
+			 * Check for flag range limits only. If flag == 1 then
+			 * no additional timing information provided.
+			 * Default GTF, GTF Secondary curve and CVT are not
+			 * supported
+			 */
+			if (range->flags != 1)
+				continue;
+
+			amdgpu_connector->min_vfreq = range->min_vfreq;
+			amdgpu_connector->max_vfreq = range->max_vfreq;
+			amdgpu_connector->pixel_clock_mhz =
+				range->pixel_clock_mhz * 10;
+			break;
+		}
+		if (amdgpu_connector->max_vfreq -
+				amdgpu_connector->min_vfreq > 10) {
+			caps.supported = true;
+			caps.min_refresh_in_micro_hz =
+					amdgpu_connector->min_vfreq * 1000000;
+			caps.max_refresh_in_micro_hz =
+					amdgpu_connector->max_vfreq * 1000000;
+		}
+	}
+	mod_freesync_add_sink(adev->dm.freesync_module,
+			amdgpu_connector->dc_sink, &caps);
+
+}
+
+void amdgpu_dm_remove_sink_from_freesync_module(
+		struct drm_connector *connector)
+{
+	struct amdgpu_connector *amdgpu_connector =
+			to_amdgpu_connector(connector);
+
+	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = dev->dev_private;
+
+	if (!amdgpu_connector->dc_sink || adev->dm.freesync_module) {
+		DRM_ERROR("dc_sink NULL or no free_sync module.\n");
+		return;
+	}
+
+	amdgpu_connector->min_vfreq = 0;
+	amdgpu_connector->max_vfreq = 0;
+	amdgpu_connector->pixel_clock_mhz = 0;
+
+	mod_freesync_remove_sink(adev->dm.freesync_module,
+			amdgpu_connector->dc_sink);
 }

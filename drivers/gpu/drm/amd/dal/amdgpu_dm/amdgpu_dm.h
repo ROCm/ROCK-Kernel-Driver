@@ -126,6 +126,8 @@ struct amdgpu_display_manager {
 	const struct dc_link *backlight_link;
 
 	struct work_struct mst_hotplug_work;
+
+	struct mod_freesync *freesync_module;
 };
 
 /* basic init/fini API */
