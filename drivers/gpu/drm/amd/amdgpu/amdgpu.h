@@ -1863,6 +1863,9 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data, struct drm_file *fi
 int amdgpu_gem_metadata_ioctl(struct drm_device *dev, void *data,
 				struct drm_file *filp);
 
+int amdgpu_freesync_ioctl(struct drm_device *dev, void *data,
+			    struct drm_file *filp);
+
 /* VRAM scratch page for HDP bug, default vram page */
 struct amdgpu_vram_scratch {
 	struct amdgpu_bo		*robj;

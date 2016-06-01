@@ -306,6 +306,10 @@ struct amdgpu_display_funcs {
 			       struct amdgpu_mode_mc_save *save);
 	void (*resume_mc_access)(struct amdgpu_device *adev,
 				 struct amdgpu_mode_mc_save *save);
+	/* it is used to enter or exit into free sync mode */
+	int (*notify_freesync)(struct drm_device *dev, void *data,
+			struct drm_file *filp);
+
 };
 
 struct amdgpu_framebuffer {
@@ -567,6 +571,12 @@ struct amdgpu_connector {
 
 	/* TODO see if we can merge with ddc_bus or make a dm_connector */
 	struct amdgpu_i2c_adapter *i2c;
+
+	/* Monitor range limits */
+	int min_vfreq ;
+	int max_vfreq ;
+	int pixel_clock_mhz;
+
 };
 
 /* TODO: start to use this struct and remove same field from base one */

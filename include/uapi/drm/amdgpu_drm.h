@@ -46,6 +46,7 @@
 #define DRM_AMDGPU_WAIT_CS		0x09
 #define DRM_AMDGPU_GEM_OP		0x10
 #define DRM_AMDGPU_GEM_USERPTR		0x11
+#define DRM_AMDGPU_FREESYNC	        0x14
 
 #define DRM_IOCTL_AMDGPU_GEM_CREATE	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_CREATE, union drm_amdgpu_gem_create)
 #define DRM_IOCTL_AMDGPU_GEM_MMAP	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_MMAP, union drm_amdgpu_gem_mmap)
@@ -59,6 +60,7 @@
 #define DRM_IOCTL_AMDGPU_WAIT_CS	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_WAIT_CS, union drm_amdgpu_wait_cs)
 #define DRM_IOCTL_AMDGPU_GEM_OP		DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_OP, struct drm_amdgpu_gem_op)
 #define DRM_IOCTL_AMDGPU_GEM_USERPTR	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_USERPTR, struct drm_amdgpu_gem_userptr)
+#define DRM_IOCTL_AMDGPU_FREESYNC	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_FREESYNC, struct drm_amdgpu_freesync)
 
 #define AMDGPU_GEM_DOMAIN_CPU		0x1
 #define AMDGPU_GEM_DOMAIN_GTT		0x2
@@ -641,5 +643,18 @@ struct drm_amdgpu_info_hw_ip {
 #define AMDGPU_FAMILY_KV			125 /* Kaveri, Kabini, Mullins */
 #define AMDGPU_FAMILY_VI			130 /* Iceland, Tonga */
 #define AMDGPU_FAMILY_CZ			135 /* Carrizo, Stoney */
+
+/*
+ * Definition of free sync enter and exit signals
+ * We may have more options in the future
+ */
+#define AMDGPU_FREESYNC_FULLSCREEN_ENTER		1
+#define AMDGPU_FREESYNC_FULLSCREEN_EXIT 		2
+
+struct drm_amdgpu_freesync {
+	__u32 op;			/* AMDGPU_FREESYNC_FULLSCREEN_ENTER or */
+				        /* AMDGPU_FREESYNC_FULLSCREEN_ENTER */
+	__u32 spare[7];
+};
 
 #endif
