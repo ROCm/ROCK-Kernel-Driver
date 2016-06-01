@@ -160,7 +160,9 @@ enum xgene_enet_rm {
 #define CFG_CLE_DSTQID0(val)		(val & GENMASK(11, 0))
 #define CFG_CLE_FPSEL0(val)		((val << 16) & GENMASK(19, 16))
 #define ICM_CONFIG0_REG_0_ADDR		0x0400
+#define ICM_CONFIG0_REG_1_ADDR		0x0408
 #define ICM_CONFIG2_REG_0_ADDR		0x0410
+#define ICM_CONFIG2_REG_1_ADDR		0x0414
 #define RX_DV_GATE_REG_0_ADDR		0x05fc
 #define TX_DV_GATE_EN0			BIT(2)
 #define RX_DV_GATE_EN0			BIT(1)
@@ -347,6 +349,8 @@ void xgene_enet_parse_error(struct xgene_enet_desc_ring *ring,
 int xgene_enet_mdio_config(struct xgene_enet_pdata *pdata);
 void xgene_enet_mdio_remove(struct xgene_enet_pdata *pdata);
 bool xgene_ring_mgr_init(struct xgene_enet_pdata *p);
+int xgene_enet_phy_connect(struct net_device *ndev);
+void xgene_enet_phy_disconnect(struct xgene_enet_pdata *pdata);
 
 extern const struct xgene_mac_ops xgene_gmac_ops;
 extern const struct xgene_port_ops xgene_gport_ops;
