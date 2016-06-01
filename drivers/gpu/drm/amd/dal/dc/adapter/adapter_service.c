@@ -1973,7 +1973,9 @@ bool dal_adapter_service_is_lid_open(struct adapter_service *as)
 {
 	bool is_lid_open = false;
 	struct platform_info_params params;
+#if defined(CONFIG_DRM_AMD_DAL_VBIOS_PRESENT)
 	struct dc_bios *dcb = dal_adapter_service_get_bios_parser(as);
+#endif
 
 	params.data = &is_lid_open;
 	params.method = PM_GET_LID_STATE;
