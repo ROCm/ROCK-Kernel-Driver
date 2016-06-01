@@ -438,7 +438,8 @@ struct dc *dc_create(const struct dc_init_data *init_params)
 			core_dc->res_pool->stream_enc_count);
 	core_dc->public.caps.max_links = core_dc->link_count;
 	core_dc->public.caps.max_audios = core_dc->res_pool->audio_count;
-	core_dc->public.caps.max_downscale_ratio =
+	if (core_dc->res_pool->adapter_srv)
+		core_dc->public.caps.max_downscale_ratio =
 			dal_adapter_service_get_downscale_limit(
 					core_dc->res_pool->adapter_srv);
 
