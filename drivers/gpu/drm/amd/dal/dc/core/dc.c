@@ -880,9 +880,8 @@ bool dc_commit_surfaces_to_target(
 	struct core_target *target = DC_TARGET_TO_CORE(dc_target);
 	struct dc_target_status *target_status = NULL;
 	struct validate_context *context;
-#ifdef DIAGS_BUILD
 	struct validate_context *temp_context;
-#endif
+
 	int current_enabled_surface_count = 0;
 	int new_enabled_surface_count = 0;
 	bool is_mpo_turning_on = false;
@@ -960,7 +959,6 @@ bool dc_commit_surfaces_to_target(
 		goto unexpected_fail;
 	}
 
-#ifdef DIAGS_BUILD
 	if (core_dc->res_pool->funcs->apply_clk_constraints) {
 		temp_context = core_dc->res_pool->funcs->apply_clk_constraints(
 				core_dc,
@@ -974,7 +972,6 @@ bool dc_commit_surfaces_to_target(
 		dm_free(context);
 		context = temp_context;
 	}
-#endif
 
 	if (prev_disp_clk < context->bw_results.dispclk_khz ||
 		(is_mpo_turning_on &&
