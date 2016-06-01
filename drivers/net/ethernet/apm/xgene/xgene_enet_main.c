@@ -1182,31 +1182,27 @@ static const struct net_device_ops xgene_ndev_ops = {
 
 #ifdef CONFIG_ACPI
 static void xgene_get_port_id_acpi(struct device *dev,
-				  struct xgene_enet_pdata *pdata)
+				   struct xgene_enet_pdata *pdata)
 {
 	acpi_status status;
 	u64 temp;
 
 	status = acpi_evaluate_integer(ACPI_HANDLE(dev), "_SUN", NULL, &temp);
-	if (ACPI_FAILURE(status)) {
+	if (ACPI_FAILURE(status))
 		pdata->port_id = 0;
-	} else {
+	else
 		pdata->port_id = temp;
-	}
-
-	return;
 }
 #endif
 
-static void xgene_get_port_id_dt(struct device *dev, struct xgene_enet_pdata *pdata)
+static void xgene_get_port_id_dt(struct device *dev,
+				 struct xgene_enet_pdata *pdata)
 {
 	u32 id = 0;
 
 	of_property_read_u32(dev->of_node, "port-id", &id);
 
 	pdata->port_id = id & BIT(0);
-
-	return;
 }
 
 static int xgene_get_tx_delay(struct xgene_enet_pdata *pdata)
@@ -1284,6 +1280,86 @@ static int xgene_enet_get_irqs(struct xgene_enet_pdata *pdata)
 	return 0;
 }
 
+static int xgene_enet_check_phy_handle(struct xgene_enet_pdata *pdata)
+{
+	struct device *dev = &pdata->pdev->dev;
+	int ret, phy_id, phy_mode = pdata->phy_mode;
+	struct device_node *mdio_np = NULL;
+	const char *ph;
+#ifdef CONFIG_ACPI
+	struct acpi_reference_args args;
+	struct fwnode_handle *fw_node;
+#endif
+
+	if (!IS_ENABLED(CONFIG_MDIO_XGENE))
+		return 0;
+
+	if (dev->of_node) {
+		ret = device_property_read_string(dev, "phy-handle", &ph);
+
+		if (phy_mode == PHY_INTERFACE_MODE_RGMII) {
+			if (ret) {
+				dev_err(dev, "Unable to get phy-handle\n");
+				return ret;
+			}
+
+			mdio_np = of_find_compatible_node(dev->of_node, NULL,
+							  "apm,xgene-mdio");
+			if (!mdio_np)
+				pdata->mdio_driver = true;
+			else
+				pdata->mdio_np = mdio_np;
+		} else {
+			if (!ret)
+				pdata->mdio_driver = true;
+		}
+	} else {
+#ifdef CONFIG_ACPI
+		fw_node = acpi_fwnode_handle(ACPI_COMPANION(dev));
+		ret = acpi_node_get_property_reference(fw_node, "mboxes", 0,
+						       &args);
+		if (!ACPI_FAILURE(ret)) {
+			pdata->mdio_driver = true;
+			pdata->phy_dev =  args.adev->driver_data;
+		} else {
+			ret = device_property_read_u32(dev, "phy-channel",
+						       &phy_id);
+			if (ret) {
+				ret = device_property_read_u32(dev, "phy-addr",
+							       &phy_id);
+			}
+
+			if (!ret)
+				pdata->phy_id = phy_id;
+		}
+#endif
+	}
+
+	return 0;
+}
+
+static int xgene_enet_get_clk(struct xgene_enet_pdata *pdata)
+{
+	struct device *dev = &pdata->pdev->dev;
+
+	if (!dev->of_node)
+		return 0;
+
+	pdata->clk = devm_clk_get(dev, NULL);
+	if (IS_ERR(pdata->clk)) {
+		if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII) {
+			dev_err(dev, "Unable to get clock\n");
+			return -ENODEV;
+		} else {
+			/* Firmware may have set up the clock already. */
+			dev_info(dev, "clocks have been setup already\n");
+			pdata->clk = NULL;
+		}
+	}
+
+	return 0;
+}
+
 static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
 {
 	struct platform_device *pdev;
@@ -1292,7 +1368,6 @@ static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
 	struct resource *res;
 	void __iomem *base_addr;
 	u32 offset;
-	const char *ph;
 	int ret = 0;
 
 	pdev = pdata->pdev;
@@ -1370,15 +1445,13 @@ static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
 	if (ret)
 		return ret;
 
-	ret = device_property_read_string(dev, "phy-handle", &ph);
-	if (!ret)
-		pdata->mdio_driver = true;
+	ret = xgene_enet_check_phy_handle(pdata);
+	if (ret)
+		return ret;
 
-	pdata->clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(pdata->clk)) {
-		/* Firmware may have set up the clock already. */
-		dev_info(dev, "clocks have been setup already\n");
-	}
+	ret = xgene_enet_get_clk(pdata);
+	if (ret)
+		return ret;
 
 	if ((pdata->phy_mode != PHY_INTERFACE_MODE_XGMII) &&
 	    (pdata->enet_id == XGENE_ENET1))
@@ -1434,8 +1507,6 @@ static int xgene_enet_init_hw(struct xgene_enet_pdata *pdata)
 		}
 	}
 
-	dst_ring_num = xgene_enet_dst_ring_num(pdata->rx_ring[0]);
-	buf_pool = pdata->rx_ring[0]->buf_pool;
 	if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
 		/* Initialize and Enable  PreClassifier Tree */
 		enet_cle->max_nodes = 512;
@@ -1451,9 +1522,12 @@ static int xgene_enet_init_hw(struct xgene_enet_pdata *pdata)
 			return ret;
 		}
 	} else {
+		dst_ring_num = xgene_enet_dst_ring_num(pdata->rx_ring[0]);
+		buf_pool = pdata->rx_ring[0]->buf_pool;
 		pdata->port_ops->cle_bypass(pdata, dst_ring_num, buf_pool->id);
 	}
 
+	pdata->phy_speed = SPEED_UNKNOWN;
 	pdata->mac_ops->init(pdata);
 
 	return ret;
@@ -1563,22 +1637,6 @@ static void xgene_enet_napi_add(struct xgene_enet_pdata *pdata)
 	}
 }
 
-static void xgene_enet_napi_del(struct xgene_enet_pdata *pdata)
-{
-	struct napi_struct *napi;
-	int i;
-
-	for (i = 0; i < pdata->rxq_cnt; i++) {
-		napi = &pdata->rx_ring[i]->napi;
-		netif_napi_del(napi);
-	}
-
-	for (i = 0; i < pdata->cq_cnt; i++) {
-		napi = &pdata->tx_ring[i]->cp_ring->napi;
-		netif_napi_del(napi);
-	}
-}
-
 static int xgene_enet_probe(struct platform_device *pdev)
 {
 	struct net_device *ndev;
@@ -1609,10 +1667,10 @@ static int xgene_enet_probe(struct platform_device *pdev)
 	of_id = of_match_device(xgene_enet_of_match, &pdev->dev);
 	if (of_id) {
 		pdata->enet_id = (enum xgene_enet_id)of_id->data;
-	}
-	else {
+	} else {
 #ifdef CONFIG_ACPI
 		const struct acpi_device_id *acpi_id;
+		enum xgene_enet_id enet_id;
 
 		acpi_id = acpi_match_device(xgene_enet_acpi_match, &pdev->dev);
 		if (acpi_id) {
@@ -1621,6 +1679,7 @@ static int xgene_enet_probe(struct platform_device *pdev)
 		}
 #endif
 	}
+
 	if (!pdata->enet_id) {
 		free_netdev(ndev);
 		return -ENODEV;
@@ -1655,23 +1714,25 @@ static int xgene_enet_probe(struct platform_device *pdev)
 		goto err_netdev;
 
 	link_state = pdata->mac_ops->link_state;
-	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII) {
-		ret = xgene_enet_mdio_config(pdata);
-		if (ret)
-			goto err_netdev;
-	} else if (pdata->phy_mode == PHY_INTERFACE_MODE_SGMII) {
+	ret = 0;
+	if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
+		INIT_DELAYED_WORK(&pdata->link_work, link_state);
+	} else {
 		if (pdata->mdio_driver)
 			ret = xgene_enet_phy_connect(ndev);
+		else if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII)
+			ret = xgene_enet_mdio_config(pdata);
 		else
 			INIT_DELAYED_WORK(&pdata->link_work, link_state);
-	} else {
-		INIT_DELAYED_WORK(&pdata->link_work, link_state);
 	}
+	if (ret)
+		goto err;
 
 	xgene_enet_napi_add(pdata);
 	return 0;
 err_netdev:
-	unregister_netdev(ndev);
+	if (ndev->reg_state == NETREG_REGISTERED)
+		unregister_netdev(ndev);
 err:
 	free_netdev(ndev);
 	return ret;
@@ -1690,11 +1751,16 @@ static int xgene_enet_remove(struct platform_device *pdev)
 	mac_ops->rx_disable(pdata);
 	mac_ops->tx_disable(pdata);
 
-	xgene_enet_napi_del(pdata);
-	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII)
-		xgene_enet_mdio_remove(pdata);
-	else if (pdata->phy_mode == PHY_INTERFACE_MODE_SGMII)
+	rtnl_lock();
+	if (netif_running(ndev))
+		dev_close(ndev);
+	rtnl_unlock();
+
+	if (pdata->mdio_driver)
 		xgene_enet_phy_disconnect(pdata);
+	else if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII)
+		xgene_enet_mdio_remove(pdata);
+
 	unregister_netdev(ndev);
 	xgene_enet_delete_desc_rings(pdata);
 	pdata->port_ops->shutdown(pdata);

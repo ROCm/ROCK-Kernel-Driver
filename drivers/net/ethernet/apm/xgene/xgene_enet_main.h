@@ -212,6 +212,8 @@ struct xgene_enet_pdata {
 	u32 mss;
 	u8 tx_delay;
 	u8 rx_delay;
+	struct device_node *mdio_np;
+	int phy_id;
 	bool mdio_driver;
 };
 

@@ -257,9 +257,7 @@ static void xgene_sgmac_set_speed(struct xgene_enet_pdata *p)
 	u32 mc2, value;
 
 	if (p->phy_speed != SPEED_UNKNOWN) {
-		value = xgene_mii_phy_read(p, INT_PHY_ADDR,
-					   SGMII_BASE_PAGE_ABILITY_ADDR >> 2);
-		if (!(value & LINK_UP)) {
+		if (!xgene_enet_link_status(p)) {
 			xgene_mii_phy_write(p, INT_PHY_ADDR,
 					    SGMII_TBI_CONTROL_ADDR >> 2,
 					    0x8000);
@@ -325,7 +323,8 @@ static void xgene_sgmac_init(struct xgene_enet_pdata *p)
 	u32 enet_spare_cfg_reg, rsif_config_reg;
 	u32 cfg_bypass_reg, rx_dv_gate_reg;
 
-	xgene_sgmac_reset(p);
+	if (!(p->enet_id == XGENE_ENET2 && p->mdio_driver))
+		xgene_sgmac_reset(p);
 
 	/* Enable auto-negotiation */
 	xgene_mii_phy_write(p, INT_PHY_ADDR, SGMII_TBI_CONTROL_ADDR >> 2,
@@ -416,6 +415,8 @@ static void xgene_sgmac_tx_disable(struct xgene_enet_pdata *p)
 
 static int xgene_enet_reset(struct xgene_enet_pdata *p)
 {
+	int ret;
+
 	if (!xgene_ring_mgr_init(p))
 		return -ENODEV;
 
@@ -428,7 +429,9 @@ static int xgene_enet_reset(struct xgene_enet_pdata *p)
 		clk_prepare_enable(p->clk);
 	}
 
-	xgene_enet_ecc_init(p);
+	ret = xgene_enet_ecc_init(p);
+	if (ret)
+		return ret;
 	xgene_enet_config_ring_if_assoc(p);
 
 	return 0;

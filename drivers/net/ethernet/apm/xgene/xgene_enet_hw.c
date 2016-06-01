@@ -476,9 +476,13 @@ static void xgene_gmac_reset(struct xgene_enet_pdata *pdata)
 static void xgene_enet_configure_clock(struct xgene_enet_pdata *pdata)
 {
 	struct device *dev = &pdata->pdev->dev;
+	struct clk *parent;
 
 	if (dev->of_node) {
-		struct clk *parent = clk_get_parent(pdata->clk);
+		if (IS_ERR(pdata->clk))
+			return;
+
+		parent = clk_get_parent(pdata->clk);
 
 		switch (pdata->phy_speed) {
 		case SPEED_10:
@@ -571,6 +575,9 @@ static void xgene_gmac_set_speed(struct xgene_enet_pdata *pdata)
 static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
 {
 	u32 value;
+
+	if (!pdata->mdio_driver)
+		xgene_gmac_reset(pdata);
 
 	xgene_gmac_set_speed(pdata);
 	xgene_gmac_set_mac_addr(pdata);
@@ -677,6 +684,14 @@ static int xgene_enet_reset(struct xgene_enet_pdata *pdata)
 	if (!xgene_ring_mgr_init(pdata))
 		return -ENODEV;
 
+	if (!pdata->mdio_driver) {
+		if (!IS_ERR(pdata->clk)) {
+			clk_prepare_enable(pdata->clk);
+			clk_disable_unprepare(pdata->clk);
+			clk_prepare_enable(pdata->clk);
+			xgene_enet_ecc_init(pdata);
+		}
+	}
 	xgene_enet_config_ring_if_assoc(pdata);
 
 	return 0;
@@ -799,27 +814,9 @@ static int xgene_mdiobus_register(struct xgene_enet_pdata *pdata,
 				  struct mii_bus *mdio)
 {
 	struct device *dev = &pdata->pdev->dev;
-	struct device_node *mdio_np = NULL;
-	struct device_node *child_np;
-	u32 phyid;
 
 	if (dev->of_node) {
-		for_each_child_of_node(dev->of_node, child_np) {
-			if (of_device_is_compatible(child_np,
-						    "apm,xgene-mdio")) {
-				mdio_np = child_np;
-				break;
-			}
-		}
-
-		if (!mdio_np) {
-			mdiobus_free(mdio);
-			return 0;
-		}
-
-		pdata->mdio_driver = false;
-
-		return of_mdiobus_register(mdio, mdio_np);
+		return of_mdiobus_register(mdio, pdata->mdio_np);
 	} else {
 #ifdef CONFIG_ACPI
 		struct phy_device *phy;
@@ -840,13 +837,7 @@ static int xgene_mdiobus_register(struct xgene_enet_pdata *pdata,
 			return ret;
 
 
-		ret = device_property_read_u32(dev, "phy-channel", &phyid);
-		if (ret)
-			ret = device_property_read_u32(dev, "phy-addr", &phyid);
-		if (ret)
-			return -EINVAL;
-
-		phy = get_phy_device(mdio, phy_id, false);
+		phy = get_phy_device(mdio, pdata->phy_id, false);
 		if (IS_ERR(phy))
 			return -EIO;
 
@@ -860,6 +851,8 @@ static int xgene_mdiobus_register(struct xgene_enet_pdata *pdata,
 		return ret;
 #endif
 	}
+
+	return 0;
 }
 
 int xgene_enet_mdio_config(struct xgene_enet_pdata *pdata)
@@ -887,10 +880,6 @@ int xgene_enet_mdio_config(struct xgene_enet_pdata *pdata)
 		if (mdio_bus->state == MDIOBUS_REGISTERED)
 			mdiobus_unregister(pdata->mdio_bus);
 		mdiobus_free(mdio_bus);
-		if (pdata->mdio_driver) {
-			ret = xgene_enet_phy_connect(ndev);
-			return 0;
-		}
 		return ret;
 	}
 	pdata->mdio_bus = mdio_bus;
@@ -913,11 +902,9 @@ void xgene_enet_mdio_remove(struct xgene_enet_pdata *pdata)
 	if (pdata->phy_dev)
 		phy_disconnect(pdata->phy_dev);
 
-	if (!pdata->mdio_driver) {
-		mdiobus_unregister(pdata->mdio_bus);
-		mdiobus_free(pdata->mdio_bus);
-		pdata->mdio_bus = NULL;
-	}
+	mdiobus_unregister(pdata->mdio_bus);
+	mdiobus_free(pdata->mdio_bus);
+	pdata->mdio_bus = NULL;
 }
 
 const struct xgene_mac_ops xgene_gmac_ops = {
