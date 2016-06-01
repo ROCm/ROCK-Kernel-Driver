@@ -287,18 +287,43 @@ static void calculate_viewport(
 		const struct dc_surface *surface,
 		struct pipe_ctx *pipe_ctx)
 {
+	const struct rect stream_src = pipe_ctx->stream->public.src;
 	const struct rect src = surface->src_rect;
-	const struct rect clip = surface->clip_rect;
 	const struct rect dst = surface->dst_rect;
+	const struct rect surface_clip = surface->clip_rect;
+	struct rect clip = {0};
+
+	/* The actual clip is an intersection between stream
+	 * source and surface clip
+	 */
+	clip.x = stream_src.x > surface_clip.x ?
+			stream_src.x : surface_clip.x;
+
+	clip.width = stream_src.x + stream_src.width <
+			surface_clip.x + surface_clip.width ?
+			stream_src.x + stream_src.width - clip.x :
+			surface_clip.x + surface_clip.width - clip.x ;
+
+	clip.y = stream_src.y > surface_clip.y ?
+			stream_src.y : surface_clip.y;
+
+	clip.height = stream_src.y + stream_src.height <
+			surface_clip.y + surface_clip.height ?
+			stream_src.y + stream_src.height - clip.y :
+			surface_clip.y + surface_clip.height - clip.y ;
 
 	/* offset = src.ofs + (clip.ofs - dst.ofs) * scl_ratio
 	 * num_pixels = clip.num_pix * scl_ratio
 	 */
-	pipe_ctx->scl_data.viewport.x = src.x + (clip.x - dst.x) * src.width / dst.width;
-	pipe_ctx->scl_data.viewport.width = clip.width * src.width / dst.width;
+	pipe_ctx->scl_data.viewport.x = src.x + (clip.x - dst.x) *
+			src.width / dst.width;
+	pipe_ctx->scl_data.viewport.width = clip.width *
+			src.width / dst.width;
 
-	pipe_ctx->scl_data.viewport.y = src.y + (clip.y - dst.y) * src.height / dst.height;
-	pipe_ctx->scl_data.viewport.height = clip.height * src.height / dst.height;
+	pipe_ctx->scl_data.viewport.y = src.y + (clip.y - dst.y) *
+			src.height / dst.height;
+	pipe_ctx->scl_data.viewport.height = clip.height *
+			src.height / dst.height;
 
 	/* Minimum viewport such that 420/422 chroma vp is non 0 */
 	if (pipe_ctx->scl_data.viewport.width < 2)
