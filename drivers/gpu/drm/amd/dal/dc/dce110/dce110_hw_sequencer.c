@@ -1640,6 +1640,13 @@ static void init_hw(struct core_dc *dc)
 	}
 }
 
+static void enable_memory_request(
+	struct pipe_ctx *pipe_ctx,
+	bool enable)
+{
+	pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, enable);
+}
+
 static const struct hw_sequencer_funcs dce110_funcs = {
 	.init_hw = init_hw,
 	.apply_ctx_to_hw = apply_ctx_to_hw,
@@ -1661,7 +1668,8 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.clock_gating_power_up = dal_dc_clock_gating_dce110_power_up,/*todo*/
 	.set_display_clock = set_display_clock,
 	.set_displaymarks = set_displaymarks,
-	.set_drr = set_drr
+	.set_drr = set_drr,
+	.enable_memory_request = enable_memory_request
 };
 
 bool dce110_hw_sequencer_construct(struct core_dc *dc)

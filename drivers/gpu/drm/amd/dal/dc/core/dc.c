@@ -375,10 +375,7 @@ static int8_t acquire_first_free_underlay(
 			DCE110_UNDERLAY_IDX,
 			dcb, PIPE_GATING_CONTROL_DISABLE);
 
-		if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
-			dm_error("DC: failed to blank crtc!\n");
-			BREAK_TO_DEBUGGER();
-		}
+		core_dc->hwss.enable_memory_request(pipe_ctx, false);
 
 		if (!pipe_ctx->tg->funcs->enable_crtc(pipe_ctx->tg)) {
 			BREAK_TO_DEBUGGER();
@@ -540,7 +537,9 @@ static bool targets_changed(
 	return false;
 }
 
-static void target_enable_memory_requests(struct dc_target *dc_target,
+static void target_enable_memory_requests(
+		struct core_dc *core_dc,
+		struct dc_target *dc_target,
 		struct resource_context *res_ctx)
 {
 	uint8_t i, j;
@@ -548,21 +547,19 @@ static void target_enable_memory_requests(struct dc_target *dc_target,
 
 	for (i = 0; i < target->public.stream_count; i++) {
 		for (j = 0; j < MAX_PIPES; j++) {
-			struct timing_generator *tg = res_ctx->pipe_ctx[j].tg;
-
 			if (res_ctx->pipe_ctx[j].stream !=
 				DC_STREAM_TO_CORE(target->public.streams[i]))
 				continue;
 
-			if (!tg->funcs->set_blank(tg, false)) {
-				dm_error("DC: failed to unblank crtc!\n");
-				BREAK_TO_DEBUGGER();
-			}
+			core_dc->hwss.enable_memory_request(
+					&res_ctx->pipe_ctx[j], true);
 		}
 	}
 }
 
-static void target_disable_memory_requests(struct dc_target *dc_target,
+static void target_disable_memory_requests(
+		struct core_dc *core_dc,
+		struct dc_target *dc_target,
 		struct resource_context *res_ctx)
 {
 	uint8_t i, j;
@@ -570,16 +567,12 @@ static void target_disable_memory_requests(struct dc_target *dc_target,
 
 	for (i = 0; i < target->public.stream_count; i++) {
 		for (j = 0; j < MAX_PIPES; j++) {
-			struct timing_generator *tg = res_ctx->pipe_ctx[j].tg;
-
 			if (res_ctx->pipe_ctx[j].stream !=
 				DC_STREAM_TO_CORE(target->public.streams[i]))
 				continue;
 
-			if (!tg->funcs->set_blank(tg, true)) {
-				dm_error("DC: failed to blank crtc!\n");
-				BREAK_TO_DEBUGGER();
-			}
+			core_dc->hwss.enable_memory_request(
+					&res_ctx->pipe_ctx[j], false);
 		}
 	}
 }
@@ -784,7 +777,9 @@ bool dc_commit_targets(
 	for (i = 0; i < core_dc->current_context.target_count; i++) {
 		/*TODO: optimize this to happen only when necessary*/
 		target_disable_memory_requests(
-				&core_dc->current_context.targets[i]->public, &core_dc->current_context.res_ctx);
+				core_dc,
+				&core_dc->current_context.targets[i]->public,
+				&core_dc->current_context.res_ctx);
 	}
 
 	if (result == DC_OK) {
@@ -796,7 +791,10 @@ bool dc_commit_targets(
 		struct core_sink *sink = DC_SINK_TO_CORE(dc_target->streams[0]->sink);
 
 		if (context->target_status[i].surface_count > 0)
-			target_enable_memory_requests(dc_target, &core_dc->current_context.res_ctx);
+			target_enable_memory_requests(
+					core_dc,
+					dc_target,
+					&core_dc->current_context.res_ctx);
 
 		CONN_MSG_MODE(sink->link, "{%dx%d, %dx%d@%dKhz}",
 				dc_target->streams[0]->timing.h_addressable,
@@ -917,7 +915,10 @@ bool dc_commit_surfaces_to_target(
 	}
 
 	if (current_enabled_surface_count > 0 && new_enabled_surface_count == 0)
-		target_disable_memory_requests(dc_target, &core_dc->current_context.res_ctx);
+		target_disable_memory_requests(
+				core_dc,
+				dc_target,
+				&core_dc->current_context.res_ctx);
 
 	for (i = 0; i < new_surface_count; i++)
 		for (j = 0; j < MAX_PIPES; j++) {
