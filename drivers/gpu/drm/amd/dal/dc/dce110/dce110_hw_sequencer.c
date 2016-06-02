@@ -1597,9 +1597,125 @@ static void init_hw(struct core_dc *dc)
 	}
 }
 
+static enum dc_status apply_ctx_to_surface(
+		struct core_dc *dc,
+		struct validate_context *context,
+		struct dc_surface *new_surfaces[],
+		uint8_t new_surface_count)
+{
+	int i, j;
+
+	for (i = 0; i < new_surface_count; i++)
+		for (j = 0; j < context->res_ctx.pool->pipe_count; j++) {
+			struct dc_surface *dc_surface = new_surfaces[i];
+			struct core_surface *surface =
+						DC_SURFACE_TO_CORE(dc_surface);
+			struct pipe_ctx *pipe_ctx =
+						&context->res_ctx.pipe_ctx[j];
+			struct core_gamma *gamma = NULL;
+			int lock_mask =
+				PIPE_LOCK_CONTROL_GRAPHICS |
+				PIPE_LOCK_CONTROL_SCL |
+				PIPE_LOCK_CONTROL_BLENDER |
+				PIPE_LOCK_CONTROL_MODE;
+
+			if (pipe_ctx->surface !=
+					DC_SURFACE_TO_CORE(new_surfaces[i]))
+				continue;
+
+
+			dal_logger_write(dc->ctx->logger,
+					LOG_MAJOR_INTERFACE_TRACE,
+					LOG_MINOR_COMPONENT_DC,
+					"Pipe:%d 0x%x: addr hi:0x%x, "
+					"addr low:0x%x, "
+					"src: %d, %d, %d,"
+					" %d; dst: %d, %d, %d, %d;\n",
+					pipe_ctx->pipe_idx,
+					dc_surface,
+					dc_surface->address.grph.addr.high_part,
+					dc_surface->address.grph.addr.low_part,
+					dc_surface->src_rect.x,
+					dc_surface->src_rect.y,
+					dc_surface->src_rect.width,
+					dc_surface->src_rect.height,
+					dc_surface->dst_rect.x,
+					dc_surface->dst_rect.y,
+					dc_surface->dst_rect.width,
+					dc_surface->dst_rect.height);
+
+
+			dal_logger_write(dc->ctx->logger,
+					LOG_MAJOR_HW_TRACE,
+					LOG_MINOR_HW_TRACE_SET_MODE,
+					"Pipe %d: width, height, x, y\n"
+					"viewport:%d, %d, %d, %d\n"
+					"recout:  %d, %d, %d, %d\n",
+					pipe_ctx->pipe_idx,
+					pipe_ctx->scl_data.viewport.width,
+					pipe_ctx->scl_data.viewport.height,
+					pipe_ctx->scl_data.viewport.x,
+					pipe_ctx->scl_data.viewport.y,
+					pipe_ctx->scl_data.recout.width,
+					pipe_ctx->scl_data.recout.height,
+					pipe_ctx->scl_data.recout.x,
+					pipe_ctx->scl_data.recout.y);
+
+			if (!pipe_ctx->surface->public.flip_immediate)
+				lock_mask |= PIPE_LOCK_CONTROL_SURFACE;
+
+			dc->hwss.pipe_control_lock(
+					dc->ctx,
+					pipe_ctx->pipe_idx,
+					lock_mask,
+					true);
+
+			dc->hwss.set_plane_config(
+					dc, pipe_ctx, &context->res_ctx);
+
+			dc->hwss.update_plane_addr(dc, pipe_ctx);
+
+			if (surface->public.gamma_correction)
+				gamma = DC_GAMMA_TO_CORE(
+					surface->public.gamma_correction);
+
+			dc->hwss.set_gamma_correction(
+					pipe_ctx->ipp,
+					pipe_ctx->opp,
+					gamma, surface);
+
+		}
+
+	/* Go in reverse order so that all pipes are unlocked simultaneously
+	 * when pipe 0 is unlocked
+	 * Need PIPE_LOCK_CONTROL_MODE to be 1 for this
+	 */
+	for (j = context->res_ctx.pool->pipe_count - 1; j >= 0; j--)
+		for (i = new_surface_count - 1; i >= 0; i--) {
+			struct pipe_ctx *pipe_ctx =
+						&context->res_ctx.pipe_ctx[j];
+
+			if (pipe_ctx->surface !=
+					DC_SURFACE_TO_CORE(new_surfaces[i]))
+				continue;
+
+			dc->hwss.pipe_control_lock(
+					dc->ctx,
+					pipe_ctx->pipe_idx,
+					PIPE_LOCK_CONTROL_GRAPHICS |
+					PIPE_LOCK_CONTROL_SCL |
+					PIPE_LOCK_CONTROL_BLENDER |
+					PIPE_LOCK_CONTROL_SURFACE,
+					false);
+		}
+
+	return DC_OK;
+}
+
 static const struct hw_sequencer_funcs dce110_funcs = {
 	.init_hw = init_hw,
 	.apply_ctx_to_hw = apply_ctx_to_hw,
+	.apply_ctx_to_surface = apply_ctx_to_surface,
 	.set_plane_config = set_plane_config,
 	.update_plane_addr = update_plane_addr,
 	.set_gamma_correction = set_gamma_ramp,
