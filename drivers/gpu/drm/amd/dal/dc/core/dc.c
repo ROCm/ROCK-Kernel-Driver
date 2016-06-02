@@ -1225,7 +1225,7 @@ void dc_flip_surface_addrs(
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
 	int i, j;
-	int pipe_count = core_dc->current_context->res_ctx.pool->pipe_count;
+	int pipe_count = core_dc->res_pool->pipe_count;
 
 	for (i = 0; i < count; i++)
 		for (j = 0; j < pipe_count; j++) {
