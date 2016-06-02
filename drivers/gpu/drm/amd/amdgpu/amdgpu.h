@@ -2128,6 +2128,7 @@ void amdgpu_io_wreg(struct amdgpu_device *adev, u32 reg, u32 v);
 
 u32 amdgpu_mm_rdoorbell(struct amdgpu_device *adev, u32 index);
 void amdgpu_mm_wdoorbell(struct amdgpu_device *adev, u32 index, u32 v);
+bool amdgpu_device_asic_has_dal_support(enum amd_asic_type asic_type);
 bool amdgpu_device_has_dal_support(struct amdgpu_device *adev);
 /*
  * Registers read & write functions.
