@@ -470,7 +470,7 @@ static int dm_suspend(void *handle)
 	 * dm_display_resume
 	 */
 	drm_modeset_lock_all(adev->ddev);
-	drm_for_each_crtc(crtc, adev->ddev) {
+	list_for_each_entry(crtc, &adev->ddev->mode_config.crtc_list, head) {
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 		if (acrtc->target)
 				drm_crtc_vblank_off(crtc);
@@ -664,7 +664,7 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 	amdgpu_dm_irq_resume_early(adev);
 
 	drm_modeset_lock_all(ddev);
-	drm_for_each_crtc(crtc, ddev) {
+	list_for_each_entry(crtc, &ddev->mode_config.crtc_list, head) {
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 		if (acrtc->target)
 				drm_crtc_vblank_on(crtc);
