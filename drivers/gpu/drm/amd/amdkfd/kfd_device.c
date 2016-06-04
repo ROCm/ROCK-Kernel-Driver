@@ -25,6 +25,7 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/highmem.h>
+#include <linux/debugfs.h>
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_pm4_headers.h"
@@ -331,6 +332,58 @@ static void kfd_cwsr_fini(struct kfd_dev *kfd)
 		__free_pages(kfd->cwsr_pages, get_order(kfd->cwsr_size));
 }
 
+#if defined(CONFIG_DEBUG_FS)
+
+static int kfd_debugfs_open(struct inode *inode, struct file *file)
+{
+	int (*show)(struct seq_file *, void *) = inode->i_private;
+
+	return single_open(file, show, NULL);
+}
+
+static const struct file_operations kfd_debugfs_fops = {
+	.owner = THIS_MODULE,
+	.open = kfd_debugfs_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static void kfd_debugfs_init(struct kfd_dev *kfd)
+{
+	struct dentry *ent;
+
+	kfd->debugfs_root = debugfs_create_dir("kfd", NULL);
+	if (kfd->debugfs_root == NULL ||
+	    kfd->debugfs_root == ERR_PTR(-ENODEV)) {
+		dev_warn(kfd_device, "Failed to create kfd debugfs dir\n");
+		return;
+	}
+
+	ent = debugfs_create_file("mqds", S_IFREG | S_IRUGO, kfd->debugfs_root,
+				  kfd_debugfs_mqds_by_process,
+				  &kfd_debugfs_fops);
+	if (ent == NULL)
+		dev_warn(kfd_device, "Failed to create mqds in kfd debugfs\n");
+}
+
+static void kfd_debugfs_fini(struct kfd_dev *kfd)
+{
+	debugfs_remove_recursive(kfd->debugfs_root);
+}
+
+#else
+
+static void kfd_debugfs_init(struct kfd_dev *kfd)
+{
+}
+
+static void kfd_debugfs_fini(struct kfd_dev *kfd)
+{
+}
+
+#endif
+
 bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			 const struct kgd2kfd_shared_resources *gpu_resources)
 {
@@ -439,6 +492,8 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	if (kfd_resume(kfd))
 		goto kfd_resume_error;
 
+	kfd_debugfs_init(kfd);
+
 	kfd->dbgmgr = NULL;
 
 	kfd->init_complete = true;
@@ -472,6 +527,7 @@ out:
 void kgd2kfd_device_exit(struct kfd_dev *kfd)
 {
 	if (kfd->init_complete) {
+		kfd_debugfs_fini(kfd);
 		kgd2kfd_suspend(kfd);
 		kfd_cwsr_fini(kfd);
 		device_queue_manager_uninit(kfd->dqm);
