@@ -34,6 +34,7 @@
 #include <linux/kfd_ioctl.h>
 #include <linux/pid.h>
 #include <linux/interval_tree.h>
+#include <linux/seq_file.h>
 #include <kgd_kfd_interface.h>
 
 #include "amd_rdma.h"
@@ -269,6 +270,11 @@ struct kfd_dev {
 	struct page *cwsr_pages;
 	uint32_t cwsr_size;
 	uint32_t tma_offset;  /*Offset for TMA from the  start of cwsr_mem*/
+
+	/* Debugfs */
+#if defined(CONFIG_DEBUG_FS)
+	struct dentry *debugfs_root;
+#endif
 };
 
 struct kfd_bo {
@@ -911,5 +917,12 @@ int restore(struct kfd_dev *kfd);
 int kfd_init_peer_direct(void);
 void kfd_close_peer_direct(void);
 
+/* Debugfs */
+#if defined(CONFIG_DEBUG_FS)
+
+int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data);
+int pqm_debugfs_mqds(struct seq_file *m, void *data);
+
+#endif
 
 #endif
