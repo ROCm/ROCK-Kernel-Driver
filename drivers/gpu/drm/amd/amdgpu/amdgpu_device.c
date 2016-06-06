@@ -1988,7 +1988,11 @@ retry:
 		}
 	}
 
-	drm_helper_resume_force_mode(adev->ddev);
+	if (amdgpu_device_has_dal_support(adev))
+		/* TODO needed from DAL, otherwise the mode cannot be back */
+		;
+	else
+		drm_helper_resume_force_mode(adev->ddev);
 
 	ttm_bo_unlock_delayed_workqueue(&adev->mman.bdev, resched);
 	if (r) {
