@@ -745,6 +745,9 @@ bool dc_link_detect(const struct dc_link *dc_link, bool boot)
 			LINK_INFO("link=%d, mst branch is now Disconnected\n",
 				link->public.link_index);
 			dm_helpers_dp_mst_stop_top_mgr(link->ctx, &link->public);
+
+			link->mst_stream_alloc_table.stream_count = 0;
+			memset(link->mst_stream_alloc_table.stream_allocations, 0, sizeof(link->mst_stream_alloc_table.stream_allocations));
 		}
 
 		link->public.type = dc_connection_none;
