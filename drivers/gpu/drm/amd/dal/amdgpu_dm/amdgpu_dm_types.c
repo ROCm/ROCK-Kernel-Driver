@@ -438,6 +438,12 @@ static void fill_plane_attributes_from_fb(
 	case DRM_FORMAT_ARGB8888:
 		surface->format = SURFACE_PIXEL_FORMAT_GRPH_ARGB8888;
 		break;
+	case DRM_FORMAT_ARGB2101010:
+		surface->format = SURFACE_PIXEL_FORMAT_GRPH_ARGB2101010;
+		break;
+	case DRM_FORMAT_ABGR2101010:
+		surface->format = SURFACE_PIXEL_FORMAT_GRPH_ABGR2101010;
+		break;
 	default:
 		DRM_ERROR("Unsupported screen depth %d\n", fb->bits_per_pixel);
 		return;
