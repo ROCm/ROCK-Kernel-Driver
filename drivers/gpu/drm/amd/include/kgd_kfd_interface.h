@@ -169,6 +169,12 @@ struct kgd2kfd_shared_resources {
  * @hqd_sdma_load: Loads the SDMA mqd structure to a H/W SDMA hqd slot.
  * used only for no HWS mode.
  *
+ * @hqd_dump: Dumps CPC HQD registers to an array of address-value pairs.
+ * Array is allocated with kmalloc, needs to be freed with kfree by caller.
+ *
+ * @hqd_sdma_dump: Dumps SDMA HQD registers to an array of address-value pairs.
+ * Array is allocated with kmalloc, needs to be freed with kfree by caller.
+ *
  * @hqd_is_occupies: Checks if a hqd slot is occupied.
  *
  * @hqd_destroy: Destructs and preempts the queue assigned to that hqd slot.
@@ -241,6 +247,14 @@ struct kfd2kgd_calls {
 				uint32_t page_table_base);
 
 	int (*hqd_sdma_load)(struct kgd_dev *kgd, void *mqd);
+
+	int (*hqd_dump)(struct kgd_dev *kgd,
+			uint32_t pipe_id, uint32_t queue_id,
+			uint32_t (**dump)[2], uint32_t *n_regs);
+
+	int (*hqd_sdma_dump)(struct kgd_dev *kgd,
+			     uint32_t engine_id, uint32_t queue_id,
+			     uint32_t (**dump)[2], uint32_t *n_regs);
 
 	bool (*hqd_is_occupied)(struct kgd_dev *kgd, uint64_t queue_address,
 				uint32_t pipe_id, uint32_t queue_id);
