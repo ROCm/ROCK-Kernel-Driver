@@ -298,8 +298,8 @@ struct pipe_ctx {
 
 	uint8_t pipe_idx;
 
-	struct pipe_ctx *primary_pipe;
-	struct pipe_ctx *secondary_pipe;
+	struct pipe_ctx *top_pipe;
+	struct pipe_ctx *bottom_pipe;
 };
 
 struct resource_context {

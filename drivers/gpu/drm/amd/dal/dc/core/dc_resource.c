@@ -525,7 +525,7 @@ bool resource_attach_surfaces_to_context(
 			struct core_surface *surface = NULL;
 
 			/* Skip surface assignment for child pipes */
-			if (context->res_ctx.pipe_ctx[j].primary_pipe != NULL)
+			if (context->res_ctx.pipe_ctx[j].top_pipe != NULL)
 				continue;
 
 			if (surface_count)
@@ -1356,11 +1356,11 @@ void resource_validate_ctx_copy_construct(
 	for (i = 0; i < dst_ctx->res_ctx.pool->pipe_count; i++) {
 		struct pipe_ctx *cur_pipe = &dst_ctx->res_ctx.pipe_ctx[i];
 
-		if (cur_pipe->primary_pipe)
-			cur_pipe->primary_pipe =  &dst_ctx->res_ctx.pipe_ctx[cur_pipe->primary_pipe->pipe_idx];
+		if (cur_pipe->top_pipe)
+			cur_pipe->top_pipe =  &dst_ctx->res_ctx.pipe_ctx[cur_pipe->top_pipe->pipe_idx];
 
-		if (cur_pipe->secondary_pipe)
-			cur_pipe->secondary_pipe = &dst_ctx->res_ctx.pipe_ctx[cur_pipe->secondary_pipe->pipe_idx];
+		if (cur_pipe->bottom_pipe)
+			cur_pipe->bottom_pipe = &dst_ctx->res_ctx.pipe_ctx[cur_pipe->bottom_pipe->pipe_idx];
 
 	}
 
