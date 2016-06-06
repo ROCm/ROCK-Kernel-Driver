@@ -367,49 +367,6 @@ void ProgramPixelDurationV(unsigned int pixelClockInKHz )
 	WriteReg (mmDPGV1_REPEATER_PROGRAM, 0x11);
 }
 */
-static int8_t acquire_first_free_underlay(
-		struct resource_context *res_ctx,
-		struct core_stream *stream,
-		struct core_dc* core_dc)
-{
-	if (!res_ctx->pipe_ctx[DCE110_UNDERLAY_IDX].stream) {
-		struct dc_bios *dcb;
-		struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[DCE110_UNDERLAY_IDX];
-
-		pipe_ctx->tg = res_ctx->pool->timing_generators[DCE110_UNDERLAY_IDX];
-		pipe_ctx->mi = res_ctx->pool->mis[DCE110_UNDERLAY_IDX];
-		/*pipe_ctx->ipp = res_ctx->pool->ipps[DCE110_UNDERLAY_IDX];*/
-		pipe_ctx->xfm = res_ctx->pool->transforms[DCE110_UNDERLAY_IDX];
-		pipe_ctx->opp = res_ctx->pool->opps[DCE110_UNDERLAY_IDX];
-		pipe_ctx->dis_clk = res_ctx->pool->display_clock;
-		pipe_ctx->pipe_idx = DCE110_UNDERLAY_IDX;
-
-		dcb = dal_adapter_service_get_bios_parser(
-						res_ctx->pool->adapter_srv);
-
-		core_dc->hwss.enable_display_power_gating(
-			core_dc->ctx,
-			DCE110_UNDERLAY_IDX,
-			dcb, PIPE_GATING_CONTROL_DISABLE);
-
-		if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
-			dm_error("DC: failed to blank crtc!\n");
-			BREAK_TO_DEBUGGER();
-		}
-
-		if (!pipe_ctx->tg->funcs->enable_crtc(pipe_ctx->tg)) {
-			BREAK_TO_DEBUGGER();
-		}
-
-		pipe_ctx->tg->funcs->set_blank_color(
-				pipe_ctx->tg,
-				COLOR_SPACE_YCBCR601);/* TODO unhardcode*/
-
-		pipe_ctx->stream = stream;
-		return DCE110_UNDERLAY_IDX;
-	}
-	return -1;
-}
 
 /*******************************************************************************
  * Public functions
@@ -916,16 +873,6 @@ bool dc_commit_surfaces_to_target(
 	for (i = 0; i < new_surface_count; i++)
 		if (new_surfaces[i]->visible)
 			new_enabled_surface_count++;
-
-	/* TODO unhack mpo */
-	if (new_surface_count == 2 && target_status->surface_count < 2) {
-		acquire_first_free_underlay(&context->res_ctx,
-				DC_STREAM_TO_CORE(dc_target->streams[0]), core_dc);
-		is_mpo_turning_on = true;
-	} else if (new_surface_count < 2 && target_status->surface_count == 2) {
-		context->res_ctx.pipe_ctx[DCE110_UNDERLAY_IDX].stream = NULL;
-		context->res_ctx.pipe_ctx[DCE110_UNDERLAY_IDX].surface = NULL;
-	}
 
 	dal_logger_write(core_dc->ctx->logger,
 				LOG_MAJOR_INTERFACE_TRACE,

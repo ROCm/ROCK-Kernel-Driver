@@ -479,14 +479,109 @@ void resource_build_scaling_params_for_context(
 	}
 }
 
+static void detach_surfaces_for_target(
+		struct validate_context *context,
+		const struct dc_target *dc_target)
+{
+	int i;
+	struct core_stream *stream = DC_STREAM_TO_CORE(dc_target->streams[0]);
+
+	for (i = 0; i < context->res_ctx.pool->pipe_count; i++) {
+		struct pipe_ctx *cur_pipe = &context->res_ctx.pipe_ctx[i];
+		if (cur_pipe->stream == stream) {
+			cur_pipe->surface = NULL;
+			cur_pipe->top_pipe = NULL;
+			cur_pipe->bottom_pipe = NULL;
+		}
+	}
+}
+
+struct pipe_ctx *find_idle_secondary_pipe(struct resource_context *res_ctx)
+{
+	int i;
+	struct pipe_ctx *secondary_pipe = NULL;
+
+	/*
+	 * search backwards for the second pipe to keep pipe
+	 * assignment more consistent
+	 */
+
+	for (i = res_ctx->pool->pipe_count - 1; i >= 0; i--) {
+		if (res_ctx->pipe_ctx[i].stream == NULL) {
+			secondary_pipe = &res_ctx->pipe_ctx[i];
+			secondary_pipe->pipe_idx = i;
+			break;
+		}
+	}
+
+
+	return secondary_pipe;
+}
+
+struct pipe_ctx *resource_get_head_pipe_for_stream(
+		struct resource_context *res_ctx,
+		const struct core_stream *stream)
+{
+	int i;
+	for (i = 0; i < res_ctx->pool->pipe_count; i++) {
+		if (res_ctx->pipe_ctx[i].stream == stream &&
+				!res_ctx->pipe_ctx[i].top_pipe) {
+			return &res_ctx->pipe_ctx[i];
+			break;
+		}
+	}
+	return NULL;
+}
+
+static struct pipe_ctx *acquire_free_pipe_for_target(
+		struct resource_context *res_ctx,
+		const struct dc_target *dc_target)
+{
+	int i;
+	struct core_stream *stream = DC_STREAM_TO_CORE(dc_target->streams[0]);
+
+	struct pipe_ctx *head_pipe = NULL;
+
+	/* Find head pipe, which has the back end set up*/
+
+	head_pipe = resource_get_head_pipe_for_stream(res_ctx, stream);
+
+	if (!head_pipe)
+		ASSERT(0);
+
+	if (!head_pipe->surface)
+		return head_pipe;
+
+	/* Re-use pipe already acquired for this stream if available*/
+	for (i = res_ctx->pool->pipe_count - 1; i >= 0; i--) {
+		if (res_ctx->pipe_ctx[i].stream == stream &&
+				!res_ctx->pipe_ctx[i].surface) {
+			return &res_ctx->pipe_ctx[i];
+		}
+	}
+
+	/*
+	 * At this point we have no re-useable pipe for this stream and we need
+	 * to acquire an idle one to satisfy the request
+	 */
+
+	if(!res_ctx->pool->funcs->acquire_idle_pipe_for_layer)
+		return NULL;
+
+	return res_ctx->pool->funcs->acquire_idle_pipe_for_layer(res_ctx, stream);
+
+}
+
 bool resource_attach_surfaces_to_context(
 		struct dc_surface *surfaces[],
 		int surface_count,
 		const struct dc_target *dc_target,
 		struct validate_context *context)
 {
-	int i, j, k;
+	int i;
+	struct pipe_ctx *tail_pipe;
 	struct dc_target_status *target_status = NULL;
+
 
 	if (surface_count > MAX_SURFACE_NUM) {
 		dm_error("Surface: can not attach %d surfaces! Maximum is: %d\n",
@@ -508,38 +603,44 @@ bool resource_attach_surfaces_to_context(
 	for (i = 0; i < surface_count; i++)
 		dc_surface_retain(surfaces[i]);
 
+	detach_surfaces_for_target(context, dc_target);
+
 	/* release existing surfaces*/
 	for (i = 0; i < target_status->surface_count; i++) {
 		dc_surface_release(target_status->surfaces[i]);
 		target_status->surfaces[i] = NULL;
 	}
 
+	target_status->surface_count = 0;
+
+	if (surface_count == 0)
+		return true;
+
+	tail_pipe = NULL;
+	for (i = 0; i < surface_count; i++) {
+		struct core_surface *surface = DC_SURFACE_TO_CORE(surfaces[i]);
+		struct pipe_ctx *free_pipe = acquire_free_pipe_for_target(
+				&context->res_ctx, dc_target);
+
+		if (!free_pipe)
+			return false;
+
+		free_pipe->surface = surface;
+
+		if (tail_pipe) {
+			free_pipe->top_pipe = tail_pipe;
+			tail_pipe->bottom_pipe = free_pipe;
+		}
+
+		tail_pipe = free_pipe;
+	}
+
+
 	/* assign new surfaces*/
 	for (i = 0; i < surface_count; i++)
 		target_status->surfaces[i] = surfaces[i];
 
 	target_status->surface_count = surface_count;
-
-	for (i = 0; i < dc_target->stream_count; i++) {
-		k = 0;
-		for (j = 0; j < MAX_PIPES; j++) {
-			struct core_surface *surface = NULL;
-
-			/* Skip surface assignment for child pipes */
-			if (context->res_ctx.pipe_ctx[j].top_pipe != NULL)
-				continue;
-
-			if (k < surface_count)
-				surface = DC_SURFACE_TO_CORE(surfaces[k]);
-
-			if (context->res_ctx.pipe_ctx[j].stream !=
-				DC_STREAM_TO_CORE(dc_target->streams[i]))
-				continue;
-
-			context->res_ctx.pipe_ctx[j].surface = surface;
-			k++;
-		}
-	}
 
 	return true;
 }

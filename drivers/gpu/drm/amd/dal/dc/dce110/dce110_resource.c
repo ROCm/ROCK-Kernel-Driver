@@ -932,6 +932,55 @@ enum dc_status dce110_validate_guaranteed(
 	return result;
 }
 
+static struct pipe_ctx *dce110_acquire_idle_pipe_for_layer(
+		struct resource_context *res_ctx,
+		struct core_stream *stream)
+{
+	struct dc_bios *dcb;
+	struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[DCE110_UNDERLAY_IDX];
+
+	if (res_ctx->pipe_ctx[DCE110_UNDERLAY_IDX].stream) {
+		return NULL;
+	}
+
+	pipe_ctx->tg = res_ctx->pool->timing_generators[DCE110_UNDERLAY_IDX];
+	pipe_ctx->mi = res_ctx->pool->mis[DCE110_UNDERLAY_IDX];
+	/*pipe_ctx->ipp = res_ctx->pool->ipps[DCE110_UNDERLAY_IDX];*/
+	pipe_ctx->xfm = res_ctx->pool->transforms[DCE110_UNDERLAY_IDX];
+	pipe_ctx->opp = res_ctx->pool->opps[DCE110_UNDERLAY_IDX];
+	pipe_ctx->dis_clk = res_ctx->pool->display_clock;
+	pipe_ctx->pipe_idx = DCE110_UNDERLAY_IDX;
+
+	dcb = dal_adapter_service_get_bios_parser(
+					res_ctx->pool->adapter_srv);
+
+	/* TODO move underlay pipe enable to apply_ctx_to_surface for dce11*/
+#if 0
+	dc->hwss.enable_display_power_gating(
+		dc->ctx,
+		DCE110_UNDERLAY_IDX,
+		dcb, PIPE_GATING_CONTROL_DISABLE);
+
+	if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
+		dm_error("DC: failed to blank crtc!\n");
+		BREAK_TO_DEBUGGER();
+	}
+
+	if (!pipe_ctx->tg->funcs->enable_crtc(pipe_ctx->tg)) {
+		BREAK_TO_DEBUGGER();
+	}
+
+	pipe_ctx->tg->funcs->set_blank_color(
+			pipe_ctx->tg,
+			COLOR_SPACE_YCBCR601);/* TODO unhardcode*/
+#endif
+
+	pipe_ctx->stream = stream;
+
+	return pipe_ctx;
+
+}
+
 static void dce110_destroy_resource_pool(struct resource_pool **pool)
 {
 	struct dce110_resource_pool *dce110_pool = TO_DCE110_RES_POOL(*pool);
@@ -947,7 +996,8 @@ static const struct resource_funcs dce110_res_pool_funcs = {
 	.link_enc_create = dce110_link_encoder_create,
 	.validate_with_context = dce110_validate_with_context,
 	.validate_guaranteed = dce110_validate_guaranteed,
-	.validate_bandwidth = dce110_validate_bandwidth
+	.validate_bandwidth = dce110_validate_bandwidth,
+	.acquire_idle_pipe_for_layer = dce110_acquire_idle_pipe_for_layer
 };
 
 static void underlay_create(struct dc_context *ctx, struct resource_pool *pool)

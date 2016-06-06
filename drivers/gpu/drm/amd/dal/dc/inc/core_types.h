@@ -214,6 +214,7 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx);
 
 struct resource_pool;
 struct validate_context;
+struct resource_context;
 
 struct resource_funcs {
 	void (*destroy)(struct resource_pool **pool);
@@ -237,6 +238,9 @@ struct resource_funcs {
 	struct validate_context *(*apply_clk_constraints)(
 					const struct core_dc *dc,
 					struct validate_context *context);
+	struct pipe_ctx *(*acquire_idle_pipe_for_layer)(
+			struct resource_context *res_ctx,
+			struct core_stream *stream);
 };
 
 struct resource_pool {

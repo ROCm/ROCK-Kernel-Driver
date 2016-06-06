@@ -78,11 +78,17 @@ struct clock_source *resource_find_used_clk_src_for_sharing(
 struct clock_source *dc_resource_find_first_free_pll(
 		struct resource_context *res_ctx);
 
+struct pipe_ctx *resource_get_head_pipe_for_stream(
+		struct resource_context *res_ctx,
+		const struct core_stream *stream);
+
 bool resource_attach_surfaces_to_context(
 		struct dc_surface *surfaces[],
 		int surface_count,
 		const struct dc_target *dc_target,
 		struct validate_context *context);
+
+struct pipe_ctx *find_idle_secondary_pipe(struct resource_context *res_ctx);
 
 bool resource_is_stream_unchanged(
 	const struct validate_context *old_context, struct core_stream *stream);
