@@ -365,6 +365,12 @@ static void kfd_debugfs_init(struct kfd_dev *kfd)
 				  &kfd_debugfs_fops);
 	if (ent == NULL)
 		dev_warn(kfd_device, "Failed to create mqds in kfd debugfs\n");
+
+	ent = debugfs_create_file("hqds", S_IFREG | S_IRUGO, kfd->debugfs_root,
+				  kfd_debugfs_hqds_by_device,
+				  &kfd_debugfs_fops);
+	if (ent == NULL)
+		dev_warn(kfd_device, "Failed to create hqds in kfd debugfs\n");
 }
 
 static void kfd_debugfs_fini(struct kfd_dev *kfd)
