@@ -830,6 +830,7 @@ struct packet_manager {
 	struct mutex lock;
 	bool allocated;
 	struct kfd_mem_obj *ib_buffer_obj;
+	unsigned ib_size_bytes;
 
 	struct packet_manager_firmware *pmf;
 };
@@ -924,6 +925,8 @@ int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data);
 int pqm_debugfs_mqds(struct seq_file *m, void *data);
 int kfd_debugfs_hqds_by_device(struct seq_file *m, void *data);
 int device_queue_manager_debugfs_hqds(struct seq_file *m, void *data);
+int kfd_debugfs_rls_by_device(struct seq_file *m, void *data);
+int pm_debugfs_runlist(struct seq_file *m, void *data);
 
 #endif
 
