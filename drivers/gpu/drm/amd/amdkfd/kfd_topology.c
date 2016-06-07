@@ -1240,3 +1240,28 @@ int kfd_get_proximity_domain(const struct pci_bus *bus)
 
 	return proximity_domain;
 }
+
+int kfd_debugfs_hqds_by_device(struct seq_file *m, void *data)
+{
+	struct kfd_topology_device *dev;
+	unsigned i = 0;
+	int r = 0;
+
+	down_read(&topology_lock);
+
+	list_for_each_entry(dev, &topology_device_list, list) {
+		if (!dev->gpu) {
+			i++;
+			continue;
+		}
+
+		seq_printf(m, "Node %u, gpu_id %x:\n", i++, dev->gpu->id);
+		r = device_queue_manager_debugfs_hqds(m, dev->gpu->dqm);
+		if (r != 0)
+			break;
+	}
+
+	up_read(&topology_lock);
+
+	return r;
+}
