@@ -1577,3 +1577,64 @@ int kfd_process_vm_fault(struct device_queue_manager *dqm,
 
 	return ret;
 }
+
+static void seq_reg_dump(struct seq_file *m,
+			 uint32_t (*dump)[2], uint32_t n_regs)
+{
+	uint32_t i, count;
+
+	for (i = 0, count = 0; i < n_regs; i++) {
+		if (count == 0 ||
+		    dump[i-1][0] + sizeof(uint32_t) != dump[i][0]) {
+			seq_printf(m, "%s    %08x: %08x",
+				   i ? "\n" : "",
+				   dump[i][0], dump[i][1]);
+			count = 7;
+		} else {
+			seq_printf(m, " %08x", dump[i][1]);
+			count--;
+		}
+	}
+
+	seq_puts(m, "\n");
+}
+
+int device_queue_manager_debugfs_hqds(struct seq_file *m, void *data)
+{
+	struct device_queue_manager *dqm = data;
+	uint32_t (*dump)[2], n_regs;
+	int pipe, queue;
+	int r = 0;
+
+	for (pipe = 0; pipe < get_pipes_num(dqm); pipe++) {
+		for (queue = 0; queue < QUEUES_PER_PIPE; queue++) {
+			r = dqm->dev->kfd2kgd->hqd_dump(
+				dqm->dev->kgd, pipe, queue, &dump, &n_regs);
+			if (r != 0)
+				break;
+
+			seq_printf(m, "  CP Pipe %d, Queue %d\n",
+				  pipe, queue);
+			seq_reg_dump(m, dump, n_regs);
+
+			kfree(dump);
+		}
+	}
+
+	for (pipe = 0; pipe < CIK_SDMA_ENGINE_NUM; pipe++) {
+		for (queue = 0; queue < CIK_SDMA_QUEUES_PER_ENGINE; queue++) {
+			r = dqm->dev->kfd2kgd->hqd_sdma_dump(
+				dqm->dev->kgd, pipe, queue, &dump, &n_regs);
+			if (r != 0)
+				break;
+
+			seq_printf(m, "  SDMA Engine %d, RLC %d\n",
+				  pipe, queue);
+			seq_reg_dump(m, dump, n_regs);
+
+			kfree(dump);
+		}
+	}
+
+	return r;
+}
