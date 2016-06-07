@@ -922,6 +922,8 @@ void kfd_close_peer_direct(void);
 
 int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data);
 int pqm_debugfs_mqds(struct seq_file *m, void *data);
+int kfd_debugfs_hqds_by_device(struct seq_file *m, void *data);
+int device_queue_manager_debugfs_hqds(struct seq_file *m, void *data);
 
 #endif
 
