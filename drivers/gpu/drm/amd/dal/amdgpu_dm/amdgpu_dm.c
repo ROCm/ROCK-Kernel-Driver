@@ -744,7 +744,30 @@ void amdgpu_dm_update_connector_after_detect(
 	if (aconnector->mst_mgr.mst_state == true)
 		return;
 
+
 	sink = aconnector->dc_link->local_sink;
+
+	/* Edid mgmt connector gets first update only in mode_valid hook and then
+	 * the connector sink is set to either fake or physical sink depends on link status.
+	 * don't do it here if u are during boot
+	 */
+	if (aconnector->base.force != DRM_FORCE_UNSPECIFIED
+			&& aconnector->dc_em_sink) {
+
+		/* For S3 resume with headless use eml_sink to fake target
+		 * because on resume connecotr->sink is set ti NULL
+		 */
+		if (sink) {
+			aconnector->dc_sink = sink;
+			amdgpu_dm_add_sink_to_freesync_module(
+								connector, aconnector->edid);
+		} else {
+			amdgpu_dm_remove_sink_from_freesync_module(connector);
+			if (!aconnector->dc_sink)
+				aconnector->dc_sink = aconnector->dc_em_sink;
+		}
+		return;
+	}
 
 	/*
 	 * TODO: temporary guard to look for proper fix
@@ -807,11 +830,13 @@ static void handle_hpd_irq(void *param)
 	if (dc_link_detect(aconnector->dc_link, false)) {
 		amdgpu_dm_update_connector_after_detect(aconnector);
 
+
 		drm_modeset_lock_all(dev);
 		dm_restore_drm_connector_state(dev, connector);
 		drm_modeset_unlock_all(dev);
 
-		drm_kms_helper_hotplug_event(dev);
+		if (aconnector->base.force == DRM_FORCE_UNSPECIFIED)
+			drm_kms_helper_hotplug_event(dev);
 	}
 
 }
@@ -828,6 +853,7 @@ static void handle_hpd_rx_irq(void *param)
 		/* Downstream Port status changed. */
 		if (dc_link_detect(aconnector->dc_link, false)) {
 			amdgpu_dm_update_connector_after_detect(aconnector);
+
 
 			drm_modeset_lock_all(dev);
 			dm_restore_drm_connector_state(dev, connector);
@@ -1105,8 +1131,7 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		}
 
 		if (dc_link_detect(dc_get_link_at_index(dm->dc, i), true))
-			amdgpu_dm_update_connector_after_detect(
-				aconnector);
+			amdgpu_dm_update_connector_after_detect(aconnector);
 	}
 
 	/* Software is initialized. Now we can register interrupt handlers. */

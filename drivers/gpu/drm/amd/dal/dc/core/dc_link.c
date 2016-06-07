@@ -1341,6 +1341,12 @@ enum dc_status dc_link_validate_mode_timing(
 {
 	uint32_t max_pix_clk = stream->sink->dongle_max_pix_clk;
 
+	/* A hack to avoid failing any modes for EDID override feature on
+	 * topology change such as lower quality cable for DP or different dongle
+	 */
+	if (link->public.remote_sinks[0])
+		return DC_OK;
+
 	if (0 != max_pix_clk && timing->pix_clk_khz > max_pix_clk)
 		return DC_EXCEED_DONGLE_MAX_CLK;
 

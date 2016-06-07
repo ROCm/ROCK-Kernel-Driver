@@ -773,9 +773,10 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 			&stream->bit_depth_params,
 			&stream->clamping);
 
-	stream->sink->link->link_enc->funcs->setup(
-		stream->sink->link->link_enc,
-		pipe_ctx->stream->signal);
+	if (pipe_ctx->stream->signal != SIGNAL_TYPE_VIRTUAL)
+		stream->sink->link->link_enc->funcs->setup(
+			stream->sink->link->link_enc,
+			pipe_ctx->stream->signal);
 
 	if (dc_is_dp_signal(pipe_ctx->stream->signal))
 		pipe_ctx->stream_enc->funcs->dp_set_stream_attribute(

@@ -1060,7 +1060,10 @@ amdgpu_dm_connector_detect(struct drm_connector *connector, bool force)
 	 * 2. This interface *is called* in context of user-mode ioctl. Which
 	 * makes it a bad place for *any* MST-related activit. */
 
-	connected = (NULL != aconnector->dc_sink);
+	if (aconnector->base.force == DRM_FORCE_UNSPECIFIED)
+		connected = (aconnector->dc_sink != NULL);
+	else
+		connected = (aconnector->base.force == DRM_FORCE_ON);
 
 	return (connected ? connector_status_connected :
 			connector_status_disconnected);
@@ -1261,22 +1264,81 @@ static int get_modes(struct drm_connector *connector)
 	return amdgpu_dm_connector_get_modes(connector);
 }
 
+static void create_eml_sink(struct amdgpu_connector *aconnector)
+{
+	struct dc_sink_init_data init_params = {
+			.link = aconnector->dc_link,
+			.sink_signal = SIGNAL_TYPE_VIRTUAL
+	};
+	struct edid *edid = (struct edid *) aconnector->base.edid_blob_ptr->data;
+
+	if (!aconnector->base.edid_blob_ptr ||
+		!aconnector->base.edid_blob_ptr->data) {
+		DRM_ERROR("No EDID firmware found on connector: %s ,forcing to OFF!\n",
+				aconnector->base.name);
+
+		aconnector->base.force = DRM_FORCE_OFF;
+		aconnector->base.override_edid = false;
+		return;
+	}
+
+	aconnector->edid = edid;
+
+	aconnector->dc_em_sink = dc_link_add_remote_sink(
+		aconnector->dc_link,
+		(uint8_t *)edid,
+		(edid->extensions + 1) * EDID_LENGTH,
+		&init_params);
+
+	if (aconnector->base.force
+					== DRM_FORCE_ON)
+		aconnector->dc_sink = aconnector->dc_link->local_sink ?
+		aconnector->dc_link->local_sink :
+		aconnector->dc_em_sink;
+}
+
+static void handle_edid_mgmt(struct amdgpu_connector *aconnector)
+{
+	struct dc_link *link = (struct dc_link *)aconnector->dc_link;
+
+	/* In case of headless boot with force on for DP managed connector
+	 * Those settings have to be != 0 to get initial modeset
+	 */
+	if (link->connector_signal == SIGNAL_TYPE_DISPLAY_PORT) {
+		link->verified_link_cap.lane_count = LANE_COUNT_FOUR;
+		link->verified_link_cap.link_rate = LINK_RATE_HIGH2;
+	}
+
+
+	aconnector->base.override_edid = true;
+	create_eml_sink(aconnector);
+}
+
 int amdgpu_dm_connector_mode_valid(
 		struct drm_connector *connector,
 		struct drm_display_mode *mode)
 {
 	int result = MODE_ERROR;
-	const struct dc_sink *dc_sink =
-			to_amdgpu_connector(connector)->dc_sink;
+	const struct dc_sink *dc_sink;
 	struct amdgpu_device *adev = connector->dev->dev_private;
 	struct dc_validation_set val_set = { 0 };
 	/* TODO: Unhardcode stream count */
 	struct dc_stream *streams[1];
 	struct dc_target *target;
+	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
 
 	if ((mode->flags & DRM_MODE_FLAG_INTERLACE) ||
 			(mode->flags & DRM_MODE_FLAG_DBLSCAN))
 		return result;
+
+	/* Only run this the first time mode_valid is called to initilialize
+	 * EDID mgmt
+	 */
+	if (aconnector->base.force != DRM_FORCE_UNSPECIFIED &&
+		!aconnector->dc_em_sink)
+		handle_edid_mgmt(aconnector);
+
+	dc_sink = to_amdgpu_connector(connector)->dc_sink;
 
 	if (NULL == dc_sink) {
 		DRM_ERROR("dc_sink is NULL!\n");
