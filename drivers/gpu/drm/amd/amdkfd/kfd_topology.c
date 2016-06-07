@@ -34,6 +34,7 @@
 #include "kfd_priv.h"
 #include "kfd_crat.h"
 #include "kfd_topology.h"
+#include "kfd_device_queue_manager.h"
 
 /* topology_device_list - Master list of all topology devices */
 struct list_head topology_device_list;
@@ -1257,6 +1258,31 @@ int kfd_debugfs_hqds_by_device(struct seq_file *m, void *data)
 
 		seq_printf(m, "Node %u, gpu_id %x:\n", i++, dev->gpu->id);
 		r = device_queue_manager_debugfs_hqds(m, dev->gpu->dqm);
+		if (r != 0)
+			break;
+	}
+
+	up_read(&topology_lock);
+
+	return r;
+}
+
+int kfd_debugfs_rls_by_device(struct seq_file *m, void *data)
+{
+	struct kfd_topology_device *dev;
+	unsigned i = 0;
+	int r = 0;
+
+	down_read(&topology_lock);
+
+	list_for_each_entry(dev, &topology_device_list, list) {
+		if (!dev->gpu) {
+			i++;
+			continue;
+		}
+
+		seq_printf(m, "Node %u, gpu_id %x:\n", i++, dev->gpu->id);
+		r = pm_debugfs_runlist(m, &dev->gpu->dqm->packets);
 		if (r != 0)
 			break;
 	}
