@@ -1710,12 +1710,35 @@ static enum dc_status apply_ctx_to_surface(
 	return DC_OK;
 }
 
+static void update_plane_surface(
+	struct core_dc *dc,
+	struct validate_context *context,
+	struct dc_surface *new_surfaces[],
+	uint8_t new_surface_count)
+{
+	int i, j;
+
+	for (i = 0; i < new_surface_count; i++)
+		for (j = 0; j < context->res_ctx.pool->pipe_count; j++) {
+			struct pipe_ctx *pipe_ctx =
+						&context->res_ctx.pipe_ctx[j];
+
+			if (pipe_ctx->surface !=
+					DC_SURFACE_TO_CORE(new_surfaces[i]))
+				continue;
+
+			dc->hwss.set_plane_config(
+				dc, pipe_ctx, &context->res_ctx);
+		}
+}
+
 static const struct hw_sequencer_funcs dce110_funcs = {
 	.init_hw = init_hw,
 	.apply_ctx_to_hw = apply_ctx_to_hw,
 	.apply_ctx_to_surface = apply_ctx_to_surface,
 	.set_plane_config = set_plane_config,
 	.update_plane_addr = update_plane_addr,
+	.update_plane_surface = update_plane_surface,
 	.set_gamma_correction = set_gamma_ramp,
 	.power_down = power_down,
 	.enable_accelerated_mode = enable_accelerated_mode,

@@ -1055,19 +1055,8 @@ bool dc_update_surfaces_for_target(
 				new_surfaces[i], &context->res_ctx.pipe_ctx[j]);
 		}
 
-	for (i = 0; i < new_surface_count; i++)
-		for (j = 0; j < context->res_ctx.pool->pipe_count; j++) {
-			struct pipe_ctx *pipe_ctx =
-						&context->res_ctx.pipe_ctx[j];
-
-			if (pipe_ctx->surface !=
-					DC_SURFACE_TO_CORE(new_surfaces[i]))
-				continue;
-
-			core_dc->hwss.set_plane_config(
-				core_dc, pipe_ctx, &context->res_ctx);
-		}
-
+	core_dc->hwss.update_plane_surface(core_dc, context, new_surfaces,
+			new_surface_count);
 	return true;
 }
 

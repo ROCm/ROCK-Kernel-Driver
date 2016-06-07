@@ -64,6 +64,12 @@ struct hw_sequencer_funcs {
 		struct core_dc *dc,
 		struct pipe_ctx *pipe_ctx);
 
+	void (*update_plane_surface)(
+		struct core_dc *dc,
+		struct validate_context *context,
+		struct dc_surface *new_surfaces[],
+		uint8_t new_surface_count);
+
 	bool (*set_gamma_correction)(
 				struct input_pixel_processor *ipp,
 				struct output_pixel_processor *opp,
