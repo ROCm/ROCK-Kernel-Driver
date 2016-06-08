@@ -5,7 +5,6 @@
 #include <linux/memblock.h>
 #include <linux/bootmem.h>	/* for max_low_pfn */
 
-#include <xen/xen.h>
 #include <asm/cacheflush.h>
 #include <asm/e820.h>
 #include <asm/init.h>
@@ -639,7 +638,7 @@ void __init init_mem_mapping(void)
 int devmem_is_allowed(unsigned long pagenr)
 {
 	if (pagenr < 256)
-		return !xen_pv_domain();
+		return 1;
 	if (iomem_is_exclusive(pagenr << PAGE_SHIFT))
 		return 0;
 	if (!page_is_ram(pagenr))
