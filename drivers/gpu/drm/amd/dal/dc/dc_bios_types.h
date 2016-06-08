@@ -156,9 +156,6 @@ struct dc_vbios_funcs {
 	void (*set_scratch_critical_state)(
 		struct dc_bios *bios,
 		bool state);
-	void (*set_scratch_acc_mode_change)(
-		struct dc_bios *bios);
-
 	bool (*is_device_id_supported)(
 		struct dc_bios *bios,
 		struct device_id id);
