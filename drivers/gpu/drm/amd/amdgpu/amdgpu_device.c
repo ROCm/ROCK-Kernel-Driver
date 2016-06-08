@@ -30,6 +30,7 @@
 #include <linux/debugfs.h>
 #include <drm/drmP.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_atomic_helper.h>
 #include <drm/amdgpu_drm.h>
 #include <linux/vgaarb.h>
 #include <linux/vga_switcheroo.h>
@@ -1946,6 +1947,7 @@ int amdgpu_resume_kms(struct drm_device *dev, bool resume, bool fbcon)
  */
 int amdgpu_gpu_reset(struct amdgpu_device *adev)
 {
+	struct drm_atomic_state *state = NULL;
 	unsigned ring_sizes[AMDGPU_MAX_RINGS];
 	uint32_t *ring_data[AMDGPU_MAX_RINGS];
 
@@ -1958,6 +1960,9 @@ int amdgpu_gpu_reset(struct amdgpu_device *adev)
 
 	/* block TTM */
 	resched = ttm_bo_lock_delayed_workqueue(&adev->mman.bdev);
+	/* store modesetting */
+	if (amdgpu_device_has_dal_support(adev))
+		state = drm_atomic_helper_suspend(adev->ddev);
 
 	r = amdgpu_suspend(adev);
 
@@ -2013,8 +2018,7 @@ retry:
 	}
 
 	if (amdgpu_device_has_dal_support(adev))
-		/* TODO needed from DAL, otherwise the mode cannot be back */
-		;
+		r = drm_atomic_helper_resume(adev->ddev, state);
 	else
 		drm_helper_resume_force_mode(adev->ddev);
 
