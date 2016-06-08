@@ -900,6 +900,7 @@ static void enable_accelerated_mode(struct core_dc *dc)
 	power_down_all_hw_blocks(dc);
 
 	disable_vga_and_power_gate_all_controllers(dc);
+	dce110_set_scratch_acc_mode_change(dc->ctx);
 }
 
 #if 0
