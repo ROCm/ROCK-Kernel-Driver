@@ -2671,6 +2671,10 @@ int polaris10_enable_dpm_tasks(struct pp_hwmgr *hwmgr)
 	PP_ASSERT_WITH_CODE((0 == tmp_result),
 			"Failed to enable deep sleep master switch!", result = tmp_result);
 
+	tmp_result = polaris10_enable_didt_config(hwmgr);
+	PP_ASSERT_WITH_CODE((tmp_result == 0),
+			"Failed to enable deep sleep master switch!", result = tmp_result);
+
 	tmp_result = polaris10_start_dpm(hwmgr);
 	PP_ASSERT_WITH_CODE((0 == tmp_result),
 			"Failed to start DPM!", result = tmp_result);
@@ -2810,13 +2814,13 @@ int polaris10_set_features_platform_caps(struct pp_hwmgr *hwmgr)
 					PHM_PlatformCaps_DynamicUVDState);
 
 	/* power tune caps Assume disabled */
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
+	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
 						PHM_PlatformCaps_SQRamping);
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
+	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
 						PHM_PlatformCaps_DBRamping);
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
+	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
 						PHM_PlatformCaps_TDRamping);
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
+	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
 						PHM_PlatformCaps_TCPRamping);
 
 	if (hwmgr->powercontainment_enabled)
@@ -3642,6 +3646,7 @@ static int polaris10_apply_state_adjust_rules(struct pp_hwmgr *hwmgr,
 	disable_mclk_switching_for_frame_lock = phm_cap_enabled(
 				    hwmgr->platform_descriptor.platformCaps,
 				    PHM_PlatformCaps_DisableMclkSwitchingForFrameLock);
+
 
 	disable_mclk_switching = (1 < info.display_count) ||
 				    disable_mclk_switching_for_frame_lock;
@@ -4619,6 +4624,8 @@ static int polaris10_notify_smc_display(struct pp_hwmgr *hwmgr)
 	return (smum_send_msg_to_smc(hwmgr->smumgr, (PPSMC_Msg)PPSMC_HasDisplay) == 0) ?  0 : -EINVAL;
 }
 
+
+
 static int polaris10_set_power_state_tasks(struct pp_hwmgr *hwmgr, const void *input)
 {
 	int tmp_result, result = 0;
@@ -4727,6 +4734,7 @@ int polaris10_notify_smc_display_config_after_ps_adjustment(struct pp_hwmgr *hwm
 	if (num_active_displays > 1)  /* to do && (pHwMgr->pPECI->displayConfiguration.bMultiMonitorInSync != TRUE)) */
 		polaris10_notify_smc_display_change(hwmgr, false);
 
+
 	return 0;
 }
 
@@ -4775,6 +4783,7 @@ int polaris10_program_display_gap(struct pp_hwmgr *hwmgr)
 	cgs_write_ind_register(hwmgr->device, CGS_IND_REG__SMC, data->soft_regs_start + offsetof(SMU74_SoftRegisters, PreVBlankGap), 0x64);
 
 	cgs_write_ind_register(hwmgr->device, CGS_IND_REG__SMC, data->soft_regs_start + offsetof(SMU74_SoftRegisters, VBlankTimeout), (frame_time_in_us - pre_vbi_time_in_us));
+
 
 	return 0;
 }
