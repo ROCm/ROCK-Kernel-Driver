@@ -92,14 +92,6 @@ void mod_freesync_update_state(struct mod_freesync *mod_freesync,
 		const struct dc_stream **streams, int num_streams,
 		struct mod_freesync_params *freesync_params);
 
-/*
- * This interface must be called for on every VUPDATE event for every stream
- * which is not FREESYNC_MODE_DISABLED.  Calling this for a stream that is in
- * FREESYNC_MODE_DISABLED has no effect.
- */
-void mod_freesync_vupdate_callback(struct mod_freesync *mod_freesync,
-	struct dc_stream *stream);
-
 bool mod_freesync_get_freesync_caps(struct mod_freesync *mod_freesync,
 		const struct dc_sink *sink, struct mod_freesync_caps *caps);
 
@@ -110,5 +102,11 @@ bool mod_freesync_set_user_enable(struct mod_freesync *mod_freesync,
 bool mod_freesync_get_user_enable(struct mod_freesync *mod_freesync,
 		const struct dc_sink *sink,
 		struct mod_freesync_user_enable *user_enable);
+
+void mod_freesync_handle_v_update(struct mod_freesync *mod_freesync,
+		const struct dc_stream **streams, int num_streams);
+
+void mod_freesync_reapply_current_state(struct mod_freesync *mod_freesync,
+		const struct dc_stream **streams, int num_streams);
 
 #endif

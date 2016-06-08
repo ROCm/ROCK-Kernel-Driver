@@ -123,9 +123,6 @@ static const struct irq_source_info_funcs vblank_irq_info_funcs = {
 		.funcs = &pflip_irq_info_funcs\
 	}
 
-#define vsync_int_entry(reg_num) \
-	[DC_IRQ_SOURCE_CRTC ## reg_num ## VSYNC] = dummy_irq_entry()
-
 #define vupdate_int_entry(reg_num)\
 	[DC_IRQ_SOURCE_VUPDATE1 + reg_num] = {\
 		.enable_reg = mmCRTC ## reg_num ## _CRTC_INTERRUPT_CONTROL,\
@@ -149,9 +146,6 @@ static const struct irq_source_info_funcs vblank_irq_info_funcs = {
 
 #define i2c_int_entry(reg_num) \
 	[DC_IRQ_SOURCE_I2C_DDC ## reg_num] = dummy_irq_entry()
-
-#define azalia_int_entry(reg_num) \
-	[DC_IRQ_SOURCE_AZALIA ## reg_num] = dummy_irq_entry()
 
 #define dp_sink_int_entry(reg_num) \
 	[DC_IRQ_SOURCE_DPSINK ## reg_num] = dummy_irq_entry()
@@ -215,24 +209,12 @@ irq_source_info_dce110[DAL_IRQ_SOURCES_NUMBER] = {
 	i2c_int_entry(4),
 	i2c_int_entry(5),
 	i2c_int_entry(6),
-	azalia_int_entry(0),
-	azalia_int_entry(1),
-	azalia_int_entry(2),
-	azalia_int_entry(3),
-	azalia_int_entry(4),
-	azalia_int_entry(5),
 	dp_sink_int_entry(1),
 	dp_sink_int_entry(2),
 	dp_sink_int_entry(3),
 	dp_sink_int_entry(4),
 	dp_sink_int_entry(5),
 	dp_sink_int_entry(6),
-	vsync_int_entry(1),
-	vsync_int_entry(2),
-	vsync_int_entry(3),
-	vsync_int_entry(3),
-	vsync_int_entry(4),
-	vsync_int_entry(5),
 	[DC_IRQ_SOURCE_TIMER] = dummy_irq_entry(),
 	pflip_int_entry(0),
 	pflip_int_entry(1),
