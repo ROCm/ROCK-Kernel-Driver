@@ -21,7 +21,8 @@
  */
 
 #if 0
-  HW (CARRIZO) source code for CWSR trap handler
+HW (VI) source code for CWSR trap handler
+#Version 8 + multiple trap handler
 
 var G8SR_WDMEM_HWREG_OFFSET = 0
 var G8SR_WDMEM_SGPR_OFFSET  = 128  // in bytes
@@ -69,6 +70,7 @@ var SWIZZLE_EN						=	0					//whether we use swizzled buffer addressing
 /**************************************************************************/
 var SQ_WAVE_STATUS_INST_ATC_SHIFT  = 23
 var SQ_WAVE_STATUS_INST_ATC_MASK   = 0x00800000
+var SQ_WAVE_STATUS_SPI_PRIO_MASK   = 0x00800006
 
 var SQ_WAVE_LDS_ALLOC_LDS_SIZE_SHIFT	= 12
 var SQ_WAVE_LDS_ALLOC_LDS_SIZE_SIZE		= 9
@@ -205,6 +207,7 @@ L_JUMP_TO_RESTORE:
 L_SKIP_RESTORE:
 	
 	s_getreg_b32  	s_save_status, hwreg(HW_REG_STATUS)								//save STATUS since we will change SCC
+	s_andn2_b32		s_save_status, s_save_status, SQ_WAVE_STATUS_SPI_PRIO_MASK      //check whether this is for save
 	s_getreg_b32  	s_save_trapsts, hwreg(HW_REG_TRAPSTS)    		 				
 	s_and_b32		s_save_trapsts, s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_MASK	//check whether this is for save  
 	s_cbranch_scc1	L_SAVE		     	  						//this is the operation for save
@@ -375,9 +378,6 @@ end
 	write_hwreg_to_mem(s_save_pc_hi, s_save_buf_rsrc0, s_save_mem_offset)
 	write_hwreg_to_mem(s_save_exec_lo, s_save_buf_rsrc0, s_save_mem_offset)				//EXEC
 	write_hwreg_to_mem(s_save_exec_hi, s_save_buf_rsrc0, s_save_mem_offset)
- 	// Save the tma_lo and tma_hi content from exec_lo and ttmp5            
-	s_mov_b32          s_save_exec_lo, exec_lo 
-	s_mov_b32          s_save_exec_hi, ttmp5   
 	write_hwreg_to_mem(s_save_status, s_save_buf_rsrc0, s_save_mem_offset)				//STATUS 
 	
 	//s_save_trapsts conflicts with s_save_alloc_size
@@ -392,8 +392,8 @@ end
 	write_hwreg_to_mem(s_save_m0, s_save_buf_rsrc0, s_save_mem_offset)
 	write_hwreg_to_mem(tba_lo, s_save_buf_rsrc0, s_save_mem_offset)						//TBA_LO
 	write_hwreg_to_mem(tba_hi, s_save_buf_rsrc0, s_save_mem_offset)						//TBA_HI
-	write_hwreg_to_mem(s_save_exec_lo, s_save_buf_rsrc0, s_save_mem_offset)				//TMA_LO 
-	write_hwreg_to_mem(s_save_exec_hi, s_save_buf_rsrc0, s_save_mem_offset)				//TMA_HI 
+
+
 
 	/*      the first wave in the threadgroup    */
         // save fist_wave bits in tba_hi unused bit.26
@@ -996,9 +996,6 @@ end
 	s_mov_b32 		exec_lo, 	s_restore_exec_lo
 	s_mov_b32 		exec_hi, 	s_restore_exec_hi
 	
-	read_hwreg_from_mem(tma_lo, s_restore_buf_rsrc0, s_restore_mem_offset)	    //tma_lo
-	read_hwreg_from_mem(tma_hi, s_restore_buf_rsrc0, s_restore_mem_offset)	    //tma_hi
-	s_waitcnt		lgkmcnt(0)		//from now on, it is safe to restore STATUS and IB_STS
 	s_and_b32		s_restore_m0, SQ_WAVE_TRAPSTS_PRE_SAVECTX_MASK, s_restore_trapsts
 	s_setreg_b32	hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_PRE_SAVECTX_SHIFT, SQ_WAVE_TRAPSTS_PRE_SAVECTX_SIZE), s_restore_m0
 	s_and_b32		s_restore_m0, SQ_WAVE_TRAPSTS_POST_SAVECTX_MASK, s_restore_trapsts
@@ -1052,26 +1049,19 @@ end
 function write_hwreg_to_mem(s, s_rsrc, s_mem_offset)
 		s_mov_b32 exec_lo, m0					//assuming exec_lo is not needed anymore from this point on
 		s_mov_b32 m0, s_mem_offset
-		s_buffer_store_dword s, s_rsrc, m0		glc:0	
+		s_buffer_store_dword s, s_rsrc, m0		glc:1
 		s_add_u32		s_mem_offset, s_mem_offset, 4
 		s_mov_b32	m0, exec_lo
 end
 
-//Only for save hwreg to mem 
-function write_tma_to_mem(s, s_rsrc, offset_imm) 
-        s_mov_b32 exec_lo, m0					//assuming exec_lo is not needed anymore from this point on 
-        s_mov_b32 m0, offset_imm 
-        s_buffer_store_dword s, s_rsrc, m0		glc:0	 
-        s_mov_b32	m0, exec_lo 
-end 
 
 // HWREG are saved before SGPRs, so all HWREG could be use.
 function write_16sgpr_to_mem(s, s_rsrc, s_mem_offset)
 
-		s_buffer_store_dwordx4 s[0], s_rsrc, 0  glc:0	
-		s_buffer_store_dwordx4 s[4], s_rsrc, 16  glc:0	
-		s_buffer_store_dwordx4 s[8], s_rsrc, 32  glc:0	
-		s_buffer_store_dwordx4 s[12], s_rsrc, 48 glc:0	
+		s_buffer_store_dwordx4 s[0], s_rsrc, 0  glc:1
+		s_buffer_store_dwordx4 s[4], s_rsrc, 16  glc:1
+		s_buffer_store_dwordx4 s[8], s_rsrc, 32  glc:1
+		s_buffer_store_dwordx4 s[12], s_rsrc, 48 glc:1
         s_add_u32       s_rsrc[0], s_rsrc[0], 4*16
         s_addc_u32 		s_rsrc[1], s_rsrc[1], 0x0			  // +scc
 end
@@ -1109,13 +1099,13 @@ end
 
 function get_hwreg_size_bytes
     return 128 //HWREG size 128 bytes
-end
 
 #endif
 
 static const uint32_t cwsr_trap_carrizo_hex[] = {
-	0xbf820001, 0xbf820131,
-	0xb8f4f802, 0xb8f5f803,
+	0xbf820001, 0xbf820125,
+	0xb8f4f802, 0x8974ff74,
+	0x00800006, 0xb8f5f803,
 	0x8675ff75, 0x00000400,
 	0xbf850013, 0xc00a1e37,
 	0x00000000, 0xbf8c007f,
@@ -1157,48 +1147,41 @@ static const uint32_t cwsr_trap_carrizo_hex[] = {
 	0x806e7a6e, 0xbefa0084,
 	0xbefa00ff, 0x01000000,
 	0xbefe007c, 0xbefc006e,
-	0xc0601bfc, 0x0000007c,
+	0xc0611bfc, 0x0000007c,
 	0x806e846e, 0xbefc007e,
 	0xbefe007c, 0xbefc006e,
-	0xc0601c3c, 0x0000007c,
+	0xc0611c3c, 0x0000007c,
 	0x806e846e, 0xbefc007e,
 	0xbefe007c, 0xbefc006e,
-	0xc0601c7c, 0x0000007c,
+	0xc0611c7c, 0x0000007c,
 	0x806e846e, 0xbefc007e,
 	0xbefe007c, 0xbefc006e,
-	0xc0601cbc, 0x0000007c,
+	0xc0611cbc, 0x0000007c,
 	0x806e846e, 0xbefc007e,
 	0xbefe007c, 0xbefc006e,
-	0xc0601cfc, 0x0000007c,
+	0xc0611cfc, 0x0000007c,
 	0x806e846e, 0xbefc007e,
-	0xbef2007e, 0xbef30075,
 	0xbefe007c, 0xbefc006e,
-	0xc0601d3c, 0x0000007c,
+	0xc0611d3c, 0x0000007c,
 	0x806e846e, 0xbefc007e,
 	0xb8f5f803, 0xbefe007c,
-	0xbefc006e, 0xc0601d7c,
+	0xbefc006e, 0xc0611d7c,
 	0x0000007c, 0x806e846e,
 	0xbefc007e, 0xbefe007c,
-	0xbefc006e, 0xc0601dbc,
+	0xbefc006e, 0xc0611dbc,
 	0x0000007c, 0x806e846e,
 	0xbefc007e, 0xbefe007c,
-	0xbefc006e, 0xc0601dfc,
+	0xbefc006e, 0xc0611dfc,
 	0x0000007c, 0x806e846e,
 	0xbefc007e, 0xb8eff801,
 	0xbefe007c, 0xbefc006e,
-	0xc0601bfc, 0x0000007c,
+	0xc0611bfc, 0x0000007c,
 	0x806e846e, 0xbefc007e,
 	0xbefe007c, 0xbefc006e,
-	0xc0601b3c, 0x0000007c,
+	0xc0611b3c, 0x0000007c,
 	0x806e846e, 0xbefc007e,
 	0xbefe007c, 0xbefc006e,
-	0xc0601b7c, 0x0000007c,
-	0x806e846e, 0xbefc007e,
-	0xbefe007c, 0xbefc006e,
-	0xc0601cbc, 0x0000007c,
-	0x806e846e, 0xbefc007e,
-	0xbefe007c, 0xbefc006e,
-	0xc0601cfc, 0x0000007c,
+	0xc0611b7c, 0x0000007c,
 	0x806e846e, 0xbefc007e,
 	0x867aff7f, 0x04000000,
 	0xbef30080, 0x8773737a,
@@ -1212,10 +1195,10 @@ static const uint32_t cwsr_trap_carrizo_hex[] = {
 	0xbe842b04, 0xbe862b06,
 	0xbe882b08, 0xbe8a2b0a,
 	0xbe8c2b0c, 0xbe8e2b0e,
-	0xc06a003c, 0x00000000,
-	0xc06a013c, 0x00000010,
-	0xc06a023c, 0x00000020,
-	0xc06a033c, 0x00000030,
+	0xc06b003c, 0x00000000,
+	0xc06b013c, 0x00000010,
+	0xc06b023c, 0x00000020,
+	0xc06b033c, 0x00000030,
 	0x8078c078, 0x82798079,
 	0x807c907c, 0xbf0a757c,
 	0xbf85ffeb, 0xbef80176,
@@ -1267,7 +1250,7 @@ static const uint32_t cwsr_trap_carrizo_hex[] = {
 	0x807c847c, 0x806eff6e,
 	0x00000400, 0xbf0a757c,
 	0xbf85ffef, 0xbf9c0000,
-	0xbf8200d1, 0xbef8007e,
+	0xbf8200ca, 0xbef8007e,
 	0x8679ff7f, 0x0000ffff,
 	0x8779ff79, 0x00040000,
 	0xbefa0080, 0xbefb00ff,
@@ -1354,24 +1337,22 @@ static const uint32_t cwsr_trap_carrizo_hex[] = {
 	0x80728472, 0xbf8c007f,
 	0x8671ff71, 0x0000ffff,
 	0xbefc0073, 0xbefe006e,
-	0xbeff006f, 0xc0211bbc,
-	0x00000072, 0x80728472,
-	0xc0211bfc, 0x00000072,
-	0x80728472, 0xbf8c007f,
-	0x867375ff, 0x000003ff,
-	0xb9734803, 0x867375ff,
-	0xfffff800, 0x8f738b73,
-	0xb973a2c3, 0xb977f801,
-	0x8673ff71, 0xf0000000,
-	0x8f739c73, 0x8e739073,
-	0xbef60080, 0x87767376,
-	0x8673ff71, 0x08000000,
-	0x8f739b73, 0x8e738f73,
-	0x87767376, 0x8673ff74,
-	0x00800000, 0x8f739773,
-	0xb976f807, 0x86fe7e7e,
-	0x86ea6a6a, 0xb974f802,
-	0xbf8a0000, 0x95807370,
-	0xbf810000, 0x00000000,
+	0xbeff006f, 0x867375ff,
+	0x000003ff, 0xb9734803,
+	0x867375ff, 0xfffff800,
+	0x8f738b73, 0xb973a2c3,
+	0xb977f801, 0x8673ff71,
+	0xf0000000, 0x8f739c73,
+	0x8e739073, 0xbef60080,
+	0x87767376, 0x8673ff71,
+	0x08000000, 0x8f739b73,
+	0x8e738f73, 0x87767376,
+	0x8673ff74, 0x00800000,
+	0x8f739773, 0xb976f807,
+	0x86fe7e7e, 0x86ea6a6a,
+	0xb974f802, 0xbf8a0000,
+	0x95807370, 0xbf810000,
+	0x00000000, 0x00000000,
+
 };
 
