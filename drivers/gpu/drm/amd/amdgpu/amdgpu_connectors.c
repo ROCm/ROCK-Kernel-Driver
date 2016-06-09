@@ -625,6 +625,11 @@ static int amdgpu_connector_set_property(struct drm_connector *connector,
 		amdgpu_connector_property_change_mode(&amdgpu_encoder->base);
 	}
 
+	if (property == adev->mode_info.freesync_property &&
+	    adev->mode_info.funcs->set_freesync_property)
+		adev->mode_info.funcs->set_freesync_property(connector,
+							     property, val);
+
 	return 0;
 }
 
