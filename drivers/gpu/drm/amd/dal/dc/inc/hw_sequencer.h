@@ -82,8 +82,9 @@ struct hw_sequencer_funcs {
 
 	void (*enable_timing_synchronization)(
 			struct core_dc *dc,
-			uint32_t group_size,
-			struct pipe_ctx *pipe_ctxs[]);
+			int group_index,
+			int group_size,
+			struct pipe_ctx *grouped_pipes[]);
 
 	/* backlight control */
 	void (*encoder_set_lcd_backlight_level)(

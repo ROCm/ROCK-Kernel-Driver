@@ -44,16 +44,9 @@ struct crtc_position {
 	uint32_t nominal_vcount;
 };
 
-enum dcp_gsl_purpose {
-	DCP_GSL_PURPOSE_SURFACE_FLIP = 0,
-	DCP_GSL_PURPOSE_STEREO3D_PHASE,
-	DCP_GSL_PURPOSE_UNDEFINED
-};
-
 struct dcp_gsl_params {
-	enum dcp_gsl_purpose gsl_purpose;
 	int gsl_group;
-	bool timing_server;
+	int gsl_master;
 };
 
 #define LEFT_EYE_3D_PRIMARY_SURFACE 1
@@ -147,8 +140,7 @@ struct timing_generator_funcs {
 							const struct dcp_gsl_params *gsl_params);
 	void (*unlock)(struct timing_generator *tg);
 	void (*lock)(struct timing_generator *tg);
-	void (*enable_reset_trigger)(struct timing_generator *tg,
-						const struct trigger_params *trigger_params);
+	void (*enable_reset_trigger)(struct timing_generator *tg, int source_tg_inst);
 	void (*disable_reset_trigger)(struct timing_generator *tg);
 	void (*tear_down_global_swap_lock)(struct timing_generator *tg);
 	void (*enable_advanced_request)(struct timing_generator *tg,

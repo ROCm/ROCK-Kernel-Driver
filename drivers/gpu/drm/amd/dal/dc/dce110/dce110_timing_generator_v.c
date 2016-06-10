@@ -652,7 +652,7 @@ static void dce110_timing_generator_v_setup_global_swap_lock(
 
 static void dce110_timing_generator_v_enable_reset_trigger(
 	struct timing_generator *tg,
-	const struct trigger_params *trigger_params)
+	int source_tg_inst)
 {
 	dal_logger_write(tg->ctx->logger, LOG_MAJOR_ERROR,
 					LOG_MINOR_COMPONENT_CONTROLLER,

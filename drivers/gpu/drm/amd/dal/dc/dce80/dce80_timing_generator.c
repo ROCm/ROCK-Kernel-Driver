@@ -161,6 +161,7 @@ bool dce80_timing_generator_construct(
 		return false;
 
 	tg110->controller_id = CONTROLLER_ID_D0 + instance;
+	tg110->base.inst = instance;
 	tg110->offsets = *offsets;
 	tg110->derived_offsets = reg_offsets[instance];
 

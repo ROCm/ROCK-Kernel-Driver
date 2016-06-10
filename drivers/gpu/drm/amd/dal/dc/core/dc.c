@@ -487,6 +487,7 @@ static void program_timing_sync(
 		struct validate_context *ctx)
 {
 	int i, j;
+	int group_index = 0;
 	int pipe_count = ctx->res_ctx.pool->pipe_count;
 	struct pipe_ctx *unsynced_pipes[MAX_PIPES] = { NULL };
 
@@ -525,7 +526,8 @@ static void program_timing_sync(
 
 		if (group_size > 1) {
 			core_dc->hwss.enable_timing_synchronization(
-						core_dc, group_size, pipe_set);
+				core_dc, group_index, group_size, pipe_set);
+			group_index++;
 		}
 	}
 }

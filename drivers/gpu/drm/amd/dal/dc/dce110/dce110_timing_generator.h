@@ -139,7 +139,7 @@ void dce110_timing_generator_tear_down_global_swap_lock(
 /* Reset slave controllers on master VSync */
 void dce110_timing_generator_enable_reset_trigger(
 	struct timing_generator *tg,
-	const struct trigger_params *trigger_params);
+	int source);
 
 /* disabling trigger-reset */
 void dce110_timing_generator_disable_reset_trigger(

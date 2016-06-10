@@ -1062,6 +1062,8 @@ bool dce110_timing_generator_construct(
 		return false;
 
 	tg110->controller_id = CONTROLLER_ID_D0 + instance;
+	tg110->base.inst = instance;
+
 	tg110->offsets = *offsets;
 
 	tg110->base.funcs = &dce110_tg_funcs;
@@ -1109,7 +1111,7 @@ void dce110_timing_generator_setup_global_swap_lock(
 			DCP_GSL0_EN);
 
 	set_reg_field_value(value,
-			gsl_params->timing_server,
+			gsl_params->gsl_master == tg->inst,
 			DCP_GSL_CONTROL,
 			DCP_GSL_MASTER_EN);
 
@@ -1125,7 +1127,7 @@ void dce110_timing_generator_setup_global_swap_lock(
 			DCP_GSL_CONTROL,
 			DCP_GSL_HSYNC_FLIP_CHECK_DELAY);
 
-	/* DCP_GSL_PURPOSE_SURFACE_FLIP */
+
 	{
 		uint32_t value_crtc_vtotal;
 
@@ -1133,7 +1135,7 @@ void dce110_timing_generator_setup_global_swap_lock(
 				CRTC_REG(mmCRTC_V_TOTAL));
 
 		set_reg_field_value(value,
-				gsl_params->gsl_purpose,
+				0,/* DCP_GSL_PURPOSE_SURFACE_FLIP */
 				DCP_GSL_CONTROL,
 				DCP_GSL_SYNC_SOURCE);
 
@@ -1350,60 +1352,33 @@ void dce110_timing_generator_set_lock_master(struct timing_generator *tg,
 
 void dce110_timing_generator_enable_reset_trigger(
 	struct timing_generator *tg,
-	const struct trigger_params *trigger_params)
+	int source_tg_inst)
 {
 	uint32_t value;
-	struct dc_context *dc_ctx = tg->ctx;
 	uint32_t rising_edge = 0;
 	uint32_t falling_edge = 0;
 	enum trigger_source_select trig_src_select = TRIGGER_SOURCE_SELECT_LOGIC_ZERO;
 	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 
 	/* Setup trigger edge */
-	switch (trigger_params->edge) {
-	/* Default = based on current timing polarity */
-	case TRIGGER_EDGE_DEFAULT:
-		{
-			uint32_t pol_value = dm_read_reg(tg->ctx,
-					CRTC_REG(mmCRTC_V_SYNC_A_CNTL));
+	{
+		uint32_t pol_value = dm_read_reg(tg->ctx,
+				CRTC_REG(mmCRTC_V_SYNC_A_CNTL));
 
-			/* Register spec has reversed definition:
-			 *	0 for positive, 1 for negative */
-			if (get_reg_field_value(pol_value,
-					CRTC_V_SYNC_A_CNTL,
-					CRTC_V_SYNC_A_POL) == 0) {
-				rising_edge = 1;
-			} else {
-				falling_edge = 1;
-			}
+		/* Register spec has reversed definition:
+		 *	0 for positive, 1 for negative */
+		if (get_reg_field_value(pol_value,
+				CRTC_V_SYNC_A_CNTL,
+				CRTC_V_SYNC_A_POL) == 0) {
+			rising_edge = 1;
+		} else {
+			falling_edge = 1;
 		}
-		break;
-	case TRIGGER_EDGE_RISING:
-		rising_edge = 1;
-		break;
-	case TRIGGER_EDGE_FALLING:
-		falling_edge = 1;
-		break;
-	case TRIGGER_EDGE_BOTH:
-		rising_edge = 1;
-		falling_edge = 1;
-		break;
-	default:
-		DC_ERROR("Invalid Trigger Edge!\n");
-		return;
 	}
 
 	value = dm_read_reg(tg->ctx, CRTC_REG(mmCRTC_TRIGB_CNTL));
 
-	switch(trigger_params->source) {
-	/* Currently supporting only a single group, the group zero. */
-	case SYNC_SOURCE_GSL_GROUP0:
-		trig_src_select = TRIGGER_SOURCE_SELECT_GSL_GROUP0;
-		break;
-	default:
-		DC_ERROR("Unsupported GSL Group!\n");
-		return;
-	}
+	trig_src_select = TRIGGER_SOURCE_SELECT_GSL_GROUP0;
 
 	set_reg_field_value(value,
 			trig_src_select,

@@ -136,17 +136,5 @@ enum sync_source {
 	SYNC_SOURCE_DUAL_GPU_PIN
 };
 
-enum trigger_edge {
-	TRIGGER_EDGE_RISING = 0,
-	TRIGGER_EDGE_FALLING,
-	TRIGGER_EDGE_BOTH,
-	TRIGGER_EDGE_DEFAULT
-};
-
-/* Parameters to enable CRTC trigger */
-struct trigger_params {
-	enum sync_source source;
-	enum trigger_edge edge;
-};
 
 #endif

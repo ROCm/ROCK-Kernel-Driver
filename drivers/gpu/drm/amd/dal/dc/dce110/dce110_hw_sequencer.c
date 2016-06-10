@@ -1491,54 +1491,49 @@ static bool wait_for_reset_trigger_to_occur(
 }
 
 /* Enable timing synchronization for a group of Timing Generators. */
-static void enable_timing_synchronization(
+static void dce110_enable_timing_synchronization(
 		struct core_dc *dc,
-		uint32_t group_size,
-		struct pipe_ctx *pipe_ctxs[])
+		int group_index,
+		int group_size,
+		struct pipe_ctx *grouped_pipes[])
 {
 	struct dc_context *dc_ctx = dc->ctx;
 	struct dcp_gsl_params gsl_params = { 0 };
-	struct trigger_params trigger_params;
-	uint32_t i;
+	int i;
 
 	DC_SYNC_INFO("GSL: Setting-up...\n");
 
+	/* Designate a single TG in the group as a master.
+	 * Since HW doesn't care which one, we always assign
+	 * the 1st one in the group. */
 	gsl_params.gsl_group = 0;
-	gsl_params.gsl_purpose = DCP_GSL_PURPOSE_SURFACE_FLIP;
+	gsl_params.gsl_master = grouped_pipes[0]->tg->inst;
 
-	for (i = 0; i < group_size; i++) {
-		/* Designate a single TG in the group as a master.
-		 * Since HW doesn't care which one, we always assign
-		 * the 1st one in the group. */
-		gsl_params.timing_server = (0 == i ? true : false);
-
-		pipe_ctxs[i]->tg->funcs->setup_global_swap_lock(pipe_ctxs[i]->tg, &gsl_params);
-	}
+	for (i = 0; i < group_size; i++)
+		grouped_pipes[i]->tg->funcs->setup_global_swap_lock(
+					grouped_pipes[i]->tg, &gsl_params);
 
 	/* Reset slave controllers on master VSync */
 	DC_SYNC_INFO("GSL: enabling trigger-reset\n");
-	memset(&trigger_params, 0, sizeof(trigger_params));
-
-	trigger_params.edge = TRIGGER_EDGE_DEFAULT;
-	trigger_params.source = SYNC_SOURCE_GSL_GROUP0;
 
 	for (i = 1 /* skip the master */; i < group_size; i++) {
-		pipe_ctxs[i]->tg->funcs->enable_reset_trigger(pipe_ctxs[i]->tg, &trigger_params);
+		grouped_pipes[i]->tg->funcs->enable_reset_trigger(
+					grouped_pipes[i]->tg, gsl_params.gsl_group);
 
 		DC_SYNC_INFO("GSL: waiting for reset to occur.\n");
-		wait_for_reset_trigger_to_occur(dc_ctx, pipe_ctxs[i]->tg);
+		wait_for_reset_trigger_to_occur(dc_ctx, grouped_pipes[i]->tg);
 
 		/* Regardless of success of the wait above, remove the reset or
 		 * the driver will start timing out on Display requests. */
 		DC_SYNC_INFO("GSL: disabling trigger-reset.\n");
-		pipe_ctxs[i]->tg->funcs->disable_reset_trigger(pipe_ctxs[i]->tg);
+		grouped_pipes[i]->tg->funcs->disable_reset_trigger(grouped_pipes[i]->tg);
 	}
 
 	/* GSL Vblank synchronization is a one time sync mechanism, assumption
 	 * is that the sync'ed displays will not drift out of sync over time*/
 	DC_SYNC_INFO("GSL: Restoring register states.\n");
 	for (i = 0; i < group_size; i++)
-		pipe_ctxs[i]->tg->funcs->tear_down_global_swap_lock(pipe_ctxs[i]->tg);
+		grouped_pipes[i]->tg->funcs->tear_down_global_swap_lock(grouped_pipes[i]->tg);
 
 	DC_SYNC_INFO("GSL: Set-up complete.\n");
 }
@@ -1743,7 +1738,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.set_gamma_correction = set_gamma_ramp,
 	.power_down = power_down,
 	.enable_accelerated_mode = enable_accelerated_mode,
-	.enable_timing_synchronization = enable_timing_synchronization,
+	.enable_timing_synchronization = dce110_enable_timing_synchronization,
 	.program_bw = program_bw,
 	.enable_stream = enable_stream,
 	.disable_stream = disable_stream,
