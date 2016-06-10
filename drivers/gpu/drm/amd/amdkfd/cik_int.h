@@ -50,6 +50,7 @@ struct cik_ih_ring_entry {
 #define CIK_INTSRC_SQ_INTERRUPT_MSG	0xEF
 #define CIK_INTSRC_GFX_PAGE_INV_FAULT	0x92
 #define CIK_INTSRC_GFX_MEM_PROT_FAULT	0x93
+#define CIK_INTSRC_SDMA_TRAP		0xE0
 
 #endif
 
