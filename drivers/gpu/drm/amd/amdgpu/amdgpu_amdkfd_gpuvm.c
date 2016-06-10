@@ -279,7 +279,14 @@ static void unpin_pts(struct amdgpu_bo_va *bo_va, struct amdgpu_vm *vm)
 	}
 }
 
-
+/**
+ * amdgpu_vm_clear_bo - initially clear the VRAM pages
+ *
+ * @adev: amdgpu_device pointer
+ * @bo: bo to clear
+ * @vm: requested vm
+ * need to reserve bo first before calling it.
+ */
 static int amdgpu_amdkfd_gpuvm_clear_bo(struct amdgpu_device *adev,
 			      struct amdgpu_vm *vm,
 			      struct amdgpu_bo *bo)
@@ -386,7 +393,14 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	(*mem)->data2.bo = bo;
 
 	if (domain == AMDGPU_GEM_DOMAIN_VRAM) {
+		ret = amdgpu_bo_reserve(bo, true);
+		if (ret) {
+			dev_err(adev->dev,
+				"(%d) failed to reserve bo for amdkfd\n", ret);
+			goto err_bo_clear;
+		}
 		ret = amdgpu_amdkfd_gpuvm_clear_bo(adev, vm, bo);
+		amdgpu_bo_unreserve(bo);
 		if (ret) {
 			pr_err("amdkfd: Failed to clear BO object on GTT. ret == %d\n",
 					ret);
