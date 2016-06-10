@@ -249,15 +249,16 @@ struct log_major_mask_info {
 
 #define LG_WARN_MSK ~(1 << LOG_MINOR_COMPONENT_TOPOLOGY_MANAGER)
 
+#define LG_HW_TRACE_MSK (LG_ALL_MSK & \
+		~((1 << LOG_MINOR_HW_TRACE_LINK_TRAINING) \
+				| (1 << LOG_MINOR_HW_TRACE_AUDIO)))
+
 static const struct log_major_mask_info log_major_mask_info_tbl[] = {
 	/* LogMajor                  major name       default     MinorTble                    tblElementCnt */
 	{{LOG_MAJOR_ERROR,           "Error"       }, LG_ALL_MSK, component_minor_info_tbl,    NUM_ELEMENTS(component_minor_info_tbl)},
-	{{LOG_MAJOR_WARNING,         "Warning"     }, LG_WARN_MSK, component_minor_info_tbl,    NUM_ELEMENTS(component_minor_info_tbl)},
+	{{LOG_MAJOR_WARNING,         "Warning"     }, LG_WARN_MSK, component_minor_info_tbl,   NUM_ELEMENTS(component_minor_info_tbl)},
 	{{LOG_MAJOR_INTERFACE_TRACE, "IfTrace"     }, LG_ALL_MSK, component_minor_info_tbl,    NUM_ELEMENTS(component_minor_info_tbl)},
-	{{LOG_MAJOR_HW_TRACE,        "HwTrace"     }, (LG_ALL_MSK &
-			~((1 << LOG_MINOR_HW_TRACE_LINK_TRAINING) |
-			(1 << LOG_MINOR_HW_TRACE_AUDIO))),
-								hw_trace_minor_info_tbl,     NUM_ELEMENTS(hw_trace_minor_info_tbl)},
+	{{LOG_MAJOR_HW_TRACE,        "HwTrace"     }, LG_HW_TRACE_MSK, hw_trace_minor_info_tbl, NUM_ELEMENTS(hw_trace_minor_info_tbl)},
 	{{LOG_MAJOR_MST,             "MST"         }, LG_ALL_MSK, mst_minor_info_tbl,          NUM_ELEMENTS(mst_minor_info_tbl)},
 	{{LOG_MAJOR_DCS,             "DCS"         }, LG_ALL_MSK, dcs_minor_info_tbl,          NUM_ELEMENTS(dcs_minor_info_tbl)},
 	{{LOG_MAJOR_DCP,             "DCP"         }, LG_DCP_MSK, dcp_minor_info_tbl,          NUM_ELEMENTS(dcp_minor_info_tbl)},

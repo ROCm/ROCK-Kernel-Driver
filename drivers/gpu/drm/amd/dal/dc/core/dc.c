@@ -489,28 +489,27 @@ static void program_timing_sync(
 	uint8_t i;
 	uint8_t j;
 	uint8_t group_size = 0;
-	uint8_t tg_count = ctx->res_ctx.pool->pipe_count;
-	struct timing_generator *tg_set[MAX_PIPES];
+	uint8_t pipe_count = ctx->res_ctx.pool->pipe_count;
+	struct pipe_ctx *pipe_set[MAX_PIPES];
 
-	for (i = 0; i < tg_count; i++) {
+	for (i = 0; i < pipe_count; i++) {
 		if (!ctx->res_ctx.pipe_ctx[i].stream)
 			continue;
 
-		tg_set[0] = ctx->res_ctx.pool->timing_generators[i];
+		pipe_set[0] = &ctx->res_ctx.pipe_ctx[i];
 		group_size = 1;
 
 		/* Add tg to the set, search rest of the tg's for ones with
 		 * same timing, add all tgs with same timing to the group
 		 */
-		for (j = i + 1; j < tg_count; j++) {
+		for (j = i + 1; j < pipe_count; j++) {
 			if (!ctx->res_ctx.pipe_ctx[j].stream)
 				continue;
 
 			if (resource_are_streams_timing_synchronizable(
 					ctx->res_ctx.pipe_ctx[j].stream,
 					ctx->res_ctx.pipe_ctx[i].stream)) {
-				tg_set[group_size] =
-					ctx->res_ctx.pool->timing_generators[j];
+				pipe_set[group_size] = &ctx->res_ctx.pipe_ctx[j];
 				group_size++;
 			}
 		}
@@ -521,9 +520,9 @@ static void program_timing_sync(
 			break;
 	}
 
-	if(group_size > 1) {
-		core_dc->hwss.enable_timing_synchronization(core_dc->ctx, group_size, tg_set);
-	}
+	if (group_size > 1)
+		core_dc->hwss.enable_timing_synchronization(
+				core_dc, group_size, pipe_set);
 }
 
 static bool targets_changed(

@@ -71,9 +71,6 @@ struct dce110_timing_generator {
 	uint32_t min_h_blank;
 	uint32_t min_h_front_porch;
 	uint32_t min_h_back_porch;
-
-	enum sync_source cached_gsl_group;
-	bool disable_advanced_request;
 };
 
 #define DCE110TG_FROM_TG(tg)\

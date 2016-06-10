@@ -1424,7 +1424,7 @@ static void set_plane_config(
 			surface->public.rotation);
 }
 
-static void update_plane_addr(struct core_dc *dc, struct pipe_ctx *pipe_ctx)
+static void update_plane_addr(const struct core_dc *dc, struct pipe_ctx *pipe_ctx)
 {
 	struct core_surface *surface = pipe_ctx->surface;
 
@@ -1492,26 +1492,27 @@ static bool wait_for_reset_trigger_to_occur(
 
 /* Enable timing synchronization for a group of Timing Generators. */
 static void enable_timing_synchronization(
-	struct dc_context *dc_ctx,
-	uint32_t timing_generator_num,
-	struct timing_generator *tgs[])
+		struct core_dc *dc,
+		uint32_t group_size,
+		struct pipe_ctx *pipe_ctxs[])
 {
+	struct dc_context *dc_ctx = dc->ctx;
 	struct dcp_gsl_params gsl_params = { 0 };
 	struct trigger_params trigger_params;
 	uint32_t i;
 
 	DC_SYNC_INFO("GSL: Setting-up...\n");
 
-	gsl_params.gsl_group = SYNC_SOURCE_GSL_GROUP0;
+	gsl_params.gsl_group = 0;
 	gsl_params.gsl_purpose = DCP_GSL_PURPOSE_SURFACE_FLIP;
 
-	for (i = 0; i < timing_generator_num; i++) {
+	for (i = 0; i < group_size; i++) {
 		/* Designate a single TG in the group as a master.
 		 * Since HW doesn't care which one, we always assign
 		 * the 1st one in the group. */
 		gsl_params.timing_server = (0 == i ? true : false);
 
-		tgs[i]->funcs->setup_global_swap_lock(tgs[i], &gsl_params);
+		pipe_ctxs[i]->tg->funcs->setup_global_swap_lock(pipe_ctxs[i]->tg, &gsl_params);
 	}
 
 	/* Reset slave controllers on master VSync */
@@ -1521,23 +1522,23 @@ static void enable_timing_synchronization(
 	trigger_params.edge = TRIGGER_EDGE_DEFAULT;
 	trigger_params.source = SYNC_SOURCE_GSL_GROUP0;
 
-	for (i = 1 /* skip the master */; i < timing_generator_num; i++) {
-		tgs[i]->funcs->enable_reset_trigger(tgs[i], &trigger_params);
+	for (i = 1 /* skip the master */; i < group_size; i++) {
+		pipe_ctxs[i]->tg->funcs->enable_reset_trigger(pipe_ctxs[i]->tg, &trigger_params);
 
 		DC_SYNC_INFO("GSL: waiting for reset to occur.\n");
-		wait_for_reset_trigger_to_occur(dc_ctx, tgs[i]);
+		wait_for_reset_trigger_to_occur(dc_ctx, pipe_ctxs[i]->tg);
 
 		/* Regardless of success of the wait above, remove the reset or
 		 * the driver will start timing out on Display requests. */
 		DC_SYNC_INFO("GSL: disabling trigger-reset.\n");
-		tgs[i]->funcs->disable_reset_trigger(tgs[i]);
+		pipe_ctxs[i]->tg->funcs->disable_reset_trigger(pipe_ctxs[i]->tg);
 	}
 
 	/* GSL Vblank synchronization is a one time sync mechanism, assumption
 	 * is that the sync'ed displays will not drift out of sync over time*/
 	DC_SYNC_INFO("GSL: Restoring register states.\n");
-	for (i = 0; i < timing_generator_num; i++)
-		tgs[i]->funcs->tear_down_global_swap_lock(tgs[i]);
+	for (i = 0; i < group_size; i++)
+		pipe_ctxs[i]->tg->funcs->tear_down_global_swap_lock(pipe_ctxs[i]->tg);
 
 	DC_SYNC_INFO("GSL: Set-up complete.\n");
 }

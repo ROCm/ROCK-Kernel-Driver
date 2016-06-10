@@ -1277,7 +1277,7 @@ void dce110_timing_generator_enable_advanced_request(
 	uint32_t addr = CRTC_REG(mmCRTC_START_LINE_CONTROL);
 	uint32_t value = dm_read_reg(tg->ctx, addr);
 
-	if (enable && !DCE110TG_FROM_TG(tg)->disable_advanced_request) {
+	if (enable) {
 		set_reg_field_value(
 			value,
 			0,

@@ -61,7 +61,7 @@ struct hw_sequencer_funcs {
 			struct resource_context *res_ctx);
 
 	void (*update_plane_addr)(
-		struct core_dc *dc,
+		const struct core_dc *dc,
 		struct pipe_ctx *pipe_ctx);
 
 	void (*update_plane_surface)(
@@ -81,9 +81,9 @@ struct hw_sequencer_funcs {
 	void (*enable_accelerated_mode)(struct core_dc *dc);
 
 	void (*enable_timing_synchronization)(
-					struct dc_context *dc_ctx,
-					uint32_t timing_generator_num,
-					struct timing_generator *tgs[]);
+			struct core_dc *dc,
+			uint32_t group_size,
+			struct pipe_ctx *pipe_ctxs[]);
 
 	/* backlight control */
 	void (*encoder_set_lcd_backlight_level)(
