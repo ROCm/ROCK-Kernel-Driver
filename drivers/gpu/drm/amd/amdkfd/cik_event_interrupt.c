@@ -46,6 +46,7 @@ static bool cik_event_interrupt_isr(struct kfd_dev *dev,
 	/* Do not process in ISR, just request it to be forwarded to WQ. */
 	return (ihre->pasid != 0) &&
 		(ihre->source_id == CIK_INTSRC_CP_END_OF_PIPE ||
+		ihre->source_id == CIK_INTSRC_SDMA_TRAP ||
 		ihre->source_id == CIK_INTSRC_SQ_INTERRUPT_MSG ||
 		ihre->source_id == CIK_INTSRC_CP_BAD_OPCODE ||
 		is_cpc_vm_fault(dev, ih_ring_entry));
@@ -61,6 +62,8 @@ static void cik_event_interrupt_wq(struct kfd_dev *dev,
 		return;
 
 	if (ihre->source_id == CIK_INTSRC_CP_END_OF_PIPE)
+		kfd_signal_event_interrupt(ihre->pasid, 0, 0);
+	else if (ihre->source_id == CIK_INTSRC_SDMA_TRAP)
 		kfd_signal_event_interrupt(ihre->pasid, 0, 0);
 	else if (ihre->source_id == CIK_INTSRC_SQ_INTERRUPT_MSG)
 		kfd_signal_event_interrupt(ihre->pasid, ihre->data & 0xFF, 8);
