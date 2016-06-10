@@ -51,9 +51,7 @@ struct hw_sequencer_funcs {
 			struct core_dc *dc, struct validate_context *context);
 
 	enum dc_status (*apply_ctx_to_surface)(
-			struct core_dc *dc, struct validate_context *context,
-			struct dc_surface *new_surfaces[],
-			uint8_t new_surface_count);
+			struct core_dc *dc, struct validate_context *context);
 
 	void (*set_plane_config)(
 			const struct core_dc *dc,
@@ -134,5 +132,14 @@ struct hw_sequencer_funcs {
 	void (*set_drr)(struct pipe_ctx **pipe_ctx, int num_pipes,
 			int vmin, int vmax);
 };
+
+void hw_sequencer_program_pipe_tree(
+	struct core_dc *dc,
+	struct validate_context *context,
+	struct pipe_ctx *const head_pipe_ctx,
+	void (*program_func)(struct core_dc *dc,
+			struct pipe_ctx *pipe_ctx,
+			struct validate_context *context));
+
 
 #endif /* __DC_HW_SEQUENCER_H__ */

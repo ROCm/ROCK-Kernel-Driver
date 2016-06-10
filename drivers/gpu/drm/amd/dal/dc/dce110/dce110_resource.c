@@ -936,7 +936,6 @@ static struct pipe_ctx *dce110_acquire_idle_pipe_for_layer(
 		struct resource_context *res_ctx,
 		struct core_stream *stream)
 {
-	struct dc_bios *dcb;
 	struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[DCE110_UNDERLAY_IDX];
 
 	if (res_ctx->pipe_ctx[DCE110_UNDERLAY_IDX].stream) {
@@ -951,29 +950,7 @@ static struct pipe_ctx *dce110_acquire_idle_pipe_for_layer(
 	pipe_ctx->dis_clk = res_ctx->pool->display_clock;
 	pipe_ctx->pipe_idx = DCE110_UNDERLAY_IDX;
 
-	dcb = dal_adapter_service_get_bios_parser(
-					res_ctx->pool->adapter_srv);
 
-	/* TODO move underlay pipe enable to apply_ctx_to_surface for dce11*/
-#if 0
-	dc->hwss.enable_display_power_gating(
-		dc->ctx,
-		DCE110_UNDERLAY_IDX,
-		dcb, PIPE_GATING_CONTROL_DISABLE);
-
-	if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
-		dm_error("DC: failed to blank crtc!\n");
-		BREAK_TO_DEBUGGER();
-	}
-
-	if (!pipe_ctx->tg->funcs->enable_crtc(pipe_ctx->tg)) {
-		BREAK_TO_DEBUGGER();
-	}
-
-	pipe_ctx->tg->funcs->set_blank_color(
-			pipe_ctx->tg,
-			COLOR_SPACE_YCBCR601);/* TODO unhardcode*/
-#endif
 
 	pipe_ctx->stream = stream;
 

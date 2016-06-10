@@ -533,6 +533,10 @@ struct pipe_ctx *resource_get_head_pipe_for_stream(
 	return NULL;
 }
 
+/*
+ * A free_pipe for a target is defined here as a pipe with a stream that belongs
+ * to the target but has no surface attached yet
+ */
 static struct pipe_ctx *acquire_free_pipe_for_target(
 		struct resource_context *res_ctx,
 		const struct dc_target *dc_target)
@@ -570,6 +574,21 @@ static struct pipe_ctx *acquire_free_pipe_for_target(
 
 	return res_ctx->pool->funcs->acquire_idle_pipe_for_layer(res_ctx, stream);
 
+}
+
+static void release_free_pipes_for_target(
+		struct resource_context *res_ctx,
+		const struct dc_target *dc_target)
+{
+	int i;
+	struct core_stream *stream = DC_STREAM_TO_CORE(dc_target->streams[0]);
+
+	for (i = res_ctx->pool->pipe_count - 1; i >= 0; i--) {
+		if (res_ctx->pipe_ctx[i].stream == stream &&
+				!res_ctx->pipe_ctx[i].surface) {
+			res_ctx->pipe_ctx[i].stream = NULL;
+		}
+	}
 }
 
 bool resource_attach_surfaces_to_context(
@@ -635,6 +654,7 @@ bool resource_attach_surfaces_to_context(
 		tail_pipe = free_pipe;
 	}
 
+	release_free_pipes_for_target(&context->res_ctx, dc_target);
 
 	/* assign new surfaces*/
 	for (i = 0; i < surface_count; i++)

@@ -844,7 +844,6 @@ bool dc_commit_surfaces_to_target(
 
 	int current_enabled_surface_count = 0;
 	int new_enabled_surface_count = 0;
-	bool is_mpo_turning_on = false;
 
 	if (core_dc->current_context->target_count == 0)
 		return false;
@@ -923,23 +922,22 @@ bool dc_commit_surfaces_to_target(
 		context = temp_context;
 	}
 
-	if (prev_disp_clk < context->bw_results.dispclk_khz ||
-		(is_mpo_turning_on &&
-			prev_disp_clk == context->bw_results.dispclk_khz)) {
-		core_dc->hwss.program_bw(core_dc, context);
+	if (prev_disp_clk < context->bw_results.dispclk_khz) {
 		pplib_apply_display_requirements(core_dc, context,
-						&context->pp_display_cfg);
+								&context->pp_display_cfg);
+		core_dc->hwss.program_bw(core_dc, context);
 	}
+
 
 	if (current_enabled_surface_count > 0 && new_enabled_surface_count == 0)
 		target_disable_memory_requests(dc_target,
 				&core_dc->current_context->res_ctx);
 
-	core_dc->hwss.apply_ctx_to_surface(core_dc, context, new_surfaces,
-			new_surface_count);
+	core_dc->hwss.apply_ctx_to_surface(core_dc, context);
 
+	/* TODO: decouple wm programming and display clock and unhack this condition*/
 	/* Lower display clock if necessary */
-	if (prev_disp_clk > context->bw_results.dispclk_khz) {
+	if (prev_disp_clk > context->bw_results.dispclk_khz || new_surface_count > 1) {
 		core_dc->hwss.program_bw(core_dc, context);
 		pplib_apply_display_requirements(core_dc, context,
 						&context->pp_display_cfg);

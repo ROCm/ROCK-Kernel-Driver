@@ -1109,6 +1109,7 @@ static void program_bw(struct core_dc *dc, struct validate_context *context)
 	/*dc_set_clocks_and_clock_state(context);*/
 
 	dc->hwss.set_display_clock(context);
+
 	dc->hwss.set_displaymarks(dc, context);
 }
 
@@ -1625,117 +1626,147 @@ static void print_context_timing_status(
 	dal_logger_close(&entry);
 }
 
+/* TODO: move this to apply_ctx_tohw some how?*/
+static void dce110_power_on_pipe_if_needed(
+		struct core_dc *dc,
+		struct pipe_ctx *pipe_ctx,
+		struct validate_context *context)
+{
+	struct pipe_ctx *old_pipe_ctx = &dc->current_context->res_ctx.pipe_ctx[pipe_ctx->pipe_idx];
+	struct dc_bios *dcb = dal_adapter_service_get_bios_parser(
+					context->res_ctx.pool->adapter_srv);
+
+	if (!old_pipe_ctx->stream && pipe_ctx->stream) {
+		dc->hwss.enable_display_power_gating(
+				dc->ctx,
+				pipe_ctx->pipe_idx,
+				dcb, PIPE_GATING_CONTROL_DISABLE);
+		if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
+			dm_error("DC: failed to blank crtc!\n");
+			BREAK_TO_DEBUGGER();
+		}
+
+		if (!pipe_ctx->tg->funcs->enable_crtc(pipe_ctx->tg)) {
+			BREAK_TO_DEBUGGER();
+		}
+
+		pipe_ctx->tg->funcs->set_blank_color(
+				pipe_ctx->tg,
+				COLOR_SPACE_YCBCR601);/* TODO unhardcode*/
+	}
+}
+
+static void dce110_program_front_end_for_pipe(struct core_dc *dc,
+		struct pipe_ctx *pipe_ctx,
+		struct validate_context *context)
+{
+	struct core_gamma *gamma = NULL;
+	int lock_mask =
+		PIPE_LOCK_CONTROL_GRAPHICS |
+		PIPE_LOCK_CONTROL_SCL |
+		PIPE_LOCK_CONTROL_BLENDER |
+		PIPE_LOCK_CONTROL_MODE;
+
+	if (!pipe_ctx->surface->public.flip_immediate)
+		lock_mask |= PIPE_LOCK_CONTROL_SURFACE;
+
+	dc->hwss.pipe_control_lock(
+			dc->ctx,
+			pipe_ctx->pipe_idx,
+			lock_mask,
+			true);
+
+
+	dc->hwss.set_plane_config(
+			dc, pipe_ctx, &context->res_ctx);
+
+	dc->hwss.update_plane_addr(dc, pipe_ctx);
+
+	if (pipe_ctx->surface->public.gamma_correction)
+		gamma = DC_GAMMA_TO_CORE(
+			pipe_ctx->surface->public.gamma_correction);
+
+	dc->hwss.set_gamma_correction(
+			pipe_ctx->ipp,
+			pipe_ctx->opp,
+			gamma, pipe_ctx->surface);
+
+	dal_logger_write(dc->ctx->logger,
+			LOG_MAJOR_INTERFACE_TRACE,
+			LOG_MINOR_COMPONENT_DC,
+			"Pipe:%d 0x%x: addr hi:0x%x, "
+			"addr low:0x%x, "
+			"src: %d, %d, %d,"
+			" %d; dst: %d, %d, %d, %d;\n",
+			pipe_ctx->pipe_idx,
+			pipe_ctx->surface,
+			pipe_ctx->surface->public.address.grph.addr.high_part,
+			pipe_ctx->surface->public.address.grph.addr.low_part,
+			pipe_ctx->surface->public.src_rect.x,
+			pipe_ctx->surface->public.src_rect.y,
+			pipe_ctx->surface->public.src_rect.width,
+			pipe_ctx->surface->public.src_rect.height,
+			pipe_ctx->surface->public.dst_rect.x,
+			pipe_ctx->surface->public.dst_rect.y,
+			pipe_ctx->surface->public.dst_rect.width,
+			pipe_ctx->surface->public.dst_rect.height);
+
+
+	dal_logger_write(dc->ctx->logger,
+			LOG_MAJOR_HW_TRACE,
+			LOG_MINOR_HW_TRACE_SET_MODE,
+			"Pipe %d: width, height, x, y\n"
+			"viewport:%d, %d, %d, %d\n"
+			"recout:  %d, %d, %d, %d\n",
+			pipe_ctx->pipe_idx,
+			pipe_ctx->scl_data.viewport.width,
+			pipe_ctx->scl_data.viewport.height,
+			pipe_ctx->scl_data.viewport.x,
+			pipe_ctx->scl_data.viewport.y,
+			pipe_ctx->scl_data.recout.width,
+			pipe_ctx->scl_data.recout.height,
+			pipe_ctx->scl_data.recout.x,
+			pipe_ctx->scl_data.recout.y);
+}
+
 static enum dc_status apply_ctx_to_surface(
 		struct core_dc *dc,
-		struct validate_context *context,
-		struct dc_surface *new_surfaces[],
-		uint8_t new_surface_count)
+		struct validate_context *context)
 {
-	int i, j;
+	int i;
 
-	for (i = 0; i < new_surface_count; i++)
-		for (j = 0; j < context->res_ctx.pool->pipe_count; j++) {
-			struct dc_surface *dc_surface = new_surfaces[i];
-			struct core_surface *surface =
-						DC_SURFACE_TO_CORE(dc_surface);
-			struct pipe_ctx *pipe_ctx =
-						&context->res_ctx.pipe_ctx[j];
-			struct core_gamma *gamma = NULL;
-			int lock_mask =
-				PIPE_LOCK_CONTROL_GRAPHICS |
-				PIPE_LOCK_CONTROL_SCL |
-				PIPE_LOCK_CONTROL_BLENDER |
-				PIPE_LOCK_CONTROL_MODE;
+	for (i = 0; i < context->res_ctx.pool->pipe_count; i++) {
+		struct pipe_ctx *head_pipe = &context->res_ctx.pipe_ctx[i];
 
-			if (pipe_ctx->surface !=
-					DC_SURFACE_TO_CORE(new_surfaces[i]))
-				continue;
+		if (!head_pipe->surface || head_pipe->top_pipe != NULL)
+			continue;
+
+		hw_sequencer_program_pipe_tree(dc, context, head_pipe,
+				dce110_power_on_pipe_if_needed);
+
+		hw_sequencer_program_pipe_tree(dc, context, head_pipe,
+				dce110_program_front_end_for_pipe);
 
 
-			dal_logger_write(dc->ctx->logger,
-					LOG_MAJOR_INTERFACE_TRACE,
-					LOG_MINOR_COMPONENT_DC,
-					"Pipe:%d 0x%x: addr hi:0x%x, "
-					"addr low:0x%x, "
-					"src: %d, %d, %d,"
-					" %d; dst: %d, %d, %d, %d;\n",
-					pipe_ctx->pipe_idx,
-					dc_surface,
-					dc_surface->address.grph.addr.high_part,
-					dc_surface->address.grph.addr.low_part,
-					dc_surface->src_rect.x,
-					dc_surface->src_rect.y,
-					dc_surface->src_rect.width,
-					dc_surface->src_rect.height,
-					dc_surface->dst_rect.x,
-					dc_surface->dst_rect.y,
-					dc_surface->dst_rect.width,
-					dc_surface->dst_rect.height);
-
-
-			dal_logger_write(dc->ctx->logger,
-					LOG_MAJOR_HW_TRACE,
-					LOG_MINOR_HW_TRACE_SET_MODE,
-					"Pipe %d: width, height, x, y\n"
-					"viewport:%d, %d, %d, %d\n"
-					"recout:  %d, %d, %d, %d\n",
-					pipe_ctx->pipe_idx,
-					pipe_ctx->scl_data.viewport.width,
-					pipe_ctx->scl_data.viewport.height,
-					pipe_ctx->scl_data.viewport.x,
-					pipe_ctx->scl_data.viewport.y,
-					pipe_ctx->scl_data.recout.width,
-					pipe_ctx->scl_data.recout.height,
-					pipe_ctx->scl_data.recout.x,
-					pipe_ctx->scl_data.recout.y);
-
-			if (!pipe_ctx->surface->public.flip_immediate)
-				lock_mask |= PIPE_LOCK_CONTROL_SURFACE;
-
-			dc->hwss.pipe_control_lock(
-					dc->ctx,
-					pipe_ctx->pipe_idx,
-					lock_mask,
-					true);
-
-			dc->hwss.set_plane_config(
-					dc, pipe_ctx, &context->res_ctx);
-
-			dc->hwss.update_plane_addr(dc, pipe_ctx);
-
-			if (surface->public.gamma_correction)
-				gamma = DC_GAMMA_TO_CORE(
-					surface->public.gamma_correction);
-
-			dc->hwss.set_gamma_correction(
-					pipe_ctx->ipp,
-					pipe_ctx->opp,
-					gamma, surface);
-
-		}
+	}
 
 	/* Go in reverse order so that all pipes are unlocked simultaneously
 	 * when pipe 0 is unlocked
 	 * Need PIPE_LOCK_CONTROL_MODE to be 1 for this
 	 */
-	for (j = context->res_ctx.pool->pipe_count - 1; j >= 0; j--)
-		for (i = new_surface_count - 1; i >= 0; i--) {
-			struct pipe_ctx *pipe_ctx =
-						&context->res_ctx.pipe_ctx[j];
+	for (i = context->res_ctx.pool->pipe_count - 1; i >= 0; i--) {
+		struct pipe_ctx *pipe_ctx =
+					&context->res_ctx.pipe_ctx[i];
 
-			if (pipe_ctx->surface !=
-					DC_SURFACE_TO_CORE(new_surfaces[i]))
-				continue;
-
-			dc->hwss.pipe_control_lock(
-					dc->ctx,
-					pipe_ctx->pipe_idx,
-					PIPE_LOCK_CONTROL_GRAPHICS |
-					PIPE_LOCK_CONTROL_SCL |
-					PIPE_LOCK_CONTROL_BLENDER |
-					PIPE_LOCK_CONTROL_SURFACE,
-					false);
-		}
+		dc->hwss.pipe_control_lock(
+				dc->ctx,
+				pipe_ctx->pipe_idx,
+				PIPE_LOCK_CONTROL_GRAPHICS |
+				PIPE_LOCK_CONTROL_SCL |
+				PIPE_LOCK_CONTROL_BLENDER |
+				PIPE_LOCK_CONTROL_SURFACE,
+				false);
+	}
 
 	print_context_timing_status(dc, &context->res_ctx);
 
