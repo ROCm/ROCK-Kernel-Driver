@@ -486,43 +486,48 @@ static void program_timing_sync(
 		struct core_dc *core_dc,
 		struct validate_context *ctx)
 {
-	uint8_t i;
-	uint8_t j;
-	uint8_t group_size = 0;
-	uint8_t pipe_count = ctx->res_ctx.pool->pipe_count;
-	struct pipe_ctx *pipe_set[MAX_PIPES];
+	int i, j;
+	int pipe_count = ctx->res_ctx.pool->pipe_count;
+	struct pipe_ctx *unsynced_pipes[MAX_PIPES] = { NULL };
 
 	for (i = 0; i < pipe_count; i++) {
 		if (!ctx->res_ctx.pipe_ctx[i].stream)
 			continue;
 
-		pipe_set[0] = &ctx->res_ctx.pipe_ctx[i];
-		group_size = 1;
+		unsynced_pipes[i] = &ctx->res_ctx.pipe_ctx[i];
+	}
+
+	for (i = 0; i < pipe_count; i++) {
+		int group_size = 1;
+		struct pipe_ctx *pipe_set[MAX_PIPES];
+
+		if (!unsynced_pipes[i])
+			continue;
+
+		pipe_set[0] = unsynced_pipes[i];
+		unsynced_pipes[i] = NULL;
 
 		/* Add tg to the set, search rest of the tg's for ones with
 		 * same timing, add all tgs with same timing to the group
 		 */
 		for (j = i + 1; j < pipe_count; j++) {
-			if (!ctx->res_ctx.pipe_ctx[j].stream)
+			if (!unsynced_pipes[j])
 				continue;
 
 			if (resource_are_streams_timing_synchronizable(
-					ctx->res_ctx.pipe_ctx[j].stream,
-					ctx->res_ctx.pipe_ctx[i].stream)) {
-				pipe_set[group_size] = &ctx->res_ctx.pipe_ctx[j];
+					unsynced_pipes[j]->stream,
+					pipe_set[0]->stream)) {
+				pipe_set[group_size] = unsynced_pipes[j];
+				unsynced_pipes[j] = NULL;
 				group_size++;
 			}
 		}
 
-		/* Right now we limit to one timing sync group so if one is
-		 * found we break. A group has to be more than one tg.*/
-		if (group_size > 1)
-			break;
+		if (group_size > 1) {
+			core_dc->hwss.enable_timing_synchronization(
+						core_dc, group_size, pipe_set);
+		}
 	}
-
-	if (group_size > 1)
-		core_dc->hwss.enable_timing_synchronization(
-				core_dc, group_size, pipe_set);
 }
 
 static bool targets_changed(
@@ -783,6 +788,8 @@ bool dc_commit_targets(
 		result = core_dc->hwss.apply_ctx_to_hw(core_dc, context);
 	}
 
+	program_timing_sync(core_dc, context);
+
 	for (i = 0; i < context->target_count; i++) {
 		struct dc_target *dc_target = &context->targets[i]->public;
 		struct core_sink *sink = DC_SINK_TO_CORE(dc_target->streams[0]->sink);
@@ -798,8 +805,6 @@ bool dc_commit_targets(
 				dc_target->streams[0]->timing.v_total,
 				dc_target->streams[0]->timing.pix_clk_khz);
 	}
-
-	program_timing_sync(core_dc, context);
 
 	pplib_apply_display_requirements(core_dc,
 			context, &context->pp_display_cfg);
