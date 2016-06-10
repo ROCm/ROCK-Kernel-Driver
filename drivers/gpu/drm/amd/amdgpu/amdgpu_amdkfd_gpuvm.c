@@ -279,6 +279,55 @@ static void unpin_pts(struct amdgpu_bo_va *bo_va, struct amdgpu_vm *vm)
 	}
 }
 
+
+static int amdgpu_amdkfd_gpuvm_clear_bo(struct amdgpu_device *adev,
+			      struct amdgpu_vm *vm,
+			      struct amdgpu_bo *bo)
+{
+	struct amdgpu_ring *ring;
+	struct fence *fence = NULL;
+	struct amdgpu_job *job;
+	unsigned entries;
+	uint64_t addr;
+	int r;
+
+	ring = container_of(vm->entity.sched, struct amdgpu_ring, sched);
+
+	r = reservation_object_reserve_shared(bo->tbo.resv);
+	if (r)
+		return r;
+
+	r = ttm_bo_validate(&bo->tbo, &bo->placement, true, false);
+	if (r)
+		goto error;
+
+	addr = amdgpu_bo_gpu_offset(bo);
+	entries = amdgpu_bo_size(bo);
+
+	r = amdgpu_job_alloc_with_ib(adev, 64, &job);
+	if (r)
+		goto error;
+
+	amdgpu_emit_fill_buffer(adev, &job->ibs[0], 0, addr, entries);
+	amdgpu_ring_pad_ib(ring, &job->ibs[0]);
+
+	WARN_ON(job->ibs[0].length_dw > 64);
+	r = amdgpu_job_submit(job, ring, &vm->entity,
+			      AMDGPU_FENCE_OWNER_VM, &fence);
+	if (r)
+		goto error_free;
+
+	amdgpu_bo_fence(bo, fence, true);
+	fence_put(fence);
+	return 0;
+
+error_free:
+	amdgpu_job_free(job);
+
+error:
+	return r;
+}
+
 static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		size_t size, void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr, struct kfd_process_device *pdd,
@@ -335,6 +384,15 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	bo->kfd_bo = *mem;
 	bo->pdd = pdd;
 	(*mem)->data2.bo = bo;
+
+	if (domain == AMDGPU_GEM_DOMAIN_VRAM) {
+		ret = amdgpu_amdkfd_gpuvm_clear_bo(adev, vm, bo);
+		if (ret) {
+			pr_err("amdkfd: Failed to clear BO object on GTT. ret == %d\n",
+					ret);
+			goto err_bo_clear;
+		}
+	}
 
 	pr_debug("Created BO on GTT with size %zu bytes\n", size);
 
@@ -397,6 +455,7 @@ allocate_mem_reserve_bo_failed:
 	if (userptr)
 		amdgpu_mn_unregister(bo);
 allocate_mem_set_userptr_failed:
+err_bo_clear:
 	amdgpu_bo_unref(&bo);
 err_bo_create:
 	kfree(*mem);
