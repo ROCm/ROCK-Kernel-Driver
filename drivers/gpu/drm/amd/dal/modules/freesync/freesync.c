@@ -208,14 +208,20 @@ static void calc_vmin_vmax (const struct dc_stream *stream,
 	unsigned int min_frame_duration_in_ns = 0, max_frame_duration_in_ns = 0;
 
 	min_frame_duration_in_ns = (unsigned int)
-		((1000000000ULL * 1000000) / caps->max_refresh_in_micro_hz);
+		div64_u64((1000000000ULL * 1000000), caps->max_refresh_in_micro_hz);
 	max_frame_duration_in_ns = (unsigned int)
-		((1000000000ULL * 1000000) / caps->min_refresh_in_micro_hz);
+		div64_u64((1000000000ULL * 1000000), caps->min_refresh_in_micro_hz);
 
 	*vmax = (unsigned long long)(max_frame_duration_in_ns) *
-		stream->timing.pix_clk_khz / stream->timing.h_total / 1000000;
+		div64_u64(
+			div64_u64(stream->timing.pix_clk_khz,
+					stream->timing.h_total),
+			1000000);
 	*vmin = (unsigned long long)(min_frame_duration_in_ns) *
-		stream->timing.pix_clk_khz / stream->timing.h_total / 1000000;
+		div64_u64(
+			div64_u64(stream->timing.pix_clk_khz,
+					stream->timing.h_total),
+			1000000);
 
 	/* Field rate might not be the maximum rate
 	 * in which case we should adjust our vmin
@@ -228,7 +234,10 @@ static void calc_v_total_from_duration(const struct dc_stream *stream,
 		unsigned int duration_in_ns, int *v_total_nominal)
 {
 	*v_total_nominal = (unsigned long long)(duration_in_ns) *
-		stream->timing.pix_clk_khz / stream->timing.h_total / 1000000;
+		div64_u64(
+			div64_u64(stream->timing.pix_clk_khz,
+					stream->timing.h_total),
+				1000000);
 
 }
 /*
