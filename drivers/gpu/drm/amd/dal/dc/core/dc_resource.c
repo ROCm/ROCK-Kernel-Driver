@@ -529,7 +529,7 @@ bool resource_attach_surfaces_to_context(
 			if (context->res_ctx.pipe_ctx[j].top_pipe != NULL)
 				continue;
 
-			if (surface_count)
+			if (k < surface_count)
 				surface = DC_SURFACE_TO_CORE(surfaces[k]);
 
 			if (context->res_ctx.pipe_ctx[j].stream !=
