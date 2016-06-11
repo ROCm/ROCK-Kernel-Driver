@@ -1429,6 +1429,15 @@ bool amdgpu_device_has_dal_support(struct amdgpu_device *adev)
 	return amdgpu_device_asic_has_dal_support(adev->asic_type);
 }
 
+static bool amdgpu_device_is_virtual(void)
+{
+#ifdef CONFIG_X86
+	return boot_cpu_has(X86_FEATURE_HYPERVISOR);
+#else
+	return false;
+#endif
+}
+
 /**
  * amdgpu_device_init - initialize the driver
  *
@@ -1566,8 +1575,14 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	adev->virtualization.supports_sr_iov =
 		amdgpu_atombios_has_gpu_virtualization_table(adev);
 
+	/* Check if we are executing in a virtualized environment */
+	adev->virtualization.is_virtual = amdgpu_device_is_virtual();
+	adev->virtualization.caps = amdgpu_asic_get_virtual_caps(adev);
+
 	/* Post card if necessary */
-	if (!amdgpu_card_posted(adev)) {
+	if (!amdgpu_card_posted(adev) ||
+	    (adev->virtualization.is_virtual &&
+	     !adev->virtualization.caps & AMDGPU_VIRT_CAPS_SRIOV_EN)) {
 		if (!adev->bios) {
 			dev_err(adev->dev, "Card not posted and no BIOS - ignoring\n");
 			r = -EINVAL;
