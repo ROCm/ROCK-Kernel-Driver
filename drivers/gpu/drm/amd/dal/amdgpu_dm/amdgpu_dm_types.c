@@ -438,9 +438,11 @@ static void fill_plane_attributes_from_fb(
 	case DRM_FORMAT_ARGB8888:
 		surface->format = SURFACE_PIXEL_FORMAT_GRPH_ARGB8888;
 		break;
+	case DRM_FORMAT_XRGB2101010:
 	case DRM_FORMAT_ARGB2101010:
 		surface->format = SURFACE_PIXEL_FORMAT_GRPH_ARGB2101010;
 		break;
+	case DRM_FORMAT_XBGR2101010:
 	case DRM_FORMAT_ABGR2101010:
 		surface->format = SURFACE_PIXEL_FORMAT_GRPH_ABGR2101010;
 		break;
@@ -1562,6 +1564,10 @@ static uint32_t rgb_formats[] = {
 	DRM_FORMAT_XRGB8888,
 	DRM_FORMAT_ARGB8888,
 	DRM_FORMAT_RGBA8888,
+	DRM_FORMAT_XRGB2101010,
+	DRM_FORMAT_XBGR2101010,
+	DRM_FORMAT_ARGB2101010,
+	DRM_FORMAT_ARGB2101010,
 };
 
 int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
