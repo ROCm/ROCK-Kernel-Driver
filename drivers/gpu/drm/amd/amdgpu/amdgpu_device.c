@@ -1959,6 +1959,9 @@ int amdgpu_gpu_reset(struct amdgpu_device *adev)
 
 	atomic_inc(&adev->gpu_reset_counter);
 
+	/* evict vram memory */
+	amdgpu_bo_evict_vram(adev);
+
 	/* block scheduler */
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 		struct amdgpu_ring *ring = adev->rings[i];
@@ -1967,6 +1970,7 @@ int amdgpu_gpu_reset(struct amdgpu_device *adev)
 			continue;
 		kthread_park(ring->sched.thread);
 	}
+
 	/* block TTM */
 	resched = ttm_bo_lock_delayed_workqueue(&adev->mman.bdev);
 	/* store modesetting */
