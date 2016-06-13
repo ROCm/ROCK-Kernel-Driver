@@ -20,12 +20,13 @@ static struct crypto_shash *tfm;
 int __init btrfs_hash_init(void)
 {
 	tfm = crypto_alloc_shash("crc32c", 0, 0);
-	if (IS_ERR(tfm))
-		return PTR_ERR(tfm);
 
-	printk("BTRFS: using %s for crc32c\n",
-	       crypto_tfm_alg_driver_name(crypto_shash_tfm(tfm)));
-	return 0;
+	return PTR_ERR_OR_ZERO(tfm);
+}
+
+const char* btrfs_crc32c_impl(void)
+{
+	return crypto_tfm_alg_driver_name(crypto_shash_tfm(tfm));
 }
 
 void btrfs_hash_exit(void)
