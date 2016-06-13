@@ -239,6 +239,53 @@ void amdgpu_amdkfd_cancel_restore_mem(struct amdgpu_device *adev,
 		cancel_delayed_work_sync(&mem->data2.work);
 }
 
+int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
+				uint32_t vmid, uint64_t gpu_addr,
+				uint32_t *ib_cmd, uint32_t ib_len)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+	struct amdgpu_ib ib;
+	struct amdgpu_ring *ring;
+	struct fence *f = NULL;
+	int ret;
+
+	switch (engine) {
+	case KGD_ENGINE_MEC1:
+		ring = &adev->gfx.compute_ring[0];
+		break;
+	case KGD_ENGINE_SDMA1:
+		ring = &adev->sdma.instance[0].ring;
+		break;
+	case KGD_ENGINE_SDMA2:
+		ring = &adev->sdma.instance[1].ring;
+		break;
+	default:
+		pr_err("Invalid engine in IB submission: %d\n", engine);
+		ret = -EINVAL;
+		goto err;
+	}
+
+	memset(&ib, 0, sizeof(ib));
+	ib.gpu_addr = gpu_addr;
+	/* This works for NO_HWS. TODO: need to handle without knowing VMID */
+	ib.vm_id = vmid;
+	ib.ptr = ib_cmd;
+	ib.length_dw = ib_len;
+
+	ret = amdgpu_ib_schedule(ring, 1, &ib, NULL, &f);
+	if (ret) {
+		DRM_ERROR("amdgpu: failed to schedule IB.\n");
+		goto err_ib_sched;
+	}
+
+	ret = fence_wait(f, false);
+
+err_ib_sched:
+	fence_put(f);
+err:
+	return ret;
+}
+
 u32 pool_to_domain(enum kgd_memory_pool p)
 {
 	switch (p) {
