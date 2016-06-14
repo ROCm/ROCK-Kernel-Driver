@@ -1516,18 +1516,21 @@ static void dce110_enable_timing_synchronization(
 	/* Reset slave controllers on master VSync */
 	DC_SYNC_INFO("GSL: enabling trigger-reset\n");
 
-	for (i = 1 /* skip the master */; i < group_size; i++) {
+	for (i = 1 /* skip the master */; i < group_size; i++)
 		grouped_pipes[i]->tg->funcs->enable_reset_trigger(
 					grouped_pipes[i]->tg, gsl_params.gsl_group);
 
+
+
+	for (i = 1 /* skip the master */; i < group_size; i++) {
 		DC_SYNC_INFO("GSL: waiting for reset to occur.\n");
 		wait_for_reset_trigger_to_occur(dc_ctx, grouped_pipes[i]->tg);
-
 		/* Regardless of success of the wait above, remove the reset or
 		 * the driver will start timing out on Display requests. */
 		DC_SYNC_INFO("GSL: disabling trigger-reset.\n");
 		grouped_pipes[i]->tg->funcs->disable_reset_trigger(grouped_pipes[i]->tg);
 	}
+
 
 	/* GSL Vblank synchronization is a one time sync mechanism, assumption
 	 * is that the sync'ed displays will not drift out of sync over time*/
@@ -1589,6 +1592,37 @@ static void init_hw(struct core_dc *dc)
 		if (dal_audio_power_up(audio) != AUDIO_RESULT_OK)
 			dm_error("Failed audio power up!\n");
 	}
+}
+
+static void print_context_timing_status(
+		const struct core_dc *dc,
+		struct resource_context *res_ctx)
+{
+	int i;
+	struct log_entry entry;
+	dal_logger_open(dc->ctx->logger, &entry, LOG_MAJOR_SYNC,
+							LOG_MINOR_SYNC_TIMING);
+	dal_logger_append(&entry, "\n");
+
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
+		struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[i];
+		int h_pos = 0;
+		int v_pos = 0;
+
+		if (pipe_ctx->stream == NULL)
+			continue;
+
+		pipe_ctx->tg->funcs->get_position(pipe_ctx->tg, &h_pos, &v_pos);
+		dal_logger_append(&entry,
+				"Pipe_%d   H_tot:%d  V_tot:%d   H_pos:%d  V_pos:%d\n",
+				pipe_ctx->pipe_idx,
+				pipe_ctx->stream->public.timing.h_total,
+				pipe_ctx->stream->public.timing.v_total,
+				h_pos, v_pos);
+
+	}
+
+	dal_logger_close(&entry);
 }
 
 static enum dc_status apply_ctx_to_surface(
@@ -1702,6 +1736,8 @@ static enum dc_status apply_ctx_to_surface(
 					PIPE_LOCK_CONTROL_SURFACE,
 					false);
 		}
+
+	print_context_timing_status(dc, &context->res_ctx);
 
 	return DC_OK;
 }
