@@ -925,7 +925,7 @@ bool dc_commit_surfaces_to_target(
 	if (prev_disp_clk < context->bw_results.dispclk_khz) {
 		pplib_apply_display_requirements(core_dc, context,
 								&context->pp_display_cfg);
-		core_dc->hwss.program_bw(core_dc, context);
+		core_dc->hwss.set_display_clock(context);
 	}
 
 
@@ -937,8 +937,8 @@ bool dc_commit_surfaces_to_target(
 
 	/* TODO: decouple wm programming and display clock and unhack this condition*/
 	/* Lower display clock if necessary */
-	if (prev_disp_clk > context->bw_results.dispclk_khz || new_surface_count > 1) {
-		core_dc->hwss.program_bw(core_dc, context);
+	if (prev_disp_clk > context->bw_results.dispclk_khz) {
+		core_dc->hwss.set_display_clock(context);
 		pplib_apply_display_requirements(core_dc, context,
 						&context->pp_display_cfg);
 	}

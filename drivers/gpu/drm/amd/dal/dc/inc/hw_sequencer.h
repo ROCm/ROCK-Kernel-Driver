@@ -103,8 +103,6 @@ struct hw_sequencer_funcs {
 					struct dc_bios *dcb,
 					enum pipe_gating_control power_gating);
 
-	void (*program_bw)(struct core_dc *dc, struct validate_context *context);
-
 	void (*enable_stream)(struct pipe_ctx *pipe_ctx);
 
 	void (*disable_stream)(struct pipe_ctx *pipe_ctx);
@@ -126,6 +124,10 @@ struct hw_sequencer_funcs {
 	void (*set_displaymarks)(
 				const struct core_dc *dc,
 				struct validate_context *context);
+
+	void (*set_display_mark_for_pipe_if_needed)(struct core_dc *dc,
+			struct pipe_ctx *pipe_ctx,
+			struct validate_context *context);
 
 	void (*set_display_clock)(struct validate_context *context);
 

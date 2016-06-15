@@ -213,6 +213,14 @@ static bool dce80_enable_display_power_gating(
 		return false;
 }
 
+
+static void set_display_mark_for_pipe_if_needed(struct core_dc *dc,
+		struct pipe_ctx *pipe_ctx,
+		struct validate_context *context)
+{
+	/* Do nothing until we have proper bandwitdth calcs */
+}
+
 static void set_displaymarks(
 		const struct core_dc *dc, struct validate_context *context)
 {
@@ -229,6 +237,7 @@ bool dce80_hw_sequencer_construct(struct core_dc *dc)
 	dc->hwss.pipe_control_lock = dce80_pipe_control_lock;
 	dc->hwss.set_blender_mode = dce80_set_blender_mode;
 	dc->hwss.set_displaymarks = set_displaymarks;
+	dc->hwss.set_display_mark_for_pipe_if_needed = set_display_mark_for_pipe_if_needed;
 
 	return true;
 }

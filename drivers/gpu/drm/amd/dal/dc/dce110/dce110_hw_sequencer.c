@@ -1055,6 +1055,70 @@ static uint32_t compute_pstate_blackout_duration(
 	return total_dest_line_time_ns;
 }
 
+/* get the index of the pipe_ctx if there were no gaps in the pipe_ctx array*/
+int get_bw_result_idx(
+		struct resource_context *res_ctx,
+		int pipe_idx)
+{
+	int i, collapsed_idx;
+
+	collapsed_idx = 0;
+	for (i = 0; i < pipe_idx; i++) {
+		if (res_ctx->pipe_ctx->stream)
+			collapsed_idx++;
+	}
+	return collapsed_idx;
+}
+
+
+static bool watermark_changed(
+		struct pipe_ctx *pipe_ctx,
+		struct validate_context *context,
+		struct validate_context *old_context)
+{
+	int collapsed_pipe_idx = get_bw_result_idx(&context->res_ctx,
+			pipe_ctx->pipe_idx);
+	int old_collapsed_pipe_idx = get_bw_result_idx(&old_context->res_ctx,
+			pipe_ctx->pipe_idx);
+	struct pipe_ctx *old_pipe_ctx =  &old_context->res_ctx.pipe_ctx[pipe_ctx->pipe_idx];
+
+	if (!old_pipe_ctx->stream)
+		return true;
+
+	if (memcmp(&context->bw_results.nbp_state_change_wm_ns[collapsed_pipe_idx],
+			&old_context->bw_results.nbp_state_change_wm_ns[old_collapsed_pipe_idx],
+			sizeof(struct bw_watermarks)))
+		return true;
+	if (memcmp(&context->bw_results.stutter_exit_wm_ns[collapsed_pipe_idx],
+			&old_context->bw_results.stutter_exit_wm_ns[old_collapsed_pipe_idx],
+			sizeof(struct bw_watermarks)))
+		return true;
+	if (memcmp(&context->bw_results.urgent_wm_ns[collapsed_pipe_idx],
+			&old_context->bw_results.urgent_wm_ns[old_collapsed_pipe_idx],
+			sizeof(struct bw_watermarks)))
+		return true;
+
+	return false;
+}
+
+static void program_wm_for_pipe(struct core_dc *dc,
+		struct pipe_ctx *pipe_ctx,
+		struct validate_context *context)
+{
+	int total_dest_line_time_ns = compute_pstate_blackout_duration(
+			dc->bw_vbios.blackout_duration,
+			pipe_ctx->stream);
+	int bw_result_idx = get_bw_result_idx(&context->res_ctx,
+				pipe_ctx->pipe_idx);
+
+	pipe_ctx->mi->funcs->mem_input_program_display_marks(
+		pipe_ctx->mi,
+		context->bw_results.nbp_state_change_wm_ns[bw_result_idx],
+		context->bw_results.stutter_exit_wm_ns[bw_result_idx],
+		context->bw_results.urgent_wm_ns[bw_result_idx],
+		total_dest_line_time_ns);
+}
+
 static void set_displaymarks(
 	const struct core_dc *dc,
 	struct validate_context *context)
@@ -1081,6 +1145,21 @@ static void set_displaymarks(
 	}
 }
 
+static void set_safe_displaymarks_for_pipe(struct pipe_ctx *pipe_ctx)
+{
+	struct bw_watermarks max_marks = {
+		MAX_WATERMARK, MAX_WATERMARK, MAX_WATERMARK, MAX_WATERMARK };
+	struct bw_watermarks nbp_marks = {
+		SAFE_NBP_MARK, SAFE_NBP_MARK, SAFE_NBP_MARK, SAFE_NBP_MARK };
+
+		pipe_ctx->mi->funcs->mem_input_program_display_marks(
+				pipe_ctx->mi,
+				nbp_marks,
+				max_marks,
+				max_marks,
+				MAX_WATERMARK);
+}
+
 static void set_safe_displaymarks(struct resource_context *res_ctx)
 {
 	uint8_t i;
@@ -1100,17 +1179,6 @@ static void set_safe_displaymarks(struct resource_context *res_ctx)
 				max_marks,
 				MAX_WATERMARK);
 	}
-}
-
-static void program_bw(struct core_dc *dc, struct validate_context *context)
-{
-	set_safe_displaymarks(&context->res_ctx);
-	/*TODO: when pplib works*/
-	/*dc_set_clocks_and_clock_state(context);*/
-
-	dc->hwss.set_display_clock(context);
-
-	dc->hwss.set_displaymarks(dc, context);
 }
 
 static void switch_dp_clock_sources(
@@ -1656,6 +1724,19 @@ static void dce110_power_on_pipe_if_needed(
 	}
 }
 
+static void set_display_mark_for_pipe_if_needed(struct core_dc *dc,
+		struct pipe_ctx *pipe_ctx,
+		struct validate_context *context)
+{
+	struct pipe_ctx *old_pipe_ctx =  &dc->current_context->res_ctx.pipe_ctx[pipe_ctx->pipe_idx];
+
+	/* hack for underlay pipe*/
+	if (pipe_ctx->top_pipe && !old_pipe_ctx->top_pipe)
+		set_safe_displaymarks_for_pipe(pipe_ctx);
+	else if (watermark_changed(pipe_ctx, context, dc->current_context))
+		program_wm_for_pipe(dc, pipe_ctx, context);
+}
+
 static void dce110_program_front_end_for_pipe(struct core_dc *dc,
 		struct pipe_ctx *pipe_ctx,
 		struct validate_context *context)
@@ -1666,6 +1747,11 @@ static void dce110_program_front_end_for_pipe(struct core_dc *dc,
 		PIPE_LOCK_CONTROL_SCL |
 		PIPE_LOCK_CONTROL_BLENDER |
 		PIPE_LOCK_CONTROL_MODE;
+
+	dc->hwss.set_display_mark_for_pipe_if_needed(
+			dc,
+		pipe_ctx,
+		context);
 
 	if (!pipe_ctx->surface->public.flip_immediate)
 		lock_mask |= PIPE_LOCK_CONTROL_SURFACE;
@@ -1806,7 +1892,6 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.power_down = power_down,
 	.enable_accelerated_mode = enable_accelerated_mode,
 	.enable_timing_synchronization = dce110_enable_timing_synchronization,
-	.program_bw = program_bw,
 	.enable_stream = enable_stream,
 	.disable_stream = disable_stream,
 	.enable_display_pipe_clock_gating = enable_display_pipe_clock_gating,
@@ -1818,6 +1903,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.clock_gating_power_up = dal_dc_clock_gating_dce110_power_up,/*todo*/
 	.set_display_clock = set_display_clock,
 	.set_displaymarks = set_displaymarks,
+	.set_display_mark_for_pipe_if_needed = set_display_mark_for_pipe_if_needed,
 	.set_drr = set_drr
 };
 
