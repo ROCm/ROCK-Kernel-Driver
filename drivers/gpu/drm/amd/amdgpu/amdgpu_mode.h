@@ -430,6 +430,7 @@ struct amdgpu_crtc {
 	struct drm_display_mode hw_mode;
 
 	/* After Set Mode target will be non-NULL */
+	int otg_inst;
 	struct dc_target *target;
 };
 
