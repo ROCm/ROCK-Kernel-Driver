@@ -2347,6 +2347,7 @@ int amdgpu_dm_atomic_commit(
 				/* this is the update mode case */
 				dc_target_release(acrtc->target);
 				acrtc->target = NULL;
+				acrtc->otg_inst = -1;
 			}
 
 			/*
@@ -2398,6 +2399,14 @@ int amdgpu_dm_atomic_commit(
 
 	/* DC is optimized not to do anything if 'targets' didn't change. */
 	dc_commit_targets(dm->dc, commit_targets, commit_targets_count);
+
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+
+		if (acrtc->target != NULL)
+			acrtc->otg_inst =
+				dc_target_get_status(acrtc->target)->primary_otg_inst;
+	}
 
 	/* update planes when needed */
 	for_each_plane_in_state(state, plane, old_plane_state, i) {
@@ -2573,6 +2582,14 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 			disconnected_acrtc->target = current_target;
 			manage_dm_interrupts(adev, disconnected_acrtc, true);
 			return;
+		}
+
+		list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+			struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+
+			if (acrtc->target != NULL)
+				acrtc->otg_inst =
+					dc_target_get_status(acrtc->target)->primary_otg_inst;
 		}
 
 		dc_target_release(current_target);

@@ -225,11 +225,10 @@ struct dc_target {
  * the IRQ source, current frame counter and currently attached surfaces.
  */
 struct dc_target_status {
-	enum dc_irq_source page_flip_src;
-	enum dc_irq_source v_update_src;
-	uint32_t cur_frame_count;
+	int primary_otg_inst;
+	int cur_frame_count;
+	int surface_count;
 	const struct dc_surface *surfaces[MAX_SURFACE_NUM];
-	uint8_t surface_count;
 };
 
 struct dc_target *dc_create_target_for_streams(
@@ -524,9 +523,6 @@ void dc_interrupt_set(const struct dc *dc, enum dc_irq_source src, bool enable);
 void dc_interrupt_ack(struct dc *dc, enum dc_irq_source src);
 enum dc_irq_source dc_get_hpd_irq_source_at_index(
 		struct dc *dc, uint32_t link_index);
-const struct dc_target *dc_get_target_on_irq_source(
-		const struct dc *dc,
-		enum dc_irq_source src);
 
 /*******************************************************************************
  * Power Interfaces

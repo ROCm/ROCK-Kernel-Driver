@@ -132,9 +132,9 @@ static int dm_soft_reset(void *handle)
 	return 0;
 }
 
-static struct amdgpu_crtc *get_crtc_by_target(
+static struct amdgpu_crtc *get_crtc_by_otg_inst(
 	struct amdgpu_device *adev,
-	const struct dc_target *dc_target)
+	int otg_inst)
 {
 	struct drm_device *dev = adev->ddev;
 	struct drm_crtc *crtc;
@@ -144,7 +144,7 @@ static struct amdgpu_crtc *get_crtc_by_target(
 	 * following if is check inherited from both functions where this one is
 	 * used now. Need to be checked why it could happen.
 	 */
-	if (dc_target == NULL) {
+	if (otg_inst == -1) {
 		WARN_ON(1);
 		return adev->mode_info.crtcs[0];
 	}
@@ -152,7 +152,7 @@ static struct amdgpu_crtc *get_crtc_by_target(
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		amdgpu_crtc = to_amdgpu_crtc(crtc);
 
-		if (amdgpu_crtc->target == dc_target)
+		if (amdgpu_crtc->otg_inst == otg_inst)
 			return amdgpu_crtc;
 	}
 
@@ -166,11 +166,8 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	struct common_irq_params *irq_params = interrupt_params;
 	struct amdgpu_device *adev = irq_params->adev;
 	unsigned long flags;
-	const struct dc *dc = irq_params->adev->dm.dc;
-	const struct dc_target *dc_target =
-			dc_get_target_on_irq_source(dc, irq_params->irq_src);
 
-	amdgpu_crtc = get_crtc_by_target(adev, dc_target);
+	amdgpu_crtc = get_crtc_by_otg_inst(adev, irq_params->irq_src - IRQ_TYPE_PFLIP);
 
 	/* IRQ could occur when in initial stage */
 	/*TODO work and BO cleanup */
@@ -216,17 +213,15 @@ static void dm_crtc_high_irq(void *interrupt_params)
 {
 	struct common_irq_params *irq_params = interrupt_params;
 	struct amdgpu_device *adev = irq_params->adev;
-	const struct dc *dc = irq_params->adev->dm.dc;
-	const struct dc_target *dc_target =
-			dc_get_target_on_irq_source(dc, irq_params->irq_src);
 	uint8_t crtc_index = 0;
-	struct amdgpu_crtc *acrtc = get_crtc_by_target(adev, dc_target);
+	struct amdgpu_crtc *acrtc;
+
+	acrtc = get_crtc_by_otg_inst(adev, irq_params->irq_src - IRQ_TYPE_VUPDATE);
 
 	if (acrtc)
 		crtc_index = acrtc->crtc_id;
 
 	drm_handle_vblank(adev->ddev, crtc_index);
-
 }
 
 static int dm_set_clockgating_state(void *handle,

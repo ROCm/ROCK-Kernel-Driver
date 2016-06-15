@@ -29,6 +29,7 @@
 #include "link_encoder.h"
 #include "stream_encoder.h"
 #include "opp.h"
+#include "timing_generator.h"
 #include "transform.h"
 #include "set_mode_types.h"
 
@@ -1075,6 +1076,11 @@ enum dc_status resource_map_pool_resources(
 					set_audio_in_use(
 						&context->res_ctx,
 						pipe_ctx->audio);
+			}
+
+			if (j == 0) {
+				context->target_status[i].primary_otg_inst =
+						pipe_ctx->tg->inst;
 			}
 		}
 	}

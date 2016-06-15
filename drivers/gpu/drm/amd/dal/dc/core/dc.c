@@ -1130,56 +1130,6 @@ void dc_interrupt_ack(struct dc *dc, enum dc_irq_source src)
 	dal_irq_service_ack(core_dc->res_pool->irqs, src);
 }
 
-const struct dc_target *dc_get_target_on_irq_source(
-		const struct dc *dc,
-		enum dc_irq_source src)
-{
-	struct core_dc *core_dc = DC_TO_CORE(dc);
-
-	uint8_t i, j;
-	uint8_t crtc_idx;
-
-	switch (src) {
-	case DC_IRQ_SOURCE_VUPDATE1:
-	case DC_IRQ_SOURCE_VUPDATE2:
-	case DC_IRQ_SOURCE_VUPDATE3:
-	case DC_IRQ_SOURCE_VUPDATE4:
-	case DC_IRQ_SOURCE_VUPDATE5:
-	case DC_IRQ_SOURCE_VUPDATE6:
-		crtc_idx = src - DC_IRQ_SOURCE_VUPDATE1;
-		break;
-	case DC_IRQ_SOURCE_PFLIP1:
-	case DC_IRQ_SOURCE_PFLIP2:
-	case DC_IRQ_SOURCE_PFLIP3:
-	case DC_IRQ_SOURCE_PFLIP4:
-	case DC_IRQ_SOURCE_PFLIP5:
-	case DC_IRQ_SOURCE_PFLIP6:
-	case DC_IRQ_SOURCE_PFLIP_UNDERLAY0:
-		crtc_idx = src - DC_IRQ_SOURCE_PFLIP1;
-		break;
-	default:
-		dm_error("%s: invalid irq source: %d\n!" ,__func__, src);
-		return NULL;
-	}
-
-	for (i = 0; i < core_dc->current_context->target_count; i++) {
-		struct core_target *target = core_dc->current_context->targets[i];
-		struct dc_target *dc_target = &target->public;
-
-		for (j = 0; j < target->public.stream_count; j++) {
-			const struct core_stream *stream =
-				DC_STREAM_TO_CORE(dc_target->streams[j]);
-
-			if (core_dc->current_context->res_ctx.
-					pipe_ctx[crtc_idx].stream == stream)
-				return dc_target;
-		}
-	}
-
-	dm_error("%s: 'dc_target' is NULL for irq source: %d\n!", __func__, src);
-	return NULL;
-}
-
 void dc_set_power_state(
 	struct dc *dc,
 	enum dc_acpi_cm_power_state power_state,

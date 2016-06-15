@@ -92,7 +92,7 @@ const struct dc_target_status *dc_target_get_status(
 {
 	uint8_t i;
 	struct core_target* target = DC_TARGET_TO_CORE(dc_target);
-    struct core_dc *dc = DC_TO_CORE(target->ctx->dc);
+	struct core_dc *dc = DC_TO_CORE(target->ctx->dc);
 
 	for (i = 0; i < dc->current_context->target_count; i++)
 		if (target == dc->current_context->targets[i])
