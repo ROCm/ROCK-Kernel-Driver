@@ -289,7 +289,7 @@ struct kfd2kgd_calls {
 	void (*write_vmid_invalidate_request)(struct kgd_dev *kgd,
 					uint8_t vmid);
 	int (*alloc_memory_of_gpu)(struct kgd_dev *kgd, uint64_t va,
-			size_t size, void *vm,
+			uint64_t size, void *vm,
 			struct kgd_mem **mem, uint64_t *offset,
 			void **kptr, struct kfd_process_device *pdd,
 			uint32_t flags);
