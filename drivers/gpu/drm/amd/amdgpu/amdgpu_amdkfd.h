@@ -113,7 +113,7 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 
 /* GPUVM API */
 int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
-		struct kgd_dev *kgd, uint64_t va, size_t size,
+		struct kgd_dev *kgd, uint64_t va, uint64_t size,
 		void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr,
 		struct kfd_process_device *pdd, uint32_t flags);

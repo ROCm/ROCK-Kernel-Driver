@@ -336,7 +336,7 @@ error:
 }
 
 static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
-		size_t size, void *vm, struct kgd_mem **mem,
+		uint64_t size, void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr, struct kfd_process_device *pdd,
 		u32 domain, u64 flags, bool aql_queue,
 		bool readonly, bool execute, bool no_sub, bool userptr)
@@ -346,6 +346,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	struct amdgpu_bo *bo;
 	uint64_t user_addr = 0;
 	int byte_align;
+	u32 alloc_domain;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(size == 0);
@@ -376,16 +377,18 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	(*mem)->data2.no_substitute = no_sub;
 	(*mem)->data2.aql_queue = aql_queue;
 
-	pr_debug("amdkfd: allocating GTT BO size %lu\n", size);
+	alloc_domain = userptr ? AMDGPU_GEM_DOMAIN_CPU : domain;
+	pr_debug("amdkfd: allocating BO on domain %d with size %llu\n",
+				alloc_domain, size);
 
 	/* Allocate buffer object. Userptr objects need to start out
 	 * in the CPU domain, get moved to GTT when pinned. */
 	ret = amdgpu_bo_create(adev, size, byte_align, false,
-			       userptr ? AMDGPU_GEM_DOMAIN_CPU : domain,
+				alloc_domain,
 			       flags, NULL, NULL, &bo);
 	if (ret != 0) {
-		pr_err("amdkfd: Failed to create BO object on GTT. ret == %d\n",
-				ret);
+		pr_err("amdkfd: failed to create BO on domain %d. ret %d\n",
+				alloc_domain, ret);
 		goto err_bo_create;
 	}
 	bo->kfd_bo = *mem;
@@ -402,13 +405,14 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		ret = amdgpu_amdkfd_gpuvm_clear_bo(adev, vm, bo);
 		amdgpu_bo_unreserve(bo);
 		if (ret) {
-			pr_err("amdkfd: Failed to clear BO object on GTT. ret == %d\n",
+			pr_err("amdkfd: failed to clear VRAM BO object. ret %d\n",
 					ret);
 			goto err_bo_clear;
 		}
 	}
 
-	pr_debug("Created BO on GTT with size %zu bytes\n", size);
+	pr_debug("amdkfd: created BO on domain %d with size %llu\n",
+				alloc_domain, size);
 
 	if (userptr) {
 		ret = amdgpu_ttm_tt_set_userptr(bo->tbo.ttm, user_addr,
@@ -816,7 +820,7 @@ err_failed_to_pin_pts:
 #define BOOL_TO_STR(b)	(b == true) ? "true" : "false"
 
 int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
-		struct kgd_dev *kgd, uint64_t va, size_t size,
+		struct kgd_dev *kgd, uint64_t va, uint64_t size,
 		void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr,
 		struct kfd_process_device *pdd, uint32_t flags)
@@ -915,11 +919,13 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	if (unlikely(ret != 0))
 		return ret;
 
+	pr_debug("Releasing BO with VA 0x%llx, size %lu bytes\n",
+					mem->data2.va,
+					mem->data2.bo->tbo.mem.size);
+
 	/* Remove from VM internal data structures */
 	list_for_each_entry_safe(entry, tmp, &mem->data2.bo_va_list, bo_list) {
-		pr_debug("Releasing BO with VA %p, size %lu bytes\n",
-				entry->bo_va,
-				mem->data2.bo->tbo.mem.size);
+		pr_debug("\t remove from amdgpu_bo_va %p\n", entry->bo_va);
 		remove_bo_from_vm((struct amdgpu_device *)entry->kgd_dev,
 				entry);
 	}
