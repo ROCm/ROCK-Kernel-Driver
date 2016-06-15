@@ -829,7 +829,7 @@ static bool construct(
 	pool->base.stream_enc_count = dal_adapter_service_get_stream_engines_num(as);
 	pool->base.scaler_filter = dal_scaler_filter_create(ctx);
 	dc->public.caps.max_downscale_ratio = 200;
-
+	dc->public.caps.i2c_speed_in_khz = 40;
 
 	if (pool->base.scaler_filter == NULL) {
 		BREAK_TO_DEBUGGER();

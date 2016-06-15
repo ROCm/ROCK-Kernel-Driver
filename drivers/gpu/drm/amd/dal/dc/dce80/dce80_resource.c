@@ -717,6 +717,7 @@ static bool construct(
 	pool->base.pipe_count = dal_adapter_service_get_func_controllers_num(as);
 	pool->base.stream_enc_count = dal_adapter_service_get_stream_engines_num(as);
 	dc->public.caps.max_downscale_ratio = 200;
+	dc->public.caps.i2c_speed_in_khz = 40;
 
 	/*************************************************
 	 *  Create resources                             *

@@ -1069,8 +1069,8 @@ static bool construct(
 	 *************************************************/
 	pool->base.pipe_count = 3;
 	pool->base.stream_enc_count = 3;
-
 	dc->public.caps.max_downscale_ratio = 150;
+	dc->public.caps.i2c_speed_in_khz = 100;
 
 	/*************************************************
 	 *  Create resources                             *

@@ -45,6 +45,7 @@ struct dc_caps {
 	uint32_t max_audios;
 	uint32_t max_underlays;
 	uint32_t max_downscale_ratio;
+	uint32_t i2c_speed_in_khz;
 };
 
 struct dc;
