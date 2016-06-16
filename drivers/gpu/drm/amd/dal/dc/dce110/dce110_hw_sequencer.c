@@ -1893,6 +1893,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.power_down = power_down,
 	.enable_accelerated_mode = enable_accelerated_mode,
 	.enable_timing_synchronization = dce110_enable_timing_synchronization,
+	.update_info_frame = update_info_frame,
 	.enable_stream = enable_stream,
 	.disable_stream = disable_stream,
 	.enable_display_pipe_clock_gating = enable_display_pipe_clock_gating,

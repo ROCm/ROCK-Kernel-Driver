@@ -103,6 +103,8 @@ struct hw_sequencer_funcs {
 					struct dc_bios *dcb,
 					enum pipe_gating_control power_gating);
 
+	void (*update_info_frame)(struct pipe_ctx *pipe_ctx);
+
 	void (*enable_stream)(struct pipe_ctx *pipe_ctx);
 
 	void (*disable_stream)(struct pipe_ctx *pipe_ctx);

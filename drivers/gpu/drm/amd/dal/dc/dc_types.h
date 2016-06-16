@@ -518,4 +518,13 @@ struct audio_info {
 	struct audio_mode modes[DC_MAX_AUDIO_DESC_COUNT];
 };
 
+struct freesync_context {
+	bool supported;
+	bool enabled;
+	bool active;
+
+	unsigned int min_refresh_in_micro_hz;
+	unsigned int nominal_refresh_in_micro_hz;
+};
+
 #endif /* DC_TYPES_H_ */

@@ -333,6 +333,8 @@ struct dc_stream {
 
 	bool ignore_msa_timing_param;
 
+	struct freesync_context freesync_ctx;
+
 	/* TODO: dithering */
 	/* TODO: transfer function (CSC/regamma/gamut remap) */
 	/* TODO: custom INFO packets */

@@ -201,7 +201,9 @@ static struct adapter_service *create_as(
 	return as;
 }
 
-static bool dc_stream_adjust_vmin_vmax(struct dc *dc, const struct dc_stream **stream, int num_streams, int vmin, int vmax)
+static bool dc_stream_adjust_vmin_vmax(struct dc *dc,
+		const struct dc_stream **stream, int num_streams,
+		int vmin, int vmax)
 {
 	/* TODO: Support multiple streams */
 	struct core_dc *core_dc = DC_TO_CORE(dc);
@@ -211,9 +213,15 @@ static bool dc_stream_adjust_vmin_vmax(struct dc *dc, const struct dc_stream **s
 	struct pipe_ctx *pipes;
 
 	for (i = 0; i < MAX_PIPES; i++) {
-		if (core_dc->current_context->res_ctx.pipe_ctx[i].stream == core_stream) {
+		if (core_dc->current_context->res_ctx.pipe_ctx[i].stream
+				== core_stream) {
+
 			pipes = &core_dc->current_context->res_ctx.pipe_ctx[i];
 			core_dc->hwss.set_drr(&pipes, 1, vmin, vmax);
+
+			/* build and update the info frame */
+			resource_build_info_frame(pipes);
+			core_dc->hwss.update_info_frame(pipes);
 
 			ret = true;
 		}

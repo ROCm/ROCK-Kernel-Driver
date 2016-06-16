@@ -52,8 +52,8 @@ struct mod_freesync_user_enable {
 
 struct mod_freesync_caps {
 	bool supported;
-	int min_refresh_in_micro_hz;
-	int max_refresh_in_micro_hz;
+	unsigned int min_refresh_in_micro_hz;
+	unsigned int max_refresh_in_micro_hz;
 };
 
 struct mod_freesync_params {
@@ -106,7 +106,7 @@ bool mod_freesync_get_user_enable(struct mod_freesync *mod_freesync,
 void mod_freesync_handle_v_update(struct mod_freesync *mod_freesync,
 		const struct dc_stream **streams, int num_streams);
 
-void mod_freesync_reapply_current_state(struct mod_freesync *mod_freesync,
+void mod_freesync_notify_mode_change(struct mod_freesync *mod_freesync,
 		const struct dc_stream **streams, int num_streams);
 
 #endif
