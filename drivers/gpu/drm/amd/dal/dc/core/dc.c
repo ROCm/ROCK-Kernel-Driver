@@ -1025,7 +1025,7 @@ struct dc_target *dc_get_target_at_index(const struct dc *dc, uint8_t i)
 	return NULL;
 }
 
-const struct dc_link *dc_get_link_at_index(struct dc *dc, uint32_t link_index)
+const struct dc_link *dc_get_link_at_index(const struct dc *dc, uint32_t link_index)
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
 	return &core_dc->links[link_index]->public;

@@ -398,7 +398,7 @@ struct dc_link {
  * boot time.  They cannot be created or destroyed.
  * Use dc_get_caps() to get number of links.
  */
-const struct dc_link *dc_get_link_at_index(struct dc *dc, uint32_t link_index);
+const struct dc_link *dc_get_link_at_index(const struct dc *dc, uint32_t link_index);
 
 /* Return id of physical connector represented by a dc_link at link_index.*/
 const struct graphics_object_id dc_get_link_id_at_index(
