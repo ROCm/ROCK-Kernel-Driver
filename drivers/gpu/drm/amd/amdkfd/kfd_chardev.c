@@ -1555,6 +1555,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 					mem, peer_pdd->vm);
 			radeon_flush_tlb(peer, p->pasid);
 		}
+		kfree(devices_arr);
 	} else {
 		dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd, mem, pdd->vm);
 		radeon_flush_tlb(dev, p->pasid);
