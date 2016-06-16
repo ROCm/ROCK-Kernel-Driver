@@ -2042,6 +2042,7 @@ retry:
 		/* bad news, how to tell it to userspace ? */
 		dev_info(adev->dev, "GPU reset failed\n");
 	}
+	amdgpu_irq_gpu_reset_resume_helper(adev);
 
 	return r;
 }
