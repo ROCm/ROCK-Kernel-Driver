@@ -166,6 +166,7 @@ bool dm_pp_apply_display_requirements(
 		adev->pm.pm_display_cfg.line_time_in_us =
 				pp_display_cfg->line_time_in_us;
 
+		adev->pm.pm_display_cfg.vrefresh = pp_display_cfg->disp_configs[0].v_refresh;
 		adev->pm.pm_display_cfg.crossfire_display_index = -1;
 		adev->pm.pm_display_cfg.min_bus_bandwidth = 0;
 
