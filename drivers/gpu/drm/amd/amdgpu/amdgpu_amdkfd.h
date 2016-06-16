@@ -69,6 +69,18 @@ struct kgd_mem {
 	};
 };
 
+/* KFD Memory Eviction */
+struct amdgpu_amdkfd_fence {
+	struct fence base;
+	void *mm;
+	spinlock_t lock;
+	char timeline_name[TASK_COMM_LEN];
+};
+
+struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
+						       void *mm);
+bool amd_kfd_fence_check_mm(struct fence *f, void *mm);
+
 /* struct amdkfd_vm -
  *  For Memory Eviction KGD requires a mechanism to keep track of all KFD BOs
  * belonging to a KFD process. All the VMs belonging to the same process point
@@ -95,6 +107,8 @@ struct amdkfd_vm {
 	/* Number of VMs including master VM */
 	unsigned n_vms;
 	struct amdgpu_device *adev;
+	/* Eviction Fence. Initialized only for master_vm */
+	struct amdgpu_amdkfd_fence *eviction_fence;
 };
 
 int amdgpu_amdkfd_init(void);

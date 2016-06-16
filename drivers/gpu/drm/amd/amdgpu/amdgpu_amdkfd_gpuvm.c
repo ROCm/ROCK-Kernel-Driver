@@ -1081,18 +1081,23 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 	if (ret != 0) {
 		pr_err("amdgpu: failed init vm ret %d\n", ret);
 		/* Undo everything related to the new VM context */
-		amdgpu_vm_fini(adev, &new_vm->base);
-		kfree(new_vm);
-		new_vm = NULL;
+		goto vm_init_fail;
 	}
 	new_vm->adev = adev;
 	mutex_init(&new_vm->lock);
 	INIT_LIST_HEAD(&new_vm->kfd_bo_list);
 	INIT_LIST_HEAD(&new_vm->kfd_vm_list);
 
-	if (master_vm == NULL)
+	if (master_vm == NULL) {
 		new_vm->master = new_vm;
-	else {
+		new_vm->eviction_fence =
+			amdgpu_amdkfd_fence_create(fence_context_alloc(1),
+						   current->mm);
+		if (new_vm->master->eviction_fence == NULL) {
+			pr_err("Failed to create eviction fence\n");
+			goto evict_fence_fail;
+		}
+	} else {
 		new_vm->master = master_vm;
 		list_add_tail(&new_vm->kfd_vm_list,
 			      &((struct amdkfd_vm *)master_vm)->kfd_vm_list);
@@ -1121,18 +1126,29 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 			amdgpu_bo_gpu_offset(new_vm->base.page_directory));
 
 	return ret;
+
+evict_fence_fail:
+	amdgpu_vm_fini(adev, &new_vm->base);
+vm_init_fail:
+	kfree(new_vm);
+	return ret;
+
 }
 
 void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
-	struct amdgpu_vm *avm = (struct amdgpu_vm *) vm;
+	struct amdkfd_vm *kfd_vm = (struct amdkfd_vm *) vm;
+	struct amdgpu_vm *avm = &kfd_vm->base;
 	struct amdgpu_bo *pd;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(vm == NULL);
 
 	pr_debug("Destroying process vm with address %p\n", vm);
+	/* Release eviction fence */
+	if (kfd_vm->master == kfd_vm && kfd_vm->eviction_fence != NULL)
+		fence_put(&kfd_vm->eviction_fence->base);
 
 	/* Unpin PTs */
 	unpin_pts(avm);
