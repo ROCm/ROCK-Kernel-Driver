@@ -696,12 +696,11 @@ static inline int dm_irq_state(
 
 	struct amdgpu_crtc *acrtc = adev->mode_info.crtcs[crtc_id];
 
-	if (!acrtc->target) {
+	if (!acrtc || !acrtc->target) {
 		DRM_INFO(
 			"%s: target is null for crtc %d, talk to David R\n",
 			func,
 			crtc_id);
-		WARN_ON(true);
 		return 0;
 	}
 
