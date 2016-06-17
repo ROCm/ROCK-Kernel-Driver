@@ -79,16 +79,24 @@ void kfd_process_destroy_wq(void)
 	}
 }
 
+static void kfd_process_free_gpuvm(struct kfd_dev *kdev, struct kgd_mem *mem,
+				void *vm)
+{
+	kdev->kfd2kgd->unmap_memory_to_gpu(kdev->kgd, mem, vm);
+	kdev->kfd2kgd->free_memory_of_gpu(kdev->kgd, mem);
+}
+
 /* kfd_process_alloc_gpuvm - Allocate GPU VM for the KFD process
  *	During the memory allocation of GPU, we can't hold the process lock.
  *	There's a chance someone else allocates the memory during the lock
- *	released time. In that case, -EINVAL error is returned but kptr remains
- *	so the caller knows the memory is allocated (by someone else) and
+ *	released time. In that case, -EINVAL is returned but kptr remains so
+ *	the caller knows the memory is allocated (by someone else) and
  *	available to use.
  */
-static int kfd_process_alloc_gpuvm(struct kfd_process *p, struct kfd_dev *kdev,
-		uint64_t gpu_va, uint32_t size, void *vm, void **kptr,
-		struct kfd_process_device *pdd, uint64_t *addr_to_assign)
+static int kfd_process_alloc_gpuvm(struct kfd_process *p,
+		struct kfd_dev *kdev, uint64_t gpu_va, uint32_t size,
+		void *vm, void **kptr, struct kfd_process_device *pdd,
+		uint64_t *addr_to_assign)
 {
 	int err;
 	void *mem = NULL;
@@ -113,20 +121,33 @@ static int kfd_process_alloc_gpuvm(struct kfd_process *p, struct kfd_dev *kdev,
 	/* Check if someone else allocated the memory while we weren't looking
 	 */
 	if (*addr_to_assign) {
-		up_write(&p->lock);
-		kdev->kfd2kgd->unmap_memory_to_gpu(kdev->kgd,
-		(struct kgd_mem *)mem, pdd->vm);
-		kdev->kfd2kgd->free_memory_of_gpu(kdev->kgd, mem);
-		down_write(&p->lock);
 		err = -EINVAL;
+		goto free_gpuvm;
+	} else {
+		/* Create an obj handle so kfd_process_device_remove_obj_handle
+		 * will take care of the bo removal when the process finishes
+		 */
+		if (kfd_process_device_create_obj_handle(
+				pdd, mem, gpu_va, size) < 0) {
+			err = -ENOMEM;
+			*kptr = NULL;
+			goto free_gpuvm;
+		}
 	}
 
+	return err;
+
+free_gpuvm:
+	up_write(&p->lock);
+	kfd_process_free_gpuvm(kdev, (struct kgd_mem *)mem, pdd->vm);
+	down_write(&p->lock);
 	return err;
 
 err_map_mem:
 	kdev->kfd2kgd->free_memory_of_gpu(kdev->kgd, mem);
 err_alloc_mem:
-	kptr = NULL;
+	*kptr = NULL;
+	down_write(&p->lock);
 	return err;
 }
 
@@ -138,30 +159,33 @@ err_alloc_mem:
  */
 static int kfd_process_reserve_ib_mem(struct kfd_process *p)
 {
-	int err;
+	int err = 0;
 	struct kfd_process_device *temp, *pdd = NULL;
 	struct kfd_dev *kdev = NULL;
 	struct qcm_process_device *qpd = NULL;
+	void *kaddr;
 
 	down_write(&p->lock);
 	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
 				per_device_list) {
 		kdev = pdd->dev;
 		qpd = &pdd->qpd;
-		if (!kdev->ib_size || qpd->ib_kaddr_assigned)
+		if (!kdev->ib_size || qpd->ib_kaddr)
 			continue;
 
 		if (qpd->ib_base) { /* is dGPU */
 			err = kfd_process_alloc_gpuvm(p, kdev,
 				qpd->ib_base, kdev->ib_size, pdd->vm,
-				&qpd->ib_kaddr, pdd, &qpd->ib_kaddr_assigned);
+				&kaddr, pdd, (uint64_t *)&qpd->ib_kaddr);
 			if (!err)
-				qpd->ib_kaddr_assigned =
-						(uint64_t)qpd->ib_kaddr;
+				qpd->ib_kaddr = kaddr;
 			else if (qpd->ib_kaddr)
 				err = 0;
+			else
+				err = -ENOMEM;
 		} else {
 			/* FIXME: Support APU */
+			err = -ENOMEM;
 		}
 	}
 
@@ -557,7 +581,6 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 	int err;
 	unsigned long  offset;
 	struct kfd_process_device *temp, *pdd = NULL;
-	void *mem = NULL;
 	struct kfd_dev *dev = NULL;
 	struct qcm_process_device *qpd = NULL;
 
@@ -571,46 +594,18 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 		if (qpd->cwsr_base) {
 			/* cwsr_base is only set for DGPU */
 
-			/* can't hold the process lock while
-			 * allocating from KGD */
-			up_write(&p->lock);
-
-			err = dev->kfd2kgd->alloc_memory_of_gpu(
-				dev->kgd, qpd->cwsr_base, dev->cwsr_size,
-				pdd->vm, (struct kgd_mem **)&mem,
-				NULL, &qpd->cwsr_kaddr, pdd,
-				ALLOC_MEM_FLAGS_GTT |
-				ALLOC_MEM_FLAGS_NONPAGED |
-				ALLOC_MEM_FLAGS_EXECUTE_ACCESS |
-				ALLOC_MEM_FLAGS_NO_SUBSTITUTE);
-			if (err)
-				goto err_alloc_tba;
-			err = kfd_map_memory_to_gpu(dev, mem, p, pdd);
-			if (err)
-				goto err_map_tba;
-
-			down_write(&p->lock);
-			/* Check if someone else allocated the memory
-			 * while we weren't looking */
-			if (qpd->tba_addr) {
-				up_write(&p->lock);
-				dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd,
-					(struct kgd_mem *)mem, pdd->vm);
-				dev->kfd2kgd->free_memory_of_gpu(dev->kgd, mem);
-				down_write(&p->lock);
-			} else {
-				qpd->cwsr_mem_handle =
-					kfd_process_device_create_obj_handle(
-						pdd, mem, qpd->cwsr_base,
-						dev->cwsr_size);
-				if (qpd->cwsr_mem_handle < 0)
-					goto err_create_handle;
-
+			err = kfd_process_alloc_gpuvm(p, dev, qpd->cwsr_base,
+					dev->cwsr_size, pdd->vm,
+					&qpd->cwsr_kaddr, pdd, &qpd->tba_addr);
+			if (!err) {
 				memcpy(qpd->cwsr_kaddr, kmap(dev->cwsr_pages),
 				       PAGE_SIZE);
 				kunmap(dev->cwsr_pages);
 				qpd->tba_addr = qpd->cwsr_base;
-			}
+			} else if (qpd->cwsr_kaddr)
+				err = 0;
+			else
+				goto out;
 		} else {
 			offset = (kfd_get_gpu_id(dev) |
 				KFD_MMAP_TYPE_RESERVED_MEM) << PAGE_SHIFT;
@@ -630,13 +625,8 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 				qpd->tba_addr, qpd->tma_addr);
 	}
 
-err_create_handle:
+out:
 	up_write(&p->lock);
-	return err;
-
-err_map_tba:
-	dev->kfd2kgd->free_memory_of_gpu(dev->kgd, mem);
-err_alloc_tba:
 	return err;
 }
 

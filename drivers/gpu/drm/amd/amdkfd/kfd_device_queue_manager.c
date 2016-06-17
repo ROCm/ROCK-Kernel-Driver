@@ -127,7 +127,7 @@ static int flush_texture_cache_nocpsch(struct kfd_dev *kdev,
 {
 	uint32_t len;
 
-	if (!qpd->ib_kaddr_assigned)
+	if (!qpd->ib_kaddr)
 		return -ENOMEM;
 
 	len = pm_create_release_mem(qpd->ib_base, (uint32_t *)qpd->ib_kaddr);

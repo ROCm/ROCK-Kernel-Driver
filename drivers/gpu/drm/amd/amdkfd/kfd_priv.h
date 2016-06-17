@@ -527,7 +527,6 @@ struct qcm_process_device {
 	uint32_t sh_hidden_private_base;
 
 	/*cwsr memory*/
-	int  cwsr_mem_handle;
 	uint64_t cwsr_base;
 	uint64_t tba_addr;
 	uint64_t tma_addr;
@@ -536,7 +535,6 @@ struct qcm_process_device {
 	/* IB memory */
 	uint64_t ib_base; /* ib_base+ib_size must be below cwsr_base */
 	void *ib_kaddr;
-	uint64_t ib_kaddr_assigned;
 };
 
 /*8 byte handle containing GPU ID in the most significant 4 bytes and
