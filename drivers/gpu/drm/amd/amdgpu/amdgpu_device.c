@@ -2032,9 +2032,10 @@ retry:
 		}
 	}
 
-	if (amdgpu_device_has_dal_support(adev))
+	if (amdgpu_device_has_dal_support(adev)) {
 		r = drm_atomic_helper_resume(adev->ddev, state);
-	else
+		amdgpu_dm_display_resume(adev);
+	} else
 		drm_helper_resume_force_mode(adev->ddev);
 
 	ttm_bo_unlock_delayed_workqueue(&adev->mman.bdev, resched);
