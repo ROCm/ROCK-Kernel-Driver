@@ -321,7 +321,10 @@ union dc_cursor_attribute_flags {
 		uint32_t INVERSE_TRANSPARENT_CLAMPING:1;
 		uint32_t HORIZONTAL_MIRROR:1;
 		uint32_t VERTICAL_MIRROR:1;
-		uint32_t RESERVED:28;
+		uint32_t INVERT_PIXEL_DATA:1;
+		uint32_t ZERO_EXPANSION:1;
+		uint32_t MIN_MAX_INVERT:1;
+		uint32_t RESERVED:25;
 	} bits;
 	uint32_t value;
 };
