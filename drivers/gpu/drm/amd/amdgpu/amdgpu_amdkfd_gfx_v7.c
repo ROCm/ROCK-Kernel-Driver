@@ -581,7 +581,8 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd,
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	uint32_t temp;
 	enum hqd_dequeue_request_type type;
-	unsigned long end_jiffies = (utimeout * HZ / 1000) + jiffies;
+	unsigned long flags, end_jiffies;
+	int retry;
 
 	acquire_queue(kgd, pipe_id, queue_id);
 	WREG32(mmCP_HQD_PQ_DOORBELL_CONTROL, 0);
@@ -598,8 +599,63 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd,
 		break;
 	}
 
+	/* Workaround: If IQ timer is active and the wait time is close to or
+	 * equal to 0, dequeueing is not safe. Wait until either the wait time
+	 * is larger or timer is cleared. Also, ensure that IQ_REQ_PEND is
+	 * cleared before continuing. Also, ensure wait times are set to at
+	 * least 0x3.
+	 */
+	local_irq_save(flags);
+	preempt_disable();
+	retry = 5000; /* wait for 500 usecs at maximum */
+	while (true) {
+		temp = RREG32(mmCP_HQD_IQ_TIMER);
+		if (REG_GET_FIELD(temp, CP_HQD_IQ_TIMER, PROCESSING_IQ)) {
+			pr_debug("HW is processing IQ\n");
+			goto loop;
+		}
+		if (REG_GET_FIELD(temp, CP_HQD_IQ_TIMER, ACTIVE)) {
+			if (REG_GET_FIELD(temp, CP_HQD_IQ_TIMER, RETRY_TYPE)
+					== 3) /* SEM-rearm is safe */
+				break;
+			/* Wait time 3 is safe for CP, but our MMIO read/write
+			 * time is close to 1 microsecond, so check for 10 to
+			 * leave more buffer room
+			 */
+			if (REG_GET_FIELD(temp, CP_HQD_IQ_TIMER, WAIT_TIME)
+					>= 10)
+				break;
+			pr_debug("IQ timer is active\n");
+		} else
+			break;
+	loop:
+		if (!retry) {
+			pr_err("kfd: CP HQD IQ timer status time out\n");
+			break;
+		}
+		ndelay(100);
+		--retry;
+	}
+	retry = 1000;
+	while (true) {
+		temp = RREG32(mmCP_HQD_DEQUEUE_REQUEST);
+		if (!(temp & CP_HQD_DEQUEUE_REQUEST__IQ_REQ_PEND_MASK))
+			break;
+		pr_debug("Dequeue request is pending\n");
+
+		if (!retry) {
+			pr_err("kfd: CP HQD dequeue request time out\n");
+			break;
+		}
+		ndelay(100);
+		--retry;
+	}
+	local_irq_restore(flags);
+	preempt_enable();
+
 	WREG32(mmCP_HQD_DEQUEUE_REQUEST, type);
 
+	end_jiffies = (utimeout * HZ / 1000) + jiffies;
 	while (true) {
 		temp = RREG32(mmCP_HQD_ACTIVE);
 		if (!(temp & CP_HQD_ACTIVE__ACTIVE_MASK))
