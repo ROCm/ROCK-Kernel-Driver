@@ -43,6 +43,13 @@ struct mem_input_funcs {
 		struct bw_watermarks urgent,
 		uint32_t total_dest_line_time_ns);
 
+	void (*mem_input_program_chroma_display_marks)(
+			struct mem_input *mem_input,
+			struct bw_watermarks nbp,
+			struct bw_watermarks stutter,
+			struct bw_watermarks urgent,
+			uint32_t total_dest_line_time_ns);
+
 	void (*allocate_mem_input)(
 		struct mem_input *mem_input,
 		uint32_t h_total,/* for current target */

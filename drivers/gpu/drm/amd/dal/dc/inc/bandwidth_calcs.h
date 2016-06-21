@@ -261,6 +261,7 @@ struct bw_calcs_input_single_display {
 	uint32_t graphics_lb_bpc;
 	uint32_t underlay_lb_bpc;
 	enum bw_defines underlay_tiling_mode;
+	struct bw_fixed underlay_scale_ratio;
 	uint32_t underlay_h_taps;
 	uint32_t underlay_v_taps;
 	uint32_t underlay_src_width;

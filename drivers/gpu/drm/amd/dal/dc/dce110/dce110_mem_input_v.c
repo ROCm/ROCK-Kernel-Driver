@@ -816,22 +816,31 @@ void dce110_mem_input_v_program_display_marks(
 		urgent,
 		total_dest_line_time_ns);
 
-	program_urgency_watermark_c(
-		mem_input->ctx,
-		urgent,
-		total_dest_line_time_ns);
-
 	program_nbp_watermark_l(
-		mem_input->ctx,
-		nbp);
-
-	program_nbp_watermark_c(
 		mem_input->ctx,
 		nbp);
 
 	program_stutter_watermark_l(
 		mem_input->ctx,
 		stutter);
+
+}
+
+void dce110_mem_input_program_chroma_display_marks(
+	struct mem_input *mem_input,
+	struct bw_watermarks nbp,
+	struct bw_watermarks stutter,
+	struct bw_watermarks urgent,
+	uint32_t total_dest_line_time_ns)
+{
+	program_urgency_watermark_c(
+		mem_input->ctx,
+		urgent,
+		total_dest_line_time_ns);
+
+	program_nbp_watermark_c(
+		mem_input->ctx,
+		nbp);
 
 	program_stutter_watermark_c(
 		mem_input->ctx,
@@ -856,6 +865,8 @@ void dce110_free_mem_input_v(
 static struct mem_input_funcs dce110_mem_input_v_funcs = {
 	.mem_input_program_display_marks =
 			dce110_mem_input_v_program_display_marks,
+	.mem_input_program_chroma_display_marks =
+			dce110_mem_input_program_chroma_display_marks,
 	.allocate_mem_input = dce110_allocate_mem_input_v,
 	.free_mem_input = dce110_free_mem_input_v,
 	.mem_input_program_surface_flip_and_addr =

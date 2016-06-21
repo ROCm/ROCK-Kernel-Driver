@@ -1063,11 +1063,15 @@ int get_bw_result_idx(
 {
 	int i, collapsed_idx;
 
+	if (res_ctx->pipe_ctx[pipe_idx].top_pipe)
+		return 3;
+
 	collapsed_idx = 0;
 	for (i = 0; i < pipe_idx; i++) {
-		if (res_ctx->pipe_ctx->stream)
+		if (res_ctx->pipe_ctx[i].stream)
 			collapsed_idx++;
 	}
+
 	return collapsed_idx;
 }
 
@@ -1118,6 +1122,14 @@ static void program_wm_for_pipe(struct core_dc *dc,
 		context->bw_results.stutter_exit_wm_ns[bw_result_idx],
 		context->bw_results.urgent_wm_ns[bw_result_idx],
 		total_dest_line_time_ns);
+
+	if (pipe_ctx->top_pipe)
+		pipe_ctx->mi->funcs->mem_input_program_chroma_display_marks(
+				pipe_ctx->mi,
+				context->bw_results.nbp_state_change_wm_ns[bw_result_idx + 1],
+				context->bw_results.stutter_exit_wm_ns[bw_result_idx + 1],
+				context->bw_results.urgent_wm_ns[bw_result_idx + 1],
+				total_dest_line_time_ns);
 }
 
 static void set_displaymarks(
@@ -1144,21 +1156,6 @@ static void set_displaymarks(
 			total_dest_line_time_ns);
 		num_pipes++;
 	}
-}
-
-static void set_safe_displaymarks_for_pipe(struct pipe_ctx *pipe_ctx)
-{
-	struct bw_watermarks max_marks = {
-		MAX_WATERMARK, MAX_WATERMARK, MAX_WATERMARK, MAX_WATERMARK };
-	struct bw_watermarks nbp_marks = {
-		SAFE_NBP_MARK, SAFE_NBP_MARK, SAFE_NBP_MARK, SAFE_NBP_MARK };
-
-		pipe_ctx->mi->funcs->mem_input_program_display_marks(
-				pipe_ctx->mi,
-				nbp_marks,
-				max_marks,
-				max_marks,
-				MAX_WATERMARK);
 }
 
 static void set_safe_displaymarks(struct resource_context *res_ctx)
@@ -1729,12 +1726,7 @@ static void set_display_mark_for_pipe_if_needed(struct core_dc *dc,
 		struct pipe_ctx *pipe_ctx,
 		struct validate_context *context)
 {
-	struct pipe_ctx *old_pipe_ctx =  &dc->current_context->res_ctx.pipe_ctx[pipe_ctx->pipe_idx];
-
-	/* hack for underlay pipe*/
-	if (pipe_ctx->top_pipe && !old_pipe_ctx->top_pipe)
-		set_safe_displaymarks_for_pipe(pipe_ctx);
-	else if (watermark_changed(pipe_ctx, context, dc->current_context))
+	if (watermark_changed(pipe_ctx, context, dc->current_context))
 		program_wm_for_pipe(dc, pipe_ctx, context);
 }
 

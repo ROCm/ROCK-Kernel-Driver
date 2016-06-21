@@ -25,6 +25,7 @@
 
 #include "dm_services.h"
 #include "bandwidth_calcs.h"
+#include "dc.h"
 
 /*******************************************************************************
  * Private Functions
@@ -4057,9 +4058,6 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 			mode_data->displays_data[0].fbc_enable;
 		bw_data_internal->d0_lpt_enable =
 			mode_data->displays_data[0].lpt_enable;
-		bw_data_internal->d0_underlay_mode =
-			mode_data->displays_data[0].underlay_mode;
-		bw_data_internal->d0_underlay_scale_ratio = bw_int_to_fixed(0);
 		bw_data_internal->d0_htotal =
 			mode_data->displays_data[0].h_total;
 		bw_data_internal->d0_pixel_rate =
@@ -4072,6 +4070,8 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 			mode_data->displays_data[0].graphics_scale_ratio;
 		bw_data_internal->d0_graphics_stereo_mode =
 			mode_data->displays_data[0].graphics_stereo_mode;
+		bw_data_internal->d0_underlay_mode =
+				mode_data->displays_data[0].underlay_mode;
 		/* fall through */
 	default:
 		/* data for all displays */
@@ -4101,6 +4101,8 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 			mode_data->displays_data[0].underlay_lb_bpc;
 		bw_data_internal->underlay_tiling_mode =
 			mode_data->displays_data[0].underlay_tiling_mode;
+		bw_data_internal->d0_underlay_scale_ratio =
+			mode_data->displays_data[0].underlay_scale_ratio;
 		bw_data_internal->underlay_htaps =
 			mode_data->displays_data[0].underlay_h_taps;
 		bw_data_internal->underlay_vtaps =
@@ -4166,6 +4168,9 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 				bw_mul(high_yclk, bw_int_to_fixed(1000)));
 
 		/* units: nanosecond, 16bit storage. */
+
+
+
 		calcs_output->nbp_state_change_wm_ns[0].a_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[4], bw_int_to_fixed(1000)));
@@ -4175,15 +4180,27 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->nbp_state_change_wm_ns[2].a_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[6], bw_int_to_fixed(1000)));
-		calcs_output->nbp_state_change_wm_ns[3].a_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				nbp_state_change_watermark[7], bw_int_to_fixed(1000)));
-		calcs_output->nbp_state_change_wm_ns[4].a_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				nbp_state_change_watermark[8], bw_int_to_fixed(1000)));
+
+		if (ctx->dc->caps.max_underlays) {
+			calcs_output->nbp_state_change_wm_ns[3].a_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[0], bw_int_to_fixed(1000)));
+			calcs_output->nbp_state_change_wm_ns[4].a_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+							nbp_state_change_watermark[1], bw_int_to_fixed(1000)));
+		} else {
+			calcs_output->nbp_state_change_wm_ns[3].a_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[7], bw_int_to_fixed(1000)));
+			calcs_output->nbp_state_change_wm_ns[4].a_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[8], bw_int_to_fixed(1000)));
+		}
 		calcs_output->nbp_state_change_wm_ns[5].a_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[9], bw_int_to_fixed(1000)));
+
+
 
 		calcs_output->stutter_exit_wm_ns[0].a_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -4194,15 +4211,26 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->stutter_exit_wm_ns[2].a_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[6], bw_int_to_fixed(1000)));
-		calcs_output->stutter_exit_wm_ns[3].a_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				stutter_exit_watermark[7], bw_int_to_fixed(1000)));
-		calcs_output->stutter_exit_wm_ns[4].a_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				stutter_exit_watermark[8], bw_int_to_fixed(1000)));
+		if (ctx->dc->caps.max_underlays) {
+			calcs_output->stutter_exit_wm_ns[3].a_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[0], bw_int_to_fixed(1000)));
+			calcs_output->stutter_exit_wm_ns[4].a_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[1], bw_int_to_fixed(1000)));
+		} else {
+			calcs_output->stutter_exit_wm_ns[3].a_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[7], bw_int_to_fixed(1000)));
+			calcs_output->stutter_exit_wm_ns[4].a_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[8], bw_int_to_fixed(1000)));
+		}
 		calcs_output->stutter_exit_wm_ns[5].a_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[9], bw_int_to_fixed(1000)));
+
+
 
 		calcs_output->urgent_wm_ns[0].a_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -4213,12 +4241,21 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->urgent_wm_ns[2].a_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[6], bw_int_to_fixed(1000)));
-		calcs_output->urgent_wm_ns[3].a_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				urgent_watermark[7], bw_int_to_fixed(1000)));
-		calcs_output->urgent_wm_ns[4].a_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				urgent_watermark[8], bw_int_to_fixed(1000)));
+		if (ctx->dc->caps.max_underlays) {
+			calcs_output->urgent_wm_ns[3].a_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[0], bw_int_to_fixed(1000)));
+			calcs_output->urgent_wm_ns[4].a_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[1], bw_int_to_fixed(1000)));
+		} else {
+			calcs_output->urgent_wm_ns[3].a_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[7], bw_int_to_fixed(1000)));
+			calcs_output->urgent_wm_ns[4].a_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[8], bw_int_to_fixed(1000)));
+		}
 		calcs_output->urgent_wm_ns[5].a_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[9], bw_int_to_fixed(1000)));
@@ -4227,6 +4264,8 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		((struct bw_calcs_vbios *)vbios)->low_sclk = mid_sclk;
 		calculate_bandwidth(dceip, vbios, bw_data_internal,
 							bw_results_internal);
+
+
 
 		calcs_output->nbp_state_change_wm_ns[0].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -4237,15 +4276,27 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->nbp_state_change_wm_ns[2].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[6], bw_int_to_fixed(1000)));
-		calcs_output->nbp_state_change_wm_ns[3].b_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				nbp_state_change_watermark[7], bw_int_to_fixed(1000)));
-		calcs_output->nbp_state_change_wm_ns[4].b_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				nbp_state_change_watermark[8], bw_int_to_fixed(1000)));
+
+		if (ctx->dc->caps.max_underlays) {
+			calcs_output->nbp_state_change_wm_ns[3].b_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[0], bw_int_to_fixed(1000)));
+			calcs_output->nbp_state_change_wm_ns[4].b_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[1], bw_int_to_fixed(1000)));
+		} else {
+			calcs_output->nbp_state_change_wm_ns[3].b_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[7], bw_int_to_fixed(1000)));
+			calcs_output->nbp_state_change_wm_ns[4].b_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[8], bw_int_to_fixed(1000)));
+		}
 		calcs_output->nbp_state_change_wm_ns[5].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[9], bw_int_to_fixed(1000)));
+
+
 
 		calcs_output->stutter_exit_wm_ns[0].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -4256,15 +4307,26 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->stutter_exit_wm_ns[2].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[6], bw_int_to_fixed(1000)));
-		calcs_output->stutter_exit_wm_ns[3].b_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				stutter_exit_watermark[7], bw_int_to_fixed(1000)));
-		calcs_output->stutter_exit_wm_ns[4].b_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				stutter_exit_watermark[8], bw_int_to_fixed(1000)));
+		if (ctx->dc->caps.max_underlays) {
+			calcs_output->stutter_exit_wm_ns[3].b_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[0], bw_int_to_fixed(1000)));
+			calcs_output->stutter_exit_wm_ns[4].b_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[1], bw_int_to_fixed(1000)));
+		} else {
+			calcs_output->stutter_exit_wm_ns[3].b_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[7], bw_int_to_fixed(1000)));
+			calcs_output->stutter_exit_wm_ns[4].b_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[8], bw_int_to_fixed(1000)));
+		}
 		calcs_output->stutter_exit_wm_ns[5].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[9], bw_int_to_fixed(1000)));
+
+
 
 		calcs_output->urgent_wm_ns[0].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -4275,12 +4337,21 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->urgent_wm_ns[2].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[6], bw_int_to_fixed(1000)));
-		calcs_output->urgent_wm_ns[3].b_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				urgent_watermark[7], bw_int_to_fixed(1000)));
-		calcs_output->urgent_wm_ns[4].b_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				urgent_watermark[8], bw_int_to_fixed(1000)));
+		if (ctx->dc->caps.max_underlays) {
+			calcs_output->urgent_wm_ns[3].b_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[0], bw_int_to_fixed(1000)));
+			calcs_output->urgent_wm_ns[4].b_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[1], bw_int_to_fixed(1000)));
+		} else {
+			calcs_output->urgent_wm_ns[3].b_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[7], bw_int_to_fixed(1000)));
+			calcs_output->urgent_wm_ns[4].b_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[8], bw_int_to_fixed(1000)));
+		}
 		calcs_output->urgent_wm_ns[5].b_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[9], bw_int_to_fixed(1000)));
@@ -4291,6 +4362,8 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calculate_bandwidth(dceip, vbios, bw_data_internal,
 							bw_results_internal);
 
+
+
 		calcs_output->nbp_state_change_wm_ns[0].c_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[4], bw_int_to_fixed(1000)));
@@ -4300,15 +4373,25 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->nbp_state_change_wm_ns[2].c_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[6], bw_int_to_fixed(1000)));
-		calcs_output->nbp_state_change_wm_ns[3].c_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				nbp_state_change_watermark[7], bw_int_to_fixed(1000)));
-		calcs_output->nbp_state_change_wm_ns[4].c_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				nbp_state_change_watermark[8], bw_int_to_fixed(1000)));
+		if (ctx->dc->caps.max_underlays) {
+			calcs_output->nbp_state_change_wm_ns[3].c_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[0], bw_int_to_fixed(1000)));
+			calcs_output->nbp_state_change_wm_ns[4].c_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[1], bw_int_to_fixed(1000)));
+		} else {
+			calcs_output->nbp_state_change_wm_ns[3].c_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[7], bw_int_to_fixed(1000)));
+			calcs_output->nbp_state_change_wm_ns[4].c_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[8], bw_int_to_fixed(1000)));
+		}
 		calcs_output->nbp_state_change_wm_ns[5].c_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[9], bw_int_to_fixed(1000)));
+
 
 		calcs_output->stutter_exit_wm_ns[0].c_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -4319,15 +4402,26 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->stutter_exit_wm_ns[2].c_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[6], bw_int_to_fixed(1000)));
-		calcs_output->stutter_exit_wm_ns[3].c_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				stutter_exit_watermark[7], bw_int_to_fixed(1000)));
-		calcs_output->stutter_exit_wm_ns[4].c_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				stutter_exit_watermark[8], bw_int_to_fixed(1000)));
+		if (ctx->dc->caps.max_underlays) {
+			calcs_output->stutter_exit_wm_ns[3].c_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[0], bw_int_to_fixed(1000)));
+			calcs_output->stutter_exit_wm_ns[4].c_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[1], bw_int_to_fixed(1000)));
+		} else {
+			calcs_output->stutter_exit_wm_ns[3].c_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[7], bw_int_to_fixed(1000)));
+			calcs_output->stutter_exit_wm_ns[4].c_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[8], bw_int_to_fixed(1000)));
+		}
 		calcs_output->stutter_exit_wm_ns[5].c_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[9], bw_int_to_fixed(1000)));
+
+
 
 		calcs_output->urgent_wm_ns[0].c_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -4338,12 +4432,21 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->urgent_wm_ns[2].c_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[6], bw_int_to_fixed(1000)));
-		calcs_output->urgent_wm_ns[3].c_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				urgent_watermark[7], bw_int_to_fixed(1000)));
-		calcs_output->urgent_wm_ns[4].c_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				urgent_watermark[8], bw_int_to_fixed(1000)));
+		if (ctx->dc->caps.max_underlays) {
+			calcs_output->urgent_wm_ns[3].c_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[0], bw_int_to_fixed(1000)));
+			calcs_output->urgent_wm_ns[4].c_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[1], bw_int_to_fixed(1000)));
+		} else {
+			calcs_output->urgent_wm_ns[3].c_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[7], bw_int_to_fixed(1000)));
+			calcs_output->urgent_wm_ns[4].c_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[8], bw_int_to_fixed(1000)));
+		}
 		calcs_output->urgent_wm_ns[5].c_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[9], bw_int_to_fixed(1000)));
@@ -4365,12 +4468,21 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->nbp_state_change_wm_ns[2].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[6], bw_int_to_fixed(1000)));
-		calcs_output->nbp_state_change_wm_ns[3].d_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				nbp_state_change_watermark[7], bw_int_to_fixed(1000)));
-		calcs_output->nbp_state_change_wm_ns[4].d_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				nbp_state_change_watermark[8], bw_int_to_fixed(1000)));
+		if (ctx->dc->caps.max_underlays) {
+			calcs_output->nbp_state_change_wm_ns[3].d_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[0], bw_int_to_fixed(1000)));
+			calcs_output->nbp_state_change_wm_ns[4].d_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[1], bw_int_to_fixed(1000)));
+		} else {
+			calcs_output->nbp_state_change_wm_ns[3].d_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[7], bw_int_to_fixed(1000)));
+			calcs_output->nbp_state_change_wm_ns[4].d_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					nbp_state_change_watermark[8], bw_int_to_fixed(1000)));
+		}
 		calcs_output->nbp_state_change_wm_ns[5].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				nbp_state_change_watermark[9], bw_int_to_fixed(1000)));
@@ -4384,15 +4496,25 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->stutter_exit_wm_ns[2].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[6], bw_int_to_fixed(1000)));
-		calcs_output->stutter_exit_wm_ns[3].d_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				stutter_exit_watermark[7], bw_int_to_fixed(1000)));
-		calcs_output->stutter_exit_wm_ns[4].d_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				stutter_exit_watermark[8], bw_int_to_fixed(1000)));
+		if (ctx->dc->caps.max_underlays) {
+			calcs_output->stutter_exit_wm_ns[3].d_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[0], bw_int_to_fixed(1000)));
+			calcs_output->stutter_exit_wm_ns[4].d_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[1], bw_int_to_fixed(1000)));
+		} else {
+			calcs_output->stutter_exit_wm_ns[3].d_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[7], bw_int_to_fixed(1000)));
+			calcs_output->stutter_exit_wm_ns[4].d_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					stutter_exit_watermark[8], bw_int_to_fixed(1000)));
+		}
 		calcs_output->stutter_exit_wm_ns[5].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				stutter_exit_watermark[9], bw_int_to_fixed(1000)));
+
 
 		calcs_output->urgent_wm_ns[0].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
@@ -4403,12 +4525,21 @@ bool bw_calcs(struct dc_context *ctx, const struct bw_calcs_dceip *dceip,
 		calcs_output->urgent_wm_ns[2].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[6], bw_int_to_fixed(1000)));
-		calcs_output->urgent_wm_ns[3].d_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				urgent_watermark[7], bw_int_to_fixed(1000)));
-		calcs_output->urgent_wm_ns[4].d_mark =
-			bw_fixed_to_int(bw_mul(bw_results_internal->
-				urgent_watermark[8], bw_int_to_fixed(1000)));
+		if (ctx->dc->caps.max_underlays) {
+			calcs_output->urgent_wm_ns[3].d_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[0], bw_int_to_fixed(1000)));
+			calcs_output->urgent_wm_ns[4].d_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[1], bw_int_to_fixed(1000)));
+		} else {
+			calcs_output->urgent_wm_ns[3].d_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[7], bw_int_to_fixed(1000)));
+			calcs_output->urgent_wm_ns[4].d_mark =
+				bw_fixed_to_int(bw_mul(bw_results_internal->
+					urgent_watermark[8], bw_int_to_fixed(1000)));
+		}
 		calcs_output->urgent_wm_ns[5].d_mark =
 			bw_fixed_to_int(bw_mul(bw_results_internal->
 				urgent_watermark[9], bw_int_to_fixed(1000)));

@@ -685,77 +685,109 @@ static enum dc_status validate_mapped_resource(
 	return DC_OK;
 }
 
+static void bw_calcs_input_single_display(
+		struct bw_calcs_input_single_display *disp,
+		struct pipe_ctx *pipe_ctx,
+		int *max_htaps,
+		int *max_vtaps)
+{
+	if (pipe_ctx->scl_data.ratios.vert.value == 0) {
+		disp->graphics_scale_ratio = bw_int_to_fixed(1);
+		disp->graphics_h_taps = 2;
+		disp->graphics_v_taps = 2;
+
+		/* TODO: remove when bw formula accepts taps per
+		 * display
+		 */
+		if (*max_vtaps < 2)
+			*max_vtaps = 2;
+		if (*max_htaps < 2)
+			*max_htaps = 2;
+
+	} else {
+		disp->graphics_scale_ratio =
+			fixed31_32_to_bw_fixed(
+				pipe_ctx->scl_data.ratios.vert.value);
+		disp->graphics_h_taps = pipe_ctx->scl_data.taps.h_taps;
+		disp->graphics_v_taps = pipe_ctx->scl_data.taps.v_taps;
+
+		/* TODO: remove when bw formula accepts taps per
+		 * display
+		 */
+		if (*max_vtaps < pipe_ctx->scl_data.taps.v_taps)
+			*max_vtaps = pipe_ctx->scl_data.taps.v_taps;
+		if (*max_htaps < pipe_ctx->scl_data.taps.h_taps)
+			*max_htaps = pipe_ctx->scl_data.taps.h_taps;
+	}
+
+	disp->graphics_src_width =
+		pipe_ctx->stream->public.timing.h_addressable;
+	disp->graphics_src_height =
+		pipe_ctx->stream->public.timing.v_addressable;
+	disp->h_total = pipe_ctx->stream->public.timing.h_total;
+	disp->pixel_rate = bw_frc_to_fixed(
+		pipe_ctx->stream->public.timing.pix_clk_khz, 1000);
+
+	/*TODO: get from surface*/
+	disp->graphics_bytes_per_pixel = 4;
+	disp->graphics_tiling_mode = bw_def_tiled;
+
+	/* DCE11 defaults*/
+	disp->graphics_lb_bpc = 10;
+	disp->graphics_interlace_mode = false;
+	disp->fbc_enable = false;
+	disp->lpt_enable = false;
+	disp->graphics_stereo_mode = bw_def_mono;
+	disp->underlay_mode = bw_def_none;
+}
+
 enum dc_status dce110_validate_bandwidth(
 	const struct core_dc *dc,
 	struct validate_context *context)
 {
-	uint8_t i;
+	int i;
 	enum dc_status result = DC_ERROR_UNEXPECTED;
-	uint8_t number_of_displays = 0;
-	uint8_t max_htaps = 1;
-	uint8_t max_vtaps = 1;
+	int number_of_displays = 0;
+	int max_htaps = 1;
+	int max_vtaps = 1;
+
 	bool all_displays_in_sync = true;
 	struct dc_crtc_timing prev_timing;
+	struct pipe_ctx *underlay_pipe_ctx = &context->res_ctx.pipe_ctx[DCE110_UNDERLAY_IDX];
+	struct bw_calcs_input_single_display *underlay_input = &context->
+		bw_mode_data.displays_data[number_of_displays];
 
 	memset(&context->bw_mode_data, 0, sizeof(context->bw_mode_data));
 
-	for (i = 0; i < MAX_PIPES; i++) {
+	/* Due to organization of bw_calcs, the underlay pipe must be at the beginning of the array*/
+
+	if (underlay_pipe_ctx->stream) {
+		bw_calcs_input_single_display(underlay_input, underlay_pipe_ctx->top_pipe, &max_htaps, &max_vtaps);
+		prev_timing = underlay_pipe_ctx->stream->public.timing;
+		underlay_input->underlay_mode = bw_def_yes;
+		underlay_input->underlay_h_taps = underlay_pipe_ctx->scl_data.taps.h_taps;
+		underlay_input->underlay_v_taps = underlay_pipe_ctx->scl_data.taps.v_taps;
+		underlay_input->underlay_scale_ratio = fixed31_32_to_bw_fixed(
+				underlay_pipe_ctx->scl_data.ratios.vert.value);
+		underlay_input->underlay_pitch_in_pixels = underlay_pipe_ctx->surface->public.plane_size.video.luma_pitch;
+		underlay_input->underlay_lb_bpc = 10;
+		underlay_input->underlay_src_width = underlay_pipe_ctx->surface->public.src_rect.width;
+		underlay_input->underlay_src_height = underlay_pipe_ctx->surface->public.src_rect.height;
+		underlay_input->underlay_tiling_mode = bw_def_tiled;
+		underlay_input->underlay_surface_type = bw_def_420;
+
+		number_of_displays++;
+	}
+
+	for (i = 0; i < context->res_ctx.pool->pipe_count; i++) {
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 		struct bw_calcs_input_single_display *disp = &context->
 			bw_mode_data.displays_data[number_of_displays];
 
-		if (pipe_ctx->stream == NULL)
+		if (pipe_ctx->stream == NULL || pipe_ctx->bottom_pipe || pipe_ctx->top_pipe)
 			continue;
 
-		if (pipe_ctx->scl_data.ratios.vert.value == 0) {
-			disp->graphics_scale_ratio = bw_int_to_fixed(1);
-			disp->graphics_h_taps = 2;
-			disp->graphics_v_taps = 2;
-
-			/* TODO: remove when bw formula accepts taps per
-			 * display
-			 */
-			if (max_vtaps < 2)
-				max_vtaps = 2;
-			if (max_htaps < 2)
-				max_htaps = 2;
-
-		} else {
-			disp->graphics_scale_ratio =
-				fixed31_32_to_bw_fixed(
-					pipe_ctx->scl_data.ratios.vert.value);
-			disp->graphics_h_taps = pipe_ctx->scl_data.taps.h_taps;
-			disp->graphics_v_taps = pipe_ctx->scl_data.taps.v_taps;
-
-			/* TODO: remove when bw formula accepts taps per
-			 * display
-			 */
-			if (max_vtaps < pipe_ctx->scl_data.taps.v_taps)
-				max_vtaps = pipe_ctx->scl_data.taps.v_taps;
-			if (max_htaps < pipe_ctx->scl_data.taps.h_taps)
-				max_htaps = pipe_ctx->scl_data.taps.h_taps;
-		}
-
-		disp->graphics_src_width =
-			pipe_ctx->stream->public.timing.h_addressable;
-		disp->graphics_src_height =
-			pipe_ctx->stream->public.timing.v_addressable;
-		disp->h_total = pipe_ctx->stream->public.timing.h_total;
-		disp->pixel_rate = bw_frc_to_fixed(
-			pipe_ctx->stream->public.timing.pix_clk_khz, 1000);
-
-		/*TODO: get from surface*/
-		disp->graphics_bytes_per_pixel = 4;
-		disp->graphics_tiling_mode = bw_def_tiled;
-
-		/* DCE11 defaults*/
-		disp->graphics_lb_bpc = 10;
-		disp->graphics_interlace_mode = false;
-		disp->fbc_enable = false;
-		disp->lpt_enable = false;
-		disp->graphics_stereo_mode = bw_def_mono;
-		disp->underlay_mode = bw_def_none;
-
+		bw_calcs_input_single_display(disp, pipe_ctx,  &max_htaps, &max_vtaps);
 		/*All displays will be synchronized if timings are all
 		 * the same
 		 */
