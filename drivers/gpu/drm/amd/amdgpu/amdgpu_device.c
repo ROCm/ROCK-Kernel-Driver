@@ -2017,6 +2017,8 @@ int amdgpu_gpu_reset(struct amdgpu_device *adev)
 	if (amdgpu_device_has_dal_support(adev))
 		state = drm_atomic_helper_suspend(adev->ddev);
 
+	/* save scratch */
+	amdgpu_atombios_scratch_regs_save(adev);
 	r = amdgpu_suspend(adev);
 
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
@@ -2041,7 +2043,8 @@ retry:
 		dev_info(adev->dev, "GPU reset succeeded, trying to resume\n");
 		r = amdgpu_resume(adev);
 	}
-
+	/* restore scratch */
+	amdgpu_atombios_scratch_regs_restore(adev);
 	if (!r) {
 		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 			struct amdgpu_ring *ring = adev->rings[i];
