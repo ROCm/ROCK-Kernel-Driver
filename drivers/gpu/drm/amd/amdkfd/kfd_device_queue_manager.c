@@ -473,10 +473,11 @@ int process_evict_queues(struct device_queue_manager *dqm,
 
 		retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
 		if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
-				q->properties.type == KFD_QUEUE_TYPE_COMPUTE)
-			retval = mqd->load_mqd(mqd, q->mqd, q->pipe,
-				q->queue,
-				(uint32_t __user *)q->properties.write_ptr, 0);
+				q->properties.type == KFD_QUEUE_TYPE_COMPUTE &&
+				q->properties.is_evicted)
+			retval = mqd->destroy_mqd(mqd, q->mqd,
+				KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN,
+				KFD_UNMAP_LATENCY_MS, q->pipe, q->queue);
 		if (q->properties.is_evicted)
 			dqm->queue_count--;
 	}
