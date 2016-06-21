@@ -1613,7 +1613,7 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 
 		if (unlikely(!have_pages)) {
 			entry->is_mapped = false;
-			goto resume_kfd;
+			continue;
 		}
 
 		r = map_bo_to_gpuvm(adev, mem->data2.bo, entry->bo_va, domain);
@@ -1623,11 +1623,23 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 			if (ret == 0)
 				ret = r;
 		}
+	}
 
-		/* Resume queues even if restore failed. Worst case
-		 * the app will get a GPUVM fault. That's better than
-		 * hanging the queues indefinitely. */
-resume_kfd:
+	if (have_pages)
+		unreserve_bo_and_vms(&ctx, true);
+
+	/* Resume queues after unreserving the BOs and most
+	 * importantly, waiting for the BO fences to guarantee that
+	 * the page table updates have completed.
+	 */
+	list_for_each_entry(entry, &mem->data2.bo_va_list, bo_list) {
+		struct amdgpu_device *adev;
+
+		if (!entry->is_mapped)
+			continue;
+
+		adev = (struct amdgpu_device *)entry->kgd_dev;
+
 		r = kgd2kfd->resume_mm(adev->kfd, mm);
 		if (ret != 0) {
 			pr_err("Failed to resume KFD\n");
@@ -1635,9 +1647,6 @@ resume_kfd:
 				ret = r;
 		}
 	}
-
-	if (have_pages)
-		unreserve_bo_and_vms(&ctx, true);
 
 	return ret;
 }
