@@ -47,12 +47,12 @@ struct i2c_request_transaction_data {
 	enum i2caux_transaction_action action;
 	enum i2c_channel_operation_result status;
 	uint8_t address;
-	uint8_t length;
+	uint32_t length;
 	uint8_t *data;
 };
 
 struct i2c_reply_transaction_data {
-	uint8_t length;
+	uint32_t length;
 	uint8_t *data;
 };
 

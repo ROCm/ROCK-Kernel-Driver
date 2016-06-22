@@ -93,7 +93,7 @@ bool dal_i2c_generic_hw_engine_submit_request(
 
 	struct i2c_hw_engine *base = &hw_engine->base;
 
-	uint8_t max_payload_size =
+	uint32_t max_payload_size =
 		base->funcs->get_hw_buffer_available_size(base);
 
 	bool initial_stop_bit = !middle_of_transaction;
@@ -109,7 +109,7 @@ bool dal_i2c_generic_hw_engine_submit_request(
 
 	uint8_t address = i2caux_request->payload.address;
 	uint8_t *current_payload = i2caux_request->payload.data;
-	uint8_t remaining_payload_size = i2caux_request->payload.length;
+	uint32_t remaining_payload_size = i2caux_request->payload.length;
 
 	bool first_iteration = true;
 
@@ -136,8 +136,8 @@ bool dal_i2c_generic_hw_engine_submit_request(
 	 * Session stop bit is set if 'middle_of_transaction' = 0. */
 
 	while (remaining_payload_size) {
-		uint8_t current_transaction_size;
-		uint8_t current_payload_size;
+		uint32_t current_transaction_size;
+		uint32_t current_payload_size;
 
 		bool last_iteration;
 		bool stop_bit;

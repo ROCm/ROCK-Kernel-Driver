@@ -28,7 +28,7 @@
 struct i2c_payload {
 	bool write;
 	uint8_t address;
-	uint8_t length;
+	uint32_t length;
 	uint8_t *data;
 };
 

@@ -33,7 +33,7 @@ enum {
 struct i2c_hw_engine;
 
 struct i2c_hw_engine_funcs {
-	uint8_t (*get_hw_buffer_available_size)(
+	uint32_t (*get_hw_buffer_available_size)(
 		const struct i2c_hw_engine *engine);
 	enum i2c_channel_operation_result (*wait_on_operation_result)(
 		struct i2c_hw_engine *engine,

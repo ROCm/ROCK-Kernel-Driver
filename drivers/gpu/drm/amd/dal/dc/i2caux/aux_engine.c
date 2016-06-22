@@ -88,7 +88,7 @@ bool dal_aux_engine_acquire(
 
 struct read_command_context {
 	uint8_t *buffer;
-	uint8_t current_read_length;
+	uint32_t current_read_length;
 	uint32_t offset;
 	enum i2caux_transaction_status status;
 
@@ -285,7 +285,7 @@ struct write_command_context {
 	bool mot;
 
 	uint8_t *buffer;
-	uint8_t current_write_length;
+	uint32_t current_write_length;
 	enum i2caux_transaction_status status;
 
 	struct aux_request_transaction_data request;

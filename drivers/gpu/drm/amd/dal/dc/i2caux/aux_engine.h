@@ -38,7 +38,7 @@ struct aux_request_transaction_data {
 	uint32_t address;
 	/* delay, in 100-microsecond units */
 	uint8_t delay;
-	uint8_t length;
+	uint32_t length;
 	uint8_t *data;
 };
 
@@ -56,7 +56,7 @@ enum aux_transaction_reply {
 
 struct aux_reply_transaction_data {
 	enum aux_transaction_reply status;
-	uint8_t length;
+	uint32_t length;
 	uint8_t *data;
 };
 

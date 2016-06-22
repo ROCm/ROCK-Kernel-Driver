@@ -302,7 +302,7 @@ static bool i2c_write(
 	struct ddc *ddc_handle,
 	uint16_t clock_delay_div_4,
 	uint8_t address,
-	uint8_t length,
+	uint32_t length,
 	const uint8_t *data)
 {
 	uint32_t i = 0;
@@ -324,7 +324,7 @@ static bool i2c_read(
 	struct ddc *ddc_handle,
 	uint16_t clock_delay_div_4,
 	uint8_t address,
-	uint8_t length,
+	uint32_t length,
 	uint8_t *data)
 {
 	uint32_t i = 0;

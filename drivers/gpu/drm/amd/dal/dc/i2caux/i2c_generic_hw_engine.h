@@ -28,7 +28,7 @@
 
 struct i2c_generic_transaction_attributes {
 	enum i2caux_transaction_action action;
-	uint8_t transaction_size;
+	uint32_t transaction_size;
 	bool start_bit;
 	bool stop_bit;
 	bool last_read;
@@ -43,11 +43,11 @@ struct i2c_generic_hw_engine_funcs {
 	void (*write_data)(
 		struct i2c_generic_hw_engine *engine,
 		const uint8_t *buffer,
-		uint8_t length);
+		uint32_t length);
 	void (*read_data)(
 		struct i2c_generic_hw_engine *engine,
 		uint8_t *buffer,
-		uint8_t length,
+		uint32_t length,
 		uint32_t offset);
 	void (*execute_transaction)(
 		struct i2c_generic_hw_engine *engine,

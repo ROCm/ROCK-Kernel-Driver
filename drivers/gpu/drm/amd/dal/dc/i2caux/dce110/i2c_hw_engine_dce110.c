@@ -65,7 +65,7 @@ enum {
 	/* No timeout in HW
 	 * (timeout implemented in SW by querying status) */
 	I2C_SETUP_TIME_LIMIT = 255,
-	I2C_HW_BUFFER_SIZE = 144
+	I2C_HW_BUFFER_SIZE = 538
 };
 
 /*
@@ -418,7 +418,7 @@ static bool process_transaction(
 	struct i2c_hw_engine_dce110 *engine,
 	struct i2c_request_transaction_data *request)
 {
-	uint8_t length = request->length;
+	uint32_t length = request->length;
 	uint8_t *buffer = request->data;
 
 	bool last_transaction = false;
@@ -679,7 +679,7 @@ static void process_channel_reply(
 	struct i2c_engine *engine,
 	struct i2c_reply_transaction_data *reply)
 {
-	uint8_t length = reply->length;
+	uint32_t length = reply->length;
 	uint8_t *buffer = reply->data;
 
 	struct i2c_hw_engine_dce110 *i2c_hw_engine_dce110 =
@@ -755,7 +755,7 @@ static enum i2c_channel_operation_result get_channel_status(
 	return I2C_CHANNEL_OPERATION_SUCCEEDED;
 }
 
-static uint8_t get_hw_buffer_available_size(
+static uint32_t get_hw_buffer_available_size(
 	const struct i2c_hw_engine *engine)
 {
 	return I2C_HW_BUFFER_SIZE -

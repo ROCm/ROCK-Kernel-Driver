@@ -39,7 +39,7 @@ enum i2caux_transaction_address_space {
 struct i2caux_transaction_payload {
 	enum i2caux_transaction_address_space address_space;
 	uint32_t address;
-	uint8_t length;
+	uint32_t length;
 	uint8_t *data;
 };
 
