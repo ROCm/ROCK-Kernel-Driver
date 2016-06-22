@@ -137,8 +137,10 @@ static void program_overscan(
 	uint32_t overscan_left_right = 0;
 	uint32_t overscan_top_bottom = 0;
 
-	int overscan_right = data->h_active - data->recout.x - data->recout.width;
-	int overscan_bottom = data->v_active - data->recout.y - data->recout.height;
+	int overscan_right = data->h_active
+			- data->recout.x - data->recout.width;
+	int overscan_bottom = data->v_active
+			- data->recout.y - data->recout.height;
 
 	if (overscan_right < 0) {
 		BREAK_TO_DEBUGGER();

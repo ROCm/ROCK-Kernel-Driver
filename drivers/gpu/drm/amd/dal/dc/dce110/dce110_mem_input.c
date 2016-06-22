@@ -215,7 +215,7 @@ static void program_size_and_rotation(
 	value = 0;
 	switch (rotation) {
 	case ROTATION_ANGLE_90:
-		set_reg_field_value(value, 3,
+		set_reg_field_value(value, 1,
 			HW_ROTATION, GRPH_ROTATION_ANGLE);
 		break;
 	case ROTATION_ANGLE_180:
@@ -223,7 +223,7 @@ static void program_size_and_rotation(
 			HW_ROTATION, GRPH_ROTATION_ANGLE);
 		break;
 	case ROTATION_ANGLE_270:
-		set_reg_field_value(value, 1,
+		set_reg_field_value(value, 3,
 			HW_ROTATION, GRPH_ROTATION_ANGLE);
 		break;
 	default:

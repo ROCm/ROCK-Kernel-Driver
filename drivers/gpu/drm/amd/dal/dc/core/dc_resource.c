@@ -285,15 +285,36 @@ static enum pixel_format convert_pixel_format_to_dalsurface(
 	return dal_pixel_format;
 }
 
+static void rect_swap_helper(struct rect *rect)
+{
+	uint32_t temp = 0;
+
+	temp = rect->height;
+	rect->height = rect->width;
+	rect->width = temp;
+
+	temp = rect->x;
+	rect->x = rect->y;
+	rect->y = temp;
+}
+
 static void calculate_viewport(
 		const struct dc_surface *surface,
 		struct pipe_ctx *pipe_ctx)
 {
 	const struct rect stream_src = pipe_ctx->stream->public.src;
-	const struct rect src = surface->src_rect;
-	const struct rect dst = surface->dst_rect;
-	const struct rect surface_clip = surface->clip_rect;
+	struct rect src = surface->src_rect;
+	struct rect dst = surface->dst_rect;
+	struct rect surface_clip = surface->clip_rect;
 	struct rect clip = {0};
+
+
+	if (surface->rotation == ROTATION_ANGLE_90 ||
+			surface->rotation == ROTATION_ANGLE_270){
+		rect_swap_helper(&src);
+		rect_swap_helper(&dst);
+		rect_swap_helper(&surface_clip);
+	}
 
 	/* The actual clip is an intersection between stream
 	 * source and surface clip
@@ -339,14 +360,20 @@ static void calculate_recout(
 		struct pipe_ctx *pipe_ctx)
 {
 	struct core_stream *stream = pipe_ctx->stream;
+	struct rect clip = surface->clip_rect;
+
+	if (surface->rotation == ROTATION_ANGLE_90 ||
+			surface->rotation == ROTATION_ANGLE_270){
+		rect_swap_helper(&clip);
+	}
 
 	pipe_ctx->scl_data.recout.x = stream->public.dst.x;
-	if (stream->public.src.x < surface->clip_rect.x)
-		pipe_ctx->scl_data.recout.x += (surface->clip_rect.x
+	if (stream->public.src.x < clip.x)
+		pipe_ctx->scl_data.recout.x += (clip.x
 			- stream->public.src.x) * stream->public.dst.width
 						/ stream->public.src.width;
 
-	pipe_ctx->scl_data.recout.width = surface->clip_rect.width *
+	pipe_ctx->scl_data.recout.width = clip.width *
 			stream->public.dst.width / stream->public.src.width;
 	if (pipe_ctx->scl_data.recout.width + pipe_ctx->scl_data.recout.x >
 			stream->public.dst.x + stream->public.dst.width)
@@ -355,12 +382,12 @@ static void calculate_recout(
 						- pipe_ctx->scl_data.recout.x;
 
 	pipe_ctx->scl_data.recout.y = stream->public.dst.y;
-	if (stream->public.src.y < surface->clip_rect.y)
-		pipe_ctx->scl_data.recout.y += (surface->clip_rect.y
+	if (stream->public.src.y < clip.y)
+		pipe_ctx->scl_data.recout.y += (clip.y
 			- stream->public.src.y) * stream->public.dst.height
 						/ stream->public.src.height;
 
-	pipe_ctx->scl_data.recout.height = surface->clip_rect.height *
+	pipe_ctx->scl_data.recout.height = clip.height *
 			stream->public.dst.height / stream->public.src.height;
 	if (pipe_ctx->scl_data.recout.height + pipe_ctx->scl_data.recout.y >
 			stream->public.dst.y + stream->public.dst.height)
@@ -412,6 +439,7 @@ void resource_build_scaling_params(
 	const struct dc_surface *surface,
 	struct pipe_ctx *pipe_ctx)
 {
+	struct dc_crtc_timing *timing = &pipe_ctx->stream->public.timing;
 	/* Important: scaling ratio calculation requires pixel format,
 	 * lb depth calculation requires recout and taps require scaling ratios.
 	 */
@@ -423,8 +451,10 @@ void resource_build_scaling_params(
 
 	calculate_recout(surface, pipe_ctx);
 
-	pipe_ctx->scl_data.h_active = pipe_ctx->stream->public.timing.h_addressable;
-	pipe_ctx->scl_data.v_active = pipe_ctx->stream->public.timing.v_addressable;
+	pipe_ctx->scl_data.h_active = timing->h_addressable
+			+ timing->h_border_left + timing->h_border_right;
+	pipe_ctx->scl_data.v_active = timing->v_addressable
+			+ timing->v_border_top + timing->v_border_bottom;
 
 	/* Check if scaling is required update taps if not */
 	if (dal_fixed31_32_u2d19(pipe_ctx->scl_data.ratios.horz) == 1 << 19)
