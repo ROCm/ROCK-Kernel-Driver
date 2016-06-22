@@ -583,10 +583,10 @@ struct amdgpu_connector *aconnector_from_drm_crtc_id(
 	return NULL;
 }
 
-static void calculate_stream_scaling_settings(
+static void update_stream_scaling_settings(
 		const struct drm_display_mode *mode,
-		const struct dc_stream *stream,
-		struct dm_connector_state *dm_state)
+		const struct dm_connector_state *dm_state,
+		const struct dc_stream *stream)
 {
 	enum amdgpu_rmx_type rmx_type;
 
@@ -634,9 +634,7 @@ static void calculate_stream_scaling_settings(
 
 static void dm_dc_surface_commit(
 		struct dc *dc,
-		struct drm_crtc *crtc,
-		struct dm_connector_state *dm_state
-		)
+		struct drm_crtc *crtc)
 {
 	struct dc_surface *dc_surface;
 	const struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
@@ -658,10 +656,6 @@ static void dm_dc_surface_commit(
 			__func__);
 		goto fail;
 	}
-
-	calculate_stream_scaling_settings(&crtc->state->mode,
-			dc_target->streams[0],
-			dm_state);
 
 	/* Surface programming */
 	fill_plane_attributes(dc_surface, crtc->primary->state);
@@ -913,11 +907,11 @@ static void decide_crtc_timing_for_drm_display_mode(
 
 static struct dc_target *create_target_for_sink(
 		const struct amdgpu_connector *aconnector,
-		struct drm_display_mode *drm_mode)
+		const struct drm_display_mode *drm_mode,
+		const struct dm_connector_state *dm_state)
 {
 	struct drm_display_mode *preferred_mode = NULL;
 	const struct drm_connector *drm_connector;
-	struct dm_connector_state *dm_state;
 	struct dc_target *target = NULL;
 	struct dc_stream *stream;
 	struct drm_display_mode mode = *drm_mode;
@@ -928,8 +922,12 @@ static struct dc_target *create_target_for_sink(
 		goto drm_connector_null;
 	}
 
+	if (NULL == dm_state) {
+		DRM_ERROR("dm_state is NULL!\n");
+		goto dm_state_null;
+	}
+
 	drm_connector = &aconnector->base;
-	dm_state = to_dm_connector_state(drm_connector->state);
 	stream = dc_create_stream_for_sink(aconnector->dc_sink);
 
 	if (NULL == stream) {
@@ -965,6 +963,7 @@ static struct dc_target *create_target_for_sink(
 
 	fill_stream_properties_from_drm_display_mode(stream,
 			&mode, &aconnector->base);
+	update_stream_scaling_settings(&mode, dm_state, stream);
 
 	fill_audio_info(
 		&stream->audio_info,
@@ -979,6 +978,7 @@ static struct dc_target *create_target_for_sink(
 		goto target_create_fail;
 	}
 
+dm_state_null:
 drm_connector_null:
 target_create_fail:
 stream_create_fail:
@@ -2233,6 +2233,24 @@ static bool pflip_pending_predicate(struct amdgpu_crtc *acrtc)
 	return acrtc->pflip_status == AMDGPU_FLIP_PENDING;
 }
 
+static bool is_scaling_state_different(
+		const struct dm_connector_state *dm_state,
+		const struct dm_connector_state *old_dm_state)
+{
+	if (dm_state->scaling != old_dm_state->scaling)
+		return true;
+	if (!dm_state->underscan_enable && old_dm_state->underscan_enable) {
+		if (old_dm_state->underscan_hborder != 0 && old_dm_state->underscan_vborder != 0)
+			return true;
+	} else  if (dm_state->underscan_enable && !old_dm_state->underscan_enable) {
+		if (dm_state->underscan_hborder != 0 && dm_state->underscan_vborder != 0)
+			return true;
+	} else if (dm_state->underscan_hborder != old_dm_state->underscan_hborder
+				|| dm_state->underscan_vborder != old_dm_state->underscan_vborder)
+			return true;
+	return false;
+}
+
 int amdgpu_dm_atomic_commit(
 	struct drm_device *dev,
 	struct drm_atomic_state *state,
@@ -2310,10 +2328,16 @@ int amdgpu_dm_atomic_commit(
 		switch (action) {
 		case DM_COMMIT_ACTION_DPMS_ON:
 		case DM_COMMIT_ACTION_SET: {
-			struct dc_target *new_target =
-				create_target_for_sink(
+			struct dm_connector_state *dm_state = NULL;
+			struct dc_target *new_target = NULL;
+
+			if (aconnector)
+				dm_state = to_dm_connector_state(aconnector->base.state);
+
+			new_target = create_target_for_sink(
 					aconnector,
-					&crtc->state->mode);
+					&crtc->state->mode,
+					dm_state);
 
 			DRM_INFO("Atomic commit: SET crtc id %d: [%p]\n", acrtc->crtc_id, acrtc);
 
@@ -2366,10 +2390,19 @@ int amdgpu_dm_atomic_commit(
 			break;
 		}
 
-		case DM_COMMIT_ACTION_NOTHING:
-			DRM_DEBUG_KMS("Atomic commit: Nothing.\n");
-			break;
+		case DM_COMMIT_ACTION_NOTHING: {
+			struct dm_connector_state *dm_state = NULL;
 
+			if (!aconnector)
+				break;
+
+			dm_state = to_dm_connector_state(aconnector->base.state);
+
+			/* Scaling update */
+			update_stream_scaling_settings(&crtc->state->mode, dm_state, acrtc->target->streams[0]);
+
+			break;
+		}
 		case DM_COMMIT_ACTION_DPMS_OFF:
 		case DM_COMMIT_ACTION_RESET:
 			DRM_INFO("Atomic commit: RESET. crtc id %d:[%p]\n", acrtc->crtc_id, acrtc);
@@ -2384,8 +2417,6 @@ int amdgpu_dm_atomic_commit(
 			break;
 		} /* switch() */
 	} /* for_each_crtc_in_state() */
-
-	commit_targets_count = 0;
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 
@@ -2465,10 +2496,7 @@ int amdgpu_dm_atomic_commit(
 			 */
 			wait_while_pflip_status(adev, acrtc, pflip_pending_predicate);
 
-			dm_dc_surface_commit(
-				dm->dc,
-				crtc,
-				dm_state);
+			dm_dc_surface_commit(dm->dc, crtc);
 		}
 	}
 
@@ -2544,10 +2572,14 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 	 * to turn on the display, so we do it here
 	 */
 	if (sink != aconnector->dc_sink) {
+		struct dm_connector_state *dm_state =
+				to_dm_connector_state(aconnector->base.state);
+
 		struct dc_target *new_target =
 			create_target_for_sink(
 				aconnector,
-				&disconnected_acrtc->base.state->mode);
+				&disconnected_acrtc->base.state->mode,
+				dm_state);
 
 		DRM_INFO("Headless hotplug, restoring connector state\n");
 		/*
@@ -2594,9 +2626,7 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 
 		dc_target_release(current_target);
 
-		dm_dc_surface_commit(dc, &disconnected_acrtc->base,
-				to_dm_connector_state(
-				connector->state));
+		dm_dc_surface_commit(dc, &disconnected_acrtc->base);
 
 		manage_dm_interrupts(adev, disconnected_acrtc, true);
 		dm_crtc_cursor_reset(&disconnected_acrtc->base);
@@ -2627,12 +2657,10 @@ static uint32_t add_val_sets_surface(
 static uint32_t update_in_val_sets_target(
 	struct dc_validation_set *val_sets,
 	struct drm_crtc **crtcs,
-	struct drm_display_mode **modes,
 	uint32_t set_count,
 	const struct dc_target *old_target,
 	const struct dc_target *new_target,
-	struct drm_crtc *crtc,
-	struct drm_display_mode *mode)
+	struct drm_crtc *crtc)
 {
 	uint32_t i = 0;
 
@@ -2644,7 +2672,6 @@ static uint32_t update_in_val_sets_target(
 
 	val_sets[i].target = new_target;
 	crtcs[i] = crtc;
-	modes[i] = mode;
 
 	if (i == set_count) {
 		/* nothing found. add new one to the end */
@@ -2686,15 +2713,12 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	struct drm_crtc_state *crtc_state;
 	struct drm_plane *plane;
 	struct drm_plane_state *plane_state;
-	int i;
-	int j;
-	int k;
+	int i, j;
 	int ret;
 	int set_count;
 	int new_target_count;
 	struct dc_validation_set set[MAX_TARGETS] = {{ 0 }};
 	struct dc_target *new_targets[MAX_TARGETS] = { 0 };
-	struct drm_display_mode *mode_set[MAX_TARGETS] = { 0 };
 	struct drm_crtc *crtc_set[MAX_TARGETS] = { 0 };
 	struct amdgpu_device *adev = dev->dev_private;
 	struct dc *dc = adev->dm.dc;
@@ -2719,7 +2743,6 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 		if (acrtc->target) {
 			set[set_count].target = acrtc->target;
-			mode_set[set_count] = &crtc->mode;
 			crtc_set[set_count] = crtc;
 			++set_count;
 		}
@@ -2730,41 +2753,23 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 		struct amdgpu_crtc *acrtc = NULL;
 		struct amdgpu_connector *aconnector = NULL;
 		enum dm_commit_action action;
-		struct drm_connector *connector;
-		struct drm_connector_state *con_state;
 
 		acrtc = to_amdgpu_crtc(crtc);
 
-		for_each_connector_in_state(state, connector, con_state, j) {
-			if (con_state->crtc == crtc) {
-				aconnector = to_amdgpu_connector(connector);
-				break;
-			}
-		}
-
-		/*TODO:
-		handle_headless_hotplug(acrtc, crtc_state, &aconnector);*/
+		aconnector = amdgpu_dm_find_first_crct_matching_connector(state, crtc, true);
 
 		action = get_dm_commit_action(crtc_state);
 
 		switch (action) {
 		case DM_COMMIT_ACTION_DPMS_ON:
 		case DM_COMMIT_ACTION_SET: {
-			struct drm_display_mode mode = crtc_state->mode;
 			struct dc_target *new_target = NULL;
+			struct dm_connector_state *dm_state = NULL;
 
-			if (!aconnector) {
-				DRM_ERROR(
-					"%s: Can't find connector for crtc %d\n",
-					__func__,
-					acrtc->crtc_id);
-				goto connector_not_found;
-			}
+			if (aconnector)
+				dm_state = to_dm_connector_state(aconnector->base.state);
 
-			new_target =
-				create_target_for_sink(
-					aconnector,
-					&mode);
+			new_target = create_target_for_sink(aconnector, &crtc_state->mode, dm_state);
 
 			/*
 			 * we can have no target on ACTION_SET if a display
@@ -2782,20 +2787,61 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 			set_count = update_in_val_sets_target(
 					set,
 					crtc_set,
-					mode_set,
 					set_count,
 					acrtc->target,
 					new_target,
-					crtc,
-					&mode);
+					crtc);
 
 			new_target_count++;
 			need_to_validate = true;
 			break;
 		}
 
-		case DM_COMMIT_ACTION_NOTHING:
+		case DM_COMMIT_ACTION_NOTHING: {
+			const struct drm_connector *drm_connector = NULL;
+			struct drm_connector_state *conn_state = NULL;
+			struct dm_connector_state *dm_state = NULL;
+			struct dm_connector_state *old_dm_state = NULL;
+			struct dc_target *new_target;
+
+			if (!aconnector)
+				break;
+
+			for_each_connector_in_state(
+				state, drm_connector, conn_state, j) {
+				if (&aconnector->base == drm_connector)
+					break;
+			}
+
+			old_dm_state = to_dm_connector_state(drm_connector->state);
+			dm_state = to_dm_connector_state(conn_state);
+
+			/* Support underscan adjustment*/
+			if (!is_scaling_state_different(dm_state, old_dm_state))
+				break;
+
+			new_target = create_target_for_sink(aconnector, &crtc_state->mode, dm_state);
+
+			if (!new_target) {
+				DRM_ERROR("%s: Failed to create new target for crtc %d\n",
+						__func__, acrtc->base.base.id);
+				break;
+			}
+
+			new_targets[new_target_count] = new_target;
+			set_count = update_in_val_sets_target(
+					set,
+					crtc_set,
+					set_count,
+					acrtc->target,
+					new_target,
+					crtc);
+
+			new_target_count++;
+			need_to_validate = true;
+
 			break;
+		}
 		case DM_COMMIT_ACTION_DPMS_OFF:
 		case DM_COMMIT_ACTION_RESET:
 			/* i.e. reset mode */
@@ -2812,38 +2858,54 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	for (i = 0; i < set_count; i++) {
 		for_each_plane_in_state(state, plane, plane_state, j) {
 			struct drm_plane_state *old_plane_state = plane->state;
-			struct drm_framebuffer *fb = plane_state->fb;
 			struct drm_crtc *crtc = plane_state->crtc;
+			struct drm_framebuffer *fb = plane_state->fb;
 			struct drm_connector *connector;
-			struct drm_connector_state *con_state;
 			struct dm_connector_state *dm_state = NULL;
+			enum dm_commit_action action;
 
-			if (!fb)
+			if (!fb || !crtc || crtc_set[i] != crtc ||
+				!crtc->state->planes_changed || !crtc->state->active)
 				continue;
 
-			if (crtc_set[i] != crtc)
-				continue;
+			action = get_dm_commit_action(crtc->state);
 
-			if (!crtc->state->planes_changed)
-				continue;
+			/* Surfaces are created under two scenarios:
+			 * 1. This commit is not a page flip.
+			 * 2. This commit is a page flip, and targets are created.
+			 */
+			if (!page_flip_needed(plane_state, old_plane_state) ||
+					action == DM_COMMIT_ACTION_DPMS_ON ||
+					action == DM_COMMIT_ACTION_SET) {
+				struct dc_surface *surface;
 
-			for_each_connector_in_state(state, connector, con_state, k) {
-				if (con_state->crtc == crtc) {
-					dm_state = to_dm_connector_state(con_state);
-					break;
+				list_for_each_entry(connector,
+					&dev->mode_config.connector_list, head)	{
+					if (connector->state->crtc == crtc) {
+						dm_state = to_dm_connector_state(
+							connector->state);
+						break;
+					}
 				}
-			}
 
-			if (dm_state) {
-					calculate_stream_scaling_settings(mode_set[i],
-						set[i].target->streams[0],
-						dm_state);
-			}
+				/*
+				 * This situation happens in the following case:
+				 * we are about to get set mode for connector who's only
+				 * possible crtc (in encoder crtc mask) is used by
+				 * another connector, that is why it will try to
+				 * re-assing crtcs in order to make configuration
+				 * supported. For our implementation we need to make all
+				 * encoders support all crtcs, then this issue will
+				 * never arise again. But to guard code from this issue
+				 * check is left.
+				 *
+				 * Also it should be needed when used with actual
+				 * drm_atomic_commit ioctl in future
+				 */
+				if (!dm_state)
+					continue;
 
-			if (!page_flip_needed(plane_state, old_plane_state) || dm_state) {
-				struct dc_surface *surface =
-					dc_create_surface(dc);
-
+				surface = dc_create_surface(dc);
 				fill_plane_attributes(
 					surface,
 					plane_state);
@@ -2863,7 +2925,6 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 		dc_validate_resources(dc, set, set_count))
 		ret = 0;
 
-connector_not_found:
 	for (i = 0; i < set_count; i++) {
 		for (j = 0; j < set[i].surface_count; j++) {
 			dc_surface_release(set[i].surfaces[j]);
