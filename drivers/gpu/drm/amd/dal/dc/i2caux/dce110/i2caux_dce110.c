@@ -148,7 +148,7 @@ static const struct i2caux_funcs i2caux_funcs = {
 	.acquire_aux_engine = dal_i2caux_acquire_aux_engine,
 };
 
-static bool construct(
+bool dal_i2caux_dce110_construct(
 	struct i2caux_dce110 *i2caux_dce110,
 	struct adapter_service *as,
 	struct dc_context *ctx)
@@ -255,7 +255,7 @@ struct i2caux *dal_i2caux_dce110_create(
 		return NULL;
 	}
 
-	if (construct(i2caux_dce110, as, ctx))
+	if (dal_i2caux_dce110_construct(i2caux_dce110, as, ctx))
 		return &i2caux_dce110->base;
 
 	ASSERT_CRITICAL(false);

@@ -36,4 +36,9 @@ struct i2caux *dal_i2caux_dce110_create(
 	struct adapter_service *as,
 	struct dc_context *ctx);
 
+bool dal_i2caux_dce110_construct(
+	struct i2caux_dce110 *i2caux_dce110,
+	struct adapter_service *as,
+	struct dc_context *ctx);
+
 #endif /* __DAL_I2C_AUX_DCE110_H__ */

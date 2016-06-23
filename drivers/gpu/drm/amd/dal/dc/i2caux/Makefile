@@ -22,7 +22,7 @@ AMD_DAL_FILES += $(AMD_DAL_I2CAUX_DCE80)
 endif
 
 ###############################################################################
-# DCE 11x family
+# DCE 110 family
 ###############################################################################
 ifdef CONFIG_DRM_AMD_DAL_DCE11_0
 I2CAUX_DCE110 = i2caux_dce110.o i2c_sw_engine_dce110.o i2c_hw_engine_dce110.o \
@@ -31,6 +31,17 @@ I2CAUX_DCE110 = i2caux_dce110.o i2c_sw_engine_dce110.o i2c_hw_engine_dce110.o \
 AMD_DAL_I2CAUX_DCE110 = $(addprefix $(AMDDALPATH)/dc/i2caux/dce110/,$(I2CAUX_DCE110))
 
 AMD_DAL_FILES += $(AMD_DAL_I2CAUX_DCE110)
+endif
+
+###############################################################################
+# DCE 112 family
+###############################################################################
+ifdef CONFIG_DRM_AMD_DAL_DCE11_2
+I2CAUX_DCE112 = i2caux_dce112.o i2c_hw_engine_dce112.o
+
+AMD_DAL_I2CAUX_DCE112 = $(addprefix $(AMDDALPATH)/dc/i2caux/dce112/,$(I2CAUX_DCE112))
+
+AMD_DAL_FILES += $(AMD_DAL_I2CAUX_DCE112)
 endif
 
 ###############################################################################

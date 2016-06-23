@@ -23,40 +23,12 @@
  *
  */
 
-#ifndef __DAL_I2C_HW_ENGINE_DCE110_H__
-#define __DAL_I2C_HW_ENGINE_DCE110_H__
+#ifndef __DAL_I2C_HW_ENGINE_DCE112_H__
+#define __DAL_I2C_HW_ENGINE_DCE112_H__
 
-struct i2c_hw_engine_dce110 {
-	struct i2c_hw_engine base;
-	struct {
-		uint32_t DC_I2C_DDCX_SETUP;
-		uint32_t DC_I2C_DDCX_SPEED;
-	} addr;
-	uint32_t engine_id;
-	/* expressed in kilohertz */
-	uint32_t reference_frequency;
-	/* number of bytes currently used in HW buffer */
-	uint32_t buffer_used_bytes;
-	/* number of bytes used for write transaction in HW buffer
-	 * - this will be used as the index to read from*/
-	uint32_t buffer_used_write;
-	/* number of pending transactions (before GO) */
-	uint32_t transaction_count;
-	uint32_t engine_keep_power_up_count;
-};
+#include "../dce110/i2c_hw_engine_dce110.h"
 
-struct i2c_hw_engine_dce110_create_arg {
-	uint32_t engine_id;
-	uint32_t reference_frequency;
-	uint32_t default_speed;
-	struct dc_context *ctx;
-};
-
-struct i2c_engine *dal_i2c_hw_engine_dce110_create(
-	const struct i2c_hw_engine_dce110_create_arg *arg);
-
-bool i2c_hw_engine_dce110_construct(
-	struct i2c_hw_engine_dce110 *engine_dce110,
+struct i2c_engine *dal_i2c_hw_engine_dce112_create(
 	const struct i2c_hw_engine_dce110_create_arg *arg);
 
 #endif

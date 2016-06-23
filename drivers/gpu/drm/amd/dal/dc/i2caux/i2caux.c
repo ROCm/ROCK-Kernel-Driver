@@ -56,6 +56,10 @@
 #include "dce110/i2caux_dce110.h"
 #endif
 
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
+#include "dce112/i2caux_dce112.h"
+#endif
+
 #include "diagnostics/i2caux_diag.h"
 
 /*
@@ -87,11 +91,12 @@ struct i2caux *dal_i2caux_create(
 	case DCE_VERSION_8_0:
 		return dal_i2caux_dce80_create(as, ctx);
 #endif
-#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
-	case DCE_VERSION_11_0:
 #if defined(CONFIG_DRM_AMD_DAL_DCE11_2)
 	case DCE_VERSION_11_2:
+		return dal_i2caux_dce112_create(as, ctx);
 #endif
+#if defined(CONFIG_DRM_AMD_DAL_DCE11_0)
+	case DCE_VERSION_11_0:
 #if defined(CONFIG_DRM_AMD_DAL_DCE10_0)
 	case DCE_VERSION_10_0:
 #endif

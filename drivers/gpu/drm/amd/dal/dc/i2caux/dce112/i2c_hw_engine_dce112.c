@@ -24,6 +24,7 @@
  */
 
 #include "dm_services.h"
+
 #include "include/logger_interface.h"
 /*
  * Pre-requisites: headers required by header of this unit
@@ -38,13 +39,10 @@
  * Header of this unit
  */
 
-#include "i2c_hw_engine_dce110.h"
+#include "i2c_hw_engine_dce112.h"
 
-/*
- * Post-requisites: headers required by this unit
- */
-#include "dce/dce_11_0_d.h"
-#include "dce/dce_11_0_sh_mask.h"
+#include "dce/dce_11_2_d.h"
+#include "dce/dce_11_2_sh_mask.h"
 
 /*
  * This unit
@@ -90,108 +88,6 @@ enum {
  */
 #define FROM_ENGINE(ptr) \
 	FROM_I2C_ENGINE(container_of((ptr), struct i2c_engine, base))
-
-static void disable_i2c_hw_engine(
-	struct i2c_hw_engine_dce110 *engine)
-{
-	const uint32_t addr = engine->addr.DC_I2C_DDCX_SETUP;
-	uint32_t value = 0;
-
-	struct dc_context *ctx = NULL;
-
-	ctx = engine->base.base.base.ctx;
-
-	value = dm_read_reg(ctx, addr);
-
-	set_reg_field_value(
-		value,
-		0,
-		DC_I2C_DDC1_SETUP,
-		DC_I2C_DDC1_ENABLE);
-
-	dm_write_reg(ctx, addr, value);
-}
-
-static void release_engine(
-	struct engine *engine)
-{
-	struct i2c_hw_engine_dce110 *hw_engine = FROM_ENGINE(engine);
-
-	struct i2c_engine *base = NULL;
-	bool safe_to_reset;
-	uint32_t value = 0;
-
-	base = &hw_engine->base.base;
-
-	/* Restore original HW engine speed */
-
-	base->funcs->set_speed(base, hw_engine->base.original_speed);
-
-	/* Release I2C */
-	{
-		value = dm_read_reg(engine->ctx, mmDC_I2C_ARBITRATION);
-
-		set_reg_field_value(
-				value,
-				1,
-				DC_I2C_ARBITRATION,
-				DC_I2C_SW_DONE_USING_I2C_REG);
-
-		dm_write_reg(engine->ctx, mmDC_I2C_ARBITRATION, value);
-	}
-
-	/* Reset HW engine */
-	{
-		uint32_t i2c_sw_status = 0;
-
-		value = dm_read_reg(engine->ctx, mmDC_I2C_SW_STATUS);
-
-		i2c_sw_status = get_reg_field_value(
-				value,
-				DC_I2C_SW_STATUS,
-				DC_I2C_SW_STATUS);
-		/* if used by SW, safe to reset */
-		safe_to_reset = (i2c_sw_status == 1);
-	}
-	{
-		value = dm_read_reg(engine->ctx, mmDC_I2C_CONTROL);
-
-		if (safe_to_reset)
-			set_reg_field_value(
-				value,
-				1,
-				DC_I2C_CONTROL,
-				DC_I2C_SOFT_RESET);
-
-		set_reg_field_value(
-			value,
-			1,
-			DC_I2C_CONTROL,
-			DC_I2C_SW_STATUS_RESET);
-
-		dm_write_reg(engine->ctx, mmDC_I2C_CONTROL, value);
-	}
-
-	/* HW I2c engine - clock gating feature */
-	if (!hw_engine->engine_keep_power_up_count)
-		disable_i2c_hw_engine(hw_engine);
-}
-
-static void keep_power_up_count(
-	struct engine *engine,
-	bool keep_power_up)
-{
-	struct i2c_hw_engine_dce110 *hw_engine = FROM_ENGINE(engine);
-
-	if (keep_power_up)
-		++hw_engine->engine_keep_power_up_count;
-	else {
-		--hw_engine->engine_keep_power_up_count;
-
-		if (!hw_engine->engine_keep_power_up_count)
-			disable_i2c_hw_engine(hw_engine);
-	}
-}
 
 static bool setup_engine(
 	struct i2c_engine *i2c_engine)
@@ -755,35 +651,6 @@ static enum i2c_channel_operation_result get_channel_status(
 	return I2C_CHANNEL_OPERATION_SUCCEEDED;
 }
 
-static uint32_t get_hw_buffer_available_size(
-	const struct i2c_hw_engine *engine)
-{
-	return I2C_HW_BUFFER_SIZE -
-		FROM_I2C_HW_ENGINE(engine)->buffer_used_bytes;
-}
-
-static uint32_t get_transaction_timeout(
-	const struct i2c_hw_engine *engine,
-	uint32_t length)
-{
-	uint32_t speed = engine->base.funcs->get_speed(&engine->base);
-
-	uint32_t period_timeout;
-	uint32_t num_of_clock_stretches;
-
-	if (!speed)
-		return 0;
-
-	period_timeout = (1000 * TRANSACTION_TIMEOUT_IN_I2C_CLOCKS) / speed;
-
-	num_of_clock_stretches = 1 + (length << 3) + 1;
-	num_of_clock_stretches +=
-		(FROM_I2C_HW_ENGINE(engine)->buffer_used_bytes << 3) +
-		(FROM_I2C_HW_ENGINE(engine)->transaction_count << 1);
-
-	return period_timeout * num_of_clock_stretches;
-}
-
 static void destroy(
 	struct i2c_engine **i2c_engine)
 {
@@ -796,40 +663,6 @@ static void destroy(
 
 	*i2c_engine = NULL;
 }
-/*
- * @brief
- * DC_I2C_DDC1_SETUP MM register offsets
- *
- * @note
- * The indices of this offset array are DDC engine IDs
- */
-static const int32_t ddc_setup_offset[] = {
-
-	mmDC_I2C_DDC1_SETUP - mmDC_I2C_DDC1_SETUP, /* DDC Engine 1 */
-	mmDC_I2C_DDC2_SETUP - mmDC_I2C_DDC1_SETUP, /* DDC Engine 2 */
-	mmDC_I2C_DDC3_SETUP - mmDC_I2C_DDC1_SETUP, /* DDC Engine 3 */
-	mmDC_I2C_DDC4_SETUP - mmDC_I2C_DDC1_SETUP, /* DDC Engine 4 */
-	mmDC_I2C_DDC5_SETUP - mmDC_I2C_DDC1_SETUP, /* DDC Engine 5 */
-	mmDC_I2C_DDC6_SETUP - mmDC_I2C_DDC1_SETUP, /* DDC Engine 6 */
-	mmDC_I2C_DDCVGA_SETUP - mmDC_I2C_DDC1_SETUP /* DDC Engine 7 */
-};
-
-/*
- * @brief
- * DC_I2C_DDC1_SPEED MM register offsets
- *
- * @note
- * The indices of this offset array are DDC engine IDs
- */
-static const int32_t ddc_speed_offset[] = {
-	mmDC_I2C_DDC1_SPEED - mmDC_I2C_DDC1_SPEED, /* DDC Engine 1 */
-	mmDC_I2C_DDC2_SPEED - mmDC_I2C_DDC1_SPEED, /* DDC Engine 2 */
-	mmDC_I2C_DDC3_SPEED - mmDC_I2C_DDC1_SPEED, /* DDC Engine 3 */
-	mmDC_I2C_DDC4_SPEED - mmDC_I2C_DDC1_SPEED, /* DDC Engine 4 */
-	mmDC_I2C_DDC5_SPEED - mmDC_I2C_DDC1_SPEED, /* DDC Engine 5 */
-	mmDC_I2C_DDC6_SPEED - mmDC_I2C_DDC1_SPEED, /* DDC Engine 6 */
-	mmDC_I2C_DDCVGA_SPEED - mmDC_I2C_DDC1_SPEED /* DDC Engine 7 */
-};
 
 static const struct i2c_engine_funcs i2c_engine_funcs = {
 	.destroy = destroy,
@@ -842,89 +675,19 @@ static const struct i2c_engine_funcs i2c_engine_funcs = {
 	.acquire_engine = dal_i2c_hw_engine_acquire_engine,
 };
 
-static const struct engine_funcs engine_funcs = {
-	.release_engine = release_engine,
-	.keep_power_up_count = keep_power_up_count,
-	.get_engine_type = dal_i2c_hw_engine_get_engine_type,
-	.acquire = dal_i2c_engine_acquire,
-	.submit_request = dal_i2c_hw_engine_submit_request,
-};
-
-static const struct i2c_hw_engine_funcs i2c_hw_engine_funcs = {
-	.get_hw_buffer_available_size = get_hw_buffer_available_size,
-	.get_transaction_timeout = get_transaction_timeout,
-	.wait_on_operation_result = dal_i2c_hw_engine_wait_on_operation_result,
-};
-
-bool i2c_hw_engine_dce110_construct(
+static bool construct(
 	struct i2c_hw_engine_dce110 *engine_dce110,
 	const struct i2c_hw_engine_dce110_create_arg *arg)
 {
-	uint32_t xtal_ref_div = 0;
-	uint32_t value = 0;
-
-	/*ddc_setup_offset of dce80 and dce110 have the same register name
-	 * but different offset. Do not need different array*/
-	if (arg->engine_id >= sizeof(ddc_setup_offset) / sizeof(int32_t))
-		return false;
-	if (arg->engine_id >= sizeof(ddc_speed_offset) / sizeof(int32_t))
-		return false;
-	if (!arg->reference_frequency)
+	if (!i2c_hw_engine_dce110_construct(engine_dce110, arg))
 		return false;
 
-	if (!dal_i2c_hw_engine_construct(&engine_dce110->base, arg->ctx))
-		return false;
-
-	engine_dce110->base.base.base.funcs = &engine_funcs;
 	engine_dce110->base.base.funcs = &i2c_engine_funcs;
-	engine_dce110->base.funcs = &i2c_hw_engine_funcs;
-	engine_dce110->base.default_speed = arg->default_speed;
-
-	engine_dce110->engine_id = arg->engine_id;
-
-	engine_dce110->buffer_used_bytes = 0;
-	engine_dce110->transaction_count = 0;
-	engine_dce110->engine_keep_power_up_count = 1;
-
-	/*values which are not included by arg*/
-	engine_dce110->addr.DC_I2C_DDCX_SETUP =
-		mmDC_I2C_DDC1_SETUP + ddc_setup_offset[arg->engine_id];
-	engine_dce110->addr.DC_I2C_DDCX_SPEED =
-		mmDC_I2C_DDC1_SPEED + ddc_speed_offset[arg->engine_id];
-
-	value = dm_read_reg(
-		engine_dce110->base.base.base.ctx,
-		mmMICROSECOND_TIME_BASE_DIV);
-
-	xtal_ref_div = get_reg_field_value(
-			value,
-			MICROSECOND_TIME_BASE_DIV,
-			XTAL_REF_DIV);
-
-	if (xtal_ref_div == 0) {
-		dal_logger_write(
-				engine_dce110->base.base.base.ctx->logger,
-				LOG_MAJOR_WARNING,
-				LOG_MINOR_COMPONENT_I2C_AUX,
-				"Invalid base timer divider\n",
-				__func__);
-		xtal_ref_div = 2;
-	}
-
-	/*Calculating Reference Clock by divding original frequency by
-	 * XTAL_REF_DIV.
-	 * At upper level, uint32_t reference_frequency =
-	 *  dal_i2caux_get_reference_clock(as) >> 1
-	 *  which already divided by 2. So we need x2 to get original
-	 *  reference clock from ppll_info
-	 */
-	engine_dce110->reference_frequency =
-		(arg->reference_frequency * 2) / xtal_ref_div;
 
 	return true;
 }
 
-struct i2c_engine *dal_i2c_hw_engine_dce110_create(
+struct i2c_engine *dal_i2c_hw_engine_dce112_create(
 	const struct i2c_hw_engine_dce110_create_arg *arg)
 {
 	struct i2c_hw_engine_dce110 *engine_dce10;
@@ -941,7 +704,7 @@ struct i2c_engine *dal_i2c_hw_engine_dce110_create(
 		return NULL;
 	}
 
-	if (i2c_hw_engine_dce110_construct(engine_dce10, arg))
+	if (construct(engine_dce10, arg))
 		return &engine_dce10->base.base;
 
 	ASSERT_CRITICAL(false);
