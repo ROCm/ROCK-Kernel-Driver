@@ -696,7 +696,26 @@ bool resource_attach_surfaces_to_context(
 	return true;
 }
 
-static bool are_streams_same(
+
+static bool is_timing_changed(const struct core_stream *cur_stream,
+		const struct core_stream *new_stream)
+{
+	if (cur_stream == NULL)
+		return true;
+
+	/* If sink pointer changed, it means this is a hotplug, we should do
+	 * full hw setting.
+	 */
+	if (cur_stream->sink != new_stream->sink)
+		return true;
+
+	return memcmp(
+		&cur_stream->public.timing,
+		&new_stream->public.timing,
+		sizeof(struct dc_crtc_timing)) != 0;
+}
+
+static bool are_stream_backends_same(
 	const struct core_stream *stream_a, const struct core_stream *stream_b)
 {
 	if (stream_a == stream_b)
@@ -705,10 +724,10 @@ static bool are_streams_same(
 	if (stream_a == NULL || stream_b == NULL)
 		return false;
 
-	if (memcmp(stream_a, stream_b, sizeof(struct core_stream)) == 0)
-		return true;
+	if (is_timing_changed(stream_a, stream_b))
+		return false;
 
-	return false;
+	return true;
 }
 
 static bool is_target_unchanged(
@@ -727,7 +746,7 @@ static bool is_target_unchanged(
 		const struct core_stream *stream = DC_STREAM_TO_CORE(
 				target->public.streams[i]);
 
-		if (!are_streams_same(old_stream, stream))
+		if (!are_stream_backends_same(old_stream, stream))
 			return false;
 	}
 
@@ -904,7 +923,7 @@ bool resource_is_stream_unchanged(
 			struct core_stream *old_stream =
 				DC_STREAM_TO_CORE(old_target->public.streams[j]);
 
-			if (are_streams_same(old_stream, stream))
+			if (are_stream_backends_same(old_stream, stream))
 				return true;
 		}
 	}
@@ -1030,7 +1049,7 @@ enum dc_status resource_map_pool_resources(
 				const struct pipe_ctx *old_pipe_ctx =
 					&dc->current_context->res_ctx.pipe_ctx[k];
 
-				if (!are_streams_same(old_pipe_ctx->stream, stream))
+				if (!are_stream_backends_same(old_pipe_ctx->stream, stream))
 					continue;
 
 				pipe_ctx->stream = stream;
@@ -1748,24 +1767,6 @@ enum dc_status resource_map_clock_resources(
 	return DC_OK;
 }
 
-static bool check_timing_change(struct core_stream *cur_stream,
-		struct core_stream *new_stream)
-{
-	if (cur_stream == NULL)
-		return true;
-
-	/* If sink pointer changed, it means this is a hotplug, we should do
-	 * full hw setting.
-	 */
-	if (cur_stream->sink != new_stream->sink)
-		return true;
-
-	return memcmp(
-		&cur_stream->public.timing,
-		&new_stream->public.timing,
-		sizeof(struct dc_crtc_timing)) != 0;
-}
-
 /*
  * Note: We need to disable output if clock sources change,
  * since bios does optimization and doesn't apply if changing
@@ -1791,7 +1792,7 @@ bool pipe_need_reprogram(
 	if (pipe_ctx_old->stream_enc != pipe_ctx->stream_enc)
 		return true;
 
-	if (check_timing_change(pipe_ctx_old->stream, pipe_ctx->stream))
+	if (is_timing_changed(pipe_ctx_old->stream, pipe_ctx->stream))
 		return true;
 
 

@@ -787,13 +787,6 @@ bool dc_commit_targets(
 		core_dc->hwss.enable_accelerated_mode(core_dc);
 	}
 
-	for (i = 0; i < core_dc->current_context->target_count; i++) {
-		/*TODO: optimize this to happen only when necessary*/
-		target_disable_memory_requests(
-				&core_dc->current_context->targets[i]->public,
-				&core_dc->current_context->res_ctx);
-	}
-
 	if (result == DC_OK) {
 		result = core_dc->hwss.apply_ctx_to_hw(core_dc, context);
 	}

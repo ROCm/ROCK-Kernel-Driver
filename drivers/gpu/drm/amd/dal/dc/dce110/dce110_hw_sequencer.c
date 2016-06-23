@@ -1285,7 +1285,7 @@ static enum dc_status apply_ctx_to_hw(
 			continue;
 
 		if (!pipe_ctx->stream ||
-			pipe_need_reprogram(pipe_ctx_old, pipe_ctx))
+				pipe_need_reprogram(pipe_ctx_old, pipe_ctx))
 			reset_single_pipe_hw_ctx(
 				dc, pipe_ctx_old, dc->current_context);
 	}
