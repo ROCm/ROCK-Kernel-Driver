@@ -1076,6 +1076,8 @@ int amdgpu_set_clockgating_state(struct amdgpu_device *adev,
 	int i, r = 0;
 
 	for (i = 0; i < adev->num_ip_blocks; i++) {
+		if (!adev->ip_block_status[i].valid)
+			continue;
 		if (adev->ip_blocks[i].type == block_type) {
 			r = adev->ip_blocks[i].funcs->set_clockgating_state((void *)adev,
 									    state);
@@ -1094,6 +1096,8 @@ int amdgpu_set_powergating_state(struct amdgpu_device *adev,
 	int i, r = 0;
 
 	for (i = 0; i < adev->num_ip_blocks; i++) {
+		if (!adev->ip_block_status[i].valid)
+			continue;
 		if (adev->ip_blocks[i].type == block_type) {
 			r = adev->ip_blocks[i].funcs->set_powergating_state((void *)adev,
 									    state);
@@ -1111,6 +1115,8 @@ int amdgpu_wait_for_idle(struct amdgpu_device *adev,
 	int i, r;
 
 	for (i = 0; i < adev->num_ip_blocks; i++) {
+		if (!adev->ip_block_status[i].valid)
+			continue;
 		if (adev->ip_blocks[i].type == block_type) {
 			r = adev->ip_blocks[i].funcs->wait_for_idle((void *)adev);
 			if (r)
@@ -1128,6 +1134,8 @@ bool amdgpu_is_idle(struct amdgpu_device *adev,
 	int i;
 
 	for (i = 0; i < adev->num_ip_blocks; i++) {
+		if (!adev->ip_block_status[i].valid)
+			continue;
 		if (adev->ip_blocks[i].type == block_type)
 			return adev->ip_blocks[i].funcs->is_idle((void *)adev);
 	}
