@@ -39,6 +39,7 @@
 #include "cik_structs.h"
 
 #define CIK_PIPE_PER_MEC	(4)
+#define CIK_QUEUES_PER_PIPE_MEC	(8)
 
 #define AMDKFD_SKIP_UNCOMPILED_CODE 1
 
@@ -243,6 +244,16 @@ static void acquire_queue(struct kgd_dev *kgd, uint32_t pipe_id,
 	lock_srbm(kgd, mec, pipe, queue_id, 0);
 }
 
+static uint32_t get_queue_mask(uint32_t pipe_id, uint32_t queue_id)
+{
+	/* assumes that pipe0 is used by graphics and that the correct
+	 * MEC is selected by acquire_queue already
+	 */
+	unsigned bit = ((pipe_id+1) * CIK_QUEUES_PER_PIPE_MEC + queue_id) & 31;
+
+	return ((uint32_t)1) << bit;
+}
+
 static void release_queue(struct kgd_dev *kgd)
 {
 	unlock_srbm(kgd);
@@ -355,12 +366,8 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct cik_mqd *m;
-	uint32_t wptr_shadow = 0, is_wptr_shadow_valid = 0;
 
 	m = get_mqd(mqd);
-
-	if (wptr != NULL)
-		is_wptr_shadow_valid = !get_user(wptr_shadow, wptr);
 
 	acquire_queue(kgd, pipe_id, queue_id);
 
@@ -381,6 +388,33 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 	WREG32(mmCP_HQD_PQ_BASE_HI, m->cp_hqd_pq_base_hi);
 	WREG32(mmCP_HQD_PQ_CONTROL, m->cp_hqd_pq_control);
 
+	WREG32(mmCP_HQD_VMID, m->cp_hqd_vmid);
+
+	WREG32(mmCP_HQD_PQ_RPTR_REPORT_ADDR, m->cp_hqd_pq_rptr_report_addr_lo);
+	WREG32(mmCP_HQD_PQ_RPTR_REPORT_ADDR_HI, m->cp_hqd_pq_rptr_report_addr_hi);
+	WREG32(mmCP_HQD_PQ_RPTR, m->cp_hqd_pq_rptr);
+
+	WREG32(mmCP_HQD_PQ_DOORBELL_CONTROL, m->cp_hqd_pq_doorbell_control);
+
+	if (wptr) {
+		/* Don't read wptr with get_user because the user
+		 * context may not be accessible (if this function
+		 * runs in a work queue). Instead trigger a one-shot
+		 * polling read from memory in the CP. This assumes
+		 * that wptr is GPU-accessible in the queue's VMID via
+		 * ATC or SVM. WPTR==RPTR before starting the poll so
+		 * the CP starts fetching new commands from the right
+		 * place.
+		 */
+		WREG32(mmCP_HQD_PQ_WPTR, m->cp_hqd_pq_rptr);
+		WREG32(mmCP_HQD_PQ_WPTR_POLL_ADDR, (uint32_t)(uint64_t)wptr);
+		WREG32(mmCP_HQD_PQ_WPTR_POLL_ADDR_HI,
+		       (uint32_t)((uint64_t)wptr >> 32));
+		WREG32(mmCP_PQ_WPTR_POLL_CNTL1,
+		       get_queue_mask(pipe_id, queue_id));
+	} else
+		WREG32(mmCP_HQD_PQ_WPTR, 0);
+
 	WREG32(mmCP_HQD_IB_CONTROL, m->cp_hqd_ib_control);
 	WREG32(mmCP_HQD_IB_BASE_ADDR, m->cp_hqd_ib_base_addr_lo);
 	WREG32(mmCP_HQD_IB_BASE_ADDR_HI, m->cp_hqd_ib_base_addr_hi);
@@ -396,25 +430,12 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 	WREG32(mmCP_HQD_ATOMIC1_PREOP_LO, m->cp_hqd_atomic1_preop_lo);
 	WREG32(mmCP_HQD_ATOMIC1_PREOP_HI, m->cp_hqd_atomic1_preop_hi);
 
-	WREG32(mmCP_HQD_PQ_RPTR_REPORT_ADDR, m->cp_hqd_pq_rptr_report_addr_lo);
-	WREG32(mmCP_HQD_PQ_RPTR_REPORT_ADDR_HI, m->cp_hqd_pq_rptr_report_addr_hi);
-	WREG32(mmCP_HQD_PQ_RPTR, m->cp_hqd_pq_rptr);
-
-	WREG32(mmCP_HQD_PQ_WPTR_POLL_ADDR, m->cp_hqd_pq_wptr_poll_addr_lo);
-	WREG32(mmCP_HQD_PQ_WPTR_POLL_ADDR_HI, m->cp_hqd_pq_wptr_poll_addr_hi);
-
-	WREG32(mmCP_HQD_PQ_DOORBELL_CONTROL, m->cp_hqd_pq_doorbell_control);
-
-	WREG32(mmCP_HQD_VMID, m->cp_hqd_vmid);
-
 	WREG32(mmCP_HQD_QUANTUM, m->cp_hqd_quantum);
 
 	WREG32(mmCP_HQD_PIPE_PRIORITY, m->cp_hqd_pipe_priority);
 	WREG32(mmCP_HQD_QUEUE_PRIORITY, m->cp_hqd_queue_priority);
 
 	WREG32(mmCP_HQD_IQ_RPTR, m->cp_hqd_iq_rptr);
-
-	WREG32(mmCP_HQD_PQ_WPTR, (is_wptr_shadow_valid ? wptr_shadow : 0));
 
 	WREG32(mmCP_HQD_ACTIVE, m->cp_hqd_active);
 	release_queue(kgd);
