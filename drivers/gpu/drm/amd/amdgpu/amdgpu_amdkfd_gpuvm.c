@@ -1034,7 +1034,8 @@ bo_reserve_failed:
 	return ret;
 }
 
-int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm)
+int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
+					  void *master_vm)
 {
 	int ret;
 	struct amdkfd_vm *new_vm;
@@ -1061,6 +1062,15 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm)
 	mutex_init(&new_vm->lock);
 	INIT_LIST_HEAD(&new_vm->kfd_bo_list);
 	INIT_LIST_HEAD(&new_vm->kfd_vm_list);
+
+	if (master_vm == NULL)
+		new_vm->master = new_vm;
+	else {
+		new_vm->master = master_vm;
+		list_add_tail(&new_vm->kfd_vm_list,
+			      &((struct amdkfd_vm *)master_vm)->kfd_vm_list);
+	}
+	new_vm->master->n_vms++;
 	*vm = (void *) new_vm;
 
 	/*
