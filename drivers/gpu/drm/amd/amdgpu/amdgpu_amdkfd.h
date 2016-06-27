@@ -156,7 +156,8 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 		struct kgd_dev *kgd, struct kgd_mem *mem, void *vm);
 
-int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm);
+int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
+					  void *master_vm);
 void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm);
 
 uint32_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm);
