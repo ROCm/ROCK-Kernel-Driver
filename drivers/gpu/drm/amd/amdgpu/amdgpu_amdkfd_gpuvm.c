@@ -27,7 +27,6 @@
 #include <linux/list.h>
 #include <drm/drmP.h>
 #include <linux/dma-buf.h>
-#include "amdgpu.h"
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_ucode.h"
 #include "gca/gfx_8_0_sh_mask.h"
@@ -1049,7 +1048,7 @@ bo_reserve_failed:
 int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm)
 {
 	int ret;
-	struct amdgpu_vm *new_vm;
+	struct amdkfd_vm *new_vm;
 	struct amdgpu_bo *pd;
 	bool vm_update_using_cpu;
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
@@ -1057,7 +1056,7 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm)
 	BUG_ON(kgd == NULL);
 	BUG_ON(vm == NULL);
 
-	new_vm = kzalloc(sizeof(struct amdgpu_vm), GFP_KERNEL);
+	new_vm = kzalloc(sizeof(struct amdkfd_vm), GFP_KERNEL);
 	if (new_vm == NULL)
 		return -ENOMEM;
 
@@ -1069,11 +1068,14 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm)
 	if (ret != 0) {
 		pr_err("amdgpu: failed init vm ret %d\n", ret);
 		/* Undo everything related to the new VM context */
-		amdgpu_vm_fini(adev, new_vm);
+		amdgpu_vm_fini(adev, &new_vm->base);
 		kfree(new_vm);
 		new_vm = NULL;
 	}
-
+	new_vm->adev = adev;
+	mutex_init(&new_vm->lock);
+	INIT_LIST_HEAD(&new_vm->kfd_bo_list);
+	INIT_LIST_HEAD(&new_vm->kfd_vm_list);
 	*vm = (void *) new_vm;
 
 	/*
@@ -1081,12 +1083,12 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm)
 	 * removed from PT. This function is called here because it requires
 	 * the radeon_vm::mutex to be locked and PT to be reserved
 	 */
-	ret = amdgpu_vm_clear_freed(adev, new_vm);
+	ret = amdgpu_vm_clear_freed(adev, &new_vm->base);
 	if (ret != 0)
 		pr_err("amdgpu: Failed to amdgpu_vm_clear_freed\n");
 
 	/* Pin the PD directory */
-	pd = new_vm->page_directory;
+	pd = new_vm->base.page_directory;
 	amdgpu_bo_reserve(pd, true);
 	ret = try_pin_bo(pd, AMDGPU_GEM_DOMAIN_VRAM);
 	amdgpu_bo_unreserve(pd);
@@ -1094,7 +1096,7 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm)
 		pr_err("amdkfd: Failed to pin PD\n");
 
 	pr_debug("amdgpu: created process vm with address 0x%llx\n",
-			amdgpu_bo_gpu_offset(new_vm->page_directory));
+			amdgpu_bo_gpu_offset(new_vm->base.page_directory));
 
 	return ret;
 }

@@ -28,6 +28,7 @@
 #include <linux/types.h>
 #include <linux/workqueue.h>
 #include <kgd_kfd_interface.h>
+#include "amdgpu.h"
 
 extern const struct kgd2kfd_calls *kgd2kfd;
 
@@ -65,6 +66,34 @@ struct kgd_mem {
 			bool aql_queue     : 1;
 		} data2;
 	};
+};
+
+/* struct amdkfd_vm -
+ *  For Memory Eviction KGD requires a mechanism to keep track of all KFD BOs
+ * belonging to a KFD process. All the VMs belonging to the same process point
+ * to the same master VM. The master VM points to itself.
+ * For master VM kfd_bo_list will contain the list of all KFD BOs and it will
+ * be empty for all the other VMs. The master VM is decided by KFD and it will
+ * pass it on KGD via create_process_vm interface
+ */
+struct amdkfd_vm {
+	/* Keep base as the first parameter for pointer compatibility between
+	 * amdkfd_vm and amdgpu_vm.
+	 */
+	struct amdgpu_vm base;
+	/* Points to master VM of the KFD process */
+	struct amdkfd_vm *master;
+	/* List Head for all KFD BOs that belong to a KFD process. Non-empty
+	 * only for Master VM.
+	 */
+	struct list_head kfd_bo_list;
+	/* Lock to protect kfd_bo_list */
+	struct mutex lock;
+	/* List of VMs that belong to a KFD process */
+	struct list_head kfd_vm_list;
+	/* Number of VMs including master VM */
+	unsigned n_vms;
+	struct amdgpu_device *adev;
 };
 
 int amdgpu_amdkfd_init(void);
