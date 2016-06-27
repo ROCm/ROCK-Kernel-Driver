@@ -3182,7 +3182,7 @@ static void calculate_bandwidth(
 																	bw_int_to_fixed(
 																		2),
 																	vbios->mcifwrmc_urgent_latency),
-																results->dmif_burst_time[i][j]),
+																	results->dmif_burst_time[results->y_clk_level][results->sclk_level]),
 															results->mcifwr_burst_time[results->y_clk_level][results->sclk_level])),
 														results->dispclk),
 													bw_int_to_fixed(
