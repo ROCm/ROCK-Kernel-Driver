@@ -148,7 +148,7 @@ struct dc_surface {
  */
 struct dc_surface_status {
 	struct dc_plane_address requested_address;
-	struct dc_plane_address current_address;
+	bool is_flip_pending;
 };
 
 /*

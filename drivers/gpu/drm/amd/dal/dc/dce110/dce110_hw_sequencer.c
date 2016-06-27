@@ -1509,10 +1509,22 @@ static void update_plane_addr(const struct core_dc *dc, struct pipe_ctx *pipe_ct
 		pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, false);
 
 	if (surface->public.flip_immediate)
-		pipe_ctx->mi->funcs->wait_for_no_surface_update_pending(
-								pipe_ctx->mi);
+		while (pipe_ctx->mi->funcs->mem_input_is_flip_pending(
+				pipe_ctx->mi))
+			;
 }
 
+static void update_pending_status(struct pipe_ctx *pipe_ctx)
+{
+	struct core_surface *surface = pipe_ctx->surface;
+
+	if (surface == NULL)
+		return;
+
+	surface->status.is_flip_pending =
+			pipe_ctx->mi->funcs->mem_input_is_flip_pending(
+					pipe_ctx->mi);
+}
 
 static void power_down(struct core_dc *dc)
 {
@@ -1880,6 +1892,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.apply_ctx_to_surface = apply_ctx_to_surface,
 	.set_plane_config = set_plane_config,
 	.update_plane_addr = update_plane_addr,
+	.update_pending_status = update_pending_status,
 	.update_plane_surface = update_plane_surface,
 	.set_gamma_correction = set_gamma_ramp,
 	.power_down = power_down,

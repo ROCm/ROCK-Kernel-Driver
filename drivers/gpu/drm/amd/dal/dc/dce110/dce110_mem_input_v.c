@@ -492,15 +492,18 @@ static void program_pixel_format(
 	}
 }
 
-void dce110_mem_input_v_wait_for_no_surface_update_pending(
-				struct mem_input *mem_input)
+bool dce110_mem_input_v_is_surface_pending(struct mem_input *mem_input)
 {
 	struct dce110_mem_input *mem_input110 = TO_DCE110_MEM_INPUT(mem_input);
 	uint32_t value;
 
-	do  {
-		value = dm_read_reg(mem_input110->base.ctx, DCP_REG(mmUNP_GRPH_UPDATE));
-	} while (get_reg_field_value(value, UNP_GRPH_UPDATE, GRPH_SURFACE_UPDATE_PENDING));
+	value = dm_read_reg(mem_input110->base.ctx, DCP_REG(mmUNP_GRPH_UPDATE));
+
+	if (get_reg_field_value(value, UNP_GRPH_UPDATE,
+			GRPH_SURFACE_UPDATE_PENDING))
+		return true;
+
+	return false;
 }
 
 bool dce110_mem_input_v_program_surface_flip_and_addr(
@@ -873,8 +876,8 @@ static struct mem_input_funcs dce110_mem_input_v_funcs = {
 			dce110_mem_input_v_program_surface_flip_and_addr,
 	.mem_input_program_surface_config =
 			dce110_mem_input_v_program_surface_config,
-	.wait_for_no_surface_update_pending =
-			dce110_mem_input_v_wait_for_no_surface_update_pending
+	.mem_input_is_flip_pending =
+			dce110_mem_input_v_is_surface_pending
 };
 /*****************************************/
 /* Constructor, Destructor               */

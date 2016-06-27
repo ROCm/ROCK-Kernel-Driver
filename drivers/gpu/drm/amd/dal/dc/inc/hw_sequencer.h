@@ -62,6 +62,9 @@ struct hw_sequencer_funcs {
 		const struct core_dc *dc,
 		struct pipe_ctx *pipe_ctx);
 
+	void (*update_pending_status)(
+			struct pipe_ctx *pipe_ctx);
+
 	void (*update_plane_surface)(
 		struct core_dc *dc,
 		struct validate_context *context,

@@ -102,6 +102,48 @@ alloc_fail:
 	return NULL;
 }
 
+const struct dc_surface_status *dc_surface_get_status(
+		struct dc_surface *dc_surface)
+{
+	struct dc_surface_status *surface_status;
+	struct core_surface *core_surface;
+	struct core_dc *core_dc;
+	int i;
+
+	if (dc_surface == NULL)
+		return NULL;
+
+	core_surface = DC_SURFACE_TO_CORE(dc_surface);
+
+	if (core_surface == NULL || core_surface->ctx == NULL)
+		return NULL;
+
+	surface_status = &core_surface->status;
+
+	if (core_surface->ctx == NULL || core_surface->ctx->dc == NULL)
+		return NULL;
+
+	core_dc = DC_TO_CORE(core_surface->ctx->dc);
+
+	if (core_dc->current_context == NULL)
+		return NULL;
+
+	for (i = 0; i < core_dc->current_context->res_ctx.pool->pipe_count;
+			i++) {
+		struct pipe_ctx *pipe_ctx =
+				&core_dc->current_context->res_ctx.pipe_ctx[i];
+
+		if (pipe_ctx->surface !=
+				DC_SURFACE_TO_CORE(dc_surface))
+			continue;
+
+		core_dc->hwss.update_pending_status(pipe_ctx);
+		surface_status->requested_address = dc_surface->address;
+	}
+
+	return surface_status;
+}
+
 void dc_surface_retain(const struct dc_surface *dc_surface)
 {
 	struct surface *surface = DC_SURFACE_TO_SURFACE(dc_surface);
