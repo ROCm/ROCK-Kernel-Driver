@@ -669,6 +669,8 @@ struct kfd_process {
 	size_t debug_event_count;
 
 	struct rb_root bo_interval_tree;
+
+	void *master_vm;
 };
 
 /**
