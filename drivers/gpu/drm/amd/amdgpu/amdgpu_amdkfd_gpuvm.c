@@ -290,6 +290,21 @@ error:
 	return r;
 }
 
+static void add_kgd_mem_to_kfd_bo_list(struct kgd_mem *mem,
+				       struct amdkfd_vm *kfd_vm)
+{
+	struct amdgpu_bo_list_entry *entry = &mem->data2.bo_list_entry;
+	struct amdgpu_bo *bo = mem->data2.bo;
+
+	entry->robj = bo;
+	INIT_LIST_HEAD(&entry->tv.head);
+	entry->tv.shared = true;
+	entry->tv.bo = &bo->tbo;
+	mutex_lock(&kfd_vm->master->lock);
+	list_add_tail(&entry->tv.head, &kfd_vm->master->kfd_bo_list);
+	mutex_unlock(&kfd_vm->master->lock);
+}
+
 static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		uint64_t size, void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr, struct kfd_process_device *pdd,
@@ -302,11 +317,12 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	uint64_t user_addr = 0;
 	int byte_align;
 	u32 alloc_domain;
+	struct amdkfd_vm *kfd_vm = (struct amdkfd_vm *)vm;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(size == 0);
 	BUG_ON(mem == NULL);
-	BUG_ON(vm == NULL);
+	BUG_ON(kfd_vm == NULL);
 
 	if (aql_queue)
 		size = size >> 1;
@@ -416,6 +432,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	(*mem)->data2.va = va;
 	(*mem)->data2.domain = domain;
 	(*mem)->data2.mapped_to_gpu_memory = 0;
+	add_kgd_mem_to_kfd_bo_list(*mem, kfd_vm);
 
 	if (offset)
 		*offset = amdgpu_bo_mmap_offset(bo);
@@ -867,11 +884,16 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	struct kfd_bo_va_list *entry, *tmp;
 	struct bo_vm_reservation_context ctx;
 	int ret;
+	struct amdgpu_bo_list_entry *bo_list_entry;
+	struct amdkfd_vm *master_vm;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
+	BUG_ON(vm == NULL);
 
 	adev = get_amdgpu_device(kgd);
+	master_vm = ((struct amdkfd_vm *)vm)->master;
+	BUG_ON(master_vm == NULL);
 
 	mutex_lock(&mem->data2.lock);
 
@@ -916,6 +938,11 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	}
 
 	/* Free the BO*/
+	bo_list_entry = &mem->data2.bo_list_entry;
+	mutex_lock(&master_vm->lock);
+	list_del(&bo_list_entry->tv.head);
+	mutex_unlock(&master_vm->lock);
+
 	amdgpu_bo_unref(&mem->data2.bo);
 	kfree(mem);
 
@@ -1476,6 +1503,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 	struct drm_gem_object *obj;
 	struct amdgpu_bo *bo;
 	int r = 0;
+	struct amdkfd_vm *kfd_vm = (struct amdkfd_vm *)vm;
 
 	dma_buf = dma_buf_get(dma_buf_fd);
 	if (IS_ERR(dma_buf))
@@ -1515,6 +1543,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 	(*mem)->data2.domain = (bo->prefered_domains & AMDGPU_GEM_DOMAIN_VRAM) ?
 		AMDGPU_GEM_DOMAIN_VRAM : AMDGPU_GEM_DOMAIN_GTT;
 	(*mem)->data2.mapped_to_gpu_memory = 0;
+	add_kgd_mem_to_kfd_bo_list(*mem, kfd_vm);
 
 out_put:
 	dma_buf_put(dma_buf);

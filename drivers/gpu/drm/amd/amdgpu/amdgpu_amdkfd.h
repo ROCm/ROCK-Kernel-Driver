@@ -52,6 +52,7 @@ struct kgd_mem {
 			struct mutex lock;
 			struct amdgpu_bo *bo;
 			struct list_head bo_va_list;
+			struct amdgpu_bo_list_entry bo_list_entry;
 			uint32_t domain;
 			unsigned int mapped_to_gpu_memory;
 			void *kptr;
