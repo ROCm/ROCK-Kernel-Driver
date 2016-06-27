@@ -56,9 +56,15 @@ struct dc_stream_funcs {
 			const struct dc_stream **stream, int num_streams, int vmin, int vmax);
 };
 
+/* Structure to hold configuration flags set by dm at dc creation. */
+struct dc_config {
+	bool gpu_vm_support;
+};
+
 struct dc {
 	struct dc_caps caps;
 	struct dc_stream_funcs stream_funcs;
+	struct dc_config config;
 };
 
 struct dc_init_data {
@@ -74,6 +80,8 @@ struct dc_init_data {
 	 */
 	struct dc_bios *vbios_override;
 	enum dce_environment dce_environment;
+
+	struct dc_config flags;
 };
 
 struct dc *dc_create(const struct dc_init_data *init_params);

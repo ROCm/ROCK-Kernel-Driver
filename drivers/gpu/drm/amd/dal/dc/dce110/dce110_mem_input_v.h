@@ -71,6 +71,17 @@ bool dce110_mem_input_v_program_surface_flip_and_addr(
 	bool flip_immediate);
 
 /*
+ * dce110_mem_input_v_program_scatter_gather
+ *
+ * This function will program scatter gather registers.
+ */
+bool  dce110_mem_input_v_program_pte_vm(
+	struct mem_input *mem_input,
+	enum surface_pixel_format format,
+	struct dc_tiling_info *tiling_info,
+	enum dc_rotation_angle rotation);
+
+/*
  * This function will program surface tiling, size, rotation and pixel format
  * to corresponding dcp registers.
  */

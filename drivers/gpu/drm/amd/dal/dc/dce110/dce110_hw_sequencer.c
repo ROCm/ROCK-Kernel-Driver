@@ -1489,6 +1489,13 @@ static void set_plane_config(
 			&surface->public.tiling_info,
 			&surface->public.plane_size,
 			surface->public.rotation);
+
+	if (dc->public.config.gpu_vm_support)
+		mi->funcs->mem_input_program_pte_vm(
+				pipe_ctx->mi,
+				surface->public.format,
+				&surface->public.tiling_info,
+				surface->public.rotation);
 }
 
 static void update_plane_addr(const struct core_dc *dc, struct pipe_ctx *pipe_ctx)
