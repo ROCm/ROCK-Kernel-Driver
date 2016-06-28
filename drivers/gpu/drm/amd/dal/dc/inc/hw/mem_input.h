@@ -67,7 +67,6 @@ struct mem_input_funcs {
 		enum dc_rotation_angle rotation);
 
 	void (*wait_for_no_surface_update_pending)(struct mem_input *mem_input);
-	void (*disable_request)(struct mem_input *mem_input);
 };
 
 #endif

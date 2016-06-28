@@ -132,10 +132,6 @@ struct hw_sequencer_funcs {
 
 	void (*set_drr)(struct pipe_ctx **pipe_ctx, int num_pipes,
 			int vmin, int vmax);
-
-	void (*enable_memory_request)(
-		struct pipe_ctx *pipe_ctx,
-		bool enable);
 };
 
 #endif /* __DC_HW_SEQUENCER_H__ */

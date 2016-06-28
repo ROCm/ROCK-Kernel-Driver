@@ -66,11 +66,7 @@ enum dce_environment {
 struct dc_context {
 	struct dc *dc;
 
-#if defined(BUILD_DAL_TEST)
-	struct test_driver_context *driver_context;
-#else
 	void *driver_context; /* e.g. amdgpu_device */
-#endif
 
 	struct dal_logger *logger;
 	void *cgs_device;

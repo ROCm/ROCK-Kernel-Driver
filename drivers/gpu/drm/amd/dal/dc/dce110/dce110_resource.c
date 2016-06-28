@@ -878,14 +878,14 @@ enum dc_status dce110_validate_with_context(
 
 	result = resource_map_pool_resources(dc, context);
 
+	if (result == DC_OK)
+		result = resource_map_clock_resources(dc, context);
+
 	if (!resource_validate_attach_surfaces(
 			set, set_count, dc->current_context, context)) {
 		DC_ERROR("Failed to attach surface to target!\n");
 		return DC_FAIL_ATTACH_SURFACES;
 	}
-
-	if (result == DC_OK)
-		result = resource_map_clock_resources(dc, context);
 
 	if (result == DC_OK)
 		result = validate_mapped_resource(dc, context);

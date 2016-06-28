@@ -192,7 +192,6 @@ static bool dce112_program_pix_clk(
 						pll_settings->use_external_clk;
 		bp_pc_params.flags.SET_XTALIN_REF_SRC =
 						!pll_settings->use_external_clk;
-		bp_pc_params.flags.SUPPORT_YUV_420 = 0;
 
 		if (pix_clk_params->flags.SUPPORT_YCBCR420) {
 			bp_pc_params.target_pixel_clock = pll_settings->actual_pix_clk / 2;
