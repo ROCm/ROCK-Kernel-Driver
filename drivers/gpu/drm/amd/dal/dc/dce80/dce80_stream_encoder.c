@@ -1053,6 +1053,13 @@ static void dce80_stream_encoder_dp_unblank(
 	dm_write_reg(ctx, addr, value);
 }
 
+static void dce80_send_null_packet(
+		struct stream_encoder *enc,
+		bool enable)
+{
+
+}
+
 static const struct stream_encoder_funcs dce80_str_enc_funcs = {
 	.dp_set_stream_attribute =
 		dce80_stream_encoder_dp_set_stream_attribute,
@@ -1074,6 +1081,8 @@ static const struct stream_encoder_funcs dce80_str_enc_funcs = {
 		dce80_stream_encoder_dp_blank,
 	.dp_unblank =
 		dce80_stream_encoder_dp_unblank,
+	.send_null_packet =
+		dce80_send_null_packet
 };
 
 bool dce80_stream_encoder_construct(

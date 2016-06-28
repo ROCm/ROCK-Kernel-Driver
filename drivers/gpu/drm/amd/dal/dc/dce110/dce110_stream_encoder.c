@@ -1071,6 +1071,40 @@ static void dce110_stream_encoder_dp_unblank(
 	dm_write_reg(ctx, addr, value);
 }
 
+static void send_null_packet(
+	struct stream_encoder *enc,
+	bool enable)
+{
+	struct dce110_stream_encoder *enc110 = DCE110STRENC_FROM_STRENC(enc);
+	struct dc_context *ctx = enc110->base.ctx;
+	uint32_t addr = LINK_REG(HDMI_CONTROL);
+	uint32_t value = dm_read_reg(ctx, addr);
+	if (enable) {
+		set_reg_field_value(
+				value,
+				0,
+				HDMI_CONTROL,
+				HDMI_NO_EXTRA_NULL_PACKET_FILLED);
+		set_reg_field_value(
+				value,
+				0,
+				HDMI_CONTROL,
+				HDMI_PACKET_GEN_VERSION);
+	} else {
+		set_reg_field_value(
+				value,
+				0,
+				HDMI_CONTROL,
+				HDMI_NO_EXTRA_NULL_PACKET_FILLED);
+		set_reg_field_value(
+				value,
+				1,
+				HDMI_CONTROL,
+				HDMI_PACKET_GEN_VERSION);
+	}
+	dm_write_reg(ctx, addr, value);
+}
+
 static const struct stream_encoder_funcs dce110_str_enc_funcs = {
 	.dp_set_stream_attribute =
 		dce110_stream_encoder_dp_set_stream_attribute,
@@ -1092,6 +1126,7 @@ static const struct stream_encoder_funcs dce110_str_enc_funcs = {
 		dce110_stream_encoder_dp_blank,
 	.dp_unblank =
 		dce110_stream_encoder_dp_unblank,
+	.send_null_packet = send_null_packet
 };
 
 bool dce110_stream_encoder_construct(

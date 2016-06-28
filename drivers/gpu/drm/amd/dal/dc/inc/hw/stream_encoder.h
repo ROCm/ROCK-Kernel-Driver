@@ -82,6 +82,9 @@ struct stream_encoder_funcs {
 	void (*dp_unblank)(
 		struct stream_encoder *enc,
 		const struct encoder_unblank_param *param);
+	void (*send_null_packet)(
+		struct stream_encoder *enc,
+		bool enable);
 };
 
 #endif /* STREAM_ENCODER_H_ */

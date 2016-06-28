@@ -201,7 +201,7 @@ static struct adapter_service *create_as(
 	return as;
 }
 
-static bool dc_stream_adjust_vmin_vmax(struct dc *dc,
+static bool stream_adjust_vmin_vmax(struct dc *dc,
 		const struct dc_stream **stream, int num_streams,
 		int vmin, int vmax)
 {
@@ -230,10 +230,28 @@ static bool dc_stream_adjust_vmin_vmax(struct dc *dc,
 	return ret;
 }
 
+static void stream_send_null_packet(const struct dc_stream *dc_stream, bool enable)
+{
+	struct core_stream *stream = DC_STREAM_TO_CORE(dc_stream);
+	struct core_dc *core_dc = DC_TO_CORE(stream->ctx->dc);
+
+	int i;
+
+	struct resource_context *res_ctx = &core_dc->current_context->res_ctx;
+
+	for (i = 0; i < res_ctx->pool->pipe_count; i++) {
+		if (res_ctx->pipe_ctx[i].stream != stream)
+			continue;
+
+		res_ctx->pipe_ctx[i].stream_enc->funcs->send_null_packet(res_ctx->pipe_ctx[i].stream_enc, enable);
+	}
+}
+
 static void allocate_dc_stream_funcs(struct core_dc *core_dc)
 {
 	if (core_dc->hwss.set_drr != NULL) {
-		core_dc->public.stream_funcs.dc_stream_adjust_vmin_vmax = dc_stream_adjust_vmin_vmax;
+		core_dc->public.stream_funcs.adjust_vmin_vmax = stream_adjust_vmin_vmax;
+		core_dc->public.stream_funcs.send_null_packet = stream_send_null_packet;
 	}
 }
 

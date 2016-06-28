@@ -69,7 +69,7 @@ struct core_freesync {
 
 static bool check_dc_support(const struct dc *dc)
 {
-	if (dc->stream_funcs.dc_stream_adjust_vmin_vmax == NULL)
+	if (dc->stream_funcs.adjust_vmin_vmax == NULL)
 		return false;
 
 	return true;
@@ -437,7 +437,7 @@ void mod_freesync_handle_v_update(struct mod_freesync *mod_freesync,
 		update_stream_freesync_context(core_freesync, streams[0]);
 
 		/* Program static screen ramp values */
-		core_freesync->dc->stream_funcs.dc_stream_adjust_vmin_vmax(
+		core_freesync->dc->stream_funcs.adjust_vmin_vmax(
 					core_freesync->dc, streams,
 					num_streams, v_total,
 					v_total);
@@ -482,7 +482,7 @@ static bool set_freesync_on_streams(struct core_freesync *core_freesync,
 						streams[stream_idx]);
 
 				core_freesync->dc->stream_funcs.
-				dc_stream_adjust_vmin_vmax(
+				adjust_vmin_vmax(
 						core_freesync->dc, streams,
 						num_streams, v_total_min,
 						v_total_max);
@@ -510,7 +510,7 @@ static bool set_freesync_on_streams(struct core_freesync *core_freesync,
 						streams[stream_idx]);
 
 					core_freesync->dc->stream_funcs.
-					dc_stream_adjust_vmin_vmax(
+					adjust_vmin_vmax(
 						core_freesync->dc, streams,
 						num_streams, v_total_nominal,
 						v_total_nominal);
@@ -530,7 +530,7 @@ static bool set_freesync_on_streams(struct core_freesync *core_freesync,
 					streams[stream_idx]);
 
 				core_freesync->dc->stream_funcs.
-						dc_stream_adjust_vmin_vmax(
+						adjust_vmin_vmax(
 						core_freesync->dc, streams,
 						num_streams, v_total_nominal,
 						v_total_nominal);

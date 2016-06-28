@@ -52,8 +52,9 @@ struct dc;
 struct dc_surface;
 
 struct dc_stream_funcs {
-	bool (*dc_stream_adjust_vmin_vmax)(struct dc *dc,
+	bool (*adjust_vmin_vmax)(struct dc *dc,
 			const struct dc_stream **stream, int num_streams, int vmin, int vmax);
+	void (*send_null_packet)(const struct dc_stream *dc_stream, bool enable);
 };
 
 /* Structure to hold configuration flags set by dm at dc creation. */
