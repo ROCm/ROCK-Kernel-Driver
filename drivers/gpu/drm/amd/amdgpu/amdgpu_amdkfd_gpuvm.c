@@ -874,7 +874,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 				entry);
 	}
 
-	unreserve_bo_and_vms(&ctx, true);
+	unreserve_bo_and_vms(&ctx, false);
 
 	/* Free the BO*/
 	amdgpu_bo_unref(&mem->data2.bo);
@@ -1210,7 +1210,7 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 	}
 
 unreserve_out:
-	unreserve_bo_and_vms(&ctx, true);
+	unreserve_bo_and_vms(&ctx, false);
 out:
 	mutex_unlock(&mem->data2.lock);
 	return ret;
