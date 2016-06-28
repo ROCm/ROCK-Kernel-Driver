@@ -1843,14 +1843,14 @@ static int polaris10_populate_clock_stretcher_data_table(struct pp_hwmgr *hwmgr)
 		data->smc_state_table.Sclk_CKS_masterEn0_7 |=
 				sclk_table->entries[i].cks_enable << i;
 		if (hwmgr->chip_id == CHIP_POLARIS10) {
-			volt_without_cks = (uint32_t)((2753594000 + (sclk_table->entries[i].clk/100) * 136418 -(ro - 70) * 1000000) / \
+			volt_without_cks = (uint32_t)((2753594000U + (sclk_table->entries[i].clk/100) * 136418 -(ro - 70) * 1000000) / \
 						(2424180 - (sclk_table->entries[i].clk/100) * 1132925/1000));
 			volt_with_cks = (uint32_t)((279720200 + sclk_table->entries[i].clk * 3232 - (ro - 65) * 100000000) / \
 					(252248000 - sclk_table->entries[i].clk/100 * 115764));
 		} else {
-			volt_without_cks = (uint32_t)((2416794800 + (sclk_table->entries[i].clk/100) * 1476925/10 -(ro - 50) * 1000000) / \
+			volt_without_cks = (uint32_t)((2416794800U + (sclk_table->entries[i].clk/100) * 1476925/10 -(ro - 50) * 1000000) / \
 						(2625416 - (sclk_table->entries[i].clk/100) * 12586807/10000));
-			volt_with_cks = (uint32_t)((2999656000 + sclk_table->entries[i].clk * 392803/100 - (ro - 44) * 1000000) / \
+			volt_with_cks = (uint32_t)((2999656000U + sclk_table->entries[i].clk * 392803/100 - (ro - 44) * 1000000) / \
 					(3422454 - sclk_table->entries[i].clk/100 * 18886376/10000));
 		}
 
