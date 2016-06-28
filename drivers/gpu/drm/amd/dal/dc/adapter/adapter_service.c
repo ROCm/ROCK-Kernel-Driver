@@ -820,8 +820,6 @@ static bool adapter_service_construct(
 		goto failed_to_create_hw_ctx;
 	}
 
-	/* Avoid wireless encoder creation in upstream branch. */
-
 	/* Integrated info is not provided on discrete ASIC. NULL is allowed */
 	as->integrated_info = dcb->funcs->create_integrated_info(dcb);
 

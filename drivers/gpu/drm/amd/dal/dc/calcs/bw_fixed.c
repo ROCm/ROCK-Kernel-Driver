@@ -93,8 +93,8 @@ struct bw_fixed bw_frc_to_fixed(int64_t numerator, int64_t denominator)
 
 	ASSERT(denominator != 0);
 
-	arg1_value = (uint64_t)abs_i64(numerator);
-	arg2_value = (uint64_t)abs_i64(denominator);
+	arg1_value = abs_i64(numerator);
+	arg2_value = abs_i64(denominator);
 	res_value = div64_u64_rem(arg1_value, arg2_value, &remainder);
 
 	ASSERT(res_value <= MAX_I32);
@@ -149,6 +149,7 @@ struct bw_fixed bw_floor2(
 {
 	struct bw_fixed result;
 	int64_t multiplicand;
+
 	multiplicand = div64_s64(arg.value, abs_i64(significance.value));
 	result.value = abs_i64(significance.value) * multiplicand;
 	ASSERT(abs_i64(result.value) <= abs_i64(arg.value));
