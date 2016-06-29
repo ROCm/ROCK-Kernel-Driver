@@ -209,6 +209,7 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.get_vm_fault_info = amdgpu_amdkfd_gpuvm_get_vm_fault_info,
 	.submit_ib = amdgpu_amdkfd_submit_ib,
 	.get_tile_config = amdgpu_amdkfd_get_tile_config,
+	.restore_process_bos = amdgpu_amdkfd_gpuvm_restore_process_bos
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions()

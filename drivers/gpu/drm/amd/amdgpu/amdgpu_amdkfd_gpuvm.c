@@ -1725,3 +1725,171 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 
 	return ret;
 }
+
+/** amdgpu_amdkfd_gpuvm_restore_process_bos - Restore all BOs for the given
+ *   KFD process identified by master_vm
+ *
+ * @master_vm: Master VM of the KFD process
+ *
+ * After memory eviction, restore thread calls this function. The function
+ * should be called when the Process is still valid. BO restore involves -
+ *
+ * 1.  Release old eviction fence and create new one
+ * 2.  Get PD BO list and PT BO list from all the VMs.
+ * 3.  Merge PD BO list into KFD BO list. Reserve all BOs.
+ * 4.  Split the list into PD BO list and KFD BO list
+ * 5.  Validate of PD and PT BOs and add new fence to the BOs
+ * 6.  Validate all KFD BOs and Map them and add new fence
+ * 7.  Merge PD BO list into KFD BO list. Unreserve all BOs
+ * 8.  Restore back KFD BO list by removing PD BO entries
+ */
+
+int amdgpu_amdkfd_gpuvm_restore_process_bos(void *m_vm)
+{
+	struct amdgpu_bo_list_entry *pd_bo_list, *last_pd_bo_entry, *entry;
+	struct amdkfd_vm *master_vm = (struct amdkfd_vm *)m_vm, *peer_vm;
+	struct kgd_mem *mem;
+	struct bo_vm_reservation_context ctx;
+	struct amdgpu_amdkfd_fence *old_fence;
+	int ret = 0, i;
+
+	if (WARN_ON(master_vm == NULL || master_vm->master != master_vm))
+		return -EINVAL;
+
+	INIT_LIST_HEAD(&ctx.list);
+	INIT_LIST_HEAD(&ctx.duplicates);
+
+	pd_bo_list = kcalloc(master_vm->n_vms,
+			     sizeof(struct amdgpu_bo_list_entry),
+			     GFP_KERNEL);
+	if (pd_bo_list == NULL)
+		return -ENOMEM;
+
+	/* Release old eviction fence and create new one. Use context and mm
+	 * from the old fence.
+	 */
+	old_fence = master_vm->eviction_fence;
+	master_vm->eviction_fence =
+		amdgpu_amdkfd_fence_create(old_fence->base.context,
+					   old_fence->mm);
+	fence_put(&old_fence->base);
+	if (master_vm->eviction_fence == NULL) {
+		pr_err("Failed to create eviction fence\n");
+		goto evict_fence_fail;
+	}
+
+	/* Get PD BO list and PT BO list from all the VMs */
+	amdgpu_vm_get_pd_bo(&master_vm->base, &ctx.list,
+			    &pd_bo_list[0]);
+	amdgpu_vm_get_pt_bos(master_vm->adev, &master_vm->base,
+			     &ctx.duplicates);
+
+	i = 1;
+	list_for_each_entry(peer_vm, &master_vm->kfd_vm_list, kfd_vm_list) {
+		amdgpu_vm_get_pd_bo(&peer_vm->base, &ctx.list,
+				    &pd_bo_list[i]);
+		amdgpu_vm_get_pt_bos(peer_vm->adev, &peer_vm->base,
+				     &ctx.duplicates);
+		i++;
+	}
+
+	/* Needed to splicing and cutting the lists */
+	last_pd_bo_entry = list_last_entry(&ctx.list,
+					   struct amdgpu_bo_list_entry,
+					   tv.head);
+
+	/* Reserve all BOs and page tables/directory. */
+	mutex_lock(&master_vm->lock);
+	list_splice_init(&ctx.list, &master_vm->kfd_bo_list);
+	ret = ttm_eu_reserve_buffers(&ctx.ticket, &master_vm->kfd_bo_list,
+				     false, &ctx.duplicates);
+	if (ret) {
+		pr_debug("Memory eviction: TTM Reserve Failed. Try again\n");
+		goto ttm_reserve_fail;
+	}
+
+	/* Restore kfd_bo_list. ctx.list contains only PDs */
+	list_cut_position(&ctx.list, &master_vm->kfd_bo_list,
+			  &last_pd_bo_entry->tv.head);
+
+	/* Validate PDs and PTs */
+	list_for_each_entry(entry, &ctx.list, tv.head) {
+		struct amdgpu_bo *bo = entry->robj;
+
+		amdgpu_ttm_placement_from_domain(bo, bo->prefered_domains);
+		ret = ttm_bo_validate(&bo->tbo, &bo->placement, false, false);
+		if (ret) {
+			pr_debug("Memory eviction: Validate failed. Try again\n");
+			goto validate_map_fail;
+		}
+	}
+	list_for_each_entry(entry, &ctx.duplicates, tv.head) {
+		struct amdgpu_bo *bo = entry->robj;
+
+		amdgpu_ttm_placement_from_domain(bo, bo->prefered_domains);
+		ret = ttm_bo_validate(&bo->tbo, &bo->placement, false, false);
+		if (ret) {
+			pr_debug("Memory eviction: Validate failed. Try again\n");
+			goto validate_map_fail;
+		}
+	}
+
+	/* Wait for PT/PD validate to finish and attach eviction fence.
+	 * PD/PT share the same reservation object
+	 */
+	list_for_each_entry(entry, &ctx.list, tv.head) {
+		struct amdgpu_bo *bo = entry->robj;
+
+		ttm_bo_wait(&bo->tbo, false, false);
+		amdgpu_bo_fence(bo, &master_vm->eviction_fence->base, true);
+	}
+
+
+	/* Validate BOs and map them to GPUVM (update VM page tables). */
+	list_for_each_entry(mem, &master_vm->kfd_bo_list,
+			    data2.bo_list_entry.tv.head) {
+
+		struct amdgpu_bo *bo = mem->data2.bo;
+		uint32_t domain = mem->data2.domain;
+		struct kfd_bo_va_list *bo_va_entry;
+
+		amdgpu_ttm_placement_from_domain(bo, domain);
+		ret = ttm_bo_validate(&bo->tbo, &bo->placement, false, false);
+		if (ret) {
+			pr_debug("Memory eviction: Validate failed. Try again\n");
+			goto validate_map_fail;
+		}
+		list_for_each_entry(bo_va_entry, &mem->data2.bo_va_list,
+				    bo_list) {
+			ret = map_bo_to_gpuvm((struct amdgpu_device *)
+					      bo_va_entry->kgd_dev,
+					      bo, bo_va_entry->bo_va,
+					      domain);
+			if (ret) {
+				pr_debug("Memory eviction: Map failed. Try again\n");
+				goto validate_map_fail;
+			}
+		}
+	}
+
+	/* Wait for validate to finish and attach new eviction fence */
+	list_for_each_entry(mem, &master_vm->kfd_bo_list,
+		data2.bo_list_entry.tv.head) {
+		struct amdgpu_bo *bo = mem->data2.bo;
+
+		ttm_bo_wait(&bo->tbo, false, false);
+		amdgpu_bo_fence(bo, &master_vm->eviction_fence->base, true);
+	}
+validate_map_fail:
+	/* Add PDs to kfd_bo_list for unreserve */
+	list_splice_init(&ctx.list, &master_vm->kfd_bo_list);
+	ttm_eu_backoff_reservation(&ctx.ticket, &master_vm->kfd_bo_list);
+ttm_reserve_fail:
+	/* Restore kfd_bo_list */
+	list_cut_position(&ctx.list, &master_vm->kfd_bo_list,
+			  &last_pd_bo_entry->tv.head);
+	mutex_unlock(&master_vm->lock);
+evict_fence_fail:
+	kfree(pd_bo_list);
+	return ret;
+}
