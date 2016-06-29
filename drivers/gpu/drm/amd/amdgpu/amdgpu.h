@@ -1277,8 +1277,7 @@ struct amdgpu_job {
 	uint32_t		oa_base, oa_size;
 
 	/* user fence handling */
-	struct amdgpu_bo	*uf_bo;
-	uint32_t		uf_offset;
+	uint64_t		uf_addr;
 	uint64_t		uf_sequence;
 
 };
