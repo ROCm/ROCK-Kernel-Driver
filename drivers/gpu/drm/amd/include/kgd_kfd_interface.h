@@ -217,6 +217,9 @@ struct tile_config {
  * @submit_ib: Submits an IB to the engine specified by inserting the IB to
  * the corresonded ring (ring type).
  *
+ * @restore_process_bos: Restore all BOs that belongs to the process identified
+ * by master_vm.
+ *
  * This structure contains function pointers to services that the kgd driver
  * provides to amdkfd driver.
  *
@@ -357,6 +360,8 @@ struct kfd2kgd_calls {
 			uint32_t *ib_cmd, uint32_t ib_len);
 	int (*get_tile_config)(struct kgd_dev *kgd,
 			struct tile_config *config);
+
+	int (*restore_process_bos)(void *master_vm);
 };
 
 /**
