@@ -822,6 +822,9 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 	sub_type_hdr = (struct crat_subtype_generic *)(crat_table+1);
 
 	for_each_online_node(numa_node_id) {
+		if (kfd_numa_node_to_apic_id(numa_node_id) == -1)
+			continue;
+
 		/* Fill in Subtype: Compute Unit */
 		ret = kfd_fill_cu_for_cpu(numa_node_id, &avail_size,
 			crat_table->num_domains,
