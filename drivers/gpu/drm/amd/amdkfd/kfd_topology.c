@@ -1194,12 +1194,14 @@ int kfd_topology_enum_kfd_devices(uint8_t idx, struct kfd_dev **kdev)
 static int kfd_cpumask_to_apic_id(const struct cpumask *cpumask)
 {
 	const struct cpuinfo_x86 *cpuinfo;
-	int first_cpu_of_nuna_node;
+	int first_cpu_of_numa_node;
 
 	if (cpumask == NULL || cpumask == cpu_none_mask)
 		return -1;
-	first_cpu_of_nuna_node = cpumask_first(cpumask);
-	cpuinfo = &cpu_data(first_cpu_of_nuna_node);
+	first_cpu_of_numa_node = cpumask_first(cpumask);
+	if (first_cpu_of_numa_node >= nr_cpu_ids)
+		return -1;
+	cpuinfo = &cpu_data(first_cpu_of_numa_node);
 
 	return cpuinfo->apicid;
 }
