@@ -2009,6 +2009,7 @@ int amdgpu_gpu_reset(struct amdgpu_device *adev)
 		if (!ring)
 			continue;
 		kthread_park(ring->sched.thread);
+		amd_sched_hw_job_reset(&ring->sched);
 	}
 	/* after all hw jobs are reset, hw fence is meaningless, so force_completion */
 	amdgpu_fence_driver_force_completion(adev);
@@ -2056,8 +2057,9 @@ retry:
 			struct amdgpu_ring *ring = adev->rings[i];
 			if (!ring)
 				continue;
+			amd_sched_job_recovery(&ring->sched);
 			kthread_unpark(ring->sched.thread);
-			amdgpu_ring_restore(ring, ring_sizes[i], ring_data[i]);
+			kfree(ring_data[i]);
 			ring_sizes[i] = 0;
 			ring_data[i] = NULL;
 		}
