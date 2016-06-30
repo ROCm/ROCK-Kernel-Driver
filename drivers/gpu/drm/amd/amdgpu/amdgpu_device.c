@@ -1999,6 +1999,9 @@ int amdgpu_gpu_reset(struct amdgpu_device *adev)
 
 	atomic_inc(&adev->gpu_reset_counter);
 
+	/* block TTM */
+	resched = ttm_bo_lock_delayed_workqueue(&adev->mman.bdev);
+
 	/* block scheduler */
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 		struct amdgpu_ring *ring = adev->rings[i];
@@ -2008,8 +2011,6 @@ int amdgpu_gpu_reset(struct amdgpu_device *adev)
 		kthread_park(ring->sched.thread);
 	}
 
-	/* block TTM */
-	resched = ttm_bo_lock_delayed_workqueue(&adev->mman.bdev);
 	/* store modesetting */
 	if (amdgpu_device_has_dal_support(adev))
 		state = drm_atomic_helper_suspend(adev->ddev);
