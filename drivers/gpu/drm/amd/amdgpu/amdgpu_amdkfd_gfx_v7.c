@@ -486,6 +486,7 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 	uint32_t sdma_base_addr;
 	uint32_t temp, timeout = 2000;
 	uint32_t data;
+	bool wptr_valid = false;
 
 	m = get_sdma_mqd(mqd);
 	sdma_base_addr = get_sdma_base_addr(m);
@@ -515,8 +516,26 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 	}
 
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL, m->sdma_rlc_doorbell);
-	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR, 0);
-	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_WPTR, 0);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR, m->sdma_rlc_rb_rptr);
+
+	if (mm && mm == current->mm)
+		wptr_valid = !get_user(data, wptr);
+	else if (mm) {
+		struct vm_area_struct *vma;
+
+		vma = find_vma(mm, (unsigned long)wptr);
+		if (vma && vma->vm_start <= (unsigned long)wptr &&
+		    vma->vm_ops && vma->vm_ops->access)
+			wptr_valid = (sizeof(data) == vma->vm_ops->access(
+					      vma, (unsigned long)wptr,
+					      &data, sizeof(data), 0));
+	}
+	if (wptr_valid)
+		WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_WPTR, data);
+	else
+		WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_WPTR,
+		       m->sdma_rlc_rb_rptr);
+
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_VIRTUAL_ADDR, m->sdma_rlc_virtual_addr);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_BASE, m->sdma_rlc_rb_base);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_BASE_HI, m->sdma_rlc_rb_base_hi);
@@ -722,6 +741,8 @@ static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL,
 		RREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL) |
 		SDMA0_RLC0_RB_CNTL__RB_ENABLE_MASK);
+
+	m->sdma_rlc_rb_rptr = RREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR);
 
 	return 0;
 }
