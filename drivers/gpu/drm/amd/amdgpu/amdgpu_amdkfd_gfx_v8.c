@@ -82,12 +82,12 @@ static int kgd_init_pipeline(struct kgd_dev *kgd, uint32_t pipe_id,
 		uint32_t hpd_size, uint64_t hpd_gpu_addr);
 static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id);
 static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
-		uint32_t queue_id, uint32_t __user *wptr,
-		uint32_t page_table_base);
+			uint32_t queue_id, uint32_t __user *wptr);
 static int kgd_hqd_dump(struct kgd_dev *kgd,
 			uint32_t pipe_id, uint32_t queue_id,
 			uint32_t (**dump)[2], uint32_t *n_regs);
-static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd);
+static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
+			     uint32_t __user *wptr, struct mm_struct *mm);
 static int kgd_hqd_sdma_dump(struct kgd_dev *kgd,
 			     uint32_t engine_id, uint32_t queue_id,
 			     uint32_t (**dump)[2], uint32_t *n_regs);
@@ -344,8 +344,7 @@ static inline struct vi_sdma_mqd *get_sdma_mqd(void *mqd)
 }
 
 static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
-		uint32_t queue_id, uint32_t __user *wptr,
-		uint32_t page_table_base)
+			uint32_t queue_id, uint32_t __user *wptr)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct vi_mqd *m;
@@ -466,7 +465,8 @@ static int kgd_hqd_dump(struct kgd_dev *kgd,
 	return 0;
 }
 
-static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd)
+static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
+			     uint32_t __user *wptr, struct mm_struct *mm)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct vi_sdma_mqd *m;
