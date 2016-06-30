@@ -324,6 +324,67 @@ static void dce110_timing_generator_v_program_blanking(
 		CRTC_V_BLANK_START);
 
 	dm_write_reg(ctx, addr, value);
+
+	addr = mmCRTCV_H_SYNC_A;
+	value = 0;
+	set_reg_field_value(
+		value,
+		timing->h_sync_width,
+		CRTCV_H_SYNC_A,
+		CRTC_H_SYNC_A_END);
+	dm_write_reg(ctx, addr, value);
+
+	addr = mmCRTCV_H_SYNC_A_CNTL;
+	value = dm_read_reg(ctx, addr);
+	if (timing->flags.HSYNC_POSITIVE_POLARITY) {
+		set_reg_field_value(
+			value,
+			0,
+			CRTCV_H_SYNC_A_CNTL,
+			CRTC_H_SYNC_A_POL);
+	} else {
+		set_reg_field_value(
+			value,
+			1,
+			CRTCV_H_SYNC_A_CNTL,
+			CRTC_H_SYNC_A_POL);
+	}
+	dm_write_reg(ctx, addr, value);
+
+	addr = mmCRTCV_V_SYNC_A;
+	value = 0;
+	set_reg_field_value(
+		value,
+		timing->v_sync_width,
+		CRTCV_V_SYNC_A,
+		CRTC_V_SYNC_A_END);
+	dm_write_reg(ctx, addr, value);
+
+	addr = mmCRTCV_V_SYNC_A_CNTL;
+	value = dm_read_reg(ctx, addr);
+	if (timing->flags.VSYNC_POSITIVE_POLARITY) {
+		set_reg_field_value(
+			value,
+			0,
+			CRTCV_V_SYNC_A_CNTL,
+			CRTC_V_SYNC_A_POL);
+	} else {
+		set_reg_field_value(
+			value,
+			1,
+			CRTCV_V_SYNC_A_CNTL,
+			CRTC_V_SYNC_A_POL);
+	}
+	dm_write_reg(ctx, addr, value);
+
+	addr = mmCRTCV_INTERLACE_CONTROL;
+	value = dm_read_reg(ctx, addr);
+	set_reg_field_value(
+		value,
+		timing->flags.INTERLACE,
+		CRTCV_INTERLACE_CONTROL,
+		CRTC_INTERLACE_ENABLE);
+	dm_write_reg(ctx, addr, value);
 }
 
 static void dce110_timing_generator_v_enable_advanced_request(

@@ -993,6 +993,39 @@ void dce110_allocate_mem_input_v(
 	uint32_t pix_clk_khz,/* for current stream */
 	uint32_t total_stream_num)
 {
+	uint32_t addr;
+	uint32_t value;
+	uint32_t pix_dur;
+	if (pix_clk_khz != 0) {
+		addr = mmDPGV0_PIPE_ARBITRATION_CONTROL1;
+		value = dm_read_reg(mi->ctx, addr);
+		pix_dur = 1000000000ULL / pix_clk_khz;
+		set_reg_field_value(
+			value,
+			pix_dur,
+			DPGV0_PIPE_ARBITRATION_CONTROL1,
+			PIXEL_DURATION);
+		dm_write_reg(mi->ctx, addr, value);
+
+		addr = mmDPGV1_PIPE_ARBITRATION_CONTROL1;
+		value = dm_read_reg(mi->ctx, addr);
+		pix_dur = 1000000000ULL / pix_clk_khz;
+		set_reg_field_value(
+			value,
+			pix_dur,
+			DPGV1_PIPE_ARBITRATION_CONTROL1,
+			PIXEL_DURATION);
+		dm_write_reg(mi->ctx, addr, value);
+
+		addr = mmDPGV0_PIPE_ARBITRATION_CONTROL2;
+		value = 0x4000800;
+		dm_write_reg(mi->ctx, addr, value);
+
+		addr = mmDPGV1_PIPE_ARBITRATION_CONTROL2;
+		value = 0x4000800;
+		dm_write_reg(mi->ctx, addr, value);
+	}
+
 }
 
 void dce110_free_mem_input_v(

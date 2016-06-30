@@ -1448,19 +1448,10 @@ static void set_plane_config(
 	struct resource_context *res_ctx)
 {
 	int i;
-	const struct dc_crtc_timing *crtc_timing =
-				&pipe_ctx->stream->public.timing;
 	struct mem_input *mi = pipe_ctx->mi;
-	struct timing_generator *tg = pipe_ctx->tg;
 	struct dc_context *ctx = pipe_ctx->stream->ctx;
 	struct core_surface *surface = pipe_ctx->surface;
 	enum blender_mode blender_mode = BLENDER_MODE_CURRENT_PIPE;
-
-	tg->funcs->program_timing(tg, crtc_timing, false);
-	tg->funcs->enable_advanced_request(
-			tg,
-			true,
-			&pipe_ctx->stream->public.timing);
 
 	dc->hwss.enable_fe_clock(ctx, pipe_ctx->pipe_idx, true);
 
@@ -1726,14 +1717,21 @@ static void dce110_power_on_pipe_if_needed(
 				dc->ctx,
 				pipe_ctx->pipe_idx,
 				dcb, PIPE_GATING_CONTROL_DISABLE);
-		if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
-			dm_error("DC: failed to blank crtc!\n");
-			BREAK_TO_DEBUGGER();
-		}
 
-		if (!pipe_ctx->tg->funcs->enable_crtc(pipe_ctx->tg)) {
-			BREAK_TO_DEBUGGER();
-		}
+		pipe_ctx->tg->funcs->program_timing(pipe_ctx->tg,
+				&pipe_ctx->stream->public.timing,
+				false);
+
+		pipe_ctx->tg->funcs->enable_advanced_request(
+				pipe_ctx->tg,
+				true,
+				&pipe_ctx->stream->public.timing);
+
+		pipe_ctx->mi->funcs->allocate_mem_input(pipe_ctx->mi,
+				pipe_ctx->stream->public.timing.h_total,
+				pipe_ctx->stream->public.timing.v_total,
+				pipe_ctx->stream->public.timing.pix_clk_khz,
+				context->target_count);
 
 		pipe_ctx->tg->funcs->set_blank_color(
 				pipe_ctx->tg,
