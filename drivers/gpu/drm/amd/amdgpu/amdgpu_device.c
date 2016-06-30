@@ -2053,6 +2053,16 @@ retry:
 	/* restore scratch */
 	amdgpu_atombios_scratch_regs_restore(adev);
 	if (!r) {
+		r = amdgpu_ib_ring_tests(adev);
+		if (r) {
+			dev_err(adev->dev, "ib ring test failed (%d).\n", r);
+			if (saved) {
+				saved = false;
+				r = amdgpu_suspend(adev);
+				goto retry;
+			}
+		}
+
 		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 			struct amdgpu_ring *ring = adev->rings[i];
 			if (!ring)
@@ -2062,16 +2072,6 @@ retry:
 			kfree(ring_data[i]);
 			ring_sizes[i] = 0;
 			ring_data[i] = NULL;
-		}
-
-		r = amdgpu_ib_ring_tests(adev);
-		if (r) {
-			dev_err(adev->dev, "ib ring test failed (%d).\n", r);
-			if (saved) {
-				saved = false;
-				r = amdgpu_suspend(adev);
-				goto retry;
-			}
 		}
 	} else {
 		dev_err(adev->dev, "asic resume failed (%d).\n", r);
