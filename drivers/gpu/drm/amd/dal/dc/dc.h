@@ -56,6 +56,8 @@ struct dc_stream_funcs {
 	bool (*adjust_vmin_vmax)(struct dc *dc,
 			const struct dc_stream **stream, int num_streams, int vmin, int vmax);
 	void (*send_null_packet)(const struct dc_stream *dc_stream, bool enable);
+	bool (*adjust_color_temperature)(struct dc *dc,
+			const struct dc_stream **stream, int num_streams);
 };
 
 /* Structure to hold configuration flags set by dm at dc creation. */
@@ -352,6 +354,7 @@ struct dc_stream {
 
 	/* TODO: dithering */
 	/* TODO: transfer function (CSC/regamma/gamut remap) */
+	struct colorspace_transform csc_matrix;
 	/* TODO: custom INFO packets */
 	/* TODO: ABM info (DMCU) */
 	/* TODO: PSR info */

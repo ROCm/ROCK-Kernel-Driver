@@ -527,4 +527,9 @@ struct freesync_context {
 	unsigned int nominal_refresh_in_micro_hz;
 };
 
+struct colorspace_transform {
+	struct fixed31_32 matrix[12];
+	bool bypass;
+};
+
 #endif /* DC_TYPES_H_ */

@@ -115,8 +115,7 @@ enum graphics_gamut_adjust_type {
 #define CSC_TEMPERATURE_MATRIX_SIZE 9
 
 struct xfm_grph_csc_adjustment {
-	int32_t temperature_matrix[CSC_TEMPERATURE_MATRIX_SIZE];
-	int32_t temperature_divider;
+	struct fixed31_32 temperature_matrix[CSC_TEMPERATURE_MATRIX_SIZE];
 	enum graphics_gamut_adjust_type gamut_adjust_type;
 };
 

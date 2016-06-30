@@ -1495,10 +1495,35 @@ static void set_plane_config(
 	struct dc_context *ctx = pipe_ctx->stream->ctx;
 	struct core_surface *surface = pipe_ctx->surface;
 	enum blender_mode blender_mode = BLENDER_MODE_CURRENT_PIPE;
+	struct xfm_grph_csc_adjustment adjust;
 
 	dc->hwss.enable_fe_clock(ctx, pipe_ctx->pipe_idx, true);
 
 	set_default_colors(pipe_ctx);
+
+	if (pipe_ctx->stream->public.csc_matrix.bypass == false) {
+		adjust.gamut_adjust_type = GRAPHICS_GAMUT_ADJUST_TYPE_SW;
+		adjust.temperature_matrix[0] =
+				pipe_ctx->stream->public.csc_matrix.matrix[0];
+		adjust.temperature_matrix[1] =
+				pipe_ctx->stream->public.csc_matrix.matrix[1];
+		adjust.temperature_matrix[2] =
+				pipe_ctx->stream->public.csc_matrix.matrix[2];
+		adjust.temperature_matrix[3] =
+				pipe_ctx->stream->public.csc_matrix.matrix[4];
+		adjust.temperature_matrix[4] =
+				pipe_ctx->stream->public.csc_matrix.matrix[5];
+		adjust.temperature_matrix[5] =
+				pipe_ctx->stream->public.csc_matrix.matrix[6];
+		adjust.temperature_matrix[6] =
+				pipe_ctx->stream->public.csc_matrix.matrix[8];
+		adjust.temperature_matrix[7] =
+				pipe_ctx->stream->public.csc_matrix.matrix[9];
+		adjust.temperature_matrix[8] =
+				pipe_ctx->stream->public.csc_matrix.matrix[10];
+	}
+
+	pipe_ctx->xfm->funcs->transform_set_gamut_remap(pipe_ctx->xfm, &adjust);
 
 	program_scaler(dc, pipe_ctx);
 

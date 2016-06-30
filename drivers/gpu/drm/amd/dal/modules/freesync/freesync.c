@@ -443,6 +443,7 @@ void mod_freesync_handle_v_update(struct mod_freesync *mod_freesync,
 					v_total);
 	}
 }
+
 /*
  * Sets freesync mode on a stream depending on current freesync state.
  */

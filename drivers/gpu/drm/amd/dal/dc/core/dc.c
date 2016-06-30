@@ -230,7 +230,31 @@ static bool stream_adjust_vmin_vmax(struct dc *dc,
 	return ret;
 }
 
-static void stream_send_null_packet(const struct dc_stream *dc_stream, bool enable)
+static bool adjust_color_temperature(struct dc *dc,
+			const struct dc_stream **stream, int num_streams)
+{
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	struct core_stream *core_stream = DC_STREAM_TO_CORE(stream[0]);
+	int i = 0;
+	bool ret = false;
+	struct pipe_ctx *pipes;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		if (core_dc->current_context->res_ctx.pipe_ctx[i].stream
+				== core_stream) {
+
+			pipes = &core_dc->current_context->res_ctx.pipe_ctx[i];
+			core_dc->hwss.set_plane_config(core_dc, pipes,
+					&core_dc->current_context->res_ctx);
+			ret = true;
+		}
+	}
+
+	return ret;
+}
+
+static void stream_send_null_packet(const struct dc_stream *dc_stream,
+		bool enable)
 {
 	struct core_stream *stream = DC_STREAM_TO_CORE(dc_stream);
 	struct core_dc *core_dc = DC_TO_CORE(stream->ctx->dc);
@@ -243,19 +267,25 @@ static void stream_send_null_packet(const struct dc_stream *dc_stream, bool enab
 		if (res_ctx->pipe_ctx[i].stream != stream)
 			continue;
 
-		res_ctx->pipe_ctx[i].stream_enc->funcs->send_null_packet(res_ctx->pipe_ctx[i].stream_enc, enable);
+		res_ctx->pipe_ctx[i].stream_enc->funcs->
+		send_null_packet(res_ctx->pipe_ctx[i].stream_enc, enable);
 	}
 }
 
 static void allocate_dc_stream_funcs(struct core_dc *core_dc)
 {
 	if (core_dc->hwss.set_drr != NULL) {
-		core_dc->public.stream_funcs.adjust_vmin_vmax = stream_adjust_vmin_vmax;
-		core_dc->public.stream_funcs.send_null_packet = stream_send_null_packet;
+		core_dc->public.stream_funcs.adjust_vmin_vmax =
+				stream_adjust_vmin_vmax;
+		core_dc->public.stream_funcs.send_null_packet =
+				stream_send_null_packet;
 	}
+	core_dc->public.stream_funcs.adjust_color_temperature =
+			adjust_color_temperature;
 }
 
-static bool construct(struct core_dc *dc, const struct dc_init_data *init_params)
+static bool construct(struct core_dc *dc,
+		const struct dc_init_data *init_params)
 {
 	struct dal_logger *logger;
 	struct adapter_service *as;
