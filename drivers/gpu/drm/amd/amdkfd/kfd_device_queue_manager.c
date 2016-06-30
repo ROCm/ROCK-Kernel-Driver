@@ -369,18 +369,20 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 
 	BUG_ON(!dqm || !q || !q->mqd);
 
+	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
+		down_read(&q->process->mm->mmap_sem);
 	mutex_lock(&dqm->lock);
 
 	pdd = kfd_get_process_device_data(q->device, q->process);
 	if (!pdd) {
-		mutex_unlock(&dqm->lock);
-		return -ENODEV;
+		retval = -ENODEV;
+		goto out_unlock;
 	}
 	mqd = dqm->ops.get_mqd_manager(dqm,
 			get_mqd_type_from_queue_type(q->properties.type));
 	if (mqd == NULL) {
-		mutex_unlock(&dqm->lock);
-		return -ENOMEM;
+		retval = -ENOMEM;
+		goto out_unlock;
 	}
 	/*
 	 * Eviction state logic: we only mark active queues as evicted
@@ -398,8 +400,8 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 
 	retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
 	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
-		q->properties.type == KFD_QUEUE_TYPE_COMPUTE) {
-		/* FIXME: Handle SDMA queues as well */
+	    (q->properties.type == KFD_QUEUE_TYPE_COMPUTE ||
+	     q->properties.type == KFD_QUEUE_TYPE_SDMA)) {
 		if (q->properties.is_active)
 			retval = mqd->load_mqd(mqd, q->mqd, q->pipe,
 				q->queue,
@@ -422,7 +424,11 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
 		retval = execute_queues_cpsch(dqm, false);
 
+out_unlock:
 	mutex_unlock(&dqm->lock);
+	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
+		up_read(&q->process->mm->mmap_sem);
+
 	return retval;
 }
 
@@ -474,8 +480,9 @@ int process_evict_queues(struct device_queue_manager *dqm,
 
 		retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
 		if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
-				q->properties.type == KFD_QUEUE_TYPE_COMPUTE &&
-				q->properties.is_evicted)
+		    (q->properties.type == KFD_QUEUE_TYPE_COMPUTE ||
+		     q->properties.type == KFD_QUEUE_TYPE_SDMA) &&
+		    q->properties.is_evicted)
 			retval = mqd->destroy_mqd(mqd, q->mqd,
 				KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN,
 				KFD_UNMAP_LATENCY_MS, q->pipe, q->queue);
@@ -495,21 +502,21 @@ int process_restore_queues(struct device_queue_manager *dqm,
 {
 	struct queue *q, *next;
 	struct mqd_manager *mqd;
+	struct kfd_process_device *pdd =
+		container_of(qpd, struct kfd_process_device, qpd);
 	int retval = 0;
-
 
 	BUG_ON(!dqm || !qpd);
 
+	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
+		down_read(&pdd->process->mm->mmap_sem);
 	mutex_lock(&dqm->lock);
-	if (qpd->evicted == 0) { /* already restored, do nothing */
-		mutex_unlock(&dqm->lock);
-		return 0;
-	}
+	if (qpd->evicted == 0) /* already restored, do nothing */
+		goto out_unlock;
 
 	if (qpd->evicted > 1) { /* ref count still > 0, decrement & quit */
 		qpd->evicted--;
-		mutex_unlock(&dqm->lock);
-		return 0;
+		goto out_unlock;
 	}
 
 	/* activate all active queues on the qpd */
@@ -524,15 +531,13 @@ int process_restore_queues(struct device_queue_manager *dqm,
 			q->properties.is_evicted = false;
 			retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
 			if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
-				q->properties.type == KFD_QUEUE_TYPE_COMPUTE)
-				retval =
-						mqd->load_mqd(
-								mqd,
-								q->mqd,
-								q->pipe,
-								q->queue,
-				(uint32_t __user *)q->properties.write_ptr,
-								q->process->mm);
+			    (q->properties.type == KFD_QUEUE_TYPE_COMPUTE ||
+			     q->properties.type == KFD_QUEUE_TYPE_SDMA))
+				retval = mqd->load_mqd(
+					mqd, q->mqd, q->pipe, q->queue,
+					(uint32_t __user *)
+					q->properties.write_ptr,
+					q->process->mm);
 			dqm->queue_count++;
 		}
 	}
@@ -541,9 +546,13 @@ int process_restore_queues(struct device_queue_manager *dqm,
 
 	if (retval == 0)
 		qpd->evicted = 0;
-	mutex_unlock(&dqm->lock);
-	return retval;
 
+out_unlock:
+	mutex_unlock(&dqm->lock);
+	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
+		up_read(&pdd->process->mm->mmap_sem);
+
+	return retval;
 }
 
 static int register_process_nocpsch(struct device_queue_manager *dqm,
