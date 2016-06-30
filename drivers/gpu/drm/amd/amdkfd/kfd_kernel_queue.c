@@ -143,7 +143,7 @@ static bool initialize(struct kernel_queue *kq, struct kfd_dev *dev,
 		kq->queue->pipe = KFD_CIK_HIQ_PIPE;
 		kq->queue->queue = KFD_CIK_HIQ_QUEUE;
 		kq->mqd->load_mqd(kq->mqd, kq->queue->mqd, kq->queue->pipe,
-					kq->queue->queue, NULL, 0);
+					kq->queue->queue, NULL, NULL);
 	} else {
 		/* allocate fence for DIQ */
 

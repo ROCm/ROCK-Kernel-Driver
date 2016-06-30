@@ -171,10 +171,10 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 
 static int load_mqd(struct mqd_manager *mm, void *mqd,
 			uint32_t pipe_id, uint32_t queue_id,
-			uint32_t __user *wptr, uint32_t page_table_base)
+			uint32_t __user *wptr, struct mm_struct *mms)
 {
 	return mm->dev->kfd2kgd->hqd_load
-		(mm->dev->kgd, mqd, pipe_id, queue_id, wptr, page_table_base);
+		(mm->dev->kgd, mqd, pipe_id, queue_id, wptr);
 }
 
 static int __update_mqd(struct mqd_manager *mm, void *mqd,
@@ -362,9 +362,9 @@ static void uninit_mqd_sdma(struct mqd_manager *mm, void *mqd,
 
 static int load_mqd_sdma(struct mqd_manager *mm, void *mqd,
 		uint32_t pipe_id, uint32_t queue_id,
-		uint32_t __user *wptr, uint32_t page_table_base)
+		uint32_t __user *wptr, struct mm_struct *mms)
 {
-	return mm->dev->kfd2kgd->hqd_sdma_load(mm->dev->kgd, mqd);
+	return mm->dev->kfd2kgd->hqd_sdma_load(mm->dev->kgd, mqd, wptr, mms);
 }
 
 static int update_mqd_sdma(struct mqd_manager *mm, void *mqd,
