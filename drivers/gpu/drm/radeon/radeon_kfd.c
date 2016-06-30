@@ -112,9 +112,9 @@ static int kgd_init_pipeline(struct kgd_dev *kgd, uint32_t pipe_id,
 				uint32_t hpd_size, uint64_t hpd_gpu_addr);
 static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id);
 static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
-		uint32_t queue_id, uint32_t __user *wptr,
-		uint32_t page_table_base);
-static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd);
+			uint32_t queue_id, uint32_t __user *wptr);
+static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
+			     uint32_t __user *wptr, struct mm_struct *mm);
 static bool kgd_hqd_is_occupied(struct kgd_dev *kgd, uint64_t queue_address,
 				uint32_t pipe_id, uint32_t queue_id);
 
@@ -700,8 +700,7 @@ static inline struct cik_sdma_rlc_registers *get_sdma_mqd(void *mqd)
 }
 
 static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
-		uint32_t queue_id, uint32_t __user *wptr,
-		uint32_t page_table_base)
+			uint32_t queue_id, uint32_t __user *wptr)
 {
 	uint32_t wptr_shadow, is_wptr_shadow_valid;
 	struct cik_mqd *m;
@@ -787,7 +786,8 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 	return 0;
 }
 
-static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd)
+static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
+			     uint32_t __user *wptr, struct mm_struct *mm)
 {
 	struct cik_sdma_rlc_registers *m;
 	uint32_t sdma_base_addr;
