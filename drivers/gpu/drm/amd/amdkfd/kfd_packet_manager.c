@@ -55,7 +55,7 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 				unsigned int *rlib_size,
 				bool *over_subscription)
 {
-	unsigned int process_count, queue_count;
+	unsigned int process_count, queue_count, compute_queue_count;
 	unsigned int map_queue_size;
 	unsigned int max_proc_per_quantum = 1;
 
@@ -65,6 +65,7 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 
 	process_count = pm->dqm->processes_count;
 	queue_count = pm->dqm->queue_count;
+	compute_queue_count = queue_count - pm->dqm->sdma_queue_count;
 
 	/* check if there is over subscription
 	 * Note: the arbitration between the number of VMIDs and
@@ -78,7 +79,8 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 		max_proc_per_quantum = dev->max_proc_per_quantum;
 
 	if ((process_count > max_proc_per_quantum) ||
-		queue_count > PIPE_PER_ME_CP_SCHEDULING * QUEUES_PER_PIPE) {
+		compute_queue_count >
+			PIPE_PER_ME_CP_SCHEDULING * QUEUES_PER_PIPE) {
 		*over_subscription = true;
 		pr_debug("kfd: over subscribed runlist\n");
 	}
