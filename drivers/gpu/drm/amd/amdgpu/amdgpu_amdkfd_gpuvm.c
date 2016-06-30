@@ -29,6 +29,7 @@
 #include <linux/list.h>
 #include <drm/drmP.h>
 #include <linux/dma-buf.h>
+#include <linux/pagemap.h>
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_ucode.h"
 #include "gca/gfx_8_0_sh_mask.h"
