@@ -68,8 +68,8 @@ enum ovl_color_space {
 };
 
 enum expansion_mode {
-	EXPANSION_MODE_ZERO,
-	EXPANSION_MODE_DYNAMIC
+	EXPANSION_MODE_DYNAMIC,
+	EXPANSION_MODE_ZERO
 };
 
 enum ipp_output_format {
@@ -97,6 +97,7 @@ struct ipp_funcs {
 
 	/* setup ipp to expand/convert input to pixel processor internal format */
 	void (*ipp_setup)(
+		struct input_pixel_processor *ipp,
 		enum surface_pixel_format input_format,
 		enum expansion_mode mode,
 		enum ipp_output_format output_format);
