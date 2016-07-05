@@ -922,6 +922,11 @@ bool dc_commit_surfaces_to_target(
 
 			resource_build_scaling_params(
 				new_surfaces[i], &context->res_ctx.pipe_ctx[j]);
+
+			if (dc->debug.surface_visual_confirm) {
+				context->res_ctx.pipe_ctx[j].scl_data.recout.height -= 2;
+				context->res_ctx.pipe_ctx[j].scl_data.recout.width -= 2;
+			}
 		}
 
 	if (core_dc->res_pool->funcs->validate_bandwidth(core_dc, context) != DC_OK) {

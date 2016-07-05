@@ -62,10 +62,15 @@ struct dc_config {
 	bool gpu_vm_support;
 };
 
+struct dc_debug {
+	bool surface_visual_confirm;
+};
+
 struct dc {
 	struct dc_caps caps;
 	struct dc_stream_funcs stream_funcs;
 	struct dc_config config;
+	struct dc_debug debug;
 };
 
 struct dc_init_data {

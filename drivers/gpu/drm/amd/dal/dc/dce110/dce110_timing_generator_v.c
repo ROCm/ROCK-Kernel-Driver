@@ -6,6 +6,7 @@
 
 #include "dc_types.h"
 #include "dc_bios_types.h"
+#include "dc.h"
 
 #include "include/grph_object_id.h"
 #include "include/adapter_service_interface.h"
@@ -559,6 +560,13 @@ static void dce110_timing_generator_v_set_overscan_color_black(
 
 	default:
 		/* default is sRGB black 0. */
+		if (tg->ctx->dc->debug.surface_visual_confirm) {
+			set_reg_field_value(
+				value,
+				0x3ff,
+				CRTCV_OVERSCAN_COLOR,
+				CRTC_OVERSCAN_COLOR_GREEN);
+		}
 		break;
 	}
 	addr = mmCRTCV_OVERSCAN_COLOR;
