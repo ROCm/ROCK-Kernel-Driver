@@ -478,7 +478,7 @@ static u32 dce_v8_0_hpd_get_gpio_reg(struct amdgpu_device *adev)
 	return mmDC_GPIO_HPD_A;
 }
 
-static bool dce_v8_0_is_display_hung(struct amdgpu_device *adev)
+bool dce_v8_0_is_display_hung(struct amdgpu_device *adev)
 {
 	u32 crtc_hung = 0;
 	u32 crtc_status[6];

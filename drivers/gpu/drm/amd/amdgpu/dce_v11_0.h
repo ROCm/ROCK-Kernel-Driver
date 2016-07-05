@@ -32,5 +32,5 @@ void dce_v11_0_stop_mc_access(struct amdgpu_device *adev,
 			      struct amdgpu_mode_mc_save *save);
 void dce_v11_0_resume_mc_access(struct amdgpu_device *adev,
 				struct amdgpu_mode_mc_save *save);
-
+bool dce_v11_0_is_display_hung(struct amdgpu_device *adev);
 #endif
