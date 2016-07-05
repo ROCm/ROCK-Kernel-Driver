@@ -1796,6 +1796,11 @@ static void dce110_power_on_pipe_if_needed(
 				pipe_ctx->pipe_idx,
 				dcb, PIPE_GATING_CONTROL_DISABLE);
 
+		/*
+		 * This is for powering on underlay, so crtc does not
+		 * need to be enabled
+		 */
+
 		pipe_ctx->tg->funcs->program_timing(pipe_ctx->tg,
 				&pipe_ctx->stream->public.timing,
 				false);
