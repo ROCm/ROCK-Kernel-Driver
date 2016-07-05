@@ -526,7 +526,7 @@ static void unreserve_bo_and_vms(struct bo_vm_reservation_context *ctx,
 		int ret;
 
 		list_for_each_entry(entry, &ctx->list, head) {
-			ret = ttm_bo_wait(entry->bo, false, false, false);
+			ret = ttm_bo_wait(entry->bo, false, false);
 			if (ret != 0)
 				pr_err("amdkfd: Failed to wait for PT/PD update (err == %d)\n",
 				       ret);
