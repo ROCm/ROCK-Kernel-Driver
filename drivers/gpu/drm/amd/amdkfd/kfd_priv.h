@@ -541,6 +541,15 @@ struct qcm_process_device {
 	void *ib_kaddr;
 };
 
+/* KFD Memory Eviction */
+/* Appox. wait time before attempting to restore evicted BOs */
+#define PROCESS_RESTORE_TIME_MS 2000
+/* Approx. back off time if restore fails due to lack of memory */
+#define PROCESS_BACK_OFF_TIME_MS 1000
+
+void kfd_restore_bo_worker(struct work_struct *work);
+
+
 /*8 byte handle containing GPU ID in the most significant 4 bytes and
  * idr_handle in the least significant 4 bytes*/
 #define MAKE_HANDLE(gpu_id, idr_handle) (((uint64_t)(gpu_id) << 32) + idr_handle)
@@ -671,6 +680,9 @@ struct kfd_process {
 	struct rb_root bo_interval_tree;
 
 	void *master_vm;
+
+	/* For restoring BOs after eviction */
+	struct delayed_work restore_work;
 };
 
 /**
