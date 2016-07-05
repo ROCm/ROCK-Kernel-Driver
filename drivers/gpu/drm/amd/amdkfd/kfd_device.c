@@ -745,6 +745,88 @@ int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 	return r;
 }
 
+/* resume_process_mm -
+ *  Resume all user queues that belongs to given process p. The caller must
+ *  ensure that process p context is valid.
+ */
+static int resume_process_mm(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+	struct mm_struct *mm = (struct mm_struct *)p->mm;
+	int r, ret = 0;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		if (pdd->dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
+			down_read(&mm->mmap_sem);
+
+		r = process_restore_queues(pdd->dev->dqm, &pdd->qpd);
+		if (r != 0) {
+			pr_err("Failed to restore process queues\n");
+			if (ret == 0)
+				ret = r;
+		}
+
+		if (pdd->dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
+			up_read(&mm->mmap_sem);
+	}
+
+	return ret;
+}
+
+/** kfd_schedule_restore_bos_and_queues - Schedules work queue that will
+ *   restore all BOs that belong to given process and then restore its queues
+ *
+ * @mm: mm_struct that identifies the KFD process
+ *
+ */
+static int kfd_schedule_restore_bos_and_queues(struct kfd_process *p)
+{
+	if (delayed_work_pending(&p->restore_work)) {
+		WARN(1, "Trying to evict an unrestored process\n");
+		cancel_delayed_work_sync(&p->restore_work);
+	}
+
+	/* During process initialization restore_work is initialized
+	 * to kfd_restore_bo_worker
+	 */
+	schedule_delayed_work(&p->restore_work, PROCESS_RESTORE_TIME_MS);
+	return 0;
+}
+
+void kfd_restore_bo_worker(struct work_struct *work)
+{
+	struct delayed_work *dwork;
+	struct kfd_process *p;
+	struct kfd_process_device *pdd;
+	int ret = 0;
+
+	dwork = to_delayed_work(work);
+
+	/* Process termination destroys this worker thread. So during the
+	 * lifetime of this thread, kfd_process p will be valid
+	 */
+	p = container_of(dwork, struct kfd_process, restore_work);
+
+	/* Call restore_process_bos on the first KGD device. This function
+	 * takes care of restoring the whole process including other devices.
+	 * Restore can fail if enough memory is not available. If so,
+	 * reschedule again.
+	 */
+	pdd = list_first_entry(&p->per_device_data,
+			       struct kfd_process_device,
+			       per_device_list);
+
+	ret = pdd->dev->kfd2kgd->restore_process_bos(p->master_vm);
+	if (ret) {
+		kfd_schedule_restore_bos_and_queues(p);
+		return;
+	}
+
+	ret = resume_process_mm(p);
+	if (ret)
+		pr_err("Failed to resume user queues\n");
+}
+
 static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,
 				unsigned int chunk_size)
 {
