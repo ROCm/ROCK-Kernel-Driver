@@ -509,6 +509,8 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	p = container_of(mn, struct kfd_process, mmu_notifier);
 	BUG_ON(p->mm != mm);
 
+	cancel_delayed_work_sync(&p->restore_work);
+
 	mutex_lock(&kfd_processes_mutex);
 	hash_del_rcu(&p->kfd_processes);
 	mutex_unlock(&kfd_processes_mutex);
@@ -676,6 +678,7 @@ static struct kfd_process *create_process(const struct task_struct *thread,
 	if (err)
 		goto err_init_cwsr;
 
+	INIT_DELAYED_WORK(&process->restore_work, kfd_restore_bo_worker);
 	return process;
 
 err_init_cwsr:
