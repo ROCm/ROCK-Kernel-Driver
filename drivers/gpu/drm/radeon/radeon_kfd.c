@@ -1278,7 +1278,7 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 
 	list_for_each_entry(lobj, &list, tv.head) {
 		struct radeon_bo *bo = lobj->robj;
-		ret = ttm_bo_wait(&bo->tbo, true, false, false);
+		ret = ttm_bo_wait(&bo->tbo, false, false);
 		if (ret != 0) {
 			pr_err("amdkfd: Failed to wait for PT/PD update (err == %d)\n",
 					ret);
