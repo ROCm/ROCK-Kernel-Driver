@@ -210,7 +210,7 @@ static void set_spatial_dither(
 	set_reg_field_value(depth_cntl_value,
 		params->flags.FRAME_RANDOM,
 		FMT_BIT_DEPTH_CONTROL,
-		FMT_RGB_RANDOM_ENABLE);
+		FMT_FRAME_RANDOM_ENABLE);
 
 	/*Set RGB data dithered with x^28+x^3+1*/
 	set_reg_field_value(depth_cntl_value,
