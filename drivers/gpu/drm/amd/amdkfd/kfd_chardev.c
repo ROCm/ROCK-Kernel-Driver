@@ -596,6 +596,7 @@ kfd_ioctl_dbg_address_watch(struct file *filep,
 	struct dbg_address_watch_info aw_info;
 	unsigned char *args_buff = NULL;
 	unsigned int args_idx = 0;
+	void __user *cmd_from_user;
 	uint64_t watch_mask_value = 0;
 
 	memset((void *) &aw_info, 0, sizeof(struct dbg_address_watch_info));
@@ -609,6 +610,8 @@ kfd_ioctl_dbg_address_watch(struct file *filep,
 			break;
 		}
 
+		cmd_from_user = (void __user *) args->content_ptr;
+
 		if (args->buf_size_in_bytes > MAX_ALLOWED_AW_BUFF_SIZE) {
 			status = -EINVAL;
 			break;
@@ -621,14 +624,6 @@ kfd_ioctl_dbg_address_watch(struct file *filep,
 
 		/* this is the actual buffer to work with */
 
-		args_buff = kzalloc(args->buf_size_in_bytes -
-						sizeof(*args), GFP_KERNEL);
-		if (args_buff == NULL) {
-			status = -ENOMEM;
-			break;
-		}
-
-		/* this is the actual buffer to work with */
 		args_buff = memdup_user(cmd_from_user,
 					args->buf_size_in_bytes - sizeof(*args));
 		if (IS_ERR(args_buff))
@@ -711,6 +706,7 @@ kfd_ioctl_dbg_wave_control(struct file *filep, struct kfd_process *p, void *data
 	struct dbg_wave_control_info wac_info;
 	unsigned char *args_buff = NULL;
 	unsigned int args_idx = 0;
+	void __user *cmd_from_user;
 	uint32_t computed_buff_size;
 
 	memset((void *) &wac_info, 0, sizeof(struct dbg_wave_control_info));
@@ -744,12 +740,14 @@ kfd_ioctl_dbg_wave_control(struct file *filep, struct kfd_process *p, void *data
 			break;
 		}
 
-	/* copy the entire buffer from user */
+		cmd_from_user = (void __user *) args->content_ptr;
 
-	args_buff = memdup_user(cmd_from_user,
+		/* copy the entire buffer from user */
+
+		args_buff = memdup_user(cmd_from_user,
 				args->buf_size_in_bytes - sizeof(*args));
-	if (IS_ERR(args_buff))
-		return PTR_ERR(args_buff);
+		if (IS_ERR(args_buff))
+			return PTR_ERR(args_buff);
 
 		if (copy_from_user(args_buff,
 				(void __user *) args->content_ptr,
