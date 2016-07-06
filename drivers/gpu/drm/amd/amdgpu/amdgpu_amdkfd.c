@@ -385,13 +385,11 @@ uint32_t get_max_engine_clock_in_mhz(struct kgd_dev *kgd)
 void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-	struct amdgpu_cu_info acu_info;
+	struct amdgpu_cu_info acu_info = adev->gfx.cu_info;
 
 	memset(cu_info, 0, sizeof(*cu_info));
 	if (sizeof(cu_info->cu_bitmap) != sizeof(acu_info.bitmap))
 		return;
-
-	memset(&acu_info, 0, sizeof(acu_info));
 
 	cu_info->cu_active_number = acu_info.number;
 	cu_info->cu_ao_mask = acu_info.ao_cu_mask;
