@@ -454,7 +454,7 @@ static void dce110_timing_generator_v_program_blank_color(
 		struct timing_generator *tg,
 		enum dc_color_space color_space)
 {
-	struct crtc_black_color black_color;
+	struct tg_color black_color;
 	uint32_t addr = mmCRTCV_BLACK_COLOR;
 	uint32_t value = dm_read_reg(tg->ctx, addr);
 
@@ -464,17 +464,17 @@ static void dce110_timing_generator_v_program_blank_color(
 
 	set_reg_field_value(
 		value,
-		black_color.black_color_b_cb,
+		black_color.color_b_cb,
 		CRTCV_BLACK_COLOR,
 		CRTC_BLACK_COLOR_B_CB);
 	set_reg_field_value(
 		value,
-		black_color.black_color_g_y,
+		black_color.color_g_y,
 		CRTCV_BLACK_COLOR,
 		CRTC_BLACK_COLOR_G_Y);
 	set_reg_field_value(
 		value,
-		black_color.black_color_r_cr,
+		black_color.color_r_cr,
 		CRTCV_BLACK_COLOR,
 		CRTC_BLACK_COLOR_R_CR);
 
@@ -483,92 +483,30 @@ static void dce110_timing_generator_v_program_blank_color(
 
 static void dce110_timing_generator_v_set_overscan_color_black(
 	struct timing_generator *tg,
-	enum dc_color_space black_color)
+	const struct tg_color *color)
 {
 	struct dc_context *ctx = tg->ctx;
-	uint32_t value = 0;
 	uint32_t addr;
+	uint32_t value = 0;
 
-	/* Overscan Color for YUV display modes:
-	 * to achieve a black color for both the explicit and implicit overscan,
-	 * the overscan color registers should be programmed to: */
-
-	switch (black_color) {
-	case COLOR_SPACE_YPBPR601:
-		set_reg_field_value(
+	set_reg_field_value(
 			value,
-			CRTC_OVERSCAN_COLOR_BLACK_COLOR_B_CB_YUV_4TV,
-			CRTCV_OVERSCAN_COLOR,
+			color->color_b_cb,
+			CRTC_OVERSCAN_COLOR,
 			CRTC_OVERSCAN_COLOR_BLUE);
 
-		set_reg_field_value(
+	set_reg_field_value(
 			value,
-			CRTC_OVERSCAN_COLOR_BLACK_COLOR_G_Y_YUV_4TV,
-			CRTCV_OVERSCAN_COLOR,
+			color->color_r_cr,
+			CRTC_OVERSCAN_COLOR,
+			CRTC_OVERSCAN_COLOR_RED);
+
+	set_reg_field_value(
+			value,
+			color->color_g_y,
+			CRTC_OVERSCAN_COLOR,
 			CRTC_OVERSCAN_COLOR_GREEN);
 
-		set_reg_field_value(
-			value,
-			CRTC_OVERSCAN_COLOR_BLACK_COLOR_R_CR_YUV_4TV,
-			CRTCV_OVERSCAN_COLOR,
-			CRTC_OVERSCAN_COLOR_RED);
-		break;
-
-	case COLOR_SPACE_YPBPR709:
-	case COLOR_SPACE_YCBCR601:
-	case COLOR_SPACE_YCBCR709:
-	case COLOR_SPACE_YCBCR601_LIMITED:
-	case COLOR_SPACE_YCBCR709_LIMITED:
-		set_reg_field_value(
-			value,
-			CRTC_OVERSCAN_COLOR_BLACK_COLOR_B_CB_YUV_4CV,
-			CRTCV_OVERSCAN_COLOR,
-			CRTC_OVERSCAN_COLOR_BLUE);
-
-		set_reg_field_value(
-			value,
-			CRTC_OVERSCAN_COLOR_BLACK_COLOR_G_Y_YUV_4TV,
-			CRTCV_OVERSCAN_COLOR,
-			CRTC_OVERSCAN_COLOR_GREEN);
-
-		set_reg_field_value(
-			value,
-			CRTC_OVERSCAN_COLOR_BLACK_COLOR_R_CR_YUV_4CV,
-			CRTCV_OVERSCAN_COLOR,
-			CRTC_OVERSCAN_COLOR_RED);
-		break;
-
-	case COLOR_SPACE_SRGB_LIMITED:
-		set_reg_field_value(
-			value,
-			CRTC_OVERSCAN_COLOR_BLACK_COLOR_B_RGB_LIMITED_RANGE,
-			CRTCV_OVERSCAN_COLOR,
-			CRTC_OVERSCAN_COLOR_BLUE);
-
-		set_reg_field_value(
-			value,
-			CRTC_OVERSCAN_COLOR_BLACK_COLOR_G_RGB_LIMITED_RANGE,
-			CRTCV_OVERSCAN_COLOR,
-			CRTC_OVERSCAN_COLOR_GREEN);
-
-		set_reg_field_value(
-			value,
-			CRTC_OVERSCAN_COLOR_BLACK_COLOR_R_RGB_LIMITED_RANGE,
-			CRTCV_OVERSCAN_COLOR,
-			CRTC_OVERSCAN_COLOR_RED);
-		break;
-
-	default:
-		/* default is sRGB black 0. */
-		if (tg->ctx->dc->debug.surface_visual_confirm) {
-			set_reg_field_value(
-				value,
-				0x3ff,
-				CRTCV_OVERSCAN_COLOR,
-				CRTC_OVERSCAN_COLOR_GREEN);
-		}
-		break;
-	}
 	addr = mmCRTCV_OVERSCAN_COLOR;
 	dm_write_reg(ctx, addr, value);
 	addr = mmCRTCV_BLACK_COLOR;
@@ -587,28 +525,27 @@ static void dce110_timing_generator_v_set_overscan_color_black(
 	 * m_mmDxCRTC_BLACK_COLOR_EXT
 	 * m_mmDxCRTC_BLANK_DATA_COLOR_EXT
 	 */
-
 }
 
 static void dce110_tg_v_program_blank_color(struct timing_generator *tg,
-		const struct crtc_black_color *black_color)
+		const struct tg_color *black_color)
 {
 	uint32_t addr = mmCRTCV_BLACK_COLOR;
 	uint32_t value = dm_read_reg(tg->ctx, addr);
 
 	set_reg_field_value(
 		value,
-		black_color->black_color_b_cb,
+		black_color->color_b_cb,
 		CRTCV_BLACK_COLOR,
 		CRTC_BLACK_COLOR_B_CB);
 	set_reg_field_value(
 		value,
-		black_color->black_color_g_y,
+		black_color->color_g_y,
 		CRTCV_BLACK_COLOR,
 		CRTC_BLACK_COLOR_G_Y);
 	set_reg_field_value(
 		value,
-		black_color->black_color_r_cr,
+		black_color->color_r_cr,
 		CRTCV_BLACK_COLOR,
 		CRTC_BLACK_COLOR_R_CR);
 
@@ -619,7 +556,7 @@ static void dce110_tg_v_program_blank_color(struct timing_generator *tg,
 }
 
 static void dce110_timing_generator_v_set_overscan_color(struct timing_generator *tg,
-	const struct crtc_black_color *overscan_color)
+	const struct tg_color *overscan_color)
 {
 	struct dc_context *ctx = tg->ctx;
 	uint32_t value = 0;
@@ -627,19 +564,19 @@ static void dce110_timing_generator_v_set_overscan_color(struct timing_generator
 
 	set_reg_field_value(
 		value,
-		overscan_color->black_color_b_cb,
+		overscan_color->color_b_cb,
 		CRTCV_OVERSCAN_COLOR,
 		CRTC_OVERSCAN_COLOR_BLUE);
 
 	set_reg_field_value(
 		value,
-		overscan_color->black_color_g_y,
+		overscan_color->color_g_y,
 		CRTCV_OVERSCAN_COLOR,
 		CRTC_OVERSCAN_COLOR_GREEN);
 
 	set_reg_field_value(
 		value,
-		overscan_color->black_color_r_cr,
+		overscan_color->color_r_cr,
 		CRTCV_OVERSCAN_COLOR,
 		CRTC_OVERSCAN_COLOR_RED);
 
@@ -648,8 +585,8 @@ static void dce110_timing_generator_v_set_overscan_color(struct timing_generator
 }
 
 static void dce110_timing_generator_v_set_colors(struct timing_generator *tg,
-	const struct crtc_black_color *blank_color,
-	const struct crtc_black_color *overscan_color)
+	const struct tg_color *blank_color,
+	const struct tg_color *overscan_color)
 {
 	if (blank_color != NULL)
 		dce110_tg_v_program_blank_color(tg, blank_color);

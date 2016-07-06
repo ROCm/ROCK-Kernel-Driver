@@ -30,26 +30,6 @@
 #include "../include/grph_object_id.h"
 #include "../include/hw_sequencer_types.h"
 
-/* overscan in blank for YUV color space. For RGB, it is zero for black. */
-#define CRTC_OVERSCAN_COLOR_BLACK_COLOR_B_CB_YUV_4CV 0x1f4
-#define CRTC_OVERSCAN_COLOR_BLACK_COLOR_G_Y_YUV_4CV 0x40
-#define CRTC_OVERSCAN_COLOR_BLACK_COLOR_R_CR_YUV_4CV 0x1f4
-
-#define CRTC_OVERSCAN_COLOR_BLACK_COLOR_B_CB_YUV_4TV 0x200
-#define CRTC_OVERSCAN_COLOR_BLACK_COLOR_G_Y_YUV_4TV 0x40
-#define CRTC_OVERSCAN_COLOR_BLACK_COLOR_R_CR_YUV_4TV 0x200
-
-/* overscan in blank for YUV color space when in SuperAA crossfire mode */
-#define CRTC_OVERSCAN_COLOR_BLACK_COLOR_B_CB_YUV_4SUPERAA 0x1a2
-#define CRTC_OVERSCAN_COLOR_BLACK_COLOR_G_Y_YUV_4SUPERAA 0x20
-#define CRTC_OVERSCAN_COLOR_BLACK_COLOR_R_CR_YUV_4SUPERAA 0x1a2
-
-/* OVERSCAN COLOR FOR RGB LIMITED RANGE
- * (16~253) 16*4 (Multiple over 256 code leve) =64 (0x40) */
-#define CRTC_OVERSCAN_COLOR_BLACK_COLOR_B_RGB_LIMITED_RANGE 0x40
-#define CRTC_OVERSCAN_COLOR_BLACK_COLOR_G_RGB_LIMITED_RANGE 0x40
-#define CRTC_OVERSCAN_COLOR_BLACK_COLOR_R_RGB_LIMITED_RANGE 0X40
-
 struct dce110_timing_generator_offsets {
 	int32_t crtc;
 	int32_t dcp;
@@ -169,10 +149,10 @@ void dce110_timing_generator_program_blank_color(
 /* Combine with above and move YUV/RGB color conversion to SW layer */
 void dce110_timing_generator_set_overscan_color_black(
 	struct timing_generator *tg,
-	enum dc_color_space black_color);
+	const struct tg_color *color);
 void dce110_timing_generator_color_space_to_black_color(
 		enum dc_color_space colorspace,
-	struct crtc_black_color *black_color);
+	struct tg_color *black_color);
 /*************** End-of-move ********************/
 
 /* Not called yet */
@@ -202,10 +182,10 @@ void dce110_timing_generator_set_lock_master(struct timing_generator *tg,
 		bool lock);
 
 void dce110_tg_program_blank_color(struct timing_generator *tg,
-	const struct crtc_black_color *black_color);
+	const struct tg_color *black_color);
 
 void dce110_tg_set_overscan_color(struct timing_generator *tg,
-	const struct crtc_black_color *overscan_color);
+	const struct tg_color *overscan_color);
 
 void dce110_tg_get_position(struct timing_generator *tg,
 	struct crtc_position *position);
@@ -224,7 +204,7 @@ void dce110_tg_wait_for_state(struct timing_generator *tg,
 	enum crtc_state state);
 
 void dce110_tg_set_colors(struct timing_generator *tg,
-	const struct crtc_black_color *blank_color,
-	const struct crtc_black_color *overscan_color);
+	const struct tg_color *blank_color,
+	const struct tg_color *overscan_color);
 
 #endif /* __DC_TIMING_GENERATOR_DCE110_H__ */

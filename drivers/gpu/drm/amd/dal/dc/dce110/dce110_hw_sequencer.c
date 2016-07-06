@@ -31,6 +31,7 @@
 #include "hw_sequencer.h"
 #include "dm_helpers.h"
 #include "dce110_hw_sequencer.h"
+#include "dce110_timing_generator.h"
 
 #include "gpu/dce110/dc_clock_gating_dce110.h"
 
@@ -1424,8 +1425,82 @@ static void set_default_colors(struct pipe_ctx *pipe_ctx)
 					pipe_ctx->opp, &default_adjust);
 }
 
-static void program_scaler(const struct pipe_ctx *pipe_ctx)
+static void get_overscan_black_color(enum dc_color_space color_space, struct tg_color *color)
 {
+	/* Overscan Color for YUV display modes:
+	 * to achieve a black color for both the explicit and implicit overscan,
+	 * the overscan color registers should be programmed to: */
+
+	switch (color_space) {
+	case COLOR_SPACE_YPBPR601:
+		color->color_b_cb = 0x200; 	/* BLACK_COLOR_B_CB_YUV_4TV */
+		color->color_g_y = 0x40; 	/* BLACK_COLOR_G_Y_YUV_4TV  */
+		color->color_r_cr = 0x200; 	/* BLACK_COLOR_R_CR_YUV_4TV */
+		break;
+
+	case COLOR_SPACE_YPBPR709:
+	case COLOR_SPACE_YCBCR601:
+	case COLOR_SPACE_YCBCR709:
+	case COLOR_SPACE_YCBCR601_LIMITED:
+	case COLOR_SPACE_YCBCR709_LIMITED:
+		color->color_b_cb = 0x1f4;	/* BLACK_COLOR_B_CB_YUV_4CV */
+		color->color_g_y = 0x40; 	/* BLACK_COLOR_G_Y_YUV_4TV  */
+		color->color_r_cr = 0x1f4;	/* BLACK_COLOR_R_CR_YUV_4CV */
+		break;
+
+	case COLOR_SPACE_SRGB_LIMITED:
+		/* OVERSCAN COLOR FOR RGB LIMITED RANGE
+		 * (16~253) 16*4 (Multiple over 256 code leve) =64 (0x40) */
+		color->color_b_cb = 0x40;
+		color->color_g_y = 0x40;
+		color->color_r_cr = 0x40;
+		break;
+
+	default:
+		/* default is sRGB black 0. */
+		break;
+	}
+}
+
+static void get_surface_visual_confirm_color(const struct pipe_ctx *pipe_ctx,
+		struct tg_color *color)
+{
+	uint32_t color_value = MAX_TG_COLOR_VALUE * (4 - pipe_ctx->pipe_idx) / 4;
+
+	switch (pipe_ctx->scl_data.format) {
+	case PIXEL_FORMAT_ARGB8888:
+		/* set boarder color to red */
+		color->color_r_cr = color_value;
+		break;
+
+	case PIXEL_FORMAT_ARGB2101010:
+		/* set boarder color to blue */
+		color->color_b_cb = color_value;
+		break;
+	case PIXEL_FORMAT_420BPP12:
+		/* set boarder color to green */
+		color->color_g_y = color_value;
+		break;
+	case PIXEL_FORMAT_FP16:
+		/* set boarder color to white */
+		color->color_r_cr = color_value;
+		color->color_b_cb = color_value;
+		color->color_g_y = color_value;
+		break;
+	default:
+		break;
+	}
+}
+
+static void program_scaler(const struct core_dc *dc, const struct pipe_ctx *pipe_ctx)
+{
+	struct tg_color color = {0};
+
+	if (dc->public.debug.surface_visual_confirm)
+		get_surface_visual_confirm_color(pipe_ctx, &color);
+	else
+		get_overscan_black_color(pipe_ctx->stream->public.output_color_space, &color);
+
 	pipe_ctx->xfm->funcs->transform_set_pixel_storage_depth(
 		pipe_ctx->xfm,
 		LB_PIXEL_DEPTH_30BPP,
@@ -1433,7 +1508,7 @@ static void program_scaler(const struct pipe_ctx *pipe_ctx)
 
 	pipe_ctx->tg->funcs->set_overscan_blank_color(
 		pipe_ctx->tg,
-		pipe_ctx->stream->public.output_color_space);
+		&color);
 
 	pipe_ctx->xfm->funcs->transform_set_scaler(pipe_ctx->xfm, &pipe_ctx->scl_data);
 }
@@ -1457,7 +1532,7 @@ static void set_plane_config(
 
 	set_default_colors(pipe_ctx);
 
-	program_scaler(pipe_ctx);
+	program_scaler(dc, pipe_ctx);
 
 	for (i = pipe_ctx->pipe_idx + 1; i < MAX_PIPES; i++)
 		if (res_ctx->pipe_ctx[i].stream == pipe_ctx->stream) {

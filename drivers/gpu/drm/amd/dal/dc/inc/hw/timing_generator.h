@@ -31,10 +31,13 @@ struct dc_bios;
 /**
  *  These parameters are required as input when doing blanking/Unblanking
 */
-struct crtc_black_color {
-	uint32_t black_color_r_cr;
-	uint32_t black_color_g_y;
-	uint32_t black_color_b_cb;
+#define MAX_TG_COLOR_VALUE 0x3FF
+
+struct tg_color {
+	/* Maximum 10 bits color value */
+	uint16_t color_r_cr;
+	uint16_t color_g_y;
+	uint16_t color_b_cb;
 };
 
 /* Contains CRTC vertical/horizontal pixel counters */
@@ -128,11 +131,11 @@ struct timing_generator_funcs {
 							enum crtc_state state);
 	bool (*set_blank)(struct timing_generator *tg,
 					   bool enable_blanking);
-	void (*set_overscan_blank_color) (struct timing_generator *tg, enum dc_color_space black_color);
+	void (*set_overscan_blank_color) (struct timing_generator *tg, const struct tg_color *color);
 	void (*set_blank_color)(struct timing_generator *tg, enum dc_color_space black_color);
 	void (*set_colors)(struct timing_generator *tg,
-						const struct crtc_black_color *blank_color,
-						const struct crtc_black_color *overscan_color);
+						const struct tg_color *blank_color,
+						const struct tg_color *overscan_color);
 
 	void (*disable_vga)(struct timing_generator *tg);
 	bool (*did_triggered_reset_occur)(struct timing_generator *tg);
