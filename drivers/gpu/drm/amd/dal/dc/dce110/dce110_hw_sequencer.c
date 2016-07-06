@@ -404,15 +404,15 @@ static void build_prescale_params(struct ipp_prescale_params *prescale_params,
 	switch (surface->public.format) {
 	case SURFACE_PIXEL_FORMAT_GRPH_ARGB8888:
 	case SURFACE_PIXEL_FORMAT_GRPH_BGRA8888:
-		prescale_params->scale = 0x2000;
+		prescale_params->scale = 0x2020;
 		break;
 	case SURFACE_PIXEL_FORMAT_GRPH_ARGB2101010:
 	case SURFACE_PIXEL_FORMAT_GRPH_ABGR2101010:
-		/* TODO */
+		prescale_params->scale = 0x2008;
 		break;
 	case SURFACE_PIXEL_FORMAT_GRPH_ARGB16161616:
 	case SURFACE_PIXEL_FORMAT_GRPH_ABGR16161616F:
-		/* TODO */
+		prescale_params->scale = 0x2000;
 		break;
 	default:
 		ASSERT(false);
