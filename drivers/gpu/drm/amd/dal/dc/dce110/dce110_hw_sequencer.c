@@ -1501,26 +1501,35 @@ static void set_plane_config(
 
 	set_default_colors(pipe_ctx);
 
-	if (pipe_ctx->stream->public.csc_matrix.bypass == false) {
+	if (pipe_ctx->stream->public.gamut_remap_matrix.bypass == false) {
 		adjust.gamut_adjust_type = GRAPHICS_GAMUT_ADJUST_TYPE_SW;
 		adjust.temperature_matrix[0] =
-				pipe_ctx->stream->public.csc_matrix.matrix[0];
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[0];
 		adjust.temperature_matrix[1] =
-				pipe_ctx->stream->public.csc_matrix.matrix[1];
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[1];
 		adjust.temperature_matrix[2] =
-				pipe_ctx->stream->public.csc_matrix.matrix[2];
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[2];
 		adjust.temperature_matrix[3] =
-				pipe_ctx->stream->public.csc_matrix.matrix[4];
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[4];
 		adjust.temperature_matrix[4] =
-				pipe_ctx->stream->public.csc_matrix.matrix[5];
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[5];
 		adjust.temperature_matrix[5] =
-				pipe_ctx->stream->public.csc_matrix.matrix[6];
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[6];
 		adjust.temperature_matrix[6] =
-				pipe_ctx->stream->public.csc_matrix.matrix[8];
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[8];
 		adjust.temperature_matrix[7] =
-				pipe_ctx->stream->public.csc_matrix.matrix[9];
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[9];
 		adjust.temperature_matrix[8] =
-				pipe_ctx->stream->public.csc_matrix.matrix[10];
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[10];
 	}
 
 	pipe_ctx->xfm->funcs->transform_set_gamut_remap(pipe_ctx->xfm, &adjust);

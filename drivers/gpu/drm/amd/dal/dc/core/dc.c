@@ -230,7 +230,7 @@ static bool stream_adjust_vmin_vmax(struct dc *dc,
 	return ret;
 }
 
-static bool adjust_color_temperature(struct dc *dc,
+static bool set_gamut_remap(struct dc *dc,
 			const struct dc_stream **stream, int num_streams)
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
@@ -280,8 +280,9 @@ static void allocate_dc_stream_funcs(struct core_dc *core_dc)
 		core_dc->public.stream_funcs.send_null_packet =
 				stream_send_null_packet;
 	}
-	core_dc->public.stream_funcs.adjust_color_temperature =
-			adjust_color_temperature;
+
+	core_dc->public.stream_funcs.set_gamut_remap =
+			set_gamut_remap;
 }
 
 static bool construct(struct core_dc *dc,

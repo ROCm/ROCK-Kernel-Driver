@@ -33,6 +33,53 @@ struct mod_color {
 	int dummy;
 };
 
+struct color_space_coordinates {
+	unsigned int redX;
+	unsigned int redY;
+	unsigned int greenX;
+	unsigned int greenY;
+	unsigned int blueX;
+	unsigned int blueY;
+	unsigned int whiteX;
+	unsigned int whiteY;
+};
+
+struct gamut_space_coordinates {
+	unsigned int redX;
+	unsigned int redY;
+	unsigned int greenX;
+	unsigned int greenY;
+	unsigned int blueX;
+	unsigned int blueY;
+};
+
+struct gamut_space_entry {
+	unsigned int index;
+	unsigned int redX;
+	unsigned int redY;
+	unsigned int greenX;
+	unsigned int greenY;
+	unsigned int blueX;
+	unsigned int blueY;
+
+	int a0;
+	int a1;
+	int a2;
+	int a3;
+	int gamma;
+};
+
+struct white_point_coodinates {
+	unsigned int whiteX;
+	unsigned int whiteY;
+};
+
+struct white_point_coodinates_entry {
+	unsigned int index;
+	unsigned int whiteX;
+	unsigned int whiteY;
+};
+
 struct mod_color *mod_color_create(struct dc *dc);
 void mod_color_destroy(struct mod_color *mod_color);
 
@@ -43,5 +90,15 @@ bool mod_color_adjust_temperature(struct mod_color *mod_color,
 bool mod_color_set_user_enable(struct mod_color *mod_color,
 		const struct dc_stream **streams, int num_streams,
 		bool user_enable);
+
+bool mod_color_adjust_source_gamut(struct mod_color *mod_color,
+		const struct dc_stream **streams, int num_streams,
+		struct gamut_space_coordinates inputGamutCoord,
+		struct white_point_coodinates inputWhitePointCoord);
+
+bool mod_color_adjust_destination_gamut(struct mod_color *mod_color,
+		const struct dc_stream **streams, int num_streams,
+		struct gamut_space_coordinates inputGamutCoord,
+		struct white_point_coodinates inputWhitePointCoord);
 
 #endif /* MOD_COLOR_H_ */
