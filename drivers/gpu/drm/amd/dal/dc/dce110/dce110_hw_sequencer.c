@@ -280,7 +280,7 @@ static void dce110_set_blender_mode(
 		break;
 	case BLENDER_MODE_CURRENT_PIPE:
 	default:
-		if (controller_id == DCE110_UNDERLAY_IDX)
+		if (controller_id == DCE110_UNDERLAY_IDX || controller_id == 0)
 			feedthrough = 0;
 		break;
 	}
@@ -1341,6 +1341,9 @@ static enum dc_status apply_ctx_to_hw(
 			continue;
 
 		if (pipe_ctx->stream == pipe_ctx_old->stream)
+			continue;
+
+		if (pipe_ctx->top_pipe)
 			continue;
 
 		status = apply_single_controller_ctx_to_hw(
