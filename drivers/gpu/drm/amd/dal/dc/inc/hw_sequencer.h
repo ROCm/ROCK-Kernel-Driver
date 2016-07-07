@@ -26,6 +26,7 @@
 #ifndef __DC_HW_SEQUENCER_H__
 #define __DC_HW_SEQUENCER_H__
 #include "core_types.h"
+#include "timing_generator.h"
 
 struct gamma_parameters;
 
@@ -148,5 +149,8 @@ void hw_sequencer_program_pipe_tree(
 			struct pipe_ctx *pipe_ctx,
 			struct validate_context *context));
 
+void color_space_to_black_color(
+		enum dc_color_space colorspace,
+	struct tg_color *black_color);
 
 #endif /* __DC_HW_SEQUENCER_H__ */

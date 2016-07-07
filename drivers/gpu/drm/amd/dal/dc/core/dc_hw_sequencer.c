@@ -26,8 +26,32 @@
 #include "dm_services.h"
 #include "core_types.h"
 #include "core_dc.h"
+#include "timing_generator.h"
 #include "hw_sequencer.h"
 
+/* used as index in array of black_color_format */
+enum black_color_format {
+	BLACK_COLOR_FORMAT_RGB_FULLRANGE = 0,
+	BLACK_COLOR_FORMAT_RGB_LIMITED,
+	BLACK_COLOR_FORMAT_YUV_TV,
+	BLACK_COLOR_FORMAT_YUV_CV,
+	BLACK_COLOR_FORMAT_YUV_SUPER_AA,
+
+	BLACK_COLOR_FORMAT_COUNT
+};
+
+static const struct tg_color black_color_format[] = {
+	/* BlackColorFormat_RGB_FullRange */
+	{0, 0, 0},
+	/* BlackColorFormat_RGB_Limited */
+	{0x40, 0x40, 0x40},
+	/* BlackColorFormat_YUV_TV */
+	{0x200, 0x40, 0x200},
+	/* BlackColorFormat_YUV_CV */
+	{0x1f4, 0x40, 0x1f4},
+	/* BlackColorFormat_YUV_SuperAA */
+	{0x1a2, 0x20, 0x1a2},
+};
 
 bool front_end_need_program(struct pipe_ctx *old_pipe, struct pipe_ctx *new_pipe)
 {
@@ -58,4 +82,35 @@ void hw_sequencer_program_pipe_tree(
 		/* get pointer to child pipe */
 		pipe_ctx_cur = pipe_ctx_cur->bottom_pipe;
 	} while (pipe_ctx_cur != NULL);
+}
+
+void color_space_to_black_color(
+		enum dc_color_space colorspace,
+	struct tg_color *black_color)
+{
+	switch (colorspace) {
+	case COLOR_SPACE_YPBPR601:
+		*black_color = black_color_format[BLACK_COLOR_FORMAT_YUV_TV];
+		break;
+
+	case COLOR_SPACE_YPBPR709:
+	case COLOR_SPACE_YCBCR601:
+	case COLOR_SPACE_YCBCR709:
+	case COLOR_SPACE_YCBCR601_LIMITED:
+	case COLOR_SPACE_YCBCR709_LIMITED:
+		*black_color = black_color_format[BLACK_COLOR_FORMAT_YUV_CV];
+		break;
+
+	case COLOR_SPACE_SRGB_LIMITED:
+		*black_color =
+			black_color_format[BLACK_COLOR_FORMAT_RGB_LIMITED];
+		break;
+
+	default:
+		/* fefault is sRGB black (full range). */
+		*black_color =
+			black_color_format[BLACK_COLOR_FORMAT_RGB_FULLRANGE];
+		/* default is sRGB black 0. */
+		break;
+	}
 }

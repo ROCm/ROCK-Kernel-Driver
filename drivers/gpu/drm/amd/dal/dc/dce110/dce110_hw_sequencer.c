@@ -718,6 +718,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	struct core_stream *stream = pipe_ctx->stream;
 	struct pipe_ctx *pipe_ctx_old = &dc->current_context->res_ctx.
 			pipe_ctx[pipe_ctx->pipe_idx];
+	struct tg_color black_color = {0};
 
 	if (!pipe_ctx_old->stream) {
 		/*
@@ -799,9 +800,10 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 			true : false);
 
 	/* program blank color */
+	color_space_to_black_color(stream->public.output_color_space, &black_color);
 	pipe_ctx->tg->funcs->set_blank_color(
 			pipe_ctx->tg,
-			stream->public.output_color_space);
+			&black_color);
 
 	if (!pipe_ctx_old->stream) {
 		core_link_enable_stream(pipe_ctx);
@@ -1425,43 +1427,6 @@ static void set_default_colors(struct pipe_ctx *pipe_ctx)
 					pipe_ctx->opp, &default_adjust);
 }
 
-static void get_overscan_black_color(enum dc_color_space color_space, struct tg_color *color)
-{
-	/* Overscan Color for YUV display modes:
-	 * to achieve a black color for both the explicit and implicit overscan,
-	 * the overscan color registers should be programmed to: */
-
-	switch (color_space) {
-	case COLOR_SPACE_YPBPR601:
-		color->color_b_cb = 0x200; 	/* BLACK_COLOR_B_CB_YUV_4TV */
-		color->color_g_y = 0x40; 	/* BLACK_COLOR_G_Y_YUV_4TV  */
-		color->color_r_cr = 0x200; 	/* BLACK_COLOR_R_CR_YUV_4TV */
-		break;
-
-	case COLOR_SPACE_YPBPR709:
-	case COLOR_SPACE_YCBCR601:
-	case COLOR_SPACE_YCBCR709:
-	case COLOR_SPACE_YCBCR601_LIMITED:
-	case COLOR_SPACE_YCBCR709_LIMITED:
-		color->color_b_cb = 0x1f4;	/* BLACK_COLOR_B_CB_YUV_4CV */
-		color->color_g_y = 0x40; 	/* BLACK_COLOR_G_Y_YUV_4TV  */
-		color->color_r_cr = 0x1f4;	/* BLACK_COLOR_R_CR_YUV_4CV */
-		break;
-
-	case COLOR_SPACE_SRGB_LIMITED:
-		/* OVERSCAN COLOR FOR RGB LIMITED RANGE
-		 * (16~253) 16*4 (Multiple over 256 code leve) =64 (0x40) */
-		color->color_b_cb = 0x40;
-		color->color_g_y = 0x40;
-		color->color_r_cr = 0x40;
-		break;
-
-	default:
-		/* default is sRGB black 0. */
-		break;
-	}
-}
-
 static void get_surface_visual_confirm_color(const struct pipe_ctx *pipe_ctx,
 		struct tg_color *color)
 {
@@ -1492,14 +1457,16 @@ static void get_surface_visual_confirm_color(const struct pipe_ctx *pipe_ctx,
 	}
 }
 
-static void program_scaler(const struct core_dc *dc, const struct pipe_ctx *pipe_ctx)
+static void program_scaler(const struct core_dc *dc,
+		const struct pipe_ctx *pipe_ctx)
 {
 	struct tg_color color = {0};
 
 	if (dc->public.debug.surface_visual_confirm)
 		get_surface_visual_confirm_color(pipe_ctx, &color);
 	else
-		get_overscan_black_color(pipe_ctx->stream->public.output_color_space, &color);
+		color_space_to_black_color(pipe_ctx->stream->public.output_color_space,
+									&color);
 
 	pipe_ctx->xfm->funcs->transform_set_pixel_storage_depth(
 		pipe_ctx->xfm,
@@ -1510,7 +1477,8 @@ static void program_scaler(const struct core_dc *dc, const struct pipe_ctx *pipe
 		pipe_ctx->tg,
 		&color);
 
-	pipe_ctx->xfm->funcs->transform_set_scaler(pipe_ctx->xfm, &pipe_ctx->scl_data);
+	pipe_ctx->xfm->funcs->transform_set_scaler(pipe_ctx->xfm,
+		&pipe_ctx->scl_data);
 }
 
 /**
@@ -1786,6 +1754,7 @@ static void dce110_power_on_pipe_if_needed(
 	struct pipe_ctx *old_pipe_ctx = &dc->current_context->res_ctx.pipe_ctx[pipe_ctx->pipe_idx];
 	struct dc_bios *dcb = dal_adapter_service_get_bios_parser(
 					context->res_ctx.pool->adapter_srv);
+	struct tg_color black_color = {0};
 
 	if (!old_pipe_ctx->stream && pipe_ctx->stream) {
 		dc->hwss.enable_display_power_gating(
@@ -1808,9 +1777,11 @@ static void dce110_power_on_pipe_if_needed(
 				pipe_ctx->stream->public.timing.pix_clk_khz,
 				context->target_count);
 
+		/* TODO unhardcode*/
+		color_space_to_black_color(COLOR_SPACE_YCBCR601, &black_color);
 		pipe_ctx->tg->funcs->set_blank_color(
 				pipe_ctx->tg,
-				COLOR_SPACE_YCBCR601);/* TODO unhardcode*/
+				&black_color);
 	}
 }
 

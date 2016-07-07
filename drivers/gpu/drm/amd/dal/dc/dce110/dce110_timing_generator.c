@@ -40,15 +40,6 @@
 
 #include "timing_generator.h"
 
-enum black_color_format {
-	BLACK_COLOR_FORMAT_RGB_FULLRANGE = 0,	/* used as index in array */
-	BLACK_COLOR_FORMAT_RGB_LIMITED,
-	BLACK_COLOR_FORMAT_YUV_TV,
-	BLACK_COLOR_FORMAT_YUV_CV,
-	BLACK_COLOR_FORMAT_YUV_SUPER_AA,
-
-	BLACK_COLOR_FORMAT_COUNT
-};
 
 #define NUMBER_OF_FRAME_TO_WAIT_ON_TRIGGERED_RESET 10
 
@@ -155,19 +146,6 @@ static const struct timing_generator_funcs dce110_tg_funcs = {
 
 };
 
-static const struct tg_color black_color_format[] = {
-	/* BlackColorFormat_RGB_FullRange */
-	{0, 0, 0},
-	/* BlackColorFormat_RGB_Limited */
-	{0x40, 0x40, 0x40},
-	/* BlackColorFormat_YUV_TV */
-	{0x200, 0x40, 0x200},
-	/* BlackColorFormat_YUV_CV */
-	{0x1f4, 0x40, 0x1f4},
-	/* BlackColorFormat_YUV_SuperAA */
-	{0x1a2, 0x20, 0x1a2},
-};
-
 /**
 * apply_front_porch_workaround
 *
@@ -184,35 +162,6 @@ static void dce110_timing_generator_apply_front_porch_workaround(
 	} else {
 		if (timing->v_front_porch < 1)
 			timing->v_front_porch = 1;
-	}
-}
-
-void dce110_timing_generator_color_space_to_black_color(
-		enum dc_color_space colorspace,
-	struct tg_color *black_color)
-{
-	switch (colorspace) {
-	case COLOR_SPACE_YPBPR601:
-		*black_color = black_color_format[BLACK_COLOR_FORMAT_YUV_TV];
-		break;
-
-	case COLOR_SPACE_YPBPR709:
-	case COLOR_SPACE_YCBCR601:
-	case COLOR_SPACE_YCBCR709:
-		*black_color = black_color_format[BLACK_COLOR_FORMAT_YUV_CV];
-		break;
-
-	case COLOR_SPACE_SRGB_LIMITED:
-		*black_color =
-			black_color_format[BLACK_COLOR_FORMAT_RGB_LIMITED];
-		break;
-
-	default:
-		/* fefault is sRGB black (full range). */
-		*black_color =
-			black_color_format[BLACK_COLOR_FORMAT_RGB_FULLRANGE];
-		/* default is sRGB black 0. */
-		break;
 	}
 }
 
@@ -291,30 +240,25 @@ bool dce110_timing_generator_enable_crtc(struct timing_generator *tg)
 
 void dce110_timing_generator_program_blank_color(
 		struct timing_generator *tg,
-		enum dc_color_space color_space)
+		const struct tg_color *black_color)
 {
-	struct tg_color black_color;
 	struct dce110_timing_generator *tg110 = DCE110TG_FROM_TG(tg);
 	uint32_t addr = CRTC_REG(mmCRTC_BLACK_COLOR);
 	uint32_t value = dm_read_reg(tg->ctx, addr);
 
-	dce110_timing_generator_color_space_to_black_color(
-		color_space,
-		&black_color);
-
 	set_reg_field_value(
 		value,
-		black_color.color_b_cb,
+		black_color->color_b_cb,
 		CRTC_BLACK_COLOR,
 		CRTC_BLACK_COLOR_B_CB);
 	set_reg_field_value(
 		value,
-		black_color.color_g_y,
+		black_color->color_g_y,
 		CRTC_BLACK_COLOR,
 		CRTC_BLACK_COLOR_G_Y);
 	set_reg_field_value(
 		value,
-		black_color.color_r_cr,
+		black_color->color_r_cr,
 		CRTC_BLACK_COLOR,
 		CRTC_BLACK_COLOR_R_CR);
 

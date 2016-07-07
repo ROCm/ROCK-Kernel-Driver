@@ -145,7 +145,7 @@ void dce110_timing_generator_program_blanking(
 /* Combine with below and move YUV/RGB color conversion to SW layer */
 void dce110_timing_generator_program_blank_color(
 	struct timing_generator *tg,
-	enum dc_color_space color_space);
+	const struct tg_color *black_color);
 /* Combine with above and move YUV/RGB color conversion to SW layer */
 void dce110_timing_generator_set_overscan_color_black(
 	struct timing_generator *tg,

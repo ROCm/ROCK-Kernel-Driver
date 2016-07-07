@@ -132,7 +132,7 @@ struct timing_generator_funcs {
 	bool (*set_blank)(struct timing_generator *tg,
 					   bool enable_blanking);
 	void (*set_overscan_blank_color) (struct timing_generator *tg, const struct tg_color *color);
-	void (*set_blank_color)(struct timing_generator *tg, enum dc_color_space black_color);
+	void (*set_blank_color)(struct timing_generator *tg, const struct tg_color *color);
 	void (*set_colors)(struct timing_generator *tg,
 						const struct tg_color *blank_color,
 						const struct tg_color *overscan_color);

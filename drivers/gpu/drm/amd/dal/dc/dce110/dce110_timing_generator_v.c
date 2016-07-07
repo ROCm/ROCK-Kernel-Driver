@@ -452,29 +452,24 @@ static void dce110_timing_generator_v_program_timing(struct timing_generator *tg
 
 static void dce110_timing_generator_v_program_blank_color(
 		struct timing_generator *tg,
-		enum dc_color_space color_space)
+		const struct tg_color *black_color)
 {
-	struct tg_color black_color;
 	uint32_t addr = mmCRTCV_BLACK_COLOR;
 	uint32_t value = dm_read_reg(tg->ctx, addr);
 
-	dce110_timing_generator_color_space_to_black_color(
-		color_space,
-		&black_color);
-
 	set_reg_field_value(
 		value,
-		black_color.color_b_cb,
+		black_color->color_b_cb,
 		CRTCV_BLACK_COLOR,
 		CRTC_BLACK_COLOR_B_CB);
 	set_reg_field_value(
 		value,
-		black_color.color_g_y,
+		black_color->color_g_y,
 		CRTCV_BLACK_COLOR,
 		CRTC_BLACK_COLOR_G_Y);
 	set_reg_field_value(
 		value,
-		black_color.color_r_cr,
+		black_color->color_r_cr,
 		CRTCV_BLACK_COLOR,
 		CRTC_BLACK_COLOR_R_CR);
 
