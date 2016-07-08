@@ -486,6 +486,21 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 
 	acquire_queue(kgd, pipe_id, queue_id);
 
+	/* HIQ is set during driver init period with vmid set to 0*/
+	if (m->cp_hqd_vmid == 0) {
+		uint32_t value, mec, pipe;
+
+		mec = (++pipe_id / V9_PIPE_PER_MEC) + 1;
+		pipe = (pipe_id % V9_PIPE_PER_MEC);
+
+		pr_debug("kfd: set HIQ, mec:%d, pipe:%d, queue:%d.\n",
+			mec, pipe, queue_id);
+		value = RREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_CP_SCHEDULERS));
+		value = REG_SET_FIELD(value, RLC_CP_SCHEDULERS, scheduler1,
+			((mec << 5) | (pipe << 3) | queue_id | 0x80));
+		WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_CP_SCHEDULERS), value);
+	}
+
 	/* HQD registers extend from CP_MQD_BASE_ADDR to CP_HQD_EOP_WPTR_MEM. */
 	mqd_hqd = &m->cp_mqd_base_addr_lo;
 	hqd_base = SOC15_REG_OFFSET(GC, 0, mmCP_MQD_BASE_ADDR);
