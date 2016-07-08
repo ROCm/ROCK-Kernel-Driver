@@ -332,6 +332,21 @@ static void kfd_cwsr_fini(struct kfd_dev *kfd)
 		__free_pages(kfd->cwsr_pages, get_order(kfd->cwsr_size));
 }
 
+static void kfd_ib_mem_init(struct kfd_dev *kdev)
+{
+	/* In certain cases we need to send IB from kernel using the GPU address
+	 * space created by user applications.
+	 * For example, on GFX v7, we need to flush TC associated to the VMID
+	 * before tearing down the VMID. In order to do so, we need an address
+	 * valid to the VMID to place the IB while this space was created on
+	 * the user's side, not the kernel.
+	 * Since kfd_set_process_dgpu_aperture reserves "cwsr_base + cwsr_size"
+	 * but CWSR only uses pages above cwsr_base, we'll use one page memory
+	 * under cwsr_base for IB submissions
+	 */
+	kdev->ib_size = PAGE_SIZE;
+}
+
 #if defined(CONFIG_DEBUG_FS)
 
 static int kfd_debugfs_open(struct inode *inode, struct file *file)
@@ -500,6 +515,8 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 
 	if (kfd_cwsr_init(kfd))
 		goto device_iommu_pasid_error;
+
+	kfd_ib_mem_init(kfd);
 
 	if (kfd_resume(kfd))
 		goto kfd_resume_error;
