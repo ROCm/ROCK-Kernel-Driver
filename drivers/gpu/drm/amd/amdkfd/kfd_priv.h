@@ -271,6 +271,9 @@ struct kfd_dev {
 	uint32_t cwsr_size;
 	uint32_t tma_offset;  /*Offset for TMA from the  start of cwsr_mem*/
 
+	/* IB usage */
+	uint32_t ib_size;
+
 	/* Debugfs */
 #if defined(CONFIG_DEBUG_FS)
 	struct dentry *debugfs_root;
@@ -529,6 +532,10 @@ struct qcm_process_device {
 	uint64_t tba_addr;
 	uint64_t tma_addr;
 	void *cwsr_kaddr;
+
+	/* IB memory */
+	uint64_t ib_base; /* ib_base+ib_size must be below cwsr_base */
+	void *ib_kaddr;
 };
 
 /*8 byte handle containing GPU ID in the most significant 4 bytes and
@@ -842,6 +849,7 @@ struct packet_manager_firmware {
 	int (*get_map_process_packet_size)(void);
 };
 
+uint32_t pm_create_release_mem(uint64_t gpu_addr, uint32_t *buffer);
 int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 		uint16_t fw_ver);
 void pm_uninit(struct packet_manager *pm);
