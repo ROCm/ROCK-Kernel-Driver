@@ -527,7 +527,6 @@ struct qcm_process_device {
 	uint32_t sh_hidden_private_base;
 
 	/*cwsr memory*/
-	int  cwsr_mem_handle;
 	uint64_t cwsr_base;
 	uint64_t tba_addr;
 	uint64_t tma_addr;
