@@ -295,6 +295,7 @@
 
 
 #define DGPU_VM_BASE_DEFAULT 0x100000
+#define DGPU_IB_BASE_DEFAULT (DGPU_VM_BASE_DEFAULT - PAGE_SIZE)
 
 int kfd_set_process_dgpu_aperture(struct kfd_process_device *pdd,
 					uint64_t base, uint64_t limit)
@@ -355,9 +356,10 @@ int kfd_init_apertures(struct kfd_process *process)
 			pdd->scratch_limit =
 				MAKE_SCRATCH_APP_LIMIT(pdd->scratch_base);
 
-			if (KFD_IS_DGPU(dev->device_info->asic_family))
+			if (KFD_IS_DGPU(dev->device_info->asic_family)) {
 				pdd->qpd.cwsr_base = DGPU_VM_BASE_DEFAULT;
-
+				pdd->qpd.ib_base = DGPU_IB_BASE_DEFAULT;
+			}
 		}
 
 		dev_dbg(kfd_device, "node id %u\n", id);
