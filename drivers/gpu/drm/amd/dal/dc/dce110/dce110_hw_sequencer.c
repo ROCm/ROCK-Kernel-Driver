@@ -1881,7 +1881,8 @@ static void dce110_program_front_end_for_pipe(struct core_dc *dc,
 			"Pipe:%d 0x%x: addr hi:0x%x, "
 			"addr low:0x%x, "
 			"src: %d, %d, %d,"
-			" %d; dst: %d, %d, %d, %d;\n",
+			" %d; dst: %d, %d, %d, %d;"
+			"clip: %d, %d, %d, %d\n",
 			pipe_ctx->pipe_idx,
 			pipe_ctx->surface,
 			pipe_ctx->surface->public.address.grph.addr.high_part,
@@ -1893,7 +1894,11 @@ static void dce110_program_front_end_for_pipe(struct core_dc *dc,
 			pipe_ctx->surface->public.dst_rect.x,
 			pipe_ctx->surface->public.dst_rect.y,
 			pipe_ctx->surface->public.dst_rect.width,
-			pipe_ctx->surface->public.dst_rect.height);
+			pipe_ctx->surface->public.dst_rect.height,
+			pipe_ctx->surface->public.clip_rect.x,
+			pipe_ctx->surface->public.clip_rect.y,
+			pipe_ctx->surface->public.clip_rect.width,
+			pipe_ctx->surface->public.clip_rect.height);
 
 
 	dal_logger_write(dc->ctx->logger,
