@@ -202,6 +202,9 @@ struct kgd2kfd_shared_resources {
  * @import_dmabuf: Imports a DMA buffer, creating a new kgd_mem object
  * Supports only DMA buffers created by GPU driver on the same GPU
  *
+ * @submit_ib: Submits an IB to the engine specified by inserting the IB to
+ * the corresonded ring (ring type).
+ *
  * This structure contains function pointers to services that the kgd driver
  * provides to amdkfd driver.
  *
@@ -335,7 +338,9 @@ struct kfd2kgd_calls {
 
 	int (*get_vm_fault_info)(struct kgd_dev *kgd,
 			struct kfd_vm_fault_info *info);
-
+	int (*submit_ib)(struct kgd_dev *kgd, enum kgd_engine_type engine,
+			uint32_t vmid, uint64_t gpu_addr,
+			uint32_t *ib_cmd, uint32_t ib_len);
 };
 
 /**
