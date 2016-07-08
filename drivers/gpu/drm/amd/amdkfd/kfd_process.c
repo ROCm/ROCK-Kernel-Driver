@@ -585,7 +585,6 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 	int err;
 	unsigned long  offset;
 	struct kfd_process_device *temp, *pdd = NULL;
-	void *mem = NULL;
 	struct kfd_dev *dev = NULL;
 	struct qcm_process_device *qpd = NULL;
 
@@ -599,46 +598,18 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 		if (qpd->cwsr_base) {
 			/* cwsr_base is only set for DGPU */
 
-			/* can't hold the process lock while
-			 * allocating from KGD */
-			up_write(&p->lock);
-
-			err = dev->kfd2kgd->alloc_memory_of_gpu(
-				dev->kgd, qpd->cwsr_base, dev->cwsr_size,
-				pdd->vm, (struct kgd_mem **)&mem,
-				NULL, &qpd->cwsr_kaddr, pdd,
-				ALLOC_MEM_FLAGS_GTT |
-				ALLOC_MEM_FLAGS_NONPAGED |
-				ALLOC_MEM_FLAGS_EXECUTE_ACCESS |
-				ALLOC_MEM_FLAGS_NO_SUBSTITUTE);
-			if (err)
-				goto err_alloc_tba;
-			err = kfd_map_memory_to_gpu(dev, mem, p, pdd);
-			if (err)
-				goto err_map_tba;
-
-			down_write(&p->lock);
-			/* Check if someone else allocated the memory
-			 * while we weren't looking */
-			if (qpd->tba_addr) {
-				up_write(&p->lock);
-				dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd,
-					(struct kgd_mem *)mem, pdd->vm);
-				dev->kfd2kgd->free_memory_of_gpu(dev->kgd, mem);
-				down_write(&p->lock);
-			} else {
-				qpd->cwsr_mem_handle =
-					kfd_process_device_create_obj_handle(
-						pdd, mem, qpd->cwsr_base,
-						dev->cwsr_size);
-				if (qpd->cwsr_mem_handle < 0)
-					goto err_create_handle;
-
+			err = kfd_process_alloc_gpuvm(p, dev, qpd->cwsr_base,
+					dev->cwsr_size, pdd->vm,
+					&qpd->cwsr_kaddr, pdd, &qpd->tba_addr);
+			if (!err) {
 				memcpy(qpd->cwsr_kaddr, kmap(dev->cwsr_pages),
 				       PAGE_SIZE);
 				kunmap(dev->cwsr_pages);
 				qpd->tba_addr = qpd->cwsr_base;
-			}
+			} else if (qpd->cwsr_kaddr)
+				err = 0;
+			else
+				goto out;
 		} else {
 			offset = (kfd_get_gpu_id(dev) |
 				KFD_MMAP_TYPE_RESERVED_MEM) << PAGE_SHIFT;
@@ -658,13 +629,8 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 				qpd->tba_addr, qpd->tma_addr);
 	}
 
-err_create_handle:
+out:
 	up_write(&p->lock);
-	return err;
-
-err_map_tba:
-	dev->kfd2kgd->free_memory_of_gpu(dev->kgd, mem);
-err_alloc_tba:
 	return err;
 }
 
