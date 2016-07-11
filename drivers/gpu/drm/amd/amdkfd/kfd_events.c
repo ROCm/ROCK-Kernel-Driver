@@ -51,6 +51,9 @@ struct kfd_event_waiter {
 	uint32_t input_index;
 };
 
+#define SLOTS_PER_PAGE KFD_SIGNAL_EVENT_LIMIT
+#define SLOT_BITMAP_LONGS BITS_TO_LONGS(SLOTS_PER_PAGE)
+
 /* Over-complicated pooled allocator for event notification slots.
  *
  * Each signal event needs a 64-bit signal slot where the signaler will write a 1
@@ -67,13 +70,8 @@ struct signal_page {
 	uint64_t __user *user_address;
 	uint32_t page_index;		/* Index into the mmap aperture. */
 	unsigned int free_slots;
-	unsigned long used_slot_bitmap[0];
+	unsigned long used_slot_bitmap[SLOT_BITMAP_LONGS];
 };
-
-#define SLOTS_PER_PAGE KFD_SIGNAL_EVENT_LIMIT
-#define SLOT_BITMAP_SIZE BITS_TO_LONGS(SLOTS_PER_PAGE)
-#define BITS_PER_PAGE (ilog2(SLOTS_PER_PAGE)+1)
-#define SIGNAL_PAGE_SIZE (sizeof(struct signal_page) + SLOT_BITMAP_SIZE * sizeof(long))
 
 /*
  * For signal events, the event ID is used as the interrupt user data.
@@ -135,7 +133,7 @@ static bool allocate_signal_page(struct file *devkfd, struct kfd_process *p)
 	unsigned int slot;
 	int i;
 
-	page = kzalloc(SIGNAL_PAGE_SIZE, GFP_KERNEL);
+	page = kzalloc(sizeof(struct signal_page), GFP_KERNEL);
 	if (!page)
 		goto fail_alloc_signal_page;
 
@@ -202,7 +200,7 @@ allocate_signal_page_dgpu(struct kfd_process *p,
 {
 	struct signal_page *my_page;
 
-	my_page = kzalloc(SIGNAL_PAGE_SIZE, GFP_KERNEL);
+	my_page = kzalloc(sizeof(struct signal_page), GFP_KERNEL);
 	if (!my_page)
 		return false;
 
