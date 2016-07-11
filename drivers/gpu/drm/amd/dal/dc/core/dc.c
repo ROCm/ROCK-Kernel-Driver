@@ -931,13 +931,19 @@ bool dc_commit_surfaces_to_target(
 		if (new_surfaces[i]->visible)
 			new_enabled_surface_count++;
 
-	dal_logger_write(core_dc->ctx->logger,
-				LOG_MAJOR_INTERFACE_TRACE,
-				LOG_MINOR_COMPONENT_DC,
-				"%s: commit %d surfaces to target 0x%x\n",
-				__func__,
-				new_surface_count,
-				dc_target);
+	/*
+	 * Do not print if we have 2 surfaces previously and we are currently
+	 * comiting 2 surfaces. Since the multi-plane case generate a lot of
+	 * spam
+	 */
+	if (!((new_surface_count > 1) && target_status->surface_count > 1))
+		dal_logger_write(core_dc->ctx->logger,
+					LOG_MAJOR_INTERFACE_TRACE,
+					LOG_MINOR_COMPONENT_DC,
+					"%s: commit %d surfaces to target 0x%x\n",
+					__func__,
+					new_surface_count,
+					dc_target);
 
 	if (!resource_attach_surfaces_to_context(
 			new_surfaces, new_surface_count, dc_target, context)) {

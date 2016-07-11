@@ -1754,6 +1754,7 @@ static void init_hw(struct core_dc *dc)
 	}
 }
 
+#ifdef DIAGS_BUILD
 static void print_context_timing_status(
 		const struct core_dc *dc,
 		struct resource_context *res_ctx)
@@ -1784,6 +1785,7 @@ static void print_context_timing_status(
 
 	dal_logger_close(&entry);
 }
+#endif
 
 /* TODO: move this to apply_ctx_tohw some how?*/
 static void dce110_power_on_pipe_if_needed(
@@ -1880,7 +1882,7 @@ static void dce110_program_front_end_for_pipe(struct core_dc *dc,
 
 	dal_logger_write(dc->ctx->logger,
 			LOG_MAJOR_INTERFACE_TRACE,
-			LOG_MINOR_COMPONENT_DC,
+			LOG_MINOR_COMPONENT_SURFACE,
 			"Pipe:%d 0x%x: addr hi:0x%x, "
 			"addr low:0x%x, "
 			"src: %d, %d, %d,"
@@ -1905,8 +1907,8 @@ static void dce110_program_front_end_for_pipe(struct core_dc *dc,
 
 
 	dal_logger_write(dc->ctx->logger,
-			LOG_MAJOR_HW_TRACE,
-			LOG_MINOR_HW_TRACE_SET_MODE,
+			LOG_MAJOR_INTERFACE_TRACE,
+			LOG_MINOR_COMPONENT_SURFACE,
 			"Pipe %d: width, height, x, y\n"
 			"viewport:%d, %d, %d, %d\n"
 			"recout:  %d, %d, %d, %d\n",
@@ -1960,8 +1962,9 @@ static enum dc_status apply_ctx_to_surface(
 				false);
 	}
 
+#ifdef DIAGS_BUILD
 	print_context_timing_status(dc, &context->res_ctx);
-
+#endif
 	return DC_OK;
 }
 
