@@ -683,7 +683,7 @@ bool mod_color_adjust_temperature(struct mod_color *mod_color,
 	for (i = 0; i < num_streams; i++) {
 		struct core_stream *core_stream = DC_STREAM_TO_CORE(streams[i]);
 
-		core_stream->public.gamut_remap_matrix.bypass = false;
+		core_stream->public.gamut_remap_matrix.enable_remap = true;
 
 		for (j = 0; j < 12; j++)
 			core_stream->public.gamut_remap_matrix.matrix[j] =
@@ -758,7 +758,7 @@ bool mod_color_adjust_source_gamut(struct mod_color *mod_color,
 	for (i = 0; i < num_streams; i++) {
 		struct core_stream *core_stream = DC_STREAM_TO_CORE(streams[i]);
 
-		core_stream->public.gamut_remap_matrix.bypass = false;
+		core_stream->public.gamut_remap_matrix.enable_remap = true;
 
 		for (j = 0; j < 12; j++)
 			core_stream->public.gamut_remap_matrix.matrix[j] =
@@ -833,7 +833,7 @@ bool mod_color_adjust_destination_gamut(struct mod_color *mod_color,
 	for (i = 0; i < num_streams; i++) {
 		struct core_stream *core_stream = DC_STREAM_TO_CORE(streams[i]);
 
-		core_stream->public.gamut_remap_matrix.bypass = false;
+		core_stream->public.gamut_remap_matrix.enable_remap = true;
 
 		for (j = 0; j < 12; j++)
 			core_stream->public.gamut_remap_matrix.matrix[j] =

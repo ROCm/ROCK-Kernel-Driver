@@ -1500,11 +1500,14 @@ static void set_plane_config(
 	enum blender_mode blender_mode = BLENDER_MODE_CURRENT_PIPE;
 	struct xfm_grph_csc_adjustment adjust;
 
+	memset(&adjust, 0, sizeof(adjust));
+	adjust.gamut_adjust_type = GRAPHICS_GAMUT_ADJUST_TYPE_BYPASS;
+
 	dc->hwss.enable_fe_clock(ctx, pipe_ctx->pipe_idx, true);
 
 	set_default_colors(pipe_ctx);
 
-	if (pipe_ctx->stream->public.gamut_remap_matrix.bypass == false) {
+	if (pipe_ctx->stream->public.gamut_remap_matrix.enable_remap == true) {
 		adjust.gamut_adjust_type = GRAPHICS_GAMUT_ADJUST_TYPE_SW;
 		adjust.temperature_matrix[0] =
 				pipe_ctx->stream->

@@ -239,6 +239,7 @@ void dce110_transform_set_gamut_remap(
 	struct dce110_transform *xfm110 = TO_DCE110_TRANSFORM(xfm);
 
 	if (adjust->gamut_adjust_type != GRAPHICS_GAMUT_ADJUST_TYPE_SW)
+		/* Bypass if type is bypass or hw */
 		program_gamut_remap(xfm110, NULL);
 	else {
 		struct fixed31_32 arr_matrix[GAMUT_MATRIX_SIZE];

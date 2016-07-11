@@ -529,7 +529,7 @@ struct freesync_context {
 
 struct colorspace_transform {
 	struct fixed31_32 matrix[12];
-	bool bypass;
+	bool enable_remap;
 };
 
 #endif /* DC_TYPES_H_ */
