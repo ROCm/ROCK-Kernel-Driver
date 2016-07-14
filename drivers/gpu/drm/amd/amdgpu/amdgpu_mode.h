@@ -438,8 +438,9 @@ struct amdgpu_crtc {
 	u32 lb_vblank_lead_lines;
 	struct drm_display_mode hw_mode;
 
-	/* After Set Mode target will be non-NULL */
 	int otg_inst;
+	uint32_t flip_flags;
+	/* After Set Mode target will be non-NULL */
 	struct dc_target *target;
 };
 
