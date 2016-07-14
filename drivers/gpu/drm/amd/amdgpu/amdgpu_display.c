@@ -668,6 +668,12 @@ int amdgpu_modeset_create_props(struct amdgpu_device *adev)
 			drm_property_create_bool(adev->ddev, 0, "freesync");
 		if (!adev->mode_info.freesync_property)
 			return -ENOMEM;
+		adev->mode_info.freesync_capable_property =
+			drm_property_create_bool(adev->ddev,
+						 DRM_MODE_PROP_IMMUTABLE,
+						 "freesync_capable");
+		if (!adev->mode_info.freesync_capable_property)
+			return -ENOMEM;
 	}
 
 	return 0;
