@@ -109,7 +109,7 @@ static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 	if (err)
 		goto err_alloc_mem;
 
-	err = kfd_map_memory_to_gpu(kdev, mem, p, pdd);
+	err = kfd_map_memory_to_gpu(mem, pdd);
 	if (err)
 		goto err_map_mem;
 

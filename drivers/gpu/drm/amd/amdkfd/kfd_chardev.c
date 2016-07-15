@@ -1344,10 +1344,10 @@ err_unlock:
 	return ret;
 }
 
-int kfd_map_memory_to_gpu(struct kfd_dev *dev, void *mem,
-		struct kfd_process *p, struct kfd_process_device *pdd)
+int kfd_map_memory_to_gpu(void *mem, struct kfd_process_device *pdd)
 {
 	int err;
+	struct kfd_dev *dev = pdd->dev;
 
 	BUG_ON(!dev);
 	BUG_ON(!pdd);
@@ -1358,7 +1358,7 @@ int kfd_map_memory_to_gpu(struct kfd_dev *dev, void *mem,
 	if (err != 0)
 		return err;
 
-	radeon_flush_tlb(dev, p->pasid);
+	radeon_flush_tlb(dev, pdd->process->pasid);
 
 	err = dev->dqm->ops.set_page_directory_base(dev->dqm, &pdd->qpd);
 	if (err != 0) {
@@ -1441,12 +1441,12 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
 			}
-			err = kfd_map_memory_to_gpu(peer, mem, p, peer_pdd);
+			err = kfd_map_memory_to_gpu(mem, peer_pdd);
 			if (err != 0)
 				pr_err("amdkfd: failed to map\n");
 		}
 	} else {
-		err = kfd_map_memory_to_gpu(dev, mem, p, pdd);
+		err = kfd_map_memory_to_gpu(mem, pdd);
 		if (err != 0)
 			pr_err("amdkfd: failed to map\n");
 	}
