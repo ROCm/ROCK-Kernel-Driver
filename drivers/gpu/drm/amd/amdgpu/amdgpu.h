@@ -1954,6 +1954,7 @@ struct amdgpu_ip_block_status {
 	bool valid;
 	bool sw;
 	bool hw;
+	bool hang;
 };
 
 struct amdgpu_device {
