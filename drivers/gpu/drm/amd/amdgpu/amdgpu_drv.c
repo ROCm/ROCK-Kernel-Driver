@@ -84,6 +84,7 @@ int amdgpu_sched_hw_submission = 2;
 int amdgpu_powerplay = -1;
 unsigned amdgpu_pcie_gen_cap = 0;
 unsigned amdgpu_pcie_lane_cap = 0;
+unsigned amdgpu_sdma_phase_quantum = 32;
 
 MODULE_PARM_DESC(vramlimit, "Restrict VRAM for testing, in megabytes");
 module_param_named(vramlimit, amdgpu_vram_limit, int, 0600);
@@ -173,6 +174,9 @@ module_param_named(pcie_gen_cap, amdgpu_pcie_gen_cap, uint, 0444);
 
 MODULE_PARM_DESC(pcie_lane_cap, "PCIE Lane Caps (0: autodetect (default))");
 module_param_named(pcie_lane_cap, amdgpu_pcie_lane_cap, uint, 0444);
+
+MODULE_PARM_DESC(sdma_phase_quantum, "SDMA context switch phase quantum (x 1K GPU clock cycles, 0 = no change (default 32))");
+module_param_named(sdma_phase_quantum, amdgpu_sdma_phase_quantum, uint, 0444);
 
 static const struct pci_device_id pciidlist[] = {
 #ifdef CONFIG_DRM_AMDGPU_CIK
