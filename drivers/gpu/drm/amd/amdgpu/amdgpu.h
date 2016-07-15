@@ -93,6 +93,7 @@ extern unsigned amdgpu_pcie_gen_cap;
 extern unsigned amdgpu_pcie_lane_cap;
 extern unsigned amdgpu_cg_mask;
 extern unsigned amdgpu_pg_mask;
+extern unsigned amdgpu_sdma_phase_quantum;
 extern int amdgpu_sclk_deep_sleep_en;
 
 #define AMDGPU_WAIT_IDLE_TIMEOUT_IN_MS	        3000
