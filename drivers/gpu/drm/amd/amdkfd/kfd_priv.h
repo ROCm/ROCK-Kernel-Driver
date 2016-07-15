@@ -717,8 +717,7 @@ void run_rdma_free_callback(struct kfd_bo *buf_obj);
 struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid);
 
 /* kfd dgpu memory */
-int kfd_map_memory_to_gpu(struct kfd_dev *dev, void *mem,
-		struct kfd_process *p, struct kfd_process_device *pdd);
+int kfd_map_memory_to_gpu(void *mem, struct kfd_process_device *pdd);
 
 /* Process device data iterator */
 struct kfd_process_device *kfd_get_first_process_device_data(struct kfd_process *p);
