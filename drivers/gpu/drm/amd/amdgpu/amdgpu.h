@@ -1685,6 +1685,7 @@ struct amdgpu_uvd {
 	struct amdgpu_irq_src	irq;
 	bool			address_64_bit;
 	struct amd_sched_entity entity;
+	uint32_t                srbm_soft_reset;
 };
 
 /*
