@@ -127,8 +127,25 @@ static int dm_wait_for_idle(void *handle)
 	return 0;
 }
 
+static int dm_check_soft_reset(void *handle)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+
+	if (amdgpu_display_is_display_hung(adev))
+		adev->ip_block_status[AMD_IP_BLOCK_TYPE_DCE].hang = true;
+	else
+		adev->ip_block_status[AMD_IP_BLOCK_TYPE_DCE].hang = false;
+
+	return 0;
+}
+
 static int dm_soft_reset(void *handle)
 {
+	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+
+	if (!adev->ip_block_status[AMD_IP_BLOCK_TYPE_DCE].hang)
+		return 0;
+
 	/* XXX todo */
 	return 0;
 }
@@ -718,6 +735,7 @@ const struct amd_ip_funcs amdgpu_dm_funcs = {
 	.resume = dm_resume,
 	.is_idle = dm_is_idle,
 	.wait_for_idle = dm_wait_for_idle,
+	.check_soft_reset = dm_check_soft_reset,
 	.soft_reset = dm_soft_reset,
 	.set_clockgating_state = dm_set_clockgating_state,
 	.set_powergating_state = dm_set_powergating_state,
