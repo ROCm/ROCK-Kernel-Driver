@@ -31,6 +31,7 @@
 #include <drm/drmP.h>
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
+#include "amdgpu_amdkfd.h"
 
 struct amdgpu_sync_entry {
 	struct hlist_node	node;
@@ -84,10 +85,19 @@ static bool amdgpu_sync_same_dev(struct amdgpu_device *adev,
  */
 static void *amdgpu_sync_get_owner(struct dma_fence *f)
 {
-	struct amd_sched_fence *s_fence = to_amd_sched_fence(f);
+	struct amd_sched_fence *s_fence;
+	struct amdgpu_amdkfd_fence *kfd_fence;
 
+	if (f == NULL)
+		return AMDGPU_FENCE_OWNER_UNDEFINED;
+
+	s_fence = to_amd_sched_fence(f);
 	if (s_fence)
 		return s_fence->owner;
+
+	kfd_fence = to_amdgpu_amdkfd_fence(f);
+	if (kfd_fence)
+		return AMDGPU_FENCE_OWNER_KFD;
 
 	return AMDGPU_FENCE_OWNER_UNDEFINED;
 }
@@ -171,7 +181,8 @@ int amdgpu_sync_fence(struct amdgpu_device *adev, struct amdgpu_sync *sync,
  * @resv: reservation object with embedded fence
  * @shared: true if we should only sync to the exclusive fence
  *
- * Sync to the fence
+ * Sync to the fence except if it is KFD eviction fence and owner is
+ * AMDGPU_FENCE_OWNER_VM.
  */
 int amdgpu_sync_resv(struct amdgpu_device *adev,
 		     struct amdgpu_sync *sync,
@@ -187,9 +198,11 @@ int amdgpu_sync_resv(struct amdgpu_device *adev,
 	if (resv == NULL)
 		return -EINVAL;
 
-	/* always sync to the exclusive fence */
 	f = reservation_object_get_excl(resv);
-	r = amdgpu_sync_fence(adev, sync, f);
+	fence_owner = amdgpu_sync_get_owner(f);
+	if (fence_owner != AMDGPU_FENCE_OWNER_KFD ||
+			owner != AMDGPU_FENCE_OWNER_VM)
+		r = amdgpu_sync_fence(adev, sync, f);
 
 	flist = reservation_object_get_list(resv);
 	if (!flist || r)
@@ -198,11 +211,15 @@ int amdgpu_sync_resv(struct amdgpu_device *adev,
 	for (i = 0; i < flist->shared_count; ++i) {
 		f = rcu_dereference_protected(flist->shared[i],
 					      reservation_object_held(resv));
+		fence_owner = amdgpu_sync_get_owner(f);
+		if (fence_owner == AMDGPU_FENCE_OWNER_KFD &&
+				owner == AMDGPU_FENCE_OWNER_VM)
+			continue;
+
 		if (amdgpu_sync_same_dev(adev, f)) {
 			/* VM updates are only interesting
 			 * for other VM updates and moves.
 			 */
-			fence_owner = amdgpu_sync_get_owner(f);
 			if ((owner != AMDGPU_FENCE_OWNER_UNDEFINED) &&
 			    (fence_owner != AMDGPU_FENCE_OWNER_UNDEFINED) &&
 			    ((owner == AMDGPU_FENCE_OWNER_VM) !=
