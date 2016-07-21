@@ -236,60 +236,6 @@ static void remove_bo_from_vm(struct amdgpu_device *adev,
 	kfree(entry);
 }
 
-
-static int try_pin_bo(struct amdgpu_bo *bo, uint32_t domain)
-{
-	int ret = 0;
-
-	if (!amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
-		ret = amdgpu_bo_pin(bo, domain, NULL);
-		if (ret != 0)
-			goto error;
-		/* Since TTM pipelines evictions and moves, wait for bo
-		 * validate to complete.
-		 */
-		ttm_bo_wait(&bo->tbo, false, false);
-	} else {
-		/* amdgpu_bo_pin doesn't support userptr. Therefore we
-		 * can use the bo->pin_count for our version of
-		 * pinning without conflict. */
-		if (bo->pin_count == 0) {
-			amdgpu_ttm_placement_from_domain(bo, domain);
-			ret = ttm_bo_validate(&bo->tbo, &bo->placement,
-					      true, false);
-			if (ret != 0) {
-				pr_err("amdgpu: failed to validate BO\n");
-				goto error;
-			}
-		}
-		bo->pin_count++;
-	}
-
-error:
-	return ret;
-}
-
-static int unpin_bo(struct amdgpu_bo *bo)
-{
-	int ret = 0;
-
-	if (!amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
-		ret = amdgpu_bo_unpin(bo);
-		if (ret != 0)
-			goto error;
-	} else if (--bo->pin_count == 0) {
-		amdgpu_ttm_placement_from_domain(bo, AMDGPU_GEM_DOMAIN_CPU);
-		ret = ttm_bo_validate(&bo->tbo, &bo->placement, true, false);
-		if (ret != 0) {
-			pr_err("amdgpu: failed to validate BO\n");
-			goto error;
-		}
-	}
-
-error:
-	return ret;
-}
-
 static int amdgpu_amdkfd_bo_validate(struct amdgpu_bo *bo, uint32_t domain,
 				     bool wait)
 {
@@ -337,43 +283,41 @@ static int amdgpu_amdkfd_bo_invalidate(struct amdgpu_bo *bo)
 	return ret;
 }
 
-static int try_pin_pts(struct amdgpu_vm *vm)
+static int validate_pt_pd_bos(struct amdgpu_vm *vm)
 {
 	int i, ret = 0;
-	struct amdgpu_bo *bo;
+	struct amdgpu_bo *bo, *pd = vm->page_directory;
+	struct amdkfd_vm *kvm = container_of(vm, struct amdkfd_vm, base);
 
-	/* only pin PTs not yet pinned*/
+	/* Remove eviction fence so that validate can wait on move fences */
+	amdgpu_bo_fence(pd, NULL, false);
+
+	/* PTs share same reservation object as PD. So only fence PD */
 	for (i = 0; i <= vm->max_pde_used; ++i) {
 		bo = vm->page_tables[i].entry.robj;
 
-		if (!bo || bo->pin_count)
+		if (!bo)
 			continue;
 
-		ret = try_pin_bo(bo, AMDGPU_GEM_DOMAIN_VRAM);
+		ret = amdgpu_amdkfd_bo_validate(bo, AMDGPU_GEM_DOMAIN_VRAM,
+						true);
 		if (ret != 0) {
-			pr_err("amdgpu: failed to pin PTE %d\n", i);
+			pr_err("amdgpu: failed to validate PTE %d\n", i);
 			break;
 		}
 	}
 
-	return ret;
-}
-
-static void unpin_pts(struct amdgpu_vm *vm)
-{
-	int i;
-	struct amdgpu_bo *bo;
-
-	for (i = vm->max_pde_used; i >= 0; --i) {
-		bo = vm->page_tables[i].entry.robj;
-
-		if (!bo || !bo->pin_count)
-			continue;
-
-		amdgpu_bo_reserve(bo, true);
-		unpin_bo(bo);
-		amdgpu_bo_unreserve(bo);
+	ret = amdgpu_amdkfd_bo_validate(pd, AMDGPU_GEM_DOMAIN_VRAM,
+					true);
+	if (ret != 0) {
+		pr_err("amdgpu: failed to validate PD\n");
+		return ret;
 	}
+
+	/* Add the eviction fence back */
+	amdgpu_bo_fence(pd, &kvm->master->eviction_fence->base, true);
+
+	return ret;
 }
 
 /**
@@ -862,10 +806,10 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	int ret;
 
 	vm = bo_va->vm;
-	/* Pin PTs */
-	ret = try_pin_pts(vm);
+	/* Validate PT / PTs */
+	ret = validate_pt_pd_bos(vm);
 	if (ret != 0) {
-		pr_err("amdkfd: Failed to pin PTs\n");
+		pr_err("amdkfd: Failed to validate PTs\n");
 		goto err_unpin_bo;
 	}
 
@@ -1233,7 +1177,6 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 {
 	int ret;
 	struct amdkfd_vm *new_vm;
-	struct amdgpu_bo *pd;
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 
 	BUG_ON(kgd == NULL);
@@ -1281,14 +1224,6 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 	if (ret != 0)
 		pr_err("amdgpu: Failed to amdgpu_vm_clear_freed\n");
 
-	/* Pin the PD directory */
-	pd = new_vm->base.page_directory;
-	amdgpu_bo_reserve(pd, true);
-	ret = try_pin_bo(pd, AMDGPU_GEM_DOMAIN_VRAM);
-	amdgpu_bo_unreserve(pd);
-	if (ret != 0)
-		pr_err("amdkfd: Failed to pin PD\n");
-
 	pr_debug("amdgpu: created process vm with address 0x%llx\n",
 			amdgpu_bo_gpu_offset(new_vm->base.page_directory));
 
@@ -1313,17 +1248,15 @@ void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 	BUG_ON(vm == NULL);
 
 	pr_debug("Destroying process vm with address %p\n", vm);
+	/* Release eviction fence from PD */
+	pd = avm->page_directory;
+	amdgpu_bo_reserve(pd, false);
+	amdgpu_bo_fence(pd, NULL, false);
+	amdgpu_bo_unreserve(pd);
+
 	/* Release eviction fence */
 	if (kfd_vm->master == kfd_vm && kfd_vm->eviction_fence != NULL)
 		fence_put(&kfd_vm->eviction_fence->base);
-
-	/* Unpin PTs */
-	unpin_pts(avm);
-	/* Unpin PD*/
-	pd = avm->page_directory;
-	amdgpu_bo_reserve(pd, true);
-	unpin_bo(pd);
-	amdgpu_bo_unreserve(pd);
 
 	/* Release the VM context */
 	amdgpu_vm_fini(adev, avm);
