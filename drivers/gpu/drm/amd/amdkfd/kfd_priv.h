@@ -163,11 +163,14 @@ enum asic_family_type {
 	CHIP_HAWAII,
 	CHIP_CARRIZO,
 	CHIP_TONGA,
-	CHIP_FIJI
+	CHIP_FIJI,
+	CHIP_POLARIS10,
+	CHIP_POLARIS11
 };
 
-#define KFD_IS_VI(chip) ((chip) >= CHIP_CARRIZO && (chip) <= CHIP_FIJI)
-#define KFD_IS_DGPU(chip) (((chip) >= CHIP_TONGA && (chip) <= CHIP_FIJI) || \
+#define KFD_IS_VI(chip) ((chip) >= CHIP_CARRIZO && (chip) <= CHIP_POLARIS11)
+#define KFD_IS_DGPU(chip) (((chip) >= CHIP_TONGA && \
+			   (chip) <= CHIP_POLARIS11) || \
 			   (chip) == CHIP_HAWAII)
 
 struct kfd_event_interrupt_class {
