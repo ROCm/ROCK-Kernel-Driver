@@ -623,6 +623,8 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 	case CHIP_CARRIZO:
 	case CHIP_TONGA:
 	case CHIP_FIJI:
+	case CHIP_POLARIS10:
+	case CHIP_POLARIS11:
 		if (fw_ver >= KFD_SCRATCH_CZ_FW_VER) {
 			pm->pmf->map_process = pm_create_map_process_scratch;
 			pm->pmf->get_map_process_packet_size =
