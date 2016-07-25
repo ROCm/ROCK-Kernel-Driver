@@ -319,7 +319,10 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 
 	adev = get_amdgpu_device(kgd);
 	byte_align = (adev->family == AMDGPU_FAMILY_VI &&
-		      adev->asic_type != CHIP_FIJI) ? VI_BO_SIZE_ALIGN : 1;
+			adev->asic_type != CHIP_FIJI &&
+			adev->asic_type != CHIP_POLARIS10 &&
+			adev->asic_type != CHIP_POLARIS11) ?
+			VI_BO_SIZE_ALIGN : 1;
 
 	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
 	if (*mem == NULL) {
