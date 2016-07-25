@@ -35,6 +35,7 @@
 #include <linux/pid.h>
 #include <linux/interval_tree.h>
 #include <linux/seq_file.h>
+#include <linux/kref.h>
 #include <kgd_kfd_interface.h>
 
 #include "amd_rdma.h"
@@ -607,6 +608,9 @@ struct kfd_process {
 	struct hlist_node kfd_processes;
 
 	struct mm_struct *mm;
+
+	struct kref ref;
+	struct work_struct release_work;
 
 	struct rw_semaphore lock;
 

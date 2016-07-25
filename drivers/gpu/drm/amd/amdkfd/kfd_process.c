@@ -51,11 +51,6 @@ DEFINE_STATIC_SRCU(kfd_processes_srcu);
 
 static struct workqueue_struct *kfd_process_wq;
 
-struct kfd_process_release_work {
-	struct work_struct kfd_work;
-	struct kfd_process *p;
-};
-
 #define MIN_IDR_ID 1
 #define MAX_IDR_ID 0 /*0 - for unlimited*/
 
@@ -415,23 +410,18 @@ int restore(struct kfd_dev *kfd)
  * is not findable any more. We must assume that no other thread is
  * using it any more, otherwise we couldn't safely free the process
  * stucture in the end. */
-static void kfd_process_wq_release(struct work_struct *work)
+static void kfd_process_ref_release(struct kref *ref)
 {
-	struct kfd_process_release_work *my_work;
+	struct kfd_process *p = container_of(ref, struct kfd_process, ref);
 	struct kfd_process_device *pdd, *temp, *peer_pdd;
-	struct kfd_process *p;
 	struct kfd_bo *buf_obj;
 	int id;
 
-	my_work = (struct kfd_process_release_work *) work;
-
-	p = my_work->p;
-
-	pr_debug("Releasing process (pasid %d) in workqueue\n",
+	pr_debug("Releasing process (pasid %d)\n",
 			p->pasid);
 
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
-		pr_debug("Releasing pdd (topology id %d) for process (pasid %d) in workqueue\n",
+		pr_debug("Releasing pdd (topology id %d) for process (pasid %d)\n",
 				pdd->dev->id, p->pasid);
 
 		if (pdd->dev->device_info->is_need_iommu_device) {
@@ -477,29 +467,24 @@ static void kfd_process_wq_release(struct work_struct *work)
 	kfd_pasid_free(p->pasid);
 
 	kfree(p);
+}
 
-	kfree((void *)work);
+static void kfd_process_wq_release(struct work_struct *work)
+{
+	struct kfd_process *p = container_of(work, struct kfd_process,
+					     release_work);
+
+	kref_put(&p->ref, kfd_process_ref_release);
 }
 
 static void kfd_process_destroy_delayed(struct rcu_head *rcu)
 {
-	struct kfd_process_release_work *work;
-	struct kfd_process *p;
+	struct kfd_process *p = container_of(rcu, struct kfd_process, rcu);
 
 	BUG_ON(!kfd_process_wq);
 
-	p = container_of(rcu, struct kfd_process, rcu);
-	BUG_ON(atomic_read(&p->mm->mm_count) <= 0);
-
-	mmdrop(p->mm);
-
-	work = kmalloc(sizeof(struct kfd_process_release_work), GFP_ATOMIC);
-
-	if (work) {
-		INIT_WORK((struct work_struct *) work, kfd_process_wq_release);
-		work->p = p;
-		queue_work(kfd_process_wq, (struct work_struct *) work);
-	}
+	INIT_WORK(&p->release_work, kfd_process_wq_release);
+	queue_work(kfd_process_wq, &p->release_work);
 }
 
 static void kfd_process_notifier_release(struct mmu_notifier *mn,
@@ -564,15 +549,12 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 		}
 	}
 
+	/* Indicate to other users that MM is no longer valid */
+	p->mm = NULL;
+
 	up_write(&p->lock);
 
-	/*
-	 * Because we drop mm_count inside kfd_process_destroy_delayed
-	 * and because the mmu_notifier_unregister function also drop
-	 * mm_count we need to take an extra count here.
-	 */
-	mmgrab(p->mm);
-	mmu_notifier_unregister_no_release(&p->mmu_notifier, p->mm);
+	mmu_notifier_unregister_no_release(&p->mmu_notifier, mm);
 	mmu_notifier_call_srcu(&p->rcu, &kfd_process_destroy_delayed);
 }
 
@@ -650,6 +632,7 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	if (process->pasid == 0)
 		goto err_alloc_pasid;
 
+	kref_init(&process->ref);
 	init_rwsem(&process->lock);
 
 	process->mm = thread->mm;
