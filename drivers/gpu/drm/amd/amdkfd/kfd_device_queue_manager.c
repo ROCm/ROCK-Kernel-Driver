@@ -1596,7 +1596,7 @@ int kfd_process_vm_fault(struct device_queue_manager *dqm,
 	pdd = kfd_get_process_device_data(dqm->dev, p);
 	if (pdd)
 		ret = process_evict_queues(dqm, &pdd->qpd);
-	up_read(&p->lock);
+	kfd_unref_process(p);
 
 	return ret;
 }
