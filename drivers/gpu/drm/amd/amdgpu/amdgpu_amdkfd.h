@@ -202,5 +202,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm);
 int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm);
 
+void amdgpu_amdkfd_gpuvm_init_mem_limits(void);
+
 #endif /* AMDGPU_AMDKFD_H_INCLUDED */
 
