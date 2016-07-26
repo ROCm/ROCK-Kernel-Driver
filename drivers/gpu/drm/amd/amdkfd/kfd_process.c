@@ -466,6 +466,8 @@ static void kfd_process_ref_release(struct kref *ref)
 
 	kfd_pasid_free(p->pasid);
 
+	put_task_struct(p->lead_thread);
+
 	kfree(p);
 }
 
@@ -647,6 +649,7 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 			(uintptr_t)process->mm);
 
 	process->lead_thread = thread->group_leader;
+	get_task_struct(process->lead_thread);
 
 	INIT_LIST_HEAD(&process->per_device_data);
 
