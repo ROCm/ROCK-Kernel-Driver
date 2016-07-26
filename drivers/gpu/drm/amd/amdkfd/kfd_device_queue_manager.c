@@ -389,7 +389,7 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 	BUG_ON(!dqm || !q || !q->mqd);
 
 	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
-		down_read(&q->process->mm->mmap_sem);
+		down_read(&current->mm->mmap_sem);
 	mutex_lock(&dqm->lock);
 
 	pdd = kfd_get_process_device_data(q->device, q->process);
@@ -446,7 +446,7 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 out_unlock:
 	mutex_unlock(&dqm->lock);
 	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
-		up_read(&q->process->mm->mmap_sem);
+		up_read(&current->mm->mmap_sem);
 
 	return retval;
 }
@@ -521,14 +521,10 @@ int process_restore_queues(struct device_queue_manager *dqm,
 {
 	struct queue *q, *next;
 	struct mqd_manager *mqd;
-	struct kfd_process_device *pdd =
-		container_of(qpd, struct kfd_process_device, qpd);
 	int retval = 0;
 
 	BUG_ON(!dqm || !qpd);
 
-	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
-		down_read(&pdd->process->mm->mmap_sem);
 	mutex_lock(&dqm->lock);
 	if (qpd->evicted == 0) /* already restored, do nothing */
 		goto out_unlock;
@@ -568,8 +564,6 @@ int process_restore_queues(struct device_queue_manager *dqm,
 
 out_unlock:
 	mutex_unlock(&dqm->lock);
-	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
-		up_read(&pdd->process->mm->mmap_sem);
 
 	return retval;
 }
