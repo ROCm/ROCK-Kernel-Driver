@@ -43,6 +43,18 @@
  * a HW bug. */
 #define VI_BO_SIZE_ALIGN (0x8000)
 
+/* Impose limit on how much memory KFD can use */
+struct kfd_mem_usage_limit {
+	uint64_t max_system_mem_limit;
+	uint64_t max_userptr_mem_limit;
+	int64_t system_mem_used;
+	int64_t userptr_mem_used;
+	spinlock_t mem_limit_lock;
+};
+
+static struct kfd_mem_usage_limit kfd_mem_limit;
+
+
 static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
 {
 	return (struct amdgpu_device *)kgd;
@@ -64,6 +76,85 @@ static bool check_if_add_bo_to_vm(struct amdgpu_vm *avm,
 			return false;
 
 	return true;
+}
+
+/* Set memory usage limits. Current, limits are
+ *  System (kernel) memory - 1/4th System RAM
+ *  Userptr memory - 3/4th System RAM
+ */
+void amdgpu_amdkfd_gpuvm_init_mem_limits(void)
+{
+	struct sysinfo si;
+	uint64_t mem;
+
+	si_meminfo(&si);
+	mem = si.totalram - si.totalhigh;
+	mem *= si.mem_unit;
+
+	spin_lock_init(&kfd_mem_limit.mem_limit_lock);
+	kfd_mem_limit.max_system_mem_limit = (mem >> 2) - (mem >> 4);
+	kfd_mem_limit.max_userptr_mem_limit = mem - (mem >> 4);
+	pr_debug("Kernel memory limit %lluM, userptr limit %lluM\n",
+		(kfd_mem_limit.max_system_mem_limit >> 20),
+		(kfd_mem_limit.max_userptr_mem_limit >> 20));
+}
+
+static int check_and_reserve_system_mem_limit(struct amdgpu_device *adev,
+					      uint64_t size, u32 domain)
+{
+	size_t acc_size;
+	int ret = 0;
+
+	acc_size = ttm_bo_dma_acc_size(&adev->mman.bdev, size,
+				       sizeof(struct amdgpu_bo));
+
+	spin_lock(&kfd_mem_limit.mem_limit_lock);
+	if (domain == AMDGPU_GEM_DOMAIN_GTT) {
+		if (kfd_mem_limit.system_mem_used + (acc_size + size) >
+			kfd_mem_limit.max_system_mem_limit) {
+			ret = -ENOMEM;
+			goto err_no_mem;
+		}
+		kfd_mem_limit.system_mem_used += (acc_size + size);
+
+	} else if (domain == AMDGPU_GEM_DOMAIN_CPU) {
+		if ((kfd_mem_limit.system_mem_used + acc_size >
+			kfd_mem_limit.max_system_mem_limit) &&
+			(kfd_mem_limit.userptr_mem_used + (size + acc_size) >
+			kfd_mem_limit.max_userptr_mem_limit)) {
+			ret = -ENOMEM;
+			goto err_no_mem;
+		}
+		kfd_mem_limit.system_mem_used += acc_size;
+		kfd_mem_limit.userptr_mem_used += size;
+	}
+
+err_no_mem:
+	spin_unlock(&kfd_mem_limit.mem_limit_lock);
+	return ret;
+}
+
+static void unreserve_system_memory_limit(struct amdgpu_bo *bo)
+{
+	spin_lock(&kfd_mem_limit.mem_limit_lock);
+
+	if (bo->prefered_domains == AMDGPU_GEM_DOMAIN_GTT)
+		kfd_mem_limit.system_mem_used -=
+			(bo->tbo.acc_size + amdgpu_bo_size(bo));
+	else if (amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
+		kfd_mem_limit.system_mem_used -= bo->tbo.acc_size;
+		kfd_mem_limit.userptr_mem_used -= amdgpu_bo_size(bo);
+	}
+	if (kfd_mem_limit.system_mem_used < 0) {
+		pr_warn("kfd system memory size ref. error\n");
+		kfd_mem_limit.system_mem_used = 0;
+	}
+	if (kfd_mem_limit.userptr_mem_used < 0) {
+		pr_warn("kfd userptr memory size ref. error\n");
+		kfd_mem_limit.userptr_mem_used = 0;
+	}
+
+	spin_unlock(&kfd_mem_limit.mem_limit_lock);
 }
 
 static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
@@ -358,6 +449,13 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	alloc_domain = userptr ? AMDGPU_GEM_DOMAIN_CPU : domain;
 	pr_debug("amdkfd: allocating BO on domain %d with size %llu\n",
 				alloc_domain, size);
+
+	ret = check_and_reserve_system_mem_limit(adev, size, alloc_domain);
+	if (ret) {
+		pr_err("amdkfd: Insufficient system memory\n");
+		goto err_bo_create;
+	}
+
 
 	/* Allocate buffer object. Userptr objects need to start out
 	 * in the CPU domain, get moved to GTT when pinned. */
@@ -944,6 +1042,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	}
 
 	/* Free the BO*/
+	unreserve_system_memory_limit(mem->data2.bo);
 	bo_list_entry = &mem->data2.bo_list_entry;
 	mutex_lock(&master_vm->lock);
 	list_del(&bo_list_entry->tv.head);
