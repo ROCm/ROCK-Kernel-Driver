@@ -56,6 +56,7 @@ static struct workqueue_struct *kfd_process_wq;
 
 static struct kfd_process *find_process(const struct task_struct *thread,
 		bool lock);
+static void kfd_process_ref_release(struct kref *ref);
 static struct kfd_process *create_process(const struct task_struct *thread);
 static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep);
 
@@ -260,21 +261,26 @@ static struct kfd_process *find_process_by_mm(const struct mm_struct *mm)
 }
 
 static struct kfd_process *find_process(const struct task_struct *thread,
-		bool lock)
+		bool ref)
 {
 	struct kfd_process *p;
 	int idx;
 
 	idx = srcu_read_lock(&kfd_processes_srcu);
 	p = find_process_by_mm(thread->mm);
-	if (p && lock)
-		down_read(&p->lock);
+	if (p && ref)
+		kref_get(&p->ref);
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 
 	return p;
 }
 
-/* This returns with process->lock read-locked. */
+void kfd_unref_process(struct kfd_process *p)
+{
+	kref_put(&p->ref, kfd_process_ref_release);
+}
+
+/* This increments the process->ref counter. */
 struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid)
 {
 	struct task_struct *task = NULL;
@@ -852,6 +858,8 @@ void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid)
 
 	mutex_unlock(get_dbgmgr_mutex());
 
+	down_write(&p->lock);
+
 	pdd = kfd_get_process_device_data(dev, p);
 	if (pdd->reset_wavefronts) {
 		dbgdev_wave_reset_wavefronts(pdd->dev, p);
@@ -859,6 +867,8 @@ void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid)
 	}
 
 	up_write(&p->lock);
+
+	kfd_unref_process(p);
 }
 
 struct kfd_process_device *kfd_get_first_process_device_data(struct kfd_process *p)
@@ -990,7 +1000,7 @@ void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 	kfree(buf_obj);
 }
 
-/* This returns with process->lock read-locked. */
+/* This increments the process->ref counter. */
 struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 {
 	struct kfd_process *p, *ret_p = NULL;
@@ -1000,7 +1010,7 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
 		if (p->pasid == pasid) {
-			down_read(&p->lock);
+			kref_get(&p->ref);
 			ret_p = p;
 			break;
 		}
@@ -1011,7 +1021,7 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 	return ret_p;
 }
 
-/* This returns with process->lock read-locked. */
+/* This increments the process->ref counter. */
 struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
 {
 	struct kfd_process *p;
@@ -1020,7 +1030,7 @@ struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
 
 	p = find_process_by_mm(mm);
 	if (p != NULL)
-		down_read(&p->lock);
+		kref_get(&p->ref);
 
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 

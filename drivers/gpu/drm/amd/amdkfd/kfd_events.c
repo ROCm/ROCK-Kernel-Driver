@@ -661,7 +661,8 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 
 	/* Because we are called from arbitrary context (workqueue) as opposed
 	 * to process context, kfd_process could attempt to exit while we are
-	 * running so the lookup function returns a read-locked process. */
+	 * running so the lookup function increments the process ref count.
+	 */
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
 	if (!p)
 		return; /* Presumably process exited. */
@@ -691,7 +692,7 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 	}
 
 	mutex_unlock(&p->event_mutex);
-	up_read(&p->lock);
+	kfd_unref_process(p);
 }
 
 static struct kfd_event_waiter *alloc_event_waiters(uint32_t num_events)
@@ -1024,7 +1025,7 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 	/*
 	 * Because we are called from arbitrary context (workqueue) as opposed
 	 * to process context, kfd_process could attempt to exit while we are
-	 * running so the lookup function returns a read-locked process.
+	 * running so the lookup function increments the process ref count.
 	 */
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
 	struct mm_struct *mm;
@@ -1037,7 +1038,7 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 	 */
 	mm = get_task_mm(p->lead_thread);
 	if (!mm) {
-		up_read(&p->lock);
+		kfd_unref_process(p);
 		return; /* Process is exiting */
 	}
 
@@ -1080,7 +1081,8 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 			&memory_exception_data);
 
 	mutex_unlock(&p->event_mutex);
-	up_read(&p->lock);
+
+	kfd_unref_process(p);
 }
 
 void kfd_signal_hw_exception_event(unsigned int pasid)
@@ -1088,7 +1090,7 @@ void kfd_signal_hw_exception_event(unsigned int pasid)
 	/*
 	 * Because we are called from arbitrary context (workqueue) as opposed
 	 * to process context, kfd_process could attempt to exit while we are
-	 * running so the lookup function returns a read-locked process.
+	 * running so the lookup function increments the process ref count.
 	 */
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
 
@@ -1101,7 +1103,7 @@ void kfd_signal_hw_exception_event(unsigned int pasid)
 	lookup_events_by_type_and_signal(p, KFD_EVENT_TYPE_HW_EXCEPTION, NULL);
 
 	mutex_unlock(&p->event_mutex);
-	up_read(&p->lock);
+	kfd_unref_process(p);
 }
 
 void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
@@ -1138,7 +1140,6 @@ void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 	}
 
 	mutex_unlock(&p->event_mutex);
-	up_read(&p->lock);
-
+	kfd_unref_process(p);
 }
 
