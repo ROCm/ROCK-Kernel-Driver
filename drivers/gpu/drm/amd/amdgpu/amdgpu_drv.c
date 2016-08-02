@@ -156,7 +156,7 @@ module_param_named(vm_fault_stop, amdgpu_vm_fault_stop, int, 0444);
 MODULE_PARM_DESC(vm_debug, "Debug VM handling (0 = disabled (default), 1 = enabled)");
 module_param_named(vm_debug, amdgpu_vm_debug, int, 0644);
 
-MODULE_PARM_DESC(vm_update_context, "VM update using CPU. (0 = never, 1 = Graphics only, 2 = Compute only (default), 3 = Both");
+MODULE_PARM_DESC(vm_update_context, "VM update using CPU on large BAR. (0 = never, 1 = Graphics only, 2 = Compute only (default), 3 = Both");
 module_param_named(vm_update_context, amdgpu_vm_update_context, int, 0444);
 
 MODULE_PARM_DESC(exp_hw_support, "experimental hw support (1 = enable, 0 = disable (default))");

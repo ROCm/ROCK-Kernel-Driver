@@ -879,6 +879,8 @@ struct amdgpu_vm_pt {
  *  updated for Graphics and Compute. BIT0 controls Graphics and BIT1 Compute.
  *  BIT0 [= 0] Graphics updated by SDMA [= 1] by CPU
  *  BIT1 [= 0] Compute updated by SDMA [= 1] by CPU
+ *
+ *  NOTE: CPU update is supported only for Large BAR systems
  */
 #define AMDGPU_VM_USE_CPU_UPDATE_FOR_GRAPHICS_MASK (1 << 0)
 #define AMDGPU_VM_USE_CPU_UPDATE_FOR_COMPUTE_MASK (1 << 1)

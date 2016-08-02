@@ -67,6 +67,17 @@ static bool check_if_add_bo_to_vm(struct amdgpu_vm *avm,
 	return true;
 }
 
+bool check_if_large_bar(struct kgd_dev *kgd)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	if (adev->mc.visible_vram_size > 0 &&
+		adev->mc.real_vram_size == adev->mc.visible_vram_size)
+		return true;
+
+	return false;
+}
+
 static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
 		struct amdgpu_vm *avm, bool is_aql,
 		struct kfd_bo_va_list **p_bo_va_entry)
@@ -1003,6 +1014,7 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm)
 	int ret;
 	struct amdgpu_vm *new_vm;
 	struct amdgpu_bo *pd;
+	bool vm_update_using_cpu;
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 
 	BUG_ON(kgd == NULL);
@@ -1013,9 +1025,10 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm)
 		return -ENOMEM;
 
 	/* Initialize the VM context, allocate the page directory and zero it */
+	vm_update_using_cpu = !!(amdgpu_vm_update_context &
+				AMDGPU_VM_USE_CPU_UPDATE_FOR_COMPUTE_MASK);
 	ret = amdgpu_vm_init(adev, new_vm,
-		!!(amdgpu_vm_update_context &
-		AMDGPU_VM_USE_CPU_UPDATE_FOR_COMPUTE_MASK));
+			     (vm_update_using_cpu && check_if_large_bar(kgd)));
 	if (ret != 0) {
 		pr_err("amdgpu: failed init vm ret %d\n", ret);
 		/* Undo everything related to the new VM context */
