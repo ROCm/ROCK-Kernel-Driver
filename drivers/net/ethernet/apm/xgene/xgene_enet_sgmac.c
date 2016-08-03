@@ -28,6 +28,12 @@ static void xgene_enet_wr_csr(struct xgene_enet_pdata *p, u32 offset, u32 val)
 	iowrite32(val, p->eth_csr_addr + offset);
 }
 
+static void xgene_enet_wr_clkrst_csr(struct xgene_enet_pdata *p, u32 offset,
+				     u32 val)
+{
+	iowrite32(val, p->base_addr + offset);
+}
+
 static void xgene_enet_wr_ring_if(struct xgene_enet_pdata *p,
 				  u32 offset, u32 val)
 {
@@ -93,6 +99,11 @@ static u32 xgene_enet_rd_diag_csr(struct xgene_enet_pdata *p, u32 offset)
 	return ioread32(p->eth_diag_csr_addr + offset);
 }
 
+static u32 xgene_enet_rd_mcx_csr(struct xgene_enet_pdata *p, u32 offset)
+{
+	return ioread32(p->mcx_mac_csr_addr + offset);
+}
+
 static u32 xgene_enet_rd_indirect(struct xgene_indirect_ctl *ctl, u32 rd_addr)
 {
 	u32 rd_data;
@@ -132,8 +143,17 @@ static u32 xgene_enet_rd_mac(struct xgene_enet_pdata *p, u32 rd_addr)
 static int xgene_enet_ecc_init(struct xgene_enet_pdata *p)
 {
 	struct net_device *ndev = p->ndev;
-	u32 data;
+	u32 data, shutdown;
 	int i = 0;
+
+	shutdown = xgene_enet_rd_diag_csr(p, ENET_CFG_MEM_RAM_SHUTDOWN_ADDR);
+	data = xgene_enet_rd_diag_csr(p, ENET_BLOCK_MEM_RDY_ADDR);
+
+	if (!shutdown && data == ~0U) {
+		netdev_dbg(ndev, "+ ecc_init called before, shutdown: %08x mem_ready: %08x\n",
+			   shutdown, data);
+		return 0;
+	}
 
 	xgene_enet_wr_diag_csr(p, ENET_CFG_MEM_RAM_SHUTDOWN_ADDR, 0);
 	do {
@@ -229,21 +249,97 @@ static u32 xgene_enet_link_status(struct xgene_enet_pdata *p)
 
 	data = xgene_mii_phy_read(p, INT_PHY_ADDR,
 				  SGMII_BASE_PAGE_ABILITY_ADDR >> 2);
+	if (LINK_SPEED(data) == PHY_SPEED_1000)
+		p->phy_speed = SPEED_1000;
+	else if (LINK_SPEED(data) == PHY_SPEED_100)
+		p->phy_speed = SPEED_100;
+	else
+		p->phy_speed = SPEED_10;
 
 	return data & LINK_UP;
+}
+
+static void xgene_sgmac_set_speed(struct xgene_enet_pdata *p)
+{
+	u32 icm0_addr, icm2_addr, debug_addr;
+	u32 icm0, icm2, intf_ctl;
+	u32 mc2, value;
+
+	if (p->phy_speed != SPEED_UNKNOWN) {
+		if (!xgene_enet_link_status(p)) {
+			xgene_mii_phy_write(p, INT_PHY_ADDR,
+					    SGMII_TBI_CONTROL_ADDR >> 2,
+					    0x8000);
+			xgene_mii_phy_write(p, INT_PHY_ADDR,
+					    SGMII_TBI_CONTROL_ADDR >> 2, 0x0);
+		}
+	}
+
+	if (p->enet_id == XGENE_ENET1) {
+		icm0_addr = (!p->port_id) ?
+			ICM_CONFIG0_REG_0_ADDR : ICM_CONFIG0_REG_1_ADDR;
+		icm2_addr = (!p->port_id) ?
+			ICM_CONFIG2_REG_0_ADDR : ICM_CONFIG2_REG_1_ADDR;
+		debug_addr = DEBUG_REG_ADDR;
+	} else {
+		icm0_addr = XG_MCX_ICM_CONFIG0_REG_0_ADDR;
+		icm2_addr = XG_MCX_ICM_CONFIG2_REG_0_ADDR;
+		debug_addr = XG_DEBUG_REG_ADDR;
+	}
+
+	icm0 = xgene_enet_rd_mcx_csr(p, icm0_addr);
+	icm2 = xgene_enet_rd_mcx_csr(p, icm2_addr);
+	mc2 = xgene_enet_rd_mac(p, MAC_CONFIG_2_ADDR);
+	intf_ctl = xgene_enet_rd_mac(p, INTERFACE_CONTROL_ADDR);
+
+	switch (p->phy_speed) {
+	case SPEED_10:
+		ENET_INTERFACE_MODE2_SET(&mc2, 1);
+		intf_ctl &= ~(ENET_LHD_MODE | ENET_GHD_MODE);
+		CFG_MACMODE_SET(&icm0, 0);
+		CFG_WAITASYNCRD_SET(&icm2, 500);
+		break;
+	case SPEED_100:
+		ENET_INTERFACE_MODE2_SET(&mc2, 1);
+		intf_ctl &= ~ENET_GHD_MODE;
+		intf_ctl |= ENET_LHD_MODE;
+		CFG_MACMODE_SET(&icm0, 1);
+		CFG_WAITASYNCRD_SET(&icm2, 80);
+		break;
+	default:
+		ENET_INTERFACE_MODE2_SET(&mc2, 2);
+		intf_ctl &= ~ENET_LHD_MODE;
+		intf_ctl |= ENET_GHD_MODE;
+		CFG_MACMODE_SET(&icm0, 2);
+		CFG_WAITASYNCRD_SET(&icm2, 16);
+		value = xgene_enet_rd_csr(p, debug_addr);
+		value |= CFG_BYPASS_UNISEC_TX | CFG_BYPASS_UNISEC_RX;
+		xgene_enet_wr_csr(p, debug_addr, value);
+		break;
+	}
+
+	mc2 |= FULL_DUPLEX2 | PAD_CRC;
+	xgene_enet_wr_mac(p, MAC_CONFIG_2_ADDR, mc2);
+	xgene_enet_wr_mac(p, INTERFACE_CONTROL_ADDR, intf_ctl);
+	xgene_enet_wr_mcx_csr(p, icm0_addr, icm0);
+	xgene_enet_wr_mcx_csr(p, icm2_addr, icm2);
 }
 
 static void xgene_sgmac_init(struct xgene_enet_pdata *p)
 {
 	u32 data, loop = 10;
-	u32 offset = p->port_id * 4;
+	u32 offset = 0;
 	u32 enet_spare_cfg_reg, rsif_config_reg;
 	u32 cfg_bypass_reg, rx_dv_gate_reg;
 
-	xgene_sgmac_reset(p);
+	if (!(p->enet_id == XGENE_ENET2 && p->mdio_driver))
+		xgene_sgmac_reset(p);
 
 	/* Enable auto-negotiation */
 	xgene_mii_phy_write(p, INT_PHY_ADDR, SGMII_CONTROL_ADDR >> 2, 0x1000);
+	xgene_mii_phy_write(p, INT_PHY_ADDR, SGMII_TBI_CONTROL_ADDR >> 2,
+			    0x8000);
+	xgene_mii_phy_write(p, INT_PHY_ADDR, SGMII_CONTROL_ADDR >> 2, 0x9140);
 	xgene_mii_phy_write(p, INT_PHY_ADDR, SGMII_TBI_CONTROL_ADDR >> 2, 0);
 
 	while (loop--) {
@@ -256,16 +352,14 @@ static void xgene_sgmac_init(struct xgene_enet_pdata *p)
 	if (!(data & AUTO_NEG_COMPLETE) || !(data & LINK_STATUS))
 		netdev_err(p->ndev, "Auto-negotiation failed\n");
 
-	data = xgene_enet_rd_mac(p, MAC_CONFIG_2_ADDR);
-	ENET_INTERFACE_MODE2_SET(&data, 2);
-	xgene_enet_wr_mac(p, MAC_CONFIG_2_ADDR, data | FULL_DUPLEX2);
-	xgene_enet_wr_mac(p, INTERFACE_CONTROL_ADDR, ENET_GHD_MODE);
+	xgene_sgmac_set_speed(p);
 
 	if (p->enet_id == XGENE_ENET1) {
 		enet_spare_cfg_reg = ENET_SPARE_CFG_REG_ADDR;
 		rsif_config_reg = RSIF_CONFIG_REG_ADDR;
 		cfg_bypass_reg = CFG_BYPASS_ADDR;
 		rx_dv_gate_reg = SG_RX_DV_GATE_REG_0_ADDR;
+		offset = p->port_id * 4;
 	} else {
 		enet_spare_cfg_reg = XG_ENET_SPARE_CFG_REG_ADDR;
 		rsif_config_reg = XG_RSIF_CONFIG_REG_ADDR;
@@ -331,17 +425,40 @@ static void xgene_sgmac_tx_disable(struct xgene_enet_pdata *p)
 
 static int xgene_enet_reset(struct xgene_enet_pdata *p)
 {
+	struct device *dev = &p->pdev->dev;
+
 	if (!xgene_ring_mgr_init(p))
 		return -ENODEV;
 
-	if (!IS_ERR(p->clk)) {
-		clk_prepare_enable(p->clk);
-		clk_disable_unprepare(p->clk);
-		clk_prepare_enable(p->clk);
+	if (p->mdio_driver && p->enet_id == XGENE_ENET2) {
+		xgene_enet_config_ring_if_assoc(p);
+		return 0;
 	}
 
-	xgene_enet_ecc_init(p);
-	xgene_enet_config_ring_if_assoc(p);
+	if (p->enet_id == XGENE_ENET2)
+		xgene_enet_wr_clkrst_csr(p, XGENET_CONFIG_REG_ADDR, SGMII_EN);
+
+	if (dev->of_node) {
+		if (!IS_ERR(p->clk)) {
+			clk_prepare_enable(p->clk);
+			clk_disable_unprepare(p->clk);
+			clk_prepare_enable(p->clk);
+		}
+	} else {
+#ifdef CONFIG_ACPI
+		if (acpi_has_method(ACPI_HANDLE(&p->pdev->dev), "_RST"))
+			acpi_evaluate_object(ACPI_HANDLE(&p->pdev->dev),
+					     "_RST", NULL, NULL);
+		else if (acpi_has_method(ACPI_HANDLE(&p->pdev->dev), "_INI"))
+			acpi_evaluate_object(ACPI_HANDLE(&p->pdev->dev),
+					     "_INI", NULL, NULL);
+#endif
+	}
+
+	if (!p->port_id) {
+		xgene_enet_ecc_init(p);
+		xgene_enet_config_ring_if_assoc(p);
+	}
 
 	return 0;
 }
@@ -369,10 +486,47 @@ static void xgene_enet_cle_bypass(struct xgene_enet_pdata *p,
 	xgene_enet_wr_csr(p, cle_bypass_reg1 + offset, data);
 }
 
+static void xgene_enet_clear(struct xgene_enet_pdata *pdata,
+			     struct xgene_enet_desc_ring *ring)
+{
+	u32 addr, val, data;
+
+	val = xgene_enet_ring_bufnum(ring->id);
+
+	if (xgene_enet_is_bufpool(ring->id)) {
+		addr = ENET_CFGSSQMIFPRESET_ADDR;
+		data = BIT(val - 0x20);
+	} else {
+		addr = ENET_CFGSSQMIWQRESET_ADDR;
+		data = BIT(val);
+	}
+
+	xgene_enet_wr_ring_if(pdata, addr, data);
+}
+
 static void xgene_enet_shutdown(struct xgene_enet_pdata *p)
 {
-	if (!IS_ERR(p->clk))
-		clk_disable_unprepare(p->clk);
+	struct xgene_enet_desc_ring *ring;
+	u32 pb, val;
+	int i;
+
+	pb = 0;
+	for (i = 0; i < p->rxq_cnt; i++) {
+		ring = p->rx_ring[i]->buf_pool;
+
+		val = xgene_enet_ring_bufnum(ring->id);
+		pb |= BIT(val - 0x20);
+	}
+	xgene_enet_wr_ring_if(p, ENET_CFGSSQMIFPRESET_ADDR, pb);
+
+	pb = 0;
+	for (i = 0; i < p->txq_cnt; i++) {
+		ring = p->tx_ring[i];
+
+		val = xgene_enet_ring_bufnum(ring->id);
+		pb |= BIT(val);
+	}
+	xgene_enet_wr_ring_if(p, ENET_CFGSSQMIWQRESET_ADDR, pb);
 }
 
 static void xgene_enet_link_state(struct work_struct *work)
@@ -386,10 +540,11 @@ static void xgene_enet_link_state(struct work_struct *work)
 	if (link) {
 		if (!netif_carrier_ok(ndev)) {
 			netif_carrier_on(ndev);
-			xgene_sgmac_init(p);
+			xgene_sgmac_set_speed(p);
 			xgene_sgmac_rx_enable(p);
 			xgene_sgmac_tx_enable(p);
-			netdev_info(ndev, "Link is Up - 1Gbps\n");
+			netdev_info(ndev, "Link is Up - %dMbps\n",
+				    p->phy_speed);
 		}
 		poll_interval = PHY_POLL_LINK_ON;
 	} else {
@@ -412,12 +567,14 @@ const struct xgene_mac_ops xgene_sgmac_ops = {
 	.tx_enable	= xgene_sgmac_tx_enable,
 	.rx_disable	= xgene_sgmac_rx_disable,
 	.tx_disable	= xgene_sgmac_tx_disable,
+	.set_speed	= xgene_sgmac_set_speed,
 	.set_mac_addr	= xgene_sgmac_set_mac_addr,
 	.link_state	= xgene_enet_link_state
 };
 
 const struct xgene_port_ops xgene_sgport_ops = {
 	.reset		= xgene_enet_reset,
+	.clear		= xgene_enet_clear,
 	.cle_bypass	= xgene_enet_cle_bypass,
 	.shutdown	= xgene_enet_shutdown
 };
