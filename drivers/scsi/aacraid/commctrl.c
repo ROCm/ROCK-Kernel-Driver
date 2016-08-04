@@ -118,6 +118,12 @@ static int ioctl_send_fib(struct aac_dev * dev, void __user *arg)
 		goto cleanup;
 	}
 
+	if (size != le16_to_cpu(kfib->header.Size)
+			+ sizeof(struct aac_fibhdr)) {
+		retval = -EINVAL;
+		goto cleanup;
+	}
+
 	if (kfib->header.Command == cpu_to_le16(TakeABreakPt)) {
 		aac_adapter_interrupt(dev);
 		/*
