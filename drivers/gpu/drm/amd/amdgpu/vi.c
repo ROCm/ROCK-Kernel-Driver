@@ -1026,16 +1026,7 @@ static int vi_common_early_init(void *handle)
 			AMD_CG_SUPPORT_SDMA_MGCG |
 			AMD_CG_SUPPORT_SDMA_LS |
 			AMD_CG_SUPPORT_VCE_MGCG;
-		/* rev0 hardware requires workarounds to support PG */
 		adev->pg_flags = 0;
-		if (adev->rev_id != 0x00 || CZ_REV_BRISTOL(adev->pdev->revision)) {
-			adev->pg_flags |= AMD_PG_SUPPORT_GFX_PG |
-				AMD_PG_SUPPORT_GFX_SMG |
-				AMD_PG_SUPPORT_GFX_PIPELINE |
-				AMD_PG_SUPPORT_CP |
-				AMD_PG_SUPPORT_UVD |
-				AMD_PG_SUPPORT_VCE;
-		}
 		adev->external_rev_id = adev->rev_id + 0x1;
 		break;
 	case CHIP_STONEY:
