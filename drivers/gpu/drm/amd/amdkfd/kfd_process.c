@@ -412,6 +412,49 @@ int restore(struct kfd_dev *kfd)
 	return 0;
 }
 
+static void kfd_process_free_outstanding_kfd_bos(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd, *peer_pdd;
+	struct kfd_bo *buf_obj;
+	int id;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		/*
+		 * Remove all handles from idr and release appropriate
+		 * local memory object
+		 */
+		idr_for_each_entry(&pdd->alloc_idr, buf_obj, id) {
+			list_for_each_entry(peer_pdd, &p->per_device_data,
+					per_device_list) {
+				peer_pdd->dev->kfd2kgd->unmap_memory_to_gpu(
+						peer_pdd->dev->kgd,
+						buf_obj->mem, peer_pdd->vm);
+			}
+
+			run_rdma_free_callback(buf_obj);
+			pdd->dev->kfd2kgd->free_memory_of_gpu(
+					pdd->dev->kgd, buf_obj->mem);
+			kfd_process_device_remove_obj_handle(pdd, id);
+		}
+	}
+}
+
+static void kfd_process_destroy_pdds(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd, *temp;
+
+	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
+				 per_device_list) {
+		radeon_flush_tlb(pdd->dev, p->pasid);
+		/* Destroy the GPUVM VM context */
+		if (pdd->vm)
+			pdd->dev->kfd2kgd->destroy_process_vm(
+				pdd->dev->kgd, pdd->vm);
+		list_del(&pdd->per_device_list);
+		kfree(pdd);
+	}
+}
+
 /* No process locking is needed in this function, because the process
  * is not findable any more. We must assume that no other thread is
  * using it any more, otherwise we couldn't safely free the process
@@ -419,9 +462,7 @@ int restore(struct kfd_dev *kfd)
 static void kfd_process_ref_release(struct kref *ref)
 {
 	struct kfd_process *p = container_of(ref, struct kfd_process, ref);
-	struct kfd_process_device *pdd, *temp, *peer_pdd;
-	struct kfd_bo *buf_obj;
-	int id;
+	struct kfd_process_device *pdd;
 
 	pr_debug("Releasing process (pasid %d)\n",
 			p->pasid);
@@ -437,36 +478,11 @@ static void kfd_process_ref_release(struct kref *ref)
 				pdd->bound = PDD_UNBOUND;
 			}
 		}
-
-		/*
-		 * Remove all handles from idr and release appropriate
-		 * local memory object
-		 */
-		idr_for_each_entry(&pdd->alloc_idr, buf_obj, id) {
-			list_for_each_entry(peer_pdd,
-				&p->per_device_data, per_device_list) {
-					pdd->dev->kfd2kgd->unmap_memory_to_gpu(
-						peer_pdd->dev->kgd,
-						buf_obj->mem, peer_pdd->vm);
-			}
-
-			run_rdma_free_callback(buf_obj);
-			pdd->dev->kfd2kgd->free_memory_of_gpu(
-					pdd->dev->kgd, buf_obj->mem);
-			kfd_process_device_remove_obj_handle(pdd, id);
-		}
 	}
 
-	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
-				 per_device_list) {
-		radeon_flush_tlb(pdd->dev, p->pasid);
-		/* Destroy the GPUVM VM context */
-		if (pdd->vm)
-			pdd->dev->kfd2kgd->destroy_process_vm(
-				pdd->dev->kgd, pdd->vm);
-		list_del(&pdd->per_device_list);
-		kfree(pdd);
-	}
+	kfd_process_free_outstanding_kfd_bos(p);
+
+	kfd_process_destroy_pdds(p);
 
 	kfd_event_free_process(p);
 
