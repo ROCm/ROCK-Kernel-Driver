@@ -919,6 +919,9 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 
 	idr_preload_end();
 
+	if (handle < 0)
+		kfree(buf_obj);
+
 	return handle;
 }
 
