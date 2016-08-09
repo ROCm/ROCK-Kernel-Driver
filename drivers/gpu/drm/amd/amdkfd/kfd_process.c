@@ -57,7 +57,8 @@ static struct workqueue_struct *kfd_process_wq;
 static struct kfd_process *find_process(const struct task_struct *thread,
 		bool lock);
 static void kfd_process_ref_release(struct kref *ref);
-static struct kfd_process *create_process(const struct task_struct *thread);
+static struct kfd_process *create_process(const struct task_struct *thread,
+					struct file *filep);
 static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep);
 
 
@@ -83,24 +84,23 @@ static void kfd_process_free_gpuvm(struct kfd_dev *kdev, struct kgd_mem *mem,
 }
 
 /* kfd_process_alloc_gpuvm - Allocate GPU VM for the KFD process
- *	During the memory allocation of GPU, we can't hold the process lock.
- *	There's a chance someone else allocates the memory during the lock
- *	released time. In that case, -EINVAL is returned but kptr remains so
- *	the caller knows the memory is allocated (by someone else) and
- *	available to use.
+ *	This function should be only called right after the process
+ *	is created and when kfd_processes_mutex is still being held
+ *	to avoid concurrency. Because of that exclusiveness, we do
+ *	not need to take p->lock. Because kfd_processes_mutex instead
+ *	of p->lock is held, we do not need to release the lock when
+ *	calling into kgd through functions such as alloc_memory_of_gpu()
+ *	etc.
  */
 static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 		struct kfd_dev *kdev, uint64_t gpu_va, uint32_t size,
-		void *vm, void **kptr, struct kfd_process_device *pdd,
-		uint64_t *addr_to_assign)
+		void **kptr, struct kfd_process_device *pdd)
 {
 	int err;
 	void *mem = NULL;
 
-	/* can't hold the process lock while allocating from KGD */
-	up_write(&p->lock);
-
-	err = kdev->kfd2kgd->alloc_memory_of_gpu(kdev->kgd, gpu_va, size, vm,
+	err = kdev->kfd2kgd->alloc_memory_of_gpu(kdev->kgd, gpu_va, size,
+				pdd->vm,
 				(struct kgd_mem **)&mem, NULL, kptr, pdd,
 				ALLOC_MEM_FLAGS_GTT |
 				ALLOC_MEM_FLAGS_NONPAGED |
@@ -113,37 +113,28 @@ static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 	if (err)
 		goto err_map_mem;
 
-	down_write(&p->lock);
-	/* Check if someone else allocated the memory while we weren't looking
+	/* Create an obj handle so kfd_process_device_remove_obj_handle
+	 * will take care of the bo removal when the process finishes.
+	 * We do not need to take p->lock, because the process is just
+	 * created and the ioctls have not had the chance to run.
 	 */
-	if (*addr_to_assign) {
-		err = -EINVAL;
+	if (kfd_process_device_create_obj_handle(
+			pdd, mem, gpu_va, size) < 0) {
+		err = -ENOMEM;
+		*kptr = NULL;
 		goto free_gpuvm;
-	} else {
-		/* Create an obj handle so kfd_process_device_remove_obj_handle
-		 * will take care of the bo removal when the process finishes
-		 */
-		if (kfd_process_device_create_obj_handle(
-				pdd, mem, gpu_va, size) < 0) {
-			err = -ENOMEM;
-			*kptr = NULL;
-			goto free_gpuvm;
-		}
 	}
 
 	return err;
 
 free_gpuvm:
-	up_write(&p->lock);
 	kfd_process_free_gpuvm(kdev, (struct kgd_mem *)mem, pdd->vm);
-	down_write(&p->lock);
 	return err;
 
 err_map_mem:
 	kdev->kfd2kgd->free_memory_of_gpu(kdev->kgd, mem);
 err_alloc_mem:
 	*kptr = NULL;
-	down_write(&p->lock);
 	return err;
 }
 
@@ -161,7 +152,6 @@ static int kfd_process_reserve_ib_mem(struct kfd_process *p)
 	struct qcm_process_device *qpd = NULL;
 	void *kaddr;
 
-	down_write(&p->lock);
 	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
 				per_device_list) {
 		kdev = pdd->dev;
@@ -171,21 +161,23 @@ static int kfd_process_reserve_ib_mem(struct kfd_process *p)
 
 		if (qpd->ib_base) { /* is dGPU */
 			err = kfd_process_alloc_gpuvm(p, kdev,
-				qpd->ib_base, kdev->ib_size, pdd->vm,
-				&kaddr, pdd, (uint64_t *)&qpd->ib_kaddr);
+				qpd->ib_base, kdev->ib_size,
+				&kaddr, pdd);
 			if (!err)
 				qpd->ib_kaddr = kaddr;
-			else if (qpd->ib_kaddr)
-				err = 0;
 			else
-				err = -ENOMEM;
+				goto err_out;
 		} else {
 			/* FIXME: Support APU */
-			err = -ENOMEM;
+			continue;
 		}
 	}
 
-	up_write(&p->lock);
+err_out:
+	/* In case of error, the kfd_bos for some pdds which are already
+	 * allocated successfully will be freed in upper level function
+	 * i.e. create_process().
+	 */
 	return err;
 }
 
@@ -204,9 +196,6 @@ struct kfd_process *kfd_create_process(struct file *filep)
 	if (thread->group_leader->mm != thread->mm)
 		return ERR_PTR(-EINVAL);
 
-	/* Take mmap_sem because we call __mmu_notifier_register inside */
-	down_write(&thread->mm->mmap_sem);
-
 	/*
 	 * take kfd processes mutex before starting of process creation
 	 * so there won't be a case where two threads of the same process
@@ -218,16 +207,10 @@ struct kfd_process *kfd_create_process(struct file *filep)
 	process = find_process(thread, false);
 	if (process)
 		pr_debug("kfd: process already found\n");
-
-	if (!process)
-		process = create_process(thread);
+	else
+		process = create_process(thread, filep);
 
 	mutex_unlock(&kfd_processes_mutex);
-
-	up_write(&thread->mm->mmap_sem);
-
-	kfd_process_init_cwsr(process, filep);
-	kfd_process_reserve_ib_mem(process);
 
 	return process;
 }
@@ -588,33 +571,30 @@ static const struct mmu_notifier_ops kfd_process_mmu_notifier_ops = {
 
 static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 {
-	int err;
+	int err = 0;
 	unsigned long  offset;
 	struct kfd_process_device *temp, *pdd = NULL;
 	struct kfd_dev *dev = NULL;
 	struct qcm_process_device *qpd = NULL;
+	void *kaddr;
 
-	down_write(&p->lock);
 	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
 				per_device_list) {
 		dev = pdd->dev;
 		qpd = &pdd->qpd;
-		if (!dev->cwsr_enabled || qpd->tba_addr)
+		if (!dev->cwsr_enabled || qpd->cwsr_kaddr)
 			continue;
 		if (qpd->cwsr_base) {
 			/* cwsr_base is only set for DGPU */
-
 			err = kfd_process_alloc_gpuvm(p, dev, qpd->cwsr_base,
-					dev->cwsr_size, pdd->vm,
-					&qpd->cwsr_kaddr, pdd, &qpd->tba_addr);
+					dev->cwsr_size,	&kaddr, pdd);
 			if (!err) {
+				qpd->cwsr_kaddr = kaddr;
 				memcpy(qpd->cwsr_kaddr, kmap(dev->cwsr_pages),
 				       PAGE_SIZE);
 				kunmap(dev->cwsr_pages);
 				qpd->tba_addr = qpd->cwsr_base;
-			} else if (qpd->cwsr_kaddr)
-				err = 0;
-			else
+			} else
 				goto out;
 		} else {
 			offset = (kfd_get_gpu_id(dev) |
@@ -622,25 +602,33 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 			qpd->tba_addr = (uint64_t)vm_mmap(filep, 0,
 				dev->cwsr_size,	PROT_READ | PROT_EXEC,
 				MAP_SHARED, offset);
-			qpd->cwsr_kaddr = (void *)qpd->tba_addr;
+
+			if (IS_ERR_VALUE(qpd->tba_addr)) {
+				pr_err("Failure to set tba address. error -%d.\n",
+					(int)qpd->tba_addr);
+				qpd->tba_addr = 0;
+				qpd->cwsr_kaddr = NULL;
+				err = -ENOMEM;
+				goto out;
+			} else
+				qpd->cwsr_kaddr = (void *)qpd->tba_addr;
 		}
-		if (IS_ERR_VALUE(qpd->tba_addr)) {
-			pr_err("Failure to set tba address. error -%d.\n",
-				(int)qpd->tba_addr);
-			qpd->tba_addr = 0;
-			qpd->cwsr_kaddr = NULL;
-		} else
-			qpd->tma_addr = qpd->tba_addr + dev->tma_offset;
-			pr_debug("set tba :0x%llx, tma:0x%llx for pqm.\n",
-				qpd->tba_addr, qpd->tma_addr);
+
+		qpd->tma_addr = qpd->tba_addr + dev->tma_offset;
+		pr_debug("set tba :0x%llx, tma:0x%llx for pqm.\n",
+			qpd->tba_addr, qpd->tma_addr);
 	}
 
 out:
-	up_write(&p->lock);
+	/* In case of error, the kfd_bos for some pdds which are already
+	 * allocated successfully will be freed in upper level function
+	 * i.e. create_process().
+	 */
 	return err;
 }
 
-static struct kfd_process *create_process(const struct task_struct *thread)
+static struct kfd_process *create_process(const struct task_struct *thread,
+					struct file *filep)
 {
 	struct kfd_process *process;
 	int err = -ENOMEM;
@@ -663,7 +651,7 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 
 	/* register notifier */
 	process->mmu_notifier.ops = &kfd_process_mmu_notifier_ops;
-	err = __mmu_notifier_register(&process->mmu_notifier, process->mm);
+	err = mmu_notifier_register(&process->mmu_notifier, process->mm);
 	if (err)
 		goto err_mmu_notifier;
 
@@ -686,14 +674,26 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	if (kfd_init_apertures(process) != 0)
 		goto err_init_apretures;
 
+	err = kfd_process_reserve_ib_mem(process);
+	if (err)
+		goto err_reserve_ib_mem;
+	err = kfd_process_init_cwsr(process, filep);
+	if (err)
+		goto err_init_cwsr;
+
 	return process;
 
+err_init_cwsr:
+err_reserve_ib_mem:
+	kfd_process_free_outstanding_kfd_bos(process);
+	kfd_process_destroy_pdds(process);
 err_init_apretures:
 	pqm_uninit(&process->pqm);
 err_process_pqm_init:
 	hash_del_rcu(&process->kfd_processes);
 	synchronize_rcu();
-	mmu_notifier_unregister_no_release(&process->mmu_notifier, process->mm);
+	mmu_notifier_unregister_no_release(&process->mmu_notifier,
+					process->mm);
 err_mmu_notifier:
 	kfd_pasid_free(process->pasid);
 err_alloc_pasid:
