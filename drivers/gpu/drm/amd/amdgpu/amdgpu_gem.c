@@ -354,6 +354,85 @@ handle_lockup:
 	return r;
 }
 
+int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
+			   struct drm_file *filp)
+{
+	struct amdgpu_device *adev = dev->dev_private;
+	struct drm_amdgpu_gem_dgma *args = data;
+	struct drm_gem_object *gobj;
+	struct amdgpu_bo *abo;
+	dma_addr_t *dma_addr;
+	uint32_t handle, flags, offset;
+	int i, r = 0;
+
+	switch (args->op) {
+	case AMDGPU_GEM_DGMA_IMPORT:
+		/* create a gem object to contain this object in */
+		r = amdgpu_gem_object_create(adev, args->size, 0,
+					     AMDGPU_GEM_DOMAIN_DGMA_IMPORT, 0,
+					     0, &gobj);
+		if (r)
+			goto handle_lockup;
+
+		abo = gem_to_amdgpu_bo(gobj);
+		r = amdgpu_bo_reserve(abo, true);
+		if (unlikely(r))
+			goto release_object;
+
+		dma_addr = kmalloc_array(abo->tbo.num_pages, sizeof(dma_addr_t), GFP_KERNEL);
+		if (unlikely(dma_addr == NULL)) {
+			amdgpu_bo_unreserve(abo);
+			goto release_object;
+		}
+		for (i = 0; i < abo->tbo.num_pages; i++)
+			dma_addr[i] = args->addr + i * PAGE_SIZE;
+
+		flags = AMDGPU_PTE_VALID | AMDGPU_PTE_READABLE | AMDGPU_PTE_WRITEABLE;
+		if (adev->asic_type >= CHIP_TONGA)
+			flags |= AMDGPU_PTE_EXECUTABLE;
+
+		offset = amdgpu_bo_gpu_offset(abo);
+		offset -= adev->mman.bdev.man[TTM_PL_TT].gpu_offset;
+		r = amdgpu_gart_bind(adev, offset, abo->tbo.num_pages,
+					NULL, dma_addr, flags);
+		kfree(dma_addr);
+		amdgpu_bo_unreserve(abo);
+		if (unlikely(r))
+			goto release_object;
+
+		abo->tbo.mem.bus.base = args->addr;
+		abo->tbo.mem.bus.offset = 0;
+
+		r = drm_gem_handle_create(filp, gobj, &handle);
+		args->handle = handle;
+		break;
+	case AMDGPU_GEM_DGMA_QUERY_PHYS_ADDR:
+		gobj = kcl_drm_gem_object_lookup(dev, filp, args->handle);
+		if (gobj == NULL)
+			return -ENOENT;
+
+		abo = gem_to_amdgpu_bo(gobj);
+		if (abo->tbo.mem.mem_type != AMDGPU_PL_DGMA) {
+			r = -EINVAL;
+			goto release_object;
+		}
+		args->addr = amdgpu_bo_gpu_offset(abo);
+		args->addr -= adev->mc.vram_start;
+		args->addr += adev->mc.aper_base;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+release_object:
+	drm_gem_object_unreference_unlocked(gobj);
+
+handle_lockup:
+	r = amdgpu_gem_handle_lockup(adev, r);
+
+	return r;
+}
+
 int amdgpu_mode_dumb_mmap(struct drm_file *filp,
 			  struct drm_device *dev,
 			  uint32_t handle, uint64_t *offset_p)
