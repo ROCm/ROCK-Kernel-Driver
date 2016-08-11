@@ -609,9 +609,17 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 		}
 	}
 	case AMDGPU_INFO_CAPABILITY: {
+		struct drm_amdgpu_capability cap;
+
+		memset(&cap, 0, sizeof(cap));
 		if (amdgpu_no_evict)
-			ui64 |= AMDGPU_CAPABILITY_PIN_MEM_FLAG;
-		return copy_to_user(out, &ui64, min(size, 8u)) ? -EFAULT : 0;
+			cap.flag |= AMDGPU_CAPABILITY_PIN_MEM_FLAG;
+		if (amdgpu_direct_gma_size) {
+			cap.flag |= AMDGPU_CAPABILITY_DIRECT_GMA_FLAG;
+			cap.direct_gma_size = amdgpu_direct_gma_size;
+		}
+		return copy_to_user(out, &cap,
+				    min((size_t)size, sizeof(cap))) ? -EFAULT : 0;
 	}
 	default:
 		DRM_DEBUG_KMS("Invalid request %d\n", info->query);
