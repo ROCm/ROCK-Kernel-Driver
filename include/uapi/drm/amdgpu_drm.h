@@ -57,6 +57,9 @@ extern "C" {
 /* not upstream */
 #define DRM_AMDGPU_FREESYNC	        0x5d
 
+/* hybrid specific ioctls */
+#define DRM_AMDGPU_GEM_DGMA            0x5c
+
 #define DRM_IOCTL_AMDGPU_GEM_CREATE	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_CREATE, union drm_amdgpu_gem_create)
 #define DRM_IOCTL_AMDGPU_GEM_MMAP	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_MMAP, union drm_amdgpu_gem_mmap)
 #define DRM_IOCTL_AMDGPU_CTX		DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_CTX, union drm_amdgpu_ctx)
@@ -74,6 +77,9 @@ extern "C" {
 #define DRM_IOCTL_AMDGPU_FENCE_TO_HANDLE DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_FENCE_TO_HANDLE, union drm_amdgpu_fence_to_handle)
 #define DRM_IOCTL_AMDGPU_SCHED		DRM_IOW(DRM_COMMAND_BASE + DRM_AMDGPU_SCHED, union drm_amdgpu_sched)
 #define DRM_IOCTL_AMDGPU_FREESYNC	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_FREESYNC, struct drm_amdgpu_freesync)
+
+/* hybrid specific ioctls */
+#define DRM_IOCTL_AMDGPU_GEM_DGMA	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_DGMA, struct drm_amdgpu_gem_dgma)
 
 #define AMDGPU_GEM_DOMAIN_CPU		0x1
 #define AMDGPU_GEM_DOMAIN_GTT		0x2
@@ -277,6 +283,15 @@ struct drm_amdgpu_gem_userptr {
 	/* AMDGPU_GEM_USERPTR_* */
 	__u32		flags;
 	/* Resulting GEM handle */
+	__u32		handle;
+};
+
+#define AMDGPU_GEM_DGMA_IMPORT			0
+#define AMDGPU_GEM_DGMA_QUERY_PHYS_ADDR		1
+struct drm_amdgpu_gem_dgma {
+	__u64		addr;
+	__u64		size;
+	__u32		op;
 	__u32		handle;
 };
 
