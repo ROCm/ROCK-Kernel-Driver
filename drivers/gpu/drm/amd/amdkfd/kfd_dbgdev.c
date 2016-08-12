@@ -47,14 +47,16 @@ static void dbgdev_address_watch_disable_nodiq(struct kfd_dev *dev)
 
 static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 				unsigned int pasid, uint64_t vmid0_address,
-				uint32_t *packet_buff, size_t size_in_bytes)
+				uint32_t *packet_buff, size_t size_in_bytes,
+				bool sync)
 {
 	int status = 0;
 	unsigned int *ib_packet_buff = NULL;
 	struct pm4__release_mem *rm_packet;
 	struct pm4__indirect_buffer_pasid *ib_packet;
 	struct kernel_queue *kq = dbgdev->kq;
-	size_t pq_packets_size_in_bytes = sizeof(struct pm4__release_mem) + sizeof(struct pm4__indirect_buffer_pasid);
+	size_t pq_packets_size_in_bytes =
+		sizeof(struct pm4__indirect_buffer_pasid);
 	struct kfd_mem_obj *mem_obj;
 
 	uint64_t *rm_state = NULL;
@@ -74,6 +76,9 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 		 * The receive packet buff will be sitting on the Indirect Buffer
 		 * and in the PQ we put the IB packet + sync packet(s).
 		 */
+		if (sync)
+			pq_packets_size_in_bytes +=
+				sizeof(struct pm4__release_mem);
 		status = kq->ops.acquire_packet_buffer(kq, pq_packets_size_in_bytes / sizeof(uint32_t), &ib_packet_buff);
 		if (status != 0) {
 			pr_debug("Error! kfd: In func %s >> acquire_packet_buffer failed\n", __func__);
@@ -97,6 +102,11 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 				((size_in_bytes / sizeof(uint32_t)) & 0xfffff);
 
 		ib_packet->bitfields5.pasid = pasid;
+
+		if (!sync) {
+			kq->ops.submit_packet(kq);
+			break;
+		}
 
 		/*
 		 * for now we use release mem for GPU-CPU synchronization
@@ -491,7 +501,7 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 						adw_info->process->pasid,
 						mem_obj->gpu_addr,
 						packet_buff_uint,
-						ib_size);
+						ib_size, true);
 
 			if (status != 0) {
 				pr_debug("Error! kfd: In func %s >> failed to submit DIQ packet\n", __func__);
@@ -707,7 +717,7 @@ static int dbgdev_wave_control_diq(struct kfd_dbgdev *dbgdev,
 				wac_info->process->pasid,
 				mem_obj->gpu_addr,
 				packet_buff_uint,
-				ib_size);
+				ib_size, false);
 
 		if (status != 0)
 			pr_debug("%s\n", " Critical Error ! Submit diq packet failed ");
