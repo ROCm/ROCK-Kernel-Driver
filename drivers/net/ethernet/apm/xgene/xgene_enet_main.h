@@ -104,7 +104,6 @@ struct xgene_enet_desc_ring {
 	void __iomem *cmd_base;
 	void __iomem *cmd;
 	dma_addr_t dma;
-	dma_addr_t dma_exp_bufs;
 	dma_addr_t irq_mbox_dma;
 	void *irq_mbox_addr;
 	u16 dst_ring_num;
@@ -216,8 +215,6 @@ struct xgene_enet_pdata {
 	u32 mss;
 	u8 tx_delay;
 	u8 rx_delay;
-	struct device_node *mdio_np;
-	int phy_id;
 	bool mdio_driver;
 };
 

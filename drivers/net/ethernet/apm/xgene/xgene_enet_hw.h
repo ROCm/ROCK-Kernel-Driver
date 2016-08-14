@@ -104,6 +104,8 @@ enum xgene_enet_rm {
 #define RECOMBBUF		BIT(27)
 
 #define MAC_OFFSET			0x30
+#define OFFSET_4			0x04
+#define OFFSET_8			0x08
 
 #define BLOCK_ETH_CSR_OFFSET		0x2000
 #define BLOCK_ETH_CLE_CSR_OFFSET	0x6000
@@ -112,13 +114,9 @@ enum xgene_enet_rm {
 #define BLOCK_ETH_DIAG_CSR_OFFSET	0xD000
 #define BLOCK_ETH_MAC_OFFSET		0x0000
 #define BLOCK_ETH_MAC_CSR_OFFSET	0x2800
-#define BLOCK_ETH_CLKRST_SRST_OFFSET	0xa000
-#define BLOCK_ETH_CLKRST_CLKEN_OFFSET	0xa008
 
 #define CLKEN_ADDR			0xc208
 #define SRST_ADDR			0xc200
-#define XGENE_CLKEN_ADDR		0xa008
-#define XGENE_SRST_ADDR			0xa000
 
 #define MAC_ADDR_REG_OFFSET		0x00
 #define MAC_COMMAND_REG_OFFSET		0x04
@@ -164,9 +162,7 @@ enum xgene_enet_rm {
 #define CFG_CLE_DSTQID0(val)		(val & GENMASK(11, 0))
 #define CFG_CLE_FPSEL0(val)		((val << 16) & GENMASK(19, 16))
 #define ICM_CONFIG0_REG_0_ADDR		0x0400
-#define ICM_CONFIG0_REG_1_ADDR		0x0408
 #define ICM_CONFIG2_REG_0_ADDR		0x0410
-#define ICM_CONFIG2_REG_1_ADDR		0x0414
 #define RX_DV_GATE_REG_0_ADDR		0x05fc
 #define TX_DV_GATE_EN0			BIT(2)
 #define RX_DV_GATE_EN0			BIT(1)
@@ -352,9 +348,6 @@ void xgene_enet_mdio_remove(struct xgene_enet_pdata *pdata);
 bool xgene_ring_mgr_init(struct xgene_enet_pdata *p);
 int xgene_enet_phy_connect(struct net_device *ndev);
 void xgene_enet_phy_disconnect(struct xgene_enet_pdata *pdata);
-#ifdef CONFIG_ACPI
-struct acpi_device *acpi_phy_find_device(struct device *dev);
-#endif
 
 extern const struct xgene_mac_ops xgene_gmac_ops;
 extern const struct xgene_port_ops xgene_gport_ops;

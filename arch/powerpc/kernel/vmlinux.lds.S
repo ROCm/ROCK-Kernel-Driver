@@ -148,20 +148,6 @@ SECTIONS
 		*(__fw_ftr_fixup)
 		__stop___fw_ftr_fixup = .;
 	}
-
-	. = ALIGN(8);
-	__fake_ile : AT(ADDR(__fake_ile) - LOAD_OFFSET) {
-		__start___fake_ile = .;
-		*(__fake_ile)
-		__stop___fake_ile = .;
-	}
-
-	. = ALIGN(8);
-	__be_patch : AT(ADDR(__be_patch) - LOAD_OFFSET) {
-		__start___be_patch = .;
-		*(__be_patch)
-		__stop___be_patch = .;
-	}
 #endif
 	.init.ramfs : AT(ADDR(.init.ramfs) - LOAD_OFFSET) {
 		INIT_RAM_FS
@@ -179,7 +165,7 @@ SECTIONS
 	. = ALIGN(8);
 	.dynsym : AT(ADDR(.dynsym) - LOAD_OFFSET)
 	{
-#ifdef CONFIG_RELOCATABLE_PPC32
+#ifdef CONFIG_PPC32
 		__dynamic_symtab = .;
 #endif
 		*(.dynsym)

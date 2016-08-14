@@ -381,59 +381,6 @@ static void xgene_enet_rd_mcx_mac(struct xgene_enet_pdata *pdata,
 			   rd_addr);
 }
 
-static int xgene_mii_phy_write(struct xgene_enet_pdata *pdata, int phy_id,
-			       u32 reg, u16 data)
-{
-	u32 addr = 0, wr_data = 0;
-	u32 done;
-	u8 wait = 10;
-
-	PHY_ADDR_SET(&addr, phy_id);
-	REG_ADDR_SET(&addr, reg);
-	xgene_enet_wr_mcx_mac(pdata, MII_MGMT_ADDRESS_ADDR, addr);
-
-	PHY_CONTROL_SET(&wr_data, data);
-	xgene_enet_wr_mcx_mac(pdata, MII_MGMT_CONTROL_ADDR, wr_data);
-	do {
-		usleep_range(5, 10);
-		xgene_enet_rd_mcx_mac(pdata, MII_MGMT_INDICATORS_ADDR, &done);
-	} while ((done & BUSY_MASK) && wait--);
-
-	if (done & BUSY_MASK) {
-		netdev_err(pdata->ndev, "MII_MGMT write failed\n");
-		return -EBUSY;
-	}
-
-	return 0;
-}
-
-static int xgene_mii_phy_read(struct xgene_enet_pdata *pdata,
-			      u8 phy_id, u32 reg)
-{
-	u32 addr = 0;
-	u32 data, done;
-	u8 wait = 10;
-
-	PHY_ADDR_SET(&addr, phy_id);
-	REG_ADDR_SET(&addr, reg);
-	xgene_enet_wr_mcx_mac(pdata, MII_MGMT_ADDRESS_ADDR, addr);
-	xgene_enet_wr_mcx_mac(pdata, MII_MGMT_COMMAND_ADDR, READ_CYCLE_MASK);
-	do {
-		usleep_range(5, 10);
-		xgene_enet_rd_mcx_mac(pdata, MII_MGMT_INDICATORS_ADDR, &done);
-	} while ((done & BUSY_MASK) && wait--);
-
-	if (done & BUSY_MASK) {
-		netdev_err(pdata->ndev, "MII_MGMT read failed\n");
-		return -EBUSY;
-	}
-
-	xgene_enet_rd_mcx_mac(pdata, MII_MGMT_STATUS_ADDR, &data);
-	xgene_enet_wr_mcx_mac(pdata, MII_MGMT_COMMAND_ADDR, 0);
-
-	return data;
-}
-
 static void xgene_gmac_set_mac_addr(struct xgene_enet_pdata *pdata)
 {
 	u32 addr0, addr1;
@@ -476,13 +423,9 @@ static void xgene_gmac_reset(struct xgene_enet_pdata *pdata)
 static void xgene_enet_configure_clock(struct xgene_enet_pdata *pdata)
 {
 	struct device *dev = &pdata->pdev->dev;
-	struct clk *parent;
 
 	if (dev->of_node) {
-		if (IS_ERR(pdata->clk))
-			return;
-
-		parent = clk_get_parent(pdata->clk);
+		struct clk *parent = clk_get_parent(pdata->clk);
 
 		switch (pdata->phy_speed) {
 		case SPEED_10:
@@ -681,6 +624,8 @@ bool xgene_ring_mgr_init(struct xgene_enet_pdata *p)
 
 static int xgene_enet_reset(struct xgene_enet_pdata *pdata)
 {
+	struct device *dev = &pdata->pdev->dev;
+
 	if (!xgene_ring_mgr_init(pdata))
 		return -ENODEV;
 
@@ -688,10 +633,14 @@ static int xgene_enet_reset(struct xgene_enet_pdata *pdata)
 		xgene_enet_config_ring_if_assoc(pdata);
 		return 0;
 	}
-	if (!IS_ERR(pdata->clk)) {
+
+	if (dev->of_node) {
 		clk_prepare_enable(pdata->clk);
+		udelay(5);
 		clk_disable_unprepare(pdata->clk);
+		udelay(5);
 		clk_prepare_enable(pdata->clk);
+		udelay(5);
 	} else {
 #ifdef CONFIG_ACPI
 		if (acpi_has_method(ACPI_HANDLE(&pdata->pdev->dev), "_RST")) {
@@ -731,6 +680,7 @@ static void xgene_enet_clear(struct xgene_enet_pdata *pdata,
 
 static void xgene_gport_shutdown(struct xgene_enet_pdata *pdata)
 {
+	struct device *dev = &pdata->pdev->dev;
 	struct xgene_enet_desc_ring *ring;
 	u32 pb, val;
 	int i;
@@ -753,30 +703,10 @@ static void xgene_gport_shutdown(struct xgene_enet_pdata *pdata)
 	}
 	xgene_enet_wr_ring_if(pdata, ENET_CFGSSQMIWQRESET_ADDR, pb);
 
-	if (!IS_ERR(pdata->clk))
-		clk_disable_unprepare(pdata->clk);
-}
-
-static int xgene_enet_mdio_read(struct mii_bus *bus, int mii_id, int regnum)
-{
-	struct xgene_enet_pdata *pdata = bus->priv;
-	u32 val;
-
-	val = xgene_mii_phy_read(pdata, mii_id, regnum);
-	netdev_dbg(pdata->ndev, "mdio_rd: bus=%d reg=%d val=%x\n",
-		   mii_id, regnum, val);
-
-	return val;
-}
-
-static int xgene_enet_mdio_write(struct mii_bus *bus, int mii_id, int regnum,
-				 u16 val)
-{
-	struct xgene_enet_pdata *pdata = bus->priv;
-
-	netdev_dbg(pdata->ndev, "mdio_wr: bus=%d reg=%d val=%x\n",
-		   mii_id, regnum, val);
-	return xgene_mii_phy_write(pdata, mii_id, regnum, val);
+	if (dev->of_node) {
+		if (!IS_ERR(pdata->clk))
+			clk_disable_unprepare(pdata->clk);
+	}
 }
 
 static void xgene_enet_adjust_link(struct net_device *ndev)
@@ -802,7 +732,7 @@ static void xgene_enet_adjust_link(struct net_device *ndev)
 }
 
 #ifdef CONFIG_ACPI
-struct acpi_device *acpi_phy_find_device(struct device *dev)
+static struct acpi_device *acpi_phy_find_device(struct device *dev)
 {
 	struct acpi_reference_args args;
 	struct fwnode_handle *fw_node;
@@ -823,36 +753,47 @@ struct acpi_device *acpi_phy_find_device(struct device *dev)
 int xgene_enet_phy_connect(struct net_device *ndev)
 {
 	struct xgene_enet_pdata *pdata = netdev_priv(ndev);
-	struct device_node *phy_np;
-	struct phy_device *phy_dev = NULL;
+	struct device_node *np;
+	struct phy_device *phy_dev;
 	struct device *dev = &pdata->pdev->dev;
+	int i;
 
 	if (dev->of_node) {
-		phy_np = of_parse_phandle(dev->of_node, "phy-handle", 0);
-		if (!phy_np) {
+		for (i = 0 ; i < 2; i++) {
+			np = of_parse_phandle(dev->of_node, "phy-handle", i);
+			if (np)
+				break;
+		}
+
+		if (!np) {
 			netdev_dbg(ndev, "No phy-handle found in DT\n");
 			return -ENODEV;
 		}
 
-		pdata->phy_dev = of_phy_find_device(phy_np);
+		phy_dev = of_phy_connect(ndev, np, &xgene_enet_adjust_link,
+					 0, pdata->phy_mode);
+		of_node_put(np);
+		if (!phy_dev) {
+			netdev_err(ndev, "Could not connect to PHY\n");
+			return -ENODEV;
+		}
+
+		pdata->phy_dev = phy_dev;
 	} else {
 #ifdef CONFIG_ACPI
-		if (pdata->mdio_driver) {
-			struct acpi_device *adev;
+		struct acpi_device *adev = acpi_phy_find_device(dev);
+		if (adev)
+			pdata->phy_dev =  adev->driver_data;
 
-			adev = acpi_phy_find_device(dev);
-			if (adev)
-				pdata->phy_dev =  adev->driver_data;
+		phy_dev = pdata->phy_dev;
+
+		if (!phy_dev ||
+		    phy_connect_direct(ndev, phy_dev, &xgene_enet_adjust_link,
+				       pdata->phy_mode)) {
+			netdev_err(ndev, "Could not connect to PHY\n");
+			return  -ENODEV;
 		}
 #endif
-	}
-
-	phy_dev = pdata->phy_dev;
-	if (!phy_dev ||
-	    phy_connect_direct(ndev, phy_dev, &xgene_enet_adjust_link,
-			       pdata->phy_mode)) {
-		netdev_err(ndev, "Could not connect to PHY\n");
-		return  -ENODEV;
 	}
 
 	pdata->phy_speed = SPEED_UNKNOWN;
@@ -868,45 +809,51 @@ static int xgene_mdiobus_register(struct xgene_enet_pdata *pdata,
 				  struct mii_bus *mdio)
 {
 	struct device *dev = &pdata->pdev->dev;
+	struct net_device *ndev = pdata->ndev;
+	struct phy_device *phy;
+	struct device_node *child_np;
+	struct device_node *mdio_np = NULL;
+	u32 phy_addr;
+	int ret;
 
 	if (dev->of_node) {
-		return of_mdiobus_register(mdio, pdata->mdio_np);
-	} else {
-#ifdef CONFIG_ACPI
-		struct phy_device *phy;
-		int ret;
-
-
-		if (pdata->mdio_driver) {
-			mdiobus_free(mdio);
-			return 0;
+		for_each_child_of_node(dev->of_node, child_np) {
+			if (of_device_is_compatible(child_np,
+						    "apm,xgene-mdio")) {
+				mdio_np = child_np;
+				break;
+			}
 		}
 
-		/* Mask out all PHYs from auto probing. */
-		mdio->phy_mask = ~0;
+		if (!mdio_np) {
+			netdev_dbg(ndev, "No mdio node in the dts\n");
+			return -ENXIO;
+		}
 
-		/* Register the MDIO bus */
-		ret = mdiobus_register(mdio);
-		if (ret)
-			return ret;
-
-
-		phy = get_phy_device(mdio, pdata->phy_id, false);
-		if (IS_ERR(phy))
-			return -EIO;
-
-
-		ret = phy_device_register(phy);
-		if (ret)
-			phy_device_free(phy);
-		else
-			pdata->phy_dev = phy;
-
-		return ret;
-#endif
+		return of_mdiobus_register(mdio, mdio_np);
 	}
 
-	return 0;
+	/* Mask out all PHYs from auto probing. */
+	mdio->phy_mask = ~0;
+
+	/* Register the MDIO bus */
+	ret = mdiobus_register(mdio);
+	if (ret)
+		return ret;
+
+	ret = device_property_read_u32(dev, "phy-channel", &phy_addr);
+	if (ret)
+		ret = device_property_read_u32(dev, "phy-addr", &phy_addr);
+	if (ret)
+		return -EINVAL;
+
+	phy = xgene_enet_phy_register(mdio, phy_addr);
+	if (!phy)
+		return -EIO;
+
+	pdata->phy_dev = phy;
+
+	return ret;
 }
 
 int xgene_enet_mdio_config(struct xgene_enet_pdata *pdata)
@@ -920,19 +867,17 @@ int xgene_enet_mdio_config(struct xgene_enet_pdata *pdata)
 		return -ENOMEM;
 
 	mdio_bus->name = "APM X-Gene MDIO bus";
-	mdio_bus->read = xgene_enet_mdio_read;
-	mdio_bus->write = xgene_enet_mdio_write;
+	mdio_bus->read = xgene_mdio_rgmii_read;
+	mdio_bus->write = xgene_mdio_rgmii_write;
 	snprintf(mdio_bus->id, MII_BUS_ID_SIZE, "%s-%s", "xgene-mii",
 		 ndev->name);
 
-	mdio_bus->priv = pdata;
+	mdio_bus->priv = (void __force *)pdata->mcx_mac_addr;
 	mdio_bus->parent = &pdata->pdev->dev;
 
 	ret = xgene_mdiobus_register(pdata, mdio_bus);
 	if (ret) {
 		netdev_err(ndev, "Failed to register MDIO bus\n");
-		if (mdio_bus->state == MDIOBUS_REGISTERED)
-			mdiobus_unregister(pdata->mdio_bus);
 		mdiobus_free(mdio_bus);
 		return ret;
 	}

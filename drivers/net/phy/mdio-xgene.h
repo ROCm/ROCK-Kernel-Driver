@@ -100,6 +100,7 @@ struct xgene_mdio_pdata {
 	void __iomem *mac_csr_addr;
 	void __iomem *diag_csr_addr;
 	void __iomem *mdio_csr_addr;
+	struct mii_bus *mdio_bus;
 	int mdio_id;
 };
 
@@ -135,6 +136,8 @@ static const struct of_device_id xgene_mdio_of_match[];
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id xgene_mdio_acpi_match[];
 #endif
-bool xgene_mdio_probe_successful(void);
+int xgene_mdio_rgmii_read(struct mii_bus *bus, int phy_id, int reg);
+int xgene_mdio_rgmii_write(struct mii_bus *bus, int phy_id, int reg, u16 data);
+struct phy_device *xgene_enet_phy_register(struct mii_bus *bus, int phy_addr);
 
 #endif  /* __MDIO_XGENE_H__ */

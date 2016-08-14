@@ -783,6 +783,12 @@ enum profile_mode aa_g_profile_mode = APPARMOR_ENFORCE;
 module_param_call(mode, param_set_mode, param_get_mode,
 		  &aa_g_profile_mode, S_IRUSR | S_IWUSR);
 
+#ifdef CONFIG_SECURITY_APPARMOR_HASH
+/* whether policy verification hashing is enabled */
+bool aa_g_hash_policy = IS_ENABLED(CONFIG_SECURITY_APPARMOR_HASH_DEFAULT);
+module_param_named(hash_policy, aa_g_hash_policy, aabool, S_IRUSR | S_IWUSR);
+#endif
+
 /* Debug mode */
 bool aa_g_debug;
 module_param_named(debug, aa_g_debug, aabool, S_IRUSR | S_IWUSR);
@@ -840,51 +846,49 @@ __setup("apparmor=", apparmor_enabled_setup);
 /* set global flag turning off the ability to load policy */
 static int param_set_aalockpolicy(const char *val, const struct kernel_param *kp)
 {
-	if (!capable(CAP_MAC_ADMIN))
+	if (!policy_admin_capable())
 		return -EPERM;
-	if (aa_g_lock_policy)
-		return -EACCES;
 	return param_set_bool(val, kp);
 }
 
 static int param_get_aalockpolicy(char *buffer, const struct kernel_param *kp)
 {
-	if (!capable(CAP_MAC_ADMIN))
+	if (!policy_view_capable())
 		return -EPERM;
 	return param_get_bool(buffer, kp);
 }
 
 static int param_set_aabool(const char *val, const struct kernel_param *kp)
 {
-	if (!capable(CAP_MAC_ADMIN))
+	if (!policy_admin_capable())
 		return -EPERM;
 	return param_set_bool(val, kp);
 }
 
 static int param_get_aabool(char *buffer, const struct kernel_param *kp)
 {
-	if (!capable(CAP_MAC_ADMIN))
+	if (!policy_view_capable())
 		return -EPERM;
 	return param_get_bool(buffer, kp);
 }
 
 static int param_set_aauint(const char *val, const struct kernel_param *kp)
 {
-	if (!capable(CAP_MAC_ADMIN))
+	if (!policy_admin_capable())
 		return -EPERM;
 	return param_set_uint(val, kp);
 }
 
 static int param_get_aauint(char *buffer, const struct kernel_param *kp)
 {
-	if (!capable(CAP_MAC_ADMIN))
+	if (!policy_view_capable())
 		return -EPERM;
 	return param_get_uint(buffer, kp);
 }
 
 static int param_get_audit(char *buffer, struct kernel_param *kp)
 {
-	if (!capable(CAP_MAC_ADMIN))
+	if (!policy_view_capable())
 		return -EPERM;
 
 	if (!apparmor_enabled)
@@ -896,7 +900,7 @@ static int param_get_audit(char *buffer, struct kernel_param *kp)
 static int param_set_audit(const char *val, struct kernel_param *kp)
 {
 	int i;
-	if (!capable(CAP_MAC_ADMIN))
+	if (!policy_admin_capable())
 		return -EPERM;
 
 	if (!apparmor_enabled)
@@ -917,7 +921,7 @@ static int param_set_audit(const char *val, struct kernel_param *kp)
 
 static int param_get_mode(char *buffer, struct kernel_param *kp)
 {
-	if (!capable(CAP_MAC_ADMIN))
+	if (!policy_admin_capable())
 		return -EPERM;
 
 	if (!apparmor_enabled)
@@ -929,7 +933,7 @@ static int param_get_mode(char *buffer, struct kernel_param *kp)
 static int param_set_mode(const char *val, struct kernel_param *kp)
 {
 	int i;
-	if (!capable(CAP_MAC_ADMIN))
+	if (!policy_admin_capable())
 		return -EPERM;
 
 	if (!apparmor_enabled)
