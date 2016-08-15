@@ -1,0 +1,33 @@
+/*?
+ * Text: "Application %s on z/VM guest %s exceeds message limit\n"
+ * Severity: Error
+ * Parameter:
+ *   @1: application name
+ *   @2: z/VM user ID
+ * Description:
+ * Messages or packets destined for the application have accumulated and
+ * reached the maximum value. The default for the message limit is 65535.
+ * You can specify a different limit as the value for MSGLIMIT within
+ * the IUCV statement of the z/VM virtual machine on which the application
+ * runs.
+ * User action:
+ * Ensure that you do not send data faster than the application retrieves
+ * them. Ensure that the message limit on the z/VM guest virtual machine
+ * on which the application runs is high enough.
+ */
+
+/*?
+ * Text: "The af_iucv module cannot be loaded without z/VM\n"
+ * Severity: Error
+ * Description:
+ * The AF_IUCV protocol connects socket applications running in Linux
+ * kernels on different z/VM virtual machines, or it connects a Linux
+ * application to another sockets application running in a z/VM virtual
+ * machine. On Linux instances that run in environments other than the
+ * z/VM hypervisor, the AF_IUCV protocol does not provide any useful
+ * function and the corresponding af_iucv module cannot be loaded.
+ * User action:
+ * Load the af_iucv module only on Linux instances that run as guest
+ * operating systems of the z/VM hypervisor. If the module has been
+ * compiled into the kernel, ignore this message.
+ */

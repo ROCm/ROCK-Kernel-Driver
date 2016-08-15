@@ -1,0 +1,16 @@
+/*? Text: "sync request failed (cmd=0x%08x, status=0x%02x)\n" */
+/*? Text: "readcpuinfo failed (response=0x%04x)\n" */
+/*? Text: "configure cpu failed (cmd=0x%08x, response=0x%04x)\n" */
+/*? Text: "configure channel-path failed (cmd=0x%08x, response=0x%04x)\n" */
+/*? Text: "read channel-path info failed (response=0x%04x)\n" */
+/*? Text: "assign storage failed (cmd=0x%08x, response=0x%04x, rn=0x%04x)\n" */
+
+/*?
+ * Text: "Memory hotplug state changed, suspend refused.\n"
+ * Severity: Error
+ * Description:
+ * Suspend is refused after a memory hotplug operation was performed.
+ * User action:
+ * The system needs to be restarted and no memory hotplug operation must be
+ * performed in order to allow suspend.
+ */

@@ -688,6 +688,14 @@ menu "Executable file formats / Emulations"
 
 source "fs/Kconfig.binfmt"
 
+config KMSG_IDS
+	bool "Kernel message numbers"
+	default y
+	help
+	  Select this option if you want to include a message number to the
+	  prefix for kernel messages issued by the s390 architecture and
+	  driver code. See "Documentation/s390/kmsg.txt" for more details.
+
 config SECCOMP
 	def_bool y
 	prompt "Enable seccomp to safely compute untrusted bytecode"

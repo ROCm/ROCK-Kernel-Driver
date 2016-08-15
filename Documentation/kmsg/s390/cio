@@ -1,0 +1,145 @@
+/*?
+ * Text: "%s is not a valid device for the cio_ignore kernel parameter\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: device bus-ID
+ * Description:
+ * The device specification for the cio_ignore kernel parameter is
+ * syntactically incorrect or specifies an unknown device. This device is not
+ * excluded from being sensed and analyzed.
+ * User action:
+ * Correct your device specification in the kernel parameter line to have the
+ * device excluded when you next reboot Linux. You can write the correct
+ * device specification to /proc/cio_ignore to add the device to the list of
+ * devices to be excluded. This does not immediately make the device
+ * inaccessible but the device is ignored if it disappears and later reappears.
+ */
+
+/*?
+ * Text: "0.%x.%04x to 0.%x.%04x is not a valid range for cio_ignore\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: from subchannel set ID
+ *   @2: from device number
+ *   @3: to subchannel set ID
+ *   @4: to device number
+ * Description:
+ * The device range specified for the cio_ignore kernel parameter is
+ * syntactically incorrect. No devices specified with this range are
+ * excluded from being sensed and analyzed.
+ * User action:
+ * Correct your range specification in the kernel parameter line to have the
+ * range of devices  excluded when you next reboot Linux. You can write the
+ * correct range specification to /proc/cio_ignore to add the range of devices
+ * to the list of devices to be excluded. This does not immediately make the
+ * devices in the range inaccessible but any of these devices are ignored if
+ * they disappear and later reappear.
+ */
+
+/*?
+ * Text: "Processing %s for channel path %x.%02x\n"
+ * Severity: Notice
+ * Parameter:
+ *   @1: configuration change
+ *   @2: channel subsystem ID
+ *   @3: CHPID
+ * Description:
+ * A configuration change is in progress for the given channel path.
+ * User action:
+ * None.
+ */
+
+/*?
+ * Text: "No CCW console was found\n"
+ * Severity: Warning
+ * Description:
+ * Linux did not find the expected CCW console and tries to use an alternative
+ * console. A possible reason why the console was not found is that the console
+ * has been specified in the cio_ignore list.
+ * User action:
+ * None, if an appropriate alternative console has been found, and you want
+ * to use this alternative console. If you want to use the CCW console, ensure
+ * that is not specified in the cio_ignore list, explicitly specify the console
+ * with the 'condev=' kernel parameter, and reboot Linux.
+ */
+
+/*?
+ * Text: "Channel measurement facility initialized using format %s (mode %s)\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: format
+ *   @2: mode
+ * Description:
+ * The channel measurement facility has been initialized successfully.
+ * Format 'extended' should be used for z990 and later mainframe systems.
+ * Format 'basic' is intended for earlier mainframes. Mode 'autodetected' means
+ * that the format has been set automatically. Mode 'parameter' means that the
+ * format has been set according to the 'format=' kernel parameter.
+ * User action:
+ * None.
+ */
+
+/*?
+ * Text: "The CSS device driver initialization failed with errno=%d\n"
+ * Severity: Alert
+ * Parameter:
+ *   @1: Return code
+ * Description:
+ * The channel subsystem bus could not be established.
+ * User action:
+ * See the errno man page to find out what caused the problem.
+ */
+ /*? Text: "%s: Got subchannel machine check but no sch_event handler provided.\n" */
+
+/*?
+ * Text: "%s: Setting the device online failed because it is boxed\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Device bus-ID
+ * Description:
+ * Initialization of a device did not complete because it did not respond in
+ * time or it was reserved by another operating system.
+ * User action:
+ * Make sure that the device is working correctly, then try again to set it
+ * online. For devices that support the reserve/release mechanism (for example
+ * DASDs), you can try to override the reservation of the other system by
+ * writing 'force' to the 'online' sysfs attribute of the affected device.
+ */
+
+/*?
+ * Text: "%s: Setting the device online failed because it is not operational\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Device bus-ID
+ * Description:
+ * Initialization of a device did not complete because it is not present or
+ * not operational.
+ * User action:
+ * Make sure that the device is present and working correctly, then try again
+ * to set it online.
+ */
+
+/*?
+ * Text: "%s: The device stopped operating while being set offline\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Device bus-ID
+ * Description:
+ * While the device was set offline, it was not present or not operational.
+ * The device is now inactive, but setting it online again might fail.
+ * User action:
+ * None.
+ */
+
+/*?
+ * Text: "%s: The device entered boxed state while being set offline\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Device bus-ID
+ * Description:
+ * While the device was set offline, it did not respond in time or it was
+ * reserved by another operating system. The device is now inactive, but
+ * setting it online again might fail.
+ * User action:
+ * None.
+ */
