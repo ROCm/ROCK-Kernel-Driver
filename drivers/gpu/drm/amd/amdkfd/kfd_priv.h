@@ -36,6 +36,7 @@
 #include <linux/interval_tree.h>
 #include <linux/seq_file.h>
 #include <linux/kref.h>
+#include <linux/kfifo.h>
 #include <kgd_kfd_interface.h>
 
 #include "amd_rdma.h"
@@ -247,10 +248,7 @@ struct kfd_dev {
 	bool init_complete;
 
 	/* Interrupts */
-	void *interrupt_ring;
-	size_t interrupt_ring_size;
-	atomic_t interrupt_ring_rptr;
-	atomic_t interrupt_ring_wptr;
+	struct kfifo ih_fifo;
 	struct work_struct interrupt_work;
 	spinlock_t interrupt_lock;
 
