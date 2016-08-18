@@ -425,7 +425,8 @@ struct queue_properties {
 	uint64_t tba_addr;
 	uint64_t tma_addr;
 	/* Relevant for CU */
-	uint32_t cu_mask;
+	uint32_t cu_mask_count; /* Must be a multiple of 32 */
+	uint32_t *cu_mask;
 };
 
 /**

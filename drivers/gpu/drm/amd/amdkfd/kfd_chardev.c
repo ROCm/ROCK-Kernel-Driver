@@ -391,14 +391,44 @@ static int kfd_ioctl_set_cu_mask(struct file *filp, struct kfd_process *p,
 					void *data)
 {
 	int retval;
+	const int max_num_cus = 1024;
 	struct kfd_ioctl_set_cu_mask_args *args = data;
 	struct queue_properties properties;
 	uint32_t __user *cu_mask_ptr = (uint32_t __user *)args->cu_mask_ptr;
+	size_t cu_mask_size = sizeof(uint32_t) * (args->num_cu_mask / 32);
 
-	if (get_user(properties.cu_mask, cu_mask_ptr))
+	if ((args->num_cu_mask % 32) != 0) {
+		pr_debug("kfd: num_cu_mask (0x%x) must be a multiple of 32",
+				args->num_cu_mask);
+		return -EINVAL;
+	}
+
+	properties.cu_mask_count = args->num_cu_mask;
+	if (properties.cu_mask_count == 0) {
+		pr_debug("kfd: CU Mask cannot be 0");
+		return -EINVAL;
+	}
+
+	/* To prevent an unreasonably large CU mask size, set an arbitrary
+	 * limit of max_num_cus bits.  We can then just drop any CU mask bits
+	 * past max_num_cus bits and just use the first max_num_cus bits.
+	 */
+	if (properties.cu_mask_count > max_num_cus) {
+		pr_debug("kfd: CU mask cannot be greater than 1024 bits");
+		properties.cu_mask_count = max_num_cus;
+		cu_mask_size = sizeof(uint32_t) * (max_num_cus/32);
+	}
+
+	properties.cu_mask = kzalloc(cu_mask_size, GFP_KERNEL);
+	if (!properties.cu_mask)
+		return -ENOMEM;
+
+	retval = copy_from_user(properties.cu_mask, cu_mask_ptr, cu_mask_size);
+	if (retval) {
+		pr_debug("kfd: Could not copy cu mask from userspace");
+		kfree(properties.cu_mask);
 		return -EFAULT;
-	if (properties.cu_mask == 0)
-		return 0;
+	}
 
 	down_write(&p->lock);
 
