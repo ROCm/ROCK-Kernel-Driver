@@ -48,12 +48,12 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 {
 	struct vi_mqd *m;
 	struct kfd_cu_info cu_info;
-	uint32_t mgmt_se_mask;
-	uint32_t cu_sh_mask, cu_sh_shift;
-	uint32_t cu_mask;
-	int se, sh;
+	uint32_t se_mask[4] = {0}; /* 4 is the max # of SEs */
+	uint32_t cu_mask_count = q->cu_mask_count;
+	const uint32_t *cu_mask = q->cu_mask;
+	int se, cu_per_sh, cu_index, i;
 
-	if (q->cu_mask == 0)
+	if (WARN_ON(cu_mask_count == 0))
 		return;
 
 	m = get_mqd(mqd);
@@ -63,32 +63,31 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 	m->compute_static_thread_mgmt_se3 = 0;
 
 	mm->dev->kfd2kgd->get_cu_info(mm->dev->kgd, &cu_info);
-	cu_mask = q->cu_mask;
-	for (se = 0; se < cu_info.num_shader_engines && cu_mask; se++) {
-		mgmt_se_mask = 0;
-		for (sh = 0; sh < 2 && cu_mask; sh++) {
-			cu_sh_shift = hweight32(cu_info.cu_bitmap[se][sh]);
-			cu_sh_mask = (1 << cu_sh_shift) - 1;
-			mgmt_se_mask |= (cu_mask & cu_sh_mask) << (sh * 16);
-			cu_mask >>= cu_sh_shift;
-		}
-		switch (se) {
-		case 0:
-			m->compute_static_thread_mgmt_se0 = mgmt_se_mask;
-			break;
-		case 1:
-			m->compute_static_thread_mgmt_se1 = mgmt_se_mask;
-			break;
-		case 2:
-			m->compute_static_thread_mgmt_se2 = mgmt_se_mask;
-			break;
-		case 3:
-			m->compute_static_thread_mgmt_se3 = mgmt_se_mask;
-			break;
-		default:
-			break;
-		}
+
+	/* If # CU mask bits > # CUs, set it to the # of CUs */
+	if (cu_mask_count > cu_info.cu_active_number)
+		cu_mask_count = cu_info.cu_active_number;
+
+	cu_index = 0;
+	for (se = 0; se < cu_info.num_shader_engines; se++) {
+		cu_per_sh = 0;
+
+		/* Get the number of CUs on this Shader Engine */
+		for (i = 0; i < 4; i++)
+			cu_per_sh += hweight32(cu_info.cu_bitmap[se][i]);
+
+		se_mask[se] = cu_mask[cu_index / 32] >> (cu_index % 32);
+		if ((cu_per_sh + (cu_index % 32)) > 32)
+			se_mask[se] |= cu_mask[(cu_index / 32) + 1]
+					<< (32 - (cu_index % 32));
+		se_mask[se] &= (1 << cu_per_sh) - 1;
+		cu_index += cu_per_sh;
 	}
+	m->compute_static_thread_mgmt_se0 = se_mask[0];
+	m->compute_static_thread_mgmt_se1 = se_mask[1];
+	m->compute_static_thread_mgmt_se2 = se_mask[2];
+	m->compute_static_thread_mgmt_se3 = se_mask[3];
+
 	pr_debug("kfd: update cu mask to %#x %#x %#x %#x\n",
 		m->compute_static_thread_mgmt_se0,
 		m->compute_static_thread_mgmt_se1,
