@@ -337,6 +337,7 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
 
 	if (pqn->q) {
 		dqm = pqn->q->device->dqm;
+		kfree(pqn->q->properties.cu_mask);
 		retval = dqm->ops.destroy_queue(dqm, &pdd->qpd, pqn->q);
 		if (retval != 0) {
 			if (retval == -ETIME)
@@ -400,6 +401,12 @@ int pqm_set_cu_mask(struct process_queue_manager *pqm, unsigned int qid,
 		return -EFAULT;
 	}
 
+	/* Free the old CU mask memory if it is already allocated, then
+	 * allocate memory for the new CU mask.
+	 */
+	kfree(pqn->q->properties.cu_mask);
+
+	pqn->q->properties.cu_mask_count = p->cu_mask_count;
 	pqn->q->properties.cu_mask = p->cu_mask;
 
 	retval = pqn->q->device->dqm->ops.update_queue(pqn->q->device->dqm,
