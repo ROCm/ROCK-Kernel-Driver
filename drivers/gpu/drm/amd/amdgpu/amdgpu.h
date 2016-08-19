@@ -1394,6 +1394,15 @@ typedef void (*amdgpu_wreg_t)(struct amdgpu_device*, uint32_t, uint32_t);
 typedef uint32_t (*amdgpu_block_rreg_t)(struct amdgpu_device*, uint32_t, uint32_t);
 typedef void (*amdgpu_block_wreg_t)(struct amdgpu_device*, uint32_t, uint32_t, uint32_t);
 
+struct amdgpu_direct_gma {
+	/* reserved in visible vram*/
+	struct amdgpu_bo	*dgma_bo;
+	atomic64_t		vram_usage;
+	/* reserved in gart */
+	struct ttm_mem_reg	gart_mem;
+	atomic64_t		gart_usage;
+};
+
 #define AMDGPU_RESET_MAGIC_NUM 64
 struct amdgpu_device {
 	struct device			*dev;
@@ -1436,6 +1445,7 @@ struct amdgpu_device {
 	uint8_t				*bios;
 	uint32_t			bios_size;
 	struct amdgpu_bo		*stolen_vga_memory;
+	struct amdgpu_direct_gma	direct_gma;
 	uint32_t			bios_scratch_reg_offset;
 	uint32_t			bios_scratch[AMDGPU_BIOS_NUM_SCRATCH];
 
