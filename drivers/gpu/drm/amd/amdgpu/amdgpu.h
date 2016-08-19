@@ -1414,6 +1414,15 @@ enum amd_hw_ip_block_type {
 
 #define HWIP_MAX_INSTANCE	6
 
+struct amdgpu_direct_gma {
+	/* reserved in visible vram*/
+	struct amdgpu_bo	*dgma_bo;
+	atomic64_t		vram_usage;
+	/* reserved in gart */
+	struct ttm_mem_reg	gart_mem;
+	atomic64_t		gart_usage;
+};
+
 struct amd_powerplay {
 	struct cgs_device *cgs_device;
 	void *pp_handle;
@@ -1463,6 +1472,7 @@ struct amdgpu_device {
 	uint8_t				*bios;
 	uint32_t			bios_size;
 	struct amdgpu_bo		*stolen_vga_memory;
+	struct amdgpu_direct_gma	direct_gma;
 	uint32_t			bios_scratch_reg_offset;
 	uint32_t			bios_scratch[AMDGPU_BIOS_NUM_SCRATCH];
 
