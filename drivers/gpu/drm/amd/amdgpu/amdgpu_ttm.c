@@ -1133,6 +1133,86 @@ static struct ttm_bo_driver amdgpu_bo_driver = {
 	.swap_lru_tail = &amdgpu_ttm_swap_lru_tail,
 };
 
+#define AMDGPU_DIRECT_GMA_SIZE_MAX 96
+static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
+{
+	struct ttm_mem_type_manager *man = &adev->mman.bdev.man[TTM_PL_TT];
+	struct ttm_mem_reg *mem = &adev->direct_gma.gart_mem;
+	struct amdgpu_bo *abo;
+	struct ttm_buffer_object gtt_bo;
+	struct ttm_place place = {
+		.fpfn = 0,
+		.lpfn = 0,
+		.flags = TTM_PL_FLAG_TOPDOWN
+	};
+	unsigned long size;
+	int r;
+
+	amdgpu_direct_gma_size = min(amdgpu_direct_gma_size, AMDGPU_DIRECT_GMA_SIZE_MAX);
+	if (amdgpu_direct_gma_size == 0)
+		return 0;
+
+	size = (unsigned long)amdgpu_direct_gma_size << 20;
+	/* reserve in visible vram */
+	r = amdgpu_bo_create(adev, size, PAGE_SIZE, true, AMDGPU_GEM_DOMAIN_VRAM,
+			     AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED | AMDGPU_GEM_CREATE_TOP_DOWN,
+			     NULL, NULL, &abo);
+	if (unlikely(r))
+		goto error_out;
+
+	r = amdgpu_bo_reserve(abo, false);
+	if (unlikely(r))
+		goto error_free;
+
+	r = amdgpu_bo_pin(abo, AMDGPU_GEM_DOMAIN_VRAM, NULL);
+	amdgpu_bo_unreserve(abo);
+	if (unlikely(r))
+		goto error_free;
+
+	adev->direct_gma.dgma_bo = abo;
+
+	/* reserve in gtt */
+	mem->size = size;
+	mem->mem_type = TTM_PL_TT;
+	mem->num_pages = size >> PAGE_SHIFT;
+	mem->page_alignment = PAGE_SIZE;
+	r = (*man->func->get_node)(man, &gtt_bo, &place, mem);
+	if (unlikely(r))
+		goto error_free;
+
+	adev->gart_pin_size += size;
+	DRM_INFO("%dMB VRAM/GTT reserved for Direct GMA\n", amdgpu_direct_gma_size);
+	return 0;
+
+error_free:
+	amdgpu_bo_unref(&abo);
+
+error_out:
+	amdgpu_direct_gma_size = 0;
+	memset(&adev->direct_gma, 0, sizeof(adev->direct_gma));
+	DRM_ERROR("Fail to enable Direct GMA\n");
+	return r;
+}
+
+static void amdgpu_direct_gma_fini(struct amdgpu_device *adev)
+{
+	struct ttm_mem_type_manager *man = &adev->mman.bdev.man[TTM_PL_TT];
+	int r;
+
+	if (amdgpu_direct_gma_size == 0)
+		return;
+
+	r = amdgpu_bo_reserve(adev->direct_gma.dgma_bo, false);
+	if (r == 0) {
+		amdgpu_bo_unpin(adev->direct_gma.dgma_bo);
+		amdgpu_bo_unreserve(adev->direct_gma.dgma_bo);
+	}
+	amdgpu_bo_unref(&adev->direct_gma.dgma_bo);
+
+	(*man->func->put_node)(man, &adev->direct_gma.gart_mem);
+	adev->gart_pin_size -= (u64)amdgpu_direct_gma_size << 20;
+}
+
 int amdgpu_ttm_init(struct amdgpu_device *adev)
 {
 	unsigned i, j;
@@ -1204,6 +1284,8 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	DRM_INFO("amdgpu: %uM of GTT memory ready.\n",
 		 (unsigned)(adev->mc.gtt_size / (1024 * 1024)));
 
+	amdgpu_direct_gma_init(adev);
+
 	adev->gds.mem.total_size = adev->gds.mem.total_size << AMDGPU_GDS_SHIFT;
 	adev->gds.mem.gfx_partition_size = adev->gds.mem.gfx_partition_size << AMDGPU_GDS_SHIFT;
 	adev->gds.mem.cs_partition_size = adev->gds.mem.cs_partition_size << AMDGPU_GDS_SHIFT;
@@ -1260,6 +1342,7 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 		}
 		amdgpu_bo_unref(&adev->stollen_vga_memory);
 	}
+	amdgpu_direct_gma_fini(adev);
 	ttm_bo_clean_mm(&adev->mman.bdev, TTM_PL_VRAM);
 	ttm_bo_clean_mm(&adev->mman.bdev, TTM_PL_TT);
 	ttm_bo_clean_mm(&adev->mman.bdev, AMDGPU_PL_GDS);
