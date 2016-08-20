@@ -249,6 +249,7 @@ struct kfd_dev {
 
 	/* Interrupts */
 	struct kfifo ih_fifo;
+	struct workqueue_struct *ih_wq;
 	struct work_struct interrupt_work;
 	spinlock_t interrupt_lock;
 
