@@ -1124,7 +1124,11 @@ retry:
 		goto fail;
 	}
 	acrtc->flip_flags = flags;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+	ret = drm_atomic_async_commit(state);
+#else
 	ret = drm_atomic_nonblocking_commit(state);
+#endif
 	if (ret != 0)
 		goto fail;
 
