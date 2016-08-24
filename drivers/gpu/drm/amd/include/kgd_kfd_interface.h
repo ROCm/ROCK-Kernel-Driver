@@ -122,6 +122,17 @@ struct kgd2kfd_shared_resources {
 	uint64_t gpuvm_size;
 };
 
+struct tile_config {
+	uint32_t *tile_config_ptr;
+	uint32_t *macro_tile_config_ptr;
+	uint32_t num_tile_configs;
+	uint32_t num_macro_tile_configs;
+
+	uint32_t gb_addr_config;
+	uint32_t num_banks;
+	uint32_t num_ranks;
+};
+
 /*
  * Allocation flag domains currently only VRAM and GTT domain supported
  */
@@ -341,6 +352,8 @@ struct kfd2kgd_calls {
 	int (*submit_ib)(struct kgd_dev *kgd, enum kgd_engine_type engine,
 			uint32_t vmid, uint64_t gpu_addr,
 			uint32_t *ib_cmd, uint32_t ib_len);
+	int (*get_tile_config)(struct kgd_dev *kgd,
+			struct tile_config *config);
 };
 
 /**
