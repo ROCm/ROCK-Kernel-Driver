@@ -364,6 +364,29 @@ struct kfd_ioctl_import_dmabuf_args {
 	uint32_t dmabuf_fd;	/* to KFD */
 };
 
+struct kfd_ioctl_get_tile_config_args {
+	/* to KFD: pointer to tile array */
+	uint64_t tile_config_ptr;
+	/* to KFD: pointer to macro tile array */
+	uint64_t macro_tile_config_ptr;
+	/* to KFD: array size allocated by user mode
+	 * from KFD: array size filled by kernel
+	 */
+	uint32_t num_tile_configs;
+	/* to KFD: array size allocated by user mode
+	 * from KFD: array size filled by kernel
+	 */
+	uint32_t num_macro_tile_configs;
+
+	uint32_t gpu_id;		/* to KFD */
+	uint32_t gb_addr_config;	/* from KFD */
+	uint32_t num_banks;		/* from KFD */
+	uint32_t num_ranks;		/* from KFD */
+	/* struct size can be extended later if needed
+	 * without breaking ABI compatibility
+	 */
+};
+
 #define AMDKFD_IOCTL_BASE 'K'
 #define AMDKFD_IO(nr)			_IO(AMDKFD_IOCTL_BASE, nr)
 #define AMDKFD_IOR(nr, type)		_IOR(AMDKFD_IOCTL_BASE, nr, type)
@@ -466,7 +489,10 @@ struct kfd_ioctl_import_dmabuf_args {
 #define AMDKFD_IOC_IMPORT_DMABUF		\
 	AMDKFD_IOWR(0x20, struct kfd_ioctl_import_dmabuf_args)
 
+#define AMDKFD_IOC_GET_TILE_CONFIG		\
+	AMDKFD_IOWR(0x21, struct kfd_ioctl_get_tile_config_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x21
+#define AMDKFD_COMMAND_END		0x22
 
 #endif
