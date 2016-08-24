@@ -128,6 +128,31 @@ static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 		uint32_t page_table_base);
 
+/* Because of REG_GET_FIELD() being used, we put this function in the
+ * asic specific file.
+ */
+static int amdgpu_amdkfd_get_tile_config(struct kgd_dev *kgd,
+		struct tile_config *config)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+
+	config->gb_addr_config = adev->gfx.config.gb_addr_config;
+	config->num_banks = REG_GET_FIELD(adev->gfx.config.mc_arb_ramcfg,
+				MC_ARB_RAMCFG, NOOFBANK);
+	config->num_ranks = REG_GET_FIELD(adev->gfx.config.mc_arb_ramcfg,
+				MC_ARB_RAMCFG, NOOFRANKS);
+
+	config->tile_config_ptr = adev->gfx.config.tile_mode_array;
+	config->num_tile_configs =
+			ARRAY_SIZE(adev->gfx.config.tile_mode_array);
+	config->macro_tile_config_ptr =
+			adev->gfx.config.macrotile_mode_array;
+	config->num_macro_tile_configs =
+			ARRAY_SIZE(adev->gfx.config.macrotile_mode_array);
+
+	return 0;
+}
+
 static const struct kfd2kgd_calls kfd2kgd = {
 	.init_gtt_mem_allocation = alloc_gtt_mem,
 	.free_gtt_mem = free_gtt_mem,
@@ -181,7 +206,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.get_dmabuf_info = amdgpu_amdkfd_get_dmabuf_info,
 	.import_dmabuf = amdgpu_amdkfd_gpuvm_import_dmabuf,
 	.get_vm_fault_info = amdgpu_amdkfd_gpuvm_get_vm_fault_info,
-	.submit_ib = amdgpu_amdkfd_submit_ib
+	.submit_ib = amdgpu_amdkfd_submit_ib,
+	.get_tile_config = amdgpu_amdkfd_get_tile_config,
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions()
