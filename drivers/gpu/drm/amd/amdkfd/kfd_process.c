@@ -80,7 +80,7 @@ static void kfd_process_free_gpuvm(struct kfd_dev *kdev, struct kgd_mem *mem,
 				void *vm)
 {
 	kdev->kfd2kgd->unmap_memory_to_gpu(kdev->kgd, mem, vm);
-	kdev->kfd2kgd->free_memory_of_gpu(kdev->kgd, mem);
+	kdev->kfd2kgd->free_memory_of_gpu(kdev->kgd, mem, vm);
 }
 
 /* kfd_process_alloc_gpuvm - Allocate GPU VM for the KFD process
@@ -132,7 +132,7 @@ free_gpuvm:
 	return err;
 
 err_map_mem:
-	kdev->kfd2kgd->free_memory_of_gpu(kdev->kgd, mem);
+	kdev->kfd2kgd->free_memory_of_gpu(kdev->kgd, mem, pdd->vm);
 err_alloc_mem:
 	*kptr = NULL;
 	return err;
@@ -416,7 +416,7 @@ static void kfd_process_free_outstanding_kfd_bos(struct kfd_process *p)
 
 			run_rdma_free_callback(buf_obj);
 			pdd->dev->kfd2kgd->free_memory_of_gpu(
-					pdd->dev->kgd, buf_obj->mem);
+					pdd->dev->kgd, buf_obj->mem, pdd->vm);
 			kfd_process_device_remove_obj_handle(pdd, id);
 		}
 	}
