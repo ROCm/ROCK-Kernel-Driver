@@ -129,14 +129,10 @@ static bool dequeue_ih_ring_entry(struct kfd_dev *kfd, void *ih_ring_entry)
 
 	count = kfifo_out(&kfd->ih_fifo, ih_ring_entry,
 				kfd->device_info->ih_ring_entry_size);
-	if (count != kfd->device_info->ih_ring_entry_size) {
-		dev_err_ratelimited(kfd_chardev(),
-				"IH dequeued unexpected number of entries %d\n",
-				count);
-		return false;
-	}
 
-	return true;
+	WARN_ON(count && count != kfd->device_info->ih_ring_entry_size);
+
+	return count == kfd->device_info->ih_ring_entry_size;
 }
 
 static void interrupt_wq(struct work_struct *work)
