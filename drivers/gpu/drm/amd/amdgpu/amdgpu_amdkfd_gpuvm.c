@@ -861,7 +861,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 }
 
 int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
-		struct kgd_dev *kgd, struct kgd_mem *mem)
+		struct kgd_dev *kgd, struct kgd_mem *mem, void *vm)
 {
 	struct amdgpu_device *adev;
 	struct kfd_bo_va_list *entry, *tmp;
