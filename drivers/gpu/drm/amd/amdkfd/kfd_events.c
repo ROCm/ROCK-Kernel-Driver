@@ -1070,7 +1070,7 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 	}
 
 	up_read(&mm->mmap_sem);
-	mmdrop(mm);
+	mmput(mm);
 
 	mutex_lock(&p->event_mutex);
 
