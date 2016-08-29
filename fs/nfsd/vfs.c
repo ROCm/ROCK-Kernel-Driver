@@ -739,7 +739,7 @@ struct raparms *
 nfsd_init_raparms(struct file *file)
 {
 	struct inode *inode = file_inode(file);
-	dev_t dev = inode->i_sb->s_dev;
+	dev_t dev = inode_get_dev(inode);
 	ino_t ino = inode->i_ino;
 	struct raparms	*ra, **rap, **frap = NULL;
 	int depth = 0;
