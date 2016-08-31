@@ -551,7 +551,7 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
  */
 
 static int
-kfd_ioctl_dbg_unrgesiter(struct file *filep, struct kfd_process *p, void *data)
+kfd_ioctl_dbg_unregister(struct file *filep, struct kfd_process *p, void *data)
 {
 	long status = -EFAULT;
 	struct kfd_ioctl_dbg_unregister_args *args = data;
@@ -1862,7 +1862,7 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 			kfd_ioctl_dbg_register, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_UNREGISTER,
-			kfd_ioctl_dbg_unrgesiter, 0),
+			kfd_ioctl_dbg_unregister, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_ADDRESS_WATCH,
 			kfd_ioctl_dbg_address_watch, 0),
