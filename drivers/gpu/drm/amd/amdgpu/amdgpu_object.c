@@ -126,7 +126,7 @@ void amdgpu_bo_placement_from_domain(struct amdgpu_bo *abo, u32 domain)
 	struct ttm_placement *placement = &abo->placement;
 	struct ttm_place *places = abo->placements;
 	u64 flags = abo->flags;
-	u32 c = 0;
+	u32 c = 0, i;
 
 	if (domain & AMDGPU_GEM_DOMAIN_VRAM) {
 		unsigned visible_pfn = adev->gmc.visible_vram_size >> PAGE_SHIFT;
@@ -198,6 +198,9 @@ void amdgpu_bo_placement_from_domain(struct amdgpu_bo *abo, u32 domain)
 
 	BUG_ON(c >= AMDGPU_BO_MAX_PLACEMENTS);
 
+	for (i = 0; i < c; i++)
+		if (flags & AMDGPU_GEM_CREATE_TOP_DOWN)
+			places[i].flags |= TTM_PL_FLAG_TOPDOWN;
 	placement->num_placement = c;
 	placement->placement = places;
 
