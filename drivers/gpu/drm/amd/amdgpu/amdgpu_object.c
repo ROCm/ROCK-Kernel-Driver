@@ -71,6 +71,22 @@ static void amdgpu_ttm_placement_init(struct amdgpu_device *adev,
 {
 	u32 c = 0;
 
+	if ((domain & AMDGPU_GEM_DOMAIN_DGMA) && amdgpu_direct_gma_size) {
+		places[c].fpfn = 0;
+		places[c].lpfn = 0;
+		places[c].flags = TTM_PL_FLAG_WC | TTM_PL_FLAG_UNCACHED |
+			AMDGPU_PL_FLAG_DGMA | TTM_PL_FLAG_NO_EVICT;
+		c++;
+	}
+
+	if ((domain & AMDGPU_GEM_DOMAIN_DGMA_IMPORT) && amdgpu_direct_gma_size) {
+		places[c].fpfn = 0;
+		places[c].lpfn = 0;
+		places[c].flags = TTM_PL_FLAG_WC | TTM_PL_FLAG_UNCACHED |
+			AMDGPU_PL_FLAG_DGMA_IMPORT | TTM_PL_FLAG_NO_EVICT;
+		c++;
+	}
+
 	if (domain & AMDGPU_GEM_DOMAIN_VRAM) {
 		unsigned visible_pfn = adev->mc.visible_vram_size >> PAGE_SHIFT;
 
@@ -349,7 +365,9 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 					 AMDGPU_GEM_DOMAIN_CPU |
 					 AMDGPU_GEM_DOMAIN_GDS |
 					 AMDGPU_GEM_DOMAIN_GWS |
-					 AMDGPU_GEM_DOMAIN_OA);
+					 AMDGPU_GEM_DOMAIN_OA |
+					 AMDGPU_GEM_DOMAIN_DGMA |
+					 AMDGPU_GEM_DOMAIN_DGMA_IMPORT);
 	bo->allowed_domains = bo->preferred_domains;
 	if (!kernel && bo->allowed_domains == AMDGPU_GEM_DOMAIN_VRAM)
 		bo->allowed_domains |= AMDGPU_GEM_DOMAIN_GTT;
@@ -433,7 +451,8 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 	if (type == ttm_bo_type_device)
 		bo->flags &= ~AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 
-	if ((flags & AMDGPU_GEM_CREATE_NO_EVICT) && amdgpu_no_evict) {
+	if (((flags & AMDGPU_GEM_CREATE_NO_EVICT) && amdgpu_no_evict) ||
+	    domain & (AMDGPU_GEM_DOMAIN_DGMA | AMDGPU_GEM_DOMAIN_DGMA_IMPORT)) {
 		r = amdgpu_bo_reserve(bo, false);
 		if (unlikely(r != 0))
 			return r;
