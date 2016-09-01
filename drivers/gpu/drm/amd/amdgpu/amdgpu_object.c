@@ -86,7 +86,7 @@ void amdgpu_ttm_placement_from_domain(struct amdgpu_bo *abo, u32 domain)
 	struct ttm_placement *placement = &abo->placement;
 	struct ttm_place *places = abo->placements;
 	u64 flags = abo->flags;
-	u32 c = 0;
+	u32 c = 0, i;
 
 	if ((domain & AMDGPU_GEM_DOMAIN_DGMA) && amdgpu_direct_gma_size) {
 		places[c].fpfn = 0;
@@ -176,6 +176,10 @@ void amdgpu_ttm_placement_from_domain(struct amdgpu_bo *abo, u32 domain)
 		places[c].flags = TTM_PL_MASK_CACHING | TTM_PL_FLAG_SYSTEM;
 		c++;
 	}
+
+	for (i = 0; i < c; i++)
+		if (flags & AMDGPU_GEM_CREATE_TOP_DOWN)
+			places[i].flags |= TTM_PL_FLAG_TOPDOWN;
 
 	placement->num_placement = c;
 	placement->placement = places;

@@ -110,6 +110,8 @@ extern "C" {
 #define AMDGPU_GEM_CREATE_EXPLICIT_SYNC		(1 << 7)
 
 /* hybrid specific */
+/* Flag that the memory allocation should be from top of domain */
+#define AMDGPU_GEM_CREATE_TOP_DOWN		(1 << 30)
 /* Flag that the memory allocation should be pinned */
 #define AMDGPU_GEM_CREATE_NO_EVICT		(1 << 31)
 
