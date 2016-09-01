@@ -173,6 +173,8 @@ extern "C" {
 #define AMDGPU_GEM_CREATE_EXT_COHERENT		(1 << 15)
 
 /* hybrid specific */
+/* Flag that the memory allocation should be from top of domain */
+#define AMDGPU_GEM_CREATE_TOP_DOWN		(1ULL << 30)
 /* Flag that the memory allocation should be pinned */
 #define AMDGPU_GEM_CREATE_NO_EVICT		(1ULL << 31)
 
