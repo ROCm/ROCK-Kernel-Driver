@@ -136,7 +136,7 @@ static void amdgpu_ttm_placement_init(struct amdgpu_device *adev,
 				      struct ttm_place *places,
 				      u32 domain, u64 flags)
 {
-	u32 c = 0;
+	u32 c = 0, i;
 
 	if ((domain & AMDGPU_GEM_DOMAIN_DGMA) && amdgpu_direct_gma_size) {
 		places[c].fpfn = 0;
@@ -224,6 +224,10 @@ static void amdgpu_ttm_placement_init(struct amdgpu_device *adev,
 		places[c].flags = TTM_PL_MASK_CACHING | TTM_PL_FLAG_SYSTEM;
 		c++;
 	}
+
+	for (i = 0; i < c; i++)
+		if (flags & AMDGPU_GEM_CREATE_TOP_DOWN)
+			places[i].flags |= TTM_PL_FLAG_TOPDOWN;
 
 	placement->num_placement = c;
 	placement->placement = places;
