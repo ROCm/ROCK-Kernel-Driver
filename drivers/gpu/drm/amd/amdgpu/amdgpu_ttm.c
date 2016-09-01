@@ -174,6 +174,23 @@ static int amdgpu_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 		man->available_caching = TTM_PL_FLAG_UNCACHED;
 		man->default_caching = TTM_PL_FLAG_UNCACHED;
 		break;
+	case AMDGPU_PL_DGMA:
+		/* reserved visible VRAM for direct GMA */
+		man->func = &ttm_bo_manager_func;
+		man->gpu_offset = amdgpu_bo_gpu_offset(adev->direct_gma.dgma_bo);
+		man->flags = TTM_MEMTYPE_FLAG_FIXED | TTM_MEMTYPE_FLAG_MAPPABLE;
+		man->available_caching = TTM_PL_FLAG_UNCACHED | TTM_PL_FLAG_WC;
+		man->default_caching = TTM_PL_FLAG_WC;
+		break;
+	case AMDGPU_PL_DGMA_IMPORT:
+		/* reserved GTT space for direct GMA */
+		man->func = &ttm_bo_manager_func;
+		man->gpu_offset = bdev->man[TTM_PL_TT].gpu_offset +
+				  (adev->direct_gma.gart_mem.start << PAGE_SHIFT);
+		man->flags = TTM_MEMTYPE_FLAG_FIXED | TTM_MEMTYPE_FLAG_MAPPABLE;
+		man->available_caching = TTM_PL_FLAG_UNCACHED | TTM_PL_FLAG_WC;
+		man->default_caching = TTM_PL_FLAG_WC;
+		break;
 	default:
 		DRM_ERROR("Unsupported memory type %u\n", (unsigned)type);
 		return -EINVAL;
@@ -203,6 +220,7 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 	abo = container_of(bo, struct amdgpu_bo, tbo);
 	switch (bo->mem.mem_type) {
 	case TTM_PL_VRAM:
+	case AMDGPU_PL_DGMA:
 		if (adev->mman.buffer_funcs_ring->ready == false) {
 			amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_CPU);
 		} else {
@@ -224,6 +242,7 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 		}
 		break;
 	case TTM_PL_TT:
+	case AMDGPU_PL_DGMA_IMPORT:
 	default:
 		amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_CPU);
 	}
@@ -264,6 +283,8 @@ static int amdgpu_mm_node_addr(struct ttm_buffer_object *bo,
 			return r;
 
 	case TTM_PL_VRAM:
+	case AMDGPU_PL_DGMA:
+	case AMDGPU_PL_DGMA_IMPORT:
 		*addr = mm_node->start << PAGE_SHIFT;
 		*addr += bo->bdev->man[mem->mem_type].gpu_offset;
 		break;
@@ -464,6 +485,10 @@ static int amdgpu_bo_move(struct ttm_buffer_object *bo,
 	if (WARN_ON_ONCE(abo->pin_count > 0))
 		return -EINVAL;
 
+	if (old_mem->mem_type == AMDGPU_GEM_DOMAIN_DGMA ||
+	    old_mem->mem_type == AMDGPU_GEM_DOMAIN_DGMA_IMPORT)
+		return -EINVAL;
+
 	adev = amdgpu_ttm_adev(bo->bdev);
 
 	/* remember the eviction */
@@ -518,7 +543,9 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 {
 	struct ttm_mem_type_manager *man = &bdev->man[mem->mem_type];
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bdev);
+	struct ttm_mem_reg backup;
 
+	backup = *mem;
 	mem->bus.addr = NULL;
 	mem->bus.offset = 0;
 	mem->bus.size = mem->num_pages << PAGE_SHIFT;
@@ -533,11 +560,20 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 	case TTM_PL_TT:
 		break;
 	case TTM_PL_VRAM:
-		mem->bus.offset = mem->start << PAGE_SHIFT;
-		/* check if it's visible */
-		if ((mem->bus.offset + mem->bus.size) > adev->mc.visible_vram_size)
-			return -EINVAL;
-		mem->bus.base = adev->mc.aper_base;
+	case AMDGPU_PL_DGMA:
+	case AMDGPU_PL_DGMA_IMPORT:
+		if (mem->mem_type != AMDGPU_PL_DGMA_IMPORT) {
+			mem->bus.offset = (mem->start << PAGE_SHIFT) + man->gpu_offset -
+					adev->mc.vram_start;
+			/* check if it's visible */
+			if ((mem->bus.offset + mem->bus.size) > adev->mc.visible_vram_size)
+				return -EINVAL;
+			mem->bus.base = adev->mc.aper_base;
+		} else {
+			mem->bus.offset = backup.bus.offset;
+			mem->bus.base = backup.bus.base;
+		}
+
 		mem->bus.is_iomem = true;
 #ifdef __alpha__
 		/*
@@ -1181,8 +1217,24 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 		goto error_free;
 
 	adev->gart_pin_size += size;
+
+	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_DGMA, size >> PAGE_SHIFT);
+	if (unlikely(r))
+		goto error_put_node;
+
+	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_DGMA_IMPORT, size >> PAGE_SHIFT);
+	if (unlikely(r))
+		goto error_release_mm;
+
 	DRM_INFO("%dMB VRAM/GTT reserved for Direct GMA\n", amdgpu_direct_gma_size);
 	return 0;
+
+error_release_mm:
+	ttm_bo_clean_mm(&adev->mman.bdev, AMDGPU_PL_DGMA);
+
+error_put_node:
+	(*man->func->put_node)(man, &adev->direct_gma.gart_mem);
+	adev->gart_pin_size -= size;
 
 error_free:
 	amdgpu_bo_unref(&abo);
@@ -1201,6 +1253,9 @@ static void amdgpu_direct_gma_fini(struct amdgpu_device *adev)
 
 	if (amdgpu_direct_gma_size == 0)
 		return;
+
+	ttm_bo_clean_mm(&adev->mman.bdev, AMDGPU_PL_DGMA);
+	ttm_bo_clean_mm(&adev->mman.bdev, AMDGPU_PL_DGMA_IMPORT);
 
 	r = amdgpu_bo_reserve(adev->direct_gma.dgma_bo, false);
 	if (r == 0) {
@@ -1569,6 +1624,8 @@ static int amdgpu_mm_dump_table(struct seq_file *m, void *data)
 
 static int ttm_pl_vram = TTM_PL_VRAM;
 static int ttm_pl_tt = TTM_PL_TT;
+static int ttm_pl_dgma = AMDGPU_PL_DGMA;
+static int ttm_pl_dgma_import = AMDGPU_PL_DGMA_IMPORT;
 
 static const struct drm_info_list amdgpu_ttm_debugfs_list[] = {
 	{"amdgpu_vram_mm", amdgpu_mm_dump_table, 0, &ttm_pl_vram},
@@ -1577,6 +1634,11 @@ static const struct drm_info_list amdgpu_ttm_debugfs_list[] = {
 #ifdef CONFIG_SWIOTLB
 	{"ttm_dma_page_pool", ttm_dma_page_alloc_debugfs, 0, NULL}
 #endif
+};
+
+static const struct drm_info_list amdgpu_ttm_dgma_debugfs_list[] = {
+	{"amdgpu_dgma_mm", amdgpu_mm_dump_table, 0, &ttm_pl_dgma},
+	{"amdgpu_dgma_import_mm", amdgpu_mm_dump_table, 0, &ttm_pl_dgma_import}
 };
 
 static ssize_t amdgpu_ttm_vram_read(struct file *f, char __user *buf,
@@ -1676,6 +1738,7 @@ static int amdgpu_ttm_debugfs_init(struct amdgpu_device *adev)
 {
 #if defined(CONFIG_DEBUG_FS)
 	unsigned count;
+	int r;
 
 	struct drm_minor *minor = adev->ddev->primary;
 	struct dentry *ent, *root = minor->debugfs_root;
@@ -1703,7 +1766,15 @@ static int amdgpu_ttm_debugfs_init(struct amdgpu_device *adev)
 		--count;
 #endif
 
-	return amdgpu_debugfs_add_files(adev, amdgpu_ttm_debugfs_list, count);
+	r = amdgpu_debugfs_add_files(adev, amdgpu_ttm_debugfs_list, count);
+	if (unlikely(r))
+		return r;
+
+	if (amdgpu_direct_gma_size)
+		r = amdgpu_debugfs_add_files(adev, amdgpu_ttm_dgma_debugfs_list,
+					ARRAY_SIZE(amdgpu_ttm_dgma_debugfs_list));
+
+	return r;
 #else
 
 	return 0;
