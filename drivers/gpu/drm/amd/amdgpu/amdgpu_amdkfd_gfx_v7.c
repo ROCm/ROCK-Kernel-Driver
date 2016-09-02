@@ -23,6 +23,7 @@
 #include <linux/fdtable.h>
 #include <linux/uaccess.h>
 #include <linux/firmware.h>
+#include <linux/mmu_context.h>
 #include <drm/drmP.h>
 #include "amdgpu.h"
 #include "amdgpu_amdkfd.h"
@@ -546,17 +547,18 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL, m->sdma_rlc_doorbell);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR, m->sdma_rlc_rb_rptr);
 
-	if (mm && mm == current->mm)
-		wptr_valid = !get_user(data, wptr);
-	else if (mm) {
-		struct vm_area_struct *vma;
-
-		vma = find_vma(mm, (unsigned long)wptr);
-		if (vma && vma->vm_start <= (unsigned long)wptr &&
-		    vma->vm_ops && vma->vm_ops->access)
-			wptr_valid = (sizeof(data) == vma->vm_ops->access(
-					      vma, (unsigned long)wptr,
-					      &data, sizeof(data), 0));
+	if (mm) {
+		if (mm == current->mm) {
+			/* Running in the correct user process context */
+			wptr_valid = !get_user(data, wptr);
+		} else if (current->mm == NULL) {
+			/* A kernel thread can temporarily use a user
+			 * process context for AIO
+			 */
+			use_mm(mm);
+			wptr_valid = !get_user(data, wptr);
+			unuse_mm(mm);
+		}
 	}
 	if (wptr_valid)
 		WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_WPTR, data);
