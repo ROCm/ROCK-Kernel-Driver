@@ -738,15 +738,8 @@ int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 
 	r = -ENODEV;
 	pdd = kfd_get_process_device_data(kfd, p);
-	if (pdd) {
-		if (kfd->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
-			down_read(&mm->mmap_sem);
-
+	if (pdd)
 		r = process_restore_queues(kfd->dqm, &pdd->qpd);
-
-		if (kfd->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
-			up_read(&mm->mmap_sem);
-	}
 
 	kfd_unref_process(p);
 	return r;
