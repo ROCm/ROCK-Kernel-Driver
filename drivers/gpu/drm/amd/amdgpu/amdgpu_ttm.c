@@ -44,6 +44,7 @@
 #include <linux/debugfs.h>
 #include "amdgpu.h"
 #include "bif/bif_4_1_d.h"
+#include "amdgpu_amdkfd.h"
 
 #define DRM_FILE_PAGE_OFFSET (0x100000000ULL >> PAGE_SHIFT)
 
@@ -179,6 +180,37 @@ static int amdgpu_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 		return -EINVAL;
 	}
 	return 0;
+}
+
+static bool amdgpu_bo_eviction_valuable(struct ttm_buffer_object *bo,
+					const struct ttm_place *place)
+{
+	struct reservation_object_list *flist;
+	struct fence *f;
+	int i;
+
+	/* Don't evict this BO if it's outside of the
+	 * requested placement range
+	 */
+	if (!ttm_bo_eviction_valuable(bo, place))
+		return false;
+
+	/* If bo is a KFD BO, check if the bo belongs to the current process.
+	 * If true, then return false as any KFD process needs all its BOs to
+	 * be resident to run successfully
+	 */
+	flist = reservation_object_get_list(bo->resv);
+	if (!flist)
+		return true;
+
+	for (i = 0; i < flist->shared_count; ++i) {
+		f = rcu_dereference_protected(flist->shared[i],
+			reservation_object_held(bo->resv));
+		if (amd_kfd_fence_check_mm(f, current->mm))
+			return false;
+	}
+
+	return true;
 }
 
 static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
@@ -1112,7 +1144,7 @@ static struct ttm_bo_driver amdgpu_bo_driver = {
 	.ttm_tt_unpopulate = &amdgpu_ttm_tt_unpopulate,
 	.invalidate_caches = &amdgpu_invalidate_caches,
 	.init_mem_type = &amdgpu_init_mem_type,
-	.eviction_valuable = amdgpu_ttm_bo_eviction_valuable,
+	.eviction_valuable = amdgpu_bo_eviction_valuable,
 	.evict_flags = &amdgpu_evict_flags,
 	.move = &amdgpu_bo_move,
 	.verify_access = &amdgpu_verify_access,
