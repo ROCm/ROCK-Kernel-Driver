@@ -26,6 +26,7 @@
 #include <linux/slab.h>
 #include <linux/highmem.h>
 #include <linux/debugfs.h>
+#include <linux/fence.h>
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_pm4_headers.h"
@@ -745,6 +746,42 @@ int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 	return r;
 }
 
+/* quiesce_process_mm -
+ *  Quiesce all user queues that belongs to given process p
+ */
+static int quiesce_process_mm(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+	int r = 0;
+	unsigned int n_evicted = 0;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		r = process_evict_queues(pdd->dev->dqm, &pdd->qpd);
+		if (r != 0) {
+			pr_err("Failed to evict process queues\n");
+			goto fail;
+		}
+		n_evicted++;
+	}
+
+	return r;
+
+fail:
+	/* To keep state consistent, roll back partial eviction by
+	 * restoring queues
+	 */
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		if (n_evicted == 0)
+			break;
+		if (process_restore_queues(pdd->dev->dqm, &pdd->qpd))
+			pr_err("Failed to restore queues\n");
+
+		n_evicted--;
+	}
+
+	return r;
+}
+
 /* resume_process_mm -
  *  Resume all user queues that belongs to given process p. The caller must
  *  ensure that process p context is valid.
@@ -825,6 +862,85 @@ void kfd_restore_bo_worker(struct work_struct *work)
 	ret = resume_process_mm(p);
 	if (ret)
 		pr_err("Failed to resume user queues\n");
+}
+
+/** kgd2kfd_schedule_evict_and_restore_process - Schedules work queue that will
+ *   prepare for safe eviction of KFD BOs that belong to the specified
+ *   process.
+ *
+ * @mm: mm_struct that identifies the specified KFD process
+ * @fence: eviction fence attached to KFD process BOs
+ *
+ */
+int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
+					       struct fence *fence)
+{
+	struct kfd_process *p;
+
+	if (!fence)
+		return -EINVAL;
+
+	if (fence_is_signaled(fence))
+		return 0;
+
+	p = kfd_lookup_process_by_mm(mm);
+	if (!p)
+		return -ENODEV;
+
+	if (work_pending(&p->eviction_work.work)) {
+		/* It is possible has TTM has lined up couple of BOs of the same
+		 * process to be evicted. Check if the fence is same which
+		 * indicates that previous work item scheduled is not complted
+		 */
+		if (p->eviction_work.eviction_fence == fence)
+			goto out;
+		else {
+			WARN(1, "Starting new evict with previous evict is not completed\n");
+			cancel_work_sync(&p->eviction_work.work);
+		}
+	}
+
+	/* During process initialization eviction_work.work is initialized
+	 * to kfd_evict_bo_worker
+	 */
+	p->eviction_work.eviction_fence = fence_get(fence);
+	schedule_work(&p->eviction_work.work);
+out:
+	kfd_unref_process(p);
+	return 0;
+}
+
+void kfd_evict_bo_worker(struct work_struct *work)
+{
+	int ret;
+	struct kfd_process *p;
+	struct kfd_eviction_work *eviction_work;
+
+	eviction_work = container_of(work, struct kfd_eviction_work,
+				     work);
+
+	/* Process termination destroys this worker thread. So during the
+	 * lifetime of this thread, kfd_process p will be valid
+	 */
+	p = container_of(eviction_work, struct kfd_process, eviction_work);
+
+	/* Narrow window of overlap between restore and evict work item is
+	 * possible. Once amdgpu_amdkfd_gpuvm_restore_process_bos unreserves
+	 * KFD BOs, it is possible to evicted again. But restore has few more
+	 * steps of finish. So lets wait for the restore work to complete
+	 */
+	if (delayed_work_pending(&p->restore_work))
+		flush_delayed_work(&p->restore_work);
+
+	ret = quiesce_process_mm(p);
+	if (!ret) {
+		fence_signal(eviction_work->eviction_fence);
+		fence_put(eviction_work->eviction_fence);
+		kfd_schedule_restore_bos_and_queues(p);
+	} else {
+		pr_err("Failed to quiesce user queues. Cannot evict BOs\n");
+	}
+
 }
 
 static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,

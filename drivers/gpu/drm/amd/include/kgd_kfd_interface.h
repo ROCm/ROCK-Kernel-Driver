@@ -31,6 +31,7 @@
 #include <linux/types.h>
 #include <linux/mm_types.h>
 #include <linux/scatterlist.h>
+#include <linux/fence.h>
 
 struct pci_dev;
 
@@ -384,6 +385,9 @@ struct kfd2kgd_calls {
  *
  * @resume_mm: Resume user queue access to specified MM address space
  *
+ * @schedule_evict_and_restore_process: Schedules work queue that will prepare
+ * for safe eviction of KFD BOs that belong to the specified process.
+ *
  * This structure contains function callback pointers so the kgd driver
  * will notify to the amdkfd about certain status changes.
  *
@@ -402,6 +406,8 @@ struct kgd2kfd_calls {
 	int (*restore)(struct kfd_dev *kfd);
 	int (*quiesce_mm)(struct kfd_dev *kfd, struct mm_struct *mm);
 	int (*resume_mm)(struct kfd_dev *kfd, struct mm_struct *mm);
+	int (*schedule_evict_and_restore_process)(struct mm_struct *mm,
+			struct fence *fence);
 };
 
 int kgd2kfd_init(unsigned interface_version,
