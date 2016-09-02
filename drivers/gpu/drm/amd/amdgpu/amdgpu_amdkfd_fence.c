@@ -117,13 +117,19 @@ static const char *amd_kfd_fence_get_timeline_name(struct fence *f)
  */
 static bool amd_kfd_fence_enable_signaling(struct fence *f)
 {
+	struct amdgpu_amdkfd_fence *fence = to_amdgpu_amdkfd_fence(f);
+
+	if (!fence)
+		return false;
+
 	if (fence_is_signaled(f))
 		return true;
 
-	/* TODO: If the fence is not signaled, call into KFD to schedule
-	 * work item that will prepare for KFD BO evictions
-	 */
-	return true;
+	if (!kgd2kfd->schedule_evict_and_restore_process(
+				(struct mm_struct *)fence->mm, f))
+		return true;
+
+	return false;
 }
 
 static int amd_kfd_fence_signal(struct fence *f)
