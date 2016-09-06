@@ -1039,10 +1039,6 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	vm_update_params.src = src;
 	vm_update_params.pages_addr = pages_addr;
 
-	/* sync to everything on unmapping */
-	if (!(flags & AMDGPU_PTE_VALID))
-		owner = AMDGPU_FENCE_OWNER_UNDEFINED;
-
 	/* If update flag is set to CPU, then try to update PT entries directly
 	 * by CPU. If failed, fallback to SDMA update.
 	 */
