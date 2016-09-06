@@ -906,10 +906,6 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	params.adev = adev;
 	params.src = src;
 
-	/* sync to everything on unmapping */
-	if (!(flags & AMDGPU_PTE_VALID))
-		owner = AMDGPU_FENCE_OWNER_UNDEFINED;
-
 	nptes = last - start + 1;
 
 	/*
