@@ -373,8 +373,8 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 	/* we do not control the vmid in DIQ mode, just a place holder */
 	unsigned int vmid = 0;
 
-	struct kfd_mem_obj *mem_obj;
 	uint32_t *packet_buff_uint = NULL;
+	uint64_t packet_buff_gpu_addr = 0;
 
 	struct pm4__set_config_reg *packets_vec = NULL;
 
@@ -398,12 +398,12 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 			break;
 		}
 
-		status = kfd_gtt_sa_allocate(dbgdev->dev, ib_size, &mem_obj);
+		status = dbgdev->kq->ops.acquire_inline_ib(dbgdev->kq,
+				ib_size/sizeof(uint32_t),
+				&packet_buff_uint, &packet_buff_gpu_addr);
 
 		if (status != 0)
 			break;
-
-		packet_buff_uint = mem_obj->cpu_ptr;
 
 		memset(packet_buff_uint, 0, ib_size);
 
@@ -499,7 +499,7 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 			status = dbgdev_diq_submit_ib(
 						dbgdev,
 						adw_info->process->pasid,
-						mem_obj->gpu_addr,
+						packet_buff_gpu_addr,
 						packet_buff_uint,
 						ib_size, true);
 
@@ -511,8 +511,6 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 		}
 
 	} while (false);
-	if (packet_buff_uint != NULL)
-		kfd_gtt_sa_free(dbgdev->dev, mem_obj);
 
 	return status;
 
@@ -632,8 +630,8 @@ static int dbgdev_wave_control_diq(struct kfd_dbgdev *dbgdev,
 	int status = 0;
 	union SQ_CMD_BITS reg_sq_cmd;
 	union GRBM_GFX_INDEX_BITS reg_gfx_index;
-	struct kfd_mem_obj *mem_obj;
 	uint32_t *packet_buff_uint = NULL;
+	uint64_t packet_buff_gpu_addr = 0;
 	struct pm4__set_config_reg *packets_vec = NULL;
 	size_t ib_size = sizeof(struct pm4__set_config_reg) * 3;
 
@@ -674,12 +672,12 @@ static int dbgdev_wave_control_diq(struct kfd_dbgdev *dbgdev,
 
 		pr_debug("\t\t %30s\n", "* * * * * * * * * * * * * * * * * *");
 
-		status = kfd_gtt_sa_allocate(dbgdev->dev, ib_size, &mem_obj);
+		status = dbgdev->kq->ops.acquire_inline_ib(dbgdev->kq,
+				ib_size / sizeof(uint32_t),
+				&packet_buff_uint, &packet_buff_gpu_addr);
 
 		if (status != 0)
 			break;
-
-		packet_buff_uint = mem_obj->cpu_ptr;
 
 		memset(packet_buff_uint, 0, ib_size);
 
@@ -715,7 +713,7 @@ static int dbgdev_wave_control_diq(struct kfd_dbgdev *dbgdev,
 		status = dbgdev_diq_submit_ib(
 				dbgdev,
 				wac_info->process->pasid,
-				mem_obj->gpu_addr,
+				packet_buff_gpu_addr,
 				packet_buff_uint,
 				ib_size, false);
 
@@ -723,9 +721,6 @@ static int dbgdev_wave_control_diq(struct kfd_dbgdev *dbgdev,
 			pr_debug("%s\n", " Critical Error ! Submit diq packet failed ");
 
 	} while (false);
-
-	if (packet_buff_uint != NULL)
-		kfd_gtt_sa_free(dbgdev->dev, mem_obj);
 
 	return status;
 }
