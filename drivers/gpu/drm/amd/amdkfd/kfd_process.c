@@ -725,6 +725,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 		pdd->reset_wavefronts = false;
 		pdd->process = p;
 		pdd->bound = PDD_UNBOUND;
+		pdd->already_dequeued = false;
 		list_add(&pdd->per_device_list, &p->per_device_data);
 
 		/* Init idr used for memory handle translation */
@@ -868,10 +869,11 @@ void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid)
 	down_write(&p->lock);
 
 	pdd = kfd_get_process_device_data(dev, p);
-	if (pdd->reset_wavefronts) {
-		dbgdev_wave_reset_wavefronts(pdd->dev, p);
-		pdd->reset_wavefronts = false;
-	}
+	if (pdd)
+		/* For GPU relying on IOMMU, we need to dequeue here
+		 * when PASID is still bound.
+		 */
+		kfd_process_dequeue_from_device(pdd);
 
 	up_write(&p->lock);
 
