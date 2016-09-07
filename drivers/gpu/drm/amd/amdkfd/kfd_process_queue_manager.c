@@ -76,7 +76,11 @@ void kfd_process_dequeue_from_device(struct kfd_process_device *pdd)
 	struct kfd_process *p = pdd->process;
 	int retval;
 
+	if (pdd->already_dequeued)
+		return;
+
 	retval = dev->dqm->ops.process_termination(dev->dqm, &pdd->qpd);
+	pdd->already_dequeued = true;
 	/* Checking pdd->reset_wavefronts may not be needed, because
 	 * if reset_wavefronts was set to true before, which means unmapping
 	 * failed, process_termination should fail too until we reset
