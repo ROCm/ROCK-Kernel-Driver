@@ -70,6 +70,33 @@ static int find_available_queue_slot(struct process_queue_manager *pqm,
 	return 0;
 }
 
+void kfd_process_dequeue_from_device(struct kfd_process_device *pdd)
+{
+	struct kfd_dev *dev = pdd->dev;
+	struct kfd_process *p = pdd->process;
+	int retval;
+
+	retval = dev->dqm->ops.process_termination(dev->dqm, &pdd->qpd);
+	/* Checking pdd->reset_wavefronts may not be needed, because
+	 * if reset_wavefronts was set to true before, which means unmapping
+	 * failed, process_termination should fail too until we reset
+	 * wavefronts. Now we put the check there to be safe.
+	 */
+	if (retval || pdd->reset_wavefronts) {
+		pr_warn("amdkfd: Resetting wave fronts on dev %p\n", dev);
+		dbgdev_wave_reset_wavefronts(dev, p);
+		pdd->reset_wavefronts = false;
+	}
+}
+
+void kfd_process_dequeue_from_all_devices(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
+		kfd_process_dequeue_from_device(pdd);
+}
+
 int pqm_init(struct process_queue_manager *pqm, struct kfd_process *p)
 {
 	BUG_ON(!pqm);
@@ -87,31 +114,11 @@ int pqm_init(struct process_queue_manager *pqm, struct kfd_process *p)
 
 void pqm_uninit(struct process_queue_manager *pqm)
 {
-	int retval;
 	struct process_queue_node *pqn, *next;
-	struct kfd_process_device *pdd;
-	struct kfd_dev *dev = NULL;
 
 	BUG_ON(!pqm);
 
 	pr_debug("In func %s\n", __func__);
-
-	list_for_each_entry_safe(pqn, next, &pqm->queues, process_queue_list) {
-		if (pqn->q)
-			dev = pqn->q->device;
-		else if (pqn->kq)
-			dev = pqn->kq->dev;
-		else
-			BUG();
-
-		pdd = kfd_get_process_device_data(dev, pqm->process);
-		if (pdd) {
-			retval = dev->dqm->ops.process_termination
-				(dev->dqm, &pdd->qpd);
-			if (retval != 0)
-				pdd->reset_wavefronts = true;
-		}
-	}
 
 	list_for_each_entry_safe(pqn, next, &pqm->queues, process_queue_list) {
 		uninit_queue(pqn->q);

@@ -536,24 +536,19 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 		mutex_unlock(get_dbgmgr_mutex());
 	}
 
+	kfd_process_dequeue_from_all_devices(p);
 
 	/* now we can uninit the pqm: */
-
 	pqm_uninit(&p->pqm);
 
 	/* Iterate over all process device data structure and check
-	 * if we should delete debug managers and reset all wavefronts
+	 * if we should delete debug managers
 	 */
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		if ((pdd->dev->dbgmgr) &&
 				(pdd->dev->dbgmgr->pasid == p->pasid))
 			kfd_dbgmgr_destroy(pdd->dev->dbgmgr);
 
-		if (pdd->reset_wavefronts) {
-			pr_warn("amdkfd: Resetting all wave fronts\n");
-			dbgdev_wave_reset_wavefronts(pdd->dev, p);
-			pdd->reset_wavefronts = false;
-		}
 	}
 
 	/* Indicate to other users that MM is no longer valid */
