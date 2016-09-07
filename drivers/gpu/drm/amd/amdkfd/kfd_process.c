@@ -824,21 +824,17 @@ void kfd_unbind_processes_from_device(struct kfd_dev *dev)
 {
 	struct kfd_process_device *pdd;
 	struct kfd_process *p;
-	unsigned int temp, temp_bound, temp_pasid;
+	unsigned int temp;
 
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
 		down_write(&p->lock);
 		pdd = kfd_get_process_device_data(dev, p);
-		temp_bound = pdd->bound;
-		temp_pasid = p->pasid;
+
 		if (pdd->bound == PDD_BOUND)
 			pdd->bound = PDD_BOUND_SUSPENDED;
 		up_write(&p->lock);
-
-		if (temp_bound == PDD_BOUND)
-			amd_iommu_unbind_pasid(dev->pdev, temp_pasid);
 	}
 
 	srcu_read_unlock(&kfd_processes_srcu, idx);
