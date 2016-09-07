@@ -219,7 +219,7 @@ static int acquire_packet_buffer(struct kernel_queue *kq,
 	 * the opposite. So we can only use up to queue_size_dwords - 1 dwords.
 	 */
 	rptr = *kq->rptr_kernel;
-	wptr = *kq->wptr_kernel;
+	wptr = kq->pending_wptr;
 	queue_address = (unsigned int *)kq->pq_kernel_addr;
 	queue_size_dwords = kq->queue->properties.queue_size / sizeof(uint32_t);
 
@@ -254,6 +254,39 @@ static int acquire_packet_buffer(struct kernel_queue *kq,
 
 	*buffer_ptr = &queue_address[wptr];
 	kq->pending_wptr = wptr + packet_size_in_dwords;
+
+	return 0;
+}
+
+static int acquire_inline_ib(struct kernel_queue *kq,
+			     size_t size_in_dwords,
+			     unsigned int **buffer_ptr,
+			     uint64_t *gpu_addr)
+{
+	int ret;
+	unsigned int *buf;
+	union PM4_MES_TYPE_3_HEADER nop;
+
+	if (size_in_dwords >= (1 << 14))
+		return -EINVAL;
+
+	/* Allocate size_in_dwords on the ring, plus an extra dword
+	 * for a NOP packet header
+	 */
+	ret = acquire_packet_buffer(kq, size_in_dwords + 1,  &buf);
+	if (ret)
+		return ret;
+
+	/* Build a NOP packet that contains the IB as "payload". */
+	nop.u32all = 0;
+	nop.opcode = IT_NOP;
+	nop.count = size_in_dwords - 1;
+	nop.type = PM4_TYPE_3;
+
+	*buf = nop.u32all;
+	*buffer_ptr = buf + 1;
+	*gpu_addr = kq->pq_gpu_addr + ((unsigned long)*buffer_ptr -
+				       (unsigned long)kq->pq_kernel_addr);
 
 	return 0;
 }
@@ -300,6 +333,7 @@ struct kernel_queue *kernel_queue_init(struct kfd_dev *dev,
 	kq->ops.initialize = initialize;
 	kq->ops.uninitialize = uninitialize;
 	kq->ops.acquire_packet_buffer = acquire_packet_buffer;
+	kq->ops.acquire_inline_ib = acquire_inline_ib;
 	kq->ops.submit_packet = submit_packet;
 	kq->ops.rollback_packet = rollback_packet;
 
