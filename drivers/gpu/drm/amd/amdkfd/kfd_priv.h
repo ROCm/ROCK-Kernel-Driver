@@ -820,6 +820,8 @@ struct process_queue_node {
 	struct list_head process_queue_list;
 };
 
+void kfd_process_dequeue_from_device(struct kfd_process_device *pdd);
+void kfd_process_dequeue_from_all_devices(struct kfd_process *p);
 int pqm_init(struct process_queue_manager *pqm, struct kfd_process *p);
 void pqm_uninit(struct process_queue_manager *pqm);
 int pqm_create_queue(struct process_queue_manager *pqm,
