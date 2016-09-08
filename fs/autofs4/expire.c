@@ -517,7 +517,7 @@ retry:
 		 * Possibly being selected for expire, wait until
 		 * it's selected or not.
 		 */
-		schedule_timeout(HZ/10);
+		schedule_timeout_uninterruptible(HZ/10);
 		goto retry;
 	}
 	if (state & AUTOFS_INF_EXPIRING) {
