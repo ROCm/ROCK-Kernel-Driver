@@ -387,9 +387,7 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 		for (i = 0; i < abo->tbo.num_pages; i++)
 			dma_addr[i] = args->addr + i * PAGE_SIZE;
 
-		flags = AMDGPU_PTE_VALID | AMDGPU_PTE_READABLE | AMDGPU_PTE_WRITEABLE;
-		if (adev->asic_type >= CHIP_TONGA)
-			flags |= AMDGPU_PTE_EXECUTABLE;
+		flags = amdgpu_ttm_tt_pte_flags(adev, abo->tbo.ttm, &abo->tbo.mem);
 
 		offset = amdgpu_bo_gpu_offset(abo);
 		offset -= adev->mman.bdev.man[TTM_PL_TT].gpu_offset;
