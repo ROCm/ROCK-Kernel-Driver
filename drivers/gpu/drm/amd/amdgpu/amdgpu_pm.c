@@ -579,6 +579,149 @@ fail:
 	return count;
 }
 
+static ssize_t amdgpu_get_pp_power_profile(struct device *dev,
+		char *buf, struct pp_profile *query)
+{
+	struct drm_device *ddev = dev_get_drvdata(dev);
+	struct amdgpu_device *adev = ddev->dev_private;
+	int ret = 0;
+
+	ret = amdgpu_dpm_get_power_profile_state(adev, query);
+
+	if (ret)
+		return ret;
+
+	return snprintf(buf, PAGE_SIZE,
+			"%d %d %d %d %d\n",
+			query->min_sclk / 100,
+			query->min_mclk / 100,
+			query->activity_threshold,
+			query->up_hyst,
+			query->down_hyst);
+}
+
+static ssize_t amdgpu_get_pp_gfx_power_profile(struct device *dev,
+		struct device_attribute *attr,
+		char *buf)
+{
+	struct pp_profile query = {0};
+
+	query.type = PP_GFX_PROFILE;
+
+	return amdgpu_get_pp_power_profile(dev, buf, &query);
+}
+
+static ssize_t amdgpu_get_pp_compute_power_profile(struct device *dev,
+		struct device_attribute *attr,
+		char *buf)
+{
+	struct pp_profile query = {0};
+
+	query.type = PP_COMPUTE_PROFILE;
+
+	return amdgpu_get_pp_power_profile(dev, buf, &query);
+}
+
+static ssize_t amdgpu_set_pp_power_profile(struct device *dev,
+		const char *buf,
+		size_t count,
+		struct pp_profile *request)
+{
+	struct drm_device *ddev = dev_get_drvdata(dev);
+	struct amdgpu_device *adev = ddev->dev_private;
+	uint32_t loop = 0;
+	char *sub_str, buf_cpy[128], *tmp_str;
+	const char delimiter[3] = {' ', '\n', '\0'};
+	long int value;
+	int ret = 0;
+
+	if (strncmp("reset", buf, strlen("reset")) == 0) {
+		ret = amdgpu_dpm_reset_power_profile_state(adev, request);
+		if (ret) {
+			count = -EINVAL;
+			goto fail;
+		}
+		return count;
+	}
+
+	if (strncmp("set", buf, strlen("set")) == 0) {
+		ret = amdgpu_dpm_set_power_profile_state(adev, request);
+		if (ret) {
+			count = -EINVAL;
+			goto fail;
+		}
+		return count;
+	}
+
+	memcpy(buf_cpy, buf, count);
+	tmp_str = buf_cpy;
+
+	while (strlen(tmp_str)) {
+		sub_str = strsep(&tmp_str, delimiter);
+		ret = kstrtol(sub_str, 0, &value);
+		if (ret) {
+			count = -EINVAL;
+			goto fail;
+		}
+
+		switch (loop) {
+		case 0:
+			/* input unit MHz convert to dpm table unit 10KHz*/
+			request->min_sclk = (uint32_t)value * 100;
+			break;
+		case 1:
+			/* input unit MHz convert to dpm table unit 10KHz*/
+			request->min_mclk = (uint32_t)value * 100;
+			break;
+		case 2:
+			request->activity_threshold = (uint16_t)value;
+			break;
+		case 3:
+			request->up_hyst = (uint8_t)value;
+			break;
+		case 4:
+			request->down_hyst = (uint8_t)value;
+			break;
+		default:
+			break;
+		}
+
+		loop++;
+	}
+
+	ret = amdgpu_dpm_set_power_profile_state(adev, request);
+
+	if (ret)
+		count = -EINVAL;
+
+fail:
+	return count;
+}
+
+static ssize_t amdgpu_set_pp_gfx_power_profile(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf,
+		size_t count)
+{
+	struct pp_profile request = {0};
+
+	request.type = PP_GFX_PROFILE;
+
+	return amdgpu_set_pp_power_profile(dev, buf, count, &request);
+}
+
+static ssize_t amdgpu_set_pp_compute_power_profile(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf,
+		size_t count)
+{
+	struct pp_profile request = {0};
+
+	request.type = PP_COMPUTE_PROFILE;
+
+	return amdgpu_set_pp_power_profile(dev, buf, count, &request);
+}
+
 static DEVICE_ATTR(power_dpm_state, S_IRUGO | S_IWUSR, amdgpu_get_dpm_state, amdgpu_set_dpm_state);
 static DEVICE_ATTR(power_dpm_force_performance_level, S_IRUGO | S_IWUSR,
 		   amdgpu_get_dpm_forced_performance_level,
@@ -606,6 +749,12 @@ static DEVICE_ATTR(pp_sclk_od, S_IRUGO | S_IWUSR,
 static DEVICE_ATTR(pp_mclk_od, S_IRUGO | S_IWUSR,
 		amdgpu_get_pp_mclk_od,
 		amdgpu_set_pp_mclk_od);
+static DEVICE_ATTR(pp_gfx_power_profile, S_IRUGO | S_IWUSR,
+		amdgpu_get_pp_gfx_power_profile,
+		amdgpu_set_pp_gfx_power_profile);
+static DEVICE_ATTR(pp_compute_power_profile, S_IRUGO | S_IWUSR,
+		amdgpu_get_pp_compute_power_profile,
+		amdgpu_set_pp_compute_power_profile);
 
 static ssize_t amdgpu_hwmon_show_temp(struct device *dev,
 				      struct device_attribute *attr,
@@ -1215,6 +1364,20 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 			DRM_ERROR("failed to create device file pp_table\n");
 			return ret;
 		}
+		ret = device_create_file(adev->dev,
+				&dev_attr_pp_gfx_power_profile);
+		if (ret) {
+			DRM_ERROR("failed to create device file	"
+					"pp_gfx_power_profile\n");
+			return ret;
+		}
+		ret = device_create_file(adev->dev,
+				&dev_attr_pp_compute_power_profile);
+		if (ret) {
+			DRM_ERROR("failed to create device file	"
+					"pp_compute_power_profile\n");
+			return ret;
+		}
 	}
 
 	ret = device_create_file(adev->dev, &dev_attr_pp_dpm_sclk);
@@ -1265,6 +1428,10 @@ void amdgpu_pm_sysfs_fini(struct amdgpu_device *adev)
 		device_remove_file(adev->dev, &dev_attr_pp_cur_state);
 		device_remove_file(adev->dev, &dev_attr_pp_force_state);
 		device_remove_file(adev->dev, &dev_attr_pp_table);
+		device_remove_file(adev->dev,
+				&dev_attr_pp_gfx_power_profile);
+		device_remove_file(adev->dev,
+				&dev_attr_pp_compute_power_profile);
 	}
 	device_remove_file(adev->dev, &dev_attr_pp_dpm_sclk);
 	device_remove_file(adev->dev, &dev_attr_pp_dpm_mclk);

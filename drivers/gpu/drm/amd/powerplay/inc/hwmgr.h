@@ -345,6 +345,8 @@ struct pp_hwmgr_func {
 	int (*set_sclk_od)(struct pp_hwmgr *hwmgr, uint32_t value);
 	int (*get_mclk_od)(struct pp_hwmgr *hwmgr);
 	int (*set_mclk_od)(struct pp_hwmgr *hwmgr, uint32_t value);
+	int (*set_power_profile_state)(struct pp_hwmgr *hwmgr,
+			struct pp_profile *request);
 };
 
 struct pp_table_func {
@@ -626,6 +628,12 @@ struct pp_hwmgr {
 	struct pp_power_state    *boot_ps;
 	struct pp_power_state    *uvd_ps;
 	struct amd_pp_display_configuration display_config;
+
+	/* power profile */
+	struct pp_profile gfx_power_profile;
+	struct pp_profile compute_power_profile;
+	struct pp_profile default_power_profile;
+	enum pp_profile_type current_power_profile;
 };
 
 

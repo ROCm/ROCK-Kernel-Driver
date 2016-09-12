@@ -898,6 +898,155 @@ static int pp_dpm_set_mclk_od(void *handle, uint32_t value)
 	return hwmgr->hwmgr_func->set_mclk_od(hwmgr, value);
 }
 
+static int pp_dpm_reset_power_profile_state(void *handle,
+		struct pp_profile *request)
+{
+	struct pp_hwmgr *hwmgr;
+
+	if (!handle || !request)
+		return -EINVAL;
+
+	hwmgr = ((struct pp_instance *)handle)->hwmgr;
+
+	PP_CHECK_HW(hwmgr);
+
+	if (hwmgr->hwmgr_func->set_power_profile_state == NULL) {
+		pr_info("%s was not implemented.\n", __func__);
+		return 0;
+	}
+
+	if (request->type == PP_GFX_PROFILE)
+		memset(&hwmgr->gfx_power_profile, 0,
+				sizeof(struct pp_profile));
+	else if (request->type == PP_COMPUTE_PROFILE)
+		memset(&hwmgr->compute_power_profile, 0,
+				sizeof(struct pp_profile));
+
+	hwmgr->current_power_profile = PP_DEFAULT_PROFILE;
+
+	return hwmgr->hwmgr_func->set_power_profile_state(hwmgr,
+			&hwmgr->default_power_profile);
+}
+
+static int pp_dpm_get_power_profile_state(void *handle,
+		struct pp_profile *query)
+{
+	struct pp_hwmgr *hwmgr;
+
+	if (!handle || !query)
+		return -EINVAL;
+
+	hwmgr = ((struct pp_instance *)handle)->hwmgr;
+
+	PP_CHECK_HW(hwmgr);
+
+	if (query->type == PP_GFX_PROFILE)
+		memcpy(query, &hwmgr->gfx_power_profile,
+				sizeof(struct pp_profile));
+	else if (query->type == PP_COMPUTE_PROFILE)
+		memcpy(query, &hwmgr->compute_power_profile,
+				sizeof(struct pp_profile));
+	else
+		return -EINVAL;
+
+	return 0;
+}
+
+static int pp_dpm_set_power_profile_state(void *handle,
+		struct pp_profile *request)
+{
+	struct pp_hwmgr *hwmgr;
+	int ret = -1;
+
+	if (!handle || !request)
+		return -EINVAL;
+
+	hwmgr = ((struct pp_instance *)handle)->hwmgr;
+
+	PP_CHECK_HW(hwmgr);
+
+	if (hwmgr->hwmgr_func->set_power_profile_state == NULL) {
+		pr_info("%s was not implemented.\n", __func__);
+		return 0;
+	}
+
+	if (request->min_sclk ||
+		request->min_mclk ||
+		request->activity_threshold ||
+		request->up_hyst ||
+		request->down_hyst) {
+		if (request->type == PP_GFX_PROFILE)
+			memcpy(&hwmgr->gfx_power_profile, request,
+					sizeof(struct pp_profile));
+		else if (request->type == PP_COMPUTE_PROFILE)
+			memcpy(&hwmgr->compute_power_profile, request,
+					sizeof(struct pp_profile));
+
+		if (request->type == hwmgr->current_power_profile)
+			ret = hwmgr->hwmgr_func->set_power_profile_state(
+					hwmgr,
+					request);
+	} else {
+		/* set power profile if it exists */
+		switch (request->type) {
+		case PP_GFX_PROFILE:
+			if (hwmgr->gfx_power_profile.type ==
+					PP_GFX_PROFILE)
+				ret = hwmgr->hwmgr_func->
+						set_power_profile_state(
+						hwmgr,
+						&hwmgr->gfx_power_profile);
+			else
+				ret = hwmgr->hwmgr_func->
+						set_power_profile_state(
+						hwmgr,
+						&hwmgr->default_power_profile);
+			break;
+		case PP_COMPUTE_PROFILE:
+			if (hwmgr->compute_power_profile.type ==
+					PP_COMPUTE_PROFILE)
+				ret = hwmgr->hwmgr_func->
+						set_power_profile_state(
+						hwmgr,
+						&hwmgr->compute_power_profile);
+			break;
+		case PP_DEFAULT_PROFILE:
+			ret = hwmgr->hwmgr_func->set_power_profile_state(
+					hwmgr,
+					&hwmgr->default_power_profile);
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (!ret)
+		hwmgr->current_power_profile = request->type;
+
+	return 0;
+}
+
+static int pp_dpm_switch_power_profile(void *handle,
+		enum pp_profile_type type)
+{
+	struct pp_hwmgr *hwmgr;
+	struct pp_profile request = {0};
+
+	if (!handle)
+		return -EINVAL;
+
+	hwmgr = ((struct pp_instance *)handle)->hwmgr;
+
+	PP_CHECK_HW(hwmgr);
+
+	if (hwmgr->current_power_profile != type) {
+		request.type = type;
+		pp_dpm_set_power_profile_state(handle, &request);
+	}
+
+	return 0;
+}
+
 const struct amd_powerplay_funcs pp_dpm_funcs = {
 	.get_temperature = pp_dpm_get_temperature,
 	.load_firmware = pp_dpm_load_fw,
@@ -924,6 +1073,10 @@ const struct amd_powerplay_funcs pp_dpm_funcs = {
 	.set_sclk_od = pp_dpm_set_sclk_od,
 	.get_mclk_od = pp_dpm_get_mclk_od,
 	.set_mclk_od = pp_dpm_set_mclk_od,
+	.reset_power_profile_state = pp_dpm_reset_power_profile_state,
+	.get_power_profile_state = pp_dpm_get_power_profile_state,
+	.set_power_profile_state = pp_dpm_set_power_profile_state,
+	.switch_power_profile = pp_dpm_switch_power_profile,
 };
 
 static int amd_pp_instance_init(struct amd_pp_init *pp_init,

@@ -282,6 +282,21 @@ struct pp_states_info {
 	uint32_t states[16];
 };
 
+enum pp_profile_type {
+	PP_DEFAULT_PROFILE,
+	PP_GFX_PROFILE,
+	PP_COMPUTE_PROFILE,
+};
+
+struct pp_profile {
+	enum pp_profile_type type;
+	uint32_t min_sclk;
+	uint32_t min_mclk;
+	uint16_t activity_threshold;
+	uint8_t up_hyst;
+	uint8_t down_hyst;
+};
+
 #define PP_GROUP_MASK        0xF0000000
 #define PP_GROUP_SHIFT       28
 
@@ -347,6 +362,14 @@ struct amd_powerplay_funcs {
 	int (*set_sclk_od)(void *handle, uint32_t value);
 	int (*get_mclk_od)(void *handle);
 	int (*set_mclk_od)(void *handle, uint32_t value);
+	int (*reset_power_profile_state)(void *handle,
+			struct pp_profile *request);
+	int (*get_power_profile_state)(void *handle,
+			struct pp_profile *query);
+	int (*set_power_profile_state)(void *handle,
+			struct pp_profile *request);
+	int (*switch_power_profile)(void *handle,
+			enum pp_profile_type type);
 };
 
 struct amd_powerplay {

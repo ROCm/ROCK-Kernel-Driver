@@ -2444,6 +2444,22 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 #define amdgpu_dpm_set_mclk_od(adev, value) \
 	((adev)->powerplay.pp_funcs->set_mclk_od((adev)->powerplay.pp_handle, value))
 
+#define amdgpu_dpm_reset_power_profile_state(adev, request) \
+	((adev)->powerplay.pp_funcs->reset_power_profile_state(\
+			(adev)->powerplay.pp_handle, request))
+
+#define amdgpu_dpm_get_power_profile_state(adev, query) \
+	((adev)->powerplay.pp_funcs->get_power_profile_state(\
+			(adev)->powerplay.pp_handle, query))
+
+#define amdgpu_dpm_set_power_profile_state(adev, request) \
+	((adev)->powerplay.pp_funcs->set_power_profile_state(\
+			(adev)->powerplay.pp_handle, request))
+
+#define amdgpu_dpm_switch_power_profile(adev, type) \
+	((adev)->powerplay.pp_funcs->switch_power_profile(\
+			(adev)->powerplay.pp_handle, type))
+
 #define amdgpu_dpm_dispatch_task(adev, event_id, input, output)		\
 	(adev)->powerplay.pp_funcs->dispatch_tasks((adev)->powerplay.pp_handle, (event_id), (input), (output))
 
