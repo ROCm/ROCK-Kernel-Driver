@@ -2954,6 +2954,20 @@ static int fiji_populate_vr_config(struct pp_hwmgr *hwmgr,
 	return 0;
 }
 
+static int fiji_save_default_power_profile(struct pp_hwmgr *hwmgr)
+{
+	struct fiji_hwmgr *data = (struct fiji_hwmgr *)(hwmgr->backend);
+	struct SMU73_Discrete_GraphicsLevel *levels =
+				data->smc_state_table.GraphicsLevel;
+
+	hwmgr->default_power_profile.activity_threshold =
+			be16_to_cpu(levels[0].ActivityLevel);
+	hwmgr->default_power_profile.up_hyst = levels[0].UpHyst;
+	hwmgr->default_power_profile.down_hyst = levels[0].DownHyst;
+
+	return 0;
+}
+
 /**
 * Initializes the SMC table and uploads it
 *
@@ -3161,6 +3175,8 @@ static int fiji_init_smc_table(struct pp_hwmgr *hwmgr)
 			data->sram_end);
 	PP_ASSERT_WITH_CODE(0 == result,
 			"Failed to upload dpm data to SMC memory!", return result);
+
+	fiji_save_default_power_profile(hwmgr);
 
 	return 0;
 }
@@ -5541,6 +5557,104 @@ static int fiji_set_mclk_od(struct pp_hwmgr *hwmgr, uint32_t value)
 	return 0;
 }
 
+static int fiji_populate_requested_graphic_levels(struct pp_hwmgr *hwmgr,
+		struct pp_profile *request)
+{
+	struct fiji_hwmgr *data = (struct fiji_hwmgr *)(hwmgr->backend);
+	struct fiji_dpm_table *dpm_table = &(data->dpm_table);
+	struct SMU73_Discrete_GraphicsLevel *levels =
+			data->smc_state_table.GraphicsLevel;
+	uint32_t array = data->dpm_table_start +
+			offsetof(SMU73_Discrete_DpmTable, GraphicsLevel);
+	uint32_t array_size = sizeof(struct SMU73_Discrete_GraphicsLevel) *
+			SMU73_MAX_LEVELS_GRAPHICS;
+	uint32_t i;
+
+	for (i = 0; i < dpm_table->sclk_table.count; i++) {
+		levels[i].ActivityLevel =
+				cpu_to_be16(request->activity_threshold);
+		levels[i].EnabledForActivity = 1;
+		levels[i].UpHyst = request->up_hyst;
+		levels[i].DownHyst = request->down_hyst;
+	}
+
+	return fiji_copy_bytes_to_smc(hwmgr->smumgr, array, (uint8_t *)levels,
+				array_size, data->sram_end);
+}
+
+static int fiji_find_min_clock_masks(struct pp_hwmgr *hwmgr,
+		uint32_t *sclk_mask, uint32_t *mclk_mask,
+		uint32_t min_sclk, uint32_t min_mclk)
+{
+	struct fiji_hwmgr *data = (struct fiji_hwmgr *)(hwmgr->backend);
+	struct fiji_dpm_table *dpm_table = &(data->dpm_table);
+	uint32_t i;
+
+	for (i = 0; i < dpm_table->sclk_table.count; i++) {
+		if (dpm_table->sclk_table.dpm_levels[i].enabled &&
+			dpm_table->sclk_table.dpm_levels[i].value >= min_sclk)
+			*sclk_mask |= 1 << i;
+	}
+
+	for (i = 0; i < dpm_table->mclk_table.count; i++) {
+		if (dpm_table->mclk_table.dpm_levels[i].enabled &&
+			dpm_table->mclk_table.dpm_levels[i].value >= min_mclk)
+			*mclk_mask |= 1 << i;
+	}
+
+	return 0;
+}
+
+static int fiji_set_power_profile_state(struct pp_hwmgr *hwmgr,
+		struct pp_profile *request)
+{
+	struct fiji_hwmgr *data = (struct fiji_hwmgr *)(hwmgr->backend);
+	int tmp_result, result = 0;
+	uint32_t sclk_mask = 0, mclk_mask = 0;
+
+	if (hwmgr->dpm_level != AMD_DPM_FORCED_LEVEL_AUTO)
+		return -EINVAL;
+
+	tmp_result = fiji_freeze_sclk_mclk_dpm(hwmgr);
+	PP_ASSERT_WITH_CODE(!tmp_result,
+			"Failed to freeze SCLK MCLK DPM!",
+			result = tmp_result);
+
+	tmp_result = fiji_populate_requested_graphic_levels(hwmgr, request);
+	PP_ASSERT_WITH_CODE(!tmp_result,
+			"Failed to populate requested graphic levels!",
+			result = tmp_result);
+
+	tmp_result = fiji_unfreeze_sclk_mclk_dpm(hwmgr);
+	PP_ASSERT_WITH_CODE(!tmp_result,
+			"Failed to unfreeze SCLK MCLK DPM!",
+			result = tmp_result);
+
+	fiji_find_min_clock_masks(hwmgr, &sclk_mask, &mclk_mask,
+			request->min_sclk, request->min_mclk);
+
+	if (sclk_mask) {
+		if (!data->sclk_dpm_key_disabled)
+			smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
+				PPSMC_MSG_SCLKDPM_SetEnabledMask,
+				data->dpm_level_enable_mask.
+				sclk_dpm_enable_mask &
+				sclk_mask);
+	}
+
+	if (mclk_mask) {
+		if (!data->mclk_dpm_key_disabled)
+			smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
+				PPSMC_MSG_MCLKDPM_SetEnabledMask,
+				data->dpm_level_enable_mask.
+				mclk_dpm_enable_mask &
+				mclk_mask);
+	}
+
+
+	return result;
+}
+
 static const struct pp_hwmgr_func fiji_hwmgr_funcs = {
 	.backend_init = &fiji_hwmgr_backend_init,
 	.backend_fini = &fiji_hwmgr_backend_fini,
@@ -5585,6 +5699,7 @@ static const struct pp_hwmgr_func fiji_hwmgr_funcs = {
 	.set_sclk_od = fiji_set_sclk_od,
 	.get_mclk_od = fiji_get_mclk_od,
 	.set_mclk_od = fiji_set_mclk_od,
+	.set_power_profile_state = fiji_set_power_profile_state,
 };
 
 int fiji_hwmgr_init(struct pp_hwmgr *hwmgr)
