@@ -62,6 +62,14 @@ static int kfd_char_dev_major = -1;
 static struct class *kfd_class;
 struct device *kfd_device;
 
+static char *kfd_devnode(struct device *dev, umode_t *mode)
+{
+	if (mode && dev->devt == MKDEV(kfd_char_dev_major, 0))
+		*mode = 0666;
+
+	return NULL;
+}
+
 int kfd_chardev_init(void)
 {
 	int err = 0;
@@ -75,6 +83,8 @@ int kfd_chardev_init(void)
 	err = PTR_ERR(kfd_class);
 	if (IS_ERR(kfd_class))
 		goto err_class_create;
+
+	kfd_class->devnode = kfd_devnode;
 
 	kfd_device = device_create(kfd_class, NULL,
 					MKDEV(kfd_char_dev_major, 0),
