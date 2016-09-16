@@ -1257,6 +1257,11 @@ static uint32_t kfd_convert_user_mem_alloction_flags(
 		kernel_allocation_flags = ALLOC_MEM_FLAGS_USERPTR;
 		goto out;
 	}
+	/* Allocate doorbell BO */
+	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
+		kernel_allocation_flags = ALLOC_MEM_FLAGS_DOORBELL;
+		goto out;
+	}
 
 out:
 	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM)
@@ -1300,7 +1305,12 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	if (IS_ERR(pdd) < 0)
 		return PTR_ERR(pdd);
 
-	offset = args->mmap_offset;
+	if (args->flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
+		if (args->size != kfd_doorbell_process_slice())
+			return -EINVAL;
+		offset = kfd_get_process_doorbells(dev, p);
+	} else
+		offset = args->mmap_offset;
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
 		pdd->vm, (struct kgd_mem **) &mem, &offset,

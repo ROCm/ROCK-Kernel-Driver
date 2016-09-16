@@ -51,7 +51,7 @@
  */
 
 /* # of doorbell bytes allocated for each process. */
-static inline size_t doorbell_process_allocation(void)
+size_t kfd_doorbell_process_slice(void)
 {
 	return roundup(KFD_SIZE_OF_DOORBELL_IN_BYTES *
 			KFD_MAX_NUM_OF_QUEUES_PER_PROCESS,
@@ -73,16 +73,16 @@ void kfd_doorbell_init(struct kfd_dev *kfd)
 
 	doorbell_start_offset =
 			roundup(kfd->shared_resources.doorbell_start_offset,
-					doorbell_process_allocation());
+					kfd_doorbell_process_slice());
 
 	doorbell_aperture_size =
 			rounddown(kfd->shared_resources.doorbell_aperture_size,
-					doorbell_process_allocation());
+					kfd_doorbell_process_slice());
 
 	if (doorbell_aperture_size > doorbell_start_offset)
 		doorbell_process_limit =
 			(doorbell_aperture_size - doorbell_start_offset) /
-						doorbell_process_allocation();
+						kfd_doorbell_process_slice();
 	else
 		doorbell_process_limit = 0;
 
@@ -93,7 +93,7 @@ void kfd_doorbell_init(struct kfd_dev *kfd)
 	kfd->doorbell_process_limit = doorbell_process_limit - 1;
 
 	kfd->doorbell_kernel_ptr = ioremap(kfd->doorbell_base,
-						doorbell_process_allocation());
+						kfd_doorbell_process_slice());
 
 	BUG_ON(!kfd->doorbell_kernel_ptr);
 
@@ -126,7 +126,7 @@ int kfd_doorbell_mmap(struct kfd_process *process, struct vm_area_struct *vma)
 	 * For simplicitly we only allow mapping of the entire doorbell
 	 * allocation of a single device & process.
 	 */
-	if (vma->vm_end - vma->vm_start != doorbell_process_allocation())
+	if (vma->vm_end - vma->vm_start != kfd_doorbell_process_slice())
 		return -EINVAL;
 
 	/* Find kfd device according to gpu id */
@@ -148,13 +148,13 @@ int kfd_doorbell_mmap(struct kfd_process *process, struct vm_area_struct *vma)
 		 "     vm_flags            == 0x%04lX\n"
 		 "     size                == 0x%04lX\n",
 		 (unsigned long long) vma->vm_start, address, vma->vm_flags,
-		 doorbell_process_allocation());
+		 kfd_doorbell_process_slice());
 
 
 	return io_remap_pfn_range(vma,
 				vma->vm_start,
 				address >> PAGE_SHIFT,
-				doorbell_process_allocation(),
+				kfd_doorbell_process_slice(),
 				vma->vm_page_prot);
 }
 
@@ -181,7 +181,7 @@ u32 __iomem *kfd_get_kernel_doorbell(struct kfd_dev *kfd,
 	 * Calculating the kernel doorbell offset using "faked" kernel
 	 * pasid that allocated for kernel queues only
 	 */
-	*doorbell_off = KERNEL_DOORBELL_PASID * (doorbell_process_allocation() /
+	*doorbell_off = KERNEL_DOORBELL_PASID * (kfd_doorbell_process_slice() /
 							sizeof(u32)) + inx;
 
 	pr_debug("kfd: get kernel queue doorbell\n"
@@ -223,11 +223,11 @@ unsigned int kfd_queue_id_to_doorbell(struct kfd_dev *kfd,
 {
 	/*
 	 * doorbell_id_offset accounts for doorbells taken by KGD.
-	 * pasid * doorbell_process_allocation/sizeof(u32) adjusts
+	 * pasid * kfd_doorbell_process_slice/sizeof(u32) adjusts
 	 * to the process's doorbells
 	 */
 	return kfd->doorbell_id_offset +
-		process->pasid * (doorbell_process_allocation()/sizeof(u32)) +
+		process->pasid * (kfd_doorbell_process_slice()/sizeof(u32)) +
 		queue_id;
 }
 
@@ -235,7 +235,7 @@ uint64_t kfd_get_number_elems(struct kfd_dev *kfd)
 {
 	uint64_t num_of_elems = (kfd->shared_resources.doorbell_aperture_size -
 				kfd->shared_resources.doorbell_start_offset) /
-					doorbell_process_allocation() + 1;
+					kfd_doorbell_process_slice() + 1;
 
 	return num_of_elems;
 
@@ -245,5 +245,5 @@ phys_addr_t kfd_get_process_doorbells(struct kfd_dev *dev,
 					struct kfd_process *process)
 {
 	return dev->doorbell_base +
-		process->pasid * doorbell_process_allocation();
+		process->pasid * kfd_doorbell_process_slice();
 }
