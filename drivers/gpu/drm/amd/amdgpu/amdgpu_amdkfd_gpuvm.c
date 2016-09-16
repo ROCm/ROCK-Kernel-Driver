@@ -294,7 +294,7 @@ error:
 static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		uint64_t size, void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr, struct kfd_process_device *pdd,
-		u32 domain, u64 flags, bool aql_queue,
+		u32 domain, u64 flags, struct sg_table *sg, bool aql_queue,
 		bool readonly, bool execute, bool no_sub, bool userptr)
 {
 	struct amdgpu_device *adev;
@@ -344,7 +344,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	 * in the CPU domain, get moved to GTT when pinned. */
 	ret = amdgpu_bo_create(adev, size, byte_align, false,
 				alloc_domain,
-			       flags, NULL, NULL, &bo);
+			       flags, sg, NULL, &bo);
 	if (ret != 0) {
 		pr_err("amdkfd: failed to create BO on domain %d. ret %d\n",
 				alloc_domain, ret);
@@ -764,6 +764,24 @@ err_unpin_bo:
 	return ret;
 }
 
+static struct sg_table *create_doorbell_sg(uint64_t addr, uint32_t size)
+{
+	struct sg_table *sg = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
+
+	if (!sg)
+		return NULL;
+	if (sg_alloc_table(sg, 1, GFP_KERNEL)) {
+		kfree(sg);
+		return NULL;
+	}
+	sg->sgl->dma_address = addr;
+	sg->sgl->length = size;
+#ifdef CONFIG_NEED_SG_DMA_LENGTH
+	sg->sgl->dma_length = size;
+#endif
+	return sg;
+}
+
 #define BOOL_TO_STR(b)	(b == true) ? "true" : "false"
 
 int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
@@ -776,6 +794,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	u64 alloc_flag;
 	uint32_t domain;
 	uint64_t *temp_offset;
+	struct sg_table *sg = NULL;
 
 	if (!(flags & ALLOC_MEM_FLAGS_NONPAGED)) {
 		pr_err("amdgpu: current hw doesn't support paged memory\n");
@@ -791,7 +810,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	readonly  = (flags & ALLOC_MEM_FLAGS_READONLY) ? true : false;
 	execute   = (flags & ALLOC_MEM_FLAGS_EXECUTE_ACCESS) ? true : false;
 	no_sub    = (flags & ALLOC_MEM_FLAGS_NO_SUBSTITUTE) ? true : false;
-	userptr = (flags & ALLOC_MEM_FLAGS_USERPTR) ? true : false;
+	userptr   = (flags & ALLOC_MEM_FLAGS_USERPTR) ? true : false;
 
 	if (userptr && kptr) {
 		pr_err("amdgpu: userptr can't be mapped to kernel\n");
@@ -801,8 +820,6 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	/*
 	 * Check on which domain to allocate BO
 	 */
-	if (offset && !userptr)
-		*offset = 0;
 	if (flags & ALLOC_MEM_FLAGS_VRAM) {
 		domain = AMDGPU_GEM_DOMAIN_VRAM;
 		alloc_flag = AMDGPU_GEM_CREATE_NO_CPU_ACCESS;
@@ -814,7 +831,19 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		domain = AMDGPU_GEM_DOMAIN_GTT;
 		alloc_flag = 0;
 		temp_offset = offset;
+	} else if (flags & ALLOC_MEM_FLAGS_DOORBELL) {
+		domain = AMDGPU_GEM_DOMAIN_GTT;
+		alloc_flag = 0;
+		temp_offset = offset;
+		if (size > UINT_MAX)
+			return -EINVAL;
+		sg = create_doorbell_sg(*offset, size);
+		if (!sg)
+			return -ENOMEM;
 	}
+
+	if (offset && !userptr)
+		*offset = 0;
 
 	pr_debug("amdgpu: allocating BO domain %d alloc_flag 0x%llu public %s readonly %s execute %s no substitue %s va 0x%llx\n",
 			domain,
@@ -827,7 +856,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 
 	return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
 			temp_offset, kptr, pdd, domain,
-			alloc_flag,
+			alloc_flag, sg,
 			aql_queue, readonly, execute,
 			no_sub, userptr);
 }
@@ -878,6 +907,14 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	}
 
 	unreserve_bo_and_vms(&ctx, false);
+
+	/* If the SG is not NULL, it's one we created for a doorbell
+	 * BO. We need to free it.
+	 */
+	if (mem->data2.bo->tbo.sg) {
+		sg_free_table(mem->data2.bo->tbo.sg);
+		kfree(mem->data2.bo->tbo.sg);
+	}
 
 	/* Free the BO*/
 	amdgpu_bo_unref(&mem->data2.bo);
