@@ -1372,6 +1372,24 @@ static int amdgpu_ttm_vm_access(struct vm_area_struct *vma, unsigned long addr,
 
 	return len;
 }
+/* This function is a tweak variance of ttm_bo_vm_open() just to avoid the
+ * warning message when fork() with KFD BOs on DGPU.
+ */
+static void amdgpu_ttm_vm_open(struct vm_area_struct *vma)
+{
+	struct ttm_buffer_object *bo =
+	    (struct ttm_buffer_object *)vma->vm_private_data;
+	struct amdgpu_bo *abo = container_of(bo, struct amdgpu_bo, tbo);
+
+	/* Because vma->vm_file for /dev/kfd can not be associated with any
+	 * ttm_bo_device due to the one to many mapping between kfd and
+	 * amdgpu devices, for KFD BOs we should just skip the check.
+	 */
+	if (!abo->kfd_bo)
+		WARN_ON(bo->bdev->dev_mapping != vma->vm_file->f_mapping);
+
+	(void)ttm_bo_reference(bo);
+}
 
 int amdgpu_bo_mmap(struct file *filp, struct vm_area_struct *vma,
 		   struct ttm_bo_device *bdev)
@@ -1386,6 +1404,7 @@ int amdgpu_bo_mmap(struct file *filp, struct vm_area_struct *vma,
 		ttm_vm_ops = vma->vm_ops;
 		amdgpu_ttm_vm_ops = *ttm_vm_ops;
 		amdgpu_ttm_vm_ops.access = &amdgpu_ttm_vm_access;
+		amdgpu_ttm_vm_ops.open = &amdgpu_ttm_vm_open;
 	}
 	vma->vm_ops = &amdgpu_ttm_vm_ops;
 
