@@ -324,6 +324,8 @@ enum evict_type {
 
 #define KFD_IOC_ALLOC_MEM_FLAGS_USERPTR			(1 << 6)
 
+#define KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL		(1 << 7)
+
 struct kfd_ioctl_alloc_memory_of_gpu_new_args {
 	uint64_t va_addr;	/* to KFD */
 	uint64_t size;		/* to KFD */
