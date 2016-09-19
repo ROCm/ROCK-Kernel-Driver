@@ -362,7 +362,8 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 	struct drm_gem_object *gobj;
 	struct amdgpu_bo *abo;
 	dma_addr_t *dma_addr;
-	uint32_t handle, flags, offset;
+	uint32_t handle, flags;
+	uint64_t offset;
 	int i, r = 0;
 
 	switch (args->op) {
