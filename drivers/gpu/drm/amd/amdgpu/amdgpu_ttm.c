@@ -1065,6 +1065,9 @@ uint32_t amdgpu_ttm_tt_pte_flags(struct amdgpu_device *adev, struct ttm_tt *ttm,
 			flags |= AMDGPU_PTE_SNOOPED;
 	}
 
+	if (mem && mem->mem_type == AMDGPU_PL_DGMA_IMPORT)
+		flags |= AMDGPU_PTE_SYSTEM;
+
 	if (adev->asic_type >= CHIP_TONGA)
 		flags |= AMDGPU_PTE_EXECUTABLE;
 
