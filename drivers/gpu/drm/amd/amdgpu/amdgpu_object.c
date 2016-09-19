@@ -102,9 +102,15 @@ static void amdgpu_ttm_bo_destroy(struct ttm_buffer_object *tbo)
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(tbo->bdev);
 	struct amdgpu_bo *bo;
+	u64 offset;
 
 	bo = container_of(tbo, struct amdgpu_bo, tbo);
 
+	if (bo->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT) {
+		offset = amdgpu_bo_gpu_offset(bo);
+		offset -= adev->mman.bdev.man[TTM_PL_TT].gpu_offset;
+		amdgpu_gart_unbind(adev, offset, bo->tbo.num_pages);
+	}
 	amdgpu_update_memory_usage(adev, &bo->tbo.mem, NULL);
 
 	drm_gem_object_release(&bo->gem_base);
