@@ -53,7 +53,7 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 	const uint32_t *cu_mask = q->cu_mask;
 	int se, cu_per_sh, cu_index, i;
 
-	if (WARN_ON(cu_mask_count == 0))
+	if (cu_mask_count == 0)
 		return;
 
 	m = get_mqd(mqd);
