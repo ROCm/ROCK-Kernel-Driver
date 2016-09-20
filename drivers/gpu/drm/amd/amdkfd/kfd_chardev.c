@@ -1292,6 +1292,7 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	int idr_handle;
 	long err;
 	uint64_t offset;
+	uint32_t alloc_flags = 0;
 
 	if (args->size == 0)
 		return -EINVAL;
@@ -1312,11 +1313,13 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 		offset = kfd_get_process_doorbells(dev, p);
 	} else
 		offset = args->mmap_offset;
+
+	alloc_flags = kfd_convert_user_mem_alloction_flags(dev, args->flags);
+
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
 		pdd->vm, (struct kgd_mem **) &mem, &offset,
-		NULL, pdd,
-		kfd_convert_user_mem_alloction_flags(dev, args->flags));
+		NULL, pdd, alloc_flags);
 
 	if (err != 0)
 		return err;
@@ -2012,8 +2015,8 @@ static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	} else
 		goto err_i1;
 
-	dev_dbg(kfd_device, "ioctl cmd 0x%x (#0x%x), arg 0x%lx\n",
-				cmd, nr, arg);
+	dev_dbg(kfd_device, "ioctl cmd (#0x%x), arg 0x%lx\n",
+				nr, arg);
 
 	process = kfd_get_process(current);
 	if (IS_ERR(process)) {
@@ -2068,7 +2071,8 @@ err_i1:
 		kfree(kdata);
 
 	if (retcode)
-		dev_dbg(kfd_device, "ret = %d\n", retcode);
+		dev_dbg(kfd_device, "ioctl cmd (#0x%x), arg 0x%lx, failed %d\n",
+				nr, arg, retcode);
 
 	return retcode;
 }
