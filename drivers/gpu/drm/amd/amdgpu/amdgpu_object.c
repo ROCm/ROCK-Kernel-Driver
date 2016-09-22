@@ -141,7 +141,7 @@ static void amdgpu_ttm_placement_init(struct amdgpu_device *adev,
 	if ((domain & AMDGPU_GEM_DOMAIN_DGMA) && amdgpu_direct_gma_size) {
 		places[c].fpfn = 0;
 		places[c].lpfn = 0;
-		places[c].flags = TTM_PL_FLAG_WC | TTM_PL_FLAG_UNCACHED |
+		places[c].flags = TTM_PL_FLAG_UNCACHED |
 			AMDGPU_PL_FLAG_DGMA | TTM_PL_FLAG_NO_EVICT;
 		c++;
 	}

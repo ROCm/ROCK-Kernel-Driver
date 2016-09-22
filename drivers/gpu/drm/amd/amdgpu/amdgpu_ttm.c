@@ -179,8 +179,8 @@ static int amdgpu_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 		man->func = &ttm_bo_manager_func;
 		man->gpu_offset = amdgpu_bo_gpu_offset(adev->direct_gma.dgma_bo);
 		man->flags = TTM_MEMTYPE_FLAG_FIXED | TTM_MEMTYPE_FLAG_MAPPABLE;
-		man->available_caching = TTM_PL_FLAG_UNCACHED | TTM_PL_FLAG_WC;
-		man->default_caching = TTM_PL_FLAG_WC;
+		man->available_caching = TTM_PL_FLAG_UNCACHED;
+		man->default_caching = TTM_PL_FLAG_UNCACHED;
 		break;
 	case AMDGPU_PL_DGMA_IMPORT:
 		/* reserved GTT space for direct GMA */
