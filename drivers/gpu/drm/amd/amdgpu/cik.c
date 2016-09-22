@@ -1839,6 +1839,7 @@ static const struct amdgpu_ip_block_version hawaii_ip_blocks_dal[] =
 		.rev = 0,
 		.funcs = &uvd_v4_2_ip_funcs,
 	},
+	/* Disable VCE block in Hawaii to eliminate kernel warning message
 	{
 		.type = AMD_IP_BLOCK_TYPE_VCE,
 		.major = 2,
@@ -1846,6 +1847,7 @@ static const struct amdgpu_ip_block_version hawaii_ip_blocks_dal[] =
 		.rev = 0,
 		.funcs = &vce_v2_0_ip_funcs,
 	},
+	*/
 };
 #endif
 
@@ -1908,6 +1910,7 @@ static const struct amdgpu_ip_block_version hawaii_ip_blocks[] =
 		.rev = 0,
 		.funcs = &uvd_v4_2_ip_funcs,
 	},
+	/* Disable VCE block in Hawaii to eliminate kernel warning message
 	{
 		.type = AMD_IP_BLOCK_TYPE_VCE,
 		.major = 2,
@@ -1915,6 +1918,7 @@ static const struct amdgpu_ip_block_version hawaii_ip_blocks[] =
 		.rev = 0,
 		.funcs = &vce_v2_0_ip_funcs,
 	},
+	*/
 };
 
 static const struct amdgpu_ip_block_version kabini_ip_blocks[] =
