@@ -1928,7 +1928,8 @@ int cik_set_ip_blocks(struct amdgpu_device *adev)
 		amdgpu_ip_block_add(adev, &gfx_v7_3_ip_block);
 		amdgpu_ip_block_add(adev, &cik_sdma_ip_block);
 		amdgpu_ip_block_add(adev, &uvd_v4_2_ip_block);
-		amdgpu_ip_block_add(adev, &vce_v2_0_ip_block);
+		/* Disable VCE block in Hawaii to eliminate kernel warning */
+		/*amdgpu_ip_block_add(adev, &vce_v2_0_ip_block);*/
 		break;
 	case CHIP_KAVERI:
 		amdgpu_ip_block_add(adev, &cik_common_ip_block);
