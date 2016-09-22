@@ -30,6 +30,7 @@
 #include <linux/device.h>
 #include <linux/io.h>
 #include <linux/resource_ext.h>
+#include <linux/notifier.h>
 #include <uapi/linux/pci.h>
 
 #include <linux/pci_ids.h>
@@ -1045,6 +1046,13 @@ int __must_check pci_reassign_resource(struct pci_dev *dev, int i, resource_size
 int pci_select_bars(struct pci_dev *dev, unsigned long flags);
 bool pci_device_is_present(struct pci_dev *pdev);
 void pci_ignore_hotplug(struct pci_dev *dev);
+
+struct pci_bar_update_info {
+	u64 old_start;
+	u64 new_start;
+	u64 size;
+};
+int pci_notify_on_update_resource(struct notifier_block *nb);
 
 /* ROM control related routines */
 int pci_enable_rom(struct pci_dev *pdev);
