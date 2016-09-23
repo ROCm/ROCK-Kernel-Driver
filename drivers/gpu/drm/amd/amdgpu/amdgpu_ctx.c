@@ -42,6 +42,8 @@ static int amdgpu_ctx_init(struct amdgpu_device *adev, struct amdgpu_ctx *ctx)
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 		ctx->rings[i].sequence = 1;
 		ctx->rings[i].fences = &ctx->fences[amdgpu_sched_jobs * i];
+		INIT_LIST_HEAD(&ctx->rings[i].sem_list);
+		mutex_init(&ctx->rings[i].sem_lock);
 	}
 
 	ctx->reset_counter = atomic_read(&adev->gpu_reset_counter);
@@ -78,8 +80,10 @@ static void amdgpu_ctx_fini(struct amdgpu_ctx *ctx)
 		return;
 
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i)
-		for (j = 0; j < amdgpu_sched_jobs; ++j)
+		for (j = 0; j < amdgpu_sched_jobs; ++j) {
 			fence_put(ctx->rings[i].fences[j]);
+			mutex_destroy(&ctx->rings[i].sem_lock);
+		}
 	kfree(ctx->fences);
 	ctx->fences = NULL;
 

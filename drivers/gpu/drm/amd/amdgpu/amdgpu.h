@@ -666,6 +666,8 @@ struct amdgpu_ctx_ring {
 	uint64_t		sequence;
 	struct fence		**fences;
 	struct amd_sched_entity	entity;
+	struct list_head	sem_list;
+	struct mutex            sem_lock;
 };
 
 struct amdgpu_ctx {
@@ -1245,6 +1247,12 @@ int amdgpu_gem_metadata_ioctl(struct drm_device *dev, void *data,
 
 int amdgpu_freesync_ioctl(struct drm_device *dev, void *data,
 			    struct drm_file *filp);
+
+int amdgpu_sem_ioctl(struct drm_device *dev, void *data,
+		     struct drm_file *filp);
+
+int amdgpu_sem_add_cs(struct amdgpu_ctx *ctx, struct amdgpu_ring *ring,
+		      struct amdgpu_sync *sync);
 
 int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 			   struct drm_file *filp);
