@@ -1156,6 +1156,22 @@ bo_reserve_failed:
 	return ret;
 }
 
+static u64 get_vm_pd_gpu_offset(void *vm)
+{
+	struct amdgpu_vm *avm = (struct amdgpu_vm *) vm;
+	u64 offset;
+
+	BUG_ON(avm == NULL);
+
+	amdgpu_bo_reserve(avm->page_directory, false);
+
+	offset = amdgpu_bo_gpu_offset(avm->page_directory);
+
+	amdgpu_bo_unreserve(avm->page_directory);
+
+	return offset;
+}
+
 int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 					  void *master_vm)
 {
@@ -1209,7 +1225,7 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 		pr_err("amdgpu: Failed to amdgpu_vm_clear_freed\n");
 
 	pr_debug("amdgpu: created process vm with address 0x%llx\n",
-			amdgpu_bo_gpu_offset(new_vm->base.page_directory));
+			get_vm_pd_gpu_offset(&new_vm->base));
 
 	return ret;
 
@@ -1249,12 +1265,7 @@ void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 
 uint32_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm)
 {
-	struct amdgpu_vm *avm = (struct amdgpu_vm *) vm;
-
-	BUG_ON(avm == NULL);
-
-	return amdgpu_bo_gpu_offset(avm->page_directory)
-			>> AMDGPU_GPU_PAGE_SHIFT;
+	return get_vm_pd_gpu_offset(vm) >> AMDGPU_GPU_PAGE_SHIFT;
 }
 
 int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
