@@ -616,16 +616,6 @@ void kgd2kfd_suspend(struct kfd_dev *kfd)
 	amd_iommu_free_device(kfd->pdev);
 }
 
-int kgd2kfd_evict_bo(struct kfd_dev *dev, void *mem)
-{
-	return evict_bo(dev, mem);
-}
-
-int kgd2kfd_restore(struct kfd_dev *kfd)
-{
-	return restore(kfd);
-}
-
 int kgd2kfd_resume(struct kfd_dev *kfd)
 {
 	BUG_ON(kfd == NULL);
