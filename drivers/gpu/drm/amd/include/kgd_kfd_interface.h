@@ -337,9 +337,6 @@ struct kfd2kgd_calls {
 			struct kgd_mem *mem, void **kptr);
 	void (*set_vm_context_page_table_base)(struct kgd_dev *kgd, uint32_t vmid,
 			uint32_t page_table_base);
-	struct kfd_process_device* (*get_pdd_from_buffer_object)
-		(struct kgd_dev *kgd, struct kgd_mem *mem);
-	int (*return_bo_size)(struct kgd_dev *kgd, struct kgd_mem *mem);
 
 	int (*pin_get_sg_table_bo)(struct kgd_dev *kgd,
 			struct kgd_mem *mem, uint64_t offset,
