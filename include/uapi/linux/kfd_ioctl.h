@@ -301,16 +301,6 @@ struct kfd_ioctl_set_process_dgpu_aperture_args {
 	uint64_t dgpu_limit;
 };
 
-struct kfd_ioctl_eviction_args {
-	uint64_t size;
-	uint64_t type;
-};
-
-enum evict_type {
-	EVICT_FIRST_PDD = 0,
-	EVICT_BIGGEST_PDD
-};
-
 /*
  * GPU Memory allocation flags
  */
@@ -482,8 +472,6 @@ struct kfd_ioctl_get_tile_config_args {
 #define AMDKFD_IOC_GET_PROCESS_APERTURES_NEW	\
 	AMDKFD_IOWR(0x1d, struct kfd_ioctl_get_process_apertures_new_args)
 
-#define AMDKFD_IOC_EVICT_MEMORY		\
-	AMDKFD_IOWR(0x1e, struct kfd_ioctl_eviction_args)
 
 #define AMDKFD_IOC_GET_DMABUF_INFO		\
 	AMDKFD_IOWR(0x1f, struct kfd_ioctl_get_dmabuf_info_args)

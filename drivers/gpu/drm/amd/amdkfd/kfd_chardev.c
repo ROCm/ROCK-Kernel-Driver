@@ -47,7 +47,6 @@ static uint32_t kfd_convert_user_mem_alloction_flags(
 		uint32_t userspace_flags);
 static bool kfd_is_large_bar(struct kfd_dev *dev);
 
-static int kfd_evict(struct file *filep, struct kfd_process *p, void *data);
 static const char kfd_dev_name[] = "kfd";
 
 static const struct file_operations kfd_fops = {
@@ -1436,7 +1435,6 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	long err = 0;
 	int i, num_dev;
 	uint32_t *devices_arr = NULL;
-	int bo_size;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (dev == NULL)
@@ -1507,11 +1505,6 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 			pr_err("amdkfd: failed to map\n");
 	}
 
-	bo_size = dev->kfd2kgd->return_bo_size(dev->kgd, mem);
-	down_write(&p->lock);
-	pdd->mapped_size += bo_size;
-	up_write(&p->lock);
-
 	if (args->device_ids_array_size > 0 && devices_arr)
 		kfree(devices_arr);
 
@@ -1547,7 +1540,6 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	struct kfd_dev *dev, *peer;
 	long err = 0;
 	uint32_t *devices_arr = NULL, num_dev, i;
-	int bo_size;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (dev == NULL)
@@ -1616,11 +1608,6 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 		dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd, mem, pdd->vm);
 		radeon_flush_tlb(dev, p->pasid);
 	}
-
-	bo_size = dev->kfd2kgd->return_bo_size(dev->kgd, mem);
-	down_write(&p->lock);
-	pdd->mapped_size -= bo_size;
-	up_write(&p->lock);
 
 	return 0;
 
@@ -1965,9 +1952,6 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_PROCESS_APERTURES_NEW,
 				kfd_ioctl_get_process_apertures_new, 0),
 
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_EVICT_MEMORY,
-				kfd_evict, 0),
-
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_DMABUF_INFO,
 				kfd_ioctl_get_dmabuf_info, 0),
 
@@ -1980,13 +1964,6 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
 
-static int kfd_evict(struct file *filep, struct kfd_process *p, void *data)
-{
-	struct kfd_ioctl_eviction_args *args = data;
-
-	return evict_size(p, args->size, args->type);
-
-}
 static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 {
 	struct kfd_process *process;
