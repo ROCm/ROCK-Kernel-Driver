@@ -164,7 +164,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		struct kgd_dev *kgd, uint64_t va, uint64_t size,
 		void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr,
-		struct kfd_process_device *pdd, uint32_t flags);
+		uint32_t flags);
 int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 		struct kgd_dev *kgd, struct kgd_mem *mem, void *vm);
 int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(

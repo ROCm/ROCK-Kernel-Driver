@@ -100,7 +100,7 @@ static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 
 	err = kdev->kfd2kgd->alloc_memory_of_gpu(kdev->kgd, gpu_va, size,
 				pdd->vm,
-				(struct kgd_mem **)&mem, NULL, kptr, pdd,
+				(struct kgd_mem **)&mem, NULL, kptr,
 				ALLOC_MEM_FLAGS_GTT |
 				ALLOC_MEM_FLAGS_NONPAGED |
 				ALLOC_MEM_FLAGS_EXECUTE_ACCESS |
