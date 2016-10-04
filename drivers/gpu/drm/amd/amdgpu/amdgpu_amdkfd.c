@@ -157,14 +157,14 @@ int amdgpu_amdkfd_evict_mem(struct amdgpu_device *adev, struct kgd_mem *mem,
 	if (!adev->kfd)
 		return -ENODEV;
 
-	mutex_lock(&mem->data2.lock);
+	mutex_lock(&mem->lock);
 
-	if (mem->data2.evicted == 1 && delayed_work_pending(&mem->data2.work))
+	if (mem->evicted == 1 && delayed_work_pending(&mem->work))
 		/* Cancelling a scheduled restoration */
-		cancel_delayed_work(&mem->data2.work);
+		cancel_delayed_work(&mem->work);
 
-	if (++mem->data2.evicted > 1) {
-		mutex_unlock(&mem->data2.lock);
+	if (++mem->evicted > 1) {
+		mutex_unlock(&mem->lock);
 		return 0;
 	}
 
@@ -173,13 +173,13 @@ int amdgpu_amdkfd_evict_mem(struct amdgpu_device *adev, struct kgd_mem *mem,
 	if (r != 0)
 		/* First eviction failed, setting count back to 0 will
 		 * make the corresponding restore fail gracefully */
-		mem->data2.evicted = 0;
+		mem->evicted = 0;
 	else
 		/* First eviction counts as 2. Eviction counter == 1
 		 * means that restoration is scheduled. */
-		mem->data2.evicted = 2;
+		mem->evicted = 2;
 
-	mutex_unlock(&mem->data2.lock);
+	mutex_unlock(&mem->lock);
 
 	return r;
 }
@@ -187,23 +187,23 @@ int amdgpu_amdkfd_evict_mem(struct amdgpu_device *adev, struct kgd_mem *mem,
 static void amdgdu_amdkfd_restore_mem_worker(struct work_struct *work)
 {
 	struct delayed_work *dwork = to_delayed_work(work);
-	struct kgd_mem *mem = container_of(dwork, struct kgd_mem, data2.work);
+	struct kgd_mem *mem = container_of(dwork, struct kgd_mem, work);
 	struct amdgpu_device *adev;
 	struct mm_struct *mm;
 
-	mutex_lock(&mem->data2.lock);
+	mutex_lock(&mem->lock);
 
-	adev = amdgpu_ttm_adev(mem->data2.bo->tbo.bdev);
-	mm = mem->data2.mm;
+	adev = amdgpu_ttm_adev(mem->bo->tbo.bdev);
+	mm = mem->mm;
 
 	/* Restoration may have been canceled by another eviction or
 	 * could already be done by a restore scheduled earlier */
-	if (mem->data2.evicted == 1) {
+	if (mem->evicted == 1) {
 		amdgpu_amdkfd_gpuvm_restore_mem(mem, mm);
-		mem->data2.evicted = 0;
+		mem->evicted = 0;
 	}
 
-	mutex_unlock(&mem->data2.lock);
+	mutex_unlock(&mem->lock);
 }
 
 int amdgpu_amdkfd_schedule_restore_mem(struct amdgpu_device *adev,
@@ -216,29 +216,29 @@ int amdgpu_amdkfd_schedule_restore_mem(struct amdgpu_device *adev,
 	if (!adev->kfd)
 		return -ENODEV;
 
-	mutex_lock(&mem->data2.lock);
+	mutex_lock(&mem->lock);
 
-	if (mem->data2.evicted <= 1) {
+	if (mem->evicted <= 1) {
 		/* Buffer is not evicted (== 0) or its restoration is
 		 * already scheduled (== 1) */
 		pr_err("Unbalanced restore of evicted buffer %p\n", mem);
-		mutex_unlock(&mem->data2.lock);
+		mutex_unlock(&mem->lock);
 		return -EFAULT;
-	} else if (--mem->data2.evicted > 1) {
-		mutex_unlock(&mem->data2.lock);
+	} else if (--mem->evicted > 1) {
+		mutex_unlock(&mem->lock);
 		return 0;
 	}
 
-	/* mem->data2.evicted is 1 after decrememting. Schedule
+	/* mem->evicted is 1 after decrememting. Schedule
 	 * restoration. */
-	if (delayed_work_pending(&mem->data2.work))
-		cancel_delayed_work(&mem->data2.work);
-	mem->data2.mm = mm;
-	INIT_DELAYED_WORK(&mem->data2.work,
+	if (delayed_work_pending(&mem->work))
+		cancel_delayed_work(&mem->work);
+	mem->mm = mm;
+	INIT_DELAYED_WORK(&mem->work,
 			  amdgdu_amdkfd_restore_mem_worker);
-	schedule_delayed_work(&mem->data2.work, delay);
+	schedule_delayed_work(&mem->work, delay);
 
-	mutex_unlock(&mem->data2.lock);
+	mutex_unlock(&mem->lock);
 
 	return r;
 }
@@ -246,8 +246,8 @@ int amdgpu_amdkfd_schedule_restore_mem(struct amdgpu_device *adev,
 void amdgpu_amdkfd_cancel_restore_mem(struct amdgpu_device *adev,
 				      struct kgd_mem *mem)
 {
-	if (delayed_work_pending(&mem->data2.work))
-		cancel_delayed_work_sync(&mem->data2.work);
+	if (delayed_work_pending(&mem->work))
+		cancel_delayed_work_sync(&mem->work);
 }
 
 int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
