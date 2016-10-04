@@ -92,7 +92,7 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, uint64_t size,
 		void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr,
-		struct kfd_process_device *pdd, uint32_t flags);
+		uint32_t flags);
 static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 			      void *vm);
 
@@ -1376,7 +1376,7 @@ static int alloc_memory_of_scratch(struct kgd_dev *kgd,
 static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, uint64_t size,
 		void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr,
-		struct kfd_process_device *pdd, uint32_t flags)
+		uint32_t flags)
 {
 	struct radeon_device *rdev = (struct radeon_device *) kgd;
 	int ret;
@@ -1406,7 +1406,6 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, uint64_t size,
 	}
 
 	pr_debug("Created BO on VRAM with size %llu bytes\n", size);
-	bo->pdd = pdd;
 	ret = add_bo_to_vm(rdev, va, vm, bo, &bo_va);
 	if (ret != 0)
 		goto err_map;

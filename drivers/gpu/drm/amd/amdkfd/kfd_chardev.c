@@ -1177,7 +1177,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
-		pdd->vm, (struct kgd_mem **) &mem, NULL, NULL, pdd, 0);
+		pdd->vm, (struct kgd_mem **) &mem, NULL, NULL, 0);
 
 	if (err != 0)
 		return err;
@@ -1318,7 +1318,7 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
 		pdd->vm, (struct kgd_mem **) &mem, &offset,
-		NULL, pdd, alloc_flags);
+		NULL, alloc_flags);
 
 	if (err != 0)
 		return err;

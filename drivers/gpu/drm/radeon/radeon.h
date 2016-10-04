@@ -517,7 +517,6 @@ struct radeon_bo {
 
 	struct radeon_mn		*mn;
 	struct list_head		mn_list;
-	struct kfd_process_device	*pdd;
 };
 #define gem_to_radeon_bo(gobj) container_of((gobj), struct radeon_bo, gem_base)
 

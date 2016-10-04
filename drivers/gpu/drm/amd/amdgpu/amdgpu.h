@@ -166,7 +166,6 @@ struct amdgpu_cs_parser;
 struct amdgpu_job;
 struct amdgpu_irq_src;
 struct amdgpu_fpriv;
-struct kfd_process_device;
 struct kfd_vm_fault_info;
 
 enum amdgpu_cp_irq {
@@ -446,7 +445,6 @@ struct amdgpu_bo {
 	struct list_head		mn_list;
 	struct list_head		shadow_list;
 	struct kgd_mem			*kfd_bo;
-	struct kfd_process_device	*pdd;
 };
 #define gem_to_amdgpu_bo(gobj) container_of((gobj), struct amdgpu_gem_object, base)->bo
 
