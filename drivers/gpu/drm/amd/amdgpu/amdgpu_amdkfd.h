@@ -42,31 +42,22 @@ struct kfd_bo_va_list {
 };
 
 struct kgd_mem {
-	union {
-		struct {
-			struct amdgpu_bo *bo;
-			uint64_t gpu_addr;
-			void *cpu_ptr;
-		} data1;
-		struct {
-			struct mutex lock;
-			struct amdgpu_bo *bo;
-			struct list_head bo_va_list;
-			struct amdgpu_bo_list_entry bo_list_entry;
-			uint32_t domain;
-			unsigned int mapped_to_gpu_memory;
-			void *kptr;
-			uint64_t va;
-			unsigned evicted; /* eviction counter */
-			struct delayed_work work; /* for restore evicted mem */
-			struct mm_struct *mm; /* for restore */
-			/* flags bitfield */
-			bool readonly      : 1;
-			bool execute       : 1;
-			bool no_substitute : 1;
-			bool aql_queue     : 1;
-		} data2;
-	};
+	struct mutex lock;
+	struct amdgpu_bo *bo;
+	struct list_head bo_va_list;
+	struct amdgpu_bo_list_entry bo_list_entry;
+	uint32_t domain;
+	unsigned int mapped_to_gpu_memory;
+	void *kptr;
+	uint64_t va;
+	unsigned int evicted; /* eviction counter */
+	struct delayed_work work; /* for restore evicted mem */
+	struct mm_struct *mm; /* for restore */
+	/* flags bitfield */
+	bool readonly      : 1;
+	bool execute       : 1;
+	bool no_substitute : 1;
+	bool aql_queue     : 1;
 };
 
 /* KFD Memory Eviction */
