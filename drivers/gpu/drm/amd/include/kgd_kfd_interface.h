@@ -402,8 +402,6 @@ struct kgd2kfd_calls {
 	void (*interrupt)(struct kfd_dev *kfd, const void *ih_ring_entry);
 	void (*suspend)(struct kfd_dev *kfd);
 	int (*resume)(struct kfd_dev *kfd);
-	int (*evict_bo)(struct kfd_dev *dev, void *ptr);
-	int (*restore)(struct kfd_dev *kfd);
 	int (*quiesce_mm)(struct kfd_dev *kfd, struct mm_struct *mm);
 	int (*resume_mm)(struct kfd_dev *kfd, struct mm_struct *mm);
 	int (*schedule_evict_and_restore_process)(struct mm_struct *mm,
