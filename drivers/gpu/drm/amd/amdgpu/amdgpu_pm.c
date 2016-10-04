@@ -653,10 +653,15 @@ static ssize_t amdgpu_set_pp_power_profile(struct device *dev,
 		return count;
 	}
 
+	if (count >= 128) {
+		count = -EINVAL;
+		goto fail;
+	}
+
 	memcpy(buf_cpy, buf, count);
 	tmp_str = buf_cpy;
 
-	while (strlen(tmp_str)) {
+	while (tmp_str[0]) {
 		sub_str = strsep(&tmp_str, delimiter);
 		ret = kstrtol(sub_str, 0, &value);
 		if (ret) {
