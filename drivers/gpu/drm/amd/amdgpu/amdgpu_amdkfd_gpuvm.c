@@ -60,12 +60,6 @@ static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
 	return (struct amdgpu_device *)kgd;
 }
 
-struct kfd_process_device *amdgpu_amdkfd_gpuvm_get_pdd_from_buffer_object(
-		struct kgd_dev *kgd, struct kgd_mem *mem)
-{
-	return mem->data2.bo->pdd;
-}
-
 static bool check_if_add_bo_to_vm(struct amdgpu_vm *avm,
 		struct kgd_mem *mem)
 {
@@ -1035,16 +1029,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 
 	return 0;
 }
-int amdgpu_amdkfd_gpuvm_return_bo_size(struct kgd_dev *kgd, struct kgd_mem *mem)
-{
-	struct amdgpu_bo *bo;
 
-	BUG_ON(mem == NULL);
-
-	bo = mem->data2.bo;
-	return bo->tbo.mem.size;
-
-}
 int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 		struct kgd_dev *kgd, struct kgd_mem *mem, void *vm)
 {

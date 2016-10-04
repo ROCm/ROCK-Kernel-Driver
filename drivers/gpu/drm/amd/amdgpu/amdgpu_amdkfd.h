@@ -187,11 +187,6 @@ int amdgpu_amdkfd_gpuvm_mmap_bo(
 int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 		struct kgd_mem *mem, void **kptr);
 
-struct kfd_process_device *amdgpu_amdkfd_gpuvm_get_pdd_from_buffer_object(
-		struct kgd_dev *kgd, struct kgd_mem *mem);
-int amdgpu_amdkfd_gpuvm_return_bo_size(
-		struct kgd_dev *kgd, struct kgd_mem *mem);
-
 int amdgpu_amdkfd_gpuvm_pin_get_sg_table(struct kgd_dev *kgd,
 		struct kgd_mem *mem, uint64_t offset,
 		uint64_t size, struct sg_table **ret_sg);
