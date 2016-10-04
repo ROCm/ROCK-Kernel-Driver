@@ -153,9 +153,6 @@ static int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 			struct kgd_mem *mem, void **kptr);
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 			uint32_t page_table_base);
-struct kfd_process_device *get_pdd_from_buffer_object(struct kgd_dev *kgd,
-		struct kgd_mem *mem);
-static int return_bo_size(struct kgd_dev *kgd, struct kgd_mem *mem);
 
 static const struct kfd2kgd_calls kfd2kgd = {
 	.init_gtt_mem_allocation = alloc_gtt_mem,
@@ -195,30 +192,10 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.write_config_static_mem = write_config_static_mem,
 	.mmap_bo = mmap_bo,
 	.map_gtt_bo_to_kernel = map_gtt_bo_to_kernel,
-	.get_pdd_from_buffer_object = get_pdd_from_buffer_object,
 	.set_vm_context_page_table_base = set_vm_context_page_table_base,
-	.return_bo_size = return_bo_size
 };
 
 static const struct kgd2kfd_calls *kgd2kfd;
-
-static int return_bo_size(struct kgd_dev *kgd, struct kgd_mem *mem)
-{
-	struct radeon_bo *bo;
-
-	BUG_ON(mem == NULL);
-
-	bo = mem->data2.bo;
-	return bo->tbo.mem.size;
-
-}
-
-struct kfd_process_device *get_pdd_from_buffer_object(struct kgd_dev *kgd,
-		struct kgd_mem *mem)
-{
-
-	return mem->data2.bo->pdd;
-}
 
 int radeon_kfd_init(void)
 {
