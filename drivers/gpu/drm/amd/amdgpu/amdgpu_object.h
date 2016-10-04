@@ -84,7 +84,6 @@ struct amdgpu_bo {
 	struct ttm_bo_kmap_obj		dma_buf_vmap;
 	struct amdgpu_mn		*mn;
 	struct kgd_mem			*kfd_bo;
-	struct kfd_process_device	*pdd;
 
 	union {
 		struct list_head	mn_list;

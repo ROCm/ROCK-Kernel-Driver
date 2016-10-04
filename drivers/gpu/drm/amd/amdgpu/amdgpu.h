@@ -181,7 +181,6 @@ struct amdgpu_cs_parser;
 struct amdgpu_job;
 struct amdgpu_irq_src;
 struct amdgpu_fpriv;
-struct kfd_process_device;
 struct kfd_vm_fault_info;
 
 enum amdgpu_cp_irq {
