@@ -218,9 +218,6 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.mmap_bo = amdgpu_amdkfd_gpuvm_mmap_bo,
 	.map_gtt_bo_to_kernel = amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel,
 	.set_vm_context_page_table_base = set_vm_context_page_table_base,
-	.get_pdd_from_buffer_object =
-			amdgpu_amdkfd_gpuvm_get_pdd_from_buffer_object,
-	.return_bo_size = amdgpu_amdkfd_gpuvm_return_bo_size,
 	.pin_get_sg_table_bo = amdgpu_amdkfd_gpuvm_pin_get_sg_table,
 	.unpin_put_sg_table_bo = amdgpu_amdkfd_gpuvm_unpin_put_sg_table,
 	.get_dmabuf_info = amdgpu_amdkfd_get_dmabuf_info,
