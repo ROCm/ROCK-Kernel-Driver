@@ -387,7 +387,7 @@ static void add_kgd_mem_to_kfd_bo_list(struct kgd_mem *mem,
 
 static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		uint64_t size, void *vm, struct kgd_mem **mem,
-		uint64_t *offset, void **kptr, struct kfd_process_device *pdd,
+		uint64_t *offset, void **kptr,
 		u32 domain, u64 flags, struct sg_table *sg, bool aql_queue,
 		bool readonly, bool execute, bool no_sub, bool userptr)
 {
@@ -453,7 +453,6 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		goto err_bo_create;
 	}
 	bo->kfd_bo = *mem;
-	bo->pdd = pdd;
 	(*mem)->data2.bo = bo;
 
 	if (domain == AMDGPU_GEM_DOMAIN_VRAM) {
@@ -879,7 +878,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		struct kgd_dev *kgd, uint64_t va, uint64_t size,
 		void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr,
-		struct kfd_process_device *pdd, uint32_t flags)
+		uint32_t flags)
 {
 	bool aql_queue, public, readonly, execute, no_sub, userptr;
 	u64 alloc_flag;
@@ -946,7 +945,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 			va);
 
 	return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
-			temp_offset, kptr, pdd, domain,
+			temp_offset, kptr, domain,
 			alloc_flag, sg,
 			aql_queue, readonly, execute,
 			no_sub, userptr);
