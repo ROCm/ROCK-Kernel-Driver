@@ -148,6 +148,9 @@ struct amdgpu_vm {
 	/* dedicated to vm */
 	struct amdgpu_vm_id	*reserved_vmid[AMDGPU_MAX_VMHUBS];
 
+	/* Whether this is a Compute or GFX Context */
+	int			vm_context;
+
 	/* Flag to indicate if VM tables are updated by CPU or GPU (SDMA) */
 	bool                    use_cpu_for_update;
 
@@ -215,6 +218,8 @@ struct amdgpu_vm_manager {
 	 * BIT1[= 0] Compute updated by SDMA [= 1] by CPU
 	 */
 	int					vm_update_mode;
+	/* Number of Compute VMs, used for detecting Compute activity */
+	unsigned                                n_compute_vms;
 };
 
 void amdgpu_vm_manager_init(struct amdgpu_device *adev);
