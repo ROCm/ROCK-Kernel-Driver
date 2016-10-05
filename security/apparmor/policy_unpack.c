@@ -597,7 +597,7 @@ static struct aa_profile *unpack_profile(struct aa_ext *e)
 			/* discard extraneous rules that this kernel will
 			 * never request
 			 */
-			if (i > AF_MAX) {
+			if (i >= AF_MAX) {
 				u16 tmp;
 				if (!unpack_u16(e, &tmp, NULL) ||
 				    !unpack_u16(e, &tmp, NULL) ||
@@ -614,11 +614,11 @@ static struct aa_profile *unpack_profile(struct aa_ext *e)
 		}
 		if (!unpack_nameX(e, AA_ARRAYEND, NULL))
 			goto fail;
-		/*
-		 * allow unix domain and netlink sockets they are handled
-		 * by IPC
-		 */
 	}
+	/*
+	 * allow unix domain and netlink sockets they are handled
+	 * by IPC
+	 */
 	profile->net.allow[AF_UNIX] = 0xffff;
 	profile->net.allow[AF_NETLINK] = 0xffff;
 

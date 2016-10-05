@@ -4,7 +4,7 @@
  * This file contains AppArmor network mediation
  *
  * Copyright (C) 1998-2008 Novell/SUSE
- * Copyright 2009-2010 Canonical Ltd.
+ * Copyright 2009-2012 Canonical Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -18,43 +18,31 @@
 #include "include/net.h"
 #include "include/policy.h"
 
-#include "af_names.h"
+#include "net_names.h"
 
-static const char *sock_type_names[] = {
-	"unknown(0)",
-	"stream",
-	"dgram",
-	"raw",
-	"rdm",
-	"seqpacket",
-	"dccp",
-	"unknown(7)",
-	"unknown(8)",
-	"unknown(9)",
-	"packet",
+struct aa_fs_entry aa_fs_entry_network[] = {
+	AA_FS_FILE_STRING("af_mask", AA_FS_AF_MASK),
+	{ }
 };
 
 /* audit callback for net specific fields */
 static void audit_cb(struct audit_buffer *ab, void *va)
 {
 	struct common_audit_data *sa = va;
-	struct apparmor_audit_data *aad = sa->apparmor_audit_data;
 
 	audit_log_format(ab, " family=");
 	if (address_family_names[sa->u.net->family]) {
 		audit_log_string(ab, address_family_names[sa->u.net->family]);
 	} else {
-		audit_log_format(ab, " \"unknown(%d)\"", sa->u.net->family);
+		audit_log_format(ab, "\"unknown(%d)\"", sa->u.net->family);
 	}
-
 	audit_log_format(ab, " sock_type=");
-	if (sock_type_names[aad->net.type]) {
-		audit_log_string(ab, sock_type_names[aad->net.type]);
+	if (sock_type_names[sa->aad->net.type]) {
+		audit_log_string(ab, sock_type_names[sa->aad->net.type]);
 	} else {
-		audit_log_format(ab, "\"unknown(%d)\"", aad->net.type);
+		audit_log_format(ab, "\"unknown(%d)\"", sa->aad->net.type);
 	}
-
-	audit_log_format(ab, " protocol=%d", aad->net.protocol);
+	audit_log_format(ab, " protocol=%d", sa->aad->net.protocol);
 }
 
 /**
@@ -74,43 +62,33 @@ static int audit_net(struct aa_profile *profile, int op, u16 family, int type,
 {
 	int audit_type = AUDIT_APPARMOR_AUTO;
 	struct common_audit_data sa;
-
-	struct apparmor_audit_data aad = {
-		.op = op,
-		.error = error
-	};
-
-	struct lsm_network_audit net = {
-		.family = family,
-		.sk = sk,
-	};
-
-	/*
-	 * Workaround gcc static initializer bug and initialize these
-	 * explicitely
-	 */
-	aad.net.type = type;
-	aad.net.protocol = protocol;
-
-	if (sk)
+	struct apparmor_audit_data aad = { };
+	struct lsm_network_audit net = { };
+	if (sk) {
 		sa.type = LSM_AUDIT_DATA_NET;
-	else
+	} else {
 		sa.type = LSM_AUDIT_DATA_NONE;
+	}
 	/* todo fill in socket addr info */
-
-	sa.apparmor_audit_data = &aad;
+	sa.aad = &aad;
 	sa.u.net = &net;
+	sa.aad->op = op,
+	sa.u.net->family = family;
+	sa.u.net->sk = sk;
+	sa.aad->net.type = type;
+	sa.aad->net.protocol = protocol;
+	sa.aad->error = error;
 
-	if (likely(!aad.error)) {
-		u16 audit_mask = profile->net.audit[net.family];
+	if (likely(!sa.aad->error)) {
+		u16 audit_mask = profile->net.audit[sa.u.net->family];
 		if (likely((AUDIT_MODE(profile) != AUDIT_ALL) &&
-			   !(1 << aad.net.type & audit_mask)))
+			   !(1 << sa.aad->net.type & audit_mask)))
 			return 0;
 		audit_type = AUDIT_APPARMOR_AUDIT;
 	} else {
-		u16 quiet_mask = profile->net.quiet[net.family];
+		u16 quiet_mask = profile->net.quiet[sa.u.net->family];
 		u16 kill_mask = 0;
-		u16 denied = (1 << aad.net.type) & ~quiet_mask;
+		u16 denied = (1 << sa.aad->net.type);
 
 		if (denied & kill_mask)
 			audit_type = AUDIT_APPARMOR_KILL;
@@ -118,7 +96,7 @@ static int audit_net(struct aa_profile *profile, int op, u16 family, int type,
 		if ((denied & quiet_mask) &&
 		    AUDIT_MODE(profile) != AUDIT_NOQUIET &&
 		    AUDIT_MODE(profile) != AUDIT_ALL)
-			return COMPLAIN_MODE(profile) ? 0 : aad.error;
+			return COMPLAIN_MODE(profile) ? 0 : sa.aad->error;
 	}
 
 	return aa_audit(audit_type, profile, GFP_KERNEL, &sa, audit_cb);
