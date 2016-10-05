@@ -1399,25 +1399,16 @@ int kfd_map_memory_to_gpu(void *mem, struct kfd_process_device *pdd)
 	int err;
 	struct kfd_dev *dev = pdd->dev;
 
-	BUG_ON(!dev);
-	BUG_ON(!pdd);
-
 	err = dev->kfd2kgd->map_memory_to_gpu(
 		dev->kgd, (struct kgd_mem *) mem, pdd->vm);
 
-	if (err != 0)
-		return err;
-
+	/* Theoretically we don't need this flush. However, as there are
+	 * some bugs in our PTE handling for mapping and unmapping, we
+	 * need this flush to pass all the tests.
+	 */
 	kfd_flush_tlb(dev, pdd->process->pasid);
 
-	err = dev->dqm->ops.set_page_directory_base(dev->dqm, &pdd->qpd);
-	if (err != 0) {
-		dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd,
-				(struct kgd_mem *) mem, pdd->vm);
-		return err;
-	}
-
-	return 0;
+	return err;
 }
 
 static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
@@ -1526,6 +1517,22 @@ static int kfd_ioctl_map_memory_to_gpu_wrapper(struct file *filep,
 	return kfd_ioctl_map_memory_to_gpu(filep, p, &new_args);
 }
 
+int kfd_unmap_memory_from_gpu(void *mem, struct kfd_process_device *pdd)
+{
+	int err;
+	struct kfd_dev *dev = pdd->dev;
+
+	err = dev->kfd2kgd->unmap_memory_to_gpu(
+		dev->kgd, (struct kgd_mem *) mem, pdd->vm);
+
+	if (err != 0)
+		return err;
+
+	kfd_flush_tlb(dev, pdd->process->pasid);
+
+	return 0;
+}
+
 static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 					struct kfd_process *p, void *data)
 {
@@ -1594,15 +1601,11 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
 			}
-			peer->kfd2kgd->unmap_memory_to_gpu(peer->kgd,
-					mem, peer_pdd->vm);
-			kfd_flush_tlb(peer, p->pasid);
+			kfd_unmap_memory_from_gpu(mem, peer_pdd);
 		}
 		kfree(devices_arr);
-	} else {
-		dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd, mem, pdd->vm);
-		kfd_flush_tlb(dev, p->pasid);
-	}
+	} else
+		kfd_unmap_memory_from_gpu(mem, pdd);
 
 	return 0;
 

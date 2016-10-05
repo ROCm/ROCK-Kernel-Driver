@@ -134,8 +134,6 @@ struct device_queue_manager_ops {
 				    uint64_t tba_addr,
 				    uint64_t tma_addr);
 
-	int	(*set_page_directory_base)(struct device_queue_manager *dqm,
-					struct qcm_process_device *qpd);
 	int (*process_termination)(struct device_queue_manager *dqm,
 			struct qcm_process_device *qpd);
 };
