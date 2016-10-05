@@ -1327,7 +1327,7 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 		return -ENOMEM;
 
 	/* Initialize the VM context, allocate the page directory and zero it */
-	ret = amdgpu_vm_init(adev, &new_vm->base);
+	ret = amdgpu_vm_init(adev, &new_vm->base, true);
 	if (ret != 0) {
 		pr_err("Failed init vm ret %d\n", ret);
 		/* Undo everything related to the new VM context */
