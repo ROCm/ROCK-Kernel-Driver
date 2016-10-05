@@ -114,11 +114,15 @@ static int allocate_vmid(struct device_queue_manager *dqm,
 	set_pasid_vmid_mapping(dqm, q->process->pasid, q->properties.vmid);
 	program_sh_mem_settings(dqm, qpd);
 
+	/* qpd->page_table_base is set earlier when register_process()
+	 * is called, i.e. when the first queue is created.
+	 */
 	dqm->dev->kfd2kgd->set_vm_context_page_table_base(dqm->dev->kgd,
-			allocated_vmid,
+			qpd->vmid,
 			qpd->page_table_base);
 	/*invalidate the VM context after pasid and vmid mapping is set up*/
 	kfd_flush_tlb(dqm->dev, qpd->pqm->process->pasid);
+
 	return 0;
 }
 
@@ -521,8 +525,14 @@ int process_restore_queues(struct device_queue_manager *dqm,
 	struct queue *q, *next;
 	struct mqd_manager *mqd;
 	int retval = 0;
+	struct kfd_process_device *pdd;
+	uint32_t pd_base;
 
 	BUG_ON(!dqm || !qpd);
+
+	pdd = qpd_to_pdd(qpd);
+	/* Retrieve PD base */
+	pd_base = dqm->dev->kfd2kgd->get_process_page_dir(pdd->vm);
 
 	mutex_lock(&dqm->lock);
 	if (qpd->evicted == 0) /* already restored, do nothing */
@@ -531,6 +541,19 @@ int process_restore_queues(struct device_queue_manager *dqm,
 	if (qpd->evicted > 1) { /* ref count still > 0, decrement & quit */
 		qpd->evicted--;
 		goto out_unlock;
+	}
+
+	/* Update PD Base in QPD */
+	qpd->page_table_base = pd_base;
+	pr_debug("Updated PD address to 0x%08x in %s\n", pd_base, __func__);
+
+	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
+		dqm->dev->kfd2kgd->set_vm_context_page_table_base(
+				dqm->dev->kgd,
+				qpd->vmid,
+				qpd->page_table_base);
+
+		kfd_flush_tlb(dqm->dev, pdd->process->pasid);
 	}
 
 	/* activate all active queues on the qpd */
@@ -570,9 +593,10 @@ out_unlock:
 static int register_process(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd)
 {
-	struct kfd_process_device *pdd;
 	struct device_process_node *n;
 	int retval;
+	struct kfd_process_device *pdd;
+	uint32_t pd_base;
 
 	BUG_ON(!dqm || !qpd);
 
@@ -584,13 +608,16 @@ static int register_process(struct device_queue_manager *dqm,
 
 	n->qpd = qpd;
 
+	pdd = qpd_to_pdd(qpd);
+	/* Retrieve PD base */
+	pd_base = dqm->dev->kfd2kgd->get_process_page_dir(pdd->vm);
+
 	mutex_lock(&dqm->lock);
 	list_add(&n->list, &dqm->queues);
 
-	pdd = qpd_to_pdd(qpd);
-	qpd->page_table_base =
-		dqm->dev->kfd2kgd->get_process_page_dir(pdd->vm);
-	pr_debug("Retrieved PD address == 0x%08u\n", qpd->page_table_base);
+	/* Update PD Base in QPD */
+	qpd->page_table_base = pd_base;
+	pr_debug("Updated PD address to 0x%08x in %s\n", pd_base, __func__);
 
 	retval = dqm->asic_ops.update_qpd(dqm, qpd);
 
@@ -1364,44 +1391,6 @@ static int set_trap_handler(struct device_queue_manager *dqm,
 	return 0;
 }
 
-
-static int set_page_directory_base(struct device_queue_manager *dqm,
-					struct qcm_process_device *qpd)
-{
-	struct kfd_process_device *pdd;
-	uint32_t pd_base;
-	int retval = 0;
-
-	BUG_ON(!dqm || !qpd);
-
-	mutex_lock(&dqm->lock);
-
-	pdd = qpd_to_pdd(qpd);
-
-	/* Retrieve PD base */
-	pd_base = dqm->dev->kfd2kgd->get_process_page_dir(pdd->vm);
-
-	/* If it has not changed, just get out */
-	if (qpd->page_table_base == pd_base)
-		goto out;
-
-	/* Update PD Base in QPD */
-	qpd->page_table_base = pd_base;
-	pr_debug("Updated PD address == 0x%08u\n", pd_base);
-
-	/*
-	 * Preempt queues, destroy runlist and create new runlist. Queues
-	 * will have the update PD base address
-	 */
-	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
-		retval = execute_queues_cpsch(dqm, false);
-
-out:
-	mutex_unlock(&dqm->lock);
-
-	return retval;
-}
-
 static int process_termination_nocpsch(struct device_queue_manager *dqm,
 		struct qcm_process_device *qpd)
 {
@@ -1537,7 +1526,6 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		dqm->ops.destroy_kernel_queue = destroy_kernel_queue_cpsch;
 		dqm->ops.set_cache_memory_policy = set_cache_memory_policy;
 		dqm->ops.set_trap_handler = set_trap_handler;
-		dqm->ops.set_page_directory_base = set_page_directory_base;
 		dqm->ops.process_termination = process_termination_cpsch;
 		break;
 	case KFD_SCHED_POLICY_NO_HWS:
@@ -1554,7 +1542,6 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		dqm->ops.uninitialize = uninitialize_nocpsch;
 		dqm->ops.set_cache_memory_policy = set_cache_memory_policy;
 		dqm->ops.set_trap_handler = set_trap_handler;
-		dqm->ops.set_page_directory_base = set_page_directory_base;
 		dqm->ops.process_termination = process_termination_nocpsch;
 		break;
 	default:
