@@ -1660,7 +1660,7 @@ void amdgpu_vm_bo_invalidate(struct amdgpu_device *adev,
  * Init @vm fields.
  */
 int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
-		bool vm_update_mode)
+		   bool vm_update_mode, bool is_kfd_vm)
 {
 	const unsigned align = min(AMDGPU_VM_PTB_ALIGN_SIZE,
 		AMDGPU_VM_PTE_COUNT * 8);
@@ -1724,6 +1724,17 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		goto error_free_page_directory;
 	vm->last_eviction_counter = atomic64_read(&adev->num_evictions);
 
+	vm->is_kfd_vm = is_kfd_vm;
+	if (is_kfd_vm && adev->pp_enabled) {
+		mutex_lock(&adev->vm_manager.lock);
+
+		if (adev->vm_manager.n_kfd_vms++ == 0)
+			/* First KFD VM: enable compute power profile */
+			amdgpu_dpm_switch_power_profile(adev, PP_COMPUTE_PROFILE);
+
+		mutex_unlock(&adev->vm_manager.lock);
+	}
+
 	return 0;
 
 error_free_page_directory:
@@ -1749,6 +1760,18 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 {
 	struct amdgpu_bo_va_mapping *mapping, *tmp;
 	int i;
+
+	if (vm->is_kfd_vm && adev->pp_enabled) {
+		mutex_lock(&adev->vm_manager.lock);
+
+		WARN(adev->vm_manager.n_kfd_vms == 0, "Unbalanced number of KFD VMs");
+
+		if (--adev->vm_manager.n_kfd_vms == 0)
+			/* Last KFD VM: enable graphics power profile */
+			amdgpu_dpm_switch_power_profile(adev, PP_GFX_PROFILE);
+
+		mutex_unlock(&adev->vm_manager.lock);
+	}
 
 	amd_sched_entity_fini(vm->entity.sched, &vm->entity);
 
@@ -1800,6 +1823,8 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 
 	atomic_set(&adev->vm_manager.vm_pte_next_ring, 0);
 	atomic64_set(&adev->vm_manager.client_counter, 0);
+
+	adev->vm_manager.n_kfd_vms = 0;
 }
 
 /**

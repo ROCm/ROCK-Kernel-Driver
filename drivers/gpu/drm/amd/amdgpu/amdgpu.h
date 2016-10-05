@@ -922,7 +922,9 @@ struct amdgpu_vm {
 	u64                     client_id;
 
 	/* Flag to indicate if VM tables are updated by CPU or GPU (SDMA) */
-	bool is_vm_update_mode_cpu;
+	bool			is_vm_update_mode_cpu : 1;
+	/* Flag to indicate if this is a KFD VM */
+	bool			is_kfd_vm : 1;
 };
 
 struct amdgpu_vm_id {
@@ -969,12 +971,15 @@ struct amdgpu_vm_manager {
 	atomic_t				vm_pte_next_ring;
 	/* client id counter */
 	atomic64_t				client_counter;
+
+	/* Number of KFD VMs, used for detecting KFD activity */
+	unsigned				n_kfd_vms;
 };
 
 void amdgpu_vm_manager_init(struct amdgpu_device *adev);
 void amdgpu_vm_manager_fini(struct amdgpu_device *adev);
 int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
-		bool vm_update_mode);
+		   bool vm_update_mode, bool is_kfd_vm);
 void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm);
 void amdgpu_vm_get_pd_bo(struct amdgpu_vm *vm,
 			 struct list_head *validated,

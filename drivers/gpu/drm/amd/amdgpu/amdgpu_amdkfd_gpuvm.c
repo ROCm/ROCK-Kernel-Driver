@@ -1186,7 +1186,8 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 	vm_update_using_cpu = !!(amdgpu_vm_update_context &
 				AMDGPU_VM_USE_CPU_UPDATE_FOR_COMPUTE_MASK);
 	ret = amdgpu_vm_init(adev, &new_vm->base,
-			     (vm_update_using_cpu && check_if_large_bar(kgd)));
+			     (vm_update_using_cpu && check_if_large_bar(kgd)),
+			     true);
 	if (ret != 0) {
 		pr_err("amdgpu: failed init vm ret %d\n", ret);
 		/* Undo everything related to the new VM context */
