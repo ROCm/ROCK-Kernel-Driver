@@ -785,7 +785,7 @@ int amdgpu_driver_open_kms(struct drm_device *dev, struct drm_file *file_priv)
 		goto out_suspend;
 	}
 
-	r = amdgpu_vm_init(adev, &fpriv->vm);
+	r = amdgpu_vm_init(adev, &fpriv->vm, false);
 	if (r) {
 		kfree(fpriv);
 		goto out_suspend;

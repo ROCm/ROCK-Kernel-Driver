@@ -129,6 +129,9 @@ struct amdgpu_vm {
 	struct amdgpu_vm_id	*reserved_vmid[AMDGPU_MAX_VMHUBS];
 	/* each VM will map on CSA */
 	struct amdgpu_bo_va *csa_bo_va;
+
+	/* Flag to indicate if this is a KFD VM */
+	bool                    is_kfd_vm : 1;
 };
 
 struct amdgpu_vm_id {
@@ -184,11 +187,15 @@ struct amdgpu_vm_manager {
 	/* partial resident texture handling */
 	spinlock_t				prt_lock;
 	atomic_t				num_prt_users;
+
+	/* Number of KFD VMs, used for detecting KFD activity */
+	unsigned                                n_kfd_vms;
 };
 
 void amdgpu_vm_manager_init(struct amdgpu_device *adev);
 void amdgpu_vm_manager_fini(struct amdgpu_device *adev);
-int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm);
+int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+		   bool is_kfd_vm);
 void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm);
 void amdgpu_vm_get_pd_bo(struct amdgpu_vm *vm,
 			 struct list_head *validated,

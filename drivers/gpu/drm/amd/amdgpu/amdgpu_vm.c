@@ -2237,7 +2237,8 @@ void amdgpu_vm_adjust_size(struct amdgpu_device *adev, uint64_t vm_size)
  *
  * Init @vm fields.
  */
-int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm)
+int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+		   bool is_kfd_vm)
 {
 	const unsigned align = min(AMDGPU_VM_PTB_ALIGN_SIZE,
 		AMDGPU_VM_PTE_COUNT(adev) * 8);
@@ -2284,6 +2285,22 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 
 	vm->last_eviction_counter = atomic64_read(&adev->num_evictions);
 	amdgpu_bo_unreserve(vm->root.bo);
+
+	vm->is_kfd_vm = is_kfd_vm;
+	if (is_kfd_vm && adev->pp_enabled) {
+		mutex_lock(&adev->vm_manager.lock);
+
+		if (adev->vm_manager.n_kfd_vms++ == 0) {
+			/* First KFD VM: enable compute power profile */
+			if (adev->pp_enabled)
+				amdgpu_dpm_switch_power_profile(adev,
+						AMD_PP_COMPUTE_PROFILE);
+			else if (adev->pm.funcs->switch_power_profile)
+				adev->pm.funcs->switch_power_profile(adev,
+						AMD_PP_COMPUTE_PROFILE);
+		}
+		mutex_unlock(&adev->vm_manager.lock);
+	}
 
 	return 0;
 
@@ -2335,6 +2352,23 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	struct amdgpu_bo_va_mapping *mapping, *tmp;
 	bool prt_fini_needed = !!adev->gart.gart_funcs->set_prt;
 	int i;
+
+	if (vm->is_kfd_vm && adev->pp_enabled) {
+		mutex_lock(&adev->vm_manager.lock);
+
+		WARN(adev->vm_manager.n_kfd_vms == 0, "Unbalanced number of KFD VMs");
+
+		if (--adev->vm_manager.n_kfd_vms == 0) {
+			/* Last KFD VM: enable graphics power profile */
+			if (adev->pp_enabled)
+				amdgpu_dpm_switch_power_profile(adev,
+						AMD_PP_GFX_PROFILE);
+			else if (adev->pm.funcs->switch_power_profile)
+				adev->pm.funcs->switch_power_profile(adev,
+						AMD_PP_GFX_PROFILE);
+		}
+		mutex_unlock(&adev->vm_manager.lock);
+	}
 
 	amd_sched_entity_fini(vm->entity.sched, &vm->entity);
 
@@ -2398,6 +2432,8 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 	atomic64_set(&adev->vm_manager.client_counter, 0);
 	spin_lock_init(&adev->vm_manager.prt_lock);
 	atomic_set(&adev->vm_manager.num_prt_users, 0);
+
+	adev->vm_manager.n_kfd_vms = 0;
 }
 
 /**
