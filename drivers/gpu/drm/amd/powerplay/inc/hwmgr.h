@@ -632,7 +632,8 @@ struct pp_hwmgr {
 	/* power profile */
 	struct pp_profile gfx_power_profile;
 	struct pp_profile compute_power_profile;
-	struct pp_profile default_power_profile;
+	struct pp_profile default_gfx_power_profile;
+	struct pp_profile default_compute_power_profile;
 	enum pp_profile_type current_power_profile;
 };
 

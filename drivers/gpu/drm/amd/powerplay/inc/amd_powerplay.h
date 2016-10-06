@@ -283,8 +283,7 @@ struct pp_states_info {
 };
 
 enum pp_profile_type {
-	PP_DEFAULT_PROFILE,
-	PP_GFX_PROFILE,
+	PP_GFX_PROFILE = 0,
 	PP_COMPUTE_PROFILE,
 };
 

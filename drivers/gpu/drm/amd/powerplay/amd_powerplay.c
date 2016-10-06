@@ -915,17 +915,17 @@ static int pp_dpm_reset_power_profile_state(void *handle,
 		return 0;
 	}
 
-	if (request->type == PP_GFX_PROFILE)
-		memset(&hwmgr->gfx_power_profile, 0,
-				sizeof(struct pp_profile));
-	else if (request->type == PP_COMPUTE_PROFILE)
-		memset(&hwmgr->compute_power_profile, 0,
-				sizeof(struct pp_profile));
-
-	hwmgr->current_power_profile = PP_DEFAULT_PROFILE;
-
-	return hwmgr->hwmgr_func->set_power_profile_state(hwmgr,
-			&hwmgr->default_power_profile);
+	if (request->type == PP_GFX_PROFILE) {
+		hwmgr->gfx_power_profile = hwmgr->default_gfx_power_profile;
+		return hwmgr->hwmgr_func->set_power_profile_state(hwmgr,
+					  &hwmgr->gfx_power_profile);
+	} else if (request->type == PP_COMPUTE_PROFILE) {
+		hwmgr->compute_power_profile =
+			hwmgr->default_compute_power_profile;
+		return hwmgr->hwmgr_func->set_power_profile_state(hwmgr,
+					  &hwmgr->compute_power_profile);
+	} else
+		return -EINVAL;
 }
 
 static int pp_dpm_get_power_profile_state(void *handle,
@@ -981,6 +981,8 @@ static int pp_dpm_set_power_profile_state(void *handle,
 		else if (request->type == PP_COMPUTE_PROFILE)
 			memcpy(&hwmgr->compute_power_profile, request,
 					sizeof(struct pp_profile));
+		else
+			return -EINVAL;
 
 		if (request->type == hwmgr->current_power_profile)
 			ret = hwmgr->hwmgr_func->set_power_profile_state(
@@ -990,33 +992,17 @@ static int pp_dpm_set_power_profile_state(void *handle,
 		/* set power profile if it exists */
 		switch (request->type) {
 		case PP_GFX_PROFILE:
-			if (hwmgr->gfx_power_profile.type ==
-					PP_GFX_PROFILE)
-				ret = hwmgr->hwmgr_func->
-						set_power_profile_state(
-						hwmgr,
-						&hwmgr->gfx_power_profile);
-			else
-				ret = hwmgr->hwmgr_func->
-						set_power_profile_state(
-						hwmgr,
-						&hwmgr->default_power_profile);
+			ret = hwmgr->hwmgr_func->set_power_profile_state(
+				hwmgr,
+				&hwmgr->gfx_power_profile);
 			break;
 		case PP_COMPUTE_PROFILE:
-			if (hwmgr->compute_power_profile.type ==
-					PP_COMPUTE_PROFILE)
-				ret = hwmgr->hwmgr_func->
-						set_power_profile_state(
-						hwmgr,
-						&hwmgr->compute_power_profile);
-			break;
-		case PP_DEFAULT_PROFILE:
 			ret = hwmgr->hwmgr_func->set_power_profile_state(
-					hwmgr,
-					&hwmgr->default_power_profile);
+				hwmgr,
+				&hwmgr->compute_power_profile);
 			break;
 		default:
-			break;
+			return -EINVAL;
 		}
 	}
 
