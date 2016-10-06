@@ -653,12 +653,12 @@ static ssize_t amdgpu_set_pp_power_profile(struct device *dev,
 		return count;
 	}
 
-	if (count >= 128) {
+	if (count+1 >= 128) {
 		count = -EINVAL;
 		goto fail;
 	}
 
-	memcpy(buf_cpy, buf, count);
+	memcpy(buf_cpy, buf, count+1);
 	tmp_str = buf_cpy;
 
 	while (tmp_str[0]) {
@@ -688,7 +688,8 @@ static ssize_t amdgpu_set_pp_power_profile(struct device *dev,
 			request->down_hyst = (uint8_t)value;
 			break;
 		default:
-			break;
+			count = -EINVAL;
+			goto fail;
 		}
 
 		loop++;
