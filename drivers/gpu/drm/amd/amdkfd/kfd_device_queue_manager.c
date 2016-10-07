@@ -194,6 +194,9 @@ static int create_queue_nocpsch(struct device_queue_manager *dqm,
 					    q->properties.queue_percent > 0 &&
 					    q->properties.queue_address != 0);
 
+	q->properties.tba_addr = qpd->tba_addr;
+	q->properties.tma_addr = qpd->tma_addr;
+
 	if (q->properties.type == KFD_QUEUE_TYPE_COMPUTE)
 		retval = create_compute_queue_nocpsch(dqm, q, qpd);
 	if (q->properties.type == KFD_QUEUE_TYPE_SDMA)
@@ -1348,9 +1351,16 @@ static int set_trap_handler(struct device_queue_manager *dqm,
 {
 	uint64_t *tma;
 
-	tma = (uint64_t *)(qpd->cwsr_kaddr + dqm->dev->tma_offset);
-	tma[0] = tba_addr;
-	tma[1] = tma_addr;
+	if (dqm->dev->cwsr_enabled) {
+		/* Jump from CWSR trap handler to user trap */
+		tma = (uint64_t *)(qpd->cwsr_kaddr + dqm->dev->tma_offset);
+		tma[0] = tba_addr;
+		tma[1] = tma_addr;
+	} else {
+		qpd->tba_addr = tba_addr;
+		qpd->tma_addr = tma_addr;
+	}
+
 	return 0;
 }
 
