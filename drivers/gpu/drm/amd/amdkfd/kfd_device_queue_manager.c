@@ -1498,8 +1498,15 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 	if (!dqm)
 		return NULL;
 
-	dqm->sched_policy = (dev->device_info->asic_family == CHIP_HAWAII) ?
-		KFD_SCHED_POLICY_NO_HWS : sched_policy;
+	switch (dev->device_info->asic_family) {
+	case CHIP_HAWAII:
+	case CHIP_TONGA:
+		dqm->sched_policy = KFD_SCHED_POLICY_NO_HWS;
+		break;
+	default:
+		dqm->sched_policy = sched_policy;
+		break;
+	}
 
 	dqm->dev = dev;
 	switch (dqm->sched_policy) {
