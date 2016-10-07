@@ -1718,6 +1718,62 @@ static void pnv_pci_ioda_dma_dev_setup(struct pnv_phb *phb, struct pci_dev *pdev
 	 */
 }
 
+static void pnv_pci_ioda_dma_sketchy_bypass(struct pnv_ioda_pe *pe)
+{
+	/* Enable a transparent bypass into TVE #1 through DMA window 0 */
+	s64 rc;
+	u64 addr;
+	u64 tce_count;
+	u64 table_size;
+	u64 tce_order = 28; /* 256MB TCEs */
+	u64 window_size = memory_hotplug_max() + (1ULL << 32);
+	struct page *table_pages;
+	__be64 *tces;
+
+	window_size = roundup_pow_of_two(memory_hotplug_max() + (1ULL << 32));
+	tce_count = window_size >> tce_order;
+	table_size = tce_count << 3;
+
+	pr_debug("ruscur: table_size %016llx PAGE_SIZE %016lx\n",
+		table_size, PAGE_SIZE);
+	if (table_size < PAGE_SIZE) {
+		pr_debug("ruscur: set table_size to PAGE_SIZE\n");
+		table_size = PAGE_SIZE;
+	}
+
+	pr_debug("ruscur: tce_count %016llx table_size %016llx\n",
+		tce_count, table_size);
+
+	table_pages = alloc_pages_node(pe->phb->hose->node, GFP_KERNEL,
+				       get_order(table_size));
+
+	pr_debug("ruscur: got table_pages %p\n", table_pages);
+	/* TODO null checking */
+	tces = page_address(table_pages);
+	pr_debug("ruscur: got tces %p\n", tces);
+	memset(tces, 0, table_size);
+
+	for (addr = 0; addr < memory_hotplug_max(); addr += (1 << tce_order)) {
+		pr_debug("ruscur: addr %016llx index %016llx\n", addr,
+			 (addr + (1ULL << 32)) >> tce_order);
+		tces[(addr + (1ULL << 32)) >> tce_order] =
+			cpu_to_be64(addr | TCE_PCI_READ | TCE_PCI_WRITE);
+	}
+
+	rc = opal_pci_map_pe_dma_window(pe->phb->opal_id,
+					pe->pe_number,
+					/* reconfigure window 0 */
+					(pe->pe_number << 1) + 0,
+					1, /* level (unsure what this means) */
+					__pa(tces),
+					table_size,
+					1 << tce_order);
+	if (rc)
+		pe_err(pe, "OPAL error %llx in sketchy bypass\n", rc);
+	else
+		pe_info(pe, "ruscur's sketchy bypass worked, apparently\n");
+}
+
 static int pnv_pci_ioda_dma_set_mask(struct pci_dev *pdev, u64 dma_mask)
 {
 	struct pci_controller *hose = pci_bus_to_host(pdev->bus);
@@ -1740,8 +1796,29 @@ static int pnv_pci_ioda_dma_set_mask(struct pci_dev *pdev, u64 dma_mask)
 		dev_info(&pdev->dev, "Using 64-bit DMA iommu bypass\n");
 		set_dma_ops(&pdev->dev, &dma_direct_ops);
 	} else {
-		dev_info(&pdev->dev, "Using 32-bit DMA via iommu\n");
-		set_dma_ops(&pdev->dev, &dma_iommu_ops);
+		/* Find out if we want to address more than 2G */
+		dev_info(&pdev->dev, "My dma_mask is %016llx\n", dma_mask);
+		if (dma_mask >> 32 /*&& pe->device_count == 1*/) {
+			/*
+			 * TODO
+			 * This mode shouldn't be used if the PE has any other
+			 * device on it.  Things will go wrong.
+			 * We can't just check for device_count of 1 though,
+			 * because of things like GPUs with audio devices and
+			 * stuff like that.  So we should walk the PE and check
+			 * if everything else on it has the same vendor ID...?
+			 */
+			dev_info(&pdev->dev, "%d devices on my PE\n",
+					pe->device_count);
+			/* Set up the bypass mode */
+			pnv_pci_ioda_dma_sketchy_bypass(pe);
+			/* 4GB offset places us into TVE#1 */
+			set_dma_offset(&pdev->dev, (1ULL << 32));
+			set_dma_ops(&pdev->dev, &dma_direct_ops);
+		} else {
+			dev_info(&pdev->dev, "Using 32-bit DMA via iommu\n");
+			set_dma_ops(&pdev->dev, &dma_iommu_ops);
+		}
 	}
 	*pdev->dev.dma_mask = dma_mask;
 
