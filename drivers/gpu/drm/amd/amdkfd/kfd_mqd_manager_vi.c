@@ -142,10 +142,17 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 		m->cp_hqd_iq_rptr = 1;
 
 	if (q->tba_addr) {
-		m->cp_hqd_persistent_state |=
-			(1 << CP_HQD_PERSISTENT_STATE__QSWITCH_MODE__SHIFT);
+		m->compute_tba_lo = lower_32_bits(q->tba_addr >> 8);
+		m->compute_tba_hi = upper_32_bits(q->tba_addr >> 8);
+		m->compute_tma_lo = lower_32_bits(q->tma_addr >> 8);
+		m->compute_tma_hi = upper_32_bits(q->tma_addr >> 8);
 		m->compute_pgm_rsrc2 |=
 			(1 << COMPUTE_PGM_RSRC2__TRAP_PRESENT__SHIFT);
+	}
+
+	if (mm->dev->cwsr_enabled) {
+		m->cp_hqd_persistent_state |=
+			(1 << CP_HQD_PERSISTENT_STATE__QSWITCH_MODE__SHIFT);
 		m->cp_hqd_ctx_save_base_addr_lo =
 			lower_32_bits(q->ctx_save_restore_area_address);
 		m->cp_hqd_ctx_save_base_addr_hi =
@@ -154,10 +161,6 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 		m->cp_hqd_cntl_stack_size = q->ctl_stack_size;
 		m->cp_hqd_cntl_stack_offset = q->ctl_stack_size;
 		m->cp_hqd_wg_state_offset = q->ctl_stack_size;
-		m->compute_tba_lo = lower_32_bits(q->tba_addr >> 8);
-		m->compute_tba_hi = upper_32_bits(q->tba_addr >> 8);
-		m->compute_tma_lo = lower_32_bits(q->tma_addr >> 8);
-		m->compute_tma_hi = upper_32_bits(q->tma_addr >> 8);
 	}
 
 	*mqd = m;
@@ -238,7 +241,7 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 		m->cp_hqd_pq_control |= CP_HQD_PQ_CONTROL__NO_UPDATE_RPTR_MASK |
 				2 << CP_HQD_PQ_CONTROL__SLOT_BASED_WPTR__SHIFT;
 	}
-	if (q->tba_addr)
+	if (mm->dev->cwsr_enabled)
 		m->cp_hqd_ctx_save_control =
 			atc_bit << CP_HQD_CTX_SAVE_CONTROL__ATC__SHIFT |
 			mtype << CP_HQD_CTX_SAVE_CONTROL__MTYPE__SHIFT;
