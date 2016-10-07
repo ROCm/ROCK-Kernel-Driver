@@ -374,33 +374,32 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct vi_mqd *m;
+	uint32_t *mqd_hqd;
+	uint32_t reg;
 
 	m = get_mqd(mqd);
 
 	acquire_queue(kgd, pipe_id, queue_id);
 
-	WREG32(mmCOMPUTE_STATIC_THREAD_MGMT_SE0,
-		m->compute_static_thread_mgmt_se0);
-	WREG32(mmCOMPUTE_STATIC_THREAD_MGMT_SE1,
-		m->compute_static_thread_mgmt_se1);
-	WREG32(mmCOMPUTE_STATIC_THREAD_MGMT_SE2,
-		m->compute_static_thread_mgmt_se2);
-	WREG32(mmCOMPUTE_STATIC_THREAD_MGMT_SE3,
-		m->compute_static_thread_mgmt_se3);
+	/* HQD registers extend from CP_MQD_BASE_ADDR to CP_HQD_EOP_WPTR_MEM. */
+	mqd_hqd = &m->cp_mqd_base_addr_lo;
 
-	WREG32(mmCP_MQD_CONTROL, m->cp_mqd_control);
-	WREG32(mmCP_MQD_BASE_ADDR, m->cp_mqd_base_addr_lo);
-	WREG32(mmCP_MQD_BASE_ADDR_HI, m->cp_mqd_base_addr_hi);
+	for (reg = mmCP_HQD_VMID; reg <= mmCP_HQD_EOP_CONTROL; reg++)
+		WREG32(reg, mqd_hqd[reg - mmCP_MQD_BASE_ADDR]);
 
-	WREG32(mmCP_HQD_VMID, m->cp_hqd_vmid);
-	WREG32(mmCP_HQD_PQ_BASE, m->cp_hqd_pq_base_lo);
-	WREG32(mmCP_HQD_PQ_BASE_HI, m->cp_hqd_pq_base_hi);
-	WREG32(mmCP_HQD_PQ_RPTR_REPORT_ADDR, m->cp_hqd_pq_rptr_report_addr_lo);
-	WREG32(mmCP_HQD_PQ_RPTR_REPORT_ADDR_HI,
-			m->cp_hqd_pq_rptr_report_addr_hi);
-	WREG32(mmCP_HQD_PQ_CONTROL, m->cp_hqd_pq_control);
-	WREG32(mmCP_HQD_PQ_DOORBELL_CONTROL, m->cp_hqd_pq_doorbell_control);
-	WREG32(mmCP_HQD_PQ_RPTR, m->cp_hqd_pq_rptr);
+	/* Tonga errata: EOP RPTR/WPTR should be left unmodified.
+	 * This is safe since EOP RPTR==WPTR for any inactive HQD
+	 * on ASICs that do not support context-save.
+	 * EOP writes/reads can start anywhere in the ring.
+	 */
+	if (get_amdgpu_device(kgd)->asic_type != CHIP_TONGA) {
+		WREG32(mmCP_HQD_EOP_RPTR, m->cp_hqd_eop_rptr);
+		WREG32(mmCP_HQD_EOP_WPTR, m->cp_hqd_eop_wptr);
+		WREG32(mmCP_HQD_EOP_WPTR_MEM, m->cp_hqd_eop_wptr_mem);
+	}
+
+	for (reg = mmCP_HQD_EOP_EVENTS; reg <= mmCP_HQD_ERROR; reg++)
+		WREG32(reg, mqd_hqd[reg - mmCP_MQD_BASE_ADDR]);
 
 	if (wptr) {
 		/* Don't read wptr with get_user because the user
@@ -418,37 +417,11 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 		       (uint32_t)((uint64_t)wptr >> 32));
 		WREG32(mmCP_PQ_WPTR_POLL_CNTL1,
 		       get_queue_mask(pipe_id, queue_id));
-	} else
-		WREG32(mmCP_HQD_PQ_WPTR, 0);
+	}
 
-	WREG32(mmCP_HQD_PERSISTENT_STATE, m->cp_hqd_persistent_state);
-	WREG32(mmCP_HQD_PIPE_PRIORITY, m->cp_hqd_pipe_priority);
-	WREG32(mmCP_HQD_QUEUE_PRIORITY, m->cp_hqd_queue_priority);
-	WREG32(mmCP_HQD_QUANTUM, m->cp_hqd_quantum);
-
-	WREG32(mmCP_HQD_EOP_BASE_ADDR, m->cp_hqd_eop_base_addr_lo);
-	WREG32(mmCP_HQD_EOP_BASE_ADDR_HI, m->cp_hqd_eop_base_addr_hi);
-	WREG32(mmCP_HQD_EOP_CONTROL, m->cp_hqd_eop_control);
-	WREG32(mmCP_HQD_EOP_RPTR, m->cp_hqd_eop_rptr);
-	WREG32(mmCP_HQD_EOP_WPTR, m->cp_hqd_eop_wptr);
-	WREG32(mmCP_HQD_EOP_EVENTS, m->cp_hqd_eop_done_events);
-
-	WREG32(mmCP_HQD_CTX_SAVE_BASE_ADDR_LO, m->cp_hqd_ctx_save_base_addr_lo);
-	WREG32(mmCP_HQD_CTX_SAVE_BASE_ADDR_HI, m->cp_hqd_ctx_save_base_addr_hi);
-	WREG32(mmCP_HQD_CTX_SAVE_CONTROL, m->cp_hqd_ctx_save_control);
-	WREG32(mmCP_HQD_CNTL_STACK_OFFSET, m->cp_hqd_cntl_stack_offset);
-	WREG32(mmCP_HQD_CNTL_STACK_SIZE, m->cp_hqd_cntl_stack_size);
-	WREG32(mmCP_HQD_WG_STATE_OFFSET, m->cp_hqd_wg_state_offset);
-	WREG32(mmCP_HQD_CTX_SAVE_SIZE, m->cp_hqd_ctx_save_size);
-
-	WREG32(mmCP_HQD_IB_CONTROL, m->cp_hqd_ib_control);
-
-	WREG32(mmCP_HQD_DEQUEUE_REQUEST, m->cp_hqd_dequeue_request);
-	WREG32(mmCP_HQD_ERROR, m->cp_hqd_error);
-	WREG32(mmCP_HQD_EOP_WPTR_MEM, m->cp_hqd_eop_wptr_mem);
-	WREG32(mmCP_HQD_EOP_DONES, m->cp_hqd_eop_dones);
-
-	WREG32(mmCP_HQD_ACTIVE, m->cp_hqd_active);
+	/* Write CP_HQD_ACTIVE last. */
+	for (reg = mmCP_MQD_BASE_ADDR; reg <= mmCP_HQD_ACTIVE; reg++)
+		WREG32(reg, mqd_hqd[reg - mmCP_MQD_BASE_ADDR]);
 
 	release_queue(kgd);
 
