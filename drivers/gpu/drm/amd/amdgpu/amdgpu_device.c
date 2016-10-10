@@ -1969,7 +1969,10 @@ int amdgpu_device_suspend(struct drm_device *dev, bool suspend, bool fbcon)
 
 	r = amdgpu_suspend(adev);
 
-	/* evict remaining vram memory */
+	/* evict remaining vram memory
+	 * This second call to evict vram is to evict the gart page table
+	 * using the CPU.
+	 */
 	amdgpu_bo_evict_vram(adev);
 
 	amdgpu_atombios_scratch_regs_save(adev);
