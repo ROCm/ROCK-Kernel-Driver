@@ -1351,7 +1351,7 @@ error_free:
  * @vm: requested vm
  * @mapping: mapped range and flags to use for the update
  * @flags: HW flags for the mapping
- * @nodes: array of drm_mm_nodes with the MC addresses
+ * @mem: ttm_mem_reg holding array of drm_mm_nodes with the MC addresses
  * @fence: optional resulting fence
  *
  * Split the mapping into smaller chunks so that each update fits
@@ -1364,9 +1364,10 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 				      struct amdgpu_vm *vm,
 				      struct amdgpu_bo_va_mapping *mapping,
 				      uint64_t flags,
-				      struct drm_mm_node *nodes,
+				      struct ttm_mem_reg *mem,
 				      struct dma_fence **fence)
 {
+	struct drm_mm_node *nodes = mem ? mem->mm_node : NULL;
 	unsigned min_linear_pages = 1 << adev->vm_manager.fragment_size;
 	uint64_t pfn, start = mapping->start;
 	int r;
@@ -1405,39 +1406,53 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 		dma_addr_t *dma_addr = NULL;
 		uint64_t max_entries;
 		uint64_t addr, last;
+		uint64_t count;
 
 		if (nodes) {
 			addr = nodes->start << PAGE_SHIFT;
 			max_entries = (nodes->size - pfn) *
 				(PAGE_SIZE / AMDGPU_GPU_PAGE_SIZE);
+			switch (mem->mem_type) {
+			case TTM_PL_TT:
+				max_entries = min(max_entries, 16ull * 1024ull);
+
+				for (count = 1; count < max_entries; ++count) {
+					uint64_t idx = pfn + count;
+
+					if (pages_addr[idx] !=
+					    (pages_addr[idx - 1] + PAGE_SIZE))
+					break;
+				}
+
+				if (count < min_linear_pages) {
+					addr = pfn << PAGE_SHIFT;
+					dma_addr = pages_addr;
+				} else {
+					addr = pages_addr[pfn];
+					max_entries = count;
+				}
+				break;
+			case AMDGPU_PL_DGMA_IMPORT:
+				addr = 0;
+				max_entries = min(max_entries, 16ull * 1024ull);
+				dma_addr = pages_addr;
+				break;
+			case AMDGPU_PL_DGMA:
+				addr += adev->vm_manager.vram_base_offset +
+					adev->mman.bdev.man[mem->mem_type].gpu_offset -
+					adev->mman.bdev.man[TTM_PL_VRAM].gpu_offset;
+				addr += pfn << PAGE_SHIFT;
+				break;
+			case TTM_PL_VRAM:
+				addr += adev->vm_manager.vram_base_offset;
+				addr += pfn << PAGE_SHIFT;
+				break;
+			default:
+				break;
+			}
 		} else {
 			addr = 0;
 			max_entries = S64_MAX;
-		}
-
-		if (pages_addr) {
-			uint64_t count;
-
-			max_entries = min(max_entries, 16ull * 1024ull);
-			for (count = 1; count < max_entries; ++count) {
-				uint64_t idx = pfn + count;
-
-				if (pages_addr[idx] !=
-				    (pages_addr[idx - 1] + PAGE_SIZE))
-					break;
-			}
-
-			if (count < min_linear_pages) {
-				addr = pfn << PAGE_SHIFT;
-				dma_addr = pages_addr;
-			} else {
-				addr = pages_addr[pfn];
-				max_entries = count;
-			}
-
-		} else if (flags & AMDGPU_PTE_VALID) {
-			addr += adev->vm_manager.vram_base_offset;
-			addr += pfn << PAGE_SHIFT;
 		}
 
 		last = min((uint64_t)mapping->last, start + max_entries - 1);
@@ -1522,7 +1537,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 
 	list_for_each_entry(mapping, &bo_va->invalids, list) {
 		r = amdgpu_vm_bo_split_mapping(adev, exclusive, pages_addr, vm,
-					       mapping, flags, nodes,
+					       mapping, flags, mem,
 					       last_update);
 		if (r)
 			return r;
