@@ -1408,7 +1408,7 @@ int kfd_map_memory_to_gpu(void *mem, struct kfd_process_device *pdd)
 	if (err != 0)
 		return err;
 
-	radeon_flush_tlb(dev, pdd->process->pasid);
+	kfd_flush_tlb(dev, pdd->process->pasid);
 
 	err = dev->dqm->ops.set_page_directory_base(dev->dqm, &pdd->qpd);
 	if (err != 0) {
@@ -1596,12 +1596,12 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 			}
 			peer->kfd2kgd->unmap_memory_to_gpu(peer->kgd,
 					mem, peer_pdd->vm);
-			radeon_flush_tlb(peer, p->pasid);
+			kfd_flush_tlb(peer, p->pasid);
 		}
 		kfree(devices_arr);
 	} else {
 		dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd, mem, pdd->vm);
-		radeon_flush_tlb(dev, p->pasid);
+		kfd_flush_tlb(dev, p->pasid);
 	}
 
 	return 0;

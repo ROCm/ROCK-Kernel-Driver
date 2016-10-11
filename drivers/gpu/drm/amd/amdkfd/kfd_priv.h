@@ -952,7 +952,7 @@ void kfd_free_signal_page_dgpu(struct kfd_process *p, uint64_t handle);
 void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 				struct kfd_vm_fault_info *info);
 
-void radeon_flush_tlb(struct kfd_dev *dev, uint32_t pasid);
+void kfd_flush_tlb(struct kfd_dev *dev, uint32_t pasid);
 
 int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 
