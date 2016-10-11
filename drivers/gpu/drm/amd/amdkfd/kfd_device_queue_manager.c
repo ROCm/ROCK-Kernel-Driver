@@ -118,7 +118,7 @@ static int allocate_vmid(struct device_queue_manager *dqm,
 			allocated_vmid,
 			qpd->page_table_base);
 	/*invalidate the VM context after pasid and vmid mapping is set up*/
-	radeon_flush_tlb(dqm->dev, qpd->pqm->process->pasid);
+	kfd_flush_tlb(dqm->dev, qpd->pqm->process->pasid);
 	return 0;
 }
 
