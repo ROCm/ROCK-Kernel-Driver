@@ -567,7 +567,7 @@ out_unlock:
 	return retval;
 }
 
-static int register_process_nocpsch(struct device_queue_manager *dqm,
+static int register_process(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd)
 {
 	struct kfd_process_device *pdd;
@@ -601,7 +601,7 @@ static int register_process_nocpsch(struct device_queue_manager *dqm,
 	return retval;
 }
 
-static int unregister_process_nocpsch(struct device_queue_manager *dqm,
+static int unregister_process(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd)
 {
 	int retval;
@@ -1530,8 +1530,8 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		dqm->ops.destroy_queue = destroy_queue_cpsch;
 		dqm->ops.update_queue = update_queue;
 		dqm->ops.get_mqd_manager = get_mqd_manager_nocpsch;
-		dqm->ops.register_process = register_process_nocpsch;
-		dqm->ops.unregister_process = unregister_process_nocpsch;
+		dqm->ops.register_process = register_process;
+		dqm->ops.unregister_process = unregister_process;
 		dqm->ops.uninitialize = uninitialize_nocpsch;
 		dqm->ops.create_kernel_queue = create_kernel_queue_cpsch;
 		dqm->ops.destroy_kernel_queue = destroy_kernel_queue_cpsch;
@@ -1548,8 +1548,8 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		dqm->ops.destroy_queue = destroy_queue_nocpsch;
 		dqm->ops.update_queue = update_queue;
 		dqm->ops.get_mqd_manager = get_mqd_manager_nocpsch;
-		dqm->ops.register_process = register_process_nocpsch;
-		dqm->ops.unregister_process = unregister_process_nocpsch;
+		dqm->ops.register_process = register_process;
+		dqm->ops.unregister_process = unregister_process;
 		dqm->ops.initialize = initialize_nocpsch;
 		dqm->ops.uninitialize = uninitialize_nocpsch;
 		dqm->ops.set_cache_memory_policy = set_cache_memory_policy;
