@@ -380,7 +380,7 @@ err:
 	return -1;
 }
 
-void radeon_flush_tlb(struct kfd_dev *dev, uint32_t pasid)
+void kfd_flush_tlb(struct kfd_dev *dev, uint32_t pasid)
 {
 	uint8_t vmid;
 	int first_vmid_to_scan = 8;
@@ -396,7 +396,7 @@ void radeon_flush_tlb(struct kfd_dev *dev, uint32_t pasid)
 			if (f2g->get_atc_vmid_pasid_mapping_pasid(
 				dev->kgd, vmid) == pasid) {
 				dev_dbg(kfd_device,
-					"TLB of vmid %u", vmid);
+					"flushing TLB of vmid %u", vmid);
 				f2g->write_vmid_invalidate_request(
 					dev->kgd, vmid);
 				break;

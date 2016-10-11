@@ -312,7 +312,7 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 
 	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
 				 per_device_list) {
-		radeon_flush_tlb(pdd->dev, p->pasid);
+		kfd_flush_tlb(pdd->dev, p->pasid);
 		/* Destroy the GPUVM VM context */
 		if (pdd->vm)
 			pdd->dev->kfd2kgd->destroy_process_vm(
