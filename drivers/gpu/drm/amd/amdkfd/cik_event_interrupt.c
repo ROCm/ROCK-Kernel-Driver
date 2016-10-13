@@ -37,12 +37,34 @@ static bool is_cpc_vm_fault(struct kfd_dev *dev,
 		return true;
 	return false;
 }
+
 static bool cik_event_interrupt_isr(struct kfd_dev *dev,
-					const uint32_t *ih_ring_entry)
+					const uint32_t *ih_ring_entry,
+					uint32_t *patched_ihre,
+					bool *patched_flag)
 {
 	const struct cik_ih_ring_entry *ihre =
 			(const struct cik_ih_ring_entry *)ih_ring_entry;
+	const struct kfd2kgd_calls *f2g = dev->kfd2kgd;
+	struct cik_ih_ring_entry *tmp_ihre =
+			(struct cik_ih_ring_entry *) patched_ihre;
 
+	/* This workaround is due to HW/FW limitation on Hawaii that
+	 * VMID and PASID are not written into ih_ring_entry
+	 */
+	if ((ihre->source_id == CIK_INTSRC_GFX_PAGE_INV_FAULT ||
+		ihre->source_id == CIK_INTSRC_GFX_MEM_PROT_FAULT) &&
+		dev->device_info->asic_family == CHIP_HAWAII) {
+		*patched_flag = true;
+		*tmp_ihre = *ihre;
+
+		tmp_ihre->vmid = f2g->read_vmid_from_vmfault_reg(dev->kgd);
+		tmp_ihre->pasid = f2g->get_atc_vmid_pasid_mapping_pasid(
+						 dev->kgd, tmp_ihre->vmid);
+		return (tmp_ihre->pasid != 0) &&
+			tmp_ihre->vmid >= dev->vm_info.first_vmid_kfd &&
+			tmp_ihre->vmid <= dev->vm_info.last_vmid_kfd;
+	}
 	/* Do not process in ISR, just request it to be forwarded to WQ. */
 	return (ihre->pasid != 0) &&
 		(ihre->source_id == CIK_INTSRC_CP_END_OF_PIPE ||
