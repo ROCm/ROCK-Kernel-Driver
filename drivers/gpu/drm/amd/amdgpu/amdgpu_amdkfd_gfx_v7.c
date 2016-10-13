@@ -148,6 +148,7 @@ static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
 		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 		uint32_t page_table_base);
+static uint32_t read_vmid_from_vmfault_reg(struct kgd_dev *kgd);
 
 /* Because of REG_GET_FIELD() being used, we put this function in the
  * asic specific file.
@@ -205,6 +206,7 @@ static const struct kfd2kgd_calls kfd2kgd = {
 			get_atc_vmid_pasid_mapping_pasid,
 	.get_atc_vmid_pasid_mapping_valid =
 			get_atc_vmid_pasid_mapping_valid,
+	.read_vmid_from_vmfault_reg = read_vmid_from_vmfault_reg,
 	.write_vmid_invalidate_request = write_vmid_invalidate_request,
 	.alloc_memory_of_gpu = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu,
 	.free_memory_of_gpu = amdgpu_amdkfd_gpuvm_free_memory_of_gpu,
@@ -958,3 +960,18 @@ static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 	WREG32(mmVM_CONTEXT8_PAGE_TABLE_BASE_ADDR + vmid - 8, page_table_base);
 }
 
+ /**
+  * read_vmid_from_vmfault_reg - read vmid from register
+  *
+  * adev: amdgpu_device pointer
+  * @vmid: vmid pointer
+  * read vmid from register (CIK).
+  */
+static uint32_t read_vmid_from_vmfault_reg(struct kgd_dev *kgd)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	uint32_t status = RREG32(mmVM_CONTEXT1_PROTECTION_FAULT_STATUS);
+
+	return REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS, VMID);
+}
