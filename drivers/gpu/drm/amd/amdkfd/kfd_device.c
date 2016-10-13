@@ -674,14 +674,19 @@ dqm_start_error:
 /* This is called directly from KGD at ISR. */
 void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 {
+	uint32_t patched_ihre[DIV_ROUND_UP(
+				kfd->device_info->ih_ring_entry_size,
+				sizeof(uint32_t))];
+	bool is_patched = false;
+
 	if (!kfd->init_complete)
 		return;
 
 	spin_lock(&kfd->interrupt_lock);
 
 	if (kfd->interrupts_active
-	    && interrupt_is_wanted(kfd, ih_ring_entry)
-	    && enqueue_ih_ring_entry(kfd, ih_ring_entry))
+	    && interrupt_is_wanted(kfd, ih_ring_entry, patched_ihre, &is_patched)
+	    && enqueue_ih_ring_entry(kfd, is_patched ? patched_ihre : ih_ring_entry))
 		queue_work(kfd->ih_wq, &kfd->interrupt_work);
 
 	spin_unlock(&kfd->interrupt_lock);
