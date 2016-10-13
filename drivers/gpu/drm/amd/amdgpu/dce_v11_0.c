@@ -2611,14 +2611,36 @@ static void dce_v11_0_cursor_reset(struct drm_crtc *crtc)
 	}
 }
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+static void dce_v11_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				    u16 *blue, uint32_t start, uint32_t size)
+{
+	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
+	int end = (start + size > 256) ? 256 : start + size, i;
+
+	/* userspace palettes are always correct as is */
+	for (i = start; i < end; i++) {
+		amdgpu_crtc->lut_r[i] = red[i] >> 6;
+		amdgpu_crtc->lut_g[i] = green[i] >> 6;
+		amdgpu_crtc->lut_b[i] = blue[i] >> 6;
+	}
+	dce_v11_0_crtc_load_lut(crtc);
+}
+#else
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 static int dce_v11_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
 				    u16 *blue, uint32_t size,
 				    struct drm_modeset_acquire_ctx *ctx)
+#else
+static int dce_v11_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				    u16 *blue, uint32_t size)
+#endif
 {
 	dce_v11_0_crtc_load_lut(crtc);
 
 	return 0;
 }
+#endif
 
 static void dce_v11_0_crtc_destroy(struct drm_crtc *crtc)
 {
