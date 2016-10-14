@@ -1725,12 +1725,18 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	vm->last_eviction_counter = atomic64_read(&adev->num_evictions);
 
 	vm->is_kfd_vm = is_kfd_vm;
-	if (is_kfd_vm && adev->pp_enabled) {
+	if (is_kfd_vm) {
 		mutex_lock(&adev->vm_manager.lock);
 
-		if (adev->vm_manager.n_kfd_vms++ == 0)
+		if (adev->vm_manager.n_kfd_vms++ == 0) {
 			/* First KFD VM: enable compute power profile */
-			amdgpu_dpm_switch_power_profile(adev, PP_COMPUTE_PROFILE);
+			if (adev->pp_enabled)
+				amdgpu_dpm_switch_power_profile(adev,
+						PP_COMPUTE_PROFILE);
+			else if (adev->pm.funcs->switch_power_profile)
+				adev->pm.funcs->switch_power_profile(adev,
+						PP_COMPUTE_PROFILE);
+		}
 
 		mutex_unlock(&adev->vm_manager.lock);
 	}
@@ -1761,14 +1767,20 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	struct amdgpu_bo_va_mapping *mapping, *tmp;
 	int i;
 
-	if (vm->is_kfd_vm && adev->pp_enabled) {
+	if (vm->is_kfd_vm) {
 		mutex_lock(&adev->vm_manager.lock);
 
 		WARN(adev->vm_manager.n_kfd_vms == 0, "Unbalanced number of KFD VMs");
 
-		if (--adev->vm_manager.n_kfd_vms == 0)
+		if (--adev->vm_manager.n_kfd_vms == 0) {
 			/* Last KFD VM: enable graphics power profile */
-			amdgpu_dpm_switch_power_profile(adev, PP_GFX_PROFILE);
+			if (adev->pp_enabled)
+				amdgpu_dpm_switch_power_profile(adev,
+						PP_GFX_PROFILE);
+			else if (adev->pm.funcs->switch_power_profile)
+				adev->pm.funcs->switch_power_profile(adev,
+						PP_GFX_PROFILE);
+		}
 
 		mutex_unlock(&adev->vm_manager.lock);
 	}
