@@ -2959,6 +2959,7 @@ static int fiji_save_default_power_profile(struct pp_hwmgr *hwmgr)
 	struct fiji_hwmgr *data = (struct fiji_hwmgr *)(hwmgr->backend);
 	struct SMU73_Discrete_GraphicsLevel *levels =
 				data->smc_state_table.GraphicsLevel;
+	unsigned min_level = 1;
 
 	hwmgr->default_gfx_power_profile.activity_threshold =
 			be16_to_cpu(levels[0].ActivityLevel);
@@ -2969,10 +2970,21 @@ static int fiji_save_default_power_profile(struct pp_hwmgr *hwmgr)
 	hwmgr->default_compute_power_profile = hwmgr->default_gfx_power_profile;
 	hwmgr->default_compute_power_profile.type = PP_COMPUTE_PROFILE;
 
-	/* Workaround for SDMA instability: disable lowest SCLK DPM state */
+	/* Workaround compute SDMA instability: disable lowest SCLK
+	 * DPM level. Optimize compute power profile: Use only highest
+	 * 2 power levels (if more than 2 are available), Hysteresis:
+	 * 0ms up, 5ms down
+	 */
+	if (data->smc_state_table.GraphicsDpmLevelCount > 2)
+		min_level = data->smc_state_table.GraphicsDpmLevelCount - 2;
+	else if (data->smc_state_table.GraphicsDpmLevelCount == 2)
+		min_level = 1;
+	else
+		min_level = 0;
 	hwmgr->default_compute_power_profile.min_sclk =
-			be32_to_cpu(levels[1].SclkFrequency);
-	/* TODO: Optimize hysteresis and threshold for compute workloads */
+			be32_to_cpu(levels[min_level].SclkFrequency);
+	hwmgr->default_compute_power_profile.up_hyst = 0;
+	hwmgr->default_compute_power_profile.down_hyst = 5;
 
 	hwmgr->gfx_power_profile = hwmgr->default_gfx_power_profile;
 	hwmgr->compute_power_profile = hwmgr->default_compute_power_profile;
