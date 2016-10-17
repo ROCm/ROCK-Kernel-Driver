@@ -26,24 +26,6 @@ config MESSAGE_LOGLEVEL_DEFAULT
 	  that are auditing their logs closely may want to set it to a lower
 	  priority.
 
-config UNWIND_INFO
-	bool "Compile the kernel with frame unwind information"
-	depends on !IA64 && !PARISC && !ARM
-	depends on !MODULES || !(MIPS || PPC || SUPERH || V850)
-	help
-	  If you say Y here the resulting kernel image will be slightly larger
-	  but not slower, and it will give very useful debugging information.
-	  If you don't debug the kernel, you can say N, but we may not be able
-	  to solve problems without frame unwind information or frame pointers.
-
-config STACK_UNWIND
-	bool "Stack unwind support"
-	depends on UNWIND_INFO
-	depends on X86
-	help
-	  This enables more precise stack traces, omitting all unrelated
-	  occurrences of pointers into kernel code from the dump.
-
 config BOOT_PRINTK_DELAY
 	bool "Delay each boot printk message by N milliseconds"
 	depends on DEBUG_KERNEL && PRINTK && GENERIC_CALIBRATE_DELAY
@@ -323,7 +305,7 @@ config DEBUG_SECTION_MISMATCH
 	    a larger kernel).
 	  - Run the section mismatch analysis for each module/built-in.o file.
 	    When we run the section mismatch analysis on vmlinux.o, we
-	    lose valueble information about where the mismatch was
+	    lose valuable information about where the mismatch was
 	    introduced.
 	    Running the analysis for each module/built-in.o file
 	    tells where the mismatch happens much closer to the
@@ -1685,8 +1667,7 @@ config FAULT_INJECTION_STACKTRACE_FILTER
 	depends on FAULT_INJECTION_DEBUG_FS && STACKTRACE_SUPPORT
 	depends on !X86_64
 	select STACKTRACE
-	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !X86 && !ARM_UNWIND && !ARC && !SCORE
-	select UNWIND_INFO if X86 && !FRAME_POINTER
+	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !ARM_UNWIND && !ARC && !SCORE
 	help
 	  Provide stacktrace filter for fault-injection capabilities
 
@@ -1695,8 +1676,7 @@ config LATENCYTOP
 	depends on DEBUG_KERNEL
 	depends on STACKTRACE_SUPPORT
 	depends on PROC_FS
-	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !X86 && !ARM_UNWIND && !ARC
-	select UNWIND_INFO if X86 && !FRAME_POINTER
+	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !ARM_UNWIND && !ARC
 	select KALLSYMS
 	select KALLSYMS_ALL
 	select STACKTRACE
@@ -1876,15 +1856,6 @@ config PROVIDE_OHCI1394_DMA_INIT
 	  in charge of the OHCI-1394 controllers should be used instead.
 
 	  See Documentation/debugging-via-ohci1394.txt for more information.
-
-config BUILD_DOCSRC
-	bool "Build targets in Documentation/ tree"
-	depends on HEADERS_CHECK
-	help
-	  This option attempts to build objects from the source files in the
-	  kernel Documentation/ tree.
-
-	  Say N if you are unsure.
 
 config DMA_API_DEBUG
 	bool "Enable debugging of DMA-API usage"

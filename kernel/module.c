@@ -45,7 +45,6 @@
 #include <linux/device.h>
 #include <linux/string.h>
 #include <linux/mutex.h>
-#include <linux/unwind.h>
 #include <linux/rculist.h>
 #include <asm/uaccess.h>
 #include <asm/cacheflush.h>
@@ -326,7 +325,7 @@ struct load_info {
 	unsigned long mod_kallsyms_init_off;
 #endif
 	struct {
-		unsigned int sym, str, mod, vers, info, pcpu, unwind;
+		unsigned int sym, str, mod, vers, info, pcpu;
 	} index;
 };
 
@@ -745,27 +744,6 @@ bool is_module_percpu_address(unsigned long addr)
 }
 
 #endif /* CONFIG_SMP */
-
-static unsigned int find_unwind(struct load_info *info)
-{
-	int section = 0;
-#ifdef ARCH_UNWIND_SECTION_NAME
-	section = find_sec(info, ARCH_UNWIND_SECTION_NAME);
-	if (section)
-		info->sechdrs[section].sh_flags |= SHF_ALLOC;
-#endif
-	return section;
-}
-
-static void add_unwind_table(struct module *mod, struct load_info *info)
-{
-	int index = info->index.unwind;
-
-	/* Size of section 0 is 0, so this is ok if there is no unwind info. */
-	mod->unwind_info = unwind_add_table(mod,
-					  (void *)info->sechdrs[index].sh_addr,
-					  info->sechdrs[index].sh_size);
-}
 
 #define MODINFO_ATTR(field)	\
 static void setup_modinfo_##field(struct module *mod, const char *s)  \
@@ -1187,6 +1165,8 @@ static size_t module_flags_taint(struct module *mod, char *buf)
 		buf[l++] = 'C';
 	if (mod->taints & (1 << TAINT_UNSIGNED_MODULE))
 		buf[l++] = 'E';
+	if (mod->taints & (1 << TAINT_LIVEPATCH))
+		buf[l++] = 'K';
 #ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 	if (mod->taints & (1 << TAINT_NO_SUPPORT))
 		buf[l++] = 'N';
@@ -2200,8 +2180,6 @@ static void free_module(struct module *mod)
 	/* Remove dynamic debug info */
 	ddebug_remove_module(mod->name);
 
-	unwind_remove_table(mod->unwind_info, false);
-
 	/* Arch-specific cleanup. */
 	module_arch_cleanup(mod);
 
@@ -2896,14 +2874,17 @@ static int copy_chunked_from_user(void *dst, const void __user *usrc, unsigned l
 }
 
 #ifdef CONFIG_LIVEPATCH
-static int find_livepatch_modinfo(struct module *mod, struct load_info *info)
+static int check_modinfo_livepatch(struct module *mod, struct load_info *info)
 {
-	mod->klp = get_modinfo(info, "livepatch") ? true : false;
+	if (get_modinfo(info, "livepatch")) {
+		mod->klp = true;
+		add_taint_module(mod, TAINT_LIVEPATCH, LOCKDEP_STILL_OK);
+	}
 
 	return 0;
 }
 #else /* !CONFIG_LIVEPATCH */
-static int find_livepatch_modinfo(struct module *mod, struct load_info *info)
+static int check_modinfo_livepatch(struct module *mod, struct load_info *info)
 {
 	if (get_modinfo(info, "livepatch")) {
 		pr_err("%s: module is marked as livepatch module, but livepatch support is disabled",
@@ -3034,8 +3015,6 @@ static struct module *setup_load_info(struct load_info *info, int flags)
 
 	info->index.pcpu = find_pcpusec(info);
 
-	info->index.unwind = find_unwind(info);
-
 	/* Check module struct version now, before we try to use module. */
 	if (!check_modstruct_version(info->sechdrs, info->index.vers, mod))
 		return ERR_PTR(-ENOEXEC);
@@ -3075,7 +3054,7 @@ static int check_modinfo(struct module *mod, struct load_info *info, int flags)
 			"is unknown, you have been warned.\n", mod->name);
 	}
 
-	err = find_livepatch_modinfo(mod, info);
+	err = check_modinfo_livepatch(mod, info);
 	if (err)
 		return err;
 
@@ -3525,7 +3504,6 @@ static noinline int do_init_module(struct module *mod)
 	/* Drop initial reference. */
 	module_put(mod);
 	trim_init_extable(mod);
-	unwind_remove_table(mod->unwind_info, true);
 #ifdef CONFIG_KALLSYMS
 	/* Switch to core kallsyms now init is done: kallsyms may be walking! */
 	rcu_assign_pointer(mod->kallsyms, &mod->core_kallsyms);
@@ -3798,9 +3776,6 @@ static int load_module(struct load_info *info, const char __user *uargs,
 		if (err < 0)
 			goto sysfs_cleanup;
 	}
-
-	/* Initialize unwind table */
-	add_unwind_table(mod, info);
 
 	/* Get rid of temporary copy. */
 	free_copy(info);

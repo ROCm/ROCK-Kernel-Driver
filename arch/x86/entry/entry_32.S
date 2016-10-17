@@ -44,6 +44,7 @@
 #include <asm/alternative-asm.h>
 #include <asm/asm.h>
 #include <asm/smap.h>
+#include <asm/export.h>
 
 	.section .entry.text, "ax"
 
@@ -204,67 +205,70 @@
 	POP_GS_EX
 .endm
 
+/*
+ * %eax: prev task
+ * %edx: next task
+ */
+ENTRY(__switch_to_asm)
+	/*
+	 * Save callee-saved registers
+	 * This must match the order in struct inactive_task_frame
+	 */
+	pushl	%ebp
+	pushl	%ebx
+	pushl	%edi
+	pushl	%esi
+
+	/* switch stack */
+	movl	%esp, TASK_threadsp(%eax)
+	movl	TASK_threadsp(%edx), %esp
+
+#ifdef CONFIG_CC_STACKPROTECTOR
+	movl	TASK_stack_canary(%edx), %ebx
+	movl	%ebx, PER_CPU_VAR(stack_canary)+stack_canary_offset
+#endif
+
+	/* restore callee-saved registers */
+	popl	%esi
+	popl	%edi
+	popl	%ebx
+	popl	%ebp
+
+	jmp	__switch_to
+END(__switch_to_asm)
+
+/*
+ * A newly forked process directly context switches into this address.
+ *
+ * eax: prev task we switched from
+ * ebx: kernel thread func (NULL for user thread)
+ * edi: kernel thread arg
+ */
 ENTRY(ret_from_fork)
 	pushl	%eax
 	call	schedule_tail
 	popl	%eax
 
+	testl	%ebx, %ebx
+	jnz	1f		/* kernel threads are uncommon */
+
+2:
 	/* When we fork, we trace the syscall return in the child, too. */
 	movl    %esp, %eax
 	call    syscall_return_slowpath
 	jmp     restore_all
-END(ret_from_fork)
 
-#ifdef CONFIG_STACK_UNWIND
-ENTRY(arch_unwind_init_running)
-	movl	4(%esp), %edx
-	movl	(%esp), %ecx
-	leal	4(%esp), %eax
-	movl	%ebx, PT_EBX(%edx)
-	xorl	%ebx, %ebx
-	movl	%ebx, PT_ECX(%edx)
-	movl	%ebx, PT_EDX(%edx)
-	movl	%esi, PT_ESI(%edx)
-	movl	%edi, PT_EDI(%edx)
-	movl	%ebp, PT_EBP(%edx)
-	movl	%ebx, PT_EAX(%edx)
-	movl	$__USER_DS, PT_DS(%edx)
-	movl	$__USER_DS, PT_ES(%edx)
-	movl	$__KERNEL_PERCPU, PT_FS(%edx)
-	movl	$__KERNEL_STACK_CANARY, PT_GS(%edx)
-	movl	%eax, PT_OLDESP(%edx)
-	movl	16(%esp), %eax
-	movl	%ebx, PT_ORIG_EAX(%edx)
-	movl	%ecx, PT_EIP(%edx)
-	movl	12(%esp), %ecx
-	movl	$__KERNEL_CS, PT_CS(%edx)
-	movl	%eax, 12(%esp)
-	movl	8(%esp), %eax
-	movl	%ecx, 8(%esp)
-	movl	%ebx, PT_EFLAGS(%edx)
-	movl	PT_EBX(%edx), %ebx
-	movl	$__KERNEL_DS, PT_OLDSS(%edx)
-	jmpl	*%eax
-ENDPROC(arch_unwind_init_running)
-#endif
-
-ENTRY(ret_from_kernel_thread)
-	pushl	%eax
-	call	schedule_tail
-	popl	%eax
-	movl	PT_EBP(%esp), %eax
-	call	*PT_EBX(%esp)
-	movl	$0, PT_EAX(%esp)
-
+	/* kernel thread */
+1:	movl	%edi, %eax
+	call	*%ebx
 	/*
-	 * Kernel threads return to userspace as if returning from a syscall.
-	 * We should check whether anything actually uses this path and, if so,
-	 * consider switching it over to ret_from_fork.
+	 * A kernel thread is allowed to return here after successfully
+	 * calling do_execve().  Exit to userspace to complete the execve()
+	 * syscall.
 	 */
-	movl    %esp, %eax
-	call    syscall_return_slowpath
-	jmp     restore_all
-ENDPROC(ret_from_kernel_thread)
+	movl	$0, PT_EAX(%esp)
+	jmp	2b
+END(ret_from_fork)
 
 /*
  * Return to user mode is not as complex as all this looks,
@@ -988,6 +992,7 @@ trace:
 	jmp	ftrace_stub
 END(mcount)
 #endif /* CONFIG_DYNAMIC_FTRACE */
+EXPORT_SYMBOL(mcount)
 #endif /* CONFIG_FUNCTION_TRACER */
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER

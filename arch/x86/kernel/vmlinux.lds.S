@@ -97,6 +97,7 @@ SECTIONS
 		_stext = .;
 		TEXT_TEXT
 		SCHED_TEXT
+		CPUIDLE_TEXT
 		LOCK_TEXT
 		KPROBES_TEXT
 		ENTRY_TEXT
@@ -343,9 +344,7 @@ SECTIONS
 	/* Sections to be discarded */
 	DISCARDS
 	/DISCARD/ : {
-#ifndef CONFIG_UNWIND_INFO
 		*(.eh_frame)
-#endif
 		*(__func_stack_frame_non_standard)
 	}
 }

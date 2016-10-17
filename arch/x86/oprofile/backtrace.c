@@ -16,40 +16,7 @@
 
 #include <asm/ptrace.h>
 #include <asm/stacktrace.h>
-
-static void backtrace_warning_symbol(void *data, char *msg,
-				     unsigned long symbol)
-{
-	/* Ignore warnings */
-}
-
-static void backtrace_warning(void *data, char *msg)
-{
-	/* Ignore warnings */
-}
-
-static int backtrace_stack(void *data, char *name)
-{
-	/* Yes, we want all stacks */
-	return 0;
-}
-
-static int backtrace_address(void *data, unsigned long addr, int reliable)
-{
-	unsigned int *depth = data;
-
-	if ((*depth)--)
-		oprofile_add_trace(addr);
-	return 0;
-}
-
-static struct stacktrace_ops backtrace_ops = {
-	.warning	= backtrace_warning,
-	.warning_symbol	= backtrace_warning_symbol,
-	.stack		= backtrace_stack,
-	.address	= backtrace_address,
-	.walk_stack	= print_context_stack,
-};
+#include <asm/unwind.h>
 
 #ifdef CONFIG_COMPAT
 static struct stack_frame_ia32 *
@@ -126,10 +93,29 @@ x86_backtrace(struct pt_regs * const regs, unsigned int depth)
 	struct stack_frame *head = (struct stack_frame *)frame_pointer(regs);
 
 	if (!user_mode(regs)) {
-		unsigned long stack = kernel_stack_pointer(regs);
-		if (depth)
-			dump_trace(NULL, regs, (unsigned long *)stack, 0,
-				   &backtrace_ops, &depth);
+		struct unwind_state state;
+		unsigned long addr;
+
+		if (!depth)
+			return;
+
+		oprofile_add_trace(regs->ip);
+
+		if (!--depth)
+			return;
+
+		for (unwind_start(&state, current, regs, NULL);
+		     !unwind_done(&state); unwind_next_frame(&state)) {
+			addr = unwind_get_return_address(&state);
+			if (!addr)
+				break;
+
+			oprofile_add_trace(addr);
+
+			if (!--depth)
+				break;
+		}
+
 		return;
 	}
 

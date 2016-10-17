@@ -521,7 +521,8 @@ static void acpi_thermal_check(void *data)
 	if (!tz->tz_enabled)
 		return;
 
-	thermal_zone_device_update(tz->thermal_zone);
+	thermal_zone_device_update(tz->thermal_zone,
+				   THERMAL_EVENT_UNSPECIFIED);
 }
 
 /* sys I/F for generic thermal sysfs support */
@@ -1145,7 +1146,8 @@ static int acpi_thermal_set_polling(struct acpi_thermal *tz, int seconds)
        tz->thermal_zone->polling_delay = seconds * 1000;
 
        if (tz->tz_enabled)
-	       thermal_zone_device_update(tz->thermal_zone);
+	       thermal_zone_device_update(tz->thermal_zone,
+					  THERMAL_EVENT_UNSPECIFIED);
 
        ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 			 "Polling frequency set to %lu seconds\n",

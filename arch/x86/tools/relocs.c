@@ -58,7 +58,6 @@ static const char * const sym_regex_kernel[S_NSYMTYPES] = {
 	"(__iommu_table|__apicdrivers|__smp_locks)(|_end)|"
 	"__(start|end)_pci_.*|"
 	"__(start|end)_builtin_fw|"
-	"__(start|end)_unwind(|_hdr)|"
 	"__(start|stop)___ksymtab(|_gpl|_unused|_unused_gpl|_gpl_future)|"
 	"__(start|stop)___kcrctab(|_gpl|_unused|_unused_gpl|_gpl_future)|"
 	"__(start|stop)___param|"
