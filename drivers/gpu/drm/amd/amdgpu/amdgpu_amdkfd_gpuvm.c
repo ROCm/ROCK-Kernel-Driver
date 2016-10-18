@@ -650,13 +650,12 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 		ctx->n_vms++;
 	}
 
-	if (ctx->n_vms == 0)
-		return 0;
-
-	ctx->vm_pd = kzalloc(sizeof(struct amdgpu_bo_list_entry)
+	if (ctx->n_vms != 0) {
+		ctx->vm_pd = kzalloc(sizeof(struct amdgpu_bo_list_entry)
 			      * ctx->n_vms, GFP_KERNEL);
-	if (ctx->vm_pd == NULL)
-		return -ENOMEM;
+		if (ctx->vm_pd == NULL)
+			return -ENOMEM;
+	}
 
 	ctx->kfd_bo.robj = bo;
 	ctx->kfd_bo.priority = 0;
@@ -702,9 +701,8 @@ static void unreserve_bo_and_vms(struct bo_vm_reservation_context *ctx,
 
 	if (ctx->reserved)
 		ttm_eu_backoff_reservation(&ctx->ticket, &ctx->list);
-	if (ctx->vm_pd) {
-		kfree(ctx->vm_pd);
-	}
+	kfree(ctx->vm_pd);
+
 	amdgpu_sync_free(&ctx->sync);
 	ctx->reserved = false;
 	ctx->vm_pd = NULL;
