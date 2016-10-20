@@ -140,10 +140,17 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 		m->cp_hqd_iq_rptr = 1;
 
 	if (q->tba_addr) {
-		m->cp_hqd_persistent_state |=
-			(1 << CP_HQD_PERSISTENT_STATE__QSWITCH_MODE__SHIFT);
+		m->compute_tba_lo = lower_32_bits(q->tba_addr >> 8);
+		m->compute_tba_hi = upper_32_bits(q->tba_addr >> 8);
+		m->compute_tma_lo = lower_32_bits(q->tma_addr >> 8);
+		m->compute_tma_hi = upper_32_bits(q->tma_addr >> 8);
 		m->compute_pgm_rsrc2 |=
 			(1 << COMPUTE_PGM_RSRC2__TRAP_PRESENT__SHIFT);
+	}
+
+	if (mm->dev->cwsr_enabled) {
+		m->cp_hqd_persistent_state |=
+			(1 << CP_HQD_PERSISTENT_STATE__QSWITCH_MODE__SHIFT);
 		m->cp_hqd_ctx_save_base_addr_lo =
 			lower_32_bits(q->ctx_save_restore_area_address);
 		m->cp_hqd_ctx_save_base_addr_hi =
@@ -152,10 +159,6 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 		m->cp_hqd_cntl_stack_size = q->ctl_stack_size;
 		m->cp_hqd_cntl_stack_offset = q->ctl_stack_size;
 		m->cp_hqd_wg_state_offset = q->ctl_stack_size;
-		m->compute_tba_lo = lower_32_bits(q->tba_addr >> 8);
-		m->compute_tba_hi = upper_32_bits(q->tba_addr >> 8);
-		m->compute_tma_lo = lower_32_bits(q->tma_addr >> 8);
-		m->compute_tma_hi = upper_32_bits(q->tma_addr >> 8);
 	}
 
 	*mqd = m;
@@ -213,8 +216,15 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 			3 << CP_HQD_IB_CONTROL__MIN_IB_AVAIL_SIZE__SHIFT |
 			mtype << CP_HQD_IB_CONTROL__MTYPE__SHIFT;
 
-	m->cp_hqd_eop_control |=
-		ffs(q->eop_ring_buffer_size / sizeof(unsigned int)) - 1 - 1;
+	/*
+	 * HW does not clamp this field correctly. Maximum EOP queue size
+	 * is constrained by per-SE EOP done signal count, which is 8-bit.
+	 * Limit is 0xFF EOP entries (= 0x7F8 dwords). CP will not submit
+	 * more than (EOP entry count - 1) so a queue size of 0x800 dwords
+	 * is safe, giving a maximum field value of 0xA.
+	 */
+	m->cp_hqd_eop_control |= min(0xA,
+		ffs(q->eop_ring_buffer_size / sizeof(unsigned int)) - 1 - 1);
 	m->cp_hqd_eop_base_addr_lo =
 			lower_32_bits(q->eop_ring_buffer_address >> 8);
 	m->cp_hqd_eop_base_addr_hi =
@@ -229,7 +239,7 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 		m->cp_hqd_pq_control |= CP_HQD_PQ_CONTROL__NO_UPDATE_RPTR_MASK |
 				2 << CP_HQD_PQ_CONTROL__SLOT_BASED_WPTR__SHIFT;
 	}
-	if (q->tba_addr)
+	if (mm->dev->cwsr_enabled)
 		m->cp_hqd_ctx_save_control =
 			atc_bit << CP_HQD_CTX_SAVE_CONTROL__ATC__SHIFT |
 			mtype << CP_HQD_CTX_SAVE_CONTROL__MTYPE__SHIFT;

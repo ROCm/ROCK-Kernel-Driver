@@ -25,6 +25,7 @@
 
 #include "amdgpu_atombios.h"
 #include "ppsmc.h"
+#include "amd_powerplay.h"
 
 #define SMU__NUM_SCLK_DPM_STATE  8
 #define SMU__NUM_MCLK_DPM_LEVELS 6
@@ -295,6 +296,13 @@ struct ci_power_info {
 	bool fan_is_controlled_by_smc;
 	u32 t_min;
 	u32 fan_ctrl_default_mode;
+
+	/* power profile */
+	struct pp_profile gfx_power_profile;
+	struct pp_profile compute_power_profile;
+	struct pp_profile default_gfx_power_profile;
+	struct pp_profile default_compute_power_profile;
+	enum pp_profile_type current_power_profile;
 };
 
 #define CISLANDS_VOLTAGE_CONTROL_NONE                   0x0

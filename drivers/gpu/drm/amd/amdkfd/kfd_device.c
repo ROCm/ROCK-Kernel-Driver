@@ -43,7 +43,8 @@ static const struct kfd_device_info kaveri_device_info = {
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
-	.is_need_iommu_device = true
+	.is_need_iommu_device = true,
+	.supports_cwsr = false,
 };
 
 static const struct kfd_device_info hawaii_device_info = {
@@ -55,7 +56,8 @@ static const struct kfd_device_info hawaii_device_info = {
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
-	.is_need_iommu_device = false
+	.is_need_iommu_device = false,
+	.supports_cwsr = false,
 };
 
 static const struct kfd_device_info carrizo_device_info = {
@@ -67,7 +69,8 @@ static const struct kfd_device_info carrizo_device_info = {
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
-	.is_need_iommu_device = true
+	.is_need_iommu_device = true,
+	.supports_cwsr = true,
 };
 
 static const struct kfd_device_info tonga_device_info = {
@@ -78,7 +81,8 @@ static const struct kfd_device_info tonga_device_info = {
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
-	.is_need_iommu_device = false
+	.is_need_iommu_device = false,
+	.supports_cwsr = false,
 };
 
 static const struct kfd_device_info fiji_device_info = {
@@ -89,7 +93,8 @@ static const struct kfd_device_info fiji_device_info = {
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
-	.is_need_iommu_device = false
+	.is_need_iommu_device = false,
+	.supports_cwsr = true,
 };
 
 static const struct kfd_device_info polaris10_device_info = {
@@ -100,7 +105,8 @@ static const struct kfd_device_info polaris10_device_info = {
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
-	.is_need_iommu_device = false
+	.is_need_iommu_device = false,
+	.supports_cwsr = true,
 };
 
 static const struct kfd_device_info polaris11_device_info = {
@@ -111,7 +117,8 @@ static const struct kfd_device_info polaris11_device_info = {
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
-	.is_need_iommu_device = false
+	.is_need_iommu_device = false,
+	.supports_cwsr = true,
 };
 
 struct kfd_deviceid {
@@ -321,10 +328,8 @@ static int kfd_cwsr_init(struct kfd_dev *kfd)
 {
 	/*
 	 * Initialize the CWSR required memory for TBA and TMA
-	 * only support CWSR on VI and up with FW version >=625.
 	 */
-	if (cwsr_enable &&
-		(kfd->mec_fw_version >= KFD_CWSR_CZ_FW_VER)) {
+	if (cwsr_enable && kfd->device_info->supports_cwsr) {
 		void *cwsr_addr = NULL;
 		unsigned int size = sizeof(cwsr_trap_carrizo_hex);
 
@@ -669,14 +674,19 @@ dqm_start_error:
 /* This is called directly from KGD at ISR. */
 void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 {
+	uint32_t patched_ihre[DIV_ROUND_UP(
+				kfd->device_info->ih_ring_entry_size,
+				sizeof(uint32_t))];
+	bool is_patched = false;
+
 	if (!kfd->init_complete)
 		return;
 
 	spin_lock(&kfd->interrupt_lock);
 
 	if (kfd->interrupts_active
-	    && interrupt_is_wanted(kfd, ih_ring_entry)
-	    && enqueue_ih_ring_entry(kfd, ih_ring_entry))
+	    && interrupt_is_wanted(kfd, ih_ring_entry, patched_ihre, &is_patched)
+	    && enqueue_ih_ring_entry(kfd, is_patched ? patched_ihre : ih_ring_entry))
 		queue_work(kfd->ih_wq, &kfd->interrupt_work);
 
 	spin_unlock(&kfd->interrupt_lock);

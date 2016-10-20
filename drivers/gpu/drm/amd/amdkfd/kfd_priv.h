@@ -175,7 +175,8 @@ enum asic_family_type {
 			   (chip) == CHIP_HAWAII)
 
 struct kfd_event_interrupt_class {
-	bool (*interrupt_isr)(struct kfd_dev *dev, const uint32_t *ih_ring_entry);
+	bool (*interrupt_isr)(struct kfd_dev *dev, const uint32_t *ih_ring_entry,
+				uint32_t *patched_ihre, bool *patched_flag);
 	void (*interrupt_wq)(struct kfd_dev *dev, const uint32_t *ih_ring_entry);
 };
 
@@ -188,6 +189,7 @@ struct kfd_device_info {
 	uint8_t num_of_watch_points;
 	uint16_t mqd_size_aligned;
 	bool is_need_iommu_device;
+	bool supports_cwsr;
 };
 
 struct kfd_mem_obj {
@@ -748,6 +750,7 @@ struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid);
 
 /* kfd dgpu memory */
 int kfd_map_memory_to_gpu(void *mem, struct kfd_process_device *pdd);
+int kfd_unmap_memory_from_gpu(void *mem, struct kfd_process_device *pdd);
 
 /* Process device data iterator */
 struct kfd_process_device *kfd_get_first_process_device_data(struct kfd_process *p);
@@ -803,7 +806,9 @@ int kfd_interrupt_init(struct kfd_dev *dev);
 void kfd_interrupt_exit(struct kfd_dev *dev);
 void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry);
 bool enqueue_ih_ring_entry(struct kfd_dev *kfd,	const void *ih_ring_entry);
-bool interrupt_is_wanted(struct kfd_dev *dev, const uint32_t *ih_ring_entry);
+bool interrupt_is_wanted(struct kfd_dev *dev,
+				const uint32_t *ih_ring_entry,
+				uint32_t *patched_ihre, bool *flag);
 
 /* Power Management */
 void kgd2kfd_suspend(struct kfd_dev *kfd);
@@ -951,7 +956,7 @@ void kfd_free_signal_page_dgpu(struct kfd_process *p, uint64_t handle);
 void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 				struct kfd_vm_fault_info *info);
 
-void radeon_flush_tlb(struct kfd_dev *dev, uint32_t pasid);
+void kfd_flush_tlb(struct kfd_dev *dev, uint32_t pasid);
 
 int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 

@@ -1622,6 +1622,14 @@ struct amdgpu_dpm_funcs {
 	int (*set_sclk_od)(struct amdgpu_device *adev, uint32_t value);
 	int (*get_mclk_od)(struct amdgpu_device *adev);
 	int (*set_mclk_od)(struct amdgpu_device *adev, uint32_t value);
+	int (*reset_power_profile_state)(struct amdgpu_device *adev,
+			struct pp_profile *request);
+	int (*get_power_profile_state)(struct amdgpu_device *adev,
+			struct pp_profile *query);
+	int (*set_power_profile_state)(struct amdgpu_device *adev,
+			struct pp_profile *request);
+	int (*switch_power_profile)(struct amdgpu_device *adev,
+			enum pp_profile_type type);
 };
 
 struct amdgpu_dpm {

@@ -214,7 +214,6 @@ static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
 	}
 
 	bo_va_entry->kgd_dev = (void *)adev;
-	bo_va_entry->is_mapped = false;
 	list_add(&bo_va_entry->bo_list, list_bo_va);
 
 	if (p_bo_va_entry)
@@ -661,13 +660,12 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 		ctx->n_vms++;
 	}
 
-	if (ctx->n_vms == 0)
-		return 0;
-
-	ctx->vm_pd = kzalloc(sizeof(struct amdgpu_bo_list_entry)
+	if (ctx->n_vms != 0) {
+		ctx->vm_pd = kzalloc(sizeof(struct amdgpu_bo_list_entry)
 			      * ctx->n_vms, GFP_KERNEL);
-	if (ctx->vm_pd == NULL)
-		return -ENOMEM;
+		if (ctx->vm_pd == NULL)
+			return -ENOMEM;
+	}
 
 	ctx->kfd_bo.robj = bo;
 	ctx->kfd_bo.priority = 0;
@@ -713,9 +711,8 @@ static void unreserve_bo_and_vms(struct bo_vm_reservation_context *ctx,
 
 	if (ctx->reserved)
 		ttm_eu_backoff_reservation(&ctx->ticket, &ctx->list);
-	if (ctx->vm_pd) {
-		kfree(ctx->vm_pd);
-	}
+	kfree(ctx->vm_pd);
+
 	amdgpu_sync_free(&ctx->sync);
 	ctx->reserved = false;
 	ctx->vm_pd = NULL;
@@ -1167,6 +1164,22 @@ bo_reserve_failed:
 	return ret;
 }
 
+static u64 get_vm_pd_gpu_offset(void *vm)
+{
+	struct amdgpu_vm *avm = (struct amdgpu_vm *) vm;
+	u64 offset;
+
+	BUG_ON(avm == NULL);
+
+	amdgpu_bo_reserve(avm->page_directory, false);
+
+	offset = amdgpu_bo_gpu_offset(avm->page_directory);
+
+	amdgpu_bo_unreserve(avm->page_directory);
+
+	return offset;
+}
+
 int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 					  void *master_vm)
 {
@@ -1225,7 +1238,7 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 		pr_err("amdgpu: Failed to amdgpu_vm_clear_freed\n");
 
 	pr_debug("amdgpu: created process vm with address 0x%llx\n",
-			amdgpu_bo_gpu_offset(new_vm->base.page_directory));
+			get_vm_pd_gpu_offset(&new_vm->base));
 
 	return ret;
 
@@ -1265,12 +1278,7 @@ void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 
 uint32_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm)
 {
-	struct amdgpu_vm *avm = (struct amdgpu_vm *) vm;
-
-	BUG_ON(avm == NULL);
-
-	return amdgpu_bo_gpu_offset(avm->page_directory)
-			>> AMDGPU_GPU_PAGE_SHIFT;
+	return get_vm_pd_gpu_offset(vm) >> AMDGPU_GPU_PAGE_SHIFT;
 }
 
 int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
@@ -1797,14 +1805,16 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 		adev = (struct amdgpu_device *)entry->kgd_dev;
 
 		if (unlikely(!have_pages)) {
-			entry->is_mapped = false;
+			pr_err("get_user_pages failed. Probably userptr is freed. %d\n",
+				ret);
+			entry->map_fail = true;
 			continue;
 		}
 
 		r = amdgpu_amdkfd_bo_validate(mem->bo, domain, true);
 		if (unlikely(r != 0)) {
 			pr_err("Failed to validate BO\n");
-			entry->is_mapped = false;
+			entry->map_fail = true;
 			if (ret == 0)
 				ret = r;
 			continue;
@@ -1814,7 +1824,7 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 				    &ctx.sync);
 		if (unlikely(r != 0)) {
 			pr_err("Failed to map BO to gpuvm\n");
-			entry->is_mapped = false;
+			entry->map_fail = true;
 			if (ret == 0)
 				ret = r;
 		}
@@ -1833,10 +1843,19 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 		if (!entry->is_mapped)
 			continue;
 
+		/* Mapping failed. To be in a consistent state, mark the
+		 * buffer as unmapped, but state of the buffer will be
+		 * not evicted. A vm fault will generated if user space tries
+		 * to access this buffer.
+		 */
+		if (entry->map_fail) {
+			entry->is_mapped = false;
+			mem->mapped_to_gpu_memory--;
+		}
 		adev = (struct amdgpu_device *)entry->kgd_dev;
 
 		r = kgd2kfd->resume_mm(adev->kfd, mm);
-		if (ret != 0) {
+		if (r != 0) {
 			pr_err("Failed to resume KFD\n");
 			if (ret == 0)
 				ret = r;

@@ -39,6 +39,7 @@ struct kfd_bo_va_list {
 	struct amdgpu_bo_va *bo_va;
 	void *kgd_dev;
 	bool is_mapped;
+	bool map_fail;
 };
 
 struct kgd_mem {

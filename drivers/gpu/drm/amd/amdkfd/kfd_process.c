@@ -75,11 +75,11 @@ void kfd_process_destroy_wq(void)
 	}
 }
 
-static void kfd_process_free_gpuvm(struct kfd_dev *kdev, struct kgd_mem *mem,
-				void *vm)
+static void kfd_process_free_gpuvm(struct kgd_mem *mem,
+			struct kfd_process_device *pdd)
 {
-	kdev->kfd2kgd->unmap_memory_to_gpu(kdev->kgd, mem, vm);
-	kdev->kfd2kgd->free_memory_of_gpu(kdev->kgd, mem, vm);
+	kfd_unmap_memory_from_gpu(mem, pdd);
+	pdd->dev->kfd2kgd->free_memory_of_gpu(pdd->dev->kgd, mem, pdd->vm);
 }
 
 /* kfd_process_alloc_gpuvm - Allocate GPU VM for the KFD process
@@ -127,7 +127,7 @@ static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 	return err;
 
 free_gpuvm:
-	kfd_process_free_gpuvm(kdev, (struct kgd_mem *)mem, pdd->vm);
+	kfd_process_free_gpuvm(mem, pdd);
 	return err;
 
 err_map_mem:
@@ -312,7 +312,7 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 
 	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
 				 per_device_list) {
-		radeon_flush_tlb(pdd->dev, p->pasid);
+		kfd_flush_tlb(pdd->dev, p->pasid);
 		/* Destroy the GPUVM VM context */
 		if (pdd->vm)
 			pdd->dev->kfd2kgd->destroy_process_vm(
