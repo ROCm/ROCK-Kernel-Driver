@@ -840,7 +840,7 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 	 * removed from PT. This function is called here because it requires
 	 * the radeon_vm::mutex to be locked and PT to be reserved
 	 */
-	ret = amdgpu_vm_clear_freed(adev, vm);
+	ret = amdgpu_vm_clear_freed(adev, vm, NULL);
 	if (ret != 0) {
 		pr_err("amdkfd: Failed to radeon_vm_clear_freed\n");
 		goto err_unpin_bo;
@@ -1251,7 +1251,7 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 	 * removed from PT. This function is called here because it requires
 	 * the radeon_vm::mutex to be locked and PT to be reserved
 	 */
-	ret = amdgpu_vm_clear_freed(adev, &new_vm->base);
+	ret = amdgpu_vm_clear_freed(adev, &new_vm->base, NULL);
 	if (ret != 0)
 		pr_err("amdgpu: Failed to amdgpu_vm_clear_freed\n");
 
@@ -1326,7 +1326,7 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 	 * removed from PT. This function is called here because it requires
 	 * the radeon_vm::mutex to be locked and PT to be reserved
 	 */
-	amdgpu_vm_clear_freed(adev, vm);
+	amdgpu_vm_clear_freed(adev, vm, NULL);
 
 	/* Update the page tables - Remove the mapping from bo_va */
 	amdgpu_vm_bo_update(adev, bo_va, NULL);
