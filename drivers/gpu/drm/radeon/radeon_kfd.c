@@ -513,7 +513,7 @@ static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm,
 	BUG_ON(filp == NULL);
 
 	/* Get object by handle*/
-	gem_obj = drm_gem_object_lookup(rdev->ddev, filp->private_data, handle);
+	gem_obj = drm_gem_object_lookup(filp->private_data, handle);
 	BUG_ON(gem_obj == NULL);
 
 	/* No need to increment GEM refcount*/
