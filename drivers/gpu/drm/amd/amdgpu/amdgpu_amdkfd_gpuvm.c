@@ -54,6 +54,12 @@ struct kfd_mem_usage_limit {
 
 static struct kfd_mem_usage_limit kfd_mem_limit;
 
+/* Struct used for amdgpu_amdkfd_bo_validate */
+struct amdgpu_vm_parser {
+	uint32_t        domain;
+	bool            wait;
+};
+
 
 static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
 {
@@ -260,6 +266,13 @@ static int amdgpu_amdkfd_bo_validate(struct amdgpu_bo *bo, uint32_t domain,
 
 validate_fail:
 	return ret;
+}
+
+static int amdgpu_amdkfd_validate(void *param, struct amdgpu_bo *bo)
+{
+	struct amdgpu_vm_parser *p = param;
+
+	return amdgpu_amdkfd_bo_validate(bo, p->domain, p->wait);
 }
 
 static int amdgpu_amdkfd_bo_invalidate(struct amdgpu_bo *bo)
