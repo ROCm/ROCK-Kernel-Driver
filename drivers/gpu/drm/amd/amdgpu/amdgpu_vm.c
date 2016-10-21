@@ -1306,6 +1306,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
  *
  * @adev: amdgpu_device pointer
  * @vm: requested vm
+ * @fence: return the last pt update fence
  *
  * Make sure all freed BOs are cleared in the PT.
  * Returns 0 for success.
@@ -1313,7 +1314,8 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
  * PTs have to be reserved and mutex must be locked!
  */
 int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
-			  struct amdgpu_vm *vm)
+			  struct amdgpu_vm *vm,
+			  struct fence **fence)
 {
 	struct amdgpu_bo_va_mapping *mapping;
 	int r;
@@ -1324,12 +1326,13 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
 		list_del(&mapping->list);
 
 		r = amdgpu_vm_bo_split_mapping(adev, NULL, 0, NULL, vm, mapping,
-					       0, 0, NULL);
+					       0, 0, fence);
 		kfree(mapping);
 		if (r)
 			return r;
 
 	}
+
 	return 0;
 
 }

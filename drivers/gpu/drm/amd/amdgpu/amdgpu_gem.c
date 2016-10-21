@@ -547,7 +547,7 @@ static void amdgpu_gem_va_update_vm(struct amdgpu_device *adev,
 	if (r)
 		goto error_unreserve;
 
-	r = amdgpu_vm_clear_freed(adev, bo_va->vm);
+	r = amdgpu_vm_clear_freed(adev, bo_va->vm, NULL);
 	if (r)
 		goto error_unreserve;
 
