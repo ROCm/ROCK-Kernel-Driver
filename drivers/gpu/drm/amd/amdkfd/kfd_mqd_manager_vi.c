@@ -173,10 +173,15 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 
 static int load_mqd(struct mqd_manager *mm, void *mqd,
 			uint32_t pipe_id, uint32_t queue_id,
-			uint32_t __user *wptr, struct mm_struct *mms)
+			struct queue_properties *p, struct mm_struct *mms)
 {
-	return mm->dev->kfd2kgd->hqd_load
-		(mm->dev->kgd, mqd, pipe_id, queue_id, wptr);
+	/* AQL write pointer counts in 64B packets, PM4/CP counts in dwords. */
+	uint32_t wptr_shift = (p->format == KFD_QUEUE_FORMAT_AQL ? 4 : 0);
+	uint32_t wptr_mask = (uint32_t)((p->queue_size / sizeof(uint32_t)) - 1);
+
+	return mm->dev->kfd2kgd->hqd_load(mm->dev->kgd, mqd, pipe_id, queue_id,
+					  (uint32_t __user *)p->write_ptr,
+					  wptr_shift, wptr_mask, mms);
 }
 
 static int __update_mqd(struct mqd_manager *mm, void *mqd,
@@ -371,9 +376,11 @@ static void uninit_mqd_sdma(struct mqd_manager *mm, void *mqd,
 
 static int load_mqd_sdma(struct mqd_manager *mm, void *mqd,
 		uint32_t pipe_id, uint32_t queue_id,
-		uint32_t __user *wptr, struct mm_struct *mms)
+		struct queue_properties *p, struct mm_struct *mms)
 {
-	return mm->dev->kfd2kgd->hqd_sdma_load(mm->dev->kgd, mqd, wptr, mms);
+	return mm->dev->kfd2kgd->hqd_sdma_load(mm->dev->kgd, mqd,
+					       (uint32_t __user *)p->write_ptr,
+					       mms);
 }
 
 static int update_mqd_sdma(struct mqd_manager *mm, void *mqd,
