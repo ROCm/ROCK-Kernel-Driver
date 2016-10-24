@@ -1061,6 +1061,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	struct kfd_bo_va_list *bo_va_entry = NULL;
 	struct kfd_bo_va_list *bo_va_entry_aql = NULL;
 	struct amdkfd_vm *kfd_vm = (struct amdkfd_vm *)vm;
+	int num_to_quiesce = 0;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
@@ -1126,14 +1127,12 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 		if (entry->bo_va->vm == vm && !entry->is_mapped) {
 			if (mem->evicted) {
 				/* If the BO is evicted, just mark the
-				 * mapping as mapped and stop the GPU's
-				 * queues until the BO is restored. */
-				ret = kgd2kfd->quiesce_mm(adev->kfd,
-							  current->mm);
-				if (ret != 0)
-					goto quiesce_failed;
+				 * mapping as mapped and the GPU's queues
+				 * will be stopped later.
+				 */
 				entry->is_mapped = true;
 				mem->mapped_to_gpu_memory++;
+				num_to_quiesce++;
 				continue;
 			}
 
@@ -1158,11 +1157,23 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 				true);
 	unreserve_bo_and_vms(&ctx, true);
 
+	while (num_to_quiesce--) {
+		/* Now stop the GPU's queues while bo and VMs are unreserved.
+		 * quiesce_mm() is reference counted, and that is why we can
+		 * call it multiple times.
+		 */
+		ret = kgd2kfd->quiesce_mm(adev->kfd, current->mm);
+		if (ret != 0) {
+			pr_err("quiesce_mm() failed\n");
+			reserve_bo_and_vm(mem, vm, &ctx);
+			goto map_bo_to_gpuvm_failed;
+		}
+	}
+
 	mutex_unlock(&mem->lock);
-	return 0;
+	return ret;
 
 map_bo_to_gpuvm_failed:
-quiesce_failed:
 update_user_pages_failed:
 	if (bo_va_entry_aql)
 		remove_bo_from_vm(adev, bo_va_entry_aql);
@@ -1349,6 +1360,7 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 	unsigned mapped_before;
 	int ret = 0;
 	struct bo_vm_reservation_context ctx;
+	int num_to_resume = 0;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
@@ -1381,14 +1393,12 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 		if (entry->bo_va->vm == vm && entry->is_mapped) {
 			if (mem->evicted) {
 				/* If the BO is evicted, just mark the
-				 * mapping as unmapped and allow the
-				 * GPU's queues to resume. */
-				ret = kgd2kfd->resume_mm(adev->kfd,
-							 current->mm);
-				if (ret != 0)
-					goto unreserve_out;
+				 * mapping as unmapped and the GPU's queues
+				 * will be resumed later.
+				 */
 				entry->is_mapped = false;
 				mem->mapped_to_gpu_memory--;
+				num_to_resume++;
 				continue;
 			}
 
@@ -1430,6 +1440,18 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 
 unreserve_out:
 	unreserve_bo_and_vms(&ctx, false);
+
+	while (num_to_resume--) {
+		/* Now resume GPU's queues while bo and VMs are unreserved.
+		 * resume_mm() is reference counted, and that is why we can
+		 * call it multiple times.
+		 */
+		ret = kgd2kfd->resume_mm(adev->kfd, current->mm);
+		if (ret != 0) {
+			pr_err("resume_mm() failed.\n");
+			break;
+		}
+	}
 out:
 	mutex_unlock(&mem->lock);
 	return ret;
@@ -1694,7 +1716,7 @@ out_put:
 int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm)
 {
 	struct kfd_bo_va_list *entry;
-	unsigned n_evicted;
+	unsigned int n_evicted = 0, n_unmapped = 0;
 	int r = 0;
 	struct bo_vm_reservation_context ctx;
 
@@ -1708,11 +1730,6 @@ int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm)
 	 * queues of the affected GPUs are quiesced first. Count the
 	 * number of evicted mappings so we can roll back if something
 	 * goes wrong. */
-	n_evicted = 0;
-
-	r = reserve_bo_and_cond_vms(mem, NULL, VA_MAPPED, &ctx);
-	if (unlikely(r != 0))
-		return r;
 
 	list_for_each_entry(entry, &mem->bo_va_list, bo_list) {
 		struct amdgpu_device *adev;
@@ -1728,16 +1745,31 @@ int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm)
 			goto fail;
 		}
 
+		n_evicted++;
+	}
+
+	r = reserve_bo_and_cond_vms(mem, NULL, VA_MAPPED, &ctx);
+	if (unlikely(r != 0))
+		goto fail;
+
+	list_for_each_entry(entry, &mem->bo_va_list, bo_list) {
+		struct amdgpu_device *adev;
+
+		if (!entry->is_mapped)
+			continue;
+
+		adev = (struct amdgpu_device *)entry->kgd_dev;
+
 		r = unmap_bo_from_gpuvm(adev, mem->bo,
 					entry->bo_va, &ctx.sync);
 		if (r != 0) {
 			pr_err("failed unmap va 0x%llx\n",
 			       mem->va);
-			kgd2kfd->resume_mm(adev->kfd, mm);
+			unreserve_bo_and_vms(&ctx, true);
 			goto fail;
 		}
 
-		n_evicted++;
+		n_unmapped++;
 	}
 
 	unreserve_bo_and_vms(&ctx, true);
@@ -1745,7 +1777,6 @@ int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm)
 	return 0;
 
 fail:
-	unreserve_bo_and_vms(&ctx, true);
 	/* To avoid hangs and keep state consistent, roll back partial
 	 * eviction by restoring queues and marking mappings as
 	 * unmapped. Access to now unmapped buffers will fault. */
@@ -1757,12 +1788,14 @@ fail:
 		if (!entry->is_mapped)
 			continue;
 
-		entry->is_mapped = false;
+		if (n_unmapped) {
+			entry->is_mapped = false;
+			n_unmapped--;
+		}
 
 		adev = (struct amdgpu_device *)entry->kgd_dev;
 		if (kgd2kfd->resume_mm(adev->kfd, mm))
 			pr_err("Failed to resume KFD\n");
-
 		n_evicted--;
 	}
 
