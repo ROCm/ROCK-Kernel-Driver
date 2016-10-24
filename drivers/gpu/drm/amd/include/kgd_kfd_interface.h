@@ -180,8 +180,7 @@ struct tile_config {
  * sceduling mode.
  *
  * @hqd_sdma_load: Loads the SDMA mqd structure to a H/W SDMA hqd slot.
- * used only for no HWS mode. If mm is passed in, its mmap_sem must be
- * read-locked.
+ * used only for no HWS mode.
  *
  * @hqd_dump: Dumps CPC HQD registers to an array of address-value pairs.
  * Array is allocated with kmalloc, needs to be freed with kfree by caller.
@@ -264,7 +263,9 @@ struct kfd2kgd_calls {
 	
 
 	int (*hqd_load)(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
-				uint32_t queue_id, uint32_t __user *wptr);
+			uint32_t queue_id, uint32_t __user *wptr,
+			uint32_t wptr_shift, uint32_t wptr_mask,
+			struct mm_struct *mm);
 
 	int (*hqd_sdma_load)(struct kgd_dev *kgd, void *mqd,
 			     uint32_t __user *wptr, struct mm_struct *mm);
