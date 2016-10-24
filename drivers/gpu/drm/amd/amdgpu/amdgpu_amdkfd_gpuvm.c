@@ -580,6 +580,7 @@ static int reserve_bo_and_vm(struct kgd_mem *mem,
 			      struct bo_vm_reservation_context *ctx)
 {
 	struct amdgpu_bo *bo = mem->bo;
+	struct amdgpu_vm_parser param;
 	int ret;
 
 	WARN_ON(!vm);
@@ -604,7 +605,10 @@ static int reserve_bo_and_vm(struct kgd_mem *mem,
 	list_add(&ctx->kfd_bo.tv.head, &ctx->list);
 
 	amdgpu_vm_get_pd_bo(vm, &ctx->list, &ctx->vm_pd[0]);
-	amdgpu_vm_get_pt_bos(bo->adev, vm, &ctx->duplicates);
+	param.domain = bo->prefered_domains;
+	param.wait = false;
+	amdgpu_vm_validate_pt_bos(amdgpu_ttm_adev(bo->tbo.bdev), vm,
+			amdgpu_amdkfd_validate, &param);
 
 	ret = ttm_eu_reserve_buffers(&ctx->ticket, &ctx->list,
 				     false, &ctx->duplicates);
@@ -642,6 +646,7 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 {
 	struct amdgpu_bo *bo = mem->bo;
 	struct kfd_bo_va_list *entry;
+	struct amdgpu_vm_parser param;
 	unsigned i;
 	int ret;
 
@@ -685,9 +690,14 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 
 		amdgpu_vm_get_pd_bo(entry->bo_va->vm, &ctx->list,
 				&ctx->vm_pd[i]);
-		amdgpu_vm_get_pt_bos(bo->adev, entry->bo_va->vm,
-				&ctx->duplicates);
 		i++;
+	}
+
+	if (vm) {
+		param.domain = bo->prefered_domains;
+		param.wait = false;
+		amdgpu_vm_validate_pt_bos(amdgpu_ttm_adev(bo->tbo.bdev), vm,
+				amdgpu_amdkfd_validate, &param);
 	}
 
 	ret = ttm_eu_reserve_buffers(&ctx->ticket, &ctx->list,
@@ -1917,15 +1927,11 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *m_vm)
 	/* Get PD BO list and PT BO list from all the VMs */
 	amdgpu_vm_get_pd_bo(&master_vm->base, &ctx.list,
 			    &pd_bo_list[0]);
-	amdgpu_vm_get_pt_bos(master_vm->adev, &master_vm->base,
-			     &ctx.duplicates);
 
 	i = 1;
 	list_for_each_entry(peer_vm, &master_vm->kfd_vm_list, kfd_vm_list) {
 		amdgpu_vm_get_pd_bo(&peer_vm->base, &ctx.list,
 				    &pd_bo_list[i]);
-		amdgpu_vm_get_pt_bos(peer_vm->adev, &peer_vm->base,
-				     &ctx.duplicates);
 		i++;
 	}
 
