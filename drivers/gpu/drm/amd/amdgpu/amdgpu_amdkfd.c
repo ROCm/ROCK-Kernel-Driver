@@ -25,6 +25,7 @@
 #include <drm/drmP.h>
 #include "amdgpu.h"
 #include <linux/module.h>
+#include <linux/mmu_context.h>
 
 #define AMDKFD_SKIP_UNCOMPILED_CODE 1
 
@@ -511,4 +512,26 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 out_put:
 	dma_buf_put(dma_buf);
 	return r;
+}
+
+bool read_user_wptr(struct mm_struct *mm, uint32_t __user *wptr,
+		    uint32_t *wptr_val)
+{
+	bool wptr_valid = false;
+
+	if (mm && wptr) {
+		if (mm == current->mm) {
+			/* Running in the correct user process context */
+			wptr_valid = !get_user(*wptr_val, wptr);
+		} else if (current->mm == NULL) {
+			/* A kernel thread can temporarily use a user
+			 * process context for AIO
+			 */
+			use_mm(mm);
+			wptr_valid = !get_user(*wptr_val, wptr);
+			unuse_mm(mm);
+		}
+	}
+
+	return wptr_valid;
 }
