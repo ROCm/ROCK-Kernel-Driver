@@ -151,6 +151,9 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 				  size_t buffer_size, uint32_t *metadata_size,
 				  uint32_t *flags);
 
+bool read_user_wptr(struct mm_struct *mm, uint32_t __user *wptr,
+		    uint32_t *wptr_val);
+
 /* GPUVM API */
 int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		struct kgd_dev *kgd, uint64_t va, uint64_t size,

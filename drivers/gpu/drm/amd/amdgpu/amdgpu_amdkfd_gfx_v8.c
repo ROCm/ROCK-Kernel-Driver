@@ -24,7 +24,6 @@
 #include <linux/fdtable.h>
 #include <linux/uaccess.h>
 #include <linux/firmware.h>
-#include <linux/mmu_context.h>
 #include <drm/drmP.h>
 #include "amdgpu.h"
 #include "amdgpu_amdkfd.h"
@@ -83,7 +82,9 @@ static int kgd_init_pipeline(struct kgd_dev *kgd, uint32_t pipe_id,
 		uint32_t hpd_size, uint64_t hpd_gpu_addr);
 static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id);
 static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
-			uint32_t queue_id, uint32_t __user *wptr);
+			uint32_t queue_id, uint32_t __user *wptr,
+			uint32_t wptr_shift, uint32_t wptr_mask,
+			struct mm_struct *mm);
 static int kgd_hqd_dump(struct kgd_dev *kgd,
 			uint32_t pipe_id, uint32_t queue_id,
 			uint32_t (**dump)[2], uint32_t *n_regs);
@@ -264,16 +265,6 @@ static void acquire_queue(struct kgd_dev *kgd, uint32_t pipe_id,
 	lock_srbm(kgd, mec, pipe, queue_id, 0);
 }
 
-static uint32_t get_queue_mask(uint32_t pipe_id, uint32_t queue_id)
-{
-	/* assumes that pipe0 is used by graphics and that the correct
-	 * MEC is selected by acquire_queue already
-	 */
-	unsigned bit = ((pipe_id+1) * VI_QUEUES_PER_PIPE_MEC + queue_id) & 31;
-
-	return ((uint32_t)1) << bit;
-}
-
 static void release_queue(struct kgd_dev *kgd)
 {
 	unlock_srbm(kgd);
@@ -370,12 +361,14 @@ static inline struct vi_sdma_mqd *get_sdma_mqd(void *mqd)
 }
 
 static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
-			uint32_t queue_id, uint32_t __user *wptr)
+			uint32_t queue_id, uint32_t __user *wptr,
+			uint32_t wptr_shift, uint32_t wptr_mask,
+			struct mm_struct *mm)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct vi_mqd *m;
 	uint32_t *mqd_hqd;
-	uint32_t reg;
+	uint32_t reg, wptr_val;
 
 	m = get_mqd(mqd);
 
@@ -401,23 +394,11 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 	for (reg = mmCP_HQD_EOP_EVENTS; reg <= mmCP_HQD_ERROR; reg++)
 		WREG32(reg, mqd_hqd[reg - mmCP_MQD_BASE_ADDR]);
 
-	if (wptr) {
-		/* Don't read wptr with get_user because the user
-		 * context may not be accessible (if this function
-		 * runs in a work queue). Instead trigger a one-shot
-		 * polling read from memory in the CP. This assumes
-		 * that wptr is GPU-accessible in the queue's VMID via
-		 * ATC or SVM. WPTR==RPTR before starting the poll so
-		 * the CP starts fetching new commands from the right
-		 * place.
-		 */
-		WREG32(mmCP_HQD_PQ_WPTR, m->cp_hqd_pq_rptr);
-		WREG32(mmCP_HQD_PQ_WPTR_POLL_ADDR, (uint32_t)(uint64_t)wptr);
-		WREG32(mmCP_HQD_PQ_WPTR_POLL_ADDR_HI,
-		       (uint32_t)((uint64_t)wptr >> 32));
-		WREG32(mmCP_PQ_WPTR_POLL_CNTL1,
-		       get_queue_mask(pipe_id, queue_id));
-	}
+	/* Copy userspace write pointer value to register.
+	 * Doorbell logic is active and will monitor subsequent changes.
+	 */
+	if (read_user_wptr(mm, wptr, &wptr_val))
+		WREG32(mmCP_HQD_PQ_WPTR, (wptr_val << wptr_shift) & wptr_mask);
 
 	/* Write CP_HQD_ACTIVE last. */
 	for (reg = mmCP_MQD_BASE_ADDR; reg <= mmCP_HQD_ACTIVE; reg++)
@@ -472,7 +453,6 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 	uint32_t sdma_base_addr;
 	uint32_t temp, timeout = 2000;
 	uint32_t data;
-	bool wptr_valid = false;
 
 	m = get_sdma_mqd(mqd);
 	sdma_base_addr = get_sdma_base_addr(m);
@@ -503,20 +483,7 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL, m->sdmax_rlcx_doorbell);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR, m->sdmax_rlcx_rb_rptr);
 
-	if (mm) {
-		if (mm == current->mm) {
-			/* Running in the correct user process context */
-			wptr_valid = !get_user(data, wptr);
-		} else if (current->mm == NULL) {
-			/* A kernel thread can temporarily use a user
-			 * process context for AIO
-			 */
-			use_mm(mm);
-			wptr_valid = !get_user(data, wptr);
-			unuse_mm(mm);
-		}
-	}
-	if (wptr_valid)
+	if (read_user_wptr(mm, wptr, &data))
 		WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_WPTR, data);
 	else
 		WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_WPTR,
