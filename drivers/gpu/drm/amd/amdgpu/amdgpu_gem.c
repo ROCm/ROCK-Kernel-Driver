@@ -581,7 +581,7 @@ int amdgpu_gem_wait_idle_ioctl(struct drm_device *dev, void *data,
 		return -ENOENT;
 	}
 	robj = gem_to_amdgpu_bo(gobj);
-	ret = reservation_object_wait_timeout_rcu(robj->tbo.resv, true, true,
+	ret = kcl_reservation_object_wait_timeout_rcu(robj->tbo.resv, true, true,
 						  timeout);
 
 	/* ret == 0 means not signaled,
