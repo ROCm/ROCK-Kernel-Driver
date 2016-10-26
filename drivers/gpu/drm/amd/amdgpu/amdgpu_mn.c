@@ -131,7 +131,7 @@ static void amdgpu_mn_invalidate_node(struct amdgpu_mn_node *node,
 			continue;
 		}
 
-		r = reservation_object_wait_timeout_rcu(bo->tbo.resv,
+		r = kcl_reservation_object_wait_timeout_rcu(bo->tbo.resv,
 			true, false, MAX_SCHEDULE_TIMEOUT);
 		if (r <= 0)
 			DRM_ERROR("(%ld) failed to wait for user bo\n", r);

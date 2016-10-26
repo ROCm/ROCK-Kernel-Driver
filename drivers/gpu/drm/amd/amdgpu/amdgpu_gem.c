@@ -570,7 +570,7 @@ int amdgpu_gem_wait_idle_ioctl(struct drm_device *dev, void *data,
 	if (timeout == 0)
 		ret = kcl_reservation_object_test_signaled_rcu(robj->tbo.resv, true);
 	else
-		ret = reservation_object_wait_timeout_rcu(robj->tbo.resv, true, true, timeout);
+		ret = kcl_reservation_object_wait_timeout_rcu(robj->tbo.resv, true, true, timeout);
 
 	/* ret == 0 means not signaled,
 	 * ret > 0 means signaled
