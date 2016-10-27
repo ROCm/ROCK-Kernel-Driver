@@ -49,6 +49,8 @@
 #include <linux/slab.h>
 #include <linux/scatterlist.h>
 #include <linux/module.h>
+
+#include "kfd_priv.h"
 #include "amd_rdma.h"
 
 
@@ -428,10 +430,20 @@ static struct peer_memory_client amd_mem_client = {
 	.release = amd_release,
 };
 
-
-int kfd_init_peer_direct(void)
+/** Initialize PeerDirect interface with RDMA Network stack.
+ *
+ *  Because network stack could potentially be loaded later we check
+ *  presence of PeerDirect when HSA process is created. If PeerDirect was
+ *  already initialized we do nothing otherwise try to detect and register.
+ */
+void kfd_init_peer_direct(void)
 {
 	int result;
+
+	if (pfn_ib_unregister_peer_memory_client) {
+		pr_debug("PeerDirect support was already initialized\n");
+		return;
+	}
 
 	pr_debug("Try to initialize PeerDirect support\n");
 
@@ -446,7 +458,9 @@ int kfd_init_peer_direct(void)
 	if (!pfn_ib_register_peer_memory_client ||
 		!pfn_ib_unregister_peer_memory_client) {
 		pr_warn("amdkfd: PeerDirect interface was not detected\n");
-		return -EINVAL;
+		/* Do cleanup */
+		kfd_close_peer_direct();
+		return;
 	}
 
 	result = amdkfd_query_rdma_interface(&rdma_interface);
@@ -454,7 +468,7 @@ int kfd_init_peer_direct(void)
 	if (result < 0) {
 		pr_err("amdkfd: Cannot get RDMA Interface (result = %d)\n",
 				result);
-		return result;
+		return;
 	}
 
 	strcpy(amd_mem_client.name,    AMD_PEER_BRIDGE_DRIVER_NAME);
@@ -465,13 +479,19 @@ int kfd_init_peer_direct(void)
 
 	if (!ib_reg_handle) {
 		pr_err("amdkfd: Cannot register peer memory client\n");
-		return -EINVAL;
+		/* Do cleanup */
+		kfd_close_peer_direct();
+		return;
 	}
 
 	pr_info("amdkfd: PeerDirect support was initialized successfully\n");
-	return 0;
+	return;
 }
 
+/**
+ * Close connection with PeerDirect interface with RDMA Network stack.
+ *
+ */
 void kfd_close_peer_direct(void)
 {
 	if (pfn_ib_unregister_peer_memory_client) {
@@ -484,5 +504,10 @@ void kfd_close_peer_direct(void)
 	if (pfn_ib_register_peer_memory_client)
 		symbol_put(ib_register_peer_memory_client);
 
+
+	/* Reset pointers to be safe */
+	pfn_ib_unregister_peer_memory_client = NULL;
+	pfn_ib_register_peer_memory_client   = NULL;
+	ib_reg_handle = NULL;
 }
 
