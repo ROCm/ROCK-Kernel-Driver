@@ -966,7 +966,7 @@ int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 #define KFD_CWSR_CZ_FW_VER 625
 
 /* PeerDirect support */
-int kfd_init_peer_direct(void);
+void kfd_init_peer_direct(void);
 void kfd_close_peer_direct(void);
 
 /* Debugfs */
