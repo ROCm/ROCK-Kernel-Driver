@@ -40,6 +40,7 @@ struct kfd_bo_va_list {
 	void *kgd_dev;
 	bool is_mapped;
 	bool map_fail;
+	uint64_t va;
 };
 
 struct kgd_mem {
@@ -54,9 +55,10 @@ struct kgd_mem {
 	unsigned int evicted; /* eviction counter */
 	struct delayed_work work; /* for restore evicted mem */
 	struct mm_struct *mm; /* for restore */
+
+	uint32_t pte_flags;
+
 	/* flags bitfield */
-	bool readonly      : 1;
-	bool execute       : 1;
 	bool no_substitute : 1;
 	bool aql_queue     : 1;
 };
