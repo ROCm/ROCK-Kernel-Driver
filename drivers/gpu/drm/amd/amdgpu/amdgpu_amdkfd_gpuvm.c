@@ -855,20 +855,11 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev, struct amdgpu_bo *bo,
 
 	amdgpu_sync_fence(adev, sync, bo_va->last_pt_update);
 
-	ret = amdgpu_vm_clear_invalids(adev, vm, sync);
-	if (ret != 0) {
-		pr_err("amdkfd: Failed to radeon_vm_clear_invalids\n");
-		goto err_failed_to_vm_clear_invalids;
-	}
-
 	/* Remove PTs from LRU list (reservation removed PD only) */
 	amdgpu_vm_move_pt_bos_in_lru(adev, vm);
 
 	return 0;
 
-err_failed_to_vm_clear_invalids:
-	amdgpu_vm_bo_update(adev, bo_va, NULL);
-	amdgpu_sync_fence(adev, sync, bo_va->last_pt_update);
 err_unpin_bo:
 	amdgpu_amdkfd_bo_invalidate(bo);
 	return ret;
@@ -1331,8 +1322,6 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 	/* Update the page tables - Remove the mapping from bo_va */
 	amdgpu_vm_bo_update(adev, bo_va, NULL);
 	amdgpu_sync_fence(adev, sync, bo_va->last_pt_update);
-
-	amdgpu_vm_clear_invalids(adev, vm, sync);
 
 	amdgpu_amdkfd_bo_invalidate(bo);
 
