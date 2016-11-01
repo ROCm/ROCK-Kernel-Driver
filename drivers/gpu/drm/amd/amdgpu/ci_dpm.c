@@ -6715,20 +6715,20 @@ static int ci_set_power_profile_state(struct amdgpu_device *adev,
 	uint32_t sclk_mask = 0, mclk_mask = 0;
 
 	tmp_result = ci_freeze_sclk_mclk_dpm(adev);
-	if (!tmp_result) {
+	if (tmp_result) {
 		DRM_ERROR("Failed to freeze SCLK MCLK DPM!");
 		result = tmp_result;
 	}
 
 	tmp_result = ci_populate_requested_graphic_levels(adev,
 			request);
-	if (!tmp_result) {
+	if (tmp_result) {
 		DRM_ERROR("Failed to populate requested graphic levels!");
 		result = tmp_result;
 	}
 
 	tmp_result = ci_unfreeze_sclk_mclk_dpm(adev);
-	if (!tmp_result) {
+	if (tmp_result) {
 		DRM_ERROR("Failed to unfreeze SCLK MCLK DPM!");
 		result = tmp_result;
 	}
