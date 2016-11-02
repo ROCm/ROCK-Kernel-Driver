@@ -643,22 +643,6 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	if (userptr)
 		bo->flags |= AMDGPU_AMDKFD_USERPTR_BO;
 
-	if (domain == AMDGPU_GEM_DOMAIN_VRAM) {
-		ret = amdgpu_bo_reserve(bo, true);
-		if (ret) {
-			pr_err("Failed to reserve bo. ret %d\n",
-					ret);
-			goto err_bo_clear;
-		}
-		ret = amdgpu_amdkfd_gpuvm_clear_bo(adev, vm, bo);
-		amdgpu_bo_unreserve(bo);
-		if (ret) {
-			pr_err("Failed to clear VRAM BO object. ret %d\n",
-					ret);
-			goto err_bo_clear;
-		}
-	}
-
 	if (userptr) {
 		ret = amdgpu_ttm_tt_set_userptr(bo->tbo.ttm, user_addr, 0);
 		if (ret) {
@@ -717,7 +701,6 @@ allocate_mem_reserve_bo_failed:
 	if (userptr)
 		amdgpu_mn_unregister(bo);
 allocate_mem_set_userptr_failed:
-err_bo_clear:
 	amdgpu_bo_unref(&bo);
 err_bo_create:
 	kfree(*mem);
