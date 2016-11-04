@@ -457,7 +457,7 @@ void kfd_init_peer_direct(void)
 
 	if (!pfn_ib_register_peer_memory_client ||
 		!pfn_ib_unregister_peer_memory_client) {
-		pr_warn("amdkfd: PeerDirect interface was not detected\n");
+		pr_debug("amdkfd: PeerDirect interface was not detected\n");
 		/* Do cleanup */
 		kfd_close_peer_direct();
 		return;
