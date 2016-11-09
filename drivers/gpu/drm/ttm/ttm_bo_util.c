@@ -268,7 +268,11 @@ static int ttm_copy_io_ttm_page(struct ttm_tt *ttm, void *src,
 	src = (void *)((unsigned long)src + (page << PAGE_SHIFT));
 
 #ifdef CONFIG_X86
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37)
+	dst = kmap_atomic_prot(d, KM_USER0, prot);
+#else
 	dst = kmap_atomic_prot(d, prot);
+#endif
 #else
 	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL))
 		dst = vmap(&d, 1, 0, prot);
@@ -281,7 +285,11 @@ static int ttm_copy_io_ttm_page(struct ttm_tt *ttm, void *src,
 	memcpy_fromio(dst, src, PAGE_SIZE);
 
 #ifdef CONFIG_X86
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37)
+	kunmap_atomic(dst, KM_USER0);
+#else
 	kunmap_atomic(dst);
+#endif
 #else
 	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL))
 		vunmap(dst);
@@ -304,7 +312,11 @@ static int ttm_copy_ttm_io_page(struct ttm_tt *ttm, void *dst,
 
 	dst = (void *)((unsigned long)dst + (page << PAGE_SHIFT));
 #ifdef CONFIG_X86
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37)
+	src = kmap_atomic_prot(s, KM_USER0, prot);
+#else
 	src = kmap_atomic_prot(s, prot);
+#endif
 #else
 	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL))
 		src = vmap(&s, 1, 0, prot);
@@ -317,7 +329,11 @@ static int ttm_copy_ttm_io_page(struct ttm_tt *ttm, void *dst,
 	memcpy_toio(dst, src, PAGE_SIZE);
 
 #ifdef CONFIG_X86
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37)
+	kunmap_atomic(src, KM_USER0);
+#else
 	kunmap_atomic(src);
+#endif
 #else
 	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL))
 		vunmap(src);
