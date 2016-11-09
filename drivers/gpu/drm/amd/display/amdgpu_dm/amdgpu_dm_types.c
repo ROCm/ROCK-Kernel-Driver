@@ -1669,6 +1669,7 @@ static void clear_unrelated_fields(struct drm_plane_state *state)
 static bool page_flip_needed(
 	const struct drm_plane_state *new_state,
 	const struct drm_plane_state *old_state,
+	struct drm_pending_vblank_event *event,
 	bool commit_surface_required)
 {
 	struct drm_plane_state old_state_tmp;
@@ -1698,7 +1699,7 @@ static bool page_flip_needed(
 	old_state_tmp = *old_state;
 	new_state_tmp = *new_state;
 
-	if (!new_state->crtc->state->event)
+	if (!event)
 		return false;
 
 	amdgpu_fb_old = to_amdgpu_framebuffer(old_state->fb);
@@ -2533,17 +2534,21 @@ int amdgpu_dm_atomic_commit(
 	struct amdgpu_device *adev = dev->dev_private;
 	struct amdgpu_display_manager *dm = &adev->dm;
 	struct drm_plane *plane;
+	struct drm_plane_state *new_plane_state;
 	struct drm_plane_state *old_plane_state;
 	uint32_t i;
 	int32_t ret = 0;
 	uint32_t commit_streams_count = 0;
 	uint32_t new_crtcs_count = 0;
+	uint32_t flip_crtcs_count = 0;
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *old_crtc_state;
-
 	const struct dc_stream *commit_streams[MAX_STREAMS];
 	struct amdgpu_crtc *new_crtcs[MAX_STREAMS];
 	const struct dc_stream *new_stream;
+	struct drm_crtc *flip_crtcs[MAX_STREAMS];
+	struct amdgpu_flip_work *work[MAX_STREAMS] = {0};
+	struct amdgpu_bo *new_abo[MAX_STREAMS] = {0};
 
 	/* In this step all new fb would be pinned */
 
@@ -2558,6 +2563,63 @@ int amdgpu_dm_atomic_commit(
 		if (ret)
 			return ret;
 	}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+	/* Page flip if needed */
+	for_each_plane_in_state(state, plane, new_plane_state, i) {
+		struct drm_plane_state *old_plane_state = plane->state;
+		struct drm_crtc *crtc = new_plane_state->crtc;
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+		struct drm_framebuffer *fb = new_plane_state->fb;
+		struct drm_crtc_state *crtc_state;
+
+		if (!fb || !crtc)
+			continue;
+
+		crtc_state = drm_atomic_get_crtc_state(state, crtc);
+
+		if (!crtc_state->planes_changed || !crtc_state->active)
+			continue;
+
+		if (page_flip_needed(
+				new_plane_state,
+				old_plane_state,
+				crtc_state->event,
+				false)) {
+			ret = amdgpu_crtc_prepare_flip(crtc,
+							fb,
+							crtc_state->event,
+							acrtc->flip_flags,
+							drm_crtc_vblank_count(crtc),
+							&work[flip_crtcs_count],
+							&new_abo[flip_crtcs_count]);
+
+			if (ret) {
+				/* According to atomic_commit hook API, EINVAL is not allowed */
+				if (unlikely(ret == -EINVAL))
+					ret = -ENOMEM;
+
+				DRM_ERROR("Atomic commit: Flip for  crtc id %d: [%p], "
+									"failed, errno = %d\n",
+									acrtc->crtc_id,
+									acrtc,
+									ret);
+				/* cleanup all flip configurations which
+				 * succeeded in this commit
+				 */
+				for (i = 0; i < flip_crtcs_count; i++)
+					amdgpu_crtc_cleanup_flip_ctx(
+							work[i],
+							new_abo[i]);
+
+				return ret;
+			}
+
+			flip_crtcs[flip_crtcs_count] = crtc;
+			flip_crtcs_count++;
+		}
+	}
+#endif
 
 	/*
 	 * This is the point of no return - everything below never fails except
@@ -2751,7 +2813,10 @@ int amdgpu_dm_atomic_commit(
 		 * 1. This commit is not a page flip.
 		 * 2. This commit is a page flip, and streams are created.
 		 */
-		if (!page_flip_needed(plane_state, old_plane_state, true) ||
+		if (!page_flip_needed(
+				plane_state,
+				old_plane_state,
+				crtc->state->event, true) ||
 				action == DM_COMMIT_ACTION_DPMS_ON ||
 				action == DM_COMMIT_ACTION_SET) {
 			list_for_each_entry(connector,
@@ -2807,7 +2872,8 @@ int amdgpu_dm_atomic_commit(
 
 	}
 
-	/* Page flip if needed */
+	/* Do actual flip */
+	flip_crtcs_count = 0;
 	for_each_plane_in_state(state, plane, old_plane_state, i) {
 		struct drm_plane_state *plane_state = plane->state;
 		struct drm_crtc *crtc = plane_state->crtc;
@@ -2818,23 +2884,30 @@ int amdgpu_dm_atomic_commit(
 			!crtc->state->active)
 			continue;
 
-		if (page_flip_needed(plane_state, old_plane_state, false)) {
+		if (page_flip_needed(
+				plane_state,
+				old_plane_state,
+				crtc->state->event,
+				false)) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
-			ret = amdgpu_crtc_page_flip_target(crtc,
-							   fb,
-							   crtc->state->event,
-							   acrtc->flip_flags,
-							   drm_crtc_vblank_count(crtc));
+				amdgpu_crtc_submit_flip(
+							crtc,
+						    fb,
+						    work[flip_crtcs_count],
+						    new_abo[i]);
+				 flip_crtcs_count++;
+			/*clean up the flags for next usage*/
+			acrtc->flip_flags = 0;
 #else
 			ret = amdgpu_crtc_page_flip(crtc,
 						    fb,
 						    crtc->state->event,
 						    acrtc->flip_flags);
-#endif
 			/*clean up the flags for next usage*/
 			acrtc->flip_flags = 0;
 			if (ret)
 				return ret;
+#endif
 		}
 	}
 
@@ -3186,6 +3259,8 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 			struct drm_connector *connector;
 			struct dm_connector_state *dm_state = NULL;
 			enum dm_commit_action action;
+			struct drm_crtc_state *crtc_state;
+
 
 			if (!fb || !crtc || crtc_set[i] != crtc ||
 				!crtc->state->planes_changed || !crtc->state->active)
@@ -3197,8 +3272,9 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 			 * 1. This commit is not a page flip.
 			 * 2. This commit is a page flip, and streams are created.
 			 */
+			crtc_state = drm_atomic_get_crtc_state(state, crtc);
 			if (!page_flip_needed(plane_state, old_plane_state,
-					      true) ||
+					crtc_state->event, true) ||
 					action == DM_COMMIT_ACTION_DPMS_ON ||
 					action == DM_COMMIT_ACTION_SET) {
 				struct dc_surface *surface;
