@@ -66,8 +66,10 @@ static int ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 	 */
 	if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 		ret = VM_FAULT_RETRY;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 		if (vmf->flags & FAULT_FLAG_RETRY_NOWAIT)
 			goto out_unlock;
+#endif
 
 		up_read(&vma->vm_mm->mmap_sem);
 		(void) fence_wait(bo->moving, true);
@@ -122,10 +124,14 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 			return VM_FAULT_NOPAGE;
 
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				up_read(&vma->vm_mm->mmap_sem);
 				(void) ttm_bo_wait_unreserved(bo);
 			}
+#else
+			up_read(&vma->vm_mm->mmap_sem);
+#endif
 
 			return VM_FAULT_RETRY;
 		}
