@@ -74,8 +74,10 @@ static int ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 	 */
 	if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 		ret = VM_FAULT_RETRY;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 		if (vmf->flags & FAULT_FLAG_RETRY_NOWAIT)
 			goto out_unlock;
+#endif
 
 		ttm_bo_reference(bo);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
@@ -160,12 +162,16 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 			return VM_FAULT_NOPAGE;
 
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_reference(bo);
 				up_read(&vma->vm_mm->mmap_sem);
 				(void) ttm_bo_wait_unreserved(bo);
 				ttm_bo_unref(&bo);
 			}
+#else
+			up_read(&vma->vm_mm->mmap_sem);
+#endif
 
 			return VM_FAULT_RETRY;
 		}
@@ -212,8 +218,12 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 	ret = ttm_bo_vm_fault_idle(bo, vmf);
 #endif
 	if (unlikely(ret != 0)) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 		if (ret == VM_FAULT_RETRY &&
 		    !(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
+#else
+		if (ret == VM_FAULT_RETRY) {
+#endif
 			/* The BO has already been unreserved. */
 			return ret;
 		}
