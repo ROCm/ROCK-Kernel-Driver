@@ -28,6 +28,7 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 
+#undef pr_fmt
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <ttm/ttm_module.h>
