@@ -36,7 +36,7 @@
 #include <drm/drm_cache.h>
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
-
+#include "amdgpu_amdkfd.h"
 
 int amdgpu_ttm_init(struct amdgpu_device *adev);
 void amdgpu_ttm_fini(struct amdgpu_device *adev);
@@ -95,6 +95,8 @@ static void amdgpu_ttm_bo_destroy(struct ttm_buffer_object *tbo)
 
 	bo = container_of(tbo, struct amdgpu_bo, tbo);
 
+	if (bo->kfd_bo)
+		amdgpu_amdkfd_unreserve_system_memory_limit(bo);
 	amdgpu_update_memory_usage(bo->adev, &bo->tbo.mem, NULL);
 
 	amdgpu_bo_unref(&bo->parent);
