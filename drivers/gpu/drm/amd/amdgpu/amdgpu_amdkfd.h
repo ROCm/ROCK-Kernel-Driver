@@ -196,6 +196,6 @@ int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm);
 int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm);
 
 void amdgpu_amdkfd_gpuvm_init_mem_limits(void);
-
+void amdgpu_amdkfd_unreserve_system_memory_limit(struct amdgpu_bo *bo);
 #endif /* AMDGPU_AMDKFD_H_INCLUDED */
 
