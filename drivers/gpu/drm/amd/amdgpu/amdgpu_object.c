@@ -36,7 +36,7 @@
 #include <drm/drm_cache.h>
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
-
+#include "amdgpu_amdkfd.h"
 
 
 static u64 amdgpu_get_vis_part_size(struct amdgpu_device *adev,
@@ -111,6 +111,8 @@ static void amdgpu_ttm_bo_destroy(struct ttm_buffer_object *tbo)
 		offset -= adev->mman.bdev.man[TTM_PL_TT].gpu_offset;
 		amdgpu_gart_unbind(adev, offset, bo->tbo.num_pages);
 	}
+	if (bo->kfd_bo)
+		amdgpu_amdkfd_unreserve_system_memory_limit(bo);
 	amdgpu_update_memory_usage(adev, &bo->tbo.mem, NULL);
 
 	amdgpu_bo_unref(&bo->parent);
