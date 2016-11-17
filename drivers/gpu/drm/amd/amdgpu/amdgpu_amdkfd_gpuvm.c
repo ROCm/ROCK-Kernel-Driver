@@ -453,40 +453,35 @@ static int amdgpu_amdkfd_bo_invalidate(struct amdgpu_bo *bo)
 	return ret;
 }
 
-static int validate_pt_pd_bos(struct amdgpu_vm *vm)
+static int validate_pt_pd_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 {
-	int i, ret = 0;
-	struct amdgpu_bo *bo, *pd = vm->page_directory;
+	struct amdgpu_bo *pd = vm->page_directory;
 	struct amdkfd_vm *kvm = container_of(vm, struct amdkfd_vm, base);
+	struct amdgpu_vm_parser param;
+	int ret;
+
+	param.domain = AMDGPU_GEM_DOMAIN_VRAM;
+	param.wait = true;
 
 	/* Remove eviction fence so that validate can wait on move fences */
 	amdgpu_amdkfd_remove_eviction_fence(pd, kvm->eviction_fence,
 					    NULL, NULL);
 
-	/* PTs share same reservation object as PD. So only fence PD */
-	for (i = 0; i <= vm->max_pde_used; ++i) {
-		bo = vm->page_tables[i].bo;
+	ret = amdgpu_vm_validate_pt_bos(adev, vm, amdgpu_amdkfd_validate,
+					&param);
 
-		if (!bo)
-			continue;
-
-		ret = amdgpu_amdkfd_bo_validate(bo, AMDGPU_GEM_DOMAIN_VRAM,
-						true);
-		if (ret != 0) {
-			pr_err("Failed to validate PTE %d\n", i);
-			break;
-		}
-	}
-
-	ret = amdgpu_amdkfd_bo_validate(pd, AMDGPU_GEM_DOMAIN_VRAM,
-					true);
-	if (ret != 0) {
-		pr_err("Failed to validate PD\n");
-		return ret;
+	if (ret) {
+		pr_err("amdgpu: failed to validate PT BOs\n");
+	} else {
+		ret = amdgpu_amdkfd_validate(&param, pd);
+		if (ret)
+			pr_err("amdgpu: failed to validate PD\n");
 	}
 
 	/* Add the eviction fence back */
 	amdgpu_bo_fence(pd, &kvm->master->eviction_fence->base, true);
+
+	vm->last_eviction_counter = atomic64_read(&adev->num_evictions);
 
 	return ret;
 }
@@ -735,7 +730,6 @@ static int reserve_bo_and_vm(struct kgd_mem *mem,
 			      struct bo_vm_reservation_context *ctx)
 {
 	struct amdgpu_bo *bo = mem->bo;
-	struct amdgpu_vm_parser param;
 	int ret;
 
 	WARN_ON(!vm);
@@ -760,10 +754,6 @@ static int reserve_bo_and_vm(struct kgd_mem *mem,
 	list_add(&ctx->kfd_bo.tv.head, &ctx->list);
 
 	amdgpu_vm_get_pd_bo(vm, &ctx->list, &ctx->vm_pd[0]);
-	param.domain = bo->prefered_domains;
-	param.wait = false;
-	amdgpu_vm_validate_pt_bos(amdgpu_ttm_adev(bo->tbo.bdev), vm,
-			amdgpu_amdkfd_validate, &param);
 
 	ret = ttm_eu_reserve_buffers(&ctx->ticket, &ctx->list,
 				     false, &ctx->duplicates);
@@ -801,7 +791,6 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 {
 	struct amdgpu_bo *bo = mem->bo;
 	struct kfd_bo_va_list *entry;
-	struct amdgpu_vm_parser param;
 	unsigned i;
 	int ret;
 
@@ -846,13 +835,6 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 		amdgpu_vm_get_pd_bo(entry->bo_va->vm, &ctx->list,
 				&ctx->vm_pd[i]);
 		i++;
-	}
-
-	if (vm) {
-		param.domain = bo->prefered_domains;
-		param.wait = false;
-		amdgpu_vm_validate_pt_bos(amdgpu_ttm_adev(bo->tbo.bdev), vm,
-				amdgpu_amdkfd_validate, &param);
 	}
 
 	ret = ttm_eu_reserve_buffers(&ctx->ticket, &ctx->list,
@@ -1044,7 +1026,7 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev,
 	/* PT BOs may be created during amdgpu_vm_bo_map() call,
 	 * so we have to validate the newly created PT BOs.
 	 */
-	ret = validate_pt_pd_bos(entry->bo_va->vm);
+	ret = validate_pt_pd_bos(adev, entry->bo_va->vm);
 	if (ret != 0) {
 		pr_err("validate_pt_pd_bos() failed\n");
 		return ret;
@@ -2114,6 +2096,8 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *m_vm)
 	struct kgd_mem *mem;
 	struct bo_vm_reservation_context ctx;
 	struct amdgpu_amdkfd_fence *old_fence;
+	struct amdgpu_device *adev;
+	struct amdgpu_vm_parser param;
 	int ret = 0, i;
 
 	if (WARN_ON(master_vm == NULL || master_vm->master != master_vm))
@@ -2184,6 +2168,9 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *m_vm)
 			goto validate_map_fail;
 		}
 	}
+        /* This isn't used for PTs any more, but can there be other
+	 * duplicates? */
+	WARN_ONCE(!list_empty(&ctx.duplicates), "Duplicates not empty");
 	list_for_each_entry(entry, &ctx.duplicates, tv.head) {
 		struct amdgpu_bo *bo = entry->robj;
 
@@ -2193,6 +2180,28 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *m_vm)
 			pr_debug("Memory eviction: Validate failed. Try again\n");
 			goto validate_map_fail;
 		}
+	}
+	param.domain = AMDGPU_GEM_DOMAIN_VRAM;
+	param.wait = false;
+	adev = amdgpu_ttm_adev(master_vm->base.page_directory->tbo.bdev);
+	ret = amdgpu_vm_validate_pt_bos(adev, &master_vm->base,
+					amdgpu_amdkfd_validate, &param);
+	if (ret) {
+		pr_debug("Memory eviction: Validate failed. Try again\n");
+		goto validate_map_fail;
+	}
+	master_vm->base.last_eviction_counter =
+		atomic64_read(&adev->num_evictions);
+	list_for_each_entry(peer_vm, &master_vm->kfd_vm_list, kfd_vm_list) {
+		adev = amdgpu_ttm_adev(peer_vm->base.page_directory->tbo.bdev);
+		ret = amdgpu_vm_validate_pt_bos(adev, &peer_vm->base,
+						amdgpu_amdkfd_validate, &param);
+		if (ret) {
+			pr_debug("Memory eviction: Validate failed. Try again\n");
+			goto validate_map_fail;
+		}
+		peer_vm->base.last_eviction_counter =
+			atomic64_read(&adev->num_evictions);
 	}
 
 	/* Wait for PT/PD validate to finish and attach eviction fence.
