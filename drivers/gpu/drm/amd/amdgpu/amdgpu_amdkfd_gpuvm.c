@@ -99,7 +99,7 @@ void amdgpu_amdkfd_gpuvm_init_mem_limits(void)
 		(kfd_mem_limit.max_userptr_mem_limit >> 20));
 }
 
-static int check_and_reserve_system_mem_limit(struct amdgpu_device *adev,
+static int amdgpu_amdkfd_reserve_system_mem_limit(struct amdgpu_device *adev,
 					      uint64_t size, u32 domain)
 {
 	size_t acc_size;
@@ -128,13 +128,12 @@ static int check_and_reserve_system_mem_limit(struct amdgpu_device *adev,
 		kfd_mem_limit.system_mem_used += acc_size;
 		kfd_mem_limit.userptr_mem_used += size;
 	}
-
 err_no_mem:
 	spin_unlock(&kfd_mem_limit.mem_limit_lock);
 	return ret;
 }
 
-static void unreserve_system_memory_limit(struct amdgpu_bo *bo)
+void amdgpu_amdkfd_unreserve_system_memory_limit(struct amdgpu_bo *bo)
 {
 	spin_lock(&kfd_mem_limit.mem_limit_lock);
 
@@ -430,7 +429,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	pr_debug("amdkfd: allocating BO on domain %d with size %llu\n",
 				alloc_domain, size);
 
-	ret = check_and_reserve_system_mem_limit(adev, size, alloc_domain);
+	ret = amdgpu_amdkfd_reserve_system_mem_limit(adev, size, alloc_domain);
 	if (ret) {
 		pr_err("amdkfd: Insufficient system memory\n");
 		goto err_bo_create;
@@ -1050,7 +1049,6 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	}
 
 	/* Free the BO*/
-	unreserve_system_memory_limit(mem->bo);
 	bo_list_entry = &mem->bo_list_entry;
 	mutex_lock(&master_vm->lock);
 	list_del(&bo_list_entry->tv.head);
