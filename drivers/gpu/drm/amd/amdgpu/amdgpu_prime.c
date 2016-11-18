@@ -160,7 +160,7 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 	return drm_gem_prime_export(dev, gobj, flags);
 }
 
-static struct drm_gem_object *
+struct drm_gem_object *
 amdgpu_gem_prime_foreign_bo(struct amdgpu_device *adev, struct amdgpu_bo *bo)
 {
 	struct amdgpu_gem_object *gobj;
