@@ -1798,7 +1798,8 @@ static int kfd_ioctl_import_dmabuf(struct file *filep,
 
 	r = dev->kfd2kgd->import_dmabuf(dev->kgd, args->dmabuf_fd,
 					args->va_addr, pdd->vm,
-					(struct kgd_mem **)&mem, &size);
+					(struct kgd_mem **)&mem, &size,
+					NULL);
 	if (r)
 		return r;
 
