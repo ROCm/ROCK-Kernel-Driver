@@ -214,6 +214,8 @@ struct tile_config {
  * @import_dmabuf: Imports a DMA buffer, creating a new kgd_mem object
  * Supports only DMA buffers created by GPU driver on the same GPU
  *
+ * @export_dmabuf: Emports a KFD BO for sharing with other process
+ *
  * @submit_ib: Submits an IB to the engine specified by inserting the IB to
  * the corresonded ring (ring type).
  *
@@ -351,6 +353,8 @@ struct kfd2kgd_calls {
 			       uint32_t *metadata_size, uint32_t *flags);
 	int (*import_dmabuf)(struct kgd_dev *kgd, int dma_buf_fd, uint64_t va,
 			     void *vm, struct kgd_mem **mem, uint64_t *size);
+	int (*export_dmabuf)(struct kgd_dev *kgd, void *vm, struct kgd_mem *mem,
+				int *dma_buf_fd);
 
 	int (*get_vm_fault_info)(struct kgd_dev *kgd,
 			struct kfd_vm_fault_info *info);
