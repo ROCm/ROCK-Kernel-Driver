@@ -156,6 +156,145 @@ void amdgpu_amdkfd_unreserve_system_memory_limit(struct amdgpu_bo *bo)
 	spin_unlock(&kfd_mem_limit.mem_limit_lock);
 }
 
+
+/* amdgpu_amdkfd_remove_eviction_fence - Removes eviction fence(s) from BO's
+ *  reservation object.
+ *
+ * @bo: [IN] Remove eviction fence(s) from this BO
+ * @ef: [IN] If ef is specified, then this eviction fence is removed if it
+ *  is present in the shared list.
+ * @ef_list: [OUT] Returns list of eviction fences. These fences are removed
+ *  from BO's reservation object shared list.
+ * @ef_count: [OUT] Number of fences in ef_list.
+ *
+ * NOTE: If called with ef_list, then amdgpu_amdkfd_add_eviction_fence must be
+ *  called to restore the eviction fences and to avoid memory leak. This is
+ *  useful for shared BOs.
+ * NOTE: Must be called with BO reserved i.e. bo->tbo.resv->lock held.
+ */
+static int amdgpu_amdkfd_remove_eviction_fence(struct amdgpu_bo *bo,
+					struct amdgpu_amdkfd_fence *ef,
+					struct amdgpu_amdkfd_fence ***ef_list,
+					unsigned int *ef_count)
+{
+	struct reservation_object_list *fobj;
+	struct reservation_object *resv;
+	unsigned int i = 0, j = 0, k = 0, shared_count;
+	unsigned int count = 0;
+	struct amdgpu_amdkfd_fence **fence_list;
+
+	if (!ef && !ef_list)
+		return -EINVAL;
+
+	if (ef_list) {
+		*ef_list = NULL;
+		*ef_count = 0;
+	}
+
+	resv = bo->tbo.resv;
+	fobj = reservation_object_get_list(resv);
+
+	if (!fobj)
+		return 0;
+
+	preempt_disable();
+	write_seqcount_begin(&resv->seq);
+
+	/* Go through all the shared fences in the resevation object. If
+	 * ef is specified and it exists in the list, remove it and reduce the
+	 * count. If ef is not specified, then get the count of eviction fences
+	 * present.
+	 */
+	shared_count = fobj->shared_count;
+	for (i = 0; i < shared_count; ++i) {
+		struct fence *f;
+
+		f = rcu_dereference_protected(fobj->shared[i],
+					      reservation_object_held(resv));
+
+		if (ef) {
+			if (f->context == ef->base.context) {
+				fence_put(f);
+				fobj->shared_count--;
+			} else
+				RCU_INIT_POINTER(fobj->shared[j++], f);
+
+		} else if (to_amdgpu_amdkfd_fence(f))
+			count++;
+	}
+	write_seqcount_end(&resv->seq);
+	preempt_enable();
+
+	if (ef || !count)
+		return 0;
+
+	/* Alloc memory for count number of eviction fence pointers. Fill the
+	 * ef_list array and ef_count
+	 */
+
+	fence_list = kcalloc(count, sizeof(struct amdgpu_amdkfd_fence *),
+			     GFP_KERNEL);
+	if (!fence_list)
+		return -ENOMEM;
+
+	preempt_disable();
+	write_seqcount_begin(&resv->seq);
+
+	j = 0;
+	for (i = 0; i < shared_count; ++i) {
+		struct fence *f;
+		struct amdgpu_amdkfd_fence *efence;
+
+		f = rcu_dereference_protected(fobj->shared[i],
+			reservation_object_held(resv));
+
+		efence = to_amdgpu_amdkfd_fence(f);
+		if (efence) {
+			fence_list[k++] = efence;
+			fobj->shared_count--;
+		} else
+			RCU_INIT_POINTER(fobj->shared[j++], f);
+	}
+
+	write_seqcount_end(&resv->seq);
+	preempt_enable();
+
+	*ef_list = fence_list;
+	*ef_count = k;
+
+	return 0;
+}
+
+/* amdgpu_amdkfd_add_eviction_fence - Adds eviction fence(s) back into BO's
+ *  reservation object.
+ *
+ * @bo: [IN] Add eviction fences to this BO
+ * @ef_list: [IN] List of eviction fences to be added
+ * @ef_count: [IN] Number of fences in ef_list.
+ *
+ * NOTE: Must call amdgpu_amdkfd_remove_eviction_fence before calling this
+ *  function.
+ */
+static void amdgpu_amdkfd_add_eviction_fence(struct amdgpu_bo *bo,
+				struct amdgpu_amdkfd_fence **ef_list,
+				unsigned int ef_count)
+{
+	int i;
+
+	if (!ef_list || !ef_count)
+		return;
+
+	for (i = 0; i < ef_count; i++) {
+		amdgpu_bo_fence(bo, &ef_list[i]->base, true);
+		/* Readding the fence takes an additional reference. Drop that
+		 * reference.
+		 */
+		fence_put(&ef_list[i]->base);
+	}
+
+	kfree(ef_list);
+}
+
 static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
 		struct amdgpu_vm *avm, bool is_aql,
 		struct kfd_bo_va_list **p_bo_va_entry)
@@ -216,12 +355,25 @@ static int amdgpu_amdkfd_bo_validate(struct amdgpu_bo *bo, uint32_t domain,
 
 	if (!amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
 		amdgpu_ttm_placement_from_domain(bo, domain);
+
 		ret = ttm_bo_validate(&bo->tbo, &bo->placement,
 				      false, false);
 		if (ret)
 			goto validate_fail;
-		if (wait)
-			ret = ttm_bo_wait(&bo->tbo, false, false);
+		if (wait) {
+			struct amdgpu_amdkfd_fence **ef_list;
+			unsigned int ef_count;
+
+			ret = amdgpu_amdkfd_remove_eviction_fence(bo, NULL,
+								  &ef_list,
+								  &ef_count);
+			if (ret)
+				goto validate_fail;
+
+			ttm_bo_wait(&bo->tbo, false, false);
+			amdgpu_amdkfd_add_eviction_fence(bo, ef_list,
+							 ef_count);
+		}
 	} else {
 		/* Userptrs are not pinned. Therefore we can use the
 		 * bo->pin_count for our version of pinning without conflict.
@@ -270,7 +422,8 @@ static int validate_pt_pd_bos(struct amdgpu_vm *vm)
 	struct amdkfd_vm *kvm = container_of(vm, struct amdkfd_vm, base);
 
 	/* Remove eviction fence so that validate can wait on move fences */
-	amdgpu_bo_fence(pd, NULL, false);
+	amdgpu_amdkfd_remove_eviction_fence(pd, kvm->eviction_fence,
+					    NULL, NULL);
 
 	/* PTs share same reservation object as PD. So only fence PD */
 	for (i = 0; i <= vm->max_pde_used; ++i) {
@@ -1026,7 +1179,8 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	 * TODO: Log an error condition if the bo still has the eviction fence
 	 * attached
 	 */
-	amdgpu_bo_fence(mem->bo, NULL, false);
+	amdgpu_amdkfd_remove_eviction_fence(mem->bo, master_vm->eviction_fence,
+					    NULL, NULL);
 	pr_debug("Releasing BO with VA 0x%llx, size %lu bytes\n",
 					mem->va,
 					mem->bo->tbo.mem.size);
@@ -1337,12 +1491,14 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 	unsigned mapped_before;
 	int ret = 0;
 	struct bo_vm_reservation_context ctx;
+	struct amdkfd_vm *master_vm;
 	int num_to_resume = 0;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
 
 	adev = (struct amdgpu_device *) kgd;
+	master_vm = ((struct amdkfd_vm *)vm)->master;
 
 	mutex_lock(&mem->lock);
 
@@ -1401,11 +1557,11 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 
 	/* If BO is unmapped from all VMs, unfence it. It can be evicted if
 	 * required.
-	 * TODO: For interop this will remove fences added by graphics driver.
-	 * Remove only KFD eviction fence
 	 */
 	if (mem->mapped_to_gpu_memory == 0)
-		amdgpu_bo_fence(mem->bo, NULL, false);
+		amdgpu_amdkfd_remove_eviction_fence(mem->bo,
+						    master_vm->eviction_fence,
+						    NULL, NULL);
 
 	if (mapped_before == mem->mapped_to_gpu_memory) {
 		pr_debug("BO size %lu bytes at va 0x%llx is not mapped on GPU %x:%x.%x\n",
