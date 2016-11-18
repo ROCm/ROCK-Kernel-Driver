@@ -1845,6 +1845,33 @@ out_put:
 	return r;
 }
 
+int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
+					struct kgd_mem *mem, int *dmabuf_fd)
+{
+	struct dma_buf *dmabuf;
+	struct amdgpu_device *adev = NULL;
+	struct amdgpu_bo *bo = NULL;
+	struct drm_gem_object *gobj = NULL;
+
+	if (!dmabuf_fd || !kgd || !vm || !mem)
+		return -EINVAL;
+
+	adev = get_amdgpu_device(kgd);
+	bo = mem->bo;
+
+	gobj = amdgpu_gem_prime_foreign_bo(adev, bo);
+	if (gobj == NULL) {
+		pr_err("Export BO failed. Unable to find/create GEM object\n");
+		return -EINVAL;
+	}
+
+	dmabuf = amdgpu_gem_prime_export(adev->ddev, gobj, 0);
+	*dmabuf_fd = dma_buf_fd(dmabuf, 0);
+
+	pr_debug("Exported: %d\n", *dmabuf_fd);
+	return 0;
+}
+
 /* Runs out of process context. mem->lock must be held. */
 int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm)
 {
