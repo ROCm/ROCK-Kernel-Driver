@@ -1791,7 +1791,8 @@ void amdgpu_amdkfd_gpuvm_unpin_put_sg_table(
 
 int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 				      uint64_t va, void *vm,
-				      struct kgd_mem **mem, uint64_t *size)
+				      struct kgd_mem **mem, uint64_t *size,
+				      uint64_t *mmap_offset)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 	struct dma_buf *dma_buf;
@@ -1821,6 +1822,9 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 
 	if (size)
 		*size = amdgpu_bo_size(bo);
+
+	if (mmap_offset)
+		*mmap_offset = amdgpu_bo_mmap_offset(bo);
 
 	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
 	if (*mem == NULL) {

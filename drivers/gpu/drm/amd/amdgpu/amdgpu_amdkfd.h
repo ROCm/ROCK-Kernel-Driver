@@ -191,7 +191,8 @@ void amdgpu_amdkfd_gpuvm_unpin_put_sg_table(
 		struct kgd_mem *mem, struct sg_table *sg);
 int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 				      uint64_t va, void *vm,
-				      struct kgd_mem **mem, uint64_t *size);
+				      struct kgd_mem **mem, uint64_t *size,
+				      uint64_t *mmap_offset);
 int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
 				      struct kgd_mem *mem, int *dmabuf_fd);
 int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm);
