@@ -352,7 +352,8 @@ struct kfd2kgd_calls {
 			       void *metadata_buffer, size_t buffer_size,
 			       uint32_t *metadata_size, uint32_t *flags);
 	int (*import_dmabuf)(struct kgd_dev *kgd, int dma_buf_fd, uint64_t va,
-			     void *vm, struct kgd_mem **mem, uint64_t *size);
+			     void *vm, struct kgd_mem **mem, uint64_t *size,
+			     uint64_t *mmap_offset);
 	int (*export_dmabuf)(struct kgd_dev *kgd, void *vm, struct kgd_mem *mem,
 				int *dma_buf_fd);
 
