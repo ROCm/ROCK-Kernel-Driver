@@ -37,6 +37,7 @@
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_dbgmgr.h"
+#include "kfd_ipc.h"
 #include "cik_regs.h"
 
 static long kfd_ioctl(struct file *, unsigned int, unsigned long);
@@ -1179,7 +1180,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 
 	down_write(&p->lock);
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
-			args->va_addr, args->size);
+			args->va_addr, args->size, NULL);
 	up_write(&p->lock);
 	if (idr_handle < 0) {
 		dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
@@ -1320,7 +1321,7 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 
 	down_write(&p->lock);
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
-			args->va_addr, args->size);
+			args->va_addr, args->size, NULL);
 	up_write(&p->lock);
 	if (idr_handle < 0) {
 		dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
@@ -1671,7 +1672,7 @@ static int kfd_ioctl_open_graphic_handle(struct file *filep,
 	* the corresponding interval tree. We need to know the size of
 	* the buffer through open_graphic_handle(). We use 1 for now.*/
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
-			args->va_addr, 1);
+			args->va_addr, 1, NULL);
 	up_write(&p->lock);
 	if (idr_handle < 0) {
 		/* FIXME: destroy_process_gpumem doesn't seem to be
@@ -1776,47 +1777,62 @@ exit:
 }
 
 static int kfd_ioctl_import_dmabuf(struct file *filep,
-		struct kfd_process *p, void *data)
+				   struct kfd_process *p, void *data)
 {
 	struct kfd_ioctl_import_dmabuf_args *args = data;
 	struct kfd_dev *dev;
-	struct kfd_process_device *pdd;
-	void *mem;
-	uint64_t size;
-	int idr_handle;
 	int r;
 
 	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev || !dev->kfd2kgd->import_dmabuf)
+	if (!dev)
 		return -EINVAL;
 
-	down_write(&p->lock);
-	pdd = kfd_bind_process_to_device(dev, p);
-	up_write(&p->lock);
-	if (IS_ERR(pdd) < 0)
-		return PTR_ERR(pdd);
-
-	r = dev->kfd2kgd->import_dmabuf(dev->kgd, args->dmabuf_fd,
-					args->va_addr, pdd->vm,
-					(struct kgd_mem **)&mem, &size,
-					NULL);
+	r = kfd_ipc_import_dmabuf(dev, p, args->gpu_id, args->dmabuf_fd,
+				  args->va_addr, &args->handle, NULL);
 	if (r)
-		return r;
+		dev_err(kfd_device, "Failed to import dmabuf\n");
 
-	down_write(&p->lock);
-	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
-			args->va_addr, size);
-	up_write(&p->lock);
-	if (idr_handle < 0) {
-		dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
-						 (struct kgd_mem *)mem,
-						 pdd->vm);
-		return -EFAULT;
-	}
+	return r;
+}
 
-	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
+static int kfd_ioctl_ipc_export_handle(struct file *filep,
+				       struct kfd_process *p,
+				       void *data)
+{
+	struct kfd_ioctl_ipc_export_handle_args *args = data;
+	struct kfd_dev *dev;
+	int r;
 
-	return 0;
+	dev = kfd_device_by_id(args->gpu_id);
+	if (!dev)
+		return -EINVAL;
+
+	r = kfd_ipc_export_as_handle(dev, p, args->handle, args->share_handle);
+	if (r)
+		dev_err(kfd_device, "Failed to export IPC handle\n");
+
+	return r;
+}
+
+static int kfd_ioctl_ipc_import_handle(struct file *filep,
+				       struct kfd_process *p,
+				       void *data)
+{
+	struct kfd_ioctl_ipc_import_handle_args *args = data;
+	struct kfd_dev *dev = NULL;
+	int r;
+
+	dev = kfd_device_by_id(args->gpu_id);
+	if (!dev)
+		return -EINVAL;
+
+	r = kfd_ipc_import_handle(dev, p, args->gpu_id, args->share_handle,
+				  args->va_addr, &args->handle,
+				  &args->mmap_offset);
+	if (r)
+		dev_err(kfd_device, "Failed to import IPC handle\n");
+
+	return r;
 }
 
 static int kfd_ioctl_get_tile_config(struct file *filep,
@@ -1958,7 +1974,14 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 				kfd_ioctl_import_dmabuf, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_TILE_CONFIG,
-				kfd_ioctl_get_tile_config, 0)
+				kfd_ioctl_get_tile_config, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_IMPORT_HANDLE,
+				kfd_ioctl_ipc_import_handle, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_EXPORT_HANDLE,
+				kfd_ioctl_ipc_export_handle, 0)
+
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
