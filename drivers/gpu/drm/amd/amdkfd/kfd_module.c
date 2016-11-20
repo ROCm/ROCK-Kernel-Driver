@@ -133,6 +133,10 @@ static int __init kfd_module_init(void)
 	if (err < 0)
 		goto err_topology;
 
+	err = kfd_ipc_init();
+	if (err < 0)
+		goto err_topology;
+
 	kfd_process_create_wq();
 
 	kfd_init_peer_direct();

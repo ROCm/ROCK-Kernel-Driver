@@ -356,6 +356,22 @@ struct kfd_ioctl_import_dmabuf_args {
 	uint32_t dmabuf_fd;	/* to KFD */
 };
 
+struct kfd_ioctl_ipc_export_handle_args {
+	uint64_t handle;		/* to KFD */
+	uint32_t share_handle[4];	/* from KFD */
+	uint32_t gpu_id;		/* to KFD */
+	uint32_t pad;
+};
+
+struct kfd_ioctl_ipc_import_handle_args {
+	uint64_t handle;		/* from KFD */
+	uint64_t va_addr;		/* to KFD */
+	uint64_t mmap_offset;		/* from KFD */
+	uint32_t share_handle[4];	/* to KFD */
+	uint32_t gpu_id;		/* to KFD */
+	uint32_t pad;
+};
+
 struct kfd_ioctl_get_tile_config_args {
 	/* to KFD: pointer to tile array */
 	uint64_t tile_config_ptr;
@@ -482,7 +498,13 @@ struct kfd_ioctl_get_tile_config_args {
 #define AMDKFD_IOC_GET_TILE_CONFIG		\
 	AMDKFD_IOWR(0x21, struct kfd_ioctl_get_tile_config_args)
 
+#define AMDKFD_IOC_IPC_IMPORT_HANDLE		\
+	AMDKFD_IOWR(0x22, struct kfd_ioctl_ipc_import_handle_args)
+
+#define AMDKFD_IOC_IPC_EXPORT_HANDLE		\
+	AMDKFD_IOWR(0x23, struct kfd_ioctl_ipc_export_handle_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x22
+#define AMDKFD_COMMAND_END		0x24
 
 #endif
