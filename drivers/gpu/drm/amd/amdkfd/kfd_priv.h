@@ -280,11 +280,14 @@ struct kfd_dev {
 	uint32_t ib_size;
 };
 
+struct kfd_ipc_obj;
+
 struct kfd_bo {
 	void *mem;
 	struct interval_tree_node it;
 	struct kfd_dev *dev;
 	struct list_head cb_data_head;
+	struct kfd_ipc_obj *kfd_ipc_obj;
 };
 
 /* KGD2KFD callbacks */
@@ -729,7 +732,8 @@ int kfd_reserved_mem_mmap(struct kfd_process *process, struct vm_area_struct *vm
 /* KFD process API for creating and translating handles */
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 					void *mem, uint64_t start,
-					uint64_t length);
+					uint64_t length,
+					struct kfd_ipc_obj *ipc_obj);
 void *kfd_process_device_translate_handle(struct kfd_process_device *p,
 					int handle);
 struct kfd_bo *kfd_process_device_find_bo(struct kfd_process_device *pdd,
@@ -963,6 +967,9 @@ int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 /* PeerDirect support */
 void kfd_init_peer_direct(void);
 void kfd_close_peer_direct(void);
+
+/* IPC Support */
+int kfd_ipc_init(void);
 
 /* Debugfs */
 #if defined(CONFIG_DEBUG_FS)
