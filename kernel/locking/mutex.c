@@ -409,6 +409,9 @@ static bool mutex_optimistic_spin(struct mutex *lock,
 __visible __used noinline
 void __sched __mutex_unlock_slowpath(atomic_t *lock_count);
 
+static __used noinline
+void __sched __mutex_unlock_slowpath_wakeall(atomic_t *lock_count);
+
 /**
  * mutex_unlock - release the mutex
  * @lock: the mutex to be released
@@ -473,7 +476,7 @@ void __sched ww_mutex_unlock(struct ww_mutex *lock)
 	 */
 	mutex_clear_owner(&lock->base);
 #endif
-	__mutex_fastpath_unlock(&lock->base.count, __mutex_unlock_slowpath);
+	__mutex_fastpath_unlock(&lock->base.count, __mutex_unlock_slowpath_wakeall);
 }
 EXPORT_SYMBOL(ww_mutex_unlock);
 
@@ -716,7 +719,7 @@ EXPORT_SYMBOL_GPL(__ww_mutex_lock_interruptible);
  * Release the lock, slowpath:
  */
 static inline void
-__mutex_unlock_common_slowpath(struct mutex *lock, int nested)
+__mutex_unlock_common_slowpath(struct mutex *lock, int nested, int wake_all)
 {
 	unsigned long flags;
 	WAKE_Q(wake_q);
@@ -740,7 +743,13 @@ __mutex_unlock_common_slowpath(struct mutex *lock, int nested)
 	mutex_release(&lock->dep_map, nested, _RET_IP_);
 	debug_mutex_unlock(lock);
 
-	if (!list_empty(&lock->wait_list)) {
+	if (wake_all) {
+		struct mutex_waiter *waiter;
+		list_for_each_entry(waiter, &lock->wait_list, list) {
+			debug_mutex_wake_waiter(lock, waiter);
+			wake_up_process(waiter->task);
+		}
+	} else if (!list_empty(&lock->wait_list)) {
 		/* get the first entry from the wait-list: */
 		struct mutex_waiter *waiter =
 				list_entry(lock->wait_list.next,
@@ -762,7 +771,15 @@ __mutex_unlock_slowpath(atomic_t *lock_count)
 {
 	struct mutex *lock = container_of(lock_count, struct mutex, count);
 
-	__mutex_unlock_common_slowpath(lock, 1);
+	__mutex_unlock_common_slowpath(lock, 1, 0);
+}
+
+static void
+__mutex_unlock_slowpath_wakeall(atomic_t *lock_count)
+{
+	struct mutex *lock = container_of(lock_count, struct mutex, count);
+
+	__mutex_unlock_common_slowpath(lock, 1, 1);
 }
 
 #ifndef CONFIG_DEBUG_LOCK_ALLOC
