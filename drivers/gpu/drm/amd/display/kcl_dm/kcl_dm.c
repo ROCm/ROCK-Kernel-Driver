@@ -1638,61 +1638,8 @@ void dce_v12_0_resume_mc_access(struct amdgpu_device *adev,
 #endif
 }
 
-void dce_v12_0_set_vga_render_state(struct amdgpu_device *adev,
-				    bool render)
-{
-	u32 tmp;
-
-	/* Lockout access through VGA aperture*/
-	tmp = RREG32(0xCA);
-	if (render) {
-		tmp = tmp & 0xFFFFFFEF;
-		WREG32(0xCA, tmp);
-	} else {
-		tmp |= 0x10;
-		WREG32(0xCA, tmp);
-	}
-
-	/* disable VGA render */
-	tmp = RREG32(0xC0);
-	if (render) {
-		tmp |=  0x10000;
-		WREG32(0xC0, tmp);
-	} else {
-		tmp = tmp & 0xFFFCFFFF;
-		WREG32(0xC0, tmp);
-	}
-}
-
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
-void dcn_v1_0_set_vga_render_state(struct amdgpu_device *adev,
-				    bool render)
-{
-	u32 tmp;
-
-	/* Lockout access through VGA aperture*/
-	tmp = RREG32(SOC15_REG_OFFSET(DCE, 0, mmVGA_HDP_CONTROL));
-	if (render)
-		tmp = tmp & 0xFFFFFFEF;
-	else
-		tmp |= 0x10;
-
-	WREG32(SOC15_REG_OFFSET(DCE, 0, mmVGA_HDP_CONTROL), tmp);
-
-	/* disable VGA render */
-	tmp = RREG32(SOC15_REG_OFFSET(DCE, 0, mmVGA_RENDER_CONTROL));
-	if (render)
-		tmp |=  0x10000;
-	else
-		tmp = tmp & 0xFFFCFFFF;
-
-	WREG32(SOC15_REG_OFFSET(DCE, 0, mmVGA_HDP_CONTROL), tmp);
-}
-#endif
-
 #ifdef CONFIG_DRM_AMDGPU_CIK
 static const struct amdgpu_display_funcs dm_dce_v8_0_display_funcs = {
-	.set_vga_render_state = dce_v8_0_set_vga_render_state,
 	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
 	.vblank_get_counter = dm_vblank_get_counter,/* called unconditionally */
 	.vblank_wait = NULL,
@@ -1715,7 +1662,6 @@ static const struct amdgpu_display_funcs dm_dce_v8_0_display_funcs = {
 #endif
 
 static const struct amdgpu_display_funcs dm_dce_v10_0_display_funcs = {
-	.set_vga_render_state = dce_v10_0_set_vga_render_state,
 	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
 	.vblank_get_counter = dm_vblank_get_counter,/* called unconditionally */
 	.vblank_wait = NULL,
@@ -1738,7 +1684,6 @@ static const struct amdgpu_display_funcs dm_dce_v10_0_display_funcs = {
 };
 
 static const struct amdgpu_display_funcs dm_dce_v11_0_display_funcs = {
-	.set_vga_render_state = dce_v11_0_set_vga_render_state,
 	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
 	.vblank_get_counter = dm_vblank_get_counter,/* called unconditionally */
 	.vblank_wait = NULL,
@@ -1761,7 +1706,6 @@ static const struct amdgpu_display_funcs dm_dce_v11_0_display_funcs = {
 };
 
 static const struct amdgpu_display_funcs dm_dce_v12_0_display_funcs = {
-	.set_vga_render_state = dce_v12_0_set_vga_render_state,
 	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
 	.vblank_get_counter = dm_vblank_get_counter,/* called unconditionally */
 	.vblank_wait = NULL,
@@ -1785,7 +1729,6 @@ static const struct amdgpu_display_funcs dm_dce_v12_0_display_funcs = {
 
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 static const struct amdgpu_display_funcs dm_dcn_v1_0_display_funcs = {
-	.set_vga_render_state = dcn_v1_0_set_vga_render_state,
 	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
 	.vblank_get_counter = dm_vblank_get_counter,/* called unconditionally */
 	.vblank_wait = NULL,
