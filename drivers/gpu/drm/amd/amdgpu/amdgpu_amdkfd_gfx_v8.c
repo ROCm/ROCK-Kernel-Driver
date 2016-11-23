@@ -20,6 +20,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#define pr_fmt(fmt) "kfd2kgd: " fmt
+
 #include <linux/module.h>
 #include <linux/fdtable.h>
 #include <linux/uaccess.h>
@@ -346,7 +348,7 @@ static inline uint32_t get_sdma_base_addr(struct vi_sdma_mqd *m)
 
 	retval = m->sdma_engine_id * SDMA1_REGISTER_OFFSET +
 		m->sdma_queue_id * KFD_VI_SDMA_QUEUE_OFFSET;
-	pr_debug("kfd: sdma base address: 0x%x\n", retval);
+	pr_debug("sdma base address: 0x%x\n", retval);
 
 	return retval;
 }
@@ -632,7 +634,7 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd,
 			break;
 	loop:
 		if (!retry) {
-			pr_err("kfd: CP HQD IQ timer status time out\n");
+			pr_err("CP HQD IQ timer status time out\n");
 			break;
 		}
 		ndelay(100);
@@ -646,7 +648,7 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd,
 		pr_debug("Dequeue request is pending\n");
 
 		if (!retry) {
-			pr_err("kfd: CP HQD dequeue request time out\n");
+			pr_err("CP HQD dequeue request time out\n");
 			break;
 		}
 		ndelay(100);
@@ -663,7 +665,7 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd,
 		if (!(temp & CP_HQD_ACTIVE__ACTIVE_MASK))
 			break;
 		if (time_after(jiffies, end_jiffies)) {
-			pr_err("kfd: cp queue preemption time out.\n");
+			pr_err("cp queue preemption time out.\n");
 			release_queue(kgd);
 			return -ETIME;
 		}
@@ -916,7 +918,7 @@ static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	/* TODO: Don't use hardcoded VMIDs */
 	if (vmid < 8 || vmid > 15) {
-		pr_err("amdkfd: trying to set page table base for wrong VMID\n");
+		pr_err("trying to set page table base for wrong VMID\n");
 		return;
 	}
 	WREG32(mmVM_CONTEXT8_PAGE_TABLE_BASE_ADDR + vmid - 8, page_table_base);
