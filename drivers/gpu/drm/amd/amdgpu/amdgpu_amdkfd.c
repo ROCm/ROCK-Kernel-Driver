@@ -20,6 +20,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#define pr_fmt(fmt) "kfd2kgd: " fmt
+
 #include "amdgpu_amdkfd.h"
 #include <linux/dma-buf.h>
 #include <drm/drmP.h>
@@ -435,7 +437,7 @@ void get_local_mem_info(struct kgd_dev *kgd,
 	}
 	mem_info->vram_width = adev->mc.vram_width;
 
-	pr_debug("amdgpu: address base: 0x%llx limit 0x%llx public 0x%llx private 0x%llx\n",
+	pr_debug("Address base: 0x%llx limit 0x%llx public 0x%llx private 0x%llx\n",
 			adev->mc.aper_base, aper_limit,
 			mem_info->local_mem_size_public,
 			mem_info->local_mem_size_private);
