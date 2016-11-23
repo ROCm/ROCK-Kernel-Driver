@@ -813,7 +813,7 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 
 	p = pdd->process;
 
-	buf_obj = kmalloc(sizeof(*buf_obj), GFP_KERNEL);
+	buf_obj = kzalloc(sizeof(*buf_obj), GFP_KERNEL);
 
 	if (!buf_obj)
 		return -ENOMEM;
