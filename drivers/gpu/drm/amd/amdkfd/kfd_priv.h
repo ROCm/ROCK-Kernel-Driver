@@ -278,11 +278,6 @@ struct kfd_dev {
 
 	/* IB usage */
 	uint32_t ib_size;
-
-	/* Debugfs */
-#if defined(CONFIG_DEBUG_FS)
-	struct dentry *debugfs_root;
-#endif
 };
 
 struct kfd_bo {
@@ -972,12 +967,19 @@ void kfd_close_peer_direct(void);
 /* Debugfs */
 #if defined(CONFIG_DEBUG_FS)
 
+void kfd_debugfs_init(void);
+void kfd_debugfs_fini(void);
 int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data);
 int pqm_debugfs_mqds(struct seq_file *m, void *data);
 int kfd_debugfs_hqds_by_device(struct seq_file *m, void *data);
 int device_queue_manager_debugfs_hqds(struct seq_file *m, void *data);
 int kfd_debugfs_rls_by_device(struct seq_file *m, void *data);
 int pm_debugfs_runlist(struct seq_file *m, void *data);
+
+#else
+
+static inline void kfd_debugfs_init(void) {}
+static inline void kfd_debugfs_fini(void) {}
 
 #endif
 
