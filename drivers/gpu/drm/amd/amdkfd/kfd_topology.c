@@ -1256,6 +1256,8 @@ int kfd_get_proximity_domain(const struct pci_bus *bus)
 	return proximity_domain;
 }
 
+#if defined(CONFIG_DEBUG_FS)
+
 int kfd_debugfs_hqds_by_device(struct seq_file *m, void *data)
 {
 	struct kfd_topology_device *dev;
@@ -1305,3 +1307,5 @@ int kfd_debugfs_rls_by_device(struct seq_file *m, void *data)
 
 	return r;
 }
+
+#endif
