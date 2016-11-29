@@ -1789,48 +1789,41 @@ void amdgpu_amdkfd_gpuvm_unpin_put_sg_table(
 	unpin_bo_wo_map(mem);
 }
 
-int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
+int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
+				      struct dma_buf *dma_buf,
 				      uint64_t va, void *vm,
 				      struct kgd_mem **mem, uint64_t *size,
 				      uint64_t *mmap_offset)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-	struct dma_buf *dma_buf;
 	struct drm_gem_object *obj;
 	struct amdgpu_bo *bo;
-	int r = 0;
 	struct amdkfd_vm *kfd_vm = (struct amdkfd_vm *)vm;
-
-	dma_buf = dma_buf_get(dma_buf_fd);
-	if (IS_ERR(dma_buf))
-		return PTR_ERR(dma_buf);
 
 	if (dma_buf->ops != &drm_gem_prime_dmabuf_ops)
 		/* Can't handle non-graphics buffers */
-		goto out_put;
+		return -EINVAL;
 
 	obj = dma_buf->priv;
 	if (obj->dev->dev_private != adev)
 		/* Can't handle buffers from other devices */
-		goto out_put;
+		return -EINVAL;
 
 	bo = gem_to_amdgpu_bo(obj);
 	if (!(bo->prefered_domains & (AMDGPU_GEM_DOMAIN_VRAM |
 				    AMDGPU_GEM_DOMAIN_GTT)))
 		/* Only VRAM and GTT BOs are supported */
-		goto out_put;
+		return -EINVAL;
+
+	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
+	if (*mem == NULL)
+		return -ENOMEM;
 
 	if (size)
 		*size = amdgpu_bo_size(bo);
 
 	if (mmap_offset)
 		*mmap_offset = amdgpu_bo_mmap_offset(bo);
-
-	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
-	if (*mem == NULL) {
-		r = -ENOMEM;
-		goto out_put;
-	}
 
 	INIT_LIST_HEAD(&(*mem)->bo_va_list);
 	mutex_init(&(*mem)->lock);
@@ -1844,20 +1837,18 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd, int dma_buf_fd,
 	(*mem)->mapped_to_gpu_memory = 0;
 	add_kgd_mem_to_kfd_bo_list(*mem, kfd_vm);
 
-out_put:
-	dma_buf_put(dma_buf);
-	return r;
+	return 0;
 }
 
 int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
-					struct kgd_mem *mem, int *dmabuf_fd)
+				      struct kgd_mem *mem,
+				      struct dma_buf **dmabuf)
 {
-	struct dma_buf *dmabuf;
 	struct amdgpu_device *adev = NULL;
 	struct amdgpu_bo *bo = NULL;
 	struct drm_gem_object *gobj = NULL;
 
-	if (!dmabuf_fd || !kgd || !vm || !mem)
+	if (!dmabuf || !kgd || !vm || !mem)
 		return -EINVAL;
 
 	adev = get_amdgpu_device(kgd);
@@ -1869,10 +1860,7 @@ int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
 		return -EINVAL;
 	}
 
-	dmabuf = amdgpu_gem_prime_export(adev->ddev, gobj, 0);
-	*dmabuf_fd = dma_buf_fd(dmabuf, 0);
-
-	pr_debug("Exported: %d\n", *dmabuf_fd);
+	*dmabuf = amdgpu_gem_prime_export(adev->ddev, gobj, 0);
 	return 0;
 }
 
