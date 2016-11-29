@@ -32,6 +32,7 @@
 #include <linux/mm_types.h>
 #include <linux/scatterlist.h>
 #include <linux/fence.h>
+#include <linux/dma-buf.h>
 
 struct pci_dev;
 
@@ -351,11 +352,11 @@ struct kfd2kgd_calls {
 			       struct kgd_dev **dma_buf_kgd, uint64_t *bo_size,
 			       void *metadata_buffer, size_t buffer_size,
 			       uint32_t *metadata_size, uint32_t *flags);
-	int (*import_dmabuf)(struct kgd_dev *kgd, int dma_buf_fd, uint64_t va,
-			     void *vm, struct kgd_mem **mem, uint64_t *size,
-			     uint64_t *mmap_offset);
+	int (*import_dmabuf)(struct kgd_dev *kgd, struct dma_buf *dmabuf,
+			     uint64_t va, void *vm, struct kgd_mem **mem,
+			     uint64_t *size, uint64_t *mmap_offset);
 	int (*export_dmabuf)(struct kgd_dev *kgd, void *vm, struct kgd_mem *mem,
-				int *dma_buf_fd);
+				struct dma_buf **dmabuf);
 
 	int (*get_vm_fault_info)(struct kgd_dev *kgd,
 			struct kfd_vm_fault_info *info);

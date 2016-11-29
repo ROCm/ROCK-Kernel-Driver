@@ -185,7 +185,7 @@ int kfd_ipc_init(void)
 
 static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 			  struct kfd_process *p,
-			  uint32_t gpu_id, int dmabuf_fd,
+			  uint32_t gpu_id, struct dma_buf *dmabuf,
 			  uint64_t va_addr, uint64_t *handle,
 			  uint64_t *mmap_offset,
 			  struct kfd_ipc_obj *ipc_obj)
@@ -210,7 +210,7 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 	if (IS_ERR(pdd) < 0)
 		return PTR_ERR(pdd);
 
-	r = dev->kfd2kgd->import_dmabuf(dev->kgd, dmabuf_fd,
+	r = dev->kfd2kgd->import_dmabuf(dev->kgd, dmabuf,
 					va_addr, pdd->vm,
 					(struct kgd_mem **)&mem, &size,
 					mmap_offset);
@@ -243,9 +243,17 @@ int kfd_ipc_import_dmabuf(struct kfd_dev *dev,
 					   uint64_t va_addr, uint64_t *handle,
 					   uint64_t *mmap_offset)
 {
-	return kfd_import_dmabuf_create_kfd_bo(dev, p, gpu_id, dmabuf_fd,
-					       va_addr, handle, mmap_offset,
-					       NULL);
+	int r;
+	struct dma_buf *dmabuf = dma_buf_get(dmabuf_fd);
+
+	if (dmabuf == NULL)
+		return -EINVAL;
+
+	r = kfd_import_dmabuf_create_kfd_bo(dev, p, gpu_id, dmabuf,
+					    va_addr, handle, mmap_offset,
+					    NULL);
+	dma_buf_put(dmabuf);
+	return r;
 }
 
 int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
@@ -254,7 +262,6 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 			  uint64_t *mmap_offset)
 {
 	int r;
-	int dmabuf_fd;
 	struct kfd_ipc_obj *found;
 
 	found = assoc_array_find(&ipc_handles,
@@ -266,8 +273,7 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 
 	pr_debug("ipc: found ipc_dma_buf: %p\n", found->data);
 
-	dmabuf_fd = dma_buf_fd(found->data, 0);
-	r = kfd_import_dmabuf_create_kfd_bo(dev, p, gpu_id, dmabuf_fd,
+	r = kfd_import_dmabuf_create_kfd_bo(dev, p, gpu_id, found->data,
 					    va_addr, handle, mmap_offset,
 					    found);
 	if (r)
@@ -286,7 +292,7 @@ int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 	struct kfd_process_device *pdd = NULL;
 	struct kfd_ipc_obj *obj;
 	struct kfd_bo *kfd_bo = NULL;
-	int dmabuf_fd;
+	struct dma_buf *dmabuf;
 	int r;
 
 	if (!dev || !ipc_handle)
@@ -317,11 +323,11 @@ int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 
 	r = dev->kfd2kgd->export_dmabuf(dev->kgd, pdd->vm,
 					(struct kgd_mem *)kfd_bo->mem,
-					&dmabuf_fd);
+					&dmabuf);
 	if (r)
 		goto err;
 
-	r = ipc_store_insert(dma_buf_get(dmabuf_fd), ipc_handle, &obj);
+	r = ipc_store_insert(dmabuf, ipc_handle, &obj);
 	if (r)
 		goto err;
 
