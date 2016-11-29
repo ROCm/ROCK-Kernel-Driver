@@ -639,7 +639,7 @@ int amdgpu_dm_irq_handler(
 		dc_interrupt_to_irq_source(
 			adev->dm.dc,
 			entry->src_id,
-			entry->src_data);
+			entry->src_data[0]);
 
 	dc_interrupt_ack(adev->dm.dc, src);
 
