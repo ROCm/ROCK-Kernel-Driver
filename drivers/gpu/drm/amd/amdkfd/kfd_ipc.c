@@ -21,100 +21,29 @@
  */
 
 #include <linux/dma-buf.h>
-#include <linux/assoc_array.h>
 #include <linux/slab.h>
 #include <linux/random.h>
 
 #include "kfd_ipc.h"
 #include "kfd_priv.h"
 
-/**
- * The assoc_array data structure provides a non-intrusive
- * key-value data store mechanism where the key can be
- * arbitratily long (and value is just a void*).
- *
- * This provides us good control for managing IPC handle length
- * in case we require extra entropy to discourage handle-guessing.
+#define KFD_IPC_HASH_TABLE_SIZE_SHIFT 4
+#define KFD_IPC_HASH_TABLE_SIZE_MASK ((1 << KFD_IPC_HASH_TABLE_SIZE_SHIFT) - 1)
+
+static struct kfd_ipc_handles {
+	DECLARE_HASHTABLE(handles, KFD_IPC_HASH_TABLE_SIZE_SHIFT);
+	struct mutex lock;
+} kfd_ipc_handles;
+
+/* Since, handles are random numbers, it can be used directly as hashing key.
+ * The least 4 bits of the handle are used as key. However, during import all
+ * 128 bits of the handle are checked to prevent handle snooping.
  */
-static struct assoc_array ipc_handles;
+#define HANDLE_TO_KEY(sh) ((*(uint64_t *)sh) & KFD_IPC_HASH_TABLE_SIZE_MASK)
 
-static unsigned long ipc_get_key_chunk(const void *index_key, int level)
-{
-	unsigned long chunk;
-	int index = level/ASSOC_ARRAY_KEY_CHUNK_SIZE;
-
-	/* no more data, but we can't fail */
-	if (level > IPC_KEY_SIZE_BYTES*8)
-		return 0;
-
-	chunk = ((unsigned long *)index_key)[index];
-	return chunk;
-}
-
-static unsigned long ipc_get_object_key_chunk(const void *object, int level)
-{
-	const struct kfd_ipc_obj *obj = (const struct kfd_ipc_obj *)object;
-
-	return ipc_get_key_chunk(&obj->key, level);
-}
-
-static bool ipc_compare_object(const void *object, const void *index_key)
-{
-	const struct kfd_ipc_obj *obj = (const struct kfd_ipc_obj *)object;
-
-	return memcmp(obj->key, index_key, IPC_KEY_SIZE_BYTES) == 0;
-}
-
-/*
- * Compare the index keys of a pair of objects and determine the bit position
- * at which they differ - if they differ.
- */
-static int ipc_diff_objects(const void *object, const void *index_key)
-{
-	const struct kfd_ipc_obj *obj = (const struct kfd_ipc_obj *)object;
-	int i;
-
-	/* naive linear byte search */
-	for (i = 0; i < IPC_KEY_SIZE_BYTES; ++i) {
-		if (obj->key[i] != ((char *)index_key)[i])
-			return i * 8;
-	}
-
-	return -1;
-}
-
-/*
- * Free an object after stripping the ipc flag off of the pointer.
- */
-static void ipc_free_object(void *object)
-{
-}
-
-/*
- * Operations for ipc management by the index-tree routines.
- */
-static const struct assoc_array_ops ipc_assoc_array_ops = {
-	.get_key_chunk		= ipc_get_key_chunk,
-	.get_object_key_chunk	= ipc_get_object_key_chunk,
-	.compare_object		= ipc_compare_object,
-	.diff_objects		= ipc_diff_objects,
-	.free_object		= ipc_free_object,
-};
-
-static void ipc_gen_key(void *buf)
-{
-	uint32_t *key = (uint32_t *) buf;
-
-	get_random_bytes(buf, IPC_KEY_SIZE_BYTES);
-
-	/* last byte of the key is reserved */
-	key[3] = (key[3] & ~0xFF) | 0x1;
-}
-
-static int ipc_store_insert(void *val, void *key, struct kfd_ipc_obj **ipc_obj)
+static int ipc_store_insert(void *val, void *sh, struct kfd_ipc_obj **ipc_obj)
 {
 	struct kfd_ipc_obj *obj;
-	struct assoc_array_edit *edit;
 
 	obj = kmalloc(sizeof(struct kfd_ipc_obj), GFP_KERNEL);
 	if (!obj)
@@ -129,29 +58,18 @@ static int ipc_store_insert(void *val, void *key, struct kfd_ipc_obj **ipc_obj)
 	 */
 	kref_init(&obj->ref);
 	obj->data = val;
-	ipc_gen_key(obj->key);
+	get_random_bytes(obj->share_handle, sizeof(obj->share_handle));
 
-	memcpy(key, obj->key, IPC_KEY_SIZE_BYTES);
+	memcpy(sh, obj->share_handle, sizeof(obj->share_handle));
 
-	pr_debug("ipc: val::%p ref:%p\n", val, &obj->ref);
-
-	edit = assoc_array_insert(&ipc_handles,
-				  &ipc_assoc_array_ops,
-				  obj->key, obj);
-	assoc_array_apply_edit(edit);
+	mutex_lock(&kfd_ipc_handles.lock);
+	hlist_add_head(&obj->node,
+		&kfd_ipc_handles.handles[HANDLE_TO_KEY(obj->share_handle)]);
+	mutex_unlock(&kfd_ipc_handles.lock);
 
 	if (ipc_obj)
 		*ipc_obj = obj;
 
-	return 0;
-}
-
-static int ipc_store_remove(void *key)
-{
-	struct assoc_array_edit *edit;
-
-	edit = assoc_array_delete(&ipc_handles, &ipc_assoc_array_ops, key);
-	assoc_array_apply_edit(edit);
 	return 0;
 }
 
@@ -161,7 +79,10 @@ static void ipc_obj_release(struct kref *r)
 
 	obj = container_of(r, struct kfd_ipc_obj, ref);
 
-	ipc_store_remove(obj->key);
+	mutex_lock(&kfd_ipc_handles.lock);
+	hash_del(&obj->node);
+	mutex_unlock(&kfd_ipc_handles.lock);
+
 	dma_buf_put(obj->data);
 	kfree(obj);
 }
@@ -179,7 +100,8 @@ void ipc_obj_put(struct kfd_ipc_obj **obj)
 
 int kfd_ipc_init(void)
 {
-	assoc_array_init(&ipc_handles);
+	mutex_init(&kfd_ipc_handles.lock);
+	hash_init(kfd_ipc_handles.handles);
 	return 0;
 }
 
@@ -262,11 +184,22 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 			  uint64_t *mmap_offset)
 {
 	int r;
-	struct kfd_ipc_obj *found;
+	struct kfd_ipc_obj *entry, *found = NULL;
 
-	found = assoc_array_find(&ipc_handles,
-				 &ipc_assoc_array_ops,
-				 share_handle);
+	mutex_lock(&kfd_ipc_handles.lock);
+	/* Convert the user provided handle to hash key and search only in that
+	 * bucket
+	 */
+	hlist_for_each_entry(entry,
+		&kfd_ipc_handles.handles[HANDLE_TO_KEY(share_handle)], node) {
+		if (!memcmp(entry->share_handle, share_handle,
+			    sizeof(entry->share_handle))) {
+			found = entry;
+			break;
+		}
+	}
+	mutex_unlock(&kfd_ipc_handles.lock);
+
 	if (!found)
 		return -EINVAL;
 	ipc_obj_get(found);
@@ -316,8 +249,8 @@ int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 		return -EINVAL;
 	}
 	if (kfd_bo->kfd_ipc_obj) {
-		memcpy(ipc_handle, kfd_bo->kfd_ipc_obj->key,
-		       sizeof(kfd_bo->kfd_ipc_obj->key));
+		memcpy(ipc_handle, kfd_bo->kfd_ipc_obj->share_handle,
+		       sizeof(kfd_bo->kfd_ipc_obj->share_handle));
 		return 0;
 	}
 
