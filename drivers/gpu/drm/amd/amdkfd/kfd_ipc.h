@@ -27,12 +27,11 @@
 #include <linux/types.h>
 #include "kfd_priv.h"
 
-#define IPC_KEY_SIZE_BYTES 16
-
 struct kfd_ipc_obj {
+	struct hlist_node node;
 	struct kref ref;
 	void *data;
-	char key[IPC_KEY_SIZE_BYTES];
+	uint32_t share_handle[4];
 };
 
 int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
