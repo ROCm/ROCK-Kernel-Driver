@@ -153,7 +153,6 @@ int assoc_array_iterate(const struct assoc_array *array,
 		return 0;
 	return assoc_array_subtree_iterate(root, NULL, iterator, iterator_data);
 }
-EXPORT_SYMBOL(assoc_array_iterate);
 
 enum assoc_array_walk_status {
 	assoc_array_walk_tree_empty,
@@ -353,7 +352,6 @@ void *assoc_array_find(const struct assoc_array *array,
 
 	return NULL;
 }
-EXPORT_SYMBOL(assoc_array_find);
 
 /*
  * Destructively iterate over an associative array.  The caller must prevent
@@ -463,7 +461,6 @@ void assoc_array_destroy(struct assoc_array *array,
 	assoc_array_destroy_subtree(array->root, ops);
 	array->root = NULL;
 }
-EXPORT_SYMBOL(assoc_array_destroy);
 
 /*
  * Handle insertion into an empty tree.
@@ -1053,7 +1050,6 @@ enomem:
 	assoc_array_cancel_edit(edit);
 	return ERR_PTR(-ENOMEM);
 }
-EXPORT_SYMBOL(assoc_array_insert);
 
 /**
  * assoc_array_insert_set_object - Set the new object pointer in an edit script
@@ -1069,7 +1065,6 @@ void assoc_array_insert_set_object(struct assoc_array_edit *edit, void *object)
 	BUG_ON(!object);
 	edit->leaf = assoc_array_leaf_to_ptr(object);
 }
-EXPORT_SYMBOL(assoc_array_insert_set_object);
 
 struct assoc_array_delete_collapse_context {
 	struct assoc_array_node	*node;
@@ -1289,7 +1284,6 @@ enomem:
 	assoc_array_cancel_edit(edit);
 	return ERR_PTR(-ENOMEM);
 }
-EXPORT_SYMBOL(assoc_array_delete);
 
 /**
  * assoc_array_clear - Script deletion of all objects from an associative array
@@ -1331,7 +1325,6 @@ struct assoc_array_edit *assoc_array_clear(struct assoc_array *array,
 	pr_devel("all gone\n");
 	return edit;
 }
-EXPORT_SYMBOL(assoc_array_clear);
 
 /*
  * Handle the deferred destruction after an applied edit.
@@ -1434,7 +1427,6 @@ void assoc_array_apply_edit(struct assoc_array_edit *edit)
 
 	call_rcu(&edit->rcu, assoc_array_rcu_cleanup);
 }
-EXPORT_SYMBOL(assoc_array_apply_edit);
 
 /**
  * assoc_array_cancel_edit - Discard an edit script.
@@ -1465,7 +1457,6 @@ void assoc_array_cancel_edit(struct assoc_array_edit *edit)
 	}
 	kfree(edit);
 }
-EXPORT_SYMBOL(assoc_array_cancel_edit);
 
 /**
  * assoc_array_gc - Garbage collect an associative array.
@@ -1758,4 +1749,3 @@ enomem:
 	kfree(edit);
 	return -ENOMEM;
 }
-EXPORT_SYMBOL(assoc_array_gc);
