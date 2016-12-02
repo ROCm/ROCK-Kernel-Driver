@@ -1160,10 +1160,6 @@ static int gmc_v8_0_sw_init(void *handle)
 		return -ENOMEM;
 	atomic_set(&adev->mc.vm_fault_info_updated, 0);
 
-	/* Allow BIF to recode atomics to PCIe 3.0 AtomicOps.
-	 */
-	pci_enable_atomic_ops_to_root(adev->pdev);
-
 	return 0;
 }
 
