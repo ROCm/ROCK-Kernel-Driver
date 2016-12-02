@@ -44,6 +44,7 @@ static const struct kfd_device_info kaveri_device_info = {
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
 	.is_need_iommu_device = true,
 	.supports_cwsr = false,
+	.needs_pci_atomics = false,
 };
 
 static const struct kfd_device_info hawaii_device_info = {
@@ -57,6 +58,7 @@ static const struct kfd_device_info hawaii_device_info = {
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
 	.is_need_iommu_device = false,
 	.supports_cwsr = false,
+	.needs_pci_atomics = false,
 };
 
 static const struct kfd_device_info carrizo_device_info = {
@@ -70,6 +72,7 @@ static const struct kfd_device_info carrizo_device_info = {
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
 	.is_need_iommu_device = true,
 	.supports_cwsr = true,
+	.needs_pci_atomics = false,
 };
 
 static const struct kfd_device_info tonga_device_info = {
@@ -82,6 +85,7 @@ static const struct kfd_device_info tonga_device_info = {
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
 	.is_need_iommu_device = false,
 	.supports_cwsr = false,
+	.needs_pci_atomics = true,
 };
 
 static const struct kfd_device_info fiji_device_info = {
@@ -94,6 +98,7 @@ static const struct kfd_device_info fiji_device_info = {
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
 	.is_need_iommu_device = false,
 	.supports_cwsr = true,
+	.needs_pci_atomics = true,
 };
 
 static const struct kfd_device_info polaris10_device_info = {
@@ -106,6 +111,7 @@ static const struct kfd_device_info polaris10_device_info = {
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
 	.is_need_iommu_device = false,
 	.supports_cwsr = true,
+	.needs_pci_atomics = true,
 };
 
 static const struct kfd_device_info polaris11_device_info = {
@@ -118,6 +124,7 @@ static const struct kfd_device_info polaris11_device_info = {
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
 	.is_need_iommu_device = false,
 	.supports_cwsr = true,
+	.needs_pci_atomics = true,
 };
 
 struct kfd_deviceid {
@@ -225,6 +232,17 @@ struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 
 	if (!device_info)
 		return NULL;
+
+	if (device_info->needs_pci_atomics) {
+		/* Allow BIF to recode atomics to PCIe 3.0 AtomicOps.
+		 */
+		if (pci_enable_atomic_ops_to_root(pdev) < 0) {
+			dev_info(kfd_device,
+				"skipped device (%x:%x), PCI rejects atomics",
+				 pdev->vendor, pdev->device);
+			return NULL;
+		}
+	}
 
 	BUG_ON(!f2g);
 

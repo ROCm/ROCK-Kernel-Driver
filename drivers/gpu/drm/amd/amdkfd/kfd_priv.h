@@ -190,6 +190,7 @@ struct kfd_device_info {
 	uint16_t mqd_size_aligned;
 	bool is_need_iommu_device;
 	bool supports_cwsr;
+	bool needs_pci_atomics;
 };
 
 struct kfd_mem_obj {
