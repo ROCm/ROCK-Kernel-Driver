@@ -323,7 +323,8 @@ static inline struct fence *fence_later(struct fence *f1, struct fence *f2)
 
 signed long fence_wait_timeout(struct fence *, bool intr, signed long timeout);
 signed long fence_wait_any_timeout(struct fence **fences, uint32_t count,
-				   bool intr, signed long timeout);
+				   bool intr, signed long timeout,
+				   uint32_t *idx);
 
 /**
  * fence_wait - sleep until the fence gets signaled

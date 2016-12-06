@@ -398,14 +398,18 @@ out:
 EXPORT_SYMBOL(fence_default_wait);
 
 static bool
-fence_test_signaled_any(struct fence **fences, uint32_t count)
+fence_test_signaled_any(struct fence **fences, uint32_t count,
+			uint32_t *idx)
 {
 	int i;
 
 	for (i = 0; i < count; ++i) {
 		struct fence *fence = fences[i];
-		if (test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags))
+		if (test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+			if (idx)
+				*idx = i;
 			return true;
+		}
 	}
 	return false;
 }
@@ -417,6 +421,8 @@ fence_test_signaled_any(struct fence **fences, uint32_t count)
  * @count:	[in]	number of fences to wait on
  * @intr:	[in]	if true, do an interruptible wait
  * @timeout:	[in]	timeout value in jiffies, or MAX_SCHEDULE_TIMEOUT
+ * @idx:       [out]	the first signaled fence index, meaningful only on
+ *			positive return
  *
  * Returns -EINVAL on custom fence wait implementation, -ERESTARTSYS if
  * interrupted, 0 if the wait timed out, or the remaining timeout in jiffies
@@ -428,7 +434,7 @@ fence_test_signaled_any(struct fence **fences, uint32_t count)
  */
 signed long
 fence_wait_any_timeout(struct fence **fences, uint32_t count,
-		       bool intr, signed long timeout)
+		       bool intr, signed long timeout, uint32_t *idx)
 {
 	struct default_wait_cb *cb;
 	signed long ret = timeout;
@@ -439,8 +445,11 @@ fence_wait_any_timeout(struct fence **fences, uint32_t count,
 
 	if (timeout == 0) {
 		for (i = 0; i < count; ++i)
-			if (fence_is_signaled(fences[i]))
+			if (fence_is_signaled(fences[i])) {
+				if (idx)
+					*idx = i;
 				return 1;
+			}
 
 		return 0;
 	}
@@ -463,6 +472,8 @@ fence_wait_any_timeout(struct fence **fences, uint32_t count,
 		if (fence_add_callback(fence, &cb[i].base,
 				       fence_default_wait_cb)) {
 			/* This fence is already signaled */
+			if (idx)
+				*idx = i;
 			goto fence_rm_cb;
 		}
 	}
@@ -473,7 +484,7 @@ fence_wait_any_timeout(struct fence **fences, uint32_t count,
 		else
 			set_current_state(TASK_UNINTERRUPTIBLE);
 
-		if (fence_test_signaled_any(fences, count))
+		if (fence_test_signaled_any(fences, count, idx))
 			break;
 
 		ret = schedule_timeout(ret);
