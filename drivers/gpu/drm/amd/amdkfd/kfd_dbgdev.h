@@ -90,17 +90,14 @@ enum SQ_IND_CMD_CMD {
 	SQ_IND_CMD_CMD_DEBUG = 0x00000004,
 	SQ_IND_CMD_CMD_TRAP = 0x00000005
 };
-/*
- * SQ_IND_CMD_MODE enum
- */
 
-typedef enum SQ_IND_CMD_MODE {
+enum SQ_IND_CMD_MODE {
 	SQ_IND_CMD_MODE_SINGLE = 0x00000000,
 	SQ_IND_CMD_MODE_BROADCAST = 0x00000001,
 	SQ_IND_CMD_MODE_BROADCAST_QUEUE = 0x00000002,
 	SQ_IND_CMD_MODE_BROADCAST_PIPE = 0x00000003,
 	SQ_IND_CMD_MODE_BROADCAST_ME = 0x00000004,
-} SQ_IND_CMD_MODE;
+};
 
 union SQ_IND_INDEX_BITS {
 	struct {
@@ -208,7 +205,7 @@ union TCP_WATCH_ADDR_L_BITS {
 };
 
 enum {
-	QUEUESTATE__INVALID = 0,	/* so by default we'll get invalid state */
+	QUEUESTATE__INVALID = 0,  /* so by default we'll get invalid state */
 	QUEUESTATE__ACTIVE_COMPLETION_PENDING,
 	QUEUESTATE__ACTIVE
 };
@@ -226,6 +223,7 @@ union ULARGE_INTEGER {
 #define KFD_CIK_VMID_END_OFFSET (KFD_CIK_VMID_START_OFFSET + (8))
 
 
-void kfd_dbgdev_init(struct kfd_dbgdev *pdbgdev, struct kfd_dev *pdev, DBGDEV_TYPE type);
+void kfd_dbgdev_init(struct kfd_dbgdev *pdbgdev, struct kfd_dev *pdev,
+			enum DBGDEV_TYPE type);
 
 #endif				/* KFD_DBGDEV_H_ */

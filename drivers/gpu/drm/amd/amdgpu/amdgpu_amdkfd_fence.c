@@ -153,7 +153,7 @@ static int amd_kfd_fence_signal(struct dma_fence *f)
  *
  * This function is called when the reference count becomes zero.
  * It just RCU schedules freeing up the fence.
-*/
+ */
 static void amd_kfd_fence_release(struct dma_fence *f)
 {
 	struct amdgpu_amdkfd_fence *fence = to_amdgpu_amdkfd_fence(f);
@@ -173,7 +173,7 @@ static void amd_kfd_fence_release(struct dma_fence *f)
  *
  * @f: [IN] fence
  * @mm: [IN] mm that needs to be verified
-*/
+ */
 bool amd_kfd_fence_check_mm(struct dma_fence *f, void *mm)
 {
 	struct amdgpu_amdkfd_fence *fence = to_amdgpu_amdkfd_fence(f);

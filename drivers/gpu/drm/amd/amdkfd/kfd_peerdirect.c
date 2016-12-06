@@ -485,7 +485,6 @@ void kfd_init_peer_direct(void)
 	}
 
 	pr_info("amdkfd: PeerDirect support was initialized successfully\n");
-	return;
 }
 
 /**

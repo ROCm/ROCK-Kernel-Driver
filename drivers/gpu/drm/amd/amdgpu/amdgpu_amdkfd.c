@@ -32,7 +32,7 @@
 
 const struct kfd2kgd_calls *kfd2kgd;
 const struct kgd2kfd_calls *kgd2kfd;
-bool (*kgd2kfd_init_p)(unsigned, const struct kgd2kfd_calls**);
+bool (*kgd2kfd_init_p)(unsigned int, const struct kgd2kfd_calls**);
 
 unsigned int global_compute_vmid_bitmap = 0xFF00;
 
@@ -41,7 +41,7 @@ int amdgpu_amdkfd_init(void)
 	int ret;
 
 #if defined(CONFIG_HSA_AMD_MODULE)
-	int (*kgd2kfd_init_p)(unsigned, const struct kgd2kfd_calls**);
+	int (*kgd2kfd_init_p)(unsigned int, const struct kgd2kfd_calls**);
 
 	kgd2kfd_init_p = symbol_request(kgd2kfd_init);
 
@@ -379,7 +379,8 @@ void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 
 	cu_info->cu_active_number = acu_info.number;
 	cu_info->cu_ao_mask = acu_info.ao_cu_mask;
-	memcpy(&cu_info->cu_bitmap[0], &acu_info.bitmap[0], sizeof(acu_info.bitmap));
+	memcpy(&cu_info->cu_bitmap[0], &acu_info.bitmap[0],
+					sizeof(acu_info.bitmap));
 	cu_info->num_shader_engines = adev->gfx.config.max_shader_engines;
 	cu_info->num_shader_arrays_per_engine = adev->gfx.config.max_sh_per_se;
 	cu_info->num_cu_per_sh = adev->gfx.config.max_cu_per_sh;

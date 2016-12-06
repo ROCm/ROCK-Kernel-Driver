@@ -396,6 +396,7 @@ static int update_mqd_sdma(struct mqd_manager *mm, void *mqd,
 		struct queue_properties *q)
 {
 	struct vi_sdma_mqd *m;
+
 	BUG_ON(!mm || !mqd || !q);
 
 	m = get_sdma_mqd(mqd);

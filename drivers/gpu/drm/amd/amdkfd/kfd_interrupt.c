@@ -54,7 +54,8 @@ int kfd_interrupt_init(struct kfd_dev *kfd)
 	int r;
 
 	r = kfifo_alloc(&kfd->ih_fifo,
-			KFD_IH_NUM_ENTRIES * kfd->device_info->ih_ring_entry_size,
+			KFD_IH_NUM_ENTRIES *
+			kfd->device_info->ih_ring_entry_size,
 			GFP_KERNEL);
 	if (r) {
 		dev_err(kfd_chardev(), "Failed to allocate IH fifo\n");
@@ -145,7 +146,8 @@ static void interrupt_wq(struct work_struct *work)
 				sizeof(uint32_t))];
 
 	while (dequeue_ih_ring_entry(dev, ih_ring_entry))
-		dev->device_info->event_interrupt_class->interrupt_wq(dev, ih_ring_entry);
+		dev->device_info->event_interrupt_class->interrupt_wq(dev,
+								ih_ring_entry);
 }
 
 bool interrupt_is_wanted(struct kfd_dev *dev,
@@ -153,7 +155,7 @@ bool interrupt_is_wanted(struct kfd_dev *dev,
 			uint32_t *patched_ihre, bool *flag)
 {
 	/* integer and bitwise OR so there is no boolean short-circuiting */
-	unsigned wanted = 0;
+	unsigned int wanted = 0;
 
 	wanted |= dev->device_info->event_interrupt_class->interrupt_isr(dev,
 					 ih_ring_entry, patched_ihre, flag);

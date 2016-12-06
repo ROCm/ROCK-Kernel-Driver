@@ -225,7 +225,8 @@ static int update_qpd_vi_tonga(struct device_queue_manager *dqm,
 	}
 
 	/* On dGPU we're always in GPUVM64 addressing mode with 64-bit
-	 * aperture addresses. */
+	 * aperture addresses.
+	 */
 	temp = get_sh_mem_bases_nybble_64(pdd);
 	qpd->sh_mem_bases = compute_sh_mem_bases_64bit(temp);
 
@@ -256,7 +257,8 @@ static void init_sdma_vm_tonga(struct device_queue_manager *dqm,
 			struct qcm_process_device *qpd)
 {
 	/* On dGPU we're always in GPUVM64 addressing mode with 64-bit
-	 * aperture addresses. */
+	 * aperture addresses.
+	 */
 	q->properties.sdma_vm_addr =
 		((get_sh_mem_bases_nybble_64(qpd_to_pdd(qpd))) <<
 		 SDMA0_RLC0_VIRTUAL_ADDR__SHARED_BASE__SHIFT) &

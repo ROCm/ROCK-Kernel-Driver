@@ -188,9 +188,11 @@ enum asic_family_type {
 #define KFD_IS_SOC15(chip) ((chip) >= CHIP_VEGA10)
 
 struct kfd_event_interrupt_class {
-	bool (*interrupt_isr)(struct kfd_dev *dev, const uint32_t *ih_ring_entry,
-				uint32_t *patched_ihre, bool *patched_flag);
-	void (*interrupt_wq)(struct kfd_dev *dev, const uint32_t *ih_ring_entry);
+	bool (*interrupt_isr)(struct kfd_dev *dev,
+			const uint32_t *ih_ring_entry, uint32_t *patched_ihre,
+			bool *patched_flag);
+	void (*interrupt_wq)(struct kfd_dev *dev,
+			const uint32_t *ih_ring_entry);
 };
 
 struct kfd_device_info {
@@ -401,13 +403,13 @@ enum KFD_QUEUE_PRIORITY {
  * @write_ptr: Defines the number of dwords written to the ring buffer.
  *
  * @doorbell_ptr: This field aim is to notify the H/W of new packet written to
- * the queue ring buffer. This field should be similar to write_ptr and the user
- * should update this field after he updated the write_ptr.
+ * the queue ring buffer. This field should be similar to write_ptr and the
+ * user should update this field after he updated the write_ptr.
  *
  * @doorbell_off: The doorbell offset in the doorbell pci-bar.
  *
- * @is_interop: Defines if this is a interop queue. Interop queue means that the
- * queue can access both graphics and compute resources.
+ * @is_interop: Defines if this is a interop queue. Interop queue means that
+ * the queue can access both graphics and compute resources.
  *
  * @is_active: Defines if the queue is active or not.
  *
@@ -466,9 +468,10 @@ struct queue_properties {
  * @properties: The queue properties.
  *
  * @mec: Used only in no cp scheduling mode and identifies to micro engine id
- * that the queue should be execute on.
+ *	 that the queue should be execute on.
  *
- * @pipe: Used only in no cp scheduling mode and identifies the queue's pipe id.
+ * @pipe: Used only in no cp scheduling mode and identifies the queue's pipe
+ *	  id.
  *
  * @queue: Used only in no cp scheduliong mode and identifies the queue's slot.
  *
@@ -552,7 +555,7 @@ struct qcm_process_device {
 	unsigned int queue_count;
 	unsigned int vmid;
 	bool is_debug;
-	unsigned evicted; /* eviction counter, 0=active */
+	unsigned int evicted; /* eviction counter, 0=active */
 	/*
 	 * All the memory management data should be here too
 	 */
@@ -601,9 +604,11 @@ int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 					       struct dma_fence *fence);
 
 
-/*8 byte handle containing GPU ID in the most significant 4 bytes and
- * idr_handle in the least significant 4 bytes*/
-#define MAKE_HANDLE(gpu_id, idr_handle) (((uint64_t)(gpu_id) << 32) + idr_handle)
+/* 8 byte handle containing GPU ID in the most significant 4 bytes and
+ * idr_handle in the least significant 4 bytes
+ */
+#define MAKE_HANDLE(gpu_id, idr_handle) \
+	(((uint64_t)(gpu_id) << 32) + idr_handle)
 #define GET_GPU_ID(handle) (handle >> 32)
 #define GET_IDR_HANDLE(handle) (handle & 0xFFFFFFFF)
 
@@ -642,7 +647,8 @@ struct kfd_process_device {
 
 	uint64_t sh_hidden_private_base_vmid;
 
-	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
+	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid)
+	 */
 	enum kfd_pdd_bound bound;
 
 	/* VM context for GPUVM allocations */
@@ -711,7 +717,8 @@ struct kfd_process {
 
 	struct process_queue_manager pqm;
 
-	unsigned long allocated_queue_bitmap[DIV_ROUND_UP(KFD_MAX_NUM_OF_QUEUES_PER_PROCESS, BITS_PER_LONG)];
+	unsigned long allocated_queue_bitmap[DIV_ROUND_UP(KFD_MAX_NUM_OF_QUEUES_PER_PROCESS,
+							  BITS_PER_LONG)];
 
 	/*Is the user space process 32 bit?*/
 	bool is_32bit_user_mode;
@@ -720,7 +727,8 @@ struct kfd_process {
 	struct mutex event_mutex;
 	/* All events in process hashed by ID, linked on kfd_event.events. */
 	DECLARE_HASHTABLE(events, 4);
-	struct list_head signal_event_pages;	/* struct slot_page_header.event_pages */
+	/* struct slot_page_header.event_pages */
+	struct list_head signal_event_pages;
 	u32 next_nonsignal_event_id;
 	size_t signal_event_count;
 	size_t debug_event_count;
@@ -760,7 +768,7 @@ struct amdkfd_ioctl_desc {
 void kfd_process_create_wq(void);
 void kfd_process_destroy_wq(void);
 struct kfd_process *kfd_create_process(struct file *filep);
-struct kfd_process *kfd_get_process(const struct task_struct *);
+struct kfd_process *kfd_get_process(const struct task_struct *task);
 struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid);
 struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm);
 void kfd_unref_process(struct kfd_process *p);
@@ -777,7 +785,8 @@ struct kfd_process_device *kfd_get_process_device_data(struct kfd_dev *dev,
 struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 							struct kfd_process *p);
 
-int kfd_reserved_mem_mmap(struct kfd_process *process, struct vm_area_struct *vma);
+int kfd_reserved_mem_mmap(struct kfd_process *process,
+		struct vm_area_struct *vma);
 
 /* KFD process API for creating and translating handles */
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
@@ -802,9 +811,11 @@ int kfd_map_memory_to_gpu(void *mem, struct kfd_process_device *pdd);
 int kfd_unmap_memory_from_gpu(void *mem, struct kfd_process_device *pdd);
 
 /* Process device data iterator */
-struct kfd_process_device *kfd_get_first_process_device_data(struct kfd_process *p);
-struct kfd_process_device *kfd_get_next_process_device_data(struct kfd_process *p,
-						struct kfd_process_device *pdd);
+struct kfd_process_device *kfd_get_first_process_device_data(
+							struct kfd_process *p);
+struct kfd_process_device *kfd_get_next_process_device_data(
+							struct kfd_process *p,
+					struct kfd_process_device *pdd);
 bool kfd_has_process_device_data(struct kfd_process *p);
 
 /* PASIDs */
@@ -938,7 +949,7 @@ struct packet_manager {
 	struct mutex lock;
 	bool allocated;
 	struct kfd_mem_obj *ib_buffer_obj;
-	unsigned ib_size_bytes;
+	unsigned int ib_size_bytes;
 
 	struct packet_manager_funcs *pmf;
 };
@@ -1046,7 +1057,8 @@ int kfd_wait_on_events(struct kfd_process *p,
 		       uint32_t num_events, void __user *data,
 		       bool all, uint32_t user_timeout_ms,
 		       enum kfd_event_wait_result *wait_result);
-void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id, uint32_t valid_id_bits);
+void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
+		uint32_t valid_id_bits);
 #if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 void kfd_signal_iommu_event(struct kfd_dev *dev,
 		unsigned int pasid, unsigned long address,

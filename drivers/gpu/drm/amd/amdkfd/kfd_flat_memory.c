@@ -422,5 +422,6 @@ err:
 void kfd_flush_tlb(struct kfd_dev *dev, uint32_t pasid)
 {
 	const struct kfd2kgd_calls *f2g = dev->kfd2kgd;
+
 	f2g->invalidate_tlbs(dev->kgd, pasid);
 }

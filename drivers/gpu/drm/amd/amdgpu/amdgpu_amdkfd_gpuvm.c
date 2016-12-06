@@ -42,7 +42,8 @@
 #include "gmc/gmc_8_1_d.h"
 
 /* Special VM and GART address alignment needed for VI pre-Fiji due to
- * a HW bug. */
+ * a HW bug.
+ */
 #define VI_BO_SIZE_ALIGN (0x8000)
 
 /* BO flag to indicate a KFD userptr BO */
@@ -663,7 +664,8 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 			va, size, domain_string(alloc_domain));
 
 	/* Allocate buffer object. Userptr objects need to start out
-	 * in the CPU domain, get moved to GTT when pinned. */
+	 * in the CPU domain, get moved to GTT when pinned.
+	 */
 	ret = amdgpu_bo_create(adev, size, byte_align, false,
 				alloc_domain,
 			       flags, sg, NULL, &bo);
@@ -719,7 +721,8 @@ err:
  * back-off the reservation and then reacquire it. Track all the
  * reservation info in a context structure. Buffers can be mapped to
  * multiple VMs simultaneously (buffers being restored on multiple
- * GPUs). */
+ * GPUs).
+ */
 struct bo_vm_reservation_context {
 	struct amdgpu_bo_list_entry kfd_bo;
 	unsigned int n_vms;
@@ -802,7 +805,7 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 {
 	struct amdgpu_bo *bo = mem->bo;
 	struct kfd_bo_va_list *entry;
-	unsigned i;
+	unsigned int i;
 	int ret;
 
 	ctx->reserved = false;
@@ -1157,7 +1160,8 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 
 	mutex_unlock(&mem->lock);
 	/* lock is not needed after this, since mem is unused and will
-	 * be freed anyway */
+	 * be freed anyway
+	 */
 
 	/* No more MMU notifiers */
 	amdgpu_mn_unregister(mem->bo);
@@ -1524,7 +1528,7 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 {
 	struct kfd_bo_va_list *entry;
 	struct amdgpu_device *adev;
-	unsigned mapped_before;
+	unsigned int mapped_before;
 	int ret = 0;
 	struct bo_vm_reservation_context ctx;
 	struct amdkfd_process_info *process_info;
