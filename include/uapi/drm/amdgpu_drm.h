@@ -221,7 +221,7 @@ union drm_amdgpu_ctx {
 struct drm_amdgpu_sem_in {
 	/** AMDGPU_SEM_OP_* */
 	uint32_t	op;
-	int32_t         fd;
+	uint32_t        handle;
 	uint32_t	ctx_id;
 	uint32_t        ip_type;
 	uint32_t        ip_instance;
@@ -231,7 +231,7 @@ struct drm_amdgpu_sem_in {
 
 union drm_amdgpu_sem_out {
 	int32_t         fd;
-	uint32_t	_pad;
+	uint32_t	handle;
 };
 
 union drm_amdgpu_sem {
