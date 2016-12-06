@@ -68,7 +68,7 @@ enum divider_range_step_size {
 };
 
 
-static int dce_clocks_get_dp_ref_freq(struct display_clock *clk)
+static uint32_t dce_clocks_get_dp_ref_freq(struct display_clock *clk)
 {
 	struct dce_disp_clk *clk_dce = TO_DCE_CLOCKS(clk);
 	int dprefclk_wdivider;
