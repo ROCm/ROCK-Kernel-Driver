@@ -244,7 +244,8 @@ static int acquire_packet_buffer(struct kernel_queue *kq,
 
 	if (wptr + packet_size_in_dwords >= queue_size_dwords) {
 		/* make sure after rolling back to position 0, there is
-		 * still enough space. */
+		 * still enough space.
+		 */
 		if (packet_size_in_dwords >= rptr) {
 			*buffer_ptr = NULL;
 			return -ENOMEM;

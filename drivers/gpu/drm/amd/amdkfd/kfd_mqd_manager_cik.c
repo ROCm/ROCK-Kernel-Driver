@@ -247,7 +247,7 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 	m->cp_hqd_pq_control = DEFAULT_RPTR_BLOCK_SIZE |
 				DEFAULT_MIN_AVAIL_SIZE;
 	m->cp_hqd_ib_control = DEFAULT_MIN_IB_AVAIL_SIZE;
-        if (atc_bit) {
+	if (atc_bit) {
 		m->cp_hqd_pq_control |= PQ_ATC_EN;
 		m->cp_hqd_ib_control |= IB_ATC_EN;
 	}
@@ -266,9 +266,8 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 
 	m->cp_hqd_vmid = q->vmid;
 
-	if (q->format == KFD_QUEUE_FORMAT_AQL) {
+	if (q->format == KFD_QUEUE_FORMAT_AQL)
 		m->cp_hqd_pq_control |= NO_UPDATE_RPTR;
-	}
 
 	update_cu_mask(mm, mqd, q);
 	set_priority(m, q);

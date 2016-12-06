@@ -51,19 +51,19 @@ void kfd_debugfs_init(void)
 		return;
 	}
 
-	ent = debugfs_create_file("mqds", S_IFREG | S_IRUGO, debugfs_root,
+	ent = debugfs_create_file("mqds", S_IFREG | 0444, debugfs_root,
 				  kfd_debugfs_mqds_by_process,
 				  &kfd_debugfs_fops);
 	if (ent == NULL)
 		pr_warn("Failed to create mqds in kfd debugfs\n");
 
-	ent = debugfs_create_file("hqds", S_IFREG | S_IRUGO, debugfs_root,
+	ent = debugfs_create_file("hqds", S_IFREG | 0444, debugfs_root,
 				  kfd_debugfs_hqds_by_device,
 				  &kfd_debugfs_fops);
 	if (ent == NULL)
 		pr_warn("Failed to create hqds in kfd debugfs\n");
 
-	ent = debugfs_create_file("rls", S_IFREG | S_IRUGO, debugfs_root,
+	ent = debugfs_create_file("rls", S_IFREG | 0444, debugfs_root,
 				  kfd_debugfs_rls_by_device,
 				  &kfd_debugfs_fops);
 	if (ent == NULL)

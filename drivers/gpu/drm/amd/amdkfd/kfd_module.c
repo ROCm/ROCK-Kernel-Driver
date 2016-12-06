@@ -75,7 +75,7 @@ MODULE_PARM_DESC(send_sigterm,
 
 static int amdkfd_init_completed;
 
-int debug_largebar = 0;
+int debug_largebar;
 module_param(debug_largebar, int, 0444);
 MODULE_PARM_DESC(debug_largebar,
 	"Debug large-bar flag used to simulate large-bar capability on non-large bar machine (0 = disable, 1 = enable)");
@@ -90,7 +90,8 @@ module_param_named(noretry, vega10_noretry, int, 0644);
 MODULE_PARM_DESC(noretry,
 	"Set sh_mem_config.retry_disable on Vega10 (0 = retry enabled (default), 1 = retry disabled)");
 
-int kgd2kfd_init(unsigned interface_version, const struct kgd2kfd_calls **g2f)
+int kgd2kfd_init(unsigned int interface_version,
+		const struct kgd2kfd_calls **g2f)
 {
 	if (!amdkfd_init_completed)
 		return -EPROBE_DEFER;

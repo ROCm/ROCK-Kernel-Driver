@@ -365,7 +365,8 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 /* No process locking is needed in this function, because the process
  * is not findable any more. We must assume that no other thread is
  * using it any more, otherwise we couldn't safely free the process
- * stucture in the end. */
+ * structure in the end.
+ */
 static void kfd_process_wq_release(struct work_struct *work)
 {
 	struct kfd_process *p = container_of(work, struct kfd_process,
@@ -447,7 +448,8 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 	/* Iterate over all process device data structures and if the pdd is in
 	 * debug mode,we should first force unregistration, then we will be
-	 * able to destroy the queues   */
+	 * able to destroy the queues
+	 */
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		dev = pdd->dev;
 		mutex_lock(get_dbgmgr_mutex());
@@ -609,8 +611,8 @@ static struct kfd_process *create_process(const struct task_struct *thread,
 	process->last_restore_timestamp = get_jiffies_64();
 
 	/* If PeerDirect interface was not detected try to detect it again
-	* in case if network driver was loaded later.
-	*/
+	 * in case if network driver was loaded later.
+	 */
 	kfd_init_peer_direct();
 
 	return process;
@@ -857,14 +859,16 @@ void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid)
 }
 #endif /* CONFIG_AMD_IOMMU_V2 */
 
-struct kfd_process_device *kfd_get_first_process_device_data(struct kfd_process *p)
+struct kfd_process_device *kfd_get_first_process_device_data(
+						struct kfd_process *p)
 {
 	return list_first_entry(&p->per_device_data,
 				struct kfd_process_device,
 				per_device_list);
 }
 
-struct kfd_process_device *kfd_get_next_process_device_data(struct kfd_process *p,
+struct kfd_process_device *kfd_get_next_process_device_data(
+						struct kfd_process *p,
 						struct kfd_process_device *pdd)
 {
 	if (list_is_last(&pdd->per_device_list, &p->per_device_data))
@@ -878,7 +882,8 @@ bool kfd_has_process_device_data(struct kfd_process *p)
 }
 
 /* Create specific handle mapped to mem from process local memory idr
- * Assumes that the process lock is held. */
+ * Assumes that the process lock is held.
+ */
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 					void *mem, uint64_t start,
 					uint64_t length,
@@ -933,7 +938,8 @@ struct kfd_bo *kfd_process_device_find_bo(struct kfd_process_device *pdd,
 }
 
 /* Translate specific handle from process local memory idr
- * Assumes that the process lock is held. */
+ * Assumes that the process lock is held.
+ */
 void *kfd_process_device_translate_handle(struct kfd_process_device *pdd,
 					int handle)
 {
@@ -971,7 +977,8 @@ void *kfd_process_find_bo_from_interval(struct kfd_process *p,
 }
 
 /* Remove specific handle from process local memory idr
- * Assumes that the process lock is held. */
+ * Assumes that the process lock is held.
+ */
 void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 					int handle)
 {
@@ -1040,7 +1047,8 @@ struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
 	return p;
 }
 
-int kfd_reserved_mem_mmap(struct kfd_process *process, struct vm_area_struct *vma)
+int kfd_reserved_mem_mmap(struct kfd_process *process,
+		struct vm_area_struct *vma)
 {
 	unsigned long pfn, i;
 	int ret = 0;
