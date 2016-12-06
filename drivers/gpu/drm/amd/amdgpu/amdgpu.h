@@ -62,6 +62,7 @@
 #include "amdgpu_sync.h"
 #include "amdgpu_ring.h"
 #include "amdgpu_vm.h"
+#include "amdgpu_sem.h"
 #include "amdgpu_dpm.h"
 #include "amdgpu_acp.h"
 #include "amdgpu_uvd.h"
@@ -714,6 +715,8 @@ struct amdgpu_fpriv {
 	struct mutex		bo_list_lock;
 	struct idr		bo_list_handles;
 	struct amdgpu_ctx_mgr	ctx_mgr;
+	spinlock_t		sem_handles_lock;
+	struct idr		sem_handles;
 };
 
 /*
@@ -1266,6 +1269,8 @@ int amdgpu_sem_ioctl(struct drm_device *dev, void *data,
 
 int amdgpu_sem_add_cs(struct amdgpu_ctx *ctx, struct amdgpu_ring *ring,
 		      struct amdgpu_sync *sync);
+
+void amdgpu_sem_destroy(struct amdgpu_fpriv *fpriv, u32 handle);
 
 int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 			   struct drm_file *filp);
