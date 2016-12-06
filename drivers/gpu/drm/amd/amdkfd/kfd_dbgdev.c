@@ -64,103 +64,111 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 	union ULARGE_INTEGER *largep;
 	union ULARGE_INTEGER addr;
 
-	do {
-		if ((kq == NULL) || (packet_buff == NULL) || (size_in_bytes == 0)) {
-			pr_debug("Error! kfd: In func %s >> Illegal packet parameters\n", __func__);
-			status = -EINVAL;
-			break;
-		}
-		/* todo - enter proper locking to be multithreaded safe */
+	if ((kq == NULL) || (packet_buff == NULL) ||
+			(size_in_bytes == 0)) {
+		pr_debug("Error! kfd: In func %s >> Illegal packet parameters\n",
+				__func__);
+		return -EINVAL;
+	}
+	/* todo - enter proper locking to be multithreaded safe */
 
-		/* We acquire a buffer from DIQ
-		 * The receive packet buff will be sitting on the Indirect Buffer
-		 * and in the PQ we put the IB packet + sync packet(s).
-		 */
-		if (sync)
-			pq_packets_size_in_bytes +=
-				sizeof(struct pm4_mec_release_mem);
-		status = kq->ops.acquire_packet_buffer(kq, pq_packets_size_in_bytes / sizeof(uint32_t), &ib_packet_buff);
-		if (status != 0) {
-			pr_debug("Error! kfd: In func %s >> acquire_packet_buffer failed\n", __func__);
-			break;
-		}
+	/* We acquire a buffer from DIQ
+	 * The receive packet buff will be sitting on the Indirect
+	 * Buffer and in the PQ we put the IB packet + sync packet(s).
+	 */
+	if (sync)
+		pq_packets_size_in_bytes +=
+			sizeof(struct pm4_mec_release_mem);
+	status = kq->ops.acquire_packet_buffer(kq,
+			pq_packets_size_in_bytes / sizeof(uint32_t),
+			&ib_packet_buff);
+	if (status != 0) {
+		pr_debug("Error! kfd: In func %s >> acquire_packet_buffer failed\n",
+				__func__);
+		return status;
+	}
 
-		memset(ib_packet_buff, 0, pq_packets_size_in_bytes);
+	memset(ib_packet_buff, 0, pq_packets_size_in_bytes);
 
-		ib_packet = (struct pm4__indirect_buffer_pasid *) (ib_packet_buff);
+	ib_packet =
+		(struct pm4__indirect_buffer_pasid *) (ib_packet_buff);
 
-		ib_packet->header.count = 3;
-		ib_packet->header.opcode = IT_INDIRECT_BUFFER_PASID;
-		ib_packet->header.type = PM4_TYPE_3;
+	ib_packet->header.count = 3;
+	ib_packet->header.opcode = IT_INDIRECT_BUFFER_PASID;
+	ib_packet->header.type = PM4_TYPE_3;
 
-		largep = (union ULARGE_INTEGER *) &vmid0_address;
+	largep = (union ULARGE_INTEGER *) &vmid0_address;
 
-		ib_packet->bitfields2.ib_base_lo = largep->u.low_part >> 2;
-		ib_packet->bitfields3.ib_base_hi = largep->u.high_part;
+	ib_packet->bitfields2.ib_base_lo = largep->u.low_part >> 2;
+	ib_packet->bitfields3.ib_base_hi = largep->u.high_part;
 
-		ib_packet->control = (1 << 23) | (1 << 31) |
-				((size_in_bytes / sizeof(uint32_t)) & 0xfffff);
+	ib_packet->control = (1 << 23) | (1 << 31) |
+			((size_in_bytes / sizeof(uint32_t)) & 0xfffff);
 
-		ib_packet->bitfields5.pasid = pasid;
+	ib_packet->bitfields5.pasid = pasid;
 
-		if (!sync) {
-			kq->ops.submit_packet(kq);
-			break;
-		}
+	if (!sync) {
+		kq->ops.submit_packet(kq);
+		return status;
+	}
 
-		/*
-		 * for now we use release mem for GPU-CPU synchronization
-		 * Consider WaitRegMem + WriteData as a better alternative
-		 * we get a GART allocations ( gpu/cpu mapping),
-		 * for the sync variable, and wait until:
-		 * (a) Sync with HW
-		 * (b) Sync var is written by CP to mem.
-		 */
-		rm_packet = (struct pm4_mec_release_mem *) (ib_packet_buff +
-				(sizeof(struct pm4__indirect_buffer_pasid) / sizeof(unsigned int)));
+	/*
+	 * for now we use release mem for GPU-CPU synchronization
+	 * Consider WaitRegMem + WriteData as a better alternative
+	 * we get a GART allocations ( gpu/cpu mapping),
+	 * for the sync variable, and wait until:
+	 * (a) Sync with HW
+	 * (b) Sync var is written by CP to mem.
+	 */
+	rm_packet = (struct pm4_mec_release_mem *) (ib_packet_buff +
+			(sizeof(struct pm4__indirect_buffer_pasid) /
+						sizeof(unsigned int)));
 
-		status = kfd_gtt_sa_allocate(dbgdev->dev, sizeof(uint64_t),
-						&mem_obj);
+	status = kfd_gtt_sa_allocate(dbgdev->dev, sizeof(uint64_t),
+					&mem_obj);
 
-		if (status == 0) {
+	if (status != 0) {
+		pr_debug("Error! kfd: In func %s >> failed to allocate GART memory\n",
+					__func__);
+		return status;
+	}
 
-			rm_state = (uint64_t *) mem_obj->cpu_ptr;
+	rm_state = (uint64_t *) mem_obj->cpu_ptr;
 
-			*rm_state = QUEUESTATE__ACTIVE_COMPLETION_PENDING;
+	*rm_state = QUEUESTATE__ACTIVE_COMPLETION_PENDING;
 
-			rm_packet->header.opcode = IT_RELEASE_MEM;
-			rm_packet->header.type = PM4_TYPE_3;
-			rm_packet->header.count = sizeof(struct pm4_mec_release_mem) / sizeof(unsigned int) - 2;
+	rm_packet->header.opcode = IT_RELEASE_MEM;
+	rm_packet->header.type = PM4_TYPE_3;
+	rm_packet->header.count = sizeof(struct pm4_mec_release_mem) /
+				sizeof(unsigned int) - 2;
 
-			rm_packet->bitfields2.event_type = CACHE_FLUSH_AND_INV_TS_EVENT;
-			rm_packet->bitfields2.event_index = event_index___release_mem__end_of_pipe;
-			rm_packet->bitfields2.cache_policy = cache_policy___release_mem__lru;
-			rm_packet->bitfields2.atc = 0;
-			rm_packet->bitfields2.tc_wb_action_ena = 1;
+	rm_packet->bitfields2.event_type = CACHE_FLUSH_AND_INV_TS_EVENT;
+	rm_packet->bitfields2.event_index =
+		event_index___release_mem__end_of_pipe;
+	rm_packet->bitfields2.cache_policy = cache_policy___release_mem__lru;
+	rm_packet->bitfields2.atc = 0;
+	rm_packet->bitfields2.tc_wb_action_ena = 1;
 
-			addr.quad_part = mem_obj->gpu_addr;
+	addr.quad_part = mem_obj->gpu_addr;
 
-			rm_packet->bitfields4.address_lo_32b = addr.u.low_part >> 2;
-			rm_packet->address_hi = addr.u.high_part;
+	rm_packet->bitfields4.address_lo_32b = addr.u.low_part >> 2;
+	rm_packet->address_hi = addr.u.high_part;
 
-			rm_packet->bitfields3.data_sel = data_sel___release_mem__send_64_bit_data;
-			rm_packet->bitfields3.int_sel = int_sel___release_mem__send_data_after_write_confirm;
-			rm_packet->bitfields3.dst_sel = dst_sel___release_mem__memory_controller;
+	rm_packet->bitfields3.data_sel =
+		data_sel___release_mem__send_64_bit_data;
+	rm_packet->bitfields3.int_sel =
+		int_sel___release_mem__send_data_after_write_confirm;
+	rm_packet->bitfields3.dst_sel =
+		dst_sel___release_mem__memory_controller;
 
-			rm_packet->data_lo = QUEUESTATE__ACTIVE;
+	rm_packet->data_lo = QUEUESTATE__ACTIVE;
 
-			kq->ops.submit_packet(kq);
+	kq->ops.submit_packet(kq);
 
-			/* Wait till CP writes sync code: */
+	/* Wait till CP writes sync code: */
 
-			status = amdkfd_fence_wait_timeout(
-					(unsigned int *) rm_state,
+	status = amdkfd_fence_wait_timeout((unsigned int *) rm_state,
 					QUEUESTATE__ACTIVE, 1500);
-
-		} else {
-			pr_debug("Error! kfd: In func %s >> failed to allocate GART memory\n", __func__);
-		}
-	} while (false);
 
 	if (rm_state != NULL)
 		kfd_gtt_sa_free(dbgdev->dev, mem_obj);
@@ -170,7 +178,9 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 
 static int dbgdev_register_nodiq(struct kfd_dbgdev *dbgdev)
 {
-	/* no action is needed in this case, just make sure diq will not be used */
+	/* no action is needed in this case, just make sure diq will not
+	 * be used
+	 */
 
 	dbgdev->kq = NULL;
 
@@ -186,37 +196,33 @@ static int dbgdev_register_diq(struct kfd_dbgdev *dbgdev)
 	unsigned int qid;
 	struct process_queue_manager *pqm = dbgdev->pqm;
 
-	do {
+	if (!pqm) {
+		pr_debug("Error! kfd: In func %s >> No PQM\n",
+				__func__);
+		return -EFAULT;
+	}
 
-		if (!pqm) {
-			pr_debug("Error! kfd: In func %s >> No PQM\n", __func__);
-			status = -EFAULT;
-			break;
-		}
+	properties.type = KFD_QUEUE_TYPE_DIQ;
 
-		properties.type = KFD_QUEUE_TYPE_DIQ;
+	status = pqm_create_queue(dbgdev->pqm, dbgdev->dev, NULL,
+			&properties, &qid);
 
-		status = pqm_create_queue(dbgdev->pqm, dbgdev->dev, NULL,
-				&properties, &qid);
+	if (status != 0) {
+		pr_debug("Error! kfd: In func %s >> Create Queue failed\n",
+				__func__);
+		return status;
+	}
 
-		if (status != 0) {
-			pr_debug("Error! kfd: In func %s >> Create Queue failed\n", __func__);
-			break;
-		}
+	pr_debug("kfd: DIQ Created with queue id: %d\n", qid);
 
-		pr_debug("kfd: DIQ Created with queue id: %d\n", qid);
+	kq = pqm_get_kernel_queue(dbgdev->pqm, qid);
 
-		kq = pqm_get_kernel_queue(dbgdev->pqm, qid);
-
-		if (kq == NULL) {
-			pr_debug("Error! kfd: In func %s >> Error getting Kernel Queue\n", __func__);
-			status = -ENOMEM;
-			break;
-		}
-
-		dbgdev->kq = kq;
-
-	} while (false);
+	if (kq == NULL) {
+		pr_debug("Error! kfd: In func %s >> Error getting Kernel Queue\n",
+				__func__);
+		return -ENOMEM;
+	}
+	dbgdev->kq = kq;
 
 	return status;
 }
@@ -233,7 +239,9 @@ static int dbgdev_unregister_diq(struct kfd_dbgdev *dbgdev)
 {
 	/* todo - if needed, kill wavefronts and disable watch */
 	int status = 0;
-	if ((dbgdev == NULL) || (dbgdev->pqm == NULL) || (dbgdev->kq == NULL)) {
+
+	if ((dbgdev == NULL) || (dbgdev->pqm == NULL) ||
+			(dbgdev->kq == NULL)) {
 		pr_debug("kfd Err:In func %s >> can't destroy diq\n", __func__);
 		status = -EFAULT;
 	} else {
@@ -260,13 +268,16 @@ static void dbgdev_address_watch_set_registers(
 	cntl->u32All = 0;
 
 	if (adw_info->watch_mask != NULL)
-		cntl->bitfields.mask = (uint32_t) (adw_info->watch_mask[index] & ADDRESS_WATCH_REG_CNTL_DEFAULT_MASK);
+		cntl->bitfields.mask =
+			(uint32_t) (adw_info->watch_mask[index] &
+					ADDRESS_WATCH_REG_CNTL_DEFAULT_MASK);
 	else
 		cntl->bitfields.mask = ADDRESS_WATCH_REG_CNTL_DEFAULT_MASK;
 
 	addr.quad_part = (unsigned long long) adw_info->watch_address[index];
 
-	addrHi->bitfields.addr = addr.u.high_part & ADDRESS_WATCH_REG_ADDHIGH_MASK;
+	addrHi->bitfields.addr = addr.u.high_part &
+					ADDRESS_WATCH_REG_ADDHIGH_MASK;
 	addrLo->bitfields.addr =
 			(addr.u.low_part >> ADDRESS_WATCH_REG_ADDLOW_SHIFT);
 
@@ -276,16 +287,16 @@ static void dbgdev_address_watch_set_registers(
 	if (KFD_IS_DGPU(asic_family) == false)
 		cntl->u32All |= ADDRESS_WATCH_REG_CNTL_ATC_BIT;
 	pr_debug("\t\t%20s %08x\n", "set reg mask :", cntl->bitfields.mask);
-	pr_debug("\t\t%20s %08x\n", "set reg add high :", addrHi->bitfields.addr);
-	pr_debug("\t\t%20s %08x\n", "set reg add low :", addrLo->bitfields.addr);
+	pr_debug("\t\t%20s %08x\n", "set reg add high :",
+			addrHi->bitfields.addr);
+	pr_debug("\t\t%20s %08x\n", "set reg add low :",
+			addrLo->bitfields.addr);
 
 }
 
 static int dbgdev_address_watch_nodiq(struct kfd_dbgdev *dbgdev,
 					struct dbg_address_watch_info *adw_info)
 {
-
-	int status = 0;
 
 	union TCP_WATCH_ADDR_H_BITS addrHi;
 	union TCP_WATCH_ADDR_L_BITS addrLo;
@@ -296,68 +307,67 @@ static int dbgdev_address_watch_nodiq(struct kfd_dbgdev *dbgdev,
 
 	struct kfd_process_device *pdd;
 
-	do {
-		/* taking the vmid for that process on the safe way using pdd */
-		pdd = kfd_get_process_device_data(dbgdev->dev,
-						adw_info->process);
-		if (!pdd) {
-			pr_debug("Error! kfd: In func %s >> no PDD available\n", __func__);
-			status = -EFAULT;
-			break;
-		}
+	/* taking the vmid for that process on the safe way
+	 * using pdd
+	 */
+	pdd = kfd_get_process_device_data(dbgdev->dev,
+					adw_info->process);
+	if (!pdd) {
+		pr_debug("Error! kfd: In func %s >> no PDD available\n",
+				__func__);
+		return -EFAULT;
+	}
 
-		addrHi.u32All = 0;
-		addrLo.u32All = 0;
-		cntl.u32All = 0;
+	addrHi.u32All = 0;
+	addrLo.u32All = 0;
+	cntl.u32All = 0;
 
-		vmid = pdd->qpd.vmid;
+	vmid = pdd->qpd.vmid;
 
-		if ((adw_info->num_watch_points > MAX_WATCH_ADDRESSES)
-		    || (adw_info->num_watch_points == 0)) {
-			status = -EINVAL;
-			break;
-		}
+	if ((adw_info->num_watch_points > MAX_WATCH_ADDRESSES) ||
+	    (adw_info->num_watch_points == 0) || (adw_info->watch_mode == NULL))
+		return -EINVAL;
 
-		if ((adw_info->watch_mode == NULL) || (adw_info->watch_address == NULL)) {
-			status = -EINVAL;
-			break;
-		}
+	for (i = 0; i < adw_info->num_watch_points; i++) {
 
-		for (i = 0; i < adw_info->num_watch_points; i++) {
+		dbgdev_address_watch_set_registers(
+			adw_info,
+			&addrHi,
+			&addrLo,
+			&cntl,
+			i,
+			vmid,
+			dbgdev->dev->device_info->asic_family
+			);
 
-			dbgdev_address_watch_set_registers(
-				adw_info,
-				&addrHi,
-				&addrLo,
-				&cntl,
-				i,
-				vmid,
-				dbgdev->dev->device_info->asic_family
-				);
+		pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
+		pr_debug("\t\t%20s %08x\n", "register index :", i);
+		pr_debug("\t\t%20s %08x\n", "vmid is :", vmid);
+		pr_debug("\t\t%20s %08x\n", "Address Low is :",
+				addrLo.bitfields.addr);
+		pr_debug("\t\t%20s %08x\n", "Address high is :",
+				addrHi.bitfields.addr);
+		pr_debug("\t\t%20s %08x\n", "Address high is :",
+				addrHi.bitfields.addr);
+		pr_debug("\t\t%20s %08x\n", "Control Mask is :",
+				cntl.bitfields.mask);
+		pr_debug("\t\t%20s %08x\n", "Control Mode is :",
+				cntl.bitfields.mode);
+		pr_debug("\t\t%20s %08x\n", "Control Vmid is :",
+				cntl.bitfields.vmid);
+		pr_debug("\t\t%20s %08x\n", "Control atc  is :",
+				cntl.bitfields.atc);
+		pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
 
-			pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
-			pr_debug("\t\t%20s %08x\n", "register index :", i);
-			pr_debug("\t\t%20s %08x\n", "vmid is :", vmid);
-			pr_debug("\t\t%20s %08x\n", "Address Low is :", addrLo.bitfields.addr);
-			pr_debug("\t\t%20s %08x\n", "Address high is :", addrHi.bitfields.addr);
-			pr_debug("\t\t%20s %08x\n", "Address high is :", addrHi.bitfields.addr);
-			pr_debug("\t\t%20s %08x\n", "Control Mask is :", cntl.bitfields.mask);
-			pr_debug("\t\t%20s %08x\n", "Control Mode is :", cntl.bitfields.mode);
-			pr_debug("\t\t%20s %08x\n", "Control Vmid is :", cntl.bitfields.vmid);
-			pr_debug("\t\t%20s %08x\n", "Control atc  is :", cntl.bitfields.atc);
-			pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
+		pdd->dev->kfd2kgd->address_watch_execute(
+						dbgdev->dev->kgd,
+						i,
+						cntl.u32All,
+						addrHi.u32All,
+						addrLo.u32All);
+	}
 
-			pdd->dev->kfd2kgd->address_watch_execute(
-							dbgdev->dev->kgd,
-							i,
-							cntl.u32All,
-							addrHi.u32All,
-							addrLo.u32All);
-		}
-
-	} while (false);
-
-	return status;
+	return 0;
 }
 
 static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
@@ -386,131 +396,135 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 	addrLo.u32All = 0;
 	cntl.u32All = 0;
 
-	do {
+	if ((adw_info->num_watch_points > MAX_WATCH_ADDRESSES) ||
+			(adw_info->num_watch_points == 0) ||
+			!adw_info->watch_mode || !adw_info->watch_address)
+		return -EINVAL;
 
-		if ((adw_info->num_watch_points > MAX_WATCH_ADDRESSES) || (adw_info->num_watch_points == 0)) {
-			status = -EINVAL;
-			break;
-		}
+	status = dbgdev->kq->ops.acquire_inline_ib(dbgdev->kq,
+			ib_size/sizeof(uint32_t),
+			&packet_buff_uint, &packet_buff_gpu_addr);
+	if (status != 0)
+		return status;
+	memset(packet_buff_uint, 0, ib_size);
 
-		if ((NULL == adw_info->watch_mode) || (NULL == adw_info->watch_address)) {
-			status = -EINVAL;
-			break;
-		}
+	packets_vec = (struct pm4__set_config_reg *) (packet_buff_uint);
 
-		status = dbgdev->kq->ops.acquire_inline_ib(dbgdev->kq,
-				ib_size/sizeof(uint32_t),
-				&packet_buff_uint, &packet_buff_gpu_addr);
+	packets_vec[0].header.count = 1;
+	packets_vec[0].header.opcode = IT_SET_CONFIG_REG;
+	packets_vec[0].header.type = PM4_TYPE_3;
+	packets_vec[0].bitfields2.vmid_shift =
+		ADDRESS_WATCH_CNTL_OFFSET;
+	packets_vec[0].bitfields2.insert_vmid = 1;
+	packets_vec[1].ordinal1 = packets_vec[0].ordinal1;
+	packets_vec[1].bitfields2.insert_vmid = 0;
+	packets_vec[2].ordinal1 = packets_vec[0].ordinal1;
+	packets_vec[2].bitfields2.insert_vmid = 0;
+	packets_vec[3].ordinal1 = packets_vec[0].ordinal1;
+	packets_vec[3].bitfields2.vmid_shift =
+		ADDRESS_WATCH_CNTL_OFFSET;
+	packets_vec[3].bitfields2.insert_vmid = 1;
 
-		if (status != 0)
-			break;
+	for (i = 0; i < adw_info->num_watch_points; i++) {
 
-		memset(packet_buff_uint, 0, ib_size);
+		dbgdev_address_watch_set_registers(
+				adw_info,
+				&addrHi,
+				&addrLo,
+				&cntl,
+				i,
+				vmid,
+				dbgdev->dev->device_info->asic_family
+				);
 
-		packets_vec = (struct pm4__set_config_reg *) (packet_buff_uint);
+		pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
+		pr_debug("\t\t%20s %08x\n", "register index :", i);
+		pr_debug("\t\t%20s %08x\n", "vmid is :", vmid);
+		pr_debug("\t\t%20s %p\n", "Add ptr is :",
+				adw_info->watch_address);
+		pr_debug("\t\t%20s %08llx\n", "Add     is :",
+				adw_info->watch_address[i]);
+		pr_debug("\t\t%20s %08x\n", "Address Low is :",
+				addrLo.bitfields.addr);
+		pr_debug("\t\t%20s %08x\n", "Address high is :",
+				addrHi.bitfields.addr);
+		pr_debug("\t\t%20s %08x\n", "Control Mask is :",
+				cntl.bitfields.mask);
+		pr_debug("\t\t%20s %08x\n", "Control Mode is :",
+				cntl.bitfields.mode);
+		pr_debug("\t\t%20s %08x\n", "Control Vmid is :",
+				cntl.bitfields.vmid);
+		pr_debug("\t\t%20s %08x\n", "Control atc  is :",
+				cntl.bitfields.atc);
+		pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
 
-		packets_vec[0].header.count = 1;
-		packets_vec[0].header.opcode = IT_SET_CONFIG_REG;
-		packets_vec[0].header.type = PM4_TYPE_3;
-		packets_vec[0].bitfields2.vmid_shift = ADDRESS_WATCH_CNTL_OFFSET;
-		packets_vec[0].bitfields2.insert_vmid = 1;
-		packets_vec[1].ordinal1 = packets_vec[0].ordinal1;
-		packets_vec[1].bitfields2.insert_vmid = 0;
-		packets_vec[2].ordinal1 = packets_vec[0].ordinal1;
-		packets_vec[2].bitfields2.insert_vmid = 0;
-		packets_vec[3].ordinal1 = packets_vec[0].ordinal1;
-		packets_vec[3].bitfields2.vmid_shift = ADDRESS_WATCH_CNTL_OFFSET;
-		packets_vec[3].bitfields2.insert_vmid = 1;
-
-		for (i = 0; i < adw_info->num_watch_points; i++) {
-
-			dbgdev_address_watch_set_registers(
-					adw_info,
-					&addrHi,
-					&addrLo,
-					&cntl,
+		aw_reg_add_dword =
+				dbgdev->dev->kfd2kgd
+				->address_watch_get_offset(
+					dbgdev->dev->kgd,
 					i,
-					vmid,
-					dbgdev->dev->device_info->asic_family
-					);
+					ADDRESS_WATCH_REG_CNTL);
 
-			pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
-			pr_debug("\t\t%20s %08x\n", "register index :", i);
-			pr_debug("\t\t%20s %08x\n", "vmid is :", vmid);
-			pr_debug("\t\t%20s %p\n", "Add ptr is :", adw_info->watch_address);
-			pr_debug("\t\t%20s %08llx\n", "Add     is :", adw_info->watch_address[i]);
-			pr_debug("\t\t%20s %08x\n", "Address Low is :", addrLo.bitfields.addr);
-			pr_debug("\t\t%20s %08x\n", "Address high is :", addrHi.bitfields.addr);
-			pr_debug("\t\t%20s %08x\n", "Control Mask is :", cntl.bitfields.mask);
-			pr_debug("\t\t%20s %08x\n", "Control Mode is :", cntl.bitfields.mode);
-			pr_debug("\t\t%20s %08x\n", "Control Vmid is :", cntl.bitfields.vmid);
-			pr_debug("\t\t%20s %08x\n", "Control atc  is :", cntl.bitfields.atc);
-			pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
+		packets_vec[0].bitfields2.reg_offset =
+				aw_reg_add_dword - CONFIG_REG_BASE;
+		packets_vec[0].reg_data[0] = cntl.u32All;
 
-			aw_reg_add_dword =
-					dbgdev->dev->kfd2kgd
-					->address_watch_get_offset(
-						dbgdev->dev->kgd,
-						i,
-						ADDRESS_WATCH_REG_CNTL);
-
-			packets_vec[0].bitfields2.reg_offset = aw_reg_add_dword - CONFIG_REG_BASE;
-			packets_vec[0].reg_data[0] = cntl.u32All;
-
-			aw_reg_add_dword =
-					dbgdev->dev->kfd2kgd
-					->address_watch_get_offset(
-						dbgdev->dev->kgd,
-						i,
-						ADDRESS_WATCH_REG_ADDR_HI);
+		aw_reg_add_dword =
+				dbgdev->dev->kfd2kgd
+				->address_watch_get_offset(
+					dbgdev->dev->kgd,
+					i,
+					ADDRESS_WATCH_REG_ADDR_HI);
 
 
-			packets_vec[1].bitfields2.reg_offset = aw_reg_add_dword - CONFIG_REG_BASE;
-			packets_vec[1].reg_data[0] = addrHi.u32All;
+		packets_vec[1].bitfields2.reg_offset =
+				aw_reg_add_dword - CONFIG_REG_BASE;
+		packets_vec[1].reg_data[0] = addrHi.u32All;
 
-			aw_reg_add_dword =
-					dbgdev->dev->kfd2kgd
-					->address_watch_get_offset(
-						dbgdev->dev->kgd,
-						i,
-						ADDRESS_WATCH_REG_ADDR_LO);
-
-
-			packets_vec[2].bitfields2.reg_offset = aw_reg_add_dword - CONFIG_REG_BASE;
-			packets_vec[2].reg_data[0] = addrLo.u32All;
-
-			/* enable watch flag if address is not zero*/
-			if (adw_info->watch_address[i] > 0)
-				cntl.bitfields.valid = 1;
-			else
-				cntl.bitfields.valid = 0;
-
-			aw_reg_add_dword =
-					dbgdev->dev->kfd2kgd
-					->address_watch_get_offset(
-						dbgdev->dev->kgd,
-						i,
-						ADDRESS_WATCH_REG_CNTL);
+		aw_reg_add_dword =
+				dbgdev->dev->kfd2kgd
+				->address_watch_get_offset(
+					dbgdev->dev->kgd,
+					i,
+					ADDRESS_WATCH_REG_ADDR_LO);
 
 
-			packets_vec[3].bitfields2.reg_offset = aw_reg_add_dword - CONFIG_REG_BASE;
-			packets_vec[3].reg_data[0] = cntl.u32All;
+		packets_vec[2].bitfields2.reg_offset =
+				aw_reg_add_dword - CONFIG_REG_BASE;
+		packets_vec[2].reg_data[0] = addrLo.u32All;
 
-			status = dbgdev_diq_submit_ib(
-						dbgdev,
-						adw_info->process->pasid,
-						packet_buff_gpu_addr,
-						packet_buff_uint,
-						ib_size, true);
+		/* enable watch flag if address is not zero*/
+		if (adw_info->watch_address[i] > 0)
+			cntl.bitfields.valid = 1;
+		else
+			cntl.bitfields.valid = 0;
 
-			if (status != 0) {
-				pr_debug("Error! kfd: In func %s >> failed to submit DIQ packet\n", __func__);
-				break;
-			}
+		aw_reg_add_dword =
+				dbgdev->dev->kfd2kgd
+				->address_watch_get_offset(
+					dbgdev->dev->kgd,
+					i,
+					ADDRESS_WATCH_REG_CNTL);
 
+
+		packets_vec[3].bitfields2.reg_offset =
+				aw_reg_add_dword - CONFIG_REG_BASE;
+		packets_vec[3].reg_data[0] = cntl.u32All;
+
+		status = dbgdev_diq_submit_ib(
+					dbgdev,
+					adw_info->process->pasid,
+					packet_buff_gpu_addr,
+					packet_buff_uint,
+					ib_size, true);
+
+		if (status != 0) {
+			pr_debug("Error! kfd: In func %s >> failed to submit DIQ packet\n",
+					__func__);
+			return status;
 		}
 
-	} while (false);
+	}
 
 	return status;
 
@@ -525,26 +539,30 @@ static int dbgdev_wave_control_set_registers(
 	int status = 0;
 	union SQ_CMD_BITS reg_sq_cmd;
 	union GRBM_GFX_INDEX_BITS reg_gfx_index;
+	struct HsaDbgWaveMsgAMDGen2 *pMsg;
 
 	reg_sq_cmd.u32All = 0;
-
 	reg_gfx_index.u32All = 0;
+	pMsg = &wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2;
 
 	switch (wac_info->mode) {
-	case HSA_DBG_WAVEMODE_SINGLE:	/*  Send command to single wave  */
-		/*limit access to the process waves only,by setting vmid check */
+	/*  Send command to single wave  */
+	case HSA_DBG_WAVEMODE_SINGLE:
+		/* limit access to the process waves only,by setting vmid check
+		 */
 		reg_sq_cmd.bits.check_vmid = 1;
-		reg_sq_cmd.bits.simd_id = wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.ui32.SIMD;
-		reg_sq_cmd.bits.wave_id = wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.ui32.WaveId;
+		reg_sq_cmd.bits.simd_id = pMsg->ui32.SIMD;
+		reg_sq_cmd.bits.wave_id = pMsg->ui32.WaveId;
 		reg_sq_cmd.bits.mode = SQ_IND_CMD_MODE_SINGLE;
 
-		reg_gfx_index.bits.sh_index = wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.ui32.ShaderArray;
-		reg_gfx_index.bits.se_index = wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.ui32.ShaderEngine;
-		reg_gfx_index.bits.instance_index = wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.ui32.HSACU;
+		reg_gfx_index.bits.sh_index = pMsg->ui32.ShaderArray;
+		reg_gfx_index.bits.se_index = pMsg->ui32.ShaderEngine;
+		reg_gfx_index.bits.instance_index = pMsg->ui32.HSACU;
 
 		break;
 
-	case HSA_DBG_WAVEMODE_BROADCAST_PROCESS:	/*  Send command to all waves with matching VMID  */
+	/*  Send command to all waves with matching VMID  */
+	case HSA_DBG_WAVEMODE_BROADCAST_PROCESS:
 
 
 		reg_gfx_index.bits.sh_broadcast_writes = 1;
@@ -554,14 +572,15 @@ static int dbgdev_wave_control_set_registers(
 		reg_sq_cmd.bits.mode = SQ_IND_CMD_MODE_BROADCAST;
 		break;
 
-	case HSA_DBG_WAVEMODE_BROADCAST_PROCESS_CU:	/*  Send command to all CU waves with matching VMID  */
+	/*  Send command to all CU waves with matching VMID  */
+	case HSA_DBG_WAVEMODE_BROADCAST_PROCESS_CU:
 
 		reg_sq_cmd.bits.check_vmid = 1;
 		reg_sq_cmd.bits.mode = SQ_IND_CMD_MODE_BROADCAST;
 
-		reg_gfx_index.bits.sh_index = wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.ui32.ShaderArray;
-		reg_gfx_index.bits.se_index = wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.ui32.ShaderEngine;
-		reg_gfx_index.bits.instance_index = wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.ui32.HSACU;
+		reg_gfx_index.bits.sh_index = pMsg->ui32.ShaderArray;
+		reg_gfx_index.bits.se_index = pMsg->ui32.ShaderEngine;
+		reg_gfx_index.bits.instance_index = pMsg->ui32.HSACU;
 
 		break;
 
@@ -636,91 +655,98 @@ static int dbgdev_wave_control_diq(struct kfd_dbgdev *dbgdev,
 	size_t ib_size = sizeof(struct pm4__set_config_reg) * 3;
 
 	reg_sq_cmd.u32All = 0;
-	do {
 
-		status = dbgdev_wave_control_set_registers(wac_info,
-				&reg_sq_cmd,
-				&reg_gfx_index,
-				dbgdev->dev->device_info->asic_family);
+	status = dbgdev_wave_control_set_registers(wac_info,
+			&reg_sq_cmd,
+			&reg_gfx_index,
+			dbgdev->dev->device_info->asic_family);
 
-		/* we do not control the VMID in DIQ,so reset it to a known value */
-		reg_sq_cmd.bits.vm_id = 0;
-		if (status != 0)
-			break;
-		pr_debug("\t\t %30s\n", "* * * * * * * * * * * * * * * * * *");
+	/* we do not control the VMID in DIQ, so reset it to a
+	 * known value
+	 */
+	reg_sq_cmd.bits.vm_id = 0;
+	if (status != 0)
+		return status;
+	pr_debug("\t\t %30s\n", "* * * * * * * * * * * * * * * * * *");
 
-		pr_debug("\t\t mode      is: %u\n", wac_info->mode);
-		pr_debug("\t\t operand   is: %u\n", wac_info->operand);
-		pr_debug("\t\t trap id   is: %u\n", wac_info->trapId);
-		pr_debug("\t\t msg value is: %u\n", wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.Value);
-		pr_debug("\t\t vmid      is: N/A\n");
+	pr_debug("\t\t mode      is: %u\n", wac_info->mode);
+	pr_debug("\t\t operand   is: %u\n", wac_info->operand);
+	pr_debug("\t\t trap id   is: %u\n", wac_info->trapId);
+	pr_debug("\t\t msg value is: %u\n", wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.Value);
+	pr_debug("\t\t vmid      is: N/A\n");
 
-		pr_debug("\t\t chk_vmid  is : %u\n", reg_sq_cmd.bitfields.check_vmid);
-		pr_debug("\t\t command   is : %u\n", reg_sq_cmd.bitfields.cmd);
-		pr_debug("\t\t queue id  is : %u\n", reg_sq_cmd.bitfields.queue_id);
-		pr_debug("\t\t simd id   is : %u\n", reg_sq_cmd.bitfields.simd_id);
-		pr_debug("\t\t mode      is : %u\n", reg_sq_cmd.bitfields.mode);
-		pr_debug("\t\t vm_id     is : %u\n", reg_sq_cmd.bitfields.vm_id);
-		pr_debug("\t\t wave_id   is : %u\n", reg_sq_cmd.bitfields.wave_id);
+	pr_debug("\t\t chk_vmid  is : %u\n", reg_sq_cmd.bitfields.check_vmid);
+	pr_debug("\t\t command   is : %u\n", reg_sq_cmd.bitfields.cmd);
+	pr_debug("\t\t queue id  is : %u\n", reg_sq_cmd.bitfields.queue_id);
+	pr_debug("\t\t simd id   is : %u\n", reg_sq_cmd.bitfields.simd_id);
+	pr_debug("\t\t mode      is : %u\n", reg_sq_cmd.bitfields.mode);
+	pr_debug("\t\t vm_id     is : %u\n", reg_sq_cmd.bitfields.vm_id);
+	pr_debug("\t\t wave_id   is : %u\n", reg_sq_cmd.bitfields.wave_id);
 
-		pr_debug("\t\t ibw       is : %u\n", reg_gfx_index.bitfields.instance_broadcast_writes);
-		pr_debug("\t\t ii        is : %u\n", reg_gfx_index.bitfields.instance_index);
-		pr_debug("\t\t sebw      is : %u\n", reg_gfx_index.bitfields.se_broadcast_writes);
-		pr_debug("\t\t se_ind    is : %u\n", reg_gfx_index.bitfields.se_index);
-		pr_debug("\t\t sh_ind    is : %u\n", reg_gfx_index.bitfields.sh_index);
-		pr_debug("\t\t sbw       is : %u\n", reg_gfx_index.bitfields.sh_broadcast_writes);
+	pr_debug("\t\t ibw       is : %u\n",
+			reg_gfx_index.bitfields.instance_broadcast_writes);
+	pr_debug("\t\t ii        is : %u\n",
+			reg_gfx_index.bitfields.instance_index);
+	pr_debug("\t\t sebw      is : %u\n",
+			reg_gfx_index.bitfields.se_broadcast_writes);
+	pr_debug("\t\t se_ind    is : %u\n",
+			reg_gfx_index.bitfields.se_index);
+	pr_debug("\t\t sh_ind    is : %u\n", reg_gfx_index.bitfields.sh_index);
+	pr_debug("\t\t sbw       is : %u\n",
+			reg_gfx_index.bitfields.sh_broadcast_writes);
 
-		pr_debug("\t\t %30s\n", "* * * * * * * * * * * * * * * * * *");
+	pr_debug("\t\t %30s\n", "* * * * * * * * * * * * * * * * * *");
 
-		status = dbgdev->kq->ops.acquire_inline_ib(dbgdev->kq,
-				ib_size / sizeof(uint32_t),
-				&packet_buff_uint, &packet_buff_gpu_addr);
+	status = dbgdev->kq->ops.acquire_inline_ib(dbgdev->kq,
+			ib_size / sizeof(uint32_t),
+			&packet_buff_uint, &packet_buff_gpu_addr);
 
-		if (status != 0)
-			break;
+	if (status != 0)
+		return status;
 
-		memset(packet_buff_uint, 0, ib_size);
+	memset(packet_buff_uint, 0, ib_size);
 
-		packets_vec =  (struct pm4__set_config_reg *) packet_buff_uint;
-		packets_vec[0].header.count = 1;
-		packets_vec[0].header.opcode = IT_SET_UCONFIG_REG;
-		packets_vec[0].header.type = PM4_TYPE_3;
-		packets_vec[0].bitfields2.reg_offset = GRBM_GFX_INDEX / (sizeof(uint32_t)) - USERCONFIG_REG_BASE;
-		packets_vec[0].bitfields2.insert_vmid = 0;
-		packets_vec[0].reg_data[0] = reg_gfx_index.u32All;
+	packets_vec =  (struct pm4__set_config_reg *) packet_buff_uint;
+	packets_vec[0].header.count = 1;
+	packets_vec[0].header.opcode = IT_SET_UCONFIG_REG;
+	packets_vec[0].header.type = PM4_TYPE_3;
+	packets_vec[0].bitfields2.reg_offset =
+		GRBM_GFX_INDEX / (sizeof(uint32_t)) - USERCONFIG_REG_BASE;
+	packets_vec[0].bitfields2.insert_vmid = 0;
+	packets_vec[0].reg_data[0] = reg_gfx_index.u32All;
 
-		packets_vec[1].header.count = 1;
-		packets_vec[1].header.opcode = IT_SET_CONFIG_REG;
-		packets_vec[1].header.type = PM4_TYPE_3;
-		packets_vec[1].bitfields2.reg_offset = SQ_CMD / (sizeof(uint32_t)) - CONFIG_REG_BASE;
-		packets_vec[1].bitfields2.vmid_shift = SQ_CMD_VMID_OFFSET;
-		packets_vec[1].bitfields2.insert_vmid = 1;
-		packets_vec[1].reg_data[0] = reg_sq_cmd.u32All;
+	packets_vec[1].header.count = 1;
+	packets_vec[1].header.opcode = IT_SET_CONFIG_REG;
+	packets_vec[1].header.type = PM4_TYPE_3;
+	packets_vec[1].bitfields2.reg_offset =
+		SQ_CMD / (sizeof(uint32_t)) - CONFIG_REG_BASE;
+	packets_vec[1].bitfields2.vmid_shift = SQ_CMD_VMID_OFFSET;
+	packets_vec[1].bitfields2.insert_vmid = 1;
+	packets_vec[1].reg_data[0] = reg_sq_cmd.u32All;
 
-		/* Restore the GRBM_GFX_INDEX register */
+	/* Restore the GRBM_GFX_INDEX register */
 
-		reg_gfx_index.u32All = 0;
-		reg_gfx_index.bits.sh_broadcast_writes = 1;
-		reg_gfx_index.bits.instance_broadcast_writes = 1;
-		reg_gfx_index.bits.se_broadcast_writes = 1;
+	reg_gfx_index.u32All = 0;
+	reg_gfx_index.bits.sh_broadcast_writes = 1;
+	reg_gfx_index.bits.instance_broadcast_writes = 1;
+	reg_gfx_index.bits.se_broadcast_writes = 1;
 
 
-		packets_vec[2].ordinal1 = packets_vec[0].ordinal1;
-		packets_vec[2].bitfields2.reg_offset = GRBM_GFX_INDEX / (sizeof(uint32_t)) - USERCONFIG_REG_BASE;
-		packets_vec[2].bitfields2.insert_vmid = 0;
-		packets_vec[2].reg_data[0] = reg_gfx_index.u32All;
+	packets_vec[2].ordinal1 = packets_vec[0].ordinal1;
+	packets_vec[2].bitfields2.reg_offset =
+		GRBM_GFX_INDEX / (sizeof(uint32_t)) - USERCONFIG_REG_BASE;
+	packets_vec[2].bitfields2.insert_vmid = 0;
+	packets_vec[2].reg_data[0] = reg_gfx_index.u32All;
 
-		status = dbgdev_diq_submit_ib(
-				dbgdev,
-				wac_info->process->pasid,
-				packet_buff_gpu_addr,
-				packet_buff_uint,
-				ib_size, false);
+	status = dbgdev_diq_submit_ib(
+			dbgdev,
+			wac_info->process->pasid,
+			packet_buff_gpu_addr,
+			packet_buff_uint,
+			ib_size, false);
 
-		if (status != 0)
-			pr_debug("%s\n", " Critical Error ! Submit diq packet failed ");
-
-	} while (false);
+	if (status != 0)
+		pr_debug("%s\n", " Critical Error ! Submit diq packet failed ");
 
 	return status;
 }
@@ -758,23 +784,37 @@ static int dbgdev_wave_control_nodiq(struct kfd_dbgdev *dbgdev,
 			pr_debug("\t\t mode      is: %u\n", wac_info->mode);
 			pr_debug("\t\t operand   is: %u\n", wac_info->operand);
 			pr_debug("\t\t trap id   is: %u\n", wac_info->trapId);
-			pr_debug("\t\t msg value is: %u\n", wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.Value);
+			pr_debug("\t\t msg value is: %u\n",
+					wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.Value);
 			pr_debug("\t\t vmid      is: %u\n", vmid);
 
-			pr_debug("\t\t chk_vmid  is : %u\n", reg_sq_cmd.bitfields.check_vmid);
-			pr_debug("\t\t command   is : %u\n", reg_sq_cmd.bitfields.cmd);
-			pr_debug("\t\t queue id  is : %u\n", reg_sq_cmd.bitfields.queue_id);
-			pr_debug("\t\t simd id   is : %u\n", reg_sq_cmd.bitfields.simd_id);
-			pr_debug("\t\t mode      is : %u\n", reg_sq_cmd.bitfields.mode);
-			pr_debug("\t\t vm_id     is : %u\n", reg_sq_cmd.bitfields.vm_id);
-			pr_debug("\t\t wave_id   is : %u\n", reg_sq_cmd.bitfields.wave_id);
+			pr_debug("\t\t chk_vmid  is : %u\n",
+					reg_sq_cmd.bitfields.check_vmid);
+			pr_debug("\t\t command   is : %u\n",
+					reg_sq_cmd.bitfields.cmd);
+			pr_debug("\t\t queue id  is : %u\n",
+					reg_sq_cmd.bitfields.queue_id);
+			pr_debug("\t\t simd id   is : %u\n",
+					reg_sq_cmd.bitfields.simd_id);
+			pr_debug("\t\t mode      is : %u\n",
+					reg_sq_cmd.bitfields.mode);
+			pr_debug("\t\t vm_id     is : %u\n",
+					reg_sq_cmd.bitfields.vm_id);
+			pr_debug("\t\t wave_id   is : %u\n",
+					reg_sq_cmd.bitfields.wave_id);
 
-			pr_debug("\t\t ibw       is : %u\n", reg_gfx_index.bitfields.instance_broadcast_writes);
-			pr_debug("\t\t ii        is : %u\n", reg_gfx_index.bitfields.instance_index);
-			pr_debug("\t\t sebw      is : %u\n", reg_gfx_index.bitfields.se_broadcast_writes);
-			pr_debug("\t\t se_ind    is : %u\n", reg_gfx_index.bitfields.se_index);
-			pr_debug("\t\t sh_ind    is : %u\n", reg_gfx_index.bitfields.sh_index);
-			pr_debug("\t\t sbw       is : %u\n", reg_gfx_index.bitfields.sh_broadcast_writes);
+			pr_debug("\t\t ibw       is : %u\n",
+					reg_gfx_index.bitfields.instance_broadcast_writes);
+			pr_debug("\t\t ii        is : %u\n",
+					reg_gfx_index.bitfields.instance_index);
+			pr_debug("\t\t sebw      is : %u\n",
+					reg_gfx_index.bitfields.se_broadcast_writes);
+			pr_debug("\t\t se_ind    is : %u\n",
+					reg_gfx_index.bitfields.se_index);
+			pr_debug("\t\t sh_ind    is : %u\n",
+					reg_gfx_index.bitfields.sh_index);
+			pr_debug("\t\t sbw       is : %u\n",
+					reg_gfx_index.bitfields.sh_broadcast_writes);
 
 			pr_debug("\t\t %30s\n", "* * * * * * * * * * * * * * * * * *");
 
@@ -814,7 +854,8 @@ int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p)
 
 	/* Scan all registers in the range ATC_VMID8_PASID_MAPPING ..
 	 * ATC_VMID15_PASID_MAPPING
-	 * to check which VMID the current process is mapped to. */
+	 * to check which VMID the current process is mapped to.
+	 */
 
 	for (vmid = first_vmid_to_scan; vmid <= last_vmid_to_scan; vmid++) {
 		if (dev->kfd2kgd->get_atc_vmid_pasid_mapping_valid
@@ -854,7 +895,7 @@ int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p)
 }
 
 void kfd_dbgdev_init(struct kfd_dbgdev *pdbgdev, struct kfd_dev *pdev,
-			DBGDEV_TYPE type)
+			enum DBGDEV_TYPE type)
 {
 	pdbgdev->dev = pdev;
 	pdbgdev->kq = NULL;

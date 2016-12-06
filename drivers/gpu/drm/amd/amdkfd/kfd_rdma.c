@@ -179,7 +179,7 @@ void run_rdma_free_callback(struct kfd_bo *buf_obj)
  * This function release resources previously allocated by get_pages() call.
  *
  * \param   p_p2p_data - A pointer to pointer to amd_p2p_info entries
- * 			allocated by get_pages() call.
+ *			allocated by get_pages() call.
  *
  * \return  0 if operation was successful
  */
