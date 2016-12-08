@@ -29,8 +29,5 @@ extern const struct amdgpu_ip_block_version dce_v10_0_ip_block;
 extern const struct amdgpu_ip_block_version dce_v10_1_ip_block;
 
 void dce_v10_0_disable_dce(struct amdgpu_device *adev);
-void dce_v10_0_stop_mc_access(struct amdgpu_device *adev,
-			      struct amdgpu_mode_mc_save *save);
-void dce_v10_0_resume_mc_access(struct amdgpu_device *adev,
-				struct amdgpu_mode_mc_save *save);
+
 #endif

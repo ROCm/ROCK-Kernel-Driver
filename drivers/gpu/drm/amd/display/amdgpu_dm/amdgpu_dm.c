@@ -37,12 +37,6 @@
 #include "amdgpu_dm_irq.h"
 #include "dm_helpers.h"
 
-#ifdef CONFIG_DRM_AMDGPU_CIK
-#include "dce_v8_0.h"
-#endif
-#include "dce_v10_0.h"
-#include "dce_v11_0.h"
-
 #include "ivsrcid/ivsrcid_vislands30.h"
 
 #include <linux/module.h>
@@ -1460,72 +1454,6 @@ static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 	return r;
 }
 
-void dce_v12_0_stop_mc_access(struct amdgpu_device *adev,
-			      struct amdgpu_mode_mc_save *save)
-{
-#if 0
-	u32 crtc_enabled, tmp;
-	int i;
-
-	save->vga_render_control = RREG32(mmVGA_RENDER_CONTROL);
-	save->vga_hdp_control = RREG32(mmVGA_HDP_CONTROL);
-
-	/* disable VGA render */
-	tmp = RREG32(mmVGA_RENDER_CONTROL);
-	tmp = REG_SET_FIELD(tmp, VGA_RENDER_CONTROL, VGA_VSTATUS_CNTL, 0);
-	WREG32(mmVGA_RENDER_CONTROL, tmp);
-
-	/* blank the display controllers */
-	for (i = 0; i < adev->mode_info.num_crtc; i++) {
-		crtc_enabled = REG_GET_FIELD(RREG32(mmCRTC_CONTROL + crtc_offsets[i]),
-					     CRTC_CONTROL, CRTC_MASTER_EN);
-		if (crtc_enabled) {
-			save->crtc_enabled[i] = true;
-			tmp = RREG32(mmCRTC_BLANK_CONTROL + crtc_offsets[i]);
-			if (REG_GET_FIELD(tmp, CRTC_BLANK_CONTROL, CRTC_BLANK_DATA_EN) == 0) {
-				/*it is correct only for RGB ; black is 0*/
-				WREG32(mmCRTC_BLANK_DATA_COLOR + crtc_offsets[i], 0);
-				tmp = REG_SET_FIELD(tmp, CRTC_BLANK_CONTROL, CRTC_BLANK_DATA_EN, 1);
-				WREG32(mmCRTC_BLANK_CONTROL + crtc_offsets[i], tmp);
-			}
-		} else {
-			save->crtc_enabled[i] = false;
-		}
-	}
-#endif
-}
-
-void dce_v12_0_resume_mc_access(struct amdgpu_device *adev,
-				struct amdgpu_mode_mc_save *save)
-{
-#if 0
-	u32 tmp;
-	int i;
-
-	/* update crtc base addresses */
-	for (i = 0; i < adev->mode_info.num_crtc; i++) {
-		WREG32(mmGRPH_PRIMARY_SURFACE_ADDRESS_HIGH + crtc_offsets[i],
-		       upper_32_bits(adev->mc.vram_start));
-		WREG32(mmGRPH_PRIMARY_SURFACE_ADDRESS + crtc_offsets[i],
-		       (u32)adev->mc.vram_start);
-
-		if (save->crtc_enabled[i]) {
-			tmp = RREG32(mmCRTC_BLANK_CONTROL + crtc_offsets[i]);
-			tmp = REG_SET_FIELD(tmp, CRTC_BLANK_CONTROL, CRTC_BLANK_DATA_EN, 0);
-			WREG32(mmCRTC_BLANK_CONTROL + crtc_offsets[i], tmp);
-		}
-	}
-
-	WREG32(mmVGA_MEMORY_BASE_ADDRESS_HIGH, upper_32_bits(adev->mc.vram_start));
-	WREG32(mmVGA_MEMORY_BASE_ADDRESS, lower_32_bits(adev->mc.vram_start));
-
-	/* Unlock vga access */
-	WREG32(mmVGA_HDP_CONTROL, save->vga_hdp_control);
-	mdelay(1);
-	WREG32(mmVGA_RENDER_CONTROL, save->vga_render_control);
-#endif
-}
-
 #ifdef CONFIG_DRM_AMDGPU_CIK
 static const struct amdgpu_display_funcs dm_dce_v8_0_display_funcs = {
 	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
@@ -1543,8 +1471,6 @@ static const struct amdgpu_display_funcs dm_dce_v8_0_display_funcs = {
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
 	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
-	.stop_mc_access = dce_v8_0_stop_mc_access, /* called unconditionally */
-	.resume_mc_access = dce_v8_0_resume_mc_access, /* called unconditionally */
 	.notify_freesync = amdgpu_notify_freesync,
 };
 #endif
@@ -1565,8 +1491,6 @@ static const struct amdgpu_display_funcs dm_dce_v10_0_display_funcs = {
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
 	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
-	.stop_mc_access = dce_v10_0_stop_mc_access, /* called unconditionally */
-	.resume_mc_access = dce_v10_0_resume_mc_access, /* called unconditionally */
 	.notify_freesync = amdgpu_notify_freesync,
 
 };
@@ -1587,8 +1511,6 @@ static const struct amdgpu_display_funcs dm_dce_v11_0_display_funcs = {
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
 	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
-	.stop_mc_access = dce_v11_0_stop_mc_access, /* called unconditionally */
-	.resume_mc_access = dce_v11_0_resume_mc_access, /* called unconditionally */
 	.notify_freesync = amdgpu_notify_freesync,
 
 };
@@ -1609,8 +1531,6 @@ static const struct amdgpu_display_funcs dm_dce_v12_0_display_funcs = {
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
 	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
-	.stop_mc_access = dce_v12_0_stop_mc_access, /* called unconditionally */
-	.resume_mc_access = dce_v12_0_resume_mc_access, /* called unconditionally */
 	.notify_freesync = amdgpu_notify_freesync,
 
 };
@@ -1632,8 +1552,6 @@ static const struct amdgpu_display_funcs dm_dcn_v1_0_display_funcs = {
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
 	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
-	.stop_mc_access = dce_v12_0_stop_mc_access, /* called unconditionally */
-	.resume_mc_access = dce_v12_0_resume_mc_access, /* called unconditionally */
 	.notify_freesync = amdgpu_notify_freesync,
 
 };
