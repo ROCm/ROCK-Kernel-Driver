@@ -502,6 +502,9 @@ int drm_atomic_helper_resume(struct drm_device *dev,
 EXPORT_SYMBOL(drm_atomic_helper_resume);
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) */
 
+struct dma_buf_ops *_kcl_drm_gem_prime_dmabuf_ops;
+EXPORT_SYMBOL(_kcl_drm_gem_prime_dmabuf_ops);
+
 void amdkcl_drm_init(void)
 {
 	_kcl_drm_fb_helper_cfb_fillrect = amdkcl_fp_setup("drm_fb_helper_cfb_fillrect",
@@ -521,4 +524,5 @@ void amdkcl_drm_init(void)
 	_kcl_drm_atomic_helper_update_legacy_modeset_state = amdkcl_fp_setup(
 					"drm_atomic_helper_update_legacy_modeset_state",
 					_kcl_drm_atomic_helper_update_legacy_modeset_state_stub);
+	_kcl_drm_gem_prime_dmabuf_ops = amdkcl_fp_setup("drm_gem_prime_dmabuf_ops", NULL);
 }
