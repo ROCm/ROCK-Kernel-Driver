@@ -345,4 +345,9 @@ static inline void kcl_drm_gem_object_put_unlocked(struct drm_gem_object *obj)
 #endif
 }
 
+#ifdef BUILD_AS_DKMS
+extern struct dma_buf_ops *_kcl_drm_gem_prime_dmabuf_ops;
+#define drm_gem_prime_dmabuf_ops (*_kcl_drm_gem_prime_dmabuf_ops)
+#endif
+
 #endif /* AMDKCL_DRM_H */
