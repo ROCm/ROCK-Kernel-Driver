@@ -144,7 +144,7 @@ static int update_qpd_cik(struct device_queue_manager *dqm,
 		qpd->sh_mem_config |= 1  << SH_MEM_CONFIG__PRIVATE_ATC__SHIFT;
 	}
 
-	pr_debug("kfd: is32bit process: %d sh_mem_bases nybble: 0x%X and register 0x%X\n",
+	pr_debug("is32bit process: %d sh_mem_bases nybble: 0x%X and register 0x%X\n",
 		qpd->pqm->process->is_32bit_user_mode, temp, qpd->sh_mem_bases);
 
 	return 0;
@@ -176,7 +176,7 @@ static int update_qpd_cik_hawaii(struct device_queue_manager *dqm,
 	temp = get_sh_mem_bases_nybble_64(pdd);
 	qpd->sh_mem_bases = compute_sh_mem_bases_64bit(temp);
 
-	pr_debug("kfd: is32bit process: %d sh_mem_bases nybble: 0x%X and register 0x%X\n",
+	pr_debug("is32bit process: %d sh_mem_bases nybble: 0x%X and register 0x%X\n",
 		qpd->pqm->process->is_32bit_user_mode, temp, qpd->sh_mem_bases);
 
 	return 0;

@@ -1215,7 +1215,7 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 
 	gpu_id = kfd_generate_gpu_id(gpu);
 
-	pr_debug("kfd: Adding new GPU (ID: 0x%x) to topology\n", gpu_id);
+	pr_debug("Adding new GPU (ID: 0x%x) to topology\n", gpu_id);
 
 	proximity_domain = atomic_inc_return(&
 				topology_crat_proximity_domain);
@@ -1297,7 +1297,7 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	case CHIP_FIJI:
 	case CHIP_POLARIS10:
 	case CHIP_POLARIS11:
-		pr_debug("amdkfd: adding doorbell packet type capability\n");
+		pr_debug("Adding doorbell packet type capability\n");
 		dev->node_props.capability |= ((HSA_CAP_DOORBELL_TYPE_1_0 <<
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);

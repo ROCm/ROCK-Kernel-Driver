@@ -204,7 +204,7 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 		return -EINVAL;
 	ipc_obj_get(found);
 
-	pr_debug("ipc: found ipc_dma_buf: %p\n", found->data);
+	pr_debug("Found ipc_dma_buf: %p\n", found->data);
 
 	r = kfd_import_dmabuf_create_kfd_bo(dev, p, gpu_id, found->data,
 					    va_addr, handle, mmap_offset,
@@ -236,7 +236,7 @@ int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 	up_write(&p->lock);
 
 	if (IS_ERR(pdd)) {
-		pr_err("failed to get pdd\n");
+		pr_err("Failed to get pdd\n");
 		return PTR_ERR(pdd);
 	}
 
@@ -245,7 +245,7 @@ int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 	up_write(&p->lock);
 
 	if (!kfd_bo) {
-		pr_err("failed to get bo");
+		pr_err("Failed to get bo");
 		return -EINVAL;
 	}
 	if (kfd_bo->kfd_ipc_obj) {

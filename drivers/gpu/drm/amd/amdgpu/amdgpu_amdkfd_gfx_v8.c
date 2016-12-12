@@ -1002,7 +1002,7 @@ static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type)
 static void set_num_of_requests(struct kgd_dev *kgd,
 			uint8_t num_of_requests)
 {
-	pr_debug("in %s this is a stub\n", __func__);
+	pr_debug("This is a stub\n");
 }
 
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,

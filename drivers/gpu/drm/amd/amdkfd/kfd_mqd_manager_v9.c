@@ -85,7 +85,7 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 	m->compute_static_thread_mgmt_se2 = se_mask[2];
 	m->compute_static_thread_mgmt_se3 = se_mask[3];
 
-	pr_debug("kfd: update cu mask to %#x %#x %#x %#x\n",
+	pr_debug("update cu mask to %#x %#x %#x %#x\n",
 		m->compute_static_thread_mgmt_se0,
 		m->compute_static_thread_mgmt_se1,
 		m->compute_static_thread_mgmt_se2,
@@ -194,14 +194,12 @@ static int update_mqd(struct mqd_manager *mm, void *mqd,
 {
 	struct v9_mqd *m;
 
-	pr_debug("kfd: In func %s\n", __func__);
-
 	m = get_mqd(mqd);
 
 	m->cp_hqd_pq_control = 5 << CP_HQD_PQ_CONTROL__RPTR_BLOCK_SIZE__SHIFT;
 	m->cp_hqd_pq_control |=
 			ffs(q->queue_size / sizeof(unsigned int)) - 1 - 1;
-	pr_debug("kfd: cp_hqd_pq_control 0x%x\n", m->cp_hqd_pq_control);
+	pr_debug("cp_hqd_pq_control 0x%x\n", m->cp_hqd_pq_control);
 
 	m->cp_hqd_pq_base_lo = lower_32_bits((uint64_t)q->queue_address >> 8);
 	m->cp_hqd_pq_base_hi = upper_32_bits((uint64_t)q->queue_address >> 8);
@@ -214,7 +212,7 @@ static int update_mqd(struct mqd_manager *mm, void *mqd,
 	m->cp_hqd_pq_doorbell_control =
 		q->doorbell_off <<
 			CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_OFFSET__SHIFT;
-	pr_debug("kfd: cp_hqd_pq_doorbell_control 0x%x\n",
+	pr_debug("cp_hqd_pq_doorbell_control 0x%x\n",
 			m->cp_hqd_pq_doorbell_control);
 
 	m->cp_hqd_ib_control = 3 << CP_HQD_IB_CONTROL__MIN_IB_AVAIL_SIZE__SHIFT;
@@ -450,8 +448,6 @@ struct mqd_manager *mqd_manager_init_v9(enum KFD_MQD_TYPE type,
 
 	if (WARN_ON(type >= KFD_MQD_TYPE_MAX))
 		return NULL;
-
-	pr_debug("kfd: In func %s\n", __func__);
 
 	mqd = kzalloc(sizeof(struct mqd_manager), GFP_NOIO);
 	if (!mqd)

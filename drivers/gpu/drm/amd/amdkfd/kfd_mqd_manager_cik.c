@@ -89,7 +89,7 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 	m->compute_static_thread_mgmt_se2 = se_mask[2];
 	m->compute_static_thread_mgmt_se3 = se_mask[3];
 
-	pr_debug("kfd: update cu mask to %#x %#x %#x %#x\n",
+	pr_debug("Update cu mask to %#x %#x %#x %#x\n",
 		m->compute_static_thread_mgmt_se0,
 		m->compute_static_thread_mgmt_se1,
 		m->compute_static_thread_mgmt_se2,
@@ -113,8 +113,6 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 	uint64_t addr;
 	struct cik_mqd *m;
 	int retval;
-
-	pr_debug("kfd: In func %s\n", __func__);
 
 	retval = kfd_gtt_sa_allocate(mm->dev, sizeof(struct cik_mqd),
 					mqd_mem_obj);
@@ -242,8 +240,6 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 	struct cik_mqd *m;
 
 	BUG_ON(!mm || !q || !mqd);
-
-	pr_debug("kfd: In func %s\n", __func__);
 
 	m = get_mqd(mqd);
 	m->cp_hqd_pq_control = DEFAULT_RPTR_BLOCK_SIZE |
@@ -388,8 +384,6 @@ static int init_mqd_hiq(struct mqd_manager *mm, void **mqd,
 
 	BUG_ON(!mm || !q || !mqd || !mqd_mem_obj);
 
-	pr_debug("kfd: In func %s\n", __func__);
-
 	retval = kfd_gtt_sa_allocate(mm->dev, sizeof(struct cik_mqd),
 					mqd_mem_obj);
 
@@ -444,8 +438,6 @@ static int update_mqd_hiq(struct mqd_manager *mm, void *mqd,
 	struct cik_mqd *m;
 
 	BUG_ON(!mm || !q || !mqd);
-
-	pr_debug("kfd: In func %s\n", __func__);
 
 	m = get_mqd(mqd);
 	m->cp_hqd_pq_control = DEFAULT_RPTR_BLOCK_SIZE |
@@ -505,8 +497,6 @@ struct mqd_manager *mqd_manager_init_cik(enum KFD_MQD_TYPE type,
 
 	BUG_ON(!dev);
 	BUG_ON(type >= KFD_MQD_TYPE_MAX);
-
-	pr_debug("kfd: In func %s\n", __func__);
 
 	mqd = kzalloc(sizeof(struct mqd_manager), GFP_NOIO);
 	if (!mqd)

@@ -409,7 +409,7 @@ static int kfd_parse_subtype(struct crat_subtype_generic *sub_type_hdr,
 		ret = kfd_parse_subtype_iolink(iolink, device_list);
 		break;
 	default:
-		pr_warn("Unknown subtype (%d) in CRAT\n",
+		pr_warn("Unknown subtype %d in CRAT\n",
 				sub_type_hdr->type);
 	}
 
@@ -469,7 +469,7 @@ int kfd_parse_crat_table(void *crat_image,
 	sub_type_hdr = (struct crat_subtype_generic *)(crat_table+1);
 	while ((char *)sub_type_hdr + sizeof(struct crat_subtype_generic) <
 			((char *)crat_image) + image_len) {
-		pr_debug("kfd parsing crat sub type header %p enabled: %s type: 0x%x length %d\n",
+		pr_debug("Parsing CRAT subtype header %p enabled: %s type: 0x%x length %d\n",
 				sub_type_hdr,
 				(sub_type_hdr->flags &
 					CRAT_SUBTYPE_FLAGS_ENABLED)
@@ -478,9 +478,9 @@ int kfd_parse_crat_table(void *crat_image,
 				sub_type_hdr->length);
 
 		if (sub_type_hdr->length == 0) {
-			pr_err("amdkfd: Parsing wrong CRAT's sub header last header type: %d last header len %d\n",
+			pr_err("Parsing wrong CRAT's subtype header last header type: %d last header len %d\n",
 				last_header_type, last_header_type);
-			pr_err("amdkfd: Current header type %d length %d\n",
+			pr_err("Current header type %d length %d\n",
 				sub_type_hdr->type, sub_type_hdr->length);
 			break;
 		}
@@ -1002,7 +1002,7 @@ static int kfd_fill_gpu_memory_affinity(int *avail_size,
 
 	sub_type_hdr->proximity_domain = proximity_domain;
 
-	pr_debug("amdkfd: fill gpu memory affinity - type 0x%x size 0x%llx\n",
+	pr_debug("Fill gpu memory affinity - type 0x%x size 0x%llx\n",
 			type, size);
 
 	sub_type_hdr->length_low = lower_32_bits(size);

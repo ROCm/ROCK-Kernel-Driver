@@ -207,7 +207,7 @@ struct kfd_process *kfd_create_process(struct file *filep)
 	/* A prior open of /dev/kfd could have already created the process. */
 	process = find_process(thread, false);
 	if (process)
-		pr_debug("kfd: process already found\n");
+		pr_debug("Process already found\n");
 	else
 		process = create_process(thread, filep);
 
@@ -711,7 +711,7 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 		return pdd;
 
 	if (pdd->bound == PDD_BOUND_SUSPENDED) {
-		pr_err("kfd: binding PDD_BOUND_SUSPENDED pdd is unexpected!\n");
+		pr_err("Binding PDD_BOUND_SUSPENDED pdd is unexpected!\n");
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -750,7 +750,7 @@ int kfd_bind_processes_to_device(struct kfd_dev *dev)
 		err = amd_iommu_bind_pasid(dev->pdev, p->pasid,
 				p->lead_thread);
 		if (err < 0) {
-			pr_err("unexpected pasid %d binding failure\n",
+			pr_err("Unexpected pasid %d binding failure\n",
 					p->pasid);
 			up_write(&p->lock);
 			break;

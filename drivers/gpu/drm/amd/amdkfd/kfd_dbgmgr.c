@@ -69,8 +69,7 @@ bool kfd_dbgmgr_create(struct kfd_dbgmgr **ppmgr, struct kfd_dev *pdev)
 
 	new_buff = kfd_alloc_struct(new_buff);
 	if (!new_buff) {
-		dev_err(NULL, "Error! kfd: In func %s >> failed to allocate dbgmgr instance\n",
-				__func__);
+		pr_err("Failed to allocate dbgmgr instance\n");
 		return false;
 	}
 
@@ -78,8 +77,7 @@ bool kfd_dbgmgr_create(struct kfd_dbgmgr **ppmgr, struct kfd_dev *pdev)
 	new_buff->dev = pdev;
 	new_buff->dbgdev = kfd_alloc_struct(new_buff->dbgdev);
 	if (!new_buff->dbgdev) {
-		dev_err(NULL, "Error! kfd: In func %s >> failed to allocate dbgdev\n",
-				__func__);
+		pr_err("Failed to allocate dbgdev\n");
 		kfree(new_buff);
 		return false;
 	}
@@ -94,17 +92,11 @@ bool kfd_dbgmgr_create(struct kfd_dbgmgr **ppmgr, struct kfd_dev *pdev)
 	return true;
 }
 
-/*===========================================================================*/
-
-long
-kfd_dbgmgr_register(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
+long kfd_dbgmgr_register(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
 {
-	if ((!pmgr) || (!pmgr->dev) || (!pmgr->dbgdev)) {
-		dev_info(NULL, "Error! kfd: In func %s >> Illegal pointers\n",
-				__func__);
-		/*  Invalid Pointer.  */
+	if ((!pmgr) || (!pmgr->dev) || (!pmgr->dbgdev))
 		return -EINVAL;
-	}
+
 	if (pmgr->pasid != 0) {
 		/*  HW debugger is already active.  */
 		return -EBUSY;
@@ -126,19 +118,13 @@ kfd_dbgmgr_register(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
 	return 0;
 }
 
-/* ========================================================================= */
-
-long
-kfd_dbgmgr_unregister(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
+long kfd_dbgmgr_unregister(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
 {
 
 	if ((pmgr == NULL) || (pmgr->dev == NULL) || (pmgr->dbgdev == NULL) ||
-			(p == NULL)) {
-		dev_info(NULL, "Error! kfd: In func %s >> Illegal pointers\n",
-				__func__);
-		/* Invalid Pointer */
+			(p == NULL))
 		return -EINVAL;
-	}
+
 	if (pmgr->pasid != p->pasid) {
 		/* Is the requests coming from the already registered
 		 * process?
@@ -157,21 +143,13 @@ kfd_dbgmgr_unregister(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
 	return 0;
 }
 
-/* ========================================================================= */
-
-long
-kfd_dbgmgr_wave_control(struct kfd_dbgmgr *pmgr,
+long kfd_dbgmgr_wave_control(struct kfd_dbgmgr *pmgr,
 		struct dbg_wave_control_info *wac_info)
 {
-	dev_info(NULL, "kfd: In func %s\n", __func__);
-
-	if ((!pmgr) || (!pmgr->dev) || (!pmgr->dbgdev) || (!wac_info)
-	    || (wac_info->process == NULL)) {
-		/* Invalid Pointer */
-		dev_info(NULL, "Error! kfd: In func %s >> Illegal pointers\n",
-				__func__);
+	if ((!pmgr) || (!pmgr->dev) || (!pmgr->dbgdev) || (!wac_info) ||
+			(wac_info->process == NULL))
 		return -EINVAL;
-	}
+
 	/* Is the requests coming from the already registered
 	 * process?
 	 */
@@ -186,21 +164,13 @@ kfd_dbgmgr_wave_control(struct kfd_dbgmgr *pmgr,
 							  wac_info);
 }
 
-/* ========================================================================= */
-
-long
-kfd_dbgmgr_address_watch(struct kfd_dbgmgr *pmgr,
+long kfd_dbgmgr_address_watch(struct kfd_dbgmgr *pmgr,
 		struct dbg_address_watch_info *adw_info)
 {
-	dev_info(NULL, "kfd: In func %s\n", __func__);
-
-	if ((!pmgr) || (!pmgr->dev) || (!pmgr->dbgdev) || (!adw_info)
-	    || (adw_info->process == NULL)) {
-		/* Invalid Pointer */
-		dev_info(NULL, "Error! kfd: In func %s >> Illegal pointers\n",
-				__func__);
+	if ((!pmgr) || (!pmgr->dev) || (!pmgr->dbgdev) || (!adw_info) ||
+			(adw_info->process == NULL))
 		return -EINVAL;
-	}
+
 	/* Is the requests coming from the already registered
 	 * process?
 	 */
@@ -216,29 +186,21 @@ kfd_dbgmgr_address_watch(struct kfd_dbgmgr *pmgr,
 }
 
 
-/* ========================================================================= */
 /*
  * Handle abnormal process termination
  * if we are in the midst of a debug session, we should kill all pending waves
  * of the debugged process and unregister the process from the Debugger.
  */
-long
-kfd_dbgmgr_abnormal_termination(struct kfd_dbgmgr *pmgr,
+long kfd_dbgmgr_abnormal_termination(struct kfd_dbgmgr *pmgr,
 		struct kfd_process *process)
 {
 	long status = 0;
 	struct dbg_wave_control_info wac_info;
 
-	dev_info(NULL, "kfd: In func %s\n", __func__);
-
-	if ((!pmgr) || (!pmgr->dev) || (!pmgr->dbgdev)) {
-		/* Invalid Pointer */
-		dev_info(NULL, "Error! kfd: In func %s >> Illegal pointers\n",
-				__func__);
+	if ((!pmgr) || (!pmgr->dev) || (!pmgr->dbgdev))
 		return -EINVAL;
-	}
-	/* first, we kill all the wavefronts of this process */
 
+	/* first, we kill all the wavefronts of this process */
 	wac_info.process = process;
 	wac_info.mode = HSA_DBG_WAVEMODE_BROADCAST_PROCESS;
 	wac_info.operand = HSA_DBG_WAVEOP_KILL;
@@ -252,8 +214,7 @@ kfd_dbgmgr_abnormal_termination(struct kfd_dbgmgr *pmgr,
 							  &wac_info);
 
 	if (status != 0) {
-		dev_info(NULL, "Error! kfd: In func %s: wave control failed, status is: %ld\n",
-				__func__, status);
+		pr_err("wave control failed, status is: %ld\n", status);
 		return status;
 	}
 	if (pmgr->pasid == wac_info.process->pasid) {
@@ -264,11 +225,8 @@ kfd_dbgmgr_abnormal_termination(struct kfd_dbgmgr *pmgr,
 		pmgr->pasid = 0;
 	}
 	if (status != 0)
-		dev_info(NULL,
-			"Error! kfd: In func %s: unregister failed, status is: %ld debugger can not be reused\n",
-			__func__, status);
+		pr_err("unregister failed, status is: %ld debugger can not be reused\n",
+				status);
 
 	return status;
 }
-
-/* ///////////////////////////////////////////////////////////////////////// */
