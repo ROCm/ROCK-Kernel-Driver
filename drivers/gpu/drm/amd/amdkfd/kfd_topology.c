@@ -198,7 +198,7 @@ struct kfd_topology_device *kfd_create_topology_device(
 	struct kfd_topology_device *dev;
 
 	dev = kfd_alloc_struct(dev);
-	if (dev == NULL) {
+	if (!dev) {
 		pr_err("No memory to allocate a topology device");
 		return NULL;
 	}
@@ -783,7 +783,7 @@ static int kfd_topology_update_sysfs(void)
 	int ret;
 
 	pr_info("Creating topology SYSFS entries\n");
-	if (sys_props.kobj_topology == NULL) {
+	if (!sys_props.kobj_topology) {
 		sys_props.kobj_topology =
 				kfd_alloc_struct(sys_props.kobj_topology);
 		if (!sys_props.kobj_topology)
@@ -929,7 +929,7 @@ static int kfd_add_perf_to_topology(struct kfd_topology_device *kdev)
 
 	if (amd_iommu_pc_supported()) {
 		props = kfd_alloc_struct(props);
-		if (props == NULL)
+		if (!props)
 			return -ENOMEM;
 		strcpy(props->block_name, "iommu");
 		props->max_concurrent = amd_iommu_pc_get_max_banks(0) *
@@ -948,7 +948,7 @@ static int kfd_add_perf_to_topology(struct kfd_topology_device *kdev)
 static void kfd_add_non_crat_information(struct kfd_topology_device *kdev)
 {
 	/* Check if CPU only node. */
-	if (kdev->gpu == NULL) {
+	if (!kdev->gpu) {
 		/* Add system memory information */
 		dmi_walk(find_system_memory, kdev);
 	}
@@ -1142,7 +1142,7 @@ static struct kfd_topology_device *kfd_assign_gpu(struct kfd_dev *gpu)
 
 	down_write(&topology_lock);
 	list_for_each_entry(dev, &topology_device_list, list)
-		if (dev->gpu == NULL && dev->node_props.simd_count > 0) {
+		if (!dev->gpu && (dev->node_props.simd_count > 0)) {
 			dev->gpu = gpu;
 			out_dev = dev;
 			break;
@@ -1167,7 +1167,7 @@ static void kfd_fill_mem_clk_max_info(struct kfd_topology_device *dev)
 	struct kfd_mem_properties *mem;
 	struct kfd_local_mem_info local_mem_info;
 
-	if (dev == NULL)
+	if (!dev)
 		return;
 
 	/* Currently, amdgpu driver (amdgpu_mc) deals only with GPUs with
@@ -1187,7 +1187,7 @@ static void kfd_fill_iolink_non_crat_info(struct kfd_topology_device *dev)
 {
 	struct kfd_iolink_properties *link;
 
-	if ((dev == NULL) || (dev->gpu == NULL))
+	if (!dev || !dev->gpu)
 		return;
 
 	/* GPU only creates direck links so apply flags setting to all */
@@ -1395,7 +1395,7 @@ static int kfd_cpumask_to_apic_id(const struct cpumask *cpumask)
 {
 	int first_cpu_of_numa_node;
 
-	if (cpumask == NULL || cpumask == cpu_none_mask)
+	if (!cpumask || (cpumask == cpu_none_mask))
 		return -1;
 	first_cpu_of_numa_node = cpumask_first(cpumask);
 	if (first_cpu_of_numa_node >= nr_cpu_ids)

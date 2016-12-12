@@ -268,7 +268,7 @@ static const struct kfd_device_info *lookup_device_info(unsigned short did)
 
 	for (i = 0; i < ARRAY_SIZE(supported_devices); i++) {
 		if (supported_devices[i].did == did) {
-			BUG_ON(supported_devices[i].device_info == NULL);
+			BUG_ON(!supported_devices[i].device_info);
 			return supported_devices[i].device_info;
 		}
 	}
@@ -389,7 +389,7 @@ static int iommu_invalid_ppr_cb(struct pci_dev *pdev, int pasid,
 			flags);
 
 	dev = kfd_device_by_pci_dev(pdev);
-	BUG_ON(dev == NULL);
+	BUG_ON(!dev);
 
 	kfd_signal_iommu_event(dev, pasid, address,
 			flags & PPR_FAULT_WRITE, flags & PPR_FAULT_EXEC);
@@ -622,7 +622,7 @@ void kgd2kfd_device_exit(struct kfd_dev *kfd)
 
 void kgd2kfd_suspend(struct kfd_dev *kfd)
 {
-	BUG_ON(kfd == NULL);
+	BUG_ON(!kfd);
 
 	if (!kfd->init_complete)
 		return;
@@ -643,7 +643,7 @@ void kgd2kfd_suspend(struct kfd_dev *kfd)
 
 int kgd2kfd_resume(struct kfd_dev *kfd)
 {
-	BUG_ON(kfd == NULL);
+	BUG_ON(!kfd);
 
 	if (!kfd->init_complete)
 		return 0;
@@ -1051,7 +1051,7 @@ int kfd_gtt_sa_allocate(struct kfd_dev *kfd, unsigned int size,
 		return -ENOMEM;
 
 	*mem_obj = kzalloc(sizeof(struct kfd_mem_obj), GFP_NOIO);
-	if ((*mem_obj) == NULL)
+	if (!(*mem_obj))
 		return -ENOMEM;
 
 	pr_debug("Allocated mem_obj = %p for size = %d\n", *mem_obj, size);

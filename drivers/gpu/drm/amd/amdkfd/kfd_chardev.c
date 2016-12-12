@@ -282,7 +282,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 
 	pr_debug("Looking for gpu id 0x%x\n", args->gpu_id);
 	dev = kfd_device_by_id(args->gpu_id);
-	if (dev == NULL) {
+	if (!dev) {
 		pr_debug("Could not find gpu id 0x%x\n", args->gpu_id);
 		return -EINVAL;
 	}
@@ -476,7 +476,7 @@ static int kfd_ioctl_set_memory_policy(struct file *filep,
 	}
 
 	dev = kfd_device_by_id(args->gpu_id);
-	if (dev == NULL)
+	if (!dev)
 		return -EINVAL;
 
 	down_write(&p->lock);
@@ -517,7 +517,7 @@ static int kfd_ioctl_set_trap_handler(struct file *filep,
 	struct kfd_process_device *pdd;
 
 	dev = kfd_device_by_id(args->gpu_id);
-	if (dev == NULL)
+	if (!dev)
 		return -EINVAL;
 
 	down_write(&p->lock);
@@ -569,7 +569,7 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
 		return PTR_ERR(pdd);
 	}
 
-	if (dev->dbgmgr == NULL) {
+	if (!dev->dbgmgr) {
 		/* In case of a legal call, we have no dbgmgr yet */
 
 		create_ok = kfd_dbgmgr_create(&dbgmgr_ptr, dev);
@@ -908,9 +908,9 @@ static int kfd_ioctl_get_process_apertures(struct file *filp,
 				"scratch_limit %llX\n", pdd->scratch_limit);
 
 			args->num_of_nodes++;
-		} while ((pdd = kfd_get_next_process_device_data(p, pdd)) !=
-				NULL &&
-				(args->num_of_nodes < NUM_OF_SUPPORTED_GPUS));
+
+			pdd = kfd_get_next_process_device_data(p, pdd);
+		} while (pdd && (args->num_of_nodes < NUM_OF_SUPPORTED_GPUS));
 	}
 
 	up_write(&p->lock);
@@ -944,8 +944,8 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 		pdd = kfd_get_first_process_device_data(p);
 		do {
 			args->num_of_nodes++;
-		} while ((pdd =
-			kfd_get_next_process_device_data(p, pdd)) != NULL);
+			pdd = kfd_get_next_process_device_data(p, pdd);
+		} while (pdd);
 
 		up_write(&p->lock);
 		return 0;
@@ -995,9 +995,9 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 		dev_dbg(kfd_device,
 			"scratch_limit %llX\n", pdd->scratch_limit);
 		nodes++;
-	} while (
-		(pdd = kfd_get_next_process_device_data(p, pdd)) != NULL &&
-		(nodes < args->num_of_nodes));
+
+		pdd = kfd_get_next_process_device_data(p, pdd);
+	} while (pdd && (nodes < args->num_of_nodes));
 	up_write(&p->lock);
 
 	args->num_of_nodes = nodes;
@@ -1115,7 +1115,7 @@ static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
 		return -EINVAL;
 
 	dev = kfd_device_by_id(args->gpu_id);
-	if (dev == NULL)
+	if (!dev)
 		return -EINVAL;
 
 	down_write(&p->lock);
@@ -1181,7 +1181,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		return -EINVAL;
 
 	dev = kfd_device_by_id(args->gpu_id);
-	if (dev == NULL)
+	if (!dev)
 		return -EINVAL;
 
 	down_write(&p->lock);
@@ -1240,7 +1240,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	int ret;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
-	if (dev == NULL)
+	if (!dev)
 		return -EINVAL;
 
 	down_write(&p->lock);
@@ -1254,7 +1254,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 
 	buf_obj = kfd_process_device_find_bo(pdd,
 					GET_IDR_HANDLE(args->handle));
-	if (buf_obj == NULL) {
+	if (!buf_obj) {
 		ret = -EINVAL;
 		goto err_unlock;
 	}
@@ -1311,7 +1311,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	uint32_t *devices_arr = NULL;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
-	if (dev == NULL)
+	if (!dev)
 		return -EINVAL;
 
 	if (args->device_ids_array_size > 0 &&
@@ -1347,7 +1347,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 						GET_IDR_HANDLE(args->handle));
 	up_write(&p->lock);
 
-	if (mem == NULL) {
+	if (!mem) {
 		err = PTR_ERR(mem);
 		goto get_mem_obj_from_handle_failed;
 	}
@@ -1419,7 +1419,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	uint32_t *devices_arr = NULL, num_dev, i;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
-	if (dev == NULL)
+	if (!dev)
 		return -EINVAL;
 
 	if (args->device_ids_array_size > 0 &&
@@ -1456,7 +1456,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 						GET_IDR_HANDLE(args->handle));
 	up_write(&p->lock);
 
-	if (mem == NULL) {
+	if (!mem) {
 		err = PTR_ERR(mem);
 		goto get_mem_obj_from_handle_failed;
 	}
@@ -1504,7 +1504,7 @@ static int kfd_ioctl_open_graphic_handle(struct file *filep,
 	long err;
 
 	dev = kfd_device_by_id(args->gpu_id);
-	if (dev == NULL)
+	if (!dev)
 		return -EINVAL;
 
 	if (dev->device_info->asic_family != CHIP_KAVERI) {
@@ -1558,7 +1558,7 @@ static int kfd_ioctl_set_process_dgpu_aperture(struct file *filep,
 	long err;
 
 	dev = kfd_device_by_id(args->gpu_id);
-	if (dev == NULL)
+	if (!dev)
 		return -EINVAL;
 
 	down_write(&p->lock);
@@ -1758,7 +1758,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 				  args->dst_mem_array_size),
 				  sizeof(struct kfd_memory_range),
 				  GFP_KERNEL);
-	if (src_array == NULL)
+	if (!src_array)
 		return -ENOMEM;
 	dst_array = &src_array[args->src_mem_array_size];
 
@@ -1777,14 +1777,14 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 
 	/* Get remote process */
 	remote_pid = find_get_pid(args->pid);
-	if (remote_pid == NULL) {
+	if (!remote_pid) {
 		pr_err("Cross mem copy failed. Invalid PID %d\n", args->pid);
 		err = -ESRCH;
 		goto copy_from_user_fail;
 	}
 
 	remote_task = get_pid_task(remote_pid, PIDTYPE_PID);
-	if (remote_pid == NULL) {
+	if (!remote_pid) {
 		pr_err("Cross mem copy failed. Invalid PID or task died %d\n",
 			args->pid);
 		err = -ESRCH;
@@ -1805,7 +1805,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 	}
 
 	remote_p = kfd_get_process(remote_task);
-	if (remote_p == NULL) {
+	if (!remote_p) {
 		pr_err("Cross mem copy failed. Invalid kfd process %d\n",
 		       args->pid);
 		err = -EINVAL;
@@ -1838,7 +1838,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 			dst_va_addr,
 			dst_va_addr + dst_array[0].size - 1);
 	up_read(&dst_p->lock);
-	if (dst_bo == NULL) {
+	if (!dst_bo) {
 		err = -EFAULT;
 		goto kfd_process_fail;
 	}
@@ -1854,7 +1854,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 				src_array[i].va_addr,
 				src_va_addr_end);
 		up_read(&src_p->lock);
-		if (src_bo == NULL || src_va_addr_end > src_bo->it.last) {
+		if (!src_bo || src_va_addr_end > src_bo->it.last) {
 			pr_err("Cross mem copy failed. Invalid range\n");
 			err = -EFAULT;
 			break;

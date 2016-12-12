@@ -194,7 +194,7 @@ static int kfd_parse_subtype_mem(struct crat_subtype_memory *mem,
 	list_for_each_entry(dev, device_list, list) {
 		if (mem->proximity_domain == dev->proximity_domain) {
 			props = kfd_alloc_struct(props);
-			if (props == NULL)
+			if (!props)
 				return -ENOMEM;
 
 			/* We're on GPU node */
@@ -263,7 +263,7 @@ static int kfd_parse_subtype_cache(struct crat_subtype_cache *cache,
 			id < dev->node_props.simd_id_base +
 				total_num_of_cu)) {
 			props = kfd_alloc_struct(props);
-			if (props == NULL)
+			if (!props)
 				return -ENOMEM;
 
 			props->processor_id_low = id;
@@ -317,7 +317,7 @@ static int kfd_parse_subtype_iolink(struct crat_subtype_iolink *iolink,
 	list_for_each_entry(dev, device_list, list) {
 		if (id_from == dev->proximity_domain) {
 			props = kfd_alloc_struct(props);
-			if (props == NULL)
+			if (!props)
 				return -ENOMEM;
 
 			props->node_from = id_from;
@@ -888,7 +888,7 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 	uint32_t entries = 0;
 #endif
 
-	if (pcrat_image == NULL || avail_size < VCRAT_SIZE_FOR_CPU)
+	if (!pcrat_image || avail_size < VCRAT_SIZE_FOR_CPU)
 		return -EINVAL;
 
 	/* Fill in CRAT Header.
@@ -1082,7 +1082,7 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 #endif
 	struct kfd_local_mem_info local_mem_info;
 
-	if (pcrat_image == NULL || avail_size < VCRAT_SIZE_FOR_GPU)
+	if (!pcrat_image || avail_size < VCRAT_SIZE_FOR_GPU)
 		return -EINVAL;
 
 	/* Fill the CRAT Header.

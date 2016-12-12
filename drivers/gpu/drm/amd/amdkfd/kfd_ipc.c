@@ -168,7 +168,7 @@ int kfd_ipc_import_dmabuf(struct kfd_dev *dev,
 	int r;
 	struct dma_buf *dmabuf = dma_buf_get(dmabuf_fd);
 
-	if (dmabuf == NULL)
+	if (!dmabuf)
 		return -EINVAL;
 
 	r = kfd_import_dmabuf_create_kfd_bo(dev, p, gpu_id, dmabuf,

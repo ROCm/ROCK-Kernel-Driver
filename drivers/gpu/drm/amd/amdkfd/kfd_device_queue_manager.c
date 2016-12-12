@@ -331,7 +331,7 @@ static int create_compute_queue_nocpsch(struct device_queue_manager *dqm,
 	BUG_ON(!dqm || !q || !qpd);
 
 	mqd = dqm->ops.get_mqd_manager(dqm, KFD_MQD_TYPE_COMPUTE);
-	if (mqd == NULL)
+	if (!mqd)
 		return -ENOMEM;
 
 	retval = allocate_hqd(dqm, q);
@@ -466,7 +466,7 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 	}
 	mqd = dqm->ops.get_mqd_manager(dqm,
 			get_mqd_type_from_queue_type(q->properties.type));
-	if (mqd == NULL) {
+	if (!mqd) {
 		retval = -ENOMEM;
 		goto out_unlock;
 	}
@@ -491,7 +491,7 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 			pr_err("unmap queue failed");
 			goto out_unlock;
 		}
-	} else if (is_queue_nocpsch(dqm, q) && prev_active == true) {
+	} else if (is_queue_nocpsch(dqm, q) && prev_active) {
 		retval = mqd->destroy_mqd(mqd, q->mqd,
 				KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN,
 				KFD_UNMAP_LATENCY_MS, q->pipe, q->queue);
@@ -512,9 +512,9 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 	 * check active state vs. the previous state
 	 * and modify counter accordingly
 	 */
-	if ((q->properties.is_active) && (!prev_active))
+	if (q->properties.is_active && !prev_active)
 		dqm->queue_count++;
-	else if ((!q->properties.is_active) && (prev_active))
+	else if (!q->properties.is_active && prev_active)
 		dqm->queue_count--;
 
 	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
@@ -538,7 +538,7 @@ static struct mqd_manager *get_mqd_manager_nocpsch(
 	mqd = dqm->mqds[type];
 	if (!mqd) {
 		mqd = mqd_manager_init(type, dqm->dev);
-		if (mqd == NULL)
+		if (!mqd)
 			pr_err("mqd manager is NULL");
 		dqm->mqds[type] = mqd;
 	}
@@ -575,7 +575,7 @@ int process_evict_queues(struct device_queue_manager *dqm,
 			continue;
 		}
 		/* if the queue is not active anyway, it is not evicted */
-		if (q->properties.is_active == true) {
+		if (q->properties.is_active) {
 			q->properties.is_evicted = true;
 			q->properties.is_active = false;
 		}
@@ -781,7 +781,7 @@ int init_pipelines(struct device_queue_manager *dqm,
 	memset(hpdptr, 0, CIK_HPD_EOP_BYTES * pipes_num);
 
 	mqd = dqm->ops.get_mqd_manager(dqm, KFD_MQD_TYPE_COMPUTE);
-	if (mqd == NULL) {
+	if (!mqd) {
 		kfd_gtt_sa_free(dqm->dev, dqm->pipeline_mem);
 		return -ENOMEM;
 	}
@@ -806,7 +806,7 @@ static void init_interrupts(struct device_queue_manager *dqm)
 {
 	unsigned int i;
 
-	BUG_ON(dqm == NULL);
+	BUG_ON(!dqm);
 
 	for (i = 0 ; i < get_pipes_num(dqm) ; i++)
 		dqm->dev->kfd2kgd->init_interrupts(dqm->dev->kgd, i);
@@ -1148,7 +1148,7 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 	mqd = dqm->ops.get_mqd_manager(dqm,
 			get_mqd_type_from_queue_type(q->properties.type));
 
-	if (mqd == NULL) {
+	if (!mqd) {
 		retval = -ENOMEM;
 		goto out_deallocate_doorbell;
 	}

@@ -45,8 +45,7 @@ void kfd_debugfs_init(void)
 	struct dentry *ent;
 
 	debugfs_root = debugfs_create_dir("kfd", NULL);
-	if (debugfs_root == NULL ||
-	    debugfs_root == ERR_PTR(-ENODEV)) {
+	if (!debugfs_root || debugfs_root == ERR_PTR(-ENODEV)) {
 		pr_warn("Failed to create kfd debugfs dir\n");
 		return;
 	}
@@ -54,19 +53,19 @@ void kfd_debugfs_init(void)
 	ent = debugfs_create_file("mqds", S_IFREG | 0444, debugfs_root,
 				  kfd_debugfs_mqds_by_process,
 				  &kfd_debugfs_fops);
-	if (ent == NULL)
+	if (!ent)
 		pr_warn("Failed to create mqds in kfd debugfs\n");
 
 	ent = debugfs_create_file("hqds", S_IFREG | 0444, debugfs_root,
 				  kfd_debugfs_hqds_by_device,
 				  &kfd_debugfs_fops);
-	if (ent == NULL)
+	if (!ent)
 		pr_warn("Failed to create hqds in kfd debugfs\n");
 
 	ent = debugfs_create_file("rls", S_IFREG | 0444, debugfs_root,
 				  kfd_debugfs_rls_by_device,
 				  &kfd_debugfs_fops);
-	if (ent == NULL)
+	if (!ent)
 		pr_warn("Failed to create rls in kfd debugfs\n");
 }
 
