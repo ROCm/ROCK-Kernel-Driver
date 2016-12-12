@@ -211,7 +211,7 @@ struct kfd_process *kfd_create_process(struct file *filep)
 
 	BUG_ON(!kfd_process_wq);
 
-	if (thread->mm == NULL)
+	if (!thread->mm)
 		return ERR_PTR(-EINVAL);
 
 	/* Only the pthreads threading model is supported. */
@@ -241,7 +241,7 @@ struct kfd_process *kfd_get_process(const struct task_struct *thread)
 {
 	struct kfd_process *process;
 
-	if (thread->mm == NULL)
+	if (!thread->mm)
 		return ERR_PTR(-EINVAL);
 
 	/* Only the pthreads threading model is supported. */
@@ -454,9 +454,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 		dev = pdd->dev;
 		mutex_lock(get_dbgmgr_mutex());
 
-		if ((dev != NULL) &&
-			(dev->dbgmgr) &&
-			(dev->dbgmgr->pasid == p->pasid)) {
+		if (dev && dev->dbgmgr && (dev->dbgmgr->pasid == p->pasid)) {
 
 			status = kfd_dbgmgr_unregister(dev->dbgmgr, p);
 			if (status == 0) {
@@ -647,7 +645,7 @@ static int init_doorbell_bitmap(struct qcm_process_device *qpd,
 	qpd->doorbell_bitmap =
 		kzalloc(DIV_ROUND_UP(KFD_MAX_NUM_OF_QUEUES_PER_PROCESS,
 				     BITS_PER_BYTE), GFP_KERNEL);
-	if (qpd->doorbell_bitmap == NULL)
+	if (!qpd->doorbell_bitmap)
 		return -ENOMEM;
 
 	/* Mask out any reserved doorbells */
@@ -819,7 +817,7 @@ void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid)
 	struct kfd_process *p;
 	struct kfd_process_device *pdd;
 
-	BUG_ON(dev == NULL);
+	BUG_ON(!dev);
 
 	/*
 	 * Look for the process that matches the pasid. If there is no such
@@ -834,7 +832,7 @@ void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid)
 
 	mutex_lock(get_dbgmgr_mutex());
 
-	if ((dev->dbgmgr) && (dev->dbgmgr->pasid == p->pasid)) {
+	if (dev->dbgmgr && (dev->dbgmgr->pasid == p->pasid)) {
 
 		if (kfd_dbgmgr_unregister(dev->dbgmgr, p) == 0) {
 			kfd_dbgmgr_destroy(dev->dbgmgr);
@@ -893,8 +891,8 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 	struct kfd_bo *buf_obj;
 	struct kfd_process *p;
 
-	BUG_ON(pdd == NULL);
-	BUG_ON(mem == NULL);
+	BUG_ON(!pdd);
+	BUG_ON(!mem);
 
 	p = pdd->process;
 
@@ -929,7 +927,7 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 struct kfd_bo *kfd_process_device_find_bo(struct kfd_process_device *pdd,
 					int handle)
 {
-	BUG_ON(pdd == NULL);
+	BUG_ON(!pdd);
 
 	if (handle < 0)
 		return NULL;
@@ -965,7 +963,7 @@ void *kfd_process_find_bo_from_interval(struct kfd_process *p,
 		return NULL;
 	}
 
-	if (interval_tree_iter_next(it_node, start_addr, last_addr) != NULL) {
+	if (interval_tree_iter_next(it_node, start_addr, last_addr)) {
 		pr_err("0x%llx-0x%llx spans more than a single BO\n",
 				start_addr, last_addr);
 		return NULL;
@@ -985,7 +983,7 @@ void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 	struct kfd_bo *buf_obj;
 	struct kfd_process *p;
 
-	BUG_ON(pdd == NULL);
+	BUG_ON(!pdd);
 
 	p = pdd->process;
 
@@ -1039,7 +1037,7 @@ struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
 	p = find_process_by_mm(mm);
-	if (p != NULL)
+	if (p)
 		kref_get(&p->ref);
 
 	srcu_read_unlock(&kfd_processes_srcu, idx);
@@ -1056,7 +1054,7 @@ int kfd_reserved_mem_mmap(struct kfd_process *process,
 	struct kfd_process_device *temp, *pdd = NULL;
 	struct qcm_process_device *qpd = NULL;
 
-	if (dev == NULL)
+	if (!dev)
 		return -EINVAL;
 	if (((vma->vm_end - vma->vm_start) != dev->cwsr_size) ||
 		(vma->vm_start & (PAGE_SIZE - 1)) ||
@@ -1074,7 +1072,7 @@ int kfd_reserved_mem_mmap(struct kfd_process *process,
 			break;
 		}
 	}
-	if (qpd == NULL)
+	if (!qpd)
 		return -EINVAL;
 
 	qpd->cwsr_pages = alloc_pages(GFP_KERNEL | __GFP_HIGHMEM,

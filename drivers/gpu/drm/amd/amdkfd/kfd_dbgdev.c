@@ -64,8 +64,7 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 	union ULARGE_INTEGER *largep;
 	union ULARGE_INTEGER addr;
 
-	if ((kq == NULL) || (packet_buff == NULL) ||
-			(size_in_bytes == 0)) {
+	if (!kq || !packet_buff || (size_in_bytes == 0)) {
 		pr_err("Illegal packet parameters\n");
 		return -EINVAL;
 	}
@@ -167,7 +166,7 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 	status = amdkfd_fence_wait_timeout((unsigned int *) rm_state,
 					QUEUESTATE__ACTIVE, 1500);
 
-	if (rm_state != NULL)
+	if (rm_state)
 		kfd_gtt_sa_free(dbgdev->dev, mem_obj);
 
 	return status;
@@ -212,7 +211,7 @@ static int dbgdev_register_diq(struct kfd_dbgdev *dbgdev)
 
 	kq = pqm_get_kernel_queue(dbgdev->pqm, qid);
 
-	if (kq == NULL) {
+	if (!kq) {
 		pr_err("Error getting Kernel Queue\n");
 		return -ENOMEM;
 	}
@@ -234,8 +233,7 @@ static int dbgdev_unregister_diq(struct kfd_dbgdev *dbgdev)
 	/* todo - if needed, kill wavefronts and disable watch */
 	int status = 0;
 
-	if ((dbgdev == NULL) || (dbgdev->pqm == NULL) ||
-			(dbgdev->kq == NULL)) {
+	if (!dbgdev || !dbgdev->pqm || !dbgdev->kq) {
 		pr_err("Can't destroy diq\n");
 		status = -EFAULT;
 	} else {
@@ -261,7 +259,7 @@ static void dbgdev_address_watch_set_registers(
 	addrLo->u32All = 0;
 	cntl->u32All = 0;
 
-	if (adw_info->watch_mask != NULL)
+	if (adw_info->watch_mask)
 		cntl->bitfields.mask =
 			(uint32_t) (adw_info->watch_mask[index] &
 					ADDRESS_WATCH_REG_CNTL_DEFAULT_MASK);
@@ -278,7 +276,7 @@ static void dbgdev_address_watch_set_registers(
 	cntl->bitfields.mode = adw_info->watch_mode[index];
 	cntl->bitfields.vmid = (uint32_t) vmid;
 	/*  for APU assume it is an ATC address.  */
-	if (KFD_IS_DGPU(asic_family) == false)
+	if (!KFD_IS_DGPU(asic_family))
 		cntl->u32All |= ADDRESS_WATCH_REG_CNTL_ATC_BIT;
 	pr_debug("\t\t%20s %08x\n", "set reg mask :", cntl->bitfields.mask);
 	pr_debug("\t\t%20s %08x\n", "set reg add high :",
@@ -318,7 +316,7 @@ static int dbgdev_address_watch_nodiq(struct kfd_dbgdev *dbgdev,
 	vmid = pdd->qpd.vmid;
 
 	if ((adw_info->num_watch_points > MAX_WATCH_ADDRESSES) ||
-	    (adw_info->num_watch_points == 0) || (adw_info->watch_mode == NULL))
+	    (adw_info->num_watch_points == 0) || !adw_info->watch_mode)
 		return -EINVAL;
 
 	for (i = 0; i < adw_info->num_watch_points; i++) {

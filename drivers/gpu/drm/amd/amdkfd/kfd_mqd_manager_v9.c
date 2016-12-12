@@ -170,7 +170,7 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 	}
 
 	*mqd = m;
-	if (gart_addr != NULL)
+	if (gart_addr)
 		*gart_addr = addr;
 	retval = mm->update_mqd(mm, m, q);
 
@@ -345,7 +345,7 @@ static int init_mqd_sdma(struct mqd_manager *mm, void **mqd,
 	memset(m, 0, sizeof(struct v9_sdma_mqd));
 
 	*mqd = m;
-	if (gart_addr != NULL)
+	if (gart_addr)
 		*gart_addr = (*mqd_mem_obj)->gpu_addr;
 
 	retval = mm->update_mqd(mm, m, q);

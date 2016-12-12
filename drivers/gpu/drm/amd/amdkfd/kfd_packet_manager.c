@@ -96,7 +96,7 @@ static int pm_allocate_runlist_ib(struct packet_manager *pm,
 
 	BUG_ON(!pm);
 	BUG_ON(pm->allocated);
-	BUG_ON(is_over_subscription == NULL);
+	BUG_ON(!is_over_subscription);
 
 	pm_calc_rlib_size(pm, rl_buffer_size, is_over_subscription);
 
@@ -229,7 +229,7 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 	pm->dqm = dqm;
 	mutex_init(&pm->lock);
 	pm->priv_queue = kernel_queue_init(dqm->dev, KFD_QUEUE_TYPE_HIQ);
-	if (pm->priv_queue == NULL) {
+	if (!pm->priv_queue) {
 		mutex_destroy(&pm->lock);
 		return -ENOMEM;
 	}
@@ -274,7 +274,7 @@ int pm_send_set_resources(struct packet_manager *pm,
 	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
 				size / sizeof(uint32_t),
 				(unsigned int **)&buffer);
-	if (buffer == NULL) {
+	if (!buffer) {
 		mutex_unlock(&pm->lock);
 		pr_err("Failed to allocate buffer on kernel queue\n");
 		return -ENOMEM;
@@ -344,7 +344,7 @@ int pm_send_query_status(struct packet_manager *pm, uint64_t fence_address,
 	mutex_lock(&pm->lock);
 	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
 			size / sizeof(uint32_t), (unsigned int **)&buffer);
-	if (buffer == NULL) {
+	if (!buffer) {
 		mutex_unlock(&pm->lock);
 		pr_err("Failed to allocate buffer on kernel queue\n");
 		return -ENOMEM;
@@ -367,7 +367,7 @@ int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
 	mutex_lock(&pm->lock);
 	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
 			size / sizeof(uint32_t), (unsigned int **)&buffer);
-	if (buffer == NULL) {
+	if (!buffer) {
 		mutex_unlock(&pm->lock);
 		pr_err("Failed to allocate buffer on kernel queue\n");
 		return -ENOMEM;
