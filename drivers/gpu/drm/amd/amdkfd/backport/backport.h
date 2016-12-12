@@ -2,5 +2,6 @@
 #define AMDKFD_BACKPORT_H
 
 #include <linux/version.h>
+#include <kcl/kcl_compat.h>
 
 #endif
