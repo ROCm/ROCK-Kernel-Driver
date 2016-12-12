@@ -52,7 +52,7 @@ static void kfd_dbgmgr_uninitialize(struct kfd_dbgmgr *pmgr)
 
 void kfd_dbgmgr_destroy(struct kfd_dbgmgr *pmgr)
 {
-	if (pmgr != NULL) {
+	if (pmgr) {
 		kfd_dbgmgr_uninitialize(pmgr);
 		kfree(pmgr);
 		pmgr = NULL;
@@ -64,7 +64,7 @@ bool kfd_dbgmgr_create(struct kfd_dbgmgr **ppmgr, struct kfd_dev *pdev)
 	enum DBGDEV_TYPE type = DBGDEV_TYPE_DIQ;
 	struct kfd_dbgmgr *new_buff;
 
-	BUG_ON(pdev == NULL);
+	BUG_ON(!pdev);
 	BUG_ON(!pdev->init_complete);
 
 	new_buff = kfd_alloc_struct(new_buff);
@@ -94,7 +94,7 @@ bool kfd_dbgmgr_create(struct kfd_dbgmgr **ppmgr, struct kfd_dev *pdev)
 
 long kfd_dbgmgr_register(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
 {
-	if ((!pmgr) || (!pmgr->dev) || (!pmgr->dbgdev))
+	if (!pmgr || !pmgr->dev || !pmgr->dbgdev)
 		return -EINVAL;
 
 	if (pmgr->pasid != 0) {
@@ -121,8 +121,7 @@ long kfd_dbgmgr_register(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
 long kfd_dbgmgr_unregister(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
 {
 
-	if ((pmgr == NULL) || (pmgr->dev == NULL) || (pmgr->dbgdev == NULL) ||
-			(p == NULL))
+	if (!pmgr || !pmgr->dev || !pmgr->dbgdev || !p)
 		return -EINVAL;
 
 	if (pmgr->pasid != p->pasid) {
@@ -146,8 +145,8 @@ long kfd_dbgmgr_unregister(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
 long kfd_dbgmgr_wave_control(struct kfd_dbgmgr *pmgr,
 		struct dbg_wave_control_info *wac_info)
 {
-	if ((!pmgr) || (!pmgr->dev) || (!pmgr->dbgdev) || (!wac_info) ||
-			(wac_info->process == NULL))
+	if (!pmgr || !pmgr->dev || !pmgr->dbgdev || !wac_info ||
+			!wac_info->process)
 		return -EINVAL;
 
 	/* Is the requests coming from the already registered
@@ -167,8 +166,8 @@ long kfd_dbgmgr_wave_control(struct kfd_dbgmgr *pmgr,
 long kfd_dbgmgr_address_watch(struct kfd_dbgmgr *pmgr,
 		struct dbg_address_watch_info *adw_info)
 {
-	if ((!pmgr) || (!pmgr->dev) || (!pmgr->dbgdev) || (!adw_info) ||
-			(adw_info->process == NULL))
+	if (!pmgr || !pmgr->dev || !pmgr->dbgdev || !adw_info ||
+			!adw_info->process)
 		return -EINVAL;
 
 	/* Is the requests coming from the already registered
@@ -197,7 +196,7 @@ long kfd_dbgmgr_abnormal_termination(struct kfd_dbgmgr *pmgr,
 	long status = 0;
 	struct dbg_wave_control_info wac_info;
 
-	if ((!pmgr) || (!pmgr->dev) || (!pmgr->dbgdev))
+	if (!pmgr || !pmgr->dev || !pmgr->dbgdev)
 		return -EINVAL;
 
 	/* first, we kill all the wavefronts of this process */
