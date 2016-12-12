@@ -134,7 +134,7 @@ static int allocate_doorbell(struct qcm_process_device *qpd, struct queue *q)
 		found = find_first_zero_bit(qpd->doorbell_bitmap,
 					    KFD_MAX_NUM_OF_QUEUES_PER_PROCESS);
 		if (found >= KFD_MAX_NUM_OF_QUEUES_PER_PROCESS) {
-			pr_debug("amdkfd: No doorbells available");
+			pr_debug("No doorbells available");
 			return -EBUSY;
 		}
 		set_bit(found, qpd->doorbell_bitmap);
@@ -175,7 +175,7 @@ static int allocate_vmid(struct device_queue_manager *dqm,
 	dqm->vmid_bitmap &= ~(1 << bit);
 
 	allocated_vmid = bit + dqm->dev->vm_info.first_vmid_kfd;
-	pr_debug("kfd: vmid allocation %d\n", allocated_vmid);
+	pr_debug("vmid allocation %d\n", allocated_vmid);
 	qpd->vmid = allocated_vmid;
 	q->properties.vmid = allocated_vmid;
 
@@ -218,7 +218,7 @@ static void deallocate_vmid(struct device_queue_manager *dqm,
 	/* On GFX v7, CP doesn't flush TC at dequeue */
 	if (q->device->device_info->asic_family == CHIP_HAWAII)
 		if (flush_texture_cache_nocpsch(q->device, qpd))
-			pr_err("kfd: Failed to flush TC\n");
+			pr_err("Failed to flush TC\n");
 
 	/* Release the vmid mapping */
 	set_pasid_vmid_mapping(dqm, 0, qpd->vmid);
@@ -237,13 +237,12 @@ static int create_queue_nocpsch(struct device_queue_manager *dqm,
 
 	BUG_ON(!dqm || !q || !qpd || !allocated_vmid);
 
-	pr_debug("kfd: In func %s\n", __func__);
 	print_queue(q);
 
 	mutex_lock(&dqm->lock);
 
 	if (dqm->total_queue_count >= max_num_of_queues_per_device) {
-		pr_warn("amdkfd: Can't create new usermode queue because %d queues were already created\n",
+		pr_warn("Can't create new usermode queue because %d queues were already created\n",
 				dqm->total_queue_count);
 		mutex_unlock(&dqm->lock);
 		return -EPERM;
@@ -329,8 +328,7 @@ static int allocate_hqd(struct device_queue_manager *dqm, struct queue *q)
 	if (!set)
 		return -EBUSY;
 
-	pr_debug("kfd: DQM %s hqd slot - pipe (%d) queue(%d)\n",
-				__func__, q->pipe, q->queue);
+	pr_debug("hqd slot - pipe %d, queue %d\n", q->pipe, q->queue);
 	/* horizontal hqd allocation */
 	dqm->next_pipe_to_allocate = (pipe + 1) % get_pipes_per_mec(dqm);
 
@@ -369,9 +367,8 @@ static int create_compute_queue_nocpsch(struct device_queue_manager *dqm,
 	if (retval != 0)
 		goto out_deallocate_doorbell;
 
-	pr_debug("kfd: loading mqd to hqd on pipe (%d) queue (%d)\n",
-			q->pipe,
-			q->queue);
+	pr_debug("Loading mqd to hqd on pipe %d, queue %d\n",
+			q->pipe, q->queue);
 
 	dqm->dev->kfd2kgd->alloc_memory_of_scratch(
 			dqm->dev->kgd, qpd->sh_hidden_private_base, qpd->vmid);
@@ -423,8 +420,8 @@ static int destroy_queue_nocpsch_locked(struct device_queue_manager *dqm,
 		dqm->sdma_queue_count--;
 		deallocate_sdma_queue(dqm, q->sdma_id);
 	} else {
-		pr_debug("q->properties.type is invalid (%d)\n",
-			q->properties.type);
+		pr_debug("q->properties.type %d is invalid\n",
+				q->properties.type);
 		retval = -EINVAL;
 	}
 	dqm->total_queue_count--;
@@ -556,13 +553,13 @@ static struct mqd_manager *get_mqd_manager_nocpsch(
 
 	BUG_ON(!dqm || type >= KFD_MQD_TYPE_MAX);
 
-	pr_debug("kfd: In func %s mqd type %d\n", __func__, type);
+	pr_debug("mqd type %d\n", type);
 
 	mqd = dqm->mqds[type];
 	if (!mqd) {
 		mqd = mqd_manager_init(type, dqm->dev);
 		if (mqd == NULL)
-			pr_err("kfd: mqd manager is NULL");
+			pr_err("mqd manager is NULL");
 		dqm->mqds[type] = mqd;
 	}
 
@@ -648,7 +645,7 @@ int process_restore_queues(struct device_queue_manager *dqm,
 
 	/* Update PD Base in QPD */
 	qpd->page_table_base = pd_base;
-	pr_debug("Updated PD address to 0x%08x in %s\n", pd_base, __func__);
+	pr_debug("Updated PD address to 0x%08x\n", pd_base);
 
 	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
 	    !list_empty(&qpd->queues_list)) {
@@ -703,8 +700,6 @@ static int register_process(struct device_queue_manager *dqm,
 
 	BUG_ON(!dqm || !qpd);
 
-	pr_debug("In func %s\n", __func__);
-
 	n = kzalloc(sizeof(struct device_process_node), GFP_KERNEL);
 	if (!n)
 		return -ENOMEM;
@@ -720,7 +715,7 @@ static int register_process(struct device_queue_manager *dqm,
 
 	/* Update PD Base in QPD */
 	qpd->page_table_base = pd_base;
-	pr_debug("Updated PD address to 0x%08x in %s\n", pd_base, __func__);
+	pr_debug("Updated PD address to 0x%08x\n", pd_base);
 
 	retval = dqm->asic_ops.update_qpd(dqm, qpd);
 
@@ -738,8 +733,6 @@ static int unregister_process(struct device_queue_manager *dqm,
 	struct device_process_node *cur, *next;
 
 	BUG_ON(!dqm || !qpd);
-
-	pr_debug("In func %s\n", __func__);
 
 	pr_debug("qpd->queues_list is %s\n",
 			list_empty(&qpd->queues_list) ? "empty" : "not empty");
@@ -793,7 +786,6 @@ static int init_scheduler(struct device_queue_manager *dqm)
 
 	BUG_ON(!dqm);
 
-	pr_debug("kfd: In %s\n", __func__);
 
 	return retval;
 }
@@ -804,8 +796,7 @@ static int initialize_nocpsch(struct device_queue_manager *dqm)
 
 	BUG_ON(!dqm);
 
-	pr_debug("kfd: In func %s num of pipes: %d\n",
-			__func__, get_pipes_per_mec(dqm));
+	pr_debug("num of pipes: %d\n", get_pipes_per_mec(dqm));
 
 	dqm->allocated_queues = kcalloc(get_pipes_per_mec(dqm),
 					sizeof(unsigned int), GFP_KERNEL);
@@ -899,9 +890,9 @@ static int create_sdma_queue_nocpsch(struct device_queue_manager *dqm,
 	if (retval)
 		goto out_deallocate_sdma_queue;
 
-	pr_debug("kfd: sdma id is:    %d\n", q->sdma_id);
-	pr_debug("     sdma queue id: %d\n", q->properties.sdma_queue_id);
-	pr_debug("     sdma engine id: %d\n", q->properties.sdma_engine_id);
+	pr_debug("SDMA id is:    %d\n", q->sdma_id);
+	pr_debug("SDMA queue id: %d\n", q->properties.sdma_queue_id);
+	pr_debug("SDMA engine id: %d\n", q->properties.sdma_engine_id);
 
 	dqm->asic_ops.init_sdma_vm(dqm, q, qpd);
 	retval = mqd->init_mqd(mqd, &q->mqd, &q->mqd_mem_obj,
@@ -936,8 +927,6 @@ static int set_sched_resources(struct device_queue_manager *dqm)
 
 	BUG_ON(!dqm);
 
-	pr_debug("kfd: In func %s\n", __func__);
-
 	res.vmid_mask = dqm->dev->shared_resources.compute_vmid_bitmap;
 
 	res.queue_mask = 0;
@@ -965,9 +954,9 @@ static int set_sched_resources(struct device_queue_manager *dqm)
 	res.gws_mask = res.oac_mask = res.gds_heap_base =
 						res.gds_heap_size = 0;
 
-	pr_debug("kfd: scheduling resources:\n"
-			"      vmid mask: 0x%8X\n"
-			"      queue mask: 0x%8llX\n",
+	pr_debug("Scheduling resources:\n"
+			"vmid mask: 0x%8X\n"
+			"queue mask: 0x%8llX\n",
 			res.vmid_mask, res.queue_mask);
 
 	return pm_send_set_resources(&dqm->packets, &res);
@@ -979,8 +968,7 @@ static int initialize_cpsch(struct device_queue_manager *dqm)
 
 	BUG_ON(!dqm);
 
-	pr_debug("kfd: In func %s num of pipes: %d\n",
-			__func__, get_pipes_per_mec(dqm));
+	pr_debug("num of pipes: %d\n", get_pipes_per_mec(dqm));
 
 	mutex_init(&dqm->lock);
 	INIT_LIST_HEAD(&dqm->queues);
@@ -1015,7 +1003,7 @@ static int start_cpsch(struct device_queue_manager *dqm)
 	if (retval != 0)
 		goto fail_set_sched_resources;
 
-	pr_debug("kfd: allocating fence memory\n");
+	pr_debug("Allocating fence memory\n");
 
 	/* allocate fence memory on the gart */
 	retval = kfd_gtt_sa_allocate(dqm->dev, sizeof(*dqm->fence_addr),
@@ -1063,11 +1051,9 @@ static int create_kernel_queue_cpsch(struct device_queue_manager *dqm,
 {
 	BUG_ON(!dqm || !kq || !qpd);
 
-	pr_debug("kfd: In func %s\n", __func__);
-
 	mutex_lock(&dqm->lock);
 	if (dqm->total_queue_count >= max_num_of_queues_per_device) {
-		pr_warn("amdkfd: Can't create new kernel queue because %d queues were already created\n",
+		pr_warn("Can't create new kernel queue because %d queues were already created\n",
 				dqm->total_queue_count);
 		mutex_unlock(&dqm->lock);
 		return -EPERM;
@@ -1095,8 +1081,6 @@ static void destroy_kernel_queue_cpsch(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd)
 {
 	BUG_ON(!dqm || !kq);
-
-	pr_debug("kfd: In %s\n", __func__);
 
 	mutex_lock(&dqm->lock);
 	/* here we actually preempt the DIQ */
@@ -1130,7 +1114,7 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 	mutex_lock(&dqm->lock);
 
 	if (dqm->total_queue_count >= max_num_of_queues_per_device) {
-		pr_warn("amdkfd: Can't create new usermode queue because %d queues were already created\n",
+		pr_warn("Can't create new usermode queue because %d queues were already created\n",
 				dqm->total_queue_count);
 		retval = -EPERM;
 		goto out_unlock;
@@ -1218,7 +1202,7 @@ int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
 
 	while (*fence_addr != fence_value) {
 		if (time_after(jiffies, end_jiffies)) {
-			pr_err("kfd: qcm fence wait loop timeout expired\n");
+			pr_err("qcm fence wait loop timeout expired\n");
 			return -ETIME;
 		}
 		schedule();
@@ -1274,7 +1258,7 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 	if (!dqm->active_runlist)
 		return retval;
 
-	pr_debug("kfd: Before destroying queues, sdma queue count is : %u\n",
+	pr_debug("Before destroying queues, sdma queue count is : %u\n",
 		dqm->sdma_queue_count);
 
 	if (dqm->sdma_queue_count > 0) {
@@ -1294,7 +1278,7 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 	retval = amdkfd_fence_wait_timeout(dqm->fence_addr, KFD_FENCE_COMPLETED,
 				QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS);
 	if (retval != 0) {
-		pr_err("kfd: unmapping queues failed.");
+		pr_err("Unmapping queues failed.");
 		return retval;
 	}
 
@@ -1313,15 +1297,13 @@ static int execute_queues_cpsch(struct device_queue_manager *dqm,
 
 	BUG_ON(!dqm);
 
-	pr_debug("In function %s\n", __func__);
-
 	filter = static_queues_included ?
 			KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES :
 			KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES;
 
 	retval = unmap_queues_cpsch(dqm, filter, 0, false);
 	if (retval != 0) {
-		pr_err("kfd: the cp might be in an unrecoverable state due to an unsuccessful queues preemption");
+		pr_err("The cp might be in an unrecoverable state due to an unsuccessful queues preemption");
 		return retval;
 	}
 
@@ -1415,8 +1397,6 @@ static bool set_cache_memory_policy(struct device_queue_manager *dqm,
 {
 	bool retval = true;
 
-	pr_debug("kfd: In func %s\n", __func__);
-
 	if (!dqm->asic_ops.set_cache_memory_policy)
 		return retval;
 
@@ -1464,7 +1444,7 @@ static bool set_cache_memory_policy(struct device_queue_manager *dqm,
 	if ((dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) && (qpd->vmid != 0))
 		program_sh_mem_settings(dqm, qpd);
 
-	pr_debug("kfd: sh_mem_config: 0x%x, ape1_base: 0x%x, ape1_limit: 0x%x\n",
+	pr_debug("sh_mem_config: 0x%x, ape1_base: 0x%x, ape1_limit: 0x%x\n",
 		qpd->sh_mem_config, qpd->sh_mem_ape1_base,
 		qpd->sh_mem_ape1_limit);
 
@@ -1596,7 +1576,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 
 	BUG_ON(!dev);
 
-	pr_debug("kfd: loading device queue manager\n");
+	pr_debug("Loading device queue manager\n");
 
 	dqm = kzalloc(sizeof(struct device_queue_manager), GFP_KERNEL);
 	if (!dqm)

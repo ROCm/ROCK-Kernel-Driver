@@ -66,8 +66,7 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 
 	if ((kq == NULL) || (packet_buff == NULL) ||
 			(size_in_bytes == 0)) {
-		pr_debug("Error! kfd: In func %s >> Illegal packet parameters\n",
-				__func__);
+		pr_err("Illegal packet parameters\n");
 		return -EINVAL;
 	}
 	/* todo - enter proper locking to be multithreaded safe */
@@ -83,8 +82,7 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 			pq_packets_size_in_bytes / sizeof(uint32_t),
 			&ib_packet_buff);
 	if (status != 0) {
-		pr_debug("Error! kfd: In func %s >> acquire_packet_buffer failed\n",
-				__func__);
+		pr_err("acquire_packet_buffer failed\n");
 		return status;
 	}
 
@@ -128,8 +126,7 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 					&mem_obj);
 
 	if (status != 0) {
-		pr_debug("Error! kfd: In func %s >> failed to allocate GART memory\n",
-					__func__);
+		pr_err("Failed to allocate GART memory\n");
 		return status;
 	}
 
@@ -197,8 +194,7 @@ static int dbgdev_register_diq(struct kfd_dbgdev *dbgdev)
 	struct process_queue_manager *pqm = dbgdev->pqm;
 
 	if (!pqm) {
-		pr_debug("Error! kfd: In func %s >> No PQM\n",
-				__func__);
+		pr_err("No PQM\n");
 		return -EFAULT;
 	}
 
@@ -208,18 +204,16 @@ static int dbgdev_register_diq(struct kfd_dbgdev *dbgdev)
 			&properties, &qid);
 
 	if (status != 0) {
-		pr_debug("Error! kfd: In func %s >> Create Queue failed\n",
-				__func__);
+		pr_err("Create Queue failed\n");
 		return status;
 	}
 
-	pr_debug("kfd: DIQ Created with queue id: %d\n", qid);
+	pr_debug("DIQ Created with queue id: %d\n", qid);
 
 	kq = pqm_get_kernel_queue(dbgdev->pqm, qid);
 
 	if (kq == NULL) {
-		pr_debug("Error! kfd: In func %s >> Error getting Kernel Queue\n",
-				__func__);
+		pr_err("Error getting Kernel Queue\n");
 		return -ENOMEM;
 	}
 	dbgdev->kq = kq;
@@ -242,7 +236,7 @@ static int dbgdev_unregister_diq(struct kfd_dbgdev *dbgdev)
 
 	if ((dbgdev == NULL) || (dbgdev->pqm == NULL) ||
 			(dbgdev->kq == NULL)) {
-		pr_debug("kfd Err:In func %s >> can't destroy diq\n", __func__);
+		pr_err("Can't destroy diq\n");
 		status = -EFAULT;
 	} else {
 		pqm_destroy_queue(dbgdev->pqm,
@@ -295,7 +289,7 @@ static void dbgdev_address_watch_set_registers(
 }
 
 static int dbgdev_address_watch_nodiq(struct kfd_dbgdev *dbgdev,
-					struct dbg_address_watch_info *adw_info)
+				      struct dbg_address_watch_info *adw_info)
 {
 
 	union TCP_WATCH_ADDR_H_BITS addrHi;
@@ -313,8 +307,7 @@ static int dbgdev_address_watch_nodiq(struct kfd_dbgdev *dbgdev,
 	pdd = kfd_get_process_device_data(dbgdev->dev,
 					adw_info->process);
 	if (!pdd) {
-		pr_debug("Error! kfd: In func %s >> no PDD available\n",
-				__func__);
+		pr_err("No PDD available\n");
 		return -EFAULT;
 	}
 
@@ -371,7 +364,7 @@ static int dbgdev_address_watch_nodiq(struct kfd_dbgdev *dbgdev,
 }
 
 static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
-					struct dbg_address_watch_info *adw_info)
+				    struct dbg_address_watch_info *adw_info)
 {
 
 	int status = 0;
@@ -519,8 +512,7 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 					ib_size, true);
 
 		if (status != 0) {
-			pr_debug("Error! kfd: In func %s >> failed to submit DIQ packet\n",
-					__func__);
+			pr_err("Failed to submit DIQ packet\n");
 			return status;
 		}
 
@@ -593,22 +585,22 @@ static int dbgdev_wave_control_set_registers(
 	case HSA_DBG_WAVEOP_HALT:
 		if (asic_family == CHIP_KAVERI) {
 			reg_sq_cmd.bits.cmd = SQ_IND_CMD_CMD_HALT;
-			pr_debug("kfd:dbgdev: halting KV\n");
+			pr_debug("Halting KV\n");
 		} else {
 			reg_sq_cmd.bits_sethalt.cmd  = SQ_IND_CMD_NEW_SETHALT;
 			reg_sq_cmd.bits_sethalt.data = SQ_IND_CMD_DATA_HALT;
-			pr_debug("kfd:dbgdev: halting CZ\n");
+			pr_debug("Halting CZ\n");
 		}
 		break;
 
 	case HSA_DBG_WAVEOP_RESUME:
 		if (asic_family == CHIP_KAVERI) {
 			reg_sq_cmd.bits.cmd = SQ_IND_CMD_CMD_RESUME;
-			pr_debug("kfd:dbgdev: resuming KV\n");
+			pr_debug("Resuming KV\n");
 		} else {
 			reg_sq_cmd.bits_sethalt.cmd  = SQ_IND_CMD_NEW_SETHALT;
 			reg_sq_cmd.bits_sethalt.data = SQ_IND_CMD_DATA_RESUME;
-			pr_debug("kfd:dbgdev: resuming CZ\n");
+			pr_debug("Resuming CZ\n");
 		}
 		break;
 
@@ -870,7 +862,7 @@ int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p)
 	}
 
 	if (vmid > last_vmid_to_scan) {
-		pr_err("amdkfd: didn't find vmid for pasid (%d)\n", p->pasid);
+		pr_err("Didn't find vmid for pasid %d\n", p->pasid);
 		return -EFAULT;
 	}
 
