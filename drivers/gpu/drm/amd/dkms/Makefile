@@ -66,6 +66,7 @@ DKMS_INCLUDE_PREFIX = \
 
 export OS_NAME OS_VERSION DKMS_INCLUDE_PREFIX
 
+export CONFIG_HSA_AMD=m
 export CONFIG_DRM_TTM=m
 export CONFIG_DRM_AMDGPU=m
 export BUILD_AS_DKMS=y
@@ -74,10 +75,11 @@ export CONFIG_DRM_AMDGPU_SI=y
 export CONFIG_DRM_AMDGPU_USERPTR=y
 export CONFIG_DRM_AMD_DC=y
 
+subdir-ccflags-y += -DCONFIG_HSA_AMD
 subdir-ccflags-y += -DBUILD_AS_DKMS
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_CIK
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_SI
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 
-obj-m += amd/amdgpu/ ttm/ amd/amdkcl/
+obj-m += amd/amdgpu/ ttm/ amd/amdkcl/ amd/amdkfd/

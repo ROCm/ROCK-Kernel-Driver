@@ -23,3 +23,6 @@ amdkfd-y	:= kfd_module.o kfd_device.o kfd_chardev.o kfd_topology.o \
 amdkfd-$(CONFIG_DEBUG_FS) += kfd_debugfs.o
 
 obj-$(CONFIG_HSA_AMD)	+= amdkfd.o
+
+AMDKFD_FULL_PATH = $(src)
+include $(AMDKFD_FULL_PATH)/backport/Makefile
