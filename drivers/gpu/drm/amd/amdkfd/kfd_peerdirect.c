@@ -159,10 +159,10 @@ static void free_callback(void *client_priv)
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_priv;
 
-	pr_debug("free_callback: data 0x%p\n", mem_context);
+	pr_debug("data 0x%p\n", mem_context);
 
 	if (!mem_context) {
-		pr_warn("free_callback: Invalid client context\n");
+		pr_warn("Invalid client context\n");
 		return;
 	}
 
@@ -189,19 +189,19 @@ static int amd_acquire(unsigned long addr, size_t size,
 	/* Get pointer to structure describing current process */
 	pid = get_task_pid(current, PIDTYPE_PID);
 
-	pr_debug("acquire: addr:0x%lx,size:0x%x, pid 0x%p\n",
+	pr_debug("addr:0x%lx,size:0x%x, pid 0x%p\n",
 					addr, (unsigned int)size, pid);
 
 	/* Check if address is handled by AMD GPU driver */
 	ret = rdma_interface->is_gpu_address(addr, pid);
 
 	if (!ret) {
-		pr_debug("acquire: Not GPU Address\n");
+		pr_debug("Not GPU Address\n");
 		/* This is not GPU address */
 		return 0;
 	}
 
-	pr_debug("acquire: GPU address\n");
+	pr_debug("GPU address\n");
 
 	/* Initialize context used for operation with given address */
 	mem_context = kzalloc(sizeof(struct amd_mem_context), GFP_KERNEL);
@@ -218,7 +218,7 @@ static int amd_acquire(unsigned long addr, size_t size,
 	 */
 	mem_context->pid  = pid;
 
-	pr_debug("acquire: Client context %p\n", mem_context);
+	pr_debug("Client context %p\n", mem_context);
 
 	/* Return pointer to allocated context */
 	*client_context = mem_context;
@@ -237,25 +237,25 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
 
-	pr_debug("get_pages: addr:0x%lx,size:0x%x, core_context:%p\n",
+	pr_debug("addr:0x%lx,size:0x%x, core_context:%p\n",
 		addr, (unsigned int)size, core_context);
 
 	if (!mem_context) {
-		pr_warn("get_pages: Invalid client context");
+		pr_warn("Invalid client context");
 		return -EINVAL;
 	}
 
-	pr_debug("get_pages: pid :0x%p\n", mem_context->pid);
+	pr_debug("pid :0x%p\n", mem_context->pid);
 
 
 	if (addr != mem_context->va) {
-		pr_warn("get_pages: Context address (0x%llx) is not the same\n",
+		pr_warn("Context address (0x%llx) is not the same\n",
 			mem_context->va);
 		return -EINVAL;
 	}
 
 	if (size != mem_context->size) {
-		pr_warn("get_pages: Context size (0x%llx) is not the same\n",
+		pr_warn("Context size (0x%llx) is not the same\n",
 			mem_context->size);
 		return -EINVAL;
 	}
@@ -304,16 +304,16 @@ static int amd_dma_map(struct sg_table *sg_head, void *client_context,
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
 
-	pr_debug("dma_map: Context 0x%p, sg_head 0x%p\n",
+	pr_debug("Context 0x%p, sg_head 0x%p\n",
 			client_context, sg_head);
 
-	pr_debug("dma_map: pid 0x%p, address 0x%llx, size:0x%llx\n",
+	pr_debug("pid 0x%p, address 0x%llx, size:0x%llx\n",
 			mem_context->pid,
 			mem_context->va,
 			mem_context->size);
 
 	if (!mem_context->p2p_info) {
-		pr_err("dma_map: No sg table were allocated\n");
+		pr_err("No sg table were allocated\n");
 		return -EINVAL;
 	}
 
@@ -332,10 +332,10 @@ static int amd_dma_unmap(struct sg_table *sg_head, void *client_context,
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
 
-	pr_debug("dma_unmap: Context 0x%p, sg_table 0x%p\n",
+	pr_debug("Context 0x%p, sg_table 0x%p\n",
 			client_context, sg_head);
 
-	pr_debug("dma_unmap: pid 0x%p, address 0x%llx, size:0x%llx\n",
+	pr_debug("pid 0x%p, address 0x%llx, size:0x%llx\n",
 			mem_context->pid,
 			mem_context->va,
 			mem_context->size);
@@ -349,18 +349,18 @@ static void amd_put_pages(struct sg_table *sg_head, void *client_context)
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
 
-	pr_debug("put_pages: sg_head %p client_context: 0x%p\n",
+	pr_debug("sg_head %p client_context: 0x%p\n",
 			sg_head, client_context);
-	pr_debug("put_pages: pid 0x%p, address 0x%llx, size:0x%llx\n",
+	pr_debug("pid 0x%p, address 0x%llx, size:0x%llx\n",
 			mem_context->pid,
 			mem_context->va,
 			mem_context->size);
 
-	pr_debug("put_pages: mem_context->p2p_info %p\n",
+	pr_debug("mem_context->p2p_info %p\n",
 				mem_context->p2p_info);
 
 	if (ACCESS_ONCE(mem_context->free_callback_called)) {
-		pr_debug("put_pages: free callback was called\n");
+		pr_debug("Free callback was called\n");
 		return;
 	}
 
@@ -369,10 +369,10 @@ static void amd_put_pages(struct sg_table *sg_head, void *client_context)
 		mem_context->p2p_info = NULL;
 
 		if (ret)
-			pr_err("put_pages failure: %d (callback status %d)\n",
+			pr_err("Failure: %d (callback status %d)\n",
 					ret, mem_context->free_callback_called);
 	} else
-		pr_err("put_pages: Pointer to p2p info is null\n");
+		pr_err("Pointer to p2p info is null\n");
 }
 static unsigned long amd_get_page_size(void *client_context)
 {
@@ -381,8 +381,8 @@ static unsigned long amd_get_page_size(void *client_context)
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
 
-	pr_debug("get_page_size: context: %p\n", client_context);
-	pr_debug("get_page_size: pid 0x%p, address 0x%llx, size:0x%llx\n",
+	pr_debug("context: %p\n", client_context);
+	pr_debug("pid 0x%p, address 0x%llx, size:0x%llx\n",
 			mem_context->pid,
 			mem_context->va,
 			mem_context->size);
@@ -410,8 +410,8 @@ static void amd_release(void *client_context)
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
 
-	pr_debug("release: context: 0x%p\n", client_context);
-	pr_debug("release: pid 0x%p, address 0x%llx, size:0x%llx\n",
+	pr_debug("context: 0x%p\n", client_context);
+	pr_debug("pid 0x%p, address 0x%llx, size:0x%llx\n",
 			mem_context->pid,
 			mem_context->va,
 			mem_context->size);
@@ -457,7 +457,7 @@ void kfd_init_peer_direct(void)
 
 	if (!pfn_ib_register_peer_memory_client ||
 		!pfn_ib_unregister_peer_memory_client) {
-		pr_debug("amdkfd: PeerDirect interface was not detected\n");
+		pr_debug("PeerDirect interface was not detected\n");
 		/* Do cleanup */
 		kfd_close_peer_direct();
 		return;
@@ -466,8 +466,7 @@ void kfd_init_peer_direct(void)
 	result = amdkfd_query_rdma_interface(&rdma_interface);
 
 	if (result < 0) {
-		pr_err("amdkfd: Cannot get RDMA Interface (result = %d)\n",
-				result);
+		pr_err("Cannot get RDMA Interface (result = %d)\n", result);
 		return;
 	}
 
@@ -478,13 +477,13 @@ void kfd_init_peer_direct(void)
 						&ib_invalidate_callback);
 
 	if (!ib_reg_handle) {
-		pr_err("amdkfd: Cannot register peer memory client\n");
+		pr_err("Cannot register peer memory client\n");
 		/* Do cleanup */
 		kfd_close_peer_direct();
 		return;
 	}
 
-	pr_info("amdkfd: PeerDirect support was initialized successfully\n");
+	pr_info("PeerDirect support was initialized successfully\n");
 }
 
 /**

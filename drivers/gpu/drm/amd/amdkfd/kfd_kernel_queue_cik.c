@@ -99,8 +99,6 @@ static int pm_map_process_scratch_cik(struct packet_manager *pm,
 
 	packet = (struct pm4_map_process_scratch_kv *)buffer;
 
-	pr_debug("kfd: In func %s\n", __func__);
-
 	memset(buffer, 0, sizeof(struct pm4_map_process_scratch_kv));
 
 	packet->header.u32all = pm_build_pm4_header(IT_MAP_PROCESS,

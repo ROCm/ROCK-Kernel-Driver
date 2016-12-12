@@ -76,15 +76,14 @@ static int get_pages(uint64_t address, uint64_t length, struct pid *pid,
 
 	p = kfd_lookup_process_by_pid(pid);
 	if (!p) {
-		pr_err("could not find the process in %s.\n",
-				__func__);
+		pr_err("Could not find the process\n");
 		return -EINVAL;
 	}
 	down_read(&p->lock);
 
 	buf_obj = kfd_process_find_bo_from_interval(p, address, last);
 	if (!buf_obj) {
-		pr_err("can not find a kfd_bo for the range\n");
+		pr_err("Cannot find a kfd_bo for the range\n");
 		ret = -EINVAL;
 		goto out;
 	}
@@ -195,8 +194,7 @@ static int put_pages(struct amd_p2p_info **p_p2p_data)
 
 	p = kfd_lookup_process_by_pid((*p_p2p_data)->pid);
 	if (!p) {
-		pr_err("could not find the process in %s\n",
-				__func__);
+		pr_err("Could not find the process\n");
 		return -EINVAL;
 	}
 
@@ -227,8 +225,7 @@ static int is_gpu_address(uint64_t address, struct pid *pid)
 
 	p = kfd_lookup_process_by_pid(pid);
 	if (!p) {
-		pr_debug("could not find the process in %s.\n",
-				__func__);
+		pr_debug("Could not find the process\n");
 		return 0;
 	}
 
