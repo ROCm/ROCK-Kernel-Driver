@@ -39,6 +39,8 @@ MODULE_FIRMWARE("amdgpu/polaris10_smc.bin");
 MODULE_FIRMWARE("amdgpu/polaris10_smc_sk.bin");
 MODULE_FIRMWARE("amdgpu/polaris11_smc.bin");
 MODULE_FIRMWARE("amdgpu/polaris11_smc_sk.bin");
+MODULE_FIRMWARE("amdgpu/polaris12_smc.bin");
+MODULE_FIRMWARE("amdgpu/polaris12_smc_sk.bin");
 
 int smum_init(struct amd_pp_init *pp_init, struct pp_instance *handle)
 {
@@ -75,6 +77,7 @@ int smum_init(struct amd_pp_init *pp_init, struct pp_instance *handle)
 			break;
 		case CHIP_POLARIS11:
 		case CHIP_POLARIS10:
+		case CHIP_POLARIS12:
 			polaris10_smum_init(smumgr);
 			break;
 		default:
