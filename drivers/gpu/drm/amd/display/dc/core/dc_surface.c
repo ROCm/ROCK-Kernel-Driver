@@ -76,9 +76,6 @@ static void destruct(struct surface *surface)
 	if (surface->protected.public.in_transfer_func != NULL)
 		dc_transfer_func_release(
 				surface->protected.public.in_transfer_func);
-	if (surface->protected.public.out_transfer_func != NULL)
-		dc_transfer_func_release(
-				surface->protected.public.out_transfer_func);
 }
 
 /*******************************************************************************
