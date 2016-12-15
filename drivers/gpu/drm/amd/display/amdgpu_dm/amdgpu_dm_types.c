@@ -413,6 +413,7 @@ static bool get_fb_info(
 	return true;
 }
 static void fill_plane_attributes_from_fb(
+	struct amdgpu_device *adev,
 	struct dc_surface *surface,
 	const struct amdgpu_framebuffer *amdgpu_fb, bool addReq)
 {
@@ -457,6 +458,7 @@ static void fill_plane_attributes_from_fb(
 
 	memset(&surface->tiling_info, 0, sizeof(surface->tiling_info));
 
+	/* Fill GFX8 params */
 	if (AMDGPU_TILING_GET(tiling_flags, ARRAY_MODE) == DC_ARRAY_2D_TILED_THIN1)
 	{
 		unsigned bankw, bankh, mtaspect, tile_split, num_banks;
@@ -547,6 +549,7 @@ static void fill_gamma_from_crtc(
 }
 
 static void fill_plane_attributes(
+			struct amdgpu_device *adev,
 			struct dc_surface *surface,
 			struct drm_plane_state *state, bool addrReq)
 {
@@ -556,6 +559,7 @@ static void fill_plane_attributes(
 
 	fill_rects_from_plane_state(state, surface);
 	fill_plane_attributes_from_fb(
+		crtc->dev->dev_private,
 		surface,
 		amdgpu_fb,
 		addrReq);
@@ -670,7 +674,11 @@ static void dm_dc_surface_commit(
 	}
 
 	/* Surface programming */
-	fill_plane_attributes(dc_surface, crtc->primary->state, true);
+	fill_plane_attributes(
+			crtc->dev->dev_private,
+			dc_surface,
+			crtc->primary->state,
+			true);
 	if (crtc->mode.private_flags &
 		AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET) {
 		/* reset trigger of gamma */
@@ -3169,6 +3177,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 				surface = dc_create_surface(dc);
 				fill_plane_attributes(
+					crtc->dev->dev_private,
 					surface,
 					plane_state,
 					false);
