@@ -41,7 +41,7 @@ struct dentry *ttm_debugfs_root;
 
 static int __init ttm_init(void)
 {
-	ttm_debugfs_root = debugfs_create_dir("ttm", NULL);
+	ttm_debugfs_root = debugfs_create_dir(TTM_NAME, NULL);
 	return 0;
 }
 
