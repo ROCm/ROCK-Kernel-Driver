@@ -2069,9 +2069,12 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *m_vm)
 	struct amdgpu_device *adev;
 	struct amdgpu_vm_parser param;
 	int ret = 0, i;
+	struct list_head duplicate_save;
 
 	if (WARN_ON(master_vm == NULL || master_vm->master != master_vm))
 		return -EINVAL;
+
+	INIT_LIST_HEAD(&duplicate_save);
 
 	INIT_LIST_HEAD(&ctx.list);
 	INIT_LIST_HEAD(&ctx.duplicates);
@@ -2095,7 +2098,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *m_vm)
 		goto evict_fence_fail;
 	}
 
-	/* Get PD BO list and PT BO list from all the VMs */
+	/* Get PD BO list from the VM */
 	amdgpu_vm_get_pd_bo(&master_vm->base, &ctx.list,
 			    &pd_bo_list[0]);
 
@@ -2115,11 +2118,18 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *m_vm)
 	mutex_lock(&master_vm->lock);
 	list_splice_init(&ctx.list, &master_vm->kfd_bo_list);
 	ret = ttm_eu_reserve_buffers(&ctx.ticket, &master_vm->kfd_bo_list,
-				     false, &ctx.duplicates);
+				     false, &duplicate_save);
 	if (ret) {
 		pr_debug("Memory eviction: TTM Reserve Failed. Try again\n");
 		goto ttm_reserve_fail;
 	}
+
+	/* Ensure kfd_bo_list does not change after ttm_eu_reserve_buffers(),
+	 * so that the following list operation such as list_cut_position()
+	 * can work as expected.
+	 */
+	if (!list_empty(&duplicate_save))
+		pr_err("BUG: list of BOs to reserve has duplicates!\n");
 
 	/* Restore kfd_bo_list. ctx.list contains only PDs */
 	list_cut_position(&ctx.list, &master_vm->kfd_bo_list,
@@ -2127,14 +2137,14 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *m_vm)
 
 	amdgpu_sync_create(&ctx.sync);
 
-	/* Validate PDs and PTs */
+	/* Validate PDs*/
 	list_for_each_entry(entry, &ctx.list, tv.head) {
 		struct amdgpu_bo *bo = entry->robj;
 
 		ret = amdgpu_amdkfd_bo_validate(bo, bo->prefered_domains,
 						false);
 		if (ret) {
-			pr_debug("Memory eviction: Validate failed. Try again\n");
+			pr_debug("Memory eviction: Validate PD failed. Try again\n");
 			goto validate_map_fail;
 		}
 	}
@@ -2147,7 +2157,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *m_vm)
 		ret = amdgpu_amdkfd_bo_validate(bo, bo->prefered_domains,
 						false);
 		if (ret) {
-			pr_debug("Memory eviction: Validate failed. Try again\n");
+			pr_debug("Memory eviction: Validate PTs failed. Try again\n");
 			goto validate_map_fail;
 		}
 	}
@@ -2174,7 +2184,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *m_vm)
 			atomic64_read(&adev->num_evictions);
 	}
 
-	/* Wait for PT/PD validate to finish and attach eviction fence.
+	/* Wait for PD/PTs validate to finish and attach eviction fence.
 	 * PD/PT share the same reservation object
 	 */
 	list_for_each_entry(entry, &ctx.list, tv.head) {
@@ -2194,7 +2204,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *m_vm)
 
 		ret = amdgpu_amdkfd_bo_validate(bo, domain, false);
 		if (ret) {
-			pr_debug("Memory eviction: Validate failed. Try again\n");
+			pr_debug("Memory eviction: Validate BOs failed. Try again\n");
 			goto validate_map_fail;
 		}
 
@@ -2205,7 +2215,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *m_vm)
 					      bo_va_entry,
 					      &ctx.sync);
 			if (ret) {
-				pr_debug("Memory eviction: Map failed. Try again\n");
+				pr_debug("Memory eviction: update PTE failed. Try again\n");
 				goto validate_map_fail;
 			}
 		}
