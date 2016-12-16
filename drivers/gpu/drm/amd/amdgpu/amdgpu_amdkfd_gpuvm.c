@@ -1014,12 +1014,6 @@ static int update_gpuvm_pte(struct amdgpu_device *adev,
 	bo_va = entry->bo_va;
 	vm = bo_va->vm;
 	bo = bo_va->bo;
-	/* Validate PT / PTs */
-	ret = validate_pt_pd_bos(vm);
-	if (ret != 0) {
-		pr_err("validate_pt_pd_bos failed\n");
-		return ret;
-	}
 
 	/* Update the page directory */
 	ret = amdgpu_vm_update_page_directory(adev, vm);
@@ -1061,6 +1055,15 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev,
 	if (ret != 0) {
 		pr_err("Failed to map VA 0x%llx in vm. ret %d\n",
 				entry->va, ret);
+		return ret;
+	}
+
+	/* PT BOs may be created during amdgpu_vm_bo_map() call,
+	 * so we have to validate the newly created PT BOs.
+	 */
+	ret = validate_pt_pd_bos(entry->bo_va->vm);
+	if (ret != 0) {
+		pr_err("validate_pt_pd_bos() failed\n");
 		return ret;
 	}
 
@@ -1329,7 +1332,6 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 			goto map_bo_to_gpuvm_failed;
 		}
 	}
-
 
 	list_for_each_entry(entry, &mem->bo_va_list, bo_list) {
 		if (entry->bo_va->vm == vm && !entry->is_mapped) {
