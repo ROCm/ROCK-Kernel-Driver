@@ -220,8 +220,7 @@ struct tile_config {
  * @submit_ib: Submits an IB to the engine specified by inserting the IB to
  * the corresonded ring (ring type).
  *
- * @restore_process_bos: Restore all BOs that belongs to the process identified
- * by master_vm.
+ * @restore_process_bos: Restore all BOs that belongs to the process
  *
  * @copy_mem_to_mem: Copies size bytes from source BO to destination BO
  *
@@ -243,7 +242,7 @@ struct kfd2kgd_calls {
 	uint32_t (*get_max_engine_clock_in_mhz)(struct kgd_dev *kgd);
 
 	int (*create_process_vm)(struct kgd_dev *kgd, void **vm,
-				 void *master_vm);
+				 void **process_info);
 	void (*destroy_process_vm)(struct kgd_dev *kgd, void *vm);
 
 	int (*create_process_gpumem)(struct kgd_dev *kgd, uint64_t va, size_t size, void *vm, struct kgd_mem **mem);
@@ -368,7 +367,7 @@ struct kfd2kgd_calls {
 	int (*get_tile_config)(struct kgd_dev *kgd,
 			struct tile_config *config);
 
-	int (*restore_process_bos)(void *master_vm);
+	int (*restore_process_bos)(void *process_info);
 	int (*copy_mem_to_mem)(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 			uint64_t src_offset, struct kgd_mem *dst_mem,
 			uint64_t dest_offset, uint64_t size, struct fence **f,

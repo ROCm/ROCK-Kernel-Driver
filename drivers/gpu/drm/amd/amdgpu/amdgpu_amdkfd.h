@@ -77,34 +77,37 @@ struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 bool amd_kfd_fence_check_mm(struct fence *f, void *mm);
 struct amdgpu_amdkfd_fence *to_amdgpu_amdkfd_fence(struct fence *f);
 
+struct amdkfd_process_info {
+	/* List head of all VMs that belong to a KFD process */
+	struct list_head vm_list_head;
+	/* List head for all KFD BOs that belong to a KFD process. */
+	struct list_head kfd_bo_list;
+	/* Lock to protect kfd_bo_list */
+	struct mutex lock;
+
+	/* Number of VMs */
+	unsigned int n_vms;
+	/* Eviction Fence */
+	struct amdgpu_amdkfd_fence *eviction_fence;
+};
+
 /* struct amdkfd_vm -
- *  For Memory Eviction KGD requires a mechanism to keep track of all KFD BOs
+ * For Memory Eviction KGD requires a mechanism to keep track of all KFD BOs
  * belonging to a KFD process. All the VMs belonging to the same process point
- * to the same master VM. The master VM points to itself.
- * For master VM kfd_bo_list will contain the list of all KFD BOs and it will
- * be empty for all the other VMs. The master VM is decided by KFD and it will
- * pass it on KGD via create_process_vm interface
+ * to the same amdkfd_process_info.
  */
 struct amdkfd_vm {
 	/* Keep base as the first parameter for pointer compatibility between
 	 * amdkfd_vm and amdgpu_vm.
 	 */
 	struct amdgpu_vm base;
-	/* Points to master VM of the KFD process */
-	struct amdkfd_vm *master;
-	/* List Head for all KFD BOs that belong to a KFD process. Non-empty
-	 * only for Master VM.
-	 */
-	struct list_head kfd_bo_list;
-	/* Lock to protect kfd_bo_list */
-	struct mutex lock;
-	/* List of VMs that belong to a KFD process */
-	struct list_head kfd_vm_list;
-	/* Number of VMs including master VM */
-	unsigned n_vms;
+
+	/* List node in amdkfd_process_info.vm_list_head*/
+	struct list_head vm_list_node;
+
 	struct amdgpu_device *adev;
-	/* Eviction Fence. Initialized only for master_vm */
-	struct amdgpu_amdkfd_fence *eviction_fence;
+	/* Points to the KFD process VM info*/
+	struct amdkfd_process_info *process_info;
 };
 
 int amdgpu_amdkfd_init(void);
@@ -130,7 +133,7 @@ void amdgpu_amdkfd_cancel_restore_mem(struct kgd_mem *mem);
 int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 				uint32_t vmid, uint64_t gpu_addr,
 				uint32_t *ib_cmd, uint32_t ib_len);
-int amdgpu_amdkfd_gpuvm_restore_process_bos(void *master_vm);
+int amdgpu_amdkfd_gpuvm_restore_process_bos(void *process_info);
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions(void);
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions(void);
 int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
@@ -174,7 +177,7 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 		struct kgd_dev *kgd, struct kgd_mem *mem, void *vm);
 
 int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
-					  void *master_vm);
+					  void **process_info);
 void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm);
 
 uint32_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm);
