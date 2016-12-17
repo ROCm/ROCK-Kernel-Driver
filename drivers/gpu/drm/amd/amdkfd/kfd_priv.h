@@ -709,7 +709,8 @@ struct kfd_process {
 
 	struct rb_root bo_interval_tree;
 
-	void *master_vm;
+	/* Information used for memory eviction */
+	void *process_info;
 
 	/* Work items for evicting and restoring BOs */
 	struct kfd_eviction_work eviction_work;
