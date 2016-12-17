@@ -817,7 +817,9 @@ void kfd_restore_bo_worker(struct work_struct *work)
 			       struct kfd_process_device,
 			       per_device_list);
 
-	ret = pdd->dev->kfd2kgd->restore_process_bos(p->master_vm);
+	pr_info("Started restoring process of pasid %d\n", p->pasid);
+
+	ret = pdd->dev->kfd2kgd->restore_process_bos(p->process_info);
 	if (ret) {
 		kfd_schedule_restore_bos_and_queues(p);
 		return;

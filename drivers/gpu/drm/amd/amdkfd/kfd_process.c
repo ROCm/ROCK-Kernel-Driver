@@ -629,14 +629,12 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 
 		/* Create the GPUVM context for this specific device */
 		if (dev->kfd2kgd->create_process_vm(dev->kgd, &pdd->vm,
-						    p->master_vm)) {
+						&p->process_info)) {
 			pr_err("Failed to create process VM object\n");
 			list_del(&pdd->per_device_list);
 			kfree(pdd);
 			pdd = NULL;
 		}
-		if (p->master_vm == NULL)
-			p->master_vm = pdd->vm;
 	}
 
 	return pdd;
