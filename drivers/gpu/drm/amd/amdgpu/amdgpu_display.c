@@ -351,7 +351,6 @@ int amdgpu_crtc_prepare_flip(
 
 	r = amdgpu_bo_pin(new_abo, AMDGPU_GEM_DOMAIN_VRAM, &base);
 	if (unlikely(r != 0)) {
-		r = -EINVAL;
 		DRM_ERROR("failed to pin new abo buffer before flip\n");
 		goto unreserve;
 	}
