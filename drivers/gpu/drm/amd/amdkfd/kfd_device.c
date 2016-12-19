@@ -774,25 +774,6 @@ static int resume_process_mm(struct kfd_process *p)
 	return ret;
 }
 
-/** kfd_schedule_restore_bos_and_queues - Schedules work queue that will
- *   restore all BOs that belong to given process and then restore its queues
- *
- * @mm: mm_struct that identifies the KFD process
- *
- */
-static int kfd_schedule_restore_bos_and_queues(struct kfd_process *p)
-{
-	if (delayed_work_pending(&p->restore_work)) {
-		WARN(1, "Trying to evict an unrestored process\n");
-		cancel_delayed_work_sync(&p->restore_work);
-	}
-
-	/* During process initialization restore_work is initialized
-	 * to kfd_restore_bo_worker
-	 */
-	schedule_delayed_work(&p->restore_work, PROCESS_RESTORE_TIME_MS);
-	return 0;
-}
 
 void kfd_restore_bo_worker(struct work_struct *work)
 {
@@ -821,7 +802,10 @@ void kfd_restore_bo_worker(struct work_struct *work)
 
 	ret = pdd->dev->kfd2kgd->restore_process_bos(p->process_info);
 	if (ret) {
-		kfd_schedule_restore_bos_and_queues(p);
+		pr_info("restore_process_bos() failed, try again after 1 sec\n");
+		ret = schedule_delayed_work(&p->restore_work,
+				PROCESS_BACK_OFF_TIME_MS);
+		WARN(!ret, "reschedule restore work failed\n");
 		return;
 	}
 
@@ -902,7 +886,8 @@ void kfd_evict_bo_worker(struct work_struct *work)
 	ret = quiesce_process_mm(p);
 	if (!ret) {
 		fence_signal(eviction_work->eviction_fence);
-		kfd_schedule_restore_bos_and_queues(p);
+		schedule_delayed_work(&p->restore_work,
+					PROCESS_RESTORE_TIME_MS);
 	} else
 		pr_err("Failed to quiesce user queues. Cannot evict BOs\n");
 
