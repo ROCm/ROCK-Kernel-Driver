@@ -517,32 +517,25 @@ static void fill_gamma_from_crtc(
 	uint16_t *red, *green, *blue;
 	int end = (crtc->gamma_size > NUM_OF_RAW_GAMMA_RAMP_RGB_256) ?
 			NUM_OF_RAW_GAMMA_RAMP_RGB_256 : crtc->gamma_size;
-	struct amdgpu_device *adev = crtc->dev->dev_private;
 
 	red = crtc->gamma_store;
 	green = red + crtc->gamma_size;
 	blue = green + crtc->gamma_size;
 
-	gamma = dc_create_gamma(adev->dm.dc);
+	gamma = dc_create_gamma();
 
 	if (gamma == NULL)
 		return;
 
 	for (i = 0; i < end; i++) {
-		gamma->gamma_ramp_rgb256x3x16.red[i] =
-				(unsigned short) red[i];
-		gamma->gamma_ramp_rgb256x3x16.green[i] =
-				(unsigned short) green[i];
-		gamma->gamma_ramp_rgb256x3x16.blue[i] =
-				(unsigned short) blue[i];
+		gamma->red[i] = (unsigned short) red[i];
+		gamma->green[i] = (unsigned short) green[i];
+		gamma->blue[i] = (unsigned short) blue[i];
 	}
-
-	gamma->type = GAMMA_RAMP_RBG256X3X16;
-	gamma->size = sizeof(gamma->gamma_ramp_rgb256x3x16);
 
 	dc_surface->gamma_correction = gamma;
 
-	input_tf = dc_create_transfer_func(adev->dm.dc);
+	input_tf = dc_create_transfer_func();
 
 	if (input_tf == NULL)
 		return;
@@ -840,6 +833,12 @@ static void fill_stream_properties_from_drm_display_mode(
 
 	stream->output_color_space = get_output_color_space(timing_out);
 
+	{
+		struct dc_transfer_func *tf = dc_create_transfer_func();
+		tf->type = TF_TYPE_PREDEFINED;
+		tf->tf = TRANSFER_FUNCTION_SRGB;
+		stream->out_transfer_func = tf;
+	}
 }
 
 static void fill_audio_info(
@@ -3213,7 +3212,7 @@ static bool is_dp_capable_without_timing_msa(
 	    dc_read_dpcd(dc, amdgpu_connector->dc_link->link_index,
 			 DP_DOWN_STREAM_PORT_COUNT,
 			 &dpcd_data, sizeof(dpcd_data)) )
-		capable = dpcd_data & DP_MSA_TIMING_PAR_IGNORED? true:false;
+		capable = (dpcd_data & DP_MSA_TIMING_PAR_IGNORED) ? true:false;
 
 	return capable;
 }
