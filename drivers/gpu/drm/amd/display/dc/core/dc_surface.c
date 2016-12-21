@@ -189,9 +189,8 @@ void dc_gamma_release(const struct dc_gamma *dc_gamma)
 		dm_free(gamma);
 }
 
-struct dc_gamma *dc_create_gamma(const struct dc *dc)
+struct dc_gamma *dc_create_gamma()
 {
-	struct core_dc *core_dc = DC_TO_CORE(dc);
 	struct gamma *gamma = dm_alloc(sizeof(*gamma));
 
 	if (gamma == NULL)
@@ -221,9 +220,8 @@ void dc_transfer_func_release(const struct dc_transfer_func *dc_tf)
 		dm_free(tf);
 }
 
-struct dc_transfer_func *dc_create_transfer_func(const struct dc *dc)
+struct dc_transfer_func *dc_create_transfer_func()
 {
-	struct core_dc *core_dc = DC_TO_CORE(dc);
 	struct transfer_func *tf = dm_alloc(sizeof(*tf));
 
 	if (tf == NULL)
