@@ -378,7 +378,7 @@ void drm_sched_stop(struct drm_gpu_scheduler *sched)
 	unsigned long flags;
 	struct dma_fence *last_fence =  NULL;
 
-	kthread_park(sched->thread);
+	kcl_kthread_park(sched->thread);
 
 	/*
 	 * Verify all the signaled jobs in mirror list are removed from the ring
@@ -448,7 +448,7 @@ void drm_sched_start(struct drm_gpu_scheduler *sched, bool full_recovery)
 	drm_sched_start_timeout(sched);
 
 unpark:
-	kthread_unpark(sched->thread);
+	kcl_kthread_unpark(sched->thread);
 }
 EXPORT_SYMBOL(drm_sched_start);
 

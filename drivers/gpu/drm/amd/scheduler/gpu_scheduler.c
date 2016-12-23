@@ -225,8 +225,8 @@ void amd_sched_entity_fini(struct amd_gpu_scheduler *sched,
 		/* Park the kernel for a moment to make sure it isn't processing
 		 * our enity.
 		 */
-		kthread_park(sched->thread);
-		kthread_unpark(sched->thread);
+		kcl_kthread_park(sched->thread);
+		kcl_kthread_unpark(sched->thread);
 		while (kfifo_out(&entity->job_queue, &job, sizeof(job)))
 			sched->ops->free_job(job);
 
@@ -570,8 +570,8 @@ static void amd_sched_process_job(struct dma_fence *f, struct dma_fence_cb *cb)
 
 static bool amd_sched_blocked(struct amd_gpu_scheduler *sched)
 {
-	if (kthread_should_park()) {
-		kthread_parkme();
+	if (kcl_kthread_should_park()) {
+		kcl_kthread_parkme();
 		return true;
 	}
 
