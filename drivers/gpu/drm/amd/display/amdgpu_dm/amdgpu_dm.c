@@ -4433,8 +4433,17 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.atomic_destroy_state = dm_drm_plane_destroy_state,
 };
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
 static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 				      struct drm_plane_state *new_state)
+#elif DRM_VERSION_CODE >= DRM_VERSION(4, 4, 0)
+static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
+				      const struct drm_plane_state *new_state)
+#else
+static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
+				      struct drm_framebuffer *fb,
+				      const struct drm_plane_state *new_state)
+#endif
 {
 	struct amdgpu_framebuffer *afb;
 	struct drm_gem_object *obj;
@@ -4515,8 +4524,17 @@ static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 	return 0;
 }
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
 static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
 				       struct drm_plane_state *old_state)
+#elif DRM_VERSION_CODE >= DRM_VERSION(4, 4, 0)
+static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
+				       const struct drm_plane_state *old_state)
+#else
+static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
+				       struct drm_framebuffer *fb,
+				       const struct drm_plane_state *old_state)
+#endif
 {
 	struct amdgpu_bo *rbo;
 	int r;
@@ -4690,7 +4708,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	num_formats = get_plane_formats(plane, plane_cap, formats,
 					ARRAY_SIZE(formats));
 
-	res = drm_universal_plane_init(dm->adev->ddev, plane, possible_crtcs,
+	res = kcl_drm_universal_plane_init(dm->adev->ddev, plane, possible_crtcs,
 				       &dm_plane_funcs, formats, num_formats,
 				       NULL, plane->type, NULL);
 	if (res)
@@ -4746,7 +4764,7 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	if (!acrtc)
 		goto fail;
 
-	res = drm_crtc_init_with_planes(
+	res = kcl_drm_crtc_init_with_planes(
 			dm->ddev,
 			&acrtc->base,
 			plane,
@@ -5232,7 +5250,7 @@ static int amdgpu_dm_encoder_init(struct drm_device *dev,
 {
 	struct amdgpu_device *adev = dev->dev_private;
 
-	int res = drm_encoder_init(dev,
+	int res = kcl_drm_encoder_init(dev,
 				   &aencoder->base,
 				   &amdgpu_dm_encoder_funcs,
 				   DRM_MODE_ENCODER_TMDS,
