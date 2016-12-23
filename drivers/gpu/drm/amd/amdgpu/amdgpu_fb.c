@@ -73,9 +73,9 @@ static struct fb_ops amdgpufb_ops = {
 	DRM_FB_HELPER_DEFAULT_OPS,
 	.fb_open = amdgpufb_open,
 	.fb_release = amdgpufb_release,
-	.fb_fillrect = drm_fb_helper_cfb_fillrect,
-	.fb_copyarea = drm_fb_helper_cfb_copyarea,
-	.fb_imageblit = drm_fb_helper_cfb_imageblit,
+	.fb_fillrect = kcl_drm_fb_helper_cfb_fillrect,
+	.fb_copyarea = kcl_drm_fb_helper_cfb_copyarea,
+	.fb_imageblit = kcl_drm_fb_helper_cfb_imageblit,
 };
 
 
@@ -216,7 +216,7 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	abo = gem_to_amdgpu_bo(gobj);
 
 	/* okay we have an object now allocate the framebuffer */
-	info = drm_fb_helper_alloc_fbi(helper);
+	info = kcl_drm_fb_helper_alloc_fbi(helper);
 	if (IS_ERR(info)) {
 		ret = PTR_ERR(info);
 		goto out;
@@ -294,7 +294,7 @@ static int amdgpu_fbdev_destroy(struct drm_device *dev, struct amdgpu_fbdev *rfb
 {
 	struct amdgpu_framebuffer *rfb = &rfbdev->rfb;
 
-	drm_fb_helper_unregister_fbi(&rfbdev->helper);
+	kcl_drm_fb_helper_unregister_fbi(&rfbdev->helper);
 
 	if (rfb->obj) {
 		amdgpufb_destroy_pinned_object(rfb->obj);
@@ -393,7 +393,7 @@ void amdgpu_fbdev_fini(struct amdgpu_device *adev)
 void amdgpu_fbdev_set_suspend(struct amdgpu_device *adev, int state)
 {
 	if (adev->mode_info.rfbdev)
-		drm_fb_helper_set_suspend(&adev->mode_info.rfbdev->helper,
+		kcl_drm_fb_helper_set_suspend(&adev->mode_info.rfbdev->helper,
 			state);
 }
 

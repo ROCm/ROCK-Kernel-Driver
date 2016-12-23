@@ -4089,7 +4089,7 @@ void amdgpu_dm_atomic_commit_tail(
 	struct drm_connector_state *old_conn_state;
 	struct dm_crtc_state *old_acrtc_state, *new_acrtc_state;
 
-	drm_atomic_helper_update_legacy_modeset_state(dev, state);
+	kcl_drm_atomic_helper_update_legacy_modeset_state(dev, state);
 
 	dm_state = to_dm_atomic_state(state);
 
