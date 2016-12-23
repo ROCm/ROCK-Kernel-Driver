@@ -1,0 +1,5 @@
+SYMS=""
+
+if version_lt 2.6.33; then
+    SYMS+=" kallsyms_lookup_name"
+fi
