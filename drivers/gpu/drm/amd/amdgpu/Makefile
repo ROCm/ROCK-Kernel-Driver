@@ -332,4 +332,6 @@ amdgpu-y += \
 	isp_v4_1_1.o
 endif
 
+include $(FULL_AMD_PATH)/backport/Makefile
+
 obj-$(CONFIG_DRM_AMDGPU)+= amdgpu.o
