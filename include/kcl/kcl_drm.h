@@ -104,4 +104,13 @@ kcl_drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
 #endif
 }
 
+#ifndef DRM_DEBUG_VBL
+#define DRM_UT_VBL		0x20
+#define DRM_DEBUG_VBL(fmt, args...)					\
+	do {								\
+		if (unlikely(drm_debug & DRM_UT_VBL))			\
+			drm_ut_debug_printk(__func__, fmt, ##args);	\
+	} while (0)
+#endif
+
 #endif /* AMDKCL_DRM_H */
