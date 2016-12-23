@@ -113,4 +113,22 @@ kcl_drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
 	} while (0)
 #endif
 
+static inline int
+kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
+					  unsigned int pipe,
+					  int *max_error,
+					  struct timeval *vblank_time,
+					  unsigned flags,
+					  const struct drm_crtc *refcrtc,
+					  const struct drm_display_mode *mode)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
+						     flags, refcrtc, mode);
+#else
+	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
+						     flags, mode);
+#endif
+}
+
 #endif /* AMDKCL_DRM_H */
