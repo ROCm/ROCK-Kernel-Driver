@@ -446,9 +446,13 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 		if (unlikely(r))
 			goto fail_unreserve;
 
+#if defined(BUILD_AS_DKMS)
+		dma_fence_wait(fence, false);
+#else
 		amdgpu_bo_fence(bo, fence, false);
 		dma_fence_put(bo->tbo.moving);
 		bo->tbo.moving = dma_fence_get(fence);
+#endif
 		dma_fence_put(fence);
 	}
 	if (!resv)
