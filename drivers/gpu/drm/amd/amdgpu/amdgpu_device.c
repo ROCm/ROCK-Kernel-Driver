@@ -2324,7 +2324,7 @@ int amdgpu_gpu_reset(struct amdgpu_device *adev)
 
 		if (!ring)
 			continue;
-		kthread_park(ring->sched.thread);
+		kcl_kthread_park(ring->sched.thread);
 		amd_sched_hw_job_reset(&ring->sched);
 	}
 	/* after all hw jobs are reset, hw fence is meaningless, so force_completion */
@@ -2415,13 +2415,13 @@ retry:
 				continue;
 
 			amd_sched_job_recovery(&ring->sched);
-			kthread_unpark(ring->sched.thread);
+			kcl_kthread_unpark(ring->sched.thread);
 		}
 	} else {
 		dev_err(adev->dev, "asic resume failed (%d).\n", r);
 		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 			if (adev->rings[i]) {
-				kthread_unpark(adev->rings[i]->sched.thread);
+				kcl_kthread_unpark(adev->rings[i]->sched.thread);
 			}
 		}
 	}

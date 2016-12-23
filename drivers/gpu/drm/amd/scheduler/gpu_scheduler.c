@@ -524,8 +524,8 @@ static void amd_sched_process_job(struct fence *f, struct fence_cb *cb)
 
 static bool amd_sched_blocked(struct amd_gpu_scheduler *sched)
 {
-	if (kthread_should_park()) {
-		kthread_parkme();
+	if (kcl_kthread_should_park()) {
+		kcl_kthread_parkme();
 		return true;
 	}
 
