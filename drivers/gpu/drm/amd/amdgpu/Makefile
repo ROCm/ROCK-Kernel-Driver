@@ -312,4 +312,6 @@ amdgpu-y += $(AMD_DISPLAY_FILES)
 
 endif
 
+include $(FULL_AMD_PATH)/backport/Makefile
+
 obj-$(CONFIG_DRM_AMDGPU)+= amdgpu.o
