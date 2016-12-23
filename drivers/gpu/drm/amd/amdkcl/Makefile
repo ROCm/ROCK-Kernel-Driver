@@ -1,0 +1,3 @@
+LINUXINCLUDE := $(DKMS_INCLUDE_PREFIX) $(LINUXINCLUDE)
+
+obj-m += amdkcl.o
