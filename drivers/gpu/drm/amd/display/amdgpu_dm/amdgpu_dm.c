@@ -3690,13 +3690,10 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.atomic_destroy_state = dm_drm_plane_destroy_state,
 };
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
 static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 				      struct drm_plane_state *new_state)
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0) || \
-	defined(OS_NAME_RHEL_6) || \
-	defined(OS_NAME_RHEL_7_3) || \
-	defined(OS_NAME_RHEL_7_4)
+#elif DRM_VERSION_CODE >= DRM_VERSION(4, 4, 0)
 static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 				      const struct drm_plane_state *new_state)
 #else
@@ -3793,13 +3790,10 @@ static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 	return 0;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
 static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
 				       struct drm_plane_state *old_state)
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0) || \
-	defined(OS_NAME_RHEL_6) || \
-	defined(OS_NAME_RHEL_7_3) || \
-	defined(OS_NAME_RHEL_7_4)
+#elif DRM_VERSION_CODE >= DRM_VERSION(4, 4, 0)
 static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
 				       const struct drm_plane_state *old_state)
 #else
@@ -3929,7 +3923,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 
 	switch (plane->type) {
 	case DRM_PLANE_TYPE_PRIMARY:
-		res = drm_universal_plane_init(
+		res = kcl_drm_universal_plane_init(
 				dm->adev->ddev,
 				plane,
 				possible_crtcs,
@@ -3939,7 +3933,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 				NULL, plane->type, NULL);
 		break;
 	case DRM_PLANE_TYPE_OVERLAY:
-		res = drm_universal_plane_init(
+		res = kcl_drm_universal_plane_init(
 				dm->adev->ddev,
 				plane,
 				possible_crtcs,
@@ -3949,7 +3943,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 				NULL, plane->type, NULL);
 		break;
 	case DRM_PLANE_TYPE_CURSOR:
-		res = drm_universal_plane_init(
+		res = kcl_drm_universal_plane_init(
 				dm->adev->ddev,
 				plane,
 				possible_crtcs,
@@ -3990,7 +3984,7 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	if (!acrtc)
 		goto fail;
 
-	res = drm_crtc_init_with_planes(
+	res = kcl_drm_crtc_init_with_planes(
 			dm->ddev,
 			&acrtc->base,
 			plane,
@@ -4461,7 +4455,7 @@ static int amdgpu_dm_encoder_init(struct drm_device *dev,
 {
 	struct amdgpu_device *adev = dev->dev_private;
 
-	int res = drm_encoder_init(dev,
+	int res = kcl_drm_encoder_init(dev,
 				   &aencoder->base,
 				   &amdgpu_dm_encoder_funcs,
 				   DRM_MODE_ENCODER_TMDS,
