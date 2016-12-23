@@ -40,7 +40,6 @@ MODULE_FIRMWARE("amdgpu/polaris10_smc_sk.bin");
 MODULE_FIRMWARE("amdgpu/polaris11_smc.bin");
 MODULE_FIRMWARE("amdgpu/polaris11_smc_sk.bin");
 MODULE_FIRMWARE("amdgpu/polaris12_smc.bin");
-MODULE_FIRMWARE("amdgpu/polaris12_smc_sk.bin");
 
 int smum_init(struct amd_pp_init *pp_init, struct pp_instance *handle)
 {
