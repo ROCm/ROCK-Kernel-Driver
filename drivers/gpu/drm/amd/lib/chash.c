@@ -21,12 +21,17 @@
  *
  */
 
+#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/hash.h>
 #include <linux/bug.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/clock.h>
+#else
+#include <linux/sched.h>
+#endif
 #include <asm/div64.h>
 #include <linux/chash.h>
 

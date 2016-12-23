@@ -27,6 +27,13 @@
 # driver components or later moved to kernel/lib for sharing with
 # other drivers.
 
+ifneq (,$(BUILD_AS_DKMS))
+	CHASH_NAME = amdchash
+	$(CHASH_NAME)-y := chash.o
+else
+	CHASH_NAME = chash
+endif
+
 ccflags-y := -I$(src)/../include
 
-obj-$(CONFIG_CHASH) += chash.o
+obj-$(CONFIG_CHASH) += $(CHASH_NAME).o
