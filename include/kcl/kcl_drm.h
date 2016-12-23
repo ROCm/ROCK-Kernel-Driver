@@ -113,6 +113,15 @@ kcl_drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
 	} while (0)
 #endif
 
+static inline bool kcl_drm_arch_can_wc_memory(void)
+{
+#if defined(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
+	return false;
+#else
+	return true;
+#endif
+}
+
 static inline int
 kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 					  unsigned int pipe,

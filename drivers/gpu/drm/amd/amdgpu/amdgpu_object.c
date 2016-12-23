@@ -366,7 +366,7 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 	/* For architectures that don't support WC memory,
 	 * mask out the WC flag from the BO
 	 */
-	if (!drm_arch_can_wc_memory())
+	if (!kcl_drm_arch_can_wc_memory())
 		bo->flags &= ~AMDGPU_GEM_CREATE_CPU_GTT_USWC;
 
 	amdgpu_fill_placement_to_bo(bo, placement);
