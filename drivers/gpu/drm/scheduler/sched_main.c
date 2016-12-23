@@ -474,7 +474,7 @@ void drm_sched_resubmit_jobs(struct drm_gpu_scheduler *sched)
 		}
 
 		if (found_guilty && s_job->s_fence->scheduled.context == guilty_context)
-			dma_fence_set_error(&s_fence->finished, -ECANCELED);
+			kcl_dma_fence_set_error(&s_fence->finished, -ECANCELED);
 
 		s_job->s_fence->parent = sched->ops->run_job(s_job);
 		atomic_inc(&sched->hw_rq_count);

@@ -30,7 +30,7 @@
 
 #include <linux/types.h>
 #include <linux/bitmap.h>
-#include <linux/dma-fence.h>
+#include <kcl/kcl_fence.h>
 
 struct pci_dev;
 
