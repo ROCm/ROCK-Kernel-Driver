@@ -2654,7 +2654,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 		if (job && job->ring->idx != i)
 			continue;
 
-		kthread_park(ring->sched.thread);
+		kcl_kthread_park(ring->sched.thread);
 		drm_sched_hw_job_reset(&ring->sched, &job->base);
 
 		/* after all hw jobs are reset, hw fence is meaningless, so force_completion */
@@ -2709,7 +2709,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 				continue;
 
 			drm_sched_job_recovery(&ring->sched);
-			kthread_unpark(ring->sched.thread);
+			kcl_kthread_unpark(ring->sched.thread);
 		}
 	} else {
 		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
@@ -2722,7 +2722,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 			if (job && job->ring->idx != i)
 				continue;
 
-			kthread_unpark(adev->rings[i]->sched.thread);
+			kcl_kthread_unpark(adev->rings[i]->sched.thread);
 		}
 	}
 
