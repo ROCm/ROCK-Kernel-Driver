@@ -266,8 +266,8 @@ void drm_sched_entity_fini(struct drm_sched_entity *entity)
 		/* Park the kernel for a moment to make sure it isn't processing
 		 * our enity.
 		 */
-		kthread_park(sched->thread);
-		kthread_unpark(sched->thread);
+		kcl_kthread_park(sched->thread);
+		kcl_kthread_unpark(sched->thread);
 		if (entity->dependency) {
 			dma_fence_remove_callback(entity->dependency,
 						  &entity->cb);

@@ -3342,7 +3342,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 		if (!ring || !ring->sched.thread)
 			continue;
 
-		kthread_park(ring->sched.thread);
+		kcl_kthread_park(ring->sched.thread);
 
 		if (job && job->base.sched == &ring->sched)
 			continue;
@@ -3371,7 +3371,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 		if ((!job || job->base.sched == &ring->sched) && !r)
 			drm_sched_job_recovery(&ring->sched);
 
-		kthread_unpark(ring->sched.thread);
+		kcl_kthread_unpark(ring->sched.thread);
 	}
 
 	if (!amdgpu_device_has_dc_support(adev)) {
