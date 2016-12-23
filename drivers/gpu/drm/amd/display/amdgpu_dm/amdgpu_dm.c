@@ -2959,7 +2959,7 @@ static void dm_drm_plane_reset(struct drm_plane *plane)
 
 	amdgpu_state = kzalloc(sizeof(*amdgpu_state), GFP_KERNEL);
 	WARN_ON(amdgpu_state == NULL);
-	
+
 	if (amdgpu_state) {
 		plane->state = &amdgpu_state->base;
 		plane->state->plane = plane;
@@ -3007,8 +3007,20 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.atomic_destroy_state = dm_drm_plane_destroy_state,
 };
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 				      struct drm_plane_state *new_state)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0) || \
+	defined(OS_NAME_RHEL_6) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4)
+static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
+				      const struct drm_plane_state *new_state)
+#else
+static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
+				      struct drm_framebuffer *fb,
+				      const struct drm_plane_state *new_state)
+#endif
 {
 	struct amdgpu_framebuffer *afb;
 	struct drm_gem_object *obj;
@@ -3090,8 +3102,20 @@ static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
 				       struct drm_plane_state *old_state)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0) || \
+	defined(OS_NAME_RHEL_6) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4)
+static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
+				       const struct drm_plane_state *old_state)
+#else
+static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
+				       struct drm_framebuffer *fb,
+				       const struct drm_plane_state *old_state)
+#endif
 {
 	struct amdgpu_bo *rbo;
 	struct amdgpu_framebuffer *afb;
