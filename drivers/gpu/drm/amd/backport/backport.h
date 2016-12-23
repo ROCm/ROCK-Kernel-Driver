@@ -8,5 +8,6 @@
 #include <kcl/kcl_drm_connector.h>
 #include <kcl/kcl_fence.h>
 #include <kcl/kcl_mm.h>
+#include <kcl/kcl_vga_switcheroo.h>
 
 #endif /* AMDGPU_BACKPORT_H */
