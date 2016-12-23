@@ -1843,7 +1843,7 @@ int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 
 	primary_plane->format_default = true;
 
-	res = drm_universal_plane_init(
+	res = kcl_drm_universal_plane_init(
 		dm->adev->ddev,
 		primary_plane,
 		0,
@@ -1856,7 +1856,7 @@ int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 
 	drm_plane_helper_add(primary_plane, &dm_plane_helper_funcs);
 
-	res = drm_crtc_init_with_planes(
+	res = kcl_drm_crtc_init_with_planes(
 			dm->ddev,
 			&acrtc->base,
 			primary_plane,
@@ -2287,7 +2287,7 @@ int amdgpu_dm_encoder_init(
 {
 	struct amdgpu_device *adev = dev->dev_private;
 
-	int res = drm_encoder_init(dev,
+	int res = kcl_drm_encoder_init(dev,
 				   &aencoder->base,
 				   &amdgpu_dm_encoder_funcs,
 				   DRM_MODE_ENCODER_TMDS,

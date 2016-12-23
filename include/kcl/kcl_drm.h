@@ -122,6 +122,51 @@ static inline bool kcl_drm_arch_can_wc_memory(void)
 #endif
 }
 
+static inline int kcl_drm_encoder_init(struct drm_device *dev,
+		      struct drm_encoder *encoder,
+		      const struct drm_encoder_funcs *funcs,
+		      int encoder_type, const char *name, ...)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+	return drm_encoder_init(dev, encoder, funcs,
+			 encoder_type, name);
+#else
+	return drm_encoder_init(dev, encoder, funcs,
+			 encoder_type);
+#endif
+}
+
+static inline int kcl_drm_crtc_init_with_planes(struct drm_device *dev, struct drm_crtc *crtc,
+			      struct drm_plane *primary,
+			      struct drm_plane *cursor,
+			      const struct drm_crtc_funcs *funcs,
+			      const char *name, ...)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+		return drm_crtc_init_with_planes(dev, crtc, primary,
+				 cursor, funcs, name);
+#else
+		return drm_crtc_init_with_planes(dev, crtc, primary,
+				 cursor, funcs);
+#endif
+}
+
+static inline int kcl_drm_universal_plane_init(struct drm_device *dev, struct drm_plane *plane,
+			     unsigned long possible_crtcs,
+			     const struct drm_plane_funcs *funcs,
+			     const uint32_t *formats, unsigned int format_count,
+			     enum drm_plane_type type,
+			     const char *name, ...)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
+				 formats, format_count, type, name);
+#else
+		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
+				 formats, format_count, type);
+#endif
+}
+
 static inline int
 kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 					  unsigned int pipe,

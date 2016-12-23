@@ -656,7 +656,7 @@ static int dce_virtual_connector_encoder_init(struct amdgpu_device *adev,
 	if (!encoder)
 		return -ENOMEM;
 	encoder->possible_crtcs = 1 << index;
-	drm_encoder_init(adev->ddev, encoder, &dce_virtual_encoder_funcs,
+	kcl_drm_encoder_init(adev->ddev, encoder, &dce_virtual_encoder_funcs,
 			 DRM_MODE_ENCODER_VIRTUAL, NULL);
 	drm_encoder_helper_add(encoder, &dce_virtual_encoder_helper_funcs);
 
