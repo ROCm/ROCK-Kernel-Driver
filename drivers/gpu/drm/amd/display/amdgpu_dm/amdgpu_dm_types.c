@@ -156,7 +156,7 @@ static int dm_crtc_pin_cursor_bo_new(
 
 		amdgpu_crtc = to_amdgpu_crtc(crtc);
 
-		obj = drm_gem_object_lookup(file_priv, handle);
+		obj = kcl_drm_gem_object_lookup(crtc->dev, file_priv, handle);
 
 		if (!obj) {
 			DRM_ERROR(
