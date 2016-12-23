@@ -5,5 +5,6 @@
 #include <kcl/kcl_drm_vma_manager_backport.h>
 #include <kcl/kcl_dma_mapping.h>
 #include <kcl/kcl_drm_backport.h>
+#include <kcl/kcl_fence_backport.h>
 
 #endif
