@@ -838,7 +838,11 @@ int amdgpu_display_get_crtc_scanoutpos(struct drm_device *dev,
 	}
 	else {
 		/* No: Fake something reasonable which gives at least ok results. */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+		vbl_start = adev->mode_info.crtcs[pipe]->base.hwmode.crtc_vdisplay;
+#else
 		vbl_start = mode->crtc_vdisplay;
+#endif
 		vbl_end = 0;
 	}
 
@@ -884,7 +888,11 @@ int amdgpu_display_get_crtc_scanoutpos(struct drm_device *dev,
 
 	/* Inside "upper part" of vblank area? Apply corrective offset if so: */
 	if (in_vbl && (*vpos >= vbl_start)) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+		vtotal = adev->mode_info.crtcs[pipe]->base.hwmode.crtc_vtotal;
+#else
 		vtotal = mode->crtc_vtotal;
+#endif
 		*vpos = *vpos - vtotal;
 	}
 
