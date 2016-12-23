@@ -14,4 +14,6 @@
 #include <kcl/kcl_firmware.h>
 #include <kcl/kcl_backlight.h>
 #include <kcl/kcl_fs.h>
+#include <kcl/backport/kcl_kthread_backport.h>
+
 #endif /* AMDGPU_BACKPORT_H */
