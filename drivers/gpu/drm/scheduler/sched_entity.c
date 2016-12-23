@@ -221,7 +221,7 @@ static void drm_sched_entity_kill_jobs(struct drm_sched_entity *entity)
 		struct drm_sched_fence *s_fence = job->s_fence;
 
 		drm_sched_fence_scheduled(s_fence);
-		dma_fence_set_error(&s_fence->finished, -ESRCH);
+		kcl_dma_fence_set_error(&s_fence->finished, -ESRCH);
 
 		/*
 		 * When pipe is hanged by older entity, new entity might
@@ -441,7 +441,7 @@ struct drm_sched_job *drm_sched_entity_pop_job(struct drm_sched_entity *entity)
 
 	/* skip jobs from entity that marked guilty */
 	if (entity->guilty && atomic_read(entity->guilty))
-		dma_fence_set_error(&sched_job->s_fence->finished, -ECANCELED);
+		kcl_dma_fence_set_error(&sched_job->s_fence->finished, -ECANCELED);
 
 	dma_fence_put(entity->last_scheduled);
 	entity->last_scheduled = dma_fence_get(&sched_job->s_fence->finished);

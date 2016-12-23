@@ -136,7 +136,11 @@ const struct dma_fence_ops drm_sched_fence_ops_scheduled = {
 	.get_timeline_name = drm_sched_fence_get_timeline_name,
 	.enable_signaling = drm_sched_fence_enable_signaling,
 	.signaled = NULL,
+#if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_4_5)
+	.wait = kcl_fence_default_wait,
+#else
 	.wait = dma_fence_default_wait,
+#endif
 	.release = drm_sched_fence_release_scheduled,
 };
 
@@ -145,7 +149,11 @@ const struct dma_fence_ops drm_sched_fence_ops_finished = {
 	.get_timeline_name = drm_sched_fence_get_timeline_name,
 	.enable_signaling = drm_sched_fence_enable_signaling,
 	.signaled = NULL,
+#if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_4_5)
+	.wait = kcl_fence_default_wait,
+#else
 	.wait = dma_fence_default_wait,
+#endif
 	.release = drm_sched_fence_release_finished,
 };
 
@@ -176,9 +184,9 @@ struct drm_sched_fence *drm_sched_fence_create(struct drm_sched_entity *entity,
 	spin_lock_init(&fence->lock);
 
 	seq = atomic_inc_return(&entity->fence_seq);
-	dma_fence_init(&fence->scheduled, &drm_sched_fence_ops_scheduled,
+	kcl_fence_init(&fence->scheduled, &drm_sched_fence_ops_scheduled,
 		       &fence->lock, entity->fence_context, seq);
-	dma_fence_init(&fence->finished, &drm_sched_fence_ops_finished,
+	kcl_fence_init(&fence->finished, &drm_sched_fence_ops_finished,
 		       &fence->lock, entity->fence_context + 1, seq);
 
 	return fence;

@@ -212,7 +212,7 @@ static struct dma_fence *amdgpu_job_run(struct drm_sched_job *sched_job)
 	trace_amdgpu_sched_run_job(job);
 
 	if (job->vram_lost_counter != atomic_read(&ring->adev->vram_lost_counter))
-		dma_fence_set_error(finished, -ECANCELED);/* skip IB as well if VRAM lost */
+		kcl_dma_fence_set_error(finished, -ECANCELED);/* skip IB as well if VRAM lost */
 
 	if (finished->error < 0) {
 		DRM_INFO("Skip scheduling IBs!\n");

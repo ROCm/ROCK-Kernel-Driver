@@ -328,7 +328,7 @@ void drm_sched_job_recovery(struct drm_gpu_scheduler *sched)
 		}
 
 		if (found_guilty && s_job->s_fence->scheduled.context == guilty_context)
-			dma_fence_set_error(&s_fence->finished, -ECANCELED);
+			kcl_dma_fence_set_error(&s_fence->finished, -ECANCELED);
 
 		spin_unlock(&sched->job_list_lock);
 		fence = sched->ops->run_job(s_job);
