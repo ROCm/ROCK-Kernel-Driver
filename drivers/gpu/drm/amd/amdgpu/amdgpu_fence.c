@@ -144,10 +144,10 @@ int amdgpu_fence_emit(struct amdgpu_ring *ring, struct dma_fence **f)
 
 	seq = ++ring->fence_drv.sync_seq;
 	fence->ring = ring;
-	dma_fence_init(&fence->base, &amdgpu_fence_ops,
-		       &ring->fence_drv.lock,
-		       adev->fence_context + ring->idx,
-		       seq);
+	kcl_fence_init(&fence->base, &amdgpu_fence_ops,
+		   &ring->fence_drv.lock,
+		   adev->fence_context + ring->idx,
+		   seq);
 	amdgpu_ring_emit_fence(ring, ring->fence_drv.gpu_addr,
 			       seq, AMDGPU_FENCE_FLAG_INT);
 
@@ -614,7 +614,11 @@ static const struct dma_fence_ops amdgpu_fence_ops = {
 	.get_driver_name = amdgpu_fence_get_driver_name,
 	.get_timeline_name = amdgpu_fence_get_timeline_name,
 	.enable_signaling = amdgpu_fence_enable_signaling,
+#if defined(BUILD_AS_DKMS)
+	.wait = kcl_fence_default_wait,
+#else
 	.wait = dma_fence_default_wait,
+#endif
 	.release = amdgpu_fence_release,
 };
 

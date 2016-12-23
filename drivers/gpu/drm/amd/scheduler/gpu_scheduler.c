@@ -139,7 +139,7 @@ int amd_sched_entity_init(struct amd_gpu_scheduler *sched,
 		return r;
 
 	atomic_set(&entity->fence_seq, 0);
-	entity->fence_context = dma_fence_context_alloc(2);
+	entity->fence_context = kcl_fence_context_alloc(2);
 
 	return 0;
 }

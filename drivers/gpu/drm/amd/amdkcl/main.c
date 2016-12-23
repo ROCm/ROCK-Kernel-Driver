@@ -2,10 +2,12 @@
 #include <linux/module.h>
 
 extern void amdkcl_drm_init(void);
+extern void amdkcl_fence_init(void);
 
 int __init amdkcl_init(void)
 {
 	amdkcl_drm_init();
+	amdkcl_fence_init();
 	return 0;
 }
 module_init(amdkcl_init);
