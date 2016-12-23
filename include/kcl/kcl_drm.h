@@ -167,6 +167,18 @@ static inline int kcl_drm_universal_plane_init(struct drm_device *dev, struct dr
 #endif
 }
 
+static inline struct drm_gem_object *
+kcl_drm_gem_object_lookup(struct drm_device *dev, struct drm_file *filp,
+				u32 handle)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+		return drm_gem_object_lookup(dev, filp, handle);
+#else
+		return drm_gem_object_lookup(filp, handle);
+#endif
+}
+
+
 static inline int
 kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 					  unsigned int pipe,
