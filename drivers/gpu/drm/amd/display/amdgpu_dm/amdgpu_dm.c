@@ -4340,7 +4340,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	struct dm_crtc_state *dm_old_crtc_state, *dm_new_crtc_state;
 	int crtc_disable_count = 0;
 
-	drm_atomic_helper_update_legacy_modeset_state(dev, state);
+	kcl_drm_atomic_helper_update_legacy_modeset_state(dev, state);
 
 	dm_state = to_dm_atomic_state(state);
 
