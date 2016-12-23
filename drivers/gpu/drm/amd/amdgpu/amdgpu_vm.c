@@ -25,7 +25,11 @@
  *          Alex Deucher
  *          Jerome Glisse
  */
+#if defined(BUILD_AS_DKMS)
+#include <kcl/kcl_fence_array.h>
+#else
 #include <linux/dma-fence-array.h>
+#endif
 #include <linux/interval_tree_generic.h>
 #include <drm/drmP.h>
 #include <drm/amdgpu_drm.h>
