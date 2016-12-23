@@ -2,3 +2,4 @@ drivers/gpu/drm/amd .
 drivers/gpu/drm/ttm .
 include/drm/ttm include/drm
 include/uapi/drm/amdgpu_drm.h include/uapi/drm
+include/kcl include
