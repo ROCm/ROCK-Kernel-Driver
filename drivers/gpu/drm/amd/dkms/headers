@@ -21,4 +21,6 @@ drm/drm_irq.h kcl/kcl_drm_irq_h.h
 drm/drm_connector.h kcl/kcl_drm_connector_h.h
 drm/drm_encoder.h kcl/kcl_drm_encoder_h.h
 drm/drm_plane.h kcl/kcl_drm_plane_h.h
+linux/dma-fence.h kcl/kcl_fence_backport.h
+linux/dma-fence-array.h kcl/kcl_fence_backport.h
 

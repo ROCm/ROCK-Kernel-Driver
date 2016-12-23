@@ -18,5 +18,6 @@
 #include <kcl/kcl_drm_connector.h>
 #include <kcl/kcl_drm_dp_helper_backport.h>
 #include <kcl/kcl_drm_vma_manager_backport.h>
+#include <kcl/kcl_fence_backport.h>
 
 #endif /* AMDGPU_BACKPORT_H */

@@ -1,6 +1,7 @@
-amdkcl-y += main.o symbols.o kcl_mn.o kcl_reservation.o kcl_memory.o \
+amdkcl-y += main.o symbols.o kcl_mn.o kcl_memory.o \
 	kcl_ioctl.o
 
-amdkcl-y += symbols.o kcl_mn.o main.o kcl_device_cgroup.o kcl_drm_cache.o kcl_drm.o
+amdkcl-y += kcl_device_cgroup.o kcl_drm_cache.o kcl_drm.o \
+	kcl_fence_array.o kcl_fence.o
 
 obj-m += amdkcl.o
