@@ -1,11 +1,13 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 
+extern void amdkcl_kthread_init(void);
 extern void amdkcl_drm_init(void);
 extern void amdkcl_fence_init(void);
 
 int __init amdkcl_init(void)
 {
+	amdkcl_kthread_init();
 	amdkcl_drm_init();
 	amdkcl_fence_init();
 	return 0;
