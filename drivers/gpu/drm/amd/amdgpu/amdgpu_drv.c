@@ -2594,6 +2594,9 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 	adev->in_runpm = true;
 	if (amdgpu_device_supports_px(drm_dev))
 		drm_dev->switch_power_state = DRM_SWITCH_POWER_CHANGING;
+#if defined(HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH)
+	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_OFF);
+#endif
 
 	/*
 	 * By setting mp1_state as PP_MP1_STATE_UNLOAD, MP1 will do some
@@ -2675,6 +2678,9 @@ static int amdgpu_pmops_runtime_resume(struct device *dev)
 		return ret;
 	}
 
+#if defined(HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH)
+	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_ON);
+#endif
 	if (amdgpu_device_supports_px(drm_dev))
 		drm_dev->switch_power_state = DRM_SWITCH_POWER_ON;
 	adev->in_runpm = false;
