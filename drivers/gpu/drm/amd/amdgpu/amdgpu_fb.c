@@ -74,9 +74,9 @@ static struct fb_ops amdgpufb_ops = {
 	.fb_release = amdgpufb_release,
 	.fb_check_var = drm_fb_helper_check_var,
 	.fb_set_par = drm_fb_helper_set_par,
-	.fb_fillrect = drm_fb_helper_cfb_fillrect,
-	.fb_copyarea = drm_fb_helper_cfb_copyarea,
-	.fb_imageblit = drm_fb_helper_cfb_imageblit,
+	.fb_fillrect = kcl_drm_fb_helper_cfb_fillrect,
+	.fb_copyarea = kcl_drm_fb_helper_cfb_copyarea,
+	.fb_imageblit = kcl_drm_fb_helper_cfb_imageblit,
 	.fb_pan_display = drm_fb_helper_pan_display,
 	.fb_blank = drm_fb_helper_blank,
 	.fb_setcmap = drm_fb_helper_setcmap,
@@ -222,7 +222,7 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	abo = gem_to_amdgpu_bo(gobj);
 
 	/* okay we have an object now allocate the framebuffer */
-	info = drm_fb_helper_alloc_fbi(helper);
+	info = kcl_drm_fb_helper_alloc_fbi(helper);
 	if (IS_ERR(info)) {
 		ret = PTR_ERR(info);
 		goto out_unref;
@@ -280,7 +280,7 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	return 0;
 
 out_destroy_fbi:
-	drm_fb_helper_release_fbi(helper);
+	kcl_drm_fb_helper_release_fbi(helper);
 out_unref:
 	if (abo) {
 
@@ -304,8 +304,8 @@ static int amdgpu_fbdev_destroy(struct drm_device *dev, struct amdgpu_fbdev *rfb
 {
 	struct amdgpu_framebuffer *rfb = &rfbdev->rfb;
 
-	drm_fb_helper_unregister_fbi(&rfbdev->helper);
-	drm_fb_helper_release_fbi(&rfbdev->helper);
+	kcl_drm_fb_helper_unregister_fbi(&rfbdev->helper);
+	kcl_drm_fb_helper_release_fbi(&rfbdev->helper);
 
 	if (rfb->obj) {
 		amdgpufb_destroy_pinned_object(rfb->obj);
@@ -404,7 +404,7 @@ void amdgpu_fbdev_fini(struct amdgpu_device *adev)
 void amdgpu_fbdev_set_suspend(struct amdgpu_device *adev, int state)
 {
 	if (adev->mode_info.rfbdev)
-		drm_fb_helper_set_suspend(&adev->mode_info.rfbdev->helper,
+		kcl_drm_fb_helper_set_suspend(&adev->mode_info.rfbdev->helper,
 			state);
 }
 

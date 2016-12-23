@@ -2518,7 +2518,7 @@ int amdgpu_dm_atomic_commit(
 	 * wait_for_fences(dev, state);
 	 */
 
-	drm_atomic_helper_update_legacy_modeset_state(dev, state);
+	kcl_drm_atomic_helper_update_legacy_modeset_state(dev, state);
 
 	/* update changed items */
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
