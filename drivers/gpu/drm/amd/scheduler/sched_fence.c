@@ -19,20 +19,20 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
+ *
  */
-
 #include <linux/kthread.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
 #include <drm/drmP.h>
-#include <drm/gpu_scheduler.h>
+#include "gpu_scheduler.h"
 
 static struct kmem_cache *sched_fence_slab;
 
-static int __init drm_sched_fence_slab_init(void)
+int amd_sched_fence_slab_init(void)
 {
 	sched_fence_slab = kmem_cache_create(
-		"drm_sched_fence", sizeof(struct drm_sched_fence), 0,
+		"amd_sched_fence", sizeof(struct amd_sched_fence), 0,
 		SLAB_HWCACHE_ALIGN, NULL);
 	if (!sched_fence_slab)
 		return -ENOMEM;
@@ -40,13 +40,36 @@ static int __init drm_sched_fence_slab_init(void)
 	return 0;
 }
 
-static void __exit drm_sched_fence_slab_fini(void)
+void amd_sched_fence_slab_fini(void)
 {
 	rcu_barrier();
 	kmem_cache_destroy(sched_fence_slab);
 }
 
-void drm_sched_fence_scheduled(struct drm_sched_fence *fence)
+struct amd_sched_fence *amd_sched_fence_create(struct amd_sched_entity *entity,
+					       void *owner)
+{
+	struct amd_sched_fence *fence = NULL;
+	unsigned seq;
+
+	fence = kmem_cache_zalloc(sched_fence_slab, GFP_KERNEL);
+	if (fence == NULL)
+		return NULL;
+
+	fence->owner = owner;
+	fence->sched = entity->sched;
+	spin_lock_init(&fence->lock);
+
+	seq = atomic_inc_return(&entity->fence_seq);
+	kcl_fence_init(&fence->scheduled, &amd_sched_fence_ops_scheduled,
+		   &fence->lock, entity->fence_context, seq);
+	kcl_fence_init(&fence->finished, &amd_sched_fence_ops_finished,
+		   &fence->lock, entity->fence_context + 1, seq);
+
+	return fence;
+}
+
+void amd_sched_fence_scheduled(struct amd_sched_fence *fence)
 {
 	int ret = dma_fence_signal(&fence->scheduled);
 
@@ -58,7 +81,7 @@ void drm_sched_fence_scheduled(struct drm_sched_fence *fence)
 				"was already signaled\n");
 }
 
-void drm_sched_fence_finished(struct drm_sched_fence *fence)
+void amd_sched_fence_finished(struct amd_sched_fence *fence)
 {
 	int ret = dma_fence_signal(&fence->finished);
 
@@ -70,18 +93,18 @@ void drm_sched_fence_finished(struct drm_sched_fence *fence)
 				"was already signaled\n");
 }
 
-static const char *drm_sched_fence_get_driver_name(struct dma_fence *fence)
+static const char *amd_sched_fence_get_driver_name(struct dma_fence *fence)
 {
-	return "drm_sched";
+	return "amd_sched";
 }
 
-static const char *drm_sched_fence_get_timeline_name(struct dma_fence *f)
+static const char *amd_sched_fence_get_timeline_name(struct dma_fence *f)
 {
-	struct drm_sched_fence *fence = to_drm_sched_fence(f);
+	struct amd_sched_fence *fence = to_amd_sched_fence(f);
 	return (const char *)fence->sched->name;
 }
 
-static bool drm_sched_fence_enable_signaling(struct dma_fence *f)
+static bool amd_sched_fence_enable_signaling(struct dma_fence *f)
 {
 	return true;
 }
@@ -93,10 +116,10 @@ static bool drm_sched_fence_enable_signaling(struct dma_fence *f)
  *
  * Free up the fence memory after the RCU grace period.
  */
-static void drm_sched_fence_free(struct rcu_head *rcu)
+static void amd_sched_fence_free(struct rcu_head *rcu)
 {
 	struct dma_fence *f = container_of(rcu, struct dma_fence, rcu);
-	struct drm_sched_fence *fence = to_drm_sched_fence(f);
+	struct amd_sched_fence *fence = to_amd_sched_fence(f);
 
 	dma_fence_put(fence->parent);
 	kmem_cache_free(sched_fence_slab, fence);
@@ -110,11 +133,11 @@ static void drm_sched_fence_free(struct rcu_head *rcu)
  * This function is called when the reference count becomes zero.
  * It just RCU schedules freeing up the fence.
  */
-static void drm_sched_fence_release_scheduled(struct dma_fence *f)
+static void amd_sched_fence_release_scheduled(struct dma_fence *f)
 {
-	struct drm_sched_fence *fence = to_drm_sched_fence(f);
+	struct amd_sched_fence *fence = to_amd_sched_fence(f);
 
-	call_rcu(&fence->finished.rcu, drm_sched_fence_free);
+	call_rcu(&fence->finished.rcu, amd_sched_fence_free);
 }
 
 /**
@@ -124,76 +147,35 @@ static void drm_sched_fence_release_scheduled(struct dma_fence *f)
  *
  * Drop the extra reference from the scheduled fence to the base fence.
  */
-static void drm_sched_fence_release_finished(struct dma_fence *f)
+static void amd_sched_fence_release_finished(struct dma_fence *f)
 {
-	struct drm_sched_fence *fence = to_drm_sched_fence(f);
+	struct amd_sched_fence *fence = to_amd_sched_fence(f);
 
 	dma_fence_put(&fence->scheduled);
 }
 
-const struct dma_fence_ops drm_sched_fence_ops_scheduled = {
-	.get_driver_name = drm_sched_fence_get_driver_name,
-	.get_timeline_name = drm_sched_fence_get_timeline_name,
-	.enable_signaling = drm_sched_fence_enable_signaling,
+const struct dma_fence_ops amd_sched_fence_ops_scheduled = {
+	.get_driver_name = amd_sched_fence_get_driver_name,
+	.get_timeline_name = amd_sched_fence_get_timeline_name,
+	.enable_signaling = amd_sched_fence_enable_signaling,
 	.signaled = NULL,
 #if defined(BUILD_AS_DKMS)
 	.wait = kcl_fence_default_wait,
 #else
 	.wait = dma_fence_default_wait,
 #endif
-	.release = drm_sched_fence_release_scheduled,
+	.release = amd_sched_fence_release_scheduled,
 };
 
-const struct dma_fence_ops drm_sched_fence_ops_finished = {
-	.get_driver_name = drm_sched_fence_get_driver_name,
-	.get_timeline_name = drm_sched_fence_get_timeline_name,
-	.enable_signaling = drm_sched_fence_enable_signaling,
+const struct dma_fence_ops amd_sched_fence_ops_finished = {
+	.get_driver_name = amd_sched_fence_get_driver_name,
+	.get_timeline_name = amd_sched_fence_get_timeline_name,
+	.enable_signaling = amd_sched_fence_enable_signaling,
 	.signaled = NULL,
 #if defined(BUILD_AS_DKMS)
 	.wait = kcl_fence_default_wait,
 #else
 	.wait = dma_fence_default_wait,
 #endif
-	.release = drm_sched_fence_release_finished,
+	.release = amd_sched_fence_release_finished,
 };
-
-struct drm_sched_fence *to_drm_sched_fence(struct dma_fence *f)
-{
-	if (f->ops == &drm_sched_fence_ops_scheduled)
-		return container_of(f, struct drm_sched_fence, scheduled);
-
-	if (f->ops == &drm_sched_fence_ops_finished)
-		return container_of(f, struct drm_sched_fence, finished);
-
-	return NULL;
-}
-EXPORT_SYMBOL(to_drm_sched_fence);
-
-struct drm_sched_fence *drm_sched_fence_create(struct drm_sched_entity *entity,
-					       void *owner)
-{
-	struct drm_sched_fence *fence = NULL;
-	unsigned seq;
-
-	fence = kmem_cache_zalloc(sched_fence_slab, GFP_KERNEL);
-	if (fence == NULL)
-		return NULL;
-
-	fence->owner = owner;
-	fence->sched = entity->sched;
-	spin_lock_init(&fence->lock);
-
-	seq = atomic_inc_return(&entity->fence_seq);
-	kcl_fence_init(&fence->scheduled, &drm_sched_fence_ops_scheduled,
-		       &fence->lock, entity->fence_context, seq);
-	kcl_fence_init(&fence->finished, &drm_sched_fence_ops_finished,
-		       &fence->lock, entity->fence_context + 1, seq);
-
-	return fence;
-}
-
-module_init(drm_sched_fence_slab_init);
-module_exit(drm_sched_fence_slab_fini);
-
-MODULE_DESCRIPTION("DRM GPU scheduler");
-MODULE_LICENSE("GPL and additional rights");

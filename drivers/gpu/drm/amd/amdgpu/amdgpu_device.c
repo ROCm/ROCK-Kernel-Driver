@@ -1778,7 +1778,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	adev->vm_manager.vm_pte_funcs = NULL;
 	adev->vm_manager.vm_pte_num_rings = 0;
 	adev->gmc.gmc_funcs = NULL;
-	adev->fence_context = dma_fence_context_alloc(AMDGPU_MAX_RINGS);
+	adev->fence_context = kcl_fence_context_alloc(AMDGPU_MAX_RINGS);
 	bitmap_zero(adev->gfx.pipe_reserve_bitmap, AMDGPU_MAX_COMPUTE_QUEUES);
 
 	adev->smc_rreg = &amdgpu_invalid_rreg;

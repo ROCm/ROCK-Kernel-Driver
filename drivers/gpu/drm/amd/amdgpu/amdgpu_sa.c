@@ -359,9 +359,9 @@ int amdgpu_sa_bo_new(struct amdgpu_sa_manager *sa_manager,
 
 		if (count) {
 			spin_unlock(&sa_manager->wq.lock);
-			t = dma_fence_wait_any_timeout(fences, count, false,
-						       MAX_SCHEDULE_TIMEOUT,
-						       NULL);
+			t = kcl_fence_wait_any_timeout(fences, count, false,
+						   MAX_SCHEDULE_TIMEOUT,
+						   NULL);
 			for (i = 0; i < count; ++i)
 				dma_fence_put(fences[i]);
 
@@ -428,8 +428,13 @@ void amdgpu_sa_bo_dump_debug_info(struct amdgpu_sa_manager *sa_manager,
 			   soffset, eoffset, eoffset - soffset);
 
 		if (i->fence)
+#if defined(BUILD_AS_DKMS)
+			seq_printf(m, " protected by 0x%08x on context %d",
+					i->fence->seqno, i->fence->context);
+#else
 			seq_printf(m, " protected by 0x%08x on context %llu",
 				   i->fence->seqno, i->fence->context);
+#endif
 
 		seq_printf(m, "\n");
 	}

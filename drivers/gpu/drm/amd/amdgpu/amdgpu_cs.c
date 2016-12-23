@@ -1306,7 +1306,7 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data,
 	if (IS_ERR(fence))
 		r = PTR_ERR(fence);
 	else if (fence) {
-		r = dma_fence_wait_timeout(fence, true, timeout);
+		r = kcl_fence_wait_timeout(fence, true, timeout);
 		if (r > 0 && fence->error)
 			r = fence->error;
 		dma_fence_put(fence);
@@ -1439,7 +1439,7 @@ static int amdgpu_cs_wait_all_fences(struct amdgpu_device *adev,
 		else if (!fence)
 			continue;
 
-		r = dma_fence_wait_timeout(fence, true, timeout);
+		r = kcl_fence_wait_timeout(fence, true, timeout);
 		dma_fence_put(fence);
 		if (r < 0)
 			return r;
@@ -1499,8 +1499,8 @@ static int amdgpu_cs_wait_any_fence(struct amdgpu_device *adev,
 		}
 	}
 
-	r = dma_fence_wait_any_timeout(array, fence_count, true, timeout,
-				       &first);
+	r = kcl_fence_wait_any_timeout(array, fence_count, true, timeout,
+				   &first);
 	if (r < 0)
 		goto err_free_fence_array;
 
