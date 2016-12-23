@@ -22,6 +22,20 @@ extern void
 (*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
 					      struct drm_atomic_state *old_state);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
+	!defined(OS_NAME_UBUNTU)
+int drm_modeset_lock_all_ctx(struct drm_device *dev,
+			     struct drm_modeset_acquire_ctx *ctx);
+int drm_atomic_helper_disable_all(struct drm_device *dev,
+				  struct drm_modeset_acquire_ctx *ctx);
+struct drm_atomic_state *
+drm_atomic_helper_duplicate_state(struct drm_device *dev,
+				  struct drm_modeset_acquire_ctx *ctx);
+struct drm_atomic_state *drm_atomic_helper_suspend(struct drm_device *dev);
+int drm_atomic_helper_resume(struct drm_device *dev,
+			     struct drm_atomic_state *state);
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)  && \
 	!defined(OS_NAME_UBUNTU)
 extern int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw);
@@ -178,6 +192,32 @@ kcl_drm_gem_object_lookup(struct drm_device *dev, struct drm_file *filp,
 #endif
 }
 
+#define kcl_drm_for_each_plane(plane, dev) \
+	list_for_each_entry(plane, &(dev)->mode_config.plane_list, head)
+
+#define kcl_drm_for_each_crtc(crtc, dev) \
+	list_for_each_entry(crtc, &(dev)->mode_config.crtc_list, head)
+
+#define kcl_drm_for_each_connector(connector, dev) \
+	for (kcl_assert_drm_connector_list_read_locked(&(dev)->mode_config),	\
+	     connector = list_first_entry(&(dev)->mode_config.connector_list,	\
+					  struct drm_connector, head);		\
+	     &connector->head != (&(dev)->mode_config.connector_list);		\
+	     connector = list_next_entry(connector, head))
+
+static inline void
+kcl_assert_drm_connector_list_read_locked(struct drm_mode_config *mode_config)
+{
+	/*
+	 * The connector hotadd/remove code currently grabs both locks when
+	 * updating lists. Hence readers need only hold either of them to be
+	 * safe and the check amounts to
+	 *
+	 * WARN_ON(not_holding(A) && not_holding(B)).
+	 */
+	WARN_ON(!mutex_is_locked(&mode_config->mutex) &&
+			!drm_modeset_is_locked(&mode_config->connection_mutex));
+}
 
 static inline int
 kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
