@@ -564,7 +564,11 @@ static int amdgpu_atpx_init(void)
  * look up whether we are the integrated or discrete GPU (all asics).
  * Returns the client id.
  */
+#ifdef HAVE_VGA_SWITCHEROO_GET_CLIENT_ID_RETURN_INT
+static int amdgpu_atpx_get_client_id(struct pci_dev *pdev)
+#else
 static enum vga_switcheroo_client_id amdgpu_atpx_get_client_id(struct pci_dev *pdev)
+#endif
 {
 	if (amdgpu_atpx_priv.dhandle == ACPI_HANDLE(&pdev->dev))
 		return VGA_SWITCHEROO_IGD;
