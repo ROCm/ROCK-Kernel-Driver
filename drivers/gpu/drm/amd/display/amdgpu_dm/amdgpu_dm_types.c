@@ -1681,9 +1681,16 @@ static bool page_flip_needed(
 	return page_flip_required;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+static int dm_plane_helper_prepare_fb(
+	struct drm_plane *plane,
+	struct drm_framebuffer *fb,
+	const struct drm_plane_state *new_state)
+#else
 static int dm_plane_helper_prepare_fb(
 	struct drm_plane *plane,
 	struct drm_plane_state *new_state)
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) */
 {
 	struct amdgpu_framebuffer *afb;
 	struct drm_gem_object *obj;
@@ -1715,9 +1722,16 @@ static int dm_plane_helper_prepare_fb(
 	return 0;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+static void dm_plane_helper_cleanup_fb(
+	struct drm_plane *plane,
+	struct drm_framebuffer *fb,
+	const struct drm_plane_state *old_state)
+#else
 static void dm_plane_helper_cleanup_fb(
 	struct drm_plane *plane,
 	struct drm_plane_state *old_state)
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) */
 {
 	struct amdgpu_bo *rbo;
 	struct amdgpu_framebuffer *afb;
