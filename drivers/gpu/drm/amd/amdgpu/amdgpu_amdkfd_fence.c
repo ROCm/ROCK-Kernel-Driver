@@ -181,5 +181,6 @@ static const struct dma_fence_ops amdkfd_fence_ops = {
 	.get_driver_name = amdkfd_fence_get_driver_name,
 	.get_timeline_name = amdkfd_fence_get_timeline_name,
 	.enable_signaling = amdkfd_fence_enable_signaling,
+	AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL
 	.release = amdkfd_fence_release,
 };
