@@ -34,6 +34,7 @@
 #include <linux/dma-buf.h>
 #include <linux/mm_types.h>
 #include <linux/scatterlist.h>
+#include <kcl/kcl_fence.h>
 
 struct pci_dev;
 
