@@ -84,6 +84,7 @@ m4_include([m4/chunk-id-synobj-in-out.m4])
 m4_include([m4/chunk-id-scheduled-dependencies.m4])
 m4_include([m4/chunk-id-syncobj-timeline-wait-signal.m4])
 m4_include([m4/pcie-get-speed-width-cap.m4])
+m4_include([m4/kthread-park-xx.m4])
 m4_include([m4/config.m4])
 
 

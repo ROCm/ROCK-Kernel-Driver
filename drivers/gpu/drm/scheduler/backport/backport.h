@@ -3,5 +3,6 @@
 
 #include <linux/version.h>
 #include <kcl/kcl_fence.h>
+#include <kcl/kcl_kthread.h>
 
 #endif

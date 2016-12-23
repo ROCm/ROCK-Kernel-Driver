@@ -25,4 +25,6 @@
 #include <kcl/kcl_ptrace.h>
 #include <kcl/kcl_pci.h>
 #include <kcl/kcl_suspend.h>
+#include <kcl/kcl_kthread.h>
+
 #endif /* AMDGPU_BACKPORT_H */
