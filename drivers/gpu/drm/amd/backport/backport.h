@@ -5,5 +5,6 @@
 #include <kcl/kcl_amdgpu.h>
 #include <kcl/kcl_fence.h>
 #include <kcl/kcl_mm.h>
+#include <kcl/kcl_vga_switcheroo.h>
 
 #endif /* AMDGPU_BACKPORT_H */
