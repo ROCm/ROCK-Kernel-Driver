@@ -58,8 +58,7 @@ amdgpu-y += \
 # add SMC block
 amdgpu-y += \
 	amdgpu_dpm.o \
-	amdgpu_powerplay.o \
-	cz_smc.o cz_dpm.o
+	amdgpu_powerplay.o
 
 # add DCE block
 amdgpu-y += \
