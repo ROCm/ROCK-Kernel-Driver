@@ -91,7 +91,7 @@ int amdgpu_bo_list_create(struct amdgpu_device *adev, struct drm_file *filp,
 		struct amdgpu_bo *bo;
 		struct mm_struct *usermm;
 
-		gobj = drm_gem_object_lookup(filp, info[i].bo_handle);
+		gobj = kcl_drm_gem_object_lookup(adev->ddev, filp, info[i].bo_handle);
 		if (!gobj) {
 			r = -ENOENT;
 			goto error_free;
