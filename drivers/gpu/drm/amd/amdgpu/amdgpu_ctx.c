@@ -252,7 +252,7 @@ uint64_t amdgpu_ctx_add_fence(struct amdgpu_ctx *ctx, struct amdgpu_ring *ring,
 	other = cring->fences[idx];
 	if (other) {
 		signed long r;
-		r = fence_wait_timeout(other, false, MAX_SCHEDULE_TIMEOUT);
+		r = kcl_fence_wait_timeout(other, false, MAX_SCHEDULE_TIMEOUT);
 		if (r < 0)
 			DRM_ERROR("Error (%ld) waiting for fence!\n", r);
 	}

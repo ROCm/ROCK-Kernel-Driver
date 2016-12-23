@@ -1658,7 +1658,7 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 			      &adev->vm_manager.ids_lru);
 	}
 
-	adev->vm_manager.fence_context = fence_context_alloc(AMDGPU_MAX_RINGS);
+	adev->vm_manager.fence_context = kcl_fence_context_alloc(AMDGPU_MAX_RINGS);
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i)
 		adev->vm_manager.seqno[i] = 0;
 
