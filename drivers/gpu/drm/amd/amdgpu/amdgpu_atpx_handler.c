@@ -605,14 +605,18 @@ static bool amdgpu_atpx_detect(void)
 void amdgpu_register_atpx_handler(void)
 {
 	bool r;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 6, 0)
+	int handler_flags = 0;
+#else
 	enum vga_switcheroo_handler_flags_t handler_flags = 0;
+#endif
 
 	/* detect if we have any ATPX + 2 VGA in the system */
 	r = amdgpu_atpx_detect();
 	if (!r)
 		return;
 
-	vga_switcheroo_register_handler(&amdgpu_atpx_handler, handler_flags);
+	kcl_vga_switcheroo_register_handler(&amdgpu_atpx_handler, handler_flags);
 }
 
 /**
