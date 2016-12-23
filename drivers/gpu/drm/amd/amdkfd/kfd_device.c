@@ -860,7 +860,8 @@ int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 			goto out;
 		else {
 			WARN(1, "Starting new evict with previous evict is not completed\n");
-			cancel_work_sync(&p->eviction_work.work);
+			if (cancel_work_sync(&p->eviction_work.work))
+				fence_put(p->eviction_work.eviction_fence);
 		}
 	}
 
@@ -899,11 +900,11 @@ void kfd_evict_bo_worker(struct work_struct *work)
 	ret = quiesce_process_mm(p);
 	if (!ret) {
 		fence_signal(eviction_work->eviction_fence);
-		fence_put(eviction_work->eviction_fence);
 		kfd_schedule_restore_bos_and_queues(p);
-	} else {
+	} else
 		pr_err("Failed to quiesce user queues. Cannot evict BOs\n");
-	}
+
+	fence_put(eviction_work->eviction_fence);
 
 }
 
