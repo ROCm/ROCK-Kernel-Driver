@@ -317,7 +317,7 @@ dm_dp_create_fake_mst_encoder(struct amdgpu_dm_connector *connector)
 	encoder = &amdgpu_encoder->base;
 	encoder->possible_crtcs = amdgpu_dm_get_encoder_crtc_mask(adev);
 
-	drm_encoder_init(
+	kcl_drm_encoder_init(
 		dev,
 		&amdgpu_encoder->base,
 		&amdgpu_dm_encoder_funcs,

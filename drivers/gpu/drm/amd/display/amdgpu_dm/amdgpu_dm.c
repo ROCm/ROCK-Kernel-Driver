@@ -3195,7 +3195,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	case DRM_PLANE_TYPE_PRIMARY:
 		aplane->base.format_default = true;
 
-		res = drm_universal_plane_init(
+		res = kcl_drm_universal_plane_init(
 				dm->adev->ddev,
 				&aplane->base,
 				possible_crtcs,
@@ -3205,7 +3205,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 				NULL, aplane->base.type, NULL);
 		break;
 	case DRM_PLANE_TYPE_OVERLAY:
-		res = drm_universal_plane_init(
+		res = kcl_drm_universal_plane_init(
 				dm->adev->ddev,
 				&aplane->base,
 				possible_crtcs,
@@ -3215,7 +3215,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 				NULL, aplane->base.type, NULL);
 		break;
 	case DRM_PLANE_TYPE_CURSOR:
-		res = drm_universal_plane_init(
+		res = kcl_drm_universal_plane_init(
 				dm->adev->ddev,
 				&aplane->base,
 				possible_crtcs,
@@ -3256,7 +3256,7 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	if (!acrtc)
 		goto fail;
 
-	res = drm_crtc_init_with_planes(
+	res = kcl_drm_crtc_init_with_planes(
 			dm->ddev,
 			&acrtc->base,
 			plane,
@@ -3713,7 +3713,7 @@ static int amdgpu_dm_encoder_init(struct drm_device *dev,
 {
 	struct amdgpu_device *adev = dev->dev_private;
 
-	int res = drm_encoder_init(dev,
+	int res = kcl_drm_encoder_init(dev,
 				   &aencoder->base,
 				   &amdgpu_dm_encoder_funcs,
 				   DRM_MODE_ENCODER_TMDS,
