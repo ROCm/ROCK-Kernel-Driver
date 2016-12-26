@@ -8,6 +8,29 @@
 #include <drm/drm_gem.h>
 #include <drm/drm_atomic_helper.h>
 
+#ifdef BUILD_AS_DKMS
+#define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
+
+#define DP_TEST_MISC1                       0x232
+
+#define DP_TEST_PHY_PATTERN                 0x248
+#define DP_TEST_80BIT_CUSTOM_PATTERN_7_0    0x250
+#define DP_TEST_80BIT_CUSTOM_PATTERN_15_8   0x251
+#define DP_TEST_80BIT_CUSTOM_PATTERN_23_16  0x252
+#define DP_TEST_80BIT_CUSTOM_PATTERN_31_24  0x253
+#define DP_TEST_80BIT_CUSTOM_PATTERN_39_32  0x254
+#define DP_TEST_80BIT_CUSTOM_PATTERN_47_40  0x255
+#define DP_TEST_80BIT_CUSTOM_PATTERN_55_48  0x256
+#define DP_TEST_80BIT_CUSTOM_PATTERN_63_56  0x257
+#define DP_TEST_80BIT_CUSTOM_PATTERN_71_64  0x258
+#define DP_TEST_80BIT_CUSTOM_PATTERN_79_72  0x259
+
+#define DP_BRANCH_REVISION_START            0x509
+
+#define DP_DP13_DPCD_REV                    0x2200
+#define DP_DP13_MAX_LINK_RATE               0x2201
+#endif
+
 extern void (*_kcl_drm_fb_helper_cfb_fillrect)(struct fb_info *info,
 				const struct fb_fillrect *rect);
 extern void (*_kcl_drm_fb_helper_cfb_copyarea)(struct fb_info *info,
