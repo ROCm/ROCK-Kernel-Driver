@@ -166,12 +166,20 @@ int amdgpu_connector_get_monitor_bpc(struct drm_connector *connector)
 		}
 
 		/* Any defined maximum tmds clock limit we must not exceed? */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 9, 0)
+		if (connector->max_tmds_clock > 0) {
+#else
 		if (connector->display_info.max_tmds_clock > 0) {
+#endif
 			/* mode_clock is clock in kHz for mode to be modeset on this connector */
 			mode_clock = amdgpu_connector->pixelclock_for_modeset;
 
 			/* Maximum allowable input clock in kHz */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 9, 0)
+			max_tmds_clock = connector->max_tmds_clock;
+#else
 			max_tmds_clock = connector->display_info.max_tmds_clock;
+#endif
 
 			DRM_DEBUG("%s: hdmi mode dotclock %d kHz, max tmds input clock %d kHz.\n",
 				  connector->name, mode_clock, max_tmds_clock);
@@ -753,6 +761,7 @@ amdgpu_connector_lvds_detect(struct drm_connector *connector, bool force)
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 static void amdgpu_connector_unregister(struct drm_connector *connector)
 {
 	struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
@@ -762,6 +771,7 @@ static void amdgpu_connector_unregister(struct drm_connector *connector)
 		amdgpu_connector->ddc_bus->has_aux = false;
 	}
 }
+#endif
 
 static void amdgpu_connector_destroy(struct drm_connector *connector)
 {
@@ -820,7 +830,9 @@ static const struct drm_connector_funcs amdgpu_connector_lvds_funcs = {
 	.dpms = drm_helper_connector_dpms,
 	.detect = amdgpu_connector_lvds_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 	.early_unregister = amdgpu_connector_unregister,
+#endif
 	.destroy = amdgpu_connector_destroy,
 	.set_property = amdgpu_connector_set_lcd_property,
 };
@@ -935,7 +947,9 @@ static const struct drm_connector_funcs amdgpu_connector_vga_funcs = {
 	.dpms = drm_helper_connector_dpms,
 	.detect = amdgpu_connector_vga_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 	.early_unregister = amdgpu_connector_unregister,
+#endif
 	.destroy = amdgpu_connector_destroy,
 	.set_property = amdgpu_connector_set_property,
 };
@@ -1196,7 +1210,9 @@ static const struct drm_connector_funcs amdgpu_connector_dvi_funcs = {
 	.detect = amdgpu_connector_dvi_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.set_property = amdgpu_connector_set_property,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 	.early_unregister = amdgpu_connector_unregister,
+#endif
 	.destroy = amdgpu_connector_destroy,
 	.force = amdgpu_connector_dvi_force,
 };
@@ -1478,7 +1494,9 @@ static const struct drm_connector_funcs amdgpu_connector_dp_funcs = {
 	.detect = amdgpu_connector_dp_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.set_property = amdgpu_connector_set_property,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 	.early_unregister = amdgpu_connector_unregister,
+#endif
 	.destroy = amdgpu_connector_destroy,
 	.force = amdgpu_connector_dvi_force,
 };
@@ -1488,7 +1506,9 @@ static const struct drm_connector_funcs amdgpu_connector_edp_funcs = {
 	.detect = amdgpu_connector_dp_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.set_property = amdgpu_connector_set_lcd_property,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 	.early_unregister = amdgpu_connector_unregister,
+#endif
 	.destroy = amdgpu_connector_destroy,
 	.force = amdgpu_connector_dvi_force,
 };
