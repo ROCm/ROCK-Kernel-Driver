@@ -3,12 +3,14 @@
 #include <linux/module.h>
 
 extern void amdkcl_symbol_init(void);
+extern void amdkcl_io_init(void);
 extern void amdkcl_kthread_init(void);
 extern int amdkcl_workqueue_init_early(void);
 
 int __init amdkcl_init(void)
 {
 	amdkcl_symbol_init();
+	amdkcl_io_init();
 	amdkcl_kthread_init();
 	amdkcl_workqueue_init_early();
 
