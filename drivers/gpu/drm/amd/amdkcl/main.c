@@ -4,6 +4,7 @@
 extern void amdkcl_dev_cgroup_init(void);
 extern void amdkcl_reservation_init(void);
 extern void amdkcl_fence_init(void);
+extern void amdkcl_io_init(void);
 
 
 int __init amdkcl_init(void)
@@ -11,6 +12,7 @@ int __init amdkcl_init(void)
 	amdkcl_dev_cgroup_init();
 	amdkcl_reservation_init();
 	amdkcl_fence_init();
+	amdkcl_io_init();
 	return 0;
 }
 module_init(amdkcl_init);
