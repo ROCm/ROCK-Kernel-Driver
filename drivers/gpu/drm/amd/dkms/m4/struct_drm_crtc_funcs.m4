@@ -23,6 +23,41 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP], [
 	])
 ])
 
+dnl #
+dnl # v4.11-rc3-945-g41292b1fa13a
+dnl # drm: Add acquire ctx parameter to ->page_flip(_target)
+dnl #
+AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_crtc.h>
+		], [
+			struct drm_crtc_funcs *funcs = NULL;
+			funcs->page_flip_target(NULL, NULL, NULL, 0, 0, NULL);
+		], [
+			AC_DEFINE(HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET_CTX, 1,
+				[drm_crtc_funcs->page_flip_target() wants ctx parameter])
+			AC_DEFINE(HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET, 1,
+				[drm_crtc_funcs->page_flip_target() is available])
+		], [
+			dnl #
+			dnl # v4.8-rc1-112-gc229bfbbd04a
+			dnl # drm: Add page_flip_target CRTC hook v2
+			dnl #
+			AC_KERNEL_TRY_COMPILE([
+				#include <drm/drm_crtc.h>
+			], [
+				struct drm_crtc_funcs *funcs = NULL;
+				funcs->page_flip_target(NULL, NULL, NULL, 0, 0);
+			], [
+				AC_DEFINE(HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET, 1,
+					[drm_crtc_funcs->page_flip_target() is available])
+			])
+		])
+	])
+])
+
 AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS], [
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
+	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET
 ])
