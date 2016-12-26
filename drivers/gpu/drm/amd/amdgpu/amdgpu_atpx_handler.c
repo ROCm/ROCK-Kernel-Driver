@@ -605,16 +605,20 @@ static bool amdgpu_atpx_detect(void)
 	struct pci_dev *pdev = NULL;
 	bool has_atpx = false;
 	int vga_count = 0;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 	bool d3_supported = false;
 	struct pci_dev *parent_pdev;
+#endif
 
 	while ((pdev = pci_get_class(PCI_CLASS_DISPLAY_VGA << 8, pdev)) != NULL) {
 		vga_count++;
 
 		has_atpx |= (amdgpu_atpx_pci_probe_handle(pdev) == true);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 		parent_pdev = pci_upstream_bridge(pdev);
 		d3_supported |= parent_pdev && parent_pdev->bridge_d3;
+#endif
 		amdgpu_atpx_get_quirks(pdev);
 	}
 
@@ -623,8 +627,10 @@ static bool amdgpu_atpx_detect(void)
 
 		has_atpx |= (amdgpu_atpx_pci_probe_handle(pdev) == true);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 		parent_pdev = pci_upstream_bridge(pdev);
 		d3_supported |= parent_pdev && parent_pdev->bridge_d3;
+#endif
 		amdgpu_atpx_get_quirks(pdev);
 	}
 
@@ -633,7 +639,9 @@ static bool amdgpu_atpx_detect(void)
 		pr_info("vga_switcheroo: detected switching method %s handle\n",
 			acpi_method_name);
 		amdgpu_atpx_priv.atpx_detected = true;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 		amdgpu_atpx_priv.bridge_pm_usable = d3_supported;
+#endif
 		amdgpu_atpx_init();
 		return true;
 	}
