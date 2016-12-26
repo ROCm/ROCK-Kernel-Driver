@@ -456,7 +456,11 @@ void amdgpu_fence_slab_fini(void);
  */
 
 struct amdgpu_flip_work {
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET
 	struct delayed_work		flip_work;
+#else
+	struct work_struct		flip_work;
+#endif
 	struct work_struct		unpin_work;
 	struct amdgpu_device		*adev;
 	int				crtc_id;
