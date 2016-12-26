@@ -8,5 +8,6 @@
 #include <kcl/kcl_vga_switcheroo.h>
 #include <kcl/kcl_fence_array.h>
 #include <kcl/kcl_kthread.h>
+#include <kcl/kcl_io.h>
 
 #endif /* AMDGPU_BACKPORT_H */
