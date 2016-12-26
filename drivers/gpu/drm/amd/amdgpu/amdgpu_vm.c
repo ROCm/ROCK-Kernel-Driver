@@ -326,7 +326,7 @@ static void amdgpu_vm_bo_base_init(struct amdgpu_vm_bo_base *base,
 	base->next = bo->vm_bo;
 	bo->vm_bo = base;
 
-	if (bo->tbo.base.resv != amdkcl_ttm_resvp(&vm->root.base.bo->tbo))
+	if (amdkcl_ttm_resvp(&bo->tbo) != amdkcl_ttm_resvp(&vm->root.base.bo->tbo))
 		return;
 
 	vm->bulk_moveable = false;
@@ -616,7 +616,7 @@ void amdgpu_vm_del_from_lru_notify(struct ttm_buffer_object *bo)
 	for (bo_base = abo->vm_bo; bo_base; bo_base = bo_base->next) {
 		struct amdgpu_vm *vm = bo_base->vm;
 
-		if (abo->tbo.base.resv == amdkcl_ttm_resvp(&vm->root.base.bo->tbo))
+		if (amdkcl_ttm_resvp(&abo->tbo) == amdkcl_ttm_resvp(&vm->root.base.bo->tbo))
 			vm->bulk_moveable = false;
 	}
 

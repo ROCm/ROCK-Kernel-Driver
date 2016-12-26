@@ -400,7 +400,11 @@ void amdgpu_fence_slab_fini(void);
  */
 
 struct amdgpu_flip_work {
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
 	struct delayed_work		flip_work;
+#else
+	struct work_struct		flip_work;
+#endif
 	struct work_struct		unpin_work;
 	struct amdgpu_device		*adev;
 	int				crtc_id;
