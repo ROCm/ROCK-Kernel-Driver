@@ -36,6 +36,11 @@ int drm_atomic_helper_resume(struct drm_device *dev,
 			     struct drm_atomic_state *state);
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+extern int drm_crtc_force_disable(struct drm_crtc *crtc);
+extern int drm_crtc_force_disable_all(struct drm_device *dev);
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
 static inline int
 drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
