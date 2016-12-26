@@ -36,7 +36,9 @@
 #include <drm/ttm/ttm_placement.h>
 #include <drm/drm_vma_manager.h>
 #include <linux/mm.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
 #include <linux/pfn_t.h>
+#endif
 #include <linux/rbtree.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
@@ -268,8 +270,16 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 		}
 
 		if (vma->vm_flags & VM_MIXEDMAP)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4_5) || \
+	defined(OS_NAME_SLE)
 			ret = vmf_insert_mixed(&cvma, address,
-					__pfn_to_pfn_t(pfn, PFN_DEV));
+			__pfn_to_pfn_t(pfn, PFN_DEV ));
+#else
+			ret = vmf_insert_mixed(&cvma, address,
+					pfn);
+#endif
 		else
 			ret = vmf_insert_pfn(&cvma, address, pfn);
 
