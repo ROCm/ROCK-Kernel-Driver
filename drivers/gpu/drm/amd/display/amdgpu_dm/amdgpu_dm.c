@@ -4160,7 +4160,13 @@ static bool adjust_colour_depth_from_display_info(
 			/* The above depths are the only ones valid for HDMI. */
 			return false;
 		}
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 9, 0)
+		struct drm_connector * connector = container_of(info, struct drm_connector, display_info);
+		if (normalized_clk <= connector->max_tmds_clock) {
+#else
 		if (normalized_clk <= info->max_tmds_clock) {
+#endif
 			timing_out->display_color_depth = depth;
 			return true;
 		}
@@ -4968,6 +4974,7 @@ amdgpu_dm_connector_atomic_duplicate_state(struct drm_connector *connector)
 	return &new_state->base;
 }
 
+#if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 static int
 amdgpu_dm_connector_late_register(struct drm_connector *connector)
 {
@@ -4980,6 +4987,7 @@ amdgpu_dm_connector_late_register(struct drm_connector *connector)
 
 	return 0;
 }
+#endif
 
 static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
 	.reset = amdgpu_dm_connector_funcs_reset,
@@ -8379,8 +8387,6 @@ dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 #else
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
 #endif
-		struct dc_scaling_info scaling_info;
-		struct dc_stream_update stream_update;
 
 		memset(bundle, 0, sizeof(struct surface_info_bundle));
 
@@ -8824,9 +8830,13 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		 * dc_validate_global_state(), or there is a chance
 		 * to get stuck in an infinite loop and hang eventually.
 		 */
+#ifdef HAVE_DRM_DP_MST_ATOMIC_CHECK
+#if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 		ret = drm_dp_mst_atomic_check(state);
 		if (ret)
 			goto fail;
+#endif
+#endif
 
 		if (dc_validate_global_state(dc, dm_state->context, false) != DC_OK) {
 			ret = -EINVAL;
