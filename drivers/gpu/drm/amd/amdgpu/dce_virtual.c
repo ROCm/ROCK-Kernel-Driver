@@ -124,6 +124,8 @@ static const struct drm_crtc_funcs dce_virtual_crtc_funcs = {
 	.destroy = dce_virtual_crtc_destroy,
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
 	.page_flip_target = amdgpu_display_crtc_page_flip_target,
+#else
+	.page_flip = amdgpu_crtc_page_flip,
 #endif
 };
 
