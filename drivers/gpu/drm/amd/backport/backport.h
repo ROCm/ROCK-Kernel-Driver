@@ -34,4 +34,6 @@
 #include <kcl/kcl_kthread.h>
 #include <kcl/kcl_firmware.h>
 #include <kcl/kcl_timekeeping.h>
+#include <kcl/kcl_io.h>
+
 #endif /* AMDGPU_BACKPORT_H */
