@@ -44,7 +44,9 @@ struct amdgpu_atpx {
 
 static struct amdgpu_atpx_priv {
 	bool atpx_detected;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 	bool bridge_pm_usable;
+#endif
 	unsigned int quirks;
 	/* handle for device - and atpx */
 	acpi_handle dhandle;
@@ -222,11 +224,18 @@ static int amdgpu_atpx_validate(struct amdgpu_atpx *atpx)
 			atpx->is_hybrid = false;
 		} else {
 			printk("ATPX Hybrid Graphics\n");
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 			/*
 			 * Disable legacy PM methods only when pcie port PM is usable,
 			 * otherwise the device might fail to power off or power on.
 			 */
 			atpx->functions.power_cntl = !amdgpu_atpx_priv.bridge_pm_usable;
+#else
+			/*
+			 * This is a temporary hack for the kernel doesn't support D3.
+			 */
+			atpx->functions.power_cntl = true;
+#endif
 			atpx->is_hybrid = true;
 		}
 	}
