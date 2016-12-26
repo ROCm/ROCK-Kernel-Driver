@@ -3882,8 +3882,14 @@ static void adjust_colour_depth_from_display_info(struct dc_crtc_timing *timing_
 		default:
 			return;
 		}
+#if DRM_VERSION_CODE > DRM_VERSION(4, 9, 0)
 		if (normalized_clk <= info->max_tmds_clock)
 			return;
+#else
+		struct drm_connector * connector = container_of(info, struct drm_connector, display_info);
+		if (normalized_clk <= connector->max_tmds_clock)
+			return;
+#endif
 		reduce_mode_colour_depth(timing_out);
 
 	} while (timing_out->display_color_depth > COLOR_DEPTH_888);
