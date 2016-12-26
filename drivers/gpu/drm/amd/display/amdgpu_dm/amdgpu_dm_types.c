@@ -2542,7 +2542,11 @@ int amdgpu_dm_atomic_commit(
 	 * the software side now.
 	 */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+	drm_atomic_helper_swap_state(dev, state);
+#else
 	drm_atomic_helper_swap_state(state, true);
+#endif
 
 	/*
 	 * From this point state become old state really. New state is
