@@ -2506,7 +2506,11 @@ static const struct drm_crtc_funcs dce_v10_0_crtc_funcs = {
 	.gamma_set = dce_v10_0_crtc_gamma_set,
 	.set_config = amdgpu_display_crtc_set_config,
 	.destroy = dce_v10_0_crtc_destroy,
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET
 	.page_flip_target = amdgpu_display_crtc_page_flip_target,
+#else
+	.page_flip = amdgpu_crtc_page_flip,
+#endif
 #ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
 	.get_vblank_counter = amdgpu_get_vblank_counter_kms,
 	.enable_vblank = amdgpu_enable_vblank_kms,
