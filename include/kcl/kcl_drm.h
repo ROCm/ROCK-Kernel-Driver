@@ -36,6 +36,19 @@ int drm_atomic_helper_resume(struct drm_device *dev,
 			     struct drm_atomic_state *state);
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+static inline int
+drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
+					      const char *name, bool primary)
+{
+#if IS_REACHABLE(CONFIG_FB)
+	return remove_conflicting_framebuffers(a, name, primary);
+#else
+	return 0;
+#endif
+}
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)  && \
 	!defined(OS_NAME_UBUNTU)
 extern int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw);
