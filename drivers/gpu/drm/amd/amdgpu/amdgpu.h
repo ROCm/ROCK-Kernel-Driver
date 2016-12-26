@@ -607,7 +607,11 @@ void amdgpu_doorbell_get_kfd_info(struct amdgpu_device *adev,
  */
 
 struct amdgpu_flip_work {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 	struct delayed_work		flip_work;
+#else
+	struct work_struct		flip_work;
+#endif
 	struct work_struct		unpin_work;
 	struct amdgpu_device		*adev;
 	int				crtc_id;

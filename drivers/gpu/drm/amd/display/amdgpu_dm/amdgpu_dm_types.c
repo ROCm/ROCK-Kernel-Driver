@@ -2796,11 +2796,18 @@ int amdgpu_dm_atomic_commit(
 			continue;
 
 		if (page_flip_needed(plane_state, old_plane_state, false)) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 			ret = amdgpu_crtc_page_flip_target(crtc,
 							   fb,
 							   crtc->state->event,
 							   acrtc->flip_flags,
 							   drm_crtc_vblank_count(crtc));
+#else
+			ret = amdgpu_crtc_page_flip(crtc,
+						    fb,
+						    crtc->state->event,
+						    acrtc->flip_flags);
+#endif
 			/*clean up the flags for next usage*/
 			acrtc->flip_flags = 0;
 			if (ret)
