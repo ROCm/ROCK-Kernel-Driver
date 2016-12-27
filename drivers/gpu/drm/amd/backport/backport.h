@@ -17,6 +17,7 @@
 #include <kcl/kcl_io.h>
 #include <kcl/kcl_mn.h>
 #include <kcl/kcl_acpi.h>
+#include <kcl/kcl_device.h>
 #include <kcl/kcl_drm_global.h>
 #include <kcl/kcl_kernel.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 7, 0)
