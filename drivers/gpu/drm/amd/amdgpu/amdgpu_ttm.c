@@ -2035,7 +2035,7 @@ static const struct drm_info_list amdgpu_ttm_dgma_debugfs_list[] = {
 static ssize_t amdgpu_ttm_vram_read(struct file *f, char __user *buf,
 				    size_t size, loff_t *pos)
 {
-	struct amdgpu_device *adev = file_inode(f)->i_private;
+	struct amdgpu_device *adev = (struct amdgpu_device *)kcl_file_private(f);
 	ssize_t result = 0;
 	int r;
 
@@ -2122,7 +2122,7 @@ static const struct file_operations amdgpu_ttm_vram_fops = {
 static ssize_t amdgpu_ttm_gtt_read(struct file *f, char __user *buf,
 				   size_t size, loff_t *pos)
 {
-	struct amdgpu_device *adev = file_inode(f)->i_private;
+	struct amdgpu_device *adev = (struct amdgpu_device *)kcl_file_private(f);
 	ssize_t result = 0;
 	int r;
 

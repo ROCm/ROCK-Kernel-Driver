@@ -471,7 +471,7 @@ void amdgpu_ring_lru_touch(struct amdgpu_device *adev, struct amdgpu_ring *ring)
 static ssize_t amdgpu_debugfs_ring_read(struct file *f, char __user *buf,
 					size_t size, loff_t *pos)
 {
-	struct amdgpu_ring *ring = file_inode(f)->i_private;
+	struct amdgpu_ring *ring = (struct amdgpu_ring*)kcl_file_private(f);
 	int r, i;
 	uint32_t value, result, early[3];
 
