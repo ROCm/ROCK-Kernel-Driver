@@ -15,5 +15,6 @@
 #include <kcl/kcl_device.h>
 #include <kcl/kcl_hwmon.h>
 #include <kcl/kcl_fs.h>
+#include <kcl/kcl_tracepoint.h>
 
 #endif /* AMDGPU_BACKPORT_H */
