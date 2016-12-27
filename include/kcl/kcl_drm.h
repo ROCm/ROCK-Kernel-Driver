@@ -51,9 +51,11 @@ int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx);
 int drm_atomic_helper_disable_all(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx);
+#ifndef OS_NAME_RHEL_6
 struct drm_atomic_state *
 drm_atomic_helper_duplicate_state(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx);
+#endif
 struct drm_atomic_state *drm_atomic_helper_suspend(struct drm_device *dev);
 int drm_atomic_helper_resume(struct drm_device *dev,
 			     struct drm_atomic_state *state);
@@ -269,7 +271,8 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 					  const struct drm_crtc *refcrtc,
 					  const struct drm_display_mode *mode)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && \
+	!defined(OS_NAME_RHEL_6)
 	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
 						     flags, refcrtc, mode);
 #else
