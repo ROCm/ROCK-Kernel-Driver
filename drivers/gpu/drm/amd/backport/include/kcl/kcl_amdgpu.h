@@ -5,7 +5,8 @@
 #include <amdgpu.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0) || \
-		defined(OS_NAME_RHEL_6)
+		defined(OS_NAME_RHEL_6) || \
+		defined(OS_NAME_RHEL_7_3)
 u32 kcl_amdgpu_get_vblank_counter_kms(struct drm_device *dev, unsigned int crtc);
 int kcl_amdgpu_enable_vblank_kms(struct drm_device *dev, unsigned int crtc);
 void kcl_amdgpu_disable_vblank_kms(struct drm_device *dev, unsigned int crtc);
