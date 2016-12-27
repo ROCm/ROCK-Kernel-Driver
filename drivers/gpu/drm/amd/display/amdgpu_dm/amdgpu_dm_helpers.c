@@ -341,6 +341,9 @@ bool dm_helpers_dp_mst_start_top_mgr(
 		const struct dc_link *link,
 		bool boot)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
+		defined(OS_NAME_RHEL_7_3) || \
+		defined(OS_NAME_RHEL_7_4)
 	struct amdgpu_dm_connector *aconnector = link->priv;
 
 	if (!aconnector) {
@@ -358,12 +361,18 @@ bool dm_helpers_dp_mst_start_top_mgr(
 			aconnector, aconnector->base.base.id);
 
 	return (drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, true) == 0);
+#else
+	return false;
+#endif
 }
 
 void dm_helpers_dp_mst_stop_top_mgr(
 		struct dc_context *ctx,
 		const struct dc_link *link)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
+		defined(OS_NAME_RHEL_7_3) || \
+		defined(OS_NAME_RHEL_7_4)
 	struct amdgpu_dm_connector *aconnector = link->priv;
 
 	if (!aconnector) {
@@ -376,6 +385,7 @@ void dm_helpers_dp_mst_stop_top_mgr(
 
 	if (aconnector->mst_mgr.mst_state == true)
 		drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, false);
+#endif
 }
 
 bool dm_helpers_dp_read_dpcd(
