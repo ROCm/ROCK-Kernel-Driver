@@ -3,6 +3,21 @@
 
 #include <linux/vga_switcheroo.h>
 
+/**
+ * arg change in mainline kernel 3.12
+ * but only affect RHEL6 without backport
+ */
+static inline int kcl_vga_switcheroo_register_client(struct pci_dev *dev,
+						     const struct vga_switcheroo_client_ops *ops,
+						     bool driver_power_control)
+{
+#if defined(OS_NAME_RHEL_6)
+	return vga_switcheroo_register_client(dev, ops);
+#else
+	return vga_switcheroo_register_client(dev, ops, driver_power_control);
+#endif
+}
+
 #if defined(CONFIG_VGA_SWITCHEROO)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
 static inline int kcl_vga_switcheroo_register_handler(struct vga_switcheroo_handler *handler,
