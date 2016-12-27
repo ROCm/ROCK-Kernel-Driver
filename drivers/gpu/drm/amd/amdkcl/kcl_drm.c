@@ -384,6 +384,7 @@ free:
 }
 EXPORT_SYMBOL(drm_atomic_helper_disable_all);
 
+#ifndef OS_NAME_RHEL_6
 struct drm_atomic_state *
 drm_atomic_helper_duplicate_state(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx)
@@ -442,6 +443,7 @@ free:
 	return state;
 }
 EXPORT_SYMBOL(drm_atomic_helper_duplicate_state);
+#endif
 
 struct drm_atomic_state *drm_atomic_helper_suspend(struct drm_device *dev)
 {
