@@ -46,7 +46,7 @@ extern void
 					      struct drm_atomic_state *old_state);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
-	!defined(OS_NAME_UBUNTU)
+	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3)
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx);
 int drm_atomic_helper_disable_all(struct drm_device *dev,
@@ -80,7 +80,7 @@ drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)  && \
-	!defined(OS_NAME_UBUNTU)
+	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3)
 extern int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw);
 #endif
 
@@ -184,7 +184,7 @@ static inline int kcl_drm_encoder_init(struct drm_device *dev,
 		      const struct drm_encoder_funcs *funcs,
 		      int encoder_type, const char *name, ...)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3)
 	return drm_encoder_init(dev, encoder, funcs,
 			 encoder_type, name);
 #else
@@ -199,7 +199,7 @@ static inline int kcl_drm_crtc_init_with_planes(struct drm_device *dev, struct d
 			      const struct drm_crtc_funcs *funcs,
 			      const char *name, ...)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3)
 		return drm_crtc_init_with_planes(dev, crtc, primary,
 				 cursor, funcs, name);
 #else
@@ -215,7 +215,7 @@ static inline int kcl_drm_universal_plane_init(struct drm_device *dev, struct dr
 			     enum drm_plane_type type,
 			     const char *name, ...)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3)
 		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
 				 formats, format_count, type, name);
 #else
@@ -272,7 +272,8 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 					  const struct drm_display_mode *mode)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && \
-	!defined(OS_NAME_RHEL_6)
+	!defined(OS_NAME_RHEL_6) && \
+	!defined(OS_NAME_RHEL_7_3)
 	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
 						     flags, refcrtc, mode);
 #else
