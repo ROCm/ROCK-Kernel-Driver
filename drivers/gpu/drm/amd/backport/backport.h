@@ -13,5 +13,6 @@
 #include <kcl/kcl_reservation.h>
 #include <kcl/kcl_acpi.h>
 #include <kcl/kcl_device.h>
+#include <kcl/kcl_hwmon.h>
 
 #endif /* AMDGPU_BACKPORT_H */

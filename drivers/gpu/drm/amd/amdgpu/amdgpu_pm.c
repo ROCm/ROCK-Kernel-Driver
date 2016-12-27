@@ -1132,7 +1132,7 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 			return 0;
 	}
 
-	adev->pm.int_hwmon_dev = hwmon_device_register_with_groups(adev->dev,
+	adev->pm.int_hwmon_dev = kcl_hwmon_device_register_with_groups(adev->dev,
 								   DRIVER_NAME, adev,
 								   hwmon_groups);
 	if (IS_ERR(adev->pm.int_hwmon_dev)) {
