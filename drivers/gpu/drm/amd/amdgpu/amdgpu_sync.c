@@ -134,7 +134,13 @@ static bool amdgpu_sync_add_later(struct amdgpu_sync *sync, struct dma_fence *f,
 {
 	struct amdgpu_sync_entry *e;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_possible(sync->fences, e, node, node, f->context) {
+#else
 	hash_for_each_possible(sync->fences, e, node, f->context) {
+#endif
 		if (unlikely(e->fence->context != f->context))
 			continue;
 
@@ -263,7 +269,12 @@ struct dma_fence *amdgpu_sync_peek_fence(struct amdgpu_sync *sync,
 	struct hlist_node *tmp;
 	int i;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+	hash_for_each_safe(sync->fences, i, node, tmp, e, node) {
+#else
 	hash_for_each_safe(sync->fences, i, tmp, e, node) {
+#endif
 		struct dma_fence *f = e->fence;
 		struct drm_sched_fence *s_fence = to_drm_sched_fence(f);
 
@@ -305,7 +316,12 @@ struct dma_fence *amdgpu_sync_get_fence(struct amdgpu_sync *sync, bool *explicit
 	struct hlist_node *tmp;
 	struct dma_fence *f;
 	int i;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+	hash_for_each_safe(sync->fences, i, node, tmp, e, node) {
+#else
 	hash_for_each_safe(sync->fences, i, tmp, e, node) {
+#endif
 
 		f = e->fence;
 		if (explicit)
@@ -338,7 +354,12 @@ int amdgpu_sync_clone(struct amdgpu_sync *source, struct amdgpu_sync *clone)
 	struct dma_fence *f;
 	int i, r;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+	hash_for_each_safe(source->fences, i, node, tmp, e, node) {
+#else
 	hash_for_each_safe(source->fences, i, tmp, e, node) {
+#endif
 		f = e->fence;
 		if (!dma_fence_is_signaled(f)) {
 			r = amdgpu_sync_fence(NULL, clone, f, e->explicit);
@@ -362,8 +383,12 @@ int amdgpu_sync_wait(struct amdgpu_sync *sync, bool intr)
 	struct amdgpu_sync_entry *e;
 	struct hlist_node *tmp;
 	int i, r;
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+	hash_for_each_safe(sync->fences, i, node, tmp, e, node) {
+#else
 	hash_for_each_safe(sync->fences, i, tmp, e, node) {
+#endif
 		r = dma_fence_wait(e->fence, intr);
 		if (r)
 			return r;
@@ -388,8 +413,12 @@ void amdgpu_sync_free(struct amdgpu_sync *sync)
 	struct amdgpu_sync_entry *e;
 	struct hlist_node *tmp;
 	unsigned i;
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+	hash_for_each_safe(sync->fences, i, node, tmp, e, node) {
+#else
 	hash_for_each_safe(sync->fences, i, tmp, e, node) {
+#endif
 		hash_del(&e->node);
 		dma_fence_put(e->fence);
 		kmem_cache_free(amdgpu_sync_slab, e);
