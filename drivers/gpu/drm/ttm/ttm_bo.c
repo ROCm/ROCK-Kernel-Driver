@@ -1615,7 +1615,7 @@ int ttm_bo_wait(struct ttm_buffer_object *bo,
 	long timeout = 15 * HZ;
 
 	if (no_wait) {
-		if (reservation_object_test_signaled_rcu(bo->resv, true))
+		if (kcl_reservation_object_test_signaled_rcu(bo->resv, true))
 			return 0;
 		else
 			return -EBUSY;
