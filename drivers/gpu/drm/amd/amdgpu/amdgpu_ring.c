@@ -398,7 +398,7 @@ void amdgpu_ring_emit_reg_write_reg_wait_helper(struct amdgpu_ring *ring,
 static ssize_t amdgpu_debugfs_ring_read(struct file *f, char __user *buf,
 					size_t size, loff_t *pos)
 {
-	struct amdgpu_ring *ring = file_inode(f)->i_private;
+	struct amdgpu_ring *ring = (struct amdgpu_ring*)kcl_file_private(f);
 	int r, i;
 	uint32_t value, result, early[3];
 
