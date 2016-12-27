@@ -1703,7 +1703,8 @@ static bool page_flip_needed(
 	return page_flip_required;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && \
+	!defined(OS_NAME_RHEL_6)
 static int dm_plane_helper_prepare_fb(
 	struct drm_plane *plane,
 	struct drm_framebuffer *fb,
@@ -1744,7 +1745,8 @@ static int dm_plane_helper_prepare_fb(
 	return 0;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && \
+	!defined(OS_NAME_RHEL_6)
 static void dm_plane_helper_cleanup_fb(
 	struct drm_plane *plane,
 	struct drm_framebuffer *fb,
