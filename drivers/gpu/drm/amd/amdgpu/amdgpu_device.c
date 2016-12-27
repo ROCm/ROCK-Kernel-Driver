@@ -1745,7 +1745,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		runtime = true;
 	if (amdgpu_device_is_px(ddev))
 		runtime = true;
-	vga_switcheroo_register_client(adev->pdev, &amdgpu_switcheroo_ops, runtime);
+	kcl_vga_switcheroo_register_client(adev->pdev, &amdgpu_switcheroo_ops, runtime);
 	if (runtime)
 		vga_switcheroo_init_domain_pm_ops(adev->dev, &adev->vga_pm_domain);
 
