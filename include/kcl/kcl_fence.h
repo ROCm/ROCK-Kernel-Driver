@@ -18,7 +18,7 @@ extern signed long _kcl_fence_wait_timeout(struct fence *fence, bool intr,
 				signed long timeout);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && !defined(OS_NAME_RHEL_7_3)
 static inline bool fence_is_later(struct fence *f1, struct fence *f2)
 {
 	if (WARN_ON(f1->context != f2->context))
