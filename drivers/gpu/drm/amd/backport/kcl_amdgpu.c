@@ -1,6 +1,7 @@
 #include <kcl/kcl_amdgpu.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0) || \
+		defined(OS_NAME_RHEL_6)
 u32 kcl_amdgpu_get_vblank_counter_kms(struct drm_device *dev, unsigned int crtc)
 {
 	return amdgpu_get_vblank_counter_kms(dev, crtc);
