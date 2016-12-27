@@ -49,7 +49,7 @@ EXPORT_SYMBOL(drm_crtc_force_disable_all);
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
-	!defined(OS_NAME_UBUNTU)
+	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3)
 int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw)
 {
 	struct pci_dev *root;
@@ -317,7 +317,7 @@ _kcl_drm_atomic_helper_update_legacy_modeset_state_stub(struct drm_device *dev,
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
-	!defined(OS_NAME_UBUNTU)
+	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3)
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx)
 {
