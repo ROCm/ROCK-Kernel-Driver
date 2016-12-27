@@ -25,7 +25,11 @@
 #define __AMDGPU_VM_H__
 
 #include <linux/idr.h>
+#if defined(OS_NAME_RHEL_6)
+#include <linux/kfifo-new.h>
+#else
 #include <linux/kfifo.h>
+#endif
 #include <linux/rbtree.h>
 #include <drm/gpu_scheduler.h>
 #include <drm/drm_file.h>
