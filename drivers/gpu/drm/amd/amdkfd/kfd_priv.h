@@ -32,7 +32,11 @@
 #include <linux/spinlock.h>
 #include <linux/kfd_ioctl.h>
 #include <linux/idr.h>
+#ifdef OS_NAME_RHEL_6
+#include <linux/kfifo-new.h>
+#else
 #include <linux/kfifo.h>
+#endif
 #include <linux/seq_file.h>
 #include <linux/kref.h>
 #include <kgd_kfd_interface.h>
