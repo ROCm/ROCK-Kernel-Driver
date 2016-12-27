@@ -1883,7 +1883,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 	if (!pci_is_thunderbolt_attached(adev->pdev))
 #endif
-		vga_switcheroo_register_client(adev->pdev,
+		kcl_vga_switcheroo_register_client(adev->pdev,
 					       &amdgpu_switcheroo_ops, runtime);
 	if (runtime)
 		vga_switcheroo_init_domain_pm_ops(adev->dev, &adev->vga_pm_domain);
