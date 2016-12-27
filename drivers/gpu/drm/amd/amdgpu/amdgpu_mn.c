@@ -200,6 +200,9 @@ static struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev)
 	struct mm_struct *mm = current->mm;
 	struct amdgpu_mn *rmn;
 	int r;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+#endif
 
 	mutex_lock(&adev->mn_lock);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
@@ -211,7 +214,11 @@ static struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev)
 	}
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	hash_for_each_possible(adev->mn_hash, rmn, node, node, (unsigned long)mm)
+#else
 	hash_for_each_possible(adev->mn_hash, rmn, node, (unsigned long)mm)
+#endif
 		if (rmn->mm == mm)
 			goto release_locks;
 
