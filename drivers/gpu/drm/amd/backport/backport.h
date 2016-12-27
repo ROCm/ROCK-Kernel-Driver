@@ -13,6 +13,7 @@
 #include <kcl/kcl_fence_array.h>
 #include <kcl/kcl_kthread.h>
 #include <kcl/kcl_io.h>
+#include <kcl/kcl_mn.h>
 #include <kcl/kcl_reservation.h>
 #include <kcl/kcl_drm_global.h>
 #include <kcl/kcl_kernel.h>
