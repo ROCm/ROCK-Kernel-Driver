@@ -3189,7 +3189,8 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 static int dm_plane_helper_prepare_fb(
 	struct drm_plane *plane,
 	struct drm_plane_state *new_state)
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0) || \
+	defined(OS_NAME_RHEL_6)
 static int dm_plane_helper_prepare_fb(
 	struct drm_plane *plane,
 	const struct drm_plane_state *new_state)
@@ -3270,7 +3271,8 @@ static int dm_plane_helper_prepare_fb(
 static void dm_plane_helper_cleanup_fb(
 	struct drm_plane *plane,
 	struct drm_plane_state *old_state)
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0) || \
+	defined(OS_NAME_RHEL_6)
 static void dm_plane_helper_cleanup_fb(
 	struct drm_plane *plane,
 	const struct drm_plane_state *old_state)
