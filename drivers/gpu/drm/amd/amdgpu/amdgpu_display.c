@@ -773,7 +773,7 @@ uint32_t amdgpu_display_framebuffer_domains(struct amdgpu_device *adev)
 
 int amdgpu_display_framebuffer_init(struct drm_device *dev,
 				    struct amdgpu_framebuffer *rfb,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3)
 				    struct drm_mode_fb_cmd2 *mode_cmd,
 #else
 				    const struct drm_mode_fb_cmd2 *mode_cmd,
@@ -798,7 +798,7 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 struct drm_framebuffer *
 amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 				       struct drm_file *file_priv,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3)
 				       struct drm_mode_fb_cmd2 *mode_cmd)
 #else
 				       const struct drm_mode_fb_cmd2 *mode_cmd)
