@@ -20,7 +20,6 @@
 #include <linux/of.h>
 #include <linux/of_fdt.h>
 #include <linux/platform_device.h>
-#include <linux/pci.h>
 #include <linux/screen_info.h>
 
 #include <asm/efi.h>
@@ -63,41 +62,6 @@ static __initdata efi_config_table_type_t arch_tables[] = {
 	{NULL_GUID, NULL, NULL}
 };
 
-#ifdef CONFIG_PCI
-static bool efi_pci_overlaps_efifb(struct pci_bar_update_info *update_info)
-{
-	/* is the screen_info frame buffer inside the pci BAR? */
-	if (screen_info.lfb_base >= update_info->old_start &&
-	    (screen_info.lfb_base + screen_info.lfb_size) <=
-	     (update_info->old_start + update_info->size))
-		return true;
-
-	return false;
-}
-
-static int efi_pci_notifier(struct notifier_block *self,
-			    unsigned long cmd, void *v)
-{
-	struct pci_bar_update_info *update_info = v;
-
-	/*
-	 * When we reallocate a BAR that contains our frame buffer, set the
-	 * screen_info base to where it belongs
-	 */
-	if (efi_pci_overlaps_efifb(update_info)) {
-		u64 diff = (update_info->new_start - update_info->old_start);
-		screen_info.lfb_base += diff;
-	}
-
-	return NOTIFY_OK;
-}
-static struct notifier_block efi_pci_notifier_block = {
-	.notifier_call = efi_pci_notifier,
-};
-#else
-#define pci_notify_on_update_resource(a)
-#endif
-
 static void __init init_screen_info(void)
 {
 	struct screen_info *si;
@@ -114,10 +78,6 @@ static void __init init_screen_info(void)
 		/* dummycon on ARM needs non-zero values for columns/lines */
 		screen_info.orig_video_cols = 80;
 		screen_info.orig_video_lines = 25;
-	}
-
-	if (screen_info.orig_video_isVGA == VIDEO_TYPE_EFI) {
-		pci_notify_on_update_resource(&efi_pci_notifier_block);
 	}
 
 	if (screen_info.orig_video_isVGA == VIDEO_TYPE_EFI &&
@@ -284,8 +244,10 @@ void __init efi_init(void)
 	     "Unexpected EFI_MEMORY_DESCRIPTOR version %ld",
 	      efi.memmap.desc_version);
 
-	if (uefi_init() < 0)
+	if (uefi_init() < 0) {
+		efi_memmap_unmap();
 		return;
+	}
 
 	reserve_regions();
 	efi_memattr_init();

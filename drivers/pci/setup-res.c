@@ -23,28 +23,20 @@
 #include <linux/ioport.h>
 #include <linux/cache.h>
 #include <linux/slab.h>
-#include <linux/notifier.h>
 #include "pci.h"
 
-static RAW_NOTIFIER_HEAD(bar_update_chain);
-
-void pci_update_resource(struct pci_dev *dev, int resno)
+static void pci_std_update_resource(struct pci_dev *dev, int resno)
 {
 	struct pci_bus_region region;
 	bool disable;
 	u16 cmd;
 	u32 new, check, mask;
 	int reg;
-	enum pci_bar_type type;
 	struct resource *res = dev->resource + resno;
-	struct pci_bar_update_info update_info;
-	struct pci_bus_region update_reg;
-	struct resource update_res;
 
-	if (dev->is_virtfn) {
-		dev_warn(&dev->dev, "can't update VF BAR%d\n", resno);
+	/* Per SR-IOV spec 3.4.1.11, VF BARs are RO zero */
+	if (dev->is_virtfn)
 		return;
-	}
 
 	/*
 	 * Ignore resources for unimplemented BARs and unused resource slots
@@ -65,37 +57,34 @@ void pci_update_resource(struct pci_dev *dev, int resno)
 		return;
 
 	pcibios_resource_to_bus(dev->bus, &region, res);
+	new = region.start;
 
-	new = region.start | (res->flags & PCI_REGION_FLAG_MASK);
-	if (res->flags & IORESOURCE_IO)
+	if (res->flags & IORESOURCE_IO) {
 		mask = (u32)PCI_BASE_ADDRESS_IO_MASK;
-	else
+		new |= res->flags & ~PCI_BASE_ADDRESS_IO_MASK;
+	} else if (resno == PCI_ROM_RESOURCE) {
+		mask = (u32)PCI_ROM_ADDRESS_MASK;
+	} else {
 		mask = (u32)PCI_BASE_ADDRESS_MEM_MASK;
+		new |= res->flags & ~PCI_BASE_ADDRESS_MEM_MASK;
+	}
 
-	reg = pci_resource_bar(dev, resno, &type);
-	if (!reg)
-		return;
-	if (type != pci_bar_unknown) {
+	if (resno < PCI_ROM_RESOURCE) {
+		reg = PCI_BASE_ADDRESS_0 + 4 * resno;
+	} else if (resno == PCI_ROM_RESOURCE) {
+
+		/*
+		 * Apparently some Matrox devices have ROM BARs that read
+		 * as zero when disabled, so don't update ROM BARs unless
+		 * they're enabled.  See https://lkml.org/lkml/2005/8/30/138.
+		 */
 		if (!(res->flags & IORESOURCE_ROM_ENABLE))
 			return;
-		new |= PCI_ROM_ADDRESS_ENABLE;
-	}
 
-	/*
-	 * Fetch the old BAR location from the device, so we can notify
-	 * users of that BAR that its location is changing.
-	 */
-	pci_read_config_dword(dev, reg, &check);
-	update_reg.start = check & PCI_BASE_ADDRESS_MEM_MASK;
-	if (check & PCI_BASE_ADDRESS_MEM_TYPE_64) {
-		pci_read_config_dword(dev, reg, &check);
-		update_reg.start |= ((u64)check) << 32;
-	}
-	update_info.size = region.end - region.start;
-	update_reg.end = update_reg.start + update_info.size;
-	pcibios_bus_to_resource(dev->bus, &update_res, &update_reg);
-	update_info.old_start = update_res.start;
-	update_info.new_start = res->start;
+		reg = dev->rom_base_reg;
+		new |= PCI_ROM_ADDRESS_ENABLE;
+	} else
+		return;
 
 	/*
 	 * We can't update a 64-bit BAR atomically, so when possible,
@@ -129,14 +118,16 @@ void pci_update_resource(struct pci_dev *dev, int resno)
 
 	if (disable)
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
-
-	/* Tell interested parties that the BAR mapping changed */
-	raw_notifier_call_chain(&bar_update_chain, 0, &update_info);
 }
 
-int pci_notify_on_update_resource(struct notifier_block *nb)
+void pci_update_resource(struct pci_dev *dev, int resno)
 {
-        return raw_notifier_chain_register(&bar_update_chain, nb);
+	if (resno <= PCI_ROM_RESOURCE)
+		pci_std_update_resource(dev, resno);
+#ifdef CONFIG_PCI_IOV
+	else if (resno >= PCI_IOV_RESOURCES && resno <= PCI_IOV_RESOURCE_END)
+		pci_iov_update_resource(dev, resno);
+#endif
 }
 
 int pci_claim_resource(struct pci_dev *dev, int resource)

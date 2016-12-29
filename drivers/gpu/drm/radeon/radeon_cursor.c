@@ -149,13 +149,21 @@ static int radeon_cursor_move_locked(struct drm_crtc *crtc, int x, int y)
 	radeon_crtc->cursor_x = x;
 	radeon_crtc->cursor_y = y;
 
+	if (ASIC_IS_AVIVO(rdev)) {
+		/* avivo cursor are offset into the total surface */
+		x += crtc->x;
+		y += crtc->y;
+	}
+
 	if (x < 0)
 		xorigin = min(-x, radeon_crtc->max_cursor_width - 1);
 	if (y < 0)
 		yorigin = min(-y, radeon_crtc->max_cursor_height - 1);
 
-	x += crtc->x;
-	y += crtc->y;
+	if (!ASIC_IS_AVIVO(rdev)) {
+		x += crtc->x;
+		y += crtc->y;
+	}
 	DRM_DEBUG("x %d y %d c->x %d c->y %d\n", x, y, crtc->x, crtc->y);
 
 	/* fixed on DCE6 and newer */

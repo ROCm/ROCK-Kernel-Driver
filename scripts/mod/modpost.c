@@ -610,6 +610,7 @@ static void handle_modversions(struct module *mod, struct elf_info *info,
 {
 	unsigned int crc;
 	enum export export;
+	bool is_crc = false;
 
 	if ((!is_vmlinux(mod->name) || mod->is_dot_o) &&
 	    strncmp(symname, "__ksymtab", 9) == 0)
@@ -619,6 +620,7 @@ static void handle_modversions(struct module *mod, struct elf_info *info,
 
 	/* CRC'd symbol */
 	if (strncmp(symname, CRC_PFX, strlen(CRC_PFX)) == 0) {
+		is_crc = true;
 		crc = (unsigned int) sym->st_value;
 		sym_update_crc(symname + strlen(CRC_PFX), mod, crc,
 				export);
@@ -664,6 +666,10 @@ static void handle_modversions(struct module *mod, struct elf_info *info,
 		else
 			symname++;
 #endif
+		if (is_crc) {
+			const char *e = is_vmlinux(mod->name) ?"":".ko";
+			warn("EXPORT symbol \"%s\" [%s%s] version generation failed, symbol will not be versioned.\n", symname + strlen(CRC_PFX), mod->name, e);
+		}
 		mod->unres = alloc_symbol(symname,
 					  ELF_ST_BIND(sym->st_info) == STB_WEAK,
 					  mod->unres);
@@ -2483,6 +2489,7 @@ static void write_dump(const char *fname)
 		}
 	}
 	write_if_changed(&buf, fname);
+	free(buf.p);
 }
 
 struct ext_sym_list {
@@ -2623,6 +2630,7 @@ int main(int argc, char **argv)
 			      "Set CONFIG_SECTION_MISMATCH_WARN_ONLY=y to allow them.\n");
 		}
 	}
+	free(buf.p);
 
 	return err;
 }
