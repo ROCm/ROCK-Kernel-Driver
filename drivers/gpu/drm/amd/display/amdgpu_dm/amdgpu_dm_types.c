@@ -513,7 +513,6 @@ static void fill_gamma_from_crtc(
 {
 	int i;
 	struct dc_gamma *gamma;
-	struct dc_transfer_func *input_tf;
 	uint16_t *red, *green, *blue;
 	int end = (crtc->gamma_size > NUM_OF_RAW_GAMMA_RAMP_RGB_256) ?
 			NUM_OF_RAW_GAMMA_RAMP_RGB_256 : crtc->gamma_size;
@@ -534,16 +533,6 @@ static void fill_gamma_from_crtc(
 	}
 
 	dc_surface->gamma_correction = gamma;
-
-	input_tf = dc_create_transfer_func();
-
-	if (input_tf == NULL)
-		return;
-
-	input_tf->type = TF_TYPE_PREDEFINED;
-	input_tf->tf = TRANSFER_FUNCTION_SRGB;
-
-	dc_surface->in_transfer_func = input_tf;
 }
 
 static void fill_plane_attributes(
@@ -554,6 +543,7 @@ static void fill_plane_attributes(
 	const struct amdgpu_framebuffer *amdgpu_fb =
 		to_amdgpu_framebuffer(state->fb);
 	const struct drm_crtc *crtc = state->crtc;
+	struct dc_transfer_func *input_tf;
 
 	fill_rects_from_plane_state(state, surface);
 	fill_plane_attributes_from_fb(
@@ -561,6 +551,16 @@ static void fill_plane_attributes(
 		surface,
 		amdgpu_fb,
 		addrReq);
+
+	input_tf = dc_create_transfer_func();
+
+	if (input_tf == NULL)
+		return;
+
+	input_tf->type = TF_TYPE_PREDEFINED;
+	input_tf->tf = TRANSFER_FUNCTION_SRGB;
+
+	surface->in_transfer_func = input_tf;
 
 	/* In case of gamma set, update gamma value */
 	if (crtc->mode.private_flags &
