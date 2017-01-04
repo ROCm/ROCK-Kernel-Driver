@@ -234,8 +234,8 @@ static int is_gpu_address(uint64_t address, struct pid *pid)
 	kfd_unref_process(p);
 	if (!buf_obj)
 		return 0;
-	else
-		return 1;
+
+	return 1;
 }
 
 /**
