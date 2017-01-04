@@ -365,7 +365,7 @@ int kfd_init_apertures(struct kfd_process *process)
 		pdd = kfd_create_process_device_data(dev, process);
 		if (!pdd) {
 			pr_err("Failed to create process device data\n");
-			goto err;
+			return -1;
 		}
 		/*
 		 * For 64 bit process aperture will be statically reserved in
@@ -392,7 +392,7 @@ int kfd_init_apertures(struct kfd_process *process)
 				break;
 			default:
 				pr_err("Unknown chip in kfd_init_apertures\n");
-				goto err;
+				return -1;
 			}
 
 			if (KFD_IS_DGPU(dev->device_info->asic_family)) {
@@ -414,9 +414,6 @@ int kfd_init_apertures(struct kfd_process *process)
 	}
 
 	return 0;
-
-err:
-	return -1;
 }
 
 void kfd_flush_tlb(struct kfd_dev *dev, uint32_t pasid)

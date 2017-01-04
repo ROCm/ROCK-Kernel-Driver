@@ -564,9 +564,8 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
 	 */
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
-		mutex_unlock(get_dbgmgr_mutex());
-		up_write(&p->lock);
-		return PTR_ERR(pdd);
+		status = PTR_ERR(pdd);
+		goto out;
 	}
 
 	if (!dev->dbgmgr) {
@@ -582,6 +581,7 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
 		}
 	}
 
+out:
 	mutex_unlock(get_dbgmgr_mutex());
 	up_write(&p->lock);
 
@@ -935,10 +935,8 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 		 */
 		down_write(&p->lock);
 
-		if (!kfd_has_process_device_data(p)) {
-			up_write(&p->lock);
-			return 0;
-		}
+		if (!kfd_has_process_device_data(p))
+			goto out_upwrite;
 
 		/* Run over all pdd of the process */
 		pdd = kfd_get_first_process_device_data(p);
@@ -947,8 +945,7 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 			pdd = kfd_get_next_process_device_data(p, pdd);
 		} while (pdd);
 
-		up_write(&p->lock);
-		return 0;
+		goto out_upwrite;
 	}
 
 	/* Fill in process-aperture information for all available
@@ -963,10 +960,9 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 	down_write(&p->lock);
 
 	if (!kfd_has_process_device_data(p)) {
-		up_write(&p->lock);
 		args->num_of_nodes = 0;
 		kfree(pa);
-		return 0;
+		goto out_upwrite;
 	}
 
 	/* Run over all pdd of the process */
@@ -1007,6 +1003,10 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 			(nodes * sizeof(struct kfd_process_device_apertures)));
 	kfree(pa);
 	return ret ? -EFAULT : 0;
+
+out_upwrite:
+	up_write(&p->lock);
+	return 0;
 }
 
 static int
@@ -1031,16 +1031,15 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 			pdd = kfd_bind_process_to_device(kfd, p);
 			if (IS_ERR(pdd)) {
 				err = PTR_ERR(pdd);
-				up_write(&p->lock);
-				return -EFAULT;
+				goto out_upwrite;
 			}
 			mem = kfd_process_device_translate_handle(pdd,
 				GET_IDR_HANDLE(args->event_page_offset));
 			if (!mem) {
 				pr_err("Can't find BO, offset is 0x%llx\n",
 						args->event_page_offset);
-				up_write(&p->lock);
-				return -EFAULT;
+				err = -EFAULT;
+				goto out_upwrite;
 			}
 			up_write(&p->lock);
 
@@ -1061,6 +1060,11 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 			kern_addr);
 
 	return err;
+
+out_upwrite:
+	up_write(&p->lock);
+	return err;
+
 }
 
 static int

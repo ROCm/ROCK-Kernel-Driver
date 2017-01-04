@@ -147,7 +147,7 @@ err_alloc_mem:
  */
 static int kfd_process_reserve_ib_mem(struct kfd_process *p)
 {
-	int err = 0;
+	int ret = 0;
 	struct kfd_process_device *temp, *pdd = NULL;
 	struct kfd_dev *kdev = NULL;
 	struct qcm_process_device *qpd = NULL;
@@ -161,25 +161,25 @@ static int kfd_process_reserve_ib_mem(struct kfd_process *p)
 			continue;
 
 		if (qpd->ib_base) { /* is dGPU */
-			err = kfd_process_alloc_gpuvm(p, kdev,
+			ret = kfd_process_alloc_gpuvm(p, kdev,
 				qpd->ib_base, kdev->ib_size,
 				&kaddr, pdd);
-			if (!err)
+			if (!ret)
 				qpd->ib_kaddr = kaddr;
 			else
-				goto err_out;
+				/* In case of error, the kfd_bos for some pdds
+				 * which are already allocated successfully
+				 * will be freed in upper level function
+				 * i.e. create_process().
+				 */
+				return ret;
 		} else {
 			/* FIXME: Support APU */
 			continue;
 		}
 	}
 
-err_out:
-	/* In case of error, the kfd_bos for some pdds which are already
-	 * allocated successfully will be freed in upper level function
-	 * i.e. create_process().
-	 */
-	return err;
+	return 0;
 }
 
 struct kfd_process *kfd_create_process(struct file *filep)
@@ -467,7 +467,7 @@ static const struct mmu_notifier_ops kfd_process_mmu_notifier_ops = {
 
 static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 {
-	int err = 0;
+	int ret;
 	unsigned long  offset;
 	struct kfd_process_device *temp, *pdd = NULL;
 	struct kfd_dev *dev = NULL;
@@ -482,13 +482,18 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 			continue;
 		if (qpd->cwsr_base) {
 			/* cwsr_base is only set for DGPU */
-			err = kfd_process_alloc_gpuvm(p, dev, qpd->cwsr_base,
+			ret = kfd_process_alloc_gpuvm(p, dev, qpd->cwsr_base,
 					dev->cwsr_size,	&kaddr, pdd);
-			if (!err) {
+			if (!ret) {
 				qpd->cwsr_kaddr = kaddr;
 				qpd->tba_addr = qpd->cwsr_base;
 			} else
-				goto out;
+				/* In case of error, the kfd_bos for some pdds
+				 * which are already allocated successfully
+				 * will be freed in upper level function
+				 * i.e. create_process().
+				 */
+				return ret;
 		} else {
 			offset = (kfd_get_gpu_id(dev) |
 				KFD_MMAP_TYPE_RESERVED_MEM) << PAGE_SHIFT;
@@ -501,8 +506,7 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 					(int)qpd->tba_addr);
 				qpd->tba_addr = 0;
 				qpd->cwsr_kaddr = NULL;
-				err = -ENOMEM;
-				goto out;
+				return -ENOMEM;
 			}
 		}
 
@@ -514,12 +518,7 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 			qpd->tba_addr, qpd->tma_addr, qpd->cwsr_kaddr);
 	}
 
-out:
-	/* In case of error, the kfd_bos for some pdds which are already
-	 * allocated successfully will be freed in upper level function
-	 * i.e. create_process().
-	 */
-	return err;
+	return 0;
 }
 
 static struct kfd_process *create_process(const struct task_struct *thread,

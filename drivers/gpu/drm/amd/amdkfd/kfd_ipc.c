@@ -258,13 +258,13 @@ int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 					(struct kgd_mem *)kfd_bo->mem,
 					&dmabuf);
 	if (r)
-		goto err;
+		return r;
 
 	r = ipc_store_insert(dmabuf, ipc_handle, &obj);
 	if (r)
-		goto err;
+		return r;
 
 	kfd_bo->kfd_ipc_obj = obj;
-err:
+
 	return r;
 }

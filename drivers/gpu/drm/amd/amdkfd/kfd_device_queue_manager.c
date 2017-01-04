@@ -217,7 +217,7 @@ static int create_queue_nocpsch(struct device_queue_manager *dqm,
 				struct qcm_process_device *qpd,
 				int *allocated_vmid)
 {
-	int retval;
+	int retval = 0;
 
 	BUG_ON(!dqm || !q || !qpd || !allocated_vmid);
 
@@ -228,16 +228,14 @@ static int create_queue_nocpsch(struct device_queue_manager *dqm,
 	if (dqm->total_queue_count >= max_num_of_queues_per_device) {
 		pr_warn("Can't create new usermode queue because %d queues were already created\n",
 				dqm->total_queue_count);
-		mutex_unlock(&dqm->lock);
-		return -EPERM;
+		retval = -EPERM;
+		goto out_unlock;
 	}
 
 	if (list_empty(&qpd->queues_list)) {
 		retval = allocate_vmid(dqm, qpd, q);
-		if (retval != 0) {
-			mutex_unlock(&dqm->lock);
-			return retval;
-		}
+		if (retval != 0)
+			goto out_unlock;
 	}
 	*allocated_vmid = qpd->vmid;
 	q->properties.vmid = qpd->vmid;
@@ -255,7 +253,7 @@ static int create_queue_nocpsch(struct device_queue_manager *dqm,
 
 	if (q->properties.type == KFD_QUEUE_TYPE_COMPUTE)
 		retval = create_compute_queue_nocpsch(dqm, q, qpd);
-	if (q->properties.type == KFD_QUEUE_TYPE_SDMA)
+	else if (q->properties.type == KFD_QUEUE_TYPE_SDMA)
 		retval = create_sdma_queue_nocpsch(dqm, q, qpd);
 
 	if (retval != 0) {
@@ -263,8 +261,7 @@ static int create_queue_nocpsch(struct device_queue_manager *dqm,
 			deallocate_vmid(dqm, qpd, q);
 			*allocated_vmid = 0;
 		}
-		mutex_unlock(&dqm->lock);
-		return retval;
+		goto out_unlock;
 	}
 
 	list_add(&q->list, &qpd->queues_list);
@@ -282,8 +279,9 @@ static int create_queue_nocpsch(struct device_queue_manager *dqm,
 	pr_debug("Total of %d queues are accountable so far\n",
 			dqm->total_queue_count);
 
+out_unlock:
 	mutex_unlock(&dqm->lock);
-	return 0;
+	return retval;
 }
 
 static int allocate_hqd(struct device_queue_manager *dqm, struct queue *q)
@@ -380,17 +378,15 @@ static int destroy_queue_nocpsch_locked(struct device_queue_manager *dqm,
 				struct qcm_process_device *qpd,
 				struct queue *q)
 {
-	int retval = 0;
+	int retval;
 	struct mqd_manager *mqd;
 
 	WARN_ON(!dqm || !q || !q->mqd || !qpd);
 
 	mqd = dqm->ops.get_mqd_manager(dqm,
 		get_mqd_type_from_queue_type(q->properties.type));
-	if (!mqd) {
-		retval = -ENOMEM;
-		goto out;
-	}
+	if (!mqd)
+		return -ENOMEM;
 
 	deallocate_doorbell(qpd, q);
 
@@ -411,7 +407,7 @@ static int destroy_queue_nocpsch_locked(struct device_queue_manager *dqm,
 				KFD_HIQ_TIMEOUT,
 				q->pipe, q->queue);
 	if (retval != 0)
-		goto out;
+		return retval;
 
 	mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
 
@@ -421,7 +417,6 @@ static int destroy_queue_nocpsch_locked(struct device_queue_manager *dqm,
 	if (q->properties.is_active)
 		dqm->queue_count--;
 
-out:
 	return retval;
 }
 
@@ -557,10 +552,8 @@ int process_evict_queues(struct device_queue_manager *dqm,
 	BUG_ON(!dqm || !qpd);
 
 	mutex_lock(&dqm->lock);
-	if (qpd->evicted++ > 0) { /* already evicted, do nothing */
-		mutex_unlock(&dqm->lock);
-		return 0;
-	}
+	if (qpd->evicted++ > 0) /* already evicted, do nothing */
+		goto out;
 
 	pdd = qpd_to_pdd(qpd);
 	pr_info_ratelimited("Evicting PASID %u queues\n",
@@ -591,6 +584,7 @@ int process_evict_queues(struct device_queue_manager *dqm,
 	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
 		retval = execute_queues_cpsch(dqm, qpd->is_debug);
 
+out:
 	mutex_unlock(&dqm->lock);
 	return retval;
 
@@ -813,12 +807,9 @@ static void init_interrupts(struct device_queue_manager *dqm)
 }
 static int init_scheduler(struct device_queue_manager *dqm)
 {
-	int retval;
-
 	BUG_ON(!dqm);
 
-	retval = init_pipelines(dqm, get_pipes_num(dqm), get_first_pipe(dqm));
-	return retval;
+	return init_pipelines(dqm, get_pipes_num(dqm), get_first_pipe(dqm));
 }
 
 static int initialize_nocpsch(struct device_queue_manager *dqm)
@@ -1431,14 +1422,11 @@ static bool set_cache_memory_policy(struct device_queue_manager *dqm,
 		uint64_t base = (uintptr_t)alternate_aperture_base;
 		uint64_t limit = base + alternate_aperture_size - 1;
 
-		if (limit <= base)
+		if (limit <= base || (base & APE1_FIXED_BITS_MASK) != 0 ||
+		   (limit & APE1_FIXED_BITS_MASK) != APE1_LIMIT_ALIGNMENT) {
+			retval = false;
 			goto out;
-
-		if ((base & APE1_FIXED_BITS_MASK) != 0)
-			goto out;
-
-		if ((limit & APE1_FIXED_BITS_MASK) != APE1_LIMIT_ALIGNMENT)
-			goto out;
+		}
 
 		qpd->sh_mem_ape1_base = base >> 16;
 		qpd->sh_mem_ape1_limit = limit >> 16;
@@ -1459,12 +1447,9 @@ static bool set_cache_memory_policy(struct device_queue_manager *dqm,
 		qpd->sh_mem_config, qpd->sh_mem_ape1_base,
 		qpd->sh_mem_ape1_limit);
 
-	mutex_unlock(&dqm->lock);
-	return retval;
-
 out:
 	mutex_unlock(&dqm->lock);
-	return false;
+	return retval;
 }
 
 static int set_trap_handler(struct device_queue_manager *dqm,
@@ -1570,13 +1555,14 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 		mqd = dqm->ops.get_mqd_manager(dqm,
 			get_mqd_type_from_queue_type(q->properties.type));
 		if (!mqd) {
-			mutex_unlock(&dqm->lock);
-			return -ENOMEM;
+			retval = -ENOMEM;
+			goto out;
 		}
 		list_del(&q->list);
 		mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
 	}
 
+out:
 	mutex_unlock(&dqm->lock);
 	return retval;
 }
