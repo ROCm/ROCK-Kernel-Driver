@@ -107,8 +107,7 @@ static int pm_allocate_runlist_ib(struct packet_manager *pm,
 
 	if (retval != 0) {
 		pr_err("Failed to allocate runlist IB\n");
-		mutex_unlock(&pm->lock);
-		return retval;
+		goto out;
 	}
 
 	*(void **)rl_buffer = pm->ib_buffer_obj->cpu_ptr;
@@ -117,6 +116,7 @@ static int pm_allocate_runlist_ib(struct packet_manager *pm,
 	memset(*rl_buffer, 0, *rl_buffer_size);
 	pm->allocated = true;
 
+out:
 	mutex_unlock(&pm->lock);
 	return retval;
 }
@@ -339,21 +339,23 @@ int pm_send_query_status(struct packet_manager *pm, uint64_t fence_address,
 			uint32_t fence_value)
 {
 	uint32_t *buffer, size;
+	int retval = 0;
 
 	size = pm->pmf->get_query_status_packet_size();
 	mutex_lock(&pm->lock);
 	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
 			size / sizeof(uint32_t), (unsigned int **)&buffer);
 	if (!buffer) {
-		mutex_unlock(&pm->lock);
 		pr_err("Failed to allocate buffer on kernel queue\n");
-		return -ENOMEM;
+		retval = -ENOMEM;
+		goto out;
 	}
 	pm->pmf->query_status(pm, buffer, fence_address, fence_value);
 	pm->priv_queue->ops.submit_packet(pm->priv_queue);
-	mutex_unlock(&pm->lock);
 
-	return 0;
+out:
+	mutex_unlock(&pm->lock);
+	return retval;
 }
 
 int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
@@ -362,22 +364,24 @@ int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
 			unsigned int sdma_engine)
 {
 	uint32_t *buffer, size;
+	int retval = 0;
 
 	size = pm->pmf->get_unmap_queues_packet_size();
 	mutex_lock(&pm->lock);
 	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
 			size / sizeof(uint32_t), (unsigned int **)&buffer);
 	if (!buffer) {
-		mutex_unlock(&pm->lock);
 		pr_err("Failed to allocate buffer on kernel queue\n");
-		return -ENOMEM;
+		retval = -ENOMEM;
+		goto out;
 	}
 	pm->pmf->unmap_queues(pm, buffer, type, filter, filter_param, reset,
 			      sdma_engine);
 	pm->priv_queue->ops.submit_packet(pm->priv_queue);
-	mutex_unlock(&pm->lock);
 
-	return 0;
+out:
+	mutex_unlock(&pm->lock);
+	return retval;
 }
 
 void pm_release_ib(struct packet_manager *pm)

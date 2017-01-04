@@ -134,7 +134,7 @@ static int __init kfd_module_init(void)
 
 	err = kfd_pasid_init();
 	if (err < 0)
-		goto err_pasid;
+		return err;
 
 	err = kfd_chardev_init();
 	if (err < 0)
@@ -164,7 +164,6 @@ err_topology:
 	kfd_chardev_exit();
 err_ioctl:
 	kfd_pasid_exit();
-err_pasid:
 	return err;
 }
 
