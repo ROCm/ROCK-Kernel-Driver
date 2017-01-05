@@ -132,7 +132,7 @@ static int amdgpu_amdkfd_reserve_system_mem_limit(struct amdgpu_device *adev,
 
 	} else if (domain == AMDGPU_GEM_DOMAIN_CPU) {
 		if ((kfd_mem_limit.system_mem_used + acc_size >
-			kfd_mem_limit.max_system_mem_limit) &&
+			kfd_mem_limit.max_system_mem_limit) ||
 			(kfd_mem_limit.userptr_mem_used + (size + acc_size) >
 			kfd_mem_limit.max_userptr_mem_limit)) {
 			ret = -ENOMEM;
