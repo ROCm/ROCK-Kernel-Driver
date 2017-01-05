@@ -45,7 +45,7 @@ static int ipc_store_insert(void *val, void *sh, struct kfd_ipc_obj **ipc_obj)
 {
 	struct kfd_ipc_obj *obj;
 
-	obj = kmalloc(sizeof(struct kfd_ipc_obj), GFP_KERNEL);
+	obj = kmalloc(sizeof(*obj), GFP_KERNEL);
 	if (!obj)
 		return -ENOMEM;
 

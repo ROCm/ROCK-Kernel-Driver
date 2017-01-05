@@ -1033,7 +1033,7 @@ update_gpuvm_pte_failed:
 
 static struct sg_table *create_doorbell_sg(uint64_t addr, uint32_t size)
 {
-	struct sg_table *sg = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
+	struct sg_table *sg = kmalloc(sizeof(*sg), GFP_KERNEL);
 
 	if (!sg)
 		return NULL;
@@ -1380,7 +1380,7 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 	BUG_ON(kgd == NULL);
 	BUG_ON(vm == NULL);
 
-	new_vm = kzalloc(sizeof(struct amdkfd_vm), GFP_KERNEL);
+	new_vm = kzalloc(sizeof(*new_vm), GFP_KERNEL);
 	if (new_vm == NULL)
 		return -ENOMEM;
 
@@ -1687,7 +1687,7 @@ static int get_sg_table(struct amdgpu_device *adev,
 	unsigned int page_size;
 	int ret;
 
-	sg = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
+	sg = kmalloc(sizeof(*sg), GFP_KERNEL);
 	if (!sg) {
 		ret = -ENOMEM;
 		goto out;

@@ -204,7 +204,7 @@ static int amd_acquire(unsigned long addr, size_t size,
 	pr_debug("GPU address\n");
 
 	/* Initialize context used for operation with given address */
-	mem_context = kzalloc(sizeof(struct amd_mem_context), GFP_KERNEL);
+	mem_context = kzalloc(sizeof(*mem_context), GFP_KERNEL);
 
 	if (!mem_context)
 		return 0;	/* Error case handled as not GPU address  */
