@@ -136,7 +136,7 @@ static bool allocate_signal_page(struct file *devkfd, struct kfd_process *p)
 	unsigned int slot;
 	int i;
 
-	page = kzalloc(sizeof(struct signal_page), GFP_KERNEL);
+	page = kzalloc(sizeof(*page), GFP_KERNEL);
 	if (!page)
 		goto fail_alloc_signal_page;
 
@@ -204,7 +204,7 @@ allocate_signal_page_dgpu(struct kfd_process *p,
 {
 	struct signal_page *my_page;
 
-	my_page = kzalloc(sizeof(struct signal_page), GFP_KERNEL);
+	my_page = kzalloc(sizeof(*my_page), GFP_KERNEL);
 	if (!my_page)
 		return false;
 

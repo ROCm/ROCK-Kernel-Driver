@@ -65,7 +65,7 @@ struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 {
 	struct amdgpu_amdkfd_fence *fence = NULL;
 
-	fence = kzalloc(sizeof(struct amdgpu_amdkfd_fence), GFP_KERNEL);
+	fence = kzalloc(sizeof(*fence), GFP_KERNEL);
 	if (fence == NULL)
 		return NULL;
 

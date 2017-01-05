@@ -203,7 +203,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 			list_empty(&pdd->qpd.priv_queue_list))
 		dev->dqm->ops.register_process(dev->dqm, &pdd->qpd);
 
-	pqn = kzalloc(sizeof(struct process_queue_node), GFP_KERNEL);
+	pqn = kzalloc(sizeof(*pqn), GFP_KERNEL);
 	if (!pqn) {
 		retval = -ENOMEM;
 		goto err_allocate_pqn;
