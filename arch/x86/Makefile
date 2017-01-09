@@ -177,7 +177,9 @@ KBUILD_CFLAGS += -pipe
 # Workaround for a gcc prelease that unfortunately was shipped in a suse release
 KBUILD_CFLAGS += -Wno-sign-compare
 #
+ifneq ($(CONFIG_UNWIND_INFO),y)
 KBUILD_CFLAGS += -fno-asynchronous-unwind-tables
+endif
 
 KBUILD_CFLAGS += $(mflags-y)
 KBUILD_AFLAGS += $(mflags-y)

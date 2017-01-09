@@ -396,6 +396,9 @@ struct module {
 	struct module_layout core_layout __module_layout_align;
 	struct module_layout init_layout;
 
+	/* The handle returned from unwind_add_table. */
+	void *unwind_info;
+
 	/* Arch-specific module values */
 	struct mod_arch_specific arch;
 

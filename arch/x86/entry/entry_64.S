@@ -398,6 +398,11 @@ ENTRY(__switch_to_asm)
 	popq	%rbp
 
 	jmp	__switch_to
+/* The stack unwind code needs this but it pollutes traces otherwise */
+#ifdef CONFIG_UNWIND_INFO
+.globl thread_return
+thread_return:
+#endif
 END(__switch_to_asm)
 
 /*
@@ -901,6 +906,24 @@ ENTRY(do_softirq_own_stack)
 	decl	PER_CPU_VAR(irq_count)
 	ret
 END(do_softirq_own_stack)
+
+#ifdef CONFIG_STACK_UNWIND
+ENTRY(arch_unwind_init_running)
+	movq	%r15, R15(%rdi)
+	movq	%r14, R14(%rdi)
+	movq	%r13, R13(%rdi)
+	movq	%r12, R12(%rdi)
+	movq	%rbp, RBP(%rdi)
+	movq	%rbx, RBX(%rdi)
+	movq	(%rsp), %r9
+	movq	%r9, RIP(%rdi)
+	leaq	8(%rsp), %r9
+	movq	%r9, RSP(%rdi)
+	movq	$__KERNEL_CS, CS(%rdi)
+	movq	$__KERNEL_DS, SS(%rdi)
+	ret
+END(arch_unwind_init_running)
+#endif
 
 #ifdef CONFIG_XEN
 idtentry xen_hypervisor_callback xen_do_hypervisor_callback has_error_code=0

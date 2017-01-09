@@ -45,6 +45,7 @@
 #include <linux/device.h>
 #include <linux/string.h>
 #include <linux/mutex.h>
+#include <linux/unwind.h>
 #include <linux/rculist.h>
 #include <linux/uaccess.h>
 #include <asm/cacheflush.h>
@@ -325,7 +326,7 @@ struct load_info {
 	unsigned long mod_kallsyms_init_off;
 #endif
 	struct {
-		unsigned int sym, str, mod, vers, info, pcpu;
+		unsigned int sym, str, mod, vers, info, pcpu, unwind;
 	} index;
 };
 
@@ -747,6 +748,27 @@ bool is_module_percpu_address(unsigned long addr)
 }
 
 #endif /* CONFIG_SMP */
+
+static unsigned int find_unwind(struct load_info *info)
+{
+	int section = 0;
+#ifdef ARCH_UNWIND_SECTION_NAME
+	section = find_sec(info, ARCH_UNWIND_SECTION_NAME);
+	if (section)
+		info->sechdrs[section].sh_flags |= SHF_ALLOC;
+#endif
+	return section;
+}
+
+static void add_unwind_table(struct module *mod, struct load_info *info)
+{
+	int index = info->index.unwind;
+
+	/* Size of section 0 is 0, so this is ok if there is no unwind info. */
+	mod->unwind_info = unwind_add_table(mod,
+					  (void *)info->sechdrs[index].sh_addr,
+					  info->sechdrs[index].sh_size);
+}
 
 #define MODINFO_ATTR(field)	\
 static void setup_modinfo_##field(struct module *mod, const char *s)  \
@@ -2193,6 +2215,8 @@ static void free_module(struct module *mod)
 	/* Remove dynamic debug info */
 	ddebug_remove_module(mod->name);
 
+	unwind_remove_table(mod->unwind_info, false);
+
 	/* Arch-specific cleanup. */
 	module_arch_cleanup(mod);
 
@@ -3028,6 +3052,8 @@ static struct module *setup_load_info(struct load_info *info, int flags)
 
 	info->index.pcpu = find_pcpusec(info);
 
+	info->index.unwind = find_unwind(info);
+
 	/* Check module struct version now, before we try to use module. */
 	if (!check_modstruct_version(info->sechdrs, info->index.vers, mod))
 		return ERR_PTR(-ENOEXEC);
@@ -3517,6 +3543,7 @@ static noinline int do_init_module(struct module *mod)
 	/* Drop initial reference. */
 	module_put(mod);
 	trim_init_extable(mod);
+	unwind_remove_table(mod->unwind_info, true);
 #ifdef CONFIG_KALLSYMS
 	/* Switch to core kallsyms now init is done: kallsyms may be walking! */
 	rcu_assign_pointer(mod->kallsyms, &mod->core_kallsyms);
@@ -3789,6 +3816,9 @@ static int load_module(struct load_info *info, const char __user *uargs,
 		if (err < 0)
 			goto sysfs_cleanup;
 	}
+
+	/* Initialize unwind table */
+	add_unwind_table(mod, info);
 
 	/* Get rid of temporary copy. */
 	free_copy(info);
