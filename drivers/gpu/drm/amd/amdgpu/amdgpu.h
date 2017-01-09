@@ -1502,7 +1502,7 @@ struct amdgpu_device {
 	/* amdkfd interface */
 	struct kfd_dev          *kfd;
 
-	struct amdgpu_virtualization virtualization;
+	struct amdgpu_virt	virt;
 
 	/* link all shadow bo */
 	struct list_head                shadow_list;
