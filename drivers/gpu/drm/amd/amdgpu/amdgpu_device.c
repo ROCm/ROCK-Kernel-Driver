@@ -1396,6 +1396,15 @@ static int amdgpu_init(struct amdgpu_device *adev)
 				return r;
 			}
 			adev->ip_blocks[i].status.hw = true;
+
+			/* right after GMC hw init, we create CSA */
+			if (amdgpu_sriov_vf(adev)) {
+				r = amdgpu_allocate_static_csa(adev);
+				if (r) {
+					DRM_ERROR("allocate CSA failed %d\n", r);
+					return r;
+				}
+			}
 		}
 	}
 
@@ -1528,6 +1537,9 @@ static int amdgpu_fini(struct amdgpu_device *adev)
 			adev->ip_blocks[i].version->funcs->late_fini((void *)adev);
 		adev->ip_blocks[i].status.late_initialized = false;
 	}
+
+	if (amdgpu_sriov_vf(adev))
+		amdgpu_bo_free_kernel(&adev->virt.csa_obj, &adev->virt.csa_vmid0_addr, NULL);
 
 	return 0;
 }
