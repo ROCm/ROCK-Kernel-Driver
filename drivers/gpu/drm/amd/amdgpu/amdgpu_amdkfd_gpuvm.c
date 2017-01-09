@@ -45,6 +45,9 @@
  * a HW bug. */
 #define VI_BO_SIZE_ALIGN (0x8000)
 
+/* BO flag to indicate a KFD userptr BO */
+#define AMDGPU_AMDKFD_USERPTR_BO (1ULL << 63)
+
 /* Impose limit on how much memory KFD can use */
 struct kfd_mem_usage_limit {
 	uint64_t max_system_mem_limit;
@@ -129,7 +132,6 @@ static int amdgpu_amdkfd_reserve_system_mem_limit(struct amdgpu_device *adev,
 			goto err_no_mem;
 		}
 		kfd_mem_limit.system_mem_used += (acc_size + size);
-
 	} else if (domain == AMDGPU_GEM_DOMAIN_CPU) {
 		if ((kfd_mem_limit.system_mem_used + acc_size >
 			kfd_mem_limit.max_system_mem_limit) ||
@@ -146,25 +148,44 @@ err_no_mem:
 	return ret;
 }
 
+static void unreserve_system_mem_limit(struct amdgpu_device *adev,
+				       uint64_t size, u32 domain)
+{
+	size_t acc_size;
+
+	acc_size = ttm_bo_dma_acc_size(&adev->mman.bdev, size,
+				       sizeof(struct amdgpu_bo));
+
+	spin_lock(&kfd_mem_limit.mem_limit_lock);
+	if (domain == AMDGPU_GEM_DOMAIN_GTT) {
+		kfd_mem_limit.system_mem_used -= (acc_size + size);
+	} else if (domain == AMDGPU_GEM_DOMAIN_CPU) {
+		kfd_mem_limit.system_mem_used -= acc_size;
+		kfd_mem_limit.userptr_mem_used -= size;
+	}
+	WARN_ONCE(kfd_mem_limit.system_mem_used < 0,
+		  "kfd system memory accounting unbalanced");
+	WARN_ONCE(kfd_mem_limit.userptr_mem_used < 0,
+		  "kfd userptr memory accounting unbalanced");
+
+	spin_unlock(&kfd_mem_limit.mem_limit_lock);
+}
+
 void amdgpu_amdkfd_unreserve_system_memory_limit(struct amdgpu_bo *bo)
 {
 	spin_lock(&kfd_mem_limit.mem_limit_lock);
 
-	if (bo->prefered_domains == AMDGPU_GEM_DOMAIN_GTT)
-		kfd_mem_limit.system_mem_used -=
-			(bo->tbo.acc_size + amdgpu_bo_size(bo));
-	else if (amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
+	if (bo->flags & AMDGPU_AMDKFD_USERPTR_BO) {
 		kfd_mem_limit.system_mem_used -= bo->tbo.acc_size;
 		kfd_mem_limit.userptr_mem_used -= amdgpu_bo_size(bo);
+	} else if (bo->prefered_domains == AMDGPU_GEM_DOMAIN_GTT) {
+		kfd_mem_limit.system_mem_used -=
+			(bo->tbo.acc_size + amdgpu_bo_size(bo));
 	}
-	if (kfd_mem_limit.system_mem_used < 0) {
-		pr_warn("kfd system memory size ref. error\n");
-		kfd_mem_limit.system_mem_used = 0;
-	}
-	if (kfd_mem_limit.userptr_mem_used < 0) {
-		pr_warn("kfd userptr memory size ref. error\n");
-		kfd_mem_limit.userptr_mem_used = 0;
-	}
+	WARN_ONCE(kfd_mem_limit.system_mem_used < 0,
+		  "kfd system memory accounting unbalanced");
+	WARN_ONCE(kfd_mem_limit.userptr_mem_used < 0,
+		  "kfd userptr memory accounting unbalanced");
 
 	spin_unlock(&kfd_mem_limit.mem_limit_lock);
 }
@@ -614,10 +635,13 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	if (ret != 0) {
 		pr_err("Failed to create BO on domain %s. ret %d\n",
 				domain_string(alloc_domain), ret);
+		unreserve_system_mem_limit(adev, size, alloc_domain);
 		goto err_bo_create;
 	}
 	bo->kfd_bo = *mem;
 	(*mem)->bo = bo;
+	if (userptr)
+		bo->flags |= AMDGPU_AMDKFD_USERPTR_BO;
 
 	if (domain == AMDGPU_GEM_DOMAIN_VRAM) {
 		ret = amdgpu_bo_reserve(bo, true);
