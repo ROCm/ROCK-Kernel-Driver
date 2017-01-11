@@ -398,11 +398,6 @@ ENTRY(__switch_to_asm)
 	popq	%rbp
 
 	jmp	__switch_to
-/* The stack unwind code needs this but it pollutes traces otherwise */
-#ifdef CONFIG_UNWIND_INFO
-.globl thread_return
-thread_return:
-#endif
 END(__switch_to_asm)
 
 /*

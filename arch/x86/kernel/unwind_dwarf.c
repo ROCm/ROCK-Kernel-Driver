@@ -11,7 +11,7 @@ static int call_trace = 1;
 #if 0
 #define dprintk(fmt, args...) printk(KERN_DEBUG "unwind: " fmt "\n", ##args)
 #else
-#define dprintk(fmt, args...)
+#define dprintk(fmt, args...) no_printk(KERN_DEBUG "unwind: " fmt "\n", ##args)
 #endif
 
 unsigned long unwind_get_return_address(struct unwind_state *state)
@@ -50,27 +50,32 @@ EXPORT_SYMBOL_GPL(unwind_next_frame);
 void __unwind_start(struct unwind_state *state, struct task_struct *task,
 		struct pt_regs *regs, unsigned long *first_frame)
 {
+	bool do_skipping = true;
+	char type;
+
 	memset(state, 0, sizeof(*state));
 	state->task = task;
 
 	if (regs) {
 		arch_unw_init_frame_info(state, regs);
-		dprintk("%s: R IP=%pS rip=%lx rsp=%lx rbp=%lx\n", __func__,
-				(void *)_THIS_IP_,
-				UNW_PC(state), UNW_SP(state), UNW_FP(state));
+		type = 'R';
 	} else if (task == current) {
 		arch_unwind_init_running(&state->u.regs);
-
-		dprintk("%s: C IP=%pS rip=%lx rsp=%lx rbp=%lx\n", __func__,
-				(void *)_THIS_IP_,
-				UNW_PC(state), UNW_SP(state), UNW_FP(state));
+		type = 'C';
 #ifdef CONFIG_SMP
 	} else if (task->on_cpu) {
 		state->on_cpu = 1;
 		return;
 #endif
-	} else
+	} else {
 		arch_unw_init_blocked(state);
+		type = 'B';
+		do_skipping = false;
+	}
+
+	dprintk("%s: %c FF=%p rip=%lx (%pS) rsp=%lx rbp=%lx\n",
+			__func__, type, first_frame, UNW_PC(state),
+			(void *)UNW_PC(state), UNW_SP(state), UNW_FP(state));
 
 	get_stack_info((void *)UNW_SP(state), task, &state->stack_info,
 			&state->stack_mask);
@@ -80,7 +85,7 @@ void __unwind_start(struct unwind_state *state, struct task_struct *task,
 	if (arch_unw_user_mode(state))
 		return;
 
-	while (1) {
+	while (do_skipping) {
 		if (UNW_SP(state) > (unsigned long)first_frame) {
 			dprintk("%s: hit first=%p sp=%lx\n", __func__,
 					first_frame, UNW_SP(state));

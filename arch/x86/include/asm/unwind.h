@@ -196,16 +196,14 @@ static inline void arch_unw_init_frame_info(struct unwind_state *info,
 
 static inline void arch_unw_init_blocked(struct unwind_state *info)
 {
-	extern const char thread_return[];
+	struct inactive_task_frame *frame = (void *)info->task->thread.sp;
 
-	memset(&info->u.regs, 0, sizeof(info->u.regs));
-	info->u.regs.ip = (unsigned long)thread_return;
-	info->u.regs.cs = __KERNEL_CS;
-	probe_kernel_address((unsigned long *)info->task->thread.sp,
-			info->u.regs.bp);
+	probe_kernel_address(&frame->ret_addr, info->u.regs.ip);
+	probe_kernel_address(&frame->bp, info->u.regs.bp);
 	info->u.regs.sp = info->task->thread.sp;
+	info->u.regs.cs = __KERNEL_CS;
 	info->u.regs.ss = __KERNEL_DS;
-#ifndef CONFIG_X86_64
+#ifdef CONFIG_X86_32
 	info->u.regs.ds = __USER_DS;
 	info->u.regs.es = __USER_DS;
 #endif

@@ -193,7 +193,8 @@ static const struct cfa badCFA = { ARRAY_SIZE(reg_info), 1 };
 static unsigned int unwind_debug;
 static int __init unwind_debug_setup(char *s)
 {
-	kstrtouint(s, 0, &unwind_debug);
+	if (kstrtouint(s, 0, &unwind_debug))
+		pr_info("%s: bad parameter '%s'\n", __func__, s);
 	return 1;
 }
 __setup("unwind_debug=", unwind_debug_setup);
