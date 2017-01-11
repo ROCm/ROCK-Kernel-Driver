@@ -8573,16 +8573,6 @@ static noinline int walk_down_proc(struct btrfs_trans_handle *trans,
 		if (wc->refs[level] > 1)
 			return 1;
 
-		/*
-		 * If this is for_reloc then we want to stop if the current
-		 * block doesn't have FULL_BACKREF set, which means that we
-		 * never cow'ed down to this block from the owner or from the
-		 * reloc_root, so we don't need to do anything for it.
-		 */
-		if (wc->for_reloc &&
-		    !(wc->flags[level] & BTRFS_BLOCK_FLAG_FULL_BACKREF))
-			return 1;
-
 		if (path->locks[level] && !wc->keep_locks) {
 			btrfs_tree_unlock_rw(eb, path->locks[level]);
 			path->locks[level] = 0;
@@ -8861,19 +8851,7 @@ static noinline int walk_up_proc(struct btrfs_trans_handle *trans,
 	/* wc->stage == DROP_REFERENCE */
 	BUG_ON(wc->refs[level] > 1 && !path->locks[level]);
 
-	/*
-	 * This is tricky because if we are doing drop_subtree we could stumble
-	 * across a block that we haven't actually touched either via the reloc
-	 * root or the owner root, which means that we would drop the owner
-	 * root's ref when it still refers to that block.  So if we are
-	 * for_reloc and the flags are not FLLL_BACKREF then we shouldn't do
-	 * anything to this blocks children.  However if FULL_BACKREF is in fact
-	 * set and we are free'ing this block then we definitely want to drop
-	 * the references for its children.
-	 */
-	if (wc->refs[level] == 1 &&
-	    (!wc->for_reloc ||
-	     (wc->flags[level] & BTRFS_BLOCK_FLAG_FULL_BACKREF))) {
+	if (wc->refs[level] == 1) {
 		if (level == 0) {
 			if (wc->flags[level] & BTRFS_BLOCK_FLAG_FULL_BACKREF)
 				ret = btrfs_dec_ref(trans, root, eb, 1);
