@@ -812,6 +812,8 @@ void kfd_restore_bo_worker(struct work_struct *work)
 	ret = resume_process_mm(p);
 	if (ret)
 		pr_err("Failed to resume user queues\n");
+
+	pr_info("Finished restoring process of pasid %d\n", p->pasid);
 }
 
 /** kgd2kfd_schedule_evict_and_restore_process - Schedules work queue that will
@@ -883,6 +885,7 @@ void kfd_evict_bo_worker(struct work_struct *work)
 	if (delayed_work_pending(&p->restore_work))
 		flush_delayed_work(&p->restore_work);
 
+	pr_info("Started evicting process of pasid %d\n", p->pasid);
 	ret = quiesce_process_mm(p);
 	if (!ret) {
 		fence_signal(eviction_work->eviction_fence);
@@ -892,6 +895,8 @@ void kfd_evict_bo_worker(struct work_struct *work)
 		pr_err("Failed to quiesce user queues. Cannot evict BOs\n");
 
 	fence_put(eviction_work->eviction_fence);
+
+	pr_info("Finished evicting process of pasid %d\n", p->pasid);
 
 }
 
