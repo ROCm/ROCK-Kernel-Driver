@@ -24,7 +24,9 @@
 #ifndef __AMDGPU_IRQ_H__
 #define __AMDGPU_IRQ_H__
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
 #include <linux/irqdomain.h>
+#endif
 #include "amdgpu_ih.h"
 
 #define AMDGPU_MAX_IRQ_SRC_ID	0x100
@@ -67,9 +69,11 @@ struct amdgpu_irq {
 	struct amdgpu_ih_ring		ih;
 	const struct amdgpu_ih_funcs	*ih_funcs;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
 	/* gen irq stuff */
 	struct irq_domain		*domain; /* GPU irq controller domain */
 	unsigned			virq[AMDGPU_MAX_IRQ_SRC_ID];
+#endif
 	uint32_t                        srbm_soft_reset;
 };
 
@@ -93,9 +97,10 @@ int amdgpu_irq_put(struct amdgpu_device *adev, struct amdgpu_irq_src *src,
 bool amdgpu_irq_enabled(struct amdgpu_device *adev, struct amdgpu_irq_src *src,
 			unsigned type);
 void amdgpu_irq_gpu_reset_resume_helper(struct amdgpu_device *adev);
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
 int amdgpu_irq_add_domain(struct amdgpu_device *adev);
 void amdgpu_irq_remove_domain(struct amdgpu_device *adev);
 unsigned amdgpu_irq_create_mapping(struct amdgpu_device *adev, unsigned src_id);
+#endif
 
 #endif

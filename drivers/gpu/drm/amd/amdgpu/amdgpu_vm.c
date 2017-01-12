@@ -25,7 +25,11 @@
  *          Alex Deucher
  *          Jerome Glisse
  */
+#if defined(BUILD_AS_DKMS)
+#include <kcl/kcl_fence_array.h>
+#else
 #include <linux/fence-array.h>
+#endif
 #include <drm/drmP.h>
 #include <drm/amdgpu_drm.h>
 #include "amdgpu.h"
@@ -1011,7 +1015,7 @@ error_free:
  * @vm: requested vm
  * @mapping: mapped range and flags to use for the update
  * @flags: HW flags for the mapping
- * @nodes: array of drm_mm_nodes with the MC addresses
+ * @mem: ttm_mem_reg holding array of drm_mm_nodes with the MC addresses
  * @fence: optional resulting fence
  *
  * Split the mapping into smaller chunks so that each update fits
@@ -1025,9 +1029,10 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 				      struct amdgpu_vm *vm,
 				      struct amdgpu_bo_va_mapping *mapping,
 				      uint32_t flags,
-				      struct drm_mm_node *nodes,
+				      struct ttm_mem_reg *mem,
 				      struct fence **fence)
 {
+	struct drm_mm_node *nodes = mem ? mem->mm_node : NULL;
 	uint64_t pfn, src = 0, start = mapping->it.start;
 	int r;
 
@@ -1057,20 +1062,35 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 			addr = nodes->start << PAGE_SHIFT;
 			max_entries = (nodes->size - pfn) *
 				(PAGE_SIZE / AMDGPU_GPU_PAGE_SIZE);
+			switch (mem->mem_type) {
+			case AMDGPU_PL_DGMA_IMPORT:
+				pages_addr = (dma_addr_t *)mem->bus.base;
+				addr += adev->mman.bdev.man[mem->mem_type].gpu_offset -
+					adev->mman.bdev.man[TTM_PL_TT].gpu_offset;
+				gtt_flags = flags;
+				/* fall through */
+			case TTM_PL_TT:
+				if (flags == gtt_flags)
+					src = adev->gart.table_addr +
+						(addr >> AMDGPU_GPU_PAGE_SHIFT) * 8;
+				else
+					max_entries = min(max_entries, 16ull * 1024ull);
+				addr = 0;
+				break;
+			case AMDGPU_PL_DGMA:
+				addr += adev->vm_manager.vram_base_offset +
+					adev->mman.bdev.man[mem->mem_type].gpu_offset -
+					adev->mman.bdev.man[TTM_PL_VRAM].gpu_offset;
+				break;
+			case TTM_PL_VRAM:
+				addr += adev->vm_manager.vram_base_offset;
+				break;
+			default:
+				break;
+			}
 		} else {
 			addr = 0;
 			max_entries = S64_MAX;
-		}
-
-		if (pages_addr) {
-			if (flags == gtt_flags)
-				src = adev->gart.table_addr +
-					(addr >> AMDGPU_GPU_PAGE_SHIFT) * 8;
-			else
-				max_entries = min(max_entries, 16ull * 1024ull);
-			addr = 0;
-		} else if (flags & AMDGPU_PTE_VALID) {
-			addr += adev->vm_manager.vram_base_offset;
 		}
 		addr += pfn << PAGE_SHIFT;
 
@@ -1130,6 +1150,8 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 			ttm = container_of(bo_va->bo->tbo.ttm, struct
 					   ttm_dma_tt, ttm);
 			pages_addr = ttm->dma_address;
+		} else if (mem->mem_type == AMDGPU_PL_DGMA_IMPORT) {
+			pages_addr = (dma_addr_t *)bo_va->bo->tbo.mem.bus.base;
 		}
 		exclusive = reservation_object_get_excl(bo_va->bo->tbo.resv);
 	}
@@ -1146,7 +1168,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	list_for_each_entry(mapping, &bo_va->invalids, list) {
 		r = amdgpu_vm_bo_split_mapping(adev, exclusive,
 					       gtt_flags, pages_addr, vm,
-					       mapping, flags, nodes,
+					       mapping, flags, mem,
 					       &bo_va->last_pt_update);
 		if (r)
 			return r;
@@ -1658,7 +1680,7 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 			      &adev->vm_manager.ids_lru);
 	}
 
-	adev->vm_manager.fence_context = fence_context_alloc(AMDGPU_MAX_RINGS);
+	adev->vm_manager.fence_context = kcl_fence_context_alloc(AMDGPU_MAX_RINGS);
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i)
 		adev->vm_manager.seqno[i] = 0;
 

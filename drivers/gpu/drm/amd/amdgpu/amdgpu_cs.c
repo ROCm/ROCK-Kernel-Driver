@@ -93,7 +93,7 @@ static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 	struct drm_gem_object *gobj;
 	unsigned long size;
 
-	gobj = drm_gem_object_lookup(p->filp, data->handle);
+	gobj = kcl_drm_gem_object_lookup(p->adev->ddev, p->filp, data->handle);
 	if (gobj == NULL)
 		return -EINVAL;
 
@@ -1114,7 +1114,7 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data,
 	if (IS_ERR(fence))
 		r = PTR_ERR(fence);
 	else if (fence) {
-		r = fence_wait_timeout(fence, true, timeout);
+		r = kcl_fence_wait_timeout(fence, true, timeout);
 		fence_put(fence);
 	} else
 		r = 1;
@@ -1187,7 +1187,7 @@ static int amdgpu_cs_wait_all_fences(struct amdgpu_device *adev,
 		else if (!fence)
 			continue;
 
-		r = fence_wait_timeout(fence, true, timeout);
+		r = kcl_fence_wait_timeout(fence, true, timeout);
 		if (r < 0)
 			return r;
 
@@ -1242,7 +1242,7 @@ static int amdgpu_cs_wait_any_fence(struct amdgpu_device *adev,
 		}
 	}
 
-	r = fence_wait_any_timeout(array, fence_count, true, timeout,
+	r = kcl_fence_wait_any_timeout(array, fence_count, true, timeout,
 				   &first);
 	if (r < 0)
 		goto err_free_fence_array;

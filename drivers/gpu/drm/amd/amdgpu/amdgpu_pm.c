@@ -34,6 +34,28 @@
 
 static int amdgpu_debugfs_pm_init(struct amdgpu_device *adev);
 
+static const struct cg_flag_name clocks[] = {
+	{AMD_CG_SUPPORT_GFX_MGCG, "Graphics Medium Grain Clock Gating"},
+	{AMD_CG_SUPPORT_GFX_MGLS, "Graphics Medium Grain memory Light Sleep"},
+	{AMD_CG_SUPPORT_GFX_CGCG, "Graphics Coarse Grain Clock Gating"},
+	{AMD_CG_SUPPORT_GFX_CGLS, "Graphics Coarse Grain memory Light Sleep"},
+	{AMD_CG_SUPPORT_GFX_CGTS, "Graphics Coarse Grain Tree Shader Light Sleep"},
+	{AMD_CG_SUPPORT_GFX_CGTS_LS, "Graphics Coarse Grain Tree Shader Light Sleep"},
+	{AMD_CG_SUPPORT_GFX_CP_LS, "Graphics Command Processor Light Sleep"},
+	{AMD_CG_SUPPORT_GFX_RLC_LS, "Graphics Run List Controller Light Sleep"},
+	{AMD_CG_SUPPORT_MC_LS, "Memory Controller Light Sleep"},
+	{AMD_CG_SUPPORT_MC_MGCG, "Memory Controller Medium Grain Clock Gating"},
+	{AMD_CG_SUPPORT_SDMA_LS, "System Direct Memory Access Light Sleep"},
+	{AMD_CG_SUPPORT_SDMA_MGCG, "System Direct Memory Access Medium Grain Clock Gating"},
+	{AMD_CG_SUPPORT_BIF_LS, "Bus Interface Light Sleep"},
+	{AMD_CG_SUPPORT_UVD_MGCG, "Unified Video Decoder Medium Grain Clock Gating"},
+	{AMD_CG_SUPPORT_VCE_MGCG, "Video Compression Engine Medium Grain Clock Gating"},
+	{AMD_CG_SUPPORT_HDP_LS, "Host Data Path Light Sleep"},
+	{AMD_CG_SUPPORT_HDP_MGCG, "Host Data Path Medium Grain Clock Gating"},
+	{AMD_CG_SUPPORT_ROM_MGCG, "Rom Medium Grain Clock Gating"},
+	{0, NULL},
+};
+
 void amdgpu_pm_acpi_event_handler(struct amdgpu_device *adev)
 {
 	if (adev->pp_enabled)
@@ -124,6 +146,7 @@ static ssize_t amdgpu_get_dpm_forced_performance_level(struct device *dev,
 			(level & AMD_DPM_FORCED_LEVEL_LOW) ? "low" :
 			(level & AMD_DPM_FORCED_LEVEL_HIGH) ? "high" :
 			(level & AMD_DPM_FORCED_LEVEL_MANUAL) ? "manual" :
+			(level & AMD_DPM_FORCED_LEVEL_PROFILING) ? "profiling" :
 			"unknown"));
 }
 
@@ -135,12 +158,15 @@ static ssize_t amdgpu_set_dpm_forced_performance_level(struct device *dev,
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = ddev->dev_private;
 	enum amd_dpm_forced_level level;
+	enum amd_dpm_forced_level current_level;
 	int ret = 0;
 
 	/* Can't force performance level when the card is off */
 	if  ((adev->flags & AMD_IS_PX) &&
 	     (ddev->switch_power_state != DRM_SWITCH_POWER_ON))
 		return -EINVAL;
+
+	current_level = amdgpu_dpm_get_performance_level(adev);
 
 	if (strncmp("low", buf, strlen("low")) == 0) {
 		level = AMD_DPM_FORCED_LEVEL_LOW;
@@ -150,10 +176,23 @@ static ssize_t amdgpu_set_dpm_forced_performance_level(struct device *dev,
 		level = AMD_DPM_FORCED_LEVEL_AUTO;
 	} else if (strncmp("manual", buf, strlen("manual")) == 0) {
 		level = AMD_DPM_FORCED_LEVEL_MANUAL;
+	} else if (strncmp("profile", buf, strlen("profile")) == 0) {
+		level = AMD_DPM_FORCED_LEVEL_PROFILING;
 	} else {
 		count = -EINVAL;
 		goto fail;
 	}
+
+	if (current_level == level)
+		return 0;
+
+	if (level == AMD_DPM_FORCED_LEVEL_PROFILING)
+		amdgpu_set_clockgating_state(adev, AMD_IP_BLOCK_TYPE_GFX,
+						AMD_CG_STATE_UNGATE);
+	else if (level != AMD_DPM_FORCED_LEVEL_PROFILING &&
+			current_level == AMD_DPM_FORCED_LEVEL_PROFILING)
+		amdgpu_set_clockgating_state(adev, AMD_IP_BLOCK_TYPE_GFX,
+						AMD_CG_STATE_GATE);
 
 	if (adev->pp_enabled)
 		amdgpu_dpm_force_performance_level(adev, level);
@@ -1132,7 +1171,7 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 			return 0;
 	}
 
-	adev->pm.int_hwmon_dev = hwmon_device_register_with_groups(adev->dev,
+	adev->pm.int_hwmon_dev = kcl_hwmon_device_register_with_groups(adev->dev,
 								   DRIVER_NAME, adev,
 								   hwmon_groups);
 	if (IS_ERR(adev->pm.int_hwmon_dev)) {
@@ -1341,12 +1380,27 @@ static int amdgpu_debugfs_pm_info_pp(struct seq_file *m, struct amdgpu_device *a
 	return 0;
 }
 
+static void amdgpu_parse_cg_state(struct seq_file *m, u32 flags)
+{
+	int i;
+
+	for (i = 0; clocks[i].flag; i++)
+		seq_printf(m, "\t%s: %s\n", clocks[i].name,
+			   (flags & clocks[i].flag) ? "On" : "Off");
+}
+
 static int amdgpu_debugfs_pm_info(struct seq_file *m, void *data)
 {
 	struct drm_info_node *node = (struct drm_info_node *) m->private;
 	struct drm_device *dev = node->minor->dev;
 	struct amdgpu_device *adev = dev->dev_private;
 	struct drm_device *ddev = adev->ddev;
+	u32 flags = 0;
+
+	amdgpu_get_clockgating_state(adev, &flags);
+	seq_printf(m, "Clock Gating Flags Mask: 0x%x\n", flags);
+	amdgpu_parse_cg_state(m, flags);
+	seq_printf(m, "\n");
 
 	if (!adev->pm.dpm_enabled) {
 		seq_printf(m, "dpm not enabled\n");

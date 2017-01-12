@@ -24,7 +24,11 @@
 #ifndef _GPU_SCHEDULER_H_
 #define _GPU_SCHEDULER_H_
 
+#if (defined OS_NAME_RHEL) && (OS_VERSION_MAJOR == 6)
+#include <linux/kfifo-new.h>
+#else
 #include <linux/kfifo.h>
+#endif
 #include <linux/fence.h>
 
 struct amd_gpu_scheduler;

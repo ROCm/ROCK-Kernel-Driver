@@ -59,10 +59,20 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 	}
 
 	if (!(initial_domain & (AMDGPU_GEM_DOMAIN_GDS | AMDGPU_GEM_DOMAIN_GWS | AMDGPU_GEM_DOMAIN_OA))) {
-		/* Maximum bo size is the unpinned gtt size since we use the gtt to
-		 * handle vram to system pool migrations.
-		 */
-		max_size = adev->mc.gtt_size - adev->gart_pin_size;
+		if (initial_domain & AMDGPU_GEM_DOMAIN_DGMA) {
+			max_size = (unsigned long)amdgpu_direct_gma_size << 20;
+			max_size -= atomic64_read(&adev->direct_gma.vram_usage);
+			flags |= AMDGPU_GEM_CREATE_NO_EVICT;
+		} else if (initial_domain & AMDGPU_GEM_DOMAIN_DGMA_IMPORT) {
+			max_size = (unsigned long)amdgpu_direct_gma_size << 20;
+			max_size -= atomic64_read(&adev->direct_gma.gart_usage);
+			flags |= AMDGPU_GEM_CREATE_NO_EVICT;
+		} else {
+			/* Maximum bo size is the unpinned gtt size since we use the gtt to
+			 * handle vram to system pool migrations.
+			 */
+			max_size = adev->mc.gtt_size - adev->gart_pin_size;
+		}
 		if (size > max_size) {
 			DRM_DEBUG("Allocation size %ldMb bigger than %ldMb limit\n",
 				  size >> 20, max_size >> 20);
@@ -93,7 +103,11 @@ void amdgpu_gem_force_release(struct amdgpu_device *adev)
 	struct drm_device *ddev = adev->ddev;
 	struct drm_file *file;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+	mutex_lock(&ddev->struct_mutex);
+#else
 	mutex_lock(&ddev->filelist_mutex);
+#endif
 
 	list_for_each_entry(file, &ddev->filelist, lhead) {
 		struct drm_gem_object *gobj;
@@ -103,13 +117,21 @@ void amdgpu_gem_force_release(struct amdgpu_device *adev)
 		spin_lock(&file->table_lock);
 		idr_for_each_entry(&file->object_idr, gobj, handle) {
 			WARN_ONCE(1, "And also active allocations!\n");
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+			drm_gem_object_unreference(gobj);
+#else
 			drm_gem_object_unreference_unlocked(gobj);
+#endif
 		}
 		idr_destroy(&file->object_idr);
 		spin_unlock(&file->table_lock);
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+	mutex_unlock(&ddev->struct_mutex);
+#else
 	mutex_unlock(&ddev->filelist_mutex);
+#endif
 }
 
 /*
@@ -241,6 +263,65 @@ error_unlock:
 	return r;
 }
 
+static int amdgpu_gem_get_handle_from_object(struct drm_file *filp,
+					     struct drm_gem_object *obj)
+{
+	int i;
+	struct drm_gem_object *tmp;
+	spin_lock(&filp->table_lock);
+	idr_for_each_entry(&filp->object_idr, tmp, i) {
+		if (obj == tmp) {
+			drm_gem_object_reference(obj);
+			spin_unlock(&filp->table_lock);
+			return i;
+		}
+	}
+	spin_unlock(&filp->table_lock);
+	return 0;
+}
+
+
+int amdgpu_gem_find_bo_by_cpu_mapping_ioctl(struct drm_device *dev, void *data,
+					    struct drm_file *filp)
+{
+	struct drm_amdgpu_gem_find_bo *args = data;
+	struct drm_gem_object *gobj;
+	struct amdgpu_bo *bo;
+	struct ttm_buffer_object *tbo;
+	struct vm_area_struct *vma;
+	uint32_t handle;
+	int r;
+
+	if (offset_in_page(args->addr | args->size))
+		return -EINVAL;
+
+	down_read(&current->mm->mmap_sem);
+	vma = find_vma(current->mm, args->addr);
+	if (!vma || vma->vm_file != filp->filp ||
+	    (args->size > (vma->vm_end - args->addr))) {
+		args->handle = 0;
+		up_read(&current->mm->mmap_sem);
+		return -EINVAL;
+	}
+	tbo = vma->vm_private_data;
+	bo = container_of(tbo, struct amdgpu_bo, tbo);
+	amdgpu_bo_ref(bo);
+	gobj = &bo->gem_base;
+	handle = amdgpu_gem_get_handle_from_object(filp, gobj);
+	if (handle == 0) {
+		r = drm_gem_handle_create(filp, gobj, &handle);
+		if (r) {
+			DRM_ERROR("create gem handle failed\n");
+			up_read(&current->mm->mmap_sem);
+			return r;
+		}
+	}
+	args->handle = handle;
+	args->offset = args->addr - vma->vm_start;
+	up_read(&current->mm->mmap_sem);
+	return 0;
+}
+
 int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 			     struct drm_file *filp)
 {
@@ -332,6 +413,84 @@ handle_lockup:
 	return r;
 }
 
+int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
+			   struct drm_file *filp)
+{
+	struct amdgpu_device *adev = dev->dev_private;
+	struct drm_amdgpu_gem_dgma *args = data;
+	struct drm_gem_object *gobj;
+	struct amdgpu_bo *abo;
+	dma_addr_t *dma_addr;
+	uint32_t handle, flags;
+	uint64_t offset;
+	int i, r = 0;
+
+	switch (args->op) {
+	case AMDGPU_GEM_DGMA_IMPORT:
+		/* create a gem object to contain this object in */
+		r = amdgpu_gem_object_create(adev, args->size, 0,
+					     AMDGPU_GEM_DOMAIN_DGMA_IMPORT, 0,
+					     0, &gobj);
+		if (r)
+			goto handle_lockup;
+
+		abo = gem_to_amdgpu_bo(gobj);
+		r = amdgpu_bo_reserve(abo, true);
+		if (unlikely(r))
+			goto release_object;
+
+		dma_addr = kmalloc_array(abo->tbo.num_pages, sizeof(dma_addr_t), GFP_KERNEL);
+		if (unlikely(dma_addr == NULL)) {
+			amdgpu_bo_unreserve(abo);
+			goto release_object;
+		}
+		for (i = 0; i < abo->tbo.num_pages; i++)
+			dma_addr[i] = args->addr + i * PAGE_SIZE;
+
+		flags = amdgpu_ttm_tt_pte_flags(adev, abo->tbo.ttm, &abo->tbo.mem);
+
+		offset = amdgpu_bo_gpu_offset(abo);
+		offset -= adev->mman.bdev.man[TTM_PL_TT].gpu_offset;
+		r = amdgpu_gart_bind(adev, offset, abo->tbo.num_pages,
+					NULL, dma_addr, flags);
+		kfree(dma_addr);
+		amdgpu_bo_unreserve(abo);
+		if (unlikely(r))
+			goto release_object;
+
+		abo->tbo.mem.bus.base = args->addr;
+		abo->tbo.mem.bus.offset = 0;
+
+		r = drm_gem_handle_create(filp, gobj, &handle);
+		args->handle = handle;
+		break;
+	case AMDGPU_GEM_DGMA_QUERY_PHYS_ADDR:
+		gobj = kcl_drm_gem_object_lookup(dev, filp, args->handle);
+		if (gobj == NULL)
+			return -ENOENT;
+
+		abo = gem_to_amdgpu_bo(gobj);
+		if (abo->tbo.mem.mem_type != AMDGPU_PL_DGMA) {
+			r = -EINVAL;
+			goto release_object;
+		}
+		args->addr = amdgpu_bo_gpu_offset(abo);
+		args->addr -= adev->mc.vram_start;
+		args->addr += adev->mc.aper_base;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+release_object:
+	drm_gem_object_unreference_unlocked(gobj);
+
+handle_lockup:
+	r = amdgpu_gem_handle_lockup(adev, r);
+
+	return r;
+}
+
 int amdgpu_mode_dumb_mmap(struct drm_file *filp,
 			  struct drm_device *dev,
 			  uint32_t handle, uint64_t *offset_p)
@@ -339,7 +498,7 @@ int amdgpu_mode_dumb_mmap(struct drm_file *filp,
 	struct drm_gem_object *gobj;
 	struct amdgpu_bo *robj;
 
-	gobj = drm_gem_object_lookup(filp, handle);
+	gobj = kcl_drm_gem_object_lookup(dev, filp, handle);
 	if (gobj == NULL) {
 		return -ENOENT;
 	}
@@ -403,15 +562,15 @@ int amdgpu_gem_wait_idle_ioctl(struct drm_device *dev, void *data,
 	int r = 0;
 	long ret;
 
-	gobj = drm_gem_object_lookup(filp, handle);
+	gobj = kcl_drm_gem_object_lookup(dev, filp, handle);
 	if (gobj == NULL) {
 		return -ENOENT;
 	}
 	robj = gem_to_amdgpu_bo(gobj);
 	if (timeout == 0)
-		ret = reservation_object_test_signaled_rcu(robj->tbo.resv, true);
+		ret = kcl_reservation_object_test_signaled_rcu(robj->tbo.resv, true);
 	else
-		ret = reservation_object_wait_timeout_rcu(robj->tbo.resv, true, true, timeout);
+		ret = kcl_reservation_object_wait_timeout_rcu(robj->tbo.resv, true, true, timeout);
 
 	/* ret == 0 means not signaled,
 	 * ret > 0 means signaled
@@ -437,7 +596,7 @@ int amdgpu_gem_metadata_ioctl(struct drm_device *dev, void *data,
 	int r = -1;
 
 	DRM_DEBUG("%d \n", args->handle);
-	gobj = drm_gem_object_lookup(filp, args->handle);
+	gobj = kcl_drm_gem_object_lookup(dev, filp, args->handle);
 	if (gobj == NULL)
 		return -ENOENT;
 	robj = gem_to_amdgpu_bo(gobj);
@@ -591,7 +750,7 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 		return -EINVAL;
 	}
 
-	gobj = drm_gem_object_lookup(filp, args->handle);
+	gobj = kcl_drm_gem_object_lookup(dev, filp, args->handle);
 	if (gobj == NULL)
 		return -ENOENT;
 	abo = gem_to_amdgpu_bo(gobj);
@@ -651,7 +810,7 @@ int amdgpu_gem_op_ioctl(struct drm_device *dev, void *data,
 	struct amdgpu_bo *robj;
 	int r;
 
-	gobj = drm_gem_object_lookup(filp, args->handle);
+	gobj = kcl_drm_gem_object_lookup(dev, filp, args->handle);
 	if (gobj == NULL) {
 		return -ENOENT;
 	}
@@ -774,7 +933,11 @@ static int amdgpu_debugfs_gem_info(struct seq_file *m, void *data)
 	struct drm_file *file;
 	int r;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+	r = mutex_lock_interruptible(&dev->struct_mutex);
+#else
 	r = mutex_lock_interruptible(&dev->filelist_mutex);
+#endif
 	if (r)
 		return r;
 
@@ -798,7 +961,11 @@ static int amdgpu_debugfs_gem_info(struct seq_file *m, void *data)
 		spin_unlock(&file->table_lock);
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+	mutex_unlock(&dev->struct_mutex);
+#else
 	mutex_unlock(&dev->filelist_mutex);
+#endif
 	return 0;
 }
 

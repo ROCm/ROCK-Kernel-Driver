@@ -85,6 +85,7 @@ enum amd_dpm_forced_level {
 	AMD_DPM_FORCED_LEVEL_MANUAL = 0x2,
 	AMD_DPM_FORCED_LEVEL_LOW = 0x4,
 	AMD_DPM_FORCED_LEVEL_HIGH = 0x8,
+	AMD_DPM_FORCED_LEVEL_PROFILING = 0x10,
 };
 
 enum amd_powergating_state {
@@ -213,6 +214,8 @@ struct amd_ip_funcs {
 	/* enable/disable pg for the IP block */
 	int (*set_powergating_state)(void *handle,
 				     enum amd_powergating_state state);
+	/* get current clockgating status */
+	void (*get_clockgating_state)(void *handle, u32 *flags);
 };
 
 #endif /* __AMD_SHARED_H__ */

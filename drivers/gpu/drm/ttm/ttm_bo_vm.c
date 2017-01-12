@@ -28,6 +28,7 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 
+#undef pr_fmt
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <ttm/ttm_module.h>
@@ -35,7 +36,9 @@
 #include <ttm/ttm_placement.h>
 #include <drm/drm_vma_manager.h>
 #include <linux/mm.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3)
 #include <linux/pfn_t.h>
+#endif
 #include <linux/rbtree.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
@@ -63,8 +66,10 @@ static int ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 	 */
 	if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 		ret = VM_FAULT_RETRY;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 		if (vmf->flags & FAULT_FLAG_RETRY_NOWAIT)
 			goto out_unlock;
+#endif
 
 		up_read(&vma->vm_mm->mmap_sem);
 		(void) fence_wait(bo->moving, true);
@@ -119,10 +124,14 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 			return VM_FAULT_NOPAGE;
 
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				up_read(&vma->vm_mm->mmap_sem);
 				(void) ttm_bo_wait_unreserved(bo);
 			}
+#else
+			up_read(&vma->vm_mm->mmap_sem);
+#endif
 
 			return VM_FAULT_RETRY;
 		}
@@ -236,7 +245,11 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 		if (vma->vm_flags & VM_MIXEDMAP)
 			ret = vm_insert_mixed(&cvma, address,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3)
 					__pfn_to_pfn_t(pfn, PFN_DEV));
+#else
+					pfn);
+#endif
 		else
 			ret = vm_insert_pfn(&cvma, address, pfn);
 

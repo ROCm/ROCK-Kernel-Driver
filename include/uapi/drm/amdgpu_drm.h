@@ -32,7 +32,7 @@
 #ifndef __AMDGPU_DRM_H__
 #define __AMDGPU_DRM_H__
 
-#include "drm.h"
+#include <drm/drm.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -53,6 +53,10 @@ extern "C" {
 #define DRM_AMDGPU_WAIT_FENCES		0x12
 #define DRM_AMDGPU_FREESYNC	        0x14
 
+/* hybrid specific ioctls */
+#define DRM_AMDGPU_GEM_DGMA            0x5c
+#define DRM_AMDGPU_GEM_FIND_BO		0x5f
+
 #define DRM_IOCTL_AMDGPU_GEM_CREATE	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_CREATE, union drm_amdgpu_gem_create)
 #define DRM_IOCTL_AMDGPU_GEM_MMAP	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_MMAP, union drm_amdgpu_gem_mmap)
 #define DRM_IOCTL_AMDGPU_CTX		DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_CTX, union drm_amdgpu_ctx)
@@ -68,12 +72,18 @@ extern "C" {
 #define DRM_IOCTL_AMDGPU_WAIT_FENCES	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_WAIT_FENCES, union drm_amdgpu_wait_fences)
 #define DRM_IOCTL_AMDGPU_FREESYNC	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_FREESYNC, struct drm_amdgpu_freesync)
 
+/* hybrid specific ioctls */
+#define DRM_IOCTL_AMDGPU_GEM_DGMA	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_DGMA, struct drm_amdgpu_gem_dgma)
+#define DRM_IOCTL_AMDGPU_GEM_FIND_BO	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_FIND_BO, struct drm_amdgpu_gem_find_bo)
+
 #define AMDGPU_GEM_DOMAIN_CPU		0x1
 #define AMDGPU_GEM_DOMAIN_GTT		0x2
 #define AMDGPU_GEM_DOMAIN_VRAM		0x4
 #define AMDGPU_GEM_DOMAIN_GDS		0x8
 #define AMDGPU_GEM_DOMAIN_GWS		0x10
 #define AMDGPU_GEM_DOMAIN_OA		0x20
+#define AMDGPU_GEM_DOMAIN_DGMA		0x40
+#define AMDGPU_GEM_DOMAIN_DGMA_IMPORT	0x80
 
 /* Flag that CPU access will be required for the case of VRAM domain */
 #define AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED	(1 << 0)
@@ -87,6 +97,12 @@ extern "C" {
 #define AMDGPU_GEM_CREATE_SHADOW		(1 << 4)
 /* Flag that allocating the BO should use linear VRAM */
 #define AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS	(1 << 5)
+
+/* hybrid specific */
+/* Flag that the memory allocation should be from top of domain */
+#define AMDGPU_GEM_CREATE_TOP_DOWN		(1 << 30)
+/* Flag that the memory allocation should be pinned */
+#define AMDGPU_GEM_CREATE_NO_EVICT		(1 << 31)
 
 struct drm_amdgpu_gem_create_in  {
 	/** the requested memory size */
@@ -209,6 +225,24 @@ struct drm_amdgpu_gem_userptr {
 	__u32		flags;
 	/* Resulting GEM handle */
 	__u32		handle;
+};
+
+#define AMDGPU_GEM_DGMA_IMPORT			0
+#define AMDGPU_GEM_DGMA_QUERY_PHYS_ADDR		1
+struct drm_amdgpu_gem_dgma {
+	__u64		addr;
+	__u64		size;
+	__u32		op;
+	__u32		handle;
+};
+struct drm_amdgpu_gem_find_bo {
+	uint64_t		addr;
+	uint64_t		size;
+	uint32_t		flags;
+	/* Resulting GEM handle */
+	uint32_t		handle;
+	/* offset in bo */
+	uint64_t		offset;
 };
 
 /* same meaning as the GB_TILE_MODE and GL_MACRO_TILE_MODE fields */
@@ -533,6 +567,16 @@ struct drm_amdgpu_cs_chunk_data {
 /* Query UVD handles */
 #define AMDGPU_INFO_NUM_HANDLES			0x1C
 
+/* Hybrid Stack Specific Defs*/
+/* gpu capability */
+#define AMDGPU_INFO_CAPABILITY			0x50
+/* virtual range */
+#define AMDGPU_INFO_VIRTUAL_RANGE		0x51
+/* query pin memory capability */
+#define AMDGPU_CAPABILITY_PIN_MEM_FLAG  (1 << 0)
+/* query direct gma capability */
+#define AMDGPU_CAPABILITY_DIRECT_GMA_FLAG	(1 << 1)
+
 #define AMDGPU_INFO_MMR_SE_INDEX_SHIFT	0
 #define AMDGPU_INFO_MMR_SE_INDEX_MASK	0xff
 #define AMDGPU_INFO_MMR_SH_INDEX_SHIFT	8
@@ -588,6 +632,11 @@ struct drm_amdgpu_info {
 			/** For future use, no flags defined so far */
 			__u32 flags;
 		} read_mmr_reg;
+
+		struct {
+			uint32_t aperture;
+			uint32_t _pad;
+		} virtual_range;
 
 		struct drm_amdgpu_query_fw query_fw;
 
@@ -757,6 +806,21 @@ struct drm_amdgpu_info_vce_clock_table {
 #define AMDGPU_FAMILY_KV			125 /* Kaveri, Kabini, Mullins */
 #define AMDGPU_FAMILY_VI			130 /* Iceland, Tonga */
 #define AMDGPU_FAMILY_CZ			135 /* Carrizo, Stoney */
+
+/**
+ *  Definition of System Unified Address (SUA) apertures
+ */
+#define AMDGPU_SUA_APERTURE_PRIVATE    1
+#define AMDGPU_SUA_APERTURE_SHARED     2
+struct drm_amdgpu_virtual_range {
+	uint64_t start;
+	uint64_t end;
+};
+
+struct drm_amdgpu_capability {
+	__u32 flag;
+	__u32 direct_gma_size;
+};
 
 /*
  * Definition of free sync enter and exit signals

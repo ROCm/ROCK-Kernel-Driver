@@ -665,6 +665,13 @@ static int gmc_v7_0_vm_init(struct amdgpu_device *adev)
 	 * amdkfd will use VMIDs 8-15
 	 */
 	adev->vm_manager.num_ids = AMDGPU_NUM_OF_VMIDS;
+	adev->vm_manager.shared_aperture_start = 0x2000000000000000ULL;
+	adev->vm_manager.shared_aperture_end =
+		adev->vm_manager.shared_aperture_start + (4ULL << 30) - 1;
+	adev->vm_manager.private_aperture_start =
+		adev->vm_manager.shared_aperture_end + 1;
+	adev->vm_manager.private_aperture_end =
+		adev->vm_manager.private_aperture_start + (4ULL << 30) - 1;
 	amdgpu_vm_manager_init(adev);
 
 	/* base offset of vram pages */

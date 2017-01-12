@@ -163,6 +163,21 @@ static void dce_virtual_bandwidth_update(struct amdgpu_device *adev)
 	return;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+static void dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				    u16 *blue, uint32_t start, uint32_t size)
+{
+	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
+	int end = (start + size > 256) ? 256 : start + size, i;
+
+	/* userspace palettes are always correct as is */
+	for (i = start; i < end; i++) {
+		amdgpu_crtc->lut_r[i] = red[i] >> 6;
+		amdgpu_crtc->lut_g[i] = green[i] >> 6;
+		amdgpu_crtc->lut_b[i] = blue[i] >> 6;
+	}
+}
+#else
 static int dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red,
 				      u16 *green, u16 *blue, uint32_t size)
 {
@@ -178,6 +193,7 @@ static int dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red,
 
 	return 0;
 }
+#endif
 
 static void dce_virtual_crtc_destroy(struct drm_crtc *crtc)
 {
@@ -193,7 +209,11 @@ static const struct drm_crtc_funcs dce_virtual_crtc_funcs = {
 	.gamma_set = dce_virtual_crtc_gamma_set,
 	.set_config = amdgpu_crtc_set_config,
 	.destroy = dce_virtual_crtc_destroy,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 	.page_flip_target = amdgpu_crtc_page_flip_target,
+#else
+	.page_flip = amdgpu_crtc_page_flip,
+#endif
 };
 
 static void dce_virtual_crtc_dpms(struct drm_crtc *crtc, int mode)
@@ -656,7 +676,7 @@ static int dce_virtual_connector_encoder_init(struct amdgpu_device *adev,
 	if (!encoder)
 		return -ENOMEM;
 	encoder->possible_crtcs = 1 << index;
-	drm_encoder_init(adev->ddev, encoder, &dce_virtual_encoder_funcs,
+	kcl_drm_encoder_init(adev->ddev, encoder, &dce_virtual_encoder_funcs,
 			 DRM_MODE_ENCODER_VIRTUAL, NULL);
 	drm_encoder_helper_add(encoder, &dce_virtual_encoder_helper_funcs);
 

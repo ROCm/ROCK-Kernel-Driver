@@ -694,11 +694,11 @@ static struct drm_driver kms_driver = {
 	.lastclose = amdgpu_driver_lastclose_kms,
 	.set_busid = drm_pci_set_busid,
 	.unload = amdgpu_driver_unload_kms,
-	.get_vblank_counter = amdgpu_get_vblank_counter_kms,
-	.enable_vblank = amdgpu_enable_vblank_kms,
-	.disable_vblank = amdgpu_disable_vblank_kms,
-	.get_vblank_timestamp = amdgpu_get_vblank_timestamp_kms,
-	.get_scanout_position = amdgpu_get_crtc_scanoutpos,
+	.get_vblank_counter = kcl_amdgpu_get_vblank_counter_kms,
+	.enable_vblank = kcl_amdgpu_enable_vblank_kms,
+	.disable_vblank = kcl_amdgpu_disable_vblank_kms,
+	.get_vblank_timestamp = kcl_amdgpu_get_vblank_timestamp_kms,
+	.get_scanout_position = kcl_amdgpu_get_crtc_scanoutpos,
 #if defined(CONFIG_DEBUG_FS)
 	.debugfs_init = amdgpu_debugfs_init,
 	.debugfs_cleanup = amdgpu_debugfs_cleanup,
@@ -708,7 +708,11 @@ static struct drm_driver kms_driver = {
 	.irq_uninstall = amdgpu_irq_uninstall,
 	.irq_handler = amdgpu_irq_handler,
 	.ioctls = amdgpu_ioctls_kms,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+	.gem_free_object = amdgpu_gem_object_free,
+#else
 	.gem_free_object_unlocked = amdgpu_gem_object_free,
+#endif
 	.gem_open_object = amdgpu_gem_object_open,
 	.gem_close_object = amdgpu_gem_object_close,
 	.dumb_create = amdgpu_mode_dumb_create,
@@ -804,3 +808,4 @@ module_exit(amdgpu_exit);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL and additional rights");
+MODULE_VERSION("17.10.2");

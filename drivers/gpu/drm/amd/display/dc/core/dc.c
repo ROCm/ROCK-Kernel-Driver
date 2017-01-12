@@ -332,14 +332,21 @@ static bool setup_psr(struct dc *dc, const struct dc_stream *stream)
 }
 
 static void set_drive_settings(struct dc *dc,
-		struct link_training_settings *lt_settings)
+		struct link_training_settings *lt_settings,
+		const struct dc_link *link)
 {
 	struct core_dc *core_dc = DC_TO_CORE(dc);
 	int i;
 
-	for (i = 0; i < core_dc->link_count; i++)
-		dc_link_dp_set_drive_settings(&core_dc->links[i]->public,
-				lt_settings);
+	for (i = 0; i < core_dc->link_count; i++) {
+		if (&core_dc->links[i]->public == link)
+			break;
+	}
+
+	if (i >= core_dc->link_count)
+		ASSERT_CRITICAL(false);
+
+	dc_link_dp_set_drive_settings(&core_dc->links[i]->public, lt_settings);
 }
 
 static void perform_link_training(struct dc *dc,
@@ -357,17 +364,16 @@ static void perform_link_training(struct dc *dc,
 }
 
 static void set_preferred_link_settings(struct dc *dc,
-		struct dc_link_settings *link_setting)
+		struct dc_link_settings *link_setting,
+		const struct dc_link *link)
 {
-	struct core_dc *core_dc = DC_TO_CORE(dc);
-	int i;
+	struct core_link *core_link = DC_LINK_TO_CORE(link);
 
-	for (i = 0; i < core_dc->link_count; i++) {
-		core_dc->links[i]->public.verified_link_cap.lane_count =
+	core_link->public.verified_link_cap.lane_count =
 				link_setting->lane_count;
-		core_dc->links[i]->public.verified_link_cap.link_rate =
+	core_link->public.verified_link_cap.link_rate =
 				link_setting->link_rate;
-	}
+	dp_retrain_link_dp_test(core_link, link_setting, false);
 }
 
 static void enable_hpd(const struct dc_link *link)

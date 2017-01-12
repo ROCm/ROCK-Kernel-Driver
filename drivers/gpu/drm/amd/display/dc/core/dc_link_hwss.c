@@ -200,24 +200,55 @@ void dp_set_hw_test_pattern(
 	encoder->funcs->dp_set_phy_pattern(encoder, &pattern_param);
 }
 
-
-void dp_retrain_link(struct core_link *link)
+void dp_retrain_link_dp_test(struct core_link *link,
+			struct dc_link_settings *link_setting,
+			bool skip_video_pattern)
 {
-	struct pipe_ctx *pipes = link->dc->current_context->res_ctx.pipe_ctx;
+	struct pipe_ctx *pipes =
+			&link->dc->current_context->res_ctx.pipe_ctx[0];
 	unsigned int i;
 
 	for (i = 0; i < MAX_PIPES; i++) {
-		if (pipes[i].stream_enc != NULL) {
+		if (pipes[i].stream != NULL &&
+			pipes[i].stream->sink != NULL &&
+			pipes[i].stream->sink->link != NULL &&
+			pipes[i].stream_enc != NULL &&
+			pipes[i].stream->sink->link == link) {
 			dm_delay_in_microseconds(link->ctx, 100);
-			pipes->stream_enc->funcs->dp_blank(pipes[i].stream_enc);
-			link->dc->hwss.disable_stream(&pipes[i]);
+
+			pipes[i].stream_enc->funcs->dp_blank(
+					pipes[i].stream_enc);
+
+			/* disable any test pattern that might be active */
+			dp_set_hw_test_pattern(link,
+					DP_TEST_PATTERN_VIDEO_MODE, NULL, 0);
+
+			dp_receiver_power_ctrl(link, false);
+
+			link->link_enc->funcs->disable_output(
+					link->link_enc,
+					SIGNAL_TYPE_DISPLAY_PORT);
+
+			/* Clear current link setting. */
+			memset(&link->public.cur_link_settings, 0,
+				sizeof(link->public.cur_link_settings));
+
+			link->link_enc->funcs->enable_dp_output(
+						link->link_enc,
+						link_setting,
+						pipes[i].clock_source->id);
+
+			dp_receiver_power_ctrl(link, true);
+
 			dc_link_dp_perform_link_training(
 					&link->public,
-					&link->public.verified_link_cap,
-					true);
-			link->dc->hwss.enable_stream(&pipes[i]);
+					link_setting,
+					skip_video_pattern);
+
+			link->public.cur_link_settings = *link_setting;
+
 			link->dc->hwss.unblank_stream(&pipes[i],
-					&link->public.verified_link_cap);
+					link_setting);
 		}
 	}
 }

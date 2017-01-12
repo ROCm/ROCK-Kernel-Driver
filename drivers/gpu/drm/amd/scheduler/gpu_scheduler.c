@@ -138,7 +138,7 @@ int amd_sched_entity_init(struct amd_gpu_scheduler *sched,
 		return r;
 
 	atomic_set(&entity->fence_seq, 0);
-	entity->fence_context = fence_context_alloc(2);
+	entity->fence_context = kcl_fence_context_alloc(2);
 
 	return 0;
 }
@@ -524,8 +524,8 @@ static void amd_sched_process_job(struct fence *f, struct fence_cb *cb)
 
 static bool amd_sched_blocked(struct amd_gpu_scheduler *sched)
 {
-	if (kthread_should_park()) {
-		kthread_parkme();
+	if (kcl_kthread_should_park()) {
+		kcl_kthread_parkme();
 		return true;
 	}
 
