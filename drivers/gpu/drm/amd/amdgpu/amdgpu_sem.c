@@ -77,9 +77,9 @@ static inline void amdgpu_sem_put(struct amdgpu_sem *sem)
 
 static int amdgpu_sem_release(struct inode *inode, struct file *file)
 {
-	struct amdgpu_sem *sem = file->private_data;
+	struct amdgpu_sem_core *core = file->private_data;
 
-	amdgpu_sem_put(sem);
+	kref_put(&core->kref, amdgpu_sem_core_free);
 	return 0;
 }
 
@@ -211,6 +211,96 @@ static int amdgpu_sem_wait(struct amdgpu_fpriv *fpriv,
 	return ret;
 }
 
+static int amdgpu_sem_import(struct amdgpu_fpriv *fpriv,
+				       int fd, u32 *handle)
+{
+	struct file *file = fget(fd);
+	struct amdgpu_sem *sem;
+	struct amdgpu_sem_core *core;
+	int ret;
+
+	if (!file)
+		return -EINVAL;
+
+	core = file->private_data;
+	if (!core) {
+		fput(file);
+		return -EINVAL;
+	}
+
+	sem = amdgpu_sem_alloc();
+	if (!sem) {
+		ret = -ENOMEM;
+		goto err_out;
+	}
+
+	sem->base = core;
+
+	idr_preload(GFP_KERNEL);
+	spin_lock(&fpriv->sem_handles_lock);
+
+	ret = idr_alloc(&fpriv->sem_handles, sem, 1, 0, GFP_NOWAIT);
+
+	spin_unlock(&fpriv->sem_handles_lock);
+	idr_preload_end();
+
+	if (ret < 0)
+		goto err_out;
+
+	*handle = ret;
+	return 0;
+
+err_out:
+	kfree(sem);
+	return ret;
+
+}
+
+static int amdgpu_sem_export(struct amdgpu_fpriv *fpriv,
+				       u32 handle, int *fd)
+{
+	struct amdgpu_sem *sem;
+	struct amdgpu_sem_core *core;
+	int ret;
+
+	sem = amdgpu_sem_lookup(fpriv, handle);
+	if (!sem)
+		return -EINVAL;
+
+	core = sem->base;
+	mutex_lock(&core->lock);
+	if (!core->file) {
+		core->file = anon_inode_getfile("sem_file",
+					       &amdgpu_sem_fops,
+					       core, 0);
+		if (IS_ERR(core->file)) {
+			mutex_unlock(&core->lock);
+			ret = -ENOMEM;
+			goto err_put_sem;
+		}
+	}
+	mutex_unlock(&core->lock);
+
+	get_file(core->file);
+	kref_get(&core->kref);
+
+	ret = get_unused_fd_flags(O_CLOEXEC);
+	if (ret < 0)
+		goto err_put_file;
+
+	fd_install(ret, core->file);
+
+	*fd = ret;
+	amdgpu_sem_put(sem);
+	return 0;
+
+err_put_file:
+	fput(core->file);
+err_put_sem:
+	amdgpu_sem_put(sem);
+	return ret;
+}
+
 void amdgpu_sem_destroy(struct amdgpu_fpriv *fpriv, u32 handle)
 {
 	struct amdgpu_sem *sem = amdgpu_sem_lookup(fpriv, handle);
@@ -333,6 +423,12 @@ int amdgpu_sem_ioctl(struct drm_device *dev, void *data,
 		}
 		r = amdgpu_sem_signal(fpriv, args->in.handle, fence);
 		fence_put(fence);
+		break;
+	case AMDGPU_SEM_OP_IMPORT_SEM:
+		r = amdgpu_sem_import(fpriv, args->in.handle, &args->out.handle);
+		break;
+	case AMDGPU_SEM_OP_EXPORT_SEM:
+		r = amdgpu_sem_export(fpriv, args->in.handle, &args->out.fd);
 		break;
 	case AMDGPU_SEM_OP_DESTROY_SEM:
 		amdgpu_sem_destroy(fpriv, args->in.handle);
