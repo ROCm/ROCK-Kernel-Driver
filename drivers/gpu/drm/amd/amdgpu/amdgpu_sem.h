@@ -34,10 +34,16 @@
 #include <linux/spinlock.h>
 #include <linux/fence.h>
 
-struct amdgpu_sem {
+struct amdgpu_sem_core {
 	struct file		*file;
 	struct kref		kref;
 	struct fence            *fence;
+	struct mutex	lock;
+};
+
+struct amdgpu_sem {
+	struct amdgpu_sem_core	*base;
+	struct kref		kref;
 	struct list_head        list;
 };
 
