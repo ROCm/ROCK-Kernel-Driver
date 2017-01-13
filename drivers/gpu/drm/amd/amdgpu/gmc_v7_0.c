@@ -862,6 +862,8 @@ static void gmc_v7_0_vm_fini(struct amdgpu_device *adev)
  * @adev: amdgpu_device pointer
  * @status: VM_CONTEXT1_PROTECTION_FAULT_STATUS register value
  * @addr: VM_CONTEXT1_PROTECTION_FAULT_ADDR register value
+ * @mc_client: VM_CONTEXT1_PROTECTION_FAULT_MCCLIENT register value
+ * @src_id: interrupt source id
  *
  * Print human readable fault information (CIK).
  */
@@ -885,7 +887,8 @@ static void gmc_v7_0_vm_decode_fault(struct amdgpu_device *adev,
 			     MEMORY_CLIENT_RW) ?
 	       "write" : "read", block, mc_client, mc_id);
 
-	if (!atomic_read(&adev->mc.vm_fault_info_updated)) {
+	if (amdgpu_amdkfd_is_kfd_vmid(adev, vmid)
+		&& !atomic_read(&adev->mc.vm_fault_info_updated)) {
 		info->vmid = vmid;
 		info->mc_id = mc_id;
 		info->page_addr = addr;
