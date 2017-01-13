@@ -36,6 +36,8 @@ const struct kfd2kgd_calls *kfd2kgd;
 const struct kgd2kfd_calls *kgd2kfd;
 bool (*kgd2kfd_init_p)(unsigned, const struct kgd2kfd_calls**);
 
+unsigned int global_compute_vmid_bitmap = 0xFF00;
+
 int amdgpu_amdkfd_init(void)
 {
 	int ret;
@@ -108,7 +110,7 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 	int last_valid_bit;
 	if (adev->kfd) {
 		struct kgd2kfd_shared_resources gpu_resources = {
-			.compute_vmid_bitmap = 0xFF00,
+			.compute_vmid_bitmap = global_compute_vmid_bitmap,
 			.num_pipe_per_mec = adev->gfx.mec.num_pipe_per_mec,
 			.num_queue_per_pipe = adev->gfx.mec.num_queue_per_pipe,
 			.gpuvm_size = (uint64_t)amdgpu_vm_size << 30
@@ -629,4 +631,15 @@ bool read_user_wptr(struct mm_struct *mm, uint32_t __user *wptr,
 	}
 
 	return wptr_valid;
+}
+
+bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev,
+			u32 vmid)
+{
+	if (adev->kfd) {
+		if ((1 << vmid) & global_compute_vmid_bitmap)
+			return true;
+	}
+
+	return false;
 }
