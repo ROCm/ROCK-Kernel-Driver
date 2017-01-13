@@ -185,12 +185,18 @@ enum amdgpu_thermal_irq {
 	AMDGPU_THERMAL_IRQ_LAST
 };
 
+enum amdgpu_kiq_irq {
+	AMDGPU_CP_KIQ_IRQ_DRIVER0 = 0,
+	AMDGPU_CP_KIQ_IRQ_LAST
+};
+
 int amdgpu_set_clockgating_state(struct amdgpu_device *adev,
 				  enum amd_ip_block_type block_type,
 				  enum amd_clockgating_state state);
 int amdgpu_set_powergating_state(struct amdgpu_device *adev,
 				  enum amd_ip_block_type block_type,
 				  enum amd_powergating_state state);
+void amdgpu_get_clockgating_state(struct amdgpu_device *adev, u32 *flags);
 int amdgpu_wait_for_idle(struct amdgpu_device *adev,
 			 enum amd_ip_block_type block_type);
 bool amdgpu_is_idle(struct amdgpu_device *adev,
@@ -607,7 +613,11 @@ void amdgpu_doorbell_get_kfd_info(struct amdgpu_device *adev,
  */
 
 struct amdgpu_flip_work {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 	struct delayed_work		flip_work;
+#else
+	struct work_struct		flip_work;
+#endif
 	struct work_struct		unpin_work;
 	struct amdgpu_device		*adev;
 	int				crtc_id;
@@ -777,6 +787,13 @@ struct amdgpu_mec {
 	u32 num_queue;
 };
 
+struct amdgpu_kiq {
+	u64			eop_gpu_addr;
+	struct amdgpu_bo	*eop_obj;
+	struct amdgpu_ring	ring;
+	struct amdgpu_irq_src	irq;
+};
+
 /*
  * GPU scratch registers structures, functions & helpers
  */
@@ -852,6 +869,7 @@ struct amdgpu_gfx {
 	struct amdgpu_gca_config	config;
 	struct amdgpu_rlc		rlc;
 	struct amdgpu_mec		mec;
+	struct amdgpu_kiq		kiq;
 	struct amdgpu_scratch		scratch;
 	const struct firmware		*me_fw;	/* ME firmware */
 	uint32_t			me_fw_version;
@@ -1025,6 +1043,7 @@ struct amdgpu_uvd {
 	bool			use_ctx_buf;
 	struct amd_sched_entity entity;
 	uint32_t                srbm_soft_reset;
+	bool			is_powergated;
 };
 
 /*
@@ -1053,6 +1072,7 @@ struct amdgpu_vce {
 	struct amd_sched_entity	entity;
 	uint32_t                srbm_soft_reset;
 	unsigned		num_rings;
+	bool			is_powergated;
 };
 
 /*
@@ -1179,7 +1199,6 @@ struct amdgpu_asic_funcs {
 	bool (*read_disabled_bios)(struct amdgpu_device *adev);
 	bool (*read_bios_from_rom)(struct amdgpu_device *adev,
 				   u8 *bios, u32 length_bytes);
-	void (*detect_hw_virtualization) (struct amdgpu_device *adev);
 	int (*read_register)(struct amdgpu_device *adev, u32 se_num,
 			     u32 sh_num, u32 reg_offset, u32 *value);
 	void (*set_vga_state)(struct amdgpu_device *adev, bool state);
@@ -1206,6 +1225,8 @@ int amdgpu_gem_info_ioctl(struct drm_device *dev, void *data,
 			  struct drm_file *filp);
 int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 			struct drm_file *filp);
+int amdgpu_gem_find_bo_by_cpu_mapping_ioctl(struct drm_device *dev, void *data,
+					    struct drm_file *filp);
 int amdgpu_gem_mmap_ioctl(struct drm_device *dev, void *data,
 			  struct drm_file *filp);
 int amdgpu_gem_wait_idle_ioctl(struct drm_device *dev, void *data,
@@ -1224,6 +1245,9 @@ int amdgpu_gem_metadata_ioctl(struct drm_device *dev, void *data,
 
 int amdgpu_freesync_ioctl(struct drm_device *dev, void *data,
 			    struct drm_file *filp);
+
+int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
+			   struct drm_file *filp);
 
 /* VRAM scratch page for HDP bug, default vram page */
 struct amdgpu_vram_scratch {
@@ -1298,6 +1322,15 @@ typedef void (*amdgpu_wreg_t)(struct amdgpu_device*, uint32_t, uint32_t);
 typedef uint32_t (*amdgpu_block_rreg_t)(struct amdgpu_device*, uint32_t, uint32_t);
 typedef void (*amdgpu_block_wreg_t)(struct amdgpu_device*, uint32_t, uint32_t, uint32_t);
 
+struct amdgpu_direct_gma {
+	/* reserved in visible vram*/
+	struct amdgpu_bo	*dgma_bo;
+	atomic64_t		vram_usage;
+	/* reserved in gart */
+	struct ttm_mem_reg	gart_mem;
+	atomic64_t		gart_usage;
+};
+
 struct amdgpu_device {
 	struct device			*dev;
 	struct drm_device		*ddev;
@@ -1338,6 +1371,7 @@ struct amdgpu_device {
 	uint8_t				*bios;
 	uint32_t			bios_size;
 	struct amdgpu_bo		*stollen_vga_memory;
+	struct amdgpu_direct_gma	direct_gma;
 	uint32_t			bios_scratch[AMDGPU_BIOS_NUM_SCRATCH];
 
 	/* Register/doorbell mmio */
@@ -1470,7 +1504,7 @@ struct amdgpu_device {
 	/* amdkfd interface */
 	struct kfd_dev          *kfd;
 
-	struct amdgpu_virtualization virtualization;
+	struct amdgpu_virt	virt;
 
 	/* link all shadow bo */
 	struct list_head                shadow_list;
@@ -1613,7 +1647,6 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 #define amdgpu_asic_get_gpu_clock_counter(adev) (adev)->asic_funcs->get_gpu_clock_counter((adev))
 #define amdgpu_asic_read_disabled_bios(adev) (adev)->asic_funcs->read_disabled_bios((adev))
 #define amdgpu_asic_read_bios_from_rom(adev, b, l) (adev)->asic_funcs->read_bios_from_rom((adev), (b), (l))
-#define amdgpu_asic_detect_hw_virtualization(adev) (adev)->asic_funcs->detect_hw_virtualization((adev))
 #define amdgpu_asic_read_register(adev, se, sh, offset, v)((adev)->asic_funcs->read_register((adev), (se), (sh), (offset), (v)))
 #define amdgpu_gart_flush_gpu_tlb(adev, vmid) (adev)->gart.gart_funcs->flush_gpu_tlb((adev), (vmid))
 #define amdgpu_gart_set_pte_pde(adev, pt, idx, addr, flags) (adev)->gart.gart_funcs->set_pte_pde((adev), (pt), (idx), (addr), (flags))

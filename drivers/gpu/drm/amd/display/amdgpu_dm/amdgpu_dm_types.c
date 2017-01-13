@@ -156,7 +156,7 @@ static int dm_crtc_pin_cursor_bo_new(
 
 		amdgpu_crtc = to_amdgpu_crtc(crtc);
 
-		obj = drm_gem_object_lookup(file_priv, handle);
+		obj = kcl_drm_gem_object_lookup(crtc->dev, file_priv, handle);
 
 		if (!obj) {
 			DRM_ERROR(
@@ -513,7 +513,6 @@ static void fill_gamma_from_crtc(
 {
 	int i;
 	struct dc_gamma *gamma;
-	struct dc_transfer_func *input_tf;
 	uint16_t *red, *green, *blue;
 	int end = (crtc->gamma_size > NUM_OF_RAW_GAMMA_RAMP_RGB_256) ?
 			NUM_OF_RAW_GAMMA_RAMP_RGB_256 : crtc->gamma_size;
@@ -534,16 +533,6 @@ static void fill_gamma_from_crtc(
 	}
 
 	dc_surface->gamma_correction = gamma;
-
-	input_tf = dc_create_transfer_func();
-
-	if (input_tf == NULL)
-		return;
-
-	input_tf->type = TF_TYPE_PREDEFINED;
-	input_tf->tf = TRANSFER_FUNCTION_SRGB;
-
-	dc_surface->in_transfer_func = input_tf;
 }
 
 static void fill_plane_attributes(
@@ -554,6 +543,7 @@ static void fill_plane_attributes(
 	const struct amdgpu_framebuffer *amdgpu_fb =
 		to_amdgpu_framebuffer(state->fb);
 	const struct drm_crtc *crtc = state->crtc;
+	struct dc_transfer_func *input_tf;
 
 	fill_rects_from_plane_state(state, surface);
 	fill_plane_attributes_from_fb(
@@ -561,6 +551,16 @@ static void fill_plane_attributes(
 		surface,
 		amdgpu_fb,
 		addrReq);
+
+	input_tf = dc_create_transfer_func();
+
+	if (input_tf == NULL)
+		return;
+
+	input_tf->type = TF_TYPE_PREDEFINED;
+	input_tf->tf = TRANSFER_FUNCTION_SRGB;
+
+	surface->in_transfer_func = input_tf;
 
 	/* In case of gamma set, update gamma value */
 	if (crtc->mode.private_flags &
@@ -1017,6 +1017,23 @@ void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc)
 	kfree(crtc);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+static void amdgpu_dm_atomic_crtc_gamma_set(
+		struct drm_crtc *crtc,
+		u16 *red,
+		u16 *green,
+		u16 *blue,
+		uint32_t start,
+		uint32_t size)
+{
+	struct drm_device *dev = crtc->dev;
+	struct drm_property *prop = dev->mode_config.prop_crtc_id;
+
+	crtc->state->mode.private_flags |= AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
+
+	drm_atomic_helper_crtc_set_property(crtc, prop, 0);
+}
+#else
 static int amdgpu_dm_atomic_crtc_gamma_set(
 		struct drm_crtc *crtc,
 		u16 *red,
@@ -1031,6 +1048,7 @@ static int amdgpu_dm_atomic_crtc_gamma_set(
 
 	return drm_atomic_helper_crtc_set_property(crtc, prop, 0);
 }
+#endif
 
 static int dm_crtc_funcs_atomic_set_property(
 	struct drm_crtc *crtc,
@@ -1077,6 +1095,10 @@ static int amdgpu_atomic_helper_page_flip(struct drm_crtc *crtc,
 	if (!state)
 		return -ENOMEM;
 
+	ret = drm_crtc_vblank_get(crtc);
+	if (ret)
+		return ret;
+
 	state->acquire_ctx = drm_modeset_legacy_acquire_ctx(crtc);
 retry:
 	crtc_state = drm_atomic_get_crtc_state(state, crtc);
@@ -1106,7 +1128,11 @@ retry:
 		goto fail;
 	}
 	acrtc->flip_flags = flags;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+	ret = drm_atomic_async_commit(state);
+#else
 	ret = drm_atomic_nonblocking_commit(state);
+#endif
 	if (ret != 0)
 		goto fail;
 
@@ -1115,6 +1141,9 @@ retry:
 fail:
 	if (ret == -EDEADLK)
 		goto backoff;
+
+	if (ret)
+		drm_crtc_vblank_put(crtc);
 
 	drm_atomic_state_free(state);
 
@@ -1681,9 +1710,22 @@ static bool page_flip_needed(
 	return page_flip_required;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || \
+	defined(OS_NAME_RHEL_6) || \
+	defined(OS_NAME_RHEL_7_3)
 static int dm_plane_helper_prepare_fb(
 	struct drm_plane *plane,
 	struct drm_plane_state *new_state)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+static int dm_plane_helper_prepare_fb(
+	struct drm_plane *plane,
+	const struct drm_plane_state *new_state)
+#else
+static int dm_plane_helper_prepare_fb(
+	struct drm_plane *plane,
+	struct drm_framebuffer *fb,
+	const struct drm_plane_state *new_state)
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) */
 {
 	struct amdgpu_framebuffer *afb;
 	struct drm_gem_object *obj;
@@ -1714,10 +1756,22 @@ static int dm_plane_helper_prepare_fb(
 
 	return 0;
 }
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || \
+	defined(OS_NAME_RHEL_6) || \
+	defined(OS_NAME_RHEL_7_3)
 static void dm_plane_helper_cleanup_fb(
 	struct drm_plane *plane,
 	struct drm_plane_state *old_state)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+static void dm_plane_helper_cleanup_fb(
+	struct drm_plane *plane,
+	const struct drm_plane_state *old_state)
+#else
+static void dm_plane_helper_cleanup_fb(
+	struct drm_plane *plane,
+	struct drm_framebuffer *fb,
+	const struct drm_plane_state *old_state)
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) */
 {
 	struct amdgpu_bo *rbo;
 	struct amdgpu_framebuffer *afb;
@@ -1829,7 +1883,7 @@ int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 
 	primary_plane->format_default = true;
 
-	res = drm_universal_plane_init(
+	res = kcl_drm_universal_plane_init(
 		dm->adev->ddev,
 		primary_plane,
 		0,
@@ -1842,7 +1896,7 @@ int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 
 	drm_plane_helper_add(primary_plane, &dm_plane_helper_funcs);
 
-	res = drm_crtc_init_with_planes(
+	res = kcl_drm_crtc_init_with_planes(
 			dm->ddev,
 			&acrtc->base,
 			primary_plane,
@@ -2273,7 +2327,7 @@ int amdgpu_dm_encoder_init(
 {
 	struct amdgpu_device *adev = dev->dev_private;
 
-	int res = drm_encoder_init(dev,
+	int res = kcl_drm_encoder_init(dev,
 				   &aencoder->base,
 				   &amdgpu_dm_encoder_funcs,
 				   DRM_MODE_ENCODER_TMDS,
@@ -2506,7 +2560,11 @@ int amdgpu_dm_atomic_commit(
 	 * the software side now.
 	 */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+	drm_atomic_helper_swap_state(dev, state);
+#else
 	drm_atomic_helper_swap_state(state, true);
+#endif
 
 	/*
 	 * From this point state become old state really. New state is
@@ -2518,7 +2576,7 @@ int amdgpu_dm_atomic_commit(
 	 * wait_for_fences(dev, state);
 	 */
 
-	drm_atomic_helper_update_legacy_modeset_state(dev, state);
+	kcl_drm_atomic_helper_update_legacy_modeset_state(dev, state);
 
 	/* update changed items */
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
@@ -2764,11 +2822,18 @@ int amdgpu_dm_atomic_commit(
 			continue;
 
 		if (page_flip_needed(plane_state, old_plane_state, false)) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 			ret = amdgpu_crtc_page_flip_target(crtc,
 							   fb,
 							   crtc->state->event,
 							   acrtc->flip_flags,
 							   drm_crtc_vblank_count(crtc));
+#else
+			ret = amdgpu_crtc_page_flip(crtc,
+						    fb,
+						    crtc->state->event,
+						    acrtc->flip_flags);
+#endif
 			/*clean up the flags for next usage*/
 			acrtc->flip_flags = 0;
 			if (ret)

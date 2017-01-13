@@ -36,7 +36,7 @@
 #include "pp_acpi.h"
 #include "amd_acpi.h"
 
-extern int cz_hwmgr_init(struct pp_hwmgr *hwmgr);
+extern int cz_init_function_pointers(struct pp_hwmgr *hwmgr);
 
 static int polaris_set_asic_special_caps(struct pp_hwmgr *hwmgr);
 static void hwmgr_init_default_caps(struct pp_hwmgr *hwmgr);
@@ -50,11 +50,11 @@ uint8_t convert_to_vid(uint16_t vddc)
 	return (uint8_t) ((6200 - (vddc * VOLTAGE_SCALE)) / 25);
 }
 
-int hwmgr_init(struct amd_pp_init *pp_init, struct pp_instance *handle)
+int hwmgr_early_init(struct pp_instance *handle)
 {
 	struct pp_hwmgr *hwmgr;
 
-	if ((handle == NULL) || (pp_init == NULL))
+	if (handle == NULL)
 		return -EINVAL;
 
 	hwmgr = kzalloc(sizeof(struct pp_hwmgr), GFP_KERNEL);
@@ -63,9 +63,10 @@ int hwmgr_init(struct amd_pp_init *pp_init, struct pp_instance *handle)
 
 	handle->hwmgr = hwmgr;
 	hwmgr->smumgr = handle->smu_mgr;
-	hwmgr->device = pp_init->device;
-	hwmgr->chip_family = pp_init->chip_family;
-	hwmgr->chip_id = pp_init->chip_id;
+	hwmgr->device = handle->device;
+	hwmgr->chip_family = handle->chip_family;
+	hwmgr->chip_id = handle->chip_id;
+	hwmgr->feature_mask = handle->feature_mask;
 	hwmgr->usec_timeout = AMD_MAX_USEC_TIMEOUT;
 	hwmgr->power_source = PP_PowerSource_AC;
 	hwmgr->pp_table_version = PP_TABLE_V1;
@@ -75,7 +76,7 @@ int hwmgr_init(struct amd_pp_init *pp_init, struct pp_instance *handle)
 
 	switch (hwmgr->chip_family) {
 	case AMDGPU_FAMILY_CZ:
-		cz_hwmgr_init(hwmgr);
+		cz_init_function_pointers(hwmgr);
 		break;
 	case AMDGPU_FAMILY_VI:
 		switch (hwmgr->chip_id) {
@@ -103,7 +104,7 @@ int hwmgr_init(struct amd_pp_init *pp_init, struct pp_instance *handle)
 		default:
 			return -EINVAL;
 		}
-		smu7_hwmgr_init(hwmgr);
+		smu7_init_function_pointers(hwmgr);
 		break;
 	default:
 		return -EINVAL;
@@ -112,28 +113,7 @@ int hwmgr_init(struct amd_pp_init *pp_init, struct pp_instance *handle)
 	return 0;
 }
 
-int hwmgr_fini(struct pp_hwmgr *hwmgr)
-{
-	if (hwmgr == NULL || hwmgr->ps == NULL)
-		return -EINVAL;
-
-	/* do hwmgr finish*/
-	kfree(hwmgr->hardcode_pp_table);
-
-	kfree(hwmgr->backend);
-
-	kfree(hwmgr->start_thermal_controller.function_list);
-
-	kfree(hwmgr->set_temperature_range.function_list);
-
-	kfree(hwmgr->ps);
-	kfree(hwmgr->current_ps);
-	kfree(hwmgr->request_ps);
-	kfree(hwmgr);
-	return 0;
-}
-
-int hw_init_power_state_table(struct pp_hwmgr *hwmgr)
+static int hw_init_power_state_table(struct pp_hwmgr *hwmgr)
 {
 	int result;
 	unsigned int i;
@@ -157,12 +137,20 @@ int hw_init_power_state_table(struct pp_hwmgr *hwmgr)
 		return -ENOMEM;
 
 	hwmgr->request_ps = kzalloc(size, GFP_KERNEL);
-	if (hwmgr->request_ps == NULL)
+	if (hwmgr->request_ps == NULL) {
+		kfree(hwmgr->ps);
+		hwmgr->ps = NULL;
 		return -ENOMEM;
+	}
 
 	hwmgr->current_ps = kzalloc(size, GFP_KERNEL);
-	if (hwmgr->current_ps == NULL)
+	if (hwmgr->current_ps == NULL) {
+		kfree(hwmgr->request_ps);
+		kfree(hwmgr->ps);
+		hwmgr->request_ps = NULL;
+		hwmgr->ps = NULL;
 		return -ENOMEM;
+	}
 
 	state = hwmgr->ps;
 
@@ -182,8 +170,75 @@ int hw_init_power_state_table(struct pp_hwmgr *hwmgr)
 		state = (struct pp_power_state *)((unsigned long)state + size);
 	}
 
-
 	return 0;
+}
+
+static int hw_fini_power_state_table(struct pp_hwmgr *hwmgr)
+{
+	if (hwmgr == NULL)
+		return -EINVAL;
+
+	kfree(hwmgr->current_ps);
+	kfree(hwmgr->request_ps);
+	kfree(hwmgr->ps);
+	hwmgr->request_ps = NULL;
+	hwmgr->ps = NULL;
+	hwmgr->current_ps = NULL;
+	return 0;
+}
+
+int hwmgr_hw_init(struct pp_instance *handle)
+{
+	struct pp_hwmgr *hwmgr;
+	int ret = 0;
+
+	if (handle == NULL)
+		return -EINVAL;
+
+	hwmgr = handle->hwmgr;
+
+	if (hwmgr->pptable_func == NULL ||
+	    hwmgr->pptable_func->pptable_init == NULL ||
+	    hwmgr->hwmgr_func->backend_init == NULL)
+		return -EINVAL;
+
+	ret = hwmgr->pptable_func->pptable_init(hwmgr);
+	if (ret)
+		goto err;
+
+	ret = hwmgr->hwmgr_func->backend_init(hwmgr);
+	if (ret)
+		goto err1;
+
+	ret = hw_init_power_state_table(hwmgr);
+	if (ret)
+		goto err2;
+	return 0;
+err2:
+	if (hwmgr->hwmgr_func->backend_fini)
+		hwmgr->hwmgr_func->backend_fini(hwmgr);
+err1:
+	if (hwmgr->pptable_func->pptable_fini)
+		hwmgr->pptable_func->pptable_fini(hwmgr);
+err:
+	pr_err("amdgpu: powerplay initialization failed\n");
+	return ret;
+}
+
+int hwmgr_hw_fini(struct pp_instance *handle)
+{
+	struct pp_hwmgr *hwmgr;
+
+	if (handle == NULL)
+		return -EINVAL;
+
+	hwmgr = handle->hwmgr;
+
+	if (hwmgr->hwmgr_func->backend_fini)
+		hwmgr->hwmgr_func->backend_fini(hwmgr);
+	if (hwmgr->pptable_func->pptable_fini)
+		hwmgr->pptable_func->pptable_fini(hwmgr);
+	return hw_fini_power_state_table(hwmgr);
 }
 
 
@@ -289,7 +344,7 @@ int phm_trim_voltage_table(struct pp_atomctrl_voltage_table *vol_table)
 
 	memcpy(vol_table, table, sizeof(struct pp_atomctrl_voltage_table));
 	kfree(table);
-
+	table = NULL;
 	return 0;
 }
 
@@ -570,21 +625,6 @@ int phm_initializa_dynamic_state_adjustment_rule_settings(struct pp_hwmgr *hwmgr
 	return 0;
 }
 
-int phm_hwmgr_backend_fini(struct pp_hwmgr *hwmgr)
-{
-	if (NULL != hwmgr->dyn_state.vddc_dep_on_dal_pwrl) {
-		kfree(hwmgr->dyn_state.vddc_dep_on_dal_pwrl);
-		hwmgr->dyn_state.vddc_dep_on_dal_pwrl = NULL;
-	}
-
-	if (NULL != hwmgr->backend) {
-		kfree(hwmgr->backend);
-		hwmgr->backend = NULL;
-	}
-
-	return 0;
-}
-
 uint32_t phm_get_lowest_enabled_level(struct pp_hwmgr *hwmgr, uint32_t mask)
 {
 	uint32_t level = 0;
@@ -684,14 +724,14 @@ void hwmgr_init_default_caps(struct pp_hwmgr *hwmgr)
 
 int hwmgr_set_user_specify_caps(struct pp_hwmgr *hwmgr)
 {
-	if (amdgpu_pp_feature_mask & PP_SCLK_DEEP_SLEEP_MASK)
+	if (hwmgr->feature_mask & PP_SCLK_DEEP_SLEEP_MASK)
 		phm_cap_set(hwmgr->platform_descriptor.platformCaps,
 			PHM_PlatformCaps_SclkDeepSleep);
 	else
 		phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
 			PHM_PlatformCaps_SclkDeepSleep);
 
-	if (amdgpu_pp_feature_mask & PP_POWER_CONTAINMENT_MASK) {
+	if (hwmgr->feature_mask & PP_POWER_CONTAINMENT_MASK) {
 		phm_cap_set(hwmgr->platform_descriptor.platformCaps,
 			    PHM_PlatformCaps_PowerContainment);
 		phm_cap_set(hwmgr->platform_descriptor.platformCaps,
@@ -702,7 +742,6 @@ int hwmgr_set_user_specify_caps(struct pp_hwmgr *hwmgr)
 		phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
 			PHM_PlatformCaps_CAC);
 	}
-	hwmgr->feature_mask = amdgpu_pp_feature_mask;
 
 	return 0;
 }

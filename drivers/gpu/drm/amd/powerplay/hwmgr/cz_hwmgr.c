@@ -1217,9 +1217,15 @@ static int cz_hwmgr_backend_init(struct pp_hwmgr *hwmgr)
 
 static int cz_hwmgr_backend_fini(struct pp_hwmgr *hwmgr)
 {
-	if (hwmgr != NULL && hwmgr->backend != NULL) {
+	if (hwmgr != NULL) {
+		phm_destroy_table(hwmgr, &(hwmgr->enable_clock_power_gatings));
+		phm_destroy_table(hwmgr, &(hwmgr->set_power_state));
+		phm_destroy_table(hwmgr, &(hwmgr->enable_dynamic_state_management));
+		phm_destroy_table(hwmgr, &(hwmgr->disable_dynamic_state_management));
+		phm_destroy_table(hwmgr, &(hwmgr->power_down_asic));
+		phm_destroy_table(hwmgr, &(hwmgr->setup_asic));
 		kfree(hwmgr->backend);
-		kfree(hwmgr);
+		hwmgr->backend = NULL;
 	}
 	return 0;
 }
@@ -1636,7 +1642,8 @@ static int cz_get_dal_power_level(struct pp_hwmgr *hwmgr,
 static int cz_force_clock_level(struct pp_hwmgr *hwmgr,
 		enum pp_clock_type type, uint32_t mask)
 {
-	if (hwmgr->dpm_level != AMD_DPM_FORCED_LEVEL_MANUAL)
+	if (!(hwmgr->dpm_level &
+		(AMD_DPM_FORCED_LEVEL_MANUAL | AMD_DPM_FORCED_LEVEL_PROFILING)))
 		return -EINVAL;
 
 	switch (type) {
@@ -1930,7 +1937,7 @@ static const struct pp_hwmgr_func cz_hwmgr_funcs = {
 	.read_sensor = cz_read_sensor,
 };
 
-int cz_hwmgr_init(struct pp_hwmgr *hwmgr)
+int cz_init_function_pointers(struct pp_hwmgr *hwmgr)
 {
 	hwmgr->hwmgr_func = &cz_hwmgr_funcs;
 	hwmgr->pptable_func = &pptable_funcs;

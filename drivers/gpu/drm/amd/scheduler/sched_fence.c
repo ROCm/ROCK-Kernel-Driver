@@ -61,9 +61,9 @@ struct amd_sched_fence *amd_sched_fence_create(struct amd_sched_entity *entity,
 	spin_lock_init(&fence->lock);
 
 	seq = atomic_inc_return(&entity->fence_seq);
-	fence_init(&fence->scheduled, &amd_sched_fence_ops_scheduled,
+	kcl_fence_init(&fence->scheduled, &amd_sched_fence_ops_scheduled,
 		   &fence->lock, entity->fence_context, seq);
-	fence_init(&fence->finished, &amd_sched_fence_ops_finished,
+	kcl_fence_init(&fence->finished, &amd_sched_fence_ops_finished,
 		   &fence->lock, entity->fence_context + 1, seq);
 
 	return fence;
@@ -155,7 +155,11 @@ const struct fence_ops amd_sched_fence_ops_scheduled = {
 	.get_timeline_name = amd_sched_fence_get_timeline_name,
 	.enable_signaling = amd_sched_fence_enable_signaling,
 	.signaled = NULL,
+#if defined(BUILD_AS_DKMS)
+	.wait = kcl_fence_default_wait,
+#else
 	.wait = fence_default_wait,
+#endif
 	.release = amd_sched_fence_release_scheduled,
 };
 
@@ -164,6 +168,10 @@ const struct fence_ops amd_sched_fence_ops_finished = {
 	.get_timeline_name = amd_sched_fence_get_timeline_name,
 	.enable_signaling = amd_sched_fence_enable_signaling,
 	.signaled = NULL,
+#if defined(BUILD_AS_DKMS)
+	.wait = kcl_fence_default_wait,
+#else
 	.wait = fence_default_wait,
+#endif
 	.release = amd_sched_fence_release_finished,
 };

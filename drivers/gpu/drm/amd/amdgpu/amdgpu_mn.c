@@ -131,7 +131,7 @@ static void amdgpu_mn_invalidate_node(struct amdgpu_mn_node *node,
 			continue;
 		}
 
-		r = reservation_object_wait_timeout_rcu(bo->tbo.resv,
+		r = kcl_reservation_object_wait_timeout_rcu(bo->tbo.resv,
 			true, false, MAX_SCHEDULE_TIMEOUT);
 		if (r <= 0)
 			DRM_ERROR("(%ld) failed to wait for user bo\n", r);
@@ -230,14 +230,25 @@ static struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev)
 	struct mm_struct *mm = current->mm;
 	struct amdgpu_mn *rmn;
 	int r;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+#endif
 
 	mutex_lock(&adev->mn_lock);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+	down_write(&mm->mmap_sem);
+#else
 	if (down_write_killable(&mm->mmap_sem)) {
 		mutex_unlock(&adev->mn_lock);
 		return ERR_PTR(-EINTR);
 	}
+#endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	hash_for_each_possible(adev->mn_hash, rmn, node, node, (unsigned long)mm)
+#else
 	hash_for_each_possible(adev->mn_hash, rmn, node, (unsigned long)mm)
+#endif
 		if (rmn->mm == mm)
 			goto release_locks;
 

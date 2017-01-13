@@ -121,7 +121,13 @@ static bool amdgpu_sync_add_later(struct amdgpu_sync *sync, struct fence *f)
 {
 	struct amdgpu_sync_entry *e;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_possible(sync->fences, e, node, node, f->context) {
+#else
 	hash_for_each_possible(sync->fences, e, node, f->context) {
+#endif
 		if (unlikely(e->fence->context != f->context))
 			continue;
 
@@ -238,7 +244,13 @@ struct fence *amdgpu_sync_peek_fence(struct amdgpu_sync *sync,
 	struct hlist_node *tmp;
 	int i;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_safe(sync->fences, i, node, tmp, e, node) {
+#else
 	hash_for_each_safe(sync->fences, i, tmp, e, node) {
+#endif
 		struct fence *f = e->fence;
 		struct amd_sched_fence *s_fence = to_amd_sched_fence(f);
 
@@ -280,8 +292,13 @@ struct fence *amdgpu_sync_get_fence(struct amdgpu_sync *sync)
 	struct hlist_node *tmp;
 	struct fence *f;
 	int i;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
 
+	hash_for_each_safe(sync->fences, i, node, tmp, e, node) {
+#else
 	hash_for_each_safe(sync->fences, i, tmp, e, node) {
+#endif
 
 		f = e->fence;
 
@@ -308,8 +325,13 @@ void amdgpu_sync_free(struct amdgpu_sync *sync)
 	struct amdgpu_sync_entry *e;
 	struct hlist_node *tmp;
 	unsigned i;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
 
+	hash_for_each_safe(sync->fences, i, node, tmp, e, node) {
+#else
 	hash_for_each_safe(sync->fences, i, tmp, e, node) {
+#endif
 		hash_del(&e->node);
 		fence_put(e->fence);
 		kmem_cache_free(amdgpu_sync_slab, e);

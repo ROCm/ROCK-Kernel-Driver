@@ -112,12 +112,14 @@ struct link_training_settings;
 
 struct dc_link_funcs {
 	void (*set_drive_settings)(struct dc *dc,
-			struct link_training_settings *lt_settings);
+			struct link_training_settings *lt_settings,
+			const struct dc_link *link);
 	void (*perform_link_training)(struct dc *dc,
 			struct dc_link_settings *link_setting,
 			bool skip_video_pattern);
 	void (*set_preferred_link_settings)(struct dc *dc,
-			struct dc_link_settings *link_setting);
+			struct dc_link_settings *link_setting,
+			const struct dc_link *link);
 	void (*enable_hpd)(const struct dc_link *link);
 	void (*disable_hpd)(const struct dc_link *link);
 	void (*set_test_pattern)(
@@ -147,7 +149,6 @@ struct dc_debug {
 	bool disable_power_gate;
 	bool disable_clock_gate;
 	bool disable_dmcu;
-	bool disable_hdmi_deep_color;
 	bool disable_color_module;
 };
 
