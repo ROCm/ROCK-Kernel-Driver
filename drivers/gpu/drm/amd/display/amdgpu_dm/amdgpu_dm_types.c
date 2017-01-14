@@ -61,7 +61,6 @@ struct dm_connector_state {
 #define to_dm_connector_state(x)\
 	container_of((x), struct dm_connector_state, base)
 
-#define AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET 1
 
 void amdgpu_dm_encoder_destroy(struct drm_encoder *encoder)
 {
@@ -553,23 +552,18 @@ static void fill_gamma_from_crtc(
 {
 	int i;
 	struct dc_gamma *gamma;
-	uint16_t *red, *green, *blue;
-	int end = (crtc->gamma_size > NUM_OF_RAW_GAMMA_RAMP_RGB_256) ?
-			NUM_OF_RAW_GAMMA_RAMP_RGB_256 : crtc->gamma_size;
-
-	red = crtc->gamma_store;
-	green = red + crtc->gamma_size;
-	blue = green + crtc->gamma_size;
+	struct drm_crtc_state *state = crtc->state;
+	struct drm_color_lut *lut = (struct drm_color_lut *) state->gamma_lut->data;
 
 	gamma = dc_create_gamma();
 
 	if (gamma == NULL)
 		return;
 
-	for (i = 0; i < end; i++) {
-		gamma->red[i] = (unsigned short) red[i];
-		gamma->green[i] = (unsigned short) green[i];
-		gamma->blue[i] = (unsigned short) blue[i];
+	for (i = 0; i < NUM_OF_RAW_GAMMA_RAMP_RGB_256; i++) {
+		gamma->red[i] = lut[i].red;
+		gamma->green[i] = lut[i].green;
+		gamma->blue[i] = lut[i].blue;
 	}
 
 	dc_surface->gamma_correction = gamma;
@@ -603,8 +597,7 @@ static void fill_plane_attributes(
 	surface->in_transfer_func = input_tf;
 
 	/* In case of gamma set, update gamma value */
-	if (crtc->mode.private_flags &
-		AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET) {
+	if (state->crtc->state->gamma_lut) {
 		fill_gamma_from_crtc(crtc, surface);
 	}
 }
@@ -721,12 +714,6 @@ static void dm_dc_surface_commit(
 			dc_surface,
 			crtc->primary->state,
 			true);
-	if (crtc->mode.private_flags &
-		AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET) {
-		/* reset trigger of gamma */
-		crtc->mode.private_flags &=
-			~AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
-	}
 
 	dc_surfaces[0] = dc_surface;
 
@@ -1051,50 +1038,6 @@ void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc)
 	kfree(crtc);
 }
 
-static int amdgpu_dm_atomic_crtc_gamma_set(
-		struct drm_crtc *crtc,
-		u16 *red,
-		u16 *green,
-		u16 *blue,
-		uint32_t size)
-{
-	struct drm_device *dev = crtc->dev;
-	struct drm_property *prop = dev->mode_config.prop_crtc_id;
-
-	crtc->state->mode.private_flags |= AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
-
-	return drm_atomic_helper_crtc_set_property(crtc, prop, 0);
-}
-
-static int dm_crtc_funcs_atomic_set_property(
-	struct drm_crtc *crtc,
-	struct drm_crtc_state *crtc_state,
-	struct drm_property *property,
-	uint64_t val)
-{
-	struct drm_plane_state *plane_state;
-
-	crtc_state->planes_changed = true;
-
-	/*
-	 * Bit of magic done here. We need to ensure
-	 * that planes get update after mode is set.
-	 * So, we need to add primary plane to state,
-	 * and this way atomic_update would be called
-	 * for it
-	 */
-	plane_state =
-		drm_atomic_get_plane_state(
-			crtc_state->state,
-			crtc->primary);
-
-	if (!plane_state)
-		return -EINVAL;
-
-	return 0;
-}
-
-
 static int amdgpu_atomic_helper_page_flip(struct drm_crtc *crtc,
 				struct drm_framebuffer *fb,
 				struct drm_pending_vblank_event *event,
@@ -1178,12 +1121,12 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.cursor_set = dm_crtc_cursor_set,
 	.cursor_move = dm_crtc_cursor_move,
 	.destroy = amdgpu_dm_crtc_destroy,
-	.gamma_set = amdgpu_dm_atomic_crtc_gamma_set,
+	.gamma_set = drm_atomic_helper_legacy_gamma_set,
 	.set_config = drm_atomic_helper_set_config,
+	.set_property = drm_atomic_helper_crtc_set_property,
 	.page_flip = amdgpu_atomic_helper_page_flip,
 	.atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
-	.atomic_set_property = dm_crtc_funcs_atomic_set_property
 };
 
 static enum drm_connector_status
@@ -2753,8 +2696,7 @@ int amdgpu_dm_atomic_commit(
 		struct dm_connector_state *dm_state = NULL;
 		enum dm_commit_action action;
 
-		if (!fb || !crtc || !crtc->state->planes_changed ||
-			!crtc->state->active)
+		if (!fb || !crtc || !crtc->state->active)
 			continue;
 
 		action = get_dm_commit_action(crtc->state);
@@ -3188,6 +3130,17 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 			}
 			break;
 		}
+
+		/*
+		 * TODO revisit when removing commit action
+		 * and looking at atomic flags directly
+		 */
+
+		/* commit needs planes right now (for gamma, eg.) */
+		/* TODO rework commit to chack crtc for gamma change */
+		ret = drm_atomic_add_affected_planes(state, crtc);
+		if (ret)
+			return ret;
 	}
 
 	for (i = 0; i < set_count; i++) {
