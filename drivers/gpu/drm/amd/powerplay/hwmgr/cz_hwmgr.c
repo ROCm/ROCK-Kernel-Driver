@@ -1407,14 +1407,22 @@ int  cz_dpm_update_vce_dpm(struct pp_hwmgr *hwmgr)
 					     cz_hwmgr->vce_dpm.hard_min_clk,
 						PPSMC_MSG_SetEclkHardMin));
 	} else {
-		/*EPR# 419220 -HW limitation to to */
-		cz_hwmgr->vce_dpm.hard_min_clk = hwmgr->vce_arbiter.ecclk;
-		smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
-					    PPSMC_MSG_SetEclkHardMin,
-					    cz_get_eclk_level(hwmgr,
-				     cz_hwmgr->vce_dpm.hard_min_clk,
-					  PPSMC_MSG_SetEclkHardMin));
-
+		/*Program HardMin based on the vce_arbiter.ecclk */
+		if (hwmgr->vce_arbiter.ecclk == 0) {
+			smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
+					    PPSMC_MSG_SetEclkHardMin, 0);
+		/* disable ECLK DPM 0. Otherwise VCE could hang if
+		 * switching SCLK from DPM 0 to 6/7 */
+			smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
+					PPSMC_MSG_SetEclkSoftMin, 1);
+		} else {
+			cz_hwmgr->vce_dpm.hard_min_clk = hwmgr->vce_arbiter.ecclk;
+			smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
+						PPSMC_MSG_SetEclkHardMin,
+						cz_get_eclk_level(hwmgr,
+						cz_hwmgr->vce_dpm.hard_min_clk,
+						PPSMC_MSG_SetEclkHardMin));
+		}
 	}
 	return 0;
 }
@@ -1642,8 +1650,7 @@ static int cz_get_dal_power_level(struct pp_hwmgr *hwmgr,
 static int cz_force_clock_level(struct pp_hwmgr *hwmgr,
 		enum pp_clock_type type, uint32_t mask)
 {
-	if (!(hwmgr->dpm_level &
-		(AMD_DPM_FORCED_LEVEL_MANUAL | AMD_DPM_FORCED_LEVEL_PROFILING)))
+	if (hwmgr->dpm_level != AMD_DPM_FORCED_LEVEL_MANUAL)
 		return -EINVAL;
 
 	switch (type) {

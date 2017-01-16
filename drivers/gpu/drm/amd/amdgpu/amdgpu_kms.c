@@ -680,6 +680,12 @@ int amdgpu_driver_open_kms(struct drm_device *dev, struct drm_file *file_priv)
 		goto out_suspend;
 	}
 
+	if (amdgpu_sriov_vf(adev)) {
+		r = amdgpu_map_static_csa(adev, &fpriv->vm);
+		if (r)
+			goto out_suspend;
+	}
+
 	mutex_init(&fpriv->bo_list_lock);
 	idr_init(&fpriv->bo_list_handles);
 
@@ -717,6 +723,14 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 
 	amdgpu_uvd_free_handles(adev, file_priv);
 	amdgpu_vce_free_handles(adev, file_priv);
+
+	if (amdgpu_sriov_vf(adev)) {
+		/* TODO: how to handle reserve failure */
+		BUG_ON(amdgpu_bo_reserve(adev->virt.csa_obj, false));
+		amdgpu_vm_bo_rmv(adev, fpriv->vm.csa_bo_va);
+		fpriv->vm.csa_bo_va = NULL;
+		amdgpu_bo_unreserve(adev->virt.csa_obj);
+	}
 
 	amdgpu_vm_fini(adev, &fpriv->vm);
 
@@ -911,7 +925,8 @@ const struct drm_ioctl_desc amdgpu_ioctls_kms[] = {
 	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_FIND_BO, amdgpu_gem_find_bo_by_cpu_mapping_ioctl, DRM_AUTH|DRM_UNLOCKED|DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(AMDGPU_FREESYNC, amdgpu_freesync_ioctl, DRM_MASTER|DRM_UNLOCKED),
 	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_FIND_BO, amdgpu_gem_find_bo_by_cpu_mapping_ioctl, DRM_AUTH|DRM_UNLOCKED|DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_DGMA, amdgpu_gem_dgma_ioctl, DRM_AUTH|DRM_UNLOCKED|DRM_RENDER_ALLOW)
+	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_DGMA, amdgpu_gem_dgma_ioctl, DRM_AUTH|DRM_UNLOCKED|DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(AMDGPU_SEM, amdgpu_sem_ioctl, DRM_AUTH|DRM_UNLOCKED|DRM_RENDER_ALLOW),
 };
 #else
 const struct drm_ioctl_desc amdgpu_ioctls_kms[] = {
@@ -931,7 +946,8 @@ const struct drm_ioctl_desc amdgpu_ioctls_kms[] = {
 	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_USERPTR, amdgpu_gem_userptr_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(AMDGPU_FREESYNC, amdgpu_freesync_ioctl, DRM_MASTER),
 	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_FIND_BO, amdgpu_gem_find_bo_by_cpu_mapping_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
-	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_DGMA, amdgpu_gem_dgma_ioctl, DRM_AUTH|DRM_RENDER_ALLOW)
+	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_DGMA, amdgpu_gem_dgma_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(AMDGPU_SEM, amdgpu_sem_ioctl, DRM_AUTH|DRM_UNLOCKED|DRM_RENDER_ALLOW),
 };
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) */
 const int amdgpu_max_kms_ioctl = ARRAY_SIZE(amdgpu_ioctls_kms);
