@@ -656,6 +656,14 @@ int amdgpu_driver_open_kms(struct drm_device *dev, struct drm_file *file_priv)
 		goto out_suspend;
 	}
 
+	fpriv->prt_va = amdgpu_vm_bo_add(adev, &fpriv->vm, NULL);
+	if (!fpriv->prt_va) {
+		r = -ENOMEM;
+		amdgpu_vm_fini(adev, &fpriv->vm);
+		kfree(fpriv);
+		goto out_suspend;
+	}
+
 	if (amdgpu_sriov_vf(adev)) {
 		r = amdgpu_map_static_csa(adev, &fpriv->vm);
 		if (r)
@@ -699,6 +707,8 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 
 	amdgpu_uvd_free_handles(adev, file_priv);
 	amdgpu_vce_free_handles(adev, file_priv);
+
+	amdgpu_vm_bo_rmv(adev, fpriv->prt_va);
 
 	if (amdgpu_sriov_vf(adev)) {
 		/* TODO: how to handle reserve failure */
