@@ -198,6 +198,11 @@ void amdgpu_gem_object_close(struct drm_gem_object *obj,
 		}
 	}
 	ttm_eu_backoff_reservation(&ticket, &list);
+
+	if ((adev->vm_manager.enable_prt) &&
+		(bo->flags & AMDGPU_GEM_CREATE_SPARSE) &&
+		(!atomic_dec_return(&adev->sparse_bo_cnt)))
+			amdgpu_vm_enable_prt(adev, false);
 }
 
 static int amdgpu_gem_handle_lockup(struct amdgpu_device *adev, int r)
@@ -253,6 +258,11 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 	drm_gem_object_unreference_unlocked(gobj);
 	if (r)
 		goto error_unlock;
+
+	if ((adev->vm_manager.enable_prt) &&
+		(args->in.domain_flags & AMDGPU_GEM_CREATE_SPARSE) &&
+		(atomic_inc_return(&adev->sparse_bo_cnt) == 1))
+			amdgpu_vm_enable_prt(adev, true);
 
 	memset(args, 0, sizeof(*args));
 	args->out.handle = handle;

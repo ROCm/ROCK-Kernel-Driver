@@ -1521,6 +1521,8 @@ struct amdgpu_device {
 	spinlock_t			gtt_list_lock;
 	struct list_head                gtt_list;
 
+	/* record sparse bo counter */
+	atomic_t			sparse_bo_cnt;
 };
 
 static inline struct amdgpu_device *amdgpu_ttm_adev(struct ttm_bo_device *bdev)
