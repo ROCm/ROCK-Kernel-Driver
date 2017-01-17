@@ -142,11 +142,11 @@ static bool set_cache_memory_policy_vi_tonga(struct device_queue_manager *dqm,
 
 	default_mtype = (default_policy == cache_policy_coherent) ?
 			MTYPE_UC :
-			MTYPE_NC_NV;
+			MTYPE_NC;
 
 	ape1_mtype = (alternate_policy == cache_policy_coherent) ?
 			MTYPE_UC :
-			MTYPE_NC_NV;
+			MTYPE_NC;
 
 	qpd->sh_mem_config =
 			SH_MEM_ALIGNMENT_MODE_UNALIGNED <<
