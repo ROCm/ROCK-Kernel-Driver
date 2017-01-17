@@ -389,6 +389,48 @@ static void gmc_v6_0_set_fault_enable_default(struct amdgpu_device *adev,
 	WREG32(mmVM_CONTEXT1_CNTL, tmp);
 }
 
+/**
+ * gmc_v6_0_enable_prt - set PRT VM fault
+ *
+ * @adev: amdgpu_device pointer
+ * @value: toggle the VM fault for accessing the none mapped tile for PRT
+ */
+static void gmc_v6_0_enable_prt(struct amdgpu_device *adev, bool value)
+{
+	u32 tmp;
+
+	tmp = RREG32(mmVM_PRT_CNTL);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    CB_DISABLE_FAULT_ON_UNMAPPED_ACCESS, value);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    TC_DISABLE_FAULT_ON_UNMAPPED_ACCESS, value);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    L2_CACHE_STORE_INVALID_ENTRIES, value);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    L1_TLB_STORE_INVALID_ENTRIES, value);
+	WREG32(mmVM_CONTEXT1_CNTL, tmp);
+
+	if (value) {
+		WREG32(mmVM_PRT_APERTURE0_LOW_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE1_LOW_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE2_LOW_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE3_LOW_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE0_HIGH_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE1_HIGH_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE2_HIGH_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE3_HIGH_ADDR, 0xfffffff);
+	} else {
+		WREG32(mmVM_PRT_APERTURE0_LOW_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE1_LOW_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE2_LOW_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE3_LOW_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE0_HIGH_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE1_HIGH_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE2_HIGH_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE3_HIGH_ADDR, 0x0);
+	}
+}
+
 static int gmc_v6_0_gart_enable(struct amdgpu_device *adev)
 {
 	int r, i;
@@ -738,6 +780,9 @@ static int gmc_v6_0_early_init(void *handle)
 
 	gmc_v6_0_set_gart_funcs(adev);
 	gmc_v6_0_set_irq_funcs(adev);
+
+	adev->vm_manager.enable_prt = &gmc_v6_0_enable_prt;
+	DRM_INFO("VM PRT is supported!\n");
 
 	if (adev->flags & AMD_IS_APU) {
 		adev->mc.vram_type = AMDGPU_VRAM_TYPE_UNKNOWN;
