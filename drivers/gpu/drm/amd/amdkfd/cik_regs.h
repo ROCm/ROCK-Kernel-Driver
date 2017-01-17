@@ -55,7 +55,8 @@
 #define	APE1_MTYPE(x)					((x) << 7)
 
 /* valid for both DEFAULT_MTYPE and APE1_MTYPE */
-#define	MTYPE_CACHED					0
+#define	MTYPE_CACHED_NV					0
+#define	MTYPE_CACHED					1
 #define	MTYPE_NONCACHED					3
 
 
