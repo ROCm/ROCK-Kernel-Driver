@@ -509,7 +509,7 @@ int process_evict_queues(struct device_queue_manager *dqm,
 			dqm->queue_count--;
 	}
 	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
-		retval = execute_queues_cpsch(dqm, false);
+		retval = execute_queues_cpsch(dqm, qpd->is_debug);
 
 	mutex_unlock(&dqm->lock);
 	return retval;
