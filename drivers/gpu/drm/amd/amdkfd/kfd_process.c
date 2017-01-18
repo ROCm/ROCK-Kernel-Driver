@@ -617,7 +617,6 @@ err_process_pqm_init:
 	synchronize_rcu();
 	mmu_notifier_unregister_no_release(&process->mmu_notifier, process->mm);
 err_mmu_notifier:
-	mutex_destroy(&process->mutex);
 	kfd_pasid_free(process->pasid);
 err_alloc_pasid:
 	kfree(process->queues);
