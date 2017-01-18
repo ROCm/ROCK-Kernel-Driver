@@ -35,7 +35,7 @@ int drm_crtc_force_disable_all(struct drm_device *dev)
 	int ret = 0;
 
 	drm_modeset_lock_all(dev);
-	drm_for_each_crtc(crtc, dev)
+	kcl_drm_for_each_crtc(crtc, dev)
 		if (crtc->enabled) {
 			ret = drm_crtc_force_disable(crtc);
 			if (ret)
