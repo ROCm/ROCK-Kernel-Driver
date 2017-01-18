@@ -1276,7 +1276,7 @@ static int amdgpu_ttm_bo_access_vram(struct amdgpu_bo *abo,
 				     unsigned long offset,
 				     void *buf, int len, int write)
 {
-	struct amdgpu_device *adev = abo->adev;
+	struct amdgpu_device *adev = amdgpu_ttm_adev(abo->tbo.bdev);
 	uint64_t pos = amdgpu_bo_gpu_offset(abo) + offset;
 	uint32_t value = 0;
 	unsigned long flags;

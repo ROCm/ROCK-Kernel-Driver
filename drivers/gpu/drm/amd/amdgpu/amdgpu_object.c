@@ -319,6 +319,7 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 				struct amdgpu_bo **bo_ptr)
 {
 	struct amdgpu_bo *bo;
+	struct amdgpu_gem_object *gobj;
 	enum ttm_bo_type type;
 	unsigned long page_align;
 	u64 initial_bytes_moved;
@@ -343,7 +344,13 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 	bo = kzalloc(sizeof(struct amdgpu_bo), GFP_KERNEL);
 	if (bo == NULL)
 		return -ENOMEM;
-	r = drm_gem_object_init(adev->ddev, &bo->gem_base, size);
+	gobj = kzalloc(sizeof(struct amdgpu_gem_object), GFP_KERNEL);
+	if (unlikely(!gobj)) {
+		amdgpu_bo_unref(&bo);
+		return -ENOMEM;
+	}
+
+	r = drm_gem_object_init(adev->ddev, &gobj->base, size);
 	if (unlikely(r)) {
 		kfree(bo);
 		return r;
