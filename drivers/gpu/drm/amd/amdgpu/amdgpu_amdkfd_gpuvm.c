@@ -240,7 +240,7 @@ static int try_pin_pts(struct amdgpu_bo_va *bo_va, bool resv)
 
 		/* walk over the address space and pin the page tables BOs*/
 		for (pt_idx = start; pt_idx <= last; pt_idx++) {
-			ret = try_pin_bo(vm->page_tables[pt_idx].entry.robj, resv,
+			ret = try_pin_bo(vm->page_tables[pt_idx].bo, resv,
 					AMDGPU_GEM_DOMAIN_VRAM);
 			if (ret != 0) {
 				failed = pt_idx;
@@ -257,7 +257,7 @@ static int try_pin_pts(struct amdgpu_bo_va *bo_va, bool resv)
 
 		/* walk over the address space and pin the page tables BOs*/
 		for (pt_idx = start; pt_idx <= last; pt_idx++) {
-			ret = try_pin_bo(vm->page_tables[pt_idx].entry.robj, resv,
+			ret = try_pin_bo(vm->page_tables[pt_idx].bo, resv,
 					AMDGPU_GEM_DOMAIN_VRAM);
 			if (ret != 0) {
 				failed = pt_idx;
@@ -273,7 +273,7 @@ err:
 	/* Unpin all already pinned BOs*/
 	if (failed > 0) {
 		for (pt_idx = start; pt_idx <= failed - 1; pt_idx++)
-			unpin_bo(vm->page_tables[pt_idx].entry.robj, resv);
+			unpin_bo(vm->page_tables[pt_idx].bo, resv);
 	}
 	return ret;
 }
@@ -292,7 +292,7 @@ static void unpin_pts(struct amdgpu_bo_va *bo_va, struct amdgpu_vm *vm,
 
 		/* walk over the address space and unpin the page tables BOs*/
 		for (pt_idx = start; pt_idx <= last; pt_idx++)
-			unpin_bo(vm->page_tables[pt_idx].entry.robj, resv);
+			unpin_bo(vm->page_tables[pt_idx].bo, resv);
 	}
 
 	list_for_each_entry(mapping, &bo_va->invalids, list) {
@@ -303,7 +303,7 @@ static void unpin_pts(struct amdgpu_bo_va *bo_va, struct amdgpu_vm *vm,
 
 		/* walk over the address space and unpin the page tables BOs*/
 		for (pt_idx = start; pt_idx <= last; pt_idx++)
-			unpin_bo(vm->page_tables[pt_idx].entry.robj, resv);
+			unpin_bo(vm->page_tables[pt_idx].bo, resv);
 	}
 }
 

@@ -190,7 +190,7 @@ static void amdgdu_amdkfd_restore_mem_worker(struct work_struct *work)
 
 	mutex_lock(&mem->data2.lock);
 
-	adev = mem->data2.bo->adev;
+	adev = amdgpu_ttm_adev(mem->data2.bo->tbo.bdev);
 	mm = mem->data2.mm;
 
 	/* Restoration may have been canceled by another eviction or
