@@ -2927,7 +2927,7 @@ void pci_enable_atomic_request(struct pci_dev *dev)
 	case PCI_EXP_TYPE_RC_END:
 	case PCI_EXP_TYPE_ROOT_PORT:
 		pcie_capability_set_word(dev, PCI_EXP_DEVCTL2,
-					 PCI_EXP_DEVCTL2_ATOMICOP_REQ);
+					 PCI_EXP_DEVCTL2_ATOMIC_REQ);
 		break;
 	}
 }
