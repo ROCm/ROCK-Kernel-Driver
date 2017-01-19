@@ -2357,7 +2357,7 @@ static enum dm_commit_action get_dm_commit_action(struct drm_crtc_state *state)
 {
 	/* mode changed means either actually mode changed or enabled changed */
 	/* active changed means dpms changed */
-
+#if !defined(OS_NAME_RHEL_7_2)
 	DRM_DEBUG_KMS("crtc_state_flags: enable:%d, active:%d, planes_changed:%d, mode_changed:%d,active_changed:%d,connectors_changed:%d\n",
 			state->enable,
 			state->active,
@@ -2365,7 +2365,7 @@ static enum dm_commit_action get_dm_commit_action(struct drm_crtc_state *state)
 			state->mode_changed,
 			state->active_changed,
 			state->connectors_changed);
-
+#endif
 	if (state->mode_changed) {
 		/* if it is got disabled - call reset mode */
 		if (!state->enable)
@@ -2382,9 +2382,10 @@ static enum dm_commit_action get_dm_commit_action(struct drm_crtc_state *state)
 		if (!state->enable)
 			return DM_COMMIT_ACTION_NOTHING;
 
+#if !defined(OS_NAME_RHEL_7_2)
 		if (state->active && state->connectors_changed)
 			return DM_COMMIT_ACTION_SET;
-
+#endif
 		if (state->active_changed) {
 			if (state->active) {
 				return DM_COMMIT_ACTION_DPMS_ON;
