@@ -300,7 +300,7 @@ static int validate_pt_pd_bos(struct amdgpu_vm *vm)
 
 	/* PTs share same reservation object as PD. So only fence PD */
 	for (i = 0; i <= vm->max_pde_used; ++i) {
-		bo = vm->page_tables[i].entry.robj;
+		bo = vm->page_tables[i].bo;
 
 		if (!bo)
 			continue;
