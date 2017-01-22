@@ -2448,7 +2448,7 @@ retry:
 				if (fence) {
 					r = fence_wait(fence, false);
 					if (r) {
-						WARN(r, "recovery from shadow isn't comleted\n");
+						WARN(r, "recovery from shadow isn't completed\n");
 						break;
 					}
 				}
@@ -2460,7 +2460,7 @@ retry:
 			if (fence) {
 				r = fence_wait(fence, false);
 				if (r)
-					WARN(r, "recovery from shadow isn't comleted\n");
+					WARN(r, "recovery from shadow isn't completed\n");
 			}
 			fence_put(fence);
 		}
