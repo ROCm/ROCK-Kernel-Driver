@@ -2250,3 +2250,91 @@ evict_fence_fail:
 	kfree(pd_bo_list);
 	return ret;
 }
+
+int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
+				  uint64_t src_offset, struct kgd_mem *dst_mem,
+				  uint64_t dst_offset, uint64_t size,
+				  struct fence **f, uint64_t *actual_size)
+{
+	struct amdgpu_device *adev = NULL;
+	struct ttm_mem_reg *src = NULL, *dst = NULL;
+	struct amdgpu_ring *ring;
+	struct ww_acquire_ctx ticket;
+	struct list_head list;
+	struct amdgpu_bo_list_entry *entry;
+	uint64_t src_start, dst_start;
+	int r;
+
+	if (!kgd || !src_mem || !dst_mem)
+		return -EINVAL;
+
+	if (actual_size)
+		*actual_size = 0;
+
+	adev = get_amdgpu_device(kgd);
+	src = &src_mem->bo->tbo.mem;
+	dst = &dst_mem->bo->tbo.mem;
+
+	ring = adev->mman.buffer_funcs_ring;
+
+	INIT_LIST_HEAD(&list);
+	entry = &src_mem->bo_list_entry;
+	list_add_tail(&entry->tv.head, &list);
+	entry = &dst_mem->bo_list_entry;
+	list_add_tail(&entry->tv.head, &list);
+
+	r = ttm_eu_reserve_buffers(&ticket, &list, false, NULL);
+	if (r) {
+		pr_err("Copy buffer failed. Unable to reserve bo (%d)\n", r);
+		return r;
+	}
+
+	src_start = (src->start << PAGE_SHIFT) + src_offset;
+	dst_start = (dst->start << PAGE_SHIFT) + dst_offset;
+
+	switch (src->mem_type) {
+	case TTM_PL_VRAM:
+		src_start += adev->mc.vram_start;
+		break;
+	case TTM_PL_TT:
+		src_start += adev->mc.gtt_start;
+		break;
+	default:
+		DRM_ERROR("Unknown placement %d\n", src->mem_type);
+		r = -EINVAL;
+		goto copy_fail;
+	}
+	switch (dst->mem_type) {
+	case TTM_PL_VRAM:
+		dst_start += adev->mc.vram_start;
+		break;
+	case TTM_PL_TT:
+		dst_start += adev->mc.gtt_start;
+		break;
+	default:
+		DRM_ERROR("Unknown placement %d\n", dst->mem_type);
+		r = -EINVAL;
+		goto copy_fail;
+	}
+	if (!ring->ready) {
+		pr_err("Trying to move memory with ring turned off.\n");
+		r = -EINVAL;
+		goto copy_fail;
+	}
+
+	r = amdgpu_copy_buffer(ring, src_start, dst_start,
+		size, NULL, f);
+	if (r)
+		goto copy_fail;
+
+	if (actual_size)
+		*actual_size = size;
+
+	amdgpu_bo_fence(src_mem->bo, *f, true);
+	amdgpu_bo_fence(dst_mem->bo, *f, true);
+
+copy_fail:
+	ttm_eu_backoff_reservation(&ticket, &list);
+	return r;
+}
+

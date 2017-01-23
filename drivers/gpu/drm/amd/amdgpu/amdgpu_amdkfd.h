@@ -133,6 +133,10 @@ int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 int amdgpu_amdkfd_gpuvm_restore_process_bos(void *master_vm);
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions(void);
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions(void);
+int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
+		uint64_t src_offset, struct kgd_mem *dst_mem,
+		uint64_t dest_offset, uint64_t size, struct fence **f,
+		uint64_t *actual_size);
 
 /* Shared API */
 int map_bo(struct amdgpu_device *rdev, uint64_t va, void *vm,
