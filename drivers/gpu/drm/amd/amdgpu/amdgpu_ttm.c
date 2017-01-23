@@ -257,7 +257,8 @@ static int amdgpu_verify_access(struct ttm_buffer_object *bo, struct file *filp)
 			continue;
 
 		ww_mutex_unlock(&abo->tbo.resv->lock);
-		return drm_vma_node_verify_access(&gobj->base.vma_node, filp);
+		return drm_vma_node_verify_access(&gobj->base.vma_node,
+				filp->private_data);
 	}
 	ww_mutex_unlock(&abo->tbo.resv->lock);
 
