@@ -526,8 +526,8 @@ extern enum system_states {
 #endif
 
 struct taint_flag {
-	char true;	/* character printed when tainted */
-	char false;	/* character printed when not tainted */
+	char c_true;	/* character printed when tainted */
+	char c_false;	/* character printed when not tainted */
 	bool module;	/* also show as a per-module taint flag */
 };
 
