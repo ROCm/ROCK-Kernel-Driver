@@ -223,6 +223,8 @@ struct tile_config {
  * @restore_process_bos: Restore all BOs that belongs to the process identified
  * by master_vm.
  *
+ * @copy_mem_to_mem: Copies size bytes from source BO to destination BO
+ *
  * This structure contains function pointers to services that the kgd driver
  * provides to amdkfd driver.
  *
@@ -367,6 +369,10 @@ struct kfd2kgd_calls {
 			struct tile_config *config);
 
 	int (*restore_process_bos)(void *master_vm);
+	int (*copy_mem_to_mem)(struct kgd_dev *kgd, struct kgd_mem *src_mem,
+			uint64_t src_offset, struct kgd_mem *dst_mem,
+			uint64_t dest_offset, uint64_t size, struct fence **f,
+			uint64_t *actual_size);
 };
 
 /**
