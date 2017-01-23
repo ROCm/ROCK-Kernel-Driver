@@ -377,7 +377,7 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 #warning Please enable CONFIG_MTRR and CONFIG_X86_PAT for better performance \
 	 thanks to write-combining
 
-	if (bo->flags & AMDGPU_GEM_CREATE_CPU_GTT_USWC;)
+	if (bo->flags & AMDGPU_GEM_CREATE_CPU_GTT_USWC)
 		DRM_INFO_ONCE("Please enable CONFIG_MTRR and CONFIG_X86_PAT for "
 			      "better performance thanks to write-combining\n");
 	bo->flags &= ~AMDGPU_GEM_CREATE_CPU_GTT_USWC;
