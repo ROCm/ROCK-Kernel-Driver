@@ -290,7 +290,7 @@ int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 	/* This works for NO_HWS. TODO: need to handle without knowing VMID */
 	job->vm_id = vmid;
 
-	ret = amdgpu_ib_schedule(ring, 1, ib, NULL, job, &f);
+	ret = amdgpu_ib_schedule(ring, 1, ib, job, &f);
 	if (ret) {
 		DRM_ERROR("amdgpu: failed to schedule IB.\n");
 		goto err_ib_sched;
