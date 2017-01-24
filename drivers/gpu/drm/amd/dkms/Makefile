@@ -24,6 +24,8 @@ else ifeq ("sled",$(OS_NAME))
 subdir-ccflags-y += -DOS_NAME_SLE
 else ifeq ("sles",$(OS_NAME))
 subdir-ccflags-y += -DOS_NAME_SLE
+else ifeq ("amzn",$(OS_NAME))
+subdir-ccflags-y += -DOS_NAME_AMZ
 else
 subdir-ccflags-y += -DOS_NAME_UNKNOWN
 endif
