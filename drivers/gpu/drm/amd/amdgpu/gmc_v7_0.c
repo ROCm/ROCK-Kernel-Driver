@@ -378,7 +378,7 @@ static int gmc_v7_0_mc_init(struct amdgpu_device *adev)
 
 #ifdef CONFIG_X86_64
 	if (adev->flags & AMD_IS_APU) {
-		adev->mc.aper_base = RREG32(mmMC_VM_FB_OFFSET) << 22ULL;
+		adev->mc.aper_base = ((u64)RREG32(mmMC_VM_FB_OFFSET)) << 22;
 		adev->mc.aper_size = adev->mc.real_vram_size;
 	}
 #endif
