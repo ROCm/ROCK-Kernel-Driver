@@ -892,7 +892,7 @@ static void dm_handle_hpd_rx_irq(struct amdgpu_connector *aconnector)
 		process_count++;
 
 		DRM_DEBUG_KMS("ESI %02x %02x %02x\n", esi[0], esi[1], esi[2]);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || defined(OS_NAME_RHEL_7_3)
 		/* handle HPD short pulse irq */
 		if (aconnector->mst_mgr.mst_state)
 			drm_dp_mst_hpd_irq(
