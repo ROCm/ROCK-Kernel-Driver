@@ -386,7 +386,7 @@ free:
 }
 EXPORT_SYMBOL(drm_atomic_helper_disable_all);
 
-#ifndef OS_NAME_RHEL_6
+#if !defined(OS_NAME_RHEL_6) && !defined(OS_NAME_AMZ)
 struct drm_atomic_state *
 drm_atomic_helper_duplicate_state(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx)
