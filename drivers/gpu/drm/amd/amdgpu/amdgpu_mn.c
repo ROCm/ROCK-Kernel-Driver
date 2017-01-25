@@ -89,8 +89,7 @@ static void amdgpu_mn_destroy(struct work_struct *work)
 			bo->mn = NULL;
 			list_del_init(&bo->mn_list);
 			if (rmn->type == AMDGPU_MN_TYPE_HSA)
-				amdgpu_amdkfd_cancel_restore_mem(
-					adev, bo->kfd_bo);
+				amdgpu_amdkfd_cancel_restore_mem(bo->kfd_bo);
 		}
 		kfree(node);
 	}
