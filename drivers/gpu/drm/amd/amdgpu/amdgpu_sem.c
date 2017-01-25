@@ -40,17 +40,31 @@ static int amdgpu_sem_cring_add(struct amdgpu_fpriv *fpriv,
 				struct drm_amdgpu_sem_in *in,
 				struct amdgpu_sem *sem);
 
-static void amdgpu_sem_core_free(struct kref *kref)
+static const struct file_operations amdgpu_sem_fops;
+
+static struct amdgpu_sem *amdgpu_sem_alloc(struct fence *fence)
 {
-	struct amdgpu_sem_core *core = container_of(
-		kref, struct amdgpu_sem_core, kref);
+	struct amdgpu_sem *sem;
 
-	if (core->file)
-		fput(core->file);
+	sem = kzalloc(sizeof(struct amdgpu_sem), GFP_KERNEL);
+	if (!sem)
+		return NULL;
 
-	fence_put(core->fence);
-	mutex_destroy(&core->lock);
-	kfree(core);
+	sem->file = anon_inode_getfile("sem_file",
+				       &amdgpu_sem_fops,
+				       sem, 0);
+	if (IS_ERR(sem->file))
+		goto err;
+
+	kref_init(&sem->kref);
+	INIT_LIST_HEAD(&sem->list);
+	/* fence should be get before passing here */
+	sem->fence = fence;
+
+	return sem;
+err:
+	kfree(sem);
+	return NULL;
 }
 
 static void amdgpu_sem_free(struct kref *kref)
@@ -58,28 +72,15 @@ static void amdgpu_sem_free(struct kref *kref)
 	struct amdgpu_sem *sem = container_of(
 		kref, struct amdgpu_sem, kref);
 
-	list_del(&sem->list);
-	kref_put(&sem->base->kref, amdgpu_sem_core_free);
+	fence_put(sem->fence);
 	kfree(sem);
-}
-
-static inline void amdgpu_sem_get(struct amdgpu_sem *sem)
-{
-	if (sem)
-		kref_get(&sem->kref);
-}
-
-static inline void amdgpu_sem_put(struct amdgpu_sem *sem)
-{
-	if (sem)
-		kref_put(&sem->kref, amdgpu_sem_free);
 }
 
 static int amdgpu_sem_release(struct inode *inode, struct file *file)
 {
 	struct amdgpu_sem *sem = file->private_data;
 
-	amdgpu_sem_put(sem);
+	kref_put(&sem->kref, amdgpu_sem_free);
 	return 0;
 }
 
@@ -101,127 +102,49 @@ static const struct file_operations amdgpu_sem_fops = {
 	.compat_ioctl = amdgpu_sem_file_ioctl,
 };
 
+static int amdgpu_sem_create(void)
+{
+	return get_unused_fd_flags(O_CLOEXEC);
+}
 
-static inline struct amdgpu_sem *amdgpu_sem_lookup(struct amdgpu_fpriv *fpriv, u32 handle)
+static int amdgpu_sem_signal(int fd, struct fence *fence)
 {
 	struct amdgpu_sem *sem;
 
-	spin_lock(&fpriv->sem_handles_lock);
-
-	/* Check if we currently have a reference on the object */
-	sem = idr_find(&fpriv->sem_handles, handle);
-	amdgpu_sem_get(sem);
-
-	spin_unlock(&fpriv->sem_handles_lock);
-
-	return sem;
-}
-
-static struct amdgpu_sem_core *amdgpu_sem_core_alloc(void)
-{
-	struct amdgpu_sem_core *core;
-
-	core = kzalloc(sizeof(*core), GFP_KERNEL);
-	if (!core)
-		return NULL;
-
-	kref_init(&core->kref);
-	mutex_init(&core->lock);
-	return core;
-}
-
-static struct amdgpu_sem *amdgpu_sem_alloc(void)
-{
-	struct amdgpu_sem *sem;
-
-	sem = kzalloc(sizeof(*sem), GFP_KERNEL);
+	sem = amdgpu_sem_alloc(fence);
 	if (!sem)
-		return NULL;
-
-	kref_init(&sem->kref);
-	INIT_LIST_HEAD(&sem->list);
-
-	return sem;
-}
-
-static int amdgpu_sem_create(struct amdgpu_fpriv *fpriv, u32 *handle)
-{
-	struct amdgpu_sem *sem;
-	struct amdgpu_sem_core *core;
-	int ret;
-
-	sem = amdgpu_sem_alloc();
-	core = amdgpu_sem_core_alloc();
-	if (!sem || !core) {
-		kfree(sem);
-		kfree(core);
 		return -ENOMEM;
-	}
+	fd_install(fd, sem->file);
 
-	sem->base = core;
-
-	idr_preload(GFP_KERNEL);
-	spin_lock(&fpriv->sem_handles_lock);
-
-	ret = idr_alloc(&fpriv->sem_handles, sem, 1, 0, GFP_NOWAIT);
-
-	spin_unlock(&fpriv->sem_handles_lock);
-	idr_preload_end();
-
-	if (ret < 0)
-		return ret;
-
-	*handle = ret;
 	return 0;
 }
 
-static int amdgpu_sem_signal(struct amdgpu_fpriv *fpriv,
-				u32 handle, struct fence *fence)
-{
-	struct amdgpu_sem *sem;
-	struct amdgpu_sem_core *core;
-
-	sem = amdgpu_sem_lookup(fpriv, handle);
-	if (!sem)
-		return -EINVAL;
-
-	core = sem->base;
-	mutex_lock(&core->lock);
-	fence_put(core->fence);
-	core->fence = fence_get(fence);
-	mutex_unlock(&core->lock);
-
-	amdgpu_sem_put(sem);
-	return 0;
-}
-
-static int amdgpu_sem_wait(struct amdgpu_fpriv *fpriv,
+static int amdgpu_sem_wait(int fd, struct amdgpu_fpriv *fpriv,
 			  struct drm_amdgpu_sem_in *in)
 {
+	struct file *file = fget(fd);
 	struct amdgpu_sem *sem;
-	int ret;
+	int r;
 
-	sem = amdgpu_sem_lookup(fpriv, in->handle);
-	if (!sem)
+	if (!file)
 		return -EINVAL;
 
-	ret = amdgpu_sem_cring_add(fpriv, in, sem);
-	amdgpu_sem_put(sem);
-
-	return ret;
+	sem = file->private_data;
+	if (!sem) {
+		r = -EINVAL;
+		goto err;
+	}
+	r = amdgpu_sem_cring_add(fpriv, in, sem);
+err:
+	fput(file);
+	return r;
 }
 
-void amdgpu_sem_destroy(struct amdgpu_fpriv *fpriv, u32 handle)
+static void amdgpu_sem_destroy(void)
 {
-	struct amdgpu_sem *sem = amdgpu_sem_lookup(fpriv, handle);
-	if (!sem)
-		return;
-
-	spin_lock(&fpriv->sem_handles_lock);
-	idr_remove(&fpriv->sem_handles, handle);
-	spin_unlock(&fpriv->sem_handles_lock);
-
-	kref_sub(&sem->kref, 2, amdgpu_sem_free);
+	/* userspace should close fd when they try to destroy sem,
+	 * closing fd will free semaphore object.
+	 */
 }
 
 static struct fence *amdgpu_sem_get_fence(struct amdgpu_fpriv *fpriv,
@@ -296,14 +219,12 @@ int amdgpu_sem_add_cs(struct amdgpu_ctx *ctx, struct amdgpu_ring *ring,
 	mutex_lock(&ctx->rings[ring->idx].sem_lock);
 	list_for_each_entry_safe(sem, tmp, &ctx->rings[ring->idx].sem_list,
 				 list) {
-		r = amdgpu_sync_fence(ctx->adev, sync, sem->base->fence);
+		r = amdgpu_sync_fence(ctx->adev, sync, sem->fence);
+		fence_put(sem->fence);
 		if (r)
 			goto err;
-		mutex_lock(&sem->base->lock);
-		fence_put(sem->base->fence);
-		sem->base->fence = NULL;
-		mutex_unlock(&sem->base->lock);
-		list_del_init(&sem->list);
+		list_del(&sem->list);
+		kfree(sem);
 	}
 err:
 	mutex_unlock(&ctx->rings[ring->idx].sem_lock);
@@ -317,13 +238,14 @@ int amdgpu_sem_ioctl(struct drm_device *dev, void *data,
 	struct amdgpu_fpriv *fpriv = filp->driver_priv;
 	struct fence *fence;
 	int r = 0;
+	int fd = args->in.fd;
 
 	switch (args->in.op) {
 	case AMDGPU_SEM_OP_CREATE_SEM:
-		r = amdgpu_sem_create(fpriv, &args->out.handle);
+		args->out.fd = amdgpu_sem_create();
 		break;
 	case AMDGPU_SEM_OP_WAIT_SEM:
-		r = amdgpu_sem_wait(fpriv, &args->in);
+		r = amdgpu_sem_wait(fd, fpriv, &args->in);
 		break;
 	case AMDGPU_SEM_OP_SIGNAL_SEM:
 		fence = amdgpu_sem_get_fence(fpriv, &args->in);
@@ -331,15 +253,14 @@ int amdgpu_sem_ioctl(struct drm_device *dev, void *data,
 			r = PTR_ERR(fence);
 			return r;
 		}
-		r = amdgpu_sem_signal(fpriv, args->in.handle, fence);
+		r = amdgpu_sem_signal(fd, fence);
 		fence_put(fence);
 		break;
 	case AMDGPU_SEM_OP_DESTROY_SEM:
-		amdgpu_sem_destroy(fpriv, args->in.handle);
+		amdgpu_sem_destroy();
 		break;
 	default:
-		r = -EINVAL;
-		break;
+		return -EINVAL;
 	}
 
 	return r;
