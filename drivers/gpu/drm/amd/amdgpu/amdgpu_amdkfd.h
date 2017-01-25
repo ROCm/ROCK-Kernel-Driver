@@ -125,8 +125,7 @@ int amdgpu_amdkfd_schedule_restore_mem(struct amdgpu_device *adev,
 				       struct kgd_mem *mem,
 				       struct mm_struct *mm,
 				       unsigned long delay);
-void amdgpu_amdkfd_cancel_restore_mem(struct amdgpu_device *adev,
-				      struct kgd_mem *mem);
+void amdgpu_amdkfd_cancel_restore_mem(struct kgd_mem *mem);
 int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 				uint32_t vmid, uint64_t gpu_addr,
 				uint32_t *ib_cmd, uint32_t ib_len);

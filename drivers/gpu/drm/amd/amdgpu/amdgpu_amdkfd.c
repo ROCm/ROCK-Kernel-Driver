@@ -152,6 +152,43 @@ int amdgpu_amdkfd_resume(struct amdgpu_device *rdev)
 	return r;
 }
 
+/* Cancel any scheduled restore work or wait for it to finish. Must be
+ * called with the mem->lock held. First drop the mm reference. If the
+ * worker has already started, it will detect that mm was dropped and
+ * cancel itself.
+ *
+ * If the worker has already started, it needs to take the
+ * mem->lock. To prevent deadlocks, we need to briefly drop the lock
+ * while waiting. During that time someone else may schedule another
+ * restore. So repeat the process if necessary.
+ *
+ * mmput needs to be called without holding the lock to prevent
+ * circular lock dependencies.
+ */
+static void cancel_restore_locked(struct kgd_mem *mem)
+{
+	struct mm_struct *mm;
+
+	while (mem->mm) {
+		mm = mem->mm;
+		mem->mm = NULL;
+
+		mutex_unlock(&mem->lock);
+
+		mmput(mm);
+		cancel_delayed_work_sync(&mem->work);
+
+		mutex_lock(&mem->lock);
+	}
+}
+
+void amdgpu_amdkfd_cancel_restore_mem(struct kgd_mem *mem)
+{
+	mutex_lock(&mem->lock);
+	cancel_restore_locked(mem);
+	mutex_unlock(&mem->lock);
+}
+
 int amdgpu_amdkfd_evict_mem(struct amdgpu_device *adev, struct kgd_mem *mem,
 			    struct mm_struct *mm)
 {
@@ -162,11 +199,12 @@ int amdgpu_amdkfd_evict_mem(struct amdgpu_device *adev, struct kgd_mem *mem,
 
 	mutex_lock(&mem->lock);
 
-	if (mem->evicted == 1 && delayed_work_pending(&mem->work))
-		/* Cancelling a scheduled restoration */
-		cancel_delayed_work(&mem->work);
-
 	if (++mem->evicted > 1) {
+		/* Memory was already evicted. It may have been
+		 * scheduled for restoration, but that restoration
+		 * hasn't happened yet. When the worker starts it will
+		 * know and abort.
+		 */
 		mutex_unlock(&mem->lock);
 		return 0;
 	}
@@ -199,14 +237,25 @@ static void amdgdu_amdkfd_restore_mem_worker(struct work_struct *work)
 	adev = amdgpu_ttm_adev(mem->bo->tbo.bdev);
 	mm = mem->mm;
 
-	/* Restoration may have been canceled by another eviction or
-	 * could already be done by a restore scheduled earlier */
+	/* Check if restore was canceled */
+	if (!mm) {
+		mutex_unlock(&mem->lock);
+		return;
+	}
+
+	/* Only restore if no other eviction happened since restore
+	 * was scheduled.
+	 */
 	if (mem->evicted == 1) {
 		amdgpu_amdkfd_gpuvm_restore_mem(mem, mm);
 		mem->evicted = 0;
 	}
 
+	mem->mm = NULL;
+
 	mutex_unlock(&mem->lock);
+
+	mmput(mm);
 }
 
 int amdgpu_amdkfd_schedule_restore_mem(struct amdgpu_device *adev,
@@ -232,25 +281,21 @@ int amdgpu_amdkfd_schedule_restore_mem(struct amdgpu_device *adev,
 		return 0;
 	}
 
-	/* mem->evicted is 1 after decrememting. Schedule
-	 * restoration. */
-	if (delayed_work_pending(&mem->work))
-		cancel_delayed_work(&mem->work);
-	mem->mm = mm;
-	INIT_DELAYED_WORK(&mem->work,
-			  amdgdu_amdkfd_restore_mem_worker);
-	schedule_delayed_work(&mem->work, delay);
+	/* mem->evicted is 1 after decrementing. If a restoration was
+	 * already scheduled, just let it do its job. Otherwise
+	 * schedule another one.
+	 */
+	if (!mem->mm) {
+		mem->mm = mm;
+		atomic_inc(&mm->mm_users);
+		INIT_DELAYED_WORK(&mem->work,
+				  amdgdu_amdkfd_restore_mem_worker);
+		schedule_delayed_work(&mem->work, delay);
+	}
 
 	mutex_unlock(&mem->lock);
 
 	return r;
-}
-
-void amdgpu_amdkfd_cancel_restore_mem(struct amdgpu_device *adev,
-				      struct kgd_mem *mem)
-{
-	if (delayed_work_pending(&mem->work))
-		cancel_delayed_work_sync(&mem->work);
 }
 
 int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
