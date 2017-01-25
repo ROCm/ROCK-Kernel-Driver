@@ -413,19 +413,13 @@ static int amdgpu_amdkfd_bo_validate(struct amdgpu_bo *bo, uint32_t domain,
 							 ef_count);
 		}
 	} else {
-		/* Userptrs are not pinned. Therefore we can use the
-		 * bo->pin_count for our version of pinning without conflict.
-		 */
-		if (bo->pin_count == 0) {
-			amdgpu_ttm_placement_from_domain(bo, domain);
-			ret = ttm_bo_validate(&bo->tbo, &bo->placement,
-					      true, false);
-			if (ret)
-				goto validate_fail;
-			if (wait)
-				ttm_bo_wait(&bo->tbo, false, false);
-		}
-		bo->pin_count++;
+		amdgpu_ttm_placement_from_domain(bo, domain);
+		ret = ttm_bo_validate(&bo->tbo, &bo->placement,
+				      true, false);
+		if (ret)
+			goto validate_fail;
+		if (wait)
+			ttm_bo_wait(&bo->tbo, false, false);
 	}
 
 validate_fail:
@@ -443,8 +437,7 @@ static int amdgpu_amdkfd_bo_invalidate(struct amdgpu_bo *bo)
 {
 	int ret = 0;
 
-	if (amdgpu_ttm_tt_get_usermm(bo->tbo.ttm) &&
-		(--bo->pin_count == 0)) {
+	if (amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
 		amdgpu_ttm_placement_from_domain(bo, AMDGPU_GEM_DOMAIN_CPU);
 		ret = ttm_bo_validate(&bo->tbo, &bo->placement, true, false);
 		if (ret != 0)
@@ -898,15 +891,12 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 {
 	struct amdgpu_bo_va *bo_va = entry->bo_va;
 	struct amdgpu_vm *vm = bo_va->vm;
-	struct amdgpu_bo *bo = bo_va->bo;
 
 	amdgpu_vm_bo_unmap(adev, bo_va, entry->va);
 
 	amdgpu_vm_clear_freed(adev, vm, &bo_va->last_pt_update);
 
 	amdgpu_sync_fence(adev, sync, bo_va->last_pt_update);
-
-	amdgpu_amdkfd_bo_invalidate(bo);
 
 	return 0;
 }
@@ -1216,21 +1206,13 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 		}
 	}
 
-	if (!mem->evicted) {
+	if (mem->mapped_to_gpu_memory == 0 && !mem->evicted) {
 		ret = update_user_pages(mem, current->mm, &ctx);
 		if (ret != 0) {
 			pr_err("update_user_pages failed\n");
 			goto update_user_pages_failed;
 		}
-	}
 
-	if (amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
-		ret = amdgpu_amdkfd_bo_validate(bo, domain, true);
-		if (ret) {
-			pr_debug("userptr: Validate failed\n");
-			goto map_bo_to_gpuvm_failed;
-		}
-	} else if (mem->mapped_to_gpu_memory == 0) {
 		/* Validate BO only once. The eviction fence gets added to BO
 		 * the first time it is mapped. Validate will wait for all
 		 * background evictions to complete.
@@ -1518,12 +1500,14 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 	}
 
 	/* If BO is unmapped from all VMs, unfence it. It can be evicted if
-	 * required.
+	 * required. User pages of userptr BOs can be released.
 	 */
-	if (mem->mapped_to_gpu_memory == 0)
+	if (mem->mapped_to_gpu_memory == 0) {
 		amdgpu_amdkfd_remove_eviction_fence(mem->bo,
 						    master_vm->eviction_fence,
 						    NULL, NULL);
+		amdgpu_amdkfd_bo_invalidate(mem->bo);
+	}
 
 	if (mapped_before == mem->mapped_to_gpu_memory) {
 		pr_debug("BO VA 0x%llx size 0x%lx is not mapped to vm %p\n",
@@ -1885,6 +1869,8 @@ int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm)
 		n_unmapped++;
 	}
 
+	amdgpu_amdkfd_bo_invalidate(mem->bo);
+
 	unreserve_bo_and_vms(&ctx, true);
 
 	return 0;
@@ -1935,15 +1921,28 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 	if (likely(ret == 0)) {
 		ret = update_user_pages(mem, mm, &ctx);
 		have_pages = !ret;
-		if (!have_pages)
+		if (!have_pages) {
 			unreserve_bo_and_vms(&ctx, false);
+			pr_err("get_user_pages failed. Probably userptr is freed. %d\n",
+			       ret);
+		}
 	}
 
 	/* update_user_pages drops the lock briefly. Check if someone
 	 * else evicted or restored the buffer in the mean time */
 	if (mem->evicted != 1) {
-		unreserve_bo_and_vms(&ctx, false);
+		if (have_pages)
+			unreserve_bo_and_vms(&ctx, false);
 		return 0;
+	}
+
+	if (have_pages) {
+		r = amdgpu_amdkfd_bo_validate(mem->bo, domain, true);
+		if (unlikely(r != 0)) {
+			pr_err("Failed to validate BO %p\n", mem);
+			have_pages = false;
+			unreserve_bo_and_vms(&ctx, false);
+		}
 	}
 
 	/* Try to restore all mappings. Mappings that fail to restore
@@ -1958,18 +1957,7 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 		adev = (struct amdgpu_device *)entry->kgd_dev;
 
 		if (unlikely(!have_pages)) {
-			pr_err("get_user_pages failed. Probably userptr is freed. %d\n",
-				ret);
 			entry->map_fail = true;
-			continue;
-		}
-
-		r = amdgpu_amdkfd_bo_validate(mem->bo, domain, true);
-		if (unlikely(r != 0)) {
-			pr_err("Failed to validate BO\n");
-			entry->map_fail = true;
-			if (ret == 0)
-				ret = r;
 			continue;
 		}
 
