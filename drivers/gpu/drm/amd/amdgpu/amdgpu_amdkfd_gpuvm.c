@@ -1111,8 +1111,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	 * be freed anyway */
 
 	amdgpu_mn_unregister(mem->bo);
-	if (mem->work.work.func)
-		cancel_delayed_work_sync(&mem->work);
+	amdgpu_amdkfd_cancel_restore_mem(mem);
 
 	ret = reserve_bo_and_cond_vms(mem, NULL, VA_DO_NOT_CARE, &ctx);
 	if (unlikely(ret != 0))
@@ -1923,6 +1922,9 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 		have_pages = !ret;
 		if (!have_pages) {
 			unreserve_bo_and_vms(&ctx, false);
+			if (ret == -ESRCH)
+				/* process terminating, fail quiet and fast */
+				return ret;
 			pr_err("get_user_pages failed. Probably userptr is freed. %d\n",
 			       ret);
 		}
