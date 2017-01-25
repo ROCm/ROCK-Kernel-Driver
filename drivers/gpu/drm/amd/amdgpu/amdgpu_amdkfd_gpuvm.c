@@ -1534,10 +1534,13 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 unreserve_out:
 	unreserve_bo_and_vms(&ctx, false);
 
-	while (num_to_resume--) {
-		/* Now resume GPU's queues while bo and VMs are unreserved.
-		 * resume_mm() is reference counted, and that is why we can
-		 * call it multiple times.
+	while (current->mm && num_to_resume--) {
+		/* Now resume GPU's queues while bo and VMs are
+		 * unreserved. This function runs in a work queue
+		 * during process termination. Only resume queues if
+		 * we're running in process context. resume_mm() is
+		 * reference counted, and that is why we can call it
+		 * multiple times.
 		 */
 		ret = kgd2kfd->resume_mm(adev->kfd, current->mm);
 		if (ret != 0) {
