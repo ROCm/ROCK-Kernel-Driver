@@ -217,8 +217,6 @@ union drm_amdgpu_ctx {
 #define AMDGPU_SEM_OP_WAIT_SEM	        2
 #define AMDGPU_SEM_OP_SIGNAL_SEM        3
 #define AMDGPU_SEM_OP_DESTROY_SEM       4
-#define AMDGPU_SEM_OP_IMPORT_SEM	5
-#define AMDGPU_SEM_OP_EXPORT_SEM	6
 
 struct drm_amdgpu_sem_in {
 	/** AMDGPU_SEM_OP_* */
