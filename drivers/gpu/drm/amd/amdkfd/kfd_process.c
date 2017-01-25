@@ -327,9 +327,10 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
  * is not findable any more. We must assume that no other thread is
  * using it any more, otherwise we couldn't safely free the process
  * stucture in the end. */
-static void kfd_process_ref_release(struct kref *ref)
+static void kfd_process_wq_release(struct work_struct *work)
 {
-	struct kfd_process *p = container_of(ref, struct kfd_process, ref);
+	struct kfd_process *p = container_of(work, struct kfd_process,
+					     release_work);
 	struct kfd_process_device *pdd;
 
 	pr_debug("Releasing process (pasid %d)\n",
@@ -361,22 +362,21 @@ static void kfd_process_ref_release(struct kref *ref)
 	kfree(p);
 }
 
-static void kfd_process_wq_release(struct work_struct *work)
+static void kfd_process_ref_release(struct kref *ref)
 {
-	struct kfd_process *p = container_of(work, struct kfd_process,
-					     release_work);
+	struct kfd_process *p = container_of(ref, struct kfd_process, ref);
 
-	kref_put(&p->ref, kfd_process_ref_release);
+	BUG_ON(!kfd_process_wq);
+
+	INIT_WORK(&p->release_work, kfd_process_wq_release);
+	queue_work(kfd_process_wq, &p->release_work);
 }
 
 static void kfd_process_destroy_delayed(struct rcu_head *rcu)
 {
 	struct kfd_process *p = container_of(rcu, struct kfd_process, rcu);
 
-	BUG_ON(!kfd_process_wq);
-
-	INIT_WORK(&p->release_work, kfd_process_wq_release);
-	queue_work(kfd_process_wq, &p->release_work);
+	kfd_unref_process(p);
 }
 
 static void kfd_process_notifier_release(struct mmu_notifier *mn,
