@@ -2410,6 +2410,7 @@ int amdgpu_sriov_gpu_reset(struct amdgpu_device *adev, bool voluntary)
 
 	mutex_lock(&adev->virt.lock_reset);
 	atomic_inc(&adev->gpu_reset_counter);
+	adev->gfx.in_reset = true;
 
 	/* block TTM */
 	resched = ttm_bo_lock_delayed_workqueue(&adev->mman.bdev);
@@ -2494,6 +2495,7 @@ int amdgpu_sriov_gpu_reset(struct amdgpu_device *adev, bool voluntary)
 		dev_info(adev->dev, "GPU reset failed\n");
 	}
 
+	adev->gfx.in_reset = false;
 	mutex_unlock(&adev->virt.lock_reset);
 	return r;
 }
