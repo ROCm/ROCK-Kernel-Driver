@@ -486,62 +486,6 @@ static int validate_pt_pd_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	return ret;
 }
 
-/**
- * amdgpu_vm_clear_bo - initially clear the VRAM pages
- *
- * @adev: amdgpu_device pointer
- * @bo: bo to clear
- * @vm: requested vm
- * need to reserve bo first before calling it.
- */
-static int amdgpu_amdkfd_gpuvm_clear_bo(struct amdgpu_device *adev,
-			      struct amdgpu_vm *vm,
-			      struct amdgpu_bo *bo)
-{
-	struct amdgpu_ring *ring;
-	struct fence *fence = NULL;
-	struct amdgpu_job *job;
-	unsigned entries;
-	uint64_t addr;
-	int r;
-
-	ring = container_of(vm->entity.sched, struct amdgpu_ring, sched);
-
-	r = reservation_object_reserve_shared(bo->tbo.resv);
-	if (r)
-		return r;
-
-	r = ttm_bo_validate(&bo->tbo, &bo->placement, true, false);
-	if (r)
-		goto error;
-
-	addr = amdgpu_bo_gpu_offset(bo);
-	entries = amdgpu_bo_size(bo);
-
-	r = amdgpu_job_alloc_with_ib(adev, 64, &job);
-	if (r)
-		goto error;
-
-	amdgpu_emit_fill_buffer(adev, &job->ibs[0], 0, addr, entries);
-	amdgpu_ring_pad_ib(ring, &job->ibs[0]);
-
-	WARN_ON(job->ibs[0].length_dw > 64);
-	r = amdgpu_job_submit(job, ring, &vm->entity,
-			      AMDGPU_FENCE_OWNER_VM, &fence);
-	if (r)
-		goto error_free;
-
-	amdgpu_bo_fence(bo, fence, true);
-	fence_put(fence);
-	return 0;
-
-error_free:
-	amdgpu_job_free(job);
-
-error:
-	return r;
-}
-
 static void add_kgd_mem_to_kfd_bo_list(struct kgd_mem *mem,
 				       struct amdkfd_vm *kfd_vm)
 {
