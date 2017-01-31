@@ -194,10 +194,24 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x6938, &tonga_device_info   },	/* Tonga */
 	{ 0x6939, &tonga_device_info   },	/* Tonga */
 	{ 0x7300, &fiji_device_info    },	/* Fiji */
+	{ 0x67C0, &polaris10_device_info },     /* Polaris10 */
+	{ 0x67C1, &polaris10_device_info },     /* Polaris10 */
+	{ 0x67C2, &polaris10_device_info },     /* Polaris10 */
 	{ 0x67C4, &polaris10_device_info },	/* Polaris10 */
 	{ 0x67C7, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67C8, &polaris10_device_info },     /* Polaris10 */
+	{ 0x67C9, &polaris10_device_info },     /* Polaris10 */
+	{ 0x67CA, &polaris10_device_info },     /* Polaris10 */
+	{ 0x67CC, &polaris10_device_info },     /* Polaris10 */
+	{ 0x67CF, &polaris10_device_info },     /* Polaris10 */
 	{ 0x67DF, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67E0, &polaris11_device_info },     /* Polaris11 */
+	{ 0x67E1, &polaris11_device_info },     /* Polaris11 */
 	{ 0x67E3, &polaris11_device_info },	/* Polaris11 */
+	{ 0x67E7, &polaris11_device_info },     /* Polaris11 */
+	{ 0x67E8, &polaris11_device_info },     /* Polaris11 */
+	{ 0x67E9, &polaris11_device_info },     /* Polaris11 */
+	{ 0x67EB, &polaris11_device_info },     /* Polaris11 */
 	{ 0x67EF, &polaris11_device_info },	/* Polaris11 */
 	{ 0x67FF, &polaris11_device_info }	/* Polaris11 */
 };
