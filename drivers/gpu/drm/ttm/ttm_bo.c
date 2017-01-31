@@ -231,7 +231,6 @@ EXPORT_SYMBOL(ttm_bo_del_sub_from_lru);
 
 void ttm_bo_move_to_lru_tail(struct ttm_buffer_object *bo)
 {
-	struct ttm_bo_device *bdev = bo->bdev;
 	int put_count = 0;
 
 	lockdep_assert_held(&bo->resv->lock.base);
