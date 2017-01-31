@@ -326,7 +326,7 @@ struct load_info {
 	unsigned long mod_kallsyms_init_off;
 #endif
 	struct {
-		unsigned int sym, str, mod, vers, info, pcpu, unwind;
+		unsigned int sym, str, mod, vers, info, pcpu, dwarf;
 	} index;
 };
 
@@ -749,23 +749,23 @@ bool is_module_percpu_address(unsigned long addr)
 
 #endif /* CONFIG_SMP */
 
-static unsigned int find_unwind(struct load_info *info)
+static unsigned int find_dwarf(struct load_info *info)
 {
-	int section = 0;
-#ifdef ARCH_UNWIND_SECTION_NAME
-	section = find_sec(info, ARCH_UNWIND_SECTION_NAME);
+	unsigned int section = 0;
+#ifdef ARCH_DWARF_SECTION_NAME
+	section = find_sec(info, ARCH_DWARF_SECTION_NAME);
 	if (section)
 		info->sechdrs[section].sh_flags |= SHF_ALLOC;
 #endif
 	return section;
 }
 
-static void add_unwind_table(struct module *mod, struct load_info *info)
+static void add_dwarf_table(struct module *mod, struct load_info *info)
 {
-	int index = info->index.unwind;
+	int index = info->index.dwarf;
 
-	/* Size of section 0 is 0, so this is ok if there is no unwind info. */
-	mod->unwind_info = unwind_add_table(mod,
+	/* Size of section 0 is 0, so this is ok if there is no dwarf info. */
+	mod->dwarf_info = dwarf_add_table(mod,
 					  (void *)info->sechdrs[index].sh_addr,
 					  info->sechdrs[index].sh_size);
 }
@@ -2215,7 +2215,7 @@ static void free_module(struct module *mod)
 	/* Remove dynamic debug info */
 	ddebug_remove_module(mod->name);
 
-	unwind_remove_table(mod->unwind_info, false);
+	dwarf_remove_table(mod->dwarf_info, false);
 
 	/* Arch-specific cleanup. */
 	module_arch_cleanup(mod);
@@ -3052,7 +3052,7 @@ static struct module *setup_load_info(struct load_info *info, int flags)
 
 	info->index.pcpu = find_pcpusec(info);
 
-	info->index.unwind = find_unwind(info);
+	info->index.dwarf = find_dwarf(info);
 
 	/* Check module struct version now, before we try to use module. */
 	if (!check_modstruct_version(info->sechdrs, info->index.vers, mod))
@@ -3543,7 +3543,7 @@ static noinline int do_init_module(struct module *mod)
 	/* Drop initial reference. */
 	module_put(mod);
 	trim_init_extable(mod);
-	unwind_remove_table(mod->unwind_info, true);
+	dwarf_remove_table(mod->dwarf_info, true);
 #ifdef CONFIG_KALLSYMS
 	/* Switch to core kallsyms now init is done: kallsyms may be walking! */
 	rcu_assign_pointer(mod->kallsyms, &mod->core_kallsyms);
@@ -3817,8 +3817,8 @@ static int load_module(struct load_info *info, const char __user *uargs,
 			goto sysfs_cleanup;
 	}
 
-	/* Initialize unwind table */
-	add_unwind_table(mod, info);
+	/* Initialize dwarf table */
+	add_dwarf_table(mod, info);
 
 	/* Get rid of temporary copy. */
 	free_copy(info);

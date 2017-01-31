@@ -14,80 +14,62 @@
 
 #include <linux/linkage.h>
 
-struct module;
-struct unwind_state;
-
-#ifdef CONFIG_STACK_UNWIND
-
+#ifdef CONFIG_X86
 #include <asm/unwind.h>
+#endif
+
+struct module;
+
+#ifdef CONFIG_DWARF_UNWIND
+
 #include <asm/stacktrace.h>
 
-#ifndef ARCH_UNWIND_SECTION_NAME
-#define ARCH_UNWIND_SECTION_NAME ".eh_frame"
+#ifndef ARCH_DWARF_SECTION_NAME
+#define ARCH_DWARF_SECTION_NAME ".eh_frame"
 #endif
 
 /*
  * Initialize unwind support.
  */
-void unwind_init(void);
-void unwind_setup(void);
+void dwarf_init(void);
+void dwarf_setup(void);
 
 #ifdef CONFIG_MODULES
 
-void *unwind_add_table(struct module *mod, const void *table_start,
+void *dwarf_add_table(struct module *mod, const void *table_start,
 		unsigned long table_size);
 
-void unwind_remove_table(void *handle, bool init_only);
+void dwarf_remove_table(void *handle, bool init_only);
 
 #endif
 
-asmlinkage void arch_unwind_init_running(struct pt_regs *regs);
+asmlinkage void arch_dwarf_init_running(struct pt_regs *regs);
 
 /*
  * Unwind to previous to frame.  Returns 0 if successful, negative
  * number in case of an error.
  */
-int unwind(struct unwind_state *state);
+int dwarf_unwind(struct unwind_state *state);
 
-/*
- * Unwind until the return pointer is in user-land (or until an error
- * occurs).  Returns 0 if successful, negative number in case of
- * error.
- */
-int unwind_to_user(struct unwind_state *state);
+#else /* CONFIG_DWARF_UNWIND */
 
-#else /* CONFIG_STACK_UNWIND */
-
-struct unwind_state {};
-
-static inline void unwind_init(void) {}
-static inline void unwind_setup(void) {}
+static inline void dwarf_init(void) {}
+static inline void dwarf_setup(void) {}
 
 #ifdef CONFIG_MODULES
 
-static inline void *unwind_add_table(struct module *mod,
-				     const void *table_start,
-				     unsigned long table_size)
+static inline void *dwarf_add_table(struct module *mod,
+		const void *table_start, unsigned long table_size)
 {
 	return NULL;
 }
 
+static inline void dwarf_remove_table(void *handle, bool init_only)
+{
+}
+
 #endif
 
-static inline void unwind_remove_table(void *handle, bool init_only)
-{
-}
-
-static inline int unwind(struct unwind_state *info)
-{
-	return -ENODEV;
-}
-
-static inline int unwind_to_user(struct unwind_state *info)
-{
-	return -ENODEV;
-}
-
-#endif /* CONFIG_STACK_UNWIND */
+#endif /* CONFIG_DWARF_UNWIND */
 
 #endif /* _LINUX_UNWIND_H */

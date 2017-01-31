@@ -125,7 +125,7 @@ obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o
 obj-$(CONFIG_TRACING)			+= tracepoint.o
 obj-$(CONFIG_SCHED_MC_PRIO)		+= itmt.o
 
-ifdef CONFIG_STACK_UNWIND
+ifdef CONFIG_DWARF_UNWIND
 obj-y					+= unwind_dwarf.o
 KASAN_SANITIZE_unwind_dwarf.o		:= n
 else

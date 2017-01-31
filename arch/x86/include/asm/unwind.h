@@ -11,7 +11,7 @@ struct unwind_state {
 	unsigned long stack_mask;
 	struct task_struct *task;
 	int graph_idx;
-#ifdef CONFIG_STACK_UNWIND
+#ifdef CONFIG_DWARF_UNWIND
 	union {
 		struct pt_regs regs;
 		char regs_arr[sizeof(struct pt_regs)];
@@ -48,7 +48,7 @@ void unwind_start(struct unwind_state *state, struct task_struct *task,
 	__unwind_start(state, task, regs, first_frame);
 }
 
-#ifdef CONFIG_STACK_UNWIND
+#ifdef CONFIG_DWARF_UNWIND
 
 #define UNW_PC(frame)      ((frame)->u.regs.ip)
 #define UNW_SP(frame)      ((frame)->u.regs.sp)
@@ -128,7 +128,7 @@ static inline struct pt_regs *unwind_get_entry_regs(struct unwind_state *state)
  * The code below is released under version 2 of the GNU GPL.
  */
 
-#ifdef CONFIG_STACK_UNWIND
+#ifdef CONFIG_DWARF_UNWIND
 
 #include <linux/uaccess.h>
 
@@ -178,8 +178,8 @@ static inline struct pt_regs *unwind_get_entry_regs(struct unwind_state *state)
 	((raItem).where == Memory && \
 	 !((raItem).value * (dataAlign) + sizeof(void *)))
 
-static inline void arch_unw_init_frame_info(struct unwind_state *info,
-					    struct pt_regs *regs)
+static inline void arch_dwarf_init_frame_info(struct unwind_state *info,
+		struct pt_regs *regs)
 {
 #ifdef CONFIG_X86_64
 	info->u.regs = *regs;
@@ -194,7 +194,7 @@ static inline void arch_unw_init_frame_info(struct unwind_state *info,
 #endif
 }
 
-static inline void arch_unw_init_blocked(struct unwind_state *info)
+static inline void arch_dwarf_init_blocked(struct unwind_state *info)
 {
 	struct inactive_task_frame *frame = (void *)info->task->thread.sp;
 
@@ -209,7 +209,7 @@ static inline void arch_unw_init_blocked(struct unwind_state *info)
 #endif
 }
 
-static inline int arch_unw_user_mode(struct unwind_state *info)
+static inline int arch_dwarf_user_mode(struct unwind_state *info)
 {
 	return user_mode(&info->u.regs)
 #ifdef CONFIG_X86_64
@@ -229,7 +229,7 @@ static inline int arch_unw_user_mode(struct unwind_state *info)
 #define UNW_SP(frame) ((void)(frame), 0UL)
 #define UNW_FP(frame) ((void)(frame), 0UL)
 
-static inline int arch_unw_user_mode(const void *info)
+static inline int arch_dwarf_user_mode(const void *info)
 {
 	return 0;
 }

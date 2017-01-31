@@ -885,7 +885,7 @@
 	. = ALIGN(stop_align);						\
 	VMLINUX_SYMBOL(__bss_stop) = .;
 
-#ifdef CONFIG_STACK_UNWIND
+#ifdef CONFIG_DWARF_UNWIND
 #define EH_FRAME							\
 		/* Unwind data binary search table */			\
 		. = ALIGN(8);						\

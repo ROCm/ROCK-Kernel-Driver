@@ -1,7 +1,7 @@
 #include <linux/unwind.h>
 
 #if 0
-#ifdef CONFIG_STACK_UNWIND
+#ifdef CONFIG_DWARF_UNWIND
 static int call_trace = 1;
 #else
 #define call_trace (-1)
@@ -31,14 +31,14 @@ bool unwind_next_frame(struct unwind_state *state)
 	if (unwind_done(state))
 		return false;
 
-	if (arch_unw_user_mode(state))
+	if (arch_dwarf_user_mode(state))
 		return false;
 
 	if ((state->dw_sp & PAGE_MASK) == (UNW_SP(state) & PAGE_MASK) &&
 			state->dw_sp > UNW_SP(state))
 		return false;
 
-	if (unwind(state) || !UNW_PC(state))
+	if (dwarf_unwind(state) || !UNW_PC(state))
 		return false;
 
 	state->dw_sp = UNW_SP(state);
@@ -57,10 +57,10 @@ void __unwind_start(struct unwind_state *state, struct task_struct *task,
 	state->task = task;
 
 	if (regs) {
-		arch_unw_init_frame_info(state, regs);
+		arch_dwarf_init_frame_info(state, regs);
 		type = 'R';
 	} else if (task == current) {
-		arch_unwind_init_running(&state->u.regs);
+		arch_dwarf_init_running(&state->u.regs);
 		type = 'C';
 #ifdef CONFIG_SMP
 	} else if (task->on_cpu) {
@@ -68,7 +68,7 @@ void __unwind_start(struct unwind_state *state, struct task_struct *task,
 		return;
 #endif
 	} else {
-		arch_unw_init_blocked(state);
+		arch_dwarf_init_blocked(state);
 		type = 'B';
 		do_skipping = false;
 	}
@@ -82,7 +82,7 @@ void __unwind_start(struct unwind_state *state, struct task_struct *task,
 
 	state->dw_sp = UNW_SP(state);
 
-	if (arch_unw_user_mode(state))
+	if (arch_dwarf_user_mode(state))
 		return;
 
 	while (do_skipping) {
@@ -108,12 +108,12 @@ static int dump_trace_unwind(struct unwind_state *state)
 	pr_info("%s: tady rip=%lx rsp=%lx rbp=%lx\n", __func__,
 			UNW_PC(state), UNW_SP(state), UNW_FP(state));
 
-	if (arch_unw_user_mode(state))
+	if (arch_dwarf_user_mode(state))
 		return -1;
 	while (unwind(state) == 0 && UNW_PC(state)) {
 		pr_info("%s: %pS\n", __func__, (void *)UNW_PC(state));
 //		ops->address(data, UNW_PC(state), 1);
-		if (arch_unw_user_mode(state))
+		if (arch_dwarf_user_mode(state))
 			break;
 		if ((sp & PAGE_MASK) == (UNW_SP(state) & PAGE_MASK) &&
 				sp > UNW_SP(state))
@@ -126,7 +126,7 @@ static int dump_trace_unwind(struct unwind_state *state)
 int try_stack_unwind(struct task_struct *task, struct pt_regs *regs,
 		     unsigned long **stack, unsigned long *bp)
 {
-#ifdef CONFIG_STACK_UNWIND
+#ifdef CONFIG_DWARF_UNWIND
 	int unw_ret = 0;
 	struct unwind_state state;
 
@@ -139,7 +139,7 @@ int try_stack_unwind(struct task_struct *task, struct pt_regs *regs,
 	unw_ret = dump_trace_unwind(&state);
 
 	if (unw_ret > 0) {
-		if (call_trace == 1 && !arch_unw_user_mode(&state)) {
+		if (call_trace == 1 && !arch_dwarf_user_mode(&state)) {
 //			ops->warning_symbol(data, "DWARF2 unwinder stuck at %s\n",
 //					    UNW_PC(&state));
 			pr_info("%s: DWARF2 unwinder stuck at %lx %pS\n",
@@ -164,7 +164,7 @@ int try_stack_unwind(struct task_struct *task, struct pt_regs *regs,
 	return 0;
 }
 
-#ifdef CONFIG_STACK_UNWIND
+#ifdef CONFIG_DWARF_UNWIND
 static int __init call_trace_setup(char *s)
 {
 	if (!s)

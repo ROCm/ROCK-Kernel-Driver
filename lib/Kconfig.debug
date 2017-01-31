@@ -55,8 +55,8 @@ config UNWIND_INFO
 	  If you don't debug the kernel, you can say N, but we may not be able
 	  to solve problems without frame unwind information or frame pointers.
 
-config STACK_UNWIND
-	bool "Stack unwind support"
+config DWARF_UNWIND
+	bool "DWARF stack unwind support"
 	depends on UNWIND_INFO
 	depends on X86
 	help

@@ -241,11 +241,15 @@ init_unwind_table(struct unwind_table *table, const char *name,
 	table->size = table_size;
 	/* See if the linker provided table looks valid. */
 	if (header_size <= 4 || header_start[0] != 1 ||
+			/* ptr to eh_frame */
 			(void *)read_pointer(&ptr, end, header_start[1], 0) !=
 				table_start ||
+			/* fde count */
 			!read_pointer(&ptr, end, header_start[2], 0) ||
+			/* table[0] -- initial location */
 			!read_pointer(&ptr, end, header_start[3],
 				(unsigned long)header_start) ||
+			/* table[0] -- address */
 			!read_pointer(&ptr, end, header_start[3],
 				(unsigned long)header_start))
 		header_start = NULL;
@@ -256,7 +260,7 @@ init_unwind_table(struct unwind_table *table, const char *name,
 	table->name = name;
 }
 
-void __init unwind_init(void)
+void __init dwarf_init(void)
 {
 	extern const char __start_unwind[], __end_unwind[];
 	extern const char __start_unwind_hdr[], __end_unwind_hdr[];
@@ -410,7 +414,7 @@ static void *__init balloc(size_t sz, gfp_t unused)
 			__pa(MAX_DMA_ADDRESS));
 }
 
-void __init unwind_setup(void)
+void __init dwarf_setup(void)
 {
 	setup_unwind_table(&root_table, balloc);
 }
@@ -420,9 +424,8 @@ void __init unwind_setup(void)
 static struct unwind_table *last_table;
 
 /* Must be called with module_mutex held. */
-void *unwind_add_table(struct module *module,
-		       const void *table_start,
-		       unsigned long table_size)
+void *dwarf_add_table(struct module *module, const void *table_start,
+		unsigned long table_size)
 {
 	struct unwind_table *table;
 #ifdef CONFIG_DEBUG_SET_MODULE_RONX
@@ -486,7 +489,7 @@ static int unlink_table(void *arg)
 }
 
 /* Must be called with module_mutex held. */
-void unwind_remove_table(void *handle, bool init_only)
+void dwarf_remove_table(void *handle, bool init_only)
 {
 	struct unwind_table *table = handle;
 	struct unlink_table_info info;
@@ -1145,7 +1148,7 @@ static unsigned long evaluate(const u8 *expr, const u8 *end,
 			if (val1 < BITS_PER_LONG)
 				PUSH((long)val2 >> val1);
 			else
-				PUSH(val2 < 0 ? -1 : 0);
+				PUSH((long)val2 < 0 ? -1 : 0);
 			break;
 		case DW_OP_xor:
 			val1 = POP();
@@ -1157,7 +1160,7 @@ static unsigned long evaluate(const u8 *expr, const u8 *end,
 				++ptr.ps16;
 				break;
 			}
-			/*nobreak*/
+			/* fallthrough */
 		case DW_OP_skip:
 			if (ptr.pu8 + 1 < end) {
 				ptr.pu8 += *ptr.ps16;
@@ -1234,7 +1237,7 @@ static unsigned long evaluate(const u8 *expr, const u8 *end,
  * Unwind to previous to frame.  Returns 0 if successful, negative number in
  * case of an error.
  */
-int unwind(struct unwind_state *frame)
+int dwarf_unwind(struct unwind_state *frame)
 {
 	const u32 *fde = NULL, *cie = NULL;
 	const u8 *ptr = NULL, *end = NULL;
@@ -1664,8 +1667,9 @@ int unwind(struct unwind_state *frame)
 	return 0;
 #undef CASES
 }
-EXPORT_SYMBOL_GPL(unwind);
+EXPORT_SYMBOL_GPL(dwarf_unwind);
 
+#if 0
 /*
  * Unwind until the return pointer is in user-land (or until an error
  * occurs).  Returns 0 if successful, negative number in case of
@@ -1683,3 +1687,4 @@ int unwind_to_user(struct unwind_state *info)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(unwind_to_user);
+#endif
