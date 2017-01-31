@@ -990,7 +990,7 @@ static int update_gpuvm_pte(struct amdgpu_device *adev,
 	amdgpu_sync_fence(adev, sync, vm->page_directory_fence);
 
 	/* Update the page tables  */
-	ret = amdgpu_vm_bo_update(adev, bo_va, &bo->tbo.mem);
+	ret = amdgpu_vm_bo_update(adev, bo_va, false);
 	if (ret != 0) {
 		pr_err("amdgpu_vm_bo_update failed\n");
 		return ret;
