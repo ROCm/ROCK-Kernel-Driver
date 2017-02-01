@@ -15,7 +15,7 @@
 
 #### Package Contents
 
-The kernel image is built from a source tree based on the 4.6 upstream
+The kernel image is built from a source tree based on the 4.9 upstream
 release plus:
 
 * Features in the HSA kernel driver ("amdkfd") that are not yet
