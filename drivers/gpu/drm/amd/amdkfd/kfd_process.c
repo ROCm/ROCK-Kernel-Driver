@@ -876,13 +876,16 @@ void *kfd_process_find_bo_from_interval(struct kfd_process *p,
 	it_node = interval_tree_iter_first(&p->bo_interval_tree,
 			start_addr, last_addr);
 	if (!it_node) {
-		pr_err("%llu - %llu does not relate to an existing buffer\n",
+		pr_err("0x%llx-0x%llx does not relate to an existing buffer\n",
 				start_addr, last_addr);
 		return NULL;
 	}
 
-	BUG_ON(NULL != interval_tree_iter_next(it_node,
-			start_addr, last_addr));
+	if (interval_tree_iter_next(it_node, start_addr, last_addr) != NULL) {
+		pr_err("0x%llx-0x%llx spans more than a single BO\n",
+				start_addr, last_addr);
+		return NULL;
+	}
 
 	buf_obj = container_of(it_node, struct kfd_bo, it);
 
