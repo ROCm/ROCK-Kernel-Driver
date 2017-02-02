@@ -57,11 +57,14 @@ config UNWIND_INFO
 
 config DWARF_UNWIND
 	bool "DWARF stack unwind support"
-	depends on UNWIND_INFO
+	depends on UNWIND_INFO && !KASAN
 	depends on X86
 	help
 	  This enables more precise stack traces, omitting all unrelated
 	  occurrences of pointers into kernel code from the dump.
+
+	  KASAN is too slow with this unwinder, so it is excluded from
+	  using in parallel.
 
 config BOOT_PRINTK_DELAY
 	bool "Delay each boot printk message by N milliseconds"

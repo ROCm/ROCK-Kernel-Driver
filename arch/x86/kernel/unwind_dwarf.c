@@ -9,9 +9,9 @@ static int call_trace = 1;
 #endif
 
 #if 0
-#define dprintk(fmt, args...) printk(KERN_DEBUG "unwind: " fmt "\n", ##args)
+#define dprintk(fmt, args...) printk(KERN_DEBUG "unwind: " fmt, ##args)
 #else
-#define dprintk(fmt, args...) no_printk(KERN_DEBUG "unwind: " fmt "\n", ##args)
+#define dprintk(fmt, args...) no_printk(KERN_DEBUG "unwind: " fmt, ##args)
 #endif
 
 unsigned long unwind_get_return_address(struct unwind_state *state)
@@ -29,21 +29,24 @@ EXPORT_SYMBOL_GPL(unwind_get_return_address);
 bool unwind_next_frame(struct unwind_state *state)
 {
 	if (unwind_done(state))
-		return false;
+		goto bad;
 
 	if (arch_dwarf_user_mode(state))
-		return false;
+		goto bad;
 
 	if ((state->dw_sp & PAGE_MASK) == (UNW_SP(state) & PAGE_MASK) &&
 			state->dw_sp > UNW_SP(state))
-		return false;
+		goto bad;
 
 	if (dwarf_unwind(state) || !UNW_PC(state))
-		return false;
+		goto bad;
 
 	state->dw_sp = UNW_SP(state);
 
 	return true;
+bad:
+	state->stack_info.type = STACK_TYPE_UNKNOWN;
+	return false;
 }
 EXPORT_SYMBOL_GPL(unwind_next_frame);
 
