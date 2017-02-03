@@ -1936,14 +1936,15 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 			pr_err("get_user_pages failed. Probably userptr is freed. %d\n",
 			       ret);
 		}
-	}
-
-	/* update_user_pages drops the lock briefly. Check if someone
-	 * else evicted or restored the buffer in the mean time */
-	if (mem->evicted != 1) {
-		if (have_pages)
-			unreserve_bo_and_vms(&ctx, false);
-		return 0;
+		/* update_user_pages drops the lock briefly. Check if
+		 * someone else evicted or restored the buffer in the
+		 * mean time. Return -EBUSY to let the caller know.
+		 */
+		if (mem->evicted != 1) {
+			if (have_pages)
+				unreserve_bo_and_vms(&ctx, false);
+			return -EBUSY;
+		}
 	}
 
 	if (have_pages) {
