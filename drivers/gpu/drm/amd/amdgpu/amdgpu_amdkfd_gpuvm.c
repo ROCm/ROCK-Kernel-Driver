@@ -449,16 +449,11 @@ static int amdgpu_amdkfd_bo_invalidate(struct amdgpu_bo *bo)
 static int validate_pt_pd_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 {
 	struct amdgpu_bo *pd = vm->page_directory;
-	struct amdkfd_vm *kvm = container_of(vm, struct amdkfd_vm, base);
 	struct amdgpu_vm_parser param;
 	int ret;
 
 	param.domain = AMDGPU_GEM_DOMAIN_VRAM;
 	param.wait = true;
-
-	/* Remove eviction fence so that validate can wait on move fences */
-	amdgpu_amdkfd_remove_eviction_fence(pd, kvm->eviction_fence,
-					    NULL, NULL);
 
 	ret = amdgpu_vm_validate_pt_bos(adev, vm, amdgpu_amdkfd_validate,
 					&param);
@@ -470,9 +465,6 @@ static int validate_pt_pd_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		if (ret)
 			pr_err("amdgpu: failed to validate PD\n");
 	}
-
-	/* Add the eviction fence back */
-	amdgpu_bo_fence(pd, &kvm->master->eviction_fence->base, true);
 
 	vm->last_eviction_counter = atomic64_read(&adev->num_evictions);
 
@@ -944,6 +936,17 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev,
 {
 	int ret;
 	struct amdgpu_bo *bo = entry->bo_va->bo;
+	struct amdkfd_vm *kvm = container_of(entry->bo_va->vm,
+					     struct amdkfd_vm, base);
+	struct amdgpu_bo *pd = entry->bo_va->vm->page_directory;
+
+	/* Remove eviction fence from PD (and thereby from PTs too as they
+	 * share the resv. object. This is necessary because new PTs are
+	 * cleared and validate needs to wait on move fences. The eviction
+	 * fence shouldn't interfere in both these activities
+	 */
+	amdgpu_amdkfd_remove_eviction_fence(pd, kvm->master->eviction_fence,
+					    NULL, NULL);
 
 	/* Set virtual address for the allocation, allocate PTs,
 	 * if needed, and zero them.
@@ -965,6 +968,9 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev,
 		pr_err("validate_pt_pd_bos() failed\n");
 		return ret;
 	}
+
+	/* Add the eviction fence back */
+	amdgpu_bo_fence(pd, &kvm->master->eviction_fence->base, true);
 
 	ret = update_gpuvm_pte(adev, entry, sync);
 	if (ret != 0) {
