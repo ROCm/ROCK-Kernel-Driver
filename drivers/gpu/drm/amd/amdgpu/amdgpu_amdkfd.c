@@ -258,8 +258,8 @@ static void amdgdu_amdkfd_restore_mem_worker(struct work_struct *work)
 	 * was scheduled.
 	 */
 	if (mem->evicted == 1) {
-		amdgpu_amdkfd_gpuvm_restore_mem(mem, mm);
-		mem->evicted = 0;
+		if (amdgpu_amdkfd_gpuvm_restore_mem(mem, mm) != -EBUSY)
+			mem->evicted = 0;
 	}
 
 	mem->mm = NULL;
