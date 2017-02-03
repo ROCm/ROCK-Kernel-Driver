@@ -61,6 +61,7 @@ struct kgd_mem {
 	/* flags bitfield */
 	bool no_substitute : 1;
 	bool aql_queue     : 1;
+	bool busy          : 1;
 };
 
 /* KFD Memory Eviction */

@@ -170,6 +170,17 @@ static void cancel_restore_locked(struct kgd_mem *mem)
 	struct mm_struct *mm;
 
 	while (mem->mm) {
+		/* update_user_pages needs to drop the lock
+		 * briefly. Therefore holding the lock is no guarantee
+		 * that no restore is in progress
+		 */
+		if (mem->busy) {
+			mutex_unlock(&mem->lock);
+			schedule_timeout_uninterruptible(1);
+			mutex_lock(&mem->lock);
+			continue;
+		}
+
 		mm = mem->mm;
 		mem->mm = NULL;
 

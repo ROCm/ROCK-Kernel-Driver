@@ -826,6 +826,7 @@ static int update_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 		if (!pages)
 			return -ENOMEM;
 
+		mem->busy = true;
 		mutex_unlock(&mem->lock);
 
 		while (true) {
@@ -834,6 +835,7 @@ static int update_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 			up_read(&mm->mmap_sem);
 
 			mutex_lock(&mem->lock);
+			mem->busy = false;
 			if (ret != 0)
 				return ret;
 
