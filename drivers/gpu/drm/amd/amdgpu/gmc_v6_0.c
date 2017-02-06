@@ -417,7 +417,7 @@ static void gmc_v6_0_enable_prt(struct amdgpu_device *adev, bool value)
 			    L2_CACHE_STORE_INVALID_ENTRIES, value);
 	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
 			    L1_TLB_STORE_INVALID_ENTRIES, value);
-	WREG32(mmVM_CONTEXT1_CNTL, tmp);
+	WREG32(mmVM_PRT_CNTL, tmp);
 
 	if (value) {
 		WREG32(mmVM_PRT_APERTURE0_LOW_ADDR, 0x0);
