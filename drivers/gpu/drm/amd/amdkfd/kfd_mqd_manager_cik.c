@@ -30,6 +30,7 @@
 #include "cik_regs.h"
 #include "cik_structs.h"
 #include "oss/oss_2_4_sh_mask.h"
+#include "asic_reg/gca/gfx_7_2_sh_mask.h"
 
 #define AQL_ENABLE 1
 
@@ -95,6 +96,16 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 		m->compute_static_thread_mgmt_se3);
 }
 
+static void set_priority(struct cik_mqd *m, struct queue_properties *q)
+{
+	m->cp_hqd_pipe_priority = pipe_priority_map[q->priority];
+	m->cp_hqd_queue_priority = q->priority;
+	m->compute_pgm_rsrc1 = (m->compute_pgm_rsrc1 &
+				(~COMPUTE_PGM_RSRC1__PRIORITY_MASK)) |
+				(spi_priority_map[q->priority] <<
+				COMPUTE_PGM_RSRC1__PRIORITY__SHIFT);
+}
+
 static int init_mqd(struct mqd_manager *mm, void **mqd,
 		struct kfd_mem_obj **mqd_mem_obj, uint64_t *gart_addr,
 		struct queue_properties *q)
@@ -102,8 +113,6 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 	uint64_t addr;
 	struct cik_mqd *m;
 	int retval;
-
-	BUG_ON(!mm || !q || !mqd);
 
 	pr_debug("kfd: In func %s\n", __func__);
 
@@ -149,8 +158,7 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 	 * 1 = CS_MEDIUM (typically between HP3D and GFX
 	 * 2 = CS_HIGH (typically above HP3D)
 	 */
-	m->cp_hqd_pipe_priority = 1;
-	m->cp_hqd_queue_priority = 15;
+	set_priority(m, q);
 
 	if (q->format == KFD_QUEUE_FORMAT_AQL)
 		m->cp_hqd_iq_rptr = AQL_ENABLE;
@@ -266,6 +274,7 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 	}
 
 	update_cu_mask(mm, mqd, q);
+	set_priority(m, q);
 
 	m->cp_hqd_active = 0;
 	q->is_active = false;
@@ -427,8 +436,7 @@ static int init_mqd_hiq(struct mqd_manager *mm, void **mqd,
 	 * 1 = CS_MEDIUM (typically between HP3D and GFX
 	 * 2 = CS_HIGH (typically above HP3D)
 	 */
-	m->cp_hqd_pipe_priority = 1;
-	m->cp_hqd_queue_priority = 15;
+	set_priority(m, q);
 
 	*mqd = m;
 	if (gart_addr)
@@ -478,6 +486,7 @@ static int update_mqd_hiq(struct mqd_manager *mm, void *mqd,
 		q->is_active = true;
 	}
 
+	set_priority(m, q);
 	return 0;
 }
 
