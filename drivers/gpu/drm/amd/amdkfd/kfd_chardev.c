@@ -33,6 +33,7 @@
 #include <linux/mm.h>
 #include <uapi/asm-generic/mman-common.h>
 #include <asm/processor.h>
+#include <linux/ptrace.h>
 
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
@@ -1875,6 +1876,247 @@ static int kfd_ioctl_get_tile_config(struct file *filep,
 	return 0;
 }
 
+static int kfd_ioctl_cross_memory_copy(struct file *filep,
+				       struct kfd_process *local_p, void *data)
+{
+	struct kfd_ioctl_cross_memory_copy_args *args = data;
+	struct kfd_memory_range *src_array, *dst_array;
+	struct kfd_bo *src_bo, *dst_bo;
+	struct kfd_process *remote_p, *src_p, *dst_p;
+	struct task_struct *remote_task;
+	struct mm_struct *remote_mm;
+	struct pid *remote_pid;
+	struct fence *fence = NULL, *lfence = NULL;
+	uint64_t dst_va_addr;
+	uint64_t copied, total_copied = 0;
+	uint64_t src_offset, dst_offset;
+	int i, j = 0, err = 0;
+
+	/* Check parameters */
+	if (args->src_mem_range_array == 0 || args->dst_mem_range_array == 0 ||
+		args->src_mem_array_size == 0 || args->dst_mem_array_size == 0)
+		return -EINVAL;
+	args->bytes_copied = 0;
+
+	/* Allocate space for source and destination arrays */
+	src_array = kmalloc_array((args->src_mem_array_size +
+				  args->dst_mem_array_size),
+				  sizeof(struct kfd_memory_range),
+				  GFP_KERNEL);
+	if (src_array == NULL)
+		return -ENOMEM;
+	dst_array = &src_array[args->src_mem_array_size];
+
+	if (copy_from_user(src_array, (void __user *)args->src_mem_range_array,
+			   args->src_mem_array_size *
+			   sizeof(struct kfd_memory_range))) {
+		err = -EFAULT;
+		goto copy_from_user_fail;
+	}
+	if (copy_from_user(dst_array, (void __user *)args->dst_mem_range_array,
+			   args->dst_mem_array_size *
+			   sizeof(struct kfd_memory_range))) {
+		err = -EFAULT;
+		goto copy_from_user_fail;
+	}
+
+	/* Get remote process */
+	remote_pid = find_get_pid(args->pid);
+	if (remote_pid == NULL) {
+		pr_err("Cross mem copy failed. Invalid PID %d\n", args->pid);
+		err = -ESRCH;
+		goto copy_from_user_fail;
+	}
+
+	remote_task = get_pid_task(remote_pid, PIDTYPE_PID);
+	if (remote_pid == NULL) {
+		pr_err("Cross mem copy failed. Invalid PID or task died %d\n",
+			args->pid);
+		err = -ESRCH;
+		goto get_pid_task_fail;
+	}
+
+	/* Check access permission */
+	remote_mm = mm_access(remote_task, PTRACE_MODE_ATTACH_REALCREDS);
+	if (!remote_mm || IS_ERR(remote_mm)) {
+		err = IS_ERR(remote_mm) ? PTR_ERR(remote_mm) : -ESRCH;
+		if (err == -EACCES) {
+			pr_err("Cross mem copy failed. Permission error\n");
+			err = -EPERM;
+		} else
+			pr_err("Cross mem copy failed. Invalid task (%d)\n",
+			       err);
+		goto mm_access_fail;
+	}
+
+	remote_p = kfd_get_process(remote_task);
+	if (remote_p == NULL) {
+		pr_err("Cross mem copy failed. Invalid kfd process %d\n",
+		       args->pid);
+		err = -EINVAL;
+		goto kfd_process_fail;
+	}
+
+	if (KFD_IS_CROSS_MEMORY_WRITE(args->flags)) {
+		src_p = local_p;
+		dst_p = remote_p;
+		pr_debug("CMA WRITE: local -> remote\n");
+	} else {
+		src_p = remote_p;
+		dst_p = local_p;
+		pr_debug("CMA READ: remote -> local\n");
+	}
+
+
+	/* For each source kfd_range:
+	 * - Find the BO. Each range has to be within the same BO.
+	 * - Copy this range to single or multiple destination BOs.
+	 * - dst_va_addr - will point to next va address into which data will
+	 *                 be copied.
+	 * - dst_bo & src_bo - the current destination and source BOs
+	 * - src_offset & dst_offset - offset into the respective BOs from
+	 *                             data will be sourced or copied
+	 */
+	dst_va_addr = dst_array[0].va_addr;
+	down_read(&dst_p->lock);
+	dst_bo = kfd_process_find_bo_from_interval(dst_p,
+			dst_va_addr,
+			dst_va_addr + dst_array[0].size - 1);
+	up_read(&dst_p->lock);
+	if (dst_bo == NULL) {
+		err = -EFAULT;
+		goto kfd_process_fail;
+	}
+	dst_offset = dst_va_addr - dst_bo->it.start;
+
+	for (i = 0; i < args->src_mem_array_size; i++) {
+		uint64_t src_va_addr_end = src_array[i].va_addr +
+					   src_array[i].size - 1;
+		uint64_t src_size_to_copy = src_array[i].size;
+
+		down_read(&src_p->lock);
+		src_bo = kfd_process_find_bo_from_interval(src_p,
+				src_array[i].va_addr,
+				src_va_addr_end);
+		up_read(&src_p->lock);
+		if (src_bo == NULL || src_va_addr_end > src_bo->it.last) {
+			pr_err("Cross mem copy failed. Invalid range\n");
+			err = -EFAULT;
+			break;
+		}
+
+		src_offset = src_array[i].va_addr - src_bo->it.start;
+
+		/* Copy src_bo to one or multiple dst_bo(s) based on size and
+		 * and current copy location.
+		 */
+		while (j < args->dst_mem_array_size) {
+			uint64_t copy_size;
+			int64_t space_left;
+
+			/* Find the current copy_size. This will be smaller of
+			 * the following
+			 * - space left in the current dest memory range
+			 * - data left to copy from source range
+			 */
+			space_left = (dst_array[j].va_addr + dst_array[j].size)
+					- dst_va_addr;
+			copy_size = (src_size_to_copy < space_left) ?
+					src_size_to_copy : space_left;
+
+			/* Check both BOs belong to same device */
+			if (src_bo->dev->kgd != dst_bo->dev->kgd) {
+				pr_err("Cross Memory failed. Not same device\n");
+				err = -EINVAL;
+				break;
+			}
+
+			/* Store prev fence. Release it when a later fence is
+			 * created
+			 */
+			lfence = fence;
+			fence = NULL;
+
+			err = dst_bo->dev->kfd2kgd->copy_mem_to_mem(
+				src_bo->dev->kgd,
+				src_bo->mem, src_offset,
+				dst_bo->mem, dst_offset,
+				copy_size,
+				&fence, &copied);
+
+			if (err) {
+				pr_err("GPU Cross mem copy failed\n");
+				err = -EFAULT;
+				break;
+			}
+
+			/* Later fence available. Release old fence */
+			if (fence && lfence) {
+				fence_put(lfence);
+				lfence = NULL;
+			}
+
+			total_copied += copied;
+			src_size_to_copy -= copied;
+			space_left -= copied;
+			dst_va_addr += copied;
+			dst_offset += copied;
+			if (dst_va_addr > dst_bo->it.last + 1) {
+				pr_err("Cross mem copy failed. Memory overflow\n");
+				err = -EFAULT;
+				break;
+			}
+
+			/* If the cur dest range is full move to next one */
+			if (space_left <= 0) {
+				if (++j >= args->dst_mem_array_size)
+					break;
+
+				dst_va_addr = dst_array[j].va_addr;
+				dst_bo = kfd_process_find_bo_from_interval(
+						dst_p,
+						dst_va_addr,
+						dst_va_addr +
+						dst_array[j].size - 1);
+				dst_offset = dst_va_addr - dst_bo->it.start;
+			}
+
+			/* If the cur src range is done, move to next one */
+			if (src_size_to_copy <= 0)
+				break;
+		}
+		if (err)
+			break;
+	}
+
+	/* Wait for the last fence irrespective of error condition */
+	if (fence) {
+		if (fence_wait_timeout(fence, false, msecs_to_jiffies(1000))
+			< 0)
+			pr_err("Cross mem copy failed. BO timed out\n");
+		fence_put(fence);
+	} else if (lfence) {
+		pr_debug("GPU copy fail. But wait for prev DMA to finish\n");
+		fence_wait_timeout(lfence, true, msecs_to_jiffies(1000));
+		fence_put(lfence);
+	}
+
+kfd_process_fail:
+	mmput(remote_mm);
+mm_access_fail:
+	put_task_struct(remote_task);
+get_pid_task_fail:
+	put_pid(remote_pid);
+copy_from_user_fail:
+	kfree(src_array);
+
+	/* An error could happen after partial copy. In that case this will
+	 * reflect partial amount of bytes copied
+	 */
+	args->bytes_copied = total_copied;
+	return err;
+}
+
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, .cmd_drv = 0, .name = #ioctl}
 
@@ -1980,7 +2222,10 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 				kfd_ioctl_ipc_import_handle, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_EXPORT_HANDLE,
-				kfd_ioctl_ipc_export_handle, 0)
+				kfd_ioctl_ipc_export_handle, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_CROSS_MEMORY_COPY,
+				kfd_ioctl_cross_memory_copy, 0)
 
 };
 
