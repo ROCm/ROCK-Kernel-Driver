@@ -395,6 +395,37 @@ struct kfd_ioctl_get_tile_config_args {
 	 */
 };
 
+struct kfd_memory_range {
+	uint64_t va_addr;
+	uint64_t size;
+};
+
+/* flags definitions
+ * BIT0: 0: read operation, 1: write operation.
+ * This also identifies if the src or dst array belongs to remote process
+ */
+#define KFD_CROSS_MEMORY_RW_BIT (1 << 0)
+#define KFD_SET_CROSS_MEMORY_READ(flags) (flags &= ~KFD_CROSS_MEMORY_RW_BIT)
+#define KFD_SET_CROSS_MEMORY_WRITE(flags) (flags |= KFD_CROSS_MEMORY_RW_BIT)
+#define KFD_IS_CROSS_MEMORY_WRITE(flags) (flags & KFD_CROSS_MEMORY_RW_BIT)
+
+struct kfd_ioctl_cross_memory_copy_args {
+	/* to KFD: Process ID of the remote process */
+	uint32_t pid;
+	/* to KFD: See above definition */
+	uint32_t flags;
+	/* to KFD: Source GPU VM range */
+	uint64_t src_mem_range_array;
+	/* to KFD: Size of above array */
+	uint64_t src_mem_array_size;
+	/* to KFD: Destination GPU VM range */
+	uint64_t dst_mem_range_array;
+	/* to KFD: Size of above array */
+	uint64_t dst_mem_array_size;
+	/* from KFD: Total amount of bytes copied */
+	uint64_t bytes_copied;
+};
+
 #define AMDKFD_IOCTL_BASE 'K'
 #define AMDKFD_IO(nr)			_IO(AMDKFD_IOCTL_BASE, nr)
 #define AMDKFD_IOR(nr, type)		_IOR(AMDKFD_IOCTL_BASE, nr, type)
@@ -504,7 +535,10 @@ struct kfd_ioctl_get_tile_config_args {
 #define AMDKFD_IOC_IPC_EXPORT_HANDLE		\
 	AMDKFD_IOWR(0x23, struct kfd_ioctl_ipc_export_handle_args)
 
+#define AMDKFD_IOC_CROSS_MEMORY_COPY		\
+	AMDKFD_IOWR(0x24, struct kfd_ioctl_cross_memory_copy_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x24
+#define AMDKFD_COMMAND_END		0x25
 
 #endif
