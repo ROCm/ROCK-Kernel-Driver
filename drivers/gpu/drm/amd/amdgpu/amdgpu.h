@@ -1054,7 +1054,6 @@ struct amdgpu_uvd {
 	bool			use_ctx_buf;
 	struct amd_sched_entity entity;
 	uint32_t                srbm_soft_reset;
-	bool			is_powergated;
 };
 
 /*
@@ -1083,7 +1082,6 @@ struct amdgpu_vce {
 	struct amd_sched_entity	entity;
 	uint32_t                srbm_soft_reset;
 	unsigned		num_rings;
-	bool			is_powergated;
 };
 
 /*
