@@ -262,6 +262,7 @@ static void amdgdu_amdkfd_restore_mem_worker(struct work_struct *work)
 			mem->evicted = 0;
 	}
 
+	BUG_ON(mem->mm != mm);
 	mem->mm = NULL;
 
 	mutex_unlock(&mem->lock);
