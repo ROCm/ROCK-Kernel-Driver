@@ -405,7 +405,7 @@ static void program_pixel_format(
 			grph_format = 1;
 			break;
 		case SURFACE_PIXEL_FORMAT_GRPH_ARGB8888:
-		case SURFACE_PIXEL_FORMAT_GRPH_BGRA8888:
+		case SURFACE_PIXEL_FORMAT_GRPH_ABGR8888:
 			grph_depth = 2;
 			grph_format = 0;
 			break;
@@ -664,7 +664,8 @@ void dce110_mem_input_v_program_surface_config(
 	union plane_size *plane_size,
 	enum dc_rotation_angle rotation,
 	struct dc_plane_dcc_param *dcc,
-	bool horizotal_mirror)
+	bool horizotal_mirror,
+	bool visible)
 {
 	struct dce110_mem_input *mem_input110 = TO_DCE110_MEM_INPUT(mem_input);
 

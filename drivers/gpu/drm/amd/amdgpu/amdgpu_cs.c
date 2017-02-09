@@ -75,14 +75,21 @@ int amdgpu_cs_get_ring(struct amdgpu_device *adev, u32 ip_type,
 		*out_ring = &adev->uvd.ring;
 		break;
 	case AMDGPU_HW_IP_VCE:
-		if (ring < 2){
+		if (ring < adev->vce.num_rings){
 			*out_ring = &adev->vce.ring[ring];
 		} else {
-			DRM_ERROR("only two VCE rings are supported\n");
+			DRM_ERROR("only %d VCE rings are supported\n", adev->vce.num_rings);
 			return -EINVAL;
 		}
 		break;
 	}
+
+	if (!(*out_ring && (*out_ring)->adev)) {
+		DRM_ERROR("Ring %d is not initialized on IP %d\n",
+			  ring, ip_type);
+		return -EINVAL;
+	}
+
 	return 0;
 }
 

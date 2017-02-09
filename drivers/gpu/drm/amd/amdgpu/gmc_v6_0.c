@@ -44,6 +44,7 @@ MODULE_FIRMWARE("radeon/tahiti_mc.bin");
 MODULE_FIRMWARE("radeon/pitcairn_mc.bin");
 MODULE_FIRMWARE("radeon/verde_mc.bin");
 MODULE_FIRMWARE("radeon/oland_mc.bin");
+MODULE_FIRMWARE("radeon/si58_mc.bin");
 
 #define MC_SEQ_MISC0__MT__MASK   0xf0000000
 #define MC_SEQ_MISC0__MT__GDDR1  0x10000000
@@ -113,6 +114,7 @@ static int gmc_v6_0_init_microcode(struct amdgpu_device *adev)
 	const char *chip_name;
 	char fw_name[30];
 	int err;
+	bool is_58_fw = false;
 
 	DRM_DEBUG("\n");
 
@@ -135,7 +137,14 @@ static int gmc_v6_0_init_microcode(struct amdgpu_device *adev)
 	default: BUG();
 	}
 
-	snprintf(fw_name, sizeof(fw_name), "radeon/%s_mc.bin", chip_name);
+	/* this memory configuration requires special firmware */
+	if (((RREG32(mmMC_SEQ_MISC0) & 0xff000000) >> 24) == 0x58)
+		is_58_fw = true;
+
+	if (is_58_fw)
+		snprintf(fw_name, sizeof(fw_name), "radeon/si58_mc.bin");
+	else
+		snprintf(fw_name, sizeof(fw_name), "radeon/%s_mc.bin", chip_name);
 	err = request_firmware(&adev->mc.fw, fw_name, adev->dev);
 	if (err)
 		goto out;
@@ -245,6 +254,9 @@ static void gmc_v6_0_mc_program(struct amdgpu_device *adev)
 	}
 	WREG32(mmHDP_REG_COHERENCY_FLUSH_CNTL, 0);
 
+	if (adev->mode_info.num_crtc)
+		amdgpu_display_set_vga_render_state(adev, false);
+
 	gmc_v6_0_mc_stop(adev, &save);
 
 	if (gmc_v6_0_wait_for_idle((void *)adev)) {
@@ -274,7 +286,6 @@ static void gmc_v6_0_mc_program(struct amdgpu_device *adev)
 		dev_warn(adev->dev, "Wait for MC idle timedout !\n");
 	}
 	gmc_v6_0_mc_resume(adev, &save);
-	amdgpu_display_set_vga_render_state(adev, false);
 }
 
 static int gmc_v6_0_mc_init(struct amdgpu_device *adev)
@@ -387,6 +398,48 @@ static void gmc_v6_0_set_fault_enable_default(struct amdgpu_device *adev,
 	tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL,
 			    WRITE_PROTECTION_FAULT_ENABLE_DEFAULT, value);
 	WREG32(mmVM_CONTEXT1_CNTL, tmp);
+}
+
+/**
+ * gmc_v6_0_enable_prt - set PRT VM fault
+ *
+ * @adev: amdgpu_device pointer
+ * @value: toggle the VM fault for accessing the none mapped tile for PRT
+ */
+static void gmc_v6_0_enable_prt(struct amdgpu_device *adev, bool value)
+{
+	u32 tmp;
+
+	tmp = RREG32(mmVM_PRT_CNTL);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    CB_DISABLE_FAULT_ON_UNMAPPED_ACCESS, value);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    TC_DISABLE_FAULT_ON_UNMAPPED_ACCESS, value);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    L2_CACHE_STORE_INVALID_ENTRIES, value);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    L1_TLB_STORE_INVALID_ENTRIES, value);
+	WREG32(mmVM_PRT_CNTL, tmp);
+
+	if (value) {
+		WREG32(mmVM_PRT_APERTURE0_LOW_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE1_LOW_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE2_LOW_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE3_LOW_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE0_HIGH_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE1_HIGH_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE2_HIGH_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE3_HIGH_ADDR, 0xfffffff);
+	} else {
+		WREG32(mmVM_PRT_APERTURE0_LOW_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE1_LOW_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE2_LOW_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE3_LOW_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE0_HIGH_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE1_HIGH_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE2_HIGH_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE3_HIGH_ADDR, 0x0);
+	}
 }
 
 static int gmc_v6_0_gart_enable(struct amdgpu_device *adev)
@@ -730,6 +783,9 @@ static int gmc_v6_0_early_init(void *handle)
 
 	gmc_v6_0_set_gart_funcs(adev);
 	gmc_v6_0_set_irq_funcs(adev);
+
+	adev->vm_manager.enable_prt = &gmc_v6_0_enable_prt;
+	DRM_INFO("VM PRT is supported!\n");
 
 	if (adev->flags & AMD_IS_APU) {
 		adev->mc.vram_type = AMDGPU_VRAM_TYPE_UNKNOWN;

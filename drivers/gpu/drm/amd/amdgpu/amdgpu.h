@@ -56,6 +56,7 @@
 #include "amdgpu_sync.h"
 #include "amdgpu_ring.h"
 #include "amdgpu_vm.h"
+#include "amdgpu_sem.h"
 #include "amd_powerplay.h"
 #include "amdgpu_dpm.h"
 #include "amdgpu_acp.h"
@@ -359,7 +360,7 @@ struct amdgpu_bo_va_mapping {
 	struct list_head		list;
 	struct interval_tree_node	it;
 	uint64_t			offset;
-	uint32_t			flags;
+	uint64_t			flags;
 };
 
 /* bo virtual addresses in a specific vm */
@@ -710,6 +711,8 @@ struct amdgpu_fpriv {
 	struct mutex		bo_list_lock;
 	struct idr		bo_list_handles;
 	struct amdgpu_ctx_mgr	ctx_mgr;
+	spinlock_t		sem_handles_lock;
+	struct idr		sem_handles;
 };
 
 /*
@@ -787,6 +790,7 @@ struct amdgpu_mec {
 	u32 num_pipe;
 	u32 num_mec;
 	u32 num_queue;
+	struct vi_mqd	*mqd_backup[AMDGPU_MAX_COMPUTE_RINGS + 1];
 };
 
 struct amdgpu_kiq {
@@ -802,8 +806,7 @@ struct amdgpu_kiq {
 struct amdgpu_scratch {
 	unsigned		num_reg;
 	uint32_t                reg_base;
-	bool			free[32];
-	uint32_t		reg[32];
+	uint32_t		free_mask;
 };
 
 /*
@@ -908,6 +911,7 @@ struct amdgpu_gfx {
 	/* reset mask */
 	uint32_t                        grbm_soft_reset;
 	uint32_t                        srbm_soft_reset;
+	bool                            in_reset;
 };
 
 int amdgpu_ib_get(struct amdgpu_device *adev, struct amdgpu_vm *vm,
@@ -915,8 +919,8 @@ int amdgpu_ib_get(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 void amdgpu_ib_free(struct amdgpu_device *adev, struct amdgpu_ib *ib,
 		    struct fence *f);
 int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
-		       struct amdgpu_ib *ib, struct fence *last_vm_update,
-		       struct amdgpu_job *job, struct fence **f);
+		       struct amdgpu_ib *ibs, struct amdgpu_job *job,
+		       struct fence **f);
 int amdgpu_ib_pool_init(struct amdgpu_device *adev);
 void amdgpu_ib_pool_fini(struct amdgpu_device *adev);
 int amdgpu_ib_ring_tests(struct amdgpu_device *adev);
@@ -959,6 +963,7 @@ struct amdgpu_cs_parser {
 #define AMDGPU_PREAMBLE_IB_PRESENT          (1 << 0) /* bit set means command submit involves a preamble IB */
 #define AMDGPU_PREAMBLE_IB_PRESENT_FIRST    (1 << 1) /* bit set means preamble IB is first presented in belonging context */
 #define AMDGPU_HAVE_CTX_SWITCH              (1 << 2) /* bit set means context switch occured */
+#define AMDGPU_VM_DOMAIN                    (1 << 3) /* bit set means in virtual memory context */
 
 struct amdgpu_job {
 	struct amd_sched_job    base;
@@ -1254,6 +1259,8 @@ int amdgpu_sem_ioctl(struct drm_device *dev, void *data,
 int amdgpu_sem_add_cs(struct amdgpu_ctx *ctx, struct amdgpu_ring *ring,
 		      struct amdgpu_sync *sync);
 
+void amdgpu_sem_destroy(struct amdgpu_fpriv *fpriv, u32 handle);
+
 int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 			   struct drm_file *filp);
 
@@ -1521,6 +1528,8 @@ struct amdgpu_device {
 	spinlock_t			gtt_list_lock;
 	struct list_head                gtt_list;
 
+	/* record sparse bo counter */
+	atomic_t			sparse_bo_cnt;
 };
 
 static inline struct amdgpu_device *amdgpu_ttm_adev(struct ttm_bo_device *bdev)
@@ -1537,9 +1546,9 @@ void amdgpu_device_fini(struct amdgpu_device *adev);
 int amdgpu_gpu_wait_for_idle(struct amdgpu_device *adev);
 
 uint32_t amdgpu_mm_rreg(struct amdgpu_device *adev, uint32_t reg,
-			bool always_indirect);
+			uint32_t acc_flags);
 void amdgpu_mm_wreg(struct amdgpu_device *adev, uint32_t reg, uint32_t v,
-		    bool always_indirect);
+		    uint32_t acc_flags);
 u32 amdgpu_io_rreg(struct amdgpu_device *adev, u32 reg);
 void amdgpu_io_wreg(struct amdgpu_device *adev, u32 reg, u32 v);
 
@@ -1550,11 +1559,18 @@ bool amdgpu_device_has_dc_support(struct amdgpu_device *adev);
 /*
  * Registers read & write functions.
  */
-#define RREG32(reg) amdgpu_mm_rreg(adev, (reg), false)
-#define RREG32_IDX(reg) amdgpu_mm_rreg(adev, (reg), true)
-#define DREG32(reg) printk(KERN_INFO "REGISTER: " #reg " : 0x%08X\n", amdgpu_mm_rreg(adev, (reg), false))
-#define WREG32(reg, v) amdgpu_mm_wreg(adev, (reg), (v), false)
-#define WREG32_IDX(reg, v) amdgpu_mm_wreg(adev, (reg), (v), true)
+
+#define AMDGPU_REGS_IDX       (1<<0)
+#define AMDGPU_REGS_NO_KIQ    (1<<1)
+
+#define RREG32_NO_KIQ(reg) amdgpu_mm_rreg(adev, (reg), AMDGPU_REGS_NO_KIQ)
+#define WREG32_NO_KIQ(reg, v) amdgpu_mm_wreg(adev, (reg), (v), AMDGPU_REGS_NO_KIQ)
+
+#define RREG32(reg) amdgpu_mm_rreg(adev, (reg), 0)
+#define RREG32_IDX(reg) amdgpu_mm_rreg(adev, (reg), AMDGPU_REGS_IDX)
+#define DREG32(reg) printk(KERN_INFO "REGISTER: " #reg " : 0x%08X\n", amdgpu_mm_rreg(adev, (reg), 0))
+#define WREG32(reg, v) amdgpu_mm_wreg(adev, (reg), (v), 0)
+#define WREG32_IDX(reg, v) amdgpu_mm_wreg(adev, (reg), (v), AMDGPU_REGS_IDX)
 #define REG_SET(FIELD, v) (((v) << FIELD##_SHIFT) & FIELD##_MASK)
 #define REG_GET(FIELD, v) (((v) << FIELD##_SHIFT) & FIELD##_MASK)
 #define RREG32_PCIE(reg) adev->pcie_rreg(adev, (reg))
@@ -1626,6 +1642,37 @@ static inline void amdgpu_ring_write(struct amdgpu_ring *ring, uint32_t v)
 	ring->count_dw--;
 }
 
+static inline void amdgpu_ring_write_multiple(struct amdgpu_ring *ring, void *src, int count_dw)
+{
+	unsigned occupied, chunk1, chunk2;
+	void *dst;
+
+	if (ring->count_dw < count_dw) {
+		DRM_ERROR("amdgpu: writing more dwords to the ring than expected!\n");
+	} else {
+		occupied = ring->wptr & ring->ptr_mask;
+		dst = (void *)&ring->ring[occupied];
+		chunk1 = ring->ptr_mask + 1 - occupied;
+		chunk1 = (chunk1 >= count_dw) ? count_dw: chunk1;
+		chunk2 = count_dw - chunk1;
+		chunk1 <<= 2;
+		chunk2 <<= 2;
+
+		if (chunk1)
+			memcpy(dst, src, chunk1);
+
+		if (chunk2) {
+			src += chunk1;
+			dst = (void *)ring->ring;
+			memcpy(dst, src, chunk2);
+		}
+
+		ring->wptr += count_dw;
+		ring->wptr &= ring->ptr_mask;
+		ring->count_dw -= count_dw;
+	}
+}
+
 static inline struct amdgpu_sdma_instance *
 amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 {
@@ -1661,6 +1708,7 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 #define amdgpu_vm_copy_pte(adev, ib, pe, src, count) ((adev)->vm_manager.vm_pte_funcs->copy_pte((ib), (pe), (src), (count)))
 #define amdgpu_vm_write_pte(adev, ib, pe, value, count, incr) ((adev)->vm_manager.vm_pte_funcs->write_pte((ib), (pe), (value), (count), (incr)))
 #define amdgpu_vm_set_pte_pde(adev, ib, pe, addr, count, incr, flags) ((adev)->vm_manager.vm_pte_funcs->set_pte_pde((ib), (pe), (addr), (count), (incr), (flags)))
+#define amdgpu_vm_enable_prt(adev, val) ((adev)->vm_manager.enable_prt((adev), (val)))
 #define amdgpu_ring_parse_cs(r, p, ib) ((r)->funcs->parse_cs((p), (ib)))
 #define amdgpu_ring_test_ring(r) (r)->funcs->test_ring((r))
 #define amdgpu_ring_test_ib(r, t) (r)->funcs->test_ib((r), (t))
@@ -1676,6 +1724,8 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 #define amdgpu_ring_emit_hdp_invalidate(r) (r)->funcs->emit_hdp_invalidate((r))
 #define amdgpu_ring_emit_switch_buffer(r) (r)->funcs->emit_switch_buffer((r))
 #define amdgpu_ring_emit_cntxcntl(r, d) (r)->funcs->emit_cntxcntl((r), (d))
+#define amdgpu_ring_emit_rreg(r, d) (r)->funcs->emit_rreg((r), (d))
+#define amdgpu_ring_emit_wreg(r, d, v) (r)->funcs->emit_wreg((r), (d), (v))
 #define amdgpu_ring_pad_ib(r, ib) ((r)->funcs->pad_ib((r), (ib)))
 #define amdgpu_ring_init_cond_exec(r) (r)->funcs->init_cond_exec((r))
 #define amdgpu_ring_patch_cond_exec(r,o) (r)->funcs->patch_cond_exec((r),(o))

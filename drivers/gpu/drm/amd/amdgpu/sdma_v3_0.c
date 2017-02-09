@@ -615,6 +615,7 @@ static int sdma_v3_0_gfx_resume(struct amdgpu_device *adev)
 
 	for (i = 0; i < adev->sdma.num_instances; i++) {
 		ring = &adev->sdma.instance[i].ring;
+		amdgpu_ring_clear_ring(ring);
 		wb_offset = (ring->rptr_offs * 4);
 
 		mutex_lock(&adev->srbm_mutex);
@@ -910,7 +911,7 @@ static int sdma_v3_0_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 	ib.ptr[7] = SDMA_PKT_NOP_HEADER_OP(SDMA_OP_NOP);
 	ib.length_dw = 8;
 
-	r = amdgpu_ib_schedule(ring, 1, &ib, NULL, NULL, &f);
+	r = amdgpu_ib_schedule(ring, 1, &ib, NULL, &f);
 	if (r)
 		goto err1;
 
@@ -1512,6 +1513,9 @@ static int sdma_v3_0_set_clockgating_state(void *handle,
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
+	if (amdgpu_sriov_vf(adev))
+		return 0;
+
 	switch (adev->asic_type) {
 	case CHIP_FIJI:
 	case CHIP_CARRIZO:
@@ -1537,6 +1541,9 @@ static void sdma_v3_0_get_clockgating_state(void *handle, u32 *flags)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	int data;
+
+	if (amdgpu_sriov_vf(adev))
+		*flags = 0;
 
 	/* AMD_CG_SUPPORT_SDMA_MGCG */
 	data = RREG32(mmSDMA0_CLK_CTRL + sdma_offsets[0]);

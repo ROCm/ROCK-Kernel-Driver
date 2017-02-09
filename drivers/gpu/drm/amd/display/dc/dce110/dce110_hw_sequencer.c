@@ -42,7 +42,7 @@
 #include "stream_encoder.h"
 #include "link_encoder.h"
 #include "clock_source.h"
-#include "gamma_calcs.h"
+#include "abm.h"
 #include "audio.h"
 #include "dce/dce_hwseq.h"
 
@@ -215,7 +215,7 @@ static void build_prescale_params(struct ipp_prescale_params *prescale_params,
 
 	switch (surface->public.format) {
 	case SURFACE_PIXEL_FORMAT_GRPH_ARGB8888:
-	case SURFACE_PIXEL_FORMAT_GRPH_BGRA8888:
+	case SURFACE_PIXEL_FORMAT_GRPH_ABGR8888:
 		prescale_params->scale = 0x2020;
 		break;
 	case SURFACE_PIXEL_FORMAT_GRPH_ARGB2101010:
@@ -256,7 +256,7 @@ static bool dce110_set_input_transfer_func(
 	if (tf == NULL) {
 		/* Default case if no input transfer function specified */
 		ipp->funcs->ipp_set_degamma(ipp,
-				IPP_DEGAMMA_MODE_BYPASS);
+				IPP_DEGAMMA_MODE_HW_sRGB);
 	} else if (tf->public.type == TF_TYPE_PREDEFINED) {
 		switch (tf->public.tf) {
 		case TRANSFER_FUNCTION_SRGB:
@@ -286,46 +286,527 @@ static bool dce110_set_input_transfer_func(
 	return result;
 }
 
+static bool build_custom_float(
+	struct fixed31_32 value,
+	const struct custom_float_format *format,
+	bool *negative,
+	uint32_t *mantissa,
+	uint32_t *exponenta)
+{
+	uint32_t exp_offset = (1 << (format->exponenta_bits - 1)) - 1;
+
+	const struct fixed31_32 mantissa_constant_plus_max_fraction =
+		dal_fixed31_32_from_fraction(
+			(1LL << (format->mantissa_bits + 1)) - 1,
+			1LL << format->mantissa_bits);
+
+	struct fixed31_32 mantiss;
+
+	if (dal_fixed31_32_eq(
+		value,
+		dal_fixed31_32_zero)) {
+		*negative = false;
+		*mantissa = 0;
+		*exponenta = 0;
+		return true;
+	}
+
+	if (dal_fixed31_32_lt(
+		value,
+		dal_fixed31_32_zero)) {
+		*negative = format->sign;
+		value = dal_fixed31_32_neg(value);
+	} else {
+		*negative = false;
+	}
+
+	if (dal_fixed31_32_lt(
+		value,
+		dal_fixed31_32_one)) {
+		uint32_t i = 1;
+
+		do {
+			value = dal_fixed31_32_shl(value, 1);
+			++i;
+		} while (dal_fixed31_32_lt(
+			value,
+			dal_fixed31_32_one));
+
+		--i;
+
+		if (exp_offset <= i) {
+			*mantissa = 0;
+			*exponenta = 0;
+			return true;
+		}
+
+		*exponenta = exp_offset - i;
+	} else if (dal_fixed31_32_le(
+		mantissa_constant_plus_max_fraction,
+		value)) {
+		uint32_t i = 1;
+
+		do {
+			value = dal_fixed31_32_shr(value, 1);
+			++i;
+		} while (dal_fixed31_32_lt(
+			mantissa_constant_plus_max_fraction,
+			value));
+
+		*exponenta = exp_offset + i - 1;
+	} else {
+		*exponenta = exp_offset;
+	}
+
+	mantiss = dal_fixed31_32_sub(
+		value,
+		dal_fixed31_32_one);
+
+	if (dal_fixed31_32_lt(
+			mantiss,
+			dal_fixed31_32_zero) ||
+		dal_fixed31_32_lt(
+			dal_fixed31_32_one,
+			mantiss))
+		mantiss = dal_fixed31_32_zero;
+	else
+		mantiss = dal_fixed31_32_shl(
+			mantiss,
+			format->mantissa_bits);
+
+	*mantissa = dal_fixed31_32_floor(mantiss);
+
+	return true;
+}
+
+static bool setup_custom_float(
+	const struct custom_float_format *format,
+	bool negative,
+	uint32_t mantissa,
+	uint32_t exponenta,
+	uint32_t *result)
+{
+	uint32_t i = 0;
+	uint32_t j = 0;
+
+	uint32_t value = 0;
+
+	/* verification code:
+	 * once calculation is ok we can remove it
+	 */
+
+	const uint32_t mantissa_mask =
+		(1 << (format->mantissa_bits + 1)) - 1;
+
+	const uint32_t exponenta_mask =
+		(1 << (format->exponenta_bits + 1)) - 1;
+
+	if (mantissa & ~mantissa_mask) {
+		BREAK_TO_DEBUGGER();
+		mantissa = mantissa_mask;
+	}
+
+	if (exponenta & ~exponenta_mask) {
+		BREAK_TO_DEBUGGER();
+		exponenta = exponenta_mask;
+	}
+
+	/* end of verification code */
+
+	while (i < format->mantissa_bits) {
+		uint32_t mask = 1 << i;
+
+		if (mantissa & mask)
+			value |= mask;
+
+		++i;
+	}
+
+	while (j < format->exponenta_bits) {
+		uint32_t mask = 1 << j;
+
+		if (exponenta & mask)
+			value |= mask << i;
+
+		++j;
+	}
+
+	if (negative && format->sign)
+		value |= 1 << (i + j);
+
+	*result = value;
+
+	return true;
+}
+
+static bool convert_to_custom_float_format(
+	struct fixed31_32 value,
+	const struct custom_float_format *format,
+	uint32_t *result)
+{
+	uint32_t mantissa;
+	uint32_t exponenta;
+	bool negative;
+
+	return build_custom_float(
+		value, format, &negative, &mantissa, &exponenta) &&
+	setup_custom_float(
+		format, negative, mantissa, exponenta, result);
+}
+
+static bool convert_to_custom_float(
+		struct pwl_result_data *rgb_resulted,
+		struct curve_points *arr_points,
+		uint32_t hw_points_num)
+{
+	struct custom_float_format fmt;
+
+	struct pwl_result_data *rgb = rgb_resulted;
+
+	uint32_t i = 0;
+
+	fmt.exponenta_bits = 6;
+	fmt.mantissa_bits = 12;
+	fmt.sign = true;
+
+	if (!convert_to_custom_float_format(
+		arr_points[0].x,
+		&fmt,
+		&arr_points[0].custom_float_x)) {
+		BREAK_TO_DEBUGGER();
+		return false;
+	}
+
+	if (!convert_to_custom_float_format(
+		arr_points[0].offset,
+		&fmt,
+		&arr_points[0].custom_float_offset)) {
+		BREAK_TO_DEBUGGER();
+		return false;
+	}
+
+	if (!convert_to_custom_float_format(
+		arr_points[0].slope,
+		&fmt,
+		&arr_points[0].custom_float_slope)) {
+		BREAK_TO_DEBUGGER();
+		return false;
+	}
+
+	fmt.mantissa_bits = 10;
+	fmt.sign = false;
+
+	if (!convert_to_custom_float_format(
+		arr_points[1].x,
+		&fmt,
+		&arr_points[1].custom_float_x)) {
+		BREAK_TO_DEBUGGER();
+		return false;
+	}
+
+	if (!convert_to_custom_float_format(
+		arr_points[1].y,
+		&fmt,
+		&arr_points[1].custom_float_y)) {
+		BREAK_TO_DEBUGGER();
+		return false;
+	}
+
+	if (!convert_to_custom_float_format(
+		arr_points[2].slope,
+		&fmt,
+		&arr_points[2].custom_float_slope)) {
+		BREAK_TO_DEBUGGER();
+		return false;
+	}
+
+	fmt.mantissa_bits = 12;
+	fmt.sign = true;
+
+	while (i != hw_points_num) {
+		if (!convert_to_custom_float_format(
+			rgb->red,
+			&fmt,
+			&rgb->red_reg)) {
+			BREAK_TO_DEBUGGER();
+			return false;
+		}
+
+		if (!convert_to_custom_float_format(
+			rgb->green,
+			&fmt,
+			&rgb->green_reg)) {
+			BREAK_TO_DEBUGGER();
+			return false;
+		}
+
+		if (!convert_to_custom_float_format(
+			rgb->blue,
+			&fmt,
+			&rgb->blue_reg)) {
+			BREAK_TO_DEBUGGER();
+			return false;
+		}
+
+		if (!convert_to_custom_float_format(
+			rgb->delta_red,
+			&fmt,
+			&rgb->delta_red_reg)) {
+			BREAK_TO_DEBUGGER();
+			return false;
+		}
+
+		if (!convert_to_custom_float_format(
+			rgb->delta_green,
+			&fmt,
+			&rgb->delta_green_reg)) {
+			BREAK_TO_DEBUGGER();
+			return false;
+		}
+
+		if (!convert_to_custom_float_format(
+			rgb->delta_blue,
+			&fmt,
+			&rgb->delta_blue_reg)) {
+			BREAK_TO_DEBUGGER();
+			return false;
+		}
+
+		++rgb;
+		++i;
+	}
+
+	return true;
+}
+
+bool dce110_translate_regamma_to_hw_format(const struct dc_transfer_func
+		*output_tf, struct pwl_params *regamma_params)
+{
+	struct curve_points *arr_points;
+	struct pwl_result_data *rgb_resulted;
+	struct pwl_result_data *rgb;
+	struct pwl_result_data *rgb_plus_1;
+	struct fixed31_32 y_r;
+	struct fixed31_32 y_g;
+	struct fixed31_32 y_b;
+	struct fixed31_32 y1_min;
+	struct fixed31_32 y3_max;
+
+	int32_t segment_start, segment_end;
+	uint32_t i, j, k, seg_distr[16], increment, start_index, hw_points;
+
+	if (output_tf == NULL || regamma_params == NULL)
+		return false;
+
+	arr_points = regamma_params->arr_points;
+	rgb_resulted = regamma_params->rgb_resulted;
+	hw_points = 0;
+
+	memset(regamma_params, 0, sizeof(struct pwl_params));
+
+	if (output_tf->tf == TRANSFER_FUNCTION_PQ) {
+		/* 16 segments
+		 * segments are from 2^-11 to 2^5
+		 */
+		segment_start = -11;
+		segment_end = 5;
+
+		seg_distr[0] = 2;
+		seg_distr[1] = 2;
+		seg_distr[2] = 2;
+		seg_distr[3] = 2;
+		seg_distr[4] = 2;
+		seg_distr[5] = 2;
+		seg_distr[6] = 3;
+		seg_distr[7] = 4;
+		seg_distr[8] = 4;
+		seg_distr[9] = 4;
+		seg_distr[10] = 4;
+		seg_distr[11] = 5;
+		seg_distr[12] = 5;
+		seg_distr[13] = 5;
+		seg_distr[14] = 5;
+		seg_distr[15] = 5;
+
+	} else {
+		/* 10 segments
+		 * segment is from 2^-10 to 2^0
+		 */
+		segment_start = -10;
+		segment_end = 0;
+
+		seg_distr[0] = 3;
+		seg_distr[1] = 4;
+		seg_distr[2] = 4;
+		seg_distr[3] = 4;
+		seg_distr[4] = 4;
+		seg_distr[5] = 4;
+		seg_distr[6] = 4;
+		seg_distr[7] = 4;
+		seg_distr[8] = 5;
+		seg_distr[9] = 5;
+		seg_distr[10] = -1;
+		seg_distr[11] = -1;
+		seg_distr[12] = -1;
+		seg_distr[13] = -1;
+		seg_distr[14] = -1;
+		seg_distr[15] = -1;
+	}
+
+	for (k = 0; k < 16; k++) {
+		if (seg_distr[k] != -1)
+			hw_points += (1 << seg_distr[k]);
+	}
+
+	j = 0;
+	for (k = 0; k < (segment_end - segment_start); k++) {
+		increment = 32 / (1 << seg_distr[k]);
+		start_index = (segment_start + k + 25) * 32;
+		for (i = start_index; i < start_index + 32; i += increment) {
+			if (j == hw_points - 1)
+				break;
+			rgb_resulted[j].red = output_tf->tf_pts.red[i];
+			rgb_resulted[j].green = output_tf->tf_pts.green[i];
+			rgb_resulted[j].blue = output_tf->tf_pts.blue[i];
+			j++;
+		}
+	}
+
+	/* last point */
+	start_index = (segment_end + 25) * 32;
+	rgb_resulted[hw_points - 1].red =
+			output_tf->tf_pts.red[start_index];
+	rgb_resulted[hw_points - 1].green =
+			output_tf->tf_pts.green[start_index];
+	rgb_resulted[hw_points - 1].blue =
+			output_tf->tf_pts.blue[start_index];
+
+	arr_points[0].x = dal_fixed31_32_pow(dal_fixed31_32_from_int(2),
+			dal_fixed31_32_from_int(segment_start));
+	arr_points[1].x = dal_fixed31_32_pow(dal_fixed31_32_from_int(2),
+			dal_fixed31_32_from_int(segment_end));
+	arr_points[2].x = dal_fixed31_32_pow(dal_fixed31_32_from_int(2),
+			dal_fixed31_32_from_int(segment_end));
+
+	y_r = rgb_resulted[0].red;
+	y_g = rgb_resulted[0].green;
+	y_b = rgb_resulted[0].blue;
+
+	y1_min = dal_fixed31_32_min(y_r, dal_fixed31_32_min(y_g, y_b));
+
+	arr_points[0].y = y1_min;
+	arr_points[0].slope = dal_fixed31_32_div(
+					arr_points[0].y,
+					arr_points[0].x);
+
+	y_r = rgb_resulted[hw_points - 1].red;
+	y_g = rgb_resulted[hw_points - 1].green;
+	y_b = rgb_resulted[hw_points - 1].blue;
+
+	/* see comment above, m_arrPoints[1].y should be the Y value for the
+	 * region end (m_numOfHwPoints), not last HW point(m_numOfHwPoints - 1)
+	 */
+	y3_max = dal_fixed31_32_max(y_r, dal_fixed31_32_max(y_g, y_b));
+
+	arr_points[1].y = y3_max;
+	arr_points[2].y = y3_max;
+
+	arr_points[1].slope = dal_fixed31_32_zero;
+	arr_points[2].slope = dal_fixed31_32_zero;
+
+	if (output_tf->tf == TRANSFER_FUNCTION_PQ) {
+		/* for PQ, we want to have a straight line from last HW X point,
+		 * and the slope to be such that we hit 1.0 at 10000 nits.
+		 */
+		const struct fixed31_32 end_value =
+				dal_fixed31_32_from_int(125);
+
+		arr_points[1].slope = dal_fixed31_32_div(
+			dal_fixed31_32_sub(dal_fixed31_32_one, arr_points[1].y),
+			dal_fixed31_32_sub(end_value, arr_points[1].x));
+		arr_points[2].slope = dal_fixed31_32_div(
+			dal_fixed31_32_sub(dal_fixed31_32_one, arr_points[1].y),
+			dal_fixed31_32_sub(end_value, arr_points[1].x));
+	}
+
+	regamma_params->hw_points_num = hw_points;
+
+	i = 1;
+	for (k = 0; k < 16 && i < 16; k++) {
+		if (seg_distr[k] != -1) {
+			regamma_params->arr_curve_points[k].segments_num =
+					seg_distr[k];
+			regamma_params->arr_curve_points[i].offset =
+					regamma_params->arr_curve_points[k].
+					offset + (1 << seg_distr[k]);
+		}
+		i++;
+	}
+
+	if (seg_distr[k] != -1)
+		regamma_params->arr_curve_points[k].segments_num =
+				seg_distr[k];
+
+	rgb = rgb_resulted;
+	rgb_plus_1 = rgb_resulted + 1;
+
+	i = 1;
+
+	while (i != hw_points + 1) {
+		if (dal_fixed31_32_lt(rgb_plus_1->red, rgb->red))
+			rgb_plus_1->red = rgb->red;
+		if (dal_fixed31_32_lt(rgb_plus_1->green, rgb->green))
+			rgb_plus_1->green = rgb->green;
+		if (dal_fixed31_32_lt(rgb_plus_1->blue, rgb->blue))
+			rgb_plus_1->blue = rgb->blue;
+
+		rgb->delta_red = dal_fixed31_32_sub(
+			rgb_plus_1->red,
+			rgb->red);
+		rgb->delta_green = dal_fixed31_32_sub(
+			rgb_plus_1->green,
+			rgb->green);
+		rgb->delta_blue = dal_fixed31_32_sub(
+			rgb_plus_1->blue,
+			rgb->blue);
+
+		++rgb_plus_1;
+		++rgb;
+		++i;
+	}
+
+	convert_to_custom_float(rgb_resulted, arr_points, hw_points);
+
+	return true;
+}
+
 static bool dce110_set_output_transfer_func(
 	struct pipe_ctx *pipe_ctx,
 	const struct core_surface *surface, /* Surface - To be removed */
 	const struct core_stream *stream)
 {
 	struct output_pixel_processor *opp = pipe_ctx->opp;
-	const struct core_gamma *ramp = NULL;
-	struct pwl_params *regamma_params;
-	bool result = false;
-
-	if (surface->public.gamma_correction)
-		ramp = DC_GAMMA_TO_CORE(surface->public.gamma_correction);
-
-	regamma_params = dm_alloc(sizeof(struct pwl_params));
-	if (regamma_params == NULL)
-		goto regamma_alloc_fail;
-
-	regamma_params->hw_points_num = GAMMA_HW_POINTS_NUM;
 
 	opp->funcs->opp_power_on_regamma_lut(opp, true);
+	opp->regamma_params->hw_points_num = GAMMA_HW_POINTS_NUM;
 
 	if (stream->public.out_transfer_func &&
-	    stream->public.out_transfer_func->type == TF_TYPE_PREDEFINED &&
-	    stream->public.out_transfer_func->tf == TRANSFER_FUNCTION_SRGB) {
+		stream->public.out_transfer_func->type ==
+			TF_TYPE_PREDEFINED &&
+		stream->public.out_transfer_func->tf ==
+			TRANSFER_FUNCTION_SRGB) {
 		opp->funcs->opp_set_regamma_mode(opp, OPP_REGAMMA_SRGB);
-	} else if (ramp && calculate_regamma_params(regamma_params, ramp, surface, stream)) {
-		opp->funcs->opp_program_regamma_pwl(opp, regamma_params);
-		opp->funcs->opp_set_regamma_mode(opp, OPP_REGAMMA_USER);
+	} else if (dce110_translate_regamma_to_hw_format(
+				stream->public.out_transfer_func, opp->regamma_params)) {
+			opp->funcs->opp_program_regamma_pwl(opp, opp->regamma_params);
+			opp->funcs->opp_set_regamma_mode(opp, OPP_REGAMMA_USER);
 	} else {
 		opp->funcs->opp_set_regamma_mode(opp, OPP_REGAMMA_BYPASS);
 	}
 
 	opp->funcs->opp_power_on_regamma_lut(opp, false);
 
-	result = true;
-
-	dm_free(regamma_params);
-
-regamma_alloc_fail:
-	return result;
+	return true;
 }
 
 static enum dc_status bios_parser_crtc_source_select(
@@ -361,6 +842,11 @@ static enum dc_status bios_parser_crtc_source_select(
 
 void dce110_update_info_frame(struct pipe_ctx *pipe_ctx)
 {
+	ASSERT(pipe_ctx->stream);
+
+	if (pipe_ctx->stream_enc == NULL)
+		return;  /* this is not root pipe */
+
 	if (dc_is_hdmi_signal(pipe_ctx->stream->signal))
 		pipe_ctx->stream_enc->funcs->update_hdmi_info_packets(
 			pipe_ctx->stream_enc,
@@ -470,7 +956,7 @@ void dce110_unblank_stream(struct pipe_ctx *pipe_ctx,
 	struct encoder_unblank_param params = { { 0 } };
 
 	/* only 3 items below are used by unblank */
-	params.crtc_timing.pixel_clock =
+	params.pixel_clk_khz =
 		pipe_ctx->stream->public.timing.pix_clk_khz;
 	params.link_settings.link_rate = link_settings->link_rate;
 	pipe_ctx->stream_enc->funcs->dp_unblank(pipe_ctx->stream_enc, &params);
@@ -623,7 +1109,7 @@ static void program_scaler(const struct core_dc *dc,
 		&pipe_ctx->scl_data);
 }
 
-static enum dc_status prog_pixclk_crtc_otg(
+static enum dc_status dce110_prog_pixclk_crtc_otg(
 		struct pipe_ctx *pipe_ctx,
 		struct validate_context *context,
 		struct core_dc *dc)
@@ -641,6 +1127,7 @@ static enum dc_status prog_pixclk_crtc_otg(
 		pipe_ctx->tg->funcs->set_blank_color(
 				pipe_ctx->tg,
 				&black_color);
+
 		/*
 		 * Must blank CRTC after disabling power gating and before any
 		 * programming, otherwise CRTC will be hung in bad state
@@ -752,7 +1239,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 					stream->public.timing.h_total,
 					stream->public.timing.v_total,
 					stream->public.timing.pix_clk_khz,
-					context->target_count);
+					context->stream_count);
 
 	return DC_OK;
 }
@@ -1047,13 +1534,14 @@ static void reset_single_pipe_hw_ctx(
 		struct validate_context *context)
 {
 	core_link_disable_stream(pipe_ctx);
-	if (!pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true)) {
+	pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, true);
+	if (!hwss_wait_for_blank_complete(pipe_ctx->tg)) {
 		dm_error("DC: failed to blank crtc!\n");
 		BREAK_TO_DEBUGGER();
 	}
 	pipe_ctx->tg->funcs->disable_crtc(pipe_ctx->tg);
 	pipe_ctx->mi->funcs->free_mem_input(
-				pipe_ctx->mi, context->target_count);
+				pipe_ctx->mi, context->stream_count);
 	resource_unreference_clock_source(
 			&context->res_ctx, &pipe_ctx->clock_source);
 
@@ -1252,7 +1740,7 @@ enum dc_status dce110_apply_ctx_to_hw(
 	dc->hwss.reset_hw_ctx_wrap(dc, context);
 
 	/* Skip applying if no targets */
-	if (context->target_count <= 0)
+	if (context->stream_count <= 0)
 		return DC_OK;
 
 	if (IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment)) {
@@ -1409,20 +1897,52 @@ static void set_default_colors(struct pipe_ctx *pipe_ctx)
 					pipe_ctx->opp, &default_adjust);
 }
 
-static void program_blender(const struct core_dc *dc,
+
+/*******************************************************************************
+ * In order to turn on/off specific surface we will program
+ * Blender + CRTC
+ *
+ * In case that we have two surfaces and they have a different visibility
+ * we can't turn off the CRTC since it will turn off the entire display
+ *
+ * |----------------------------------------------- |
+ * |bottom pipe|curr pipe  |              |         |
+ * |Surface    |Surface    | Blender      |  CRCT   |
+ * |visibility |visibility | Configuration|         |
+ * |------------------------------------------------|
+ * |   off     |    off    | CURRENT_PIPE | blank   |
+ * |   off     |    on     | CURRENT_PIPE | unblank |
+ * |   on      |    off    | OTHER_PIPE   | unblank |
+ * |   on      |    on     | BLENDING     | unblank |
+ * -------------------------------------------------|
+ *
+ ******************************************************************************/
+static void program_surface_visibility(const struct core_dc *dc,
 		struct pipe_ctx *pipe_ctx)
 {
 	enum blnd_mode blender_mode = BLND_MODE_CURRENT_PIPE;
+	bool blank_target = false;
 
 	if (pipe_ctx->bottom_pipe) {
+
+		/* For now we are supporting only two pipes */
+		ASSERT(pipe_ctx->bottom_pipe->bottom_pipe == NULL);
+
 		if (pipe_ctx->bottom_pipe->surface->public.visible) {
 			if (pipe_ctx->surface->public.visible)
 				blender_mode = BLND_MODE_BLENDING;
 			else
 				blender_mode = BLND_MODE_OTHER_PIPE;
-		}
-	}
+
+		} else if (!pipe_ctx->surface->public.visible)
+			blank_target = true;
+
+	} else if (!pipe_ctx->surface->public.visible)
+		blank_target = true;
+
 	dce_set_blender_mode(dc->hwseq, pipe_ctx->pipe_idx, blender_mode);
+	pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, blank_target);
+
 }
 
 /**
@@ -1495,7 +2015,7 @@ static void set_plane_config(
 	pipe_ctx->scl_data.lb_params.alpha_en = pipe_ctx->bottom_pipe != 0;
 	program_scaler(dc, pipe_ctx);
 
-	program_blender(dc, pipe_ctx);
+	program_surface_visibility(dc, pipe_ctx);
 
 	mi->funcs->mem_input_program_surface_config(
 			mi,
@@ -1504,7 +2024,8 @@ static void set_plane_config(
 			&surface->public.plane_size,
 			surface->public.rotation,
 			NULL,
-			false);
+			false,
+			pipe_ctx->surface->public.visible);
 
 	if (dc->public.config.gpu_vm_support)
 		mi->funcs->mem_input_program_pte_vm(
@@ -1528,9 +2049,6 @@ static void update_plane_addr(const struct core_dc *dc,
 			surface->public.flip_immediate);
 
 	surface->status.requested_address = surface->public.address;
-
-	if (surface->public.visible)
-		pipe_ctx->tg->funcs->set_blank(pipe_ctx->tg, false);
 }
 
 void dce110_update_pending_status(struct pipe_ctx *pipe_ctx)
@@ -1649,6 +2167,7 @@ static void init_hw(struct core_dc *dc)
 	int i;
 	struct dc_bios *bp;
 	struct transform *xfm;
+	struct abm *abm;
 
 	bp = dc->ctx->dc_bios;
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
@@ -1686,11 +2205,18 @@ static void init_hw(struct core_dc *dc)
 		/* Blank controller using driver code instead of
 		 * command table. */
 		tg->funcs->set_blank(tg, true);
+		hwss_wait_for_blank_complete(tg);
 	}
 
 	for (i = 0; i < dc->res_pool->audio_count; i++) {
 		struct audio *audio = dc->res_pool->audios[i];
 		audio->funcs->hw_init(audio);
+	}
+
+	abm = dc->res_pool->abm;
+	if (abm != NULL) {
+		abm->funcs->init_backlight(abm);
+		abm->funcs->abm_init(abm);
 	}
 }
 
@@ -1728,7 +2254,7 @@ static void dce110_power_on_pipe_if_needed(
 				pipe_ctx->stream->public.timing.h_total,
 				pipe_ctx->stream->public.timing.v_total,
 				pipe_ctx->stream->public.timing.pix_clk_khz,
-				context->target_count);
+				context->stream_count);
 
 		/* TODO unhardcode*/
 		color_space_to_black_color(dc,
@@ -1845,8 +2371,9 @@ static void dce110_program_front_end_for_pipe(
 			&surface->public.tiling_info,
 			&surface->public.plane_size,
 			surface->public.rotation,
+			NULL,
 			false,
-			false);
+			pipe_ctx->surface->public.visible);
 
 	if (dc->public.config.gpu_vm_support)
 		mi->funcs->mem_input_program_pte_vm(
@@ -1920,7 +2447,7 @@ static void dce110_apply_ctx_for_surface(
 			continue;
 
 		dce110_program_front_end_for_pipe(dc, pipe_ctx);
-		program_blender(dc, pipe_ctx);
+		program_surface_visibility(dc, pipe_ctx);
 
 	}
 }
@@ -1970,7 +2497,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.set_drr = set_drr,
 	.set_static_screen_control = set_static_screen_control,
 	.reset_hw_ctx_wrap = reset_hw_ctx_wrap,
-	.prog_pixclk_crtc_otg = prog_pixclk_crtc_otg,
+	.prog_pixclk_crtc_otg = dce110_prog_pixclk_crtc_otg,
 };
 
 bool dce110_hw_sequencer_construct(struct core_dc *dc)

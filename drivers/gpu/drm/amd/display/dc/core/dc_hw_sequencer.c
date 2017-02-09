@@ -66,11 +66,6 @@ void color_space_to_black_color(
 	}
 
 	switch (colorspace) {
-	case COLOR_SPACE_YPBPR601:
-		*black_color = black_color_format[BLACK_COLOR_FORMAT_YUV_TV];
-		break;
-
-	case COLOR_SPACE_YPBPR709:
 	case COLOR_SPACE_YCBCR601:
 	case COLOR_SPACE_YCBCR709:
 	case COLOR_SPACE_YCBCR601_LIMITED:
@@ -90,4 +85,24 @@ void color_space_to_black_color(
 		/* default is sRGB black 0. */
 		break;
 	}
+}
+
+bool hwss_wait_for_blank_complete(
+		struct timing_generator *tg)
+{
+	int counter;
+
+	for (counter = 0; counter < 100; counter++) {
+		if (tg->funcs->is_blanked(tg))
+			break;
+
+		msleep(1);
+	}
+
+	if (counter == 100) {
+		dm_error("DC: failed to blank crtc!\n");
+		return false;
+	}
+
+	return true;
 }

@@ -101,6 +101,8 @@ extern "C" {
 #define AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS	(1 << 5)
 
 /* hybrid specific */
+/* Flag that the memory should be in SPARSE resource */
+#define AMDGPU_GEM_CREATE_SPARSE		(1 << 29)
 /* Flag that the memory allocation should be from top of domain */
 #define AMDGPU_GEM_CREATE_TOP_DOWN		(1 << 30)
 /* Flag that the memory allocation should be pinned */
@@ -215,11 +217,13 @@ union drm_amdgpu_ctx {
 #define AMDGPU_SEM_OP_WAIT_SEM	        2
 #define AMDGPU_SEM_OP_SIGNAL_SEM        3
 #define AMDGPU_SEM_OP_DESTROY_SEM       4
+#define AMDGPU_SEM_OP_IMPORT_SEM	5
+#define AMDGPU_SEM_OP_EXPORT_SEM	6
 
 struct drm_amdgpu_sem_in {
 	/** AMDGPU_SEM_OP_* */
 	uint32_t	op;
-	int32_t         fd;
+	uint32_t        handle;
 	uint32_t	ctx_id;
 	uint32_t        ip_type;
 	uint32_t        ip_instance;
@@ -229,7 +233,7 @@ struct drm_amdgpu_sem_in {
 
 union drm_amdgpu_sem_out {
 	int32_t         fd;
-	uint32_t	_pad;
+	uint32_t	handle;
 };
 
 union drm_amdgpu_sem {

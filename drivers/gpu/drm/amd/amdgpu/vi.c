@@ -77,6 +77,7 @@
 #endif
 #include "dce_virtual.h"
 #include "amdgpu_dm.h"
+#include "mxgpu_vi.h"
 
 /*
  * Indirect registers accessor
@@ -272,6 +273,12 @@ static void vi_init_golden_registers(struct amdgpu_device *adev)
 {
 	/* Some of the registers might be dependent on GRBM_GFX_INDEX */
 	mutex_lock(&adev->grbm_idx_mutex);
+
+	if (amdgpu_sriov_vf(adev)) {
+		xgpu_vi_init_golden_registers(adev);
+		mutex_unlock(&adev->grbm_idx_mutex);
+		return;
+	}
 
 	switch (adev->asic_type) {
 	case CHIP_TOPAZ:
@@ -922,6 +929,11 @@ static int vi_common_early_init(void *handle)
 		(amdgpu_ip_block_mask & (1 << AMD_IP_BLOCK_TYPE_SMC)))
 		smc_enabled = true;
 
+	if (amdgpu_sriov_vf(adev)) {
+		amdgpu_virt_init_setting(adev);
+		xgpu_vi_mailbox_set_irq_funcs(adev);
+	}
+
 	adev->rev_id = vi_get_rev_id(adev);
 	adev->external_rev_id = 0xFF;
 	switch (adev->asic_type) {
@@ -1086,8 +1098,23 @@ static int vi_common_early_init(void *handle)
 	return 0;
 }
 
+static int vi_common_late_init(void *handle)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+
+	if (amdgpu_sriov_vf(adev))
+		xgpu_vi_mailbox_get_irq(adev);
+
+	return 0;
+}
+
 static int vi_common_sw_init(void *handle)
 {
+	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+
+	if (amdgpu_sriov_vf(adev))
+		xgpu_vi_mailbox_add_irq_id(adev);
+
 	return 0;
 }
 
@@ -1118,6 +1145,9 @@ static int vi_common_hw_fini(void *handle)
 
 	/* enable the doorbell aperture */
 	vi_enable_doorbell_aperture(adev, false);
+
+	if (amdgpu_sriov_vf(adev))
+		xgpu_vi_mailbox_put_irq(adev);
 
 	return 0;
 }
@@ -1361,6 +1391,9 @@ static int vi_common_set_clockgating_state(void *handle,
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
+	if (amdgpu_sriov_vf(adev))
+		return 0;
+
 	switch (adev->asic_type) {
 	case CHIP_FIJI:
 		vi_update_bif_medium_grain_light_sleep(adev,
@@ -1405,6 +1438,9 @@ static void vi_common_get_clockgating_state(void *handle, u32 *flags)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	int data;
 
+	if (amdgpu_sriov_vf(adev))
+		*flags = 0;
+
 	/* AMD_CG_SUPPORT_BIF_LS */
 	data = RREG32_PCIE(ixPCIE_CNTL2);
 	if (data & PCIE_CNTL2__SLV_MEM_LS_EN_MASK)
@@ -1429,7 +1465,7 @@ static void vi_common_get_clockgating_state(void *handle, u32 *flags)
 static const struct amd_ip_funcs vi_common_ip_funcs = {
 	.name = "vi_common",
 	.early_init = vi_common_early_init,
-	.late_init = NULL,
+	.late_init = vi_common_late_init,
 	.sw_init = vi_common_sw_init,
 	.sw_fini = vi_common_sw_fini,
 	.hw_init = vi_common_hw_init,
@@ -1457,6 +1493,9 @@ int vi_set_ip_blocks(struct amdgpu_device *adev)
 {
 	/* in early init stage, vbios code won't work */
 	vi_detect_hw_virtualization(adev);
+
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.ops = &xgpu_vi_virt_ops;
 
 	switch (adev->asic_type) {
 	case CHIP_TOPAZ:

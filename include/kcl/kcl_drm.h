@@ -47,7 +47,8 @@ extern void
 					      struct drm_atomic_state *old_state);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
-	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3)
+	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3) && \
+	!defined(OS_NAME_SLE)
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx);
 int drm_atomic_helper_disable_all(struct drm_device *dev,
@@ -116,8 +117,9 @@ drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0) */
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)  && \
-	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
+	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3) && \
+	!defined(OS_NAME_SLE)
 extern int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw);
 #endif
 

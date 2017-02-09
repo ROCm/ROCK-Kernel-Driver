@@ -83,11 +83,140 @@ int amdgpu_map_static_csa(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		DRM_ERROR("failed to do bo_map on static CSA, err=%d\n", r);
 		amdgpu_vm_bo_rmv(adev, bo_va);
 		ttm_eu_backoff_reservation(&ticket, &list);
-		kfree(bo_va);
 		return r;
 	}
 
 	vm->csa_bo_va = bo_va;
 	ttm_eu_backoff_reservation(&ticket, &list);
+	return 0;
+}
+
+void amdgpu_virt_init_setting(struct amdgpu_device *adev)
+{
+	/* enable virtual display */
+	adev->mode_info.num_crtc = 1;
+	adev->enable_virtual_display = true;
+
+	mutex_init(&adev->virt.lock_kiq);
+	mutex_init(&adev->virt.lock_reset);
+}
+
+uint32_t amdgpu_virt_kiq_rreg(struct amdgpu_device *adev, uint32_t reg)
+{
+	signed long r;
+	uint32_t val;
+	struct fence *f;
+	struct amdgpu_kiq *kiq = &adev->gfx.kiq;
+	struct amdgpu_ring *ring = &kiq->ring;
+
+	BUG_ON(!ring->funcs->emit_rreg);
+
+	mutex_lock(&adev->virt.lock_kiq);
+	amdgpu_ring_alloc(ring, 32);
+	amdgpu_ring_emit_hdp_flush(ring);
+	amdgpu_ring_emit_rreg(ring, reg);
+	amdgpu_ring_emit_hdp_invalidate(ring);
+	amdgpu_fence_emit(ring, &f);
+	amdgpu_ring_commit(ring);
+	mutex_unlock(&adev->virt.lock_kiq);
+
+	r = fence_wait(f, false);
+	if (r)
+		DRM_ERROR("wait for kiq fence error: %ld.\n", r);
+	fence_put(f);
+
+	val = adev->wb.wb[adev->virt.reg_val_offs];
+
+	return val;
+}
+
+void amdgpu_virt_kiq_wreg(struct amdgpu_device *adev, uint32_t reg, uint32_t v)
+{
+	signed long r;
+	struct fence *f;
+	struct amdgpu_kiq *kiq = &adev->gfx.kiq;
+	struct amdgpu_ring *ring = &kiq->ring;
+
+	BUG_ON(!ring->funcs->emit_wreg);
+
+	mutex_lock(&adev->virt.lock_kiq);
+	amdgpu_ring_alloc(ring, 32);
+	amdgpu_ring_emit_hdp_flush(ring);
+	amdgpu_ring_emit_wreg(ring, reg, v);
+	amdgpu_ring_emit_hdp_invalidate(ring);
+	amdgpu_fence_emit(ring, &f);
+	amdgpu_ring_commit(ring);
+	mutex_unlock(&adev->virt.lock_kiq);
+
+	r = fence_wait(f, false);
+	if (r)
+		DRM_ERROR("wait for kiq fence error: %ld.\n", r);
+	fence_put(f);
+}
+
+/**
+ * amdgpu_virt_request_full_gpu() - request full gpu access
+ * @amdgpu:	amdgpu device.
+ * @init:	is driver init time.
+ * When start to init/fini driver, first need to request full gpu access.
+ * Return: Zero if request success, otherwise will return error.
+ */
+int amdgpu_virt_request_full_gpu(struct amdgpu_device *adev, bool init)
+{
+	struct amdgpu_virt *virt = &adev->virt;
+	int r;
+
+	if (virt->ops && virt->ops->req_full_gpu) {
+		r = virt->ops->req_full_gpu(adev, init);
+		if (r)
+			return r;
+
+		adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
+	}
+
+	return 0;
+}
+
+/**
+ * amdgpu_virt_release_full_gpu() - release full gpu access
+ * @amdgpu:	amdgpu device.
+ * @init:	is driver init time.
+ * When finishing driver init/fini, need to release full gpu access.
+ * Return: Zero if release success, otherwise will returen error.
+ */
+int amdgpu_virt_release_full_gpu(struct amdgpu_device *adev, bool init)
+{
+	struct amdgpu_virt *virt = &adev->virt;
+	int r;
+
+	if (virt->ops && virt->ops->rel_full_gpu) {
+		r = virt->ops->rel_full_gpu(adev, init);
+		if (r)
+			return r;
+
+		adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
+	}
+	return 0;
+}
+
+/**
+ * amdgpu_virt_reset_gpu() - reset gpu
+ * @amdgpu:	amdgpu device.
+ * Send reset command to GPU hypervisor to reset GPU that VM is using
+ * Return: Zero if reset success, otherwise will return error.
+ */
+int amdgpu_virt_reset_gpu(struct amdgpu_device *adev)
+{
+	struct amdgpu_virt *virt = &adev->virt;
+	int r;
+
+	if (virt->ops && virt->ops->reset_gpu) {
+		r = virt->ops->reset_gpu(adev);
+		if (r)
+			return r;
+
+		adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
+	}
+
 	return 0;
 }

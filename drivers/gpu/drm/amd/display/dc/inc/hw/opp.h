@@ -138,9 +138,7 @@ struct custom_float_value {
 
 struct hw_x_point {
 	uint32_t custom_float_x;
-	uint32_t custom_float_x_adjusted;
 	struct fixed31_32 x;
-	struct fixed31_32 adjusted_x;
 	struct fixed31_32 regamma_y_red;
 	struct fixed31_32 regamma_y_green;
 	struct fixed31_32 regamma_y_blue;
@@ -204,6 +202,7 @@ enum opp_regamma {
 struct output_pixel_processor {
 	struct dc_context *ctx;
 	uint32_t inst;
+	struct pwl_params *regamma_params;
 	const struct opp_funcs *funcs;
 };
 

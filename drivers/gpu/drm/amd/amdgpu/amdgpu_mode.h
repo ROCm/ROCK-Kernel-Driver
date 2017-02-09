@@ -444,8 +444,8 @@ struct amdgpu_crtc {
 
 	int otg_inst;
 	uint32_t flip_flags;
-	/* After Set Mode target will be non-NULL */
-	struct dc_target *target;
+	/* After Set Mode stream will be non-NULL */
+	const struct dc_stream *stream;
 };
 
 struct amdgpu_encoder_atom_dig {
@@ -566,7 +566,7 @@ struct amdgpu_connector {
 	const struct dc_sink *dc_sink;
 	const struct dc_link *dc_link;
 	const struct dc_sink *dc_em_sink;
-	const struct dc_target *target;
+	const struct dc_stream *stream;
 	void *con_priv;
 	bool dac_load_detect;
 	bool detected_by_load; /* if the connection status was determined by load */
@@ -678,6 +678,24 @@ void amdgpu_print_display_setup(struct drm_device *dev);
 int amdgpu_modeset_create_props(struct amdgpu_device *adev);
 int amdgpu_crtc_set_config(struct drm_mode_set *set);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+void amdgpu_crtc_cleanup_flip_ctx(
+		struct amdgpu_flip_work *work,
+		struct amdgpu_bo *new_abo);
+
+int amdgpu_crtc_prepare_flip(struct drm_crtc *crtc,
+			  struct drm_framebuffer *fb,
+			  struct drm_pending_vblank_event *event,
+			  uint32_t page_flip_flags,
+			  uint32_t target,
+			  struct amdgpu_flip_work **work,
+			  struct amdgpu_bo **new_abo);
+
+void amdgpu_crtc_submit_flip(
+		struct drm_crtc *crtc,
+		struct drm_framebuffer *fb,
+		struct amdgpu_flip_work *work,
+		struct amdgpu_bo *new_abo);
+
 int amdgpu_crtc_page_flip_target(struct drm_crtc *crtc,
 				 struct drm_framebuffer *fb,
 				 struct drm_pending_vblank_event *event,
@@ -688,6 +706,7 @@ int amdgpu_crtc_page_flip(struct drm_crtc *crtc,
 			  struct drm_pending_vblank_event *event,
 			  uint32_t page_flip_flags);
 #endif
+
 extern const struct drm_mode_config_funcs amdgpu_mode_funcs;
 
 #endif

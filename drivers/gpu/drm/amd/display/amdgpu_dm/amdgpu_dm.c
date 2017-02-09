@@ -74,12 +74,12 @@ static u32 dm_vblank_get_counter(struct amdgpu_device *adev, int crtc)
 	else {
 		struct amdgpu_crtc *acrtc = adev->mode_info.crtcs[crtc];
 
-		if (NULL == acrtc->target) {
-			DRM_ERROR("dc_target is NULL for crtc '%d'!\n", crtc);
+		if (NULL == acrtc->stream) {
+			DRM_ERROR("dc_stream is NULL for crtc '%d'!\n", crtc);
 			return 0;
 		}
 
-		return dc_target_get_vblank_counter(acrtc->target);
+		return dc_stream_get_vblank_counter(acrtc->stream);
 	}
 }
 
@@ -91,12 +91,12 @@ static int dm_crtc_get_scanoutpos(struct amdgpu_device *adev, int crtc,
 	else {
 		struct amdgpu_crtc *acrtc = adev->mode_info.crtcs[crtc];
 
-		if (NULL == acrtc->target) {
-			DRM_ERROR("dc_target is NULL for crtc '%d'!\n", crtc);
+		if (NULL == acrtc->stream) {
+			DRM_ERROR("dc_stream is NULL for crtc '%d'!\n", crtc);
 			return 0;
 		}
 
-		return dc_target_get_scanoutpos(acrtc->target, vbl, position);
+		return dc_stream_get_scanoutpos(acrtc->stream, vbl, position);
 	}
 
 	return 0;
@@ -207,7 +207,7 @@ static void dm_crtc_high_irq(void *interrupt_params)
 	uint8_t crtc_index = 0;
 	struct amdgpu_crtc *acrtc;
 
-	acrtc = get_crtc_by_otg_inst(adev, irq_params->irq_src - IRQ_TYPE_VUPDATE);
+	acrtc = get_crtc_by_otg_inst(adev, irq_params->irq_src - IRQ_TYPE_VBLANK);
 
 	if (acrtc)
 		crtc_index = acrtc->crtc_id;
@@ -467,7 +467,7 @@ static int dm_suspend(void *handle)
 	drm_modeset_lock_all(adev->ddev);
 	list_for_each_entry(crtc, &adev->ddev->mode_config.crtc_list, head) {
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
-		if (acrtc->target)
+		if (acrtc->stream)
 				drm_crtc_vblank_off(crtc);
 	}
 	drm_modeset_unlock_all(adev->ddev);
@@ -661,7 +661,7 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 	drm_modeset_lock_all(ddev);
 	list_for_each_entry(crtc, &ddev->mode_config.crtc_list, head) {
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
-		if (acrtc->target)
+		if (acrtc->stream)
 				drm_crtc_vblank_on(crtc);
 	}
 	drm_modeset_unlock_all(ddev);
@@ -746,7 +746,7 @@ void amdgpu_dm_update_connector_after_detect(
 	if (aconnector->base.force != DRM_FORCE_UNSPECIFIED
 			&& aconnector->dc_em_sink) {
 
-		/* For S3 resume with headless use eml_sink to fake target
+		/* For S3 resume with headless use eml_sink to fake stream
 		 * because on resume connecotr->sink is set ti NULL
 		 */
 		mutex_lock(&dev->mode_config.mutex);
@@ -1032,9 +1032,10 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 	 *    amdgpu_dm_irq_handler() will re-direct the interrupt to DC
 	 *    for acknowledging and handling. */
 
-	for (i = VISLANDS30_IV_SRCID_D1_V_UPDATE_INT;
-			i <= VISLANDS30_IV_SRCID_D6_V_UPDATE_INT; i += 2) {
+	/* Use VBLANK interrupt */
+	for (i = 1; i <= adev->mode_info.num_crtc; i++) {
 		r = amdgpu_irq_add_id(adev, i, &adev->crtc_irq);
+
 		if (r) {
 			DRM_ERROR("Failed to add crtc irq id!\n");
 			return r;
@@ -1044,7 +1045,7 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 		int_params.irq_source =
 			dc_interrupt_to_irq_source(dc, i, 0);
 
-		c_irq_params = &adev->dm.vupdate_params[int_params.irq_source - DC_IRQ_SOURCE_VUPDATE1];
+		c_irq_params = &adev->dm.vblank_params[int_params.irq_source - DC_IRQ_SOURCE_VBLANK1];
 
 		c_irq_params->adev = adev;
 		c_irq_params->irq_src = int_params.irq_source;
@@ -1053,6 +1054,7 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 				dm_crtc_high_irq, c_irq_params);
 	}
 
+	/* Use GRPH_PFLIP interrupt */
 	for (i = VISLANDS30_IV_SRCID_D1_GRPH_PFLIP;
 			i <= VISLANDS30_IV_SRCID_D6_GRPH_PFLIP; i += 2) {
 		r = amdgpu_irq_add_id(adev, i, &adev->pageflip_irq);
@@ -1203,7 +1205,7 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		return -1;
 	}
 
-	for (i = 0; i < dm->dc->caps.max_targets; i++) {
+	for (i = 0; i < dm->dc->caps.max_streams; i++) {
 		acrtc = kzalloc(sizeof(struct amdgpu_crtc), GFP_KERNEL);
 		if (!acrtc)
 			goto fail;
@@ -1218,7 +1220,7 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		}
 	}
 
-	dm->display_indexes_num = dm->dc->caps.max_targets;
+	dm->display_indexes_num = dm->dc->caps.max_streams;
 
 	/* loops over all connectors on the board */
 	for (i = 0; i < link_cnt; i++) {
@@ -1337,7 +1339,7 @@ static void dm_page_flip(struct amdgpu_device *adev,
 			 int crtc_id, u64 crtc_base, bool async)
 {
 	struct amdgpu_crtc *acrtc;
-	struct dc_target *target;
+	const struct dc_stream *stream;
 	struct dc_flip_addrs addr = { {0} };
 
 	/*
@@ -1355,7 +1357,7 @@ static void dm_page_flip(struct amdgpu_device *adev,
 	 * a little longer to lock up all cores.
 	 *
 	 * The reason we should lock on dal_mutex is so that we can be sure
-	 * nobody messes with acrtc->target after we read and check its value.
+	 * nobody messes with acrtc->stream after we read and check its value.
 	 *
 	 * We might be able to fix our concurrency issues with a work queue
 	 * where we schedule all work items (mode_set, page_flip, etc.) and
@@ -1364,14 +1366,14 @@ static void dm_page_flip(struct amdgpu_device *adev,
 	 */
 
 	acrtc = adev->mode_info.crtcs[crtc_id];
-	target = acrtc->target;
+	stream = acrtc->stream;
 
 	/*
 	 * Received a page flip call after the display has been reset.
 	 * Just return in this case. Everything should be clean-up on reset.
 	 */
 
-	if (!target) {
+	if (!stream) {
 		WARN_ON(1);
 		return;
 	}
@@ -1387,7 +1389,7 @@ static void dm_page_flip(struct amdgpu_device *adev,
 
 	dc_flip_surface_addrs(
 			adev->dm.dc,
-			dc_target_get_status(target)->surfaces,
+			dc_stream_get_status(stream)->surfaces,
 			&addr, 1);
 }
 
@@ -1395,9 +1397,8 @@ static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 				struct drm_file *filp)
 {
 	struct mod_freesync_params freesync_params;
-	uint8_t num_targets;
+	uint8_t num_streams;
 	uint8_t i;
-	struct dc_target *target;
 
 	struct amdgpu_device *adev = dev->dev_private;
 	struct drm_amdgpu_freesync *args = data;
@@ -1409,16 +1410,14 @@ static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 	else
 		freesync_params.enable = false;
 
-	num_targets = dc_get_current_target_count(adev->dm.dc);
+	num_streams = dc_get_current_stream_count(adev->dm.dc);
 
-	for (i = 0; i < num_targets; i++) {
-
-		target = dc_get_target_at_index(adev->dm.dc, i);
+	for (i = 0; i < num_streams; i++) {
+		const struct dc_stream *stream;
+		stream = dc_get_stream_at_index(adev->dm.dc, i);
 
 		mod_freesync_update_state(adev->dm.freesync_module,
-						target->streams,
-						target->stream_count,
-						&freesync_params);
+					  &stream, 1, &freesync_params);
 	}
 
 	return r;

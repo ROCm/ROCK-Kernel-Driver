@@ -92,6 +92,8 @@ struct dce_mem_input_registers {
 	.field_name = blk_name ## reg_name ## __ ## field_name ## post_fix
 
 #define MI_GFX8_TILE_MASK_SH_LIST(mask_sh, blk)\
+	SFB(blk, GRPH_CONTROL, GRPH_NUM_BANKS, mask_sh),\
+	SFB(blk, GRPH_CONTROL, GRPH_BANK_WIDTH, mask_sh),\
 	SFB(blk, GRPH_CONTROL, GRPH_BANK_HEIGHT, mask_sh),\
 	SFB(blk, GRPH_CONTROL, GRPH_MACRO_TILE_ASPECT, mask_sh),\
 	SFB(blk, GRPH_CONTROL, GRPH_TILE_SPLIT, mask_sh),\
@@ -243,7 +245,8 @@ void dce_mem_input_program_surface_config(struct mem_input *mi,
 	union plane_size *plane_size,
 	enum dc_rotation_angle rotation,
 	struct dc_plane_dcc_param *dcc,
-	bool horizontal_mirror);
+	bool horizontal_mirror,
+	bool visible);
 
 void dce_mem_input_allocate_dmif(struct mem_input *mi,
 	uint32_t h_total,

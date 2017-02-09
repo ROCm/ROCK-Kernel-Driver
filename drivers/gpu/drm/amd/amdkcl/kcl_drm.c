@@ -35,7 +35,7 @@ int drm_crtc_force_disable_all(struct drm_device *dev)
 	int ret = 0;
 
 	drm_modeset_lock_all(dev);
-	drm_for_each_crtc(crtc, dev)
+	kcl_drm_for_each_crtc(crtc, dev)
 		if (crtc->enabled) {
 			ret = drm_crtc_force_disable(crtc);
 			if (ret)
@@ -49,7 +49,8 @@ EXPORT_SYMBOL(drm_crtc_force_disable_all);
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
-	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3)
+	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3) && \
+	!defined(OS_NAME_SLE)
 int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw)
 {
 	struct pci_dev *root;
@@ -317,7 +318,8 @@ _kcl_drm_atomic_helper_update_legacy_modeset_state_stub(struct drm_device *dev,
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
-	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3)
+	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3) && \
+	!defined(OS_NAME_SLE)
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx)
 {
@@ -384,7 +386,7 @@ free:
 }
 EXPORT_SYMBOL(drm_atomic_helper_disable_all);
 
-#ifndef OS_NAME_RHEL_6
+#if !defined(OS_NAME_RHEL_6) && !defined(OS_NAME_AMZ)
 struct drm_atomic_state *
 drm_atomic_helper_duplicate_state(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx)

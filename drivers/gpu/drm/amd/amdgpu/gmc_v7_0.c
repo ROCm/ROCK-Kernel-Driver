@@ -375,9 +375,16 @@ static int gmc_v7_0_mc_init(struct amdgpu_device *adev)
 	/* size in MB on si */
 	adev->mc.mc_vram_size = RREG32(mmCONFIG_MEMSIZE) * 1024ULL * 1024ULL;
 	adev->mc.real_vram_size = RREG32(mmCONFIG_MEMSIZE) * 1024ULL * 1024ULL;
-	adev->mc.visible_vram_size = adev->mc.aper_size;
+
+#ifdef CONFIG_X86_64
+	if (adev->flags & AMD_IS_APU) {
+		adev->mc.aper_base = ((u64)RREG32(mmMC_VM_FB_OFFSET)) << 22;
+		adev->mc.aper_size = adev->mc.real_vram_size;
+	}
+#endif
 
 	/* In case the PCI BAR is larger than the actual amount of vram */
+	adev->mc.visible_vram_size = adev->mc.aper_size;
 	if (adev->mc.visible_vram_size > adev->mc.real_vram_size)
 		adev->mc.visible_vram_size = adev->mc.real_vram_size;
 
@@ -471,6 +478,54 @@ static void gmc_v7_0_set_fault_enable_default(struct amdgpu_device *adev,
 	tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL,
 			    WRITE_PROTECTION_FAULT_ENABLE_DEFAULT, value);
 	WREG32(mmVM_CONTEXT1_CNTL, tmp);
+}
+
+/**
+ * gmc_v7_0_enable_prt - set PRT VM fault
+ *
+ * @adev: amdgpu_device pointer
+ * @value: toggle the VM fault for accessing the none mapped tile for PRT
+ */
+static void gmc_v7_0_enable_prt(struct amdgpu_device *adev, bool value)
+{
+	u32 tmp;
+
+	tmp = RREG32(mmVM_PRT_CNTL);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    CB_DISABLE_READ_FAULT_ON_UNMAPPED_ACCESS, value);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    CB_DISABLE_WRITE_FAULT_ON_UNMAPPED_ACCESS, value);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    TC_DISABLE_READ_FAULT_ON_UNMAPPED_ACCESS, value);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    TC_DISABLE_WRITE_FAULT_ON_UNMAPPED_ACCESS, value);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    L2_CACHE_STORE_INVALID_ENTRIES, value);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    L1_TLB_STORE_INVALID_ENTRIES, value);
+	tmp = REG_SET_FIELD(tmp, VM_PRT_CNTL,
+			    MASK_PDE0_FAULT, value);
+	WREG32(mmVM_PRT_CNTL, tmp);
+
+	if (value) {
+		WREG32(mmVM_PRT_APERTURE0_LOW_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE1_LOW_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE2_LOW_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE3_LOW_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE0_HIGH_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE1_HIGH_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE2_HIGH_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE3_HIGH_ADDR, 0xfffffff);
+	} else {
+		WREG32(mmVM_PRT_APERTURE0_LOW_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE1_LOW_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE2_LOW_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE3_LOW_ADDR, 0xfffffff);
+		WREG32(mmVM_PRT_APERTURE0_HIGH_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE1_HIGH_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE2_HIGH_ADDR, 0x0);
+		WREG32(mmVM_PRT_APERTURE3_HIGH_ADDR, 0x0);
+	}
 }
 
 /**
@@ -879,6 +934,9 @@ static int gmc_v7_0_early_init(void *handle)
 
 	gmc_v7_0_set_gart_funcs(adev);
 	gmc_v7_0_set_irq_funcs(adev);
+
+	adev->vm_manager.enable_prt = &gmc_v7_0_enable_prt;
+	DRM_INFO("VM PRT is supported!\n");
 
 	return 0;
 }

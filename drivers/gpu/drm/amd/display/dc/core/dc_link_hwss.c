@@ -61,6 +61,32 @@ void dp_enable_link_phy(
 {
 	struct link_encoder *link_enc = link->link_enc;
 
+	struct pipe_ctx *pipes =
+			link->dc->current_context->res_ctx.pipe_ctx;
+	struct clock_source *dp_cs =
+			link->dc->res_pool->dp_clock_source;
+	unsigned int i;
+	/* If the current pixel clock source is not DTO(happens after
+	 * switching from HDMI passive dongle to DP on the same connector),
+	 * switch the pixel clock source to DTO.
+	 */
+	for (i = 0; i < MAX_PIPES; i++) {
+		if (pipes[i].stream != NULL &&
+			pipes[i].stream->sink != NULL &&
+			pipes[i].stream->sink->link == link) {
+			if (pipes[i].clock_source != NULL &&
+					pipes[i].clock_source->id != CLOCK_SOURCE_ID_DP_DTO) {
+				pipes[i].clock_source = dp_cs;
+				pipes[i].pix_clk_params.requested_pix_clk =
+						pipes[i].stream->public.timing.pix_clk_khz;
+				pipes[i].clock_source->funcs->program_pix_clk(
+							pipes[i].clock_source,
+							&pipes[i].pix_clk_params,
+							&pipes[i].pll_settings);
+			}
+		}
+	}
+
 	if (dc_is_dp_sst_signal(signal)) {
 		if (signal == SIGNAL_TYPE_EDP) {
 			link_enc->funcs->power_control(link_enc, true);
@@ -225,6 +251,8 @@ void dp_retrain_link_dp_test(struct core_link *link,
 
 			dp_receiver_power_ctrl(link, false);
 
+			link->dc->hwss.disable_stream(&pipes[i]);
+
 			link->link_enc->funcs->disable_output(
 					link->link_enc,
 					SIGNAL_TYPE_DISPLAY_PORT);
@@ -246,6 +274,8 @@ void dp_retrain_link_dp_test(struct core_link *link,
 					skip_video_pattern);
 
 			link->public.cur_link_settings = *link_setting;
+
+			link->dc->hwss.enable_stream(&pipes[i]);
 
 			link->dc->hwss.unblank_stream(&pipes[i],
 					link_setting);

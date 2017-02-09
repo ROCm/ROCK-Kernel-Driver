@@ -164,6 +164,9 @@ struct amdgpu_vm_manager {
 	u64					shared_aperture_end;
 	u64					private_aperture_start;
 	u64					private_aperture_end;
+
+	/* prt support */
+	void (*enable_prt)(struct amdgpu_device *adev, bool value);
 };
 
 void amdgpu_vm_manager_init(struct amdgpu_device *adev);
@@ -202,7 +205,7 @@ struct amdgpu_bo_va *amdgpu_vm_bo_add(struct amdgpu_device *adev,
 int amdgpu_vm_bo_map(struct amdgpu_device *adev,
 		     struct amdgpu_bo_va *bo_va,
 		     uint64_t addr, uint64_t offset,
-		     uint64_t size, uint32_t flags);
+		     uint64_t size, uint64_t flags);
 int amdgpu_vm_bo_unmap(struct amdgpu_device *adev,
 		       struct amdgpu_bo_va *bo_va,
 		       uint64_t addr);

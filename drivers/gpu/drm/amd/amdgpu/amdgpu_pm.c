@@ -39,7 +39,7 @@ static const struct cg_flag_name clocks[] = {
 	{AMD_CG_SUPPORT_GFX_MGLS, "Graphics Medium Grain memory Light Sleep"},
 	{AMD_CG_SUPPORT_GFX_CGCG, "Graphics Coarse Grain Clock Gating"},
 	{AMD_CG_SUPPORT_GFX_CGLS, "Graphics Coarse Grain memory Light Sleep"},
-	{AMD_CG_SUPPORT_GFX_CGTS, "Graphics Coarse Grain Tree Shader Light Sleep"},
+	{AMD_CG_SUPPORT_GFX_CGTS, "Graphics Coarse Grain Tree Shader Clock Gating"},
 	{AMD_CG_SUPPORT_GFX_CGTS_LS, "Graphics Coarse Grain Tree Shader Light Sleep"},
 	{AMD_CG_SUPPORT_GFX_CP_LS, "Graphics Command Processor Light Sleep"},
 	{AMD_CG_SUPPORT_GFX_RLC_LS, "Graphics Run List Controller Light Sleep"},
@@ -1141,12 +1141,22 @@ void amdgpu_dpm_enable_vce(struct amdgpu_device *adev, bool enable)
 			/* XXX select vce level based on ring/task */
 			adev->pm.dpm.vce_level = AMD_VCE_LEVEL_AC_ALL;
 			mutex_unlock(&adev->pm.mutex);
+			amdgpu_pm_compute_clocks(adev);
+			amdgpu_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_VCE,
+							AMD_PG_STATE_UNGATE);
+			amdgpu_set_clockgating_state(adev, AMD_IP_BLOCK_TYPE_VCE,
+							AMD_CG_STATE_UNGATE);
 		} else {
+			amdgpu_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_VCE,
+							AMD_PG_STATE_GATE);
+			amdgpu_set_clockgating_state(adev, AMD_IP_BLOCK_TYPE_VCE,
+							AMD_CG_STATE_GATE);
 			mutex_lock(&adev->pm.mutex);
 			adev->pm.dpm.vce_active = false;
 			mutex_unlock(&adev->pm.mutex);
+			amdgpu_pm_compute_clocks(adev);
 		}
-		amdgpu_pm_compute_clocks(adev);
+
 	}
 }
 

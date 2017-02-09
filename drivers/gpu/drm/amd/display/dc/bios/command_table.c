@@ -54,13 +54,10 @@ static void init_enable_spread_spectrum_on_ppll(struct bios_parser *bp);
 static void init_adjust_display_pll(struct bios_parser *bp);
 static void init_dac_encoder_control(struct bios_parser *bp);
 static void init_dac_output_control(struct bios_parser *bp);
-static void init_blank_crtc(struct bios_parser *bp);
 static void init_set_crtc_timing(struct bios_parser *bp);
-static void init_set_crtc_overscan(struct bios_parser *bp);
 static void init_select_crtc_source(struct bios_parser *bp);
 static void init_enable_crtc(struct bios_parser *bp);
 static void init_enable_crtc_mem_req(struct bios_parser *bp);
-static void init_compute_memore_engine_pll(struct bios_parser *bp);
 static void init_external_encoder_control(struct bios_parser *bp);
 static void init_enable_disp_power_gating(struct bios_parser *bp);
 static void init_program_clock(struct bios_parser *bp);
@@ -75,14 +72,11 @@ void dal_bios_parser_init_cmd_tbl(struct bios_parser *bp)
 	init_adjust_display_pll(bp);
 	init_dac_encoder_control(bp);
 	init_dac_output_control(bp);
-	init_blank_crtc(bp);
 	init_set_crtc_timing(bp);
-	init_set_crtc_overscan(bp);
 	init_select_crtc_source(bp);
 	init_enable_crtc(bp);
 	init_enable_crtc_mem_req(bp);
 	init_program_clock(bp);
-	init_compute_memore_engine_pll(bp);
 	init_external_encoder_control(bp);
 	init_enable_disp_power_gating(bp);
 	init_set_dce_clock(bp);
@@ -1678,66 +1672,6 @@ static enum bp_result dac2_output_control_v1(
 /*******************************************************************************
  ********************************************************************************
  **
- **                 BLANK CRTC
- **
- ********************************************************************************
- *******************************************************************************/
-
-static enum bp_result blank_crtc_v1(
-	struct bios_parser *bp,
-	struct bp_blank_crtc_parameters *bp_params,
-	bool blank);
-
-static void init_blank_crtc(struct bios_parser *bp)
-{
-	switch (BIOS_CMD_TABLE_PARA_REVISION(BlankCRTC)) {
-	case 1:
-		bp->cmd_tbl.blank_crtc = blank_crtc_v1;
-		break;
-	default:
-		bp->cmd_tbl.blank_crtc = NULL;
-		break;
-	}
-}
-
-static enum bp_result blank_crtc_v1(
-	struct bios_parser *bp,
-	struct bp_blank_crtc_parameters *bp_params,
-	bool blank)
-{
-	enum bp_result result = BP_RESULT_FAILURE;
-	BLANK_CRTC_PARAMETERS params = {0};
-	uint8_t atom_controller_id;
-
-	if (bp->cmd_helper->controller_id_to_atom(bp_params->controller_id,
-			&atom_controller_id)) {
-		params.ucCRTC = (uint8_t)atom_controller_id;
-
-		if (blank)
-			params.ucBlanking = ATOM_BLANKING;
-		else
-			params.ucBlanking = ATOM_BLANKING_OFF;
-		params.usBlackColorRCr =
-				cpu_to_le16((uint16_t)bp_params->black_color_rcr);
-		params.usBlackColorGY =
-				cpu_to_le16((uint16_t)bp_params->black_color_gy);
-		params.usBlackColorBCb =
-				cpu_to_le16((uint16_t)bp_params->black_color_bcb);
-
-		if (EXEC_BIOS_CMD_TABLE(BlankCRTC, params))
-			result = BP_RESULT_OK;
-	} else
-		/* Not support more than two CRTC as current ASIC, update this
-		 * if needed.
-		 */
-		result = BP_RESULT_BADINPUT;
-
-	return result;
-}
-
-/*******************************************************************************
- ********************************************************************************
- **
  **                  SET CRTC TIMING
  **
  ********************************************************************************
@@ -1926,59 +1860,6 @@ static enum bp_result set_crtc_using_dtd_timing_v3(
 				cpu_to_le16(le16_to_cpu(params.susModeMiscInfo.usAccess) | ATOM_DOUBLE_CLOCK_MODE);
 
 	if (EXEC_BIOS_CMD_TABLE(SetCRTC_UsingDTDTiming, params))
-		result = BP_RESULT_OK;
-
-	return result;
-}
-
-/*******************************************************************************
- ********************************************************************************
- **
- **                  SET CRTC OVERSCAN
- **
- ********************************************************************************
- *******************************************************************************/
-
-static enum bp_result set_crtc_overscan_v1(
-	struct bios_parser *bp,
-	struct bp_hw_crtc_overscan_parameters *bp_params);
-
-static void init_set_crtc_overscan(struct bios_parser *bp)
-{
-	switch (BIOS_CMD_TABLE_PARA_REVISION(SetCRTC_OverScan))	{
-	case 1:
-		bp->cmd_tbl.set_crtc_overscan = set_crtc_overscan_v1;
-		break;
-	default:
-		bp->cmd_tbl.set_crtc_overscan = NULL;
-		break;
-	}
-}
-
-static enum bp_result set_crtc_overscan_v1(
-	struct bios_parser *bp,
-	struct bp_hw_crtc_overscan_parameters *bp_params)
-{
-	enum bp_result result = BP_RESULT_FAILURE;
-	SET_CRTC_OVERSCAN_PARAMETERS params = {0};
-	uint8_t atom_controller_id;
-
-	if (bp->cmd_helper->controller_id_to_atom(
-			bp_params->controller_id, &atom_controller_id))
-		params.ucCRTC = atom_controller_id;
-	else
-		return BP_RESULT_BADINPUT;
-
-	params.usOverscanRight =
-			cpu_to_le16((uint16_t)bp_params->h_overscan_right);
-	params.usOverscanLeft =
-			cpu_to_le16((uint16_t)bp_params->h_overscan_left);
-	params.usOverscanBottom =
-			cpu_to_le16((uint16_t)bp_params->v_overscan_bottom);
-	params.usOverscanTop =
-			cpu_to_le16((uint16_t)bp_params->v_overscan_top);
-
-	if (EXEC_BIOS_CMD_TABLE(SetCRTC_OverScan, params))
 		result = BP_RESULT_OK;
 
 	return result;
@@ -2288,56 +2169,6 @@ static enum bp_result program_clock_v6(
 		 * is enabled. */
 		bp_params->dfs_bypass_display_clock =
 				(uint32_t)(le32_to_cpu(params.sPCLKInput.ulDispEngClkFreq) * 10);
-		result = BP_RESULT_OK;
-	}
-
-	return result;
-}
-
-/*******************************************************************************
- ********************************************************************************
- **
- **                 COMPUTE MEMORY ENGINE PLL
- **
- ********************************************************************************
- *******************************************************************************/
-
-static enum bp_result compute_memore_engine_pll_v4(
-	struct bios_parser *bp,
-	struct bp_display_clock_parameters *bp_params);
-
-static void init_compute_memore_engine_pll(struct bios_parser *bp)
-{
-	switch (BIOS_CMD_TABLE_PARA_REVISION(ComputeMemoryEnginePLL)) {
-	case 4:
-		bp->cmd_tbl.compute_memore_engine_pll =
-				compute_memore_engine_pll_v4;
-		break;
-	default:
-		bp->cmd_tbl.compute_memore_engine_pll = NULL;
-		break;
-	}
-}
-
-static enum bp_result compute_memore_engine_pll_v4(
-	struct bios_parser *bp,
-	struct bp_display_clock_parameters *bp_params)
-{
-	enum bp_result result = BP_RESULT_FAILURE;
-	COMPUTE_MEMORY_ENGINE_PLL_PARAMETERS_V4 params;
-
-	memset(&params, 0, sizeof(params));
-
-	params.ulClock = cpu_to_le32(bp_params->target_display_clock / 10);
-
-	/* Initialize this to the target clock in case this call fails */
-	bp_params->actual_display_clock = bp_params->target_display_clock;
-
-	if (EXEC_BIOS_CMD_TABLE(ComputeMemoryEnginePLL, params)) {
-		/* Convert from 10KHz units back to KHz */
-		bp_params->actual_display_clock =
-				le32_to_cpu(params.ulClock) * 10;
-		bp_params->actual_post_divider_id = params.ucPostDiv;
 		result = BP_RESULT_OK;
 	}
 

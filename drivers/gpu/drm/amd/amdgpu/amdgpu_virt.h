@@ -28,12 +28,30 @@
 #define AMDGPU_SRIOV_CAPS_ENABLE_IOV   (1 << 1) /* sr-iov is enabled on this GPU */
 #define AMDGPU_SRIOV_CAPS_IS_VF        (1 << 2) /* this GPU is a virtual function */
 #define AMDGPU_PASSTHROUGH_MODE        (1 << 3) /* thw whole GPU is pass through for VM */
+#define AMDGPU_SRIOV_CAPS_RUNTIME      (1 << 4) /* is out of full access mode */
+
+/**
+ * struct amdgpu_virt_ops - amdgpu device virt operations
+ */
+struct amdgpu_virt_ops {
+	int (*req_full_gpu)(struct amdgpu_device *adev, bool init);
+	int (*rel_full_gpu)(struct amdgpu_device *adev, bool init);
+	int (*reset_gpu)(struct amdgpu_device *adev);
+};
 
 /* GPU virtualization */
 struct amdgpu_virt {
-	uint32_t caps;
-	struct amdgpu_bo *csa_obj;
-	uint64_t csa_vmid0_addr;
+	uint32_t			caps;
+	struct amdgpu_bo		*csa_obj;
+	uint64_t			csa_vmid0_addr;
+	bool chained_ib_support;
+	uint32_t			reg_val_offs;
+	struct mutex			lock_kiq;
+	struct mutex                    lock_reset;
+	struct amdgpu_irq_src		ack_irq;
+	struct amdgpu_irq_src		rcv_irq;
+	struct work_struct		flr_work;
+	const struct amdgpu_virt_ops	*ops;
 };
 
 #define AMDGPU_CSA_SIZE    (8 * 1024)
@@ -47,6 +65,9 @@ struct amdgpu_virt {
 
 #define amdgpu_sriov_bios(adev) \
 ((adev)->virt.caps & AMDGPU_SRIOV_CAPS_SRIOV_VBIOS)
+
+#define amdgpu_sriov_runtime(adev) \
+((adev)->virt.caps & AMDGPU_SRIOV_CAPS_RUNTIME)
 
 #define amdgpu_passthrough(adev) \
 ((adev)->virt.caps & AMDGPU_PASSTHROUGH_MODE)
@@ -63,5 +84,12 @@ static inline bool is_virtual_machine(void)
 struct amdgpu_vm;
 int amdgpu_allocate_static_csa(struct amdgpu_device *adev);
 int amdgpu_map_static_csa(struct amdgpu_device *adev, struct amdgpu_vm *vm);
+void amdgpu_virt_init_setting(struct amdgpu_device *adev);
+uint32_t amdgpu_virt_kiq_rreg(struct amdgpu_device *adev, uint32_t reg);
+void amdgpu_virt_kiq_wreg(struct amdgpu_device *adev, uint32_t reg, uint32_t v);
+int amdgpu_virt_request_full_gpu(struct amdgpu_device *adev, bool init);
+int amdgpu_virt_release_full_gpu(struct amdgpu_device *adev, bool init);
+int amdgpu_virt_reset_gpu(struct amdgpu_device *adev);
+int amdgpu_sriov_gpu_reset(struct amdgpu_device *adev, bool voluntary);
 
 #endif

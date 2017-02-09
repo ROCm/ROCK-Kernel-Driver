@@ -123,8 +123,6 @@ union plane_size {
 		 * is 32 pixel aligned.
 		 */
 		uint32_t surface_pitch;
-
-		uint32_t meta_pitch;
 	} grph;
 
 	struct {
@@ -134,7 +132,6 @@ union plane_size {
 		 * 32 pixel aligned.
 		 */
 		uint32_t luma_pitch;
-		uint32_t meta_luma_pitch;
 
 		struct rect chroma_size;
 		/* Graphic surface pitch in pixels.
@@ -142,7 +139,6 @@ union plane_size {
 		 * 32 pixel aligned.
 		 */
 		uint32_t chroma_pitch;
-		uint32_t meta_chroma_pitch;
 	} video;
 };
 
@@ -178,7 +174,7 @@ enum surface_pixel_format {
 	/*32 bpp*/
 	SURFACE_PIXEL_FORMAT_GRPH_ARGB8888,
 	/*32 bpp swaped*/
-	SURFACE_PIXEL_FORMAT_GRPH_BGRA8888,
+	SURFACE_PIXEL_FORMAT_GRPH_ABGR8888,
 
 	SURFACE_PIXEL_FORMAT_GRPH_ARGB2101010,
 	/*swaped*/
@@ -439,12 +435,14 @@ enum dc_color_space {
 	COLOR_SPACE_UNKNOWN,
 	COLOR_SPACE_SRGB,
 	COLOR_SPACE_SRGB_LIMITED,
-	COLOR_SPACE_YPBPR601,
-	COLOR_SPACE_YPBPR709,
 	COLOR_SPACE_YCBCR601,
 	COLOR_SPACE_YCBCR709,
 	COLOR_SPACE_YCBCR601_LIMITED,
-	COLOR_SPACE_YCBCR709_LIMITED
+	COLOR_SPACE_YCBCR709_LIMITED,
+	COLOR_SPACE_2020_RGB_FULLRANGE,
+	COLOR_SPACE_2020_RGB_LIMITEDRANGE,
+	COLOR_SPACE_2020_YCBCR,
+	COLOR_SPACE_ADOBERGB,
 };
 
 enum dc_quantization_range {
