@@ -1934,6 +1934,11 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 			if (ret == -ESRCH)
 				/* process terminating, fail quiet and fast */
 				return ret;
+			else if (ret == -EDEADLK)
+				/* Someone else is still updating the
+				 * VM, let's try again later
+				 */
+				return ret;
 			pr_err("get_user_pages failed. Probably userptr is freed. %d\n",
 			       ret);
 		}

@@ -242,6 +242,7 @@ static void amdgdu_amdkfd_restore_mem_worker(struct work_struct *work)
 	struct kgd_mem *mem = container_of(dwork, struct kgd_mem, work);
 	struct amdgpu_device *adev;
 	struct mm_struct *mm;
+	int ret = 0;
 
 	mutex_lock(&mem->lock);
 
@@ -258,16 +259,27 @@ static void amdgdu_amdkfd_restore_mem_worker(struct work_struct *work)
 	 * was scheduled.
 	 */
 	if (mem->evicted == 1) {
-		if (amdgpu_amdkfd_gpuvm_restore_mem(mem, mm) != -EBUSY)
+		ret = amdgpu_amdkfd_gpuvm_restore_mem(mem, mm);
+		if (ret != -EBUSY && ret != -EDEADLK)
 			mem->evicted = 0;
 	}
 
-	BUG_ON(mem->mm != mm);
-	mem->mm = NULL;
+	/* If restore failed due to the VM being updated concurrently,
+	 * reschedule restore again in a jiffie
+	 */
+	if (ret == -EDEADLK && mem->evicted == 1) {
+		pr_err("Rescheduling restore\n");
+		mm = NULL;
+		schedule_delayed_work(&mem->work, 1);
+	} else {
+		BUG_ON(mem->mm != mm);
+		mem->mm = NULL;
+	}
 
 	mutex_unlock(&mem->lock);
 
-	mmput(mm);
+	if (mm)
+		mmput(mm);
 }
 
 int amdgpu_amdkfd_schedule_restore_mem(struct amdgpu_device *adev,
