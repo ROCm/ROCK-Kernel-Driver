@@ -858,6 +858,7 @@ static int update_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 			release_pages(pages, bo->tbo.ttm->num_pages, 0);
 			ttm_eu_backoff_reservation(&ctx->ticket, &ctx->list);
 			ctx->reserved = false;
+			mem->busy = true;
 			mutex_unlock(&mem->lock);
 		}
 
