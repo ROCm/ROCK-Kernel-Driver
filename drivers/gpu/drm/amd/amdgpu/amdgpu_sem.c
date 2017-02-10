@@ -225,10 +225,11 @@ static int amdgpu_sem_import(struct amdgpu_fpriv *fpriv,
 		return -EINVAL;
 	}
 
+	kref_get(&core->kref);
 	sem = amdgpu_sem_alloc();
 	if (!sem) {
 		ret = -ENOMEM;
-		goto err_out;
+		goto err_sem;
 	}
 
 	sem->base = core;
@@ -246,9 +247,10 @@ static int amdgpu_sem_import(struct amdgpu_fpriv *fpriv,
 
 	*handle = ret;
 	return 0;
-
+err_sem:
+	kref_put(&core->kref, amdgpu_sem_core_free);
 err_out:
-	kfree(sem);
+	amdgpu_sem_put(sem);
 	return ret;
 
 }
