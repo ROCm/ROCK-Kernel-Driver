@@ -1,14 +1,6 @@
 #include <linux/unwind.h>
 
 #if 0
-#ifdef CONFIG_DWARF_UNWIND
-static int call_trace = 1;
-#else
-#define call_trace (-1)
-#endif
-#endif
-
-#if 0
 #define dprintk(fmt, args...) printk(KERN_DEBUG "unwind: " fmt, ##args)
 #else
 #define dprintk(fmt, args...) no_printk(KERN_DEBUG "unwind: " fmt, ##args)
@@ -102,87 +94,3 @@ void __unwind_start(struct unwind_state *state, struct task_struct *task,
 	}
 }
 EXPORT_SYMBOL_GPL(__unwind_start);
-
-#if 0
-static int dump_trace_unwind(struct unwind_state *state)
-{
-	unsigned long sp = UNW_SP(state);
-
-	pr_info("%s: tady rip=%lx rsp=%lx rbp=%lx\n", __func__,
-			UNW_PC(state), UNW_SP(state), UNW_FP(state));
-
-	if (arch_dwarf_user_mode(state))
-		return -1;
-	while (unwind(state) == 0 && UNW_PC(state)) {
-		pr_info("%s: %pS\n", __func__, (void *)UNW_PC(state));
-//		ops->address(data, UNW_PC(state), 1);
-		if (arch_dwarf_user_mode(state))
-			break;
-		if ((sp & PAGE_MASK) == (UNW_SP(state) & PAGE_MASK) &&
-				sp > UNW_SP(state))
-			break;
-		sp = UNW_SP(state);
-	}
-	return 1;
-}
-
-int try_stack_unwind(struct task_struct *task, struct pt_regs *regs,
-		     unsigned long **stack, unsigned long *bp)
-{
-#ifdef CONFIG_DWARF_UNWIND
-	int unw_ret = 0;
-	struct unwind_state state;
-
-	if (call_trace < 0)
-		return 0;
-
-	__unwind_start(&state, task, regs, get_stack_pointer(task, regs));
-	if (state.on_cpu)
-		return 0;
-	unw_ret = dump_trace_unwind(&state);
-
-	if (unw_ret > 0) {
-		if (call_trace == 1 && !arch_dwarf_user_mode(&state)) {
-//			ops->warning_symbol(data, "DWARF2 unwinder stuck at %s\n",
-//					    UNW_PC(&state));
-			pr_info("%s: DWARF2 unwinder stuck at %lx %pS\n",
-					__func__, UNW_PC(&state),
-					(void *)UNW_PC(&state));
-			if (UNW_SP(&state) >= PAGE_OFFSET) {
-//				ops->warning(data, "Leftover inexact backtrace:\n");
-				pr_info("%s: Leftover inexact backtrace:\n",
-						__func__);
-				*stack = (void *)UNW_SP(&state);
-				*bp = UNW_FP(&state);
-				return 0;
-			}
-		} else if (call_trace >= 1)
-			return -1;
-//		ops->warning(data, "Full inexact backtrace again:\n");
-		pr_info("%s: Full inexact backtrace again:\n", __func__);
-	} else
-		pr_info("%s: Inexact backtrace:\n", __func__);
-//		ops->warning(data, "Inexact backtrace:\n");
-#endif
-	return 0;
-}
-
-#ifdef CONFIG_DWARF_UNWIND
-static int __init call_trace_setup(char *s)
-{
-	if (!s)
-		return -EINVAL;
-	if (strcmp(s, "old") == 0)
-		call_trace = -1;
-	else if (strcmp(s, "both") == 0)
-		call_trace = 0;
-	else if (strcmp(s, "newfallback") == 0)
-		call_trace = 1;
-	else if (strcmp(s, "new") == 0)
-		call_trace = 2;
-	return 0;
-}
-early_param("call_trace", call_trace_setup);
-#endif
-
-#endif

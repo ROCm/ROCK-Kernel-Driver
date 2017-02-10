@@ -174,9 +174,9 @@ static inline struct pt_regs *unwind_get_entry_regs(struct unwind_state *state)
 
 #endif
 
-#define UNW_DEFAULT_RA(raItem, dataAlign) \
-	((raItem).where == Memory && \
-	 !((raItem).value * (dataAlign) + sizeof(void *)))
+#define UNW_DEFAULT_RA(raItem, data_align) \
+	((raItem).where == MEMORY && \
+	 !((raItem).value * (data_align) + sizeof(void *)))
 
 static inline void arch_dwarf_init_frame_info(struct unwind_state *info,
 		struct pt_regs *regs)
