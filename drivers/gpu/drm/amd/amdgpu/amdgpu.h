@@ -1530,6 +1530,9 @@ struct amdgpu_device {
 
 	/* record sparse bo counter */
 	atomic_t			sparse_bo_cnt;
+	/* record hw reset is performed */
+	bool has_hw_reset;
+
 };
 
 static inline struct amdgpu_device *amdgpu_ttm_adev(struct ttm_bo_device *bdev)
@@ -1757,7 +1760,7 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 int amdgpu_gpu_reset(struct amdgpu_device *adev);
 bool amdgpu_need_backup(struct amdgpu_device *adev);
 void amdgpu_pci_config_reset(struct amdgpu_device *adev);
-bool amdgpu_card_posted(struct amdgpu_device *adev);
+bool amdgpu_need_post(struct amdgpu_device *adev);
 void amdgpu_update_display_priority(struct amdgpu_device *adev);
 
 int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data);
