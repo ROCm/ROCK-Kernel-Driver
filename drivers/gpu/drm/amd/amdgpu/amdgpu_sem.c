@@ -294,6 +294,7 @@ static int amdgpu_sem_export(struct amdgpu_fpriv *fpriv,
 err_put_file:
 	fput(core->file);
 err_put_sem:
+	kref_put(&core->kref, amdgpu_sem_core_free);
 	amdgpu_sem_put(sem);
 	return ret;
 }
