@@ -246,11 +246,13 @@ static int amdgpu_sem_import(struct amdgpu_fpriv *fpriv,
 		goto err_out;
 
 	*handle = ret;
+	fput(file);
 	return 0;
 err_sem:
 	kref_put(&core->kref, amdgpu_sem_core_free);
 err_out:
 	amdgpu_sem_put(sem);
+	fput(file);
 	return ret;
 
 }
