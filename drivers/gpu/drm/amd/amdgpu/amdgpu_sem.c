@@ -45,9 +45,6 @@ static void amdgpu_sem_core_free(struct kref *kref)
 	struct amdgpu_sem_core *core = container_of(
 		kref, struct amdgpu_sem_core, kref);
 
-	if (core->file)
-		fput(core->file);
-
 	fence_put(core->fence);
 	mutex_destroy(&core->lock);
 	kfree(core);
@@ -278,10 +275,11 @@ static int amdgpu_sem_export(struct amdgpu_fpriv *fpriv,
 			ret = -ENOMEM;
 			goto err_put_sem;
 		}
+	} else {
+		get_file(core->file);
 	}
 	mutex_unlock(&core->lock);
 
-	get_file(core->file);
 	kref_get(&core->kref);
 
 	ret = get_unused_fd_flags(O_CLOEXEC);
