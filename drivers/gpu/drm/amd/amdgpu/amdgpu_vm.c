@@ -1726,7 +1726,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	amdgpu_bo_unreserve(vm->page_directory);
 
 	vm->is_kfd_vm = is_kfd_vm;
-	if (is_kfd_vm && adev->pp_enabled) {
+	if (is_kfd_vm) {
 		mutex_lock(&adev->vm_manager.lock);
 
 		if (adev->vm_manager.n_kfd_vms++ == 0) {
@@ -1772,7 +1772,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	bool prt_fini_called = false;
 	int i;
 
-	if (vm->is_kfd_vm && adev->pp_enabled) {
+	if (vm->is_kfd_vm) {
 		mutex_lock(&adev->vm_manager.lock);
 
 		WARN(adev->vm_manager.n_kfd_vms == 0, "Unbalanced number of KFD VMs");
