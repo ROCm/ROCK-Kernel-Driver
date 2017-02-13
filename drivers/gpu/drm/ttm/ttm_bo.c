@@ -1206,6 +1206,7 @@ int ttm_bo_init_reserved(struct ttm_bo_device *bdev,
 	bo->persistent_swap_storage = persistent_swap_storage;
 	bo->acc_size = acc_size;
 	bo->sg = sg;
+	bo->ssg_can_map = false;
 	if (resv) {
 		bo->resv = resv;
 		reservation_object_assert_held(bo->resv);
