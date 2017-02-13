@@ -431,6 +431,9 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 	if (unlikely(r != 0))
 		return r;
 
+	if (domain & AMDGPU_GEM_DOMAIN_DGMA && adev->ssg.enabled)
+		bo->tbo.ssg_can_map = true;
+
 	if (kernel)
 		bo->tbo.priority = 1;
 
