@@ -77,7 +77,7 @@ static int amdgpu_ttm_global_init(struct amdgpu_device *adev)
 	global_ref->size = sizeof(struct ttm_mem_global);
 	global_ref->init = &amdgpu_ttm_mem_global_init;
 	global_ref->release = &amdgpu_ttm_mem_global_release;
-	r = drm_global_item_ref(global_ref);
+	r = kcl_drm_global_item_ref(global_ref);
 	if (r) {
 		DRM_ERROR("Failed setting up TTM memory accounting "
 			  "subsystem.\n");
@@ -91,7 +91,7 @@ static int amdgpu_ttm_global_init(struct amdgpu_device *adev)
 	global_ref->size = sizeof(struct ttm_bo_global);
 	global_ref->init = &ttm_bo_global_init;
 	global_ref->release = &ttm_bo_global_release;
-	r = drm_global_item_ref(global_ref);
+	r = kcl_drm_global_item_ref(global_ref);
 	if (r) {
 		DRM_ERROR("Failed setting up TTM BO subsystem.\n");
 		goto error_bo;
@@ -111,9 +111,9 @@ static int amdgpu_ttm_global_init(struct amdgpu_device *adev)
 	return 0;
 
 error_entity:
-	drm_global_item_unref(&adev->mman.bo_global_ref.ref);
+	kcl_drm_global_item_unref(&adev->mman.bo_global_ref.ref);
 error_bo:
-	drm_global_item_unref(&adev->mman.mem_global_ref);
+	kcl_drm_global_item_unref(&adev->mman.mem_global_ref);
 error_mem:
 	return r;
 }
@@ -123,8 +123,8 @@ static void amdgpu_ttm_global_fini(struct amdgpu_device *adev)
 	if (adev->mman.mem_global_referenced) {
 		amd_sched_entity_fini(adev->mman.entity.sched,
 				      &adev->mman.entity);
-		drm_global_item_unref(&adev->mman.bo_global_ref.ref);
-		drm_global_item_unref(&adev->mman.mem_global_ref);
+		kcl_drm_global_item_unref(&adev->mman.bo_global_ref.ref);
+		kcl_drm_global_item_unref(&adev->mman.mem_global_ref);
 		adev->mman.mem_global_referenced = false;
 	}
 }
