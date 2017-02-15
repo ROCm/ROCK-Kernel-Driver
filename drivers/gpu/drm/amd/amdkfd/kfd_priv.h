@@ -127,6 +127,12 @@ extern int send_sigterm;
  */
 extern int debug_largebar;
 
+/*
+ * Ignore CRAT table during KFD initialization, can be used to work around
+ * broken CRAT tables on some AMD systems
+ */
+extern int ignore_crat;
+
 /**
  * enum kfd_sched_policy
  *
