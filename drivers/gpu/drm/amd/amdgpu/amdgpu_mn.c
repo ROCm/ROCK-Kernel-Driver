@@ -244,6 +244,8 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 	/* notification is exclusive, but interval is inclusive */
 	end -= 1;
 
+	mutex_lock(&rmn->lock);
+
 	it = interval_tree_iter_first(&rmn->objects, start, end);
 	while (it) {
 		struct amdgpu_mn_node *node;
@@ -260,6 +262,8 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 				amdgpu_amdkfd_evict_mem(amdgpu_ttm_adev(bo->tbo.bdev), mem, mm);
 		}
 	}
+
+	mutex_unlock(&rmn->lock);
 }
 
 /**
@@ -287,6 +291,8 @@ static void amdgpu_mn_invalidate_range_end_hsa(struct mmu_notifier *mn,
 	/* notification is exclusive, but interval is inclusive */
 	end -= 1;
 
+	mutex_lock(&rmn->lock);
+
 	it = interval_tree_iter_first(&rmn->objects, start, end);
 	while (it) {
 		struct amdgpu_mn_node *node;
@@ -304,6 +310,8 @@ static void amdgpu_mn_invalidate_range_end_hsa(struct mmu_notifier *mn,
 								   mem, mm, 1);
 		}
 	}
+
+	mutex_unlock(&rmn->lock);
 }
 
 static const struct mmu_notifier_ops amdgpu_mn_ops[] = {
