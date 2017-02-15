@@ -80,6 +80,11 @@ module_param(debug_largebar, int, 0444);
 MODULE_PARM_DESC(debug_largebar,
 	"Debug large-bar flag used to simulate large-bar capability on non-large bar machine (0 = disable, 1 = enable)");
 
+int ignore_crat;
+module_param(ignore_crat, int, 0444);
+MODULE_PARM_DESC(ignore_crat,
+	"Ignore CRAT table during KFD initialization (0 = use CRAT (default), 1 = ignore CRAT)");
+
 int kgd2kfd_init(unsigned interface_version, const struct kgd2kfd_calls **g2f)
 {
 	if (!amdkfd_init_completed)
