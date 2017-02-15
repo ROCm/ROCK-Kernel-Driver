@@ -893,6 +893,15 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 
 	amdgpu_sync_fence(adev, sync, bo_va->last_pt_update);
 
+	/* Sync objects can't handle multiple GPUs (contexts) updating
+	 * sync->last_vm_update. Fortunately we don't need it for
+	 * KFD's purposes, so we can just drop that fence.
+	 */
+	if (sync->last_vm_update) {
+		fence_put(sync->last_vm_update);
+		sync->last_vm_update = NULL;
+	}
+
 	return 0;
 }
 
@@ -929,6 +938,15 @@ static int update_gpuvm_pte(struct amdgpu_device *adev,
 
 	/* Remove PTs from LRU list (reservation removed PD only) */
 	amdgpu_vm_move_pt_bos_in_lru(adev, vm);
+
+	/* Sync objects can't handle multiple GPUs (contexts) updating
+	 * sync->last_vm_update. Fortunately we don't need it for
+	 * KFD's purposes, so we can just drop that fence.
+	 */
+	if (sync->last_vm_update) {
+		fence_put(sync->last_vm_update);
+		sync->last_vm_update = NULL;
+	}
 
 	return 0;
 }
