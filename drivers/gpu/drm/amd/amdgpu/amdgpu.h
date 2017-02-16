@@ -297,6 +297,8 @@ struct amdgpu_gart_funcs {
 			   uint32_t gpu_page_idx, /* pte/pde to update */
 			   uint64_t addr, /* addr to write into pte/pde */
 			   uint32_t flags); /* access flags */
+	/* enable/disable PRT support */
+	void (*set_prt)(struct amdgpu_device *adev, bool enable);
 };
 
 /* provided by the ih block */
@@ -570,6 +572,7 @@ struct amdgpu_mc {
 	uint32_t		vram_type;
 	uint32_t                srbm_soft_reset;
 	struct amdgpu_mode_mc_save save;
+	bool			prt_warning;
 };
 
 /*
@@ -708,6 +711,7 @@ void amdgpu_ctx_mgr_fini(struct amdgpu_ctx_mgr *mgr);
 
 struct amdgpu_fpriv {
 	struct amdgpu_vm	vm;
+	struct amdgpu_bo_va	*prt_va;
 	struct mutex		bo_list_lock;
 	struct idr		bo_list_handles;
 	struct amdgpu_ctx_mgr	ctx_mgr;
@@ -1050,7 +1054,6 @@ struct amdgpu_uvd {
 	bool			use_ctx_buf;
 	struct amd_sched_entity entity;
 	uint32_t                srbm_soft_reset;
-	bool			is_powergated;
 };
 
 /*
@@ -1079,7 +1082,6 @@ struct amdgpu_vce {
 	struct amd_sched_entity	entity;
 	uint32_t                srbm_soft_reset;
 	unsigned		num_rings;
-	bool			is_powergated;
 };
 
 /*
@@ -1764,6 +1766,7 @@ int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data);
 int amdgpu_cs_get_ring(struct amdgpu_device *adev, u32 ip_type,
 		       u32 ip_instance, u32 ring,
 		       struct amdgpu_ring **out_ring);
+void amdgpu_cs_report_moved_bytes(struct amdgpu_device *adev, u64 num_bytes);
 void amdgpu_ttm_placement_from_domain(struct amdgpu_bo *abo, u32 domain);
 bool amdgpu_ttm_bo_is_amdgpu_bo(struct ttm_buffer_object *bo);
 int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages);

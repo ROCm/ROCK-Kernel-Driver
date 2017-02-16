@@ -49,6 +49,7 @@
 /* include DCE11 register header files */
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_sh_mask.h"
+#include "custom_float.h"
 
 struct dce110_hw_seq_reg_offsets {
 	uint32_t crtc;
@@ -286,174 +287,6 @@ static bool dce110_set_input_transfer_func(
 	return result;
 }
 
-static bool build_custom_float(
-	struct fixed31_32 value,
-	const struct custom_float_format *format,
-	bool *negative,
-	uint32_t *mantissa,
-	uint32_t *exponenta)
-{
-	uint32_t exp_offset = (1 << (format->exponenta_bits - 1)) - 1;
-
-	const struct fixed31_32 mantissa_constant_plus_max_fraction =
-		dal_fixed31_32_from_fraction(
-			(1LL << (format->mantissa_bits + 1)) - 1,
-			1LL << format->mantissa_bits);
-
-	struct fixed31_32 mantiss;
-
-	if (dal_fixed31_32_eq(
-		value,
-		dal_fixed31_32_zero)) {
-		*negative = false;
-		*mantissa = 0;
-		*exponenta = 0;
-		return true;
-	}
-
-	if (dal_fixed31_32_lt(
-		value,
-		dal_fixed31_32_zero)) {
-		*negative = format->sign;
-		value = dal_fixed31_32_neg(value);
-	} else {
-		*negative = false;
-	}
-
-	if (dal_fixed31_32_lt(
-		value,
-		dal_fixed31_32_one)) {
-		uint32_t i = 1;
-
-		do {
-			value = dal_fixed31_32_shl(value, 1);
-			++i;
-		} while (dal_fixed31_32_lt(
-			value,
-			dal_fixed31_32_one));
-
-		--i;
-
-		if (exp_offset <= i) {
-			*mantissa = 0;
-			*exponenta = 0;
-			return true;
-		}
-
-		*exponenta = exp_offset - i;
-	} else if (dal_fixed31_32_le(
-		mantissa_constant_plus_max_fraction,
-		value)) {
-		uint32_t i = 1;
-
-		do {
-			value = dal_fixed31_32_shr(value, 1);
-			++i;
-		} while (dal_fixed31_32_lt(
-			mantissa_constant_plus_max_fraction,
-			value));
-
-		*exponenta = exp_offset + i - 1;
-	} else {
-		*exponenta = exp_offset;
-	}
-
-	mantiss = dal_fixed31_32_sub(
-		value,
-		dal_fixed31_32_one);
-
-	if (dal_fixed31_32_lt(
-			mantiss,
-			dal_fixed31_32_zero) ||
-		dal_fixed31_32_lt(
-			dal_fixed31_32_one,
-			mantiss))
-		mantiss = dal_fixed31_32_zero;
-	else
-		mantiss = dal_fixed31_32_shl(
-			mantiss,
-			format->mantissa_bits);
-
-	*mantissa = dal_fixed31_32_floor(mantiss);
-
-	return true;
-}
-
-static bool setup_custom_float(
-	const struct custom_float_format *format,
-	bool negative,
-	uint32_t mantissa,
-	uint32_t exponenta,
-	uint32_t *result)
-{
-	uint32_t i = 0;
-	uint32_t j = 0;
-
-	uint32_t value = 0;
-
-	/* verification code:
-	 * once calculation is ok we can remove it
-	 */
-
-	const uint32_t mantissa_mask =
-		(1 << (format->mantissa_bits + 1)) - 1;
-
-	const uint32_t exponenta_mask =
-		(1 << (format->exponenta_bits + 1)) - 1;
-
-	if (mantissa & ~mantissa_mask) {
-		BREAK_TO_DEBUGGER();
-		mantissa = mantissa_mask;
-	}
-
-	if (exponenta & ~exponenta_mask) {
-		BREAK_TO_DEBUGGER();
-		exponenta = exponenta_mask;
-	}
-
-	/* end of verification code */
-
-	while (i < format->mantissa_bits) {
-		uint32_t mask = 1 << i;
-
-		if (mantissa & mask)
-			value |= mask;
-
-		++i;
-	}
-
-	while (j < format->exponenta_bits) {
-		uint32_t mask = 1 << j;
-
-		if (exponenta & mask)
-			value |= mask << i;
-
-		++j;
-	}
-
-	if (negative && format->sign)
-		value |= 1 << (i + j);
-
-	*result = value;
-
-	return true;
-}
-
-static bool convert_to_custom_float_format(
-	struct fixed31_32 value,
-	const struct custom_float_format *format,
-	uint32_t *result)
-{
-	uint32_t mantissa;
-	uint32_t exponenta;
-	bool negative;
-
-	return build_custom_float(
-		value, format, &negative, &mantissa, &exponenta) &&
-	setup_custom_float(
-		format, negative, mantissa, exponenta, result);
-}
-
 static bool convert_to_custom_float(
 		struct pwl_result_data *rgb_resulted,
 		struct curve_points *arr_points,
@@ -579,7 +412,7 @@ static bool convert_to_custom_float(
 	return true;
 }
 
-bool dce110_translate_regamma_to_hw_format(const struct dc_transfer_func
+static bool dce110_translate_regamma_to_hw_format(const struct dc_transfer_func
 		*output_tf, struct pwl_params *regamma_params)
 {
 	struct curve_points *arr_points;
@@ -1221,6 +1054,8 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	if (!pipe_ctx_old->stream) {
 		core_link_enable_stream(pipe_ctx);
 
+	resource_build_info_frame(pipe_ctx);
+	dce110_update_info_frame(pipe_ctx);
 		if (dc_is_dp_signal(pipe_ctx->stream->signal))
 			dce110_unblank_stream(pipe_ctx,
 				&stream->sink->link->public.cur_link_settings);
@@ -1651,7 +1486,7 @@ static void apply_min_clocks(
 	/* get the required state based on state dependent clocks:
 	 * display clock and pixel clock
 	 */
-	req_clocks.display_clk_khz = context->bw_results.dispclk_khz;
+	req_clocks.display_clk_khz = context->dispclk_khz;
 
 	req_clocks.pixel_clk_khz = get_max_pixel_clock_for_all_paths(
 			dc, context, true);
@@ -1732,7 +1567,6 @@ enum dc_status dce110_apply_ctx_to_hw(
 	struct dc_bios *dcb = dc->ctx->dc_bios;
 	enum dc_status status;
 	int i;
-	bool programmed_audio_dto = false;
 	enum dm_pp_clocks_state clocks_state = DM_PP_CLOCKS_STATE_INVALID;
 
 	/* Reset old context */
@@ -1776,11 +1610,85 @@ enum dc_status dce110_apply_ctx_to_hw(
 	/*TODO: when pplib works*/
 	apply_min_clocks(dc, context, &clocks_state, true);
 
-	if (context->bw_results.dispclk_khz
-			> dc->current_context->bw_results.dispclk_khz)
+	if (context->dispclk_khz
+			> dc->current_context->dispclk_khz)
 		context->res_ctx.pool->display_clock->funcs->set_clock(
 				context->res_ctx.pool->display_clock,
-				context->bw_results.dispclk_khz * 115 / 100);
+				context->dispclk_khz * 115 / 100);
+
+	/* program audio wall clock. use HDMI as clock source if HDMI
+	 * audio active. Otherwise, use DP as clock source
+	 * first, loop to find any HDMI audio, if not, loop find DP audio
+	 */
+	/* Setup audio rate clock source */
+	/* Issue:
+	* Audio lag happened on DP monitor when unplug a HDMI monitor
+	*
+	* Cause:
+	* In case of DP and HDMI connected or HDMI only, DCCG_AUDIO_DTO_SEL
+	* is set to either dto0 or dto1, audio should work fine.
+	* In case of DP connected only, DCCG_AUDIO_DTO_SEL should be dto1,
+	* set to dto0 will cause audio lag.
+	*
+	* Solution:
+	* Not optimized audio wall dto setup. When mode set, iterate pipe_ctx,
+	* find first available pipe with audio, setup audio wall DTO per topology
+	* instead of per pipe.
+	*/
+	for (i = 0; i < context->res_ctx.pool->pipe_count; i++) {
+		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
+
+		if (pipe_ctx->stream == NULL)
+			continue;
+
+		if (pipe_ctx->top_pipe)
+			continue;
+
+		if (pipe_ctx->stream->signal != SIGNAL_TYPE_HDMI_TYPE_A)
+			continue;
+
+		if (pipe_ctx->audio != NULL) {
+			struct audio_output audio_output;
+
+			build_audio_output(pipe_ctx, &audio_output);
+
+			pipe_ctx->audio->funcs->wall_dto_setup(
+				pipe_ctx->audio,
+				pipe_ctx->stream->signal,
+				&audio_output.crtc_info,
+				&audio_output.pll_info);
+			break;
+		}
+	}
+
+	/* no HDMI audio is found, try DP audio */
+	if (i == context->res_ctx.pool->pipe_count) {
+		for (i = 0; i < context->res_ctx.pool->pipe_count; i++) {
+			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
+
+			if (pipe_ctx->stream == NULL)
+				continue;
+
+			if (pipe_ctx->top_pipe)
+				continue;
+
+			if (!dc_is_dp_signal(pipe_ctx->stream->signal))
+				continue;
+
+			if (pipe_ctx->audio != NULL) {
+				struct audio_output audio_output;
+
+				build_audio_output(pipe_ctx, &audio_output);
+
+				pipe_ctx->audio->funcs->wall_dto_setup(
+					pipe_ctx->audio,
+					pipe_ctx->stream->signal,
+					&audio_output.crtc_info,
+					&audio_output.pll_info);
+				break;
+			}
+		}
+	}
 
 	for (i = 0; i < context->res_ctx.pool->pipe_count; i++) {
 		struct pipe_ctx *pipe_ctx_old =
@@ -1797,21 +1705,7 @@ enum dc_status dce110_apply_ctx_to_hw(
 			continue;
 
 		if (context->res_ctx.pipe_ctx[i].audio != NULL) {
-			/* Setup audio rate clock source */
-			/* Issue:
-			* Audio lag happened on DP monitor when unplug a HDMI monitor
-			*
-			* Cause:
-			* In case of DP and HDMI connected or HDMI only, DCCG_AUDIO_DTO_SEL
-			* is set to either dto0 or dto1, audio should work fine.
-			* In case of DP connected only, DCCG_AUDIO_DTO_SEL should be dto1,
-			* set to dto0 will cause audio lag.
-			*
-			* Solution:
-			* Not optimized audio wall dto setup. When mode set, iterate pipe_ctx,
-			* find first available pipe with audio, setup audio wall DTO per topology
-			* instead of per pipe.
-			*/
+
 			struct audio_output audio_output;
 
 			build_audio_output(pipe_ctx, &audio_output);
@@ -1833,15 +1727,6 @@ enum dc_status dce110_apply_ctx_to_hw(
 					pipe_ctx->stream->signal,
 					&audio_output.crtc_info,
 					&pipe_ctx->stream->public.audio_info);
-
-			if (!programmed_audio_dto) {
-				pipe_ctx->audio->funcs->wall_dto_setup(
-					pipe_ctx->audio,
-					pipe_ctx->stream->signal,
-					&audio_output.crtc_info,
-					&audio_output.pll_info);
-				programmed_audio_dto = true;
-			}
 		}
 
 		status = apply_single_controller_ctx_to_hw(
@@ -2289,7 +2174,7 @@ static void dce110_set_bandwidth(struct core_dc *dc)
 
 	dc->current_context->res_ctx.pool->display_clock->funcs->set_clock(
 			dc->current_context->res_ctx.pool->display_clock,
-			dc->current_context->bw_results.dispclk_khz * 115 / 100);
+			dc->current_context->dispclk_khz * 115 / 100);
 }
 
 static void dce110_program_front_end_for_pipe(

@@ -351,8 +351,7 @@ static u64 amdgpu_cs_get_threshold_for_moves(struct amdgpu_device *adev)
  * submission. This can result in a debt that can stop buffer migrations
  * temporarily.
  */
-static void amdgpu_cs_report_moved_bytes(struct amdgpu_device *adev,
-					 u64 num_bytes)
+void amdgpu_cs_report_moved_bytes(struct amdgpu_device *adev, u64 num_bytes)
 {
 	spin_lock(&adev->mm_stats.lock);
 	adev->mm_stats.accum_us -= bytes_to_us(adev, num_bytes);
@@ -758,10 +757,11 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error, bo
 	amdgpu_bo_unref(&parser->uf_entry.robj);
 }
 
-static int amdgpu_bo_vm_update_pte(struct amdgpu_cs_parser *p,
-				   struct amdgpu_vm *vm)
+static int amdgpu_bo_vm_update_pte(struct amdgpu_cs_parser *p)
 {
 	struct amdgpu_device *adev = p->adev;
+	struct amdgpu_fpriv *fpriv = p->filp->driver_priv;
+	struct amdgpu_vm *vm = &fpriv->vm;
 	struct amdgpu_bo_va *bo_va;
 	struct amdgpu_bo *bo;
 	int i, r;
@@ -775,6 +775,15 @@ static int amdgpu_bo_vm_update_pte(struct amdgpu_cs_parser *p,
 		return r;
 
 	r = amdgpu_vm_clear_freed(adev, vm);
+	if (r)
+		return r;
+
+	r = amdgpu_vm_bo_update(adev, fpriv->prt_va, false);
+	if (r)
+		return r;
+
+	r = amdgpu_sync_fence(adev, &p->job->sync,
+			      fpriv->prt_va->last_pt_update);
 	if (r)
 		return r;
 
@@ -854,7 +863,7 @@ static int amdgpu_cs_ib_vm_chunk(struct amdgpu_device *adev,
 	if (p->job->vm) {
 		p->job->vm_pd_addr = amdgpu_bo_gpu_offset(vm->page_directory);
 
-		r = amdgpu_bo_vm_update_pte(p, vm);
+		r = amdgpu_bo_vm_update_pte(p);
 		if (r)
 			return r;
 	}

@@ -46,6 +46,7 @@ enum amd_pp_sensors {
 	AMDGPU_PP_SENSOR_GPU_TEMP,
 	AMDGPU_PP_SENSOR_VCE_POWER,
 	AMDGPU_PP_SENSOR_UVD_POWER,
+	AMDGPU_PP_SENSOR_GPU_POWER,
 };
 
 enum amd_pp_event {
@@ -295,6 +296,13 @@ struct pp_states_info {
 	uint32_t states[16];
 };
 
+struct pp_gpu_power {
+	uint32_t vddc_power;
+	uint32_t vddci_power;
+	uint32_t max_gpu_power;
+	uint32_t average_gpu_power;
+};
+
 #define PP_GROUP_MASK        0xF0000000
 #define PP_GROUP_SHIFT       28
 
@@ -359,8 +367,16 @@ struct amd_powerplay_funcs {
 	int (*set_sclk_od)(void *handle, uint32_t value);
 	int (*get_mclk_od)(void *handle);
 	int (*set_mclk_od)(void *handle, uint32_t value);
-	int (*read_sensor)(void *handle, int idx, int32_t *value);
+	int (*read_sensor)(void *handle, int idx, void *value, int *size);
 	struct amd_vce_state* (*get_vce_clock_state)(void *handle, unsigned idx);
+	int (*reset_power_profile_state)(void *handle,
+			struct amd_pp_profile *request);
+	int (*get_power_profile_state)(void *handle,
+			struct amd_pp_profile *query);
+	int (*set_power_profile_state)(void *handle,
+			struct amd_pp_profile *request);
+	int (*switch_power_profile)(void *handle,
+			enum amd_pp_profile_type type);
 };
 
 struct amd_powerplay {

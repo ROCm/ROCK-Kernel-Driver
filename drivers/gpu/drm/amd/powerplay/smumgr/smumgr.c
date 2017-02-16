@@ -37,8 +37,10 @@ MODULE_FIRMWARE("amdgpu/tonga_k_smc.bin");
 MODULE_FIRMWARE("amdgpu/fiji_smc.bin");
 MODULE_FIRMWARE("amdgpu/polaris10_smc.bin");
 MODULE_FIRMWARE("amdgpu/polaris10_smc_sk.bin");
+MODULE_FIRMWARE("amdgpu/polaris10_k_smc.bin");
 MODULE_FIRMWARE("amdgpu/polaris11_smc.bin");
 MODULE_FIRMWARE("amdgpu/polaris11_smc_sk.bin");
+MODULE_FIRMWARE("amdgpu/polaris11_k_smc.bin");
 MODULE_FIRMWARE("amdgpu/polaris12_smc.bin");
 
 
@@ -371,4 +373,14 @@ bool smum_is_dpm_running(struct pp_hwmgr *hwmgr)
 		return hwmgr->smumgr->smumgr_funcs->is_dpm_running(hwmgr);
 
 	return true;
+}
+
+int smum_populate_requested_graphic_levels(struct pp_hwmgr *hwmgr,
+		struct amd_pp_profile *request)
+{
+	if (hwmgr->smumgr->smumgr_funcs->populate_requested_graphic_levels)
+		return hwmgr->smumgr->smumgr_funcs->populate_requested_graphic_levels(
+				hwmgr, request);
+
+	return 0;
 }
