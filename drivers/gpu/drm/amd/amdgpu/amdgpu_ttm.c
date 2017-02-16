@@ -562,6 +562,9 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 	case TTM_PL_VRAM:
 	case AMDGPU_PL_DGMA:
 	case AMDGPU_PL_DGMA_IMPORT:
+		if (mem->start == AMDGPU_BO_INVALID_OFFSET)
+			return -EINVAL;
+
 		if (mem->mem_type != AMDGPU_PL_DGMA_IMPORT) {
 			mem->bus.offset = (mem->start << PAGE_SHIFT) + man->gpu_offset -
 					adev->mc.vram_start;
