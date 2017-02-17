@@ -2323,7 +2323,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 	}
 
 	r = amdgpu_copy_buffer(ring, src_start, dst_start,
-		size, NULL, f);
+		size, NULL, f, false);
 	if (r)
 		goto copy_fail;
 
