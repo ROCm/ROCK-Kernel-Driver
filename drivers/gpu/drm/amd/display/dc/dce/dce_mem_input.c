@@ -302,7 +302,7 @@ static void program_grph_pixel_format(
 	uint32_t grph_depth, grph_format;
 	uint32_t sign = 0, floating = 0;
 
-	if (format == SURFACE_PIXEL_FORMAT_GRPH_BGRA8888 ||
+	if (format == SURFACE_PIXEL_FORMAT_GRPH_ABGR8888 ||
 			/*todo: doesn't look like we handle BGRA here,
 			 *  should problem swap endian*/
 		format == SURFACE_PIXEL_FORMAT_GRPH_ABGR2101010 ||
@@ -331,7 +331,7 @@ static void program_grph_pixel_format(
 		grph_format = 1;
 		break;
 	case SURFACE_PIXEL_FORMAT_GRPH_ARGB8888:
-	case SURFACE_PIXEL_FORMAT_GRPH_BGRA8888:
+	case SURFACE_PIXEL_FORMAT_GRPH_ABGR8888:
 		grph_depth = 2;
 		grph_format = 0;
 		break;
@@ -372,7 +372,8 @@ void dce_mem_input_program_surface_config(struct mem_input *mi,
 	union plane_size *plane_size,
 	enum dc_rotation_angle rotation,
 	struct dc_plane_dcc_param *dcc,
-	bool horizontal_mirror)
+	bool horizontal_mirror,
+	bool visible)
 {
 	REG_UPDATE(GRPH_ENABLE, GRPH_ENABLE, 1);
 

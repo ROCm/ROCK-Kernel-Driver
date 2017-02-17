@@ -135,6 +135,8 @@ struct amdgpu_ring_funcs {
 	void (*end_use)(struct amdgpu_ring *ring);
 	void (*emit_switch_buffer) (struct amdgpu_ring *ring);
 	void (*emit_cntxcntl) (struct amdgpu_ring *ring, uint32_t flags);
+	void (*emit_rreg)(struct amdgpu_ring *ring, uint32_t reg);
+	void (*emit_wreg)(struct amdgpu_ring *ring, uint32_t reg, uint32_t val);
 };
 
 struct amdgpu_ring {
@@ -159,6 +161,8 @@ struct amdgpu_ring {
 	u32			pipe;
 	u32			queue;
 	struct amdgpu_bo	*mqd_obj;
+	uint64_t                mqd_gpu_addr;
+	struct vi_mqd           *mqd_ptr;
 	u32			doorbell_index;
 	bool			use_doorbell;
 	unsigned		wptr_offs;
@@ -182,5 +186,12 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 		     unsigned ring_size, struct amdgpu_irq_src *irq_src,
 		     unsigned irq_type);
 void amdgpu_ring_fini(struct amdgpu_ring *ring);
+static inline void amdgpu_ring_clear_ring(struct amdgpu_ring *ring)
+{
+	int i = 0;
+	while (i <= ring->ptr_mask)
+		ring->ring[i++] = ring->funcs->nop;
+
+}
 
 #endif

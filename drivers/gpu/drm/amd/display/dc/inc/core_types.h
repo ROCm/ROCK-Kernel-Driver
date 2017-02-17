@@ -32,21 +32,10 @@
 #include "dc_bios_types.h"
 
 struct core_stream;
-/********* core_target *************/
-
-#define CONST_DC_TARGET_TO_CORE(dc_target) \
-	container_of(dc_target, const struct core_target, public)
-#define DC_TARGET_TO_CORE(dc_target) \
-	container_of(dc_target, struct core_target, public)
 
 #define MAX_PIPES 6
 #define MAX_CLOCK_SOURCES 7
 
-struct core_target {
-	struct dc_target public;
-
-	struct dc_context *ctx;
-};
 
 /********* core_surface **********/
 #define DC_SURFACE_TO_CORE(dc_surface) \
@@ -215,7 +204,7 @@ struct resource_funcs {
 
 	enum dc_status (*validate_guaranteed)(
 					const struct core_dc *dc,
-					const struct dc_target *dc_target,
+					const struct dc_stream *stream,
 					struct validate_context *context);
 
 	enum dc_status (*validate_bandwidth)(
@@ -270,6 +259,9 @@ struct resource_pool {
 	struct display_clock *display_clock;
 	struct irq_service *irqs;
 
+	struct abm *abm;
+	struct dmcu *dmcu;
+
 	const struct resource_funcs *funcs;
 	const struct resource_caps *res_cap;
 };
@@ -314,9 +306,9 @@ struct resource_context {
  };
 
 struct validate_context {
-	struct core_target *targets[MAX_PIPES];
-	struct dc_target_status target_status[MAX_PIPES];
-	uint8_t target_count;
+	struct core_stream *streams[MAX_PIPES];
+	struct dc_stream_status stream_status[MAX_PIPES];
+	uint8_t stream_count;
 
 	struct resource_context res_ctx;
 
@@ -324,6 +316,7 @@ struct validate_context {
 	struct bw_calcs_output bw_results;
 	/* Note: these are big structures, do *not* put on stack! */
 	struct dm_pp_display_configuration pp_display_cfg;
+	int dispclk_khz;
 };
 
 #endif /* _CORE_TYPES_H_ */

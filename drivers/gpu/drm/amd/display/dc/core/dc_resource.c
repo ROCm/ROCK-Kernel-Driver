@@ -341,7 +341,7 @@ static enum pixel_format convert_pixel_format_to_dalsurface(
 	case SURFACE_PIXEL_FORMAT_GRPH_ARGB8888:
 		dal_pixel_format = PIXEL_FORMAT_ARGB8888;
 		break;
-	case SURFACE_PIXEL_FORMAT_GRPH_BGRA8888:
+	case SURFACE_PIXEL_FORMAT_GRPH_ABGR8888:
 		dal_pixel_format = PIXEL_FORMAT_ARGB8888;
 		break;
 	case SURFACE_PIXEL_FORMAT_GRPH_ARGB2101010:
@@ -585,18 +585,18 @@ enum dc_status resource_build_scaling_params_for_context(
 			if (!resource_build_scaling_params(
 				&context->res_ctx.pipe_ctx[i].surface->public,
 				&context->res_ctx.pipe_ctx[i]))
-				return DC_FAIL_BANDWIDTH_VALIDATE;
+				return DC_FAIL_SCALING;
 	}
 
 	return DC_OK;
 }
 
-static void detach_surfaces_for_target(
+static void detach_surfaces_for_stream(
 		struct validate_context *context,
-		const struct dc_target *dc_target)
+		const struct dc_stream *dc_stream)
 {
 	int i;
-	struct core_stream *stream = DC_STREAM_TO_CORE(dc_target->streams[0]);
+	struct core_stream *stream = DC_STREAM_TO_CORE(dc_stream);
 
 	for (i = 0; i < context->res_ctx.pool->pipe_count; i++) {
 		struct pipe_ctx *cur_pipe = &context->res_ctx.pipe_ctx[i];
@@ -646,15 +646,15 @@ struct pipe_ctx *resource_get_head_pipe_for_stream(
 }
 
 /*
- * A free_pipe for a target is defined here as a pipe with a stream that belongs
- * to the target but has no surface attached yet
+ * A free_pipe for a stream is defined here as a pipe
+ * that has no surface attached yet
  */
-static struct pipe_ctx *acquire_free_pipe_for_target(
+static struct pipe_ctx *acquire_free_pipe_for_stream(
 		struct resource_context *res_ctx,
-		const struct dc_target *dc_target)
+		const struct dc_stream *dc_stream)
 {
 	int i;
-	struct core_stream *stream = DC_STREAM_TO_CORE(dc_target->streams[0]);
+	struct core_stream *stream = DC_STREAM_TO_CORE(dc_stream);
 
 	struct pipe_ctx *head_pipe = NULL;
 
@@ -688,12 +688,12 @@ static struct pipe_ctx *acquire_free_pipe_for_target(
 
 }
 
-static void release_free_pipes_for_target(
+static void release_free_pipes_for_stream(
 		struct resource_context *res_ctx,
-		const struct dc_target *dc_target)
+		const struct dc_stream *dc_stream)
 {
 	int i;
-	struct core_stream *stream = DC_STREAM_TO_CORE(dc_target->streams[0]);
+	struct core_stream *stream = DC_STREAM_TO_CORE(dc_stream);
 
 	for (i = res_ctx->pool->pipe_count - 1; i >= 0; i--) {
 		if (res_ctx->pipe_ctx[i].stream == stream &&
@@ -706,12 +706,12 @@ static void release_free_pipes_for_target(
 bool resource_attach_surfaces_to_context(
 		const struct dc_surface * const *surfaces,
 		int surface_count,
-		const struct dc_target *dc_target,
+		const struct dc_stream *dc_stream,
 		struct validate_context *context)
 {
 	int i;
 	struct pipe_ctx *tail_pipe;
-	struct dc_target_status *target_status = NULL;
+	struct dc_stream_status *stream_status = NULL;
 
 
 	if (surface_count > MAX_SURFACE_NUM) {
@@ -720,13 +720,13 @@ bool resource_attach_surfaces_to_context(
 		return false;
 	}
 
-	for (i = 0; i < context->target_count; i++)
-		if (&context->targets[i]->public == dc_target) {
-			target_status = &context->target_status[i];
+	for (i = 0; i < context->stream_count; i++)
+		if (&context->streams[i]->public == dc_stream) {
+			stream_status = &context->stream_status[i];
 			break;
 		}
-	if (target_status == NULL) {
-		dm_error("Existing target not found; failed to attach surfaces\n");
+	if (stream_status == NULL) {
+		dm_error("Existing stream not found; failed to attach surfaces\n");
 		return false;
 	}
 
@@ -734,16 +734,16 @@ bool resource_attach_surfaces_to_context(
 	for (i = 0; i < surface_count; i++)
 		dc_surface_retain(surfaces[i]);
 
-	detach_surfaces_for_target(context, dc_target);
+	detach_surfaces_for_stream(context, dc_stream);
 
 	/* release existing surfaces*/
-	for (i = 0; i < target_status->surface_count; i++)
-		dc_surface_release(target_status->surfaces[i]);
+	for (i = 0; i < stream_status->surface_count; i++)
+		dc_surface_release(stream_status->surfaces[i]);
 
-	for (i = surface_count; i < target_status->surface_count; i++)
-		target_status->surfaces[i] = NULL;
+	for (i = surface_count; i < stream_status->surface_count; i++)
+		stream_status->surfaces[i] = NULL;
 
-	target_status->surface_count = 0;
+	stream_status->surface_count = 0;
 
 	if (surface_count == 0)
 		return true;
@@ -751,11 +751,11 @@ bool resource_attach_surfaces_to_context(
 	tail_pipe = NULL;
 	for (i = 0; i < surface_count; i++) {
 		struct core_surface *surface = DC_SURFACE_TO_CORE(surfaces[i]);
-		struct pipe_ctx *free_pipe = acquire_free_pipe_for_target(
-				&context->res_ctx, dc_target);
+		struct pipe_ctx *free_pipe = acquire_free_pipe_for_stream(
+				&context->res_ctx, dc_stream);
 
 		if (!free_pipe) {
-			target_status->surfaces[i] = NULL;
+			stream_status->surfaces[i] = NULL;
 			return false;
 		}
 
@@ -769,13 +769,13 @@ bool resource_attach_surfaces_to_context(
 		tail_pipe = free_pipe;
 	}
 
-	release_free_pipes_for_target(&context->res_ctx, dc_target);
+	release_free_pipes_for_stream(&context->res_ctx, dc_stream);
 
 	/* assign new surfaces*/
 	for (i = 0; i < surface_count; i++)
-		target_status->surfaces[i] = surfaces[i];
+		stream_status->surfaces[i] = surfaces[i];
 
-	target_status->surface_count = surface_count;
+	stream_status->surface_count = surface_count;
 
 	return true;
 }
@@ -819,25 +819,14 @@ static bool are_stream_backends_same(
 	return true;
 }
 
-bool is_target_unchanged(
-	const struct core_target *old_target, const struct core_target *target)
+bool is_stream_unchanged(
+	const struct core_stream *old_stream, const struct core_stream *stream)
 {
-	int i;
-
-	if (old_target == target)
+	if (old_stream == stream)
 		return true;
-	if (old_target->public.stream_count != target->public.stream_count)
+
+	if (!are_stream_backends_same(old_stream, stream))
 		return false;
-
-	for (i = 0; i < old_target->public.stream_count; i++) {
-		const struct core_stream *old_stream = DC_STREAM_TO_CORE(
-				old_target->public.streams[i]);
-		const struct core_stream *stream = DC_STREAM_TO_CORE(
-				target->public.streams[i]);
-
-		if (!are_stream_backends_same(old_stream, stream))
-			return false;
-	}
 
 	return true;
 }
@@ -851,23 +840,23 @@ bool resource_validate_attach_surfaces(
 	int i, j;
 
 	for (i = 0; i < set_count; i++) {
-		for (j = 0; j < old_context->target_count; j++)
-			if (is_target_unchanged(
-					old_context->targets[j],
-					context->targets[i])) {
+		for (j = 0; j < old_context->stream_count; j++)
+			if (is_stream_unchanged(
+					old_context->streams[j],
+					context->streams[i])) {
 				if (!resource_attach_surfaces_to_context(
-						old_context->target_status[j].surfaces,
-						old_context->target_status[j].surface_count,
-						&context->targets[i]->public,
+						old_context->stream_status[j].surfaces,
+						old_context->stream_status[j].surface_count,
+						&context->streams[i]->public,
 						context))
 					return false;
-				context->target_status[i] = old_context->target_status[j];
+				context->stream_status[i] = old_context->stream_status[j];
 			}
 		if (set[i].surface_count != 0)
 			if (!resource_attach_surfaces_to_context(
 					set[i].surfaces,
 					set[i].surface_count,
-					&context->targets[i]->public,
+					&context->streams[i]->public,
 					context))
 				return false;
 
@@ -984,36 +973,32 @@ static void update_stream_signal(struct core_stream *stream)
 {
 	const struct dc_sink *dc_sink = stream->public.sink;
 
-	stream->signal = dc_sink->sink_signal;
-	/* For asic supports dual link DVI, we should adjust signal type
-	 * based on timing pixel clock. If pixel clock more than 165Mhz,
-	 * signal is dual link, otherwise, single link.
-	 */
-	if (dc_sink->sink_signal == SIGNAL_TYPE_DVI_SINGLE_LINK ||
-			dc_sink->sink_signal == SIGNAL_TYPE_DVI_DUAL_LINK) {
-		if (stream->public.timing.pix_clk_khz >
-						TMDS_MAX_PIXEL_CLOCK_IN_KHZ)
+	if (dc_sink->sink_signal == SIGNAL_TYPE_NONE)
+		stream->signal = stream->sink->link->public.connector_signal;
+	else if (dc_sink->sink_signal == SIGNAL_TYPE_DVI_SINGLE_LINK ||
+			dc_sink->sink_signal == SIGNAL_TYPE_DVI_DUAL_LINK)
+		/* For asic supports dual link DVI, we should adjust signal type
+		 * based on timing pixel clock. If pixel clock more than 165Mhz,
+		 * signal is dual link, otherwise, single link.
+		 */
+		if (stream->public.timing.pix_clk_khz > TMDS_MAX_PIXEL_CLOCK_IN_KHZ)
 			stream->signal = SIGNAL_TYPE_DVI_DUAL_LINK;
 		else
 			stream->signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
-	}
+	else
+		stream->signal = dc_sink->sink_signal;
 }
 
 bool resource_is_stream_unchanged(
-	const struct validate_context *old_context, struct core_stream *stream)
+	const struct validate_context *old_context, const struct core_stream *stream)
 {
-	int i, j;
+	int i;
 
-	for (i = 0; i < old_context->target_count; i++) {
-		struct core_target *old_target = old_context->targets[i];
+	for (i = 0; i < old_context->stream_count; i++) {
+		const struct core_stream *old_stream = old_context->streams[i];
 
-		for (j = 0; j < old_target->public.stream_count; j++) {
-			struct core_stream *old_stream =
-				DC_STREAM_TO_CORE(old_target->public.streams[j]);
-
-			if (are_stream_backends_same(old_stream, stream))
+		if (are_stream_backends_same(old_stream, stream))
 				return true;
-		}
 	}
 
 	return false;
@@ -1035,23 +1020,19 @@ static struct core_stream *find_pll_sharable_stream(
 		const struct core_stream *stream_needs_pll,
 		struct validate_context *context)
 {
-	int i, j;
+	int i;
 
-	for (i = 0; i < context->target_count; i++) {
-		struct core_target *target = context->targets[i];
+	for (i = 0; i < context->stream_count; i++) {
+		struct core_stream *stream_has_pll = context->streams[i];
 
-		for (j = 0; j < target->public.stream_count; j++) {
-			struct core_stream *stream_has_pll =
-				DC_STREAM_TO_CORE(target->public.streams[j]);
+		/* We are looking for non dp, non virtual stream */
+		if (resource_are_streams_timing_synchronizable(
+			stream_needs_pll, stream_has_pll)
+			&& !dc_is_dp_signal(stream_has_pll->signal)
+			&& stream_has_pll->sink->link->public.connector_signal
+			!= SIGNAL_TYPE_VIRTUAL)
+			return stream_has_pll;
 
-			/* We are looking for non dp, non virtual stream */
-			if (resource_are_streams_timing_synchronizable(
-						stream_needs_pll, stream_has_pll)
-				&& !dc_is_dp_signal(stream_has_pll->signal)
-				&& stream_has_pll->sink->link->public.connector_signal
-							!= SIGNAL_TYPE_VIRTUAL)
-					return stream_has_pll;
-		}
 	}
 
 	return NULL;
@@ -1090,25 +1071,20 @@ static void calculate_phy_pix_clks(
 		const struct core_dc *dc,
 		struct validate_context *context)
 {
-	int i, j;
+	int i;
 
-	for (i = 0; i < context->target_count; i++) {
-		struct core_target *target = context->targets[i];
+	for (i = 0; i < context->stream_count; i++) {
+		struct core_stream *stream = context->streams[i];
 
-		for (j = 0; j < target->public.stream_count; j++) {
-			struct core_stream *stream =
-				DC_STREAM_TO_CORE(target->public.streams[j]);
+		update_stream_signal(stream);
 
-			update_stream_signal(stream);
-
-			/* update actual pixel clock on all streams */
-			if (dc_is_hdmi_signal(stream->signal))
-				stream->phy_pix_clk = get_norm_pix_clk(
-					&stream->public.timing);
-			else
-				stream->phy_pix_clk =
-						stream->public.timing.pix_clk_khz;
-		}
+		/* update actual pixel clock on all streams */
+		if (dc_is_hdmi_signal(stream->signal))
+			stream->phy_pix_clk = get_norm_pix_clk(
+				&stream->public.timing);
+		else
+			stream->phy_pix_clk =
+				stream->public.timing.pix_clk_khz;
 	}
 }
 
@@ -1116,203 +1092,146 @@ enum dc_status resource_map_pool_resources(
 		const struct core_dc *dc,
 		struct validate_context *context)
 {
-	int i, j, k;
+	int i, j;
 
 	calculate_phy_pix_clks(dc, context);
 
-	for (i = 0; i < context->target_count; i++) {
-		struct core_target *target = context->targets[i];
+	for (i = 0; i < context->stream_count; i++) {
+		struct core_stream *stream = context->streams[i];
 
-		for (j = 0; j < target->public.stream_count; j++) {
-			struct core_stream *stream =
-				DC_STREAM_TO_CORE(target->public.streams[j]);
+		if (!resource_is_stream_unchanged(dc->current_context, stream))
+			continue;
 
-			if (!resource_is_stream_unchanged(dc->current_context, stream))
+		/* mark resources used for stream that is already active */
+		for (j = 0; j < MAX_PIPES; j++) {
+			struct pipe_ctx *pipe_ctx =
+				&context->res_ctx.pipe_ctx[j];
+			const struct pipe_ctx *old_pipe_ctx =
+				&dc->current_context->res_ctx.pipe_ctx[j];
+
+			if (!are_stream_backends_same(old_pipe_ctx->stream, stream))
 				continue;
 
-			/* mark resources used for stream that is already active */
-			for (k = 0; k < MAX_PIPES; k++) {
-				struct pipe_ctx *pipe_ctx =
-					&context->res_ctx.pipe_ctx[k];
-				const struct pipe_ctx *old_pipe_ctx =
-					&dc->current_context->res_ctx.pipe_ctx[k];
+			pipe_ctx->stream = stream;
+			copy_pipe_ctx(old_pipe_ctx, pipe_ctx);
 
-				if (!are_stream_backends_same(old_pipe_ctx->stream, stream))
-					continue;
+			/* Split pipe resource, do not acquire back end */
+			if (!pipe_ctx->stream_enc)
+				continue;
 
-				pipe_ctx->stream = stream;
-				copy_pipe_ctx(old_pipe_ctx, pipe_ctx);
+			set_stream_engine_in_use(
+				&context->res_ctx,
+				pipe_ctx->stream_enc);
 
-				/* Split pipe resource, do not acquire back end */
-				if (!pipe_ctx->stream_enc)
-					continue;
+			/* Switch to dp clock source only if there is
+			 * no non dp stream that shares the same timing
+			 * with the dp stream.
+			 */
+			if (dc_is_dp_signal(pipe_ctx->stream->signal) &&
+				!find_pll_sharable_stream(stream, context))
+				pipe_ctx->clock_source =
+					context->res_ctx.pool->dp_clock_source;
 
-				set_stream_engine_in_use(
-					&context->res_ctx,
-					pipe_ctx->stream_enc);
+			resource_reference_clock_source(
+				&context->res_ctx,
+				pipe_ctx->clock_source);
 
-				/* Switch to dp clock source only if there is
-				 * no non dp stream that shares the same timing
-				 * with the dp stream.
-				 */
-				if (dc_is_dp_signal(pipe_ctx->stream->signal) &&
-					!find_pll_sharable_stream(stream, context))
-					pipe_ctx->clock_source =
-						context->res_ctx.pool->dp_clock_source;
-
-				resource_reference_clock_source(
-					&context->res_ctx,
-					pipe_ctx->clock_source);
-
-				set_audio_in_use(&context->res_ctx,
-					pipe_ctx->audio);
-			}
+			set_audio_in_use(&context->res_ctx,
+					 pipe_ctx->audio);
 		}
 	}
 
-	for (i = 0; i < context->target_count; i++) {
-		struct core_target *target = context->targets[i];
+	for (i = 0; i < context->stream_count; i++) {
+		struct core_stream *stream = context->streams[i];
+		struct pipe_ctx *pipe_ctx = NULL;
+		int pipe_idx = -1;
 
-		for (j = 0; j < target->public.stream_count; j++) {
-			struct core_stream *stream =
-				DC_STREAM_TO_CORE(target->public.streams[j]);
-			struct pipe_ctx *pipe_ctx = NULL;
-			int pipe_idx = -1;
-
-			if (resource_is_stream_unchanged(dc->current_context, stream))
-				continue;
-			/* acquire new resources */
-			pipe_idx = acquire_first_free_pipe(
-						&context->res_ctx, stream);
-			if (pipe_idx < 0)
-				return DC_NO_CONTROLLER_RESOURCE;
+		if (resource_is_stream_unchanged(dc->current_context, stream))
+			continue;
+		/* acquire new resources */
+		pipe_idx = acquire_first_free_pipe(&context->res_ctx, stream);
+		if (pipe_idx < 0)
+			return DC_NO_CONTROLLER_RESOURCE;
 
 
-			pipe_ctx = &context->res_ctx.pipe_ctx[pipe_idx];
+		pipe_ctx = &context->res_ctx.pipe_ctx[pipe_idx];
 
-			pipe_ctx->stream_enc =
-				find_first_free_match_stream_enc_for_link(
-					&context->res_ctx, stream);
+		pipe_ctx->stream_enc =
+			find_first_free_match_stream_enc_for_link(
+				&context->res_ctx, stream);
 
-			if (!pipe_ctx->stream_enc)
-				return DC_NO_STREAM_ENG_RESOURCE;
+		if (!pipe_ctx->stream_enc)
+			return DC_NO_STREAM_ENG_RESOURCE;
 
-			set_stream_engine_in_use(
+		set_stream_engine_in_use(
+			&context->res_ctx,
+			pipe_ctx->stream_enc);
+
+		/* TODO: Add check if ASIC support and EDID audio */
+		if (!stream->sink->converter_disable_audio &&
+			dc_is_audio_capable_signal(pipe_ctx->stream->signal) &&
+			stream->public.audio_info.mode_count) {
+			pipe_ctx->audio = find_first_free_audio(
+				&context->res_ctx);
+
+			/*
+			 * Audio assigned in order first come first get.
+			 * There are asics which has number of audio
+			 * resources less then number of pipes
+			 */
+			if (pipe_ctx->audio)
+				set_audio_in_use(
 					&context->res_ctx,
-					pipe_ctx->stream_enc);
-
-			/* TODO: Add check if ASIC support and EDID audio */
-			if (!stream->sink->converter_disable_audio &&
-						dc_is_audio_capable_signal(pipe_ctx->stream->signal) &&
-						stream->public.audio_info.mode_count) {
-				pipe_ctx->audio = find_first_free_audio(
-						&context->res_ctx);
-
-				/*
-				 * Audio assigned in order first come first get.
-				 * There are asics which has number of audio
-				 * resources less then number of pipes
-				 */
-				if (pipe_ctx->audio)
-					set_audio_in_use(
-						&context->res_ctx,
-						pipe_ctx->audio);
-			}
-
-			if (j == 0) {
-				context->target_status[i].primary_otg_inst =
-						pipe_ctx->tg->inst;
-			}
+					pipe_ctx->audio);
 		}
+
+		context->stream_status[i].primary_otg_inst = pipe_ctx->tg->inst;
 	}
 
 	return DC_OK;
 }
 
-/* first target in the context is used to populate the rest */
-void validate_guaranteed_copy_target(
+/* first stream in the context is used to populate the rest */
+void validate_guaranteed_copy_streams(
 		struct validate_context *context,
-		int max_targets)
+		int max_streams)
 {
 	int i;
 
-	for (i = 1; i < max_targets; i++) {
-		context->targets[i] = context->targets[0];
+	for (i = 1; i < max_streams; i++) {
+		context->streams[i] = context->streams[0];
 
 		copy_pipe_ctx(&context->res_ctx.pipe_ctx[0],
 			      &context->res_ctx.pipe_ctx[i]);
 		context->res_ctx.pipe_ctx[i].stream =
 				context->res_ctx.pipe_ctx[0].stream;
 
-		dc_target_retain(&context->targets[i]->public);
-		context->target_count++;
+		dc_stream_retain(&context->streams[i]->public);
+		context->stream_count++;
 	}
 }
 
-static void translate_info_frame(const struct hw_info_frame *hw_info_frame,
-	struct encoder_info_frame *encoder_info_frame)
+static void patch_gamut_packet_checksum(
+		struct encoder_info_packet *gamut_packet)
 {
-	memset(
-		encoder_info_frame, 0, sizeof(struct encoder_info_frame));
-
 	/* For gamut we recalc checksum */
-	if (hw_info_frame->gamut_packet.valid) {
+	if (gamut_packet->valid) {
 		uint8_t chk_sum = 0;
 		uint8_t *ptr;
 		uint8_t i;
 
-		memmove(
-						&encoder_info_frame->gamut,
-						&hw_info_frame->gamut_packet,
-						sizeof(struct hw_info_packet));
-
 		/*start of the Gamut data. */
-		ptr = &encoder_info_frame->gamut.sb[3];
+		ptr = &gamut_packet->sb[3];
 
-		for (i = 0; i <= encoder_info_frame->gamut.sb[1]; i++)
+		for (i = 0; i <= gamut_packet->sb[1]; i++)
 			chk_sum += ptr[i];
 
-		encoder_info_frame->gamut.sb[2] = (uint8_t) (0x100 - chk_sum);
-	}
-
-	if (hw_info_frame->avi_info_packet.valid) {
-		memmove(
-						&encoder_info_frame->avi,
-						&hw_info_frame->avi_info_packet,
-						sizeof(struct hw_info_packet));
-	}
-
-	if (hw_info_frame->vendor_info_packet.valid) {
-		memmove(
-						&encoder_info_frame->vendor,
-						&hw_info_frame->vendor_info_packet,
-						sizeof(struct hw_info_packet));
-	}
-
-	if (hw_info_frame->spd_packet.valid) {
-		memmove(
-						&encoder_info_frame->spd,
-						&hw_info_frame->spd_packet,
-						sizeof(struct hw_info_packet));
-	}
-
-	if (hw_info_frame->vsc_packet.valid) {
-		memmove(
-						&encoder_info_frame->vsc,
-						&hw_info_frame->vsc_packet,
-						sizeof(struct hw_info_packet));
-	}
-
-	if (hw_info_frame->hdrsmd_packet.valid) {
-		memmove(
-						&encoder_info_frame->hdrsmd,
-						&hw_info_frame->hdrsmd_packet,
-						sizeof(struct hw_info_packet));
+		gamut_packet->sb[2] = (uint8_t) (0x100 - chk_sum);
 	}
 }
 
 static void set_avi_info_frame(
-	struct hw_info_packet *info_packet,
+		struct encoder_info_packet *info_packet,
 		struct pipe_ctx *pipe_ctx)
 {
 	struct core_stream *stream = pipe_ctx->stream;
@@ -1326,20 +1245,16 @@ static void set_avi_info_frame(
 	uint8_t *check_sum = NULL;
 	uint8_t byte_index = 0;
 
-	if (info_packet == NULL)
-		return;
-
 	color_space = pipe_ctx->stream->public.output_color_space;
 
 	/* Initialize header */
 	info_frame.avi_info_packet.info_packet_hdmi.bits.header.
-			info_frame_type = INFO_FRAME_AVI;
+			info_frame_type = HDMI_INFOFRAME_TYPE_AVI;
 	/* InfoFrameVersion_3 is defined by CEA861F (Section 6.4), but shall
 	* not be used in HDMI 2.0 (Section 10.1) */
-	info_frame.avi_info_packet.info_packet_hdmi.bits.header.version =
-			INFO_FRAME_VERSION_2;
+	info_frame.avi_info_packet.info_packet_hdmi.bits.header.version = 2;
 	info_frame.avi_info_packet.info_packet_hdmi.bits.header.length =
-			INFO_FRAME_SIZE_AVI;
+			HDMI_AVI_INFOFRAME_SIZE;
 
 	/*
 	 * IDO-defined (Y2,Y1,Y0 = 1,1,1) shall not be used by devices built
@@ -1394,6 +1309,20 @@ static void set_avi_info_frame(
 	else
 		info_frame.avi_info_packet.info_packet_hdmi.bits.C0_C1 =
 				COLORIMETRY_NO_DATA;
+
+	if (color_space == COLOR_SPACE_2020_RGB_FULLRANGE ||
+		color_space == COLOR_SPACE_2020_RGB_LIMITEDRANGE ||
+		color_space == COLOR_SPACE_2020_YCBCR) {
+		info_frame.avi_info_packet.info_packet_hdmi.bits.EC0_EC2 =
+				COLORIMETRYEX_BT2020RGBYCBCR;
+		info_frame.avi_info_packet.info_packet_hdmi.bits.C0_C1 =
+				COLORIMETRY_EXTENDED;
+	} else if (color_space == COLOR_SPACE_ADOBERGB) {
+		info_frame.avi_info_packet.info_packet_hdmi.bits.EC0_EC2 =
+				COLORIMETRYEX_ADOBERGB;
+		info_frame.avi_info_packet.info_packet_hdmi.bits.C0_C1 =
+				COLORIMETRY_EXTENDED;
+	}
 
 	/* TODO: un-hardcode aspect ratio */
 	aspect = stream->public.timing.aspect_ratio;
@@ -1472,10 +1401,9 @@ static void set_avi_info_frame(
 	check_sum =
 		&info_frame.
 		avi_info_packet.info_packet_hdmi.packet_raw_data.sb[0];
-	*check_sum = INFO_FRAME_AVI + INFO_FRAME_SIZE_AVI
-			+ INFO_FRAME_VERSION_2;
+	*check_sum = HDMI_INFOFRAME_TYPE_AVI + HDMI_AVI_INFOFRAME_SIZE + 2;
 
-	for (byte_index = 1; byte_index <= INFO_FRAME_SIZE_AVI; byte_index++)
+	for (byte_index = 1; byte_index <= HDMI_AVI_INFOFRAME_SIZE; byte_index++)
 		*check_sum += info_frame.avi_info_packet.info_packet_hdmi.
 				packet_raw_data.sb[byte_index];
 
@@ -1498,17 +1426,15 @@ static void set_avi_info_frame(
 	info_packet->valid = true;
 }
 
-static void set_vendor_info_packet(struct core_stream *stream,
-		struct hw_info_packet *info_packet)
+static void set_vendor_info_packet(
+		struct encoder_info_packet *info_packet,
+		struct core_stream *stream)
 {
 	uint32_t length = 0;
 	bool hdmi_vic_mode = false;
 	uint8_t checksum = 0;
 	uint32_t i = 0;
 	enum dc_timing_3d_format format;
-
-	ASSERT_CRITICAL(stream != NULL);
-	ASSERT_CRITICAL(info_packet != NULL);
 
 	format = stream->public.timing.timing_3d_format;
 
@@ -1587,7 +1513,7 @@ static void set_vendor_info_packet(struct core_stream *stream,
 		info_packet->sb[5] = stream->public.timing.hdmi_vic;
 
 	/* Header */
-	info_packet->hb0 = 0x81; /* VSIF packet type. */
+	info_packet->hb0 = HDMI_INFOFRAME_TYPE_VENDOR; /* VSIF packet type. */
 	info_packet->hb1 = 0x01; /* Version */
 
 	/* 4 lower bits = Length, 4 higher bits = 0 (reserved) */
@@ -1607,8 +1533,9 @@ static void set_vendor_info_packet(struct core_stream *stream,
 	info_packet->valid = true;
 }
 
-static void set_spd_info_packet(struct core_stream *stream,
-		struct hw_info_packet *info_packet)
+static void set_spd_info_packet(
+		struct encoder_info_packet *info_packet,
+		struct core_stream *stream)
 {
 	/* SPD info packet for FreeSync */
 
@@ -1628,7 +1555,7 @@ static void set_spd_info_packet(struct core_stream *stream,
 		/* HB0  = Packet Type = 0x83 (Source Product
 		 *	  Descriptor InfoFrame)
 		 */
-		info_packet->hb0 = 0x83;
+		info_packet->hb0 = HDMI_INFOFRAME_TYPE_SPD;
 
 		/* HB1  = Version = 0x01 */
 		info_packet->hb1 = 0x01;
@@ -1650,7 +1577,7 @@ static void set_spd_info_packet(struct core_stream *stream,
 		/* HB1  = Packet Type = 0x83 (Source Product
 		 *	  Descriptor InfoFrame)
 		 */
-		info_packet->hb1 = 0x83;
+		info_packet->hb1 = HDMI_INFOFRAME_TYPE_SPD;
 
 		/* HB2  = [Bits 7:0 = Least significant eight bits -
 		 *	  For INFOFRAME, the value must be 1Bh]
@@ -1728,9 +1655,9 @@ static void set_spd_info_packet(struct core_stream *stream,
 }
 
 static void set_hdr_static_info_packet(
+		struct encoder_info_packet *info_packet,
 		struct core_surface *surface,
-		struct core_stream *stream,
-		struct hw_info_packet *info_packet)
+		struct core_stream *stream)
 {
 	uint16_t i = 0;
 	enum signal_type signal = stream->signal;
@@ -1831,8 +1758,9 @@ static void set_hdr_static_info_packet(
 	}
 }
 
-static void set_vsc_info_packet(struct core_stream *stream,
-		struct hw_info_packet *info_packet)
+static void set_vsc_info_packet(
+		struct encoder_info_packet *info_packet,
+		struct core_stream *stream)
 {
 	unsigned int vscPacketRevision = 0;
 	unsigned int i;
@@ -1876,18 +1804,19 @@ void resource_validate_ctx_destruct(struct validate_context *context)
 {
 	int i, j;
 
-	for (i = 0; i < context->target_count; i++) {
-		for (j = 0; j < context->target_status[i].surface_count; j++)
+	for (i = 0; i < context->stream_count; i++) {
+		for (j = 0; j < context->stream_status[i].surface_count; j++)
 			dc_surface_release(
-				context->target_status[i].surfaces[j]);
+				context->stream_status[i].surfaces[j]);
 
-		context->target_status[i].surface_count = 0;
-		dc_target_release(&context->targets[i]->public);
+		context->stream_status[i].surface_count = 0;
+		dc_stream_release(&context->streams[i]->public);
+		context->streams[i] = NULL;
 	}
 }
 
 /*
- * Copy src_ctx into dst_ctx and retain all surfaces and targets referenced
+ * Copy src_ctx into dst_ctx and retain all surfaces and streams referenced
  * by the src_ctx
  */
 void resource_validate_ctx_copy_construct(
@@ -1909,11 +1838,11 @@ void resource_validate_ctx_copy_construct(
 
 	}
 
-	for (i = 0; i < dst_ctx->target_count; i++) {
-		dc_target_retain(&dst_ctx->targets[i]->public);
-		for (j = 0; j < dst_ctx->target_status[i].surface_count; j++)
+	for (i = 0; i < dst_ctx->stream_count; i++) {
+		dc_stream_retain(&dst_ctx->streams[i]->public);
+		for (j = 0; j < dst_ctx->stream_status[i].surface_count; j++)
 			dc_surface_retain(
-				dst_ctx->target_status[i].surfaces[j]);
+				dst_ctx->stream_status[i].surfaces[j]);
 	}
 }
 
@@ -1933,89 +1862,86 @@ struct clock_source *dc_resource_find_first_free_pll(
 void resource_build_info_frame(struct pipe_ctx *pipe_ctx)
 {
 	enum signal_type signal = SIGNAL_TYPE_NONE;
-	struct hw_info_frame info_frame = { { 0 } };
+	struct encoder_info_frame *info = &pipe_ctx->encoder_info_frame;
 
 	/* default all packets to invalid */
-	info_frame.avi_info_packet.valid = false;
-	info_frame.gamut_packet.valid = false;
-	info_frame.vendor_info_packet.valid = false;
-	info_frame.spd_packet.valid = false;
-	info_frame.vsc_packet.valid = false;
-	info_frame.hdrsmd_packet.valid = false;
+	info->avi.valid = false;
+	info->gamut.valid = false;
+	info->vendor.valid = false;
+	info->hdrsmd.valid = false;
+	info->vsc.valid = false;
 
 	signal = pipe_ctx->stream->signal;
 
 	/* HDMi and DP have different info packets*/
 	if (dc_is_hdmi_signal(signal)) {
-		set_avi_info_frame(
-			&info_frame.avi_info_packet, pipe_ctx);
-		set_vendor_info_packet(
-			pipe_ctx->stream, &info_frame.vendor_info_packet);
-		set_spd_info_packet(pipe_ctx->stream, &info_frame.spd_packet);
-		set_hdr_static_info_packet(pipe_ctx->surface,
-				pipe_ctx->stream, &info_frame.hdrsmd_packet);
+		set_avi_info_frame(&info->avi, pipe_ctx);
+
+		set_vendor_info_packet(&info->vendor, pipe_ctx->stream);
+
+		set_spd_info_packet(&info->spd, pipe_ctx->stream);
+
+		set_hdr_static_info_packet(&info->hdrsmd,
+				pipe_ctx->surface, pipe_ctx->stream);
+
 	} else if (dc_is_dp_signal(signal)) {
-		set_vsc_info_packet(pipe_ctx->stream, &info_frame.vsc_packet);
-		set_spd_info_packet(pipe_ctx->stream, &info_frame.spd_packet);
-		set_hdr_static_info_packet(pipe_ctx->surface,
-				pipe_ctx->stream, &info_frame.hdrsmd_packet);
+		set_vsc_info_packet(&info->vsc, pipe_ctx->stream);
+
+		set_spd_info_packet(&info->spd, pipe_ctx->stream);
+
+		set_hdr_static_info_packet(&info->hdrsmd,
+				pipe_ctx->surface, pipe_ctx->stream);
 	}
 
-	translate_info_frame(&info_frame,
-			&pipe_ctx->encoder_info_frame);
+	patch_gamut_packet_checksum(&info->gamut);
 }
 
 enum dc_status resource_map_clock_resources(
 		const struct core_dc *dc,
 		struct validate_context *context)
 {
-	int i, j, k;
+	int i, j;
 
 	/* acquire new resources */
-	for (i = 0; i < context->target_count; i++) {
-		struct core_target *target = context->targets[i];
+	for (i = 0; i < context->stream_count; i++) {
+		const struct core_stream *stream = context->streams[i];
 
-		for (j = 0; j < target->public.stream_count; j++) {
-			struct core_stream *stream =
-				DC_STREAM_TO_CORE(target->public.streams[j]);
+		if (resource_is_stream_unchanged(dc->current_context, stream))
+			continue;
 
-			if (resource_is_stream_unchanged(dc->current_context, stream))
+		for (j = 0; j < MAX_PIPES; j++) {
+			struct pipe_ctx *pipe_ctx =
+				&context->res_ctx.pipe_ctx[j];
+
+			if (context->res_ctx.pipe_ctx[j].stream != stream)
 				continue;
 
-			for (k = 0; k < MAX_PIPES; k++) {
-				struct pipe_ctx *pipe_ctx =
-					&context->res_ctx.pipe_ctx[k];
+			if (dc_is_dp_signal(pipe_ctx->stream->signal)
+				|| pipe_ctx->stream->signal == SIGNAL_TYPE_VIRTUAL)
+				pipe_ctx->clock_source =
+					context->res_ctx.pool->dp_clock_source;
+			else {
+				pipe_ctx->clock_source = NULL;
 
-				if (context->res_ctx.pipe_ctx[k].stream != stream)
-					continue;
-
-				if (dc_is_dp_signal(pipe_ctx->stream->signal)
-					|| pipe_ctx->stream->signal == SIGNAL_TYPE_VIRTUAL)
-					pipe_ctx->clock_source =
-						context->res_ctx.pool->dp_clock_source;
-				else {
-					pipe_ctx->clock_source = NULL;
-
-					if (!dc->public.config.disable_disp_pll_sharing)
-						resource_find_used_clk_src_for_sharing(
-							&context->res_ctx,
-							pipe_ctx);
-
-					if (pipe_ctx->clock_source == NULL)
-						pipe_ctx->clock_source =
-							dc_resource_find_first_free_pll(&context->res_ctx);
-				}
+				if (!dc->public.config.disable_disp_pll_sharing)
+					resource_find_used_clk_src_for_sharing(
+						&context->res_ctx,
+						pipe_ctx);
 
 				if (pipe_ctx->clock_source == NULL)
-					return DC_NO_CLOCK_SOURCE_RESOURCE;
-
-				resource_reference_clock_source(
-						&context->res_ctx,
-						pipe_ctx->clock_source);
-
-				/* only one cs per stream regardless of mpo */
-				break;
+					pipe_ctx->clock_source =
+						dc_resource_find_first_free_pll(&context->res_ctx);
 			}
+
+			if (pipe_ctx->clock_source == NULL)
+				return DC_NO_CLOCK_SOURCE_RESOURCE;
+
+			resource_reference_clock_source(
+				&context->res_ctx,
+				pipe_ctx->clock_source);
+
+			/* only one cs per stream regardless of mpo */
+			break;
 		}
 	}
 

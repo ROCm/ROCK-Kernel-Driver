@@ -94,10 +94,6 @@ struct hw_sequencer_funcs {
 			int group_size,
 			struct pipe_ctx *grouped_pipes[]);
 
-	/* backlight control */
-	void (*encoder_set_lcd_backlight_level)(
-		struct link_encoder *enc, uint32_t level);
-
 	void (*enable_display_pipe_clock_gating)(
 					struct dc_context *ctx,
 					bool clock_gating);
@@ -150,5 +146,8 @@ void color_space_to_black_color(
 	const struct core_dc *dc,
 	enum dc_color_space colorspace,
 	struct tg_color *black_color);
+
+bool hwss_wait_for_blank_complete(
+		struct timing_generator *tg);
 
 #endif /* __DC_HW_SEQUENCER_H__ */

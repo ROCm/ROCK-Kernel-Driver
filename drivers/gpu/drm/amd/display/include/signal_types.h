@@ -36,24 +36,17 @@ enum signal_type {
 	SIGNAL_TYPE_DISPLAY_PORT	= (1 << 5),
 	SIGNAL_TYPE_DISPLAY_PORT_MST	= (1 << 6),
 	SIGNAL_TYPE_EDP			= (1 << 7),
-	SIGNAL_TYPE_WIRELESS		= (1 << 8),	/* Wireless Display */
 	SIGNAL_TYPE_VIRTUAL		= (1 << 9),	/* Virtual Display */
-
-	SIGNAL_TYPE_COUNT		= 10,
-	SIGNAL_TYPE_ALL			= (1 << SIGNAL_TYPE_COUNT) - 1
 };
 
 /* help functions for signal types manipulation */
 bool dc_is_hdmi_signal(enum signal_type signal);
 bool dc_is_dp_sst_signal(enum signal_type signal);
 bool dc_is_dp_signal(enum signal_type signal);
-bool dc_is_dp_external_signal(enum signal_type signal);
-bool dc_is_analog_signal(enum signal_type signal);
 bool dc_is_embedded_signal(enum signal_type signal);
 bool dc_is_dvi_signal(enum signal_type signal);
 bool dc_is_dvi_single_link_signal(enum signal_type signal);
 bool dc_is_dual_link_signal(enum signal_type signal);
 bool dc_is_audio_capable_signal(enum signal_type signal);
-bool dc_is_digital_encoder_compatible_signal(enum signal_type signal);
 
 #endif

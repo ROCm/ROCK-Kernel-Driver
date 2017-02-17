@@ -467,9 +467,16 @@ static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 	/* size in MB on si */
 	adev->mc.mc_vram_size = RREG32(mmCONFIG_MEMSIZE) * 1024ULL * 1024ULL;
 	adev->mc.real_vram_size = RREG32(mmCONFIG_MEMSIZE) * 1024ULL * 1024ULL;
-	adev->mc.visible_vram_size = adev->mc.aper_size;
+
+#ifdef CONFIG_X86_64
+	if (adev->flags & AMD_IS_APU) {
+		adev->mc.aper_base = ((u64)RREG32(mmMC_VM_FB_OFFSET)) << 22;
+		adev->mc.aper_size = adev->mc.real_vram_size;
+	}
+#endif
 
 	/* In case the PCI BAR is larger than the actual amount of vram */
+	adev->mc.visible_vram_size = adev->mc.aper_size;
 	if (adev->mc.visible_vram_size > adev->mc.real_vram_size)
 		adev->mc.visible_vram_size = adev->mc.real_vram_size;
 
@@ -1288,6 +1295,13 @@ static int gmc_v8_0_process_interrupt(struct amdgpu_device *adev,
 {
 	u32 addr, status, mc_client;
 
+	if (amdgpu_sriov_vf(adev)) {
+		dev_err(adev->dev, "GPU fault detected: %d 0x%08x\n",
+			entry->src_id, entry->src_data);
+		dev_err(adev->dev, " Can't decode VM fault info here on SRIOV VF\n");
+		return 0;
+	}
+
 	addr = RREG32(mmVM_CONTEXT1_PROTECTION_FAULT_ADDR);
 	status = RREG32(mmVM_CONTEXT1_PROTECTION_FAULT_STATUS);
 	mc_client = RREG32(mmVM_CONTEXT1_PROTECTION_FAULT_MCCLIENT);
@@ -1478,6 +1492,9 @@ static int gmc_v8_0_set_clockgating_state(void *handle,
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
+	if (amdgpu_sriov_vf(adev))
+		return 0;
+
 	switch (adev->asic_type) {
 	case CHIP_FIJI:
 		fiji_update_mc_medium_grain_clock_gating(adev,
@@ -1501,6 +1518,9 @@ static void gmc_v8_0_get_clockgating_state(void *handle, u32 *flags)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	int data;
+
+	if (amdgpu_sriov_vf(adev))
+		*flags = 0;
 
 	/* AMD_CG_SUPPORT_MC_MGCG */
 	data = RREG32(mmMC_HUB_MISC_HUB_CG);
