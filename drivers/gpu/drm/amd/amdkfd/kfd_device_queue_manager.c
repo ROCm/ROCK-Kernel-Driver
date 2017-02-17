@@ -50,6 +50,8 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 		enum kfd_unmap_queues_filter filter,
 		uint32_t filter_param, bool reset);
 
+static int map_queues_cpsch(struct device_queue_manager *dqm);
+
 static int create_sdma_queue_nocpsch(struct device_queue_manager *dqm,
 					struct queue *q,
 					struct qcm_process_device *qpd);
@@ -384,6 +386,13 @@ static int destroy_queue_nocpsch(struct device_queue_manager *dqm,
 	return retval;
 }
 
+static  bool is_queue_nocpsch(struct device_queue_manager *dqm, struct queue *q)
+{
+	return (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
+			(q->properties.type == KFD_QUEUE_TYPE_COMPUTE ||
+			q->properties.type == KFD_QUEUE_TYPE_SDMA));
+}
+
 static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 {
 	int retval;
@@ -417,33 +426,45 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 					    q->properties.queue_address != 0);
 
 	/* save previous activity state for counters */
-	if (q->properties.is_active)
-		prev_active = true;
+	prev_active = q->properties.is_active;
 
+	/* HWS mode, unmap first to own mqd */
+	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS) {
+		retval = unmap_queues_cpsch(dqm,
+				KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0,
+				false);
+		if (retval != 0) {
+			pr_err("unmap queue failed");
+			goto out_unlock;
+		}
+	} else if (is_queue_nocpsch(dqm, q) && prev_active == true) {
+		retval = mqd->destroy_mqd(mqd, q->mqd,
+				KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN,
+				KFD_UNMAP_LATENCY_MS, q->pipe, q->queue);
+		if (retval != 0) {
+			pr_err("destroy mqd failed");
+			goto out_unlock;
+		}
+	}
 
 	retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
-	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
-	    (q->properties.type == KFD_QUEUE_TYPE_COMPUTE ||
-	     q->properties.type == KFD_QUEUE_TYPE_SDMA)) {
+
+	if (is_queue_nocpsch(dqm, q)) {
 		if (q->properties.is_active)
 			retval = mqd->load_mqd(mqd, q->mqd, q->pipe, q->queue,
 					       &q->properties, q->process->mm);
-		else if (prev_active)
-			retval = mqd->destroy_mqd(mqd, q->mqd,
-				KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN,
-				KFD_UNMAP_LATENCY_MS, q->pipe, q->queue);
 	}
 	/*
-		 * check active state vs. the previous state
-		 * and modify counter accordingly
-	*/
+	 * check active state vs. the previous state
+	 * and modify counter accordingly
+	 */
 	if ((q->properties.is_active) && (!prev_active))
 		dqm->queue_count++;
 	else if ((!q->properties.is_active) && (prev_active))
 		dqm->queue_count--;
 
 	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
-		retval = execute_queues_cpsch(dqm, false);
+		retval = map_queues_cpsch(dqm);
 
 out_unlock:
 	mutex_unlock(&dqm->lock);
@@ -498,9 +519,7 @@ int process_evict_queues(struct device_queue_manager *dqm,
 			q->properties.is_evicted = true;
 
 		retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
-		if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
-		    (q->properties.type == KFD_QUEUE_TYPE_COMPUTE ||
-		     q->properties.type == KFD_QUEUE_TYPE_SDMA) &&
+		if (is_queue_nocpsch(dqm, q) &&
 		    q->properties.is_evicted)
 			retval = mqd->destroy_mqd(mqd, q->mqd,
 				KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN,
@@ -1143,6 +1162,31 @@ static int unmap_sdma_queues(struct device_queue_manager *dqm,
 }
 
 /* dqm->lock mutex has to be locked before calling this function */
+static int map_queues_cpsch(struct device_queue_manager *dqm)
+{
+	int retval;
+
+	if (dqm->queue_count <= 0 || dqm->processes_count <= 0) {
+		retval = 0;
+		return retval;
+	}
+
+	if (dqm->active_runlist) {
+		retval = 0;
+		return retval;
+	}
+
+	retval = pm_send_runlist(&dqm->packets, &dqm->queues);
+	if (retval != 0) {
+		pr_err("failed to execute runlist");
+		return retval;
+	}
+	dqm->active_runlist = true;
+
+	return retval;
+}
+
+/* dqm->lock mutex has to be locked before calling this function */
 static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 		enum kfd_unmap_queues_filter filter,
 		uint32_t filter_param, bool reset)
@@ -1195,6 +1239,8 @@ static int execute_queues_cpsch(struct device_queue_manager *dqm,
 
 	BUG_ON(!dqm);
 
+	pr_debug("In function %s\n", __func__);
+
 	filter = static_queues_included ?
 			KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES :
 			KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES;
@@ -1205,22 +1251,7 @@ static int execute_queues_cpsch(struct device_queue_manager *dqm,
 		return retval;
 	}
 
-	if (dqm->queue_count <= 0 || dqm->processes_count <= 0) {
-		retval = 0;
-		return retval;
-	}
-
-	if (dqm->active_runlist) {
-		retval = 0;
-		return retval;
-	}
-
-	retval = pm_send_runlist(&dqm->packets, &dqm->queues);
-	if (retval != 0) {
-		pr_err("kfd: failed to execute runlist");
-		return retval;
-	}
-	dqm->active_runlist = true;
+	retval = map_queues_cpsch(dqm);
 
 	return retval;
 }
