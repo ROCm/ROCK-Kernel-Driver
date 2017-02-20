@@ -1,8 +1,7 @@
 #include <kcl/kcl_io.h>
 #include "kcl_common.h"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
-#ifdef CONFIG_X86_PAT
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && defined(CONFIG_X86_PAT)
 static int (*_kcl_io_reserve_memtype)(resource_size_t start, resource_size_t end,
 			enum page_cache_mode *type);
 static void (*_kcl_io_free_memtype)(resource_size_t start, resource_size_t end);
@@ -30,5 +29,9 @@ void amdkcl_io_init(void)
 	_kcl_io_reserve_memtype = amdkcl_fp_setup("io_reserve_memtype", NULL);
 	_kcl_io_free_memtype = amdkcl_fp_setup("io_free_memtype", NULL);
 }
-#endif
+#else
+void amdkcl_io_init(void)
+{
+
+}
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) */
