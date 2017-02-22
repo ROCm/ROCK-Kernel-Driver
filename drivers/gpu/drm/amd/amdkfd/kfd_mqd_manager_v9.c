@@ -148,8 +148,7 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 
 	if (q->format == KFD_QUEUE_FORMAT_AQL) {
 		m->cp_hqd_aql_control =
-			1 << CP_HQD_AQL_CONTROL__CONTROL0__SHIFT |
-			1 << CP_HQD_AQL_CONTROL__CONTROL0_EN__SHIFT;
+			1 << CP_HQD_AQL_CONTROL__CONTROL0__SHIFT;
 	}
 
 	if (q->tba_addr) {
