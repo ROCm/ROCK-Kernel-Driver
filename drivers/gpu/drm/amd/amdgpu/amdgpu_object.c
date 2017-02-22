@@ -352,11 +352,6 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 		return -ENOMEM;
 	}
 
-	r = drm_gem_object_init(adev->ddev, &gobj->base, size);
-	if (unlikely(r)) {
-		kfree(bo);
-		return r;
-	}
 	INIT_LIST_HEAD(&bo->shadow_list);
 	INIT_LIST_HEAD(&bo->va);
 	INIT_LIST_HEAD(&bo->gem_objects);
