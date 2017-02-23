@@ -354,6 +354,7 @@ int amdgpu_gem_find_bo_by_cpu_mapping_ioctl(struct drm_device *dev, void *data,
 {
 	struct drm_amdgpu_gem_find_bo *args = data;
 	struct drm_gem_object *gobj;
+	struct amdgpu_gem_object *amdgpu_gobj;
 	struct amdgpu_bo *bo;
 	struct ttm_buffer_object *tbo;
 	struct vm_area_struct *vma;
@@ -374,7 +375,17 @@ int amdgpu_gem_find_bo_by_cpu_mapping_ioctl(struct drm_device *dev, void *data,
 	tbo = vma->vm_private_data;
 	bo = container_of(tbo, struct amdgpu_bo, tbo);
 	amdgpu_bo_ref(bo);
-	gobj = &bo->gem_base;
+
+	ww_mutex_lock(&bo->tbo.resv->lock, NULL);
+	list_for_each_entry(amdgpu_gobj, &bo->gem_objects, list) {
+		if (amdgpu_gobj->base.dev != filp->minor->dev)
+			continue;
+
+		ww_mutex_unlock(&bo->tbo.resv->lock);
+		break;
+	}
+	gobj = &amdgpu_gobj->base;
+	
 	handle = amdgpu_gem_get_handle_from_object(filp, gobj);
 	if (handle == 0) {
 		r = drm_gem_handle_create(filp, gobj, &handle);
