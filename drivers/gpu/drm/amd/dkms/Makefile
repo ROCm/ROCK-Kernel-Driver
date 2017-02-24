@@ -78,6 +78,6 @@ subdir-ccflags-y += -DBUILD_AS_DKMS
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_CIK
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_SI
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
-subdir-ccflags-y += -DCONFIG_DRM_AMD_DC=y
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 
 obj-m += amd/amdgpu/ ttm/ amd/amdkcl/
