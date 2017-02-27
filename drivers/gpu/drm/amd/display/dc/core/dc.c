@@ -1246,6 +1246,7 @@ bool dc_commit_surfaces_to_stream(
 		plane_info[i].stereo_format = new_surfaces[i]->stereo_format;
 		plane_info[i].tiling_info = new_surfaces[i]->tiling_info;
 		plane_info[i].visible = new_surfaces[i]->visible;
+		plane_info[i].dcc = new_surfaces[i]->dcc;
 		scaling_info[i].scaling_quality = new_surfaces[i]->scaling_quality;
 		scaling_info[i].src_rect = new_surfaces[i]->src_rect;
 		scaling_info[i].dst_rect = new_surfaces[i]->dst_rect;
@@ -1723,6 +1724,31 @@ bool dc_read_dpcd(
 			size);
 	return r == DDC_RESULT_SUCESSFULL;
 }
+
+bool dc_query_ddc_data(
+		struct dc *dc,
+		uint32_t link_index,
+		uint32_t address,
+		uint8_t *write_buf,
+		uint32_t write_size,
+		uint8_t *read_buf,
+		uint32_t read_size) {
+
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+
+	struct core_link *link = core_dc->links[link_index];
+
+	bool result = dal_ddc_service_query_ddc_data(
+			link->ddc,
+			address,
+			write_buf,
+			write_size,
+			read_buf,
+			read_size);
+
+	return result;
+}
+
 
 bool dc_write_dpcd(
 		struct dc *dc,

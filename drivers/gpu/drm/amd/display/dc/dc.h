@@ -186,6 +186,7 @@ enum {
 };
 
 struct dc_hdr_static_metadata {
+	bool hdr_supported;
 	bool is_hdr;
 
 	/* display chromaticities and white point in units of 0.00001 */
@@ -207,6 +208,7 @@ struct dc_hdr_static_metadata {
 enum dc_transfer_func_type {
 	TF_TYPE_PREDEFINED,
 	TF_TYPE_DISTRIBUTED_POINTS,
+	TF_TYPE_BYPASS
 };
 
 struct dc_transfer_func_distributed_points {
@@ -718,7 +720,16 @@ bool dc_write_dpcd(
 		uint32_t link_index,
 		uint32_t address,
 		const uint8_t *data,
-	uint32_t size);
+		uint32_t size);
+
+bool dc_query_ddc_data(
+		struct dc *dc,
+		uint32_t link_index,
+		uint32_t address,
+		uint8_t *write_buf,
+		uint32_t write_size,
+		uint8_t *read_buf,
+		uint32_t read_size);
 
 bool dc_submit_i2c(
 		struct dc *dc,

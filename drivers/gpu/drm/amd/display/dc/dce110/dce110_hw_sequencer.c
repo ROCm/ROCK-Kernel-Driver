@@ -279,6 +279,8 @@ static bool dce110_set_input_transfer_func(
 			result = false;
 			break;
 		}
+	} else if (tf->public.type == TF_TYPE_BYPASS) {
+		ipp->funcs->ipp_set_degamma(ipp, IPP_DEGAMMA_MODE_BYPASS);
 	} else {
 		/*TF_TYPE_DISTRIBUTED_POINTS - Not supported in DCE 11*/
 		result = false;
@@ -428,7 +430,8 @@ static bool dce110_translate_regamma_to_hw_format(const struct dc_transfer_func
 	int32_t segment_start, segment_end;
 	uint32_t i, j, k, seg_distr[16], increment, start_index, hw_points;
 
-	if (output_tf == NULL || regamma_params == NULL)
+	if (output_tf == NULL || regamma_params == NULL ||
+			output_tf->type == TF_TYPE_BYPASS)
 		return false;
 
 	arr_points = regamma_params->arr_points;
@@ -858,12 +861,39 @@ static void build_audio_output(
 	audio_output->crtc_info.requested_pixel_clock =
 			pipe_ctx->pix_clk_params.requested_pix_clk;
 
-	/*
-	 * TODO - Investigate why calculated pixel clk has to be
-	 * requested pixel clk
-	 */
 	audio_output->crtc_info.calculated_pixel_clock =
 			pipe_ctx->pix_clk_params.requested_pix_clk;
+
+/*for HDMI, audio ACR is with deep color ratio factor*/
+	if (dc_is_hdmi_signal(pipe_ctx->stream->signal) &&
+		audio_output->crtc_info.requested_pixel_clock ==
+				stream->public.timing.pix_clk_khz) {
+		if (pipe_ctx->pix_clk_params.pixel_encoding == PIXEL_ENCODING_YCBCR420) {
+			audio_output->crtc_info.requested_pixel_clock =
+					audio_output->crtc_info.requested_pixel_clock/2;
+			audio_output->crtc_info.calculated_pixel_clock =
+					pipe_ctx->pix_clk_params.requested_pix_clk/2;
+		}
+
+		if (pipe_ctx->pix_clk_params.pixel_encoding != PIXEL_ENCODING_YCBCR422) {
+			switch (pipe_ctx->pix_clk_params.color_depth) {
+			case COLOR_DEPTH_888:
+				break;
+			case COLOR_DEPTH_101010:
+				audio_output->crtc_info.calculated_pixel_clock = (audio_output->crtc_info.calculated_pixel_clock * 30) / 24;
+			break;
+			case COLOR_DEPTH_121212:
+				audio_output->crtc_info.calculated_pixel_clock = (audio_output->crtc_info.calculated_pixel_clock * 36) / 24;
+			break;
+			case COLOR_DEPTH_161616:
+				audio_output->crtc_info.calculated_pixel_clock = (audio_output->crtc_info.calculated_pixel_clock * 48) / 24;
+			break;
+			default:
+				ASSERT(0);
+			break;
+			}
+		}
+	}
 
 	if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT ||
 			pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
@@ -1010,15 +1040,14 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 			stream->public.timing.display_color_depth,
 			pipe_ctx->stream->signal);
 
+	/* FPGA does not program backend */
+	if (IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment)) {
 	pipe_ctx->opp->funcs->opp_program_fmt(
 			pipe_ctx->opp,
 			&stream->bit_depth_params,
 			&stream->clamping);
-
-	/* FPGA does not program backend */
-	if (IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment))
 		return DC_OK;
-
+	}
 	/* TODO: move to stream encoder */
 	if (pipe_ctx->stream->signal != SIGNAL_TYPE_VIRTUAL)
 		if (DC_OK != bios_parser_crtc_source_select(pipe_ctx)) {
@@ -1030,6 +1059,12 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		stream->sink->link->link_enc->funcs->setup(
 			stream->sink->link->link_enc,
 			pipe_ctx->stream->signal);
+
+/*vbios crtc_source_selection and encoder_setup will override fmt_C*/
+	pipe_ctx->opp->funcs->opp_program_fmt(
+			pipe_ctx->opp,
+			&stream->bit_depth_params,
+			&stream->clamping);
 
 	if (dc_is_dp_signal(pipe_ctx->stream->signal))
 		pipe_ctx->stream_enc->funcs->dp_set_stream_attribute(

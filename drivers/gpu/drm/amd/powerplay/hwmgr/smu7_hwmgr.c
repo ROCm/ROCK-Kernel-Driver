@@ -1383,6 +1383,15 @@ static void smu7_init_dpm_defaults(struct pp_hwmgr *hwmgr)
 	data->force_pcie_gen = PP_PCIEGenInvalid;
 	data->ulv_supported = hwmgr->feature_mask & PP_ULV_MASK ? true : false;
 
+	if (hwmgr->chip_id == CHIP_POLARIS12 || hwmgr->smumgr->is_kicker) {
+		uint8_t tmp1, tmp2;
+		uint16_t tmp3 = 0;
+		atomctrl_get_svi2_info(hwmgr, VOLTAGE_TYPE_VDDC, &tmp1, &tmp2,
+						&tmp3);
+		tmp3 = (tmp3 >> 5) & 0x3;
+		data->vddc_phase_shed_control = ((tmp3 << 1) | (tmp3 >> 1)) & 0x3;
+	}
+
 	data->fast_watermark_threshold = 100;
 	if (atomctrl_is_voltage_controled_by_gpio_v3(hwmgr,
 			VOLTAGE_TYPE_VDDC, VOLTAGE_OBJ_SVID2))
@@ -1535,7 +1544,7 @@ static int smu7_get_evv_voltages(struct pp_hwmgr *hwmgr)
 					if (vddc >= 2000 || vddc == 0)
 						return -EINVAL;
 				} else {
-					pr_warning("failed to retrieving EVV voltage!\n");
+					pr_warn("failed to retrieving EVV voltage!\n");
 					continue;
 				}
 
