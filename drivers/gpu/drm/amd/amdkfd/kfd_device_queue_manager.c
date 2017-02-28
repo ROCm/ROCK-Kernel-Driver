@@ -563,7 +563,8 @@ int process_restore_queues(struct device_queue_manager *dqm,
 	qpd->page_table_base = pd_base;
 	pr_debug("Updated PD address to 0x%08x in %s\n", pd_base, __func__);
 
-	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
+	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
+	    !list_empty(&qpd->queues_list)) {
 		dqm->dev->kfd2kgd->set_vm_context_page_table_base(
 				dqm->dev->kgd,
 				qpd->vmid,
