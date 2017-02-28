@@ -510,6 +510,7 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 		amdgpu_ip_block_add(adev, &mmhub_v1_0_ip_block);
 		amdgpu_ip_block_add(adev, &gmc_v9_0_ip_block);
 		amdgpu_ip_block_add(adev, &vega10_ih_ip_block);
+		amdgpu_ip_block_add(adev, &psp_v10_0_ip_block);
 #if defined(CONFIG_DRM_AMD_DC)
 		if (amdgpu_device_has_dc_support(adev))
 			amdgpu_ip_block_add(adev, &dm_ip_block);
