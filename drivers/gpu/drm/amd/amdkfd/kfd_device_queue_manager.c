@@ -497,6 +497,7 @@ int process_evict_queues(struct device_queue_manager *dqm,
 {
 	struct queue *q, *next;
 	struct mqd_manager *mqd;
+	struct kfd_process_device *pdd;
 	int retval = 0;
 
 	BUG_ON(!dqm || !qpd);
@@ -506,6 +507,11 @@ int process_evict_queues(struct device_queue_manager *dqm,
 		mutex_unlock(&dqm->lock);
 		return 0;
 	}
+
+	pdd = qpd_to_pdd(qpd);
+	pr_info_ratelimited("Evicting PASID %u queues\n",
+			    pdd->process->pasid);
+
 	/* unactivate all active queues on the qpd */
 	list_for_each_entry_safe(q, next, &qpd->queues_list, list) {
 		mqd = dqm->ops.get_mqd_manager(dqm,
@@ -558,6 +564,9 @@ int process_restore_queues(struct device_queue_manager *dqm,
 		qpd->evicted--;
 		goto out_unlock;
 	}
+
+	pr_info_ratelimited("Restoring PASID %u queues\n",
+			    pdd->process->pasid);
 
 	/* Update PD Base in QPD */
 	qpd->page_table_base = pd_base;
