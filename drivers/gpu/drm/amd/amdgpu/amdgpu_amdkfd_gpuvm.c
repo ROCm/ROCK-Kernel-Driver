@@ -416,8 +416,15 @@ static int amdgpu_amdkfd_bo_validate(struct amdgpu_bo *bo, uint32_t domain,
 		amdgpu_ttm_placement_from_domain(bo, domain);
 		ret = ttm_bo_validate(&bo->tbo, &bo->placement,
 				      true, false);
-		if (ret)
+		if (ret) {
+			/* Don't leak the pages. If validate failed,
+			 * the pages aren't bound, and won't be
+			 * released by unbind later on
+			 */
+			release_pages(bo->tbo.ttm->pages,
+				      bo->tbo.ttm->num_pages, 0);
 			goto validate_fail;
+		}
 		if (wait)
 			ttm_bo_wait(&bo->tbo, false, false);
 	}
