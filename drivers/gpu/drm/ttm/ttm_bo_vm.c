@@ -71,8 +71,11 @@ static int ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 			goto out_unlock;
 #endif
 
+		ttm_bo_reference(bo);
 		up_read(&vma->vm_mm->mmap_sem);
 		(void) fence_wait(bo->moving, true);
+		ttm_bo_unreserve(bo);
+		ttm_bo_unref(&bo);
 		goto out_unlock;
 	}
 
@@ -126,8 +129,10 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
+				ttm_bo_reference(bo);
 				up_read(&vma->vm_mm->mmap_sem);
 				(void) ttm_bo_wait_unreserved(bo);
+				ttm_bo_unref(&bo);
 			}
 #else
 			up_read(&vma->vm_mm->mmap_sem);
@@ -175,6 +180,17 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	ret = ttm_bo_vm_fault_idle(bo, vma, vmf);
 	if (unlikely(ret != 0)) {
 		retval = ret;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
+		if (retval == VM_FAULT_RETRY &&
+		    !(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
+#else
+		if (retval == VM_FAULT_RETRY) {
+#endif
+			/* The BO has already been unreserved. */
+			return retval;
+		}
+
 		goto out_unlock;
 	}
 
@@ -246,7 +262,7 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		if (vma->vm_flags & VM_MIXEDMAP)
 			ret = vm_insert_mixed(&cvma, address,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_SLE)
-					__pfn_to_pfn_t(pfn, PFN_DEV));
+					__pfn_to_pfn_t(pfn, PFN_DEV | (bo->ssg_can_map ? PFN_MAP : 0)));
 #else
 					pfn);
 #endif
@@ -362,7 +378,7 @@ int ttm_bo_mmap(struct file *filp, struct vm_area_struct *vma,
 	 * VM_MIXEDMAP on all mappings. See freedesktop.org bug #75719
 	 */
 	vma->vm_flags |= VM_MIXEDMAP;
-	vma->vm_flags |= VM_IO | VM_DONTEXPAND | VM_DONTDUMP;
+	vma->vm_flags |= (bo->ssg_can_map ? 0 : VM_IO) | VM_DONTEXPAND | VM_DONTDUMP;
 	return 0;
 out_unref:
 	ttm_bo_unref(&bo);

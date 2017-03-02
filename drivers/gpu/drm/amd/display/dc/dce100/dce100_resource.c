@@ -770,7 +770,7 @@ enum dc_status dce100_validate_bandwidth(
 	struct validate_context *context)
 {
 	/* TODO implement when needed but for now hardcode max value*/
-	context->bw_results.dispclk_khz = 681000;
+	context->dispclk_khz = 681000;
 
 	return DC_OK;
 }
@@ -984,6 +984,7 @@ static bool construct(
 	pool->base.pipe_count = res_cap.num_timing_generator;
 	dc->public.caps.max_downscale_ratio = 200;
 	dc->public.caps.i2c_speed_in_khz = 40;
+	dc->public.caps.max_cursor_size = 128;
 
 	for (i = 0; i < pool->base.pipe_count; i++) {
 		pool->base.timing_generators[i] =

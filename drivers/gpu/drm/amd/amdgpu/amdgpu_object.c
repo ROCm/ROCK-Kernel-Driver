@@ -361,6 +361,7 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 	struct amdgpu_bo *bo;
 	enum ttm_bo_type type;
 	unsigned long page_align;
+	u64 initial_bytes_moved;
 	size_t acc_size;
 	int r;
 
@@ -434,19 +435,18 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 	amdgpu_fill_placement_to_bo(bo, placement);
 	/* Kernel allocation are uninterruptible */
 
-	if (!resv) {
-		bool locked;
+	initial_bytes_moved = atomic64_read(&adev->num_bytes_moved);
+	r = ttm_bo_init_reserved(&adev->mman.bdev, &bo->tbo, size, type,
+				 &bo->placement, page_align, !kernel, NULL,
+				 acc_size, sg, resv, &amdgpu_ttm_bo_destroy);
+	amdgpu_cs_report_moved_bytes(adev,
+		atomic64_read(&adev->num_bytes_moved) - initial_bytes_moved);
 
-		reservation_object_init(&bo->tbo.ttm_resv);
-		locked = ww_mutex_trylock(&bo->tbo.ttm_resv.lock);
-		WARN_ON(!locked);
-	}
-	r = ttm_bo_init(&adev->mman.bdev, &bo->tbo, size, type,
-			&bo->placement, page_align, !kernel, NULL,
-			acc_size, sg, resv ? resv : &bo->tbo.ttm_resv,
-			&amdgpu_ttm_bo_destroy);
 	if (unlikely(r != 0))
 		return r;
+
+	if (domain & AMDGPU_GEM_DOMAIN_DGMA && adev->ssg.enabled)
+		bo->tbo.ssg_can_map = true;
 
 	bo->tbo.priority = ilog2(bo->tbo.num_pages);
 	if (kernel)
@@ -471,7 +471,7 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 		fence_put(fence);
 	}
 	if (!resv)
-		ww_mutex_unlock(&bo->tbo.resv->lock);
+		amdgpu_bo_unreserve(bo);
 	*bo_ptr = bo;
 
 	trace_amdgpu_bo_create(bo);

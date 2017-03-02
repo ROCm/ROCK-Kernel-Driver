@@ -1608,7 +1608,7 @@ int amdgpu_suspend(struct amdgpu_device *adev)
 	return 0;
 }
 
-static int amdgpu_sriov_resume_early(struct amdgpu_device *adev)
+static int amdgpu_sriov_reinit_early(struct amdgpu_device *adev)
 {
 	int i, r;
 
@@ -1619,7 +1619,7 @@ static int amdgpu_sriov_resume_early(struct amdgpu_device *adev)
 		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_COMMON ||
 				adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_GMC ||
 				adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_IH)
-			r = adev->ip_blocks[i].version->funcs->resume(adev);
+			r = adev->ip_blocks[i].version->funcs->hw_init(adev);
 
 		if (r) {
 			DRM_ERROR("resume of IP block <%s> failed %d\n",
@@ -1631,7 +1631,7 @@ static int amdgpu_sriov_resume_early(struct amdgpu_device *adev)
 	return 0;
 }
 
-static int amdgpu_sriov_resume_late(struct amdgpu_device *adev)
+static int amdgpu_sriov_reinit_late(struct amdgpu_device *adev)
 {
 	int i, r;
 
@@ -1644,7 +1644,7 @@ static int amdgpu_sriov_resume_late(struct amdgpu_device *adev)
 				adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_IH )
 			continue;
 
-		r = adev->ip_blocks[i].version->funcs->resume(adev);
+		r = adev->ip_blocks[i].version->funcs->hw_init(adev);
 		if (r) {
 			DRM_ERROR("resume of IP block <%s> failed %d\n",
 				  adev->ip_blocks[i].version->funcs->name, r);
@@ -2437,13 +2437,13 @@ int amdgpu_sriov_gpu_reset(struct amdgpu_device *adev, bool voluntary)
 
 
 	/* Resume IP prior to SMC */
-	amdgpu_sriov_resume_early(adev);
+	amdgpu_sriov_reinit_early(adev);
 
 	/* we need recover gart prior to run SMC/CP/SDMA resume */
 	amdgpu_ttm_recover_gart(adev);
 
 	/* now we are okay to resume SMC/CP/SDMA */
-	amdgpu_sriov_resume_late(adev);
+	amdgpu_sriov_reinit_late(adev);
 
 	amdgpu_irq_gpu_reset_resume_helper(adev);
 
@@ -3196,24 +3196,42 @@ static ssize_t amdgpu_debugfs_sensor_read(struct file *f, char __user *buf,
 					size_t size, loff_t *pos)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)kcl_file_private(f);
-	int idx, r;
-	int32_t value;
+	int idx, x, outsize, r, valuesize;
+	uint32_t values[16];
 
-	if (size != 4 || *pos & 0x3)
+	if (size & 3 || *pos & 0x3)
+		return -EINVAL;
+
+	if (amdgpu_dpm == 0)
 		return -EINVAL;
 
 	/* convert offset to sensor number */
 	idx = *pos >> 2;
 
+	valuesize = sizeof(values);
 	if (adev->powerplay.pp_funcs && adev->powerplay.pp_funcs->read_sensor)
-		r = adev->powerplay.pp_funcs->read_sensor(adev->powerplay.pp_handle, idx, &value);
+		r = adev->powerplay.pp_funcs->read_sensor(adev->powerplay.pp_handle, idx, &values[0], &valuesize);
+	else if (adev->pm.funcs && adev->pm.funcs->read_sensor)
+		r = adev->pm.funcs->read_sensor(adev, idx, &values[0],
+						&valuesize);
 	else
 		return -EINVAL;
 
-	if (!r)
-		r = put_user(value, (int32_t *)buf);
+	if (size > valuesize)
+		return -EINVAL;
 
-	return !r ? 4 : r;
+	outsize = 0;
+	x = 0;
+	if (!r) {
+		while (size) {
+			r = put_user(values[x++], (int32_t *)buf);
+			buf += 4;
+			size -= 4;
+			outsize += 4;
+		}
+	}
+
+	return !r ? outsize : r;
 }
 
 static ssize_t amdgpu_debugfs_wave_read(struct file *f, char __user *buf,

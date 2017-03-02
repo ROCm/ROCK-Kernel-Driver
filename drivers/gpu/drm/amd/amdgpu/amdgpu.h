@@ -96,6 +96,7 @@ extern int amdgpu_sched_jobs;
 extern int amdgpu_sched_hw_submission;
 extern int amdgpu_no_evict;
 extern int amdgpu_direct_gma_size;
+extern int amdgpu_ssg_enabled;
 extern unsigned amdgpu_pcie_gen_cap;
 extern unsigned amdgpu_pcie_lane_cap;
 extern unsigned amdgpu_cg_mask;
@@ -297,6 +298,8 @@ struct amdgpu_gart_funcs {
 			   uint32_t gpu_page_idx, /* pte/pde to update */
 			   uint64_t addr, /* addr to write into pte/pde */
 			   uint32_t flags); /* access flags */
+	/* enable/disable PRT support */
+	void (*set_prt)(struct amdgpu_device *adev, bool enable);
 };
 
 /* provided by the ih block */
@@ -570,6 +573,7 @@ struct amdgpu_mc {
 	uint32_t		vram_type;
 	uint32_t                srbm_soft_reset;
 	struct amdgpu_mode_mc_save save;
+	bool			prt_warning;
 };
 
 /*
@@ -708,6 +712,7 @@ void amdgpu_ctx_mgr_fini(struct amdgpu_ctx_mgr *mgr);
 
 struct amdgpu_fpriv {
 	struct amdgpu_vm	vm;
+	struct amdgpu_bo_va	*prt_va;
 	struct mutex		bo_list_lock;
 	struct idr		bo_list_handles;
 	struct amdgpu_ctx_mgr	ctx_mgr;
@@ -790,7 +795,7 @@ struct amdgpu_mec {
 	u32 num_pipe;
 	u32 num_mec;
 	u32 num_queue;
-	struct vi_mqd	*mqd_backup[AMDGPU_MAX_COMPUTE_RINGS + 1];
+	void			*mqd_backup[AMDGPU_MAX_COMPUTE_RINGS + 1];
 };
 
 struct amdgpu_kiq {
@@ -822,7 +827,7 @@ struct amdgpu_rb_config {
 	uint32_t raster_config_1;
 };
 
-struct amdgpu_gca_config {
+struct amdgpu_gfx_config {
 	unsigned max_shader_engines;
 	unsigned max_tile_pipes;
 	unsigned max_cu_per_sh;
@@ -874,7 +879,7 @@ struct amdgpu_gfx_funcs {
 
 struct amdgpu_gfx {
 	struct mutex			gpu_clock_mutex;
-	struct amdgpu_gca_config	config;
+	struct amdgpu_gfx_config	config;
 	struct amdgpu_rlc		rlc;
 	struct amdgpu_mec		mec;
 	struct amdgpu_kiq		kiq;
@@ -1053,7 +1058,6 @@ struct amdgpu_uvd {
 	bool			use_ctx_buf;
 	struct amd_sched_entity entity;
 	uint32_t                srbm_soft_reset;
-	bool			is_powergated;
 };
 
 /*
@@ -1082,7 +1086,6 @@ struct amdgpu_vce {
 	struct amd_sched_entity	entity;
 	uint32_t                srbm_soft_reset;
 	unsigned		num_rings;
-	bool			is_powergated;
 };
 
 /*
@@ -1349,6 +1352,19 @@ struct amdgpu_direct_gma {
 	atomic64_t		gart_usage;
 };
 
+#if defined(CONFIG_ZONE_DEVICE) && \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_SLE))
+#define CONFIG_ENABLE_SSG
+#endif
+
+struct amdgpu_ssg {
+	bool			enabled;
+#ifdef CONFIG_ENABLE_SSG
+	struct percpu_ref	ref;
+	struct completion	cmp;
+#endif
+};
+
 struct amdgpu_device {
 	struct device			*dev;
 	struct drm_device		*ddev;
@@ -1391,6 +1407,9 @@ struct amdgpu_device {
 	struct amdgpu_bo		*stollen_vga_memory;
 	struct amdgpu_direct_gma	direct_gma;
 	uint32_t			bios_scratch[AMDGPU_BIOS_NUM_SCRATCH];
+
+	/* SSG */
+	struct amdgpu_ssg		ssg;
 
 	/* Register/doorbell mmio */
 	resource_size_t			rmmio_base;
@@ -1533,6 +1552,7 @@ struct amdgpu_device {
 
 	/* record sparse bo counter */
 	atomic_t			sparse_bo_cnt;
+
 	/* record hw reset is performed */
 	bool has_hw_reset;
 
@@ -1770,6 +1790,7 @@ int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data);
 int amdgpu_cs_get_ring(struct amdgpu_device *adev, u32 ip_type,
 		       u32 ip_instance, u32 ring,
 		       struct amdgpu_ring **out_ring);
+void amdgpu_cs_report_moved_bytes(struct amdgpu_device *adev, u64 num_bytes);
 void amdgpu_ttm_placement_from_domain(struct amdgpu_bo *abo, u32 domain);
 bool amdgpu_ttm_bo_is_amdgpu_bo(struct ttm_buffer_object *bo);
 int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages);

@@ -644,6 +644,10 @@ static void update_stream_scaling_settings(
 	struct rect src = { 0 }; /* viewport in composition space*/
 	struct rect dst = { 0 }; /* stream addressable area */
 
+	/* no mode. nothing to be done */
+	if (!mode)
+		return;
+
 	/* Full screen scaling by default */
 	src.width = mode->hdisplay;
 	src.height = mode->vdisplay;
@@ -946,11 +950,11 @@ static void copy_crtc_timing_for_drm_display_mode(
 	dst_mode->crtc_hsync_end = src_mode->crtc_hsync_end;
 	dst_mode->crtc_htotal = src_mode->crtc_htotal;
 	dst_mode->crtc_hskew = src_mode->crtc_hskew;
-	dst_mode->crtc_vblank_start = src_mode->crtc_vblank_start;;
-	dst_mode->crtc_vblank_end = src_mode->crtc_vblank_end;;
-	dst_mode->crtc_vsync_start = src_mode->crtc_vsync_start;;
-	dst_mode->crtc_vsync_end = src_mode->crtc_vsync_end;;
-	dst_mode->crtc_vtotal = src_mode->crtc_vtotal;;
+	dst_mode->crtc_vblank_start = src_mode->crtc_vblank_start;
+	dst_mode->crtc_vblank_end = src_mode->crtc_vblank_end;
+	dst_mode->crtc_vsync_start = src_mode->crtc_vsync_start;
+	dst_mode->crtc_vsync_end = src_mode->crtc_vsync_end;
+	dst_mode->crtc_vtotal = src_mode->crtc_vtotal;
 }
 
 static void decide_crtc_timing_for_drm_display_mode(

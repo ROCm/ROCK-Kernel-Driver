@@ -59,9 +59,11 @@
  * - 3.7.0 - Add support for VCE clock list packet
  * - 3.8.0 - Add support raster config init in the kernel
  * - 3.9.0 - Add support for memory query info about VRAM and GTT.
+ * - 3.10.0 - Add support for sensor query info (clocks, temp, etc).
+ * - 3.11.0 - Add double offchip LDS buffers info for gfx config
  */
 #define KMS_DRIVER_MAJOR	3
-#define KMS_DRIVER_MINOR	9
+#define KMS_DRIVER_MINOR	11
 #define KMS_DRIVER_PATCHLEVEL	0
 
 int amdgpu_vram_limit = 0;
@@ -93,6 +95,7 @@ int amdgpu_sched_jobs = 32;
 int amdgpu_sched_hw_submission = 2;
 int amdgpu_no_evict = 0;
 int amdgpu_direct_gma_size = 0;
+int amdgpu_ssg_enabled = 0;
 unsigned amdgpu_pcie_gen_cap = 0;
 unsigned amdgpu_pcie_lane_cap = 0;
 unsigned amdgpu_cg_mask = 0xffffffff;
@@ -190,6 +193,9 @@ module_param_named(no_evict, amdgpu_no_evict, int, 0444);
 
 MODULE_PARM_DESC(direct_gma_size, "Direct GMA size in megabytes (max 96MB)");
 module_param_named(direct_gma_size, amdgpu_direct_gma_size, int, 0444);
+
+MODULE_PARM_DESC(ssg, "SSG support (1 = enable, 0 = disable (default))");
+module_param_named(ssg, amdgpu_ssg_enabled, int, 0444);
 
 MODULE_PARM_DESC(pcie_gen_cap, "PCIE Gen Caps (0: autodetect (default))");
 module_param_named(pcie_gen_cap, amdgpu_pcie_gen_cap, uint, 0444);

@@ -77,7 +77,7 @@ static int amdgpu_ttm_global_init(struct amdgpu_device *adev)
 	global_ref->size = sizeof(struct ttm_mem_global);
 	global_ref->init = &amdgpu_ttm_mem_global_init;
 	global_ref->release = &amdgpu_ttm_mem_global_release;
-	r = drm_global_item_ref(global_ref);
+	r = kcl_drm_global_item_ref(global_ref);
 	if (r) {
 		DRM_ERROR("Failed setting up TTM memory accounting "
 			  "subsystem.\n");
@@ -91,7 +91,7 @@ static int amdgpu_ttm_global_init(struct amdgpu_device *adev)
 	global_ref->size = sizeof(struct ttm_bo_global);
 	global_ref->init = &ttm_bo_global_init;
 	global_ref->release = &ttm_bo_global_release;
-	r = drm_global_item_ref(global_ref);
+	r = kcl_drm_global_item_ref(global_ref);
 	if (r) {
 		DRM_ERROR("Failed setting up TTM BO subsystem.\n");
 		goto error_bo;
@@ -111,9 +111,9 @@ static int amdgpu_ttm_global_init(struct amdgpu_device *adev)
 	return 0;
 
 error_entity:
-	drm_global_item_unref(&adev->mman.bo_global_ref.ref);
+	kcl_drm_global_item_unref(&adev->mman.bo_global_ref.ref);
 error_bo:
-	drm_global_item_unref(&adev->mman.mem_global_ref);
+	kcl_drm_global_item_unref(&adev->mman.mem_global_ref);
 error_mem:
 	return r;
 }
@@ -123,8 +123,8 @@ static void amdgpu_ttm_global_fini(struct amdgpu_device *adev)
 	if (adev->mman.mem_global_referenced) {
 		amd_sched_entity_fini(adev->mman.entity.sched,
 				      &adev->mman.entity);
-		drm_global_item_unref(&adev->mman.bo_global_ref.ref);
-		drm_global_item_unref(&adev->mman.mem_global_ref);
+		kcl_drm_global_item_unref(&adev->mman.bo_global_ref.ref);
+		kcl_drm_global_item_unref(&adev->mman.mem_global_ref);
 		adev->mman.mem_global_referenced = false;
 	}
 }
@@ -562,6 +562,9 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 	case TTM_PL_VRAM:
 	case AMDGPU_PL_DGMA:
 	case AMDGPU_PL_DGMA_IMPORT:
+		if (mem->start == AMDGPU_BO_INVALID_OFFSET)
+			return -EINVAL;
+
 		if (mem->mem_type != AMDGPU_PL_DGMA_IMPORT) {
 			mem->bus.offset = (mem->start << PAGE_SHIFT) + man->gpu_offset -
 					adev->mc.vram_start;
@@ -1221,6 +1224,83 @@ static void amdgpu_direct_gma_fini(struct amdgpu_device *adev)
 	adev->gart_pin_size -= (u64)amdgpu_direct_gma_size << 20;
 }
 
+#ifdef CONFIG_ENABLE_SSG
+#include <linux/memremap.h>
+
+static struct amdgpu_ssg *to_amdgpu_ssg(struct percpu_ref *ref)
+{
+	return container_of(ref, struct amdgpu_ssg, ref);
+}
+
+static void amdgpu_ssg_percpu_release(struct percpu_ref *ref)
+{
+	struct amdgpu_ssg *ssg = to_amdgpu_ssg(ref);
+
+	complete(&ssg->cmp);
+}
+
+static int amdgpu_ssg_init(struct amdgpu_device *adev)
+{
+	struct resource res;
+	void *addr;
+	int rc;
+
+	adev->ssg.enabled = false;
+
+	if (!amdgpu_ssg_enabled)
+		return 0;
+
+	if (amdgpu_direct_gma_size == 0) {
+		DRM_INFO("SSG: not enabled due to DirectGMA is disabled\n");
+		return 0;
+	}
+
+	init_completion(&adev->ssg.cmp);
+
+	res.start = adev->mc.aper_base +
+		(amdgpu_bo_gpu_offset(adev->direct_gma.dgma_bo) -
+		 adev->mc.vram_start);
+	res.end = res.start + amdgpu_bo_size(adev->direct_gma.dgma_bo);
+	res.name = "DirectGMA";
+
+	rc = percpu_ref_init(&adev->ssg.ref, amdgpu_ssg_percpu_release,
+			     0, GFP_KERNEL);
+	if (rc)
+		return rc;
+
+	addr = devm_memremap_pages(adev->dev, &res, &adev->ssg.ref, NULL);
+	if (IS_ERR(addr)) {
+		percpu_ref_exit(&adev->ssg.ref);
+		return PTR_ERR(addr);
+	}
+
+	adev->ssg.enabled = true;
+	DRM_INFO("SSG: remap %llx-%llx to %p\n", res.start, res.end, addr);
+	return 0;
+}
+
+static void amdgpu_ssg_fini(struct amdgpu_device *adev)
+{
+	if (!adev->ssg.enabled)
+		return;
+
+	percpu_ref_kill(&adev->ssg.ref);
+	wait_for_completion(&adev->ssg.cmp);
+	percpu_ref_exit(&adev->ssg.ref);
+}
+#else
+static int amdgpu_ssg_init(struct amdgpu_device *adev)
+{
+	adev->ssg.enabled = false;
+	return 0;
+}
+
+static void amdgpu_ssg_fini(struct amdgpu_device *adev)
+{
+
+}
+#endif
+
 int amdgpu_ttm_init(struct amdgpu_device *adev)
 {
 	int r;
@@ -1279,6 +1359,7 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 		 (unsigned)(adev->mc.gtt_size / (1024 * 1024)));
 
 	amdgpu_direct_gma_init(adev);
+	amdgpu_ssg_init(adev);
 
 	adev->gds.mem.total_size = adev->gds.mem.total_size << AMDGPU_GDS_SHIFT;
 	adev->gds.mem.gfx_partition_size = adev->gds.mem.gfx_partition_size << AMDGPU_GDS_SHIFT;
@@ -1336,6 +1417,7 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 		}
 		amdgpu_bo_unref(&adev->stollen_vga_memory);
 	}
+	amdgpu_ssg_fini(adev);
 	amdgpu_direct_gma_fini(adev);
 	ttm_bo_clean_mm(&adev->mman.bdev, TTM_PL_VRAM);
 	ttm_bo_clean_mm(&adev->mman.bdev, TTM_PL_TT);

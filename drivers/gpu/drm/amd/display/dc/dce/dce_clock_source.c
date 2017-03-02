@@ -390,25 +390,24 @@ static bool pll_adjust_pix_clk(
 	struct bp_adjust_pixel_clock_parameters bp_adjust_pixel_clock_params = {
 							0 };
 	enum bp_result bp_result;
-
 	switch (pix_clk_params->signal_type) {
 	case SIGNAL_TYPE_HDMI_TYPE_A: {
 		requested_clk_khz = pix_clk_params->requested_pix_clk;
-
-		switch (pix_clk_params->color_depth) {
-		case COLOR_DEPTH_101010:
-			requested_clk_khz = (requested_clk_khz * 5) >> 2;
-			break; /* x1.25*/
-		case COLOR_DEPTH_121212:
-			requested_clk_khz = (requested_clk_khz * 6) >> 2;
-			break; /* x1.5*/
-		case COLOR_DEPTH_161616:
-			requested_clk_khz = requested_clk_khz * 2;
-			break; /* x2.0*/
-		default:
-			break;
+		if (pix_clk_params->pixel_encoding != PIXEL_ENCODING_YCBCR422) {
+			switch (pix_clk_params->color_depth) {
+			case COLOR_DEPTH_101010:
+				requested_clk_khz = (requested_clk_khz * 5) >> 2;
+				break; /* x1.25*/
+			case COLOR_DEPTH_121212:
+				requested_clk_khz = (requested_clk_khz * 6) >> 2;
+				break; /* x1.5*/
+			case COLOR_DEPTH_161616:
+				requested_clk_khz = requested_clk_khz * 2;
+				break; /* x2.0*/
+			default:
+				break;
+			}
 		}
-
 		actual_pix_clk_khz = requested_clk_khz;
 	}
 		break;
@@ -853,18 +852,20 @@ static bool dce110_program_pix_clk(
 		 * during PLL Reset, but they do not have effect
 		 * until SS_EN is asserted.*/
 		if (clock_source->id != CLOCK_SOURCE_ID_EXTERNAL
-			&& pix_clk_params->flags.ENABLE_SS && !dc_is_dp_signal(
-							pix_clk_params->signal_type)) {
+				&& !dc_is_dp_signal(pix_clk_params->signal_type)) {
 
-			if (!enable_spread_spectrum(clk_src,
-							pix_clk_params->signal_type,
-							pll_settings))
-				return false;
+			if (pix_clk_params->flags.ENABLE_SS)
+				if (!enable_spread_spectrum(clk_src,
+								pix_clk_params->signal_type,
+								pll_settings))
+					return false;
+
 			/* Resync deep color DTO */
 			dce110_program_pixel_clk_resync(clk_src,
 						pix_clk_params->signal_type,
 						pix_clk_params->color_depth);
 		}
+
 		break;
 	case DCE_VERSION_11_2:
 		if (clock_source->id != CLOCK_SOURCE_ID_DP_DTO) {
