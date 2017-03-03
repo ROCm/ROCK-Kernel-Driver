@@ -1877,6 +1877,12 @@ static int kfd_ioctl_get_tile_config(struct file *filep,
 	return 0;
 }
 
+#if defined(BUILD_AS_DKMS)
+static int kfd_ioctl_cross_memory_copy(struct file *filep,
+				       struct kfd_process *local_p, void *data)
+{
+}
+#else
 static int kfd_ioctl_cross_memory_copy(struct file *filep,
 				       struct kfd_process *local_p, void *data)
 {
@@ -2117,6 +2123,7 @@ copy_from_user_fail:
 	args->bytes_copied = total_copied;
 	return err;
 }
+#endif
 
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, .cmd_drv = 0, .name = #ioctl}
