@@ -3022,11 +3022,15 @@ static uint32_t update_in_val_sets_stream(
 	}
 
 	val_sets[i].stream = new_stream;
+	dc_stream_retain(new_stream);
 	crtcs[i] = crtc;
 
 	if (i == set_count) {
 		/* nothing found. add new one to the end */
 		return set_count + 1;
+	} else {
+		/* update. relase old stream */
+		dc_stream_release(old_stream);
 	}
 
 	return set_count;
@@ -3048,6 +3052,7 @@ static uint32_t remove_from_val_sets(
 		return set_count;
 	}
 
+	dc_stream_release(stream);
 	set_count--;
 
 	for (; i < set_count; i++) {
@@ -3152,6 +3157,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 
 		if (acrtc->stream) {
+			dc_stream_retain(acrtc->stream);
 			dm_state->set[dm_state->set_count].stream = acrtc->stream;
 			crtc_set[dm_state->set_count] = crtc;
 			++dm_state->set_count;
