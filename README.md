@@ -31,21 +31,11 @@ from 3.19 and onward.
 #### Target Platform
 
 This release is intended for use with any hardware configuration that
-contains only a Kaveri or Carrizo APU, or configurations which contain
-an Intel Haswell or newer CPU plus Fiji dGPUs.
-
-APU motherboards must support run latest BIOS version and have the IOMMU
-enabled in the BIOS.
+contains configurations which contain
+an Intel Haswell or newer CPU, AMD Ryzen CPU plus GFX8 or newer dGPUs.
 
 The following is a reference hardware configuration that was used for
 testing purposes:
-
-APU Config:
-* APU:            AMD A10-7850K APU
-* Motherboard:    ASUS A88X-PRO motherboard (ATX form factor)
-* Memory:         G.SKILL Ripjaws X Series 16GB (2 x 8GB) 240-Pin DDR3 SDRAM DDR3 2133
-* OS:             Ubuntu 14.04 64-bit edition
-* No discrete GPU present in the system
 
 dGPU Config:
 * CPU:            Intel i7-4790
