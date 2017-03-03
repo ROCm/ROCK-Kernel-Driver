@@ -228,7 +228,11 @@ struct drm_amdgpu_gem_userptr {
 #define AMDGPU_TILING_MACRO_TILE_ASPECT_MASK		0x3
 #define AMDGPU_TILING_NUM_BANKS_SHIFT			21
 #define AMDGPU_TILING_NUM_BANKS_MASK			0x3
+/* Tiling flags for GFX9. */
+#define AMDGPU_TILING_SWIZZLE_MODE_SHIFT		0
+#define AMDGPU_TILING_SWIZZLE_MODE_MASK			0x1f
 
+/* Set/Get helpers for tiling flags. */
 #define AMDGPU_TILING_SET(field, value) \
 	(((value) & AMDGPU_TILING_##field##_MASK) << AMDGPU_TILING_##field##_SHIFT)
 #define AMDGPU_TILING_GET(value, field) \
