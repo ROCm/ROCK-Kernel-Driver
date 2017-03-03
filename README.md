@@ -32,7 +32,7 @@ from 3.19 and onward.
 
 This release is intended for use with any hardware configuration that
 contains configurations which contain
-an Intel Haswell or newer CPU, AMD Ryzen CPU plus GFX8 or newer dGPUs.
+an Intel Haswell or newer CPU, AMD Ryzen CPU plus GFX8 or newer dGPUs.  Please see https://rocm.github.io/hardware.html for list all hardware supported 
 
 The following is a reference hardware configuration that was used for
 testing purposes:
