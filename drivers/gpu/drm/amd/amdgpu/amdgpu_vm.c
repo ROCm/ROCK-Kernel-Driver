@@ -1045,6 +1045,9 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 	flags &= ~AMDGPU_PTE_EXECUTABLE;
 	flags |= mapping->flags & AMDGPU_PTE_EXECUTABLE;
 
+	flags &= ~AMDGPU_PTE_MTYPE_MASK;
+	flags |= (mapping->flags & AMDGPU_PTE_MTYPE_MASK);
+
 	trace_amdgpu_vm_bo_update(mapping);
 
 	pfn = mapping->offset >> PAGE_SHIFT;
