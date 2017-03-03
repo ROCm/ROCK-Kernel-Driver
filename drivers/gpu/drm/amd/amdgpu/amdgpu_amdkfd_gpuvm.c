@@ -2142,7 +2142,6 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 				    &pd_bo_list[i]);
 		i++;
 	}
-	mutex_unlock(&process_info->lock);
 
 	/* Needed to splicing and cutting the lists */
 	last_pd_bo_entry = list_last_entry(&ctx.list,
@@ -2150,7 +2149,6 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 					   tv.head);
 
 	/* Reserve all BOs and page tables/directory. */
-	mutex_lock(&process_info->lock);
 	list_splice_init(&ctx.list, &process_info->kfd_bo_list);
 	ret = ttm_eu_reserve_buffers(&ctx.ticket, &process_info->kfd_bo_list,
 				     false, &duplicate_save);
@@ -2183,30 +2181,23 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 			goto validate_map_fail;
 		}
 	}
-        /* This isn't used for PTs any more, but can there be other
-	 * duplicates? */
-	WARN_ONCE(!list_empty(&ctx.duplicates), "Duplicates not empty");
-	list_for_each_entry(entry, &ctx.duplicates, tv.head) {
-		struct amdgpu_bo *bo = entry->robj;
 
-		ret = amdgpu_amdkfd_bo_validate(bo, bo->prefered_domains,
-						false);
+	param.domain = AMDGPU_GEM_DOMAIN_VRAM;
+	param.wait = false;
+
+	/* Validate PTs*/
+	list_for_each_entry(peer_vm, &process_info->vm_list_head,
+			vm_list_node) {
+		adev = amdgpu_ttm_adev(peer_vm->base.page_directory->tbo.bdev);
+		ret = amdgpu_vm_validate_pt_bos(adev, &peer_vm->base,
+				amdgpu_amdkfd_validate, &param);
 		if (ret) {
 			pr_debug("Memory eviction: Validate PTs failed. Try again\n");
 			goto validate_map_fail;
 		}
+		peer_vm->base.last_eviction_counter =
+				atomic64_read(&adev->num_evictions);
 	}
-	param.domain = AMDGPU_GEM_DOMAIN_VRAM;
-	param.wait = false;
-	adev = amdgpu_ttm_adev(peer_vm->base.page_directory->tbo.bdev);
-	ret = amdgpu_vm_validate_pt_bos(adev, &peer_vm->base,
-					amdgpu_amdkfd_validate, &param);
-	if (ret) {
-		pr_debug("Memory eviction: Validate failed. Try again\n");
-		goto validate_map_fail;
-	}
-	peer_vm->base.last_eviction_counter =
-		atomic64_read(&adev->num_evictions);
 
 	/* Wait for PD/PTs validate to finish and attach eviction fence.
 	 * PD/PT share the same reservation object
