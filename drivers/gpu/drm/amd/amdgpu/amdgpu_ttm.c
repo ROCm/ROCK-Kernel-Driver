@@ -182,37 +182,6 @@ static int amdgpu_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 	return 0;
 }
 
-static bool amdgpu_bo_eviction_valuable(struct ttm_buffer_object *bo,
-					const struct ttm_place *place)
-{
-	struct reservation_object_list *flist;
-	struct fence *f;
-	int i;
-
-	/* Don't evict this BO if it's outside of the
-	 * requested placement range
-	 */
-	if (!ttm_bo_eviction_valuable(bo, place))
-		return false;
-
-	/* If bo is a KFD BO, check if the bo belongs to the current process.
-	 * If true, then return false as any KFD process needs all its BOs to
-	 * be resident to run successfully
-	 */
-	flist = reservation_object_get_list(bo->resv);
-	if (!flist)
-		return true;
-
-	for (i = 0; i < flist->shared_count; ++i) {
-		f = rcu_dereference_protected(flist->shared[i],
-			reservation_object_held(bo->resv));
-		if (amd_kfd_fence_check_mm(f, current->mm))
-			return false;
-	}
-
-	return true;
-}
-
 static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 				struct ttm_placement *placement)
 {
@@ -1125,8 +1094,25 @@ uint64_t amdgpu_ttm_tt_pte_flags(struct amdgpu_device *adev, struct ttm_tt *ttm,
 static bool amdgpu_ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 					    const struct ttm_place *place)
 {
+	struct reservation_object_list *flist;
+	struct fence *f;
+	int i;
 	unsigned long num_pages = bo->mem.num_pages;
 	struct drm_mm_node *node = bo->mem.mm_node;
+
+	/* If bo is a KFD BO, check if the bo belongs to the current process.
+	 * If true, then return false as any KFD process needs all its BOs to
+	 * be resident to run successfully
+	 */
+	flist = reservation_object_get_list(bo->resv);
+	if (flist) {
+		for (i = 0; i < flist->shared_count; ++i) {
+			f = rcu_dereference_protected(flist->shared[i],
+				reservation_object_held(bo->resv));
+			if (amd_kfd_fence_check_mm(f, current->mm))
+				return false;
+		}
+	}
 
 	if (bo->mem.start != AMDGPU_BO_INVALID_OFFSET)
 		return ttm_bo_eviction_valuable(bo, place);
@@ -1160,7 +1146,7 @@ static struct ttm_bo_driver amdgpu_bo_driver = {
 	.ttm_tt_unpopulate = &amdgpu_ttm_tt_unpopulate,
 	.invalidate_caches = &amdgpu_invalidate_caches,
 	.init_mem_type = &amdgpu_init_mem_type,
-	.eviction_valuable = amdgpu_bo_eviction_valuable,
+	.eviction_valuable = amdgpu_ttm_bo_eviction_valuable,
 	.evict_flags = &amdgpu_evict_flags,
 	.move = &amdgpu_bo_move,
 	.verify_access = &amdgpu_verify_access,
