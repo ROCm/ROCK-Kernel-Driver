@@ -32,9 +32,9 @@ struct aa_net {
 
 extern struct aa_fs_entry aa_fs_entry_network[];
 
-extern int aa_net_perm(int op, struct aa_profile *profile, u16 family,
+extern int aa_net_perm(const char *op, struct aa_profile *profile, u16 family,
 		       int type, int protocol, struct sock *sk);
-extern int aa_revalidate_sk(int op, struct sock *sk);
+extern int aa_revalidate_sk(const char *op, struct sock *sk);
 
 static inline void aa_free_net_rules(struct aa_net *new)
 {

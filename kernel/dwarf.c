@@ -300,12 +300,12 @@ void __init dwarf_init(void)
 {
 	extern const char __start_unwind[], __end_unwind[];
 	extern const char __start_unwind_hdr[], __end_unwind_hdr[];
-#ifdef CONFIG_DEBUG_RODATA
+#ifdef CONFIG_STRICT_KERNEL_RWX
 	unsigned long text_len = _etext - _text;
 	const void *init_start = __init_begin;
 	unsigned long init_len = __init_end - __init_begin;
 #else
-	unsigned long text_len = _end - _text,
+	unsigned long text_len = _end - _text;
 	const void *init_start = NULL;
 	unsigned long init_len = 0;
 #endif
