@@ -43,24 +43,26 @@ int pipe_priority_map[] = {
 	KFD_PIPE_PRIORITY_CS_HIGH
 };
 
-/* Mapping queue priority to SPI priority, indexed by queue priority */
+/* Mapping queue priority to SPI priority, indexed by queue priority
+ * SPI priority 2 and 3 are reserved for trap handler context save
+ */
 int spi_priority_map[] = {
 	KFD_SPI_PRIORITY_EXTRA_LOW,
 	KFD_SPI_PRIORITY_EXTRA_LOW,
 	KFD_SPI_PRIORITY_EXTRA_LOW,
 	KFD_SPI_PRIORITY_EXTRA_LOW,
+	KFD_SPI_PRIORITY_EXTRA_LOW,
+	KFD_SPI_PRIORITY_EXTRA_LOW,
+	KFD_SPI_PRIORITY_EXTRA_LOW,
+	KFD_SPI_PRIORITY_EXTRA_LOW,
 	KFD_SPI_PRIORITY_LOW,
 	KFD_SPI_PRIORITY_LOW,
 	KFD_SPI_PRIORITY_LOW,
 	KFD_SPI_PRIORITY_LOW,
-	KFD_SPI_PRIORITY_MEDIUM,
-	KFD_SPI_PRIORITY_MEDIUM,
-	KFD_SPI_PRIORITY_MEDIUM,
-	KFD_SPI_PRIORITY_MEDIUM,
-	KFD_SPI_PRIORITY_HIGH,
-	KFD_SPI_PRIORITY_HIGH,
-	KFD_SPI_PRIORITY_HIGH,
-	KFD_SPI_PRIORITY_HIGH
+	KFD_SPI_PRIORITY_LOW,
+	KFD_SPI_PRIORITY_LOW,
+	KFD_SPI_PRIORITY_LOW,
+	KFD_SPI_PRIORITY_LOW
 };
 
 struct mqd_manager *mqd_manager_init(enum KFD_MQD_TYPE type,
