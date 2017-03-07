@@ -1087,7 +1087,7 @@ static void amdgpu_switcheroo_set_state(struct pci_dev *pdev, enum vga_switchero
 	if (state == VGA_SWITCHEROO_ON) {
 		unsigned d3_delay = dev->pdev->d3_delay;
 
-		printk(KERN_INFO "amdgpu: switched on\n");
+		pr_info("amdgpu: switched on\n");
 		/* don't suspend or resume card normally */
 		dev->switch_power_state = DRM_SWITCH_POWER_CHANGING;
 
@@ -1098,7 +1098,7 @@ static void amdgpu_switcheroo_set_state(struct pci_dev *pdev, enum vga_switchero
 		dev->switch_power_state = DRM_SWITCH_POWER_ON;
 		drm_kms_helper_poll_enable(dev);
 	} else {
-		printk(KERN_INFO "amdgpu: switched off\n");
+		pr_info("amdgpu: switched off\n");
 		drm_kms_helper_poll_disable(dev);
 		dev->switch_power_state = DRM_SWITCH_POWER_CHANGING;
 		amdgpu_device_suspend(dev, true, true);
@@ -1979,12 +1979,6 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		else
 			DRM_INFO("amdgpu: acceleration disabled, skipping move tests\n");
 	}
-	if ((amdgpu_testing & 2)) {
-		if (adev->accel_working)
-			amdgpu_test_syncing(adev);
-		else
-			DRM_INFO("amdgpu: acceleration disabled, skipping sync tests\n");
-	}
 	if (amdgpu_benchmarking) {
 		if (adev->accel_working)
 			amdgpu_benchmark(adev, amdgpu_benchmarking);
@@ -2212,8 +2206,11 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 	}
 
 	r = amdgpu_late_init(adev);
-	if (r)
+	if (r) {
+		if (fbcon)
+			console_unlock();
 		return r;
+	}
 
 	/* pin cursors */
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
