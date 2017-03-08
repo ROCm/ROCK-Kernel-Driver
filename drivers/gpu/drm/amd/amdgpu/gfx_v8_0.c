@@ -6560,6 +6560,9 @@ static void gfx_v8_0_ring_emit_ib_gfx(struct amdgpu_ring *ring,
 
 	control |= ib->length_dw | (vm_id << 24);
 
+	if (amdgpu_sriov_vf(ring->adev) && ib->flags & AMDGPU_IB_FLAG_PREEMPT)
+		control |= (1<<21);
+
 	amdgpu_ring_write(ring, header);
 	amdgpu_ring_write(ring,
 #ifdef __BIG_ENDIAN
