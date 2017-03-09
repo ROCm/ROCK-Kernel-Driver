@@ -52,17 +52,11 @@ void amdgpu_dm_encoder_destroy(struct drm_encoder *encoder);
 
 int amdgpu_dm_connector_get_modes(struct drm_connector *connector);
 
-int amdgpu_dm_atomic_commit(
-	struct drm_device *dev,
-	struct drm_atomic_state *state,
-	bool async);
+void amdgpu_dm_atomic_commit_tail(
+	struct drm_atomic_state *state);
+
 int amdgpu_dm_atomic_check(struct drm_device *dev,
 				struct drm_atomic_state *state);
-
-int dm_create_validation_set_for_stream(
-	struct drm_connector *connector,
-	struct drm_display_mode *mode,
-	struct dc_validation_set *val_set);
 
 void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector);
 struct drm_connector_state *amdgpu_dm_connector_atomic_duplicate_state(

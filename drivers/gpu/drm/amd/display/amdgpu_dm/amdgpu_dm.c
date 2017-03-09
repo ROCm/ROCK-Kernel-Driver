@@ -28,6 +28,7 @@
 
 #include "vid.h"
 #include "amdgpu.h"
+#include "amdgpu_display.h"
 #include "atom.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_types.h"
@@ -154,7 +155,6 @@ static struct amdgpu_crtc *get_crtc_by_otg_inst(
 
 static void dm_pflip_high_irq(void *interrupt_params)
 {
-	struct amdgpu_flip_work *works;
 	struct amdgpu_crtc *amdgpu_crtc;
 	struct common_irq_params *irq_params = interrupt_params;
 	struct amdgpu_device *adev = irq_params->adev;
@@ -170,7 +170,6 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	}
 
 	spin_lock_irqsave(&adev->ddev->event_lock, flags);
-	works = amdgpu_crtc->pflip_works;
 
 	if (amdgpu_crtc->pflip_status != AMDGPU_FLIP_SUBMITTED){
 		DRM_DEBUG_DRIVER("amdgpu_crtc->pflip_status = %d !=AMDGPU_FLIP_SUBMITTED(%d) on crtc:%d[%p] \n",
@@ -182,22 +181,24 @@ static void dm_pflip_high_irq(void *interrupt_params)
 		return;
 	}
 
-	/* page flip completed. clean up */
-	amdgpu_crtc->pflip_status = AMDGPU_FLIP_NONE;
-	amdgpu_crtc->pflip_works = NULL;
 
 	/* wakeup usersapce */
-	if (works->event)
-		drm_crtc_send_vblank_event(&amdgpu_crtc->base,
-					   works->event);
+	if (amdgpu_crtc->event
+			&& amdgpu_crtc->event->event.base.type
+			== DRM_EVENT_FLIP_COMPLETE) {
+		drm_crtc_send_vblank_event(&amdgpu_crtc->base, amdgpu_crtc->event);
+		/* page flip completed. clean up */
+		amdgpu_crtc->event = NULL;
+	} else
+		WARN_ON(1);
 
+	amdgpu_crtc->pflip_status = AMDGPU_FLIP_NONE;
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 
-	DRM_DEBUG_DRIVER("%s - crtc :%d[%p], pflip_stat:AMDGPU_FLIP_NONE, work: %p,\n",
-					__func__, amdgpu_crtc->crtc_id, amdgpu_crtc, works);
+	DRM_DEBUG_DRIVER("%s - crtc :%d[%p], pflip_stat:AMDGPU_FLIP_NONE\n",
+					__func__, amdgpu_crtc->crtc_id, amdgpu_crtc);
 
 	drm_crtc_vblank_put(&amdgpu_crtc->base);
-	schedule_work(&works->unpin_work);
 }
 
 static void dm_crtc_high_irq(void *interrupt_params)
@@ -456,28 +457,17 @@ static int dm_suspend(void *handle)
 	struct amdgpu_device *adev = handle;
 	struct amdgpu_display_manager *dm = &adev->dm;
 	int ret = 0;
-	struct drm_crtc *crtc;
 
 	s3_handle_mst(adev->ddev, true);
 
-	/* flash all pending vblank events and turn interrupt off
-	 * before disabling CRTCs. They will be enabled back in
-	 * dm_display_resume
-	 */
-	drm_modeset_lock_all(adev->ddev);
-	list_for_each_entry(crtc, &adev->ddev->mode_config.crtc_list, head) {
-		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
-		if (acrtc->stream)
-				drm_crtc_vblank_off(crtc);
-	}
-	drm_modeset_unlock_all(adev->ddev);
-
 	amdgpu_dm_irq_suspend(adev);
+
+	adev->dm.cached_state = drm_atomic_helper_suspend(adev->ddev);
 
 	dc_set_power_state(
 		dm->dc,
-		DC_ACPI_CM_POWER_STATE_D3,
-		DC_VIDEO_POWER_SUSPEND);
+		DC_ACPI_CM_POWER_STATE_D3
+		);
 
 	return ret;
 }
@@ -509,120 +499,6 @@ struct amdgpu_connector *amdgpu_dm_find_first_crct_matching_connector(
 	return NULL;
 }
 
-static int dm_display_resume(struct drm_device *ddev)
-{
-	int ret = 0;
-	struct drm_connector *connector;
-
-	struct drm_atomic_state *state = drm_atomic_state_alloc(ddev);
-	struct drm_plane *plane;
-	struct drm_crtc *crtc;
-	struct amdgpu_connector *aconnector;
-	struct drm_connector_state *conn_state;
-
-	if (!state)
-		return ENOMEM;
-
-	state->acquire_ctx = ddev->mode_config.acquire_ctx;
-
-	/* Construct an atomic state to restore previous display setting */
-
-	/*
-	 * Attach connectors to drm_atomic_state
-	 * Should be done in the first place in order to make connectors
-	 * available in state during crtc state processing. It is used for
-	 * making decision if crtc should be disabled in case sink got
-	 * disconnected.
-	 *
-	 * Connectors state crtc with NULL dc_sink should be cleared, because it
-	 * will fail validation during commit
-	 */
-	list_for_each_entry(connector, &ddev->mode_config.connector_list, head) {
-		aconnector = to_amdgpu_connector(connector);
-		conn_state = drm_atomic_get_connector_state(state, connector);
-
-		ret = PTR_ERR_OR_ZERO(conn_state);
-		if (ret)
-			goto err;
-	}
-
-	/* Attach crtcs to drm_atomic_state*/
-	list_for_each_entry(crtc, &ddev->mode_config.crtc_list, head) {
-		struct drm_crtc_state *crtc_state =
-			drm_atomic_get_crtc_state(state, crtc);
-
-		ret = PTR_ERR_OR_ZERO(crtc_state);
-		if (ret)
-			goto err;
-
-		/* force a restore */
-		crtc_state->mode_changed = true;
-	}
-
-
-	/* Attach planes to drm_atomic_state */
-	list_for_each_entry(plane, &ddev->mode_config.plane_list, head) {
-
-		struct drm_crtc *crtc;
-		struct drm_gem_object *obj;
-		struct drm_framebuffer *fb;
-		struct amdgpu_framebuffer *afb;
-		struct amdgpu_bo *rbo;
-		int r;
-		struct drm_plane_state *plane_state = drm_atomic_get_plane_state(state, plane);
-
-		ret = PTR_ERR_OR_ZERO(plane_state);
-		if (ret)
-			goto err;
-
-		crtc = plane_state->crtc;
-		fb = plane_state->fb;
-
-		if (!crtc || !crtc->state || !crtc->state->active)
-			continue;
-
-		if (!fb) {
-			DRM_DEBUG_KMS("No FB bound\n");
-			return 0;
-		}
-
-		/*
-		 * Pin back the front buffers, cursor buffer was already pinned
-		 * back in amdgpu_resume_kms
-		 */
-
-		afb = to_amdgpu_framebuffer(fb);
-
-		obj = afb->obj;
-		rbo = gem_to_amdgpu_bo(obj);
-		r = amdgpu_bo_reserve(rbo, false);
-		if (unlikely(r != 0))
-		       return r;
-
-		r = amdgpu_bo_pin(rbo, AMDGPU_GEM_DOMAIN_VRAM, NULL);
-
-		amdgpu_bo_unreserve(rbo);
-
-		if (unlikely(r != 0)) {
-			DRM_ERROR("Failed to pin framebuffer\n");
-			return r;
-		}
-
-	}
-
-
-	/* Call commit internally with the state we just constructed */
-	ret = drm_atomic_commit(state);
-	if (!ret)
-		return 0;
-
-err:
-	DRM_ERROR("Restoring old state failed with %i\n", ret);
-	drm_atomic_state_free(state);
-
-	return ret;
-}
-
 static int dm_resume(void *handle)
 {
 	struct amdgpu_device *adev = handle;
@@ -631,8 +507,8 @@ static int dm_resume(void *handle)
 	/* power on hardware */
 	dc_set_power_state(
 		dm->dc,
-		DC_ACPI_CM_POWER_STATE_D0,
-		DC_VIDEO_POWER_ON);
+		DC_ACPI_CM_POWER_STATE_D0
+		);
 
 	return 0;
 }
@@ -643,8 +519,10 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 	struct amdgpu_display_manager *dm = &adev->dm;
 	struct amdgpu_connector *aconnector;
 	struct drm_connector *connector;
-	int ret = 0;
 	struct drm_crtc *crtc;
+	struct drm_crtc_state *crtc_state;
+	int ret = 0;
+	int i;
 
 	/* program HPD filter */
 	dc_resume(dm->dc);
@@ -657,14 +535,6 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 	 * pulse interrupts are used for MST
 	 */
 	amdgpu_dm_irq_resume_early(adev);
-
-	drm_modeset_lock_all(ddev);
-	list_for_each_entry(crtc, &ddev->mode_config.crtc_list, head) {
-		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
-		if (acrtc->stream)
-				drm_crtc_vblank_on(crtc);
-	}
-	drm_modeset_unlock_all(ddev);
 
 	/* Do detection*/
 	list_for_each_entry(connector,
@@ -683,9 +553,11 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 		amdgpu_dm_update_connector_after_detect(aconnector);
 	}
 
-	drm_modeset_lock_all(ddev);
-	ret = dm_display_resume(ddev);
-	drm_modeset_unlock_all(ddev);
+	/* Force mode set in atomic comit */
+	for_each_crtc_in_state(adev->dm.cached_state, crtc, crtc_state, i)
+			crtc_state->active_changed = true;
+
+	ret = drm_atomic_helper_resume(ddev, adev->dm.cached_state);
 
 	amdgpu_dm_irq_resume(adev);
 
@@ -721,8 +593,14 @@ const struct amdgpu_ip_block_version dm_ip_block =
 
 /* TODO: it is temporary non-const, should fixed later */
 static struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
+	.fb_create = amdgpu_user_framebuffer_create,
+	.output_poll_changed = amdgpu_output_poll_changed,
 	.atomic_check = amdgpu_dm_atomic_check,
-	.atomic_commit = amdgpu_dm_atomic_commit
+	.atomic_commit = drm_atomic_helper_commit
+};
+
+static struct drm_mode_config_helper_funcs amdgpu_dm_mode_config_helperfuncs = {
+	.atomic_commit_tail = amdgpu_dm_atomic_commit_tail
 };
 
 void amdgpu_dm_update_connector_after_detect(
@@ -1094,12 +972,8 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 
 	adev->mode_info.mode_config_initialized = true;
 
-	amdgpu_dm_mode_funcs.fb_create =
-		amdgpu_mode_funcs.fb_create;
-	amdgpu_dm_mode_funcs.output_poll_changed =
-		amdgpu_mode_funcs.output_poll_changed;
-
 	adev->ddev->mode_config.funcs = (void *)&amdgpu_dm_mode_funcs;
+	adev->ddev->mode_config.helper_private = &amdgpu_dm_mode_config_helperfuncs;
 
 	adev->ddev->mode_config.max_width = 16384;
 	adev->ddev->mode_config.max_height = 16384;
@@ -1353,6 +1227,14 @@ static void dm_page_flip(struct amdgpu_device *adev,
 	acrtc = adev->mode_info.crtcs[crtc_id];
 	stream = acrtc->stream;
 
+
+	if (acrtc->pflip_status != AMDGPU_FLIP_NONE) {
+		DRM_ERROR("flip queue: acrtc %d, already busy\n", acrtc->crtc_id);
+		/* In commit tail framework this cannot happen */
+		BUG_ON(0);
+	}
+
+
 	/*
 	 * Received a page flip call after the display has been reset.
 	 * Just return in this case. Everything should be clean-up on reset.
@@ -1367,15 +1249,28 @@ static void dm_page_flip(struct amdgpu_device *adev,
 	addr.address.grph.addr.high_part = upper_32_bits(crtc_base);
 	addr.flip_immediate = async;
 
+
+	if (acrtc->base.state->event &&
+	    acrtc->base.state->event->event.base.type ==
+			    DRM_EVENT_FLIP_COMPLETE) {
+		acrtc->event = acrtc->base.state->event;
+
+		/* Set the flip status */
+		acrtc->pflip_status = AMDGPU_FLIP_SUBMITTED;
+
+		/* Mark this event as consumed */
+		acrtc->base.state->event = NULL;
+	}
+
+	dc_flip_surface_addrs(adev->dm.dc,
+			      dc_stream_get_status(stream)->surfaces,
+			      &addr, 1);
+
 	DRM_DEBUG_DRIVER("%s Flipping to hi: 0x%x, low: 0x%x \n",
 			 __func__,
 			 addr.address.grph.addr.high_part,
 			 addr.address.grph.addr.low_part);
 
-	dc_flip_surface_addrs(
-			adev->dm.dc,
-			dc_stream_get_status(stream)->surfaces,
-			&addr, 1);
 }
 
 static int amdgpu_notify_freesync(struct drm_device *dev, void *data,

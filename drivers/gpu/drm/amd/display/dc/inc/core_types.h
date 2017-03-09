@@ -109,8 +109,6 @@ struct core_sink {
 	/* not used for now */
 	struct core_link *link;
 	struct dc_context *ctx;
-	uint32_t dongle_max_pix_clk;
-	bool converter_disable_audio;
 };
 
 /************ link *****************/
@@ -239,6 +237,7 @@ struct resource_pool {
 	unsigned int pipe_count;
 	unsigned int underlay_pipe_index;
 	unsigned int stream_enc_count;
+	unsigned int ref_clock_inKhz;
 
 	/*
 	 * reserved clock source for DP
