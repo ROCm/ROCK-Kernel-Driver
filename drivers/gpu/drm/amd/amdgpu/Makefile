@@ -45,7 +45,8 @@ amdgpu-y += \
 # add GMC block
 amdgpu-y += \
 	gmc_v7_0.o \
-	gmc_v8_0.o
+	gmc_v8_0.o \
+	gfxhub_v1_0.o mmhub_v1_0.o gmc_v9_0.o
 
 # add IH block
 amdgpu-y += \
@@ -74,7 +75,8 @@ amdgpu-y += \
 # add async DMA block
 amdgpu-y += \
 	sdma_v2_4.o \
-	sdma_v3_0.o
+	sdma_v3_0.o \
+	sdma_v4_0.o
 
 # add UVD block
 amdgpu-y += \
