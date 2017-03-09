@@ -59,11 +59,12 @@
  * - 3.7.0 - Add support for VCE clock list packet
  * - 3.8.0 - Add support raster config init in the kernel
  * - 3.9.0 - Add support for memory query info about VRAM and GTT.
- * - 3.10.0 - Add support for sensor query info (clocks, temp, etc).
- * - 3.11.0 - Add double offchip LDS buffers info for gfx config
+ * - 3.10.0 - Add support for new fences ioctl, new gem ioctl flags
+ * - 3.11.0 - Add support for sensor query info (clocks, temp, etc).
+ * - 3.12.0 - Add double offchip LDS buffers info for gfx config
  */
 #define KMS_DRIVER_MAJOR	3
-#define KMS_DRIVER_MINOR	11
+#define KMS_DRIVER_MINOR	12
 #define KMS_DRIVER_PATCHLEVEL	0
 
 int amdgpu_vram_limit = 0;
