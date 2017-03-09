@@ -265,6 +265,7 @@ static int amdgpu_sem_export(struct amdgpu_fpriv *fpriv,
 		return -EINVAL;
 
 	core = sem->base;
+	kref_get(&core->kref);
 	mutex_lock(&core->lock);
 	if (!core->file) {
 		core->file = anon_inode_getfile("sem_file",
@@ -279,8 +280,6 @@ static int amdgpu_sem_export(struct amdgpu_fpriv *fpriv,
 		get_file(core->file);
 	}
 	mutex_unlock(&core->lock);
-
-	kref_get(&core->kref);
 
 	ret = get_unused_fd_flags(O_CLOEXEC);
 	if (ret < 0)
