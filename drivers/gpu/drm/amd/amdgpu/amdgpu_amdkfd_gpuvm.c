@@ -481,15 +481,14 @@ static int validate_pt_pd_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 static void add_kgd_mem_to_kfd_bo_list(struct kgd_mem *mem,
 			struct amdkfd_process_info *process_info)
 {
-	struct amdgpu_bo_list_entry *entry = &mem->bo_list_entry;
+	struct ttm_validate_buffer *entry = &mem->validate_list;
 	struct amdgpu_bo *bo = mem->bo;
 
-	entry->robj = bo;
-	INIT_LIST_HEAD(&entry->tv.head);
-	entry->tv.shared = true;
-	entry->tv.bo = &bo->tbo;
+	INIT_LIST_HEAD(&entry->head);
+	entry->shared = true;
+	entry->bo = &bo->tbo;
 	mutex_lock(&process_info->lock);
-	list_add_tail(&entry->tv.head, &process_info->kfd_bo_list);
+	list_add_tail(&entry->head, &process_info->kfd_bo_list);
 	mutex_unlock(&process_info->lock);
 }
 
@@ -1118,7 +1117,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	struct kfd_bo_va_list *entry, *tmp;
 	struct bo_vm_reservation_context ctx;
 	int ret;
-	struct amdgpu_bo_list_entry *bo_list_entry;
+	struct ttm_validate_buffer *bo_list_entry;
 	struct amdkfd_process_info *process_info;
 	unsigned long bo_size;
 
@@ -1178,9 +1177,9 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	}
 
 	/* Free the BO*/
-	bo_list_entry = &mem->bo_list_entry;
+	bo_list_entry = &mem->validate_list;
 	mutex_lock(&process_info->lock);
-	list_del(&bo_list_entry->tv.head);
+	list_del(&bo_list_entry->head);
 	mutex_unlock(&process_info->lock);
 
 	amdgpu_bo_unref(&mem->bo);
@@ -2211,7 +2210,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 
 	/* Validate BOs and map them to GPUVM (update VM page tables). */
 	list_for_each_entry(mem, &process_info->kfd_bo_list,
-			    bo_list_entry.tv.head) {
+			    validate_list.head) {
 
 		struct amdgpu_bo *bo = mem->bo;
 		uint32_t domain = mem->domain;
@@ -2240,7 +2239,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 
 	/* Wait for validate to finish and attach new eviction fence */
 	list_for_each_entry(mem, &process_info->kfd_bo_list,
-		bo_list_entry.tv.head) {
+		validate_list.head) {
 		struct amdgpu_bo *bo = mem->bo;
 
 		ttm_bo_wait(&bo->tbo, false, false);
@@ -2278,7 +2277,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 	struct amdgpu_ring *ring;
 	struct ww_acquire_ctx ticket;
 	struct list_head list;
-	struct amdgpu_bo_list_entry *entry;
+	struct ttm_validate_buffer *entry;
 	uint64_t src_start, dst_start;
 	uint64_t src_left, dst_left, cur_copy_size, total_copy_size = 0;
 	struct fence *fence = NULL;
@@ -2301,10 +2300,10 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 	ring = adev->mman.buffer_funcs_ring;
 
 	INIT_LIST_HEAD(&list);
-	entry = &src_mem->bo_list_entry;
-	list_add_tail(&entry->tv.head, &list);
-	entry = &dst_mem->bo_list_entry;
-	list_add_tail(&entry->tv.head, &list);
+	entry = &src_mem->validate_list;
+	list_add_tail(&entry->head, &list);
+	entry = &dst_mem->validate_list;
+	list_add_tail(&entry->head, &list);
 
 	if (!ring->ready) {
 		pr_err("Trying to move memory with ring turned off.\n");
