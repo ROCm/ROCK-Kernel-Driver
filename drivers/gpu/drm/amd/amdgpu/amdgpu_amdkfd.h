@@ -49,6 +49,7 @@ struct kgd_mem {
 	struct list_head bo_va_list;
 	/* protected by amdkfd_process_info.lock */
 	struct ttm_validate_buffer validate_list;
+	struct ttm_validate_buffer resv_list;
 	uint32_t domain;
 	unsigned int mapped_to_gpu_memory;
 	void *kptr;
