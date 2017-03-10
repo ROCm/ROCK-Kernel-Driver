@@ -2277,7 +2277,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 	struct amdgpu_ring *ring;
 	struct ww_acquire_ctx ticket;
 	struct list_head list;
-	struct ttm_validate_buffer *entry;
+	struct ttm_validate_buffer resv_list[2];
 	uint64_t src_start, dst_start;
 	uint64_t src_left, dst_left, cur_copy_size, total_copy_size = 0;
 	struct fence *fence = NULL;
@@ -2300,10 +2300,14 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 	ring = adev->mman.buffer_funcs_ring;
 
 	INIT_LIST_HEAD(&list);
-	entry = &src_mem->validate_list;
-	list_add_tail(&entry->head, &list);
-	entry = &dst_mem->validate_list;
-	list_add_tail(&entry->head, &list);
+
+	resv_list[0].bo = src_ttm_bo;
+	resv_list[0].shared = true;
+	resv_list[1].bo = dst_ttm_bo;
+	resv_list[1].shared = true;
+
+	list_add_tail(&resv_list[0].head, &list);
+	list_add_tail(&resv_list[1].head, &list);
 
 	if (!ring->ready) {
 		pr_err("Trying to move memory with ring turned off.\n");
