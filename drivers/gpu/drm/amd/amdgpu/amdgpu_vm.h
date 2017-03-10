@@ -161,11 +161,6 @@ struct amdgpu_vm_manager {
 	atomic_t				vm_pte_next_ring;
 	/* client id counter */
 	atomic64_t				client_counter;
-	/* vm aperture */
-	u64					shared_aperture_start;
-	u64					shared_aperture_end;
-	u64					private_aperture_start;
-	u64					private_aperture_end;
 
 	/* prt support */
 	void (*enable_prt)(struct amdgpu_device *adev, bool value);
