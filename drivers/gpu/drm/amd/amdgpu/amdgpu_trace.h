@@ -11,6 +11,9 @@
 #define TRACE_SYSTEM amdgpu
 #define TRACE_INCLUDE_FILE amdgpu_trace
 
+#define AMDGPU_JOB_GET_TIMELINE_NAME(job) \
+	 job->base.s_fence->finished.ops->get_timeline_name(&job->base.s_fence->finished)
+
 TRACE_EVENT(amdgpu_mm_rreg,
 	    TP_PROTO(unsigned did, uint32_t reg, uint32_t value),
 	    TP_ARGS(did, reg, value),
@@ -139,7 +142,7 @@ TRACE_EVENT(amdgpu_cs_ioctl,
 	    TP_ARGS(job),
 	    TP_STRUCT__entry(
 			     __field(uint64_t, sched_job_id)
-			     __string(timeline, job->base.s_fence->finished.ops->get_timeline_name(&job->base.s_fence->finished))
+			     __string(timeline, AMDGPU_JOB_GET_TIMELINE_NAME(job))
 			     __field(unsigned int, context)
 			     __field(unsigned int, seqno)
 			     __field(struct fence *, fence)
@@ -149,7 +152,7 @@ TRACE_EVENT(amdgpu_cs_ioctl,
 
 	    TP_fast_assign(
 			   __entry->sched_job_id = job->base.id;
-			   __assign_str(timeline, job->base.s_fence->finished.ops->get_timeline_name(&job->base.s_fence->finished))
+			   __assign_str(timeline, AMDGPU_JOB_GET_TIMELINE_NAME(job))
 			   __entry->context = job->base.s_fence->finished.context;
 			   __entry->seqno = job->base.s_fence->finished.seqno;
 			   __entry->ring_name = job->ring->name;
@@ -165,7 +168,7 @@ TRACE_EVENT(amdgpu_sched_run_job,
 	    TP_ARGS(job),
 	    TP_STRUCT__entry(
 			     __field(uint64_t, sched_job_id)
-			     __string(timeline, job->base.s_fence->finished.ops->get_timeline_name(&job->base.s_fence->finished))
+			     __string(timeline, AMDGPU_JOB_GET_TIMELINE_NAME(job))
 			     __field(unsigned int, context)
 			     __field(unsigned int, seqno)
 			     __field(char *, ring_name)
@@ -174,7 +177,7 @@ TRACE_EVENT(amdgpu_sched_run_job,
 
 	    TP_fast_assign(
 			   __entry->sched_job_id = job->base.id;
-			   __assign_str(timeline, job->base.s_fence->finished.ops->get_timeline_name(&job->base.s_fence->finished))
+			   __assign_str(timeline, AMDGPU_JOB_GET_TIMELINE_NAME(job))
 			   __entry->context = job->base.s_fence->finished.context;
 			   __entry->seqno = job->base.s_fence->finished.seqno;
 			   __entry->ring_name = job->ring->name;
@@ -402,6 +405,7 @@ TRACE_EVENT(amdgpu_ttm_bo_move,
 			__entry->new_placement, __entry->bo_size)
 );
 
+#undef AMDGPU_JOB_GET_TIMELINE_NAME
 #endif
 
 /* This part must be outside protection */
