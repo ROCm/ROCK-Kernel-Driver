@@ -894,6 +894,10 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 	struct dc_interrupt_params int_params = {0};
 	int r;
 	int i;
+	unsigned client_id = AMDGPU_IH_CLIENTID_LEGACY;
+
+	if (adev->asic_type == CHIP_VEGA10)
+		client_id = AMDGPU_IH_CLIENTID_DCE;
 
 	int_params.requested_polarity = INTERRUPT_POLARITY_DEFAULT;
 	int_params.current_polarity = INTERRUPT_POLARITY_DEFAULT;
@@ -910,7 +914,7 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 
 	/* Use VBLANK interrupt */
 	for (i = 1; i <= adev->mode_info.num_crtc; i++) {
-		r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, i, &adev->crtc_irq);
+		r = amdgpu_irq_add_id(adev, client_id, i, &adev->crtc_irq);
 
 		if (r) {
 			DRM_ERROR("Failed to add crtc irq id!\n");
@@ -933,7 +937,7 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 	/* Use GRPH_PFLIP interrupt */
 	for (i = VISLANDS30_IV_SRCID_D1_GRPH_PFLIP;
 			i <= VISLANDS30_IV_SRCID_D6_GRPH_PFLIP; i += 2) {
-		r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, i, &adev->pageflip_irq);
+		r = amdgpu_irq_add_id(adev, client_id, i, &adev->pageflip_irq);
 		if (r) {
 			DRM_ERROR("Failed to add page flip irq id!\n");
 			return r;
@@ -954,8 +958,8 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 	}
 
 	/* HPD */
-	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, VISLANDS30_IV_SRCID_HOTPLUG_DETECT_A,
-			&adev->hpd_irq);
+	r = amdgpu_irq_add_id(adev, client_id,
+			VISLANDS30_IV_SRCID_HOTPLUG_DETECT_A, &adev->hpd_irq);
 	if (r) {
 		DRM_ERROR("Failed to add hpd irq id!\n");
 		return r;
@@ -1125,6 +1129,9 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	case CHIP_POLARIS11:
 	case CHIP_POLARIS10:
 	case CHIP_POLARIS12:
+#if defined(CONFIG_DRM_AMD_DC_DCE12_0)
+	case CHIP_VEGA10:
+#endif
 		if (dce110_register_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
 			return -1;
@@ -1303,6 +1310,101 @@ static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 	return r;
 }
 
+#if  defined(CONFIG_DRM_AMD_DC_DCE12_0)
+void dce_v12_0_stop_mc_access(struct amdgpu_device *adev,
+			      struct amdgpu_mode_mc_save *save)
+{
+#if 0
+	u32 crtc_enabled, tmp;
+	int i;
+
+	save->vga_render_control = RREG32(mmVGA_RENDER_CONTROL);
+	save->vga_hdp_control = RREG32(mmVGA_HDP_CONTROL);
+
+	/* disable VGA render */
+	tmp = RREG32(mmVGA_RENDER_CONTROL);
+	tmp = REG_SET_FIELD(tmp, VGA_RENDER_CONTROL, VGA_VSTATUS_CNTL, 0);
+	WREG32(mmVGA_RENDER_CONTROL, tmp);
+
+	/* blank the display controllers */
+	for (i = 0; i < adev->mode_info.num_crtc; i++) {
+		crtc_enabled = REG_GET_FIELD(RREG32(mmCRTC_CONTROL + crtc_offsets[i]),
+					     CRTC_CONTROL, CRTC_MASTER_EN);
+		if (crtc_enabled) {
+			save->crtc_enabled[i] = true;
+			tmp = RREG32(mmCRTC_BLANK_CONTROL + crtc_offsets[i]);
+			if (REG_GET_FIELD(tmp, CRTC_BLANK_CONTROL, CRTC_BLANK_DATA_EN) == 0) {
+				/*it is correct only for RGB ; black is 0*/
+				WREG32(mmCRTC_BLANK_DATA_COLOR + crtc_offsets[i], 0);
+				tmp = REG_SET_FIELD(tmp, CRTC_BLANK_CONTROL, CRTC_BLANK_DATA_EN, 1);
+				WREG32(mmCRTC_BLANK_CONTROL + crtc_offsets[i], tmp);
+			}
+		} else {
+			save->crtc_enabled[i] = false;
+		}
+	}
+#endif
+}
+
+void dce_v12_0_resume_mc_access(struct amdgpu_device *adev,
+				struct amdgpu_mode_mc_save *save)
+{
+#if 0
+	u32 tmp;
+	int i;
+
+	/* update crtc base addresses */
+	for (i = 0; i < adev->mode_info.num_crtc; i++) {
+		WREG32(mmGRPH_PRIMARY_SURFACE_ADDRESS_HIGH + crtc_offsets[i],
+		       upper_32_bits(adev->mc.vram_start));
+		WREG32(mmGRPH_PRIMARY_SURFACE_ADDRESS + crtc_offsets[i],
+		       (u32)adev->mc.vram_start);
+
+		if (save->crtc_enabled[i]) {
+			tmp = RREG32(mmCRTC_BLANK_CONTROL + crtc_offsets[i]);
+			tmp = REG_SET_FIELD(tmp, CRTC_BLANK_CONTROL, CRTC_BLANK_DATA_EN, 0);
+			WREG32(mmCRTC_BLANK_CONTROL + crtc_offsets[i], tmp);
+		}
+	}
+
+	WREG32(mmVGA_MEMORY_BASE_ADDRESS_HIGH, upper_32_bits(adev->mc.vram_start));
+	WREG32(mmVGA_MEMORY_BASE_ADDRESS, lower_32_bits(adev->mc.vram_start));
+
+	/* Unlock vga access */
+	WREG32(mmVGA_HDP_CONTROL, save->vga_hdp_control);
+	mdelay(1);
+	WREG32(mmVGA_RENDER_CONTROL, save->vga_render_control);
+#endif
+}
+
+void dce_v12_0_set_vga_render_state(struct amdgpu_device *adev,
+				    bool render)
+{
+	u32 tmp;
+
+	/* Lockout access through VGA aperture*/
+	tmp = RREG32(0xCA);
+	if (render) {
+		tmp = tmp & 0xFFFFFFEF;
+		WREG32(0xCA, tmp);
+	} else {
+		tmp |= 0x10;
+		WREG32(0xCA, tmp);
+	}
+
+	/* disable VGA render */
+	tmp = RREG32(0xC0);
+	if (render) {
+		tmp |=  0x10000;
+		WREG32(0xC0, tmp);
+	} else {
+		tmp = tmp & 0xFFFCFFFF;
+		WREG32(0xC0, tmp);
+	}
+}
+
+#endif
+
 #ifdef CONFIG_DRM_AMDGPU_CIK
 static const struct amdgpu_display_funcs dm_dce_v8_0_display_funcs = {
 	.set_vga_render_state = dce_v8_0_set_vga_render_state,
@@ -1372,6 +1474,32 @@ static const struct amdgpu_display_funcs dm_dce_v11_0_display_funcs = {
 	.notify_freesync = amdgpu_notify_freesync,
 
 };
+
+#ifdef CONFIG_DRM_AMD_DC_DCE12_0
+static const struct amdgpu_display_funcs dm_dce_v12_0_display_funcs = {
+	.set_vga_render_state = dce_v12_0_set_vga_render_state,
+	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
+	.vblank_get_counter = dm_vblank_get_counter,/* called unconditionally */
+	.vblank_wait = NULL,
+	.backlight_set_level =
+		dm_set_backlight_level,/* called unconditionally */
+	.backlight_get_level =
+		dm_get_backlight_level,/* called unconditionally */
+	.hpd_sense = NULL,/* called unconditionally */
+	.hpd_set_polarity = NULL, /* called unconditionally */
+	.hpd_get_gpio_reg = NULL, /* VBIOS parsing. DAL does it. */
+	.page_flip = dm_page_flip, /* called unconditionally */
+	.page_flip_get_scanoutpos =
+		dm_crtc_get_scanoutpos,/* called unconditionally */
+	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
+	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
+	.stop_mc_access = dce_v12_0_stop_mc_access, /* called unconditionally */
+	.resume_mc_access = dce_v12_0_resume_mc_access, /* called unconditionally */
+	.notify_freesync = amdgpu_notify_freesync,
+
+};
+#endif
+
 
 #if defined(CONFIG_DEBUG_KERNEL_DC)
 
@@ -1459,6 +1587,15 @@ static int dm_early_init(void *handle)
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v11_0_display_funcs;
 		break;
+#if defined(CONFIG_DRM_AMD_DC_DCE12_0)
+	case CHIP_VEGA10:
+		adev->mode_info.num_crtc = 6;
+		adev->mode_info.num_hpd = 6;
+		adev->mode_info.num_dig = 6;
+		if (adev->mode_info.funcs == NULL)
+			adev->mode_info.funcs = &dm_dce_v12_0_display_funcs;
+		break;
+#endif
 	default:
 		DRM_ERROR("Usupported ASIC type: 0x%X\n", adev->asic_type);
 		return -EINVAL;
