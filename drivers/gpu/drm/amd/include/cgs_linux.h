@@ -66,8 +66,7 @@ typedef int (*cgs_irq_handler_func_t)(void *private_data,
  *
  * Return:  0 on success, -errno otherwise
  */
-typedef int (*cgs_add_irq_source_t)(void *cgs_device, unsigned client_id,
-				    unsigned src_id,
+typedef int (*cgs_add_irq_source_t)(struct cgs_device *cgs_device, unsigned src_id,
 				    unsigned num_types,
 				    cgs_irq_source_set_func_t set,
 				    cgs_irq_handler_func_t handler,
@@ -84,7 +83,7 @@ typedef int (*cgs_add_irq_source_t)(void *cgs_device, unsigned client_id,
  *
  * Return:  0 on success, -errno otherwise
  */
-typedef int (*cgs_irq_get_t)(void *cgs_device, unsigned client_id, unsigned src_id, unsigned type);
+typedef int (*cgs_irq_get_t)(struct cgs_device *cgs_device, unsigned src_id, unsigned type);
 
 /**
  * cgs_irq_put() - Indicate IRQ source is no longer needed
@@ -99,7 +98,7 @@ typedef int (*cgs_irq_get_t)(void *cgs_device, unsigned client_id, unsigned src_
  *
  * Return:  0 on success, -errno otherwise
  */
-typedef int (*cgs_irq_put_t)(void *cgs_device, unsigned client_id, unsigned src_id, unsigned type);
+typedef int (*cgs_irq_put_t)(struct cgs_device *cgs_device, unsigned src_id, unsigned type);
 
 struct cgs_os_ops {
 	/* IRQ handling */
@@ -108,12 +107,12 @@ struct cgs_os_ops {
 	cgs_irq_put_t irq_put;
 };
 
-#define cgs_add_irq_source(dev,client_id,src_id,num_types,set,handler,private_data) \
-	CGS_OS_CALL(add_irq_source,dev,client_id,src_id,num_types,set,handler, \
+#define cgs_add_irq_source(dev,src_id,num_types,set,handler,private_data) \
+	CGS_OS_CALL(add_irq_source,dev,src_id,num_types,set,handler,	\
 		    private_data)
-#define cgs_irq_get(dev,client_id,src_id,type)	\
-	CGS_OS_CALL(irq_get,dev,client_id,src_id,type)
-#define cgs_irq_put(dev,client_id,src_id,type)	\
-	CGS_OS_CALL(irq_put,dev,client_id,src_id,type)
+#define cgs_irq_get(dev,src_id,type)		\
+	CGS_OS_CALL(irq_get,dev,src_id,type)
+#define cgs_irq_put(dev,src_id,type)		\
+	CGS_OS_CALL(irq_put,dev,src_id,type)
 
 #endif /* _CGS_LINUX_H */
