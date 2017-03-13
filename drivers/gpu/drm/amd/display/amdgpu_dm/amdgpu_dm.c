@@ -933,7 +933,7 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 	/* Use GRPH_PFLIP interrupt */
 	for (i = VISLANDS30_IV_SRCID_D1_GRPH_PFLIP;
 			i <= VISLANDS30_IV_SRCID_D6_GRPH_PFLIP; i += 2) {
-		r = amdgpu_irq_add_id(adev, i, AMDGPU_IH_CLIENTID_LEGACY, &adev->pageflip_irq);
+		r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, i, &adev->pageflip_irq);
 		if (r) {
 			DRM_ERROR("Failed to add page flip irq id!\n");
 			return r;
