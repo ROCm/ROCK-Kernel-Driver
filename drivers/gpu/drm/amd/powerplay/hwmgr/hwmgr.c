@@ -807,6 +807,8 @@ int polaris_set_asic_special_caps(struct pp_hwmgr *hwmgr)
 int fiji_set_asic_special_caps(struct pp_hwmgr *hwmgr)
 {
 	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
+			PHM_PlatformCaps_PowerContainment);
+	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
 			PHM_PlatformCaps_SQRamping);
 	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
 			PHM_PlatformCaps_DBRamping);
