@@ -3275,7 +3275,7 @@ static unsigned gfx_v9_0_ring_emit_init_cond_exec(struct amdgpu_ring *ring)
 	amdgpu_ring_write(ring, lower_32_bits(ring->cond_exe_gpu_addr));
 	amdgpu_ring_write(ring, upper_32_bits(ring->cond_exe_gpu_addr));
 	amdgpu_ring_write(ring, 0); /* discard following DWs if *cond_exec_gpu_addr==0 */
-	ret = ring->wptr;
+	ret = ring->wptr & ring->buf_mask;
 	amdgpu_ring_write(ring, 0x55aa55aa); /* patch dummy value later */
 	return ret;
 }
@@ -3283,9 +3283,10 @@ static unsigned gfx_v9_0_ring_emit_init_cond_exec(struct amdgpu_ring *ring)
 static void gfx_v9_0_ring_emit_patch_cond_exec(struct amdgpu_ring *ring, unsigned offset)
 {
 	unsigned cur;
+	BUG_ON(offset > ring->buf_mask);
 	BUG_ON(ring->ring[offset] != 0x55aa55aa);
 
-	cur = ring->wptr - 1;
+	cur = (ring->wptr & ring->buf_mask) - 1;
 	if (likely(cur > offset))
 		ring->ring[offset] = cur - offset;
 	else
