@@ -42,7 +42,11 @@
 
 #include <linux/slab.h>
 #include <linux/device.h>
+#if (defined OS_NAME_RHEL) && (OS_VERSION_MAJOR == 6)
+#include <linux/kfifo-new.h>
+#else
 #include <linux/kfifo.h>
+#endif
 #include "kfd_priv.h"
 
 #define KFD_IH_NUM_ENTRIES 8192
@@ -61,7 +65,11 @@ int kfd_interrupt_init(struct kfd_dev *kfd)
 		return r;
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+	kfd->ih_wq = create_rt_workqueue("KFD IH");
+#else
 	kfd->ih_wq = alloc_workqueue("KFD IH", WQ_HIGHPRI, 1);
+#endif
 	spin_lock_init(&kfd->interrupt_lock);
 
 	INIT_WORK(&kfd->interrupt_work, interrupt_wq);
@@ -111,9 +119,15 @@ bool enqueue_ih_ring_entry(struct kfd_dev *kfd,	const void *ih_ring_entry)
 	count = kfifo_in(&kfd->ih_fifo, ih_ring_entry,
 				kfd->device_info->ih_ring_entry_size);
 	if (count != kfd->device_info->ih_ring_entry_size) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+		dev_err(kfd_chardev(),
+			"Interrupt ring overflow, dropping interrupt %d\n",
+			count);
+#else
 		dev_err_ratelimited(kfd_chardev(),
 			"Interrupt ring overflow, dropping interrupt %d\n",
 			count);
+#endif
 		return false;
 	}
 

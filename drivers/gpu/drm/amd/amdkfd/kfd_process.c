@@ -24,13 +24,19 @@
 #include <linux/log2.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 #include <linux/amd-iommu.h>
+#endif
 #include <linux/notifier.h>
 #include <linux/compat.h>
 #include <linux/mm.h>
 #include <asm/tlb.h>
 #include <linux/highmem.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+#include <asm-generic/mman-common.h>
+#else
 #include <uapi/asm-generic/mman-common.h>
+#endif
 #include "kfd_ipc.h"
 
 struct mm_struct;
@@ -46,7 +52,20 @@ struct mm_struct;
 static DEFINE_HASHTABLE(kfd_processes_table, KFD_PROCESS_TABLE_SIZE);
 static DEFINE_MUTEX(kfd_processes_mutex);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+static struct srcu_struct kfd_processes_srcu;
+void kfd_init_processes_srcu(void)
+{
+	init_srcu_struct(&kfd_processes_srcu);
+}
+
+void kfd_cleanup_processes_srcu(void)
+{
+	cleanup_srcu_struct(&kfd_processes_srcu);
+}
+#else
 DEFINE_STATIC_SRCU(kfd_processes_srcu);
+#endif
 
 static struct workqueue_struct *kfd_process_wq;
 
@@ -64,7 +83,11 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep);
 void kfd_process_create_wq(void)
 {
 	if (!kfd_process_wq)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+		kfd_process_wq = create_workqueue("kfd_process_wq");
+#else
 		kfd_process_wq = alloc_workqueue("kfd_process_wq", 0, 0);
+#endif
 }
 
 void kfd_process_destroy_wq(void)
@@ -234,8 +257,15 @@ static struct kfd_process *find_process_by_mm(const struct mm_struct *mm)
 {
 	struct kfd_process *process;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_possible_rcu(kfd_processes_table, process, node,
+					kfd_processes, (uintptr_t)mm)
+#else
 	hash_for_each_possible_rcu(kfd_processes_table, process,
 					kfd_processes, (uintptr_t)mm)
+#endif
 		if (process->mm == mm)
 			return process;
 
@@ -339,6 +369,7 @@ static void kfd_process_wq_release(struct work_struct *work)
 		pr_debug("Releasing pdd (topology id %d) for process (pasid %d)\n",
 				pdd->dev->id, p->pasid);
 
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 		if (pdd->dev->device_info->is_need_iommu_device) {
 			if (pdd->bound == PDD_BOUND) {
 				amd_iommu_unbind_pasid(pdd->dev->pdev,
@@ -346,6 +377,7 @@ static void kfd_process_wq_release(struct work_struct *work)
 				pdd->bound = PDD_UNBOUND;
 			}
 		}
+#endif
 	}
 
 	kfd_process_free_outstanding_kfd_bos(p);
@@ -666,17 +698,20 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 		return ERR_PTR(-EINVAL);
 	}
 
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 	if (dev->device_info->is_need_iommu_device) {
 		err = amd_iommu_bind_pasid(dev->pdev, p->pasid, p->lead_thread);
 		if (err < 0)
 			return ERR_PTR(err);
 	}
+#endif
 
 	pdd->bound = PDD_BOUND;
 
 	return pdd;
 }
 
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 int kfd_bind_processes_to_device(struct kfd_dev *dev)
 {
 	struct kfd_process_device *pdd;
@@ -719,6 +754,7 @@ void kfd_unbind_processes_from_device(struct kfd_dev *dev)
 	unsigned int temp;
 
 	int idx = srcu_read_lock(&kfd_processes_srcu);
+
 
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
 		down_write(&p->lock);
@@ -775,6 +811,7 @@ void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid)
 
 	kfd_unref_process(p);
 }
+#endif
 
 struct kfd_process_device *kfd_get_first_process_device_data(struct kfd_process *p)
 {
@@ -924,7 +961,13 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
+#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+#endif
 		if (p->pasid == pasid) {
 			kref_get(&p->ref);
 			ret_p = p;
@@ -996,7 +1039,13 @@ int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data)
 
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
+#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+#endif
 		seq_printf(m, "Process %d PASID %d:\n",
 			   p->lead_thread->tgid, p->pasid);
 

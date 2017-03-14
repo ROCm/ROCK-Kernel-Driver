@@ -1,7 +1,9 @@
 #include <linux/kernel.h>
 #include <linux/acpi.h>
 #include <linux/mm.h>
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 #include <linux/amd-iommu.h>
+#endif
 #include <linux/pci.h>
 #include "kfd_crat.h"
 #include "kfd_priv.h"
@@ -117,8 +119,10 @@ static void kfd_populated_cu_info_cpu(struct kfd_topology_device *dev,
 
 	dev->node_props.cpu_cores_count = cu->num_cpu_cores;
 	dev->node_props.cpu_core_id_base = cu->processor_id_low;
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 	if (cu->hsa_capability & CRAT_CU_FLAGS_IOMMU_PRESENT)
 		dev->node_props.capability |= HSA_CAP_ATS_PRESENT;
+#endif
 
 	pr_debug("CU CPU: cores=%d id_base=%d\n", cu->num_cpu_cores,
 			cu->processor_id_low);
@@ -783,7 +787,11 @@ static int kfd_fill_mem_info_for_cpu(int numa_node_id, int *avail_size,
 	 * function */
 	pgdat = NODE_DATA(numa_node_id);
 	for (zone_type = 0; zone_type < MAX_NR_ZONES; zone_type++)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+		mem_in_bytes += pgdat->node_zones[zone_type].present_pages;
+#else
 		mem_in_bytes += pgdat->node_zones[zone_type].managed_pages;
+#endif
 	mem_in_bytes <<= PAGE_SHIFT;
 
 	sub_type_hdr->length_low = lower_32_bits(mem_in_bytes);
@@ -963,15 +971,19 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	struct crat_subtype_generic *sub_type_hdr;
 	struct crat_subtype_computeunit *cu;
 	struct kfd_cu_info cu_info;
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 	struct amd_iommu_device_info iommu_info;
+#endif
 	int avail_size = *size;
 	uint32_t total_num_of_cu;
 	int num_of_cache_entries = 0;
 	int cache_mem_filled = 0;
 	int ret = 0;
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 	const u32 required_iommu_flags = AMD_IOMMU_DEVICE_FLAG_ATS_SUP |
 								AMD_IOMMU_DEVICE_FLAG_PRI_SUP |
 								AMD_IOMMU_DEVICE_FLAG_PASID_SUP;
+#endif
 	struct kfd_local_mem_info local_mem_info;
 
 	if (pcrat_image == NULL || avail_size < VCRAT_SIZE_FOR_GPU)
@@ -1027,6 +1039,7 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 
 	cu->hsa_capability = 0;
 
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 	/* Check if this node supports IOMMU. During parsing this flag will
 	 * translate to HSA_CAP_ATS_PRESENT */
 	iommu_info.flags = 0;
@@ -1034,6 +1047,7 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 		if ((iommu_info.flags & required_iommu_flags) == required_iommu_flags)
 			cu->hsa_capability |= CRAT_CU_FLAGS_IOMMU_PRESENT;
 	}
+#endif
 
 	crat_table->length += sub_type_hdr->length;
 	crat_table->total_entries++;

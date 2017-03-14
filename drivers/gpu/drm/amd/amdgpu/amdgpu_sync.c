@@ -336,7 +336,13 @@ int amdgpu_sync_wait(struct amdgpu_sync *sync)
 	struct hlist_node *tmp;
 	int i, r;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_safe(sync->fences, i, node, tmp, e, node) {
+#else
 	hash_for_each_safe(sync->fences, i, tmp, e, node) {
+#endif
 		r = fence_wait(e->fence, false);
 		if (r)
 			return r;

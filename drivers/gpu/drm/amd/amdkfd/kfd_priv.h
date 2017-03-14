@@ -745,8 +745,10 @@ void kfd_unref_process(struct kfd_process *p);
 
 struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 						struct kfd_process *p);
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 int kfd_bind_processes_to_device(struct kfd_dev *dev);
 void kfd_unbind_processes_from_device(struct kfd_dev *dev);
+#endif
 void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid);
 struct kfd_process_device *kfd_get_process_device_data(struct kfd_dev *dev,
 							struct kfd_process *p);

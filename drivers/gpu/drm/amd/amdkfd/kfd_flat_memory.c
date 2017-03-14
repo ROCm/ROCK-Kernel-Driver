@@ -33,7 +33,11 @@
 #include <linux/time.h>
 #include "kfd_priv.h"
 #include <linux/mm.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+#include <asm-generic/mman-common.h>
+#else
 #include <uapi/asm-generic/mman-common.h>
+#endif
 #include <asm/processor.h>
 
 /*
