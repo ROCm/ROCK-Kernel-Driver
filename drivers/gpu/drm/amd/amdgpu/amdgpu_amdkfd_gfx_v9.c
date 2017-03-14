@@ -141,6 +141,7 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd,
 static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 				unsigned int utimeout);
 static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);
+static uint32_t get_watch_base_addr(void);
 static int kgd_address_watch_disable(struct kgd_dev *kgd);
 static int kgd_address_watch_execute(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
@@ -447,6 +448,16 @@ static uint32_t get_sdma_base_addr(unsigned int engine_id,
 					       mmSDMA0_RLC0_RB_CNTL);
 
 	pr_debug("sdma base address: 0x%x\n", retval);
+
+	return retval;
+}
+
+static uint32_t get_watch_base_addr(void)
+{
+	uint32_t retval = SOC15_REG_OFFSET(GC, 0, mmTCP_WATCH0_ADDR_H) -
+			mmTCP_WATCH0_ADDR_H;
+
+	pr_debug("kfd: reg watch base address: 0x%x\n", retval);
 
 	return retval;
 }
@@ -909,12 +920,10 @@ static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
 
 static int kgd_address_watch_disable(struct kgd_dev *kgd)
 {
-	WARN_ONCE(1, "Not implemented");
-
-#if 0 /* TODO: Update to SOC15 register */
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	union TCP_WATCH_CNTL_BITS cntl;
 	unsigned int i;
+	uint32_t watch_base_addr;
 
 	cntl.u32All = 0;
 
@@ -922,11 +931,13 @@ static int kgd_address_watch_disable(struct kgd_dev *kgd)
 	cntl.bitfields.mask = ADDRESS_WATCH_REG_CNTL_DEFAULT_MASK;
 	cntl.bitfields.atc = 1;
 
+	watch_base_addr = get_watch_base_addr();
 	/* Turning off this address until we set all the registers */
 	for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
-		WREG32(watchRegs[i * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_CNTL],
+		WREG32(watch_base_addr +
+				watchRegs[i * ADDRESS_WATCH_REG_MAX +
+						ADDRESS_WATCH_REG_CNTL],
 			cntl.u32All);
-#endif
 
 	return 0;
 }
@@ -937,31 +948,37 @@ static int kgd_address_watch_execute(struct kgd_dev *kgd,
 					uint32_t addr_hi,
 					uint32_t addr_lo)
 {
-	WARN_ONCE(1, "Not implemented");
-
-#if 0 /* TODO: Update to SOC15 register */
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	union TCP_WATCH_CNTL_BITS cntl;
+	uint32_t watch_base_addr;
 
+	watch_base_addr = get_watch_base_addr();
 	cntl.u32All = cntl_val;
 
 	/* Turning off this watch point until we set all the registers */
 	cntl.bitfields.valid = 0;
-	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_CNTL],
+	WREG32(watch_base_addr +
+			watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX +
+				ADDRESS_WATCH_REG_CNTL],
 			cntl.u32All);
 
-	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_ADDR_HI],
+	WREG32(watch_base_addr +
+			watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX +
+				ADDRESS_WATCH_REG_ADDR_HI],
 			addr_hi);
 
-	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_ADDR_LO],
+	WREG32(watch_base_addr +
+			watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX +
+				ADDRESS_WATCH_REG_ADDR_LO],
 			addr_lo);
 
 	/* Enable the watch point */
 	cntl.bitfields.valid = 1;
 
-	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_CNTL],
+	WREG32(watch_base_addr +
+			watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX +
+				ADDRESS_WATCH_REG_CNTL],
 			cntl.u32All);
-#endif
 
 	return 0;
 }
@@ -970,16 +987,13 @@ static int kgd_wave_control_execute(struct kgd_dev *kgd,
 					uint32_t gfx_index_val,
 					uint32_t sq_cmd)
 {
-	WARN_ONCE(1, "Not implemented");
-
-#if 0 /* TODO: Update to SOC15 register */
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	uint32_t data = 0;
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
-	WREG32(mmGRBM_GFX_INDEX, gfx_index_val);
-	WREG32(mmSQ_CMD, sq_cmd);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmGRBM_GFX_INDEX), gfx_index_val);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_CMD), sq_cmd);
 
 	data = REG_SET_FIELD(data, GRBM_GFX_INDEX,
 		INSTANCE_BROADCAST_WRITES, 1);
@@ -988,9 +1002,8 @@ static int kgd_wave_control_execute(struct kgd_dev *kgd,
 	data = REG_SET_FIELD(data, GRBM_GFX_INDEX,
 		SE_BROADCAST_WRITES, 1);
 
-	WREG32(mmGRBM_GFX_INDEX, data);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmGRBM_GFX_INDEX), data);
 	mutex_unlock(&adev->grbm_idx_mutex);
-#endif
 
 	return 0;
 }
@@ -999,7 +1012,8 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
 					unsigned int reg_offset)
 {
-	return watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + reg_offset];
+	return get_watch_base_addr() +
+		watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + reg_offset];
 }
 
 static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
