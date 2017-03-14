@@ -305,7 +305,13 @@ static struct kfd_event *lookup_event_by_id(struct kfd_process *p, uint32_t id)
 {
 	struct kfd_event *ev;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_possible(p->events, ev, node, events, id)
+#else
 	hash_for_each_possible(p->events, ev, events, id)
+#endif
 		if (ev->event_id == id)
 			return ev;
 
@@ -463,7 +469,13 @@ static void destroy_events(struct kfd_process *p)
 	struct hlist_node *tmp;
 	unsigned int hash_bkt;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_safe(p->events, hash_bkt, node, tmp, ev, events)
+#else
 	hash_for_each_safe(p->events, hash_bkt, tmp, ev, events)
+#endif
 		destroy_event(p, ev);
 }
 
@@ -978,7 +990,13 @@ static void lookup_events_by_type_and_signal(struct kfd_process *p,
 	int bkt;
 	bool send_signal = true;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each(p->events, bkt, node, ev, events) {
+#else
 	hash_for_each(p->events, bkt, ev, events) {
+#endif
 		if (ev->type == type) {
 			send_signal = false;
 			dev_dbg(kfd_device,
@@ -1013,6 +1031,7 @@ static void lookup_events_by_type_and_signal(struct kfd_process *p,
 	}
 }
 
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 		unsigned long address, bool is_write_requested,
 		bool is_execute_requested)
@@ -1082,6 +1101,7 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 
 	kfd_unref_process(p);
 }
+#endif
 
 void kfd_signal_hw_exception_event(unsigned int pasid)
 {
@@ -1111,6 +1131,9 @@ void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 	int bkt;
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
 	struct kfd_hsa_memory_exception_data memory_exception_data;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+#endif
 
 	if (!p)
 		return; /* Presumably process exited. */
@@ -1130,7 +1153,11 @@ void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 	}
 	mutex_lock(&p->event_mutex);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	hash_for_each(p->events, bkt, node, ev, events) {
+#else
 	hash_for_each(p->events, bkt, ev, events) {
+#endif
 		if (ev->type == KFD_EVENT_TYPE_MEMORY) {
 			ev->memory_exception_data = memory_exception_data;
 			set_event(ev);

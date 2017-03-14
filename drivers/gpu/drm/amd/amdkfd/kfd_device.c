@@ -20,8 +20,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 #include <linux/amd-iommu.h>
-#include <linux/bsearch.h>
+#endif
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/highmem.h>
@@ -222,6 +223,11 @@ static void kfd_gtt_sa_fini(struct kfd_dev *kfd);
 
 static int kfd_resume(struct kfd_dev *kfd);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+void kfd_init_processes_srcu(void);
+void kfd_cleanup_processes_srcu(void);
+#endif
+
 static const struct kfd_device_info *lookup_device_info(unsigned short did)
 {
 	size_t i;
@@ -277,6 +283,7 @@ struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 	return kfd;
 }
 
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 static bool device_iommu_pasid_init(struct kfd_dev *kfd)
 {
 	const u32 required_iommu_flags = AMD_IOMMU_DEVICE_FLAG_ATS_SUP |
@@ -354,6 +361,7 @@ static int iommu_invalid_ppr_cb(struct pci_dev *pdev, int pasid,
 
 	return AMD_IOMMU_INV_PRI_RSP_INVALID;
 }
+#endif
 
 static int kfd_cwsr_init(struct kfd_dev *kfd)
 {
@@ -505,6 +513,7 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 		goto device_queue_manager_error;
 	}
 
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 	if (kfd->device_info->is_need_iommu_device) {
 		if (!device_iommu_pasid_init(kfd)) {
 			dev_err(kfd_device,
@@ -513,11 +522,16 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			goto device_iommu_pasid_error;
 		}
 	}
+#endif
 
 	if (kfd_cwsr_init(kfd))
 		goto device_iommu_pasid_error;
 
 	kfd_ib_mem_init(kfd);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+	kfd_init_processes_srcu();
+#endif
 
 	if (kfd_resume(kfd))
 		goto kfd_resume_error;
@@ -556,6 +570,9 @@ void kgd2kfd_device_exit(struct kfd_dev *kfd)
 {
 	if (kfd->init_complete) {
 		kgd2kfd_suspend(kfd);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+		kfd_cleanup_processes_srcu();
+#endif
 		kfd_cwsr_fini(kfd);
 		device_queue_manager_uninit(kfd->dqm);
 		kfd_interrupt_exit(kfd);
@@ -575,6 +592,8 @@ void kgd2kfd_suspend(struct kfd_dev *kfd)
 		return;
 
 	kfd->dqm->ops.stop(kfd->dqm);
+
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 	if (!kfd->device_info->is_need_iommu_device)
 		return;
 
@@ -583,6 +602,7 @@ void kgd2kfd_suspend(struct kfd_dev *kfd)
 	amd_iommu_set_invalidate_ctx_cb(kfd->pdev, NULL);
 	amd_iommu_set_invalid_ppr_cb(kfd->pdev, NULL);
 	amd_iommu_free_device(kfd->pdev);
+#endif
 }
 
 int kgd2kfd_resume(struct kfd_dev *kfd)
@@ -600,6 +620,7 @@ static int kfd_resume(struct kfd_dev *kfd)
 {
 	int err = 0;
 
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 	if (kfd->device_info->is_need_iommu_device) {
 		unsigned int pasid_limit = kfd_get_pasid_limit();
 
@@ -615,6 +636,7 @@ static int kfd_resume(struct kfd_dev *kfd)
 		if (err)
 			return -ENXIO;
 	}
+#endif
 
 	err = kfd->dqm->ops.start(kfd->dqm);
 	if (err) {
@@ -629,8 +651,10 @@ static int kfd_resume(struct kfd_dev *kfd)
 	return err;
 
 dqm_start_error:
+#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 	if (kfd->device_info->is_need_iommu_device)
 		amd_iommu_free_device(kfd->pdev);
+#endif
 
 	return err;
 }

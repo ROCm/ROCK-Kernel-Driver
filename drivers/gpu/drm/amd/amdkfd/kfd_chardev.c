@@ -31,7 +31,11 @@
 #include <uapi/linux/kfd_ioctl.h>
 #include <linux/time.h>
 #include <linux/mm.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+#include <asm-generic/mman-common.h>
+#else
 #include <uapi/asm-generic/mman-common.h>
+#endif
 #include <asm/processor.h>
 #include <linux/ptrace.h>
 
@@ -841,7 +845,11 @@ static int kfd_ioctl_get_clock_counters(struct file *filep,
 {
 	struct kfd_ioctl_get_clock_counters_args *args = data;
 	struct kfd_dev *dev;
+#if (defined OS_NAME_RHEL) && (OS_VERSION_MAJOR == 6)
+	struct timespec time;
+#else
 	struct timespec64 time;
+#endif
 
 	dev = kfd_device_by_id(args->gpu_id);
 	if (dev)
@@ -853,11 +861,19 @@ static int kfd_ioctl_get_clock_counters(struct file *filep,
 		args->gpu_clock_counter = 0;
 
 	/* No access to rdtsc. Using raw monotonic time */
+#if (defined OS_NAME_RHEL) && (OS_VERSION_MAJOR == 6)
+	getrawmonotonic(&time);
+	args->cpu_clock_counter = (uint64_t)timespec_to_ns(&time);
+
+	get_monotonic_boottime(&time);
+	args->system_clock_counter = (uint64_t)timespec_to_ns(&time);
+#else
 	getrawmonotonic64(&time);
 	args->cpu_clock_counter = (uint64_t)timespec64_to_ns(&time);
 
 	get_monotonic_boottime64(&time);
 	args->system_clock_counter = (uint64_t)timespec64_to_ns(&time);
+#endif
 
 	/* Since the counter is in nano-seconds we use 1GHz frequency */
 	args->system_clock_freq = 1000000000;

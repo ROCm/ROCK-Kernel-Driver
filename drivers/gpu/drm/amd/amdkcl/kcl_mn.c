@@ -6,6 +6,19 @@
 	!defined(OS_NAME_RHEL_7_2) && \
 	!defined(OS_NAME_RHEL_7_3) && \
 	!defined(OS_NAME_RHEL_7_4)
+/*
+ * This function allows mmu_notifier::release callback to delay a call to
+ * a function that will free appropriate resources. The function must be
+ * quick and must not block.
+ */
+void mmu_notifier_call_srcu(struct rcu_head *rcu,
+			    void (*func)(struct rcu_head *rcu))
+{
+	/* changed from call_srcu to call_rcu */
+	call_rcu(rcu, func);
+}
+EXPORT_SYMBOL_GPL(mmu_notifier_call_srcu);
+
 void mmu_notifier_unregister_no_release(struct mmu_notifier *mn,
 					struct mm_struct *mm)
 {
