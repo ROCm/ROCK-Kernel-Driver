@@ -76,6 +76,11 @@ static int amdgpu_sem_release(struct inode *inode, struct file *file)
 {
 	struct amdgpu_sem_core *core = file->private_data;
 
+	/* set the core->file to null if file got released */
+	mutex_lock(&core->lock);
+	core->file = NULL;
+	mutex_unlock(&core->lock);
+
 	kref_put(&core->kref, amdgpu_sem_core_free);
 	return 0;
 }
@@ -293,6 +298,7 @@ static int amdgpu_sem_export(struct amdgpu_fpriv *fpriv,
 
 	*fd = ret;
 	amdgpu_sem_put(sem);
+
 	return 0;
 
 err_put_file:
