@@ -47,6 +47,7 @@ enum amd_asic_type {
 	CHIP_POLARIS10,
 	CHIP_POLARIS11,
 	CHIP_POLARIS12,
+	CHIP_VEGA10,
 	CHIP_LAST,
 };
 
@@ -67,12 +68,15 @@ enum amd_ip_block_type {
 	AMD_IP_BLOCK_TYPE_GMC,
 	AMD_IP_BLOCK_TYPE_IH,
 	AMD_IP_BLOCK_TYPE_SMC,
+	AMD_IP_BLOCK_TYPE_PSP,
 	AMD_IP_BLOCK_TYPE_DCE,
 	AMD_IP_BLOCK_TYPE_GFX,
 	AMD_IP_BLOCK_TYPE_SDMA,
 	AMD_IP_BLOCK_TYPE_UVD,
 	AMD_IP_BLOCK_TYPE_VCE,
 	AMD_IP_BLOCK_TYPE_ACP,
+	AMD_IP_BLOCK_TYPE_GFXHUB,
+	AMD_IP_BLOCK_TYPE_MMHUB
 };
 
 enum amd_clockgating_state {
@@ -157,6 +161,8 @@ struct amd_pp_profile {
 #define AMD_CG_SUPPORT_BIF_MGCG			(1 << 19)
 #define AMD_CG_SUPPORT_GFX_3D_CGCG		(1 << 20)
 #define AMD_CG_SUPPORT_GFX_3D_CGLS		(1 << 21)
+#define AMD_CG_SUPPORT_DRM_MGCG			(1 << 22)
+#define AMD_CG_SUPPORT_DF_MGCG			(1 << 23)
 
 /* PG flags */
 #define AMD_PG_SUPPORT_GFX_PG			(1 << 0)

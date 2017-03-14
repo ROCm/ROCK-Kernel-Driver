@@ -52,7 +52,7 @@ static void vce_v2_0_set_irq_funcs(struct amdgpu_device *adev);
  *
  * Returns the current hardware read pointer
  */
-static uint32_t vce_v2_0_ring_get_rptr(struct amdgpu_ring *ring)
+static uint64_t vce_v2_0_ring_get_rptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -69,7 +69,7 @@ static uint32_t vce_v2_0_ring_get_rptr(struct amdgpu_ring *ring)
  *
  * Returns the current hardware write pointer
  */
-static uint32_t vce_v2_0_ring_get_wptr(struct amdgpu_ring *ring)
+static uint64_t vce_v2_0_ring_get_wptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -91,9 +91,9 @@ static void vce_v2_0_ring_set_wptr(struct amdgpu_ring *ring)
 	struct amdgpu_device *adev = ring->adev;
 
 	if (ring == &adev->vce.ring[0])
-		WREG32(mmVCE_RB_WPTR, ring->wptr);
+		WREG32(mmVCE_RB_WPTR, lower_32_bits(ring->wptr));
 	else
-		WREG32(mmVCE_RB_WPTR2, ring->wptr);
+		WREG32(mmVCE_RB_WPTR2, lower_32_bits(ring->wptr));
 }
 
 static int vce_v2_0_lmi_clean(struct amdgpu_device *adev)
@@ -241,15 +241,15 @@ static int vce_v2_0_start(struct amdgpu_device *adev)
 	vce_v2_0_mc_resume(adev);
 
 	ring = &adev->vce.ring[0];
-	WREG32(mmVCE_RB_RPTR, ring->wptr);
-	WREG32(mmVCE_RB_WPTR, ring->wptr);
+	WREG32(mmVCE_RB_RPTR, lower_32_bits(ring->wptr));
+	WREG32(mmVCE_RB_WPTR, lower_32_bits(ring->wptr));
 	WREG32(mmVCE_RB_BASE_LO, ring->gpu_addr);
 	WREG32(mmVCE_RB_BASE_HI, upper_32_bits(ring->gpu_addr));
 	WREG32(mmVCE_RB_SIZE, ring->ring_size / 4);
 
 	ring = &adev->vce.ring[1];
-	WREG32(mmVCE_RB_RPTR2, ring->wptr);
-	WREG32(mmVCE_RB_WPTR2, ring->wptr);
+	WREG32(mmVCE_RB_RPTR2, lower_32_bits(ring->wptr));
+	WREG32(mmVCE_RB_WPTR2, lower_32_bits(ring->wptr));
 	WREG32(mmVCE_RB_BASE_LO2, ring->gpu_addr);
 	WREG32(mmVCE_RB_BASE_HI2, upper_32_bits(ring->gpu_addr));
 	WREG32(mmVCE_RB_SIZE2, ring->ring_size / 4);
@@ -430,7 +430,7 @@ static int vce_v2_0_sw_init(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
 	/* VCE */
-	r = amdgpu_irq_add_id(adev, 167, &adev->vce.irq);
+	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, 167, &adev->vce.irq);
 	if (r)
 		return r;
 
@@ -560,14 +560,14 @@ static int vce_v2_0_process_interrupt(struct amdgpu_device *adev,
 				      struct amdgpu_iv_entry *entry)
 {
 	DRM_DEBUG("IH: VCE\n");
-	switch (entry->src_data) {
+	switch (entry->src_data[0]) {
 	case 0:
 	case 1:
-		amdgpu_fence_process(&adev->vce.ring[entry->src_data]);
+		amdgpu_fence_process(&adev->vce.ring[entry->src_data[0]]);
 		break;
 	default:
 		DRM_ERROR("Unhandled interrupt: %d %d\n",
-			  entry->src_id, entry->src_data);
+			  entry->src_id, entry->src_data[0]);
 		break;
 	}
 
@@ -631,6 +631,7 @@ static const struct amdgpu_ring_funcs vce_v2_0_ring_funcs = {
 	.type = AMDGPU_RING_TYPE_VCE,
 	.align_mask = 0xf,
 	.nop = VCE_CMD_NO_OP,
+	.support_64bit_ptrs = false,
 	.get_rptr = vce_v2_0_ring_get_rptr,
 	.get_wptr = vce_v2_0_ring_get_wptr,
 	.set_wptr = vce_v2_0_ring_set_wptr,

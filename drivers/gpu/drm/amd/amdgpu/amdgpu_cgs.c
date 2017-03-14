@@ -571,7 +571,9 @@ static const struct amdgpu_irq_src_funcs cgs_irq_funcs = {
 	.process = cgs_process_irq,
 };
 
-static int amdgpu_cgs_add_irq_source(struct cgs_device *cgs_device, unsigned src_id,
+static int amdgpu_cgs_add_irq_source(void *cgs_device,
+				     unsigned client_id,
+				     unsigned src_id,
 				     unsigned num_types,
 				     cgs_irq_source_set_func_t set,
 				     cgs_irq_handler_func_t handler,
@@ -597,7 +599,7 @@ static int amdgpu_cgs_add_irq_source(struct cgs_device *cgs_device, unsigned src
 	irq_params->handler = handler;
 	irq_params->private_data = private_data;
 	source->data = (void *)irq_params;
-	ret = amdgpu_irq_add_id(adev, src_id, source);
+	ret = amdgpu_irq_add_id(adev, client_id, src_id, source);
 	if (ret) {
 		kfree(irq_params);
 		kfree(source);
@@ -606,16 +608,26 @@ static int amdgpu_cgs_add_irq_source(struct cgs_device *cgs_device, unsigned src
 	return ret;
 }
 
-static int amdgpu_cgs_irq_get(struct cgs_device *cgs_device, unsigned src_id, unsigned type)
+static int amdgpu_cgs_irq_get(void *cgs_device, unsigned client_id,
+			      unsigned src_id, unsigned type)
 {
 	CGS_FUNC_ADEV;
-	return amdgpu_irq_get(adev, adev->irq.sources[src_id], type);
+
+	if (!adev->irq.client[client_id].sources)
+		return -EINVAL;
+
+	return amdgpu_irq_get(adev, adev->irq.client[client_id].sources[src_id], type);
 }
 
-static int amdgpu_cgs_irq_put(struct cgs_device *cgs_device, unsigned src_id, unsigned type)
+static int amdgpu_cgs_irq_put(void *cgs_device, unsigned client_id,
+			      unsigned src_id, unsigned type)
 {
 	CGS_FUNC_ADEV;
-	return amdgpu_irq_put(adev, adev->irq.sources[src_id], type);
+
+	if (!adev->irq.client[client_id].sources)
+		return -EINVAL;
+
+	return amdgpu_irq_put(adev, adev->irq.client[client_id].sources[src_id], type);
 }
 
 static int amdgpu_cgs_set_clockgating_state(struct cgs_device *cgs_device,
@@ -825,6 +837,8 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 		uint32_t ucode_start_address;
 		const uint8_t *src;
 		const struct smc_firmware_header_v1_0 *hdr;
+		const struct common_firmware_header *header;
+		struct amdgpu_firmware_info *ucode = NULL;
 
 		if (CGS_UCODE_ID_SMU_SK == type)
 			amdgpu_cgs_rel_firmware(cgs_device, CGS_UCODE_ID_SMU);
@@ -889,6 +903,9 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 			case CHIP_POLARIS12:
 				strcpy(fw_name, "amdgpu/polaris12_smc.bin");
 				break;
+			case CHIP_VEGA10:
+				strcpy(fw_name, "amdgpu/vega10_smc.bin");
+				break;
 			default:
 				DRM_ERROR("SMC firmware not supported\n");
 				return -EINVAL;
@@ -906,6 +923,15 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 				release_firmware(adev->pm.fw);
 				adev->pm.fw = NULL;
 				return err;
+			}
+
+			if (adev->firmware.load_type == AMDGPU_FW_LOAD_PSP) {
+				ucode = &adev->firmware.ucode[AMDGPU_UCODE_ID_SMC];
+				ucode->ucode_id = AMDGPU_UCODE_ID_SMC;
+				ucode->fw = adev->pm.fw;
+				header = (const struct common_firmware_header *)ucode->fw->data;
+				adev->firmware.fw_size +=
+					ALIGN(le32_to_cpu(header->ucode_size_bytes), PAGE_SIZE);
 			}
 		}
 
@@ -987,10 +1013,6 @@ static int amdgpu_cgs_get_active_displays_info(struct cgs_device *cgs_device,
 					  struct cgs_display_info *info)
 {
 	CGS_FUNC_ADEV;
-	struct amdgpu_crtc *amdgpu_crtc;
-	struct drm_device *ddev = adev->ddev;
-	struct drm_crtc *crtc;
-	uint32_t line_time_us, vblank_lines;
 	struct cgs_mode_info *mode_info;
 
 	if (info == NULL)
@@ -998,30 +1020,43 @@ static int amdgpu_cgs_get_active_displays_info(struct cgs_device *cgs_device,
 
 	mode_info = info->mode_info;
 
-	if (adev->mode_info.num_crtc && adev->mode_info.mode_config_initialized) {
-		list_for_each_entry(crtc,
-				&ddev->mode_config.crtc_list, head) {
-			amdgpu_crtc = to_amdgpu_crtc(crtc);
-			if (crtc->enabled) {
-				info->active_display_mask |= (1 << amdgpu_crtc->crtc_id);
-				info->display_count++;
-			}
-			if (mode_info != NULL &&
-				crtc->enabled && amdgpu_crtc->enabled &&
-				amdgpu_crtc->hw_mode.clock) {
-				line_time_us = (amdgpu_crtc->hw_mode.crtc_htotal * 1000) /
-							amdgpu_crtc->hw_mode.clock;
-				vblank_lines = amdgpu_crtc->hw_mode.crtc_vblank_end -
-							amdgpu_crtc->hw_mode.crtc_vdisplay +
-							(amdgpu_crtc->v_border * 2);
-				mode_info->vblank_time_us = vblank_lines * line_time_us;
-				mode_info->refresh_rate = drm_mode_vrefresh(&amdgpu_crtc->hw_mode);
-				mode_info->ref_clock = adev->clock.spll.reference_freq;
-				mode_info = NULL;
+	if (!amdgpu_device_has_dc_support(adev)) {
+		struct amdgpu_crtc *amdgpu_crtc;
+		struct drm_device *ddev = adev->ddev;
+		struct drm_crtc *crtc;
+		uint32_t line_time_us, vblank_lines;
+
+		if (adev->mode_info.num_crtc && adev->mode_info.mode_config_initialized) {
+			list_for_each_entry(crtc,
+					&ddev->mode_config.crtc_list, head) {
+				amdgpu_crtc = to_amdgpu_crtc(crtc);
+				if (crtc->enabled) {
+					info->active_display_mask |= (1 << amdgpu_crtc->crtc_id);
+					info->display_count++;
+				}
+				if (mode_info != NULL &&
+					crtc->enabled && amdgpu_crtc->enabled &&
+					amdgpu_crtc->hw_mode.clock) {
+					line_time_us = (amdgpu_crtc->hw_mode.crtc_htotal * 1000) /
+								amdgpu_crtc->hw_mode.clock;
+					vblank_lines = amdgpu_crtc->hw_mode.crtc_vblank_end -
+								amdgpu_crtc->hw_mode.crtc_vdisplay +
+								(amdgpu_crtc->v_border * 2);
+					mode_info->vblank_time_us = vblank_lines * line_time_us;
+					mode_info->refresh_rate = drm_mode_vrefresh(&amdgpu_crtc->hw_mode);
+					mode_info->ref_clock = adev->clock.spll.reference_freq;
+					mode_info = NULL;
+				}
 			}
 		}
+	} else {
+		info->display_count = adev->pm.pm_display_cfg.num_display;
+		if (mode_info != NULL) {
+			mode_info->vblank_time_us = adev->pm.pm_display_cfg.min_vblank_time;
+			mode_info->refresh_rate = adev->pm.pm_display_cfg.vrefresh;
+			mode_info->ref_clock = adev->clock.spll.reference_freq;
+		}
 	}
-
 	return 0;
 }
 

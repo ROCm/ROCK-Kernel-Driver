@@ -41,6 +41,7 @@
 #include "amdgpu_i2c.h"
 #include "atom.h"
 #include "amdgpu_atombios.h"
+#include "amdgpu_atomfirmware.h"
 #include "amd_pcie.h"
 #ifdef CONFIG_DRM_AMDGPU_SI
 #include "si.h"
@@ -49,6 +50,7 @@
 #include "cik.h"
 #endif
 #include "vi.h"
+#include "soc15.h"
 #include "bif/bif_4_1_d.h"
 #include <linux/pci.h>
 #include <linux/firmware.h>
@@ -77,6 +79,7 @@ static const char *amdgpu_asic_name[] = {
 	"POLARIS10",
 	"POLARIS11",
 	"POLARIS12",
+	"VEGA10",
 	"LAST",
 };
 
@@ -192,6 +195,44 @@ void amdgpu_mm_wdoorbell(struct amdgpu_device *adev, u32 index, u32 v)
 {
 	if (index < adev->doorbell.num_doorbells) {
 		writel(v, adev->doorbell.ptr + index);
+	} else {
+		DRM_ERROR("writing beyond doorbell aperture: 0x%08x!\n", index);
+	}
+}
+
+/**
+ * amdgpu_mm_rdoorbell64 - read a doorbell Qword
+ *
+ * @adev: amdgpu_device pointer
+ * @index: doorbell index
+ *
+ * Returns the value in the doorbell aperture at the
+ * requested doorbell index (VEGA10+).
+ */
+u64 amdgpu_mm_rdoorbell64(struct amdgpu_device *adev, u32 index)
+{
+	if (index < adev->doorbell.num_doorbells) {
+		return atomic64_read((atomic64_t *)(adev->doorbell.ptr + index));
+	} else {
+		DRM_ERROR("reading beyond doorbell aperture: 0x%08x!\n", index);
+		return 0;
+	}
+}
+
+/**
+ * amdgpu_mm_wdoorbell64 - write a doorbell Qword
+ *
+ * @adev: amdgpu_device pointer
+ * @index: doorbell index
+ * @v: value to write
+ *
+ * Writes @v to the doorbell aperture at the
+ * requested doorbell index (VEGA10+).
+ */
+void amdgpu_mm_wdoorbell64(struct amdgpu_device *adev, u32 index, u64 v)
+{
+	if (index < adev->doorbell.num_doorbells) {
+		atomic64_set((atomic64_t *)(adev->doorbell.ptr + index), v);
 	} else {
 		DRM_ERROR("writing beyond doorbell aperture: 0x%08x!\n", index);
 	}
@@ -383,12 +424,11 @@ static int amdgpu_doorbell_init(struct amdgpu_device *adev)
 	if (adev->doorbell.num_doorbells == 0)
 		return -EINVAL;
 
-	adev->doorbell.ptr = ioremap(adev->doorbell.base, adev->doorbell.num_doorbells * sizeof(u32));
-	if (adev->doorbell.ptr == NULL) {
+	adev->doorbell.ptr = ioremap(adev->doorbell.base,
+				     adev->doorbell.num_doorbells *
+				     sizeof(u32));
+	if (adev->doorbell.ptr == NULL)
 		return -ENOMEM;
-	}
-	DRM_INFO("doorbell mmio base: 0x%08X\n", (uint32_t)adev->doorbell.base);
-	DRM_INFO("doorbell mmio size: %u\n", (unsigned)adev->doorbell.size);
 
 	return 0;
 }
@@ -519,6 +559,29 @@ int amdgpu_wb_get(struct amdgpu_device *adev, u32 *wb)
 }
 
 /**
+ * amdgpu_wb_get_64bit - Allocate a wb entry
+ *
+ * @adev: amdgpu_device pointer
+ * @wb: wb index
+ *
+ * Allocate a wb slot for use by the driver (all asics).
+ * Returns 0 on success or -EINVAL on failure.
+ */
+int amdgpu_wb_get_64bit(struct amdgpu_device *adev, u32 *wb)
+{
+	unsigned long offset = bitmap_find_next_zero_area_off(adev->wb.used,
+				adev->wb.num_wb, 0, 2, 7, 0);
+	if ((offset + 1) < adev->wb.num_wb) {
+		__set_bit(offset, adev->wb.used);
+		__set_bit(offset + 1, adev->wb.used);
+		*wb = offset;
+		return 0;
+	} else {
+		return -EINVAL;
+	}
+}
+
+/**
  * amdgpu_wb_free - Free a wb entry
  *
  * @adev: amdgpu_device pointer
@@ -530,6 +593,22 @@ void amdgpu_wb_free(struct amdgpu_device *adev, u32 wb)
 {
 	if (wb < adev->wb.num_wb)
 		__clear_bit(wb, adev->wb.used);
+}
+
+/**
+ * amdgpu_wb_free_64bit - Free a wb entry
+ *
+ * @adev: amdgpu_device pointer
+ * @wb: wb index
+ *
+ * Free a wb slot allocated for use by the driver (all asics)
+ */
+void amdgpu_wb_free_64bit(struct amdgpu_device *adev, u32 wb)
+{
+	if ((wb + 1) < adev->wb.num_wb) {
+		__clear_bit(wb, adev->wb.used);
+		__clear_bit(wb + 1, adev->wb.used);
+	}
 }
 
 /**
@@ -639,7 +718,7 @@ bool amdgpu_need_post(struct amdgpu_device *adev)
 		return true;
 	}
 	/* then check MEM_SIZE, in case the crtcs are off */
-	reg = RREG32(mmCONFIG_MEMSIZE);
+	reg = amdgpu_asic_get_config_memsize(adev);
 
 	if (reg)
 		return false;
@@ -918,8 +997,13 @@ static int amdgpu_atombios_init(struct amdgpu_device *adev)
 	}
 
 	mutex_init(&adev->mode_info.atom_context->mutex);
-	amdgpu_atombios_scratch_regs_init(adev);
-	amdgpu_atom_allocate_fb_scratch(adev->mode_info.atom_context);
+	if (adev->is_atom_fw) {
+		amdgpu_atomfirmware_scratch_regs_init(adev);
+		amdgpu_atomfirmware_allocate_fb_scratch(adev);
+	} else {
+		amdgpu_atombios_scratch_regs_init(adev);
+		amdgpu_atombios_allocate_fb_scratch(adev);
+	}
 	return 0;
 }
 
@@ -1142,13 +1226,15 @@ int amdgpu_set_clockgating_state(struct amdgpu_device *adev,
 	for (i = 0; i < adev->num_ip_blocks; i++) {
 		if (!adev->ip_blocks[i].status.valid)
 			continue;
-		if (adev->ip_blocks[i].version->type == block_type) {
-			r = adev->ip_blocks[i].version->funcs->set_clockgating_state((void *)adev,
-										     state);
-			if (r)
-				return r;
-			break;
-		}
+		if (adev->ip_blocks[i].version->type != block_type)
+			continue;
+		if (!adev->ip_blocks[i].version->funcs->set_clockgating_state)
+			continue;
+		r = adev->ip_blocks[i].version->funcs->set_clockgating_state(
+			(void *)adev, state);
+		if (r)
+			DRM_ERROR("set_clockgating_state of IP block <%s> failed %d\n",
+				  adev->ip_blocks[i].version->funcs->name, r);
 	}
 	return r;
 }
@@ -1162,13 +1248,15 @@ int amdgpu_set_powergating_state(struct amdgpu_device *adev,
 	for (i = 0; i < adev->num_ip_blocks; i++) {
 		if (!adev->ip_blocks[i].status.valid)
 			continue;
-		if (adev->ip_blocks[i].version->type == block_type) {
-			r = adev->ip_blocks[i].version->funcs->set_powergating_state((void *)adev,
-										     state);
-			if (r)
-				return r;
-			break;
-		}
+		if (adev->ip_blocks[i].version->type != block_type)
+			continue;
+		if (!adev->ip_blocks[i].version->funcs->set_powergating_state)
+			continue;
+		r = adev->ip_blocks[i].version->funcs->set_powergating_state(
+			(void *)adev, state);
+		if (r)
+			DRM_ERROR("set_powergating_state of IP block <%s> failed %d\n",
+				  adev->ip_blocks[i].version->funcs->name, r);
 	}
 	return r;
 }
@@ -1373,6 +1461,13 @@ static int amdgpu_early_init(struct amdgpu_device *adev)
 			return r;
 		break;
 #endif
+	case CHIP_VEGA10:
+		adev->family = AMDGPU_FAMILY_AI;
+
+		r = soc15_set_ip_blocks(adev);
+		if (r)
+			return r;
+		break;
 	default:
 		/* FIXME: not supported yet */
 		return -EINVAL;
@@ -1702,8 +1797,13 @@ static int amdgpu_resume(struct amdgpu_device *adev)
 
 static void amdgpu_device_detect_sriov_bios(struct amdgpu_device *adev)
 {
-	if (amdgpu_atombios_has_gpu_virtualization_table(adev))
-		adev->virt.caps |= AMDGPU_SRIOV_CAPS_SRIOV_VBIOS;
+	if (adev->is_atom_fw) {
+		if (amdgpu_atomfirmware_gpu_supports_virtualization(adev))
+			adev->virt.caps |= AMDGPU_SRIOV_CAPS_SRIOV_VBIOS;
+	} else {
+		if (amdgpu_atombios_has_gpu_virtualization_table(adev))
+			adev->virt.caps |= AMDGPU_SRIOV_CAPS_SRIOV_VBIOS;
+	}
 }
 
 bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type)
@@ -1712,15 +1812,16 @@ bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type)
 #if defined(CONFIG_DRM_AMD_DC)
 	case CHIP_BONAIRE:
 	case CHIP_HAWAII:
-		return amdgpu_dc != 0;
 	case CHIP_CARRIZO:
 	case CHIP_STONEY:
 	case CHIP_POLARIS11:
 	case CHIP_POLARIS10:
 	case CHIP_POLARIS12:
-		return amdgpu_dc != 0;
 	case CHIP_TONGA:
 	case CHIP_FIJI:
+#if defined(CONFIG_DRM_AMD_DC_DCE12_0)
+	case CHIP_VEGA10:
+#endif
 		return amdgpu_dc != 0;
 #endif
 	default:
@@ -1805,6 +1906,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	 * can recall function without having locking issues */
 	mutex_init(&adev->vm_manager.lock);
 	atomic_set(&adev->irq.ih.lock, 0);
+	mutex_init(&adev->firmware.mutex);
 	mutex_init(&adev->pm.mutex);
 	mutex_init(&adev->gfx.gpu_clock_mutex);
 	mutex_init(&adev->srbm_mutex);
@@ -1911,16 +2013,17 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		DRM_INFO("GPU post is not needed\n");
 	}
 
-	/* Initialize clocks */
-	r = amdgpu_atombios_get_clock_info(adev);
-	if (r) {
-		dev_err(adev->dev, "amdgpu_atombios_get_clock_info failed\n");
-		goto failed;
+	if (!adev->is_atom_fw) {
+		/* Initialize clocks */
+		r = amdgpu_atombios_get_clock_info(adev);
+		if (r) {
+			dev_err(adev->dev, "amdgpu_atombios_get_clock_info failed\n");
+			return r;
+		}
+		/* init i2c buses */
+		if (!amdgpu_device_has_dc_support(adev))
+			amdgpu_atombios_i2c_init(adev);
 	}
-
-	/* init i2c buses */
-	if (!amdgpu_device_has_dc_support(adev))
-		amdgpu_atombios_i2c_init(adev);
 
 	/* Fence driver */
 	r = amdgpu_fence_driver_init(adev);
@@ -2132,7 +2235,10 @@ int amdgpu_device_suspend(struct drm_device *dev, bool suspend, bool fbcon)
 	 */
 	amdgpu_bo_evict_vram(adev);
 
-	amdgpu_atombios_scratch_regs_save(adev);
+	if (adev->is_atom_fw)
+		amdgpu_atomfirmware_scratch_regs_save(adev);
+	else
+		amdgpu_atombios_scratch_regs_save(adev);
 	pci_save_state(dev->pdev);
 	if (suspend) {
 		/* Shut down the device */
@@ -2184,7 +2290,10 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 			return r;
 		}
 	}
-	amdgpu_atombios_scratch_regs_restore(adev);
+	if (adev->is_atom_fw)
+		amdgpu_atomfirmware_scratch_regs_restore(adev);
+	else
+		amdgpu_atombios_scratch_regs_restore(adev);
 
 	/* post card */
 	if (amdgpu_need_post(adev)) {
@@ -2591,9 +2700,15 @@ retry:
 			amdgpu_display_stop_mc_access(adev, &save);
 			amdgpu_wait_for_idle(adev, AMD_IP_BLOCK_TYPE_GMC);
 		}
-		amdgpu_atombios_scratch_regs_save(adev);
+		if (adev->is_atom_fw)
+			amdgpu_atomfirmware_scratch_regs_save(adev);
+		else
+			amdgpu_atombios_scratch_regs_save(adev);
 		r = amdgpu_asic_reset(adev);
-		amdgpu_atombios_scratch_regs_restore(adev);
+		if (adev->is_atom_fw)
+			amdgpu_atomfirmware_scratch_regs_restore(adev);
+		else
+			amdgpu_atombios_scratch_regs_restore(adev);
 		/* post card */
 		amdgpu_atom_asic_init(adev->mode_info.atom_context);
 
