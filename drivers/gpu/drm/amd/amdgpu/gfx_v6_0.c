@@ -378,9 +378,7 @@ static int gfx_v6_0_init_microcode(struct amdgpu_device *adev)
 
 out:
 	if (err) {
-		printk(KERN_ERR
-		       "gfx6: Failed to load firmware \"%s\"\n",
-		       fw_name);
+		pr_err("gfx6: Failed to load firmware \"%s\"\n", fw_name);
 		release_firmware(adev->gfx.pfp_fw);
 		adev->gfx.pfp_fw = NULL;
 		release_firmware(adev->gfx.me_fw);
@@ -2194,12 +2192,12 @@ static int gfx_v6_0_cp_gfx_resume(struct amdgpu_device *adev)
 	return 0;
 }
 
-static u32 gfx_v6_0_ring_get_rptr(struct amdgpu_ring *ring)
+static u64 gfx_v6_0_ring_get_rptr(struct amdgpu_ring *ring)
 {
 	return ring->adev->wb.wb[ring->rptr_offs];
 }
 
-static u32 gfx_v6_0_ring_get_wptr(struct amdgpu_ring *ring)
+static u64 gfx_v6_0_ring_get_wptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -2217,7 +2215,7 @@ static void gfx_v6_0_ring_set_wptr_gfx(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
-	WREG32(mmCP_RB0_WPTR, ring->wptr);
+	WREG32(mmCP_RB0_WPTR, lower_32_bits(ring->wptr));
 	(void)RREG32(mmCP_RB0_WPTR);
 }
 
@@ -2226,10 +2224,10 @@ static void gfx_v6_0_ring_set_wptr_compute(struct amdgpu_ring *ring)
 	struct amdgpu_device *adev = ring->adev;
 
 	if (ring == &adev->gfx.compute_ring[0]) {
-		WREG32(mmCP_RB1_WPTR, ring->wptr);
+		WREG32(mmCP_RB1_WPTR, lower_32_bits(ring->wptr));
 		(void)RREG32(mmCP_RB1_WPTR);
 	} else if (ring == &adev->gfx.compute_ring[1]) {
-		WREG32(mmCP_RB2_WPTR, ring->wptr);
+		WREG32(mmCP_RB2_WPTR, lower_32_bits(ring->wptr));
 		(void)RREG32(mmCP_RB2_WPTR);
 	} else {
 		BUG();
@@ -3633,6 +3631,7 @@ static const struct amdgpu_ring_funcs gfx_v6_0_ring_funcs_gfx = {
 	.type = AMDGPU_RING_TYPE_GFX,
 	.align_mask = 0xff,
 	.nop = 0x80000000,
+	.support_64bit_ptrs = false,
 	.get_rptr = gfx_v6_0_ring_get_rptr,
 	.get_wptr = gfx_v6_0_ring_get_wptr,
 	.set_wptr = gfx_v6_0_ring_set_wptr_gfx,

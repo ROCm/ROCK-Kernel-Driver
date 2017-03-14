@@ -454,7 +454,8 @@ struct drm_amdgpu_gem_va {
 #define AMDGPU_HW_IP_DMA          2
 #define AMDGPU_HW_IP_UVD          3
 #define AMDGPU_HW_IP_VCE          4
-#define AMDGPU_HW_IP_NUM          5
+#define AMDGPU_HW_IP_UVD_ENC      5
+#define AMDGPU_HW_IP_NUM          6
 
 #define AMDGPU_HW_IP_INSTANCE_MAX_COUNT 1
 
@@ -493,8 +494,11 @@ union drm_amdgpu_cs {
 /* This IB should be submitted to CE */
 #define AMDGPU_IB_FLAG_CE	(1<<0)
 
-/* CE Preamble */
+/* Preamble flag, which means the IB could be dropped if no context switch */
 #define AMDGPU_IB_FLAG_PREAMBLE (1<<1)
+
+/* Preempt flag, IB should set Pre_enb bit if PREEMPT flag detected */
+#define AMDGPU_IB_FLAG_PREEMPT (1<<2)
 
 struct drm_amdgpu_cs_chunk_ib {
 	__u32 _pad;

@@ -147,13 +147,24 @@ struct line_buffer_params {
 	enum lb_pixel_depth depth;
 };
 
+struct scl_inits {
+	struct fixed31_32 h;
+	struct fixed31_32 h_c;
+	struct fixed31_32 v;
+	struct fixed31_32 v_bot;
+	struct fixed31_32 v_c;
+	struct fixed31_32 v_c_bot;
+};
+
 struct scaler_data {
 	int h_active;
 	int v_active;
 	struct scaling_taps taps;
 	struct rect viewport;
+	struct rect viewport_c;
 	struct rect recout;
 	struct scaling_ratios ratios;
+	struct scl_inits inits;
 	struct sharpness_adj sharpness;
 	enum pixel_format format;
 	struct line_buffer_params lb_params;
@@ -186,5 +197,9 @@ const uint16_t *get_filter_3tap_16p(struct fixed31_32 ratio);
 const uint16_t *get_filter_3tap_64p(struct fixed31_32 ratio);
 const uint16_t *get_filter_4tap_16p(struct fixed31_32 ratio);
 const uint16_t *get_filter_4tap_64p(struct fixed31_32 ratio);
+const uint16_t *get_filter_5tap_64p(struct fixed31_32 ratio);
+const uint16_t *get_filter_6tap_64p(struct fixed31_32 ratio);
+const uint16_t *get_filter_7tap_64p(struct fixed31_32 ratio);
+const uint16_t *get_filter_8tap_64p(struct fixed31_32 ratio);
 
 #endif

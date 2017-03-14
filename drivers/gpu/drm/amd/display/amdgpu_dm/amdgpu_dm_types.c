@@ -974,7 +974,7 @@ static void decide_crtc_timing_for_drm_display_mode(
 }
 
 static struct dc_stream *create_stream_for_sink(
-		const struct amdgpu_connector *aconnector,
+		struct amdgpu_connector *aconnector,
 		const struct drm_display_mode *drm_mode,
 		const struct dm_connector_state *dm_state)
 {
@@ -2118,8 +2118,9 @@ void amdgpu_dm_connector_init_helper(
 
 	aconnector->connector_id = link_index;
 	aconnector->dc_link = link;
-	aconnector->base.interlace_allowed = true;
-	aconnector->base.doublescan_allowed = true;
+	aconnector->base.interlace_allowed = false;
+	aconnector->base.doublescan_allowed = false;
+	aconnector->base.stereo_allowed = false;
 	aconnector->base.dpms = DRM_MODE_DPMS_OFF;
 	aconnector->hpd.hpd = AMDGPU_HPD_NONE; /* not used */
 

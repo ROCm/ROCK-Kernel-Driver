@@ -196,6 +196,44 @@ void amdgpu_mm_wdoorbell(struct amdgpu_device *adev, u32 index, u32 v)
 }
 
 /**
+ * amdgpu_mm_rdoorbell64 - read a doorbell Qword
+ *
+ * @adev: amdgpu_device pointer
+ * @index: doorbell index
+ *
+ * Returns the value in the doorbell aperture at the
+ * requested doorbell index (VEGA10+).
+ */
+u64 amdgpu_mm_rdoorbell64(struct amdgpu_device *adev, u32 index)
+{
+	if (index < adev->doorbell.num_doorbells) {
+		return atomic64_read((atomic64_t *)(adev->doorbell.ptr + index));
+	} else {
+		DRM_ERROR("reading beyond doorbell aperture: 0x%08x!\n", index);
+		return 0;
+	}
+}
+
+/**
+ * amdgpu_mm_wdoorbell64 - write a doorbell Qword
+ *
+ * @adev: amdgpu_device pointer
+ * @index: doorbell index
+ * @v: value to write
+ *
+ * Writes @v to the doorbell aperture at the
+ * requested doorbell index (VEGA10+).
+ */
+void amdgpu_mm_wdoorbell64(struct amdgpu_device *adev, u32 index, u64 v)
+{
+	if (index < adev->doorbell.num_doorbells) {
+		atomic64_set((atomic64_t *)(adev->doorbell.ptr + index), v);
+	} else {
+		DRM_ERROR("writing beyond doorbell aperture: 0x%08x!\n", index);
+	}
+}
+
+/**
  * amdgpu_invalid_rreg - dummy reg read function
  *
  * @adev: amdgpu device pointer
@@ -381,12 +419,11 @@ static int amdgpu_doorbell_init(struct amdgpu_device *adev)
 	if (adev->doorbell.num_doorbells == 0)
 		return -EINVAL;
 
-	adev->doorbell.ptr = ioremap(adev->doorbell.base, adev->doorbell.num_doorbells * sizeof(u32));
-	if (adev->doorbell.ptr == NULL) {
+	adev->doorbell.ptr = ioremap(adev->doorbell.base,
+				     adev->doorbell.num_doorbells *
+				     sizeof(u32));
+	if (adev->doorbell.ptr == NULL)
 		return -ENOMEM;
-	}
-	DRM_INFO("doorbell mmio base: 0x%08X\n", (uint32_t)adev->doorbell.base);
-	DRM_INFO("doorbell mmio size: %u\n", (unsigned)adev->doorbell.size);
 
 	return 0;
 }
@@ -517,6 +554,29 @@ int amdgpu_wb_get(struct amdgpu_device *adev, u32 *wb)
 }
 
 /**
+ * amdgpu_wb_get_64bit - Allocate a wb entry
+ *
+ * @adev: amdgpu_device pointer
+ * @wb: wb index
+ *
+ * Allocate a wb slot for use by the driver (all asics).
+ * Returns 0 on success or -EINVAL on failure.
+ */
+int amdgpu_wb_get_64bit(struct amdgpu_device *adev, u32 *wb)
+{
+	unsigned long offset = bitmap_find_next_zero_area_off(adev->wb.used,
+				adev->wb.num_wb, 0, 2, 7, 0);
+	if ((offset + 1) < adev->wb.num_wb) {
+		__set_bit(offset, adev->wb.used);
+		__set_bit(offset + 1, adev->wb.used);
+		*wb = offset;
+		return 0;
+	} else {
+		return -EINVAL;
+	}
+}
+
+/**
  * amdgpu_wb_free - Free a wb entry
  *
  * @adev: amdgpu_device pointer
@@ -528,6 +588,22 @@ void amdgpu_wb_free(struct amdgpu_device *adev, u32 wb)
 {
 	if (wb < adev->wb.num_wb)
 		__clear_bit(wb, adev->wb.used);
+}
+
+/**
+ * amdgpu_wb_free_64bit - Free a wb entry
+ *
+ * @adev: amdgpu_device pointer
+ * @wb: wb index
+ *
+ * Free a wb slot allocated for use by the driver (all asics)
+ */
+void amdgpu_wb_free_64bit(struct amdgpu_device *adev, u32 wb)
+{
+	if ((wb + 1) < adev->wb.num_wb) {
+		__clear_bit(wb, adev->wb.used);
+		__clear_bit(wb + 1, adev->wb.used);
+	}
 }
 
 /**
@@ -637,7 +713,7 @@ bool amdgpu_need_post(struct amdgpu_device *adev)
 		return true;
 	}
 	/* then check MEM_SIZE, in case the crtcs are off */
-	reg = RREG32(mmCONFIG_MEMSIZE);
+	reg = amdgpu_asic_get_config_memsize(adev);
 
 	if (reg)
 		return false;
@@ -1060,7 +1136,7 @@ static void amdgpu_switcheroo_set_state(struct pci_dev *pdev, enum vga_switchero
 	if (state == VGA_SWITCHEROO_ON) {
 		unsigned d3_delay = dev->pdev->d3_delay;
 
-		printk(KERN_INFO "amdgpu: switched on\n");
+		pr_info("amdgpu: switched on\n");
 		/* don't suspend or resume card normally */
 		dev->switch_power_state = DRM_SWITCH_POWER_CHANGING;
 
@@ -1071,7 +1147,7 @@ static void amdgpu_switcheroo_set_state(struct pci_dev *pdev, enum vga_switchero
 		dev->switch_power_state = DRM_SWITCH_POWER_ON;
 		drm_kms_helper_poll_enable(dev);
 	} else {
-		printk(KERN_INFO "amdgpu: switched off\n");
+		pr_info("amdgpu: switched off\n");
 		drm_kms_helper_poll_disable(dev);
 		dev->switch_power_state = DRM_SWITCH_POWER_CHANGING;
 		amdgpu_device_suspend(dev, true, true);
@@ -1115,13 +1191,15 @@ int amdgpu_set_clockgating_state(struct amdgpu_device *adev,
 	for (i = 0; i < adev->num_ip_blocks; i++) {
 		if (!adev->ip_blocks[i].status.valid)
 			continue;
-		if (adev->ip_blocks[i].version->type == block_type) {
-			r = adev->ip_blocks[i].version->funcs->set_clockgating_state((void *)adev,
-										     state);
-			if (r)
-				return r;
-			break;
-		}
+		if (adev->ip_blocks[i].version->type != block_type)
+			continue;
+		if (!adev->ip_blocks[i].version->funcs->set_clockgating_state)
+			continue;
+		r = adev->ip_blocks[i].version->funcs->set_clockgating_state(
+			(void *)adev, state);
+		if (r)
+			DRM_ERROR("set_clockgating_state of IP block <%s> failed %d\n",
+				  adev->ip_blocks[i].version->funcs->name, r);
 	}
 	return r;
 }
@@ -1135,13 +1213,15 @@ int amdgpu_set_powergating_state(struct amdgpu_device *adev,
 	for (i = 0; i < adev->num_ip_blocks; i++) {
 		if (!adev->ip_blocks[i].status.valid)
 			continue;
-		if (adev->ip_blocks[i].version->type == block_type) {
-			r = adev->ip_blocks[i].version->funcs->set_powergating_state((void *)adev,
-										     state);
-			if (r)
-				return r;
-			break;
-		}
+		if (adev->ip_blocks[i].version->type != block_type)
+			continue;
+		if (!adev->ip_blocks[i].version->funcs->set_powergating_state)
+			continue;
+		r = adev->ip_blocks[i].version->funcs->set_powergating_state(
+			(void *)adev, state);
+		if (r)
+			DRM_ERROR("set_powergating_state of IP block <%s> failed %d\n",
+				  adev->ip_blocks[i].version->funcs->name, r);
 	}
 	return r;
 }
@@ -1952,12 +2032,6 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		else
 			DRM_INFO("amdgpu: acceleration disabled, skipping move tests\n");
 	}
-	if ((amdgpu_testing & 2)) {
-		if (adev->accel_working)
-			amdgpu_test_syncing(adev);
-		else
-			DRM_INFO("amdgpu: acceleration disabled, skipping sync tests\n");
-	}
 	if (amdgpu_benchmarking) {
 		if (adev->accel_working)
 			amdgpu_benchmark(adev, amdgpu_benchmarking);
@@ -2186,8 +2260,11 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 	}
 
 	r = amdgpu_late_init(adev);
-	if (r)
+	if (r) {
+		if (fbcon)
+			console_unlock();
 		return r;
+	}
 
 	/* pin cursors */
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {

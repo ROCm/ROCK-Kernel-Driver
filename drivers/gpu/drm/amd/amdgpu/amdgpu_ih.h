@@ -46,9 +46,11 @@ struct amdgpu_ih_ring {
 	dma_addr_t		rb_dma_addr; /* only used when use_bus_addr = true */
 };
 
+#define AMDGPU_IH_SRC_DATA_MAX_SIZE_DW 4
+
 struct amdgpu_iv_entry {
 	unsigned src_id;
-	unsigned src_data;
+	unsigned src_data[AMDGPU_IH_SRC_DATA_MAX_SIZE_DW];
 	unsigned ring_id;
 	unsigned vm_id;
 	unsigned pas_id;

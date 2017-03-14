@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-15 Advanced Micro Devices, Inc.
+ * Copyright 2017 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,53 +19,15 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Authors: AMD
- *
  */
+#ifndef __AMDGPU_DISPLAY_H__
+#define __AMDGPU_DISPLAY_H__
 
-#include "dm_services.h"
+struct drm_framebuffer *
+amdgpu_user_framebuffer_create(struct drm_device *dev,
+						       struct drm_file *file_priv,
+							   const struct drm_mode_fb_cmd2 *mode_cmd);
 
-#include "include/logger_interface.h"
-#include "include/fixed31_32.h"
-#include "basics/conversion.h"
+void amdgpu_output_poll_changed(struct drm_device *dev);
 
-#include "dce/dce_8_0_d.h"
-#include "dce/dce_8_0_sh_mask.h"
-
-#include "dce80_ipp.h"
-#include "dce110/dce110_ipp.h"
-
-#define DCP_REG(reg)\
-	(reg + ipp80->offsets.dcp_offset)
-
-/*PROTOTYPE DECLARATIONS*/
-
-static void set_legacy_input_gamma_mode(
-	struct dce110_ipp *ipp80,
-	bool is_legacy);
-
-void dce80_ipp_set_legacy_input_gamma_mode(
-		struct input_pixel_processor *ipp,
-		bool is_legacy)
-{
-	struct dce110_ipp *ipp80 = TO_DCE80_IPP(ipp);
-
-	set_legacy_input_gamma_mode(ipp80, is_legacy);
-}
-
-static void set_legacy_input_gamma_mode(
-	struct dce110_ipp *ipp80,
-	bool is_legacy)
-{
-	const uint32_t addr = DCP_REG(mmINPUT_GAMMA_CONTROL);
-	uint32_t value = dm_read_reg(ipp80->base.ctx, addr);
-
-	set_reg_field_value(
-		value,
-		!is_legacy,
-		INPUT_GAMMA_CONTROL,
-		GRPH_INPUT_GAMMA_MODE);
-
-	dm_write_reg(ipp80->base.ctx, addr, value);
-}
-
+#endif

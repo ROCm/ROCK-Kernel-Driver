@@ -45,9 +45,6 @@ static void amdgpu_sem_core_free(struct kref *kref)
 	struct amdgpu_sem_core *core = container_of(
 		kref, struct amdgpu_sem_core, kref);
 
-	if (core->file)
-		fput(core->file);
-
 	fence_put(core->fence);
 	mutex_destroy(&core->lock);
 	kfree(core);
@@ -78,6 +75,11 @@ static inline void amdgpu_sem_put(struct amdgpu_sem *sem)
 static int amdgpu_sem_release(struct inode *inode, struct file *file)
 {
 	struct amdgpu_sem_core *core = file->private_data;
+
+	/* set the core->file to null if file got released */
+	mutex_lock(&core->lock);
+	core->file = NULL;
+	mutex_unlock(&core->lock);
 
 	kref_put(&core->kref, amdgpu_sem_core_free);
 	return 0;
@@ -228,10 +230,11 @@ static int amdgpu_sem_import(struct amdgpu_fpriv *fpriv,
 		return -EINVAL;
 	}
 
+	kref_get(&core->kref);
 	sem = amdgpu_sem_alloc();
 	if (!sem) {
 		ret = -ENOMEM;
-		goto err_out;
+		goto err_sem;
 	}
 
 	sem->base = core;
@@ -248,10 +251,13 @@ static int amdgpu_sem_import(struct amdgpu_fpriv *fpriv,
 		goto err_out;
 
 	*handle = ret;
+	fput(file);
 	return 0;
-
+err_sem:
+	kref_put(&core->kref, amdgpu_sem_core_free);
 err_out:
-	kfree(sem);
+	amdgpu_sem_put(sem);
+	fput(file);
 	return ret;
 
 }
@@ -268,6 +274,7 @@ static int amdgpu_sem_export(struct amdgpu_fpriv *fpriv,
 		return -EINVAL;
 
 	core = sem->base;
+	kref_get(&core->kref);
 	mutex_lock(&core->lock);
 	if (!core->file) {
 		core->file = anon_inode_getfile("sem_file",
@@ -278,11 +285,10 @@ static int amdgpu_sem_export(struct amdgpu_fpriv *fpriv,
 			ret = -ENOMEM;
 			goto err_put_sem;
 		}
+	} else {
+		get_file(core->file);
 	}
 	mutex_unlock(&core->lock);
-
-	get_file(core->file);
-	kref_get(&core->kref);
 
 	ret = get_unused_fd_flags(O_CLOEXEC);
 	if (ret < 0)
@@ -292,11 +298,13 @@ static int amdgpu_sem_export(struct amdgpu_fpriv *fpriv,
 
 	*fd = ret;
 	amdgpu_sem_put(sem);
+
 	return 0;
 
 err_put_file:
 	fput(core->file);
 err_put_sem:
+	kref_put(&core->kref, amdgpu_sem_core_free);
 	amdgpu_sem_put(sem);
 	return ret;
 }

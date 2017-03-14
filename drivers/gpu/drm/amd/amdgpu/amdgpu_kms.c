@@ -251,12 +251,12 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 		struct drm_amdgpu_virtual_range range_info;
 		switch (info->virtual_range.aperture) {
 		case AMDGPU_SUA_APERTURE_PRIVATE:
-			range_info.start = adev->vm_manager.private_aperture_start;
-			range_info.end = adev->vm_manager.private_aperture_end;
+			range_info.start = adev->mc.private_aperture_start;
+			range_info.end = adev->mc.private_aperture_end;
 			break;
 		case AMDGPU_SUA_APERTURE_SHARED:
-			range_info.start = adev->vm_manager.shared_aperture_start;
-			range_info.end = adev->vm_manager.shared_aperture_end;
+			range_info.start = adev->mc.shared_aperture_start;
+			range_info.end = adev->mc.shared_aperture_end;
 			break;
 		default:
 			return -EINVAL;
@@ -327,6 +327,13 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 			ib_start_alignment = AMDGPU_GPU_PAGE_SIZE;
 			ib_size_alignment = 1;
 			break;
+		case AMDGPU_HW_IP_UVD_ENC:
+			type = AMD_IP_BLOCK_TYPE_UVD;
+			for (i = 0; i < adev->uvd.num_enc_rings; i++)
+				ring_mask |= ((adev->uvd.ring_enc[i].ready ? 1 : 0) << i);
+			ib_start_alignment = AMDGPU_GPU_PAGE_SIZE;
+			ib_size_alignment = 1;
+			break;
 		default:
 			return -EINVAL;
 		}
@@ -365,6 +372,9 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 			break;
 		case AMDGPU_HW_IP_VCE:
 			type = AMD_IP_BLOCK_TYPE_VCE;
+			break;
+		case AMDGPU_HW_IP_UVD_ENC:
+			type = AMD_IP_BLOCK_TYPE_UVD;
 			break;
 		default:
 			return -EINVAL;

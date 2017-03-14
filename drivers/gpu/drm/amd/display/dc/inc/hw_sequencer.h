@@ -34,14 +34,18 @@ enum pipe_gating_control {
 	PIPE_GATING_CONTROL_INIT
 };
 
-enum pipe_lock_control {
-	PIPE_LOCK_CONTROL_GRAPHICS = 1 << 0,
-	PIPE_LOCK_CONTROL_BLENDER = 1 << 1,
-	PIPE_LOCK_CONTROL_SCL = 1 << 2,
-	PIPE_LOCK_CONTROL_MODE = 1 << 3
+struct dce_hwseq_wa {
+	bool blnd_crtc_trigger;
 };
 
-struct dce_hwseq;
+struct dce_hwseq {
+	struct dc_context *ctx;
+	const struct dce_hwseq_registers *regs;
+	const struct dce_hwseq_shift *shifts;
+	const struct dce_hwseq_mask *masks;
+	struct dce_hwseq_wa wa;
+};
+
 
 struct hw_sequencer_funcs {
 
@@ -115,20 +119,18 @@ struct hw_sequencer_funcs {
 			struct dc_link_settings *link_settings);
 
 	void (*pipe_control_lock)(
-				struct dce_hwseq *hwseq,
-				unsigned int blnd_inst,
-				enum pipe_lock_control control_mask,
+				struct core_dc *dc,
+				struct pipe_ctx *pipe,
 				bool lock);
 
 	void (*set_displaymarks)(
 				const struct core_dc *dc,
 				struct validate_context *context);
 
-	void (*increase_watermarks_for_pipe)(struct core_dc *dc,
-			struct pipe_ctx *pipe_ctx,
-			struct validate_context *context);
-
-	void (*set_bandwidth)(struct core_dc *dc);
+	void (*set_bandwidth)(
+			struct core_dc *dc,
+			struct validate_context *context,
+			bool decrease_allowed);
 
 	void (*set_drr)(struct pipe_ctx **pipe_ctx, int num_pipes,
 			int vmin, int vmax);

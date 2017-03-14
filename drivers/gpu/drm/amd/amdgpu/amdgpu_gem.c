@@ -229,6 +229,27 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 	bool kernel = false;
 	int r;
 
+	/* reject invalid gem flags */
+	if (args->in.domain_flags & ~(AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED |
+				      AMDGPU_GEM_CREATE_NO_CPU_ACCESS |
+				      AMDGPU_GEM_CREATE_CPU_GTT_USWC |
+				      AMDGPU_GEM_CREATE_VRAM_CLEARED|
+				      AMDGPU_GEM_CREATE_SHADOW |
+				      AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS)) {
+		r = -EINVAL;
+		goto error_unlock;
+	}
+	/* reject invalid gem domains */
+	if (args->in.domains & ~(AMDGPU_GEM_DOMAIN_CPU |
+				 AMDGPU_GEM_DOMAIN_GTT |
+				 AMDGPU_GEM_DOMAIN_VRAM |
+				 AMDGPU_GEM_DOMAIN_GDS |
+				 AMDGPU_GEM_DOMAIN_GWS |
+				 AMDGPU_GEM_DOMAIN_OA)) {
+		r = -EINVAL;
+		goto error_unlock;
+	}
+
 	/* create a gem object to contain this object in */
 	if (args->in.domains & (AMDGPU_GEM_DOMAIN_GDS |
 	    AMDGPU_GEM_DOMAIN_GWS | AMDGPU_GEM_DOMAIN_OA)) {
@@ -719,7 +740,7 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 	struct ttm_validate_buffer tv;
 	struct ww_acquire_ctx ticket;
 	struct list_head list;
-	uint64_t va_flags = 0;
+	uint64_t va_flags;
 	int r = 0;
 
 	if (!adev->vm_manager.enabled)
@@ -781,14 +802,8 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 
 	switch (args->operation) {
 	case AMDGPU_VA_OP_MAP:
-		if (args->flags & AMDGPU_VM_PAGE_READABLE)
-			va_flags |= AMDGPU_PTE_READABLE;
-		if (args->flags & AMDGPU_VM_PAGE_WRITEABLE)
-			va_flags |= AMDGPU_PTE_WRITEABLE;
-		if (args->flags & AMDGPU_VM_PAGE_EXECUTABLE)
-			va_flags |= AMDGPU_PTE_EXECUTABLE;
-		if (args->flags & AMDGPU_VM_PAGE_PRT)
-			va_flags |= AMDGPU_PTE_PRT;
+		va_flags = amdgpu_vm_get_pte_flags(adev, args->flags);
+
 		r = amdgpu_vm_bo_map(adev, bo_va, args->va_address,
 				     args->offset_in_bo, args->map_size,
 				     va_flags);
