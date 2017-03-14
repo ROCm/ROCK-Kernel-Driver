@@ -892,10 +892,23 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 {
 	struct amdgpu_bo_va *bo_va = entry->bo_va;
 	struct amdgpu_vm *vm = bo_va->vm;
+	struct amdkfd_vm *kvm = container_of(vm, struct amdkfd_vm, base);
+	struct amdgpu_bo *pd = vm->page_directory;
 
+	/* Remove eviction fence from PD (and thereby from PTs too as they
+	 * share the resv. object. Otherwise during PT update job (see
+	 * amdgpu_vm_bo_update_mapping), eviction fence will get added to
+	 * job->sync object
+	 */
+	amdgpu_amdkfd_remove_eviction_fence(pd,
+					    kvm->process_info->eviction_fence,
+					    NULL, NULL);
 	amdgpu_vm_bo_unmap(adev, bo_va, entry->va);
 
 	amdgpu_vm_clear_freed(adev, vm, &bo_va->last_pt_update);
+
+	/* Add the eviction fence back */
+	amdgpu_bo_fence(pd, &kvm->process_info->eviction_fence->base, true);
 
 	amdgpu_sync_fence(adev, sync, bo_va->last_pt_update);
 
