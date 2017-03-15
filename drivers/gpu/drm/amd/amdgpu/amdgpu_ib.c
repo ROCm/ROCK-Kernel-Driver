@@ -167,9 +167,6 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 		return r;
 	}
 
-	if (ring->funcs->init_cond_exec)
-		patch_offset = amdgpu_ring_init_cond_exec(ring);
-
 	if (vm) {
 		amdgpu_ring_insert_nop(ring, extra_nop); /* prevent CE go too fast than DE */
 
@@ -180,7 +177,10 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 		}
 	}
 
-	if (ring->funcs->emit_hdp_flush
+	if (ring->funcs->init_cond_exec)
+		patch_offset = amdgpu_ring_init_cond_exec(ring);
+
+		if (ring->funcs->emit_hdp_flush
 #ifdef CONFIG_X86_64
 	    && !(adev->flags & AMD_IS_APU)
 #endif
