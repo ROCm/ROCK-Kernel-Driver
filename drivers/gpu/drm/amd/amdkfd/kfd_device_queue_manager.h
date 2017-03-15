@@ -182,6 +182,7 @@ struct device_queue_manager {
 	unsigned int		*allocated_queues;
 	unsigned int		sdma_bitmap;
 	unsigned int		vmid_bitmap;
+	unsigned long           *doorbell_bitmap;
 	uint64_t		pipelines_addr;
 	struct kfd_mem_obj	*pipeline_mem;
 	uint64_t		fence_gpu_addr;
@@ -198,6 +199,8 @@ void device_queue_manager_init_cik_hawaii(
 void device_queue_manager_init_vi(
 		struct device_queue_manager_asic_ops *asic_ops);
 void device_queue_manager_init_vi_tonga(
+		struct device_queue_manager_asic_ops *asic_ops);
+void device_queue_manager_init_v9_vega10(
 		struct device_queue_manager_asic_ops *asic_ops);
 void program_sh_mem_settings(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd);
@@ -216,6 +219,7 @@ static inline unsigned int get_sh_mem_bases_32(struct kfd_process_device *pdd)
 	return (pdd->lds_base >> 16) & 0xFF;
 }
 
+/* This function is only useful for GFXv7 and v8 */
 static inline unsigned int
 get_sh_mem_bases_nybble_64(struct kfd_process_device *pdd)
 {
