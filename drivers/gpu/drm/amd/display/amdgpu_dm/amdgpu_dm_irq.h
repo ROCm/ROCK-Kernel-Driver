@@ -24,6 +24,8 @@
 #ifndef __AMDGPU_DM_IRQ_H__
 #define __AMDGPU_DM_IRQ_H__
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+
 #include "irq_types.h" /* DAL irq definitions */
 
 /*
@@ -119,4 +121,7 @@ int amdgpu_dm_irq_suspend(struct amdgpu_device *adev);
 int amdgpu_dm_irq_resume_early(struct amdgpu_device *adev);
 int amdgpu_dm_irq_resume_late(struct amdgpu_device *adev);
 
+#else
+#include "../kcl_dm/kcl_dm_irq.h"
+#endif /* KERNEL_VERSION */
 #endif /* __AMDGPU_DM_IRQ_H__ */

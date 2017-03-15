@@ -26,6 +26,8 @@
 #ifndef __AMDGPU_DM_H__
 #define __AMDGPU_DM_H__
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+
 #include <drm/drmP.h>
 #include <drm/drm_atomic.h>
 #include "dc.h"
@@ -282,5 +284,9 @@ void amdgpu_dm_remove_sink_from_freesync_module(
 		struct drm_connector *connector);
 
 extern const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs;
+
+#else
+#include "../kcl_dm/kcl_dm.h"
+#endif /* KERNEL_VERSION */
 
 #endif /* __AMDGPU_DM_H__ */

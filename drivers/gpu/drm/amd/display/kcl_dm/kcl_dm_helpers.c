@@ -23,6 +23,8 @@
  *
  */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+
 #include <linux/string.h>
 #include <linux/acpi.h>
 #include <linux/version.h>
@@ -487,3 +489,5 @@ bool dm_helpers_submit_i2c(
 
 	return result;
 }
+
+#endif

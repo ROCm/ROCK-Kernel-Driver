@@ -23,6 +23,8 @@
  *
  */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+
 #include <linux/types.h>
 #include <linux/version.h>
 
@@ -3487,3 +3489,5 @@ void amdgpu_dm_remove_sink_from_freesync_module(
 	amdgpu_freesync_update_property_atomic(connector, 0);
 
 }
+
+#endif

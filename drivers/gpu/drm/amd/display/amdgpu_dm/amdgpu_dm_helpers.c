@@ -23,6 +23,8 @@
  *
  */
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+
 #include <linux/string.h>
 #include <linux/acpi.h>
 #include <linux/version.h>
@@ -496,3 +498,4 @@ enum dc_edid_status dm_helpers_read_local_edid(
 
 	return edid_status;
 }
+#endif
