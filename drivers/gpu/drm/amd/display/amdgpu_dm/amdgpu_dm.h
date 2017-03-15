@@ -26,6 +26,8 @@
 #ifndef __AMDGPU_DM_H__
 #define __AMDGPU_DM_H__
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+
 /*
 #include "linux/switch.h"
 */
@@ -167,5 +169,9 @@ struct amdgpu_connector *amdgpu_dm_find_first_crct_matching_connector(
 	struct drm_atomic_state *state,
 	struct drm_crtc *crtc,
 	bool from_state_var);
+
+#else
+#include "../kcl_dm/kcl_dm.h"
+#endif /* KERNEL_VERSION */
 
 #endif /* __AMDGPU_DM_H__ */

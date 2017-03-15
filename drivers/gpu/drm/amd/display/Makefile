@@ -15,7 +15,7 @@ subdir-ccflags-y += -I$(FULL_AMD_DISPLAY_PATH)/modules/freesync
 #TODO: remove when Timing Sync feature is complete
 subdir-ccflags-y += -DBUILD_FEATURE_TIMING_SYNC=0
 
-DAL_LIBS = amdgpu_dm dc	modules/freesync
+DAL_LIBS = amdgpu_dm kcl_dm dc modules/freesync
 
 AMD_DAL = $(addsuffix /Makefile, $(addprefix $(FULL_AMD_DISPLAY_PATH)/,$(DAL_LIBS)))
 
