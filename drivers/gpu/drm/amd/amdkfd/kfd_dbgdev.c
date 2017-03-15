@@ -29,7 +29,7 @@
 #include <linux/mutex.h>
 #include <linux/device.h>
 
-#include "kfd_pm4_headers.h"
+#include "kfd_pm4_headers_vi.h"
 #include "kfd_pm4_headers_diq.h"
 #include "kfd_kernel_queue.h"
 #include "kfd_priv.h"
@@ -52,7 +52,7 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 {
 	int status = 0;
 	unsigned int *ib_packet_buff = NULL;
-	struct pm4__release_mem *rm_packet;
+	struct pm4_mec_release_mem *rm_packet;
 	struct pm4__indirect_buffer_pasid *ib_packet;
 	struct kernel_queue *kq = dbgdev->kq;
 	size_t pq_packets_size_in_bytes =
@@ -78,7 +78,7 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 		 */
 		if (sync)
 			pq_packets_size_in_bytes +=
-				sizeof(struct pm4__release_mem);
+				sizeof(struct pm4_mec_release_mem);
 		status = kq->ops.acquire_packet_buffer(kq, pq_packets_size_in_bytes / sizeof(uint32_t), &ib_packet_buff);
 		if (status != 0) {
 			pr_debug("Error! kfd: In func %s >> acquire_packet_buffer failed\n", __func__);
@@ -116,7 +116,7 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 		 * (a) Sync with HW
 		 * (b) Sync var is written by CP to mem.
 		 */
-		rm_packet = (struct pm4__release_mem *) (ib_packet_buff +
+		rm_packet = (struct pm4_mec_release_mem *) (ib_packet_buff +
 				(sizeof(struct pm4__indirect_buffer_pasid) / sizeof(unsigned int)));
 
 		status = kfd_gtt_sa_allocate(dbgdev->dev, sizeof(uint64_t),
@@ -130,7 +130,7 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 
 			rm_packet->header.opcode = IT_RELEASE_MEM;
 			rm_packet->header.type = PM4_TYPE_3;
-			rm_packet->header.count = sizeof(struct pm4__release_mem) / sizeof(unsigned int) - 2;
+			rm_packet->header.count = sizeof(struct pm4_mec_release_mem) / sizeof(unsigned int) - 2;
 
 			rm_packet->bitfields2.event_type = CACHE_FLUSH_AND_INV_TS_EVENT;
 			rm_packet->bitfields2.event_index = event_index___release_mem__end_of_pipe;

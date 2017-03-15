@@ -1233,6 +1233,11 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
 		break;
+	case CHIP_VEGA10:
+		dev->node_props.capability |= ((HSA_CAP_DOORBELL_TYPE_2_0 <<
+			HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
+			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
+		break;
 	}
 
 	/* Fix errors in CZ CRAT.

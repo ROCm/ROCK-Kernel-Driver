@@ -275,25 +275,39 @@
  * for FLAT_* / S_LOAD operations.
  */
 
-#define MAKE_GPUVM_APP_BASE(gpu_num) \
+#define MAKE_GPUVM_APP_BASE_VI(gpu_num) \
 	(((uint64_t)(gpu_num) << 61) + 0x1000000000000L)
 
 #define MAKE_GPUVM_APP_LIMIT(base, size) \
 	(((uint64_t)(base) & 0xFFFFFF0000000000UL) + (size) - 1)
 
-#define MAKE_SCRATCH_APP_BASE() \
+#define MAKE_SCRATCH_APP_BASE_VI() \
 	(((uint64_t)(0x1UL) << 61) + 0x100000000L)
 
 #define MAKE_SCRATCH_APP_LIMIT(base) \
 	(((uint64_t)base & 0xFFFFFFFF00000000UL) | 0xFFFFFFFF)
 
-#define MAKE_LDS_APP_BASE() \
+#define MAKE_LDS_APP_BASE_VI() \
 	(((uint64_t)(0x1UL) << 61) + 0x0)
 
 #define MAKE_LDS_APP_LIMIT(base) \
 	(((uint64_t)(base) & 0xFFFFFFFF00000000UL) | 0xFFFFFFFF)
 
+/* On GFXv9 the LDS and scratch apertures are programmed independently
+ * using the high 16 bits of the 64-bit virtual address. They must be
+ * in the hole, which will be the case as long as the high 16 bits are
+ * not 0.
+ *
+ * The aperture sizes are still 4GB implicitly.
+ *
+ * A GPUVM aperture is not applicable on GFXv9.
+ */
+#define MAKE_LDS_APP_BASE_V9() ((uint64_t)(0x1UL) << 48)
+#define MAKE_SCRATCH_APP_BASE_V9() ((uint64_t)(0x2UL) << 48)
 
+/* Some VM address space reserved for kernel use (CWSR trap handlers
+ * and kernel IBs)
+ */
 #define DGPU_VM_BASE_DEFAULT 0x100000
 #define DGPU_IB_BASE_DEFAULT (DGPU_VM_BASE_DEFAULT - PAGE_SIZE)
 
@@ -307,6 +321,32 @@ int kfd_set_process_dgpu_aperture(struct kfd_process_device *pdd,
 	pdd->dgpu_base = base;
 	pdd->dgpu_limit = limit;
 	return 0;
+}
+
+void kfd_init_apertures_vi(struct kfd_process_device *pdd, uint8_t id)
+{
+	/*
+	 * node id couldn't be 0 - the three MSB bits of
+	 * aperture shoudn't be 0
+	 */
+	pdd->lds_base = MAKE_LDS_APP_BASE_VI();
+	pdd->lds_limit = MAKE_LDS_APP_LIMIT(pdd->lds_base);
+
+	pdd->gpuvm_base = MAKE_GPUVM_APP_BASE_VI(id + 1);
+	pdd->gpuvm_limit = MAKE_GPUVM_APP_LIMIT(
+		pdd->gpuvm_base, pdd->dev->shared_resources.gpuvm_size);
+
+	pdd->scratch_base = MAKE_SCRATCH_APP_BASE_VI();
+	pdd->scratch_limit = MAKE_SCRATCH_APP_LIMIT(pdd->scratch_base);
+}
+
+void kfd_init_apertures_v9(struct kfd_process_device *pdd, uint8_t id)
+{
+	pdd->lds_base = MAKE_LDS_APP_BASE_V9();
+	pdd->lds_limit = MAKE_LDS_APP_LIMIT(pdd->lds_base);
+
+	pdd->scratch_base = MAKE_SCRATCH_APP_BASE_V9();
+	pdd->scratch_limit = MAKE_SCRATCH_APP_LIMIT(pdd->scratch_base);
 }
 
 int kfd_init_apertures(struct kfd_process *process)
@@ -337,24 +377,23 @@ int kfd_init_apertures(struct kfd_process *process)
 			pdd->gpuvm_base = pdd->gpuvm_limit = 0;
 			pdd->scratch_base = pdd->scratch_limit = 0;
 		} else {
-			/*
-			 * node id couldn't be 0 - the three MSB bits of
-			 * aperture shoudn't be 0
-			 */
-			pdd->lds_base = MAKE_LDS_APP_BASE();
-
-			pdd->lds_limit = MAKE_LDS_APP_LIMIT(pdd->lds_base);
-
-			pdd->gpuvm_base = MAKE_GPUVM_APP_BASE(id + 1);
-
-			pdd->gpuvm_limit = MAKE_GPUVM_APP_LIMIT(
-				pdd->gpuvm_base,
-				dev->shared_resources.gpuvm_size);
-
-			pdd->scratch_base = MAKE_SCRATCH_APP_BASE();
-
-			pdd->scratch_limit =
-				MAKE_SCRATCH_APP_LIMIT(pdd->scratch_base);
+			switch (dev->device_info->asic_family) {
+			case CHIP_KAVERI:
+			case CHIP_HAWAII:
+			case CHIP_CARRIZO:
+			case CHIP_TONGA:
+			case CHIP_FIJI:
+			case CHIP_POLARIS10:
+			case CHIP_POLARIS11:
+				kfd_init_apertures_vi(pdd, id);
+				break;
+			case CHIP_VEGA10:
+				kfd_init_apertures_v9(pdd, id);
+				break;
+			default:
+				pr_err("Unknown chip in kfd_init_apertures\n");
+				goto err;
+			}
 
 			if (KFD_IS_DGPU(dev->device_info->asic_family)) {
 				pdd->qpd.cwsr_base = DGPU_VM_BASE_DEFAULT;

@@ -309,8 +309,16 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 
 
 	/* Return gpu_id as doorbell offset for mmap usage */
-	args->doorbell_offset = (KFD_MMAP_TYPE_DOORBELL | args->gpu_id);
+	args->doorbell_offset = KFD_MMAP_TYPE_DOORBELL;
+	args->doorbell_offset |= KFD_MMAP_GPU_ID(args->gpu_id);
 	args->doorbell_offset <<= PAGE_SHIFT;
+	if (KFD_IS_SOC15(dev->device_info->asic_family))
+		/* On SOC15 ASICs, doorbell allocation must be
+		 * per-device, and independent from the per-process
+		 * queue_id. Return the doorbell offset within the
+		 * doorbell aperture to user mode.
+		 */
+		args->doorbell_offset |= q_properties.doorbell_off;
 
 	up_write(&p->lock);
 
@@ -1263,6 +1271,8 @@ static uint32_t kfd_convert_user_mem_alloction_flags(
 out:
 	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM)
 		kernel_allocation_flags |= ALLOC_MEM_FLAGS_AQL_QUEUE_MEM;
+	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_COHERENT)
+		kernel_allocation_flags |= ALLOC_MEM_FLAGS_COHERENT;
 	/* Current HW doesn't support non paged memory */
 	kernel_allocation_flags |= ALLOC_MEM_FLAGS_NONPAGED;
 	/*
@@ -1304,7 +1314,7 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 		return PTR_ERR(pdd);
 
 	if (args->flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
-		if (args->size != kfd_doorbell_process_slice())
+		if (args->size != kfd_doorbell_process_slice(dev))
 			return -EINVAL;
 		offset = kfd_get_process_doorbells(dev, p);
 	} else
@@ -2337,7 +2347,10 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	switch (vm_pgoff & KFD_MMAP_TYPE_MASK) {
 	case KFD_MMAP_TYPE_DOORBELL:
-		return kfd_doorbell_mmap(process, vma);
+		kfd = kfd_device_by_id(KFD_MMAP_GPU_ID_GET(vm_pgoff));
+		if (!kfd)
+			return -EFAULT;
+		return kfd_doorbell_mmap(kfd, process, vma);
 
 	case KFD_MMAP_TYPE_EVENTS:
 		return kfd_event_mmap(process, vma);
