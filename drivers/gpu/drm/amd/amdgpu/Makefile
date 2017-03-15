@@ -109,6 +109,7 @@ amdgpu-y += \
 	 amdgpu_amdkfd.o \
 	 amdgpu_amdkfd_gfx_v7.o \
 	 amdgpu_amdkfd_gfx_v8.o \
+	 amdgpu_amdkfd_gfx_v9.o \
 	 amdgpu_amdkfd_gpuvm.o 
 
 # add cgs

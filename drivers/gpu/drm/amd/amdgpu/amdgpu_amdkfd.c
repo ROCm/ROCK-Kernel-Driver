@@ -28,7 +28,6 @@
 #include "amdgpu.h"
 #include "amdgpu_gfx.h"
 #include <linux/module.h>
-#include <linux/mmu_context.h>
 
 #define AMDKFD_SKIP_UNCOMPILED_CODE 1
 
@@ -81,6 +80,9 @@ bool amdgpu_amdkfd_load_interface(struct amdgpu_device *adev)
 	case CHIP_POLARIS10:
 	case CHIP_POLARIS11:
 		kfd2kgd = amdgpu_amdkfd_gfx_8_0_get_functions();
+		break;
+	case CHIP_VEGA10:
+		kfd2kgd = amdgpu_amdkfd_gfx_9_0_get_functions();
 		break;
 	default:
 		return false;
@@ -142,6 +144,28 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 				&gpu_resources.doorbell_physical_address,
 				&gpu_resources.doorbell_aperture_size,
 				&gpu_resources.doorbell_start_offset);
+		if (adev->asic_type >= CHIP_VEGA10) {
+			/* On SOC15 the BIF is involved in routing
+			 * doorbells using the low 12 bits of the
+			 * address. Communicate the assignments to
+			 * KFD. KFD uses two doorbell pages per
+			 * process in case of 64-bit doorbells so we
+			 * can use each doorbell assignment twice.
+			 */
+			gpu_resources.sdma_doorbell[0][0] =
+				AMDGPU_DOORBELL64_sDMA_ENGINE0;
+			gpu_resources.sdma_doorbell[0][1] =
+				AMDGPU_DOORBELL64_sDMA_ENGINE0 + 0x200;
+			gpu_resources.sdma_doorbell[1][0] =
+				AMDGPU_DOORBELL64_sDMA_ENGINE1;
+			gpu_resources.sdma_doorbell[1][1] =
+				AMDGPU_DOORBELL64_sDMA_ENGINE1 + 0x200;
+			/* Doorbells 0x0f0-0ff and 0x2f0-2ff are reserved for
+			 * SDMA, IH and VCN. So don't use them for the CP.
+			 */
+			gpu_resources.reserved_doorbell_mask = 0x1f0;
+			gpu_resources.reserved_doorbell_val  = 0x0f0;
+		}
 
 		kgd2kfd->device_init(adev->kfd, &gpu_resources);
 	}
@@ -609,28 +633,6 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 out_put:
 	dma_buf_put(dma_buf);
 	return r;
-}
-
-bool read_user_wptr(struct mm_struct *mm, uint32_t __user *wptr,
-		    uint32_t *wptr_val)
-{
-	bool wptr_valid = false;
-
-	if (mm && wptr) {
-		if (mm == current->mm) {
-			/* Running in the correct user process context */
-			wptr_valid = !get_user(*wptr_val, wptr);
-		} else if (current->mm == NULL) {
-			/* A kernel thread can temporarily use a user
-			 * process context for AIO
-			 */
-			use_mm(mm);
-			wptr_valid = !get_user(*wptr_val, wptr);
-			unuse_mm(mm);
-		}
-	}
-
-	return wptr_valid;
 }
 
 bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev,

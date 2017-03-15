@@ -27,6 +27,7 @@
 
 #include <linux/types.h>
 #include <linux/workqueue.h>
+#include <linux/mmu_context.h>
 #include <kgd_kfd_interface.h>
 #include "amdgpu.h"
 
@@ -58,9 +59,10 @@ struct kgd_mem {
 	struct delayed_work work; /* for restore evicted mem */
 	struct mm_struct *mm; /* for restore */
 
-	uint32_t pte_flags;
+	uint64_t pte_flags;
 
 	/* flags bitfield */
+	bool coherent      : 1;
 	bool no_substitute : 1;
 	bool aql_queue     : 1;
 	bool busy          : 1;
@@ -138,6 +140,7 @@ int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 int amdgpu_amdkfd_gpuvm_restore_process_bos(void *process_info);
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions(void);
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions(void);
+struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void);
 int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 		uint64_t src_offset, struct kgd_mem *dst_mem,
 		uint64_t dest_offset, uint64_t size, struct fence **f,
@@ -165,8 +168,20 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 				  size_t buffer_size, uint32_t *metadata_size,
 				  uint32_t *flags);
 
-bool read_user_wptr(struct mm_struct *mm, uint32_t __user *wptr,
-		    uint32_t *wptr_val);
+#define read_user_wptr(mmptr, wptr, dst)				\
+	({								\
+		bool valid = false;					\
+		if ((mmptr) && (wptr)) {				\
+			if ((mmptr) == current->mm) {			\
+				valid = !get_user((dst), (wptr));	\
+			} else if (current->mm == NULL) {		\
+				use_mm(mmptr);				\
+				valid = !get_user((dst), (wptr));	\
+				unuse_mm(mmptr);			\
+			}						\
+		}							\
+		valid;							\
+	})
 
 /* GPUVM API */
 int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
