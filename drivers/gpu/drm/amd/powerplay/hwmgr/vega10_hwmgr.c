@@ -873,7 +873,7 @@ static int vega10_setup_dpm_led_config(struct pp_hwmgr *hwmgr)
 	pp_table->LedPin0 = (uint8_t)(mask & 0xff);
 	pp_table->LedPin1 = (uint8_t)((mask >> 8) & 0xff);
 	pp_table->LedPin2 = (uint8_t)((mask >> 16) & 0xff);
-	return ret;
+	return 0;
 }
 
 static int vega10_setup_asic_task(struct pp_hwmgr *hwmgr)
