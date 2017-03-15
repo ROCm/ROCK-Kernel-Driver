@@ -172,13 +172,15 @@ enum asic_family_type {
 	CHIP_TONGA,
 	CHIP_FIJI,
 	CHIP_POLARIS10,
-	CHIP_POLARIS11
+	CHIP_POLARIS11,
+	CHIP_VEGA10
 };
 
 #define KFD_IS_VI(chip) ((chip) >= CHIP_CARRIZO && (chip) <= CHIP_POLARIS11)
 #define KFD_IS_DGPU(chip) (((chip) >= CHIP_TONGA && \
-			   (chip) <= CHIP_POLARIS11) || \
+			   (chip) <= CHIP_VEGA10) || \
 			   (chip) == CHIP_HAWAII)
+#define KFD_IS_SOC15(chip) ((chip) >= CHIP_VEGA10)
 
 struct kfd_event_interrupt_class {
 	bool (*interrupt_isr)(struct kfd_dev *dev, const uint32_t *ih_ring_entry,
@@ -191,6 +193,7 @@ struct kfd_device_info {
 	const struct kfd_event_interrupt_class *event_interrupt_class;
 	unsigned int max_pasid_bits;
 	unsigned int max_no_of_hqd;
+	unsigned int doorbell_size;
 	size_t ih_ring_entry_size;
 	uint8_t num_of_watch_points;
 	uint16_t mqd_size_aligned;
@@ -204,6 +207,7 @@ struct kfd_mem_obj {
 	uint32_t range_end;
 	uint64_t gpu_addr;
 	uint32_t *cpu_ptr;
+	void *gtt_mem;
 };
 
 struct kfd_vmid_info {
@@ -417,7 +421,7 @@ struct queue_properties {
 	uint32_t queue_percent;
 	uint32_t *read_ptr;
 	uint32_t *write_ptr;
-	uint32_t __iomem *doorbell_ptr;
+	void __iomem *doorbell_ptr;
 	uint32_t doorbell_off;
 	bool is_interop;
 	bool is_evicted; /* true -> queue is evicted */
@@ -482,6 +486,7 @@ struct queue {
 	uint32_t queue;
 
 	unsigned int sdma_id;
+	unsigned int doorbell_id;
 
 	struct kfd_process	*process;
 	struct kfd_dev		*device;
@@ -792,17 +797,19 @@ unsigned int kfd_pasid_alloc(void);
 void kfd_pasid_free(unsigned int pasid);
 
 /* Doorbells */
-size_t kfd_doorbell_process_slice(void);
+size_t kfd_doorbell_process_slice(struct kfd_dev *kfd);
 void kfd_doorbell_init(struct kfd_dev *kfd);
-int kfd_doorbell_mmap(struct kfd_process *process, struct vm_area_struct *vma);
-u32 __iomem *kfd_get_kernel_doorbell(struct kfd_dev *kfd,
+int kfd_doorbell_mmap(struct kfd_dev *kfd, struct kfd_process *process,
+		      struct vm_area_struct *vma);
+void __iomem *kfd_get_kernel_doorbell(struct kfd_dev *kfd,
 					unsigned int *doorbell_off);
 void kfd_release_kernel_doorbell(struct kfd_dev *kfd, u32 __iomem *db_addr);
 u32 read_kernel_doorbell(u32 __iomem *db);
-void write_kernel_doorbell(u32 __iomem *db, u32 value);
-unsigned int kfd_queue_id_to_doorbell(struct kfd_dev *kfd,
+void write_kernel_doorbell(void __iomem *db, u32 value);
+void write_kernel_doorbell64(void __iomem *db, u64 value);
+unsigned int kfd_doorbell_id_to_offset(struct kfd_dev *kfd,
 					struct kfd_process *process,
-					unsigned int queue_id);
+					unsigned int doorbell_id);
 
 /* GTT Sub-Allocator */
 
@@ -863,6 +870,8 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		struct kfd_dev *dev);
 struct mqd_manager *mqd_manager_init_vi_tonga(enum KFD_MQD_TYPE type,
 		struct kfd_dev *dev);
+struct mqd_manager *mqd_manager_init_v9(enum KFD_MQD_TYPE type,
+		struct kfd_dev *dev);
 struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev);
 void device_queue_manager_uninit(struct device_queue_manager *dqm);
 struct kernel_queue *kernel_queue_init(struct kfd_dev *dev,
@@ -902,7 +911,7 @@ int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm);
 #define KFD_FENCE_COMPLETED (100)
 #define KFD_FENCE_INIT   (10)
 
-struct packet_manager_firmware;
+struct packet_manager_func;
 
 struct packet_manager {
 	struct device_queue_manager *dqm;
@@ -912,17 +921,38 @@ struct packet_manager {
 	struct kfd_mem_obj *ib_buffer_obj;
 	unsigned ib_size_bytes;
 
-	struct packet_manager_firmware *pmf;
+	struct packet_manager_funcs *pmf;
 };
 
-struct packet_manager_firmware {
-	/* Support different firmware versions for map process packet */
+struct packet_manager_funcs {
+	/* Support different firmware versions for PM4  packets */
 	int (*map_process)(struct packet_manager *pm, uint32_t *buffer,
-				struct qcm_process_device *qpd);
-	int (*get_map_process_packet_size)(void);
+			struct qcm_process_device *qpd);
+	int (*runlist)(struct packet_manager *pm, uint32_t *buffer,
+			uint64_t ib, size_t ib_size_in_dwords, bool chain);
+	int (*set_resources)(struct packet_manager *pm, uint32_t *buffer,
+			struct scheduling_resources *res);
+	int (*map_queues)(struct packet_manager *pm, uint32_t *buffer,
+			struct queue *q, bool is_static);
+	int (*unmap_queues)(struct packet_manager *pm, uint32_t *buffer,
+			enum kfd_queue_type type,
+			enum kfd_unmap_queues_filter mode,
+			uint32_t filter_param, bool reset,
+			unsigned int sdma_engine);
+	int (*query_status)(struct packet_manager *pm, uint32_t *buffer,
+			uint64_t fence_address,	uint32_t fence_value);
+	uint32_t (*release_mem)(uint64_t gpu_addr, uint32_t *buffer);
+
+	uint32_t (*get_map_process_packet_size)(void);
+	uint32_t (*get_runlist_packet_size)(void);
+	uint32_t (*get_set_resources_packet_size)(void);
+	uint32_t (*get_map_queues_packet_size)(void);
+	uint32_t (*get_unmap_queues_packet_size)(void);
+	uint32_t (*get_query_status_packet_size)(void);
+	uint32_t (*get_release_mem_packet_size)(void);
+
 };
 
-uint32_t pm_create_release_mem(uint64_t gpu_addr, uint32_t *buffer);
 int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 		uint16_t fw_ver);
 void pm_uninit(struct packet_manager *pm);
@@ -939,6 +969,38 @@ int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
 
 void pm_release_ib(struct packet_manager *pm);
 
+/* Following  PM funcs can be shared among KV and VI  */
+unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size);
+int pm_runlist_vi(struct packet_manager *pm, uint32_t *buffer,
+			uint64_t ib, size_t ib_size_in_dwords, bool chain);
+int pm_map_queues_vi(struct packet_manager *pm, uint32_t *buffer,
+				struct queue *q, bool is_static);
+int pm_set_resources_vi(struct packet_manager *pm, uint32_t *buffer,
+				struct scheduling_resources *res);
+int pm_unmap_queues_vi(struct packet_manager *pm, uint32_t *buffer,
+			enum kfd_queue_type type,
+			enum kfd_unmap_queues_filter filter,
+			uint32_t filter_param, bool reset,
+			unsigned int sdma_engine);
+int pm_query_status_vi(struct packet_manager *pm, uint32_t *buffer,
+			uint64_t fence_address,	uint32_t fence_value);
+uint32_t pm_release_mem_vi(uint64_t gpu_addr, uint32_t *buffer);
+
+uint32_t pm_get_map_process_packet_size_vi(void);
+uint32_t pm_get_runlist_packet_size_vi(void);
+uint32_t pm_get_set_resources_packet_size_vi(void);
+uint32_t pm_get_map_queues_packet_size_vi(void);
+uint32_t pm_get_unmap_queues_packet_size_vi(void);
+uint32_t pm_get_query_status_packet_size_vi(void);
+uint32_t pm_get_release_mem_packet_size_vi(void);
+
+
+void kfd_pm_func_init_vi(struct packet_manager *pm, uint16_t fw_ver);
+void kfd_pm_func_init_cik(struct packet_manager *pm, uint16_t fw_ver);
+
+void kfd_pm_func_init_v9(struct packet_manager *pm, uint16_t fw_ver);
+
+
 uint64_t kfd_get_number_elems(struct kfd_dev *kfd);
 phys_addr_t kfd_get_process_doorbells(struct kfd_dev *dev,
 					struct kfd_process *process);
@@ -948,6 +1010,8 @@ int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
 
 /* Events */
 extern const struct kfd_event_interrupt_class event_interrupt_class_cik;
+extern const struct kfd_event_interrupt_class event_interrupt_class_v9;
+
 extern const struct kfd_device_global_init_class device_global_init_class_cik;
 
 enum kfd_event_wait_result {

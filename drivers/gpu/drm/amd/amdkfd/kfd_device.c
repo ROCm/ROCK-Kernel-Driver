@@ -28,8 +28,9 @@
 #include <linux/fence.h>
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
-#include "kfd_pm4_headers.h"
+#include "kfd_pm4_headers_vi.h"
 #include "cwsr_trap_handler_carrizo.h"
+#include "cwsr_trap_handler_gfx9.asm"
 
 #define MQD_SIZE_ALIGNED 768
 
@@ -38,6 +39,7 @@ static const struct kfd_device_info kaveri_device_info = {
 	.max_pasid_bits = 16,
 	/* max num of queues for KV.TODO should be a dynamic value */
 	.max_no_of_hqd	= 24,
+	.doorbell_size  = 4,
 	.ih_ring_entry_size = 4 * sizeof(uint32_t),
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
@@ -52,6 +54,7 @@ static const struct kfd_device_info hawaii_device_info = {
 	.max_pasid_bits = 16,
 	/* max num of queues for KV.TODO should be a dynamic value */
 	.max_no_of_hqd	= 24,
+	.doorbell_size  = 4,
 	.ih_ring_entry_size = 4 * sizeof(uint32_t),
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
@@ -66,6 +69,7 @@ static const struct kfd_device_info carrizo_device_info = {
 	.max_pasid_bits = 16,
 	/* max num of queues for CZ.TODO should be a dynamic value */
 	.max_no_of_hqd	= 24,
+	.doorbell_size  = 4,
 	.ih_ring_entry_size = 4 * sizeof(uint32_t),
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
@@ -79,6 +83,7 @@ static const struct kfd_device_info tonga_device_info = {
 	.asic_family = CHIP_TONGA,
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
+	.doorbell_size  = 4,
 	.ih_ring_entry_size = 4 * sizeof(uint32_t),
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
@@ -92,6 +97,7 @@ static const struct kfd_device_info fiji_device_info = {
 	.asic_family = CHIP_FIJI,
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
+	.doorbell_size  = 4,
 	.ih_ring_entry_size = 4 * sizeof(uint32_t),
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
@@ -105,6 +111,7 @@ static const struct kfd_device_info polaris10_device_info = {
 	.asic_family = CHIP_POLARIS10,
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
+	.doorbell_size  = 4,
 	.ih_ring_entry_size = 4 * sizeof(uint32_t),
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
@@ -118,6 +125,7 @@ static const struct kfd_device_info polaris11_device_info = {
 	.asic_family = CHIP_POLARIS11,
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
+	.doorbell_size  = 4,
 	.ih_ring_entry_size = 4 * sizeof(uint32_t),
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.num_of_watch_points = 4,
@@ -125,6 +133,19 @@ static const struct kfd_device_info polaris11_device_info = {
 	.is_need_iommu_device = false,
 	.supports_cwsr = true,
 	.needs_pci_atomics = true,
+};
+
+static const struct kfd_device_info vega10_device_info = {
+	.asic_family = CHIP_VEGA10,
+	.max_pasid_bits = 16,
+	.max_no_of_hqd  = 24,
+	.doorbell_size  = 8,
+	.ih_ring_entry_size = 8 * sizeof(uint32_t),
+	.event_interrupt_class = &event_interrupt_class_v9,
+	.num_of_watch_points = 4,
+	.mqd_size_aligned = MQD_SIZE_ALIGNED,
+	.is_need_iommu_device = false,
+	.supports_cwsr = true,
 };
 
 struct kfd_deviceid {
@@ -214,7 +235,13 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x67E9, &polaris11_device_info },     /* Polaris11 */
 	{ 0x67EB, &polaris11_device_info },     /* Polaris11 */
 	{ 0x67EF, &polaris11_device_info },	/* Polaris11 */
-	{ 0x67FF, &polaris11_device_info }	/* Polaris11 */
+	{ 0x67FF, &polaris11_device_info },	/* Polaris11 */
+	{ 0x6860, &vega10_device_info },	/* Vega10 */
+	{ 0x6861, &vega10_device_info },	/* Vega10 */
+	{ 0x6863, &vega10_device_info },	/* Vega10 */
+	{ 0x6867, &vega10_device_info },	/* Vega10 */
+	{ 0x686C, &vega10_device_info },	/* Vega10 */
+	{ 0x687F, &vega10_device_info }		/* Vega10 */
 };
 
 static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,
@@ -362,8 +389,17 @@ static int kfd_cwsr_init(struct kfd_dev *kfd)
 	 * Initialize the CWSR required memory for TBA and TMA
 	 */
 	if (cwsr_enable && kfd->device_info->supports_cwsr) {
+		const uint32_t *cwsr_hex;
 		void *cwsr_addr = NULL;
-		unsigned int size = sizeof(cwsr_trap_carrizo_hex);
+		unsigned int size;
+
+		if (kfd->device_info->asic_family < CHIP_VEGA10) {
+			cwsr_hex = cwsr_trap_carrizo_hex;
+			size = sizeof(cwsr_trap_carrizo_hex);
+		} else {
+			cwsr_hex = cwsr_trap_gfx9_hex;
+			size = sizeof(cwsr_trap_gfx9_hex);
+		}
 
 		if (size > PAGE_SIZE) {
 			pr_err("amdkfd: wrong CWSR ISA size.\n");
@@ -380,7 +416,7 @@ static int kfd_cwsr_init(struct kfd_dev *kfd)
 		/*Only first page used for cwsr ISA code */
 		cwsr_addr = kmap(kfd->cwsr_pages);
 		memset(cwsr_addr, 0, PAGE_SIZE);
-		memcpy(cwsr_addr, cwsr_trap_carrizo_hex, size);
+		memcpy(cwsr_addr, cwsr_hex, size);
 		kunmap(kfd->cwsr_pages);
 		kfd->tma_offset = ALIGN(size, PAGE_SIZE);
 		kfd->cwsr_enabled = true;
@@ -452,9 +488,9 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	 * calculate max size of runlist packet.
 	 * There can be only 2 packets at once
 	 */
-	size += (KFD_MAX_NUM_OF_PROCESSES * sizeof(struct pm4_map_process) +
-		max_num_of_queues_per_device *
-		sizeof(struct pm4_map_queues) + sizeof(struct pm4_runlist)) * 2;
+	size += (KFD_MAX_NUM_OF_PROCESSES * sizeof(struct pm4_mes_map_process) +
+		max_num_of_queues_per_device * sizeof(struct pm4_mes_map_queues)
+		+ sizeof(struct pm4_mes_runlist)) * 2;
 
 	/* Add size of HIQ & DIQ */
 	size += KFD_KERNEL_QUEUE_SIZE * 2;
@@ -965,7 +1001,7 @@ int kfd_gtt_sa_allocate(struct kfd_dev *kfd, unsigned int size,
 	if (size > kfd->gtt_sa_num_of_chunks * kfd->gtt_sa_chunk_size)
 		return -ENOMEM;
 
-	*mem_obj = kmalloc(sizeof(struct kfd_mem_obj), GFP_KERNEL);
+	*mem_obj = kzalloc(sizeof(struct kfd_mem_obj), GFP_KERNEL);
 	if ((*mem_obj) == NULL)
 		return -ENOMEM;
 
