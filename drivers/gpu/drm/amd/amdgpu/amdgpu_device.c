@@ -2944,7 +2944,7 @@ static ssize_t amdgpu_debugfs_regs_read(struct file *f, char __user *buf,
 		use_bank = 0;
 	}
 
-	*pos &= 0x3FFFF;
+	*pos &= (1UL << 22) - 1;
 
 	if (use_bank) {
 		if ((sh_bank != 0xFFFFFFFF && sh_bank >= adev->gfx.config.max_sh_per_se) ||
@@ -3020,7 +3020,7 @@ static ssize_t amdgpu_debugfs_regs_write(struct file *f, const char __user *buf,
 		use_bank = 0;
 	}
 
-	*pos &= 0x3FFFF;
+	*pos &= (1UL << 22) - 1;
 
 	if (use_bank) {
 		if ((sh_bank != 0xFFFFFFFF && sh_bank >= adev->gfx.config.max_sh_per_se) ||
