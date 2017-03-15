@@ -38,8 +38,6 @@
 #include "oss/oss_3_0_d.h"
 #include "gmc/gmc_8_1_sh_mask.h"
 #include "gmc/gmc_8_1_d.h"
-#include "vi_structs.h"
-#include "vid.h"
 
 /* Special VM and GART address alignment needed for VI pre-Fiji due to
  * a HW bug. */
@@ -496,7 +494,8 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		uint64_t size, void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr,
 		u32 domain, u64 flags, struct sg_table *sg, bool aql_queue,
-		bool readonly, bool execute, bool no_sub, bool userptr)
+		bool readonly, bool execute, bool coherent, bool no_sub,
+		bool userptr)
 {
 	struct amdgpu_device *adev;
 	int ret;
@@ -504,7 +503,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	uint64_t user_addr = 0;
 	int byte_align;
 	u32 alloc_domain;
-	uint32_t pte_flags;
+	uint32_t get_pte_flags;
 	struct amdkfd_vm *kfd_vm = (struct amdkfd_vm *)vm;
 
 	BUG_ON(kgd == NULL);
@@ -534,17 +533,21 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	}
 	INIT_LIST_HEAD(&(*mem)->bo_va_list);
 	mutex_init(&(*mem)->lock);
-
+	(*mem)->coherent = coherent;
 	(*mem)->no_substitute = no_sub;
 	(*mem)->aql_queue = aql_queue;
 
-	pte_flags = AMDGPU_PTE_READABLE | AMDGPU_PTE_VALID;
+	get_pte_flags = AMDGPU_VM_PAGE_READABLE;
 	if (!readonly)
-		pte_flags |= AMDGPU_PTE_WRITEABLE;
+		get_pte_flags |= AMDGPU_VM_PAGE_WRITEABLE;
 	if (execute)
-		pte_flags |= AMDGPU_PTE_EXECUTABLE;
+		get_pte_flags |= AMDGPU_VM_PAGE_EXECUTABLE;
+	if (coherent)
+		get_pte_flags |= AMDGPU_VM_MTYPE_UC;
+	else
+		get_pte_flags |= AMDGPU_VM_MTYPE_NC;
 
-	(*mem)->pte_flags = pte_flags;
+	(*mem)->pte_flags = amdgpu_vm_get_pte_flags(adev, get_pte_flags);
 
 	alloc_domain = userptr ? AMDGPU_GEM_DOMAIN_CPU : domain;
 
@@ -971,7 +974,7 @@ static int update_gpuvm_pte(struct amdgpu_device *adev,
 }
 
 static int map_bo_to_gpuvm(struct amdgpu_device *adev,
-		struct kfd_bo_va_list *entry, uint32_t pte_flags,
+		struct kfd_bo_va_list *entry, uint64_t pte_flags,
 		struct amdgpu_sync *sync)
 {
 	int ret;
@@ -1052,7 +1055,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		uint64_t *offset, void **kptr,
 		uint32_t flags)
 {
-	bool aql_queue, public, readonly, execute, no_sub, userptr;
+	bool aql_queue, public, readonly, execute, coherent, no_sub, userptr;
 	u64 alloc_flag;
 	uint32_t domain;
 	uint64_t *temp_offset;
@@ -1071,6 +1074,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	public    = (flags & ALLOC_MEM_FLAGS_PUBLIC) ? true : false;
 	readonly  = (flags & ALLOC_MEM_FLAGS_READONLY) ? true : false;
 	execute   = (flags & ALLOC_MEM_FLAGS_EXECUTE_ACCESS) ? true : false;
+	coherent  = (flags & ALLOC_MEM_FLAGS_COHERENT) ? true : false;
 	no_sub    = (flags & ALLOC_MEM_FLAGS_NO_SUBSTITUTE) ? true : false;
 	userptr   = (flags & ALLOC_MEM_FLAGS_USERPTR) ? true : false;
 
@@ -1111,16 +1115,16 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 			va, va + size, domain_string(domain),
 			BOOL_TO_STR(aql_queue));
 
-	pr_debug("\t alloc_flag 0x%llx public %s readonly %s execute %s no_sub %s\n",
+	pr_debug("\t alloc_flag 0x%llx public %s readonly %s execute %s coherent %s no_sub %s\n",
 			alloc_flag, BOOL_TO_STR(public),
 			BOOL_TO_STR(readonly), BOOL_TO_STR(execute),
-			BOOL_TO_STR(no_sub));
+			BOOL_TO_STR(coherent), BOOL_TO_STR(no_sub));
 
 	return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
 			temp_offset, kptr, domain,
 			alloc_flag, sg,
 			aql_queue, readonly, execute,
-			no_sub, userptr);
+			coherent, no_sub, userptr);
 }
 
 int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
@@ -1339,15 +1343,21 @@ bo_reserve_failed:
 static u64 get_vm_pd_gpu_offset(void *vm)
 {
 	struct amdgpu_vm *avm = (struct amdgpu_vm *) vm;
+	struct amdgpu_device *adev =
+		amdgpu_ttm_adev(avm->page_directory->tbo.bdev);
 	u64 offset;
-
-	BUG_ON(avm == NULL);
 
 	amdgpu_bo_reserve(avm->page_directory, false);
 
 	offset = amdgpu_bo_gpu_offset(avm->page_directory);
 
 	amdgpu_bo_unreserve(avm->page_directory);
+
+	/* On some ASICs the FB doesn't start at 0. Adjust FB offset
+	 * to an actual MC address.
+	 */
+	if (adev->mc.mc_funcs && adev->mc.mc_funcs->adjust_mc_addr)
+		offset = adev->mc.mc_funcs->adjust_mc_addr(adev, offset);
 
 	return offset;
 }
@@ -1846,8 +1856,11 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 
 	INIT_LIST_HEAD(&(*mem)->bo_va_list);
 	mutex_init(&(*mem)->lock);
-	(*mem)->pte_flags = AMDGPU_PTE_READABLE | AMDGPU_PTE_VALID
-			| AMDGPU_PTE_WRITEABLE | AMDGPU_PTE_EXECUTABLE;
+	(*mem)->pte_flags = amdgpu_vm_get_pte_flags(adev,
+						    AMDGPU_VM_PAGE_READABLE |
+						    AMDGPU_VM_PAGE_WRITEABLE |
+						    AMDGPU_VM_PAGE_EXECUTABLE |
+						    AMDGPU_VM_MTYPE_NC);
 
 	(*mem)->bo = amdgpu_bo_ref(bo);
 	(*mem)->va = va;

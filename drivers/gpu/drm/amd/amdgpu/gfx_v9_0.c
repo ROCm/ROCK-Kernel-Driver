@@ -4558,6 +4558,19 @@ static int gfx_v9_0_get_cu_info(struct amdgpu_device *adev,
 
 	cu_info->number = active_cu_number;
 	cu_info->ao_cu_mask = ao_cu_mask;
+	cu_info->simd_per_cu = NUM_SIMD_PER_CU;
+
+	switch (adev->asic_type) {
+	case CHIP_VEGA10: /* TODO: check if any of this changed */
+		cu_info->max_waves_per_simd = 10;
+		cu_info->max_scratch_slots_per_cu = 32;
+		cu_info->wave_front_size = 64;
+		cu_info->lds_size = 64;
+		break;
+	default:
+		dev_warn(adev->dev, "CU info asic_type [0x%x] not supported\n",
+					adev->asic_type);
+	}
 
 	return 0;
 }
