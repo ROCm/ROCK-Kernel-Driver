@@ -407,7 +407,7 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 	/* Copy userspace write pointer value to register.
 	 * Doorbell logic is active and will monitor subsequent changes.
 	 */
-	if (read_user_wptr(mm, wptr, &wptr_val))
+	if (read_user_wptr(mm, wptr, wptr_val))
 		WREG32(mmCP_HQD_PQ_WPTR, (wptr_val << wptr_shift) & wptr_mask);
 
 	/* Write CP_HQD_ACTIVE last. */
@@ -494,7 +494,7 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL, m->sdma_rlc_doorbell);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR, m->sdma_rlc_rb_rptr);
 
-	if (read_user_wptr(mm, wptr, &data))
+	if (read_user_wptr(mm, wptr, data))
 		WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_WPTR, data);
 	else
 		WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_WPTR,
