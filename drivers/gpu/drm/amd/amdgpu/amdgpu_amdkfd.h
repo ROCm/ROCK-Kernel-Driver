@@ -42,6 +42,7 @@ struct kfd_bo_va_list {
 	bool is_mapped;
 	bool map_fail;
 	uint64_t va;
+	uint64_t pte_flags;
 };
 
 struct kgd_mem {
@@ -59,7 +60,7 @@ struct kgd_mem {
 	struct delayed_work work; /* for restore evicted mem */
 	struct mm_struct *mm; /* for restore */
 
-	uint64_t pte_flags;
+	uint32_t mapping_flags;
 
 	/* flags bitfield */
 	bool coherent      : 1;
