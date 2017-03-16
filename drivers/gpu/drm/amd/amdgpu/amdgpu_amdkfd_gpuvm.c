@@ -360,6 +360,8 @@ static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
 	}
 
 	bo_va_entry->va = va;
+	bo_va_entry->pte_flags = amdgpu_vm_get_pte_flags(adev,
+							 mem->mapping_flags);
 	bo_va_entry->kgd_dev = (void *)adev;
 	list_add(&bo_va_entry->bo_list, list_bo_va);
 
@@ -503,7 +505,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	uint64_t user_addr = 0;
 	int byte_align;
 	u32 alloc_domain;
-	uint32_t get_pte_flags;
+	uint32_t mapping_flags;
 	struct amdkfd_vm *kfd_vm = (struct amdkfd_vm *)vm;
 
 	BUG_ON(kgd == NULL);
@@ -537,17 +539,17 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	(*mem)->no_substitute = no_sub;
 	(*mem)->aql_queue = aql_queue;
 
-	get_pte_flags = AMDGPU_VM_PAGE_READABLE;
+	mapping_flags = AMDGPU_VM_PAGE_READABLE;
 	if (!readonly)
-		get_pte_flags |= AMDGPU_VM_PAGE_WRITEABLE;
+		mapping_flags |= AMDGPU_VM_PAGE_WRITEABLE;
 	if (execute)
-		get_pte_flags |= AMDGPU_VM_PAGE_EXECUTABLE;
+		mapping_flags |= AMDGPU_VM_PAGE_EXECUTABLE;
 	if (coherent)
-		get_pte_flags |= AMDGPU_VM_MTYPE_UC;
+		mapping_flags |= AMDGPU_VM_MTYPE_UC;
 	else
-		get_pte_flags |= AMDGPU_VM_MTYPE_NC;
+		mapping_flags |= AMDGPU_VM_MTYPE_NC;
 
-	(*mem)->pte_flags = amdgpu_vm_get_pte_flags(adev, get_pte_flags);
+	(*mem)->mapping_flags = mapping_flags;
 
 	alloc_domain = userptr ? AMDGPU_GEM_DOMAIN_CPU : domain;
 
@@ -974,8 +976,7 @@ static int update_gpuvm_pte(struct amdgpu_device *adev,
 }
 
 static int map_bo_to_gpuvm(struct amdgpu_device *adev,
-		struct kfd_bo_va_list *entry, uint64_t pte_flags,
-		struct amdgpu_sync *sync)
+		struct kfd_bo_va_list *entry, struct amdgpu_sync *sync)
 {
 	int ret;
 	struct amdgpu_bo *bo = entry->bo_va->bo;
@@ -997,7 +998,7 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev,
 	 */
 	ret = amdgpu_vm_bo_map(adev, entry->bo_va,
 			entry->va, 0, amdgpu_bo_size(bo),
-			pte_flags);
+			entry->pte_flags);
 	if (ret != 0) {
 		pr_err("Failed to map VA 0x%llx in vm. ret %d\n",
 				entry->va, ret);
@@ -1291,8 +1292,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 					entry->va, entry->va + bo_size,
 					entry);
 
-			ret = map_bo_to_gpuvm(adev, entry, mem->pte_flags,
-					&ctx.sync);
+			ret = map_bo_to_gpuvm(adev, entry, &ctx.sync);
 			if (ret != 0) {
 				pr_err("Failed to map radeon bo to gpuvm\n");
 				goto map_bo_to_gpuvm_failed;
@@ -1856,11 +1856,9 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 
 	INIT_LIST_HEAD(&(*mem)->bo_va_list);
 	mutex_init(&(*mem)->lock);
-	(*mem)->pte_flags = amdgpu_vm_get_pte_flags(adev,
-						    AMDGPU_VM_PAGE_READABLE |
-						    AMDGPU_VM_PAGE_WRITEABLE |
-						    AMDGPU_VM_PAGE_EXECUTABLE |
-						    AMDGPU_VM_MTYPE_NC);
+	(*mem)->mapping_flags =
+		AMDGPU_VM_PAGE_READABLE | AMDGPU_VM_PAGE_WRITEABLE |
+		AMDGPU_VM_PAGE_EXECUTABLE | AMDGPU_VM_MTYPE_NC;
 
 	(*mem)->bo = amdgpu_bo_ref(bo);
 	(*mem)->va = va;
@@ -2056,8 +2054,7 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 			continue;
 		}
 
-		r = map_bo_to_gpuvm(adev, entry, mem->pte_flags,
-				&ctx.sync);
+		r = map_bo_to_gpuvm(adev, entry, &ctx.sync);
 		if (unlikely(r != 0)) {
 			pr_err("Failed to map BO to gpuvm\n");
 			entry->map_fail = true;
