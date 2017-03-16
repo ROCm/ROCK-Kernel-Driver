@@ -1423,8 +1423,6 @@ static bool construct(
 
 	bw_calcs_data_update_from_pplib(dc);
 
-	dc->public.caps.max_surfaces =  pool->base.pipe_count;
-
 	return true;
 
 res_create_fail:
