@@ -1737,37 +1737,67 @@ static uint32_t rgb_formats[] = {
 	DRM_FORMAT_ABGR2101010,
 };
 
-int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
-			struct amdgpu_crtc *acrtc,
-			uint32_t crtc_index)
+static uint32_t yuv_formats[] = {
+	DRM_FORMAT_YUYV,
+	DRM_FORMAT_YVYU,
+	DRM_FORMAT_UYVY,
+	DRM_FORMAT_VYUY,
+};
+
+int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
+			struct amdgpu_plane *aplane,
+			unsigned long possible_crtcs)
 {
 	int res = -ENOMEM;
 
-	struct drm_plane *primary_plane =
-		kzalloc(sizeof(*primary_plane), GFP_KERNEL);
+	switch (aplane->plane_type) {
+	case DRM_PLANE_TYPE_PRIMARY:
+		aplane->base.format_default = true;
 
-	if (!primary_plane)
-		goto fail_plane;
+		res = drm_universal_plane_init(
+				dm->adev->ddev,
+				&aplane->base,
+				possible_crtcs,
+				&dm_plane_funcs,
+				rgb_formats,
+				ARRAY_SIZE(rgb_formats),
+				aplane->plane_type, NULL);
+		break;
+	case DRM_PLANE_TYPE_OVERLAY:
+		res = drm_universal_plane_init(
+				dm->adev->ddev,
+				&aplane->base,
+				possible_crtcs,
+				&dm_plane_funcs,
+				yuv_formats,
+				ARRAY_SIZE(yuv_formats),
+				aplane->plane_type, NULL);
+		break;
+	case DRM_PLANE_TYPE_CURSOR:
+		break;
+	}
 
-	primary_plane->format_default = true;
+	drm_plane_helper_add(&aplane->base, &dm_plane_helper_funcs);
 
-	res = drm_universal_plane_init(
-		dm->adev->ddev,
-		primary_plane,
-		0,
-		&dm_plane_funcs,
-		rgb_formats,
-		ARRAY_SIZE(rgb_formats),
-		DRM_PLANE_TYPE_PRIMARY, NULL);
+	return 0;
 
-	primary_plane->crtc = &acrtc->base;
+}
 
-	drm_plane_helper_add(primary_plane, &dm_plane_helper_funcs);
+int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
+			struct drm_plane *plane,
+			uint32_t link_index)
+{
+	struct amdgpu_crtc *acrtc;
+	int res = -ENOMEM;
+
+	acrtc = kzalloc(sizeof(struct amdgpu_crtc), GFP_KERNEL);
+	if (!acrtc)
+		goto fail;
 
 	res = drm_crtc_init_with_planes(
 			dm->ddev,
 			&acrtc->base,
-			primary_plane,
+			plane,
 			NULL,
 			&amdgpu_dm_crtc_funcs, NULL);
 
@@ -1779,16 +1809,15 @@ int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	acrtc->max_cursor_width = 128;
 	acrtc->max_cursor_height = 128;
 
-	acrtc->crtc_id = crtc_index;
+	acrtc->crtc_id = link_index;
 	acrtc->base.enabled = false;
 
-	dm->adev->mode_info.crtcs[crtc_index] = acrtc;
+	dm->adev->mode_info.crtcs[link_index] = acrtc;
 	drm_mode_crtc_set_gamma_size(&acrtc->base, 256);
 
 	return 0;
 fail:
-	kfree(primary_plane);
-fail_plane:
+	kfree(acrtc);
 	acrtc->crtc_id = -1;
 	return res;
 }
