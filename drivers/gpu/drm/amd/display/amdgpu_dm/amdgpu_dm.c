@@ -1129,9 +1129,7 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	case CHIP_POLARIS11:
 	case CHIP_POLARIS10:
 	case CHIP_POLARIS12:
-#if defined(CONFIG_DRM_AMD_DC_DCE12_0)
 	case CHIP_VEGA10:
-#endif
 		if (dce110_register_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
 			return -1;
@@ -1310,7 +1308,6 @@ static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 	return r;
 }
 
-#if  defined(CONFIG_DRM_AMD_DC_DCE12_0)
 void dce_v12_0_stop_mc_access(struct amdgpu_device *adev,
 			      struct amdgpu_mode_mc_save *save)
 {
@@ -1403,8 +1400,6 @@ void dce_v12_0_set_vga_render_state(struct amdgpu_device *adev,
 	}
 }
 
-#endif
-
 #ifdef CONFIG_DRM_AMDGPU_CIK
 static const struct amdgpu_display_funcs dm_dce_v8_0_display_funcs = {
 	.set_vga_render_state = dce_v8_0_set_vga_render_state,
@@ -1475,7 +1470,6 @@ static const struct amdgpu_display_funcs dm_dce_v11_0_display_funcs = {
 
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCE12_0
 static const struct amdgpu_display_funcs dm_dce_v12_0_display_funcs = {
 	.set_vga_render_state = dce_v12_0_set_vga_render_state,
 	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
@@ -1498,7 +1492,6 @@ static const struct amdgpu_display_funcs dm_dce_v12_0_display_funcs = {
 	.notify_freesync = amdgpu_notify_freesync,
 
 };
-#endif
 
 
 #if defined(CONFIG_DEBUG_KERNEL_DC)
@@ -1587,7 +1580,6 @@ static int dm_early_init(void *handle)
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v11_0_display_funcs;
 		break;
-#if defined(CONFIG_DRM_AMD_DC_DCE12_0)
 	case CHIP_VEGA10:
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
@@ -1595,7 +1587,6 @@ static int dm_early_init(void *handle)
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v12_0_display_funcs;
 		break;
-#endif
 	default:
 		DRM_ERROR("Usupported ASIC type: 0x%X\n", adev->asic_type);
 		return -EINVAL;

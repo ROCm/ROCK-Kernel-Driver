@@ -873,7 +873,7 @@ static int vega10_setup_dpm_led_config(struct pp_hwmgr *hwmgr)
 	pp_table->LedPin0 = (uint8_t)(mask & 0xff);
 	pp_table->LedPin1 = (uint8_t)((mask >> 8) & 0xff);
 	pp_table->LedPin2 = (uint8_t)((mask >> 16) & 0xff);
-	return ret;
+	return 0;
 }
 
 static int vega10_setup_asic_task(struct pp_hwmgr *hwmgr)
@@ -3893,14 +3893,15 @@ static int vega10_get_fan_control_mode(struct pp_hwmgr *hwmgr)
 {
 	uint32_t reg;
 
-	if (hwmgr->fan_ctrl_is_in_default_mode)
+	if (hwmgr->fan_ctrl_is_in_default_mode) {
 		return hwmgr->fan_ctrl_default_mode;
-	else
+	} else {
 		reg = soc15_get_register_offset(THM_HWID, 0,
 			mmCG_FDO_CTRL2_BASE_IDX, mmCG_FDO_CTRL2);
 		return (cgs_read_register(hwmgr->device, reg) &
 				CG_FDO_CTRL2__FDO_PWM_MODE_MASK) >>
 				CG_FDO_CTRL2__FDO_PWM_MODE__SHIFT;
+	}
 }
 
 static int vega10_get_dal_power_level(struct pp_hwmgr *hwmgr,
