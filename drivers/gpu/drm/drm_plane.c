@@ -456,6 +456,12 @@ static int __setplane_internal(struct drm_plane *plane,
 {
 	int ret = 0;
 
+	if (plane->funcs->disable_plane == NULL ||
+				 plane->funcs->update_plane == NULL) {
+		DRM_ERROR("plane funcs not implemented\n");
+		ret = -EPERM;
+		goto out;
+	}
 	/* No fb means shut it down */
 	if (!fb) {
 		plane->old_fb = plane->fb;
