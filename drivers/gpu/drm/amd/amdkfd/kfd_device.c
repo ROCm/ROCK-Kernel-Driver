@@ -146,6 +146,7 @@ static const struct kfd_device_info vega10_device_info = {
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
 	.is_need_iommu_device = false,
 	.supports_cwsr = true,
+	.needs_pci_atomics = true,
 };
 
 struct kfd_deviceid {
