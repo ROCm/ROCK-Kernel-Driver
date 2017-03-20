@@ -208,7 +208,8 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 	if (flags & ~(AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED |
 		      AMDGPU_GEM_CREATE_NO_CPU_ACCESS |
 		      AMDGPU_GEM_CREATE_CPU_GTT_USWC |
-		      AMDGPU_GEM_CREATE_VRAM_CLEARED))
+		      AMDGPU_GEM_CREATE_VRAM_CLEARED |
+		      AMDGPU_GEM_CREATE_NO_EVICT))
 		return -EINVAL;
 
 	/* reject invalid gem domains */
