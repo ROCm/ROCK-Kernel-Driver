@@ -697,60 +697,6 @@ void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 	spin_unlock(&kfd->interrupt_lock);
 }
 
-int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm)
-{
-	struct kfd_process *p;
-	struct kfd_process_device *pdd;
-	int r;
-
-	BUG_ON(kfd == NULL);
-	if (!kfd->init_complete)
-		return 0;
-
-	/* Because we are called from arbitrary context (workqueue) as opposed
-	 * to process context, kfd_process could attempt to exit while we are
-	 * running so the lookup function increments the process ref count.
-	 */
-	p = kfd_lookup_process_by_mm(mm);
-	if (!p)
-		return -ENODEV;
-
-	r = -ENODEV;
-	pdd = kfd_get_process_device_data(kfd, p);
-	if (pdd)
-		r = process_evict_queues(kfd->dqm, &pdd->qpd);
-
-	kfd_unref_process(p);
-	return r;
-}
-
-int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm)
-{
-	struct kfd_process *p;
-	struct kfd_process_device *pdd;
-	int r;
-
-	BUG_ON(kfd == NULL);
-	if (!kfd->init_complete)
-		return 0;
-
-	/* Because we are called from arbitrary context (workqueue) as opposed
-	 * to process context, kfd_process could attempt to exit while we are
-	 * running so the lookup function increments the process ref count.
-	 */
-	p = kfd_lookup_process_by_mm(mm);
-	if (!p)
-		return -ENODEV;
-
-	r = -ENODEV;
-	pdd = kfd_get_process_device_data(kfd, p);
-	if (pdd)
-		r = process_restore_queues(kfd->dqm, &pdd->qpd);
-
-	kfd_unref_process(p);
-	return r;
-}
-
 /* quiesce_process_mm -
  *  Quiesce all user queues that belongs to given process p
  */
@@ -813,6 +759,60 @@ static int resume_process_mm(struct kfd_process *p)
 	}
 
 	return ret;
+}
+
+int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm)
+{
+	struct kfd_process *p;
+	struct kfd_process_device *pdd;
+	int r;
+
+	/* Because we are called from arbitrary context (workqueue) as opposed
+	 * to process context, kfd_process could attempt to exit while we are
+	 * running so the lookup function increments the process ref count.
+	 */
+	p = kfd_lookup_process_by_mm(mm);
+	if (!p)
+		return -ENODEV;
+
+	if (kfd) {
+		r = -ENODEV;
+		pdd = kfd_get_process_device_data(kfd, p);
+		if (pdd)
+			r = process_evict_queues(kfd->dqm, &pdd->qpd);
+	} else {
+		r = quiesce_process_mm(p);
+	}
+
+	kfd_unref_process(p);
+	return r;
+}
+
+int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm)
+{
+	struct kfd_process *p;
+	struct kfd_process_device *pdd;
+	int r;
+
+	/* Because we are called from arbitrary context (workqueue) as opposed
+	 * to process context, kfd_process could attempt to exit while we are
+	 * running so the lookup function increments the process ref count.
+	 */
+	p = kfd_lookup_process_by_mm(mm);
+	if (!p)
+		return -ENODEV;
+
+	if (kfd) {
+		r = -ENODEV;
+		pdd = kfd_get_process_device_data(kfd, p);
+		if (pdd)
+			r = process_restore_queues(kfd->dqm, &pdd->qpd);
+	} else {
+		r = resume_process_mm(p);
+	}
+
+	kfd_unref_process(p);
+	return r;
 }
 
 
