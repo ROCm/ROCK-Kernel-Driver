@@ -299,9 +299,8 @@ static int kfd_parse_subtype_cache(struct crat_subtype_cache *cache,
 static int kfd_parse_subtype_iolink(struct crat_subtype_iolink *iolink,
 					struct list_head *device_list)
 {
-	struct kfd_iolink_properties *props;
-	struct kfd_topology_device *dev;
-	uint32_t i = 0;
+	struct kfd_iolink_properties *props, *props2;
+	struct kfd_topology_device *dev, *cpu_dev;
 	uint32_t id_from;
 	uint32_t id_to;
 
@@ -323,10 +322,10 @@ static int kfd_parse_subtype_iolink(struct crat_subtype_iolink *iolink,
 			props->ver_min = iolink->version_minor;
 			props->iolink_type = iolink->io_interface_type;
 
-			/*
-			 * weight factor (derived from CDIR), currently always 1
-			 */
-			props->weight = 1;
+			if (props->iolink_type == CRAT_IOLINK_TYPE_PCIEXPRESS)
+				props->weight = 20;
+			else
+				props->weight = node_distance(id_from, id_to);
 
 			props->min_latency = iolink->minimum_latency;
 			props->max_latency = iolink->maximum_latency;
@@ -338,10 +337,27 @@ static int kfd_parse_subtype_iolink(struct crat_subtype_iolink *iolink,
 			dev->io_link_count++;
 			dev->node_props.io_links_count++;
 			list_add_tail(&props->list, &dev->io_link_props);
-
 			break;
 		}
-		i++;
+	}
+
+	/* CPU topology is created before GPUs are detected, so CPU->GPU
+	 * links are not built at that time. If a PCIe type is discovered, it
+	 * means a GPU is detected and we are adding GPU->CPU to the topology.
+	 * At this time, also add the corresponded CPU->GPU link.
+	 */
+	if (props && props->iolink_type == CRAT_IOLINK_TYPE_PCIEXPRESS) {
+		cpu_dev = topology_device_by_nodeid(id_to);
+		if (!cpu_dev)
+			return -ENODEV;
+		/* same everything but the other direction */
+		props2 = kmemdup(props, sizeof(*props2), GFP_KERNEL);
+		props2->node_from = id_to;
+		props2->node_to = id_from;
+		props2->kobj = NULL;
+		cpu_dev->io_link_count++;
+		cpu_dev->node_props.io_links_count++;
+		list_add_tail(&props2->list, &cpu_dev->io_link_props);
 	}
 
 	return 0;
@@ -713,7 +729,7 @@ int kfd_create_crat_image_acpi(void **crat_image, size_t *size)
  * expected to cover all known conditions. But to be safe additional check
  * is put in the code to ensure we don't overwrite.
  */
-#define VCRAT_SIZE_FOR_CPU	PAGE_SIZE
+#define VCRAT_SIZE_FOR_CPU	(2 * PAGE_SIZE)
 #define VCRAT_SIZE_FOR_GPU	(3 * PAGE_SIZE)
 
 /* kfd_fill_cu_for_cpu - Fill in Compute info for the given CPU NUMA node
@@ -771,7 +787,7 @@ static int kfd_fill_mem_info_for_cpu(int numa_node_id, int *avail_size,
 	pg_data_t *pgdat;
 	int zone_type;
 
-	*avail_size -= sizeof(struct crat_subtype_computeunit);
+	*avail_size -= sizeof(struct crat_subtype_memory);
 	if (*avail_size < 0)
 		return -ENOMEM;
 
@@ -799,6 +815,49 @@ static int kfd_fill_mem_info_for_cpu(int numa_node_id, int *avail_size,
 	return 0;
 }
 
+static int kfd_fill_iolink_info_for_cpu(int numa_node_id, int *avail_size,
+				uint32_t *num_entries,
+				struct crat_subtype_iolink *sub_type_hdr)
+{
+	int nid;
+	struct cpuinfo_x86 *c = &cpu_data(0);
+	uint8_t link_type;
+
+	if (c->x86_vendor == X86_VENDOR_AMD)
+		link_type = CRAT_IOLINK_TYPE_HYPERTRANSPORT;
+	else
+		link_type = CRAT_IOLINK_TYPE_QPI_1_1;
+
+	*num_entries = 0;
+
+	/* Create IO links from this node to other CPU nodes */
+	for_each_online_node(nid) {
+		if (nid == numa_node_id) /* node itself */
+			continue;
+
+		*avail_size -= sizeof(struct crat_subtype_iolink);
+		if (*avail_size < 0)
+			return -ENOMEM;
+
+		memset(sub_type_hdr, 0, sizeof(struct crat_subtype_iolink));
+
+		/* Fill in subtype header data */
+		sub_type_hdr->type = CRAT_SUBTYPE_IOLINK_AFFINITY;
+		sub_type_hdr->length = sizeof(struct crat_subtype_iolink);
+		sub_type_hdr->flags = CRAT_SUBTYPE_FLAGS_ENABLED;
+
+		/* Fill in IO link data */
+		sub_type_hdr->proximity_domain_from = numa_node_id;
+		sub_type_hdr->proximity_domain_to = nid;
+		sub_type_hdr->io_interface_type = link_type;
+
+		(*num_entries)++;
+		sub_type_hdr++;
+	}
+
+	return 0;
+}
+
 /* kfd_create_vcrat_image_cpu - Create Virtual CRAT for CPU
  *
  *	@pcrat_image: Fill in VCRAT for CPU
@@ -813,6 +872,7 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 	struct crat_subtype_generic *sub_type_hdr;
 	int avail_size = *size;
 	int numa_node_id;
+	uint32_t entries = 0;
 	int ret = 0;
 
 	if (pcrat_image == NULL || avail_size < VCRAT_SIZE_FOR_CPU)
@@ -869,6 +929,18 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 
 		sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
 			sub_type_hdr->length);
+
+		/* Fill in Subtype: IO Link */
+		ret = kfd_fill_iolink_info_for_cpu(numa_node_id, &avail_size,
+				&entries,
+				(struct crat_subtype_iolink *)sub_type_hdr);
+		if (ret < 0)
+			return ret;
+		crat_table->length += (sub_type_hdr->length * entries);
+		crat_table->total_entries += entries;
+
+		sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
+				sub_type_hdr->length * entries);
 
 		crat_table->num_domains++;
 	}
@@ -930,7 +1002,6 @@ static int kfd_fill_gpu_direct_io_link(int *avail_size,
 			struct crat_subtype_iolink *sub_type_hdr,
 			uint32_t proximity_domain)
 {
-	int proximity_domain_to;
 	*avail_size -= sizeof(struct crat_subtype_iolink);
 	if (*avail_size < 0)
 		return -ENOMEM;
@@ -946,12 +1017,11 @@ static int kfd_fill_gpu_direct_io_link(int *avail_size,
 	 * TODO: Fill-in other fields of iolink subtype */
 	sub_type_hdr->io_interface_type = CRAT_IOLINK_TYPE_PCIEXPRESS;
 	sub_type_hdr->proximity_domain_from = proximity_domain;
-	proximity_domain_to =
-		kfd_get_proximity_domain(kdev->pdev->bus);
-	if (proximity_domain_to == -1)
-		return -EINVAL;
+	if (kdev->pdev->dev.numa_node == NUMA_NO_NODE)
+		sub_type_hdr->proximity_domain_to = 0;
+	else
+		sub_type_hdr->proximity_domain_to = kdev->pdev->dev.numa_node;
 
-	sub_type_hdr->proximity_domain_to = proximity_domain_to;
 	return 0;
 }
 
