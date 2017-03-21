@@ -33,6 +33,7 @@
 
 #include "dce80/irq_service_dce80.h"
 
+#include "dce120/irq_service_dce120.h"
 
 #include "reg_helper.h"
 #include "irq_service.h"

@@ -45,6 +45,12 @@
 	CLK_SF(MASTER_COMM_CMD_REG, MASTER_COMM_CMD_REG_BYTE0, mask_sh), \
 	CLK_SF(MASTER_COMM_CNTL_REG, MASTER_COMM_INTERRUPT, mask_sh)
 
+#define CLK_COMMON_MASK_SH_LIST_SOC_BASE(mask_sh) \
+	CLK_SF(DCCG_DFS_DPREFCLK_CNTL, DPREFCLK_SRC_SEL, mask_sh), \
+	CLK_SF(DCCG_DFS_DENTIST_DISPCLK_CNTL, DENTIST_DPREFCLK_WDIVIDER, mask_sh), \
+	CLK_SF(DCCG_DFS_MASTER_COMM_CMD_REG, MASTER_COMM_CMD_REG_BYTE0, mask_sh), \
+	CLK_SF(DCCG_DFS_MASTER_COMM_CNTL_REG, MASTER_COMM_INTERRUPT, mask_sh)
+
 #define CLK_REG_FIELD_LIST(type) \
 	type DPREFCLK_SRC_SEL; \
 	type DENTIST_DPREFCLK_WDIVIDER; \
@@ -118,6 +124,8 @@ struct dce_disp_clk {
 	int gpu_pll_ss_divider;
 
 
+	/* max disp_clk from PPLIB for max validation display clock*/
+	int max_displ_clk_in_khz;
 };
 
 
@@ -134,6 +142,12 @@ struct display_clock *dce110_disp_clk_create(
 	const struct dce_disp_clk_mask *clk_mask);
 
 struct display_clock *dce112_disp_clk_create(
+	struct dc_context *ctx,
+	const struct dce_disp_clk_registers *regs,
+	const struct dce_disp_clk_shift *clk_shift,
+	const struct dce_disp_clk_mask *clk_mask);
+
+struct display_clock *dce120_disp_clk_create(
 	struct dc_context *ctx,
 	const struct dce_disp_clk_registers *regs,
 	const struct dce_disp_clk_shift *clk_shift,

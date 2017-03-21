@@ -39,6 +39,7 @@
 #include "dce100/dce100_resource.h"
 #include "dce110/dce110_resource.h"
 #include "dce112/dce112_resource.h"
+#include "dce120/dce120_resource.h"
 
 enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 {
@@ -64,6 +65,9 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 				ASIC_REV_IS_POLARIS12_V(asic_id.hw_internal_rev)) {
 			dc_version = DCE_VERSION_11_2;
 		}
+		break;
+	case FAMILY_AI:
+		dc_version = DCE_VERSION_12_0;
 		break;
 	default:
 		dc_version = DCE_VERSION_UNKNOWN;
@@ -95,6 +99,10 @@ struct resource_pool *dc_create_resource_pool(
 		break;
 	case DCE_VERSION_11_2:
 		res_pool = dce112_create_resource_pool(
+			num_virtual_links, dc);
+		break;
+	case DCE_VERSION_12_0:
+		res_pool = dce120_create_resource_pool(
 			num_virtual_links, dc);
 		break;
 	default:

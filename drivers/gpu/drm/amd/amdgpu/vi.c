@@ -796,6 +796,8 @@ static int vi_set_uvd_clocks(struct amdgpu_device *adev, u32 vclk, u32 dclk)
 		return r;
 
 	r = vi_set_uvd_clock(adev, dclk, ixCG_DCLK_CNTL, ixCG_DCLK_STATUS);
+	if (r)
+		return r;
 
 	return 0;
 }
@@ -908,6 +910,9 @@ static const struct amdgpu_asic_funcs vi_asic_funcs =
 	.set_vce_clocks = &vi_set_vce_clocks,
 	.get_config_memsize = &vi_get_config_memsize,
 };
+
+#define CZ_REV_BRISTOL(rev)	 \
+	((rev >= 0xC8 && rev <= 0xCE) || (rev >= 0xE1 && rev <= 0xE6))
 
 static int vi_common_early_init(void *handle)
 {
@@ -1045,7 +1050,6 @@ static int vi_common_early_init(void *handle)
 			AMD_CG_SUPPORT_GFX_RLC_LS |
 			AMD_CG_SUPPORT_GFX_CP_LS |
 			AMD_CG_SUPPORT_GFX_CGTS |
-			AMD_CG_SUPPORT_GFX_MGLS |
 			AMD_CG_SUPPORT_GFX_CGTS_LS |
 			AMD_CG_SUPPORT_GFX_CGCG |
 			AMD_CG_SUPPORT_GFX_CGLS |
@@ -1057,8 +1061,8 @@ static int vi_common_early_init(void *handle)
 			AMD_CG_SUPPORT_VCE_MGCG;
 		/* rev0 hardware requires workarounds to support PG */
 		adev->pg_flags = 0;
-		if (adev->rev_id != 0x00) {
-			adev->pg_flags |=
+		if (adev->rev_id != 0x00 || CZ_REV_BRISTOL(adev->pdev->revision)) {
+			adev->pg_flags |= AMD_PG_SUPPORT_GFX_PG |
 				AMD_PG_SUPPORT_GFX_SMG |
 				AMD_PG_SUPPORT_GFX_PIPELINE |
 				AMD_PG_SUPPORT_CP |
@@ -1074,7 +1078,6 @@ static int vi_common_early_init(void *handle)
 			AMD_CG_SUPPORT_GFX_RLC_LS |
 			AMD_CG_SUPPORT_GFX_CP_LS |
 			AMD_CG_SUPPORT_GFX_CGTS |
-			AMD_CG_SUPPORT_GFX_MGLS |
 			AMD_CG_SUPPORT_GFX_CGTS_LS |
 			AMD_CG_SUPPORT_GFX_CGCG |
 			AMD_CG_SUPPORT_GFX_CGLS |
@@ -1097,8 +1100,8 @@ static int vi_common_early_init(void *handle)
 		return -EINVAL;
 	}
 
-	if (amdgpu_smc_load_fw && smc_enabled)
-		adev->firmware.smu_load = true;
+	/* vi use smc load by default */
+	adev->firmware.load_type = amdgpu_ucode_get_load_type(adev, amdgpu_fw_load_type);
 
 	amdgpu_get_pcie_info(adev);
 
@@ -1404,24 +1407,24 @@ static int vi_common_set_clockgating_state(void *handle,
 	switch (adev->asic_type) {
 	case CHIP_FIJI:
 		vi_update_bif_medium_grain_light_sleep(adev,
-				state == AMD_CG_STATE_GATE ? true : false);
+				state == AMD_CG_STATE_GATE);
 		vi_update_hdp_medium_grain_clock_gating(adev,
-				state == AMD_CG_STATE_GATE ? true : false);
+				state == AMD_CG_STATE_GATE);
 		vi_update_hdp_light_sleep(adev,
-				state == AMD_CG_STATE_GATE ? true : false);
+				state == AMD_CG_STATE_GATE);
 		vi_update_rom_medium_grain_clock_gating(adev,
-				state == AMD_CG_STATE_GATE ? true : false);
+				state == AMD_CG_STATE_GATE);
 		break;
 	case CHIP_CARRIZO:
 	case CHIP_STONEY:
 		vi_update_bif_medium_grain_light_sleep(adev,
-				state == AMD_CG_STATE_GATE ? true : false);
+				state == AMD_CG_STATE_GATE);
 		vi_update_hdp_medium_grain_clock_gating(adev,
-				state == AMD_CG_STATE_GATE ? true : false);
+				state == AMD_CG_STATE_GATE);
 		vi_update_hdp_light_sleep(adev,
-				state == AMD_CG_STATE_GATE ? true : false);
+				state == AMD_CG_STATE_GATE);
 		vi_update_drm_light_sleep(adev,
-				state == AMD_CG_STATE_GATE ? true : false);
+				state == AMD_CG_STATE_GATE);
 		break;
 	case CHIP_TONGA:
 	case CHIP_POLARIS10:

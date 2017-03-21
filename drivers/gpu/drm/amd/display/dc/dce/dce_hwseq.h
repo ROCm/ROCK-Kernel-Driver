@@ -186,6 +186,12 @@ struct dce_hwseq_registers {
 	HWSEQ_DCE10_MASK_SH_LIST(mask_sh),\
 	HWSEQ_PHYPLL_MASK_SH_LIST(mask_sh, CRTC0_)
 
+#define HWSEQ_DCE12_MASK_SH_LIST(mask_sh)\
+	HWSEQ_DCEF_MASK_SH_LIST(mask_sh, DCFE0_DCFE_),\
+	HWSEQ_BLND_MASK_SH_LIST(mask_sh, BLND0_BLND_),\
+	HWSEQ_PIXEL_RATE_MASK_SH_LIST(mask_sh, CRTC0_),\
+	HWSEQ_PHYPLL_MASK_SH_LIST(mask_sh, CRTC0_)
+
 #define HWSEQ_REG_FIED_LIST(type) \
 	type DCFE_CLOCK_ENABLE; \
 	type DCFEV_CLOCK_ENABLE; \

@@ -57,6 +57,8 @@
 
 #include "dce112/i2caux_dce112.h"
 
+#include "dce120/i2caux_dce120.h"
+
 #include "diagnostics/i2caux_diag.h"
 
 /*
@@ -80,6 +82,8 @@ struct i2caux *dal_i2caux_create(
 		return dal_i2caux_dce110_create(ctx);
 	case DCE_VERSION_10_0:
 		return dal_i2caux_dce100_create(ctx);
+	case DCE_VERSION_12_0:
+		return dal_i2caux_dce120_create(ctx);
 	default:
 		BREAK_TO_DEBUGGER();
 		return NULL;

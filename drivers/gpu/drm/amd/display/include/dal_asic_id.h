@@ -123,6 +123,8 @@
 #define FAMILY_VI 130 /* Volcanic Islands: Iceland (V), Tonga (M) */
 #define FAMILY_CZ 135 /* Carrizo */
 
+#define FAMILY_AI 141
+
 #define	FAMILY_UNKNOWN 0xFF
 
 #endif /* __DAL_ASIC_ID_H__ */
