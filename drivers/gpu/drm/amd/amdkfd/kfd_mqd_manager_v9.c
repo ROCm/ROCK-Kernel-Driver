@@ -106,7 +106,7 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 	 * instead of sub-allocation function.
 	 */
 	if (kfd->cwsr_enabled && (q->type == KFD_QUEUE_TYPE_COMPUTE)) {
-		*mqd_mem_obj = kzalloc(sizeof(struct kfd_mem_obj), GFP_KERNEL);
+		*mqd_mem_obj = kzalloc(sizeof(struct kfd_mem_obj), GFP_NOIO);
 		retval = kfd->kfd2kgd->init_gtt_mem_allocation(kfd->kgd,
 			ALIGN(q->ctl_stack_size, PAGE_SIZE) +
 				ALIGN(sizeof(struct v9_mqd), PAGE_SIZE),
@@ -458,7 +458,7 @@ struct mqd_manager *mqd_manager_init_v9(enum KFD_MQD_TYPE type,
 
 	pr_debug("kfd: In func %s\n", __func__);
 
-	mqd = kzalloc(sizeof(struct mqd_manager), GFP_KERNEL);
+	mqd = kzalloc(sizeof(struct mqd_manager), GFP_NOIO);
 	if (!mqd)
 		return NULL;
 
