@@ -1894,6 +1894,40 @@ int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
 	return 0;
 }
 
+static int validate_pd_pt_bos(struct amdkfd_process_info *process_info)
+{
+	struct amdkfd_vm *peer_vm;
+	struct amdgpu_vm_parser param;
+	int ret;
+
+	param.domain = AMDGPU_GEM_DOMAIN_VRAM;
+	param.wait = false;
+
+	list_for_each_entry(peer_vm, &process_info->vm_list_head,
+			    vm_list_node) {
+		struct amdgpu_bo *pd_bo = peer_vm->base.root.bo;
+		struct amdgpu_device *adev = amdgpu_ttm_adev(pd_bo->tbo.bdev);
+
+		ret = amdgpu_amdkfd_bo_validate(pd_bo, pd_bo->prefered_domains,
+						false);
+		if (ret) {
+			pr_debug("Validate PD failed. Try again\n");
+			return ret;
+		}
+
+		ret = amdgpu_vm_validate_pt_bos(adev, &peer_vm->base,
+				amdgpu_amdkfd_validate, &param);
+		if (ret) {
+			pr_debug("Validate PTs failed. Try again\n");
+			return ret;
+		}
+		peer_vm->base.last_eviction_counter =
+				atomic64_read(&adev->num_evictions);
+	}
+
+	return 0;
+}
+
 /* Runs out of process context. mem->lock must be held. */
 int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm)
 {
@@ -2119,26 +2153,23 @@ int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm)
 
 int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 {
-	struct amdgpu_bo_list_entry *pd_bo_list, *entry;
+	struct amdgpu_bo_list_entry *pd_bo_list;
 	struct amdkfd_process_info *process_info = info;
 	struct amdkfd_vm *peer_vm;
 	struct kgd_mem *mem;
 	struct bo_vm_reservation_context ctx;
 	struct amdgpu_amdkfd_fence *old_fence;
-	struct amdgpu_device *adev;
-	struct amdgpu_vm_parser param;
 	int ret = 0, i;
-	struct list_head duplicate_save, pd_list;
+	struct list_head duplicate_save;
 
 	if (WARN_ON(!process_info))
 		return -EINVAL;
 
 	INIT_LIST_HEAD(&duplicate_save);
-	INIT_LIST_HEAD(&pd_list);
 	INIT_LIST_HEAD(&ctx.list);
 	INIT_LIST_HEAD(&ctx.duplicates);
 
-	pd_bo_list = kcalloc(process_info->n_vms * 2,
+	pd_bo_list = kcalloc(process_info->n_vms,
 			     sizeof(struct amdgpu_bo_list_entry),
 			     GFP_KERNEL);
 	if (pd_bo_list == NULL)
@@ -2160,12 +2191,9 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 	i = 0;
 	mutex_lock(&process_info->lock);
 	list_for_each_entry(peer_vm, &process_info->vm_list_head,
-			vm_list_node) {
+			vm_list_node)
 		amdgpu_vm_get_pd_bo(&peer_vm->base, &ctx.list,
 				    &pd_bo_list[i++]);
-		amdgpu_vm_get_pd_bo(&peer_vm->base, &pd_list,
-				    &pd_bo_list[i++]);
-	}
 
 	/* Reserve all BOs and page tables/directory. Add all BOs from
 	 * kfd_bo_list to ctx.list
@@ -2190,42 +2218,19 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 
 	amdgpu_sync_create(&ctx.sync);
 
-	/* Validate PDs*/
-	list_for_each_entry(entry, &pd_list, tv.head) {
-		struct amdgpu_bo *bo = entry->robj;
-
-		ret = amdgpu_amdkfd_bo_validate(bo, bo->prefered_domains,
-						false);
-		if (ret) {
-			pr_debug("Memory eviction: Validate PD failed. Try again\n");
-			goto validate_map_fail;
-		}
-	}
-
-	param.domain = AMDGPU_GEM_DOMAIN_VRAM;
-	param.wait = false;
-
-	/* Validate PTs*/
-	list_for_each_entry(peer_vm, &process_info->vm_list_head,
-			vm_list_node) {
-		adev = amdgpu_ttm_adev(peer_vm->base.page_directory->tbo.bdev);
-		ret = amdgpu_vm_validate_pt_bos(adev, &peer_vm->base,
-				amdgpu_amdkfd_validate, &param);
-		if (ret) {
-			pr_debug("Memory eviction: Validate PTs failed. Try again\n");
-			goto validate_map_fail;
-		}
-		peer_vm->base.last_eviction_counter =
-				atomic64_read(&adev->num_evictions);
-	}
+	/* Validate PDs and PTs */
+	ret = validate_pd_pt_bos(process_info);
+	if (ret)
+		goto validate_map_fail;
 
 	/* Wait for PD/PTs validate to finish */
-	list_for_each_entry(entry, &pd_list, tv.head) {
-		struct amdgpu_bo *bo = entry->robj;
+	/* FIXME: I think this isn't needed */
+	list_for_each_entry(peer_vm, &process_info->vm_list_head,
+			    vm_list_node) {
+		struct amdgpu_bo *bo = peer_vm->base.root.bo;
 
 		ttm_bo_wait(&bo->tbo, false, false);
 	}
-
 
 	/* Validate BOs and map them to GPUVM (update VM page tables). */
 	list_for_each_entry(mem, &process_info->kfd_bo_list,
@@ -2266,8 +2271,9 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 	}
 
 	/* Attach eviction fence to PD / PT BOs */
-	list_for_each_entry(entry, &pd_list, tv.head) {
-		struct amdgpu_bo *bo = entry->robj;
+	list_for_each_entry(peer_vm, &process_info->vm_list_head,
+			    vm_list_node) {
+		struct amdgpu_bo *bo = peer_vm->base.root.bo;
 
 		amdgpu_bo_fence(bo, &process_info->eviction_fence->base, true);
 	}
