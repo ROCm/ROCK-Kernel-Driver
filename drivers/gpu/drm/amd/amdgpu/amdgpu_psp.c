@@ -148,11 +148,6 @@ static void psp_prep_tmr_cmd_buf(struct psp_gfx_cmd_resp *cmd,
 static int psp_tmr_init(struct psp_context *psp)
 {
 	int ret;
-	struct psp_gfx_cmd_resp *cmd;
-
-	cmd = kzalloc(sizeof(struct psp_gfx_cmd_resp), GFP_KERNEL);
-	if (!cmd)
-		return -ENOMEM;
 
 	/*
 	 * Allocate 3M memory aligned to 1M from Frame Buffer (local
@@ -164,20 +159,28 @@ static int psp_tmr_init(struct psp_context *psp)
 	ret = amdgpu_bo_create_kernel(psp->adev, 0x300000, 0x100000,
 				      AMDGPU_GEM_DOMAIN_VRAM,
 				      &psp->tmr_bo, &psp->tmr_mc_addr, &psp->tmr_buf);
-	if (ret)
-		goto failed;
+
+	return ret;
+}
+
+static int psp_tmr_load(struct psp_context *psp)
+{
+	int ret;
+	struct psp_gfx_cmd_resp *cmd;
+
+	cmd = kzalloc(sizeof(struct psp_gfx_cmd_resp), GFP_KERNEL);
+	if (!cmd)
+		return -ENOMEM;
 
 	psp_prep_tmr_cmd_buf(cmd, psp->tmr_mc_addr, 0x300000);
 
 	ret = psp_cmd_submit_buf(psp, NULL, cmd,
 				 psp->fence_buf_mc_addr, 1);
 	if (ret)
-		goto failed_mem;
+		goto failed;
 
 	return 0;
 
-failed_mem:
-	amdgpu_bo_free_kernel(&psp->tmr_bo, &psp->tmr_mc_addr, &psp->tmr_buf);
 failed:
 	kfree(cmd);
 	return ret;
@@ -290,6 +293,10 @@ static int psp_load_fw(struct amdgpu_device *adev)
 	ret = psp_tmr_init(psp);
 	if (ret)
 		goto failed;
+
+	ret = psp_tmr_load(psp);
+	if (ret)
+		goto failed_mem;
 
 	ret = psp_asd_load(psp);
 	if (ret)
