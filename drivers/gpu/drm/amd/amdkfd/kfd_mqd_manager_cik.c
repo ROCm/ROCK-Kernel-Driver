@@ -519,7 +519,7 @@ struct mqd_manager *mqd_manager_init_cik(enum KFD_MQD_TYPE type,
 
 	pr_debug("kfd: In func %s\n", __func__);
 
-	mqd = kzalloc(sizeof(struct mqd_manager), GFP_KERNEL);
+	mqd = kzalloc(sizeof(struct mqd_manager), GFP_NOIO);
 	if (!mqd)
 		return NULL;
 
