@@ -637,8 +637,7 @@ struct amdgpu_ttm_tt {
 	struct amdgpu_device	*adev;
 	u64			offset;
 	uint64_t		userptr;
-	struct mm_struct	*usermm;
-	struct pid		*userpid;
+	struct task_struct	*usertask;
 	uint32_t		userflags;
 	spinlock_t              guptasklock;
 	struct list_head        guptasks;
@@ -649,10 +648,13 @@ struct amdgpu_ttm_tt {
 int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 {
 	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	struct mm_struct *mm = gtt->usertask->mm;
 	unsigned int flags = 0;
 	unsigned pinned = 0;
-	struct task_struct *usertask;
 	int r;
+
+	if (!mm) /* Happens during process shutdown */
+		return -ESRCH;
 
 	if (!(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY))
 		flags |= FOLL_WRITE;
@@ -663,20 +665,9 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 		unsigned long end = gtt->userptr + ttm->num_pages * PAGE_SIZE;
 		struct vm_area_struct *vma;
 
-		vma = find_vma(gtt->usermm, gtt->userptr);
+		vma = find_vma(mm, gtt->userptr);
 		if (!vma || vma->vm_file || vma->vm_end < end)
 			return -EPERM;
-	}
-
-	if (!gtt->userpid)
-		return -EINVAL;
-	usertask = get_pid_task(gtt->userpid, PIDTYPE_PID);
-	if (!usertask)
-		return -ESRCH;
-	if (usertask->mm != gtt->usermm) {
-		/* Happens during process shutdown */
-		put_task_struct(usertask);
-		return -ESRCH;
 	}
 
 	do {
@@ -690,7 +681,7 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 		list_add(&guptask.list, &gtt->guptasks);
 		spin_unlock(&gtt->guptasklock);
 
-		r = kcl_get_user_pages(usertask, gtt->usermm,
+		r = kcl_get_user_pages(gtt->usertask, mm,
 					userptr, num_pages,
 				       flags, 0, p, NULL);
 
@@ -705,12 +696,10 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 
 	} while (pinned < ttm->num_pages);
 
-	put_task_struct(usertask);
 	return 0;
 
 release_pages:
 	release_pages(pages, pinned, 0);
-	put_task_struct(usertask);
 	return r;
 }
 
@@ -892,9 +881,6 @@ static void amdgpu_ttm_backend_destroy(struct ttm_tt *ttm)
 {
 	struct amdgpu_ttm_tt *gtt = (void *)ttm;
 
-	if (gtt->userpid)
-		put_pid(gtt->userpid);
-
 	ttm_dma_tt_fini(&gtt->ttm);
 	kfree(gtt);
 }
@@ -1017,8 +1003,7 @@ int amdgpu_ttm_tt_set_userptr(struct ttm_tt *ttm, uint64_t addr,
 		return -EINVAL;
 
 	gtt->userptr = addr;
-	gtt->usermm = current->mm;
-	gtt->userpid = get_task_pid(current->group_leader, PIDTYPE_PID);
+	gtt->usertask = current->group_leader;
 	gtt->userflags = flags;
 	spin_lock_init(&gtt->guptasklock);
 	INIT_LIST_HEAD(&gtt->guptasks);
@@ -1034,7 +1019,10 @@ struct mm_struct *amdgpu_ttm_tt_get_usermm(struct ttm_tt *ttm)
 	if (gtt == NULL)
 		return NULL;
 
-	return gtt->usermm;
+	if (gtt->usertask == NULL)
+		return NULL;
+
+	return gtt->usertask->mm;
 }
 
 bool amdgpu_ttm_tt_affect_userptr(struct ttm_tt *ttm, unsigned long start,
