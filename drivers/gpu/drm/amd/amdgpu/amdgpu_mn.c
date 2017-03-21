@@ -431,7 +431,7 @@ int amdgpu_mn_register(struct amdgpu_bo *bo, unsigned long addr)
 	}
 
 	if (!node) {
-		node = kmalloc(sizeof(struct amdgpu_mn_node), GFP_KERNEL);
+		node = kmalloc(sizeof(struct amdgpu_mn_node), GFP_NOIO);
 		if (!node) {
 			mutex_unlock(&rmn->lock);
 			return -ENOMEM;
