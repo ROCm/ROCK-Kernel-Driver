@@ -22,7 +22,35 @@
 
 #if 0
 HW (VI) source code for CWSR trap handler
-#Version 9 + multiple trap handler
+#Version 18 + multiple trap handler
+
+// this performance-optimal version was originally from Seven Xu at SRDC
+
+// Revison #18   --...
+/* Rev History
+** #1. Branch from gc dv.   //gfxip/gfx8/main/src/test/suites/block/cs/sr/cs_trap_handler.sp3#1,#50, #51, #52-53(Skip, Already Fixed by PV), #54-56(merged),#57-58(mergerd, skiped-already fixed by PV)
+** #4. SR Memory Layout:
+**             1. VGPR-SGPR-HWREG-{LDS}
+**             2. tba_hi.bits.26 - reconfigured as the first wave in tg bits, for defer Save LDS for a threadgroup.. performance concern..
+** #5. Update: 1. Accurate g8sr_ts_save_d timestamp
+** #6. Update: 1. Fix s_barrier usage; 2. VGPR s/r using swizzle buffer?(NoNeed, already matched the swizzle pattern, more investigation)
+** #7. Update: 1. don't barrier if noLDS
+** #8. Branch: 1. Branch to ver#0, which is very similar to gc dv version
+**             2. Fix SQ issue by s_sleep 2
+** #9. Update: 1. Fix scc restore failed issue, restore wave_status at last
+**             2. optimize s_buffer save by burst 16sgprs...
+** #10. Update 1. Optimize restore sgpr by busrt 16 sgprs.
+** #11. Update 1. Add 2 more timestamp for debug version
+** #12. Update 1. Add VGPR SR using DWx4, some case improve and some case drop performance
+** #13. Integ  1. Always use MUBUF for PV trap shader...
+** #14. Update 1. s_buffer_store soft clause...
+** #15. Update 1. PERF - sclar write with glc:0/mtype0 to allow L2 combine. perf improvement a lot.
+** #16. Update 1. PRRF - UNROLL LDS_DMA got 2500cycle save in IP tree
+** #17. Update 1. FUNC - LDS_DMA has issues while ATC, replace with ds_read/buffer_store for save part[TODO restore part]
+**             2. PERF - Save LDS before save VGPR to cover LDS save long latency...
+** #18. Update 1. FUNC - Implicitly estore STATUS.VCCZ, which is not writable by s_setreg_b32
+**             2. FUNC - Handle non-CWSR traps
+*/
 
 var G8SR_WDMEM_HWREG_OFFSET = 0
 var G8SR_WDMEM_SGPR_OFFSET  = 128  // in bytes
@@ -186,7 +214,7 @@ var	s_restore_buf_rsrc3		=	ttmp11
 /* Shader Main*/
 
 shader main
-  asic(CARRIZO)
+  asic(VI)
   type(CS)
 
 
@@ -219,8 +247,6 @@ if (!EMU_RUN_HACK)
 	s_waitcnt lgkmcnt(0)
 	s_or_b32        ttmp7, ttmp8, ttmp9
 	s_cbranch_scc0  L_NO_NEXT_TRAP //next level trap handler not been set
-	s_mov_b32       tma_lo, ttmp10  //set tma_lo/hi for next level trap handler
-	s_mov_b32       tma_hi, ttmp11 
 	s_setreg_b32    hwreg(HW_REG_STATUS), s_save_status //restore HW status(SCC)
 	s_setpc_b64     [ttmp8,ttmp9] //jump to next level trap handler 
 
@@ -1099,18 +1125,19 @@ end
 
 function get_hwreg_size_bytes
     return 128 //HWREG size 128 bytes
+end
+
 
 #endif
 
 static const uint32_t cwsr_trap_carrizo_hex[] = {
-	0xbf820001, 0xbf820124,
+	0xbf820001, 0xbf820122,
 	0xb8f4f802, 0x89748674,
 	0xb8f5f803, 0x8675ff75,
-	0x00000400, 0xbf850013,
+	0x00000400, 0xbf850011,
 	0xc00a1e37, 0x00000000,
 	0xbf8c007f, 0x87777978,
-	0xbf840004, 0xbeee007a,
-	0xbeef007b, 0xb974f802,
+	0xbf840002, 0xb974f802,
 	0xbe801d78, 0xb8f5f803,
 	0x8675ff75, 0x000001ff,
 	0xbf850002, 0x80708470,

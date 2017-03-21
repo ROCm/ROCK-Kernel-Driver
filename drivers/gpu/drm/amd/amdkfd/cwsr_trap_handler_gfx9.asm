@@ -28,7 +28,7 @@ HW (GFX9) source code for CWSR trap handler
 
 // Revison #18	 --...
 /* Rev History
-** #1. Branch from gc dv.   //gfxip/gfx8/main/src/test/suites/block/cs/sr/cs_trap_handler.sp3#1,#50, #51, #52-53(Skip, Already Fixed by PV), #54-56(merged),#57-58(mergerd, skiped-already fixed by PV)
+** #1. Branch from gc dv.   //gfxip/gfx9/main/src/test/suites/block/cs/sr/cs_trap_handler.sp3#1,#50, #51, #52-53(Skip, Already Fixed by PV), #54-56(merged),#57-58(mergerd, skiped-already fixed by PV)
 ** #4. SR Memory Layout:
 **			 1. VGPR-SGPR-HWREG-{LDS}
 **			 2. tba_hi.bits.26 - reconfigured as the first wave in tg bits, for defer Save LDS for a threadgroup.. performance concern..
@@ -248,12 +248,12 @@ if (!EMU_RUN_HACK)
     /* read tba and tma for next level trap handler, ttmp4 is used as s_save_status */
     s_getreg_b32    tma_lo,hwreg(HW_REG_SQ_SHADER_TMA_LO)
     s_getreg_b32    tma_hi,hwreg(HW_REG_SQ_SHADER_TMA_HI)
-    s_load_dwordx4  [tba_lo,tba_hi,tma_lo, tma_hi], [tma_lo,tma_hi], 0
+    s_load_dwordx4  [ttmp8,ttmp9, ttmp10, ttmp11], [tma_lo,tma_hi], 0
     s_waitcnt lgkmcnt(0)
-    s_or_b32	    ttmp11, tba_lo, tba_hi
+    s_or_b32	    ttmp7, ttmp8, ttmp9
     s_cbranch_scc0  L_NO_NEXT_TRAP //next level trap handler not been set
     s_setreg_b32    hwreg(HW_REG_STATUS), s_save_status //restore HW status(SCC)
-    s_setpc_b64	    [tba_lo,tba_hi] //jump to next level trap handler
+    s_setpc_b64	    [ttmp8,ttmp9] //jump to next level trap handler
 
 L_NO_NEXT_TRAP:
     s_getreg_b32    s_save_trapsts, hwreg(HW_REG_TRAPSTS)
@@ -1135,6 +1135,7 @@ function get_hwreg_size_bytes
 end
 
 
+
 #endif
 
 static const uint32_t cwsr_trap_gfx9_hex[] = {
@@ -1143,10 +1144,10 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0xb8f1f803, 0x8671ff71,
 	0x00000400, 0xbf850013,
 	0xb8faf812, 0xb8fbf813,
-	0xc00a1e3d, 0x00000000,
-	0xbf8cc07f, 0x87777978,
+	0xc00a1d3d, 0x00000000,
+	0xbf8cc07f, 0x87737574,
 	0xbf840002, 0xb970f802,
-	0xbe801d78, 0xb8f1f803,
+	0xbe801d74, 0xb8f1f803,
 	0x8671ff71, 0x000001ff,
 	0xbf850002, 0x806c846c,
 	0x826d806d, 0x866dff6d,
