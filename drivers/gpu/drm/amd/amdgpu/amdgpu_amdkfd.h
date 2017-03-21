@@ -56,17 +56,17 @@ struct kgd_mem {
 	unsigned int mapped_to_gpu_memory;
 	void *kptr;
 	uint64_t va;
-	unsigned int evicted; /* eviction counter */
-	struct delayed_work work; /* for restore evicted mem */
-	struct mm_struct *mm; /* for restore */
 
 	uint32_t mapping_flags;
+
+	atomic_t invalid;
+	struct amdkfd_process_info *process_info;
+	struct page **user_pages;
 
 	/* flags bitfield */
 	bool coherent      : 1;
 	bool no_substitute : 1;
 	bool aql_queue     : 1;
-	bool busy          : 1;
 };
 
 /* KFD Memory Eviction */
@@ -87,6 +87,9 @@ struct amdkfd_process_info {
 	struct list_head vm_list_head;
 	/* List head for all KFD BOs that belong to a KFD process. */
 	struct list_head kfd_bo_list;
+	/* List of userptr BOs that are valid or invalid */
+	struct list_head userptr_valid_list;
+	struct list_head userptr_inval_list;
 	/* Lock to protect kfd_bo_list */
 	struct mutex lock;
 
@@ -94,6 +97,11 @@ struct amdkfd_process_info {
 	unsigned int n_vms;
 	/* Eviction Fence */
 	struct amdgpu_amdkfd_fence *eviction_fence;
+
+	/* MMU-notifier related fields */
+	atomic_t evicted_bos;
+	struct delayed_work work;
+	struct pid *pid;
 };
 
 /* struct amdkfd_vm -
@@ -128,13 +136,9 @@ void amdgpu_amdkfd_device_probe(struct amdgpu_device *rdev);
 void amdgpu_amdkfd_device_init(struct amdgpu_device *rdev);
 void amdgpu_amdkfd_device_fini(struct amdgpu_device *rdev);
 
-int amdgpu_amdkfd_evict_mem(struct amdgpu_device *adev, struct kgd_mem *mem,
-			    struct mm_struct *mm);
-int amdgpu_amdkfd_schedule_restore_mem(struct amdgpu_device *adev,
-				       struct kgd_mem *mem,
-				       struct mm_struct *mm,
-				       unsigned long delay);
-void amdgpu_amdkfd_cancel_restore_mem(struct kgd_mem *mem);
+int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem, struct mm_struct *mm);
+int amdgpu_amdkfd_schedule_restore_userptr(struct kgd_mem *mem,
+					   unsigned long delay);
 int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 				uint32_t vmid, uint64_t gpu_addr,
 				uint32_t *ib_cmd, uint32_t ib_len);

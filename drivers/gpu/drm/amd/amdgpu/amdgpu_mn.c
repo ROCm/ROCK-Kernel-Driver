@@ -87,8 +87,6 @@ static void amdgpu_mn_destroy(struct work_struct *work)
 		list_for_each_entry_safe(bo, next_bo, &node->bos, mn_list) {
 			bo->mn = NULL;
 			list_del_init(&bo->mn_list);
-			if (rmn->type == AMDGPU_MN_TYPE_HSA)
-				amdgpu_amdkfd_cancel_restore_mem(bo->kfd_bo);
 		}
 		kfree(node);
 	}
@@ -259,7 +257,7 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 
 			if (amdgpu_ttm_tt_affect_userptr(bo->tbo.ttm,
 							 start, end))
-				amdgpu_amdkfd_evict_mem(amdgpu_ttm_adev(bo->tbo.bdev), mem, mm);
+				amdgpu_amdkfd_evict_userptr(mem, mm);
 		}
 	}
 
@@ -306,8 +304,7 @@ static void amdgpu_mn_invalidate_range_end_hsa(struct mmu_notifier *mn,
 
 			if (amdgpu_ttm_tt_affect_userptr(bo->tbo.ttm,
 							 start, end))
-				amdgpu_amdkfd_schedule_restore_mem(amdgpu_ttm_adev(bo->tbo.bdev),
-								   mem, mm, 1);
+				amdgpu_amdkfd_schedule_restore_userptr(mem, 1);
 		}
 	}
 
