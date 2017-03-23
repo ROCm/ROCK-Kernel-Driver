@@ -645,7 +645,7 @@ static void gfx_v9_0_kiq_free_ring(struct amdgpu_ring *ring,
 }
 
 /* create MQD for each compute queue */
-static int gfx_v9_0_compute_mqd_soft_init(struct amdgpu_device *adev)
+static int gfx_v9_0_compute_mqd_sw_init(struct amdgpu_device *adev)
 {
 	struct amdgpu_ring *ring = NULL;
 	int r, i;
@@ -683,7 +683,7 @@ static int gfx_v9_0_compute_mqd_soft_init(struct amdgpu_device *adev)
 	return 0;
 }
 
-static void gfx_v9_0_compute_mqd_soft_fini(struct amdgpu_device *adev)
+static void gfx_v9_0_compute_mqd_sw_fini(struct amdgpu_device *adev)
 {
 	struct amdgpu_ring *ring = NULL;
 	int i;
@@ -1105,7 +1105,7 @@ static int gfx_v9_0_sw_init(void *handle)
 		return r;
 
 	/* create MQD for all compute queues as wel as KIQ for SRIOV case */
-	r = gfx_v9_0_compute_mqd_soft_init(adev);
+	r = gfx_v9_0_compute_mqd_sw_init(adev);
 	if (r)
 		return r;
 
@@ -1154,7 +1154,7 @@ static int gfx_v9_0_sw_fini(void *handle)
 	for (i = 0; i < adev->gfx.num_compute_rings; i++)
 		amdgpu_ring_fini(&adev->gfx.compute_ring[i]);
 
-	gfx_v9_0_compute_mqd_soft_fini(adev);
+	gfx_v9_0_compute_mqd_sw_fini(adev);
 	gfx_v9_0_kiq_free_ring(&adev->gfx.kiq.ring, &adev->gfx.kiq.irq);
 	gfx_v9_0_kiq_fini(adev);
 
