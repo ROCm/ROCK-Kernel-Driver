@@ -1811,7 +1811,7 @@ int amdgpu_vm_clear_invalids(struct amdgpu_device *adev,
 	}
 	spin_unlock(&vm->status_lock);
 
-	if (bo_va && sync)
+	if (bo_va)
 		r = amdgpu_sync_fence(adev, sync, bo_va->last_pt_update);
 
 	return r;
