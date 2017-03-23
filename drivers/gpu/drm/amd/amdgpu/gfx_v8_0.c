@@ -4976,6 +4976,13 @@ static int gfx_v8_0_kiq_resume(struct amdgpu_device *adev)
 	if (r)
 		goto done;
 
+	ring->ready = true;
+	r = amdgpu_ring_test_ring(ring);
+	if (r) {
+		ring->ready = false;
+		goto done;
+	}
+
 	for (i = 0; i < adev->gfx.num_compute_rings; i++) {
 		ring = &adev->gfx.compute_ring[i];
 
@@ -5003,12 +5010,6 @@ static int gfx_v8_0_kiq_resume(struct amdgpu_device *adev)
 		if (r)
 			ring->ready = false;
 	}
-
-	ring = &adev->gfx.kiq.ring;
-	ring->ready = true;
-	r = amdgpu_ring_test_ring(ring);
-	if (r)
-		ring->ready = false;
 
 done:
 	return r;
