@@ -772,7 +772,7 @@ static struct ctl_table kern_table[] = {
 #if defined(CONFIG_MODULES) && defined(CONFIG_SUSE_KERNEL_SUPPORTED)
 	{
 		.procname	= "unsupported",
-		.data		= &unsupported,
+		.data		= &suse_unsupported,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,

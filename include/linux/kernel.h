@@ -456,7 +456,7 @@ extern int panic_on_io_nmi;
 extern int panic_on_warn;
 extern int sysctl_panic_on_rcu_stall;
 #ifdef CONFIG_SUSE_KERNEL_SUPPORTED
-extern int unsupported;
+extern int suse_unsupported;
 #endif
 extern int sysctl_panic_on_stackoverflow;
 
