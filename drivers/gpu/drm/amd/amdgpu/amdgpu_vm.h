@@ -194,7 +194,8 @@ void amdgpu_vm_reset_id(struct amdgpu_device *adev, unsigned vm_id);
 int amdgpu_vm_update_page_directory(struct amdgpu_device *adev,
 				    struct amdgpu_vm *vm);
 int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
-			  struct amdgpu_vm *vm);
+			  struct amdgpu_vm *vm,
+			  struct fence **fence);
 int amdgpu_vm_clear_invalids(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 			     struct amdgpu_sync *sync);
 int amdgpu_vm_bo_update(struct amdgpu_device *adev,

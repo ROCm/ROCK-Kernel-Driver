@@ -1404,6 +1404,8 @@ static void amdgpu_vm_prt_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
  *
  * @adev: amdgpu_device pointer
  * @vm: requested vm
+ * @fence: optional resulting fence (unchanged if no work needed to be done
+ * or if an error occurred)
  *
  * Make sure all freed BOs are cleared in the PT.
  * Returns 0 for success.
@@ -1411,10 +1413,11 @@ static void amdgpu_vm_prt_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
  * PTs have to be reserved and mutex must be locked!
  */
 int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
-			  struct amdgpu_vm *vm)
+			  struct amdgpu_vm *vm,
+			  struct fence **fence)
 {
 	struct amdgpu_bo_va_mapping *mapping;
-	struct fence *fence = NULL;
+	struct fence *f = NULL;
 	int r;
 
 	while (!list_empty(&vm->freed)) {
@@ -1423,15 +1426,21 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
 		list_del(&mapping->list);
 
 		r = amdgpu_vm_bo_split_mapping(adev, NULL, 0, NULL, vm, mapping,
-					       0, 0, &fence);
-		amdgpu_vm_free_mapping(adev, vm, mapping, fence);
+					       0, 0, &f);
+		amdgpu_vm_free_mapping(adev, vm, mapping, f);
 		if (r) {
-			fence_put(fence);
+			fence_put(f);
 			return r;
 		}
-
 	}
-	fence_put(fence);
+
+	if (fence && f) {
+		fence_put(*fence);
+		*fence = f;
+	} else {
+		fence_put(f);
+	}
+
 	return 0;
 
 }
