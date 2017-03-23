@@ -123,7 +123,6 @@ static int gmc_v9_0_vm_fault_interrupt_state(struct amdgpu_device *adev,
 	}
 
 	return 0;
-	return 0;
 }
 
 static int gmc_v9_0_process_interrupt(struct amdgpu_device *adev,
