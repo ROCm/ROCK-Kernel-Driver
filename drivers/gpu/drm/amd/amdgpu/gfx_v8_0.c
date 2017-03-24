@@ -4890,7 +4890,7 @@ static int gfx_v8_0_kiq_init_queue(struct amdgpu_ring *ring)
 		mqd_idx = ring - &adev->gfx.compute_ring[0];
 	}
 
-	if (!adev->gfx.in_reset) {
+	if (!adev->gfx.in_reset && !adev->gfx.in_suspend) {
 		memset((void *)mqd, 0, sizeof(*mqd));
 		mutex_lock(&adev->srbm_mutex);
 		vi_srbm_select(adev, ring->me, ring->pipe, ring->queue, 0);
@@ -5088,15 +5088,18 @@ static int gfx_v8_0_hw_fini(void *handle)
 static int gfx_v8_0_suspend(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-
+	adev->gfx.in_suspend = true;
 	return gfx_v8_0_hw_fini(adev);
 }
 
 static int gfx_v8_0_resume(void *handle)
 {
+	int r;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-	return gfx_v8_0_hw_init(adev);
+	r = gfx_v8_0_hw_init(adev);
+	adev->gfx.in_suspend = false;
+	return r;
 }
 
 static bool gfx_v8_0_is_idle(void *handle)
