@@ -97,6 +97,8 @@ static void dm_set_cursor(
 	attributes.rotation_angle    = 0;
 	attributes.attribute_flags.value = 0;
 
+	attributes.pitch = attributes.width;
+
 	x = amdgpu_crtc->cursor_x;
 	y = amdgpu_crtc->cursor_y;
 
@@ -534,6 +536,8 @@ static void fill_plane_attributes_from_fb(
 			adev->gfx.config.gb_addr_config_fields.num_se;
 		surface->tiling_info.gfx9.max_compressed_frags =
 			adev->gfx.config.gb_addr_config_fields.max_compress_frags;
+		surface->tiling_info.gfx9.num_rb_per_se =
+			adev->gfx.config.gb_addr_config_fields.num_rb_per_se;
 		surface->tiling_info.gfx9.swizzle =
 			AMDGPU_TILING_GET(tiling_flags, SWIZZLE_MODE);
 		surface->tiling_info.gfx9.shaderEnable = 1;
@@ -1776,8 +1780,8 @@ int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 
 	drm_crtc_helper_add(&acrtc->base, &amdgpu_dm_crtc_helper_funcs);
 
-	acrtc->max_cursor_width = 128;
-	acrtc->max_cursor_height = 128;
+	acrtc->max_cursor_width = dm->adev->dm.dc->caps.max_cursor_size;
+	acrtc->max_cursor_height = dm->adev->dm.dc->caps.max_cursor_size;
 
 	acrtc->crtc_id = crtc_index;
 	acrtc->base.enabled = false;
@@ -2563,7 +2567,7 @@ void amdgpu_dm_atomic_commit_tail(
 	}
 
 	/* DC is optimized not to do anything if 'streams' didn't change. */
-	dc_commit_streams(dm->dc, commit_streams, commit_streams_count);
+	WARN_ON(!dc_commit_streams(dm->dc, commit_streams, commit_streams_count));
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
@@ -3029,6 +3033,8 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 		ret = drm_atomic_add_affected_planes(state, crtc);
 		if (ret)
 			return ret;
+
+		ret = -EINVAL;
 	}
 
 	for (i = 0; i < set_count; i++) {
