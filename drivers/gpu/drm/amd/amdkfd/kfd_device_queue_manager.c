@@ -916,11 +916,12 @@ static void uninitialize_nocpsch(struct device_queue_manager *dqm)
 static int start_nocpsch(struct device_queue_manager *dqm)
 {
 	init_interrupts(dqm);
-	return 0;
+	return pm_init(&dqm->packets, dqm, dqm->dev->mec_fw_version);
 }
 
 static int stop_nocpsch(struct device_queue_manager *dqm)
 {
+	pm_uninit(&dqm->packets);
 	return 0;
 }
 
