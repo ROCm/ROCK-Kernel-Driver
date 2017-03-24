@@ -368,9 +368,12 @@ static int xgpu_vi_mailbox_rcv_msg(struct amdgpu_device *adev,
 	u32 reg;
 	u32 mask = REG_FIELD_MASK(MAILBOX_CONTROL, RCV_MSG_VALID);
 
-	reg = RREG32_NO_KIQ(mmMAILBOX_CONTROL);
-	if (!(reg & mask))
-		return -ENOENT;
+	/* workaround: host driver doesn't set VALID for CMPL now */
+	if (event != IDH_FLR_NOTIFICATION_CMPL) {
+		reg = RREG32_NO_KIQ(mmMAILBOX_CONTROL);
+		if (!(reg & mask))
+			return -ENOENT;
+	}
 
 	reg = RREG32_NO_KIQ(mmMAILBOX_MSGBUF_RCV_DW0);
 	if (reg != event)
@@ -566,11 +569,11 @@ int xgpu_vi_mailbox_add_irq_id(struct amdgpu_device *adev)
 {
 	int r;
 
-	r = amdgpu_irq_add_id(adev, 135, &adev->virt.rcv_irq);
+	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, 135, &adev->virt.rcv_irq);
 	if (r)
 		return r;
 
-	r = amdgpu_irq_add_id(adev, 138, &adev->virt.ack_irq);
+	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, 138, &adev->virt.ack_irq);
 	if (r) {
 		amdgpu_irq_put(adev, &adev->virt.rcv_irq, 0);
 		return r;

@@ -31,6 +31,7 @@
 #include "opp.h"
 #include "timing_generator.h"
 #include "transform.h"
+#include "core_types.h"
 #include "set_mode_types.h"
 #include "virtual/virtual_stream_encoder.h"
 
@@ -38,6 +39,7 @@
 #include "dce100/dce100_resource.h"
 #include "dce110/dce110_resource.h"
 #include "dce112/dce112_resource.h"
+#include "dce120/dce120_resource.h"
 
 enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 {
@@ -64,6 +66,9 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 			dc_version = DCE_VERSION_11_2;
 		}
 		break;
+	case FAMILY_AI:
+		dc_version = DCE_VERSION_12_0;
+		break;
 	default:
 		dc_version = DCE_VERSION_UNKNOWN;
 		break;
@@ -77,25 +82,43 @@ struct resource_pool *dc_create_resource_pool(
 				enum dce_version dc_version,
 				struct hw_asic_id asic_id)
 {
+	struct resource_pool *res_pool = NULL;
 
 	switch (dc_version) {
 	case DCE_VERSION_8_0:
-		return dce80_create_resource_pool(
+		res_pool = dce80_create_resource_pool(
 			num_virtual_links, dc);
+		break;
 	case DCE_VERSION_10_0:
-		return dce100_create_resource_pool(
+		res_pool = dce100_create_resource_pool(
 				num_virtual_links, dc);
+		break;
 	case DCE_VERSION_11_0:
-		return dce110_create_resource_pool(
+		res_pool = dce110_create_resource_pool(
 			num_virtual_links, dc, asic_id);
+		break;
 	case DCE_VERSION_11_2:
-		return dce112_create_resource_pool(
+		res_pool = dce112_create_resource_pool(
 			num_virtual_links, dc);
+		break;
+	case DCE_VERSION_12_0:
+		res_pool = dce120_create_resource_pool(
+			num_virtual_links, dc);
+		break;
 	default:
 		break;
 	}
+	if (res_pool != NULL) {
+		struct firmware_info fw_info = { { 0 } };
 
-	return false;
+		if (dc->ctx->dc_bios->funcs->get_firmware_info(
+				dc->ctx->dc_bios, &fw_info) == BP_RESULT_OK) {
+				res_pool->ref_clock_inKhz = fw_info.pll_info.crystal_frequency;
+			} else
+				ASSERT_CRITICAL(false);
+	}
+
+	return res_pool;
 }
 
 void dc_destroy_resource_pool(struct core_dc *dc)
@@ -386,70 +409,100 @@ static void rect_swap_helper(struct rect *rect)
 	rect->y = temp;
 }
 
-static void calculate_viewport(
-		const struct dc_surface *surface,
-		struct pipe_ctx *pipe_ctx)
+static void calculate_viewport(struct pipe_ctx *pipe_ctx)
 {
-	struct rect stream_src = pipe_ctx->stream->public.src;
-	struct rect src = surface->src_rect;
-	struct rect dst = surface->dst_rect;
-	struct rect surface_clip = surface->clip_rect;
-	struct rect clip = {0};
-
-
-	if (surface->rotation == ROTATION_ANGLE_90 ||
-	    surface->rotation == ROTATION_ANGLE_270) {
-		rect_swap_helper(&src);
-		rect_swap_helper(&dst);
-		rect_swap_helper(&surface_clip);
-		rect_swap_helper(&stream_src);
-	}
+	const struct dc_surface *surface = &pipe_ctx->surface->public;
+	const struct dc_stream *stream = &pipe_ctx->stream->public;
+	struct scaler_data *data = &pipe_ctx->scl_data;
+	struct rect clip = { 0 };
+	int vpc_div = (data->format == PIXEL_FORMAT_420BPP12
+			|| data->format == PIXEL_FORMAT_420BPP15) ? 2 : 1;
+	bool pri_split = pipe_ctx->bottom_pipe &&
+			pipe_ctx->bottom_pipe->surface == pipe_ctx->surface;
+	bool sec_split = pipe_ctx->top_pipe &&
+			pipe_ctx->top_pipe->surface == pipe_ctx->surface;
 
 	/* The actual clip is an intersection between stream
 	 * source and surface clip
 	 */
-	clip.x = stream_src.x > surface_clip.x ?
-			stream_src.x : surface_clip.x;
+	clip.x = stream->src.x > surface->clip_rect.x ?
+			stream->src.x : surface->clip_rect.x;
 
-	clip.width = stream_src.x + stream_src.width <
-			surface_clip.x + surface_clip.width ?
-			stream_src.x + stream_src.width - clip.x :
-			surface_clip.x + surface_clip.width - clip.x ;
+	clip.width = stream->src.x + stream->src.width <
+			surface->clip_rect.x + surface->clip_rect.width ?
+			stream->src.x + stream->src.width - clip.x :
+			surface->clip_rect.x + surface->clip_rect.width - clip.x ;
 
-	clip.y = stream_src.y > surface_clip.y ?
-			stream_src.y : surface_clip.y;
+	clip.y = stream->src.y > surface->clip_rect.y ?
+			stream->src.y : surface->clip_rect.y;
 
-	clip.height = stream_src.y + stream_src.height <
-			surface_clip.y + surface_clip.height ?
-			stream_src.y + stream_src.height - clip.y :
-			surface_clip.y + surface_clip.height - clip.y ;
+	clip.height = stream->src.y + stream->src.height <
+			surface->clip_rect.y + surface->clip_rect.height ?
+			stream->src.y + stream->src.height - clip.y :
+			surface->clip_rect.y + surface->clip_rect.height - clip.y ;
 
-	/* offset = src.ofs + (clip.ofs - dst.ofs) * scl_ratio
+	/* offset = src.ofs + (clip.ofs - surface->dst_rect.ofs) * scl_ratio
 	 * num_pixels = clip.num_pix * scl_ratio
 	 */
-	pipe_ctx->scl_data.viewport.x = src.x + (clip.x - dst.x) *
-			src.width / dst.width;
-	pipe_ctx->scl_data.viewport.width = clip.width *
-			src.width / dst.width;
+	data->viewport.x = surface->src_rect.x + (clip.x - surface->dst_rect.x) *
+			surface->src_rect.width / surface->dst_rect.width;
+	data->viewport.width = clip.width *
+			surface->src_rect.width / surface->dst_rect.width;
 
-	pipe_ctx->scl_data.viewport.y = src.y + (clip.y - dst.y) *
-			src.height / dst.height;
-	pipe_ctx->scl_data.viewport.height = clip.height *
-			src.height / dst.height;
+	data->viewport.y = surface->src_rect.y + (clip.y - surface->dst_rect.y) *
+			surface->src_rect.height / surface->dst_rect.height;
+	data->viewport.height = clip.height *
+			surface->src_rect.height / surface->dst_rect.height;
 
-	/* Minimum viewport such that 420/422 chroma vp is non 0 */
-	if (pipe_ctx->scl_data.viewport.width < 2)
-		pipe_ctx->scl_data.viewport.width = 2;
-	if (pipe_ctx->scl_data.viewport.height < 2)
-		pipe_ctx->scl_data.viewport.height = 2;
+	/* Round down, compensate in init */
+	data->viewport_c.x = data->viewport.x / vpc_div;
+	data->viewport_c.y = data->viewport.y / vpc_div;
+	data->inits.h_c = (data->viewport.x % vpc_div) != 0 ?
+			dal_fixed31_32_half : dal_fixed31_32_zero;
+	data->inits.v_c = (data->viewport.y % vpc_div) != 0 ?
+			dal_fixed31_32_half : dal_fixed31_32_zero;
+	/* Round up, assume original video size always even dimensions */
+	data->viewport_c.width = (data->viewport.width + vpc_div - 1) / vpc_div;
+	data->viewport_c.height = (data->viewport.height + vpc_div - 1) / vpc_div;
+
+	/* Handle hsplit */
+	if (pri_split || sec_split) {
+		/* HMirror XOR Secondary_pipe XOR Rotation_180 */
+		bool right_view = (sec_split != surface->horizontal_mirror) !=
+					(surface->rotation == ROTATION_ANGLE_180);
+
+		if (surface->rotation == ROTATION_ANGLE_90
+				|| surface->rotation == ROTATION_ANGLE_270)
+			/* Secondary_pipe XOR Rotation_270 */
+			right_view = (surface->rotation == ROTATION_ANGLE_270) != sec_split;
+
+		if (right_view) {
+			data->viewport.width /= 2;
+			data->viewport_c.width /= 2;
+			data->viewport.x +=  data->viewport.width;
+			data->viewport_c.x +=  data->viewport_c.width;
+			/* Ceil offset pipe */
+			data->viewport.width += data->viewport.width % 2;
+			data->viewport_c.width += data->viewport_c.width % 2;
+		} else {
+			data->viewport.width /= 2;
+			data->viewport_c.width /= 2;
+		}
+	}
+
+	if (surface->rotation == ROTATION_ANGLE_90 ||
+			surface->rotation == ROTATION_ANGLE_270) {
+		rect_swap_helper(&data->viewport_c);
+		rect_swap_helper(&data->viewport);
+	}
 }
 
-static void calculate_recout(
-		const struct dc_surface *surface,
-		struct pipe_ctx *pipe_ctx)
+static void calculate_recout(struct pipe_ctx *pipe_ctx, struct view *recout_skip)
 {
+	const struct dc_surface *surface = &pipe_ctx->surface->public;
 	struct core_stream *stream = pipe_ctx->stream;
 	struct rect clip = surface->clip_rect;
+	int recout_full_x, recout_full_y;
 
 	pipe_ctx->scl_data.recout.x = stream->public.dst.x;
 	if (stream->public.src.x < clip.x)
@@ -478,17 +531,42 @@ static void calculate_recout(
 		pipe_ctx->scl_data.recout.height =
 			stream->public.dst.y + stream->public.dst.height
 						- pipe_ctx->scl_data.recout.y;
+
+	/* Handle hsplit */
+	if (pipe_ctx->top_pipe && pipe_ctx->top_pipe->surface == pipe_ctx->surface) {
+		pipe_ctx->scl_data.recout.width /= 2;
+		pipe_ctx->scl_data.recout.x += pipe_ctx->scl_data.recout.width;
+		/* Floor primary pipe, ceil 2ndary pipe */
+		pipe_ctx->scl_data.recout.width += pipe_ctx->scl_data.recout.width % 2;
+	} else if (pipe_ctx->bottom_pipe && pipe_ctx->bottom_pipe->surface == pipe_ctx->surface) {
+		pipe_ctx->scl_data.recout.width /= 2;
+	}
+
+	/* Unclipped recout offset = stream dst offset + ((surf dst offset - stream src offset)
+	 * 				* 1/ stream scaling ratio) - (surf src offset * 1/ full scl
+	 * 				ratio)
+	 */
+	recout_full_x = stream->public.dst.x + (surface->dst_rect.x -  stream->public.src.x)
+					* stream->public.dst.width / stream->public.src.width -
+			surface->src_rect.x * surface->dst_rect.width / surface->src_rect.width
+					* stream->public.dst.width / stream->public.src.width;
+	recout_full_y = stream->public.dst.y + (surface->dst_rect.y -  stream->public.src.y)
+					* stream->public.dst.height / stream->public.src.height -
+			surface->src_rect.y * surface->dst_rect.height / surface->src_rect.height
+					* stream->public.dst.height / stream->public.src.height;
+
+	recout_skip->width = pipe_ctx->scl_data.recout.x - recout_full_x;
+	recout_skip->height = pipe_ctx->scl_data.recout.y - recout_full_y;
 }
 
-static void calculate_scaling_ratios(
-		const struct dc_surface *surface,
-		struct pipe_ctx *pipe_ctx)
+static void calculate_scaling_ratios(struct pipe_ctx *pipe_ctx)
 {
+	const struct dc_surface *surface = &pipe_ctx->surface->public;
 	struct core_stream *stream = pipe_ctx->stream;
-	const uint32_t in_w = stream->public.src.width;
-	const uint32_t in_h = stream->public.src.height;
-	const uint32_t out_w = stream->public.dst.width;
-	const uint32_t out_h = stream->public.dst.height;
+	const int in_w = stream->public.src.width;
+	const int in_h = stream->public.src.height;
+	const int out_w = stream->public.dst.width;
+	const int out_h = stream->public.dst.height;
 
 	pipe_ctx->scl_data.ratios.horz = dal_fixed31_32_from_fraction(
 					surface->src_rect.width,
@@ -510,31 +588,199 @@ static void calculate_scaling_ratios(
 	pipe_ctx->scl_data.ratios.horz_c = pipe_ctx->scl_data.ratios.horz;
 	pipe_ctx->scl_data.ratios.vert_c = pipe_ctx->scl_data.ratios.vert;
 
-	if (pipe_ctx->scl_data.format == PIXEL_FORMAT_420BPP12) {
+	if (pipe_ctx->scl_data.format == PIXEL_FORMAT_420BPP12
+			|| pipe_ctx->scl_data.format == PIXEL_FORMAT_420BPP15) {
 		pipe_ctx->scl_data.ratios.horz_c.value /= 2;
 		pipe_ctx->scl_data.ratios.vert_c.value /= 2;
 	}
 }
 
-bool resource_build_scaling_params(
-	const struct dc_surface *surface,
-	struct pipe_ctx *pipe_ctx)
+static void calculate_inits_and_adj_vp(struct pipe_ctx *pipe_ctx, struct view *recout_skip)
 {
-	bool res;
+	struct scaler_data *data = &pipe_ctx->scl_data;
+	struct rect src = pipe_ctx->surface->public.src_rect;
+	int vpc_div = (data->format == PIXEL_FORMAT_420BPP12
+			|| data->format == PIXEL_FORMAT_420BPP15) ? 2 : 1;
+
+	if (pipe_ctx->surface->public.rotation == ROTATION_ANGLE_90 ||
+			pipe_ctx->surface->public.rotation == ROTATION_ANGLE_270) {
+		rect_swap_helper(&data->viewport_c);
+		rect_swap_helper(&data->viewport);
+	}
+
+	/*
+	 * Init calculated according to formula:
+	 * 	init = (scaling_ratio + number_of_taps + 1) / 2
+	 * 	init_bot = init + scaling_ratio
+	 * 	init_c = init + truncated_vp_c_offset(from calculate viewport)
+	 */
+	data->inits.h = dal_fixed31_32_div_int(
+			dal_fixed31_32_add_int(data->ratios.horz, data->taps.h_taps + 1), 2);
+
+	data->inits.h_c = dal_fixed31_32_add(data->inits.h_c, dal_fixed31_32_div_int(
+			dal_fixed31_32_add_int(data->ratios.horz_c, data->taps.h_taps_c + 1), 2));
+
+	data->inits.v = dal_fixed31_32_div_int(
+			dal_fixed31_32_add_int(data->ratios.vert, data->taps.v_taps + 1), 2);
+
+	data->inits.v_c = dal_fixed31_32_add(data->inits.v_c, dal_fixed31_32_div_int(
+			dal_fixed31_32_add_int(data->ratios.vert_c, data->taps.v_taps_c + 1), 2));
+
+
+	/* Adjust for viewport end clip-off */
+	if ((data->viewport.x + data->viewport.width) < (src.x + src.width)) {
+		int vp_clip = src.x + src.width - data->viewport.width - data->viewport.x;
+		int int_part = dal_fixed31_32_floor(
+				dal_fixed31_32_sub(data->inits.h, data->ratios.horz));
+
+		int_part = int_part > 0 ? int_part : 0;
+		data->viewport.width += int_part < vp_clip ? int_part : vp_clip;
+	}
+	if ((data->viewport.y + data->viewport.height) < (src.y + src.height)) {
+		int vp_clip = src.y + src.height - data->viewport.height - data->viewport.y;
+		int int_part = dal_fixed31_32_floor(
+				dal_fixed31_32_sub(data->inits.v, data->ratios.vert));
+
+		int_part = int_part > 0 ? int_part : 0;
+		data->viewport.height += int_part < vp_clip ? int_part : vp_clip;
+	}
+	if ((data->viewport_c.x + data->viewport_c.width) < (src.x + src.width) / vpc_div) {
+		int vp_clip = (src.x + src.width) / vpc_div -
+				data->viewport_c.width - data->viewport_c.x;
+		int int_part = dal_fixed31_32_floor(
+				dal_fixed31_32_sub(data->inits.h_c, data->ratios.horz_c));
+
+		int_part = int_part > 0 ? int_part : 0;
+		data->viewport_c.width += int_part < vp_clip ? int_part : vp_clip;
+	}
+	if ((data->viewport_c.y + data->viewport_c.height) < (src.y + src.height) / vpc_div) {
+		int vp_clip = (src.y + src.height) / vpc_div -
+				data->viewport_c.height - data->viewport_c.y;
+		int int_part = dal_fixed31_32_floor(
+				dal_fixed31_32_sub(data->inits.v_c, data->ratios.vert_c));
+
+		int_part = int_part > 0 ? int_part : 0;
+		data->viewport_c.height += int_part < vp_clip ? int_part : vp_clip;
+	}
+
+	/* Adjust for non-0 viewport offset */
+	if (data->viewport.x) {
+		int int_part;
+
+		data->inits.h = dal_fixed31_32_add(data->inits.h, dal_fixed31_32_mul_int(
+				data->ratios.horz, recout_skip->width));
+		int_part = dal_fixed31_32_floor(data->inits.h) - data->viewport.x;
+		if (int_part < data->taps.h_taps) {
+			int int_adj = data->viewport.x >= (data->taps.h_taps - int_part) ?
+						(data->taps.h_taps - int_part) : data->viewport.x;
+			data->viewport.x -= int_adj;
+			data->viewport.width += int_adj;
+			int_part += int_adj;
+		} else if (int_part > data->taps.h_taps) {
+			data->viewport.x += int_part - data->taps.h_taps;
+			data->viewport.width -= int_part - data->taps.h_taps;
+			int_part = data->taps.h_taps;
+		}
+		data->inits.h.value &= 0xffffffff;
+		data->inits.h = dal_fixed31_32_add_int(data->inits.h, int_part);
+	}
+
+	if (data->viewport_c.x) {
+		int int_part;
+
+		data->inits.h_c = dal_fixed31_32_add(data->inits.h_c, dal_fixed31_32_mul_int(
+				data->ratios.horz_c, recout_skip->width));
+		int_part = dal_fixed31_32_floor(data->inits.h_c) - data->viewport_c.x;
+		if (int_part < data->taps.h_taps_c) {
+			int int_adj = data->viewport_c.x >= (data->taps.h_taps_c - int_part) ?
+					(data->taps.h_taps_c - int_part) : data->viewport_c.x;
+			data->viewport_c.x -= int_adj;
+			data->viewport_c.width += int_adj;
+			int_part += int_adj;
+		} else if (int_part > data->taps.h_taps_c) {
+			data->viewport_c.x += int_part - data->taps.h_taps_c;
+			data->viewport_c.width -= int_part - data->taps.h_taps_c;
+			int_part = data->taps.h_taps_c;
+		}
+		data->inits.h_c.value &= 0xffffffff;
+		data->inits.h_c = dal_fixed31_32_add_int(data->inits.h_c, int_part);
+	}
+
+	if (data->viewport.y) {
+		int int_part;
+
+		data->inits.v = dal_fixed31_32_add(data->inits.v, dal_fixed31_32_mul_int(
+				data->ratios.vert, recout_skip->height));
+		int_part = dal_fixed31_32_floor(data->inits.v) - data->viewport.y;
+		if (int_part < data->taps.v_taps) {
+			int int_adj = data->viewport.y >= (data->taps.v_taps - int_part) ?
+						(data->taps.v_taps - int_part) : data->viewport.y;
+			data->viewport.y -= int_adj;
+			data->viewport.height += int_adj;
+			int_part += int_adj;
+		} else if (int_part > data->taps.v_taps) {
+			data->viewport.y += int_part - data->taps.v_taps;
+			data->viewport.height -= int_part - data->taps.v_taps;
+			int_part = data->taps.v_taps;
+		}
+		data->inits.v.value &= 0xffffffff;
+		data->inits.v = dal_fixed31_32_add_int(data->inits.v, int_part);
+	}
+
+	if (data->viewport_c.y) {
+		int int_part;
+
+		data->inits.v_c = dal_fixed31_32_add(data->inits.v_c, dal_fixed31_32_mul_int(
+				data->ratios.vert_c, recout_skip->height));
+		int_part = dal_fixed31_32_floor(data->inits.v_c) - data->viewport_c.y;
+		if (int_part < data->taps.v_taps_c) {
+			int int_adj = data->viewport_c.y >= (data->taps.v_taps_c - int_part) ?
+					(data->taps.v_taps_c - int_part) : data->viewport_c.y;
+			data->viewport_c.y -= int_adj;
+			data->viewport_c.height += int_adj;
+			int_part += int_adj;
+		} else if (int_part > data->taps.v_taps_c) {
+			data->viewport_c.y += int_part - data->taps.v_taps_c;
+			data->viewport_c.height -= int_part - data->taps.v_taps_c;
+			int_part = data->taps.v_taps_c;
+		}
+		data->inits.v_c.value &= 0xffffffff;
+		data->inits.v_c = dal_fixed31_32_add_int(data->inits.v_c, int_part);
+	}
+
+	/* Interlaced inits based on final vert inits */
+	data->inits.v_bot = dal_fixed31_32_add(data->inits.v, data->ratios.vert);
+	data->inits.v_c_bot = dal_fixed31_32_add(data->inits.v_c, data->ratios.vert_c);
+
+	if (pipe_ctx->surface->public.rotation == ROTATION_ANGLE_90 ||
+			pipe_ctx->surface->public.rotation == ROTATION_ANGLE_270) {
+		rect_swap_helper(&data->viewport_c);
+		rect_swap_helper(&data->viewport);
+	}
+}
+
+bool resource_build_scaling_params(struct pipe_ctx *pipe_ctx)
+{
+	const struct dc_surface *surface = &pipe_ctx->surface->public;
 	struct dc_crtc_timing *timing = &pipe_ctx->stream->public.timing;
+	struct view recout_skip = { 0 };
+	bool res = false;
+
 	/* Important: scaling ratio calculation requires pixel format,
 	 * lb depth calculation requires recout and taps require scaling ratios.
+	 * Inits require viewport, taps, ratios and recout of split pipe
 	 */
-	pipe_ctx->scl_data.format = convert_pixel_format_to_dalsurface(surface->format);
+	pipe_ctx->scl_data.format = convert_pixel_format_to_dalsurface(
+			pipe_ctx->surface->public.format);
 
-	calculate_viewport(surface, pipe_ctx);
+	calculate_scaling_ratios(pipe_ctx);
+
+	calculate_viewport(pipe_ctx);
 
 	if (pipe_ctx->scl_data.viewport.height < 16 || pipe_ctx->scl_data.viewport.width < 16)
 		return false;
 
-	calculate_scaling_ratios(surface, pipe_ctx);
-
-	calculate_recout(surface, pipe_ctx);
+	calculate_recout(pipe_ctx, &recout_skip);
 
 	/**
 	 * Setting line buffer pixel depth to 24bpp yields banding
@@ -556,6 +802,10 @@ bool resource_build_scaling_params(
 		res = pipe_ctx->xfm->funcs->transform_get_optimal_number_of_taps(
 			pipe_ctx->xfm, &pipe_ctx->scl_data, &surface->scaling_quality);
 	}
+
+	if (res)
+		/* May need to re-check lb size after this in some obscure scenario */
+		calculate_inits_and_adj_vp(pipe_ctx, &recout_skip);
 
 	dm_logger_write(pipe_ctx->stream->ctx->logger, LOG_SCALER,
 				"%s: Viewport:\nheight:%d width:%d x:%d "
@@ -584,9 +834,7 @@ enum dc_status resource_build_scaling_params_for_context(
 	for (i = 0; i < MAX_PIPES; i++) {
 		if (context->res_ctx.pipe_ctx[i].surface != NULL &&
 				context->res_ctx.pipe_ctx[i].stream != NULL)
-			if (!resource_build_scaling_params(
-				&context->res_ctx.pipe_ctx[i].surface->public,
-				&context->res_ctx.pipe_ctx[i]))
+			if (!resource_build_scaling_params(&context->res_ctx.pipe_ctx[i]))
 				return DC_FAIL_SCALING;
 	}
 
@@ -1101,9 +1349,14 @@ enum dc_status resource_map_pool_resources(
 	for (i = 0; i < context->stream_count; i++) {
 		struct core_stream *stream = context->streams[i];
 
-		if (!resource_is_stream_unchanged(dc->current_context, stream))
+		if (!resource_is_stream_unchanged(dc->current_context, stream)) {
+			if (stream != NULL && dc->current_context->streams[i] != NULL) {
+				stream->bit_depth_params =
+						dc->current_context->streams[i]->bit_depth_params;
+				stream->clamping = dc->current_context->streams[i]->clamping;
 			continue;
-
+		}
+	}
 		/* mark resources used for stream that is already active */
 		for (j = 0; j < MAX_PIPES; j++) {
 			struct pipe_ctx *pipe_ctx =
@@ -1112,6 +1365,9 @@ enum dc_status resource_map_pool_resources(
 				&dc->current_context->res_ctx.pipe_ctx[j];
 
 			if (!are_stream_backends_same(old_pipe_ctx->stream, stream))
+				continue;
+
+			if (old_pipe_ctx->top_pipe)
 				continue;
 
 			pipe_ctx->stream = stream;
@@ -1170,7 +1426,7 @@ enum dc_status resource_map_pool_resources(
 			pipe_ctx->stream_enc);
 
 		/* TODO: Add check if ASIC support and EDID audio */
-		if (!stream->sink->converter_disable_audio &&
+		if (!stream->sink->public.converter_disable_audio &&
 			dc_is_audio_capable_signal(pipe_ctx->stream->signal) &&
 			stream->public.audio_info.mode_count) {
 			pipe_ctx->audio = find_first_free_audio(
@@ -1675,7 +1931,7 @@ static void set_hdr_static_info_packet(
 
 	hdr_metadata = surface->public.hdr_static_ctx;
 
-	if (!hdr_metadata.is_hdr)
+	if (!hdr_metadata.hdr_supported)
 		return;
 
 	if (dc_is_hdmi_signal(signal)) {

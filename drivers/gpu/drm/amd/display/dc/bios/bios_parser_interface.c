@@ -29,6 +29,8 @@
 #include "bios_parser_interface.h"
 #include "bios_parser.h"
 
+#include "bios_parser2.h"
+
 
 struct dc_bios *dal_bios_parser_create(
 	struct bp_init_data *init,
@@ -36,7 +38,11 @@ struct dc_bios *dal_bios_parser_create(
 {
 	struct dc_bios *bios = NULL;
 
-	bios = bios_parser_create(init, dce_version);
+	bios = firmware_parser_create(init, dce_version);
+
+	/* Fall back to old bios parser for older asics */
+	if (bios == NULL)
+		bios = bios_parser_create(init, dce_version);
 
 	return bios;
 }

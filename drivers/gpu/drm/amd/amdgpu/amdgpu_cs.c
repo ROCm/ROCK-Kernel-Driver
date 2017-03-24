@@ -82,6 +82,15 @@ int amdgpu_cs_get_ring(struct amdgpu_device *adev, u32 ip_type,
 			return -EINVAL;
 		}
 		break;
+	case AMDGPU_HW_IP_UVD_ENC:
+		if (ring < adev->uvd.num_enc_rings){
+			*out_ring = &adev->uvd.ring_enc[ring];
+		} else {
+			DRM_ERROR("only %d UVD ENC rings are supported\n",
+				adev->uvd.num_enc_rings);
+			return -EINVAL;
+		}
+		break;
 	}
 
 	if (!(*out_ring && (*out_ring)->adev)) {
@@ -240,6 +249,8 @@ free_partial_kdata:
 	for (; i >= 0; i--)
 		drm_free_large(p->chunks[i].kdata);
 	kfree(p->chunks);
+	p->chunks = NULL;
+	p->nchunks = 0;
 put_ctx:
 	amdgpu_ctx_put(p->ctx);
 free_chunk:
@@ -877,7 +888,7 @@ static int amdgpu_cs_ib_fill(struct amdgpu_device *adev,
 	struct amdgpu_fpriv *fpriv = parser->filp->driver_priv;
 	struct amdgpu_vm *vm = &fpriv->vm;
 	int i, j;
-	int r;
+	int r, ce_preempt = 0, de_preempt = 0;
 
 	for (i = 0, j = 0; i < parser->nchunks && j < parser->job->num_ibs; i++) {
 		struct amdgpu_cs_chunk *chunk;
@@ -891,6 +902,17 @@ static int amdgpu_cs_ib_fill(struct amdgpu_device *adev,
 
 		if (chunk->chunk_id != AMDGPU_CHUNK_ID_IB)
 			continue;
+
+		if (ib->flags & AMDGPU_IB_FLAG_PREEMPT) {
+			if (ib->flags & AMDGPU_IB_FLAG_CE)
+				ce_preempt++;
+			else
+				de_preempt++;
+		}
+
+		/* only one preemptible IB per submit for me/ce */
+		if (ce_preempt > 1 || de_preempt > 1)
+			return -EINVAL;
 
 		r = amdgpu_cs_get_ring(adev, chunk_ib->ip_type,
 				       chunk_ib->ip_instance, chunk_ib->ring,

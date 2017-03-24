@@ -776,6 +776,13 @@ static void get_pixel_clock_parameters(
 	pixel_clk_params->flags.DISPLAY_BLANKED = 1;
 	pixel_clk_params->flags.SUPPORT_YCBCR420 = (stream->public.timing.pixel_encoding ==
 			PIXEL_ENCODING_YCBCR420);
+	pixel_clk_params->pixel_encoding = stream->public.timing.pixel_encoding;
+	if (stream->public.timing.pixel_encoding == PIXEL_ENCODING_YCBCR422) {
+		pixel_clk_params->color_depth = COLOR_DEPTH_888;
+	}
+	if (stream->public.timing.pixel_encoding == PIXEL_ENCODING_YCBCR420) {
+		pixel_clk_params->requested_pix_clk  = pixel_clk_params->requested_pix_clk / 2;
+	}
 }
 
 void dce110_resource_build_bit_depth_reduction_params(
@@ -905,30 +912,28 @@ static enum dc_status validate_mapped_resource(
 	return DC_OK;
 }
 
-enum dc_status dce110_validate_bandwidth(
+bool dce110_validate_bandwidth(
 	const struct core_dc *dc,
 	struct validate_context *context)
 {
-	enum dc_status result = DC_ERROR_UNEXPECTED;
+	bool result = false;
 
 	dm_logger_write(
 		dc->ctx->logger, LOG_BANDWIDTH_CALCS,
 		"%s: start",
 		__func__);
 
-	if (!bw_calcs(
+	if (bw_calcs(
 			dc->ctx,
 			&dc->bw_dceip,
 			&dc->bw_vbios,
 			context->res_ctx.pipe_ctx,
 			context->res_ctx.pool->pipe_count,
 			&context->bw_results))
-		result =  DC_FAIL_BANDWIDTH_VALIDATE;
-	else
-		result =  DC_OK;
+		result =  true;
 	context->dispclk_khz = context->bw_results.dispclk_khz;
 
-	if (result == DC_FAIL_BANDWIDTH_VALIDATE)
+	if (!result)
 		dm_logger_write(dc->ctx->logger, LOG_BANDWIDTH_VALIDATION,
 			"%s: %dx%d@%d Bandwidth validation failed!\n",
 			__func__,
@@ -1002,10 +1007,10 @@ static bool dce110_validate_surface_sets(
 		if (set[i].surface_count > 2)
 			return false;
 
-		if (set[i].surfaces[0]->src_rect.width
-				< set[i].stream->src.width
-				|| set[i].surfaces[0]->src_rect.height
-				< set[i].stream->src.height)
+		if (set[i].surfaces[0]->clip_rect.width
+				> set[i].stream->src.width
+				|| set[i].surfaces[0]->clip_rect.height
+				> set[i].stream->src.height)
 			return false;
 		if (set[i].surfaces[0]->format
 				>= SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)
@@ -1066,7 +1071,8 @@ enum dc_status dce110_validate_with_context(
 		result = resource_build_scaling_params_for_context(dc, context);
 
 	if (result == DC_OK)
-		result = dce110_validate_bandwidth(dc, context);
+		if (!dce110_validate_bandwidth(dc, context))
+			result = DC_FAIL_BANDWIDTH_VALIDATE;
 
 	return result;
 }
@@ -1099,7 +1105,8 @@ enum dc_status dce110_validate_guaranteed(
 	}
 
 	if (result == DC_OK)
-		result = dce110_validate_bandwidth(dc, context);
+		if (!dce110_validate_bandwidth(dc, context))
+			result = DC_FAIL_BANDWIDTH_VALIDATE;
 
 	return result;
 }

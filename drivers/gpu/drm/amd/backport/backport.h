@@ -17,5 +17,6 @@
 #include <kcl/kcl_fs.h>
 #include <kcl/kcl_tracepoint.h>
 #include <kcl/kcl_drm_global.h>
+#include <kcl/kcl_bitmap.h>
 
 #endif /* AMDGPU_BACKPORT_H */

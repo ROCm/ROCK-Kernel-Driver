@@ -109,8 +109,6 @@ struct core_sink {
 	/* not used for now */
 	struct core_link *link;
 	struct dc_context *ctx;
-	uint32_t dongle_max_pix_clk;
-	bool converter_disable_audio;
 };
 
 /************ link *****************/
@@ -207,11 +205,7 @@ struct resource_funcs {
 					const struct dc_stream *stream,
 					struct validate_context *context);
 
-	enum dc_status (*validate_bandwidth)(
-					const struct core_dc *dc,
-					struct validate_context *context);
-
-	struct validate_context *(*apply_clk_constraints)(
+	bool (*validate_bandwidth)(
 					const struct core_dc *dc,
 					struct validate_context *context);
 
@@ -243,6 +237,7 @@ struct resource_pool {
 	unsigned int pipe_count;
 	unsigned int underlay_pipe_index;
 	unsigned int stream_enc_count;
+	unsigned int ref_clock_inKhz;
 
 	/*
 	 * reserved clock source for DP

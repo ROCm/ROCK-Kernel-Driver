@@ -602,8 +602,8 @@ static bool amdgpu_atpx_detect(void)
 
 	if (has_atpx && vga_count == 2) {
 		acpi_get_name(amdgpu_atpx_priv.atpx.handle, ACPI_FULL_PATHNAME, &buffer);
-		printk(KERN_INFO "vga_switcheroo: detected switching method %s handle\n",
-		       acpi_method_name);
+		pr_info("vga_switcheroo: detected switching method %s handle\n",
+			acpi_method_name);
 		amdgpu_atpx_priv.atpx_detected = true;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 		amdgpu_atpx_priv.bridge_pm_usable = d3_supported;

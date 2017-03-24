@@ -585,6 +585,7 @@ static uint32_t dce110_get_pix_clk_dividers(
 			pll_settings, pix_clk_params);
 		break;
 	case DCE_VERSION_11_2:
+	case DCE_VERSION_12_0:
 		dce112_get_pix_clk_dividers_helper(clk_src,
 				pll_settings, pix_clk_params);
 		break;
@@ -868,13 +869,13 @@ static bool dce110_program_pix_clk(
 
 		break;
 	case DCE_VERSION_11_2:
+	case DCE_VERSION_12_0:
 		if (clock_source->id != CLOCK_SOURCE_ID_DP_DTO) {
 			bp_pc_params.flags.SET_GENLOCK_REF_DIV_SRC =
 							pll_settings->use_external_clk;
 			bp_pc_params.flags.SET_XTALIN_REF_SRC =
 							!pll_settings->use_external_clk;
 			if (pix_clk_params->flags.SUPPORT_YCBCR420) {
-				bp_pc_params.target_pixel_clock = pll_settings->actual_pix_clk / 2;
 				bp_pc_params.flags.SUPPORT_YUV_420 = 1;
 			}
 		}
@@ -1231,17 +1232,12 @@ bool dce110_clk_src_construct(
 			goto unexpected_failure;
 		}
 
-		if (clk_src->ref_freq_khz == 48000) {
-			calc_pll_cs_init_data_hdmi.
-				min_override_input_pxl_clk_pll_freq_khz = 24000;
-			calc_pll_cs_init_data_hdmi.
-				max_override_input_pxl_clk_pll_freq_khz = 48000;
-		} else if (clk_src->ref_freq_khz == 100000) {
-			calc_pll_cs_init_data_hdmi.
-				min_override_input_pxl_clk_pll_freq_khz = 25000;
-			calc_pll_cs_init_data_hdmi.
-				max_override_input_pxl_clk_pll_freq_khz = 50000;
-		}
+
+		calc_pll_cs_init_data_hdmi.
+				min_override_input_pxl_clk_pll_freq_khz = clk_src->ref_freq_khz/2;
+		calc_pll_cs_init_data_hdmi.
+				max_override_input_pxl_clk_pll_freq_khz = clk_src->ref_freq_khz;
+
 
 		if (!calc_pll_max_vco_construct(
 				&clk_src->calc_pll_hdmi, &calc_pll_cs_init_data_hdmi)) {

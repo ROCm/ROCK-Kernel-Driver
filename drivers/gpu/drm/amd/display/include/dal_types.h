@@ -38,6 +38,7 @@ enum dce_version {
 	DCE_VERSION_10_0,
 	DCE_VERSION_11_0,
 	DCE_VERSION_11_2,
+	DCE_VERSION_12_0,
 	DCE_VERSION_MAX,
 };
 

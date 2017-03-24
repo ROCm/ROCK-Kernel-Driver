@@ -141,6 +141,10 @@ void pre_surface_trace(
 				surface->format,
 				surface->rotation,
 				surface->stereo_format);
+
+		SURFACE_TRACE("surface->tiling_info.gfx9.swizzle = %d;\n",
+				surface->tiling_info.gfx9.swizzle);
+
 		SURFACE_TRACE("\n");
 	}
 	SURFACE_TRACE("\n");
@@ -221,6 +225,9 @@ void update_surface_trace(
 					update->plane_info->tiling_info.gfx8.pipe_config,
 					update->plane_info->tiling_info.gfx8.array_mode,
 					update->plane_info->visible);
+
+			SURFACE_TRACE("surface->tiling_info.gfx9.swizzle = %d;\n",
+					update->plane_info->tiling_info.gfx9.swizzle);
 		}
 
 		if (update->scaling_info) {

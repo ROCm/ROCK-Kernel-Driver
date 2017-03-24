@@ -209,6 +209,14 @@ static int amdgpu_firmware_info(struct drm_amdgpu_info_firmware *fw_info,
 		fw_info->ver = adev->sdma.instance[query_fw->index].fw_version;
 		fw_info->feature = adev->sdma.instance[query_fw->index].feature_version;
 		break;
+	case AMDGPU_INFO_FW_SOS:
+		fw_info->ver = adev->psp.sos_fw_version;
+		fw_info->feature = adev->psp.sos_feature_version;
+		break;
+	case AMDGPU_INFO_FW_ASD:
+		fw_info->ver = adev->psp.asd_fw_version;
+		fw_info->feature = adev->psp.asd_feature_version;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -251,12 +259,12 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 		struct drm_amdgpu_virtual_range range_info;
 		switch (info->virtual_range.aperture) {
 		case AMDGPU_SUA_APERTURE_PRIVATE:
-			range_info.start = adev->vm_manager.private_aperture_start;
-			range_info.end = adev->vm_manager.private_aperture_end;
+			range_info.start = adev->mc.private_aperture_start;
+			range_info.end = adev->mc.private_aperture_end;
 			break;
 		case AMDGPU_SUA_APERTURE_SHARED:
-			range_info.start = adev->vm_manager.shared_aperture_start;
-			range_info.end = adev->vm_manager.shared_aperture_end;
+			range_info.start = adev->mc.shared_aperture_start;
+			range_info.end = adev->mc.shared_aperture_end;
 			break;
 		default:
 			return -EINVAL;
@@ -327,6 +335,13 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 			ib_start_alignment = AMDGPU_GPU_PAGE_SIZE;
 			ib_size_alignment = 1;
 			break;
+		case AMDGPU_HW_IP_UVD_ENC:
+			type = AMD_IP_BLOCK_TYPE_UVD;
+			for (i = 0; i < adev->uvd.num_enc_rings; i++)
+				ring_mask |= ((adev->uvd.ring_enc[i].ready ? 1 : 0) << i);
+			ib_start_alignment = AMDGPU_GPU_PAGE_SIZE;
+			ib_size_alignment = 1;
+			break;
 		default:
 			return -EINVAL;
 		}
@@ -365,6 +380,9 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 			break;
 		case AMDGPU_HW_IP_VCE:
 			type = AMD_IP_BLOCK_TYPE_VCE;
+			break;
+		case AMDGPU_HW_IP_UVD_ENC:
+			type = AMD_IP_BLOCK_TYPE_UVD;
 			break;
 		default:
 			return -EINVAL;
@@ -548,6 +566,13 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 		dev_info.vce_harvest_config = adev->vce.harvest_config;
 		dev_info.gc_double_offchip_lds_buf =
 			adev->gfx.config.double_offchip_lds_buf;
+
+		if (amdgpu_ngg) {
+			dev_info.prim_buf_gpu_addr = adev->gfx.ngg.buf[PRIM].gpu_addr;
+			dev_info.pos_buf_gpu_addr = adev->gfx.ngg.buf[POS].gpu_addr;
+			dev_info.cntl_sb_buf_gpu_addr = adev->gfx.ngg.buf[CNTL].gpu_addr;
+			dev_info.param_buf_gpu_addr = adev->gfx.ngg.buf[PARAM].gpu_addr;
+		}
 
 		return copy_to_user(out, &dev_info,
 				    min((size_t)size, sizeof(dev_info))) ? -EFAULT : 0;
@@ -1141,6 +1166,23 @@ static int amdgpu_debugfs_firmware_info(struct seq_file *m, void *data)
 		seq_printf(m, "MEC2 feature version: %u, firmware version: 0x%08x\n",
 			   fw_info.feature, fw_info.ver);
 	}
+
+	/* PSP SOS */
+	query_fw.fw_type = AMDGPU_INFO_FW_SOS;
+	ret = amdgpu_firmware_info(&fw_info, &query_fw, adev);
+	if (ret)
+		return ret;
+	seq_printf(m, "SOS feature version: %u, firmware version: 0x%08x\n",
+		   fw_info.feature, fw_info.ver);
+
+
+	/* PSP ASD */
+	query_fw.fw_type = AMDGPU_INFO_FW_ASD;
+	ret = amdgpu_firmware_info(&fw_info, &query_fw, adev);
+	if (ret)
+		return ret;
+	seq_printf(m, "ASD feature version: %u, firmware version: 0x%08x\n",
+		   fw_info.feature, fw_info.ver);
 
 	/* SMC */
 	query_fw.fw_type = AMDGPU_INFO_FW_SMC;

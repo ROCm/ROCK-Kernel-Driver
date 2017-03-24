@@ -787,7 +787,7 @@ int amdgpu_ttm_bind(struct ttm_buffer_object *bo, struct ttm_mem_reg *bo_mem)
 {
 	struct ttm_tt *ttm = bo->ttm;
 	struct amdgpu_ttm_tt *gtt = (void *)bo->ttm;
-	uint32_t flags;
+	uint64_t flags;
 	int r;
 
 	if (!ttm || amdgpu_ttm_is_bound(ttm))
@@ -1055,10 +1055,10 @@ bool amdgpu_ttm_tt_is_readonly(struct ttm_tt *ttm)
 	return !!(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY);
 }
 
-uint32_t amdgpu_ttm_tt_pte_flags(struct amdgpu_device *adev, struct ttm_tt *ttm,
+uint64_t amdgpu_ttm_tt_pte_flags(struct amdgpu_device *adev, struct ttm_tt *ttm,
 				 struct ttm_mem_reg *mem)
 {
-	uint32_t flags = 0;
+	uint64_t flags = 0;
 
 	if (mem && mem->mem_type != TTM_PL_SYSTEM)
 		flags |= AMDGPU_PTE_VALID;
@@ -1073,9 +1073,7 @@ uint32_t amdgpu_ttm_tt_pte_flags(struct amdgpu_device *adev, struct ttm_tt *ttm,
 	if (mem && mem->mem_type == AMDGPU_PL_DGMA_IMPORT)
 		flags |= AMDGPU_PTE_SYSTEM;
 
-	if (adev->asic_type >= CHIP_TONGA)
-		flags |= AMDGPU_PTE_EXECUTABLE;
-
+	flags |= adev->gart.gart_pte_flags;
 	flags |= AMDGPU_PTE_READABLE;
 
 	if (!amdgpu_ttm_tt_is_readonly(ttm))
@@ -1371,27 +1369,33 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	adev->gds.oa.gfx_partition_size = adev->gds.oa.gfx_partition_size << AMDGPU_OA_SHIFT;
 	adev->gds.oa.cs_partition_size = adev->gds.oa.cs_partition_size << AMDGPU_OA_SHIFT;
 	/* GDS Memory */
-	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_GDS,
-				adev->gds.mem.total_size >> PAGE_SHIFT);
-	if (r) {
-		DRM_ERROR("Failed initializing GDS heap.\n");
-		return r;
+	if (adev->gds.mem.total_size) {
+		r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_GDS,
+				   adev->gds.mem.total_size >> PAGE_SHIFT);
+		if (r) {
+			DRM_ERROR("Failed initializing GDS heap.\n");
+			return r;
+		}
 	}
 
 	/* GWS */
-	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_GWS,
-				adev->gds.gws.total_size >> PAGE_SHIFT);
-	if (r) {
-		DRM_ERROR("Failed initializing gws heap.\n");
-		return r;
+	if (adev->gds.gws.total_size) {
+		r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_GWS,
+				   adev->gds.gws.total_size >> PAGE_SHIFT);
+		if (r) {
+			DRM_ERROR("Failed initializing gws heap.\n");
+			return r;
+		}
 	}
 
 	/* OA */
-	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_OA,
-				adev->gds.oa.total_size >> PAGE_SHIFT);
-	if (r) {
-		DRM_ERROR("Failed initializing oa heap.\n");
-		return r;
+	if (adev->gds.oa.total_size) {
+		r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_OA,
+				   adev->gds.oa.total_size >> PAGE_SHIFT);
+		if (r) {
+			DRM_ERROR("Failed initializing oa heap.\n");
+			return r;
+		}
 	}
 
 	r = amdgpu_ttm_debugfs_init(adev);
@@ -1421,9 +1425,12 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 	amdgpu_direct_gma_fini(adev);
 	ttm_bo_clean_mm(&adev->mman.bdev, TTM_PL_VRAM);
 	ttm_bo_clean_mm(&adev->mman.bdev, TTM_PL_TT);
-	ttm_bo_clean_mm(&adev->mman.bdev, AMDGPU_PL_GDS);
-	ttm_bo_clean_mm(&adev->mman.bdev, AMDGPU_PL_GWS);
-	ttm_bo_clean_mm(&adev->mman.bdev, AMDGPU_PL_OA);
+	if (adev->gds.mem.total_size)
+		ttm_bo_clean_mm(&adev->mman.bdev, AMDGPU_PL_GDS);
+	if (adev->gds.gws.total_size)
+		ttm_bo_clean_mm(&adev->mman.bdev, AMDGPU_PL_GWS);
+	if (adev->gds.oa.total_size)
+		ttm_bo_clean_mm(&adev->mman.bdev, AMDGPU_PL_OA);
 	ttm_bo_device_release(&adev->mman.bdev);
 	amdgpu_gart_fini(adev);
 	amdgpu_ttm_global_fini(adev);

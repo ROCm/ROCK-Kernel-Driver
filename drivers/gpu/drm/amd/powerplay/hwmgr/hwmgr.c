@@ -106,6 +106,15 @@ int hwmgr_early_init(struct pp_instance *handle)
 		}
 		smu7_init_function_pointers(hwmgr);
 		break;
+	case AMDGPU_FAMILY_AI:
+		switch (hwmgr->chip_id) {
+		case CHIP_VEGA10:
+			vega10_hwmgr_init(hwmgr);
+			break;
+		default:
+			return -EINVAL;
+		}
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -797,6 +806,8 @@ int polaris_set_asic_special_caps(struct pp_hwmgr *hwmgr)
 
 int fiji_set_asic_special_caps(struct pp_hwmgr *hwmgr)
 {
+	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
+			PHM_PlatformCaps_PowerContainment);
 	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
 			PHM_PlatformCaps_SQRamping);
 	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,

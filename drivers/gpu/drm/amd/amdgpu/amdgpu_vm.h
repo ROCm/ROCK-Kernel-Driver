@@ -67,6 +67,10 @@ struct amdgpu_bo_list_entry;
 
 #define AMDGPU_PTE_PRT		(1ULL << 63)
 
+/* VEGA10 only */
+#define AMDGPU_PTE_MTYPE(a)    ((uint64_t)a << 57)
+#define AMDGPU_PTE_MTYPE_MASK	AMDGPU_PTE_MTYPE(3ULL)
+
 /* How to programm VM fault handling */
 #define AMDGPU_VM_FAULT_STOP_NEVER	0
 #define AMDGPU_VM_FAULT_STOP_FIRST	1
@@ -161,11 +165,6 @@ struct amdgpu_vm_manager {
 	atomic_t				vm_pte_next_ring;
 	/* client id counter */
 	atomic64_t				client_counter;
-	/* vm aperture */
-	u64					shared_aperture_start;
-	u64					shared_aperture_end;
-	u64					private_aperture_start;
-	u64					private_aperture_end;
 
 	/* prt support */
 	void (*enable_prt)(struct amdgpu_device *adev, bool value);
@@ -187,6 +186,9 @@ int amdgpu_vm_validate_pt_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 			      void *param);
 void amdgpu_vm_move_pt_bos_in_lru(struct amdgpu_device *adev,
 				  struct amdgpu_vm *vm);
+int amdgpu_vm_alloc_pts(struct amdgpu_device *adev,
+			struct amdgpu_vm *vm,
+			uint64_t saddr, uint64_t size);
 int amdgpu_vm_grab_id(struct amdgpu_vm *vm, struct amdgpu_ring *ring,
 		      struct amdgpu_sync *sync, struct fence *fence,
 		      struct amdgpu_job *job);
@@ -212,9 +214,16 @@ int amdgpu_vm_bo_map(struct amdgpu_device *adev,
 		     struct amdgpu_bo_va *bo_va,
 		     uint64_t addr, uint64_t offset,
 		     uint64_t size, uint64_t flags);
+int amdgpu_vm_bo_replace_map(struct amdgpu_device *adev,
+			     struct amdgpu_bo_va *bo_va,
+			     uint64_t addr, uint64_t offset,
+			     uint64_t size, uint64_t flags);
 int amdgpu_vm_bo_unmap(struct amdgpu_device *adev,
 		       struct amdgpu_bo_va *bo_va,
 		       uint64_t addr);
+int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
+				struct amdgpu_vm *vm,
+				uint64_t saddr, uint64_t size);
 void amdgpu_vm_bo_rmv(struct amdgpu_device *adev,
 		      struct amdgpu_bo_va *bo_va);
 

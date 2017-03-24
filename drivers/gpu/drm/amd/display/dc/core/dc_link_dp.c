@@ -921,8 +921,8 @@ static inline bool perform_link_training_int(
 	 * If the upstream DPTX and downstream DPRX both support TPS4,
 	 * TPS4 must be used instead of POST_LT_ADJ_REQ.
 	 */
-	if (link->dpcd_caps.max_ln_count.bits.POST_LT_ADJ_REQ_SUPPORTED != 1 &&
-		get_supported_tp(link) == HW_DP_TRAINING_PATTERN_4)
+	if (link->dpcd_caps.max_ln_count.bits.POST_LT_ADJ_REQ_SUPPORTED != 1 ||
+			get_supported_tp(link) == HW_DP_TRAINING_PATTERN_4)
 		return status;
 
 	if (status &&
@@ -1762,7 +1762,7 @@ bool dc_link_handle_hpd_rx_irq(const struct dc_link *dc_link)
 {
 	struct core_link *link = DC_LINK_TO_LINK(dc_link);
 	union hpd_irq_data hpd_irq_dpcd_data = {{{{0}}}};
-	union device_service_irq device_service_clear = {0};
+	union device_service_irq device_service_clear = { { 0 } };
 	enum dc_status result = DDC_RESULT_UNKNOWN;
 	bool status = false;
 	/* For use cases related to down stream connection status change,

@@ -5840,9 +5840,7 @@ static int ci_dpm_init_microcode(struct amdgpu_device *adev)
 
 out:
 	if (err) {
-		printk(KERN_ERR
-		       "cik_smc: Failed to load firmware \"%s\"\n",
-		       fw_name);
+		pr_err("cik_smc: Failed to load firmware \"%s\"\n", fw_name);
 		release_firmware(adev->pm.fw);
 		adev->pm.fw = NULL;
 	}
@@ -6286,11 +6284,13 @@ static int ci_dpm_sw_init(void *handle)
 	int ret;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-	ret = amdgpu_irq_add_id(adev, 230, &adev->pm.dpm.thermal.irq);
+	ret = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, 230,
+				&adev->pm.dpm.thermal.irq);
 	if (ret)
 		return ret;
 
-	ret = amdgpu_irq_add_id(adev, 231, &adev->pm.dpm.thermal.irq);
+	ret = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, 231,
+				&adev->pm.dpm.thermal.irq);
 	if (ret)
 		return ret;
 

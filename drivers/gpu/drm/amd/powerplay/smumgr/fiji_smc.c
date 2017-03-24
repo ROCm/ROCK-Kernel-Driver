@@ -1758,6 +1758,36 @@ static int fiji_save_default_power_profile(struct pp_hwmgr *hwmgr)
 
 	return 0;
 }
+
+static int fiji_setup_dpm_led_config(struct pp_hwmgr *hwmgr)
+{
+	pp_atomctrl_voltage_table param_led_dpm;
+	int result = 0;
+	u32 mask = 0;
+
+	result = atomctrl_get_voltage_table_v3(hwmgr,
+					       VOLTAGE_TYPE_LEDDPM, VOLTAGE_OBJ_GPIO_LUT,
+					       &param_led_dpm);
+	if (result == 0) {
+		int i, j;
+		u32 tmp = param_led_dpm.mask_low;
+
+		for (i = 0, j = 0; i < 32; i++) {
+			if (tmp & 1) {
+				mask |= (i << (8 * j));
+				if (++j >= 3)
+					break;
+			}
+			tmp >>= 1;
+		}
+	}
+	if (mask)
+		smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
+						    PPSMC_MSG_LedConfig,
+						    mask);
+	return 0;
+}
+
 /**
 * Initializes the SMC table and uploads it
 *
@@ -1972,6 +2002,10 @@ int fiji_init_smc_table(struct pp_hwmgr *hwmgr)
 	PP_ASSERT_WITH_CODE(0 == result,
 			"Failed to  populate PM fuses to SMC memory!", return result);
 
+	result = fiji_setup_dpm_led_config(hwmgr);
+	PP_ASSERT_WITH_CODE(0 == result,
+			    "Failed to setup dpm led config", return result);
+
 	fiji_save_default_power_profile(hwmgr);
 
 	return 0;
@@ -2171,7 +2205,7 @@ uint32_t fiji_get_offsetof(uint32_t type, uint32_t member)
 			return offsetof(SMU73_Discrete_DpmTable, LowSclkInterruptThreshold);
 		}
 	}
-	pr_warning("can't get the offset of type %x member %x\n", type, member);
+	pr_warn("can't get the offset of type %x member %x\n", type, member);
 	return 0;
 }
 
@@ -2196,7 +2230,7 @@ uint32_t fiji_get_mac_definition(uint32_t value)
 		return SMU73_MAX_LEVELS_MVDD;
 	}
 
-	pr_warning("can't get the mac of %x\n", value);
+	pr_warn("can't get the mac of %x\n", value);
 	return 0;
 }
 

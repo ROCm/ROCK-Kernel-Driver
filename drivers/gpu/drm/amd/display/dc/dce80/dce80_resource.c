@@ -780,7 +780,7 @@ static enum dc_status validate_mapped_resource(
 	return DC_OK;
 }
 
-enum dc_status dce80_validate_bandwidth(
+bool dce80_validate_bandwidth(
 	const struct core_dc *dc,
 	struct validate_context *context)
 {
@@ -788,7 +788,7 @@ enum dc_status dce80_validate_bandwidth(
 	context->dispclk_khz = 681000;
 	context->bw_results.required_yclk = 250000 * MEMORY_TYPE_MULTIPLIER;
 
-	return DC_OK;
+	return true;
 }
 
 static bool dce80_validate_surface_sets(
@@ -805,9 +805,9 @@ static bool dce80_validate_surface_sets(
 			return false;
 
 		if (set[i].surfaces[0]->clip_rect.width
-				!= set[i].stream->src.width
+				> set[i].stream->src.width
 				|| set[i].surfaces[0]->clip_rect.height
-				!= set[i].stream->src.height)
+				> set[i].stream->src.height)
 			return false;
 		if (set[i].surfaces[0]->format
 				>= SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)

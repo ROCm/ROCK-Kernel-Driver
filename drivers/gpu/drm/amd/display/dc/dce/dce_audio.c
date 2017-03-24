@@ -773,6 +773,15 @@ void dce_aud_wall_dto_setup(
 			crtc_info->calculated_pixel_clock,
 			&clock_info);
 
+		dm_logger_write(audio->ctx->logger, LOG_HW_AUDIO,\
+				"\n%s:Input::requested_pixel_clock = %d"\
+				"calculated_pixel_clock =%d\n"\
+				"audio_dto_module = %d audio_dto_phase =%d \n\n", __func__,\
+				crtc_info->requested_pixel_clock,\
+				crtc_info->calculated_pixel_clock,\
+				clock_info.audio_dto_module,\
+				clock_info.audio_dto_phase);
+
 		/* On TN/SI, Program DTO source select and DTO select before
 		programming DTO modulo and DTO phase. These bits must be
 		programmed first, otherwise there will be no HDMI audio at boot
@@ -828,11 +837,9 @@ void dce_aud_wall_dto_setup(
 		REG_UPDATE(DCCG_AUDIO_DTO1_PHASE,
 				DCCG_AUDIO_DTO1_PHASE, clock_info.audio_dto_phase);
 
-		/* DAL2 code separate DCCG_AUDIO_DTO_SEL and
-		DCCG_AUDIO_DTO2_USE_512FBR_DTO programming into two different
-		location. merge together should not hurt */
-		/*value.bits.DCCG_AUDIO_DTO2_USE_512FBR_DTO = 1;
-		dal_write_reg(mmDCCG_AUDIO_DTO_SOURCE, value);*/
+		REG_UPDATE(DCCG_AUDIO_DTO_SOURCE,
+				DCCG_AUDIO_DTO2_USE_512FBR_DTO, 1);
+
 	}
 }
 

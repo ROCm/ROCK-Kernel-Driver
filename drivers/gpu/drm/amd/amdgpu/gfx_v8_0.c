@@ -1040,7 +1040,7 @@ static int gfx_v8_0_init_microcode(struct amdgpu_device *adev)
 		}
 	}
 
-	if (adev->firmware.smu_load) {
+	if (adev->firmware.load_type == AMDGPU_FW_LOAD_SMU) {
 		info = &adev->firmware.ucode[AMDGPU_UCODE_ID_CP_PFP];
 		info->ucode_id = AMDGPU_UCODE_ID_CP_PFP;
 		info->fw = adev->gfx.pfp_fw;
@@ -2073,22 +2073,24 @@ static int gfx_v8_0_sw_init(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
 	/* KIQ event */
-	r = amdgpu_irq_add_id(adev, 178, &adev->gfx.kiq.irq);
+	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, 178, &adev->gfx.kiq.irq);
 	if (r)
 		return r;
 
 	/* EOP Event */
-	r = amdgpu_irq_add_id(adev, 181, &adev->gfx.eop_irq);
+	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, 181, &adev->gfx.eop_irq);
 	if (r)
 		return r;
 
 	/* Privileged reg */
-	r = amdgpu_irq_add_id(adev, 184, &adev->gfx.priv_reg_irq);
+	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, 184,
+			      &adev->gfx.priv_reg_irq);
 	if (r)
 		return r;
 
 	/* Privileged inst */
-	r = amdgpu_irq_add_id(adev, 185, &adev->gfx.priv_inst_irq);
+	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, 185,
+			      &adev->gfx.priv_inst_irq);
 	if (r)
 		return r;
 
@@ -3897,7 +3899,7 @@ static void gfx_v8_0_gpu_init(struct amdgpu_device *adev)
 			tmp = REG_SET_FIELD(tmp, SH_MEM_CONFIG, ALIGNMENT_MODE,
 					    SH_MEM_ALIGNMENT_MODE_UNALIGNED);
 			WREG32(mmSH_MEM_CONFIG, tmp);
-			tmp = adev->vm_manager.shared_aperture_start >> 48;
+			tmp = adev->mc.shared_aperture_start >> 48;
 			WREG32(mmSH_MEM_BASES, tmp);
 		}
 
@@ -4244,7 +4246,7 @@ static int gfx_v8_0_rlc_resume(struct amdgpu_device *adev)
 	gfx_v8_0_init_pg(adev);
 
 	if (!adev->pp_enabled) {
-		if (!adev->firmware.smu_load) {
+		if (adev->firmware.load_type != AMDGPU_FW_LOAD_SMU) {
 			/* legacy rlc firmware loading */
 			r = gfx_v8_0_rlc_load_microcode(adev);
 			if (r)
@@ -4490,7 +4492,7 @@ static int gfx_v8_0_cp_gfx_resume(struct amdgpu_device *adev)
 	/* Initialize the ring buffer's read and write pointers */
 	WREG32(mmCP_RB0_CNTL, tmp | CP_RB0_CNTL__RB_RPTR_WR_ENA_MASK);
 	ring->wptr = 0;
-	WREG32(mmCP_RB0_WPTR, ring->wptr);
+	WREG32(mmCP_RB0_WPTR, lower_32_bits(ring->wptr));
 
 	/* set the wb address wether it's enabled or not */
 	rptr_addr = adev->wb.gpu_addr + (ring->rptr_offs * 4);
@@ -5204,7 +5206,7 @@ static int gfx_v8_0_cp_compute_resume(struct amdgpu_device *adev)
 
 		/* reset read and write pointers, similar to CP_RB0_WPTR/_RPTR */
 		ring->wptr = 0;
-		mqd->cp_hqd_pq_wptr = ring->wptr;
+		mqd->cp_hqd_pq_wptr = lower_32_bits(ring->wptr);
 		WREG32(mmCP_HQD_PQ_WPTR, mqd->cp_hqd_pq_wptr);
 		mqd->cp_hqd_pq_rptr = RREG32(mmCP_HQD_PQ_RPTR);
 
@@ -5264,7 +5266,7 @@ static int gfx_v8_0_cp_resume(struct amdgpu_device *adev)
 		gfx_v8_0_enable_gui_idle_interrupt(adev, false);
 
 	if (!adev->pp_enabled) {
-		if (!adev->firmware.smu_load) {
+		if (adev->firmware.load_type != AMDGPU_FW_LOAD_SMU) {
 			/* legacy firmware loading */
 			r = gfx_v8_0_cp_gfx_load_microcode(adev);
 			if (r)
@@ -5857,7 +5859,7 @@ static int gfx_v8_0_set_powergating_state(void *handle,
 					  enum amd_powergating_state state)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	bool enable = (state == AMD_PG_STATE_GATE) ? true : false;
+	bool enable = (state == AMD_PG_STATE_GATE);
 
 	if (amdgpu_sriov_vf(adev))
 		return 0;
@@ -6443,7 +6445,7 @@ static int gfx_v8_0_set_clockgating_state(void *handle,
 	case CHIP_CARRIZO:
 	case CHIP_STONEY:
 		gfx_v8_0_update_gfx_clock_gating(adev,
-						 state == AMD_CG_STATE_GATE ? true : false);
+						 state == AMD_CG_STATE_GATE);
 		break;
 	case CHIP_TONGA:
 		gfx_v8_0_tonga_update_gfx_clock_gating(adev, state);
@@ -6458,12 +6460,12 @@ static int gfx_v8_0_set_clockgating_state(void *handle,
 	return 0;
 }
 
-static u32 gfx_v8_0_ring_get_rptr(struct amdgpu_ring *ring)
+static u64 gfx_v8_0_ring_get_rptr(struct amdgpu_ring *ring)
 {
 	return ring->adev->wb.wb[ring->rptr_offs];
 }
 
-static u32 gfx_v8_0_ring_get_wptr_gfx(struct amdgpu_ring *ring)
+static u64 gfx_v8_0_ring_get_wptr_gfx(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -6480,10 +6482,10 @@ static void gfx_v8_0_ring_set_wptr_gfx(struct amdgpu_ring *ring)
 
 	if (ring->use_doorbell) {
 		/* XXX check if swapping is necessary on BE */
-		adev->wb.wb[ring->wptr_offs] = ring->wptr;
-		WDOORBELL32(ring->doorbell_index, ring->wptr);
+		adev->wb.wb[ring->wptr_offs] = lower_32_bits(ring->wptr);
+		WDOORBELL32(ring->doorbell_index, lower_32_bits(ring->wptr));
 	} else {
-		WREG32(mmCP_RB0_WPTR, ring->wptr);
+		WREG32(mmCP_RB0_WPTR, lower_32_bits(ring->wptr));
 		(void)RREG32(mmCP_RB0_WPTR);
 	}
 }
@@ -6557,6 +6559,9 @@ static void gfx_v8_0_ring_emit_ib_gfx(struct amdgpu_ring *ring,
 		header = PACKET3(PACKET3_INDIRECT_BUFFER, 2);
 
 	control |= ib->length_dw | (vm_id << 24);
+
+	if (amdgpu_sriov_vf(ring->adev) && ib->flags & AMDGPU_IB_FLAG_PREEMPT)
+		control |= (1<<21);
 
 	amdgpu_ring_write(ring, header);
 	amdgpu_ring_write(ring,
@@ -6671,7 +6676,7 @@ static void gfx_v8_0_ring_emit_vm_flush(struct amdgpu_ring *ring,
 	}
 }
 
-static u32 gfx_v8_0_ring_get_wptr_compute(struct amdgpu_ring *ring)
+static u64 gfx_v8_0_ring_get_wptr_compute(struct amdgpu_ring *ring)
 {
 	return ring->adev->wb.wb[ring->wptr_offs];
 }
@@ -6681,8 +6686,8 @@ static void gfx_v8_0_ring_set_wptr_compute(struct amdgpu_ring *ring)
 	struct amdgpu_device *adev = ring->adev;
 
 	/* XXX check if swapping is necessary on BE */
-	adev->wb.wb[ring->wptr_offs] = ring->wptr;
-	WDOORBELL32(ring->doorbell_index, ring->wptr);
+	adev->wb.wb[ring->wptr_offs] = lower_32_bits(ring->wptr);
+	WDOORBELL32(ring->doorbell_index, lower_32_bits(ring->wptr));
 }
 
 static void gfx_v8_0_ring_emit_fence_compute(struct amdgpu_ring *ring,
@@ -7037,6 +7042,7 @@ static const struct amdgpu_ring_funcs gfx_v8_0_ring_funcs_gfx = {
 	.type = AMDGPU_RING_TYPE_GFX,
 	.align_mask = 0xff,
 	.nop = PACKET3(PACKET3_NOP, 0x3FFF),
+	.support_64bit_ptrs = false,
 	.get_rptr = gfx_v8_0_ring_get_rptr,
 	.get_wptr = gfx_v8_0_ring_get_wptr_gfx,
 	.set_wptr = gfx_v8_0_ring_set_wptr_gfx,
@@ -7069,6 +7075,7 @@ static const struct amdgpu_ring_funcs gfx_v8_0_ring_funcs_compute = {
 	.type = AMDGPU_RING_TYPE_COMPUTE,
 	.align_mask = 0xff,
 	.nop = PACKET3(PACKET3_NOP, 0x3FFF),
+	.support_64bit_ptrs = false,
 	.get_rptr = gfx_v8_0_ring_get_rptr,
 	.get_wptr = gfx_v8_0_ring_get_wptr_compute,
 	.set_wptr = gfx_v8_0_ring_set_wptr_compute,
@@ -7097,6 +7104,7 @@ static const struct amdgpu_ring_funcs gfx_v8_0_ring_funcs_kiq = {
 	.type = AMDGPU_RING_TYPE_KIQ,
 	.align_mask = 0xff,
 	.nop = PACKET3(PACKET3_NOP, 0x3FFF),
+	.support_64bit_ptrs = false,
 	.get_rptr = gfx_v8_0_ring_get_rptr,
 	.get_wptr = gfx_v8_0_ring_get_wptr_compute,
 	.set_wptr = gfx_v8_0_ring_set_wptr_compute,
@@ -7293,15 +7301,15 @@ static void gfx_v8_0_ring_emit_ce_meta_init(struct amdgpu_ring *ring, uint64_t c
 	uint64_t ce_payload_addr;
 	int cnt_ce;
 	static union {
-		struct amdgpu_ce_ib_state regular;
-		struct amdgpu_ce_ib_state_chained_ib chained;
+		struct vi_ce_ib_state regular;
+		struct vi_ce_ib_state_chained_ib chained;
 	} ce_payload = {};
 
 	if (ring->adev->virt.chained_ib_support) {
-		ce_payload_addr = csa_addr + offsetof(struct amdgpu_gfx_meta_data_chained_ib, ce_payload);
+		ce_payload_addr = csa_addr + offsetof(struct vi_gfx_meta_data_chained_ib, ce_payload);
 		cnt_ce = (sizeof(ce_payload.chained) >> 2) + 4 - 2;
 	} else {
-		ce_payload_addr = csa_addr + offsetof(struct amdgpu_gfx_meta_data, ce_payload);
+		ce_payload_addr = csa_addr + offsetof(struct vi_gfx_meta_data, ce_payload);
 		cnt_ce = (sizeof(ce_payload.regular) >> 2) + 4 - 2;
 	}
 
@@ -7320,20 +7328,20 @@ static void gfx_v8_0_ring_emit_de_meta_init(struct amdgpu_ring *ring, uint64_t c
 	uint64_t de_payload_addr, gds_addr;
 	int cnt_de;
 	static union {
-		struct amdgpu_de_ib_state regular;
-		struct amdgpu_de_ib_state_chained_ib chained;
+		struct vi_de_ib_state regular;
+		struct vi_de_ib_state_chained_ib chained;
 	} de_payload = {};
 
 	gds_addr = csa_addr + 4096;
 	if (ring->adev->virt.chained_ib_support) {
 		de_payload.chained.gds_backup_addrlo = lower_32_bits(gds_addr);
 		de_payload.chained.gds_backup_addrhi = upper_32_bits(gds_addr);
-		de_payload_addr = csa_addr + offsetof(struct amdgpu_gfx_meta_data_chained_ib, de_payload);
+		de_payload_addr = csa_addr + offsetof(struct vi_gfx_meta_data_chained_ib, de_payload);
 		cnt_de = (sizeof(de_payload.chained) >> 2) + 4 - 2;
 	} else {
 		de_payload.regular.gds_backup_addrlo = lower_32_bits(gds_addr);
 		de_payload.regular.gds_backup_addrhi = upper_32_bits(gds_addr);
-		de_payload_addr = csa_addr + offsetof(struct amdgpu_gfx_meta_data, de_payload);
+		de_payload_addr = csa_addr + offsetof(struct vi_gfx_meta_data, de_payload);
 		cnt_de = (sizeof(de_payload.regular) >> 2) + 4 - 2;
 	}
 

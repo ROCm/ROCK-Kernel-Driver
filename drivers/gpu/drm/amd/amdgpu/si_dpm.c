@@ -3464,6 +3464,16 @@ static void si_apply_state_adjust_rules(struct amdgpu_device *adev,
 		    (adev->pdev->device == 0x6667)) {
 			max_sclk = 75000;
 		}
+	} else if (adev->asic_type == CHIP_OLAND) {
+		if ((adev->pdev->revision == 0xC7) ||
+		    (adev->pdev->revision == 0x80) ||
+		    (adev->pdev->revision == 0x81) ||
+		    (adev->pdev->revision == 0x83) ||
+		    (adev->pdev->revision == 0x87) ||
+		    (adev->pdev->device == 0x6604) ||
+		    (adev->pdev->device == 0x6605)) {
+			max_sclk = 75000;
+		}
 	}
 
 	if (rps->vce_active) {
@@ -7690,11 +7700,11 @@ static int si_dpm_sw_init(void *handle)
 	int ret;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-	ret = amdgpu_irq_add_id(adev, 230, &adev->pm.dpm.thermal.irq);
+	ret = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, 230, &adev->pm.dpm.thermal.irq);
 	if (ret)
 		return ret;
 
-	ret = amdgpu_irq_add_id(adev, 231, &adev->pm.dpm.thermal.irq);
+	ret = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, 231, &adev->pm.dpm.thermal.irq);
 	if (ret)
 		return ret;
 

@@ -80,6 +80,18 @@ static struct state_dependent_clocks dce112_max_clks_by_state[] = {
 /*ClocksStatePerformance*/
 { .display_clk_khz = 1132000, .pixel_clk_khz = 600000 } };
 
+static struct state_dependent_clocks dce120_max_clks_by_state[] = {
+/*ClocksStateInvalid - should not be used*/
+{ .display_clk_khz = 0, .pixel_clk_khz = 0 },
+/*ClocksStateUltraLow - currently by HW design team not supposed to be used*/
+{ .display_clk_khz = 0, .pixel_clk_khz = 0 },
+/*ClocksStateLow*/
+{ .display_clk_khz = 460000, .pixel_clk_khz = 400000 },
+/*ClocksStateNominal*/
+{ .display_clk_khz = 670000, .pixel_clk_khz = 600000 },
+/*ClocksStatePerformance*/
+{ .display_clk_khz = 1133000, .pixel_clk_khz = 600000 } };
+
 /* Starting point for each divider range.*/
 enum dce_divider_range_start {
 	DIVIDER_RANGE_01_START = 200, /* 2.00*/
@@ -387,14 +399,15 @@ static void dce112_set_clock(
 					CLOCK_SOURCE_COMBO_DISPLAY_PLL0);
 
 	bp->funcs->set_dce_clock(bp, &dce_clk_params);
+
 }
 
 static void dce_clock_read_integrated_info(struct dce_disp_clk *clk_dce)
 {
 	struct dc_debug *debug = &clk_dce->base.ctx->dc->debug;
 	struct dc_bios *bp = clk_dce->base.ctx->dc_bios;
-	struct integrated_info info = { 0 };
-	struct firmware_info fw_info = { 0 };
+	struct integrated_info info = { { { 0 } } };
+	struct firmware_info fw_info = { { 0 } };
 	int i;
 
 	if (bp->integrated_info)
@@ -456,7 +469,7 @@ static void dce_clock_read_ss_info(struct dce_disp_clk *clk_dce)
 			bp, AS_SIGNAL_TYPE_GPU_PLL);
 
 	if (ss_info_num) {
-		struct spread_spectrum_info info = { 0 };
+		struct spread_spectrum_info info = { { 0 } };
 		enum bp_result result = bp->funcs->get_spread_spectrum_info(
 				bp, AS_SIGNAL_TYPE_GPU_PLL, 0, &info);
 
@@ -481,6 +494,101 @@ static void dce_clock_read_ss_info(struct dce_disp_clk *clk_dce)
 
 	}
 }
+
+static bool dce_apply_clock_voltage_request(
+	struct display_clock *clk,
+	enum dm_pp_clock_type clocks_type,
+	int clocks_in_khz,
+	bool pre_mode_set,
+	bool update_dp_phyclk)
+{
+	struct dm_pp_clock_for_voltage_req clock_voltage_req = {0};
+
+	switch (clocks_type) {
+	case DM_PP_CLOCK_TYPE_DISPLAY_CLK:
+	case DM_PP_CLOCK_TYPE_PIXELCLK:
+	case DM_PP_CLOCK_TYPE_DISPLAYPHYCLK:
+		break;
+	default:
+		BREAK_TO_DEBUGGER();
+		return false;
+	}
+
+	clock_voltage_req.clk_type = clocks_type;
+	clock_voltage_req.clocks_in_khz = clocks_in_khz;
+
+	/* to pplib */
+	if (pre_mode_set) {
+		switch (clocks_type) {
+		case DM_PP_CLOCK_TYPE_DISPLAY_CLK:
+			if (clocks_in_khz > clk->cur_clocks_value.dispclk_in_khz) {
+				dm_pp_apply_clock_for_voltage_request(
+						clk->ctx, &clock_voltage_req);
+				clk->cur_clocks_value.dispclk_notify_pplib_done = true;
+			} else
+				clk->cur_clocks_value.dispclk_notify_pplib_done = false;
+			/* no matter incrase or decrase clock, update current clock value */
+			clk->cur_clocks_value.dispclk_in_khz = clocks_in_khz;
+			break;
+		case DM_PP_CLOCK_TYPE_PIXELCLK:
+			if (clocks_in_khz > clk->cur_clocks_value.max_pixelclk_in_khz) {
+				dm_pp_apply_clock_for_voltage_request(
+						clk->ctx, &clock_voltage_req);
+				clk->cur_clocks_value.pixelclk_notify_pplib_done = true;
+			} else
+				clk->cur_clocks_value.pixelclk_notify_pplib_done = false;
+			/* no matter incrase or decrase clock, update current clock value */
+			clk->cur_clocks_value.max_pixelclk_in_khz = clocks_in_khz;
+			break;
+		case DM_PP_CLOCK_TYPE_DISPLAYPHYCLK:
+			if (clocks_in_khz > clk->cur_clocks_value.max_non_dp_phyclk_in_khz) {
+				dm_pp_apply_clock_for_voltage_request(
+						clk->ctx, &clock_voltage_req);
+				clk->cur_clocks_value.phyclk_notigy_pplib_done = true;
+			} else
+				clk->cur_clocks_value.phyclk_notigy_pplib_done = false;
+			/* no matter incrase or decrase clock, update current clock value */
+			clk->cur_clocks_value.max_non_dp_phyclk_in_khz = clocks_in_khz;
+			break;
+		default:
+			ASSERT(0);
+			break;
+		}
+	} else {
+		switch (clocks_type) {
+		case DM_PP_CLOCK_TYPE_DISPLAY_CLK:
+			if (!clk->cur_clocks_value.dispclk_notify_pplib_done)
+				dm_pp_apply_clock_for_voltage_request(
+						clk->ctx, &clock_voltage_req);
+			break;
+		case DM_PP_CLOCK_TYPE_PIXELCLK:
+			if (!clk->cur_clocks_value.pixelclk_notify_pplib_done)
+				dm_pp_apply_clock_for_voltage_request(
+						clk->ctx, &clock_voltage_req);
+			break;
+		case DM_PP_CLOCK_TYPE_DISPLAYPHYCLK:
+			if (!clk->cur_clocks_value.phyclk_notigy_pplib_done)
+				dm_pp_apply_clock_for_voltage_request(
+						clk->ctx, &clock_voltage_req);
+			break;
+		default:
+			ASSERT(0);
+			break;
+		}
+	}
+
+	if (update_dp_phyclk && (clocks_in_khz >
+	clk->cur_clocks_value.max_dp_phyclk_in_khz))
+		clk->cur_clocks_value.max_dp_phyclk_in_khz = clocks_in_khz;
+
+	return true;
+}
+
+static const struct display_clock_funcs dce120_funcs = {
+	.get_dp_ref_clk_frequency = dce_clocks_get_dp_ref_freq,
+	.apply_clock_voltage_request = dce_apply_clock_voltage_request,
+	.set_clock = dce112_set_clock
+};
 
 static const struct display_clock_funcs dce112_funcs = {
 	.get_dp_ref_clk_frequency = dce_clocks_get_dp_ref_freq,
@@ -618,6 +726,42 @@ struct display_clock *dce112_disp_clk_create(
 		clk_dce, ctx, regs, clk_shift, clk_mask);
 
 	clk_dce->base.funcs = &dce112_funcs;
+
+	return &clk_dce->base;
+}
+
+struct display_clock *dce120_disp_clk_create(
+		struct dc_context *ctx,
+		const struct dce_disp_clk_registers *regs,
+		const struct dce_disp_clk_shift *clk_shift,
+		const struct dce_disp_clk_mask *clk_mask)
+{
+	struct dce_disp_clk *clk_dce = dm_alloc(sizeof(*clk_dce));
+	struct dm_pp_clock_levels_with_voltage clk_level_info = {0};
+
+	if (clk_dce == NULL) {
+		BREAK_TO_DEBUGGER();
+		return NULL;
+	}
+
+	memcpy(clk_dce->max_clks_by_state,
+		dce120_max_clks_by_state,
+		sizeof(dce120_max_clks_by_state));
+
+	dce_disp_clk_construct(
+		clk_dce, ctx, regs, clk_shift, clk_mask);
+
+	clk_dce->base.funcs = &dce120_funcs;
+
+	/* new in dce120 */
+	if (!ctx->dc->debug.disable_pplib_clock_request  &&
+			dm_pp_get_clock_levels_by_type_with_voltage(
+			ctx, DM_PP_CLOCK_TYPE_DISPLAY_CLK, &clk_level_info)
+						&& clk_level_info.num_levels)
+		clk_dce->max_displ_clk_in_khz =
+			clk_level_info.data[clk_level_info.num_levels - 1].clocks_in_khz;
+	else
+		clk_dce->max_displ_clk_in_khz = 1133000;
 
 	return &clk_dce->base;
 }

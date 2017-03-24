@@ -44,6 +44,8 @@
 
 #include "dce110/hw_factory_dce110.h"
 
+#include "dce120/hw_factory_dce120.h"
+
 #include "diagnostics/hw_factory_diag.h"
 
 /*
@@ -71,6 +73,9 @@ bool dal_hw_factory_init(
 	case DCE_VERSION_11_0:
 	case DCE_VERSION_11_2:
 		dal_hw_factory_dce110_init(factory);
+		return true;
+	case DCE_VERSION_12_0:
+		dal_hw_factory_dce120_init(factory);
 		return true;
 	default:
 		ASSERT_CRITICAL(false);

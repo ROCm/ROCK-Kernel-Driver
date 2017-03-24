@@ -2,9 +2,6 @@
 #define AMDKCL_IO_H
 #include <linux/version.h>
 #include <linux/types.h>
-#include <linux/module.h>
-#include <asm/pat.h>
-#include <asm/pgtable_types.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
 

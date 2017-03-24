@@ -40,6 +40,7 @@
 #include "abm.h"
 #include "fixed31_32.h"
 #include "dpcd_defs.h"
+#include "dmcu.h"
 
 #include "dce/dce_11_0_d.h"
 #include "dce/dce_11_0_enum.h"
@@ -674,16 +675,15 @@ bool dc_link_detect(const struct dc_link *dc_link, bool boot)
 
 		sink_init_data.link = &link->public;
 		sink_init_data.sink_signal = sink_caps.signal;
-		sink_init_data.dongle_max_pix_clk =
-			sink_caps.max_hdmi_pixel_clock;
-		sink_init_data.converter_disable_audio =
-			converter_disable_audio;
 
 		dc_sink = dc_sink_create(&sink_init_data);
 		if (!dc_sink) {
 			DC_ERROR("Failed to create sink!\n");
 			return false;
 		}
+
+		dc_sink->dongle_max_pix_clk = sink_caps.max_hdmi_pixel_clock;
+		dc_sink->converter_disable_audio = converter_disable_audio;
 
 		sink = DC_SINK_TO_CORE(dc_sink);
 		link->public.local_sink = &sink->public;
@@ -927,7 +927,7 @@ static bool construct(
 {
 	uint8_t i;
 	struct gpio *hpd_gpio = NULL;
-	struct ddc_service_init_data ddc_service_init_data = { 0 };
+	struct ddc_service_init_data ddc_service_init_data = { { 0 } };
 	struct dc_context *dc_ctx = init_params->ctx;
 	struct encoder_init_data enc_init_data = { 0 };
 	struct integrated_info info = {{{ 0 }}};
@@ -1217,6 +1217,23 @@ static enum dc_status enable_link_dp(struct pipe_ctx *pipe_ctx)
 				pipe_ctx->dis_clk->funcs->set_min_clocks_state(
 					pipe_ctx->dis_clk, DM_PP_CLOCKS_STATE_NOMINAL);
 		} else {
+			uint32_t dp_phyclk_in_khz;
+			const struct clocks_value clocks_value =
+					pipe_ctx->dis_clk->cur_clocks_value;
+
+			/* 27mhz = 27000000hz= 27000khz */
+			dp_phyclk_in_khz = link_settings.link_rate * 27000;
+
+			if (((clocks_value.max_non_dp_phyclk_in_khz != 0) &&
+				(dp_phyclk_in_khz > clocks_value.max_non_dp_phyclk_in_khz)) ||
+				(dp_phyclk_in_khz > clocks_value.max_dp_phyclk_in_khz)) {
+				pipe_ctx->dis_clk->funcs->apply_clock_voltage_request(
+						pipe_ctx->dis_clk,
+						DM_PP_CLOCK_TYPE_DISPLAYPHYCLK,
+						dp_phyclk_in_khz,
+						false,
+						true);
+			}
 		}
 	}
 
@@ -1360,7 +1377,7 @@ enum dc_status dc_link_validate_mode_timing(
 		struct core_link *link,
 		const struct dc_crtc_timing *timing)
 {
-	uint32_t max_pix_clk = stream->sink->dongle_max_pix_clk;
+	uint32_t max_pix_clk = stream->sink->public.dongle_max_pix_clk;
 
 	/* A hack to avoid failing any modes for EDID override feature on
 	 * topology change such as lower quality cable for DP or different dongle
@@ -1433,28 +1450,33 @@ bool dc_link_set_backlight_level(const struct dc_link *dc_link, uint32_t level,
 bool dc_link_set_psr_enable(const struct dc_link *dc_link, bool enable)
 {
 	struct core_link *link = DC_LINK_TO_CORE(dc_link);
+	struct dc_context *ctx = link->ctx;
+	struct core_dc *core_dc = DC_TO_CORE(ctx->dc);
+	struct dmcu *dmcu = core_dc->res_pool->dmcu;
 
-	if (dc_link != NULL && dc_link->psr_caps.psr_version > 0)
-		link->link_enc->funcs->set_dmcu_psr_enable(link->link_enc,
-								enable);
+	if (dmcu != NULL && dc_link->psr_caps.psr_version > 0)
+		dmcu->funcs->set_psr_enable(dmcu, enable);
+
 	return true;
 }
 
 bool dc_link_setup_psr(const struct dc_link *dc_link,
 		const struct dc_stream *stream)
 {
-
 	struct core_link *link = DC_LINK_TO_CORE(dc_link);
 	struct dc_context *ctx = link->ctx;
 	struct core_dc *core_dc = DC_TO_CORE(ctx->dc);
+	struct dmcu *dmcu = core_dc->res_pool->dmcu;
 	struct core_stream *core_stream = DC_STREAM_TO_CORE(stream);
-	struct psr_dmcu_context psr_context = {0};
+	struct psr_context psr_context = {0};
 	int i;
 
 	psr_context.controllerId = CONTROLLER_ID_UNDEFINED;
 
 
-	if (dc_link != NULL && dc_link->psr_caps.psr_version > 0) {
+	if (dc_link != NULL &&
+		dmcu != NULL &&
+		dc_link->psr_caps.psr_version > 0) {
 		/* updateSinkPsrDpcdConfig*/
 		union dpcd_psr_configuration psr_configuration;
 
@@ -1552,8 +1574,7 @@ bool dc_link_setup_psr(const struct dc_link *dc_link,
 		 */
 		psr_context.frame_delay = 0;
 
-		link->link_enc->funcs->setup_dmcu_psr
-			(link->link_enc, &psr_context);
+		dmcu->funcs->setup_psr(dmcu, link, &psr_context);
 		return true;
 	} else
 		return false;

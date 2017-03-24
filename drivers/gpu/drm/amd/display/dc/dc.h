@@ -55,6 +55,7 @@ struct dc_caps {
 struct dc_dcc_surface_param {
 	enum surface_pixel_format format;
 	struct dc_size surface_size;
+	enum swizzle_mode_values swizzle_mode;
 	enum dc_scan_direction scan;
 };
 
@@ -143,6 +144,7 @@ struct dc_debug {
 	bool disable_stutter;
 	bool disable_dcc;
 	bool disable_dfs_bypass;
+	bool disable_pplib_clock_request;
 	bool disable_clock_gate;
 	bool disable_dmcu;
 	bool force_abm_enable;
@@ -155,6 +157,21 @@ struct dc {
 	struct dc_link_funcs link_funcs;
 	struct dc_config config;
 	struct dc_debug debug;
+};
+
+enum frame_buffer_mode {
+	FRAME_BUFFER_MODE_LOCAL_ONLY = 0,
+	FRAME_BUFFER_MODE_ZFB_ONLY,
+	FRAME_BUFFER_MODE_MIXED_ZFB_AND_LOCAL,
+} ;
+
+struct dchub_init_data {
+	bool dchub_initialzied;
+	bool dchub_info_valid;
+	int64_t zfb_phys_addr_base;
+	int64_t zfb_mc_base_addr;
+	uint64_t zfb_size_in_byte;
+	enum frame_buffer_mode fb_mode;
 };
 
 struct dc_init_data {
@@ -177,6 +194,8 @@ struct dc *dc_create(const struct dc_init_data *init_params);
 
 void dc_destroy(struct dc **dc);
 
+bool dc_init_dchub(struct dc *dc, struct dchub_init_data *dh_data);
+
 /*******************************************************************************
  * Surface Interfaces
  ******************************************************************************/
@@ -186,6 +205,7 @@ enum {
 };
 
 struct dc_hdr_static_metadata {
+	bool hdr_supported;
 	bool is_hdr;
 
 	/* display chromaticities and white point in units of 0.00001 */
@@ -207,6 +227,7 @@ struct dc_hdr_static_metadata {
 enum dc_transfer_func_type {
 	TF_TYPE_PREDEFINED,
 	TF_TYPE_DISTRIBUTED_POINTS,
+	TF_TYPE_BYPASS
 };
 
 struct dc_transfer_func_distributed_points {
@@ -377,6 +398,12 @@ bool dc_post_update_surfaces_to_stream(
 void dc_update_surfaces_for_stream(struct dc *dc, struct dc_surface_update *updates,
 		int surface_count, const struct dc_stream *stream);
 
+enum surface_update_type {
+	UPDATE_TYPE_FAST, /* super fast, safe to execute in isr */
+	UPDATE_TYPE_MED,  /* a lot of programming needed.  may need to alloc */
+	UPDATE_TYPE_FULL, /* may need to shuffle resources */
+};
+
 /*******************************************************************************
  * Stream Interfaces
  ******************************************************************************/
@@ -495,6 +522,12 @@ struct dc_stream_status {
 
 const struct dc_stream_status *dc_stream_get_status(
 	const struct dc_stream *dc_stream);
+
+enum surface_update_type dc_check_update_surfaces_for_stream(
+		struct dc *dc,
+		struct dc_surface_update *updates,
+		int surface_count,
+		const struct dc_stream_status *stream_status);
 
 /*******************************************************************************
  * Link Interfaces
@@ -639,6 +672,8 @@ struct dc_sink {
 	enum signal_type sink_signal;
 	struct dc_edid dc_edid; /* raw edid */
 	struct dc_edid_caps edid_caps; /* parse display caps */
+	uint32_t dongle_max_pix_clk;
+	bool converter_disable_audio;
 };
 
 void dc_sink_retain(const struct dc_sink *sink);
@@ -718,7 +753,16 @@ bool dc_write_dpcd(
 		uint32_t link_index,
 		uint32_t address,
 		const uint8_t *data,
-	uint32_t size);
+		uint32_t size);
+
+bool dc_query_ddc_data(
+		struct dc *dc,
+		uint32_t link_index,
+		uint32_t address,
+		uint8_t *write_buf,
+		uint32_t write_size,
+		uint8_t *read_buf,
+		uint32_t read_size);
 
 bool dc_submit_i2c(
 		struct dc *dc,

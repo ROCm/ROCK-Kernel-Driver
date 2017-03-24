@@ -245,9 +245,7 @@ static int gmc_v8_0_init_microcode(struct amdgpu_device *adev)
 
 out:
 	if (err) {
-		printk(KERN_ERR
-		       "mc: Failed to load firmware \"%s\"\n",
-		       fw_name);
+		pr_err("mc: Failed to load firmware \"%s\"\n", fw_name);
 		release_firmware(adev->mc.fw);
 		adev->mc.fw = NULL;
 	}
@@ -533,7 +531,7 @@ static int gmc_v8_0_gart_set_pte_pde(struct amdgpu_device *adev,
 				     void *cpu_pt_addr,
 				     uint32_t gpu_page_idx,
 				     uint64_t addr,
-				     uint32_t flags)
+				     uint64_t flags)
 {
 	void __iomem *ptr = (void *)cpu_pt_addr;
 	uint64_t value;
@@ -563,6 +561,23 @@ static int gmc_v8_0_gart_set_pte_pde(struct amdgpu_device *adev,
 	writeq(value, ptr + (gpu_page_idx * 8));
 
 	return 0;
+}
+
+static uint64_t gmc_v8_0_get_vm_pte_flags(struct amdgpu_device *adev,
+					  uint32_t flags)
+{
+	uint64_t pte_flag = 0;
+
+	if (flags & AMDGPU_VM_PAGE_EXECUTABLE)
+		pte_flag |= AMDGPU_PTE_EXECUTABLE;
+	if (flags & AMDGPU_VM_PAGE_READABLE)
+		pte_flag |= AMDGPU_PTE_READABLE;
+	if (flags & AMDGPU_VM_PAGE_WRITEABLE)
+		pte_flag |= AMDGPU_PTE_WRITEABLE;
+	if (flags & AMDGPU_VM_PAGE_PRT)
+		pte_flag |= AMDGPU_PTE_PRT;
+
+	return pte_flag;
 }
 
 /**
@@ -839,6 +854,7 @@ static int gmc_v8_0_gart_init(struct amdgpu_device *adev)
 	if (r)
 		return r;
 	adev->gart.table_size = adev->gart.num_gpu_pages * 8;
+	adev->gart.gart_pte_flags = AMDGPU_PTE_EXECUTABLE;
 	return amdgpu_gart_table_vram_alloc(adev);
 }
 
@@ -907,13 +923,6 @@ static int gmc_v8_0_vm_init(struct amdgpu_device *adev)
 	 * amdkfd will use VMIDs 8-15
 	 */
 	adev->vm_manager.num_ids = AMDGPU_NUM_OF_VMIDS;
-	adev->vm_manager.shared_aperture_start = 0x2000000000000000ULL;
-	adev->vm_manager.shared_aperture_end =
-		adev->vm_manager.shared_aperture_start + (4ULL << 30) - 1;
-	adev->vm_manager.private_aperture_start =
-		adev->vm_manager.shared_aperture_end + 1;
-	adev->vm_manager.private_aperture_end =
-		adev->vm_manager.private_aperture_start + (4ULL << 30) - 1;
 	amdgpu_vm_manager_init(adev);
 
 	/* base offset of vram pages */
@@ -996,6 +1005,14 @@ static int gmc_v8_0_early_init(void *handle)
 	gmc_v8_0_set_gart_funcs(adev);
 	gmc_v8_0_set_irq_funcs(adev);
 
+	adev->mc.shared_aperture_start = 0x2000000000000000ULL;
+	adev->mc.shared_aperture_end =
+		adev->mc.shared_aperture_start + (4ULL << 30) - 1;
+	adev->mc.private_aperture_start =
+		adev->mc.shared_aperture_end + 1;
+	adev->mc.private_aperture_end =
+		adev->mc.private_aperture_start + (4ULL << 30) - 1;
+
 	adev->vm_manager.enable_prt = &gmc_v8_0_enable_prt;
 	DRM_INFO("VM PRT is supported!\n");
 
@@ -1033,11 +1050,11 @@ static int gmc_v8_0_sw_init(void *handle)
 		adev->mc.vram_type = gmc_v8_0_convert_vram_type(tmp);
 	}
 
-	r = amdgpu_irq_add_id(adev, 146, &adev->mc.vm_fault);
+	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, 146, &adev->mc.vm_fault);
 	if (r)
 		return r;
 
-	r = amdgpu_irq_add_id(adev, 147, &adev->mc.vm_fault);
+	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_LEGACY, 147, &adev->mc.vm_fault);
 	if (r)
 		return r;
 
@@ -1064,12 +1081,12 @@ static int gmc_v8_0_sw_init(void *handle)
 	if (r) {
 		adev->need_dma32 = true;
 		dma_bits = 32;
-		printk(KERN_WARNING "amdgpu: No suitable DMA available.\n");
+		pr_warn("amdgpu: No suitable DMA available\n");
 	}
 	r = pci_set_consistent_dma_mask(adev->pdev, DMA_BIT_MASK(dma_bits));
 	if (r) {
 		pci_set_consistent_dma_mask(adev->pdev, DMA_BIT_MASK(32));
-		printk(KERN_WARNING "amdgpu: No coherent DMA available.\n");
+		pr_warn("amdgpu: No coherent DMA available\n");
 	}
 
 	r = gmc_v8_0_init_microcode(adev);
@@ -1353,7 +1370,7 @@ static int gmc_v8_0_process_interrupt(struct amdgpu_device *adev,
 
 	if (amdgpu_sriov_vf(adev)) {
 		dev_err(adev->dev, "GPU fault detected: %d 0x%08x\n",
-			entry->src_id, entry->src_data);
+			entry->src_id, entry->src_data[0]);
 		dev_err(adev->dev, " Can't decode VM fault info here on SRIOV VF\n");
 		return 0;
 	}
@@ -1372,7 +1389,7 @@ static int gmc_v8_0_process_interrupt(struct amdgpu_device *adev,
 
 	if (printk_ratelimit()) {
 		dev_err(adev->dev, "GPU fault detected: %d 0x%08x\n",
-			entry->src_id, entry->src_data);
+			entry->src_id, entry->src_data[0]);
 		dev_err(adev->dev, "  VM_CONTEXT1_PROTECTION_FAULT_ADDR   0x%08X\n",
 			addr);
 		dev_err(adev->dev, "  VM_CONTEXT1_PROTECTION_FAULT_STATUS 0x%08X\n",
@@ -1554,9 +1571,9 @@ static int gmc_v8_0_set_clockgating_state(void *handle,
 	switch (adev->asic_type) {
 	case CHIP_FIJI:
 		fiji_update_mc_medium_grain_clock_gating(adev,
-				state == AMD_CG_STATE_GATE ? true : false);
+				state == AMD_CG_STATE_GATE);
 		fiji_update_mc_light_sleep(adev,
-				state == AMD_CG_STATE_GATE ? true : false);
+				state == AMD_CG_STATE_GATE);
 		break;
 	default:
 		break;
@@ -1613,6 +1630,7 @@ static const struct amdgpu_gart_funcs gmc_v8_0_gart_funcs = {
 	.flush_gpu_tlb = gmc_v8_0_gart_flush_gpu_tlb,
 	.set_pte_pde = gmc_v8_0_gart_set_pte_pde,
 	.set_prt = gmc_v8_0_set_prt,
+	.get_vm_pte_flags = gmc_v8_0_get_vm_pte_flags
 };
 
 static const struct amdgpu_irq_src_funcs gmc_v8_0_irq_funcs = {

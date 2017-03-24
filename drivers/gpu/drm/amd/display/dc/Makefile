@@ -4,6 +4,7 @@
 
 DC_LIBS = basics bios calcs dce gpio i2caux irq virtual
 
+DC_LIBS += dce120
 DC_LIBS += dce112
 DC_LIBS += dce110
 DC_LIBS += dce100

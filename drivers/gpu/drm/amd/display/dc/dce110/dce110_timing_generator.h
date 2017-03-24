@@ -108,6 +108,7 @@ struct dce110_timing_generator {
 	uint32_t min_h_front_porch;
 	uint32_t min_h_back_porch;
 
+	/* DCE 12 */
 	uint32_t min_h_sync_width;
 	uint32_t min_v_sync_width;
 	uint32_t min_v_blank;

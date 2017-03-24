@@ -494,7 +494,7 @@ static void fill_plane_attributes_from_fb(
 
 	memset(&surface->tiling_info, 0, sizeof(surface->tiling_info));
 
-	/* Fill GFX8 params */
+	/* Fill GFX params */
 	if (AMDGPU_TILING_GET(tiling_flags, ARRAY_MODE) == DC_ARRAY_2D_TILED_THIN1)
 	{
 		unsigned bankw, bankh, mtaspect, tile_split, num_banks;
@@ -522,6 +522,24 @@ static void fill_plane_attributes_from_fb(
 
 	surface->tiling_info.gfx8.pipe_config =
 			AMDGPU_TILING_GET(tiling_flags, PIPE_CONFIG);
+
+	if (adev->asic_type == CHIP_VEGA10) {
+		/* Fill GFX9 params */
+		surface->tiling_info.gfx9.num_pipes =
+			adev->gfx.config.gb_addr_config_fields.num_pipes;
+		surface->tiling_info.gfx9.num_banks =
+			adev->gfx.config.gb_addr_config_fields.num_banks;
+		surface->tiling_info.gfx9.pipe_interleave =
+			adev->gfx.config.gb_addr_config_fields.pipe_interleave_size;
+		surface->tiling_info.gfx9.num_shader_engines =
+			adev->gfx.config.gb_addr_config_fields.num_se;
+		surface->tiling_info.gfx9.max_compressed_frags =
+			adev->gfx.config.gb_addr_config_fields.max_compress_frags;
+		surface->tiling_info.gfx9.swizzle =
+			AMDGPU_TILING_GET(tiling_flags, SWIZZLE_MODE);
+		surface->tiling_info.gfx9.shaderEnable = 1;
+	}
+
 
 	surface->plane_size.grph.surface_size.x = 0;
 	surface->plane_size.grph.surface_size.y = 0;
@@ -974,7 +992,7 @@ static void decide_crtc_timing_for_drm_display_mode(
 }
 
 static struct dc_stream *create_stream_for_sink(
-		const struct amdgpu_connector *aconnector,
+		struct amdgpu_connector *aconnector,
 		const struct drm_display_mode *drm_mode,
 		const struct dm_connector_state *dm_state)
 {
@@ -2118,8 +2136,9 @@ void amdgpu_dm_connector_init_helper(
 
 	aconnector->connector_id = link_index;
 	aconnector->dc_link = link;
-	aconnector->base.interlace_allowed = true;
-	aconnector->base.doublescan_allowed = true;
+	aconnector->base.interlace_allowed = false;
+	aconnector->base.doublescan_allowed = false;
+	aconnector->base.stereo_allowed = false;
 	aconnector->base.dpms = DRM_MODE_DPMS_OFF;
 	aconnector->hpd.hpd = AMDGPU_HPD_NONE; /* not used */
 
