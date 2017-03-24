@@ -239,6 +239,7 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x67FF, &polaris11_device_info },	/* Polaris11 */
 	{ 0x6860, &vega10_device_info },	/* Vega10 */
 	{ 0x6861, &vega10_device_info },	/* Vega10 */
+	{ 0x6862, &vega10_device_info },	/* Vega10 */
 	{ 0x6863, &vega10_device_info },	/* Vega10 */
 	{ 0x6867, &vega10_device_info },	/* Vega10 */
 	{ 0x686C, &vega10_device_info },	/* Vega10 */
