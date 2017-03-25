@@ -3484,31 +3484,6 @@ int vega10_enable_disable_vce_dpm(struct pp_hwmgr *hwmgr, bool enable)
 	return 0;
 }
 
-int vega10_update_vce_dpm(struct pp_hwmgr *hwmgr, const void *input)
-{
-	const struct phm_set_power_state_input *states =
-			(const struct phm_set_power_state_input *)input;
-	const struct vega10_power_state *vega10_nps =
-			cast_const_phw_vega10_power_state(states->pnew_state);
-	const struct vega10_power_state *vega10_cps =
-			cast_const_phw_vega10_power_state(states->pcurrent_state);
-	int result = 0;
-
-	if (!phm_cap_enabled(hwmgr->platform_descriptor.platformCaps,
-			PHM_PlatformCaps_VCEDPM))
-		return 0;
-
-	if (vega10_nps->vce_clks.evclk > 0 &&
-			(vega10_cps == NULL ||
-			vega10_cps->vce_clks.evclk == 0))
-		result = vega10_enable_disable_vce_dpm(hwmgr, true);
-	else if (!vega10_nps->vce_clks.evclk &&
-			(vega10_cps && vega10_cps->vce_clks.evclk))
-		result = vega10_enable_disable_vce_dpm(hwmgr, false);
-
-	return result;
-}
-
 static int vega10_update_sclk_threshold(struct pp_hwmgr *hwmgr)
 {
 	struct vega10_hwmgr *data =
@@ -3558,11 +3533,6 @@ static int vega10_set_power_state_tasks(struct pp_hwmgr *hwmgr,
 	tmp_result = vega10_generate_dpm_level_enable_mask(hwmgr, input);
 	PP_ASSERT_WITH_CODE(!tmp_result,
 			"Failed to generate DPM level enabled mask!",
-			result = tmp_result);
-
-	tmp_result = vega10_update_vce_dpm(hwmgr, input);
-	PP_ASSERT_WITH_CODE(!tmp_result,
-			"Failed to update VCE DPM!",
 			result = tmp_result);
 
 	tmp_result = vega10_update_sclk_threshold(hwmgr);
