@@ -1604,21 +1604,6 @@ static int vega10_populate_single_soc_level(struct pp_hwmgr *hwmgr,
 	return 0;
 }
 
-uint16_t vega10_locate_vddc_given_clock(struct pp_hwmgr *hwmgr,
-		uint32_t clk,
-		struct phm_ppt_v1_clock_voltage_dependency_table *dep_table)
-{
-	uint16_t i;
-
-	for (i = 0; i < dep_table->count; i++) {
-		if (dep_table->entries[i].clk == clk)
-			return dep_table->entries[i].vddc;
-	}
-
-	pr_info("[LocateVddcGivenClock] Cannot locate SOC Vddc for this clock!");
-	return 0;
-}
-
 /**
 * Populates all SMC SCLK levels' structure based on the trimmed allowed dpm engine clock states
 *
@@ -1630,8 +1615,8 @@ static int vega10_populate_all_graphic_levels(struct pp_hwmgr *hwmgr)
 			(struct vega10_hwmgr *)(hwmgr->backend);
 	struct phm_ppt_v2_information *table_info =
 			(struct phm_ppt_v2_information *)(hwmgr->pptable);
-	struct phm_ppt_v1_clock_voltage_dependency_table *dep_table =
-			table_info->vdd_dep_on_socclk;
+	struct phm_ppt_v1_voltage_lookup_table *lookup_table =
+			table_info->vddc_lookup_table;
 	PPTable_t *pp_table = &(data->smc_state_table.pp_table);
 	struct vega10_single_dpm_table *dpm_table = &(data->dpm_table.gfx_table);
 	int result = 0;
@@ -1660,11 +1645,11 @@ static int vega10_populate_all_graphic_levels(struct pp_hwmgr *hwmgr)
 
 	dpm_table = &(data->dpm_table.soc_table);
 	for (i = 0; i < dpm_table->count; i++) {
-		pp_table->SocVid[i] =
+		for (j = 0; j < lookup_table->count; j++) {
+			pp_table->SocVid[j] =
 				(uint8_t)convert_to_vid(
-				vega10_locate_vddc_given_clock(hwmgr,
-						dpm_table->dpm_levels[i].value,
-						dep_table));
+				lookup_table->entries[j].us_vdd);
+		}
 		result = vega10_populate_single_soc_level(hwmgr,
 				dpm_table->dpm_levels[i].value,
 				&(pp_table->SocclkDid[i]),
