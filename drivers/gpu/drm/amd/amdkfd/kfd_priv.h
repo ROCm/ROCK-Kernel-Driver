@@ -567,6 +567,7 @@ struct qcm_process_device {
 	uint64_t tba_addr;
 	uint64_t tma_addr;
 	void *cwsr_kaddr;
+	struct page *cwsr_pages;
 
 	/* IB memory */
 	uint64_t ib_base; /* ib_base+ib_size must be below cwsr_base */
