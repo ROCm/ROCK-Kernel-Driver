@@ -65,7 +65,8 @@ static bool event_interrupt_isr_v9(struct kfd_dev *dev,
 	     source_id == SOC15_INTSRC_SDMA_TRAP ||
 	     source_id == SOC15_INTSRC_SQ_INTERRUPT_MSG ||
 	     source_id == SOC15_INTSRC_CP_BAD_OPCODE ||
-	     client_id == SOC15_IH_CLIENTID_VMC)) {
+	     client_id == SOC15_IH_CLIENTID_VMC ||
+	     client_id == SOC15_IH_CLIENTID_UTCL2)) {
 
 		/*
 		 * KFD want to handle this INT, but MEC firmware did
@@ -108,19 +109,21 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 		kfd_signal_event_interrupt(pasid, 0, 0);  /*todo */
 	else if (source_id == SOC15_INTSRC_CP_BAD_OPCODE)
 		kfd_signal_hw_exception_event(pasid);
-	else if (client_id == SOC15_IH_CLIENTID_VMC) {
-		struct kfd_vm_fault_info info;
+	else if (client_id == SOC15_IH_CLIENTID_VMC ||
+		 client_id == SOC15_IH_CLIENTID_UTCL2) {
+		struct kfd_vm_fault_info info = {0};
+		uint16_t ring_id = SOC15_RING_ID_FROM_IH_ENTRY(ih_ring_entry);
 
-		memset(&info, 0, sizeof(info));
-		dev->kfd2kgd->get_vm_fault_info(dev->kgd, &info);
+		info.vmid = vmid;
+		info.mc_id = client_id;
+		info.page_addr = ih_ring_entry[4] |
+			(uint64_t)(ih_ring_entry[5] & 0xf) << 32;
+		info.prot_valid = ring_id & 0x08;
+		info.prot_read  = ring_id & 0x10;
+		info.prot_write = ring_id & 0x20;
+
 		kfd_process_vm_fault(dev->dqm, pasid);
-		if (!info.page_addr && !info.status)
-			return;
-
-		if (info.vmid == vmid)
-			kfd_signal_vm_fault_event(dev, pasid, &info);
-		else
-			kfd_signal_vm_fault_event(dev, pasid, NULL);
+		kfd_signal_vm_fault_event(dev, pasid, &info);
 	}
 }
 
