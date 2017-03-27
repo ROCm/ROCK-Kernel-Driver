@@ -234,7 +234,6 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 		mutex_destroy(&pm->lock);
 		return -ENOMEM;
 	}
-	pm->pmf = kzalloc(sizeof(struct packet_manager_funcs), GFP_KERNEL);
 	pm->allocated = false;
 
 	switch (pm->dqm->dev->device_info->asic_family) {
@@ -264,7 +263,6 @@ void pm_uninit(struct packet_manager *pm)
 
 	mutex_destroy(&pm->lock);
 	kernel_queue_uninit(pm->priv_queue);
-	kfree(pm->pmf);
 }
 
 int pm_send_set_resources(struct packet_manager *pm,
