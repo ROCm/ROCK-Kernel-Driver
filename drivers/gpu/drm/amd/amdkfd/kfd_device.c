@@ -268,7 +268,8 @@ static const struct kfd_device_info *lookup_device_info(unsigned short did)
 
 	for (i = 0; i < ARRAY_SIZE(supported_devices); i++) {
 		if (supported_devices[i].did == did) {
-			BUG_ON(!supported_devices[i].device_info);
+			WARN(!supported_devices[i].device_info,
+				"Cannot look up device info, Device Info is NULL");
 			return supported_devices[i].device_info;
 		}
 	}
@@ -297,8 +298,6 @@ struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 			return NULL;
 		}
 	}
-
-	BUG_ON(!f2g);
 
 	kfd = kzalloc(sizeof(*kfd), GFP_KERNEL);
 	if (!kfd)
@@ -389,7 +388,8 @@ static int iommu_invalid_ppr_cb(struct pci_dev *pdev, int pasid,
 			flags);
 
 	dev = kfd_device_by_pci_dev(pdev);
-	BUG_ON(!dev);
+	if (WARN_ON(!dev))
+		return -ENODEV;
 
 	kfd_signal_iommu_event(dev, pasid, address,
 			flags & PPR_FAULT_WRITE, flags & PPR_FAULT_EXEC);
@@ -622,8 +622,6 @@ void kgd2kfd_device_exit(struct kfd_dev *kfd)
 
 void kgd2kfd_suspend(struct kfd_dev *kfd)
 {
-	BUG_ON(!kfd);
-
 	if (!kfd->init_complete)
 		return;
 
@@ -643,8 +641,6 @@ void kgd2kfd_suspend(struct kfd_dev *kfd)
 
 int kgd2kfd_resume(struct kfd_dev *kfd)
 {
-	BUG_ON(!kfd);
-
 	if (!kfd->init_complete)
 		return 0;
 
@@ -991,17 +987,14 @@ static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,
 {
 	unsigned int num_of_bits;
 
-	BUG_ON(!kfd);
-	BUG_ON(!kfd->gtt_mem);
-	BUG_ON(buf_size < chunk_size);
-	BUG_ON(buf_size == 0);
-	BUG_ON(chunk_size == 0);
-
 	kfd->gtt_sa_chunk_size = chunk_size;
 	kfd->gtt_sa_num_of_chunks = buf_size / chunk_size;
 
 	num_of_bits = kfd->gtt_sa_num_of_chunks / BITS_PER_BYTE;
-	BUG_ON(num_of_bits == 0);
+	if (num_of_bits == 0) {
+		pr_err("Number of bits is 0 in %s", __func__);
+		return -EINVAL;
+	}
 
 	kfd->gtt_sa_bitmap = kzalloc(num_of_bits, GFP_KERNEL);
 
@@ -1041,8 +1034,6 @@ int kfd_gtt_sa_allocate(struct kfd_dev *kfd, unsigned int size,
 			struct kfd_mem_obj **mem_obj)
 {
 	unsigned int found, start_search, cur_size;
-
-	BUG_ON(!kfd);
 
 	if (size == 0)
 		return -EINVAL;
@@ -1147,8 +1138,6 @@ kfd_gtt_no_free_chunk:
 int kfd_gtt_sa_free(struct kfd_dev *kfd, struct kfd_mem_obj *mem_obj)
 {
 	unsigned int bit;
-
-	BUG_ON(!kfd);
 
 	/* Act like kfree when trying to free a NULL object */
 	if (!mem_obj)

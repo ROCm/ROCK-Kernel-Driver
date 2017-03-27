@@ -120,9 +120,6 @@ static struct kfd_gpu_cache_info carrizo_cache_info[] = {
 static void kfd_populated_cu_info_cpu(struct kfd_topology_device *dev,
 		struct crat_subtype_computeunit *cu)
 {
-	BUG_ON(!dev);
-	BUG_ON(!cu);
-
 	dev->node_props.cpu_cores_count = cu->num_cpu_cores;
 	dev->node_props.cpu_core_id_base = cu->processor_id_low;
 	if (cu->hsa_capability & CRAT_CU_FLAGS_IOMMU_PRESENT)
@@ -135,9 +132,6 @@ static void kfd_populated_cu_info_cpu(struct kfd_topology_device *dev,
 static void kfd_populated_cu_info_gpu(struct kfd_topology_device *dev,
 		struct crat_subtype_computeunit *cu)
 {
-	BUG_ON(!dev);
-	BUG_ON(!cu);
-
 	dev->node_props.simd_id_base = cu->processor_id_low;
 	dev->node_props.simd_count = cu->num_simd_cores;
 	dev->node_props.lds_size_in_kb = cu->lds_size_in_kb;
@@ -159,8 +153,6 @@ static int kfd_parse_subtype_cu(struct crat_subtype_computeunit *cu,
 				struct list_head *device_list)
 {
 	struct kfd_topology_device *dev;
-
-	BUG_ON(!cu);
 
 	pr_debug("Found CU entry in CRAT table with proximity_domain=%d caps=%x\n",
 			cu->proximity_domain, cu->hsa_capability);
@@ -186,8 +178,6 @@ static int kfd_parse_subtype_mem(struct crat_subtype_memory *mem,
 {
 	struct kfd_mem_properties *props;
 	struct kfd_topology_device *dev;
-
-	BUG_ON(!mem);
 
 	pr_debug("Found memory entry in CRAT table with proximity_domain=%d\n",
 			mem->proximity_domain);
@@ -239,8 +229,6 @@ static int kfd_parse_subtype_cache(struct crat_subtype_cache *cache,
 	struct kfd_topology_device *dev;
 	uint32_t id;
 	uint32_t total_num_of_cu;
-
-	BUG_ON(!cache);
 
 	id = cache->processor_id_low;
 
@@ -306,8 +294,6 @@ static int kfd_parse_subtype_iolink(struct crat_subtype_iolink *iolink,
 	struct kfd_topology_device *dev, *cpu_dev;
 	uint32_t id_from;
 	uint32_t id_to;
-
-	BUG_ON(!iolink);
 
 	id_from = iolink->proximity_domain_from;
 	id_to = iolink->proximity_domain_to;
@@ -380,8 +366,6 @@ static int kfd_parse_subtype(struct crat_subtype_generic *sub_type_hdr,
 	struct crat_subtype_cache *cache;
 	struct crat_subtype_iolink *iolink;
 	int ret = 0;
-
-	BUG_ON(!sub_type_hdr);
 
 	switch (sub_type_hdr->type) {
 	case CRAT_SUBTYPE_COMPUTEUNIT_AFFINITY:

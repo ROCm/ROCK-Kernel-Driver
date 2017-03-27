@@ -251,10 +251,6 @@ int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 	uint64_t gpu_addr_tmp = 0;
 	void *cpu_ptr_tmp = NULL;
 
-	BUG_ON(kgd == NULL);
-	BUG_ON(gpu_addr == NULL);
-	BUG_ON(cpu_ptr == NULL);
-
 	r = amdgpu_bo_create(rdev, size, PAGE_SIZE, true, AMDGPU_GEM_DOMAIN_GTT,
 			AMDGPU_GEM_CREATE_CPU_GTT_USWC, NULL, NULL, &bo);
 	if (r) {
@@ -306,8 +302,6 @@ void free_gtt_mem(struct kgd_dev *kgd, void *mem_obj)
 {
 	struct amdgpu_bo *bo = (struct amdgpu_bo *) mem_obj;
 
-	BUG_ON(bo == NULL);
-
 	amdgpu_bo_reserve(bo, true);
 	amdgpu_bo_kunmap(bo);
 	amdgpu_bo_unpin(bo);
@@ -321,8 +315,6 @@ void get_local_mem_info(struct kgd_dev *kgd,
 	uint64_t address_mask;
 	resource_size_t aper_limit;
 	struct amdgpu_device *rdev = (struct amdgpu_device *)kgd;
-
-	BUG_ON(kgd == NULL);
 
 	address_mask = ~((1UL << 40) - 1);
 	aper_limit = rdev->mc.aper_base + rdev->mc.aper_size;

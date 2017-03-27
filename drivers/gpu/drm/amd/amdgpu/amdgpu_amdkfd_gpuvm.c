@@ -350,7 +350,10 @@ static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
 	if (!bo_va_entry)
 		return -ENOMEM;
 
-	BUG_ON(va == 0);
+	if (!va) {
+		pr_err("Invalid VA when adding BO to VM\n");
+		return -EINVAL;
+	}
 
 	pr_debug("\t add VA 0x%llx - 0x%llx to vm %p\n", va,
 			va + bo_size, avm);
@@ -608,11 +611,6 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	u32 alloc_domain;
 	uint32_t mapping_flags;
 	struct amdkfd_vm *kfd_vm = (struct amdkfd_vm *)vm;
-
-	BUG_ON(kgd == NULL);
-	BUG_ON(size == 0);
-	BUG_ON(mem == NULL);
-	BUG_ON(kfd_vm == NULL);
 
 	if (aql_queue)
 		size = size >> 1;
@@ -1140,10 +1138,6 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	struct amdkfd_process_info *process_info;
 	unsigned long bo_size;
 
-	BUG_ON(kgd == NULL);
-	BUG_ON(mem == NULL);
-	BUG_ON(vm == NULL);
-
 	adev = get_amdgpu_device(kgd);
 	process_info = ((struct amdkfd_vm *)vm)->process_info;
 
@@ -1233,9 +1227,6 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	unsigned long bo_size;
 	bool is_invalid_userptr;
 
-	BUG_ON(kgd == NULL);
-	BUG_ON(mem == NULL);
-
 	adev = get_amdgpu_device(kgd);
 
 	/* Make sure restore is not running concurrently. Since we
@@ -1256,7 +1247,10 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 
 	bo = mem->bo;
 
-	BUG_ON(bo == NULL);
+	if (!bo) {
+		pr_err("Invalid BO when mapping memory to GPU\n");
+		return -EINVAL;
+	}
 
 	domain = mem->domain;
 	bo_size = bo->tbo.mem.size;
@@ -1377,9 +1371,6 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 	struct amdkfd_process_info *info;
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 
-	BUG_ON(kgd == NULL);
-	BUG_ON(vm == NULL);
-
 	new_vm = kzalloc(sizeof(*new_vm), GFP_KERNEL);
 	if (new_vm == NULL)
 		return -ENOMEM;
@@ -1456,8 +1447,8 @@ void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 	struct amdgpu_bo *pd;
 	struct amdkfd_process_info *process_info;
 
-	BUG_ON(kgd == NULL);
-	BUG_ON(vm == NULL);
+	if (WARN_ON(!kgd || !vm))
+		return;
 
 	pr_debug("Destroying process vm %p\n", vm);
 	/* Release eviction fence from PD */
@@ -1500,7 +1491,6 @@ int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
 {
 	struct amdgpu_device *adev;
 
-	BUG_ON(kgd == NULL);
 	adev = (struct amdgpu_device *) kgd;
 	if (atomic_read(&adev->mc.vm_fault_info_updated) == 1) {
 		*mem = *adev->mc.vm_fault_info;
@@ -1533,9 +1523,6 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 	struct bo_vm_reservation_context ctx;
 	struct amdkfd_process_info *process_info;
 	unsigned long bo_size;
-
-	BUG_ON(kgd == NULL);
-	BUG_ON(mem == NULL);
 
 	adev = (struct amdgpu_device *) kgd;
 	process_info = ((struct amdkfd_vm *)vm)->process_info;
@@ -1618,7 +1605,10 @@ int amdgpu_amdkfd_gpuvm_mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma)
 	struct amdgpu_device *adev;
 
 	adev = get_amdgpu_device(kgd);
-	BUG_ON(!adev);
+	if (!adev) {
+		pr_err("Could not get amdgpu device in %s\n", __func__);
+		return -ENODEV;
+	}
 
 	return amdgpu_bo_mmap(NULL, vma, &adev->mman.bdev);
 }
@@ -2234,9 +2224,6 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 	struct amdgpu_amdkfd_fence *old_fence;
 	int ret = 0, i;
 	struct list_head duplicate_save;
-
-	if (WARN_ON(!process_info))
-		return -EINVAL;
 
 	INIT_LIST_HEAD(&duplicate_save);
 	INIT_LIST_HEAD(&ctx.list);

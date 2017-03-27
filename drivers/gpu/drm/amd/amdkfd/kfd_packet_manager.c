@@ -33,7 +33,8 @@ static inline void inc_wptr(unsigned int *wptr, unsigned int increment_bytes,
 {
 	unsigned int temp = *wptr + increment_bytes / sizeof(uint32_t);
 
-	BUG_ON((temp * sizeof(uint32_t)) > buffer_size_bytes);
+	WARN_ON((temp * sizeof(uint32_t)) > buffer_size_bytes);
+
 	*wptr = temp;
 }
 
@@ -46,8 +47,6 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 	unsigned int max_proc_per_quantum = 1;
 
 	struct kfd_dev	*dev = pm->dqm->dev;
-
-	BUG_ON(!pm || !rlib_size || !over_subscription || !dev);
 
 	process_count = pm->dqm->processes_count;
 	queue_count = pm->dqm->queue_count;
@@ -94,10 +93,6 @@ static int pm_allocate_runlist_ib(struct packet_manager *pm,
 {
 	int retval;
 
-	BUG_ON(!pm);
-	BUG_ON(pm->allocated);
-	BUG_ON(!is_over_subscription);
-
 	pm_calc_rlib_size(pm, rl_buffer_size, is_over_subscription);
 
 	mutex_lock(&pm->lock);
@@ -134,8 +129,6 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 	struct queue *q;
 	struct kernel_queue *kq;
 	bool is_over_subscription = false;
-
-	BUG_ON(!pm || !queues || !rl_size_bytes || !rl_gpu_addr);
 
 	rl_wptr = retval = proccesses_mapped = 0;
 
@@ -224,8 +217,6 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 		uint16_t fw_ver)
 {
-	BUG_ON(!dqm);
-
 	pm->dqm = dqm;
 	mutex_init(&pm->lock);
 	pm->priv_queue = kernel_queue_init(dqm->dev, KFD_QUEUE_TYPE_HIQ);
@@ -258,8 +249,6 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 
 void pm_uninit(struct packet_manager *pm)
 {
-	BUG_ON(!pm);
-
 	mutex_destroy(&pm->lock);
 	kernel_queue_uninit(pm->priv_queue);
 }
@@ -295,8 +284,6 @@ int pm_send_runlist(struct packet_manager *pm, struct list_head *dqm_queues)
 	uint32_t *rl_buffer;
 	size_t rl_ib_size, packet_size_dwords;
 	int retval;
-
-	BUG_ON(!pm || !dqm_queues);
 
 	retval = pm_create_runlist_ib(pm, dqm_queues, &rl_gpu_ib_addr,
 					&rl_ib_size);
@@ -386,8 +373,6 @@ out:
 
 void pm_release_ib(struct packet_manager *pm)
 {
-	BUG_ON(!pm);
-
 	mutex_lock(&pm->lock);
 	if (pm->allocated) {
 		kfd_gtt_sa_free(pm->dqm->dev, pm->ib_buffer_obj);

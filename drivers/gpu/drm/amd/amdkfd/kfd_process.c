@@ -188,8 +188,6 @@ struct kfd_process *kfd_create_process(struct file *filep)
 
 	struct task_struct *thread = current;
 
-	BUG_ON(!kfd_process_wq);
-
 	if (!thread->mm)
 		return ERR_PTR(-EINVAL);
 
@@ -380,7 +378,8 @@ static void kfd_process_ref_release(struct kref *ref)
 {
 	struct kfd_process *p = container_of(ref, struct kfd_process, ref);
 
-	BUG_ON(!kfd_process_wq);
+	if (WARN_ON(!kfd_process_wq))
+		return;
 
 	INIT_WORK(&p->release_work, kfd_process_wq_release);
 	queue_work(kfd_process_wq, &p->release_work);
@@ -406,7 +405,8 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	 * mmu_notifier srcu is read locked
 	 */
 	p = container_of(mn, struct kfd_process, mmu_notifier);
-	BUG_ON(p->mm != mm);
+	if (WARN_ON(p->mm != mm))
+		return;
 
 	cancel_delayed_work_sync(&p->eviction_work.dwork);
 	cancel_delayed_work_sync(&p->restore_work);
@@ -787,8 +787,6 @@ void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid)
 	struct kfd_process *p;
 	struct kfd_process_device *pdd;
 
-	BUG_ON(!dev);
-
 	/*
 	 * Look for the process that matches the pasid. If there is no such
 	 * process, we either released it in amdkfd's own notifier, or there
@@ -862,9 +860,6 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 	struct kfd_bo *buf_obj;
 	struct kfd_process *p;
 
-	BUG_ON(!pdd);
-	BUG_ON(!mem);
-
 	p = pdd->process;
 
 	buf_obj = kzalloc(sizeof(*buf_obj), GFP_KERNEL);
@@ -898,8 +893,6 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 struct kfd_bo *kfd_process_device_find_bo(struct kfd_process_device *pdd,
 					int handle)
 {
-	BUG_ON(!pdd);
-
 	if (handle < 0)
 		return NULL;
 
@@ -953,8 +946,6 @@ void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 {
 	struct kfd_bo *buf_obj;
 	struct kfd_process *p;
-
-	BUG_ON(!pdd);
 
 	p = pdd->process;
 

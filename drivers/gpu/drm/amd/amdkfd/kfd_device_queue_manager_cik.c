@@ -81,7 +81,7 @@ static uint32_t compute_sh_mem_bases_64bit(unsigned int top_address_nybble)
 	 * for LDS/Scratch and GPUVM.
 	 */
 
-	BUG_ON((top_address_nybble & 1) || top_address_nybble > 0xE ||
+	WARN_ON((top_address_nybble & 1) || top_address_nybble > 0xE ||
 		top_address_nybble == 0);
 
 	return PRIVATE_BASE(top_address_nybble << 12) |
@@ -120,8 +120,6 @@ static int update_qpd_cik(struct device_queue_manager *dqm,
 	struct kfd_process_device *pdd;
 	unsigned int temp;
 
-	BUG_ON(!dqm || !qpd);
-
 	pdd = qpd_to_pdd(qpd);
 
 	/* check if sh_mem_config register already configured */
@@ -155,8 +153,6 @@ static int update_qpd_cik_hawaii(struct device_queue_manager *dqm,
 {
 	struct kfd_process_device *pdd;
 	unsigned int temp;
-
-	BUG_ON(!dqm || !qpd);
 
 	pdd = qpd_to_pdd(qpd);
 

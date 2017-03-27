@@ -141,8 +141,6 @@ static void kfd_release_topology_device(struct kfd_topology_device *dev)
 	struct kfd_iolink_properties *iolink;
 	struct kfd_perf_properties *perf;
 
-	BUG_ON(!dev);
-
 	list_del(&dev->list);
 
 	while (dev->mem_props.next != &dev->mem_props) {
@@ -545,8 +543,6 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 	struct kfd_mem_properties *mem;
 	struct kfd_perf_properties *perf;
 
-	BUG_ON(!dev);
-
 	if (dev->kobj_iolink) {
 		list_for_each_entry(iolink, &dev->io_link_props, list)
 			if (iolink->kobj) {
@@ -613,12 +609,14 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 	uint32_t i, num_attrs;
 	struct attribute **attrs;
 
-	BUG_ON(!dev);
+	if (dev->kobj_node) {
+		pr_err("Cannot build sysfs node entry, kobj_node is not NULL\n");
+		return -EINVAL;
+	}
 
 	/*
 	 * Creating the sysfs folders
 	 */
-	BUG_ON(dev->kobj_node);
 	dev->kobj_node = kfd_alloc_struct(dev->kobj_node);
 	if (!dev->kobj_node)
 		return -ENOMEM;
@@ -1138,8 +1136,6 @@ static struct kfd_topology_device *kfd_assign_gpu(struct kfd_dev *gpu)
 	struct kfd_topology_device *dev;
 	struct kfd_topology_device *out_dev = NULL;
 
-	BUG_ON(!gpu);
-
 	down_write(&topology_lock);
 	list_for_each_entry(dev, &topology_device_list, list)
 		if (!dev->gpu && (dev->node_props.simd_count > 0)) {
@@ -1209,8 +1205,6 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	size_t image_size = 0;
 	int proximity_domain;
 
-	BUG_ON(!gpu);
-
 	INIT_LIST_HEAD(&temp_topology_device_list);
 
 	gpu_id = kfd_generate_gpu_id(gpu);
@@ -1255,7 +1249,11 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 			pr_err("Failed to update GPU (ID: 0x%x) to sysfs topology. res=%d\n",
 						gpu_id, res);
 		dev = kfd_assign_gpu(gpu);
-		BUG_ON(!dev);
+		if (!dev) {
+			pr_err("Could not assign GPU\n");
+			res = -ENODEV;
+			goto err;
+		}
 	}
 
 	dev->gpu_id = gpu_id;
@@ -1336,8 +1334,6 @@ int kfd_topology_remove_device(struct kfd_dev *gpu)
 	struct kfd_topology_device *dev;
 	uint32_t gpu_id;
 	int res = -ENODEV;
-
-	BUG_ON(!gpu);
 
 	down_write(&topology_lock);
 
