@@ -197,8 +197,6 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 {
 	struct vi_mqd *m;
 
-	BUG_ON(!mm || !q || !mqd);
-
 	m = get_mqd(mqd);
 
 	m->cp_hqd_pq_control = 5 << CP_HQD_PQ_CONTROL__RPTR_BLOCK_SIZE__SHIFT |
@@ -297,7 +295,6 @@ static int destroy_mqd(struct mqd_manager *mm, void *mqd,
 static void uninit_mqd(struct mqd_manager *mm, void *mqd,
 			struct kfd_mem_obj *mqd_mem_obj)
 {
-	BUG_ON(!mm || !mqd);
 	kfd_gtt_sa_free(mm->dev, mqd_mem_obj);
 }
 
@@ -350,8 +347,6 @@ static int init_mqd_sdma(struct mqd_manager *mm, void **mqd,
 	struct vi_sdma_mqd *m;
 
 
-	BUG_ON(!mm || !mqd || !mqd_mem_obj);
-
 	retval = kfd_gtt_sa_allocate(mm->dev,
 			sizeof(struct vi_sdma_mqd),
 			mqd_mem_obj);
@@ -375,7 +370,6 @@ static int init_mqd_sdma(struct mqd_manager *mm, void **mqd,
 static void uninit_mqd_sdma(struct mqd_manager *mm, void *mqd,
 		struct kfd_mem_obj *mqd_mem_obj)
 {
-	BUG_ON(!mm || !mqd);
 	kfd_gtt_sa_free(mm->dev, mqd_mem_obj);
 }
 
@@ -392,8 +386,6 @@ static int update_mqd_sdma(struct mqd_manager *mm, void *mqd,
 		struct queue_properties *q)
 {
 	struct vi_sdma_mqd *m;
-
-	BUG_ON(!mm || !mqd || !q);
 
 	m = get_sdma_mqd(mqd);
 	m->sdmax_rlcx_rb_cntl = (ffs(q->queue_size / sizeof(unsigned int)) - 1)
@@ -470,9 +462,6 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		struct kfd_dev *dev)
 {
 	struct mqd_manager *mqd;
-
-	BUG_ON(!dev);
-	BUG_ON(type >= KFD_MQD_TYPE_MAX);
 
 	mqd = kzalloc(sizeof(*mqd), GFP_NOIO);
 	if (!mqd)

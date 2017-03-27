@@ -92,6 +92,7 @@ unsigned int kfd_pasid_alloc(void)
 
 void kfd_pasid_free(unsigned int pasid)
 {
-	BUG_ON(pasid == 0 || pasid >= pasid_limit);
+	if (WARN_ON(pasid == 0 || pasid >= pasid_limit))
+		return;
 	clear_bit(pasid, pasid_bitmap);
 }

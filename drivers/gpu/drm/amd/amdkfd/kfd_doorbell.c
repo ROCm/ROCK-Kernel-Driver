@@ -94,7 +94,7 @@ void kfd_doorbell_init(struct kfd_dev *kfd)
 	kfd->doorbell_kernel_ptr = ioremap(kfd->doorbell_base,
 					   kfd_doorbell_process_slice(kfd));
 
-	BUG_ON(!kfd->doorbell_kernel_ptr);
+	WARN_ON(!kfd->doorbell_kernel_ptr);
 
 	pr_debug("Doorbell initialization:\n");
 	pr_debug("doorbell base           == 0x%08lX\n",
@@ -159,8 +159,6 @@ void __iomem *kfd_get_kernel_doorbell(struct kfd_dev *kfd,
 {
 	u32 inx;
 
-	BUG_ON(!kfd || !doorbell_off);
-
 	mutex_lock(&kfd->doorbell_mutex);
 	inx = find_first_zero_bit(kfd->doorbell_available_index,
 					KFD_MAX_NUM_OF_QUEUES_PER_PROCESS);
@@ -192,8 +190,6 @@ void __iomem *kfd_get_kernel_doorbell(struct kfd_dev *kfd,
 void kfd_release_kernel_doorbell(struct kfd_dev *kfd, u32 __iomem *db_addr)
 {
 	unsigned int inx;
-
-	BUG_ON(!kfd || !db_addr);
 
 	inx = (unsigned int)(db_addr - kfd->doorbell_kernel_ptr);
 

@@ -64,9 +64,6 @@ bool kfd_dbgmgr_create(struct kfd_dbgmgr **ppmgr, struct kfd_dev *pdev)
 	enum DBGDEV_TYPE type = DBGDEV_TYPE_DIQ;
 	struct kfd_dbgmgr *new_buff;
 
-	BUG_ON(!pdev);
-	BUG_ON(!pdev->init_complete);
-
 	new_buff = kfd_alloc_struct(new_buff);
 	if (!new_buff) {
 		pr_err("Failed to allocate dbgmgr instance\n");
