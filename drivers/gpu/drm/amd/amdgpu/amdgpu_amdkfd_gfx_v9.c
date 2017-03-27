@@ -445,8 +445,6 @@ static uint32_t get_sdma_base_addr(unsigned int engine_id,
 	};
 	uint32_t retval;
 
-	BUG_ON(engine_id > 1);
-
 	retval = base[engine_id] + queue_id * (mmSDMA0_RLC1_RB_CNTL -
 					       mmSDMA0_RLC0_RB_CNTL);
 
