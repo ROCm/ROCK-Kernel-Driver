@@ -319,6 +319,13 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 			pdd->dev->kfd2kgd->destroy_process_vm(
 				pdd->dev->kgd, pdd->vm);
 		list_del(&pdd->per_device_list);
+
+		if (pdd->qpd.cwsr_pages) {
+			kunmap(pdd->qpd.cwsr_pages);
+			__free_pages(pdd->qpd.cwsr_pages,
+				get_order(pdd->dev->cwsr_size));
+		}
+
 		kfree(pdd);
 	}
 }
@@ -473,9 +480,6 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 					dev->cwsr_size,	&kaddr, pdd);
 			if (!err) {
 				qpd->cwsr_kaddr = kaddr;
-				memcpy(qpd->cwsr_kaddr, kmap(dev->cwsr_pages),
-				       PAGE_SIZE);
-				kunmap(dev->cwsr_pages);
 				qpd->tba_addr = qpd->cwsr_base;
 			} else
 				goto out;
@@ -493,13 +497,15 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 				qpd->cwsr_kaddr = NULL;
 				err = -ENOMEM;
 				goto out;
-			} else
-				qpd->cwsr_kaddr = (void *)qpd->tba_addr;
+			}
 		}
 
+		memcpy(qpd->cwsr_kaddr, kmap(dev->cwsr_pages), PAGE_SIZE);
+		kunmap(dev->cwsr_pages);
+
 		qpd->tma_addr = qpd->tba_addr + dev->tma_offset;
-		pr_debug("set tba :0x%llx, tma:0x%llx for pqm.\n",
-			qpd->tba_addr, qpd->tma_addr);
+		pr_debug("set tba :0x%llx, tma:0x%llx, cwsr_kaddr:%p for pqm.\n",
+			qpd->tba_addr, qpd->tma_addr, qpd->cwsr_kaddr);
 	}
 
 out:
@@ -960,25 +966,42 @@ int kfd_reserved_mem_mmap(struct kfd_process *process, struct vm_area_struct *vm
 	unsigned long pfn, i;
 	int ret = 0;
 	struct kfd_dev *dev = kfd_device_by_id(vma->vm_pgoff);
+	struct kfd_process_device *temp, *pdd = NULL;
+	struct qcm_process_device *qpd = NULL;
 
 	if (dev == NULL)
 		return -EINVAL;
-	if ((vma->vm_start & (PAGE_SIZE - 1)) ||
+	if (((vma->vm_end - vma->vm_start) != dev->cwsr_size) ||
+		(vma->vm_start & (PAGE_SIZE - 1)) ||
 		(vma->vm_end & (PAGE_SIZE - 1))) {
-		pr_err("KFD only support page aligned memory map.\n");
+		pr_err("KFD only support page aligned memory map and correct size.\n");
 		return -EINVAL;
 	}
 
 	pr_debug("kfd reserved mem mmap been called.\n");
-	/* We supported  two reserved memory mmap in the future .
-	    1. Trap handler code and parameter (TBA and TMA , 2 pages total)
-	    2. Relaunch stack (control  block, 1 page for Carrizo)
-	 */
 
+	list_for_each_entry_safe(pdd, temp, &process->per_device_data,
+				per_device_list) {
+		if (dev == pdd->dev) {
+			qpd = &pdd->qpd;
+			break;
+		}
+	}
+	if (qpd == NULL)
+		return -EINVAL;
+
+	qpd->cwsr_pages = alloc_pages(GFP_KERNEL | __GFP_HIGHMEM,
+				get_order(dev->cwsr_size));
+	if (!qpd->cwsr_pages) {
+		pr_err("amdkfd: error alloc CWSR isa memory per process.\n");
+		return -ENOMEM;
+	}
+	qpd->cwsr_kaddr = kmap(qpd->cwsr_pages);
+
+	vma->vm_flags |= VM_IO | VM_DONTCOPY | VM_DONTEXPAND
+		| VM_NORESERVE | VM_DONTDUMP | VM_PFNMAP;
 	for (i = 0; i < ((vma->vm_end - vma->vm_start) >> PAGE_SHIFT); ++i) {
-		pfn = page_to_pfn(&dev->cwsr_pages[i]);
-		vma->vm_flags |= VM_IO | VM_DONTCOPY | VM_DONTEXPAND
-			| VM_NORESERVE | VM_DONTDUMP | VM_PFNMAP;
+		pfn = page_to_pfn(&qpd->cwsr_pages[i]);
 		/* mapping the page to user process */
 		ret = remap_pfn_range(vma, vma->vm_start + (i << PAGE_SHIFT),
 				pfn, PAGE_SIZE, vma->vm_page_prot);
