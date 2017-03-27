@@ -91,14 +91,14 @@
 #ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 /* Allow unsupported modules switch. */
 #ifdef UNSUPPORTED_MODULES
-int unsupported = UNSUPPORTED_MODULES;
+int suse_unsupported = UNSUPPORTED_MODULES;
 #else
-int unsupported = 2;  /* don't warn when loading unsupported modules. */
+int suse_unsupported = 2;  /* don't warn when loading unsupported modules. */
 #endif
 
 static int __init unsupported_setup(char *str)
 {
-	get_option(&str, &unsupported);
+	get_option(&str, &suse_unsupported);
 	return 1;
 }
 __setup("unsupported=", unsupported_setup);
@@ -1863,7 +1863,7 @@ static int mod_sysfs_setup(struct module *mod,
 	if (mod->taints & (1 << TAINT_EXTERNAL_SUPPORT))
 		add_taint(TAINT_EXTERNAL_SUPPORT, LOCKDEP_STILL_OK);
 	else if (mod->taints & (1 << TAINT_NO_SUPPORT)) {
-		if (unsupported == 0) {
+		if (suse_unsupported == 0) {
 			printk(KERN_WARNING "%s: module not supported by "
 			       "SUSE, refusing to load. To override, echo "
 			       "1 > /proc/sys/kernel/unsupported\n", mod->name);
@@ -1871,7 +1871,7 @@ static int mod_sysfs_setup(struct module *mod,
 			goto out_remove_attrs;
 		}
 		add_taint(TAINT_NO_SUPPORT, LOCKDEP_STILL_OK);
-		if (unsupported == 1) {
+		if (suse_unsupported == 1) {
 			printk(KERN_WARNING "%s: module is not supported by "
 			       "SUSE. Our support organization may not be "
 			       "able to address your support request if it "
