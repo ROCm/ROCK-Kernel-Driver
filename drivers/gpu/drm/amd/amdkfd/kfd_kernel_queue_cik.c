@@ -157,13 +157,28 @@ static struct packet_manager_funcs kfd_cik_pm_funcs = {
 	.get_release_mem_packet_size	= pm_get_release_mem_packet_size_vi,
 };
 
+static struct packet_manager_funcs kfd_cik_scratch_pm_funcs = {
+	.map_process			= pm_map_process_scratch_cik,
+	.runlist			= pm_runlist_vi,
+	.set_resources			= pm_set_resources_vi,
+	.map_queues			= pm_map_queues_vi,
+	.unmap_queues			= pm_unmap_queues_vi,
+	.query_status			= pm_query_status_vi,
+	.release_mem			= pm_release_mem_vi,
+	.get_map_process_packet_size	=
+				pm_get_map_process_scratch_packet_size_cik,
+	.get_runlist_packet_size	= pm_get_runlist_packet_size_vi,
+	.get_set_resources_packet_size	= pm_get_set_resources_packet_size_vi,
+	.get_map_queues_packet_size	= pm_get_map_queues_packet_size_vi,
+	.get_unmap_queues_packet_size	= pm_get_unmap_queues_packet_size_vi,
+	.get_query_status_packet_size	= pm_get_query_status_packet_size_vi,
+	.get_release_mem_packet_size	= pm_get_release_mem_packet_size_vi,
+};
 
 void kfd_pm_func_init_cik(struct packet_manager *pm, uint16_t fw_ver)
 {
-	pm->pmf = &kfd_cik_pm_funcs;
-	if (fw_ver >= KFD_SCRATCH_KV_FW_VER) {
-		pm->pmf->map_process = pm_map_process_scratch_cik;
-		pm->pmf->get_map_process_packet_size =
-			pm_get_map_process_scratch_packet_size_cik;
-	}
+	if (fw_ver >= KFD_SCRATCH_KV_FW_VER)
+		pm->pmf = &kfd_cik_scratch_pm_funcs;
+	else
+		pm->pmf = &kfd_cik_pm_funcs;
 }
