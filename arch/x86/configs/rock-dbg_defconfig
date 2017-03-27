@@ -2400,7 +2400,7 @@ CONFIG_DRM_AMDGPU_USERPTR=y
 #
 # Display Engine Configuration
 #
-# CONFIG_DRM_AMD_DC is not set
+CONFIG_DRM_AMD_DC=y
 # CONFIG_DRM_NOUVEAU is not set
 # CONFIG_DRM_I915 is not set
 # CONFIG_DRM_VGEM is not set
