@@ -3609,12 +3609,9 @@ static int vega10_read_sensor(struct pp_hwmgr *hwmgr, int idx,
 		}
 		break;
 	case AMDGPU_PP_SENSOR_GPU_LOAD:
-		ret = smum_send_msg_to_smc(hwmgr->smumgr, PPSMC_MSG_GetAverageGfxActivity);
+		ret = smum_send_msg_to_smc_with_parameter(hwmgr->smumgr, PPSMC_MSG_GetAverageGfxActivity, 0);
 		if (!ret) {
 			vega10_read_arg_from_smc(hwmgr->smumgr, &activity_percent);
-
-			activity_percent += 0x80;
-			activity_percent >>= 8;
 			*((uint32_t *)value) = activity_percent > 100 ? 100 : activity_percent;
 			*size = 4;
 		}
