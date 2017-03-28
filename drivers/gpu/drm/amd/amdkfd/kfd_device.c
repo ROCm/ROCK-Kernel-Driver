@@ -841,6 +841,17 @@ void kfd_restore_bo_worker(struct work_struct *work)
 
 	pr_info("Started restoring process of pasid %d\n", p->pasid);
 
+	/* Setting last_restore_timestamp before successful restoration.
+	 * Otherwise this would have to be set by KGD (restore_process_bos)
+	 * before KFD BOs are unreserved. If not, the process can be evicted
+	 * again before the timestamp is set.
+	 * If restore fails, the timestamp will be set again in the next
+	 * attempt. This would mean that the minimum GPU quanta would be
+	 * PROCESS_ACTIVE_TIME_MS - (time to execute the following two
+	 * functions)
+	 */
+
+	p->last_restore_timestamp = get_jiffies_64();
 	ret = pdd->dev->kfd2kgd->restore_process_bos(p->process_info);
 	if (ret) {
 		pr_info("Restore failed, try again after %d ms\n",
@@ -870,6 +881,8 @@ int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 					       struct fence *fence)
 {
 	struct kfd_process *p;
+	unsigned long active_time;
+	unsigned long delay_jiffies = msecs_to_jiffies(PROCESS_ACTIVE_TIME_MS);
 
 	if (!fence)
 		return -EINVAL;
@@ -895,11 +908,21 @@ int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 		}
 	}
 
-	/* During process initialization eviction_work.work is initialized
+	p->eviction_work.eviction_fence = fence_get(fence);
+
+	/* Avoid KFD process starvation. Wait for at least
+	 * PROCESS_ACTIVE_TIME_MS before evicting the process again
+	 */
+	active_time = get_jiffies_64() - p->last_restore_timestamp;
+	if (delay_jiffies > active_time)
+		delay_jiffies -= active_time;
+	else
+		delay_jiffies = 0;
+
+	/* During process initialization eviction_work.dwork is initialized
 	 * to kfd_evict_bo_worker
 	 */
-	p->eviction_work.eviction_fence = fence_get(fence);
-	schedule_delayed_work(&p->eviction_work.dwork, 0);
+	schedule_delayed_work(&p->eviction_work.dwork, delay_jiffies);
 out:
 	kfd_unref_process(p);
 	return 0;
