@@ -2589,6 +2589,9 @@ static int vega10_enable_dpm_tasks(struct pp_hwmgr *hwmgr)
 
 	vega10_set_tools_address(hwmgr->smumgr);
 
+	smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
+			PPSMC_MSG_NumOfDisplays, 0);
+
 	tmp_result = (!vega10_is_dpm_running(hwmgr)) ? 0 : -1;
 	PP_ASSERT_WITH_CODE(!tmp_result,
 			"DPM is already running right , skipping re-enablement!",
@@ -4232,18 +4235,19 @@ static int vega10_display_configuration_changed_task(struct pp_hwmgr *hwmgr)
 	Watermarks_t *wm_table = &(data->smc_state_table.water_marks_table);
 	struct cgs_display_info info = {0};
 
-	cgs_get_active_displays_info(hwmgr->device, &info);
-	num_turned_on_displays = info.display_count;
-
-	smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
-			PPSMC_MSG_NumOfDisplays, num_turned_on_displays);
-
 	if ((data->water_marks_bitmap & WaterMarksExist) &&
 			!(data->water_marks_bitmap & WaterMarksLoaded)) {
 		result = vega10_copy_table_to_smc(hwmgr->smumgr,
 			(uint8_t *)wm_table, WMTABLE);
 		PP_ASSERT_WITH_CODE(result, "Failed to update WMTABLE!", return EINVAL);
 		data->water_marks_bitmap |= WaterMarksLoaded;
+	}
+
+	if (data->water_marks_bitmap & WaterMarksLoaded) {
+		cgs_get_active_displays_info(hwmgr->device, &info);
+		num_turned_on_displays = info.display_count;
+		smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
+			PPSMC_MSG_NumOfDisplays, num_turned_on_displays);
 	}
 
 	return result;
