@@ -129,7 +129,7 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 	down_write(&p->lock);
 	pdd = kfd_bind_process_to_device(dev, p);
 	up_write(&p->lock);
-	if (IS_ERR(pdd) < 0)
+	if (IS_ERR(pdd))
 		return PTR_ERR(pdd);
 
 	r = dev->kfd2kgd->import_dmabuf(dev->kgd, dmabuf,
@@ -235,7 +235,7 @@ int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 	pdd = kfd_bind_process_to_device(dev, p);
 	up_write(&p->lock);
 
-	if (IS_ERR(pdd) < 0) {
+	if (IS_ERR(pdd)) {
 		pr_err("failed to get pdd\n");
 		return PTR_ERR(pdd);
 	}
