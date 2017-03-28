@@ -583,6 +583,8 @@ struct kfd_eviction_work {
 #define PROCESS_RESTORE_TIME_MS 100
 /* Approx. back off time if restore fails due to lack of memory */
 #define PROCESS_BACK_OFF_TIME_MS 100
+/* Approx. time before evicting the process again */
+#define PROCESS_ACTIVE_TIME_MS 10
 
 void kfd_evict_bo_worker(struct work_struct *work);
 void kfd_restore_bo_worker(struct work_struct *work);
@@ -722,6 +724,10 @@ struct kfd_process {
 	/* Work items for evicting and restoring BOs */
 	struct kfd_eviction_work eviction_work;
 	struct delayed_work restore_work;
+	/* Approx. the last timestamp (in jiffies) when the process was
+	 * restored after an eviction
+	 */
+	unsigned long last_restore_timestamp;
 };
 
 /**
