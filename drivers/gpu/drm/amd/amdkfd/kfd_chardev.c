@@ -569,7 +569,7 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
 
 	/* make sure that we have pdd, if this the first queue created for this process */
 	pdd = kfd_bind_process_to_device(dev, p);
-	if (IS_ERR(pdd) < 0) {
+	if (IS_ERR(pdd)) {
 		mutex_unlock(get_dbgmgr_mutex());
 		up_write(&p->lock);
 		return PTR_ERR(pdd);
@@ -1054,7 +1054,7 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 		if (KFD_IS_DGPU(kfd->device_info->asic_family)) {
 			down_write(&p->lock);
 			pdd = kfd_bind_process_to_device(kfd, p);
-			if (IS_ERR(pdd) < 0) {
+			if (IS_ERR(pdd)) {
 				err = PTR_ERR(pdd);
 				up_write(&p->lock);
 				return -EFAULT;
@@ -1147,7 +1147,7 @@ static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
 	down_write(&p->lock);
 
 	pdd = kfd_bind_process_to_device(dev, p);
-	if (IS_ERR(pdd) < 0) {
+	if (IS_ERR(pdd)) {
 		err = PTR_ERR(pdd);
 		goto bind_process_to_device_fail;
 	}
@@ -1193,7 +1193,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	down_write(&p->lock);
 	pdd = kfd_bind_process_to_device(dev, p);
 	up_write(&p->lock);
-	if (IS_ERR(pdd) < 0)
+	if (IS_ERR(pdd))
 		return PTR_ERR(pdd);
 
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
@@ -1326,7 +1326,7 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	down_write(&p->lock);
 	pdd = kfd_bind_process_to_device(dev, p);
 	up_write(&p->lock);
-	if (IS_ERR(pdd) < 0)
+	if (IS_ERR(pdd))
 		return PTR_ERR(pdd);
 
 	if (args->flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
@@ -1478,7 +1478,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	down_write(&p->lock);
 
 	pdd = kfd_bind_process_to_device(dev, p);
-	if (IS_ERR(pdd) < 0) {
+	if (IS_ERR(pdd)) {
 		err = PTR_ERR(pdd);
 		goto bind_process_to_device_failed;
 	}
@@ -1681,7 +1681,7 @@ static int kfd_ioctl_open_graphic_handle(struct file *filep,
 	down_write(&p->lock);
 	pdd = kfd_bind_process_to_device(dev, p);
 	up_write(&p->lock);
-	if (IS_ERR(pdd) < 0)
+	if (IS_ERR(pdd))
 		return PTR_ERR(pdd);
 
 	err = dev->kfd2kgd->open_graphic_handle(dev->kgd,
@@ -1728,7 +1728,7 @@ static int kfd_ioctl_set_process_dgpu_aperture(struct file *filep,
 	down_write(&p->lock);
 
 	pdd = kfd_bind_process_to_device(dev, p);
-	if (IS_ERR(pdd) < 0) {
+	if (IS_ERR(pdd)) {
 		err = PTR_ERR(pdd);
 		goto exit;
 	}
