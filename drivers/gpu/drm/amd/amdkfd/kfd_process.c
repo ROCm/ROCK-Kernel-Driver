@@ -566,6 +566,7 @@ static struct kfd_process *create_process(const struct task_struct *thread,
 
 	INIT_DELAYED_WORK(&process->eviction_work.dwork, kfd_evict_bo_worker);
 	INIT_DELAYED_WORK(&process->restore_work, kfd_restore_bo_worker);
+	process->last_restore_timestamp = get_jiffies_64();
 
 	/* If PeerDirect interface was not detected try to detect it again
 	* in case if network driver was loaded later.
