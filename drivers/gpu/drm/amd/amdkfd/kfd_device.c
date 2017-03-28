@@ -843,7 +843,8 @@ void kfd_restore_bo_worker(struct work_struct *work)
 
 	ret = pdd->dev->kfd2kgd->restore_process_bos(p->process_info);
 	if (ret) {
-		pr_info("restore_process_bos() failed, try again after 1 sec\n");
+		pr_info("Restore failed, try again after %d ms\n",
+			PROCESS_BACK_OFF_TIME_MS);
 		ret = schedule_delayed_work(&p->restore_work,
 				PROCESS_BACK_OFF_TIME_MS);
 		WARN(!ret, "reschedule restore work failed\n");
