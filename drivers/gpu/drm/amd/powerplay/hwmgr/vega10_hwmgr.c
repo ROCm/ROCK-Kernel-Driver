@@ -4282,6 +4282,69 @@ static int vega10_power_gate_uvd(struct pp_hwmgr *hwmgr, bool bgate)
 	return vega10_enable_disable_uvd_dpm(hwmgr, !bgate);
 }
 
+static inline bool vega10_are_power_levels_equal(
+				const struct vega10_performance_level *pl1,
+				const struct vega10_performance_level *pl2)
+{
+	return ((pl1->soc_clock == pl2->soc_clock) &&
+			(pl1->gfx_clock == pl2->gfx_clock) &&
+			(pl1->mem_clock == pl2->mem_clock));
+}
+
+static int vega10_check_states_equal(struct pp_hwmgr *hwmgr,
+				const struct pp_hw_power_state *pstate1,
+			const struct pp_hw_power_state *pstate2, bool *equal)
+{
+	const struct vega10_power_state *psa;
+	const struct vega10_power_state *psb;
+	int i;
+
+	if (pstate1 == NULL || pstate2 == NULL || equal == NULL)
+		return -EINVAL;
+
+	psa = cast_const_phw_vega10_power_state(pstate1);
+	psb = cast_const_phw_vega10_power_state(pstate2);
+	/* If the two states don't even have the same number of performance levels they cannot be the same state. */
+	if (psa->performance_level_count != psb->performance_level_count) {
+		*equal = false;
+		return 0;
+	}
+
+	for (i = 0; i < psa->performance_level_count; i++) {
+		if (!vega10_are_power_levels_equal(&(psa->performance_levels[i]), &(psb->performance_levels[i]))) {
+			/* If we have found even one performance level pair that is different the states are different. */
+			*equal = false;
+			return 0;
+		}
+	}
+
+	/* If all performance levels are the same try to use the UVD clocks to break the tie.*/
+	*equal = ((psa->uvd_clks.vclk == psb->uvd_clks.vclk) && (psa->uvd_clks.dclk == psb->uvd_clks.dclk));
+	*equal &= ((psa->vce_clks.evclk == psb->vce_clks.evclk) && (psa->vce_clks.ecclk == psb->vce_clks.ecclk));
+	*equal &= (psa->sclk_threshold == psb->sclk_threshold);
+
+	return 0;
+}
+
+static bool
+vega10_check_smc_update_required_for_display_configuration(struct pp_hwmgr *hwmgr)
+{
+	struct vega10_hwmgr *data = (struct vega10_hwmgr *)(hwmgr->backend);
+	bool is_update_required = false;
+	struct cgs_display_info info = {0, 0, NULL};
+
+	cgs_get_active_displays_info(hwmgr->device, &info);
+
+	if (data->display_timing.num_existing_displays != info.display_count)
+		is_update_required = true;
+
+	if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_SclkDeepSleep)) {
+		if (data->display_timing.min_clock_in_sr != hwmgr->display_config.min_core_set_clock_in_sr)
+			is_update_required = true;
+	}
+
+	return is_update_required;
+}
 
 static const struct pp_hwmgr_func vega10_hwmgr_funcs = {
 	.backend_init = vega10_hwmgr_backend_init,
@@ -4324,6 +4387,9 @@ static const struct pp_hwmgr_func vega10_hwmgr_funcs = {
 	.display_config_changed = vega10_display_configuration_changed_task,
 	.powergate_uvd = vega10_power_gate_uvd,
 	.powergate_vce = vega10_power_gate_vce,
+	.check_states_equal = vega10_check_states_equal,
+	.check_smc_update_required_for_display_configuration =
+			vega10_check_smc_update_required_for_display_configuration,
 };
 
 int vega10_hwmgr_init(struct pp_hwmgr *hwmgr)
