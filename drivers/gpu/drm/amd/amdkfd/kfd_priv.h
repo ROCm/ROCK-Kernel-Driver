@@ -579,10 +579,10 @@ struct kfd_eviction_work {
 	struct fence *eviction_fence;
 };
 
-/* Appox. wait time before attempting to restore evicted BOs */
-#define PROCESS_RESTORE_TIME_MS 2000
+/* Approx. wait time before attempting to restore evicted BOs */
+#define PROCESS_RESTORE_TIME_MS 100
 /* Approx. back off time if restore fails due to lack of memory */
-#define PROCESS_BACK_OFF_TIME_MS 1000
+#define PROCESS_BACK_OFF_TIME_MS 100
 
 void kfd_evict_bo_worker(struct work_struct *work);
 void kfd_restore_bo_worker(struct work_struct *work);
