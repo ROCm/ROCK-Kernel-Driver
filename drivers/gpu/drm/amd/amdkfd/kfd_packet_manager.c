@@ -126,14 +126,14 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 				uint64_t *rl_gpu_addr,
 				size_t *rl_size_bytes)
 {
-	unsigned int alloc_size_bytes;
+	unsigned int alloc_size_bytes = 0;
 	unsigned int *rl_buffer, rl_wptr, i;
 	int retval, proccesses_mapped;
 	struct device_process_node *cur;
 	struct qcm_process_device *qpd;
 	struct queue *q;
 	struct kernel_queue *kq;
-	bool is_over_subscription;
+	bool is_over_subscription = false;
 
 	BUG_ON(!pm || !queues || !rl_size_bytes || !rl_gpu_addr);
 
