@@ -2785,6 +2785,9 @@ static int vega10_enable_dpm_tasks(struct pp_hwmgr *hwmgr)
 	smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
 			PPSMC_MSG_NumOfDisplays, 0);
 
+	smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
+			PPSMC_MSG_NumOfDisplays, 0);
+
 	tmp_result = (!vega10_is_dpm_running(hwmgr)) ? 0 : -1;
 	PP_ASSERT_WITH_CODE(!tmp_result,
 			"DPM is already running right , skipping re-enablement!",
