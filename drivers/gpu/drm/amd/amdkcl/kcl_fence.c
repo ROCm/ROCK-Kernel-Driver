@@ -23,7 +23,7 @@
 #include <kcl/kcl_fence.h>
 
 #define CREATE_TRACE_POINTS
-#include "kcl_trace.h"
+#include "kcl_fence_trace.h"
 
 /* Copied from drivers/dma-buf/dma-fence.c */
 static bool
