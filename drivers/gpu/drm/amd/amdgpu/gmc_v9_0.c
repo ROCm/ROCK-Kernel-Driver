@@ -511,16 +511,6 @@ static int gmc_v9_0_vm_init(struct amdgpu_device *adev)
 	 * amdkfd will use VMIDs 8-15
 	 */
 	adev->vm_manager.num_ids = AMDGPU_NUM_OF_VMIDS;
-	/* Because of four level VMPTs, vm size at least is 256GB.
-	256TB is OK as well */
-	if (amdgpu_vm_size < 256) {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
-		printk(KERN_WARNING "amdgpu: vm size at least is 256GB!\n");
-#else
-		DRM_WARN("vm size at least is 256GB!\n");
-#endif
-		amdgpu_vm_size = 256;
-	}
 	adev->vm_manager.num_level = 3;
 	amdgpu_vm_manager_init(adev);
 
@@ -567,11 +557,18 @@ static int gmc_v9_0_sw_init(void *handle)
 	if (r)
 		return r;
 
-	/* Adjust VM size here.
-	 * Currently default to 64GB ((16 << 20) 4k pages).
-	 * Max GPUVM size is 48 bits.
+	/* Because of four level VMPTs, vm size is at least 512GB.
+	 * The maximum size is 256TB (48bit).
 	 */
-	adev->vm_manager.max_pfn = amdgpu_vm_size << 18;
+	if (amdgpu_vm_size < 512) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+		printk(KERN_WARNING "amdgpu: VM size is at least 512GB!\n");
+#else
+		DRM_WARN("VM size is at least 512GB!\n");
+#endif
+		amdgpu_vm_size = 512;
+	}
+	adev->vm_manager.max_pfn = (uint64_t)amdgpu_vm_size << 18;
 
 	/* Set the internal MC address mask
 	 * This is the max address of the GPU's
