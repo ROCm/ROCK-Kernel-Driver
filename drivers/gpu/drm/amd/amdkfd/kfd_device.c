@@ -881,16 +881,16 @@ int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 	if (!p)
 		return -ENODEV;
 
-	if (work_pending(&p->eviction_work.work)) {
+	if (delayed_work_pending(&p->eviction_work.dwork)) {
 		/* It is possible has TTM has lined up couple of BOs of the same
 		 * process to be evicted. Check if the fence is same which
-		 * indicates that previous work item scheduled is not complted
+		 * indicates that previous work item scheduled is not completed
 		 */
 		if (p->eviction_work.eviction_fence == fence)
 			goto out;
 		else {
 			WARN(1, "Starting new evict with previous evict is not completed\n");
-			if (cancel_work_sync(&p->eviction_work.work))
+			if (cancel_delayed_work_sync(&p->eviction_work.dwork))
 				fence_put(p->eviction_work.eviction_fence);
 		}
 	}
@@ -899,7 +899,7 @@ int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 	 * to kfd_evict_bo_worker
 	 */
 	p->eviction_work.eviction_fence = fence_get(fence);
-	schedule_work(&p->eviction_work.work);
+	schedule_delayed_work(&p->eviction_work.dwork, 0);
 out:
 	kfd_unref_process(p);
 	return 0;
@@ -910,9 +910,11 @@ void kfd_evict_bo_worker(struct work_struct *work)
 	int ret;
 	struct kfd_process *p;
 	struct kfd_eviction_work *eviction_work;
+	struct delayed_work *dwork;
 
-	eviction_work = container_of(work, struct kfd_eviction_work,
-				     work);
+	dwork = to_delayed_work(work);
+	eviction_work = container_of(dwork, struct kfd_eviction_work,
+				     dwork);
 
 	/* Process termination destroys this worker thread. So during the
 	 * lifetime of this thread, kfd_process p will be valid

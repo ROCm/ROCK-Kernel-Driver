@@ -394,7 +394,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	p = container_of(mn, struct kfd_process, mmu_notifier);
 	BUG_ON(p->mm != mm);
 
-	cancel_work_sync(&p->eviction_work.work);
+	cancel_delayed_work_sync(&p->eviction_work.dwork);
 	cancel_delayed_work_sync(&p->restore_work);
 
 	mutex_lock(&kfd_processes_mutex);
@@ -564,7 +564,7 @@ static struct kfd_process *create_process(const struct task_struct *thread,
 	if (err)
 		goto err_init_cwsr;
 
-	INIT_WORK(&process->eviction_work.work, kfd_evict_bo_worker);
+	INIT_DELAYED_WORK(&process->eviction_work.dwork, kfd_evict_bo_worker);
 	INIT_DELAYED_WORK(&process->restore_work, kfd_restore_bo_worker);
 
 	/* If PeerDirect interface was not detected try to detect it again
