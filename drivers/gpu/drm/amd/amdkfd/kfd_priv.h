@@ -575,7 +575,7 @@ struct qcm_process_device {
 
 /* KFD Memory Eviction */
 struct kfd_eviction_work {
-	struct work_struct work;
+	struct delayed_work dwork;
 	struct fence *eviction_fence;
 };
 
