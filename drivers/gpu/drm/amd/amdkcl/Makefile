@@ -6,6 +6,9 @@ amdkcl-y += kcl_workqueue.o kcl_backlight.o kcl_ioctl.o \
 	kcl_suspend.o kcl_pci.o kcl_mm.o kcl_memory.o kcl_sched.o \
 	kcl_fence.o kcl_fence_array.o
 
+# for trace-points
+CFLAGS_kcl_fence.o := -I$(src)
+
 ccflags-y += -include $(src)/../dkms/config/config.h
 ccflags-y += -DHAVE_CONFIG_H
 
