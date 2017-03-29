@@ -469,11 +469,8 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			- kfd->vm_info.first_vmid_kfd + 1;
 	kfd->vm_info.vmid_num_kfd = vmid_num_kfd;
 
-	/* If MEC firmware is too old, turn off hws multiple process mapping */
-	if (kfd->mec_fw_version	< KFD_MULTI_PROC_MAPPING_HWS_SUPPORT)
-		kfd->max_proc_per_quantum = 0;
 	/* Verify module parameters regarding mapped process number*/
-	else if ((hws_max_conc_proc < 0)
+	if ((hws_max_conc_proc < 0)
 			|| (hws_max_conc_proc > vmid_num_kfd)) {
 		dev_err(kfd_device,
 			"hws_max_conc_proc (%d) must be between 0 and %d, use %d instead\n",
