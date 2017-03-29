@@ -4,6 +4,9 @@
 #define	ACP3x_I2S_MODE	0
 #define	ACP3x_REG_START	0x1240000
 #define	ACP3x_REG_END	0x1250200
+#define	BT_TX_THRESHOLD 26
+#define	BT_RX_THRESHOLD 25
+
 
 static inline u32 rv_readl(void __iomem *base_addr)
 {
