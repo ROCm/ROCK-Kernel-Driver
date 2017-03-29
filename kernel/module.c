@@ -38,6 +38,7 @@
 #include <linux/capability.h>
 #include <linux/cpu.h>
 #include <linux/moduleparam.h>
+#include <linux/dwarf.h>
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/vermagic.h>
@@ -46,7 +47,6 @@
 #include <linux/device.h>
 #include <linux/string.h>
 #include <linux/mutex.h>
-#include <linux/unwind.h>
 #include <linux/rculist.h>
 #include <linux/uaccess.h>
 #include <asm/cacheflush.h>

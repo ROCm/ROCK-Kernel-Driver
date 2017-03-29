@@ -906,7 +906,7 @@ ENTRY(do_softirq_own_stack)
 END(do_softirq_own_stack)
 
 #ifdef CONFIG_DWARF_UNWIND
-ENTRY(arch_dwarf_init_running)
+SYM_FUNC_START(arch_dwarf_init_running)
 	movq	%r15, R15(%rdi)
 	movq	%r14, R14(%rdi)
 	movq	%r13, R13(%rdi)
@@ -920,7 +920,7 @@ ENTRY(arch_dwarf_init_running)
 	movq	$__KERNEL_CS, CS(%rdi)
 	movq	$__KERNEL_DS, SS(%rdi)
 	ret
-END(arch_dwarf_init_running)
+SYM_FUNC_END(arch_dwarf_init_running)
 #endif
 
 #ifdef CONFIG_XEN

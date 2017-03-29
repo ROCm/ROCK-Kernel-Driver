@@ -12,9 +12,8 @@
 
 #ifdef __ASSEMBLY__
 
-#define GLOBAL(name)	\
-	.globl name;	\
-	name:
+/* deprecated, use SYM_DATA_START, SYM_FUNC_START, or SYM_FUNC_INNER_LABEL */
+#define GLOBAL(name)	SYM_ENTRY(name, SYM_V_GLOBAL, SYM_A_NONE)
 
 #if defined(CONFIG_X86_64) || defined(CONFIG_X86_ALIGNMENT_16)
 #define __ALIGN		.p2align 4, 0x90

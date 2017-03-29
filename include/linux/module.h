@@ -257,6 +257,7 @@ extern const typeof(name) __mod_##type##__##name##_device_table		\
  * files require multiple MODULE_FIRMWARE() specifiers */
 #define MODULE_FIRMWARE(_firmware) MODULE_INFO(firmware, _firmware)
 
+struct dwarf_table;
 struct notifier_block;
 
 #ifdef CONFIG_MODULES
@@ -394,7 +395,7 @@ struct module {
 	struct module_layout init_layout;
 
 	/* The handle returned from dwarf_add_table. */
-	void *dwarf_info;
+	struct dwarf_table *dwarf_info;
 
 	/* Arch-specific module values */
 	struct mod_arch_specific arch;

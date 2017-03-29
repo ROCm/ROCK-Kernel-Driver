@@ -295,7 +295,7 @@ ENTRY(ret_from_fork)
 END(ret_from_fork)
 
 #ifdef CONFIG_DWARF_UNWIND
-ENTRY(arch_dwarf_init_running)
+SYM_FUNC_START(arch_dwarf_init_running)
 	movl	4(%esp), %edx
 	movl	(%esp), %ecx
 	movl	%ecx, PT_EIP(%edx)
@@ -312,7 +312,7 @@ ENTRY(arch_dwarf_init_running)
 	movl	$__KERNEL_STACK_CANARY, PT_GS(%edx)
 	movl	$__KERNEL_DS, PT_OLDSS(%edx)
 	ret
-ENDPROC(arch_dwarf_init_running)
+SYM_FUNC_END(arch_dwarf_init_running)
 #endif
 
 /*
