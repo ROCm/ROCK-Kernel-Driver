@@ -1059,7 +1059,6 @@ int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 
 #define KFD_SCRATCH_CZ_FW_VER 600
 #define KFD_SCRATCH_KV_FW_VER 413
-#define KFD_MULTI_PROC_MAPPING_HWS_SUPPORT 600
 #define KFD_CWSR_CZ_FW_VER 625
 
 /* PeerDirect support */
