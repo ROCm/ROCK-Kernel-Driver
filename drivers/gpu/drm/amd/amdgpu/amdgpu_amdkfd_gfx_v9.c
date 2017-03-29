@@ -1121,8 +1121,10 @@ static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 	WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmMMHUB_VM_CONTEXT0_PAGE_TABLE_START_ADDR_LO32) + (vmid*2), 0);
 	WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmMMHUB_VM_CONTEXT0_PAGE_TABLE_START_ADDR_HI32) + (vmid*2), 0);
 
-	WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmMMHUB_VM_CONTEXT0_PAGE_TABLE_END_ADDR_LO32) + (vmid*2), adev->vm_manager.max_pfn - 1);
-	WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmMMHUB_VM_CONTEXT0_PAGE_TABLE_END_ADDR_HI32) + (vmid*2), 0);
+	WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmMMHUB_VM_CONTEXT0_PAGE_TABLE_END_ADDR_LO32) + (vmid*2),
+		lower_32_bits(adev->vm_manager.max_pfn - 1));
+	WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmMMHUB_VM_CONTEXT0_PAGE_TABLE_END_ADDR_HI32) + (vmid*2),
+		upper_32_bits(adev->vm_manager.max_pfn - 1));
 
 	WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmMMHUB_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_LO32) + (vmid*2), lower_32_bits(base));
 	WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmMMHUB_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_HI32) + (vmid*2), upper_32_bits(base));
@@ -1130,8 +1132,10 @@ static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT0_PAGE_TABLE_START_ADDR_LO32) + (vmid*2), 0);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT0_PAGE_TABLE_START_ADDR_HI32) + (vmid*2), 0);
 
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT0_PAGE_TABLE_END_ADDR_LO32) + (vmid*2), adev->vm_manager.max_pfn - 1);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT0_PAGE_TABLE_END_ADDR_HI32) + (vmid*2), 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT0_PAGE_TABLE_END_ADDR_LO32) + (vmid*2),
+		lower_32_bits(adev->vm_manager.max_pfn - 1));
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT0_PAGE_TABLE_END_ADDR_HI32) + (vmid*2),
+		upper_32_bits(adev->vm_manager.max_pfn - 1));
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT0_PAGE_TABLE_BASE_ADDR_LO32) + (vmid*2), lower_32_bits(base));
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT0_PAGE_TABLE_BASE_ADDR_HI32) + (vmid*2), upper_32_bits(base));
