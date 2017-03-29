@@ -67,6 +67,15 @@ int mmhub_v1_0_gart_enable(struct amdgpu_device *adev)
 				mmMC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB),
 				(u32)(value >> 44));
 
+	if (amdgpu_sriov_vf(adev)) {
+		/* MC_VM_FB_LOCATION_BASE/TOP is NULL for VF, becuase they are VF copy registers so
+		vbios post doesn't program them, for SRIOV driver need to program them */
+		WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmMC_VM_FB_LOCATION_BASE),
+			adev->mc.vram_start >> 24);
+		WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmMC_VM_FB_LOCATION_TOP),
+			adev->mc.vram_end >> 24);
+	}
+
 	/* Disable AGP. */
 	WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmMC_VM_AGP_BASE), 0);
 	WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmMC_VM_AGP_TOP), 0);
@@ -216,7 +225,7 @@ int mmhub_v1_0_gart_enable(struct amdgpu_device *adev)
 		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL,
 				ENABLE_CONTEXT, 1);
 		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL,
-				PAGE_TABLE_DEPTH, 1);
+				PAGE_TABLE_DEPTH, adev->vm_manager.num_level);
 		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL,
 				RANGE_PROTECTION_FAULT_ENABLE_DEFAULT, 1);
 		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL,
@@ -238,8 +247,9 @@ int mmhub_v1_0_gart_enable(struct amdgpu_device *adev)
 		WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmVM_CONTEXT1_PAGE_TABLE_START_ADDR_LO32) + i*2, 0);
 		WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmVM_CONTEXT1_PAGE_TABLE_START_ADDR_HI32) + i*2, 0);
 		WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmVM_CONTEXT1_PAGE_TABLE_END_ADDR_LO32) + i*2,
-				adev->vm_manager.max_pfn - 1);
-		WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmVM_CONTEXT1_PAGE_TABLE_END_ADDR_HI32) + i*2, 0);
+			lower_32_bits(adev->vm_manager.max_pfn - 1));
+		WREG32(SOC15_REG_OFFSET(MMHUB, 0, mmVM_CONTEXT1_PAGE_TABLE_END_ADDR_HI32) + i*2,
+			upper_32_bits(adev->vm_manager.max_pfn - 1));
 	}
 
 	return 0;
@@ -552,6 +562,25 @@ static int mmhub_v1_0_set_clockgating_state(void *handle,
 	return 0;
 }
 
+static void mmhub_v1_0_get_clockgating_state(void *handle, u32 *flags)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	int data;
+
+	if (amdgpu_sriov_vf(adev))
+		*flags = 0;
+
+	/* AMD_CG_SUPPORT_MC_MGCG */
+	data = RREG32(SOC15_REG_OFFSET(ATHUB, 0, mmATHUB_MISC_CNTL));
+	if (data & ATHUB_MISC_CNTL__CG_ENABLE_MASK)
+		*flags |= AMD_CG_SUPPORT_MC_MGCG;
+
+	/* AMD_CG_SUPPORT_MC_LS */
+	data = RREG32(SOC15_REG_OFFSET(MMHUB, 0, mmATC_L2_MISC_CG));
+	if (data & ATC_L2_MISC_CG__MEM_LS_ENABLE_MASK)
+		*flags |= AMD_CG_SUPPORT_MC_LS;
+}
+
 static int mmhub_v1_0_set_powergating_state(void *handle,
 					enum amd_powergating_state state)
 {
@@ -573,6 +602,7 @@ const struct amd_ip_funcs mmhub_v1_0_ip_funcs = {
 	.soft_reset = mmhub_v1_0_soft_reset,
 	.set_clockgating_state = mmhub_v1_0_set_clockgating_state,
 	.set_powergating_state = mmhub_v1_0_set_powergating_state,
+	.get_clockgating_state = mmhub_v1_0_get_clockgating_state,
 };
 
 const struct amdgpu_ip_block_version mmhub_v1_0_ip_block =

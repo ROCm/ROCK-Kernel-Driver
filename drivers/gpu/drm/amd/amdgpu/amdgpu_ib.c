@@ -161,9 +161,6 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 		return r;
 	}
 
-	if (ring->funcs->init_cond_exec)
-		patch_offset = amdgpu_ring_init_cond_exec(ring);
-
 	if (vm) {
 		r = amdgpu_vm_flush(ring, job);
 		if (r) {
@@ -171,6 +168,9 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 			return r;
 		}
 	}
+
+	if (ring->funcs->init_cond_exec)
+		patch_offset = amdgpu_ring_init_cond_exec(ring);
 
 	if (ring->funcs->emit_hdp_flush
 #ifdef CONFIG_X86_64
