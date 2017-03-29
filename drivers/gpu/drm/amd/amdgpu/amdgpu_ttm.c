@@ -562,9 +562,6 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 	case TTM_PL_VRAM:
 	case AMDGPU_PL_DGMA:
 	case AMDGPU_PL_DGMA_IMPORT:
-		if (mem->start == AMDGPU_BO_INVALID_OFFSET)
-			return -EINVAL;
-
 		if (mem->mem_type != AMDGPU_PL_DGMA_IMPORT) {
 			mem->bus.offset = (mem->start << PAGE_SHIFT) + man->gpu_offset -
 					adev->mc.vram_start;
@@ -587,6 +584,17 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 
 static void amdgpu_ttm_io_mem_free(struct ttm_bo_device *bdev, struct ttm_mem_reg *mem)
 {
+}
+
+static unsigned long amdgpu_ttm_io_mem_pfn(struct ttm_buffer_object *bo,
+					   unsigned long page_offset)
+{
+	struct drm_mm_node *mm = bo->mem.mm_node;
+	uint64_t size = mm->size;
+
+	mm += page_offset / size;
+	page_offset %= size;
+	return (bo->mem.bus.base >> PAGE_SHIFT) + mm->start + page_offset;
 }
 
 /*
@@ -1095,7 +1103,7 @@ static struct ttm_bo_driver amdgpu_bo_driver = {
 	.fault_reserve_notify = &amdgpu_bo_fault_reserve_notify,
 	.io_mem_reserve = &amdgpu_ttm_io_mem_reserve,
 	.io_mem_free = &amdgpu_ttm_io_mem_free,
-	.io_mem_pfn = ttm_bo_default_io_mem_pfn,
+	.io_mem_pfn = amdgpu_ttm_io_mem_pfn,
 };
 
 #define AMDGPU_DIRECT_GMA_SIZE_MAX 96
