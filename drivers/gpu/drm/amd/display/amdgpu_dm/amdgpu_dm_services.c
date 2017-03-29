@@ -23,8 +23,6 @@
  *
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
-
 #include <linux/string.h>
 #include <linux/acpi.h>
 
@@ -437,4 +435,3 @@ bool dm_pp_get_static_clocks(
 }
 
 /**** end of power component interfaces ****/
-#endif
