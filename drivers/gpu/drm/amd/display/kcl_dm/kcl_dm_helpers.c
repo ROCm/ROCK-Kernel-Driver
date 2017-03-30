@@ -23,7 +23,7 @@
  *
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
 
 #include <linux/string.h>
 #include <linux/acpi.h>
@@ -38,9 +38,9 @@
 #include "dm_services.h"
 #include "amdgpu.h"
 #include "dc.h"
-#include "amdgpu_dm.h"
-#include "amdgpu_dm_irq.h"
-#include "amdgpu_dm_types.h"
+#include "kcl_dm.h"
+#include "kcl_dm_irq.h"
+#include "kcl_dm_types.h"
 
 #include "dm_helpers.h"
 

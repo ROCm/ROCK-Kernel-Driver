@@ -23,7 +23,7 @@
  *
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
 
 #include <linux/types.h>
 #include <linux/version.h>
@@ -46,8 +46,8 @@
 
 #include "dc.h"
 
-#include "amdgpu_dm_types.h"
-#include "amdgpu_dm_mst_types.h"
+#include "kcl_dm_types.h"
+#include "kcl_dm_mst_types.h"
 
 #include "modules/inc/mod_freesync.h"
 

@@ -23,7 +23,7 @@
  *
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
 
 #include "dm_services_types.h"
 #include "dc.h"
@@ -32,11 +32,11 @@
 #include "amdgpu.h"
 #include "amdgpu_display.h"
 #include "atom.h"
-#include "amdgpu_dm.h"
-#include "amdgpu_dm_types.h"
+#include "kcl_dm.h"
+#include "kcl_dm_types.h"
 
 #include "amd_shared.h"
-#include "amdgpu_dm_irq.h"
+#include "kcl_dm_irq.h"
 #include "dm_helpers.h"
 
 #ifdef CONFIG_DRM_AMDGPU_CIK
@@ -1227,10 +1227,10 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	/* loops over all connectors on the board */
 	for (i = 0; i < link_cnt; i++) {
 
-		if (i > AMDGPU_DM_MAX_DISPLAY_INDEX) {
+		if (i > KCL_DM_MAX_DISPLAY_INDEX) {
 			DRM_ERROR(
 				"KMS: Cannot support more than %d display indexes\n",
-					AMDGPU_DM_MAX_DISPLAY_INDEX);
+					KCL_DM_MAX_DISPLAY_INDEX);
 			continue;
 		}
 

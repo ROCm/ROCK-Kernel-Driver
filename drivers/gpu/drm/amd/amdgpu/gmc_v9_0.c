@@ -123,7 +123,6 @@ static int gmc_v9_0_vm_fault_interrupt_state(struct amdgpu_device *adev,
 	}
 
 	return 0;
-	return 0;
 }
 
 static int gmc_v9_0_process_interrupt(struct amdgpu_device *adev,
@@ -132,26 +131,35 @@ static int gmc_v9_0_process_interrupt(struct amdgpu_device *adev,
 {
 	struct amdgpu_vmhub *gfxhub = &adev->vmhub[AMDGPU_GFXHUB];
 	struct amdgpu_vmhub *mmhub = &adev->vmhub[AMDGPU_MMHUB];
-	uint32_t status;
+	uint32_t status = 0;
 	u64 addr;
 
 	addr = (u64)entry->src_data[0] << 12;
 	addr |= ((u64)entry->src_data[1] & 0xf) << 44;
 
-	if (entry->vm_id_src) {
-		status = RREG32(mmhub->vm_l2_pro_fault_status);
-		WREG32_P(mmhub->vm_l2_pro_fault_cntl, 1, ~1);
-	} else {
-		status = RREG32(gfxhub->vm_l2_pro_fault_status);
-		WREG32_P(gfxhub->vm_l2_pro_fault_cntl, 1, ~1);
+	if (!amdgpu_sriov_vf(adev)) {
+		if (entry->vm_id_src) {
+			status = RREG32(mmhub->vm_l2_pro_fault_status);
+			WREG32_P(mmhub->vm_l2_pro_fault_cntl, 1, ~1);
+		} else {
+			status = RREG32(gfxhub->vm_l2_pro_fault_status);
+			WREG32_P(gfxhub->vm_l2_pro_fault_cntl, 1, ~1);
+		}
 	}
 
-	DRM_ERROR("[%s]VMC page fault (src_id:%u ring:%u vm_id:%u pas_id:%u) "
-		  "at page 0x%016llx from %d\n"
-		  "VM_L2_PROTECTION_FAULT_STATUS:0x%08X\n",
-		  entry->vm_id_src ? "mmhub" : "gfxhub",
-		  entry->src_id, entry->ring_id, entry->vm_id, entry->pas_id,
-		  addr, entry->client_id, status);
+	if (printk_ratelimit()) {
+		dev_err(adev->dev,
+			"[%s] VMC page fault (src_id:%u ring:%u vm_id:%u pas_id:%u)\n",
+			entry->vm_id_src ? "mmhub" : "gfxhub",
+			entry->src_id, entry->ring_id, entry->vm_id,
+			entry->pas_id);
+		dev_err(adev->dev, "  at page 0x%016llx from %d\n",
+			addr, entry->client_id);
+		if (!amdgpu_sriov_vf(adev))
+			dev_err(adev->dev,
+				"VM_L2_PROTECTION_FAULT_STATUS:0x%08X\n",
+				status);
+	}
 
 	return 0;
 }
@@ -375,7 +383,9 @@ static int gmc_v9_0_late_init(void *handle)
 static void gmc_v9_0_vram_gtt_location(struct amdgpu_device *adev,
 					struct amdgpu_mc *mc)
 {
-	u64 base = mmhub_v1_0_get_fb_location(adev);
+	u64 base = 0;
+	if (!amdgpu_sriov_vf(adev))
+		base = mmhub_v1_0_get_fb_location(adev);
 	amdgpu_vram_location(adev, &adev->mc, base);
 	adev->mc.gtt_base_align = 0;
 	amdgpu_gtt_location(adev, mc);
@@ -501,6 +511,17 @@ static int gmc_v9_0_vm_init(struct amdgpu_device *adev)
 	 * amdkfd will use VMIDs 8-15
 	 */
 	adev->vm_manager.num_ids = AMDGPU_NUM_OF_VMIDS;
+	/* Because of four level VMPTs, vm size at least is 256GB.
+	256TB is OK as well */
+	if (amdgpu_vm_size < 256) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+		printk(KERN_WARNING "amdgpu: vm size at least is 256GB!\n");
+#else
+		DRM_WARN("vm size at least is 256GB!\n");
+#endif
+		amdgpu_vm_size = 256;
+	}
+	adev->vm_manager.num_level = 3;
 	amdgpu_vm_manager_init(adev);
 
 	/* base offset of vram pages */
@@ -539,6 +560,8 @@ static int gmc_v9_0_sw_init(void *handle)
 
 	/* This interrupt is VMC page fault.*/
 	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_VMC, 0,
+				&adev->mc.vm_fault);
+	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_UTCL2, 0,
 				&adev->mc.vm_fault);
 
 	if (r)

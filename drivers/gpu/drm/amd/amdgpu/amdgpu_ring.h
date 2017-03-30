@@ -168,6 +168,7 @@ struct amdgpu_ring {
 	struct amdgpu_bo	*mqd_obj;
 	uint64_t                mqd_gpu_addr;
 	void                    *mqd_ptr;
+	uint64_t                eop_gpu_addr;
 	u32			doorbell_index;
 	bool			use_doorbell;
 	unsigned		wptr_offs;
@@ -194,7 +195,7 @@ void amdgpu_ring_fini(struct amdgpu_ring *ring);
 static inline void amdgpu_ring_clear_ring(struct amdgpu_ring *ring)
 {
 	int i = 0;
-	while (i <= ring->ptr_mask)
+	while (i <= ring->buf_mask)
 		ring->ring[i++] = ring->funcs->nop;
 
 }

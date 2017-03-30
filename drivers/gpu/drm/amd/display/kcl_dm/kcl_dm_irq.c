@@ -23,7 +23,7 @@
  *
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
 
 #include <drm/drmP.h>
 
@@ -31,8 +31,8 @@
 #include "dc.h"
 
 #include "amdgpu.h"
-#include "amdgpu_dm.h"
-#include "amdgpu_dm_irq.h"
+#include "kcl_dm.h"
+#include "kcl_dm_irq.h"
 
 /******************************************************************************
  * Private declarations.

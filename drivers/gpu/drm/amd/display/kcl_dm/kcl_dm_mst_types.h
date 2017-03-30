@@ -23,10 +23,8 @@
  *
  */
 
-#ifndef __DAL_AMDGPU_DM_MST_TYPES_H__
-#define __DAL_AMDGPU_DM_MST_TYPES_H__
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#ifndef __DAL_KCL_DM_MST_TYPES_H__
+#define __DAL_KCL_DM_MST_TYPES_H__
 
 struct amdgpu_display_manager;
 struct amdgpu_connector;
@@ -34,9 +32,5 @@ struct amdgpu_connector;
 void amdgpu_dm_initialize_mst_connector(
 	struct amdgpu_display_manager *dm,
 	struct amdgpu_connector *aconnector);
-
-#else
-#include "../kcl_dm/kcl_dm_mst_types.h"
-#endif /* KERNEL_VERSION */
 
 #endif

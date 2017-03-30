@@ -79,6 +79,10 @@ struct amdgpu_bo_list_entry;
 struct amdgpu_vm_pt {
 	struct amdgpu_bo	*bo;
 	uint64_t		addr;
+
+	/* array of page tables, one for each directory entry */
+	struct amdgpu_vm_pt	*entries;
+	unsigned		last_entry_used;
 };
 
 struct amdgpu_vm {
@@ -98,13 +102,9 @@ struct amdgpu_vm {
 	struct list_head	freed;
 
 	/* contains the page directory */
-	struct amdgpu_bo	*page_directory;
-	unsigned		max_pde_used;
-	struct fence		*page_directory_fence;
+	struct amdgpu_vm_pt     root;
+	struct fence		*last_dir_update;
 	uint64_t		last_eviction_counter;
-
-	/* array of page tables, one for each page directory entry */
-	struct amdgpu_vm_pt	*page_tables;
 
 	/* for id and flush management per ring */
 	struct amdgpu_vm_id	*ids[AMDGPU_MAX_RINGS];
@@ -154,6 +154,7 @@ struct amdgpu_vm_manager {
 	unsigned				seqno[AMDGPU_MAX_RINGS];
 
 	uint32_t				max_pfn;
+	uint32_t				num_level;
 	/* vram base address for page table entry  */
 	u64					vram_base_offset;
 	/* is vm enabled? */
@@ -194,10 +195,11 @@ int amdgpu_vm_grab_id(struct amdgpu_vm *vm, struct amdgpu_ring *ring,
 		      struct amdgpu_job *job);
 int amdgpu_vm_flush(struct amdgpu_ring *ring, struct amdgpu_job *job);
 void amdgpu_vm_reset_id(struct amdgpu_device *adev, unsigned vm_id);
-int amdgpu_vm_update_page_directory(struct amdgpu_device *adev,
-				    struct amdgpu_vm *vm);
+int amdgpu_vm_update_directories(struct amdgpu_device *adev,
+				 struct amdgpu_vm *vm);
 int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
-			  struct amdgpu_vm *vm);
+			  struct amdgpu_vm *vm,
+			  struct fence **fence);
 int amdgpu_vm_clear_invalids(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 			     struct amdgpu_sync *sync);
 int amdgpu_vm_bo_update(struct amdgpu_device *adev,

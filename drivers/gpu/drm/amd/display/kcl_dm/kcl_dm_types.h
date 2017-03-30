@@ -23,10 +23,8 @@
  *
  */
 
-#ifndef __AMDGPU_DM_TYPES_H__
-#define __AMDGPU_DM_TYPES_H__
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#ifndef __KCL_DM_TYPES_H__
+#define __KCL_DM_TYPES_H__
 
 #include <drm/drmP.h>
 
@@ -95,7 +93,4 @@ void amdgpu_dm_remove_sink_from_freesync_module(
 
 extern const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs;
 
-#else
-#include "../kcl_dm/kcl_dm_types.h"
-#endif		/* KERNEL_VERSION */
-#endif		/* __AMDGPU_DM_TYPES_H__ */
+#endif		/* __KCL_DM_TYPES_H__ */

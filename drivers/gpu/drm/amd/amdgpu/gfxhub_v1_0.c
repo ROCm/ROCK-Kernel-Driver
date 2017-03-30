@@ -53,6 +53,15 @@ int gfxhub_v1_0_gart_enable(struct amdgpu_device *adev)
 				mmMC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB),
 				(u32)(value >> 44));
 
+	if (amdgpu_sriov_vf(adev)) {
+		/* MC_VM_FB_LOCATION_BASE/TOP is NULL for VF, becuase they are VF copy registers so
+		vbios post doesn't program them, for SRIOV driver need to program them */
+		WREG32(SOC15_REG_OFFSET(GC, 0, mmMC_VM_FB_LOCATION_BASE),
+				adev->mc.vram_start >> 24);
+		WREG32(SOC15_REG_OFFSET(GC, 0, mmMC_VM_FB_LOCATION_TOP),
+				adev->mc.vram_end >> 24);
+	}
+
 	/* Disable AGP. */
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmMC_VM_AGP_BASE), 0);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmMC_VM_AGP_TOP), 0);
@@ -195,7 +204,8 @@ int gfxhub_v1_0_gart_enable(struct amdgpu_device *adev)
 	for (i = 0; i <= 14; i++) {
 		tmp = RREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT1_CNTL) + i);
 		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL, ENABLE_CONTEXT, 1);
-		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL, PAGE_TABLE_DEPTH, 1);
+		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL, PAGE_TABLE_DEPTH,
+				    adev->vm_manager.num_level);
 		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL,
 				RANGE_PROTECTION_FAULT_ENABLE_DEFAULT, 1);
 		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL,

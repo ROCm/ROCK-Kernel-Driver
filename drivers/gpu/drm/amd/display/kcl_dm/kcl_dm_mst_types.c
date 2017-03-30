@@ -23,14 +23,14 @@
  *
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
 
 #include <linux/version.h>
 #include <drm/drm_atomic_helper.h>
 #include "dm_services.h"
 #include "amdgpu.h"
-#include "amdgpu_dm_types.h"
-#include "amdgpu_dm_mst_types.h"
+#include "kcl_dm_types.h"
+#include "kcl_dm_mst_types.h"
 
 #include "dc.h"
 #include "dm_helpers.h"
@@ -436,4 +436,5 @@ void amdgpu_dm_initialize_mst_connector(
 		4,
 		aconnector->connector_id);
 }
+
 #endif

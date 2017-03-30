@@ -23,10 +23,8 @@
  *
  */
 
-#ifndef __AMDGPU_DM_H__
-#define __AMDGPU_DM_H__
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#ifndef __KCL_DM_H__
+#define __KCL_DM_H__
 
 /*
 #include "linux/switch.h"
@@ -42,10 +40,10 @@
  * in amdgpu_dm_kms.h file
  */
 
-#define AMDGPU_DM_MAX_DISPLAY_INDEX 31
+#define KCL_DM_MAX_DISPLAY_INDEX 31
 /*
 #include "include/amdgpu_dal_power_if.h"
-#include "amdgpu_dm_irq.h"
+#include "kcl_dm_irq.h"
 */
 
 #include "irq_types.h"
@@ -170,8 +168,4 @@ struct amdgpu_connector *amdgpu_dm_find_first_crct_matching_connector(
 	struct drm_crtc *crtc,
 	bool from_state_var);
 
-#else
-#include "../kcl_dm/kcl_dm.h"
-#endif /* KERNEL_VERSION */
-
-#endif /* __AMDGPU_DM_H__ */
+#endif /* __KCL_DM_H__ */

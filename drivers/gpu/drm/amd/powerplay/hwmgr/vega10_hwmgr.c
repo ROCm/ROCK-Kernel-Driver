@@ -2604,6 +2604,9 @@ static int vega10_enable_dpm_tasks(struct pp_hwmgr *hwmgr)
 
 	vega10_set_tools_address(hwmgr->smumgr);
 
+	smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
+			PPSMC_MSG_NumOfDisplays, 0);
+
 	tmp_result = (!vega10_is_dpm_running(hwmgr)) ? 0 : -1;
 	PP_ASSERT_WITH_CODE(!tmp_result,
 			"DPM is already running right , skipping re-enablement!",
@@ -3393,16 +3396,31 @@ static int vega10_upload_dpm_bootup_level(struct pp_hwmgr *hwmgr)
 
 	if (!data->registry_data.sclk_dpm_key_disabled) {
 		if (data->smc_state_table.gfx_boot_level !=
-				data->dpm_table.gfx_table.dpm_state.soft_min_level)
+				data->dpm_table.gfx_table.dpm_state.soft_min_level) {
+				PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc_with_parameter(
+				hwmgr->smumgr,
+				PPSMC_MSG_SetSoftMinGfxclkByIndex,
+				data->smc_state_table.gfx_boot_level),
+				"Failed to set soft min sclk index!",
+				return -EINVAL);
 			data->dpm_table.gfx_table.dpm_state.soft_min_level =
 					data->smc_state_table.gfx_boot_level;
+		}
 	}
 
 	if (!data->registry_data.mclk_dpm_key_disabled) {
 		if (data->smc_state_table.mem_boot_level !=
-				data->dpm_table.mem_table.dpm_state.soft_min_level)
+				data->dpm_table.mem_table.dpm_state.soft_min_level) {
+				PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc_with_parameter(
+				hwmgr->smumgr,
+				 PPSMC_MSG_SetSoftMinUclkByIndex,
+				data->smc_state_table.mem_boot_level),
+				"Failed to set soft min mclk index!",
+				return -EINVAL);
+
 			data->dpm_table.mem_table.dpm_state.soft_min_level =
 					data->smc_state_table.mem_boot_level;
+		}
 	}
 
 	return 0;
@@ -3418,6 +3436,12 @@ static int vega10_upload_dpm_max_level(struct pp_hwmgr *hwmgr)
 	if (!data->registry_data.sclk_dpm_key_disabled) {
 		if (data->smc_state_table.gfx_max_level !=
 				data->dpm_table.gfx_table.dpm_state.soft_max_level) {
+				PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc_with_parameter(
+				hwmgr->smumgr,
+				PPSMC_MSG_SetSoftMaxGfxclkByIndex,
+				data->smc_state_table.gfx_max_level),
+				"Failed to set soft max sclk index!",
+				return -EINVAL);
 			data->dpm_table.gfx_table.dpm_state.soft_max_level =
 					data->smc_state_table.gfx_max_level;
 		}
@@ -3426,6 +3450,12 @@ static int vega10_upload_dpm_max_level(struct pp_hwmgr *hwmgr)
 	if (!data->registry_data.mclk_dpm_key_disabled) {
 		if (data->smc_state_table.mem_max_level !=
 				data->dpm_table.mem_table.dpm_state.soft_max_level) {
+				PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc_with_parameter(
+				hwmgr->smumgr,
+				PPSMC_MSG_SetSoftMaxUclkByIndex,
+				data->smc_state_table.mem_max_level),
+				"Failed to set soft max mclk index!",
+				return -EINVAL);
 			data->dpm_table.mem_table.dpm_state.soft_max_level =
 					data->smc_state_table.mem_max_level;
 		}
@@ -3443,6 +3473,7 @@ static int vega10_generate_dpm_level_enable_mask(
 			(const struct phm_set_power_state_input *)input;
 	const struct vega10_power_state *vega10_ps =
 			cast_const_phw_vega10_power_state(states->pnew_state);
+	int i;
 
 	PP_ASSERT_WITH_CODE(!vega10_trim_dpm_states(hwmgr, vega10_ps),
 			"Attempt to Trim DPM States Failed!",
@@ -3463,6 +3494,12 @@ static int vega10_generate_dpm_level_enable_mask(
 	PP_ASSERT_WITH_CODE(!vega10_upload_dpm_max_level(hwmgr),
 			"Attempt to upload DPM Max Levels Failed!",
 			return -1);
+	for(i = data->smc_state_table.gfx_boot_level; i < data->smc_state_table.gfx_max_level; i++)
+		data->dpm_table.gfx_table.dpm_levels[i].enabled = true;
+
+
+	for(i = data->smc_state_table.mem_boot_level; i < data->smc_state_table.mem_max_level; i++)
+		data->dpm_table.mem_table.dpm_levels[i].enabled = true;
 
 	return 0;
 }
@@ -3482,31 +3519,6 @@ int vega10_enable_disable_vce_dpm(struct pp_hwmgr *hwmgr, bool enable)
 	}
 
 	return 0;
-}
-
-int vega10_update_vce_dpm(struct pp_hwmgr *hwmgr, const void *input)
-{
-	const struct phm_set_power_state_input *states =
-			(const struct phm_set_power_state_input *)input;
-	const struct vega10_power_state *vega10_nps =
-			cast_const_phw_vega10_power_state(states->pnew_state);
-	const struct vega10_power_state *vega10_cps =
-			cast_const_phw_vega10_power_state(states->pcurrent_state);
-	int result = 0;
-
-	if (!phm_cap_enabled(hwmgr->platform_descriptor.platformCaps,
-			PHM_PlatformCaps_VCEDPM))
-		return 0;
-
-	if (vega10_nps->vce_clks.evclk > 0 &&
-			(vega10_cps == NULL ||
-			vega10_cps->vce_clks.evclk == 0))
-		result = vega10_enable_disable_vce_dpm(hwmgr, true);
-	else if (!vega10_nps->vce_clks.evclk &&
-			(vega10_cps && vega10_cps->vce_clks.evclk))
-		result = vega10_enable_disable_vce_dpm(hwmgr, false);
-
-	return result;
 }
 
 static int vega10_update_sclk_threshold(struct pp_hwmgr *hwmgr)
@@ -3558,11 +3570,6 @@ static int vega10_set_power_state_tasks(struct pp_hwmgr *hwmgr,
 	tmp_result = vega10_generate_dpm_level_enable_mask(hwmgr, input);
 	PP_ASSERT_WITH_CODE(!tmp_result,
 			"Failed to generate DPM level enabled mask!",
-			result = tmp_result);
-
-	tmp_result = vega10_update_vce_dpm(hwmgr, input);
-	PP_ASSERT_WITH_CODE(!tmp_result,
-			"Failed to update VCE DPM!",
 			result = tmp_result);
 
 	tmp_result = vega10_update_sclk_threshold(hwmgr);
@@ -3651,12 +3658,9 @@ static int vega10_read_sensor(struct pp_hwmgr *hwmgr, int idx,
 		}
 		break;
 	case AMDGPU_PP_SENSOR_GPU_LOAD:
-		ret = smum_send_msg_to_smc(hwmgr->smumgr, PPSMC_MSG_GetAverageGfxActivity);
+		ret = smum_send_msg_to_smc_with_parameter(hwmgr->smumgr, PPSMC_MSG_GetAverageGfxActivity, 0);
 		if (!ret) {
 			vega10_read_arg_from_smc(hwmgr->smumgr, &activity_percent);
-
-			activity_percent += 0x80;
-			activity_percent >>= 8;
 			*((uint32_t *)value) = activity_percent > 100 ? 100 : activity_percent;
 			*size = 4;
 		}
@@ -4277,18 +4281,19 @@ static int vega10_display_configuration_changed_task(struct pp_hwmgr *hwmgr)
 	Watermarks_t *wm_table = &(data->smc_state_table.water_marks_table);
 	struct cgs_display_info info = {0};
 
-	cgs_get_active_displays_info(hwmgr->device, &info);
-	num_turned_on_displays = info.display_count;
-
-	smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
-			PPSMC_MSG_NumOfDisplays, num_turned_on_displays);
-
 	if ((data->water_marks_bitmap & WaterMarksExist) &&
 			!(data->water_marks_bitmap & WaterMarksLoaded)) {
 		result = vega10_copy_table_to_smc(hwmgr->smumgr,
 			(uint8_t *)wm_table, WMTABLE);
 		PP_ASSERT_WITH_CODE(result, "Failed to update WMTABLE!", return EINVAL);
 		data->water_marks_bitmap |= WaterMarksLoaded;
+	}
+
+	if (data->water_marks_bitmap & WaterMarksLoaded) {
+		cgs_get_active_displays_info(hwmgr->device, &info);
+		num_turned_on_displays = info.display_count;
+		smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
+			PPSMC_MSG_NumOfDisplays, num_turned_on_displays);
 	}
 
 	return result;
@@ -4326,6 +4331,69 @@ static int vega10_power_gate_uvd(struct pp_hwmgr *hwmgr, bool bgate)
 	return vega10_enable_disable_uvd_dpm(hwmgr, !bgate);
 }
 
+static inline bool vega10_are_power_levels_equal(
+				const struct vega10_performance_level *pl1,
+				const struct vega10_performance_level *pl2)
+{
+	return ((pl1->soc_clock == pl2->soc_clock) &&
+			(pl1->gfx_clock == pl2->gfx_clock) &&
+			(pl1->mem_clock == pl2->mem_clock));
+}
+
+static int vega10_check_states_equal(struct pp_hwmgr *hwmgr,
+				const struct pp_hw_power_state *pstate1,
+			const struct pp_hw_power_state *pstate2, bool *equal)
+{
+	const struct vega10_power_state *psa;
+	const struct vega10_power_state *psb;
+	int i;
+
+	if (pstate1 == NULL || pstate2 == NULL || equal == NULL)
+		return -EINVAL;
+
+	psa = cast_const_phw_vega10_power_state(pstate1);
+	psb = cast_const_phw_vega10_power_state(pstate2);
+	/* If the two states don't even have the same number of performance levels they cannot be the same state. */
+	if (psa->performance_level_count != psb->performance_level_count) {
+		*equal = false;
+		return 0;
+	}
+
+	for (i = 0; i < psa->performance_level_count; i++) {
+		if (!vega10_are_power_levels_equal(&(psa->performance_levels[i]), &(psb->performance_levels[i]))) {
+			/* If we have found even one performance level pair that is different the states are different. */
+			*equal = false;
+			return 0;
+		}
+	}
+
+	/* If all performance levels are the same try to use the UVD clocks to break the tie.*/
+	*equal = ((psa->uvd_clks.vclk == psb->uvd_clks.vclk) && (psa->uvd_clks.dclk == psb->uvd_clks.dclk));
+	*equal &= ((psa->vce_clks.evclk == psb->vce_clks.evclk) && (psa->vce_clks.ecclk == psb->vce_clks.ecclk));
+	*equal &= (psa->sclk_threshold == psb->sclk_threshold);
+
+	return 0;
+}
+
+static bool
+vega10_check_smc_update_required_for_display_configuration(struct pp_hwmgr *hwmgr)
+{
+	struct vega10_hwmgr *data = (struct vega10_hwmgr *)(hwmgr->backend);
+	bool is_update_required = false;
+	struct cgs_display_info info = {0, 0, NULL};
+
+	cgs_get_active_displays_info(hwmgr->device, &info);
+
+	if (data->display_timing.num_existing_displays != info.display_count)
+		is_update_required = true;
+
+	if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_SclkDeepSleep)) {
+		if (data->display_timing.min_clock_in_sr != hwmgr->display_config.min_core_set_clock_in_sr)
+			is_update_required = true;
+	}
+
+	return is_update_required;
+}
 
 static const struct pp_hwmgr_func vega10_hwmgr_funcs = {
 	.backend_init = vega10_hwmgr_backend_init,
@@ -4368,6 +4436,9 @@ static const struct pp_hwmgr_func vega10_hwmgr_funcs = {
 	.display_config_changed = vega10_display_configuration_changed_task,
 	.powergate_uvd = vega10_power_gate_uvd,
 	.powergate_vce = vega10_power_gate_vce,
+	.check_states_equal = vega10_check_states_equal,
+	.check_smc_update_required_for_display_configuration =
+			vega10_check_smc_update_required_for_display_configuration,
 };
 
 int vega10_hwmgr_init(struct pp_hwmgr *hwmgr)

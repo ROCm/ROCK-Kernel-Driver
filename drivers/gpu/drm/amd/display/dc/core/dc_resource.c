@@ -297,8 +297,8 @@ bool resource_are_streams_timing_synchronizable(
 		return false;
 
 	if (stream1->phy_pix_clk != stream2->phy_pix_clk
-			&& !dc_is_dp_signal(stream1->signal)
-			&& !dc_is_dp_signal(stream2->signal))
+			&& (!dc_is_dp_signal(stream1->signal)
+			|| !dc_is_dp_signal(stream2->signal)))
 		return false;
 
 	return true;
@@ -887,7 +887,7 @@ struct pipe_ctx *resource_get_head_pipe_for_stream(
 	int i;
 	for (i = 0; i < res_ctx->pool->pipe_count; i++) {
 		if (res_ctx->pipe_ctx[i].stream == stream &&
-				!res_ctx->pipe_ctx[i].top_pipe) {
+				res_ctx->pipe_ctx[i].stream_enc) {
 			return &res_ctx->pipe_ctx[i];
 			break;
 		}
@@ -900,10 +900,11 @@ struct pipe_ctx *resource_get_head_pipe_for_stream(
  * that has no surface attached yet
  */
 static struct pipe_ctx *acquire_free_pipe_for_stream(
-		struct resource_context *res_ctx,
+		struct validate_context *context,
 		const struct dc_stream *dc_stream)
 {
 	int i;
+	struct resource_context *res_ctx = &context->res_ctx;
 	struct core_stream *stream = DC_STREAM_TO_CORE(dc_stream);
 
 	struct pipe_ctx *head_pipe = NULL;
@@ -934,7 +935,7 @@ static struct pipe_ctx *acquire_free_pipe_for_stream(
 	if(!res_ctx->pool->funcs->acquire_idle_pipe_for_layer)
 		return NULL;
 
-	return res_ctx->pool->funcs->acquire_idle_pipe_for_layer(res_ctx, stream);
+	return res_ctx->pool->funcs->acquire_idle_pipe_for_layer(context, stream);
 
 }
 
@@ -1001,8 +1002,7 @@ bool resource_attach_surfaces_to_context(
 	tail_pipe = NULL;
 	for (i = 0; i < surface_count; i++) {
 		struct core_surface *surface = DC_SURFACE_TO_CORE(surfaces[i]);
-		struct pipe_ctx *free_pipe = acquire_free_pipe_for_stream(
-				&context->res_ctx, dc_stream);
+		struct pipe_ctx *free_pipe = acquire_free_pipe_for_stream(context, dc_stream);
 
 		if (!free_pipe) {
 			stream_status->surfaces[i] = NULL;
@@ -1072,8 +1072,6 @@ static bool are_stream_backends_same(
 bool is_stream_unchanged(
 	const struct core_stream *old_stream, const struct core_stream *stream)
 {
-	if (old_stream == stream)
-		return true;
 
 	if (!are_stream_backends_same(old_stream, stream))
 		return false;
@@ -1357,6 +1355,7 @@ enum dc_status resource_map_pool_resources(
 			continue;
 		}
 	}
+
 		/* mark resources used for stream that is already active */
 		for (j = 0; j < MAX_PIPES; j++) {
 			struct pipe_ctx *pipe_ctx =
