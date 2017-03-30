@@ -24,7 +24,7 @@ struct acp3x_dev_data {
 	void __iomem *acp3x_base;
 	bool acp3x_audio_mode;
 	struct resource *res;
-	struct platform_device *pdev;
+	struct platform_device *pdev[3];
 };
 
 static int snd_acp3x_probe(struct pci_dev *pci,
@@ -103,12 +103,29 @@ static int snd_acp3x_probe(struct pci_dev *pci,
 		pdevinfo.data = &irqflags;
 		pdevinfo.size_data = sizeof(irqflags);
 
-		adata->pdev = platform_device_register_full(&pdevinfo);
-		if (adata->pdev == NULL) {
+		adata->pdev[0] = platform_device_register_full(&pdevinfo);
+		if (adata->pdev[0] == NULL) {
 			dev_err(&pci->dev, "cannot register %s device\n",
 				pdevinfo.name);
 			ret = -ENODEV;
 			goto unmap_mmio;
+		}
+
+		/* create dummy codec device */
+		adata->pdev[1] = platform_device_register_simple("dummy_w5102",
+					0, NULL, 0);
+		if (IS_ERR(adata->pdev[1])) {
+			dev_err(&pci->dev, "Cannot register dummy_w5102\n");
+			ret = -ENODEV;
+			goto unregister_pdev0;
+		}
+		/* create dummy mach device */
+		adata->pdev[2] = platform_device_register_simple(
+					"acp3x_w5102_mach", 0, NULL, 0);
+		if (IS_ERR(adata->pdev[2])) {
+			dev_err(&pci->dev, "Cannot register acp3x_w5102_mach\n");
+			ret = -ENODEV;
+			goto unregister_pdev1;
 		}
 	} else {
 		dev_err(&pci->dev, "Inavlid ACP audio mode : %d\n", val);
@@ -118,6 +135,10 @@ static int snd_acp3x_probe(struct pci_dev *pci,
 
 	return 0;
 
+unregister_pdev1:
+	platform_device_unregister(adata->pdev[1]);
+unregister_pdev0:
+	platform_device_unregister(adata->pdev[0]);
 unmap_mmio:
 	pci_disable_msi(pci);
 	iounmap(adata->acp3x_base);
@@ -131,9 +152,14 @@ disable_pci:
 
 static void snd_acp3x_remove(struct pci_dev *pci)
 {
+	int i;
 	struct acp3x_dev_data *adata = pci_get_drvdata(pci);
 
-	platform_device_unregister(adata->pdev);
+	if (adata->acp3x_audio_mode == ACP3x_I2S_MODE) {
+		for (i = 2; i >= 0; i--)
+			platform_device_unregister(adata->pdev[i]);
+	}
+
 	iounmap(adata->acp3x_base);
 
 	pci_disable_msi(pci);
