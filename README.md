@@ -1,19 +1,19 @@
 ### AMD Radeon Open Compute Kernel driver
 
-#### What's New in this tree ?
+#### What's new in this tree ?
 
 * dGPU support for Fiji
 * device and host memory support
 * multiple GPU support
 * host memory allocations are shared between GPUs
 
-#### Known Issues
+#### Known issues
 
 * On consumer grade products (Nano, Fury, Fury X), thermal control is not
   working correctly. As a workaround, fans are hardcoded to 100% to prevent
   overheating.
 
-#### Package Contents
+#### Package contents
 
 The kernel image is built from a source tree based on the 4.9 upstream
 release plus:
@@ -28,7 +28,7 @@ Please note that the libhsakmt library in this repository is NOT compatible
 with amdkfd that is distributed as part of the mainline Linux kernel
 from 3.19 and onward.
 
-#### Target Platform
+#### Target platform
 
 This release is intended for use with any hardware configuration that
 contains configurations which contain
@@ -37,7 +37,7 @@ an Intel Haswell or newer CPU, AMD Ryzen CPU plus GFX8 or newer dGPUs.  Please s
 The following is a reference hardware configuration that was used for
 testing purposes:
 
-dGPU Config:
+dGPU config:
 * CPU:            Intel i7-4790
 * Motherboard:    ASUS Z97-PRO
 * Memory:         G.Skill Ripjaws 4 32GB RAM (4 x 8GB)
