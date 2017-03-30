@@ -426,9 +426,10 @@ static int amdgpu_amdkfd_validate(void *param, struct amdgpu_bo *bo)
 	return amdgpu_amdkfd_bo_validate(bo, p->domain, p->wait);
 }
 
-static int validate_pt_pd_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm)
+static int vm_validate_pt_pd_bos(struct amdgpu_vm *vm)
 {
 	struct amdgpu_bo *pd = vm->page_directory;
+	struct amdgpu_device *adev = amdgpu_ttm_adev(pd->tbo.bdev);
 	struct amdgpu_vm_parser param;
 	int ret;
 
@@ -437,18 +438,20 @@ static int validate_pt_pd_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 
 	ret = amdgpu_vm_validate_pt_bos(adev, vm, amdgpu_amdkfd_validate,
 					&param);
-
 	if (ret) {
 		pr_err("amdgpu: failed to validate PT BOs\n");
-	} else {
-		ret = amdgpu_amdkfd_validate(&param, pd);
-		if (ret)
-			pr_err("amdgpu: failed to validate PD\n");
+		return ret;
+	}
+
+	ret = amdgpu_amdkfd_validate(&param, pd);
+	if (ret) {
+		pr_err("amdgpu: failed to validate PD\n");
+		return ret;
 	}
 
 	vm->last_eviction_counter = atomic64_read(&adev->num_evictions);
 
-	return ret;
+	return 0;
 }
 
 static void add_kgd_mem_to_kfd_bo_list(struct kgd_mem *mem,
@@ -981,7 +984,7 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev,
 	/* PT BOs may be created during amdgpu_vm_bo_map() call,
 	 * so we have to validate the newly created PT BOs.
 	 */
-	ret = validate_pt_pd_bos(adev, entry->bo_va->vm);
+	ret = vm_validate_pt_pd_bos(entry->bo_va->vm);
 	if (ret != 0) {
 		pr_err("validate_pt_pd_bos() failed\n");
 		return ret;
@@ -1862,35 +1865,16 @@ int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
 	return 0;
 }
 
-static int validate_pd_pt_bos(struct amdkfd_process_info *process_info)
+static int process_validate_vms(struct amdkfd_process_info *process_info)
 {
 	struct amdkfd_vm *peer_vm;
-	struct amdgpu_vm_parser param;
 	int ret;
-
-	param.domain = AMDGPU_GEM_DOMAIN_VRAM;
-	param.wait = false;
 
 	list_for_each_entry(peer_vm, &process_info->vm_list_head,
 			    vm_list_node) {
-		struct amdgpu_bo *pd_bo = peer_vm->base.root.bo;
-		struct amdgpu_device *adev = amdgpu_ttm_adev(pd_bo->tbo.bdev);
-
-		ret = amdgpu_amdkfd_bo_validate(pd_bo, pd_bo->prefered_domains,
-						false);
-		if (ret) {
-			pr_debug("Validate PD failed. Try again\n");
+		ret = vm_validate_pt_pd_bos(&peer_vm->base);
+		if (ret)
 			return ret;
-		}
-
-		ret = amdgpu_vm_validate_pt_bos(adev, &peer_vm->base,
-				amdgpu_amdkfd_validate, &param);
-		if (ret) {
-			pr_debug("Validate PTs failed. Try again\n");
-			return ret;
-		}
-		peer_vm->base.last_eviction_counter =
-				atomic64_read(&adev->num_evictions);
 	}
 
 	return 0;
@@ -2069,7 +2053,7 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 
 	amdgpu_sync_create(&sync);
 
-	ret = validate_pd_pt_bos(process_info);
+	ret = process_validate_vms(process_info);
 	if (ret)
 		goto unreserve_out;
 
@@ -2300,7 +2284,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 	amdgpu_sync_create(&ctx.sync);
 
 	/* Validate PDs and PTs */
-	ret = validate_pd_pt_bos(process_info);
+	ret = process_validate_vms(process_info);
 	if (ret)
 		goto validate_map_fail;
 
