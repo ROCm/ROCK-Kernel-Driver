@@ -520,9 +520,6 @@ int amdgpu_vm_grab_id(struct amdgpu_vm *vm, struct amdgpu_ring *ring,
 	if (r)
 		goto error;
 
-	fence_put(id->first);
-	id->first = fence_get(fence);
-
 	fence_put(id->last_flush);
 	id->last_flush = NULL;
 
@@ -2255,7 +2252,6 @@ void amdgpu_vm_manager_fini(struct amdgpu_device *adev)
 	for (i = 0; i < AMDGPU_NUM_VM; ++i) {
 		struct amdgpu_vm_id *id = &adev->vm_manager.ids[i];
 
-		fence_put(adev->vm_manager.ids[i].first);
 		amdgpu_sync_free(&adev->vm_manager.ids[i].active);
 		fence_put(id->flushed_updates);
 		fence_put(id->last_flush);
