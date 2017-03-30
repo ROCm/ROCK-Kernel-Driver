@@ -25,7 +25,9 @@
 #include "acp3x.h"
 
 struct i2s_dev_data {
+	bool tdm_mode;
 	unsigned int i2s_irq;
+	u32 tdm_fmt;
 	void __iomem *acp3x_base;
 	struct snd_pcm_substream *play_stream;
 	struct snd_pcm_substream *capture_stream;
@@ -35,7 +37,6 @@ struct i2s_stream_instance {
 	u16 num_pages;
 	u16 channels;
 	u32 xfer_resolution;
-	u32 fmt;
 	u32 val;
 	struct page *pg;
 	void __iomem *acp3x_base;
@@ -436,6 +437,64 @@ static struct snd_soc_platform_driver acp3x_asoc_platform = {
 	.pcm_new = acp3x_dma_new,
 };
 
+static int acp3x_dai_i2s_set_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
+{
+
+	struct i2s_dev_data *adata = snd_soc_dai_get_drvdata(cpu_dai);
+
+	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
+	case SND_SOC_DAIFMT_I2S:
+		adata->tdm_mode = false;
+	break;
+	case SND_SOC_DAIFMT_DSP_A:
+		adata->tdm_mode = true;
+	break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int acp3x_dai_set_tdm_slot(struct snd_soc_dai *cpu_dai, u32 tx_mask,
+				u32 rx_mask, int slots, int slot_width)
+{
+	u32 val = 0;
+	u16 resolution;
+
+	struct i2s_dev_data *adata = snd_soc_dai_get_drvdata(cpu_dai);
+
+	switch (slot_width) {
+	case 8:
+		resolution = 0;
+	break;
+	case 16:
+		resolution = 2;
+	break;
+	case 24:
+		resolution = 4;
+	break;
+	case 32:
+		resolution = 5;
+	break;
+	default:
+		return -EINVAL;
+	break;
+	}
+
+	val = rv_readl(adata->acp3x_base + mmACP_BTTDM_ITER);
+	rv_writel((val | 0x2), adata->acp3x_base + mmACP_BTTDM_ITER);
+	val = rv_readl(adata->acp3x_base + mmACP_BTTDM_IRER);
+	rv_writel((val | 0x2), adata->acp3x_base + mmACP_BTTDM_IRER);
+
+	val = (FRM_LEN | ((slots-1) << 15) | (resolution << 18));
+	rv_writel(val, adata->acp3x_base + mmACP_BTTDM_TXFRMT);
+	rv_writel(val, adata->acp3x_base + mmACP_BTTDM_RXFRMT);
+
+	adata->tdm_fmt = val;
+	return 0;
+}
+
 static int acp3x_dai_i2s_hwparams(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params,
 				struct snd_soc_dai *dai)
@@ -519,6 +578,8 @@ static int acp3x_dai_i2s_trigger(struct snd_pcm_substream *substream,
 struct snd_soc_dai_ops acp3x_dai_i2s_ops = {
 	.hw_params = acp3x_dai_i2s_hwparams,
 	.trigger   = acp3x_dai_i2s_trigger,
+	.set_fmt = acp3x_dai_i2s_set_fmt,
+	.set_tdm_slot = acp3x_dai_set_tdm_slot,
 };
 
 static struct snd_soc_dai_driver acp3x_i2s_dai_driver = {
