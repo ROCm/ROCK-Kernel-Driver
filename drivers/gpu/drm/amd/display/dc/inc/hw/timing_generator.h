@@ -96,7 +96,6 @@ enum crtc_state {
 	CRTC_STATE_VBLANK = 0,
 	CRTC_STATE_VACTIVE
 };
-
 struct timing_generator {
 	const struct timing_generator_funcs *funcs;
 	struct dc_bios *bp;
@@ -156,6 +155,8 @@ struct timing_generator_funcs {
 		struct timing_generator *tg,
 		enum controller_dp_test_pattern test_pattern,
 		enum dc_color_depth color_depth);
+
+	bool (*arm_vert_intr)(struct timing_generator *tg, uint8_t width);
 
 };
 

@@ -76,9 +76,17 @@ static bool construct(struct core_stream *stream,
 	stream->public.audio_info.product_id = dc_sink_data->edid_caps.product_id;
 	stream->public.audio_info.flags.all = dc_sink_data->edid_caps.speaker_flags;
 
-	/* TODO - Unhardcode port_id */
-	stream->public.audio_info.port_id[0] = 0x5558859e;
-	stream->public.audio_info.port_id[1] = 0xd989449;
+	if (dc_sink_data->dc_container_id != NULL) {
+		struct dc_container_id *dc_container_id = dc_sink_data->dc_container_id;
+
+		stream->public.audio_info.port_id[0] = dc_container_id->portId[0];
+		stream->public.audio_info.port_id[1] = dc_container_id->portId[1];
+	} else {
+		/* TODO - WindowDM has implemented,
+		other DMs need Unhardcode port_id */
+		stream->public.audio_info.port_id[0] = 0x5558859e;
+		stream->public.audio_info.port_id[1] = 0xd989449;
+	}
 
 	/* EDID CAP translation for HDMI 2.0 */
 	stream->public.timing.flags.LTE_340MCSC_SCRAMBLE = dc_sink_data->edid_caps.lte_340mcsc_scramble;
@@ -207,7 +215,7 @@ bool dc_stream_set_cursor_attributes(
 
 bool dc_stream_set_cursor_position(
 	const struct dc_stream *dc_stream,
-	const struct dc_cursor_position *position)
+	struct dc_cursor_position *position)
 {
 	int i;
 	struct core_stream *stream;
@@ -242,6 +250,9 @@ bool dc_stream_set_cursor_position(
 				.viewport_width = pipe_ctx->scl_data.viewport.width,
 				.h_scale_ratio = pipe_ctx->scl_data.ratios.horz,
 			};
+
+			if (pipe_ctx->top_pipe && pipe_ctx->surface != pipe_ctx->top_pipe->surface)
+				position->enable = false;
 
 			ipp->funcs->ipp_cursor_set_position(ipp, position, &param);
 			ret = true;
