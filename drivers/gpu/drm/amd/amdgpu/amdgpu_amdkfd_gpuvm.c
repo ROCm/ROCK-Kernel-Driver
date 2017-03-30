@@ -433,7 +433,7 @@ static int validate_pt_pd_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	int ret;
 
 	param.domain = AMDGPU_GEM_DOMAIN_VRAM;
-	param.wait = true;
+	param.wait = false;
 
 	ret = amdgpu_vm_validate_pt_bos(adev, vm, amdgpu_amdkfd_validate,
 					&param);
