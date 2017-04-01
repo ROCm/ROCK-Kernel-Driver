@@ -30,7 +30,9 @@
 #else
 #include <linux/fence-array.h>
 #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0)
 #include <linux/interval_tree_generic.h>
+#endif
 #include <drm/drmP.h>
 #include <drm/amdgpu_drm.h>
 #include "amdgpu.h"
