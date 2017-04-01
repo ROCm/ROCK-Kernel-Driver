@@ -10,5 +10,8 @@
 #include <kcl/kcl_kthread.h>
 #include <kcl/kcl_io.h>
 #include <kcl/kcl_drm_global.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 7, 0)
+#include <kcl/kcl_interval_tree_generic.h>
+#endif
 
 #endif /* AMDGPU_BACKPORT_H */
