@@ -1552,7 +1552,7 @@ static void amdgpu_vm_add_prt_cb(struct amdgpu_device *adev,
 		if (fence)
 			fence_wait(fence, false);
 
-		amdgpu_vm_prt_put(cb->adev);
+		amdgpu_vm_prt_put(adev);
 	} else {
 		cb->adev = adev;
 		if (!fence || fence_add_callback(fence, &cb->cb,
