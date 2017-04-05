@@ -57,6 +57,28 @@
 
 #include "modules/inc/mod_freesync.h"
 
+static enum drm_plane_type dm_surfaces_type_default[AMDGPU_MAX_PLANES] = {
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+};
+
+static enum drm_plane_type dm_surfaces_type_carizzo[AMDGPU_MAX_PLANES] = {
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_OVERLAY,/* YUV Capable Underlay */
+};
+
+static enum drm_plane_type dm_surfaces_type_stoney[AMDGPU_MAX_PLANES] = {
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_OVERLAY, /* YUV Capable Underlay */
+};
+
 /*
  * dm_vblank_get_counter
  *
@@ -1197,30 +1219,34 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	uint32_t i;
 	struct amdgpu_connector *aconnector;
 	struct amdgpu_encoder *aencoder;
-	struct amdgpu_crtc *acrtc;
+	struct amdgpu_mode_info *mode_info = &adev->mode_info;
 	uint32_t link_cnt;
 
 	link_cnt = dm->dc->caps.max_links;
-
 	if (amdgpu_dm_mode_config_init(dm->adev)) {
 		DRM_ERROR("DM: Failed to initialize mode config\n");
-		return -1;
+		goto fail;
 	}
 
-	for (i = 0; i < dm->dc->caps.max_streams; i++) {
-		acrtc = kzalloc(sizeof(struct amdgpu_crtc), GFP_KERNEL);
-		if (!acrtc)
-			goto fail;
-
-		if (amdgpu_dm_crtc_init(
-			dm,
-			acrtc,
-			i)) {
-			DRM_ERROR("KMS: Failed to initialize crtc\n");
-			kfree(acrtc);
-			goto fail;
+	for (i = 0; i < dm->dc->caps.max_surfaces; i++) {
+		mode_info->planes[i] = kzalloc(sizeof(struct amdgpu_plane),
+								 GFP_KERNEL);
+		if (!mode_info->planes[i]) {
+			DRM_ERROR("KMS: Failed to allocate surface\n");
+			goto fail_free_planes;
+		}
+		mode_info->planes[i]->plane_type = mode_info->plane_type[i];
+		if (amdgpu_dm_plane_init(dm, mode_info->planes[i], 1)) {
+			DRM_ERROR("KMS: Failed to initialize plane\n");
+			goto fail_free_planes;
 		}
 	}
+
+	for (i = 0; i < dm->dc->caps.max_streams; i++)
+		if (amdgpu_dm_crtc_init(dm, &mode_info->planes[i]->base, i)) {
+			DRM_ERROR("KMS: Failed to initialize crtc\n");
+			goto fail_free_planes;
+		}
 
 	dm->display_indexes_num = dm->dc->caps.max_streams;
 
@@ -1271,12 +1297,12 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	case CHIP_VEGA10:
 		if (dce110_register_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
-			return -1;
+			goto fail_free_encoder;
 		}
 		break;
 	default:
 		DRM_ERROR("Usupported ASIC type: 0x%X\n", adev->asic_type);
-		return -1;
+		goto fail_free_encoder;
 	}
 
 	drm_mode_config_reset(dm->ddev);
@@ -1286,6 +1312,9 @@ fail_free_encoder:
 	kfree(aencoder);
 fail_free_connector:
 	kfree(aconnector);
+fail_free_planes:
+	for (i = 0; i < dm->dc->caps.max_surfaces; i++)
+		kfree(mode_info->planes[i]);
 fail:
 	return -1;
 }
@@ -1656,6 +1685,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
+		adev->mode_info.plane_type = dm_surfaces_type_default;
 #ifdef CONFIG_DRM_AMDGPU_CIK
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v8_0_display_funcs;
@@ -1666,6 +1696,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 7;
+		adev->mode_info.plane_type = dm_surfaces_type_default;
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v10_0_display_funcs;
 		break;
@@ -1673,6 +1704,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 3;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 9;
+		adev->mode_info.plane_type = dm_surfaces_type_carizzo;
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v11_0_display_funcs;
 		break;
@@ -1680,6 +1712,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 2;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 9;
+		adev->mode_info.plane_type = dm_surfaces_type_stoney;
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v11_0_display_funcs;
 		break;
@@ -1688,6 +1721,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 5;
 		adev->mode_info.num_hpd = 5;
 		adev->mode_info.num_dig = 5;
+		adev->mode_info.plane_type = dm_surfaces_type_default;
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v11_0_display_funcs;
 		break;
@@ -1695,6 +1729,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
+		adev->mode_info.plane_type = dm_surfaces_type_default;
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v11_0_display_funcs;
 		break;
