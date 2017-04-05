@@ -265,53 +265,6 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 	mutex_unlock(&rmn->lock);
 }
 
-/**
- * amdgpu_mn_invalidate_range_end_hsa - callback to notify about mm change
- *
- * @mn: our notifier
- * @mn: the mm this callback is about
- * @start: start of updated range
- * @end: end of updated range
- *
- * Restore BOs between start and end. Once the last BO is restored,
- * the queues can be reenabled. Restoring a BO can itself trigger
- * another recursive MMU notifier. Therefore this needs to be
- * scheduled in a worker thread. Adding a slight delay (1 jiffy)
- * avoids excessive repeated evictions.
- */
-static void amdgpu_mn_invalidate_range_end_hsa(struct mmu_notifier *mn,
-					       struct mm_struct *mm,
-					       unsigned long start,
-					       unsigned long end)
-{
-	struct amdgpu_mn *rmn = container_of(mn, struct amdgpu_mn, mn);
-	struct interval_tree_node *it;
-
-	/* notification is exclusive, but interval is inclusive */
-	end -= 1;
-
-	mutex_lock(&rmn->lock);
-
-	it = interval_tree_iter_first(&rmn->objects, start, end);
-	while (it) {
-		struct amdgpu_mn_node *node;
-		struct amdgpu_bo *bo;
-
-		node = container_of(it, struct amdgpu_mn_node, it);
-		it = interval_tree_iter_next(it, start, end);
-
-		list_for_each_entry(bo, &node->bos, mn_list) {
-			struct kgd_mem *mem = bo->kfd_bo;
-
-			if (amdgpu_ttm_tt_affect_userptr(bo->tbo.ttm,
-							 start, end))
-				amdgpu_amdkfd_schedule_restore_userptr(mem, 1);
-		}
-	}
-
-	mutex_unlock(&rmn->lock);
-}
-
 static void amdgpu_mn_invalidate_page_hsa(struct mmu_notifier *mn,
 					  struct mm_struct *mm,
 					  unsigned long address)
@@ -332,10 +285,8 @@ static void amdgpu_mn_invalidate_page_hsa(struct mmu_notifier *mn,
 			struct kgd_mem *mem = bo->kfd_bo;
 
 			if (amdgpu_ttm_tt_affect_userptr(bo->tbo.ttm,
-							 address, address)) {
+							 address, address))
 				amdgpu_amdkfd_evict_userptr(mem, mm);
-				amdgpu_amdkfd_schedule_restore_userptr(mem, 1);
-			}
 		}
 	}
 
@@ -352,7 +303,6 @@ static const struct mmu_notifier_ops amdgpu_mn_ops[] = {
 		.release = amdgpu_mn_release,
 		.invalidate_page = amdgpu_mn_invalidate_page_hsa,
 		.invalidate_range_start = amdgpu_mn_invalidate_range_start_hsa,
-		.invalidate_range_end = amdgpu_mn_invalidate_range_end_hsa,
 	},
 };
 

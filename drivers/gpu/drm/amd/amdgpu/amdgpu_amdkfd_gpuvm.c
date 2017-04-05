@@ -1905,6 +1905,7 @@ int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem,
 		r = kgd2kfd->quiesce_mm(NULL, mm);
 		if (r != 0)
 			pr_err("Failed to quiesce KFD\n");
+		schedule_delayed_work(&process_info->work, 1);
 	}
 
 	return r;
@@ -2178,23 +2179,6 @@ unlock_out:
 	/* If validation failed, reschedule another attempt */
 	if (evicted_bos)
 		schedule_delayed_work(&process_info->work, 1);
-}
-
-/* Schedule delayed restoring of userptr BOs
- *
- * This runs in an MMU notifier. See limitations above. The scheduled
- * worker is free of those limitations. Delaying the restore allows
- * multiple MMU notifiers to happen in rapid succession, for example
- * when fork COWs many BOs at once.
- */
-int amdgpu_amdkfd_schedule_restore_userptr(struct kgd_mem *mem,
-					   unsigned long delay)
-{
-	struct amdkfd_process_info *process_info = mem->process_info;
-
-	schedule_delayed_work(&process_info->work, delay);
-
-	return 0;
 }
 
 /** amdgpu_amdkfd_gpuvm_restore_process_bos - Restore all BOs for the given
