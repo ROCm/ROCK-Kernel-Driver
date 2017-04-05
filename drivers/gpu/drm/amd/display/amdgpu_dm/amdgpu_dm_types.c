@@ -1728,7 +1728,7 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 {
 	int res = -EPERM;
 
-	switch (aplane->plane_type) {
+	switch (aplane->base.type) {
 	case DRM_PLANE_TYPE_PRIMARY:
 		aplane->base.format_default = true;
 
@@ -1739,7 +1739,7 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 				&dm_plane_funcs,
 				rgb_formats,
 				ARRAY_SIZE(rgb_formats),
-				aplane->plane_type, NULL);
+				aplane->base.type, NULL);
 		break;
 	case DRM_PLANE_TYPE_OVERLAY:
 		res = drm_universal_plane_init(
@@ -1749,7 +1749,7 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 				&dm_plane_funcs,
 				yuv_formats,
 				ARRAY_SIZE(yuv_formats),
-				aplane->plane_type, NULL);
+				aplane->base.type, NULL);
 		break;
 	case DRM_PLANE_TYPE_CURSOR:
 		res = drm_universal_plane_init(
@@ -1759,7 +1759,7 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 				&dm_plane_funcs,
 				cursor_formats,
 				ARRAY_SIZE(cursor_formats),
-				aplane->plane_type, NULL);
+				aplane->base.type, NULL);
 		break;
 	}
 
