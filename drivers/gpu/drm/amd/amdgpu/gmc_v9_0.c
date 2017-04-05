@@ -566,7 +566,7 @@ static int gmc_v9_0_sw_init(void *handle)
 		adev->vm_manager.block_size = 9;
 	}
 
-	DRM_INFO("vm size is %d GB, block size is %d-bit\n",
+	DRM_INFO("vm size is %llu GB, block size is %d-bit\n",
 		adev->vm_manager.vm_size, adev->vm_manager.block_size);
 
 	/* This interrupt is VMC page fault.*/

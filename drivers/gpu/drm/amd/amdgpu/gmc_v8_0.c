@@ -1142,7 +1142,7 @@ static int gmc_v8_0_sw_init(void *handle)
 	adev->vm_manager.block_size = amdgpu_vm_block_size;
 	adev->vm_manager.max_pfn = adev->vm_manager.vm_size << 18;
 
-	DRM_INFO("vm size is %d GB, block size is %d-bit\n",
+	DRM_INFO("vm size is %llu GB, block size is %d-bit\n",
 		adev->vm_manager.vm_size, adev->vm_manager.block_size);
 
 	/* Set the internal MC address mask
