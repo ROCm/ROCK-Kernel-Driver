@@ -1680,12 +1680,61 @@ const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs = {
 	.atomic_check = dm_encoder_helper_atomic_check
 };
 
+static void dm_drm_plane_reset(struct drm_plane *plane)
+{
+	struct amdgpu_drm_plane_state *amdgpu_state;
+
+	if (plane->state) {
+		amdgpu_state = to_amdgpu_plane_state(plane->state);
+		if (amdgpu_state->base.fb)
+			drm_framebuffer_unreference(amdgpu_state->base.fb);
+		kfree(amdgpu_state);
+		plane->state = NULL;
+	}
+
+	amdgpu_state = kzalloc(sizeof(*amdgpu_state), GFP_KERNEL);
+	if (amdgpu_state) {
+		plane->state = &amdgpu_state->base;
+		plane->state->plane = plane;
+	}
+}
+
+static struct drm_plane_state *
+dm_drm_plane_duplicate_state(struct drm_plane *plane)
+{
+	struct amdgpu_drm_plane_state *amdgpu_state;
+	struct amdgpu_drm_plane_state *copy;
+
+	amdgpu_state = to_amdgpu_plane_state(plane->state);
+	copy = kzalloc(sizeof(*amdgpu_state), GFP_KERNEL);
+	if (!copy)
+		return NULL;
+
+	__drm_atomic_helper_plane_duplicate_state(plane, &copy->base);
+	return &copy->base;
+}
+
+static void dm_drm_plane_destroy_state(struct drm_plane *plane,
+					   struct drm_plane_state *old_state)
+{
+	struct amdgpu_drm_plane_state *old_amdgpu_state =
+					to_amdgpu_plane_state(old_state);
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 7, 0)
+	__drm_atomic_helper_plane_destroy_state(old_state);
+#else
+	__drm_atomic_helper_plane_destroy_state(plane, old_state);
+#endif
+	kfree(old_amdgpu_state);
+}
+
 static const struct drm_plane_funcs dm_plane_funcs = {
-	.update_plane   = drm_atomic_helper_update_plane,
-	.disable_plane  = drm_atomic_helper_disable_plane,
-	.reset = drm_atomic_helper_plane_reset,
-	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
-	.atomic_destroy_state = drm_atomic_helper_plane_destroy_state
+	.update_plane	= drm_atomic_helper_update_plane,
+	.disable_plane	= drm_atomic_helper_disable_plane,
+	.destroy	= drm_plane_cleanup,
+	.set_property	= drm_atomic_helper_plane_set_property,
+	.reset = dm_drm_plane_reset,
+	.atomic_duplicate_state = dm_drm_plane_duplicate_state,
+	.atomic_destroy_state = dm_drm_plane_destroy_state,
 };
 
 static void clear_unrelated_fields(struct drm_plane_state *state)
