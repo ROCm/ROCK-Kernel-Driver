@@ -523,7 +523,7 @@ static int init_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 	ret = amdgpu_ttm_tt_get_user_pages(bo->tbo.ttm, mem->user_pages);
 	up_read(&mm->mmap_sem);
 	if (ret) {
-		pr_err("%s: Failed to get user pages\n", __func__);
+		pr_err("%s: Failed to get user pages: %d\n", __func__, ret);
 		goto free_out;
 	}
 
@@ -1986,8 +1986,14 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 						   mem->user_pages);
 		if (ret) {
 			mem->user_pages[0] = NULL;
-			pr_err("%s: Failed to get user pages\n", __func__);
-			goto unlock_mmap_out;
+			pr_info("%s: Failed to get user pages: %d\n",
+				__func__, ret);
+			ret = 0;
+			/* Pretend it succeeded. It will fail later
+			 * with a VM fault if the GPU tries to access
+			 * it. Better than hanging indefinitely with
+			 * stalled user mode queues.
+			 */
 		}
 
 		/* Mark the BO as valid unless it was invalidated
@@ -2054,6 +2060,16 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 
 	amdgpu_sync_create(&sync);
 
+	/* Avoid triggering eviction fences when unmapping invalid
+	 * userptr BOs (waits for all fences, doesn't use
+	 * FENCE_OWNER_VM)
+	 */
+	list_for_each_entry(peer_vm, &process_info->vm_list_head,
+			    vm_list_node)
+		amdgpu_amdkfd_remove_eviction_fence(peer_vm->base.root.bo,
+						process_info->eviction_fence,
+						NULL, NULL);
+
 	ret = process_validate_vms(process_info);
 	if (ret)
 		goto unreserve_out;
@@ -2066,15 +2082,17 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 
 		bo = mem->bo;
 
-		/* Copy pages array and validate the BO */
-		memcpy(bo->tbo.ttm->pages, mem->user_pages,
-		       sizeof(struct page *) * bo->tbo.ttm->num_pages);
-		amdgpu_ttm_placement_from_domain(bo, mem->domain);
-		ret = ttm_bo_validate(&bo->tbo, &bo->placement,
-				      false, false);
-		if (ret) {
-			pr_err("%s: failed to validate BO\n", __func__);
-			goto unreserve_out;
+		/* Copy pages array and validate the BO if we got user pages */
+		if (mem->user_pages[0]) {
+			memcpy(bo->tbo.ttm->pages, mem->user_pages,
+			       sizeof(struct page *) * bo->tbo.ttm->num_pages);
+			amdgpu_ttm_placement_from_domain(bo, mem->domain);
+			ret = ttm_bo_validate(&bo->tbo, &bo->placement,
+					      false, false);
+			if (ret) {
+				pr_err("%s: failed to validate BO\n", __func__);
+				goto unreserve_out;
+			}
 		}
 
 		/* Validate succeeded, now the BO owns the pages, free
@@ -2087,6 +2105,12 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 		list_move_tail(&mem->validate_list.head,
 			       &process_info->userptr_valid_list);
 
+		/* Update mapping. If the BO was not validated
+		 * (because we couldn't get user pages), this will
+		 * clear the page table entries, which will result in
+		 * VM faults if the GPU tries to access the invalid
+		 * memory.
+		 */
 		list_for_each_entry(bo_va_entry, &mem->bo_va_list, bo_list) {
 			if (!bo_va_entry->is_mapped)
 				continue;
@@ -2103,6 +2127,10 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 		}
 	}
 unreserve_out:
+	list_for_each_entry(peer_vm, &process_info->vm_list_head,
+			    vm_list_node)
+		amdgpu_bo_fence(peer_vm->base.root.bo,
+				&process_info->eviction_fence->base, true);
 	ttm_eu_backoff_reservation(&ticket, &resv_list);
 	amdgpu_sync_wait(&sync);
 	amdgpu_sync_free(&sync);
