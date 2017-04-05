@@ -137,8 +137,6 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *rdev);
 void amdgpu_amdkfd_device_fini(struct amdgpu_device *rdev);
 
 int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem, struct mm_struct *mm);
-int amdgpu_amdkfd_schedule_restore_userptr(struct kgd_mem *mem,
-					   unsigned long delay);
 int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 				uint32_t vmid, uint64_t gpu_addr,
 				uint32_t *ib_cmd, uint32_t ib_len);
