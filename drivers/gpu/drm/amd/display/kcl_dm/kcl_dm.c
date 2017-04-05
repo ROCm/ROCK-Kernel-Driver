@@ -712,7 +712,7 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 	ret = dm_display_resume(ddev);
 	drm_modeset_unlock_all(ddev);
 
-	amdgpu_dm_irq_resume(adev);
+	amdgpu_dm_irq_resume_late(adev);
 
 	return ret;
 }
