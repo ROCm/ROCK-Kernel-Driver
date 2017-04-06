@@ -1447,6 +1447,56 @@ int amdgpu_dm_connector_atomic_set_property(
 	return ret;
 }
 
+int amdgpu_dm_connector_atomic_get_property(
+	struct drm_connector *connector,
+	const struct drm_connector_state *state,
+	struct drm_property *property,
+	uint64_t *val)
+{
+	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = dev->dev_private;
+	struct dm_connector_state *dm_state =
+		to_dm_connector_state(state);
+	int ret = -EINVAL;
+
+	if (property == dev->mode_config.scaling_mode_property) {
+		switch (dm_state->scaling) {
+		case RMX_CENTER:
+			*val = DRM_MODE_SCALE_CENTER;
+			break;
+		case RMX_ASPECT:
+			*val = DRM_MODE_SCALE_ASPECT;
+			break;
+		case RMX_FULL:
+			*val = DRM_MODE_SCALE_FULLSCREEN;
+			break;
+		case RMX_OFF:
+		default:
+			*val = DRM_MODE_SCALE_NONE;
+			break;
+		}
+		ret = 0;
+	} else if (property == adev->mode_info.underscan_hborder_property) {
+		*val = dm_state->underscan_hborder;
+		ret = 0;
+	} else if (property == adev->mode_info.underscan_vborder_property) {
+		*val = dm_state->underscan_vborder;
+		ret = 0;
+	} else if (property == adev->mode_info.underscan_property) {
+		*val = dm_state->underscan_enable;
+		ret = 0;
+	} else if (property == adev->mode_info.freesync_property) {
+		//TODO
+		*val = 0;
+		ret = 0;
+	} else if (property == adev->mode_info.freesync_capable_property) {
+		//TODO
+		*val = 0;
+		ret = 0;
+	}
+	return ret;
+}
+
 void amdgpu_dm_connector_destroy(struct drm_connector *connector)
 {
 	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
@@ -1518,7 +1568,8 @@ static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
 	.destroy = amdgpu_dm_connector_destroy,
 	.atomic_duplicate_state = amdgpu_dm_connector_atomic_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
-	.atomic_set_property = amdgpu_dm_connector_atomic_set_property
+	.atomic_set_property = amdgpu_dm_connector_atomic_set_property,
+	.atomic_get_property = amdgpu_dm_connector_atomic_get_property
 };
 
 static struct drm_encoder *best_encoder(struct drm_connector *connector)
