@@ -1736,6 +1736,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
+		adev->mode_info.plane_type = dm_surfaces_type_default;
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v12_0_display_funcs;
 		break;
