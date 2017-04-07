@@ -465,15 +465,9 @@ static void vi_detect_hw_virtualization(struct amdgpu_device *adev)
 }
 
 static const struct amdgpu_allowed_register_entry tonga_allowed_read_registers[] = {
-	{mmGB_MACROTILE_MODE7, true},
 };
 
 static const struct amdgpu_allowed_register_entry cz_allowed_read_registers[] = {
-	{mmGB_TILE_MODE7, true},
-	{mmGB_TILE_MODE12, true},
-	{mmGB_TILE_MODE17, true},
-	{mmGB_TILE_MODE23, true},
-	{mmGB_MACROTILE_MODE7, true},
 };
 
 static const struct amdgpu_allowed_register_entry vi_allowed_read_registers[] = {
@@ -1080,7 +1074,7 @@ static int vi_common_early_init(void *handle)
 		/* rev0 hardware requires workarounds to support PG */
 		adev->pg_flags = 0;
 		if (adev->rev_id != 0x00 || CZ_REV_BRISTOL(adev->pdev->revision)) {
-			adev->pg_flags |= AMD_PG_SUPPORT_GFX_PG |
+			adev->pg_flags |=
 				AMD_PG_SUPPORT_GFX_SMG |
 				AMD_PG_SUPPORT_GFX_PIPELINE |
 				AMD_PG_SUPPORT_CP |

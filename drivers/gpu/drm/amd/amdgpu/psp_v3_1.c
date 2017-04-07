@@ -170,7 +170,14 @@ int psp_v3_1_bootloader_load_sysdrv(struct psp_context *psp)
 	void *psp_sysdrv_virt = NULL;
 	uint64_t psp_sysdrv_mem;
 	struct amdgpu_device *adev = psp->adev;
-	uint32_t size;
+	uint32_t size, sol_reg;
+
+	/* Check sOS sign of life register to confirm sys driver and sOS
+	 * are already been loaded.
+	 */
+	sol_reg = RREG32(SOC15_REG_OFFSET(MP0, 0, mmMP0_SMN_C2PMSG_81));
+	if (sol_reg)
+		return 0;
 
 	/* Wait for bootloader to signify that is ready having bit 31 of C2PMSG_35 set to 1 */
 	ret = psp_wait_for(psp, SOC15_REG_OFFSET(MP0, 0, mmMP0_SMN_C2PMSG_35),
@@ -222,7 +229,14 @@ int psp_v3_1_bootloader_load_sos(struct psp_context *psp)
 	void *psp_sos_virt = NULL;
 	uint64_t psp_sos_mem;
 	struct amdgpu_device *adev = psp->adev;
-	uint32_t size;
+	uint32_t size, sol_reg;
+
+	/* Check sOS sign of life register to confirm sys driver and sOS
+	 * are already been loaded.
+	 */
+	sol_reg = RREG32(SOC15_REG_OFFSET(MP0, 0, mmMP0_SMN_C2PMSG_81));
+	if (sol_reg)
+		return 0;
 
 	/* Wait for bootloader to signify that is ready having bit 31 of C2PMSG_35 set to 1 */
 	ret = psp_wait_for(psp, SOC15_REG_OFFSET(MP0, 0, mmMP0_SMN_C2PMSG_35),
@@ -477,7 +491,7 @@ bool psp_v3_1_compare_sram_data(struct psp_context *psp,
 
 	ucode_size = ucode->ucode_size;
 	ucode_mem = (uint32_t *)ucode->kaddr;
-	while (!ucode_size) {
+	while (ucode_size) {
 		fw_sram_reg_val = RREG32(fw_sram_data_reg_offset);
 
 		if (*ucode_mem != fw_sram_reg_val)
@@ -494,14 +508,10 @@ bool psp_v3_1_compare_sram_data(struct psp_context *psp,
 bool psp_v3_1_smu_reload_quirk(struct psp_context *psp)
 {
 	struct amdgpu_device *adev = psp->adev;
-	uint32_t reg, reg_val;
+	uint32_t reg;
 
-	reg_val = (smnMP1_FIRMWARE_FLAGS & 0xffffffff) | 0x03b00000;
-	WREG32(SOC15_REG_OFFSET(NBIO, 0, mmPCIE_INDEX2), reg_val);
+	reg = smnMP1_FIRMWARE_FLAGS | 0x03b00000;
+	WREG32(SOC15_REG_OFFSET(NBIO, 0, mmPCIE_INDEX2), reg);
 	reg = RREG32(SOC15_REG_OFFSET(NBIO, 0, mmPCIE_DATA2));
-	if ((reg & MP1_FIRMWARE_FLAGS__INTERRUPTS_ENABLED_MASK) >>
-	     MP1_FIRMWARE_FLAGS__INTERRUPTS_ENABLED__SHIFT)
-		return true;
-
-	return false;
+	return (reg & MP1_FIRMWARE_FLAGS__INTERRUPTS_ENABLED_MASK) ? true : false;
 }

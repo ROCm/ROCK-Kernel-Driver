@@ -130,7 +130,11 @@ psp_cmd_submit_buf(struct psp_context *psp,
 
 	while (*((unsigned int *)psp->fence_buf) != index) {
 		msleep(1);
-	};
+	}
+
+	amdgpu_bo_free_kernel(&cmd_buf_bo,
+			      &cmd_buf_mc_addr,
+			      (void **)&cmd_buf_mem);
 
 	return ret;
 }
@@ -173,6 +177,8 @@ static int psp_tmr_init(struct psp_context *psp)
 				 psp->fence_buf_mc_addr, 1);
 	if (ret)
 		goto failed_mem;
+
+	kfree(cmd);
 
 	return 0;
 
@@ -241,6 +247,7 @@ static int psp_asd_load(struct psp_context *psp)
 
 	amdgpu_bo_free_kernel(&asd_bo, &asd_mc_addr, &asd_buf);
 	amdgpu_bo_free_kernel(&asd_shared_bo, &asd_shared_mc_addr, &asd_shared_buf);
+	kfree(cmd);
 
 	return 0;
 
@@ -289,11 +296,11 @@ static int psp_load_fw(struct amdgpu_device *adev)
 
 	ret = psp_tmr_init(psp);
 	if (ret)
-		goto failed;
+		goto failed_mem;
 
 	ret = psp_asd_load(psp);
 	if (ret)
-		goto failed;
+		goto failed_mem;
 
 	for (i = 0; i < adev->firmware.max_ucodes; i++) {
 		ucode = &adev->firmware.ucode[i];
@@ -322,6 +329,7 @@ static int psp_load_fw(struct amdgpu_device *adev)
 
 	amdgpu_bo_free_kernel(&psp->fence_buf_bo,
 			      &psp->fence_buf_mc_addr, &psp->fence_buf);
+	kfree(cmd);
 
 	return 0;
 

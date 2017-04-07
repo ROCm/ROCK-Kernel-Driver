@@ -45,6 +45,7 @@ struct dc_caps {
 	uint32_t max_links;
 	uint32_t max_audios;
 	uint32_t max_slave_planes;
+	uint32_t max_surfaces;
 	uint32_t max_downscale_ratio;
 	uint32_t i2c_speed_in_khz;
 
@@ -591,6 +592,9 @@ struct dc_link {
 	struct psr_caps psr_caps;
 	bool test_pattern_enabled;
 	union compliance_test_state compliance_test_state;
+
+	void *priv;
+	bool aux_mode;
 };
 
 struct dpcd_caps {
@@ -695,6 +699,17 @@ bool dc_link_dp_set_test_pattern(
  * Sink Interfaces - A sink corresponds to a display output device
  ******************************************************************************/
 
+struct dc_container_id {
+	// 128bit GUID in binary form
+	unsigned char  guid[16];
+	// 8 byte port ID -> ELD.PortID
+	unsigned int   portId[2];
+	// 128bit GUID in binary formufacturer name -> ELD.ManufacturerName
+	unsigned short manufacturerName;
+	// 2 byte product code -> ELD.ProductCode
+	unsigned short productCode;
+};
+
 /*
  * The sink structure contains EDID and other display device properties
  */
@@ -702,8 +717,10 @@ struct dc_sink {
 	enum signal_type sink_signal;
 	struct dc_edid dc_edid; /* raw edid */
 	struct dc_edid_caps edid_caps; /* parse display caps */
+	struct dc_container_id *dc_container_id;
 	uint32_t dongle_max_pix_clk;
 	bool converter_disable_audio;
+	void *priv;
 };
 
 void dc_sink_retain(const struct dc_sink *sink);
@@ -719,6 +736,8 @@ struct dc_sink_init_data {
 };
 
 struct dc_sink *dc_sink_create(const struct dc_sink_init_data *init_params);
+bool dc_sink_get_container_id(struct dc_sink *dc_sink, struct dc_container_id *container_id);
+bool dc_sink_set_container_id(struct dc_sink *dc_sink, const struct dc_container_id *container_id);
 
 /*******************************************************************************
  * Cursor interfaces - To manages the cursor within a stream
@@ -730,7 +749,7 @@ bool dc_stream_set_cursor_attributes(
 
 bool dc_stream_set_cursor_position(
 	const struct dc_stream *stream,
-	const struct dc_cursor_position *position);
+	struct dc_cursor_position *position);
 
 /* Newer interfaces  */
 struct dc_cursor {
@@ -771,16 +790,32 @@ const struct ddc_service *dc_get_ddc_at_index(
  * DPCD access interfaces
  */
 
-bool dc_read_dpcd(
+bool dc_read_aux_dpcd(
 		struct dc *dc,
 		uint32_t link_index,
 		uint32_t address,
 		uint8_t *data,
 		uint32_t size);
 
-bool dc_write_dpcd(
+bool dc_write_aux_dpcd(
 		struct dc *dc,
 		uint32_t link_index,
+		uint32_t address,
+		const uint8_t *data,
+		uint32_t size);
+
+bool dc_read_aux_i2c(
+		struct dc *dc,
+		uint32_t link_index,
+		enum i2c_mot_mode mot,
+		uint32_t address,
+		uint8_t *data,
+		uint32_t size);
+
+bool dc_write_aux_i2c(
+		struct dc *dc,
+		uint32_t link_index,
+		enum i2c_mot_mode mot,
 		uint32_t address,
 		const uint8_t *data,
 		uint32_t size);

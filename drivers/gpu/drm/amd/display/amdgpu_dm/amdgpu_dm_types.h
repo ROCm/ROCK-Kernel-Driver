@@ -36,8 +36,11 @@ struct dc_validation_set;
 struct dc_surface;
 
 /*TODO Jodan Hersen use the one in amdgpu_dm*/
+int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
+			struct amdgpu_plane *aplane,
+			unsigned long possible_crtcs);
 int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
-			struct amdgpu_crtc *amdgpu_crtc,
+			struct drm_plane *plane,
 			uint32_t link_index);
 int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
 			struct amdgpu_connector *amdgpu_connector,
@@ -54,10 +57,9 @@ void amdgpu_dm_encoder_destroy(struct drm_encoder *encoder);
 
 int amdgpu_dm_connector_get_modes(struct drm_connector *connector);
 
-int amdgpu_dm_atomic_commit(
-	struct drm_device *dev,
-	struct drm_atomic_state *state,
-	bool async);
+void amdgpu_dm_atomic_commit_tail(
+	struct drm_atomic_state *state);
+
 int amdgpu_dm_atomic_check(struct drm_device *dev,
 				struct drm_atomic_state *state);
 

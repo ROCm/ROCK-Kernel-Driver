@@ -1680,10 +1680,61 @@ const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs = {
 	.atomic_check = dm_encoder_helper_atomic_check
 };
 
+static void dm_drm_plane_reset(struct drm_plane *plane)
+{
+	struct amdgpu_drm_plane_state *amdgpu_state;
+
+	if (plane->state) {
+		amdgpu_state = to_amdgpu_plane_state(plane->state);
+		if (amdgpu_state->base.fb)
+			drm_framebuffer_unreference(amdgpu_state->base.fb);
+		kfree(amdgpu_state);
+		plane->state = NULL;
+	}
+
+	amdgpu_state = kzalloc(sizeof(*amdgpu_state), GFP_KERNEL);
+	if (amdgpu_state) {
+		plane->state = &amdgpu_state->base;
+		plane->state->plane = plane;
+	}
+}
+
+static struct drm_plane_state *
+dm_drm_plane_duplicate_state(struct drm_plane *plane)
+{
+	struct amdgpu_drm_plane_state *amdgpu_state;
+	struct amdgpu_drm_plane_state *copy;
+
+	amdgpu_state = to_amdgpu_plane_state(plane->state);
+	copy = kzalloc(sizeof(*amdgpu_state), GFP_KERNEL);
+	if (!copy)
+		return NULL;
+
+	__drm_atomic_helper_plane_duplicate_state(plane, &copy->base);
+	return &copy->base;
+}
+
+static void dm_drm_plane_destroy_state(struct drm_plane *plane,
+					   struct drm_plane_state *old_state)
+{
+	struct amdgpu_drm_plane_state *old_amdgpu_state =
+					to_amdgpu_plane_state(old_state);
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 7, 0)
+	__drm_atomic_helper_plane_destroy_state(old_state);
+#else
+	__drm_atomic_helper_plane_destroy_state(plane, old_state);
+#endif
+	kfree(old_amdgpu_state);
+}
+
 static const struct drm_plane_funcs dm_plane_funcs = {
-	.reset = drm_atomic_helper_plane_reset,
-	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
-	.atomic_destroy_state = drm_atomic_helper_plane_destroy_state
+	.update_plane	= drm_atomic_helper_update_plane,
+	.disable_plane	= drm_atomic_helper_disable_plane,
+	.destroy	= drm_plane_cleanup,
+	.set_property	= drm_atomic_helper_plane_set_property,
+	.reset = dm_drm_plane_reset,
+	.atomic_duplicate_state = dm_drm_plane_duplicate_state,
+	.atomic_destroy_state = dm_drm_plane_destroy_state,
 };
 
 static void clear_unrelated_fields(struct drm_plane_state *state)
@@ -1904,37 +1955,67 @@ static uint32_t rgb_formats[] = {
 	DRM_FORMAT_ABGR2101010,
 };
 
+static uint32_t yuv_formats[] = {
+	DRM_FORMAT_YUYV,
+	DRM_FORMAT_YVYU,
+	DRM_FORMAT_UYVY,
+	DRM_FORMAT_VYUY,
+};
+
+int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
+			struct amdgpu_plane *aplane,
+			unsigned long possible_crtcs)
+{
+	int res = -EPERM;
+
+	switch (aplane->plane_type) {
+	case DRM_PLANE_TYPE_PRIMARY:
+		aplane->base.format_default = true;
+
+		res = kcl_drm_universal_plane_init(
+				dm->adev->ddev,
+				&aplane->base,
+				possible_crtcs,
+				&dm_plane_funcs,
+				rgb_formats,
+				ARRAY_SIZE(rgb_formats),
+				aplane->plane_type, NULL);
+		break;
+	case DRM_PLANE_TYPE_OVERLAY:
+		res = kcl_drm_universal_plane_init(
+				dm->adev->ddev,
+				&aplane->base,
+				possible_crtcs,
+				&dm_plane_funcs,
+				yuv_formats,
+				ARRAY_SIZE(yuv_formats),
+				aplane->plane_type, NULL);
+		break;
+	case DRM_PLANE_TYPE_CURSOR:
+		DRM_ERROR("KMS: Cursor plane not implemented.");
+		break;
+	}
+
+	drm_plane_helper_add(&aplane->base, &dm_plane_helper_funcs);
+
+	return res;
+}
+
 int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
-			struct amdgpu_crtc *acrtc,
+			struct drm_plane *plane,
 			uint32_t crtc_index)
 {
+	struct amdgpu_crtc *acrtc;
 	int res = -ENOMEM;
 
-	struct drm_plane *primary_plane =
-		kzalloc(sizeof(*primary_plane), GFP_KERNEL);
-
-	if (!primary_plane)
-		goto fail_plane;
-
-	primary_plane->format_default = true;
-
-	res = kcl_drm_universal_plane_init(
-		dm->adev->ddev,
-		primary_plane,
-		0,
-		&dm_plane_funcs,
-		rgb_formats,
-		ARRAY_SIZE(rgb_formats),
-		DRM_PLANE_TYPE_PRIMARY, NULL);
-
-	primary_plane->crtc = &acrtc->base;
-
-	drm_plane_helper_add(primary_plane, &dm_plane_helper_funcs);
+	acrtc = kzalloc(sizeof(struct amdgpu_crtc), GFP_KERNEL);
+	if (!acrtc)
+		goto fail;
 
 	res = kcl_drm_crtc_init_with_planes(
 			dm->ddev,
 			&acrtc->base,
-			primary_plane,
+			plane,
 			NULL,
 			&amdgpu_dm_crtc_funcs, NULL);
 
@@ -1954,8 +2035,7 @@ int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 
 	return 0;
 fail:
-	kfree(primary_plane);
-fail_plane:
+	kfree(acrtc);
 	acrtc->crtc_id = -1;
 	return res;
 }
@@ -2208,7 +2288,7 @@ int amdgpu_dm_i2c_xfer(struct i2c_adapter *i2c_adap,
 	cmd.speed = 100;
 
 	for (i = 0; i < num; i++) {
-		cmd.payloads[i].write = (msgs[i].flags & I2C_M_RD);
+		cmd.payloads[i].write = !(msgs[i].flags & I2C_M_RD);
 		cmd.payloads[i].address = msgs[i].addr;
 		cmd.payloads[i].length = msgs[i].len;
 		cmd.payloads[i].data = msgs[i].buf;
@@ -2262,6 +2342,7 @@ int amdgpu_dm_connector_init(
 	struct dc *dc = dm->dc;
 	const struct dc_link *link = dc_get_link_at_index(dc, link_index);
 	struct amdgpu_i2c_adapter *i2c;
+	((struct dc_link *)link)->priv = aconnector;
 
 	DRM_DEBUG_KMS("%s()\n", __func__);
 
@@ -2306,7 +2387,7 @@ int amdgpu_dm_connector_init(
 
 	if (connector_type == DRM_MODE_CONNECTOR_DisplayPort
 		|| connector_type == DRM_MODE_CONNECTOR_eDP)
-		amdgpu_dm_initialize_mst_connector(dm, aconnector);
+		amdgpu_dm_initialize_dp_connector(dm, aconnector);
 
 #if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) ||\
 	defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE)
@@ -3377,9 +3458,11 @@ static bool is_dp_capable_without_timing_msa(
 	uint8_t dpcd_data;
 	bool capable = false;
 	if (amdgpu_connector->dc_link &&
-	    dc_read_dpcd(dc, amdgpu_connector->dc_link->link_index,
-			 DP_DOWN_STREAM_PORT_COUNT,
-			 &dpcd_data, sizeof(dpcd_data)) )
+		dc_read_aux_dpcd(
+			dc,
+			amdgpu_connector->dc_link->link_index,
+			DP_DOWN_STREAM_PORT_COUNT,
+			&dpcd_data, sizeof(dpcd_data)))
 		capable = (dpcd_data & DP_MSA_TIMING_PAR_IGNORED) ? true:false;
 
 	return capable;

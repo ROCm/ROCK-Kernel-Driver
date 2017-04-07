@@ -972,11 +972,6 @@ static bool dce112_validate_surface_sets(
 		if (set[i].surface_count > 1)
 			return false;
 
-		if (set[i].surfaces[0]->clip_rect.width
-				> set[i].stream->src.width
-				|| set[i].surfaces[0]->clip_rect.height
-				> set[i].stream->src.height)
-			return false;
 		if (set[i].surfaces[0]->format
 				>= SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)
 			return false;
@@ -1408,6 +1403,8 @@ static bool construct(
 	if (!resource_construct(num_virtual_links, dc, &pool->base,
 			  &res_create_funcs))
 		goto res_create_fail;
+
+	dc->public.caps.max_surfaces =  pool->base.pipe_count;
 
 	/* Create hardware sequencer */
 	if (!dce112_hw_sequencer_construct(dc))
