@@ -1093,7 +1093,8 @@ void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc)
 static int amdgpu_atomic_helper_page_flip(struct drm_crtc *crtc,
 				struct drm_framebuffer *fb,
 				struct drm_pending_vblank_event *event,
-				uint32_t flags)
+				uint32_t flags,
+				struct drm_modeset_acquire_ctx *ctx)
 {
 	struct drm_plane *plane = crtc->primary;
 	struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
@@ -1110,8 +1111,8 @@ static int amdgpu_atomic_helper_page_flip(struct drm_crtc *crtc,
 	if (ret)
 		return ret;
 
-	state->acquire_ctx = drm_modeset_legacy_acquire_ctx(crtc);
-retry:
+	state->acquire_ctx = ctx;
+
 	crtc_state = drm_atomic_get_crtc_state(state, crtc);
 	if (IS_ERR(crtc_state)) {
 		ret = PTR_ERR(crtc_state);
@@ -1146,25 +1147,10 @@ retry:
 	/* Driver takes ownership of state on successful async commit. */
 	return 0;
 fail:
-	if (ret == -EDEADLK)
-		goto backoff;
-
 	if (ret)
 		drm_crtc_vblank_put(crtc);
 
 	return ret;
-backoff:
-	drm_atomic_state_clear(state);
-	drm_atomic_legacy_backoff(state);
-
-	/*
-	 * Someone might have exchanged the framebuffer while we dropped locks
-	 * in the backoff code. We need to fix up the fb refcount tracking the
-	 * core does for us.
-	 */
-	plane->old_fb = plane->fb;
-
-	goto retry;
 }
 
 /* Implemented only the options currently availible for the driver */
