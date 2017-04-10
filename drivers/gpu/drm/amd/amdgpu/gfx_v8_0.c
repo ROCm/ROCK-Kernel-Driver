@@ -4612,29 +4612,6 @@ static int gfx_v8_0_cp_compute_load_microcode(struct amdgpu_device *adev)
 	return 0;
 }
 
-static void gfx_v8_0_cp_compute_fini(struct amdgpu_device *adev)
-{
-	int i, r;
-
-	for (i = 0; i < adev->gfx.num_compute_rings; i++) {
-		struct amdgpu_ring *ring = &adev->gfx.compute_ring[i];
-
-		if (ring->mqd_obj) {
-			r = amdgpu_bo_reserve(ring->mqd_obj, false);
-			if (unlikely(r != 0))
-				dev_warn(adev->dev, "(%d) reserve MQD bo failed\n", r);
-
-			amdgpu_bo_unpin(ring->mqd_obj);
-			amdgpu_bo_unreserve(ring->mqd_obj);
-
-			amdgpu_bo_unref(&ring->mqd_obj);
-			ring->mqd_obj = NULL;
-			ring->mqd_ptr = NULL;
-			ring->mqd_gpu_addr = 0;
-		}
-	}
-}
-
 /* KIQ functions */
 static void gfx_v8_0_kiq_setting(struct amdgpu_ring *ring)
 {
@@ -5212,7 +5189,6 @@ static int gfx_v8_0_hw_fini(void *handle)
 	gfx_v8_0_kiq_kcq_disable(adev);
 	gfx_v8_0_cp_enable(adev, false);
 	gfx_v8_0_rlc_stop(adev);
-	gfx_v8_0_cp_compute_fini(adev);
 
 	amdgpu_set_powergating_state(adev,
 			AMD_IP_BLOCK_TYPE_GFX, AMD_PG_STATE_UNGATE);
