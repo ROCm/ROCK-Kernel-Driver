@@ -1210,7 +1210,7 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	 * reserve space for one command every (1 << BLOCK_SIZE)
 	 *  entries or 2k dwords (whatever is smaller)
 	 */
-	ncmds = (nptes >> min(adev->vm_manager.block_size, 11)) + 1;
+	ncmds = (nptes >> min(adev->vm_manager.block_size, 11u)) + 1;
 
 	/* padding, etc. */
 	ndw = 64;
@@ -2086,6 +2086,44 @@ void amdgpu_vm_bo_invalidate(struct amdgpu_device *adev,
 			list_add(&bo_va->vm_status, &bo_va->vm->invalidated);
 		spin_unlock(&bo_va->vm->status_lock);
 	}
+}
+
+static uint32_t amdgpu_vm_get_block_size(uint64_t vm_size)
+{
+	/* Total bits covered by PD + PTs */
+	unsigned bits = ilog2(vm_size) + 18;
+
+	/* Make sure the PD is 4K in size up to 8GB address space.
+	   Above that split equal between PD and PTs */
+	if (vm_size <= 8)
+		return (bits - 9);
+	else
+		return ((bits + 3) / 2);
+}
+
+/**
+ * amdgpu_vm_adjust_size - adjust vm size and block size
+ *
+ * @adev: amdgpu_device pointer
+ * @vm_size: the default vm size if it's set auto
+ */
+void amdgpu_vm_adjust_size(struct amdgpu_device *adev, uint64_t vm_size)
+{
+	/* adjust vm size firstly */
+	if (amdgpu_vm_size == -1)
+		adev->vm_manager.vm_size = vm_size;
+	else
+		adev->vm_manager.vm_size = amdgpu_vm_size;
+
+	/* block size depends on vm size */
+	if (amdgpu_vm_block_size == -1)
+		adev->vm_manager.block_size =
+			amdgpu_vm_get_block_size(adev->vm_manager.vm_size);
+	else
+		adev->vm_manager.block_size = amdgpu_vm_block_size;
+
+	DRM_INFO("vm size is %llu GB, block size is %u-bit\n",
+		adev->vm_manager.vm_size, adev->vm_manager.block_size);
 }
 
 /**
