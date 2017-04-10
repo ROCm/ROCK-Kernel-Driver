@@ -2294,7 +2294,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	if (is_kfd_vm) {
 		mutex_lock(&adev->vm_manager.lock);
 
-		if (adev->vm_manager.n_kfd_vms++ == 0) {
+		if ((!amdgpu_sriov_vf(adev)) && adev->vm_manager.n_kfd_vms++ == 0) {
 			/* First KFD VM: enable compute power profile */
 			if (adev->pp_enabled)
 				amdgpu_dpm_switch_power_profile(adev,
