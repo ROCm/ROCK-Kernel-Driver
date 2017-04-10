@@ -2606,7 +2606,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 
 		mutex_lock(&id_mgr->lock);
 
-		if (adev->vm_manager.n_compute_vms++ == 0) {
+		if ((!amdgpu_sriov_vf(adev)) && adev->vm_manager.n_compute_vms++ == 0) {
 			/* First Compute VM: enable compute power profile */
 			if (adev->pp_enabled)
 				amdgpu_dpm_switch_power_profile(adev,
