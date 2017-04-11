@@ -345,9 +345,7 @@ static struct fence *amdgpu_sem_get_fence(struct amdgpu_fpriv *fpriv,
 		return NULL;
 	}
 	/* get the last fence of this entity */
-	fence = amdgpu_ctx_get_fence(ctx, out_ring,
-				     in->seq ? in->seq :
-				     ctx->rings[out_ring->idx].sequence - 1);
+	fence = amdgpu_ctx_get_fence(ctx, out_ring, in->seq);
 	amdgpu_ctx_put(ctx);
 
 	return fence;
