@@ -79,11 +79,20 @@ static void amdgpu_ctx_fini(struct amdgpu_ctx *ctx)
 	if (!adev)
 		return;
 
-	for (i = 0; i < AMDGPU_MAX_RINGS; ++i)
-		for (j = 0; j < amdgpu_sched_jobs; ++j) {
+	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
+		struct amdgpu_sem *sem, *tmp;
+
+		mutex_lock(&ctx->rings[i].sem_lock);
+		/* release all the reset inserted SEM here */
+		list_for_each_entry_safe(sem, tmp, &ctx->rings[i].sem_list, list)
+			amdgpu_sem_put(sem);
+
+		mutex_unlock(&ctx->rings[i].sem_lock);
+		mutex_destroy(&ctx->rings[i].sem_lock);
+
+		for (j = 0; j < amdgpu_sched_jobs; ++j)
 			fence_put(ctx->rings[i].fences[j]);
-			mutex_destroy(&ctx->rings[i].sem_lock);
-		}
+	}
 	kfree(ctx->fences);
 	ctx->fences = NULL;
 
