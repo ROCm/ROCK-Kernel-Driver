@@ -222,7 +222,9 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 	switch (bo->mem.mem_type) {
 	case TTM_PL_VRAM:
 	case AMDGPU_PL_DGMA:
-		if (adev->mman.buffer_funcs_ring->ready == false) {
+		if (adev->mman.buffer_funcs &&
+		    adev->mman.buffer_funcs_ring &&
+		    adev->mman.buffer_funcs_ring->ready == false) {
 			amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_CPU);
 		} else {
 			amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_GTT);
