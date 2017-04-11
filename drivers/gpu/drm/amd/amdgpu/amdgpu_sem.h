@@ -47,4 +47,5 @@ struct amdgpu_sem {
 	struct list_head        list;
 };
 
+void amdgpu_sem_put(struct amdgpu_sem *sem);
 #endif /* _LINUX_AMDGPU_SEM_H */
