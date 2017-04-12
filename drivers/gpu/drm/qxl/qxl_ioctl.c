@@ -308,6 +308,7 @@ static int qxl_update_area_ioctl(struct drm_device *dev, void *data,
 	int ret;
 	struct drm_gem_object *gobj = NULL;
 	struct qxl_bo *qobj = NULL;
+	struct ttm_operation_ctx ctx = { true, false };
 
 	if (update_area->left >= update_area->right ||
 	    update_area->top >= update_area->bottom)
@@ -325,8 +326,7 @@ static int qxl_update_area_ioctl(struct drm_device *dev, void *data,
 
 	if (!qobj->pin_count) {
 		qxl_ttm_placement_from_domain(qobj, qobj->type, false);
-		ret = ttm_bo_validate(&qobj->tbo, &qobj->placement,
-				      true, false);
+		ret = ttm_bo_validate(&qobj->tbo, &qobj->placement, &ctx);
 		if (unlikely(ret))
 			goto out;
 	}
