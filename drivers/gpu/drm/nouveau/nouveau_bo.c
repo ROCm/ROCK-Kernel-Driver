@@ -1200,6 +1200,7 @@ static int
 nouveau_bo_move_flipd(struct ttm_buffer_object *bo, bool evict, bool intr,
 		      bool no_wait_gpu, struct ttm_mem_reg *new_reg)
 {
+	struct ttm_operation_ctx ctx = { intr, no_wait_gpu };
 	struct ttm_place placement_memtype = {
 		.fpfn = 0,
 		.lpfn = 0,
@@ -1214,7 +1215,7 @@ nouveau_bo_move_flipd(struct ttm_buffer_object *bo, bool evict, bool intr,
 
 	tmp_reg = *new_reg;
 	tmp_reg.mm_node = NULL;
-	ret = ttm_bo_mem_space(bo, &placement, &tmp_reg, intr, no_wait_gpu);
+	ret = ttm_bo_mem_space(bo, &placement, &tmp_reg, &ctx);
 	if (ret)
 		return ret;
 
@@ -1236,6 +1237,7 @@ static int
 nouveau_bo_move_flips(struct ttm_buffer_object *bo, bool evict, bool intr,
 		      bool no_wait_gpu, struct ttm_mem_reg *new_reg)
 {
+	struct ttm_operation_ctx ctx = { intr, no_wait_gpu };
 	struct ttm_place placement_memtype = {
 		.fpfn = 0,
 		.lpfn = 0,
@@ -1250,7 +1252,7 @@ nouveau_bo_move_flips(struct ttm_buffer_object *bo, bool evict, bool intr,
 
 	tmp_reg = *new_reg;
 	tmp_reg.mm_node = NULL;
-	ret = ttm_bo_mem_space(bo, &placement, &tmp_reg, intr, no_wait_gpu);
+	ret = ttm_bo_mem_space(bo, &placement, &tmp_reg, &ctx);
 	if (ret)
 		return ret;
 
