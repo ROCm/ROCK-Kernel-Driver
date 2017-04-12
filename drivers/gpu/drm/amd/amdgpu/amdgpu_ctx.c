@@ -281,6 +281,9 @@ struct fence *amdgpu_ctx_get_fence(struct amdgpu_ctx *ctx,
 
 	spin_lock(&ctx->ring_lock);
 
+	if (seq == ~0ull)
+		seq = ctx->rings[ring->idx].sequence - 1;
+
 	if (seq >= cring->sequence) {
 		spin_unlock(&ctx->ring_lock);
 		return ERR_PTR(-EINVAL);

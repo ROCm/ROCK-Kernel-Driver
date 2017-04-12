@@ -364,7 +364,10 @@ union drm_amdgpu_gem_wait_idle {
 };
 
 struct drm_amdgpu_wait_cs_in {
-	/** Command submission handle */
+	/* Command submission handle
+         * handle equals 0 means none to wait for
+         * handle equal ~0ull meanas wait for the latest sequence number
+         */
 	__u64 handle;
 	/** Absolute timeout to wait */
 	__u64 timeout;
@@ -795,6 +798,8 @@ struct drm_amdgpu_info_firmware {
 #define AMDGPU_VRAM_TYPE_GDDR5 5
 #define AMDGPU_VRAM_TYPE_HBM   6
 #define AMDGPU_VRAM_TYPE_DDR3  7
+
+#define AMDGPU_VRAM_TYPE_HBM_WIDTH 4096
 
 struct drm_amdgpu_info_device {
 	/** PCI Device ID */

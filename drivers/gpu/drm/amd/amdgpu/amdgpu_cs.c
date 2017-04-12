@@ -1242,6 +1242,7 @@ static int amdgpu_cs_wait_all_fences(struct amdgpu_device *adev,
 			continue;
 
 		r = kcl_fence_wait_timeout(fence, true, timeout);
+		fence_put(fence);
 		if (r < 0)
 			return r;
 
@@ -1384,7 +1385,7 @@ amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 		struct amdgpu_bo_list_entry *lobj;
 
 		lobj = &parser->bo_list->array[i];
-		if (!lobj->bo_va)
+		if (!lobj->bo_va || amdgpu_ttm_adev(lobj->bo_va->bo->tbo.bdev) != parser->adev)
 			continue;
 
 		list_for_each_entry(mapping, &lobj->bo_va->valids, list) {

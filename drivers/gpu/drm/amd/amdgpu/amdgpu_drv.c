@@ -102,6 +102,7 @@ unsigned amdgpu_pcie_gen_cap = 0;
 unsigned amdgpu_pcie_lane_cap = 0;
 unsigned amdgpu_cg_mask = 0xffffffff;
 unsigned amdgpu_pg_mask = 0xffffffff;
+unsigned amdgpu_sdma_phase_quantum = 32;
 char *amdgpu_disable_cu = NULL;
 char *amdgpu_virtual_display = NULL;
 unsigned amdgpu_pp_feature_mask = 0xffffffff;
@@ -215,6 +216,9 @@ module_param_named(cg_mask, amdgpu_cg_mask, uint, 0444);
 
 MODULE_PARM_DESC(pg_mask, "Powergating flags mask (0 = disable power gating)");
 module_param_named(pg_mask, amdgpu_pg_mask, uint, 0444);
+
+MODULE_PARM_DESC(sdma_phase_quantum, "SDMA context switch phase quantum (x 1K GPU clock cycles, 0 = no change (default 32))");
+module_param_named(sdma_phase_quantum, amdgpu_sdma_phase_quantum, uint, 0444);
 
 MODULE_PARM_DESC(disable_cu, "Disable CUs (se.sh.cu,...)");
 module_param_named(disable_cu, amdgpu_disable_cu, charp, 0444);
@@ -761,7 +765,7 @@ static struct drm_driver kms_driver = {
 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
 	.gem_prime_export = amdgpu_gem_prime_export,
-	.gem_prime_import = drm_gem_prime_import,
+	.gem_prime_import = amdgpu_gem_prime_import,
 	.gem_prime_pin = amdgpu_gem_prime_pin,
 	.gem_prime_unpin = amdgpu_gem_prime_unpin,
 	.gem_prime_res_obj = amdgpu_gem_prime_res_obj,
@@ -846,4 +850,4 @@ module_exit(amdgpu_exit);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL and additional rights");
-MODULE_VERSION("17.20.1");
+MODULE_VERSION("17.30.0");

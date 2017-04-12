@@ -25,6 +25,7 @@
 #include "amdgpu.h"
 #include "gmc_v8_0.h"
 #include "amdgpu_ucode.h"
+#include "amdgpu_amdkfd.h"
 
 #include "gmc/gmc_8_1_d.h"
 #include "gmc/gmc_8_1_sh_mask.h"
@@ -489,6 +490,9 @@ static void gmc_v8_0_mc_program(struct amdgpu_device *adev)
  */
 static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 {
+	uint64_t gart_size_aligned;
+	struct sysinfo si;
+
 	adev->mc.vram_width = amdgpu_atombios_get_vram_width(adev);
 	if (!adev->mc.vram_width) {
 		u32 tmp;
@@ -533,6 +537,10 @@ static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 			break;
 		}
 		adev->mc.vram_width = numchan * chansize;
+		/* FIXME: The above calculation is outdated.
+		 * For HBM provide a temporary fix */
+		if (adev->mc.vram_type == AMDGPU_VRAM_TYPE_HBM)
+			adev->mc.vram_width = AMDGPU_VRAM_TYPE_HBM_WIDTH;
 	}
 	/* Could aper size report 0 ? */
 	adev->mc.aper_base = pci_resource_start(adev->pdev, 0);
@@ -553,11 +561,37 @@ static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 	if (adev->mc.visible_vram_size > adev->mc.real_vram_size)
 		adev->mc.visible_vram_size = adev->mc.real_vram_size;
 
-	/* unless the user had overridden it, set the gart
-	 * size equal to the 1024 or vram, whichever is larger.
-	 */
-	if (amdgpu_gart_size == -1)
-		adev->mc.gtt_size = max((1024ULL << 20), adev->mc.mc_vram_size);
+	/* Unless the user has overridden it, compute the GART size */
+	if (amdgpu_gart_size == -1) {
+		/* Maximum GTT size is limited by the GART table size
+		 * in visible VRAM and the address space. Use at most
+		 * half of each. */
+		uint64_t max_gtt_size = min(
+			adev->mc.visible_vram_size / 8 * PAGE_SIZE / 2,
+			1ULL << 39);
+
+		si_meminfo(&si);
+		/* Set the GART to map the largest size between either
+		 * VRAM capacity or double the available physical RAM
+		 */
+		adev->mc.gtt_size = min(
+			max(
+				((uint64_t)si.totalram * si.mem_unit * 2),
+				adev->mc.mc_vram_size
+			),
+			max_gtt_size
+		);
+
+		/* GART sizes computed from physical RAM capacity
+		 * may not always be perfect powers of two.
+		 * Round up starting from the minimum size of 1GB.
+		 */
+		gart_size_aligned = 1024ULL << 20;
+		while (adev->mc.gtt_size > gart_size_aligned)
+			gart_size_aligned <<= 1;
+
+		adev->mc.gtt_size = gart_size_aligned;
+	}
 	else
 		adev->mc.gtt_size = (uint64_t)amdgpu_gart_size << 20;
 
@@ -1009,6 +1043,12 @@ static int gmc_v8_0_vm_init(struct amdgpu_device *adev)
 	} else
 		adev->vm_manager.vram_base_offset = 0;
 
+	adev->mc.vm_fault_info = kmalloc(sizeof(struct kfd_vm_fault_info),
+					GFP_KERNEL);
+	if (!adev->mc.vm_fault_info)
+		return -ENOMEM;
+	atomic_set(&adev->mc.vm_fault_info_updated, 0);
+
 	return 0;
 }
 
@@ -1029,13 +1069,16 @@ static void gmc_v8_0_vm_fini(struct amdgpu_device *adev)
  * @adev: amdgpu_device pointer
  * @status: VM_CONTEXT1_PROTECTION_FAULT_STATUS register value
  * @addr: VM_CONTEXT1_PROTECTION_FAULT_ADDR register value
+ * @mc_client: VM_CONTEXT1_PROTECTION_FAULT_MCCLIENT register value
+ * @src_id: interrupt source id
  *
- * Print human readable fault information (CIK).
+ * Print human readable fault information (VI).
  */
 static void gmc_v8_0_vm_decode_fault(struct amdgpu_device *adev,
 				     u32 status, u32 addr, u32 mc_client)
 {
 	u32 mc_id;
+	struct kfd_vm_fault_info *info = adev->mc.vm_fault_info;
 	u32 vmid = REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS, VMID);
 	u32 protections = REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS,
 					PROTECTIONS);
@@ -1050,6 +1093,19 @@ static void gmc_v8_0_vm_decode_fault(struct amdgpu_device *adev,
 	       REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS,
 			     MEMORY_CLIENT_RW) ?
 	       "write" : "read", block, mc_client, mc_id);
+
+	if (amdgpu_amdkfd_is_kfd_vmid(adev, vmid)
+		&& !atomic_read(&adev->mc.vm_fault_info_updated)) {
+		info->vmid = vmid;
+		info->mc_id = mc_id;
+		info->page_addr = addr;
+		info->prot_valid = protections & 0x6 ? true : false;
+		info->prot_read = protections & 0x8 ? true : false;
+		info->prot_write = protections & 0x10 ? true : false;
+		info->prot_exec = protections & 0x20 ? true : false;
+		mb();
+		atomic_set(&adev->mc.vm_fault_info_updated, 1);
+	}
 }
 
 static int gmc_v8_0_convert_vram_type(int mc_seq_vram_type)

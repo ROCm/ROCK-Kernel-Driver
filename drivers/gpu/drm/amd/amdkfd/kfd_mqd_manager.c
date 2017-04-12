@@ -23,14 +23,65 @@
 
 #include "kfd_priv.h"
 
+/* Mapping queue priority to pipe priority, indexed by queue priority */
+int pipe_priority_map[] = {
+	KFD_PIPE_PRIORITY_CS_LOW,
+	KFD_PIPE_PRIORITY_CS_LOW,
+	KFD_PIPE_PRIORITY_CS_LOW,
+	KFD_PIPE_PRIORITY_CS_LOW,
+	KFD_PIPE_PRIORITY_CS_LOW,
+	KFD_PIPE_PRIORITY_CS_LOW,
+	KFD_PIPE_PRIORITY_CS_LOW,
+	KFD_PIPE_PRIORITY_CS_MEDIUM,
+	KFD_PIPE_PRIORITY_CS_MEDIUM,
+	KFD_PIPE_PRIORITY_CS_MEDIUM,
+	KFD_PIPE_PRIORITY_CS_MEDIUM,
+	KFD_PIPE_PRIORITY_CS_HIGH,
+	KFD_PIPE_PRIORITY_CS_HIGH,
+	KFD_PIPE_PRIORITY_CS_HIGH,
+	KFD_PIPE_PRIORITY_CS_HIGH,
+	KFD_PIPE_PRIORITY_CS_HIGH
+};
+
+/* Mapping queue priority to SPI priority, indexed by queue priority
+ * SPI priority 2 and 3 are reserved for trap handler context save
+ */
+int spi_priority_map[] = {
+	KFD_SPI_PRIORITY_EXTRA_LOW,
+	KFD_SPI_PRIORITY_EXTRA_LOW,
+	KFD_SPI_PRIORITY_EXTRA_LOW,
+	KFD_SPI_PRIORITY_EXTRA_LOW,
+	KFD_SPI_PRIORITY_EXTRA_LOW,
+	KFD_SPI_PRIORITY_EXTRA_LOW,
+	KFD_SPI_PRIORITY_EXTRA_LOW,
+	KFD_SPI_PRIORITY_EXTRA_LOW,
+	KFD_SPI_PRIORITY_LOW,
+	KFD_SPI_PRIORITY_LOW,
+	KFD_SPI_PRIORITY_LOW,
+	KFD_SPI_PRIORITY_LOW,
+	KFD_SPI_PRIORITY_LOW,
+	KFD_SPI_PRIORITY_LOW,
+	KFD_SPI_PRIORITY_LOW,
+	KFD_SPI_PRIORITY_LOW
+};
+
 struct mqd_manager *mqd_manager_init(enum KFD_MQD_TYPE type,
 					struct kfd_dev *dev)
 {
 	switch (dev->device_info->asic_family) {
 	case CHIP_KAVERI:
 		return mqd_manager_init_cik(type, dev);
+	case CHIP_HAWAII:
+		return mqd_manager_init_cik_hawaii(type, dev);
 	case CHIP_CARRIZO:
 		return mqd_manager_init_vi(type, dev);
+	case CHIP_TONGA:
+	case CHIP_FIJI:
+	case CHIP_POLARIS10:
+	case CHIP_POLARIS11:
+		return mqd_manager_init_vi_tonga(type, dev);
+	case CHIP_VEGA10:
+		return mqd_manager_init_v9(type, dev);
 	}
 
 	return NULL;

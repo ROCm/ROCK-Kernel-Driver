@@ -55,6 +55,8 @@
 #include <linux/pci.h>
 #include <linux/firmware.h>
 
+#include "amdgpu_amdkfd.h"
+
 static int amdgpu_debugfs_regs_init(struct amdgpu_device *adev);
 static void amdgpu_debugfs_regs_cleanup(struct amdgpu_device *adev);
 
@@ -1105,6 +1107,9 @@ def_value:
  */
 static void amdgpu_check_arguments(struct amdgpu_device *adev)
 {
+	struct sysinfo si;
+	int phys_ram_gb, amdgpu_vm_size_aligned;
+
 	if (amdgpu_sched_jobs < 4) {
 		dev_warn(adev->dev, "sched jobs (%d) must be at least 4\n",
 			 amdgpu_sched_jobs);
@@ -1122,6 +1127,27 @@ static void amdgpu_check_arguments(struct amdgpu_device *adev)
 				 amdgpu_gart_size);
 			amdgpu_gart_size = -1;
 		}
+	}
+
+	/* Compute the GPU VM space only if the user
+	 * hasn't changed it from the default.
+	 */
+	if (amdgpu_vm_size == -1) {
+		/* Computation depends on the amount of physical RAM available.
+		 * Cannot exceed 1TB.
+		 */
+		si_meminfo(&si);
+		phys_ram_gb = ((uint64_t)si.totalram * si.mem_unit) >> 30;
+		amdgpu_vm_size = min(phys_ram_gb * 3 + 16, 1024);
+
+		/* GPUVM sizes are almost never perfect powers of two.
+		 * Round up to nearest power of two starting from
+		 * the minimum allowed but aligned size of 32GB */
+		amdgpu_vm_size_aligned = 32;
+		while (amdgpu_vm_size > amdgpu_vm_size_aligned)
+			amdgpu_vm_size_aligned *= 2;
+
+		amdgpu_vm_size = amdgpu_vm_size_aligned;
 	}
 
 	amdgpu_check_vm_size(adev);
@@ -2174,6 +2200,8 @@ int amdgpu_device_suspend(struct drm_device *dev, bool suspend, bool fbcon)
 		drm_modeset_unlock_all(dev);
 	}
 
+	amdgpu_amdkfd_suspend(adev);
+
 	/* unpin the front buffers and cursors */
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
@@ -2319,6 +2347,9 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 			}
 		}
 	}
+	r = amdgpu_amdkfd_resume(adev);
+	if (r)
+		return r;
 
 	/* blat the mode back in */
 	if (fbcon) {

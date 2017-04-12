@@ -42,6 +42,12 @@
  * pending write pointer to that location so subsequent calls to
  * acquire_packet_buffer will get a correct write pointer
  *
+ * @acquire_inline_ib: Returns a pointer to the location in the kernel
+ * queue ring buffer where the calling function can write an inline IB. It is
+ * Guaranteed that there is enough space for that IB. It also updates the
+ * pending write pointer to that location so subsequent calls to
+ * acquire_packet_buffer will get a correct write pointer
+ *
  * @submit_packet: Update the write pointer and doorbell of a kernel queue.
  *
  * @sync_with_hw: Wait until the write pointer and the read pointer of a kernel
@@ -59,6 +65,10 @@ struct kernel_queue_ops {
 	int	(*acquire_packet_buffer)(struct kernel_queue *kq,
 					size_t packet_size_in_dwords,
 					unsigned int **buffer_ptr);
+	int	(*acquire_inline_ib)(struct kernel_queue *kq,
+				     size_t packet_size_in_dwords,
+				     unsigned int **buffer_ptr,
+				     uint64_t *gpu_addr);
 
 	void	(*submit_packet)(struct kernel_queue *kq);
 	void	(*rollback_packet)(struct kernel_queue *kq);
@@ -72,6 +82,7 @@ struct kernel_queue {
 	struct kfd_dev		*dev;
 	struct mqd_manager	*mqd;
 	struct queue		*queue;
+	uint64_t		pending_wptr64;
 	uint32_t		pending_wptr;
 	unsigned int		nop_packet;
 
@@ -79,7 +90,10 @@ struct kernel_queue {
 	uint32_t		*rptr_kernel;
 	uint64_t		rptr_gpu_addr;
 	struct kfd_mem_obj	*wptr_mem;
-	uint32_t		*wptr_kernel;
+	union {
+		uint64_t	*wptr64_kernel;
+		uint32_t	*wptr_kernel;
+	};
 	uint64_t		wptr_gpu_addr;
 	struct kfd_mem_obj	*pq;
 	uint64_t		pq_gpu_addr;
@@ -97,5 +111,6 @@ struct kernel_queue {
 
 void kernel_queue_init_cik(struct kernel_queue_ops *ops);
 void kernel_queue_init_vi(struct kernel_queue_ops *ops);
+void kernel_queue_init_v9(struct kernel_queue_ops *ops);
 
 #endif /* KFD_KERNEL_QUEUE_H_ */

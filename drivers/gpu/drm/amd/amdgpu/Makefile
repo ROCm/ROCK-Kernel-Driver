@@ -31,12 +31,11 @@ amdgpu-y += amdgpu_device.o amdgpu_kms.o \
 	amdgpu_prime.o amdgpu_vm.o amdgpu_ib.o amdgpu_pll.o \
 	amdgpu_ucode.o amdgpu_bo_list.o amdgpu_ctx.o amdgpu_sync.o \
 	amdgpu_gtt_mgr.o amdgpu_vram_mgr.o amdgpu_sem.o amdgpu_virt.o \
-	amdgpu_atomfirmware.o
+	amdgpu_atomfirmware.o amdgpu_amdkfd_fence.o
 
 # add asic specific block
 amdgpu-$(CONFIG_DRM_AMDGPU_CIK)+= cik.o cik_ih.o kv_smc.o kv_dpm.o \
-	ci_smc.o ci_dpm.o dce_v8_0.o gfx_v7_0.o cik_sdma.o uvd_v4_2.o vce_v2_0.o \
-	amdgpu_amdkfd_gfx_v7.o
+	ci_smc.o ci_dpm.o dce_v8_0.o gfx_v7_0.o cik_sdma.o uvd_v4_2.o vce_v2_0.o
 
 amdgpu-$(CONFIG_DRM_AMDGPU_SI)+= si.o gmc_v6_0.o gfx_v6_0.o si_ih.o si_dma.o dce_v6_0.o si_dpm.o si_smc.o
 
@@ -102,7 +101,10 @@ amdgpu-y += \
 # add amdkfd interfaces
 amdgpu-y += \
 	 amdgpu_amdkfd.o \
-	 amdgpu_amdkfd_gfx_v8.o
+	 amdgpu_amdkfd_gfx_v7.o \
+	 amdgpu_amdkfd_gfx_v8.o \
+	 amdgpu_amdkfd_gfx_v9.o \
+	 amdgpu_amdkfd_gpuvm.o 
 
 # add cgs
 amdgpu-y += amdgpu_cgs.o

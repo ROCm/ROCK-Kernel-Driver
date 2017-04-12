@@ -36,12 +36,19 @@
 #include <drm/drm.h>
 
 #include "amdgpu.h"
+#include "amdgpu_amdkfd.h"
+
+enum amdgpu_mn_type {
+	AMDGPU_MN_TYPE_GFX,
+	AMDGPU_MN_TYPE_HSA,
+};
 
 struct amdgpu_mn {
 	/* constant after initialisation */
 	struct amdgpu_device	*adev;
 	struct mm_struct	*mm;
 	struct mmu_notifier	mn;
+	enum amdgpu_mn_type	type;
 
 	/* only used on destruction */
 	struct work_struct	work;
@@ -177,7 +184,7 @@ static void amdgpu_mn_invalidate_page(struct mmu_notifier *mn,
 }
 
 /**
- * amdgpu_mn_invalidate_range_start - callback to notify about mm change
+ * amdgpu_mn_invalidate_range_start_gfx - callback to notify about mm change
  *
  * @mn: our notifier
  * @mn: the mm this callback is about
@@ -187,10 +194,10 @@ static void amdgpu_mn_invalidate_page(struct mmu_notifier *mn,
  * We block for all BOs between start and end to be idle and
  * unmap them by move them into system domain again.
  */
-static void amdgpu_mn_invalidate_range_start(struct mmu_notifier *mn,
-					     struct mm_struct *mm,
-					     unsigned long start,
-					     unsigned long end)
+static void amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
+						 struct mm_struct *mm,
+						 unsigned long start,
+						 unsigned long end)
 {
 	struct amdgpu_mn *rmn = container_of(mn, struct amdgpu_mn, mn);
 	struct interval_tree_node *it;
@@ -213,23 +220,111 @@ static void amdgpu_mn_invalidate_range_start(struct mmu_notifier *mn,
 	mutex_unlock(&rmn->lock);
 }
 
-static const struct mmu_notifier_ops amdgpu_mn_ops = {
-	.release = amdgpu_mn_release,
-	.invalidate_page = amdgpu_mn_invalidate_page,
-	.invalidate_range_start = amdgpu_mn_invalidate_range_start,
+/**
+ * amdgpu_mn_invalidate_range_start_hsa - callback to notify about mm change
+ *
+ * @mn: our notifier
+ * @mn: the mm this callback is about
+ * @start: start of updated range
+ * @end: end of updated range
+ *
+ * We temporarily evict all BOs between start and end. This
+ * necessitates evicting all user-mode queues of the process. The BOs
+ * are restorted in amdgpu_mn_invalidate_range_end_hsa.
+ */
+static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
+						 struct mm_struct *mm,
+						 unsigned long start,
+						 unsigned long end)
+{
+	struct amdgpu_mn *rmn = container_of(mn, struct amdgpu_mn, mn);
+	struct interval_tree_node *it;
+
+	/* notification is exclusive, but interval is inclusive */
+	end -= 1;
+
+	mutex_lock(&rmn->lock);
+
+	it = interval_tree_iter_first(&rmn->objects, start, end);
+	while (it) {
+		struct amdgpu_mn_node *node;
+		struct amdgpu_bo *bo;
+
+		node = container_of(it, struct amdgpu_mn_node, it);
+		it = interval_tree_iter_next(it, start, end);
+
+		list_for_each_entry(bo, &node->bos, mn_list) {
+			struct kgd_mem *mem = bo->kfd_bo;
+
+			if (amdgpu_ttm_tt_affect_userptr(bo->tbo.ttm,
+							 start, end))
+				amdgpu_amdkfd_evict_userptr(mem, mm);
+		}
+	}
+
+	mutex_unlock(&rmn->lock);
+}
+
+static void amdgpu_mn_invalidate_page_hsa(struct mmu_notifier *mn,
+					  struct mm_struct *mm,
+					  unsigned long address)
+{
+	struct amdgpu_mn *rmn = container_of(mn, struct amdgpu_mn, mn);
+	struct interval_tree_node *it;
+
+	mutex_lock(&rmn->lock);
+
+	it = interval_tree_iter_first(&rmn->objects, address, address);
+	if (it) {
+		struct amdgpu_mn_node *node;
+		struct amdgpu_bo *bo;
+
+		node = container_of(it, struct amdgpu_mn_node, it);
+
+		list_for_each_entry(bo, &node->bos, mn_list) {
+			struct kgd_mem *mem = bo->kfd_bo;
+
+			if (amdgpu_ttm_tt_affect_userptr(bo->tbo.ttm,
+							 address, address))
+				amdgpu_amdkfd_evict_userptr(mem, mm);
+		}
+	}
+
+	mutex_unlock(&rmn->lock);
+}
+
+static const struct mmu_notifier_ops amdgpu_mn_ops[] = {
+	[AMDGPU_MN_TYPE_GFX] = {
+		.release = amdgpu_mn_release,
+		.invalidate_page = amdgpu_mn_invalidate_page,
+		.invalidate_range_start = amdgpu_mn_invalidate_range_start_gfx,
+	},
+	[AMDGPU_MN_TYPE_HSA] = {
+		.release = amdgpu_mn_release,
+		.invalidate_page = amdgpu_mn_invalidate_page_hsa,
+		.invalidate_range_start = amdgpu_mn_invalidate_range_start_hsa,
+	},
 };
+
+/* Low bits of any reasonable mm pointer will be unused due to struct
+ * alignment. Use these bits to make a unique key from the mm pointer
+ * and notifier type. */
+#define AMDGPU_MN_KEY(mm, type) ((unsigned long)(mm) + (type))
 
 /**
  * amdgpu_mn_get - create notifier context
  *
  * @adev: amdgpu device pointer
+ * @type: type of MMU notifier context
  *
  * Creates a notifier context for current->mm.
  */
-static struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev)
+static struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
+				       enum amdgpu_mn_type type)
 {
 	struct mm_struct *mm = current->mm;
 	struct amdgpu_mn *rmn;
+	unsigned long key = AMDGPU_MN_KEY(mm, type);
 	int r;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
 	struct hlist_node *node;
@@ -246,11 +341,11 @@ static struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev)
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
-	hash_for_each_possible(adev->mn_hash, rmn, node, node, (unsigned long)mm)
+	hash_for_each_possible(adev->mn_hash, rmn, node, node, key)
 #else
-	hash_for_each_possible(adev->mn_hash, rmn, node, (unsigned long)mm)
+	hash_for_each_possible(adev->mn_hash, rmn, node, key)
 #endif
-		if (rmn->mm == mm)
+		if (AMDGPU_MN_KEY(rmn->mm, rmn->type) == key)
 			goto release_locks;
 
 	rmn = kzalloc(sizeof(*rmn), GFP_KERNEL);
@@ -261,7 +356,8 @@ static struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev)
 
 	rmn->adev = adev;
 	rmn->mm = mm;
-	rmn->mn.ops = &amdgpu_mn_ops;
+	rmn->type = type;
+	rmn->mn.ops = &amdgpu_mn_ops[type];
 	mutex_init(&rmn->lock);
 	rmn->objects = RB_ROOT;
 
@@ -269,7 +365,7 @@ static struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev)
 	if (r)
 		goto free_rmn;
 
-	hash_add(adev->mn_hash, &rmn->node, (unsigned long)mm);
+	hash_add(adev->mn_hash, &rmn->node, AMDGPU_MN_KEY(mm, type));
 
 release_locks:
 	up_write(&mm->mmap_sem);
@@ -298,12 +394,14 @@ int amdgpu_mn_register(struct amdgpu_bo *bo, unsigned long addr)
 {
 	unsigned long end = addr + amdgpu_bo_size(bo) - 1;
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
+	enum amdgpu_mn_type type =
+		bo->kfd_bo ? AMDGPU_MN_TYPE_HSA : AMDGPU_MN_TYPE_GFX;
 	struct amdgpu_mn *rmn;
 	struct amdgpu_mn_node *node = NULL;
 	struct list_head bos;
 	struct interval_tree_node *it;
 
-	rmn = amdgpu_mn_get(adev);
+	rmn = amdgpu_mn_get(adev, type);
 	if (IS_ERR(rmn))
 		return PTR_ERR(rmn);
 
@@ -321,7 +419,7 @@ int amdgpu_mn_register(struct amdgpu_bo *bo, unsigned long addr)
 	}
 
 	if (!node) {
-		node = kmalloc(sizeof(struct amdgpu_mn_node), GFP_KERNEL);
+		node = kmalloc(sizeof(struct amdgpu_mn_node), GFP_NOIO);
 		if (!node) {
 			mutex_unlock(&rmn->lock);
 			return -ENOMEM;

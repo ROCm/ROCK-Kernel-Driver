@@ -104,6 +104,7 @@ extern unsigned amdgpu_pcie_gen_cap;
 extern unsigned amdgpu_pcie_lane_cap;
 extern unsigned amdgpu_cg_mask;
 extern unsigned amdgpu_pg_mask;
+extern unsigned amdgpu_sdma_phase_quantum;
 extern char *amdgpu_disable_cu;
 extern char *amdgpu_virtual_display;
 extern unsigned amdgpu_pp_feature_mask;
@@ -163,6 +164,7 @@ struct amdgpu_cs_parser;
 struct amdgpu_job;
 struct amdgpu_irq_src;
 struct amdgpu_fpriv;
+struct kfd_vm_fault_info;
 
 enum amdgpu_cp_irq {
 	AMDGPU_CP_IRQ_GFX_EOP = 0,
@@ -401,6 +403,14 @@ struct amdgpu_bo_va {
 
 #define AMDGPU_GEM_DOMAIN_MAX		0x3
 
+struct amdgpu_gem_object {
+	struct drm_gem_object		base;
+	struct list_head		list;
+	struct amdgpu_bo		*bo;
+};
+
+struct kgd_mem;
+
 struct amdgpu_bo {
 	/* Protected by tbo.reserved */
 	u32				prefered_domains;
@@ -417,12 +427,14 @@ struct amdgpu_bo {
 	void				*metadata;
 	u32				metadata_size;
 	unsigned			prime_shared_count;
+	/* GEM objects refereing to this BO */
+	struct list_head	gem_objects;
+
 	/* list of all virtual address to which this bo
 	 * is associated to
 	 */
 	struct list_head		va;
 	/* Constant after initialization */
-	struct drm_gem_object		gem_base;
 	struct amdgpu_bo		*parent;
 	struct amdgpu_bo		*shadow;
 
@@ -430,8 +442,9 @@ struct amdgpu_bo {
 	struct amdgpu_mn		*mn;
 	struct list_head		mn_list;
 	struct list_head		shadow_list;
+	struct kgd_mem			*kfd_bo;
 };
-#define gem_to_amdgpu_bo(gobj) container_of((gobj), struct amdgpu_bo, gem_base)
+#define gem_to_amdgpu_bo(gobj) container_of((gobj), struct amdgpu_gem_object, base)->bo
 
 void amdgpu_gem_object_free(struct drm_gem_object *obj);
 int amdgpu_gem_object_open(struct drm_gem_object *obj,
@@ -447,6 +460,10 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 					struct drm_gem_object *gobj,
 					int flags);
+struct drm_gem_object *
+amdgpu_gem_prime_foreign_bo(struct amdgpu_device *adev, struct amdgpu_bo *bo);
+struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
+					       struct dma_buf *dma_buf);
 int amdgpu_gem_prime_pin(struct drm_gem_object *obj);
 void amdgpu_gem_prime_unpin(struct drm_gem_object *obj);
 struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *);
@@ -612,6 +629,9 @@ struct amdgpu_mc {
 	u64					private_aperture_end;
 	/* protects concurrent invalidation */
 	spinlock_t		invalidate_lock;
+
+	struct kfd_vm_fault_info *vm_fault_info;
+	atomic_t		vm_fault_info_updated;
 };
 
 /*
@@ -992,6 +1012,11 @@ struct amdgpu_gfx_config {
 struct amdgpu_cu_info {
 	uint32_t number; /* total active CU number */
 	uint32_t ao_cu_mask;
+	uint32_t simd_per_cu;
+	uint32_t max_waves_per_simd;
+	uint32_t wave_front_size;
+	uint32_t max_scratch_slots_per_cu;
+	uint32_t lds_size;
 	uint32_t bitmap[4][4];
 };
 
@@ -1309,6 +1334,7 @@ struct amdgpu_allowed_register_entry {
 	bool untouched;
 	bool grbm_indexed;
 };
+
 
 /*
  * ASIC specific functions.
@@ -1771,9 +1797,6 @@ bool amdgpu_device_has_dc_support(struct amdgpu_device *adev);
 #define WREG32_FIELD_OFFSET(reg, offset, field, val)	\
 	WREG32(mm##reg + offset, (RREG32(mm##reg + offset) & ~REG_FIELD_MASK(reg, field)) | (val) << REG_FIELD_SHIFT(reg, field))
 
-#define WREG32_FIELD15(ip, idx, reg, field, val)	\
-	WREG32(SOC15_REG_OFFSET(ip, idx, mm##reg), (RREG32(SOC15_REG_OFFSET(ip, idx, mm##reg)) & ~REG_FIELD_MASK(reg, field)) | (val) << REG_FIELD_SHIFT(reg, field))
-
 /*
  * BIOS helpers.
  */
@@ -2032,3 +2055,4 @@ static inline int amdgpu_dm_display_resume(struct amdgpu_device *adev) { return 
 
 #include "amdgpu_object.h"
 #endif
+

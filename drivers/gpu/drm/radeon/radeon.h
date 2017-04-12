@@ -1852,6 +1852,17 @@ struct radeon_asic_ring {
 	void (*ring_start)(struct radeon_device *rdev, struct radeon_ring *cp);
 };
 
+struct radeon_cu_info {
+	uint32_t number; /* total active CU number */
+	uint32_t ao_cu_mask;
+	uint32_t simd_per_cu;
+	uint32_t max_waves_per_simd;
+	uint32_t wave_front_size;
+	uint32_t max_scratch_slots_per_cu;
+	uint32_t lds_size;
+	uint32_t bitmap[4][4];
+};
+
 /*
  * ASIC specific functions.
  */
@@ -1874,6 +1885,7 @@ struct radeon_asic {
 	uint64_t (*get_gpu_clock_counter)(struct radeon_device *rdev);
 	/* get register for info ioctl */
 	int (*get_allowed_info_register)(struct radeon_device *rdev, u32 reg, u32 *val);
+	int (*get_cu_info)(struct radeon_device *rdev, struct radeon_cu_info *info);
 	/* gart */
 	struct {
 		void (*tlb_flush)(struct radeon_device *rdev);
@@ -2593,6 +2605,16 @@ static inline struct radeon_fence *to_radeon_fence(struct fence *f)
 
 #define RDOORBELL32(index) cik_mm_rdoorbell(rdev, (index))
 #define WDOORBELL32(index, v) cik_mm_wdoorbell(rdev, (index), (v))
+
+#define REG_FIELD_SHIFT(reg, field) reg##__##field##__SHIFT
+#define REG_FIELD_MASK(reg, field) reg##__##field##_MASK
+
+#define REG_SET_FIELD(orig_val, reg, field, field_val)			\
+	(((orig_val) & ~REG_FIELD_MASK(reg, field)) |			\
+	 (REG_FIELD_MASK(reg, field) & ((field_val) << REG_FIELD_SHIFT(reg, field))))
+
+#define REG_GET_FIELD(value, reg, field)				\
+	(((value) & REG_FIELD_MASK(reg, field)) >> REG_FIELD_SHIFT(reg, field))
 
 /*
  * Indirect registers accessors.
