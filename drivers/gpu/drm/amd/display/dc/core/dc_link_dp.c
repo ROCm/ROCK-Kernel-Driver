@@ -1691,7 +1691,7 @@ static void dp_test_send_link_test_pattern(struct core_link *link)
 			sizeof(dpcd_test_pattern));
 	core_link_read_dpcd(
 			link,
-			DP_TEST_MISC1,
+			DP_TEST_MISC0,
 			&dpcd_test_params.raw,
 			sizeof(dpcd_test_params));
 
