@@ -95,8 +95,8 @@ static bool check_if_add_bo_to_vm(struct amdgpu_vm *avm,
 }
 
 /* Set memory usage limits. Current, limits are
- *  System (TTM + userptr) memory - 3/4th System RAM
- *  TTM memory - 3/8th System RAM
+ *  System (TTM + userptr) memory - 29/32th System RAM
+ *  TTM memory - 29/32th System RAM
  */
 void amdgpu_amdkfd_gpuvm_init_mem_limits(void)
 {
@@ -108,8 +108,8 @@ void amdgpu_amdkfd_gpuvm_init_mem_limits(void)
 	mem *= si.mem_unit;
 
 	spin_lock_init(&kfd_mem_limit.mem_limit_lock);
-	kfd_mem_limit.max_system_mem_limit = (mem >> 1) + (mem >> 2);
-	kfd_mem_limit.max_ttm_mem_limit = (mem >> 1) - (mem >> 3);
+	kfd_mem_limit.max_system_mem_limit = mem - (3 * (mem >> 5)); /* 29/32 */
+	kfd_mem_limit.max_ttm_mem_limit = mem - (3 * (mem >> 5)); /* 29/32 */
 	pr_debug("Kernel memory limit %lluM, TTM limit %lluM\n",
 		(kfd_mem_limit.max_system_mem_limit >> 20),
 		(kfd_mem_limit.max_ttm_mem_limit >> 20));
