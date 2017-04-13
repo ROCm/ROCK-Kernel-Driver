@@ -12,7 +12,7 @@
 #ifdef BUILD_AS_DKMS
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
 
-#define DP_TEST_MISC1                       0x232
+#define DP_TEST_MISC0                       0x232
 
 #define DP_TEST_PHY_PATTERN                 0x248
 #define DP_TEST_80BIT_CUSTOM_PATTERN_7_0    0x250
