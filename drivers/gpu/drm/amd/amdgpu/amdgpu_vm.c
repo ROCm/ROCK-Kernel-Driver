@@ -1297,6 +1297,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 				      dma_addr_t *pages_addr,
 				      struct amdgpu_vm *vm,
 				      struct amdgpu_bo_va_mapping *mapping,
+				      uint64_t vram_base_offset,
 				      uint64_t flags,
 				      struct drm_mm_node *nodes,
 				      struct fence **fence)
@@ -1349,7 +1350,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 				max_entries = min(max_entries, 16ull * 1024ull);
 			addr = 0;
 		} else if (flags & AMDGPU_PTE_VALID) {
-			addr += adev->vm_manager.vram_base_offset;
+			addr += vram_base_offset;
 		}
 		addr += pfn << PAGE_SHIFT;
 
@@ -1394,6 +1395,8 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	struct ttm_mem_reg *mem;
 	struct drm_mm_node *nodes;
 	struct fence *exclusive;
+	uint64_t vram_base_offset = adev->vm_manager.vram_base_offset;
+	struct amdgpu_device *bo_adev;
 	int r;
 
 	if (clear || !bo_va->bo) {
@@ -1415,9 +1418,15 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 
 	if (bo_va->bo) {
 		flags = amdgpu_ttm_tt_pte_flags(adev, bo_va->bo->tbo.ttm, mem);
+		bo_adev = amdgpu_ttm_adev(bo_va->bo->tbo.bdev);
 		gtt_flags = (amdgpu_ttm_is_bound(bo_va->bo->tbo.ttm) &&
-			adev == amdgpu_ttm_adev(bo_va->bo->tbo.bdev)) ?
+			adev == bo_adev) ?
 			flags : 0;
+		if (mem && mem->mem_type == TTM_PL_VRAM &&
+			adev != bo_adev) {
+			flags |= AMDGPU_PTE_SYSTEM;
+			vram_base_offset = bo_adev->mc.aper_base;
+		}
 	} else {
 		flags = 0x0;
 		gtt_flags = ~0x0;
@@ -1431,8 +1440,8 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	list_for_each_entry(mapping, &bo_va->invalids, list) {
 		r = amdgpu_vm_bo_split_mapping(adev, exclusive,
 					       gtt_flags, pages_addr, vm,
-					       mapping, flags, nodes,
-					       &bo_va->last_pt_update);
+					       mapping, vram_base_offset, flags,
+					       nodes, &bo_va->last_pt_update);
 		if (r)
 			return r;
 	}
@@ -1604,6 +1613,7 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
 {
 	struct amdgpu_bo_va_mapping *mapping;
 	struct fence *f = NULL;
+	uint64_t vram_base_offset = adev->vm_manager.vram_base_offset;
 	int r;
 
 	while (!list_empty(&vm->freed)) {
@@ -1612,7 +1622,7 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
 		list_del(&mapping->list);
 
 		r = amdgpu_vm_bo_split_mapping(adev, NULL, 0, NULL, vm, mapping,
-					       0, 0, &f);
+					       vram_base_offset, 0, 0, &f);
 		amdgpu_vm_free_mapping(adev, vm, mapping, f);
 		if (r) {
 			fence_put(f);
