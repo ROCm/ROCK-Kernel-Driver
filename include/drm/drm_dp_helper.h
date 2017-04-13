@@ -419,7 +419,7 @@
 
 #define DP_TEST_PATTERN			    0x221
 
-#define DP_TEST_MISC0                       0x232
+#define DP_TEST_MISC1                       0x232
 
 #define DP_TEST_CRC_R_CR		    0x240
 #define DP_TEST_CRC_G_Y			    0x242
