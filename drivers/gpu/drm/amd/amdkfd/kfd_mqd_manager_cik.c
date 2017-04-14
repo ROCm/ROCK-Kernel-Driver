@@ -264,8 +264,7 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 	m->cp_hqd_pq_base_hi = upper_32_bits((uint64_t)q->queue_address >> 8);
 	m->cp_hqd_pq_rptr_report_addr_lo = lower_32_bits((uint64_t)q->read_ptr);
 	m->cp_hqd_pq_rptr_report_addr_hi = upper_32_bits((uint64_t)q->read_ptr);
-	m->cp_hqd_pq_doorbell_control = DOORBELL_EN |
-					DOORBELL_OFFSET(q->doorbell_off);
+	m->cp_hqd_pq_doorbell_control = DOORBELL_OFFSET(q->doorbell_off);
 
 	m->cp_hqd_vmid = q->vmid;
 
@@ -276,13 +275,11 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 	update_cu_mask(mm, mqd, q);
 	set_priority(m, q);
 
-	m->cp_hqd_active = 0;
 	q->is_active = false;
 	if (q->queue_size > 0 &&
 			q->queue_address != 0 &&
 			q->queue_percent > 0 &&
 			!q->is_evicted) {
-		m->cp_hqd_active = 1;
 		q->is_active = true;
 	}
 
@@ -319,9 +316,8 @@ static int update_mqd_sdma(struct mqd_manager *mm, void *mqd,
 	m->sdma_rlc_rb_base_hi = upper_32_bits(q->queue_address >> 8);
 	m->sdma_rlc_rb_rptr_addr_lo = lower_32_bits((uint64_t)q->read_ptr);
 	m->sdma_rlc_rb_rptr_addr_hi = upper_32_bits((uint64_t)q->read_ptr);
-	m->sdma_rlc_doorbell = q->doorbell_off <<
-			SDMA0_RLC0_DOORBELL__OFFSET__SHIFT |
-			1 << SDMA0_RLC0_DOORBELL__ENABLE__SHIFT;
+	m->sdma_rlc_doorbell =
+		q->doorbell_off << SDMA0_RLC0_DOORBELL__OFFSET__SHIFT;
 
 	m->sdma_rlc_virtual_addr = q->sdma_vm_addr;
 
@@ -333,9 +329,6 @@ static int update_mqd_sdma(struct mqd_manager *mm, void *mqd,
 			q->queue_address != 0 &&
 			q->queue_percent > 0 &&
 			!q->is_evicted) {
-		m->sdma_rlc_rb_cntl |=
-				1 << SDMA0_RLC0_RB_CNTL__RB_ENABLE__SHIFT;
-
 		q->is_active = true;
 	}
 
@@ -471,18 +464,15 @@ static int update_mqd_hiq(struct mqd_manager *mm, void *mqd,
 	m->cp_hqd_pq_base_hi = upper_32_bits((uint64_t)q->queue_address >> 8);
 	m->cp_hqd_pq_rptr_report_addr_lo = lower_32_bits((uint64_t)q->read_ptr);
 	m->cp_hqd_pq_rptr_report_addr_hi = upper_32_bits((uint64_t)q->read_ptr);
-	m->cp_hqd_pq_doorbell_control = DOORBELL_EN |
-					DOORBELL_OFFSET(q->doorbell_off);
+	m->cp_hqd_pq_doorbell_control = DOORBELL_OFFSET(q->doorbell_off);
 
 	m->cp_hqd_vmid = q->vmid;
 
-	m->cp_hqd_active = 0;
 	q->is_active = false;
 	if (q->queue_size > 0 &&
 			q->queue_address != 0 &&
 			q->queue_percent > 0 &&
 			!q->is_evicted) {
-		m->cp_hqd_active = 1;
 		q->is_active = true;
 	}
 
