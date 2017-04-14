@@ -372,7 +372,7 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct vi_mqd *m;
 	uint32_t *mqd_hqd;
-	uint32_t reg, wptr_val;
+	uint32_t reg, wptr_val, data;
 
 	m = get_mqd(mqd);
 
@@ -381,7 +381,7 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 	/* HQD registers extend from CP_MQD_BASE_ADDR to CP_HQD_EOP_WPTR_MEM. */
 	mqd_hqd = &m->cp_mqd_base_addr_lo;
 
-	for (reg = mmCP_HQD_VMID; reg <= mmCP_HQD_EOP_CONTROL; reg++)
+	for (reg = mmCP_MQD_BASE_ADDR; reg <= mmCP_HQD_EOP_CONTROL; reg++)
 		WREG32(reg, mqd_hqd[reg - mmCP_MQD_BASE_ADDR]);
 
 	/* Tonga errata: EOP RPTR/WPTR should be left unmodified.
@@ -399,14 +399,17 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 		WREG32(reg, mqd_hqd[reg - mmCP_MQD_BASE_ADDR]);
 
 	/* Copy userspace write pointer value to register.
-	 * Doorbell logic is active and will monitor subsequent changes.
+	 * Activate doorbell logic to monitor subsequent changes.
 	 */
+	data = REG_SET_FIELD(m->cp_hqd_pq_doorbell_control,
+			     CP_HQD_PQ_DOORBELL_CONTROL, DOORBELL_EN, 1);
+	WREG32(mmCP_HQD_PQ_DOORBELL_CONTROL, data);
+
 	if (read_user_wptr(mm, wptr, wptr_val))
 		WREG32(mmCP_HQD_PQ_WPTR, (wptr_val << wptr_shift) & wptr_mask);
 
-	/* Write CP_HQD_ACTIVE last. */
-	for (reg = mmCP_MQD_BASE_ADDR; reg <= mmCP_HQD_ACTIVE; reg++)
-		WREG32(reg, mqd_hqd[reg - mmCP_MQD_BASE_ADDR]);
+	data = REG_SET_FIELD(m->cp_hqd_active, CP_HQD_ACTIVE, ACTIVE, 1);
+	WREG32(mmCP_HQD_ACTIVE, data);
 
 	release_queue(kgd);
 
@@ -484,7 +487,9 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 		WREG32(mmSDMA0_GFX_CONTEXT_CNTL, data);
 	}
 
-	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL, m->sdmax_rlcx_doorbell);
+	data = REG_SET_FIELD(m->sdmax_rlcx_doorbell, SDMA0_RLC0_DOORBELL,
+			     ENABLE, 1);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL, data);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR, m->sdmax_rlcx_rb_rptr);
 
 	if (read_user_wptr(mm, wptr, data))
@@ -498,7 +503,10 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_BASE_HI, m->sdmax_rlcx_rb_base_hi);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR_ADDR_LO, m->sdmax_rlcx_rb_rptr_addr_lo);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR_ADDR_HI, m->sdmax_rlcx_rb_rptr_addr_hi);
-	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL, m->sdmax_rlcx_rb_cntl);
+
+	data = REG_SET_FIELD(m->sdmax_rlcx_rb_cntl, SDMA0_RLC0_RB_CNTL,
+			     RB_ENABLE, 1);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL, data);
 
 	return 0;
 }
