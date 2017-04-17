@@ -553,8 +553,6 @@ int tf_vega10_thermal_setup_fan_table(struct pp_hwmgr *hwmgr,
 	if (!data->smu_features[GNLD_FAN_CONTROL].supported)
 		return 0;
 
-	table->FuzzyFan_PwmSetDelta = (uint16_t)hwmgr->thermal_controller.
-			advanceFanControlParameters.usFanOutputSensitivity;
 	table->FanMaximumRpm = (uint16_t)hwmgr->thermal_controller.
 			advanceFanControlParameters.usMaxFanRPM;
 	table->FanThrottlingRpm = hwmgr->thermal_controller.
