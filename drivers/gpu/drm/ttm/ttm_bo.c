@@ -1422,7 +1422,7 @@ EXPORT_SYMBOL(ttm_bo_evict_mm);
 int ttm_bo_init_mm(struct ttm_bo_device *bdev, unsigned type,
 			unsigned long p_size)
 {
-	int ret = -EINVAL;
+	int ret;
 	struct ttm_mem_type_manager *man;
 	unsigned i;
 
@@ -1440,7 +1440,6 @@ int ttm_bo_init_mm(struct ttm_bo_device *bdev, unsigned type,
 		return ret;
 	man->bdev = bdev;
 
-	ret = 0;
 	if (type != TTM_PL_SYSTEM) {
 		ret = (*man->func->init)(man, p_size);
 		if (ret)
