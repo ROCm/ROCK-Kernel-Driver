@@ -915,17 +915,18 @@ return true;
 
 bool dc_post_update_surfaces_to_stream(struct dc *dc)
 {
-int i;
-struct core_dc *core_dc = DC_TO_CORE(dc);
-struct validate_context *context = dm_alloc(sizeof(struct validate_context));
+	int i;
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	struct validate_context *context = dm_alloc(sizeof(struct validate_context));
+	bool result = true;
 
-if (!context) {
-	dm_error("%s: failed to create validate ctx\n", __func__);
-	return false;
-}
-dc_resource_validate_ctx_copy_construct(core_dc->current_context, context);
+	if (!context) {
+		dm_error("%s: failed to create validate ctx\n", __func__);
+		return false;
+	}
+	dc_resource_validate_ctx_copy_construct(core_dc->current_context, context);
 
-post_surface_trace(dc);
+	post_surface_trace(dc);
 
 	for (i = 0; i < core_dc->res_pool->pipe_count; i++)
 		if (context->res_ctx.pipe_ctx[i].stream == NULL) {
@@ -936,17 +937,19 @@ post_surface_trace(dc);
 
 	if (!core_dc->res_pool->funcs->validate_bandwidth(core_dc, context)) {
 		BREAK_TO_DEBUGGER();
-		return false;
+		result = false;
+		goto cleanup;
 	}
 
 	core_dc->hwss.set_bandwidth(core_dc, context, true);
 
 	dc_resource_validate_ctx_copy_construct(context, core_dc->current_context);
 
+cleanup:
 	dc_resource_validate_ctx_destruct(context);
 	dm_free(context);
 
-	return true;
+	return result;
 }
 
 bool dc_commit_surfaces_to_stream(
