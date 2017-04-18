@@ -454,7 +454,7 @@ static u32 dce_v10_0_hpd_get_gpio_reg(struct amdgpu_device *adev)
 	return mmDC_GPIO_HPD_A;
 }
 
-static bool dce_v10_0_is_display_hung(struct amdgpu_device *adev)
+bool dce_v10_0_is_display_hung(struct amdgpu_device *adev)
 {
 	u32 crtc_hung = 0;
 	u32 crtc_status[6];
@@ -484,8 +484,8 @@ static bool dce_v10_0_is_display_hung(struct amdgpu_device *adev)
 	return true;
 }
 
-static void dce_v10_0_stop_mc_access(struct amdgpu_device *adev,
-				     struct amdgpu_mode_mc_save *save)
+void dce_v10_0_stop_mc_access(struct amdgpu_device *adev,
+			      struct amdgpu_mode_mc_save *save)
 {
 	u32 crtc_enabled, tmp;
 	int i;
@@ -549,8 +549,8 @@ static void dce_v10_0_stop_mc_access(struct amdgpu_device *adev,
 	}
 }
 
-static void dce_v10_0_resume_mc_access(struct amdgpu_device *adev,
-				       struct amdgpu_mode_mc_save *save)
+void dce_v10_0_resume_mc_access(struct amdgpu_device *adev,
+				struct amdgpu_mode_mc_save *save)
 {
 	u32 tmp, frame_count;
 	int i, j;
@@ -612,8 +612,8 @@ static void dce_v10_0_resume_mc_access(struct amdgpu_device *adev,
 	WREG32(mmVGA_RENDER_CONTROL, save->vga_render_control);
 }
 
-static void dce_v10_0_set_vga_render_state(struct amdgpu_device *adev,
-					   bool render)
+void dce_v10_0_set_vga_render_state(struct amdgpu_device *adev,
+				    bool render)
 {
 	u32 tmp;
 

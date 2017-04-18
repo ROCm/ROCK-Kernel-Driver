@@ -62,6 +62,7 @@
 #include "amdgpu_acp.h"
 #include "amdgpu_uvd.h"
 #include "amdgpu_vce.h"
+#include "amdgpu_dm.h"
 
 #include "gpu_scheduler.h"
 #include "amdgpu_virt.h"
@@ -92,6 +93,7 @@ extern int amdgpu_vm_size;
 extern int amdgpu_vm_block_size;
 extern int amdgpu_vm_fault_stop;
 extern int amdgpu_vm_debug;
+extern int amdgpu_dc;
 extern int amdgpu_sched_jobs;
 extern int amdgpu_sched_hw_submission;
 extern int amdgpu_no_evict;
@@ -1348,6 +1350,9 @@ int amdgpu_cs_wait_fences_ioctl(struct drm_device *dev, void *data,
 int amdgpu_gem_metadata_ioctl(struct drm_device *dev, void *data,
 				struct drm_file *filp);
 
+int amdgpu_freesync_ioctl(struct drm_device *dev, void *data,
+			    struct drm_file *filp);
+
 /* VRAM scratch page for HDP bug, default vram page */
 struct amdgpu_vram_scratch {
 	struct amdgpu_bo		*robj;
@@ -1533,6 +1538,7 @@ struct amdgpu_device {
 	/* display */
 	bool				enable_virtual_display;
 	struct amdgpu_mode_info		mode_info;
+	/* For pre-DCE11. DCE11 and later are in "struct amdgpu_device->dm" */
 	struct work_struct		hotplug_work;
 	struct amdgpu_irq_src		crtc_irq;
 	struct amdgpu_irq_src		pageflip_irq;
@@ -1581,6 +1587,9 @@ struct amdgpu_device {
 
 	/* GDS */
 	struct amdgpu_gds		gds;
+
+	/* display related functionality */
+	struct amdgpu_display_manager dm;
 
 	struct amdgpu_ip_block          ip_blocks[AMDGPU_MAX_IP_NUM];
 	int				num_ip_blocks;
@@ -1633,6 +1642,9 @@ u32 amdgpu_mm_rdoorbell(struct amdgpu_device *adev, u32 index);
 void amdgpu_mm_wdoorbell(struct amdgpu_device *adev, u32 index, u32 v);
 u64 amdgpu_mm_rdoorbell64(struct amdgpu_device *adev, u32 index);
 void amdgpu_mm_wdoorbell64(struct amdgpu_device *adev, u32 index, u64 v);
+
+bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type);
+bool amdgpu_device_has_dc_support(struct amdgpu_device *adev);
 
 /*
  * Registers read & write functions.
@@ -1952,6 +1964,12 @@ struct amdgpu_bo_va_mapping *
 amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 		       uint64_t addr, struct amdgpu_bo **bo);
 int amdgpu_cs_sysvm_access_required(struct amdgpu_cs_parser *parser);
+
+#if defined(CONFIG_DRM_AMD_DC)
+int amdgpu_dm_display_resume(struct amdgpu_device *adev );
+#else
+static inline int amdgpu_dm_display_resume(struct amdgpu_device *adev) { return 0; }
+#endif
 
 #include "amdgpu_object.h"
 #endif
