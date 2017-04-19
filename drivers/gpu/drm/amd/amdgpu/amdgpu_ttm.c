@@ -587,19 +587,17 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 		break;
 	case TTM_PL_VRAM:
 	case AMDGPU_PL_DGMA:
+		mem->bus.offset = (mem->start << PAGE_SHIFT) + man->gpu_offset -
+				adev->mc.vram_start;
+		/* check if it's visible */
+		if ((mem->bus.offset + mem->bus.size) > adev->mc.visible_vram_size)
+			return -EINVAL;
+		mem->bus.base = adev->mc.aper_base;
+		mem->bus.is_iomem = true;
+		break;
 	case AMDGPU_PL_DGMA_IMPORT:
-		if (mem->mem_type != AMDGPU_PL_DGMA_IMPORT) {
-			mem->bus.offset = (mem->start << PAGE_SHIFT) + man->gpu_offset -
-					adev->mc.vram_start;
-			/* check if it's visible */
-			if ((mem->bus.offset + mem->bus.size) > adev->mc.visible_vram_size)
-				return -EINVAL;
-			mem->bus.base = adev->mc.aper_base;
-		} else {
-			mem->bus.offset = backup.bus.offset;
-			mem->bus.base = backup.bus.base;
-		}
-
+		mem->bus.offset = backup.bus.offset;
+		mem->bus.base = backup.bus.base;
 		mem->bus.is_iomem = true;
 		break;
 	default:
