@@ -1462,6 +1462,8 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 		gtt_flags = (amdgpu_ttm_is_bound(bo_va->bo->tbo.ttm) &&
 			adev == amdgpu_ttm_adev(bo_va->bo->tbo.bdev)) ?
 			flags : 0;
+		if (mem && mem->mem_type == AMDGPU_PL_DGMA_IMPORT)
+			gtt_flags = (adev == amdgpu_ttm_adev(bo_va->bo->tbo.bdev)) ? flags : 0;
 	} else {
 		flags = 0x0;
 		gtt_flags = ~0x0;

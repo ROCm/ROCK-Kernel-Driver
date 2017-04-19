@@ -280,6 +280,7 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 	if (args->in.domains & ~(AMDGPU_GEM_DOMAIN_CPU |
 				 AMDGPU_GEM_DOMAIN_GTT |
 				 AMDGPU_GEM_DOMAIN_VRAM |
+				 AMDGPU_GEM_DOMAIN_DGMA |
 				 AMDGPU_GEM_DOMAIN_GDS |
 				 AMDGPU_GEM_DOMAIN_GWS |
 				 AMDGPU_GEM_DOMAIN_OA)) {

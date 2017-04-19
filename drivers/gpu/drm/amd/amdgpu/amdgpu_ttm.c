@@ -615,13 +615,18 @@ static void amdgpu_ttm_io_mem_free(struct ttm_bo_device *bdev, struct ttm_mem_re
 static unsigned long amdgpu_ttm_io_mem_pfn(struct ttm_buffer_object *bo,
 					   unsigned long page_offset)
 {
-	struct drm_mm_node *mm = bo->mem.mm_node;
-	uint64_t size = mm->size;
-	uint64_t offset = page_offset;
+	if (bo->mem.mem_type != AMDGPU_PL_DGMA &&
+	    bo->mem.mem_type != AMDGPU_PL_DGMA_IMPORT) {
+		struct drm_mm_node *mm = bo->mem.mm_node;
+		uint64_t size = mm->size;
+		uint64_t offset = page_offset;
 
-	page_offset = do_div(offset, size);
-	mm += offset;
-	return (bo->mem.bus.base >> PAGE_SHIFT) + mm->start + page_offset;
+		page_offset = do_div(offset, size);
+		mm += offset;
+		return (bo->mem.bus.base >> PAGE_SHIFT) + mm->start + page_offset;
+	}
+
+	return ttm_bo_default_io_mem_pfn(bo, page_offset);
 }
 
 /*
