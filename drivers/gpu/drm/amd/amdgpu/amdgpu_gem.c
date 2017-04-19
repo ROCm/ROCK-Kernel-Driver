@@ -1013,6 +1013,12 @@ static int amdgpu_debugfs_gem_bo_info(int id, void *ptr, void *data)
 	case AMDGPU_GEM_DOMAIN_VRAM:
 		placement = "VRAM";
 		break;
+	case AMDGPU_GEM_DOMAIN_DGMA:
+		placement = "DGMA";
+		break;
+	case AMDGPU_GEM_DOMAIN_DGMA_IMPORT:
+		placement = "DGMA_IMPORT";
+		break;
 	case AMDGPU_GEM_DOMAIN_GTT:
 		placement = " GTT";
 		break;
