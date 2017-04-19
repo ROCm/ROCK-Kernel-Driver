@@ -1796,14 +1796,16 @@ bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type)
 #if defined(CONFIG_DRM_AMD_DC)
 	case CHIP_BONAIRE:
 	case CHIP_HAWAII:
-		return amdgpu_dc != 0;
 	case CHIP_CARRIZO:
 	case CHIP_STONEY:
 	case CHIP_POLARIS11:
 	case CHIP_POLARIS10:
-		return amdgpu_dc != 0;
+	case CHIP_POLARIS12:
 	case CHIP_TONGA:
 	case CHIP_FIJI:
+#if defined(CONFIG_DRM_AMD_DC_DCE12_0)
+	case CHIP_VEGA10:
+#endif
 		return amdgpu_dc != 0;
 #endif
 	default:
