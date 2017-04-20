@@ -3886,7 +3886,7 @@ static void gfx_v8_0_gpu_init(struct amdgpu_device *adev)
 	sh_static_mem_cfg = REG_SET_FIELD(sh_static_mem_cfg, SH_STATIC_MEM_CONFIG,
 				   INDEX_STRIDE, 3);
 	mutex_lock(&adev->srbm_mutex);
-	for (i = 0; i < adev->vm_manager.num_ids; i++) {
+	for (i = 0; i < adev->vm_manager.id_mgr[0].num_ids; i++) {
 		vi_srbm_select(adev, 0, 0, 0, i);
 		/* CP and shaders */
 		if (i == 0) {
@@ -4465,6 +4465,39 @@ static int gfx_v8_0_cp_gfx_start(struct amdgpu_device *adev)
 
 	return 0;
 }
+static void gfx_v8_0_set_cpg_door_bell(struct amdgpu_device *adev, struct amdgpu_ring *ring)
+{
+	u32 tmp;
+	/* no gfx doorbells on iceland */
+	if (adev->asic_type == CHIP_TOPAZ)
+		return;
+
+	tmp = RREG32(mmCP_RB_DOORBELL_CONTROL);
+
+	if (ring->use_doorbell) {
+		tmp = REG_SET_FIELD(tmp, CP_RB_DOORBELL_CONTROL,
+				DOORBELL_OFFSET, ring->doorbell_index);
+		tmp = REG_SET_FIELD(tmp, CP_RB_DOORBELL_CONTROL,
+						DOORBELL_HIT, 0);
+		tmp = REG_SET_FIELD(tmp, CP_RB_DOORBELL_CONTROL,
+					    DOORBELL_EN, 1);
+	} else {
+		tmp = REG_SET_FIELD(tmp, CP_RB_DOORBELL_CONTROL, DOORBELL_EN, 0);
+	}
+
+	WREG32(mmCP_RB_DOORBELL_CONTROL, tmp);
+
+	if (adev->flags & AMD_IS_APU)
+		return;
+
+	tmp = REG_SET_FIELD(0, CP_RB_DOORBELL_RANGE_LOWER,
+					DOORBELL_RANGE_LOWER,
+					AMDGPU_DOORBELL_GFX_RING0);
+	WREG32(mmCP_RB_DOORBELL_RANGE_LOWER, tmp);
+
+	WREG32(mmCP_RB_DOORBELL_RANGE_UPPER,
+		CP_RB_DOORBELL_RANGE_UPPER__DOORBELL_RANGE_UPPER_MASK);
+}
 
 static int gfx_v8_0_cp_gfx_resume(struct amdgpu_device *adev)
 {
@@ -4512,34 +4545,7 @@ static int gfx_v8_0_cp_gfx_resume(struct amdgpu_device *adev)
 	WREG32(mmCP_RB0_BASE, rb_addr);
 	WREG32(mmCP_RB0_BASE_HI, upper_32_bits(rb_addr));
 
-	/* no gfx doorbells on iceland */
-	if (adev->asic_type != CHIP_TOPAZ) {
-		tmp = RREG32(mmCP_RB_DOORBELL_CONTROL);
-		if (ring->use_doorbell) {
-			tmp = REG_SET_FIELD(tmp, CP_RB_DOORBELL_CONTROL,
-					    DOORBELL_OFFSET, ring->doorbell_index);
-			tmp = REG_SET_FIELD(tmp, CP_RB_DOORBELL_CONTROL,
-					    DOORBELL_HIT, 0);
-			tmp = REG_SET_FIELD(tmp, CP_RB_DOORBELL_CONTROL,
-					    DOORBELL_EN, 1);
-		} else {
-			tmp = REG_SET_FIELD(tmp, CP_RB_DOORBELL_CONTROL,
-					    DOORBELL_EN, 0);
-		}
-		WREG32(mmCP_RB_DOORBELL_CONTROL, tmp);
-
-		if (adev->asic_type == CHIP_TONGA) {
-			tmp = REG_SET_FIELD(0, CP_RB_DOORBELL_RANGE_LOWER,
-					    DOORBELL_RANGE_LOWER,
-					    AMDGPU_DOORBELL_GFX_RING0);
-			WREG32(mmCP_RB_DOORBELL_RANGE_LOWER, tmp);
-
-			WREG32(mmCP_RB_DOORBELL_RANGE_UPPER,
-			       CP_RB_DOORBELL_RANGE_UPPER__DOORBELL_RANGE_UPPER_MASK);
-		}
-
-	}
-
+	gfx_v8_0_set_cpg_door_bell(adev, ring);
 	/* start the ring */
 	amdgpu_ring_clear_ring(ring);
 	gfx_v8_0_cp_gfx_start(adev);
@@ -5016,6 +5022,14 @@ static int gfx_v8_0_kcq_init_queue(struct amdgpu_ring *ring)
 	return 0;
 }
 
+static void gfx_v8_0_set_mec_doorbell_range(struct amdgpu_device *adev)
+{
+	if (adev->asic_type > CHIP_TONGA) {
+		WREG32(mmCP_MEC_DOORBELL_RANGE_LOWER, AMDGPU_DOORBELL_KIQ << 2);
+		WREG32(mmCP_MEC_DOORBELL_RANGE_UPPER, AMDGPU_DOORBELL_MEC_RING7 << 2);
+	}
+}
+
 static int gfx_v8_0_kiq_resume(struct amdgpu_device *adev)
 {
 	struct amdgpu_ring *ring = NULL;
@@ -5056,17 +5070,7 @@ static int gfx_v8_0_kiq_resume(struct amdgpu_device *adev)
 			goto done;
 	}
 
-	if ((adev->asic_type == CHIP_CARRIZO) ||
-	    (adev->asic_type == CHIP_FIJI) ||
-	    (adev->asic_type == CHIP_STONEY) ||
-	    (adev->asic_type == CHIP_POLARIS10) ||
-	    (adev->asic_type == CHIP_POLARIS11) ||
-	    (adev->asic_type == CHIP_POLARIS12)) {
-		WREG32(mmCP_MEC_DOORBELL_RANGE_LOWER,
-		       AMDGPU_DOORBELL_KIQ << 2);
-		WREG32(mmCP_MEC_DOORBELL_RANGE_UPPER,
-		       AMDGPU_DOORBELL_MEC_RING7 << 2);
-	}
+	gfx_v8_0_set_mec_doorbell_range(adev);
 
 	r = gfx_v8_0_kiq_kcq_enable(adev);
 	if (r)
@@ -5299,23 +5303,25 @@ static bool gfx_v8_0_check_soft_reset(void *handle)
 	}
 }
 
-static void gfx_v8_0_inactive_hqd(struct amdgpu_device *adev,
-				  struct amdgpu_ring *ring)
+static int gfx_v8_0_deactivate_hqd(struct amdgpu_device *adev, u32 req)
 {
-	int i;
+	int i, r = 0;
 
-	mutex_lock(&adev->srbm_mutex);
-	vi_srbm_select(adev, ring->me, ring->pipe, ring->queue, 0);
 	if (RREG32(mmCP_HQD_ACTIVE) & CP_HQD_ACTIVE__ACTIVE_MASK) {
-		WREG32_FIELD(CP_HQD_DEQUEUE_REQUEST, DEQUEUE_REQ, 2);
+		WREG32_FIELD(CP_HQD_DEQUEUE_REQUEST, DEQUEUE_REQ, req);
 		for (i = 0; i < adev->usec_timeout; i++) {
 			if (!(RREG32(mmCP_HQD_ACTIVE) & CP_HQD_ACTIVE__ACTIVE_MASK))
 				break;
 			udelay(1);
 		}
+		if (i == adev->usec_timeout)
+			r = -ETIMEDOUT;
 	}
-	vi_srbm_select(adev, 0, 0, 0, 0);
-	mutex_unlock(&adev->srbm_mutex);
+	WREG32(mmCP_HQD_DEQUEUE_REQUEST, 0);
+	WREG32(mmCP_HQD_PQ_RPTR, 0);
+	WREG32(mmCP_HQD_PQ_WPTR, 0);
+
+	return r;
 }
 
 static int gfx_v8_0_pre_soft_reset(void *handle)
@@ -5347,7 +5353,11 @@ static int gfx_v8_0_pre_soft_reset(void *handle)
 		for (i = 0; i < adev->gfx.num_compute_rings; i++) {
 			struct amdgpu_ring *ring = &adev->gfx.compute_ring[i];
 
-			gfx_v8_0_inactive_hqd(adev, ring);
+			mutex_lock(&adev->srbm_mutex);
+			vi_srbm_select(adev, ring->me, ring->pipe, ring->queue, 0);
+			gfx_v8_0_deactivate_hqd(adev, 2);
+			vi_srbm_select(adev, 0, 0, 0, 0);
+			mutex_unlock(&adev->srbm_mutex);
 		}
 		/* Disable MEC parsing/prefetching */
 		gfx_v8_0_cp_compute_enable(adev, false);
@@ -5418,18 +5428,6 @@ static int gfx_v8_0_soft_reset(void *handle)
 	return 0;
 }
 
-static void gfx_v8_0_init_hqd(struct amdgpu_device *adev,
-			      struct amdgpu_ring *ring)
-{
-	mutex_lock(&adev->srbm_mutex);
-	vi_srbm_select(adev, ring->me, ring->pipe, ring->queue, 0);
-	WREG32(mmCP_HQD_DEQUEUE_REQUEST, 0);
-	WREG32(mmCP_HQD_PQ_RPTR, 0);
-	WREG32(mmCP_HQD_PQ_WPTR, 0);
-	vi_srbm_select(adev, 0, 0, 0, 0);
-	mutex_unlock(&adev->srbm_mutex);
-}
-
 static int gfx_v8_0_post_soft_reset(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
@@ -5455,7 +5453,11 @@ static int gfx_v8_0_post_soft_reset(void *handle)
 		for (i = 0; i < adev->gfx.num_compute_rings; i++) {
 			struct amdgpu_ring *ring = &adev->gfx.compute_ring[i];
 
-			gfx_v8_0_init_hqd(adev, ring);
+			mutex_lock(&adev->srbm_mutex);
+			vi_srbm_select(adev, ring->me, ring->pipe, ring->queue, 0);
+			gfx_v8_0_deactivate_hqd(adev, 2);
+			vi_srbm_select(adev, 0, 0, 0, 0);
+			mutex_unlock(&adev->srbm_mutex);
 		}
 		gfx_v8_0_kiq_resume(adev);
 	}
@@ -6095,6 +6097,8 @@ static void gfx_v8_0_update_coarse_grain_clock_gating(struct amdgpu_device *adev
 			  RLC_CGCG_CGLS_CTRL__CGLS_EN_MASK);
 		if (temp != data)
 			WREG32(mmRLC_CGCG_CGLS_CTRL, data);
+		/* enable interrupts again for PG */
+		gfx_v8_0_enable_gui_idle_interrupt(adev, true);
 	}
 
 	gfx_v8_0_wait_for_rlc_serdes(adev);
@@ -7140,6 +7144,7 @@ static void gfx_v8_0_get_cu_info(struct amdgpu_device *adev)
 	case CHIP_FIJI:
 	case CHIP_POLARIS10:
 	case CHIP_POLARIS11:
+	case CHIP_POLARIS12:
 		cu_info->max_waves_per_simd = 10;
 		cu_info->max_scratch_slots_per_cu = 32;
 		cu_info->wave_front_size = 64;
