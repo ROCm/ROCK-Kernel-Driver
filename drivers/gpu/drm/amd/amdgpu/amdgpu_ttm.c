@@ -1109,6 +1109,8 @@ static bool amdgpu_ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 	struct reservation_object_list *flist;
 	struct fence *f;
 	int i;
+	unsigned long num_pages = bo->mem.num_pages;
+	struct drm_mm_node *node = bo->mem.mm_node;
 
 	/* If bo is a KFD BO, check if the bo belongs to the current process.
 	 * If true, then return false as any KFD process needs all its BOs to
@@ -1124,11 +1126,14 @@ static bool amdgpu_ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 		}
 	}
 
-	if (bo->mem.mem_type == TTM_PL_VRAM &&
-	    bo->mem.start == AMDGPU_BO_INVALID_OFFSET) {
-		unsigned long num_pages = bo->mem.num_pages;
-		struct drm_mm_node *node = bo->mem.mm_node;
+	if (bo->mem.start != AMDGPU_BO_INVALID_OFFSET)
+		return ttm_bo_eviction_valuable(bo, place);
 
+	switch (bo->mem.mem_type) {
+	case TTM_PL_TT:
+		return true;
+
+	case TTM_PL_VRAM:
 		/* Check each drm MM node individually */
 		while (num_pages) {
 			if (place->fpfn < (node->start + node->size) &&
@@ -1138,8 +1143,10 @@ static bool amdgpu_ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 			num_pages -= node->size;
 			++node;
 		}
+		break;
 
-		return false;
+	default:
+		break;
 	}
 
 	return ttm_bo_eviction_valuable(bo, place);
