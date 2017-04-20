@@ -1079,6 +1079,10 @@ static int amdgpu_atomic_helper_page_flip(struct drm_crtc *crtc,
 	if (!state)
 		return -ENOMEM;
 
+	ret = drm_crtc_vblank_get(crtc);
+	if (ret)
+		return ret;
+
 	state->acquire_ctx = drm_modeset_legacy_acquire_ctx(crtc);
 retry:
 	crtc_state = drm_atomic_get_crtc_state(state, crtc);
@@ -1118,7 +1122,8 @@ fail:
 	if (ret == -EDEADLK)
 		goto backoff;
 
-	drm_atomic_state_put(state);
+	if (ret)
+		drm_crtc_vblank_put(crtc);
 
 	return ret;
 backoff:
