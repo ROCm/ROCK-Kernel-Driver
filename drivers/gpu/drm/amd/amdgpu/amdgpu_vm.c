@@ -2153,10 +2153,12 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	unsigned ring_instance;
 	struct amdgpu_ring *ring;
 	struct amd_sched_rq *rq;
-	int r;
+	int r, i;
 
 	vm->va = RB_ROOT;
 	vm->client_id = atomic64_inc_return(&adev->vm_manager.client_counter);
+	for (i = 0; i < AMDGPU_MAX_VMHUBS; i++)
+		vm->reserved_vmid[i] = NULL;
 	spin_lock_init(&vm->status_lock);
 	INIT_LIST_HEAD(&vm->invalidated);
 	INIT_LIST_HEAD(&vm->cleared);
@@ -2259,6 +2261,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 {
 	struct amdgpu_bo_va_mapping *mapping, *tmp;
 	bool prt_fini_needed = !!adev->gart.gart_funcs->set_prt;
+	int i;
 
 	if (vm->is_kfd_vm) {
 		struct amdgpu_vm_id_manager *id_mgr =
@@ -2301,6 +2304,18 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 
 	amdgpu_vm_free_levels(&vm->root);
 	fence_put(vm->last_dir_update);
+	for (i = 0; i < AMDGPU_MAX_VMHUBS; i++) {
+		struct amdgpu_vm_id_manager *id_mgr =
+			&adev->vm_manager.id_mgr[i];
+
+		mutex_lock(&id_mgr->lock);
+		if (vm->reserved_vmid[i]) {
+			list_add(&vm->reserved_vmid[i]->list,
+				 &id_mgr->ids_lru);
+			vm->reserved_vmid[i] = NULL;
+		}
+		mutex_unlock(&id_mgr->lock);
+	}
 }
 
 /**
