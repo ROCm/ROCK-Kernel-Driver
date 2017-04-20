@@ -2208,7 +2208,8 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 				&adev->vm_manager.id_mgr[AMDGPU_GFXHUB];
 
 		mutex_lock(&id_mgr->lock);
-		if ((!amdgpu_sriov_vf(adev)) && adev->vm_manager.n_kfd_vms++ == 0) {
+		if ((adev->vm_manager.n_kfd_vms++ == 0) &&
+			(!amdgpu_sriov_vf(adev))) {
 			/* First KFD VM: enable compute power profile */
 			if (adev->pp_enabled)
 				amdgpu_dpm_switch_power_profile(adev,
@@ -2277,7 +2278,8 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		mutex_lock(&id_mgr->lock);
 		WARN(adev->vm_manager.n_kfd_vms == 0, "Unbalanced number of KFD VMs");
 
-		if (--adev->vm_manager.n_kfd_vms == 0) {
+		if ((--adev->vm_manager.n_kfd_vms == 0) &&
+			(!amdgpu_sriov_vf(adev))) {
 			/* Last KFD VM: enable graphics power profile */
 			if (adev->pp_enabled)
 				amdgpu_dpm_switch_power_profile(adev,
