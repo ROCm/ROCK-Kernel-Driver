@@ -265,7 +265,7 @@ static const struct dce110_link_enc_hpd_registers link_enc_hpd_regs[] = {
 
 #define link_regs(id)\
 [id] = {\
-	LE_DCE110_REG_LIST(id)\
+	LE_DCE100_REG_LIST(id)\
 }
 
 static const struct dce110_link_enc_registers link_enc_regs[] = {
@@ -788,11 +788,6 @@ static bool dce100_validate_surface_sets(
 		if (set[i].surface_count > 1)
 			return false;
 
-		if (set[i].surfaces[0]->clip_rect.width
-				< set[i].stream->src.width
-				|| set[i].surfaces[0]->clip_rect.height
-				< set[i].stream->src.height)
-			return false;
 		if (set[i].surfaces[0]->format
 				>= SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)
 			return false;
@@ -1034,6 +1029,8 @@ static bool construct(
 			goto res_create_fail;
 		}
 	}
+
+	dc->public.caps.max_surfaces =  pool->base.pipe_count;
 
 	if (!resource_construct(num_virtual_links, dc, &pool->base,
 			&res_create_funcs))

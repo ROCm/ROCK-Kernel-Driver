@@ -297,8 +297,8 @@ bool resource_are_streams_timing_synchronizable(
 		return false;
 
 	if (stream1->phy_pix_clk != stream2->phy_pix_clk
-			&& !dc_is_dp_signal(stream1->signal)
-			&& !dc_is_dp_signal(stream2->signal))
+			&& (!dc_is_dp_signal(stream1->signal)
+			|| !dc_is_dp_signal(stream2->signal)))
 		return false;
 
 	return true;
@@ -422,6 +422,11 @@ static void calculate_viewport(struct pipe_ctx *pipe_ctx)
 	bool sec_split = pipe_ctx->top_pipe &&
 			pipe_ctx->top_pipe->surface == pipe_ctx->surface;
 
+	if (stream->timing.timing_3d_format == TIMING_3D_FORMAT_SIDE_BY_SIDE ||
+		stream->timing.timing_3d_format == TIMING_3D_FORMAT_TOP_AND_BOTTOM) {
+		pri_split = false;
+		sec_split = false;
+	}
 	/* The actual clip is an intersection between stream
 	 * source and surface clip
 	 */
@@ -532,14 +537,27 @@ static void calculate_recout(struct pipe_ctx *pipe_ctx, struct view *recout_skip
 			stream->public.dst.y + stream->public.dst.height
 						- pipe_ctx->scl_data.recout.y;
 
-	/* Handle hsplit */
-	if (pipe_ctx->top_pipe && pipe_ctx->top_pipe->surface == pipe_ctx->surface) {
-		pipe_ctx->scl_data.recout.width /= 2;
-		pipe_ctx->scl_data.recout.x += pipe_ctx->scl_data.recout.width;
-		/* Floor primary pipe, ceil 2ndary pipe */
-		pipe_ctx->scl_data.recout.width += pipe_ctx->scl_data.recout.width % 2;
-	} else if (pipe_ctx->bottom_pipe && pipe_ctx->bottom_pipe->surface == pipe_ctx->surface) {
-		pipe_ctx->scl_data.recout.width /= 2;
+	/* Handle h & vsplit */
+	if (pipe_ctx->top_pipe && pipe_ctx->top_pipe->surface ==
+		pipe_ctx->surface) {
+		if (stream->public.timing.timing_3d_format ==
+			TIMING_3D_FORMAT_TOP_AND_BOTTOM) {
+			pipe_ctx->scl_data.recout.height /= 2;
+			pipe_ctx->scl_data.recout.y += pipe_ctx->scl_data.recout.height;
+			/* Floor primary pipe, ceil 2ndary pipe */
+			pipe_ctx->scl_data.recout.height += pipe_ctx->scl_data.recout.height % 2;
+		} else {
+			pipe_ctx->scl_data.recout.width /= 2;
+			pipe_ctx->scl_data.recout.x += pipe_ctx->scl_data.recout.width;
+			pipe_ctx->scl_data.recout.width += pipe_ctx->scl_data.recout.width % 2;
+		}
+	} else if (pipe_ctx->bottom_pipe &&
+			   pipe_ctx->bottom_pipe->surface == pipe_ctx->surface) {
+		if (stream->public.timing.timing_3d_format ==
+			TIMING_3D_FORMAT_TOP_AND_BOTTOM)
+			pipe_ctx->scl_data.recout.height /= 2;
+		else
+			pipe_ctx->scl_data.recout.width /= 2;
 	}
 
 	/* Unclipped recout offset = stream dst offset + ((surf dst offset - stream src offset)
@@ -887,7 +905,7 @@ struct pipe_ctx *resource_get_head_pipe_for_stream(
 	int i;
 	for (i = 0; i < res_ctx->pool->pipe_count; i++) {
 		if (res_ctx->pipe_ctx[i].stream == stream &&
-				!res_ctx->pipe_ctx[i].top_pipe) {
+				res_ctx->pipe_ctx[i].stream_enc) {
 			return &res_ctx->pipe_ctx[i];
 			break;
 		}
@@ -900,10 +918,11 @@ struct pipe_ctx *resource_get_head_pipe_for_stream(
  * that has no surface attached yet
  */
 static struct pipe_ctx *acquire_free_pipe_for_stream(
-		struct resource_context *res_ctx,
+		struct validate_context *context,
 		const struct dc_stream *dc_stream)
 {
 	int i;
+	struct resource_context *res_ctx = &context->res_ctx;
 	struct core_stream *stream = DC_STREAM_TO_CORE(dc_stream);
 
 	struct pipe_ctx *head_pipe = NULL;
@@ -934,7 +953,7 @@ static struct pipe_ctx *acquire_free_pipe_for_stream(
 	if(!res_ctx->pool->funcs->acquire_idle_pipe_for_layer)
 		return NULL;
 
-	return res_ctx->pool->funcs->acquire_idle_pipe_for_layer(res_ctx, stream);
+	return res_ctx->pool->funcs->acquire_idle_pipe_for_layer(context, stream);
 
 }
 
@@ -1001,8 +1020,7 @@ bool resource_attach_surfaces_to_context(
 	tail_pipe = NULL;
 	for (i = 0; i < surface_count; i++) {
 		struct core_surface *surface = DC_SURFACE_TO_CORE(surfaces[i]);
-		struct pipe_ctx *free_pipe = acquire_free_pipe_for_stream(
-				&context->res_ctx, dc_stream);
+		struct pipe_ctx *free_pipe = acquire_free_pipe_for_stream(context, dc_stream);
 
 		if (!free_pipe) {
 			stream_status->surfaces[i] = NULL;
@@ -1072,8 +1090,6 @@ static bool are_stream_backends_same(
 bool is_stream_unchanged(
 	const struct core_stream *old_stream, const struct core_stream *stream)
 {
-	if (old_stream == stream)
-		return true;
 
 	if (!are_stream_backends_same(old_stream, stream))
 		return false;
@@ -1357,6 +1373,7 @@ enum dc_status resource_map_pool_resources(
 			continue;
 		}
 	}
+
 		/* mark resources used for stream that is already active */
 		for (j = 0; j < MAX_PIPES; j++) {
 			struct pipe_ctx *pipe_ctx =
@@ -1502,17 +1519,16 @@ static void set_avi_info_frame(
 	uint8_t cn0_cn1 = 0;
 	uint8_t *check_sum = NULL;
 	uint8_t byte_index = 0;
+	union hdmi_info_packet *hdmi_info = &info_frame.avi_info_packet.info_packet_hdmi;
 
 	color_space = pipe_ctx->stream->public.output_color_space;
 
 	/* Initialize header */
-	info_frame.avi_info_packet.info_packet_hdmi.bits.header.
-			info_frame_type = HDMI_INFOFRAME_TYPE_AVI;
+	hdmi_info->bits.header.info_frame_type = HDMI_INFOFRAME_TYPE_AVI;
 	/* InfoFrameVersion_3 is defined by CEA861F (Section 6.4), but shall
 	* not be used in HDMI 2.0 (Section 10.1) */
-	info_frame.avi_info_packet.info_packet_hdmi.bits.header.version = 2;
-	info_frame.avi_info_packet.info_packet_hdmi.bits.header.length =
-			HDMI_AVI_INFOFRAME_SIZE;
+	hdmi_info->bits.header.version = 2;
+	hdmi_info->bits.header.length = HDMI_AVI_INFOFRAME_SIZE;
 
 	/*
 	 * IDO-defined (Y2,Y1,Y0 = 1,1,1) shall not be used by devices built
@@ -1538,52 +1554,41 @@ static void set_avi_info_frame(
 
 	/* Y0_Y1_Y2 : The pixel encoding */
 	/* H14b AVI InfoFrame has extension on Y-field from 2 bits to 3 bits */
-	info_frame.avi_info_packet.info_packet_hdmi.bits.Y0_Y1_Y2 =
-		pixel_encoding;
+	hdmi_info->bits.Y0_Y1_Y2 = pixel_encoding;
 
 	/* A0 = 1 Active Format Information valid */
-	info_frame.avi_info_packet.info_packet_hdmi.bits.A0 =
-		ACTIVE_FORMAT_VALID;
+	hdmi_info->bits.A0 = ACTIVE_FORMAT_VALID;
 
 	/* B0, B1 = 3; Bar info data is valid */
-	info_frame.avi_info_packet.info_packet_hdmi.bits.B0_B1 =
-		BAR_INFO_BOTH_VALID;
+	hdmi_info->bits.B0_B1 = BAR_INFO_BOTH_VALID;
 
-	info_frame.avi_info_packet.info_packet_hdmi.bits.SC0_SC1 =
-			PICTURE_SCALING_UNIFORM;
+	hdmi_info->bits.SC0_SC1 = PICTURE_SCALING_UNIFORM;
 
 	/* S0, S1 : Underscan / Overscan */
 	/* TODO: un-hardcode scan type */
 	scan_type = SCANNING_TYPE_UNDERSCAN;
-	info_frame.avi_info_packet.info_packet_hdmi.bits.S0_S1 = scan_type;
+	hdmi_info->bits.S0_S1 = scan_type;
 
 	/* C0, C1 : Colorimetry */
 	if (color_space == COLOR_SPACE_YCBCR709 ||
 			color_space == COLOR_SPACE_YCBCR709_LIMITED)
-		info_frame.avi_info_packet.info_packet_hdmi.bits.C0_C1 =
-				COLORIMETRY_ITU709;
+		hdmi_info->bits.C0_C1 = COLORIMETRY_ITU709;
 	else if (color_space == COLOR_SPACE_YCBCR601 ||
 			color_space == COLOR_SPACE_YCBCR601_LIMITED)
-		info_frame.avi_info_packet.info_packet_hdmi.bits.C0_C1 =
-				COLORIMETRY_ITU601;
+		hdmi_info->bits.C0_C1 = COLORIMETRY_ITU601;
 	else {
 		if (stream->public.timing.pixel_encoding != PIXEL_ENCODING_RGB)
 			BREAK_TO_DEBUGGER();
-		info_frame.avi_info_packet.info_packet_hdmi.bits.C0_C1 =
-				COLORIMETRY_NO_DATA;
+		hdmi_info->bits.C0_C1 = COLORIMETRY_NO_DATA;
 	}
 	if (color_space == COLOR_SPACE_2020_RGB_FULLRANGE ||
 			color_space == COLOR_SPACE_2020_RGB_LIMITEDRANGE ||
 			color_space == COLOR_SPACE_2020_YCBCR) {
-		info_frame.avi_info_packet.info_packet_hdmi.bits.EC0_EC2 =
-				COLORIMETRYEX_BT2020RGBYCBCR;
-		info_frame.avi_info_packet.info_packet_hdmi.bits.C0_C1 =
-				COLORIMETRY_EXTENDED;
+		hdmi_info->bits.EC0_EC2 = COLORIMETRYEX_BT2020RGBYCBCR;
+		hdmi_info->bits.C0_C1   = COLORIMETRY_EXTENDED;
 	} else if (color_space == COLOR_SPACE_ADOBERGB) {
-		info_frame.avi_info_packet.info_packet_hdmi.bits.EC0_EC2 =
-				COLORIMETRYEX_ADOBERGB;
-		info_frame.avi_info_packet.info_packet_hdmi.bits.C0_C1 =
-				COLORIMETRY_EXTENDED;
+		hdmi_info->bits.EC0_EC2 = COLORIMETRYEX_ADOBERGB;
+		hdmi_info->bits.C0_C1   = COLORIMETRY_EXTENDED;
 	}
 
 	/* TODO: un-hardcode aspect ratio */
@@ -1592,93 +1597,76 @@ static void set_avi_info_frame(
 	switch (aspect) {
 	case ASPECT_RATIO_4_3:
 	case ASPECT_RATIO_16_9:
-		info_frame.avi_info_packet.info_packet_hdmi.bits.M0_M1 = aspect;
+		hdmi_info->bits.M0_M1 = aspect;
 		break;
 
 	case ASPECT_RATIO_NO_DATA:
 	case ASPECT_RATIO_64_27:
 	case ASPECT_RATIO_256_135:
 	default:
-		info_frame.avi_info_packet.info_packet_hdmi.bits.M0_M1 = 0;
+		hdmi_info->bits.M0_M1 = 0;
 	}
 
 	/* Active Format Aspect ratio - same as Picture Aspect Ratio. */
-	info_frame.avi_info_packet.info_packet_hdmi.bits.R0_R3 =
-			ACTIVE_FORMAT_ASPECT_RATIO_SAME_AS_PICTURE;
+	hdmi_info->bits.R0_R3 = ACTIVE_FORMAT_ASPECT_RATIO_SAME_AS_PICTURE;
 
 	/* TODO: un-hardcode cn0_cn1 and itc */
 	cn0_cn1 = 0;
 	itc = false;
 
 	if (itc) {
-		info_frame.avi_info_packet.info_packet_hdmi.bits.ITC = 1;
-		info_frame.avi_info_packet.info_packet_hdmi.bits.CN0_CN1 =
-			cn0_cn1;
+		hdmi_info->bits.ITC     = 1;
+		hdmi_info->bits.CN0_CN1 = cn0_cn1;
 	}
 
 	/* TODO : We should handle YCC quantization */
 	/* but we do not have matrix calculation */
 	if (color_space == COLOR_SPACE_SRGB) {
-		info_frame.avi_info_packet.info_packet_hdmi.bits.Q0_Q1 =
-						RGB_QUANTIZATION_FULL_RANGE;
-		info_frame.avi_info_packet.info_packet_hdmi.bits.YQ0_YQ1 =
-						YYC_QUANTIZATION_FULL_RANGE;
+		hdmi_info->bits.Q0_Q1   = RGB_QUANTIZATION_FULL_RANGE;
+		hdmi_info->bits.YQ0_YQ1 = YYC_QUANTIZATION_FULL_RANGE;
 	} else if (color_space == COLOR_SPACE_SRGB_LIMITED) {
-		info_frame.avi_info_packet.info_packet_hdmi.bits.Q0_Q1 =
-						RGB_QUANTIZATION_LIMITED_RANGE;
-		info_frame.avi_info_packet.info_packet_hdmi.bits.YQ0_YQ1 =
-						YYC_QUANTIZATION_LIMITED_RANGE;
+		hdmi_info->bits.Q0_Q1   = RGB_QUANTIZATION_LIMITED_RANGE;
+		hdmi_info->bits.YQ0_YQ1 = YYC_QUANTIZATION_LIMITED_RANGE;
 	} else {
-		info_frame.avi_info_packet.info_packet_hdmi.bits.Q0_Q1 =
-						RGB_QUANTIZATION_DEFAULT_RANGE;
-		info_frame.avi_info_packet.info_packet_hdmi.bits.YQ0_YQ1 =
-						YYC_QUANTIZATION_LIMITED_RANGE;
+		hdmi_info->bits.Q0_Q1   = RGB_QUANTIZATION_DEFAULT_RANGE;
+		hdmi_info->bits.YQ0_YQ1 = YYC_QUANTIZATION_LIMITED_RANGE;
 	}
 
-	info_frame.avi_info_packet.info_packet_hdmi.bits.VIC0_VIC7 =
+	hdmi_info->bits.VIC0_VIC7 =
 					stream->public.timing.vic;
 
 	/* pixel repetition
 	 * PR0 - PR3 start from 0 whereas pHwPathMode->mode.timing.flags.pixel
 	 * repetition start from 1 */
-	info_frame.avi_info_packet.info_packet_hdmi.bits.PR0_PR3 = 0;
+	hdmi_info->bits.PR0_PR3 = 0;
 
 	/* Bar Info
 	 * barTop:    Line Number of End of Top Bar.
 	 * barBottom: Line Number of Start of Bottom Bar.
 	 * barLeft:   Pixel Number of End of Left Bar.
 	 * barRight:  Pixel Number of Start of Right Bar. */
-	info_frame.avi_info_packet.info_packet_hdmi.bits.bar_top =
-			stream->public.timing.v_border_top;
-	info_frame.avi_info_packet.info_packet_hdmi.bits.bar_bottom =
-		(stream->public.timing.v_border_top
+	hdmi_info->bits.bar_top = stream->public.timing.v_border_top;
+	hdmi_info->bits.bar_bottom = (stream->public.timing.v_border_top
 			- stream->public.timing.v_border_bottom + 1);
-	info_frame.avi_info_packet.info_packet_hdmi.bits.bar_left =
-			stream->public.timing.h_border_left;
-	info_frame.avi_info_packet.info_packet_hdmi.bits.bar_right =
-		(stream->public.timing.h_total
+	hdmi_info->bits.bar_left  = stream->public.timing.h_border_left;
+	hdmi_info->bits.bar_right = (stream->public.timing.h_total
 			- stream->public.timing.h_border_right + 1);
 
 	/* check_sum - Calculate AFMT_AVI_INFO0 ~ AFMT_AVI_INFO3 */
-	check_sum =
-		&info_frame.
-		avi_info_packet.info_packet_hdmi.packet_raw_data.sb[0];
+	check_sum = &info_frame.avi_info_packet.info_packet_hdmi.packet_raw_data.sb[0];
+
 	*check_sum = HDMI_INFOFRAME_TYPE_AVI + HDMI_AVI_INFOFRAME_SIZE + 2;
 
 	for (byte_index = 1; byte_index <= HDMI_AVI_INFOFRAME_SIZE; byte_index++)
-		*check_sum += info_frame.avi_info_packet.info_packet_hdmi.
-				packet_raw_data.sb[byte_index];
+		*check_sum += hdmi_info->packet_raw_data.sb[byte_index];
 
 	/* one byte complement */
 	*check_sum = (uint8_t) (0x100 - *check_sum);
 
 	/* Store in hw_path_mode */
-	info_packet->hb0 =
-		info_frame.avi_info_packet.info_packet_hdmi.packet_raw_data.hb0;
-	info_packet->hb1 =
-		info_frame.avi_info_packet.info_packet_hdmi.packet_raw_data.hb1;
-	info_packet->hb2 =
-		info_frame.avi_info_packet.info_packet_hdmi.packet_raw_data.hb2;
+	info_packet->hb0 = hdmi_info->packet_raw_data.hb0;
+	info_packet->hb1 = hdmi_info->packet_raw_data.hb1;
+	info_packet->hb2 = hdmi_info->packet_raw_data.hb2;
 
 	for (byte_index = 0; byte_index < sizeof(info_frame.avi_info_packet.
 				info_packet_hdmi.packet_raw_data.sb); byte_index++)

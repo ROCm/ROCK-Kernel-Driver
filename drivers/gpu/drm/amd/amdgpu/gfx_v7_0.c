@@ -47,6 +47,8 @@
 #include "oss/oss_2_0_d.h"
 #include "oss/oss_2_0_sh_mask.h"
 
+#define NUM_SIMD_PER_CU 0x4
+
 #define GFX7_NUM_GFX_RINGS     1
 #define GFX7_NUM_COMPUTE_RINGS 8
 
@@ -1935,7 +1937,7 @@ static void gfx_v7_0_gpu_init(struct amdgpu_device *adev)
 				   INDEX_STRIDE, 3);
 
 	mutex_lock(&adev->srbm_mutex);
-	for (i = 0; i < adev->vm_manager.num_ids; i++) {
+	for (i = 0; i < adev->vm_manager.id_mgr[0].num_ids; i++) {
 		if (i == 0)
 			sh_mem_base = 0;
 		else
@@ -3797,6 +3799,9 @@ static void gfx_v7_0_enable_cgcg(struct amdgpu_device *adev, bool enable)
 		gfx_v7_0_update_rlc(adev, tmp);
 
 		data |= RLC_CGCG_CGLS_CTRL__CGCG_EN_MASK | RLC_CGCG_CGLS_CTRL__CGLS_EN_MASK;
+		if (orig != data)
+			WREG32(mmRLC_CGCG_CGLS_CTRL, data);
+
 	} else {
 		gfx_v7_0_enable_gui_idle_interrupt(adev, false);
 
@@ -3806,11 +3811,11 @@ static void gfx_v7_0_enable_cgcg(struct amdgpu_device *adev, bool enable)
 		RREG32(mmCB_CGTT_SCLK_CTRL);
 
 		data &= ~(RLC_CGCG_CGLS_CTRL__CGCG_EN_MASK | RLC_CGCG_CGLS_CTRL__CGLS_EN_MASK);
+		if (orig != data)
+			WREG32(mmRLC_CGCG_CGLS_CTRL, data);
+
+		gfx_v7_0_enable_gui_idle_interrupt(adev, true);
 	}
-
-	if (orig != data)
-		WREG32(mmRLC_CGCG_CGLS_CTRL, data);
-
 }
 
 static void gfx_v7_0_enable_mgcg(struct amdgpu_device *adev, bool enable)
@@ -5371,6 +5376,20 @@ static void gfx_v7_0_get_cu_info(struct amdgpu_device *adev)
 
 	cu_info->number = active_cu_number;
 	cu_info->ao_cu_mask = ao_cu_mask;
+	cu_info->simd_per_cu = NUM_SIMD_PER_CU;
+	switch (adev->asic_type) {
+	case CHIP_KAVERI:
+	case CHIP_HAWAII:
+		cu_info->max_waves_per_simd = 10;
+		cu_info->max_scratch_slots_per_cu = 32;
+		cu_info->wave_front_size = 64;
+		cu_info->lds_size = 64;
+		break;
+	default:
+		dev_warn(adev->dev, "CU info asic_type [0x%x] not supported\n",
+				adev->asic_type);
+		break;
+	}
 }
 
 const struct amdgpu_ip_block_version gfx_v7_0_ip_block =

@@ -23,6 +23,8 @@
  *
  */
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+
 #include "dm_services_types.h"
 #include "dc.h"
 
@@ -54,6 +56,28 @@
 #include <drm/drm_dp_mst_helper.h>
 
 #include "modules/inc/mod_freesync.h"
+
+static enum drm_plane_type dm_surfaces_type_default[AMDGPU_MAX_PLANES] = {
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+};
+
+static enum drm_plane_type dm_surfaces_type_carizzo[AMDGPU_MAX_PLANES] = {
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_OVERLAY,/* YUV Capable Underlay */
+};
+
+static enum drm_plane_type dm_surfaces_type_stoney[AMDGPU_MAX_PLANES] = {
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_PRIMARY,
+	DRM_PLANE_TYPE_OVERLAY, /* YUV Capable Underlay */
+};
 
 /*
  * dm_vblank_get_counter
@@ -155,7 +179,6 @@ static struct amdgpu_crtc *get_crtc_by_otg_inst(
 
 static void dm_pflip_high_irq(void *interrupt_params)
 {
-	struct amdgpu_flip_work *works;
 	struct amdgpu_crtc *amdgpu_crtc;
 	struct common_irq_params *irq_params = interrupt_params;
 	struct amdgpu_device *adev = irq_params->adev;
@@ -171,7 +194,6 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	}
 
 	spin_lock_irqsave(&adev->ddev->event_lock, flags);
-	works = amdgpu_crtc->pflip_works;
 
 	if (amdgpu_crtc->pflip_status != AMDGPU_FLIP_SUBMITTED){
 		DRM_DEBUG_DRIVER("amdgpu_crtc->pflip_status = %d !=AMDGPU_FLIP_SUBMITTED(%d) on crtc:%d[%p] \n",
@@ -183,22 +205,24 @@ static void dm_pflip_high_irq(void *interrupt_params)
 		return;
 	}
 
-	/* page flip completed. clean up */
-	amdgpu_crtc->pflip_status = AMDGPU_FLIP_NONE;
-	amdgpu_crtc->pflip_works = NULL;
 
 	/* wakeup usersapce */
-	if (works->event)
-		drm_crtc_send_vblank_event(&amdgpu_crtc->base,
-					   works->event);
+	if (amdgpu_crtc->event
+			&& amdgpu_crtc->event->event.base.type
+			== DRM_EVENT_FLIP_COMPLETE) {
+		drm_crtc_send_vblank_event(&amdgpu_crtc->base, amdgpu_crtc->event);
+		/* page flip completed. clean up */
+		amdgpu_crtc->event = NULL;
+	} else
+		WARN_ON(1);
 
+	amdgpu_crtc->pflip_status = AMDGPU_FLIP_NONE;
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 
-	DRM_DEBUG_DRIVER("%s - crtc :%d[%p], pflip_stat:AMDGPU_FLIP_NONE, work: %p,\n",
-					__func__, amdgpu_crtc->crtc_id, amdgpu_crtc, works);
+	DRM_DEBUG_DRIVER("%s - crtc :%d[%p], pflip_stat:AMDGPU_FLIP_NONE\n",
+					__func__, amdgpu_crtc->crtc_id, amdgpu_crtc);
 
 	drm_crtc_vblank_put(&amdgpu_crtc->base);
-	schedule_work(&works->unpin_work);
 }
 
 static void dm_crtc_high_irq(void *interrupt_params)
@@ -317,8 +341,8 @@ int amdgpu_dm_init(struct amdgpu_device *adev)
 	/* TODO: Add_display_info? */
 
 	/* TODO use dynamic cursor width */
-	adev->ddev->mode_config.cursor_width = 128;
-	adev->ddev->mode_config.cursor_height = 128;
+	adev->ddev->mode_config.cursor_width = adev->dm.dc->caps.max_cursor_size;
+	adev->ddev->mode_config.cursor_height = adev->dm.dc->caps.max_cursor_size;
 
 	if (drm_vblank_init(adev->ddev, adev->dm.display_indexes_num)) {
 		DRM_ERROR(
@@ -688,7 +712,7 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 	ret = dm_display_resume(ddev);
 	drm_modeset_unlock_all(ddev);
 
-	amdgpu_dm_irq_resume(adev);
+	amdgpu_dm_irq_resume_late(adev);
 
 	return ret;
 }
@@ -725,7 +749,11 @@ static struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 	.fb_create = amdgpu_user_framebuffer_create,
 	.output_poll_changed = amdgpu_output_poll_changed,
 	.atomic_check = amdgpu_dm_atomic_check,
-	.atomic_commit = amdgpu_dm_atomic_commit
+	.atomic_commit = drm_atomic_helper_commit
+};
+
+static struct drm_mode_config_helper_funcs amdgpu_dm_mode_config_helperfuncs = {
+	.atomic_commit_tail = amdgpu_dm_atomic_commit_tail
 };
 
 void amdgpu_dm_update_connector_after_detect(
@@ -1038,9 +1066,8 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 	 *    for acknowledging and handling. */
 
 	/* Use VBLANK interrupt */
-	for (i = 1; i <= adev->mode_info.num_crtc; i++) {
+	for (i = VISLANDS30_IV_SRCID_D1_VERTICAL_INTERRUPT0; i <= VISLANDS30_IV_SRCID_D6_VERTICAL_INTERRUPT0; i++) {
 		r = amdgpu_irq_add_id(adev, client_id, i, &adev->crtc_irq);
-
 		if (r) {
 			DRM_ERROR("Failed to add crtc irq id!\n");
 			return r;
@@ -1102,6 +1129,7 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 	adev->mode_info.mode_config_initialized = true;
 
 	adev->ddev->mode_config.funcs = (void *)&amdgpu_dm_mode_funcs;
+	adev->ddev->mode_config.helper_private = &amdgpu_dm_mode_config_helperfuncs;
 
 	adev->ddev->mode_config.max_width = 16384;
 	adev->ddev->mode_config.max_height = 16384;
@@ -1193,32 +1221,36 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 {
 	struct amdgpu_display_manager *dm = &adev->dm;
 	uint32_t i;
-	struct amdgpu_connector *aconnector;
-	struct amdgpu_encoder *aencoder;
-	struct amdgpu_crtc *acrtc;
+	struct amdgpu_connector *aconnector = NULL;
+	struct amdgpu_encoder *aencoder = NULL;
+	struct amdgpu_mode_info *mode_info = &adev->mode_info;
 	uint32_t link_cnt;
 
 	link_cnt = dm->dc->caps.max_links;
-
 	if (amdgpu_dm_mode_config_init(dm->adev)) {
 		DRM_ERROR("DM: Failed to initialize mode config\n");
 		return -1;
 	}
 
-	for (i = 0; i < dm->dc->caps.max_streams; i++) {
-		acrtc = kzalloc(sizeof(struct amdgpu_crtc), GFP_KERNEL);
-		if (!acrtc)
-			goto fail;
-
-		if (amdgpu_dm_crtc_init(
-			dm,
-			acrtc,
-			i)) {
-			DRM_ERROR("KMS: Failed to initialize crtc\n");
-			kfree(acrtc);
-			goto fail;
+	for (i = 0; i < dm->dc->caps.max_surfaces; i++) {
+		mode_info->planes[i] = kzalloc(sizeof(struct amdgpu_plane),
+								 GFP_KERNEL);
+		if (!mode_info->planes[i]) {
+			DRM_ERROR("KMS: Failed to allocate surface\n");
+			goto fail_free_planes;
+		}
+		mode_info->planes[i]->plane_type = mode_info->plane_type[i];
+		if (amdgpu_dm_plane_init(dm, mode_info->planes[i], 1)) {
+			DRM_ERROR("KMS: Failed to initialize plane\n");
+			goto fail_free_planes;
 		}
 	}
+
+	for (i = 0; i < dm->dc->caps.max_streams; i++)
+		if (amdgpu_dm_crtc_init(dm, &mode_info->planes[i]->base, i)) {
+			DRM_ERROR("KMS: Failed to initialize crtc\n");
+			goto fail_free_planes;
+		}
 
 	dm->display_indexes_num = dm->dc->caps.max_streams;
 
@@ -1234,7 +1266,7 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 
 		aconnector = kzalloc(sizeof(*aconnector), GFP_KERNEL);
 		if (!aconnector)
-			goto fail;
+			goto fail_free_planes;
 
 		aencoder = kzalloc(sizeof(*aencoder), GFP_KERNEL);
 		if (!aencoder) {
@@ -1248,7 +1280,7 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 
 		if (amdgpu_dm_connector_init(dm, aconnector, i, aencoder)) {
 			DRM_ERROR("KMS: Failed to initialize connector\n");
-			goto fail_free_connector;
+			goto fail_free_encoder;
 		}
 
 		if (dc_link_detect(dc_get_link_at_index(dm->dc, i), true))
@@ -1269,12 +1301,12 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	case CHIP_VEGA10:
 		if (dce110_register_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
-			return -1;
+			goto fail_free_encoder;
 		}
 		break;
 	default:
 		DRM_ERROR("Usupported ASIC type: 0x%X\n", adev->asic_type);
-		return -1;
+		goto fail_free_encoder;
 	}
 
 	drm_mode_config_reset(dm->ddev);
@@ -1284,7 +1316,9 @@ fail_free_encoder:
 	kfree(aencoder);
 fail_free_connector:
 	kfree(aconnector);
-fail:
+fail_free_planes:
+	for (i = 0; i < dm->dc->caps.max_surfaces; i++)
+		kfree(mode_info->planes[i]);
 	return -1;
 }
 
@@ -1369,6 +1403,14 @@ static void dm_page_flip(struct amdgpu_device *adev,
 	acrtc = adev->mode_info.crtcs[crtc_id];
 	stream = acrtc->stream;
 
+
+	if (acrtc->pflip_status != AMDGPU_FLIP_NONE) {
+		DRM_ERROR("flip queue: acrtc %d, already busy\n", acrtc->crtc_id);
+		/* In commit tail framework this cannot happen */
+		BUG_ON(0);
+	}
+
+
 	/*
 	 * Received a page flip call after the display has been reset.
 	 * Just return in this case. Everything should be clean-up on reset.
@@ -1383,15 +1425,28 @@ static void dm_page_flip(struct amdgpu_device *adev,
 	addr.address.grph.addr.high_part = upper_32_bits(crtc_base);
 	addr.flip_immediate = async;
 
+
+	if (acrtc->base.state->event &&
+	    acrtc->base.state->event->event.base.type ==
+			    DRM_EVENT_FLIP_COMPLETE) {
+		acrtc->event = acrtc->base.state->event;
+
+		/* Set the flip status */
+		acrtc->pflip_status = AMDGPU_FLIP_SUBMITTED;
+
+		/* Mark this event as consumed */
+		acrtc->base.state->event = NULL;
+	}
+
+	dc_flip_surface_addrs(adev->dm.dc,
+			      dc_stream_get_status(stream)->surfaces,
+			      &addr, 1);
+
 	DRM_DEBUG_DRIVER("%s Flipping to hi: 0x%x, low: 0x%x \n",
 			 __func__,
 			 addr.address.grph.addr.high_part,
 			 addr.address.grph.addr.low_part);
 
-	dc_flip_surface_addrs(
-			adev->dm.dc,
-			dc_stream_get_status(stream)->surfaces,
-			&addr, 1);
 }
 
 static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
@@ -1654,6 +1709,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
+		adev->mode_info.plane_type = dm_surfaces_type_default;
 #ifdef CONFIG_DRM_AMDGPU_CIK
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v8_0_display_funcs;
@@ -1664,6 +1720,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 7;
+		adev->mode_info.plane_type = dm_surfaces_type_default;
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v10_0_display_funcs;
 		break;
@@ -1671,6 +1728,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 3;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 9;
+		adev->mode_info.plane_type = dm_surfaces_type_carizzo;
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v11_0_display_funcs;
 		break;
@@ -1678,6 +1736,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 2;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 9;
+		adev->mode_info.plane_type = dm_surfaces_type_stoney;
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v11_0_display_funcs;
 		break;
@@ -1686,6 +1745,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 5;
 		adev->mode_info.num_hpd = 5;
 		adev->mode_info.num_dig = 5;
+		adev->mode_info.plane_type = dm_surfaces_type_default;
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v11_0_display_funcs;
 		break;
@@ -1693,6 +1753,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
+		adev->mode_info.plane_type = dm_surfaces_type_default;
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v11_0_display_funcs;
 		break;
@@ -1700,6 +1761,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
+		adev->mode_info.plane_type = dm_surfaces_type_default;
 		if (adev->mode_info.funcs == NULL)
 			adev->mode_info.funcs = &dm_dce_v12_0_display_funcs;
 		break;
@@ -1732,4 +1794,4 @@ bool amdgpu_dm_release_dal_lock(struct amdgpu_display_manager *dm)
 	return true;
 }
 
-
+#endif

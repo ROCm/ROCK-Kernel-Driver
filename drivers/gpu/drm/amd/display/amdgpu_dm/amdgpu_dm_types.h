@@ -26,6 +26,8 @@
 #ifndef __AMDGPU_DM_TYPES_H__
 #define __AMDGPU_DM_TYPES_H__
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+
 #include <drm/drmP.h>
 
 struct amdgpu_framebuffer;
@@ -34,8 +36,11 @@ struct dc_validation_set;
 struct dc_surface;
 
 /*TODO Jodan Hersen use the one in amdgpu_dm*/
+int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
+			struct amdgpu_plane *aplane,
+			unsigned long possible_crtcs);
 int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
-			struct amdgpu_crtc *amdgpu_crtc,
+			struct drm_plane *plane,
 			uint32_t link_index);
 int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
 			struct amdgpu_connector *amdgpu_connector,
@@ -52,10 +57,9 @@ void amdgpu_dm_encoder_destroy(struct drm_encoder *encoder);
 
 int amdgpu_dm_connector_get_modes(struct drm_connector *connector);
 
-int amdgpu_dm_atomic_commit(
-	struct drm_device *dev,
-	struct drm_atomic_state *state,
-	bool async);
+void amdgpu_dm_atomic_commit_tail(
+	struct drm_atomic_state *state);
+
 int amdgpu_dm_atomic_check(struct drm_device *dev,
 				struct drm_atomic_state *state);
 
@@ -93,4 +97,7 @@ void amdgpu_dm_remove_sink_from_freesync_module(
 
 extern const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs;
 
+#else
+#include "../kcl_dm/kcl_dm_types.h"
+#endif		/* KERNEL_VERSION */
 #endif		/* __AMDGPU_DM_TYPES_H__ */

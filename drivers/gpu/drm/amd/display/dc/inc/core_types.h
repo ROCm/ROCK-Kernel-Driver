@@ -27,7 +27,7 @@
 #define _CORE_TYPES_H_
 
 #include "dc.h"
-#include "bandwidth_calcs.h"
+#include "dce_calcs.h"
 #include "ddc_service_types.h"
 #include "dc_bios_types.h"
 
@@ -210,7 +210,7 @@ struct resource_funcs {
 					struct validate_context *context);
 
 	struct pipe_ctx *(*acquire_idle_pipe_for_layer)(
-			struct resource_context *res_ctx,
+			struct validate_context *context,
 			struct core_stream *stream);
 
 	void (*build_bit_depth_reduction_params)(

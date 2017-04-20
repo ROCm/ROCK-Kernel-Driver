@@ -53,6 +53,15 @@ int gfxhub_v1_0_gart_enable(struct amdgpu_device *adev)
 				mmMC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB),
 				(u32)(value >> 44));
 
+	if (amdgpu_sriov_vf(adev)) {
+		/* MC_VM_FB_LOCATION_BASE/TOP is NULL for VF, becuase they are VF copy registers so
+		vbios post doesn't program them, for SRIOV driver need to program them */
+		WREG32(SOC15_REG_OFFSET(GC, 0, mmMC_VM_FB_LOCATION_BASE),
+				adev->mc.vram_start >> 24);
+		WREG32(SOC15_REG_OFFSET(GC, 0, mmMC_VM_FB_LOCATION_TOP),
+				adev->mc.vram_end >> 24);
+	}
+
 	/* Disable AGP. */
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmMC_VM_AGP_BASE), 0);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmMC_VM_AGP_TOP), 0);
@@ -163,7 +172,7 @@ int gfxhub_v1_0_gart_enable(struct amdgpu_device *adev)
 		(u32)(adev->dummy_page.addr >> 12));
 	WREG32(SOC15_REG_OFFSET(GC, 0,
 				mmVM_L2_PROTECTION_FAULT_DEFAULT_ADDR_HI32),
-		(u32)(adev->dummy_page.addr >> 44));
+		(u32)((u64)adev->dummy_page.addr >> 44));
 
 	tmp = RREG32(SOC15_REG_OFFSET(GC, 0, mmVM_L2_PROTECTION_FAULT_CNTL2));
 	tmp = REG_SET_FIELD(tmp, VM_L2_PROTECTION_FAULT_CNTL2,
@@ -195,7 +204,8 @@ int gfxhub_v1_0_gart_enable(struct amdgpu_device *adev)
 	for (i = 0; i <= 14; i++) {
 		tmp = RREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT1_CNTL) + i);
 		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL, ENABLE_CONTEXT, 1);
-		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL, PAGE_TABLE_DEPTH, 1);
+		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL, PAGE_TABLE_DEPTH,
+				    adev->vm_manager.num_level);
 		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL,
 				RANGE_PROTECTION_FAULT_ENABLE_DEFAULT, 1);
 		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL,
@@ -212,13 +222,14 @@ int gfxhub_v1_0_gart_enable(struct amdgpu_device *adev)
 				EXECUTE_PROTECTION_FAULT_ENABLE_DEFAULT, 1);
 		tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL,
 				PAGE_TABLE_BLOCK_SIZE,
-				    amdgpu_vm_block_size - 9);
+				adev->vm_manager.block_size - 9);
 		WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT1_CNTL) + i, tmp);
 		WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT1_PAGE_TABLE_START_ADDR_LO32) + i*2, 0);
 		WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT1_PAGE_TABLE_START_ADDR_HI32) + i*2, 0);
 		WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT1_PAGE_TABLE_END_ADDR_LO32) + i*2,
-				adev->vm_manager.max_pfn - 1);
-		WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT1_PAGE_TABLE_END_ADDR_HI32) + i*2, 0);
+			lower_32_bits(adev->vm_manager.max_pfn - 1));
+		WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_CONTEXT1_PAGE_TABLE_END_ADDR_HI32) + i*2,
+			upper_32_bits(adev->vm_manager.max_pfn - 1));
 	}
 
 
@@ -288,36 +299,6 @@ void gfxhub_v1_0_set_fault_enable_default(struct amdgpu_device *adev,
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmVM_L2_PROTECTION_FAULT_CNTL), tmp);
 }
 
-static uint32_t gfxhub_v1_0_get_invalidate_req(unsigned int vm_id)
-{
-	u32 req = 0;
-
-	/* invalidate using legacy mode on vm_id*/
-	req = REG_SET_FIELD(req, VM_INVALIDATE_ENG0_REQ,
-			    PER_VMID_INVALIDATE_REQ, 1 << vm_id);
-	req = REG_SET_FIELD(req, VM_INVALIDATE_ENG0_REQ, FLUSH_TYPE, 0);
-	req = REG_SET_FIELD(req, VM_INVALIDATE_ENG0_REQ, INVALIDATE_L2_PTES, 1);
-	req = REG_SET_FIELD(req, VM_INVALIDATE_ENG0_REQ, INVALIDATE_L2_PDE0, 1);
-	req = REG_SET_FIELD(req, VM_INVALIDATE_ENG0_REQ, INVALIDATE_L2_PDE1, 1);
-	req = REG_SET_FIELD(req, VM_INVALIDATE_ENG0_REQ, INVALIDATE_L2_PDE2, 1);
-	req = REG_SET_FIELD(req, VM_INVALIDATE_ENG0_REQ, INVALIDATE_L1_PTES, 1);
-	req = REG_SET_FIELD(req, VM_INVALIDATE_ENG0_REQ,
-			    CLEAR_PROTECTION_FAULT_STATUS_ADDR,	0);
-
-	return req;
-}
-
-static uint32_t gfxhub_v1_0_get_vm_protection_bits(void)
-{
-	return (VM_CONTEXT1_CNTL__RANGE_PROTECTION_FAULT_ENABLE_INTERRUPT_MASK |
-		    VM_CONTEXT1_CNTL__DUMMY_PAGE_PROTECTION_FAULT_ENABLE_INTERRUPT_MASK |
-		    VM_CONTEXT1_CNTL__PDE0_PROTECTION_FAULT_ENABLE_INTERRUPT_MASK |
-		    VM_CONTEXT1_CNTL__VALID_PROTECTION_FAULT_ENABLE_INTERRUPT_MASK |
-		    VM_CONTEXT1_CNTL__READ_PROTECTION_FAULT_ENABLE_INTERRUPT_MASK |
-		    VM_CONTEXT1_CNTL__WRITE_PROTECTION_FAULT_ENABLE_INTERRUPT_MASK |
-		    VM_CONTEXT1_CNTL__EXECUTE_PROTECTION_FAULT_ENABLE_INTERRUPT_MASK);
-}
-
 static int gfxhub_v1_0_early_init(void *handle)
 {
 	return 0;
@@ -349,9 +330,6 @@ static int gfxhub_v1_0_sw_init(void *handle)
 		SOC15_REG_OFFSET(GC, 0, mmVM_L2_PROTECTION_FAULT_STATUS);
 	hub->vm_l2_pro_fault_cntl =
 		SOC15_REG_OFFSET(GC, 0, mmVM_L2_PROTECTION_FAULT_CNTL);
-
-	hub->get_invalidate_req = gfxhub_v1_0_get_invalidate_req;
-	hub->get_vm_protection_bits = gfxhub_v1_0_get_vm_protection_bits;
 
 	return 0;
 }

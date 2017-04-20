@@ -36,7 +36,7 @@
 #include <drm/drm_cache.h>
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
-
+#include "amdgpu_amdkfd.h"
 
 
 static u64 amdgpu_get_vis_part_size(struct amdgpu_device *adev,
@@ -111,9 +111,10 @@ static void amdgpu_ttm_bo_destroy(struct ttm_buffer_object *tbo)
 		offset -= adev->mman.bdev.man[TTM_PL_TT].gpu_offset;
 		amdgpu_gart_unbind(adev, offset, bo->tbo.num_pages);
 	}
+	if (bo->kfd_bo)
+		amdgpu_amdkfd_unreserve_system_memory_limit(bo);
 	amdgpu_update_memory_usage(adev, &bo->tbo.mem, NULL);
 
-	drm_gem_object_release(&bo->gem_base);
 	amdgpu_bo_unref(&bo->parent);
 	if (!list_empty(&bo->shadow_list)) {
 		mutex_lock(&adev->shadow_list_lock);
@@ -156,20 +157,19 @@ static void amdgpu_ttm_placement_init(struct amdgpu_device *adev,
 
 	if (domain & AMDGPU_GEM_DOMAIN_VRAM) {
 		unsigned visible_pfn = adev->mc.visible_vram_size >> PAGE_SHIFT;
-		unsigned lpfn = 0;
-
-		/* This forces a reallocation if the flag wasn't set before */
-		if (flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS)
-			lpfn = adev->mc.real_vram_size >> PAGE_SHIFT;
 
 		places[c].fpfn = 0;
-		places[c].lpfn = lpfn;
+		places[c].lpfn = 0;
 		places[c].flags = TTM_PL_FLAG_WC | TTM_PL_FLAG_UNCACHED |
 			TTM_PL_FLAG_VRAM;
+
 		if (flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED)
 			places[c].lpfn = visible_pfn;
 		else
 			places[c].flags |= TTM_PL_FLAG_TOPDOWN;
+
+		if (flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS)
+			places[c].flags |= TTM_PL_FLAG_CONTIGUOUS;
 		c++;
 	}
 
@@ -383,13 +383,10 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 	bo = kzalloc(sizeof(struct amdgpu_bo), GFP_KERNEL);
 	if (bo == NULL)
 		return -ENOMEM;
-	r = drm_gem_object_init(adev->ddev, &bo->gem_base, size);
-	if (unlikely(r)) {
-		kfree(bo);
-		return r;
-	}
+
 	INIT_LIST_HEAD(&bo->shadow_list);
 	INIT_LIST_HEAD(&bo->va);
+	INIT_LIST_HEAD(&bo->gem_objects);
 	bo->prefered_domains = domain & (AMDGPU_GEM_DOMAIN_VRAM |
 					 AMDGPU_GEM_DOMAIN_GTT |
 					 AMDGPU_GEM_DOMAIN_CPU |
@@ -707,6 +704,10 @@ int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,
 	if (WARN_ON_ONCE(min_offset > max_offset))
 		return -EINVAL;
 
+	/* A shared bo cannot be migrated to VRAM */
+	if (bo->prime_shared_count && (domain == AMDGPU_GEM_DOMAIN_VRAM))
+		return -EINVAL;
+
 	if (bo->pin_count) {
 		uint32_t mem_type = bo->tbo.mem.mem_type;
 
@@ -984,8 +985,7 @@ int amdgpu_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 	size = bo->mem.num_pages << PAGE_SHIFT;
 	offset = bo->mem.start << PAGE_SHIFT;
 	/* TODO: figure out how to map scattered VRAM to the CPU */
-	if ((offset + size) <= adev->mc.visible_vram_size &&
-	    (abo->flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS))
+	if ((offset + size) <= adev->mc.visible_vram_size)
 		return 0;
 
 	/* Can't move a pinned BO to visible VRAM */
@@ -993,7 +993,6 @@ int amdgpu_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 		return -EINVAL;
 
 	/* hurrah the memory is not visible ! */
-	abo->flags |= AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS;
 	amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_VRAM);
 	lpfn =	adev->mc.visible_vram_size >> PAGE_SHIFT;
 	for (i = 0; i < abo->placement.num_placement; i++) {

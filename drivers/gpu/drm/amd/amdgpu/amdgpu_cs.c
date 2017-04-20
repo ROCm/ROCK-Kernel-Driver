@@ -161,7 +161,7 @@ int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data)
 	}
 
 	/* get chunks */
-	chunk_array_user = (uint64_t __user *)(unsigned long)(cs->in.chunks);
+	chunk_array_user = (uint64_t __user *)(uintptr_t)(cs->in.chunks);
 	if (copy_from_user(chunk_array, chunk_array_user,
 			   sizeof(uint64_t)*cs->in.num_chunks)) {
 		ret = -EFAULT;
@@ -181,7 +181,7 @@ int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data)
 		struct drm_amdgpu_cs_chunk user_chunk;
 		uint32_t __user *cdata;
 
-		chunk_ptr = (void __user *)(unsigned long)chunk_array[i];
+		chunk_ptr = (void __user *)(uintptr_t)chunk_array[i];
 		if (copy_from_user(&user_chunk, chunk_ptr,
 				       sizeof(struct drm_amdgpu_cs_chunk))) {
 			ret = -EFAULT;
@@ -192,7 +192,7 @@ int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data)
 		p->chunks[i].length_dw = user_chunk.length_dw;
 
 		size = p->chunks[i].length_dw;
-		cdata = (void __user *)(unsigned long)user_chunk.chunk_data;
+		cdata = (void __user *)(uintptr_t)user_chunk.chunk_data;
 
 		p->chunks[i].kdata = drm_malloc_ab(size, sizeof(uint32_t));
 		if (p->chunks[i].kdata == NULL) {
@@ -777,15 +777,15 @@ static int amdgpu_bo_vm_update_pte(struct amdgpu_cs_parser *p)
 	struct amdgpu_bo *bo;
 	int i, r;
 
-	r = amdgpu_vm_update_page_directory(adev, vm);
+	r = amdgpu_vm_update_directories(adev, vm);
 	if (r)
 		return r;
 
-	r = amdgpu_sync_fence(adev, &p->job->sync, vm->page_directory_fence);
+	r = amdgpu_sync_fence(adev, &p->job->sync, vm->last_dir_update);
 	if (r)
 		return r;
 
-	r = amdgpu_vm_clear_freed(adev, vm);
+	r = amdgpu_vm_clear_freed(adev, vm, NULL);
 	if (r)
 		return r;
 
@@ -872,7 +872,7 @@ static int amdgpu_cs_ib_vm_chunk(struct amdgpu_device *adev,
 	}
 
 	if (p->job->vm) {
-		p->job->vm_pd_addr = amdgpu_bo_gpu_offset(vm->page_directory);
+		p->job->vm_pd_addr = amdgpu_bo_gpu_offset(vm->root.bo);
 
 		r = amdgpu_bo_vm_update_pte(p);
 		if (r)
@@ -903,16 +903,18 @@ static int amdgpu_cs_ib_fill(struct amdgpu_device *adev,
 		if (chunk->chunk_id != AMDGPU_CHUNK_ID_IB)
 			continue;
 
-		if (ib->flags & AMDGPU_IB_FLAG_PREEMPT) {
-			if (ib->flags & AMDGPU_IB_FLAG_CE)
-				ce_preempt++;
-			else
-				de_preempt++;
-		}
+		if (chunk_ib->ip_type == AMDGPU_HW_IP_GFX && amdgpu_sriov_vf(adev)) {
+			if (chunk_ib->flags & AMDGPU_IB_FLAG_PREEMPT) {
+				if (chunk_ib->flags & AMDGPU_IB_FLAG_CE)
+					ce_preempt++;
+				else
+					de_preempt++;
+			}
 
-		/* only one preemptible IB per submit for me/ce */
-		if (ce_preempt > 1 || de_preempt > 1)
-			return -EINVAL;
+			/* each GFX command submit allows 0 or 1 IB preemptible for CE & DE */
+			if (ce_preempt > 1 || de_preempt > 1)
+				return -EINVAL;
+		}
 
 		r = amdgpu_cs_get_ring(adev, chunk_ib->ip_type,
 				       chunk_ib->ip_instance, chunk_ib->ring,
@@ -920,7 +922,7 @@ static int amdgpu_cs_ib_fill(struct amdgpu_device *adev,
 		if (r)
 			return r;
 
-		if (ib->flags & AMDGPU_IB_FLAG_PREAMBLE) {
+		if (chunk_ib->flags & AMDGPU_IB_FLAG_PREAMBLE) {
 			parser->job->preamble_status |= AMDGPU_PREAMBLE_IB_PRESENT;
 			if (!parser->ctx->preamble_presented) {
 				parser->job->preamble_status |= AMDGPU_PREAMBLE_IB_PRESENT_FIRST;
@@ -947,7 +949,7 @@ static int amdgpu_cs_ib_fill(struct amdgpu_device *adev,
 			}
 
 			if ((chunk_ib->va_start + chunk_ib->ib_bytes) >
-			    (m->it.last + 1) * AMDGPU_GPU_PAGE_SIZE) {
+			    (m->last + 1) * AMDGPU_GPU_PAGE_SIZE) {
 				DRM_ERROR("IB va_start+ib_bytes is invalid\n");
 				return -EINVAL;
 			}
@@ -958,7 +960,7 @@ static int amdgpu_cs_ib_fill(struct amdgpu_device *adev,
 				return r;
 			}
 
-			offset = ((uint64_t)m->it.start) * AMDGPU_GPU_PAGE_SIZE;
+			offset = m->start * AMDGPU_GPU_PAGE_SIZE;
 			kptr += chunk_ib->va_start - offset;
 
 			r =  amdgpu_ib_get(adev, vm, chunk_ib->ib_bytes, ib);
@@ -1240,6 +1242,7 @@ static int amdgpu_cs_wait_all_fences(struct amdgpu_device *adev,
 			continue;
 
 		r = kcl_fence_wait_timeout(fence, true, timeout);
+		fence_put(fence);
 		if (r < 0)
 			return r;
 
@@ -1337,7 +1340,7 @@ int amdgpu_cs_wait_fences_ioctl(struct drm_device *dev, void *data,
 	if (fences == NULL)
 		return -ENOMEM;
 
-	fences_user = (void __user *)(unsigned long)(wait->in.fences);
+	fences_user = (void __user *)(uintptr_t)(wait->in.fences);
 	if (copy_from_user(fences, fences_user,
 		sizeof(struct drm_amdgpu_fence) * fence_count)) {
 		r = -EFAULT;
@@ -1382,12 +1385,12 @@ amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 		struct amdgpu_bo_list_entry *lobj;
 
 		lobj = &parser->bo_list->array[i];
-		if (!lobj->bo_va)
+		if (!lobj->bo_va || amdgpu_ttm_adev(lobj->bo_va->bo->tbo.bdev) != parser->adev)
 			continue;
 
 		list_for_each_entry(mapping, &lobj->bo_va->valids, list) {
-			if (mapping->it.start > addr ||
-			    addr > mapping->it.last)
+			if (mapping->start > addr ||
+			    addr > mapping->last)
 				continue;
 
 			*bo = lobj->bo_va->bo;
@@ -1395,8 +1398,8 @@ amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 		}
 
 		list_for_each_entry(mapping, &lobj->bo_va->invalids, list) {
-			if (mapping->it.start > addr ||
-			    addr > mapping->it.last)
+			if (mapping->start > addr ||
+			    addr > mapping->last)
 				continue;
 
 			*bo = lobj->bo_va->bo;

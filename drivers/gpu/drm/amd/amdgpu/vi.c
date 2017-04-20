@@ -465,15 +465,9 @@ static void vi_detect_hw_virtualization(struct amdgpu_device *adev)
 }
 
 static const struct amdgpu_allowed_register_entry tonga_allowed_read_registers[] = {
-	{mmGB_MACROTILE_MODE7, true},
 };
 
 static const struct amdgpu_allowed_register_entry cz_allowed_read_registers[] = {
-	{mmGB_TILE_MODE7, true},
-	{mmGB_TILE_MODE12, true},
-	{mmGB_TILE_MODE17, true},
-	{mmGB_TILE_MODE23, true},
-	{mmGB_MACROTILE_MODE7, true},
 };
 
 static const struct amdgpu_allowed_register_entry vi_allowed_read_registers[] = {
@@ -1039,7 +1033,25 @@ static int vi_common_early_init(void *handle)
 		adev->external_rev_id = adev->rev_id + 0x50;
 		break;
 	case CHIP_POLARIS12:
-		adev->cg_flags = AMD_CG_SUPPORT_UVD_MGCG;
+		adev->cg_flags = AMD_CG_SUPPORT_GFX_MGCG |
+			AMD_CG_SUPPORT_GFX_RLC_LS |
+			AMD_CG_SUPPORT_GFX_CP_LS |
+			AMD_CG_SUPPORT_GFX_CGCG |
+			AMD_CG_SUPPORT_GFX_CGLS |
+			AMD_CG_SUPPORT_GFX_3D_CGCG |
+			AMD_CG_SUPPORT_GFX_3D_CGLS |
+			AMD_CG_SUPPORT_SDMA_MGCG |
+			AMD_CG_SUPPORT_SDMA_LS |
+			AMD_CG_SUPPORT_BIF_MGCG |
+			AMD_CG_SUPPORT_BIF_LS |
+			AMD_CG_SUPPORT_HDP_MGCG |
+			AMD_CG_SUPPORT_HDP_LS |
+			AMD_CG_SUPPORT_ROM_MGCG |
+			AMD_CG_SUPPORT_MC_MGCG |
+			AMD_CG_SUPPORT_MC_LS |
+			AMD_CG_SUPPORT_DRM_LS |
+			AMD_CG_SUPPORT_UVD_MGCG |
+			AMD_CG_SUPPORT_VCE_MGCG;
 		adev->pg_flags = 0;
 		adev->external_rev_id = adev->rev_id + 0x64;
 		break;

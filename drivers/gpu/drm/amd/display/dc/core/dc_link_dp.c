@@ -1481,22 +1481,25 @@ static bool handle_hpd_irq_psr_sink(const struct core_link *link)
 	if (link->public.psr_caps.psr_version == 0)
 		return false;
 
-	dal_ddc_service_read_dpcd_data(
-					link->ddc,
-					368 /*DpcdAddress_PSR_Enable_Cfg*/,
-					&psr_configuration.raw,
-					sizeof(psr_configuration.raw));
+	dm_helpers_dp_read_dpcd(
+		link->ctx,
+		&link->public,
+		368,/*DpcdAddress_PSR_Enable_Cfg*/
+		&psr_configuration.raw,
+		sizeof(psr_configuration.raw));
+
 
 	if (psr_configuration.bits.ENABLE) {
 		unsigned char dpcdbuf[3] = {0};
 		union psr_error_status psr_error_status;
 		union psr_sink_psr_status psr_sink_psr_status;
 
-		dal_ddc_service_read_dpcd_data(
-					link->ddc,
-					0x2006 /*DpcdAddress_PSR_Error_Status*/,
-					(unsigned char *) dpcdbuf,
-					sizeof(dpcdbuf));
+		dm_helpers_dp_read_dpcd(
+			link->ctx,
+			&link->public,
+			0x2006, /*DpcdAddress_PSR_Error_Status*/
+			(unsigned char *) dpcdbuf,
+			sizeof(dpcdbuf));
 
 		/*DPCD 2006h   ERROR STATUS*/
 		psr_error_status.raw = dpcdbuf[0];
@@ -1506,9 +1509,10 @@ static bool handle_hpd_irq_psr_sink(const struct core_link *link)
 		if (psr_error_status.bits.LINK_CRC_ERROR ||
 				psr_error_status.bits.RFB_STORAGE_ERROR) {
 			/* Acknowledge and clear error bits */
-			dal_ddc_service_write_dpcd_data(
-				link->ddc,
-				8198 /*DpcdAddress_PSR_Error_Status*/,
+			dm_helpers_dp_write_dpcd(
+				link->ctx,
+				&link->public,
+				8198,/*DpcdAddress_PSR_Error_Status*/
 				&psr_error_status.raw,
 				sizeof(psr_error_status.raw));
 
@@ -1599,19 +1603,25 @@ static void dp_test_send_phy_test_pattern(struct core_link *link)
 	switch (dpcd_test_pattern.bits.PATTERN) {
 	case PHY_TEST_PATTERN_D10_2:
 		test_pattern = DP_TEST_PATTERN_D102;
-	break;
+		break;
 	case PHY_TEST_PATTERN_SYMBOL_ERROR:
 		test_pattern = DP_TEST_PATTERN_SYMBOL_ERROR;
-	break;
+		break;
 	case PHY_TEST_PATTERN_PRBS7:
 		test_pattern = DP_TEST_PATTERN_PRBS7;
-	break;
+		break;
 	case PHY_TEST_PATTERN_80BIT_CUSTOM:
 		test_pattern = DP_TEST_PATTERN_80BIT_CUSTOM;
-	break;
-	case PHY_TEST_PATTERN_HBR2_COMPLIANCE_EYE:
-		test_pattern = DP_TEST_PATTERN_HBR2_COMPLIANCE_EYE;
-	break;
+		break;
+	case PHY_TEST_PATTERN_CP2520_1:
+		test_pattern = DP_TEST_PATTERN_CP2520_1;
+		break;
+	case PHY_TEST_PATTERN_CP2520_2:
+		test_pattern = DP_TEST_PATTERN_CP2520_2;
+		break;
+	case PHY_TEST_PATTERN_CP2520_3:
+		test_pattern = DP_TEST_PATTERN_CP2520_3;
+		break;
 	default:
 		test_pattern = DP_TEST_PATTERN_VIDEO_MODE;
 	break;
@@ -2081,9 +2091,6 @@ static void retrieve_link_cap(struct core_link *link)
 		dpcd_data,
 		sizeof(dpcd_data));
 
-	link->dpcd_caps.dpcd_rev.raw =
-		dpcd_data[DP_DPCD_REV - DP_DPCD_REV];
-
 	{
 		union training_aux_rd_interval aux_rd_interval;
 
@@ -2098,6 +2105,9 @@ static void retrieve_link_cap(struct core_link *link)
 				sizeof(dpcd_data));
 		}
 	}
+
+	link->dpcd_caps.dpcd_rev.raw =
+		dpcd_data[DP_DPCD_REV - DP_DPCD_REV];
 
 	ds_port.byte = dpcd_data[DP_DOWNSTREAMPORT_PRESENT -
 				 DP_DPCD_REV];
@@ -2159,7 +2169,8 @@ static void retrieve_link_cap(struct core_link *link)
 	CONN_DATA_DETECT(link, dpcd_data, sizeof(dpcd_data), "Rx Caps: ");
 
 	/* TODO: Confirm if need retrieve_psr_link_cap */
-	retrieve_psr_link_cap(link, link->edp_revision);
+	if (link->public.reported_link_cap.link_rate < LINK_RATE_HIGH2)
+		retrieve_psr_link_cap(link, link->edp_revision);
 }
 
 void detect_dp_sink_caps(struct core_link *link)
@@ -2202,16 +2213,9 @@ void dc_link_dp_disable_hpd(const struct dc_link *link)
 
 static bool is_dp_phy_pattern(enum dp_test_pattern test_pattern)
 {
-	if (test_pattern == DP_TEST_PATTERN_D102 ||
-	test_pattern == DP_TEST_PATTERN_SYMBOL_ERROR ||
-	test_pattern == DP_TEST_PATTERN_PRBS7 ||
-	test_pattern == DP_TEST_PATTERN_80BIT_CUSTOM ||
-	test_pattern == DP_TEST_PATTERN_HBR2_COMPLIANCE_EYE ||
-	test_pattern == DP_TEST_PATTERN_TRAINING_PATTERN1 ||
-	test_pattern == DP_TEST_PATTERN_TRAINING_PATTERN2 ||
-	test_pattern == DP_TEST_PATTERN_TRAINING_PATTERN3 ||
-	test_pattern == DP_TEST_PATTERN_TRAINING_PATTERN4 ||
-	test_pattern == DP_TEST_PATTERN_VIDEO_MODE)
+	if ((DP_TEST_PATTERN_PHY_PATTERN_BEGIN <= test_pattern &&
+			test_pattern <= DP_TEST_PATTERN_PHY_PATTERN_END) ||
+			test_pattern == DP_TEST_PATTERN_VIDEO_MODE)
 		return true;
 	else
 		return false;
@@ -2377,22 +2381,28 @@ bool dc_link_dp_set_test_pattern(
 		switch (test_pattern) {
 		case DP_TEST_PATTERN_VIDEO_MODE:
 			pattern = PHY_TEST_PATTERN_NONE;
-		break;
+			break;
 		case DP_TEST_PATTERN_D102:
 			pattern = PHY_TEST_PATTERN_D10_2;
-		break;
+			break;
 		case DP_TEST_PATTERN_SYMBOL_ERROR:
 			pattern = PHY_TEST_PATTERN_SYMBOL_ERROR;
-		break;
+			break;
 		case DP_TEST_PATTERN_PRBS7:
 			pattern = PHY_TEST_PATTERN_PRBS7;
-		break;
+			break;
 		case DP_TEST_PATTERN_80BIT_CUSTOM:
 			pattern = PHY_TEST_PATTERN_80BIT_CUSTOM;
-		break;
-		case DP_TEST_PATTERN_HBR2_COMPLIANCE_EYE:
-			pattern = PHY_TEST_PATTERN_HBR2_COMPLIANCE_EYE;
-		break;
+			break;
+		case DP_TEST_PATTERN_CP2520_1:
+			pattern = PHY_TEST_PATTERN_CP2520_1;
+			break;
+		case DP_TEST_PATTERN_CP2520_2:
+			pattern = PHY_TEST_PATTERN_CP2520_2;
+			break;
+		case DP_TEST_PATTERN_CP2520_3:
+			pattern = PHY_TEST_PATTERN_CP2520_3;
+			break;
 		default:
 			return false;
 		}

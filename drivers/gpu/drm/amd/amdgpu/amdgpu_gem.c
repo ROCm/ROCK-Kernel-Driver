@@ -33,14 +33,20 @@
 
 void amdgpu_gem_object_free(struct drm_gem_object *gobj)
 {
-	struct amdgpu_bo *robj = gem_to_amdgpu_bo(gobj);
+	struct amdgpu_gem_object *aobj;
 
-	if (robj) {
-		if (robj->gem_base.import_attach)
-			drm_prime_gem_destroy(&robj->gem_base, robj->tbo.sg);
-		amdgpu_mn_unregister(robj);
-		amdgpu_bo_unref(&robj);
-	}
+	aobj = container_of((gobj), struct amdgpu_gem_object, base);
+	if (aobj->base.import_attach)
+		drm_prime_gem_destroy(&aobj->base, aobj->bo->tbo.sg);
+
+	ww_mutex_lock(&aobj->bo->tbo.resv->lock, NULL);
+	list_del(&aobj->list);
+	ww_mutex_unlock(&aobj->bo->tbo.resv->lock);
+
+	amdgpu_mn_unregister(aobj->bo);
+	amdgpu_bo_unref(&aobj->bo);
+	drm_gem_object_release(&aobj->base);
+	kfree(aobj);
 }
 
 int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
@@ -49,6 +55,7 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 				struct drm_gem_object **obj)
 {
 	struct amdgpu_bo *robj;
+	struct amdgpu_gem_object *gobj;
 	unsigned long max_size;
 	int r;
 
@@ -93,7 +100,24 @@ retry:
 		}
 		return r;
 	}
-	*obj = &robj->gem_base;
+
+	gobj = kzalloc(sizeof(struct amdgpu_gem_object), GFP_KERNEL);
+	if (unlikely(!gobj)) {
+		amdgpu_bo_unref(&robj);
+		return -ENOMEM;
+	}
+
+	r = drm_gem_object_init(adev->ddev, &gobj->base, amdgpu_bo_size(robj));
+	if (unlikely(r)) {
+		kfree(gobj);
+		amdgpu_bo_unref(&robj);
+		return r;
+	}
+
+	list_add(&gobj->list, &robj->gem_objects);
+	gobj->bo = robj;
+	*obj = &gobj->base;
+
 
 	return 0;
 }
@@ -174,6 +198,7 @@ void amdgpu_gem_object_close(struct drm_gem_object *obj,
 	struct ttm_validate_buffer tv;
 	struct ww_acquire_ctx ticket;
 	struct amdgpu_bo_va *bo_va;
+	struct fence *fence = NULL;
 	int r;
 
 	INIT_LIST_HEAD(&list);
@@ -195,6 +220,17 @@ void amdgpu_gem_object_close(struct drm_gem_object *obj,
 	if (bo_va) {
 		if (--bo_va->ref_count == 0) {
 			amdgpu_vm_bo_rmv(adev, bo_va);
+
+			r = amdgpu_vm_clear_freed(adev, vm, &fence);
+			if (unlikely(r)) {
+				dev_err(adev->dev, "failed to clear page "
+					"tables on GEM object close (%d)\n", r);
+			}
+
+			if (fence) {
+				amdgpu_bo_fence(bo, fence, true);
+				fence_put(fence);
+			}
 		}
 	}
 	ttm_eu_backoff_reservation(&ticket, &list);
@@ -318,6 +354,7 @@ int amdgpu_gem_find_bo_by_cpu_mapping_ioctl(struct drm_device *dev, void *data,
 {
 	struct drm_amdgpu_gem_find_bo *args = data;
 	struct drm_gem_object *gobj;
+	struct amdgpu_gem_object *amdgpu_gobj;
 	struct amdgpu_bo *bo;
 	struct ttm_buffer_object *tbo;
 	struct vm_area_struct *vma;
@@ -338,7 +375,17 @@ int amdgpu_gem_find_bo_by_cpu_mapping_ioctl(struct drm_device *dev, void *data,
 	tbo = vma->vm_private_data;
 	bo = container_of(tbo, struct amdgpu_bo, tbo);
 	amdgpu_bo_ref(bo);
-	gobj = &bo->gem_base;
+
+	ww_mutex_lock(&bo->tbo.resv->lock, NULL);
+	list_for_each_entry(amdgpu_gobj, &bo->gem_objects, list) {
+		if (amdgpu_gobj->base.dev != filp->minor->dev)
+			continue;
+
+		ww_mutex_unlock(&bo->tbo.resv->lock);
+		break;
+	}
+	gobj = &amdgpu_gobj->base;
+	
 	handle = amdgpu_gem_get_handle_from_object(filp, gobj);
 	if (handle == 0) {
 		r = drm_gem_handle_create(filp, gobj, &handle);
@@ -708,11 +755,11 @@ static void amdgpu_gem_va_update_vm(struct amdgpu_device *adev,
 	if (r)
 		goto error;
 
-	r = amdgpu_vm_update_page_directory(adev, vm);
+	r = amdgpu_vm_update_directories(adev, vm);
 	if (r)
 		goto error;
 
-	r = amdgpu_vm_clear_freed(adev, vm);
+	r = amdgpu_vm_clear_freed(adev, vm, NULL);
 	if (r)
 		goto error;
 
@@ -877,9 +924,9 @@ int amdgpu_gem_op_ioctl(struct drm_device *dev, void *data,
 	switch (args->op) {
 	case AMDGPU_GEM_OP_GET_GEM_CREATE_INFO: {
 		struct drm_amdgpu_gem_create_in info;
-		void __user *out = (void __user *)(long)args->value;
+		void __user *out = (void __user *)(uintptr_t)args->value;
 
-		info.bo_size = robj->gem_base.size;
+		info.bo_size = amdgpu_bo_size(robj);
 		info.alignment = robj->tbo.mem.page_alignment << PAGE_SHIFT;
 		info.domains = robj->prefered_domains;
 		info.domain_flags = robj->flags;
@@ -889,6 +936,11 @@ int amdgpu_gem_op_ioctl(struct drm_device *dev, void *data,
 		break;
 	}
 	case AMDGPU_GEM_OP_SET_PLACEMENT:
+		if (robj->prime_shared_count && (args->value & AMDGPU_GEM_DOMAIN_VRAM)) {
+			r = -EINVAL;
+			amdgpu_bo_unreserve(robj);
+			break;
+		}
 		if (amdgpu_ttm_tt_get_usermm(robj->tbo.ttm)) {
 			r = -EPERM;
 			amdgpu_bo_unreserve(robj);

@@ -36,6 +36,7 @@
 /* some special values for the owner field */
 #define AMDGPU_FENCE_OWNER_UNDEFINED	((void*)0ul)
 #define AMDGPU_FENCE_OWNER_VM		((void*)1ul)
+#define AMDGPU_FENCE_OWNER_KFD		((void *)2ul)
 
 #define AMDGPU_FENCE_FLAG_64BIT         (1 << 0)
 #define AMDGPU_FENCE_FLAG_INT           (1 << 1)
@@ -99,6 +100,7 @@ struct amdgpu_ring_funcs {
 	uint32_t		align_mask;
 	u32			nop;
 	bool			support_64bit_ptrs;
+	unsigned		vmhub;
 
 	/* ring read/write ptr handling */
 	u64 (*get_rptr)(struct amdgpu_ring *ring);
@@ -168,6 +170,7 @@ struct amdgpu_ring {
 	struct amdgpu_bo	*mqd_obj;
 	uint64_t                mqd_gpu_addr;
 	void                    *mqd_ptr;
+	uint64_t                eop_gpu_addr;
 	u32			doorbell_index;
 	bool			use_doorbell;
 	unsigned		wptr_offs;
@@ -177,6 +180,7 @@ struct amdgpu_ring {
 	unsigned		cond_exe_offs;
 	u64			cond_exe_gpu_addr;
 	volatile u32		*cond_exe_cpu_addr;
+	unsigned		vm_inv_eng;
 #if defined(CONFIG_DEBUG_FS)
 	struct dentry *ent;
 #endif
@@ -194,7 +198,7 @@ void amdgpu_ring_fini(struct amdgpu_ring *ring);
 static inline void amdgpu_ring_clear_ring(struct amdgpu_ring *ring)
 {
 	int i = 0;
-	while (i <= ring->ptr_mask)
+	while (i <= ring->buf_mask)
 		ring->ring[i++] = ring->funcs->nop;
 
 }

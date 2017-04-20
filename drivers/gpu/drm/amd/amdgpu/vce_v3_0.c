@@ -417,11 +417,7 @@ static int vce_v3_0_sw_fini(void *handle)
 	if (r)
 		return r;
 
-	r = amdgpu_vce_sw_fini(adev);
-	if (r)
-		return r;
-
-	return r;
+	return amdgpu_vce_sw_fini(adev);
 }
 
 static int vce_v3_0_hw_init(void *handle)
@@ -471,11 +467,7 @@ static int vce_v3_0_suspend(void *handle)
 	if (r)
 		return r;
 
-	r = amdgpu_vce_suspend(adev);
-	if (r)
-		return r;
-
-	return r;
+	return amdgpu_vce_suspend(adev);
 }
 
 static int vce_v3_0_resume(void *handle)
@@ -487,11 +479,7 @@ static int vce_v3_0_resume(void *handle)
 	if (r)
 		return r;
 
-	r = vce_v3_0_hw_init(adev);
-	if (r)
-		return r;
-
-	return r;
+	return vce_v3_0_hw_init(adev);
 }
 
 static void vce_v3_0_mc_resume(struct amdgpu_device *adev, int idx)
@@ -783,8 +771,12 @@ static void vce_v3_0_get_clockgating_state(void *handle, u32 *flags)
 
 	mutex_lock(&adev->pm.mutex);
 
-	if (RREG32_SMC(ixCURRENT_PG_STATUS) &
-			CURRENT_PG_STATUS__VCE_PG_STATUS_MASK) {
+	if (adev->flags & AMD_IS_APU)
+		data = RREG32_SMC(ixCURRENT_PG_STATUS_APU);
+	else
+		data = RREG32_SMC(ixCURRENT_PG_STATUS);
+
+	if (data & CURRENT_PG_STATUS__VCE_PG_STATUS_MASK) {
 		DRM_INFO("Cannot get clockgating state when VCE is powergated.\n");
 		goto out;
 	}

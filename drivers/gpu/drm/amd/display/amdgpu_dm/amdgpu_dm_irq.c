@@ -23,6 +23,8 @@
  *
  */
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+
 #include <drm/drmP.h>
 
 #include "dm_services_types.h"
@@ -504,8 +506,11 @@ int amdgpu_dm_irq_suspend(
 
 	DRM_DEBUG_KMS("DM_IRQ: suspend\n");
 
-	/* disable HW interrupt */
-	for (src = DC_IRQ_SOURCE_HPD1; src < DAL_IRQ_SOURCES_NUMBER; src++) {
+	/**
+	 * Disable HW interrupt  for HPD and HPDRX only since FLIP and VBLANK
+	 * will be disabled from manage_dm_interrupts on disable CRTC.
+	 */
+	for (src = DC_IRQ_SOURCE_HPD1; src < DC_IRQ_SOURCE_HPD6RX; src++) {
 		hnd_list_l = &adev->dm.irq_handler_list_low_tab[src].head;
 		hnd_list_h = &adev->dm.irq_handler_list_high_tab[src];
 		if (!list_empty(hnd_list_l) || !list_empty(hnd_list_h))
@@ -544,7 +549,7 @@ int amdgpu_dm_irq_resume_early(struct amdgpu_device *adev)
 	return 0;
 }
 
-int amdgpu_dm_irq_resume(struct amdgpu_device *adev)
+int amdgpu_dm_irq_resume_late(struct amdgpu_device *adev)
 {
 	int src;
 	struct list_head *hnd_list_h, *hnd_list_l;
@@ -554,8 +559,11 @@ int amdgpu_dm_irq_resume(struct amdgpu_device *adev)
 
 	DRM_DEBUG_KMS("DM_IRQ: resume\n");
 
-	/* re-enable HW interrupt */
-	for (src = DC_IRQ_SOURCE_HPD1; src < DAL_IRQ_SOURCES_NUMBER; src++) {
+	/**
+	 * Renable HW interrupt  for HPD and only since FLIP and VBLANK
+	 * will be enabled from manage_dm_interrupts on enable CRTC.
+	 */
+	for (src = DC_IRQ_SOURCE_HPD1; src < DC_IRQ_SOURCE_HPD6; src++) {
 		hnd_list_l = &adev->dm.irq_handler_list_low_tab[src].head;
 		hnd_list_h = &adev->dm.irq_handler_list_high_tab[src];
 		if (!list_empty(hnd_list_l) || !list_empty(hnd_list_h))
@@ -827,3 +835,5 @@ void amdgpu_dm_hpd_fini(struct amdgpu_device *adev)
 		}
 	}
 }
+
+#endif

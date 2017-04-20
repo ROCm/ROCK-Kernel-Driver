@@ -45,7 +45,7 @@ struct amdgpu_bo_list_entry;
 #define AMDGPU_VM_MAX_UPDATE_SIZE	0x3FFFF
 
 /* number of entries in page table */
-#define AMDGPU_VM_PTE_COUNT (1 << amdgpu_vm_block_size)
+#define AMDGPU_VM_PTE_COUNT(adev) (1 << (adev)->vm_manager.block_size)
 
 /* PTBs (Page Table Blocks) need to be aligned to 32K */
 #define AMDGPU_VM_PTB_ALIGN_SIZE   32768
@@ -76,9 +76,21 @@ struct amdgpu_bo_list_entry;
 #define AMDGPU_VM_FAULT_STOP_FIRST	1
 #define AMDGPU_VM_FAULT_STOP_ALWAYS	2
 
+/* max number of VMHUB */
+#define AMDGPU_MAX_VMHUBS			2
+#define AMDGPU_GFXHUB				0
+#define AMDGPU_MMHUB				1
+
+/* hardcode that limit for now */
+#define AMDGPU_VA_RESERVED_SIZE			(8 << 20)
+
 struct amdgpu_vm_pt {
 	struct amdgpu_bo	*bo;
 	uint64_t		addr;
+
+	/* array of page tables, one for each directory entry */
+	struct amdgpu_vm_pt	*entries;
+	unsigned		last_entry_used;
 };
 
 struct amdgpu_vm {
@@ -98,16 +110,9 @@ struct amdgpu_vm {
 	struct list_head	freed;
 
 	/* contains the page directory */
-	struct amdgpu_bo	*page_directory;
-	unsigned		max_pde_used;
-	struct fence		*page_directory_fence;
+	struct amdgpu_vm_pt     root;
+	struct fence		*last_dir_update;
 	uint64_t		last_eviction_counter;
-
-	/* array of page tables, one for each page directory entry */
-	struct amdgpu_vm_pt	*page_tables;
-
-	/* for id and flush management per ring */
-	struct amdgpu_vm_id	*ids[AMDGPU_MAX_RINGS];
 
 	/* protecting freed */
 	spinlock_t		freed_lock;
@@ -119,11 +124,13 @@ struct amdgpu_vm {
 	u64                     client_id;
 	/* each VM will map on CSA */
 	struct amdgpu_bo_va *csa_bo_va;
+
+	/* Flag to indicate if this is a KFD VM */
+	bool                    is_kfd_vm : 1;
 };
 
 struct amdgpu_vm_id {
 	struct list_head	list;
-	struct fence		*first;
 	struct amdgpu_sync	active;
 	struct fence		*last_flush;
 	atomic64_t		owner;
@@ -142,18 +149,25 @@ struct amdgpu_vm_id {
 	uint32_t		oa_size;
 };
 
+struct amdgpu_vm_id_manager {
+	struct mutex		lock;
+	unsigned		num_ids;
+	struct list_head	ids_lru;
+	struct amdgpu_vm_id	ids[AMDGPU_NUM_VM];
+};
+
 struct amdgpu_vm_manager {
 	/* Handling of VMIDs */
-	struct mutex				lock;
-	unsigned				num_ids;
-	struct list_head			ids_lru;
-	struct amdgpu_vm_id			ids[AMDGPU_NUM_VM];
+	struct amdgpu_vm_id_manager		id_mgr[AMDGPU_MAX_VMHUBS];
 
 	/* Handling of VM fences */
 	u64					fence_context;
 	unsigned				seqno[AMDGPU_MAX_RINGS];
 
-	uint32_t				max_pfn;
+	uint64_t				max_pfn;
+	uint32_t				num_level;
+	uint64_t				vm_size;
+	uint32_t				block_size;
 	/* vram base address for page table entry  */
 	u64					vram_base_offset;
 	/* is vm enabled? */
@@ -172,11 +186,15 @@ struct amdgpu_vm_manager {
 	/* partial resident texture handling */
 	spinlock_t				prt_lock;
 	atomic_t				num_prt_users;
+
+	/* Number of KFD VMs, used for detecting KFD activity */
+	unsigned                                n_kfd_vms;
 };
 
 void amdgpu_vm_manager_init(struct amdgpu_device *adev);
 void amdgpu_vm_manager_fini(struct amdgpu_device *adev);
-int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm);
+int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+		   bool is_kfd_vm);
 void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm);
 void amdgpu_vm_get_pd_bo(struct amdgpu_vm *vm,
 			 struct list_head *validated,
@@ -193,11 +211,13 @@ int amdgpu_vm_grab_id(struct amdgpu_vm *vm, struct amdgpu_ring *ring,
 		      struct amdgpu_sync *sync, struct fence *fence,
 		      struct amdgpu_job *job);
 int amdgpu_vm_flush(struct amdgpu_ring *ring, struct amdgpu_job *job);
-void amdgpu_vm_reset_id(struct amdgpu_device *adev, unsigned vm_id);
-int amdgpu_vm_update_page_directory(struct amdgpu_device *adev,
-				    struct amdgpu_vm *vm);
+void amdgpu_vm_reset_id(struct amdgpu_device *adev, unsigned vmhub,
+			unsigned vmid);
+int amdgpu_vm_update_directories(struct amdgpu_device *adev,
+				 struct amdgpu_vm *vm);
 int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
-			  struct amdgpu_vm *vm);
+			  struct amdgpu_vm *vm,
+			  struct fence **fence);
 int amdgpu_vm_clear_invalids(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 			     struct amdgpu_sync *sync);
 int amdgpu_vm_bo_update(struct amdgpu_device *adev,
@@ -226,5 +246,6 @@ int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
 				uint64_t saddr, uint64_t size);
 void amdgpu_vm_bo_rmv(struct amdgpu_device *adev,
 		      struct amdgpu_bo_va *bo_va);
+void amdgpu_vm_adjust_size(struct amdgpu_device *adev, uint64_t vm_size);
 
 #endif

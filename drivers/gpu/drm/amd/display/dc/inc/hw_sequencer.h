@@ -57,11 +57,6 @@ struct hw_sequencer_funcs {
 	void (*reset_hw_ctx_wrap)(
 			struct core_dc *dc, struct validate_context *context);
 
-	void (*prepare_pipe_for_context)(
-			struct core_dc *dc,
-			struct pipe_ctx *pipe_ctx,
-			struct validate_context *context);
-
 	void (*apply_ctx_for_surface)(
 			struct core_dc *dc,
 			struct core_surface *surface,
@@ -109,6 +104,11 @@ struct hw_sequencer_funcs {
 					enum pipe_gating_control power_gating);
 
 	void (*power_down_front_end)(struct core_dc *dc, struct pipe_ctx *pipe);
+
+	void (*power_on_front_end)(struct core_dc *dc,
+			struct pipe_ctx *pipe,
+			struct validate_context *context);
+
 	void (*update_info_frame)(struct pipe_ctx *pipe_ctx);
 
 	void (*enable_stream)(struct pipe_ctx *pipe_ctx);

@@ -235,6 +235,9 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 	ring->ring_size = roundup_pow_of_two(max_dw * 4 *
 					     amdgpu_sched_hw_submission);
 
+	ring->buf_mask = (ring->ring_size / 4) - 1;
+	ring->ptr_mask = ring->funcs->support_64bit_ptrs ?
+		0xffffffffffffffff : ring->buf_mask;
 	/* Allocate ring buffer */
 	if (ring->ring_obj == NULL) {
 		r = amdgpu_bo_create_kernel(adev, ring->ring_size, PAGE_SIZE,
@@ -248,9 +251,6 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 		}
 		amdgpu_ring_clear_ring(ring);
 	}
-	ring->buf_mask = (ring->ring_size / 4) - 1;
-	ring->ptr_mask = ring->funcs->support_64bit_ptrs ?
-		0xffffffffffffffff : ring->buf_mask;
 
 	ring->max_dw = max_dw;
 
@@ -320,8 +320,8 @@ static ssize_t amdgpu_debugfs_ring_read(struct file *f, char __user *buf,
 
 	if (*pos < 12) {
 		early[0] = amdgpu_ring_get_rptr(ring);
-		early[1] = amdgpu_ring_get_wptr(ring);
-		early[2] = ring->wptr;
+		early[1] = amdgpu_ring_get_wptr(ring) & ring->buf_mask;
+		early[2] = ring->wptr & ring->buf_mask;
 		for (i = *pos / 4; i < 3 && size; i++) {
 			r = put_user(early[i], (uint32_t *)buf);
 			if (r)

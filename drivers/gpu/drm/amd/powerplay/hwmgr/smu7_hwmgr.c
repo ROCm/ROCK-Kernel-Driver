@@ -3296,7 +3296,7 @@ static int smu7_get_gpu_power(struct pp_hwmgr *hwmgr,
 			"Failed to start pm status log!",
 			return -1);
 
-	msleep_interruptible(2000);
+	msleep_interruptible(20);
 
 	PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc(hwmgr->smumgr,
 			PPSMC_MSG_PmStatusLogSample),
@@ -4575,6 +4575,13 @@ static int smu7_set_power_profile_state(struct pp_hwmgr *hwmgr,
 	struct smu7_hwmgr *data = (struct smu7_hwmgr *)(hwmgr->backend);
 	int tmp_result, result = 0;
 	uint32_t sclk_mask = 0, mclk_mask = 0;
+
+	if (hwmgr->chip_id == CHIP_FIJI) {
+		if (request->type == AMD_PP_GFX_PROFILE)
+			smu7_enable_power_containment(hwmgr);
+		else if (request->type == AMD_PP_COMPUTE_PROFILE)
+			smu7_disable_power_containment(hwmgr);
+	}
 
 	if (hwmgr->dpm_level != AMD_DPM_FORCED_LEVEL_AUTO)
 		return -EINVAL;

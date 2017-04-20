@@ -3,7 +3,7 @@
 #include "kcl_common.h"
 
 #define CREATE_TRACE_POINTS
-#include <trace/events/fence.h>
+#include <kcl/kcl_trace.h>
 
 static atomic64_t fence_context_counter = ATOMIC64_INIT(0);
 u64 _kcl_fence_context_alloc(unsigned num)
@@ -29,7 +29,7 @@ _kcl_fence_init(struct fence *fence, const struct fence_ops *ops,
 	fence->seqno = seqno;
 	fence->flags = 0UL;
 
-	trace_fence_init(fence);
+	trace_kcl_fence_init(fence);
 }
 EXPORT_SYMBOL(_kcl_fence_init);
 
@@ -80,7 +80,7 @@ kcl_fence_default_wait(struct fence *fence, bool intr, signed long timeout)
 		goto out;
 
 	if (!was_set) {
-		trace_fence_enable_signal(fence);
+		trace_kcl_fence_enable_signal(fence);
 
 		if (!fence->ops->enable_signaling(fence)) {
 			fence_signal_locked(fence);
@@ -203,9 +203,9 @@ _kcl_fence_wait_timeout(struct fence *fence, bool intr, signed long timeout)
 	if (WARN_ON(timeout < 0))
 		return -EINVAL;
 
-	trace_fence_wait_start(fence);
+	trace_kcl_fence_wait_start(fence);
 	ret = fence->ops->wait(fence, intr, timeout);
-	trace_fence_wait_end(fence);
+	trace_kcl_fence_wait_end(fence);
 	return ret;
 }
 EXPORT_SYMBOL(_kcl_fence_wait_timeout);

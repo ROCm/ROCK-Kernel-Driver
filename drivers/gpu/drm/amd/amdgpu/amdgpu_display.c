@@ -342,6 +342,12 @@ int amdgpu_crtc_prepare_flip(
 	obj = new_amdgpu_fb->obj;
 	new_abo = gem_to_amdgpu_bo(obj);
 
+	if (amdgpu_ttm_adev(new_abo->tbo.bdev) != adev) {
+		DRM_ERROR("Foreign BOs not allowed in the display engine\n");
+		r = -EINVAL;
+		goto cleanup;
+	}
+
 	/* pin the new buffer */
 	r = amdgpu_bo_reserve(new_abo, false);
 	if (unlikely(r != 0)) {
@@ -866,6 +872,12 @@ amdgpu_user_framebuffer_create(struct drm_device *dev,
 		dev_err(&dev->pdev->dev, "No GEM object associated to handle 0x%08X, "
 			"can't create framebuffer\n", mode_cmd->handles[0]);
 		return ERR_PTR(-ENOENT);
+	}
+
+	/* Handle is imported dma-buf, so cannot be migrated to VRAM for scanout */
+	if (obj->import_attach) {
+		DRM_DEBUG_KMS("Cannot create framebuffer from imported dma_buf\n");
+		return ERR_PTR(-EINVAL);
 	}
 
 	amdgpu_fb = kzalloc(sizeof(*amdgpu_fb), GFP_KERNEL);

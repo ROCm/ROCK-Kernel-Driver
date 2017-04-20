@@ -379,7 +379,7 @@ static int drm_gem_dmabuf_mmap(struct dma_buf *dma_buf,
 	return dev->driver->gem_prime_mmap(obj, vma);
 }
 
-static const struct dma_buf_ops drm_gem_prime_dmabuf_ops =  {
+const struct dma_buf_ops drm_gem_prime_dmabuf_ops =  {
 	.attach = drm_gem_map_attach,
 	.detach = drm_gem_map_detach,
 	.map_dma_buf = drm_gem_map_dma_buf,
@@ -393,6 +393,7 @@ static const struct dma_buf_ops drm_gem_prime_dmabuf_ops =  {
 	.vmap = drm_gem_dmabuf_vmap,
 	.vunmap = drm_gem_dmabuf_vunmap,
 };
+EXPORT_SYMBOL(drm_gem_prime_dmabuf_ops);
 
 /**
  * DOC: PRIME Helpers

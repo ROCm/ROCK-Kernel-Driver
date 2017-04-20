@@ -25,6 +25,7 @@
 #include "amdgpu.h"
 #include "gmc_v8_0.h"
 #include "amdgpu_ucode.h"
+#include "amdgpu_amdkfd.h"
 
 #include "gmc/gmc_8_1_d.h"
 #include "gmc/gmc_8_1_sh_mask.h"
@@ -37,6 +38,8 @@
 
 #include "vid.h"
 #include "vi.h"
+
+#include "amdgpu_atombios.h"
 
 
 static void gmc_v8_0_set_gart_funcs(struct amdgpu_device *adev);
@@ -253,23 +256,20 @@ out:
 }
 
 /**
- * gmc_v8_0_mc_load_microcode - load MC ucode into the hw
+ * gmc_v8_0_tonga_mc_load_microcode - load tonga MC ucode into the hw
  *
  * @adev: amdgpu_device pointer
  *
  * Load the GDDR MC ucode into the hw (CIK).
  * Returns 0 on success, error on failure.
  */
-static int gmc_v8_0_mc_load_microcode(struct amdgpu_device *adev)
+static int gmc_v8_0_tonga_mc_load_microcode(struct amdgpu_device *adev)
 {
 	const struct mc_firmware_header_v1_0 *hdr;
 	const __le32 *fw_data = NULL;
 	const __le32 *io_mc_regs = NULL;
 	u32 running;
 	int i, ucode_size, regs_size;
-
-	if (!adev->mc.fw)
-		return -EINVAL;
 
 	/* Skip MC ucode loading on SR-IOV capable boards.
 	 * vbios does this for us in asic_init in that case.
@@ -278,6 +278,9 @@ static int gmc_v8_0_mc_load_microcode(struct amdgpu_device *adev)
 	 */
 	if (amdgpu_sriov_bios(adev))
 		return 0;
+
+	if (!adev->mc.fw)
+		return -EINVAL;
 
 	hdr = (const struct mc_firmware_header_v1_0 *)adev->mc.fw->data;
 	amdgpu_ucode_print_mc_hdr(&hdr->header);
@@ -324,6 +327,76 @@ static int gmc_v8_0_mc_load_microcode(struct amdgpu_device *adev)
 				break;
 			udelay(1);
 		}
+	}
+
+	return 0;
+}
+
+static int gmc_v8_0_polaris_mc_load_microcode(struct amdgpu_device *adev)
+{
+	const struct mc_firmware_header_v1_0 *hdr;
+	const __le32 *fw_data = NULL;
+	const __le32 *io_mc_regs = NULL;
+	u32 data, vbios_version;
+	int i, ucode_size, regs_size;
+
+	/* Skip MC ucode loading on SR-IOV capable boards.
+	 * vbios does this for us in asic_init in that case.
+	 * Skip MC ucode loading on VF, because hypervisor will do that
+	 * for this adaptor.
+	 */
+	if (amdgpu_sriov_bios(adev))
+		return 0;
+
+	WREG32(mmMC_SEQ_IO_DEBUG_INDEX, 0x9F);
+	data = RREG32(mmMC_SEQ_IO_DEBUG_DATA);
+	vbios_version = data & 0xf;
+
+	if (vbios_version == 0)
+		return 0;
+
+	if (!adev->mc.fw)
+		return -EINVAL;
+
+	hdr = (const struct mc_firmware_header_v1_0 *)adev->mc.fw->data;
+	amdgpu_ucode_print_mc_hdr(&hdr->header);
+
+	adev->mc.fw_version = le32_to_cpu(hdr->header.ucode_version);
+	regs_size = le32_to_cpu(hdr->io_debug_size_bytes) / (4 * 2);
+	io_mc_regs = (const __le32 *)
+		(adev->mc.fw->data + le32_to_cpu(hdr->io_debug_array_offset_bytes));
+	ucode_size = le32_to_cpu(hdr->header.ucode_size_bytes) / 4;
+	fw_data = (const __le32 *)
+		(adev->mc.fw->data + le32_to_cpu(hdr->header.ucode_array_offset_bytes));
+
+	data = RREG32(mmMC_SEQ_MISC0);
+	data &= ~(0x40);
+	WREG32(mmMC_SEQ_MISC0, data);
+
+	/* load mc io regs */
+	for (i = 0; i < regs_size; i++) {
+		WREG32(mmMC_SEQ_IO_DEBUG_INDEX, le32_to_cpup(io_mc_regs++));
+		WREG32(mmMC_SEQ_IO_DEBUG_DATA, le32_to_cpup(io_mc_regs++));
+	}
+
+	WREG32(mmMC_SEQ_SUP_CNTL, 0x00000008);
+	WREG32(mmMC_SEQ_SUP_CNTL, 0x00000010);
+
+	/* load the MC ucode */
+	for (i = 0; i < ucode_size; i++)
+		WREG32(mmMC_SEQ_SUP_PGM, le32_to_cpup(fw_data++));
+
+	/* put the engine back into the active state */
+	WREG32(mmMC_SEQ_SUP_CNTL, 0x00000008);
+	WREG32(mmMC_SEQ_SUP_CNTL, 0x00000004);
+	WREG32(mmMC_SEQ_SUP_CNTL, 0x00000001);
+
+	/* wait for training to complete */
+	for (i = 0; i < adev->usec_timeout; i++) {
+		data = RREG32(mmMC_SEQ_MISC0);
+		if (data & 0x80)
+			break;
+		udelay(1);
 	}
 
 	return 0;
@@ -417,48 +490,58 @@ static void gmc_v8_0_mc_program(struct amdgpu_device *adev)
  */
 static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 {
-	u32 tmp;
-	int chansize, numchan;
+	uint64_t gart_size_aligned;
+	struct sysinfo si;
 
-	/* Get VRAM informations */
-	tmp = RREG32(mmMC_ARB_RAMCFG);
-	if (REG_GET_FIELD(tmp, MC_ARB_RAMCFG, CHANSIZE)) {
-		chansize = 64;
-	} else {
-		chansize = 32;
+	adev->mc.vram_width = amdgpu_atombios_get_vram_width(adev);
+	if (!adev->mc.vram_width) {
+		u32 tmp;
+		int chansize, numchan;
+
+		/* Get VRAM informations */
+		tmp = RREG32(mmMC_ARB_RAMCFG);
+		if (REG_GET_FIELD(tmp, MC_ARB_RAMCFG, CHANSIZE)) {
+			chansize = 64;
+		} else {
+			chansize = 32;
+		}
+		tmp = RREG32(mmMC_SHARED_CHMAP);
+		switch (REG_GET_FIELD(tmp, MC_SHARED_CHMAP, NOOFCHAN)) {
+		case 0:
+		default:
+			numchan = 1;
+			break;
+		case 1:
+			numchan = 2;
+			break;
+		case 2:
+			numchan = 4;
+			break;
+		case 3:
+			numchan = 8;
+			break;
+		case 4:
+			numchan = 3;
+			break;
+		case 5:
+			numchan = 6;
+			break;
+		case 6:
+			numchan = 10;
+			break;
+		case 7:
+			numchan = 12;
+			break;
+		case 8:
+			numchan = 16;
+			break;
+		}
+		adev->mc.vram_width = numchan * chansize;
+		/* FIXME: The above calculation is outdated.
+		 * For HBM provide a temporary fix */
+		if (adev->mc.vram_type == AMDGPU_VRAM_TYPE_HBM)
+			adev->mc.vram_width = AMDGPU_VRAM_TYPE_HBM_WIDTH;
 	}
-	tmp = RREG32(mmMC_SHARED_CHMAP);
-	switch (REG_GET_FIELD(tmp, MC_SHARED_CHMAP, NOOFCHAN)) {
-	case 0:
-	default:
-		numchan = 1;
-		break;
-	case 1:
-		numchan = 2;
-		break;
-	case 2:
-		numchan = 4;
-		break;
-	case 3:
-		numchan = 8;
-		break;
-	case 4:
-		numchan = 3;
-		break;
-	case 5:
-		numchan = 6;
-		break;
-	case 6:
-		numchan = 10;
-		break;
-	case 7:
-		numchan = 12;
-		break;
-	case 8:
-		numchan = 16;
-		break;
-	}
-	adev->mc.vram_width = numchan * chansize;
 	/* Could aper size report 0 ? */
 	adev->mc.aper_base = pci_resource_start(adev->pdev, 0);
 	adev->mc.aper_size = pci_resource_len(adev->pdev, 0);
@@ -478,11 +561,37 @@ static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 	if (adev->mc.visible_vram_size > adev->mc.real_vram_size)
 		adev->mc.visible_vram_size = adev->mc.real_vram_size;
 
-	/* unless the user had overridden it, set the gart
-	 * size equal to the 1024 or vram, whichever is larger.
-	 */
-	if (amdgpu_gart_size == -1)
-		adev->mc.gtt_size = max((1024ULL << 20), adev->mc.mc_vram_size);
+	/* Unless the user has overridden it, compute the GART size */
+	if (amdgpu_gart_size == -1) {
+		/* Maximum GTT size is limited by the GART table size
+		 * in visible VRAM and the address space. Use at most
+		 * half of each. */
+		uint64_t max_gtt_size = min(
+			adev->mc.visible_vram_size / 8 * PAGE_SIZE / 2,
+			1ULL << 39);
+
+		si_meminfo(&si);
+		/* Set the GART to map the largest size between either
+		 * VRAM capacity or double the available physical RAM
+		 */
+		adev->mc.gtt_size = min(
+			max(
+				((uint64_t)si.totalram * si.mem_unit * 2),
+				adev->mc.mc_vram_size
+			),
+			max_gtt_size
+		);
+
+		/* GART sizes computed from physical RAM capacity
+		 * may not always be perfect powers of two.
+		 * Round up starting from the minimum size of 1GB.
+		 */
+		gart_size_aligned = 1024ULL << 20;
+		while (adev->mc.gtt_size > gart_size_aligned)
+			gart_size_aligned <<= 1;
+
+		adev->mc.gtt_size = gart_size_aligned;
+	}
 	else
 		adev->mc.gtt_size = (uint64_t)amdgpu_gart_size << 20;
 
@@ -826,7 +935,7 @@ static int gmc_v8_0_gart_enable(struct amdgpu_device *adev)
 	tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL, WRITE_PROTECTION_FAULT_ENABLE_DEFAULT, 1);
 	tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL, EXECUTE_PROTECTION_FAULT_ENABLE_DEFAULT, 1);
 	tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL, PAGE_TABLE_BLOCK_SIZE,
-			    amdgpu_vm_block_size - 9);
+			    adev->vm_manager.block_size - 9);
 	WREG32(mmVM_CONTEXT1_CNTL, tmp);
 	if (amdgpu_vm_fault_stop == AMDGPU_VM_FAULT_STOP_ALWAYS)
 		gmc_v8_0_set_fault_enable_default(adev, false);
@@ -922,7 +1031,8 @@ static int gmc_v8_0_vm_init(struct amdgpu_device *adev)
 	 * amdgpu graphics/compute will use VMIDs 1-7
 	 * amdkfd will use VMIDs 8-15
 	 */
-	adev->vm_manager.num_ids = AMDGPU_NUM_OF_VMIDS;
+	adev->vm_manager.id_mgr[0].num_ids = AMDGPU_NUM_OF_VMIDS;
+	adev->vm_manager.num_level = 1;
 	amdgpu_vm_manager_init(adev);
 
 	/* base offset of vram pages */
@@ -932,6 +1042,12 @@ static int gmc_v8_0_vm_init(struct amdgpu_device *adev)
 		adev->vm_manager.vram_base_offset = tmp;
 	} else
 		adev->vm_manager.vram_base_offset = 0;
+
+	adev->mc.vm_fault_info = kmalloc(sizeof(struct kfd_vm_fault_info),
+					GFP_KERNEL);
+	if (!adev->mc.vm_fault_info)
+		return -ENOMEM;
+	atomic_set(&adev->mc.vm_fault_info_updated, 0);
 
 	return 0;
 }
@@ -953,13 +1069,16 @@ static void gmc_v8_0_vm_fini(struct amdgpu_device *adev)
  * @adev: amdgpu_device pointer
  * @status: VM_CONTEXT1_PROTECTION_FAULT_STATUS register value
  * @addr: VM_CONTEXT1_PROTECTION_FAULT_ADDR register value
+ * @mc_client: VM_CONTEXT1_PROTECTION_FAULT_MCCLIENT register value
+ * @src_id: interrupt source id
  *
- * Print human readable fault information (CIK).
+ * Print human readable fault information (VI).
  */
 static void gmc_v8_0_vm_decode_fault(struct amdgpu_device *adev,
 				     u32 status, u32 addr, u32 mc_client)
 {
 	u32 mc_id;
+	struct kfd_vm_fault_info *info = adev->mc.vm_fault_info;
 	u32 vmid = REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS, VMID);
 	u32 protections = REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS,
 					PROTECTIONS);
@@ -974,6 +1093,19 @@ static void gmc_v8_0_vm_decode_fault(struct amdgpu_device *adev,
 	       REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS,
 			     MEMORY_CLIENT_RW) ?
 	       "write" : "read", block, mc_client, mc_id);
+
+	if (amdgpu_amdkfd_is_kfd_vmid(adev, vmid)
+		&& !atomic_read(&adev->mc.vm_fault_info_updated)) {
+		info->vmid = vmid;
+		info->mc_id = mc_id;
+		info->page_addr = addr;
+		info->prot_valid = protections & 0x6 ? true : false;
+		info->prot_read = protections & 0x8 ? true : false;
+		info->prot_write = protections & 0x10 ? true : false;
+		info->prot_exec = protections & 0x20 ? true : false;
+		mb();
+		atomic_set(&adev->mc.vm_fault_info_updated, 1);
+	}
 }
 
 static int gmc_v8_0_convert_vram_type(int mc_seq_vram_type)
@@ -1062,7 +1194,8 @@ static int gmc_v8_0_sw_init(void *handle)
 	 * Currently set to 4GB ((1 << 20) 4k pages).
 	 * Max GPUVM size for cayman and SI is 40 bits.
 	 */
-	adev->vm_manager.max_pfn = amdgpu_vm_size << 18;
+	amdgpu_vm_adjust_size(adev, 64);
+	adev->vm_manager.max_pfn = adev->vm_manager.vm_size << 18;
 
 	/* Set the internal MC address mask
 	 * This is the max address of the GPU's
@@ -1146,7 +1279,15 @@ static int gmc_v8_0_hw_init(void *handle)
 	gmc_v8_0_mc_program(adev);
 
 	if (adev->asic_type == CHIP_TONGA) {
-		r = gmc_v8_0_mc_load_microcode(adev);
+		r = gmc_v8_0_tonga_mc_load_microcode(adev);
+		if (r) {
+			DRM_ERROR("Failed to load MC firmware!\n");
+			return r;
+		}
+	} else if (adev->asic_type == CHIP_POLARIS11 ||
+			adev->asic_type == CHIP_POLARIS10 ||
+			adev->asic_type == CHIP_POLARIS12) {
+		r = gmc_v8_0_polaris_mc_load_microcode(adev);
 		if (r) {
 			DRM_ERROR("Failed to load MC firmware!\n");
 			return r;

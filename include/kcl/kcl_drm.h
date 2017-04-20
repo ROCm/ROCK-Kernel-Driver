@@ -321,4 +321,9 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 #endif
 }
 
+#ifdef BUILD_AS_DKMS
+extern struct dma_buf_ops *_kcl_drm_gem_prime_dmabuf_ops;
+#define drm_gem_prime_dmabuf_ops (*_kcl_drm_gem_prime_dmabuf_ops)
+#endif
+
 #endif /* AMDKCL_DRM_H */

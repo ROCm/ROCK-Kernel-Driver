@@ -23,6 +23,8 @@
  *
  */
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+
 #include <linux/string.h>
 #include <linux/acpi.h>
 #include <linux/version.h>
@@ -133,36 +135,6 @@ enum dc_edid_status dm_helpers_parse_edid_caps(
 	return result;
 }
 
-static struct amdgpu_connector *get_connector_for_sink(
-	struct drm_device *dev,
-	const struct dc_sink *sink)
-{
-	struct drm_connector *connector;
-
-	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
-		struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
-		if (aconnector->dc_sink == sink)
-			return aconnector;
-	}
-
-	return NULL;
-}
-
-static struct amdgpu_connector *get_connector_for_link(
-	struct drm_device *dev,
-	const struct dc_link *link)
-{
-	struct drm_connector *connector;
-
-	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
-		struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
-		if (aconnector->dc_link == link)
-			return aconnector;
-	}
-
-	return NULL;
-}
-
 static void get_payload_table(
 		struct amdgpu_connector *aconnector,
 		struct dp_mst_stream_allocation_table *proposed_table)
@@ -209,8 +181,6 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 		struct dp_mst_stream_allocation_table *proposed_table,
 		bool enable)
 {
-	struct amdgpu_device *adev = ctx->driver_context;
-	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector;
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	struct drm_dp_mst_port *mst_port;
@@ -220,7 +190,7 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 	int bpp = 0;
 	int pbn = 0;
 
-	aconnector = get_connector_for_sink(dev, stream->sink);
+	aconnector = stream->sink->priv;
 
 	if (!aconnector || !aconnector->mst_port)
 		return false;
@@ -298,13 +268,11 @@ bool dm_helpers_dp_mst_poll_for_allocation_change_trigger(
 		struct dc_context *ctx,
 		const struct dc_stream *stream)
 {
-	struct amdgpu_device *adev = ctx->driver_context;
-	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector;
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	int ret;
 
-	aconnector = get_connector_for_sink(dev, stream->sink);
+	aconnector = stream->sink->priv;
 
 	if (!aconnector || !aconnector->mst_port)
 		return false;
@@ -327,14 +295,12 @@ bool dm_helpers_dp_mst_send_payload_allocation(
 		const struct dc_stream *stream,
 		bool enable)
 {
-	struct amdgpu_device *adev = ctx->driver_context;
-	struct drm_device *dev = adev->ddev;
 	struct amdgpu_connector *aconnector;
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	struct drm_dp_mst_port *mst_port;
 	int ret;
 
-	aconnector = get_connector_for_sink(dev, stream->sink);
+	aconnector = stream->sink->priv;
 
 	if (!aconnector || !aconnector->mst_port)
 		return false;
@@ -363,9 +329,7 @@ bool dm_helpers_dp_mst_start_top_mgr(
 		bool boot)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || defined(OS_NAME_RHEL_7_3)
-	struct amdgpu_device *adev = ctx->driver_context;
-	struct drm_device *dev = adev->ddev;
-	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
+	struct amdgpu_connector *aconnector = link->priv;
 
 	if (!aconnector) {
 			DRM_ERROR("Failed to found connector for link!");
@@ -392,9 +356,7 @@ void dm_helpers_dp_mst_stop_top_mgr(
 		const struct dc_link *link)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || defined(OS_NAME_RHEL_7_3)
-	struct amdgpu_device *adev = ctx->driver_context;
-	struct drm_device *dev = adev->ddev;
-	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
+	struct amdgpu_connector *aconnector = link->priv;
 
 	if (!aconnector) {
 			DRM_ERROR("Failed to found connector for link!");
@@ -417,9 +379,7 @@ bool dm_helpers_dp_read_dpcd(
 		uint32_t size)
 {
 
-	struct amdgpu_device *adev = ctx->driver_context;
-	struct drm_device *dev = adev->ddev;
-	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
+	struct amdgpu_connector *aconnector = link->priv;
 
 	if (!aconnector) {
 		DRM_ERROR("Failed to found connector for link!");
@@ -437,10 +397,7 @@ bool dm_helpers_dp_write_dpcd(
 		const uint8_t *data,
 		uint32_t size)
 {
-
-	struct amdgpu_device *adev = ctx->driver_context;
-	struct drm_device *dev = adev->ddev;
-	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
+	struct amdgpu_connector *aconnector = link->priv;
 
 	if (!aconnector) {
 		DRM_ERROR("Failed to found connector for link!");
@@ -456,9 +413,7 @@ bool dm_helpers_submit_i2c(
 		const struct dc_link *link,
 		struct i2c_command *cmd)
 {
-	struct amdgpu_device *adev = ctx->driver_context;
-	struct drm_device *dev = adev->ddev;
-	struct amdgpu_connector *aconnector = get_connector_for_link(dev, link);
+	struct amdgpu_connector *aconnector = link->priv;
 	struct i2c_msg *msgs;
 	int i = 0;
 	int num = cmd->number_of_payloads;
@@ -475,7 +430,7 @@ bool dm_helpers_submit_i2c(
 		return false;
 
 	for (i = 0; i < num; i++) {
-		msgs[i].flags = cmd->payloads[i].write ? I2C_M_RD : 0;
+		msgs[i].flags = cmd->payloads[i].write ? 0 : I2C_M_RD;
 		msgs[i].addr = cmd->payloads[i].address;
 		msgs[i].len = cmd->payloads[i].length;
 		msgs[i].buf = cmd->payloads[i].data;
@@ -487,3 +442,51 @@ bool dm_helpers_submit_i2c(
 
 	return result;
 }
+
+enum dc_edid_status dm_helpers_read_local_edid(
+		struct dc_context *ctx,
+		struct dc_link *link,
+		struct dc_sink *sink)
+{
+	struct amdgpu_connector *aconnector = link->priv;
+	struct i2c_adapter *ddc;
+	int retry = 3;
+	enum dc_edid_status edid_status;
+	struct edid *edid;
+
+	if (link->aux_mode)
+		ddc = &aconnector->dm_dp_aux.aux.ddc;
+	else
+		ddc = &aconnector->i2c->base;
+
+	/* some dongles read edid incorrectly the first time,
+	 * do check sum and retry to make sure read correct edid.
+	 */
+	do {
+
+		edid = drm_get_edid(&aconnector->base, ddc);
+
+		if (!edid)
+			return EDID_NO_RESPONSE;
+
+		sink->dc_edid.length = EDID_LENGTH * (edid->extensions + 1);
+		memmove(sink->dc_edid.raw_edid, (uint8_t *)edid, sink->dc_edid.length);
+
+		/* We don't need the original edid anymore */
+		kfree(edid);
+
+		edid_status = dm_helpers_parse_edid_caps(
+						ctx,
+						&sink->dc_edid,
+						&sink->edid_caps);
+
+	} while (edid_status == EDID_BAD_CHECKSUM && --retry > 0);
+
+	if (edid_status != EDID_OK)
+		DRM_ERROR("EDID err: %d, on connector: %s",
+				edid_status,
+				aconnector->base.name);
+
+	return edid_status;
+}
+#endif

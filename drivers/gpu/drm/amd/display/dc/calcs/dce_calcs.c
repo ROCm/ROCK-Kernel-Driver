@@ -24,7 +24,7 @@
  */
 
 #include "dm_services.h"
-#include "bandwidth_calcs.h"
+#include "dce_calcs.h"
 #include "dc.h"
 #include "core_types.h"
 #include "dal_asic_id.h"
@@ -796,11 +796,11 @@ static void calculate_bandwidth(
 			}
 			else if (bw_leq(data->vsr[i], bw_int_to_fixed(1))) {
 				data->lb_lines_in_per_line_out_in_middle_of_frame[i] = bw_int_to_fixed(1);
-			}
-			else if (bw_leq(data->vsr[i], bw_int_to_fixed(4 / 3))) {
+			} else if (bw_leq(data->vsr[i],
+					bw_frc_to_fixed(4, 3))) {
 				data->lb_lines_in_per_line_out_in_middle_of_frame[i] = bw_div(bw_int_to_fixed(4), bw_int_to_fixed(3));
-			}
-			else if (bw_leq(data->vsr[i], bw_int_to_fixed(6 / 4))) {
+			} else if (bw_leq(data->vsr[i],
+					bw_frc_to_fixed(6, 4))) {
 				data->lb_lines_in_per_line_out_in_middle_of_frame[i] = bw_div(bw_int_to_fixed(6), bw_int_to_fixed(4));
 			}
 			else if (bw_leq(data->vsr[i], bw_int_to_fixed(2))) {
@@ -1341,12 +1341,12 @@ static void calculate_bandwidth(
 	/*initialize variables*/
 	number_of_displays_enabled = 0;
 	number_of_displays_enabled_with_margin = 0;
-	for (k = 0; k < maximum_number_of_surfaces; k++) {
+	for (k = 0; k <= maximum_number_of_surfaces - 1; k++) {
 		if (data->enable[k]) {
 			number_of_displays_enabled = number_of_displays_enabled + 1;
 		}
+		data->display_pstate_change_enable[k] = 0;
 	}
-	data->display_pstate_change_enable[maximum_number_of_surfaces - 1] = 0;
 	for (i = 0; i <= 2; i++) {
 		for (j = 0; j <= 7; j++) {
 			data->min_dram_speed_change_margin[i][j] = bw_int_to_fixed(9999);

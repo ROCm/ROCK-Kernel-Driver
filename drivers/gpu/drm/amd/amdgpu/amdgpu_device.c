@@ -54,6 +54,7 @@
 #include "bif/bif_4_1_d.h"
 #include <linux/pci.h>
 #include <linux/firmware.h>
+#include "amdgpu_amdkfd.h"
 
 static int amdgpu_debugfs_regs_init(struct amdgpu_device *adev);
 static void amdgpu_debugfs_regs_cleanup(struct amdgpu_device *adev);
@@ -718,7 +719,7 @@ bool amdgpu_need_post(struct amdgpu_device *adev)
 	/* then check MEM_SIZE, in case the crtcs are off */
 	reg = amdgpu_asic_get_config_memsize(adev);
 
-	if (reg)
+	if ((reg != 0) && (reg != 0xffffffff))
 		return false;
 
 	return true;
@@ -1039,6 +1040,62 @@ static bool amdgpu_check_pot_argument(int arg)
 	return (arg & (arg - 1)) == 0;
 }
 
+static void amdgpu_check_block_size(struct amdgpu_device *adev)
+{
+	/* defines number of bits in page table versus page directory,
+	 * a page is 4KB so we have 12 bits offset, minimum 9 bits in the
+	 * page table and the remaining bits are in the page directory */
+	if (amdgpu_vm_block_size == -1)
+		return;
+
+	if (amdgpu_vm_block_size < 9) {
+		dev_warn(adev->dev, "VM page table size (%d) too small\n",
+			 amdgpu_vm_block_size);
+		goto def_value;
+	}
+
+	if (amdgpu_vm_block_size > 24 ||
+	    (amdgpu_vm_size * 1024) < (1ull << amdgpu_vm_block_size)) {
+		dev_warn(adev->dev, "VM page table size (%d) too large\n",
+			 amdgpu_vm_block_size);
+		goto def_value;
+	}
+
+	return;
+
+def_value:
+	amdgpu_vm_block_size = -1;
+}
+
+static void amdgpu_check_vm_size(struct amdgpu_device *adev)
+{
+	if (!amdgpu_check_pot_argument(amdgpu_vm_size)) {
+		dev_warn(adev->dev, "VM size (%d) must be a power of 2\n",
+			 amdgpu_vm_size);
+		goto def_value;
+	}
+
+	if (amdgpu_vm_size < 1) {
+		dev_warn(adev->dev, "VM size (%d) too small, min is 1GB\n",
+			 amdgpu_vm_size);
+		goto def_value;
+	}
+
+	/*
+	 * Max GPUVM size for Cayman, SI, CI VI are 40 bits.
+	 */
+	if (amdgpu_vm_size > 1024) {
+		dev_warn(adev->dev, "VM size (%d) too large, max is 1TB\n",
+			 amdgpu_vm_size);
+		goto def_value;
+	}
+
+	return;
+
+def_value:
+	amdgpu_vm_size = -1;
+}
+
 /**
  * amdgpu_check_arguments - validate module params
  *
@@ -1049,6 +1106,9 @@ static bool amdgpu_check_pot_argument(int arg)
  */
 static void amdgpu_check_arguments(struct amdgpu_device *adev)
 {
+	struct sysinfo si;
+	int phys_ram_gb, amdgpu_vm_size_aligned;
+
 	if (amdgpu_sched_jobs < 4) {
 		dev_warn(adev->dev, "sched jobs (%d) must be at least 4\n",
 			 amdgpu_sched_jobs);
@@ -1068,54 +1128,30 @@ static void amdgpu_check_arguments(struct amdgpu_device *adev)
 		}
 	}
 
-	if (!amdgpu_check_pot_argument(amdgpu_vm_size)) {
-		dev_warn(adev->dev, "VM size (%d) must be a power of 2\n",
-			 amdgpu_vm_size);
-		amdgpu_vm_size = 8;
-	}
-
-	if (amdgpu_vm_size < 1) {
-		dev_warn(adev->dev, "VM size (%d) too small, min is 1GB\n",
-			 amdgpu_vm_size);
-		amdgpu_vm_size = 8;
-	}
-
-	/*
-	 * Max GPUVM size for Cayman, SI and CI are 40 bits.
+	/* Compute the GPU VM space only if the user
+	 * hasn't changed it from the default.
 	 */
-	if (amdgpu_vm_size > 1024) {
-		dev_warn(adev->dev, "VM size (%d) too large, max is 1TB\n",
-			 amdgpu_vm_size);
-		amdgpu_vm_size = 8;
+	if (amdgpu_vm_size == -1) {
+		/* Computation depends on the amount of physical RAM available.
+		 * Cannot exceed 1TB.
+		 */
+		si_meminfo(&si);
+		phys_ram_gb = ((uint64_t)si.totalram * si.mem_unit) >> 30;
+		amdgpu_vm_size = min(phys_ram_gb * 3 + 16, 1024);
+
+		/* GPUVM sizes are almost never perfect powers of two.
+		 * Round up to nearest power of two starting from
+		 * the minimum allowed but aligned size of 32GB */
+		amdgpu_vm_size_aligned = 32;
+		while (amdgpu_vm_size > amdgpu_vm_size_aligned)
+			amdgpu_vm_size_aligned *= 2;
+
+		amdgpu_vm_size = amdgpu_vm_size_aligned;
 	}
 
-	/* defines number of bits in page table versus page directory,
-	 * a page is 4KB so we have 12 bits offset, minimum 9 bits in the
-	 * page table and the remaining bits are in the page directory */
-	if (amdgpu_vm_block_size == -1) {
+	amdgpu_check_vm_size(adev);
 
-		/* Total bits covered by PD + PTs */
-		unsigned bits = ilog2(amdgpu_vm_size) + 18;
-
-		/* Make sure the PD is 4K in size up to 8GB address space.
-		   Above that split equal between PD and PTs */
-		if (amdgpu_vm_size <= 8)
-			amdgpu_vm_block_size = bits - 9;
-		else
-			amdgpu_vm_block_size = (bits + 3) / 2;
-
-	} else if (amdgpu_vm_block_size < 9) {
-		dev_warn(adev->dev, "VM page table size (%d) too small\n",
-			 amdgpu_vm_block_size);
-		amdgpu_vm_block_size = 9;
-	}
-
-	if (amdgpu_vm_block_size > 24 ||
-	    (amdgpu_vm_size * 1024) < (1ull << amdgpu_vm_block_size)) {
-		dev_warn(adev->dev, "VM page table size (%d) too large\n",
-			 amdgpu_vm_block_size);
-		amdgpu_vm_block_size = 9;
-	}
+	amdgpu_check_block_size(adev);
 
 	if (amdgpu_vram_page_split != -1 && (amdgpu_vram_page_split < 16 ||
 	    !amdgpu_check_pot_argument(amdgpu_vram_page_split))) {
@@ -1809,7 +1845,7 @@ bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type)
  */
 bool amdgpu_device_has_dc_support(struct amdgpu_device *adev)
 {
-	if (amdgpu_sriov_vf(adev))
+	if (adev->enable_virtual_display)
 		return false;
 
 	return amdgpu_device_asic_has_dc_support(adev->asic_type);
@@ -1875,7 +1911,6 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 
 	/* mutex initialization are all done here so we
 	 * can recall function without having locking issues */
-	mutex_init(&adev->vm_manager.lock);
 	atomic_set(&adev->irq.ih.lock, 0);
 	mutex_init(&adev->firmware.mutex);
 	mutex_init(&adev->pm.mutex);
@@ -2163,6 +2198,8 @@ int amdgpu_device_suspend(struct drm_device *dev, bool suspend, bool fbcon)
 		drm_modeset_unlock_all(dev);
 	}
 
+	amdgpu_amdkfd_suspend(adev);
+
 	/* unpin the front buffers and cursors */
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
@@ -2273,7 +2310,6 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 		DRM_ERROR("amdgpu_resume failed (%d).\n", r);
 		goto unlock;
 	}
-
 	amdgpu_fence_driver_resume(adev);
 
 	if (resume) {
@@ -2303,6 +2339,9 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 			}
 		}
 	}
+	r = amdgpu_amdkfd_resume(adev);
+	if (r)
+		return r;
 
 	/* blat the mode back in */
 	if (fbcon) {
