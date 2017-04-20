@@ -248,7 +248,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 		goto exit_reset;
 	}
 
-	r = i2c_dw_eval_lock_support(dev);
+	r = i2c_dw_probe_lock_support(dev);
 	if (r)
 		goto exit_reset;
 
@@ -326,6 +326,8 @@ static int dw_i2c_plat_remove(struct platform_device *pdev)
 		pm_runtime_disable(&pdev->dev);
 	if (!IS_ERR_OR_NULL(dev->rst))
 		reset_control_assert(dev->rst);
+
+	i2c_dw_remove_lock_support(dev);
 
 	return 0;
 }
