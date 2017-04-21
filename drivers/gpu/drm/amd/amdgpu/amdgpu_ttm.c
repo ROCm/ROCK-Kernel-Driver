@@ -587,19 +587,17 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 		break;
 	case TTM_PL_VRAM:
 	case AMDGPU_PL_DGMA:
+		mem->bus.offset = (mem->start << PAGE_SHIFT) + man->gpu_offset -
+				adev->mc.vram_start;
+		/* check if it's visible */
+		if ((mem->bus.offset + mem->bus.size) > adev->mc.visible_vram_size)
+			return -EINVAL;
+		mem->bus.base = adev->mc.aper_base;
+		mem->bus.is_iomem = true;
+		break;
 	case AMDGPU_PL_DGMA_IMPORT:
-		if (mem->mem_type != AMDGPU_PL_DGMA_IMPORT) {
-			mem->bus.offset = (mem->start << PAGE_SHIFT) + man->gpu_offset -
-					adev->mc.vram_start;
-			/* check if it's visible */
-			if ((mem->bus.offset + mem->bus.size) > adev->mc.visible_vram_size)
-				return -EINVAL;
-			mem->bus.base = adev->mc.aper_base;
-		} else {
-			mem->bus.offset = backup.bus.offset;
-			mem->bus.base = backup.bus.base;
-		}
-
+		mem->bus.offset = backup.bus.offset;
+		mem->bus.base = backup.bus.base;
 		mem->bus.is_iomem = true;
 		break;
 	default:
@@ -615,13 +613,18 @@ static void amdgpu_ttm_io_mem_free(struct ttm_bo_device *bdev, struct ttm_mem_re
 static unsigned long amdgpu_ttm_io_mem_pfn(struct ttm_buffer_object *bo,
 					   unsigned long page_offset)
 {
-	struct drm_mm_node *mm = bo->mem.mm_node;
-	uint64_t size = mm->size;
-	uint64_t offset = page_offset;
+	if (bo->mem.mem_type != AMDGPU_PL_DGMA &&
+	    bo->mem.mem_type != AMDGPU_PL_DGMA_IMPORT) {
+		struct drm_mm_node *mm = bo->mem.mm_node;
+		uint64_t size = mm->size;
+		uint64_t offset = page_offset;
 
-	page_offset = do_div(offset, size);
-	mm += offset;
-	return (bo->mem.bus.base >> PAGE_SHIFT) + mm->start + page_offset;
+		page_offset = do_div(offset, size);
+		mm += offset;
+		return (bo->mem.bus.base >> PAGE_SHIFT) + mm->start + page_offset;
+	}
+
+	return ttm_bo_default_io_mem_pfn(bo, page_offset);
 }
 
 /*

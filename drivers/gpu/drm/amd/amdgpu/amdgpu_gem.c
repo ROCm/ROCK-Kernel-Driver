@@ -280,6 +280,7 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 	if (args->in.domains & ~(AMDGPU_GEM_DOMAIN_CPU |
 				 AMDGPU_GEM_DOMAIN_GTT |
 				 AMDGPU_GEM_DOMAIN_VRAM |
+				 AMDGPU_GEM_DOMAIN_DGMA |
 				 AMDGPU_GEM_DOMAIN_GDS |
 				 AMDGPU_GEM_DOMAIN_GWS |
 				 AMDGPU_GEM_DOMAIN_OA)) {
@@ -1011,6 +1012,12 @@ static int amdgpu_debugfs_gem_bo_info(int id, void *ptr, void *data)
 	switch (domain) {
 	case AMDGPU_GEM_DOMAIN_VRAM:
 		placement = "VRAM";
+		break;
+	case AMDGPU_GEM_DOMAIN_DGMA:
+		placement = "DGMA";
+		break;
+	case AMDGPU_GEM_DOMAIN_DGMA_IMPORT:
+		placement = "DGMA_IMPORT";
 		break;
 	case AMDGPU_GEM_DOMAIN_GTT:
 		placement = " GTT";
