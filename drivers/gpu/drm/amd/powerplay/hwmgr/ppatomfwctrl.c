@@ -314,45 +314,52 @@ int pp_atomfwctrl_get_avfs_information(struct pp_hwmgr *hwmgr,
 			le32_to_cpu(profile->gb_vdroop_table_ckson_a2);
 	param->ulGbFuseTableCksoffM1 =
 			le32_to_cpu(profile->avfsgb_fuse_table_cksoff_m1);
-	param->ulGbFuseTableCksoffM2 =
+	param->usGbFuseTableCksoffM2 =
 			le16_to_cpu(profile->avfsgb_fuse_table_cksoff_m2);
 	param->ulGbFuseTableCksoffB =
 			le32_to_cpu(profile->avfsgb_fuse_table_cksoff_b);
 	param->ulGbFuseTableCksonM1 =
 			le32_to_cpu(profile->avfsgb_fuse_table_ckson_m1);
-	param->ulGbFuseTableCksonM2 =
+	param->usGbFuseTableCksonM2 =
 			le16_to_cpu(profile->avfsgb_fuse_table_ckson_m2);
 	param->ulGbFuseTableCksonB =
 			le32_to_cpu(profile->avfsgb_fuse_table_ckson_b);
-
+	param->usMaxVoltage025mv =
+			le16_to_cpu(profile->max_voltage_0_25mv);
+	param->ucEnableGbVdroopTableCksoff =
+			profile->enable_gb_vdroop_table_cksoff;
 	param->ucEnableGbVdroopTableCkson =
 			profile->enable_gb_vdroop_table_ckson;
+	param->ucEnableGbFuseTableCksoff =
+			profile->enable_gb_fuse_table_cksoff;
 	param->ucEnableGbFuseTableCkson =
 			profile->enable_gb_fuse_table_ckson;
 	param->usPsmAgeComfactor =
 			le16_to_cpu(profile->psm_age_comfactor);
+	param->ucEnableApplyAvfsCksoffVoltage =
+			profile->enable_apply_avfs_cksoff_voltage;
 
 	param->ulDispclk2GfxclkM1 =
 			le32_to_cpu(profile->dispclk2gfxclk_a);
-	param->ulDispclk2GfxclkM2 =
+	param->usDispclk2GfxclkM2 =
 			le16_to_cpu(profile->dispclk2gfxclk_b);
 	param->ulDispclk2GfxclkB =
 			le32_to_cpu(profile->dispclk2gfxclk_c);
 	param->ulDcefclk2GfxclkM1 =
 			le32_to_cpu(profile->dcefclk2gfxclk_a);
-	param->ulDcefclk2GfxclkM2 =
+	param->usDcefclk2GfxclkM2 =
 			le16_to_cpu(profile->dcefclk2gfxclk_b);
 	param->ulDcefclk2GfxclkB =
 			le32_to_cpu(profile->dcefclk2gfxclk_c);
 	param->ulPixelclk2GfxclkM1 =
 			le32_to_cpu(profile->pixclk2gfxclk_a);
-	param->ulPixelclk2GfxclkM2 =
+	param->usPixelclk2GfxclkM2 =
 			le16_to_cpu(profile->pixclk2gfxclk_b);
 	param->ulPixelclk2GfxclkB =
 			le32_to_cpu(profile->pixclk2gfxclk_c);
 	param->ulPhyclk2GfxclkM1 =
 			le32_to_cpu(profile->phyclk2gfxclk_a);
-	param->ulPhyclk2GfxclkM2 =
+	param->usPhyclk2GfxclkM2 =
 			le16_to_cpu(profile->phyclk2gfxclk_b);
 	param->ulPhyclk2GfxclkB =
 			le32_to_cpu(profile->phyclk2gfxclk_c);
