@@ -63,10 +63,12 @@ MODULE_DESCRIPTION("Asus HID Keyboard and TouchPad");
 #define QUIRK_NO_INIT_REPORTS		BIT(1)
 #define QUIRK_SKIP_INPUT_MAPPING	BIT(2)
 #define QUIRK_IS_MULTITOUCH		BIT(3)
+#define QUIRK_NO_CONSUMER_USAGES	BIT(4)
 
-#define KEYBOARD_QUIRKS			(QUIRK_FIX_NOTEBOOK_REPORT | \
-						 QUIRK_NO_INIT_REPORTS)
-#define TOUCHPAD_QUIRKS			(QUIRK_NO_INIT_REPORTS | \
+#define I2C_KEYBOARD_QUIRKS			(QUIRK_FIX_NOTEBOOK_REPORT | \
+						 QUIRK_NO_INIT_REPORTS | \
+						 QUIRK_NO_CONSUMER_USAGES)
+#define I2C_TOUCHPAD_QUIRKS			(QUIRK_NO_INIT_REPORTS | \
 						 QUIRK_SKIP_INPUT_MAPPING | \
 						 QUIRK_IS_MULTITOUCH)
 
@@ -199,6 +201,8 @@ static int asus_input_configured(struct hid_device *hdev, struct hid_input *hi)
 	return 0;
 }
 
+#define asus_map_key_clear(c)	hid_map_usage_clear(hi, usage, bit, \
+						    max, EV_KEY, (c))
 static int asus_input_mapping(struct hid_device *hdev,
 		struct hid_input *hi, struct hid_field *field,
 		struct hid_usage *usage, unsigned long **bit,
@@ -211,6 +215,55 @@ static int asus_input_mapping(struct hid_device *hdev,
 		 * We do it all manually in asus_input_configured
 		 */
 		return -1;
+	}
+
+	/* ASUS-specific keyboard hotkeys */
+	if ((usage->hid & HID_USAGE_PAGE) == 0xff310000) {
+		set_bit(EV_REP, hi->input->evbit);
+		switch (usage->hid & HID_USAGE) {
+		case 0x10: asus_map_key_clear(KEY_BRIGHTNESSDOWN);	break;
+		case 0x20: asus_map_key_clear(KEY_BRIGHTNESSUP);		break;
+		case 0x35: asus_map_key_clear(KEY_DISPLAY_OFF);		break;
+		case 0x6c: asus_map_key_clear(KEY_SLEEP);		break;
+		case 0x82: asus_map_key_clear(KEY_CAMERA);		break;
+		case 0x88: asus_map_key_clear(KEY_RFKILL);			break;
+		case 0xb5: asus_map_key_clear(KEY_CALC);			break;
+		case 0xc4: asus_map_key_clear(KEY_KBDILLUMUP);		break;
+		case 0xc5: asus_map_key_clear(KEY_KBDILLUMDOWN);		break;
+
+		/* ASUS touchpad toggle */
+		case 0x6b: asus_map_key_clear(KEY_F21);			break;
+
+		/* ROG key */
+		case 0x38: asus_map_key_clear(KEY_PROG1);		break;
+
+		/* Fn+C ASUS Splendid */
+		case 0xba: asus_map_key_clear(KEY_PROG2);		break;
+
+		/* Fn+Space Power4Gear Hybrid */
+		case 0x5c: asus_map_key_clear(KEY_PROG3);		break;
+
+		default:
+			/* ASUS lazily declares 256 usages, ignore the rest,
+			 * as some make the keyboard appear as a pointer device. */
+			return -1;
+		}
+		return 1;
+	}
+
+	if (drvdata->quirks & QUIRK_NO_CONSUMER_USAGES &&
+		(usage->hid & HID_USAGE_PAGE) == HID_UP_CONSUMER) {
+		switch (usage->hid & HID_USAGE) {
+		case 0xe2: /* Mute */
+		case 0xe9: /* Volume up */
+		case 0xea: /* Volume down */
+			return 0;
+		default:
+			/* Ignore dummy Consumer usages which make the
+			 * keyboard incorrectly appear as a pointer device.
+			 */
+			return -1;
+		}
 	}
 
 	return 0;
@@ -320,9 +373,13 @@ static __u8 *asus_report_fixup(struct hid_device *hdev, __u8 *rdesc,
 
 static const struct hid_device_id asus_devices[] = {
 	{ HID_I2C_DEVICE(USB_VENDOR_ID_ASUSTEK,
-		 USB_DEVICE_ID_ASUSTEK_NOTEBOOK_KEYBOARD), KEYBOARD_QUIRKS},
+		USB_DEVICE_ID_ASUSTEK_I2C_KEYBOARD), I2C_KEYBOARD_QUIRKS},
 	{ HID_I2C_DEVICE(USB_VENDOR_ID_ASUSTEK,
-			 USB_DEVICE_ID_ASUSTEK_TOUCHPAD), TOUCHPAD_QUIRKS },
+		USB_DEVICE_ID_ASUSTEK_I2C_TOUCHPAD), I2C_TOUCHPAD_QUIRKS },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_ASUSTEK,
+		USB_DEVICE_ID_ASUSTEK_ROG_KEYBOARD1) },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_ASUSTEK,
+		USB_DEVICE_ID_ASUSTEK_ROG_KEYBOARD2) },
 	{ }
 };
 MODULE_DEVICE_TABLE(hid, asus_devices);
