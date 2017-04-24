@@ -46,6 +46,7 @@
 #include "soc15_common.h"
 #include "v9_structs.h"
 #include "soc15.h"
+#include "soc15d.h"
 
 /* HACK: MMHUB and GC both have VM-related register with the same
  * names but different offsets. Define the MMHUB register we need here
@@ -168,6 +169,7 @@ static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
 		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 		uint32_t page_table_base);
+static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid);
 
 /* Because of REG_GET_FIELD() being used, we put this function in the
  * asic specific file.
@@ -234,6 +236,7 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.get_atc_vmid_pasid_mapping_valid =
 			get_atc_vmid_pasid_mapping_valid,
 	.write_vmid_invalidate_request = write_vmid_invalidate_request,
+	.invalidate_tlbs = invalidate_tlbs,
 	.alloc_memory_of_gpu = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu,
 	.free_memory_of_gpu = amdgpu_amdkfd_gpuvm_free_memory_of_gpu,
 	.map_memory_to_gpu = amdgpu_amdkfd_gpuvm_map_memory_to_gpu,
@@ -941,6 +944,54 @@ static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
 	while (!(RREG32(SOC15_REG_OFFSET(MMHUB, 0, mmMMHUB_VM_INVALIDATE_ENG16_ACK)) &
 		 (1 << vmid)))
 		cpu_relax();
+}
+
+static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
+{
+	signed long r;
+	struct fence *f;
+	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
+
+	mutex_lock(&adev->virt.lock_kiq);
+	amdgpu_ring_alloc(ring, 12); /* fence + invalidate_tlbs package*/
+	amdgpu_ring_write(ring, PACKET3(PACKET3_INVALIDATE_TLBS, 0));
+	amdgpu_ring_write(ring,
+			PACKET3_INVALIDATE_TLBS_DST_SEL(1) |
+			PACKET3_INVALIDATE_TLBS_PASID(pasid));
+	amdgpu_fence_emit(ring, &f);
+	amdgpu_ring_commit(ring);
+	mutex_unlock(&adev->virt.lock_kiq);
+
+	r = fence_wait(f, false);
+	if (r)
+		DRM_ERROR("wait for kiq fence error: %ld.\n", r);
+	fence_put(f);
+
+	return r;
+}
+
+static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
+	int vmid;
+	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
+
+	if (ring->ready)
+		return invalidate_tlbs_with_kiq(adev, pasid);
+
+	for (vmid = 0; vmid < 16; vmid++) {
+		if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid))
+			continue;
+		if (get_atc_vmid_pasid_mapping_valid(kgd, vmid)) {
+			if (get_atc_vmid_pasid_mapping_pasid(kgd, vmid)
+				== pasid) {
+				write_vmid_invalidate_request(kgd, vmid);
+				break;
+			}
+		}
+	}
+
+	return 0;
 }
 
 static int kgd_address_watch_disable(struct kgd_dev *kgd)
