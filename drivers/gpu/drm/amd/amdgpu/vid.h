@@ -363,6 +363,10 @@
 #define	PACKET3_WAIT_ON_CE_COUNTER			0x86
 #define	PACKET3_WAIT_ON_DE_COUNTER_DIFF			0x88
 #define	PACKET3_SWITCH_BUFFER				0x8B
+#define	PACKET3_INVALIDATE_TLBS				0x98
+#              define PACKET3_INVALIDATE_TLBS_DST_SEL(x)     ((x) << 0)
+#              define PACKET3_INVALIDATE_TLBS_PASID(x)       ((x) << 5)
+
 #define	PACKET3_SET_RESOURCES				0xA0
 /* 1. header
  * 2. CONTROL

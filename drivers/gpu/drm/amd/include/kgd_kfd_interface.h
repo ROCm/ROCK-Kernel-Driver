@@ -331,6 +331,9 @@ struct kfd2kgd_calls {
 	uint32_t (*read_vmid_from_vmfault_reg)(struct kgd_dev *kgd);
 	void (*write_vmid_invalidate_request)(struct kgd_dev *kgd,
 					uint8_t vmid);
+
+	int (*invalidate_tlbs)(struct kgd_dev *kgd, uint16_t pasid);
+
 	int (*alloc_memory_of_gpu)(struct kgd_dev *kgd, uint64_t va,
 			uint64_t size, void *vm,
 			struct kgd_mem **mem, uint64_t *offset,
