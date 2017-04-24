@@ -2674,7 +2674,7 @@ int amdgpu_gpu_reset(struct amdgpu_device *adev)
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 		struct amdgpu_ring *ring = adev->rings[i];
 
-		if (!ring)
+		if (!ring || !ring->sched.thread)
 			continue;
 		kcl_kthread_park(ring->sched.thread);
 		amd_sched_hw_job_reset(&ring->sched);
@@ -2769,7 +2769,8 @@ retry:
 		}
 		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 			struct amdgpu_ring *ring = adev->rings[i];
-			if (!ring)
+
+			if (!ring || !ring->sched.thread)
 				continue;
 
 			amd_sched_job_recovery(&ring->sched);
@@ -2778,7 +2779,7 @@ retry:
 	} else {
 		dev_err(adev->dev, "asic resume failed (%d).\n", r);
 		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
-			if (adev->rings[i]) {
+			if (adev->rings[i] && adev->rings[i]->sched.thread) {
 				kcl_kthread_unpark(adev->rings[i]->sched.thread);
 			}
 		}
