@@ -385,7 +385,9 @@ void amd_sched_hw_job_reset(struct amd_gpu_scheduler *sched)
 
 	spin_lock(&sched->job_list_lock);
 	list_for_each_entry_reverse(s_job, &sched->ring_mirror_list, node) {
-		if (fence_remove_callback(s_job->s_fence->parent, &s_job->s_fence->cb)) {
+		if (s_job->s_fence->parent &&
+		    fence_remove_callback(s_job->s_fence->parent,
+					  &s_job->s_fence->cb)) {
 			fence_put(s_job->s_fence->parent);
 			s_job->s_fence->parent = NULL;
 		}
