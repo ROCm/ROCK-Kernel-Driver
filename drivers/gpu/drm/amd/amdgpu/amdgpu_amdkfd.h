@@ -71,7 +71,7 @@ struct kgd_mem {
 
 /* KFD Memory Eviction */
 struct amdgpu_amdkfd_fence {
-	struct fence base;
+	struct dma_fence base;
 	void *mm;
 	spinlock_t lock;
 	char timeline_name[TASK_COMM_LEN];
@@ -79,8 +79,8 @@ struct amdgpu_amdkfd_fence {
 
 struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 						       void *mm);
-bool amd_kfd_fence_check_mm(struct fence *f, void *mm);
-struct amdgpu_amdkfd_fence *to_amdgpu_amdkfd_fence(struct fence *f);
+bool amd_kfd_fence_check_mm(struct dma_fence *f, void *mm);
+struct amdgpu_amdkfd_fence *to_amdgpu_amdkfd_fence(struct dma_fence *f);
 
 struct amdkfd_process_info {
 	/* List head of all VMs that belong to a KFD process */
@@ -146,7 +146,7 @@ struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions(void);
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void);
 int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 		uint64_t src_offset, struct kgd_mem *dst_mem,
-		uint64_t dest_offset, uint64_t size, struct fence **f,
+		uint64_t dest_offset, uint64_t size, struct dma_fence **f,
 		uint64_t *actual_size);
 
 bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev,

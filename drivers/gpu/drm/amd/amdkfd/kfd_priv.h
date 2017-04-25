@@ -588,7 +588,7 @@ struct qcm_process_device {
 /* KFD Memory Eviction */
 struct kfd_eviction_work {
 	struct delayed_work dwork;
-	struct fence *quiesce_fence;
+	struct dma_fence *quiesce_fence;
 };
 
 /* Approx. wait time before attempting to restore evicted BOs */
@@ -601,7 +601,7 @@ struct kfd_eviction_work {
 void kfd_evict_bo_worker(struct work_struct *work);
 void kfd_restore_bo_worker(struct work_struct *work);
 int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
-					       struct fence *fence);
+					       struct dma_fence *fence);
 
 
 /* 8 byte handle containing GPU ID in the most significant 4 bytes and
