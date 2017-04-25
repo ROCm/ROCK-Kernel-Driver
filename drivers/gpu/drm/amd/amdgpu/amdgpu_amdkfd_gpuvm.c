@@ -242,14 +242,14 @@ static int amdgpu_amdkfd_remove_eviction_fence(struct amdgpu_bo *bo,
 	 */
 	shared_count = fobj->shared_count;
 	for (i = 0; i < shared_count; ++i) {
-		struct fence *f;
+		struct dma_fence *f;
 
 		f = rcu_dereference_protected(fobj->shared[i],
 					      reservation_object_held(resv));
 
 		if (ef) {
 			if (f->context == ef->base.context) {
-				fence_put(f);
+				dma_fence_put(f);
 				fobj->shared_count--;
 			} else
 				RCU_INIT_POINTER(fobj->shared[j++], f);
@@ -277,7 +277,7 @@ static int amdgpu_amdkfd_remove_eviction_fence(struct amdgpu_bo *bo,
 
 	j = 0;
 	for (i = 0; i < shared_count; ++i) {
-		struct fence *f;
+		struct dma_fence *f;
 		struct amdgpu_amdkfd_fence *efence;
 
 		f = rcu_dereference_protected(fobj->shared[i],
@@ -324,7 +324,7 @@ static void amdgpu_amdkfd_add_eviction_fence(struct amdgpu_bo *bo,
 		/* Readding the fence takes an additional reference. Drop that
 		 * reference.
 		 */
-		fence_put(&ef_list[i]->base);
+		dma_fence_put(&ef_list[i]->base);
 	}
 
 	kfree(ef_list);
@@ -898,7 +898,7 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 	 * KFD's purposes, so we can just drop that fence.
 	 */
 	if (sync->last_vm_update) {
-		fence_put(sync->last_vm_update);
+		dma_fence_put(sync->last_vm_update);
 		sync->last_vm_update = NULL;
 	}
 
@@ -944,7 +944,7 @@ static int update_gpuvm_pte(struct amdgpu_device *adev,
 	 * KFD's purposes, so we can just drop that fence.
 	 */
 	if (sync->last_vm_update) {
-		fence_put(sync->last_vm_update);
+		dma_fence_put(sync->last_vm_update);
 		sync->last_vm_update = NULL;
 	}
 
@@ -1386,7 +1386,7 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 		INIT_LIST_HEAD(&info->userptr_inval_list);
 
 		info->eviction_fence =
-			amdgpu_amdkfd_fence_create(fence_context_alloc(1),
+			amdgpu_amdkfd_fence_create(dma_fence_context_alloc(1),
 						   current->mm);
 		if (info->eviction_fence == NULL) {
 			pr_err("Failed to create eviction fence\n");
@@ -1457,7 +1457,7 @@ void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 		WARN_ON(!list_empty(&process_info->userptr_valid_list));
 		WARN_ON(!list_empty(&process_info->userptr_inval_list));
 
-		fence_put(&process_info->eviction_fence->base);
+		dma_fence_put(&process_info->eviction_fence->base);
 		cancel_delayed_work_sync(&process_info->work);
 		put_pid(process_info->pid);
 		kfree(process_info);
@@ -2260,7 +2260,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 	process_info->eviction_fence =
 		amdgpu_amdkfd_fence_create(old_fence->base.context,
 					   old_fence->mm);
-	fence_put(&old_fence->base);
+	dma_fence_put(&old_fence->base);
 	if (!process_info->eviction_fence) {
 		pr_err("Failed to create eviction fence\n");
 		goto evict_fence_fail;
@@ -2368,7 +2368,7 @@ evict_fence_fail:
 int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 				  uint64_t src_offset, struct kgd_mem *dst_mem,
 				  uint64_t dst_offset, uint64_t size,
-				  struct fence **f, uint64_t *actual_size)
+				  struct dma_fence **f, uint64_t *actual_size)
 {
 	struct amdgpu_device *adev = NULL;
 	struct ttm_mem_reg *src = NULL, *dst = NULL;
@@ -2380,7 +2380,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 	struct ttm_validate_buffer resv_list[2];
 	uint64_t src_start, dst_start;
 	uint64_t src_left, dst_left, cur_copy_size, total_copy_size = 0;
-	struct fence *fence = NULL;
+	struct dma_fence *fence = NULL;
 	int r;
 
 	if (!kgd || !src_mem || !dst_mem)
@@ -2472,7 +2472,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 	dst_left = (dst_mm->size << PAGE_SHIFT) - dst_offset;
 
 	do {
-		struct fence *next;
+		struct dma_fence *next;
 
 		/* src_left/dst_left: amount of space left in the current node
 		 * Copy minimum of (src_left, dst_left, amount of bytes left to
@@ -2487,7 +2487,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 			break;
 
 		/* Just keep the last fence */
-		fence_put(fence);
+		dma_fence_put(fence);
 		fence = next;
 
 		total_copy_size += cur_copy_size;

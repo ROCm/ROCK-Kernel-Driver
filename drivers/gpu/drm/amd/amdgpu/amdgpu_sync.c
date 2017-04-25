@@ -322,12 +322,12 @@ int amdgpu_sync_wait(struct amdgpu_sync *sync)
 	int i, r;
 
 	hash_for_each_safe(sync->fences, i, tmp, e, node) {
-		r = fence_wait(e->fence, false);
+		r = dma_fence_wait(e->fence, false);
 		if (r)
 			return r;
 
 		hash_del(&e->node);
-		fence_put(e->fence);
+		dma_fence_put(e->fence);
 		kmem_cache_free(amdgpu_sync_slab, e);
 	}
 

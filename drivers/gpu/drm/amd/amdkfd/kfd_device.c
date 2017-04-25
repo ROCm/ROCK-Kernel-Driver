@@ -25,7 +25,7 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/highmem.h>
-#include <linux/fence.h>
+#include <linux/dma-fence.h>
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_pm4_headers_vi.h"
@@ -875,7 +875,7 @@ void kfd_restore_bo_worker(struct work_struct *work)
  *
  */
 int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
-					       struct fence *fence)
+					       struct dma_fence *fence)
 {
 	struct kfd_process *p;
 	unsigned long active_time;
@@ -884,7 +884,7 @@ int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 	if (!fence)
 		return -EINVAL;
 
-	if (fence_is_signaled(fence))
+	if (dma_fence_is_signaled(fence))
 		return 0;
 
 	p = kfd_lookup_process_by_mm(mm);
@@ -901,11 +901,11 @@ int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 		else {
 			WARN(1, "Starting new evict with previous evict is not completed\n");
 			if (cancel_delayed_work_sync(&p->eviction_work.dwork))
-				fence_put(p->eviction_work.eviction_fence);
+				dma_fence_put(p->eviction_work.eviction_fence);
 		}
 	}
 
-	p->eviction_work.eviction_fence = fence_get(fence);
+	p->eviction_work.eviction_fence = dma_fence_get(fence);
 
 	/* Avoid KFD process starvation. Wait for at least
 	 * PROCESS_ACTIVE_TIME_MS before evicting the process again
@@ -952,13 +952,13 @@ void kfd_evict_bo_worker(struct work_struct *work)
 	pr_info("Started evicting process of pasid %d\n", p->pasid);
 	ret = quiesce_process_mm(p);
 	if (!ret) {
-		fence_signal(eviction_work->eviction_fence);
+		dma_fence_signal(eviction_work->eviction_fence);
 		schedule_delayed_work(&p->restore_work,
 					PROCESS_RESTORE_TIME_MS);
 	} else
 		pr_err("Failed to quiesce user queues. Cannot evict BOs\n");
 
-	fence_put(eviction_work->eviction_fence);
+	dma_fence_put(eviction_work->eviction_fence);
 
 	pr_info("Finished evicting process of pasid %d\n", p->pasid);
 

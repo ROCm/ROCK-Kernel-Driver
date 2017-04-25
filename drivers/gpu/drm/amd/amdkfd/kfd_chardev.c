@@ -1897,7 +1897,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 	struct task_struct *remote_task;
 	struct mm_struct *remote_mm;
 	struct pid *remote_pid;
-	struct fence *fence = NULL, *lfence = NULL;
+	struct dma_fence *fence = NULL, *lfence = NULL;
 	uint64_t dst_va_addr;
 	uint64_t copied, total_copied = 0;
 	uint64_t src_offset, dst_offset;
@@ -2063,7 +2063,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 
 			/* Later fence available. Release old fence */
 			if (fence && lfence) {
-				fence_put(lfence);
+				dma_fence_put(lfence);
 				lfence = NULL;
 			}
 
@@ -2102,14 +2102,14 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 
 	/* Wait for the last fence irrespective of error condition */
 	if (fence) {
-		if (fence_wait_timeout(fence, false, msecs_to_jiffies(1000))
+		if (dma_fence_wait_timeout(fence, false, msecs_to_jiffies(1000))
 			< 0)
 			pr_err("Cross mem copy failed. BO timed out\n");
-		fence_put(fence);
+		dma_fence_put(fence);
 	} else if (lfence) {
 		pr_debug("GPU copy fail. But wait for prev DMA to finish\n");
-		fence_wait_timeout(lfence, true, msecs_to_jiffies(1000));
-		fence_put(lfence);
+		dma_fence_wait_timeout(lfence, true, msecs_to_jiffies(1000));
+		dma_fence_put(lfence);
 	}
 
 kfd_process_fail:

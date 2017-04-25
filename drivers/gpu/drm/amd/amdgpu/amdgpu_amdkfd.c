@@ -186,7 +186,7 @@ int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 	struct amdgpu_job *job;
 	struct amdgpu_ib *ib;
 	struct amdgpu_ring *ring;
-	struct fence *f = NULL;
+	struct dma_fence *f = NULL;
 	int ret;
 
 	switch (engine) {
@@ -224,10 +224,10 @@ int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 		goto err_ib_sched;
 	}
 
-	ret = fence_wait(f, false);
+	ret = dma_fence_wait(f, false);
 
 err_ib_sched:
-	fence_put(f);
+	dma_fence_put(f);
 	amdgpu_job_free(job);
 err:
 	return ret;

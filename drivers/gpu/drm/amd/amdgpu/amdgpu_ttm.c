@@ -1083,7 +1083,7 @@ static bool amdgpu_ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 					    const struct ttm_place *place)
 {
 	struct reservation_object_list *flist;
-	struct fence *f;
+	struct dma_fence *f;
 	int i;
 	unsigned long num_pages = bo->mem.num_pages;
 	struct drm_mm_node *node = bo->mem.mm_node;

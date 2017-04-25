@@ -31,7 +31,7 @@
 #include <linux/types.h>
 #include <linux/mm_types.h>
 #include <linux/scatterlist.h>
-#include <linux/fence.h>
+#include <linux/dma-fence.h>
 #include <linux/dma-buf.h>
 
 struct pci_dev;
@@ -386,8 +386,8 @@ struct kfd2kgd_calls {
 	int (*restore_process_bos)(void *process_info);
 	int (*copy_mem_to_mem)(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 			uint64_t src_offset, struct kgd_mem *dst_mem,
-			uint64_t dest_offset, uint64_t size, struct fence **f,
-			uint64_t *actual_size);
+			uint64_t dest_offset, uint64_t size,
+			struct dma_fence **f, uint64_t *actual_size);
 };
 
 /**
@@ -430,7 +430,7 @@ struct kgd2kfd_calls {
 	int (*quiesce_mm)(struct kfd_dev *kfd, struct mm_struct *mm);
 	int (*resume_mm)(struct kfd_dev *kfd, struct mm_struct *mm);
 	int (*schedule_evict_and_restore_process)(struct mm_struct *mm,
-			struct fence *fence);
+			struct dma_fence *fence);
 };
 
 int kgd2kfd_init(unsigned interface_version,
