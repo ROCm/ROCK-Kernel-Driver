@@ -1406,6 +1406,7 @@ static int gfx_v8_0_kiq_init_ring(struct amdgpu_device *adev,
 
 	return r;
 }
+
 static void gfx_v8_0_kiq_free_ring(struct amdgpu_ring *ring,
 				   struct amdgpu_irq_src *irq)
 {
@@ -4744,7 +4745,7 @@ static int gfx_v8_0_kiq_kcq_disable(struct amdgpu_device *adev)
 		DRM_UDELAY(1);
 	}
 	if (i >= adev->usec_timeout) {
-		DRM_ERROR("KCQ enable failed (scratch(0x%04X)=0x%08X)\n",
+		DRM_ERROR("KCQ disabled failed (scratch(0x%04X)=0x%08X)\n",
 			  scratch, tmp);
 		r = -EINVAL;
 	}
@@ -6826,8 +6827,6 @@ static int gfx_v8_0_kiq_set_interrupt_state(struct amdgpu_device *adev,
 {
 	struct amdgpu_ring *ring = &(adev->gfx.kiq.ring);
 
-	BUG_ON(ring->funcs->type != AMDGPU_RING_TYPE_KIQ);
-
 	switch (type) {
 	case AMDGPU_CP_KIQ_IRQ_DRIVER0:
 		WREG32_FIELD(CPC_INT_CNTL, GENERIC2_INT_ENABLE,
@@ -6856,8 +6855,6 @@ static int gfx_v8_0_kiq_irq(struct amdgpu_device *adev,
 {
 	u8 me_id, pipe_id, queue_id;
 	struct amdgpu_ring *ring = &(adev->gfx.kiq.ring);
-
-	BUG_ON(ring->funcs->type != AMDGPU_RING_TYPE_KIQ);
 
 	me_id = (entry->ring_id & 0x0c) >> 2;
 	pipe_id = (entry->ring_id & 0x03) >> 0;

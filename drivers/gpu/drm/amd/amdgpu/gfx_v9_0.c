@@ -631,7 +631,6 @@ static int gfx_v9_0_kiq_init_ring(struct amdgpu_device *adev,
 		ring->pipe = 1;
 	}
 
-	irq->data = ring;
 	ring->queue = 0;
 	ring->eop_gpu_addr = kiq->eop_gpu_addr;
 	sprintf(ring->name, "kiq %d.%d.%d", ring->me, ring->pipe, ring->queue);
@@ -647,7 +646,6 @@ static void gfx_v9_0_kiq_free_ring(struct amdgpu_ring *ring,
 {
 	amdgpu_wb_free(ring->adev, ring->adev->virt.reg_val_offs);
 	amdgpu_ring_fini(ring);
-	irq->data = NULL;
 }
 
 /* create MQD for each compute queue */
@@ -787,6 +785,9 @@ static void gfx_v9_0_gpu_early_init(struct amdgpu_device *adev)
 		adev->gfx.config.sc_prim_fifo_size_backend = 0x100;
 		adev->gfx.config.sc_hiz_tile_fifo_size = 0x30;
 		adev->gfx.config.sc_earlyz_tile_fifo_size = 0x4C0;
+		adev->gfx.config.gs_vgt_table_depth = 32;
+		adev->gfx.config.gs_prim_buffer_depth = 1792;
+		adev->gfx.config.max_gs_waves_per_vgt = 32;
 		gb_addr_config = VEGA10_GB_ADDR_CONFIG_GOLDEN;
 		break;
 	default:
@@ -1096,7 +1097,7 @@ static int gfx_v9_0_sw_init(void *handle)
 		ring->pipe = i / 8;
 		ring->queue = i % 8;
 		ring->eop_gpu_addr = adev->gfx.mec.hpd_eop_gpu_addr + (i * MEC_HPD_SIZE);
-		sprintf(ring->name, "comp %d.%d.%d", ring->me, ring->pipe, ring->queue);
+		sprintf(ring->name, "comp_%d.%d.%d", ring->me, ring->pipe, ring->queue);
 		irq_type = AMDGPU_CP_IRQ_COMPUTE_MEC1_PIPE0_EOP + ring->pipe;
 		/* type-2 packets are deprecated on MEC, use type-3 instead */
 		r = amdgpu_ring_init(adev, ring, 1024,
@@ -2740,6 +2741,9 @@ static int gfx_v9_0_set_clockgating_state(void *handle,
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
+	if (amdgpu_sriov_vf(adev))
+		return 0;
+
 	switch (adev->asic_type) {
 	case CHIP_VEGA10:
 		gfx_v9_0_update_gfx_clock_gating(adev,
@@ -3367,9 +3371,7 @@ static int gfx_v9_0_kiq_set_interrupt_state(struct amdgpu_device *adev,
 					    enum amdgpu_interrupt_state state)
 {
 	uint32_t tmp, target;
-	struct amdgpu_ring *ring = (struct amdgpu_ring *)src->data;
-
-	BUG_ON(!ring || (ring->funcs->type != AMDGPU_RING_TYPE_KIQ));
+	struct amdgpu_ring *ring = &(adev->gfx.kiq.ring);
 
 	if (ring->me == 1)
 		target = SOC15_REG_OFFSET(GC, 0, mmCP_ME1_PIPE0_INT_CNTL);
@@ -3413,9 +3415,7 @@ static int gfx_v9_0_kiq_irq(struct amdgpu_device *adev,
 			    struct amdgpu_iv_entry *entry)
 {
 	u8 me_id, pipe_id, queue_id;
-	struct amdgpu_ring *ring = (struct amdgpu_ring *)source->data;
-
-	BUG_ON(!ring || (ring->funcs->type != AMDGPU_RING_TYPE_KIQ));
+	struct amdgpu_ring *ring = &(adev->gfx.kiq.ring);
 
 	me_id = (entry->ring_id & 0x0c) >> 2;
 	pipe_id = (entry->ring_id & 0x03) >> 0;
