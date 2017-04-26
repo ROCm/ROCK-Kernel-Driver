@@ -421,32 +421,6 @@ err:
 
 void kfd_flush_tlb(struct kfd_dev *dev, uint32_t pasid)
 {
-	uint8_t vmid;
-	int first_vmid_to_scan = 8;
-	int last_vmid_to_scan = 15;
-
 	const struct kfd2kgd_calls *f2g = dev->kfd2kgd;
-	/* Scan all registers in the range ATC_VMID8_PASID_MAPPING .. ATC_VMID15_PASID_MAPPING
-	 * to check which VMID the current process is mapped to
-	 * and flush TLB for this VMID if found*/
-	if (dev->device_info->asic_family >= CHIP_VEGA10)
-		spin_lock(&dev->tlb_invalidation_lock);
-
-	for (vmid = first_vmid_to_scan; vmid <= last_vmid_to_scan; vmid++) {
-		if (f2g->get_atc_vmid_pasid_mapping_valid(
-			dev->kgd, vmid)) {
-			if (f2g->get_atc_vmid_pasid_mapping_pasid(
-				dev->kgd, vmid) == pasid) {
-				dev_dbg(kfd_device,
-					"flushing TLB of vmid %u", vmid);
-				f2g->write_vmid_invalidate_request(
-					dev->kgd, vmid);
-				break;
-			}
-		}
-	}
-
-	if (dev->device_info->asic_family >= CHIP_VEGA10)
-		spin_unlock(&dev->tlb_invalidation_lock);
-
+	f2g->invalidate_tlbs(dev->kgd, pasid);
 }
