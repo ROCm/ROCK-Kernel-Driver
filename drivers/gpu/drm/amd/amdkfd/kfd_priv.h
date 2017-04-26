@@ -577,7 +577,7 @@ struct qcm_process_device {
 /* KFD Memory Eviction */
 struct kfd_eviction_work {
 	struct delayed_work dwork;
-	struct dma_fence *eviction_fence;
+	struct dma_fence *quiesce_fence;
 };
 
 /* Approx. wait time before attempting to restore evicted BOs */
