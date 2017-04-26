@@ -395,7 +395,8 @@ static int gmc_v7_0_mc_init(struct amdgpu_device *adev)
 		 * in visible VRAM and the address space. Use at most
 		 * half of each. */
 		uint64_t max_gtt_size = min(
-			adev->mc.visible_vram_size / 8 * PAGE_SIZE / 2,
+			adev->mc.visible_vram_size / 8 *
+				AMDGPU_GPU_PAGE_SIZE / 2,
 			1ULL << 39);
 
 		si_meminfo(&si);
