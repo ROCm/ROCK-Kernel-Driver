@@ -942,6 +942,7 @@ static void find_system_memory(const struct dmi_header *dm,
  */
 static int kfd_add_perf_to_topology(struct kfd_topology_device *kdev)
 {
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 	struct kfd_perf_properties *props;
 
 	if (amd_iommu_pc_supported()) {
@@ -953,6 +954,7 @@ static int kfd_add_perf_to_topology(struct kfd_topology_device *kdev)
 			amd_iommu_pc_get_max_counters(0); /* assume one iommu */
 		list_add_tail(&props->list, &kdev->perf_props);
 	}
+#endif
 
 	return 0;
 }
