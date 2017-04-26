@@ -680,6 +680,7 @@ static int kfd_fill_gpu_cache_info(struct kfd_dev *kdev,
  *
  * Return 0 if successful else return -ve value
  */
+#ifdef CONFIG_ACPI
 int kfd_create_crat_image_acpi(void **crat_image, size_t *size)
 {
 	struct acpi_table_header *crat_table;
@@ -722,6 +723,7 @@ int kfd_create_crat_image_acpi(void **crat_image, size_t *size)
 
 	return 0;
 }
+#endif
 
 /* Memory required to create Virtual CRAT.
  * Since there is no easy way to predict the amount of memory required, the
@@ -867,13 +869,15 @@ static int kfd_fill_iolink_info_for_cpu(int numa_node_id, int *avail_size,
 static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 {
 	struct crat_header *crat_table = (struct crat_header *)pcrat_image;
-	struct acpi_table_header *acpi_table;
-	acpi_status status;
 	struct crat_subtype_generic *sub_type_hdr;
 	int avail_size = *size;
 	int numa_node_id;
 	uint32_t entries = 0;
 	int ret = 0;
+#ifdef CONFIG_ACPI
+	struct acpi_table_header *acpi_table;
+	acpi_status status;
+#endif
 
 	if (pcrat_image == NULL || avail_size < VCRAT_SIZE_FOR_CPU)
 		return -EINVAL;
@@ -889,6 +893,7 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 	memcpy(&crat_table->signature, CRAT_SIGNATURE, sizeof(crat_table->signature));
 	crat_table->length = sizeof(struct crat_header);
 
+#ifdef CONFIG_ACPI
 	status = acpi_get_table("DSDT", 0, &acpi_table);
 	if (status == AE_NOT_FOUND)
 		pr_warn("DSDT table not found for OEM information\n");
@@ -897,6 +902,11 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 		memcpy(crat_table->oem_id, acpi_table->oem_id, CRAT_OEMID_LENGTH);
 		memcpy(crat_table->oem_table_id, acpi_table->oem_table_id, CRAT_OEMTABLEID_LENGTH);
 	}
+#else
+	crat_table->oem_revision = 0;
+	memcpy(crat_table->oem_id, "INV", CRAT_OEMID_LENGTH);
+	memcpy(crat_table->oem_table_id, "UNAVAIL", CRAT_OEMTABLEID_LENGTH);
+#endif
 	crat_table->total_entries = 0;
 	crat_table->num_domains = 0;
 
