@@ -1,7 +1,7 @@
 #include <linux/kernel.h>
 #include <linux/acpi.h>
 #include <linux/mm.h>
-#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 #include <linux/amd-iommu.h>
 #endif
 #include <linux/pci.h>
@@ -121,7 +121,7 @@ static void kfd_populated_cu_info_cpu(struct kfd_topology_device *dev,
 
 	dev->node_props.cpu_cores_count = cu->num_cpu_cores;
 	dev->node_props.cpu_core_id_base = cu->processor_id_low;
-#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 	if (cu->hsa_capability & CRAT_CU_FLAGS_IOMMU_PRESENT)
 		dev->node_props.capability |= HSA_CAP_ATS_PRESENT;
 #endif
@@ -1068,15 +1068,13 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	struct crat_subtype_generic *sub_type_hdr;
 	struct crat_subtype_computeunit *cu;
 	struct kfd_cu_info cu_info;
-#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
-	struct amd_iommu_device_info iommu_info;
-#endif
 	int avail_size = *size;
 	uint32_t total_num_of_cu;
 	int num_of_cache_entries = 0;
 	int cache_mem_filled = 0;
 	int ret = 0;
-#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
+	struct amd_iommu_device_info iommu_info;
 	const u32 required_iommu_flags = AMD_IOMMU_DEVICE_FLAG_ATS_SUP |
 								AMD_IOMMU_DEVICE_FLAG_PRI_SUP |
 								AMD_IOMMU_DEVICE_FLAG_PASID_SUP;
@@ -1136,9 +1134,9 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 
 	cu->hsa_capability = 0;
 
-#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 	/* Check if this node supports IOMMU. During parsing this flag will
 	 * translate to HSA_CAP_ATS_PRESENT */
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 	iommu_info.flags = 0;
 	if (0 == amd_iommu_device_info(kdev->pdev, &iommu_info)) {
 		if ((iommu_info.flags & required_iommu_flags) == required_iommu_flags)

@@ -25,7 +25,7 @@
 #include <linux/sched.h>
 #include <linux/sched/mm.h>
 #include <linux/slab.h>
-#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 #include <linux/amd-iommu.h>
 #endif
 #include <linux/notifier.h>
@@ -368,6 +368,7 @@ static void kfd_process_wq_release(struct work_struct *work)
 {
 	struct kfd_process *p = container_of(work, struct kfd_process,
 					     release_work);
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 	struct kfd_process_device *pdd;
 
 	pr_debug("Releasing process (pasid %d)\n",
@@ -377,7 +378,6 @@ static void kfd_process_wq_release(struct work_struct *work)
 		pr_debug("Releasing pdd (topology id %d) for process (pasid %d)\n",
 				pdd->dev->id, p->pasid);
 
-#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 		if (pdd->dev->device_info->is_need_iommu_device) {
 			if (pdd->bound == PDD_BOUND) {
 				amd_iommu_unbind_pasid(pdd->dev->pdev,
@@ -385,8 +385,8 @@ static void kfd_process_wq_release(struct work_struct *work)
 				pdd->bound = PDD_UNBOUND;
 			}
 		}
-#endif
 	}
+#endif
 
 	kfd_process_free_outstanding_kfd_bos(p);
 
@@ -691,7 +691,6 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 							struct kfd_process *p)
 {
 	struct kfd_process_device *pdd;
-	int err;
 
 	pdd = kfd_get_process_device_data(dev, p);
 	if (!pdd) {
@@ -707,9 +706,10 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 		return ERR_PTR(-EINVAL);
 	}
 
-#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 	if (dev->device_info->is_need_iommu_device) {
-		err = amd_iommu_bind_pasid(dev->pdev, p->pasid, p->lead_thread);
+		int err = amd_iommu_bind_pasid(dev->pdev, p->pasid,
+					       p->lead_thread);
 		if (err < 0)
 			return ERR_PTR(err);
 	}
@@ -720,7 +720,7 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 	return pdd;
 }
 
-#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 int kfd_bind_processes_to_device(struct kfd_dev *dev)
 {
 	struct kfd_process_device *pdd;
@@ -820,7 +820,7 @@ void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid)
 
 	kfd_unref_process(p);
 }
-#endif
+#endif /* CONFIG_AMD_IOMMU_V2 */
 
 struct kfd_process_device *kfd_get_first_process_device_data(struct kfd_process *p)
 {
