@@ -764,9 +764,11 @@ void kfd_unref_process(struct kfd_process *p);
 
 struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 						struct kfd_process *p);
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 int kfd_bind_processes_to_device(struct kfd_dev *dev);
 void kfd_unbind_processes_from_device(struct kfd_dev *dev);
 void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid);
+#endif
 struct kfd_process_device *kfd_get_process_device_data(struct kfd_dev *dev,
 							struct kfd_process *p);
 struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
@@ -1042,9 +1044,11 @@ int kfd_wait_on_events(struct kfd_process *p,
 		       bool all, uint32_t user_timeout_ms,
 		       enum kfd_event_wait_result *wait_result);
 void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id, uint32_t valid_id_bits);
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 void kfd_signal_iommu_event(struct kfd_dev *dev,
 		unsigned int pasid, unsigned long address,
 		bool is_write_requested, bool is_execute_requested);
+#endif
 void kfd_signal_hw_exception_event(unsigned int pasid);
 int kfd_set_event(struct kfd_process *p, uint32_t event_id);
 int kfd_reset_event(struct kfd_process *p, uint32_t event_id);
