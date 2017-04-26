@@ -564,6 +564,14 @@ static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 
 	/* Unless the user has overridden it, compute the GART size */
 	if (amdgpu_gart_size == -1) {
+		/* Maximum GTT size is limited by the GART table size
+		 * in visible VRAM and the address space. Use at most
+		 * half of each. */
+		uint64_t max_gtt_size = min(
+			adev->mc.visible_vram_size / 8 *
+				AMDGPU_GPU_PAGE_SIZE / 2,
+			1ULL << 39);
+
 		si_meminfo(&si);
 		/* Set the GART to map the largest size between either
 		 * VRAM capacity or double the available physical RAM
