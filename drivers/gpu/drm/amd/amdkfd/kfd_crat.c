@@ -299,7 +299,7 @@ static int kfd_parse_subtype_cache(struct crat_subtype_cache *cache,
 static int kfd_parse_subtype_iolink(struct crat_subtype_iolink *iolink,
 					struct list_head *device_list)
 {
-	struct kfd_iolink_properties *props, *props2;
+	struct kfd_iolink_properties *props = NULL, *props2;
 	struct kfd_topology_device *dev, *cpu_dev;
 	uint32_t id_from;
 	uint32_t id_to;
