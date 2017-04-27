@@ -2260,6 +2260,10 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	struct amd_sched_rq *rq;
 	int r, i;
 
+	/* Temporary use only the first VM manager */
+	unsigned vmhub = 0; /*ring->funcs->vmhub;*/
+	struct amdgpu_vm_id_manager *id_mgr = &adev->vm_manager.id_mgr[vmhub];
+
 	vm->va = RB_ROOT;
 	vm->client_id = atomic64_inc_return(&adev->vm_manager.client_counter);
 	for (i = 0; i < AMDGPU_MAX_VMHUBS; i++)
@@ -2301,7 +2305,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 
 	vm->is_kfd_vm = is_kfd_vm;
 	if (is_kfd_vm) {
-		mutex_lock(&adev->vm_manager.lock);
+		mutex_lock(&id_mgr->lock);
 
 		if ((adev->vm_manager.n_kfd_vms++ == 0) &&
 			(!amdgpu_sriov_vf(adev))) {
@@ -2313,7 +2317,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 				adev->pm.funcs->switch_power_profile(adev,
 						AMD_PP_COMPUTE_PROFILE);
 		}
-		mutex_unlock(&adev->vm_manager.lock);
+		mutex_unlock(&id_mgr->lock);
 	}
 
 	return 0;
@@ -2367,8 +2371,12 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	bool prt_fini_needed = !!adev->gart.gart_funcs->set_prt;
 	int i;
 
+	/* Temporary use only the first VM manager */
+	unsigned vmhub = 0; /*ring->funcs->vmhub;*/
+	struct amdgpu_vm_id_manager *id_mgr = &adev->vm_manager.id_mgr[vmhub];
+
 	if (vm->is_kfd_vm) {
-		mutex_lock(&adev->vm_manager.lock);
+		mutex_lock(&id_mgr->lock);
 
 		WARN(adev->vm_manager.n_kfd_vms == 0, "Unbalanced number of KFD VMs");
 
@@ -2382,7 +2390,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 				adev->pm.funcs->switch_power_profile(adev,
 						AMD_PP_GFX_PROFILE);
 		}
-		mutex_unlock(&adev->vm_manager.lock);
+		mutex_unlock(&id_mgr->lock);
 	}
 
 	amd_sched_entity_fini(vm->entity.sched, &vm->entity);
