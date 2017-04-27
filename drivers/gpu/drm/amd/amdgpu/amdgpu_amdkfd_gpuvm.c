@@ -27,6 +27,7 @@
 #include <linux/uaccess.h>
 #include <linux/firmware.h>
 #include <linux/list.h>
+#include <linux/sched/mm.h>
 #include <drm/drmP.h>
 #include <linux/dma-buf.h>
 #include "amdgpu_amdkfd.h"
