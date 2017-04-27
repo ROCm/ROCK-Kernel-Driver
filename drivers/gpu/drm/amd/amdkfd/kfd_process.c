@@ -24,6 +24,7 @@
 #include <linux/log2.h>
 #include <linux/sched.h>
 #include <linux/sched/mm.h>
+#include <linux/sched/task.h>
 #include <linux/slab.h>
 #if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 #include <linux/amd-iommu.h>

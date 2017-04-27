@@ -25,7 +25,7 @@
 #include <linux/types.h>
 #include <linux/sched/signal.h>
 #include <linux/uaccess.h>
-#include <linux/mm.h>
+#include <linux/sched/mm.h>
 #include <linux/mman.h>
 #include <linux/memory.h>
 #include "kfd_priv.h"
