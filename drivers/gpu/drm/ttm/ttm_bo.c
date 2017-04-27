@@ -368,6 +368,7 @@ moved:
 	else
 		bo->offset = 0;
 
+	ctx->bytes_moved += bo->num_pages << PAGE_SHIFT;
 	return 0;
 
 out_err:
