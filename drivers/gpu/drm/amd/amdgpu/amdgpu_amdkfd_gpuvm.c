@@ -970,6 +970,13 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev,
 					kvm->process_info->eviction_fence,
 					NULL, NULL);
 
+	ret = amdgpu_vm_alloc_pts(adev, entry->bo_va->vm, entry->va,
+				  amdgpu_bo_size(bo));
+	if (ret) {
+		pr_err("Failed to allocate pts, err=%d\n", ret);
+		return ret;
+	}
+
 	/* Set virtual address for the allocation, allocate PTs,
 	 * if needed, and zero them.
 	 */
