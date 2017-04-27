@@ -429,7 +429,7 @@ static int amdgpu_amdkfd_validate(void *param, struct amdgpu_bo *bo)
 
 static int vm_validate_pt_pd_bos(struct amdgpu_vm *vm)
 {
-	struct amdgpu_bo *pd = vm->page_directory;
+	struct amdgpu_bo *pd = vm->root.bo;
 	struct amdgpu_device *adev = amdgpu_ttm_adev(pd->tbo.bdev);
 	struct amdgpu_vm_parser param;
 	int ret;
@@ -874,7 +874,7 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 	struct amdgpu_bo_va *bo_va = entry->bo_va;
 	struct amdgpu_vm *vm = bo_va->vm;
 	struct amdkfd_vm *kvm = container_of(vm, struct amdkfd_vm, base);
-	struct amdgpu_bo *pd = vm->page_directory;
+	struct amdgpu_bo *pd = vm->root.bo;
 
 	/* Remove eviction fence from PD (and thereby from PTs too as they
 	 * share the resv. object. Otherwise during PT update job (see
@@ -919,13 +919,13 @@ static int update_gpuvm_pte(struct amdgpu_device *adev,
 	bo = bo_va->bo;
 
 	/* Update the page directory */
-	ret = amdgpu_vm_update_page_directory(adev, vm);
+	ret = amdgpu_vm_update_directories(adev, vm);
 	if (ret != 0) {
-		pr_err("amdgpu_vm_update_page_directory failed\n");
+		pr_err("amdgpu_vm_update_directories failed\n");
 		return ret;
 	}
 
-	amdgpu_sync_fence(adev, sync, vm->page_directory_fence);
+	amdgpu_sync_fence(adev, sync, vm->last_dir_update);
 
 	/* Update the page tables  */
 	ret = amdgpu_vm_bo_update(adev, bo_va, false);
@@ -959,7 +959,7 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev,
 	struct amdgpu_bo *bo = entry->bo_va->bo;
 	struct amdkfd_vm *kvm = container_of(entry->bo_va->vm,
 					     struct amdkfd_vm, base);
-	struct amdgpu_bo *pd = entry->bo_va->vm->page_directory;
+	struct amdgpu_bo *pd = entry->bo_va->vm->root.bo;
 
 	/* Remove eviction fence from PD (and thereby from PTs too as they
 	 * share the resv. object. This is necessary because new PTs are
@@ -1329,14 +1329,14 @@ static u64 get_vm_pd_gpu_offset(void *vm)
 {
 	struct amdgpu_vm *avm = (struct amdgpu_vm *) vm;
 	struct amdgpu_device *adev =
-		amdgpu_ttm_adev(avm->page_directory->tbo.bdev);
+		amdgpu_ttm_adev(avm->root.bo->tbo.bdev);
 	u64 offset;
 
-	amdgpu_bo_reserve(avm->page_directory, false);
+	amdgpu_bo_reserve(avm->root.bo, false);
 
-	offset = amdgpu_bo_gpu_offset(avm->page_directory);
+	offset = amdgpu_bo_gpu_offset(avm->root.bo);
 
-	amdgpu_bo_unreserve(avm->page_directory);
+	amdgpu_bo_unreserve(avm->root.bo);
 
 	/* On some ASICs the FB doesn't start at 0. Adjust FB offset
 	 * to an actual MC address.
@@ -1439,7 +1439,7 @@ void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 
 	pr_debug("Destroying process vm %p\n", vm);
 	/* Release eviction fence from PD */
-	pd = avm->page_directory;
+	pd = avm->root.bo;
 	amdgpu_bo_reserve(pd, false);
 	amdgpu_bo_fence(pd, NULL, false);
 	amdgpu_bo_unreserve(pd);
