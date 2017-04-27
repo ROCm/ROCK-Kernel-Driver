@@ -494,7 +494,7 @@ static int update_mqd_hiq(struct mqd_manager *mm, void *mqd,
 
 static int debugfs_show_mqd(struct seq_file *m, void *data)
 {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 0, 0)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 0, 0) && !defined(OS_NAME_RHEL_7_2)
 	seq_hex_dump(m, "    ", DUMP_PREFIX_OFFSET, 32, 4,
 		     data, sizeof(struct cik_mqd), false);
 #endif
@@ -503,7 +503,7 @@ static int debugfs_show_mqd(struct seq_file *m, void *data)
 
 static int debugfs_show_mqd_sdma(struct seq_file *m, void *data)
 {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 0, 0)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 0, 0) && !defined(OS_NAME_RHEL_7_2)
 	seq_hex_dump(m, "    ", DUMP_PREFIX_OFFSET, 32, 4,
 		     data, sizeof(struct cik_sdma_rlc_registers), false);
 #endif
