@@ -847,31 +847,12 @@ struct drm_amdgpu_info_device {
 	__u32 gc_double_offchip_lds_buf;
 	/* NGG Primitive Buffer */
 	__u64 prim_buf_gpu_addr;
-	__u32 prim_buf_size;
 	/* NGG Position Buffer */
 	__u64 pos_buf_gpu_addr;
-	__u32 pos_buf_size;
 	/* NGG Control Sideband */
 	__u64 cntl_sb_buf_gpu_addr;
-	__u32 cntl_sb_buf_size;
 	/* NGG Parameter Cache */
 	__u64 param_buf_gpu_addr;
-	__u32 param_buf_size;
-	/* wavefront size*/
-	__u32 wave_front_size;
-	/* shader visible vgprs*/
-	__u32 num_shader_visible_vgprs;
-	/* CU per shader array*/
-	__u32 num_cu_per_sh;
-	/* number of tcc blocks*/
-	__u32 num_tcc_blocks;
-	/* gs vgt table depth*/
-	__u32 gs_vgt_table_depth;
-	/* gs primitive buffer depth*/
-	__u32 gs_prim_buffer_depth;
-	/* max gs wavefront per vgt*/
-	__u32 max_gs_waves_per_vgt;
-
 };
 
 struct drm_amdgpu_info_hw_ip {
