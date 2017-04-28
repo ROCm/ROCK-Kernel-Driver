@@ -123,7 +123,9 @@ static void kfd_release_topology_device(struct kfd_topology_device *dev)
 	struct kfd_mem_properties *mem;
 	struct kfd_cache_properties *cache;
 	struct kfd_iolink_properties *iolink;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 	struct kfd_perf_properties *perf;
+#endif
 
 	list_del(&dev->list);
 
@@ -148,12 +150,14 @@ static void kfd_release_topology_device(struct kfd_topology_device *dev)
 		kfree(iolink);
 	}
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 	while (dev->perf_props.next != &dev->perf_props) {
 		perf = container_of(dev->perf_props.next,
 				struct kfd_perf_properties, list);
 		list_del(&perf->list);
 		kfree(perf);
 	}
+#endif
 
 	kfree(dev);
 }
@@ -189,7 +193,9 @@ struct kfd_topology_device *kfd_create_topology_device(
 	INIT_LIST_HEAD(&dev->mem_props);
 	INIT_LIST_HEAD(&dev->cache_props);
 	INIT_LIST_HEAD(&dev->io_link_props);
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 	INIT_LIST_HEAD(&dev->perf_props);
+#endif
 
 	list_add_tail(&dev->list, device_list);
 
@@ -369,6 +375,7 @@ static struct kobj_type cache_type = {
 	.sysfs_ops = &cache_ops,
 };
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 /****** Sysfs of Performance Counters ******/
 
 struct kfd_perf_attr {
@@ -401,6 +408,7 @@ static struct kfd_perf_attr perf_attr_iommu[] = {
 	KFD_PERF_DESC(counter_ids, 0),
 };
 /****************************************/
+#endif
 
 static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 		char *buffer)
@@ -544,7 +552,9 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 	struct kfd_iolink_properties *iolink;
 	struct kfd_cache_properties *cache;
 	struct kfd_mem_properties *mem;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 	struct kfd_perf_properties *perf;
+#endif
 
 	if (dev->kobj_iolink) {
 		list_for_each_entry(iolink, &dev->io_link_props, list)
@@ -586,6 +596,7 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 		dev->kobj_mem = NULL;
 	}
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 	if (dev->kobj_perf) {
 		list_for_each_entry(perf, &dev->perf_props, list) {
 			kfree(perf->attr_group);
@@ -595,6 +606,7 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 		kobject_put(dev->kobj_perf);
 		dev->kobj_perf = NULL;
 	}
+#endif
 
 	if (dev->kobj_node) {
 		sysfs_remove_file(dev->kobj_node, &dev->attr_gpuid);
@@ -612,10 +624,13 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 	struct kfd_iolink_properties *iolink;
 	struct kfd_cache_properties *cache;
 	struct kfd_mem_properties *mem;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 	struct kfd_perf_properties *perf;
-	int ret;
-	uint32_t i, num_attrs;
+	uint32_t num_attrs;
 	struct attribute **attrs;
+#endif
+	int ret;
+	uint32_t i;
 
 	if (WARN_ON(dev->kobj_node))
 		return -EEXIST;
@@ -644,9 +659,11 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 	if (!dev->kobj_iolink)
 		return -ENOMEM;
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 	dev->kobj_perf = kobject_create_and_add("perf", dev->kobj_node);
 	if (!dev->kobj_perf)
 		return -ENOMEM;
+#endif
 
 	/*
 	 * Creating sysfs files for node properties
@@ -738,6 +755,7 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 		i++;
 	}
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 	/* All hardware blocks have the same number of attributes. */
 	num_attrs = sizeof(perf_attr_iommu)/sizeof(struct kfd_perf_attr);
 	list_for_each_entry(perf, &dev->perf_props, list) {
@@ -763,6 +781,7 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 		if (ret < 0)
 			return ret;
 	}
+#endif
 
 	return 0;
 }
@@ -929,6 +948,7 @@ static void find_system_memory(const struct dmi_header *dm,
 	}
 }
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 /*
  * Performance counters information is not part of CRAT but we would like to
  * put them in the sysfs under topology directory for Thunk to get the data.
@@ -939,6 +959,7 @@ static int kfd_add_perf_to_topology(struct kfd_topology_device *kdev)
 	/* These are the only counters supported so far */
 	return kfd_iommu_add_perf_counters(kdev);
 }
+#endif
 
 /* kfd_add_non_crat_information - Add information that is not currently
  *	defined in CRAT but is necessary for KFD topology
@@ -1045,9 +1066,12 @@ int kfd_topology_init(void)
 			goto err;
 		}
 	}
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 	kdev = list_first_entry(&temp_topology_device_list,
 				struct kfd_topology_device, list);
 	kfd_add_perf_to_topology(kdev);
+#endif
 
 	down_write(&topology_lock);
 	kfd_topology_update_device_list(&temp_topology_device_list,
