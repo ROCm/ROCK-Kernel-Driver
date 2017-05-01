@@ -1157,52 +1157,6 @@ alloc_memory_of_scratch_failed:
 	return -EFAULT;
 }
 
-static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
-					struct kfd_process *p, void *data)
-{
-	struct kfd_ioctl_alloc_memory_of_gpu_args *args = data;
-	struct kfd_process_device *pdd;
-	void *mem;
-	struct kfd_dev *dev;
-	int idr_handle;
-	long err;
-
-	if (args->size == 0)
-		return -EINVAL;
-
-	dev = kfd_device_by_id(args->gpu_id);
-	if (dev == NULL)
-		return -EINVAL;
-
-	down_write(&p->lock);
-	pdd = kfd_bind_process_to_device(dev, p);
-	up_write(&p->lock);
-	if (IS_ERR(pdd))
-		return PTR_ERR(pdd);
-
-	err = dev->kfd2kgd->alloc_memory_of_gpu(
-		dev->kgd, args->va_addr, args->size,
-		pdd->vm, (struct kgd_mem **) &mem, NULL, NULL, 0);
-
-	if (err != 0)
-		return err;
-
-	down_write(&p->lock);
-	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
-			args->va_addr, args->size, NULL);
-	up_write(&p->lock);
-	if (idr_handle < 0) {
-		dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
-						 (struct kgd_mem *) mem,
-						 pdd->vm);
-		return -EFAULT;
-	}
-
-	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
-
-	return 0;
-}
-
 bool kfd_is_large_bar(struct kfd_dev *dev)
 {
 	struct kfd_local_mem_info mem_info;
@@ -1222,6 +1176,8 @@ bool kfd_is_large_bar(struct kfd_dev *dev)
 	return false;
 }
 
+/* TODO: Remove this once the Thunk has transitioned to
+ * AMDKFD_IOC_ALLOC_MEMORY_OF_GPU */
 static uint32_t kfd_convert_user_mem_alloction_flags(
 		struct kfd_dev *dev,
 		uint32_t userspace_flags)
@@ -1288,17 +1244,16 @@ out:
 	return kernel_allocation_flags;
 }
 
-static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
+static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 					struct kfd_process *p, void *data)
 {
-	struct kfd_ioctl_alloc_memory_of_gpu_new_args *args = data;
+	struct kfd_ioctl_alloc_memory_of_gpu_args *args = data;
 	struct kfd_process_device *pdd;
 	void *mem;
 	struct kfd_dev *dev;
 	int idr_handle;
 	long err;
 	uint64_t offset;
-	uint32_t alloc_flags = 0;
 
 	if (args->size == 0)
 		return -EINVAL;
@@ -1313,19 +1268,17 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	if (IS_ERR(pdd))
 		return PTR_ERR(pdd);
 
-	if (args->flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL_OLD) {
+	if (args->flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
 		if (args->size != kfd_doorbell_process_slice(dev))
 			return -EINVAL;
 		offset = kfd_get_process_doorbells(dev, p);
 	} else
 		offset = args->mmap_offset;
 
-	alloc_flags = kfd_convert_user_mem_alloction_flags(dev, args->flags);
-
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
 		pdd->vm, (struct kgd_mem **) &mem, &offset,
-		NULL, alloc_flags);
+		NULL, args->flags);
 
 	if (err != 0)
 		return err;
@@ -1342,7 +1295,7 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	}
 
 	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
-	if ((args->flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE) != 0 &&
+	if ((args->flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) != 0 &&
 			!kfd_is_large_bar(dev)) {
 		args->mmap_offset = 0;
 	} else {
@@ -1353,6 +1306,40 @@ static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
 	}
 
 	return 0;
+}
+
+/* TODO: Remove this once the Thunk has transitioned to
+ * AMDKFD_IOC_ALLOC_MEMORY_OF_GPU */
+static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
+					struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_alloc_memory_of_gpu_new_args *new_args = data;
+	struct kfd_ioctl_alloc_memory_of_gpu_args args;
+	struct kfd_dev *dev;
+	uint32_t flags;
+	int ret;
+
+	dev = kfd_device_by_id(new_args->gpu_id);
+	if (dev == NULL)
+		return -EINVAL;
+	/* New ioctl flags match kfd2kgd API */
+	flags = kfd_convert_user_mem_alloction_flags(dev, new_args->flags);
+
+	/* copy input arguments, adjusting the ABI */
+	args.va_addr = new_args->va_addr;
+	args.size = new_args->size;
+	args.handle = new_args->handle;
+	args.mmap_offset = new_args->mmap_offset;
+	args.gpu_id = new_args->gpu_id;
+	args.flags = flags;
+
+	ret = kfd_ioctl_alloc_memory_of_gpu(filep, p, &args);
+
+	/* copy output arguments */
+	new_args->handle = args.handle;
+	new_args->mmap_offset = args.mmap_offset;
+
+	return ret;
 }
 
 static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
@@ -1426,7 +1413,7 @@ int kfd_map_memory_to_gpu(void *mem, struct kfd_process_device *pdd)
 static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 					struct kfd_process *p, void *data)
 {
-	struct kfd_ioctl_map_memory_to_gpu_new_args *args = data;
+	struct kfd_ioctl_map_memory_to_gpu_args *args = data;
 	struct kfd_process_device *pdd, *peer_pdd;
 	void *mem;
 	struct kfd_dev *dev, *peer;
@@ -1451,7 +1438,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 			return -ENOMEM;
 
 		err = copy_from_user(devices_arr,
-				(void __user *)args->device_ids_array,
+				(void __user *)args->device_ids_array_ptr,
 				args->device_ids_array_size);
 		if (err != 0) {
 			err = -EFAULT;
@@ -1516,17 +1503,19 @@ copy_from_user_failed:
 	return err;
 }
 
-static int kfd_ioctl_map_memory_to_gpu_wrapper(struct file *filep,
+/* TODO: Remove this once the Thunk has transitioned to
+ * AMDKFD_IOC_MAP_MEMORY_TO_GPU */
+static int kfd_ioctl_map_memory_to_gpu_new(struct file *filep,
 					struct kfd_process *p, void *data)
 {
-	struct kfd_ioctl_map_memory_to_gpu_args *args = data;
-	struct kfd_ioctl_map_memory_to_gpu_new_args new_args;
+	struct kfd_ioctl_map_memory_to_gpu_new_args *new_args = data;
+	struct kfd_ioctl_map_memory_to_gpu_args args;
 
-	new_args.handle = args->handle;
-	new_args.device_ids_array = NULL;
-	new_args.device_ids_array_size = 0;
+	args.handle = new_args->handle;
+	args.device_ids_array_ptr = (uint64_t)new_args->device_ids_array;
+	args.device_ids_array_size = new_args->device_ids_array_size;
 
-	return kfd_ioctl_map_memory_to_gpu(filep, p, &new_args);
+	return kfd_ioctl_map_memory_to_gpu(filep, p, &args);
 }
 
 int kfd_unmap_memory_from_gpu(void *mem, struct kfd_process_device *pdd)
@@ -1548,7 +1537,7 @@ int kfd_unmap_memory_from_gpu(void *mem, struct kfd_process_device *pdd)
 static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 					struct kfd_process *p, void *data)
 {
-	struct kfd_ioctl_unmap_memory_from_gpu_new_args *args = data;
+	struct kfd_ioctl_unmap_memory_from_gpu_args *args = data;
 	struct kfd_process_device *pdd, *peer_pdd;
 	void *mem;
 	struct kfd_dev *dev, *peer;
@@ -1572,7 +1561,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 			return -ENOMEM;
 
 		err = copy_from_user(devices_arr,
-				(void __user *)args->device_ids_array,
+				(void __user *)args->device_ids_array_ptr,
 				args->device_ids_array_size);
 		if (err != 0) {
 			err = -EFAULT;
@@ -1629,17 +1618,19 @@ copy_from_user_failed:
 	return err;
 }
 
-static int kfd_ioctl_unmap_memory_from_gpu_wrapper(struct file *filep,
+/* TODO: Remove this once the Thunk has transitioned to
+ * AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU */
+static int kfd_ioctl_unmap_memory_from_gpu_new(struct file *filep,
 					struct kfd_process *p, void *data)
 {
-	struct kfd_ioctl_unmap_memory_from_gpu_args *args = data;
-	struct kfd_ioctl_unmap_memory_from_gpu_new_args new_args;
+	struct kfd_ioctl_unmap_memory_from_gpu_new_args *new_args = data;
+	struct kfd_ioctl_unmap_memory_from_gpu_args args;
 
-	new_args.handle = args->handle;
-	new_args.device_ids_array = NULL;
-	new_args.device_ids_array_size = 0;
+	args.handle = new_args->handle;
+	args.device_ids_array_ptr = (uint64_t)new_args->device_ids_array;
+	args.device_ids_array_size = new_args->device_ids_array_size;
 
-	return kfd_ioctl_unmap_memory_from_gpu(filep, p, &new_args);
+	return kfd_ioctl_unmap_memory_from_gpu(filep, p, &args);
 }
 
 static int kfd_ioctl_open_graphic_handle(struct file *filep,
@@ -1764,14 +1755,7 @@ static int kfd_ioctl_get_dmabuf_info(struct file *filep,
 		goto exit;
 	}
 	args->gpu_id = kfd_get_gpu_id(dev);
-
-	/* Translate flags */
-	if (flags & ALLOC_MEM_FLAGS_VRAM) {
-		args->flags = KFD_IS_DGPU(dev->device_info->asic_family) ?
-			KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE :
-			KFD_IOC_ALLOC_MEM_FLAGS_APU_DEVICE;
-	} else
-		args->flags = KFD_IOC_ALLOC_MEM_FLAGS_DGPU_HOST;
+	args->flags = flags;
 
 	/* Copy metadata buffer to user mode */
 	if (metadata_buffer) {
@@ -2188,10 +2172,10 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 			kfd_ioctl_free_memory_of_gpu, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_MAP_MEMORY_TO_GPU,
-			kfd_ioctl_map_memory_to_gpu_wrapper, 0),
+			kfd_ioctl_map_memory_to_gpu, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU,
-			kfd_ioctl_unmap_memory_from_gpu_wrapper, 0),
+			kfd_ioctl_unmap_memory_from_gpu, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_OPEN_GRAPHIC_HANDLE,
 			kfd_ioctl_open_graphic_handle, 0),
@@ -2212,10 +2196,10 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 				kfd_ioctl_alloc_memory_of_gpu_new, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_MAP_MEMORY_TO_GPU_NEW,
-				kfd_ioctl_map_memory_to_gpu, 0),
+				kfd_ioctl_map_memory_to_gpu_new, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU_NEW,
-				kfd_ioctl_unmap_memory_from_gpu, 0),
+				kfd_ioctl_unmap_memory_from_gpu_new, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_PROCESS_APERTURES_NEW,
 				kfd_ioctl_get_process_apertures_new, 0),
