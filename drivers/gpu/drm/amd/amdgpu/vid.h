@@ -366,7 +366,12 @@
 #define	PACKET3_INVALIDATE_TLBS				0x98
 #              define PACKET3_INVALIDATE_TLBS_DST_SEL(x)     ((x) << 0)
 #              define PACKET3_INVALIDATE_TLBS_PASID(x)       ((x) << 5)
-
+#define PACKET3_FRAME_CONTROL				0x90
+#			define FRAME_CMD(x) ((x) << 28)
+			/*
+			 * x=0: tmz_begin
+			 * x=1: tmz_end
+			 */
 #define	PACKET3_SET_RESOURCES				0xA0
 /* 1. header
  * 2. CONTROL
