@@ -1035,11 +1035,14 @@ static int kfd_fill_gpu_direct_io_link(int *avail_size,
 	 * TODO: Fill-in other fields of iolink subtype */
 	sub_type_hdr->io_interface_type = CRAT_IOLINK_TYPE_PCIEXPRESS;
 	sub_type_hdr->proximity_domain_from = proximity_domain;
+#ifdef CONFIG_NUMA
 	if (kdev->pdev->dev.numa_node == NUMA_NO_NODE)
 		sub_type_hdr->proximity_domain_to = 0;
 	else
 		sub_type_hdr->proximity_domain_to = kdev->pdev->dev.numa_node;
-
+#else
+	sub_type_hdr->proximity_domain_to = 0;
+#endif
 	return 0;
 }
 
