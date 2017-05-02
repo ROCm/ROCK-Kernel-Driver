@@ -274,26 +274,10 @@ struct kfd_ioctl_map_memory_to_gpu_args {
 	uint32_t pad;
 };
 
-/* TODO: remove this after KFD and Thunk have been updated */
-struct kfd_ioctl_map_memory_to_gpu_new_args {
-	uint64_t handle;			/* to KFD */
-	uint32_t *device_ids_array;		/* to KFD */
-	uint32_t device_ids_array_size;		/* to KFD */
-	uint32_t pad;
-};
-
 struct kfd_ioctl_unmap_memory_from_gpu_args {
 	uint64_t handle;			/* to KFD */
 	uint64_t device_ids_array_ptr;		/* to KFD */
 	uint32_t device_ids_array_size;		/* to KFD */
-	uint32_t pad;
-};
-
-/* TODO: remove this after KFD and Thunk have been updated */
-struct kfd_ioctl_unmap_memory_from_gpu_new_args {
-	uint64_t handle;	/* to KFD */
-	uint32_t *device_ids_array;             /* to KFD */
-	uint32_t device_ids_array_size;         /* to KFD */
 	uint32_t pad;
 };
 
@@ -313,23 +297,6 @@ struct kfd_ioctl_set_process_dgpu_aperture_args {
 	uint64_t dgpu_limit;
 };
 
-/*
- * GPU Memory allocation flags
- * TODO: remove this after KFD and Thunk have been updated to use the new flags
- */
-#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_HOST		(1 << 0)
-#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE		(1 << 1)
-#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_SCRATCH	(1 << 2)
-#define KFD_IOC_ALLOC_MEM_FLAGS_APU_DEVICE		(1 << 3)
-#define KFD_IOC_ALLOC_MEM_FLAGS_APU_SCRATCH		(1 << 4)
-
-#define KFD_IOC_ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM		(1 << 5)
-#define KFD_IOC_ALLOC_MEM_FLAGS_USERPTR_OLD		(1 << 6)
-#define KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL_OLD		(1 << 7)
-#define KFD_IOC_ALLOC_MEM_FLAGS_COHERENT_OLD		(1 << 8)
-
-/* New GPU memory allocation flags aligned with the cleaner KFD2KGD
- * interface. */
 /*
  * Memory types
  */
@@ -355,16 +322,6 @@ struct kfd_ioctl_alloc_memory_of_gpu_args {
 	uint64_t handle;	/* from KFD */
 	uint64_t mmap_offset;   /* to KFD (userptr), from KFD (mmap offset) */
 	uint32_t gpu_id;	/* to KFD */
-	uint32_t flags;
-};
-
-/* TODO: remove this after KFD and Thunk have been updated */
-struct kfd_ioctl_alloc_memory_of_gpu_new_args {
-	uint64_t va_addr;	/* to KFD */
-	uint64_t size;		/* to KFD */
-	uint64_t handle;	/* from KFD */
-	uint32_t gpu_id;	/* to KFD */
-	uint64_t mmap_offset;   /* to KFD (userptr), from KFD (mmap offset) */
 	uint32_t flags;
 };
 
@@ -548,20 +505,8 @@ struct kfd_ioctl_cross_memory_copy_args {
 		AMDKFD_IOW(0x18,	\
 		struct kfd_ioctl_set_process_dgpu_aperture_args)
 
-/* TODO: Remove this after KFD and Thunk has been updated */
-#define AMDKFD_IOC_ALLOC_MEMORY_OF_GPU_NEW		\
-		AMDKFD_IOWR(0x19, struct kfd_ioctl_alloc_memory_of_gpu_new_args)
-
 #define AMDKFD_IOC_SET_TRAP_HANDLER		\
 		AMDKFD_IOW(0x1a, struct kfd_ioctl_set_trap_handler_args)
-
-/* TODO: Remove this after KFD and Thunk has been updated */
-#define AMDKFD_IOC_MAP_MEMORY_TO_GPU_NEW		\
-		AMDKFD_IOWR(0x1b, struct kfd_ioctl_map_memory_to_gpu_new_args)
-
-/* TODO: Remove this after KFD and Thunk has been updated */
-#define AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU_NEW	\
-		AMDKFD_IOWR(0x1c, struct kfd_ioctl_unmap_memory_from_gpu_new_args)
 
 #define AMDKFD_IOC_GET_PROCESS_APERTURES_NEW	\
 	AMDKFD_IOWR(0x1d, struct kfd_ioctl_get_process_apertures_new_args)
