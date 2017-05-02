@@ -1449,6 +1449,41 @@ out:
 	return retval;
 }
 
+static int get_wave_state(struct device_queue_manager *dqm,
+			  struct queue *q,
+			  void __user *ctl_stack,
+			  u32 *ctl_stack_used_size,
+			  u32 *save_area_used_size)
+{
+	struct mqd_manager *mqd;
+	int r;
+
+	mutex_lock(&dqm->lock);
+
+	if (q->properties.type != KFD_QUEUE_TYPE_COMPUTE ||
+	    q->properties.is_active || !q->device->cwsr_enabled) {
+		r = -EINVAL;
+		goto dqm_unlock;
+	}
+
+	mqd = dqm->ops.get_mqd_manager(dqm, KFD_MQD_TYPE_COMPUTE);
+	if (!mqd) {
+		r = -ENOMEM;
+		goto dqm_unlock;
+	}
+
+	if (!mqd->get_wave_state) {
+		r = -EINVAL;
+		goto dqm_unlock;
+	}
+
+	r = mqd->get_wave_state(mqd, q->mqd, ctl_stack, ctl_stack_used_size,
+				save_area_used_size);
+
+dqm_unlock:
+	mutex_unlock(&dqm->lock);
+	return r;
+}
 
 static int process_termination_cpsch(struct device_queue_manager *dqm,
 		struct qcm_process_device *qpd)
@@ -1553,6 +1588,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		dqm->ops.set_cache_memory_policy = set_cache_memory_policy;
 		dqm->ops.set_trap_handler = set_trap_handler;
 		dqm->ops.process_termination = process_termination_cpsch;
+		dqm->ops.get_wave_state = get_wave_state;
 		break;
 	case KFD_SCHED_POLICY_NO_HWS:
 		/* initialize dqm for no cp scheduling */
@@ -1569,6 +1605,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		dqm->ops.set_cache_memory_policy = set_cache_memory_policy;
 		dqm->ops.set_trap_handler = set_trap_handler;
 		dqm->ops.process_termination = process_termination_nocpsch;
+		dqm->ops.get_wave_state = get_wave_state;
 		break;
 	default:
 		pr_err("Invalid scheduling policy %d\n", dqm->sched_policy);

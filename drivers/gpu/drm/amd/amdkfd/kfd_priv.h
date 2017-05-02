@@ -935,6 +935,11 @@ int pqm_set_cu_mask(struct process_queue_manager *pqm, unsigned int qid,
 			struct queue_properties *p);
 struct kernel_queue *pqm_get_kernel_queue(struct process_queue_manager *pqm,
 						unsigned int qid);
+int pqm_get_wave_state(struct process_queue_manager *pqm,
+		       unsigned int qid,
+		       void __user *ctl_stack,
+		       u32 *ctl_stack_used_size,
+		       u32 *save_area_used_size);
 int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm);
 int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm);
 

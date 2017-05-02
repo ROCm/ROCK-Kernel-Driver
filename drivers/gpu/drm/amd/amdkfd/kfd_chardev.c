@@ -1977,6 +1977,24 @@ copy_from_user_fail:
 	return err;
 }
 
+static int kfd_ioctl_get_queue_wave_state(struct file *filep,
+					  struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_get_queue_wave_state_args *args = data;
+	int r;
+
+	down_read(&p->lock);
+
+	r = pqm_get_wave_state(&p->pqm, args->queue_id,
+			       (void __user *)args->ctl_stack_address,
+			       &args->ctl_stack_used_size,
+			       &args->save_area_used_size);
+
+	up_read(&p->lock);
+
+	return r;
+}
+
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, \
 			    .cmd_drv = 0, .name = #ioctl}
@@ -2077,7 +2095,10 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 				kfd_ioctl_ipc_export_handle, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_CROSS_MEMORY_COPY,
-				kfd_ioctl_cross_memory_copy, 0)
+				kfd_ioctl_cross_memory_copy, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_QUEUE_WAVE_STATE,
+				kfd_ioctl_get_queue_wave_state, 0)
 
 };
 
