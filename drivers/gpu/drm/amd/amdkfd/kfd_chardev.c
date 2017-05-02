@@ -45,9 +45,6 @@
 static long kfd_ioctl(struct file *, unsigned int, unsigned long);
 static int kfd_open(struct inode *, struct file *);
 static int kfd_mmap(struct file *, struct vm_area_struct *);
-static uint32_t kfd_convert_user_mem_alloction_flags(
-		struct kfd_dev *dev,
-		uint32_t userspace_flags);
 static bool kfd_is_large_bar(struct kfd_dev *dev);
 
 static const char kfd_dev_name[] = "kfd";
@@ -1176,74 +1173,6 @@ bool kfd_is_large_bar(struct kfd_dev *dev)
 	return false;
 }
 
-/* TODO: Remove this once the Thunk has transitioned to
- * AMDKFD_IOC_ALLOC_MEMORY_OF_GPU */
-static uint32_t kfd_convert_user_mem_alloction_flags(
-		struct kfd_dev *dev,
-		uint32_t userspace_flags)
-{
-	uint32_t kernel_allocation_flags;
-
-	kernel_allocation_flags = 0;
-
-	/* Allocate VRAM bo */
-	if ((userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE) ||
-		(userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_APU_DEVICE)) {
-		kernel_allocation_flags = ALLOC_MEM_FLAGS_VRAM;
-		if ((userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_DEVICE) &&
-				kfd_is_large_bar(dev))
-			kernel_allocation_flags |= ALLOC_MEM_FLAGS_PUBLIC;
-		goto out;
-	}
-	/*
-	 * Since currently user space library doesn't uses scratch
-	 * allocation flag I route it to VRAM
-	 */
-	if ((userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_SCRATCH) ||
-		(userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_APU_SCRATCH)) {
-		kernel_allocation_flags = ALLOC_MEM_FLAGS_VRAM;
-		goto out;
-	}
-	/*
-	 * The current usage for *_HOST allocation flags are for GTT memory
-	 * Need to verify if we're node zero or we want to allocate bo on
-	 * public domain for P2P buffers.
-	 */
-	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_HOST) {
-		kernel_allocation_flags = ALLOC_MEM_FLAGS_GTT;
-		goto out;
-	}
-	/* Allocate userptr BO */
-	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR_OLD) {
-		kernel_allocation_flags = ALLOC_MEM_FLAGS_USERPTR;
-		goto out;
-	}
-	/* Allocate doorbell BO */
-	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL_OLD) {
-		kernel_allocation_flags = ALLOC_MEM_FLAGS_DOORBELL;
-		goto out;
-	}
-
-out:
-	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_DGPU_AQL_QUEUE_MEM)
-		kernel_allocation_flags |= ALLOC_MEM_FLAGS_AQL_QUEUE_MEM;
-	if (userspace_flags & KFD_IOC_ALLOC_MEM_FLAGS_COHERENT_OLD)
-		kernel_allocation_flags |= ALLOC_MEM_FLAGS_COHERENT;
-	/* Current HW doesn't support non paged memory */
-	kernel_allocation_flags |= ALLOC_MEM_FLAGS_NONPAGED;
-	/*
-	 *  Set by default execute access as this buffer might be allocated
-	 * for CP's ring buffer
-	 */
-	kernel_allocation_flags |= ALLOC_MEM_FLAGS_EXECUTE_ACCESS;
-	kernel_allocation_flags |= ALLOC_MEM_FLAGS_NO_SUBSTITUTE;
-
-	pr_debug("amdkfd: user allocation flags 0x%x kernel allocation flags: 0x%x\n",
-			userspace_flags, kernel_allocation_flags);
-
-	return kernel_allocation_flags;
-}
-
 static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 					struct kfd_process *p, void *data)
 {
@@ -1306,40 +1235,6 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	}
 
 	return 0;
-}
-
-/* TODO: Remove this once the Thunk has transitioned to
- * AMDKFD_IOC_ALLOC_MEMORY_OF_GPU */
-static int kfd_ioctl_alloc_memory_of_gpu_new(struct file *filep,
-					struct kfd_process *p, void *data)
-{
-	struct kfd_ioctl_alloc_memory_of_gpu_new_args *new_args = data;
-	struct kfd_ioctl_alloc_memory_of_gpu_args args;
-	struct kfd_dev *dev;
-	uint32_t flags;
-	int ret;
-
-	dev = kfd_device_by_id(new_args->gpu_id);
-	if (dev == NULL)
-		return -EINVAL;
-	/* New ioctl flags match kfd2kgd API */
-	flags = kfd_convert_user_mem_alloction_flags(dev, new_args->flags);
-
-	/* copy input arguments, adjusting the ABI */
-	args.va_addr = new_args->va_addr;
-	args.size = new_args->size;
-	args.handle = new_args->handle;
-	args.mmap_offset = new_args->mmap_offset;
-	args.gpu_id = new_args->gpu_id;
-	args.flags = flags;
-
-	ret = kfd_ioctl_alloc_memory_of_gpu(filep, p, &args);
-
-	/* copy output arguments */
-	new_args->handle = args.handle;
-	new_args->mmap_offset = args.mmap_offset;
-
-	return ret;
 }
 
 static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
@@ -1503,21 +1398,6 @@ copy_from_user_failed:
 	return err;
 }
 
-/* TODO: Remove this once the Thunk has transitioned to
- * AMDKFD_IOC_MAP_MEMORY_TO_GPU */
-static int kfd_ioctl_map_memory_to_gpu_new(struct file *filep,
-					struct kfd_process *p, void *data)
-{
-	struct kfd_ioctl_map_memory_to_gpu_new_args *new_args = data;
-	struct kfd_ioctl_map_memory_to_gpu_args args;
-
-	args.handle = new_args->handle;
-	args.device_ids_array_ptr = (uint64_t)new_args->device_ids_array;
-	args.device_ids_array_size = new_args->device_ids_array_size;
-
-	return kfd_ioctl_map_memory_to_gpu(filep, p, &args);
-}
-
 int kfd_unmap_memory_from_gpu(void *mem, struct kfd_process_device *pdd)
 {
 	int err;
@@ -1616,21 +1496,6 @@ get_mem_obj_from_handle_failed:
 copy_from_user_failed:
 	kfree(devices_arr);
 	return err;
-}
-
-/* TODO: Remove this once the Thunk has transitioned to
- * AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU */
-static int kfd_ioctl_unmap_memory_from_gpu_new(struct file *filep,
-					struct kfd_process *p, void *data)
-{
-	struct kfd_ioctl_unmap_memory_from_gpu_new_args *new_args = data;
-	struct kfd_ioctl_unmap_memory_from_gpu_args args;
-
-	args.handle = new_args->handle;
-	args.device_ids_array_ptr = (uint64_t)new_args->device_ids_array;
-	args.device_ids_array_size = new_args->device_ids_array_size;
-
-	return kfd_ioctl_unmap_memory_from_gpu(filep, p, &args);
 }
 
 static int kfd_ioctl_open_graphic_handle(struct file *filep,
@@ -2191,15 +2056,6 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_TRAP_HANDLER,
 			kfd_ioctl_set_trap_handler, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ALLOC_MEMORY_OF_GPU_NEW,
-				kfd_ioctl_alloc_memory_of_gpu_new, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_MAP_MEMORY_TO_GPU_NEW,
-				kfd_ioctl_map_memory_to_gpu_new, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU_NEW,
-				kfd_ioctl_unmap_memory_from_gpu_new, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_PROCESS_APERTURES_NEW,
 				kfd_ioctl_get_process_apertures_new, 0),
