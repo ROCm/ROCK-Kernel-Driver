@@ -82,6 +82,14 @@ struct kfd_ioctl_set_cu_mask_args {
 	uint64_t cu_mask_ptr;		/* to KFD */
 };
 
+struct kfd_ioctl_get_queue_wave_state_args {
+	uint64_t ctl_stack_address;	/* to KFD */
+	uint32_t ctl_stack_used_size;	/* from KFD */
+	uint32_t save_area_used_size;	/* from KFD */
+	uint32_t queue_id;		/* to KFD */
+	uint32_t pad;
+};
+
 /* For kfd_ioctl_set_memory_policy_args.default_policy and alternate_policy */
 #define KFD_IOC_CACHE_POLICY_COHERENT 0
 #define KFD_IOC_CACHE_POLICY_NONCOHERENT 1
@@ -526,11 +534,14 @@ struct kfd_ioctl_cross_memory_copy_args {
 #define AMDKFD_IOC_CROSS_MEMORY_COPY		\
 		AMDKFD_IOWR(0x1F, struct kfd_ioctl_cross_memory_copy_args)
 
+#define AMDKFD_IOC_GET_QUEUE_WAVE_STATE		\
+		AMDKFD_IOWR(0x20, struct kfd_ioctl_get_queue_wave_state_args)
+
 /* TODO: remove this */
 #define AMDKFD_IOC_OPEN_GRAPHIC_HANDLE		\
-		AMDKFD_IOWR(0x20, struct kfd_ioctl_open_graphic_handle_args)
+		AMDKFD_IOWR(0x21, struct kfd_ioctl_open_graphic_handle_args)
 
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x21
+#define AMDKFD_COMMAND_END		0x22
 
 #endif
