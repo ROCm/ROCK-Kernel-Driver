@@ -2992,19 +2992,19 @@ static int r100_debugfs_cp_csq_fifo(struct seq_file *m, void *data)
 	seq_printf(m, "Indirect2 wptr %u\n", ib2_wptr);
 	/* FIXME: 0, 128, 640 depends on fifo setup see cp_init_kms
 	 * 128 = indirect1_start * 8 & 640 = indirect2_start * 8 */
-	seq_printf(m, "Ring fifo:\n");
+	seq_puts(m, "Ring fifo:\n");
 	for (i = 0; i < 256; i++) {
 		WREG32(RADEON_CP_CSQ_ADDR, i << 2);
 		tmp = RREG32(RADEON_CP_CSQ_DATA);
 		seq_printf(m, "rfifo[%04d]=0x%08X\n", i, tmp);
 	}
-	seq_printf(m, "Indirect1 fifo:\n");
+	seq_puts(m, "Indirect1 fifo:\n");
 	for (i = 256; i <= 512; i++) {
 		WREG32(RADEON_CP_CSQ_ADDR, i << 2);
 		tmp = RREG32(RADEON_CP_CSQ_DATA);
 		seq_printf(m, "ib1fifo[%04d]=0x%08X\n", i, tmp);
 	}
-	seq_printf(m, "Indirect2 fifo:\n");
+	seq_puts(m, "Indirect2 fifo:\n");
 	for (i = 640; i < ib1_wptr; i++) {
 		WREG32(RADEON_CP_CSQ_ADDR, i << 2);
 		tmp = RREG32(RADEON_CP_CSQ_DATA);
