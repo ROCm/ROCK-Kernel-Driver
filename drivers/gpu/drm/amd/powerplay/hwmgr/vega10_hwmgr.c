@@ -124,7 +124,7 @@ static void vega10_set_default_registry_data(struct pp_hwmgr *hwmgr)
 	}
 
 	data->registry_data.clock_stretcher_support =
-			hwmgr->feature_mask & PP_CLOCK_STRETCH_MASK ? true : false;
+			hwmgr->feature_mask & PP_CLOCK_STRETCH_MASK ? false : true;
 
 	data->registry_data.disable_water_mark = 0;
 
@@ -1182,29 +1182,9 @@ static int vega10_setup_default_pcie_table(struct pp_hwmgr *hwmgr)
 		else
 			pcie_table->lclk[i] =
 					bios_pcie_table->entries[i].pcie_sclk;
-
-		pcie_table->count++;
 	}
 
-	if (data->registry_data.pcieSpeedOverride)
-		pcie_table->pcie_gen[i] = data->registry_data.pcieSpeedOverride;
-	else
-		pcie_table->pcie_gen[i] =
-			bios_pcie_table->entries[bios_pcie_table->count - 1].gen_speed;
-
-	if (data->registry_data.pcieLaneOverride)
-		pcie_table->pcie_lane[i] = data->registry_data.pcieLaneOverride;
-	else
-		pcie_table->pcie_lane[i] =
-			bios_pcie_table->entries[bios_pcie_table->count - 1].lane_width;
-
-	if (data->registry_data.pcieClockOverride)
-		pcie_table->lclk[i] = data->registry_data.pcieClockOverride;
-	else
-		pcie_table->lclk[i] =
-			bios_pcie_table->entries[bios_pcie_table->count - 1].pcie_sclk;
-
-	pcie_table->count++;
+	pcie_table->count = NUM_LINK_LEVELS;
 
 	return 0;
 }
@@ -1436,9 +1416,7 @@ static int vega10_populate_ulv_state(struct pp_hwmgr *hwmgr)
 			(struct phm_ppt_v2_information *)(hwmgr->pptable);
 
 	data->smc_state_table.pp_table.UlvOffsetVid =
-			(uint8_t)(table_info->us_ulv_voltage_offset *
-					VOLTAGE_VID_OFFSET_SCALE2 /
-					VOLTAGE_VID_OFFSET_SCALE1);
+			(uint8_t)table_info->us_ulv_voltage_offset;
 
 	data->smc_state_table.pp_table.UlvSmnclkDid =
 			(uint8_t)(table_info->us_ulv_smnclk_did);
@@ -2342,6 +2320,7 @@ static int vega10_init_smc_table(struct pp_hwmgr *hwmgr)
 			(uint8_t)(table_info->uc_vce_dpm_voltage_mode);
 	pp_table->Mp0DpmVoltageMode =
 			(uint8_t)(table_info->uc_mp0_dpm_voltage_mode);
+
 	pp_table->DisplayDpmVoltageMode =
 			(uint8_t)(table_info->uc_dcef_dpm_voltage_mode);
 

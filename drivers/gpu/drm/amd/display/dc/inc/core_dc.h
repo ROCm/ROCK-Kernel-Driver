@@ -22,8 +22,6 @@ struct core_dc {
 	struct core_link *links[MAX_PIPES * 2];
 
 	struct validate_context *current_context;
-	struct validate_context *temp_flip_context;
-	struct validate_context *scratch_val_ctx;
 	struct resource_pool *res_pool;
 
 	/*Power State*/

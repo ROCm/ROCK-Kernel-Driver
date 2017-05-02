@@ -46,6 +46,7 @@
 #include "soc15_common.h"
 #include "v9_structs.h"
 #include "soc15.h"
+#include "soc15d.h"
 
 /* HACK: MMHUB and GC both have VM-related register with the same
  * names but different offsets. Define the MMHUB register we need here
@@ -168,6 +169,7 @@ static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
 		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 		uint32_t page_table_base);
+static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid);
 
 /* Because of REG_GET_FIELD() being used, we put this function in the
  * asic specific file.
@@ -234,6 +236,7 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.get_atc_vmid_pasid_mapping_valid =
 			get_atc_vmid_pasid_mapping_valid,
 	.write_vmid_invalidate_request = write_vmid_invalidate_request,
+	.invalidate_tlbs = invalidate_tlbs,
 	.alloc_memory_of_gpu = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu,
 	.free_memory_of_gpu = amdgpu_amdkfd_gpuvm_free_memory_of_gpu,
 	.map_memory_to_gpu = amdgpu_amdkfd_gpuvm_map_memory_to_gpu,
@@ -480,19 +483,40 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct v9_mqd *m;
 	uint32_t *mqd_hqd;
-	uint32_t reg, hqd_base;
+	uint32_t reg, hqd_base, data;
 
 	m = get_mqd(mqd);
 
 	acquire_queue(kgd, pipe_id, queue_id);
 
+	/* HIQ is set during driver init period with vmid set to 0*/
+	if (m->cp_hqd_vmid == 0) {
+		uint32_t value, mec, pipe;
+
+		mec = (++pipe_id / V9_PIPE_PER_MEC) + 1;
+		pipe = (pipe_id % V9_PIPE_PER_MEC);
+
+		pr_debug("kfd: set HIQ, mec:%d, pipe:%d, queue:%d.\n",
+			mec, pipe, queue_id);
+		value = RREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_CP_SCHEDULERS));
+		value = REG_SET_FIELD(value, RLC_CP_SCHEDULERS, scheduler1,
+			((mec << 5) | (pipe << 3) | queue_id | 0x80));
+		WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_CP_SCHEDULERS), value);
+	}
+
 	/* HQD registers extend from CP_MQD_BASE_ADDR to CP_HQD_EOP_WPTR_MEM. */
 	mqd_hqd = &m->cp_mqd_base_addr_lo;
 	hqd_base = SOC15_REG_OFFSET(GC, 0, mmCP_MQD_BASE_ADDR);
 
-	for (reg = SOC15_REG_OFFSET(GC, 0, mmCP_HQD_VMID);
+	for (reg = hqd_base;
 	     reg <= SOC15_REG_OFFSET(GC, 0, mmCP_HQD_PQ_WPTR_HI); reg++)
 		WREG32(reg, mqd_hqd[reg - hqd_base]);
+
+
+	/* Activate doorbell logic before triggering WPTR poll. */
+	data = REG_SET_FIELD(m->cp_hqd_pq_doorbell_control,
+			     CP_HQD_PQ_DOORBELL_CONTROL, DOORBELL_EN, 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmCP_HQD_PQ_DOORBELL_CONTROL), data);
 
 	if (wptr) {
 		/* Don't read wptr with get_user because the user
@@ -538,10 +562,8 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 	       REG_SET_FIELD(m->cp_hqd_eop_rptr,
 			     CP_HQD_EOP_RPTR, INIT_FETCHER, 1));
 
-	/* Write CP_HQD_ACTIVE last. */
-	for (reg = SOC15_REG_OFFSET(GC, 0, mmCP_MQD_BASE_ADDR);
-	     reg <= SOC15_REG_OFFSET(GC, 0, mmCP_HQD_ACTIVE); reg++)
-		WREG32(reg, mqd_hqd[reg - hqd_base]);
+	data = REG_SET_FIELD(m->cp_hqd_active, CP_HQD_ACTIVE, ACTIVE, 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmCP_HQD_ACTIVE), data);
 
 	release_queue(kgd);
 
@@ -617,7 +639,10 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL_OFFSET,
 	       m->sdmax_rlcx_doorbell_offset);
-	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL, m->sdmax_rlcx_doorbell);
+
+	data = REG_SET_FIELD(m->sdmax_rlcx_doorbell, SDMA0_RLC0_DOORBELL,
+			     ENABLE, 1);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_DOORBELL, data);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR, m->sdmax_rlcx_rb_rptr);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR_HI, m->sdmax_rlcx_rb_rptr_hi);
 
@@ -639,7 +664,10 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_BASE_HI, m->sdmax_rlcx_rb_base_hi);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR_ADDR_LO, m->sdmax_rlcx_rb_rptr_addr_lo);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR_ADDR_HI, m->sdmax_rlcx_rb_rptr_addr_hi);
-	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL, m->sdmax_rlcx_rb_cntl);
+
+	data = REG_SET_FIELD(m->sdmax_rlcx_rb_cntl, SDMA0_RLC0_RB_CNTL,
+			     RB_ENABLE, 1);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL, data);
 
 	return 0;
 }
@@ -916,6 +944,54 @@ static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
 	while (!(RREG32(SOC15_REG_OFFSET(MMHUB, 0, mmMMHUB_VM_INVALIDATE_ENG16_ACK)) &
 		 (1 << vmid)))
 		cpu_relax();
+}
+
+static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
+{
+	signed long r;
+	struct fence *f;
+	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
+
+	mutex_lock(&adev->virt.lock_kiq);
+	amdgpu_ring_alloc(ring, 12); /* fence + invalidate_tlbs package*/
+	amdgpu_ring_write(ring, PACKET3(PACKET3_INVALIDATE_TLBS, 0));
+	amdgpu_ring_write(ring,
+			PACKET3_INVALIDATE_TLBS_DST_SEL(1) |
+			PACKET3_INVALIDATE_TLBS_PASID(pasid));
+	amdgpu_fence_emit(ring, &f);
+	amdgpu_ring_commit(ring);
+	mutex_unlock(&adev->virt.lock_kiq);
+
+	r = fence_wait(f, false);
+	if (r)
+		DRM_ERROR("wait for kiq fence error: %ld.\n", r);
+	fence_put(f);
+
+	return r;
+}
+
+static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
+	int vmid;
+	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
+
+	if (ring->ready)
+		return invalidate_tlbs_with_kiq(adev, pasid);
+
+	for (vmid = 0; vmid < 16; vmid++) {
+		if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid))
+			continue;
+		if (get_atc_vmid_pasid_mapping_valid(kgd, vmid)) {
+			if (get_atc_vmid_pasid_mapping_pasid(kgd, vmid)
+				== pasid) {
+				write_vmid_invalidate_request(kgd, vmid);
+				break;
+			}
+		}
+	}
+
+	return 0;
 }
 
 static int kgd_address_watch_disable(struct kgd_dev *kgd)

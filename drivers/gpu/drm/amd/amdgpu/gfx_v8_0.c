@@ -4972,7 +4972,6 @@ static int gfx_v8_0_kiq_init_queue(struct amdgpu_ring *ring)
 		/* reset ring buffer */
 		ring->wptr = 0;
 		amdgpu_ring_clear_ring(ring);
-
 		mutex_lock(&adev->srbm_mutex);
 		vi_srbm_select(adev, ring->me, ring->pipe, ring->queue, 0);
 		gfx_v8_0_kiq_init_register(ring);
@@ -5014,12 +5013,12 @@ static int gfx_v8_0_kcq_init_queue(struct amdgpu_ring *ring)
 		/* reset MQD to a clean status */
 		if (adev->gfx.mec.mqd_backup[mqd_idx])
 			memcpy(mqd, adev->gfx.mec.mqd_backup[mqd_idx], sizeof(*mqd));
-
 		/* reset ring buffer */
 		ring->wptr = 0;
 		amdgpu_ring_clear_ring(ring);
+	} else {
+		amdgpu_ring_clear_ring(ring);
 	}
-
 	return 0;
 }
 
@@ -7099,8 +7098,14 @@ static void gfx_v8_0_get_cu_info(struct amdgpu_device *adev)
 	u32 mask, bitmap, ao_bitmap, ao_cu_mask = 0;
 	struct amdgpu_cu_info *cu_info = &adev->gfx.cu_info;
 	unsigned disable_masks[4 * 2];
+	u32 ao_cu_num;
 
 	memset(cu_info, 0, sizeof(*cu_info));
+
+	if (adev->flags & AMD_IS_APU)
+		ao_cu_num = 2;
+	else
+		ao_cu_num = adev->gfx.config.max_cu_per_sh;
 
 	amdgpu_gfx_parse_disable_cu(disable_masks, 4, 2);
 
@@ -7117,9 +7122,9 @@ static void gfx_v8_0_get_cu_info(struct amdgpu_device *adev)
 			bitmap = gfx_v8_0_get_cu_active_bitmap(adev);
 			cu_info->bitmap[i][j] = bitmap;
 
-			for (k = 0; k < 16; k ++) {
+			for (k = 0; k < adev->gfx.config.max_cu_per_sh; k ++) {
 				if (bitmap & mask) {
-					if (counter < 2)
+					if (counter < ao_cu_num)
 						ao_bitmap |= mask;
 					counter ++;
 				}

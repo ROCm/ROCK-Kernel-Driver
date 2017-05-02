@@ -586,13 +586,12 @@ static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 		 * may not always be perfect powers of two.
 		 * Round up starting from the minimum size of 1GB.
 		 */
-		gart_size_aligned = 1024ULL << 20;
+		gart_size_aligned = AMDGPU_DEFAULT_GTT_SIZE_MB << 20;
 		while (adev->mc.gtt_size > gart_size_aligned)
 			gart_size_aligned <<= 1;
 
 		adev->mc.gtt_size = gart_size_aligned;
-	}
-	else
+	} else
 		adev->mc.gtt_size = (uint64_t)amdgpu_gart_size << 20;
 
 	gmc_v8_0_vram_gtt_location(adev, &adev->mc);

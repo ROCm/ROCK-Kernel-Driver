@@ -609,10 +609,11 @@ int process_evict_queues(struct device_queue_manager *dqm,
 			continue;
 		}
 		/* if the queue is not active anyway, it is not evicted */
-		if (q->properties.is_active == true)
+		if (q->properties.is_active == true) {
 			q->properties.is_evicted = true;
+			q->properties.is_active = false;
+		}
 
-		retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
 		if (is_queue_nocpsch(dqm, q) &&
 		    q->properties.is_evicted)
 			retval = mqd->destroy_mqd(mqd, q->mqd,
@@ -680,7 +681,8 @@ int process_restore_queues(struct device_queue_manager *dqm,
 		}
 		if (q->properties.is_evicted) {
 			q->properties.is_evicted = false;
-			retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
+			q->properties.is_active = true;
+
 			if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
 			    (q->properties.type == KFD_QUEUE_TYPE_COMPUTE ||
 			     q->properties.type == KFD_QUEUE_TYPE_SDMA))

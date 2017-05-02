@@ -389,7 +389,7 @@ static void allocate_dc_stream_funcs(struct core_dc *core_dc)
 
 static void destruct(struct core_dc *dc)
 {
-	resource_validate_ctx_destruct(dc->current_context);
+	dc_resource_validate_ctx_destruct(dc->current_context);
 
 	destroy_links(dc);
 
@@ -409,10 +409,6 @@ static void destruct(struct core_dc *dc)
 
 	dm_free(dc->current_context);
 	dc->current_context = NULL;
-	dm_free(dc->temp_flip_context);
-	dc->temp_flip_context = NULL;
-	dm_free(dc->scratch_val_ctx);
-	dc->scratch_val_ctx = NULL;
 
 	dm_free(dc->ctx);
 	dc->ctx = NULL;
@@ -431,10 +427,8 @@ static bool construct(struct core_dc *dc,
 	}
 
 	dc->current_context = dm_alloc(sizeof(*dc->current_context));
-	dc->temp_flip_context = dm_alloc(sizeof(*dc->temp_flip_context));
-	dc->scratch_val_ctx = dm_alloc(sizeof(*dc->scratch_val_ctx));
 
-	if (!dc->current_context || !dc->temp_flip_context) {
+	if (!dc->current_context) {
 		dm_error("%s: failed to create validate ctx\n", __func__);
 		goto val_ctx_fail;
 	}
@@ -641,7 +635,7 @@ static bool is_validation_required(
 	return false;
 }
 
-bool dc_validate_resources(
+struct validate_context *dc_get_validate_context(
 		const struct dc *dc,
 		const struct dc_validation_set set[],
 		uint8_t set_count)
@@ -650,18 +644,17 @@ bool dc_validate_resources(
 	enum dc_status result = DC_ERROR_UNEXPECTED;
 	struct validate_context *context;
 
-	if (!is_validation_required(core_dc, set, set_count))
-		return true;
-
 	context = dm_alloc(sizeof(struct validate_context));
 	if(context == NULL)
 		goto context_alloc_fail;
 
+	if (!is_validation_required(core_dc, set, set_count)) {
+		dc_resource_validate_ctx_copy_construct(core_dc->current_context, context);
+		return context;
+	}
+
 	result = core_dc->res_pool->funcs->validate_with_context(
 						core_dc, set, set_count, context);
-
-	resource_validate_ctx_destruct(context);
-	dm_free(context);
 
 context_alloc_fail:
 	if (result != DC_OK) {
@@ -669,10 +662,31 @@ context_alloc_fail:
 				"%s:resource validation failed, dc_status:%d\n",
 				__func__,
 				result);
+
+		dc_resource_validate_ctx_destruct(context);
+		dm_free(context);
+		context = NULL;
 	}
 
-	return (result == DC_OK);
+	return context;
 
+}
+
+bool dc_validate_resources(
+		const struct dc *dc,
+		const struct dc_validation_set set[],
+		uint8_t set_count)
+{
+	struct validate_context *ctx;
+
+	ctx = dc_get_validate_context(dc, set, set_count);
+	if (ctx) {
+		dc_resource_validate_ctx_destruct(ctx);
+		dm_free(ctx);
+		return true;
+	}
+
+	return false;
 }
 
 bool dc_validate_guaranteed(
@@ -690,7 +704,7 @@ bool dc_validate_guaranteed(
 	result = core_dc->res_pool->funcs->validate_guaranteed(
 					core_dc, stream, context);
 
-	resource_validate_ctx_destruct(context);
+	dc_resource_validate_ctx_destruct(context);
 	dm_free(context);
 
 context_alloc_fail:
@@ -844,7 +858,7 @@ bool dc_commit_streams(
 					__func__,
 					result);
 		BREAK_TO_DEBUGGER();
-		resource_validate_ctx_destruct(context);
+		dc_resource_validate_ctx_destruct(context);
 		goto fail;
 	}
 
@@ -876,14 +890,10 @@ bool dc_commit_streams(
 				context->streams[i]->public.timing.pix_clk_khz);
 	}
 
-	resource_validate_ctx_destruct(core_dc->current_context);
+	dc_resource_validate_ctx_destruct(core_dc->current_context);
+	dm_free(core_dc->current_context);
 
-	if (core_dc->temp_flip_context != core_dc->current_context) {
-		dm_free(core_dc->temp_flip_context);
-		core_dc->temp_flip_context = core_dc->current_context;
-	}
 	core_dc->current_context = context;
-	memset(core_dc->temp_flip_context, 0, sizeof(*core_dc->temp_flip_context));
 
 	return (result == DC_OK);
 
@@ -913,16 +923,16 @@ bool dc_post_update_surfaces_to_stream(struct dc *dc)
 		dm_error("%s: failed to create validate ctx\n", __func__);
 		return false;
 	}
-	resource_validate_ctx_copy_construct(core_dc->current_context, context);
+	dc_resource_validate_ctx_copy_construct(core_dc->current_context, context);
 
 	post_surface_trace(dc);
-
 	for (i = 0; i < context->res_ctx.pool->pipe_count; i++)
 		if (context->res_ctx.pipe_ctx[i].stream == NULL) {
 			context->res_ctx.pipe_ctx[i].pipe_idx = i;
 			core_dc->hwss.power_down_front_end(
 					core_dc, &context->res_ctx.pipe_ctx[i]);
 		}
+
 	if (!core_dc->res_pool->funcs->validate_bandwidth(core_dc, context)) {
 		BREAK_TO_DEBUGGER();
 		return false;
@@ -930,11 +940,10 @@ bool dc_post_update_surfaces_to_stream(struct dc *dc)
 
 	core_dc->hwss.set_bandwidth(core_dc, context, true);
 
-	resource_validate_ctx_destruct(core_dc->current_context);
-	if (core_dc->current_context)
-		dm_free(core_dc->current_context);
+	dc_resource_validate_ctx_copy_construct(context, core_dc->current_context);
 
-	core_dc->current_context = context;
+	dc_resource_validate_ctx_destruct(context);
+	dm_free(context);
 
 	return true;
 }
@@ -1024,7 +1033,8 @@ static unsigned int pixel_format_to_bpp(enum surface_pixel_format format)
 }
 
 static enum surface_update_type get_plane_info_update_type(
-		const struct dc_surface_update *u)
+		const struct dc_surface_update *u,
+		int surface_index)
 {
 	struct dc_plane_info temp_plane_info = { { { { 0 } } } };
 
@@ -1049,7 +1059,11 @@ static enum surface_update_type get_plane_info_update_type(
 
 	/* Special Validation parameters */
 	temp_plane_info.format = u->plane_info->format;
-	temp_plane_info.visible = u->plane_info->visible;
+
+	if (surface_index == 0)
+		temp_plane_info.visible = u->plane_info->visible;
+	else
+		temp_plane_info.visible = u->surface->visible;
 
 	if (memcmp(u->plane_info, &temp_plane_info,
 			sizeof(struct dc_plane_info)) != 0)
@@ -1111,7 +1125,8 @@ static enum surface_update_type  get_scaling_info_update_type(
 
 static enum surface_update_type det_surface_update(
 		const struct core_dc *dc,
-		const struct dc_surface_update *u)
+		const struct dc_surface_update *u,
+		int surface_index)
 {
 	const struct validate_context *context = dc->current_context;
 	enum surface_update_type type = UPDATE_TYPE_FAST;
@@ -1120,7 +1135,7 @@ static enum surface_update_type det_surface_update(
 	if (!is_surface_in_context(context, u->surface))
 		return UPDATE_TYPE_FULL;
 
-	type = get_plane_info_update_type(u);
+	type = get_plane_info_update_type(u, surface_index);
 	if (overall_type < type)
 		overall_type = type;
 
@@ -1149,7 +1164,7 @@ enum surface_update_type dc_check_update_surfaces_for_stream(
 	int i;
 	enum surface_update_type overall_type = UPDATE_TYPE_FAST;
 
-	if (stream_status->surface_count != surface_count)
+	if (stream_status == NULL || stream_status->surface_count != surface_count)
 		return UPDATE_TYPE_FULL;
 
 	if (stream_update)
@@ -1157,7 +1172,7 @@ enum surface_update_type dc_check_update_surfaces_for_stream(
 
 	for (i = 0 ; i < surface_count; i++) {
 		enum surface_update_type type =
-				det_surface_update(core_dc, &updates[i]);
+				det_surface_update(core_dc, &updates[i], i);
 
 		if (type == UPDATE_TYPE_FULL)
 			return type;
@@ -1209,15 +1224,15 @@ void dc_update_surfaces_and_stream(struct dc *dc,
 			new_surfaces[i] = srf_updates[i].surface;
 
 		/* initialize scratch memory for building context */
-		context = core_dc->temp_flip_context;
-		resource_validate_ctx_copy_construct(
+		context = dm_alloc(sizeof(*context));
+		dc_resource_validate_ctx_copy_construct(
 				core_dc->current_context, context);
 
 		/* add surface to context */
 		if (!resource_attach_surfaces_to_context(
 				new_surfaces, surface_count, dc_stream, context)) {
 			BREAK_TO_DEBUGGER();
-			return;
+			goto fail;
 		}
 	} else {
 		context = core_dc->current_context;
@@ -1323,7 +1338,7 @@ void dc_update_surfaces_and_stream(struct dc *dc,
 	if (update_type == UPDATE_TYPE_FULL) {
 		if (!core_dc->res_pool->funcs->validate_bandwidth(core_dc, context)) {
 			BREAK_TO_DEBUGGER();
-			return;
+			goto fail;
 		} else
 			core_dc->hwss.set_bandwidth(core_dc, context, false);
 	}
@@ -1414,10 +1429,17 @@ void dc_update_surfaces_and_stream(struct dc *dc,
 	}
 
 	if (core_dc->current_context != context) {
-		resource_validate_ctx_destruct(core_dc->current_context);
-		core_dc->temp_flip_context = core_dc->current_context;
+		dc_resource_validate_ctx_destruct(core_dc->current_context);
+		dm_free(core_dc->current_context);
 
 		core_dc->current_context = context;
+	}
+	return;
+
+fail:
+	if (core_dc->current_context != context) {
+		dc_resource_validate_ctx_destruct(context);
+		dm_free(context);
 	}
 }
 
@@ -1787,7 +1809,7 @@ void dc_link_remove_remote_sink(const struct dc_link *link, const struct dc_sink
 				dc_link->remote_sinks[i] = dc_link->remote_sinks[i+1];
 				i++;
 			}
-
+			dc_link->remote_sinks[i] = NULL;
 			dc_link->sink_count--;
 			return;
 		}

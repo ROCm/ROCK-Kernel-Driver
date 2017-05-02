@@ -1056,6 +1056,13 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 			stream->sink->link->link_enc,
 			pipe_ctx->stream->signal);
 
+	if (pipe_ctx->stream->signal != SIGNAL_TYPE_VIRTUAL)
+		pipe_ctx->stream_enc->funcs->setup_stereo_sync(
+		pipe_ctx->stream_enc,
+		pipe_ctx->tg->inst,
+		stream->public.timing.timing_3d_format != TIMING_3D_FORMAT_NONE);
+
+
 /*vbios crtc_source_selection and encoder_setup will override fmt_C*/
 	pipe_ctx->opp->funcs->opp_program_fmt(
 			pipe_ctx->opp,
@@ -1599,11 +1606,11 @@ enum dc_status dce110_apply_ctx_to_hw(
 	apply_min_clocks(dc, context, &clocks_state, true);
 
 	if (context->dispclk_khz
-			> dc->current_context->dispclk_khz)
+			> dc->current_context->dispclk_khz) {
 		context->res_ctx.pool->display_clock->funcs->set_clock(
 				context->res_ctx.pool->display_clock,
 				context->dispclk_khz * 115 / 100);
-
+	}
 	/* program audio wall clock. use HDMI as clock source if HDMI
 	 * audio active. Otherwise, use DP as clock source
 	 * first, loop to find any HDMI audio, if not, loop find DP audio
@@ -1687,6 +1694,10 @@ enum dc_status dce110_apply_ctx_to_hw(
 			continue;
 
 		if (pipe_ctx->stream == pipe_ctx_old->stream)
+			continue;
+
+		if (pipe_ctx->stream && pipe_ctx_old->stream
+				&& !pipe_need_reprogram(pipe_ctx_old, pipe_ctx))
 			continue;
 
 		if (pipe_ctx->top_pipe)
@@ -2255,7 +2266,7 @@ static void dce110_set_bandwidth(
 		struct validate_context *context,
 		bool decrease_allowed)
 {
-	dc->hwss.set_displaymarks(dc, context);
+	dce110_set_displaymarks(dc, context);
 
 	if (decrease_allowed || context->dispclk_khz > dc->current_context->dispclk_khz) {
 		context->res_ctx.pool->display_clock->funcs->set_clock(
@@ -2457,7 +2468,6 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.enable_display_power_gating = dce110_enable_display_power_gating,
 	.power_down_front_end = dce110_power_down_fe,
 	.pipe_control_lock = dce_pipe_control_lock,
-	.set_displaymarks = dce110_set_displaymarks,
 	.set_bandwidth = dce110_set_bandwidth,
 	.set_drr = set_drr,
 	.set_static_screen_control = set_static_screen_control,
