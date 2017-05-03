@@ -2072,6 +2072,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 			space_left -= copied;
 			dst_va_addr += copied;
 			dst_offset += copied;
+			src_offset += copied;
 			if (dst_va_addr > dst_bo->it.last + 1) {
 				pr_err("Cross mem copy failed. Memory overflow\n");
 				err = -EFAULT;
