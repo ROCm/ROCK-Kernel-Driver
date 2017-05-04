@@ -657,6 +657,8 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 			cap.flag |= AMDGPU_CAPABILITY_DIRECT_GMA_FLAG;
 			cap.direct_gma_size = amdgpu_direct_gma_size;
 		}
+		if (adev->ssg.enabled)
+			cap.flag |= AMDGPU_CAPABILITY_SSG_FLAG;
 		return copy_to_user(out, &cap,
 				    min((size_t)size, sizeof(cap))) ? -EFAULT : 0;
 	}
@@ -852,7 +854,7 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 
 	if (amdgpu_sriov_vf(adev)) {
 		/* TODO: how to handle reserve failure */
-		BUG_ON(amdgpu_bo_reserve(adev->virt.csa_obj, false));
+		BUG_ON(amdgpu_bo_reserve(adev->virt.csa_obj, true));
 		amdgpu_vm_bo_rmv(adev, fpriv->vm.csa_bo_va);
 		fpriv->vm.csa_bo_va = NULL;
 		amdgpu_bo_unreserve(adev->virt.csa_obj);
@@ -1062,6 +1064,7 @@ const struct drm_ioctl_desc amdgpu_ioctls_kms[] = {
 const struct drm_ioctl_desc amdgpu_ioctls_kms[] = {
 	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_CREATE, amdgpu_gem_create_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(AMDGPU_CTX, amdgpu_ctx_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(AMDGPU_VM, amdgpu_vm_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(AMDGPU_BO_LIST, amdgpu_bo_list_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
 	/* KMS */
 	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_MMAP, amdgpu_gem_mmap_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),

@@ -33,8 +33,10 @@
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_atomic.h>
 
+
 #include "amdgpu.h"
 #include "amdgpu_pm.h"
+#include "dm_helpers.h"
 #include "dm_services_types.h"
 
 #include "drm_edid.h"
@@ -463,9 +465,6 @@ static void fill_plane_attributes_from_fb(
 		&tiling_flags,
 		addReq == true ? &fb_location:NULL);
 
-	surface->address.type                = PLN_ADDR_TYPE_GRAPHICS;
-	surface->address.grph.addr.low_part  = lower_32_bits(fb_location);
-	surface->address.grph.addr.high_part = upper_32_bits(fb_location);
 
 	switch (fb->pixel_format) {
 	case DRM_FORMAT_C8:
@@ -486,9 +485,52 @@ static void fill_plane_attributes_from_fb(
 	case DRM_FORMAT_ABGR2101010:
 		surface->format = SURFACE_PIXEL_FORMAT_GRPH_ABGR2101010;
 		break;
+	case DRM_FORMAT_YUV420:
+		surface->format = SURFACE_PIXEL_FORMAT_VIDEO_420_YCbCr;
+		break;
+	case DRM_FORMAT_YVU420:
+		surface->format = SURFACE_PIXEL_FORMAT_VIDEO_420_YCrCb;
+		break;
 	default:
 		DRM_ERROR("Unsupported screen depth %d\n", fb->bits_per_pixel);
 		return;
+	}
+
+	if (surface->format < SURFACE_PIXEL_FORMAT_VIDEO_BEGIN) {
+		surface->address.type = PLN_ADDR_TYPE_GRAPHICS;
+		surface->address.grph.addr.low_part = lower_32_bits(fb_location);
+		surface->address.grph.addr.high_part = upper_32_bits(fb_location);
+		surface->plane_size.grph.surface_size.x = 0;
+		surface->plane_size.grph.surface_size.y = 0;
+		surface->plane_size.grph.surface_size.width = fb->width;
+		surface->plane_size.grph.surface_size.height = fb->height;
+		surface->plane_size.grph.surface_pitch =
+				fb->pitches[0] / (fb->bits_per_pixel / 8);
+		/* TODO: unhardcode */
+		surface->color_space = COLOR_SPACE_SRGB;
+
+	} else {
+		surface->address.type = PLN_ADDR_TYPE_VIDEO_PROGRESSIVE;
+		surface->address.video_progressive.luma_addr.low_part
+						= lower_32_bits(fb_location);
+		surface->address.video_progressive.chroma_addr.high_part
+						= upper_32_bits(fb_location);
+		surface->plane_size.video.luma_size.x = 0;
+		surface->plane_size.video.luma_size.y = 0;
+		surface->plane_size.video.luma_size.width = fb->width;
+		surface->plane_size.video.luma_size.height = fb->height;
+		/* TODO: unhardcode */
+		surface->plane_size.video.luma_pitch = fb->pitches[0] / 4;
+
+		surface->plane_size.video.chroma_size.x = 0;
+		surface->plane_size.video.chroma_size.y = 0;
+		surface->plane_size.video.chroma_size.width = fb->width;
+		surface->plane_size.video.chroma_size.height = fb->height;
+		surface->plane_size.video.chroma_pitch =
+			fb->pitches[0] / 4;
+
+		/* TODO: unhardcode */
+		surface->color_space = COLOR_SPACE_YCBCR709;
 	}
 
 	memset(&surface->tiling_info, 0, sizeof(surface->tiling_info));
@@ -541,20 +583,10 @@ static void fill_plane_attributes_from_fb(
 		surface->tiling_info.gfx9.shaderEnable = 1;
 	}
 
-
-	surface->plane_size.grph.surface_size.x = 0;
-	surface->plane_size.grph.surface_size.y = 0;
-	surface->plane_size.grph.surface_size.width = fb->width;
-	surface->plane_size.grph.surface_size.height = fb->height;
-	surface->plane_size.grph.surface_pitch =
-		fb->pitches[0] / (fb->bits_per_pixel / 8);
-
 	surface->visible = true;
 	surface->scaling_quality.h_taps_c = 0;
 	surface->scaling_quality.v_taps_c = 0;
 
-	/* TODO: unhardcode */
-	surface->color_space = COLOR_SPACE_SRGB;
 	/* is this needed? is surface zeroed at allocation? */
 	surface->scaling_quality.h_taps = 0;
 	surface->scaling_quality.v_taps = 0;
@@ -1262,6 +1294,7 @@ static int amdgpu_freesync_update_property_atomic(
 	dev  = connector->dev;
 	adev = dev->dev_private;
 
+	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
 	ret = drm_object_property_get_value(
 			&connector->base,
 			adev->mode_info.freesync_property,
@@ -1271,6 +1304,8 @@ static int amdgpu_freesync_update_property_atomic(
 				&connector->base,
 				adev->mode_info.freesync_property,
 				val_capable);
+	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+
 	return ret;
 
 }
@@ -1574,6 +1609,7 @@ int amdgpu_dm_connector_mode_valid(
 	/* TODO: Unhardcode stream count */
 	struct dc_stream *stream;
 	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
+	struct validate_context *context;
 
 	if ((mode->flags & DRM_MODE_FLAG_INTERLACE) ||
 			(mode->flags & DRM_MODE_FLAG_DBLSCAN))
@@ -1608,8 +1644,13 @@ int amdgpu_dm_connector_mode_valid(
 	stream->src.height = mode->vdisplay;
 	stream->dst = stream->src;
 
-	if (dc_validate_resources(adev->dm.dc, &val_set, 1))
+	context = dc_get_validate_context(adev->dm.dc, &val_set, 1);
+
+	if (context) {
 		result = MODE_OK;
+		dc_resource_validate_ctx_destruct(context);
+		dm_free(context);
+	}
 
 	dc_stream_release(stream);
 
@@ -1951,10 +1992,8 @@ static uint32_t rgb_formats[] = {
 };
 
 static uint32_t yuv_formats[] = {
-	DRM_FORMAT_YUYV,
-	DRM_FORMAT_YVYU,
-	DRM_FORMAT_UYVY,
-	DRM_FORMAT_VYUY,
+	DRM_FORMAT_YUV420,
+	DRM_FORMAT_YVU420,
 };
 
 int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
@@ -2631,6 +2670,80 @@ static void remove_stream(struct amdgpu_device *adev, struct amdgpu_crtc *acrtc)
 	acrtc->enabled = false;
 }
 
+void dc_commit_surfaces(struct drm_atomic_state *state,
+	struct drm_device *dev, struct amdgpu_display_manager *dm)
+{
+	uint32_t i;
+	struct drm_plane *plane;
+	struct drm_plane_state *old_plane_state;
+	struct amdgpu_device *adev = dev->dev_private;
+
+	/* update planes when needed */
+	for_each_plane_in_state(state, plane, old_plane_state, i) {
+		struct drm_plane_state *plane_state = plane->state;
+		struct drm_crtc *crtc = plane_state->crtc;
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+		struct drm_framebuffer *fb = plane_state->fb;
+		struct drm_connector *connector;
+		struct dm_connector_state *dm_state = NULL;
+		enum dm_commit_action action;
+
+		if (!fb || !crtc || !crtc->state->planes_changed ||
+			!crtc->state->active)
+			continue;
+
+		action = get_dm_commit_action(crtc->state);
+
+		/* Surfaces are created under two scenarios:
+		 * 1. This commit is not a page flip.
+		 * 2. This commit is a page flip, and streams are created.
+		 */
+		if (!page_flip_needed(
+				plane_state,
+				old_plane_state,
+				crtc->state->event, true) ||
+				action == DM_COMMIT_ACTION_DPMS_ON ||
+				action == DM_COMMIT_ACTION_SET) {
+			list_for_each_entry(connector,
+					    &dev->mode_config.connector_list,
+					    head) {
+				if (connector->state->crtc == crtc) {
+					dm_state = to_dm_connector_state(
+						connector->state);
+					break;
+				}
+			}
+
+			/*
+			 * This situation happens in the following case:
+			 * we are about to get set mode for connector who's only
+			 * possible crtc (in encoder crtc mask) is used by
+			 * another connector, that is why it will try to
+			 * re-assing crtcs in order to make configuration
+			 * supported. For our implementation we need to make all
+			 * encoders support all crtcs, then this issue will
+			 * never arise again. But to guard code from this issue
+			 * check is left.
+			 *
+			 * Also it should be needed when used with actual
+			 * drm_atomic_commit ioctl in future
+			 */
+			if (!dm_state)
+				continue;
+
+			/*
+			 * if flip is pending (ie, still waiting for fence to return
+			 * before address is submitted) here, we cannot commit_surface
+			 * as commit_surface will pre-maturely write out the future
+			 * address. wait until flip is submitted before proceeding.
+			 */
+			wait_while_pflip_status(adev, acrtc, pflip_pending_predicate);
+
+			dm_dc_surface_commit(dm->dc, crtc);
+		}
+	}
+}
+
 int amdgpu_dm_atomic_commit(
 	struct drm_device *dev,
 	struct drm_atomic_state *state,
@@ -2898,69 +3011,7 @@ int amdgpu_dm_atomic_commit(
 				dc_stream_get_status(acrtc->stream)->primary_otg_inst;
 	}
 
-	/* update planes when needed */
-	for_each_plane_in_state(state, plane, old_plane_state, i) {
-		struct drm_plane_state *plane_state = plane->state;
-		struct drm_crtc *crtc = plane_state->crtc;
-		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
-		struct drm_framebuffer *fb = plane_state->fb;
-		struct drm_connector *connector;
-		struct dm_connector_state *dm_state = NULL;
-		enum dm_commit_action action;
-
-		if (!fb || !crtc || !crtc->state->planes_changed ||
-			!crtc->state->active)
-			continue;
-
-		action = get_dm_commit_action(crtc->state);
-
-		/* Surfaces are created under two scenarios:
-		 * 1. This commit is not a page flip.
-		 * 2. This commit is a page flip, and streams are created.
-		 */
-		if (!page_flip_needed(
-				plane_state,
-				old_plane_state,
-				crtc->state->event, true) ||
-				action == DM_COMMIT_ACTION_DPMS_ON ||
-				action == DM_COMMIT_ACTION_SET) {
-			list_for_each_entry(connector,
-				&dev->mode_config.connector_list, head)	{
-				if (connector->state->crtc == crtc) {
-					dm_state = to_dm_connector_state(
-						connector->state);
-					break;
-				}
-			}
-
-			/*
-			 * This situation happens in the following case:
-			 * we are about to get set mode for connector who's only
-			 * possible crtc (in encoder crtc mask) is used by
-			 * another connector, that is why it will try to
-			 * re-assing crtcs in order to make configuration
-			 * supported. For our implementation we need to make all
-			 * encoders support all crtcs, then this issue will
-			 * never arise again. But to guard code from this issue
-			 * check is left.
-			 *
-			 * Also it should be needed when used with actual
-			 * drm_atomic_commit ioctl in future
-			 */
-			if (!dm_state)
-				continue;
-
-			/*
-			 * if flip is pending (ie, still waiting for fence to return
-			 * before address is submitted) here, we cannot commit_surface
-			 * as commit_surface will pre-maturely write out the future
-			 * address. wait until flip is submitted before proceeding.
-			 */
-			wait_while_pflip_status(adev, acrtc, pflip_pending_predicate);
-
-			dm_dc_surface_commit(dm->dc, crtc);
-		}
-	}
+	dc_commit_surfaces(state, dev, dm);
 
 	for (i = 0; i < new_crtcs_count; i++) {
 		/*
@@ -3219,6 +3270,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	struct amdgpu_device *adev = dev->dev_private;
 	struct dc *dc = adev->dm.dc;
 	bool need_to_validate = false;
+	struct validate_context *context;
 
 	ret = drm_atomic_helper_check(dev, state);
 
@@ -3428,15 +3480,20 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 	}
 
-	if (need_to_validate == false || set_count == 0 ||
-		dc_validate_resources(dc, set, set_count))
+	context = dc_get_validate_context(dc, set, set_count);
+
+	if (need_to_validate == false || set_count == 0 || context)
 		ret = 0;
 
-	for (i = 0; i < set_count; i++) {
-		for (j = 0; j < set[i].surface_count; j++) {
-			dc_surface_release(set[i].surfaces[j]);
-		}
+	if (context) {
+		dc_resource_validate_ctx_destruct(context);
+		dm_free(context);
 	}
+
+	for (i = 0; i < set_count; i++)
+		for (j = 0; j < set[i].surface_count; j++)
+			dc_surface_release(set[i].surfaces[j]);
+
 	for (i = 0; i < new_stream_count; i++)
 		dc_stream_release(new_streams[i]);
 
@@ -3452,13 +3509,16 @@ static bool is_dp_capable_without_timing_msa(
 {
 	uint8_t dpcd_data;
 	bool capable = false;
+
 	if (amdgpu_connector->dc_link &&
-		dc_read_aux_dpcd(
-			dc,
-			amdgpu_connector->dc_link->link_index,
-			DP_DOWN_STREAM_PORT_COUNT,
-			&dpcd_data, sizeof(dpcd_data)))
+		dm_helpers_dp_read_dpcd(
+				NULL,
+				amdgpu_connector->dc_link,
+				DP_DOWN_STREAM_PORT_COUNT,
+				&dpcd_data,
+				sizeof(dpcd_data))) {
 		capable = (dpcd_data & DP_MSA_TIMING_PAR_IGNORED) ? true:false;
+	}
 
 	return capable;
 }

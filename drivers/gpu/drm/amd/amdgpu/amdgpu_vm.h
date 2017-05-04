@@ -84,6 +84,8 @@ struct amdgpu_bo_list_entry;
 
 /* hardcode that limit for now */
 #define AMDGPU_VA_RESERVED_SIZE			(8 << 20)
+/* max vmids dedicated for process */
+#define AMDGPU_VM_MAX_RESERVED_VMID	1
 
 struct amdgpu_vm_pt {
 	struct amdgpu_bo	*bo;
@@ -123,6 +125,8 @@ struct amdgpu_vm {
 
 	/* client id */
 	u64                     client_id;
+	/* dedicated to vm */
+	struct amdgpu_vm_id	*reserved_vmid[AMDGPU_MAX_VMHUBS];
 	/* each VM will map on CSA */
 	struct amdgpu_bo_va *csa_bo_va;
 
@@ -155,6 +159,7 @@ struct amdgpu_vm_id_manager {
 	unsigned		num_ids;
 	struct list_head	ids_lru;
 	struct amdgpu_vm_id	ids[AMDGPU_NUM_VM];
+	atomic_t		reserved_vmid_num;
 };
 
 struct amdgpu_vm_manager {
@@ -248,5 +253,6 @@ int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
 void amdgpu_vm_bo_rmv(struct amdgpu_device *adev,
 		      struct amdgpu_bo_va *bo_va);
 void amdgpu_vm_adjust_size(struct amdgpu_device *adev, uint64_t vm_size);
+int amdgpu_vm_ioctl(struct drm_device *dev, void *data, struct drm_file *filp);
 
 #endif

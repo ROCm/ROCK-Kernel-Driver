@@ -453,7 +453,7 @@ static void gfx_v9_0_mec_fini(struct amdgpu_device *adev)
 	int r;
 
 	if (adev->gfx.mec.hpd_eop_obj) {
-		r = amdgpu_bo_reserve(adev->gfx.mec.hpd_eop_obj, false);
+		r = amdgpu_bo_reserve(adev->gfx.mec.hpd_eop_obj, true);
 		if (unlikely(r != 0))
 			dev_warn(adev->dev, "(%d) reserve HPD EOP bo failed\n", r);
 		amdgpu_bo_unpin(adev->gfx.mec.hpd_eop_obj);
@@ -463,7 +463,7 @@ static void gfx_v9_0_mec_fini(struct amdgpu_device *adev)
 		adev->gfx.mec.hpd_eop_obj = NULL;
 	}
 	if (adev->gfx.mec.mec_fw_obj) {
-		r = amdgpu_bo_reserve(adev->gfx.mec.mec_fw_obj, false);
+		r = amdgpu_bo_reserve(adev->gfx.mec.mec_fw_obj, true);
 		if (unlikely(r != 0))
 			dev_warn(adev->dev, "(%d) reserve mec firmware bo failed\n", r);
 		amdgpu_bo_unpin(adev->gfx.mec.mec_fw_obj);
@@ -599,7 +599,7 @@ static int gfx_v9_0_kiq_init(struct amdgpu_device *adev)
 
 	memset(hpd, 0, MEC_HPD_SIZE);
 
-	r = amdgpu_bo_reserve(kiq->eop_obj, false);
+	r = amdgpu_bo_reserve(kiq->eop_obj, true);
 	if (unlikely(r != 0))
 		dev_warn(adev->dev, "(%d) reserve kiq eop bo failed\n", r);
 	amdgpu_bo_kunmap(kiq->eop_obj);
@@ -614,6 +614,8 @@ static int gfx_v9_0_kiq_init_ring(struct amdgpu_device *adev,
 {
 	struct amdgpu_kiq *kiq = &adev->gfx.kiq;
 	int r = 0;
+
+	mutex_init(&kiq->ring_mutex);
 
 	r = amdgpu_wb_get(adev, &adev->virt.reg_val_offs);
 	if (r)
@@ -1786,7 +1788,7 @@ static void gfx_v9_0_cp_compute_fini(struct amdgpu_device *adev)
 		struct amdgpu_ring *ring = &adev->gfx.compute_ring[i];
 
 		if (ring->mqd_obj) {
-			r = amdgpu_bo_reserve(ring->mqd_obj, false);
+			r = amdgpu_bo_reserve(ring->mqd_obj, true);
 			if (unlikely(r != 0))
 				dev_warn(adev->dev, "(%d) reserve MQD bo failed\n", r);
 
