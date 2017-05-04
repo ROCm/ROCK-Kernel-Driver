@@ -1802,7 +1802,8 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 
 	bo = gem_to_amdgpu_bo(obj);
 	if (!(bo->prefered_domains & (AMDGPU_GEM_DOMAIN_VRAM |
-				    AMDGPU_GEM_DOMAIN_GTT)))
+				    AMDGPU_GEM_DOMAIN_GTT |
+				    AMDGPU_GEM_DOMAIN_DGMA)))
 		/* Only VRAM and GTT BOs are supported */
 		return -EINVAL;
 
@@ -1824,8 +1825,12 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 
 	(*mem)->bo = amdgpu_bo_ref(bo);
 	(*mem)->va = va;
-	(*mem)->domain = (bo->prefered_domains & AMDGPU_GEM_DOMAIN_VRAM) ?
-		AMDGPU_GEM_DOMAIN_VRAM : AMDGPU_GEM_DOMAIN_GTT;
+	if (bo->prefered_domains & AMDGPU_GEM_DOMAIN_VRAM)
+		(*mem)->domain = AMDGPU_GEM_DOMAIN_VRAM;
+	else if (bo->prefered_domains & AMDGPU_GEM_DOMAIN_GTT)
+		(*mem)->domain = AMDGPU_GEM_DOMAIN_GTT;
+	else
+		(*mem)->domain = AMDGPU_GEM_DOMAIN_DGMA;
 	(*mem)->mapped_to_gpu_memory = 0;
 	(*mem)->process_info = kfd_vm->process_info;
 	add_kgd_mem_to_kfd_bo_list(*mem, kfd_vm->process_info, false);
