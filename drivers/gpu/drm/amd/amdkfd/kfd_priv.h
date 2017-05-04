@@ -577,6 +577,9 @@ struct qcm_process_device {
 	/* IB memory */
 	uint64_t ib_base; /* ib_base+ib_size must be below cwsr_base */
 	void *ib_kaddr;
+
+	/*doorbell resources per process per device*/
+	unsigned long           *doorbell_bitmap;
 };
 
 /* KFD Memory Eviction */
