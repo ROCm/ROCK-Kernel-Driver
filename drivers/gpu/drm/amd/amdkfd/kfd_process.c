@@ -327,6 +327,9 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 				get_order(pdd->dev->cwsr_size));
 		}
 
+		kfree(pdd->qpd.doorbell_bitmap);
+		idr_destroy(&pdd->alloc_idr);
+
 		kfree(pdd);
 	}
 }
@@ -603,6 +606,31 @@ err_alloc_process:
 	return ERR_PTR(err);
 }
 
+static int init_doorbell_bitmap(struct qcm_process_device *qpd,
+			struct kfd_dev *dev)
+{
+	unsigned int i;
+
+	if (!KFD_IS_SOC15(dev->device_info->asic_family))
+		return 0;
+
+	qpd->doorbell_bitmap =
+		kzalloc(DIV_ROUND_UP(KFD_MAX_NUM_OF_QUEUES_PER_PROCESS,
+				     BITS_PER_BYTE), GFP_KERNEL);
+	if (qpd->doorbell_bitmap == NULL)
+		return -ENOMEM;
+
+	/* Mask out any reserved doorbells */
+	for (i = 0; i < KFD_MAX_NUM_OF_QUEUES_PER_PROCESS; i++)
+		if ((dev->shared_resources.reserved_doorbell_mask & i) ==
+		    dev->shared_resources.reserved_doorbell_val) {
+			set_bit(i, qpd->doorbell_bitmap);
+			pr_debug("reserved doorbell 0x%03x\n", i);
+		}
+
+	return 0;
+}
+
 struct kfd_process_device *kfd_get_process_device_data(struct kfd_dev *dev,
 							struct kfd_process *p)
 {
@@ -621,33 +649,42 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	struct kfd_process_device *pdd = NULL;
 
 	pdd = kzalloc(sizeof(*pdd), GFP_KERNEL);
-	if (pdd != NULL) {
-		pdd->dev = dev;
-		INIT_LIST_HEAD(&pdd->qpd.queues_list);
-		INIT_LIST_HEAD(&pdd->qpd.priv_queue_list);
-		pdd->qpd.dqm = dev->dqm;
-		pdd->qpd.pqm = &p->pqm;
-		pdd->qpd.evicted = 0;
-		pdd->reset_wavefronts = false;
-		pdd->process = p;
-		pdd->bound = PDD_UNBOUND;
-		pdd->already_dequeued = false;
-		list_add(&pdd->per_device_list, &p->per_device_data);
+	if (!pdd)
+		return NULL;
 
-		/* Init idr used for memory handle translation */
-		idr_init(&pdd->alloc_idr);
+	pdd->dev = dev;
+	INIT_LIST_HEAD(&pdd->qpd.queues_list);
+	INIT_LIST_HEAD(&pdd->qpd.priv_queue_list);
+	pdd->qpd.dqm = dev->dqm;
+	pdd->qpd.pqm = &p->pqm;
+	pdd->qpd.evicted = 0;
+	pdd->reset_wavefronts = false;
+	pdd->process = p;
+	pdd->bound = PDD_UNBOUND;
+	pdd->already_dequeued = false;
+	list_add(&pdd->per_device_list, &p->per_device_data);
 
-		/* Create the GPUVM context for this specific device */
-		if (dev->kfd2kgd->create_process_vm(dev->kgd, &pdd->vm,
-						&p->process_info)) {
-			pr_err("Failed to create process VM object\n");
-			list_del(&pdd->per_device_list);
-			kfree(pdd);
-			pdd = NULL;
-		}
+	/* Init idr used for memory handle translation */
+	idr_init(&pdd->alloc_idr);
+	if (init_doorbell_bitmap(&pdd->qpd, dev)) {
+		pr_err("Failed to init doorbell for process\n");
+		goto err_create_pdd;
 	}
 
+	/* Create the GPUVM context for this specific device */
+	if (dev->kfd2kgd->create_process_vm(dev->kgd, &pdd->vm,
+					&p->process_info)) {
+		pr_err("Failed to create process VM object\n");
+		goto err_create_pdd;
+	}
 	return pdd;
+
+err_create_pdd:
+	kfree(pdd->qpd.doorbell_bitmap);
+	idr_destroy(&pdd->alloc_idr);
+	list_del(&pdd->per_device_list);
+	kfree(pdd);
+	return NULL;
 }
 
 /*
