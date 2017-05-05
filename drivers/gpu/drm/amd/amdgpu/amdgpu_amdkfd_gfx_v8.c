@@ -763,6 +763,13 @@ static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
 	WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);
 }
 
+/*
+ * FIXME: Poliars test failed with this package, FIJI works fine
+ * From the CP spec it does not official support the invalidation
+ * with the specified pasid in the package,  so disable it for V8
+ *
+ */
+#ifdef V8_SUPPORT_IT_OFFICIAL
 static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
 {
 	signed long r;
@@ -786,15 +793,18 @@ static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
 
 	return r;
 }
-
+#endif
 static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
 	int vmid;
+
+#ifdef V8_SUPPORT_IT_OFFICIAL
 	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
 
 	if (ring->ready)
 		return invalidate_tlbs_with_kiq(adev, pasid);
+#endif
 
 	for (vmid = 0; vmid < 16; vmid++) {
 		if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid))
