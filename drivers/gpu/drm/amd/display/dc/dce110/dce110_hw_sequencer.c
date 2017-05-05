@@ -1252,10 +1252,12 @@ void dce110_set_displaymarks(
 	}
 }
 
-static void set_safe_displaymarks(struct resource_context *res_ctx)
+static void set_safe_displaymarks(
+		struct resource_context *res_ctx,
+		const struct resource_pool *pool)
 {
 	int i;
-	int underlay_idx = res_ctx->pool->underlay_pipe_index;
+	int underlay_idx = pool->underlay_pipe_index;
 	struct bw_watermarks max_marks = {
 		MAX_WATERMARK, MAX_WATERMARK, MAX_WATERMARK, MAX_WATERMARK };
 	struct bw_watermarks nbp_marks = {
@@ -1300,9 +1302,11 @@ static void switch_dp_clock_sources(
 			if (clk_src &&
 				clk_src != pipe_ctx->clock_source) {
 				resource_unreference_clock_source(
-					res_ctx, &pipe_ctx->clock_source);
+					res_ctx, dc->res_pool,
+					&pipe_ctx->clock_source);
 				pipe_ctx->clock_source = clk_src;
-				resource_reference_clock_source(res_ctx, clk_src);
+				resource_reference_clock_source(
+						res_ctx, dc->res_pool, clk_src);
 
 				dce_crtc_switch_to_clk_src(dc->hwseq, clk_src, i);
 			}
@@ -1328,8 +1332,8 @@ static void reset_single_pipe_hw_ctx(
 	pipe_ctx->tg->funcs->disable_crtc(pipe_ctx->tg);
 	pipe_ctx->mi->funcs->free_mem_input(
 				pipe_ctx->mi, context->stream_count);
-	resource_unreference_clock_source(
-			&context->res_ctx, &pipe_ctx->clock_source);
+	resource_unreference_clock_source(&context->res_ctx, dc->res_pool,
+			 &pipe_ctx->clock_source);
 
 	dc->hwss.power_down_front_end((struct core_dc *)dc, pipe_ctx);
 
@@ -1502,7 +1506,7 @@ static enum dc_status apply_ctx_to_hw_fpga(
 	enum dc_status status = DC_ERROR_UNEXPECTED;
 	int i;
 
-	for (i = 0; i < context->res_ctx.pool->pipe_count; i++) {
+	for (i = 0; i < MAX_PIPES; i++) {
 		struct pipe_ctx *pipe_ctx_old =
 				&dc->current_context->res_ctx.pipe_ctx[i];
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
@@ -1533,7 +1537,7 @@ static void reset_hw_ctx_wrap(
 
 	/* Reset old context */
 	/* look up the targets that have been removed since last commit */
-	for (i = 0; i < context->res_ctx.pool->pipe_count; i++) {
+	for (i = 0; i < MAX_PIPES; i++) {
 		struct pipe_ctx *pipe_ctx_old =
 			&dc->current_context->res_ctx.pipe_ctx[i];
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
@@ -1581,7 +1585,7 @@ enum dc_status dce110_apply_ctx_to_hw(
 	dcb->funcs->set_scratch_critical_state(dcb, true);
 
 	/* below is for real asic only */
-	for (i = 0; i < context->res_ctx.pool->pipe_count; i++) {
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
 		struct pipe_ctx *pipe_ctx_old =
 					&dc->current_context->res_ctx.pipe_ctx[i];
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
@@ -1601,14 +1605,14 @@ enum dc_status dce110_apply_ctx_to_hw(
 				PIPE_GATING_CONTROL_DISABLE);
 	}
 
-	set_safe_displaymarks(&context->res_ctx);
+	set_safe_displaymarks(&context->res_ctx, dc->res_pool);
 	/*TODO: when pplib works*/
 	apply_min_clocks(dc, context, &clocks_state, true);
 
 	if (context->dispclk_khz
 			> dc->current_context->dispclk_khz) {
-		context->res_ctx.pool->display_clock->funcs->set_clock(
-				context->res_ctx.pool->display_clock,
+		dc->res_pool->display_clock->funcs->set_clock(
+				dc->res_pool->display_clock,
 				context->dispclk_khz * 115 / 100);
 	}
 	/* program audio wall clock. use HDMI as clock source if HDMI
@@ -1630,7 +1634,7 @@ enum dc_status dce110_apply_ctx_to_hw(
 	* find first available pipe with audio, setup audio wall DTO per topology
 	* instead of per pipe.
 	*/
-	for (i = 0; i < context->res_ctx.pool->pipe_count; i++) {
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 
 		if (pipe_ctx->stream == NULL)
@@ -1657,8 +1661,8 @@ enum dc_status dce110_apply_ctx_to_hw(
 	}
 
 	/* no HDMI audio is found, try DP audio */
-	if (i == context->res_ctx.pool->pipe_count) {
-		for (i = 0; i < context->res_ctx.pool->pipe_count; i++) {
+	if (i == dc->res_pool->pipe_count) {
+		for (i = 0; i < dc->res_pool->pipe_count; i++) {
 			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 
 			if (pipe_ctx->stream == NULL)
@@ -1685,7 +1689,7 @@ enum dc_status dce110_apply_ctx_to_hw(
 		}
 	}
 
-	for (i = 0; i < context->res_ctx.pool->pipe_count; i++) {
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
 		struct pipe_ctx *pipe_ctx_old =
 					&dc->current_context->res_ctx.pipe_ctx[i];
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
@@ -2269,8 +2273,8 @@ static void dce110_set_bandwidth(
 	dce110_set_displaymarks(dc, context);
 
 	if (decrease_allowed || context->dispclk_khz > dc->current_context->dispclk_khz) {
-		context->res_ctx.pool->display_clock->funcs->set_clock(
-				context->res_ctx.pool->display_clock,
+		dc->res_pool->display_clock->funcs->set_clock(
+				dc->res_pool->display_clock,
 				context->dispclk_khz * 115 / 100);
 		dc->current_context->bw_results.dispclk_khz = context->dispclk_khz;
 		dc->current_context->dispclk_khz = context->dispclk_khz;
@@ -2418,7 +2422,7 @@ static void dce110_apply_ctx_for_surface(
 	if (!surface)
 		return;
 
-	for (i = 0; i < context->res_ctx.pool->pipe_count; i++) {
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 
 		if (pipe_ctx->surface != surface)
