@@ -1726,7 +1726,7 @@ static int amdgpu_sriov_reinit_early(struct amdgpu_device *adev)
 		AMD_IP_BLOCK_TYPE_IH,
 	};
 
-	for (i = 0; i < sizeof(ip_order)/sizeof(ip_order[0]); i++) {
+	for (i = 0; i < ARRAY_SIZE(ip_order); i++) {
 		int j;
 		struct amdgpu_ip_block *block;
 
@@ -1757,7 +1757,7 @@ static int amdgpu_sriov_reinit_late(struct amdgpu_device *adev)
 		AMD_IP_BLOCK_TYPE_VCE,
 	};
 
-	for (i = 0; i < sizeof(ip_order)/sizeof(ip_order[0]); i++) {
+	for (i = 0; i < ARRAY_SIZE(ip_order); i++) {
 		int j;
 		struct amdgpu_ip_block *block;
 
