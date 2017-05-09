@@ -52,7 +52,7 @@ static struct snd_soc_dai_link acp3x_dai_w5102[] = {
 		.cpu_dai_name = "acp3x_rv_i2s.0",
 		.codec_dai_name = "dummy_w5102_dai",
 		.codec_name = "dummy_w5102.0",
-		.dai_fmt = SND_SOC_DAIFMT_DSP_A /*SND_SOC_DAIFMT_I2S*/ | SND_SOC_DAIFMT_NB_NF
+		.dai_fmt =     SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF
 				| SND_SOC_DAIFMT_CBM_CFM,
 		.ops = &acp3x_wm5102_ops,
 		.init = acp3x_init,
