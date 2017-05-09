@@ -1,7 +1,7 @@
 #include <linux/kernel.h>
 #include <linux/acpi.h>
 #include <linux/mm.h>
-#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 #include <linux/amd-iommu.h>
 #endif
 #include <linux/pci.h>
@@ -121,7 +121,7 @@ static void kfd_populated_cu_info_cpu(struct kfd_topology_device *dev,
 
 	dev->node_props.cpu_cores_count = cu->num_cpu_cores;
 	dev->node_props.cpu_core_id_base = cu->processor_id_low;
-#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 	if (cu->hsa_capability & CRAT_CU_FLAGS_IOMMU_PRESENT)
 		dev->node_props.capability |= HSA_CAP_ATS_PRESENT;
 #endif
@@ -303,7 +303,7 @@ static int kfd_parse_subtype_cache(struct crat_subtype_cache *cache,
 static int kfd_parse_subtype_iolink(struct crat_subtype_iolink *iolink,
 					struct list_head *device_list)
 {
-	struct kfd_iolink_properties *props, *props2;
+	struct kfd_iolink_properties *props = NULL, *props2;
 	struct kfd_topology_device *dev, *cpu_dev;
 	uint32_t id_from;
 	uint32_t id_to;
@@ -684,6 +684,7 @@ static int kfd_fill_gpu_cache_info(struct kfd_dev *kdev,
  *
  * Return 0 if successful else return -ve value
  */
+#ifdef CONFIG_ACPI
 int kfd_create_crat_image_acpi(void **crat_image, size_t *size)
 {
 	struct acpi_table_header *crat_table;
@@ -726,6 +727,7 @@ int kfd_create_crat_image_acpi(void **crat_image, size_t *size)
 
 	return 0;
 }
+#endif
 
 /* Memory required to create Virtual CRAT.
  * Since there is no easy way to predict the amount of memory required, the
@@ -823,6 +825,7 @@ static int kfd_fill_mem_info_for_cpu(int numa_node_id, int *avail_size,
 	return 0;
 }
 
+#ifdef CONFIG_X86_64
 static int kfd_fill_iolink_info_for_cpu(int numa_node_id, int *avail_size,
 				uint32_t *num_entries,
 				struct crat_subtype_iolink *sub_type_hdr)
@@ -865,6 +868,7 @@ static int kfd_fill_iolink_info_for_cpu(int numa_node_id, int *avail_size,
 
 	return 0;
 }
+#endif
 
 /* kfd_create_vcrat_image_cpu - Create Virtual CRAT for CPU
  *
@@ -875,13 +879,17 @@ static int kfd_fill_iolink_info_for_cpu(int numa_node_id, int *avail_size,
 static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 {
 	struct crat_header *crat_table = (struct crat_header *)pcrat_image;
-	struct acpi_table_header *acpi_table;
-	acpi_status status;
 	struct crat_subtype_generic *sub_type_hdr;
 	int avail_size = *size;
 	int numa_node_id;
-	uint32_t entries = 0;
 	int ret = 0;
+#ifdef CONFIG_ACPI
+	struct acpi_table_header *acpi_table;
+	acpi_status status;
+#endif
+#ifdef CONFIG_X86_64
+	uint32_t entries = 0;
+#endif
 
 	if (pcrat_image == NULL || avail_size < VCRAT_SIZE_FOR_CPU)
 		return -EINVAL;
@@ -897,6 +905,7 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 	memcpy(&crat_table->signature, CRAT_SIGNATURE, sizeof(crat_table->signature));
 	crat_table->length = sizeof(struct crat_header);
 
+#ifdef CONFIG_ACPI
 	status = acpi_get_table("DSDT", 0, &acpi_table);
 	if (status == AE_NOT_FOUND)
 		pr_warn("DSDT table not found for OEM information\n");
@@ -905,6 +914,11 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 		memcpy(crat_table->oem_id, acpi_table->oem_id, CRAT_OEMID_LENGTH);
 		memcpy(crat_table->oem_table_id, acpi_table->oem_table_id, CRAT_OEMTABLEID_LENGTH);
 	}
+#else
+	crat_table->oem_revision = 0;
+	memcpy(crat_table->oem_id, "INV", CRAT_OEMID_LENGTH);
+	memcpy(crat_table->oem_table_id, "UNAVAIL", CRAT_OEMTABLEID_LENGTH);
+#endif
 	crat_table->total_entries = 0;
 	crat_table->num_domains = 0;
 
@@ -939,6 +953,7 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 			sub_type_hdr->length);
 
 		/* Fill in Subtype: IO Link */
+#ifdef CONFIG_X86_64
 		ret = kfd_fill_iolink_info_for_cpu(numa_node_id, &avail_size,
 				&entries,
 				(struct crat_subtype_iolink *)sub_type_hdr);
@@ -949,6 +964,9 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 
 		sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
 				sub_type_hdr->length * entries);
+#else
+		pr_info("IO link not available for non x86 platforms\n");
+#endif
 
 		crat_table->num_domains++;
 	}
@@ -1025,11 +1043,14 @@ static int kfd_fill_gpu_direct_io_link(int *avail_size,
 	 * TODO: Fill-in other fields of iolink subtype */
 	sub_type_hdr->io_interface_type = CRAT_IOLINK_TYPE_PCIEXPRESS;
 	sub_type_hdr->proximity_domain_from = proximity_domain;
+#ifdef CONFIG_NUMA
 	if (kdev->pdev->dev.numa_node == NUMA_NO_NODE)
 		sub_type_hdr->proximity_domain_to = 0;
 	else
 		sub_type_hdr->proximity_domain_to = kdev->pdev->dev.numa_node;
-
+#else
+	sub_type_hdr->proximity_domain_to = 0;
+#endif
 	return 0;
 }
 
@@ -1047,15 +1068,13 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	struct crat_subtype_generic *sub_type_hdr;
 	struct crat_subtype_computeunit *cu;
 	struct kfd_cu_info cu_info;
-#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
-	struct amd_iommu_device_info iommu_info;
-#endif
 	int avail_size = *size;
 	uint32_t total_num_of_cu;
 	int num_of_cache_entries = 0;
 	int cache_mem_filled = 0;
 	int ret = 0;
-#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
+	struct amd_iommu_device_info iommu_info;
 	const u32 required_iommu_flags = AMD_IOMMU_DEVICE_FLAG_ATS_SUP |
 								AMD_IOMMU_DEVICE_FLAG_PRI_SUP |
 								AMD_IOMMU_DEVICE_FLAG_PASID_SUP;
@@ -1115,9 +1134,9 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 
 	cu->hsa_capability = 0;
 
-#if !defined(KFD_NO_IOMMU_V2_SUPPORT)
 	/* Check if this node supports IOMMU. During parsing this flag will
 	 * translate to HSA_CAP_ATS_PRESENT */
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 	iommu_info.flags = 0;
 	if (0 == amd_iommu_device_info(kdev->pdev, &iommu_info)) {
 		if ((iommu_info.flags & required_iommu_flags) == required_iommu_flags)

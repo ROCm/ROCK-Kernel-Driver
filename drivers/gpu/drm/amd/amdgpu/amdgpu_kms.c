@@ -563,10 +563,21 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 
 		if (amdgpu_ngg) {
 			dev_info.prim_buf_gpu_addr = adev->gfx.ngg.buf[PRIM].gpu_addr;
+			dev_info.prim_buf_size = adev->gfx.ngg.buf[PRIM].size;
 			dev_info.pos_buf_gpu_addr = adev->gfx.ngg.buf[POS].gpu_addr;
+			dev_info.pos_buf_size = adev->gfx.ngg.buf[POS].size;
 			dev_info.cntl_sb_buf_gpu_addr = adev->gfx.ngg.buf[CNTL].gpu_addr;
+			dev_info.cntl_sb_buf_size = adev->gfx.ngg.buf[CNTL].size;
 			dev_info.param_buf_gpu_addr = adev->gfx.ngg.buf[PARAM].gpu_addr;
+			dev_info.param_buf_size = adev->gfx.ngg.buf[PARAM].size;
 		}
+		dev_info.wave_front_size = adev->gfx.cu_info.wave_front_size;
+		dev_info.num_shader_visible_vgprs = adev->gfx.config.max_gprs;
+		dev_info.num_cu_per_sh = adev->gfx.config.max_cu_per_sh;
+		dev_info.num_tcc_blocks = adev->gfx.config.max_texture_channel_caches;
+		dev_info.gs_vgt_table_depth = adev->gfx.config.gs_vgt_table_depth;
+		dev_info.gs_prim_buffer_depth = adev->gfx.config.gs_prim_buffer_depth;
+		dev_info.max_gs_waves_per_vgt = adev->gfx.config.max_gs_waves_per_vgt;
 
 		return copy_to_user(out, &dev_info,
 				    min((size_t)size, sizeof(dev_info))) ? -EFAULT : 0;
@@ -646,6 +657,8 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 			cap.flag |= AMDGPU_CAPABILITY_DIRECT_GMA_FLAG;
 			cap.direct_gma_size = amdgpu_direct_gma_size;
 		}
+		if (adev->ssg.enabled)
+			cap.flag |= AMDGPU_CAPABILITY_SSG_FLAG;
 		return copy_to_user(out, &cap,
 				    min((size_t)size, sizeof(cap))) ? -EFAULT : 0;
 	}
@@ -841,7 +854,7 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 
 	if (amdgpu_sriov_vf(adev)) {
 		/* TODO: how to handle reserve failure */
-		BUG_ON(amdgpu_bo_reserve(adev->virt.csa_obj, false));
+		BUG_ON(amdgpu_bo_reserve(adev->virt.csa_obj, true));
 		amdgpu_vm_bo_rmv(adev, fpriv->vm.csa_bo_va);
 		fpriv->vm.csa_bo_va = NULL;
 		amdgpu_bo_unreserve(adev->virt.csa_obj);

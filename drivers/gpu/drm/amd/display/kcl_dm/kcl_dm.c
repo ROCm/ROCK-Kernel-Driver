@@ -111,6 +111,8 @@ static u32 dm_vblank_get_counter(struct amdgpu_device *adev, int crtc)
 static int dm_crtc_get_scanoutpos(struct amdgpu_device *adev, int crtc,
 					u32 *vbl, u32 *position)
 {
+	uint32_t v_blank_start, v_blank_end, h_position, v_position;
+
 	if ((crtc < 0) || (crtc >= adev->mode_info.num_crtc))
 		return -EINVAL;
 	else {
@@ -121,7 +123,18 @@ static int dm_crtc_get_scanoutpos(struct amdgpu_device *adev, int crtc,
 			return 0;
 		}
 
-		return dc_stream_get_scanoutpos(acrtc->stream, vbl, position);
+		/*
+		 * TODO rework base driver to use values directly.
+		 * for now parse it back into reg-format
+		 */
+		dc_stream_get_scanoutpos(acrtc->stream,
+					 &v_blank_start,
+					 &v_blank_end,
+					 &h_position,
+					 &v_position);
+
+		*position = (v_position) || (h_position << 16);
+		*vbl = (v_blank_start) || (v_blank_end << 16);
 	}
 
 	return 0;
@@ -638,8 +651,16 @@ static int dm_display_resume(struct drm_device *ddev)
 
 	/* Call commit internally with the state we just constructed */
 	ret = drm_atomic_commit(state);
-	if (!ret)
+	if (!ret) {
+		/* Enable vblank after pipes powered back on */
+		list_for_each_entry(crtc, &ddev->mode_config.crtc_list, head) {
+			struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+			if (acrtc->stream)
+				drm_crtc_vblank_on(crtc);
+		}
 		return 0;
+        }
+
 
 err:
 	DRM_ERROR("Restoring old state failed with %i\n", ret);
@@ -682,14 +703,6 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 	 * pulse interrupts are used for MST
 	 */
 	amdgpu_dm_irq_resume_early(adev);
-
-	drm_modeset_lock_all(ddev);
-	list_for_each_entry(crtc, &ddev->mode_config.crtc_list, head) {
-		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
-		if (acrtc->stream)
-				drm_crtc_vblank_on(crtc);
-	}
-	drm_modeset_unlock_all(ddev);
 
 	/* Do detection*/
 	list_for_each_entry(connector,
@@ -1236,7 +1249,7 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 			goto fail_free_planes;
 		}
 		mode_info->planes[i]->plane_type = mode_info->plane_type[i];
-		if (amdgpu_dm_plane_init(dm, mode_info->planes[i], 1)) {
+		if (amdgpu_dm_plane_init(dm, mode_info->planes[i], 0xff)) {
 			DRM_ERROR("KMS: Failed to initialize plane\n");
 			goto fail_free_planes;
 		}

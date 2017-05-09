@@ -115,6 +115,7 @@ extern int amdgpu_pos_buf_per_se;
 extern int amdgpu_cntl_sb_buf_per_se;
 extern int amdgpu_param_buf_per_se;
 
+#define AMDGPU_DEFAULT_GTT_SIZE_MB		3072ULL /* 3GB by default */
 #define AMDGPU_WAIT_IDLE_TIMEOUT_IN_MS	        3000
 #define AMDGPU_MAX_USEC_TIMEOUT			100000	/* 100 ms */
 #define AMDGPU_FENCE_JIFFIES_TIMEOUT		(HZ / 2)
@@ -938,6 +939,7 @@ struct amdgpu_mec {
 struct amdgpu_kiq {
 	u64			eop_gpu_addr;
 	struct amdgpu_bo	*eop_obj;
+	struct mutex		ring_mutex;
 	struct amdgpu_ring	ring;
 	struct amdgpu_irq_src	irq;
 };
@@ -998,6 +1000,9 @@ struct amdgpu_gfx_config {
 	unsigned mc_arb_ramcfg;
 	unsigned gb_addr_config;
 	unsigned num_rbs;
+	unsigned gs_vgt_table_depth;
+	unsigned gs_prim_buffer_depth;
+	unsigned max_gs_waves_per_vgt;
 
 	uint32_t tile_mode_array[32];
 	uint32_t macrotile_mode_array[16];
@@ -1331,7 +1336,6 @@ struct amdgpu_smumgr {
  */
 struct amdgpu_allowed_register_entry {
 	uint32_t reg_offset;
-	bool untouched;
 	bool grbm_indexed;
 };
 

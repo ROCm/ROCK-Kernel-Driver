@@ -139,6 +139,9 @@ static void kfd_release_topology_device(struct kfd_topology_device *dev)
 	struct kfd_mem_properties *mem;
 	struct kfd_cache_properties *cache;
 	struct kfd_iolink_properties *iolink;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+	struct kfd_perf_properties *perf;
+#endif
 
 	BUG_ON(!dev);
 
@@ -164,6 +167,15 @@ static void kfd_release_topology_device(struct kfd_topology_device *dev)
 		list_del(&iolink->list);
 		kfree(iolink);
 	}
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+	while (dev->perf_props.next != &dev->perf_props) {
+		perf = container_of(dev->perf_props.next,
+				struct kfd_perf_properties, list);
+		list_del(&perf->list);
+		kfree(perf);
+	}
+#endif
 
 	kfree(dev);
 
@@ -198,6 +210,9 @@ struct kfd_topology_device *kfd_create_topology_device(
 	INIT_LIST_HEAD(&dev->mem_props);
 	INIT_LIST_HEAD(&dev->cache_props);
 	INIT_LIST_HEAD(&dev->io_link_props);
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+	INIT_LIST_HEAD(&dev->perf_props);
+#endif
 
 	list_add_tail(&dev->list, device_list);
 	sys_props.num_devices++;
@@ -364,6 +379,41 @@ static struct kobj_type cache_type = {
 	.sysfs_ops = &cache_ops,
 };
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+/****** Sysfs of Performance Counters ******/
+
+struct kfd_perf_attr {
+	struct kobj_attribute attr;
+	uint32_t data;
+};
+
+static ssize_t perf_show(struct kobject *kobj, struct kobj_attribute *attrs,
+			char *buf)
+{
+	struct kfd_perf_attr *attr;
+
+	buf[0] = 0;
+	attr = container_of(attrs, struct kfd_perf_attr, attr);
+	if (!attr->data) /* invalid data for PMC */
+		return 0;
+	else
+		return sysfs_show_32bit_val(buf, attr->data);
+}
+
+#define KFD_PERF_DESC(_name, _data)			\
+{							\
+	.attr  = __ATTR(_name, 0444, perf_show, NULL),	\
+	.data = _data,					\
+}
+
+static struct kfd_perf_attr perf_attr_iommu[] = {
+	KFD_PERF_DESC(max_concurrent, 0),
+	KFD_PERF_DESC(num_counters, 0),
+	KFD_PERF_DESC(counter_ids, 0),
+};
+/****************************************/
+#endif
+
 static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 		char *buffer)
 {
@@ -503,6 +553,9 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 	struct kfd_iolink_properties *iolink;
 	struct kfd_cache_properties *cache;
 	struct kfd_mem_properties *mem;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+	struct kfd_perf_properties *perf;
+#endif
 
 	BUG_ON(!dev);
 
@@ -541,6 +594,18 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 		dev->kobj_mem = NULL;
 	}
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+	if (dev->kobj_perf) {
+		list_for_each_entry(perf, &dev->perf_props, list) {
+			kfree(perf->attr_group);
+			perf->attr_group = NULL;
+		}
+		kobject_del(dev->kobj_perf);
+		kobject_put(dev->kobj_perf);
+		dev->kobj_perf = NULL;
+	}
+#endif
+
 	if (dev->kobj_node) {
 		sysfs_remove_file(dev->kobj_node, &dev->attr_gpuid);
 		sysfs_remove_file(dev->kobj_node, &dev->attr_name);
@@ -557,6 +622,11 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 	struct kfd_iolink_properties *iolink;
 	struct kfd_cache_properties *cache;
 	struct kfd_mem_properties *mem;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+	struct kfd_perf_properties *perf;
+	uint32_t num_attrs;
+	struct attribute **attrs;
+#endif
 	int ret;
 	uint32_t i;
 
@@ -586,6 +656,12 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 	dev->kobj_iolink = kobject_create_and_add("io_links", dev->kobj_node);
 	if (!dev->kobj_iolink)
 		return -ENOMEM;
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+	dev->kobj_perf = kobject_create_and_add("perf", dev->kobj_node);
+	if (!dev->kobj_perf)
+		return -ENOMEM;
+#endif
 
 	/*
 	 * Creating sysfs files for node properties
@@ -664,7 +740,35 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 		if (ret < 0)
 			return ret;
 		i++;
-}
+	}
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+	/* All hardware blocks have the same number of attributes. */
+	num_attrs = sizeof(perf_attr_iommu)/sizeof(struct kfd_perf_attr);
+	list_for_each_entry(perf, &dev->perf_props, list) {
+		perf->attr_group = kzalloc(sizeof(struct kfd_perf_attr)
+			* num_attrs + sizeof(struct attribute_group),
+			GFP_KERNEL);
+		if (!perf->attr_group)
+			return -ENOMEM;
+
+		attrs = (struct attribute **)(perf->attr_group + 1);
+		if (!strcmp(perf->block_name, "iommu")) {
+		/* Information of IOMMU's num_counters and counter_ids is shown
+		 * under /sys/bus/event_source/devices/amd_iommu. We don't
+		 * duplicate here.
+		 */
+			perf_attr_iommu[0].data = perf->max_concurrent;
+			for (i = 0; i < num_attrs; i++)
+				attrs[i] = &perf_attr_iommu[i].attr.attr;
+		}
+		perf->attr_group->name = perf->block_name;
+		perf->attr_group->attrs = attrs;
+		ret = sysfs_create_group(dev->kobj_perf, perf->attr_group);
+		if (ret < 0)
+			return ret;
+	}
+#endif
 
 	return 0;
 }
@@ -829,6 +933,33 @@ static void find_system_memory(const struct dmi_header *dm,
 		}
 	}
 }
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+/*
+ * Performance counters information is not part of CRAT but we would like to
+ * put them in the sysfs under topology directory for Thunk to get the data.
+ * This function is called before updating the sysfs.
+ */
+static int kfd_add_perf_to_topology(struct kfd_topology_device *kdev)
+{
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
+	struct kfd_perf_properties *props;
+
+	if (amd_iommu_pc_supported()) {
+		props = kfd_alloc_struct(props);
+		if (props == NULL)
+			return -ENOMEM;
+		strcpy(props->block_name, "iommu");
+		props->max_concurrent = amd_iommu_pc_get_max_banks(0) *
+			amd_iommu_pc_get_max_counters(0); /* assume one iommu */
+		list_add_tail(&props->list, &kdev->perf_props);
+	}
+#endif
+
+	return 0;
+}
+#endif
+
 /* kfd_add_non_crat_information - Add information that is not currently
  *	defined in CRAT but is necessary for KFD topology
  * @dev - topology device to which addition info is added
@@ -842,6 +973,35 @@ static void kfd_add_non_crat_information(struct kfd_topology_device *kdev)
 	}
 	/* TODO: For GPU node, rearrange code from kfd_topology_add_device */
 }
+
+#ifdef CONFIG_ACPI
+/* kfd_is_acpi_crat_invalid - CRAT from ACPI is valid only for AMD APU devices.
+ *	Ignore CRAT for all other devices. AMD APU is identified if both CPU
+ *	and GPU cores are present.
+ * @device_list - topology device list created by parsing ACPI CRAT table.
+ * @return - TRUE if invalid, FALSE is valid.
+ */
+static bool kfd_is_acpi_crat_invalid(struct list_head *device_list)
+{
+	struct kfd_topology_device *dev;
+
+	list_for_each_entry(dev, device_list, list) {
+		if (dev->node_props.cpu_cores_count &&
+			dev->node_props.simd_count)
+			return false;
+	}
+	pr_info("Ignoring ACPI CRAT on non-APU system\n");
+	return true;
+}
+
+static void kfd_delete_topology_device_list(struct list_head *device_list)
+{
+	struct kfd_topology_device *dev, *tmp;
+
+	list_for_each_entry_safe(dev, tmp, device_list, list)
+		kfd_release_topology_device(dev);
+}
+#endif
 
 int kfd_topology_init(void)
 {
@@ -876,26 +1036,48 @@ int kfd_topology_init(void)
 
 	/*
 	 * Get the CRAT image from the ACPI. If ACPI doesn't have one
-	 * create a virtual CRAT.
+	 * or if ACPI CRAT is invalid create a virtual CRAT.
 	 * NOTE: The current implementation expects all AMD APUs to have
 	 *	CRAT. If no CRAT is available, it is assumed to be a CPU
 	 */
+#ifdef CONFIG_ACPI
 	ret = kfd_create_crat_image_acpi(&crat_image, &image_size);
-	if (ret != 0) {
+	if (ret == 0) {
+		ret = kfd_parse_crat_table(crat_image,
+					   &temp_topology_device_list,
+					   proximity_domain);
+		if (ret ||
+			kfd_is_acpi_crat_invalid(&temp_topology_device_list)) {
+
+			kfd_delete_topology_device_list(
+				&temp_topology_device_list);
+			INIT_LIST_HEAD(&temp_topology_device_list);
+			kfd_destroy_crat_image(crat_image);
+			crat_image = NULL;
+		}
+	}
+#endif
+	if (!crat_image) {
 		ret = kfd_create_crat_image_virtual(&crat_image, &image_size,
 				COMPUTE_UNIT_CPU, NULL,
 				proximity_domain);
 		cpu_only_node = 1;
-	}
 
-	if (ret == 0)
-		ret = kfd_parse_crat_table(crat_image,
+		if (ret == 0)
+			ret = kfd_parse_crat_table(crat_image,
 				&temp_topology_device_list,
 				proximity_domain);
-	else {
-		pr_err("Error getting/creating CRAT table\n");
-		goto err;
+		else {
+			pr_err("Error getting/creating CRAT table\n");
+			goto err;
+		}
 	}
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+	kdev = list_first_entry(&temp_topology_device_list,
+				struct kfd_topology_device, list);
+	kfd_add_perf_to_topology(kdev);
+#endif
 
 	down_write(&topology_lock);
 	num_nodes = kfd_topology_update_device_list(&temp_topology_device_list,
@@ -1230,7 +1412,6 @@ int kfd_topology_enum_kfd_devices(uint8_t idx, struct kfd_dev **kdev)
 
 static int kfd_cpumask_to_apic_id(const struct cpumask *cpumask)
 {
-	const struct cpuinfo_x86 *cpuinfo;
 	int first_cpu_of_numa_node;
 
 	if (cpumask == NULL || cpumask == cpu_none_mask)
@@ -1238,9 +1419,11 @@ static int kfd_cpumask_to_apic_id(const struct cpumask *cpumask)
 	first_cpu_of_numa_node = cpumask_first(cpumask);
 	if (first_cpu_of_numa_node >= nr_cpu_ids)
 		return -1;
-	cpuinfo = &cpu_data(first_cpu_of_numa_node);
-
-	return cpuinfo->apicid;
+#ifdef CONFIG_X86_64
+	return cpu_data(first_cpu_of_numa_node).apicid;
+#else
+	return first_cpu_of_numa_node;
+#endif
 }
 
 /* kfd_numa_node_to_apic_id - Returns the APIC ID of the first logical processor

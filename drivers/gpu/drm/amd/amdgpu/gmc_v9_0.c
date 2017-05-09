@@ -386,7 +386,7 @@ static int gmc_v9_0_early_init(void *handle)
 static int gmc_v9_0_late_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	unsigned vm_inv_eng[AMDGPU_MAX_VMHUBS] = { 0 };
+	unsigned vm_inv_eng[AMDGPU_MAX_VMHUBS] = { 3, 3 };
 	unsigned i;
 
 	for(i = 0; i < adev->num_rings; ++i) {
@@ -394,8 +394,9 @@ static int gmc_v9_0_late_init(void *handle)
 		unsigned vmhub = ring->funcs->vmhub;
 
 		ring->vm_inv_eng = vm_inv_eng[vmhub]++;
-		dev_info(adev->dev, "ring %u uses VM inv eng %u on hub %u\n",
-			 ring->idx, ring->vm_inv_eng, ring->funcs->vmhub);
+		dev_info(adev->dev, "ring %u(%s) uses VM inv eng %u on hub %u\n",
+			 ring->idx, ring->name, ring->vm_inv_eng,
+			 ring->funcs->vmhub);
 	}
 
 	/* Engine 17 is used for GART flushes */
@@ -484,9 +485,41 @@ static int gmc_v9_0_mc_init(struct amdgpu_device *adev)
 	/* unless the user had overridden it, set the gart
 	 * size equal to the 1024 or vram, whichever is larger.
 	 */
-	if (amdgpu_gart_size == -1)
-		adev->mc.gtt_size = max((1024ULL << 20), adev->mc.mc_vram_size);
-	else
+	if (amdgpu_gart_size == -1) {
+		uint64_t gart_size_aligned;
+		struct sysinfo si;
+
+		/* Maximum GTT size is limited by the GART table size
+		 * in visible VRAM and the address space. Use at most
+		 * half of each.
+		 */
+		uint64_t max_gtt_size = min(
+			adev->mc.visible_vram_size / 8 *
+				AMDGPU_GPU_PAGE_SIZE / 2,
+			1ULL << 39);
+
+		si_meminfo(&si);
+		/* Set the GART to map the largest size between either
+		 * VRAM capacity or double the available physical RAM
+		 */
+		adev->mc.gtt_size = min(
+			max(
+				((uint64_t)si.totalram * si.mem_unit * 2),
+				adev->mc.mc_vram_size
+			),
+			max_gtt_size
+		);
+
+		/* GART sizes computed from physical RAM capacity
+		 * may not always be perfect powers of two.
+		 * Round up starting from the minimum size of 1GB.
+		 */
+		gart_size_aligned = 1024ULL << 20;
+		while (adev->mc.gtt_size > gart_size_aligned)
+			gart_size_aligned <<= 1;
+
+		adev->mc.gtt_size = gart_size_aligned;
+	} else
 		adev->mc.gtt_size = (uint64_t)amdgpu_gart_size << 20;
 
 	gmc_v9_0_vram_gtt_location(adev, &adev->mc);
@@ -778,6 +811,12 @@ static void gmc_v9_0_gart_disable(struct amdgpu_device *adev)
 static int gmc_v9_0_hw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+
+	if (amdgpu_sriov_vf(adev)) {
+		/* full access mode, so don't touch any GMC register */
+		DRM_DEBUG("For SRIOV client, shouldn't do anything.\n");
+		return 0;
+	}
 
 	amdgpu_irq_put(adev, &adev->mc.vm_fault, 0);
 	gmc_v9_0_gart_disable(adev);

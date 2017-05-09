@@ -181,9 +181,8 @@ static int allocate_vmid(struct device_queue_manager *dqm,
 	if (dqm->vmid_bitmap == 0)
 		return -ENOMEM;
 
-	bit = find_first_bit((unsigned long *)&dqm->vmid_bitmap,
-				dqm->dev->vm_info.vmid_num_kfd);
-	clear_bit(bit, (unsigned long *)&dqm->vmid_bitmap);
+	bit = ffs(dqm->vmid_bitmap) - 1;
+	dqm->vmid_bitmap &= ~(1 << bit);
 
 	allocated_vmid = bit + dqm->dev->vm_info.first_vmid_kfd;
 	pr_debug("kfd: vmid allocation %d\n", allocated_vmid);
@@ -234,7 +233,7 @@ static void deallocate_vmid(struct device_queue_manager *dqm,
 	/* Release the vmid mapping */
 	set_pasid_vmid_mapping(dqm, 0, qpd->vmid);
 
-	set_bit(bit, (unsigned long *)&dqm->vmid_bitmap);
+	dqm->vmid_bitmap |= (1 << bit);
 	qpd->vmid = 0;
 	q->properties.vmid = 0;
 }
@@ -324,12 +323,8 @@ static int allocate_hqd(struct device_queue_manager *dqm, struct queue *q)
 	for (pipe = dqm->next_pipe_to_allocate, i = 0; i < get_pipes_num(dqm);
 			pipe = ((pipe + 1) % get_pipes_num(dqm)), ++i) {
 		if (dqm->allocated_queues[pipe] != 0) {
-			bit = find_first_bit(
-				(unsigned long *)&dqm->allocated_queues[pipe],
-				QUEUES_PER_PIPE);
-
-			clear_bit(bit,
-				(unsigned long *)&dqm->allocated_queues[pipe]);
+			bit = ffs(dqm->allocated_queues[pipe]) - 1;
+			dqm->allocated_queues[pipe] &= ~(1 << bit);
 			q->pipe = pipe;
 			q->queue = bit;
 			set = true;
@@ -351,7 +346,7 @@ static int allocate_hqd(struct device_queue_manager *dqm, struct queue *q)
 static inline void deallocate_hqd(struct device_queue_manager *dqm,
 				struct queue *q)
 {
-	set_bit(q->queue, (unsigned long *)&dqm->allocated_queues[q->pipe]);
+	dqm->allocated_queues[q->pipe] |= (1 << q->queue);
 }
 
 static int create_compute_queue_nocpsch(struct device_queue_manager *dqm,
@@ -609,10 +604,11 @@ int process_evict_queues(struct device_queue_manager *dqm,
 			continue;
 		}
 		/* if the queue is not active anyway, it is not evicted */
-		if (q->properties.is_active == true)
+		if (q->properties.is_active == true) {
 			q->properties.is_evicted = true;
+			q->properties.is_active = false;
+		}
 
-		retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
 		if (is_queue_nocpsch(dqm, q) &&
 		    q->properties.is_evicted)
 			retval = mqd->destroy_mqd(mqd, q->mqd,
@@ -680,7 +676,8 @@ int process_restore_queues(struct device_queue_manager *dqm,
 		}
 		if (q->properties.is_evicted) {
 			q->properties.is_evicted = false;
-			retval = mqd->update_mqd(mqd, q->mqd, &q->properties);
+			q->properties.is_active = true;
+
 			if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
 			    (q->properties.type == KFD_QUEUE_TYPE_COMPUTE ||
 			     q->properties.type == KFD_QUEUE_TYPE_SDMA))
@@ -933,10 +930,8 @@ static int allocate_sdma_queue(struct device_queue_manager *dqm,
 	if (dqm->sdma_bitmap == 0)
 		return -ENOMEM;
 
-	bit = find_first_bit((unsigned long *)&dqm->sdma_bitmap,
-				CIK_SDMA_QUEUES);
-
-	clear_bit(bit, (unsigned long *)&dqm->sdma_bitmap);
+	bit = ffs(dqm->sdma_bitmap) - 1;
+	dqm->sdma_bitmap &= ~(1 << bit);
 	*sdma_queue_id = bit;
 
 	return 0;
@@ -947,7 +942,7 @@ static void deallocate_sdma_queue(struct device_queue_manager *dqm,
 {
 	if (sdma_queue_id >= CIK_SDMA_QUEUES)
 		return;
-	set_bit(sdma_queue_id, (unsigned long *)&dqm->sdma_bitmap);
+	dqm->sdma_bitmap |= (1 << sdma_queue_id);
 }
 
 static int create_sdma_queue_nocpsch(struct device_queue_manager *dqm,

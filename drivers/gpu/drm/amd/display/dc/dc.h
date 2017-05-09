@@ -411,6 +411,7 @@ enum surface_update_type {
 struct dc_stream {
 	const struct dc_sink *sink;
 	struct dc_crtc_timing timing;
+	enum signal_type output_signal;
 
 	enum dc_color_space output_color_space;
 
@@ -483,8 +484,11 @@ uint32_t dc_stream_get_vblank_counter(const struct dc_stream *stream);
  * This has a dependency on the caller (amdgpu_get_crtc_scanoutpos)
  * being refactored properly to be dce-specific
  */
-uint32_t dc_stream_get_scanoutpos(
-		const struct dc_stream *stream, uint32_t *vbl, uint32_t *position);
+bool dc_stream_get_scanoutpos(const struct dc_stream *stream,
+				  uint32_t *v_blank_start,
+				  uint32_t *v_blank_end,
+				  uint32_t *h_position,
+				  uint32_t *v_position);
 
 /*
  * Structure to store surface/stream associations for validation
@@ -501,6 +505,11 @@ struct dc_validation_set {
  * After this call:
  *   No hardware is programmed for call.  Only validation is done.
  */
+struct validate_context *dc_get_validate_context(
+		const struct dc *dc,
+		const struct dc_validation_set set[],
+		uint8_t set_count);
+
 bool dc_validate_resources(
 		const struct dc *dc,
 		const struct dc_validation_set set[],
@@ -517,6 +526,12 @@ bool dc_validate_resources(
 bool dc_validate_guaranteed(
 		const struct dc *dc,
 		const struct dc_stream *stream);
+
+void dc_resource_validate_ctx_copy_construct(
+		const struct validate_context *src_ctx,
+		struct validate_context *dst_ctx);
+
+void dc_resource_validate_ctx_destruct(struct validate_context *context);
 
 /*
  * Set up streams and links associated to drive sinks

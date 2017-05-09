@@ -56,6 +56,7 @@ static int psp_sw_init(void *handle)
 		psp->prep_cmd_buf = psp_v3_1_prep_cmd_buf;
 		psp->ring_init = psp_v3_1_ring_init;
 		psp->ring_create = psp_v3_1_ring_create;
+		psp->ring_destroy = psp_v3_1_ring_destroy;
 		psp->cmd_submit = psp_v3_1_cmd_submit;
 		psp->compare_sram_data = psp_v3_1_compare_sram_data;
 		psp->smu_reload_quirk = psp_v3_1_smu_reload_quirk;
@@ -233,6 +234,13 @@ static int psp_asd_load(struct psp_context *psp)
 	int ret;
 	struct psp_gfx_cmd_resp *cmd;
 
+	/* If PSP version doesn't match ASD version, asd loading will be failed.
+	 * add workaround to bypass it for sriov now.
+	 * TODO: add version check to make it common
+	 */
+	if (amdgpu_sriov_vf(psp->adev))
+		return 0;
+
 	cmd = kzalloc(sizeof(struct psp_gfx_cmd_resp), GFP_KERNEL);
 	if (!cmd)
 		return -ENOMEM;
@@ -291,6 +299,12 @@ static int psp_np_fw_load(struct psp_context *psp)
 
 		if (ucode->ucode_id == AMDGPU_UCODE_ID_SMC &&
 		    psp_smu_reload_quirk(psp))
+			continue;
+		if (amdgpu_sriov_vf(adev) &&
+		   (ucode->ucode_id == AMDGPU_UCODE_ID_SDMA0
+		    || ucode->ucode_id == AMDGPU_UCODE_ID_SDMA1
+		    || ucode->ucode_id == AMDGPU_UCODE_ID_RLC_G))
+			/*skip ucode loading in SRIOV VF */
 			continue;
 
 		ret = psp_prep_cmd_buf(ucode, psp->cmd);
@@ -415,8 +429,12 @@ static int psp_hw_fini(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct psp_context *psp = &adev->psp;
 
-	if (adev->firmware.load_type == AMDGPU_FW_LOAD_PSP)
-		amdgpu_ucode_fini_bo(adev);
+	if (adev->firmware.load_type != AMDGPU_FW_LOAD_PSP)
+		return 0;
+
+	amdgpu_ucode_fini_bo(adev);
+
+	psp_ring_destroy(psp, PSP_RING_TYPE__KM);
 
 	if (psp->tmr_buf)
 		amdgpu_bo_free_kernel(&psp->tmr_bo, &psp->tmr_mc_addr, &psp->tmr_buf);

@@ -1441,6 +1441,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 				      dma_addr_t *pages_addr,
 				      struct amdgpu_vm *vm,
 				      struct amdgpu_bo_va_mapping *mapping,
+				      uint64_t vram_base_offset,
 				      uint64_t flags,
 				      struct ttm_mem_reg *mem,
 				      struct fence **fence)
@@ -1503,12 +1504,12 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 				addr = 0;
 				break;
 			case AMDGPU_PL_DGMA:
-				addr += adev->vm_manager.vram_base_offset +
+				addr += vram_base_offset +
 					adev->mman.bdev.man[mem->mem_type].gpu_offset -
 					adev->mman.bdev.man[TTM_PL_VRAM].gpu_offset;
 				break;
 			case TTM_PL_VRAM:
-				addr += adev->vm_manager.vram_base_offset;
+				addr += vram_base_offset;
 				break;
 			default:
 				break;
@@ -1517,6 +1518,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 			addr = 0;
 			max_entries = S64_MAX;
 		}
+
 		addr += pfn << PAGE_SHIFT;
 
 		last = min((uint64_t)mapping->last, start + max_entries - 1);
@@ -1560,6 +1562,8 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	struct ttm_mem_reg *mem;
 	struct drm_mm_node *nodes;
 	struct fence *exclusive;
+	uint64_t vram_base_offset = adev->vm_manager.vram_base_offset;
+	struct amdgpu_device *bo_adev;
 	int r;
 
 	if (clear || !bo_va->bo) {
@@ -1583,11 +1587,17 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 
 	if (bo_va->bo) {
 		flags = amdgpu_ttm_tt_pte_flags(adev, bo_va->bo->tbo.ttm, mem);
+		bo_adev = amdgpu_ttm_adev(bo_va->bo->tbo.bdev);
 		gtt_flags = (amdgpu_ttm_is_bound(bo_va->bo->tbo.ttm) &&
-			adev == amdgpu_ttm_adev(bo_va->bo->tbo.bdev)) ?
+			adev == bo_adev) ?
 			flags : 0;
 		if (mem && mem->mem_type == AMDGPU_PL_DGMA_IMPORT)
 			gtt_flags = (adev == amdgpu_ttm_adev(bo_va->bo->tbo.bdev)) ? flags : 0;
+		if (mem && mem->mem_type == TTM_PL_VRAM &&
+			adev != bo_adev) {
+			flags |= AMDGPU_PTE_SYSTEM;
+			vram_base_offset = bo_adev->mc.aper_base;
+		}
 	} else {
 		flags = 0x0;
 		gtt_flags = ~0x0;
@@ -1601,8 +1611,8 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	list_for_each_entry(mapping, &bo_va->invalids, list) {
 		r = amdgpu_vm_bo_split_mapping(adev, exclusive,
 					       gtt_flags, pages_addr, vm,
-					       mapping, flags, mem,
-					       &bo_va->last_pt_update);
+					       mapping, vram_base_offset, flags,
+					       mem, &bo_va->last_pt_update);
 		if (r)
 			return r;
 	}
@@ -2318,7 +2328,8 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 				&adev->vm_manager.id_mgr[AMDGPU_GFXHUB];
 
 		mutex_lock(&id_mgr->lock);
-		if (adev->vm_manager.n_kfd_vms++ == 0) {
+		if ((adev->vm_manager.n_kfd_vms++ == 0) &&
+			(!amdgpu_sriov_vf(adev))) {
 			/* First KFD VM: enable compute power profile */
 			if (adev->pp_enabled)
 				amdgpu_dpm_switch_power_profile(adev,
@@ -2388,7 +2399,8 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		mutex_lock(&id_mgr->lock);
 		WARN(adev->vm_manager.n_kfd_vms == 0, "Unbalanced number of KFD VMs");
 
-		if (--adev->vm_manager.n_kfd_vms == 0) {
+		if ((--adev->vm_manager.n_kfd_vms == 0) &&
+			(!amdgpu_sriov_vf(adev))) {
 			/* Last KFD VM: enable graphics power profile */
 			if (adev->pp_enabled)
 				amdgpu_dpm_switch_power_profile(adev,

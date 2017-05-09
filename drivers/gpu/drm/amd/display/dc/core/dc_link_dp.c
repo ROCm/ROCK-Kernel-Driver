@@ -1691,7 +1691,7 @@ static void dp_test_send_link_test_pattern(struct core_link *link)
 			sizeof(dpcd_test_pattern));
 	core_link_read_dpcd(
 			link,
-			DP_TEST_MISC1,
+			DP_TEST_MISC0,
 			&dpcd_test_params.raw,
 			sizeof(dpcd_test_params));
 
@@ -2278,7 +2278,7 @@ static void set_crtc_test_pattern(struct core_link *link,
 	case DP_TEST_PATTERN_VIDEO_MODE:
 	{
 		/* restore bitdepth reduction */
-		link->dc->current_context->res_ctx.pool->funcs->
+		link->dc->res_pool->funcs->
 			build_bit_depth_reduction_params(pipe_ctx->stream,
 					&params);
 		pipe_ctx->stream->bit_depth_params = params;
@@ -2452,4 +2452,17 @@ bool dc_link_dp_set_test_pattern(
 	}
 
 	return true;
+}
+
+void dp_enable_mst_on_sink(struct core_link *link, bool enable)
+{
+	unsigned char mstmCntl;
+
+	core_link_read_dpcd(link, DP_MSTM_CTRL, &mstmCntl, 1);
+	if (enable)
+		mstmCntl |= DP_MST_EN;
+	else
+		mstmCntl &= (~DP_MST_EN);
+
+	core_link_write_dpcd(link, DP_MSTM_CTRL, &mstmCntl, 1);
 }

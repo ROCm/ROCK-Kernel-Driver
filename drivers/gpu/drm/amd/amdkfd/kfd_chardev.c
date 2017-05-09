@@ -854,7 +854,8 @@ static int kfd_ioctl_get_clock_counters(struct file *filep,
 {
 	struct kfd_ioctl_get_clock_counters_args *args = data;
 	struct kfd_dev *dev;
-#if (defined OS_NAME_RHEL) && (OS_VERSION_MAJOR == 6)
+#if (defined OS_NAME_RHEL) && (OS_VERSION_MAJOR == 6) \
+	|| (defined OS_NAME_RHEL_7_2)
 	struct timespec time;
 #else
 	struct timespec64 time;
@@ -870,7 +871,8 @@ static int kfd_ioctl_get_clock_counters(struct file *filep,
 		args->gpu_clock_counter = 0;
 
 	/* No access to rdtsc. Using raw monotonic time */
-#if (defined OS_NAME_RHEL) && (OS_VERSION_MAJOR == 6)
+#if (defined OS_NAME_RHEL) && (OS_VERSION_MAJOR == 6) \
+	|| (defined OS_NAME_RHEL_7_2)
 	getrawmonotonic(&time);
 	args->cpu_clock_counter = (uint64_t)timespec_to_ns(&time);
 
@@ -2094,6 +2096,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 			space_left -= copied;
 			dst_va_addr += copied;
 			dst_offset += copied;
+			src_offset += copied;
 			if (dst_va_addr > dst_bo->it.last + 1) {
 				pr_err("Cross mem copy failed. Memory overflow\n");
 				err = -EFAULT;

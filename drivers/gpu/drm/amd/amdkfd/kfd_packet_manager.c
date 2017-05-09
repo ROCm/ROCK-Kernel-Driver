@@ -404,7 +404,7 @@ int pm_debugfs_runlist(struct seq_file *m, void *data)
 		return 0;
 	}
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 0, 0)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 0, 0) && !defined(OS_NAME_RHEL_7_2)
 	seq_hex_dump(m, "  ", DUMP_PREFIX_OFFSET, 32, 4,
 		     pm->ib_buffer_obj->cpu_ptr, pm->ib_size_bytes, false);
 #endif

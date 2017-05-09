@@ -351,7 +351,7 @@ static void amdgpu_vram_scratch_fini(struct amdgpu_device *adev)
 	if (adev->vram_scratch.robj == NULL) {
 		return;
 	}
-	r = amdgpu_bo_reserve(adev->vram_scratch.robj, false);
+	r = amdgpu_bo_reserve(adev->vram_scratch.robj, true);
 	if (likely(r == 0)) {
 		amdgpu_bo_kunmap(adev->vram_scratch.robj);
 		amdgpu_bo_unpin(adev->vram_scratch.robj);
@@ -1743,19 +1743,27 @@ static int amdgpu_sriov_reinit_early(struct amdgpu_device *adev)
 {
 	int i, r;
 
-	for (i = 0; i < adev->num_ip_blocks; i++) {
-		if (!adev->ip_blocks[i].status.valid)
-			continue;
+	static enum amd_ip_block_type ip_order[] = {
+		AMD_IP_BLOCK_TYPE_GMC,
+		AMD_IP_BLOCK_TYPE_COMMON,
+		AMD_IP_BLOCK_TYPE_GFXHUB,
+		AMD_IP_BLOCK_TYPE_MMHUB,
+		AMD_IP_BLOCK_TYPE_IH,
+	};
 
-		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_COMMON ||
-				adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_GMC ||
-				adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_IH)
-			r = adev->ip_blocks[i].version->funcs->hw_init(adev);
+	for (i = 0; i < sizeof(ip_order)/sizeof(ip_order[0]); i++) {
+		int j;
+		struct amdgpu_ip_block *block;
 
-		if (r) {
-			DRM_ERROR("resume of IP block <%s> failed %d\n",
-				  adev->ip_blocks[i].version->funcs->name, r);
-			return r;
+		for (j = 0; j < adev->num_ip_blocks; j++) {
+			block = &adev->ip_blocks[j];
+
+			if (block->version->type != ip_order[i] ||
+				!block->status.valid)
+				continue;
+
+			r = block->version->funcs->hw_init(adev);
+			DRM_INFO("RE-INIT: %s %s\n", block->version->funcs->name, r?"failed":"successed");
 		}
 	}
 
@@ -1766,20 +1774,27 @@ static int amdgpu_sriov_reinit_late(struct amdgpu_device *adev)
 {
 	int i, r;
 
-	for (i = 0; i < adev->num_ip_blocks; i++) {
-		if (!adev->ip_blocks[i].status.valid)
-			continue;
+	static enum amd_ip_block_type ip_order[] = {
+		AMD_IP_BLOCK_TYPE_SMC,
+		AMD_IP_BLOCK_TYPE_DCE,
+		AMD_IP_BLOCK_TYPE_GFX,
+		AMD_IP_BLOCK_TYPE_SDMA,
+		AMD_IP_BLOCK_TYPE_VCE,
+	};
 
-		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_COMMON ||
-				adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_GMC ||
-				adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_IH )
-			continue;
+	for (i = 0; i < sizeof(ip_order)/sizeof(ip_order[0]); i++) {
+		int j;
+		struct amdgpu_ip_block *block;
 
-		r = adev->ip_blocks[i].version->funcs->hw_init(adev);
-		if (r) {
-			DRM_ERROR("resume of IP block <%s> failed %d\n",
-				  adev->ip_blocks[i].version->funcs->name, r);
-			return r;
+		for (j = 0; j < adev->num_ip_blocks; j++) {
+			block = &adev->ip_blocks[j];
+
+			if (block->version->type != ip_order[i] ||
+				!block->status.valid)
+				continue;
+
+			r = block->version->funcs->hw_init(adev);
+			DRM_INFO("RE-INIT: %s %s\n", block->version->funcs->name, r?"failed":"successed");
 		}
 	}
 
@@ -2208,7 +2223,7 @@ int amdgpu_device_suspend(struct drm_device *dev, bool suspend, bool fbcon)
 
 		if (amdgpu_crtc->cursor_bo) {
 			struct amdgpu_bo *aobj = gem_to_amdgpu_bo(amdgpu_crtc->cursor_bo);
-			r = amdgpu_bo_reserve(aobj, false);
+			r = amdgpu_bo_reserve(aobj, true);
 			if (r == 0) {
 				amdgpu_bo_unpin(aobj);
 				amdgpu_bo_unreserve(aobj);
@@ -2221,7 +2236,7 @@ int amdgpu_device_suspend(struct drm_device *dev, bool suspend, bool fbcon)
 		robj = gem_to_amdgpu_bo(rfb->obj);
 		/* don't unpin kernel fb objects */
 		if (!amdgpu_fbdev_robj_is_fb(adev, robj)) {
-			r = amdgpu_bo_reserve(robj, false);
+			r = amdgpu_bo_reserve(robj, true);
 			if (r == 0) {
 				amdgpu_bo_unpin(robj);
 				amdgpu_bo_unreserve(robj);
@@ -2328,7 +2343,7 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 
 		if (amdgpu_crtc->cursor_bo) {
 			struct amdgpu_bo *aobj = gem_to_amdgpu_bo(amdgpu_crtc->cursor_bo);
-			r = amdgpu_bo_reserve(aobj, false);
+			r = amdgpu_bo_reserve(aobj, true);
 			if (r == 0) {
 				r = amdgpu_bo_pin(aobj,
 						  AMDGPU_GEM_DOMAIN_VRAM,
@@ -2341,7 +2356,7 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 	}
 	r = amdgpu_amdkfd_resume(adev);
 	if (r)
-		return r;
+		goto unlock;
 
 	/* blat the mode back in */
 	if (fbcon) {
@@ -2506,25 +2521,37 @@ static int amdgpu_recover_vram_from_shadow(struct amdgpu_device *adev,
 	uint32_t domain;
 	int r;
 
-       if (!bo->shadow)
-               return 0;
+	if (!bo->shadow)
+		return 0;
 
-       r = amdgpu_bo_reserve(bo, false);
-       if (r)
-               return r;
-       domain = amdgpu_mem_type_to_domain(bo->tbo.mem.mem_type);
-       /* if bo has been evicted, then no need to recover */
-       if (domain == AMDGPU_GEM_DOMAIN_VRAM) {
-               r = amdgpu_bo_restore_from_shadow(adev, ring, bo,
+	r = amdgpu_bo_reserve(bo, true);
+	if (r)
+		return r;
+	domain = amdgpu_mem_type_to_domain(bo->tbo.mem.mem_type);
+	/* if bo has been evicted, then no need to recover */
+	if (domain == AMDGPU_GEM_DOMAIN_VRAM) {
+		r = amdgpu_bo_validate(bo->shadow);
+		if (r) {
+			DRM_ERROR("bo validate failed!\n");
+			goto err;
+		}
+
+		r = amdgpu_ttm_bind(&bo->shadow->tbo, &bo->shadow->tbo.mem);
+		if (r) {
+			DRM_ERROR("%p bind failed\n", bo->shadow);
+			goto err;
+		}
+
+		r = amdgpu_bo_restore_from_shadow(adev, ring, bo,
 						 NULL, fence, true);
-               if (r) {
-                       DRM_ERROR("recover page table failed!\n");
-                       goto err;
-               }
-       }
+		if (r) {
+			DRM_ERROR("recover page table failed!\n");
+			goto err;
+		}
+	}
 err:
-       amdgpu_bo_unreserve(bo);
-       return r;
+	amdgpu_bo_unreserve(bo);
+	return r;
 }
 
 /**
@@ -2596,6 +2623,7 @@ int amdgpu_sriov_gpu_reset(struct amdgpu_device *adev, bool voluntary)
 	ring = adev->mman.buffer_funcs_ring;
 	mutex_lock(&adev->shadow_list_lock);
 	list_for_each_entry_safe(bo, tmp, &adev->shadow_list, shadow_list) {
+		next = NULL;
 		amdgpu_recover_vram_from_shadow(adev, ring, bo, &next);
 		if (fence) {
 			r = fence_wait(fence, false);
@@ -2673,7 +2701,7 @@ int amdgpu_gpu_reset(struct amdgpu_device *adev)
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 		struct amdgpu_ring *ring = adev->rings[i];
 
-		if (!ring)
+		if (!ring || !ring->sched.thread)
 			continue;
 		kcl_kthread_park(ring->sched.thread);
 		amd_sched_hw_job_reset(&ring->sched);
@@ -2746,6 +2774,7 @@ retry:
 			DRM_INFO("recover vram bo from shadow\n");
 			mutex_lock(&adev->shadow_list_lock);
 			list_for_each_entry_safe(bo, tmp, &adev->shadow_list, shadow_list) {
+				next = NULL;
 				amdgpu_recover_vram_from_shadow(adev, ring, bo, &next);
 				if (fence) {
 					r = fence_wait(fence, false);
@@ -2768,7 +2797,8 @@ retry:
 		}
 		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 			struct amdgpu_ring *ring = adev->rings[i];
-			if (!ring)
+
+			if (!ring || !ring->sched.thread)
 				continue;
 
 			amd_sched_job_recovery(&ring->sched);
@@ -2777,7 +2807,7 @@ retry:
 	} else {
 		dev_err(adev->dev, "asic resume failed (%d).\n", r);
 		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
-			if (adev->rings[i]) {
+			if (adev->rings[i] && adev->rings[i]->sched.thread) {
 				kcl_kthread_unpark(adev->rings[i]->sched.thread);
 			}
 		}

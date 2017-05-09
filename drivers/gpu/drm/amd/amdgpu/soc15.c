@@ -280,29 +280,25 @@ static bool soc15_read_bios_from_rom(struct amdgpu_device *adev,
 	return true;
 }
 
-static struct amdgpu_allowed_register_entry vega10_allowed_read_registers[] = {
-	/* todo */
-};
-
 static struct amdgpu_allowed_register_entry soc15_allowed_read_registers[] = {
-	{ SOC15_REG_OFFSET(GC, 0, mmGRBM_STATUS), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmGRBM_STATUS2), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmGRBM_STATUS_SE0), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmGRBM_STATUS_SE1), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmGRBM_STATUS_SE2), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmGRBM_STATUS_SE3), false},
-	{ SOC15_REG_OFFSET(SDMA0, 0, mmSDMA0_STATUS_REG), false},
-	{ SOC15_REG_OFFSET(SDMA1, 0, mmSDMA1_STATUS_REG), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmCP_STAT), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmCP_STALLED_STAT1), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmCP_STALLED_STAT2), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmCP_STALLED_STAT3), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmCP_CPF_BUSY_STAT), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmCP_CPF_STALLED_STAT1), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmCP_CPF_STATUS), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmCP_CPC_STALLED_STAT1), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmCP_CPC_STATUS), false},
-	{ SOC15_REG_OFFSET(GC, 0, mmGB_ADDR_CONFIG), false},
+	{ SOC15_REG_OFFSET(GC, 0, mmGRBM_STATUS)},
+	{ SOC15_REG_OFFSET(GC, 0, mmGRBM_STATUS2)},
+	{ SOC15_REG_OFFSET(GC, 0, mmGRBM_STATUS_SE0)},
+	{ SOC15_REG_OFFSET(GC, 0, mmGRBM_STATUS_SE1)},
+	{ SOC15_REG_OFFSET(GC, 0, mmGRBM_STATUS_SE2)},
+	{ SOC15_REG_OFFSET(GC, 0, mmGRBM_STATUS_SE3)},
+	{ SOC15_REG_OFFSET(SDMA0, 0, mmSDMA0_STATUS_REG)},
+	{ SOC15_REG_OFFSET(SDMA1, 0, mmSDMA1_STATUS_REG)},
+	{ SOC15_REG_OFFSET(GC, 0, mmCP_STAT)},
+	{ SOC15_REG_OFFSET(GC, 0, mmCP_STALLED_STAT1)},
+	{ SOC15_REG_OFFSET(GC, 0, mmCP_STALLED_STAT2)},
+	{ SOC15_REG_OFFSET(GC, 0, mmCP_STALLED_STAT3)},
+	{ SOC15_REG_OFFSET(GC, 0, mmCP_CPF_BUSY_STAT)},
+	{ SOC15_REG_OFFSET(GC, 0, mmCP_CPF_STALLED_STAT1)},
+	{ SOC15_REG_OFFSET(GC, 0, mmCP_CPF_STATUS)},
+	{ SOC15_REG_OFFSET(GC, 0, mmCP_CPC_STALLED_STAT1)},
+	{ SOC15_REG_OFFSET(GC, 0, mmCP_CPC_STATUS)},
+	{ SOC15_REG_OFFSET(GC, 0, mmGB_ADDR_CONFIG)},
 };
 
 static uint32_t soc15_read_indexed_register(struct amdgpu_device *adev, u32 se_num,
@@ -341,41 +337,16 @@ static uint32_t soc15_get_register_value(struct amdgpu_device *adev,
 static int soc15_read_register(struct amdgpu_device *adev, u32 se_num,
 			    u32 sh_num, u32 reg_offset, u32 *value)
 {
-	struct amdgpu_allowed_register_entry *asic_register_table = NULL;
-	struct amdgpu_allowed_register_entry *asic_register_entry;
-	uint32_t size, i;
+	uint32_t i;
 
 	*value = 0;
-	switch (adev->asic_type) {
-	case CHIP_VEGA10:
-		asic_register_table = vega10_allowed_read_registers;
-		size = ARRAY_SIZE(vega10_allowed_read_registers);
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	if (asic_register_table) {
-		for (i = 0; i < size; i++) {
-			asic_register_entry = asic_register_table + i;
-			if (reg_offset != asic_register_entry->reg_offset)
-				continue;
-			if (!asic_register_entry->untouched)
-				*value = soc15_get_register_value(adev,
-								  asic_register_entry->grbm_indexed,
-								  se_num, sh_num, reg_offset);
-			return 0;
-		}
-	}
-
 	for (i = 0; i < ARRAY_SIZE(soc15_allowed_read_registers); i++) {
 		if (reg_offset != soc15_allowed_read_registers[i].reg_offset)
 			continue;
 
-		if (!soc15_allowed_read_registers[i].untouched)
-			*value = soc15_get_register_value(adev,
-							  soc15_allowed_read_registers[i].grbm_indexed,
-							  se_num, sh_num, reg_offset);
+		*value = soc15_get_register_value(adev,
+						  soc15_allowed_read_registers[i].grbm_indexed,
+						  se_num, sh_num, reg_offset);
 		return 0;
 	}
 	return -EINVAL;
@@ -511,8 +482,7 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 #endif
 		amdgpu_ip_block_add(adev, &gfx_v9_0_ip_block);
 		amdgpu_ip_block_add(adev, &sdma_v4_0_ip_block);
-		if (!amdgpu_sriov_vf(adev))
-			amdgpu_ip_block_add(adev, &uvd_v7_0_ip_block);
+		amdgpu_ip_block_add(adev, &uvd_v7_0_ip_block);
 		amdgpu_ip_block_add(adev, &vce_v4_0_ip_block);
 		break;
 	default:
@@ -567,11 +537,6 @@ static int soc15_common_early_init(void *handle)
 		(amdgpu_ip_block_mask & (1 << AMD_IP_BLOCK_TYPE_PSP)))
 		psp_enabled = true;
 
-	if (amdgpu_sriov_vf(adev)) {
-		amdgpu_virt_init_setting(adev);
-		xgpu_ai_mailbox_set_irq_funcs(adev);
-	}
-
 	/*
 	 * nbio need be used for both sdma and gfx9, but only
 	 * initializes once
@@ -613,6 +578,11 @@ static int soc15_common_early_init(void *handle)
 	default:
 		/* FIXME: not supported yet */
 		return -EINVAL;
+	}
+
+	if (amdgpu_sriov_vf(adev)) {
+		amdgpu_virt_init_setting(adev);
+		xgpu_ai_mailbox_set_irq_funcs(adev);
 	}
 
 	adev->firmware.load_type = amdgpu_ucode_get_load_type(adev, amdgpu_fw_load_type);

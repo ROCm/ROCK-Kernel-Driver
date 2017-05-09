@@ -501,7 +501,7 @@ static int vega10_thermal_enable_alert(struct pp_hwmgr *hwmgr)
 * Disable thermal alerts on the RV770 thermal controller.
 * @param    hwmgr The address of the hardware manager.
 */
-static int vega10_thermal_disable_alert(struct pp_hwmgr *hwmgr)
+int vega10_thermal_disable_alert(struct pp_hwmgr *hwmgr)
 {
 	struct vega10_hwmgr *data = (struct vega10_hwmgr *)(hwmgr->backend);
 
@@ -561,6 +561,11 @@ int tf_vega10_thermal_setup_fan_table(struct pp_hwmgr *hwmgr,
 			advanceFanControlParameters.ulMinFanSCLKAcousticLimit);
 	table->FanTargetTemperature = hwmgr->thermal_controller.
 			advanceFanControlParameters.usTMax;
+
+	smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
+				PPSMC_MSG_SetFanTemperatureTarget,
+				(uint32_t)table->FanTargetTemperature);
+
 	table->FanPwmMin = hwmgr->thermal_controller.
 			advanceFanControlParameters.usPWMMin * 255 / 100;
 	table->FanTargetGfxclk = (uint16_t)(hwmgr->thermal_controller.

@@ -22,6 +22,7 @@
  */
 
 #include "amdgpu.h"
+#define MAX_KIQ_REG_WAIT	100000
 
 int amdgpu_allocate_static_csa(struct amdgpu_device *adev)
 {
@@ -105,8 +106,9 @@ void amdgpu_virt_init_setting(struct amdgpu_device *adev)
 	/* enable virtual display */
 	adev->mode_info.num_crtc = 1;
 	adev->enable_virtual_display = true;
+	adev->cg_flags = 0;
+	adev->pg_flags = 0;
 
-	mutex_init(&adev->virt.lock_kiq);
 	mutex_init(&adev->virt.lock_reset);
 }
 
@@ -120,17 +122,19 @@ uint32_t amdgpu_virt_kiq_rreg(struct amdgpu_device *adev, uint32_t reg)
 
 	BUG_ON(!ring->funcs->emit_rreg);
 
-	mutex_lock(&adev->virt.lock_kiq);
+	mutex_lock(&kiq->ring_mutex);
 	amdgpu_ring_alloc(ring, 32);
 	amdgpu_ring_emit_rreg(ring, reg);
 	amdgpu_fence_emit(ring, &f);
 	amdgpu_ring_commit(ring);
-	mutex_unlock(&adev->virt.lock_kiq);
+	mutex_unlock(&kiq->ring_mutex);
 
-	r = fence_wait(f, false);
-	if (r)
-		DRM_ERROR("wait for kiq fence error: %ld.\n", r);
+	r = fence_wait_timeout(f, false, msecs_to_jiffies(MAX_KIQ_REG_WAIT));
 	fence_put(f);
+	if (r < 1) {
+		DRM_ERROR("wait for kiq fence error: %ld.\n", r);
+		return ~0;
+	}
 
 	val = adev->wb.wb[adev->virt.reg_val_offs];
 
@@ -146,15 +150,15 @@ void amdgpu_virt_kiq_wreg(struct amdgpu_device *adev, uint32_t reg, uint32_t v)
 
 	BUG_ON(!ring->funcs->emit_wreg);
 
-	mutex_lock(&adev->virt.lock_kiq);
+	mutex_lock(&kiq->ring_mutex);
 	amdgpu_ring_alloc(ring, 32);
 	amdgpu_ring_emit_wreg(ring, reg, v);
 	amdgpu_fence_emit(ring, &f);
 	amdgpu_ring_commit(ring);
-	mutex_unlock(&adev->virt.lock_kiq);
+	mutex_unlock(&kiq->ring_mutex);
 
-	r = fence_wait(f, false);
-	if (r)
+	r = fence_wait_timeout(f, false, msecs_to_jiffies(MAX_KIQ_REG_WAIT));
+	if (r < 1)
 		DRM_ERROR("wait for kiq fence error: %ld.\n", r);
 	fence_put(f);
 }
@@ -224,4 +228,50 @@ int amdgpu_virt_reset_gpu(struct amdgpu_device *adev)
 	}
 
 	return 0;
+}
+
+/**
+ * amdgpu_virt_alloc_mm_table() - alloc memory for mm table
+ * @amdgpu:	amdgpu device.
+ * MM table is used by UVD and VCE for its initialization
+ * Return: Zero if allocate success.
+ */
+int amdgpu_virt_alloc_mm_table(struct amdgpu_device *adev)
+{
+	int r;
+
+	if (!amdgpu_sriov_vf(adev) || adev->virt.mm_table.gpu_addr)
+		return 0;
+
+	r = amdgpu_bo_create_kernel(adev, PAGE_SIZE, PAGE_SIZE,
+				    AMDGPU_GEM_DOMAIN_VRAM,
+				    &adev->virt.mm_table.bo,
+				    &adev->virt.mm_table.gpu_addr,
+				    (void *)&adev->virt.mm_table.cpu_addr);
+	if (r) {
+		DRM_ERROR("failed to alloc mm table and error = %d.\n", r);
+		return r;
+	}
+
+	memset((void *)adev->virt.mm_table.cpu_addr, 0, PAGE_SIZE);
+	DRM_INFO("MM table gpu addr = 0x%llx, cpu addr = %p.\n",
+		 adev->virt.mm_table.gpu_addr,
+		 adev->virt.mm_table.cpu_addr);
+	return 0;
+}
+
+/**
+ * amdgpu_virt_free_mm_table() - free mm table memory
+ * @amdgpu:	amdgpu device.
+ * Free MM table memory
+ */
+void amdgpu_virt_free_mm_table(struct amdgpu_device *adev)
+{
+	if (!amdgpu_sriov_vf(adev) || !adev->virt.mm_table.gpu_addr)
+		return;
+
+	amdgpu_bo_free_kernel(&adev->virt.mm_table.bo,
+			      &adev->virt.mm_table.gpu_addr,
+			      (void *)&adev->virt.mm_table.cpu_addr);
+	adev->virt.mm_table.gpu_addr = 0;
 }

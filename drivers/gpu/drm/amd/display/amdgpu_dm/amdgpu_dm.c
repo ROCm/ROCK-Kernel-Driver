@@ -111,6 +111,8 @@ static u32 dm_vblank_get_counter(struct amdgpu_device *adev, int crtc)
 static int dm_crtc_get_scanoutpos(struct amdgpu_device *adev, int crtc,
 					u32 *vbl, u32 *position)
 {
+	uint32_t v_blank_start, v_blank_end, h_position, v_position;
+
 	if ((crtc < 0) || (crtc >= adev->mode_info.num_crtc))
 		return -EINVAL;
 	else {
@@ -121,7 +123,18 @@ static int dm_crtc_get_scanoutpos(struct amdgpu_device *adev, int crtc,
 			return 0;
 		}
 
-		return dc_stream_get_scanoutpos(acrtc->stream, vbl, position);
+		/*
+		 * TODO rework base driver to use values directly.
+		 * for now parse it back into reg-format
+		 */
+		dc_stream_get_scanoutpos(acrtc->stream,
+					 &v_blank_start,
+					 &v_blank_end,
+					 &h_position,
+					 &v_position);
+
+		*position = (v_position) || (h_position << 16);
+		*vbl = (v_blank_start) || (v_blank_end << 16);
 	}
 
 	return 0;
@@ -210,6 +223,9 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	if (amdgpu_crtc->event
 			&& amdgpu_crtc->event->event.base.type
 			== DRM_EVENT_FLIP_COMPLETE) {
+		/* Update to correct count/ts if racing with vblank irq */
+		drm_accurate_vblank_count(&amdgpu_crtc->base);
+
 		drm_crtc_send_vblank_event(&amdgpu_crtc->base, amdgpu_crtc->event);
 		/* page flip completed. clean up */
 		amdgpu_crtc->event = NULL;
@@ -1240,7 +1256,7 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 			goto fail_free_planes;
 		}
 		mode_info->planes[i]->plane_type = mode_info->plane_type[i];
-		if (amdgpu_dm_plane_init(dm, mode_info->planes[i], 1)) {
+		if (amdgpu_dm_plane_init(dm, mode_info->planes[i], 0xff)) {
 			DRM_ERROR("KMS: Failed to initialize plane\n");
 			goto fail_free_planes;
 		}
