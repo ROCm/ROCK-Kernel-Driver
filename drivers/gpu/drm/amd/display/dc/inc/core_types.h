@@ -31,8 +31,8 @@
 #include "dcn_calcs.h"
 #include "ddc_service_types.h"
 #include "dc_bios_types.h"
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include "mem_input.h"
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include "mpc.h"
 #endif
 
