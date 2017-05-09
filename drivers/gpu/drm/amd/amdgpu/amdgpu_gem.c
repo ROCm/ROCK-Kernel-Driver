@@ -637,7 +637,6 @@ unsigned long amdgpu_gem_timeout(uint64_t timeout_ns)
 int amdgpu_gem_wait_idle_ioctl(struct drm_device *dev, void *data,
 			      struct drm_file *filp)
 {
-	struct amdgpu_device *adev = dev->dev_private;
 	union drm_amdgpu_gem_wait_idle *args = data;
 	struct drm_gem_object *gobj;
 	struct amdgpu_bo *robj;
