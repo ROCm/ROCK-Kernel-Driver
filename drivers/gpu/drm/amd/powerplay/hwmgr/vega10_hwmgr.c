@@ -4519,14 +4519,18 @@ static void vega10_find_min_clock_index(struct pp_hwmgr *hwmgr,
 
 	for (i = 0; i < dpm_table->gfx_table.count; i++) {
 		if (dpm_table->gfx_table.dpm_levels[i].enabled &&
-			dpm_table->gfx_table.dpm_levels[i].value >= min_sclk)
+			dpm_table->gfx_table.dpm_levels[i].value >= min_sclk) {
 			*sclk_idx = i;
+			break;
+		}
 	}
 
 	for (i = 0; i < dpm_table->mem_table.count; i++) {
 		if (dpm_table->mem_table.dpm_levels[i].enabled &&
-			dpm_table->mem_table.dpm_levels[i].value >= min_mclk)
+			dpm_table->mem_table.dpm_levels[i].value >= min_mclk) {
 			*mclk_idx = i;
+			break;
+		}
 	}
 }
 
