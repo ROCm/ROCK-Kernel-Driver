@@ -30,7 +30,7 @@
  * SMU TEAM: Always increment the interface version if
  * any structure is changed in this file
  */
-#define SMU9_DRIVER_IF_VERSION 0xD
+#define SMU9_DRIVER_IF_VERSION 0xE
 
 #define PPTABLE_V10_SMU_VERSION 1
 
