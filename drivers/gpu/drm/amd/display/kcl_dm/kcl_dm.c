@@ -651,8 +651,16 @@ static int dm_display_resume(struct drm_device *ddev)
 
 	/* Call commit internally with the state we just constructed */
 	ret = drm_atomic_commit(state);
-	if (!ret)
+	if (!ret) {
+		/* Enable vblank after pipes powered back on */
+		list_for_each_entry(crtc, &ddev->mode_config.crtc_list, head) {
+			struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+			if (acrtc->stream)
+				drm_crtc_vblank_on(crtc);
+		}
 		return 0;
+        }
+
 
 err:
 	DRM_ERROR("Restoring old state failed with %i\n", ret);
@@ -695,14 +703,6 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 	 * pulse interrupts are used for MST
 	 */
 	amdgpu_dm_irq_resume_early(adev);
-
-	drm_modeset_lock_all(ddev);
-	list_for_each_entry(crtc, &ddev->mode_config.crtc_list, head) {
-		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
-		if (acrtc->stream)
-				drm_crtc_vblank_on(crtc);
-	}
-	drm_modeset_unlock_all(ddev);
 
 	/* Do detection*/
 	list_for_each_entry(connector,

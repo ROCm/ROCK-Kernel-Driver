@@ -30,6 +30,7 @@
 #include <linux/list.h>
 #include <drm/drmP.h>
 #include <linux/dma-buf.h>
+#include <linux/pagemap.h>
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_ucode.h"
 #include "gca/gfx_8_0_sh_mask.h"
@@ -557,6 +558,40 @@ out:
 	return ret;
 }
 
+static int __map_bo_to_kernel(struct amdgpu_bo *bo, u32 domain, void **kptr)
+{
+	int ret;
+
+	ret = amdgpu_bo_reserve(bo, true);
+	if (ret) {
+		pr_err("Failed to reserve bo. ret %d\n", ret);
+		return ret;
+	}
+
+	ret = amdgpu_bo_pin(bo, domain, NULL);
+	if (ret) {
+		pr_err("Failed to pin bo. ret %d\n", ret);
+		goto pin_failed;
+	}
+
+	ret = amdgpu_bo_kmap(bo, kptr);
+	if (ret) {
+		pr_err("Failed to map bo to kernel. ret %d\n", ret);
+		goto kmap_failed;
+	}
+
+	amdgpu_bo_unreserve(bo);
+
+	return ret;
+
+kmap_failed:
+	amdgpu_bo_unpin(bo);
+pin_failed:
+	amdgpu_bo_unreserve(bo);
+
+	return ret;
+}
+
 static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		uint64_t size, void *vm, struct kgd_mem **mem,
 		uint64_t *offset, void **kptr,
@@ -644,28 +679,9 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		bo->flags |= AMDGPU_AMDKFD_USERPTR_BO;
 
 	if (kptr) {
-		ret = amdgpu_bo_reserve(bo, true);
-		if (ret) {
-			pr_err("Failed to reserve bo. ret %d\n", ret);
-			goto allocate_mem_reserve_bo_failed;
-		}
-
-		ret = amdgpu_bo_pin(bo, domain,
-					NULL);
-		if (ret) {
-			pr_err("Failed to pin bo. ret %d\n", ret);
-			goto allocate_mem_pin_bo_failed;
-		}
-
-		ret = amdgpu_bo_kmap(bo, kptr);
-		if (ret) {
-			pr_err("Failed to map bo to kernel. ret %d\n",
-					ret);
-			goto allocate_mem_kmap_bo_failed;
-		}
-		(*mem)->kptr = *kptr;
-
-		amdgpu_bo_unreserve(bo);
+		ret = __map_bo_to_kernel(bo, domain, kptr);
+		if (ret)
+			goto map_bo_to_kernel_failed;
 	}
 
 	(*mem)->va = va;
@@ -689,12 +705,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 
 	return 0;
 
-allocate_mem_kmap_bo_failed:
-	amdgpu_bo_unpin(bo);
-allocate_mem_pin_bo_failed:
-	amdgpu_bo_unreserve(bo);
-allocate_mem_reserve_bo_failed:
-
+map_bo_to_kernel_failed:
 allocate_init_user_pages_failed:
 	amdgpu_bo_unref(&bo);
 err_bo_create:
@@ -1615,46 +1626,19 @@ int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 		struct kgd_mem *mem, void **kptr)
 {
 	int ret;
-	struct amdgpu_device *adev;
 	struct amdgpu_bo *bo;
-
-	adev = get_amdgpu_device(kgd);
 
 	mutex_lock(&mem->lock);
 
 	bo = mem->bo;
-	/* map the buffer */
-	ret = amdgpu_bo_reserve(bo, true);
-	if (ret) {
-		pr_err("Failed to reserve bo. ret %d\n", ret);
-		mutex_unlock(&mem->lock);
-		return ret;
-	}
 
-	ret = amdgpu_bo_pin(bo, AMDGPU_GEM_DOMAIN_GTT,
-			NULL);
-	if (ret) {
-		pr_err("Failed to pin bo. ret %d\n", ret);
-		amdgpu_bo_unreserve(bo);
-		mutex_unlock(&mem->lock);
-		return ret;
-	}
+	ret = __map_bo_to_kernel(bo, AMDGPU_GEM_DOMAIN_GTT, kptr);
+	if (!ret)
+		mem->kptr = *kptr;
 
-	ret = amdgpu_bo_kmap(bo, kptr);
-	if (ret) {
-		pr_err("Failed to map bo to kernel. ret %d\n", ret);
-		amdgpu_bo_unpin(bo);
-		amdgpu_bo_unreserve(bo);
-		mutex_unlock(&mem->lock);
-		return ret;
-	}
-
-	mem->kptr = *kptr;
-
-	amdgpu_bo_unreserve(bo);
 	mutex_unlock(&mem->lock);
 
-	return 0;
+	return ret;
 }
 
 static int pin_bo_wo_map(struct kgd_mem *mem)
@@ -1821,7 +1805,8 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 
 	bo = gem_to_amdgpu_bo(obj);
 	if (!(bo->prefered_domains & (AMDGPU_GEM_DOMAIN_VRAM |
-				    AMDGPU_GEM_DOMAIN_GTT)))
+				    AMDGPU_GEM_DOMAIN_GTT |
+				    AMDGPU_GEM_DOMAIN_DGMA)))
 		/* Only VRAM and GTT BOs are supported */
 		return -EINVAL;
 
@@ -1843,8 +1828,12 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 
 	(*mem)->bo = amdgpu_bo_ref(bo);
 	(*mem)->va = va;
-	(*mem)->domain = (bo->prefered_domains & AMDGPU_GEM_DOMAIN_VRAM) ?
-		AMDGPU_GEM_DOMAIN_VRAM : AMDGPU_GEM_DOMAIN_GTT;
+	if (bo->prefered_domains & AMDGPU_GEM_DOMAIN_VRAM)
+		(*mem)->domain = AMDGPU_GEM_DOMAIN_VRAM;
+	else if (bo->prefered_domains & AMDGPU_GEM_DOMAIN_GTT)
+		(*mem)->domain = AMDGPU_GEM_DOMAIN_GTT;
+	else
+		(*mem)->domain = AMDGPU_GEM_DOMAIN_DGMA;
 	(*mem)->mapped_to_gpu_memory = 0;
 	(*mem)->process_info = kfd_vm->process_info;
 	add_kgd_mem_to_kfd_bo_list(*mem, kfd_vm->process_info, false);

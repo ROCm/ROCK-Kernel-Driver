@@ -85,6 +85,11 @@ module_param(ignore_crat, int, 0444);
 MODULE_PARM_DESC(ignore_crat,
 	"Ignore CRAT table during KFD initialization (0 = use CRAT (default), 1 = ignore CRAT)");
 
+int vega10_noretry;
+module_param_named(noretry, vega10_noretry, int, 0644);
+MODULE_PARM_DESC(noretry,
+	"Set sh_mem_config.retry_disable on Vega10 (0 = retry enabled (default), 1 = retry disabled)");
+
 int kgd2kfd_init(unsigned interface_version, const struct kgd2kfd_calls **g2f)
 {
 	if (!amdkfd_init_completed)

@@ -2357,7 +2357,7 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 	}
 	r = amdgpu_amdkfd_resume(adev);
 	if (r)
-		return r;
+		goto unlock;
 
 	/* blat the mode back in */
 	if (fbcon) {

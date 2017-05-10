@@ -1694,48 +1694,6 @@ static void dm_drm_plane_destroy_state(struct drm_plane *plane,
 	kfree(old_amdgpu_state);
 }
 
-
-
-#if LINUX_VERSION_CODE == KERNEL_VERSION(4, 8, 0)
-static int stall_checks(struct drm_crtc *crtc)
-{
-        struct drm_crtc_commit *commit, *stall_commit = NULL;
-        bool completed = true;
-        int i;
-        long ret = 0;
-
-        spin_lock(&crtc->commit_lock);
-        i = 0;
-        list_for_each_entry(commit, &crtc->commit_list, commit_entry) {
-                if (i == 0) {
-                        stall_commit = commit;
-                        drm_crtc_commit_get(stall_commit);
-                }
-
-                i++;
-        }
-        spin_unlock(&crtc->commit_lock);
-
-        if (!stall_commit)
-                return 0;
-
-        /* We don't want to let commits get ahead of cleanup work too much,
-         * stalling on 2nd previous commit means triple-buffer won't ever stall.
-         */
-
-
-        ret = wait_for_completion_timeout(&stall_commit->cleanup_done,
-                                                        10*HZ);
-        if (ret == 0)
-                DRM_ERROR("[CRTC:%d:%s] cleanup_done timed out\n",
-                          crtc->base.id, crtc->name);
-
-        drm_crtc_commit_put(stall_commit);
-
-        return ret < 0 ? ret : 0;
-}
-#endif
-
 static const struct drm_plane_funcs dm_plane_funcs = {
 	.update_plane	= drm_atomic_helper_update_plane,
 	.disable_plane	= drm_atomic_helper_disable_plane,
@@ -1773,18 +1731,6 @@ static int dm_plane_helper_prepare_fb(
 		return 0;
 	}
 
-/*
- * A temp solution for SWDEV-119533.
- * A race between two adjecent page flips makes the earlier one to release an
- * alocated frame buffer for the subsequent one -
- * since there are 2 frambuffer swapped back and forth between flips,
- * the 'new' fb of the later flip is actually the 'previous' fb for the earlier flip.
- * Temp fix , wait for prevoius fb cleanup work to be done before allocation
- * yout FB.
- */
-#if LINUX_VERSION_CODE == KERNEL_VERSION(4, 8, 0)
-	stall_checks(new_state->crtc);
-#endif
 	afb = to_amdgpu_framebuffer(new_state->fb);
 
 	obj = afb->obj;
@@ -1840,8 +1786,6 @@ static void dm_plane_helper_cleanup_fb(
 		amdgpu_bo_unreserve(rbo);
 		amdgpu_bo_unref(&rbo);
 	}
-
-	afb->address = 0;
 }
 
 int dm_create_validation_set_for_connector(struct drm_connector *connector,

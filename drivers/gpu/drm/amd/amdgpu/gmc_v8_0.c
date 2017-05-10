@@ -567,7 +567,8 @@ static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 		 * in visible VRAM and the address space. Use at most
 		 * half of each. */
 		uint64_t max_gtt_size = min(
-			adev->mc.visible_vram_size / 8 * PAGE_SIZE / 2,
+			adev->mc.visible_vram_size / 8 *
+				AMDGPU_GPU_PAGE_SIZE / 2,
 			1ULL << 39);
 
 		si_meminfo(&si);
@@ -1098,7 +1099,7 @@ static void gmc_v8_0_vm_decode_fault(struct amdgpu_device *adev,
 		info->vmid = vmid;
 		info->mc_id = mc_id;
 		info->page_addr = addr;
-		info->prot_valid = protections & 0x6 ? true : false;
+		info->prot_valid = protections & 0x7 ? true : false;
 		info->prot_read = protections & 0x8 ? true : false;
 		info->prot_write = protections & 0x10 ? true : false;
 		info->prot_exec = protections & 0x20 ? true : false;
