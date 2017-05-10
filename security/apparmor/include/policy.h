@@ -28,6 +28,7 @@
 #include "capability.h"
 #include "domain.h"
 #include "file.h"
+#include "net.h"
 #include "lib.h"
 #include "resource.h"
 
@@ -132,6 +133,7 @@ struct aa_data {
  * @policy: general match rules governing policy
  * @file: The set of rules governing basic file access and domain transitions
  * @caps: capabilities for the profile
+ * @net: network controls for the profile
  * @rlimits: rlimits for the profile
  *
  * @dents: dentries for the profiles file entries in apparmorfs
@@ -174,6 +176,7 @@ struct aa_profile {
 	struct aa_policydb policy;
 	struct aa_file_rules file;
 	struct aa_caps caps;
+	struct aa_net net;
 	struct aa_rlimit rlimits;
 
 	struct aa_loaddata *rawdata;

@@ -313,6 +313,10 @@ static int __init adb_init(void)
 	if (!machine_is(chrp) && !machine_is(powermac))
 		return 0;
 #endif
+#ifdef CONFIG_PPC64
+	if (!machine_is(powermac))
+		return 0;
+#endif
 #ifdef CONFIG_MAC
 	if (!MACH_IS_MAC)
 		return 0;

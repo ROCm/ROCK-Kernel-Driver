@@ -2000,8 +2000,7 @@ sd_spinup_disk(struct scsi_disk *sdkp)
 		 * Yes, this sense key/ASC combination shouldn't
 		 * occur here.  It's characteristic of these devices.
 		 */
-		} else if (sense_valid &&
-				sshdr.sense_key == UNIT_ATTENTION &&
+		} else if (sshdr.sense_key == UNIT_ATTENTION &&
 				sshdr.asc == 0x28) {
 			if (!spintime) {
 				spintime_expire = jiffies + 5 * HZ;

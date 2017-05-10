@@ -36,7 +36,7 @@
 
 #define APPLE_FLAG_FKEY		0x01
 
-static unsigned int fnmode = 1;
+static unsigned int fnmode = 2;
 module_param(fnmode, uint, 0644);
 MODULE_PARM_DESC(fnmode, "Mode of fn key on Apple keyboards (0 = disabled, "
 		"[1] = fkeyslast, 2 = fkeysfirst)");

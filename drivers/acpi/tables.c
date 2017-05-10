@@ -762,6 +762,9 @@ int __init acpi_table_init(void)
 		acpi_gbl_verify_table_checksum = FALSE;
 	}
 
+	if (acpi_gbl_do_not_use_xsdt)
+		printk(KERN_INFO "Using RSDT as ACPI root table\n");
+
 	status = acpi_initialize_tables(initial_tables, ACPI_MAX_TABLES, 0);
 	if (ACPI_FAILURE(status))
 		return -EINVAL;

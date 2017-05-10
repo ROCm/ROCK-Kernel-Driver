@@ -2969,7 +2969,7 @@ int ll_getattr(const struct path *path, struct kstat *stat,
 
 	OBD_FAIL_TIMEOUT(OBD_FAIL_GETATTR_DELAY, 30);
 
-	stat->dev = inode->i_sb->s_dev;
+	stat->dev = inode_get_dev(inode);
 	if (ll_need_32bit_api(sbi))
 		stat->ino = cl_fid_build_ino(&lli->lli_fid, 1);
 	else

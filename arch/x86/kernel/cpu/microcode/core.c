@@ -150,9 +150,11 @@ extern struct builtin_fw __end_builtin_fw[];
 bool get_builtin_firmware(struct cpio_data *cd, const char *name)
 {
 #ifdef CONFIG_FW_LOADER
-	struct builtin_fw *b_fw;
+	struct builtin_fw *b_fw = __start_builtin_fw;
 
-	for (b_fw = __start_builtin_fw; b_fw != __end_builtin_fw; b_fw++) {
+	OPTIMIZER_HIDE_VAR(b_fw);
+
+	for (; b_fw != __end_builtin_fw; b_fw++) {
 		if (!strcmp(name, b_fw->name)) {
 			cd->size = b_fw->size;
 			cd->data = b_fw->data;

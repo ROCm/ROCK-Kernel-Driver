@@ -4077,6 +4077,14 @@
 	unknown_nmi_panic
 			[X86] Cause panic on unknown NMI.
 
+	unsupported	Allow loading of unsupported kernel modules:
+			0 = only allow supported modules,
+			1 = warn when loading unsupported modules,
+			2 = don't warn.
+
+			CONFIG_SUSE_KERNEL_SUPPORTED must be enabled for this
+			to have any effect.
+
 	usbcore.authorized_default=
 			[USB] Default USB device authorization:
 			(default -1 = authorized except for wireless USB,

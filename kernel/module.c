@@ -38,6 +38,7 @@
 #include <linux/capability.h>
 #include <linux/cpu.h>
 #include <linux/moduleparam.h>
+#include <linux/dwarf.h>
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/vermagic.h>
@@ -86,6 +87,22 @@
 
 /* If this is set, the section belongs in the init part of the module */
 #define INIT_OFFSET_MASK (1UL << (BITS_PER_LONG-1))
+
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+/* Allow unsupported modules switch. */
+#ifdef UNSUPPORTED_MODULES
+int suse_unsupported = UNSUPPORTED_MODULES;
+#else
+int suse_unsupported = 2;  /* don't warn when loading unsupported modules. */
+#endif
+
+static int __init unsupported_setup(char *str)
+{
+	get_option(&str, &suse_unsupported);
+	return 1;
+}
+__setup("unsupported=", unsupported_setup);
+#endif
 
 /*
  * Mutex protects:
@@ -311,7 +328,7 @@ struct load_info {
 	unsigned long mod_kallsyms_init_off;
 #endif
 	struct {
-		unsigned int sym, str, mod, vers, info, pcpu;
+		unsigned int sym, str, mod, vers, info, pcpu, dwarf;
 	} index;
 };
 
@@ -734,6 +751,27 @@ bool is_module_percpu_address(unsigned long addr)
 
 #endif /* CONFIG_SMP */
 
+static unsigned int find_dwarf(struct load_info *info)
+{
+	unsigned int section = 0;
+#ifdef ARCH_DWARF_SECTION_NAME
+	section = find_sec(info, ARCH_DWARF_SECTION_NAME);
+	if (section)
+		info->sechdrs[section].sh_flags |= SHF_ALLOC;
+#endif
+	return section;
+}
+
+static void add_dwarf_table(struct module *mod, struct load_info *info)
+{
+	int index = info->index.dwarf;
+
+	/* Size of section 0 is 0, so this is ok if there is no dwarf info. */
+	mod->dwarf_info = dwarf_add_table(mod,
+					  (void *)info->sechdrs[index].sh_addr,
+					  info->sechdrs[index].sh_size);
+}
+
 #define MODINFO_ATTR(field)	\
 static void setup_modinfo_##field(struct module *mod, const char *s)  \
 {                                                                     \
@@ -1150,6 +1188,12 @@ static size_t module_flags_taint(struct module *mod, char *buf)
 			buf[l++] = taint_flags[i].c_true;
 	}
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+	if (mod->taints & (1 << TAINT_NO_SUPPORT))
+		buf[l++] = 'N';
+	if (mod->taints & (1 << TAINT_EXTERNAL_SUPPORT))
+		buf[l++] = 'X';
+#endif
 	return l;
 }
 
@@ -1222,6 +1266,33 @@ static ssize_t show_taint(struct module_attribute *mattr,
 static struct module_attribute modinfo_taint =
 	__ATTR(taint, 0444, show_taint, NULL);
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+static void setup_modinfo_supported(struct module *mod, const char *s)
+{
+	if (!s) {
+		mod->taints |= (1 << TAINT_NO_SUPPORT);
+		return;
+	}
+
+	if (strcmp(s, "external") == 0)
+		mod->taints |= (1 << TAINT_EXTERNAL_SUPPORT);
+	else if (strcmp(s, "yes"))
+		mod->taints |= (1 << TAINT_NO_SUPPORT);
+}
+
+static ssize_t show_modinfo_supported(struct module_attribute *mattr,
+				      struct module_kobject *mk, char *buffer)
+{
+	return sprintf(buffer, "%s\n", supported_printable(mk->mod->taints));
+}
+
+static struct module_attribute modinfo_supported = {
+	.attr = { .name = "supported", .mode = 0444 },
+	.show = show_modinfo_supported,
+	.setup = setup_modinfo_supported,
+};
+#endif
+
 static struct module_attribute *modinfo_attrs[] = {
 	&module_uevent,
 	&modinfo_version,
@@ -1230,6 +1301,9 @@ static struct module_attribute *modinfo_attrs[] = {
 	&modinfo_coresize,
 	&modinfo_initsize,
 	&modinfo_taint,
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+	&modinfo_supported,
+#endif
 #ifdef CONFIG_MODULE_UNLOAD
 	&modinfo_refcnt,
 #endif
@@ -1785,9 +1859,37 @@ static int mod_sysfs_setup(struct module *mod,
 	add_sect_attrs(mod, info);
 	add_notes_attrs(mod, info);
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+	if (mod->taints & (1 << TAINT_EXTERNAL_SUPPORT))
+		add_taint(TAINT_EXTERNAL_SUPPORT, LOCKDEP_STILL_OK);
+	else if (mod->taints & (1 << TAINT_NO_SUPPORT)) {
+		if (suse_unsupported == 0) {
+			printk(KERN_WARNING "%s: module not supported by "
+			       "SUSE, refusing to load. To override, echo "
+			       "1 > /proc/sys/kernel/unsupported\n", mod->name);
+			err = -ENOEXEC;
+			goto out_remove_attrs;
+		}
+		add_taint(TAINT_NO_SUPPORT, LOCKDEP_STILL_OK);
+		if (suse_unsupported == 1) {
+			printk(KERN_WARNING "%s: module is not supported by "
+			       "SUSE. Our support organization may not be "
+			       "able to address your support request if it "
+			       "involves a kernel fault.\n", mod->name);
+		}
+	}
+#endif
+
 	kobject_uevent(&mod->mkobj.kobj, KOBJ_ADD);
 	return 0;
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+out_remove_attrs:
+	remove_notes_attrs(mod);
+	remove_sect_attrs(mod);
+	del_usage_links(mod);
+	module_remove_modinfo_attrs(mod);
+#endif
 out_unreg_param:
 	module_param_sysfs_remove(mod);
 out_unreg_holders:
@@ -2111,6 +2213,8 @@ static void free_module(struct module *mod)
 
 	/* Remove dynamic debug info */
 	ddebug_remove_module(mod->name);
+
+	dwarf_remove_table(mod->dwarf_info, false);
 
 	/* Arch-specific cleanup. */
 	module_arch_cleanup(mod);
@@ -2949,6 +3053,8 @@ static struct module *setup_load_info(struct load_info *info, int flags)
 
 	info->index.pcpu = find_pcpusec(info);
 
+	info->index.dwarf = find_dwarf(info);
+
 	/* Check module struct version now, before we try to use module. */
 	if (!check_modstruct_version(info->sechdrs, info->index.vers, mod))
 		return ERR_PTR(-ENOEXEC);
@@ -3438,6 +3544,7 @@ static noinline int do_init_module(struct module *mod)
 	/* Drop initial reference. */
 	module_put(mod);
 	trim_init_extable(mod);
+	dwarf_remove_table(mod->dwarf_info, true);
 #ifdef CONFIG_KALLSYMS
 	/* Switch to core kallsyms now init is done: kallsyms may be walking! */
 	rcu_assign_pointer(mod->kallsyms, &mod->core_kallsyms);
@@ -3712,6 +3819,9 @@ static int load_module(struct load_info *info, const char __user *uargs,
 		if (err < 0)
 			goto sysfs_cleanup;
 	}
+
+	/* Initialize dwarf table */
+	add_dwarf_table(mod, info);
 
 	/* Get rid of temporary copy. */
 	free_copy(info);
@@ -4293,6 +4403,9 @@ void print_modules(void)
 	if (last_unloaded_module[0])
 		pr_cont(" [last unloaded: %s]", last_unloaded_module);
 	pr_cont("\n");
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+	printk("Supported: %s\n", supported_printable(get_taint()));
+#endif
 }
 
 #ifdef CONFIG_MODVERSIONS

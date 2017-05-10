@@ -200,7 +200,7 @@ struct btrfs_inode {
 
 extern unsigned char btrfs_filetype_table[];
 
-static inline struct btrfs_inode *BTRFS_I(struct inode *inode)
+static inline struct btrfs_inode *BTRFS_I(const struct inode *inode)
 {
 	return container_of(inode, struct btrfs_inode, vfs_inode);
 }

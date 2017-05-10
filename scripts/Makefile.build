@@ -166,6 +166,7 @@ cmd_gensymtypes_c =                                                         \
      $(patsubst y,-s _,$(CONFIG_HAVE_UNDERSCORE_SYMBOL_PREFIX))             \
      $(patsubst y,-R,$(CONFIG_MODULE_REL_CRCS))                             \
      $(if $(KBUILD_PRESERVE),-p)                                            \
+     $(if $(KBUILD_OVERRIDE),-o)                                            \
      -r $(firstword $(wildcard $(2:.symtypes=.symref) /dev/null))
 
 quiet_cmd_cc_symtypes_c = SYM $(quiet_modtag) $@

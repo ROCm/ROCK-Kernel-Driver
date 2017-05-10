@@ -215,7 +215,7 @@ int __init default_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 		if (!(*drv)->acpi_madt_oem_check(oem_id, oem_table_id))
 			continue;
 
-		if (!cmdline_apic) {
+		if (!cmdline_apic && apic == &apic_default) {
 			apic = *drv;
 			printk(KERN_INFO "Switched to APIC driver `%s'.\n",
 			       apic->name);

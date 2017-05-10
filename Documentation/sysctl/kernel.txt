@@ -963,6 +963,18 @@ can be ORed together:
        signature.
 16384 - A soft lockup has previously occurred on the system.
 32768 - The kernel has been live patched.
+ 0x40000000 - An unsupported kernel module was loaded.
+ 0x80000000 - An kernel module with external support was loaded.
+
+==============================================================
+
+unsupported:
+
+Allow to load unsupported kernel modules:
+
+  0 - refuse to load unsupported modules,
+  1 - warn when loading unsupported modules,
+  2 - don't warn.
 
 ==============================================================
 

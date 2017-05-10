@@ -1362,7 +1362,7 @@ skip_lmm:
 			struct lov_user_mds_data __user *lmdp;
 			lstat_t st = { 0 };
 
-			st.st_dev     = inode->i_sb->s_dev;
+			st.st_dev     = inode_get_dev(inode);
 			st.st_mode    = body->mbo_mode;
 			st.st_nlink   = body->mbo_nlink;
 			st.st_uid     = body->mbo_uid;

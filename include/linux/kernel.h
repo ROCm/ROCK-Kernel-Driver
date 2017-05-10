@@ -455,6 +455,9 @@ extern int panic_on_unrecovered_nmi;
 extern int panic_on_io_nmi;
 extern int panic_on_warn;
 extern int sysctl_panic_on_rcu_stall;
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+extern int suse_unsupported;
+#endif
 extern int sysctl_panic_on_stackoverflow;
 
 extern bool crash_kexec_post_notifiers;
@@ -514,6 +517,15 @@ extern enum system_states {
 #define TAINT_SOFTLOCKUP		14
 #define TAINT_LIVEPATCH			15
 #define TAINT_FLAGS_COUNT		16
+
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+/*
+ * Take the upper bits to hopefully allow them
+ * to stay the same for more than one release.
+ */
+#define TAINT_NO_SUPPORT		30
+#define TAINT_EXTERNAL_SUPPORT		31
+#endif
 
 struct taint_flag {
 	char c_true;	/* character printed when tainted */

@@ -35,7 +35,8 @@
 /* SCSI Transport Broadcast Groups */
 	/* leaving groups 0 and 1 unassigned */
 #define SCSI_NL_GRP_FC_EVENTS		(1<<2)		/* Group 2 */
-#define SCSI_NL_GRP_CNT			3
+#define SCSI_NL_GRP_ML_EVENTS		(1<<3)		/* Group 3 */
+#define SCSI_NL_GRP_CNT			4
 
 
 /* SCSI_TRANSPORT_MSG event message header */
@@ -56,7 +57,8 @@ struct scsi_nl_hdr {
 /* scsi_nl_hdr->transport value */
 #define SCSI_NL_TRANSPORT			0
 #define SCSI_NL_TRANSPORT_FC			1
-#define SCSI_NL_MAX_TRANSPORTS			2
+#define SCSI_NL_TRANSPORT_ML			2
+#define SCSI_NL_MAX_TRANSPORTS			3
 
 /* Transport-based scsi_nl_hdr->msgtype values are defined in each transport */
 

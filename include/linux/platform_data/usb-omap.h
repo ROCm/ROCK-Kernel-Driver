@@ -19,6 +19,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _PLATFORM_USB_OMAP_
+#define _PLATFORM_USB_OMAP_
+
 #define OMAP3_HS_USB_PORTS	3
 
 enum usbhs_omap_port_mode {
@@ -86,3 +89,5 @@ enum musb_interface {
 	MUSB_INTERFACE_ULPI,
 	MUSB_INTERFACE_UTMI
 };
+
+#endif

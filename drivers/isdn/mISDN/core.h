@@ -17,6 +17,7 @@
 
 extern struct mISDNdevice	*get_mdevice(u_int);
 extern int			get_mdevice_count(void);
+extern kgid_t misdn_permitted_gid;
 
 /* stack status flag */
 #define mISDN_STACK_ACTION_MASK		0x0000ffff

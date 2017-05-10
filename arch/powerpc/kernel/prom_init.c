@@ -161,6 +161,7 @@ static unsigned long __initdata dt_string_start, dt_string_end;
 
 static unsigned long __initdata prom_initrd_start, prom_initrd_end;
 
+static int __initdata prom_no_display;
 #ifdef CONFIG_PPC64
 static int __initdata prom_iommu_force_on;
 static int __initdata prom_iommu_off;
@@ -612,6 +613,14 @@ static void __init early_cmdline_parse(void)
 #endif /* CONFIG_CMDLINE */
 	prom_printf("command line: %s\n", prom_cmd_line);
 
+	opt = strstr(prom_cmd_line, "prom=");
+	if (opt) {
+		opt += 5;
+		while (*opt && *opt == ' ')
+			opt++;
+		if (!strncmp(opt, "nodisplay", 9))
+			prom_no_display = 1;
+	}
 #ifdef CONFIG_PPC64
 	opt = strstr(prom_cmd_line, "iommu=");
 	if (opt) {
@@ -3132,7 +3141,8 @@ unsigned long __init prom_init(unsigned long r3, unsigned long r4,
 	/* 
 	 * Initialize display devices
 	 */
-	prom_check_displays();
+	if (prom_no_display == 0)
+		prom_check_displays();
 
 #if defined(CONFIG_PPC64) && defined(__BIG_ENDIAN__)
 	/*

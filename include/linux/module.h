@@ -257,6 +257,7 @@ extern const typeof(name) __mod_##type##__##name##_device_table		\
  * files require multiple MODULE_FIRMWARE() specifiers */
 #define MODULE_FIRMWARE(_firmware) MODULE_INFO(firmware, _firmware)
 
+struct dwarf_table;
 struct notifier_block;
 
 #ifdef CONFIG_MODULES
@@ -393,6 +394,9 @@ struct module {
 	struct module_layout core_layout __module_layout_align;
 	struct module_layout init_layout;
 
+	/* The handle returned from dwarf_add_table. */
+	struct dwarf_table *dwarf_info;
+
 	/* Arch-specific module values */
 	struct mod_arch_specific arch;
 
@@ -495,6 +499,9 @@ struct module *__module_address(unsigned long addr);
 bool is_module_address(unsigned long addr);
 bool is_module_percpu_address(unsigned long addr);
 bool is_module_text_address(unsigned long addr);
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+const char *supported_printable(int taint);
+#endif
 
 static inline bool within_module_core(unsigned long addr,
 				      const struct module *mod)

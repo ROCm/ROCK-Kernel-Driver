@@ -905,6 +905,24 @@ ENTRY(do_softirq_own_stack)
 	ret
 END(do_softirq_own_stack)
 
+#ifdef CONFIG_DWARF_UNWIND
+SYM_FUNC_START(arch_dwarf_init_running)
+	movq	%r15, R15(%rdi)
+	movq	%r14, R14(%rdi)
+	movq	%r13, R13(%rdi)
+	movq	%r12, R12(%rdi)
+	movq	%rbp, RBP(%rdi)
+	movq	%rbx, RBX(%rdi)
+	movq	(%rsp), %r9
+	movq	%r9, RIP(%rdi)
+	leaq	8(%rsp), %r9
+	movq	%r9, RSP(%rdi)
+	movq	$__KERNEL_CS, CS(%rdi)
+	movq	$__KERNEL_DS, SS(%rdi)
+	ret
+SYM_FUNC_END(arch_dwarf_init_running)
+#endif
+
 #ifdef CONFIG_XEN
 idtentry xen_hypervisor_callback xen_do_hypervisor_callback has_error_code=0
 

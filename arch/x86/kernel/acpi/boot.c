@@ -1337,6 +1337,21 @@ static int __init dmi_ignore_irq0_timer_override(const struct dmi_system_id *d)
 	return 0;
 }
 
+static int __init force_acpi_rsdt(const struct dmi_system_id *d)
+{
+	if (!acpi_force) {
+		printk(KERN_NOTICE "%s detected: force use of acpi=rsdt\n",
+		       d->ident);
+		acpi_gbl_do_not_use_xsdt = TRUE;
+	} else {
+		printk(KERN_NOTICE
+		       "Warning: acpi=force overrules DMI blacklist: "
+		       "acpi=rsdt\n");
+	}
+	return 0;
+
+}
+
 /*
  * ACPI offers an alternative platform interface model that removes
  * ACPI hardware requirements for platforms that do not implement
@@ -1432,6 +1447,32 @@ static struct dmi_system_id __initdata acpi_dmi_table[] = {
 		     DMI_MATCH(DMI_PRODUCT_NAME, "TravelMate 360"),
 		     },
 	 },
+
+	/*
+	 * Boxes that need RSDT as ACPI root table
+	 */
+	{
+	    .callback = force_acpi_rsdt,
+	    .ident = "ThinkPad ", /* R40e, broken C-states */
+	    .matches = {
+		DMI_MATCH(DMI_BIOS_VENDOR, "IBM"),
+		DMI_MATCH(DMI_BIOS_VERSION, "1SET")},
+	},
+	{
+	    .callback = force_acpi_rsdt,
+	    .ident = "ThinkPad ", /* R50e, slow booting */
+	    .matches = {
+		DMI_MATCH(DMI_BIOS_VENDOR, "IBM"),
+		DMI_MATCH(DMI_BIOS_VERSION, "1WET")},
+	},
+	{
+	    .callback = force_acpi_rsdt,
+	    .ident = "ThinkPad ", /* T40, T40p, T41, T41p, T42, T42p
+				     R50, R50p */
+	    .matches = {
+		DMI_MATCH(DMI_BIOS_VENDOR, "IBM"),
+		DMI_MATCH(DMI_BIOS_VERSION, "1RET")},
+	},
 	{}
 };
 
@@ -1643,6 +1684,18 @@ static int __init parse_acpi(char *arg)
 	return 0;
 }
 early_param("acpi", parse_acpi);
+
+/* Alias for acpi=rsdt for compatibility with openSUSE 11.1 and SLE11 */
+static int __init parse_acpi_root_table(char *opt)
+{
+	if (!strcmp(opt, "rsdt")) {
+		acpi_gbl_do_not_use_xsdt = TRUE;
+		printk(KERN_WARNING "acpi_root_table=rsdt is deprecated. "
+		       "Please use acpi=rsdt instead.\n");
+	}
+	return 0;
+}
+early_param("acpi_root_table", parse_acpi_root_table);
 
 /* FIXME: Using pci= for an ACPI parameter is a travesty. */
 static int __init parse_pci(char *arg)
