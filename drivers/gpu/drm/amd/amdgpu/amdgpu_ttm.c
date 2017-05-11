@@ -1305,7 +1305,7 @@ static int amdgpu_ssg_init(struct amdgpu_device *adev)
 	res.start = adev->mc.aper_base +
 		(amdgpu_bo_gpu_offset(adev->direct_gma.dgma_bo) -
 		 adev->mc.vram_start);
-	res.end = res.start + amdgpu_bo_size(adev->direct_gma.dgma_bo);
+	res.end = res.start + amdgpu_bo_size(adev->direct_gma.dgma_bo) - 1;
 	res.name = "DirectGMA";
 
 	rc = percpu_ref_init(&adev->ssg.ref, amdgpu_ssg_percpu_release,
