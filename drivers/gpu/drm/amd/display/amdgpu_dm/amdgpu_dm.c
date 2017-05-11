@@ -1892,7 +1892,11 @@ static int fill_plane_attributes_from_fb(
 	if (ret)
 		return ret;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+	switch (fb->pixel_format) {
+#else
 	switch (fb->format->format) {
+#endif
 	case DRM_FORMAT_C8:
 		plane_state->format = SURFACE_PIXEL_FORMAT_GRPH_PALETA_256_COLORS;
 		break;
@@ -1919,7 +1923,11 @@ static int fill_plane_attributes_from_fb(
 		break;
 	default:
 		DRM_ERROR("Unsupported screen format %s\n",
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+		          drm_get_format_name(fb->pixel_format, &format_name));
+#else
 		          drm_get_format_name(fb->format->format, &format_name));
+#endif
 		return -EINVAL;
 	}
 
@@ -1932,7 +1940,11 @@ static int fill_plane_attributes_from_fb(
 		plane_state->plane_size.grph.surface_size.width = fb->width;
 		plane_state->plane_size.grph.surface_size.height = fb->height;
 		plane_state->plane_size.grph.surface_pitch =
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+				fb->pitches[0] / (fb->bits_per_pixel / 8);
+#else
 				fb->pitches[0] / fb->format->cpp[0];
+#endif
 		/* TODO: unhardcode */
 		plane_state->color_space = COLOR_SPACE_SRGB;
 
