@@ -251,7 +251,9 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x6861, &vega10_device_info },	/* Vega10 */
 	{ 0x6862, &vega10_device_info },	/* Vega10 */
 	{ 0x6863, &vega10_device_info },	/* Vega10 */
+	{ 0x6864, &vega10_device_info },	/* Vega10 */
 	{ 0x6867, &vega10_device_info },	/* Vega10 */
+	{ 0x6868, &vega10_device_info },	/* Vega10 */
 	{ 0x686C, &vega10_device_info },	/* Vega10 */
 	{ 0x687F, &vega10_device_info }		/* Vega10 */
 };
