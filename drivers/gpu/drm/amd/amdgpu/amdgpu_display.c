@@ -753,7 +753,11 @@ amdgpu_framebuffer_init(struct drm_device *dev,
 {
 	int ret;
 	rfb->obj = obj;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+	drm_helper_mode_fill_fb_struct(&rfb->base, mode_cmd);
+#else
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
+#endif
 	ret = drm_framebuffer_init(dev, &rfb->base, &amdgpu_fb_funcs);
 	if (ret) {
 		rfb->obj = NULL;
