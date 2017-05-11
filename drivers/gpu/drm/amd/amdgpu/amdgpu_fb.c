@@ -354,6 +354,9 @@ int amdgpu_fbdev_init(struct amdgpu_device *adev)
 			&amdgpu_fb_helper_funcs);
 
 	ret = drm_fb_helper_init(adev->ddev, &rfbdev->helper,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+				 adev->mode_info.num_crtc,
+#endif
 				 AMDGPUFB_CONN_LIMIT);
 	if (ret) {
 		kfree(rfbdev);
