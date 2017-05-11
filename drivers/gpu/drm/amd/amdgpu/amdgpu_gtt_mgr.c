@@ -115,7 +115,12 @@ static int amdgpu_gtt_mgr_alloc(struct ttm_mem_type_manager *man,
 	struct amdgpu_device *adev = amdgpu_ttm_adev(man->bdev);
 	struct amdgpu_gtt_mgr *mgr = man->priv;
 	struct amdgpu_gtt_node *node = mem->mm_node;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+	enum drm_mm_search_flags sflags = DRM_MM_SEARCH_BEST;
+	enum drm_mm_allocator_flags aflags = DRM_MM_CREATE_DEFAULT;
+#else
 	enum drm_mm_insert_mode mode;
+#endif
 	unsigned long fpfn, lpfn;
 	int r;
 
@@ -132,14 +137,28 @@ static int amdgpu_gtt_mgr_alloc(struct ttm_mem_type_manager *man,
 	else
 		lpfn = adev->gart.num_cpu_pages;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+	if (place && place->flags & TTM_PL_FLAG_TOPDOWN) {
+		sflags = DRM_MM_SEARCH_BELOW;
+		aflags = DRM_MM_CREATE_TOP;
+	}
+#else
 	mode = DRM_MM_INSERT_BEST;
 	if (place && place->flags & TTM_PL_FLAG_TOPDOWN)
 		mode = DRM_MM_INSERT_HIGH;
+#endif
 
 	spin_lock(&mgr->lock);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+	r = drm_mm_insert_node_in_range_generic(&mgr->mm, &node->node,
+						mem->num_pages,
+						mem->page_alignment, 0,
+						fpfn, lpfn, sflags, aflags);
+#else
 	r = drm_mm_insert_node_in_range(&mgr->mm, &node->node, mem->num_pages,
 					mem->page_alignment, 0, fpfn, lpfn,
 					mode);
+#endif
 	spin_unlock(&mgr->lock);
 
 	if (!r)

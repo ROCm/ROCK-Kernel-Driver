@@ -47,6 +47,50 @@ struct ttm_range_manager {
 	spinlock_t lock;
 };
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+static int ttm_bo_man_get_node(struct ttm_mem_type_manager *man,
+			       struct ttm_buffer_object *bo,
+			       const struct ttm_place *place,
+			       struct ttm_mem_reg *mem)
+{
+	struct ttm_range_manager *rman = (struct ttm_range_manager *) man->priv;
+	struct drm_mm *mm = &rman->mm;
+	struct drm_mm_node *node = NULL;
+	enum drm_mm_search_flags sflags = DRM_MM_SEARCH_BEST;
+	enum drm_mm_allocator_flags aflags = DRM_MM_CREATE_DEFAULT;
+	unsigned long lpfn;
+	int ret;
+
+	lpfn = place->lpfn;
+	if (!lpfn)
+		lpfn = man->size;
+
+	node = kzalloc(sizeof(*node), GFP_KERNEL);
+	if (!node)
+		return -ENOMEM;
+
+	if (place->flags & TTM_PL_FLAG_TOPDOWN) {
+		sflags = DRM_MM_SEARCH_BELOW;
+		aflags = DRM_MM_CREATE_TOP;
+	}
+
+	spin_lock(&rman->lock);
+	ret = drm_mm_insert_node_in_range_generic(mm, node, mem->num_pages,
+					  mem->page_alignment, 0,
+					  place->fpfn, lpfn,
+					  sflags, aflags);
+	spin_unlock(&rman->lock);
+
+	if (unlikely(ret)) {
+		kfree(node);
+	} else {
+		mem->mm_node = node;
+		mem->start = node->start;
+	}
+
+	return 0;
+}
+#else
 static int ttm_bo_man_get_node(struct ttm_mem_type_manager *man,
 			       struct ttm_buffer_object *bo,
 			       const struct ttm_place *place,
@@ -87,6 +131,7 @@ static int ttm_bo_man_get_node(struct ttm_mem_type_manager *man,
 
 	return 0;
 }
+#endif
 
 static void ttm_bo_man_put_node(struct ttm_mem_type_manager *man,
 				struct ttm_mem_reg *mem)
