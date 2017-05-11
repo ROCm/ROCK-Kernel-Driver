@@ -32,7 +32,9 @@
 
 #include <drm/drm_crtc.h>
 #include <drm/drm_edid.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <drm/drm_encoder.h>
+#endif
 #include <drm/drm_dp_helper.h>
 #include <drm/drm_fixed.h>
 #include <drm/drm_crtc_helper.h>
