@@ -48,12 +48,20 @@
  * This is the main unload function for KMS (all asics).
  * Returns 0 on success.
  */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+int amdgpu_driver_unload_kms(struct drm_device *dev)
+#else
 void amdgpu_driver_unload_kms(struct drm_device *dev)
+#endif
 {
 	struct amdgpu_device *adev = dev->dev_private;
 
 	if (adev == NULL)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+		return 0;
+#else
 		return;
+#endif
 
 	if (adev->rmmio == NULL)
 		goto done_free;
@@ -73,6 +81,9 @@ void amdgpu_driver_unload_kms(struct drm_device *dev)
 done_free:
 	kfree(adev);
 	dev->dev_private = NULL;
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+	return 0;
+#endif
 }
 
 /**
