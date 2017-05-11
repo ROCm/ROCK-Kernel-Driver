@@ -36,6 +36,7 @@
 #include <linux/fs.h>
 #include <linux/spinlock.h>
 #include <linux/reservation.h>
+#include <linux/version.h>
 
 #include "ttm_bo_api.h"
 #include "ttm_memory.h"
@@ -126,6 +127,7 @@ struct ttm_mem_type_manager_func {
 	 *
 	 * @man: Pointer to a memory type manager.
 	 * @printer: Prefix to be used in printout to identify the caller.
+	 * @prefix: Prefix to be used in printout to identify the caller.
 	 *
 	 * This function is called to print out the state of the memory
 	 * type manager to aid debugging of out-of-memory conditions.
