@@ -1864,9 +1864,9 @@ static int fill_plane_attributes_from_fb(struct amdgpu_device *adev,
 	default:
 		DRM_ERROR("Unsupported screen format %s\n",
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
-		          drm_get_format_name(fb->pixel_format, &format_name));
+		          kcl_drm_get_format_name(fb->pixel_format, &format_name));
 #else
-			  drm_get_format_name(fb->format->format, &format_name));
+		          kcl_drm_get_format_name(fb->format->format, &format_name));
 #endif
 		return -EINVAL;
 	}

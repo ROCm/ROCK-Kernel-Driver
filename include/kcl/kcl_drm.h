@@ -7,6 +7,8 @@
 #include <drm/drm_atomic.h>
 #include <drm/drm_gem.h>
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_fourcc.h>
+#include <linux/ctype.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
@@ -277,6 +279,39 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 #else
 	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
 						     flags, mode);
+#endif
+}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+/**
+ * struct drm_format_name_buf - name of a DRM format
+ * @str: string buffer containing the format name
+ */
+struct drm_format_name_buf {
+	char str[32];
+};
+
+static char printable_char(int c)
+{
+	return isascii(c) && isprint(c) ? c : '?';
+}
+#endif
+
+static inline const char *kcl_drm_get_format_name(uint32_t format, struct drm_format_name_buf *buf)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+	snprintf(buf->str, sizeof(buf->str),
+		 "%c%c%c%c %s-endian (0x%08x)",
+		 printable_char(format & 0xff),
+		 printable_char((format >> 8) & 0xff),
+		 printable_char((format >> 16) & 0xff),
+		 printable_char((format >> 24) & 0x7f),
+		 format & DRM_FORMAT_BIG_ENDIAN ? "big" : "little",
+		 format);
+
+	return buf->str;
+#else
+	return drm_get_format_name(format, buf);
 #endif
 }
 

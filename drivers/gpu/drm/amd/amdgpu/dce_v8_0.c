@@ -1936,9 +1936,9 @@ static int dce_v8_0_crtc_do_set_base(struct drm_crtc *crtc,
 	default:
 		DRM_ERROR("Unsupported screen format %s\n",
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
-		          drm_get_format_name(target_fb->pixel_format, &format_name));
+		          kcl_drm_get_format_name(target_fb->pixel_format, &format_name));
 #else
-		          drm_get_format_name(target_fb->format->format, &format_name));
+		          kcl_drm_get_format_name(target_fb->format->format, &format_name));
 #endif
 		return -EINVAL;
 	}
