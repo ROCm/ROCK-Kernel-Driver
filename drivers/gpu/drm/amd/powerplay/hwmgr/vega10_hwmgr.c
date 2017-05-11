@@ -4016,7 +4016,6 @@ static int vega10_set_fan_control_mode(struct pp_hwmgr *hwmgr, uint32_t mode)
 
 static int vega10_get_fan_control_mode(struct pp_hwmgr *hwmgr)
 {
-	uint32_t reg;
 	struct vega10_hwmgr *data = (struct vega10_hwmgr *)(hwmgr->backend);
 
 	if (data->smu_features[GNLD_FAN_CONTROL].enabled == false)
