@@ -2453,7 +2453,11 @@ static int fill_plane_attributes_from_fb(struct amdgpu_device *adev,
 	if (ret)
 		return ret;
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+	switch (fb->pixel_format) {
+#else
 	switch (fb->format->format) {
+#endif
 	case DRM_FORMAT_C8:
 		plane_state->format = SURFACE_PIXEL_FORMAT_GRPH_PALETA_256_COLORS;
 		break;
@@ -2484,7 +2488,11 @@ static int fill_plane_attributes_from_fb(struct amdgpu_device *adev,
 		break;
 	default:
 		DRM_ERROR("Unsupported screen format %s\n",
-			  drm_get_format_name(fb->format->format, &format_name));
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+		          kcl_drm_get_format_name(fb->pixel_format, &format_name));
+#else
+		          kcl_drm_get_format_name(fb->format->format, &format_name));
+#endif
 		return -EINVAL;
 	}
 
@@ -2499,7 +2507,11 @@ static int fill_plane_attributes_from_fb(struct amdgpu_device *adev,
 		plane_state->plane_size.grph.surface_size.width = fb->width;
 		plane_state->plane_size.grph.surface_size.height = fb->height;
 		plane_state->plane_size.grph.surface_pitch =
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+				fb->pitches[0] / (fb->bits_per_pixel / 8);
+#else
 				fb->pitches[0] / fb->format->cpp[0];
+#endif
 		/* TODO: unhardcode */
 		plane_state->color_space = COLOR_SPACE_SRGB;
 

@@ -1824,7 +1824,11 @@ static int dce_v6_0_crtc_do_set_base(struct drm_crtc *crtc,
 	amdgpu_bo_get_tiling_flags(abo, &tiling_flags);
 	amdgpu_bo_unreserve(abo);
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+	switch (target_fb->pixel_format) {
+#else
 	switch (target_fb->format->format) {
+#endif
 	case DRM_FORMAT_C8:
 		fb_format = (GRPH_DEPTH(GRPH_DEPTH_8BPP) |
 			     GRPH_FORMAT(GRPH_FORMAT_INDEXED));
@@ -1900,7 +1904,11 @@ static int dce_v6_0_crtc_do_set_base(struct drm_crtc *crtc,
 		break;
 	default:
 		DRM_ERROR("Unsupported screen format %s\n",
-		          drm_get_format_name(target_fb->format->format, &format_name));
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+		          kcl_drm_get_format_name(target_fb->pixel_format, &format_name));
+#else
+		          kcl_drm_get_format_name(target_fb->format->format, &format_name));
+#endif
 		return -EINVAL;
 	}
 
@@ -1963,7 +1971,11 @@ static int dce_v6_0_crtc_do_set_base(struct drm_crtc *crtc,
 	WREG32(mmGRPH_X_END + amdgpu_crtc->crtc_offset, target_fb->width);
 	WREG32(mmGRPH_Y_END + amdgpu_crtc->crtc_offset, target_fb->height);
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+	fb_pitch_pixels = target_fb->pitches[0] / (target_fb->bits_per_pixel / 8);
+#else
 	fb_pitch_pixels = target_fb->pitches[0] / target_fb->format->cpp[0];
+#endif
 	WREG32(mmGRPH_PITCH + amdgpu_crtc->crtc_offset, fb_pitch_pixels);
 
 	dce_v6_0_grph_enable(crtc, true);
@@ -2269,7 +2281,7 @@ static int dce_v6_0_crtc_cursor_set2(struct drm_crtc *crtc,
 	aobj = gem_to_amdgpu_bo(obj);
 	ret = amdgpu_bo_reserve(aobj, false);
 	if (ret != 0) {
-		drm_gem_object_put_unlocked(obj);
+		kcl_drm_gem_object_put_unlocked(obj);
 		return ret;
 	}
 
@@ -2277,7 +2289,7 @@ static int dce_v6_0_crtc_cursor_set2(struct drm_crtc *crtc,
 	amdgpu_bo_unreserve(aobj);
 	if (ret) {
 		DRM_ERROR("Failed to pin new cursor BO (%d)\n", ret);
-		drm_gem_object_put_unlocked(obj);
+		kcl_drm_gem_object_put_unlocked(obj);
 		return ret;
 	}
 	amdgpu_crtc->cursor_addr = amdgpu_bo_gpu_offset(aobj);
@@ -2312,7 +2324,7 @@ unpin:
 			amdgpu_bo_unpin(aobj);
 			amdgpu_bo_unreserve(aobj);
 		}
-		drm_gem_object_put_unlocked(amdgpu_crtc->cursor_bo);
+		kcl_drm_gem_object_put_unlocked(amdgpu_crtc->cursor_bo);
 	}
 
 	amdgpu_crtc->cursor_bo = obj;
@@ -2379,7 +2391,7 @@ static const struct drm_crtc_funcs dce_v6_0_crtc_funcs = {
 	.gamma_set = dce_v6_0_crtc_gamma_set,
 	.set_config = amdgpu_display_crtc_set_config,
 	.destroy = dce_v6_0_crtc_destroy,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
 	.page_flip_target = amdgpu_display_crtc_page_flip_target,
 #else
 	.page_flip = amdgpu_crtc_page_flip,
