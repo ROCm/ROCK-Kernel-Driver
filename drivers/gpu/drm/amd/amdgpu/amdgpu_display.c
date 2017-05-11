@@ -833,7 +833,11 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 {
 	int ret;
 	kcl_drm_fb_set_gem_obj(&rfb->base, 0, obj);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+	drm_helper_mode_fill_fb_struct(&rfb->base, mode_cmd);
+#else
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
+#endif
 	ret = drm_framebuffer_init(dev, &rfb->base, &amdgpu_fb_funcs);
 	if (ret) {
 		kcl_drm_fb_set_gem_obj(&rfb->base, 0, NULL);
