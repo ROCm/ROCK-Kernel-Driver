@@ -246,7 +246,9 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	}
 
 	info->par = rfbdev;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
 	info->skip_vt_switch = true;
+#endif
 
 	ret = amdgpu_display_framebuffer_init(adev->ddev, &rfbdev->rfb,
 					      &mode_cmd, gobj);
@@ -262,7 +264,11 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 
 	strcpy(info->fix.id, "amdgpudrmfb");
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->depth);
+#else
 	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->format->depth);
+#endif
 
 	info->fbops = &amdgpufb_ops;
 
@@ -275,8 +281,13 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	drm_fb_helper_fill_var(info, &rfbdev->helper, sizes->fb_width, sizes->fb_height);
 
 	/* setup aperture base/size for vesafb takeover */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 35)
+	info->aperture_base = adev->ddev->mode_config.fb_base;
+	info->aperture_size = adev->gmc.aper_size;
+#else
 	info->apertures->ranges[0].base = adev->ddev->mode_config.fb_base;
 	info->apertures->ranges[0].size = adev->gmc.aper_size;
+#endif
 
 	/* Use default scratch pixmap (info->pixmap.flags = FB_PIXMAP_SYSTEM) */
 
@@ -288,7 +299,11 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	DRM_INFO("fb mappable at 0x%lX\n",  info->fix.smem_start);
 	DRM_INFO("vram apper at 0x%lX\n",  (unsigned long)adev->gmc.aper_base);
 	DRM_INFO("size %lu\n", (unsigned long)amdgpu_bo_size(abo));
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+	DRM_INFO("fb depth is %d\n", fb->depth);
+#else
 	DRM_INFO("fb depth is %d\n", fb->format->depth);
+#endif
 	DRM_INFO("   pitch is %d\n", fb->pitches[0]);
 
 	vga_switcheroo_client_fb_set(adev->ddev->pdev, info);
