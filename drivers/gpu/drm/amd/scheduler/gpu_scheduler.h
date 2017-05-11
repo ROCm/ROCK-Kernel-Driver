@@ -85,6 +85,7 @@ struct amd_sched_job {
 	struct list_head		node;
 	struct delayed_work		work_tdr;
 	uint64_t			id;
+	atomic_t karma;
 };
 
 extern const struct fence_ops amd_sched_fence_ops_scheduled;
@@ -98,6 +99,11 @@ static inline struct amd_sched_fence *to_amd_sched_fence(struct fence *f)
 		return container_of(f, struct amd_sched_fence, finished);
 
 	return NULL;
+}
+
+static inline bool amd_sched_invalidate_job(struct amd_sched_job *s_job, int threshold)
+{
+	return (s_job && atomic_inc_return(&s_job->karma) > threshold);
 }
 
 /**
@@ -164,4 +170,5 @@ void amd_sched_hw_job_reset(struct amd_gpu_scheduler *sched);
 void amd_sched_job_recovery(struct amd_gpu_scheduler *sched);
 bool amd_sched_dependency_optimized(struct fence* fence,
 				    struct amd_sched_entity *entity);
+void amd_sched_job_kickout(struct amd_sched_job *s_job);
 #endif
