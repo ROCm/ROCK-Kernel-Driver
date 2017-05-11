@@ -115,7 +115,12 @@ static int amdgpu_gtt_mgr_alloc(struct ttm_mem_type_manager *man,
 	struct amdgpu_device *adev = amdgpu_ttm_adev(man->bdev);
 	struct amdgpu_gtt_mgr *mgr = man->priv;
 	struct amdgpu_gtt_node *node = mem->mm_node;
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+	enum drm_mm_search_flags sflags = DRM_MM_SEARCH_BEST;
+	enum drm_mm_allocator_flags aflags = DRM_MM_CREATE_DEFAULT;
+#else
 	enum drm_mm_insert_mode mode;
+#endif
 	unsigned long fpfn, lpfn;
 	int r;
 
@@ -132,14 +137,28 @@ static int amdgpu_gtt_mgr_alloc(struct ttm_mem_type_manager *man,
 	else
 		lpfn = adev->gart.num_cpu_pages;
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+	if (place && place->flags & TTM_PL_FLAG_TOPDOWN) {
+		sflags = DRM_MM_SEARCH_BELOW;
+		aflags = DRM_MM_CREATE_TOP;
+	}
+#else
 	mode = DRM_MM_INSERT_BEST;
 	if (place && place->flags & TTM_PL_FLAG_TOPDOWN)
 		mode = DRM_MM_INSERT_HIGH;
+#endif
 
 	spin_lock(&mgr->lock);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+	r = drm_mm_insert_node_in_range_generic(&mgr->mm, &node->node,
+						mem->num_pages,
+						mem->page_alignment, 0,
+						fpfn, lpfn, sflags, aflags);
+#else
 	r = drm_mm_insert_node_in_range(&mgr->mm, &node->node, mem->num_pages,
 					mem->page_alignment, 0, fpfn, lpfn,
 					mode);
+#endif
 	spin_unlock(&mgr->lock);
 
 	if (!r)
@@ -274,21 +293,36 @@ int amdgpu_gtt_mgr_recover(struct ttm_mem_type_manager *man)
  *
  * @man: TTM memory type manager
  * @printer: DRM printer to use
+ * @prefix: text prefix
  *
  * Dump the table content using printk.
  */
 static void amdgpu_gtt_mgr_debug(struct ttm_mem_type_manager *man,
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 				 struct drm_printer *printer)
+#else
+				 const char *prefix)
+#endif
 {
 	struct amdgpu_gtt_mgr *mgr = man->priv;
 
 	spin_lock(&mgr->lock);
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 	drm_mm_print(&mgr->mm, printer);
+#else
+	drm_mm_debug_table(&mgr->mm, prefix);
+#endif
 	spin_unlock(&mgr->lock);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 	drm_printf(printer, "man size:%llu pages, gtt available:%lld pages, usage:%lluMB\n",
 		   man->size, (u64)atomic64_read(&mgr->available),
 		   amdgpu_gtt_mgr_usage(man) >> 20);
+#else
+	DRM_DEBUG("man size:%llu pages, gtt available:%llu pages, usage:%lluMB\n",
+		   man->size, (u64)atomic64_read(&mgr->available),
+		   amdgpu_gtt_mgr_usage(man) >> 20);
+#endif
 }
 
 const struct ttm_mem_type_manager_func amdgpu_gtt_mgr_func = {

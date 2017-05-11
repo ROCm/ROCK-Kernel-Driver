@@ -143,7 +143,12 @@ static int amdgpu_vram_mgr_new(struct ttm_mem_type_manager *man,
 	struct amdgpu_vram_mgr *mgr = man->priv;
 	struct drm_mm *mm = &mgr->mm;
 	struct drm_mm_node *nodes;
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+	enum drm_mm_search_flags sflags = DRM_MM_SEARCH_DEFAULT;
+	enum drm_mm_allocator_flags aflags = DRM_MM_CREATE_DEFAULT;
+#else
 	enum drm_mm_insert_mode mode;
+#endif
 	unsigned long lpfn, num_nodes, pages_per_node, pages_left;
 	uint64_t usage = 0, vis_usage = 0;
 	unsigned i;
@@ -162,15 +167,25 @@ static int amdgpu_vram_mgr_new(struct ttm_mem_type_manager *man,
 				     mem->page_alignment);
 		num_nodes = DIV_ROUND_UP(mem->num_pages, pages_per_node);
 	}
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
+	nodes = kcalloc(num_nodes, sizeof(*nodes), GFP_KERNEL);
+#else
 	nodes = kvmalloc_array(num_nodes, sizeof(*nodes),
 			       GFP_KERNEL | __GFP_ZERO);
+#endif
 	if (!nodes)
 		return -ENOMEM;
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+	if (place->flags & TTM_PL_FLAG_TOPDOWN) {
+		sflags = DRM_MM_SEARCH_BELOW;
+		aflags = DRM_MM_CREATE_TOP;
+	}
+#else
 	mode = DRM_MM_INSERT_BEST;
 	if (place->flags & TTM_PL_FLAG_TOPDOWN)
 		mode = DRM_MM_INSERT_HIGH;
+#endif
 
 	mem->start = 0;
 	pages_left = mem->num_pages;
@@ -183,11 +198,20 @@ static int amdgpu_vram_mgr_new(struct ttm_mem_type_manager *man,
 
 		if (pages == pages_per_node)
 			alignment = pages_per_node;
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+		else
+			sflags |= DRM_MM_SEARCH_BEST;
 
+		r = drm_mm_insert_node_in_range_generic(mm, &nodes[i], pages,
+							alignment, 0,
+							place->fpfn, lpfn,
+							sflags, aflags);
+#else
 		r = drm_mm_insert_node_in_range(mm, &nodes[i],
 						pages, alignment, 0,
 						place->fpfn, lpfn,
 						mode);
+#endif
 		if (unlikely(r))
 			goto error;
 
@@ -219,7 +243,7 @@ error:
 		drm_mm_remove_node(&nodes[i]);
 	spin_unlock(&mgr->lock);
 
-	kvfree(nodes);
+	kfree(nodes);
 	return r == -ENOSPC ? 0 : r;
 }
 
@@ -258,7 +282,7 @@ static void amdgpu_vram_mgr_del(struct ttm_mem_type_manager *man,
 	atomic64_sub(usage, &mgr->usage);
 	atomic64_sub(vis_usage, &mgr->vis_usage);
 
-	kvfree(mem->mm_node);
+	kfree(mem->mm_node);
 	mem->mm_node = NULL;
 }
 
@@ -295,21 +319,36 @@ uint64_t amdgpu_vram_mgr_vis_usage(struct ttm_mem_type_manager *man)
  *
  * @man: TTM memory type manager
  * @printer: DRM printer to use
+ * @prefix: text prefix
  *
  * Dump the table content using printk.
  */
 static void amdgpu_vram_mgr_debug(struct ttm_mem_type_manager *man,
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 				  struct drm_printer *printer)
+#else
+				  const char *prefix)
+#endif
 {
 	struct amdgpu_vram_mgr *mgr = man->priv;
 
 	spin_lock(&mgr->lock);
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 	drm_mm_print(&mgr->mm, printer);
+#else
+	drm_mm_debug_table(&mgr->mm, prefix);
+#endif
 	spin_unlock(&mgr->lock);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 	drm_printf(printer, "man size:%llu pages, ram usage:%lluMB, vis usage:%lluMB\n",
 		   man->size, amdgpu_vram_mgr_usage(man) >> 20,
 		   amdgpu_vram_mgr_vis_usage(man) >> 20);
+#else
+	DRM_DEBUG("man size:%llu pages, ram usage:%lluMB, vis usage:%lluMB\n",
+		   man->size, amdgpu_vram_mgr_usage(man) >> 20,
+		   amdgpu_vram_mgr_vis_usage(man) >> 20);
+#endif
 }
 
 const struct ttm_mem_type_manager_func amdgpu_vram_mgr_func = {
