@@ -55,6 +55,7 @@ static void amdgpu_sem_free(struct kref *kref)
 	struct amdgpu_sem *sem = container_of(
 		kref, struct amdgpu_sem, kref);
 
+	list_del(&sem->list);
 	kref_put(&sem->base->kref, amdgpu_sem_core_free);
 	kfree(sem);
 }
@@ -65,7 +66,7 @@ static inline void amdgpu_sem_get(struct amdgpu_sem *sem)
 		kref_get(&sem->kref);
 }
 
-void amdgpu_sem_put(struct amdgpu_sem *sem)
+static inline void amdgpu_sem_put(struct amdgpu_sem *sem)
 {
 	if (sem)
 		kref_put(&sem->kref, amdgpu_sem_free);
@@ -373,7 +374,6 @@ static int amdgpu_sem_cring_add(struct amdgpu_fpriv *fpriv,
 	mutex_lock(&ctx->rings[out_ring->idx].sem_lock);
 	list_add(&sem->list, &ctx->rings[out_ring->idx].sem_list);
 	mutex_unlock(&ctx->rings[out_ring->idx].sem_lock);
-	amdgpu_sem_get(sem);
 
 err:
 	amdgpu_ctx_put(ctx);
@@ -400,7 +400,6 @@ int amdgpu_sem_add_cs(struct amdgpu_ctx *ctx, struct amdgpu_ring *ring,
 		sem->base->fence = NULL;
 		mutex_unlock(&sem->base->lock);
 		list_del_init(&sem->list);
-		amdgpu_sem_put(sem);
 	}
 err:
 	mutex_unlock(&ctx->rings[ring->idx].sem_lock);
