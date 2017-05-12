@@ -5018,11 +5018,14 @@ static int gfx_v8_0_kcq_init_queue(struct amdgpu_ring *ring)
 	struct vi_mqd *mqd = ring->mqd_ptr;
 	int mqd_idx = ring - &adev->gfx.compute_ring[0];
 
-	if (!adev->gfx.in_reset && !adev->gfx.in_suspend) {
+	if (adev->asic_type == CHIP_FIJI ||
+		(!adev->gfx.in_reset && !adev->gfx.in_suspend)) {
 		memset((void *)mqd, 0, sizeof(*mqd));
 		mutex_lock(&adev->srbm_mutex);
 		vi_srbm_select(adev, ring->me, ring->pipe, ring->queue, 0);
 		gfx_v8_0_mqd_init(ring);
+		if (adev->asic_type == CHIP_FIJI)
+			gfx_v8_0_kiq_init_register(ring);
 		vi_srbm_select(adev, 0, 0, 0, 0);
 		mutex_unlock(&adev->srbm_mutex);
 
@@ -5091,9 +5094,11 @@ static int gfx_v8_0_kiq_resume(struct amdgpu_device *adev)
 
 	gfx_v8_0_set_mec_doorbell_range(adev);
 
-	r = gfx_v8_0_kiq_kcq_enable(adev);
-	if (r)
-		goto done;
+	if (adev->asic_type != CHIP_FIJI) {
+		r = gfx_v8_0_kiq_kcq_enable(adev);
+		if (r)
+			goto done;
+	}
 
 	/* Test KIQ */
 	ring = &adev->gfx.kiq.ring;
@@ -5209,7 +5214,8 @@ static int gfx_v8_0_hw_fini(void *handle)
 		pr_debug("For SRIOV client, shouldn't do anything.\n");
 		return 0;
 	}
-	gfx_v8_0_kiq_kcq_disable(adev);
+	if (adev->asic_type != CHIP_FIJI)
+		gfx_v8_0_kiq_kcq_disable(adev);
 	gfx_v8_0_cp_enable(adev, false);
 	gfx_v8_0_rlc_stop(adev);
 
