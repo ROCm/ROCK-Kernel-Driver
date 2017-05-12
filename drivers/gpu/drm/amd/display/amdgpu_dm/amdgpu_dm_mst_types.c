@@ -195,6 +195,14 @@ dm_dp_mst_connector_destroy(struct drm_connector *connector)
 }
 
 static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
+/* 
+ * Need to add support for DRM < 4.14 as DP1.1 does
+ * 4.13 DRM uses .set_property hook, while 4.15 doesn't
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+        .dpms = drm_atomic_helper_connector_dpms,
+        .set_property = drm_atomic_helper_connector_set_property,
+#endif
 	.detect = dm_dp_mst_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.destroy = dm_dp_mst_connector_destroy,
@@ -204,6 +212,17 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 	.atomic_set_property = amdgpu_dm_connector_atomic_set_property,
 	.atomic_get_property = amdgpu_dm_connector_atomic_get_property
 };
+
+static int dm_connector_update_modes(struct drm_connector *connector,
+				struct edid *edid)
+{
+	int ret;
+
+	ret = drm_add_edid_modes(connector, edid);
+	drm_edid_to_eld(connector, edid);
+
+	return ret;
+}
 
 void dm_dp_mst_dc_sink_create(struct drm_connector *connector)
 {
@@ -278,7 +297,6 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 		if (aconnector->dc_sink)
 			amdgpu_dm_update_freesync_caps(
 					connector, aconnector->edid);
-
 	}
 
 	drm_mode_connector_update_edid_property(
@@ -354,10 +372,15 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	struct amdgpu_device *adev = dev->dev_private;
 	struct amdgpu_dm_connector *aconnector;
 	struct drm_connector *connector;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 	struct drm_connector_list_iter conn_iter;
 
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter) {
+#else
+	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
+	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
+#endif
 		aconnector = to_amdgpu_dm_connector(connector);
 		if (aconnector->mst_port == master
 				&& !aconnector->port) {
@@ -367,12 +390,20 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 			aconnector->port = port;
 			drm_mode_connector_set_path_property(connector, pathprop);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 			drm_connector_list_iter_end(&conn_iter);
+#else
+			drm_modeset_unlock(&dev->mode_config.connection_mutex);
+#endif
 			aconnector->mst_connected = true;
 			return &aconnector->base;
 		}
 	}
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 	drm_connector_list_iter_end(&conn_iter);
+#else
+	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+#endif
 
 	aconnector = kzalloc(sizeof(*aconnector), GFP_KERNEL);
 	if (!aconnector)
@@ -458,28 +489,41 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 	drm_kms_helper_hotplug_event(dev);
 }
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 static void dm_dp_mst_link_status_reset(struct drm_connector *connector)
 {
 	mutex_lock(&connector->dev->mode_config.mutex);
 	drm_mode_connector_set_link_status_property(connector, DRM_MODE_LINK_STATUS_BAD);
 	mutex_unlock(&connector->dev->mode_config.mutex);
 }
+#endif
 
 static void dm_dp_mst_register_connector(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = dev->dev_private;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
+#endif
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+	drm_modeset_lock_all(dev);
+#endif
 	if (adev->mode_info.rfbdev)
 		drm_fb_helper_add_one_connector(&adev->mode_info.rfbdev->helper, connector);
 	else
 		DRM_ERROR("adev->mode_info.rfbdev is NULL\n");
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+	drm_modeset_unlock_all(dev);
+#endif
+
 	drm_connector_register(connector);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 	if (aconnector->mst_connected)
 		dm_dp_mst_link_status_reset(connector);
+#endif
 }
 
 static const struct drm_dp_mst_topology_cbs dm_mst_cbs = {
@@ -501,7 +545,11 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 	aconnector->mst_mgr.cbs = &dm_mst_cbs;
 	drm_dp_mst_topology_mgr_init(
 		&aconnector->mst_mgr,
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+		dm->adev->dev,
+#else
 		dm->adev->ddev,
+#endif
 		&aconnector->dm_dp_aux.aux,
 		16,
 		4,
