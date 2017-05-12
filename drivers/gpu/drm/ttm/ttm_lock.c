@@ -33,7 +33,11 @@
 #include <linux/atomic.h>
 #include <linux/errno.h>
 #include <linux/wait.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#include <linux/sched.h>
+#else
 #include <linux/sched/signal.h>
+#endif
 #include <linux/module.h>
 
 #define TTM_WRITE_LOCK_PENDING    (1 << 0)
