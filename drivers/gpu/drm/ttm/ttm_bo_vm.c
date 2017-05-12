@@ -45,8 +45,14 @@
 
 #define TTM_BO_VM_NUM_PREFAULT 16
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+static int ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
+				struct vm_area_struct *vma,
+				struct vm_fault *vmf)
+#else
 static int ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 				struct vm_fault *vmf)
+#endif
 {
 	int ret = 0;
 
@@ -69,7 +75,11 @@ static int ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 			goto out_unlock;
 
 		ttm_bo_reference(bo);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+		up_read(&vma->vm_mm->mmap_sem);
+#else
 		up_read(&vmf->vma->vm_mm->mmap_sem);
+#endif
 		(void) dma_fence_wait(bo->moving, true);
 		ttm_bo_unreserve(bo);
 		ttm_bo_unref(&bo);
@@ -94,9 +104,15 @@ out_unlock:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+#else
 static int ttm_bo_vm_fault(struct vm_fault *vmf)
+#endif
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 	struct vm_area_struct *vma = vmf->vma;
+#endif
 	struct ttm_buffer_object *bo = (struct ttm_buffer_object *)
 	    vma->vm_private_data;
 	struct ttm_bo_device *bdev = bo->bdev;
@@ -131,7 +147,7 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_reference(bo);
-				up_read(&vmf->vma->vm_mm->mmap_sem);
+				up_read(&vma->vm_mm->mmap_sem);
 				(void) ttm_bo_wait_unreserved(bo);
 				ttm_bo_unref(&bo);
 			}
@@ -175,7 +191,11 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 	 * Wait for buffer data in transit, due to a pipelined
 	 * move.
 	 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+	ret = ttm_bo_vm_fault_idle(bo, vma, vmf);
+#else
 	ret = ttm_bo_vm_fault_idle(bo, vmf);
+#endif
 	if (unlikely(ret != 0)) {
 		retval = ret;
 
