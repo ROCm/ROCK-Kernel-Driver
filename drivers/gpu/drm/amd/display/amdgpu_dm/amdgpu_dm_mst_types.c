@@ -141,6 +141,14 @@ dm_dp_mst_connector_destroy(struct drm_connector *connector)
 }
 
 static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
+/* 
+ * Need to add support for DRM < 4.14 as DP1.1 does
+ * 4.13 DRM uses .set_property hook, while 4.15 doesn't
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+        .dpms = drm_atomic_helper_connector_dpms,
+        .set_property = drm_atomic_helper_connector_set_property,
+#endif
 	.detect = dm_dp_mst_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.destroy = dm_dp_mst_connector_destroy,
@@ -195,7 +203,6 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 		if (aconnector->dc_sink)
 			amdgpu_dm_update_freesync_caps(
 					connector, aconnector->edid);
-
 	}
 
 	drm_connector_update_edid_property(
@@ -351,10 +358,17 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = dev->dev_private;
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+	drm_modeset_lock_all(dev);
+#endif
 	if (adev->mode_info.rfbdev)
 		drm_fb_helper_add_one_connector(&adev->mode_info.rfbdev->helper, connector);
 	else
 		DRM_ERROR("adev->mode_info.rfbdev is NULL\n");
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+	drm_modeset_unlock_all(dev);
+#endif
 
 	drm_connector_register(connector);
 }
@@ -379,7 +393,11 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 	aconnector->mst_mgr.cbs = &dm_mst_cbs;
 	drm_dp_mst_topology_mgr_init(
 		&aconnector->mst_mgr,
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+		dm->adev->dev,
+#else
 		dm->adev->ddev,
+#endif
 		&aconnector->dm_dp_aux.aux,
 		16,
 		4,
