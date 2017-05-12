@@ -29,6 +29,7 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 
+#undef pr_fmt
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <drm/ttm/ttm_module.h>
@@ -36,18 +37,29 @@
 #include <drm/ttm/ttm_placement.h>
 #include <drm/drm_vma_manager.h>
 #include <linux/mm.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4_5) || \
+	defined(OS_NAME_SLE)
 #include <linux/pfn_t.h>
 #endif
 #include <linux/rbtree.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 #include <linux/mem_encrypt.h>
+#endif
 
 #define TTM_BO_VM_NUM_PREFAULT 16
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
+				struct vm_area_struct *vma,
+				struct vm_fault *vmf)
+#else
 static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 				struct vm_fault *vmf)
+#endif
 {
 	vm_fault_t ret = 0;
 	int err = 0;
@@ -67,11 +79,17 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 	 */
 	if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 		ret = VM_FAULT_RETRY;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 		if (vmf->flags & FAULT_FLAG_RETRY_NOWAIT)
 			goto out_unlock;
+#endif
 
 		ttm_bo_get(bo);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+		up_read(&vma->vm_mm->mmap_sem);
+#else
 		up_read(&vmf->vma->vm_mm->mmap_sem);
+#endif
 		(void) dma_fence_wait(bo->moving, true);
 		ttm_bo_unreserve(bo);
 		ttm_bo_put(bo);
@@ -107,10 +125,15 @@ static unsigned long ttm_bo_io_mem_pfn(struct ttm_buffer_object *bo,
 	return ((bo->mem.bus.base + bo->mem.bus.offset) >> PAGE_SHIFT)
 		+ page_offset;
 }
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+static vm_fault_t ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+#else
 static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
+#endif
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 	struct vm_area_struct *vma = vmf->vma;
+#endif
 	struct ttm_buffer_object *bo = (struct ttm_buffer_object *)
 	    vma->vm_private_data;
 	struct ttm_bo_device *bdev = bo->bdev;
@@ -122,7 +145,11 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	int err;
 	int i;
 	vm_fault_t ret = VM_FAULT_NOPAGE;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+	unsigned long address = (unsigned long)vmf->virtual_address;
+#else
 	unsigned long address = vmf->address;
+#endif
 	struct ttm_mem_type_manager *man =
 		&bdev->man[bo->mem.mem_type];
 	struct vm_area_struct cvma;
@@ -139,12 +166,16 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 			return VM_FAULT_NOPAGE;
 
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_get(bo);
 				up_read(&vmf->vma->vm_mm->mmap_sem);
 				(void) ttm_bo_wait_unreserved(bo);
 				ttm_bo_put(bo);
 			}
+#else
+			up_read(&vma->vm_mm->mmap_sem);
+#endif
 
 			return VM_FAULT_RETRY;
 		}
@@ -185,10 +216,18 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	 * Wait for buffer data in transit, due to a pipelined
 	 * move.
 	 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+	ret = ttm_bo_vm_fault_idle(bo, vma, vmf);
+#else
 	ret = ttm_bo_vm_fault_idle(bo, vmf);
+#endif
 	if (unlikely(ret != 0)) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 		if (ret == VM_FAULT_RETRY &&
 		    !(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
+#else
+		if (ret == VM_FAULT_RETRY) {
+#endif
 			/* The BO has already been unreserved. */
 			return ret;
 		}
@@ -253,8 +292,10 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	 */
 	for (i = 0; i < TTM_BO_VM_NUM_PREFAULT; ++i) {
 		if (bo->mem.bus.is_iomem) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 			/* Iomem should not be marked encrypted */
 			cvma.vm_page_prot = pgprot_decrypted(cvma.vm_page_prot);
+#endif
 			pfn = ttm_bo_io_mem_pfn(bo, page_offset);
 		} else {
 			page = ttm->pages[page_offset];
@@ -270,19 +311,17 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 		}
 
 		if (vma->vm_flags & VM_MIXEDMAP)
+			ret = vmf_insert_mixed(&cvma, address,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
 	defined(OS_NAME_RHEL_7_3) || \
 	defined(OS_NAME_RHEL_7_4_5) || \
 	defined(OS_NAME_SLE)
-			ret = vmf_insert_mixed(&cvma, address,
 			__pfn_to_pfn_t(pfn, PFN_DEV ));
 #else
-			ret = vmf_insert_mixed(&cvma, address,
 					pfn);
 #endif
 		else
 			ret = vmf_insert_pfn(&cvma, address, pfn);
-
 		/*
 		 * Somebody beat us to this PTE or prefaulting to
 		 * an already populated PTE, or prefaulting error.

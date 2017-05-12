@@ -24,7 +24,9 @@
 #include <linux/kthread.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <uapi/linux/sched/types.h>
+#endif
 #include <drm/drmP.h>
 #include "gpu_scheduler.h"
 
