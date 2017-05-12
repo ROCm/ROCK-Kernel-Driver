@@ -243,7 +243,6 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 		if (aconnector->dc_sink)
 			amdgpu_dm_update_freesync_caps(
 					connector, aconnector->edid);
-
 	}
 
 	drm_connector_update_edid_property(
@@ -478,10 +477,17 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = dev->dev_private;
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+	drm_modeset_lock_all(dev);
+#endif
 	if (adev->mode_info.rfbdev)
 		drm_fb_helper_add_one_connector(&adev->mode_info.rfbdev->helper, connector);
 	else
 		DRM_ERROR("adev->mode_info.rfbdev is NULL\n");
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+	drm_modeset_unlock_all(dev);
+#endif
 
 	drm_connector_register(connector);
 }
