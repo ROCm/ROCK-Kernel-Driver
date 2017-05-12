@@ -107,7 +107,11 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 	struct page *page;
 	int ret;
 	int i;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+	unsigned long address = (unsigned long)vmf->virtual_address;
+#else
 	unsigned long address = vmf->address;
+#endif
 	int retval = VM_FAULT_NOPAGE;
 	struct ttm_mem_type_manager *man =
 		&bdev->man[bo->mem.mem_type];
