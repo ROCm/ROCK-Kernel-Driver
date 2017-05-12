@@ -30,7 +30,9 @@
  * SMU TEAM: Always increment the interface version if
  * any structure is changed in this file
  */
-#define SMU9_DRIVER_IF_VERSION 0xa
+#define SMU9_DRIVER_IF_VERSION 0xE
+
+#define PPTABLE_V10_SMU_VERSION 1
 
 #define NUM_GFXCLK_DPM_LEVELS  8
 #define NUM_UVD_DPM_LEVELS     8
@@ -87,6 +89,11 @@ typedef struct {
   int32_t a0;
   int32_t a1;
   int32_t a2;
+
+  uint8_t a0_shift;
+  uint8_t a1_shift;
+  uint8_t a2_shift;
+  uint8_t padding;
 } GbVdroopTable_t;
 
 typedef struct {
@@ -293,7 +300,19 @@ typedef struct {
   uint16_t     Platform_sigma;
   uint16_t     PSM_Age_CompFactor;
 
-  uint32_t     Reserved[20];
+  uint32_t     DpmLevelPowerDelta;
+
+  uint8_t      EnableBoostState;
+  uint8_t      AConstant_Shift;
+  uint8_t      DC_tol_sigma_Shift;
+  uint8_t      PSM_Age_CompFactor_Shift;
+
+  uint16_t     BoostStartTemperature;
+  uint16_t     BoostStopTemperature;
+
+  PllSetting_t GfxBoostState;
+
+  uint32_t     Reserved[14];
 
   /* Padding - ignore */
   uint32_t     MmHubPadding[7]; /* SMU internal use */
@@ -350,8 +369,8 @@ typedef struct {
 typedef struct {
   uint16_t avgPsmCount[30];
   uint16_t minPsmCount[30];
-  uint16_t avgPsmVoltage[30]; /* in mV with 2 fractional bits */
-  uint16_t minPsmVoltage[30]; /* in mV with 2 fractional bits */
+  float    avgPsmVoltage[30];
+  float    minPsmVoltage[30];
 
   uint32_t MmHubPadding[7]; /* SMU internal use */
 } AvfsDebugTable_t;
@@ -361,25 +380,25 @@ typedef struct {
   uint8_t  AvfsVersion;
   uint8_t  Padding[2];
 
-  uint32_t VFT0_m1; /* Q16.16 */
-  uint32_t VFT0_m2; /* Q16.16 */
-  uint32_t VFT0_b;  /* Q16.16 */
+  int32_t VFT0_m1; /* Q8.24 */
+  int32_t VFT0_m2; /* Q12.12 */
+  int32_t VFT0_b;  /* Q32 */
 
-  uint32_t VFT1_m1; /* Q16.16 */
-  uint32_t VFT1_m2; /* Q16.16 */
-  uint32_t VFT1_b;  /* Q16.16 */
+  int32_t VFT1_m1; /* Q8.16 */
+  int32_t VFT1_m2; /* Q12.12 */
+  int32_t VFT1_b;  /* Q32 */
 
-  uint32_t VFT2_m1; /* Q16.16 */
-  uint32_t VFT2_m2; /* Q16.16 */
-  uint32_t VFT2_b;  /* Q16.16 */
+  int32_t VFT2_m1; /* Q8.16 */
+  int32_t VFT2_m2; /* Q12.12 */
+  int32_t VFT2_b;  /* Q32 */
 
-  uint32_t AvfsGb0_m1; /* Q16.16 */
-  uint32_t AvfsGb0_m2; /* Q16.16 */
-  uint32_t AvfsGb0_b;  /* Q16.16 */
+  int32_t AvfsGb0_m1; /* Q8.16 */
+  int32_t AvfsGb0_m2; /* Q12.12 */
+  int32_t AvfsGb0_b;  /* Q32 */
 
-  uint32_t AcBtcGb_m1; /* Q16.16 */
-  uint32_t AcBtcGb_m2; /* Q16.16 */
-  uint32_t AcBtcGb_b;  /* Q16.16 */
+  int32_t AcBtcGb_m1; /* Q8.24 */
+  int32_t AcBtcGb_m2; /* Q12.12 */
+  int32_t AcBtcGb_b;  /* Q32 */
 
   uint32_t AvfsTempCold;
   uint32_t AvfsTempMid;
@@ -387,9 +406,9 @@ typedef struct {
 
   uint32_t InversionVoltage; /*  in mV with 2 fractional bits */
 
-  uint32_t P2V_m1; /* Q16.16 */
-  uint32_t P2V_m2; /* Q16.16 */
-  uint32_t P2V_b;  /* Q16.16 */
+  int32_t P2V_m1; /* Q8.24 */
+  int32_t P2V_m2; /* Q12.12 */
+  int32_t P2V_b;  /* Q32 */
 
   uint32_t P2VCharzFreq; /* in 10KHz units */
 
@@ -414,5 +433,49 @@ typedef struct {
 #define UCLK_SWITCH_SLOW 0
 #define UCLK_SWITCH_FAST 1
 
+/* GFX DIDT Configuration */
+#define SQ_Enable_MASK 0x1
+#define SQ_IR_MASK 0x2
+#define SQ_PCC_MASK 0x4
+#define SQ_EDC_MASK 0x8
+
+#define TCP_Enable_MASK 0x100
+#define TCP_IR_MASK 0x200
+#define TCP_PCC_MASK 0x400
+#define TCP_EDC_MASK 0x800
+
+#define TD_Enable_MASK 0x10000
+#define TD_IR_MASK 0x20000
+#define TD_PCC_MASK 0x40000
+#define TD_EDC_MASK 0x80000
+
+#define DB_Enable_MASK 0x1000000
+#define DB_IR_MASK 0x2000000
+#define DB_PCC_MASK 0x4000000
+#define DB_EDC_MASK 0x8000000
+
+#define SQ_Enable_SHIFT 0
+#define SQ_IR_SHIFT 1
+#define SQ_PCC_SHIFT 2
+#define SQ_EDC_SHIFT 3
+
+#define TCP_Enable_SHIFT 8
+#define TCP_IR_SHIFT 9
+#define TCP_PCC_SHIFT 10
+#define TCP_EDC_SHIFT 11
+
+#define TD_Enable_SHIFT 16
+#define TD_IR_SHIFT 17
+#define TD_PCC_SHIFT 18
+#define TD_EDC_SHIFT 19
+
+#define DB_Enable_SHIFT 24
+#define DB_IR_SHIFT 25
+#define DB_PCC_SHIFT 26
+#define DB_EDC_SHIFT 27
+
+#define REMOVE_FMAX_MARGIN_BIT     0x0
+#define REMOVE_DCTOL_MARGIN_BIT    0x1
+#define REMOVE_PLATFORM_MARGIN_BIT 0x2
 
 #endif
