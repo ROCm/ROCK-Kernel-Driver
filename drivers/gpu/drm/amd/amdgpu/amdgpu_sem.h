@@ -41,6 +41,11 @@ struct amdgpu_sem_core {
 	struct mutex	lock;
 };
 
+struct amdgpu_sem_dep {
+	struct fence		*fence;
+	struct list_head	list;
+};
+
 struct amdgpu_sem {
 	struct amdgpu_sem_core	*base;
 	struct kref		kref;
