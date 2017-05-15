@@ -3082,6 +3082,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	struct dc *dc = adev->dm.dc;
 	bool need_to_validate = false;
 	struct validate_context *context;
+	bool wait_4_prev_commits = false;
 
 	ret = drm_atomic_helper_check(dev, state);
 
@@ -3158,6 +3159,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 			new_stream_count++;
 			need_to_validate = true;
+			wait_4_prev_commits = true;
 			break;
 		}
 
@@ -3203,6 +3205,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 			new_stream_count++;
 			need_to_validate = true;
+			wait_4_prev_commits = true;
 
 			break;
 		}
@@ -3214,6 +3217,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 						set,
 						set_count,
 						acrtc->stream);
+				wait_4_prev_commits = true;
 			}
 			break;
 		}
@@ -3306,8 +3310,25 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 	context = dc_get_validate_context(dc, set, set_count);
 
-	if (need_to_validate == false || set_count == 0 || context)
+	if (need_to_validate == false || set_count == 0 || context) {
+
 		ret = 0;
+
+		if (wait_4_prev_commits) {
+			list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+				struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+				struct drm_crtc_state *crtc_state;
+
+				if (acrtc->stream) {
+					crtc_state = drm_atomic_get_crtc_state(state, crtc);
+					if (IS_ERR(crtc_state)) {
+						ret = PTR_ERR(crtc_state);
+						break;
+					}
+				}
+			}
+		}
+	}
 
 	if (context) {
 		dc_resource_validate_ctx_destruct(context);
