@@ -1131,6 +1131,7 @@ static int gmc_v7_0_sw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
+	kfree(adev->mc.vm_fault_info);
 	amdgpu_vm_manager_fini(adev);
 	gmc_v7_0_gart_fini(adev);
 	amdgpu_gem_force_release(adev);
