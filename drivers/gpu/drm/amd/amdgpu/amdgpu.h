@@ -657,7 +657,7 @@ struct amdgpu_ctx_ring {
 	uint64_t		sequence;
 	struct dma_fence	**fences;
 	struct drm_sched_entity	entity;
-	struct list_head	sem_list;
+	struct list_head	sem_dep_list;
 	struct mutex            sem_lock;
 };
 

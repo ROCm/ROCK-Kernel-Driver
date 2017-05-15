@@ -357,6 +357,7 @@ static int amdgpu_sem_cring_add(struct amdgpu_fpriv *fpriv,
 {
 	struct amdgpu_ring *out_ring;
 	struct amdgpu_ctx *ctx;
+	struct amdgpu_sem_dep *dep;
 	uint32_t ctx_id, ip_type, ip_instance, ring;
 	int r;
 
@@ -371,10 +372,17 @@ static int amdgpu_sem_cring_add(struct amdgpu_fpriv *fpriv,
 			       &out_ring);
 	if (r)
 		goto err;
+
+	dep = kzalloc(sizeof(*dep), GFP_KERNEL);
+	if (!dep)
+		goto err;
+
+	INIT_LIST_HEAD(&dep->list);
+	dep->fence = dma_fence_get(sem->base->fence);
+
 	mutex_lock(&ctx->rings[out_ring->idx].sem_lock);
-	list_add(&sem->list, &ctx->rings[out_ring->idx].sem_list);
+	list_add(&dep->list, &ctx->rings[out_ring->idx].sem_dep_list);
 	mutex_unlock(&ctx->rings[out_ring->idx].sem_lock);
-	amdgpu_sem_get(sem);
 
 err:
 	amdgpu_ctx_put(ctx);
@@ -384,24 +392,21 @@ err:
 int amdgpu_sem_add_cs(struct amdgpu_ctx *ctx, struct amdgpu_ring *ring,
 		     struct amdgpu_sync *sync)
 {
-	struct amdgpu_sem *sem, *tmp;
+	struct amdgpu_sem_dep *dep, *tmp;
 	int r = 0;
 
-	if (list_empty(&ctx->rings[ring->idx].sem_list))
+	if (list_empty(&ctx->rings[ring->idx].sem_dep_list))
 		return 0;
 
 	mutex_lock(&ctx->rings[ring->idx].sem_lock);
-	list_for_each_entry_safe(sem, tmp, &ctx->rings[ring->idx].sem_list,
+	list_for_each_entry_safe(dep, tmp, &ctx->rings[ring->idx].sem_dep_list,
 				 list) {
-		r = amdgpu_sync_fence(ctx->adev, sync, sem->base->fence);
+		r = amdgpu_sync_fence(ctx->adev, sync, dep->fence);
 		if (r)
 			goto err;
-		mutex_lock(&sem->base->lock);
-		dma_fence_put(sem->base->fence);
-		sem->base->fence = NULL;
-		mutex_unlock(&sem->base->lock);
-		list_del_init(&sem->list);
-		amdgpu_sem_put(sem);
+		dma_fence_put(dep->fence);
+		list_del_init(&dep->list);
+		kfree(dep);
 	}
 err:
 	mutex_unlock(&ctx->rings[ring->idx].sem_lock);
