@@ -25,7 +25,7 @@
 #define _GPU_SCHEDULER_H_
 
 #include <linux/kfifo.h>
-#include <linux/dma-fence.h>
+#include <kcl/kcl_fence.h>
 
 struct amd_gpu_scheduler;
 struct amd_sched_rq;

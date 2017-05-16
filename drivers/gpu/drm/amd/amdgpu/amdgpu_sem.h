@@ -32,7 +32,6 @@
 #include <linux/ktime.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
-#include <linux/dma-fence.h>
 
 struct amdgpu_sem_core {
 	struct file		*file;

@@ -2,12 +2,48 @@
 #define AMDKCL_FENCE_H
 
 #include <linux/version.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 #include <linux/fence.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#include <linux/fence-array.h>
+#endif
+#include <kcl/kcl_fence_array.h>
+#else
+#include <linux/dma-fence.h>
+#include <linux/dma-fence-array.h>
+#endif
 
-signed long
-kcl_fence_default_wait(struct fence *fence, bool intr, signed long timeout);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#define dma_fence_cb fence_cb
+#define dma_fence_ops fence_ops
+#define dma_fence_array fence_array
+#define dma_fence fence
+#define DMA_FENCE_TRACE FENCE_TRACE
+
+#define dma_fence_wait fence_wait
+#define dma_fence_get fence_get
+#define dma_fence_put fence_put
+#define dma_fence_is_signaled fence_is_signaled
+#define dma_fence_signal fence_signal
+#define dma_fence_get_rcu fence_get_rcu
+#define dma_fence_is_later fence_is_later
+#define dma_fence_wait_timeout fence_wait_timeout
+#define dma_fence_array_create fence_array_create
+#define dma_fence_add_callback fence_add_callback
+#define dma_fence_remove_callback fence_remove_callback
+#define dma_fence_default_wait fence_default_wait
+#define dma_fence_enable_sw_signaling fence_enable_sw_signaling
+typedef struct fence kcl_fence_t;
+typedef struct fence_ops kcl_fence_ops_t;
+#else
+typedef struct dma_fence kcl_fence_t;
+typedef struct dma_fence_ops kcl_fence_ops_t;
+#endif
 
 #if defined(BUILD_AS_DKMS)
+extern signed long
+_kcl_fence_default_wait(struct fence *fence, bool intr, signed long timeout);
+
 extern signed long _kcl_fence_wait_any_timeout(struct fence **fences,
 				   uint32_t count, bool intr,
 				   signed long timeout, uint32_t *idx);
@@ -28,14 +64,25 @@ static inline bool fence_is_later(struct fence *f1, struct fence *f2)
 }
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) */
 
-static inline signed long kcl_fence_wait_any_timeout(struct fence **fences,
+static inline signed long kcl_fence_default_wait(kcl_fence_t *fence,
+						 bool intr,
+						 signed long timeout)
+{
+#if defined(BUILD_AS_DKMS)
+	return _kcl_fence_default_wait(fence, intr, timeout);
+#else
+	return dma_fence_default_wait(fence, intr, timeout);
+#endif
+}
+
+static inline signed long kcl_fence_wait_any_timeout(kcl_fence_t **fences,
 				   uint32_t count, bool intr,
 				   signed long timeout, uint32_t *idx)
 {
 #if defined(BUILD_AS_DKMS)
 	return _kcl_fence_wait_any_timeout(fences, count, intr, timeout, idx);
 #else
-	return fence_wait_any_timeout(fences, count, intr, timeout, idx);
+	return dma_fence_wait_any_timeout(fences, count, intr, timeout, idx);
 #endif
 }
 
@@ -44,27 +91,27 @@ static inline u64 kcl_fence_context_alloc(unsigned num)
 #if defined(BUILD_AS_DKMS)
 	return _kcl_fence_context_alloc(num);
 #else
-	return fence_context_alloc(num);
+	return dma_fence_context_alloc(num);
 #endif
 }
 
-static inline void kcl_fence_init(struct fence *fence, const struct fence_ops *ops,
+static inline void kcl_fence_init(kcl_fence_t *fence, const kcl_fence_ops_t *ops,
 	     spinlock_t *lock, u64 context, unsigned seqno)
 {
 #if defined(BUILD_AS_DKMS)
 	return _kcl_fence_init(fence, ops, lock, context, seqno);
 #else
-	return fence_init(fence, ops, lock, context, seqno);
+	return dma_fence_init(fence, ops, lock, context, seqno);
 #endif
 }
 
-static inline signed long kcl_fence_wait_timeout(struct fence *fences, bool intr,
+static inline signed long kcl_fence_wait_timeout(kcl_fence_t *fences, bool intr,
 					signed long timeout)
 {
 #if defined(BUILD_AS_DKMS)
 	return _kcl_fence_wait_timeout(fences, intr, timeout);
 #else
-	return fence_wait_timeout(fences, intr, timeout);
+	return dma_fence_wait_timeout(fences, intr, timeout);
 #endif
 }
 #endif /* AMDKCL_FENCE_H */
