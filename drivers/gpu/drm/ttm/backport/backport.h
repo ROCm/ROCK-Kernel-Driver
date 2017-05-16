@@ -3,5 +3,6 @@
 
 #include <linux/version.h>
 #include <kcl/kcl_drm_global.h>
+#include <kcl/kcl_kref.h>
 
 #endif
