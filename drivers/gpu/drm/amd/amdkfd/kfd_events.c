@@ -23,9 +23,11 @@
 #include <linux/mm_types.h>
 #include <linux/slab.h>
 #include <linux/types.h>
-#include <linux/sched/signal.h>
 #include <linux/uaccess.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
+#include <linux/sched/signal.h>
+#endif
 #include <linux/mman.h>
 #include <linux/memory.h>
 #include "kfd_priv.h"

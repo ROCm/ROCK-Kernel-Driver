@@ -28,7 +28,9 @@
 #include <linux/uaccess.h>
 #include <linux/firmware.h>
 #include <linux/list.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
+#endif
 #include <drm/drmP.h>
 #include <linux/dma-buf.h>
 #include <linux/pagemap.h>

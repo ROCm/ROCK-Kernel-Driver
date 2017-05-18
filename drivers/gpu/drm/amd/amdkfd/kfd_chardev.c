@@ -25,7 +25,9 @@
 #include <linux/err.h>
 #include <linux/fs.h>
 #include <linux/sched.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
+#endif
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/compat.h>
