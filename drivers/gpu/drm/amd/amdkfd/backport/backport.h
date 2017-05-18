@@ -5,5 +5,6 @@
 #include <kcl/kcl_compat.h>
 #include <kcl/kcl_pci.h>
 #include <kcl/kcl_mn.h>
+#include <kcl/kcl_fence.h>
 
 #endif

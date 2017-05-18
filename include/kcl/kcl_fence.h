@@ -21,12 +21,15 @@
 #define dma_fence_array fence_array
 #define dma_fence fence
 #define DMA_FENCE_TRACE FENCE_TRACE
+#define DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT FENCE_FLAG_ENABLE_SIGNAL_BIT
 
+#define dma_fence_init fence_init
 #define dma_fence_wait fence_wait
 #define dma_fence_get fence_get
 #define dma_fence_put fence_put
 #define dma_fence_is_signaled fence_is_signaled
 #define dma_fence_signal fence_signal
+#define dma_fence_signal_locked fence_signal_locked
 #define dma_fence_get_rcu fence_get_rcu
 #define dma_fence_is_later fence_is_later
 #define dma_fence_wait_timeout fence_wait_timeout
