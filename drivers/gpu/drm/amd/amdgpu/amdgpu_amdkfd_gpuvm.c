@@ -23,7 +23,9 @@
 #define pr_fmt(fmt) "kfd2kgd: " fmt
 
 #include <linux/list.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
+#endif
 #include <drm/drmP.h>
 #include "amdgpu_object.h"
 #include "amdgpu_vm.h"
