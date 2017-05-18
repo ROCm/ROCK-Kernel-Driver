@@ -382,11 +382,17 @@ create_signal_event(struct file *devkfd, struct kfd_process *p,
 {
 	if ((ev->type == KFD_EVENT_TYPE_SIGNAL) &&
 			(p->signal_event_count == KFD_SIGNAL_EVENT_LIMIT)) {
-		pr_warn("Signal event wasn't created because limit was reached\n");
+		if (!p->signal_event_limit_reached) {
+			pr_warn("Signal event wasn't created because limit was reached\n");
+			p->signal_event_limit_reached = true;
+		}
 		return -ENOMEM;
 	} else if ((ev->type == KFD_EVENT_TYPE_DEBUG) &&
 			(p->debug_event_count == KFD_DEBUG_EVENT_LIMIT)) {
-		pr_warn("Debug event wasn't created because limit was reached\n");
+		if (!p->debug_event_limit_reached) {
+			pr_warn("Debug event wasn't created because limit was reached\n");
+			p->debug_event_limit_reached = true;
+		}
 		return -ENOMEM;
 	}
 
