@@ -732,6 +732,8 @@ struct kfd_process {
 	u32 next_nonsignal_event_id;
 	size_t signal_event_count;
 	size_t debug_event_count;
+	bool signal_event_limit_reached;
+	bool debug_event_limit_reached;
 
 	struct rb_root bo_interval_tree;
 
