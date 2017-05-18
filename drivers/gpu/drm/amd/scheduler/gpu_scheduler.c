@@ -235,6 +235,23 @@ static void amd_sched_entity_clear_dep(struct fence *f, struct fence_cb *cb)
 	fence_put(f);
 }
 
+bool amd_sched_dependency_optimized(struct fence* fence,
+				    struct amd_sched_entity *entity)
+{
+	struct amd_gpu_scheduler *sched = entity->sched;
+	struct amd_sched_fence *s_fence;
+
+	if (!fence || fence_is_signaled(fence))
+		return false;
+	if (fence->context == entity->fence_context)
+		return true;
+	s_fence = to_amd_sched_fence(fence);
+	if (s_fence && s_fence->sched == sched)
+		return true;
+
+	return false;
+}
+
 static bool amd_sched_entity_add_dependency_cb(struct amd_sched_entity *entity)
 {
 	struct amd_gpu_scheduler *sched = entity->sched;
