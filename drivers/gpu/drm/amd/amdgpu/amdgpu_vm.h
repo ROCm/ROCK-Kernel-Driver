@@ -176,8 +176,6 @@ struct amdgpu_vm_manager {
 	uint32_t				block_size;
 	/* vram base address for page table entry  */
 	u64					vram_base_offset;
-	/* is vm enabled? */
-	bool					enabled;
 	/* vm pte handling */
 	const struct amdgpu_vm_pte_funcs        *vm_pte_funcs;
 	struct amdgpu_ring                      *vm_pte_rings[AMDGPU_MAX_RINGS];
@@ -219,6 +217,7 @@ int amdgpu_vm_grab_id(struct amdgpu_vm *vm, struct amdgpu_ring *ring,
 int amdgpu_vm_flush(struct amdgpu_ring *ring, struct amdgpu_job *job);
 void amdgpu_vm_reset_id(struct amdgpu_device *adev, unsigned vmhub,
 			unsigned vmid);
+void amdgpu_vm_reset_all_ids(struct amdgpu_device *adev);
 int amdgpu_vm_update_directories(struct amdgpu_device *adev,
 				 struct amdgpu_vm *vm);
 int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
@@ -254,5 +253,7 @@ void amdgpu_vm_bo_rmv(struct amdgpu_device *adev,
 		      struct amdgpu_bo_va *bo_va);
 void amdgpu_vm_adjust_size(struct amdgpu_device *adev, uint64_t vm_size);
 int amdgpu_vm_ioctl(struct drm_device *dev, void *data, struct drm_file *filp);
+bool amdgpu_vm_need_pipeline_sync(struct amdgpu_ring *ring,
+				  struct amdgpu_job *job);
 
 #endif

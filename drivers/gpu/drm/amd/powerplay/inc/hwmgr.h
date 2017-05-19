@@ -488,6 +488,9 @@ struct phm_tdp_table {
 	uint8_t  ucVr_I2C_LineSDA;
 	uint8_t  ucPlx_I2C_LineSDA;
 	uint32_t usBoostPowerLimit;
+	uint16_t usBoostStartTemperature;
+	uint16_t usBoostStopTemperature;
+	uint32_t  ulBoostClock;
 };
 
 struct phm_ppm_table {
@@ -764,6 +767,7 @@ struct pp_hwmgr {
 	struct pp_thermal_controller_info thermal_controller;
 	bool fan_ctrl_is_in_default_mode;
 	uint32_t fan_ctrl_default_mode;
+	bool fan_ctrl_enabled;
 	uint32_t tmin;
 	struct phm_microcode_version_info microcode_version_info;
 	uint32_t ps_size;

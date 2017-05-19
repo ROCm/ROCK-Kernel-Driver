@@ -1869,13 +1869,14 @@ static int radeon_debugfs_pm_info(struct seq_file *m, void *data)
 
 	if  ((rdev->flags & RADEON_IS_PX) &&
 	     (ddev->switch_power_state != DRM_SWITCH_POWER_ON)) {
-		seq_printf(m, "PX asic powered off\n");
+		seq_puts(m, "PX asic powered off\n");
 	} else if (rdev->pm.dpm_enabled) {
 		mutex_lock(&rdev->pm.mutex);
 		if (rdev->asic->dpm.debugfs_print_current_performance_level)
 			radeon_dpm_debugfs_print_current_performance_level(rdev, m);
 		else
-			seq_printf(m, "Debugfs support not implemented for this asic\n");
+			seq_puts(m,
+				 "Debugfs support not implemented for this asic\n");
 		mutex_unlock(&rdev->pm.mutex);
 	} else {
 		seq_printf(m, "default engine clock: %u0 kHz\n", rdev->pm.default_sclk);

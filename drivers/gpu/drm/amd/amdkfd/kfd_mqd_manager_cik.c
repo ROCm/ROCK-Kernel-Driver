@@ -87,7 +87,7 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 	m->compute_static_thread_mgmt_se2 = se_mask[2];
 	m->compute_static_thread_mgmt_se3 = se_mask[3];
 
-	pr_debug("kfd: update cu mask to %#x %#x %#x %#x\n",
+	pr_debug("Update cu mask to %#x %#x %#x %#x\n",
 		m->compute_static_thread_mgmt_se0,
 		m->compute_static_thread_mgmt_se1,
 		m->compute_static_thread_mgmt_se2,
@@ -111,8 +111,6 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 	uint64_t addr;
 	struct cik_mqd *m;
 	int retval;
-
-	pr_debug("kfd: In func %s\n", __func__);
 
 	retval = kfd_gtt_sa_allocate(mm->dev, sizeof(struct cik_mqd),
 					mqd_mem_obj);
@@ -162,7 +160,7 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 		m->cp_hqd_iq_rptr = AQL_ENABLE;
 
 	*mqd = m;
-	if (gart_addr != NULL)
+	if (gart_addr)
 		*gart_addr = addr;
 	retval = mm->update_mqd(mm, m, q);
 
@@ -176,8 +174,6 @@ static int init_mqd_sdma(struct mqd_manager *mm, void **mqd,
 	int retval;
 	struct cik_sdma_rlc_registers *m;
 
-	BUG_ON(!mm || !mqd || !mqd_mem_obj);
-
 	retval = kfd_gtt_sa_allocate(mm->dev,
 					sizeof(struct cik_sdma_rlc_registers),
 					mqd_mem_obj);
@@ -190,7 +186,7 @@ static int init_mqd_sdma(struct mqd_manager *mm, void **mqd,
 	memset(m, 0, sizeof(struct cik_sdma_rlc_registers));
 
 	*mqd = m;
-	if (gart_addr != NULL)
+	if (gart_addr)
 		*gart_addr = (*mqd_mem_obj)->gpu_addr;
 
 	retval = mm->update_mqd(mm, m, q);
@@ -201,14 +197,12 @@ static int init_mqd_sdma(struct mqd_manager *mm, void **mqd,
 static void uninit_mqd(struct mqd_manager *mm, void *mqd,
 			struct kfd_mem_obj *mqd_mem_obj)
 {
-	BUG_ON(!mm || !mqd);
 	kfd_gtt_sa_free(mm->dev, mqd_mem_obj);
 }
 
 static void uninit_mqd_sdma(struct mqd_manager *mm, void *mqd,
 				struct kfd_mem_obj *mqd_mem_obj)
 {
-	BUG_ON(!mm || !mqd);
 	kfd_gtt_sa_free(mm->dev, mqd_mem_obj);
 }
 
@@ -239,15 +233,11 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 {
 	struct cik_mqd *m;
 
-	BUG_ON(!mm || !q || !mqd);
-
-	pr_debug("kfd: In func %s\n", __func__);
-
 	m = get_mqd(mqd);
 	m->cp_hqd_pq_control = DEFAULT_RPTR_BLOCK_SIZE |
 				DEFAULT_MIN_AVAIL_SIZE;
 	m->cp_hqd_ib_control = DEFAULT_MIN_IB_AVAIL_SIZE;
-        if (atc_bit) {
+	if (atc_bit) {
 		m->cp_hqd_pq_control |= PQ_ATC_EN;
 		m->cp_hqd_ib_control |= IB_ATC_EN;
 	}
@@ -266,9 +256,8 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 
 	m->cp_hqd_vmid = q->vmid;
 
-	if (q->format == KFD_QUEUE_FORMAT_AQL) {
+	if (q->format == KFD_QUEUE_FORMAT_AQL)
 		m->cp_hqd_pq_control |= NO_UPDATE_RPTR;
-	}
 
 	update_cu_mask(mm, mqd, q);
 	set_priority(m, q);
@@ -300,8 +289,6 @@ static int update_mqd_sdma(struct mqd_manager *mm, void *mqd,
 				struct queue_properties *q)
 {
 	struct cik_sdma_rlc_registers *m;
-
-	BUG_ON(!mm || !mqd || !q);
 
 	m = get_sdma_mqd(mqd);
 	m->sdma_rlc_rb_cntl = (ffs(q->queue_size / sizeof(unsigned int)) - 1)
@@ -385,10 +372,6 @@ static int init_mqd_hiq(struct mqd_manager *mm, void **mqd,
 	struct cik_mqd *m;
 	int retval;
 
-	BUG_ON(!mm || !q || !mqd || !mqd_mem_obj);
-
-	pr_debug("kfd: In func %s\n", __func__);
-
 	retval = kfd_gtt_sa_allocate(mm->dev, sizeof(struct cik_mqd),
 					mqd_mem_obj);
 
@@ -441,10 +424,6 @@ static int update_mqd_hiq(struct mqd_manager *mm, void *mqd,
 				struct queue_properties *q)
 {
 	struct cik_mqd *m;
-
-	BUG_ON(!mm || !q || !mqd);
-
-	pr_debug("kfd: In func %s\n", __func__);
 
 	m = get_mqd(mqd);
 	m->cp_hqd_pq_control = DEFAULT_RPTR_BLOCK_SIZE |
@@ -506,12 +485,7 @@ struct mqd_manager *mqd_manager_init_cik(enum KFD_MQD_TYPE type,
 {
 	struct mqd_manager *mqd;
 
-	BUG_ON(!dev);
-	BUG_ON(type >= KFD_MQD_TYPE_MAX);
-
-	pr_debug("kfd: In func %s\n", __func__);
-
-	mqd = kzalloc(sizeof(struct mqd_manager), GFP_NOIO);
+	mqd = kzalloc(sizeof(*mqd), GFP_NOIO);
 	if (!mqd)
 		return NULL;
 

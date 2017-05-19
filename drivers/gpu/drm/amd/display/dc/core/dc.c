@@ -175,6 +175,31 @@ for (i = 0; i < MAX_PIPES; i++) {
 return ret;
 }
 
+static bool stream_get_crtc_position(struct dc *dc,
+		const struct dc_stream **stream, int num_streams,
+		unsigned int *v_pos, unsigned int *nom_v_pos)
+{
+	/* TODO: Support multiple streams */
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	struct core_stream *core_stream = DC_STREAM_TO_CORE(stream[0]);
+	int i = 0;
+	bool ret = false;
+	struct crtc_position position;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		struct pipe_ctx *pipe =
+				&core_dc->current_context->res_ctx.pipe_ctx[i];
+
+		if (pipe->stream == core_stream && pipe->stream_enc) {
+			core_dc->hwss.get_position(&pipe, 1, &position);
+
+			*v_pos = position.vertical_count;
+			*nom_v_pos = position.nominal_vcount;
+			ret = true;
+		}
+	}
+	return ret;
+}
 
 static bool set_gamut_remap(struct dc *dc,
 		const struct dc_stream **stream, int num_streams)
@@ -197,6 +222,32 @@ for (i = 0; i < MAX_PIPES; i++) {
 }
 
 return ret;
+}
+
+static void set_static_screen_events(struct dc *dc,
+		const struct dc_stream **stream,
+		int num_streams,
+		const struct dc_static_screen_events *events)
+{
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	int i = 0;
+	int j = 0;
+	struct pipe_ctx *pipes_affected[MAX_PIPES];
+	int num_pipes_affected = 0;
+
+	for (i = 0; i < num_streams; i++) {
+		struct core_stream *core_stream = DC_STREAM_TO_CORE(stream[i]);
+
+		for (j = 0; j < MAX_PIPES; j++) {
+			if (core_dc->current_context->res_ctx.pipe_ctx[j].stream
+					== core_stream) {
+				pipes_affected[num_pipes_affected++] =
+						&core_dc->current_context->res_ctx.pipe_ctx[j];
+			}
+		}
+	}
+
+	core_dc->hwss.set_static_screen_control(pipes_affected, num_pipes_affected, events);
 }
 
 /* This function is not expected to fail, proper implementation of
@@ -238,45 +289,6 @@ for (i = 0; i < cur_ctx->stream_count; i++) {
 		return;
 	}
 }
-}
-
-static bool set_psr_enable(struct dc *dc, bool enable)
-{
-struct core_dc *core_dc = DC_TO_CORE(dc);
-int i;
-
-for (i = 0; i < core_dc->link_count; i++)
-	dc_link_set_psr_enable(&core_dc->links[i]->public,
-			enable);
-
-return true;
-}
-
-
-static bool setup_psr(struct dc *dc, const struct dc_stream *stream)
-{
-struct core_dc *core_dc = DC_TO_CORE(dc);
-struct core_stream *core_stream = DC_STREAM_TO_CORE(stream);
-struct pipe_ctx *pipes;
-int i;
-unsigned int underlay_idx = core_dc->res_pool->underlay_pipe_index;
-
-for (i = 0; i < core_dc->link_count; i++) {
-	if (core_stream->sink->link == core_dc->links[i])
-		dc_link_setup_psr(&core_dc->links[i]->public,
-				stream);
-}
-
-for (i = 0; i < MAX_PIPES; i++) {
-	if (core_dc->current_context->res_ctx.pipe_ctx[i].stream
-			== core_stream && i != underlay_idx) {
-		pipes = &core_dc->current_context->res_ctx.pipe_ctx[i];
-		core_dc->hwss.set_static_screen_control(&pipes, 1,
-				0x182);
-	}
-}
-
-return true;
 }
 
 static void set_drive_settings(struct dc *dc,
@@ -351,39 +363,80 @@ if (link != NULL)
 		cust_pattern_size);
 }
 
-static void allocate_dc_stream_funcs(struct core_dc *core_dc)
+void set_dither_option(const struct dc_stream *dc_stream,
+		enum dc_dither_option option)
 {
-core_dc->public.stream_funcs.stream_update_scaling = stream_update_scaling;
-if (core_dc->hwss.set_drr != NULL) {
-	core_dc->public.stream_funcs.adjust_vmin_vmax =
-			stream_adjust_vmin_vmax;
+	struct core_stream *stream = DC_STREAM_TO_CORE(dc_stream);
+	struct bit_depth_reduction_params params;
+	struct core_link *core_link = DC_LINK_TO_CORE(stream->status.link);
+	struct pipe_ctx *pipes =
+			core_link->dc->current_context->res_ctx.pipe_ctx;
+
+	memset(&params, 0, sizeof(params));
+	if (!stream)
+		return;
+	if (option > DITHER_OPTION_MAX)
+		return;
+	if (option == DITHER_OPTION_DEFAULT) {
+		switch (stream->public.timing.display_color_depth) {
+		case COLOR_DEPTH_666:
+			stream->public.dither_option = DITHER_OPTION_SPATIAL6;
+			break;
+		case COLOR_DEPTH_888:
+			stream->public.dither_option = DITHER_OPTION_SPATIAL8;
+			break;
+		case COLOR_DEPTH_101010:
+			stream->public.dither_option = DITHER_OPTION_SPATIAL10;
+			break;
+		default:
+			option = DITHER_OPTION_DISABLE;
+		}
+	} else {
+		stream->public.dither_option = option;
+	}
+	resource_build_bit_depth_reduction_params(stream,
+				&params);
+	stream->bit_depth_params = params;
+	pipes->opp->funcs->
+		opp_program_bit_depth_reduction(pipes->opp, &params);
 }
 
-core_dc->public.stream_funcs.set_gamut_remap =
-		set_gamut_remap;
+static void allocate_dc_stream_funcs(struct core_dc *core_dc)
+{
+	core_dc->public.stream_funcs.stream_update_scaling = stream_update_scaling;
+	if (core_dc->hwss.set_drr != NULL) {
+		core_dc->public.stream_funcs.adjust_vmin_vmax =
+			stream_adjust_vmin_vmax;
+	}
 
-core_dc->public.stream_funcs.set_psr_enable =
-		set_psr_enable;
+	core_dc->public.stream_funcs.set_static_screen_events =
+			set_static_screen_events;
 
-core_dc->public.stream_funcs.setup_psr =
-		setup_psr;
+	core_dc->public.stream_funcs.get_crtc_position =
+			stream_get_crtc_position;
 
-core_dc->public.link_funcs.set_drive_settings =
-		set_drive_settings;
+	core_dc->public.stream_funcs.set_gamut_remap =
+			set_gamut_remap;
 
-core_dc->public.link_funcs.perform_link_training =
+	core_dc->public.stream_funcs.set_dither_option =
+			set_dither_option;
+
+	core_dc->public.link_funcs.set_drive_settings =
+			set_drive_settings;
+
+	core_dc->public.link_funcs.perform_link_training =
 		perform_link_training;
 
-core_dc->public.link_funcs.set_preferred_link_settings =
+	core_dc->public.link_funcs.set_preferred_link_settings =
 		set_preferred_link_settings;
 
-core_dc->public.link_funcs.enable_hpd =
+	core_dc->public.link_funcs.enable_hpd =
 		enable_hpd;
 
-core_dc->public.link_funcs.disable_hpd =
+	core_dc->public.link_funcs.disable_hpd =
 		disable_hpd;
 
-core_dc->public.link_funcs.set_test_pattern =
+	core_dc->public.link_funcs.set_test_pattern =
 		set_test_pattern;
 }
 
@@ -915,17 +968,17 @@ return true;
 
 bool dc_post_update_surfaces_to_stream(struct dc *dc)
 {
-int i;
-struct core_dc *core_dc = DC_TO_CORE(dc);
-struct validate_context *context = dm_alloc(sizeof(struct validate_context));
+	int i;
+	struct core_dc *core_dc = DC_TO_CORE(dc);
+	struct validate_context *context = dm_alloc(sizeof(struct validate_context));
 
-if (!context) {
-	dm_error("%s: failed to create validate ctx\n", __func__);
-	return false;
-}
-dc_resource_validate_ctx_copy_construct(core_dc->current_context, context);
+	if (!context) {
+		dm_error("%s: failed to create validate ctx\n", __func__);
+		return false;
+	}
+	dc_resource_validate_ctx_copy_construct(core_dc->current_context, context);
 
-post_surface_trace(dc);
+	post_surface_trace(dc);
 
 	for (i = 0; i < core_dc->res_pool->pipe_count; i++)
 		if (context->res_ctx.pipe_ctx[i].stream == NULL) {
@@ -936,15 +989,18 @@ post_surface_trace(dc);
 
 	if (!core_dc->res_pool->funcs->validate_bandwidth(core_dc, context)) {
 		BREAK_TO_DEBUGGER();
+		dc_resource_validate_ctx_destruct(context);
+		dm_free(context);
 		return false;
 	}
 
 	core_dc->hwss.set_bandwidth(core_dc, context, true);
 
-	dc_resource_validate_ctx_copy_construct(context, core_dc->current_context);
-
-	dc_resource_validate_ctx_destruct(context);
-	dm_free(context);
+	if (core_dc->current_context) {
+		dc_resource_validate_ctx_destruct(core_dc->current_context);
+		dm_free(core_dc->current_context);
+	}
+	core_dc->current_context = context;
 
 	return true;
 }
@@ -1439,10 +1495,8 @@ void dc_update_surfaces_and_stream(struct dc *dc,
 	return;
 
 fail:
-	if (core_dc->current_context != context) {
-		dc_resource_validate_ctx_destruct(context);
-		dm_free(context);
-	}
+	dc_resource_validate_ctx_destruct(context);
+	dm_free(context);
 }
 
 uint8_t dc_get_current_stream_count(const struct dc *dc)

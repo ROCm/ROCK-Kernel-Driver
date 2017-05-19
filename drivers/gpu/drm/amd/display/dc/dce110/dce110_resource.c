@@ -40,7 +40,7 @@
 #include "dce/dce_stream_encoder.h"
 #include "dce110/dce110_mem_input.h"
 #include "dce110/dce110_mem_input_v.h"
-#include "dce110/dce110_ipp.h"
+#include "dce/dce_ipp.h"
 #include "dce/dce_transform.h"
 #include "dce110/dce110_transform_v.h"
 #include "dce/dce_opp.h"
@@ -157,31 +157,6 @@ static const struct dce110_mem_input_reg_offsets dce110_mi_reg_offsets[] = {
 	}
 };
 
-
-static const struct dce110_ipp_reg_offsets dce110_ipp_reg_offsets[] = {
-{
-	.dcp_offset = (mmDCP0_CUR_CONTROL - mmCUR_CONTROL),
-},
-{
-	.dcp_offset = (mmDCP1_CUR_CONTROL - mmCUR_CONTROL),
-},
-{
-	.dcp_offset = (mmDCP2_CUR_CONTROL - mmCUR_CONTROL),
-},
-{
-	.dcp_offset = (mmDCP3_CUR_CONTROL - mmCUR_CONTROL),
-},
-{
-	.dcp_offset = (mmDCP4_CUR_CONTROL - mmCUR_CONTROL),
-},
-{
-	.dcp_offset = (mmDCP5_CUR_CONTROL - mmCUR_CONTROL),
-}
-};
-
-
-
-
 /* set register offset */
 #define SR(reg_name)\
 	.reg_name = mm ## reg_name
@@ -224,6 +199,25 @@ static const struct dce_abm_shift abm_shift = {
 
 static const struct dce_abm_mask abm_mask = {
 		ABM_MASK_SH_LIST_DCE110(_MASK)
+};
+
+#define ipp_regs(id)\
+[id] = {\
+		IPP_DCE110_REG_LIST_DCE_BASE(id)\
+}
+
+static const struct dce_ipp_registers ipp_regs[] = {
+		ipp_regs(0),
+		ipp_regs(1),
+		ipp_regs(2)
+};
+
+static const struct dce_ipp_shift ipp_shift = {
+		IPP_DCE100_MASK_SH_LIST_DCE_COMMON_BASE(__SHIFT)
+};
+
+static const struct dce_ipp_mask ipp_mask = {
+		IPP_DCE100_MASK_SH_LIST_DCE_COMMON_BASE(_MASK)
 };
 
 #define transform_regs(id)\
@@ -578,22 +572,18 @@ static struct transform *dce110_transform_create(
 }
 
 static struct input_pixel_processor *dce110_ipp_create(
-	struct dc_context *ctx,
-	uint32_t inst,
-	const struct dce110_ipp_reg_offsets *offsets)
+	struct dc_context *ctx, uint32_t inst)
 {
-	struct dce110_ipp *ipp =
-		dm_alloc(sizeof(struct dce110_ipp));
+	struct dce_ipp *ipp = dm_alloc(sizeof(struct dce_ipp));
 
-	if (!ipp)
+	if (!ipp) {
+		BREAK_TO_DEBUGGER();
 		return NULL;
+	}
 
-	if (dce110_ipp_construct(ipp, ctx, inst, offsets))
-		return &ipp->base;
-
-	BREAK_TO_DEBUGGER();
-	dm_free(ipp);
-	return NULL;
+	dce_ipp_construct(ipp, ctx, inst,
+			&ipp_regs[inst], &ipp_shift, &ipp_mask);
+	return &ipp->base;
 }
 
 static const struct encoder_feature_support link_enc_feature = {
@@ -705,7 +695,7 @@ static void destruct(struct dce110_resource_pool *pool)
 			dce110_transform_destroy(&pool->base.transforms[i]);
 
 		if (pool->base.ipps[i] != NULL)
-			dce110_ipp_destroy(&pool->base.ipps[i]);
+			dce_ipp_destroy(&pool->base.ipps[i]);
 
 		if (pool->base.mis[i] != NULL) {
 			dm_free(TO_DCE110_MEM_INPUT(pool->base.mis[i]));
@@ -785,50 +775,6 @@ static void get_pixel_clock_parameters(
 	}
 }
 
-void dce110_resource_build_bit_depth_reduction_params(
-		const struct core_stream *stream,
-		struct bit_depth_reduction_params *fmt_bit_depth)
-{
-	memset(fmt_bit_depth, 0, sizeof(*fmt_bit_depth));
-
-	/*TODO: Need to un-hardcode, refer to function with same name
-	 * in dal2 hw_sequencer*/
-
-	fmt_bit_depth->flags.TRUNCATE_ENABLED = 0;
-	fmt_bit_depth->flags.SPATIAL_DITHER_ENABLED = 0;
-	fmt_bit_depth->flags.FRAME_MODULATION_ENABLED = 0;
-
-	/* Diagnostics need consistent CRC of the image, that means
-	 * dithering should not be enabled for Diagnostics. */
-	if (IS_DIAG_DC(stream->ctx->dce_environment) == false) {
-		switch (stream->public.timing.display_color_depth) {
-		case COLOR_DEPTH_666:
-			fmt_bit_depth->flags.SPATIAL_DITHER_ENABLED = 1;
-			fmt_bit_depth->flags.SPATIAL_DITHER_DEPTH = 0;
-		break;
-		case COLOR_DEPTH_888:
-			fmt_bit_depth->flags.SPATIAL_DITHER_ENABLED = 1;
-			fmt_bit_depth->flags.SPATIAL_DITHER_DEPTH = 1;
-		break;
-		case COLOR_DEPTH_101010:
-			fmt_bit_depth->flags.SPATIAL_DITHER_ENABLED = 1;
-			fmt_bit_depth->flags.SPATIAL_DITHER_DEPTH = 2;
-		break;
-		default:
-		break;
-		}
-		fmt_bit_depth->flags.RGB_RANDOM = 1;
-		fmt_bit_depth->flags.HIGHPASS_RANDOM = 1;
-		fmt_bit_depth->flags.TRUNCATE_ENABLED = 1;
-		fmt_bit_depth->flags.TRUNCATE_DEPTH = 2;
-
-		fmt_bit_depth->pixel_encoding =
-				stream->public.timing.pixel_encoding;
-	}
-
-	return;
-}
-
 enum dc_status dce110_resource_build_pipe_hw_param(struct pipe_ctx *pipe_ctx)
 {
 	get_pixel_clock_parameters(pipe_ctx, &pipe_ctx->pix_clk_params);
@@ -836,7 +782,7 @@ enum dc_status dce110_resource_build_pipe_hw_param(struct pipe_ctx *pipe_ctx)
 		pipe_ctx->clock_source,
 		&pipe_ctx->pix_clk_params,
 		&pipe_ctx->pll_settings);
-	dce110_resource_build_bit_depth_reduction_params(pipe_ctx->stream,
+	resource_build_bit_depth_reduction_params(pipe_ctx->stream,
 			&pipe_ctx->stream->bit_depth_params);
 	pipe_ctx->stream->clamping.pixel_encoding = pipe_ctx->stream->public.timing.pixel_encoding;
 
@@ -1181,8 +1127,6 @@ static const struct resource_funcs dce110_res_pool_funcs = {
 	.validate_guaranteed = dce110_validate_guaranteed,
 	.validate_bandwidth = dce110_validate_bandwidth,
 	.acquire_idle_pipe_for_layer = dce110_acquire_underlay,
-	.build_bit_depth_reduction_params =
-			dce110_resource_build_bit_depth_reduction_params
 };
 
 static bool underlay_create(struct dc_context *ctx, struct resource_pool *pool)
@@ -1411,7 +1355,7 @@ static bool construct(
 			goto res_create_fail;
 		}
 
-		pool->base.ipps[i] = dce110_ipp_create(ctx, i, &dce110_ipp_reg_offsets[i]);
+		pool->base.ipps[i] = dce110_ipp_create(ctx, i);
 		if (pool->base.ipps[i] == NULL) {
 			BREAK_TO_DEBUGGER();
 			dm_error(

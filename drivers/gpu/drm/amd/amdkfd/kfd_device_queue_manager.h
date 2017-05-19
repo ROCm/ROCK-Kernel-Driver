@@ -184,7 +184,6 @@ struct device_queue_manager {
 	unsigned int		*allocated_queues;
 	unsigned int		sdma_bitmap;
 	unsigned int		vmid_bitmap;
-	unsigned long           *doorbell_bitmap;
 	uint64_t		pipelines_addr;
 	struct kfd_mem_obj	*pipeline_mem;
 	uint64_t		fence_gpu_addr;

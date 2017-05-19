@@ -42,7 +42,7 @@ static int amdgpu_ctx_init(struct amdgpu_device *adev, struct amdgpu_ctx *ctx)
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 		ctx->rings[i].sequence = 1;
 		ctx->rings[i].fences = &ctx->fences[amdgpu_sched_jobs * i];
-		INIT_LIST_HEAD(&ctx->rings[i].sem_list);
+		INIT_LIST_HEAD(&ctx->rings[i].sem_dep_list);
 		mutex_init(&ctx->rings[i].sem_lock);
 	}
 
@@ -54,6 +54,10 @@ static int amdgpu_ctx_init(struct amdgpu_device *adev, struct amdgpu_ctx *ctx)
 		struct amd_sched_rq *rq;
 
 		rq = &ring->sched.sched_rq[AMD_SCHED_PRIORITY_NORMAL];
+
+		if (ring == &adev->gfx.kiq.ring)
+			continue;
+
 		r = amd_sched_entity_init(&ring->sched, &ctx->rings[i].entity,
 					  rq, amdgpu_sched_jobs);
 		if (r)
@@ -79,11 +83,24 @@ static void amdgpu_ctx_fini(struct amdgpu_ctx *ctx)
 	if (!adev)
 		return;
 
-	for (i = 0; i < AMDGPU_MAX_RINGS; ++i)
-		for (j = 0; j < amdgpu_sched_jobs; ++j) {
-			fence_put(ctx->rings[i].fences[j]);
-			mutex_destroy(&ctx->rings[i].sem_lock);
+	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
+		struct amdgpu_sem_dep *dep, *tmp;
+
+		mutex_lock(&ctx->rings[i].sem_lock);
+		/* release all the reset inserted SEM here */
+		list_for_each_entry_safe(dep, tmp, &ctx->rings[i].sem_dep_list,
+					 list) {
+			fence_put(dep->fence);
+			list_del_init(&dep->list);
+			kfree(dep);
 		}
+
+		mutex_unlock(&ctx->rings[i].sem_lock);
+		mutex_destroy(&ctx->rings[i].sem_lock);
+
+		for (j = 0; j < amdgpu_sched_jobs; ++j)
+			fence_put(ctx->rings[i].fences[j]);
+	}
 	kfree(ctx->fences);
 	ctx->fences = NULL;
 

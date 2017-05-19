@@ -47,7 +47,7 @@
 #include "amd_pcie_helpers.h"
 #include "cgs_linux.h"
 #include "ppinterrupt.h"
-
+#include "pp_overdriver.h"
 
 #define VOLTAGE_SCALE  4
 #define VOLTAGE_VID_OFFSET_SCALE1   625
@@ -1161,7 +1161,7 @@ static int vega10_setup_default_pcie_table(struct pp_hwmgr *hwmgr)
 			"Incorrect number of PCIE States from VBIOS!",
 			return -1);
 
-	for (i = 0; i < NUM_LINK_LEVELS - 1; i++) {
+	for (i = 0; i < NUM_LINK_LEVELS; i++) {
 		if (data->registry_data.pcieSpeedOverride)
 			pcie_table->pcie_gen[i] =
 					data->registry_data.pcieSpeedOverride;
@@ -1170,12 +1170,12 @@ static int vega10_setup_default_pcie_table(struct pp_hwmgr *hwmgr)
 					bios_pcie_table->entries[i].gen_speed;
 
 		if (data->registry_data.pcieLaneOverride)
-			pcie_table->pcie_lane[i] =
-					data->registry_data.pcieLaneOverride;
+			pcie_table->pcie_lane[i] = (uint8_t)encode_pcie_lane_width(
+					data->registry_data.pcieLaneOverride);
 		else
-			pcie_table->pcie_lane[i] =
-					bios_pcie_table->entries[i].lane_width;
-
+			pcie_table->pcie_lane[i] = (uint8_t)encode_pcie_lane_width(
+							bios_pcie_table->entries[i].lane_width);
+		printk("pcie_table->pcie_lane[%d] is %d  %d\n", i, pcie_table->pcie_lane[i], bios_pcie_table->entries[i].lane_width);
 		if (data->registry_data.pcieClockOverride)
 			pcie_table->lclk[i] =
 					data->registry_data.pcieClockOverride;
@@ -2271,6 +2271,73 @@ static int vega10_avfs_enable(struct pp_hwmgr *hwmgr, bool enable)
 	return 0;
 }
 
+static int vega10_populate_and_upload_avfs_fuse_override(struct pp_hwmgr *hwmgr)
+{
+	int result = 0;
+
+	uint64_t serial_number = 0;
+	uint32_t top32, bottom32;
+	struct phm_fuses_default fuse;
+
+	struct vega10_hwmgr *data = (struct vega10_hwmgr *)(hwmgr->backend);
+	AvfsFuseOverride_t *avfs_fuse_table = &(data->smc_state_table.avfs_fuse_override_table);
+
+	smum_send_msg_to_smc(hwmgr->smumgr, PPSMC_MSG_ReadSerialNumTop32);
+	vega10_read_arg_from_smc(hwmgr->smumgr, &top32);
+
+	smum_send_msg_to_smc(hwmgr->smumgr, PPSMC_MSG_ReadSerialNumBottom32);
+	vega10_read_arg_from_smc(hwmgr->smumgr, &bottom32);
+
+	serial_number = ((uint64_t)bottom32 << 32) | top32;
+
+	if (pp_override_get_default_fuse_value(serial_number, vega10_fuses_default, &fuse) == 0) {
+		avfs_fuse_table->VFT0_b  = fuse.VFT0_b;
+		avfs_fuse_table->VFT0_m1 = fuse.VFT0_m1;
+		avfs_fuse_table->VFT0_m2 = fuse.VFT0_m2;
+		avfs_fuse_table->VFT1_b  = fuse.VFT1_b;
+		avfs_fuse_table->VFT1_m1 = fuse.VFT1_m1;
+		avfs_fuse_table->VFT1_m2 = fuse.VFT1_m2;
+		avfs_fuse_table->VFT2_b  = fuse.VFT2_b;
+		avfs_fuse_table->VFT2_m1 = fuse.VFT2_m1;
+		avfs_fuse_table->VFT2_m2 = fuse.VFT2_m2;
+		result = vega10_copy_table_to_smc(hwmgr->smumgr,
+			(uint8_t *)avfs_fuse_table, AVFSFUSETABLE);
+		PP_ASSERT_WITH_CODE(!result,
+			"Failed to upload FuseOVerride!",
+			);
+	}
+
+	return result;
+}
+
+static int vega10_save_default_power_profile(struct pp_hwmgr *hwmgr)
+{
+	struct vega10_hwmgr *data = (struct vega10_hwmgr *)(hwmgr->backend);
+	struct vega10_single_dpm_table *dpm_table = &(data->dpm_table.gfx_table);
+	uint32_t min_level;
+
+	hwmgr->default_gfx_power_profile.type = AMD_PP_GFX_PROFILE;
+	hwmgr->default_compute_power_profile.type = AMD_PP_COMPUTE_PROFILE;
+
+	/* Optimize compute power profile: Use only highest
+	 * 2 power levels (if more than 2 are available)
+	 */
+	if (dpm_table->count > 2)
+		min_level = dpm_table->count - 2;
+	else if (dpm_table->count == 2)
+		min_level = 1;
+	else
+		min_level = 0;
+
+	hwmgr->default_compute_power_profile.min_sclk =
+			dpm_table->dpm_levels[min_level].value;
+
+	hwmgr->gfx_power_profile = hwmgr->default_gfx_power_profile;
+	hwmgr->compute_power_profile = hwmgr->default_compute_power_profile;
+
+	return 0;
+}
+
 /**
 * Initializes the SMC table and uploads it
 *
@@ -2396,6 +2463,8 @@ static int vega10_init_smc_table(struct pp_hwmgr *hwmgr)
 	pp_table->GfxActivityAverageAlpha = (uint8_t)
 			(data->gfx_activity_average_alpha);
 
+	vega10_populate_and_upload_avfs_fuse_override(hwmgr);
+
 	result = vega10_copy_table_to_smc(hwmgr->smumgr,
 			(uint8_t *)pp_table, PPTABLE);
 	PP_ASSERT_WITH_CODE(!result,
@@ -2404,6 +2473,8 @@ static int vega10_init_smc_table(struct pp_hwmgr *hwmgr)
 	result = vega10_avfs_enable(hwmgr, true);
 	PP_ASSERT_WITH_CODE(!result, "Attempt to enable AVFS feature Failed!",
 					return result);
+
+	vega10_save_default_power_profile(hwmgr);
 
 	return 0;
 }
@@ -3906,32 +3977,36 @@ static int vega10_dpm_force_dpm_level(struct pp_hwmgr *hwmgr,
 
 static int vega10_set_fan_control_mode(struct pp_hwmgr *hwmgr, uint32_t mode)
 {
-	if (mode) {
-		/* stop auto-manage */
-		if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps,
-				PHM_PlatformCaps_MicrocodeFanControl))
-			vega10_fan_ctrl_stop_smc_fan_control(hwmgr);
-		vega10_fan_ctrl_set_static_mode(hwmgr, mode);
-	} else
-		/* restart auto-manage */
-		vega10_fan_ctrl_reset_fan_speed_to_default(hwmgr);
+	int result = 0;
 
-	return 0;
+	switch (mode) {
+	case AMD_FAN_CTRL_NONE:
+		result = vega10_fan_ctrl_set_fan_speed_percent(hwmgr, 100);
+		break;
+	case AMD_FAN_CTRL_MANUAL:
+		if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps,
+			PHM_PlatformCaps_MicrocodeFanControl))
+			result = vega10_fan_ctrl_stop_smc_fan_control(hwmgr);
+		break;
+	case AMD_FAN_CTRL_AUTO:
+		result = vega10_fan_ctrl_set_static_mode(hwmgr, mode);
+		if (!result)
+			result = vega10_fan_ctrl_start_smc_fan_control(hwmgr);
+		break;
+	default:
+		break;
+	}
+	return result;
 }
 
 static int vega10_get_fan_control_mode(struct pp_hwmgr *hwmgr)
 {
-	uint32_t reg;
+	struct vega10_hwmgr *data = (struct vega10_hwmgr *)(hwmgr->backend);
 
-	if (hwmgr->fan_ctrl_is_in_default_mode) {
-		return hwmgr->fan_ctrl_default_mode;
-	} else {
-		reg = soc15_get_register_offset(THM_HWID, 0,
-			mmCG_FDO_CTRL2_BASE_IDX, mmCG_FDO_CTRL2);
-		return (cgs_read_register(hwmgr->device, reg) &
-				CG_FDO_CTRL2__FDO_PWM_MODE_MASK) >>
-				CG_FDO_CTRL2__FDO_PWM_MODE__SHIFT;
-	}
+	if (data->smu_features[GNLD_FAN_CONTROL].enabled == false)
+		return AMD_FAN_CTRL_MANUAL;
+	else
+		return AMD_FAN_CTRL_AUTO;
 }
 
 static int vega10_get_dal_power_level(struct pp_hwmgr *hwmgr,
@@ -4464,6 +4539,67 @@ static int vega10_power_off_asic(struct pp_hwmgr *hwmgr)
 	return result;
 }
 
+static void vega10_find_min_clock_index(struct pp_hwmgr *hwmgr,
+		uint32_t *sclk_idx, uint32_t *mclk_idx,
+		uint32_t min_sclk, uint32_t min_mclk)
+{
+	struct vega10_hwmgr *data = (struct vega10_hwmgr *)(hwmgr->backend);
+	struct vega10_dpm_table *dpm_table = &(data->dpm_table);
+	uint32_t i;
+
+	for (i = 0; i < dpm_table->gfx_table.count; i++) {
+		if (dpm_table->gfx_table.dpm_levels[i].enabled &&
+			dpm_table->gfx_table.dpm_levels[i].value >= min_sclk) {
+			*sclk_idx = i;
+			break;
+		}
+	}
+
+	for (i = 0; i < dpm_table->mem_table.count; i++) {
+		if (dpm_table->mem_table.dpm_levels[i].enabled &&
+			dpm_table->mem_table.dpm_levels[i].value >= min_mclk) {
+			*mclk_idx = i;
+			break;
+		}
+	}
+}
+
+static int vega10_set_power_profile_state(struct pp_hwmgr *hwmgr,
+		struct amd_pp_profile *request)
+{
+	struct vega10_hwmgr *data = (struct vega10_hwmgr *)(hwmgr->backend);
+	uint32_t sclk_idx = ~0, mclk_idx = ~0;
+
+	if (hwmgr->dpm_level != AMD_DPM_FORCED_LEVEL_AUTO)
+		return -EINVAL;
+
+	vega10_find_min_clock_index(hwmgr, &sclk_idx, &mclk_idx,
+			request->min_sclk, request->min_mclk);
+
+	if (sclk_idx != ~0) {
+		if (!data->registry_data.sclk_dpm_key_disabled)
+			PP_ASSERT_WITH_CODE(
+					!smum_send_msg_to_smc_with_parameter(
+					hwmgr->smumgr,
+					PPSMC_MSG_SetSoftMinGfxclkByIndex,
+					sclk_idx),
+					"Failed to set soft min sclk index!",
+					return -EINVAL);
+	}
+
+	if (mclk_idx != ~0) {
+		if (!data->registry_data.mclk_dpm_key_disabled)
+			PP_ASSERT_WITH_CODE(
+					!smum_send_msg_to_smc_with_parameter(
+					hwmgr->smumgr,
+					PPSMC_MSG_SetSoftMinUclkByIndex,
+					mclk_idx),
+					"Failed to set soft min mclk index!",
+					return -EINVAL);
+	}
+
+	return 0;
+}
 
 static const struct pp_hwmgr_func vega10_hwmgr_funcs = {
 	.backend_init = vega10_hwmgr_backend_init,
@@ -4512,6 +4648,7 @@ static const struct pp_hwmgr_func vega10_hwmgr_funcs = {
 			vega10_check_smc_update_required_for_display_configuration,
 	.power_off_asic = vega10_power_off_asic,
 	.disable_smc_firmware_ctf = vega10_thermal_disable_alert,
+	.set_power_profile_state = vega10_set_power_profile_state,
 };
 
 int vega10_hwmgr_init(struct pp_hwmgr *hwmgr)

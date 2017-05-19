@@ -65,7 +65,7 @@ struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 {
 	struct amdgpu_amdkfd_fence *fence = NULL;
 
-	fence = kzalloc(sizeof(struct amdgpu_amdkfd_fence), GFP_KERNEL);
+	fence = kzalloc(sizeof(*fence), GFP_KERNEL);
 	if (fence == NULL)
 		return NULL;
 
@@ -153,7 +153,7 @@ static int amd_kfd_fence_signal(struct fence *f)
  *
  * This function is called when the reference count becomes zero.
  * It just RCU schedules freeing up the fence.
-*/
+ */
 static void amd_kfd_fence_release(struct fence *f)
 {
 	struct amdgpu_amdkfd_fence *fence = to_amdgpu_amdkfd_fence(f);
@@ -173,7 +173,7 @@ static void amd_kfd_fence_release(struct fence *f)
  *
  * @f: [IN] fence
  * @mm: [IN] mm that needs to be verified
-*/
+ */
 bool amd_kfd_fence_check_mm(struct fence *f, void *mm)
 {
 	struct amdgpu_amdkfd_fence *fence = to_amdgpu_amdkfd_fence(f);

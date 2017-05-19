@@ -406,18 +406,15 @@ void radeon_sa_bo_dump_debug_info(struct radeon_sa_manager *sa_manager,
 	list_for_each_entry(i, &sa_manager->olist, olist) {
 		uint64_t soffset = i->soffset + sa_manager->gpu_addr;
 		uint64_t eoffset = i->eoffset + sa_manager->gpu_addr;
-		if (&i->olist == sa_manager->hole) {
-			seq_printf(m, ">");
-		} else {
-			seq_printf(m, " ");
-		}
+
+		seq_putc(m, (&i->olist == sa_manager->hole) ? '>' : ' ');
 		seq_printf(m, "[0x%010llx 0x%010llx] size %8lld",
 			   soffset, eoffset, eoffset - soffset);
 		if (i->fence) {
 			seq_printf(m, " protected by 0x%016llx on ring %d",
 				   i->fence->seq, i->fence->ring);
 		}
-		seq_printf(m, "\n");
+		seq_putc(m, '\n');
 	}
 	spin_unlock(&sa_manager->wq.lock);
 }

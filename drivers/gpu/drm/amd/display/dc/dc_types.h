@@ -338,6 +338,26 @@ enum {
 	LAYER_INDEX_PRIMARY = -1,
 };
 
+enum dpcd_downstream_port_max_bpc {
+	DOWN_STREAM_MAX_8BPC = 0,
+	DOWN_STREAM_MAX_10BPC,
+	DOWN_STREAM_MAX_12BPC,
+	DOWN_STREAM_MAX_16BPC
+};
+struct dc_dongle_caps {
+	/* dongle type (DP converter, CV smart dongle) */
+	enum display_dongle_type dongle_type;
+	bool extendedCapValid;
+	/* If dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER,
+	indicates 'Frame Sequential-to-lllFrame Pack' conversion capability.*/
+	bool is_dp_hdmi_s3d_converter;
+	bool is_dp_hdmi_ycbcr422_pass_through;
+	bool is_dp_hdmi_ycbcr420_pass_through;
+	bool is_dp_hdmi_ycbcr422_converter;
+	bool is_dp_hdmi_ycbcr420_converter;
+	uint32_t dp_hdmi_max_bpc;
+	uint32_t dp_hdmi_max_pixel_clk;
+};
 /* Scaling format */
 enum scaling_transformation {
 	SCALING_TRANSFORMATION_UNINITIALIZED,
@@ -464,6 +484,15 @@ struct freesync_context {
 	unsigned int nominal_refresh_in_micro_hz;
 };
 
+struct psr_config {
+	unsigned char psr_version;
+	unsigned int psr_rfb_setup_time;
+	bool psr_exit_link_training_required;
+
+	bool psr_frame_capture_indication_req;
+	unsigned int psr_sdp_transmit_line_num_deadline;
+};
+
 struct colorspace_transform {
 	struct fixed31_32 matrix[12];
 	bool enable_remap;
@@ -472,21 +501,6 @@ struct colorspace_transform {
 struct csc_transform {
 	uint16_t matrix[12];
 	bool enable_adjustment;
-};
-
-struct psr_caps {
-	/* These parameters are from PSR capabilities reported by Sink DPCD */
-	unsigned char psr_version;
-	unsigned int psr_rfb_setup_time;
-	bool psr_exit_link_training_required;
-
-	/* These parameters are calculated in Driver,
-	 * based on display timing and Sink capabilities.
-	 * If VBLANK region is too small and Sink takes a long time
-	 * to set up RFB, it may take an extra frame to enter PSR state.
-	 */
-	bool psr_frame_capture_indication_req;
-	unsigned int psr_sdp_transmit_line_num_deadline;
 };
 
 enum i2c_mot_mode {

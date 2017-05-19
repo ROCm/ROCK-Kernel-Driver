@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Advanced Micro Devices, Inc.
+ * Copyright 2017 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
 #define __DAL_IPP_H__
 
 #include "hw_shared.h"
+#include "dc_hw_types.h"
 
 #define MAXTRIX_COEFFICIENTS_NUMBER 12
 #define MAXTRIX_COEFFICIENTS_WRAP_NUMBER (MAXTRIX_COEFFICIENTS_NUMBER + 4)
@@ -37,8 +38,6 @@ struct input_pixel_processor {
 	struct  dc_context *ctx;
 	unsigned int inst;
 	const struct ipp_funcs *funcs;
-
-	unsigned int cusor_width;
 };
 
 enum ipp_prescale_mode {
@@ -88,7 +87,7 @@ struct ipp_funcs {
 		const struct dc_cursor_position *position,
 		const struct dc_cursor_mi_param *param);
 
-	bool (*ipp_cursor_set_attributes)(
+	void (*ipp_cursor_set_attributes)(
 		struct input_pixel_processor *ipp,
 		const struct dc_cursor_attributes *attributes);
 
@@ -115,11 +114,11 @@ struct ipp_funcs {
 			const struct dc_gamma *gamma);
 
 	/*** DEGAMMA RELATED ***/
-	bool (*ipp_set_degamma)(
+	void (*ipp_set_degamma)(
 		struct input_pixel_processor *ipp,
 		enum ipp_degamma_mode mode);
 
-	bool (*ipp_program_degamma_pwl)(
+	void (*ipp_program_degamma_pwl)(
 		struct input_pixel_processor *ipp,
 		const struct pwl_params *params);
 
