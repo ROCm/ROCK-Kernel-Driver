@@ -81,7 +81,7 @@ static uint32_t compute_sh_mem_bases_64bit(unsigned int top_address_nybble)
 	 * for LDS/Scratch and GPUVM.
 	 */
 
-	BUG_ON((top_address_nybble & 1) || top_address_nybble > 0xE ||
+	WARN_ON((top_address_nybble & 1) || top_address_nybble > 0xE ||
 		top_address_nybble == 0);
 
 	return PRIVATE_BASE(top_address_nybble << 12) |
@@ -120,8 +120,6 @@ static int update_qpd_cik(struct device_queue_manager *dqm,
 	struct kfd_process_device *pdd;
 	unsigned int temp;
 
-	BUG_ON(!dqm || !qpd);
-
 	pdd = qpd_to_pdd(qpd);
 
 	/* check if sh_mem_config register already configured */
@@ -144,7 +142,7 @@ static int update_qpd_cik(struct device_queue_manager *dqm,
 		qpd->sh_mem_config |= 1  << SH_MEM_CONFIG__PRIVATE_ATC__SHIFT;
 	}
 
-	pr_debug("kfd: is32bit process: %d sh_mem_bases nybble: 0x%X and register 0x%X\n",
+	pr_debug("is32bit process: %d sh_mem_bases nybble: 0x%X and register 0x%X\n",
 		qpd->pqm->process->is_32bit_user_mode, temp, qpd->sh_mem_bases);
 
 	return 0;
@@ -155,8 +153,6 @@ static int update_qpd_cik_hawaii(struct device_queue_manager *dqm,
 {
 	struct kfd_process_device *pdd;
 	unsigned int temp;
-
-	BUG_ON(!dqm || !qpd);
 
 	pdd = qpd_to_pdd(qpd);
 
@@ -171,11 +167,12 @@ static int update_qpd_cik_hawaii(struct device_queue_manager *dqm,
 	}
 
 	/* On dGPU we're always in GPUVM64 addressing mode with 64-bit
-	 * aperture addresses. */
+	 * aperture addresses.
+	 */
 	temp = get_sh_mem_bases_nybble_64(pdd);
 	qpd->sh_mem_bases = compute_sh_mem_bases_64bit(temp);
 
-	pr_debug("kfd: is32bit process: %d sh_mem_bases nybble: 0x%X and register 0x%X\n",
+	pr_debug("is32bit process: %d sh_mem_bases nybble: 0x%X and register 0x%X\n",
 		qpd->pqm->process->is_32bit_user_mode, temp, qpd->sh_mem_bases);
 
 	return 0;
@@ -202,7 +199,8 @@ static void init_sdma_vm_hawaii(struct device_queue_manager *dqm,
 				struct qcm_process_device *qpd)
 {
 	/* On dGPU we're always in GPUVM64 addressing mode with 64-bit
-	 * aperture addresses. */
+	 * aperture addresses.
+	 */
 	q->properties.sdma_vm_addr =
 		((get_sh_mem_bases_nybble_64(qpd_to_pdd(qpd))) <<
 		 SDMA0_RLC0_VIRTUAL_ADDR__SHARED_BASE__SHIFT) &

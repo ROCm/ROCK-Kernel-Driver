@@ -628,6 +628,13 @@ static int sdma_v4_0_gfx_resume(struct amdgpu_device *adev)
 
 		if (adev->mman.buffer_funcs_ring == ring)
 			amdgpu_ttm_set_active_vram_size(adev, adev->mc.real_vram_size);
+
+		/* FIXME: temporarily disable SDMA-ULV interrupts for Vega10.
+		 * Remove this once the fix is in firmware.
+		 */
+		if (ring->adev->asic_type == CHIP_VEGA10)
+			WREG32(sdma_v4_0_get_reg_offset(i, mmSDMA0_ULV_CNTL),
+							0);
 	}
 
 	return 0;
@@ -1038,6 +1045,7 @@ static void sdma_v4_0_ring_emit_vm_flush(struct amdgpu_ring *ring,
 	uint32_t req = ring->adev->gart.gart_funcs->get_invalidate_req(vm_id);
 	unsigned eng = ring->vm_inv_eng;
 
+	pd_addr = ring->adev->gart.gart_funcs->adjust_mc_addr(ring->adev, pd_addr);
 	pd_addr = pd_addr | 0x1; /* valid bit */
 	/* now only use physical base address of PDE and valid */
 	BUG_ON(pd_addr & 0xFFFF00000000003EULL);

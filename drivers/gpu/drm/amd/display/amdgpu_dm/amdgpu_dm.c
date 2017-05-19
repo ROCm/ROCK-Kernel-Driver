@@ -719,9 +719,11 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 		if (aconnector->mst_port)
 			continue;
 
+		mutex_lock(&aconnector->hpd_lock);
 		dc_link_detect(aconnector->dc_link, false);
 		aconnector->dc_sink = NULL;
 		amdgpu_dm_update_connector_after_detect(aconnector);
+		mutex_unlock(&aconnector->hpd_lock);
 	}
 
 	drm_modeset_lock_all(ddev);

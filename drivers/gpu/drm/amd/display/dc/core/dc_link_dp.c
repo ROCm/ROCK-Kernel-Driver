@@ -11,6 +11,7 @@
 #include "dpcd_defs.h"
 
 #include "core_dc.h"
+#include "resource.h"
 
 /* maximum pre emphasis level allowed for each voltage swing level*/
 static const enum dc_pre_emphasis voltage_swing_to_pre_emphasis[] = {
@@ -605,7 +606,7 @@ static bool is_max_vs_reached(
 }
 
 void dc_link_dp_set_drive_settings(
-	struct dc_link *link,
+	const struct dc_link *link,
 	struct link_training_settings *lt_settings)
 {
 	struct core_link *core_link = DC_LINK_TO_CORE(link);
@@ -1478,7 +1479,7 @@ static bool handle_hpd_irq_psr_sink(const struct core_link *link)
 {
 	union dpcd_psr_configuration psr_configuration;
 
-	if (link->public.psr_caps.psr_version == 0)
+	if (!link->psr_enabled)
 		return false;
 
 	dm_helpers_dp_read_dpcd(
@@ -1951,14 +1952,33 @@ static void get_active_converter_info(
 			link->dpcd_caps.dongle_type =
 				DISPLAY_DONGLE_DP_HDMI_CONVERTER;
 
+			link->dpcd_caps.dongle_caps.dongle_type = link->dpcd_caps.dongle_type;
 			if (ds_port.fields.DETAILED_CAPS) {
 
 				union dwnstream_port_caps_byte3_hdmi
 					hdmi_caps = {.raw = det_caps[3] };
+				union dwnstream_port_caps_byte1
+					hdmi_color_caps = {.raw = det_caps[2] };
+				link->dpcd_caps.dongle_caps.dp_hdmi_max_pixel_clk =
+					det_caps[1] * 25000;
 
-				link->dpcd_caps.is_dp_hdmi_s3d_converter =
+				link->dpcd_caps.dongle_caps.is_dp_hdmi_s3d_converter =
 					hdmi_caps.bits.FRAME_SEQ_TO_FRAME_PACK;
+				link->dpcd_caps.dongle_caps.is_dp_hdmi_ycbcr422_pass_through =
+					hdmi_caps.bits.YCrCr422_PASS_THROUGH;
+				link->dpcd_caps.dongle_caps.is_dp_hdmi_ycbcr420_pass_through =
+					hdmi_caps.bits.YCrCr420_PASS_THROUGH;
+				link->dpcd_caps.dongle_caps.is_dp_hdmi_ycbcr422_converter =
+					hdmi_caps.bits.YCrCr422_CONVERSION;
+				link->dpcd_caps.dongle_caps.is_dp_hdmi_ycbcr420_converter =
+					hdmi_caps.bits.YCrCr420_CONVERSION;
+
+				link->dpcd_caps.dongle_caps.dp_hdmi_max_bpc =
+					hdmi_color_caps.bits.MAX_BITS_PER_COLOR_COMPONENT;
+
+				link->dpcd_caps.dongle_caps.extendedCapValid = true;
 			}
+
 			break;
 		}
 	}
@@ -2041,36 +2061,6 @@ static void dp_wa_power_up_0010FA(struct core_link *link, uint8_t *dpcd_data,
 		link->wa_flags.dp_keep_receiver_powered = false;
 }
 
-static void retrieve_psr_link_cap(struct core_link *link,
-		enum edp_revision edp_revision)
-{
-	if (edp_revision >= EDP_REVISION_13) {
-		core_link_read_dpcd(link,
-				DP_PSR_SUPPORT,
-				(uint8_t *)(&link->public.psr_caps),
-				sizeof(link->public.psr_caps));
-		if (link->public.psr_caps.psr_version != 0) {
-			unsigned char psr_capability = 0;
-
-			core_link_read_dpcd(link,
-					    DP_PSR_CAPS,
-						&psr_capability,
-						sizeof(psr_capability));
-			/* Bit 0 determines whether fast link training is
-			 * required on PSR exit. If set to 0, link training
-			 * is required. If set to 1, sink must lock within
-			 * five Idle Patterns after Main Link is turned on.
-			 */
-			link->public.psr_caps.psr_exit_link_training_required
-						= !(psr_capability & 0x1);
-
-			psr_capability = (psr_capability >> 1) & 0x7;
-			link->public.psr_caps.psr_rfb_setup_time =
-					55 * (6 - psr_capability);
-		}
-	}
-}
-
 static void retrieve_link_cap(struct core_link *link)
 {
 	uint8_t dpcd_data[DP_TRAINING_AUX_RD_INTERVAL - DP_DPCD_REV + 1];
@@ -2138,16 +2128,8 @@ static void retrieve_link_cap(struct core_link *link)
 	link->dpcd_caps.panel_mode_edp =
 		edp_config_cap.bits.ALT_SCRAMBLER_RESET;
 
-	link->edp_revision = EDP_REVISION_11;
-
 	link->public.test_pattern_enabled = false;
 	link->public.compliance_test_state.raw = 0;
-
-	link->public.psr_caps.psr_exit_link_training_required = false;
-	link->public.psr_caps.psr_frame_capture_indication_req = false;
-	link->public.psr_caps.psr_rfb_setup_time = 0;
-	link->public.psr_caps.psr_sdp_transmit_line_num_deadline = 0;
-	link->public.psr_caps.psr_version = 0;
 
 	/* read sink count */
 	core_link_read_dpcd(link,
@@ -2155,22 +2137,8 @@ static void retrieve_link_cap(struct core_link *link)
 			&link->dpcd_caps.sink_count.raw,
 			sizeof(link->dpcd_caps.sink_count.raw));
 
-	/* Display control registers starting at DPCD 700h are only valid and
-	 * enabled if this eDP config cap bit is set. */
-	if (edp_config_cap.bits.DPCD_DISPLAY_CONTROL_CAPABLE) {
-		/* Read the Panel's eDP revision at DPCD 700h. */
-		core_link_read_dpcd(link,
-			DP_EDP_DPCD_REV,
-			(uint8_t *)(&link->edp_revision),
-			sizeof(link->edp_revision));
-	}
-
 	/* Connectivity log: detection */
 	CONN_DATA_DETECT(link, dpcd_data, sizeof(dpcd_data), "Rx Caps: ");
-
-	/* TODO: Confirm if need retrieve_psr_link_cap */
-	if (link->public.reported_link_cap.link_rate < LINK_RATE_HIGH2)
-		retrieve_psr_link_cap(link, link->edp_revision);
 }
 
 void detect_dp_sink_caps(struct core_link *link)
@@ -2278,8 +2246,7 @@ static void set_crtc_test_pattern(struct core_link *link,
 	case DP_TEST_PATTERN_VIDEO_MODE:
 	{
 		/* restore bitdepth reduction */
-		link->dc->res_pool->funcs->
-			build_bit_depth_reduction_params(pipe_ctx->stream,
+		resource_build_bit_depth_reduction_params(pipe_ctx->stream,
 					&params);
 		pipe_ctx->stream->bit_depth_params = params;
 		pipe_ctx->opp->funcs->

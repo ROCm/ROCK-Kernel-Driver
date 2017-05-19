@@ -42,7 +42,7 @@ enum {
 	ADDRESS_WATCH_REG_CNTL_ATC_BIT = 0x10000000UL,
 	ADDRESS_WATCH_REG_CNTL_DEFAULT_MASK = 0x00FFFFFF,
 	ADDRESS_WATCH_REG_ADDLOW_MASK_EXTENSION = 0x03000000,
-	/* extend the mask to 26 bits in order to match the low address field. */
+	/* extend the mask to 26 bits in order to match the low address field */
 	ADDRESS_WATCH_REG_ADDLOW_SHIFT = 6,
 	ADDRESS_WATCH_REG_ADDHIGH_MASK = 0xFFFF
 };

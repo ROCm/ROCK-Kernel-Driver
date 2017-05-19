@@ -76,6 +76,16 @@ struct fixed_refresh {
 	bool program_fixed_refresh;
 };
 
+struct freesync_range {
+	unsigned int min_refresh;
+	unsigned int max_frame_duration;
+	unsigned int vmax;
+
+	unsigned int max_refresh;
+	unsigned int min_frame_duration;
+	unsigned int vmin;
+};
+
 struct freesync_state {
 	bool fullscreen;
 	bool static_screen;
@@ -89,6 +99,7 @@ struct freesync_state {
 	struct gradual_static_ramp static_ramp;
 	struct below_the_range btr;
 	struct fixed_refresh fixed_refresh;
+	struct freesync_range freesync_range;
 };
 
 struct freesync_entity {
@@ -98,11 +109,16 @@ struct freesync_entity {
 	struct mod_freesync_user_enable user_enable;
 };
 
+struct freesync_registry_options {
+	unsigned int min_refresh_from_edid;
+};
+
 struct core_freesync {
 	struct mod_freesync public;
 	struct dc *dc;
 	struct freesync_entity *map;
 	int num_entities;
+	struct freesync_registry_options opts;
 };
 
 #define MOD_FREESYNC_TO_CORE(mod_freesync)\
@@ -125,7 +141,7 @@ struct mod_freesync *mod_freesync_create(struct dc *dc)
 
 	struct persistent_data_flag flag;
 
-	int i = 0;
+	int i, data = 0;
 
 	if (core_freesync == NULL)
 		goto fail_alloc_context;
@@ -154,6 +170,12 @@ struct mod_freesync *mod_freesync_create(struct dc *dc)
 	flag.save_per_link = false;
 	dm_write_persistent_data(core_dc->ctx, NULL, FREESYNC_REGISTRY_NAME, NULL, NULL,
 					0, &flag);
+	flag.save_per_edid = false;
+	flag.save_per_link = false;
+	if (dm_read_persistent_data(core_dc->ctx, NULL, NULL,
+			"DalDrrSupport", &data, sizeof(data), &flag)) {
+		core_freesync->opts.min_refresh_from_edid = data;
+	}
 
 	return &core_freesync->public;
 
@@ -227,6 +249,24 @@ bool mod_freesync_add_stream(struct mod_freesync *mod_freesync,
 
 		dc_stream_retain(stream);
 
+		temp = stream->timing.pix_clk_khz;
+		temp *= 1000ULL * 1000ULL * 1000ULL;
+		temp = div_u64(temp, stream->timing.h_total);
+		temp = div_u64(temp, stream->timing.v_total);
+
+		nom_refresh_rate_micro_hz = (unsigned int) temp;
+
+		if (core_freesync->opts.min_refresh_from_edid != 0 &&
+				dc_is_embedded_signal(
+					stream->sink->sink_signal)) {
+			caps->supported = true;
+			caps->min_refresh_in_micro_hz =
+				core_freesync->opts.min_refresh_from_edid *
+					1000000;
+			caps->max_refresh_in_micro_hz =
+					nom_refresh_rate_micro_hz;
+		}
+
 		core_freesync->map[core_freesync->num_entities].stream = stream;
 		core_freesync->map[core_freesync->num_entities].caps = caps;
 
@@ -263,13 +303,6 @@ bool mod_freesync_add_stream(struct mod_freesync *mod_freesync,
 			core_freesync->map[core_freesync->num_entities].user_enable.
 					enable_for_video = false;
 		}
-
-		temp = core_stream->public.timing.pix_clk_khz;
-		temp *= 1000ULL * 1000ULL * 1000ULL;
-		temp = div_u64(temp, core_stream->public.timing.h_total);
-		temp = div_u64(temp, core_stream->public.timing.v_total);
-
-		nom_refresh_rate_micro_hz = (unsigned int) temp;
 
 		if (caps->supported &&
 		    nom_refresh_rate_micro_hz >= caps->min_refresh_in_micro_hz &&
@@ -342,26 +375,77 @@ static void update_stream(struct core_freesync *core_freesync,
 	}
 }
 
-static void calc_vmin_vmax(struct core_freesync *core_freesync,
-		const struct dc_stream *stream, int *vmin, int *vmax)
+static void calc_freesync_range(struct core_freesync *core_freesync,
+		const struct dc_stream *stream,
+		struct freesync_state *state,
+		unsigned int min_refresh_in_uhz,
+		unsigned int max_refresh_in_uhz)
 {
 	unsigned int min_frame_duration_in_ns = 0, max_frame_duration_in_ns = 0;
 	unsigned int index = map_index_from_stream(core_freesync, stream);
+	uint32_t vtotal = stream->timing.v_total;
+
+	if ((min_refresh_in_uhz == 0) || (max_refresh_in_uhz == 0)) {
+		state->freesync_range.min_refresh =
+				state->nominal_refresh_rate_in_micro_hz;
+		state->freesync_range.max_refresh =
+				state->nominal_refresh_rate_in_micro_hz;
+
+		state->freesync_range.max_frame_duration = 0;
+		state->freesync_range.min_frame_duration = 0;
+
+		state->freesync_range.vmax = vtotal;
+		state->freesync_range.vmin = vtotal;
+
+		return;
+	}
 
 	min_frame_duration_in_ns = ((unsigned int) (div64_u64(
 					(1000000000ULL * 1000000),
-					core_freesync->map[index].state.
-					nominal_refresh_rate_in_micro_hz)));
+					max_refresh_in_uhz)));
 	max_frame_duration_in_ns = ((unsigned int) (div64_u64(
-					(1000000000ULL * 1000000),
-					core_freesync->map[index].caps->min_refresh_in_micro_hz)));
+		(1000000000ULL * 1000000),
+		min_refresh_in_uhz)));
 
-	*vmax = div64_u64(div64_u64(((unsigned long long)(
-			max_frame_duration_in_ns) * stream->timing.pix_clk_khz),
-			stream->timing.h_total), 1000000);
-	*vmin = div64_u64(div64_u64(((unsigned long long)(
-			min_frame_duration_in_ns) * stream->timing.pix_clk_khz),
-			stream->timing.h_total), 1000000);
+	state->freesync_range.min_refresh = min_refresh_in_uhz;
+	state->freesync_range.max_refresh = max_refresh_in_uhz;
+
+	state->freesync_range.max_frame_duration = max_frame_duration_in_ns;
+	state->freesync_range.min_frame_duration = min_frame_duration_in_ns;
+
+	state->freesync_range.vmax = div64_u64(div64_u64(((unsigned long long)(
+		max_frame_duration_in_ns) * stream->timing.pix_clk_khz),
+		stream->timing.h_total), 1000000);
+	state->freesync_range.vmin = div64_u64(div64_u64(((unsigned long long)(
+		min_frame_duration_in_ns) * stream->timing.pix_clk_khz),
+		stream->timing.h_total), 1000000);
+
+	/* In case of 4k free sync monitor, vmin or vmax cannot be less than vtotal */
+	if (state->freesync_range.vmin < vtotal) {
+		ASSERT(false);
+		state->freesync_range.vmin = vtotal;
+	}
+
+	if (state->freesync_range.vmax < vtotal) {
+		ASSERT(false);
+		state->freesync_range.vmax = vtotal;
+	}
+
+	/* Determine whether BTR can be supported */
+	if (max_frame_duration_in_ns >=
+			2 * min_frame_duration_in_ns)
+		core_freesync->map[index].caps->btr_supported = true;
+	else
+		core_freesync->map[index].caps->btr_supported = false;
+
+	/* Cache the time variables */
+	state->time.max_render_time_in_us =
+		max_frame_duration_in_ns / 1000;
+	state->time.min_render_time_in_us =
+		min_frame_duration_in_ns / 1000;
+	state->btr.mid_point_in_us =
+		(max_frame_duration_in_ns +
+		min_frame_duration_in_ns) / 2000;
 }
 
 static void calc_v_total_from_duration(const struct dc_stream *stream,
@@ -506,9 +590,8 @@ static bool set_freesync_on_streams(struct core_freesync *core_freesync,
 				state->fixed_refresh.fixed_refresh_active == false) {
 				/* Enable freesync */
 
-				calc_vmin_vmax(core_freesync,
-						streams[stream_idx],
-						&v_total_min, &v_total_max);
+				v_total_min = state->freesync_range.vmin;
+				v_total_max = state->freesync_range.vmax;
 
 				/* Update the freesync context for the stream */
 				update_stream_freesync_context(core_freesync,
@@ -645,6 +728,7 @@ void mod_freesync_handle_v_update(struct mod_freesync *mod_freesync,
 	unsigned int min_frame_duration_in_ns, vmax, vmin = 0;
 	struct freesync_state *state;
 	struct core_freesync *core_freesync = NULL;
+	struct dc_static_screen_events triggers = {0};
 
 	if (mod_freesync == NULL)
 		return;
@@ -683,7 +767,7 @@ void mod_freesync_handle_v_update(struct mod_freesync *mod_freesync,
 					(1000000000ULL * 1000000),
 					state->nominal_refresh_rate_in_micro_hz)));
 
-			calc_vmin_vmax(core_freesync, *streams, &vmin, &vmax);
+			vmin = state->freesync_range.vmin;
 
 			inserted_frame_v_total = vmin;
 
@@ -737,6 +821,13 @@ void mod_freesync_handle_v_update(struct mod_freesync *mod_freesync,
 					core_freesync->dc, streams,
 					num_streams, v_total,
 					v_total);
+
+		triggers.overlay_update = true;
+		triggers.surface_update = true;
+
+		core_freesync->dc->stream_funcs.set_static_screen_events(
+					core_freesync->dc, streams,	num_streams,
+					&triggers);
 	}
 }
 
@@ -921,11 +1012,120 @@ bool mod_freesync_get_user_enable(struct mod_freesync *mod_freesync,
 	return true;
 }
 
+bool mod_freesync_override_min_max(struct mod_freesync *mod_freesync,
+		const struct dc_stream *streams,
+		unsigned int min_refresh,
+		unsigned int max_refresh)
+{
+	unsigned int index = 0;
+	struct core_freesync *core_freesync;
+	struct freesync_state *state;
+
+	if (mod_freesync == NULL)
+		return false;
+
+	core_freesync = MOD_FREESYNC_TO_CORE(mod_freesync);
+	index = map_index_from_stream(core_freesync, streams);
+	state = &core_freesync->map[index].state;
+
+	if (min_refresh == 0 || max_refresh == 0) {
+		/* Restore defaults */
+		calc_freesync_range(core_freesync, streams, state,
+			core_freesync->map[index].caps->
+			min_refresh_in_micro_hz,
+			state->nominal_refresh_rate_in_micro_hz);
+	} else {
+		calc_freesync_range(core_freesync, streams,
+				state,
+				min_refresh,
+				max_refresh);
+
+		/* Program vtotal min/max */
+		core_freesync->dc->stream_funcs.adjust_vmin_vmax(
+			core_freesync->dc, &streams, 1,
+			state->freesync_range.vmin,
+			state->freesync_range.vmax);
+	}
+
+	return true;
+}
+
+bool mod_freesync_get_min_max(struct mod_freesync *mod_freesync,
+		const struct dc_stream *stream,
+		unsigned int *min_refresh,
+		unsigned int *max_refresh)
+{
+	unsigned int index = 0;
+	struct core_freesync *core_freesync = NULL;
+
+	if (mod_freesync == NULL)
+		return false;
+
+	core_freesync = MOD_FREESYNC_TO_CORE(mod_freesync);
+	index = map_index_from_stream(core_freesync, stream);
+
+	*min_refresh =
+		core_freesync->map[index].state.freesync_range.min_refresh;
+	*max_refresh =
+		core_freesync->map[index].state.freesync_range.max_refresh;
+
+	return true;
+}
+
+bool mod_freesync_get_vmin_vmax(struct mod_freesync *mod_freesync,
+		const struct dc_stream *stream,
+		unsigned int *vmin,
+		unsigned int *vmax)
+{
+	unsigned int index = 0;
+	struct core_freesync *core_freesync = NULL;
+
+	if (mod_freesync == NULL)
+		return false;
+
+	core_freesync = MOD_FREESYNC_TO_CORE(mod_freesync);
+	index = map_index_from_stream(core_freesync, stream);
+
+	*vmin =
+		core_freesync->map[index].state.freesync_range.vmin;
+	*vmax =
+		core_freesync->map[index].state.freesync_range.vmax;
+
+	return true;
+}
+
+bool mod_freesync_get_v_position(struct mod_freesync *mod_freesync,
+		const struct dc_stream *stream,
+		unsigned int *nom_v_pos,
+		unsigned int *v_pos)
+{
+	unsigned int index = 0;
+	struct core_freesync *core_freesync = NULL;
+	struct crtc_position position;
+
+	if (mod_freesync == NULL)
+		return false;
+
+	core_freesync = MOD_FREESYNC_TO_CORE(mod_freesync);
+	index = map_index_from_stream(core_freesync, stream);
+
+	if (core_freesync->dc->stream_funcs.get_crtc_position(
+			core_freesync->dc, &stream, 1,
+			&position.vertical_count, &position.nominal_vcount)) {
+
+		*nom_v_pos = position.vertical_count;
+		*v_pos = position.nominal_vcount;
+
+		return true;
+	}
+
+	return false;
+}
+
 void mod_freesync_notify_mode_change(struct mod_freesync *mod_freesync,
 		const struct dc_stream **streams, int num_streams)
 {
 	unsigned int stream_index, map_index;
-	unsigned min_frame_duration_in_ns, max_frame_duration_in_ns;
 	struct freesync_state *state;
 	struct core_freesync *core_freesync = NULL;
 
@@ -945,37 +1145,23 @@ void mod_freesync_notify_mode_change(struct mod_freesync *mod_freesync,
 			unsigned long long temp;
 			temp = streams[stream_index]->timing.pix_clk_khz;
 			temp *= 1000ULL * 1000ULL * 1000ULL;
-			temp = div_u64(temp, streams[stream_index]->timing.h_total);
-			temp = div_u64(temp, streams[stream_index]->timing.v_total);
-			state->nominal_refresh_rate_in_micro_hz = (unsigned int) temp;
+			temp = div_u64(temp,
+					streams[stream_index]->timing.h_total);
+			temp = div_u64(temp,
+					streams[stream_index]->timing.v_total);
+			state->nominal_refresh_rate_in_micro_hz =
+					(unsigned int) temp;
 
 			/* Update the stream */
 			update_stream(core_freesync, streams[stream_index]);
 
-			/* Determine whether BTR can be supported */
-			min_frame_duration_in_ns = ((unsigned int) (div64_u64(
-					(1000000000ULL * 1000000),
-					state->nominal_refresh_rate_in_micro_hz)));
-
-			max_frame_duration_in_ns = ((unsigned int) (div64_u64(
-					(1000000000ULL * 1000000),
-					core_freesync->map[map_index].caps->min_refresh_in_micro_hz)));
-
-			if (max_frame_duration_in_ns >=
-					2 * min_frame_duration_in_ns)
-				core_freesync->map[map_index].caps->btr_supported = true;
-			else
-				core_freesync->map[map_index].caps->btr_supported = false;
-
-			/* Cache the time variables */
-			state->time.max_render_time_in_us =
-				max_frame_duration_in_ns / 1000;
-			state->time.min_render_time_in_us =
-				min_frame_duration_in_ns / 1000;
-			state->btr.mid_point_in_us =
-				(max_frame_duration_in_ns +
-				min_frame_duration_in_ns) / 2000;
-
+			/* Calculate vmin/vmax and refresh rate for
+			 * current mode
+			 */
+			calc_freesync_range(core_freesync, *streams, state,
+				core_freesync->map[map_index].caps->
+				min_refresh_in_micro_hz,
+				state->nominal_refresh_rate_in_micro_hz);
 		}
 	}
 
@@ -1158,7 +1344,7 @@ static void apply_fixed_refresh(struct core_freesync *core_freesync,
 	/* Fixed Refresh set to "active" so engage (fix to max) */
 	} else {
 
-		calc_vmin_vmax(core_freesync, stream, &vmin, &vmax);
+		vmin = state->freesync_range.vmin;
 
 		vmax = vmin;
 

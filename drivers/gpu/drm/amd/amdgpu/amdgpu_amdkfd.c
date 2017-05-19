@@ -33,7 +33,7 @@
 
 const struct kfd2kgd_calls *kfd2kgd;
 const struct kgd2kfd_calls *kgd2kfd;
-bool (*kgd2kfd_init_p)(unsigned, const struct kgd2kfd_calls**);
+bool (*kgd2kfd_init_p)(unsigned int, const struct kgd2kfd_calls**);
 
 unsigned int global_compute_vmid_bitmap = 0xFF00;
 
@@ -42,7 +42,7 @@ int amdgpu_amdkfd_init(void)
 	int ret;
 
 #if defined(CONFIG_HSA_AMD_MODULE)
-	int (*kgd2kfd_init_p)(unsigned, const struct kgd2kfd_calls**);
+	int (*kgd2kfd_init_p)(unsigned int, const struct kgd2kfd_calls**);
 
 	kgd2kfd_init_p = symbol_request(kgd2kfd_init);
 
@@ -252,10 +252,6 @@ int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 	uint64_t gpu_addr_tmp = 0;
 	void *cpu_ptr_tmp = NULL;
 
-	BUG_ON(kgd == NULL);
-	BUG_ON(gpu_addr == NULL);
-	BUG_ON(cpu_ptr == NULL);
-
 	r = amdgpu_bo_create(rdev, size, PAGE_SIZE, true, AMDGPU_GEM_DOMAIN_GTT,
 			AMDGPU_GEM_CREATE_CPU_GTT_USWC, NULL, NULL, &bo);
 	if (r) {
@@ -307,8 +303,6 @@ void free_gtt_mem(struct kgd_dev *kgd, void *mem_obj)
 {
 	struct amdgpu_bo *bo = (struct amdgpu_bo *) mem_obj;
 
-	BUG_ON(bo == NULL);
-
 	amdgpu_bo_reserve(bo, true);
 	amdgpu_bo_kunmap(bo);
 	amdgpu_bo_unpin(bo);
@@ -322,8 +316,6 @@ void get_local_mem_info(struct kgd_dev *kgd,
 	uint64_t address_mask;
 	resource_size_t aper_limit;
 	struct amdgpu_device *rdev = (struct amdgpu_device *)kgd;
-
-	BUG_ON(kgd == NULL);
 
 	address_mask = ~((1UL << 40) - 1);
 	aper_limit = rdev->mc.aper_base + rdev->mc.aper_size;
@@ -380,7 +372,8 @@ void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 
 	cu_info->cu_active_number = acu_info.number;
 	cu_info->cu_ao_mask = acu_info.ao_cu_mask;
-	memcpy(&cu_info->cu_bitmap[0], &acu_info.bitmap[0], sizeof(acu_info.bitmap));
+	memcpy(&cu_info->cu_bitmap[0], &acu_info.bitmap[0],
+					sizeof(acu_info.bitmap));
 	cu_info->num_shader_engines = adev->gfx.config.max_shader_engines;
 	cu_info->num_shader_arrays_per_engine = adev->gfx.config.max_sh_per_se;
 	cu_info->num_cu_per_sh = adev->gfx.config.max_cu_per_sh;
@@ -420,8 +413,9 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 	adev = obj->dev->dev_private;
 	bo = gem_to_amdgpu_bo(obj);
 	if (!(bo->prefered_domains & (AMDGPU_GEM_DOMAIN_VRAM |
-				    AMDGPU_GEM_DOMAIN_GTT)))
-		/* Only VRAM and GTT BOs are supported */
+				    AMDGPU_GEM_DOMAIN_GTT |
+				    AMDGPU_GEM_DOMAIN_DGMA)))
+		/* Only VRAM, GTT and DGMA BOs are supported */
 		goto out_put;
 
 	r = 0;
@@ -435,8 +429,12 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 		r = amdgpu_bo_get_metadata(bo, metadata_buffer, buffer_size,
 					   metadata_size, &metadata_flags);
 	if (flags) {
-		*flags = (bo->prefered_domains & AMDGPU_GEM_DOMAIN_VRAM) ?
-			ALLOC_MEM_FLAGS_VRAM : ALLOC_MEM_FLAGS_GTT;
+		/* If the preferred domain is DGMA, set flags to VRAM because
+		 * KFD doesn't support allocating DGMA memory
+		 */
+		*flags = (bo->prefered_domains & (AMDGPU_GEM_DOMAIN_VRAM |
+				AMDGPU_GEM_DOMAIN_DGMA)) ?
+				ALLOC_MEM_FLAGS_VRAM : ALLOC_MEM_FLAGS_GTT;
 
 		if (bo->flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED)
 			*flags |= ALLOC_MEM_FLAGS_PUBLIC;

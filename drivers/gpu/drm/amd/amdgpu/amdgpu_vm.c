@@ -450,7 +450,6 @@ static int amdgpu_vm_grab_reserved_vmid_locked(struct amdgpu_vm *vm,
 		id->flushed_updates = fence_get(updates);
 	}
 	id->pd_gpu_addr = job->vm_pd_addr;
-	id->current_gpu_reset_count = atomic_read(&adev->gpu_reset_counter);
 	atomic64_set(&id->owner, vm->client_id);
 	job->vm_needs_flush = needs_flush;
 	if (needs_flush) {
@@ -598,7 +597,6 @@ int amdgpu_vm_grab_id(struct amdgpu_vm *vm, struct amdgpu_ring *ring,
 	id->pd_gpu_addr = job->vm_pd_addr;
 	fence_put(id->flushed_updates);
 	id->flushed_updates = fence_get(updates);
-	id->current_gpu_reset_count = atomic_read(&adev->gpu_reset_counter);
 	atomic64_set(&id->owner, vm->client_id);
 
 needs_flush:
@@ -700,6 +698,35 @@ static u64 amdgpu_vm_adjust_mc_addr(struct amdgpu_device *adev, u64 mc_addr)
 	return addr;
 }
 
+bool amdgpu_vm_need_pipeline_sync(struct amdgpu_ring *ring,
+				  struct amdgpu_job *job)
+{
+	struct amdgpu_device *adev = ring->adev;
+	unsigned vmhub = ring->funcs->vmhub;
+	struct amdgpu_vm_id_manager *id_mgr = &adev->vm_manager.id_mgr[vmhub];
+	struct amdgpu_vm_id *id;
+	bool gds_switch_needed;
+	bool vm_flush_needed = job->vm_needs_flush ||
+		amdgpu_vm_ring_has_compute_vm_bug(ring);
+
+	if (job->vm_id == 0)
+		return false;
+	id = &id_mgr->ids[job->vm_id];
+	gds_switch_needed = ring->funcs->emit_gds_switch && (
+		id->gds_base != job->gds_base ||
+		id->gds_size != job->gds_size ||
+		id->gws_base != job->gws_base ||
+		id->gws_size != job->gws_size ||
+		id->oa_base != job->oa_base ||
+		id->oa_size != job->oa_size);
+
+	if (amdgpu_vm_had_gpu_reset(adev, id))
+		return true;
+	if (!vm_flush_needed && !gds_switch_needed)
+		return false;
+	return true;
+}
+
 /**
  * amdgpu_vm_flush - hardware flush the vm
  *
@@ -738,15 +765,11 @@ int amdgpu_vm_flush(struct amdgpu_ring *ring, struct amdgpu_job *job)
 	if (ring->funcs->init_cond_exec)
 		patch_offset = amdgpu_ring_init_cond_exec(ring);
 
-	if (ring->funcs->emit_pipeline_sync)
-		amdgpu_ring_emit_pipeline_sync(ring);
-
 	if (ring->funcs->emit_vm_flush && vm_flush_needed) {
-		u64 pd_addr = amdgpu_vm_adjust_mc_addr(adev, job->vm_pd_addr);
 		struct fence *fence;
 
-		trace_amdgpu_vm_flush(ring, job->vm_id, pd_addr);
-		amdgpu_ring_emit_vm_flush(ring, job->vm_id, pd_addr);
+		trace_amdgpu_vm_flush(ring, job->vm_id, job->vm_pd_addr);
+		amdgpu_ring_emit_vm_flush(ring, job->vm_id, job->vm_pd_addr);
 
 		r = amdgpu_fence_emit(ring, &fence);
 		if (r)
@@ -755,10 +778,11 @@ int amdgpu_vm_flush(struct amdgpu_ring *ring, struct amdgpu_job *job)
 		mutex_lock(&id_mgr->lock);
 		fence_put(id->last_flush);
 		id->last_flush = fence;
+		id->current_gpu_reset_count = atomic_read(&adev->gpu_reset_counter);
 		mutex_unlock(&id_mgr->lock);
 	}
 
-	if (gds_switch_needed) {
+	if (ring->funcs->emit_gds_switch && gds_switch_needed) {
 		id->gds_base = job->gds_base;
 		id->gds_size = job->gds_size;
 		id->gws_base = job->gws_base;
@@ -796,12 +820,33 @@ void amdgpu_vm_reset_id(struct amdgpu_device *adev, unsigned vmhub,
 	struct amdgpu_vm_id_manager *id_mgr = &adev->vm_manager.id_mgr[vmhub];
 	struct amdgpu_vm_id *id = &id_mgr->ids[vmid];
 
+	atomic64_set(&id->owner, 0);
 	id->gds_base = 0;
 	id->gds_size = 0;
 	id->gws_base = 0;
 	id->gws_size = 0;
 	id->oa_base = 0;
 	id->oa_size = 0;
+}
+
+/**
+ * amdgpu_vm_reset_all_id - reset VMID to zero
+ *
+ * @adev: amdgpu device structure
+ *
+ * Reset VMID to force flush on next use
+ */
+void amdgpu_vm_reset_all_ids(struct amdgpu_device *adev)
+{
+	unsigned i, j;
+
+	for (i = 0; i < AMDGPU_MAX_VMHUBS; ++i) {
+		struct amdgpu_vm_id_manager *id_mgr =
+			&adev->vm_manager.id_mgr[i];
+
+		for (j = 1; j < id_mgr->num_ids; ++j)
+			amdgpu_vm_reset_id(adev, i, j);
+	}
 }
 
 /**
@@ -2468,7 +2513,6 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 	adev->vm_manager.fence_context = kcl_fence_context_alloc(AMDGPU_MAX_RINGS);
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i)
 		adev->vm_manager.seqno[i] = 0;
-
 
 	atomic_set(&adev->vm_manager.vm_pte_next_ring, 0);
 	atomic64_set(&adev->vm_manager.client_counter, 0);

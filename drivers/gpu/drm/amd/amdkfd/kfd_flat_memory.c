@@ -367,9 +367,9 @@ int kfd_init_apertures(struct kfd_process *process)
 		}
 
 		pdd = kfd_create_process_device_data(dev, process);
-		if (pdd == NULL) {
+		if (!pdd) {
 			pr_err("Failed to create process device data\n");
-			goto err;
+			return -1;
 		}
 		/*
 		 * For 64 bit process aperture will be statically reserved in
@@ -396,7 +396,7 @@ int kfd_init_apertures(struct kfd_process *process)
 				break;
 			default:
 				pr_err("Unknown chip in kfd_init_apertures\n");
-				goto err;
+				return -1;
 			}
 
 			if (KFD_IS_DGPU(dev->device_info->asic_family)) {
@@ -418,39 +418,11 @@ int kfd_init_apertures(struct kfd_process *process)
 	}
 
 	return 0;
-
-err:
-	return -1;
 }
 
 void kfd_flush_tlb(struct kfd_dev *dev, uint32_t pasid)
 {
-	uint8_t vmid;
-	int first_vmid_to_scan = 8;
-	int last_vmid_to_scan = 15;
-
 	const struct kfd2kgd_calls *f2g = dev->kfd2kgd;
-	/* Scan all registers in the range ATC_VMID8_PASID_MAPPING .. ATC_VMID15_PASID_MAPPING
-	 * to check which VMID the current process is mapped to
-	 * and flush TLB for this VMID if found*/
-	if (dev->device_info->asic_family >= CHIP_VEGA10)
-		spin_lock(&dev->tlb_invalidation_lock);
 
-	for (vmid = first_vmid_to_scan; vmid <= last_vmid_to_scan; vmid++) {
-		if (f2g->get_atc_vmid_pasid_mapping_valid(
-			dev->kgd, vmid)) {
-			if (f2g->get_atc_vmid_pasid_mapping_pasid(
-				dev->kgd, vmid) == pasid) {
-				dev_dbg(kfd_device,
-					"flushing TLB of vmid %u", vmid);
-				f2g->write_vmid_invalidate_request(
-					dev->kgd, vmid);
-				break;
-			}
-		}
-	}
-
-	if (dev->device_info->asic_family >= CHIP_VEGA10)
-		spin_unlock(&dev->tlb_invalidation_lock);
-
+	f2g->invalidate_tlbs(dev->kgd, pasid);
 }

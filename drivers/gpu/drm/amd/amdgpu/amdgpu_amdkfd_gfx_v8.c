@@ -515,11 +515,15 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 		WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_WPTR,
 		       m->sdmax_rlcx_rb_rptr);
 
-	WREG32(sdma_base_addr + mmSDMA0_RLC0_VIRTUAL_ADDR, m->sdmax_rlcx_virtual_addr);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_VIRTUAL_ADDR,
+				m->sdmax_rlcx_virtual_addr);
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_BASE, m->sdmax_rlcx_rb_base);
-	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_BASE_HI, m->sdmax_rlcx_rb_base_hi);
-	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR_ADDR_LO, m->sdmax_rlcx_rb_rptr_addr_lo);
-	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR_ADDR_HI, m->sdmax_rlcx_rb_rptr_addr_hi);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_BASE_HI,
+			m->sdmax_rlcx_rb_base_hi);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR_ADDR_LO,
+			m->sdmax_rlcx_rb_rptr_addr_lo);
+	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_RPTR_ADDR_HI,
+			m->sdmax_rlcx_rb_rptr_addr_hi);
 
 	data = REG_SET_FIELD(m->sdmax_rlcx_rb_cntl, SDMA0_RLC0_RB_CNTL,
 			     RB_ENABLE, 1);
@@ -658,7 +662,7 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd,
 			pr_debug("IQ timer is active\n");
 		} else
 			break;
-	loop:
+loop:
 		if (!retry) {
 			pr_err("CP HQD IQ timer status time out\n");
 			break;
@@ -764,6 +768,13 @@ static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
 	WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);
 }
 
+/*
+ * FIXME: Poliars test failed with this package, FIJI works fine
+ * From the CP spec it does not official support the invalidation
+ * with the specified pasid in the package,  so disable it for V8
+ *
+ */
+#ifdef V8_SUPPORT_IT_OFFICIAL
 static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
 {
 	signed long r;
@@ -771,7 +782,7 @@ static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
 	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
 	struct amdgpu_kiq *kiq = &adev->gfx.kiq;
 
-	mutex_lock(&kiq->ring_mutex);
+	mutex_lock(&adev->gfx.kiq.ring_mutex);
 	amdgpu_ring_alloc(ring, 12); /* fence + invalidate_tlbs package*/
 	amdgpu_ring_write(ring, PACKET3(PACKET3_INVALIDATE_TLBS, 0));
 	amdgpu_ring_write(ring,
@@ -779,7 +790,7 @@ static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
 			PACKET3_INVALIDATE_TLBS_PASID(pasid));
 	amdgpu_fence_emit(ring, &f);
 	amdgpu_ring_commit(ring);
-	mutex_unlock(&kiq->ring_mutex);
+	mutex_unlock(&adev->gfx.kiq.ring_mutex);
 
 	r = fence_wait(f, false);
 	if (r)
@@ -788,15 +799,18 @@ static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
 
 	return r;
 }
-
+#endif
 static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
 	int vmid;
+
+#ifdef V8_SUPPORT_IT_OFFICIAL
 	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
 
 	if (ring->ready)
 		return invalidate_tlbs_with_kiq(adev, pasid);
+#endif
 
 	for (vmid = 0; vmid < 16; vmid++) {
 		if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid))
@@ -828,8 +842,9 @@ static int kgd_address_watch_disable(struct kgd_dev *kgd)
 
 	/* Turning off this address until we set all the registers */
 	for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
-		WREG32(watchRegs[i * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_CNTL],
-			cntl.u32All);
+		WREG32(watchRegs[i * ADDRESS_WATCH_REG_MAX
+				+ ADDRESS_WATCH_REG_CNTL],
+				cntl.u32All);
 
 	return 0;
 }
@@ -847,19 +862,23 @@ static int kgd_address_watch_execute(struct kgd_dev *kgd,
 
 	/* Turning off this watch point until we set all the registers */
 	cntl.bitfields.valid = 0;
-	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_CNTL],
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX
+			+ ADDRESS_WATCH_REG_CNTL],
 			cntl.u32All);
 
-	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_ADDR_HI],
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX
+			+ ADDRESS_WATCH_REG_ADDR_HI],
 			addr_hi);
 
-	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_ADDR_LO],
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX
+			+ ADDRESS_WATCH_REG_ADDR_LO],
 			addr_lo);
 
 	/* Enable the watch point */
 	cntl.bitfields.valid = 1;
 
-	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_CNTL],
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX
+			+ ADDRESS_WATCH_REG_CNTL],
 			cntl.u32All);
 
 	return 0;
@@ -928,47 +947,45 @@ static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type)
 	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
 	const union amdgpu_firmware_header *hdr;
 
-	BUG_ON(kgd == NULL);
-
 	switch (type) {
 	case KGD_ENGINE_PFP:
 		hdr = (const union amdgpu_firmware_header *)
-							adev->gfx.pfp_fw->data;
+						adev->gfx.pfp_fw->data;
 		break;
 
 	case KGD_ENGINE_ME:
 		hdr = (const union amdgpu_firmware_header *)
-							adev->gfx.me_fw->data;
+						adev->gfx.me_fw->data;
 		break;
 
 	case KGD_ENGINE_CE:
 		hdr = (const union amdgpu_firmware_header *)
-							adev->gfx.ce_fw->data;
+						adev->gfx.ce_fw->data;
 		break;
 
 	case KGD_ENGINE_MEC1:
 		hdr = (const union amdgpu_firmware_header *)
-							adev->gfx.mec_fw->data;
+						adev->gfx.mec_fw->data;
 		break;
 
 	case KGD_ENGINE_MEC2:
 		hdr = (const union amdgpu_firmware_header *)
-							adev->gfx.mec2_fw->data;
+						adev->gfx.mec2_fw->data;
 		break;
 
 	case KGD_ENGINE_RLC:
 		hdr = (const union amdgpu_firmware_header *)
-							adev->gfx.rlc_fw->data;
+						adev->gfx.rlc_fw->data;
 		break;
 
 	case KGD_ENGINE_SDMA1:
 		hdr = (const union amdgpu_firmware_header *)
-							adev->sdma.instance[0].fw->data;
+						adev->sdma.instance[0].fw->data;
 		break;
 
 	case KGD_ENGINE_SDMA2:
 		hdr = (const union amdgpu_firmware_header *)
-							adev->sdma.instance[1].fw->data;
+						adev->sdma.instance[1].fw->data;
 		break;
 
 	default:
@@ -985,7 +1002,7 @@ static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type)
 static void set_num_of_requests(struct kgd_dev *kgd,
 			uint8_t num_of_requests)
 {
-	pr_debug("in %s this is a stub\n", __func__);
+	pr_debug("This is a stub\n");
 }
 
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,

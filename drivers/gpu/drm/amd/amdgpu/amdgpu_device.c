@@ -480,9 +480,8 @@ void amdgpu_doorbell_get_kfd_info(struct amdgpu_device *adev,
 
 /*
  * amdgpu_wb_*()
- * Writeback is the the method by which the the GPU updates special pages
- * in memory with the status of certain GPU events (fences, ring pointers,
- * etc.).
+ * Writeback is the method by which the GPU updates special pages in memory
+ * with the status of certain GPU events (fences, ring pointers,etc.).
  */
 
 /**
@@ -508,7 +507,7 @@ static void amdgpu_wb_fini(struct amdgpu_device *adev)
  *
  * @adev: amdgpu_device pointer
  *
- * Disables Writeback and frees the Writeback memory (all asics).
+ * Initializes writeback and allocates writeback memory (all asics).
  * Used at driver startup.
  * Returns 0 on success or an -error on failure.
  */
@@ -616,7 +615,7 @@ void amdgpu_wb_free_64bit(struct amdgpu_device *adev, u32 wb)
  * @mc: memory controller structure holding memory informations
  * @base: base address at which to put VRAM
  *
- * Function will place try to place VRAM at base address provided
+ * Function will try to place VRAM at base address provided
  * as parameter (which is so far either PCI aperture address or
  * for IGP TOM base address).
  *
@@ -638,7 +637,7 @@ void amdgpu_wb_free_64bit(struct amdgpu_device *adev, u32 wb)
  * ones)
  *
  * Note: IGP TOM addr should be the same as the aperture addr, we don't
- * explicitly check for that thought.
+ * explicitly check for that though.
  *
  * FIXME: when reducing VRAM size align new size on power of 2.
  */
@@ -1751,7 +1750,7 @@ static int amdgpu_sriov_reinit_early(struct amdgpu_device *adev)
 		AMD_IP_BLOCK_TYPE_IH,
 	};
 
-	for (i = 0; i < sizeof(ip_order)/sizeof(ip_order[0]); i++) {
+	for (i = 0; i < ARRAY_SIZE(ip_order); i++) {
 		int j;
 		struct amdgpu_ip_block *block;
 
@@ -1782,7 +1781,7 @@ static int amdgpu_sriov_reinit_late(struct amdgpu_device *adev)
 		AMD_IP_BLOCK_TYPE_VCE,
 	};
 
-	for (i = 0; i < sizeof(ip_order)/sizeof(ip_order[0]); i++) {
+	for (i = 0; i < ARRAY_SIZE(ip_order); i++) {
 		int j;
 		struct amdgpu_ip_block *block;
 
@@ -1801,12 +1800,39 @@ static int amdgpu_sriov_reinit_late(struct amdgpu_device *adev)
 	return 0;
 }
 
-static int amdgpu_resume(struct amdgpu_device *adev)
+static int amdgpu_resume_phase1(struct amdgpu_device *adev)
 {
 	int i, r;
 
 	for (i = 0; i < adev->num_ip_blocks; i++) {
 		if (!adev->ip_blocks[i].status.valid)
+			continue;
+		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_COMMON ||
+				adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_GMC ||
+				adev->ip_blocks[i].version->type ==
+				AMD_IP_BLOCK_TYPE_IH) {
+			r = adev->ip_blocks[i].version->funcs->resume(adev);
+			if (r) {
+				DRM_ERROR("resume of IP block <%s> failed %d\n",
+					  adev->ip_blocks[i].version->funcs->name, r);
+				return r;
+			}
+		}
+	}
+
+	return 0;
+}
+
+static int amdgpu_resume_phase2(struct amdgpu_device *adev)
+{
+	int i, r;
+
+	for (i = 0; i < adev->num_ip_blocks; i++) {
+		if (!adev->ip_blocks[i].status.valid)
+			continue;
+		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_COMMON ||
+				adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_GMC ||
+				adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_IH )
 			continue;
 		r = adev->ip_blocks[i].version->funcs->resume(adev);
 		if (r) {
@@ -1817,6 +1843,18 @@ static int amdgpu_resume(struct amdgpu_device *adev)
 	}
 
 	return 0;
+}
+
+static int amdgpu_resume(struct amdgpu_device *adev)
+{
+	int r;
+
+	r = amdgpu_resume_phase1(adev);
+	if (r)
+		return r;
+	r = amdgpu_resume_phase2(adev);
+
+	return r;
 }
 
 static void amdgpu_device_detect_sriov_bios(struct amdgpu_device *adev)
@@ -2143,7 +2181,8 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 
 	DRM_INFO("amdgpu: finishing device.\n");
 	adev->shutdown = true;
-	drm_crtc_force_disable_all(adev->ddev);
+	if (adev->mode_info.mode_config_initialized)
+		drm_crtc_force_disable_all(adev->ddev);
 	/* evict vram memory */
 	amdgpu_bo_evict_vram(adev);
 	amdgpu_ib_pool_fini(adev);
@@ -2558,16 +2597,15 @@ err:
  * amdgpu_sriov_gpu_reset - reset the asic
  *
  * @adev: amdgpu device pointer
- * @voluntary: if this reset is requested by guest.
- *             (true means by guest and false means by HYPERVISOR )
+ * @job: which job trigger hang
  *
  * Attempt the reset the GPU if it has hung (all asics).
  * for SRIOV case.
  * Returns 0 for success or an error on failure.
  */
-int amdgpu_sriov_gpu_reset(struct amdgpu_device *adev, bool voluntary)
+int amdgpu_sriov_gpu_reset(struct amdgpu_device *adev, struct amdgpu_job *job)
 {
-	int i, r = 0;
+	int i, j, r = 0;
 	int resched;
 	struct amdgpu_bo *bo, *tmp;
 	struct amdgpu_ring *ring;
@@ -2580,22 +2618,39 @@ int amdgpu_sriov_gpu_reset(struct amdgpu_device *adev, bool voluntary)
 	/* block TTM */
 	resched = ttm_bo_lock_delayed_workqueue(&adev->mman.bdev);
 
-	/* block scheduler */
-	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
-		ring = adev->rings[i];
+	/* we start from the ring trigger GPU hang */
+	j = job ? job->ring->idx : 0;
 
+	/* block scheduler */
+	for (i = j; i < j + AMDGPU_MAX_RINGS; ++i) {
+		ring = adev->rings[i % AMDGPU_MAX_RINGS];
 		if (!ring || !ring->sched.thread)
 			continue;
 
 		kcl_kthread_park(ring->sched.thread);
+
+		if (job && j != i)
+			continue;
+
+		/* here give the last chance to check if job removed from mirror-list
+		 * since we already pay some time on kthread_park */
+		if (job && list_empty(&job->base.node)) {
+			kcl_kthread_unpark(ring->sched.thread);
+			goto give_up_reset;
+		}
+
+		if (amd_sched_invalidate_job(&job->base, amdgpu_job_hang_limit))
+			amd_sched_job_kickout(&job->base);
+
+		/* only do job_reset on the hang ring if @job not NULL */
 		amd_sched_hw_job_reset(&ring->sched);
+
+		/* after all hw jobs are reset, hw fence is meaningless, so force_completion */
+		amdgpu_fence_driver_force_completion_ring(ring);
 	}
 
-	/* after all hw jobs are reset, hw fence is meaningless, so force_completion */
-	amdgpu_fence_driver_force_completion(adev);
-
 	/* request to take full control of GPU before re-initialization  */
-	if (voluntary)
+	if (job)
 		amdgpu_virt_reset_gpu(adev);
 	else
 		amdgpu_virt_request_full_gpu(adev, true);
@@ -2645,20 +2700,28 @@ int amdgpu_sriov_gpu_reset(struct amdgpu_device *adev, bool voluntary)
 	}
 	fence_put(fence);
 
-	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
-		struct amdgpu_ring *ring = adev->rings[i];
+	for (i = j; i < j + AMDGPU_MAX_RINGS; ++i) {
+		ring = adev->rings[i % AMDGPU_MAX_RINGS];
 		if (!ring || !ring->sched.thread)
 			continue;
+
+		if (job && j != i) {
+			kcl_kthread_unpark(ring->sched.thread);
+			continue;
+		}
 
 		amd_sched_job_recovery(&ring->sched);
 		kcl_kthread_unpark(ring->sched.thread);
 	}
 
 	drm_helper_resume_force_mode(adev->ddev);
+give_up_reset:
 	ttm_bo_unlock_delayed_workqueue(&adev->mman.bdev, resched);
 	if (r) {
 		/* bad news, how to tell it to userspace ? */
 		dev_info(adev->dev, "GPU reset failed\n");
+	} else {
+		dev_info(adev->dev, "GPU reset successed!\n");
 	}
 
 	adev->gfx.in_reset = false;
@@ -2680,9 +2743,6 @@ int amdgpu_gpu_reset(struct amdgpu_device *adev)
 	int i, r;
 	int resched;
 	bool need_full_reset;
-
-	if (amdgpu_sriov_vf(adev))
-		return amdgpu_sriov_gpu_reset(adev, true);
 
 	if (!amdgpu_check_soft_reset(adev)) {
 		DRM_INFO("No hardware hang detected. Did some blocks stall?\n");
@@ -2745,16 +2805,20 @@ retry:
 
 		if (!r) {
 			dev_info(adev->dev, "GPU reset succeeded, trying to resume\n");
-			r = amdgpu_resume(adev);
-		}
-	}
-	if (!r) {
-		amdgpu_irq_gpu_reset_resume_helper(adev);
-		if (need_full_reset && amdgpu_need_backup(adev)) {
+			r = amdgpu_resume_phase1(adev);
+			if (r)
+				goto out;
 			r = amdgpu_ttm_recover_gart(adev);
 			if (r)
-				DRM_ERROR("gart recovery failed!!!\n");
+				goto out;
+			r = amdgpu_resume_phase2(adev);
+			if (r)
+				goto out;
 		}
+	}
+out:
+	if (!r) {
+		amdgpu_irq_gpu_reset_resume_helper(adev);
 		r = amdgpu_ib_ring_tests(adev);
 		if (r) {
 			dev_err(adev->dev, "ib ring test failed (%d).\n", r);
@@ -2820,10 +2884,11 @@ retry:
 		drm_helper_resume_force_mode(adev->ddev);
 
 	ttm_bo_unlock_delayed_workqueue(&adev->mman.bdev, resched);
-	if (r) {
+	if (r)
 		/* bad news, how to tell it to userspace ? */
 		dev_info(adev->dev, "GPU reset failed\n");
-	}
+	else
+		dev_info(adev->dev, "GPU reset successed!\n");
 
 	return r;
 }

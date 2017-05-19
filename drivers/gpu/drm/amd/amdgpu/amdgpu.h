@@ -114,6 +114,7 @@ extern int amdgpu_prim_buf_per_se;
 extern int amdgpu_pos_buf_per_se;
 extern int amdgpu_cntl_sb_buf_per_se;
 extern int amdgpu_param_buf_per_se;
+extern int amdgpu_job_hang_limit;
 
 #define AMDGPU_DEFAULT_GTT_SIZE_MB		3072ULL /* 3GB by default */
 #define AMDGPU_WAIT_IDLE_TIMEOUT_IN_MS	        3000
@@ -575,7 +576,7 @@ int amdgpu_gart_table_vram_pin(struct amdgpu_device *adev);
 void amdgpu_gart_table_vram_unpin(struct amdgpu_device *adev);
 int amdgpu_gart_init(struct amdgpu_device *adev);
 void amdgpu_gart_fini(struct amdgpu_device *adev);
-void amdgpu_gart_unbind(struct amdgpu_device *adev, uint64_t offset,
+int amdgpu_gart_unbind(struct amdgpu_device *adev, uint64_t offset,
 			int pages);
 int amdgpu_gart_bind(struct amdgpu_device *adev, uint64_t offset,
 		     int pages, struct page **pagelist,
@@ -1002,7 +1003,6 @@ struct amdgpu_gfx_config {
 	unsigned num_rbs;
 	unsigned gs_vgt_table_depth;
 	unsigned gs_prim_buffer_depth;
-	unsigned max_gs_waves_per_vgt;
 
 	uint32_t tile_mode_array[32];
 	uint32_t macrotile_mode_array[16];
@@ -1042,10 +1042,10 @@ struct amdgpu_ngg_buf {
 };
 
 enum {
-	PRIM = 0,
-	POS,
-	CNTL,
-	PARAM,
+	NGG_PRIM = 0,
+	NGG_POS,
+	NGG_CNTL,
+	NGG_PARAM,
 	NGG_BUF_MAX
 };
 
@@ -1154,7 +1154,6 @@ struct amdgpu_cs_parser {
 #define AMDGPU_PREAMBLE_IB_PRESENT          (1 << 0) /* bit set means command submit involves a preamble IB */
 #define AMDGPU_PREAMBLE_IB_PRESENT_FIRST    (1 << 1) /* bit set means preamble IB is first presented in belonging context */
 #define AMDGPU_HAVE_CTX_SWITCH              (1 << 2) /* bit set means context switch occured */
-#define AMDGPU_VM_DOMAIN                    (1 << 3) /* bit set means in virtual memory context */
 
 struct amdgpu_job {
 	struct amd_sched_job    base;
@@ -1162,6 +1161,8 @@ struct amdgpu_job {
 	struct amdgpu_vm	*vm;
 	struct amdgpu_ring	*ring;
 	struct amdgpu_sync	sync;
+	struct amdgpu_sync	dep_sync;
+	struct amdgpu_sync	sched_sync;
 	struct amdgpu_ib	*ibs;
 	struct fence		*fence; /* the hw fence */
 	uint32_t		preamble_status;
@@ -1825,30 +1826,31 @@ static inline void amdgpu_ring_write_multiple(struct amdgpu_ring *ring, void *sr
 	unsigned occupied, chunk1, chunk2;
 	void *dst;
 
-	if (ring->count_dw < count_dw) {
+	if (unlikely(ring->count_dw < count_dw)) {
 		DRM_ERROR("amdgpu: writing more dwords to the ring than expected!\n");
-	} else {
-		occupied = ring->wptr & ring->buf_mask;
-		dst = (void *)&ring->ring[occupied];
-		chunk1 = ring->buf_mask + 1 - occupied;
-		chunk1 = (chunk1 >= count_dw) ? count_dw: chunk1;
-		chunk2 = count_dw - chunk1;
-		chunk1 <<= 2;
-		chunk2 <<= 2;
-
-		if (chunk1)
-			memcpy(dst, src, chunk1);
-
-		if (chunk2) {
-			src += chunk1;
-			dst = (void *)ring->ring;
-			memcpy(dst, src, chunk2);
-		}
-
-		ring->wptr += count_dw;
-		ring->wptr &= ring->ptr_mask;
-		ring->count_dw -= count_dw;
+		return;
 	}
+
+	occupied = ring->wptr & ring->buf_mask;
+	dst = (void *)&ring->ring[occupied];
+	chunk1 = ring->buf_mask + 1 - occupied;
+	chunk1 = (chunk1 >= count_dw) ? count_dw: chunk1;
+	chunk2 = count_dw - chunk1;
+	chunk1 <<= 2;
+	chunk2 <<= 2;
+
+	if (chunk1)
+		memcpy(dst, src, chunk1);
+
+	if (chunk2) {
+		src += chunk1;
+		dst = (void *)ring->ring;
+		memcpy(dst, src, chunk2);
+	}
+
+	ring->wptr += count_dw;
+	ring->wptr &= ring->ptr_mask;
+	ring->count_dw -= count_dw;
 }
 
 static inline struct amdgpu_sdma_instance *
@@ -1906,6 +1908,7 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 #define amdgpu_ring_emit_cntxcntl(r, d) (r)->funcs->emit_cntxcntl((r), (d))
 #define amdgpu_ring_emit_rreg(r, d) (r)->funcs->emit_rreg((r), (d))
 #define amdgpu_ring_emit_wreg(r, d, v) (r)->funcs->emit_wreg((r), (d), (v))
+#define amdgpu_ring_emit_tmz(r, b) (r)->funcs->emit_tmz((r), (b))
 #define amdgpu_ring_pad_ib(r, ib) ((r)->funcs->pad_ib((r), (ib)))
 #define amdgpu_ring_init_cond_exec(r) (r)->funcs->init_cond_exec((r))
 #define amdgpu_ring_patch_cond_exec(r,o) (r)->funcs->patch_cond_exec((r),(o))

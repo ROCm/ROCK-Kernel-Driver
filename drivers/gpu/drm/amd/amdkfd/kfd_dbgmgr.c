@@ -37,16 +37,12 @@
 
 static DEFINE_MUTEX(kfd_dbgmgr_mutex);
 
-struct mutex *
-get_dbgmgr_mutex(void)
+struct mutex *get_dbgmgr_mutex(void)
 {
 	return &kfd_dbgmgr_mutex;
 }
 
-/*===========================================================================*/
-
-static void
-kfd_dbgmgr_uninitialize(struct kfd_dbgmgr *pmgr)
+static void kfd_dbgmgr_uninitialize(struct kfd_dbgmgr *pmgr)
 {
 	kfree(pmgr->dbgdev);
 	pmgr->dbgdev = NULL;
@@ -54,33 +50,23 @@ kfd_dbgmgr_uninitialize(struct kfd_dbgmgr *pmgr)
 	pmgr->dev = NULL;
 }
 
-/*===========================================================================*/
-
-void
-kfd_dbgmgr_destroy(struct kfd_dbgmgr *pmgr)
+void kfd_dbgmgr_destroy(struct kfd_dbgmgr *pmgr)
 {
-	if (pmgr != NULL) {
+	if (pmgr) {
 		kfd_dbgmgr_uninitialize(pmgr);
 		kfree(pmgr);
 		pmgr = NULL;
 	}
 }
 
-/*===========================================================================*/
-
-bool
-kfd_dbgmgr_create(struct kfd_dbgmgr **ppmgr, struct kfd_dev *pdev)
+bool kfd_dbgmgr_create(struct kfd_dbgmgr **ppmgr, struct kfd_dev *pdev)
 {
-	DBGDEV_TYPE  type = DBGDEV_TYPE_DIQ;
+	enum DBGDEV_TYPE type = DBGDEV_TYPE_DIQ;
 	struct kfd_dbgmgr *new_buff;
 
-	BUG_ON(pdev == NULL);
-	BUG_ON(!pdev->init_complete);
-
 	new_buff = kfd_alloc_struct(new_buff);
-	if (!new_buff)
-	{
-		dev_err(NULL, "Error! kfd: In func %s >> failed to allocate dbgmgr instance\n", __func__);
+	if (!new_buff) {
+		pr_err("Failed to allocate dbgmgr instance\n");
 		return false;
 	}
 
@@ -88,7 +74,7 @@ kfd_dbgmgr_create(struct kfd_dbgmgr **ppmgr, struct kfd_dev *pdev)
 	new_buff->dev = pdev;
 	new_buff->dbgdev = kfd_alloc_struct(new_buff->dbgdev);
 	if (!new_buff->dbgdev) {
-		dev_err(NULL, "Error! kfd: In func %s >> failed to allocate dbgdev\n", __func__);
+		pr_err("Failed to allocate dbgdev\n");
 		kfree(new_buff);
 		return false;
 	}
@@ -103,200 +89,140 @@ kfd_dbgmgr_create(struct kfd_dbgmgr **ppmgr, struct kfd_dev *pdev)
 	return true;
 }
 
-/*===========================================================================*/
-
-long
-kfd_dbgmgr_register(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
+long kfd_dbgmgr_register(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
 {
-	long status = 0;
+	if (!pmgr || !pmgr->dev || !pmgr->dbgdev)
+		return -EINVAL;
 
-	do {
+	if (pmgr->pasid != 0) {
+		/*  HW debugger is already active.  */
+		return -EBUSY;
+	}
 
-		if ((pmgr == NULL) || (pmgr->dev == NULL) || (pmgr->dbgdev == NULL)) {
-			dev_info(NULL, "Error! kfd: In func %s >> Illegal pointers\n", __func__);
-			/*  Invalid Pointer.  */
-			status = -EINVAL;
-			break;
-		}
-		if (pmgr->pasid != 0) {
-			/*  HW debugger is already active.  */
-			status = -EBUSY;
-			break;
-		}
+	/* remember pasid */
 
-		/* remember pasid */
+	pmgr->pasid = p->pasid;
 
-		pmgr->pasid = p->pasid;
+	/* provide the pqm for diq generation */
 
-		/* provide the pqm for diq generation */
+	pmgr->dbgdev->pqm = &p->pqm;
 
-		pmgr->dbgdev->pqm = &p->pqm;
+	/* activate the actual registering */
+	/* todo: you should lock with the process mutex here */
+	pmgr->dbgdev->dbgdev_register(pmgr->dbgdev);
+	/* todo: you should unlock with the process mutex here  */
 
-		/* activate the actual registering */
-		/* todo: you should lock with the process mutex here */
-		pmgr->dbgdev->dbgdev_register(pmgr->dbgdev);
-		/* todo: you should unlock with the process mutex here  */
-
-	} while (false);
-
-	return status;
+	return 0;
 }
 
-/* ========================================================================== */
-
-long
-kfd_dbgmgr_unregister(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
+long kfd_dbgmgr_unregister(struct kfd_dbgmgr *pmgr, struct kfd_process *p)
 {
 
-	long status = 0;
+	if (!pmgr || !pmgr->dev || !pmgr->dbgdev || !p)
+		return -EINVAL;
 
-	do {
+	if (pmgr->pasid != p->pasid) {
+		/* Is the requests coming from the already registered
+		 * process?
+		 */
+		return -EINVAL;
+	}
 
-		if ((pmgr == NULL) || (pmgr->dev == NULL)
-				|| (pmgr->dbgdev == NULL) || (p == NULL)) {
-			dev_info(NULL, "Error! kfd: In func %s >> Illegal pointers\n", __func__);
-			/* Invalid Pointer */
-			status = -EINVAL;
-			break;
-		}
-		if (pmgr->pasid != p->pasid) {
-			/* Is the requests coming from the already registered process? */
-			status = -EINVAL;
-			break;
-		}
+	/* todo: you should lock with the process mutex here */
 
-		/* todo: you should lock with the process mutex here */
+	pmgr->dbgdev->dbgdev_unregister(pmgr->dbgdev);
 
-		pmgr->dbgdev->dbgdev_unregister(pmgr->dbgdev);
+	/* todo: you should unlock with the process mutex here  */
 
-		/* todo: you should unlock with the process mutex here  */
+	pmgr->pasid = 0;
 
-		pmgr->pasid = 0;
-
-	} while (false);
-
-	return status;
+	return 0;
 }
 
-/* =========================================================================== */
-
-long
-kfd_dbgmgr_wave_control(struct kfd_dbgmgr *pmgr, struct dbg_wave_control_info *wac_info)
+long kfd_dbgmgr_wave_control(struct kfd_dbgmgr *pmgr,
+		struct dbg_wave_control_info *wac_info)
 {
-	long status = 0;
+	if (!pmgr || !pmgr->dev || !pmgr->dbgdev || !wac_info ||
+			!wac_info->process)
+		return -EINVAL;
 
-	dev_info(NULL, "kfd: In func %s\n", __func__);
+	/* Is the requests coming from the already registered
+	 * process?
+	 */
+	if (pmgr->pasid != wac_info->process->pasid) {
+		/* HW debugger support was not registered for
+		 * requester process
+		 */
+		return -EINVAL;
+	}
 
-	do {
-
-		if ((pmgr == NULL) || (pmgr->dev == NULL) || (pmgr->dbgdev == NULL) || (wac_info == NULL)
-		    || (wac_info->process == NULL)) {
-			/* Invalid Pointer */
-			dev_info(NULL, "Error! kfd: In func %s >> Illegal pointers\n", __func__);
-			status = -EINVAL;
-			break;
-		}
-		/* Is the requests coming from the already registered process? */
-		if (pmgr->pasid != wac_info->process->pasid) {
-			/* HW debugger support was not registered for requester process */
-			status = -EINVAL;
-			break;
-		}
-
-		status = (long) pmgr->dbgdev->dbgdev_wave_control(pmgr->dbgdev, wac_info);
-
-	} while (false);
-
-	return status;
-
+	return (long) pmgr->dbgdev->dbgdev_wave_control(pmgr->dbgdev,
+							  wac_info);
 }
 
-/* =========================================================================== */
-
-long
-kfd_dbgmgr_address_watch(struct kfd_dbgmgr *pmgr, struct dbg_address_watch_info *adw_info)
+long kfd_dbgmgr_address_watch(struct kfd_dbgmgr *pmgr,
+		struct dbg_address_watch_info *adw_info)
 {
-	long status = 0;
+	if (!pmgr || !pmgr->dev || !pmgr->dbgdev || !adw_info ||
+			!adw_info->process)
+		return -EINVAL;
 
-	dev_info(NULL, "kfd: In func %s\n", __func__);
+	/* Is the requests coming from the already registered
+	 * process?
+	 */
+	if (pmgr->pasid != adw_info->process->pasid) {
+		/* HW debugger support was not registered for
+		 * requester process
+		 */
+		return -EINVAL;
+	}
 
-	do {
-
-		if ((pmgr == NULL) || (pmgr->dev == NULL) || (pmgr->dbgdev == NULL) || (adw_info == NULL)
-		    || (adw_info->process == NULL)) {
-			/* Invalid Pointer */
-			dev_info(NULL, "Error! kfd: In func %s >> Illegal pointers\n", __func__);
-			status = -EINVAL;
-			break;
-		}
-		/* Is the requests coming from the already registered process? */
-		if (pmgr->pasid != adw_info->process->pasid) {
-			/* HW debugger support was not registered for requester process */
-			status = -EINVAL;
-			break;
-		}
-
-		status = (long) pmgr->dbgdev->dbgdev_address_watch(pmgr->dbgdev, adw_info);
-
-	} while (false);
-
-	return status;
-
+	return (long) pmgr->dbgdev->dbgdev_address_watch(pmgr->dbgdev,
+							  adw_info);
 }
 
 
-/* =========================================================================== */
 /*
  * Handle abnormal process termination
  * if we are in the midst of a debug session, we should kill all pending waves
  * of the debugged process and unregister the process from the Debugger.
  */
-long
-kfd_dbgmgr_abnormal_termination(struct kfd_dbgmgr *pmgr, struct kfd_process *process)
+long kfd_dbgmgr_abnormal_termination(struct kfd_dbgmgr *pmgr,
+		struct kfd_process *process)
 {
 	long status = 0;
 	struct dbg_wave_control_info wac_info;
 
-	dev_info(NULL, "kfd: In func %s\n", __func__);
+	if (!pmgr || !pmgr->dev || !pmgr->dbgdev)
+		return -EINVAL;
 
-	do {
+	/* first, we kill all the wavefronts of this process */
+	wac_info.process = process;
+	wac_info.mode = HSA_DBG_WAVEMODE_BROADCAST_PROCESS;
+	wac_info.operand = HSA_DBG_WAVEOP_KILL;
 
-		if ((pmgr == NULL) || (pmgr->dev == NULL) || (pmgr->dbgdev == NULL)) {
-			/* Invalid Pointer */
-			dev_info(NULL, "Error! kfd: In func %s >> Illegal pointers\n", __func__);
-			status = -EINVAL;
-			break;
-		}
-		/* first, we kill all the wavefronts of this process */
+	/* not used for KILL */
+	wac_info.trapId  = 0x0;
+	wac_info.dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.Value = 0;
+	wac_info.dbgWave_msg.MemoryVA = NULL;
 
-		wac_info.process = process;
-		wac_info.mode = HSA_DBG_WAVEMODE_BROADCAST_PROCESS;
-		wac_info.operand = HSA_DBG_WAVEOP_KILL;
-		wac_info.trapId  = 0x0; /* not used for the KILL */
-		wac_info.dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.Value = 0; /* not used for kill */
-		wac_info.dbgWave_msg.MemoryVA = NULL; /* not used for kill  */
+	status = (long) pmgr->dbgdev->dbgdev_wave_control(pmgr->dbgdev,
+							  &wac_info);
 
-		status = (long) pmgr->dbgdev->dbgdev_wave_control(pmgr->dbgdev, &wac_info);
-
-		if (status != 0) {
-			dev_info(NULL, "Error! kfd: In func %s: wave control failed, status is: %ld\n", __func__, status);
-			break;
-		}
-		if (pmgr->pasid == wac_info.process->pasid) {
-				/* if terminated process was registered for debug, then unregister it  */
-				status = kfd_dbgmgr_unregister(pmgr, process);
-				pmgr->pasid = 0;
-		}
-		if (status != 0)
-			dev_info(NULL,
-					"Error! kfd: In func %s: unregister failed, status is: %ld debugger can not be reused\n",
-					__func__, status);
-
-	} while (false);
+	if (status != 0) {
+		pr_err("wave control failed, status is: %ld\n", status);
+		return status;
+	}
+	if (pmgr->pasid == wac_info.process->pasid) {
+		/* if terminated process was registered for debug,
+		 * then unregister it
+		 */
+		status = kfd_dbgmgr_unregister(pmgr, process);
+		pmgr->pasid = 0;
+	}
+	if (status != 0)
+		pr_err("unregister failed, status is: %ld debugger can not be reused\n",
+				status);
 
 	return status;
-
 }
-
-
-/*///////////////////////////////////////////////////////////////////////////////////////// */

@@ -514,7 +514,7 @@ static void xgpu_vi_mailbox_flr_work(struct work_struct *work)
 	}
 
 	/* Trigger recovery due to world switch failure */
-	amdgpu_sriov_gpu_reset(adev, false);
+	amdgpu_sriov_gpu_reset(adev, NULL);
 }
 
 static int xgpu_vi_set_mailbox_rcv_irq(struct amdgpu_device *adev,
@@ -537,12 +537,15 @@ static int xgpu_vi_mailbox_rcv_irq(struct amdgpu_device *adev,
 {
 	int r;
 
-	/* see what event we get */
-	r = xgpu_vi_mailbox_rcv_msg(adev, IDH_FLR_NOTIFICATION);
+	/* trigger gpu-reset by hypervisor only if TDR disbaled */
+	if (amdgpu_lockup_timeout == 0) {
+		/* see what event we get */
+		r = xgpu_vi_mailbox_rcv_msg(adev, IDH_FLR_NOTIFICATION);
 
-	/* only handle FLR_NOTIFY now */
-	if (!r)
-		schedule_work(&adev->virt.flr_work);
+		/* only handle FLR_NOTIFY now */
+		if (!r)
+			schedule_work(&adev->virt.flr_work);
+	}
 
 	return 0;
 }

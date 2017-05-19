@@ -82,6 +82,12 @@ struct dc_surface_dcc_cap {
 	};
 };
 
+struct dc_static_screen_events {
+	bool cursor_update;
+	bool surface_update;
+	bool overlay_update;
+};
+
 /* Forward declaration*/
 struct dc;
 struct dc_surface;
@@ -97,15 +103,28 @@ struct dc_stream_funcs {
 			int num_streams,
 			int vmin,
 			int vmax);
+	bool (*get_crtc_position)(struct dc *dc,
+			const struct dc_stream **stream,
+			int num_streams,
+			unsigned int *v_pos,
+			unsigned int *nom_v_pos);
+
 
 	void (*stream_update_scaling)(const struct dc *dc,
 			const struct dc_stream *dc_stream,
 			const struct rect *src,
 			const struct rect *dst);
+
 	bool (*set_gamut_remap)(struct dc *dc,
 			const struct dc_stream **stream, int num_streams);
-	bool (*set_psr_enable)(struct dc *dc, bool enable);
-	bool (*setup_psr)(struct dc *dc, const struct dc_stream *stream);
+
+	void (*set_static_screen_events)(struct dc *dc,
+			const struct dc_stream **stream,
+			int num_streams,
+			const struct dc_static_screen_events *events);
+
+	void (*set_dither_option)(const struct dc_stream *stream,
+			enum dc_dither_option option);
 };
 
 struct link_training_settings;
@@ -414,6 +433,7 @@ struct dc_stream {
 	enum signal_type output_signal;
 
 	enum dc_color_space output_color_space;
+	enum dc_dither_option dither_option;
 
 	struct rect src; /* composition area */
 	struct rect dst; /* stream addressable area */
@@ -428,7 +448,6 @@ struct dc_stream {
 	struct colorspace_transform gamut_remap_matrix;
 	struct csc_transform csc_color_matrix;
 
-	/* TODO: dithering */
 	/* TODO: custom INFO packets */
 	/* TODO: ABM info (DMCU) */
 	/* TODO: PSR info */
@@ -604,7 +623,6 @@ struct dc_link {
 	uint8_t ddc_hw_inst;
 	uint8_t link_enc_hw_inst;
 
-	struct psr_caps psr_caps;
 	bool test_pattern_enabled;
 	union compliance_test_state compliance_test_state;
 
@@ -623,7 +641,7 @@ struct dpcd_caps {
 	union sink_count sink_count;
 	/* If dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER,
 	indicates 'Frame Sequential-to-lllFrame Pack' conversion capability.*/
-	bool is_dp_hdmi_s3d_converter;
+	struct dc_dongle_caps dongle_caps;
 
 	bool allow_invalid_MSA_timing_param;
 	bool panel_mode_edp;
@@ -657,7 +675,7 @@ bool dc_link_set_backlight_level(const struct dc_link *dc_link, uint32_t level,
 bool dc_link_set_psr_enable(const struct dc_link *dc_link, bool enable);
 
 bool dc_link_setup_psr(const struct dc_link *dc_link,
-		const struct dc_stream *stream);
+		const struct dc_stream *stream, struct psr_config *psr_config);
 
 /* Request DC to detect if there is a Panel connected.
  * boot - If this call is during initial boot.
@@ -691,7 +709,7 @@ void dc_link_remove_remote_sink(
 void dc_link_set_sink(const struct dc_link *link, struct dc_sink *sink);
 
 void dc_link_dp_set_drive_settings(
-	struct dc_link *link,
+	const struct dc_link *link,
 	struct link_training_settings *lt_settings);
 
 bool dc_link_dp_perform_link_training(
@@ -764,7 +782,7 @@ bool dc_stream_set_cursor_attributes(
 
 bool dc_stream_set_cursor_position(
 	const struct dc_stream *stream,
-	struct dc_cursor_position *position);
+	const struct dc_cursor_position *position);
 
 /* Newer interfaces  */
 struct dc_cursor {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-15 Advanced Micro Devices, Inc.
+ * Copyright 2015 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,27 +19,30 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Authors: AMD
- *
  */
 
-#ifndef __DC_IPP_DCE80_H__
-#define __DC_IPP_DCE80_H__
+#ifndef _PP_OVERDRIVER_H_
+#define _PP_OVERDRIVER_H_
 
-#include "ipp.h"
+#include <linux/types.h>
+#include <linux/kernel.h>
 
-#define TO_DCE80_IPP(input_pixel_processor)\
-		container_of(input_pixel_processor, struct dce110_ipp, base)
+struct phm_fuses_default {
+	const char *key;
+	uint32_t VFT2_m1;
+	uint32_t VFT2_m2;
+	uint32_t VFT2_b;
+	uint32_t VFT1_m1;
+	uint32_t VFT1_m2;
+	uint32_t VFT1_b;
+	uint32_t VFT0_m1;
+	uint32_t VFT0_m2;
+	uint32_t VFT0_b;
+};
 
-struct dce110_ipp;
-struct dce110_ipp_reg_offsets;
+extern struct phm_fuses_default vega10_fuses_default[];
+extern int pp_override_get_default_fuse_value(uint64_t key,
+			struct phm_fuses_default list[],
+			struct phm_fuses_default *result);
 
-bool dce80_ipp_construct(
-	struct dce110_ipp *ipp,
-	struct dc_context *ctx,
-	uint32_t inst,
-	const struct dce110_ipp_reg_offsets *offset);
-
-void dce80_ipp_destroy(struct input_pixel_processor **ipp);
-
-#endif /*__DC_IPP_DCE80_H__*/
+#endif

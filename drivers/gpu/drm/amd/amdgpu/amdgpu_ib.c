@@ -121,6 +121,7 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 {
 	struct amdgpu_device *adev = ring->adev;
 	struct amdgpu_ib *ib = &ibs[0];
+	struct fence *tmp = NULL;
 	bool skip_preamble, need_ctx_switch;
 	unsigned patch_offset = ~0;
 	struct amdgpu_vm *vm;
@@ -167,6 +168,13 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 		return r;
 	}
 
+	if (ring->funcs->emit_pipeline_sync && job &&
+	    ((tmp = amdgpu_sync_get_fence(&job->sched_sync)) ||
+	     amdgpu_vm_need_pipeline_sync(ring, job))) {
+		amdgpu_ring_emit_pipeline_sync(ring);
+		fence_put(tmp);
+	}
+
 	if (vm) {
 		amdgpu_ring_insert_nop(ring, extra_nop); /* prevent CE go too fast than DE */
 
@@ -194,8 +202,6 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 			status |= AMDGPU_HAVE_CTX_SWITCH;
 		status |= job->preamble_status;
 
-		if (vm)
-			status |= AMDGPU_VM_DOMAIN;
 		amdgpu_ring_emit_cntxcntl(ring, status);
 	}
 
@@ -213,6 +219,9 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 				    need_ctx_switch);
 		need_ctx_switch = false;
 	}
+
+	if (ring->funcs->emit_tmz)
+		amdgpu_ring_emit_tmz(ring, false);
 
 	if (ring->funcs->emit_hdp_invalidate
 #ifdef CONFIG_X86_64

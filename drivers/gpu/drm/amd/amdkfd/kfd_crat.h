@@ -46,8 +46,8 @@
 #define CRAT_OEMID_64BIT_MASK ((1ULL << (CRAT_OEMID_LENGTH * 8)) - 1)
 
 /* Compute Unit flags */
-#define COMPUTE_UNIT_CPU	(1 << 0)	/* Create Virtual CRAT for CPU */
-#define COMPUTE_UNIT_GPU	(1 << 1)	/* Create Virtual CRAT for GPU */
+#define COMPUTE_UNIT_CPU	(1 << 0)  /* Create Virtual CRAT for CPU */
+#define COMPUTE_UNIT_GPU	(1 << 1)  /* Create Virtual CRAT for GPU */
 
 struct crat_header {
 	uint32_t	signature;
