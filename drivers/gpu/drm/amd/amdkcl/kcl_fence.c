@@ -56,7 +56,7 @@ struct default_wait_cb {
 
 static void (*_kcl_fence_default_wait_cb)(struct fence *fence, struct fence_cb *cb);
 
-signed long
+static signed long
 _kcl_fence_default_wait(struct fence *fence, bool intr, signed long timeout)
 {
 	struct default_wait_cb cb;
@@ -119,7 +119,18 @@ out:
 	spin_unlock_irqrestore(fence->lock, flags);
 	return ret;
 }
-EXPORT_SYMBOL(_kcl_fence_default_wait);
+
+signed long kcl_fence_default_wait(kcl_fence_t *fence,
+				   bool intr,
+				   signed long timeout)
+{
+#if defined(BUILD_AS_DKMS)
+	return _kcl_fence_default_wait(fence, intr, timeout);
+#else
+	return dma_fence_default_wait(fence, intr, timeout);
+#endif
+}
+EXPORT_SYMBOL(kcl_fence_default_wait);
 
 signed long
 _kcl_fence_wait_any_timeout(struct fence **fences, uint32_t count,

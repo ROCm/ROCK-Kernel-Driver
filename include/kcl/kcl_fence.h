@@ -41,9 +41,9 @@ typedef struct dma_fence_ops kcl_fence_ops_t;
 #endif
 
 #if defined(BUILD_AS_DKMS)
-extern signed long
-_kcl_fence_default_wait(struct fence *fence, bool intr, signed long timeout);
-
+extern signed long kcl_fence_default_wait(kcl_fence_t *fence,
+					  bool intr,
+					  signed long timeout);
 extern signed long _kcl_fence_wait_any_timeout(struct fence **fences,
 				   uint32_t count, bool intr,
 				   signed long timeout, uint32_t *idx);
@@ -63,17 +63,6 @@ static inline bool fence_is_later(struct fence *f1, struct fence *f2)
 	return (int)(f1->seqno - f2->seqno) > 0;
 }
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) */
-
-static inline signed long kcl_fence_default_wait(kcl_fence_t *fence,
-						 bool intr,
-						 signed long timeout)
-{
-#if defined(BUILD_AS_DKMS)
-	return _kcl_fence_default_wait(fence, intr, timeout);
-#else
-	return dma_fence_default_wait(fence, intr, timeout);
-#endif
-}
 
 static inline signed long kcl_fence_wait_any_timeout(kcl_fence_t **fences,
 				   uint32_t count, bool intr,
