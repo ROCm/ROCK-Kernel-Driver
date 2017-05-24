@@ -40,7 +40,7 @@ typedef struct dma_fence kcl_fence_t;
 typedef struct dma_fence_ops kcl_fence_ops_t;
 #endif
 
-#if defined(BUILD_AS_DKMS)
+#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 extern signed long kcl_fence_default_wait(kcl_fence_t *fence,
 					  bool intr,
 					  signed long timeout);
@@ -68,7 +68,7 @@ static inline signed long kcl_fence_wait_any_timeout(kcl_fence_t **fences,
 				   uint32_t count, bool intr,
 				   signed long timeout, uint32_t *idx)
 {
-#if defined(BUILD_AS_DKMS)
+#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 	return _kcl_fence_wait_any_timeout(fences, count, intr, timeout, idx);
 #else
 	return dma_fence_wait_any_timeout(fences, count, intr, timeout, idx);
@@ -77,7 +77,7 @@ static inline signed long kcl_fence_wait_any_timeout(kcl_fence_t **fences,
 
 static inline u64 kcl_fence_context_alloc(unsigned num)
 {
-#if defined(BUILD_AS_DKMS)
+#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 	return _kcl_fence_context_alloc(num);
 #else
 	return dma_fence_context_alloc(num);
@@ -87,7 +87,7 @@ static inline u64 kcl_fence_context_alloc(unsigned num)
 static inline void kcl_fence_init(kcl_fence_t *fence, const kcl_fence_ops_t *ops,
 	     spinlock_t *lock, u64 context, unsigned seqno)
 {
-#if defined(BUILD_AS_DKMS)
+#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 	return _kcl_fence_init(fence, ops, lock, context, seqno);
 #else
 	return dma_fence_init(fence, ops, lock, context, seqno);
@@ -97,7 +97,7 @@ static inline void kcl_fence_init(kcl_fence_t *fence, const kcl_fence_ops_t *ops
 static inline signed long kcl_fence_wait_timeout(kcl_fence_t *fences, bool intr,
 					signed long timeout)
 {
-#if defined(BUILD_AS_DKMS)
+#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 	return _kcl_fence_wait_timeout(fences, intr, timeout);
 #else
 	return dma_fence_wait_timeout(fences, intr, timeout);
