@@ -456,7 +456,7 @@ int amdgpu_gem_wait_idle_ioctl(struct drm_device *dev, void *data,
 		return -ENOENT;
 	}
 	robj = gem_to_amdgpu_bo(gobj);
-	ret = reservation_object_wait_timeout_rcu(robj->tbo.resv, true, true,
+	ret = kcl_reservation_object_wait_timeout_rcu(robj->tbo.resv, true, true,
 						  timeout);
 
 	/* ret == 0 means not signaled,
@@ -469,7 +469,7 @@ int amdgpu_gem_wait_idle_ioctl(struct drm_device *dev, void *data,
 	} else
 		r = ret;
 
-	drm_gem_object_put_unlocked(gobj);
+	kcl_drm_gem_object_put_unlocked(gobj);
 	return r;
 }
 
@@ -512,7 +512,7 @@ int amdgpu_gem_metadata_ioctl(struct drm_device *dev, void *data,
 unreserve:
 	amdgpu_bo_unreserve(robj);
 out:
-	drm_gem_object_put_unlocked(gobj);
+	kcl_drm_gem_object_put_unlocked(gobj);
 	return r;
 }
 

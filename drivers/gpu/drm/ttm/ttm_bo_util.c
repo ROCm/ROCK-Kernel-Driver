@@ -517,7 +517,7 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 	fbo->base.acc_size = 0;
 	fbo->base.resv = &fbo->base.ttm_resv;
 	reservation_object_init(fbo->base.resv);
-	ret = reservation_object_trylock(fbo->base.resv);
+	ret = kcl_reservation_object_trylock(fbo->base.resv);
 	WARN_ON(!ret);
 
 	*new_obj = &fbo->base;
@@ -842,7 +842,7 @@ int ttm_bo_pipeline_gutting(struct ttm_buffer_object *bo)
 	if (ret)
 		return ret;
 
-	ret = reservation_object_copy_fences(ghost->resv, bo->resv);
+	ret = kcl_reservation_object_copy_fences(ghost->resv, bo->resv);
 	/* Last resort, wait for the BO to be idle when we are OOM */
 	if (ret)
 		ttm_bo_wait(bo, false, false);
