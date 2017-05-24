@@ -1,6 +1,7 @@
 #include <kcl/kcl_fence.h>
 #include <kcl/kcl_reservation.h>
 
+#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 long _kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 bool wait_all, bool intr,
 					 unsigned long timeout)
@@ -76,3 +77,4 @@ unlock_retry:
 	goto retry;
 }
 EXPORT_SYMBOL(_kcl_reservation_object_wait_timeout_rcu);
+#endif
