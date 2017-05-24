@@ -655,13 +655,6 @@ static int sdma_v4_0_gfx_resume(struct amdgpu_device *adev)
 
 		if (adev->mman.buffer_funcs_ring == ring)
 			amdgpu_ttm_set_active_vram_size(adev, adev->mc.real_vram_size);
-
-		/* FIXME: temporarily disable SDMA-ULV interrupts for Vega10.
-		 * Remove this once the fix is in firmware.
-		 */
-		if (ring->adev->asic_type == CHIP_VEGA10)
-			WREG32(sdma_v4_0_get_reg_offset(i, mmSDMA0_ULV_CNTL),
-							0);
 	}
 
 	return 0;
