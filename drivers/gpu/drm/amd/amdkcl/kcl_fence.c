@@ -23,6 +23,7 @@
 #include <kcl/kcl_rcupdate.h>
 #include "kcl_common.h"
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 #define CREATE_TRACE_POINTS
 #include <kcl/kcl_trace.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && !defined(OS_NAME_RHEL_7_4)
