@@ -523,9 +523,25 @@ struct phm_vq_budgeting_record {
 	uint32_t ulSustainableCUs;
 };
 
+struct phm_vq_budgeting_settings {
+	uint32_t ulSetting1;	/* RV: CUs */
+	uint32_t ulSetting2;	/* RV: SustainableSOCPowerLimitLow in W */
+	uint32_t ulSetting3;	/* RV: SustainableSOCPowerLimitHigh in W */
+	uint8_t ulSetting4;	/* RV: DispConfig */
+	uint32_t ulSetting5;	/* RV: Sustainable GFXCLK in 10KHz */
+	uint32_t ulSetting6;	/* RV: Sustainable FCLK in 10KHz */
+	uint32_t ulSetting7;	/* RV: Sustainable CUs */
+	uint32_t ulSetting8;	/* unused */
+	uint32_t ulSetting9;	/* unused */
+	uint32_t ulSetting10;	/* unused */
+};
+
 struct phm_vq_budgeting_table {
 	uint8_t numEntries;
-	struct phm_vq_budgeting_record entries[1];
+	union {
+		struct phm_vq_budgeting_record   entries[1];
+		struct phm_vq_budgeting_settings settings[1];
+	};
 };
 
 struct phm_clock_and_voltage_limits {
