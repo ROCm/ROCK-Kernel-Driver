@@ -920,6 +920,8 @@ static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
 		VM_INVALIDATE_ENG16_REQ__INVALIDATE_L2_PDE2_MASK |
 		VM_INVALIDATE_ENG16_REQ__INVALIDATE_L1_PTES_MASK;
 
+	mutex_lock(&adev->srbm_mutex);
+
 	/* Use light weight invalidation.
 	 *
 	 * TODO 1: agree on the right set of invalidation registers for
@@ -954,6 +956,9 @@ static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
 					mmMMHUB_VM_INVALIDATE_ENG16_ACK)) &
 					(1 << vmid)))
 		cpu_relax();
+
+	mutex_unlock(&adev->srbm_mutex);
+
 }
 
 static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
