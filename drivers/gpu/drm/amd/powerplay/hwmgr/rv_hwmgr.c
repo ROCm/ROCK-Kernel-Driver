@@ -47,10 +47,27 @@ static const unsigned long PhwRaven_Magic = (unsigned long) PHM_Rv_Magic;
 int rv_display_clock_voltage_request(struct pp_hwmgr *hwmgr,
 		struct pp_display_clock_request *clock_req);
 
-struct phm_vq_budgeting_record rv_vqtable[] = {
-	/* _TBD
-	 * CUs, SSP low, SSP High, Min Sclk Low, Min Sclk, High, AWD/non-AWD, DCLK, ECLK, Sustainable Sclk, Sustainable CUs */
-	{ 8, 0, 45, 0, 0, VQ_DisplayConfig_NoneAWD, 80000, 120000, 4, 0 },
+struct phm_vq_budgeting_settings RV_VQTable[] = {
+	/* CUs, SSP low, SSP High, Display Configuration, AWD/non-AWD,
+	* Sustainable GFXCLK, Sustainable FCLK, Sustainable CUs,
+	* unused, unused, unused */
+	{ 11, 30, 60, VQ_DisplayConfig_NoneAWD,  80000, 160000, 11, 0, 0, 0 },
+	{ 11, 30, 60, VQ_DisplayConfig_AWD,      80000, 160000, 11, 0, 0, 0 },
+
+	{  8, 30, 60, VQ_DisplayConfig_NoneAWD, 100000, 160000,  8, 0, 0, 0 },
+	{  8, 30, 60, VQ_DisplayConfig_AWD,     100000, 160000,  8, 0, 0, 0 },
+
+	{ 10, 12, 30, VQ_DisplayConfig_NoneAWD,  40000, 120000, 10, 0, 0, 0 },
+	{ 10, 12, 30, VQ_DisplayConfig_AWD,      40000, 120000, 10, 0, 0, 0 },
+
+	{  8, 12, 30, VQ_DisplayConfig_NoneAWD,  45000, 120000,  8, 0, 0, 0 },
+	{  8, 12, 30, VQ_DisplayConfig_AWD,      45000, 120000,  8, 0, 0, 0 },
+
+	{  6, 12, 30, VQ_DisplayConfig_NoneAWD,  45000, 120000,  6, 0, 0, 0 },
+	{  6, 12, 30, VQ_DisplayConfig_AWD,      45000, 120000,  6, 0, 0, 0 },
+
+	{  3, 12, 30, VQ_DisplayConfig_NoneAWD,  45000, 120000,  3, 0, 0, 0 },
+	{  3, 12, 30, VQ_DisplayConfig_AWD,      45000, 120000,  3, 0, 0, 0 },
 };
 
 static struct rv_power_state *cast_rv_ps(struct pp_hw_power_state *hw_ps)
@@ -74,13 +91,13 @@ static int rv_init_vq_budget_table(struct pp_hwmgr *hwmgr)
 {
 	uint32_t table_size, i;
 	struct phm_vq_budgeting_table *ptable;
-	uint32_t num_entries = ARRAY_SIZE(rv_vqtable);
+	uint32_t num_entries = sizeof(RV_VQTable)/sizeof(*RV_VQTable);
 
 	if (hwmgr->dyn_state.vq_budgeting_table != NULL)
 		return 0;
 
 	table_size = sizeof(struct phm_vq_budgeting_table) +
-			sizeof(struct phm_vq_budgeting_record) * (num_entries - 1);
+		sizeof(struct phm_vq_budgeting_record) * (num_entries - 1);
 
 	ptable = kzalloc(table_size, GFP_KERNEL);
 	if (NULL == ptable)
@@ -89,16 +106,13 @@ static int rv_init_vq_budget_table(struct pp_hwmgr *hwmgr)
 	ptable->numEntries = (uint8_t) num_entries;
 
 	for (i = 0; i < ptable->numEntries; i++) {
-		ptable->entries[i].ulCUs = rv_vqtable[i].ulCUs;
-		ptable->entries[i].ulSustainableSOCPowerLimitLow = rv_vqtable[i].ulSustainableSOCPowerLimitLow;
-		ptable->entries[i].ulSustainableSOCPowerLimitHigh = rv_vqtable[i].ulSustainableSOCPowerLimitHigh;
-		ptable->entries[i].ulMinSclkLow = rv_vqtable[i].ulMinSclkLow;
-		ptable->entries[i].ulMinSclkHigh = rv_vqtable[i].ulMinSclkHigh;
-		ptable->entries[i].ucDispConfig = rv_vqtable[i].ucDispConfig;
-		ptable->entries[i].ulDClk = rv_vqtable[i].ulDClk;
-		ptable->entries[i].ulEClk = rv_vqtable[i].ulEClk;
-		ptable->entries[i].ulSustainableSclk = rv_vqtable[i].ulSustainableSclk;
-		ptable->entries[i].ulSustainableCUs = rv_vqtable[i].ulSustainableCUs;
+		ptable->settings[i].ulSetting1 = RV_VQTable[i].ulSetting1;
+		ptable->settings[i].ulSetting2 = RV_VQTable[i].ulSetting2;
+		ptable->settings[i].ulSetting3 = RV_VQTable[i].ulSetting3;
+		ptable->settings[i].ulSetting4 = RV_VQTable[i].ulSetting4;
+		ptable->settings[i].ulSetting5 = RV_VQTable[i].ulSetting5;
+		ptable->settings[i].ulSetting6 = RV_VQTable[i].ulSetting6;
+		ptable->settings[i].ulSetting7 = RV_VQTable[i].ulSetting7;
 	}
 
 	hwmgr->dyn_state.vq_budgeting_table = ptable;
