@@ -1511,63 +1511,6 @@ copy_from_user_failed:
 	return err;
 }
 
-static int kfd_ioctl_open_graphic_handle(struct file *filep,
-					struct kfd_process *p,
-					void *data)
-{
-	struct kfd_ioctl_open_graphic_handle_args *args = data;
-	struct kfd_dev *dev;
-	struct kfd_process_device *pdd;
-	void *mem;
-	int idr_handle;
-	long err;
-
-	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev)
-		return -EINVAL;
-
-	if (dev->device_info->asic_family != CHIP_KAVERI) {
-		pr_debug("kfd_ioctl_open_graphic_handle only supported on KV\n");
-		return -EINVAL;
-	}
-
-	down_write(&p->lock);
-	pdd = kfd_bind_process_to_device(dev, p);
-	up_write(&p->lock);
-	if (IS_ERR(pdd))
-		return PTR_ERR(pdd);
-
-	err = dev->kfd2kgd->open_graphic_handle(dev->kgd,
-			args->va_addr,
-			(struct kgd_vm *) pdd->vm,
-			args->graphic_device_fd,
-			args->graphic_handle,
-			(struct kgd_mem **) &mem);
-
-	if (err != 0)
-		return err;
-
-	down_write(&p->lock);
-	/*TODO: When open_graphic_handle is implemented, we need to create
-	 * the corresponding interval tree. We need to know the size of
-	 * the buffer through open_graphic_handle(). We use 1 for now.
-	 */
-	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
-			args->va_addr, 1, NULL);
-	up_write(&p->lock);
-	if (idr_handle < 0) {
-		/* FIXME: destroy_process_gpumem doesn't seem to be
-		 * implemented anywhere
-		 */
-		dev->kfd2kgd->destroy_process_gpumem(dev->kgd, mem);
-		return -EFAULT;
-	}
-
-	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
-
-	return 0;
-}
-
 static int kfd_ioctl_set_process_dgpu_aperture(struct file *filep,
 		struct kfd_process *p, void *data)
 {
@@ -2083,9 +2026,6 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU,
 			kfd_ioctl_unmap_memory_from_gpu, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_OPEN_GRAPHIC_HANDLE,
-			kfd_ioctl_open_graphic_handle, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ALLOC_MEMORY_OF_SCRATCH,
 			kfd_ioctl_alloc_scratch_memory, 0),
