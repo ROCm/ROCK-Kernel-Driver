@@ -497,6 +497,7 @@ static inline int module_is_live(struct module *mod)
 struct module *__module_text_address(unsigned long addr);
 struct module *__module_address(unsigned long addr);
 bool is_module_address(unsigned long addr);
+bool __is_module_percpu_address(unsigned long addr, unsigned long *can_addr);
 bool is_module_percpu_address(unsigned long addr);
 bool is_module_text_address(unsigned long addr);
 #ifdef CONFIG_SUSE_KERNEL_SUPPORTED
@@ -589,7 +590,7 @@ extern bool try_module_get(struct module *module);
 extern void module_put(struct module *module);
 
 #else /*!CONFIG_MODULE_UNLOAD*/
-static inline int try_module_get(struct module *module)
+static inline bool try_module_get(struct module *module)
 {
 	return !module || module_is_live(module);
 }
@@ -667,6 +668,11 @@ static inline bool is_module_percpu_address(unsigned long addr)
 	return false;
 }
 
+static inline bool __is_module_percpu_address(unsigned long addr, unsigned long *can_addr)
+{
+	return false;
+}
+
 static inline bool is_module_text_address(unsigned long addr)
 {
 	return false;
@@ -681,9 +687,9 @@ static inline void __module_get(struct module *module)
 {
 }
 
-static inline int try_module_get(struct module *module)
+static inline bool try_module_get(struct module *module)
 {
-	return 1;
+	return true;
 }
 
 static inline void module_put(struct module *module)

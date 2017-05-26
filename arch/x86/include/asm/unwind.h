@@ -11,6 +11,7 @@ struct unwind_state {
 	unsigned long stack_mask;
 	struct task_struct *task;
 	int graph_idx;
+	bool error;
 #ifdef CONFIG_DWARF_UNWIND
 	union {
 		struct pt_regs regs;
@@ -19,8 +20,10 @@ struct unwind_state {
 	unsigned long dw_sp;
 	unsigned call_frame:1;
 #elif defined(CONFIG_FRAME_POINTER)
+	bool got_irq;
 	unsigned long *bp, *orig_sp;
 	struct pt_regs *regs;
+	unsigned long ip;
 #else
 	unsigned long *sp;
 #endif
@@ -45,6 +48,11 @@ void unwind_start(struct unwind_state *state, struct task_struct *task,
 	first_frame = first_frame ? : get_stack_pointer(task, regs);
 
 	__unwind_start(state, task, regs, first_frame);
+}
+
+static inline bool unwind_error(struct unwind_state *state)
+{
+	return state->error;
 }
 
 #ifdef CONFIG_DWARF_UNWIND

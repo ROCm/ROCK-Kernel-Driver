@@ -32,10 +32,10 @@ extern void	pstore_get_records(unsigned);
 #define PGR_SYSLOG	4
 #define PGR_CLEAR	8
 
-extern int	pstore_mkfile(enum pstore_type_id, char *psname, u64 id,
-			      int count, char *data, bool compressed,
-			      size_t size, struct timespec time,
-			      struct pstore_info *psi);
+extern void	pstore_get_backend_records(struct pstore_info *psi,
+					   struct dentry *root, unsigned flags);
+extern int	pstore_mkfile(struct dentry *root,
+			      struct pstore_record *record);
 extern bool	pstore_is_mounted(void);
 
 #endif
