@@ -697,8 +697,12 @@ static inline void *alloc_tramp(unsigned long size)
 {
 	return module_alloc(size);
 }
-static inline void tramp_free(void *tramp)
+static inline void tramp_free(void *tramp, int size)
 {
+	int npages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+
+	set_memory_nx((unsigned long)tramp, npages);
+	set_memory_rw((unsigned long)tramp, npages);
 	module_memfree(tramp);
 }
 #else
@@ -707,7 +711,7 @@ static inline void *alloc_tramp(unsigned long size)
 {
 	return NULL;
 }
-static inline void tramp_free(void *tramp) { }
+static inline void tramp_free(void *tramp, int size) { }
 #endif
 
 /* Defined as markers to the end of the ftrace default trampolines */
@@ -779,7 +783,7 @@ create_trampoline(struct ftrace_ops *ops, unsigned int *tramp_size)
 	/* Copy ftrace_caller onto the trampoline memory */
 	ret = probe_kernel_read(trampoline, (void *)start_offset, size);
 	if (WARN_ON(ret < 0)) {
-		tramp_free(trampoline);
+		tramp_free(trampoline, *tramp_size);
 		return 0;
 	}
 
@@ -805,7 +809,7 @@ create_trampoline(struct ftrace_ops *ops, unsigned int *tramp_size)
 
 	/* Are we pointing to the reference? */
 	if (WARN_ON(memcmp(op_ptr.op, op_ref, 3) != 0)) {
-		tramp_free(trampoline);
+		tramp_free(trampoline, *tramp_size);
 		return 0;
 	}
 
@@ -847,7 +851,7 @@ void arch_ftrace_update_trampoline(struct ftrace_ops *ops)
 	unsigned long offset;
 	unsigned long ip;
 	unsigned int size;
-	int ret;
+	int ret, npages;
 
 	if (ops->trampoline) {
 		/*
@@ -856,11 +860,14 @@ void arch_ftrace_update_trampoline(struct ftrace_ops *ops)
 		 */
 		if (!(ops->flags & FTRACE_OPS_FL_ALLOC_TRAMP))
 			return;
+		npages = PAGE_ALIGN(ops->trampoline_size) >> PAGE_SHIFT;
+		set_memory_rw(ops->trampoline, npages);
 	} else {
 		ops->trampoline = create_trampoline(ops, &size);
 		if (!ops->trampoline)
 			return;
 		ops->trampoline_size = size;
+		npages = PAGE_ALIGN(size) >> PAGE_SHIFT;
 	}
 
 	offset = calc_trampoline_call_offset(ops->flags & FTRACE_OPS_FL_SAVE_REGS);
@@ -871,6 +878,7 @@ void arch_ftrace_update_trampoline(struct ftrace_ops *ops)
 	/* Do a safe modify in case the trampoline is executing */
 	new = ftrace_call_replace(ip, (unsigned long)func);
 	ret = update_ftrace_func(ip, new);
+	set_memory_ro(ops->trampoline, npages);
 
 	/* The update should never fail */
 	WARN_ON(ret);
@@ -947,7 +955,7 @@ void arch_ftrace_trampoline_free(struct ftrace_ops *ops)
 	if (!ops || !(ops->flags & FTRACE_OPS_FL_ALLOC_TRAMP))
 		return;
 
-	tramp_free((void *)ops->trampoline);
+	tramp_free((void *)ops->trampoline, ops->trampoline_size);
 	ops->trampoline = 0;
 }
 
