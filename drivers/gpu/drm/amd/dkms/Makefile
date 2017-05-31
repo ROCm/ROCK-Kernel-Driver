@@ -67,11 +67,13 @@ export CONFIG_DRM_AMDGPU_CIK=y
 export CONFIG_DRM_AMDGPU_SI=y
 export CONFIG_DRM_AMDGPU_USERPTR=y
 export CONFIG_DRM_AMD_DC=y
+export CONFIG_DRM_AMD_DC_DCN1_0=y
 
 subdir-ccflags-y += -DBUILD_AS_DKMS
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_CIK
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_SI
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_0
 
 obj-m += amd/amdgpu/ ttm/ amd/amdkcl/
