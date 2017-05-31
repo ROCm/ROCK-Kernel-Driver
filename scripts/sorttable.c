@@ -1,5 +1,5 @@
 /*
- * sortextable.c: Sort the kernel's exception table
+ * sorttable.c: Sort vmlinux tables
  *
  * Copyright 2011 - 2012 Cavium, Inc.
  *
@@ -51,11 +51,10 @@
 #define EM_ARCV2	195
 #endif
 
-static int fd_map;	/* File descriptor for file being modified. */
-static int mmap_failed; /* Boolean flag. */
+static int fd_map = -1;	/* File descriptor for file being modified. */
+static int mmap_succeeded; /* Boolean flag. */
 static void *ehdr_curr; /* current ElfXX_Ehdr *  for resource cleanup */
 static struct stat sb;	/* Remember .st_size, etc. */
-static jmp_buf jmpenv;	/* setjmp/longjmp per-file error escape */
 
 /* setjmp() return values */
 enum {
@@ -64,20 +63,19 @@ enum {
 	SJ_SUCCEED
 };
 
+enum sectype {
+	SEC_TYPE_EXTABLE,
+	SEC_TYPE_UNDWARF,
+};
+
 /* Per-file resource cleanup when multiple files. */
 static void
 cleanup(void)
 {
-	if (!mmap_failed)
+	if (mmap_succeeded)
 		munmap(ehdr_curr, sb.st_size);
-	close(fd_map);
-}
-
-static void __attribute__((noreturn))
-fail_file(void)
-{
-	cleanup();
-	longjmp(jmpenv, SJ_FAIL);
+	if (fd_map >= 0)
+		close(fd_map);
 }
 
 /*
@@ -93,19 +91,20 @@ static void *mmap_file(char const *fname)
 	fd_map = open(fname, O_RDWR);
 	if (fd_map < 0 || fstat(fd_map, &sb) < 0) {
 		perror(fname);
-		fail_file();
+		return NULL;
 	}
 	if (!S_ISREG(sb.st_mode)) {
 		fprintf(stderr, "not a regular file: %s\n", fname);
-		fail_file();
+		return NULL;
 	}
 	addr = mmap(0, sb.st_size, PROT_READ|PROT_WRITE, MAP_SHARED,
 		    fd_map, 0);
 	if (addr == MAP_FAILED) {
-		mmap_failed = 1;
 		fprintf(stderr, "Could not mmap file: %s\n", fname);
-		fail_file();
+		return NULL;
 	}
+	mmap_succeeded = 1;
+
 	return addr;
 }
 
@@ -166,7 +165,7 @@ static void (*w8)(uint64_t, uint64_t *);
 static void (*w)(uint32_t, uint32_t *);
 static void (*w2)(uint16_t, uint16_t *);
 
-typedef void (*table_sort_t)(char *, int);
+typedef void (*table_sort_t)(char *, size_t, size_t);
 
 /*
  * Move reserved section indices SHN_LORESERVE..SHN_HIRESERVE out of
@@ -193,9 +192,9 @@ static inline unsigned int get_secindex(unsigned int shndx,
 }
 
 /* 32 bit and 64 bit are very similar */
-#include "sortextable.h"
-#define SORTEXTABLE_64
-#include "sortextable.h"
+#include "sorttable.h"
+#define SORTTABLE_64
+#include "sorttable.h"
 
 static int compare_relative_table(const void *a, const void *b)
 {
@@ -209,36 +208,7 @@ static int compare_relative_table(const void *a, const void *b)
 	return 0;
 }
 
-static void x86_sort_relative_table(char *extab_image, int image_size)
-{
-	int i;
-
-	i = 0;
-	while (i < image_size) {
-		uint32_t *loc = (uint32_t *)(extab_image + i);
-
-		w(r(loc) + i, loc);
-		w(r(loc + 1) + i + 4, loc + 1);
-		w(r(loc + 2) + i + 8, loc + 2);
-
-		i += sizeof(uint32_t) * 3;
-	}
-
-	qsort(extab_image, image_size / 12, 12, compare_relative_table);
-
-	i = 0;
-	while (i < image_size) {
-		uint32_t *loc = (uint32_t *)(extab_image + i);
-
-		w(r(loc) - i, loc);
-		w(r(loc + 1) - (i + 4), loc + 1);
-		w(r(loc + 2) - (i + 8), loc + 2);
-
-		i += sizeof(uint32_t) * 3;
-	}
-}
-
-static void sort_relative_table(char *extab_image, int image_size)
+static void sort_relative_extable(char *image, size_t image_size, size_t entsize)
 {
 	int i;
 
@@ -248,34 +218,65 @@ static void sort_relative_table(char *extab_image, int image_size)
 	 */
 	i = 0;
 	while (i < image_size) {
-		uint32_t *loc = (uint32_t *)(extab_image + i);
+		uint32_t *loc = (uint32_t *)(image + i);
 		w(r(loc) + i, loc);
 		i += 4;
 	}
 
-	qsort(extab_image, image_size / 8, 8, compare_relative_table);
+	qsort(image, image_size / entsize, entsize, compare_relative_table);
 
 	/* Now denormalize. */
 	i = 0;
 	while (i < image_size) {
-		uint32_t *loc = (uint32_t *)(extab_image + i);
+		uint32_t *loc = (uint32_t *)(image + i);
 		w(r(loc) - i, loc);
 		i += 4;
 	}
 }
 
-static void
-do_file(char const *const fname)
+static void sort_undwarf_table(char *image, size_t image_size, size_t entsize)
+{
+	int i;
+
+	/*
+	 * Do the same thing the runtime sort does, first normalize to
+	 * being relative to the start of the section.
+	 */
+	i = 0;
+	while (i < image_size) {
+		uint32_t *loc = (uint32_t *)(image + i);
+		w(r(loc) + i, loc);
+		i += entsize;
+	}
+
+	qsort(image, image_size / entsize, entsize, compare_relative_table);
+
+	/* Now denormalize. */
+	i = 0;
+	while (i < image_size) {
+		uint32_t *loc = (uint32_t *)(image + i);
+		w(r(loc) - i, loc);
+		i += entsize;
+	}
+}
+
+static int do_file(char const *const fname, enum sectype sectype)
 {
 	table_sort_t custom_sort;
-	Elf32_Ehdr *ehdr = mmap_file(fname);
+	Elf32_Ehdr *ehdr;
+	const char *secname, *sort_needed_var;
+	size_t entsize_32, entsize_64;
+
+	ehdr = mmap_file(fname);
+	if (!ehdr)
+		return -1;
 
 	ehdr_curr = ehdr;
 	switch (ehdr->e_ident[EI_DATA]) {
 	default:
 		fprintf(stderr, "unrecognized ELF data encoding %d: %s\n",
 			ehdr->e_ident[EI_DATA], fname);
-		fail_file();
+		return -1;
 		break;
 	case ELFDATA2LSB:
 		r = rle;
@@ -298,7 +299,7 @@ do_file(char const *const fname)
 	||  (r2(&ehdr->e_type) != ET_EXEC && r2(&ehdr->e_type) != ET_DYN)
 	||  ehdr->e_ident[EI_VERSION] != EV_CURRENT) {
 		fprintf(stderr, "unrecognized ET_EXEC/ET_DYN file %s\n", fname);
-		fail_file();
+		return -1;
 	}
 
 	custom_sort = NULL;
@@ -306,11 +307,13 @@ do_file(char const *const fname)
 	default:
 		fprintf(stderr, "unrecognized e_machine %d %s\n",
 			r2(&ehdr->e_machine), fname);
-		fail_file();
-		break;
+		return -1;
 	case EM_386:
 	case EM_X86_64:
-		custom_sort = x86_sort_relative_table;
+		if (sectype == SEC_TYPE_EXTABLE) {
+			custom_sort = sort_relative_extable;
+			entsize_32 = entsize_64 = 12;
+		}
 		break;
 
 	case EM_S390:
@@ -318,7 +321,10 @@ do_file(char const *const fname)
 	case EM_PARISC:
 	case EM_PPC:
 	case EM_PPC64:
-		custom_sort = sort_relative_table;
+		if (sectype == SEC_TYPE_EXTABLE) {
+			custom_sort = sort_relative_extable;
+			entsize_32 = entsize_64 = 8;
+		}
 		break;
 	case EM_ARCOMPACT:
 	case EM_ARCV2:
@@ -326,23 +332,38 @@ do_file(char const *const fname)
 	case EM_MICROBLAZE:
 	case EM_MIPS:
 	case EM_XTENSA:
+		entsize_32 = 8;
+		entsize_64 = 16;
 		break;
 	}  /* end switch */
+
+	switch (sectype) {
+	case SEC_TYPE_EXTABLE:
+		secname = "__ex_table";
+		sort_needed_var = "main_extable_sort_needed";
+		break;
+	case SEC_TYPE_UNDWARF:
+		secname = ".undwarf";
+		custom_sort = sort_undwarf_table;
+		entsize_32 = entsize_64 = 16;
+		sort_needed_var = NULL;
+		break;
+	}
 
 	switch (ehdr->e_ident[EI_CLASS]) {
 	default:
 		fprintf(stderr, "unrecognized ELF class %d %s\n",
 			ehdr->e_ident[EI_CLASS], fname);
-		fail_file();
-		break;
+		return -1;
 	case ELFCLASS32:
 		if (r2(&ehdr->e_ehsize) != sizeof(Elf32_Ehdr)
 		||  r2(&ehdr->e_shentsize) != sizeof(Elf32_Shdr)) {
 			fprintf(stderr,
 				"unrecognized ET_EXEC/ET_DYN file: %s\n", fname);
-			fail_file();
+			return -1;
 		}
-		do32(ehdr, fname, custom_sort);
+		if (do32(ehdr, fname, secname, entsize_32, custom_sort, sort_needed_var))
+			return -1;
 		break;
 	case ELFCLASS64: {
 		Elf64_Ehdr *const ghdr = (Elf64_Ehdr *)ehdr;
@@ -350,51 +371,40 @@ do_file(char const *const fname)
 		||  r2(&ghdr->e_shentsize) != sizeof(Elf64_Shdr)) {
 			fprintf(stderr,
 				"unrecognized ET_EXEC/ET_DYN file: %s\n", fname);
-			fail_file();
+			return -1;
 		}
-		do64(ghdr, fname, custom_sort);
+		if (do64(ghdr, fname, secname, entsize_64, custom_sort, sort_needed_var))
+			return -1;
 		break;
 	}
 	}  /* end switch */
 
 	cleanup();
+
+	return 0;
 }
 
 int
 main(int argc, char *argv[])
 {
-	int n_error = 0;  /* gcc-4.3.0 false positive complaint */
-	int i;
+	char *file;
+	enum sectype sectype;
 
-	if (argc < 2) {
-		fprintf(stderr, "usage: sortextable vmlinux...\n");
-		return 0;
+	if (argc != 3) {
+		fprintf(stderr, "usage: sorttable <object file> <extable|undwarf>\n");
+		return -1;
 	}
 
-	/* Process each file in turn, allowing deep failure. */
-	for (i = 1; i < argc; i++) {
-		char *file = argv[i];
-		int const sjval = setjmp(jmpenv);
+	file = argv[1];
 
-		switch (sjval) {
-		default:
-			fprintf(stderr, "internal error: %s\n", file);
-			exit(1);
-			break;
-		case SJ_SETJMP:    /* normal sequence */
-			/* Avoid problems if early cleanup() */
-			fd_map = -1;
-			ehdr_curr = NULL;
-			mmap_failed = 1;
-			do_file(file);
-			break;
-		case SJ_FAIL:    /* error in do_file or below */
-			++n_error;
-			break;
-		case SJ_SUCCEED:    /* premature success */
-			/* do nothing */
-			break;
-		}  /* end switch */
+	if (!strcmp(argv[2], "extable"))
+		sectype = SEC_TYPE_EXTABLE;
+	else if (!strcmp(argv[2], "undwarf"))
+		sectype = SEC_TYPE_UNDWARF;
+	else  {
+		fprintf(stderr, "unsupported section type %s\n", argv[2]);
+		return -1;
 	}
-	return !!n_error;
+
+	return do_file(file, sectype);
 }

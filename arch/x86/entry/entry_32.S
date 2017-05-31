@@ -299,27 +299,6 @@ ENTRY(ret_from_fork)
 	jmp	2b
 END(ret_from_fork)
 
-#ifdef CONFIG_DWARF_UNWIND
-SYM_FUNC_START(arch_dwarf_init_running)
-	movl	4(%esp), %edx
-	movl	(%esp), %ecx
-	movl	%ecx, PT_EIP(%edx)
-	leal	4(%esp), %eax
-	movl	%eax, PT_OLDESP(%edx)
-	movl	%ebx, PT_EBX(%edx)
-	movl	%esi, PT_ESI(%edx)
-	movl	%edi, PT_EDI(%edx)
-	movl	%ebp, PT_EBP(%edx)
-	movl	$__KERNEL_CS, PT_CS(%edx)
-	movl	$__USER_DS, PT_DS(%edx)
-	movl	$__USER_DS, PT_ES(%edx)
-	movl	$__KERNEL_PERCPU, PT_FS(%edx)
-	movl	$__KERNEL_STACK_CANARY, PT_GS(%edx)
-	movl	$__KERNEL_DS, PT_OLDSS(%edx)
-	ret
-SYM_FUNC_END(arch_dwarf_init_running)
-#endif
-
 /*
  * Return to user mode is not as complex as all this looks,
  * but we want the default path for a system call return to

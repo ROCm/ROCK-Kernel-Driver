@@ -154,7 +154,12 @@ mksysmap()
 
 sortextable()
 {
-	${objtree}/scripts/sortextable ${1}
+	${objtree}/scripts/sorttable ${1} extable
+}
+
+sortundwarf()
+{
+	${objtree}/scripts/sorttable ${1} undwarf
 }
 
 # Delete output files in case of error
@@ -289,6 +294,11 @@ vmlinux_link "${kallsymso}" vmlinux
 if [ -n "${CONFIG_BUILDTIME_EXTABLE_SORT}" ]; then
 	info SORTEX vmlinux
 	sortextable vmlinux
+fi
+
+if [ -n "${CONFIG_UNDWARF_UNWINDER}" ]; then
+	info SORTUD vmlinux
+	sortundwarf vmlinux
 fi
 
 info SYSMAP System.map

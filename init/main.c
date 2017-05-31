@@ -22,7 +22,6 @@
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/delay.h>
-#include <linux/dwarf.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
 #include <linux/initrd.h>
@@ -491,7 +490,6 @@ asmlinkage __visible void __init start_kernel(void)
 	char *command_line;
 	char *after_dashes;
 
-	dwarf_init();
 	set_task_stack_end_magic(&init_task);
 	smp_setup_processor_id();
 	debug_objects_early_init();
@@ -516,7 +514,6 @@ asmlinkage __visible void __init start_kernel(void)
 	setup_arch(&command_line);
 	mm_init_cpumask(&init_mm);
 	setup_command_line(command_line);
-	dwarf_setup();
 	setup_nr_cpu_ids();
 	setup_per_cpu_areas();
 	boot_cpu_state_init();

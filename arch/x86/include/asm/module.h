@@ -2,6 +2,14 @@
 #define _ASM_X86_MODULE_H
 
 #include <asm-generic/module.h>
+#include <asm/undwarf.h>
+
+struct mod_arch_specific {
+#ifdef CONFIG_UNDWARF_UNWINDER
+	unsigned int num_undwarves;
+	struct undwarf *undwarf;
+#endif
+};
 
 #ifdef CONFIG_X86_64
 /* X86_64 does not define MODULE_PROC_FAMILY */

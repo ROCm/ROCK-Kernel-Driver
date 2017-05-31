@@ -1,0 +1,99 @@
+Undwarf debuginfo generation
+============================
+
+Overview
+--------
+
+The kernel CONFIG_UNDWARF_UNWINDER option enables objtool generation of
+undwarf debuginfo, which is out-of-band data which is used by the
+in-kernel undwarf unwinder.  It's similar in concept to DWARF CFI
+debuginfo which would be used by a DWARF unwinder.  The difference is
+that the format of the undwarf data is simpler than DWARF, which in turn
+allows the unwinder to be simpler.
+
+Objtool generates the undwarf data by piggybacking on the compile-time
+stack metadata validation work described in stack-validation.txt.  After
+analyzing all the code paths of a .o file, it creates an array of
+'struct undwarf's and writes them to the .undwarf section.
+
+Then at vmlinux link time, the .undwarf section is sorted by the
+sorttable script.  The resulting sorted array of undwarf structs is used
+by the unwinder at runtime to correlate a given text address with its
+stack state.
+
+
+Why not just use DWARF?
+-----------------------
+
+Undwarf has some of the same benefits as DWARF.  Unlike frame pointers,
+the debuginfo is out-of-band. so it has no effect on runtime
+performance.  Another benefit is that it's possible to reliably unwind
+across interrupts and exceptions.
+
+Undwarf debuginfo's advantage over DWARF itself is that it's much
+simpler.  It gets rid of the DWARF CFI state machine and also gets rid
+of the tracking of unnecessary registers.  This allows the unwinder to
+be much simpler, meaning fewer bugs, which is especially important for
+mission critical oops code.
+
+The simpler debuginfo format also enables the unwinder to be relatively
+fast, which is important for perf and lockdep.
+
+The undwarf format does have a few downsides.  The undwarf table takes
+up extra memory -- something in the ballpark of 3-5MB, depending on the
+kernel config.  In the future we may try to rearrange the data to
+compress that a bit.
+
+Another downside is that, as GCC evolves, it's conceivable that the
+undwarf data may end up being *too* simple to describe the state of the
+stack for certain optimizations.  Will we end up having to track the
+state of more registers and eventually end up reinventing DWARF?
+
+I think this is unlikely because GCC seems to save the frame pointer for
+any unusual stack adjustments it does, so I suspect we'll really only
+ever need to keep track of the stack pointer and the frame pointer
+between call frames.  But even if we do end up having to track all the
+registers DWARF tracks, at least we will still control the format, e.g.
+no complex state machines.
+
+
+Why generate undwarf with objtool?
+----------------------------------
+
+It should be possible to generate the undwarf data with a simple tool
+which converts DWARF to undwarf.  However, such a solution would be
+incomplete due to the kernel's extensive use of asm, inline asm, and
+special sections like exception tables.
+
+That could be rectified by manually annotating those special code paths
+using GNU assembler .cfi annotations in .S files, and homegrown
+annotations for inline asm in .c files.  But asm annotations were tried
+in the past and were found to be unmaintainable.  They were often
+incorrect/incomplete and made the code harder to read and keep updated.
+And based on looking at glibc code, annotating inline asm in .c files
+might be even worse.
+
+With compile-time stack metadata validation, objtool already follows all
+the code paths and already has all the information it needs to be able
+to generate undwarf data from scratch.  So it's an easy step to go from
+stack validation to undwarf generation.
+
+Objtool still needs a few annotations, but only in code which does
+unusual things to the stack like entry code.  And even then, far fewer
+annotations are needed than what DWARF would need, so it's much more
+maintainable than DWARF CFI annotations.
+
+So the advantages of using objtool to generate undwarf are that it gives
+more accurate debuginfo, with close to zero annotations.  It also
+insulates the kernel from toolchain bugs which can be very painful to
+deal with in the kernel since it often has to workaround issues in older
+versions of the toolchain for years.
+
+The downside is that the unwinder now becomes dependent on objtool's
+ability to reverse engineer GCC code flows.  If GCC optimizations become
+too complicated for objtool to follow, the undwarf generation might stop
+working or become incomplete.  In such a case we may need to revisit the
+current implementation.  Some possible solutions would be asking GCC to
+make the optimizations more palatable, or having objtool use DWARF as an
+additional input.  (It's worth noting that live patching already has
+such a dependency on objtool.)

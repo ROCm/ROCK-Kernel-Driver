@@ -37,10 +37,9 @@ struct section {
 	DECLARE_HASHTABLE(rela_hash, 16);
 	struct section *base, *rela;
 	struct symbol *sym;
-	Elf_Data *elf_data;
+	Elf_Data *data;
 	char *name;
 	int idx;
-	unsigned long data;
 	unsigned int len;
 };
 
@@ -84,6 +83,11 @@ struct rela *find_rela_by_dest(struct section *sec, unsigned long offset);
 struct rela *find_rela_by_dest_range(struct section *sec, unsigned long offset,
 				     unsigned int len);
 struct symbol *find_containing_func(struct section *sec, unsigned long offset);
+struct section *elf_create_section(struct elf *elf, const char *name, size_t
+				   entsize, int nr);
+struct section *elf_create_rela_section(struct elf *elf, struct section *base);
+int elf_rebuild_rela_section(struct section *sec);
+int elf_write_to_file(struct elf *elf, char *outfile);
 void elf_close(struct elf *elf);
 
 

@@ -36,6 +36,7 @@
 #include <asm/smap.h>
 #include <asm/pgtable_types.h>
 #include <asm/export.h>
+#include <asm/frame.h>
 #include <linux/err.h>
 
 .code64
@@ -43,9 +44,10 @@
 
 #ifdef CONFIG_PARAVIRT
 ENTRY(native_usergs_sysret64)
+	CFI_EMPTY
 	swapgs
 	sysretq
-ENDPROC(native_usergs_sysret64)
+END(native_usergs_sysret64)
 #endif /* CONFIG_PARAVIRT */
 
 .macro TRACE_IRQS_IRETQ
@@ -134,6 +136,7 @@ ENDPROC(native_usergs_sysret64)
  */
 
 ENTRY(entry_SYSCALL_64)
+	CFI_EMPTY
 	/*
 	 * Interrupts are off on entry.
 	 * We do not frame this tiny irq-off block with TRACE_IRQS_OFF/ON,
@@ -169,6 +172,7 @@ GLOBAL(entry_SYSCALL_64_after_swapgs)
 	pushq	%r10				/* pt_regs->r10 */
 	pushq	%r11				/* pt_regs->r11 */
 	sub	$(6*8), %rsp			/* pt_regs->bp, bx, r12-15 not saved */
+	CFI_REGS extra=0
 
 	/*
 	 * If we need to do entry work or if we guess we'll need to do
@@ -223,6 +227,7 @@ entry_SYSCALL_64_fastpath:
 	movq	EFLAGS(%rsp), %r11
 	RESTORE_C_REGS_EXCEPT_RCX_R11
 	movq	RSP(%rsp), %rsp
+	CFI_EMPTY
 	USERGS_SYSRET64
 
 1:
@@ -315,6 +320,7 @@ syscall_return_via_sysret:
 	/* rcx and r11 are already restored (see code above) */
 	RESTORE_C_REGS_EXCEPT_RCX_R11
 	movq	RSP(%rsp), %rsp
+	CFI_EMPTY
 	USERGS_SYSRET64
 
 opportunistic_sysret_failed:
@@ -342,6 +348,7 @@ ENTRY(stub_ptregs_64)
 	DISABLE_INTERRUPTS(CLBR_ANY)
 	TRACE_IRQS_OFF
 	popq	%rax
+	CFI_REGS extra=0
 	jmp	entry_SYSCALL64_slow_path
 
 1:
@@ -350,6 +357,7 @@ END(stub_ptregs_64)
 
 .macro ptregs_stub func
 ENTRY(ptregs_\func)
+	CFI_FUNC
 	leaq	\func(%rip), %rax
 	jmp	stub_ptregs_64
 END(ptregs_\func)
@@ -366,6 +374,7 @@ END(ptregs_\func)
  * %rsi: next task
  */
 ENTRY(__switch_to_asm)
+	CFI_FUNC
 	/*
 	 * Save callee-saved registers
 	 * This must match the order in inactive_task_frame
@@ -405,6 +414,7 @@ END(__switch_to_asm)
  * r12: kernel thread arg
  */
 ENTRY(ret_from_fork)
+	CFI_EMPTY
 	movq	%rax, %rdi
 	call	schedule_tail			/* rdi: 'prev' task parameter */
 
@@ -414,6 +424,7 @@ ENTRY(ret_from_fork)
 2:
 	movq	%rsp, %rdi
 	call	syscall_return_slowpath	/* returns with IRQs disabled */
+	CFI_REGS
 	TRACE_IRQS_ON			/* user mode is traced as IRQS on */
 	SWAPGS
 	jmp	restore_regs_and_iret
@@ -439,10 +450,11 @@ END(ret_from_fork)
 ENTRY(irq_entries_start)
     vector=FIRST_EXTERNAL_VECTOR
     .rept (FIRST_SYSTEM_VECTOR - FIRST_EXTERNAL_VECTOR)
+	CFI_IRET_REGS
 	pushq	$(~vector+0x80)			/* Note: always in signed byte range */
-    vector=vector+1
 	jmp	common_interrupt
 	.align	8
+	vector=vector+1
     .endr
 END(irq_entries_start)
 
@@ -494,7 +506,9 @@ END(irq_entries_start)
 	movq	%rsp, %rdi
 	incl	PER_CPU_VAR(irq_count)
 	cmovzq	PER_CPU_VAR(irq_stack_ptr), %rsp
+	CFI_REGS base=rdi
 	pushq	%rdi
+	CFI_REGS indirect=1
 	/* We entered an interrupt context - irqs are off: */
 	TRACE_IRQS_OFF
 
@@ -518,6 +532,7 @@ ret_from_intr:
 
 	/* Restore saved previous stack */
 	popq	%rsp
+	CFI_REGS
 
 	testb	$3, CS(%rsp)
 	jz	retint_kernel
@@ -560,6 +575,7 @@ restore_c_regs_and_iret:
 	INTERRUPT_RETURN
 
 ENTRY(native_iret)
+	CFI_IRET_REGS
 	/*
 	 * Are we returning to a stack segment from the LDT?  Note: in
 	 * 64-bit mode SS:RSP on the exception stack is always valid.
@@ -632,6 +648,7 @@ native_irq_return_ldt:
 	orq	PER_CPU_VAR(espfix_stack), %rax
 	SWAPGS
 	movq	%rax, %rsp
+	CFI_IRET_REGS offset=8
 
 	/*
 	 * At this point, we cannot write to the stack any more, but we can
@@ -653,6 +670,7 @@ END(common_interrupt)
  */
 .macro apicinterrupt3 num sym do_sym
 ENTRY(\sym)
+	CFI_IRET_REGS
 	ASM_CLAC
 	pushq	$~(\num)
 .Lcommon_\sym:
@@ -738,6 +756,8 @@ apicinterrupt IRQ_WORK_VECTOR			irq_work_interrupt		smp_irq_work_interrupt
 
 .macro idtentry sym do_sym has_error_code:req paranoid=0 shift_ist=-1
 ENTRY(\sym)
+	CFI_IRET_REGS offset=8
+
 	/* Sanity check */
 	.if \shift_ist != -1 && \paranoid == 0
 	.error "using shift_ist requires paranoid=1"
@@ -761,6 +781,7 @@ ENTRY(\sym)
 	.else
 	call	error_entry
 	.endif
+	CFI_REGS
 	/* returned flag: ebx=0: need swapgs on exit, ebx=1: don't need it */
 
 	.if \paranoid
@@ -858,6 +879,7 @@ idtentry simd_coprocessor_error		do_simd_coprocessor_error	has_error_code=0
 	 * edi:  new selector
 	 */
 ENTRY(native_load_gs_index)
+	FRAME_BEGIN
 	pushfq
 	DISABLE_INTERRUPTS(CLBR_ANY & ~CLBR_RDI)
 	SWAPGS
@@ -866,8 +888,9 @@ ENTRY(native_load_gs_index)
 2:	ALTERNATIVE "", "mfence", X86_BUG_SWAPGS_FENCE
 	SWAPGS
 	popfq
+	FRAME_END
 	ret
-END(native_load_gs_index)
+ENDPROC(native_load_gs_index)
 EXPORT_SYMBOL(native_load_gs_index)
 
 	_ASM_EXTABLE(.Lgs_change, bad_gs)
@@ -897,25 +920,7 @@ ENTRY(do_softirq_own_stack)
 	leaveq
 	decl	PER_CPU_VAR(irq_count)
 	ret
-END(do_softirq_own_stack)
-
-#ifdef CONFIG_DWARF_UNWIND
-SYM_FUNC_START(arch_dwarf_init_running)
-	movq	%r15, R15(%rdi)
-	movq	%r14, R14(%rdi)
-	movq	%r13, R13(%rdi)
-	movq	%r12, R12(%rdi)
-	movq	%rbp, RBP(%rdi)
-	movq	%rbx, RBX(%rdi)
-	movq	(%rsp), %r9
-	movq	%r9, RIP(%rdi)
-	leaq	8(%rsp), %r9
-	movq	%r9, RSP(%rdi)
-	movq	$__KERNEL_CS, CS(%rdi)
-	movq	$__KERNEL_DS, SS(%rdi)
-	ret
-SYM_FUNC_END(arch_dwarf_init_running)
-#endif
+ENDPROC(do_softirq_own_stack)
 
 #ifdef CONFIG_XEN
 idtentry xen_hypervisor_callback xen_do_hypervisor_callback has_error_code=0
@@ -939,13 +944,18 @@ ENTRY(xen_do_hypervisor_callback)		/* do_hypervisor_callback(struct *pt_regs) */
  * Since we don't modify %rdi, evtchn_do_upall(struct *pt_regs) will
  * see the correct pointer to the pt_regs
  */
+	CFI_FUNC
 	movq	%rdi, %rsp			/* we don't return, adjust the stack frame */
+	CFI_REGS
 11:	incl	PER_CPU_VAR(irq_count)
 	movq	%rsp, %rbp
 	cmovzq	PER_CPU_VAR(irq_stack_ptr), %rsp
+	CFI_REGS base=rbp
 	pushq	%rbp				/* frame pointer backlink */
+	CFI_REGS indirect=1
 	call	xen_evtchn_do_upcall
 	popq	%rsp
+	CFI_REGS
 	decl	PER_CPU_VAR(irq_count)
 #ifndef CONFIG_PREEMPT
 	call	xen_maybe_preempt_hcall
@@ -967,6 +977,7 @@ END(xen_do_hypervisor_callback)
  * with its current contents: any discrepancy means we in category 1.
  */
 ENTRY(xen_failsafe_callback)
+	CFI_EMPTY
 	movl	%ds, %ecx
 	cmpw	%cx, 0x10(%rsp)
 	jne	1f
@@ -986,11 +997,13 @@ ENTRY(xen_failsafe_callback)
 	pushq	$0				/* RIP */
 	pushq	%r11
 	pushq	%rcx
+	CFI_IRET_REGS offset=8
 	jmp	general_protection
 1:	/* Segment mismatch => Category 1 (Bad segment). Retry the IRET. */
 	movq	(%rsp), %rcx
 	movq	8(%rsp), %r11
 	addq	$0x30, %rsp
+	CFI_IRET_REGS
 	pushq	$-1 /* orig_ax = -1 => not a system call */
 	ALLOC_PT_GPREGS_ON_STACK
 	SAVE_C_REGS
@@ -1036,6 +1049,7 @@ idtentry machine_check					has_error_code=0	paranoid=1 do_sym=*machine_check_vec
  * Return: ebx=0: need swapgs on exit, ebx=1: otherwise
  */
 ENTRY(paranoid_entry)
+	CFI_FUNC
 	cld
 	SAVE_C_REGS 8
 	SAVE_EXTRA_REGS 8
@@ -1063,6 +1077,7 @@ END(paranoid_entry)
  * On entry, ebx is "no swapgs" flag (1: don't need swapgs, 0: need it)
  */
 ENTRY(paranoid_exit)
+	CFI_REGS
 	DISABLE_INTERRUPTS(CLBR_ANY)
 	TRACE_IRQS_OFF_DEBUG
 	testl	%ebx, %ebx			/* swapgs needed? */
@@ -1084,6 +1099,7 @@ END(paranoid_exit)
  * Return: EBX=0: came from user mode; EBX=1: otherwise
  */
 ENTRY(error_entry)
+	CFI_FUNC
 	cld
 	SAVE_C_REGS 8
 	SAVE_EXTRA_REGS 8
@@ -1168,6 +1184,7 @@ END(error_entry)
  *   0: user gsbase is loaded, we need SWAPGS and standard preparation for return to usermode
  */
 ENTRY(error_exit)
+	CFI_REGS
 	DISABLE_INTERRUPTS(CLBR_ANY)
 	TRACE_IRQS_OFF
 	testl	%ebx, %ebx
@@ -1177,6 +1194,7 @@ END(error_exit)
 
 /* Runs on exception stack */
 ENTRY(nmi)
+	CFI_IRET_REGS
 	/*
 	 * Fix up the exception frame if we're on Xen.
 	 * PARAVIRT_ADJUST_EXCEPTION_FRAME is guaranteed to push at most
@@ -1248,11 +1266,13 @@ ENTRY(nmi)
 	cld
 	movq	%rsp, %rdx
 	movq	PER_CPU_VAR(cpu_current_top_of_stack), %rsp
+	CFI_IRET_REGS base=rdx offset=8
 	pushq	5*8(%rdx)	/* pt_regs->ss */
 	pushq	4*8(%rdx)	/* pt_regs->rsp */
 	pushq	3*8(%rdx)	/* pt_regs->flags */
 	pushq	2*8(%rdx)	/* pt_regs->cs */
 	pushq	1*8(%rdx)	/* pt_regs->rip */
+	CFI_IRET_REGS
 	pushq   $-1		/* pt_regs->orig_ax */
 	pushq   %rdi		/* pt_regs->di */
 	pushq   %rsi		/* pt_regs->si */
@@ -1269,6 +1289,7 @@ ENTRY(nmi)
 	pushq	%r13		/* pt_regs->r13 */
 	pushq	%r14		/* pt_regs->r14 */
 	pushq	%r15		/* pt_regs->r15 */
+	CFI_REGS
 	ENCODE_FRAME_POINTER
 
 	/*
@@ -1423,6 +1444,7 @@ first_nmi:
 	.rept 5
 	pushq	11*8(%rsp)
 	.endr
+	CFI_IRET_REGS
 
 	/* Everything up to here is safe from nested NMIs */
 
@@ -1438,6 +1460,7 @@ first_nmi:
 	pushq	$__KERNEL_CS	/* CS */
 	pushq	$1f		/* RIP */
 	INTERRUPT_RETURN	/* continues at repeat_nmi below */
+	CFI_IRET_REGS
 1:
 #endif
 
@@ -1487,6 +1510,7 @@ end_repeat_nmi:
 	 * exceptions might do.
 	 */
 	call	paranoid_entry
+	CFI_REGS
 
 	/* paranoidentry do_nmi, 0; without TRACE_IRQS_OFF */
 	movq	%rsp, %rdi
@@ -1524,17 +1548,19 @@ nmi_restore:
 END(nmi)
 
 ENTRY(ignore_sysret)
+	CFI_EMPTY
 	mov	$-ENOSYS, %eax
 	sysret
 END(ignore_sysret)
 
 ENTRY(rewind_stack_do_exit)
+	CFI_FUNC
 	/* Prevent any naive code from trying to unwind to our caller. */
 	xorl	%ebp, %ebp
 
 	movq	PER_CPU_VAR(cpu_current_top_of_stack), %rax
-	leaq	-TOP_OF_KERNEL_STACK_PADDING-PTREGS_SIZE(%rax), %rsp
+	leaq	-PTREGS_SIZE(%rax), %rsp
+	CFI_FUNC cfa_offset=PTREGS_SIZE
 
 	call	do_exit
-1:	jmp 1b
 END(rewind_stack_do_exit)

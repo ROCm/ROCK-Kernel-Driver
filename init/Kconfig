@@ -45,6 +45,10 @@ config IRQ_WORK
 
 config BUILDTIME_EXTABLE_SORT
 	bool
+	select SORTTABLE
+
+config SORTTABLE
+	bool
 
 config THREAD_INFO_IN_TASK
 	bool

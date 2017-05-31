@@ -182,20 +182,19 @@ static int read_sections(struct elf *elf)
 			return -1;
 		}
 
-		sec->elf_data = elf_getdata(s, NULL);
-		if (!sec->elf_data) {
+		sec->data = elf_getdata(s, NULL);
+		if (!sec->data) {
 			perror("elf_getdata");
 			return -1;
 		}
 
-		if (sec->elf_data->d_off != 0 ||
-		    sec->elf_data->d_size != sec->sh.sh_size) {
+		if (sec->data->d_off != 0 ||
+		    sec->data->d_size != sec->sh.sh_size) {
 			WARN("unexpected data attributes for %s", sec->name);
 			return -1;
 		}
 
-		sec->data = (unsigned long)sec->elf_data->d_buf;
-		sec->len = sec->elf_data->d_size;
+		sec->len = sec->data->d_size;
 	}
 
 	/* sanity check, one more call to elf_nextscn() should return NULL */
@@ -232,7 +231,7 @@ static int read_symbols(struct elf *elf)
 
 		sym->idx = i;
 
-		if (!gelf_getsym(symtab->elf_data, i, &sym->sym)) {
+		if (!gelf_getsym(symtab->data, i, &sym->sym)) {
 			perror("gelf_getsym");
 			goto err;
 		}
@@ -322,7 +321,7 @@ static int read_relas(struct elf *elf)
 			}
 			memset(rela, 0, sizeof(*rela));
 
-			if (!gelf_getrela(sec->elf_data, i, &rela->rela)) {
+			if (!gelf_getrela(sec->data, i, &rela->rela)) {
 				perror("gelf_getrela");
 				return -1;
 			}
@@ -362,12 +361,6 @@ struct elf *elf_open(const char *name)
 
 	INIT_LIST_HEAD(&elf->sections);
 
-	elf->name = strdup(name);
-	if (!elf->name) {
-		perror("strdup");
-		goto err;
-	}
-
 	elf->fd = open(name, O_RDONLY);
 	if (elf->fd == -1) {
 		perror("open");
@@ -401,6 +394,230 @@ err:
 	return NULL;
 }
 
+struct section *elf_create_section(struct elf *elf, const char *name,
+				   size_t entsize, int nr)
+{
+	struct section *sec, *shstrtab;
+	size_t size = entsize * nr;
+	char *buf;
+
+	sec = malloc(sizeof(*sec));
+	if (!sec) {
+		perror("malloc");
+		return NULL;
+	}
+	memset(sec, 0, sizeof(*sec));
+
+	INIT_LIST_HEAD(&sec->symbol_list);
+	INIT_LIST_HEAD(&sec->rela_list);
+	hash_init(sec->rela_hash);
+	hash_init(sec->symbol_hash);
+
+	list_add_tail(&sec->list, &elf->sections);
+
+	sec->name = strdup(name);
+	if (!sec->name) {
+		perror("strdup");
+		return NULL;
+	}
+
+	sec->idx = list_prev_entry(sec, list)->idx + 1;
+	sec->len = size;
+
+	sec->sh.sh_entsize = entsize;
+	sec->sh.sh_size = size;
+
+	sec->data = malloc(sizeof(*sec->data));
+	if (!sec->data) {
+		perror("malloc");
+		return NULL;
+	}
+
+	sec->data->d_buf = NULL;
+	if (size) {
+		sec->data->d_buf = malloc(size);
+		if (!sec->data->d_buf) {
+			perror("malloc");
+			return NULL;
+		}
+	}
+
+	sec->data->d_size = size;
+	sec->data->d_type = ELF_T_BYTE;
+
+	shstrtab = find_section_by_name(elf, ".shstrtab");
+	if (!shstrtab) {
+		WARN("can't find .shstrtab section");
+		return NULL;
+	}
+	size = shstrtab->len + strlen(name) + 1;
+	buf = malloc(size);
+	memcpy(buf, shstrtab->data->d_buf, shstrtab->len);
+	strcpy(buf + shstrtab->len, name);
+	sec->sh.sh_name = shstrtab->len;
+	shstrtab->data->d_buf = buf;
+	shstrtab->data->d_size = shstrtab->len = size;
+
+	return sec;
+}
+
+struct section *elf_create_rela_section(struct elf *elf, struct section *base)
+{
+	char *relaname;
+	struct section *sec;
+
+	relaname = malloc(strlen(base->name) + strlen(".rela") + 1);
+	if (!relaname) {
+		perror("malloc");
+		return NULL;
+	}
+	strcpy(relaname, ".rela");
+	strcat(relaname, base->name);
+
+	sec = elf_create_section(elf, relaname, sizeof(GElf_Rela), 0);
+	if (!sec)
+		return NULL;
+
+	base->rela = sec;
+	sec->base = base;
+
+	sec->sh.sh_type = SHT_RELA;
+	sec->sh.sh_addralign = 8;
+	sec->sh.sh_link = find_section_by_name(elf, ".symtab")->idx;
+	sec->sh.sh_info = base->idx;
+	sec->sh.sh_flags = SHF_INFO_LINK;
+
+	return sec;
+}
+
+int elf_rebuild_rela_section(struct section *sec)
+{
+	struct rela *rela;
+	int nr, index = 0, size;
+	GElf_Rela *relas;
+
+	nr = 0;
+	list_for_each_entry(rela, &sec->rela_list, list)
+		nr++;
+
+	size = nr * sizeof(*relas);
+	relas = malloc(size);
+	if (!relas) {
+		perror("malloc");
+		return -1;
+	}
+
+	sec->data->d_buf = relas;
+	sec->data->d_size = size;
+
+	sec->sh.sh_size = size;
+
+	index = 0;
+	list_for_each_entry(rela, &sec->rela_list, list) {
+		relas[index].r_offset = rela->offset;
+		relas[index].r_addend = rela->addend;
+		relas[index].r_info = GELF_R_INFO(rela->sym->idx, rela->type);
+		index++;
+	}
+
+	return 0;
+}
+
+int elf_write_to_file(struct elf *elf, char *outfile)
+{
+	int fd;
+	struct section *sec;
+	Elf *elfout;
+	GElf_Ehdr eh, ehout;
+	Elf_Scn *scn;
+	Elf_Data *data;
+	GElf_Shdr sh;
+
+	fd = creat(outfile, 0777);
+	if (fd == -1) {
+		perror("creat");
+		return -1;
+	}
+
+	elfout = elf_begin(fd, ELF_C_WRITE, NULL);
+	if (!elfout) {
+		perror("elf_begin");
+		return -1;
+	}
+
+	if (!gelf_newehdr(elfout, gelf_getclass(elf->elf))) {
+		perror("gelf_newehdr");
+		return -1;
+	}
+
+	if (!gelf_getehdr(elfout, &ehout)) {
+		perror("gelf_getehdr");
+		return -1;
+	}
+
+	if (!gelf_getehdr(elf->elf, &eh)) {
+		perror("gelf_getehdr");
+		return -1;
+	}
+
+	memset(&ehout, 0, sizeof(ehout));
+	ehout.e_ident[EI_DATA] = eh.e_ident[EI_DATA];
+	ehout.e_machine = eh.e_machine;
+	ehout.e_type = eh.e_type;
+	ehout.e_version = EV_CURRENT;
+	ehout.e_shstrndx = find_section_by_name(elf, ".shstrtab")->idx;
+
+	list_for_each_entry(sec, &elf->sections, list) {
+		if (sec->idx == 0)
+			continue;
+
+		scn = elf_newscn(elfout);
+		if (!scn) {
+			perror("elf_newscn");
+			return -1;
+		}
+
+		data = elf_newdata(scn);
+		if (!data) {
+			perror("elf_newdata");
+			return -1;
+		}
+
+		if (!elf_flagdata(data, ELF_C_SET, ELF_F_DIRTY)) {
+			perror("elf_flagdata");
+			return -1;
+		}
+
+		data->d_type = sec->data->d_type;
+		data->d_buf = sec->data->d_buf;
+		data->d_size = sec->data->d_size;
+
+		if(!gelf_getshdr(scn, &sh)) {
+			perror("gelf_getshdr");
+			return -1;
+		}
+
+		sh = sec->sh;
+
+		if (!gelf_update_shdr(scn, &sh)) {
+			perror("gelf_update_shdr");
+			return -1;
+		}
+	}
+
+	if (!gelf_update_ehdr(elfout, &ehout)) {
+		perror("gelf_update_ehdr");
+		return -1;
+	}
+
+	if (elf_update(elfout, ELF_C_WRITE) < 0) {
+		perror("elf_update");
+		return -1;
+	}
+
+	return 0;
+}
+
 void elf_close(struct elf *elf)
 {
 	struct section *sec, *tmpsec;
@@ -421,8 +638,6 @@ void elf_close(struct elf *elf)
 		list_del(&sec->list);
 		free(sec);
 	}
-	if (elf->name)
-		free(elf->name);
 	if (elf->fd > 0)
 		close(elf->fd);
 	if (elf->elf)
