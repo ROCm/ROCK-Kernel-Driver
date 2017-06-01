@@ -1077,24 +1077,13 @@ static int amdgpu_freesync_update_property_atomic(
 				struct drm_connector *connector,
 				uint64_t val_capable)
 {
-	struct drm_device *dev;
-	struct amdgpu_device *adev;
-	int ret;
-	uint64_t val;
+	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = dev->dev_private;
 
-	dev  = connector->dev;
-	adev = dev->dev_private;
+	return drm_object_property_set_value(&connector->base,
+					     adev->mode_info.freesync_property,
+					     val_capable);
 
-	ret = drm_object_property_get_value(
-			&connector->base,
-			adev->mode_info.freesync_property,
-			&val);
-	if (ret == 0 && val != 0 && val_capable == 0)
-		ret = drm_object_property_set_value(
-				&connector->base,
-				adev->mode_info.freesync_property,
-				val_capable);
-	return ret;
 
 }
 
