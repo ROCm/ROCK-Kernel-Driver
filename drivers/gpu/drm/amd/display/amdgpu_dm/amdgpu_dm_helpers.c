@@ -234,7 +234,8 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 
 		pbn = drm_dp_calc_pbn_mode(clock, bpp);
 
-		ret = drm_dp_mst_allocate_vcpi(mst_mgr, mst_port, pbn, &slots);
+		slots = drm_dp_find_vcpi_slots(mst_mgr, pbn);
+		ret = drm_dp_mst_allocate_vcpi(mst_mgr, mst_port, pbn, slots);
 
 		if (!ret)
 			return false;
