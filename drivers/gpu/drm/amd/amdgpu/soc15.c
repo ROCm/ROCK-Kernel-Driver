@@ -509,8 +509,10 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 		amdgpu_ip_block_add(adev, &vega10_ih_ip_block);
 		amdgpu_ip_block_add(adev, &psp_v10_0_ip_block);
 		amdgpu_ip_block_add(adev, &amdgpu_pp_ip_block);
+		if (adev->enable_virtual_display || amdgpu_sriov_vf(adev))
+			amdgpu_ip_block_add(adev, &dce_virtual_ip_block);
 #if defined(CONFIG_DRM_AMD_DC)
-		if (amdgpu_device_has_dc_support(adev))
+		else if (amdgpu_device_has_dc_support(adev))
 			amdgpu_ip_block_add(adev, &dm_ip_block);
 #else
 #	warning "Enable CONFIG_DRM_AMD_DC for display support on Raven."
