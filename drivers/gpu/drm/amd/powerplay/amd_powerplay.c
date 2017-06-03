@@ -251,7 +251,9 @@ static int pp_suspend(void *handle)
 
 	ret = pp_check(pp_handle);
 
-	if (ret != 0)
+	if (ret == PP_DPM_DISABLED)
+		return 0;
+	else if (ret != 0)
 		return ret;
 
 	eventmgr = pp_handle->eventmgr;
@@ -493,8 +495,10 @@ static int pp_dpm_dispatch_tasks(void *handle, enum amd_pp_event event_id,
 	{
 		enum amd_pm_state_type  ps;
 
-		if (input == NULL)
-			return -EINVAL;
+		if (input == NULL) {
+			ret = -EINVAL;
+			break;
+		}
 		ps = *(unsigned long *)input;
 
 		data.requested_ui_label = power_state_convert(ps);
@@ -539,15 +543,19 @@ static enum amd_pm_state_type pp_dpm_get_current_power_state(void *handle)
 	switch (state->classification.ui_label) {
 	case PP_StateUILabel_Battery:
 		pm_type = POWER_STATE_TYPE_BATTERY;
+		break;
 	case PP_StateUILabel_Balanced:
 		pm_type = POWER_STATE_TYPE_BALANCED;
+		break;
 	case PP_StateUILabel_Performance:
 		pm_type = POWER_STATE_TYPE_PERFORMANCE;
+		break;
 	default:
 		if (state->classification.flags & PP_StateClassificationFlag_Boot)
 			pm_type = POWER_STATE_TYPE_INTERNAL_BOOT;
 		else
 			pm_type = POWER_STATE_TYPE_DEFAULT;
+		break;
 	}
 	mutex_unlock(&pp_handle->pp_lock);
 
@@ -894,7 +902,7 @@ static int pp_dpm_set_sclk_od(void *handle, uint32_t value)
 
 	mutex_lock(&pp_handle->pp_lock);
 	ret = hwmgr->hwmgr_func->set_sclk_od(hwmgr, value);
-	mutex_lock(&pp_handle->pp_lock);
+	mutex_unlock(&pp_handle->pp_lock);
 	return ret;
 }
 

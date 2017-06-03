@@ -904,6 +904,7 @@ static void find_system_memory(const struct dmi_header *dm,
  */
 static int kfd_add_perf_to_topology(struct kfd_topology_device *kdev)
 {
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 	struct kfd_perf_properties *props;
 
 	if (amd_iommu_pc_supported()) {
@@ -915,6 +916,7 @@ static int kfd_add_perf_to_topology(struct kfd_topology_device *kdev)
 			amd_iommu_pc_get_max_counters(0); /* assume one iommu */
 		list_add_tail(&props->list, &kdev->perf_props);
 	}
+#endif
 
 	return 0;
 }
@@ -933,6 +935,7 @@ static void kfd_add_non_crat_information(struct kfd_topology_device *kdev)
 	/* TODO: For GPU node, rearrange code from kfd_topology_add_device */
 }
 
+#ifdef CONFIG_ACPI
 /* kfd_is_acpi_crat_invalid - CRAT from ACPI is valid only for AMD APU devices.
  *	Ignore CRAT for all other devices. AMD APU is identified if both CPU
  *	and GPU cores are present.
@@ -959,6 +962,7 @@ static void kfd_delete_topology_device_list(struct list_head *device_list)
 	list_for_each_entry_safe(dev, tmp, device_list, list)
 		kfd_release_topology_device(dev);
 }
+#endif
 
 int kfd_topology_init(void)
 {
@@ -997,6 +1001,7 @@ int kfd_topology_init(void)
 	 * NOTE: The current implementation expects all AMD APUs to have
 	 *	CRAT. If no CRAT is available, it is assumed to be a CPU
 	 */
+#ifdef CONFIG_ACPI
 	ret = kfd_create_crat_image_acpi(&crat_image, &image_size);
 	if (ret == 0) {
 		ret = kfd_parse_crat_table(crat_image,
@@ -1012,7 +1017,7 @@ int kfd_topology_init(void)
 			crat_image = NULL;
 		}
 	}
-
+#endif
 	if (!crat_image) {
 		ret = kfd_create_crat_image_virtual(&crat_image, &image_size,
 				COMPUTE_UNIT_CPU, NULL,
@@ -1365,7 +1370,6 @@ int kfd_topology_enum_kfd_devices(uint8_t idx, struct kfd_dev **kdev)
 
 static int kfd_cpumask_to_apic_id(const struct cpumask *cpumask)
 {
-	const struct cpuinfo_x86 *cpuinfo;
 	int first_cpu_of_numa_node;
 
 	if (cpumask == NULL || cpumask == cpu_none_mask)
@@ -1373,9 +1377,11 @@ static int kfd_cpumask_to_apic_id(const struct cpumask *cpumask)
 	first_cpu_of_numa_node = cpumask_first(cpumask);
 	if (first_cpu_of_numa_node >= nr_cpu_ids)
 		return -1;
-	cpuinfo = &cpu_data(first_cpu_of_numa_node);
-
-	return cpuinfo->apicid;
+#ifdef CONFIG_X86_64
+	return cpu_data(first_cpu_of_numa_node).apicid;
+#else
+	return first_cpu_of_numa_node;
+#endif
 }
 
 /* kfd_numa_node_to_apic_id - Returns the APIC ID of the first logical processor

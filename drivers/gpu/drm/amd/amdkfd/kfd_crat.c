@@ -1,7 +1,9 @@
 #include <linux/kernel.h>
 #include <linux/acpi.h>
 #include <linux/mm.h>
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 #include <linux/amd-iommu.h>
+#endif
 #include <linux/pci.h>
 #include "kfd_crat.h"
 #include "kfd_priv.h"
@@ -664,6 +666,7 @@ static int kfd_fill_gpu_cache_info(struct kfd_dev *kdev,
  *
  * Return 0 if successful else return -ve value
  */
+#ifdef CONFIG_ACPI
 int kfd_create_crat_image_acpi(void **crat_image, size_t *size)
 {
 	struct acpi_table_header *crat_table;
@@ -706,6 +709,7 @@ int kfd_create_crat_image_acpi(void **crat_image, size_t *size)
 
 	return 0;
 }
+#endif
 
 /* Memory required to create Virtual CRAT.
  * Since there is no easy way to predict the amount of memory required, the
@@ -808,12 +812,14 @@ static int kfd_fill_mem_info_for_cpu(int numa_node_id, int *avail_size,
 static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 {
 	struct crat_header *crat_table = (struct crat_header *)pcrat_image;
-	struct acpi_table_header *acpi_table;
-	acpi_status status;
 	struct crat_subtype_generic *sub_type_hdr;
 	int avail_size = *size;
 	int numa_node_id;
 	int ret = 0;
+#ifdef CONFIG_ACPI
+	struct acpi_table_header *acpi_table;
+	acpi_status status;
+#endif
 
 	if (pcrat_image == NULL || avail_size < VCRAT_SIZE_FOR_CPU)
 		return -EINVAL;
@@ -829,6 +835,7 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 	memcpy(&crat_table->signature, CRAT_SIGNATURE, sizeof(crat_table->signature));
 	crat_table->length = sizeof(struct crat_header);
 
+#ifdef CONFIG_ACPI
 	status = acpi_get_table("DSDT", 0, &acpi_table);
 	if (status == AE_NOT_FOUND)
 		pr_warn("DSDT table not found for OEM information\n");
@@ -837,6 +844,11 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 		memcpy(crat_table->oem_id, acpi_table->oem_id, CRAT_OEMID_LENGTH);
 		memcpy(crat_table->oem_table_id, acpi_table->oem_table_id, CRAT_OEMTABLEID_LENGTH);
 	}
+#else
+	crat_table->oem_revision = 0;
+	memcpy(crat_table->oem_id, "INV", CRAT_OEMID_LENGTH);
+	memcpy(crat_table->oem_table_id, "UNAVAIL", CRAT_OEMTABLEID_LENGTH);
+#endif
 	crat_table->total_entries = 0;
 	crat_table->num_domains = 0;
 
@@ -969,15 +981,17 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	struct crat_subtype_generic *sub_type_hdr;
 	struct crat_subtype_computeunit *cu;
 	struct kfd_cu_info cu_info;
-	struct amd_iommu_device_info iommu_info;
 	int avail_size = *size;
 	uint32_t total_num_of_cu;
 	int num_of_cache_entries = 0;
 	int cache_mem_filled = 0;
 	int ret = 0;
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
+	struct amd_iommu_device_info iommu_info;
 	const u32 required_iommu_flags = AMD_IOMMU_DEVICE_FLAG_ATS_SUP |
 								AMD_IOMMU_DEVICE_FLAG_PRI_SUP |
 								AMD_IOMMU_DEVICE_FLAG_PASID_SUP;
+#endif
 	struct kfd_local_mem_info local_mem_info;
 
 	if (pcrat_image == NULL || avail_size < VCRAT_SIZE_FOR_GPU)
@@ -1035,11 +1049,13 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 
 	/* Check if this node supports IOMMU. During parsing this flag will
 	 * translate to HSA_CAP_ATS_PRESENT */
+#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 	iommu_info.flags = 0;
 	if (0 == amd_iommu_device_info(kdev->pdev, &iommu_info)) {
 		if ((iommu_info.flags & required_iommu_flags) == required_iommu_flags)
 			cu->hsa_capability |= CRAT_CU_FLAGS_IOMMU_PRESENT;
 	}
+#endif
 
 	crat_table->length += sub_type_hdr->length;
 	crat_table->total_entries++;

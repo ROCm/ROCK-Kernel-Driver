@@ -2221,15 +2221,16 @@ static struct iommu_group *amd_iommu_device_group(struct device *dev)
 
 static void __queue_flush(struct flush_queue *queue)
 {
-	struct protection_domain *domain;
-	unsigned long flags;
 	int idx;
 
-	/* First flush TLB of all known domains */
-	spin_lock_irqsave(&amd_iommu_pd_lock, flags);
-	list_for_each_entry(domain, &amd_iommu_pd_list, list)
-		domain_flush_tlb(domain);
-	spin_unlock_irqrestore(&amd_iommu_pd_lock, flags);
+	/* First flush TLB of all domains which were added to flush queue */
+	for (idx = 0; idx < queue->next; ++idx) {
+		struct flush_queue_entry *entry;
+
+		entry = queue->entries + idx;
+
+		domain_flush_tlb(&entry->dma_dom->domain);
+	}
 
 	/* Wait until flushes have completed */
 	domain_flush_complete(NULL);
