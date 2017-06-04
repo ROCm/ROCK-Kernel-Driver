@@ -1103,7 +1103,6 @@ void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc)
 	kfree(crtc);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
 static void amdgpu_dm_atomic_crtc_gamma_set(
 		struct drm_crtc *crtc,
 		u16 *red,
@@ -1119,22 +1118,6 @@ static void amdgpu_dm_atomic_crtc_gamma_set(
 
 	drm_atomic_helper_crtc_set_property(crtc, prop, 0);
 }
-#else
-static int amdgpu_dm_atomic_crtc_gamma_set(
-		struct drm_crtc *crtc,
-		u16 *red,
-		u16 *green,
-		u16 *blue,
-		uint32_t size)
-{
-	struct drm_device *dev = crtc->dev;
-	struct drm_property *prop = dev->mode_config.prop_crtc_id;
-
-	crtc->state->mode.private_flags |= AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
-
-	return drm_atomic_helper_crtc_set_property(crtc, prop, 0);
-}
-#endif
 
 static int dm_crtc_funcs_atomic_set_property(
 	struct drm_crtc *crtc,
@@ -1895,9 +1878,7 @@ static bool page_flip_needed(
 	return page_flip_required;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || \
-	defined(OS_NAME_RHEL_6) || \
-	defined(OS_NAME_RHEL_7_3)
+#if defined(OS_NAME_RHEL_6) || defined(OS_NAME_RHEL_7_3)
 static int dm_plane_helper_prepare_fb(
 	struct drm_plane *plane,
 	struct drm_plane_state *new_state)
@@ -1910,7 +1891,7 @@ static int dm_plane_helper_prepare_fb(
 	struct drm_plane *plane,
 	struct drm_framebuffer *fb,
 	const struct drm_plane_state *new_state)
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) */
+#endif
 {
 	struct amdgpu_framebuffer *afb;
 	struct drm_gem_object *obj;
@@ -1941,9 +1922,7 @@ static int dm_plane_helper_prepare_fb(
 
 	return 0;
 }
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || \
-	defined(OS_NAME_RHEL_6) || \
-	defined(OS_NAME_RHEL_7_3)
+#if defined(OS_NAME_RHEL_6) || defined(OS_NAME_RHEL_7_3)
 static void dm_plane_helper_cleanup_fb(
 	struct drm_plane *plane,
 	struct drm_plane_state *old_state)
@@ -1956,7 +1935,7 @@ static void dm_plane_helper_cleanup_fb(
 	struct drm_plane *plane,
 	struct drm_framebuffer *fb,
 	const struct drm_plane_state *old_state)
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) */
+#endif
 {
 	struct amdgpu_bo *rbo;
 	struct amdgpu_framebuffer *afb;
@@ -2839,74 +2818,13 @@ int amdgpu_dm_atomic_commit(
 			return ret;
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
-	/* Page flip if needed */
-	for_each_plane_in_state(state, plane, new_plane_state, i) {
-		struct drm_plane_state *old_plane_state = plane->state;
-		struct drm_crtc *crtc = new_plane_state->crtc;
-		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
-		struct drm_framebuffer *fb = new_plane_state->fb;
-		struct drm_crtc_state *crtc_state;
-
-		if (!fb || !crtc)
-			continue;
-
-		crtc_state = drm_atomic_get_crtc_state(state, crtc);
-
-		if (!crtc_state->planes_changed || !crtc_state->active)
-			continue;
-
-		if (page_flip_needed(
-				new_plane_state,
-				old_plane_state,
-				crtc_state->event,
-				false)) {
-			ret = amdgpu_crtc_prepare_flip(crtc,
-							fb,
-							crtc_state->event,
-							acrtc->flip_flags,
-							drm_crtc_vblank_count(crtc),
-							&work[flip_crtcs_count],
-							&new_abo[flip_crtcs_count]);
-
-			if (ret) {
-				/* According to atomic_commit hook API, EINVAL is not allowed */
-				if (unlikely(ret == -EINVAL))
-					ret = -ENOMEM;
-
-				DRM_ERROR("Atomic commit: Flip for  crtc id %d: [%p], "
-									"failed, errno = %d\n",
-									acrtc->crtc_id,
-									acrtc,
-									ret);
-				/* cleanup all flip configurations which
-				 * succeeded in this commit
-				 */
-				for (i = 0; i < flip_crtcs_count; i++)
-					amdgpu_crtc_cleanup_flip_ctx(
-							work[i],
-							new_abo[i]);
-
-				return ret;
-			}
-
-			flip_crtcs[flip_crtcs_count] = crtc;
-			flip_crtcs_count++;
-		}
-	}
-#endif
-
 	/*
 	 * This is the point of no return - everything below never fails except
 	 * when the hw goes bonghits. Which means we can commit the new state on
 	 * the software side now.
 	 */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
 	drm_atomic_helper_swap_state(dev, state);
-#else
-	drm_atomic_helper_swap_state(state, true);
-#endif
 
 	/*
 	 * From this point state become old state really. New state is
@@ -3102,16 +3020,6 @@ int amdgpu_dm_atomic_commit(
 				old_plane_state,
 				crtc->state->event,
 				false)) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
-				amdgpu_crtc_submit_flip(
-							crtc,
-						    fb,
-						    work[flip_crtcs_count],
-						    new_abo[i]);
-				 flip_crtcs_count++;
-			/*clean up the flags for next usage*/
-			acrtc->flip_flags = 0;
-#else
 			ret = amdgpu_crtc_page_flip(crtc,
 						    fb,
 						    crtc->state->event,
@@ -3120,7 +3028,6 @@ int amdgpu_dm_atomic_commit(
 			acrtc->flip_flags = 0;
 			if (ret)
 				return ret;
-#endif
 		}
 	}
 
