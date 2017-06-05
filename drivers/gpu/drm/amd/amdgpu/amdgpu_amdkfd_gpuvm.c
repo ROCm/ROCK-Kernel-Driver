@@ -1363,8 +1363,8 @@ static u64 get_vm_pd_gpu_offset(void *vm)
 	/* On some ASICs the FB doesn't start at 0. Adjust FB offset
 	 * to an actual MC address.
 	 */
-	if (adev->gart.gart_funcs->adjust_mc_addr)
-		offset = adev->gart.gart_funcs->adjust_mc_addr(adev, offset);
+	if (adev->gart.gart_funcs->get_vm_pde)
+		offset = amdgpu_gart_get_vm_pde(adev, offset);
 
 	return offset;
 }
