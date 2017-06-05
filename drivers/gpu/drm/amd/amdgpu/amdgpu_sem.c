@@ -338,8 +338,8 @@ static struct dma_fence *amdgpu_sem_get_fence(struct amdgpu_fpriv *fpriv,
 	ctx = amdgpu_ctx_get(fpriv, ctx_id);
 	if (!ctx)
 		return NULL;
-	r = amdgpu_cs_get_ring(ctx->adev, ip_type, ip_instance, ring,
-			       &out_ring);
+	r = amdgpu_queue_mgr_map(ctx->adev, &ctx->queue_mgr, ip_type,
+			       ip_instance, ring, &out_ring);
 	if (r) {
 		amdgpu_ctx_put(ctx);
 		return NULL;
@@ -368,8 +368,8 @@ static int amdgpu_sem_cring_add(struct amdgpu_fpriv *fpriv,
 	ctx = amdgpu_ctx_get(fpriv, ctx_id);
 	if (!ctx)
 		return -EINVAL;
-	r = amdgpu_cs_get_ring(ctx->adev, ip_type, ip_instance, ring,
-			       &out_ring);
+	r = amdgpu_queue_mgr_map(ctx->adev, &ctx->queue_mgr, ip_type,
+			         ip_instance, ring, &out_ring);
 	if (r)
 		goto err;
 
