@@ -1094,26 +1094,48 @@ static void restore_reg(struct insn_state *state, unsigned char reg)
  * the stack pointer when aligning the stack.  r10 or r13 is used as the DRAP
  * register.  The typical DRAP pattern is:
  *
- *   ffffffff810079c5:	4c 8d 54 24 08		lea    0x8(%rsp),%r10
- *   ffffffff810079ca:	48 83 e4 c0		and    $0xffffffffffffffc0,%rsp
- *   ffffffff810079ce:	41 ff 72 f8		pushq  -0x8(%r10)
- *   ffffffff810079d2:	55			push   %rbp
- *   ffffffff810079d3:	48 89 e5		mov    %rsp,%rbp
- *   ...
- *   ffffffff810079e5:	41 52			push   %r10
- *   ...
- *   ffffffff810079e8:	48 81 ec 00 02 00 00	sub    $0x200,%rsp
- *   ...
- *   ffffffff81007b56:	48 81 c4 00 02 00 00	add    $0x200,%rsp
- *   ...
- *   ffffffff81007b5e:	41 5a			pop    %r10
- *   ...
- *   ffffffff81007b68:	5d			pop    %rbp
- *   ffffffff81007b69:	49 8d 62 f8		lea    -0x8(%r10),%rsp
- *   ffffffff81007b6d:	c3			retq
+ *   4c 8d 54 24 08		lea    0x8(%rsp),%r10
+ *   48 83 e4 c0		and    $0xffffffffffffffc0,%rsp
+ *   41 ff 72 f8		pushq  -0x8(%r10)
+ *   55				push   %rbp
+ *   48 89 e5			mov    %rsp,%rbp
+ *				(more pushes)
+ *   41 52			push   %r10
+ *				...
+ *   41 5a			pop    %r10
+ *				(more pops)
+ *   5d				pop    %rbp
+ *   49 8d 62 f8		lea    -0x8(%r10),%rsp
+ *   c3				retq
  *
- * When r13 is used as the DRAP pointer, the main difference from the above is
- * that r13 gets pushed before the realignment.
+ * There are some variations in the epilogues, like:
+ *
+ *   5b				pop    %rbx
+ *   41 5a			pop    %r10
+ *   41 5c			pop    %r12
+ *   41 5d			pop    %r13
+ *   41 5e			pop    %r14
+ *   c9				leaveq
+ *   49 8d 62 f8		lea    -0x8(%r10),%rsp
+ *   c3				retq
+ *
+ * and:
+ *
+ *   4c 8b 55 f8		mov    -0x8(%rbp),%r10
+ *   c9				leaveq
+ *   49 8d 62 f8		lea    -0x8(%r10),%rsp
+ *   c3				retq
+ *
+ * Sometimes r13 is used as the DRAP register, in which case it's saved and
+ * restored beforehand:
+ *
+ *   41 55			push   %r13
+ *   4c 8d 6c 24 10		lea    0x10(%rsp),%r13
+ *   48 83 e4 f0		and    $0xfffffffffffffff0,%rsp
+ *				...
+ *   49 8d 65 f0		lea    -0x10(%r13),%rsp
+ *   41 5d			pop    %r13
+ *   c3				retq
  */
 static int update_insn_state(struct instruction *insn, struct insn_state *state)
 {
@@ -1225,7 +1247,7 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 
 			/*
 			 * Older versions of GCC (4.8ish) realign the stack
-			 * without drap, with a frame pointer.
+			 * without DRAP, with a frame pointer.
 			 */
 
 			break;
@@ -1238,11 +1260,7 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 				cfa->base = CFI_SP;
 			}
 
-			state->stack_size -= 8;
-			if (cfa->base == CFI_SP)
-				cfa->offset -= 8;
-
-			if (regs[op->dest.reg].offset + state->stack_size == -8) {
+			if (regs[op->dest.reg].offset == -state->stack_size) {
 
 				if (state->drap && cfa->base == CFI_BP_INDIRECT &&
 				    op->dest.type == OP_DEST_REG &&
@@ -1256,14 +1274,30 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 				restore_reg(state, op->dest.reg);
 			}
 
+			state->stack_size -= 8;
+			if (cfa->base == CFI_SP)
+				cfa->offset -= 8;
+
 			break;
 
 		case OP_SRC_REG_INDIRECT:
-			if (op->src.reg == cfa->base &&
+			if (state->drap && cfa->base == CFI_BP_INDIRECT &&
+			    op->src.reg == CFI_BP &&
+			    op->src.offset == regs[op->dest.reg].offset) {
+
+				/* drap: mov disp(%rbp), %reg */
+				if (op->dest.reg == state->drap_reg) {
+					cfa->base = state->drap_reg;
+					cfa->offset = 0;
+				}
+
+				restore_reg(state, op->dest.reg);
+
+			} else if (op->src.reg == cfa->base &&
 			    op->src.offset == regs[op->dest.reg].offset + cfa->offset) {
 
-				/* mov disp(%rbp), reg */
-				/* mov disp(%rsp), reg */
+				/* mov disp(%rbp), %reg */
+				/* mov disp(%rsp), %reg */
 				restore_reg(state, op->dest.reg);
 			}
 
@@ -1289,7 +1323,7 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 
 	case OP_DEST_REG_INDIRECT:
 		if (state->drap) {
-			if (op->src.reg == cfa->base) {
+			if (op->src.reg == cfa->base && op->src.reg == state->drap_reg) {
 
 				/* drap: push %drap */
 				cfa->base = CFI_BP_INDIRECT;
@@ -1305,7 +1339,7 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 
 			} else if (regs[op->src.reg].base == CFI_UNDEFINED) {
 
-				/* drap: push reg (other than rbp) */
+				/* drap: push %reg (other than drap or rbp) */
 				save_reg(state, op->src.reg, CFI_BP, -state->stack_size);
 			}
 
@@ -1313,6 +1347,7 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 
 			/* push reg */
 			save_reg(state, op->src.reg, CFI_CFA, -state->stack_size);
+
 		} else if (op->dest.reg == cfa->base) {
 
 			/* mov reg, disp(%rbp) */
@@ -1330,7 +1365,7 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 
 	case OP_DEST_LEAVE:
 		if ((!state->drap && cfa->base != CFI_BP) ||
-		    (state->drap && (cfa->base != state->drap_reg || state->stack_size))) {
+		    (state->drap && cfa->base != state->drap_reg)) {
 			WARN_FUNC("leave instruction with modified stack frame",
 				  insn->sec, insn->offset);
 			return -1;
@@ -1338,13 +1373,13 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 
 		/* leave (mov %rbp, %rsp; pop %rbp) */
 
+		state->stack_size = -state->regs[CFI_BP].offset - 8;
+		restore_reg(state, CFI_BP);
+
 		if (!state->drap) {
 			cfa->base = CFI_SP;
 			cfa->offset -= 8;
-			state->stack_size = cfa->offset;
 		}
-
-		restore_reg(state, CFI_BP);
 
 		break;
 
