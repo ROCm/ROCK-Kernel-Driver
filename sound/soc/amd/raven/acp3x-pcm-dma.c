@@ -52,7 +52,7 @@ static const struct snd_pcm_hardware acp3x_pcm_hardware_playback = {
 		   SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S24_LE |
 		   SNDRV_PCM_FMTBIT_S32_LE,
 	.channels_min = 2,
-	.channels_max = 8,
+	.channels_max = 6,
 	.rates = SNDRV_PCM_RATE_8000_96000,
 	.rate_min = 8000,
 	.rate_max = 96000,
@@ -228,12 +228,12 @@ static void config_acp3x_dma(struct i2s_stream_instance *rtd, int direction)
 	struct page *pg = rtd->pg;
 
 	/* 8 scratch registers used to map one 64 bit address.
-	 * For 2 pages (4096 * 2 bytes), it will be 16 registers.
+	 * For 2 pages (8192 * 2 bytes), it will be 16 registers.
 	 */
 	if (direction == SNDRV_PCM_STREAM_PLAYBACK)
 		val = 0;
 	else
-		val = 16;
+		val = 32;
 
 	/* Group Enable */
 	rv_writel(ACP_SRAM_PTE_OFFSET | BIT(31), rtd->acp3x_base +
@@ -461,22 +461,22 @@ static int acp3x_dai_set_tdm_slot(struct snd_soc_dai *cpu_dai, u32 tx_mask,
 				u32 rx_mask, int slots, int slot_width)
 {
 	u32 val = 0;
-	u16 resolution;
+	u16 slot_len;
 
 	struct i2s_dev_data *adata = snd_soc_dai_get_drvdata(cpu_dai);
 
 	switch (slot_width) {
 	case 8:
-		resolution = 0;
+		slot_len = 8;
 	break;
 	case 16:
-		resolution = 2;
+		slot_len = 16;
 	break;
 	case 24:
-		resolution = 4;
+		slot_len = 24;
 	break;
 	case 32:
-		resolution = 5;
+		slot_len = 0;
 	break;
 	default:
 		return -EINVAL;
@@ -488,7 +488,7 @@ static int acp3x_dai_set_tdm_slot(struct snd_soc_dai *cpu_dai, u32 tx_mask,
 	val = rv_readl(adata->acp3x_base + mmACP_BTTDM_IRER);
 	rv_writel((val | 0x2), adata->acp3x_base + mmACP_BTTDM_IRER);
 
-	val = (FRM_LEN | ((slots-1) << 15) | (resolution << 18));
+	val = (FRM_LEN | ((slots) << 15) | (slot_len << 18));
 	rv_writel(val, adata->acp3x_base + mmACP_BTTDM_TXFRMT);
 	rv_writel(val, adata->acp3x_base + mmACP_BTTDM_RXFRMT);
 
@@ -500,6 +500,7 @@ static int acp3x_dai_i2s_hwparams(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params,
 				struct snd_soc_dai *dai)
 {
+	u32 val = 0;
 	struct i2s_stream_instance *rtd = substream->runtime->private_data;
 
 	switch (params_format(params)) {
@@ -521,12 +522,12 @@ static int acp3x_dai_i2s_hwparams(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
+	val = rv_readl(rtd->acp3x_base + mmACP_BTTDM_ITER);
+	val = val | (rtd->xfer_resolution  << 3);
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		rv_writel((rtd->xfer_resolution  << 3),
-			rtd->acp3x_base + mmACP_BTTDM_ITER);
+		rv_writel(val, rtd->acp3x_base + mmACP_BTTDM_ITER);
 	else
-		rv_writel((rtd->xfer_resolution  << 3),
-			rtd->acp3x_base + mmACP_BTTDM_IRER);
+		rv_writel(val, rtd->acp3x_base + mmACP_BTTDM_IRER);
 
 	return 0;
 }
