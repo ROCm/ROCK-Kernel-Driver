@@ -395,7 +395,7 @@ static int gmc_v9_0_early_init(void *handle)
 static int gmc_v9_0_late_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	unsigned vm_inv_eng[AMDGPU_MAX_VMHUBS] = { 3, 3 };
+	unsigned vm_inv_eng[AMDGPU_MAX_VMHUBS] = { 4, 4 };
 	unsigned i;
 
 	for(i = 0; i < adev->num_rings; ++i) {
