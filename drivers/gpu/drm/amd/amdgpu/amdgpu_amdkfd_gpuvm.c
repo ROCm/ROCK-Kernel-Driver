@@ -871,7 +871,7 @@ static void unreserve_bo_and_vms(struct bo_vm_reservation_context *ctx,
 				 bool wait)
 {
 	if (wait)
-		amdgpu_sync_wait(&ctx->sync);
+		amdgpu_sync_wait(&ctx->sync, false);
 
 	if (ctx->reserved)
 		ttm_eu_backoff_reservation(&ctx->ticket, &ctx->list);
@@ -2129,7 +2129,7 @@ unreserve_out:
 		amdgpu_bo_fence(peer_vm->base.root.bo,
 				&process_info->eviction_fence->base, true);
 	ttm_eu_backoff_reservation(&ticket, &resv_list);
-	amdgpu_sync_wait(&sync);
+	amdgpu_sync_wait(&sync, false);
 	amdgpu_sync_free(&sync);
 out:
 	kfree(pd_bo_list_entries);
@@ -2330,7 +2330,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 		}
 	}
 
-	amdgpu_sync_wait(&ctx.sync);
+	amdgpu_sync_wait(&ctx.sync, false);
 
 	/* Wait for validate to finish and attach new eviction fence */
 	list_for_each_entry(mem, &process_info->kfd_bo_list,
