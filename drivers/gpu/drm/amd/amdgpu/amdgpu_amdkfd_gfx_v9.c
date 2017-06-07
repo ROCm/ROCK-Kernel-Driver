@@ -920,7 +920,7 @@ static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
 		VM_INVALIDATE_ENG16_REQ__INVALIDATE_L2_PDE2_MASK |
 		VM_INVALIDATE_ENG16_REQ__INVALIDATE_L1_PTES_MASK;
 
-	mutex_lock(&adev->srbm_mutex);
+	spin_lock(&adev->tlb_invalidation_lock);
 
 	/* Use light weight invalidation.
 	 *
@@ -957,7 +957,7 @@ static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
 					(1 << vmid)))
 		cpu_relax();
 
-	mutex_unlock(&adev->srbm_mutex);
+	spin_unlock(&adev->tlb_invalidation_lock);
 
 }
 

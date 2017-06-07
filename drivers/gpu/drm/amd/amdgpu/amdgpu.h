@@ -1671,7 +1671,10 @@ struct amdgpu_device {
 
 	/* record hw reset is performed */
 	bool has_hw_reset;
+
 	u8				reset_magic[AMDGPU_RESET_MAGIC_NUM];
+
+	spinlock_t tlb_invalidation_lock;
 
 	/* record last mm index being written through WREG32*/
 	unsigned long last_mm_index;
