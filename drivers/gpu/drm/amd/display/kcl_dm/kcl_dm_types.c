@@ -2501,60 +2501,32 @@ int amdgpu_dm_encoder_init(
 	return res;
 }
 
-enum dm_commit_action {
-	DM_COMMIT_ACTION_NOTHING,
-	DM_COMMIT_ACTION_RESET,
-	DM_COMMIT_ACTION_DPMS_ON,
-	DM_COMMIT_ACTION_DPMS_OFF,
-	DM_COMMIT_ACTION_SET
-};
-
-static enum dm_commit_action get_dm_commit_action(struct drm_crtc_state *state)
+static bool modeset_required(struct drm_crtc_state *crtc_state)
 {
-	/* mode changed means either actually mode changed or enabled changed */
-	/* active changed means dpms changed */
+	if (!(crtc_state->mode_changed || crtc_state->active_changed
 #if !defined(OS_NAME_RHEL_7_2)
-	DRM_DEBUG_KMS("crtc_state_flags: enable:%d, active:%d, planes_changed:%d, mode_changed:%d,active_changed:%d,connectors_changed:%d\n",
-			state->enable,
-			state->active,
-			state->planes_changed,
-			state->mode_changed,
-			state->active_changed,
-			state->connectors_changed);
+				|| crtc_state->connectors_changed
 #endif
-	if (state->mode_changed) {
-		/* if it is got disabled - call reset mode */
-		if (!state->enable)
-			return DM_COMMIT_ACTION_RESET;
+				))
+		return false;
 
-		if (state->active)
-			return DM_COMMIT_ACTION_SET;
-		else
-			return DM_COMMIT_ACTION_RESET;
-	} else {
-		/* ! mode_changed */
+	if (!crtc_state->enable)
+		return false;
 
-		/* if it is remain disable - skip it */
-		if (!state->enable)
-			return DM_COMMIT_ACTION_NOTHING;
-
-#if !defined(OS_NAME_RHEL_7_2)
-		if (state->active && state->connectors_changed)
-			return DM_COMMIT_ACTION_SET;
-#endif
-		if (state->active_changed) {
-			if (state->active) {
-				return DM_COMMIT_ACTION_DPMS_ON;
-			} else {
-				return DM_COMMIT_ACTION_DPMS_OFF;
-			}
-		} else {
-			/* ! active_changed */
-			return DM_COMMIT_ACTION_NOTHING;
-		}
-	}
+	return crtc_state->active;
 }
 
+static bool modereset_required(struct drm_crtc_state *crtc_state)
+{
+	if (!(crtc_state->mode_changed || crtc_state->active_changed
+#if !defined(OS_NAME_RHEL_7_2)
+				|| crtc_state->connectors_changed
+#endif
+				))
+		return false;
+
+	return !crtc_state->enable || !crtc_state->active;
+}
 
 typedef bool (*predicate)(struct amdgpu_crtc *acrtc);
 
@@ -2691,13 +2663,10 @@ void dc_commit_surfaces(struct drm_atomic_state *state,
 		struct drm_framebuffer *fb = plane_state->fb;
 		struct drm_connector *connector;
 		struct dm_connector_state *con_state = NULL;
-		enum dm_commit_action action;
 
 		if (!fb || !crtc || !crtc->state->planes_changed ||
 			!crtc->state->active)
 			continue;
-
-		action = get_dm_commit_action(crtc->state);
 
 		/* Surfaces are created under two scenarios:
 		 * 1. This commit is not a page flip.
@@ -2707,8 +2676,7 @@ void dc_commit_surfaces(struct drm_atomic_state *state,
 				plane_state,
 				old_plane_state,
 				crtc->state->event, true) ||
-				action == DM_COMMIT_ACTION_DPMS_ON ||
-				action == DM_COMMIT_ACTION_SET) {
+				modeset_required(crtc->state)) {
 			list_for_each_entry(connector,
 					    &dev->mode_config.connector_list,
 					    head) {
@@ -2813,7 +2781,6 @@ int amdgpu_dm_atomic_commit(
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		struct amdgpu_crtc *acrtc;
 		struct amdgpu_connector *aconnector = NULL;
-		enum dm_commit_action action;
 		struct drm_crtc_state *new_state = crtc->state;
 
 		acrtc = to_amdgpu_crtc(crtc);
@@ -2824,15 +2791,29 @@ int amdgpu_dm_atomic_commit(
 				crtc,
 				false);
 
+		DRM_DEBUG_KMS(
+			"amdgpu_crtc id:%d crtc_state_flags: enable:%d, active:%d, "
+			"planes_changed:%d, mode_changed:%d, active_changed:%d"
+#if !defined(OS_NAME_RHEL_7_2)
+			", connectors_changed:%d"
+#endif
+			"\n",
+			acrtc->crtc_id,
+			new_state->enable,
+			new_state->active,
+			new_state->planes_changed,
+			new_state->mode_changed,
+			new_state->active_changed
+#if !defined(OS_NAME_RHEL_7_2)
+			, new_state->connectors_changed
+#endif
+			);
+
 		/* handles headless hotplug case, updating new_state and
 		 * aconnector as needed
 		 */
 
-		action = get_dm_commit_action(new_state);
-
-		switch (action) {
-		case DM_COMMIT_ACTION_DPMS_ON:
-		case DM_COMMIT_ACTION_SET: {
+		if (modeset_required(new_state)) {
 			struct dm_connector_state *dm_state = NULL;
 			new_stream = NULL;
 
@@ -2882,21 +2863,12 @@ int amdgpu_dm_atomic_commit(
 			acrtc->enabled = true;
 			acrtc->hw_mode = crtc->state->mode;
 			crtc->hwmode = crtc->state->mode;
-
-			break;
-		}
-
-		case DM_COMMIT_ACTION_DPMS_OFF:
-		case DM_COMMIT_ACTION_RESET:
+		} else if (modereset_required(new_state)) {
 			DRM_INFO("Atomic commit: RESET. crtc id %d:[%p]\n", acrtc->crtc_id, acrtc);
 			/* i.e. reset mode */
 			if (acrtc->stream)
 				remove_stream(adev, acrtc);
-			break;
-		/*TODO retire */
-		case DM_COMMIT_ACTION_NOTHING:
-			continue;
-		} /* switch() */
+		}
 	} /* for_each_crtc_in_state() */
 
 	/* Handle scaling and underscan changes */
@@ -2907,11 +2879,19 @@ int amdgpu_dm_atomic_commit(
 		struct dm_connector_state *con_old_state =
 				to_dm_connector_state(old_conn_state);
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(con_new_state->base.crtc);
+		struct drm_crtc_state *crtc_state;
 		const struct dc_stream_status *status = NULL;
 
+		if (!acrtc)
+			continue;
+
 		/* Skip any modesets/resets */
-		if (!acrtc ||
-			get_dm_commit_action(acrtc->base.state) != DM_COMMIT_ACTION_NOTHING)
+		crtc_state = acrtc->base.state;
+		if (crtc_state->mode_changed || crtc_state->active_changed
+#if !defined(OS_NAME_RHEL_7_2)
+				|| crtc_state->connectors_changed
+#endif
+		   )
 			continue;
 
 		/* Skip any thing not scale or underscan changes */
@@ -3261,17 +3241,30 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	for_each_crtc_in_state(state, crtc, crtc_state, i) {
 		struct amdgpu_crtc *acrtc = NULL;
 		struct amdgpu_connector *aconnector = NULL;
-		enum dm_commit_action action;
 
 		acrtc = to_amdgpu_crtc(crtc);
 
 		aconnector = amdgpu_dm_find_first_crct_matching_connector(state, crtc, true);
 
-		action = get_dm_commit_action(crtc_state);
+		DRM_DEBUG_KMS(
+			"amdgpu_crtc id:%d crtc_state_flags: enable:%d, active:%d, "
+			"planes_changed:%d, mode_changed:%d, active_changed:%d"
+#if !defined(OS_NAME_RHEL_7_2)
+			", connectors_changed:%d"
+#endif
+			"\n",
+			acrtc->crtc_id,
+			crtc_state->enable,
+			crtc_state->active,
+			crtc_state->planes_changed,
+			crtc_state->mode_changed,
+			crtc_state->active_changed
+#if !defined(OS_NAME_RHEL_7_2)
+			, crtc_state->connectors_changed
+#endif
+			);
 
-		switch (action) {
-		case DM_COMMIT_ACTION_DPMS_ON:
-		case DM_COMMIT_ACTION_SET: {
+		if (modeset_required(crtc_state)) {
 			struct dc_stream *new_stream = NULL;
 			struct drm_connector_state *conn_state = NULL;
 			struct dm_connector_state *dm_state = NULL;
@@ -3308,11 +3301,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 			new_stream_count++;
 			need_to_validate = true;
-			break;
-		}
-
-		case DM_COMMIT_ACTION_DPMS_OFF:
-		case DM_COMMIT_ACTION_RESET:
+		} else if (modereset_required(crtc_state)) {
 			/* i.e. reset mode */
 			if (acrtc->stream) {
 				set_count = remove_from_val_sets(
@@ -3320,11 +3309,6 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 						set_count,
 						acrtc->stream);
 			}
-			break;
-
-		/* TODO retire */
-		case DM_COMMIT_ACTION_NOTHING:
-			continue;
 		}
 	}
 
@@ -3336,11 +3320,19 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 		struct dm_connector_state *con_new_state =
 				to_dm_connector_state(conn_state);
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(con_new_state->base.crtc);
+		struct drm_crtc_state *crtc_state;
 		struct dc_stream *new_stream;
 
+		if (!acrtc)
+			continue;
+
 		/* Skip any modesets/resets */
-		if (!acrtc ||
-			get_dm_commit_action(acrtc->base.state) != DM_COMMIT_ACTION_NOTHING)
+		crtc_state = acrtc->base.state;
+		if (crtc_state->mode_changed || crtc_state->active_changed
+#if !defined(OS_NAME_RHEL_7_2)
+				|| crtc_state->connectors_changed
+#endif
+		   )
 			continue;
 
 		/* Skip any thing not scale or underscan changes */
@@ -3377,15 +3369,12 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 			struct drm_framebuffer *fb = plane_state->fb;
 			struct drm_connector *connector;
 			struct dm_connector_state *dm_state = NULL;
-			enum dm_commit_action action;
 			struct drm_crtc_state *crtc_state;
 
 
 			if (!fb || !crtc || crtc_set[i] != crtc ||
 				!crtc->state->planes_changed || !crtc->state->active)
 				continue;
-
-			action = get_dm_commit_action(crtc->state);
 
 			/* Surfaces are created under two scenarios:
 			 * 1. This commit is not a page flip.
@@ -3394,8 +3383,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 			crtc_state = drm_atomic_get_crtc_state(state, crtc);
 			if (!page_flip_needed(plane_state, old_plane_state,
 					crtc_state->event, true) ||
-					action == DM_COMMIT_ACTION_DPMS_ON ||
-					action == DM_COMMIT_ACTION_SET) {
+					modeset_required(crtc_state)) {
 				struct dc_surface *surface;
 
 				list_for_each_entry(connector,
