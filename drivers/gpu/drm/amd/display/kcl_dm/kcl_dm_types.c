@@ -690,9 +690,8 @@ struct amdgpu_connector *aconnector_from_drm_crtc_id(
 static void update_stream_scaling_settings(
 		const struct drm_display_mode *mode,
 		const struct dm_connector_state *dm_state,
-		const struct dc_stream *stream)
+		struct dc_stream *stream)
 {
-	struct amdgpu_device *adev = dm_state->base.crtc->dev->dev_private;
 	enum amdgpu_rmx_type rmx_type;
 
 	struct rect src = { 0 }; /* viewport in composition space*/
@@ -734,7 +733,8 @@ static void update_stream_scaling_settings(
 		dst.height -= dm_state->underscan_vborder;
 	}
 
-	adev->dm.dc->stream_funcs.stream_update_scaling(adev->dm.dc, stream, &src, &dst);
+	stream->src = src;
+	stream->dst = dst;
 
 	DRM_DEBUG_KMS("Destination Rectangle x:%d  y:%d  width:%d  height:%d\n",
 			dst.x, dst.y, dst.width, dst.height);
@@ -1351,9 +1351,6 @@ int amdgpu_dm_connector_atomic_set_property(
 	struct dm_connector_state *dm_new_state =
 		to_dm_connector_state(connector_state);
 
-	struct drm_crtc_state *new_crtc_state;
-	struct drm_crtc *crtc;
-	int i;
 	int ret = -EINVAL;
 
 	if (property == dev->mode_config.scaling_mode_property) {
@@ -1397,34 +1394,6 @@ int amdgpu_dm_connector_atomic_set_property(
 	} else if (property == adev->mode_info.freesync_capable_property) {
 		ret = -EINVAL;
 		return ret;
-	}
-
-
-
-	for_each_crtc_in_state(
-		connector_state->state,
-		crtc,
-		new_crtc_state,
-		i) {
-
-		if (crtc == connector_state->crtc) {
-			struct drm_plane_state *plane_state;
-
-			/*
-			 * Bit of magic done here. We need to ensure
-			 * that planes get update after mode is set.
-			 * So, we need to add primary plane to state,
-			 * and this way atomic_update would be called
-			 * for it
-			 */
-			plane_state =
-				drm_atomic_get_plane_state(
-					connector_state->state,
-					crtc->primary);
-
-			if (!plane_state)
-				return -EINVAL;
-		}
 	}
 
 	return ret;
@@ -2721,7 +2690,7 @@ void dc_commit_surfaces(struct drm_atomic_state *state,
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 		struct drm_framebuffer *fb = plane_state->fb;
 		struct drm_connector *connector;
-		struct dm_connector_state *dm_state = NULL;
+		struct dm_connector_state *con_state = NULL;
 		enum dm_commit_action action;
 
 		if (!fb || !crtc || !crtc->state->planes_changed ||
@@ -2744,7 +2713,7 @@ void dc_commit_surfaces(struct drm_atomic_state *state,
 					    &dev->mode_config.connector_list,
 					    head) {
 				if (connector->state->crtc == crtc) {
-					dm_state = to_dm_connector_state(
+					con_state = to_dm_connector_state(
 						connector->state);
 					break;
 				}
@@ -2764,7 +2733,7 @@ void dc_commit_surfaces(struct drm_atomic_state *state,
 			 * Also it should be needed when used with actual
 			 * drm_atomic_commit ioctl in future
 			 */
-			if (!dm_state)
+			if (!con_state)
 				continue;
 
 			/*
@@ -2803,6 +2772,8 @@ int amdgpu_dm_atomic_commit(
 	struct drm_crtc *flip_crtcs[MAX_STREAMS];
 	struct amdgpu_flip_work *work[MAX_STREAMS] = {0};
 	struct amdgpu_bo *new_abo[MAX_STREAMS] = {0};
+	struct drm_connector *connector;
+	struct drm_connector_state *old_conn_state;
 
 	/* In this step all new fb would be pinned */
 
@@ -2915,20 +2886,6 @@ int amdgpu_dm_atomic_commit(
 			break;
 		}
 
-		case DM_COMMIT_ACTION_NOTHING: {
-			struct dm_connector_state *dm_state = NULL;
-
-			if (!aconnector)
-				break;
-
-			dm_state = to_dm_connector_state(aconnector->base.state);
-
-			/* Scaling update */
-			update_stream_scaling_settings(&crtc->state->mode,
-					dm_state, acrtc->stream);
-
-			break;
-		}
 		case DM_COMMIT_ACTION_DPMS_OFF:
 		case DM_COMMIT_ACTION_RESET:
 			DRM_INFO("Atomic commit: RESET. crtc id %d:[%p]\n", acrtc->crtc_id, acrtc);
@@ -2936,8 +2893,46 @@ int amdgpu_dm_atomic_commit(
 			if (acrtc->stream)
 				remove_stream(adev, acrtc);
 			break;
+		/*TODO retire */
+		case DM_COMMIT_ACTION_NOTHING:
+			continue;
 		} /* switch() */
 	} /* for_each_crtc_in_state() */
+
+	/* Handle scaling and underscan changes */
+	for_each_connector_in_state(state, connector, old_conn_state, i) {
+		struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
+		struct dm_connector_state *con_new_state =
+				to_dm_connector_state(aconnector->base.state);
+		struct dm_connector_state *con_old_state =
+				to_dm_connector_state(old_conn_state);
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(con_new_state->base.crtc);
+		const struct dc_stream_status *status = NULL;
+
+		/* Skip any modesets/resets */
+		if (!acrtc ||
+			get_dm_commit_action(acrtc->base.state) != DM_COMMIT_ACTION_NOTHING)
+			continue;
+
+		/* Skip any thing not scale or underscan changes */
+		if (!is_scaling_state_different(con_new_state, con_old_state))
+			continue;
+
+		update_stream_scaling_settings(&con_new_state->base.crtc->mode,
+				con_new_state, (struct dc_stream *)acrtc->stream);
+
+		status = dc_stream_get_status(acrtc->stream);
+		WARN_ON(!status);
+		WARN_ON(!status->surface_count);
+
+		/* TODO How it works with MPO ? */
+		if (!dc_commit_surfaces_to_stream(
+					dm->dc,
+					(const struct dc_surface **)status->surfaces,
+					status->surface_count,
+					acrtc->stream))
+			dm_error("%s: Failed to update stream scaling!\n", __func__);
+	}
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 
@@ -3235,6 +3230,8 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	struct dc *dc = adev->dm.dc;
 	bool need_to_validate = false;
 	struct validate_context *context;
+	struct drm_connector *connector;
+	struct drm_connector_state *conn_state;
 
 	ret = drm_atomic_helper_check(dev, state);
 
@@ -3314,51 +3311,6 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 			break;
 		}
 
-		case DM_COMMIT_ACTION_NOTHING: {
-			const struct drm_connector *drm_connector = NULL;
-			struct drm_connector_state *conn_state = NULL;
-			struct dm_connector_state *dm_state = NULL;
-			struct dm_connector_state *old_dm_state = NULL;
-			struct dc_stream *new_stream;
-
-			if (!aconnector)
-				break;
-
-			for_each_connector_in_state(
-				state, drm_connector, conn_state, j) {
-				if (&aconnector->base == drm_connector)
-					break;
-			}
-
-			old_dm_state = to_dm_connector_state(drm_connector->state);
-			dm_state = to_dm_connector_state(conn_state);
-
-			/* Support underscan adjustment*/
-			if (!is_scaling_state_different(dm_state, old_dm_state))
-				break;
-
-			new_stream = create_stream_for_sink(aconnector, &crtc_state->mode, dm_state);
-
-			if (!new_stream) {
-				DRM_ERROR("%s: Failed to create new stream for crtc %d\n",
-						__func__, acrtc->base.base.id);
-				break;
-			}
-
-			new_streams[new_stream_count] = new_stream;
-			set_count = update_in_val_sets_stream(
-					set,
-					crtc_set,
-					set_count,
-					acrtc->stream,
-					new_stream,
-					crtc);
-
-			new_stream_count++;
-			need_to_validate = true;
-
-			break;
-		}
 		case DM_COMMIT_ACTION_DPMS_OFF:
 		case DM_COMMIT_ACTION_RESET:
 			/* i.e. reset mode */
@@ -3369,7 +3321,53 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 						acrtc->stream);
 			}
 			break;
+
+		/* TODO retire */
+		case DM_COMMIT_ACTION_NOTHING:
+			continue;
 		}
+	}
+
+	/* Check scaling and underscan changes */
+	for_each_connector_in_state(state, connector, conn_state, i) {
+		struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
+		struct dm_connector_state *con_old_state =
+				to_dm_connector_state(aconnector->base.state);
+		struct dm_connector_state *con_new_state =
+				to_dm_connector_state(conn_state);
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(con_new_state->base.crtc);
+		struct dc_stream *new_stream;
+
+		/* Skip any modesets/resets */
+		if (!acrtc ||
+			get_dm_commit_action(acrtc->base.state) != DM_COMMIT_ACTION_NOTHING)
+			continue;
+
+		/* Skip any thing not scale or underscan changes */
+		if (!is_scaling_state_different(con_new_state, con_old_state))
+			continue;
+
+		new_stream = create_stream_for_sink(
+				aconnector,
+				&acrtc->base.state->mode,
+				con_new_state);
+
+		if (!new_stream) {
+			DRM_ERROR("%s: Failed to create new stream for crtc %d\n",
+					__func__, acrtc->base.base.id);
+			continue;
+		}
+
+		new_streams[new_stream_count] = new_stream;
+		set_count = update_in_val_sets_stream(
+				set,
+				crtc_set,
+				set_count,
+				acrtc->stream,
+				new_stream,
+				&acrtc->base);
+		new_stream_count++;
+		need_to_validate = true;
 	}
 
 	for (i = 0; i < set_count; i++) {
