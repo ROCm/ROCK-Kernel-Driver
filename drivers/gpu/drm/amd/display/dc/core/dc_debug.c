@@ -326,10 +326,10 @@ void context_clock_trace(
 		const struct dc *dc,
 		struct validate_context *context)
 {
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	struct core_dc *core_dc = DC_TO_CORE(dc);
 	struct dal_logger *logger =  core_dc->ctx->logger;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	CLOCK_TRACE("Current: dispclk_khz:%d  dppclk_div:%d  dcfclk_khz:%d\n"
 			"dcfclk_deep_sleep_khz:%d  fclk_khz:%d\n"
 			"dram_ccm_us:%d  min_active_dram_ccm_us:%d\n",
