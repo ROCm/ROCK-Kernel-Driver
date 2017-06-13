@@ -262,8 +262,6 @@ struct kfd_dev {
 	unsigned int gtt_sa_chunk_size;
 	unsigned int gtt_sa_num_of_chunks;
 
-	spinlock_t tlb_invalidation_lock;
-
 	/* QCM Device instance */
 	struct device_queue_manager *dqm;
 
