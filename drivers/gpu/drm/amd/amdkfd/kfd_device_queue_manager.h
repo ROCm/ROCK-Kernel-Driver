@@ -33,8 +33,6 @@
 #define KFD_UNMAP_LATENCY_MS			(4000)
 #define QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS (2 * KFD_UNMAP_LATENCY_MS + 1000)
 
-#define QUEUES_PER_PIPE				(8)
-#define PIPE_PER_ME_CP_SCHEDULING		(3)
 #define KFD_DQM_FIRST_PIPE			(0)
 #define CIK_SDMA_QUEUES				(4)
 #define CIK_SDMA_QUEUES_PER_ENGINE		(2)
@@ -213,10 +211,10 @@ void device_queue_manager_init_v9_vega10(
 		struct device_queue_manager_asic_ops *asic_ops);
 void program_sh_mem_settings(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd);
-int init_pipelines(struct device_queue_manager *dqm,
-		unsigned int pipes_num, unsigned int first_pipe);
-unsigned int get_first_pipe(struct device_queue_manager *dqm);
-unsigned int get_pipes_num(struct device_queue_manager *dqm);
+unsigned int get_mec_num(struct device_queue_manager *dqm);
+unsigned int get_queues_num(struct device_queue_manager *dqm);
+unsigned int get_queues_per_pipe(struct device_queue_manager *dqm);
+unsigned int get_pipes_per_mec(struct device_queue_manager *dqm);
 
 int process_evict_queues(struct device_queue_manager *dqm,
 		struct qcm_process_device *qpd);

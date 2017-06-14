@@ -124,7 +124,7 @@ static void vega10_set_default_registry_data(struct pp_hwmgr *hwmgr)
 	}
 
 	data->registry_data.clock_stretcher_support =
-			hwmgr->feature_mask & PP_CLOCK_STRETCH_MASK ? false : true;
+			hwmgr->feature_mask & PP_CLOCK_STRETCH_MASK ? true : false;
 
 	data->registry_data.ulv_support =
 			hwmgr->feature_mask & PP_ULV_MASK ? true : false;
@@ -2108,7 +2108,7 @@ static int vega10_populate_avfs_parameters(struct pp_hwmgr *hwmgr)
 			pp_table->AvfsGbCksOn.m1 =
 					cpu_to_le32(avfs_params.ulGbFuseTableCksonM1);
 			pp_table->AvfsGbCksOn.m2 =
-					cpu_to_le16(avfs_params.ulGbFuseTableCksonM2);
+					cpu_to_le32(avfs_params.ulGbFuseTableCksonM2);
 			pp_table->AvfsGbCksOn.b =
 					cpu_to_le32(avfs_params.ulGbFuseTableCksonB);
 			pp_table->AvfsGbCksOn.m1_shift = 24;
@@ -2120,7 +2120,7 @@ static int vega10_populate_avfs_parameters(struct pp_hwmgr *hwmgr)
 			pp_table->AvfsGbCksOff.m1 =
 					cpu_to_le32(avfs_params.ulGbFuseTableCksoffM1);
 			pp_table->AvfsGbCksOff.m2 =
-					cpu_to_le16(avfs_params.ulGbFuseTableCksoffM2);
+					cpu_to_le32(avfs_params.ulGbFuseTableCksoffM2);
 			pp_table->AvfsGbCksOff.b =
 					cpu_to_le32(avfs_params.ulGbFuseTableCksoffB);
 			pp_table->AvfsGbCksOff.m1_shift = 24;
@@ -2462,6 +2462,7 @@ static int vega10_init_smc_table(struct pp_hwmgr *hwmgr)
 		data->vbios_boot_state.gfx_clock = boot_up_values.ulGfxClk;
 		data->vbios_boot_state.mem_clock = boot_up_values.ulUClk;
 		data->vbios_boot_state.soc_clock = boot_up_values.ulSocClk;
+		data->vbios_boot_state.dcef_clock = boot_up_values.ulDCEFClk;
 		if (0 != boot_up_values.usVddc) {
 			smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
 						PPSMC_MSG_SetFloorSocVoltage,
@@ -2470,6 +2471,9 @@ static int vega10_init_smc_table(struct pp_hwmgr *hwmgr)
 		} else {
 			data->vbios_boot_state.bsoc_vddc_lock = false;
 		}
+		smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
+				PPSMC_MSG_SetMinDeepSleepDcefclk,
+			(uint32_t)(data->vbios_boot_state.dcef_clock / 100));
 	}
 
 	result = vega10_populate_avfs_parameters(hwmgr);
@@ -2698,9 +2702,9 @@ static int vega10_stop_dpm(struct pp_hwmgr *hwmgr, uint32_t bitmap)
 
 	if(data->smu_features[GNLD_LED_DISPLAY].supported == true){
 		PP_ASSERT_WITH_CODE(!vega10_enable_smc_features(hwmgr->smumgr,
-				true, data->smu_features[GNLD_LED_DISPLAY].smu_feature_bitmap),
-		"Attempt to Enable LED DPM feature Failed!", return -EINVAL);
-		data->smu_features[GNLD_LED_DISPLAY].enabled = true;
+				false, data->smu_features[GNLD_LED_DISPLAY].smu_feature_bitmap),
+		"Attempt to disable LED DPM feature failed!", return -EINVAL);
+		data->smu_features[GNLD_LED_DISPLAY].enabled = false;
 	}
 
 	for (i = 0; i < GNLD_DPM_MAX; i++) {
@@ -3129,11 +3133,10 @@ static int vega10_apply_state_adjust_rules(struct pp_hwmgr *hwmgr,
 	vega10_ps->performance_levels[0].gfx_clock = sclk;
 	vega10_ps->performance_levels[0].mem_clock = mclk;
 
-	vega10_ps->performance_levels[1].gfx_clock =
-		(vega10_ps->performance_levels[1].gfx_clock >=
-				vega10_ps->performance_levels[0].gfx_clock) ?
-						vega10_ps->performance_levels[1].gfx_clock :
-						vega10_ps->performance_levels[0].gfx_clock;
+	if (vega10_ps->performance_levels[1].gfx_clock <
+			vega10_ps->performance_levels[0].gfx_clock)
+		vega10_ps->performance_levels[0].gfx_clock =
+				vega10_ps->performance_levels[1].gfx_clock;
 
 	if (disable_mclk_switching) {
 		/* Set Mclk the max of level 0 and level 1 */
@@ -3156,8 +3159,8 @@ static int vega10_apply_state_adjust_rules(struct pp_hwmgr *hwmgr,
 	} else {
 		if (vega10_ps->performance_levels[1].mem_clock <
 				vega10_ps->performance_levels[0].mem_clock)
-			vega10_ps->performance_levels[1].mem_clock =
-					vega10_ps->performance_levels[0].mem_clock;
+			vega10_ps->performance_levels[0].mem_clock =
+					vega10_ps->performance_levels[1].mem_clock;
 	}
 
 	if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps,
@@ -4907,6 +4910,7 @@ static const struct pp_hwmgr_func vega10_hwmgr_funcs = {
 	.set_sclk_od = vega10_set_sclk_od,
 	.get_mclk_od = vega10_get_mclk_od,
 	.set_mclk_od = vega10_set_mclk_od,
+	.avfs_control = vega10_avfs_enable,
 };
 
 int vega10_hwmgr_init(struct pp_hwmgr *hwmgr)

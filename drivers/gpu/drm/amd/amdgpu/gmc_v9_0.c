@@ -445,7 +445,7 @@ static int gmc_v9_0_mc_init(struct amdgpu_device *adev)
 	/* hbm memory channel size */
 	chansize = 128;
 
-	tmp = RREG32(SOC15_REG_OFFSET(DF, 0, mmDF_CS_AON0_DramBaseAddress0));
+	tmp = RREG32_SOC15(DF, 0, mmDF_CS_AON0_DramBaseAddress0);
 	tmp &= DF_CS_AON0_DramBaseAddress0__IntLvNumChan_MASK;
 	tmp >>= DF_CS_AON0_DramBaseAddress0__IntLvNumChan__SHIFT;
 	switch (tmp) {
@@ -563,6 +563,9 @@ static int gmc_v9_0_sw_init(void *handle)
 	int dma_bits;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
+	gfxhub_v1_0_init(adev);
+	mmhub_v1_0_init(adev);
+
 	spin_lock_init(&adev->mc.invalidate_lock);
 
 	if (adev->flags & AMD_IS_APU) {
@@ -599,6 +602,12 @@ static int gmc_v9_0_sw_init(void *handle)
 	 * internal address space.
 	 */
 	adev->mc.mc_mask = 0xffffffffffffULL; /* 48 bit MC */
+
+	/*
+	 * It needs to reserve 8M stolen memory for vega10
+	 * TODO: Figure out how to avoid that...
+	 */
+	adev->mc.stolen_size = 8 * 1024 * 1024;
 
 	/* set DMA mask + need_dma32 flags.
 	 * PCIE - can handle 44-bits.
@@ -725,12 +734,12 @@ static int gmc_v9_0_gart_enable(struct amdgpu_device *adev)
 	if (r)
 		return r;
 
-	tmp = RREG32(SOC15_REG_OFFSET(HDP, 0, mmHDP_MISC_CNTL));
+	tmp = RREG32_SOC15(HDP, 0, mmHDP_MISC_CNTL);
 	tmp |= HDP_MISC_CNTL__FLUSH_INVALIDATE_CACHE_MASK;
-	WREG32(SOC15_REG_OFFSET(HDP, 0, mmHDP_MISC_CNTL), tmp);
+	WREG32_SOC15(HDP, 0, mmHDP_MISC_CNTL, tmp);
 
-	tmp = RREG32(SOC15_REG_OFFSET(HDP, 0, mmHDP_HOST_PATH_CNTL));
-	WREG32(SOC15_REG_OFFSET(HDP, 0, mmHDP_HOST_PATH_CNTL), tmp);
+	tmp = RREG32_SOC15(HDP, 0, mmHDP_HOST_PATH_CNTL);
+	WREG32_SOC15(HDP, 0, mmHDP_HOST_PATH_CNTL, tmp);
 
 
 	if (amdgpu_vm_fault_stop == AMDGPU_VM_FAULT_STOP_ALWAYS)
@@ -837,7 +846,16 @@ static int gmc_v9_0_soft_reset(void *handle)
 static int gmc_v9_0_set_clockgating_state(void *handle,
 					enum amd_clockgating_state state)
 {
-	return 0;
+	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+
+	return mmhub_v1_0_set_clockgating(adev, state);
+}
+
+static void gmc_v9_0_get_clockgating_state(void *handle, u32 *flags)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+
+	mmhub_v1_0_get_clockgating(adev, flags);
 }
 
 static int gmc_v9_0_set_powergating_state(void *handle,
@@ -861,6 +879,7 @@ const struct amd_ip_funcs gmc_v9_0_ip_funcs = {
 	.soft_reset = gmc_v9_0_soft_reset,
 	.set_clockgating_state = gmc_v9_0_set_clockgating_state,
 	.set_powergating_state = gmc_v9_0_set_powergating_state,
+	.get_clockgating_state = gmc_v9_0_get_clockgating_state,
 };
 
 const struct amdgpu_ip_block_version gmc_v9_0_ip_block =

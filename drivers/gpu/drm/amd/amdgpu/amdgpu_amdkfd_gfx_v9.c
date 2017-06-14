@@ -80,9 +80,6 @@
 #define mmMMHUB_VM_INVALIDATE_ENG16_ADDR_RANGE_HI32		0x0728
 #define mmMMHUB_VM_INVALIDATE_ENG16_ADDR_RANGE_HI32_BASE_IDX	0
 
-#define V9_PIPE_PER_MEC		(4)
-#define V9_QUEUES_PER_PIPE_MEC	(8)
-
 enum hqd_dequeue_request_type {
 	NO_ACTION = 0,
 	DRAIN_PIPE,
@@ -309,18 +306,18 @@ static void unlock_srbm(struct kgd_dev *kgd)
 static void acquire_queue(struct kgd_dev *kgd, uint32_t pipe_id,
 				uint32_t queue_id)
 {
-	uint32_t mec = (++pipe_id / V9_PIPE_PER_MEC) + 1;
-	uint32_t pipe = (pipe_id % V9_PIPE_PER_MEC);
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	uint32_t mec = (pipe_id / adev->gfx.mec.num_pipe_per_mec) + 1;
+	uint32_t pipe = (pipe_id % adev->gfx.mec.num_pipe_per_mec);
 
 	lock_srbm(kgd, mec, pipe, queue_id, 0);
 }
 
-static uint32_t get_queue_mask(uint32_t pipe_id, uint32_t queue_id)
+static uint32_t get_queue_mask(struct amdgpu_device *adev,
+			       uint32_t pipe_id, uint32_t queue_id)
 {
-	/* assumes that pipe0 is used by graphics and that the correct
-	 * MEC is selected by acquire_queue already
-	 */
-	unsigned int bit = ((pipe_id+1) * V9_QUEUES_PER_PIPE_MEC +
+	unsigned int bit = (pipe_id * adev->gfx.mec.num_pipe_per_mec +
 			    queue_id) & 31;
 
 	return ((uint32_t)1) << bit;
@@ -408,6 +405,7 @@ static int kgd_set_pasid_vmid_mapping(struct kgd_dev *kgd, unsigned int pasid,
 static int kgd_init_pipeline(struct kgd_dev *kgd, uint32_t pipe_id,
 				uint32_t hpd_size, uint64_t hpd_gpu_addr)
 {
+	/* amdgpu owns the per-pipe state */
 	return 0;
 }
 
@@ -421,8 +419,8 @@ static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id)
 	uint32_t mec;
 	uint32_t pipe;
 
-	mec = (++pipe_id / V9_PIPE_PER_MEC) + 1;
-	pipe = (pipe_id % V9_PIPE_PER_MEC);
+	mec = (pipe_id / adev->gfx.mec.num_pipe_per_mec) + 1;
+	pipe = (pipe_id % adev->gfx.mec.num_pipe_per_mec);
 
 	lock_srbm(kgd, mec, pipe, 0, 0);
 
@@ -491,8 +489,8 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 	if (m->cp_hqd_vmid == 0) {
 		uint32_t value, mec, pipe;
 
-		mec = (++pipe_id / V9_PIPE_PER_MEC) + 1;
-		pipe = (pipe_id % V9_PIPE_PER_MEC);
+		mec = (pipe_id / adev->gfx.mec.num_pipe_per_mec) + 1;
+		pipe = (pipe_id % adev->gfx.mec.num_pipe_per_mec);
 
 		pr_debug("kfd: set HIQ, mec:%d, pipe:%d, queue:%d.\n",
 			mec, pipe, queue_id);
@@ -552,7 +550,7 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 		WREG32(SOC15_REG_OFFSET(GC, 0, mmCP_HQD_PQ_WPTR_POLL_ADDR_HI),
 		       upper_32_bits((uint64_t)wptr));
 		WREG32(SOC15_REG_OFFSET(GC, 0, mmCP_PQ_WPTR_POLL_CNTL1),
-		       get_queue_mask(pipe_id, queue_id));
+		       get_queue_mask(adev, pipe_id, queue_id));
 	}
 
 	/* Start the EOP fetcher */

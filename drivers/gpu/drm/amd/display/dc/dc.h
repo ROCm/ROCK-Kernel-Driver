@@ -115,12 +115,6 @@ struct dc_stream_funcs {
 			unsigned int *v_pos,
 			unsigned int *nom_v_pos);
 
-
-	void (*stream_update_scaling)(const struct dc *dc,
-			const struct dc_stream *dc_stream,
-			const struct rect *src,
-			const struct rect *dst);
-
 	bool (*set_gamut_remap)(struct dc *dc,
 			const struct dc_stream *stream);
 
@@ -166,6 +160,7 @@ struct dc_debug {
 	bool max_disp_clk;
 	bool surface_trace;
 	bool timing_trace;
+	bool clock_trace;
 	bool validation_trace;
 	bool disable_stutter;
 	bool disable_dcc;
@@ -181,10 +176,12 @@ struct dc_debug {
 	int urgent_latency_ns;
 	int percent_of_ideal_drambw;
 	int dram_clock_change_latency_ns;
+	int always_scale;
 #endif
 	bool disable_pplib_clock_request;
 	bool disable_clock_gate;
 	bool disable_dmcu;
+	bool disable_psr;
 	bool force_abm_enable;
 };
 
@@ -294,6 +291,7 @@ struct dc_transfer_func {
 };
 
 struct dc_surface {
+	bool per_pixel_alpha;
 	bool visible;
 	bool flip_immediate;
 	struct dc_plane_address address;
@@ -320,6 +318,7 @@ struct dc_surface {
 };
 
 struct dc_plane_info {
+	bool per_pixel_alpha;
 	union plane_size plane_size;
 	union dc_tiling_info tiling_info;
 	struct dc_plane_dcc_param dcc;
@@ -362,6 +361,7 @@ struct dc_surface_status {
 	struct dc_plane_address requested_address;
 	struct dc_plane_address current_address;
 	bool is_flip_pending;
+	bool is_right_eye;
 };
 
 /*
@@ -477,7 +477,7 @@ struct dc_stream {
 	const struct dc_transfer_func *out_transfer_func;
 	struct colorspace_transform gamut_remap_matrix;
 	struct csc_transform csc_color_matrix;
-
+	enum view_3d_format view_format;
 	/* TODO: custom INFO packets */
 	/* TODO: ABM info (DMCU) */
 	/* TODO: PSR info */
@@ -592,6 +592,15 @@ bool dc_commit_streams(
 		struct dc *dc,
 		const struct dc_stream *streams[],
 		uint8_t stream_count);
+/*
+ * Enable stereo when commit_streams is not required,
+ * for example, frame alternate.
+ */
+bool dc_enable_stereo(
+	struct dc *dc,
+	struct validate_context *context,
+	const struct dc_stream *streams[],
+	uint8_t stream_count);
 
 /**
  * Create a new default stream for the requested sink
@@ -706,8 +715,11 @@ bool dc_link_set_abm_disable(const struct dc_link *dc_link);
 
 bool dc_link_set_psr_enable(const struct dc_link *dc_link, bool enable);
 
+bool dc_link_get_psr_state(const struct dc_link *dc_link, uint32_t *psr_state);
+
 bool dc_link_setup_psr(const struct dc_link *dc_link,
-		const struct dc_stream *stream, struct psr_config *psr_config);
+		const struct dc_stream *stream, struct psr_config *psr_config,
+		struct psr_context *psr_context);
 
 /* Request DC to detect if there is a Panel connected.
  * boot - If this call is during initial boot.
@@ -775,6 +787,14 @@ struct dc_container_id {
 	unsigned short productCode;
 };
 
+struct stereo_3d_features {
+	bool supported			;
+	bool allTimings			;
+	bool cloneMode			;
+	bool scaling			;
+	bool singleFrameSWPacked;
+};
+
 /*
  * The sink structure contains EDID and other display device properties
  */
@@ -786,6 +806,7 @@ struct dc_sink {
 	uint32_t dongle_max_pix_clk;
 	bool converter_disable_audio;
 	void *priv;
+	struct stereo_3d_features features_3d[TIMING_3D_FORMAT_MAX];
 };
 
 void dc_sink_retain(const struct dc_sink *sink);

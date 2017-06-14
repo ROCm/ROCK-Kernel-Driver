@@ -64,6 +64,7 @@ MODULE_FIRMWARE("amdgpu/raven_gpu_info.bin");
 
 static int amdgpu_debugfs_regs_init(struct amdgpu_device *adev);
 static void amdgpu_debugfs_regs_cleanup(struct amdgpu_device *adev);
+static int amdgpu_debugfs_test_ib_ring_init(struct amdgpu_device *adev);
 
 static const char *amdgpu_asic_name[] = {
 	"TAHITI",
@@ -1374,6 +1375,9 @@ int amdgpu_ip_block_add(struct amdgpu_device *adev,
 	if (!ip_block_version)
 		return -EINVAL;
 
+	DRM_DEBUG("add ip block number %d <%s>\n", adev->num_ip_blocks,
+		  ip_block_version->funcs->name);
+
 	adev->ip_blocks[adev->num_ip_blocks++].version = ip_block_version;
 
 	return 0;
@@ -1426,11 +1430,12 @@ static void amdgpu_device_enable_virtual_display(struct amdgpu_device *adev)
 
 static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 {
-	const struct firmware *fw;
 	const char *chip_name;
 	char fw_name[30];
 	int err;
 	const struct gpu_info_firmware_header_v1_0 *hdr;
+
+	adev->firmware.gpu_info_fw = NULL;
 
 	switch (adev->asic_type) {
 	case CHIP_TOPAZ:
@@ -1466,14 +1471,14 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 	}
 
 	snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_gpu_info.bin", chip_name);
-	err = request_firmware(&fw, fw_name, adev->dev);
+	err = request_firmware(&adev->firmware.gpu_info_fw, fw_name, adev->dev);
 	if (err) {
 		dev_err(adev->dev,
 			"Failed to load gpu_info firmware \"%s\"\n",
 			fw_name);
 		goto out;
 	}
-	err = amdgpu_ucode_validate(fw);
+	err = amdgpu_ucode_validate(adev->firmware.gpu_info_fw);
 	if (err) {
 		dev_err(adev->dev,
 			"Failed to validate gpu_info firmware \"%s\"\n",
@@ -1481,14 +1486,14 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 		goto out;
 	}
 
-	hdr = (const struct gpu_info_firmware_header_v1_0 *)fw->data;
+	hdr = (const struct gpu_info_firmware_header_v1_0 *)adev->firmware.gpu_info_fw->data;
 	amdgpu_ucode_print_gpu_info_hdr(&hdr->header);
 
 	switch (hdr->version_major) {
 	case 1:
 	{
 		const struct gpu_info_firmware_v1_0 *gpu_info_fw =
-			(const struct gpu_info_firmware_v1_0 *)(fw->data +
+			(const struct gpu_info_firmware_v1_0 *)(adev->firmware.gpu_info_fw->data +
 								le32_to_cpu(hdr->header.ucode_array_offset_bytes));
 
 		adev->gfx.config.max_shader_engines = le32_to_cpu(gpu_info_fw->gc_num_se);
@@ -1504,6 +1509,11 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 		adev->gfx.config.double_offchip_lds_buf =
 			le32_to_cpu(gpu_info_fw->gc_double_offchip_lds_buffer);
 		adev->gfx.cu_info.wave_front_size = le32_to_cpu(gpu_info_fw->gc_wave_size);
+		adev->gfx.cu_info.max_waves_per_simd =
+			le32_to_cpu(gpu_info_fw->gc_max_waves_per_simd);
+		adev->gfx.cu_info.max_scratch_slots_per_cu =
+			le32_to_cpu(gpu_info_fw->gc_max_scratch_slots_per_cu);
+		adev->gfx.cu_info.lds_size = le32_to_cpu(gpu_info_fw->gc_lds_size);
 		break;
 	}
 	default:
@@ -1513,9 +1523,6 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 		goto out;
 	}
 out:
-	release_firmware(fw);
-	fw = NULL;
-
 	return err;
 }
 
@@ -1599,7 +1606,8 @@ static int amdgpu_early_init(struct amdgpu_device *adev)
 
 	for (i = 0; i < adev->num_ip_blocks; i++) {
 		if ((amdgpu_ip_block_mask & (1 << i)) == 0) {
-			DRM_ERROR("disabled ip block: %d\n", i);
+			DRM_ERROR("disabled ip block: %d <%s>\n",
+				  i, adev->ip_blocks[i].version->funcs->name);
 			adev->ip_blocks[i].status.valid = false;
 		} else {
 			if (adev->ip_blocks[i].version->funcs->early_init) {
@@ -1889,8 +1897,6 @@ static int amdgpu_sriov_reinit_early(struct amdgpu_device *adev)
 	static enum amd_ip_block_type ip_order[] = {
 		AMD_IP_BLOCK_TYPE_GMC,
 		AMD_IP_BLOCK_TYPE_COMMON,
-		AMD_IP_BLOCK_TYPE_GFXHUB,
-		AMD_IP_BLOCK_TYPE_MMHUB,
 		AMD_IP_BLOCK_TYPE_IH,
 	};
 
@@ -2105,6 +2111,9 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	adev->audio_endpt_rreg = &amdgpu_block_invalid_rreg;
 	adev->audio_endpt_wreg = &amdgpu_block_invalid_wreg;
 
+	if (amdgpu_device_has_dc_support(adev))
+		adev->ddev->driver->driver_features |= DRIVER_ATOMIC;
+
 
 	DRM_INFO("initializing kernel modesetting (%s 0x%04X:0x%04X 0x%04X:0x%04X 0x%02X).\n",
 		 amdgpu_asic_name[adev->asic_type], pdev->vendor, pdev->device,
@@ -2123,8 +2132,6 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 
 	amdgpu_check_arguments(adev);
 
-	/* Registers mapping */
-	/* TODO: block userspace mapping of io register */
 	spin_lock_init(&adev->mmio_idx_lock);
 	spin_lock_init(&adev->smc_idx_lock);
 	spin_lock_init(&adev->pcie_idx_lock);
@@ -2140,8 +2147,13 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	INIT_LIST_HEAD(&adev->gtt_list);
 	spin_lock_init(&adev->gtt_list_lock);
 
+	INIT_LIST_HEAD(&adev->ring_lru_list);
+	spin_lock_init(&adev->ring_lru_list_lock);
+
 	INIT_DELAYED_WORK(&adev->late_init_work, amdgpu_late_init_func_handler);
 
+	/* Registers mapping */
+	/* TODO: block userspace mapping of io register */
 	if (adev->asic_type >= CHIP_BONAIRE) {
 		adev->rmmio_base = pci_resource_start(adev->pdev, 5);
 		adev->rmmio_size = pci_resource_len(adev->pdev, 5);
@@ -2253,6 +2265,8 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 
 	adev->accel_working = true;
 
+	amdgpu_vm_check_compute_bug(adev);
+
 	/* Initialize the buffer migration limit. */
 	if (amdgpu_moverate >= 0)
 		max_MBps = amdgpu_moverate;
@@ -2280,6 +2294,10 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	r = amdgpu_debugfs_regs_init(adev);
 	if (r)
 		DRM_ERROR("registering register debugfs failed (%d).\n", r);
+
+	r = amdgpu_debugfs_test_ib_ring_init(adev);
+	if (r)
+		DRM_ERROR("registering register test ib ring debugfs failed (%d).\n", r);
 
 	r = amdgpu_debugfs_firmware_init(adev);
 	if (r)
@@ -2337,6 +2355,10 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	amdgpu_fence_driver_fini(adev);
 	amdgpu_fbdev_fini(adev);
 	r = amdgpu_fini(adev);
+	if (adev->firmware.gpu_info_fw) {
+		release_firmware(adev->firmware.gpu_info_fw);
+		adev->firmware.gpu_info_fw = NULL;
+	}
 	adev->accel_working = false;
 	cancel_delayed_work_sync(&adev->late_init_work);
 	/* free i2c buses */
@@ -3828,11 +3850,60 @@ static void amdgpu_debugfs_regs_cleanup(struct amdgpu_device *adev)
 	}
 }
 
+static int amdgpu_debugfs_test_ib(struct seq_file *m, void *data)
+{
+	struct drm_info_node *node = (struct drm_info_node *) m->private;
+	struct drm_device *dev = node->minor->dev;
+	struct amdgpu_device *adev = dev->dev_private;
+	int r = 0, i;
+
+	/* hold on the scheduler */
+	for (i = 0; i < AMDGPU_MAX_RINGS; i++) {
+		struct amdgpu_ring *ring = adev->rings[i];
+
+		if (!ring || !ring->sched.thread)
+			continue;
+		kthread_park(ring->sched.thread);
+	}
+
+	seq_printf(m, "run ib test:\n");
+	r = amdgpu_ib_ring_tests(adev);
+	if (r)
+		seq_printf(m, "ib ring tests failed (%d).\n", r);
+	else
+		seq_printf(m, "ib ring tests passed.\n");
+
+	/* go on the scheduler */
+	for (i = 0; i < AMDGPU_MAX_RINGS; i++) {
+		struct amdgpu_ring *ring = adev->rings[i];
+
+		if (!ring || !ring->sched.thread)
+			continue;
+		kthread_unpark(ring->sched.thread);
+	}
+
+	return 0;
+}
+
+static const struct drm_info_list amdgpu_debugfs_test_ib_ring_list[] = {
+	{"amdgpu_test_ib", &amdgpu_debugfs_test_ib}
+};
+
+static int amdgpu_debugfs_test_ib_ring_init(struct amdgpu_device *adev)
+{
+	return amdgpu_debugfs_add_files(adev,
+					amdgpu_debugfs_test_ib_ring_list, 1);
+}
+
 int amdgpu_debugfs_init(struct drm_minor *minor)
 {
 	return 0;
 }
 #else
+static int amdgpu_debugfs_test_ib_init(struct amdgpu_device *adev)
+{
+	return 0;
+}
 static int amdgpu_debugfs_regs_init(struct amdgpu_device *adev)
 {
 	return 0;

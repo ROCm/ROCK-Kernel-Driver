@@ -894,24 +894,6 @@ enum dc_status resource_build_scaling_params_for_context(
 	return DC_OK;
 }
 
-static void detach_surfaces_for_stream(
-		struct validate_context *context,
-		const struct resource_pool *pool,
-		const struct dc_stream *dc_stream)
-{
-	int i;
-	struct core_stream *stream = DC_STREAM_TO_CORE(dc_stream);
-
-	for (i = 0; i < pool->pipe_count; i++) {
-		struct pipe_ctx *cur_pipe = &context->res_ctx.pipe_ctx[i];
-		if (cur_pipe->stream == stream) {
-			cur_pipe->surface = NULL;
-			cur_pipe->top_pipe = NULL;
-			cur_pipe->bottom_pipe = NULL;
-		}
-	}
-}
-
 struct pipe_ctx *find_idle_secondary_pipe(
 		struct resource_context *res_ctx,
 		const struct resource_pool *pool)
@@ -1004,12 +986,51 @@ static void release_free_pipes_for_stream(
 	struct core_stream *stream = DC_STREAM_TO_CORE(dc_stream);
 
 	for (i = MAX_PIPES - 1; i >= 0; i--) {
+		/* never release the topmost pipe*/
 		if (res_ctx->pipe_ctx[i].stream == stream &&
+				res_ctx->pipe_ctx[i].top_pipe &&
 				!res_ctx->pipe_ctx[i].surface) {
-			res_ctx->pipe_ctx[i].stream = NULL;
+			memset(&res_ctx->pipe_ctx[i], 0, sizeof(struct pipe_ctx));
 		}
 	}
 }
+
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+static int acquire_first_split_pipe(
+		struct resource_context *res_ctx,
+		const struct resource_pool *pool,
+		struct core_stream *stream)
+{
+	int i;
+
+	for (i = 0; i < pool->pipe_count; i++) {
+		struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[i];
+
+		if (pipe_ctx->top_pipe &&
+				pipe_ctx->top_pipe->surface == pipe_ctx->surface) {
+			int mpc_idx = pipe_ctx->mpc_idx;
+
+			pipe_ctx->top_pipe->bottom_pipe = pipe_ctx->bottom_pipe;
+			if (pipe_ctx->bottom_pipe)
+				pipe_ctx->bottom_pipe->top_pipe = pipe_ctx->top_pipe;
+
+			memset(pipe_ctx, 0, sizeof(*pipe_ctx));
+			pipe_ctx->tg = pool->timing_generators[i];
+			pipe_ctx->mi = pool->mis[i];
+			pipe_ctx->ipp = pool->ipps[i];
+			pipe_ctx->xfm = pool->transforms[i];
+			pipe_ctx->opp = pool->opps[i];
+			pipe_ctx->dis_clk = pool->display_clock;
+			pipe_ctx->pipe_idx = i;
+			pipe_ctx->mpc_idx = mpc_idx;
+
+			pipe_ctx->stream = stream;
+			return i;
+		}
+	}
+	return -1;
+}
+#endif
 
 bool resource_attach_surfaces_to_context(
 		const struct dc_surface * const *surfaces,
@@ -1021,6 +1042,7 @@ bool resource_attach_surfaces_to_context(
 	int i;
 	struct pipe_ctx *tail_pipe;
 	struct dc_stream_status *stream_status = NULL;
+	struct core_stream *stream = DC_STREAM_TO_CORE(dc_stream);
 
 
 	if (surface_count > MAX_SURFACE_NUM) {
@@ -1043,7 +1065,12 @@ bool resource_attach_surfaces_to_context(
 	for (i = 0; i < surface_count; i++)
 		dc_surface_retain(surfaces[i]);
 
-	detach_surfaces_for_stream(context, pool, dc_stream);
+	/* detach surfaces from pipes */
+	for (i = 0; i < pool->pipe_count; i++)
+		if (context->res_ctx.pipe_ctx[i].stream == stream) {
+			context->res_ctx.pipe_ctx[i].surface = NULL;
+			context->res_ctx.pipe_ctx[i].bottom_pipe = NULL;
+		}
 
 	/* release existing surfaces*/
 	for (i = 0; i < stream_status->surface_count; i++)
@@ -1052,17 +1079,19 @@ bool resource_attach_surfaces_to_context(
 	for (i = surface_count; i < stream_status->surface_count; i++)
 		stream_status->surfaces[i] = NULL;
 
-	stream_status->surface_count = 0;
-
-	if (surface_count == 0)
-		return true;
-
 	tail_pipe = NULL;
 	for (i = 0; i < surface_count; i++) {
 		struct core_surface *surface = DC_SURFACE_TO_CORE(surfaces[i]);
 		struct pipe_ctx *free_pipe = acquire_free_pipe_for_stream(
 				context, pool, dc_stream);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+		if (!free_pipe) {
+			int pipe_idx = acquire_first_split_pipe(&context->res_ctx, pool, stream);
+			if (pipe_idx >= 0)
+				free_pipe = &context->res_ctx.pipe_ctx[pipe_idx];
+		}
+#endif
 		if (!free_pipe) {
 			stream_status->surfaces[i] = NULL;
 			return false;
@@ -1175,6 +1204,7 @@ bool resource_validate_attach_surfaces(
 
 /* Maximum TMDS single link pixel clock 165MHz */
 #define TMDS_MAX_PIXEL_CLOCK_IN_KHZ 165000
+#define TMDS_MAX_PIXEL_CLOCK_IN_KHZ_UPMOST 297000
 
 static void set_stream_engine_in_use(
 		struct resource_context *res_ctx,
@@ -1278,7 +1308,7 @@ static struct audio *find_first_free_audio(
 {
 	int i;
 	for (i = 0; i < pool->audio_count; i++) {
-		if (res_ctx->is_audio_acquired[i] == false) {
+		if ((res_ctx->is_audio_acquired[i] == false) && (res_ctx->is_stream_enc_acquired[i] == true)) {
 			return pool->audios[i];
 		}
 	}
@@ -1302,7 +1332,8 @@ static void update_stream_signal(struct core_stream *stream)
 	}
 
 	if (dc_is_dvi_signal(stream->signal)) {
-		if (stream->public.timing.pix_clk_khz > TMDS_MAX_PIXEL_CLOCK_IN_KHZ)
+		if (stream->public.timing.pix_clk_khz > TMDS_MAX_PIXEL_CLOCK_IN_KHZ_UPMOST &&
+			stream->public.sink->sink_signal != SIGNAL_TYPE_DVI_SINGLE_LINK)
 			stream->signal = SIGNAL_TYPE_DVI_DUAL_LINK;
 		else
 			stream->signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
@@ -1477,8 +1508,11 @@ enum dc_status resource_map_pool_resources(
 		if (old_context && resource_is_stream_unchanged(old_context, stream))
 			continue;
 		/* acquire new resources */
-		pipe_idx = acquire_first_free_pipe(
-				&context->res_ctx, pool, stream);
+		pipe_idx = acquire_first_free_pipe(&context->res_ctx, pool, stream);
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+		if (pipe_idx < 0)
+			acquire_first_split_pipe(&context->res_ctx, pool, stream);
+#endif
 		if (pipe_idx < 0)
 			return DC_NO_CONTROLLER_RESOURCE;
 
@@ -2172,6 +2206,7 @@ void resource_build_info_frame(struct pipe_ctx *pipe_ctx)
 	info->avi.valid = false;
 	info->gamut.valid = false;
 	info->vendor.valid = false;
+	info->spd.valid = false;
 	info->hdrsmd.valid = false;
 	info->vsc.valid = false;
 

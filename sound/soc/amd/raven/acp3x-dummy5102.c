@@ -27,12 +27,48 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <linux/module.h>
+#include <sound/pcm.h>
+#include <sound/pcm_params.h>
 
 static int acp3x_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params)
 
 {
-	return 0;
+      struct snd_soc_pcm_runtime *rtd = substream->private_data;
+      struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+      unsigned int fmt;
+      unsigned int slot_width;
+      unsigned int channels;
+      int ret = 0;
+
+      fmt = params_format(params);
+      switch (fmt) {
+	case SNDRV_PCM_FORMAT_S16_LE:
+		slot_width = 16;
+		break;
+	case SNDRV_PCM_FORMAT_S24_LE:
+		slot_width = 32;
+		break;
+	case SNDRV_PCM_FORMAT_S32_LE:
+                slot_width = 32;
+		break;
+	default:
+		printk(KERN_WARNING "acp3x: unsupported PCM format");
+		return -EINVAL;
+      }
+
+      channels = params_channels(params);
+
+      if (channels == 0x04) {
+                ret = snd_soc_dai_set_tdm_slot(cpu_dai, 0x3, 0x3, 4, slot_width);
+                if (ret < 0)
+                       return ret;
+      } else {
+               ret = snd_soc_dai_set_tdm_slot(cpu_dai, 0x3, 0x3, 2, slot_width);
+               if (ret < 0)
+                       return ret;
+      }
+      return 0;
 }
 
 static struct snd_soc_ops acp3x_wm5102_ops = {
@@ -52,7 +88,7 @@ static struct snd_soc_dai_link acp3x_dai_w5102[] = {
 		.cpu_dai_name = "acp3x_rv_i2s.0",
 		.codec_dai_name = "dummy_w5102_dai",
 		.codec_name = "dummy_w5102.0",
-		.dai_fmt =     SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF
+                .dai_fmt = SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_NB_NF
 				| SND_SOC_DAIFMT_CBM_CFM,
 		.ops = &acp3x_wm5102_ops,
 		.init = acp3x_init,

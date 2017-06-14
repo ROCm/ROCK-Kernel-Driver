@@ -1894,6 +1894,47 @@ static void program_surface_visibility(const struct core_dc *dc,
 
 }
 
+static void program_gamut_remap(struct pipe_ctx *pipe_ctx)
+{
+	struct xfm_grph_csc_adjustment adjust;
+	memset(&adjust, 0, sizeof(adjust));
+	adjust.gamut_adjust_type = GRAPHICS_GAMUT_ADJUST_TYPE_BYPASS;
+
+
+	if (pipe_ctx->stream->public.gamut_remap_matrix.enable_remap == true) {
+		adjust.gamut_adjust_type = GRAPHICS_GAMUT_ADJUST_TYPE_SW;
+		adjust.temperature_matrix[0] =
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[0];
+		adjust.temperature_matrix[1] =
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[1];
+		adjust.temperature_matrix[2] =
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[2];
+		adjust.temperature_matrix[3] =
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[4];
+		adjust.temperature_matrix[4] =
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[5];
+		adjust.temperature_matrix[5] =
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[6];
+		adjust.temperature_matrix[6] =
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[8];
+		adjust.temperature_matrix[7] =
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[9];
+		adjust.temperature_matrix[8] =
+				pipe_ctx->stream->
+				public.gamut_remap_matrix.matrix[10];
+	}
+
+	pipe_ctx->xfm->funcs->transform_set_gamut_remap(pipe_ctx->xfm, &adjust);
+}
+
 /**
  * TODO REMOVE, USE UPDATE INSTEAD
  */
@@ -2408,10 +2449,8 @@ static void dce110_program_front_end_for_pipe(
 	pipe_ctx->xfm->funcs->transform_set_gamut_remap(pipe_ctx->xfm, &adjust);
 
 	pipe_ctx->scl_data.lb_params.alpha_en = pipe_ctx->bottom_pipe != 0;
-	if (old_pipe && memcmp(&old_pipe->scl_data,
-				&pipe_ctx->scl_data,
-				sizeof(struct scaler_data)) != 0)
-		program_scaler(dc, pipe_ctx);
+
+	program_scaler(dc, pipe_ctx);
 
 	mi->funcs->mem_input_program_surface_config(
 			mi,
@@ -2511,6 +2550,7 @@ static void dce110_power_down_fe(struct core_dc *dc, struct pipe_ctx *pipe)
 }
 
 static const struct hw_sequencer_funcs dce110_funcs = {
+	.program_gamut_remap = program_gamut_remap,
 	.init_hw = init_hw,
 	.apply_ctx_to_hw = dce110_apply_ctx_to_hw,
 	.apply_ctx_for_surface = dce110_apply_ctx_for_surface,

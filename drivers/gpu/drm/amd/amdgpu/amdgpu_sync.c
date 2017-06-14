@@ -315,14 +315,14 @@ struct dma_fence *amdgpu_sync_get_fence(struct amdgpu_sync *sync)
 	return NULL;
 }
 
-int amdgpu_sync_wait(struct amdgpu_sync *sync)
+int amdgpu_sync_wait(struct amdgpu_sync *sync, bool intr)
 {
 	struct amdgpu_sync_entry *e;
 	struct hlist_node *tmp;
 	int i, r;
 
 	hash_for_each_safe(sync->fences, i, tmp, e, node) {
-		r = dma_fence_wait(e->fence, false);
+		r = dma_fence_wait(e->fence, intr);
 		if (r)
 			return r;
 

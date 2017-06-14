@@ -1114,11 +1114,6 @@ static void gfx_v6_0_select_se_sh(struct amdgpu_device *adev, u32 se_num,
 	WREG32(mmGRBM_GFX_INDEX, data);
 }
 
-static u32 gfx_v6_0_create_bitmask(u32 bit_width)
-{
-	return (u32)(((u64)1 << bit_width) - 1);
-}
-
 static u32 gfx_v6_0_get_rb_active_bitmap(struct amdgpu_device *adev)
 {
 	u32 data, mask;
@@ -1128,8 +1123,8 @@ static u32 gfx_v6_0_get_rb_active_bitmap(struct amdgpu_device *adev)
 
 	data = REG_GET_FIELD(data, GC_USER_RB_BACKEND_DISABLE, BACKEND_DISABLE);
 
-	mask = gfx_v6_0_create_bitmask(adev->gfx.config.max_backends_per_se/
-					adev->gfx.config.max_sh_per_se);
+	mask = amdgpu_gfx_create_bitmask(adev->gfx.config.max_backends_per_se/
+					 adev->gfx.config.max_sh_per_se);
 
 	return ~data & mask;
 }
@@ -1331,7 +1326,7 @@ static u32 gfx_v6_0_get_cu_enabled(struct amdgpu_device *adev)
 	data = RREG32(mmCC_GC_SHADER_ARRAY_CONFIG) |
 		RREG32(mmGC_USER_SHADER_ARRAY_CONFIG);
 
-	mask = gfx_v6_0_create_bitmask(adev->gfx.config.max_cu_per_sh);
+	mask = amdgpu_gfx_create_bitmask(adev->gfx.config.max_cu_per_sh);
 	return ~REG_GET_FIELD(data, CC_GC_SHADER_ARRAY_CONFIG, INACTIVE_CUS) & mask;
 }
 
@@ -1475,7 +1470,8 @@ static void gfx_v6_0_gpu_init(struct amdgpu_device *adev)
 	WREG32(mmBIF_FB_EN, BIF_FB_EN__FB_READ_EN_MASK | BIF_FB_EN__FB_WRITE_EN_MASK);
 
 	mc_shared_chmap = RREG32(mmMC_SHARED_CHMAP);
-	mc_arb_ramcfg = RREG32(mmMC_ARB_RAMCFG);
+	adev->gfx.config.mc_arb_ramcfg = RREG32(mmMC_ARB_RAMCFG);
+	mc_arb_ramcfg = adev->gfx.config.mc_arb_ramcfg;
 
 	adev->gfx.config.num_tile_pipes = adev->gfx.config.max_tile_pipes;
 	adev->gfx.config.mem_max_burst_length_bytes = 256;

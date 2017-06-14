@@ -369,16 +369,22 @@ static bool mem_input_program_surface_flip_and_addr(
 	return true;
 }
 
-static void program_control(struct dcn10_mem_input *mi,
-		struct dc_plane_dcc_param *dcc)
+static void dcc_control(struct mem_input *mem_input, bool enable,
+		bool independent_64b_blks)
 {
-	uint32_t dcc_en = dcc->enable ? 1 : 0;
-	uint32_t dcc_ind_64b_blk = dcc->grph.independent_64b_blks ? 1 : 0;
+	uint32_t dcc_en = enable ? 1 : 0;
+	uint32_t dcc_ind_64b_blk = independent_64b_blks ? 1 : 0;
+	struct dcn10_mem_input *mi = TO_DCN10_MEM_INPUT(mem_input);
 
 	REG_UPDATE_2(DCSURF_SURFACE_CONTROL,
 			PRIMARY_SURFACE_DCC_EN, dcc_en,
 			PRIMARY_SURFACE_DCC_IND_64B_BLK, dcc_ind_64b_blk);
+}
 
+static void program_control(struct dcn10_mem_input *mi,
+		struct dc_plane_dcc_param *dcc)
+{
+	dcc_control(&mi->base, dcc->enable, dcc->grph.independent_64b_blks);
 }
 
 static void mem_input_program_surface_config(
@@ -582,6 +588,7 @@ static void program_watermarks(
 		unsigned int refclk_mhz)
 {
 	struct dcn10_mem_input *mi = TO_DCN10_MEM_INPUT(mem_input);
+	uint32_t force_en = mem_input->ctx->dc->debug.disable_stutter ? 1 : 0;
 	/*
 	 * Need to clamp to max of the register values (i.e. no wrap)
 	 * for dcn1, all wm registers are 21-bit wide
@@ -793,6 +800,10 @@ static void program_watermarks(
 	REG_UPDATE(DCHUBBUB_ARB_DF_REQ_OUTSTAND,
 			DCHUBBUB_ARB_MIN_REQ_OUTSTAND, 68);
 
+	REG_UPDATE_2(DCHUBBUB_ARB_DRAM_STATE_CNTL,
+			DCHUBBUB_ARB_ALLOW_SELF_REFRESH_FORCE_VALUE, 0,
+			DCHUBBUB_ARB_ALLOW_SELF_REFRESH_FORCE_ENABLE, force_en);
+
 #if 0
 	REG_UPDATE_2(DCHUBBUB_ARB_WATERMARK_CHANGE_CNTL,
 			DCHUBBUB_ARB_WATERMARK_CHANGE_DONE_INTERRUPT_DISABLE, 1,
@@ -816,11 +827,21 @@ bool mem_input_is_flip_pending(struct mem_input *mem_input)
 {
 	uint32_t update_pending = 0;
 	struct dcn10_mem_input *mi = TO_DCN10_MEM_INPUT(mem_input);
+	struct dc_plane_address earliest_inuse_address;
 
 	REG_GET(DCSURF_FLIP_CONTROL,
 			SURFACE_UPDATE_PENDING, &update_pending);
 
+	REG_GET(DCSURF_SURFACE_EARLIEST_INUSE,
+			SURFACE_EARLIEST_INUSE_ADDRESS, &earliest_inuse_address.grph.addr.low_part);
+
+	REG_GET(DCSURF_SURFACE_EARLIEST_INUSE_HIGH,
+			SURFACE_EARLIEST_INUSE_ADDRESS_HIGH, &earliest_inuse_address.grph.addr.high_part);
+
 	if (update_pending)
+		return true;
+
+	if (earliest_inuse_address.grph.addr.quad_part != mem_input->request_address.grph.addr.quad_part)
 		return true;
 
 	mem_input->current_address = mem_input->request_address;
@@ -1057,6 +1078,7 @@ static struct mem_input_funcs dcn10_mem_input_funcs = {
 	.mem_input_update_dchub = mem_input_update_dchub,
 	.mem_input_program_pte_vm = dcn_mem_input_program_pte_vm,
 	.set_blank = dcn_mi_set_blank,
+	.dcc_control = dcc_control,
 };
 
 

@@ -97,6 +97,7 @@ static bool create_links(
 		struct core_link *link;
 
 		link_init_params.ctx = dc->ctx;
+		/* next BIOS object table connector */
 		link_init_params.connector_index = i;
 		link_init_params.link_index = dc->link_count;
 		link_init_params.dc = dc;
@@ -106,8 +107,6 @@ static bool create_links(
 			dc->links[dc->link_count] = link;
 			link->dc = dc;
 			++dc->link_count;
-		} else {
-			dm_error("DC: failed to create link!\n");
 		}
 	}
 
@@ -214,8 +213,7 @@ static bool set_gamut_remap(struct dc *dc, const struct dc_stream *stream)
 				== core_stream) {
 
 			pipes = &core_dc->current_context->res_ctx.pipe_ctx[i];
-			core_dc->hwss.set_plane_config(core_dc, pipes,
-					&core_dc->current_context->res_ctx);
+			core_dc->hwss.program_gamut_remap(pipes);
 			ret = true;
 		}
 	}
@@ -247,47 +245,6 @@ static void set_static_screen_events(struct dc *dc,
 	}
 
 	core_dc->hwss.set_static_screen_control(pipes_affected, num_pipes_affected, events);
-}
-
-/* This function is not expected to fail, proper implementation of
- * validation will prevent this from ever being called for unsupported
- * configurations.
- */
-static void stream_update_scaling(
-		const struct dc *dc,
-		const struct dc_stream *dc_stream,
-		const struct rect *src,
-		const struct rect *dst)
-{
-	struct core_stream *stream = DC_STREAM_TO_CORE(dc_stream);
-	struct core_dc *core_dc = DC_TO_CORE(dc);
-	struct validate_context *cur_ctx = core_dc->current_context;
-	int i;
-
-	if (src)
-		stream->public.src = *src;
-
-	if (dst)
-		stream->public.dst = *dst;
-
-	for (i = 0; i < cur_ctx->stream_count; i++) {
-		struct core_stream *cur_stream = cur_ctx->streams[i];
-
-		if (stream == cur_stream) {
-			struct dc_stream_status *status = &cur_ctx->stream_status[i];
-
-			if (status->surface_count)
-				if (!dc_commit_surfaces_to_stream(
-						&core_dc->public,
-						status->surfaces,
-						status->surface_count,
-						&cur_stream->public))
-					/* Need to debug validation */
-					BREAK_TO_DEBUGGER();
-
-			return;
-		}
-	}
 }
 
 static void set_drive_settings(struct dc *dc,
@@ -402,7 +359,6 @@ void set_dither_option(const struct dc_stream *dc_stream,
 
 static void allocate_dc_stream_funcs(struct core_dc *core_dc)
 {
-	core_dc->public.stream_funcs.stream_update_scaling = stream_update_scaling;
 	if (core_dc->hwss.set_drr != NULL) {
 		core_dc->public.stream_funcs.adjust_vmin_vmax =
 				stream_adjust_vmin_vmax;
@@ -1011,11 +967,22 @@ bool dc_commit_surfaces_to_stream(
 	struct dc_plane_info plane_info[MAX_SURFACES];
 	struct dc_scaling_info scaling_info[MAX_SURFACES];
 	int i;
+	bool ret;
+	struct dc_stream_update *stream_update =
+			dm_alloc(sizeof(struct dc_stream_update));
+
+	if (!stream_update) {
+		BREAK_TO_DEBUGGER();
+		return false;
+	}
 
 	memset(updates, 0, sizeof(updates));
 	memset(flip_addr, 0, sizeof(flip_addr));
 	memset(plane_info, 0, sizeof(plane_info));
 	memset(scaling_info, 0, sizeof(scaling_info));
+
+	stream_update->src = dc_stream->src;
+	stream_update->dst = dc_stream->dst;
 
 	for (i = 0; i < new_surface_count; i++) {
 		updates[i].surface = new_surfaces[i];
@@ -1031,6 +998,7 @@ bool dc_commit_surfaces_to_stream(
 		plane_info[i].stereo_format = new_surfaces[i]->stereo_format;
 		plane_info[i].tiling_info = new_surfaces[i]->tiling_info;
 		plane_info[i].visible = new_surfaces[i]->visible;
+		plane_info[i].per_pixel_alpha = new_surfaces[i]->per_pixel_alpha;
 		plane_info[i].dcc = new_surfaces[i]->dcc;
 		scaling_info[i].scaling_quality = new_surfaces[i]->scaling_quality;
 		scaling_info[i].src_rect = new_surfaces[i]->src_rect;
@@ -1041,9 +1009,17 @@ bool dc_commit_surfaces_to_stream(
 		updates[i].plane_info = &plane_info[i];
 		updates[i].scaling_info = &scaling_info[i];
 	}
-	dc_update_surfaces_for_stream(dc, updates, new_surface_count, dc_stream);
 
-	return dc_post_update_surfaces_to_stream(dc);
+	dc_update_surfaces_and_stream(
+			dc,
+			updates,
+			new_surface_count,
+			dc_stream, stream_update);
+
+	ret = dc_post_update_surfaces_to_stream(dc);
+
+	dm_free(stream_update);
+	return ret;
 }
 
 static bool is_surface_in_context(
@@ -1093,7 +1069,7 @@ static enum surface_update_type get_plane_info_update_type(
 		const struct dc_surface_update *u,
 		int surface_index)
 {
-	struct dc_plane_info temp_plane_info = { { { { 0 } } } };
+	struct dc_plane_info temp_plane_info = { 0 };
 
 	if (!u->plane_info)
 		return UPDATE_TYPE_FAST;
@@ -1116,6 +1092,7 @@ static enum surface_update_type get_plane_info_update_type(
 
 	/* Special Validation parameters */
 	temp_plane_info.format = u->plane_info->format;
+	temp_plane_info.per_pixel_alpha = u->plane_info->per_pixel_alpha;
 
 	if (surface_index == 0)
 		temp_plane_info.visible = u->plane_info->visible;
@@ -1246,33 +1223,7 @@ void dc_update_surfaces_and_stream(struct dc *dc,
 	if (!stream_status)
 		return; /* Cannot commit surface to stream that is not committed */
 
-	update_type = dc_check_update_surfaces_for_stream(
-			dc, srf_updates, surface_count, stream_update, stream_status);
-
-	if (update_type >= update_surface_trace_level)
-		update_surface_trace(dc, srf_updates, surface_count);
-
-	if (update_type >= UPDATE_TYPE_FULL) {
-		const struct dc_surface *new_surfaces[MAX_SURFACES] = { 0 };
-
-		for (i = 0; i < surface_count; i++)
-			new_surfaces[i] = srf_updates[i].surface;
-
-		/* initialize scratch memory for building context */
-		context = dm_alloc(sizeof(*context));
-		dc_resource_validate_ctx_copy_construct(
-				core_dc->current_context, context);
-
-		/* add surface to context */
-		if (!resource_attach_surfaces_to_context(
-				new_surfaces, surface_count, dc_stream,
-				context, core_dc->res_pool)) {
-			BREAK_TO_DEBUGGER();
-			goto fail;
-		}
-	} else {
-		context = core_dc->current_context;
-	}
+	context = core_dc->current_context;
 
 	/* update current stream with the new updates */
 	if (stream_update) {
@@ -1297,6 +1248,45 @@ void dc_update_surfaces_and_stream(struct dc *dc,
 				stream->public.out_transfer_func =
 					stream_update->out_transfer_func;
 			}
+		}
+	}
+
+	/* do not perform surface update if surface has invalid dimensions
+	 * (all zero) and no scaling_info is provided
+	 */
+	if (surface_count > 0 &&
+			srf_updates->surface->src_rect.width == 0 &&
+			srf_updates->surface->src_rect.height == 0 &&
+			srf_updates->surface->dst_rect.width == 0 &&
+			srf_updates->surface->dst_rect.height == 0 &&
+			!srf_updates->scaling_info) {
+		ASSERT(false);
+		return;
+	}
+
+	update_type = dc_check_update_surfaces_for_stream(
+			dc, srf_updates, surface_count, stream_update, stream_status);
+
+	if (update_type >= update_surface_trace_level)
+		update_surface_trace(dc, srf_updates, surface_count);
+
+	if (update_type >= UPDATE_TYPE_FULL) {
+		const struct dc_surface *new_surfaces[MAX_SURFACES] = { 0 };
+
+		for (i = 0; i < surface_count; i++)
+			new_surfaces[i] = srf_updates[i].surface;
+
+		/* initialize scratch memory for building context */
+		context = dm_alloc(sizeof(*context));
+		dc_resource_validate_ctx_copy_construct(
+				core_dc->current_context, context);
+
+		/* add surface to context */
+		if (!resource_attach_surfaces_to_context(
+				new_surfaces, surface_count, dc_stream,
+				context, core_dc->res_pool)) {
+			BREAK_TO_DEBUGGER();
+			goto fail;
 		}
 	}
 
@@ -1339,6 +1329,8 @@ void dc_update_surfaces_and_stream(struct dc *dc,
 					srf_updates[i].plane_info->tiling_info;
 			surface->public.visible =
 					srf_updates[i].plane_info->visible;
+			surface->public.per_pixel_alpha =
+					srf_updates[i].plane_info->per_pixel_alpha;
 			surface->public.dcc =
 					srf_updates[i].plane_info->dcc;
 		}
@@ -1387,8 +1379,10 @@ void dc_update_surfaces_and_stream(struct dc *dc,
 		if (!core_dc->res_pool->funcs->validate_bandwidth(core_dc, context)) {
 			BREAK_TO_DEBUGGER();
 			goto fail;
-		} else
+		} else {
 			core_dc->hwss.set_bandwidth(core_dc, context, false);
+			context_clock_trace(dc, context);
+		}
 	}
 
 	if (!surface_count)  /* reset */

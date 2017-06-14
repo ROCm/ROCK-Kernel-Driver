@@ -67,6 +67,9 @@ struct hw_sequencer_funcs {
 			struct pipe_ctx *pipe_ctx,
 			struct resource_context *res_ctx);
 
+	void (*program_gamut_remap)(
+			struct pipe_ctx *pipe_ctx);
+
 	void (*update_plane_addr)(
 		const struct core_dc *dc,
 		struct pipe_ctx *pipe_ctx);
@@ -139,6 +142,10 @@ struct hw_sequencer_funcs {
 	enum dc_status (*prog_pixclk_crtc_otg)(
 			struct pipe_ctx *pipe_ctx,
 			struct validate_context *context,
+			struct core_dc *dc);
+
+	void (*setup_stereo)(
+			struct pipe_ctx *pipe_ctx,
 			struct core_dc *dc);
 };
 

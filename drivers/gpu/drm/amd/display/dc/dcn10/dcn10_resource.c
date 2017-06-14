@@ -426,11 +426,10 @@ static const struct resource_caps res_cap = {
 
 static const struct dc_debug debug_defaults_drv = {
 		.disable_dcc = false,
-		.disable_dpp_power_gate = false,
-		.disable_hubp_power_gate = false,
 		.disable_dmcu = true,
 		.force_abm_enable = false,
 		.timing_trace = false,
+		.clock_trace = true,
 		.disable_pplib_clock_request = true,
 		.disable_pplib_wm_range = false,
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
@@ -440,12 +439,10 @@ static const struct dc_debug debug_defaults_drv = {
 };
 
 static const struct dc_debug debug_defaults_diags = {
-		.disable_dpp_power_gate = false,
-		.disable_hubp_power_gate = false,
-		.disable_clock_gate = true,
 		.disable_dmcu = true,
 		.force_abm_enable = false,
 		.timing_trace = true,
+		.clock_trace = true,
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		.disable_pplib_clock_request = true,
 		.disable_pplib_wm_range = true,

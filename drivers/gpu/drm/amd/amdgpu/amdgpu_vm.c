@@ -79,6 +79,12 @@ struct amdgpu_pte_update_params {
 		     uint64_t flags);
 	/* indicate update pt or its shadow */
 	bool shadow;
+	/* The next two are used during VM update by CPU
+	 *  DMA addresses to use for mapping
+	 *  Kernel pointer of PD/PT BO that needs to be updated
+	 */
+	dma_addr_t *pages_addr;
+	void *kptr;
 };
 
 /* Helper to disable partial resident texture feature from a fence callback */
@@ -275,6 +281,7 @@ static int amdgpu_vm_alloc_levels(struct amdgpu_device *adev,
 		adev->vm_manager.block_size;
 	unsigned pt_idx, from, to;
 	int r;
+	u64 flags;
 
 	if (!parent->entries) {
 		unsigned num_entries = amdgpu_vm_num_entries(adev, level);
@@ -299,6 +306,14 @@ static int amdgpu_vm_alloc_levels(struct amdgpu_device *adev,
 	saddr = saddr & ((1 << shift) - 1);
 	eaddr = eaddr & ((1 << shift) - 1);
 
+	flags = AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS |
+			AMDGPU_GEM_CREATE_VRAM_CLEARED;
+	if (vm->use_cpu_for_update)
+		flags |= AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
+	else
+		flags |= (AMDGPU_GEM_CREATE_NO_CPU_ACCESS |
+				AMDGPU_GEM_CREATE_SHADOW);
+
 	/* walk over the address space and allocate the page tables */
 	for (pt_idx = from; pt_idx <= to; ++pt_idx) {
 		struct reservation_object *resv = vm->root.bo->tbo.resv;
@@ -310,10 +325,7 @@ static int amdgpu_vm_alloc_levels(struct amdgpu_device *adev,
 					     amdgpu_vm_bo_size(adev, level),
 					     AMDGPU_GPU_PAGE_SIZE, true,
 					     AMDGPU_GEM_DOMAIN_VRAM,
-					     AMDGPU_GEM_CREATE_NO_CPU_ACCESS |
-					     AMDGPU_GEM_CREATE_SHADOW |
-					     AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS |
-					     AMDGPU_GEM_CREATE_VRAM_CLEARED,
+					     flags,
 					     NULL, resv, &pt);
 			if (r)
 				return r;
@@ -656,6 +668,41 @@ unlock:
 	return r;
 }
 
+/**
+ * amdgpu_vm_check_compute_bug - check whether asic has compute vm bug
+ *
+ * @adev: amdgpu_device pointer
+ */
+void amdgpu_vm_check_compute_bug(struct amdgpu_device *adev)
+{
+	const struct amdgpu_ip_block *ip_block;
+	bool has_compute_vm_bug;
+	struct amdgpu_ring *ring;
+	int i;
+
+	has_compute_vm_bug = false;
+
+	ip_block = amdgpu_get_ip_block(adev, AMD_IP_BLOCK_TYPE_GFX);
+	if (ip_block) {
+		/* Compute has a VM bug for GFX version < 7.
+		   Compute has a VM bug for GFX 8 MEC firmware version < 673.*/
+		if (ip_block->version->major <= 7)
+			has_compute_vm_bug = true;
+		else if (ip_block->version->major == 8)
+			if (adev->gfx.mec_fw_version < 673)
+				has_compute_vm_bug = true;
+	}
+
+	for (i = 0; i < adev->num_rings; i++) {
+		ring = adev->rings[i];
+		if (ring->funcs->type == AMDGPU_RING_TYPE_COMPUTE)
+			/* only compute rings */
+			ring->has_compute_vm_bug = has_compute_vm_bug;
+		else
+			ring->has_compute_vm_bug = false;
+	}
+}
+
 bool amdgpu_vm_need_pipeline_sync(struct amdgpu_ring *ring,
 				  struct amdgpu_job *job)
 {
@@ -664,8 +711,7 @@ bool amdgpu_vm_need_pipeline_sync(struct amdgpu_ring *ring,
 	struct amdgpu_vm_id_manager *id_mgr = &adev->vm_manager.id_mgr[vmhub];
 	struct amdgpu_vm_id *id;
 	bool gds_switch_needed;
-	bool vm_flush_needed = job->vm_needs_flush ||
-		amdgpu_ring_has_compute_vm_bug(ring);
+	bool vm_flush_needed = job->vm_needs_flush || ring->has_compute_vm_bug;
 
 	if (job->vm_id == 0)
 		return false;
@@ -682,6 +728,11 @@ bool amdgpu_vm_need_pipeline_sync(struct amdgpu_ring *ring,
 		return true;
 
 	return vm_flush_needed || gds_switch_needed;
+}
+
+static bool amdgpu_vm_is_large_bar(struct amdgpu_device *adev)
+{
+	return (adev->mc.real_vram_size == adev->mc.visible_vram_size);
 }
 
 /**
@@ -909,6 +960,53 @@ static uint64_t amdgpu_vm_map_gart(const dma_addr_t *pages_addr, uint64_t addr)
 	return result;
 }
 
+/**
+ * amdgpu_vm_cpu_set_ptes - helper to update page tables via CPU
+ *
+ * @params: see amdgpu_pte_update_params definition
+ * @pe: kmap addr of the page entry
+ * @addr: dst addr to write into pe
+ * @count: number of page entries to update
+ * @incr: increase next addr by incr bytes
+ * @flags: hw access flags
+ *
+ * Write count number of PT/PD entries directly.
+ */
+static void amdgpu_vm_cpu_set_ptes(struct amdgpu_pte_update_params *params,
+				   uint64_t pe, uint64_t addr,
+				   unsigned count, uint32_t incr,
+				   uint64_t flags)
+{
+	unsigned int i;
+	uint64_t value;
+
+	for (i = 0; i < count; i++) {
+		value = params->pages_addr ?
+			amdgpu_vm_map_gart(params->pages_addr, addr) :
+			addr;
+		amdgpu_gart_set_pte_pde(params->adev, (void *)pe,
+					i, value, flags);
+		addr += incr;
+	}
+
+	/* Flush HDP */
+	mb();
+	amdgpu_gart_flush_gpu_tlb(params->adev, 0);
+}
+
+static int amdgpu_vm_bo_wait(struct amdgpu_device *adev, struct amdgpu_bo *bo)
+{
+	struct amdgpu_sync sync;
+	int r;
+
+	amdgpu_sync_create(&sync);
+	amdgpu_sync_resv(adev, &sync, bo->tbo.resv, AMDGPU_FENCE_OWNER_VM);
+	r = amdgpu_sync_wait(&sync, true);
+	amdgpu_sync_free(&sync);
+
+	return r;
+}
+
 /*
  * amdgpu_vm_update_level - update a single level in the hierarchy
  *
@@ -938,34 +1036,54 @@ static int amdgpu_vm_update_level(struct amdgpu_device *adev,
 
 	if (!parent->entries)
 		return 0;
-	ring = container_of(vm->entity.sched, struct amdgpu_ring, sched);
-
-	/* padding, etc. */
-	ndw = 64;
-
-	/* assume the worst case */
-	ndw += parent->last_entry_used * 6;
-
-	pd_addr = amdgpu_bo_gpu_offset(parent->bo);
-
-	shadow = parent->bo->shadow;
-	if (shadow) {
-		r = amdgpu_ttm_bind(&shadow->tbo, &shadow->tbo.mem);
-		if (r)
-			return r;
-		shadow_addr = amdgpu_bo_gpu_offset(shadow);
-		ndw *= 2;
-	} else {
-		shadow_addr = 0;
-	}
-
-	r = amdgpu_job_alloc_with_ib(adev, ndw * 4, &job);
-	if (r)
-		return r;
 
 	memset(&params, 0, sizeof(params));
 	params.adev = adev;
-	params.ib = &job->ibs[0];
+	shadow = parent->bo->shadow;
+
+	WARN_ON(vm->use_cpu_for_update && shadow);
+	if (vm->use_cpu_for_update && !shadow) {
+		r = amdgpu_bo_kmap(parent->bo, (void **)&pd_addr);
+		if (r)
+			return r;
+		r = amdgpu_vm_bo_wait(adev, parent->bo);
+		if (unlikely(r)) {
+			amdgpu_bo_kunmap(parent->bo);
+			return r;
+		}
+		params.func = amdgpu_vm_cpu_set_ptes;
+	} else {
+		if (shadow) {
+			r = amdgpu_ttm_bind(&shadow->tbo, &shadow->tbo.mem);
+			if (r)
+				return r;
+		}
+		ring = container_of(vm->entity.sched, struct amdgpu_ring,
+				    sched);
+
+		/* padding, etc. */
+		ndw = 64;
+
+		/* assume the worst case */
+		ndw += parent->last_entry_used * 6;
+
+		pd_addr = amdgpu_bo_gpu_offset(parent->bo);
+
+		if (shadow) {
+			shadow_addr = amdgpu_bo_gpu_offset(shadow);
+			ndw *= 2;
+		} else {
+			shadow_addr = 0;
+		}
+
+		r = amdgpu_job_alloc_with_ib(adev, ndw * 4, &job);
+		if (r)
+			return r;
+
+		params.ib = &job->ibs[0];
+		params.func = amdgpu_vm_do_set_ptes;
+	}
+
 
 	/* walk over the address space and update the directory */
 	for (pt_idx = 0; pt_idx <= parent->last_entry_used; ++pt_idx) {
@@ -998,15 +1116,15 @@ static int amdgpu_vm_update_level(struct amdgpu_device *adev,
 
 			if (count) {
 				if (shadow)
-					amdgpu_vm_do_set_ptes(&params,
-							      last_shadow,
-							      last_pt, count,
-							      incr,
-							      AMDGPU_PTE_VALID);
+					params.func(&params,
+						    last_shadow,
+						    last_pt, count,
+						    incr,
+						    AMDGPU_PTE_VALID);
 
-				amdgpu_vm_do_set_ptes(&params, last_pde,
-						      last_pt, count, incr,
-						      AMDGPU_PTE_VALID);
+				params.func(&params, last_pde,
+					    last_pt, count, incr,
+					    AMDGPU_PTE_VALID);
 			}
 
 			count = 1;
@@ -1020,14 +1138,16 @@ static int amdgpu_vm_update_level(struct amdgpu_device *adev,
 
 	if (count) {
 		if (vm->root.bo->shadow)
-			amdgpu_vm_do_set_ptes(&params, last_shadow, last_pt,
-					      count, incr, AMDGPU_PTE_VALID);
+			params.func(&params, last_shadow, last_pt,
+				    count, incr, AMDGPU_PTE_VALID);
 
-		amdgpu_vm_do_set_ptes(&params, last_pde, last_pt,
-				      count, incr, AMDGPU_PTE_VALID);
+		params.func(&params, last_pde, last_pt,
+			    count, incr, AMDGPU_PTE_VALID);
 	}
 
-	if (params.ib->length_dw == 0) {
+	if (params.func == amdgpu_vm_cpu_set_ptes)
+		amdgpu_bo_kunmap(parent->bo);
+	else if (params.ib->length_dw == 0) {
 		amdgpu_job_free(job);
 	} else {
 		amdgpu_ring_pad_ib(ring, params.ib);
@@ -1144,6 +1264,59 @@ static struct amdgpu_bo *amdgpu_vm_get_pt(struct amdgpu_pte_update_params *p,
 }
 
 /**
+ * amdgpu_vm_update_ptes_cpu - Update the page tables in the range
+ *  start - @end using CPU.
+ * See amdgpu_vm_update_ptes for parameter description.
+ *
+ */
+static int amdgpu_vm_update_ptes_cpu(struct amdgpu_pte_update_params *params,
+				     uint64_t start, uint64_t end,
+				     uint64_t dst, uint64_t flags)
+{
+	struct amdgpu_device *adev = params->adev;
+	const uint64_t mask = AMDGPU_VM_PTE_COUNT(adev) - 1;
+	void *pe_ptr;
+	uint64_t addr;
+	struct amdgpu_bo *pt;
+	unsigned int nptes;
+	int r;
+
+	/* initialize the variables */
+	addr = start;
+
+	/* walk over the address space and update the page tables */
+	while (addr < end) {
+		pt = amdgpu_vm_get_pt(params, addr);
+		if (!pt) {
+			pr_err("PT not found, aborting update_ptes\n");
+			return -EINVAL;
+		}
+
+		WARN_ON(params->shadow);
+
+		r = amdgpu_bo_kmap(pt, &pe_ptr);
+		if (r)
+			return r;
+
+		pe_ptr += (addr & mask) * 8;
+
+		if ((addr & ~mask) == (end & ~mask))
+			nptes = end - addr;
+		else
+			nptes = AMDGPU_VM_PTE_COUNT(adev) - (addr & mask);
+
+		params->func(params, (uint64_t)pe_ptr, dst, nptes,
+			     AMDGPU_GPU_PAGE_SIZE, flags);
+
+		amdgpu_bo_kunmap(pt);
+		addr += nptes;
+		dst += nptes * AMDGPU_GPU_PAGE_SIZE;
+	}
+
+	return 0;
+}
+
+/**
  * amdgpu_vm_update_ptes - make sure that page tables are valid
  *
  * @params: see amdgpu_pte_update_params definition
@@ -1166,6 +1339,10 @@ static int amdgpu_vm_update_ptes(struct amdgpu_pte_update_params *params,
 	uint64_t addr, pe_start;
 	struct amdgpu_bo *pt;
 	unsigned nptes;
+
+	if (params->func == amdgpu_vm_cpu_set_ptes)
+		return amdgpu_vm_update_ptes_cpu(params, start, end,
+						 dst, flags);
 
 	/* walk over the address space and update the page tables */
 	for (addr = start; addr < end; addr += nptes) {
@@ -1307,6 +1484,25 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	params.adev = adev;
 	params.vm = vm;
 	params.src = src;
+
+	if (vm->use_cpu_for_update) {
+		/* params.src is used as flag to indicate system Memory */
+		if (pages_addr)
+			params.src = ~0;
+
+		/* Wait for PT BOs to be free. PTs share the same resv. object
+		 * as the root PD BO
+		 */
+		r = amdgpu_vm_bo_wait(adev, vm->root.bo);
+		if (unlikely(r))
+			return r;
+
+		params.func = amdgpu_vm_cpu_set_ptes;
+		params.pages_addr = pages_addr;
+		params.shadow = false;
+		return amdgpu_vm_frag_ptes(&params, start, last + 1,
+					   addr, flags);
+	}
 
 	ring = container_of(vm->entity.sched, struct amdgpu_ring, sched);
 
@@ -2247,6 +2443,7 @@ void amdgpu_vm_adjust_size(struct amdgpu_device *adev, uint64_t vm_size)
  *
  * @adev: amdgpu_device pointer
  * @vm: requested vm
+ * @vm_context: Indicates if it GFX or Compute context
  *
  * Init @vm fields.
  */
@@ -2259,6 +2456,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	struct amdgpu_ring *ring;
 	struct amd_sched_rq *rq;
 	int r, i;
+	u64 flags;
 
 	/* Temporary use only the first VM manager */
 	unsigned vmhub = 0; /*ring->funcs->vmhub;*/
@@ -2284,14 +2482,29 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	if (r)
 		return r;
 
+	if (vm_context == AMDGPU_VM_CONTEXT_COMPUTE)
+		vm->use_cpu_for_update = !!(adev->vm_manager.vm_update_mode &
+						AMDGPU_VM_USE_CPU_FOR_COMPUTE);
+	else
+		vm->use_cpu_for_update = !!(adev->vm_manager.vm_update_mode &
+						AMDGPU_VM_USE_CPU_FOR_GFX);
+	DRM_DEBUG_DRIVER("VM update mode is %s\n",
+			 vm->use_cpu_for_update ? "CPU" : "SDMA");
+	WARN_ONCE((vm->use_cpu_for_update & !amdgpu_vm_is_large_bar(adev)),
+		  "CPU update of VM recommended only for large BAR system\n");
 	vm->last_dir_update = NULL;
+
+	flags = AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS |
+			AMDGPU_GEM_CREATE_VRAM_CLEARED;
+	if (vm->use_cpu_for_update)
+		flags |= AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
+	else
+		flags |= (AMDGPU_GEM_CREATE_NO_CPU_ACCESS |
+				AMDGPU_GEM_CREATE_SHADOW);
 
 	r = amdgpu_bo_create(adev, amdgpu_vm_bo_size(adev, 0), align, true,
 			     AMDGPU_GEM_DOMAIN_VRAM,
-			     AMDGPU_GEM_CREATE_NO_CPU_ACCESS |
-			     AMDGPU_GEM_CREATE_SHADOW |
-			     AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS |
-			     AMDGPU_GEM_CREATE_VRAM_CLEARED,
+			     flags,
 			     NULL, NULL, &vm->root.bo);
 	if (r)
 		goto error_free_sched_entity;
@@ -2453,6 +2666,22 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 	atomic64_set(&adev->vm_manager.client_counter, 0);
 	spin_lock_init(&adev->vm_manager.prt_lock);
 	atomic_set(&adev->vm_manager.num_prt_users, 0);
+
+	/* If not overridden by the user, by default, only in large BAR systems
+	 * Compute VM tables will be updated by CPU
+	 */
+#ifdef CONFIG_X86_64
+	if (amdgpu_vm_update_mode == -1) {
+		if (amdgpu_vm_is_large_bar(adev))
+			adev->vm_manager.vm_update_mode =
+				AMDGPU_VM_USE_CPU_FOR_COMPUTE;
+		else
+			adev->vm_manager.vm_update_mode = 0;
+	} else
+		adev->vm_manager.vm_update_mode = amdgpu_vm_update_mode;
+#else
+	adev->vm_manager.vm_update_mode = 0;
+#endif
 
 	adev->vm_manager.n_compute_vms = 0;
 }

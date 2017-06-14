@@ -46,6 +46,8 @@
 #include <drm/drm_gem.h>
 #include <drm/amdgpu_drm.h>
 
+#include <kgd_kfd_interface.h>
+
 #include "amd_shared.h"
 #include "amdgpu_mode.h"
 #include "amdgpu_ih.h"
@@ -94,6 +96,7 @@ extern int amdgpu_vm_size;
 extern int amdgpu_vm_block_size;
 extern int amdgpu_vm_fault_stop;
 extern int amdgpu_vm_debug;
+extern int amdgpu_vm_update_mode;
 extern int amdgpu_dc;
 extern int amdgpu_sched_jobs;
 extern int amdgpu_sched_hw_submission;
@@ -115,6 +118,13 @@ extern int amdgpu_cntl_sb_buf_per_se;
 extern int amdgpu_param_buf_per_se;
 extern int amdgpu_job_hang_limit;
 extern int amdgpu_lbpw;
+
+#ifdef CONFIG_DRM_AMDGPU_SI
+extern int amdgpu_si_support;
+#endif
+#ifdef CONFIG_DRM_AMDGPU_CIK
+extern int amdgpu_cik_support;
+#endif
 
 #define AMDGPU_DEFAULT_GTT_SIZE_MB		3072ULL /* 3GB by default */
 #define AMDGPU_WAIT_IDLE_TIMEOUT_IN_MS	        3000
@@ -624,6 +634,7 @@ struct amdgpu_mc {
 	uint32_t                srbm_soft_reset;
 	struct amdgpu_mode_mc_save save;
 	bool			prt_warning;
+	uint64_t		stolen_size;
 	/* apertures */
 	u64					shared_aperture_start;
 	u64					shared_aperture_end;
@@ -796,6 +807,29 @@ int amdgpu_job_submit(struct amdgpu_job *job, struct amdgpu_ring *ring,
 		      struct dma_fence **f);
 
 /*
+ * Queue manager
+ */
+struct amdgpu_queue_mapper {
+	int 		hw_ip;
+	struct mutex	lock;
+	/* protected by lock */
+	struct amdgpu_ring *queue_map[AMDGPU_MAX_RINGS];
+};
+
+struct amdgpu_queue_mgr {
+	struct amdgpu_queue_mapper mapper[AMDGPU_MAX_IP_NUM];
+};
+
+int amdgpu_queue_mgr_init(struct amdgpu_device *adev,
+			  struct amdgpu_queue_mgr *mgr);
+int amdgpu_queue_mgr_fini(struct amdgpu_device *adev,
+			  struct amdgpu_queue_mgr *mgr);
+int amdgpu_queue_mgr_map(struct amdgpu_device *adev,
+			 struct amdgpu_queue_mgr *mgr,
+			 int hw_ip, int instance, int ring,
+			 struct amdgpu_ring **out_ring);
+
+/*
  * context related structures
  */
 
@@ -808,6 +842,7 @@ struct amdgpu_ctx_ring {
 struct amdgpu_ctx {
 	struct kref		refcount;
 	struct amdgpu_device    *adev;
+	struct amdgpu_queue_mgr queue_mgr;
 	unsigned		reset_counter;
 	spinlock_t		ring_lock;
 	struct dma_fence	**fences;
@@ -918,15 +953,20 @@ struct amdgpu_rlc {
 	u32 *register_restore;
 };
 
+#define AMDGPU_MAX_COMPUTE_QUEUES KGD_MAX_QUEUES
+
 struct amdgpu_mec {
 	struct amdgpu_bo	*hpd_eop_obj;
 	u64			hpd_eop_gpu_addr;
 	struct amdgpu_bo	*mec_fw_obj;
 	u64			mec_fw_gpu_addr;
-	u32 num_pipe;
 	u32 num_mec;
-	u32 num_queue;
+	u32 num_pipe_per_mec;
+	u32 num_queue_per_pipe;
 	void			*mqd_backup[AMDGPU_MAX_COMPUTE_RINGS + 1];
+
+	/* These are the resources for which amdgpu takes ownership */
+	DECLARE_BITMAP(queue_bitmap, AMDGPU_MAX_COMPUTE_QUEUES);
 };
 
 struct amdgpu_kiq {
@@ -1009,9 +1049,9 @@ struct amdgpu_gfx_config {
 struct amdgpu_cu_info {
 	uint32_t number; /* total active CU number */
 	uint32_t ao_cu_mask;
-	uint32_t wave_front_size;
 	uint32_t simd_per_cu;
 	uint32_t max_waves_per_simd;
+	uint32_t wave_front_size;
 	uint32_t max_scratch_slots_per_cu;
 	uint32_t lds_size;
 	uint32_t bitmap[4][4];
@@ -1253,6 +1293,9 @@ struct amdgpu_firmware {
 	const struct amdgpu_psp_funcs *funcs;
 	struct amdgpu_bo *rbuf;
 	struct mutex mutex;
+
+	/* gpu info firmware data pointer */
+	const struct firmware *gpu_info_fw;
 };
 
 /*
@@ -1658,6 +1701,9 @@ struct amdgpu_device {
 	/* link all gtt */
 	spinlock_t			gtt_list_lock;
 	struct list_head                gtt_list;
+	/* keep an lru list of rings by HW IP */
+	struct list_head		ring_lru_list;
+	spinlock_t			ring_lru_list_lock;
 
 	/* record hw reset is performed */
 	bool has_hw_reset;
@@ -1670,7 +1716,6 @@ static inline struct amdgpu_device *amdgpu_ttm_adev(struct ttm_bo_device *bdev)
 	return container_of(bdev, struct amdgpu_device, mman.bdev);
 }
 
-bool amdgpu_device_is_px(struct drm_device *dev);
 int amdgpu_device_init(struct amdgpu_device *adev,
 		       struct drm_device *ddev,
 		       struct pci_dev *pdev,
@@ -1908,9 +1953,6 @@ bool amdgpu_need_post(struct amdgpu_device *adev);
 void amdgpu_update_display_priority(struct amdgpu_device *adev);
 
 int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data);
-int amdgpu_cs_get_ring(struct amdgpu_device *adev, u32 ip_type,
-		       u32 ip_instance, u32 ring,
-		       struct amdgpu_ring **out_ring);
 void amdgpu_cs_report_moved_bytes(struct amdgpu_device *adev, u64 num_bytes);
 void amdgpu_ttm_placement_from_domain(struct amdgpu_bo *abo, u32 domain);
 bool amdgpu_ttm_bo_is_amdgpu_bo(struct ttm_buffer_object *bo);
