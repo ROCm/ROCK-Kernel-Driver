@@ -317,7 +317,8 @@ void get_local_mem_info(struct kgd_dev *kgd,
 	resource_size_t aper_limit;
 	struct amdgpu_device *rdev = (struct amdgpu_device *)kgd;
 
-	address_mask = ~((1UL << 40) - 1);
+	address_mask = rdev->dev->dma_mask ? ~*rdev->dev->dma_mask :
+					     ~((1ULL << 32) - 1);
 	aper_limit = rdev->mc.aper_base + rdev->mc.aper_size;
 	memset(mem_info, 0, sizeof(*mem_info));
 	if (!(rdev->mc.aper_base & address_mask ||
