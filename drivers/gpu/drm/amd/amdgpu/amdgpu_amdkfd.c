@@ -343,8 +343,10 @@ void get_local_mem_info(struct kgd_dev *kgd,
 	resource_size_t aper_limit;
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 
-	address_mask = ~((1UL << 40) - 1);
+	address_mask = adev->dev->dma_mask ? ~*adev->dev->dma_mask :
+					     ~((1ULL << 32) - 1);
 	aper_limit = adev->mc.aper_base + adev->mc.aper_size;
+
 	memset(mem_info, 0, sizeof(*mem_info));
 	if (!(adev->mc.aper_base & address_mask ||
 			aper_limit & address_mask)) {
