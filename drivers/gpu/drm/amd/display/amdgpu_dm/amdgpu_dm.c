@@ -1399,7 +1399,6 @@ static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 
 #ifdef CONFIG_DRM_AMDGPU_CIK
 static const struct amdgpu_display_funcs dm_dce_v8_0_display_funcs = {
-	.set_vga_render_state = dce_v8_0_set_vga_render_state,
 	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
 	.vblank_get_counter = dm_vblank_get_counter,/* called unconditionally */
 	.vblank_wait = NULL,
@@ -1422,7 +1421,6 @@ static const struct amdgpu_display_funcs dm_dce_v8_0_display_funcs = {
 #endif
 
 static const struct amdgpu_display_funcs dm_dce_v10_0_display_funcs = {
-	.set_vga_render_state = dce_v10_0_set_vga_render_state,
 	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
 	.vblank_get_counter = dm_vblank_get_counter,/* called unconditionally */
 	.vblank_wait = NULL,
@@ -1445,7 +1443,6 @@ static const struct amdgpu_display_funcs dm_dce_v10_0_display_funcs = {
 };
 
 static const struct amdgpu_display_funcs dm_dce_v11_0_display_funcs = {
-	.set_vga_render_state = dce_v11_0_set_vga_render_state,
 	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
 	.vblank_get_counter = dm_vblank_get_counter,/* called unconditionally */
 	.vblank_wait = NULL,
