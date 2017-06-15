@@ -36,12 +36,6 @@
 #include "amdgpu_dm_irq.h"
 #include "dm_helpers.h"
 
-#ifdef CONFIG_DRM_AMDGPU_CIK
-#include "dce_v8_0.h"
-#endif
-#include "dce_v10_0.h"
-#include "dce_v11_0.h"
-
 #include "ivsrcid/ivsrcid_vislands30.h"
 
 #include <linux/module.h>
@@ -1414,8 +1408,6 @@ static const struct amdgpu_display_funcs dm_dce_v8_0_display_funcs = {
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
 	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
-	.stop_mc_access = dce_v8_0_stop_mc_access, /* called unconditionally */
-	.resume_mc_access = dce_v8_0_resume_mc_access, /* called unconditionally */
 	.notify_freesync = amdgpu_notify_freesync,
 };
 #endif
@@ -1436,8 +1428,6 @@ static const struct amdgpu_display_funcs dm_dce_v10_0_display_funcs = {
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
 	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
-	.stop_mc_access = dce_v10_0_stop_mc_access, /* called unconditionally */
-	.resume_mc_access = dce_v10_0_resume_mc_access, /* called unconditionally */
 	.notify_freesync = amdgpu_notify_freesync,
 
 };
@@ -1458,8 +1448,6 @@ static const struct amdgpu_display_funcs dm_dce_v11_0_display_funcs = {
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
 	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
-	.stop_mc_access = dce_v11_0_stop_mc_access, /* called unconditionally */
-	.resume_mc_access = dce_v11_0_resume_mc_access, /* called unconditionally */
 	.notify_freesync = amdgpu_notify_freesync,
 
 };
