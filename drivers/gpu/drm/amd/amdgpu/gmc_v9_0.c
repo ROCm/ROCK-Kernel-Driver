@@ -498,17 +498,15 @@ static int gmc_v9_0_mc_init(struct amdgpu_device *adev)
 	 * size equal to the 1024 or vram, whichever is larger.
 	 */
 	if (amdgpu_gart_size == -1) {
-		uint64_t gart_size_aligned;
 		struct sysinfo si;
 
 		/* Maximum GTT size is limited by the GART table size
-		 * in visible VRAM and the address space. Use at most
-		 * half of each.
+		 * in visible VRAM. Use at most half of visible VRAM
+		 * or 256MB, whichever is less.
 		 */
-		uint64_t max_gtt_size = min(
-			adev->mc.visible_vram_size / 8 *
-				AMDGPU_GPU_PAGE_SIZE / 2,
-			1ULL << 39);
+		uint64_t max_gtt_size =
+			min(adev->mc.visible_vram_size / 2, 256ULL << 20)
+			/ 8 * AMDGPU_GPU_PAGE_SIZE;
 
 		si_meminfo(&si);
 		/* Set the GART to map the largest size between either
@@ -521,16 +519,6 @@ static int gmc_v9_0_mc_init(struct amdgpu_device *adev)
 			),
 			max_gtt_size
 		);
-
-		/* GART sizes computed from physical RAM capacity
-		 * may not always be perfect powers of two.
-		 * Round up starting from the minimum size of 1GB.
-		 */
-		gart_size_aligned = 1024ULL << 20;
-		while (adev->mc.gtt_size > gart_size_aligned)
-			gart_size_aligned <<= 1;
-
-		adev->mc.gtt_size = gart_size_aligned;
 	} else
 		adev->mc.gtt_size = (uint64_t)amdgpu_gart_size << 20;
 
