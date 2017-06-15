@@ -95,7 +95,7 @@ static void kfd_process_free_gpuvm(struct kgd_mem *mem,
  */
 static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 		struct kfd_dev *kdev, uint64_t gpu_va, uint32_t size,
-		void **kptr, struct kfd_process_device *pdd)
+		void **kptr, struct kfd_process_device *pdd, uint32_t flags)
 {
 	int err;
 	void *mem = NULL;
@@ -103,10 +103,7 @@ static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 	err = kdev->kfd2kgd->alloc_memory_of_gpu(kdev->kgd, gpu_va, size,
 				pdd->vm,
 				(struct kgd_mem **)&mem, NULL, kptr,
-				ALLOC_MEM_FLAGS_GTT |
-				ALLOC_MEM_FLAGS_NONPAGED |
-				ALLOC_MEM_FLAGS_EXECUTE_ACCESS |
-				ALLOC_MEM_FLAGS_NO_SUBSTITUTE);
+				flags);
 	if (err)
 		goto err_alloc_mem;
 
@@ -152,6 +149,9 @@ static int kfd_process_reserve_ib_mem(struct kfd_process *p)
 	struct kfd_dev *kdev = NULL;
 	struct qcm_process_device *qpd = NULL;
 	void *kaddr;
+	uint32_t flags = ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_NONPAGED |
+			 ALLOC_MEM_FLAGS_NO_SUBSTITUTE |
+			 ALLOC_MEM_FLAGS_EXECUTE_ACCESS;
 
 	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
 				per_device_list) {
@@ -163,7 +163,7 @@ static int kfd_process_reserve_ib_mem(struct kfd_process *p)
 		if (qpd->ib_base) { /* is dGPU */
 			ret = kfd_process_alloc_gpuvm(p, kdev,
 				qpd->ib_base, kdev->ib_size,
-				&kaddr, pdd);
+				&kaddr, pdd, flags);
 			if (!ret)
 				qpd->ib_kaddr = kaddr;
 			else
@@ -473,6 +473,10 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 	struct kfd_dev *dev = NULL;
 	struct qcm_process_device *qpd = NULL;
 	void *kaddr;
+	uint32_t flags = ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_NONPAGED |
+			 ALLOC_MEM_FLAGS_NO_SUBSTITUTE |
+			 ALLOC_MEM_FLAGS_READONLY |
+			 ALLOC_MEM_FLAGS_EXECUTE_ACCESS;
 
 	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
 				per_device_list) {
@@ -483,7 +487,7 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 		if (qpd->cwsr_base) {
 			/* cwsr_base is only set for DGPU */
 			ret = kfd_process_alloc_gpuvm(p, dev, qpd->cwsr_base,
-					dev->cwsr_size,	&kaddr, pdd);
+					dev->cwsr_size,	&kaddr, pdd, flags);
 			if (!ret) {
 				qpd->cwsr_kaddr = kaddr;
 				qpd->tba_addr = qpd->cwsr_base;
