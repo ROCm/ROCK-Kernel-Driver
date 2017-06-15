@@ -726,7 +726,7 @@ static int quiesce_process_mm(struct kfd_process *p)
 	unsigned int n_evicted = 0;
 
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
-		r = process_evict_queues(pdd->dev->dqm, &pdd->qpd);
+		r = process_evict_queues(pdd->dev->dqm, &pdd->qpd, false);
 		if (r != 0) {
 			pr_err("Failed to evict process queues\n");
 			goto fail;
@@ -798,7 +798,7 @@ int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 		r = -ENODEV;
 		pdd = kfd_get_process_device_data(kfd, p);
 		if (pdd)
-			r = process_evict_queues(kfd->dqm, &pdd->qpd);
+			r = process_evict_queues(kfd->dqm, &pdd->qpd, false);
 	} else {
 		r = quiesce_process_mm(p);
 	}
