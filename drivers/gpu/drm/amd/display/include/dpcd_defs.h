@@ -26,7 +26,7 @@
 #ifndef __DAL_DPCD_DEFS_H__
 #define __DAL_DPCD_DEFS_H__
 
-#include "drm_dp_helper.h"
+#include <drm/drm_dp_helper.h>
 
 enum dpcd_revision {
 	DPCD_REV_10 = 0x10,
