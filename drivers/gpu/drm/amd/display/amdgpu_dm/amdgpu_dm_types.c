@@ -30,14 +30,12 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_atomic.h>
-
+#include <drm/drm_edid.h>
 
 #include "amdgpu.h"
 #include "amdgpu_pm.h"
 #include "dm_helpers.h"
 #include "dm_services_types.h"
-
-#include "drm_edid.h"
 
 // We need to #undef FRAME_SIZE and DEPRECATED because they conflict
 // with ptrace-abi.h's #define's of them.
