@@ -1401,6 +1401,7 @@ int amdgpu_dm_connector_atomic_get_property(
 	struct dm_connector_state *dm_state =
 		to_dm_connector_state(state);
 	int ret = -EINVAL;
+	int i;
 
 	if (property == dev->mode_config.scaling_mode_property) {
 		switch (dm_state->scaling) {
@@ -1428,14 +1429,14 @@ int amdgpu_dm_connector_atomic_get_property(
 	} else if (property == adev->mode_info.underscan_property) {
 		*val = dm_state->underscan_enable;
 		ret = 0;
-	} else if (property == adev->mode_info.freesync_property) {
-		//TODO
-		*val = 0;
-		ret = 0;
-	} else if (property == adev->mode_info.freesync_capable_property) {
-		//TODO
-		*val = 0;
-		ret = 0;
+	} else if ((property == adev->mode_info.freesync_property) ||
+		   (property == adev->mode_info.freesync_capable_property)) {
+		for (i = 0; i < connector->base.properties->count; i++) {
+			if (connector->base.properties->properties[i] == property) {
+				*val = connector->base.properties->values[i];
+				ret = 0;
+			}
+		}
 	}
 	return ret;
 }
