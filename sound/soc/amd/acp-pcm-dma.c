@@ -34,6 +34,8 @@
 
 #define MAX_BUFFER (PLAYBACK_MAX_PERIOD_SIZE * PLAYBACK_MAX_NUM_PERIODS)
 #define MIN_BUFFER MAX_BUFFER
+#define CHIP_STONEY 14
+#define CHIP_CARRIZO 13
 
 static const struct snd_pcm_hardware acp_pcm_hardware_playback = {
 	.info = SNDRV_PCM_INFO_INTERLEAVED |
@@ -419,7 +421,7 @@ static void acp_set_sram_bank_state(void __iomem *acp_mmio, u16 bank,
 }
 
 /* Initialize and bring ACP hardware to default state. */
-static int acp_init(void __iomem *acp_mmio)
+static int acp_init(void __iomem *acp_mmio, u32 asic_type)
 {
 	u16 bank;
 	u32 val, count, sram_pte_offset;
@@ -494,8 +496,10 @@ static int acp_init(void __iomem *acp_mmio)
 	* Now, turn off all of them. This can't be done in 'poweron' of
 	* ACP pm domain, as this requires ACP to be initialized.
 	*/
-	for (bank = 1; bank < 48; bank++)
-		acp_set_sram_bank_state(acp_mmio, bank, false);
+	if (asic_type == CHIP_CARRIZO) {
+		for (bank = 1; bank < 48; bank++)
+			acp_set_sram_bank_state(acp_mmio, bank, false);
+	}
 
 	return 0;
 }
@@ -646,14 +650,18 @@ static int acp_dma_open(struct snd_pcm_substream *substream)
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		intr_data->play_stream = substream;
-		for (bank = 1; bank <= 4; bank++)
-			acp_set_sram_bank_state(intr_data->acp_mmio, bank,
-						true);
+		if (intr_data->asic_type == CHIP_CARRIZO) {
+			for (bank = 1; bank <= 4; bank++)
+				acp_set_sram_bank_state(intr_data->acp_mmio,
+							bank, true);
+		}
 	} else {
 		intr_data->capture_stream = substream;
-		for (bank = 5; bank <= 8; bank++)
-			acp_set_sram_bank_state(intr_data->acp_mmio, bank,
-						true);
+		if (intr_data->asic_type == CHIP_CARRIZO) {
+			for (bank = 5; bank <= 8; bank++)
+				acp_set_sram_bank_state(intr_data->acp_mmio,
+							bank, true);
+		}
 	}
 
 	return 0;
@@ -869,14 +877,18 @@ static int acp_dma_close(struct snd_pcm_substream *substream)
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		adata->play_stream = NULL;
-		for (bank = 1; bank <= 4; bank++)
-			acp_set_sram_bank_state(adata->acp_mmio, bank,
-						false);
-	} else {
+		if (adata->asic_type == CHIP_CARRIZO) {
+			for (bank = 1; bank <= 4; bank++)
+				acp_set_sram_bank_state(adata->acp_mmio, bank,
+				false);
+		}
+	} else  {
 		adata->capture_stream = NULL;
-		for (bank = 5; bank <= 8; bank++)
-			acp_set_sram_bank_state(adata->acp_mmio, bank,
-						false);
+		if (adata->asic_type == CHIP_CARRIZO) {
+			for (bank = 5; bank <= 8; bank++)
+				acp_set_sram_bank_state(adata->acp_mmio, bank,
+						     false);
+		}
 	}
 
 	/* Disable ACP irq, when the current stream is being closed and
@@ -945,7 +957,7 @@ static int acp_audio_probe(struct platform_device *pdev)
 	dev_set_drvdata(&pdev->dev, audio_drv_data);
 
 	/* Initialize the ACP */
-	acp_init(audio_drv_data->acp_mmio);
+	acp_init(audio_drv_data->acp_mmio, audio_drv_data->asic_type);
 
 	status = snd_soc_register_platform(&pdev->dev, &acp_asoc_platform);
 	if (status != 0) {
@@ -976,19 +988,23 @@ static int acp_pcm_resume(struct device *dev)
 	u16 bank;
 	struct audio_drv_data *adata = dev_get_drvdata(dev);
 
-	acp_init(adata->acp_mmio);
+	acp_init(adata->acp_mmio, adata->asic_type);
 
 	if (adata->play_stream && adata->play_stream->runtime) {
-		for (bank = 1; bank <= 4; bank++)
-			acp_set_sram_bank_state(adata->acp_mmio, bank,
+		if (adata->asic_type == CHIP_CARRIZO) {
+			for (bank = 1; bank <= 4; bank++)
+				acp_set_sram_bank_state(adata->acp_mmio, bank,
 						true);
+		}
 		config_acp_dma(adata->acp_mmio,
 				adata->play_stream->runtime->private_data);
 	}
 	if (adata->capture_stream && adata->capture_stream->runtime) {
-		for (bank = 5; bank <= 8; bank++)
-			acp_set_sram_bank_state(adata->acp_mmio, bank,
+		if (adata->asic_type == CHIP_CARRIZO) {
+			for (bank = 5; bank <= 8; bank++)
+				acp_set_sram_bank_state(adata->acp_mmio, bank,
 						true);
+		}
 		config_acp_dma(adata->acp_mmio,
 				adata->capture_stream->runtime->private_data);
 	}
@@ -1009,7 +1025,7 @@ static int acp_pcm_runtime_resume(struct device *dev)
 {
 	struct audio_drv_data *adata = dev_get_drvdata(dev);
 
-	acp_init(adata->acp_mmio);
+	acp_init(adata->acp_mmio, adata->asic_type);
 	acp_reg_write(1, adata->acp_mmio, mmACP_EXTERNAL_INTR_ENB);
 	return 0;
 }
