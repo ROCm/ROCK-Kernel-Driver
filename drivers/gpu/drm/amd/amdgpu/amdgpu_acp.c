@@ -287,19 +287,20 @@ static int acp_hw_init(void *handle)
 		return 0;
 	else if (r)
 		return r;
+	if (asic_type != CHIP_STONEY) {
+		adev->acp.acp_genpd = kzalloc(sizeof(struct acp_pm_domain), GFP_KERNEL);
+		if (adev->acp.acp_genpd == NULL)
+			return -ENOMEM;
 
-	adev->acp.acp_genpd = kzalloc(sizeof(struct acp_pm_domain), GFP_KERNEL);
-	if (adev->acp.acp_genpd == NULL)
-		return -ENOMEM;
-
-	adev->acp.acp_genpd->gpd.name = "ACP_AUDIO";
-	adev->acp.acp_genpd->gpd.power_off = acp_poweroff;
-	adev->acp.acp_genpd->gpd.power_on = acp_poweron;
+		adev->acp.acp_genpd->gpd.name = "ACP_AUDIO";
+		adev->acp.acp_genpd->gpd.power_off = acp_poweroff;
+		adev->acp.acp_genpd->gpd.power_on = acp_poweron;
 
 
-	adev->acp.acp_genpd->cgs_dev = adev->acp.cgs_device;
+		adev->acp.acp_genpd->cgs_dev = adev->acp.cgs_device;
 
-	pm_genpd_init(&adev->acp.acp_genpd->gpd, NULL, false);
+		pm_genpd_init(&adev->acp.acp_genpd->gpd, NULL, false);
+	}
 
 	adev->acp.acp_cell = kzalloc(sizeof(struct mfd_cell) * ACP_DEVS,
 							GFP_KERNEL);
@@ -388,12 +389,14 @@ static int acp_hw_init(void *handle)
 	if (r)
 		return r;
 
-	for (i = 0; i < ACP_DEVS ; i++) {
-		dev = get_mfd_cell_dev(adev->acp.acp_cell[i].name, i);
-		r = pm_genpd_add_device(&adev->acp.acp_genpd->gpd, dev);
-		if (r) {
-			dev_err(dev, "Failed to add dev to genpd\n");
-			return r;
+	if (asic_type != CHIP_STONEY) {
+		for (i = 0; i < ACP_DEVS ; i++) {
+			dev = get_mfd_cell_dev(adev->acp.acp_cell[i].name, i);
+			r = pm_genpd_add_device(&adev->acp.acp_genpd->gpd, dev);
+			if (r) {
+				dev_err(dev, "Failed to add dev to genpd\n");
+				return r;
+			}
 		}
 	}
 
