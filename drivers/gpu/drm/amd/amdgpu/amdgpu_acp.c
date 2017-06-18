@@ -262,6 +262,7 @@ static int acp_hw_init(void *handle)
 	uint64_t acp_base;
 	struct device *dev;
 	struct i2s_platform_data *i2s_pdata;
+	u32 asic_type;
 
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
@@ -271,6 +272,7 @@ static int acp_hw_init(void *handle)
 	if (!ip_block)
 		return -EINVAL;
 
+	asic_type = adev->asic_type;
 	r = amd_acp_hw_init(adev->acp.cgs_device,
 			    ip_block->version->major, ip_block->version->minor);
 	/* -ENODEV means board uses AZ rather than ACP */
@@ -355,6 +357,8 @@ static int acp_hw_init(void *handle)
 	adev->acp.acp_cell[0].name = "acp_audio_dma";
 	adev->acp.acp_cell[0].num_resources = 4;
 	adev->acp.acp_cell[0].resources = &adev->acp.acp_res[0];
+	adev->acp.acp_cell[0].platform_data = &asic_type;
+	adev->acp.acp_cell[0].pdata_size = sizeof(asic_type);
 
 	adev->acp.acp_cell[1].name = "designware-i2s";
 	adev->acp.acp_cell[1].num_resources = 1;
