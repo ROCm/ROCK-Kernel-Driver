@@ -109,7 +109,7 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 			dev_info(dev->dev,
 				 "SI support provided by radeon.\n");
 			dev_info(dev->dev,
-				 "Use radeon.si_support=0 amdgpu.si_support=1 to override.\n"
+		"Use radeon.si_support=0 amdgpu.si_support=1 to override.\n"
 				);
 			return -ENODEV;
 		}
@@ -124,10 +124,7 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 		case CHIP_KABINI:
 		case CHIP_MULLINS:
 			dev_info(dev->dev,
-				 "CIK support provided by radeon.\n");
-			dev_info(dev->dev,
-				 "Use radeon.cik_support=0 amdgpu.cik_support=1 to override.\n"
-				);
+				 "CIK support disabled by module param\n");
 			return -ENODEV;
 		}
 	}
