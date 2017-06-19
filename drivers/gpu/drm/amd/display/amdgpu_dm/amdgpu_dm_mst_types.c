@@ -170,7 +170,8 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 	.set_property = drm_atomic_helper_connector_set_property,
 	.atomic_duplicate_state = amdgpu_dm_connector_atomic_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
-	.atomic_set_property = amdgpu_dm_connector_atomic_set_property
+	.atomic_set_property = amdgpu_dm_connector_atomic_set_property,
+	.atomic_get_property = amdgpu_dm_connector_atomic_get_property
 };
 
 static int dm_dp_mst_get_modes(struct drm_connector *connector)
