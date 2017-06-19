@@ -335,11 +335,11 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
 	if (pqn->q) {
 		dqm = pqn->q->device->dqm;
 		kfree(pqn->q->properties.cu_mask);
+		pqn->q->properties.cu_mask = NULL;
 		retval = dqm->ops.destroy_queue(dqm, &pdd->qpd, pqn->q);
 		if (retval != 0) {
 			if (retval == -ETIME)
 				pdd->reset_wavefronts = true;
-			return retval;
 		}
 		uninit_queue(pqn->q);
 	}
