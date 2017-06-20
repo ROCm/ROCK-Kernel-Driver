@@ -1305,10 +1305,17 @@ static int amdgpu_ttm_bo_access_vram(struct amdgpu_bo *abo,
 				     void *buf, int len, int write)
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(abo->tbo.bdev);
-	uint64_t pos = amdgpu_bo_gpu_offset(abo) + offset;
+	struct drm_mm_node *nodes = abo->tbo.mem.mm_node;
 	uint32_t value = 0;
-	unsigned long flags;
 	int result = 0;
+	uint64_t pos;
+	unsigned long flags;
+
+	while (offset >= (nodes->size << PAGE_SHIFT)) {
+		offset -= nodes->size << PAGE_SHIFT;
+		++nodes;
+	}
+	pos = (nodes->start << PAGE_SHIFT) + offset;
 
 	while (len && pos < adev->mc.mc_vram_size) {
 		uint64_t aligned_pos = pos & ~(uint64_t)3;
