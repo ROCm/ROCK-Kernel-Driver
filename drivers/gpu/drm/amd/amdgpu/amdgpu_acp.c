@@ -262,6 +262,7 @@ static int acp_hw_init(void *handle)
 	uint64_t acp_base;
 	struct device *dev;
 	struct i2s_platform_data *i2s_pdata;
+	u32 asic_type;
 
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
@@ -271,6 +272,7 @@ static int acp_hw_init(void *handle)
 	if (!ip_block)
 		return -EINVAL;
 
+	asic_type = adev->asic_type;
 	r = amd_acp_hw_init(adev->acp.cgs_device,
 			    ip_block->version->major, ip_block->version->minor);
 	/* -ENODEV means board uses AZ rather than ACP */
@@ -285,19 +287,20 @@ static int acp_hw_init(void *handle)
 		return 0;
 	else if (r)
 		return r;
+	if (asic_type != CHIP_STONEY) {
+		adev->acp.acp_genpd = kzalloc(sizeof(struct acp_pm_domain), GFP_KERNEL);
+		if (adev->acp.acp_genpd == NULL)
+			return -ENOMEM;
 
-	adev->acp.acp_genpd = kzalloc(sizeof(struct acp_pm_domain), GFP_KERNEL);
-	if (adev->acp.acp_genpd == NULL)
-		return -ENOMEM;
-
-	adev->acp.acp_genpd->gpd.name = "ACP_AUDIO";
-	adev->acp.acp_genpd->gpd.power_off = acp_poweroff;
-	adev->acp.acp_genpd->gpd.power_on = acp_poweron;
+		adev->acp.acp_genpd->gpd.name = "ACP_AUDIO";
+		adev->acp.acp_genpd->gpd.power_off = acp_poweroff;
+		adev->acp.acp_genpd->gpd.power_on = acp_poweron;
 
 
-	adev->acp.acp_genpd->cgs_dev = adev->acp.cgs_device;
+		adev->acp.acp_genpd->cgs_dev = adev->acp.cgs_device;
 
-	pm_genpd_init(&adev->acp.acp_genpd->gpd, NULL, false);
+		pm_genpd_init(&adev->acp.acp_genpd->gpd, NULL, false);
+	}
 
 	adev->acp.acp_cell = kzalloc(sizeof(struct mfd_cell) * ACP_DEVS,
 							GFP_KERNEL);
@@ -319,14 +322,25 @@ static int acp_hw_init(void *handle)
 		return -ENOMEM;
 	}
 
-	i2s_pdata[0].quirks = DW_I2S_QUIRK_COMP_REG_OFFSET;
+	if (adev->asic_type == CHIP_STONEY) {
+		i2s_pdata[0].quirks = DW_I2S_QUIRK_COMP_REG_OFFSET |
+			DW_I2S_QUIRK_16BIT_IDX_OVERRIDE;
+	} else {
+		i2s_pdata[0].quirks = DW_I2S_QUIRK_COMP_REG_OFFSET;
+	}
 	i2s_pdata[0].cap = DWC_I2S_PLAY;
 	i2s_pdata[0].snd_rates = SNDRV_PCM_RATE_8000_96000;
 	i2s_pdata[0].i2s_reg_comp1 = ACP_I2S_COMP1_PLAY_REG_OFFSET;
 	i2s_pdata[0].i2s_reg_comp2 = ACP_I2S_COMP2_PLAY_REG_OFFSET;
+	if (adev->asic_type == CHIP_STONEY) {
+		i2s_pdata[1].quirks = DW_I2S_QUIRK_COMP_REG_OFFSET |
+			DW_I2S_QUIRK_COMP_PARAM1 |
+			DW_I2S_QUIRK_16BIT_IDX_OVERRIDE;
+	} else {
+		i2s_pdata[1].quirks = DW_I2S_QUIRK_COMP_REG_OFFSET |
+			DW_I2S_QUIRK_COMP_PARAM1;
+	}
 
-	i2s_pdata[1].quirks = DW_I2S_QUIRK_COMP_REG_OFFSET |
-				DW_I2S_QUIRK_COMP_PARAM1;
 	i2s_pdata[1].cap = DWC_I2S_RECORD;
 	i2s_pdata[1].snd_rates = SNDRV_PCM_RATE_8000_96000;
 	i2s_pdata[1].i2s_reg_comp1 = ACP_I2S_COMP1_CAP_REG_OFFSET;
@@ -355,6 +369,8 @@ static int acp_hw_init(void *handle)
 	adev->acp.acp_cell[0].name = "acp_audio_dma";
 	adev->acp.acp_cell[0].num_resources = 4;
 	adev->acp.acp_cell[0].resources = &adev->acp.acp_res[0];
+	adev->acp.acp_cell[0].platform_data = &asic_type;
+	adev->acp.acp_cell[0].pdata_size = sizeof(asic_type);
 
 	adev->acp.acp_cell[1].name = "designware-i2s";
 	adev->acp.acp_cell[1].num_resources = 1;
@@ -373,12 +389,14 @@ static int acp_hw_init(void *handle)
 	if (r)
 		return r;
 
-	for (i = 0; i < ACP_DEVS ; i++) {
-		dev = get_mfd_cell_dev(adev->acp.acp_cell[i].name, i);
-		r = pm_genpd_add_device(&adev->acp.acp_genpd->gpd, dev);
-		if (r) {
-			dev_err(dev, "Failed to add dev to genpd\n");
-			return r;
+	if (asic_type != CHIP_STONEY) {
+		for (i = 0; i < ACP_DEVS ; i++) {
+			dev = get_mfd_cell_dev(adev->acp.acp_cell[i].name, i);
+			r = pm_genpd_add_device(&adev->acp.acp_genpd->gpd, dev);
+			if (r) {
+				dev_err(dev, "Failed to add dev to genpd\n");
+				return r;
+			}
 		}
 	}
 

@@ -162,13 +162,9 @@ static void gmc_v8_0_init_golden_registers(struct amdgpu_device *adev)
 	}
 }
 
-static void gmc_v8_0_mc_stop(struct amdgpu_device *adev,
-			     struct amdgpu_mode_mc_save *save)
+static void gmc_v8_0_mc_stop(struct amdgpu_device *adev)
 {
 	u32 blackout;
-
-	if (adev->mode_info.num_crtc)
-		amdgpu_display_stop_mc_access(adev, save);
 
 	gmc_v8_0_wait_for_idle(adev);
 
@@ -185,8 +181,7 @@ static void gmc_v8_0_mc_stop(struct amdgpu_device *adev,
 	udelay(100);
 }
 
-static void gmc_v8_0_mc_resume(struct amdgpu_device *adev,
-			       struct amdgpu_mode_mc_save *save)
+static void gmc_v8_0_mc_resume(struct amdgpu_device *adev)
 {
 	u32 tmp;
 
@@ -198,9 +193,6 @@ static void gmc_v8_0_mc_resume(struct amdgpu_device *adev,
 	tmp = REG_SET_FIELD(0, BIF_FB_EN, FB_READ_EN, 1);
 	tmp = REG_SET_FIELD(tmp, BIF_FB_EN, FB_WRITE_EN, 1);
 	WREG32(mmBIF_FB_EN, tmp);
-
-	if (adev->mode_info.num_crtc)
-		amdgpu_display_resume_mc_access(adev, save);
 }
 
 /**
@@ -405,13 +397,16 @@ static int gmc_v8_0_polaris_mc_load_microcode(struct amdgpu_device *adev)
 static void gmc_v8_0_vram_gtt_location(struct amdgpu_device *adev,
 				       struct amdgpu_mc *mc)
 {
+	u64 base = RREG32(mmMC_VM_FB_LOCATION) & 0xFFFF;
+	base <<= 24;
+
 	if (mc->mc_vram_size > 0xFFC0000000ULL) {
 		/* leave room for at least 1024M GTT */
 		dev_warn(adev->dev, "limiting VRAM\n");
 		mc->real_vram_size = 0xFFC0000000ULL;
 		mc->mc_vram_size = 0xFFC0000000ULL;
 	}
-	amdgpu_vram_location(adev, &adev->mc, 0);
+	amdgpu_vram_location(adev, &adev->mc, base);
 	adev->mc.gtt_base_align = 0;
 	amdgpu_gtt_location(adev, mc);
 }
@@ -426,7 +421,6 @@ static void gmc_v8_0_vram_gtt_location(struct amdgpu_device *adev,
  */
 static void gmc_v8_0_mc_program(struct amdgpu_device *adev)
 {
-	struct amdgpu_mode_mc_save save;
 	u32 tmp;
 	int i, j;
 
@@ -440,10 +434,6 @@ static void gmc_v8_0_mc_program(struct amdgpu_device *adev)
 	}
 	WREG32(mmHDP_REG_COHERENCY_FLUSH_CNTL, 0);
 
-	if (adev->mode_info.num_crtc)
-		amdgpu_display_set_vga_render_state(adev, false);
-
-	gmc_v8_0_mc_stop(adev, &save);
 	if (gmc_v8_0_wait_for_idle((void *)adev)) {
 		dev_warn(adev->dev, "Wait for MC idle timedout !\n");
 	}
@@ -454,20 +444,12 @@ static void gmc_v8_0_mc_program(struct amdgpu_device *adev)
 	       adev->mc.vram_end >> 12);
 	WREG32(mmMC_VM_SYSTEM_APERTURE_DEFAULT_ADDR,
 	       adev->vram_scratch.gpu_addr >> 12);
-	tmp = ((adev->mc.vram_end >> 24) & 0xFFFF) << 16;
-	tmp |= ((adev->mc.vram_start >> 24) & 0xFFFF);
-	WREG32(mmMC_VM_FB_LOCATION, tmp);
-	/* XXX double check these! */
-	WREG32(mmHDP_NONSURFACE_BASE, (adev->mc.vram_start >> 8));
-	WREG32(mmHDP_NONSURFACE_INFO, (2 << 7) | (1 << 30));
-	WREG32(mmHDP_NONSURFACE_SIZE, 0x3FFFFFFF);
 	WREG32(mmMC_VM_AGP_BASE, 0);
 	WREG32(mmMC_VM_AGP_TOP, 0x0FFFFFFF);
 	WREG32(mmMC_VM_AGP_BOT, 0x0FFFFFFF);
 	if (gmc_v8_0_wait_for_idle((void *)adev)) {
 		dev_warn(adev->dev, "Wait for MC idle timedout !\n");
 	}
-	gmc_v8_0_mc_resume(adev, &save);
 
 	WREG32(mmBIF_FB_EN, BIF_FB_EN__FB_READ_EN_MASK | BIF_FB_EN__FB_WRITE_EN_MASK);
 
@@ -1307,7 +1289,7 @@ static int gmc_v8_0_pre_soft_reset(void *handle)
 	if (!adev->mc.srbm_soft_reset)
 		return 0;
 
-	gmc_v8_0_mc_stop(adev, &adev->mc.save);
+	gmc_v8_0_mc_stop(adev);
 	if (gmc_v8_0_wait_for_idle(adev)) {
 		dev_warn(adev->dev, "Wait for GMC idle timed out !\n");
 	}
@@ -1353,7 +1335,7 @@ static int gmc_v8_0_post_soft_reset(void *handle)
 	if (!adev->mc.srbm_soft_reset)
 		return 0;
 
-	gmc_v8_0_mc_resume(adev, &adev->mc.save);
+	gmc_v8_0_mc_resume(adev);
 	return 0;
 }
 

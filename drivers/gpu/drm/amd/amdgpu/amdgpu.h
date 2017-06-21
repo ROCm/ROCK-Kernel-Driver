@@ -632,7 +632,6 @@ struct amdgpu_mc {
 	struct amdgpu_irq_src	vm_fault;
 	uint32_t		vram_type;
 	uint32_t                srbm_soft_reset;
-	struct amdgpu_mode_mc_save save;
 	bool			prt_warning;
 	uint64_t		stolen_size;
 	/* apertures */
@@ -890,6 +889,8 @@ struct amdgpu_fpriv {
 
 struct amdgpu_bo_list {
 	struct mutex lock;
+	struct rcu_head rhead;
+	struct kref refcount;
 	struct amdgpu_bo *gds_obj;
 	struct amdgpu_bo *gws_obj;
 	struct amdgpu_bo *oa_obj;
@@ -1923,7 +1924,6 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 #define amdgpu_ih_get_wptr(adev) (adev)->irq.ih_funcs->get_wptr((adev))
 #define amdgpu_ih_decode_iv(adev, iv) (adev)->irq.ih_funcs->decode_iv((adev), (iv))
 #define amdgpu_ih_set_rptr(adev) (adev)->irq.ih_funcs->set_rptr((adev))
-#define amdgpu_display_set_vga_render_state(adev, r) (adev)->mode_info.funcs->set_vga_render_state((adev), (r))
 #define amdgpu_display_vblank_get_counter(adev, crtc) (adev)->mode_info.funcs->vblank_get_counter((adev), (crtc))
 #define amdgpu_display_vblank_wait(adev, crtc) (adev)->mode_info.funcs->vblank_wait((adev), (crtc))
 #define amdgpu_display_backlight_set_level(adev, e, l) (adev)->mode_info.funcs->backlight_set_level((e), (l))
@@ -1936,8 +1936,6 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 #define amdgpu_display_page_flip_get_scanoutpos(adev, crtc, vbl, pos) (adev)->mode_info.funcs->page_flip_get_scanoutpos((adev), (crtc), (vbl), (pos))
 #define amdgpu_display_add_encoder(adev, e, s, c) (adev)->mode_info.funcs->add_encoder((adev), (e), (s), (c))
 #define amdgpu_display_add_connector(adev, ci, sd, ct, ib, coi, h, r) (adev)->mode_info.funcs->add_connector((adev), (ci), (sd), (ct), (ib), (coi), (h), (r))
-#define amdgpu_display_stop_mc_access(adev, s) (adev)->mode_info.funcs->stop_mc_access((adev), (s))
-#define amdgpu_display_resume_mc_access(adev, s) (adev)->mode_info.funcs->resume_mc_access((adev), (s))
 #define amdgpu_emit_copy_buffer(adev, ib, s, d, b) (adev)->mman.buffer_funcs->emit_copy_buffer((ib),  (s), (d), (b))
 #define amdgpu_emit_fill_buffer(adev, ib, s, d, b) (adev)->mman.buffer_funcs->emit_fill_buffer((ib), (s), (d), (b))
 #define amdgpu_gfx_get_gpu_clock_counter(adev) (adev)->gfx.funcs->get_gpu_clock_counter((adev))
