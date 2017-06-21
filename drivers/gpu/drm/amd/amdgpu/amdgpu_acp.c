@@ -84,6 +84,11 @@
 #define ACP_DEVS				4
 #define ACP_SRC_ID				162
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) || \
+	defined(OS_NAME_SUSE_15)
+#define DW_I2S_QUIRK_16BIT_IDX_OVERRIDE (1 << 2)
+#endif
+
 enum {
 	ACP_TILE_P1 = 0,
 	ACP_TILE_P2,
