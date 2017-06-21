@@ -3854,7 +3854,7 @@ int amdgpu_debugfs_init(struct drm_minor *minor)
 	return 0;
 }
 #else
-static int amdgpu_debugfs_test_ib_init(struct amdgpu_device *adev)
+static int amdgpu_debugfs_test_ib_ring_init(struct amdgpu_device *adev)
 {
 	return 0;
 }
