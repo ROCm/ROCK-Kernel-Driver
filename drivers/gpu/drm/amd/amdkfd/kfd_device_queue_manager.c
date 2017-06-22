@@ -1232,7 +1232,7 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 	retval = amdkfd_fence_wait_timeout(dqm->fence_addr, KFD_FENCE_COMPLETED,
 				QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS);
 	if (retval != 0) {
-		pr_err("Unmapping queues failed.");
+		pr_err("%s queues failed.", reset ? "Resetting" : "Unmapping");
 		return retval;
 	}
 
