@@ -58,14 +58,14 @@
  * UNDWARF_TYPE_REGS_IRET: Used in entry code to indicate that
  * cfa_reg+cfa_offset points to the iret return frame.
  *
- * The CFI_HINT macros are only used for the undwarf_cfi_hints struct.  They
- * are not used for the undwarf struct due to size and complexity constraints.
+ * The UNWIND_HINT macros are only used for the unwind_hint struct.  They are
+ * not used for the undwarf struct due to size and complexity constraints.
  */
 #define UNDWARF_TYPE_CFA		0
 #define UNDWARF_TYPE_REGS		1
 #define UNDWARF_TYPE_REGS_IRET		2
-#define CFI_HINT_TYPE_SAVE		3
-#define CFI_HINT_TYPE_RESTORE		4
+#define UNWIND_HINT_TYPE_SAVE		3
+#define UNWIND_HINT_TYPE_RESTORE	4
 
 #ifndef __ASSEMBLY__
 /*
@@ -73,11 +73,10 @@
  * Information standard.  It contains only the necessary parts of the real
  * DWARF, simplified for ease of access by the in-kernel unwinder.  It tells
  * the unwinder how to find the previous SP and BP (and sometimes entry regs)
- * on the stack, given a code address (IP).
+ * on the stack for a given code address (IP).  Each instance of the struct
+ * corresponds to one or more code locations.
  */
 struct undwarf {
-	int ip;
-	unsigned int len;
 	short cfa_offset;
 	short bp_offset;
 	unsigned cfa_reg:4;
@@ -89,7 +88,7 @@ struct undwarf {
  * This struct is used by asm and inline asm code to manually annotate the
  * location of registers on the stack for the undwarf unwinder.
  */
-struct undwarf_cfi_hint {
+struct unwind_hint {
 	unsigned int ip;
 	short cfa_offset;
 	unsigned char cfa_reg;

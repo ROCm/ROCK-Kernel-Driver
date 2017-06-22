@@ -373,7 +373,7 @@ config UNDWARF_UNWINDER
 	  disabled.
 
 	  Enabling this option will increase the kernel's runtime memory usage
-	  by roughly 3-5MB, depending on the kernel config.
+	  by roughly 3-5MB, depending on your kernel config.
 
 config FRAME_POINTER_UNWINDER
 	def_bool y

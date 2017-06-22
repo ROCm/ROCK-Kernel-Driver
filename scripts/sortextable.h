@@ -13,7 +13,7 @@
  */
 
 #undef extable_ent_size
-#undef generic_compare
+#undef compare_extable
 #undef do_func
 #undef Elf_Addr
 #undef Elf_Ehdr
@@ -33,8 +33,9 @@
 #undef _r
 #undef _w
 
-#ifdef SORTTABLE_64
-# define generic_compare	generic_compare_64
+#ifdef SORTEXTABLE_64
+# define extable_ent_size	16
+# define compare_extable	compare_extable_64
 # define do_func		do64
 # define Elf_Addr		Elf64_Addr
 # define Elf_Ehdr		Elf64_Ehdr
@@ -54,7 +55,8 @@
 # define _r			r8
 # define _w			w8
 #else
-# define generic_compare	generic_compare_32
+# define extable_ent_size	8
+# define compare_extable	compare_extable_32
 # define do_func		do32
 # define Elf_Addr		Elf32_Addr
 # define Elf_Ehdr		Elf32_Ehdr
@@ -75,7 +77,7 @@
 # define _w			w
 #endif
 
-static int generic_compare(const void *a, const void *b)
+static int compare_extable(const void *a, const void *b)
 {
 	Elf_Addr av = _r(a);
 	Elf_Addr bv = _r(b);
@@ -87,16 +89,14 @@ static int generic_compare(const void *a, const void *b)
 	return 0;
 }
 
-static int
-do_func(Elf_Ehdr *ehdr, char const *const fname, char const *const secname,
-	size_t entsize, table_sort_t custom_sort,
-	char const *const sort_needed_var)
+static void
+do_func(Elf_Ehdr *ehdr, char const *const fname, table_sort_t custom_sort)
 {
 	Elf_Shdr *shdr;
 	Elf_Shdr *shstrtab_sec;
 	Elf_Shdr *strtab_sec = NULL;
 	Elf_Shdr *symtab_sec = NULL;
-	Elf_Shdr *table_sec = NULL;
+	Elf_Shdr *extab_sec = NULL;
 	Elf_Sym *sym;
 	const Elf_Sym *symtab;
 	Elf32_Word *symtab_shndx_start = NULL;
@@ -107,8 +107,8 @@ do_func(Elf_Ehdr *ehdr, char const *const fname, char const *const secname,
 	uint32_t *sort_done_location;
 	const char *secstrtab;
 	const char *strtab;
-	char *table_image;
-	int table_index = 0;
+	char *extab_image;
+	int extab_index = 0;
 	int i;
 	int idx;
 	unsigned int num_sections;
@@ -128,13 +128,13 @@ do_func(Elf_Ehdr *ehdr, char const *const fname, char const *const secname,
 	secstrtab = (const char *)ehdr + _r(&shstrtab_sec->sh_offset);
 	for (i = 0; i < num_sections; i++) {
 		idx = r(&shdr[i].sh_name);
-		if (strcmp(secstrtab + idx, secname) == 0) {
-			table_sec = shdr + i;
-			table_index = i;
+		if (strcmp(secstrtab + idx, "__ex_table") == 0) {
+			extab_sec = shdr + i;
+			extab_index = i;
 		}
 		if ((r(&shdr[i].sh_type) == SHT_REL ||
 		     r(&shdr[i].sh_type) == SHT_RELA) &&
-		    r(&shdr[i].sh_info) == table_index) {
+		    r(&shdr[i].sh_info) == extab_index) {
 			relocs = (void *)ehdr + _r(&shdr[i].sh_offset);
 			relocs_size = _r(&shdr[i].sh_size);
 		}
@@ -147,37 +147,35 @@ do_func(Elf_Ehdr *ehdr, char const *const fname, char const *const secname,
 				(const char *)ehdr + _r(&shdr[i].sh_offset));
 	}
 	if (strtab_sec == NULL) {
-		fprintf(stderr,	"no .strtab in file: %s\n", fname);
-		return -1;
+		fprintf(stderr,	"no .strtab in  file: %s\n", fname);
+		fail_file();
 	}
 	if (symtab_sec == NULL) {
-		fprintf(stderr,	"no .symtab in file: %s\n", fname);
-		return -1;
+		fprintf(stderr,	"no .symtab in  file: %s\n", fname);
+		fail_file();
 	}
 	symtab = (const Elf_Sym *)((const char *)ehdr +
 				   _r(&symtab_sec->sh_offset));
-	if (table_sec == NULL) {
-		fprintf(stderr,	"no %s section in file: %s\n", secname, fname);
-		return -1;
+	if (extab_sec == NULL) {
+		fprintf(stderr,	"no __ex_table in  file: %s\n", fname);
+		fail_file();
 	}
 	strtab = (const char *)ehdr + _r(&strtab_sec->sh_offset);
 
-	table_image = (void *)ehdr + _r(&table_sec->sh_offset);
+	extab_image = (void *)ehdr + _r(&extab_sec->sh_offset);
 
 	if (custom_sort) {
-		custom_sort(table_image, _r(&table_sec->sh_size), entsize);
+		custom_sort(extab_image, _r(&extab_sec->sh_size));
 	} else {
-		int num_entries = _r(&table_sec->sh_size) / entsize;
-		qsort(table_image, num_entries, entsize, generic_compare);
+		int num_entries = _r(&extab_sec->sh_size) / extable_ent_size;
+		qsort(extab_image, num_entries,
+		      extable_ent_size, compare_extable);
 	}
 	/* If there were relocations, we no longer need them. */
 	if (relocs)
 		memset(relocs, 0, relocs_size);
 
-	if (!sort_needed_var)
-		return 0;
-
-	/* find sort needed variable so we can clear it */
+	/* find main_extable_sort_needed */
 	sort_needed_sym = NULL;
 	for (i = 0; i < _r(&symtab_sec->sh_size) / sizeof(Elf_Sym); i++) {
 		sym = (void *)ehdr + _r(&symtab_sec->sh_offset);
@@ -185,16 +183,16 @@ do_func(Elf_Ehdr *ehdr, char const *const fname, char const *const secname,
 		if (ELF_ST_TYPE(sym->st_info) != STT_OBJECT)
 			continue;
 		idx = r(&sym->st_name);
-		if (strcmp(strtab + idx, sort_needed_var) == 0) {
+		if (strcmp(strtab + idx, "main_extable_sort_needed") == 0) {
 			sort_needed_sym = sym;
 			break;
 		}
 	}
 	if (sort_needed_sym == NULL) {
 		fprintf(stderr,
-			"no %s symbol in file: %s\n",
-			sort_needed_var, fname);
-		return -1;
+			"no main_extable_sort_needed symbol in  file: %s\n",
+			fname);
+		fail_file();
 	}
 	sort_needed_sec = &shdr[get_secindex(r2(&sym->st_shndx),
 					     sort_needed_sym - symtab,
@@ -210,5 +208,4 @@ do_func(Elf_Ehdr *ehdr, char const *const fname, char const *const secname,
 #endif
 	/* We sorted it, clear the flag. */
 	w(0, sort_done_location);
-	return 0;
 }

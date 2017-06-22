@@ -21,7 +21,8 @@ instructions).  Similarly, it knows how to follow switch statements, for
 which gcc sometimes uses jump tables.
 
 (Objtool also has an 'undwarf generate' subcommand which generates
-debuginfo for the undwarf unwinder.  See undwarf.txt for more details.)
+debuginfo for the undwarf unwinder.  See Documentation/x86/undwarf.txt
+in the kernel tree for more details.)
 
 
 Why do we need stack metadata validation?

@@ -217,7 +217,7 @@ series
 setup
 setup.bin
 setup.elf
-sorttable
+sortextable
 sImage
 sm_tbl*
 split-include

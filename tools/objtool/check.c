@@ -36,8 +36,8 @@ const char *objname;
 static bool nofp;
 struct cfi_state initial_func_cfi;
 
-static struct instruction *find_insn(struct objtool_file *file,
-				     struct section *sec, unsigned long offset)
+struct instruction *find_insn(struct objtool_file *file,
+			      struct section *sec, unsigned long offset)
 {
 	struct instruction *insn;
 
@@ -64,7 +64,7 @@ static bool gcov_enabled(struct objtool_file *file)
 	struct section *sec;
 	struct symbol *sym;
 
-	list_for_each_entry(sec, &file->elf->sections, list)
+	for_each_sec(file, sec)
 		list_for_each_entry(sym, &sec->symbol_list, list)
 			if (!strncmp(sym->name, "__gcov_.", 8))
 				return true;
@@ -247,19 +247,16 @@ static int decode_instructions(struct objtool_file *file)
 	unsigned long offset;
 	struct instruction *insn;
 	int ret;
-	bool needs_cfi;
 
-	list_for_each_entry(sec, &file->elf->sections, list) {
+	for_each_sec(file, sec) {
 
 		if (!(sec->sh.sh_flags & SHF_EXECINSTR))
 			continue;
 
-		if (!strcmp(sec->name, ".altinstr_replacement") ||
-		    !strcmp(sec->name, ".altinstr_aux") ||
-		    !strncmp(sec->name, ".discard.", 9))
-			needs_cfi = false;
-		else
-			needs_cfi = true;
+		if (strcmp(sec->name, ".altinstr_replacement") &&
+		    strcmp(sec->name, ".altinstr_aux") &&
+		    strncmp(sec->name, ".discard.", 9))
+			sec->text = true;
 
 		for (offset = 0; offset < sec->len; offset += insn->len) {
 			insn = malloc(sizeof(*insn));
@@ -273,7 +270,6 @@ static int decode_instructions(struct objtool_file *file)
 
 			insn->sec = sec;
 			insn->offset = offset;
-			insn->needs_cfi = needs_cfi;
 
 			ret = arch_decode_instruction(file->elf, sec, offset,
 						      sec->len - offset,
@@ -369,7 +365,7 @@ static void add_ignores(struct objtool_file *file)
 	struct section *sec;
 	struct symbol *func;
 
-	list_for_each_entry(sec, &file->elf->sections, list) {
+	for_each_sec(file, sec) {
 		list_for_each_entry(func, &sec->symbol_list, list) {
 			if (func->type != STT_FUNC)
 				continue;
@@ -863,7 +859,7 @@ static int add_switch_table_alts(struct objtool_file *file)
 	if (!file->rodata || !file->rodata->rela)
 		return 0;
 
-	list_for_each_entry(sec, &file->elf->sections, list) {
+	for_each_sec(file, sec) {
 		list_for_each_entry(func, &sec->symbol_list, list) {
 			if (func->type != STT_FUNC)
 				continue;
@@ -877,54 +873,54 @@ static int add_switch_table_alts(struct objtool_file *file)
 	return 0;
 }
 
-static int read_cfi_hints(struct objtool_file *file)
+static int read_unwind_hints(struct objtool_file *file)
 {
 	struct section *sec, *relasec;
 	struct rela *rela;
-	struct undwarf_cfi_hint *hint;
+	struct unwind_hint *hint;
 	struct instruction *insn;
 	struct cfi_reg *cfa;
 	int i;
 
-	sec = find_section_by_name(file->elf, ".discard.undwarf_cfi_hints");
+	sec = find_section_by_name(file->elf, ".discard.unwind_hints");
 	if (!sec)
 		return 0;
 
 	relasec = sec->rela;
 	if (!relasec) {
-		WARN("missing .rela.discard.undwarf_cfi_hints section");
+		WARN("missing .rela.discard.unwind_hints section");
 		return -1;
 	}
 
-	if (sec->len % sizeof(struct undwarf_cfi_hint)) {
-		WARN("struct undwarf_cfi_hint size mismatch");
+	if (sec->len % sizeof(struct unwind_hint)) {
+		WARN("struct unwind_hint size mismatch");
 		return -1;
 	}
 
 	file->hints = true;
 
-	for (i = 0; i < sec->len / sizeof(struct undwarf_cfi_hint); i++) {
-		hint = (struct undwarf_cfi_hint *)sec->data->d_buf + i;
+	for (i = 0; i < sec->len / sizeof(struct unwind_hint); i++) {
+		hint = (struct unwind_hint *)sec->data->d_buf + i;
 
 		rela = find_rela_by_dest(sec, i * sizeof(*hint));
 		if (!rela) {
-			WARN("can't find rela for undwarf_cfi_hints[%d]", i);
+			WARN("can't find rela for unwind_hints[%d]", i);
 			return -1;
 		}
 
 		insn = find_insn(file, rela->sym->sec, rela->addend);
 		if (!insn) {
-			WARN("can't find insn for undwarf_cfi_hints[%d]", i);
+			WARN("can't find insn for unwind_hints[%d]", i);
 			return -1;
 		}
 
 		cfa = &insn->state.cfa;
 
-		if (hint->type == CFI_HINT_TYPE_SAVE) {
+		if (hint->type == UNWIND_HINT_TYPE_SAVE) {
 			insn->save = true;
 			continue;
 
-		} else if (hint->type == CFI_HINT_TYPE_RESTORE) {
+		} else if (hint->type == UNWIND_HINT_TYPE_RESTORE) {
 			insn->restore = true;
 			insn->hint = true;
 			continue;
@@ -958,7 +954,7 @@ static int read_cfi_hints(struct objtool_file *file)
 			cfa->base = CFI_DX;
 			break;
 		default:
-			WARN_FUNC("unsupported undwarf_cfi_hint cfa base reg %d",
+			WARN_FUNC("unsupported unwind_hint cfa base reg %d",
 				  insn->sec, insn->offset, hint->cfa_reg);
 			return -1;
 		}
@@ -1000,7 +996,7 @@ static int decode_sections(struct objtool_file *file)
 	if (ret)
 		return ret;
 
-	ret = read_cfi_hints(file);
+	ret = read_unwind_hints(file);
 	if (ret)
 		return ret;
 
@@ -1122,7 +1118,10 @@ static void restore_reg(struct insn_state *state, unsigned char reg)
  *
  * and:
  *
- *   4c 8b 55 f8		mov    -0x8(%rbp),%r10
+ *   4c 8b 55 e8		mov    -0x18(%rbp),%r10
+ *   48 8b 5d e0		mov    -0x20(%rbp),%rbx
+ *   4c 8b 65 f0		mov    -0x10(%rbp),%r12
+ *   4c 8b 6d f8		mov    -0x8(%rbp),%r13
  *   c9				leaveq
  *   49 8d 62 f8		lea    -0x8(%r10),%rsp
  *   c3				retq
@@ -1282,8 +1281,7 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 			break;
 
 		case OP_SRC_REG_INDIRECT:
-			if (state->drap && cfa->base == CFI_BP_INDIRECT &&
-			    op->src.reg == CFI_BP &&
+			if (state->drap && op->src.reg == CFI_BP &&
 			    op->src.offset == regs[op->dest.reg].offset) {
 
 				/* drap: mov disp(%rbp), %reg */
@@ -1320,9 +1318,6 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 		if (op->src.type != OP_SRC_REG)
 			break;
 
-		/* fallthrough */
-
-	case OP_DEST_REG_INDIRECT:
 		if (state->drap) {
 			if (op->src.reg == cfa->base && op->src.reg == state->drap_reg) {
 
@@ -1333,21 +1328,47 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 				/* save drap so we know when to undefine it */
 				save_reg(state, op->src.reg, CFI_CFA, -state->stack_size);
 
-			} else if (op->src.reg == CFI_BP) {
+			} else if (op->src.reg == CFI_BP && cfa->base == state->drap_reg) {
 
 				/* drap: push %rbp */
 				state->stack_size = 0;
 
 			} else if (regs[op->src.reg].base == CFI_UNDEFINED) {
 
-				/* drap: push %reg (other than drap or rbp) */
+				/* drap: push %reg */
 				save_reg(state, op->src.reg, CFI_BP, -state->stack_size);
 			}
 
-		} else if (op->dest.type == OP_DEST_PUSH) {
+		} else {
 
-			/* push reg */
+			/* push %reg */
 			save_reg(state, op->src.reg, CFI_CFA, -state->stack_size);
+		}
+
+		/* detect when asm code uses rbp as a scratch register */
+		if (!nofp && insn->func && op->src.reg == CFI_BP &&
+		    cfa->base != CFI_BP)
+			state->bp_scratch = true;
+		break;
+
+	case OP_DEST_REG_INDIRECT:
+
+		if (state->drap) {
+			if (op->src.reg == cfa->base && op->src.reg == state->drap_reg) {
+
+				/* drap: mov %drap, disp(%rbp) */
+				cfa->base = CFI_BP_INDIRECT;
+				cfa->offset = op->dest.offset;
+
+				/* save drap so we know when to undefine it */
+				save_reg(state, op->src.reg, CFI_CFA, op->dest.offset);
+			}
+
+			else if (regs[op->src.reg].base == CFI_UNDEFINED) {
+
+				/* drap: mov reg, disp(%rbp) */
+				save_reg(state, op->src.reg, CFI_BP, op->dest.offset);
+			}
 
 		} else if (op->dest.reg == cfa->base) {
 
@@ -1356,11 +1377,6 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 			save_reg(state, op->src.reg, CFI_CFA,
 				 op->dest.offset - state->cfa.offset);
 		}
-
-		/* detect when asm code uses rbp as a scratch register */
-		if (!nofp && insn->func && op->src.reg == CFI_BP &&
-		    cfa->base != CFI_BP)
-			state->bp_scratch = true;
 
 		break;
 
@@ -1638,7 +1654,7 @@ static int validate_branch(struct objtool_file *file, struct instruction *first,
 	return 0;
 }
 
-static int validate_cfi_hints(struct objtool_file *file)
+static int validate_unwind_hints(struct objtool_file *file)
 {
 	struct instruction *insn;
 	int ret, warnings = 0;
@@ -1727,7 +1743,7 @@ static int validate_functions(struct objtool_file *file)
 	       CFI_NUM_REGS * sizeof(struct cfi_reg));
 	state.stack_size = initial_func_cfi.cfa.offset;
 
-	list_for_each_entry(sec, &file->elf->sections, list) {
+	for_each_sec(file, sec) {
 		list_for_each_entry(func, &sec->symbol_list, list) {
 			if (func->type != STT_FUNC)
 				continue;
@@ -1796,18 +1812,17 @@ int check(const char *_objname, bool _nofp, bool undwarf)
 	objname = _objname;
 	nofp = _nofp;
 
-	file.elf = elf_open(objname);
-	if (!file.elf) {
-		fprintf(stderr, "error reading elf file %s\n", objname);
+	file.elf = elf_open(objname, undwarf ? O_RDWR : O_RDONLY);
+	if (!file.elf)
 		return 1;
-	}
 
 	INIT_LIST_HEAD(&file.insn_list);
 	hash_init(file.insn_hash);
 	file.whitelist = find_section_by_name(file.elf, ".discard.func_stack_frame_non_standard");
 	file.rodata = find_section_by_name(file.elf, ".rodata");
-	file.ignore_unreachables = false;
 	file.c_file = find_section_by_name(file.elf, ".comment");
+	file.ignore_unreachables = false;
+	file.hints = false;
 
 	arch_initial_func_cfi_state(&initial_func_cfi);
 
@@ -1824,7 +1839,7 @@ int check(const char *_objname, bool _nofp, bool undwarf)
 		goto out;
 	warnings += ret;
 
-	ret = validate_cfi_hints(&file);
+	ret = validate_unwind_hints(&file);
 	if (ret < 0)
 		goto out;
 	warnings += ret;
@@ -1841,11 +1856,11 @@ int check(const char *_objname, bool _nofp, bool undwarf)
 		if (ret < 0)
 			goto out;
 
-		ret = create_undwarf_section(&file);
+		ret = create_undwarf_sections(&file);
 		if (ret < 0)
 			goto out;
 
-		ret = update_file(&file);
+		ret = elf_write(file.elf);
 		if (ret < 0)
 			goto out;
 	}

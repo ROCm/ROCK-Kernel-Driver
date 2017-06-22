@@ -43,7 +43,7 @@ struct instruction {
 	unsigned int len;
 	unsigned char type;
 	unsigned long immediate;
-	bool alt_group, visited, dead_end, ignore, needs_cfi, hint, save, restore;
+	bool alt_group, visited, dead_end, ignore, hint, save, restore;
 	struct symbol *call_dest;
 	struct instruction *jump_dest;
 	struct list_head alts;
@@ -63,7 +63,17 @@ struct objtool_file {
 
 int check(const char *objname, bool nofp, bool undwarf);
 
+struct instruction *find_insn(struct objtool_file *file,
+			      struct section *sec, unsigned long offset);
+
 #define for_each_insn(file, insn)					\
 	list_for_each_entry(insn, &file->insn_list, list)
+
+#define sec_for_each_insn(file, sec, insn)				\
+	for (insn = find_insn(file, sec, 0);				\
+	     insn && &insn->list != &file->insn_list &&			\
+			insn->sec == sec;				\
+	     insn = list_next_entry(insn, list))
+
 
 #endif /* _CHECK_H */

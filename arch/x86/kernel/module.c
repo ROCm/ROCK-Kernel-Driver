@@ -214,7 +214,7 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    struct module *me)
 {
 	const Elf_Shdr *s, *text = NULL, *alt = NULL, *locks = NULL,
-		*para = NULL, *undwarf = NULL;
+		*para = NULL, *undwarf = NULL, *undwarf_ip = NULL;
 	char *secstrings = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
 
 	for (s = sechdrs; s < sechdrs + hdr->e_shnum; s++) {
@@ -228,6 +228,8 @@ int module_finalize(const Elf_Ehdr *hdr,
 			para = s;
 		if (!strcmp(".undwarf", secstrings + s->sh_name))
 			undwarf = s;
+		if (!strcmp(".undwarf_ip", secstrings + s->sh_name))
+			undwarf_ip = s;
 	}
 
 	if (alt) {
@@ -251,9 +253,10 @@ int module_finalize(const Elf_Ehdr *hdr,
 	/* make jump label nops */
 	jump_label_apply_nops(me);
 
-	if (undwarf)
-		unwind_module_init(me, (void *)undwarf->sh_addr,
-				   undwarf->sh_size);
+	if (undwarf && undwarf_ip)
+		unwind_module_init(me, (void *)undwarf_ip->sh_addr,
+				   undwarf_ip->sh_size,
+				   (void *)undwarf->sh_addr, undwarf->sh_size);
 
 	return 0;
 }
