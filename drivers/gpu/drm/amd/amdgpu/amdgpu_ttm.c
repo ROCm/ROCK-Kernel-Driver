@@ -1348,6 +1348,10 @@ static int amdgpu_ttm_bo_access_vram(struct amdgpu_bo *abo,
 		buf = (uint8_t *)buf + bytes;
 		pos += bytes;
 		len -= bytes;
+		if (pos >= (nodes->start + nodes->size) << PAGE_SHIFT) {
+			++nodes;
+			pos = (nodes->start << PAGE_SHIFT);
+		}
 	}
 
 	return result;
