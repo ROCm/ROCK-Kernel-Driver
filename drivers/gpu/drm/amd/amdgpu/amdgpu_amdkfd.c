@@ -71,10 +71,12 @@ int amdgpu_amdkfd_init(void)
 bool amdgpu_amdkfd_load_interface(struct amdgpu_device *adev)
 {
 	switch (adev->asic_type) {
+#ifdef CONFIG_DRM_AMDGPU_CIK
 	case CHIP_KAVERI:
 	case CHIP_HAWAII:
 		kfd2kgd = amdgpu_amdkfd_gfx_7_get_functions();
 		break;
+#endif
 	case CHIP_CARRIZO:
 	case CHIP_TONGA:
 	case CHIP_FIJI:

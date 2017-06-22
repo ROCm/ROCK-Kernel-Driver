@@ -42,8 +42,6 @@
 #include "vi_structs.h"
 #include "vid.h"
 
-#define VI_QUEUES_PER_PIPE_MEC	(8)
-
 enum hqd_dequeue_request_type {
 	NO_ACTION = 0,
 	DRAIN_PIPE,
@@ -266,7 +264,7 @@ static void acquire_queue(struct kgd_dev *kgd, uint32_t pipe_id,
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 
-	uint32_t mec = (++pipe_id / adev->gfx.mec.num_pipe_per_mec) + 1;
+	uint32_t mec = (pipe_id / adev->gfx.mec.num_pipe_per_mec) + 1;
 	uint32_t pipe = (pipe_id % adev->gfx.mec.num_pipe_per_mec);
 
 	lock_srbm(kgd, mec, pipe, queue_id, 0);
@@ -335,7 +333,7 @@ static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id)
 	uint32_t mec;
 	uint32_t pipe;
 
-	mec = (++pipe_id / adev->gfx.mec.num_pipe_per_mec) + 1;
+	mec = (pipe_id / adev->gfx.mec.num_pipe_per_mec) + 1;
 	pipe = (pipe_id % adev->gfx.mec.num_pipe_per_mec);
 
 	lock_srbm(kgd, mec, pipe, 0, 0);
@@ -386,8 +384,8 @@ static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 	if (m->cp_hqd_vmid == 0) {
 		uint32_t value, mec, pipe;
 
-		mec = (++pipe_id / VI_PIPE_PER_MEC) + 1;
-		pipe = (pipe_id % VI_PIPE_PER_MEC);
+		mec = (pipe_id / adev->gfx.mec.num_pipe_per_mec) + 1;
+		pipe = (pipe_id % adev->gfx.mec.num_pipe_per_mec);
 
 		pr_debug("kfd: set HIQ, mec:%d, pipe:%d, queue:%d.\n",
 			mec, pipe, queue_id);
@@ -782,7 +780,6 @@ static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
 	signed long r;
 	struct dma_fence *f;
 	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
-	struct amdgpu_kiq *kiq = &adev->gfx.kiq;
 
 	mutex_lock(&adev->gfx.kiq.ring_mutex);
 	amdgpu_ring_alloc(ring, 12); /* fence + invalidate_tlbs package*/

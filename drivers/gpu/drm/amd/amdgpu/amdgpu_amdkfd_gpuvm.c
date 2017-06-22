@@ -870,7 +870,7 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 static void unreserve_bo_and_vms(struct bo_vm_reservation_context *ctx,
 				 bool wait)
 {
-	if (wait)
+	if (wait) /* FIXME: when called from user context, this needs to be interruptible */
 		amdgpu_sync_wait(&ctx->sync, false);
 
 	if (ctx->reserved)
@@ -936,7 +936,7 @@ static int update_gpuvm_pte(struct amdgpu_device *adev,
 	/* Update the page directory */
 	ret = amdgpu_vm_update_directories(adev, vm);
 	if (ret != 0) {
-		pr_err("amdgpu_vm_update_page_directory failed\n");
+		pr_err("amdgpu_vm_update_directories failed\n");
 		return ret;
 	}
 
