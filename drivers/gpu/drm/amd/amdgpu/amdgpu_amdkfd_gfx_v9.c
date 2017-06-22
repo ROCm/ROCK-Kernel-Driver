@@ -425,7 +425,8 @@ static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id)
 	lock_srbm(kgd, mec, pipe, 0, 0);
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmCPC_INT_CNTL),
-	       CP_INT_CNTL_RING0__TIME_STAMP_INT_ENABLE_MASK);
+		CP_INT_CNTL_RING0__TIME_STAMP_INT_ENABLE_MASK |
+		CP_INT_CNTL_RING0__OPCODE_ERROR_INT_ENABLE_MASK);
 
 	unlock_srbm(kgd);
 
