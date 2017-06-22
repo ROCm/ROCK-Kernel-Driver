@@ -677,7 +677,7 @@ static inline void sync_core(void)
 	unsigned int tmp;
 
 	asm volatile (
-		CFI_SAVE
+		UNWIND_HINT_SAVE
 		"mov %%ss, %0\n\t"
 		"pushq %q0\n\t"
 		"pushq %%rsp\n\t"
@@ -687,7 +687,7 @@ static inline void sync_core(void)
 		"pushq %q0\n\t"
 		"pushq $1f\n\t"
 		"iretq\n\t"
-		CFI_RESTORE
+		UNWIND_HINT_RESTORE
 		"1:"
 		: "=&r" (tmp), "+r" (__sp) : : "cc", "memory");
 #endif

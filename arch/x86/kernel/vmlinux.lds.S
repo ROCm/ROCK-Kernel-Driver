@@ -148,6 +148,8 @@ SECTIONS
 
 	BUG_TABLE
 
+	UNDWARF_TABLE
+
 	. = ALIGN(PAGE_SIZE);
 	__vvar_page = .;
 

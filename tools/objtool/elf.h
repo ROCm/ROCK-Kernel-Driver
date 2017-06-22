@@ -28,6 +28,13 @@
 # define elf_getshdrstrndx elf_getshstrndx
 #endif
 
+/*
+ * Fallback for systems without this "read, mmaping if possible" cmd.
+ */
+#ifndef ELF_C_READ_MMAP
+#define ELF_C_READ_MMAP ELF_C_READ
+#endif
+
 struct section {
 	struct list_head list;
 	GElf_Shdr sh;
@@ -41,6 +48,7 @@ struct section {
 	char *name;
 	int idx;
 	unsigned int len;
+	bool changed, text;
 };
 
 struct symbol {
@@ -75,7 +83,7 @@ struct elf {
 };
 
 
-struct elf *elf_open(const char *name);
+struct elf *elf_open(const char *name, int flags);
 struct section *find_section_by_name(struct elf *elf, const char *name);
 struct symbol *find_symbol_by_offset(struct section *sec, unsigned long offset);
 struct symbol *find_symbol_containing(struct section *sec, unsigned long offset);
@@ -87,9 +95,10 @@ struct section *elf_create_section(struct elf *elf, const char *name, size_t
 				   entsize, int nr);
 struct section *elf_create_rela_section(struct elf *elf, struct section *base);
 int elf_rebuild_rela_section(struct section *sec);
-int elf_write_to_file(struct elf *elf, char *outfile);
+int elf_write(struct elf *elf);
 void elf_close(struct elf *elf);
 
-
+#define for_each_sec(file, sec)						\
+	list_for_each_entry(sec, &file->elf->sections, list)
 
 #endif /* _OBJTOOL_ELF_H */

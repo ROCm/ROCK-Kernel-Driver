@@ -23,8 +23,7 @@
 struct objtool_file;
 
 int create_undwarf(struct objtool_file *file);
-int create_undwarf_section(struct objtool_file *file);
-int update_file(struct objtool_file *file);
+int create_undwarf_sections(struct objtool_file *file);
 
 int undwarf_dump(const char *objname);
 

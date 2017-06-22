@@ -13,6 +13,7 @@ struct unwind_state {
 	int graph_idx;
 	bool error;
 #if defined(CONFIG_UNDWARF_UNWINDER)
+	bool signal;
 	unsigned long sp, bp, ip;
 	struct pt_regs *regs;
 #elif defined(CONFIG_FRAME_POINTER)
@@ -65,10 +66,15 @@ static inline struct pt_regs *unwind_get_entry_regs(struct unwind_state *state)
 #endif
 
 #ifdef CONFIG_UNDWARF_UNWINDER
-void unwind_module_init(struct module *mod, void *undwarf, size_t size);
+void unwind_init(void);
+void unwind_module_init(struct module *mod, void *undwarf_ip,
+			size_t undwarf_ip_size, void *undwarf,
+			size_t undwarf_size);
 #else
-static inline void
-unwind_module_init(struct module *mod, void *undwarf, size_t size) {}
+static inline void unwind_init(void) {}
+static inline void unwind_module_init(struct module *mod, void *undwarf_ip,
+				      size_t undwarf_ip_size, void *undwarf,
+				      size_t undwarf_size) {}
 #endif
 
 /*
@@ -85,5 +91,14 @@ unwind_module_init(struct module *mod, void *undwarf, size_t size) {}
 		val = READ_ONCE_NOCHECK(x);		\
 	val;						\
 })
+
+static inline bool task_on_another_cpu(struct task_struct *task)
+{
+#ifdef CONFIG_SMP
+	return task != current && task->on_cpu;
+#else
+	return false;
+#endif
+}
 
 #endif /* _ASM_X86_UNWIND_H */

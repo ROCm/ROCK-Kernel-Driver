@@ -22,27 +22,28 @@
  *
  * These macros provide hints to objtool about the state of the stack at each
  * instruction.  Objtool starts from the hints and follows the code flow,
- * making automatic CFI adjustments when it sees pushes and pops, adjusting the
- * debuginfo as necessary.  It will also warn if it sees any inconsistencies.
+ * making automatic CFI adjustments when it sees pushes and pops, filling out
+ * the debuginfo as necessary.  It will also warn if it sees any
+ * inconsistencies.
  */
-.macro CFI_HINT cfa_reg=UNDWARF_REG_SP cfa_offset=0 type=UNDWARF_TYPE_CFA
+.macro UNWIND_HINT cfa_reg=UNDWARF_REG_SP cfa_offset=0 type=UNDWARF_TYPE_CFA
 #ifdef CONFIG_STACK_VALIDATION
-999:
-	.pushsection .discard.undwarf_cfi_hints
-		/* struct undwarf_cfi_hint */
-		.long 999b - .		/* ip		*/
-		.short \cfa_offset	/* cfa_offset	*/
-		.byte \cfa_reg		/* cfa_reg */
-		.byte \type		/* type */
+.Lunwind_hint_ip_\@:
+	.pushsection .discard.unwind_hints
+		/* struct unwind_hint */
+		.long .Lunwind_hint_ip_\@ - .
+		.short \cfa_offset
+		.byte \cfa_reg
+		.byte \type
 	.popsection
 #endif
 .endm
 
-.macro CFI_EMPTY
-	CFI_HINT cfa_reg=UNDWARF_REG_UNDEFINED
+.macro UNWIND_HINT_EMPTY
+	UNWIND_HINT cfa_reg=UNDWARF_REG_UNDEFINED
 .endm
 
-.macro CFI_REGS base=rsp offset=0 indirect=0 extra=1 iret=0
+.macro UNWIND_HINT_REGS base=rsp offset=0 indirect=0 extra=1 iret=0
 	.if \base == rsp && \indirect
 		.set cfa_reg, UNDWARF_REG_SP_INDIRECT
 	.elseif \base == rsp
@@ -54,41 +55,46 @@
 	.elseif \base == rdx
 		.set cfa_reg, UNDWARF_REG_DX
 	.else
-		.error "CFI_REGS: bad base register"
+		.error "UNWIND_HINT_REGS: bad base register"
 	.endif
+
+	.set cfa_offset, \offset
 
 	.if \iret
 		.set type, UNDWARF_TYPE_REGS_IRET
+	.elseif \extra == 0
+		.set type, UNDWARF_TYPE_REGS_IRET
+		.set cfa_offset, \offset + (16*8)
 	.else
 		.set type, UNDWARF_TYPE_REGS
 	.endif
 
-	CFI_HINT cfa_reg=cfa_reg cfa_offset=\offset type=type
+	UNWIND_HINT cfa_reg=cfa_reg cfa_offset=cfa_offset type=type
 .endm
 
-.macro CFI_IRET_REGS base=rsp offset=0
-	CFI_REGS base=\base offset=\offset iret=1
+.macro UNWIND_HINT_IRET_REGS base=rsp offset=0
+	UNWIND_HINT_REGS base=\base offset=\offset iret=1
 .endm
 
-.macro CFI_FUNC cfa_offset=8
-	CFI_HINT cfa_offset=\cfa_offset
+.macro UNWIND_HINT_FUNC cfa_offset=8
+	UNWIND_HINT cfa_offset=\cfa_offset
 .endm
 
 #else /* !__ASSEMBLY__ */
 
-#define CFI_HINT(cfa_reg, cfa_offset, type)			\
-	"999: \n\t"						\
-	".pushsection .discard.undwarf_cfi_hints\n\t"		\
-	/* struct undwarf_cfi_hint */				\
-	".long 999b - .\n\t"					\
+#define UNWIND_HINT(cfa_reg, cfa_offset, type)			\
+	"987: \n\t"						\
+	".pushsection .discard.unwind_hints\n\t"		\
+	/* struct unwind_hint */				\
+	".long 987b - .\n\t"					\
 	".short " __stringify(cfa_offset) "\n\t"		\
 	".byte " __stringify(cfa_reg) "\n\t"			\
 	".byte " __stringify(type) "\n\t"			\
 	".popsection\n\t"
 
-#define CFI_SAVE CFI_HINT(0, 0, CFI_HINT_TYPE_SAVE)
+#define UNWIND_HINT_SAVE UNWIND_HINT(0, 0, UNWIND_HINT_TYPE_SAVE)
 
-#define CFI_RESTORE CFI_HINT(0, 0, CFI_HINT_TYPE_RESTORE)
+#define UNWIND_HINT_RESTORE UNWIND_HINT(0, 0, UNWIND_HINT_TYPE_RESTORE)
 
 
 #endif /* __ASSEMBLY__ */

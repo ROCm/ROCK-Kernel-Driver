@@ -7,6 +7,7 @@
 struct mod_arch_specific {
 #ifdef CONFIG_UNDWARF_UNWINDER
 	unsigned int num_undwarves;
+	int *undwarf_ip;
 	struct undwarf *undwarf;
 #endif
 };
