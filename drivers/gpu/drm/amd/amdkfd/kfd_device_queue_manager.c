@@ -428,8 +428,6 @@ static int destroy_queue_nocpsch_locked(struct device_queue_manager *dqm,
 				KFD_PREEMPT_TYPE_WAVEFRONT_RESET,
 				KFD_HIQ_TIMEOUT,
 				q->pipe, q->queue);
-	if (retval != 0)
-		return retval;
 
 	mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
 
