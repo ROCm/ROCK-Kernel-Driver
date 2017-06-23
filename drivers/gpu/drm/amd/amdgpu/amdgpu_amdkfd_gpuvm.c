@@ -652,6 +652,8 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 
 	alloc_domain = userptr ? AMDGPU_GEM_DOMAIN_CPU : domain;
 
+	amdgpu_sync_create(&(*mem)->sync);
+
 	ret = amdgpu_amdkfd_reserve_system_mem_limit(adev, size, alloc_domain);
 	if (ret) {
 		pr_err("Insufficient system memory\n");
@@ -727,7 +729,7 @@ struct bo_vm_reservation_context {
 	struct amdgpu_bo_list_entry *vm_pd;
 	struct ww_acquire_ctx ticket;
 	struct list_head list, duplicates;
-	struct amdgpu_sync sync;
+	struct amdgpu_sync *sync;
 	bool reserved;
 };
 
@@ -748,7 +750,7 @@ static int reserve_bo_and_vm(struct kgd_mem *mem,
 
 	ctx->reserved = false;
 	ctx->n_vms = 1;
-	amdgpu_sync_create(&ctx->sync);
+	ctx->sync = &mem->sync;
 
 	INIT_LIST_HEAD(&ctx->list);
 	INIT_LIST_HEAD(&ctx->duplicates);
@@ -809,7 +811,7 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 	ctx->reserved = false;
 	ctx->n_vms = 0;
 	ctx->vm_pd = NULL;
-	amdgpu_sync_create(&ctx->sync);
+	ctx->sync = &mem->sync;
 
 	INIT_LIST_HEAD(&ctx->list);
 	INIT_LIST_HEAD(&ctx->duplicates);
@@ -864,19 +866,27 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 	return ret;
 }
 
-static void unreserve_bo_and_vms(struct bo_vm_reservation_context *ctx,
-				 bool wait)
+static int unreserve_bo_and_vms(struct bo_vm_reservation_context *ctx,
+				 bool wait, bool intr)
 {
-	if (wait) /* FIXME: when called from user context, this needs to be interruptible */
-		amdgpu_sync_wait(&ctx->sync, false);
+	int ret = 0;
+
+	if (wait) {
+		ret = amdgpu_sync_wait(ctx->sync, intr);
+		if (ret)
+			return ret;
+	}
 
 	if (ctx->reserved)
 		ttm_eu_backoff_reservation(&ctx->ticket, &ctx->list);
 	kfree(ctx->vm_pd);
 
-	amdgpu_sync_free(&ctx->sync);
+	ctx->sync = NULL;
+
 	ctx->reserved = false;
 	ctx->vm_pd = NULL;
+
+	return ret;
 }
 
 static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
@@ -1047,6 +1057,25 @@ static struct sg_table *create_doorbell_sg(uint64_t addr, uint32_t size)
 	return sg;
 }
 
+int amdgpu_amdkfd_gpuvm_sync_memory(
+		struct kgd_dev *kgd, struct kgd_mem *mem, bool intr)
+{
+	int ret = 0;
+	struct amdgpu_sync sync;
+	struct amdgpu_device *adev;
+
+	adev = get_amdgpu_device(kgd);
+	amdgpu_sync_create(&sync);
+
+	mutex_lock(&mem->lock);
+	amdgpu_sync_clone(adev, &mem->sync, &sync);
+	mutex_unlock(&mem->lock);
+
+	ret = amdgpu_sync_wait(&sync, intr);
+	amdgpu_sync_free(&sync);
+	return ret;
+}
+
 #define BOOL_TO_STR(b)	(b == true) ? "true" : "false"
 
 int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
@@ -1133,7 +1162,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	struct amdgpu_device *adev;
 	struct kfd_bo_va_list *entry, *tmp;
 	struct bo_vm_reservation_context ctx;
-	int ret;
+	int ret = 0;
 	struct ttm_validate_buffer *bo_list_entry;
 	struct amdkfd_process_info *process_info;
 	unsigned long bo_size;
@@ -1195,7 +1224,10 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 				entry, bo_size);
 	}
 
-	unreserve_bo_and_vms(&ctx, false);
+	ret = unreserve_bo_and_vms(&ctx, false, true);
+
+	/* Free the sync object */
+	amdgpu_sync_free(&mem->sync);
 
 	/* If the SG is not NULL, it's one we created for a doorbell
 	 * BO. We need to free it.
@@ -1209,7 +1241,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	amdgpu_bo_unref(&mem->bo);
 	kfree(mem);
 
-	return 0;
+	return ret;
 }
 
 int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
@@ -1304,7 +1336,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 					entry->va, entry->va + bo_size,
 					entry);
 
-			ret = map_bo_to_gpuvm(adev, entry, &ctx.sync,
+			ret = map_bo_to_gpuvm(adev, entry, ctx.sync,
 					      is_invalid_userptr);
 			if (ret != 0) {
 				pr_err("Failed to map radeon bo to gpuvm\n");
@@ -1321,7 +1353,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 		amdgpu_bo_fence(bo,
 				&kfd_vm->process_info->eviction_fence->base,
 				true);
-	unreserve_bo_and_vms(&ctx, true);
+	ret = unreserve_bo_and_vms(&ctx, false, true);
 
 	mutex_unlock(&mem->process_info->lock);
 	mutex_unlock(&mem->lock);
@@ -1334,7 +1366,7 @@ add_bo_to_vm_failed_aql:
 	if (bo_va_entry)
 		remove_bo_from_vm(adev, bo_va_entry, bo_size);
 add_bo_to_vm_failed:
-	unreserve_bo_and_vms(&ctx, false);
+	unreserve_bo_and_vms(&ctx, false, false);
 bo_reserve_failed:
 	mutex_unlock(&mem->process_info->lock);
 	mutex_unlock(&mem->lock);
@@ -1562,7 +1594,7 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 					entry->va + bo_size,
 					entry);
 
-			ret = unmap_bo_from_gpuvm(adev, entry, &ctx.sync);
+			ret = unmap_bo_from_gpuvm(adev, entry, ctx.sync);
 			if (ret == 0) {
 				entry->is_mapped = false;
 			} else {
@@ -1593,7 +1625,7 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 	}
 
 unreserve_out:
-	unreserve_bo_and_vms(&ctx, false);
+	unreserve_bo_and_vms(&ctx, false, false);
 out:
 	mutex_unlock(&mem->lock);
 	return ret;
@@ -2223,6 +2255,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 	struct amdgpu_amdkfd_fence *old_fence;
 	int ret = 0, i;
 	struct list_head duplicate_save;
+	struct amdgpu_sync sync_obj;
 
 	INIT_LIST_HEAD(&duplicate_save);
 	INIT_LIST_HEAD(&ctx.list);
@@ -2275,7 +2308,8 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 	if (!list_empty(&duplicate_save))
 		pr_err("BUG: list of BOs to reserve has duplicates!\n");
 
-	amdgpu_sync_create(&ctx.sync);
+	amdgpu_sync_create(&sync_obj);
+	ctx.sync = &sync_obj;
 
 	/* Validate PDs and PTs */
 	ret = process_validate_vms(process_info);
@@ -2310,7 +2344,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 			ret = update_gpuvm_pte((struct amdgpu_device *)
 					      bo_va_entry->kgd_dev,
 					      bo_va_entry,
-					      &ctx.sync);
+					      ctx.sync);
 			if (ret) {
 				pr_debug("Memory eviction: update PTE failed. Try again\n");
 				goto validate_map_fail;
@@ -2318,7 +2352,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 		}
 	}
 
-	amdgpu_sync_wait(&ctx.sync, false);
+	amdgpu_sync_wait(ctx.sync, false);
 
 	/* Wait for validate to finish and attach new eviction fence */
 	list_for_each_entry(mem, &process_info->kfd_bo_list,
@@ -2338,7 +2372,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 	}
 validate_map_fail:
 	ttm_eu_backoff_reservation(&ctx.ticket, &ctx.list);
-	amdgpu_sync_free(&ctx.sync);
+	amdgpu_sync_free(&sync_obj);
 ttm_reserve_fail:
 	mutex_unlock(&process_info->lock);
 evict_fence_fail:
