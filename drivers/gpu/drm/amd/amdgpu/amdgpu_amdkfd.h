@@ -63,6 +63,8 @@ struct kgd_mem {
 	struct amdkfd_process_info *process_info;
 	struct page **user_pages;
 
+	struct amdgpu_sync sync;
+
 	/* flags bitfield */
 	bool coherent      : 1;
 	bool no_substitute : 1;
@@ -187,6 +189,8 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 	})
 
 /* GPUVM API */
+int amdgpu_amdkfd_gpuvm_sync_memory(
+		struct kgd_dev *kgd, struct kgd_mem *mem, bool intr);
 int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		struct kgd_dev *kgd, uint64_t va, uint64_t size,
 		void *vm, struct kgd_mem **mem,

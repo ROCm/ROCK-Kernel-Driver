@@ -216,6 +216,7 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.read_vmid_from_vmfault_reg = read_vmid_from_vmfault_reg,
 	.write_vmid_invalidate_request = write_vmid_invalidate_request,
 	.invalidate_tlbs = invalidate_tlbs,
+	.sync_memory = amdgpu_amdkfd_gpuvm_sync_memory,
 	.alloc_memory_of_gpu = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu,
 	.free_memory_of_gpu = amdgpu_amdkfd_gpuvm_free_memory_of_gpu,
 	.map_memory_to_gpu = amdgpu_amdkfd_gpuvm_map_memory_to_gpu,

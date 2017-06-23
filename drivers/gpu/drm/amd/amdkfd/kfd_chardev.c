@@ -1398,6 +1398,12 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 			pr_err("Failed to map\n");
 	}
 
+	err = dev->kfd2kgd->sync_memory(dev->kgd, (struct kgd_mem *) mem, true);
+	if (err) {
+		pr_debug("Sync memory failed, wait interrupted by user signal\n");
+		goto sync_memory_failed;
+	}
+
 	if (args->device_ids_array_size > 0 && devices_arr)
 		kfree(devices_arr);
 
@@ -1407,6 +1413,7 @@ bind_process_to_device_failed:
 	up_write(&p->lock);
 get_mem_obj_from_handle_failed:
 copy_from_user_failed:
+sync_memory_failed:
 	kfree(devices_arr);
 	return err;
 }

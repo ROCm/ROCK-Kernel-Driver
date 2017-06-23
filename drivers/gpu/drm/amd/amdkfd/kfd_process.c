@@ -136,6 +136,13 @@ static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 	if (err)
 		goto err_map_mem;
 
+	err = kdev->kfd2kgd->sync_memory(kdev->kgd, (struct kgd_mem *) mem,
+				true);
+	if (err) {
+		pr_debug("Sync memory failed, wait interrupted by user signal\n");
+		goto sync_memory_failed;
+	}
+
 	/* Create an obj handle so kfd_process_device_remove_obj_handle
 	 * will take care of the bo removal when the process finishes.
 	 * We do not need to take p->lock, because the process is just
@@ -151,6 +158,7 @@ static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 	return err;
 
 free_gpuvm:
+sync_memory_failed:
 	kfd_process_free_gpuvm(mem, pdd);
 	return err;
 
