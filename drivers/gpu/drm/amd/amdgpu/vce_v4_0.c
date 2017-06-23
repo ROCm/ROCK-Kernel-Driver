@@ -38,6 +38,7 @@
 #include "vega10/VCE/vce_4_0_sh_mask.h"
 #include "vega10/MMHUB/mmhub_1_0_offset.h"
 #include "vega10/MMHUB/mmhub_1_0_sh_mask.h"
+#include "vf_error.h"
 
 #define VCE_STATUS_VCPU_REPORT_FW_LOADED_MASK	0x02
 
@@ -188,6 +189,7 @@ static int vce_v4_0_mmsch_start(struct amdgpu_device *adev,
 
 	if (!loop) {
 		dev_err(adev->dev, "failed to init MMSCH, mmVCE_MMSCH_VF_MAILBOX_RESP = %x\n", data);
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_INIT_MMSCH_FAIL, 0, data);
 		return -EBUSY;
 	}
 	WDOORBELL32(adev->vce.ring[0].doorbell_index, 0);
