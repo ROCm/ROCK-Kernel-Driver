@@ -27,6 +27,7 @@
 #include <drm/drmP.h>
 #include "amdgpu.h"
 #include "amdgpu_ucode.h"
+#include "vf_error.h"
 
 static void amdgpu_ucode_print_common_hdr(const struct common_firmware_header *hdr)
 {
@@ -383,12 +384,14 @@ int amdgpu_ucode_init_bo(struct amdgpu_device *adev)
 				NULL, NULL, bo);
 	if (err) {
 		dev_err(adev->dev, "(%d) Firmware buffer allocate failed\n", err);
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_FW_ALLOC_FAIL, 0, err);
 		goto failed;
 	}
 
 	err = amdgpu_bo_reserve(*bo, false);
 	if (err) {
 		dev_err(adev->dev, "(%d) Firmware buffer reserve failed\n", err);
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_FW_RESERVE_FAIL, 0, err);
 		goto failed_reserve;
 	}
 
@@ -396,12 +399,14 @@ int amdgpu_ucode_init_bo(struct amdgpu_device *adev)
 				&fw_mc_addr);
 	if (err) {
 		dev_err(adev->dev, "(%d) Firmware buffer pin failed\n", err);
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_FW_PIN_FAIL, 0, err);
 		goto failed_pin;
 	}
 
 	err = amdgpu_bo_kmap(*bo, &fw_buf_ptr);
 	if (err) {
 		dev_err(adev->dev, "(%d) Firmware buffer kmap failed\n", err);
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_FW_KMAP_FAIL, 0, err);
 		goto failed_kmap;
 	}
 

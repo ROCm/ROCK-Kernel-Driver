@@ -25,6 +25,7 @@
 #include "amdgpu.h"
 #include "amdgpu_ih.h"
 #include "amdgpu_amdkfd.h"
+#include "vf_error.h"
 
 /**
  * amdgpu_ih_ring_alloc - allocate memory for the IH ring
@@ -95,6 +96,7 @@ int amdgpu_ih_ring_init(struct amdgpu_device *adev, unsigned ring_size,
 		r = amdgpu_wb_get(adev, &adev->irq.ih.wptr_offs);
 		if (r) {
 			dev_err(adev->dev, "(%d) ih wptr_offs wb alloc failed\n", r);
+			amdgpu_put_vf_error(AMDGIM_ERROR_VF_IH_WB_ALLOC_FAIL, 0, r);
 			return r;
 		}
 
@@ -102,6 +104,7 @@ int amdgpu_ih_ring_init(struct amdgpu_device *adev, unsigned ring_size,
 		if (r) {
 			amdgpu_wb_free(adev, adev->irq.ih.wptr_offs);
 			dev_err(adev->dev, "(%d) ih rptr_offs wb alloc failed\n", r);
+			amdgpu_put_vf_error(AMDGIM_ERROR_VF_IH_WB_ALLOC_FAIL, 0, r);
 			return r;
 		}
 

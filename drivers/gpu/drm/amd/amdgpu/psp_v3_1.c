@@ -37,6 +37,7 @@
 #include "vega10/GC/gc_9_0_offset.h"
 #include "vega10/SDMA0/sdma0_4_0_offset.h"
 #include "vega10/NBIO/nbio_6_1_offset.h"
+#include "vf_error.h"
 
 MODULE_FIRMWARE("amdgpu/vega10_sos.bin");
 MODULE_FIRMWARE("amdgpu/vega10_asd.bin");
@@ -153,6 +154,7 @@ out:
 		dev_err(adev->dev,
 			"psp v3.1: Failed to load firmware \"%s\"\n",
 			fw_name);
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_PSP_LOAD_FW_FAIL, 0, 0);
 		release_firmware(adev->psp.sos_fw);
 		adev->psp.sos_fw = NULL;
 		release_firmware(adev->psp.asd_fw);
