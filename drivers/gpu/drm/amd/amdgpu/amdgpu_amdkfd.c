@@ -112,6 +112,7 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 {
 	int i;
 	int last_valid_bit;
+
 	if (adev->kfd) {
 		struct kgd2kfd_shared_resources gpu_resources = {
 			.compute_vmid_bitmap = global_compute_vmid_bitmap,
@@ -122,7 +123,8 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 		};
 
 		/* this is going to have a few of the MSBs set that we need to
-		 * clear */
+		 * clear
+		 */
 		bitmap_complement(gpu_resources.queue_bitmap,
 				  adev->gfx.mec.queue_bitmap,
 				  KGD_MAX_QUEUES);
@@ -136,7 +138,8 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 				  gpu_resources.queue_bitmap);
 
 		/* According to linux/bitmap.h we shouldn't use bitmap_clear if
-		 * nbits is not compile time constant */
+		 * nbits is not compile time constant
+		 */
 		last_valid_bit = adev->gfx.mec.num_mec
 				* adev->gfx.mec.num_pipe_per_mec
 				* adev->gfx.mec.num_queue_per_pipe;
@@ -382,11 +385,12 @@ uint64_t get_gpu_clock_counter(struct kgd_dev *kgd)
 uint32_t get_max_engine_clock_in_mhz(struct kgd_dev *kgd)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+
+	/* the sclk is in quantas of 10kHz */
 	if (amdgpu_sriov_vf(adev))
 		return adev->clock.default_sclk / 100;
-	else
-	/* The sclk is in quantas of 10kHz */
-		return amdgpu_dpm_get_sclk(adev, false) / 100;
+
+	return amdgpu_dpm_get_sclk(adev, false) / 100;
 }
 
 void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)

@@ -313,7 +313,8 @@ static int allocate_hqd(struct device_queue_manager *dqm, struct queue *q)
 
 	set = false;
 
-	for (pipe = dqm->next_pipe_to_allocate, i = 0; i < get_pipes_per_mec(dqm);
+	for (pipe = dqm->next_pipe_to_allocate, i = 0;
+			i < get_pipes_per_mec(dqm);
 			pipe = ((pipe + 1) % get_pipes_per_mec(dqm)), ++i) {
 
 		if (!is_pipe_enabled(dqm, 0, pipe))
@@ -912,7 +913,8 @@ static int set_sched_resources(struct device_queue_manager *dqm)
 
 		/* This situation may be hit in the future if a new HW
 		 * generation exposes more than 64 queues. If so, the
-		 * definition of res.queue_mask needs updating */
+		 * definition of res.queue_mask needs updating
+		 */
 		if (WARN_ON(i > (sizeof(res.queue_mask)*8))) {
 			pr_err("Invalid queue enabled by amdgpu: %d\n", i);
 			break;
