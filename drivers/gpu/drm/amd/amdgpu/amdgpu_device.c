@@ -54,6 +54,7 @@
 #include "bif/bif_4_1_d.h"
 #include <linux/pci.h>
 #include <linux/firmware.h>
+#include "vf_error.h"
 
 #include "amdgpu_amdkfd.h"
 
@@ -1034,19 +1035,6 @@ static unsigned int amdgpu_vga_set_decode(void *cookie, bool state)
 		return VGA_RSRC_NORMAL_IO | VGA_RSRC_NORMAL_MEM;
 }
 
-/**
- * amdgpu_check_pot_argument - check that argument is a power of two
- *
- * @arg: value to check
- *
- * Validates that a certain argument is a power of two (all asics).
- * Returns true if argument is valid.
- */
-static bool amdgpu_check_pot_argument(int arg)
-{
-	return (arg & (arg - 1)) == 0;
-}
-
 static void amdgpu_check_block_size(struct amdgpu_device *adev)
 {
 	/* defines number of bits in page table versus page directory,
@@ -1100,7 +1088,7 @@ static void amdgpu_check_vm_size(struct amdgpu_device *adev)
 		amdgpu_vm_size = amdgpu_vm_size_aligned;
 	}
 
-	if (!amdgpu_check_pot_argument(amdgpu_vm_size)) {
+	if (!is_power_of_2(amdgpu_vm_size)) {
 		dev_warn(adev->dev, "VM size (%d) must be a power of 2\n",
 			 amdgpu_vm_size);
 		goto def_value;
@@ -1141,7 +1129,7 @@ static void amdgpu_check_arguments(struct amdgpu_device *adev)
 		dev_warn(adev->dev, "sched jobs (%d) must be at least 4\n",
 			 amdgpu_sched_jobs);
 		amdgpu_sched_jobs = 4;
-	} else if (!amdgpu_check_pot_argument(amdgpu_sched_jobs)){
+	} else if (!is_power_of_2(amdgpu_sched_jobs)){
 		dev_warn(adev->dev, "sched jobs (%d) must be a power of 2\n",
 			 amdgpu_sched_jobs);
 		amdgpu_sched_jobs = roundup_pow_of_two(amdgpu_sched_jobs);
@@ -1161,7 +1149,7 @@ static void amdgpu_check_arguments(struct amdgpu_device *adev)
 	amdgpu_check_block_size(adev);
 
 	if (amdgpu_vram_page_split != -1 && (amdgpu_vram_page_split < 16 ||
-	    !amdgpu_check_pot_argument(amdgpu_vram_page_split))) {
+	    !is_power_of_2(amdgpu_vram_page_split))) {
 		dev_warn(adev->dev, "invalid VRAM page split (%d)\n",
 			 amdgpu_vram_page_split);
 		amdgpu_vram_page_split = 1024;
@@ -2211,6 +2199,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	r = amdgpu_atombios_init(adev);
 	if (r) {
 		dev_err(adev->dev, "amdgpu_atombios_init failed\n");
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_ATOMBIOS_INIT_FAIL, 0, 0);
 		goto failed;
 	}
 
@@ -2221,6 +2210,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	if (amdgpu_vpost_needed(adev)) {
 		if (!adev->bios) {
 			dev_err(adev->dev, "no vBIOS found\n");
+			amdgpu_put_vf_error(AMDGIM_ERROR_VF_NO_VBIOS, 0, 0);
 			r = -EINVAL;
 			goto failed;
 		}
@@ -2228,6 +2218,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		r = amdgpu_atom_asic_init(adev->mode_info.atom_context);
 		if (r) {
 			dev_err(adev->dev, "gpu post error!\n");
+			amdgpu_put_vf_error(AMDGIM_ERROR_VF_GPU_POST_ERROR, 0, 0);
 			goto failed;
 		}
 	} else {
@@ -2239,6 +2230,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		r = amdgpu_atombios_get_clock_info(adev);
 		if (r) {
 			dev_err(adev->dev, "amdgpu_atombios_get_clock_info failed\n");
+			amdgpu_put_vf_error(AMDGIM_ERROR_VF_ATOMBIOS_GET_CLOCK_FAIL, 0, 0);
 			return r;
 		}
 		/* init i2c buses */
@@ -2250,6 +2242,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	r = amdgpu_fence_driver_init(adev);
 	if (r) {
 		dev_err(adev->dev, "amdgpu_fence_driver_init failed\n");
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_FENCE_INIT_FAIL, 0, 0);
 		goto failed;
 	}
 
@@ -2259,6 +2252,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	r = amdgpu_init(adev);
 	if (r) {
 		dev_err(adev->dev, "amdgpu_init failed\n");
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_AMDGPU_INIT_FAIL, 0, 0);
 		amdgpu_fini(adev);
 		goto failed;
 	}
@@ -2322,12 +2316,15 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	r = amdgpu_late_init(adev);
 	if (r) {
 		dev_err(adev->dev, "amdgpu_late_init failed\n");
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_AMDGPU_LATE_INIT_FAIL, 0, r);
 		goto failed;
 	}
 
+	amdgpu_trans_all_vf_error(adev);
 	return 0;
 
 failed:
+	amdgpu_trans_all_vf_error(adev);
 	if (runtime)
 		vga_switcheroo_fini_domain_pm_ops(adev->dev);
 	return r;
@@ -3042,6 +3039,7 @@ out:
 		}
 	} else {
 		dev_err(adev->dev, "asic resume failed (%d).\n", r);
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_ASIC_RESUME_FAIL, 0, r);
 		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 			if (adev->rings[i] && adev->rings[i]->sched.thread) {
 				kthread_unpark(adev->rings[i]->sched.thread);
@@ -3056,9 +3054,11 @@ out:
 		drm_helper_resume_force_mode(adev->ddev);
 
 	ttm_bo_unlock_delayed_workqueue(&adev->mman.bdev, resched);
-	if (r)
+	if (r) {
 		/* bad news, how to tell it to userspace ? */
 		dev_info(adev->dev, "GPU reset failed\n");
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_GPU_RESET_FAIL, 0, r);
+	}
 	else
 		dev_info(adev->dev, "GPU reset successed!\n");
 
@@ -3894,7 +3894,7 @@ int amdgpu_debugfs_init(struct drm_minor *minor)
 	return 0;
 }
 #else
-static int amdgpu_debugfs_test_ib_init(struct amdgpu_device *adev)
+static int amdgpu_debugfs_test_ib_ring_init(struct amdgpu_device *adev)
 {
 	return 0;
 }

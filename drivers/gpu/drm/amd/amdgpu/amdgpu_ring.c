@@ -33,6 +33,7 @@
 #include <drm/amdgpu_drm.h>
 #include "amdgpu.h"
 #include "atom.h"
+#include "vf_error.h"
 
 /*
  * Rings
@@ -188,12 +189,14 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 		r = amdgpu_wb_get_64bit(adev, &ring->rptr_offs);
 		if (r) {
 			dev_err(adev->dev, "(%d) ring rptr_offs wb alloc failed\n", r);
+			amdgpu_put_vf_error(AMDGIM_ERROR_VF_RING_R_WB_ALLOC_FAIL, 0, r);
 			return r;
 		}
 
 		r = amdgpu_wb_get_64bit(adev, &ring->wptr_offs);
 		if (r) {
 			dev_err(adev->dev, "(%d) ring wptr_offs wb alloc failed\n", r);
+			amdgpu_put_vf_error(AMDGIM_ERROR_VF_RING_W_WB_ALLOC_FAIL, 0, r);
 			return r;
 		}
 
@@ -201,12 +204,14 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 		r = amdgpu_wb_get(adev, &ring->rptr_offs);
 		if (r) {
 			dev_err(adev->dev, "(%d) ring rptr_offs wb alloc failed\n", r);
+			amdgpu_put_vf_error(AMDGIM_ERROR_VF_RING_R_WB_ALLOC_FAIL, 0, r);
 			return r;
 		}
 
 		r = amdgpu_wb_get(adev, &ring->wptr_offs);
 		if (r) {
 			dev_err(adev->dev, "(%d) ring wptr_offs wb alloc failed\n", r);
+			amdgpu_put_vf_error(AMDGIM_ERROR_VF_RING_W_WB_ALLOC_FAIL, 0, r);
 			return r;
 		}
 
@@ -215,12 +220,14 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 	r = amdgpu_wb_get(adev, &ring->fence_offs);
 	if (r) {
 		dev_err(adev->dev, "(%d) ring fence_offs wb alloc failed\n", r);
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_RING_F_WB_ALLOC_FAIL, 0, r);
 		return r;
 	}
 
 	r = amdgpu_wb_get(adev, &ring->cond_exe_offs);
 	if (r) {
 		dev_err(adev->dev, "(%d) ring cond_exec_polling wb alloc failed\n", r);
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_RING_C_WB_ALLOC_FAIL, 0, r);
 		return r;
 	}
 	ring->cond_exe_gpu_addr = adev->wb.gpu_addr + (ring->cond_exe_offs * 4);
@@ -231,6 +238,7 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 	r = amdgpu_fence_driver_start_ring(ring, irq_src, irq_type);
 	if (r) {
 		dev_err(adev->dev, "failed initializing fences (%d).\n", r);
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_INIT_FENCE_FAIL, 0, r);
 		return r;
 	}
 
@@ -249,6 +257,7 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 					    (void **)&ring->ring);
 		if (r) {
 			dev_err(adev->dev, "(%d) ring create failed\n", r);
+			amdgpu_put_vf_error(AMDGIM_ERROR_VF_RING_CREATE_FAIL, 0, r);
 			return r;
 		}
 		amdgpu_ring_clear_ring(ring);

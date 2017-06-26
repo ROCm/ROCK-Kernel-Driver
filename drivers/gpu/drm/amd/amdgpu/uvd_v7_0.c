@@ -39,6 +39,7 @@
 #include "vega10/HDP/hdp_4_0_offset.h"
 #include "vega10/MMHUB/mmhub_1_0_offset.h"
 #include "vega10/MMHUB/mmhub_1_0_sh_mask.h"
+#include "vf_error.h"
 
 static void uvd_v7_0_set_ring_funcs(struct amdgpu_device *adev);
 static void uvd_v7_0_set_enc_ring_funcs(struct amdgpu_device *adev);
@@ -700,6 +701,7 @@ static int uvd_v7_0_mmsch_start(struct amdgpu_device *adev,
 
 	if (!loop) {
 		dev_err(adev->dev, "failed to init MMSCH, mmVCE_MMSCH_VF_MAILBOX_RESP = %x\n", data);
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_MMSCH_INIT_FAIL, 0, data);
 		return -EBUSY;
 	}
 	WDOORBELL32(adev->uvd.ring_enc[0].doorbell_index, 0);
@@ -1001,6 +1003,7 @@ static int uvd_v7_0_start(struct amdgpu_device *adev)
 			break;
 
 		DRM_ERROR("UVD not responding, trying to reset the VCPU!!!\n");
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_UVD_NORESP_RESET, 0, 0);
 		WREG32_P(SOC15_REG_OFFSET(UVD, 0, mmUVD_SOFT_RESET),
 				UVD_SOFT_RESET__VCPU_SOFT_RESET_MASK,
 				~UVD_SOFT_RESET__VCPU_SOFT_RESET_MASK);
@@ -1013,6 +1016,7 @@ static int uvd_v7_0_start(struct amdgpu_device *adev)
 
 	if (r) {
 		DRM_ERROR("UVD not responding, giving up!!!\n");
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_UVD_NORESP_GIVEUP, 0, 0);
 		return r;
 	}
 	/* enable master interrupt */

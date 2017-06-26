@@ -237,6 +237,10 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 	}
 
 	if (!amdgpu_device_has_dc_support(adev)) {
+		/* Disable vblank irqs aggressively for power-saving */
+		/* XXX: can we enable this with DC? */
+		adev->ddev->vblank_disable_immediate = true;
+
 		r = drm_vblank_init(adev->ddev, adev->mode_info.num_crtc);
 		if (r)
 			return r;

@@ -36,6 +36,7 @@
 #include <drm/drm_cache.h>
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
+#include "vf_error.h"
 #include "amdgpu_amdkfd.h"
 
 
@@ -247,18 +248,21 @@ int amdgpu_bo_create_kernel(struct amdgpu_device *adev,
 			     NULL, NULL, bo_ptr);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to allocate kernel bo\n", r);
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_BO_ALLOC_K_FAIL, 0, r);
 		return r;
 	}
 
 	r = amdgpu_bo_reserve(*bo_ptr, false);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to reserve kernel bo\n", r);
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_BO_RESERVE_FAIL, 0, r);
 		goto error_free;
 	}
 
 	r = amdgpu_bo_pin(*bo_ptr, domain, gpu_addr);
 	if (r) {
 		dev_err(adev->dev, "(%d) kernel bo pin failed\n", r);
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_BO_PIN_FAIL, 0, r);
 		goto error_unreserve;
 	}
 
@@ -266,6 +270,7 @@ int amdgpu_bo_create_kernel(struct amdgpu_device *adev,
 		r = amdgpu_bo_kmap(*bo_ptr, cpu_addr);
 		if (r) {
 			dev_err(adev->dev, "(%d) kernel bo map failed\n", r);
+			amdgpu_put_vf_error(AMDGIM_ERROR_VF_BO_MAP_FAIL, 0, r);
 			goto error_unreserve;
 		}
 	}

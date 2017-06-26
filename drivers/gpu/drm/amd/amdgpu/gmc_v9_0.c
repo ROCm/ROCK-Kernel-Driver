@@ -36,6 +36,7 @@
 #include "nbio_v7_0.h"
 #include "gfxhub_v1_0.h"
 #include "mmhub_v1_0.h"
+#include "vf_error.h"
 
 #define mmDF_CS_AON0_DramBaseAddress0                                                                  0x0044
 #define mmDF_CS_AON0_DramBaseAddress0_BASE_IDX                                                         0
@@ -556,10 +557,20 @@ static int gmc_v9_0_sw_init(void *handle)
 
 	spin_lock_init(&adev->mc.invalidate_lock);
 
-	if (adev->flags & AMD_IS_APU) {
+	switch (adev->asic_type) {
+	case CHIP_RAVEN:
 		adev->mc.vram_type = AMDGPU_VRAM_TYPE_UNKNOWN;
-		amdgpu_vm_adjust_size(adev, 64);
-	} else {
+		if (adev->rev_id == 0x0 || adev->rev_id == 0x1) {
+			adev->vm_manager.vm_size = 1U << 18;
+			adev->vm_manager.block_size = 9;
+			adev->vm_manager.num_level = 3;
+		} else {
+			/* vm_size is 64GB for legacy 2-level page support*/
+			amdgpu_vm_adjust_size(adev, 64);
+			adev->vm_manager.num_level = 1;
+		}
+		break;
+	case CHIP_VEGA10:
 		/* XXX Don't know how to get VRAM type yet. */
 		adev->mc.vram_type = AMDGPU_VRAM_TYPE_HBM;
 		/*
@@ -569,10 +580,15 @@ static int gmc_v9_0_sw_init(void *handle)
 		 */
 		adev->vm_manager.vm_size = 1U << 18;
 		adev->vm_manager.block_size = 9;
-		DRM_INFO("vm size is %llu GB, block size is %u-bit\n",
-				adev->vm_manager.vm_size,
-				adev->vm_manager.block_size);
+		adev->vm_manager.num_level = 3;
+		break;
+	default:
+		break;
 	}
+
+	DRM_INFO("vm size is %llu GB, block size is %u-bit\n",
+			adev->vm_manager.vm_size,
+			adev->vm_manager.block_size);
 
 	/* This interrupt is VMC page fault.*/
 	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_VMC, 0,
@@ -638,11 +654,6 @@ static int gmc_v9_0_sw_init(void *handle)
 	adev->vm_manager.id_mgr[AMDGPU_GFXHUB].num_ids = AMDGPU_NUM_OF_VMIDS;
 	adev->vm_manager.id_mgr[AMDGPU_MMHUB].num_ids = AMDGPU_NUM_OF_VMIDS;
 
-	/* TODO: fix num_level for APU when updating vm size and block size */
-	if (adev->flags & AMD_IS_APU)
-		adev->vm_manager.num_level = 1;
-	else
-		adev->vm_manager.num_level = 3;
 	amdgpu_vm_manager_init(adev);
 
 	return 0;
@@ -702,6 +713,7 @@ static int gmc_v9_0_gart_enable(struct amdgpu_device *adev)
 
 	if (adev->gart.robj == NULL) {
 		dev_err(adev->dev, "No VRAM object for PCIE GART.\n");
+		amdgpu_put_vf_error(AMDGIM_ERROR_VF_NO_VRAM_FOR_GART, 0, 0);
 		return -EINVAL;
 	}
 	r = amdgpu_gart_table_vram_pin(adev);
