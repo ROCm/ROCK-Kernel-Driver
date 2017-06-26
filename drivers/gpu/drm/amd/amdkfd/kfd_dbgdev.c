@@ -662,7 +662,8 @@ static int dbgdev_wave_control_diq(struct kfd_dbgdev *dbgdev,
 	pr_debug("\t\t mode      is: %u\n", wac_info->mode);
 	pr_debug("\t\t operand   is: %u\n", wac_info->operand);
 	pr_debug("\t\t trap id   is: %u\n", wac_info->trapId);
-	pr_debug("\t\t msg value is: %u\n", wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.Value);
+	pr_debug("\t\t msg value is: %u\n",
+			wac_info->dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.Value);
 	pr_debug("\t\t vmid      is: N/A\n");
 
 	pr_debug("\t\t chk_vmid  is : %u\n", reg_sq_cmd.bitfields.check_vmid);
@@ -769,7 +770,8 @@ static int dbgdev_wave_control_nodiq(struct kfd_dbgdev *dbgdev,
 			vmid = pdd->qpd.vmid;
 			reg_sq_cmd.bits.vm_id = vmid;
 
-			pr_debug("\t\t %30s\n", "* * * * * * * * * * * * * * * * * *");
+			pr_debug("\t\t %30s\n",
+					"* * * * * * * * * * * * * * * * * *");
 
 			pr_debug("\t\t mode      is: %u\n", wac_info->mode);
 			pr_debug("\t\t operand   is: %u\n", wac_info->operand);
@@ -806,7 +808,8 @@ static int dbgdev_wave_control_nodiq(struct kfd_dbgdev *dbgdev,
 			pr_debug("\t\t sbw       is : %u\n",
 					reg_gfx_index.bitfields.sh_broadcast_writes);
 
-			pr_debug("\t\t %30s\n", "* * * * * * * * * * * * * * * * * *");
+			pr_debug("\t\t %30s\n",
+					"* * * * * * * * * * * * * * * * * *");
 
 			dbgdev->dev->kfd2kgd
 				->wave_control_execute(dbgdev->dev->kgd,
