@@ -36,7 +36,6 @@
 #include "nbio_v7_0.h"
 #include "gfxhub_v1_0.h"
 #include "mmhub_v1_0.h"
-#include "vf_error.h"
 
 #define mmDF_CS_AON0_DramBaseAddress0                                                                  0x0044
 #define mmDF_CS_AON0_DramBaseAddress0_BASE_IDX                                                         0
@@ -694,7 +693,6 @@ static int gmc_v9_0_gart_enable(struct amdgpu_device *adev)
 
 	if (adev->gart.robj == NULL) {
 		dev_err(adev->dev, "No VRAM object for PCIE GART.\n");
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_NO_VRAM_FOR_GART, 0, 0);
 		return -EINVAL;
 	}
 	r = amdgpu_gart_table_vram_pin(adev);

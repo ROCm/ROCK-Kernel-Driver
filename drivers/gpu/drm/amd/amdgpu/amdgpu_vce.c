@@ -34,7 +34,6 @@
 #include "amdgpu_pm.h"
 #include "amdgpu_vce.h"
 #include "cikd.h"
-#include "vf_error.h"
 
 /* 1 second timeout */
 #define VCE_IDLE_TIMEOUT	msecs_to_jiffies(1000)
@@ -143,7 +142,6 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
 	if (r) {
 		dev_err(adev->dev, "amdgpu_vce: Can't load firmware \"%s\"\n",
 			fw_name);
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_VCE_NOT_LOAD_FW, 0, 0);
 		return r;
 	}
 
@@ -151,7 +149,6 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
 	if (r) {
 		dev_err(adev->dev, "amdgpu_vce: Can't validate firmware \"%s\"\n",
 			fw_name);
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_VCE_NOT_VALIDATE_FW, 0, 0);
 		release_firmware(adev->vce.fw);
 		adev->vce.fw = NULL;
 		return r;
@@ -173,7 +170,6 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
 				    &adev->vce.gpu_addr, &adev->vce.cpu_addr);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to allocate VCE bo\n", r);
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_ALLOC_VCE_BO_FAIL, 0, 0);
 		return r;
 	}
 
@@ -269,7 +265,6 @@ int amdgpu_vce_resume(struct amdgpu_device *adev)
 	r = amdgpu_bo_reserve(adev->vce.vcpu_bo, false);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to reserve VCE bo\n", r);
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_VCE_RESERVE_FAIL, 0, r);
 		return r;
 	}
 
@@ -277,7 +272,6 @@ int amdgpu_vce_resume(struct amdgpu_device *adev)
 	if (r) {
 		amdgpu_bo_unreserve(adev->vce.vcpu_bo);
 		dev_err(adev->dev, "(%d) VCE map failed\n", r);
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_VCE_KMAP_FAIL, 0, r);
 		return r;
 	}
 

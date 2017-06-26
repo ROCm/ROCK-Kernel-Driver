@@ -31,7 +31,6 @@
 
 #include <linux/slab.h>
 #include <linux/acpi.h>
-#include "vf_error.h"
 /*
  * BIOS.
  */
@@ -453,7 +452,6 @@ bool amdgpu_get_bios(struct amdgpu_device *adev)
 		goto success;
 
 	DRM_ERROR("Unable to locate a BIOS ROM\n");
-	amdgpu_put_vf_error(AMDGIM_ERROR_VF_UNLOCATE_BIOS_ROM, 0, 0);
 	return false;
 
 success:

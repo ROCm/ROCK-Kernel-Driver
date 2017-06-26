@@ -34,7 +34,6 @@
 #include "amdgpu_acp.h"
 
 #include "acp_gfx_if.h"
-#include "vf_error.h"
 
 #define ACP_TILE_ON_MASK                0x03
 #define ACP_TILE_OFF_MASK               0x02
@@ -396,7 +395,6 @@ static int acp_hw_init(void *handle)
 			r = pm_genpd_add_device(&adev->acp.acp_genpd->gpd, dev);
 			if (r) {
 				dev_err(dev, "Failed to add dev to genpd\n");
-				amdgpu_put_vf_error(MDGIM_ERROR_VF_ADD_DEV_TO_GENPD_FAIL, 0, 0);
 				return r;
 			}
 		}
