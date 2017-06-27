@@ -1510,7 +1510,7 @@ static void dm_drm_plane_reset(struct drm_plane *plane)
 	if (amdgpu_state) {
 		plane->state = &amdgpu_state->base;
 		plane->state->plane = plane;
-		plane->state->rotation = DRM_ROTATE_0;
+		plane->state->rotation = DRM_MODE_ROTATE_0;
 
 		amdgpu_state->dc_surface = dc_create_surface(adev->dm.dc);
 		WARN_ON(!amdgpu_state->dc_surface);
