@@ -1,4 +1,5 @@
-/* Copyright 2012-15 Advanced Micro Devices, Inc.
+/*
+ * Copyright 2012-15 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -21,565 +22,1061 @@
  * Authors: AMD
  *
  */
+#include "dm_services.h"
+#include "dce_calcs.h"
+#include "dcn10_mem_input.h"
+#include "reg_helper.h"
+#include "basics/conversion.h"
 
-#ifndef __DC_MEM_INPUT_DCN10_H__
-#define __DC_MEM_INPUT_DCN10_H__
+#define REG(reg)\
+	mi->mi_regs->reg
 
-#include "mem_input.h"
+#define CTX \
+	mi->base.ctx
 
-#define TO_DCN10_MEM_INPUT(mi)\
-	container_of(mi, struct dcn10_mem_input, base)
+#undef FN
+#define FN(reg_name, field_name) \
+	mi->mi_shift->field_name, mi->mi_mask->field_name
+
+static void min10_set_blank(struct mem_input *mem_input, bool blank)
+{
+	struct dcn10_mem_input *mi = TO_DCN10_MEM_INPUT(mem_input);
+	uint32_t blank_en = blank ? 1 : 0;
+
+	REG_UPDATE_2(DCHUBP_CNTL,
+			HUBP_BLANK_EN, blank_en,
+			HUBP_TTU_DISABLE, blank_en);
+}
+
+static void min10_vready_workaround(struct mem_input *mem_input,
+		struct _vcs_dpi_display_pipe_dest_params_st *pipe_dest)
+{
+	uint32_t value = 0;
+	struct dcn10_mem_input *mi = TO_DCN10_MEM_INPUT(mem_input);
+
+	/* set HBUBREQ_DEBUG_DB[12] = 1 */
+	value = REG_READ(HUBPREQ_DEBUG_DB);
+
+	/* hack mode disable */
+	value |= 0x100;
+	value &= ~0x1000;
+
+	if ((pipe_dest->vstartup_start - 2*(pipe_dest->vready_offset+pipe_dest->vupdate_width
+		+ pipe_dest->vupdate_offset) / pipe_dest->htotal) <= pipe_dest->vblank_end) {
+		/* if (eco_fix_needed(otg_global_sync_timing)
+		 * set HBUBREQ_DEBUG_DB[12] = 1 */
+		value |= 0x1000;
+	}
+
+	REG_WRITE(HUBPREQ_DEBUG_DB, value);
+}
+
+static void min10_program_tiling(
+	struct dcn10_mem_input *mi,
+	const union dc_tiling_info *info,
+	const enum surface_pixel_format pixel_format)
+{
+	REG_UPDATE_6(DCSURF_ADDR_CONFIG,
+			NUM_PIPES, log_2(info->gfx9.num_pipes),
+			NUM_BANKS, log_2(info->gfx9.num_banks),
+			PIPE_INTERLEAVE, info->gfx9.pipe_interleave,
+			NUM_SE, log_2(info->gfx9.num_shader_engines),
+			NUM_RB_PER_SE, log_2(info->gfx9.num_rb_per_se),
+			MAX_COMPRESSED_FRAGS, log_2(info->gfx9.max_compressed_frags));
+
+	REG_UPDATE_4(DCSURF_TILING_CONFIG,
+			SW_MODE, info->gfx9.swizzle,
+			META_LINEAR, info->gfx9.meta_linear,
+			RB_ALIGNED, info->gfx9.rb_aligned,
+			PIPE_ALIGNED, info->gfx9.pipe_aligned);
+}
+
+static void min10_program_size_and_rotation(
+	struct dcn10_mem_input *mi,
+	enum dc_rotation_angle rotation,
+	enum surface_pixel_format format,
+	const union plane_size *plane_size,
+	struct dc_plane_dcc_param *dcc,
+	bool horizontal_mirror)
+{
+	uint32_t pitch, meta_pitch, pitch_c, meta_pitch_c, mirror;
+
+	/* Program data and meta surface pitch (calculation from addrlib)
+	 * 444 or 420 luma
+	 */
+	if (format >= SURFACE_PIXEL_FORMAT_VIDEO_BEGIN) {
+		pitch = plane_size->video.luma_pitch - 1;
+		meta_pitch = dcc->video.meta_pitch_l - 1;
+		pitch_c = plane_size->video.chroma_pitch - 1;
+		meta_pitch_c = dcc->video.meta_pitch_c - 1;
+	} else {
+		pitch = plane_size->grph.surface_pitch - 1;
+		meta_pitch = dcc->grph.meta_pitch - 1;
+		pitch_c = 0;
+		meta_pitch_c = 0;
+	}
+
+	if (!dcc->enable) {
+		meta_pitch = 0;
+		meta_pitch_c = 0;
+	}
+
+	REG_UPDATE_2(DCSURF_SURFACE_PITCH,
+			PITCH, pitch, META_PITCH, meta_pitch);
+
+	if (format >= SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)
+		REG_UPDATE_2(DCSURF_SURFACE_PITCH_C,
+			PITCH_C, pitch_c, META_PITCH_C, meta_pitch_c);
+
+	if (horizontal_mirror)
+		mirror = 1;
+	else
+		mirror = 0;
 
 
-#define MI_DCN10_REG_LIST(id)\
-	SRI(DCHUBP_CNTL, HUBP, id),\
-	SRI(HUBPREQ_DEBUG_DB, HUBP, id),\
-	SRI(DCSURF_ADDR_CONFIG, HUBP, id),\
-	SRI(DCSURF_TILING_CONFIG, HUBP, id),\
-	SRI(DCSURF_SURFACE_PITCH, HUBPREQ, id),\
-	SRI(DCSURF_SURFACE_PITCH_C, HUBPREQ, id),\
-	SRI(DCSURF_SURFACE_CONFIG, HUBP, id),\
-	SRI(DCSURF_FLIP_CONTROL, HUBPREQ, id),\
-	SRI(DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH, HUBPREQ, id),\
-	SRI(DCSURF_PRIMARY_SURFACE_ADDRESS, HUBPREQ, id),\
-	SRI(DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH, HUBPREQ, id),\
-	SRI(DCSURF_SECONDARY_SURFACE_ADDRESS, HUBPREQ, id),\
-	SRI(DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH, HUBPREQ, id),\
-	SRI(DCSURF_PRIMARY_META_SURFACE_ADDRESS, HUBPREQ, id),\
-	SRI(DCSURF_SECONDARY_META_SURFACE_ADDRESS_HIGH, HUBPREQ, id),\
-	SRI(DCSURF_SECONDARY_META_SURFACE_ADDRESS, HUBPREQ, id),\
-	SRI(DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH_C, HUBPREQ, id),\
-	SRI(DCSURF_PRIMARY_SURFACE_ADDRESS_C, HUBPREQ, id),\
-	SRI(DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH_C, HUBPREQ, id),\
-	SRI(DCSURF_PRIMARY_META_SURFACE_ADDRESS_C, HUBPREQ, id),\
-	SRI(DCSURF_SURFACE_INUSE, HUBPREQ, id),\
-	SRI(DCSURF_SURFACE_INUSE_HIGH, HUBPREQ, id),\
-	SRI(DCSURF_SURFACE_INUSE_C, HUBPREQ, id),\
-	SRI(DCSURF_SURFACE_INUSE_HIGH_C, HUBPREQ, id),\
-	SRI(DCSURF_SURFACE_EARLIEST_INUSE, HUBPREQ, id),\
-	SRI(DCSURF_SURFACE_EARLIEST_INUSE_HIGH, HUBPREQ, id),\
-	SRI(DCSURF_SURFACE_EARLIEST_INUSE_C, HUBPREQ, id),\
-	SRI(DCSURF_SURFACE_EARLIEST_INUSE_HIGH_C, HUBPREQ, id),\
-	SRI(DCSURF_SURFACE_CONTROL, HUBPREQ, id),\
-	SRI(HUBPRET_CONTROL, HUBPRET, id),\
-	SRI(DCN_EXPANSION_MODE, HUBPREQ, id),\
-	SRI(DCHUBP_REQ_SIZE_CONFIG, HUBP, id),\
-	SRI(DCHUBP_REQ_SIZE_CONFIG_C, HUBP, id),\
-	SRI(BLANK_OFFSET_0, HUBPREQ, id),\
-	SRI(BLANK_OFFSET_1, HUBPREQ, id),\
-	SRI(DST_DIMENSIONS, HUBPREQ, id),\
-	SRI(DST_AFTER_SCALER, HUBPREQ, id),\
-	SRI(PREFETCH_SETTINS, HUBPREQ, id),\
-	SRI(VBLANK_PARAMETERS_0, HUBPREQ, id),\
-	SRI(REF_FREQ_TO_PIX_FREQ, HUBPREQ, id),\
-	SRI(VBLANK_PARAMETERS_1, HUBPREQ, id),\
-	SRI(VBLANK_PARAMETERS_3, HUBPREQ, id),\
-	SRI(NOM_PARAMETERS_0, HUBPREQ, id),\
-	SRI(NOM_PARAMETERS_1, HUBPREQ, id),\
-	SRI(NOM_PARAMETERS_4, HUBPREQ, id),\
-	SRI(NOM_PARAMETERS_5, HUBPREQ, id),\
-	SRI(PER_LINE_DELIVERY_PRE, HUBPREQ, id),\
-	SRI(PER_LINE_DELIVERY, HUBPREQ, id),\
-	SRI(PREFETCH_SETTINS_C, HUBPREQ, id),\
-	SRI(VBLANK_PARAMETERS_2, HUBPREQ, id),\
-	SRI(VBLANK_PARAMETERS_4, HUBPREQ, id),\
-	SRI(NOM_PARAMETERS_2, HUBPREQ, id),\
-	SRI(NOM_PARAMETERS_3, HUBPREQ, id),\
-	SRI(NOM_PARAMETERS_6, HUBPREQ, id),\
-	SRI(NOM_PARAMETERS_7, HUBPREQ, id),\
-	SRI(DCN_TTU_QOS_WM, HUBPREQ, id),\
-	SRI(DCN_GLOBAL_TTU_CNTL, HUBPREQ, id),\
-	SRI(DCN_SURF0_TTU_CNTL0, HUBPREQ, id),\
-	SRI(DCN_SURF0_TTU_CNTL1, HUBPREQ, id),\
-	SRI(DCN_SURF1_TTU_CNTL0, HUBPREQ, id),\
-	SRI(DCN_SURF1_TTU_CNTL1, HUBPREQ, id),\
-	SRI(DCN_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_MSB, HUBPREQ, id),\
-	SRI(DCN_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_LSB, HUBPREQ, id),\
-	SRI(DCN_VM_CONTEXT0_PAGE_TABLE_START_ADDR_MSB, HUBPREQ, id),\
-	SRI(DCN_VM_CONTEXT0_PAGE_TABLE_START_ADDR_LSB, HUBPREQ, id),\
-	SRI(DCN_VM_CONTEXT0_PAGE_TABLE_END_ADDR_MSB, HUBPREQ, id),\
-	SRI(DCN_VM_CONTEXT0_PAGE_TABLE_END_ADDR_LSB, HUBPREQ, id),\
-	SRI(DCN_VM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR_MSB, HUBPREQ, id),\
-	SRI(DCN_VM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR_LSB, HUBPREQ, id),\
-	SRI(DCN_VM_MX_L1_TLB_CNTL, HUBPREQ, id),\
-	SRI(DCN_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB, HUBPREQ, id),\
-	SRI(DCN_VM_SYSTEM_APERTURE_DEFAULT_ADDR_LSB, HUBPREQ, id),\
-	SRI(DCN_VM_SYSTEM_APERTURE_LOW_ADDR_MSB, HUBPREQ, id),\
-	SRI(DCN_VM_SYSTEM_APERTURE_LOW_ADDR_LSB, HUBPREQ, id),\
-	SRI(DCN_VM_SYSTEM_APERTURE_HIGH_ADDR_MSB, HUBPREQ, id),\
-	SRI(DCN_VM_SYSTEM_APERTURE_HIGH_ADDR_LSB, HUBPREQ, id),\
-	SR(DCHUBBUB_SDPIF_FB_TOP),\
-	SR(DCHUBBUB_SDPIF_FB_BASE),\
-	SR(DCHUBBUB_SDPIF_FB_OFFSET),\
-	SR(DCHUBBUB_SDPIF_AGP_BASE),\
-	SR(DCHUBBUB_SDPIF_AGP_BOT),\
-	SR(DCHUBBUB_SDPIF_AGP_TOP),\
-	SR(DCHUBBUB_ARB_DATA_URGENCY_WATERMARK_A),\
-	SR(DCHUBBUB_ARB_PTE_META_URGENCY_WATERMARK_A),\
-	SR(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_A),\
-	SR(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_A),\
-	SR(DCHUBBUB_ARB_ALLOW_DRAM_CLK_CHANGE_WATERMARK_A),\
-	SR(DCHUBBUB_ARB_DATA_URGENCY_WATERMARK_B),\
-	SR(DCHUBBUB_ARB_PTE_META_URGENCY_WATERMARK_B),\
-	SR(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_B),\
-	SR(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_B),\
-	SR(DCHUBBUB_ARB_ALLOW_DRAM_CLK_CHANGE_WATERMARK_B),\
-	SR(DCHUBBUB_ARB_DATA_URGENCY_WATERMARK_C),\
-	SR(DCHUBBUB_ARB_PTE_META_URGENCY_WATERMARK_C),\
-	SR(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_C),\
-	SR(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_C),\
-	SR(DCHUBBUB_ARB_ALLOW_DRAM_CLK_CHANGE_WATERMARK_C),\
-	SR(DCHUBBUB_ARB_DATA_URGENCY_WATERMARK_D),\
-	SR(DCHUBBUB_ARB_PTE_META_URGENCY_WATERMARK_D),\
-	SR(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_D),\
-	SR(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_D),\
-	SR(DCHUBBUB_ARB_ALLOW_DRAM_CLK_CHANGE_WATERMARK_D),\
-	SR(DCHUBBUB_ARB_WATERMARK_CHANGE_CNTL),\
-	SR(DCHUBBUB_ARB_DRAM_STATE_CNTL),\
-	SR(DCHUBBUB_ARB_SAT_LEVEL),\
-	SR(DCHUBBUB_ARB_DF_REQ_OUTSTAND),\
-	/* todo:  get these from GVM instead of reading registers ourselves */\
-	MMHUB_SR(VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_HI32),\
-	MMHUB_SR(VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_LO32),\
-	MMHUB_SR(VM_CONTEXT0_PAGE_TABLE_START_ADDR_HI32),\
-	MMHUB_SR(VM_CONTEXT0_PAGE_TABLE_START_ADDR_LO32),\
-	MMHUB_SR(VM_CONTEXT0_PAGE_TABLE_END_ADDR_HI32),\
-	MMHUB_SR(VM_CONTEXT0_PAGE_TABLE_END_ADDR_LO32),\
-	MMHUB_SR(VM_L2_PROTECTION_FAULT_DEFAULT_ADDR_HI32),\
-	MMHUB_SR(VM_L2_PROTECTION_FAULT_DEFAULT_ADDR_LO32),\
-	MMHUB_SR(MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB),\
-	MMHUB_SR(MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_LSB),\
-	MMHUB_SR(MC_VM_SYSTEM_APERTURE_LOW_ADDR),\
-	MMHUB_SR(MC_VM_SYSTEM_APERTURE_HIGH_ADDR)
+	/* Program rotation angle and horz mirror - no mirror */
+	if (rotation == ROTATION_ANGLE_0)
+		REG_UPDATE_2(DCSURF_SURFACE_CONFIG,
+				ROTATION_ANGLE, 0,
+				H_MIRROR_EN, mirror);
+	else if (rotation == ROTATION_ANGLE_90)
+		REG_UPDATE_2(DCSURF_SURFACE_CONFIG,
+				ROTATION_ANGLE, 1,
+				H_MIRROR_EN, mirror);
+	else if (rotation == ROTATION_ANGLE_180)
+		REG_UPDATE_2(DCSURF_SURFACE_CONFIG,
+				ROTATION_ANGLE, 2,
+				H_MIRROR_EN, mirror);
+	else if (rotation == ROTATION_ANGLE_270)
+		REG_UPDATE_2(DCSURF_SURFACE_CONFIG,
+				ROTATION_ANGLE, 3,
+				H_MIRROR_EN, mirror);
+}
 
-struct dcn_mi_registers {
-	uint32_t DCHUBP_CNTL;
-	uint32_t HUBPREQ_DEBUG_DB;
-	uint32_t DCSURF_ADDR_CONFIG;
-	uint32_t DCSURF_TILING_CONFIG;
-	uint32_t DCSURF_SURFACE_PITCH;
-	uint32_t DCSURF_SURFACE_PITCH_C;
-	uint32_t DCSURF_SURFACE_CONFIG;
-	uint32_t DCSURF_FLIP_CONTROL;
-	uint32_t DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH;
-	uint32_t DCSURF_PRIMARY_SURFACE_ADDRESS;
-	uint32_t DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH;
-	uint32_t DCSURF_SECONDARY_SURFACE_ADDRESS;
-	uint32_t DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH;
-	uint32_t DCSURF_PRIMARY_META_SURFACE_ADDRESS;
-	uint32_t DCSURF_SECONDARY_META_SURFACE_ADDRESS_HIGH;
-	uint32_t DCSURF_SECONDARY_META_SURFACE_ADDRESS;
-	uint32_t DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH_C;
-	uint32_t DCSURF_PRIMARY_SURFACE_ADDRESS_C;
-	uint32_t DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH_C;
-	uint32_t DCSURF_PRIMARY_META_SURFACE_ADDRESS_C;
-	uint32_t DCSURF_SURFACE_INUSE;
-	uint32_t DCSURF_SURFACE_INUSE_HIGH;
-	uint32_t DCSURF_SURFACE_INUSE_C;
-	uint32_t DCSURF_SURFACE_INUSE_HIGH_C;
-	uint32_t DCSURF_SURFACE_EARLIEST_INUSE;
-	uint32_t DCSURF_SURFACE_EARLIEST_INUSE_HIGH;
-	uint32_t DCSURF_SURFACE_EARLIEST_INUSE_C;
-	uint32_t DCSURF_SURFACE_EARLIEST_INUSE_HIGH_C;
-	uint32_t DCSURF_SURFACE_CONTROL;
-	uint32_t HUBPRET_CONTROL;
-	uint32_t DCN_EXPANSION_MODE;
-	uint32_t DCHUBP_REQ_SIZE_CONFIG;
-	uint32_t DCHUBP_REQ_SIZE_CONFIG_C;
-	uint32_t BLANK_OFFSET_0;
-	uint32_t BLANK_OFFSET_1;
-	uint32_t DST_DIMENSIONS;
-	uint32_t DST_AFTER_SCALER;
-	uint32_t PREFETCH_SETTINS;
-	uint32_t VBLANK_PARAMETERS_0;
-	uint32_t REF_FREQ_TO_PIX_FREQ;
-	uint32_t VBLANK_PARAMETERS_1;
-	uint32_t VBLANK_PARAMETERS_3;
-	uint32_t NOM_PARAMETERS_0;
-	uint32_t NOM_PARAMETERS_1;
-	uint32_t NOM_PARAMETERS_4;
-	uint32_t NOM_PARAMETERS_5;
-	uint32_t PER_LINE_DELIVERY_PRE;
-	uint32_t PER_LINE_DELIVERY;
-	uint32_t PREFETCH_SETTINS_C;
-	uint32_t VBLANK_PARAMETERS_2;
-	uint32_t VBLANK_PARAMETERS_4;
-	uint32_t NOM_PARAMETERS_2;
-	uint32_t NOM_PARAMETERS_3;
-	uint32_t NOM_PARAMETERS_6;
-	uint32_t NOM_PARAMETERS_7;
-	uint32_t DCN_TTU_QOS_WM;
-	uint32_t DCN_GLOBAL_TTU_CNTL;
-	uint32_t DCN_SURF0_TTU_CNTL0;
-	uint32_t DCN_SURF0_TTU_CNTL1;
-	uint32_t DCN_SURF1_TTU_CNTL0;
-	uint32_t DCN_SURF1_TTU_CNTL1;
-	uint32_t DCN_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_MSB;
-	uint32_t DCN_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_LSB;
-	uint32_t DCN_VM_CONTEXT0_PAGE_TABLE_START_ADDR_MSB;
-	uint32_t DCN_VM_CONTEXT0_PAGE_TABLE_START_ADDR_LSB;
-	uint32_t DCN_VM_CONTEXT0_PAGE_TABLE_END_ADDR_MSB;
-	uint32_t DCN_VM_CONTEXT0_PAGE_TABLE_END_ADDR_LSB;
-	uint32_t DCN_VM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR_MSB;
-	uint32_t DCN_VM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR_LSB;
-	uint32_t DCN_VM_MX_L1_TLB_CNTL;
-	uint32_t DCN_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB;
-	uint32_t DCN_VM_SYSTEM_APERTURE_DEFAULT_ADDR_LSB;
-	uint32_t DCN_VM_SYSTEM_APERTURE_LOW_ADDR_MSB;
-	uint32_t DCN_VM_SYSTEM_APERTURE_LOW_ADDR_LSB;
-	uint32_t DCN_VM_SYSTEM_APERTURE_HIGH_ADDR_MSB;
-	uint32_t DCN_VM_SYSTEM_APERTURE_HIGH_ADDR_LSB;
-	uint32_t DCHUBBUB_SDPIF_FB_TOP;
-	uint32_t DCHUBBUB_SDPIF_FB_BASE;
-	uint32_t DCHUBBUB_SDPIF_FB_OFFSET;
-	uint32_t DCHUBBUB_SDPIF_AGP_BASE;
-	uint32_t DCHUBBUB_SDPIF_AGP_BOT;
-	uint32_t DCHUBBUB_SDPIF_AGP_TOP;
-	uint32_t DCHUBBUB_ARB_DATA_URGENCY_WATERMARK_A;
-	uint32_t DCHUBBUB_ARB_PTE_META_URGENCY_WATERMARK_A;
-	uint32_t DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_A;
-	uint32_t DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_A;
-	uint32_t DCHUBBUB_ARB_ALLOW_DRAM_CLK_CHANGE_WATERMARK_A;
-	uint32_t DCHUBBUB_ARB_DATA_URGENCY_WATERMARK_B;
-	uint32_t DCHUBBUB_ARB_PTE_META_URGENCY_WATERMARK_B;
-	uint32_t DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_B;
-	uint32_t DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_B;
-	uint32_t DCHUBBUB_ARB_ALLOW_DRAM_CLK_CHANGE_WATERMARK_B;
-	uint32_t DCHUBBUB_ARB_DATA_URGENCY_WATERMARK_C;
-	uint32_t DCHUBBUB_ARB_PTE_META_URGENCY_WATERMARK_C;
-	uint32_t DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_C;
-	uint32_t DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_C;
-	uint32_t DCHUBBUB_ARB_ALLOW_DRAM_CLK_CHANGE_WATERMARK_C;
-	uint32_t DCHUBBUB_ARB_DATA_URGENCY_WATERMARK_D;
-	uint32_t DCHUBBUB_ARB_PTE_META_URGENCY_WATERMARK_D;
-	uint32_t DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_D;
-	uint32_t DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_D;
-	uint32_t DCHUBBUB_ARB_ALLOW_DRAM_CLK_CHANGE_WATERMARK_D;
-	uint32_t DCHUBBUB_ARB_WATERMARK_CHANGE_CNTL;
-	uint32_t DCHUBBUB_ARB_DRAM_STATE_CNTL;
-	uint32_t DCHUBBUB_ARB_SAT_LEVEL;
-	uint32_t DCHUBBUB_ARB_DF_REQ_OUTSTAND;
+static void min10_program_pixel_format(
+	struct dcn10_mem_input *mi,
+	enum surface_pixel_format format)
+{
+	uint32_t red_bar = 3;
+	uint32_t blue_bar = 2;
 
-	/* GC registers. read only. temporary hack */
-	uint32_t VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_HI32;
-	uint32_t VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_LO32;
-	uint32_t VM_CONTEXT0_PAGE_TABLE_START_ADDR_HI32;
-	uint32_t VM_CONTEXT0_PAGE_TABLE_START_ADDR_LO32;
-	uint32_t VM_CONTEXT0_PAGE_TABLE_END_ADDR_HI32;
-	uint32_t VM_CONTEXT0_PAGE_TABLE_END_ADDR_LO32;
-	uint32_t VM_L2_PROTECTION_FAULT_DEFAULT_ADDR_HI32;
-	uint32_t VM_L2_PROTECTION_FAULT_DEFAULT_ADDR_LO32;
-	uint32_t MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB;
-	uint32_t MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_LSB;
-	uint32_t MC_VM_SYSTEM_APERTURE_LOW_ADDR;
-	uint32_t MC_VM_SYSTEM_APERTURE_HIGH_ADDR;
+	/* swap for ABGR format */
+	if (format == SURFACE_PIXEL_FORMAT_GRPH_ABGR8888
+			|| format == SURFACE_PIXEL_FORMAT_GRPH_ABGR2101010
+			|| format == SURFACE_PIXEL_FORMAT_GRPH_ABGR2101010_XR_BIAS
+			|| format == SURFACE_PIXEL_FORMAT_GRPH_ABGR16161616F) {
+		red_bar = 2;
+		blue_bar = 3;
+	}
+
+	REG_UPDATE_2(HUBPRET_CONTROL,
+			CROSSBAR_SRC_CB_B, blue_bar,
+			CROSSBAR_SRC_CR_R, red_bar);
+
+	/* Mapping is same as ipp programming (cnvc) */
+
+	switch (format)	{
+	case SURFACE_PIXEL_FORMAT_GRPH_ARGB1555:
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 1);
+		break;
+	case SURFACE_PIXEL_FORMAT_GRPH_RGB565:
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 3);
+		break;
+	case SURFACE_PIXEL_FORMAT_GRPH_ARGB8888:
+	case SURFACE_PIXEL_FORMAT_GRPH_ABGR8888:
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 8);
+		break;
+	case SURFACE_PIXEL_FORMAT_GRPH_ARGB2101010:
+	case SURFACE_PIXEL_FORMAT_GRPH_ABGR2101010:
+	case SURFACE_PIXEL_FORMAT_GRPH_ABGR2101010_XR_BIAS:
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 10);
+		break;
+	case SURFACE_PIXEL_FORMAT_GRPH_ARGB16161616:
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 22);
+		break;
+	case SURFACE_PIXEL_FORMAT_GRPH_ARGB16161616F:
+	case SURFACE_PIXEL_FORMAT_GRPH_ABGR16161616F:/*we use crossbar already*/
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 24);
+		break;
+
+	case SURFACE_PIXEL_FORMAT_VIDEO_420_YCbCr:
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 65);
+		break;
+	case SURFACE_PIXEL_FORMAT_VIDEO_420_YCrCb:
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 64);
+		break;
+	case SURFACE_PIXEL_FORMAT_VIDEO_420_10bpc_YCbCr:
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 67);
+		break;
+	case SURFACE_PIXEL_FORMAT_VIDEO_420_10bpc_YCrCb:
+		REG_UPDATE(DCSURF_SURFACE_CONFIG,
+				SURFACE_PIXEL_FORMAT, 66);
+		break;
+	default:
+		BREAK_TO_DEBUGGER();
+		break;
+	}
+
+	/* don't see the need of program the xbar in DCN 1.0 */
+}
+
+static bool min10_program_surface_flip_and_addr(
+	struct mem_input *mem_input,
+	const struct dc_plane_address *address,
+	bool flip_immediate)
+{
+	struct dcn10_mem_input *mi = TO_DCN10_MEM_INPUT(mem_input);
+
+	/* program flip type */
+	REG_SET(DCSURF_FLIP_CONTROL, 0,
+			SURFACE_FLIP_TYPE, flip_immediate);
+
+	/* HW automatically latch rest of address register on write to
+	 * DCSURF_PRIMARY_SURFACE_ADDRESS if SURFACE_UPDATE_LOCK is not used
+	 *
+	 * program high first and then the low addr, order matters!
+	 */
+	switch (address->type) {
+	case PLN_ADDR_TYPE_GRAPHICS:
+		/* DCN1.0 does not support const color
+		 * TODO: program DCHUBBUB_RET_PATH_DCC_CFGx_0/1
+		 * base on address->grph.dcc_const_color
+		 * x = 0, 2, 4, 6 for pipe 0, 1, 2, 3 for rgb and luma
+		 * x = 1, 3, 5, 7 for pipe 0, 1, 2, 3 for chroma
+		 */
+
+		if (address->grph.addr.quad_part == 0)
+			break;
+
+		if (address->grph.meta_addr.quad_part != 0) {
+			REG_SET(DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH, 0,
+					PRIMARY_META_SURFACE_ADDRESS_HIGH,
+					address->grph.meta_addr.high_part);
+
+			REG_SET(DCSURF_PRIMARY_META_SURFACE_ADDRESS, 0,
+					PRIMARY_META_SURFACE_ADDRESS,
+					address->grph.meta_addr.low_part);
+		}
+
+		REG_SET(DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH, 0,
+				PRIMARY_SURFACE_ADDRESS_HIGH,
+				address->grph.addr.high_part);
+
+		REG_SET(DCSURF_PRIMARY_SURFACE_ADDRESS, 0,
+				PRIMARY_SURFACE_ADDRESS,
+				address->grph.addr.low_part);
+		break;
+	case PLN_ADDR_TYPE_VIDEO_PROGRESSIVE:
+		if (address->video_progressive.luma_addr.quad_part == 0
+			|| address->video_progressive.chroma_addr.quad_part == 0)
+			break;
+
+		if (address->video_progressive.luma_meta_addr.quad_part != 0) {
+			REG_SET(DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH_C, 0,
+				PRIMARY_META_SURFACE_ADDRESS_HIGH_C,
+				address->video_progressive.chroma_meta_addr.high_part);
+
+			REG_SET(DCSURF_PRIMARY_META_SURFACE_ADDRESS_C, 0,
+				PRIMARY_META_SURFACE_ADDRESS_C,
+				address->video_progressive.chroma_meta_addr.low_part);
+
+			REG_SET(DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH, 0,
+				PRIMARY_META_SURFACE_ADDRESS_HIGH,
+				address->video_progressive.luma_meta_addr.high_part);
+
+			REG_SET(DCSURF_PRIMARY_META_SURFACE_ADDRESS, 0,
+				PRIMARY_META_SURFACE_ADDRESS,
+				address->video_progressive.luma_meta_addr.low_part);
+		}
+
+		REG_SET(DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH_C, 0,
+			PRIMARY_SURFACE_ADDRESS_HIGH_C,
+			address->video_progressive.chroma_addr.high_part);
+
+		REG_SET(DCSURF_PRIMARY_SURFACE_ADDRESS_C, 0,
+			PRIMARY_SURFACE_ADDRESS_C,
+			address->video_progressive.chroma_addr.low_part);
+
+		REG_SET(DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH, 0,
+			PRIMARY_SURFACE_ADDRESS_HIGH,
+			address->video_progressive.luma_addr.high_part);
+
+		REG_SET(DCSURF_PRIMARY_SURFACE_ADDRESS, 0,
+			PRIMARY_SURFACE_ADDRESS,
+			address->video_progressive.luma_addr.low_part);
+		break;
+	case PLN_ADDR_TYPE_GRPH_STEREO:
+		if (address->grph_stereo.left_addr.quad_part == 0)
+			break;
+		if (address->grph_stereo.right_addr.quad_part == 0)
+			break;
+		if (address->grph_stereo.right_meta_addr.quad_part != 0) {
+
+			REG_SET(DCSURF_SECONDARY_META_SURFACE_ADDRESS_HIGH, 0,
+					SECONDARY_META_SURFACE_ADDRESS_HIGH,
+					address->grph_stereo.right_meta_addr.high_part);
+
+			REG_SET(DCSURF_SECONDARY_META_SURFACE_ADDRESS, 0,
+					SECONDARY_META_SURFACE_ADDRESS,
+					address->grph_stereo.right_meta_addr.low_part);
+		}
+		if (address->grph_stereo.left_meta_addr.quad_part != 0) {
+
+			REG_SET(DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH, 0,
+					PRIMARY_META_SURFACE_ADDRESS_HIGH,
+					address->grph_stereo.left_meta_addr.high_part);
+
+			REG_SET(DCSURF_PRIMARY_META_SURFACE_ADDRESS, 0,
+					PRIMARY_META_SURFACE_ADDRESS,
+					address->grph_stereo.left_meta_addr.low_part);
+		}
+
+		REG_SET(DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH, 0,
+				SECONDARY_SURFACE_ADDRESS_HIGH,
+				address->grph_stereo.right_addr.high_part);
+
+		REG_SET(DCSURF_SECONDARY_SURFACE_ADDRESS, 0,
+				SECONDARY_SURFACE_ADDRESS,
+				address->grph_stereo.right_addr.low_part);
+
+		REG_SET(DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH, 0,
+				PRIMARY_SURFACE_ADDRESS_HIGH,
+				address->grph_stereo.left_addr.high_part);
+
+		REG_SET(DCSURF_PRIMARY_SURFACE_ADDRESS, 0,
+				PRIMARY_SURFACE_ADDRESS,
+				address->grph_stereo.left_addr.low_part);
+		break;
+	default:
+		BREAK_TO_DEBUGGER();
+		break;
+	}
+
+	mem_input->request_address = *address;
+
+	if (flip_immediate)
+		mem_input->current_address = *address;
+
+	return true;
+}
+
+static void min10_dcc_control(struct mem_input *mem_input, bool enable,
+		bool independent_64b_blks)
+{
+	uint32_t dcc_en = enable ? 1 : 0;
+	uint32_t dcc_ind_64b_blk = independent_64b_blks ? 1 : 0;
+	struct dcn10_mem_input *mi = TO_DCN10_MEM_INPUT(mem_input);
+
+	REG_UPDATE_2(DCSURF_SURFACE_CONTROL,
+			PRIMARY_SURFACE_DCC_EN, dcc_en,
+			PRIMARY_SURFACE_DCC_IND_64B_BLK, dcc_ind_64b_blk);
+}
+
+static void min10_program_surface_config(
+	struct mem_input *mem_input,
+	enum surface_pixel_format format,
+	union dc_tiling_info *tiling_info,
+	union plane_size *plane_size,
+	enum dc_rotation_angle rotation,
+	struct dc_plane_dcc_param *dcc,
+	bool horizontal_mirror)
+{
+	struct dcn10_mem_input *mi = TO_DCN10_MEM_INPUT(mem_input);
+
+	min10_dcc_control(mem_input, dcc->enable, dcc->grph.independent_64b_blks);
+	min10_program_tiling(mi, tiling_info, format);
+	min10_program_size_and_rotation(
+		mi, rotation, format, plane_size, dcc, horizontal_mirror);
+	min10_program_pixel_format(mi, format);
+}
+
+static void min10_program_requestor(
+		struct mem_input *mem_input,
+		struct _vcs_dpi_display_rq_regs_st *rq_regs)
+{
+
+	struct dcn10_mem_input *mi = TO_DCN10_MEM_INPUT(mem_input);
+
+	REG_UPDATE(HUBPRET_CONTROL,
+			DET_BUF_PLANE1_BASE_ADDRESS, rq_regs->plane1_base_address);
+	REG_SET_4(DCN_EXPANSION_MODE, 0,
+			DRQ_EXPANSION_MODE, rq_regs->drq_expansion_mode,
+			PRQ_EXPANSION_MODE, rq_regs->prq_expansion_mode,
+			MRQ_EXPANSION_MODE, rq_regs->mrq_expansion_mode,
+			CRQ_EXPANSION_MODE, rq_regs->crq_expansion_mode);
+	REG_SET_8(DCHUBP_REQ_SIZE_CONFIG, 0,
+		CHUNK_SIZE, rq_regs->rq_regs_l.chunk_size,
+		MIN_CHUNK_SIZE, rq_regs->rq_regs_l.min_chunk_size,
+		META_CHUNK_SIZE, rq_regs->rq_regs_l.meta_chunk_size,
+		MIN_META_CHUNK_SIZE, rq_regs->rq_regs_l.min_meta_chunk_size,
+		DPTE_GROUP_SIZE, rq_regs->rq_regs_l.dpte_group_size,
+		MPTE_GROUP_SIZE, rq_regs->rq_regs_l.mpte_group_size,
+		SWATH_HEIGHT, rq_regs->rq_regs_l.swath_height,
+		PTE_ROW_HEIGHT_LINEAR, rq_regs->rq_regs_l.pte_row_height_linear);
+	REG_SET_8(DCHUBP_REQ_SIZE_CONFIG_C, 0,
+		CHUNK_SIZE_C, rq_regs->rq_regs_c.chunk_size,
+		MIN_CHUNK_SIZE_C, rq_regs->rq_regs_c.min_chunk_size,
+		META_CHUNK_SIZE_C, rq_regs->rq_regs_c.meta_chunk_size,
+		MIN_META_CHUNK_SIZE_C, rq_regs->rq_regs_c.min_meta_chunk_size,
+		DPTE_GROUP_SIZE_C, rq_regs->rq_regs_c.dpte_group_size,
+		MPTE_GROUP_SIZE_C, rq_regs->rq_regs_c.mpte_group_size,
+		SWATH_HEIGHT_C, rq_regs->rq_regs_c.swath_height,
+		PTE_ROW_HEIGHT_LINEAR_C, rq_regs->rq_regs_c.pte_row_height_linear);
+}
+
+
+static void min10_program_deadline(
+		struct mem_input *mem_input,
+		struct _vcs_dpi_display_dlg_regs_st *dlg_attr,
+		struct _vcs_dpi_display_ttu_regs_st *ttu_attr)
+{
+	struct dcn10_mem_input *mi = TO_DCN10_MEM_INPUT(mem_input);
+
+	/* DLG - Per hubp */
+	REG_SET_2(BLANK_OFFSET_0, 0,
+		REFCYC_H_BLANK_END, dlg_attr->refcyc_h_blank_end,
+		DLG_V_BLANK_END, dlg_attr->dlg_vblank_end);
+
+	REG_SET(BLANK_OFFSET_1, 0,
+		MIN_DST_Y_NEXT_START, dlg_attr->min_dst_y_next_start);
+
+	REG_SET(DST_DIMENSIONS, 0,
+		REFCYC_PER_HTOTAL, dlg_attr->refcyc_per_htotal);
+
+	REG_SET_2(DST_AFTER_SCALER, 0,
+		REFCYC_X_AFTER_SCALER, dlg_attr->refcyc_x_after_scaler,
+		DST_Y_AFTER_SCALER, dlg_attr->dst_y_after_scaler);
+
+	REG_SET_2(PREFETCH_SETTINS, 0,
+		DST_Y_PREFETCH, dlg_attr->dst_y_prefetch,
+		VRATIO_PREFETCH, dlg_attr->vratio_prefetch);
+
+	REG_SET_2(VBLANK_PARAMETERS_0, 0,
+		DST_Y_PER_VM_VBLANK, dlg_attr->dst_y_per_vm_vblank,
+		DST_Y_PER_ROW_VBLANK, dlg_attr->dst_y_per_row_vblank);
+
+	REG_SET(REF_FREQ_TO_PIX_FREQ, 0,
+		REF_FREQ_TO_PIX_FREQ, dlg_attr->ref_freq_to_pix_freq);
+
+	/* DLG - Per luma/chroma */
+	REG_SET(VBLANK_PARAMETERS_1, 0,
+		REFCYC_PER_PTE_GROUP_VBLANK_L, dlg_attr->refcyc_per_pte_group_vblank_l);
+
+	REG_SET(VBLANK_PARAMETERS_3, 0,
+		REFCYC_PER_META_CHUNK_VBLANK_L, dlg_attr->refcyc_per_meta_chunk_vblank_l);
+
+	REG_SET(NOM_PARAMETERS_0, 0,
+		DST_Y_PER_PTE_ROW_NOM_L, dlg_attr->dst_y_per_pte_row_nom_l);
+
+	REG_SET(NOM_PARAMETERS_1, 0,
+		REFCYC_PER_PTE_GROUP_NOM_L, dlg_attr->refcyc_per_pte_group_nom_l);
+
+	REG_SET(NOM_PARAMETERS_4, 0,
+		DST_Y_PER_META_ROW_NOM_L, dlg_attr->dst_y_per_meta_row_nom_l);
+
+	REG_SET(NOM_PARAMETERS_5, 0,
+		REFCYC_PER_META_CHUNK_NOM_L, dlg_attr->refcyc_per_meta_chunk_nom_l);
+
+	REG_SET_2(PER_LINE_DELIVERY_PRE, 0,
+		REFCYC_PER_LINE_DELIVERY_PRE_L, dlg_attr->refcyc_per_line_delivery_pre_l,
+		REFCYC_PER_LINE_DELIVERY_PRE_C, dlg_attr->refcyc_per_line_delivery_pre_c);
+
+	REG_SET_2(PER_LINE_DELIVERY, 0,
+		REFCYC_PER_LINE_DELIVERY_L, dlg_attr->refcyc_per_line_delivery_l,
+		REFCYC_PER_LINE_DELIVERY_C, dlg_attr->refcyc_per_line_delivery_c);
+
+	REG_SET(PREFETCH_SETTINS_C, 0,
+		VRATIO_PREFETCH_C, dlg_attr->vratio_prefetch_c);
+
+	REG_SET(VBLANK_PARAMETERS_2, 0,
+		REFCYC_PER_PTE_GROUP_VBLANK_C, dlg_attr->refcyc_per_pte_group_vblank_c);
+
+	REG_SET(VBLANK_PARAMETERS_4, 0,
+		REFCYC_PER_META_CHUNK_VBLANK_C, dlg_attr->refcyc_per_meta_chunk_vblank_c);
+
+	REG_SET(NOM_PARAMETERS_2, 0,
+		DST_Y_PER_PTE_ROW_NOM_C, dlg_attr->dst_y_per_pte_row_nom_c);
+
+	REG_SET(NOM_PARAMETERS_3, 0,
+		REFCYC_PER_PTE_GROUP_NOM_C, dlg_attr->refcyc_per_pte_group_nom_c);
+
+	REG_SET(NOM_PARAMETERS_6, 0,
+		DST_Y_PER_META_ROW_NOM_C, dlg_attr->dst_y_per_meta_row_nom_c);
+
+	REG_SET(NOM_PARAMETERS_7, 0,
+		REFCYC_PER_META_CHUNK_NOM_C, dlg_attr->refcyc_per_meta_chunk_nom_c);
+
+	/* TTU - per hubp */
+	REG_SET_2(DCN_TTU_QOS_WM, 0,
+		QoS_LEVEL_LOW_WM, ttu_attr->qos_level_low_wm,
+		QoS_LEVEL_HIGH_WM, ttu_attr->qos_level_high_wm);
+
+	REG_SET_2(DCN_GLOBAL_TTU_CNTL, 0,
+		MIN_TTU_VBLANK, ttu_attr->min_ttu_vblank,
+		QoS_LEVEL_FLIP, ttu_attr->qos_level_flip);
+
+	/* TTU - per luma/chroma */
+	/* Assumed surf0 is luma and 1 is chroma */
+
+	REG_SET_3(DCN_SURF0_TTU_CNTL0, 0,
+		REFCYC_PER_REQ_DELIVERY, ttu_attr->refcyc_per_req_delivery_l,
+		QoS_LEVEL_FIXED, ttu_attr->qos_level_fixed_l,
+		QoS_RAMP_DISABLE, ttu_attr->qos_ramp_disable_l);
+
+	REG_SET(DCN_SURF0_TTU_CNTL1, 0,
+		REFCYC_PER_REQ_DELIVERY_PRE,
+		ttu_attr->refcyc_per_req_delivery_pre_l);
+
+	REG_SET_3(DCN_SURF1_TTU_CNTL0, 0,
+		REFCYC_PER_REQ_DELIVERY, ttu_attr->refcyc_per_req_delivery_c,
+		QoS_LEVEL_FIXED, ttu_attr->qos_level_fixed_c,
+		QoS_RAMP_DISABLE, ttu_attr->qos_ramp_disable_c);
+
+	REG_SET(DCN_SURF1_TTU_CNTL1, 0,
+		REFCYC_PER_REQ_DELIVERY_PRE,
+		ttu_attr->refcyc_per_req_delivery_pre_c);
+}
+
+static void min10_setup(
+		struct mem_input *mem_input,
+		struct _vcs_dpi_display_dlg_regs_st *dlg_attr,
+		struct _vcs_dpi_display_ttu_regs_st *ttu_attr,
+		struct _vcs_dpi_display_rq_regs_st *rq_regs,
+		struct _vcs_dpi_display_pipe_dest_params_st *pipe_dest)
+{
+	/* otg is locked when this func is called. Register are double buffered.
+	 * disable the requestors is not needed
+	 */
+	min10_program_requestor(mem_input, rq_regs);
+	min10_program_deadline(mem_input, dlg_attr, ttu_attr);
+	min10_vready_workaround(mem_input, pipe_dest);
+}
+
+static uint32_t convert_and_clamp(
+	uint32_t wm_ns,
+	uint32_t refclk_mhz,
+	uint32_t clamp_value)
+{
+	uint32_t ret_val = 0;
+	ret_val = wm_ns * refclk_mhz;
+	ret_val /= 1000;
+
+	if (ret_val > clamp_value)
+		ret_val = clamp_value;
+
+	return ret_val;
+}
+
+static void min10_program_watermarks(
+		struct mem_input *mem_input,
+		struct dcn_watermark_set *watermarks,
+		unsigned int refclk_mhz)
+{
+	struct dcn10_mem_input *mi = TO_DCN10_MEM_INPUT(mem_input);
+	uint32_t force_en = mem_input->ctx->dc->debug.disable_stutter ? 1 : 0;
+	/*
+	 * Need to clamp to max of the register values (i.e. no wrap)
+	 * for dcn1, all wm registers are 21-bit wide
+	 */
+	uint32_t prog_wm_value;
+
+	/* Repeat for water mark set A, B, C and D. */
+	/* clock state A */
+	prog_wm_value = convert_and_clamp(watermarks->a.urgent_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_DATA_URGENCY_WATERMARK_A, prog_wm_value);
+
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"URGENCY_WATERMARK_A calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->a.urgent_ns, prog_wm_value);
+
+	prog_wm_value = convert_and_clamp(watermarks->a.pte_meta_urgent_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_PTE_META_URGENCY_WATERMARK_A, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"PTE_META_URGENCY_WATERMARK_A calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->a.pte_meta_urgent_ns, prog_wm_value);
+
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->a.cstate_pstate.cstate_enter_plus_exit_ns,
+			refclk_mhz, 0x1fffff);
+
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_A, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"SR_ENTER_EXIT_WATERMARK_A calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->a.cstate_pstate.cstate_enter_plus_exit_ns, prog_wm_value);
+
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->a.cstate_pstate.cstate_exit_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_A, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"SR_EXIT_WATERMARK_A calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->a.cstate_pstate.cstate_exit_ns, prog_wm_value);
+
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->a.cstate_pstate.pstate_change_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_DRAM_CLK_CHANGE_WATERMARK_A, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"DRAM_CLK_CHANGE_WATERMARK_A calculated =%d\n"
+		"HW register value = 0x%x\n\n",
+		watermarks->a.cstate_pstate.pstate_change_ns, prog_wm_value);
+
+
+	/* clock state B */
+	prog_wm_value = convert_and_clamp(
+			watermarks->b.urgent_ns, refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_DATA_URGENCY_WATERMARK_B, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"URGENCY_WATERMARK_B calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->b.urgent_ns, prog_wm_value);
+
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->b.pte_meta_urgent_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_PTE_META_URGENCY_WATERMARK_B, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"PTE_META_URGENCY_WATERMARK_B calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->b.pte_meta_urgent_ns, prog_wm_value);
+
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->b.cstate_pstate.cstate_enter_plus_exit_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_B, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"SR_ENTER_WATERMARK_B calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->b.cstate_pstate.cstate_enter_plus_exit_ns, prog_wm_value);
+
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->b.cstate_pstate.cstate_exit_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_B, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"SR_EXIT_WATERMARK_B calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->b.cstate_pstate.cstate_exit_ns, prog_wm_value);
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->b.cstate_pstate.pstate_change_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_DRAM_CLK_CHANGE_WATERMARK_B, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"DRAM_CLK_CHANGE_WATERMARK_B calculated =%d\n\n"
+		"HW register value = 0x%x\n",
+		watermarks->b.cstate_pstate.pstate_change_ns, prog_wm_value);
+
+	/* clock state C */
+	prog_wm_value = convert_and_clamp(
+			watermarks->c.urgent_ns, refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_DATA_URGENCY_WATERMARK_C, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"URGENCY_WATERMARK_C calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->c.urgent_ns, prog_wm_value);
+
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->c.pte_meta_urgent_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_PTE_META_URGENCY_WATERMARK_C, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"PTE_META_URGENCY_WATERMARK_C calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->c.pte_meta_urgent_ns, prog_wm_value);
+
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->c.cstate_pstate.cstate_enter_plus_exit_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_C, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"SR_ENTER_WATERMARK_C calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->c.cstate_pstate.cstate_enter_plus_exit_ns, prog_wm_value);
+
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->c.cstate_pstate.cstate_exit_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_C, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"SR_EXIT_WATERMARK_C calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->c.cstate_pstate.cstate_exit_ns, prog_wm_value);
+
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->c.cstate_pstate.pstate_change_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_DRAM_CLK_CHANGE_WATERMARK_C, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"DRAM_CLK_CHANGE_WATERMARK_C calculated =%d\n\n"
+		"HW register value = 0x%x\n",
+		watermarks->c.cstate_pstate.pstate_change_ns, prog_wm_value);
+
+	/* clock state D */
+	prog_wm_value = convert_and_clamp(
+			watermarks->d.urgent_ns, refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_DATA_URGENCY_WATERMARK_D, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"URGENCY_WATERMARK_D calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->d.urgent_ns, prog_wm_value);
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->d.pte_meta_urgent_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_PTE_META_URGENCY_WATERMARK_D, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"PTE_META_URGENCY_WATERMARK_D calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->d.pte_meta_urgent_ns, prog_wm_value);
+
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->d.cstate_pstate.cstate_enter_plus_exit_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_D, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"SR_ENTER_WATERMARK_D calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->d.cstate_pstate.cstate_enter_plus_exit_ns, prog_wm_value);
+
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->d.cstate_pstate.cstate_exit_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_D, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"SR_EXIT_WATERMARK_D calculated =%d\n"
+		"HW register value = 0x%x\n",
+		watermarks->d.cstate_pstate.cstate_exit_ns, prog_wm_value);
+
+
+	prog_wm_value = convert_and_clamp(
+			watermarks->d.cstate_pstate.pstate_change_ns,
+			refclk_mhz, 0x1fffff);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_DRAM_CLK_CHANGE_WATERMARK_D, prog_wm_value);
+	dm_logger_write(mem_input->ctx->logger, LOG_HW_MARKS,
+		"DRAM_CLK_CHANGE_WATERMARK_D calculated =%d\n"
+		"HW register value = 0x%x\n\n",
+		watermarks->d.cstate_pstate.pstate_change_ns, prog_wm_value);
+
+	REG_UPDATE(DCHUBBUB_ARB_WATERMARK_CHANGE_CNTL,
+			DCHUBBUB_ARB_WATERMARK_CHANGE_REQUEST, 1);
+	REG_UPDATE(DCHUBBUB_ARB_WATERMARK_CHANGE_CNTL,
+			DCHUBBUB_ARB_WATERMARK_CHANGE_REQUEST, 0);
+	REG_UPDATE(DCHUBBUB_ARB_SAT_LEVEL,
+			DCHUBBUB_ARB_SAT_LEVEL, 60 * refclk_mhz);
+	REG_UPDATE(DCHUBBUB_ARB_DF_REQ_OUTSTAND,
+			DCHUBBUB_ARB_MIN_REQ_OUTSTAND, 68);
+
+	REG_UPDATE_2(DCHUBBUB_ARB_DRAM_STATE_CNTL,
+			DCHUBBUB_ARB_ALLOW_SELF_REFRESH_FORCE_VALUE, 0,
+			DCHUBBUB_ARB_ALLOW_SELF_REFRESH_FORCE_ENABLE, force_en);
+
+#if 0
+	REG_UPDATE_2(DCHUBBUB_ARB_WATERMARK_CHANGE_CNTL,
+			DCHUBBUB_ARB_WATERMARK_CHANGE_DONE_INTERRUPT_DISABLE, 1,
+			DCHUBBUB_ARB_WATERMARK_CHANGE_REQUEST, 1);
+#endif
+}
+
+static void min10_program_display_marks(
+	struct mem_input *mem_input,
+	struct dce_watermarks nbp,
+	struct dce_watermarks stutter,
+	struct dce_watermarks urgent,
+	uint32_t total_dest_line_time_ns)
+{
+	/* only for dce
+	 * dcn use only program_watermarks
+	 */
+}
+
+static bool min10_is_flip_pending(struct mem_input *mem_input)
+{
+	uint32_t flip_pending = 0;
+	struct dcn10_mem_input *mi = TO_DCN10_MEM_INPUT(mem_input);
+	struct dc_plane_address earliest_inuse_address;
+
+	REG_GET(DCSURF_FLIP_CONTROL,
+			SURFACE_FLIP_PENDING, &flip_pending);
+
+	REG_GET(DCSURF_SURFACE_EARLIEST_INUSE,
+			SURFACE_EARLIEST_INUSE_ADDRESS, &earliest_inuse_address.grph.addr.low_part);
+
+	REG_GET(DCSURF_SURFACE_EARLIEST_INUSE_HIGH,
+			SURFACE_EARLIEST_INUSE_ADDRESS_HIGH, &earliest_inuse_address.grph.addr.high_part);
+
+	if (flip_pending)
+		return true;
+
+	if (earliest_inuse_address.grph.addr.quad_part != mem_input->request_address.grph.addr.quad_part)
+		return true;
+
+	mem_input->current_address = mem_input->request_address;
+	return false;
+}
+
+static void min10_update_dchub(
+	struct mem_input *mem_input,
+	struct dchub_init_data *dh_data)
+{
+	struct dcn10_mem_input *mi = TO_DCN10_MEM_INPUT(mem_input);
+	/* TODO: port code from dal2 */
+	switch (dh_data->fb_mode) {
+	case FRAME_BUFFER_MODE_ZFB_ONLY:
+		/*For ZFB case need to put DCHUB FB BASE and TOP upside down to indicate ZFB mode*/
+		REG_UPDATE(DCHUBBUB_SDPIF_FB_TOP,
+				SDPIF_FB_TOP, 0);
+
+		REG_UPDATE(DCHUBBUB_SDPIF_FB_BASE,
+				SDPIF_FB_BASE, 0x0FFFF);
+
+		REG_UPDATE(DCHUBBUB_SDPIF_AGP_BASE,
+				SDPIF_AGP_BASE, dh_data->zfb_phys_addr_base >> 22);
+
+		REG_UPDATE(DCHUBBUB_SDPIF_AGP_BOT,
+				SDPIF_AGP_BOT, dh_data->zfb_mc_base_addr >> 22);
+
+		REG_UPDATE(DCHUBBUB_SDPIF_AGP_TOP,
+				SDPIF_AGP_TOP, (dh_data->zfb_mc_base_addr +
+						dh_data->zfb_size_in_byte - 1) >> 22);
+		break;
+	case FRAME_BUFFER_MODE_MIXED_ZFB_AND_LOCAL:
+		/*Should not touch FB LOCATION (done by VBIOS on AsicInit table)*/
+
+		REG_UPDATE(DCHUBBUB_SDPIF_AGP_BASE,
+				SDPIF_AGP_BASE, dh_data->zfb_phys_addr_base >> 22);
+
+		REG_UPDATE(DCHUBBUB_SDPIF_AGP_BOT,
+				SDPIF_AGP_BOT, dh_data->zfb_mc_base_addr >> 22);
+
+		REG_UPDATE(DCHUBBUB_SDPIF_AGP_TOP,
+				SDPIF_AGP_TOP, (dh_data->zfb_mc_base_addr +
+						dh_data->zfb_size_in_byte - 1) >> 22);
+		break;
+	case FRAME_BUFFER_MODE_LOCAL_ONLY:
+		/*Should not touch FB LOCATION (done by VBIOS on AsicInit table)*/
+		REG_UPDATE(DCHUBBUB_SDPIF_AGP_BASE,
+				SDPIF_AGP_BASE, 0);
+
+		REG_UPDATE(DCHUBBUB_SDPIF_AGP_BOT,
+				SDPIF_AGP_BOT, 0X03FFFF);
+
+		REG_UPDATE(DCHUBBUB_SDPIF_AGP_TOP,
+				SDPIF_AGP_TOP, 0);
+		break;
+	default:
+		break;
+	}
+
+	dh_data->dchub_initialzied = true;
+	dh_data->dchub_info_valid = false;
+}
+
+struct vm_system_aperture_param {
+	PHYSICAL_ADDRESS_LOC sys_default;
+	PHYSICAL_ADDRESS_LOC sys_low;
+	PHYSICAL_ADDRESS_LOC sys_high;
 };
 
-#define MI_SF(reg_name, field_name, post_fix)\
-	.field_name = reg_name ## __ ## field_name ## post_fix
+static void min10_read_vm_system_aperture_settings(struct dcn10_mem_input *mi,
+		struct vm_system_aperture_param *apt)
+{
+	PHYSICAL_ADDRESS_LOC physical_page_number;
+	uint32_t logical_addr_low;
+	uint32_t logical_addr_high;
 
-#define MI_DCN10_MASK_SH_LIST(mask_sh)\
-	MI_SF(HUBP0_DCHUBP_CNTL, HUBP_BLANK_EN, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_CNTL, HUBP_TTU_DISABLE, mask_sh),\
-	MI_SF(HUBP0_DCSURF_ADDR_CONFIG, NUM_PIPES, mask_sh),\
-	MI_SF(HUBP0_DCSURF_ADDR_CONFIG, NUM_BANKS, mask_sh),\
-	MI_SF(HUBP0_DCSURF_ADDR_CONFIG, PIPE_INTERLEAVE, mask_sh),\
-	MI_SF(HUBP0_DCSURF_ADDR_CONFIG, NUM_SE, mask_sh),\
-	MI_SF(HUBP0_DCSURF_ADDR_CONFIG, NUM_RB_PER_SE, mask_sh),\
-	MI_SF(HUBP0_DCSURF_ADDR_CONFIG, MAX_COMPRESSED_FRAGS, mask_sh),\
-	MI_SF(HUBP0_DCSURF_TILING_CONFIG, SW_MODE, mask_sh),\
-	MI_SF(HUBP0_DCSURF_TILING_CONFIG, META_LINEAR, mask_sh),\
-	MI_SF(HUBP0_DCSURF_TILING_CONFIG, RB_ALIGNED, mask_sh),\
-	MI_SF(HUBP0_DCSURF_TILING_CONFIG, PIPE_ALIGNED, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SURFACE_PITCH, PITCH, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SURFACE_PITCH, META_PITCH, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SURFACE_PITCH_C, PITCH_C, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SURFACE_PITCH_C, META_PITCH_C, mask_sh),\
-	MI_SF(HUBP0_DCSURF_SURFACE_CONFIG, ROTATION_ANGLE, mask_sh),\
-	MI_SF(HUBP0_DCSURF_SURFACE_CONFIG, H_MIRROR_EN, mask_sh),\
-	MI_SF(HUBP0_DCSURF_SURFACE_CONFIG, SURFACE_PIXEL_FORMAT, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_FLIP_CONTROL, SURFACE_FLIP_TYPE, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_FLIP_CONTROL, SURFACE_UPDATE_PENDING, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_FLIP_CONTROL, SURFACE_UPDATE_LOCK, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH, PRIMARY_SURFACE_ADDRESS_HIGH, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_PRIMARY_SURFACE_ADDRESS, PRIMARY_SURFACE_ADDRESS, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH, SECONDARY_SURFACE_ADDRESS_HIGH, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SECONDARY_SURFACE_ADDRESS, SECONDARY_SURFACE_ADDRESS, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH, PRIMARY_META_SURFACE_ADDRESS_HIGH, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_PRIMARY_META_SURFACE_ADDRESS, PRIMARY_META_SURFACE_ADDRESS, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SECONDARY_META_SURFACE_ADDRESS_HIGH, SECONDARY_META_SURFACE_ADDRESS_HIGH, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SECONDARY_META_SURFACE_ADDRESS, SECONDARY_META_SURFACE_ADDRESS, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH_C, PRIMARY_SURFACE_ADDRESS_HIGH_C, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_PRIMARY_SURFACE_ADDRESS_C, PRIMARY_SURFACE_ADDRESS_C, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH_C, PRIMARY_META_SURFACE_ADDRESS_HIGH_C, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_PRIMARY_META_SURFACE_ADDRESS_C, PRIMARY_META_SURFACE_ADDRESS_C, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SURFACE_INUSE, SURFACE_INUSE_ADDRESS, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SURFACE_INUSE_HIGH, SURFACE_INUSE_ADDRESS_HIGH, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SURFACE_INUSE_C, SURFACE_INUSE_ADDRESS_C, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SURFACE_INUSE_HIGH_C, SURFACE_INUSE_ADDRESS_HIGH_C, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SURFACE_EARLIEST_INUSE, SURFACE_EARLIEST_INUSE_ADDRESS, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SURFACE_EARLIEST_INUSE_HIGH, SURFACE_EARLIEST_INUSE_ADDRESS_HIGH, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SURFACE_EARLIEST_INUSE_C, SURFACE_EARLIEST_INUSE_ADDRESS_C, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SURFACE_EARLIEST_INUSE_HIGH_C, SURFACE_EARLIEST_INUSE_ADDRESS_HIGH_C, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SURFACE_CONTROL, PRIMARY_SURFACE_DCC_EN, mask_sh),\
-	MI_SF(HUBPREQ0_DCSURF_SURFACE_CONTROL, PRIMARY_SURFACE_DCC_IND_64B_BLK, mask_sh),\
-	MI_SF(HUBPRET0_HUBPRET_CONTROL, DET_BUF_PLANE1_BASE_ADDRESS, mask_sh),\
-	MI_SF(HUBPRET0_HUBPRET_CONTROL, CROSSBAR_SRC_CB_B, mask_sh),\
-	MI_SF(HUBPRET0_HUBPRET_CONTROL, CROSSBAR_SRC_CR_R, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_EXPANSION_MODE, DRQ_EXPANSION_MODE, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_EXPANSION_MODE, PRQ_EXPANSION_MODE, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_EXPANSION_MODE, MRQ_EXPANSION_MODE, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_EXPANSION_MODE, CRQ_EXPANSION_MODE, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG, CHUNK_SIZE, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG, MIN_CHUNK_SIZE, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG, META_CHUNK_SIZE, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG, MIN_META_CHUNK_SIZE, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG, DPTE_GROUP_SIZE, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG, MPTE_GROUP_SIZE, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG, SWATH_HEIGHT, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG, PTE_ROW_HEIGHT_LINEAR, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG_C, CHUNK_SIZE_C, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG_C, MIN_CHUNK_SIZE_C, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG_C, META_CHUNK_SIZE_C, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG_C, MIN_META_CHUNK_SIZE_C, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG_C, DPTE_GROUP_SIZE_C, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG_C, MPTE_GROUP_SIZE_C, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG_C, SWATH_HEIGHT_C, mask_sh),\
-	MI_SF(HUBP0_DCHUBP_REQ_SIZE_CONFIG_C, PTE_ROW_HEIGHT_LINEAR_C, mask_sh),\
-	MI_SF(HUBPREQ0_BLANK_OFFSET_0, REFCYC_H_BLANK_END, mask_sh),\
-	MI_SF(HUBPREQ0_BLANK_OFFSET_0, DLG_V_BLANK_END, mask_sh),\
-	MI_SF(HUBPREQ0_BLANK_OFFSET_1, MIN_DST_Y_NEXT_START, mask_sh),\
-	MI_SF(HUBPREQ0_DST_DIMENSIONS, REFCYC_PER_HTOTAL, mask_sh),\
-	MI_SF(HUBPREQ0_DST_AFTER_SCALER, REFCYC_X_AFTER_SCALER, mask_sh),\
-	MI_SF(HUBPREQ0_DST_AFTER_SCALER, DST_Y_AFTER_SCALER, mask_sh),\
-	MI_SF(HUBPREQ0_PREFETCH_SETTINS, DST_Y_PREFETCH, mask_sh),\
-	MI_SF(HUBPREQ0_PREFETCH_SETTINS, VRATIO_PREFETCH, mask_sh),\
-	MI_SF(HUBPREQ0_VBLANK_PARAMETERS_0, DST_Y_PER_VM_VBLANK, mask_sh),\
-	MI_SF(HUBPREQ0_VBLANK_PARAMETERS_0, DST_Y_PER_ROW_VBLANK, mask_sh),\
-	MI_SF(HUBPREQ0_REF_FREQ_TO_PIX_FREQ, REF_FREQ_TO_PIX_FREQ, mask_sh),\
-	MI_SF(HUBPREQ0_VBLANK_PARAMETERS_1, REFCYC_PER_PTE_GROUP_VBLANK_L, mask_sh),\
-	MI_SF(HUBPREQ0_VBLANK_PARAMETERS_3, REFCYC_PER_META_CHUNK_VBLANK_L, mask_sh),\
-	MI_SF(HUBPREQ0_NOM_PARAMETERS_0, DST_Y_PER_PTE_ROW_NOM_L, mask_sh),\
-	MI_SF(HUBPREQ0_NOM_PARAMETERS_1, REFCYC_PER_PTE_GROUP_NOM_L, mask_sh),\
-	MI_SF(HUBPREQ0_NOM_PARAMETERS_4, DST_Y_PER_META_ROW_NOM_L, mask_sh),\
-	MI_SF(HUBPREQ0_NOM_PARAMETERS_5, REFCYC_PER_META_CHUNK_NOM_L, mask_sh),\
-	MI_SF(HUBPREQ0_PER_LINE_DELIVERY_PRE, REFCYC_PER_LINE_DELIVERY_PRE_L, mask_sh),\
-	MI_SF(HUBPREQ0_PER_LINE_DELIVERY_PRE, REFCYC_PER_LINE_DELIVERY_PRE_C, mask_sh),\
-	MI_SF(HUBPREQ0_PER_LINE_DELIVERY, REFCYC_PER_LINE_DELIVERY_L, mask_sh),\
-	MI_SF(HUBPREQ0_PER_LINE_DELIVERY, REFCYC_PER_LINE_DELIVERY_C, mask_sh),\
-	MI_SF(HUBPREQ0_PREFETCH_SETTINS_C, VRATIO_PREFETCH_C, mask_sh),\
-	MI_SF(HUBPREQ0_VBLANK_PARAMETERS_2, REFCYC_PER_PTE_GROUP_VBLANK_C, mask_sh),\
-	MI_SF(HUBPREQ0_VBLANK_PARAMETERS_4, REFCYC_PER_META_CHUNK_VBLANK_C, mask_sh),\
-	MI_SF(HUBPREQ0_NOM_PARAMETERS_2, DST_Y_PER_PTE_ROW_NOM_C, mask_sh),\
-	MI_SF(HUBPREQ0_NOM_PARAMETERS_3, REFCYC_PER_PTE_GROUP_NOM_C, mask_sh),\
-	MI_SF(HUBPREQ0_NOM_PARAMETERS_6, DST_Y_PER_META_ROW_NOM_C, mask_sh),\
-	MI_SF(HUBPREQ0_NOM_PARAMETERS_7, REFCYC_PER_META_CHUNK_NOM_C, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_TTU_QOS_WM, QoS_LEVEL_LOW_WM, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_TTU_QOS_WM, QoS_LEVEL_HIGH_WM, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_GLOBAL_TTU_CNTL, MIN_TTU_VBLANK, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_GLOBAL_TTU_CNTL, QoS_LEVEL_FLIP, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_SURF0_TTU_CNTL0, REFCYC_PER_REQ_DELIVERY, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_SURF0_TTU_CNTL0, QoS_LEVEL_FIXED, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_SURF0_TTU_CNTL0, QoS_RAMP_DISABLE, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_SURF0_TTU_CNTL1, REFCYC_PER_REQ_DELIVERY_PRE, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_MSB, VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_MSB, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_LSB, VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_LSB, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_CONTEXT0_PAGE_TABLE_START_ADDR_MSB, VM_CONTEXT0_PAGE_TABLE_START_ADDR_MSB, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_CONTEXT0_PAGE_TABLE_START_ADDR_LSB, VM_CONTEXT0_PAGE_TABLE_START_ADDR_LSB, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_CONTEXT0_PAGE_TABLE_END_ADDR_MSB, VM_CONTEXT0_PAGE_TABLE_END_ADDR_MSB, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_CONTEXT0_PAGE_TABLE_END_ADDR_LSB, VM_CONTEXT0_PAGE_TABLE_END_ADDR_LSB, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR_MSB, VM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR_MSB, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR_LSB, VM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR_LSB, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_MX_L1_TLB_CNTL, ENABLE_L1_TLB, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_MX_L1_TLB_CNTL, SYSTEM_ACCESS_MODE, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB, MC_VM_SYSTEM_APERTURE_DEFAULT_SYSTEM, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB, MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_SYSTEM_APERTURE_DEFAULT_ADDR_LSB, MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_LSB, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_SYSTEM_APERTURE_LOW_ADDR_MSB, MC_VM_SYSTEM_APERTURE_LOW_ADDR_MSB, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_SYSTEM_APERTURE_LOW_ADDR_LSB, MC_VM_SYSTEM_APERTURE_LOW_ADDR_LSB, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_SYSTEM_APERTURE_HIGH_ADDR_MSB, MC_VM_SYSTEM_APERTURE_HIGH_ADDR_MSB, mask_sh),\
-	MI_SF(HUBPREQ0_DCN_VM_SYSTEM_APERTURE_HIGH_ADDR_LSB, MC_VM_SYSTEM_APERTURE_HIGH_ADDR_LSB, mask_sh),\
-	MI_SF(DCHUBBUB_SDPIF_FB_TOP, SDPIF_FB_TOP, mask_sh),\
-	MI_SF(DCHUBBUB_SDPIF_FB_BASE, SDPIF_FB_BASE, mask_sh),\
-	MI_SF(DCHUBBUB_SDPIF_FB_OFFSET, SDPIF_FB_OFFSET, mask_sh),\
-	MI_SF(DCHUBBUB_SDPIF_AGP_BASE, SDPIF_AGP_BASE, mask_sh),\
-	MI_SF(DCHUBBUB_SDPIF_AGP_BOT, SDPIF_AGP_BOT, mask_sh),\
-	MI_SF(DCHUBBUB_SDPIF_AGP_TOP, SDPIF_AGP_TOP, mask_sh),\
-	MI_SF(DCHUBBUB_ARB_WATERMARK_CHANGE_CNTL, DCHUBBUB_ARB_WATERMARK_CHANGE_REQUEST, mask_sh),\
-	MI_SF(DCHUBBUB_ARB_WATERMARK_CHANGE_CNTL, DCHUBBUB_ARB_WATERMARK_CHANGE_DONE_INTERRUPT_DISABLE, mask_sh),\
-	MI_SF(DCHUBBUB_ARB_DRAM_STATE_CNTL, DCHUBBUB_ARB_ALLOW_SELF_REFRESH_FORCE_VALUE, mask_sh),\
-	MI_SF(DCHUBBUB_ARB_DRAM_STATE_CNTL, DCHUBBUB_ARB_ALLOW_SELF_REFRESH_FORCE_ENABLE, mask_sh),\
-	MI_SF(DCHUBBUB_ARB_SAT_LEVEL, DCHUBBUB_ARB_SAT_LEVEL, mask_sh),\
-	MI_SF(DCHUBBUB_ARB_DF_REQ_OUTSTAND, DCHUBBUB_ARB_MIN_REQ_OUTSTAND, mask_sh),\
-	/* todo:  get these from GVM instead of reading registers ourselves */\
-	MI_SF(VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_HI32, PAGE_DIRECTORY_ENTRY_HI32, mask_sh),\
-	MI_SF(VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_LO32, PAGE_DIRECTORY_ENTRY_LO32, mask_sh),\
-	MI_SF(VM_CONTEXT0_PAGE_TABLE_START_ADDR_HI32, LOGICAL_PAGE_NUMBER_HI4, mask_sh),\
-	MI_SF(VM_CONTEXT0_PAGE_TABLE_START_ADDR_LO32, LOGICAL_PAGE_NUMBER_LO32, mask_sh),\
-	MI_SF(VM_L2_PROTECTION_FAULT_DEFAULT_ADDR_HI32, PHYSICAL_PAGE_ADDR_HI4, mask_sh),\
-	MI_SF(VM_L2_PROTECTION_FAULT_DEFAULT_ADDR_LO32, PHYSICAL_PAGE_ADDR_LO32, mask_sh),\
-	MI_SF(MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB, PHYSICAL_PAGE_NUMBER_MSB, mask_sh),\
-	MI_SF(MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_LSB, PHYSICAL_PAGE_NUMBER_LSB, mask_sh),\
-	MI_SF(MC_VM_SYSTEM_APERTURE_LOW_ADDR, LOGICAL_ADDR, mask_sh)
+	REG_GET(MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB,
+			PHYSICAL_PAGE_NUMBER_MSB, &physical_page_number.high_part);
+	REG_GET(MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_LSB,
+			PHYSICAL_PAGE_NUMBER_LSB, &physical_page_number.low_part);
 
-#define DCN_MI_REG_FIELD_LIST(type) \
-	type HUBP_BLANK_EN;\
-	type HUBP_TTU_DISABLE;\
-	type NUM_PIPES;\
-	type NUM_BANKS;\
-	type PIPE_INTERLEAVE;\
-	type NUM_SE;\
-	type NUM_RB_PER_SE;\
-	type MAX_COMPRESSED_FRAGS;\
-	type SW_MODE;\
-	type META_LINEAR;\
-	type RB_ALIGNED;\
-	type PIPE_ALIGNED;\
-	type PITCH;\
-	type META_PITCH;\
-	type PITCH_C;\
-	type META_PITCH_C;\
-	type ROTATION_ANGLE;\
-	type H_MIRROR_EN;\
-	type SURFACE_PIXEL_FORMAT;\
-	type SURFACE_FLIP_TYPE;\
-	type SURFACE_UPDATE_LOCK;\
-	type SURFACE_UPDATE_PENDING;\
-	type PRIMARY_SURFACE_ADDRESS_HIGH;\
-	type PRIMARY_SURFACE_ADDRESS;\
-	type SECONDARY_SURFACE_ADDRESS_HIGH;\
-	type SECONDARY_SURFACE_ADDRESS;\
-	type PRIMARY_META_SURFACE_ADDRESS_HIGH;\
-	type PRIMARY_META_SURFACE_ADDRESS;\
-	type SECONDARY_META_SURFACE_ADDRESS_HIGH;\
-	type SECONDARY_META_SURFACE_ADDRESS;\
-	type PRIMARY_SURFACE_ADDRESS_HIGH_C;\
-	type PRIMARY_SURFACE_ADDRESS_C;\
-	type PRIMARY_META_SURFACE_ADDRESS_HIGH_C;\
-	type PRIMARY_META_SURFACE_ADDRESS_C;\
-	type SURFACE_INUSE_ADDRESS;\
-	type SURFACE_INUSE_ADDRESS_HIGH;\
-	type SURFACE_INUSE_ADDRESS_C;\
-	type SURFACE_INUSE_ADDRESS_HIGH_C;\
-	type SURFACE_EARLIEST_INUSE_ADDRESS;\
-	type SURFACE_EARLIEST_INUSE_ADDRESS_HIGH;\
-	type SURFACE_EARLIEST_INUSE_ADDRESS_C;\
-	type SURFACE_EARLIEST_INUSE_ADDRESS_HIGH_C;\
-	type PRIMARY_SURFACE_DCC_EN;\
-	type PRIMARY_SURFACE_DCC_IND_64B_BLK;\
-	type DET_BUF_PLANE1_BASE_ADDRESS;\
-	type CROSSBAR_SRC_CB_B;\
-	type CROSSBAR_SRC_CR_R;\
-	type DRQ_EXPANSION_MODE;\
-	type PRQ_EXPANSION_MODE;\
-	type MRQ_EXPANSION_MODE;\
-	type CRQ_EXPANSION_MODE;\
-	type CHUNK_SIZE;\
-	type MIN_CHUNK_SIZE;\
-	type META_CHUNK_SIZE;\
-	type MIN_META_CHUNK_SIZE;\
-	type DPTE_GROUP_SIZE;\
-	type MPTE_GROUP_SIZE;\
-	type SWATH_HEIGHT;\
-	type PTE_ROW_HEIGHT_LINEAR;\
-	type CHUNK_SIZE_C;\
-	type MIN_CHUNK_SIZE_C;\
-	type META_CHUNK_SIZE_C;\
-	type MIN_META_CHUNK_SIZE_C;\
-	type DPTE_GROUP_SIZE_C;\
-	type MPTE_GROUP_SIZE_C;\
-	type SWATH_HEIGHT_C;\
-	type PTE_ROW_HEIGHT_LINEAR_C;\
-	type REFCYC_H_BLANK_END;\
-	type DLG_V_BLANK_END;\
-	type MIN_DST_Y_NEXT_START;\
-	type REFCYC_PER_HTOTAL;\
-	type REFCYC_X_AFTER_SCALER;\
-	type DST_Y_AFTER_SCALER;\
-	type DST_Y_PREFETCH;\
-	type VRATIO_PREFETCH;\
-	type DST_Y_PER_VM_VBLANK;\
-	type DST_Y_PER_ROW_VBLANK;\
-	type REF_FREQ_TO_PIX_FREQ;\
-	type REFCYC_PER_PTE_GROUP_VBLANK_L;\
-	type REFCYC_PER_META_CHUNK_VBLANK_L;\
-	type DST_Y_PER_PTE_ROW_NOM_L;\
-	type REFCYC_PER_PTE_GROUP_NOM_L;\
-	type DST_Y_PER_META_ROW_NOM_L;\
-	type REFCYC_PER_META_CHUNK_NOM_L;\
-	type REFCYC_PER_LINE_DELIVERY_PRE_L;\
-	type REFCYC_PER_LINE_DELIVERY_PRE_C;\
-	type REFCYC_PER_LINE_DELIVERY_L;\
-	type REFCYC_PER_LINE_DELIVERY_C;\
-	type VRATIO_PREFETCH_C;\
-	type REFCYC_PER_PTE_GROUP_VBLANK_C;\
-	type REFCYC_PER_META_CHUNK_VBLANK_C;\
-	type DST_Y_PER_PTE_ROW_NOM_C;\
-	type REFCYC_PER_PTE_GROUP_NOM_C;\
-	type DST_Y_PER_META_ROW_NOM_C;\
-	type REFCYC_PER_META_CHUNK_NOM_C;\
-	type QoS_LEVEL_LOW_WM;\
-	type QoS_LEVEL_HIGH_WM;\
-	type MIN_TTU_VBLANK;\
-	type QoS_LEVEL_FLIP;\
-	type REFCYC_PER_REQ_DELIVERY;\
-	type QoS_LEVEL_FIXED;\
-	type QoS_RAMP_DISABLE;\
-	type REFCYC_PER_REQ_DELIVERY_PRE;\
-	type VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_MSB;\
-	type VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_LSB;\
-	type VM_CONTEXT0_PAGE_TABLE_START_ADDR_MSB;\
-	type VM_CONTEXT0_PAGE_TABLE_START_ADDR_LSB;\
-	type VM_CONTEXT0_PAGE_TABLE_END_ADDR_MSB;\
-	type VM_CONTEXT0_PAGE_TABLE_END_ADDR_LSB;\
-	type VM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR_MSB;\
-	type VM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR_LSB;\
-	type ENABLE_L1_TLB;\
-	type SYSTEM_ACCESS_MODE;\
-	type MC_VM_SYSTEM_APERTURE_DEFAULT_SYSTEM;\
-	type MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB;\
-	type MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_LSB;\
-	type MC_VM_SYSTEM_APERTURE_LOW_ADDR_MSB;\
-	type MC_VM_SYSTEM_APERTURE_LOW_ADDR_LSB;\
-	type MC_VM_SYSTEM_APERTURE_HIGH_ADDR_MSB;\
-	type MC_VM_SYSTEM_APERTURE_HIGH_ADDR_LSB;\
-	type SDPIF_FB_TOP;\
-	type SDPIF_FB_BASE;\
-	type SDPIF_FB_OFFSET;\
-	type SDPIF_AGP_BASE;\
-	type SDPIF_AGP_BOT;\
-	type SDPIF_AGP_TOP;\
-	type DCHUBBUB_ARB_WATERMARK_CHANGE_REQUEST;\
-	type DCHUBBUB_ARB_WATERMARK_CHANGE_DONE_INTERRUPT_DISABLE;\
-	type DCHUBBUB_ARB_ALLOW_SELF_REFRESH_FORCE_VALUE;\
-	type DCHUBBUB_ARB_ALLOW_SELF_REFRESH_FORCE_ENABLE;\
-	type DCHUBBUB_ARB_SAT_LEVEL;\
-	type DCHUBBUB_ARB_MIN_REQ_OUTSTAND;\
-	/* todo:  get these from GVM instead of reading registers ourselves */\
-	type PAGE_DIRECTORY_ENTRY_HI32;\
-	type PAGE_DIRECTORY_ENTRY_LO32;\
-	type LOGICAL_PAGE_NUMBER_HI4;\
-	type LOGICAL_PAGE_NUMBER_LO32;\
-	type PHYSICAL_PAGE_ADDR_HI4;\
-	type PHYSICAL_PAGE_ADDR_LO32;\
-	type PHYSICAL_PAGE_NUMBER_MSB;\
-	type PHYSICAL_PAGE_NUMBER_LSB;\
-	type LOGICAL_ADDR
+	REG_GET(MC_VM_SYSTEM_APERTURE_LOW_ADDR,
+			LOGICAL_ADDR, &logical_addr_low);
 
-struct dcn_mi_shift {
-	DCN_MI_REG_FIELD_LIST(uint8_t);
+	REG_GET(MC_VM_SYSTEM_APERTURE_HIGH_ADDR,
+			LOGICAL_ADDR, &logical_addr_high);
+
+	apt->sys_default.quad_part =  physical_page_number.quad_part << 12;
+	apt->sys_low.quad_part =  (int64_t)logical_addr_low << 18;
+	apt->sys_high.quad_part =  (int64_t)logical_addr_high << 18;
+}
+
+static void min10_set_vm_system_aperture_settings(struct dcn10_mem_input *mi,
+		struct vm_system_aperture_param *apt)
+{
+	PHYSICAL_ADDRESS_LOC mc_vm_apt_default;
+	PHYSICAL_ADDRESS_LOC mc_vm_apt_low;
+	PHYSICAL_ADDRESS_LOC mc_vm_apt_high;
+
+	mc_vm_apt_default.quad_part = apt->sys_default.quad_part >> 12;
+	mc_vm_apt_low.quad_part = apt->sys_low.quad_part >> 12;
+	mc_vm_apt_high.quad_part = apt->sys_high.quad_part >> 12;
+
+	REG_SET_2(DCN_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB, 0,
+		MC_VM_SYSTEM_APERTURE_DEFAULT_SYSTEM, 1, /* 1 = system physical memory */
+		MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_MSB, mc_vm_apt_default.high_part);
+	REG_SET(DCN_VM_SYSTEM_APERTURE_DEFAULT_ADDR_LSB, 0,
+		MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR_LSB, mc_vm_apt_default.low_part);
+
+	REG_SET(DCN_VM_SYSTEM_APERTURE_LOW_ADDR_MSB, 0,
+			MC_VM_SYSTEM_APERTURE_LOW_ADDR_MSB, mc_vm_apt_low.high_part);
+	REG_SET(DCN_VM_SYSTEM_APERTURE_LOW_ADDR_LSB, 0,
+			MC_VM_SYSTEM_APERTURE_LOW_ADDR_LSB, mc_vm_apt_low.low_part);
+
+	REG_SET(DCN_VM_SYSTEM_APERTURE_HIGH_ADDR_MSB, 0,
+			MC_VM_SYSTEM_APERTURE_HIGH_ADDR_MSB, mc_vm_apt_high.high_part);
+	REG_SET(DCN_VM_SYSTEM_APERTURE_HIGH_ADDR_LSB, 0,
+			MC_VM_SYSTEM_APERTURE_HIGH_ADDR_LSB, mc_vm_apt_high.low_part);
+}
+
+struct vm_context0_param {
+	PHYSICAL_ADDRESS_LOC pte_base;
+	PHYSICAL_ADDRESS_LOC pte_start;
+	PHYSICAL_ADDRESS_LOC pte_end;
+	PHYSICAL_ADDRESS_LOC fault_default;
 };
 
-struct dcn_mi_mask {
-	DCN_MI_REG_FIELD_LIST(uint32_t);
+/* Temporary read settings, future will get values from kmd directly */
+static void min10_read_vm_context0_settings(struct dcn10_mem_input *mi,
+		struct vm_context0_param *vm0)
+{
+	PHYSICAL_ADDRESS_LOC fb_base;
+	PHYSICAL_ADDRESS_LOC fb_offset;
+	uint32_t fb_base_value;
+	uint32_t fb_offset_value;
+
+	REG_GET(DCHUBBUB_SDPIF_FB_BASE, SDPIF_FB_BASE, &fb_base_value);
+	REG_GET(DCHUBBUB_SDPIF_FB_OFFSET, SDPIF_FB_OFFSET, &fb_offset_value);
+
+	REG_GET(VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_HI32,
+			PAGE_DIRECTORY_ENTRY_HI32, &vm0->pte_base.high_part);
+	REG_GET(VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_LO32,
+			PAGE_DIRECTORY_ENTRY_LO32, &vm0->pte_base.low_part);
+
+	REG_GET(VM_CONTEXT0_PAGE_TABLE_START_ADDR_HI32,
+			LOGICAL_PAGE_NUMBER_HI4, &vm0->pte_start.high_part);
+	REG_GET(VM_CONTEXT0_PAGE_TABLE_START_ADDR_LO32,
+			LOGICAL_PAGE_NUMBER_LO32, &vm0->pte_start.low_part);
+
+	REG_GET(VM_CONTEXT0_PAGE_TABLE_END_ADDR_HI32,
+			LOGICAL_PAGE_NUMBER_HI4, &vm0->pte_end.high_part);
+	REG_GET(VM_CONTEXT0_PAGE_TABLE_END_ADDR_LO32,
+			LOGICAL_PAGE_NUMBER_LO32, &vm0->pte_end.low_part);
+
+	REG_GET(VM_L2_PROTECTION_FAULT_DEFAULT_ADDR_HI32,
+			PHYSICAL_PAGE_ADDR_HI4, &vm0->fault_default.high_part);
+	REG_GET(VM_L2_PROTECTION_FAULT_DEFAULT_ADDR_LO32,
+			PHYSICAL_PAGE_ADDR_LO32, &vm0->fault_default.low_part);
+
+	/*
+	 * The values in VM_CONTEXT0_PAGE_TABLE_BASE_ADDR is in UMA space.
+	 * Therefore we need to do
+	 * DCN_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR = VM_CONTEXT0_PAGE_TABLE_BASE_ADDR
+	 * - DCHUBBUB_SDPIF_FB_OFFSET + DCHUBBUB_SDPIF_FB_BASE
+	 */
+	fb_base.quad_part = (uint64_t)fb_base_value << 24;
+	fb_offset.quad_part = (uint64_t)fb_offset_value << 24;
+	vm0->pte_base.quad_part += fb_base.quad_part;
+	vm0->pte_base.quad_part -= fb_offset.quad_part;
+}
+
+static void min10_set_vm_context0_settings(struct dcn10_mem_input *mi,
+		const struct vm_context0_param *vm0)
+{
+	/* pte base */
+	REG_SET(DCN_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_MSB, 0,
+			VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_MSB, vm0->pte_base.high_part);
+	REG_SET(DCN_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_LSB, 0,
+			VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_LSB, vm0->pte_base.low_part);
+
+	/* pte start */
+	REG_SET(DCN_VM_CONTEXT0_PAGE_TABLE_START_ADDR_MSB, 0,
+			VM_CONTEXT0_PAGE_TABLE_START_ADDR_MSB, vm0->pte_start.high_part);
+	REG_SET(DCN_VM_CONTEXT0_PAGE_TABLE_START_ADDR_LSB, 0,
+			VM_CONTEXT0_PAGE_TABLE_START_ADDR_LSB, vm0->pte_start.low_part);
+
+	/* pte end */
+	REG_SET(DCN_VM_CONTEXT0_PAGE_TABLE_END_ADDR_MSB, 0,
+			VM_CONTEXT0_PAGE_TABLE_END_ADDR_MSB, vm0->pte_end.high_part);
+	REG_SET(DCN_VM_CONTEXT0_PAGE_TABLE_END_ADDR_LSB, 0,
+			VM_CONTEXT0_PAGE_TABLE_END_ADDR_LSB, vm0->pte_end.low_part);
+
+	/* fault handling */
+	REG_SET(DCN_VM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR_MSB, 0,
+			VM_CONTEXT0_PAGE_TABLE_END_ADDR_MSB, vm0->fault_default.high_part);
+	/* VM_CONTEXT0_PROTECTION_FAULT_DEFAULT_SYSTEM, 0 */
+	REG_SET(DCN_VM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR_LSB, 0,
+			VM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR_LSB, vm0->fault_default.low_part);
+}
+
+static void min10_program_pte_vm(struct mem_input *mem_input,
+		enum surface_pixel_format format,
+		union dc_tiling_info *tiling_info,
+		enum dc_rotation_angle rotation)
+{
+	struct dcn10_mem_input *mi = TO_DCN10_MEM_INPUT(mem_input);
+	struct vm_system_aperture_param apt = { {{ 0 } } };
+	struct vm_context0_param vm0 = { { { 0 } } };
+
+
+	min10_read_vm_system_aperture_settings(mi, &apt);
+	min10_read_vm_context0_settings(mi, &vm0);
+
+	min10_set_vm_system_aperture_settings(mi, &apt);
+	min10_set_vm_context0_settings(mi, &vm0);
+
+	/* control: enable VM PTE*/
+	REG_SET_2(DCN_VM_MX_L1_TLB_CNTL, 0,
+			ENABLE_L1_TLB, 1,
+			SYSTEM_ACCESS_MODE, 3);
+}
+
+static struct mem_input_funcs dcn10_mem_input_funcs = {
+	.mem_input_program_display_marks = min10_program_display_marks,
+	.mem_input_program_surface_flip_and_addr =
+			min10_program_surface_flip_and_addr,
+	.mem_input_program_surface_config =
+			min10_program_surface_config,
+	.mem_input_is_flip_pending = min10_is_flip_pending,
+	.mem_input_setup = min10_setup,
+	.program_watermarks = min10_program_watermarks,
+	.mem_input_update_dchub = min10_update_dchub,
+	.mem_input_program_pte_vm = min10_program_pte_vm,
+	.set_blank = min10_set_blank,
+	.dcc_control = min10_dcc_control,
 };
 
-struct dcn10_mem_input {
-	struct mem_input base;
-	const struct dcn_mi_registers *mi_regs;
-	const struct dcn_mi_shift *mi_shift;
-	const struct dcn_mi_mask *mi_mask;
-};
+
+/*****************************************/
+/* Constructor, Destructor               */
+/*****************************************/
 
 bool dcn10_mem_input_construct(
 	struct dcn10_mem_input *mi,
@@ -587,7 +1084,15 @@ bool dcn10_mem_input_construct(
 	uint32_t inst,
 	const struct dcn_mi_registers *mi_regs,
 	const struct dcn_mi_shift *mi_shift,
-	const struct dcn_mi_mask *mi_mask);
+	const struct dcn_mi_mask *mi_mask)
+{
+	mi->base.funcs = &dcn10_mem_input_funcs;
+	mi->base.ctx = ctx;
+	mi->mi_regs = mi_regs;
+	mi->mi_shift = mi_shift;
+	mi->mi_mask = mi_mask;
+	mi->base.inst = inst;
 
+	return true;
+}
 
-#endif
