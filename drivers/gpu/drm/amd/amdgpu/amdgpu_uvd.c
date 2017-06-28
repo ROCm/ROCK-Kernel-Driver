@@ -38,7 +38,6 @@
 #include "amdgpu_uvd.h"
 #include "cikd.h"
 #include "uvd/uvd_4_2_d.h"
-#include "vf_error.h"
 
 /* 1 second timeout */
 #define UVD_IDLE_TIMEOUT	msecs_to_jiffies(1000)
@@ -176,7 +175,6 @@ int amdgpu_uvd_sw_init(struct amdgpu_device *adev)
 	if (r) {
 		dev_err(adev->dev, "amdgpu_uvd: Can't load firmware \"%s\"\n",
 			fw_name);
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_UVD_NOT_LOAD_FW, 0, 0);
 		return r;
 	}
 
@@ -184,7 +182,6 @@ int amdgpu_uvd_sw_init(struct amdgpu_device *adev)
 	if (r) {
 		dev_err(adev->dev, "amdgpu_uvd: Can't validate firmware \"%s\"\n",
 			fw_name);
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_UVD_NOT_VALIDATE_FW, 0, 0);
 		release_firmware(adev->uvd.fw);
 		adev->uvd.fw = NULL;
 		return r;
@@ -229,7 +226,6 @@ int amdgpu_uvd_sw_init(struct amdgpu_device *adev)
 				    &adev->uvd.gpu_addr, &adev->uvd.cpu_addr);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to allocate UVD bo\n", r);
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_ALLOC_UVD_BO_FAIL, 0, 0);
 		return r;
 	}
 

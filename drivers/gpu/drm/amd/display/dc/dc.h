@@ -54,8 +54,8 @@ struct dc_caps {
 
 
 struct dc_dcc_surface_param {
-	enum surface_pixel_format format;
 	struct dc_size surface_size;
+	enum surface_pixel_format format;
 	enum swizzle_mode_values swizzle_mode;
 	enum dc_scan_direction scan;
 };
@@ -67,9 +67,6 @@ struct dc_dcc_setting {
 };
 
 struct dc_surface_dcc_cap {
-	bool capable;
-	bool const_color_support;
-
 	union {
 		struct {
 			struct dc_dcc_setting rgb;
@@ -80,6 +77,9 @@ struct dc_surface_dcc_cap {
 			struct dc_dcc_setting chroma;
 		} video;
 	};
+
+	bool capable;
+	bool const_color_support;
 };
 
 struct dc_static_screen_events {
@@ -170,7 +170,9 @@ struct dc_debug {
 	bool disable_hubp_power_gate;
 	bool disable_pplib_wm_range;
 	bool use_dml_wm;
-	bool use_max_voltage;
+	bool disable_pipe_split;
+	int sr_exit_time_dpm0_ns;
+	int sr_enter_plus_exit_time_dpm0_ns;
 	int sr_exit_time_ns;
 	int sr_enter_plus_exit_time_ns;
 	int urgent_latency_ns;
@@ -201,12 +203,12 @@ enum frame_buffer_mode {
 } ;
 
 struct dchub_init_data {
-	bool dchub_initialzied;
-	bool dchub_info_valid;
 	int64_t zfb_phys_addr_base;
 	int64_t zfb_mc_base_addr;
 	uint64_t zfb_size_in_byte;
 	enum frame_buffer_mode fb_mode;
+	bool dchub_initialzied;
+	bool dchub_info_valid;
 };
 
 struct dc_init_data {
@@ -240,9 +242,6 @@ enum {
 };
 
 struct dc_hdr_static_metadata {
-	bool hdr_supported;
-	bool is_hdr;
-
 	/* display chromaticities and white point in units of 0.00001 */
 	unsigned int chromaticity_green_x;
 	unsigned int chromaticity_green_y;
@@ -257,13 +256,15 @@ struct dc_hdr_static_metadata {
 	uint32_t max_luminance;
 	uint32_t maximum_content_light_level;
 	uint32_t maximum_frame_average_light_level;
+
+	bool hdr_supported;
+	bool is_hdr;
 };
 
 enum dc_transfer_func_type {
 	TF_TYPE_PREDEFINED,
 	TF_TYPE_DISTRIBUTED_POINTS,
-	TF_TYPE_BYPASS,
-	TF_TYPE_UNKNOWN
+	TF_TYPE_BYPASS
 };
 
 struct dc_transfer_func_distributed_points {
@@ -285,15 +286,12 @@ enum dc_transfer_func_predefined {
 };
 
 struct dc_transfer_func {
+	struct dc_transfer_func_distributed_points tf_pts;
 	enum dc_transfer_func_type type;
 	enum dc_transfer_func_predefined tf;
-	struct dc_transfer_func_distributed_points tf_pts;
 };
 
 struct dc_surface {
-	bool per_pixel_alpha;
-	bool visible;
-	bool flip_immediate;
 	struct dc_plane_address address;
 
 	struct scaling_taps scaling_quality;
@@ -303,38 +301,42 @@ struct dc_surface {
 
 	union plane_size plane_size;
 	union dc_tiling_info tiling_info;
+
 	struct dc_plane_dcc_param dcc;
-	enum dc_color_space color_space;
-
-	enum surface_pixel_format format;
-	enum dc_rotation_angle rotation;
-	bool horizontal_mirror;
-	enum plane_stereo_format stereo_format;
-
 	struct dc_hdr_static_metadata hdr_static_ctx;
 
 	const struct dc_gamma *gamma_correction;
 	const struct dc_transfer_func *in_transfer_func;
+
+	enum dc_color_space color_space;
+	enum surface_pixel_format format;
+	enum dc_rotation_angle rotation;
+	enum plane_stereo_format stereo_format;
+
+	bool per_pixel_alpha;
+	bool visible;
+	bool flip_immediate;
+	bool horizontal_mirror;
 };
 
 struct dc_plane_info {
-	bool per_pixel_alpha;
 	union plane_size plane_size;
 	union dc_tiling_info tiling_info;
 	struct dc_plane_dcc_param dcc;
 	enum surface_pixel_format format;
 	enum dc_rotation_angle rotation;
-	bool horizontal_mirror;
 	enum plane_stereo_format stereo_format;
 	enum dc_color_space color_space; /*todo: wrong place, fits in scaling info*/
+	bool horizontal_mirror;
 	bool visible;
+	bool per_pixel_alpha;
 };
 
 struct dc_scaling_info {
-		struct rect src_rect;
-		struct rect dst_rect;
-		struct rect clip_rect;
-		struct scaling_taps scaling_quality;
+	struct rect src_rect;
+	struct rect dst_rect;
+	struct rect clip_rect;
+	struct scaling_taps scaling_quality;
 };
 
 struct dc_surface_update {
@@ -410,12 +412,6 @@ bool dc_commit_surfaces_to_stream(
 		uint8_t surface_count,
 		const struct dc_stream *stream);
 
-bool dc_pre_update_surfaces_to_stream(
-		struct dc *dc,
-		const struct dc_surface *const *new_surfaces,
-		uint8_t new_surface_count,
-		const struct dc_stream *stream);
-
 bool dc_post_update_surfaces_to_stream(
 		struct dc *dc);
 
@@ -460,24 +456,26 @@ enum surface_update_type {
 struct dc_stream {
 	const struct dc_sink *sink;
 	struct dc_crtc_timing timing;
-	enum signal_type output_signal;
-
-	enum dc_color_space output_color_space;
-	enum dc_dither_option dither_option;
 
 	struct rect src; /* composition area */
 	struct rect dst; /* stream addressable area */
 
 	struct audio_info audio_info;
 
-	bool ignore_msa_timing_param;
-
 	struct freesync_context freesync_ctx;
 
 	const struct dc_transfer_func *out_transfer_func;
 	struct colorspace_transform gamut_remap_matrix;
 	struct csc_transform csc_color_matrix;
+
+	enum signal_type output_signal;
+
+	enum dc_color_space output_color_space;
+	enum dc_dither_option dither_option;
+
 	enum view_3d_format view_format;
+
+	bool ignore_msa_timing_param;
 	/* TODO: custom INFO packets */
 	/* TODO: ABM info (DMCU) */
 	/* TODO: PSR info */
@@ -658,15 +656,19 @@ struct dc_link {
 	struct dc_lane_settings cur_lane_setting;
 
 	uint8_t ddc_hw_inst;
+
+	uint8_t hpd_src;
+
 	uint8_t link_enc_hw_inst;
 
 	bool test_pattern_enabled;
 	union compliance_test_state compliance_test_state;
 
 	void *priv;
-	bool aux_mode;
 
 	struct ddc_service *ddc;
+
+	bool aux_mode;
 };
 
 struct dpcd_caps {
@@ -682,12 +684,13 @@ struct dpcd_caps {
 	indicates 'Frame Sequential-to-lllFrame Pack' conversion capability.*/
 	struct dc_dongle_caps dongle_caps;
 
-	bool allow_invalid_MSA_timing_param;
-	bool panel_mode_edp;
 	uint32_t sink_dev_id;
 	uint32_t branch_dev_id;
 	int8_t branch_dev_name[6];
 	int8_t branch_hw_revision;
+
+	bool allow_invalid_MSA_timing_param;
+	bool panel_mode_edp;
 };
 
 struct dc_link_status {
@@ -787,13 +790,7 @@ struct dc_container_id {
 	unsigned short productCode;
 };
 
-struct stereo_3d_features {
-	bool supported			;
-	bool allTimings			;
-	bool cloneMode			;
-	bool scaling			;
-	bool singleFrameSWPacked;
-};
+
 
 /*
  * The sink structure contains EDID and other display device properties
@@ -804,9 +801,9 @@ struct dc_sink {
 	struct dc_edid_caps edid_caps; /* parse display caps */
 	struct dc_container_id *dc_container_id;
 	uint32_t dongle_max_pix_clk;
-	bool converter_disable_audio;
 	void *priv;
 	struct stereo_3d_features features_3d[TIMING_3D_FORMAT_MAX];
+	bool converter_disable_audio;
 };
 
 void dc_sink_retain(const struct dc_sink *sink);

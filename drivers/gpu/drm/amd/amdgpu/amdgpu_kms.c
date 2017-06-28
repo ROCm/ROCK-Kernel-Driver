@@ -35,7 +35,6 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 #include "amdgpu_amdkfd.h"
-#include "vf_error.h"
 
 /**
  * amdgpu_driver_unload_kms - Main unload function for KMS.
@@ -145,7 +144,6 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 	r = amdgpu_device_init(adev, dev, dev->pdev, flags);
 	if (r) {
 		dev_err(&dev->pdev->dev, "Fatal error during GPU init\n");
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_GPU_INIT_FATAL_FAIL, 0, 0);
 		goto out;
 	}
 

@@ -517,6 +517,7 @@ static void split_stream_across_pipes(
 	secondary_pipe->stream = primary_pipe->stream;
 	secondary_pipe->tg = primary_pipe->tg;
 
+	secondary_pipe->mpcc = pool->mpcc[secondary_pipe->pipe_idx];
 	secondary_pipe->mi = pool->mis[secondary_pipe->pipe_idx];
 	secondary_pipe->ipp = pool->ipps[secondary_pipe->pipe_idx];
 	secondary_pipe->xfm = pool->transforms[secondary_pipe->pipe_idx];
@@ -790,7 +791,7 @@ bool dcn_validate_bandwidth(
 	v->phyclk_per_state[1] = v->phyclkv_mid0p72;
 	v->phyclk_per_state[0] = v->phyclkv_min0p65;
 
-	if (dc->public.debug.use_max_voltage) {
+	if (dc->public.debug.disable_pipe_split) {
 		v->max_dppclk[1] = v->max_dppclk_vnom0p8;
 		v->max_dppclk[0] = v->max_dppclk_vnom0p8;
 	}
@@ -905,6 +906,21 @@ bool dcn_validate_bandwidth(
 	scaler_settings_calculation(v);
 	mode_support_and_system_configuration(v);
 
+	if (v->voltage_level == 0 &&
+			(dc->public.debug.sr_exit_time_dpm0_ns
+				|| dc->public.debug.sr_enter_plus_exit_time_dpm0_ns)) {
+		struct core_dc *dc_core = DC_TO_CORE(&dc->public);
+
+		if (dc->public.debug.sr_enter_plus_exit_time_dpm0_ns)
+			v->sr_enter_plus_exit_time =
+				dc->public.debug.sr_enter_plus_exit_time_dpm0_ns / 1000.0f;
+		if (dc->public.debug.sr_exit_time_dpm0_ns)
+			v->sr_exit_time =  dc->public.debug.sr_exit_time_dpm0_ns / 1000.0f;
+		dc_core->dml.soc.sr_enter_plus_exit_time_us = v->sr_enter_plus_exit_time;
+		dc_core->dml.soc.sr_exit_time_us = v->sr_exit_time;
+		mode_support_and_system_configuration(v);
+	}
+
 	if (v->voltage_level != 5) {
 		float bw_consumed = v->total_bandwidth_consumed_gbyte_per_second;
 		if (bw_consumed < v->fabric_and_dram_bandwidth_vmin0p65)
@@ -971,9 +987,7 @@ bool dcn_validate_bandwidth(
 			if (pipe->surface) {
 				struct pipe_ctx *hsplit_pipe = pipe->bottom_pipe;
 
-				if (v->dpp_per_plane[input_idx] == 2 ||
-						(pipe->stream->public.timing.timing_3d_format == TIMING_3D_FORMAT_TOP_AND_BOTTOM ||
-						 pipe->stream->public.timing.timing_3d_format == TIMING_3D_FORMAT_SIDE_BY_SIDE)) {
+				if (v->dpp_per_plane[input_idx] == 2) {
 					if (hsplit_pipe && hsplit_pipe->surface == pipe->surface) {
 						/* update previously split pipe */
 						hsplit_pipe->pipe_dlg_param.vupdate_width = v->v_update_width[input_idx];
@@ -1012,6 +1026,14 @@ bool dcn_validate_bandwidth(
 		if (dc->public.debug.use_dml_wm)
 			dcn_dml_wm_override(v, (struct display_mode_lib *)
 					&dc->dml, context, pool);
+	}
+
+	if (v->voltage_level == 0) {
+		struct core_dc *dc_core = DC_TO_CORE(&dc->public);
+
+		dc_core->dml.soc.sr_enter_plus_exit_time_us =
+				dc_core->dcn_soc.sr_enter_plus_exit_time;
+		dc_core->dml.soc.sr_exit_time_us = dc_core->dcn_soc.sr_exit_time;
 	}
 
 	kernel_fpu_end();

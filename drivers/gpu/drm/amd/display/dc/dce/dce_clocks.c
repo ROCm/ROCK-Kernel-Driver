@@ -246,6 +246,33 @@ static int dce_clocks_get_dp_ref_freq(struct display_clock *clk)
 	return dp_ref_clk_khz;
 }
 
+/* TODO: This is DCN DPREFCLK: it could be program by DENTIST by VBIOS
+ * or CLK0_CLK11 by SMU. For DCE120, it is wlays 600Mhz. Will re-visit
+ * clock implementation
+ */
+static int dce_clocks_get_dp_ref_freq_wrkaround(struct display_clock *clk)
+{
+	struct dce_disp_clk *clk_dce = TO_DCE_CLOCKS(clk);
+	int dp_ref_clk_khz = 600000;
+
+	if (clk_dce->ss_on_dprefclk && clk_dce->dprefclk_ss_divider != 0) {
+		struct fixed32_32 ss_percentage = dal_fixed32_32_div_int(
+				dal_fixed32_32_from_fraction(
+						clk_dce->dprefclk_ss_percentage,
+						clk_dce->dprefclk_ss_divider), 200);
+		struct fixed32_32 adj_dp_ref_clk_khz;
+
+		ss_percentage = dal_fixed32_32_sub(dal_fixed32_32_one,
+								ss_percentage);
+		adj_dp_ref_clk_khz =
+			dal_fixed32_32_mul_int(
+				ss_percentage,
+				dp_ref_clk_khz);
+		dp_ref_clk_khz = dal_fixed32_32_floor(adj_dp_ref_clk_khz);
+	}
+
+	return dp_ref_clk_khz;
+}
 static enum dm_pp_clocks_state dce_get_required_clocks_state(
 	struct display_clock *clk,
 	struct state_dependent_clocks *req_clocks)
@@ -587,11 +614,13 @@ static bool dce_apply_clock_voltage_request(
 	}
 	if (send_request) {
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
-	struct core_dc *core_dc = DC_TO_CORE(clk->ctx->dc);
-	/*use dcfclk request voltage*/
-		clock_voltage_req.clk_type = DM_PP_CLOCK_TYPE_DCFCLK;
-		clock_voltage_req.clocks_in_khz =
+		if (clk->ctx->dce_version == DCN_VERSION_1_0) {
+			struct core_dc *core_dc = DC_TO_CORE(clk->ctx->dc);
+			/*use dcfclk request voltage*/
+			clock_voltage_req.clk_type = DM_PP_CLOCK_TYPE_DCFCLK;
+			clock_voltage_req.clocks_in_khz =
 				dcn_find_dcfclk_suits_all(core_dc, &clk->cur_clocks_value);
+		}
 #endif
 		dm_pp_apply_clock_for_voltage_request(
 			clk->ctx, &clock_voltage_req);
@@ -605,7 +634,7 @@ static bool dce_apply_clock_voltage_request(
 
 
 static const struct display_clock_funcs dce120_funcs = {
-	.get_dp_ref_clk_frequency = dce_clocks_get_dp_ref_freq,
+	.get_dp_ref_clk_frequency = dce_clocks_get_dp_ref_freq_wrkaround,
 	.apply_clock_voltage_request = dce_apply_clock_voltage_request,
 	.set_clock = dce112_set_clock
 };
