@@ -440,8 +440,8 @@ static void calculate_viewport(struct pipe_ctx *pipe_ctx)
 	bool sec_split = pipe_ctx->top_pipe &&
 			pipe_ctx->top_pipe->surface == pipe_ctx->surface;
 
-	if (stream->timing.timing_3d_format == TIMING_3D_FORMAT_SIDE_BY_SIDE ||
-		stream->timing.timing_3d_format == TIMING_3D_FORMAT_TOP_AND_BOTTOM) {
+	if (stream->view_format == VIEW_3D_FORMAT_SIDE_BY_SIDE ||
+		stream->view_format == VIEW_3D_FORMAT_TOP_AND_BOTTOM) {
 		pri_split = false;
 		sec_split = false;
 	}
@@ -568,8 +568,7 @@ static void calculate_recout(struct pipe_ctx *pipe_ctx, struct view *recout_skip
 	/* Handle h & vsplit */
 	if (pipe_ctx->top_pipe && pipe_ctx->top_pipe->surface ==
 		pipe_ctx->surface) {
-		if (stream->public.timing.timing_3d_format ==
-			TIMING_3D_FORMAT_TOP_AND_BOTTOM) {
+		if (stream->public.view_format == VIEW_3D_FORMAT_TOP_AND_BOTTOM) {
 			pipe_ctx->scl_data.recout.height /= 2;
 			pipe_ctx->scl_data.recout.y += pipe_ctx->scl_data.recout.height;
 			/* Floor primary pipe, ceil 2ndary pipe */
@@ -581,8 +580,7 @@ static void calculate_recout(struct pipe_ctx *pipe_ctx, struct view *recout_skip
 		}
 	} else if (pipe_ctx->bottom_pipe &&
 			pipe_ctx->bottom_pipe->surface == pipe_ctx->surface) {
-		if (stream->public.timing.timing_3d_format ==
-			TIMING_3D_FORMAT_TOP_AND_BOTTOM)
+		if (stream->public.view_format == VIEW_3D_FORMAT_TOP_AND_BOTTOM)
 			pipe_ctx->scl_data.recout.height /= 2;
 		else
 			pipe_ctx->scl_data.recout.width /= 2;
@@ -626,7 +624,7 @@ static void calculate_scaling_ratios(struct pipe_ctx *pipe_ctx)
 					surf_src.height,
 					surface->dst_rect.height);
 
-	if (surface->stereo_format == PLANE_STEREO_FORMAT_SIDE_BY_SIDE)
+	if (stream->public.view_format == VIEW_3D_FORMAT_SIDE_BY_SIDE)
 		pipe_ctx->scl_data.ratios.horz.value *= 2;
 	else if (surface->stereo_format == PLANE_STEREO_FORMAT_TOP_AND_BOTTOM)
 		pipe_ctx->scl_data.ratios.vert.value *= 2;
@@ -1008,8 +1006,6 @@ static int acquire_first_split_pipe(
 
 		if (pipe_ctx->top_pipe &&
 				pipe_ctx->top_pipe->surface == pipe_ctx->surface) {
-			int mpc_idx = pipe_ctx->mpc_idx;
-
 			pipe_ctx->top_pipe->bottom_pipe = pipe_ctx->bottom_pipe;
 			if (pipe_ctx->bottom_pipe)
 				pipe_ctx->bottom_pipe->top_pipe = pipe_ctx->top_pipe;
@@ -1021,8 +1017,8 @@ static int acquire_first_split_pipe(
 			pipe_ctx->xfm = pool->transforms[i];
 			pipe_ctx->opp = pool->opps[i];
 			pipe_ctx->dis_clk = pool->display_clock;
+			pipe_ctx->mpcc = pool->mpcc[i];
 			pipe_ctx->pipe_idx = i;
-			pipe_ctx->mpc_idx = mpc_idx;
 
 			pipe_ctx->stream = stream;
 			return i;
@@ -1243,6 +1239,9 @@ static int acquire_first_free_pipe(
 		if (!res_ctx->pipe_ctx[i].stream) {
 			struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[i];
 
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+			pipe_ctx->mpcc = pool->mpcc[i];
+#endif
 			pipe_ctx->tg = pool->timing_generators[i];
 			pipe_ctx->mi = pool->mis[i];
 			pipe_ctx->ipp = pool->ipps[i];
@@ -1251,9 +1250,6 @@ static int acquire_first_free_pipe(
 			pipe_ctx->dis_clk = pool->display_clock;
 			pipe_ctx->pipe_idx = i;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
-			pipe_ctx->mpc_idx = -1;
-#endif
 
 			pipe_ctx->stream = stream;
 			return i;
@@ -1609,6 +1605,9 @@ static void set_avi_info_frame(
 	union hdmi_info_packet *hdmi_info = &info_frame.avi_info_packet.info_packet_hdmi;
 
 	color_space = pipe_ctx->stream->public.output_color_space;
+	if (color_space == COLOR_SPACE_UNKNOWN)
+		color_space = (stream->public.timing.pixel_encoding == PIXEL_ENCODING_RGB)?
+			COLOR_SPACE_SRGB:COLOR_SPACE_YCBCR709;
 
 	/* Initialize header */
 	hdmi_info->bits.header.info_frame_type = HDMI_INFOFRAME_TYPE_AVI;
@@ -1774,6 +1773,8 @@ static void set_vendor_info_packet(
 	enum dc_timing_3d_format format;
 
 	format = stream->public.timing.timing_3d_format;
+	if (stream->public.view_format == VIEW_3D_FORMAT_NONE)
+		format = TIMING_3D_FORMAT_NONE;
 
 	/* Can be different depending on packet content */
 	length = 5;

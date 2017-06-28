@@ -43,7 +43,6 @@
  */
 #include <drm/drmP.h>
 #include "amdgpu.h"
-#include "vf_error.h"
 
 static void amdgpu_sa_bo_remove_locked(struct amdgpu_sa_bo *sa_bo);
 static void amdgpu_sa_bo_try_free(struct amdgpu_sa_manager *sa_manager);
@@ -68,7 +67,6 @@ int amdgpu_sa_bo_manager_init(struct amdgpu_device *adev,
 			     0, NULL, NULL, &sa_manager->bo);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to allocate bo for manager\n", r);
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_BO_ALLOC_M_FAIL, 0, r);
 		return r;
 	}
 
@@ -101,7 +99,6 @@ int amdgpu_sa_bo_manager_start(struct amdgpu_device *adev,
 
 	if (sa_manager->bo == NULL) {
 		dev_err(adev->dev, "no bo for sa manager\n");
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_NO_BO_FOR_SA, 0, 0);
 		return -EINVAL;
 	}
 
@@ -109,14 +106,12 @@ int amdgpu_sa_bo_manager_start(struct amdgpu_device *adev,
 	r = amdgpu_bo_reserve(sa_manager->bo, false);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to reserve manager bo\n", r);
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_BO_RESERVE_FAIL, 0, r);
 		return r;
 	}
 	r = amdgpu_bo_pin(sa_manager->bo, sa_manager->domain, &sa_manager->gpu_addr);
 	if (r) {
 		amdgpu_bo_unreserve(sa_manager->bo);
 		dev_err(adev->dev, "(%d) failed to pin manager bo\n", r);
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_BO_PIN_FAIL, 0, r);
 		return r;
 	}
 	r = amdgpu_bo_kmap(sa_manager->bo, &sa_manager->cpu_ptr);
@@ -132,7 +127,6 @@ int amdgpu_sa_bo_manager_suspend(struct amdgpu_device *adev,
 
 	if (sa_manager->bo == NULL) {
 		dev_err(adev->dev, "no bo for sa manager\n");
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_NO_BO_FOR_SA, 0, 0);
 		return -EINVAL;
 	}
 

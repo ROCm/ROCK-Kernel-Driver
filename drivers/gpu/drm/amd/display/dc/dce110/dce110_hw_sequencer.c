@@ -1099,10 +1099,12 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 
 	pipe_ctx->scl_data.lb_params.alpha_en = pipe_ctx->bottom_pipe != 0;
 	/* program_scaler and allocate_mem_input are not new asic */
-	if (!pipe_ctx_old || memcmp(&pipe_ctx_old->scl_data,
-				&pipe_ctx->scl_data,
-				sizeof(struct scaler_data)) != 0)
+	if ((!pipe_ctx_old ||
+	     memcmp(&pipe_ctx_old->scl_data, &pipe_ctx->scl_data,
+		    sizeof(struct scaler_data)) != 0) &&
+	     pipe_ctx->surface) {
 		program_scaler(dc, pipe_ctx);
+	}
 
 	/* mst support - use total stream count */
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
@@ -1633,7 +1635,7 @@ enum dc_status dce110_apply_ctx_to_hw(
 	apply_min_clocks(dc, context, &clocks_state, true);
 
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
-	if (resource_parse_asic_id(dc->ctx->asic_id) == DCN_VERSION_1_0) {
+	if (dc->ctx->dce_version == DCN_VERSION_1_0) {
 		if (context->bw.dcn.calc_clk.fclk_khz
 				> dc->current_context->bw.dcn.cur_clk.fclk_khz) {
 			struct dm_pp_clock_for_voltage_req clock;
@@ -2057,6 +2059,11 @@ void dce110_update_pending_status(struct pipe_ctx *pipe_ctx)
 		pipe_ctx->mi->current_address = pipe_ctx->mi->request_address;
 
 	surface->status.current_address = pipe_ctx->mi->current_address;
+	if (pipe_ctx->mi->current_address.type == PLN_ADDR_TYPE_GRPH_STEREO &&
+			pipe_ctx->tg->funcs->is_stereo_left_eye) {
+		surface->status.is_right_eye =\
+				!pipe_ctx->tg->funcs->is_stereo_left_eye(pipe_ctx->tg);
+	}
 }
 
 void dce110_power_down(struct core_dc *dc)
@@ -2533,17 +2540,12 @@ static void dce110_apply_ctx_for_surface(
 
 static void dce110_power_down_fe(struct core_dc *dc, struct pipe_ctx *pipe)
 {
-	int i;
-
-	for (i = 0; i < dc->res_pool->pipe_count; i++)
-		if (&dc->current_context->res_ctx.pipe_ctx[i] == pipe)
-			break;
-
-	if (i == dc->res_pool->pipe_count)
+	/* Do not power down fe when stream is active on dce*/
+	if (pipe->stream)
 		return;
 
 	dc->hwss.enable_display_power_gating(
-		dc, i, dc->ctx->dc_bios, PIPE_GATING_CONTROL_ENABLE);
+		dc, pipe->pipe_idx, dc->ctx->dc_bios, PIPE_GATING_CONTROL_ENABLE);
 	if (pipe->xfm)
 		pipe->xfm->funcs->transform_reset(pipe->xfm);
 	memset(&pipe->scl_data, 0, sizeof(struct scaler_data));
@@ -2576,6 +2578,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.set_static_screen_control = set_static_screen_control,
 	.reset_hw_ctx_wrap = reset_hw_ctx_wrap,
 	.prog_pixclk_crtc_otg = dce110_prog_pixclk_crtc_otg,
+	.setup_stereo = NULL
 };
 
 bool dce110_hw_sequencer_construct(struct core_dc *dc)

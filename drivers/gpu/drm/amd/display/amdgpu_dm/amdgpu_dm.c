@@ -222,15 +222,15 @@ static void dm_pflip_high_irq(void *interrupt_params)
 
 
 	/* wakeup usersapce */
-	if (amdgpu_crtc->event
-			&& amdgpu_crtc->event->event.base.type
-			== DRM_EVENT_FLIP_COMPLETE) {
+	if (amdgpu_crtc->event) {
 		/* Update to correct count/ts if racing with vblank irq */
 		drm_accurate_vblank_count(&amdgpu_crtc->base);
 
 		drm_crtc_send_vblank_event(&amdgpu_crtc->base, amdgpu_crtc->event);
+
 		/* page flip completed. clean up */
 		amdgpu_crtc->event = NULL;
+
 	} else
 		WARN_ON(1);
 
@@ -1189,6 +1189,7 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	struct amdgpu_encoder *aencoder = NULL;
 	struct amdgpu_mode_info *mode_info = &adev->mode_info;
 	uint32_t link_cnt;
+	unsigned long possible_crtcs;
 
 	link_cnt = dm->dc->caps.max_links;
 	if (amdgpu_dm_mode_config_init(dm->adev)) {
@@ -1204,7 +1205,18 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 			goto fail_free_planes;
 		}
 		mode_info->planes[i]->base.type = mode_info->plane_type[i];
-		if (amdgpu_dm_plane_init(dm, mode_info->planes[i], 0xff)) {
+
+		/*
+		 * HACK: IGT tests expect that each plane can only have one
+		 * one possible CRTC. For now, set one CRTC for each
+		 * plane that is not an underlay, but still allow multiple
+		 * CRTCs for underlay planes.
+		 */
+		possible_crtcs = 1 << i;
+		if (i >= dm->dc->caps.max_streams)
+			possible_crtcs = 0xff;
+
+		if (amdgpu_dm_plane_init(dm, mode_info->planes[i], possible_crtcs)) {
 			DRM_ERROR("KMS: Failed to initialize plane\n");
 			goto fail_free_planes;
 		}
@@ -1328,102 +1340,6 @@ static u8 dm_get_backlight_level(struct amdgpu_encoder *amdgpu_encoder)
 	return 0;
 }
 
-/******************************************************************************
- * Page Flip functions
- ******************************************************************************/
-
-/**
- * dm_page_flip - called by amdgpu_flip_work_func(), which is triggered
- * 			via DRM IOCTL, by user mode.
- *
- * @adev: amdgpu_device pointer
- * @crtc_id: crtc to cleanup pageflip on
- * @crtc_base: new address of the crtc (GPU MC address)
- *
- * Does the actual pageflip (surface address update).
- */
-static void dm_page_flip(struct amdgpu_device *adev,
-			 int crtc_id, u64 crtc_base, bool async)
-{
-	struct amdgpu_crtc *acrtc;
-	const struct dc_stream *stream;
-	struct dc_flip_addrs addr = { {0} };
-	struct dc_surface_update surface_updates[1] = { {0} };
-
-	/*
-	 * TODO risk of concurrency issues
-	 *
-	 * This should guarded by the dal_mutex but we can't do this since the
-	 * caller uses a spin_lock on event_lock.
-	 *
-	 * If we wait on the dal_mutex a second page flip interrupt might come,
-	 * spin on the event_lock, disabling interrupts while it does so. At
-	 * this point the core can no longer be pre-empted and return to the
-	 * thread that waited on the dal_mutex and we're deadlocked.
-	 *
-	 * With multiple cores the same essentially happens but might just take
-	 * a little longer to lock up all cores.
-	 *
-	 * The reason we should lock on dal_mutex is so that we can be sure
-	 * nobody messes with acrtc->stream after we read and check its value.
-	 *
-	 * We might be able to fix our concurrency issues with a work queue
-	 * where we schedule all work items (mode_set, page_flip, etc.) and
-	 * execute them one by one. Care needs to be taken to still deal with
-	 * any potential concurrency issues arising from interrupt calls.
-	 */
-
-	acrtc = adev->mode_info.crtcs[crtc_id];
-	stream = acrtc->stream;
-
-
-	if (acrtc->pflip_status != AMDGPU_FLIP_NONE) {
-		DRM_ERROR("flip queue: acrtc %d, already busy\n", acrtc->crtc_id);
-		/* In commit tail framework this cannot happen */
-		BUG_ON(0);
-	}
-
-
-	/*
-	 * Received a page flip call after the display has been reset.
-	 * Just return in this case. Everything should be clean-up on reset.
-	 */
-
-	if (!stream) {
-		WARN_ON(1);
-		return;
-	}
-
-	addr.address.grph.addr.low_part = lower_32_bits(crtc_base);
-	addr.address.grph.addr.high_part = upper_32_bits(crtc_base);
-	addr.flip_immediate = async;
-
-
-	if (acrtc->base.state->event &&
-	    acrtc->base.state->event->event.base.type ==
-			    DRM_EVENT_FLIP_COMPLETE) {
-		acrtc->event = acrtc->base.state->event;
-
-		/* Set the flip status */
-		acrtc->pflip_status = AMDGPU_FLIP_SUBMITTED;
-
-		/* Mark this event as consumed */
-		acrtc->base.state->event = NULL;
-	}
-
-	surface_updates->surface = dc_stream_get_status(stream)->surfaces[0];
-	surface_updates->flip_addr = &addr;
-
-
-	dc_update_surfaces_for_stream(adev->dm.dc, surface_updates, 1, stream);
-
-	DRM_DEBUG_DRIVER("%s Flipping to hi: 0x%x, low: 0x%x \n",
-			 __func__,
-			 addr.address.grph.addr.high_part,
-			 addr.address.grph.addr.low_part);
-
-}
-
 static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 				struct drm_file *filp)
 {
@@ -1465,7 +1381,6 @@ static const struct amdgpu_display_funcs dm_display_funcs = {
 	.hpd_sense = NULL,/* called unconditionally */
 	.hpd_set_polarity = NULL, /* called unconditionally */
 	.hpd_get_gpio_reg = NULL, /* VBIOS parsing. DAL does it. */
-	.page_flip = dm_page_flip, /* called unconditionally */
 	.page_flip_get_scanoutpos =
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */

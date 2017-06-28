@@ -36,7 +36,6 @@
 #include "soc15_common.h"
 #include "clearstate_gfx9.h"
 #include "v9_structs.h"
-#include "vf_error.h"
 
 #define GFX9_NUM_GFX_RINGS     1
 #define GFX9_MEC_HPD_SIZE 2048
@@ -549,7 +548,6 @@ out:
 		dev_err(adev->dev,
 			"gfx9: Failed to load firmware \"%s\"\n",
 			fw_name);
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_GFX_LOAD_FW_FAIL, 0, 0);
 		release_firmware(adev->gfx.pfp_fw);
 		adev->gfx.pfp_fw = NULL;
 		release_firmware(adev->gfx.me_fw);
@@ -1083,7 +1081,6 @@ static int gfx_v9_0_ngg_create_buf(struct amdgpu_device *adev,
 
 	if (size_se < 0) {
 		dev_err(adev->dev, "Buffer size is invalid: %d\n", size_se);
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_BUFL_SIZE_INVALID, 0, size_se);
 		return -EINVAL;
 	}
 	size_se = size_se ? size_se : default_size_se;
@@ -1096,7 +1093,6 @@ static int gfx_v9_0_ngg_create_buf(struct amdgpu_device *adev,
 				    NULL);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to create NGG buffer\n", r);
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_NGG_CREATE_BUF_FAIL, 0, r);
 		return r;
 	}
 	ngg_buf->bo_size = amdgpu_bo_size(ngg_buf->bo);
@@ -1141,7 +1137,6 @@ static int gfx_v9_0_ngg_init(struct amdgpu_device *adev)
 				    64 * 1024);
 	if (r) {
 		dev_err(adev->dev, "Failed to create Primitive Buffer\n");
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_NGG_CREATE_PR_BUF_FAIL, 0, r);
 		goto err;
 	}
 
@@ -1151,7 +1146,6 @@ static int gfx_v9_0_ngg_init(struct amdgpu_device *adev)
 				    256 * 1024);
 	if (r) {
 		dev_err(adev->dev, "Failed to create Position Buffer\n");
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_NGG_CREATE_PO_BUF_FAIL, 0, r);
 		goto err;
 	}
 
@@ -1161,7 +1155,6 @@ static int gfx_v9_0_ngg_init(struct amdgpu_device *adev)
 				    256);
 	if (r) {
 		dev_err(adev->dev, "Failed to create Control Sideband Buffer\n");
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_NGG_CREATE_CS_BUF_FAIL, 0, r);
 		goto err;
 	}
 
@@ -1174,7 +1167,6 @@ static int gfx_v9_0_ngg_init(struct amdgpu_device *adev)
 				    512 * 1024);
 	if (r) {
 		dev_err(adev->dev, "Failed to create Parameter Cache\n");
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_NGG_CREATE_PC_BUF_FAIL, 0, r);
 		goto err;
 	}
 
@@ -1357,21 +1349,18 @@ static int gfx_v9_0_sw_init(void *handle)
 	r = gfx_v9_0_init_microcode(adev);
 	if (r) {
 		DRM_ERROR("Failed to load gfx firmware!\n");
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_LOAD_GFX_FIRMWARE_FAIL, 0, 0);
 		return r;
 	}
 
 	r = gfx_v9_0_rlc_init(adev);
 	if (r) {
 		DRM_ERROR("Failed to init rlc BOs!\n");
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_RLC_BO_INIT_FAIL, 0, 0);
 		return r;
 	}
 
 	r = gfx_v9_0_mec_init(adev);
 	if (r) {
 		DRM_ERROR("Failed to init MEC BOs!\n");
-		amdgpu_put_vf_error(AMDGIM_ERROR_VF_MEC_BO_INIT_FAIL, 0, 0);
 		return r;
 	}
 
@@ -4427,6 +4416,20 @@ static void gfx_v9_0_set_gds_init(struct amdgpu_device *adev)
 	}
 }
 
+static void gfx_v9_0_set_user_cu_inactive_bitmap(struct amdgpu_device *adev,
+						 u32 bitmap)
+{
+	u32 data;
+
+	if (!bitmap)
+		return;
+
+	data = bitmap << GC_USER_SHADER_ARRAY_CONFIG__INACTIVE_CUS__SHIFT;
+	data &= GC_USER_SHADER_ARRAY_CONFIG__INACTIVE_CUS_MASK;
+
+	WREG32_SOC15(GC, 0, mmGC_USER_SHADER_ARRAY_CONFIG, data);
+}
+
 static u32 gfx_v9_0_get_cu_active_bitmap(struct amdgpu_device *adev)
 {
 	u32 data, mask;
@@ -4447,9 +4450,12 @@ static int gfx_v9_0_get_cu_info(struct amdgpu_device *adev,
 {
 	int i, j, k, counter, active_cu_number = 0;
 	u32 mask, bitmap, ao_bitmap, ao_cu_mask = 0;
+	unsigned disable_masks[4 * 2];
 
 	if (!adev || !cu_info)
 		return -EINVAL;
+
+	amdgpu_gfx_parse_disable_cu(disable_masks, 4, 2);
 
 	mutex_lock(&adev->grbm_idx_mutex);
 	for (i = 0; i < adev->gfx.config.max_shader_engines; i++) {
@@ -4458,6 +4464,9 @@ static int gfx_v9_0_get_cu_info(struct amdgpu_device *adev,
 			ao_bitmap = 0;
 			counter = 0;
 			gfx_v9_0_select_se_sh(adev, i, j, 0xffffffff);
+			if (i < 4 && j < 2)
+				gfx_v9_0_set_user_cu_inactive_bitmap(
+					adev, disable_masks[i * 2 + j]);
 			bitmap = gfx_v9_0_get_cu_active_bitmap(adev);
 			cu_info->bitmap[i][j] = bitmap;
 
