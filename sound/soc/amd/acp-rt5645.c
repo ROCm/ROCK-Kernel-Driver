@@ -189,7 +189,7 @@ static int cz_remove(struct platform_device *pdev)
 }
 
 static const struct acpi_device_id cz_audio_acpi_match[] = {
-	{ "I2SC1002", 0 },
+	{ "AMDI1002", 0 },
 	{},
 };
 
