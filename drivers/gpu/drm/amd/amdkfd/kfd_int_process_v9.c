@@ -122,7 +122,7 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 		info.prot_read  = ring_id & 0x10;
 		info.prot_write = ring_id & 0x20;
 
-		kfd_process_vm_fault(dev->dqm, pasid);
+		kfd_process_vm_fault(dev->dqm, pasid, false);
 		kfd_signal_vm_fault_event(dev, pasid, &info);
 	}
 }
