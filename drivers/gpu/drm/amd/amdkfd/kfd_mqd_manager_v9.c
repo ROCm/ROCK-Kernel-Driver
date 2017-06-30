@@ -167,7 +167,7 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 		m->cp_hqd_ctx_save_size = q->ctx_save_restore_area_size;
 		m->cp_hqd_cntl_stack_size = q->ctl_stack_size;
 		m->cp_hqd_cntl_stack_offset = q->ctl_stack_size;
-		m->cp_hqd_wg_state_offset = 0;
+		m->cp_hqd_wg_state_offset = q->ctl_stack_size;
 	}
 
 	*mqd = m;
@@ -307,7 +307,8 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 
 	*ctl_stack_used_size = m->cp_hqd_cntl_stack_size -
 		m->cp_hqd_cntl_stack_offset;
-	*save_area_used_size = m->cp_hqd_wg_state_offset;
+	*save_area_used_size = m->cp_hqd_wg_state_offset -
+		m->cp_hqd_cntl_stack_size;
 
 	if (copy_to_user(ctl_stack, mqd_ctl_stack, m->cp_hqd_cntl_stack_size))
 		return -EFAULT;
