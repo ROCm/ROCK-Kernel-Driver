@@ -1657,7 +1657,7 @@ void device_queue_manager_uninit(struct device_queue_manager *dqm)
 }
 
 int kfd_process_vm_fault(struct device_queue_manager *dqm,
-				unsigned int pasid)
+			 unsigned int pasid, bool reset)
 {
 	struct kfd_process_device *pdd;
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
@@ -1667,7 +1667,7 @@ int kfd_process_vm_fault(struct device_queue_manager *dqm,
 		return -EINVAL;
 	pdd = kfd_get_process_device_data(dqm->dev, p);
 	if (pdd)
-		ret = process_evict_queues(dqm, &pdd->qpd, true);
+		ret = process_evict_queues(dqm, &pdd->qpd, reset);
 	kfd_unref_process(p);
 
 	return ret;

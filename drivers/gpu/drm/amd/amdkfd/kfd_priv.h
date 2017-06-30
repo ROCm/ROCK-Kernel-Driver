@@ -908,7 +908,7 @@ struct kernel_queue *kernel_queue_init(struct kfd_dev *dev,
 					enum kfd_queue_type type);
 void kernel_queue_uninit(struct kernel_queue *kq);
 int kfd_process_vm_fault(struct device_queue_manager *dqm,
-				unsigned int pasid);
+			 unsigned int pasid, bool reset);
 
 /* Process Queue Manager */
 struct process_queue_node {
