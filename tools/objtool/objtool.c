@@ -46,7 +46,7 @@ static const char objtool_usage_string[] =
 
 static struct cmd_struct objtool_cmds[] = {
 	{"check",	cmd_check,	"Perform stack metadata validation on an object file" },
-	{"undwarf",	cmd_undwarf,	"Generate in-place undwarf metadata for an object file" },
+	{"orc",		cmd_orc,	"Generate in-place orc metadata for an object file" },
 };
 
 bool help;

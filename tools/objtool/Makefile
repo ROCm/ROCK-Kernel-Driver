@@ -53,8 +53,8 @@ $(OBJTOOL): $(LIBSUBCMD) $(OBJTOOL_IN)
 	diff -I'^#include' arch/x86/insn/inat_types.h ../../arch/x86/include/asm/inat_types.h >/dev/null) \
 	|| echo "warning: objtool: x86 instruction decoder differs from kernel" >&2 )) || true
 	@(test -d ../../kernel -a -d ../../tools -a -d ../objtool && (( \
-	diff ../../arch/x86/include/asm/undwarf-types.h undwarf-types.h >/dev/null) \
-	|| echo "warning: objtool: undwarf-types.h differs from kernel" >&2 )) || true
+	diff ../../arch/x86/include/asm/orc_types.h orc_types.h >/dev/null) \
+	|| echo "warning: objtool: orc_types.h differs from kernel" >&2 )) || true
 	$(QUIET_LINK)$(CC) $(OBJTOOL_IN) $(LDFLAGS) -o $@
 
 

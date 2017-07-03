@@ -16,10 +16,10 @@
  */
 
 /*
- * objtool undwarf:
+ * objtool orc:
  *
- * This command analyzes a .o file and adds an .undwarf section to it, which is
- * used by the in-kernel "undwarf" unwinder.
+ * This command analyzes a .o file and adds .orc_unwind and .orc_unwind_ip
+ * sections to it, which is used by the in-kernel orc unwinder.
  *
  * This command is a superset of "objtool check".
  */
@@ -30,24 +30,24 @@
 #include "check.h"
 
 
-static const char *undwarf_usage[] = {
-	"objtool undwarf generate [<options>] file.o",
-	"objtool undwarf dump file.o",
+static const char *orc_usage[] = {
+	"objtool orc generate [<options>] file.o",
+	"objtool orc dump file.o",
 	NULL,
 };
 
 extern const struct option check_options[];
 extern bool nofp;
 
-int cmd_undwarf(int argc, const char **argv)
+int cmd_orc(int argc, const char **argv)
 {
 	const char *objname;
 
 	argc--; argv++;
 	if (!strncmp(argv[0], "gen", 3)) {
-		argc = parse_options(argc, argv, check_options, undwarf_usage, 0);
+		argc = parse_options(argc, argv, check_options, orc_usage, 0);
 		if (argc != 1)
-			usage_with_options(undwarf_usage, check_options);
+			usage_with_options(orc_usage, check_options);
 
 		objname = argv[0];
 
@@ -57,14 +57,14 @@ int cmd_undwarf(int argc, const char **argv)
 
 	if (!strcmp(argv[0], "dump")) {
 		if (argc != 2)
-			usage_with_options(undwarf_usage, check_options);
+			usage_with_options(orc_usage, check_options);
 
 		objname = argv[1];
 
-		return undwarf_dump(objname);
+		return orc_dump(objname);
 	}
 
-	usage_with_options(undwarf_usage, check_options);
+	usage_with_options(orc_usage, check_options);
 
 	return 0;
 }

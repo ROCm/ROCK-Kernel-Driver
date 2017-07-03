@@ -669,22 +669,22 @@
 #define BUG_TABLE
 #endif
 
-#ifdef CONFIG_UNDWARF_UNWINDER
-#define UNDWARF_TABLE							\
+#ifdef CONFIG_ORC_UNWINDER
+#define ORC_UNWIND_TABLE						\
 	. = ALIGN(4);							\
-	.undwarf_ip : AT(ADDR(.undwarf_ip) - LOAD_OFFSET) {		\
-		VMLINUX_SYMBOL(__start_undwarf_ip) = .;			\
-		KEEP(*(.undwarf_ip))					\
-		VMLINUX_SYMBOL(__stop_undwarf_ip) = .;			\
+	.orc_unwind_ip : AT(ADDR(.orc_unwind_ip) - LOAD_OFFSET) {	\
+		VMLINUX_SYMBOL(__start_orc_unwind_ip) = .;		\
+		KEEP(*(.orc_unwind_ip))					\
+		VMLINUX_SYMBOL(__stop_orc_ip) = .;			\
 	}								\
-	. = ALIGN(8);							\
-	.undwarf : AT(ADDR(.undwarf) - LOAD_OFFSET) {			\
-		VMLINUX_SYMBOL(__start_undwarf) = .;			\
-		KEEP(*(.undwarf))					\
-		VMLINUX_SYMBOL(__stop_undwarf) = .;			\
+	. = ALIGN(6);							\
+	.orc_unwind : AT(ADDR(.orc_unwind) - LOAD_OFFSET) {		\
+		VMLINUX_SYMBOL(__start_orc_unwind) = .;			\
+		KEEP(*(.orc_unwind))					\
+		VMLINUX_SYMBOL(__stop_orc) = .;				\
 	}
 #else
-#define UNDWARF_TABLE
+#define ORC_UNWIND_TABLE
 #endif
 
 #ifdef CONFIG_PM_TRACE

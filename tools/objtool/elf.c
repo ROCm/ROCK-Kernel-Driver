@@ -361,12 +361,12 @@ struct elf *elf_open(const char *name, int flags)
 		goto err;
 	}
 
-	if (flags & O_WRONLY)
-		cmd = ELF_C_WRITE;
-	else if (flags & O_RDWR)
-		cmd = ELF_C_RDWR;
-	else
+	if ((flags & O_ACCMODE) == O_RDONLY)
 		cmd = ELF_C_READ_MMAP;
+	else if ((flags & O_ACCMODE) == O_RDWR)
+		cmd = ELF_C_RDWR;
+	else /* O_WRONLY */
+		cmd = ELF_C_WRITE;
 
 	elf->elf = elf_begin(elf->fd, cmd, NULL);
 	if (!elf->elf) {

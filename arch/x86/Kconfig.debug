@@ -357,13 +357,12 @@ config PUNIT_ATOM_DEBUG
 	  The current power state can be read from
 	  /sys/kernel/debug/punit_atom/dev_power_state
 
-config UNDWARF_UNWINDER
-	bool "undwarf unwinder"
+config ORC_UNWINDER
+	bool "Orc unwinder"
 	depends on X86_64
 	select STACK_VALIDATION
-	select SORTTABLE
 	---help---
-	  This option enables the "undwarf" unwinder for unwinding kernel stack
+	  This option enables the "orc" unwinder for unwinding kernel stack
 	  traces.  It uses a custom data format which is a simplified version
 	  of the DWARF Call Frame Information standard.
 
@@ -373,14 +372,14 @@ config UNDWARF_UNWINDER
 	  disabled.
 
 	  Enabling this option will increase the kernel's runtime memory usage
-	  by roughly 3-5MB, depending on your kernel config.
+	  by roughly 2-4MB, depending on your kernel config.
 
 config FRAME_POINTER_UNWINDER
 	def_bool y
-	depends on !UNDWARF_UNWINDER && FRAME_POINTER
+	depends on !ORC_UNWINDER && FRAME_POINTER
 
 config GUESS_UNWINDER
 	def_bool y
-	depends on !UNDWARF_UNWINDER && !FRAME_POINTER
+	depends on !ORC_UNWINDER && !FRAME_POINTER
 
 endmenu

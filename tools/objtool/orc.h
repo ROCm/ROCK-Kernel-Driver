@@ -15,16 +15,16 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _UNDWARF_H
-#define _UNDWARF_H
+#ifndef _ORC_H
+#define _ORC_H
 
-#include "undwarf-types.h"
+#include "orc_types.h"
 
 struct objtool_file;
 
-int create_undwarf(struct objtool_file *file);
-int create_undwarf_sections(struct objtool_file *file);
+int create_orc(struct objtool_file *file);
+int create_orc_sections(struct objtool_file *file);
 
-int undwarf_dump(const char *objname);
+int orc_dump(const char *objname);
 
-#endif /* _UNDWARF_H */
+#endif /* _ORC_H */

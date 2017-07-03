@@ -928,38 +928,38 @@ static int read_unwind_hints(struct objtool_file *file)
 
 		insn->hint = true;
 
-		switch (hint->cfa_reg) {
-		case UNDWARF_REG_UNDEFINED:
+		switch (hint->sp_reg) {
+		case ORC_REG_UNDEFINED:
 			cfa->base = CFI_UNDEFINED;
 			break;
-		case UNDWARF_REG_SP:
+		case ORC_REG_SP:
 			cfa->base = CFI_SP;
 			break;
-		case UNDWARF_REG_BP:
+		case ORC_REG_BP:
 			cfa->base = CFI_BP;
 			break;
-		case UNDWARF_REG_SP_INDIRECT:
+		case ORC_REG_SP_INDIRECT:
 			cfa->base = CFI_SP_INDIRECT;
 			break;
-		case UNDWARF_REG_R10:
+		case ORC_REG_R10:
 			cfa->base = CFI_R10;
 			break;
-		case UNDWARF_REG_R13:
+		case ORC_REG_R13:
 			cfa->base = CFI_R13;
 			break;
-		case UNDWARF_REG_DI:
+		case ORC_REG_DI:
 			cfa->base = CFI_DI;
 			break;
-		case UNDWARF_REG_DX:
+		case ORC_REG_DX:
 			cfa->base = CFI_DX;
 			break;
 		default:
-			WARN_FUNC("unsupported unwind_hint cfa base reg %d",
-				  insn->sec, insn->offset, hint->cfa_reg);
+			WARN_FUNC("unsupported unwind_hint sp base reg %d",
+				  insn->sec, insn->offset, hint->sp_reg);
 			return -1;
 		}
 
-		cfa->offset = hint->cfa_offset;
+		cfa->offset = hint->sp_offset;
 		insn->state.type = hint->type;
 	}
 
@@ -1152,8 +1152,7 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 		return 0;
 	}
 
-	if (state->type == UNDWARF_TYPE_REGS ||
-	    state->type == UNDWARF_TYPE_REGS_IRET)
+	if (state->type == ORC_TYPE_REGS || state->type == ORC_TYPE_REGS_IRET)
 		return update_insn_state_regs(insn, state);
 
 	switch (op->dest.type) {
@@ -1804,7 +1803,7 @@ static void cleanup(struct objtool_file *file)
 	elf_close(file->elf);
 }
 
-int check(const char *_objname, bool _nofp, bool undwarf)
+int check(const char *_objname, bool _nofp, bool orc)
 {
 	struct objtool_file file;
 	int ret, warnings = 0;
@@ -1812,7 +1811,7 @@ int check(const char *_objname, bool _nofp, bool undwarf)
 	objname = _objname;
 	nofp = _nofp;
 
-	file.elf = elf_open(objname, undwarf ? O_RDWR : O_RDONLY);
+	file.elf = elf_open(objname, orc ? O_RDWR : O_RDONLY);
 	if (!file.elf)
 		return 1;
 
@@ -1851,12 +1850,12 @@ int check(const char *_objname, bool _nofp, bool undwarf)
 		warnings += ret;
 	}
 
-	if (undwarf) {
-		ret = create_undwarf(&file);
+	if (orc) {
+		ret = create_orc(&file);
 		if (ret < 0)
 			goto out;
 
-		ret = create_undwarf_sections(&file);
+		ret = create_orc_sections(&file);
 		if (ret < 0)
 			goto out;
 

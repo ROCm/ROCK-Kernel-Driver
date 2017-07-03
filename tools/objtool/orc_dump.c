@@ -16,43 +16,43 @@
  */
 
 #include <unistd.h>
-#include "undwarf.h"
+#include "orc.h"
 #include "warn.h"
 
 static const char *reg_name(unsigned int reg)
 {
 	switch (reg) {
-	case UNDWARF_REG_CFA:
-		return "cfa";
-	case UNDWARF_REG_DX:
+	case ORC_REG_PREV_SP:
+		return "prevsp";
+	case ORC_REG_DX:
 		return "dx";
-	case UNDWARF_REG_DI:
+	case ORC_REG_DI:
 		return "di";
-	case UNDWARF_REG_BP:
+	case ORC_REG_BP:
 		return "bp";
-	case UNDWARF_REG_SP:
+	case ORC_REG_SP:
 		return "sp";
-	case UNDWARF_REG_R10:
+	case ORC_REG_R10:
 		return "r10";
-	case UNDWARF_REG_R13:
+	case ORC_REG_R13:
 		return "r13";
-	case UNDWARF_REG_BP_INDIRECT:
+	case ORC_REG_BP_INDIRECT:
 		return "bp(ind)";
-	case UNDWARF_REG_SP_INDIRECT:
+	case ORC_REG_SP_INDIRECT:
 		return "sp(ind)";
 	default:
 		return "?";
 	}
 }
 
-static const char *undwarf_type_name(unsigned int type)
+static const char *orc_type_name(unsigned int type)
 {
 	switch (type) {
-	case UNDWARF_TYPE_CFA:
-		return "cfa";
-	case UNDWARF_TYPE_REGS:
+	case ORC_TYPE_CALL:
+		return "call";
+	case ORC_TYPE_REGS:
 		return "regs";
-	case UNDWARF_TYPE_REGS_IRET:
+	case ORC_TYPE_REGS_IRET:
 		return "iret";
 	default:
 		return "?";
@@ -61,29 +61,29 @@ static const char *undwarf_type_name(unsigned int type)
 
 static void print_reg(unsigned int reg, int offset)
 {
-	if (reg == UNDWARF_REG_BP_INDIRECT)
+	if (reg == ORC_REG_BP_INDIRECT)
 		printf("(bp%+d)", offset);
-	else if (reg == UNDWARF_REG_SP_INDIRECT)
+	else if (reg == ORC_REG_SP_INDIRECT)
 		printf("(sp%+d)", offset);
-	else if (reg == UNDWARF_REG_UNDEFINED)
+	else if (reg == ORC_REG_UNDEFINED)
 		printf("(und)");
 	else
 		printf("%s%+d", reg_name(reg), offset);
 }
 
-int undwarf_dump(const char *_objname)
+int orc_dump(const char *_objname)
 {
-	int fd, nr_entries, i, *undwarf_ip = NULL, undwarf_size = 0;
-	struct undwarf *undwarf = NULL;
+	int fd, nr_entries, i, *orc_ip = NULL, orc_size = 0;
+	struct orc_entry *orc = NULL;
 	char *name;
-	unsigned long nr_sections, undwarf_ip_addr = 0;
+	unsigned long nr_sections, orc_ip_addr = 0;
 	size_t shstrtab_idx;
 	Elf *elf;
 	Elf_Scn *scn;
 	GElf_Shdr sh;
 	GElf_Rela rela;
 	GElf_Sym sym;
-	Elf_Data *data, *symtab = NULL, *rela_undwarf_ip = NULL;
+	Elf_Data *data, *symtab = NULL, *rela_orc_ip = NULL;
 
 
 	objname = _objname;
@@ -138,29 +138,29 @@ int undwarf_dump(const char *_objname)
 
 		if (!strcmp(name, ".symtab")) {
 			symtab = data;
-		} else if (!strcmp(name, ".undwarf")) {
-			undwarf = data->d_buf;
-			undwarf_size = sh.sh_size;
-		} else if (!strcmp(name, ".undwarf_ip")) {
-			undwarf_ip = data->d_buf;
-			undwarf_ip_addr = sh.sh_addr;
-		} else if (!strcmp(name, ".rela.undwarf_ip")) {
-			rela_undwarf_ip = data;
+		} else if (!strcmp(name, ".orc_unwind")) {
+			orc = data->d_buf;
+			orc_size = sh.sh_size;
+		} else if (!strcmp(name, ".orc_unwind_ip")) {
+			orc_ip = data->d_buf;
+			orc_ip_addr = sh.sh_addr;
+		} else if (!strcmp(name, ".rela.orc_unwind_ip")) {
+			rela_orc_ip = data;
 		}
 	}
 
-	if (!symtab || !undwarf || !undwarf_ip)
+	if (!symtab || !orc || !orc_ip)
 		return 0;
 
-	if (undwarf_size % sizeof(*undwarf) != 0) {
-		WARN("bad .undwarf section size");
+	if (orc_size % sizeof(*orc) != 0) {
+		WARN("bad .orc_unwind section size");
 		return -1;
 	}
 
-	nr_entries = undwarf_size / sizeof(*undwarf);
+	nr_entries = orc_size / sizeof(*orc);
 	for (i = 0; i < nr_entries; i++) {
-		if (rela_undwarf_ip) {
-			if (!gelf_getrela(rela_undwarf_ip, i, &rela)) {
+		if (rela_orc_ip) {
+			if (!gelf_getrela(rela_orc_ip, i, &rela)) {
 				WARN_ELF("gelf_getrela");
 				return -1;
 			}
@@ -190,19 +190,19 @@ int undwarf_dump(const char *_objname)
 			printf("%s+%lx:", name, rela.r_addend);
 
 		} else {
-			printf("%lx:", undwarf_ip_addr + (i * sizeof(int)) + undwarf_ip[i]);
+			printf("%lx:", orc_ip_addr + (i * sizeof(int)) + orc_ip[i]);
 		}
 
 
-		printf(" cfa:");
+		printf(" sp:");
 
-		print_reg(undwarf[i].cfa_reg, undwarf[i].cfa_offset);
+		print_reg(orc[i].sp_reg, orc[i].sp_offset);
 
 		printf(" bp:");
 
-		print_reg(undwarf[i].bp_reg, undwarf[i].bp_offset);
+		print_reg(orc[i].bp_reg, orc[i].bp_offset);
 
-		printf(" type:%s\n", undwarf_type_name(undwarf[i].type));
+		printf(" type:%s\n", orc_type_name(orc[i].type));
 	}
 
 	elf_end(elf);

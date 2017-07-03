@@ -2,13 +2,13 @@
 #define _ASM_X86_MODULE_H
 
 #include <asm-generic/module.h>
-#include <asm/undwarf.h>
+#include <asm/orc_types.h>
 
 struct mod_arch_specific {
-#ifdef CONFIG_UNDWARF_UNWINDER
+#ifdef CONFIG_ORC_UNWINDER
 	unsigned int num_undwarves;
-	int *undwarf_ip;
-	struct undwarf *undwarf;
+	int *orc_unwind_ip;
+	struct orc_entry *orc_unwind;
 #endif
 };
 

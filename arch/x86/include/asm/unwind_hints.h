@@ -1,7 +1,7 @@
-#ifndef _ASM_X86_UNDWARF_H
-#define _ASM_X86_UNDWARF_H
+#ifndef _ASM_X86_UNWIND_HINTS_H
+#define _ASM_X86_UNWIND_HINTS_H
 
-#include "undwarf-types.h"
+#include "orc_types.h"
 
 #ifdef __ASSEMBLY__
 
@@ -11,8 +11,8 @@
  * don't do anything unusual with the stack.  Such normal callable functions
  * are annotated with the ENTRY/ENDPROC macros.  Most asm code falls in this
  * category.  In this case, no special debugging annotations are needed because
- * objtool can automatically generate the .undwarf section which the undwarf
- * unwinder reads at runtime.
+ * objtool can automatically generate the orc debuginfo for the orc unwinder to
+ * read at runtime.
  *
  * Anything which doesn't fall into the above category, such as syscall and
  * interrupt handlers, tends to not be called directly by other functions, and
@@ -26,69 +26,69 @@
  * the debuginfo as necessary.  It will also warn if it sees any
  * inconsistencies.
  */
-.macro UNWIND_HINT cfa_reg=UNDWARF_REG_SP cfa_offset=0 type=UNDWARF_TYPE_CFA
+.macro UNWIND_HINT sp_reg=ORC_REG_SP sp_offset=0 type=ORC_TYPE_CALL
 #ifdef CONFIG_STACK_VALIDATION
 .Lunwind_hint_ip_\@:
 	.pushsection .discard.unwind_hints
 		/* struct unwind_hint */
 		.long .Lunwind_hint_ip_\@ - .
-		.short \cfa_offset
-		.byte \cfa_reg
+		.short \sp_offset
+		.byte \sp_reg
 		.byte \type
 	.popsection
 #endif
 .endm
 
 .macro UNWIND_HINT_EMPTY
-	UNWIND_HINT cfa_reg=UNDWARF_REG_UNDEFINED
+	UNWIND_HINT sp_reg=ORC_REG_UNDEFINED
 .endm
 
 .macro UNWIND_HINT_REGS base=rsp offset=0 indirect=0 extra=1 iret=0
 	.if \base == rsp && \indirect
-		.set cfa_reg, UNDWARF_REG_SP_INDIRECT
+		.set sp_reg, ORC_REG_SP_INDIRECT
 	.elseif \base == rsp
-		.set cfa_reg, UNDWARF_REG_SP
+		.set sp_reg, ORC_REG_SP
 	.elseif \base == rbp
-		.set cfa_reg, UNDWARF_REG_BP
+		.set sp_reg, ORC_REG_BP
 	.elseif \base == rdi
-		.set cfa_reg, UNDWARF_REG_DI
+		.set sp_reg, ORC_REG_DI
 	.elseif \base == rdx
-		.set cfa_reg, UNDWARF_REG_DX
+		.set sp_reg, ORC_REG_DX
 	.else
 		.error "UNWIND_HINT_REGS: bad base register"
 	.endif
 
-	.set cfa_offset, \offset
+	.set sp_offset, \offset
 
 	.if \iret
-		.set type, UNDWARF_TYPE_REGS_IRET
+		.set type, ORC_TYPE_REGS_IRET
 	.elseif \extra == 0
-		.set type, UNDWARF_TYPE_REGS_IRET
-		.set cfa_offset, \offset + (16*8)
+		.set type, ORC_TYPE_REGS_IRET
+		.set sp_offset, \offset + (16*8)
 	.else
-		.set type, UNDWARF_TYPE_REGS
+		.set type, ORC_TYPE_REGS
 	.endif
 
-	UNWIND_HINT cfa_reg=cfa_reg cfa_offset=cfa_offset type=type
+	UNWIND_HINT sp_reg=sp_reg sp_offset=sp_offset type=type
 .endm
 
 .macro UNWIND_HINT_IRET_REGS base=rsp offset=0
 	UNWIND_HINT_REGS base=\base offset=\offset iret=1
 .endm
 
-.macro UNWIND_HINT_FUNC cfa_offset=8
-	UNWIND_HINT cfa_offset=\cfa_offset
+.macro UNWIND_HINT_FUNC sp_offset=8
+	UNWIND_HINT sp_offset=\sp_offset
 .endm
 
 #else /* !__ASSEMBLY__ */
 
-#define UNWIND_HINT(cfa_reg, cfa_offset, type)			\
+#define UNWIND_HINT(sp_reg, sp_offset, type)			\
 	"987: \n\t"						\
 	".pushsection .discard.unwind_hints\n\t"		\
 	/* struct unwind_hint */				\
 	".long 987b - .\n\t"					\
-	".short " __stringify(cfa_offset) "\n\t"		\
-	".byte " __stringify(cfa_reg) "\n\t"			\
+	".short " __stringify(sp_offset) "\n\t"		\
+	".byte " __stringify(sp_reg) "\n\t"			\
 	".byte " __stringify(type) "\n\t"			\
 	".popsection\n\t"
 
@@ -96,8 +96,6 @@
 
 #define UNWIND_HINT_RESTORE UNWIND_HINT(0, 0, UNWIND_HINT_TYPE_RESTORE)
 
-
 #endif /* __ASSEMBLY__ */
 
-
-#endif /* _ASM_X86_UNDWARF_H */
+#endif /* _ASM_X86_UNWIND_HINTS_H */

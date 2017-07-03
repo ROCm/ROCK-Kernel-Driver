@@ -259,7 +259,7 @@ ifneq ($(SKIP_STACK_VALIDATION),1)
 
 __objtool_obj := $(objtree)/tools/objtool/objtool
 
-objtool_args = $(if $(CONFIG_UNDWARF_UNWINDER),undwarf generate,check)
+objtool_args = $(if $(CONFIG_ORC_UNWINDER),orc generate,check)
 
 ifndef CONFIG_FRAME_POINTER
 objtool_args += --no-fp
@@ -280,7 +280,7 @@ endif # CONFIG_STACK_VALIDATION
 
 # Rebuild all objects when objtool changes, or is enabled/disabled.
 objtool_dep = $(objtool_obj)					\
-	      $(wildcard include/config/undwarf/unwinder.h	\
+	      $(wildcard include/config/orc/unwinder.h		\
 			 include/config/stack/validation.h)
 
 define rule_cc_o_c

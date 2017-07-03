@@ -22,7 +22,7 @@
 #include "elf.h"
 #include "cfi.h"
 #include "arch.h"
-#include "undwarf.h"
+#include "orc.h"
 #include <linux/hashtable.h>
 
 struct insn_state {
@@ -50,7 +50,7 @@ struct instruction {
 	struct symbol *func;
 	struct stack_op stack_op;
 	struct insn_state state;
-	struct undwarf undwarf;
+	struct orc_entry orc;
 };
 
 struct objtool_file {
@@ -61,7 +61,7 @@ struct objtool_file {
 	bool ignore_unreachables, c_file, hints;
 };
 
-int check(const char *objname, bool nofp, bool undwarf);
+int check(const char *objname, bool nofp, bool orc);
 
 struct instruction *find_insn(struct objtool_file *file,
 			      struct section *sec, unsigned long offset);
