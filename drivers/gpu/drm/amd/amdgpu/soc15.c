@@ -25,7 +25,7 @@
 #include <linux/module.h>
 #include "drmP.h"
 #include "amdgpu.h"
-#include "amdgpu_atomfirmware.h"
+#include "amdgpu_atombios.h"
 #include "amdgpu_ih.h"
 #include "amdgpu_uvd.h"
 #include "amdgpu_vce.h"
@@ -61,8 +61,6 @@
 #include "amdgpu_powerplay.h"
 #include "dce_virtual.h"
 #include "mxgpu_ai.h"
-
-MODULE_FIRMWARE("amdgpu/vega10_smc.bin");
 
 #define mmFabricConfigAccessControl                                                                    0x0410
 #define mmFabricConfigAccessControl_BASE_IDX                                                           0
@@ -392,11 +390,11 @@ static void soc15_gpu_pci_config_reset(struct amdgpu_device *adev)
 
 static int soc15_asic_reset(struct amdgpu_device *adev)
 {
-	amdgpu_atomfirmware_scratch_regs_engine_hung(adev, true);
+	amdgpu_atombios_scratch_regs_engine_hung(adev, true);
 
 	soc15_gpu_pci_config_reset(adev);
 
-	amdgpu_atomfirmware_scratch_regs_engine_hung(adev, false);
+	amdgpu_atombios_scratch_regs_engine_hung(adev, false);
 
 	return 0;
 }
