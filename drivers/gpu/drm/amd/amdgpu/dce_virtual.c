@@ -141,7 +141,7 @@ static const struct drm_crtc_funcs dce_virtual_crtc_funcs = {
 	.gamma_set = dce_virtual_crtc_gamma_set,
 	.set_config = amdgpu_display_crtc_set_config,
 	.destroy = dce_virtual_crtc_destroy,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
 	.page_flip_target = amdgpu_display_crtc_page_flip_target,
 #else
 	.page_flip = amdgpu_crtc_page_flip,
@@ -303,7 +303,12 @@ dce_virtual_encoder(struct drm_connector *connector)
 		if (connector->encoder_ids[i] == 0)
 			break;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
+	!defined(OS_NAME_SUSE_15)
+		encoder = drm_encoder_find(connector->dev, connector->encoder_ids[i]);
+#else
 		encoder = drm_encoder_find(connector->dev, NULL, connector->encoder_ids[i]);
+#endif
 		if (!encoder)
 			continue;
 
@@ -313,7 +318,12 @@ dce_virtual_encoder(struct drm_connector *connector)
 
 	/* pick the first one */
 	if (enc_id)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
+	!defined(OS_NAME_SUSE_15)
+		return drm_encoder_find(connector->dev, enc_id);
+#else
 		return drm_encoder_find(connector->dev, NULL, enc_id);
+#endif
 	return NULL;
 }
 
@@ -365,6 +375,14 @@ dce_virtual_dpms(struct drm_connector *connector, int mode)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+static enum drm_connector_status
+dce_virtual_detect(struct drm_connector *connector, bool force)
+{
+	return connector_status_connected;
+}
+#endif
+
 static int
 dce_virtual_set_property(struct drm_connector *connector,
 			 struct drm_property *property,
@@ -394,6 +412,9 @@ static const struct drm_connector_helper_funcs dce_virtual_connector_helper_func
 static const struct drm_connector_funcs dce_virtual_connector_funcs = {
 	.dpms = dce_virtual_dpms,
 	.fill_modes = drm_helper_probe_single_connector_modes,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+	.detect = dce_virtual_detect,
+#endif
 	.set_property = dce_virtual_set_property,
 	.destroy = dce_virtual_destroy,
 	.force = dce_virtual_force,
