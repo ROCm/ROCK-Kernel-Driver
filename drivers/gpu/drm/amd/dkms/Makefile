@@ -53,6 +53,8 @@ else ifeq ($(OS_VERSION),"7.2")
 subdir-ccflags-y += -DOS_NAME_RHEL_7_2
 else ifeq ($(OS_VERSION),"7.3")
 subdir-ccflags-y += -DOS_NAME_RHEL_7_3
+else ifeq ($(OS_VERSION),"7.4")
+subdir-ccflags-y += -DOS_NAME_RHEL_7_4
 endif
 subdir-ccflags-y += \
 	-include /usr/src/kernels/$(KERNELRELEASE)/include/drm/drm_backport.h
