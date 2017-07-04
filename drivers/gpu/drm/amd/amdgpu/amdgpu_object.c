@@ -533,7 +533,7 @@ int amdgpu_bo_backup_to_shadow(struct amdgpu_device *adev,
 
 	r = amdgpu_copy_buffer(ring, bo_addr, shadow_addr,
 			       amdgpu_bo_size(bo), resv, fence,
-			       direct);
+			       direct, false);
 	if (!r)
 		amdgpu_bo_fence(bo, *fence, true);
 
@@ -586,7 +586,7 @@ int amdgpu_bo_restore_from_shadow(struct amdgpu_device *adev,
 
 	r = amdgpu_copy_buffer(ring, shadow_addr, bo_addr,
 			       amdgpu_bo_size(bo), resv, fence,
-			       direct);
+			       direct, false);
 	if (!r)
 		amdgpu_bo_fence(bo, *fence, true);
 
@@ -949,7 +949,6 @@ int amdgpu_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 
 	size = bo->mem.num_pages << PAGE_SHIFT;
 	offset = bo->mem.start << PAGE_SHIFT;
-	/* TODO: figure out how to map scattered VRAM to the CPU */
 	if ((offset + size) <= adev->mc.visible_vram_size)
 		return 0;
 
