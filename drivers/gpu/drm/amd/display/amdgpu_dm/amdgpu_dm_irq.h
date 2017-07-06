@@ -24,7 +24,7 @@
 #ifndef __AMDGPU_DM_IRQ_H__
 #define __AMDGPU_DM_IRQ_H__
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 
 #include "irq_types.h" /* DAL irq definitions */
 

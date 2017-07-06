@@ -23,7 +23,7 @@
  *
  */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
 
 #include <linux/version.h>
 #include <drm/drm_atomic_helper.h>

@@ -23,7 +23,7 @@
  *
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 
 #include <linux/string.h>
 #include <linux/acpi.h>
@@ -343,7 +343,9 @@ bool dm_helpers_dp_mst_start_top_mgr(
 		const struct dc_link *link,
 		bool boot)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || defined(OS_NAME_RHEL_7_3)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
+		defined(OS_NAME_RHEL_7_3) || \
+		defined(OS_NAME_RHEL_7_4)
 	struct amdgpu_connector *aconnector = link->priv;
 
 	if (!aconnector) {
@@ -370,7 +372,9 @@ void dm_helpers_dp_mst_stop_top_mgr(
 		struct dc_context *ctx,
 		const struct dc_link *link)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || defined(OS_NAME_RHEL_7_3)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
+		defined(OS_NAME_RHEL_7_3) || \
+		defined(OS_NAME_RHEL_7_4)
 	struct amdgpu_connector *aconnector = link->priv;
 
 	if (!aconnector) {
