@@ -43,7 +43,7 @@ static void amdgpu_display_flip_callback(struct dma_fence *f,
 		container_of(cb, struct amdgpu_flip_work, cb);
 
 	dma_fence_put(f);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || defined(OS_NAME_RHEL_7_4)
 	schedule_work(&work->flip_work.work);
 #else
 	schedule_work(&work->flip_work);
@@ -68,7 +68,7 @@ static bool amdgpu_display_flip_handle_fence(struct amdgpu_flip_work *work,
 	return false;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && !defined(OS_NAME_RHEL_7_4)
 static void amdgpu_display_flip_work_func(struct work_struct *__work)
 {
 	struct amdgpu_flip_work *work =
@@ -96,7 +96,7 @@ static void amdgpu_display_flip_work_func(struct work_struct *__work)
 	/* Do the flip (mmio) */
 	adev->mode_info.funcs->page_flip(adev, work->crtc_id, work->base, work->async);
 }
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && !defined(OS_NAME_RHEL_7_4)
 static void amdgpu_display_flip_work_func(struct work_struct *__work)
 {
 	struct amdgpu_flip_work *work =
@@ -257,7 +257,7 @@ static void amdgpu_display_unpin_work_func(struct work_struct *__work)
 	kfree(work);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || defined(OS_NAME_RHEL_7_4)
 int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 				struct drm_framebuffer *fb,
 				struct drm_pending_vblank_event *event,
@@ -773,10 +773,12 @@ uint32_t amdgpu_display_framebuffer_domains(struct amdgpu_device *adev)
 
 int amdgpu_display_framebuffer_init(struct drm_device *dev,
 				    struct amdgpu_framebuffer *rfb,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3)
-				    struct drm_mode_fb_cmd2 *mode_cmd,
-#else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+			defined(OS_NAME_RHEL_7_3) || \
+			defined(OS_NAME_RHEL_7_4)
 				    const struct drm_mode_fb_cmd2 *mode_cmd,
+#else
+				    struct drm_mode_fb_cmd2 *mode_cmd,
 #endif
 				    struct drm_gem_object *obj)
 {
@@ -798,10 +800,12 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 struct drm_framebuffer *
 amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 				       struct drm_file *file_priv,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3)
-				       struct drm_mode_fb_cmd2 *mode_cmd)
-#else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+			defined(OS_NAME_RHEL_7_3) || \
+			defined(OS_NAME_RHEL_7_4)
 				       const struct drm_mode_fb_cmd2 *mode_cmd)
+#else
+				       struct drm_mode_fb_cmd2 *mode_cmd)
 #endif
 {
 	struct drm_gem_object *obj;

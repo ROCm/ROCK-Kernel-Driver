@@ -2447,7 +2447,7 @@ static const struct drm_crtc_funcs dce_v6_0_crtc_funcs = {
 	.gamma_set = dce_v6_0_crtc_gamma_set,
 	.set_config = amdgpu_display_crtc_set_config,
 	.destroy = dce_v6_0_crtc_destroy,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || defined(OS_NAME_RHEL_7_4)
 	.page_flip_target = amdgpu_display_crtc_page_flip_target,
 #else
 	.page_flip = amdgpu_crtc_page_flip,
