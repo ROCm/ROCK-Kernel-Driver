@@ -340,7 +340,13 @@ int amdgpu_sync_clone(struct amdgpu_device *adev,
 	struct dma_fence *f;
 	int i, r;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_safe(source->fences, i, node, tmp, e, node) {
+#else
 	hash_for_each_safe(source->fences, i, tmp, e, node) {
+#endif
 
 		f = e->fence;
 		if (!dma_fence_is_signaled(f)) {
