@@ -2,7 +2,8 @@
 #define AMDKCL_FENCE_H
 
 #include <linux/version.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
+		!defined(OS_NAME_RHEL_7_4)
 #include <linux/fence.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
 #include <linux/fence-array.h>
@@ -13,7 +14,8 @@
 #include <linux/dma-fence-array.h>
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
+		!defined(OS_NAME_RHEL_7_4)
 #define dma_fence_cb fence_cb
 #define dma_fence_ops fence_ops
 #define dma_fence_array fence_array
@@ -64,7 +66,7 @@ typedef struct dma_fence kcl_fence_t;
 typedef struct dma_fence_ops kcl_fence_ops_t;
 #endif
 
-#if defined(BUILD_AS_DKMS)
+#if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_4)
 extern signed long kcl_fence_default_wait(kcl_fence_t *fence,
 					  bool intr,
 					  signed long timeout);
@@ -78,7 +80,9 @@ extern signed long _kcl_fence_wait_timeout(struct fence *fence, bool intr,
 				signed long timeout);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && !defined(OS_NAME_RHEL_7_3)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && \
+		!defined(OS_NAME_RHEL_7_3) && \
+		!defined(OS_NAME_RHEL_7_4)
 static inline bool fence_is_later(struct fence *f1, struct fence *f2)
 {
 	if (WARN_ON(f1->context != f2->context))
@@ -92,7 +96,7 @@ static inline signed long kcl_fence_wait_any_timeout(kcl_fence_t **fences,
 				   uint32_t count, bool intr,
 				   signed long timeout, uint32_t *idx)
 {
-#if defined(BUILD_AS_DKMS)
+#if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_4)
 	return _kcl_fence_wait_any_timeout(fences, count, intr, timeout, idx);
 #else
 	return dma_fence_wait_any_timeout(fences, count, intr, timeout, idx);
@@ -101,7 +105,8 @@ static inline signed long kcl_fence_wait_any_timeout(kcl_fence_t **fences,
 
 static inline u64 kcl_fence_context_alloc(unsigned num)
 {
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
+		!defined(OS_NAME_RHEL_7_4)
 	return _kcl_fence_context_alloc(num);
 #else
 	return dma_fence_context_alloc(num);
@@ -111,7 +116,8 @@ static inline u64 kcl_fence_context_alloc(unsigned num)
 static inline void kcl_fence_init(kcl_fence_t *fence, const kcl_fence_ops_t *ops,
 	     spinlock_t *lock, u64 context, unsigned seqno)
 {
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
+		!defined(OS_NAME_RHEL_7_4)
 	return _kcl_fence_init(fence, ops, lock, context, seqno);
 #else
 	return dma_fence_init(fence, ops, lock, context, seqno);
@@ -121,7 +127,8 @@ static inline void kcl_fence_init(kcl_fence_t *fence, const kcl_fence_ops_t *ops
 static inline signed long kcl_fence_wait_timeout(kcl_fence_t *fences, bool intr,
 					signed long timeout)
 {
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
+		!defined(OS_NAME_RHEL_7_4)
 	return _kcl_fence_wait_timeout(fences, intr, timeout);
 #else
 	return dma_fence_wait_timeout(fences, intr, timeout);
