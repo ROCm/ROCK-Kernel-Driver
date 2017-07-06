@@ -1446,7 +1446,10 @@ struct amdgpu_direct_gma {
 };
 
 #if defined(CONFIG_ZONE_DEVICE) && \
-	(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_SLE))
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4) || \
+	defined(OS_NAME_SLE))
 #define CONFIG_ENABLE_SSG
 #endif
 
