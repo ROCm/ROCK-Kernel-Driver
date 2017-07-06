@@ -12,7 +12,7 @@ static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *
 	if (mm == current->mm)
 		return get_user_pages(start, nr_pages, write, pages, vmas);
 	else
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) || defined(OS_NAME_RHEL_7_4)
 		return get_user_pages_remote(tsk, mm, start, nr_pages,
 				write, pages, vmas, NULL);
 #else
