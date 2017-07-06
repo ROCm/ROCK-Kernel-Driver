@@ -874,11 +874,8 @@ static int unreserve_bo_and_vms(struct bo_vm_reservation_context *ctx,
 {
 	int ret = 0;
 
-	if (wait) {
+	if (wait)
 		ret = amdgpu_sync_wait(ctx->sync, intr);
-		if (ret)
-			return ret;
-	}
 
 	if (ctx->reserved)
 		ttm_eu_backoff_reservation(&ctx->ticket, &ctx->list);
@@ -1228,7 +1225,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 				entry, bo_size);
 	}
 
-	ret = unreserve_bo_and_vms(&ctx, false, true);
+	ret = unreserve_bo_and_vms(&ctx, false, false);
 
 	/* Free the sync object */
 	amdgpu_sync_free(&mem->sync);
@@ -1357,7 +1354,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 		amdgpu_bo_fence(bo,
 				&kfd_vm->process_info->eviction_fence->base,
 				true);
-	ret = unreserve_bo_and_vms(&ctx, false, true);
+	ret = unreserve_bo_and_vms(&ctx, false, false);
 
 	mutex_unlock(&mem->process_info->lock);
 	mutex_unlock(&mem->lock);
@@ -1866,6 +1863,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 	(*mem)->mapped_to_gpu_memory = 0;
 	(*mem)->process_info = kfd_vm->process_info;
 	add_kgd_mem_to_kfd_bo_list(*mem, kfd_vm->process_info, false);
+	amdgpu_sync_create(&(*mem)->sync);
 
 	return 0;
 }
