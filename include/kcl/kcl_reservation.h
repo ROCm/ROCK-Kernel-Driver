@@ -4,7 +4,8 @@
 #include <linux/reservation.h>
 #include <linux/ww_mutex.h>
 
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
+		!defined(OS_NAME_RHEL_7_4)
 extern long _kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 bool wait_all, bool intr,
 					 unsigned long timeout);
@@ -15,7 +16,8 @@ kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 bool wait_all, bool intr,
 					 unsigned long timeout)
 {
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
+		!defined(OS_NAME_RHEL_7_4)
 	return _kcl_reservation_object_wait_timeout_rcu(obj,
 					wait_all, intr, timeout);
 #else
