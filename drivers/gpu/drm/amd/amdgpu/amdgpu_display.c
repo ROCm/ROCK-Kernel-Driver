@@ -41,7 +41,7 @@ static void amdgpu_flip_callback(struct dma_fence *f, struct dma_fence_cb *cb)
 		container_of(cb, struct amdgpu_flip_work, cb);
 
 	dma_fence_put(f);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || defined(OS_NAME_RHEL_7_4)
 	schedule_work(&work->flip_work.work);
 #else
 	schedule_work(&work->flip_work);
@@ -65,7 +65,7 @@ static bool amdgpu_flip_handle_fence(struct amdgpu_flip_work *work,
 	return false;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && !defined(OS_NAME_RHEL_7_4)
 static void amdgpu_flip_work_func(struct work_struct *__work)
 {
 	struct amdgpu_flip_work *work =
@@ -93,7 +93,7 @@ static void amdgpu_flip_work_func(struct work_struct *__work)
 	/* Do the flip (mmio) */
 	adev->mode_info.funcs->page_flip(adev, work->crtc_id, work->base, work->async);
 }
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && !defined(OS_NAME_RHEL_7_4)
 static void amdgpu_flip_work_func(struct work_struct *__work)
 {
 	struct amdgpu_flip_work *work =
@@ -254,7 +254,7 @@ static void amdgpu_unpin_work_func(struct work_struct *__work)
 	kfree(work);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || defined(OS_NAME_RHEL_7_4)
 int amdgpu_crtc_page_flip_target(struct drm_crtc *crtc,
 				 struct drm_framebuffer *fb,
 				 struct drm_pending_vblank_event *event,
@@ -756,7 +756,9 @@ static const struct drm_framebuffer_funcs amdgpu_fb_funcs = {
 int
 amdgpu_framebuffer_init(struct drm_device *dev,
 			struct amdgpu_framebuffer *rfb,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+			defined(OS_NAME_RHEL_7_3) || \
+			defined(OS_NAME_RHEL_7_4)
 			const struct drm_mode_fb_cmd2 *mode_cmd,
 #else
 			struct drm_mode_fb_cmd2 *mode_cmd,
@@ -781,7 +783,9 @@ amdgpu_framebuffer_init(struct drm_device *dev,
 struct drm_framebuffer *
 amdgpu_user_framebuffer_create(struct drm_device *dev,
 			       struct drm_file *file_priv,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+			defined(OS_NAME_RHEL_7_3) || \
+			defined(OS_NAME_RHEL_7_4)
 				const struct drm_mode_fb_cmd2 *mode_cmd)
 #else
 				struct drm_mode_fb_cmd2 *mode_cmd)
