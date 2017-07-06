@@ -48,11 +48,11 @@ config DRM_AMDGPU_CIK
 	  Choose this option if you want to enable support for CIK (Sea
 	  Islands) asics.
 
-	  CIK is already supported in radeon. Support for CIK in amdgpu
-	  will be disabled by default and is still provided by radeon.
-	  Use module options to override this:
+	  CIK is already supported in radeon. If you enable this option,
+	  support for CIK will be provided by amdgpu and disabled in
+	  radeon by default. Use module options to override this:
 
-	  radeon.cik_support=0 amdgpu.cik_support=1
+	  radeon.cik_support=1 amdgpu.cik_support=0
 
 config DRM_AMDGPU_USERPTR
 	bool "Always enable userptr write support"
