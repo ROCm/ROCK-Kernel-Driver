@@ -2,7 +2,9 @@
 #include <kcl/kcl_io.h>
 #include "kcl_common.h"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && defined(CONFIG_X86_PAT)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && \
+	!defined(OS_NAME_RHEL_7_4) && \
+	defined(CONFIG_X86_PAT)
 #include <asm/pgtable_types.h>
 
 static int (*_kcl_io_reserve_memtype)(resource_size_t start, resource_size_t end,

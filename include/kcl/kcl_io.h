@@ -3,7 +3,7 @@
 #include <linux/version.h>
 #include <linux/types.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && !defined(OS_NAME_RHEL_7_4)
 
 #ifdef CONFIG_X86_PAT
 extern int arch_io_reserve_memtype_wc(resource_size_t start, resource_size_t size);
