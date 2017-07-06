@@ -3,7 +3,9 @@
 #include <kcl/kcl_mn.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0) && \
-	!defined(OS_NAME_RHEL_7_3) && !defined(OS_NAME_RHEL_7_2)
+	!defined(OS_NAME_RHEL_7_2) && \
+	!defined(OS_NAME_RHEL_7_3) && \
+	!defined(OS_NAME_RHEL_7_4)
 void mmu_notifier_unregister_no_release(struct mmu_notifier *mn,
 					struct mm_struct *mm)
 {
