@@ -22,7 +22,7 @@
 #include <linux/export.h>
 #include <linux/slab.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
 static void fence_array_cb_func(struct fence *f, struct fence_cb *cb);
 
 static const char *fence_array_get_driver_name(struct fence *fence)
