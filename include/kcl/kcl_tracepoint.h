@@ -3,8 +3,9 @@
 
 #include <linux/tracepoint.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 16, 0) && !defined(OS_NAME_RHEL_7_3)
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 16, 0) && \
+	!defined(OS_NAME_RHEL_7_3) && \
+	!defined(OS_NAME_RHEL_7_4)
 #ifdef CONFIG_TRACEPOINTS
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
 #define DECLARE_TRACE_APPEND(name)					\
