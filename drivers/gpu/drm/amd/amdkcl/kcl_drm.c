@@ -1,7 +1,7 @@
 #include <kcl/kcl_drm.h>
 #include "kcl_common.h"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
 /**
  * drm_crtc_force_disable - Forcibly turn off a CRTC
  * @crtc: CRTC to turn off
@@ -50,7 +50,7 @@ EXPORT_SYMBOL(drm_crtc_force_disable_all);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
 	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3) && \
-	!defined(OS_NAME_SLE)
+	!defined(OS_NAME_RHEL_7_4) && !defined(OS_NAME_SLE)
 int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw)
 {
 	struct pci_dev *root;
@@ -244,7 +244,7 @@ static inline struct drm_plane_state *
 _kcl_drm_atomic_get_existing_plane_state(struct drm_atomic_state *state,
                     struct drm_plane *plane)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
 	return state->plane_states[drm_plane_index(plane)];
 #else
 	return state->planes[drm_plane_index(plane)].state;
@@ -319,7 +319,7 @@ _kcl_drm_atomic_helper_update_legacy_modeset_state_stub(struct drm_device *dev,
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
 	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3) && \
-	!defined(OS_NAME_SLE)
+	!defined(OS_NAME_SLE) && !defined(OS_NAME_RHEL_7_4)
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx)
 {
