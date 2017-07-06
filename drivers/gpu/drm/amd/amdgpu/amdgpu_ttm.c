@@ -281,7 +281,7 @@ static int amdgpu_verify_access(struct ttm_buffer_object *bo, struct file *filp)
 
 	if (amdgpu_ttm_tt_get_usermm(bo->ttm))
 		return -EPERM;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && !defined(OS_NAME_RHEL_7_4)
 	return drm_vma_node_verify_access(&abo->gem_base.vma_node, filp);
 #else
 	return drm_vma_node_verify_access(&abo->gem_base.vma_node,
