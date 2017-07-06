@@ -95,19 +95,23 @@ static void amdgpu_bo_list_destroy(struct amdgpu_fpriv *fpriv, int id)
 {
 	struct amdgpu_bo_list *list;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
 	mutex_lock(&fpriv->bo_list_lock);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
 	list = idr_find(&fpriv->bo_list_handles, id);
-#else
-	list = idr_remove(&fpriv->bo_list_handles, id);
-#endif
-	mutex_unlock(&fpriv->bo_list_lock);
 	if (list) {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
 		idr_remove(&fpriv->bo_list_handles, id);
-#endif
+		mutex_unlock(&fpriv->bo_list_lock);
 		kref_put(&list->refcount, amdgpu_bo_list_release_rcu);
+	} else {
+		mutex_unlock(&fpriv->bo_list_lock);
 	}
+#else
+	mutex_lock(&fpriv->bo_list_lock);
+	list = idr_remove(&fpriv->bo_list_handles, id);
+	mutex_unlock(&fpriv->bo_list_lock);
+	if (list)
+		kref_put(&list->refcount, amdgpu_bo_list_release_rcu);
+#endif
 }
 
 static int amdgpu_bo_list_set(struct amdgpu_device *adev,
