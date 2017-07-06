@@ -168,7 +168,7 @@ int amdgpu_connector_get_monitor_bpc(struct drm_connector *connector)
 		}
 
 		/* Any defined maximum tmds clock limit we must not exceed? */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && !defined(OS_NAME_RHEL_7_4)
 		if (connector->max_tmds_clock > 0) {
 #else
 		if (connector->display_info.max_tmds_clock > 0) {
@@ -177,7 +177,7 @@ int amdgpu_connector_get_monitor_bpc(struct drm_connector *connector)
 			mode_clock = amdgpu_connector->pixelclock_for_modeset;
 
 			/* Maximum allowable input clock in kHz */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && !defined(OS_NAME_RHEL_7_4)
 			max_tmds_clock = connector->max_tmds_clock;
 #else
 			max_tmds_clock = connector->display_info.max_tmds_clock;
