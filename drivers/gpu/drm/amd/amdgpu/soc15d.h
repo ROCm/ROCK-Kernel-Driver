@@ -269,6 +269,7 @@
 
 #define	PACKET3_INVALIDATE_TLBS				0x98
 #              define PACKET3_INVALIDATE_TLBS_DST_SEL(x)     ((x) << 0)
+#              define PACKET3_INVALIDATE_TLBS_ALL_HUB(x)     ((x) << 4)
 #              define PACKET3_INVALIDATE_TLBS_PASID(x)       ((x) << 5)
 #define PACKET3_SET_RESOURCES				0xA0
 /* 1. header
