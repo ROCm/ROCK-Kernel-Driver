@@ -34,6 +34,9 @@
 #define AMDGPU_PL_FLAG_GWS		(TTM_PL_FLAG_PRIV << 1)
 #define AMDGPU_PL_FLAG_OA		(TTM_PL_FLAG_PRIV << 2)
 
+#define AMDGPU_GTT_MAX_TRANSFER_SIZE	512
+#define AMDGPU_GTT_NUM_TRANSFER_WINDOWS	2
+
 struct amdgpu_mman {
 	struct ttm_bo_global_ref        bo_global_ref;
 	struct drm_global_reference	mem_global_ref;
@@ -49,6 +52,8 @@ struct amdgpu_mman {
 	/* buffer handling */
 	const struct amdgpu_buffer_funcs	*buffer_funcs;
 	struct amdgpu_ring			*buffer_funcs_ring;
+
+	struct mutex				gtt_window_lock;
 	/* Scheduler entity for buffer moves */
 	struct amd_sched_entity			entity;
 };

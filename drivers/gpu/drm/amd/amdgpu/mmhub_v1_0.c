@@ -252,7 +252,7 @@ struct pctl_data {
 	uint32_t data;
 };
 
-const struct pctl_data pctl0_data[] = {
+static const struct pctl_data pctl0_data[] = {
 	{0x0, 0x7a640},
 	{0x9, 0x2a64a},
 	{0xd, 0x2a680},
@@ -277,7 +277,7 @@ const struct pctl_data pctl0_data[] = {
 #define PCTL0_STCTRL_REG_SAVE_RANGE0_BASE  0xa640
 #define PCTL0_STCTRL_REG_SAVE_RANGE0_LIMIT 0xa833
 
-const struct pctl_data pctl1_data[] = {
+static const struct pctl_data pctl1_data[] = {
 	{0x0, 0x39a000},
 	{0x3b, 0x44a040},
 	{0x81, 0x2a08d},
