@@ -50,12 +50,30 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 			     struct drm_gem_object **obj)
 {
 	struct amdgpu_bo *bo;
+	unsigned long max_size;
 	int r;
 
 	*obj = NULL;
 	/* At least align on page size */
 	if (alignment < PAGE_SIZE) {
 		alignment = PAGE_SIZE;
+	}
+
+	if ((initial_domain & AMDGPU_GEM_DOMAIN_DGMA) ||
+		(initial_domain & AMDGPU_GEM_DOMAIN_DGMA_IMPORT)) {
+		flags |= AMDGPU_GEM_CREATE_NO_EVICT;
+		max_size = (unsigned long)amdgpu_direct_gma_size << 20;
+
+		if (initial_domain & AMDGPU_GEM_DOMAIN_DGMA)
+			max_size -= atomic64_read(&adev->direct_gma.vram_usage);
+		else if (initial_domain & AMDGPU_GEM_DOMAIN_DGMA_IMPORT)
+			max_size -= atomic64_read(&adev->direct_gma.gart_usage);
+
+		if (size > max_size) {
+			DRM_DEBUG("Allocation size %ldMb bigger than %ldMb limit\n",
+				size >> 20, max_size >> 20);
+			return -ENOMEM;
+		}
 	}
 
 retry:
