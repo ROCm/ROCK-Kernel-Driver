@@ -21,9 +21,9 @@ int *cur_orc_ip_table = __start_orc_unwind_ip;
 struct orc_entry *cur_orc_table = __start_orc_unwind;
 
 /*
- * This is a lookup table for speeding up access to the orc unwind table.
+ * This is a lookup table for speeding up access to the .orc_unwind table.
  * Given an input address offset, the corresponding lookup table entry
- * specifies a subset of the orc unwind table to search.
+ * specifies a subset of the .orc_unwind table to search.
  *
  * Each block represents the end of the previous range and the start of the
  * next range.  An extra block is added to give the last range an end.
@@ -39,8 +39,8 @@ struct orc_entry *cur_orc_table = __start_orc_unwind;
  *     64k		256k		2.9x		2.2x
  *     128k		512k		3.3x		2.4x
  *
- * Go with 32k blocks because it doubles unwinder performance while only adding
- * 3.5% to the orc data footprint.
+ * Here we go with 32k blocks because it doubles unwinder performance while
+ * only adding 3.5% to the ORC data footprint.
  */
 #define LOOKUP_NUM_BLOCKS		(32 * 1024)
 static unsigned int orc_fast_lookup[LOOKUP_NUM_BLOCKS + 1] __ro_after_init;
@@ -179,9 +179,9 @@ void unwind_module_init(struct module *mod, void *_orc_ip, size_t orc_ip_size,
 		     num_entries != orc_size / sizeof(*orc));
 
 	/*
-	 * The 'cur_orc_*' globals allow the orc_sort_swap() callback
-	 * to associate an orc_ip table entry with its corresponding
-	 * orc entry so they can both be swapped.
+	 * The 'cur_orc_*' globals allow the orc_sort_swap() callback to
+	 * associate an .orc_unwind_ip table entry with its corresponding
+	 * .orc_unwind entry so they can both be swapped.
 	 */
 	mutex_lock(&sort_mutex);
 	cur_orc_ip_table = orc_ip;
@@ -205,7 +205,7 @@ void __init unwind_init(void)
 	if (!num_entries || orc_ip_size % sizeof(int) != 0 ||
 	    orc_size % sizeof(struct orc_entry) != 0 ||
 	    num_entries != orc_size / sizeof(struct orc_entry)) {
-		pr_warn("WARNING: Bad or missing orc unwind table.  Disabling unwinder.\n");
+		pr_warn("WARNING: Bad or missing .orc_unwind table.  Disabling unwinder.\n");
 		return;
 	}
 
@@ -219,7 +219,7 @@ void __init unwind_init(void)
 				 num_entries,
 				 LOOKUP_START_IP + (LOOKUP_BLOCK_SIZE * i));
 		if (!orc) {
-			pr_warn("WARNING: Corrupt orc unwind table.  Disabling unwinder.\n");
+			pr_warn("WARNING: Corrupt .orc_unwind table.  Disabling unwinder.\n");
 			return;
 		}
 
@@ -230,7 +230,7 @@ void __init unwind_init(void)
 	orc = __orc_find(__start_orc_unwind_ip, __start_orc_unwind, num_entries,
 			 LOOKUP_STOP_IP);
 	if (!orc) {
-		pr_warn("WARNING: Corrupt orc unwind table.  Disabling unwinder.\n");
+		pr_warn("WARNING: Corrupt .orc_unwind table.  Disabling unwinder.\n");
 		return;
 	}
 	orc_fast_lookup[LOOKUP_NUM_BLOCKS] = orc - __start_orc_unwind;
@@ -341,7 +341,7 @@ bool unwind_next_frame(struct unwind_state *state)
 	if (unwind_done(state))
 		return false;
 
-	/* Don't let modules unload while we're reading their orc data. */
+	/* Don't let modules unload while we're reading their ORC data. */
 	preempt_disable();
 
 	/* Have we reached the end? */
@@ -349,7 +349,7 @@ bool unwind_next_frame(struct unwind_state *state)
 		goto done;
 
 	/*
-	 * Find the orc entry associated with the text address.
+	 * Find the orc_entry associated with the text address.
 	 *
 	 * Decrement call return addresses by one so they work for sibling
 	 * calls and calls to noreturn functions.
@@ -473,7 +473,7 @@ bool unwind_next_frame(struct unwind_state *state)
 		break;
 
 	default:
-		orc_warn("unknown orc entry type %d\n", orc->type);
+		orc_warn("unknown .orc_unwind entry type %d\n", orc->type);
 		break;
 	}
 
@@ -500,7 +500,7 @@ bool unwind_next_frame(struct unwind_state *state)
 		goto done;
 	}
 
-	/* Prevent a recursive loop due to bad orc data: */
+	/* Prevent a recursive loop due to bad ORC data: */
 	if (state->stack_info.type == prev_type &&
 	    on_stack(&state->stack_info, (void *)state->sp, sizeof(long)) &&
 	    state->sp <= prev_sp) {
@@ -568,6 +568,14 @@ void __unwind_start(struct unwind_state *state, struct task_struct *task,
 	 * (first_frame) or indirectly (regs->sp) to indicate which stack frame
 	 * to start unwinding at.  Skip ahead until we reach it.
 	 */
+
+	/* When starting from regs, skip the regs frame: */
+	if (regs) {
+		unwind_next_frame(state);
+		return;
+	}
+
+	/* Otherwise, skip ahead to the user-specified starting frame: */
 	while (!unwind_done(state) &&
 	       (!on_stack(&state->stack_info, first_frame, sizeof(long)) ||
 			state->sp <= (unsigned long)first_frame))

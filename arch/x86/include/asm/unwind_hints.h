@@ -11,8 +11,8 @@
  * don't do anything unusual with the stack.  Such normal callable functions
  * are annotated with the ENTRY/ENDPROC macros.  Most asm code falls in this
  * category.  In this case, no special debugging annotations are needed because
- * objtool can automatically generate the orc debuginfo for the orc unwinder to
- * read at runtime.
+ * objtool can automatically generate the ORC data for the ORC unwinder to read
+ * at runtime.
  *
  * Anything which doesn't fall into the above category, such as syscall and
  * interrupt handlers, tends to not be called directly by other functions, and
@@ -43,17 +43,19 @@
 	UNWIND_HINT sp_reg=ORC_REG_UNDEFINED
 .endm
 
-.macro UNWIND_HINT_REGS base=rsp offset=0 indirect=0 extra=1 iret=0
-	.if \base == rsp && \indirect
+.macro UNWIND_HINT_REGS base=%rsp offset=0 indirect=0 extra=1 iret=0
+	.if \base == %rsp && \indirect
 		.set sp_reg, ORC_REG_SP_INDIRECT
-	.elseif \base == rsp
+	.elseif \base == %rsp
 		.set sp_reg, ORC_REG_SP
-	.elseif \base == rbp
+	.elseif \base == %rbp
 		.set sp_reg, ORC_REG_BP
-	.elseif \base == rdi
+	.elseif \base == %rdi
 		.set sp_reg, ORC_REG_DI
-	.elseif \base == rdx
+	.elseif \base == %rdx
 		.set sp_reg, ORC_REG_DX
+	.elseif \base == %r10
+		.set sp_reg, ORC_REG_R10
 	.else
 		.error "UNWIND_HINT_REGS: bad base register"
 	.endif
@@ -72,7 +74,7 @@
 	UNWIND_HINT sp_reg=sp_reg sp_offset=sp_offset type=type
 .endm
 
-.macro UNWIND_HINT_IRET_REGS base=rsp offset=0
+.macro UNWIND_HINT_IRET_REGS base=%rsp offset=0
 	UNWIND_HINT_REGS base=\base offset=\offset iret=1
 .endm
 

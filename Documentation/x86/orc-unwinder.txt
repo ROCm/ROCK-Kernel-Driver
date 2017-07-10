@@ -1,38 +1,38 @@
-Orc unwinder debuginfo generation
-=====================================
+ORC unwinder
+============
 
 Overview
 --------
 
-The kernel CONFIG_ORC_UNWINDER option enables objtool generation of orc
-debuginfo, which is out-of-band data which is used by the in-kernel orc
-unwinder.  It's similar in concept to DWARF CFI debuginfo which would be
-used by a DWARF unwinder.  The difference is that the format of the orc
-data is simpler than DWARF, which in turn allows the unwinder to be
-simpler and faster.
+The kernel CONFIG_ORC_UNWINDER option enables objtool generation of the
+ORC unwind tables, which contain out-of-band data which is used by the
+in-kernel ORC unwinder.  It's similar in concept to DWARF CFI debuginfo
+which would be used by a DWARF unwinder.  The difference is that the
+format of the ORC data is simpler than DWARF, which in turn allows the
+unwinder to be simpler and faster.
 
-Objtool generates the orc data by first doing compile-time stack
+Objtool generates the ORC data by first doing compile-time stack
 metadata validation (CONFIG_STACK_VALIDATION).  After analyzing all the
 code paths of a .o file, it determines information about the stack state
 at each instruction address in the file and outputs that information to
 the .orc_unwind and .orc_unwind_ip sections.
 
-The orc sections are combined at link time and are sorted at boot time.
-The unwinder uses the resulting data to correlate instruction addresses
-with their stack states at run time.
+The per-object ORC sections are combined at link time and are sorted and
+post-processed at boot time.  The unwinder uses the resulting data to
+correlate instruction addresses with their stack states at run time.
 
 
-Orc vs frame pointers
--------------------------
+ORC vs frame pointers
+---------------------
 
 With frame pointers enabled, GCC adds instrumentation code to every
 function in the kernel.  The kernel's .text size increases by about
 3.2%, resulting in a broad kernel-wide slowdown.  Measurements by Mel
 Gorman [1] have shown a slowdown of 5-10% for some workloads.
 
-In contrast, the orc unwinder has no effect on text size or runtime
+In contrast, the ORC unwinder has no effect on text size or runtime
 performance, because the debuginfo is out of band.  So if you disable
-frame pointers and enable the orc unwinder, you get a nice performance
+frame pointers and enable the ORC unwinder, you get a nice performance
 improvement across the board, and still have reliable stack traces.
 
 Ingo Molnar says:
@@ -43,20 +43,21 @@ Ingo Molnar says:
   footprint. That can transform to even higher speedups for workloads
   whose cache locality is borderline."
 
-Another benefit of orc compared to frame pointers is that it can
+Another benefit of ORC compared to frame pointers is that it can
 reliably unwind across interrupts and exceptions.  Frame pointer based
-unwinds can skip the caller of the interrupted function if it was a leaf
-function or if the interrupt hit before the frame pointer was saved.
+unwinds can sometimes skip the caller of the interrupted function, if it
+was a leaf function or if the interrupt hit before the frame pointer was
+saved.
 
-The main disadvantage of the orc unwinder compared to frame pointers is
-that it needs more memory to store the orc unwind tables: roughly 2-4MB
+The main disadvantage of the ORC unwinder compared to frame pointers is
+that it needs more memory to store the ORC unwind tables: roughly 2-4MB
 depending on the kernel config.
 
 
-Orc vs DWARF
+ORC vs DWARF
 ------------
 
-Orc debuginfo's advantage over DWARF itself is that it's much simpler.
+ORC debuginfo's advantage over DWARF itself is that it's much simpler.
 It gets rid of the complex DWARF CFI state machine and also gets rid of
 the tracking of unnecessary registers.  This allows the unwinder to be
 much simpler, meaning fewer bugs, which is especially important for
@@ -64,36 +65,35 @@ mission critical oops code.
 
 The simpler debuginfo format also enables the unwinder to be much faster
 than DWARF, which is important for perf and lockdep.  In a basic
-performance test by Jiri Slaby [2], the orc unwinder was about 20x
-faster than an out-of-tree DWARF unwinder.  (Note: that measurement was
-taken before some performance tweaks were implemented which doubled
+performance test by Jiri Slaby [2], the ORC unwinder was about 20x
+faster than an out-of-tree DWARF unwinder.  (Note: That measurement was
+taken before some performance tweaks were added, which doubled
 performance, so the speedup over DWARF may be closer to 40x.)
 
-The orc data format does have a few downsides compared to DWARF.  The
-orc unwind tables take up ~2MB more memory than an DWARF .eh_frame
-table.
+The ORC data format does have a few downsides compared to DWARF.  The
+ORC unwind tables take up ~1MB more memory than DWARF eh_frame tables.
 
 Another potential downside is that, as GCC evolves, it's conceivable
-that the orc data may end up being *too* simple to describe the state of
+that the ORC data may end up being *too* simple to describe the state of
 the stack for certain optimizations.  But IMO this is unlikely because
 GCC saves the frame pointer for any unusual stack adjustments it does,
 so I suspect we'll really only ever need to keep track of the stack
 pointer and the frame pointer between call frames.  But even if we do
 end up having to track all the registers DWARF tracks, at least we will
-still be able to control the format, e.g.  no complex state machines.
+still be able to control the format, e.g. no complex state machines.
 
 
-Orc debuginfo generation
-------------------------
+ORC unwind table generation
+---------------------------
 
-The orc data is generated by objtool.  With the existing compile-time
+The ORC data is generated by objtool.  With the existing compile-time
 stack metadata validation feature, objtool already follows all code
 paths, and so it already has all the information it needs to be able to
-generate orc data from scratch.  So it's an easy step to go from stack
-validation to orc data generation.
+generate ORC data from scratch.  So it's an easy step to go from stack
+validation to ORC data generation.
 
-It should be possible to instead generate the orc data with a simple
-tool which converts DWARF to orc data.  However, such a solution would
+It should be possible to instead generate the ORC data with a simple
+tool which converts DWARF to ORC data.  However, such a solution would
 be incomplete due to the kernel's extensive use of asm, inline asm, and
 special sections like exception tables.
 
@@ -110,18 +110,18 @@ unusual things to the stack like entry code.  And even then, far fewer
 annotations are needed than what DWARF would need, so they're much more
 maintainable than DWARF CFI annotations.
 
-So the advantages of using objtool to generate orc data are that it
+So the advantages of using objtool to generate ORC data are that it
 gives more accurate debuginfo, with very few annotations.  It also
 insulates the kernel from toolchain bugs which can be very painful to
 deal with in the kernel since we often have to workaround issues in
 older versions of the toolchain for years.
 
 The downside is that the unwinder now becomes dependent on objtool's
-ability to reverse engineer GCC code paths.  If GCC optimizations become
-too complicated for objtool to follow, the orc data generation might
+ability to reverse engineer GCC code flow.  If GCC optimizations become
+too complicated for objtool to follow, the ORC data generation might
 stop working or become incomplete.  (It's worth noting that livepatch
 already has such a dependency on objtool's ability to follow GCC code
-paths.)
+flow.)
 
 If newer versions of GCC come up with some optimizations which break
 objtool, we may need to revisit the current implementation.  Some
@@ -134,45 +134,45 @@ objtool follows GCC code quite well.
 Unwinder implementation details
 -------------------------------
 
-Objtool generates the orc data by integrating with the compile-time
+Objtool generates the ORC data by integrating with the compile-time
 stack metadata validation feature, which is described in detail in
 tools/objtool/Documentation/stack-validation.txt.  After analyzing all
-the code paths of a .o file, it creates an array of orc structs, and a
-parallel array of instruction addresses associated with those structs,
-and writes them to the .orc_unwind and .orc_unwind_ip sections
+the code paths of a .o file, it creates an array of orc_entry structs,
+and a parallel array of instruction addresses associated with those
+structs, and writes them to the .orc_unwind and .orc_unwind_ip sections
 respectively.
 
-The orc data is split into the two arrays for performance reasons, to
+The ORC data is split into the two arrays for performance reasons, to
 make the searchable part of the data (.orc_unwind_ip) more compact.  The
 arrays are sorted in parallel at boot time.
 
 Performance is further improved by the use of a fast lookup table which
 is created at runtime.  The fast lookup table associates a given address
-with a range of orc unwind table indices, so that only a small subset of
-the orc unwind table needs to be searched.
+with a range of indices for the .orc_unwind table, so that only a small
+subset of the table needs to be searched.
 
 
 Etymology
 ---------
 
-Orcs, fearsome creatures of medieval folklore, are natural enemies of
-the Dwarves.  Similarly, the orc unwinder has been created in opposition
-to DWARF.  Unlike the esoteric DWARF unwinder, the veracious orc
-unwinder wastes no time or siloconic effort decoding variable-length
-zero-extended unsigned-integer byte-coded state-machine-based debug
-information entries.
+Orcs, fearsome creatures of medieval folklore, are the Dwarves' natural
+enemies.  Similarly, the ORC unwinder was created in opposition to the
+complexity and slowness of DWARF.
 
-The Orcs are not only opposed to Dwarves: they're adversarial toward
-*all* beings -- sometimes even themselves.  This is not dissimilar to
-the fact that the insular orc debuginfo format is exclusive to the Linux
-kernel -- and may even have some bugs lurking which could harm the
-kernel itself.  The orc debuginfo format is loathsomely feared by all
-other software projects.
+"Although Orcs rarely consider multiple solutions to a problem, they do
+excel at getting things done because they are creatures of action, not
+thought." [3]  Similarly, unlike the esoteric DWARF unwinder, the
+veracious ORC unwinder wastes no time or siloconic effort decoding
+variable-length zero-extended unsigned-integer byte-coded
+state-machine-based debug information entries.
 
 Similar to how Orcs frequently unravel the well-intentioned plans of
-their adversaries, the orc unwinder frequently unravels stacks with
+their adversaries, the ORC unwinder frequently unravels stacks with
 brutal, unyielding efficiency.
+
+ORC stands for Oops Rewind Capability.
 
 
 [1] https://lkml.kernel.org/r/20170602104048.jkkzssljsompjdwy@suse.de
 [2] https://lkml.kernel.org/r/d2ca5435-6386-29b8-db87-7f227c2b713a@suse.cz
+[3] http://dustin.wikidot.com/half-orcs-and-orcs

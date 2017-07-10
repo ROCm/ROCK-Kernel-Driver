@@ -19,7 +19,7 @@
  * objtool orc:
  *
  * This command analyzes a .o file and adds .orc_unwind and .orc_unwind_ip
- * sections to it, which is used by the in-kernel orc unwinder.
+ * sections to it, which is used by the in-kernel ORC unwinder.
  *
  * This command is a superset of "objtool check".
  */
