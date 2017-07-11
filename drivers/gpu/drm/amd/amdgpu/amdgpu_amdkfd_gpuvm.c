@@ -335,68 +335,6 @@ static void amdgpu_amdkfd_add_eviction_fence(struct amdgpu_bo *bo,
 	kfree(ef_list);
 }
 
-static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
-		struct amdgpu_vm *avm, bool is_aql,
-		struct kfd_bo_va_list **p_bo_va_entry)
-{
-	int ret;
-	struct kfd_bo_va_list *bo_va_entry;
-	struct amdgpu_bo *bo = mem->bo;
-	uint64_t va = mem->va;
-	struct list_head *list_bo_va = &mem->bo_va_list;
-	unsigned long bo_size = bo->tbo.mem.size;
-
-	if (is_aql)
-		va += bo_size;
-
-	bo_va_entry = kzalloc(sizeof(*bo_va_entry), GFP_KERNEL);
-	if (!bo_va_entry)
-		return -ENOMEM;
-
-	if (!va) {
-		pr_err("Invalid VA when adding BO to VM\n");
-		return -EINVAL;
-	}
-
-	pr_debug("\t add VA 0x%llx - 0x%llx to vm %p\n", va,
-			va + bo_size, avm);
-
-	/* Add BO to VM internal data structures*/
-	bo_va_entry->bo_va = amdgpu_vm_bo_add(adev, avm, bo);
-	if (bo_va_entry->bo_va == NULL) {
-		ret = -EINVAL;
-		pr_err("Failed to add BO object to VM. ret == %d\n",
-				ret);
-		goto err_vmadd;
-	}
-
-	bo_va_entry->va = va;
-	bo_va_entry->pte_flags = amdgpu_vm_get_pte_flags(adev,
-							 mem->mapping_flags);
-	bo_va_entry->kgd_dev = (void *)adev;
-	list_add(&bo_va_entry->bo_list, list_bo_va);
-
-	if (p_bo_va_entry)
-		*p_bo_va_entry = bo_va_entry;
-
-	return 0;
-
-err_vmadd:
-	kfree(bo_va_entry);
-	return ret;
-}
-
-static void remove_bo_from_vm(struct amdgpu_device *adev,
-		struct kfd_bo_va_list *entry, unsigned long size)
-{
-	pr_debug("\t remove VA 0x%llx - 0x%llx in entry %p\n",
-			entry->va,
-			entry->va + size, entry);
-	amdgpu_vm_bo_rmv(adev, entry->bo_va);
-	list_del(&entry->bo_list);
-	kfree(entry);
-}
-
 static int amdgpu_amdkfd_bo_validate(struct amdgpu_bo *bo, uint32_t domain,
 				     bool wait)
 {
@@ -435,6 +373,12 @@ static int amdgpu_amdkfd_validate(void *param, struct amdgpu_bo *bo)
 	return amdgpu_amdkfd_bo_validate(bo, p->domain, p->wait);
 }
 
+/* vm_validate_pt_pd_bos - Validate page table and directory BOs
+ *
+ * Also updates page directory entries so we don't need to do this
+ * again later until the page directory is validated again (e.g. after
+ * an eviction or allocating new page tables).
+ */
 static int vm_validate_pt_pd_bos(struct amdgpu_vm *vm)
 {
 	struct amdgpu_bo *pd = vm->root.bo;
@@ -460,7 +404,116 @@ static int vm_validate_pt_pd_bos(struct amdgpu_vm *vm)
 
 	vm->last_eviction_counter = atomic64_read(&adev->num_evictions);
 
+	ret = amdgpu_vm_update_directories(adev, vm);
+	if (ret != 0)
+		return ret;
+
 	return 0;
+}
+
+/* add_bo_to_vm - Add a BO to a VM
+ *
+ * Everything that needs to bo done only once when a BO is first added
+ * to a VM. It can later be mapped and unmapped many times without
+ * repeating these steps.
+ *
+ * 1. Allocate and initialize BO VA entry data structure
+ * 2. Add BO to the VM
+ * 3. Determine ASIC-specific PTE flags
+ * 4. Alloc page tables and directories if needed
+ * 4a.  Validate new page tables and directories and update directories
+ */
+static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
+		struct amdgpu_vm *avm, bool is_aql,
+		struct kfd_bo_va_list **p_bo_va_entry)
+{
+	int ret;
+	struct kfd_bo_va_list *bo_va_entry;
+	struct amdkfd_vm *kvm = container_of(avm,
+					     struct amdkfd_vm, base);
+	struct amdgpu_bo *pd = avm->root.bo;
+	struct amdgpu_bo *bo = mem->bo;
+	uint64_t va = mem->va;
+	struct list_head *list_bo_va = &mem->bo_va_list;
+	unsigned long bo_size = bo->tbo.mem.size;
+
+	if (!va) {
+		pr_err("Invalid VA when adding BO to VM\n");
+		return -EINVAL;
+	}
+
+	if (is_aql)
+		va += bo_size;
+
+	bo_va_entry = kzalloc(sizeof(*bo_va_entry), GFP_KERNEL);
+	if (!bo_va_entry)
+		return -ENOMEM;
+
+	pr_debug("\t add VA 0x%llx - 0x%llx to vm %p\n", va,
+			va + bo_size, avm);
+
+	/* Add BO to VM internal data structures*/
+	bo_va_entry->bo_va = amdgpu_vm_bo_add(adev, avm, bo);
+	if (bo_va_entry->bo_va == NULL) {
+		ret = -EINVAL;
+		pr_err("Failed to add BO object to VM. ret == %d\n",
+				ret);
+		goto err_vmadd;
+	}
+
+	bo_va_entry->va = va;
+	bo_va_entry->pte_flags = amdgpu_vm_get_pte_flags(adev,
+							 mem->mapping_flags);
+	bo_va_entry->kgd_dev = (void *)adev;
+	list_add(&bo_va_entry->bo_list, list_bo_va);
+
+	if (p_bo_va_entry)
+		*p_bo_va_entry = bo_va_entry;
+
+	/* Allocate new page tables if neeeded and validate
+	 * them. Clearing of new page tables and validate need to wait
+	 * on move fences. We don't want that to trigger the eviction
+	 * fence, so remove it temporarily.
+	 */
+	amdgpu_amdkfd_remove_eviction_fence(pd,
+					kvm->process_info->eviction_fence,
+					NULL, NULL);
+
+	ret = amdgpu_vm_alloc_pts(adev, avm, va, amdgpu_bo_size(bo));
+	if (ret) {
+		pr_err("Failed to allocate pts, err=%d\n", ret);
+		goto err_alloc_pts;
+	}
+
+	ret = vm_validate_pt_pd_bos(avm);
+	if (ret != 0) {
+		pr_err("validate_pt_pd_bos() failed\n");
+		goto err_alloc_pts;
+	}
+
+	/* Add the eviction fence back */
+	amdgpu_bo_fence(pd, &kvm->process_info->eviction_fence->base, true);
+
+	return 0;
+
+err_alloc_pts:
+	amdgpu_bo_fence(pd, &kvm->process_info->eviction_fence->base, true);
+	amdgpu_vm_bo_rmv(adev, bo_va_entry->bo_va);
+	list_del(&bo_va_entry->bo_list);
+err_vmadd:
+	kfree(bo_va_entry);
+	return ret;
+}
+
+static void remove_bo_from_vm(struct amdgpu_device *adev,
+		struct kfd_bo_va_list *entry, unsigned long size)
+{
+	pr_debug("\t remove VA 0x%llx - 0x%llx in entry %p\n",
+			entry->va,
+			entry->va + size, entry);
+	amdgpu_vm_bo_rmv(adev, entry->bo_va);
+	list_del(&entry->bo_list);
+	kfree(entry);
 }
 
 static void add_kgd_mem_to_kfd_bo_list(struct kgd_mem *mem,
@@ -940,15 +993,6 @@ static int update_gpuvm_pte(struct amdgpu_device *adev,
 	vm = bo_va->vm;
 	bo = bo_va->bo;
 
-	/* Update the page directory */
-	ret = amdgpu_vm_update_directories(adev, vm);
-	if (ret != 0) {
-		pr_err("amdgpu_vm_update_directories failed\n");
-		return ret;
-	}
-
-	amdgpu_sync_fence(adev, sync, vm->last_dir_update);
-
 	/* Update the page tables  */
 	ret = amdgpu_vm_bo_update(adev, bo_va, false);
 	if (ret != 0) {
@@ -957,9 +1001,6 @@ static int update_gpuvm_pte(struct amdgpu_device *adev,
 	}
 
 	amdgpu_sync_fence(adev, sync, bo_va->last_pt_update);
-
-	/* Remove PTs from LRU list (reservation removed PD only) */
-	amdgpu_vm_move_pt_bos_in_lru(adev, vm);
 
 	/* Sync objects can't handle multiple GPUs (contexts) updating
 	 * sync->last_vm_update. Fortunately we don't need it for
@@ -978,51 +1019,15 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev,
 		bool no_update_pte)
 {
 	int ret;
-	struct amdgpu_bo *bo = entry->bo_va->bo;
-	struct amdkfd_vm *kvm = container_of(entry->bo_va->vm,
-					     struct amdkfd_vm, base);
-	struct amdgpu_bo *pd = entry->bo_va->vm->root.bo;
 
-	/* Remove eviction fence from PD (and thereby from PTs too as they
-	 * share the resv. object. This is necessary because new PTs are
-	 * cleared and validate needs to wait on move fences. The eviction
-	 * fence shouldn't interfere in both these activities
-	 */
-	amdgpu_amdkfd_remove_eviction_fence(pd,
-					kvm->process_info->eviction_fence,
-					NULL, NULL);
-
-	ret = amdgpu_vm_alloc_pts(adev, entry->bo_va->vm, entry->va,
-				  amdgpu_bo_size(bo));
-
-	if (ret) {
-		pr_err("Failed to allocate pts, err=%d\n", ret);
-		return ret;
-	}
-
-	/* Set virtual address for the allocation, allocate PTs,
-	 * if needed, and zero them.
-	 */
-	ret = amdgpu_vm_bo_map(adev, entry->bo_va,
-			entry->va, 0, amdgpu_bo_size(bo),
-			entry->pte_flags);
+	/* Set virtual address for the allocation */
+	ret = amdgpu_vm_bo_map(adev, entry->bo_va, entry->va, 0,
+			amdgpu_bo_size(entry->bo_va->bo), entry->pte_flags);
 	if (ret != 0) {
 		pr_err("Failed to map VA 0x%llx in vm. ret %d\n",
 				entry->va, ret);
 		return ret;
 	}
-
-	/* PT BOs may be created during amdgpu_vm_bo_map() call,
-	 * so we have to validate the newly created PT BOs.
-	 */
-	ret = vm_validate_pt_pd_bos(entry->bo_va->vm);
-	if (ret != 0) {
-		pr_err("validate_pt_pd_bos() failed\n");
-		return ret;
-	}
-
-	/* Add the eviction fence back */
-	amdgpu_bo_fence(pd, &kvm->process_info->eviction_fence->base, true);
 
 	if (no_update_pte)
 		return 0;
