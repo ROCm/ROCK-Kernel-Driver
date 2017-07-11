@@ -807,7 +807,6 @@ void run_rdma_free_callback(struct kfd_bo *buf_obj);
 struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid);
 
 /* kfd dgpu memory */
-int kfd_map_memory_to_gpu(void *mem, struct kfd_process_device *pdd);
 int kfd_unmap_memory_from_gpu(void *mem, struct kfd_process_device *pdd);
 
 /* Process device data iterator */

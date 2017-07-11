@@ -107,7 +107,8 @@ static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 	if (err)
 		goto err_alloc_mem;
 
-	err = kfd_map_memory_to_gpu(mem, pdd);
+	err = kdev->kfd2kgd->map_memory_to_gpu(
+				kdev->kgd, (struct kgd_mem *)mem, pdd->vm);
 	if (err)
 		goto err_map_mem;
 
@@ -117,6 +118,8 @@ static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 		pr_debug("Sync memory failed, wait interrupted by user signal\n");
 		goto sync_memory_failed;
 	}
+
+	kfd_flush_tlb(kdev, p->pasid);
 
 	/* Create an obj handle so kfd_process_device_remove_obj_handle
 	 * will take care of the bo removal when the process finishes.
