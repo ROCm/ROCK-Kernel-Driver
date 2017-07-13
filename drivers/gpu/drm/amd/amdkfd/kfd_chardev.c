@@ -1194,7 +1194,9 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	struct kfd_dev *dev;
 	int idr_handle;
 	long err;
-	uint64_t offset;
+	uint64_t offset = args->mmap_offset;
+	uint32_t flags = args->flags;
+	struct vm_area_struct *vma;
 
 	if (args->size == 0)
 		return -EINVAL;
@@ -1209,17 +1211,31 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	if (IS_ERR(pdd))
 		return PTR_ERR(pdd);
 
-	if (args->flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
+	if (flags & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
+		/* Check if the userptr corresponds to another (or third-party)
+		 * device local memory. If so treat is as a doorbell. User
+		 * space will be oblivious of this and will use this doorbell
+		 * BO as a regular userptr BO
+		 */
+		vma = find_vma(current->mm, args->mmap_offset);
+		if (vma && (vma->vm_flags & VM_IO)) {
+			unsigned long pfn;
+
+			follow_pfn(vma, args->mmap_offset, &pfn);
+			flags |= KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL;
+			flags &= ~KFD_IOC_ALLOC_MEM_FLAGS_USERPTR;
+			offset = (pfn << PAGE_SHIFT);
+		}
+	} else if (flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
 		if (args->size != kfd_doorbell_process_slice(dev))
 			return -EINVAL;
 		offset = kfd_get_process_doorbells(dev, p);
-	} else
-		offset = args->mmap_offset;
+	}
 
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
 		pdd->vm, (struct kgd_mem **) &mem, &offset,
-		NULL, args->flags);
+		NULL, flags);
 
 	if (err != 0)
 		return err;
