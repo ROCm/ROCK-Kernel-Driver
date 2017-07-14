@@ -192,7 +192,12 @@ static inline bool amdgpu_bo_gpu_accessible(struct amdgpu_bo *bo)
 {
 	switch (bo->tbo.mem.mem_type) {
 	case TTM_PL_TT: return amdgpu_gtt_mgr_has_gart_addr(&bo->tbo.mem);
-	case TTM_PL_VRAM: return true;
+
+	case TTM_PL_VRAM:
+	case AMDGPU_PL_DGMA:
+	case AMDGPU_PL_DGMA_IMPORT:
+		return true;
+
 	default: return false;
 	}
 }
