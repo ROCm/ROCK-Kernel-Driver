@@ -75,10 +75,6 @@ static DEFINE_SPINLOCK(pstore_lock);
 struct pstore_info *psinfo;
 
 static char *backend;
-static int auto_action=0;
-module_param(auto_action, int, 0664);
-MODULE_PARM_DESC(auto_action, "action to take on backend "
-		 "registration: 0=nothing, 1=print, 2=print+clear");
 
 /* Compression parameters */
 #ifdef CONFIG_PSTORE_ZLIB_COMPRESS
@@ -104,8 +100,6 @@ static size_t big_oops_buf_sz;
 
 /* How much of the console log to snapshot */
 static unsigned long kmsg_bytes = 10240;
-module_param(kmsg_bytes, ulong, 0644);
-MODULE_PARM_DESC(kmsg_bytes, "maximum size to save of a crash dump");
 
 void pstore_set_kmsg_bytes(int bytes)
 {
@@ -723,11 +717,7 @@ int pstore_register(struct pstore_info *psi)
 	allocate_buf_for_compression();
 
 	if (pstore_is_mounted())
-		pstore_get_records(PGR_VERBOSE|PGR_POPULATE);
-
-	if (auto_action)
-		pstore_get_records(PGR_SYSLOG|
-				   ((auto_action>1)?PGR_CLEAR:0));
+		pstore_get_records(0);
 
 	if (psi->flags & PSTORE_FLAGS_DMESG)
 		pstore_register_kmsg();
@@ -833,7 +823,7 @@ static void decompress_record(struct pstore_record *record)
  * error records.
  */
 void pstore_get_backend_records(struct pstore_info *psi,
-				struct dentry *root, unsigned flags)
+				struct dentry *root, int quiet)
 {
 	int failed = 0;
 
@@ -851,7 +841,7 @@ void pstore_get_backend_records(struct pstore_info *psi,
 	 */
 	for (;;) {
 		struct pstore_record *record;
-		int rc = 0;
+		int rc;
 
 		record = kzalloc(sizeof(*record), GFP_KERNEL);
 		if (!record) {
@@ -867,23 +857,12 @@ void pstore_get_backend_records(struct pstore_info *psi,
 			break;
 
 		decompress_record(record);
-		if (flags & PGR_POPULATE)
-			rc = pstore_mkfile(root, record);
-		if (record->type == PSTORE_TYPE_DMESG) {
-			if (flags & PGR_SYSLOG) {
-				pr_notice("---------- pstore: ----------\n");
-				pr_notice("%.*s\n", (int)record->size,
-					  record->buf);
-				pr_notice("-----------------------------\n");
-			}
-			if (flags & PGR_CLEAR && psi->erase)
-				psi->erase(record);
-		}
+		rc = pstore_mkfile(root, record);
 		if (rc) {
 			/* pstore_mkfile() did not take record, so free it. */
 			kfree(record->buf);
 			kfree(record);
-			if (rc != -EEXIST || (flags & PGR_VERBOSE))
+			if (rc != -EEXIST || !quiet)
 				failed++;
 		}
 	}
@@ -899,7 +878,7 @@ out:
 
 static void pstore_dowork(struct work_struct *work)
 {
-	pstore_get_records(PGR_QUIET|PGR_POPULATE);
+	pstore_get_records(1);
 }
 
 static void pstore_timefunc(unsigned long dummy)
