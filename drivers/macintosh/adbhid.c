@@ -1264,12 +1264,8 @@ init_ms_a3(int id)
 
 static int __init adbhid_init(void)
 {
-#ifdef CONFIG_PPC32
+#ifndef CONFIG_MAC
 	if (!machine_is(chrp) && !machine_is(powermac))
-		return 0;
-#endif
-#ifdef CONFIG_PPC64
-	if (!machine_is(powermac))
 		return 0;
 #endif
 
