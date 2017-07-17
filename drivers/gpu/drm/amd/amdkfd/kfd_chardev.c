@@ -1325,7 +1325,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	void *mem;
 	struct kfd_dev *dev, *peer;
 	long err = 0;
-	int i, num_dev;
+	int i, num_dev = 0;
 	uint32_t *devices_arr = NULL;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
