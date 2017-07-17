@@ -119,7 +119,7 @@ var SQ_WAVE_TRAPSTS_PRE_SAVECTX_SIZE	=   10
 var SQ_WAVE_TRAPSTS_POST_SAVECTX_MASK	=   0xFFFFF800
 var SQ_WAVE_TRAPSTS_POST_SAVECTX_SHIFT	=   11
 var SQ_WAVE_TRAPSTS_POST_SAVECTX_SIZE	=   21
-var SQ_WAVE_TRAPSTS_XNACK_ERROR_MASK	= 0x10000000
+var SQ_WAVE_TRAPSTS_MEM_VIOL_MASK	= 0x100
 
 var SQ_WAVE_IB_STS_RCNT_SHIFT		=   16			//FIXME
 var SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT	=   15			//FIXME
@@ -247,14 +247,14 @@ L_SKIP_RESTORE:
 
     // *********    Handle non-CWSR traps	*******************
 if (!EMU_RUN_HACK)
-    // If STATUS.XNACK_ERROR is asserted then we cannot fetch from the TMA.
+    // If STATUS.MEM_VIOL is asserted then we cannot fetch from the TMA.
     // Instead, halt the wavefront and return from the trap.
-    s_and_b32       ttmp8, s_save_trapsts, SQ_WAVE_TRAPSTS_XNACK_ERROR_MASK
-    s_cbranch_scc0  L_NO_XNACK_ERROR
+    s_and_b32       ttmp8, s_save_trapsts, SQ_WAVE_TRAPSTS_MEM_VIOL_MASK
+    s_cbranch_scc0  L_NO_MEM_VIOL
     s_or_b32        s_save_status, s_save_status, SQ_WAVE_STATUS_HALT_MASK
     s_branch        L_EXCP_CASE
 
-L_NO_XNACK_ERROR:
+L_NO_MEM_VIOL:
     /* read tba and tma for next level trap handler, ttmp4 is used as s_save_status */
     s_getreg_b32    tma_lo,hwreg(HW_REG_SQ_SHADER_TMA_LO)
     s_getreg_b32    tma_hi,hwreg(HW_REG_SQ_SHADER_TMA_HI)
@@ -1154,7 +1154,7 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0xb8f0f802, 0x89708670,
 	0xb8f1f803, 0x8674ff71,
 	0x00000400, 0xbf85001a,
-	0x8674ff71, 0x10000000,
+	0x8674ff71, 0x00000100,
 	0xbf840003, 0x8770ff70,
 	0x00002000, 0xbf820010,
 	0xb8faf812, 0xb8fbf813,
@@ -1404,4 +1404,3 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0xbf8a0000, 0x95806f6c,
 	0xbf810000, 0x00000000,
 };
-
