@@ -578,13 +578,6 @@ static uint32_t soc15_get_rev_id(struct amdgpu_device *adev)
 		return nbio_v6_1_get_rev_id(adev);
 }
 
-
-int gmc_v9_0_mc_wait_for_idle(struct amdgpu_device *adev)
-{
-	/* to be implemented in MC IP*/
-	return 0;
-}
-
 static const struct amdgpu_asic_funcs soc15_asic_funcs =
 {
 	.read_disabled_bios = &soc15_read_disabled_bios,
@@ -739,6 +732,9 @@ static int soc15_common_hw_init(void *handle)
 	soc15_pcie_gen3_enable(adev);
 	/* enable aspm */
 	soc15_program_aspm(adev);
+	/* setup nbio registers */
+	if (!(adev->flags & AMD_IS_APU))
+		nbio_v6_1_init_registers(adev);
 	/* enable the doorbell aperture */
 	soc15_enable_doorbell_aperture(adev, true);
 

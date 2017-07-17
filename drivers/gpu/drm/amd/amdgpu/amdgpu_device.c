@@ -684,7 +684,7 @@ void amdgpu_vram_location(struct amdgpu_device *adev, struct amdgpu_mc *mc, u64 
 }
 
 /**
- * amdgpu_gtt_location - try to find GTT location
+ * amdgpu_gart_location - try to find GTT location
  * @adev: amdgpu device structure holding all necessary informations
  * @mc: memory controller structure holding memory informations
  *
@@ -695,28 +695,28 @@ void amdgpu_vram_location(struct amdgpu_device *adev, struct amdgpu_mc *mc, u64 
  *
  * FIXME: when reducing GTT size align new size on power of 2.
  */
-void amdgpu_gtt_location(struct amdgpu_device *adev, struct amdgpu_mc *mc)
+void amdgpu_gart_location(struct amdgpu_device *adev, struct amdgpu_mc *mc)
 {
 	u64 size_af, size_bf;
 
-	size_af = ((adev->mc.mc_mask - mc->vram_end) + mc->gtt_base_align) & ~mc->gtt_base_align;
-	size_bf = mc->vram_start & ~mc->gtt_base_align;
+	size_af = adev->mc.mc_mask - mc->vram_end;
+	size_bf = mc->vram_start;
 	if (size_bf > size_af) {
-		if (mc->gtt_size > size_bf) {
+		if (mc->gart_size > size_bf) {
 			dev_warn(adev->dev, "limiting GTT\n");
-			mc->gtt_size = size_bf;
+			mc->gart_size = size_bf;
 		}
-		mc->gtt_start = 0;
+		mc->gart_start = 0;
 	} else {
-		if (mc->gtt_size > size_af) {
+		if (mc->gart_size > size_af) {
 			dev_warn(adev->dev, "limiting GTT\n");
-			mc->gtt_size = size_af;
+			mc->gart_size = size_af;
 		}
-		mc->gtt_start = (mc->vram_end + 1 + mc->gtt_base_align) & ~mc->gtt_base_align;
+		mc->gart_start = mc->vram_end + 1;
 	}
-	mc->gtt_end = mc->gtt_start + mc->gtt_size - 1;
+	mc->gart_end = mc->gart_start + mc->gart_size - 1;
 	dev_info(adev->dev, "GTT: %lluM 0x%016llX - 0x%016llX\n",
-			mc->gtt_size >> 20, mc->gtt_start, mc->gtt_end);
+			mc->gart_size >> 20, mc->gart_start, mc->gart_end);
 }
 
 /*
@@ -739,7 +739,12 @@ bool amdgpu_need_post(struct amdgpu_device *adev)
 		adev->has_hw_reset = false;
 		return true;
 	}
-	/* then check MEM_SIZE, in case the crtcs are off */
+
+	/* bios scratch used on CIK+ */
+	if (adev->asic_type >= CHIP_BONAIRE)
+		return amdgpu_atombios_scratch_need_asic_init(adev);
+
+	/* check MEM_SIZE for older asics */
 	reg = amdgpu_asic_get_config_memsize(adev);
 
 	if ((reg != 0) && (reg != 0xffffffff))
@@ -1150,13 +1155,18 @@ static void amdgpu_check_arguments(struct amdgpu_device *adev)
 		amdgpu_sched_jobs = roundup_pow_of_two(amdgpu_sched_jobs);
 	}
 
-	if (amdgpu_gart_size != -1) {
+	if (amdgpu_gart_size < 32) {
+		/* gart size must be greater or equal to 32M */
+		dev_warn(adev->dev, "gart size (%d) too small\n",
+			 amdgpu_gart_size);
+		amdgpu_gart_size = 32;
+	}
+
+	if (amdgpu_gtt_size != -1 && amdgpu_gtt_size < 32) {
 		/* gtt size must be greater or equal to 32M */
-		if (amdgpu_gart_size < 32) {
-			dev_warn(adev->dev, "gart size (%d) too small\n",
-				 amdgpu_gart_size);
-			amdgpu_gart_size = -1;
-		}
+		dev_warn(adev->dev, "gtt size (%d) too small\n",
+				 amdgpu_gtt_size);
+		amdgpu_gtt_size = -1;
 	}
 
 	amdgpu_check_vm_size(adev);
@@ -2089,7 +2099,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	adev->flags = flags;
 	adev->asic_type = flags & AMD_ASIC_MASK;
 	adev->usec_timeout = AMDGPU_MAX_USEC_TIMEOUT;
-	adev->mc.gtt_size = 512 * 1024 * 1024;
+	adev->mc.gart_size = 512 * 1024 * 1024;
 	adev->accel_working = false;
 	adev->num_rings = 0;
 	adev->mman.buffer_funcs = NULL;
@@ -2241,7 +2251,15 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		DRM_INFO("GPU post is not needed\n");
 	}
 
-	if (!adev->is_atom_fw) {
+	if (adev->is_atom_fw) {
+		/* Initialize clocks */
+		r = amdgpu_atomfirmware_get_clock_info(adev);
+		if (r) {
+			dev_err(adev->dev, "amdgpu_atomfirmware_get_clock_info failed\n");
+			amdgpu_vf_error_put(AMDGIM_ERROR_VF_ATOMBIOS_GET_CLOCK_FAIL, 0, 0);
+			goto failed;
+		}
+	} else {
 		/* Initialize clocks */
 		r = amdgpu_atombios_get_clock_info(adev);
 		if (r) {

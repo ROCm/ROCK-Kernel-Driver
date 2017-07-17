@@ -159,7 +159,7 @@ static int amdgpu_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 		break;
 	case TTM_PL_TT:
 		man->func = &amdgpu_gtt_mgr_func;
-		man->gpu_offset = adev->mc.gtt_start;
+		man->gpu_offset = adev->mc.gart_start;
 		man->available_caching = TTM_PL_MASK_CACHING;
 		man->default_caching = TTM_PL_FLAG_CACHED;
 		man->flags = TTM_MEMTYPE_FLAG_MAPPABLE | TTM_MEMTYPE_FLAG_CMA;
@@ -215,7 +215,35 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 		    adev->mman.buffer_funcs_ring &&
 		    adev->mman.buffer_funcs_ring->ready == false) {
 			amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_CPU);
+		} else if (adev->mc.visible_vram_size < adev->mc.real_vram_size &&
+			   !(abo->flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED)) {
+			unsigned fpfn = adev->mc.visible_vram_size >> PAGE_SHIFT;
+			struct drm_mm_node *node = bo->mem.mm_node;
+			unsigned long pages_left;
+
+			for (pages_left = bo->mem.num_pages;
+			     pages_left;
+			     pages_left -= node->size, node++) {
+				if (node->start < fpfn)
+					break;
+			}
+
+			if (!pages_left)
+				goto gtt;
+
+			/* Try evicting to the CPU inaccessible part of VRAM
+			 * first, but only set GTT as busy placement, so this
+			 * BO will be evicted to GTT rather than causing other
+			 * BOs to be evicted from VRAM
+			 */
+			amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_VRAM |
+							 AMDGPU_GEM_DOMAIN_GTT);
+			abo->placements[0].fpfn = fpfn;
+			abo->placements[0].lpfn = 0;
+			abo->placement.busy_placement = &abo->placements[1];
+			abo->placement.num_busy_placement = 1;
 		} else {
+gtt:
 			amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_GTT);
 		}
 		break;
@@ -521,6 +549,15 @@ memcpy:
 		if (r) {
 			return r;
 		}
+	}
+
+	if (bo->type == ttm_bo_type_device &&
+	    new_mem->mem_type == TTM_PL_VRAM &&
+	    old_mem->mem_type != TTM_PL_VRAM) {
+		/* amdgpu_bo_fault_reserve_notify will re-set this if the CPU
+		 * accesses the BO after it's moved.
+		 */
+		abo->flags &= ~AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 	}
 
 	/* update statistics */
@@ -1150,7 +1187,9 @@ static struct ttm_bo_driver amdgpu_bo_driver = {
 
 int amdgpu_ttm_init(struct amdgpu_device *adev)
 {
+	uint64_t gtt_size;
 	int r;
+	u64 vis_vram_limit;
 
 	r = amdgpu_ttm_global_init(adev);
 	if (r) {
@@ -1174,6 +1213,13 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 		DRM_ERROR("Failed initializing VRAM heap.\n");
 		return r;
 	}
+
+	/* Reduce size of CPU-visible VRAM if requested */
+	vis_vram_limit = (u64)amdgpu_vis_vram_limit * 1024 * 1024;
+	if (amdgpu_vis_vram_limit > 0 &&
+	    vis_vram_limit <= adev->mc.visible_vram_size)
+		adev->mc.visible_vram_size = vis_vram_limit;
+
 	/* Change the size here instead of the init above so only lpfn is affected */
 	amdgpu_ttm_set_active_vram_size(adev, adev->mc.visible_vram_size);
 
@@ -1198,14 +1244,19 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 
 	DRM_INFO("amdgpu: %uM of VRAM memory ready\n",
 		 (unsigned) (adev->mc.real_vram_size / (1024 * 1024)));
-	r = ttm_bo_init_mm(&adev->mman.bdev, TTM_PL_TT,
-				adev->mc.gtt_size >> PAGE_SHIFT);
+
+	if (amdgpu_gtt_size == -1)
+		gtt_size = max((AMDGPU_DEFAULT_GTT_SIZE_MB << 20),
+			       adev->mc.mc_vram_size);
+	else
+		gtt_size = (uint64_t)amdgpu_gtt_size << 20;
+	r = ttm_bo_init_mm(&adev->mman.bdev, TTM_PL_TT, gtt_size >> PAGE_SHIFT);
 	if (r) {
 		DRM_ERROR("Failed initializing GTT heap.\n");
 		return r;
 	}
 	DRM_INFO("amdgpu: %uM of GTT memory ready.\n",
-		 (unsigned)(adev->mc.gtt_size / (1024 * 1024)));
+		 (unsigned)(gtt_size / (1024 * 1024)));
 
 	adev->gds.mem.total_size = adev->gds.mem.total_size << AMDGPU_GDS_SHIFT;
 	adev->gds.mem.gfx_partition_size = adev->gds.mem.gfx_partition_size << AMDGPU_GDS_SHIFT;
@@ -1483,7 +1534,7 @@ static int amdgpu_map_buffer(struct ttm_buffer_object *bo,
 	BUG_ON(adev->mman.buffer_funcs->copy_max_bytes <
 	       AMDGPU_GTT_MAX_TRANSFER_SIZE * 8);
 
-	*addr = adev->mc.gtt_start;
+	*addr = adev->mc.gart_start;
 	*addr += (u64)window * AMDGPU_GTT_MAX_TRANSFER_SIZE *
 		AMDGPU_GPU_PAGE_SIZE;
 
@@ -1849,7 +1900,7 @@ static int amdgpu_ttm_debugfs_init(struct amdgpu_device *adev)
 				  adev, &amdgpu_ttm_gtt_fops);
 	if (IS_ERR(ent))
 		return PTR_ERR(ent);
-	i_size_write(ent->d_inode, adev->mc.gtt_size);
+	i_size_write(ent->d_inode, adev->mc.gart_size);
 	adev->mman.gtt = ent;
 
 #endif

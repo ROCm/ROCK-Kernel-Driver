@@ -95,6 +95,7 @@ static void amdgpu_ttm_bo_destroy(struct ttm_buffer_object *tbo)
 
 	if (bo->kfd_bo)
 		amdgpu_amdkfd_unreserve_system_memory_limit(bo);
+	amdgpu_bo_kunmap(bo);
 	amdgpu_update_memory_usage(adev, &bo->tbo.mem, NULL);
 
 	amdgpu_bo_unref(&bo->parent);
@@ -323,7 +324,7 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 	struct amdgpu_bo *bo;
 	enum ttm_bo_type type;
 	unsigned long page_align;
-	u64 initial_bytes_moved;
+	u64 initial_bytes_moved, bytes_moved;
 	size_t acc_size;
 	int r;
 
@@ -396,8 +397,14 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 	r = ttm_bo_init_reserved(&adev->mman.bdev, &bo->tbo, size, type,
 				 &bo->placement, page_align, !kernel, NULL,
 				 acc_size, sg, resv, &amdgpu_ttm_bo_destroy);
-	amdgpu_cs_report_moved_bytes(adev,
-		atomic64_read(&adev->num_bytes_moved) - initial_bytes_moved);
+	bytes_moved = atomic64_read(&adev->num_bytes_moved) -
+		      initial_bytes_moved;
+	if (adev->mc.visible_vram_size < adev->mc.real_vram_size &&
+	    bo->tbo.mem.mem_type == TTM_PL_VRAM &&
+	    bo->tbo.mem.start < adev->mc.visible_vram_size >> PAGE_SHIFT)
+		amdgpu_cs_report_moved_bytes(adev, bytes_moved, bytes_moved);
+	else
+		amdgpu_cs_report_moved_bytes(adev, bytes_moved, 0);
 
 	if (unlikely(r != 0))
 		return r;
@@ -423,6 +430,10 @@ int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
 	*bo_ptr = bo;
 
 	trace_amdgpu_bo_create(bo);
+
+	/* Treat CPU_ACCESS_REQUIRED only as a hint if given by UMD */
+	if (type == ttm_bo_type_device)
+		bo->flags &= ~AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 
 	return 0;
 
@@ -919,6 +930,8 @@ void amdgpu_bo_move_notify(struct ttm_buffer_object *bo,
 	abo = container_of(bo, struct amdgpu_bo, tbo);
 	amdgpu_vm_bo_invalidate(adev, abo);
 
+	amdgpu_bo_kunmap(abo);
+
 	/* remember the eviction */
 	if (evict)
 		atomic64_inc(&adev->num_evictions);
@@ -937,13 +950,17 @@ int amdgpu_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->bdev);
 	struct amdgpu_bo *abo;
-	unsigned long offset, size, lpfn;
-	int i, r;
+	unsigned long offset, size;
+	int r;
 
 	if (!amdgpu_ttm_bo_is_amdgpu_bo(bo))
 		return 0;
 
 	abo = container_of(bo, struct amdgpu_bo, tbo);
+
+	/* Remember that this BO was accessed by the CPU */
+	abo->flags |= AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
+
 	if (bo->mem.mem_type != TTM_PL_VRAM)
 		return 0;
 
@@ -958,26 +975,21 @@ int amdgpu_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 
 	/* hurrah the memory is not visible ! */
 	atomic64_inc(&adev->num_vram_cpu_page_faults);
-	amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_VRAM);
-	lpfn =	adev->mc.visible_vram_size >> PAGE_SHIFT;
-	for (i = 0; i < abo->placement.num_placement; i++) {
-		/* Force into visible VRAM */
-		if ((abo->placements[i].flags & TTM_PL_FLAG_VRAM) &&
-		    (!abo->placements[i].lpfn ||
-		     abo->placements[i].lpfn > lpfn))
-			abo->placements[i].lpfn = lpfn;
-	}
+	amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_VRAM |
+					 AMDGPU_GEM_DOMAIN_GTT);
+
+	/* Avoid costly evictions; only set GTT as a busy placement */
+	abo->placement.num_busy_placement = 1;
+	abo->placement.busy_placement = &abo->placements[1];
+
 	r = ttm_bo_validate(bo, &abo->placement, false, false);
-	if (unlikely(r == -ENOMEM)) {
-		amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_GTT);
-		return ttm_bo_validate(bo, &abo->placement, false, false);
-	} else if (unlikely(r != 0)) {
+	if (unlikely(r != 0))
 		return r;
-	}
 
 	offset = bo->mem.start << PAGE_SHIFT;
 	/* this should never happen */
-	if ((offset + size) > adev->mc.visible_vram_size)
+	if (bo->mem.mem_type == TTM_PL_VRAM &&
+	    (offset + size) > adev->mc.visible_vram_size)
 		return -EINVAL;
 
 	return 0;

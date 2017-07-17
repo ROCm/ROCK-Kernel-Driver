@@ -54,11 +54,11 @@
  */
 
 /**
- * amdgpu_gart_set_defaults - set the default gtt_size
+ * amdgpu_gart_set_defaults - set the default gart_size
  *
  * @adev: amdgpu_device pointer
  *
- * Set the default gtt_size based on parameters and available VRAM.
+ * Set the default gart_size based on parameters and available VRAM.
  */
 void amdgpu_gart_set_defaults(struct amdgpu_device *adev)
 {
@@ -70,7 +70,7 @@ void amdgpu_gart_set_defaults(struct amdgpu_device *adev)
 		 * in visible VRAM. Use at most half of visible VRAM
 		 * or 256MB, whichever is less.
 		 */
-		uint64_t max_gtt_size =
+		uint64_t max_gart_size =
 			min(adev->mc.visible_vram_size / 2, 256ULL << 20)
 			/ 8 * AMDGPU_GPU_PAGE_SIZE;
 
@@ -78,15 +78,15 @@ void amdgpu_gart_set_defaults(struct amdgpu_device *adev)
 		/* Set the GART to map the largest size between either
 		 * VRAM capacity or double the available physical RAM
 		 */
-		adev->mc.gtt_size = min(
+		adev->mc.gart_size = min(
 			max(
 				((uint64_t)si.totalram * si.mem_unit * 2),
 				adev->mc.mc_vram_size
 			),
-			max_gtt_size
+			max_gart_size
 			);
 	} else
-		adev->mc.gtt_size = (uint64_t)amdgpu_gart_size << 20;
+		adev->mc.gart_size = (uint64_t)amdgpu_gart_size << 20;
 }
 
 /**
@@ -401,8 +401,8 @@ int amdgpu_gart_init(struct amdgpu_device *adev)
 	if (r)
 		return r;
 	/* Compute table size */
-	adev->gart.num_cpu_pages = adev->mc.gtt_size / PAGE_SIZE;
-	adev->gart.num_gpu_pages = adev->mc.gtt_size / AMDGPU_GPU_PAGE_SIZE;
+	adev->gart.num_cpu_pages = adev->mc.gart_size / PAGE_SIZE;
+	adev->gart.num_gpu_pages = adev->mc.gart_size / AMDGPU_GPU_PAGE_SIZE;
 	DRM_INFO("GART: num cpu pages %u, num gpu pages %u\n",
 		 adev->gart.num_cpu_pages, adev->gart.num_gpu_pages);
 

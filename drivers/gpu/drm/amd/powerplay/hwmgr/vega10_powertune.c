@@ -954,7 +954,7 @@ static void vega10_didt_set_mask(struct pp_hwmgr *hwmgr, const bool enable)
 static int vega10_enable_cac_driving_se_didt_config(struct pp_hwmgr *hwmgr)
 {
 	int result;
-	uint32_t num_se, count, data;
+	uint32_t num_se = 0, count, data;
 	struct cgs_system_info sys_info = {0};
 	uint32_t reg;
 
@@ -1008,7 +1008,7 @@ static int vega10_disable_cac_driving_se_didt_config(struct pp_hwmgr *hwmgr)
 static int vega10_enable_psm_gc_didt_config(struct pp_hwmgr *hwmgr)
 {
 	int result;
-	uint32_t num_se, count, data;
+	uint32_t num_se = 0, count, data;
 	struct cgs_system_info sys_info = {0};
 	uint32_t reg;
 
@@ -1073,7 +1073,7 @@ static int vega10_disable_psm_gc_didt_config(struct pp_hwmgr *hwmgr)
 static int vega10_enable_se_edc_config(struct pp_hwmgr *hwmgr)
 {
 	int result;
-	uint32_t num_se, count, data;
+	uint32_t num_se = 0, count, data;
 	struct cgs_system_info sys_info = {0};
 	uint32_t reg;
 
@@ -1123,7 +1123,7 @@ static int vega10_disable_se_edc_config(struct pp_hwmgr *hwmgr)
 static int vega10_enable_psm_gc_edc_config(struct pp_hwmgr *hwmgr)
 {
 	int result;
-	uint32_t num_se;
+	uint32_t num_se = 0;
 	uint32_t count, data;
 	struct cgs_system_info sys_info = {0};
 	uint32_t reg;
