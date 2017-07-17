@@ -30,9 +30,9 @@ struct aa_net {
 	u16 quiet[AF_MAX];
 };
 
-extern struct aa_fs_entry aa_fs_entry_network[];
+extern struct aa_sfs_entry aa_sfs_entry_network[];
 
-extern int aa_net_perm(const char *op, struct aa_profile *profile, u16 family,
+extern int aa_net_perm(const char *op, struct aa_label *label, u16 family,
 		       int type, int protocol, struct sock *sk);
 extern int aa_revalidate_sk(const char *op, struct sock *sk);
 
