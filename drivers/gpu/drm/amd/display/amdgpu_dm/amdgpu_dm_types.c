@@ -3142,7 +3142,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 				conn_state = drm_atomic_get_connector_state(state, &aconnector->base);
 				if (IS_ERR(conn_state)) {
 					ret = PTR_ERR_OR_ZERO(conn_state);
-					goto fail_crtcs;
+					goto fail;
 				}
 
 				dm_conn_state = to_dm_connector_state(conn_state);
@@ -3201,7 +3201,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 			ret = drm_atomic_add_affected_planes(state, crtc);
 			if (ret)
-				goto fail_crtcs;
+				goto fail;
 		}
 	}
 
@@ -3263,7 +3263,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 					crtc_state,
 					false);
 				if (ret)
-					goto fail_planes;
+					goto fail;
 
 
 				if (dm_plane_state->surface)
@@ -3295,13 +3295,12 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 		ret = do_aquire_global_lock(dev, state);
 		if (ret)
-			goto fail_planes;
-
+			goto fail;
 		WARN_ON(dm_state->context);
 		dm_state->context = dc_get_validate_context(dc, set, set_count);
 		if (!dm_state->context) {
 			ret = -EINVAL;
-			goto fail_planes;
+			goto fail;
 		}
 	}
 
@@ -3309,15 +3308,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	WARN_ON(ret);
 	return ret;
 
-fail_planes:
-	for (i = 0; i < set_count; i++)
-		for (j = 0; j < set[i].surface_count; j++)
-			dc_surface_release(set[i].surfaces[j]);
-
-fail_crtcs:
-	for (i = 0; i < set_count; i++)
-		dc_stream_release(set[i].stream);
-
+fail:
 	if (ret == -EDEADLK)
 		DRM_DEBUG_KMS("Atomic check stopped due to to deadlock.\n");
 	else if (ret == -EINTR || ret == -EAGAIN || ret == -ERESTARTSYS)
