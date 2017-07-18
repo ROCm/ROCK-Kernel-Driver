@@ -2024,11 +2024,6 @@ static int i915_pm_thaw(struct device *kdev)
 /* restore: called after loading the hibernation image. */
 static int i915_pm_restore_early(struct device *kdev)
 {
-	struct pci_dev *pdev = to_pci_dev(kdev);
-	struct drm_device *dev = pci_get_drvdata(pdev);
-
-	/* for avoiding the memory corruption at S4 resume (bsc#984624) */
-	intel_gpu_reset(to_i915(dev), ALL_ENGINES);
 	return i915_pm_resume_early(kdev);
 }
 
