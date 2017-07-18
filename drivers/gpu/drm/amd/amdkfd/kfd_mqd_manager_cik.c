@@ -327,7 +327,7 @@ static int destroy_mqd(struct mqd_manager *mm, void *mqd,
 			unsigned int timeout, uint32_t pipe_id,
 			uint32_t queue_id)
 {
-	return mm->dev->kfd2kgd->hqd_destroy(mm->dev->kgd, type, timeout,
+	return mm->dev->kfd2kgd->hqd_destroy(mm->dev->kgd, mqd, type, timeout,
 					pipe_id, queue_id);
 }
 

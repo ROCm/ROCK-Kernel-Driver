@@ -121,7 +121,7 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 static bool kgd_hqd_is_occupied(struct kgd_dev *kgd, uint64_t queue_address,
 				uint32_t pipe_id, uint32_t queue_id);
 
-static int kgd_hqd_destroy(struct kgd_dev *kgd, uint32_t reset_type,
+static int kgd_hqd_destroy(struct kgd_dev *kgd, void *mqd, uint32_t reset_type,
 				unsigned int timeout, uint32_t pipe_id,
 				uint32_t queue_id);
 static bool kgd_hqd_sdma_is_occupied(struct kgd_dev *kgd, void *mqd);
@@ -851,7 +851,7 @@ static bool kgd_hqd_sdma_is_occupied(struct kgd_dev *kgd, void *mqd)
 	return false;
 }
 
-static int kgd_hqd_destroy(struct kgd_dev *kgd, uint32_t reset_type,
+static int kgd_hqd_destroy(struct kgd_dev *kgd, void *mqd, uint32_t reset_type,
 				unsigned int timeout, uint32_t pipe_id,
 				uint32_t queue_id)
 {

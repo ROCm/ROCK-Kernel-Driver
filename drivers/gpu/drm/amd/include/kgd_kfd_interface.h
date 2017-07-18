@@ -303,7 +303,7 @@ struct kfd2kgd_calls {
 	bool (*hqd_is_occupied)(struct kgd_dev *kgd, uint64_t queue_address,
 				uint32_t pipe_id, uint32_t queue_id);
 
-	int (*hqd_destroy)(struct kgd_dev *kgd, uint32_t reset_type,
+	int (*hqd_destroy)(struct kgd_dev *kgd, void *mqd, uint32_t reset_type,
 				unsigned int timeout, uint32_t pipe_id,
 				uint32_t queue_id);
 
