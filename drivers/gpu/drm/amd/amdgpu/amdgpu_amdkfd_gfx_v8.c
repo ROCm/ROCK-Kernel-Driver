@@ -620,8 +620,12 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd, void *mqd,
 	enum hqd_dequeue_request_type type;
 	unsigned long flags, end_jiffies;
 	int retry;
+	struct vi_mqd *m = get_mqd(mqd);
 
 	acquire_queue(kgd, pipe_id, queue_id);
+
+	if (m->cp_hqd_vmid == 0)
+		WREG32_FIELD(RLC_CP_SCHEDULERS, scheduler1, 0);
 
 	switch (reset_type) {
 	case KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN:
