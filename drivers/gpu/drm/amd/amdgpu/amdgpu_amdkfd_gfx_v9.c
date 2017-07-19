@@ -755,12 +755,17 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd, void *mqd,
 	enum hqd_dequeue_request_type type;
 	unsigned long end_jiffies;
 	uint32_t temp;
+	struct v9_mqd *m = get_mqd(mqd);
+
 #if 0
 	unsigned long flags;
 	int retry;
 #endif
 
 	acquire_queue(kgd, pipe_id, queue_id);
+
+	if (m->cp_hqd_vmid == 0)
+		WREG32_FIELD15(GC, 0, RLC_CP_SCHEDULERS, scheduler1, 0);
 
 	switch (reset_type) {
 	case KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN:
