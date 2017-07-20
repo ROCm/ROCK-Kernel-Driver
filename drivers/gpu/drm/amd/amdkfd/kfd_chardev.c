@@ -293,7 +293,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 		return -EINVAL;
 	}
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
@@ -324,7 +324,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 		 */
 		args->doorbell_offset |= q_properties.doorbell_off;
 
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	pr_debug("Queue id %d was created successfully\n", args->queue_id);
 
@@ -341,7 +341,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 
 err_create_queue:
 err_bind_process:
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 	return err;
 }
 
@@ -355,11 +355,11 @@ static int kfd_ioctl_destroy_queue(struct file *filp, struct kfd_process *p,
 				args->queue_id,
 				p->pasid);
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 
 	retval = pqm_destroy_queue(&p->pqm, args->queue_id);
 
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 	return retval;
 }
 
@@ -401,11 +401,11 @@ static int kfd_ioctl_update_queue(struct file *filp, struct kfd_process *p,
 	pr_debug("Updating queue id %d for pasid %d\n",
 			args->queue_id, p->pasid);
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 
 	retval = pqm_update_queue(&p->pqm, args->queue_id, &properties);
 
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	return retval;
 }
@@ -453,11 +453,11 @@ static int kfd_ioctl_set_cu_mask(struct file *filp, struct kfd_process *p,
 		return -EFAULT;
 	}
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 
 	retval = pqm_set_cu_mask(&p->pqm, args->queue_id, &properties);
 
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	return retval;
 }
@@ -485,7 +485,7 @@ static int kfd_ioctl_set_memory_policy(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
@@ -509,7 +509,7 @@ static int kfd_ioctl_set_memory_policy(struct file *filep,
 		err = -EINVAL;
 
 out:
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	return err;
 }
@@ -526,7 +526,7 @@ static int kfd_ioctl_set_trap_handler(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
@@ -541,7 +541,7 @@ static int kfd_ioctl_set_trap_handler(struct file *filep,
 		err = -EINVAL;
 
 out:
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	return err;
 }
@@ -562,7 +562,7 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
 		return status;
 	}
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 	mutex_lock(get_dbgmgr_mutex());
 
 	/* make sure that we have pdd, if this the first queue created for
@@ -589,7 +589,7 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
 
 out:
 	mutex_unlock(get_dbgmgr_mutex());
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	return status;
 }
@@ -888,7 +888,7 @@ static int kfd_ioctl_get_process_apertures(struct file *filp,
 
 	args->num_of_nodes = 0;
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 
 	/*if the process-device list isn't empty*/
 	if (kfd_has_process_device_data(p)) {
@@ -928,7 +928,7 @@ static int kfd_ioctl_get_process_apertures(struct file *filp,
 		} while (pdd && (args->num_of_nodes < NUM_OF_SUPPORTED_GPUS));
 	}
 
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	return 0;
 }
@@ -948,7 +948,7 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 		/* Return number of nodes, so that user space can alloacate
 		 * sufficient memory
 		 */
-		down_write(&p->lock);
+		mutex_lock(&p->mutex);
 
 		if (!kfd_has_process_device_data(p))
 			goto out_upwrite;
@@ -972,7 +972,7 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 	if (!pa)
 		return -ENOMEM;
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 
 	if (!kfd_has_process_device_data(p)) {
 		args->num_of_nodes = 0;
@@ -1009,7 +1009,7 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 
 		pdd = kfd_get_next_process_device_data(p, pdd);
 	} while (pdd && (nodes < args->num_of_nodes));
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	args->num_of_nodes = nodes;
 	ret = copy_to_user(
@@ -1020,7 +1020,7 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 	return ret ? -EFAULT : 0;
 
 out_upwrite:
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 	return 0;
 }
 
@@ -1042,7 +1042,7 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 			return -EFAULT;
 		}
 		if (!kfd->device_info->is_need_iommu_device) {
-			down_write(&p->lock);
+			mutex_lock(&p->mutex);
 			pdd = kfd_bind_process_to_device(kfd, p);
 			if (IS_ERR(pdd)) {
 				err = PTR_ERR(pdd);
@@ -1056,7 +1056,7 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 				err = -EFAULT;
 				goto out_upwrite;
 			}
-			up_write(&p->lock);
+			mutex_unlock(&p->mutex);
 
 			/* Map dGPU gtt BO to kernel */
 			kfd->kfd2kgd->map_gtt_bo_to_kernel(kfd->kgd,
@@ -1077,7 +1077,7 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 	return err;
 
 out_upwrite:
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 	return err;
 
 }
@@ -1137,7 +1137,7 @@ static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
@@ -1148,7 +1148,7 @@ static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
 	pdd->sh_hidden_private_base_vmid = args->va_addr;
 	pdd->qpd.sh_hidden_private_base = args->va_addr;
 
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
 	    pdd->qpd.vmid != 0) {
@@ -1161,7 +1161,7 @@ static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
 	return 0;
 
 bind_process_to_device_fail:
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 alloc_memory_of_scratch_failed:
 	return -EFAULT;
 }
@@ -1205,9 +1205,9 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 	pdd = kfd_bind_process_to_device(dev, p);
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 	if (IS_ERR(pdd))
 		return PTR_ERR(pdd);
 
@@ -1240,10 +1240,10 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	if (err != 0)
 		return err;
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
 			args->va_addr, args->size, NULL);
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 	if (idr_handle < 0) {
 		dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
 						 (struct kgd_mem *) mem,
@@ -1278,7 +1278,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 
 	pdd = kfd_get_process_device_data(dev, p);
 	if (!pdd) {
@@ -1295,7 +1295,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	}
 	run_rdma_free_callback(buf_obj);
 
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	ret = dev->kfd2kgd->free_memory_of_gpu(dev->kgd, buf_obj->mem,
 					       pdd->vm);
@@ -1304,16 +1304,16 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	 * clean-up during process tear-down.
 	 */
 	if (ret == 0) {
-		down_write(&p->lock);
+		mutex_lock(&p->mutex);
 		kfd_process_device_remove_obj_handle(
 			pdd, GET_IDR_HANDLE(args->handle));
-		up_write(&p->lock);
+		mutex_unlock(&p->mutex);
 	}
 
 	return ret;
 
 err_unlock:
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 	return ret;
 }
 
@@ -1353,7 +1353,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		}
 	}
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
@@ -1363,7 +1363,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 
 	mem = kfd_process_device_translate_handle(pdd,
 						GET_IDR_HANDLE(args->handle));
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	if (!mem) {
 		err = PTR_ERR(mem);
@@ -1380,9 +1380,9 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
 			}
-			down_write(&p->lock);
+			mutex_lock(&p->mutex);
 			peer_pdd = kfd_bind_process_to_device(peer, p);
-			up_write(&p->lock);
+			mutex_unlock(&p->mutex);
 			if (!peer_pdd) {
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
@@ -1426,7 +1426,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	return err;
 
 bind_process_to_device_failed:
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 get_mem_obj_from_handle_failed:
 copy_from_user_failed:
 sync_memory_failed:
@@ -1485,7 +1485,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 		}
 	}
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 
 	pdd = kfd_get_process_device_data(dev, p);
 	if (!pdd) {
@@ -1496,7 +1496,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 
 	mem = kfd_process_device_translate_handle(pdd,
 						GET_IDR_HANDLE(args->handle));
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	if (!mem) {
 		err = PTR_ERR(mem);
@@ -1511,9 +1511,9 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
 			}
-			down_write(&p->lock);
+			mutex_lock(&p->mutex);
 			peer_pdd = kfd_get_process_device_data(peer, p);
-			up_write(&p->lock);
+			mutex_unlock(&p->mutex);
 			if (!peer_pdd) {
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
@@ -1527,7 +1527,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	return 0;
 
 bind_process_to_device_failed:
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 get_mem_obj_from_handle_failed:
 copy_from_user_failed:
 	kfree(devices_arr);
@@ -1546,7 +1546,7 @@ static int kfd_ioctl_set_process_dgpu_aperture(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
@@ -1558,7 +1558,7 @@ static int kfd_ioctl_set_process_dgpu_aperture(struct file *filep,
 			args->dgpu_limit);
 
 exit:
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 	return err;
 }
 
@@ -1825,11 +1825,11 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 	 *                             data will be sourced or copied
 	 */
 	dst_va_addr = dst_array[0].va_addr;
-	down_read(&dst_p->lock);
+	mutex_lock(&dst_p->mutex);
 	dst_bo = kfd_process_find_bo_from_interval(dst_p,
 			dst_va_addr,
 			dst_va_addr + dst_array[0].size - 1);
-	up_read(&dst_p->lock);
+	mutex_unlock(&dst_p->mutex);
 	if (!dst_bo) {
 		err = -EFAULT;
 		goto kfd_process_fail;
@@ -1841,11 +1841,11 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 					   src_array[i].size - 1;
 		uint64_t src_size_to_copy = src_array[i].size;
 
-		down_read(&src_p->lock);
+		mutex_lock(&src_p->mutex);
 		src_bo = kfd_process_find_bo_from_interval(src_p,
 				src_array[i].va_addr,
 				src_va_addr_end);
-		up_read(&src_p->lock);
+		mutex_unlock(&src_p->mutex);
 		if (!src_bo || src_va_addr_end > src_bo->it.last) {
 			pr_err("Cross mem copy failed. Invalid range\n");
 			err = -EFAULT;
@@ -1972,14 +1972,14 @@ static int kfd_ioctl_get_queue_wave_state(struct file *filep,
 	struct kfd_ioctl_get_queue_wave_state_args *args = data;
 	int r;
 
-	down_read(&p->lock);
+	mutex_lock(&p->mutex);
 
 	r = pqm_get_wave_state(&p->pqm, args->queue_id,
 			       (void __user *)args->ctl_stack_address,
 			       &args->ctl_stack_used_size,
 			       &args->save_area_used_size);
 
-	up_read(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	return r;
 }

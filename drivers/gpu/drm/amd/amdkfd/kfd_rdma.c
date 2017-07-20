@@ -79,7 +79,7 @@ static int get_pages(uint64_t address, uint64_t length, struct pid *pid,
 		pr_err("Could not find the process\n");
 		return -EINVAL;
 	}
-	down_read(&p->lock);
+	mutex_lock(&p->mutex);
 
 	buf_obj = kfd_process_find_bo_from_interval(p, address, last);
 	if (!buf_obj) {
@@ -126,7 +126,7 @@ static int get_pages(uint64_t address, uint64_t length, struct pid *pid,
 free_mem:
 	kfree(rdma_cb_data);
 out:
-	up_read(&p->lock);
+	mutex_unlock(&p->mutex);
 	kfd_unref_process(p);
 
 	return ret;

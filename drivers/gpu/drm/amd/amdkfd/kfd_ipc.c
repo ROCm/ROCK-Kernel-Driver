@@ -126,9 +126,9 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 	if (!dev || !dev->kfd2kgd->import_dmabuf)
 		return -EINVAL;
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 	pdd = kfd_bind_process_to_device(dev, p);
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 	if (IS_ERR(pdd))
 		return PTR_ERR(pdd);
 
@@ -139,11 +139,11 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 	if (r)
 		return r;
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
 							  va_addr, size,
 							  ipc_obj);
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 	if (idr_handle < 0) {
 		dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
 						 (struct kgd_mem *)mem,
@@ -239,18 +239,18 @@ int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 	if (!dev || !ipc_handle)
 		return -EINVAL;
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 	pdd = kfd_bind_process_to_device(dev, p);
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	if (IS_ERR(pdd)) {
 		pr_err("Failed to get pdd\n");
 		return PTR_ERR(pdd);
 	}
 
-	down_write(&p->lock);
+	mutex_lock(&p->mutex);
 	kfd_bo = kfd_process_device_find_bo(pdd, GET_IDR_HANDLE(handle));
-	up_write(&p->lock);
+	mutex_unlock(&p->mutex);
 
 	if (!kfd_bo) {
 		pr_err("Failed to get bo");
