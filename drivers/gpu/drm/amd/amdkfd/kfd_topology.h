@@ -97,7 +97,9 @@ struct kfd_mem_properties {
 	uint32_t		width;
 	uint32_t		mem_clk_max;
 	struct kobject		*kobj;
-	struct attribute	attr;
+	struct kfd_dev		*gpu;
+	struct attribute	attr_props;
+	struct attribute	attr_used;
 };
 
 #define HSA_CACHE_TYPE_DATA		0x00000001

@@ -226,6 +226,8 @@ struct kfd_topology_device *kfd_create_topology_device(
 		sysfs_show_gen_prop(buffer, "%s %llu\n", name, value)
 #define sysfs_show_32bit_val(buffer, value) \
 		sysfs_show_gen_prop(buffer, "%u\n", value)
+#define sysfs_show_64bit_val(buffer, value) \
+		sysfs_show_gen_prop(buffer, "%llu\n", value)
 #define sysfs_show_str_val(buffer, value) \
 		sysfs_show_gen_prop(buffer, "%s\n", value)
 
@@ -308,11 +310,23 @@ static ssize_t mem_show(struct kobject *kobj, struct attribute *attr,
 {
 	ssize_t ret;
 	struct kfd_mem_properties *mem;
+	uint64_t used_mem;
 
 	/* Making sure that the buffer is an empty string */
 	buffer[0] = 0;
 
-	mem = container_of(attr, struct kfd_mem_properties, attr);
+	if (strcmp(attr->name, "used_memory") == 0) {
+		mem = container_of(attr, struct kfd_mem_properties,
+				attr_used);
+		if (mem->gpu) {
+			used_mem = mem->gpu->kfd2kgd->get_vram_usage(mem->gpu->kgd);
+			return sysfs_show_64bit_val(buffer, used_mem);
+		}
+		/* TODO: Report APU/CPU-allocated memory; For now return 0 */
+		return 0;
+	}
+
+	mem = container_of(attr, struct kfd_mem_properties, attr_props);
 	sysfs_show_32bit_prop(buffer, "heap_type", mem->heap_type);
 	sysfs_show_64bit_prop(buffer, "size_in_bytes", mem->size_in_bytes);
 	sysfs_show_32bit_prop(buffer, "flags", mem->flags);
@@ -580,7 +594,12 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 	if (dev->kobj_mem) {
 		list_for_each_entry(mem, &dev->mem_props, list)
 			if (mem->kobj) {
-				kfd_remove_sysfs_file(mem->kobj, &mem->attr);
+				kfd_remove_sysfs_file(mem->kobj,
+						&mem->attr_props);
+				/* TODO: Remove when CPU/APU supported */
+				if (dev->node_props.cpu_cores_count == 0)
+					kfd_remove_sysfs_file(mem->kobj,
+							&mem->attr_used);
 				mem->kobj = NULL;
 			}
 		kobject_del(dev->kobj_mem);
@@ -691,12 +710,23 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 		if (ret < 0)
 			return ret;
 
-		mem->attr.name = "properties";
-		mem->attr.mode = KFD_SYSFS_FILE_MODE;
-		sysfs_attr_init(&mem->attr);
-		ret = sysfs_create_file(mem->kobj, &mem->attr);
+		mem->attr_props.name = "properties";
+		mem->attr_props.mode = KFD_SYSFS_FILE_MODE;
+		sysfs_attr_init(&mem->attr_props);
+		ret = sysfs_create_file(mem->kobj, &mem->attr_props);
 		if (ret < 0)
 			return ret;
+
+		/* TODO: Support APU/CPU memory usage */
+		if (dev->node_props.cpu_cores_count == 0) {
+			mem->attr_used.name = "used_memory";
+			mem->attr_used.mode = KFD_SYSFS_FILE_MODE;
+			sysfs_attr_init(&mem->attr_used);
+			ret = sysfs_create_file(mem->kobj, &mem->attr_used);
+			if (ret < 0)
+				return ret;
+		}
+
 		i++;
 	}
 
@@ -1159,15 +1189,22 @@ static struct kfd_topology_device *kfd_assign_gpu(struct kfd_dev *gpu)
 {
 	struct kfd_topology_device *dev;
 	struct kfd_topology_device *out_dev = NULL;
+	struct kfd_mem_properties *mem;
 
 	down_write(&topology_lock);
 	list_for_each_entry(dev, &topology_device_list, list)
 		if (!dev->gpu && (dev->node_props.simd_count > 0)) {
 			dev->gpu = gpu;
 			out_dev = dev;
+
+			/* Assign mem->gpu */
+			list_for_each_entry(mem, &dev->mem_props, list)
+				mem->gpu = dev->gpu;
+
 			break;
 		}
 	up_write(&topology_lock);
+
 	return out_dev;
 }
 
