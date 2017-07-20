@@ -211,7 +211,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.submit_ib = amdgpu_amdkfd_submit_ib,
 	.get_tile_config = amdgpu_amdkfd_get_tile_config,
 	.restore_process_bos = amdgpu_amdkfd_gpuvm_restore_process_bos,
-	.copy_mem_to_mem = amdgpu_amdkfd_copy_mem_to_mem
+	.copy_mem_to_mem = amdgpu_amdkfd_copy_mem_to_mem,
+	.get_vram_usage = amdgpu_amdkfd_get_vram_usage
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions()

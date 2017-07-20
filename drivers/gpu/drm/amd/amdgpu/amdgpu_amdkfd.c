@@ -479,6 +479,13 @@ out_put:
 	return r;
 }
 
+uint64_t amdgpu_amdkfd_get_vram_usage(struct kgd_dev *kgd)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+	uint64_t usage = (u64)atomic64_read(&adev->vram_usage);
+	return usage;
+}
+
 bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev,
 			u32 vmid)
 {

@@ -242,6 +242,8 @@ struct tile_config {
  *
  * @copy_mem_to_mem: Copies size bytes from source BO to destination BO
  *
+ * @get_vram_usage: Returns current VRAM usage
+ *
  * This structure contains function pointers to services that the kgd driver
  * provides to amdkfd driver.
  *
@@ -395,6 +397,7 @@ struct kfd2kgd_calls {
 			uint64_t src_offset, struct kgd_mem *dst_mem,
 			uint64_t dest_offset, uint64_t size,
 			struct dma_fence **f, uint64_t *actual_size);
+	uint64_t (*get_vram_usage)(struct kgd_dev *kgd);
 };
 
 /**
