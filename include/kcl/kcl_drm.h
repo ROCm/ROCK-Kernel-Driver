@@ -128,7 +128,9 @@ static inline void kcl_drm_fb_helper_release_fbi(struct drm_fb_helper *fb_helper
 #ifdef BUILD_AS_DKMS
 	_kcl_drm_fb_helper_release_fbi(fb_helper);
 #else
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 	drm_fb_helper_release_fbi(fb_helper);
+#endif
 #endif
 }
 
