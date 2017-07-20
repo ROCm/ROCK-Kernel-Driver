@@ -1140,7 +1140,7 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 		}
 	}
 
-	return amdgpu_sem_add_cs(p->ctx, p->job->ring, &p->job->sync);
+	return amdgpu_sem_add_cs(p->ctx, p->job->ring, &p->job->dep_sync);
 }
 
 static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
