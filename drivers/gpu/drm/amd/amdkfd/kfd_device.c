@@ -97,6 +97,20 @@ static const struct kfd_device_info tonga_device_info = {
 	.needs_pci_atomics = true,
 };
 
+static const struct kfd_device_info tonga_vf_device_info = {
+	.asic_family = CHIP_TONGA,
+	.max_pasid_bits = 16,
+	.max_no_of_hqd  = 24,
+	.doorbell_size  = 4,
+	.ih_ring_entry_size = 4 * sizeof(uint32_t),
+	.event_interrupt_class = &event_interrupt_class_cik,
+	.num_of_watch_points = 4,
+	.mqd_size_aligned = MQD_SIZE_ALIGNED,
+	.is_need_iommu_device = false,
+	.supports_cwsr = false,
+	.needs_pci_atomics = false,
+};
+
 static const struct kfd_device_info fiji_device_info = {
 	.asic_family = CHIP_FIJI,
 	.max_pasid_bits = 16,
@@ -111,6 +125,21 @@ static const struct kfd_device_info fiji_device_info = {
 	.needs_pci_atomics = true,
 };
 
+static const struct kfd_device_info fiji_vf_device_info = {
+	.asic_family = CHIP_FIJI,
+	.max_pasid_bits = 16,
+	.max_no_of_hqd  = 24,
+	.doorbell_size  = 4,
+	.ih_ring_entry_size = 4 * sizeof(uint32_t),
+	.event_interrupt_class = &event_interrupt_class_cik,
+	.num_of_watch_points = 4,
+	.mqd_size_aligned = MQD_SIZE_ALIGNED,
+	.is_need_iommu_device = false,
+	.supports_cwsr = true,
+	.needs_pci_atomics = false,
+};
+
+
 static const struct kfd_device_info polaris10_device_info = {
 	.asic_family = CHIP_POLARIS10,
 	.max_pasid_bits = 16,
@@ -123,6 +152,20 @@ static const struct kfd_device_info polaris10_device_info = {
 	.is_need_iommu_device = false,
 	.supports_cwsr = true,
 	.needs_pci_atomics = true,
+};
+
+static const struct kfd_device_info polaris10_vf_device_info = {
+	.asic_family = CHIP_POLARIS10,
+	.max_pasid_bits = 16,
+	.max_no_of_hqd  = 24,
+	.doorbell_size  = 4,
+	.ih_ring_entry_size = 4 * sizeof(uint32_t),
+	.event_interrupt_class = &event_interrupt_class_cik,
+	.num_of_watch_points = 4,
+	.mqd_size_aligned = MQD_SIZE_ALIGNED,
+	.is_need_iommu_device = false,
+	.supports_cwsr = true,
+	.needs_pci_atomics = false,
 };
 
 static const struct kfd_device_info polaris11_device_info = {
@@ -152,6 +195,21 @@ static const struct kfd_device_info vega10_device_info = {
 	.supports_cwsr = true,
 	.needs_pci_atomics = true,
 };
+
+static const struct kfd_device_info vega10_vf_device_info = {
+	.asic_family = CHIP_VEGA10,
+	.max_pasid_bits = 16,
+	.max_no_of_hqd  = 24,
+	.doorbell_size  = 8,
+	.ih_ring_entry_size = 8 * sizeof(uint32_t),
+	.event_interrupt_class = &event_interrupt_class_v9,
+	.num_of_watch_points = 4,
+	.mqd_size_aligned = MQD_SIZE_ALIGNED,
+	.is_need_iommu_device = false,
+	.supports_cwsr = true,
+	.needs_pci_atomics = false,
+};
+
 
 struct kfd_deviceid {
 	unsigned short did;
@@ -220,10 +278,11 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x6921, &tonga_device_info   },	/* Tonga */
 	{ 0x6928, &tonga_device_info   },	/* Tonga */
 	{ 0x692B, &tonga_device_info   },	/* Tonga */
-	{ 0x692F, &tonga_device_info   },	/* Tonga */
+	{ 0x692F, &tonga_vf_device_info   },	/* Tonga vf */
 	{ 0x6938, &tonga_device_info   },	/* Tonga */
 	{ 0x6939, &tonga_device_info   },	/* Tonga */
 	{ 0x7300, &fiji_device_info    },	/* Fiji */
+	{ 0x730F, &fiji_vf_device_info    },	/* Fiji vf*/
 	{ 0x67C0, &polaris10_device_info },     /* Polaris10 */
 	{ 0x67C1, &polaris10_device_info },     /* Polaris10 */
 	{ 0x67C2, &polaris10_device_info },     /* Polaris10 */
@@ -234,7 +293,7 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x67CA, &polaris10_device_info },     /* Polaris10 */
 	{ 0x67CC, &polaris10_device_info },     /* Polaris10 */
 	{ 0x67CF, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67D0, &polaris10_device_info },     /* Polaris10 */
+	{ 0x67D0, &polaris10_vf_device_info },     /* Polaris10 vf*/
 	{ 0x67DF, &polaris10_device_info },	/* Polaris10 */
 	{ 0x67E0, &polaris11_device_info },     /* Polaris11 */
 	{ 0x67E1, &polaris11_device_info },     /* Polaris11 */
@@ -252,7 +311,7 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x6864, &vega10_device_info },	/* Vega10 */
 	{ 0x6867, &vega10_device_info },	/* Vega10 */
 	{ 0x6868, &vega10_device_info },	/* Vega10 */
-	{ 0x686C, &vega10_device_info },	/* Vega10 */
+	{ 0x686C, &vega10_vf_device_info },	/* Vega10  vf*/
 	{ 0x687F, &vega10_device_info }		/* Vega10 */
 };
 
