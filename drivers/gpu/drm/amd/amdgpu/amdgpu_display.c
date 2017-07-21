@@ -267,8 +267,12 @@ static void amdgpu_display_unpin_work_func(struct work_struct *__work)
 int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 				struct drm_framebuffer *fb,
 				struct drm_pending_vblank_event *event,
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 				uint32_t page_flip_flags, uint32_t target,
 				struct drm_modeset_acquire_ctx *ctx)
+#else
+				uint32_t page_flip_flags, uint32_t target)
+#endif
 {
 	struct drm_device *dev = crtc->dev;
 	struct amdgpu_device *adev = dev->dev_private;
@@ -508,8 +512,12 @@ cleanup:
 }
 #endif
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 int amdgpu_display_crtc_set_config(struct drm_mode_set *set,
 				   struct drm_modeset_acquire_ctx *ctx)
+#else
+int amdgpu_display_crtc_set_config(struct drm_mode_set *set)
+#endif
 {
 	struct drm_device *dev;
 	struct amdgpu_device *adev;
@@ -526,7 +534,11 @@ int amdgpu_display_crtc_set_config(struct drm_mode_set *set,
 	if (ret < 0)
 		return ret;
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 	ret = drm_crtc_helper_set_config(set, ctx);
+#else
+	ret = drm_crtc_helper_set_config(set);
+#endif
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head)
 		if (crtc->enabled)
@@ -812,10 +824,10 @@ uint32_t amdgpu_display_supported_domains(struct amdgpu_device *adev,
 
 int amdgpu_display_framebuffer_init(struct drm_device *dev,
 				    struct amdgpu_framebuffer *rfb,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0)
-				    struct drm_mode_fb_cmd2 *mode_cmd,
-#else
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0)
 				    const struct drm_mode_fb_cmd2 *mode_cmd,
+#else
+				    struct drm_mode_fb_cmd2 *mode_cmd,
 #endif
 				    struct drm_gem_object *obj)
 {
@@ -833,10 +845,10 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 struct drm_framebuffer *
 amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 				       struct drm_file *file_priv,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0)
-				       struct drm_mode_fb_cmd2 *mode_cmd)
-#else
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0)
 				       const struct drm_mode_fb_cmd2 *mode_cmd)
+#else
+				       struct drm_mode_fb_cmd2 *mode_cmd)
 #endif
 {
 	struct drm_gem_object *obj;
