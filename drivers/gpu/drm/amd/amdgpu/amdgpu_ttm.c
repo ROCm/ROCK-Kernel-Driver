@@ -1487,10 +1487,14 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	DRM_INFO("amdgpu: %uM of VRAM memory ready\n",
 		 (unsigned) (adev->mc.real_vram_size / (1024 * 1024)));
 
-	if (amdgpu_gtt_size == -1)
-		gtt_size = max((AMDGPU_DEFAULT_GTT_SIZE_MB << 20),
-			       adev->mc.mc_vram_size);
-	else
+	if (amdgpu_gtt_size == -1) {
+		struct sysinfo si;
+
+		si_meminfo(&si);
+		gtt_size = max3((AMDGPU_DEFAULT_GTT_SIZE_MB << 20),
+				adev->mc.mc_vram_size,
+				((uint64_t)si.totalram * si.mem_unit));
+	} else
 		gtt_size = (uint64_t)amdgpu_gtt_size << 20;
 
 	/* reserve for DGMA import domain */
