@@ -44,8 +44,10 @@
 #include <drm/ttm/ttm_bo_driver.h>
 #include <drm/ttm/ttm_placement.h>
 #include <drm/ttm/ttm_page_alloc.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 #ifdef CONFIG_X86
 #include <asm/set_memory.h>
+#endif
 #endif
 
 /**

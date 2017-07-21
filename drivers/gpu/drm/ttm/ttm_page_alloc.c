@@ -52,8 +52,10 @@
 #if IS_ENABLED(CONFIG_AGP)
 #include <asm/agp.h>
 #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 #ifdef CONFIG_X86
 #include <asm/set_memory.h>
+#endif
 #endif
 
 #define NUM_PAGES_TO_ALLOC		(PAGE_SIZE/sizeof(struct page *))
