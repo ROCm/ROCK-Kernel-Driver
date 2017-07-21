@@ -27,8 +27,10 @@
  */
 #include <drm/drmP.h>
 #include <drm/amdgpu_drm.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 #ifdef CONFIG_X86
 #include <asm/set_memory.h>
+#endif
 #endif
 #include "amdgpu.h"
 

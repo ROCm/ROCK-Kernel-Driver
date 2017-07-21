@@ -29,6 +29,7 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 
+#undef pr_fmt
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <linux/sched.h>
@@ -36,8 +37,17 @@
 #include <linux/shmem_fs.h>
 #include <linux/file.h>
 #include <drm/drm_cache.h>
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#include <drm/drm_mem_util.h>
+#endif
+#include <drm/ttm/ttm_module.h>
 #include <drm/ttm/ttm_bo_driver.h>
 #include <drm/ttm/ttm_page_alloc.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#ifdef CONFIG_X86
+#include <asm/set_memory.h>
+#endif
+#endif
 #include <drm/ttm/ttm_set_memory.h>
 
 /**

@@ -34,6 +34,7 @@
  */
 
 #if defined(CONFIG_SWIOTLB) || defined(CONFIG_INTEL_IOMMU)
+#undef pr_fmt
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <linux/dma-mapping.h>
@@ -50,6 +51,14 @@
 #include <linux/kthread.h>
 #include <drm/ttm/ttm_bo_driver.h>
 #include <drm/ttm/ttm_page_alloc.h>
+#if IS_ENABLED(CONFIG_AGP)
+#include <asm/agp.h>
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#ifdef CONFIG_X86
+#include <asm/set_memory.h>
+#endif
+#endif
 #include <drm/ttm/ttm_set_memory.h>
 
 #define NUM_PAGES_TO_ALLOC		(PAGE_SIZE/sizeof(struct page *))
