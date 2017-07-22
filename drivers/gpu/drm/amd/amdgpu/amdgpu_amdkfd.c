@@ -85,9 +85,11 @@ bool amdgpu_amdkfd_load_interface(struct amdgpu_device *adev)
 		kfd2kgd = amdgpu_amdkfd_gfx_8_0_get_functions();
 		break;
 	case CHIP_VEGA10:
+	case CHIP_RAVEN:
 		kfd2kgd = amdgpu_amdkfd_gfx_9_0_get_functions();
 		break;
 	default:
+		dev_info(adev->dev, "kfd not supported on this ASIC\n");
 		return false;
 	}
 
