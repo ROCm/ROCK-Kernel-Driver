@@ -1041,7 +1041,7 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 			pr_err("Getting device by id failed in %s\n", __func__);
 			return -EFAULT;
 		}
-		if (KFD_IS_DGPU(kfd->device_info->asic_family)) {
+		if (!kfd->device_info->is_need_iommu_device) {
 			down_write(&p->lock);
 			pdd = kfd_bind_process_to_device(kfd, p);
 			if (IS_ERR(pdd)) {
@@ -1175,7 +1175,7 @@ bool kfd_is_large_bar(struct kfd_dev *dev)
 		return true;
 	}
 
-	if (!KFD_IS_DGPU(dev->device_info->asic_family))
+	if (dev->device_info->is_need_iommu_device)
 		return false;
 
 	dev->kfd2kgd->get_local_mem_info(dev->kgd, &mem_info);

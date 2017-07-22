@@ -250,7 +250,7 @@ static void dbgdev_address_watch_set_registers(
 			union TCP_WATCH_ADDR_L_BITS *addrLo,
 			union TCP_WATCH_CNTL_BITS *cntl,
 			unsigned int index, unsigned int vmid,
-			unsigned int asic_family)
+			bool is_apu)
 {
 	union ULARGE_INTEGER addr;
 
@@ -276,7 +276,7 @@ static void dbgdev_address_watch_set_registers(
 	cntl->bitfields.mode = adw_info->watch_mode[index];
 	cntl->bitfields.vmid = (uint32_t) vmid;
 	/*  for APU assume it is an ATC address.  */
-	if (!KFD_IS_DGPU(asic_family))
+	if (is_apu)
 		cntl->u32All |= ADDRESS_WATCH_REG_CNTL_ATC_BIT;
 	pr_debug("\t\t%20s %08x\n", "set reg mask :", cntl->bitfields.mask);
 	pr_debug("\t\t%20s %08x\n", "set reg add high :",
@@ -328,7 +328,7 @@ static int dbgdev_address_watch_nodiq(struct kfd_dbgdev *dbgdev,
 			&cntl,
 			i,
 			vmid,
-			dbgdev->dev->device_info->asic_family
+			dbgdev->dev->device_info->is_need_iommu_device
 			);
 
 		pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
@@ -425,7 +425,7 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 				&cntl,
 				i,
 				vmid,
-				dbgdev->dev->device_info->asic_family
+				dbgdev->dev->device_info->is_need_iommu_device
 				);
 
 		pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");

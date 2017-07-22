@@ -347,6 +347,8 @@ struct kernel_queue *kernel_queue_init(struct kfd_dev *dev,
 	case CHIP_VEGA10:
 		kernel_queue_init_v9(&kq->ops_asic_specific);
 		break;
+	default:
+		BUG();
 	}
 
 	if (!kq->ops.initialize(kq, dev, type, KFD_KERNEL_QUEUE_SIZE)) {

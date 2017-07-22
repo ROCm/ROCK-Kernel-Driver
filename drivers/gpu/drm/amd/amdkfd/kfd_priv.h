@@ -40,6 +40,7 @@
 #include <kgd_kfd_interface.h>
 
 #include "amd_rdma.h"
+#include "amd_shared.h"
 
 #define KFD_SYSFS_FILE_MODE 0444
 
@@ -170,21 +171,6 @@ enum cache_policy {
 	cache_policy_noncoherent
 };
 
-enum asic_family_type {
-	CHIP_KAVERI = 0,
-	CHIP_HAWAII,
-	CHIP_CARRIZO,
-	CHIP_TONGA,
-	CHIP_FIJI,
-	CHIP_POLARIS10,
-	CHIP_POLARIS11,
-	CHIP_VEGA10
-};
-
-#define KFD_IS_VI(chip) ((chip) >= CHIP_CARRIZO && (chip) <= CHIP_POLARIS11)
-#define KFD_IS_DGPU(chip) (((chip) >= CHIP_TONGA && \
-			   (chip) <= CHIP_VEGA10) || \
-			   (chip) == CHIP_HAWAII)
 #define KFD_IS_SOC15(chip) ((chip) >= CHIP_VEGA10)
 
 struct kfd_event_interrupt_class {
@@ -196,7 +182,7 @@ struct kfd_event_interrupt_class {
 };
 
 struct kfd_device_info {
-	unsigned int asic_family;
+	enum amd_asic_type asic_family;
 	const struct kfd_event_interrupt_class *event_interrupt_class;
 	unsigned int max_pasid_bits;
 	unsigned int max_no_of_hqd;

@@ -240,7 +240,8 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 	case CHIP_VEGA10:
 		kfd_pm_func_init_v9(pm, fw_ver);
 		break;
-
+	default:
+		BUG();
 	}
 
 	return 0;

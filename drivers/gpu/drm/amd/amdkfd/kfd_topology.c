@@ -1329,6 +1329,8 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
 		break;
+	default:
+		BUG();
 	}
 
 	/* Fix errors in CZ CRAT.

@@ -1631,6 +1631,8 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 	case CHIP_VEGA10:
 		device_queue_manager_init_v9_vega10(&dqm->asic_ops);
 		break;
+	default:
+		BUG();
 	}
 
 	if (dqm->ops.initialize(dqm) != 0) {

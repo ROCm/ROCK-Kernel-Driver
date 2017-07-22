@@ -399,7 +399,7 @@ int kfd_init_apertures(struct kfd_process *process)
 				return -1;
 			}
 
-			if (KFD_IS_DGPU(dev->device_info->asic_family)) {
+			if (!dev->device_info->is_need_iommu_device) {
 				pdd->qpd.cwsr_base = DGPU_VM_BASE_DEFAULT;
 				pdd->qpd.ib_base = DGPU_IB_BASE_DEFAULT;
 			}
