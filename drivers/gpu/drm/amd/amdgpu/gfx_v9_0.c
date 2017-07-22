@@ -4395,6 +4395,7 @@ static int gfx_v9_0_get_cu_info(struct amdgpu_device *adev,
 
 	switch (adev->asic_type) {
 	case CHIP_VEGA10: /* TODO: check if any of this changed */
+	case CHIP_RAVEN:
 		cu_info->max_waves_per_simd = 10;
 		cu_info->max_scratch_slots_per_cu = 32;
 		cu_info->wave_front_size = 64;
