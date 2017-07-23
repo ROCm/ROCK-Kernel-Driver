@@ -2514,7 +2514,7 @@ bool dc_validate_stream(const struct dc *dc, const struct dc_stream *stream)
 	struct core_dc *core_dc = DC_TO_CORE(dc);
 	struct dc_context *dc_ctx = core_dc->ctx;
 	struct core_stream *core_stream = DC_STREAM_TO_CORE(stream);
-	struct core_link *link = core_stream->sink->link;
+	struct dc_link *link = core_stream->sink->link;
 	struct timing_generator *tg = core_dc->res_pool->timing_generators[0];
 	enum dc_status res = DC_OK;
 
