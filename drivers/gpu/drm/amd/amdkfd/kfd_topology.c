@@ -37,7 +37,7 @@
 #include "kfd_device_queue_manager.h"
 
 /* topology_device_list - Master list of all topology devices */
-struct list_head topology_device_list;
+static struct list_head topology_device_list;
 static struct kfd_system_properties sys_props;
 
 static DECLARE_RWSEM(topology_lock);
@@ -626,10 +626,8 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 	int ret;
 	uint32_t i;
 
-	if (dev->kobj_node) {
-		pr_err("Cannot build sysfs node entry, kobj_node is not NULL\n");
-		return -EINVAL;
-	}
+	if (WARN_ON(dev->kobj_node))
+		return -EEXIST;
 
 	/*
 	 * Creating the sysfs folders

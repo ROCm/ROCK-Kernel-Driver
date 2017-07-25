@@ -33,7 +33,6 @@
 #define KFD_DRIVER_MAJOR	2
 #define KFD_DRIVER_MINOR	0
 #define KFD_DRIVER_PATCHLEVEL	0
-#define KFD_DRIVER_RC_LEVEL	""
 
 static const struct kgd2kfd_calls kgd2kfd = {
 	.exit		= kgd2kfd_exit,
@@ -188,5 +187,4 @@ MODULE_DESCRIPTION(KFD_DRIVER_DESC);
 MODULE_LICENSE("GPL and additional rights");
 MODULE_VERSION(__stringify(KFD_DRIVER_MAJOR) "."
 	       __stringify(KFD_DRIVER_MINOR) "."
-	       __stringify(KFD_DRIVER_PATCHLEVEL)
-	       KFD_DRIVER_RC_LEVEL);
+	       __stringify(KFD_DRIVER_PATCHLEVEL));

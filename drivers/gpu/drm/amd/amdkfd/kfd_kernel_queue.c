@@ -220,8 +220,9 @@ static int acquire_packet_buffer(struct kernel_queue *kq,
 	queue_address = (unsigned int *)kq->pq_kernel_addr;
 	queue_size_dwords = kq->queue->properties.queue_size / sizeof(uint32_t);
 
-	pr_debug("rptr: %d\n wptr: %d\n queue_address 0x%p\n", rptr, wptr,
-			queue_address);
+	pr_debug("rptr: %d\n", rptr);
+	pr_debug("wptr: %d\n", wptr);
+	pr_debug("queue_address 0x%p\n", queue_address);
 
 	available_size = (rptr + queue_size_dwords - 1 - wptr) %
 							queue_size_dwords;

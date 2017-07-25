@@ -210,7 +210,6 @@ static const struct kfd_device_info vega10_vf_device_info = {
 	.needs_pci_atomics = false,
 };
 
-
 static const struct kfd_device_info raven_device_info = {
 	.asic_family = CHIP_RAVEN,
 	.max_pasid_bits = 16,
@@ -230,19 +229,6 @@ struct kfd_deviceid {
 	const struct kfd_device_info *device_info;
 };
 
-/*
- * //
-// TONGA/AMETHYST device IDs (performance segment)
-//
-#define DEVICE_ID_VI_TONGA_P_6920               0x6920  // unfused
-#define DEVICE_ID_VI_TONGA_P_6921               0x6921  // Amethyst XT
-#define DEVICE_ID_VI_TONGA_P_6928               0x6928  // Tonga GL XT
-#define DEVICE_ID_VI_TONGA_P_692B               0x692B  // Tonga GL PRO
-#define DEVICE_ID_VI_TONGA_P_692F               0x692F  // Tonga GL PRO VF
-#define DEVICE_ID_VI_TONGA_P_6938               0x6938  // Tonga XT
-#define DEVICE_ID_VI_TONGA_P_6939               0x6939  // Tonga PRO
- *
- */
 /* Please keep this sorted by increasing device id. */
 static const struct kfd_deviceid supported_devices[] = {
 #if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
@@ -349,8 +335,7 @@ static const struct kfd_device_info *lookup_device_info(unsigned short did)
 
 	for (i = 0; i < ARRAY_SIZE(supported_devices); i++) {
 		if (supported_devices[i].did == did) {
-			WARN(!supported_devices[i].device_info,
-				"Cannot look up device info, Device Info is NULL");
+			WARN_ON(!supported_devices[i].device_info);
 			return supported_devices[i].device_info;
 		}
 	}
@@ -469,10 +454,8 @@ static int iommu_invalid_ppr_cb(struct pci_dev *pdev, int pasid,
 			flags);
 
 	dev = kfd_device_by_pci_dev(pdev);
-	if (WARN_ON(!dev))
-		return -ENODEV;
-
-	kfd_signal_iommu_event(dev, pasid, address,
+	if (!WARN_ON(!dev))
+		kfd_signal_iommu_event(dev, pasid, address,
 			flags & PPR_FAULT_WRITE, flags & PPR_FAULT_EXEC);
 
 	return AMD_IOMMU_INV_PRI_RSP_INVALID;
@@ -617,7 +600,7 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 		goto kfd_doorbell_error;
 	}
 
-	if (kfd_topology_add_device(kfd) != 0) {
+	if (kfd_topology_add_device(kfd)) {
 		dev_err(kfd_device,
 			"Error adding device %x:%x to topology\n",
 			kfd->pdev->vendor, kfd->pdev->device);
@@ -738,7 +721,6 @@ int kgd2kfd_resume(struct kfd_dev *kfd)
 		return 0;
 
 	return kfd_resume(kfd);
-
 }
 
 static int kfd_resume(struct kfd_dev *kfd)

@@ -30,7 +30,7 @@
 #include "cik_regs.h"
 #include "cik_structs.h"
 #include "oss/oss_2_4_sh_mask.h"
-#include "asic_reg/gca/gfx_7_2_sh_mask.h"
+#include "gca/gfx_7_2_sh_mask.h"
 
 static inline struct cik_mqd *get_mqd(void *mqd)
 {

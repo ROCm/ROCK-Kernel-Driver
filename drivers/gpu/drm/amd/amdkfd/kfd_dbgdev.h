@@ -23,10 +23,6 @@
 #ifndef KFD_DBGDEV_H_
 #define KFD_DBGDEV_H_
 
-/*
- * SQ_IND_CMD_CMD enum
- */
-
 enum {
 	SQ_CMD_VMID_OFFSET = 28,
 	ADDRESS_WATCH_CNTL_OFFSET = 24
@@ -52,9 +48,9 @@ enum {
 
 /* CONFIG reg space definition */
 enum {
-	CONFIG_REG_BASE = 0x2000,	/* in dwords */
-	CONFIG_REG_END = 0x2B00,
-	CONFIG_REG_SIZE = CONFIG_REG_END - CONFIG_REG_BASE
+	AMD_CONFIG_REG_BASE = 0x2000,	/* in dwords */
+	AMD_CONFIG_REG_END = 0x2B00,
+	AMD_CONFIG_REG_SIZE = AMD_CONFIG_REG_END - AMD_CONFIG_REG_BASE
 };
 
 /* SH reg space definition */
@@ -88,7 +84,7 @@ enum SQ_IND_CMD_CMD {
 	SQ_IND_CMD_CMD_RESUME = 0x00000002,
 	SQ_IND_CMD_CMD_KILL = 0x00000003,
 	SQ_IND_CMD_CMD_DEBUG = 0x00000004,
-	SQ_IND_CMD_CMD_TRAP = 0x00000005
+	SQ_IND_CMD_CMD_TRAP = 0x00000005,
 };
 
 enum SQ_IND_CMD_MODE {
@@ -128,30 +124,30 @@ union SQ_IND_CMD_BITS {
 union SQ_CMD_BITS {
 	struct {
 		uint32_t cmd:3;
-		uint32_t:1;
+		 uint32_t:1;
 		uint32_t mode:3;
 		uint32_t check_vmid:1;
 		uint32_t trap_id:3;
-		uint32_t:5;
+		 uint32_t:5;
 		uint32_t wave_id:4;
 		uint32_t simd_id:2;
-		uint32_t:2;
+		 uint32_t:2;
 		uint32_t queue_id:3;
-		uint32_t:1;
+		 uint32_t:1;
 		uint32_t vm_id:4;
 	} bitfields, bits;
 	struct {
 		uint32_t cmd:3;
-		uint32_t:1;
+		 uint32_t:1;
 		uint32_t mode:3;
 		uint32_t check_vmid:1;
 		uint32_t data:3;
-		uint32_t:5;
+		 uint32_t:5;
 		uint32_t wave_id:4;
 		uint32_t simd_id:2;
-		uint32_t:2;
+		 uint32_t:2;
 		uint32_t queue_id:3;
-		uint32_t:1;
+		 uint32_t:1;
 		uint32_t vm_id:4;
 	} bitfields_sethalt, bits_sethalt;
 	uint32_t u32All;
@@ -205,7 +201,7 @@ union TCP_WATCH_ADDR_L_BITS {
 };
 
 enum {
-	QUEUESTATE__INVALID = 0,  /* so by default we'll get invalid state */
+	QUEUESTATE__INVALID = 0, /* so by default we'll get invalid state */
 	QUEUESTATE__ACTIVE_COMPLETION_PENDING,
 	QUEUESTATE__ACTIVE
 };
@@ -226,4 +222,4 @@ union ULARGE_INTEGER {
 void kfd_dbgdev_init(struct kfd_dbgdev *pdbgdev, struct kfd_dev *pdev,
 			enum DBGDEV_TYPE type);
 
-#endif				/* KFD_DBGDEV_H_ */
+#endif	/* KFD_DBGDEV_H_ */

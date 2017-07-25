@@ -33,8 +33,8 @@ static inline void inc_wptr(unsigned int *wptr, unsigned int increment_bytes,
 {
 	unsigned int temp = *wptr + increment_bytes / sizeof(uint32_t);
 
-	WARN_ON((temp * sizeof(uint32_t)) > buffer_size_bytes);
-
+	WARN((temp * sizeof(uint32_t)) > buffer_size_bytes,
+	     "Runlist IB overflow");
 	*wptr = temp;
 }
 
@@ -102,7 +102,7 @@ static int pm_allocate_runlist_ib(struct packet_manager *pm,
 	retval = kfd_gtt_sa_allocate(pm->dqm->dev, *rl_buffer_size,
 					&pm->ib_buffer_obj);
 
-	if (retval != 0) {
+	if (retval) {
 		pr_err("Failed to allocate runlist IB\n");
 		goto out;
 	}
@@ -123,20 +123,20 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 				uint64_t *rl_gpu_addr,
 				size_t *rl_size_bytes)
 {
-	unsigned int alloc_size_bytes = 0;
+	unsigned int alloc_size_bytes;
 	unsigned int *rl_buffer, rl_wptr, i;
 	int retval, proccesses_mapped;
 	struct device_process_node *cur;
 	struct qcm_process_device *qpd;
 	struct queue *q;
 	struct kernel_queue *kq;
-	bool is_over_subscription = false;
+	bool is_over_subscription;
 
 	rl_wptr = retval = proccesses_mapped = 0;
 
 	retval = pm_allocate_runlist_ib(pm, &rl_buffer, rl_gpu_addr,
 				&alloc_size_bytes, &is_over_subscription);
-	if (retval != 0)
+	if (retval)
 		return retval;
 
 	*rl_size_bytes = alloc_size_bytes;
@@ -156,7 +156,7 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 		}
 
 		retval = pm->pmf->map_process(pm, &rl_buffer[rl_wptr], qpd);
-		if (retval != 0)
+		if (retval)
 			return retval;
 
 		proccesses_mapped++;
@@ -174,7 +174,7 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 						&rl_buffer[rl_wptr],
 						kq->queue,
 						qpd->is_debug);
-			if (retval != 0)
+			if (retval)
 				return retval;
 
 			inc_wptr(&rl_wptr,
@@ -193,7 +193,7 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 						&rl_buffer[rl_wptr],
 						q,
 						qpd->is_debug);
-			if (retval != 0)
+			if (retval)
 				return retval;
 
 			inc_wptr(&rl_wptr,
@@ -267,8 +267,8 @@ int pm_send_set_resources(struct packet_manager *pm,
 	size = pm->pmf->get_set_resources_packet_size();
 	mutex_lock(&pm->lock);
 	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
-				size / sizeof(uint32_t),
-				(unsigned int **)&buffer);
+					size / sizeof(uint32_t),
+					(unsigned int **)&buffer);
 	if (!buffer) {
 		pr_err("Failed to allocate buffer on kernel queue\n");
 		retval = -ENOMEM;
@@ -296,7 +296,7 @@ int pm_send_runlist(struct packet_manager *pm, struct list_head *dqm_queues)
 
 	retval = pm_create_runlist_ib(pm, dqm_queues, &rl_gpu_ib_addr,
 					&rl_ib_size);
-	if (retval != 0)
+	if (retval)
 		goto fail_create_runlist_ib;
 
 	pr_debug("runlist IB address: 0x%llX\n", rl_gpu_ib_addr);
@@ -307,12 +307,12 @@ int pm_send_runlist(struct packet_manager *pm, struct list_head *dqm_queues)
 
 	retval = pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
 					packet_size_dwords, &rl_buffer);
-	if (retval != 0)
+	if (retval)
 		goto fail_acquire_packet_buffer;
 
 	retval = pm->pmf->runlist(pm, rl_buffer, rl_gpu_ib_addr,
 				rl_ib_size / sizeof(uint32_t), false);
-	if (retval != 0)
+	if (retval)
 		goto fail_create_runlist;
 
 	pm->priv_queue->ops.submit_packet(pm->priv_queue);
@@ -326,8 +326,7 @@ fail_create_runlist:
 fail_acquire_packet_buffer:
 	mutex_unlock(&pm->lock);
 fail_create_runlist_ib:
-	if (pm->allocated)
-		pm_release_ib(pm);
+	pm_release_ib(pm);
 	return retval;
 }
 

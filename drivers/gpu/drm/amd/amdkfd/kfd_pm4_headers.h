@@ -21,8 +21,8 @@
  *
  */
 
-#ifndef KFD_PM4_HEADERS_CIK_H_
-#define KFD_PM4_HEADERS_CIK_H_
+#ifndef KFD_PM4_HEADERS_H_
+#define KFD_PM4_HEADERS_H_
 
 #ifndef PM4_MES_HEADER_DEFINED
 #define PM4_MES_HEADER_DEFINED

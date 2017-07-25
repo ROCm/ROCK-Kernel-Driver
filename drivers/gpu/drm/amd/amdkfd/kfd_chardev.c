@@ -34,11 +34,7 @@
 #include <uapi/linux/kfd_ioctl.h>
 #include <linux/time.h>
 #include <linux/mm.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
-#include <asm-generic/mman-common.h>
-#else
-#include <uapi/asm-generic/mman-common.h>
-#endif
+#include <linux/mman.h>
 #include <asm/processor.h>
 #include <linux/ptrace.h>
 
@@ -46,7 +42,6 @@
 #include "kfd_device_queue_manager.h"
 #include "kfd_dbgmgr.h"
 #include "kfd_ipc.h"
-#include "cik_regs.h"
 
 static long kfd_ioctl(struct file *, unsigned int, unsigned long);
 static int kfd_open(struct inode *, struct file *);
@@ -546,26 +541,25 @@ out:
 	return err;
 }
 
-static int
-kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
+static int kfd_ioctl_dbg_register(struct file *filep,
+				struct kfd_process *p, void *data)
 {
-	long status = -EFAULT;
 	struct kfd_ioctl_dbg_register_args *args = data;
 	struct kfd_dev *dev;
 	struct kfd_dbgmgr *dbgmgr_ptr;
 	struct kfd_process_device *pdd;
-	bool create_ok = false;
+	bool create_ok;
+	long status = 0;
 
 	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev) {
-		pr_err("Getting device by id failed in %s\n", __func__);
-		return status;
-	}
+	if (!dev)
+		return -EINVAL;
 
 	mutex_lock(&p->mutex);
-	mutex_lock(get_dbgmgr_mutex());
+	mutex_lock(kfd_get_dbgmgr_mutex());
 
-	/* make sure that we have pdd, if this the first queue created for
+	/*
+	 * make sure that we have pdd, if this the first queue created for
 	 * this process
 	 */
 	pdd = kfd_bind_process_to_device(dev, p);
@@ -576,7 +570,6 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
 
 	if (!dev->dbgmgr) {
 		/* In case of a legal call, we have no dbgmgr yet */
-
 		create_ok = kfd_dbgmgr_create(&dbgmgr_ptr, dev);
 		if (create_ok) {
 			status = kfd_dbgmgr_register(dbgmgr_ptr, p);
@@ -585,10 +578,13 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
 			else
 				dev->dbgmgr = dbgmgr_ptr;
 		}
+	} else {
+		pr_debug("debugger already registered\n");
+		status = -EINVAL;
 	}
 
 out:
-	mutex_unlock(get_dbgmgr_mutex());
+	mutex_unlock(kfd_get_dbgmgr_mutex());
 	mutex_unlock(&p->mutex);
 
 	return status;
@@ -597,25 +593,28 @@ out:
 static int kfd_ioctl_dbg_unregister(struct file *filep,
 				struct kfd_process *p, void *data)
 {
-	long status = -EFAULT;
 	struct kfd_ioctl_dbg_unregister_args *args = data;
 	struct kfd_dev *dev;
+	long status;
 
 	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev) {
-		pr_err("Getting device by id failed in %s\n", __func__);
-		return status;
+	if (!dev)
+		return -EINVAL;
+
+	if (dev->device_info->asic_family == CHIP_CARRIZO) {
+		pr_debug("kfd_ioctl_dbg_unregister not supported on CZ\n");
+		return -EINVAL;
 	}
 
-	mutex_lock(get_dbgmgr_mutex());
+	mutex_lock(kfd_get_dbgmgr_mutex());
 
 	status = kfd_dbgmgr_unregister(dev->dbgmgr, p);
-	if (status == 0) {
+	if (!status) {
 		kfd_dbgmgr_destroy(dev->dbgmgr);
 		dev->dbgmgr = NULL;
 	}
 
-	mutex_unlock(get_dbgmgr_mutex());
+	mutex_unlock(kfd_get_dbgmgr_mutex());
 
 	return status;
 }
@@ -624,33 +623,28 @@ static int kfd_ioctl_dbg_unregister(struct file *filep,
  * Parse and generate variable size data structure for address watch.
  * Total size of the buffer and # watch points is limited in order
  * to prevent kernel abuse. (no bearing to the much smaller HW limitation
- * which is enforced by dbgdev module.
+ * which is enforced by dbgdev module)
  * please also note that the watch address itself are not "copied from user",
  * since it be set into the HW in user mode values.
  *
  */
-
-static int
-kfd_ioctl_dbg_address_watch(struct file *filep,
-		struct kfd_process *p,
-		void *data)
+static int kfd_ioctl_dbg_address_watch(struct file *filep,
+					struct kfd_process *p, void *data)
 {
-	long status = -EFAULT;
 	struct kfd_ioctl_dbg_address_watch_args *args = data;
 	struct kfd_dev *dev;
 	struct dbg_address_watch_info aw_info;
-	unsigned char *args_buff = NULL;
-	unsigned int args_idx = 0;
+	unsigned char *args_buff;
+	long status;
 	void __user *cmd_from_user;
 	uint64_t watch_mask_value = 0;
+	unsigned int args_idx = 0;
 
 	memset((void *) &aw_info, 0, sizeof(struct dbg_address_watch_info));
 
 	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev) {
-		pr_err("Getting device by id failed in %s\n", __func__);
-		return -EFAULT;
-	}
+	if (!dev)
+		return -EINVAL;
 
 	cmd_from_user = (void __user *) args->content_ptr;
 
@@ -660,31 +654,26 @@ kfd_ioctl_dbg_address_watch(struct file *filep,
 
 	/* this is the actual buffer to work with */
 	args_buff = memdup_user(cmd_from_user,
-			args->buf_size_in_bytes - sizeof(*args));
-
+				args->buf_size_in_bytes - sizeof(*args));
 	if (IS_ERR(args_buff))
 		return PTR_ERR(args_buff);
 
 	aw_info.process = p;
 
-	aw_info.num_watch_points =
-		*((uint32_t *)(&args_buff[args_idx]));
+	aw_info.num_watch_points = *((uint32_t *)(&args_buff[args_idx]));
 	args_idx += sizeof(aw_info.num_watch_points);
 
-	aw_info.watch_mode =
-		(enum HSA_DBG_WATCH_MODE *) &args_buff[args_idx];
-	args_idx += sizeof(enum HSA_DBG_WATCH_MODE) *
-					aw_info.num_watch_points;
+	aw_info.watch_mode = (enum HSA_DBG_WATCH_MODE *) &args_buff[args_idx];
+	args_idx += sizeof(enum HSA_DBG_WATCH_MODE) * aw_info.num_watch_points;
 
-	/* set watch address base pointer to point on the array base
+	/*
+	 * set watch address base pointer to point on the array base
 	 * within args_buff
 	 */
-
 	aw_info.watch_address = (uint64_t *) &args_buff[args_idx];
 
 	/* skip over the addresses buffer */
-	args_idx += sizeof(aw_info.watch_address) *
-					aw_info.num_watch_points;
+	args_idx += sizeof(aw_info.watch_address) * aw_info.num_watch_points;
 
 	if (args_idx >= args->buf_size_in_bytes) {
 		status = -EINVAL;
@@ -694,21 +683,18 @@ kfd_ioctl_dbg_address_watch(struct file *filep,
 	watch_mask_value = (uint64_t) args_buff[args_idx];
 
 	if (watch_mask_value > 0) {
-		/* there is an array of masks */
-
-		/* set watch mask base pointer to point on the array
-		 * base within args_buff
+		/*
+		 * There is an array of masks.
+		 * set watch mask base pointer to point on the array base
+		 * within args_buff
 		 */
 		aw_info.watch_mask = (uint64_t *) &args_buff[args_idx];
 
 		/* skip over the masks buffer */
 		args_idx += sizeof(aw_info.watch_mask) *
-					aw_info.num_watch_points;
-	}
-
-	else
+				aw_info.num_watch_points;
+	} else {
 		/* just the NULL mask, set to NULL and skip over it */
-	{
 		aw_info.watch_mask = NULL;
 		args_idx += sizeof(aw_info.watch_mask);
 	}
@@ -721,11 +707,11 @@ kfd_ioctl_dbg_address_watch(struct file *filep,
 	/* Currently HSA Event is not supported for DBG */
 	aw_info.watch_event = NULL;
 
-	mutex_lock(get_dbgmgr_mutex());
+	mutex_lock(kfd_get_dbgmgr_mutex());
 
 	status = kfd_dbgmgr_address_watch(dev->dbgmgr, &aw_info);
 
-	mutex_unlock(get_dbgmgr_mutex());
+	mutex_unlock(kfd_get_dbgmgr_mutex());
 
 out:
 	kfree(args_buff);
@@ -733,29 +719,22 @@ out:
 	return status;
 }
 
-/*
- * Parse and generate fixed size data structure for wave control.
- * Buffer is generated in a "packed" form, for avoiding structure
- * packing/pending dependencies.
- */
-
-static int
-kfd_ioctl_dbg_wave_control(struct file *filep, struct kfd_process *p,
-		void *data)
+/* Parse and generate fixed size data structure for wave control */
+static int kfd_ioctl_dbg_wave_control(struct file *filep,
+					struct kfd_process *p, void *data)
 {
-	long status = -EFAULT;
 	struct kfd_ioctl_dbg_wave_control_args *args = data;
 	struct kfd_dev *dev;
 	struct dbg_wave_control_info wac_info;
-	unsigned char *args_buff = NULL;
-	unsigned int args_idx = 0;
-	void __user *cmd_from_user;
+	unsigned char *args_buff;
 	uint32_t computed_buff_size;
+	long status;
+	void __user *cmd_from_user;
+	unsigned int args_idx = 0;
 
 	memset((void *) &wac_info, 0, sizeof(struct dbg_wave_control_info));
 
 	/* we use compact form, independent of the packing attribute value */
-
 	computed_buff_size = sizeof(*args) +
 				sizeof(wac_info.mode) +
 				sizeof(wac_info.operand) +
@@ -763,71 +742,58 @@ kfd_ioctl_dbg_wave_control(struct file *filep, struct kfd_process *p,
 				sizeof(wac_info.dbgWave_msg.MemoryVA) +
 				sizeof(wac_info.trapId);
 
-
 	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev) {
-		pr_err("Getting device by id failed in %s\n", __func__);
-		return -EFAULT;
-	}
+	if (!dev)
+		return -EINVAL;
 
 	/* input size must match the computed "compact" size */
-
 	if (args->buf_size_in_bytes != computed_buff_size) {
-		pr_err("Size mismatch, computed %u : actual %u\n",
+		pr_debug("size mismatch, computed : actual %u : %u\n",
 				args->buf_size_in_bytes, computed_buff_size);
 		return -EINVAL;
 	}
 
 	cmd_from_user = (void __user *) args->content_ptr;
 
+	if (cmd_from_user == NULL)
+		return -EINVAL;
+
 	/* copy the entire buffer from user */
 
 	args_buff = memdup_user(cmd_from_user,
-			args->buf_size_in_bytes - sizeof(*args));
+				args->buf_size_in_bytes - sizeof(*args));
 	if (IS_ERR(args_buff))
 		return PTR_ERR(args_buff);
 
-	if (copy_from_user(args_buff,
-			(void __user *) args->content_ptr,
-			args->buf_size_in_bytes - sizeof(*args))) {
-		pr_err("copy_from_user failed\n");
-		status = -EFAULT;
-		goto out;
-	}
-
 	/* move ptr to the start of the "pay-load" area */
-
 	wac_info.process = p;
 
-	wac_info.operand =
-		*((enum HSA_DBG_WAVEOP *)(&args_buff[args_idx]));
+	wac_info.operand = *((enum HSA_DBG_WAVEOP *)(&args_buff[args_idx]));
 	args_idx += sizeof(wac_info.operand);
 
-	wac_info.mode =
-		*((enum HSA_DBG_WAVEMODE *)(&args_buff[args_idx]));
+	wac_info.mode = *((enum HSA_DBG_WAVEMODE *)(&args_buff[args_idx]));
 	args_idx += sizeof(wac_info.mode);
 
 	wac_info.trapId = *((uint32_t *)(&args_buff[args_idx]));
 	args_idx += sizeof(wac_info.trapId);
 
 	wac_info.dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.Value =
-		*((uint32_t *)(&args_buff[args_idx]));
+					*((uint32_t *)(&args_buff[args_idx]));
 	wac_info.dbgWave_msg.MemoryVA = NULL;
 
-	mutex_lock(get_dbgmgr_mutex());
+	mutex_lock(kfd_get_dbgmgr_mutex());
 
-	pr_info("Calling dbg manager process %p, operand %u, mode %u, trapId %u, message %u\n",
-			wac_info.process, wac_info.operand, wac_info.mode,
-			wac_info.trapId,
+	pr_debug("Calling dbg manager process %p, operand %u, mode %u, trapId %u, message %u\n",
+			wac_info.process, wac_info.operand,
+			wac_info.mode, wac_info.trapId,
 			wac_info.dbgWave_msg.DbgWaveMsg.WaveMsgInfoGen2.Value);
 
 	status = kfd_dbgmgr_wave_control(dev->dbgmgr, &wac_info);
 
-	pr_info("Returned status of dbg manager is %ld\n", status);
+	pr_debug("Returned status of dbg manager is %ld\n", status);
 
-	mutex_unlock(get_dbgmgr_mutex());
+	mutex_unlock(kfd_get_dbgmgr_mutex());
 
-out:
 	kfree(args_buff);
 
 	return status;
@@ -1024,8 +990,8 @@ out_upwrite:
 	return 0;
 }
 
-static int
-kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
+static int kfd_ioctl_create_event(struct file *filp, struct kfd_process *p,
+					void *data)
 {
 	struct kfd_ioctl_create_event_args *args = data;
 	struct kfd_dev *kfd;
@@ -1079,35 +1045,34 @@ kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 out_upwrite:
 	mutex_unlock(&p->mutex);
 	return err;
-
 }
 
-static int
-kfd_ioctl_destroy_event(struct file *filp, struct kfd_process *p, void *data)
+static int kfd_ioctl_destroy_event(struct file *filp, struct kfd_process *p,
+					void *data)
 {
 	struct kfd_ioctl_destroy_event_args *args = data;
 
 	return kfd_event_destroy(p, args->event_id);
 }
 
-static int
-kfd_ioctl_set_event(struct file *filp, struct kfd_process *p, void *data)
+static int kfd_ioctl_set_event(struct file *filp, struct kfd_process *p,
+				void *data)
 {
 	struct kfd_ioctl_set_event_args *args = data;
 
 	return kfd_set_event(p, args->event_id);
 }
 
-static int
-kfd_ioctl_reset_event(struct file *filp, struct kfd_process *p, void *data)
+static int kfd_ioctl_reset_event(struct file *filp, struct kfd_process *p,
+				void *data)
 {
 	struct kfd_ioctl_reset_event_args *args = data;
 
 	return kfd_reset_event(p, args->event_id);
 }
 
-static int
-kfd_ioctl_wait_events(struct file *filp, struct kfd_process *p, void *data)
+static int kfd_ioctl_wait_events(struct file *filp, struct kfd_process *p,
+				void *data)
 {
 	struct kfd_ioctl_wait_events_args *args = data;
 	enum kfd_event_wait_result wait_result;
@@ -2117,8 +2082,7 @@ static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	} else
 		goto err_i1;
 
-	dev_dbg(kfd_device, "ioctl cmd (#0x%x), arg 0x%lx\n",
-				nr, arg);
+	dev_dbg(kfd_device, "ioctl cmd 0x%x (#%d), arg 0x%lx\n", cmd, nr, arg);
 
 	process = kfd_get_process(current);
 	if (IS_ERR(process)) {
@@ -2173,8 +2137,7 @@ err_i1:
 		kfree(kdata);
 
 	if (retcode)
-		dev_dbg(kfd_device, "ioctl cmd (#0x%x), arg 0x%lx, failed %d\n",
-				nr, arg, retcode);
+		dev_dbg(kfd_device, "ret = %d\n", retcode);
 
 	return retcode;
 }
@@ -2217,5 +2180,3 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	return -EFAULT;
 }
-
-

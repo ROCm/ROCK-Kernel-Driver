@@ -188,7 +188,7 @@ static int pm_map_queues_v9(struct packet_manager *pm, uint32_t *buffer,
 		use_static = false; /* no static queues under SDMA */
 		break;
 	default:
-		WARN(1, "queue type %d\n", q->properties.type);
+		WARN(1, "queue type %d", q->properties.type);
 		return -EINVAL;
 	}
 	packet->bitfields3.doorbell_offset =
@@ -233,7 +233,7 @@ static int pm_unmap_queues_v9(struct packet_manager *pm, uint32_t *buffer,
 			engine_sel__mes_unmap_queues__sdma0 + sdma_engine;
 		break;
 	default:
-		WARN(1, "queue type %d\n", type);
+		WARN(1, "queue type %d", type);
 		return -EINVAL;
 	}
 
@@ -266,7 +266,7 @@ static int pm_unmap_queues_v9(struct packet_manager *pm, uint32_t *buffer,
 			queue_sel__mes_unmap_queues__unmap_all_non_static_queues;
 		break;
 	default:
-		WARN(1, "filter %d\n", filter);
+		WARN(1, "filter %d", filter);
 		return -EINVAL;
 	}
 

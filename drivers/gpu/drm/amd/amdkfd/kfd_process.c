@@ -33,14 +33,8 @@
 #endif
 #include <linux/notifier.h>
 #include <linux/compat.h>
-#include <linux/mm.h>
-#include <asm/tlb.h>
+#include <linux/mman.h>
 #include <linux/highmem.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
-#include <asm-generic/mman-common.h>
-#else
-#include <uapi/asm-generic/mman-common.h>
-#endif
 #include "kfd_ipc.h"
 
 struct mm_struct;
@@ -77,7 +71,7 @@ static struct workqueue_struct *kfd_process_wq;
 #define MAX_IDR_ID 0 /*0 - for unlimited*/
 
 static struct kfd_process *find_process(const struct task_struct *thread,
-		bool lock);
+		bool ref);
 static void kfd_process_ref_release(struct kref *ref);
 static struct kfd_process *create_process(const struct task_struct *thread,
 					struct file *filep);
@@ -466,7 +460,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	 */
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		dev = pdd->dev;
-		mutex_lock(get_dbgmgr_mutex());
+		mutex_lock(kfd_get_dbgmgr_mutex());
 
 		if (dev && dev->dbgmgr && (dev->dbgmgr->pasid == p->pasid)) {
 
@@ -476,7 +470,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 				dev->dbgmgr = NULL;
 			}
 		}
-		mutex_unlock(get_dbgmgr_mutex());
+		mutex_unlock(kfd_get_dbgmgr_mutex());
 	}
 
 	kfd_process_dequeue_from_all_devices(p);
@@ -642,8 +636,7 @@ err_init_apertures:
 err_process_pqm_init:
 	hash_del_rcu(&process->kfd_processes);
 	synchronize_rcu();
-	mmu_notifier_unregister_no_release(&process->mmu_notifier,
-					process->mm);
+	mmu_notifier_unregister_no_release(&process->mmu_notifier, process->mm);
 err_mmu_notifier:
 	mutex_destroy(&process->mutex);
 	kfd_pasid_free(process->pasid);
@@ -846,7 +839,7 @@ void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid)
 
 	pr_debug("Unbinding process %d from IOMMU\n", pasid);
 
-	mutex_lock(get_dbgmgr_mutex());
+	mutex_lock(kfd_get_dbgmgr_mutex());
 
 	if (dev->dbgmgr && (dev->dbgmgr->pasid == p->pasid)) {
 
@@ -856,7 +849,7 @@ void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid)
 		}
 	}
 
-	mutex_unlock(get_dbgmgr_mutex());
+	mutex_unlock(kfd_get_dbgmgr_mutex());
 
 	mutex_lock(&p->mutex);
 
