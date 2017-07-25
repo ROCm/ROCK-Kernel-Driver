@@ -340,6 +340,8 @@ static const struct kfd_device_info *lookup_device_info(unsigned short did)
 		}
 	}
 
+	WARN(1, "device is not added to supported_devices\n");
+
 	return NULL;
 }
 
@@ -351,8 +353,10 @@ struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 	const struct kfd_device_info *device_info =
 					lookup_device_info(pdev->device);
 
-	if (!device_info)
+	if (!device_info) {
+		dev_err(kfd_device, "kgd2kfd_probe failed\n");
 		return NULL;
+	}
 
 	if (device_info->needs_pci_atomics) {
 		/* Allow BIF to recode atomics to PCIe 3.0 AtomicOps.
@@ -577,20 +581,15 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	if (kfd->kfd2kgd->init_gtt_mem_allocation(
 			kfd->kgd, size, &kfd->gtt_mem,
 			&kfd->gtt_start_gpu_addr, &kfd->gtt_start_cpu_ptr)){
-		dev_err(kfd_device,
-			"Could not allocate %d bytes for device %x:%x\n",
-			size, kfd->pdev->vendor, kfd->pdev->device);
+		dev_err(kfd_device, "Could not allocate %d bytes\n", size);
 		goto out;
 	}
 
-	dev_info(kfd_device,
-		"Allocated %d bytes on gart for device %x:%x\n",
-		size, kfd->pdev->vendor, kfd->pdev->device);
+	dev_info(kfd_device, "Allocated %d bytes on gart\n", size);
 
 	/* Initialize GTT sa with 512 byte chunk size */
 	if (kfd_gtt_sa_init(kfd, size, 512) != 0) {
-		dev_err(kfd_device,
-			"Error initializing gtt sub-allocator\n");
+		dev_err(kfd_device, "Error initializing gtt sub-allocator\n");
 		goto kfd_gtt_sa_init_error;
 	}
 
@@ -601,40 +600,34 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	}
 
 	if (kfd_topology_add_device(kfd)) {
-		dev_err(kfd_device,
-			"Error adding device %x:%x to topology\n",
-			kfd->pdev->vendor, kfd->pdev->device);
+		dev_err(kfd_device, "Error adding device to topology\n");
 		goto kfd_topology_add_device_error;
 	}
 
 	if (kfd_interrupt_init(kfd)) {
-		dev_err(kfd_device,
-			"Error initializing interrupts for device %x:%x\n",
-			kfd->pdev->vendor, kfd->pdev->device);
+		dev_err(kfd_device, "Error initializing interrupts\n");
 		goto kfd_interrupt_error;
 	}
 
 	kfd->dqm = device_queue_manager_init(kfd);
 	if (!kfd->dqm) {
-		dev_err(kfd_device,
-			"Error initializing queue manager for device %x:%x\n",
-			kfd->pdev->vendor, kfd->pdev->device);
+		dev_err(kfd_device, "Error initializing queue manager\n");
 		goto device_queue_manager_error;
 	}
 
 #if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 	if (kfd->device_info->is_need_iommu_device) {
 		if (!device_iommu_pasid_init(kfd)) {
-			dev_err(kfd_device,
-				"Error initializing iommuv2 for device %x:%x\n",
-				kfd->pdev->vendor, kfd->pdev->device);
+			dev_err(kfd_device, "Error initializing iommuv2\n");
 			goto device_iommu_pasid_error;
 		}
 	}
 #endif
 
-	if (kfd_cwsr_init(kfd))
+	if (kfd_cwsr_init(kfd)) {
+		dev_err(kfd_device, "Error initializing cwsr\n");
 		goto device_iommu_pasid_error;
+	}
 
 	kfd_ib_mem_init(kfd);
 
@@ -642,8 +635,10 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	kfd_init_processes_srcu();
 #endif
 
-	if (kfd_resume(kfd))
+	if (kfd_resume(kfd)) {
+		dev_err(kfd_device, "Error resuming kfd\n");
 		goto kfd_resume_error;
+	}
 
 	kfd->dbgmgr = NULL;
 
@@ -732,16 +727,22 @@ static int kfd_resume(struct kfd_dev *kfd)
 		unsigned int pasid_limit = kfd_get_pasid_limit();
 
 		err = amd_iommu_init_device(kfd->pdev, pasid_limit);
-		if (err)
+		if (err) {
+			dev_err(kfd_device, "failed to initialize iommu\n");
 			return -ENXIO;
+		}
+
 		amd_iommu_set_invalidate_ctx_cb(kfd->pdev,
 				iommu_pasid_shutdown_callback);
 		amd_iommu_set_invalid_ppr_cb(kfd->pdev,
 				iommu_invalid_ppr_cb);
 
 		err = kfd_bind_processes_to_device(kfd);
-		if (err)
+		if (err) {
+			dev_err(kfd_device,
+				"failed to bind process to device\n");
 			return -ENXIO;
+		}
 	}
 #endif
 
