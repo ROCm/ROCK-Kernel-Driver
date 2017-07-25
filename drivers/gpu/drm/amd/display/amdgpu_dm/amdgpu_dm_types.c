@@ -976,10 +976,6 @@ static int amdgpu_atomic_helper_page_flip(struct drm_crtc *crtc,
 	if (!state)
 		return -ENOMEM;
 
-	ret = drm_crtc_vblank_get(crtc);
-	if (ret)
-		return ret;
-
 	state->acquire_ctx = ctx;
 
 	crtc_state = drm_atomic_get_crtc_state(state, crtc);
@@ -2535,8 +2531,6 @@ static void amdgpu_dm_commit_surfaces(struct drm_atomic_state *state,
 			if (!con_state)
 				continue;
 
-
-
 			add_surface(dm->dc, crtc, plane,
 				    &dc_surfaces_constructed[planes_count]);
 			if (dc_surfaces_constructed[planes_count] == NULL) {
@@ -2554,6 +2548,10 @@ static void amdgpu_dm_commit_surfaces(struct drm_atomic_state *state,
 			*wait_for_vblank =
 				acrtc_attach->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC ?
 				false : true;
+
+			/* TODO: Needs rework for multiplane flip */
+			if (plane->type == DRM_PLANE_TYPE_PRIMARY)
+				drm_crtc_vblank_get(crtc);
 
 			amdgpu_dm_do_flip(
 				crtc,
