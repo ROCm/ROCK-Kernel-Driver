@@ -113,10 +113,7 @@ static void kfd_process_free_gpuvm(struct kgd_mem *mem,
  *	This function should be only called right after the process
  *	is created and when kfd_processes_mutex is still being held
  *	to avoid concurrency. Because of that exclusiveness, we do
- *	not need to take p->mutex. Because kfd_processes_mutex instead
- *	of p->mutex is held, we do not need to release the lock when
- *	calling into kgd through functions such as alloc_memory_of_gpu()
- *	etc.
+ *	not need to take p->mutex.
  */
 static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 		struct kfd_dev *kdev, uint64_t gpu_va, uint32_t size,

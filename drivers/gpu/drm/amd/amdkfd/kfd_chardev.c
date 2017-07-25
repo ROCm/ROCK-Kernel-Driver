@@ -1205,12 +1205,6 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
-	mutex_lock(&p->mutex);
-	pdd = kfd_bind_process_to_device(dev, p);
-	mutex_unlock(&p->mutex);
-	if (IS_ERR(pdd))
-		return PTR_ERR(pdd);
-
 	if (flags & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
 		/* Check if the userptr corresponds to another (or third-party)
 		 * device local memory. If so treat is as a doorbell. User
@@ -1232,24 +1226,30 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		offset = kfd_get_process_doorbells(dev, p);
 	}
 
+	mutex_lock(&p->mutex);
+
+	pdd = kfd_bind_process_to_device(dev, p);
+	if (IS_ERR(pdd)) {
+		err = PTR_ERR(pdd);
+		goto err_unlock;
+	}
+
 	err = dev->kfd2kgd->alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
 		pdd->vm, (struct kgd_mem **) &mem, &offset,
 		NULL, flags);
 
-	if (err != 0)
-		return err;
+	if (err)
+		goto err_unlock;
 
-	mutex_lock(&p->mutex);
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
 			args->va_addr, args->size, NULL);
-	mutex_unlock(&p->mutex);
 	if (idr_handle < 0) {
-		dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
-						 (struct kgd_mem *) mem,
-						 pdd->vm);
-		return -EFAULT;
+		err = -EFAULT;
+		goto err_free;
 	}
+
+	mutex_unlock(&p->mutex);
 
 	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
 	if ((args->flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) != 0 &&
@@ -1263,6 +1263,14 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	}
 
 	return 0;
+
+err_free:
+	dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
+					 (struct kgd_mem *) mem,
+					 pdd->vm);
+err_unlock:
+	mutex_unlock(&p->mutex);
+	return err;
 }
 
 static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
@@ -1295,22 +1303,15 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	}
 	run_rdma_free_callback(buf_obj);
 
-	mutex_unlock(&p->mutex);
-
 	ret = dev->kfd2kgd->free_memory_of_gpu(dev->kgd, buf_obj->mem,
 					       pdd->vm);
 
 	/* If freeing the buffer failed, leave the handle in place for
 	 * clean-up during process tear-down.
 	 */
-	if (ret == 0) {
-		mutex_lock(&p->mutex);
+	if (ret == 0)
 		kfd_process_device_remove_obj_handle(
 			pdd, GET_IDR_HANDLE(args->handle));
-		mutex_unlock(&p->mutex);
-	}
-
-	return ret;
 
 err_unlock:
 	mutex_unlock(&p->mutex);
@@ -1363,8 +1364,6 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 
 	mem = kfd_process_device_translate_handle(pdd,
 						GET_IDR_HANDLE(args->handle));
-	mutex_unlock(&p->mutex);
-
 	if (!mem) {
 		err = PTR_ERR(mem);
 		goto get_mem_obj_from_handle_failed;
@@ -1380,9 +1379,8 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
 			}
-			mutex_lock(&p->mutex);
+
 			peer_pdd = kfd_bind_process_to_device(peer, p);
-			mutex_unlock(&p->mutex);
 			if (!peer_pdd) {
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
@@ -1398,6 +1396,8 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		if (err != 0)
 			pr_err("Failed to map\n");
 	}
+
+	mutex_unlock(&p->mutex);
 
 	err = dev->kfd2kgd->sync_memory(dev->kgd, (struct kgd_mem *) mem, true);
 	if (err) {
@@ -1426,8 +1426,8 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	return err;
 
 bind_process_to_device_failed:
-	mutex_unlock(&p->mutex);
 get_mem_obj_from_handle_failed:
+	mutex_unlock(&p->mutex);
 copy_from_user_failed:
 sync_memory_failed:
 	kfree(devices_arr);
@@ -1496,8 +1496,6 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 
 	mem = kfd_process_device_translate_handle(pdd,
 						GET_IDR_HANDLE(args->handle));
-	mutex_unlock(&p->mutex);
-
 	if (!mem) {
 		err = PTR_ERR(mem);
 		goto get_mem_obj_from_handle_failed;
@@ -1511,9 +1509,8 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
 			}
-			mutex_lock(&p->mutex);
+
 			peer_pdd = kfd_get_process_device_data(peer, p);
-			mutex_unlock(&p->mutex);
 			if (!peer_pdd) {
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
@@ -1524,11 +1521,13 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	} else
 		kfd_unmap_memory_from_gpu(mem, pdd);
 
+	mutex_unlock(&p->mutex);
+
 	return 0;
 
 bind_process_to_device_failed:
-	mutex_unlock(&p->mutex);
 get_mem_obj_from_handle_failed:
+	mutex_unlock(&p->mutex);
 copy_from_user_failed:
 	kfree(devices_arr);
 	return err;
