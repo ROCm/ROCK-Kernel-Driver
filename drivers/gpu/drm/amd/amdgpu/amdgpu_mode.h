@@ -567,9 +567,9 @@ struct amdgpu_connector {
 	int num_modes;
 	/* The 'old' sink - before an HPD.
 	 * The 'current' sink is in dc_link->sink. */
-	struct dc_sink *dc_sink;
+	const struct dc_sink *dc_sink;
 	struct dc_link *dc_link;
-	struct dc_sink *dc_em_sink;
+	const struct dc_sink *dc_em_sink;
 	const struct dc_stream *stream;
 	void *con_priv;
 	bool dac_load_detect;
