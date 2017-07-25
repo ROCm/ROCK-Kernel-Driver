@@ -1012,8 +1012,7 @@ static int amdgpu_atomic_helper_page_flip(struct drm_crtc *crtc,
 	/* Driver takes ownership of state on successful async commit. */
 	return 0;
 fail:
-	if (ret)
-		drm_crtc_vblank_put(crtc);
+	drm_atomic_state_put(state);
 
 	return ret;
 }
