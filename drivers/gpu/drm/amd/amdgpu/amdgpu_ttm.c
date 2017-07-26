@@ -1402,7 +1402,7 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 	struct ttm_buffer_object gtt_bo;
 	struct ttm_place place = {
 		.fpfn = 0,
-		.lpfn = 0,
+		.lpfn = adev->mc.gart_size >> PAGE_SHIFT,
 		.flags = TTM_PL_FLAG_TOPDOWN
 	};
 	unsigned long size;
