@@ -462,7 +462,6 @@ struct dce_hwseq_registers {
 	type PHYPLL_PIXEL_RATE_SOURCE; \
 	type PIXEL_RATE_PLL_SOURCE; \
 
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #define HWSEQ_DCN_REG_FIELD_LIST(type) \
 	type VUPDATE_NO_LOCK_EVENT_CLEAR; \
 	type VUPDATE_NO_LOCK_EVENT_OCCURRED; \
@@ -518,20 +517,15 @@ struct dce_hwseq_registers {
 	type DCFCLK_GATE_DIS; \
 	type DCHUBBUB_GLOBAL_TIMER_REFDIV; \
 	type DENTIST_DPPCLK_WDIVIDER;
-#endif
 
 struct dce_hwseq_shift {
 	HWSEQ_REG_FIELD_LIST(uint8_t)
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	HWSEQ_DCN_REG_FIELD_LIST(uint8_t)
-#endif
 };
 
 struct dce_hwseq_mask {
 	HWSEQ_REG_FIELD_LIST(uint32_t)
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	HWSEQ_DCN_REG_FIELD_LIST(uint32_t)
-#endif
 };
 
 
