@@ -139,7 +139,7 @@ int create_orc_sections(struct objtool_file *file)
 		return -1;
 	}
 
-	/* count the number of needed undwarves */
+	/* count the number of needed orcs */
 	idx = 0;
 	for_each_sec(file, sec) {
 		if (!sec->text)

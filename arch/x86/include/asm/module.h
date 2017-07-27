@@ -6,7 +6,7 @@
 
 struct mod_arch_specific {
 #ifdef CONFIG_ORC_UNWINDER
-	unsigned int num_undwarves;
+	unsigned int num_orcs;
 	int *orc_unwind_ip;
 	struct orc_entry *orc_unwind;
 #endif

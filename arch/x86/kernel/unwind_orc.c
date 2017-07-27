@@ -4,52 +4,23 @@
 #include <asm/stacktrace.h>
 #include <asm/unwind.h>
 #include <asm/orc_types.h>
+#include <asm/orc_lookup.h>
 #include <asm/sections.h>
 
 #define orc_warn(fmt, ...) \
 	printk_deferred_once(KERN_WARNING pr_fmt("WARNING: " fmt), ##__VA_ARGS__)
 
 extern int __start_orc_unwind_ip[];
-extern int __stop_orc_ip[];
+extern int __stop_orc_unwind_ip[];
 extern struct orc_entry __start_orc_unwind[];
-extern struct orc_entry __stop_orc[];
+extern struct orc_entry __stop_orc_unwind[];
 
-bool orc_init;
 static DEFINE_MUTEX(sort_mutex);
-
 int *cur_orc_ip_table = __start_orc_unwind_ip;
 struct orc_entry *cur_orc_table = __start_orc_unwind;
 
-/*
- * This is a lookup table for speeding up access to the .orc_unwind table.
- * Given an input address offset, the corresponding lookup table entry
- * specifies a subset of the .orc_unwind table to search.
- *
- * Each block represents the end of the previous range and the start of the
- * next range.  An extra block is added to give the last range an end.
- *
- * Some measured performance results for different values of LOOKUP_NUM_BLOCKS:
- *
- *  num blocks       array size	   lookup speedup   total speedup
- *     2k		8k		1.5x		1.5x
- *     4k		16k		1.6x		1.6x
- *     8k		32k		1.8x		1.7x
- *     16k		64k		2.0x		1.8x
- *     32k		128k		2.5x		2.0x
- *     64k		256k		2.9x		2.2x
- *     128k		512k		3.3x		2.4x
- *
- * Here we go with 32k blocks because it doubles unwinder performance while
- * only adding 3.5% to the ORC data footprint.
- */
-#define LOOKUP_NUM_BLOCKS		(32 * 1024)
-static unsigned int orc_fast_lookup[LOOKUP_NUM_BLOCKS + 1] __ro_after_init;
-
-#define LOOKUP_START_IP			(unsigned long)_stext
-#define LOOKUP_STOP_IP			(unsigned long)_etext
-#define LOOKUP_BLOCK_SIZE \
-	(DIV_ROUND_UP(LOOKUP_STOP_IP - LOOKUP_START_IP,	 LOOKUP_NUM_BLOCKS))
-
+unsigned int lookup_num_blocks;
+bool orc_init;
 
 static inline unsigned long orc_ip(const int *ip)
 {
@@ -85,10 +56,26 @@ static struct orc_entry *__orc_find(int *ip_table, struct orc_entry *u_table,
 	return u_table + (found - ip_table);
 }
 
-static struct orc_entry *orc_find(unsigned long ip)
+#ifdef CONFIG_MODULES
+static struct orc_entry *orc_module_find(unsigned long ip)
 {
 	struct module *mod;
 
+	mod = __module_address(ip);
+	if (!mod || !mod->arch.orc_unwind || !mod->arch.orc_unwind_ip)
+		return NULL;
+	return __orc_find(mod->arch.orc_unwind_ip, mod->arch.orc_unwind,
+			  mod->arch.num_orcs, ip);
+}
+#else
+static struct orc_entry *orc_module_find(unsigned long ip)
+{
+	return NULL;
+}
+#endif
+
+static struct orc_entry *orc_find(unsigned long ip)
+{
 	if (!orc_init)
 		return NULL;
 
@@ -98,15 +85,21 @@ static struct orc_entry *orc_find(unsigned long ip)
 
 		idx = (ip - LOOKUP_START_IP) / LOOKUP_BLOCK_SIZE;
 
-		if (WARN_ON_ONCE(idx >= LOOKUP_NUM_BLOCKS))
+		if (unlikely((idx >= lookup_num_blocks-1))) {
+			orc_warn("WARNING: bad lookup idx: idx=%u num=%u ip=%lx\n",
+				 idx, lookup_num_blocks, ip);
 			return NULL;
+		}
 
-		start = orc_fast_lookup[idx];
-		stop = orc_fast_lookup[idx + 1] + 1;
+		start = orc_lookup[idx];
+		stop = orc_lookup[idx + 1] + 1;
 
-		if (WARN_ON_ONCE(__start_orc_unwind + start >= __stop_orc) ||
-				 __start_orc_unwind + stop > __stop_orc)
+		if (unlikely((__start_orc_unwind + start >= __stop_orc_unwind) ||
+			     (__start_orc_unwind + stop > __stop_orc_unwind))) {
+			orc_warn("WARNING: bad lookup value: idx=%u num=%u start=%u stop=%u ip=%lx\n",
+				 idx, lookup_num_blocks, start, stop, ip);
 			return NULL;
+		}
 
 		return __orc_find(__start_orc_unwind_ip + start,
 				  __start_orc_unwind + start, stop - start, ip);
@@ -115,14 +108,10 @@ static struct orc_entry *orc_find(unsigned long ip)
 	/* vmlinux .init slow lookup: */
 	if (ip >= (unsigned long)_sinittext && ip < (unsigned long)_einittext)
 		return __orc_find(__start_orc_unwind_ip, __start_orc_unwind,
-				  __stop_orc - __start_orc_unwind, ip);
+				  __stop_orc_unwind_ip - __start_orc_unwind_ip, ip);
 
 	/* Module lookup: */
-	mod = __module_address(ip);
-	if (!mod || !mod->arch.orc_unwind || !mod->arch.orc_unwind_ip)
-		return NULL;
-	return __orc_find(mod->arch.orc_unwind_ip, mod->arch.orc_unwind,
-			  mod->arch.num_undwarves, ip);
+	return orc_module_find(ip);
 }
 
 static void orc_sort_swap(void *_a, void *_b, int size)
@@ -167,6 +156,7 @@ static int orc_sort_cmp(const void *_a, const void *_b)
 	return orc_a->sp_reg == ORC_REG_UNDEFINED ? -1 : 1;
 }
 
+#ifdef CONFIG_MODULES
 void unwind_module_init(struct module *mod, void *_orc_ip, size_t orc_ip_size,
 			void *_orc, size_t orc_size)
 {
@@ -191,13 +181,14 @@ void unwind_module_init(struct module *mod, void *_orc_ip, size_t orc_ip_size,
 
 	mod->arch.orc_unwind_ip = orc_ip;
 	mod->arch.orc_unwind = orc;
-	mod->arch.num_undwarves = num_entries;
+	mod->arch.num_orcs = num_entries;
 }
+#endif
 
 void __init unwind_init(void)
 {
-	size_t orc_ip_size = (void *)__stop_orc_ip - (void *)__start_orc_unwind_ip;
-	size_t orc_size = (void *)__stop_orc - (void *)__start_orc_unwind;
+	size_t orc_ip_size = (void *)__stop_orc_unwind_ip - (void *)__start_orc_unwind_ip;
+	size_t orc_size = (void *)__stop_orc_unwind - (void *)__start_orc_unwind;
 	size_t num_entries = orc_ip_size / sizeof(int);
 	struct orc_entry *orc;
 	int i;
@@ -205,7 +196,7 @@ void __init unwind_init(void)
 	if (!num_entries || orc_ip_size % sizeof(int) != 0 ||
 	    orc_size % sizeof(struct orc_entry) != 0 ||
 	    num_entries != orc_size / sizeof(struct orc_entry)) {
-		pr_warn("WARNING: Bad or missing .orc_unwind table.  Disabling unwinder.\n");
+		orc_warn("WARNING: Bad or missing .orc_unwind table.  Disabling unwinder.\n");
 		return;
 	}
 
@@ -214,26 +205,27 @@ void __init unwind_init(void)
 	     orc_sort_swap);
 
 	/* Initialize the fast lookup table: */
-	for (i = 0; i < LOOKUP_NUM_BLOCKS; i++) {
+	lookup_num_blocks = orc_lookup_end - orc_lookup;
+	for (i = 0; i < lookup_num_blocks-1; i++) {
 		orc = __orc_find(__start_orc_unwind_ip, __start_orc_unwind,
 				 num_entries,
 				 LOOKUP_START_IP + (LOOKUP_BLOCK_SIZE * i));
 		if (!orc) {
-			pr_warn("WARNING: Corrupt .orc_unwind table.  Disabling unwinder.\n");
+			orc_warn("WARNING: Corrupt .orc_unwind table.  Disabling unwinder.\n");
 			return;
 		}
 
-		orc_fast_lookup[i] = orc - __start_orc_unwind;
+		orc_lookup[i] = orc - __start_orc_unwind;
 	}
 
-	/* Initialize the last 'end' block: */
+	/* Initialize the ending block: */
 	orc = __orc_find(__start_orc_unwind_ip, __start_orc_unwind, num_entries,
 			 LOOKUP_STOP_IP);
 	if (!orc) {
-		pr_warn("WARNING: Corrupt .orc_unwind table.  Disabling unwinder.\n");
+		orc_warn("WARNING: Corrupt .orc_unwind table.  Disabling unwinder.\n");
 		return;
 	}
-	orc_fast_lookup[LOOKUP_NUM_BLOCKS] = orc - __start_orc_unwind;
+	orc_lookup[lookup_num_blocks-1] = orc - __start_orc_unwind;
 
 	orc_init = true;
 }
@@ -554,9 +546,9 @@ void __unwind_start(struct unwind_state *state, struct task_struct *task,
 	} else {
 		struct inactive_task_frame *frame = (void *)task->thread.sp;
 
-		state->ip = frame->ret_addr;
 		state->sp = task->thread.sp;
-		state->bp = frame->bp;
+		state->bp = READ_ONCE_NOCHECK(frame->bp);
+		state->ip = READ_ONCE_NOCHECK(frame->ret_addr);
 	}
 
 	if (get_stack_info((unsigned long *)state->sp, state->task,
