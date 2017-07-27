@@ -72,6 +72,15 @@ struct irq_list_head {
 	struct work_struct work;
 };
 
+#ifdef ENABLE_FBC
+struct dm_comressor_info {
+	void *cpu_addr;
+	struct amdgpu_bo *bo_ptr;
+	uint64_t gpu_addr;
+};
+#endif
+
+
 struct amdgpu_display_manager {
 	struct dal *dal;
 	struct dc *dc;
@@ -128,6 +137,10 @@ struct amdgpu_display_manager {
 	struct work_struct mst_hotplug_work;
 
 	struct mod_freesync *freesync_module;
+
+#ifdef ENABLE_FBC
+	struct dm_comressor_info compressor;
+#endif
 };
 
 /* basic init/fini API */
