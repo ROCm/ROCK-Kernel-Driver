@@ -116,7 +116,8 @@ static u32 dm_vblank_get_counter(struct amdgpu_device *adev, int crtc)
 
 
 		if (acrtc_state->stream == NULL) {
-			DRM_ERROR("dc_stream is NULL for crtc '%d'!\n", crtc);
+			DRM_ERROR("dc_stream_state is NULL for crtc '%d'!\n",
+				  crtc);
 			return 0;
 		}
 
@@ -137,7 +138,8 @@ static int dm_crtc_get_scanoutpos(struct amdgpu_device *adev, int crtc,
 						acrtc->base.state);
 
 		if (acrtc_state->stream ==  NULL) {
-			DRM_ERROR("dc_stream is NULL for crtc '%d'!\n", crtc);
+			DRM_ERROR("dc_stream_state is NULL for crtc '%d'!\n",
+				  crtc);
 			return 0;
 		}
 
@@ -1446,7 +1448,7 @@ static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 	num_streams = dc_get_current_stream_count(adev->dm.dc);
 
 	for (i = 0; i < num_streams; i++) {
-		struct dc_stream *stream;
+		struct dc_stream_state *stream;
 		stream = dc_get_stream_at_index(adev->dm.dc, i);
 
 		mod_freesync_update_state(adev->dm.freesync_module,
@@ -1614,8 +1616,8 @@ struct dm_connector_state {
 	container_of((x), struct dm_connector_state, base)
 
 static bool modeset_required(struct drm_crtc_state *crtc_state,
-			     struct dc_stream *new_stream,
-			     struct dc_stream *old_stream)
+			     struct dc_stream_state *new_stream,
+			     struct dc_stream_state *old_stream)
 {
 	if (dc_is_stream_unchanged(new_stream, old_stream)) {
 		crtc_state->mode_changed = false;
@@ -2146,7 +2148,7 @@ struct amdgpu_connector *aconnector_from_drm_crtc_id(
 static void update_stream_scaling_settings(
 		const struct drm_display_mode *mode,
 		const struct dm_connector_state *dm_state,
-		struct dc_stream *stream)
+		struct dc_stream_state *stream)
 {
 	enum amdgpu_rmx_type rmx_type;
 
@@ -2290,7 +2292,7 @@ static enum dc_color_space get_output_color_space(
 /*****************************************************************************/
 
 static void fill_stream_properties_from_drm_display_mode(
-	struct dc_stream *stream,
+	struct dc_stream_state *stream,
 	const struct drm_display_mode *mode_in,
 	const struct drm_connector *connector)
 {
@@ -2431,14 +2433,14 @@ static void decide_crtc_timing_for_drm_display_mode(
 	}
 }
 
-static struct dc_stream *create_stream_for_sink(
+static struct dc_stream_state *create_stream_for_sink(
 		struct amdgpu_connector *aconnector,
 		const struct drm_display_mode *drm_mode,
 		const struct dm_connector_state *dm_state)
 {
 	struct drm_display_mode *preferred_mode = NULL;
 	const struct drm_connector *drm_connector;
-	struct dc_stream *stream = NULL;
+	struct dc_stream_state *stream = NULL;
 	struct drm_display_mode mode = *drm_mode;
 	bool native_mode_found = false;
 
@@ -2991,7 +2993,7 @@ int amdgpu_dm_connector_mode_valid(
 	struct dc_sink *dc_sink;
 	struct amdgpu_device *adev = connector->dev->dev_private;
 	/* TODO: Unhardcode stream count */
-	struct dc_stream *stream;
+	struct dc_stream_state *stream;
 	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
 
 	if ((mode->flags & DRM_MODE_FLAG_INTERLACE) ||
@@ -3269,7 +3271,7 @@ int dm_create_validation_set_for_connector(struct drm_connector *connector,
 	struct dc_sink *dc_sink =
 			to_amdgpu_connector(connector)->dc_sink;
 	/* TODO: Unhardcode stream count */
-	struct dc_stream *stream;
+	struct dc_stream_state *stream;
 
 	if ((mode->flags & DRM_MODE_FLAG_INTERLACE) ||
 			(mode->flags & DRM_MODE_FLAG_DBLSCAN))
@@ -3928,7 +3930,7 @@ static bool is_scaling_state_different(
 static void remove_stream(
 		struct amdgpu_device *adev,
 		struct amdgpu_crtc *acrtc,
-		struct dc_stream *stream)
+		struct dc_stream_state *stream)
 {
 	/* this is the update mode case */
 	if (adev->dm.freesync_module)
@@ -4083,7 +4085,7 @@ static void amdgpu_dm_commit_surfaces(struct drm_atomic_state *state,
 	uint32_t i;
 	struct drm_plane *plane;
 	struct drm_plane_state *old_plane_state;
-	struct dc_stream *dc_stream_attach;
+	struct dc_stream_state *dc_stream_attach;
 	struct dc_plane_state *dc_surfaces_constructed[MAX_SURFACES];
 	struct amdgpu_crtc *acrtc_attach = to_amdgpu_crtc(pcrtc);
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(pcrtc->state);
@@ -4219,7 +4221,7 @@ void amdgpu_dm_atomic_commit_tail(
 	struct drm_crtc *crtc, *pcrtc;
 	struct drm_crtc_state *old_crtc_state;
 	struct amdgpu_crtc *new_crtcs[MAX_STREAMS];
-	struct dc_stream *new_stream = NULL;
+	struct dc_stream_state *new_stream = NULL;
 	unsigned long flags;
 	bool wait_for_vblank = true;
 	struct drm_connector *connector;
@@ -4378,7 +4380,7 @@ void amdgpu_dm_atomic_commit_tail(
 		new_acrtc_state = to_dm_crtc_state(acrtc->base.state);
 
 		update_stream_scaling_settings(&con_new_state->base.crtc->mode,
-				con_new_state, (struct dc_stream *)new_acrtc_state->stream);
+				con_new_state, (struct dc_stream_state *)new_acrtc_state->stream);
 
 		status = dc_stream_get_status(new_acrtc_state->stream);
 		WARN_ON(!status);
@@ -4534,7 +4536,7 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 static uint32_t add_val_sets_surface(
 	struct dc_validation_set *val_sets,
 	uint32_t set_count,
-	const struct dc_stream *stream,
+	const struct dc_stream_state *stream,
 	struct dc_plane_state *surface)
 {
 	uint32_t i = 0, j = 0;
@@ -4557,8 +4559,8 @@ static uint32_t add_val_sets_surface(
 static uint32_t update_in_val_sets_stream(
 	struct dc_validation_set *val_sets,
 	uint32_t set_count,
-	struct dc_stream *old_stream,
-	struct dc_stream *new_stream,
+	struct dc_stream_state *old_stream,
+	struct dc_stream_state *new_stream,
 	struct drm_crtc *crtc)
 {
 	uint32_t i = 0;
@@ -4581,7 +4583,7 @@ static uint32_t update_in_val_sets_stream(
 static uint32_t remove_from_val_sets(
 	struct dc_validation_set *val_sets,
 	uint32_t set_count,
-	const struct dc_stream *stream)
+	const struct dc_stream_state *stream)
 {
 	int i;
 
@@ -4703,7 +4705,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	for_each_crtc_in_state(state, crtc, crtc_state, i) {
 		struct amdgpu_crtc *acrtc = NULL;
 		struct amdgpu_connector *aconnector = NULL;
-		struct dc_stream *new_stream = NULL;
+		struct dc_stream_state *new_stream = NULL;
 		struct drm_connector_state *conn_state = NULL;
 		struct dm_connector_state *dm_conn_state = NULL;
 
