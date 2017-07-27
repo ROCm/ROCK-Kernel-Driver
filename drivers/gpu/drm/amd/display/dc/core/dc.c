@@ -1769,7 +1769,7 @@ const struct audio **dc_get_audios(struct dc *dc)
 	return (const struct audio **)core_dc->res_pool->audios;
 }
 
-void dc_flip_surface_addrs(
+void dc_flip_plane_addrs(
 		struct dc *dc,
 		struct dc_plane_state *const plane_states[],
 		struct dc_flip_addrs flip_addrs[],

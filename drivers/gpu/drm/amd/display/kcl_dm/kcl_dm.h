@@ -189,7 +189,7 @@ struct dc_plane_state;
 
 struct dm_plane_state {
 	struct drm_plane_state base;
-	struct dc_plane_state *dc_surface;
+	struct dc_plane_state *dc_state;
 };
 
 /*TODO Jodan Hersen use the one in amdgpu_dm*/
