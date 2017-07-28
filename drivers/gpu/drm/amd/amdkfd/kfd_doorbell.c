@@ -58,7 +58,7 @@ size_t kfd_doorbell_process_slice(struct kfd_dev *kfd)
 }
 
 /* Doorbell calculations for device init. */
-void kfd_doorbell_init(struct kfd_dev *kfd)
+int kfd_doorbell_init(struct kfd_dev *kfd)
 {
 	size_t doorbell_start_offset;
 	size_t doorbell_aperture_size;
@@ -94,7 +94,8 @@ void kfd_doorbell_init(struct kfd_dev *kfd)
 	kfd->doorbell_kernel_ptr = ioremap(kfd->doorbell_base,
 					   kfd_doorbell_process_slice(kfd));
 
-	WARN_ON(!kfd->doorbell_kernel_ptr);
+	if (!kfd->doorbell_kernel_ptr)
+		return -ENOMEM;
 
 	pr_debug("Doorbell initialization:\n");
 	pr_debug("doorbell base           == 0x%08lX\n",
@@ -114,6 +115,14 @@ void kfd_doorbell_init(struct kfd_dev *kfd)
 
 	pr_debug("doorbell kernel address == 0x%08lX\n",
 			(uintptr_t)kfd->doorbell_kernel_ptr);
+
+	return 0;
+}
+
+void kfd_doorbell_fini(struct kfd_dev *kfd)
+{
+	if (kfd->doorbell_kernel_ptr)
+		iounmap(kfd->doorbell_kernel_ptr);
 }
 
 int kfd_doorbell_mmap(struct kfd_dev *dev, struct kfd_process *process,

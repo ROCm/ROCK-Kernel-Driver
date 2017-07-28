@@ -817,7 +817,8 @@ void kfd_pasid_free(unsigned int pasid);
 
 /* Doorbells */
 size_t kfd_doorbell_process_slice(struct kfd_dev *kfd);
-void kfd_doorbell_init(struct kfd_dev *kfd);
+int kfd_doorbell_init(struct kfd_dev *kfd);
+void kfd_doorbell_fini(struct kfd_dev *kfd);
 int kfd_doorbell_mmap(struct kfd_dev *kfd, struct kfd_process *process,
 		      struct vm_area_struct *vma);
 void __iomem *kfd_get_kernel_doorbell(struct kfd_dev *kfd,

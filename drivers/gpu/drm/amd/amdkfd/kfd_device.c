@@ -611,7 +611,11 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 		goto kfd_gtt_sa_init_error;
 	}
 
-	kfd_doorbell_init(kfd);
+	if (kfd_doorbell_init(kfd)) {
+		dev_err(kfd_device,
+			"Error initializing doorbell aperture\n");
+		goto kfd_doorbell_error;
+	}
 
 	if (kfd_topology_add_device(kfd) != 0) {
 		dev_err(kfd_device,
@@ -678,6 +682,8 @@ device_queue_manager_error:
 kfd_interrupt_error:
 	kfd_topology_remove_device(kfd);
 kfd_topology_add_device_error:
+	kfd_doorbell_fini(kfd);
+kfd_doorbell_error:
 	kfd_gtt_sa_fini(kfd);
 kfd_gtt_sa_init_error:
 	kfd->kfd2kgd->free_gtt_mem(kfd->kgd, kfd->gtt_mem);
@@ -699,6 +705,7 @@ void kgd2kfd_device_exit(struct kfd_dev *kfd)
 		device_queue_manager_uninit(kfd->dqm);
 		kfd_interrupt_exit(kfd);
 		kfd_topology_remove_device(kfd);
+		kfd_doorbell_fini(kfd);
 		kfd_gtt_sa_fini(kfd);
 		kfd->kfd2kgd->free_gtt_mem(kfd->kgd, kfd->gtt_mem);
 	}
