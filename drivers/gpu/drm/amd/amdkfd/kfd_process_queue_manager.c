@@ -66,7 +66,6 @@ static int find_available_queue_slot(struct process_queue_manager *pqm,
 void kfd_process_dequeue_from_device(struct kfd_process_device *pdd)
 {
 	struct kfd_dev *dev = pdd->dev;
-	struct kfd_process *p = pdd->process;
 	int retval;
 
 	if (pdd->already_dequeued)
@@ -74,16 +73,6 @@ void kfd_process_dequeue_from_device(struct kfd_process_device *pdd)
 
 	retval = dev->dqm->ops.process_termination(dev->dqm, &pdd->qpd);
 	pdd->already_dequeued = true;
-	/* Checking pdd->reset_wavefronts may not be needed, because
-	 * if reset_wavefronts was set to true before, which means unmapping
-	 * failed, process_termination should fail too until we reset
-	 * wavefronts. Now we put the check there to be safe.
-	 */
-	if (retval || pdd->reset_wavefronts) {
-		pr_warn("Resetting wave fronts on dev %p\n", dev);
-		dbgdev_wave_reset_wavefronts(dev, p);
-		pdd->reset_wavefronts = false;
-	}
 }
 
 void kfd_process_dequeue_from_all_devices(struct kfd_process *p)
@@ -337,10 +326,6 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
 		kfree(pqn->q->properties.cu_mask);
 		pqn->q->properties.cu_mask = NULL;
 		retval = dqm->ops.destroy_queue(dqm, &pdd->qpd, pqn->q);
-		if (retval != 0) {
-			if (retval == -ETIME)
-				pdd->reset_wavefronts = true;
-		}
 		uninit_queue(pqn->q);
 	}
 

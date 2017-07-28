@@ -544,6 +544,12 @@ struct qcm_process_device {
 	unsigned int vmid;
 	bool is_debug;
 	unsigned int evicted; /* eviction counter, 0=active */
+
+	/* This flag tells if we should reset all wavefronts on
+	 * process termination
+	 */
+	bool reset_wavefronts;
+
 	/*
 	 * All the memory management data should be here too
 	 */
@@ -644,11 +650,6 @@ struct kfd_process_device {
 
 	/* GPUVM allocations storage */
 	struct idr alloc_idr;
-
-	/* This flag tells if we should reset all
-	 * wavefronts on process termination
-	 */
-	bool reset_wavefronts;
 
 	/* Flag used to tell the pdd has dequeued from the dqm.
 	 * This is used to prevent dev->dqm->ops.process_termination() from

@@ -421,12 +421,26 @@ static int destroy_queue_nocpsch_locked(struct device_queue_manager *dqm,
 				KFD_PREEMPT_TYPE_WAVEFRONT_RESET,
 				KFD_HIQ_TIMEOUT,
 				q->pipe, q->queue);
+	if (retval == -ETIME)
+		qpd->reset_wavefronts = true;
 
 	mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
 
 	list_del(&q->list);
-	if (list_empty(&qpd->queues_list))
+	if (list_empty(&qpd->queues_list)) {
+		if (qpd->reset_wavefronts) {
+			pr_warn("Resetting wave fronts (nocpsch) on dev %p\n",
+					dqm->dev);
+			/* dbgdev_wave_reset_wavefronts has to be called before
+			 * deallocate_vmid(), i.e. when vmid is still in use.
+			 */
+			dbgdev_wave_reset_wavefronts(dqm->dev,
+					qpd->pqm->process);
+			qpd->reset_wavefronts = false;
+		}
+
 		deallocate_vmid(dqm, qpd, q);
+	}
 	if (q->properties.is_active)
 		dqm->queue_count--;
 
@@ -1307,6 +1321,8 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 		dqm->queue_count--;
 
 	retval = execute_queues_cpsch(dqm, false, false);
+	if (retval == -ETIME)
+		qpd->reset_wavefronts = true;
 
 	mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
 
@@ -1532,6 +1548,12 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 	}
 
 	retval = execute_queues_cpsch(dqm, true, true);
+
+	if (retval || qpd->reset_wavefronts) {
+		pr_warn("Resetting wave fronts (cpsch) on dev %p\n", dqm->dev);
+		dbgdev_wave_reset_wavefronts(dqm->dev, qpd->pqm->process);
+		qpd->reset_wavefronts = false;
+	}
 
 	/* lastly, free mqd resources */
 	list_for_each_entry_safe(q, next, &qpd->queues_list, list) {
