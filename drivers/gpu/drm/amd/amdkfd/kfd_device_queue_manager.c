@@ -1427,9 +1427,11 @@ static int process_termination_nocpsch(struct device_queue_manager *dqm,
 
 	/* Clear all user mode queues */
 	list_for_each_entry_safe(q, next, &qpd->queues_list, list) {
-		retval = destroy_queue_nocpsch_locked(dqm, qpd, q);
-		if (retval)
-			goto out;
+		int ret;
+
+		ret = destroy_queue_nocpsch_locked(dqm, qpd, q);
+		if (ret)
+			retval = ret;
 	}
 
 	/* Unregister process */
@@ -1442,7 +1444,6 @@ static int process_termination_nocpsch(struct device_queue_manager *dqm,
 		}
 	}
 
-out:
 	mutex_unlock(&dqm->lock);
 	return retval;
 }
