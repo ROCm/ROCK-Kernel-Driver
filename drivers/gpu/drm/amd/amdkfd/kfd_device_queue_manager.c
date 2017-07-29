@@ -1610,7 +1610,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		break;
 	default:
 		pr_err("Invalid scheduling policy %d\n", dqm->sched_policy);
-		return NULL;
+		goto out_free;
 	}
 
 	switch (dev->device_info->asic_family) {
@@ -1641,12 +1641,12 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		BUG();
 	}
 
-	if (dqm->ops.initialize(dqm) != 0) {
-		kfree(dqm);
-		return NULL;
-	}
+	if (!dqm->ops.initialize(dqm))
+		return dqm;
 
-	return dqm;
+out_free:
+	kfree(dqm);
+	return NULL;
 }
 
 void device_queue_manager_uninit(struct device_queue_manager *dqm)
