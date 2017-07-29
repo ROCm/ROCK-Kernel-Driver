@@ -189,7 +189,7 @@ static int pm_map_queues_v9(struct packet_manager *pm, uint32_t *buffer,
 		break;
 	default:
 		WARN(1, "queue type %d\n", q->properties.type);
-		break;
+		return -EINVAL;
 	}
 	packet->bitfields3.doorbell_offset =
 			q->properties.doorbell_off;
@@ -234,7 +234,7 @@ static int pm_unmap_queues_v9(struct packet_manager *pm, uint32_t *buffer,
 		break;
 	default:
 		WARN(1, "queue type %d\n", type);
-		break;
+		return -EINVAL;
 	}
 
 	if (reset)
@@ -267,7 +267,7 @@ static int pm_unmap_queues_v9(struct packet_manager *pm, uint32_t *buffer,
 		break;
 	default:
 		WARN(1, "filter %d\n", filter);
-		break;
+		return -EINVAL;
 	}
 
 	return 0;
@@ -304,8 +304,6 @@ static int pm_query_status_v9(struct packet_manager *pm, uint32_t *buffer,
 static uint32_t pm_release_mem_v9(uint64_t gpu_addr, uint32_t *buffer)
 {
 	struct pm4_mec_release_mem *packet;
-
-	WARN_ON(!buffer);
 
 	packet = (struct pm4_mec_release_mem *)buffer;
 	memset(buffer, 0, sizeof(struct pm4_mec_release_mem));

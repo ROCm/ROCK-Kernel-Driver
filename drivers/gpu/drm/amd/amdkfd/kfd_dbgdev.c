@@ -126,6 +126,7 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 
 	if (status != 0) {
 		pr_err("Failed to allocate GART memory\n");
+		kq->ops.rollback_packet(kq);
 		return status;
 	}
 
@@ -213,6 +214,7 @@ static int dbgdev_register_diq(struct kfd_dbgdev *dbgdev)
 
 	if (!kq) {
 		pr_err("Error getting Kernel Queue\n");
+		pqm_destroy_queue(dbgdev->pqm, qid);
 		return -ENOMEM;
 	}
 	dbgdev->kq = kq;
@@ -575,8 +577,7 @@ static int dbgdev_wave_control_set_registers(
 		break;
 
 	default:
-		status = -EINVAL;
-		break;
+		return -EINVAL;
 	}
 
 	switch (wac_info->operand) {

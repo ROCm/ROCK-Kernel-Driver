@@ -535,6 +535,9 @@ static struct mqd_manager *get_mqd_manager_nocpsch(
 {
 	struct mqd_manager *mqd;
 
+	if (WARN_ON(type >= KFD_MQD_TYPE_MAX))
+		return NULL;
+
 	pr_debug("mqd type %d\n", type);
 
 	mqd = dqm->mqds[type];
@@ -788,6 +791,8 @@ static int initialize_nocpsch(struct device_queue_manager *dqm)
 static void uninitialize_nocpsch(struct device_queue_manager *dqm)
 {
 	int i;
+
+	WARN_ON(dqm->queue_count > 0 || dqm->processes_count > 0);
 
 	kfree(dqm->allocated_queues);
 	for (i = 0 ; i < KFD_MQD_TYPE_MAX ; i++)

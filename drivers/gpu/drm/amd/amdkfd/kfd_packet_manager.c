@@ -92,6 +92,9 @@ static int pm_allocate_runlist_ib(struct packet_manager *pm,
 {
 	int retval;
 
+	if (WARN_ON(pm->allocated))
+		return -EINVAL;
+
 	pm_calc_rlib_size(pm, rl_buffer_size, is_over_subscription);
 
 	mutex_lock(&pm->lock);
@@ -202,15 +205,16 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 	pr_debug("Finished map process and queues to runlist\n");
 
 	if (is_over_subscription)
-		pm->pmf->runlist(pm, &rl_buffer[rl_wptr], *rl_gpu_addr,
-				alloc_size_bytes / sizeof(uint32_t), true);
+		retval = pm->pmf->runlist(pm, &rl_buffer[rl_wptr],
+					*rl_gpu_addr,
+					alloc_size_bytes / sizeof(uint32_t),
+					true);
 
 	for (i = 0; i < alloc_size_bytes / sizeof(uint32_t); i++)
 		pr_debug("0x%2X ", rl_buffer[i]);
-
 	pr_debug("\n");
 
-	return 0;
+	return retval;
 }
 
 int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
@@ -258,6 +262,7 @@ int pm_send_set_resources(struct packet_manager *pm,
 				struct scheduling_resources *res)
 {
 	uint32_t *buffer, size;
+	int retval = 0;
 
 	size = pm->pmf->get_set_resources_packet_size();
 	mutex_lock(&pm->lock);
@@ -265,18 +270,21 @@ int pm_send_set_resources(struct packet_manager *pm,
 				size / sizeof(uint32_t),
 				(unsigned int **)&buffer);
 	if (!buffer) {
-		mutex_unlock(&pm->lock);
 		pr_err("Failed to allocate buffer on kernel queue\n");
-		return -ENOMEM;
+		retval = -ENOMEM;
+		goto out;
 	}
 
-	pm->pmf->set_resources(pm, buffer, res);
+	retval = pm->pmf->set_resources(pm, buffer, res);
+	if (!retval)
+		pm->priv_queue->ops.submit_packet(pm->priv_queue);
+	else
+		pm->priv_queue->ops.rollback_packet(pm->priv_queue);
 
-	pm->priv_queue->ops.submit_packet(pm->priv_queue);
-
+out:
 	mutex_unlock(&pm->lock);
 
-	return 0;
+	return retval;
 }
 
 int pm_send_runlist(struct packet_manager *pm, struct list_head *dqm_queues)
@@ -329,6 +337,9 @@ int pm_send_query_status(struct packet_manager *pm, uint64_t fence_address,
 	uint32_t *buffer, size;
 	int retval = 0;
 
+	if (WARN_ON(!fence_address))
+		return -EFAULT;
+
 	size = pm->pmf->get_query_status_packet_size();
 	mutex_lock(&pm->lock);
 	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
@@ -338,8 +349,12 @@ int pm_send_query_status(struct packet_manager *pm, uint64_t fence_address,
 		retval = -ENOMEM;
 		goto out;
 	}
-	pm->pmf->query_status(pm, buffer, fence_address, fence_value);
-	pm->priv_queue->ops.submit_packet(pm->priv_queue);
+
+	retval = pm->pmf->query_status(pm, buffer, fence_address, fence_value);
+	if (!retval)
+		pm->priv_queue->ops.submit_packet(pm->priv_queue);
+	else
+		pm->priv_queue->ops.rollback_packet(pm->priv_queue);
 
 out:
 	mutex_unlock(&pm->lock);
@@ -363,9 +378,13 @@ int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
 		retval = -ENOMEM;
 		goto out;
 	}
-	pm->pmf->unmap_queues(pm, buffer, type, filter, filter_param, reset,
-			      sdma_engine);
-	pm->priv_queue->ops.submit_packet(pm->priv_queue);
+
+	retval = pm->pmf->unmap_queues(pm, buffer, type, filter, filter_param,
+				       reset, sdma_engine);
+	if (!retval)
+		pm->priv_queue->ops.submit_packet(pm->priv_queue);
+	else
+		pm->priv_queue->ops.rollback_packet(pm->priv_queue);
 
 out:
 	mutex_unlock(&pm->lock);

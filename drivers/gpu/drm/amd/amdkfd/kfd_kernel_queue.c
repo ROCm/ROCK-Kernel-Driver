@@ -366,6 +366,7 @@ void kernel_queue_uninit(struct kernel_queue *kq)
 	kfree(kq);
 }
 
+/* FIXME: Can this test be removed? */
 static __attribute__((unused)) void test_kq(struct kfd_dev *dev)
 {
 	struct kernel_queue *kq;
@@ -375,8 +376,18 @@ static __attribute__((unused)) void test_kq(struct kfd_dev *dev)
 	pr_err("Starting kernel queue test\n");
 
 	kq = kernel_queue_init(dev, KFD_QUEUE_TYPE_HIQ);
+	if (unlikely(!kq)) {
+		pr_err("  Failed to initialize HIQ\n");
+		pr_err("Kernel queue test failed\n");
+		return;
+	}
 
 	retval = kq->ops.acquire_packet_buffer(kq, 5, &buffer);
+	if (unlikely(retval != 0)) {
+		pr_err("  Failed to acquire packet buffer\n");
+		pr_err("Kernel queue test failed\n");
+		return;
+	}
 	for (i = 0; i < 5; i++)
 		buffer[i] = kq->nop_packet;
 	kq->ops.submit_packet(kq);

@@ -1074,6 +1074,13 @@ static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,
 {
 	unsigned int num_of_longs;
 
+	if (WARN_ON(buf_size < chunk_size))
+		return -EINVAL;
+	if (WARN_ON(buf_size == 0))
+		return -EINVAL;
+	if (WARN_ON(chunk_size == 0))
+		return -EINVAL;
+
 	kfd->gtt_sa_chunk_size = chunk_size;
 	kfd->gtt_sa_num_of_chunks = buf_size / chunk_size;
 
