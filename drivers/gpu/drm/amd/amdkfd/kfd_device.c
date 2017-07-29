@@ -1072,18 +1072,15 @@ void kfd_evict_bo_worker(struct work_struct *work)
 static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,
 				unsigned int chunk_size)
 {
-	unsigned int num_of_bits;
+	unsigned int num_of_longs;
 
 	kfd->gtt_sa_chunk_size = chunk_size;
 	kfd->gtt_sa_num_of_chunks = buf_size / chunk_size;
 
-	num_of_bits = kfd->gtt_sa_num_of_chunks / BITS_PER_BYTE;
-	if (num_of_bits == 0) {
-		pr_err("Number of bits is 0 in %s", __func__);
-		return -EINVAL;
-	}
+	num_of_longs = (kfd->gtt_sa_num_of_chunks + BITS_PER_LONG - 1) /
+		BITS_PER_LONG;
 
-	kfd->gtt_sa_bitmap = kzalloc(num_of_bits, GFP_KERNEL);
+	kfd->gtt_sa_bitmap = kcalloc(num_of_longs, sizeof(long), GFP_KERNEL);
 
 	if (!kfd->gtt_sa_bitmap)
 		return -ENOMEM;
