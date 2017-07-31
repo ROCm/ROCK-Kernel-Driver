@@ -55,11 +55,8 @@ static void amdgpu_ttm_bo_destroy(struct ttm_buffer_object *tbo)
 	struct amdgpu_bo *bo = ttm_to_amdgpu_bo(tbo);
 	u64 offset;
 
-	if (bo->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT) {
-		offset = amdgpu_bo_gpu_offset(bo);
-		offset -= adev->mman.bdev.man[TTM_PL_TT].gpu_offset;
-		amdgpu_gart_unbind(adev, offset, bo->tbo.num_pages);
-	}
+	if (bo->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT)
+		kfree(tbo->mem.bus.addr);
 	amdgpu_bo_kunmap(bo);
 
 	drm_gem_object_release(&bo->gem_base);

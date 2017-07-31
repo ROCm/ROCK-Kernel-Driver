@@ -463,8 +463,7 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 	struct drm_gem_object *gobj;
 	struct amdgpu_bo *abo;
 	dma_addr_t *dma_addr;
-	uint32_t handle, flags;
-	uint64_t offset;
+	uint32_t handle;
 	int i, r = 0;
 
 	switch (args->op) {
@@ -477,31 +476,15 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 			return r;
 
 		abo = gem_to_amdgpu_bo(gobj);
-		r = amdgpu_bo_reserve(abo, true);
-		if (unlikely(r))
+		dma_addr = kmalloc_array(abo->tbo.num_pages, sizeof(dma_addr_t), GFP_KERNEL);
+		if (unlikely(dma_addr == NULL))
 			goto release_object;
 
-		dma_addr = kmalloc_array(abo->tbo.num_pages, sizeof(dma_addr_t), GFP_KERNEL);
-		if (unlikely(dma_addr == NULL)) {
-			amdgpu_bo_unreserve(abo);
-			goto release_object;
-		}
 		for (i = 0; i < abo->tbo.num_pages; i++)
 			dma_addr[i] = args->addr + i * PAGE_SIZE;
-
-		flags = amdgpu_ttm_tt_pte_flags(adev, abo->tbo.ttm, &abo->tbo.mem);
-
-		offset = amdgpu_bo_gpu_offset(abo);
-		offset -= adev->mman.bdev.man[TTM_PL_TT].gpu_offset;
-		r = amdgpu_gart_bind(adev, offset, abo->tbo.num_pages,
-					NULL, dma_addr, flags);
-		kfree(dma_addr);
-		amdgpu_bo_unreserve(abo);
-		if (unlikely(r))
-			goto release_object;
-
 		abo->tbo.mem.bus.base = args->addr;
 		abo->tbo.mem.bus.offset = 0;
+		abo->tbo.mem.bus.addr = (void *)dma_addr;
 
 		r = drm_gem_handle_create(filp, gobj, &handle);
 		args->handle = handle;
