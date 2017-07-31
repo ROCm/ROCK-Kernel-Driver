@@ -43,7 +43,8 @@ static struct kfd_system_properties sys_props;
 static DECLARE_RWSEM(topology_lock);
 static atomic_t topology_crat_proximity_domain;
 
-struct kfd_topology_device *topology_device_by_nodeid(uint32_t node_id)
+struct kfd_topology_device *kfd_topology_device_by_proximity_domain(
+						uint32_t proximity_domain)
 {
 	struct kfd_topology_device *top_dev;
 	struct kfd_topology_device *device = NULL;
@@ -51,7 +52,7 @@ struct kfd_topology_device *topology_device_by_nodeid(uint32_t node_id)
 	down_read(&topology_lock);
 
 	list_for_each_entry(top_dev, &topology_device_list, list)
-		if (top_dev->proximity_domain == node_id) {
+		if (top_dev->proximity_domain == proximity_domain) {
 			device = top_dev;
 			break;
 		}

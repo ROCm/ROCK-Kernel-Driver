@@ -340,7 +340,7 @@ static int kfd_parse_subtype_iolink(struct crat_subtype_iolink *iolink,
 	 * At this time, also add the corresponded CPU->GPU link.
 	 */
 	if (props && props->iolink_type == CRAT_IOLINK_TYPE_PCIEXPRESS) {
-		cpu_dev = topology_device_by_nodeid(id_to);
+		cpu_dev = kfd_topology_device_by_proximity_domain(id_to);
 		if (!cpu_dev)
 			return -ENODEV;
 		/* same everything but the other direction */
