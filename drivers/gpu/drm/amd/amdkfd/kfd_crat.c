@@ -420,7 +420,7 @@ int kfd_parse_crat_table(void *crat_image,
 	struct kfd_topology_device *top_dev = NULL;
 	struct crat_subtype_generic *sub_type_hdr;
 	uint16_t node_id;
-	int ret;
+	int ret = 0;
 	struct crat_header *crat_table = (struct crat_header *)crat_image;
 	uint16_t num_nodes;
 	uint32_t image_len;
@@ -429,8 +429,10 @@ int kfd_parse_crat_table(void *crat_image,
 	if (!crat_image)
 		return -EINVAL;
 
-	if (!list_empty(device_list))
+	if (!list_empty(device_list)) {
 		pr_warn("Error device list should be empty\n");
+		return -EINVAL;
+	}
 
 	num_nodes = crat_table->num_domains;
 	image_len = crat_table->length;
@@ -444,8 +446,10 @@ int kfd_parse_crat_table(void *crat_image,
 		top_dev->proximity_domain = proximity_domain++;
 	}
 
-	if (!top_dev)
-		return -ENOMEM;
+	if (!top_dev) {
+		ret = -ENOMEM;
+		goto err;
+	}
 
 	memcpy(top_dev->oem_id, crat_table->oem_id, CRAT_OEMID_LENGTH);
 	memcpy(top_dev->oem_table_id, crat_table->oem_table_id,
@@ -475,7 +479,7 @@ int kfd_parse_crat_table(void *crat_image,
 		if (sub_type_hdr->flags & CRAT_SUBTYPE_FLAGS_ENABLED) {
 			ret = kfd_parse_subtype(sub_type_hdr, device_list);
 			if (ret != 0)
-				return ret;
+				break;
 		}
 
 		last_header_type = sub_type_hdr->type;
@@ -484,7 +488,11 @@ int kfd_parse_crat_table(void *crat_image,
 				sub_type_hdr->length);
 	}
 
-	return 0;
+err:
+	if (ret)
+		kfd_release_topology_device_list(device_list);
+
+	return ret;
 }
 
 /* Helper function. See kfd_fill_gpu_cache_info for parameter description */
@@ -1240,7 +1248,7 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 int kfd_create_crat_image_virtual(void **crat_image, size_t *size,
 		int flags, struct kfd_dev *kdev, uint32_t proximity_domain)
 {
-	void *pcrat_image;
+	void *pcrat_image = NULL;
 	int ret = 0;
 
 	if (!crat_image)
@@ -1280,8 +1288,10 @@ int kfd_create_crat_image_virtual(void **crat_image, size_t *size,
 		ret = -EINVAL;
 	}
 
-	if (ret == 0)
+	if (!ret)
 		*crat_image = pcrat_image;
+	else
+		kfree(pcrat_image);
 
 	return ret;
 }

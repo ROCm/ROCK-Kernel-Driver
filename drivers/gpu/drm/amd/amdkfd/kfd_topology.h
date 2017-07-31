@@ -193,7 +193,7 @@ struct kfd_system_properties {
 
 struct kfd_topology_device *kfd_create_topology_device(
 		struct list_head *device_list);
-void kfd_release_live_view(void);
+void kfd_release_topology_device_list(struct list_head *device_list);
 
 #if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 extern bool amd_iommu_pc_supported(void);
