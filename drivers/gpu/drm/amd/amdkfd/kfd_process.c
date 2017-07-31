@@ -541,7 +541,7 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 				 */
 				return ret;
 		} else {
-			offset = (kfd_get_gpu_id(dev) |
+			offset = (dev->id |
 				KFD_MMAP_TYPE_RESERVED_MEM) << PAGE_SHIFT;
 			qpd->tba_addr = (uint64_t)vm_mmap(filep, 0,
 				dev->cwsr_size,	PROT_READ | PROT_EXEC,

@@ -1599,7 +1599,7 @@ static int kfd_ioctl_get_dmabuf_info(struct file *filep,
 		r = -EINVAL;
 		goto exit;
 	}
-	args->gpu_id = kfd_get_gpu_id(dev);
+	args->gpu_id = dev->id;
 	args->flags = flags;
 
 	/* Copy metadata buffer to user mode */

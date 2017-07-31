@@ -79,24 +79,6 @@ struct kfd_dev *kfd_device_by_id(uint32_t gpu_id)
 	return device;
 }
 
-uint32_t kfd_get_gpu_id(struct kfd_dev *dev)
-{
-	struct kfd_topology_device *top_dev;
-	uint32_t gpu_id = 0;
-
-	down_read(&topology_lock);
-
-	list_for_each_entry(top_dev, &topology_device_list, list)
-		if (top_dev->gpu == dev) {
-			gpu_id = top_dev->gpu_id;
-			break;
-		}
-
-	up_read(&topology_lock);
-
-	return gpu_id;
-}
-
 struct kfd_dev *kfd_device_by_pci_dev(const struct pci_dev *pdev)
 {
 	struct kfd_topology_device *top_dev;
