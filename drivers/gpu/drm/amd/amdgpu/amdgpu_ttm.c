@@ -601,6 +601,7 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 		mem->bus.is_iomem = true;
 		break;
 	case AMDGPU_PL_DGMA_IMPORT:
+		mem->bus.addr = backup.bus.addr;
 		mem->bus.offset = backup.bus.offset;
 		mem->bus.base = backup.bus.base;
 		mem->bus.is_iomem = true;
@@ -1242,11 +1243,7 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 	struct ttm_mem_reg *mem = &adev->direct_gma.gart_mem;
 	struct amdgpu_bo *abo;
 	struct ttm_buffer_object gtt_bo;
-	struct ttm_place place = {
-		.fpfn = 0,
-		.lpfn = adev->mc.gart_size >> PAGE_SHIFT,
-		.flags = TTM_PL_FLAG_TOPDOWN
-	};
+	struct ttm_place place = {0};
 	unsigned long size;
 	int r;
 

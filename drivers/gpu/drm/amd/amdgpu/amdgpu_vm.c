@@ -1717,15 +1717,13 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 			max_entries = (nodes->size - pfn) *
 				(PAGE_SIZE / AMDGPU_GPU_PAGE_SIZE);
 			switch (mem->mem_type) {
-			case AMDGPU_PL_DGMA_IMPORT:
-				pages_addr = (dma_addr_t *)mem->bus.base;
-				addr += adev->mman.bdev.man[mem->mem_type].gpu_offset -
-					adev->mman.bdev.man[TTM_PL_TT].gpu_offset;
-				gtt_flags = flags;
-				/* fall through */
 			case TTM_PL_TT:
 				max_entries = min(max_entries, 16ull * 1024ull);
 				addr = 0;
+				break;
+			case AMDGPU_PL_DGMA_IMPORT:
+				addr = 0;
+				max_entries = min(max_entries, 16ull * 1024ull);
 				break;
 			case AMDGPU_PL_DGMA:
 				addr += adev->vm_manager.vram_base_offset +
@@ -1803,7 +1801,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 					   struct ttm_dma_tt, ttm);
 			pages_addr = ttm->dma_address;
 		} else if (mem->mem_type == AMDGPU_PL_DGMA_IMPORT) {
-			pages_addr = (dma_addr_t *)bo_va->bo->tbo.mem.bus.base;
+			pages_addr = (dma_addr_t *)bo_va->base.bo->tbo.mem.bus.addr;
 		}
 		exclusive = reservation_object_get_excl(bo->tbo.resv);
 	}
