@@ -34,14 +34,19 @@
 #include "grph_object_ctrl_defs.h"
 #include <inc/hw/opp.h>
 
+#include "inc/hw_sequencer.h"
+#include "dml/display_mode_lib.h"
+
+
+
 #define MAX_SURFACES 3
 #define MAX_STREAMS 6
 #define MAX_SINKS_PER_LINK 4
 
+
 /*******************************************************************************
  * Display Core Interfaces
  ******************************************************************************/
-
 struct dc_caps {
 	uint32_t max_streams;
 	uint32_t max_links;
@@ -186,7 +191,9 @@ struct dc_debug {
 	bool disable_psr;
 	bool force_abm_enable;
 };
-
+struct validate_context;
+struct resource_pool;
+struct dce_hwseq;
 struct dc {
 	struct dc_caps caps;
 	struct dc_cap_funcs cap_funcs;
@@ -194,6 +201,44 @@ struct dc {
 	struct dc_link_funcs link_funcs;
 	struct dc_config config;
 	struct dc_debug debug;
+
+	struct dc_context *ctx;
+
+	uint8_t link_count;
+	struct dc_link *links[MAX_PIPES * 2];
+
+	struct validate_context *current_context;
+	struct resource_pool *res_pool;
+
+	/*Power State*/
+	enum dc_video_power_state previous_power_state;
+	enum dc_video_power_state current_power_state;
+
+	/* Display Engine Clock levels */
+	struct dm_pp_clock_levels sclk_lvls;
+
+	/* Inputs into BW and WM calculations. */
+	struct bw_calcs_dceip *bw_dceip;
+	struct bw_calcs_vbios *bw_vbios;
+#ifdef CONFIG_DRM_AMD_DC_DCN1_0
+	struct dcn_soc_bounding_box *dcn_soc;
+	struct dcn_ip_params *dcn_ip;
+	struct display_mode_lib dml;
+#endif
+
+	/* HW functions */
+	struct hw_sequencer_funcs hwss;
+	struct dce_hwseq *hwseq;
+
+	/* temp store of dm_pp_display_configuration
+	 * to compare to see if display config changed
+	 */
+	struct dm_pp_display_configuration prev_display_config;
+
+	/* FBC compressor */
+#ifdef ENABLE_FBC
+	struct compressor *fbc_compressor;
+#endif
 };
 
 enum frame_buffer_mode {
@@ -384,7 +429,7 @@ struct dc_surface_update {
 /*
  * Create a new surface with default parameters;
  */
-struct dc_plane_state *dc_create_plane_state(const struct dc *dc);
+struct dc_plane_state *dc_create_plane_state(struct dc *dc);
 const struct dc_plane_status *dc_plane_get_status(
 		const struct dc_plane_state *plane_state);
 
@@ -570,8 +615,8 @@ void dc_stream_log(
 	struct dal_logger *dc_logger,
 	enum dc_log_type log_type);
 
-uint8_t dc_get_current_stream_count(const struct dc *dc);
-struct dc_stream_state *dc_get_stream_at_index(const struct dc *dc, uint8_t i);
+uint8_t dc_get_current_stream_count(struct dc *dc);
+struct dc_stream_state *dc_get_stream_at_index(struct dc *dc, uint8_t i);
 
 /*
  * Return the current frame counter.
@@ -597,9 +642,9 @@ struct dc_validation_set {
 	uint8_t plane_count;
 };
 
-bool dc_validate_stream(const struct dc *dc, struct dc_stream_state *stream);
+bool dc_validate_stream(struct dc *dc, struct dc_stream_state *stream);
 
-bool dc_validate_plane(const struct dc *dc, const struct dc_plane_state *plane_state);
+bool dc_validate_plane(struct dc *dc, const struct dc_plane_state *plane_state);
 /*
  * This function takes a set of resources and checks that they are cofunctional.
  *
@@ -607,12 +652,12 @@ bool dc_validate_plane(const struct dc *dc, const struct dc_plane_state *plane_s
  *   No hardware is programmed for call.  Only validation is done.
  */
 struct validate_context *dc_get_validate_context(
-		const struct dc *dc,
+		struct dc *dc,
 		const struct dc_validation_set set[],
 		uint8_t set_count);
 
 bool dc_validate_resources(
-		const struct dc *dc,
+		struct dc *dc,
 		const struct dc_validation_set set[],
 		uint8_t set_count);
 
@@ -625,7 +670,7 @@ bool dc_validate_resources(
  */
 
 bool dc_validate_guaranteed(
-		const struct dc *dc,
+		struct dc *dc,
 		struct dc_stream_state *stream);
 
 void dc_resource_validate_ctx_copy_construct(
@@ -776,7 +821,7 @@ struct dc_link {
 
 	/* Private to DC core */
 
-	const struct core_dc *dc;
+	const struct dc *dc;
 
 	struct dc_context *ctx;
 
@@ -807,9 +852,9 @@ const struct dc_link_status *dc_link_get_status(const struct dc_link *dc_link);
  * boot time.  They cannot be created or destroyed.
  * Use dc_get_caps() to get number of links.
  */
-struct dc_link *dc_get_link_at_index(const struct dc *dc, uint32_t link_index);
+struct dc_link *dc_get_link_at_index(struct dc *dc, uint32_t link_index);
 
-struct dwbc *dc_get_dwb_at_pipe(const struct dc *dc, uint32_t pipe);
+struct dwbc *dc_get_dwb_at_pipe(struct dc *dc, uint32_t pipe);
 
 /* Return id of physical connector represented by a dc_link at link_index.*/
 const struct graphics_object_id dc_get_link_id_at_index(
@@ -960,7 +1005,7 @@ enum dc_irq_source dc_interrupt_to_irq_source(
 		struct dc *dc,
 		uint32_t src_id,
 		uint32_t ext_id);
-void dc_interrupt_set(const struct dc *dc, enum dc_irq_source src, bool enable);
+void dc_interrupt_set(struct dc *dc, enum dc_irq_source src, bool enable);
 void dc_interrupt_ack(struct dc *dc, enum dc_irq_source src);
 enum dc_irq_source dc_get_hpd_irq_source_at_index(
 		struct dc *dc, uint32_t link_index);
@@ -973,7 +1018,7 @@ void dc_set_power_state(
 		struct dc *dc,
 		enum dc_acpi_cm_power_state power_state,
 		enum dc_video_power_state video_power_state);
-void dc_resume(const struct dc *dc);
+void dc_resume(struct dc *dc);
 
 /*
  * DPCD access interfaces
