@@ -855,6 +855,9 @@ static void amdgpu_device_check_arguments(struct amdgpu_device *adev)
 		dev_warn(adev->dev, "lockup_timeout msut be > 0, adjusting to 10000\n");
 		amdgpu_lockup_timeout = 10000;
 	}
+
+	/* Max DGMA size is 96M Bytes */
+	amdgpu_direct_gma_size = min(amdgpu_direct_gma_size, 96);
 }
 
 /**
