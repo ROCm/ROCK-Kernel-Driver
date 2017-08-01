@@ -1118,6 +1118,8 @@ static void amdgpu_check_arguments(struct amdgpu_device *adev)
 			 amdgpu_vram_page_split);
 		amdgpu_vram_page_split = 1024;
 	}
+	/* Max DGMA size is 96M Bytes */
+	amdgpu_direct_gma_size = min(amdgpu_direct_gma_size, 96);
 }
 
 /**

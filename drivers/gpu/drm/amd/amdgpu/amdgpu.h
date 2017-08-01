@@ -1417,7 +1417,6 @@ struct amdgpu_direct_gma {
 	struct amdgpu_bo	*dgma_bo;
 	atomic64_t		vram_usage;
 	/* reserved in gart */
-	struct ttm_mem_reg	gart_mem;
 	atomic64_t		gart_usage;
 };
 
