@@ -74,7 +74,7 @@ This config is based on the Ubuntu 14.04 build patches by Canonical.
   [ROCT-Thunk-Interface](https://github.com/RadeonOpenCompute/ROCT-Thunk-Interface)
   repository
 
-###LICENSE
+### LICENSE
 
 The following lists the different licenses that apply to the different
 components in this repository:
