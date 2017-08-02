@@ -604,13 +604,13 @@ int amdgpu_bo_create(struct amdgpu_device *adev,
 
 	if ((flags & AMDGPU_GEM_CREATE_SHADOW) && !(adev->flags & AMD_IS_APU)) {
 		if (!bp->resv)
-			WARN_ON(reservation_object_lock((*bo_ptr)->tbo.resv,
+			WARN_ON(kcl_reservation_object_lock((*bo_ptr)->tbo.resv,
 							NULL));
 
 		r = amdgpu_bo_create_shadow(adev, bp->size, *bo_ptr);
 
 		if (!bp->resv)
-			reservation_object_unlock((*bo_ptr)->tbo.resv);
+			kcl_reservation_object_unlock((*bo_ptr)->tbo.resv);
 
 		if (r)
 			amdgpu_bo_unref(bo_ptr);
