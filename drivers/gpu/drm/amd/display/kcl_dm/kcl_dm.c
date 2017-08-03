@@ -2305,8 +2305,6 @@ static void fill_plane_attributes_from_fb(
 
 }
 
-#define NUM_OF_RAW_GAMMA_RAMP_RGB_256 256
-
 static void fill_gamma_from_crtc(
 	const struct drm_crtc *crtc,
 	struct dc_plane_state *plane_state)
@@ -2314,8 +2312,8 @@ static void fill_gamma_from_crtc(
 	int i;
 	struct dc_gamma *gamma;
 	uint16_t *red, *green, *blue;
-	int end = (crtc->gamma_size > NUM_OF_RAW_GAMMA_RAMP_RGB_256) ?
-			NUM_OF_RAW_GAMMA_RAMP_RGB_256 : crtc->gamma_size;
+	int end = (crtc->gamma_size > GAMMA_RGB_256_ENTRIES) ?
+			GAMMA_RGB_256_ENTRIES : crtc->gamma_size;
 
 	red = crtc->gamma_store;
 	green = red + crtc->gamma_size;
@@ -2326,10 +2324,11 @@ static void fill_gamma_from_crtc(
 	if (gamma == NULL)
 		return;
 
+	gamma->type = GAMMA_RGB_256_ENTRIES;
 	for (i = 0; i < end; i++) {
-		gamma->red[i] = (unsigned short) red[i];
-		gamma->green[i] = (unsigned short) green[i];
-		gamma->blue[i] = (unsigned short) blue[i];
+		gamma->entries.red[i] = dal_fixed31_32_from_int((unsigned short)red[i]);
+		gamma->entries.green[i] = dal_fixed31_32_from_int((unsigned short)green[i]);
+		gamma->entries.blue[i] = dal_fixed31_32_from_int((unsigned short)blue[i]);
 	}
 
 	plane_state->gamma_correction = gamma;
