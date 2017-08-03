@@ -36,7 +36,11 @@
 #include <linux/interval_tree.h>
 #include <linux/seq_file.h>
 #include <linux/kref.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+#include <linux/kfifo-new.h>
+#else
 #include <linux/kfifo.h>
+#endif
 #include <kgd_kfd_interface.h>
 
 #include "amd_rdma.h"

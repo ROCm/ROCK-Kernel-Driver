@@ -42,11 +42,6 @@
 
 #include <linux/slab.h>
 #include <linux/device.h>
-#if (defined OS_NAME_RHEL) && (OS_VERSION_MAJOR == 6)
-#include <linux/kfifo-new.h>
-#else
-#include <linux/kfifo.h>
-#endif
 #include "kfd_priv.h"
 
 #define KFD_IH_NUM_ENTRIES 8192
