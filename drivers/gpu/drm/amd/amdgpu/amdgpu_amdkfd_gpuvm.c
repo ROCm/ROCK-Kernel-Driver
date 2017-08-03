@@ -381,7 +381,7 @@ static int amdgpu_amdkfd_validate(void *param, struct amdgpu_bo *bo)
  */
 static int vm_validate_pt_pd_bos(struct amdgpu_vm *vm)
 {
-	struct amdgpu_bo *pd = vm->root.bo;
+	struct amdgpu_bo *pd = vm->root.base.bo;
 	struct amdgpu_device *adev = amdgpu_ttm_adev(pd->tbo.bdev);
 	struct amdgpu_vm_parser param;
 	int ret;
@@ -401,8 +401,6 @@ static int vm_validate_pt_pd_bos(struct amdgpu_vm *vm)
 		pr_err("amdgpu: failed to validate PD\n");
 		return ret;
 	}
-
-	vm->last_eviction_counter = atomic64_read(&adev->num_evictions);
 
 	ret = amdgpu_vm_update_directories(adev, vm);
 	if (ret != 0)
@@ -431,7 +429,7 @@ static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
 	struct kfd_bo_va_list *bo_va_entry;
 	struct amdkfd_vm *kvm = container_of(avm,
 					     struct amdkfd_vm, base);
-	struct amdgpu_bo *pd = avm->root.bo;
+	struct amdgpu_bo *pd = avm->root.base.bo;
 	struct amdgpu_bo *bo = mem->bo;
 	uint64_t va = mem->va;
 	struct list_head *list_bo_va = &mem->bo_va_list;
@@ -952,7 +950,7 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 	struct amdgpu_bo_va *bo_va = entry->bo_va;
 	struct amdgpu_vm *vm = bo_va->base.vm;
 	struct amdkfd_vm *kvm = container_of(vm, struct amdkfd_vm, base);
-	struct amdgpu_bo *pd = vm->root.bo;
+	struct amdgpu_bo *pd = vm->root.base.bo;
 
 	/* Remove eviction fence from PD (and thereby from PTs too as they
 	 * share the resv. object. Otherwise during PT update job (see
@@ -1384,16 +1382,16 @@ static u64 get_vm_pd_gpu_offset(void *vm)
 {
 	struct amdgpu_vm *avm = (struct amdgpu_vm *) vm;
 	struct amdgpu_device *adev =
-		amdgpu_ttm_adev(avm->root.bo->tbo.bdev);
+		amdgpu_ttm_adev(avm->root.base.bo->tbo.bdev);
 	u64 offset;
 
 	BUG_ON(avm == NULL);
 
-	amdgpu_bo_reserve(avm->root.bo, false);
+	amdgpu_bo_reserve(avm->root.base.bo, false);
 
-	offset = amdgpu_bo_gpu_offset(avm->root.bo);
+	offset = amdgpu_bo_gpu_offset(avm->root.base.bo);
 
-	amdgpu_bo_unreserve(avm->root.bo);
+	amdgpu_bo_unreserve(avm->root.base.bo);
 
 	/* On some ASICs the FB doesn't start at 0. Adjust FB offset
 	 * to an actual MC address.
@@ -1493,7 +1491,7 @@ void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 
 	pr_debug("Destroying process vm %p\n", vm);
 	/* Release eviction fence from PD */
-	pd = avm->root.bo;
+	pd = avm->root.base.bo;
 	amdgpu_bo_reserve(pd, false);
 	amdgpu_bo_fence(pd, NULL, false);
 	amdgpu_bo_unreserve(pd);
@@ -2114,7 +2112,7 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 	 */
 	list_for_each_entry(peer_vm, &process_info->vm_list_head,
 			    vm_list_node)
-		amdgpu_amdkfd_remove_eviction_fence(peer_vm->base.root.bo,
+		amdgpu_amdkfd_remove_eviction_fence(peer_vm->base.root.base.bo,
 						process_info->eviction_fence,
 						NULL, NULL);
 
@@ -2181,7 +2179,7 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 unreserve_out:
 	list_for_each_entry(peer_vm, &process_info->vm_list_head,
 			    vm_list_node)
-		amdgpu_bo_fence(peer_vm->base.root.bo,
+		amdgpu_bo_fence(peer_vm->base.root.base.bo,
 				&process_info->eviction_fence->base, true);
 	ttm_eu_backoff_reservation(&ticket, &resv_list);
 	amdgpu_sync_wait(&sync, false);
@@ -2352,7 +2350,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 	/* FIXME: I think this isn't needed */
 	list_for_each_entry(peer_vm, &process_info->vm_list_head,
 			    vm_list_node) {
-		struct amdgpu_bo *bo = peer_vm->base.root.bo;
+		struct amdgpu_bo *bo = peer_vm->base.root.base.bo;
 
 		ttm_bo_wait(&bo->tbo, false, false);
 	}
@@ -2398,7 +2396,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 	/* Attach eviction fence to PD / PT BOs */
 	list_for_each_entry(peer_vm, &process_info->vm_list_head,
 			    vm_list_node) {
-		struct amdgpu_bo *bo = peer_vm->base.root.bo;
+		struct amdgpu_bo *bo = peer_vm->base.root.base.bo;
 
 		amdgpu_bo_fence(bo, &process_info->eviction_fence->base, true);
 	}
