@@ -99,7 +99,7 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data)
 	mutex_lock(&p->ctx->lock);
 
 	/* get chunks */
-	chunk_array_user = u64_to_user_ptr(cs->in.chunks);
+	chunk_array_user = kcl_u64_to_user_ptr(cs->in.chunks);
 	if (copy_from_user(chunk_array, chunk_array_user,
 			   sizeof(uint64_t)*cs->in.num_chunks)) {
 		ret = -EFAULT;
@@ -119,7 +119,7 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data)
 		struct drm_amdgpu_cs_chunk user_chunk;
 		uint32_t __user *cdata;
 
-		chunk_ptr = u64_to_user_ptr(chunk_array[i]);
+		chunk_ptr = kcl_u64_to_user_ptr(chunk_array[i]);
 		if (copy_from_user(&user_chunk, chunk_ptr,
 				       sizeof(struct drm_amdgpu_cs_chunk))) {
 			ret = -EFAULT;
@@ -130,7 +130,7 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data)
 		p->chunks[i].length_dw = user_chunk.length_dw;
 
 		size = p->chunks[i].length_dw;
-		cdata = u64_to_user_ptr(user_chunk.chunk_data);
+		cdata = kcl_u64_to_user_ptr(user_chunk.chunk_data);
 
 		p->chunks[i].kdata = kvmalloc_array(size, sizeof(uint32_t), GFP_KERNEL);
 		if (p->chunks[i].kdata == NULL) {
@@ -1545,7 +1545,7 @@ int amdgpu_cs_wait_fences_ioctl(struct drm_device *dev, void *data,
 	if (fences == NULL)
 		return -ENOMEM;
 
-	fences_user = u64_to_user_ptr(wait->in.fences);
+	fences_user = kcl_u64_to_user_ptr(wait->in.fences);
 	if (copy_from_user(fences, fences_user,
 		sizeof(struct drm_amdgpu_fence) * fence_count)) {
 		r = -EFAULT;
