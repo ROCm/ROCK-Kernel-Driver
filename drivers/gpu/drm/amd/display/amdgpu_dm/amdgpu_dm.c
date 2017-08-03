@@ -987,6 +987,11 @@ static int dm_resume(void *handle)
 
 	drm_atomic_helper_resume(ddev, dm->cached_state);
 
+#if (DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)) && \
+  (DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)) && \
+    !(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && defined(OS_NAME_UBUNTU))
+	drm_atomic_state_put(dm->cached_state);
+#endif
 	dm->cached_state = NULL;
 
 	amdgpu_dm_irq_resume_late(adev);
@@ -2118,7 +2123,9 @@ fail:
 		goto retry;
 	}
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 	drm_atomic_state_put(state);
+#endif
 
 out:
 	drm_modeset_drop_locks(&ctx);
@@ -3206,7 +3213,11 @@ fail:
 	if (ret == -EDEADLK)
 		goto backoff;
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+	drm_atomic_state_free(state);
+#else
 	drm_atomic_state_put(state);
+#endif
 
 	return ret;
 backoff:
@@ -5464,7 +5475,11 @@ static int dm_force_atomic_commit(struct drm_connector *connector)
 
 err:
 	DRM_ERROR("Restoring old state failed with %i\n", ret);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+	drm_atomic_state_free(state);
+#else
 	drm_atomic_state_put(state);
+#endif
 
 	return ret;
 }
