@@ -98,7 +98,7 @@ int amdgpu_bo_list_create(struct amdgpu_device *adev, struct drm_file *filp,
 		}
 
 		bo = amdgpu_bo_ref(gem_to_amdgpu_bo(gobj));
-		drm_gem_object_put_unlocked(gobj);
+		kcl_drm_gem_object_put_unlocked(gobj);
 
 		usermm = amdgpu_ttm_tt_get_usermm(bo->tbo.ttm);
 		if (usermm) {
@@ -224,12 +224,20 @@ void amdgpu_bo_list_put(struct amdgpu_bo_list *list)
 int amdgpu_bo_create_list_entry_array(struct drm_amdgpu_bo_list_in *in,
 				      struct drm_amdgpu_bo_list_entry **info_param)
 {
-	const void __user *uptr = u64_to_user_ptr(in->bo_info_ptr);
 	const uint32_t info_size = sizeof(struct drm_amdgpu_bo_list_entry);
+
+	const void __user *uptr = kcl_u64_to_user_ptr(in->bo_info_ptr);
+
 	struct drm_amdgpu_bo_list_entry *info;
 	int r;
 
-	info = kvmalloc_array(in->bo_number, info_size, GFP_KERNEL);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	info = drm_malloc_ab(in->bo_number,
+			     sizeof(struct drm_amdgpu_bo_list_entry));
+#else
+	info = kvmalloc_array(in->bo_number,
+			     sizeof(struct drm_amdgpu_bo_list_entry), GFP_KERNEL);
+#endif
 	if (!info)
 		return -ENOMEM;
 
