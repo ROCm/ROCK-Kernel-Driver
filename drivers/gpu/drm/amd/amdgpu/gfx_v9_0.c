@@ -789,7 +789,6 @@ static int gfx_v9_0_rlc_init(struct amdgpu_device *adev)
 		dst_ptr = adev->gfx.rlc.cs_ptr;
 		gfx_v9_0_get_csb_buffer(adev, dst_ptr);
 		amdgpu_bo_kunmap(adev->gfx.rlc.clear_state_obj);
-		amdgpu_bo_unreserve(adev->gfx.rlc.clear_state_obj);
 	}
 
 	if (adev->asic_type == CHIP_RAVEN) {
@@ -811,7 +810,6 @@ static int gfx_v9_0_rlc_init(struct amdgpu_device *adev)
 
 		rv_init_cp_jump_table(adev);
 		amdgpu_bo_kunmap(adev->gfx.rlc.cp_table_obj);
-		amdgpu_bo_unreserve(adev->gfx.rlc.cp_table_obj);
 
 		gfx_v9_0_init_lbpw(adev);
 	}
