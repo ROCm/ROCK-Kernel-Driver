@@ -36,11 +36,35 @@
 typedef struct fence kcl_fence_t;
 typedef struct fence_ops kcl_fence_ops_t;
 #else
+#define fence_cb dma_fence_cb
+#define fence_ops dma_fence_ops
+#define fence_array dma_fence_array
+#define fence dma_fence
+#define FENCE_TRACE DMA_FENCE_TRACE
+#define FENCE_FLAG_SIGNALED_BIT DMA_FENCE_FLAG_SIGNALED_BIT
+#define FENCE_FLAG_ENABLE_SIGNAL_BIT DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT
+#define FENCE_FLAG_USER_BITS DMA_FENCE_FLAG_USER_BITS
+
+#define fence_init dma_fence_init
+#define fence_wait dma_fence_wait
+#define fence_get dma_fence_get
+#define fence_put dma_fence_put
+#define fence_is_signaled dma_fence_is_signaled
+#define fence_signal dma_fence_signal
+#define fence_signal_locked dma_fence_signal_locked
+#define fence_get_rcu dma_fence_get_rcu
+#define fence_is_later dma_fence_is_later
+#define fence_wait_timeout dma_fence_wait_timeout
+#define fence_array_create dma_fence_array_create
+#define fence_add_callback dma_fence_add_callback
+#define fence_remove_callback dma_fence_remove_callback
+#define fence_default_wait dma_fence_default_wait
+#define fence_enable_sw_signaling dma_fence_enable_sw_signaling
 typedef struct dma_fence kcl_fence_t;
 typedef struct dma_fence_ops kcl_fence_ops_t;
 #endif
 
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#if defined(BUILD_AS_DKMS)
 extern signed long kcl_fence_default_wait(kcl_fence_t *fence,
 					  bool intr,
 					  signed long timeout);
@@ -68,7 +92,7 @@ static inline signed long kcl_fence_wait_any_timeout(kcl_fence_t **fences,
 				   uint32_t count, bool intr,
 				   signed long timeout, uint32_t *idx)
 {
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#if defined(BUILD_AS_DKMS)
 	return _kcl_fence_wait_any_timeout(fences, count, intr, timeout, idx);
 #else
 	return dma_fence_wait_any_timeout(fences, count, intr, timeout, idx);

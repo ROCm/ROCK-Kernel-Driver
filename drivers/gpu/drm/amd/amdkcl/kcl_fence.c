@@ -2,10 +2,9 @@
 #include <kcl/kcl_fence.h>
 #include "kcl_common.h"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 #define CREATE_TRACE_POINTS
 #include <kcl/kcl_trace.h>
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 static atomic64_t fence_context_counter = ATOMIC64_INIT(0);
 u64 _kcl_fence_context_alloc(unsigned num)
 {
@@ -33,6 +32,7 @@ _kcl_fence_init(struct fence *fence, const struct fence_ops *ops,
 	trace_kcl_fence_init(fence);
 }
 EXPORT_SYMBOL(_kcl_fence_init);
+#endif
 
 static bool
 fence_test_signaled_any(struct fence **fences, uint32_t count, uint32_t *idx)
@@ -54,9 +54,7 @@ struct default_wait_cb {
 	struct fence_cb base;
 	struct task_struct *task;
 };
-
 static void (*_kcl_fence_default_wait_cb)(struct fence *fence, struct fence_cb *cb);
-
 static signed long
 _kcl_fence_default_wait(struct fence *fence, bool intr, signed long timeout)
 {
@@ -224,6 +222,9 @@ EXPORT_SYMBOL(_kcl_fence_wait_timeout);
 
 void amdkcl_fence_init(void)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
+	_kcl_fence_default_wait_cb = amdkcl_fp_setup("dma_fence_default_wait_cb", NULL);
+#else
 	_kcl_fence_default_wait_cb = amdkcl_fp_setup("fence_default_wait_cb", NULL);
-}
 #endif
+}
