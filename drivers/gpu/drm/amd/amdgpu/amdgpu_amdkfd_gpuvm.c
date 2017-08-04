@@ -2368,12 +2368,12 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 
 	/* Wait for validate to finish and attach new eviction fence */
 	list_for_each_entry(mem, &process_info->kfd_bo_list,
-		validate_list.head) {
-		struct amdgpu_bo *bo = mem->bo;
-
-		ttm_bo_wait(&bo->tbo, false, false);
-		amdgpu_bo_fence(bo, &process_info->eviction_fence->base, true);
-	}
+		validate_list.head)
+		ttm_bo_wait(&mem->bo->tbo, false, false);
+	list_for_each_entry(mem, &process_info->kfd_bo_list,
+		validate_list.head)
+		amdgpu_bo_fence(mem->bo,
+			&process_info->eviction_fence->base, true);
 
 	/* Attach eviction fence to PD / PT BOs */
 	list_for_each_entry(peer_vm, &process_info->vm_list_head,
