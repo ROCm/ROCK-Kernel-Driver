@@ -1477,7 +1477,6 @@ static const struct amdgpu_display_funcs dm_display_funcs = {
 
 };
 
-
 #if defined(CONFIG_DEBUG_KERNEL_DC)
 
 static ssize_t s3_debug_store(
@@ -1599,7 +1598,8 @@ bool amdgpu_dm_acquire_dal_lock(struct amdgpu_display_manager *dm)
 
 bool amdgpu_dm_release_dal_lock(struct amdgpu_display_manager *dm)
 {
-	/* TODO */	return true;
+	/* TODO */
+	return true;
 }
 
 
