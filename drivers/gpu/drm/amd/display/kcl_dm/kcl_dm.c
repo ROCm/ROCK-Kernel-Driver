@@ -2324,7 +2324,8 @@ static void fill_gamma_from_crtc(
 	if (gamma == NULL)
 		return;
 
-	gamma->type = GAMMA_RGB_256_ENTRIES;
+	gamma->type = GAMMA_RGB_256;
+	gamma->num_entries = GAMMA_RGB_256_ENTRIES;
 	for (i = 0; i < end; i++) {
 		gamma->entries.red[i] = dal_fixed31_32_from_int((unsigned short)red[i]);
 		gamma->entries.green[i] = dal_fixed31_32_from_int((unsigned short)green[i]);
