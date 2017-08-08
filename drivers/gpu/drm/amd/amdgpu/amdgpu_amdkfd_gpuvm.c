@@ -2320,9 +2320,6 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 		goto ttm_reserve_fail;
 	}
 
-	if (!list_empty(&duplicate_save))
-		pr_err("BUG: list of BOs to reserve has duplicates!\n");
-
 	amdgpu_sync_create(&sync_obj);
 	ctx.sync = &sync_obj;
 
