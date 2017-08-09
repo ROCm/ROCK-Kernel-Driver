@@ -3158,6 +3158,27 @@ int amdgpu_debugfs_add_files(struct amdgpu_device *adev,
 	return 0;
 }
 
+#if defined(BUILD_AS_DKMS) &&  LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+void amdgpu_debugfs_cleanup(struct drm_minor *minor)
+{
+	struct drm_info_node *node, *tmp;
+
+	if (!&minor->debugfs_root)
+		return 0;
+
+	mutex_lock(&minor->debugfs_lock);
+	list_for_each_entry_safe(node, tmp,
+		&minor->debugfs_list, list) {
+		debugfs_remove(node->dent);
+		list_del(&node->list);
+		kfree(node);
+	}
+	mutex_unlock(&minor->debugfs_lock);
+
+	return 0;
+}
+#endif
+
 #if defined(CONFIG_DEBUG_FS)
 
 static ssize_t amdgpu_debugfs_regs_read(struct file *f, char __user *buf,
