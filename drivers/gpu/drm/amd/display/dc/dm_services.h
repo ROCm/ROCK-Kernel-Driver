@@ -76,7 +76,9 @@
 } while (0)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include <asm/fpu/api.h>
+#endif
 #else
 #include <asm/i387.h>
 #endif
