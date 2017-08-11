@@ -184,7 +184,7 @@ void amdgpu_amdkfd_unreserve_system_memory_limit(struct amdgpu_bo *bo)
 	if (bo->flags & AMDGPU_AMDKFD_USERPTR_BO) {
 		kfd_mem_limit.system_mem_used -= bo->tbo.acc_size;
 		kfd_mem_limit.userptr_mem_used -= amdgpu_bo_size(bo);
-	} else if (bo->prefered_domains == AMDGPU_GEM_DOMAIN_GTT) {
+	} else if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_GTT) {
 		kfd_mem_limit.system_mem_used -=
 			(bo->tbo.acc_size + amdgpu_bo_size(bo));
 	}
@@ -1723,7 +1723,7 @@ static int get_sg_table(struct amdgpu_device *adev,
 		goto out;
 	}
 
-	if (bo->prefered_domains == AMDGPU_GEM_DOMAIN_VRAM)
+	if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM)
 		page_size = AMD_GPU_PAGE_SIZE;
 	else
 		page_size = PAGE_SIZE;
@@ -1737,7 +1737,7 @@ static int get_sg_table(struct amdgpu_device *adev,
 	if (unlikely(ret))
 		goto out;
 
-	if (bo->prefered_domains == AMDGPU_GEM_DOMAIN_VRAM) {
+	if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM) {
 		bus_addr = bo->tbo.offset + adev->mc.aper_base + offset;
 
 		for_each_sg(sg->sgl, s, sg->orig_nents, i) {
@@ -1835,7 +1835,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 		return -EINVAL;
 
 	bo = gem_to_amdgpu_bo(obj);
-	if (!(bo->prefered_domains & (AMDGPU_GEM_DOMAIN_VRAM |
+	if (!(bo->preferred_domains & (AMDGPU_GEM_DOMAIN_VRAM |
 				    AMDGPU_GEM_DOMAIN_GTT |
 				    AMDGPU_GEM_DOMAIN_DGMA)))
 		/* Only VRAM and GTT BOs are supported */
@@ -1859,9 +1859,9 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 
 	(*mem)->bo = amdgpu_bo_ref(bo);
 	(*mem)->va = va;
-	if (bo->prefered_domains & AMDGPU_GEM_DOMAIN_VRAM)
+	if (bo->preferred_domains & AMDGPU_GEM_DOMAIN_VRAM)
 		(*mem)->domain = AMDGPU_GEM_DOMAIN_VRAM;
-	else if (bo->prefered_domains & AMDGPU_GEM_DOMAIN_GTT)
+	else if (bo->preferred_domains & AMDGPU_GEM_DOMAIN_GTT)
 		(*mem)->domain = AMDGPU_GEM_DOMAIN_GTT;
 	else
 		(*mem)->domain = AMDGPU_GEM_DOMAIN_DGMA;

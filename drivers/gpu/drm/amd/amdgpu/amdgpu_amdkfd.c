@@ -446,7 +446,7 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 
 	adev = obj->dev->dev_private;
 	bo = gem_to_amdgpu_bo(obj);
-	if (!(bo->prefered_domains & (AMDGPU_GEM_DOMAIN_VRAM |
+	if (!(bo->preferred_domains & (AMDGPU_GEM_DOMAIN_VRAM |
 				    AMDGPU_GEM_DOMAIN_GTT |
 				    AMDGPU_GEM_DOMAIN_DGMA)))
 		/* Only VRAM, GTT and DGMA BOs are supported */
@@ -466,7 +466,7 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 		/* If the preferred domain is DGMA, set flags to VRAM because
 		 * KFD doesn't support allocating DGMA memory
 		 */
-		*flags = (bo->prefered_domains & (AMDGPU_GEM_DOMAIN_VRAM |
+		*flags = (bo->preferred_domains & (AMDGPU_GEM_DOMAIN_VRAM |
 				AMDGPU_GEM_DOMAIN_DGMA)) ?
 				ALLOC_MEM_FLAGS_VRAM : ALLOC_MEM_FLAGS_GTT;
 
