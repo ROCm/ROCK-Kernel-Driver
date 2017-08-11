@@ -131,7 +131,7 @@ void amdgpu_gem_force_release(struct amdgpu_device *adev)
 		spin_lock(&file->table_lock);
 		idr_for_each_entry(&file->object_idr, gobj, handle) {
 			WARN_ONCE(1, "And also active allocations!\n");
-			drm_gem_object_put_unlocked(gobj);
+			kcl_drm_gem_object_put_unlocked(gobj);
 		}
 		idr_destroy(&file->object_idr);
 		spin_unlock(&file->table_lock);
@@ -298,7 +298,7 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 
 	r = drm_gem_handle_create(filp, gobj, &handle);
 	/* drop reference from allocate - handle holds it now */
-	drm_gem_object_put_unlocked(gobj);
+	kcl_drm_gem_object_put_unlocked(gobj);
 	if (r)
 		return r;
 
@@ -372,7 +372,7 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 
 	r = drm_gem_handle_create(filp, gobj, &handle);
 	/* drop reference from allocate - handle holds it now */
-	drm_gem_object_put_unlocked(gobj);
+	kcl_drm_gem_object_put_unlocked(gobj);
 	if (r)
 		return r;
 
@@ -383,7 +383,7 @@ free_pages:
 	release_pages(bo->tbo.ttm->pages, bo->tbo.ttm->num_pages);
 
 release_object:
-	drm_gem_object_put_unlocked(gobj);
+	kcl_drm_gem_object_put_unlocked(gobj);
 
 	return r;
 }
@@ -459,7 +459,7 @@ int amdgpu_mode_dumb_mmap(struct drm_file *filp,
 	robj = gem_to_amdgpu_bo(gobj);
 	if (amdgpu_ttm_tt_get_usermm(robj->tbo.ttm) ||
 	    (robj->flags & AMDGPU_GEM_CREATE_NO_CPU_ACCESS)) {
-		drm_gem_object_put_unlocked(gobj);
+		kcl_drm_gem_object_put_unlocked(gobj);
 		return -EPERM;
 	}
 	*offset_p = amdgpu_bo_mmap_offset(robj);
@@ -775,7 +775,7 @@ error_backoff:
 	ttm_eu_backoff_reservation(&ticket, &list);
 
 error_unref:
-	drm_gem_object_put_unlocked(gobj);
+	kcl_drm_gem_object_put_unlocked(gobj);
 	return r;
 }
 
@@ -851,7 +851,7 @@ int amdgpu_gem_op_ioctl(struct drm_device *dev, void *data,
 	}
 
 out:
-	drm_gem_object_put_unlocked(gobj);
+	kcl_drm_gem_object_put_unlocked(gobj);
 	return r;
 }
 
@@ -888,7 +888,7 @@ int amdgpu_mode_dumb_create(struct drm_file *file_priv,
 
 	r = drm_gem_handle_create(file_priv, gobj, &handle);
 	/* drop reference from allocate - handle holds it now */
-	drm_gem_object_put_unlocked(gobj);
+	kcl_drm_gem_object_put_unlocked(gobj);
 	if (r) {
 		return r;
 	}
