@@ -148,7 +148,7 @@ static int amdgpu_bo_list_set(struct amdgpu_device *adev,
 		}
 
 		bo = amdgpu_bo_ref(gem_to_amdgpu_bo(gobj));
-		drm_gem_object_put_unlocked(gobj);
+		kcl_drm_gem_object_put_unlocked(gobj);
 
 		usermm = amdgpu_ttm_tt_get_usermm(bo->tbo.ttm);
 		if (usermm) {
