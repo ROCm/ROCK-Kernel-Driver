@@ -737,7 +737,7 @@ static void amdgpu_display_user_framebuffer_destroy(struct drm_framebuffer *fb)
 {
 	struct amdgpu_framebuffer *amdgpu_fb = to_amdgpu_framebuffer(fb);
 
-	drm_gem_object_put_unlocked(amdgpu_fb->obj);
+	kcl_drm_gem_object_put_unlocked(amdgpu_fb->obj);
 	drm_framebuffer_cleanup(fb);
 	kfree(amdgpu_fb);
 }
@@ -823,14 +823,14 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 
 	amdgpu_fb = kzalloc(sizeof(*amdgpu_fb), GFP_KERNEL);
 	if (amdgpu_fb == NULL) {
-		drm_gem_object_put_unlocked(obj);
+		kcl_drm_gem_object_put_unlocked(obj);
 		return ERR_PTR(-ENOMEM);
 	}
 
 	ret = amdgpu_display_framebuffer_init(dev, amdgpu_fb, mode_cmd, obj);
 	if (ret) {
 		kfree(amdgpu_fb);
-		drm_gem_object_put_unlocked(obj);
+		kcl_drm_gem_object_put_unlocked(obj);
 		return ERR_PTR(ret);
 	}
 

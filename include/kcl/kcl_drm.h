@@ -317,4 +317,13 @@ static inline const char *kcl_drm_get_format_name(uint32_t format, struct drm_fo
 #endif
 }
 
+static inline void kcl_drm_gem_object_put_unlocked(struct drm_gem_object *obj)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	return drm_gem_object_unreference_unlocked(obj);
+#else
+	return drm_gem_object_put_unlocked(obj);
+#endif
+}
+
 #endif /* AMDKCL_DRM_H */
