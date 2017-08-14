@@ -4,7 +4,7 @@
 
 
 
-KCLDM = kcl_dm_types.o kcl_dm.o kcl_dm_irq.o kcl_dm_mst_types.o
+KCLDM = kcl_dm.o kcl_dm_irq.o kcl_dm_mst_types.o
 
 ifneq ($(CONFIG_DRM_AMD_DC),)
 KCLDM += kcl_dm_services.o kcl_dm_helpers.o

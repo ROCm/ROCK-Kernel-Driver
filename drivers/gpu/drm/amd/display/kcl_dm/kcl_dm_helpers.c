@@ -40,7 +40,6 @@
 #include "dc.h"
 #include "kcl_dm.h"
 #include "kcl_dm_irq.h"
-#include "kcl_dm_types.h"
 
 #include "dm_helpers.h"
 

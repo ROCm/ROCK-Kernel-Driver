@@ -35,7 +35,6 @@
 #include "amdgpu.h"
 #include "kcl_dm.h"
 #include "kcl_dm_irq.h"
-#include "kcl_dm_types.h"
 #include "amdgpu_pm.h"
 
 /******************************************************************************

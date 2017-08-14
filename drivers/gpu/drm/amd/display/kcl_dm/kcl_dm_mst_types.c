@@ -29,7 +29,7 @@
 #include <drm/drm_atomic_helper.h>
 #include "dm_services.h"
 #include "amdgpu.h"
-#include "kcl_dm_types.h"
+#include "kcl_dm.h"
 #include "kcl_dm_mst_types.h"
 
 #include "dc.h"
