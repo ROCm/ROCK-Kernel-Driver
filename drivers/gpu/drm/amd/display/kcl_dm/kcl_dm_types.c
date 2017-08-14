@@ -750,7 +750,7 @@ static void dm_dc_surface_commit(
 	struct dc_surface *dc_surface;
 	struct dc_surface *dc_surfaces[1];
 	const struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
-	const struct dc_stream *dc_stream = acrtc->stream;
+	struct dc_stream *dc_stream = acrtc->stream;
 
 	if (!dc_stream) {
 		dm_error(
@@ -2758,9 +2758,9 @@ int amdgpu_dm_atomic_commit(
 	uint32_t flip_crtcs_count = 0;
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *old_crtc_state;
-	const struct dc_stream *commit_streams[MAX_STREAMS];
+	struct dc_stream *commit_streams[MAX_STREAMS];
 	struct amdgpu_crtc *new_crtcs[MAX_STREAMS];
-	const struct dc_stream *new_stream;
+	struct dc_stream *new_stream;
 	struct drm_crtc *flip_crtcs[MAX_STREAMS];
 	struct amdgpu_flip_work *work[MAX_STREAMS] = {0};
 	struct amdgpu_bo *new_abo[MAX_STREAMS] = {0};
@@ -3053,8 +3053,8 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
 	struct amdgpu_crtc *disconnected_acrtc;
 	const struct dc_sink *sink;
-	const struct dc_stream *commit_streams[MAX_STREAMS];
-	const struct dc_stream *current_stream;
+	struct dc_stream *commit_streams[MAX_STREAMS];
+	struct dc_stream *current_stream;
 	uint32_t commit_streams_count = 0;
 
 	if (!aconnector->dc_sink || !connector->state || !connector->encoder)
@@ -3168,8 +3168,8 @@ static uint32_t update_in_val_sets_stream(
 	struct dc_validation_set *val_sets,
 	struct drm_crtc **crtcs,
 	uint32_t set_count,
-	const struct dc_stream *old_stream,
-	const struct dc_stream *new_stream,
+	struct dc_stream *old_stream,
+	struct dc_stream *new_stream,
 	struct drm_crtc *crtc)
 {
 	uint32_t i = 0;

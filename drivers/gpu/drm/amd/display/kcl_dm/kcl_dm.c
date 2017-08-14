@@ -1493,7 +1493,7 @@ static void dm_page_flip(struct amdgpu_device *adev,
 			 int crtc_id, u64 crtc_base, bool async)
 {
 	struct amdgpu_crtc *acrtc;
-	const struct dc_stream *stream;
+	struct dc_stream *stream;
 	struct dc_flip_addrs addr = { {0} };
 
 	/*
@@ -1567,7 +1567,7 @@ static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 	num_streams = dc_get_current_stream_count(adev->dm.dc);
 
 	for (i = 0; i < num_streams; i++) {
-		const struct dc_stream *stream;
+		struct dc_stream *stream;
 		stream = dc_get_stream_at_index(adev->dm.dc, i);
 
 		mod_freesync_update_state(adev->dm.freesync_module,
