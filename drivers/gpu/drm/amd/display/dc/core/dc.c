@@ -1771,7 +1771,7 @@ const struct audio **dc_get_audios(struct dc *dc)
 
 void dc_flip_surface_addrs(
 		struct dc *dc,
-		const struct dc_surface *const surfaces[],
+		struct dc_plane_state *const plane_states[],
 		struct dc_flip_addrs flip_addrs[],
 		uint32_t count)
 {
@@ -1779,15 +1779,15 @@ void dc_flip_surface_addrs(
 	int i, j;
 
 	for (i = 0; i < count; i++) {
-		struct core_surface *surface = DC_SURFACE_TO_CORE(surfaces[i]);
+		struct dc_plane_state *plane_state = plane_states[i];
 
-		surface->public.address = flip_addrs[i].address;
-		surface->public.flip_immediate = flip_addrs[i].flip_immediate;
+		plane_state->address = flip_addrs[i].address;
+		plane_state->flip_immediate = flip_addrs[i].flip_immediate;
 
 		for (j = 0; j < core_dc->res_pool->pipe_count; j++) {
 			struct pipe_ctx *pipe_ctx = &core_dc->current_context->res_ctx.pipe_ctx[j];
 
-			if (pipe_ctx->surface != surface)
+			if (pipe_ctx->plane_state != plane_state)
 				continue;
 
 			core_dc->hwss.update_plane_addr(core_dc, pipe_ctx);

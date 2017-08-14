@@ -1543,7 +1543,7 @@ static void dm_page_flip(struct amdgpu_device *adev,
 
 	dc_flip_surface_addrs(
 			adev->dm.dc,
-			dc_stream_get_status(stream)->surfaces,
+			dc_stream_get_status(stream)->plane_states,
 			&addr, 1);
 }
 
