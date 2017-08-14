@@ -1926,17 +1926,16 @@ static int dm_crtc_cursor_set(
 
 	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
 
-	ret		= EINVAL;
+	ret = EINVAL;
 	new_cursor_gem	= NULL;
 
-	DRM_DEBUG_KMS(
-	"%s: crtc_id=%d with handle %d and size %d to %d, bo_object %p\n",
-		__func__,
-		amdgpu_crtc->crtc_id,
-		handle,
-		width,
-		height,
-		amdgpu_crtc->cursor_bo);
+	DRM_DEBUG_KMS("%s: crtc_id=%d with handle %d and size %d to %d, bo_object %p\n",
+		      __func__,
+		      amdgpu_crtc->crtc_id,
+		      handle,
+		      width,
+		      height,
+		      amdgpu_crtc->cursor_bo);
 
 	if (!handle) {
 		/* turn off cursor */
@@ -2116,6 +2115,7 @@ static bool get_fb_info(
 {
 	struct amdgpu_bo *rbo = gem_to_amdgpu_bo(amdgpu_fb->obj);
 	int r = amdgpu_bo_reserve(rbo, false);
+
 	if (unlikely(r != 0)){
 		DRM_ERROR("Unable to reserve buffer\n");
 		return false;
@@ -2217,10 +2217,9 @@ static void fill_plane_attributes_from_fb(
 
 	memset(&surface->tiling_info, 0, sizeof(surface->tiling_info));
 
-	/* Fill GFX params */
-	if (AMDGPU_TILING_GET(tiling_flags, ARRAY_MODE) == DC_ARRAY_2D_TILED_THIN1)
-	{
-		unsigned bankw, bankh, mtaspect, tile_split, num_banks;
+	/* Fill GFX8 params */
+	if (AMDGPU_TILING_GET(tiling_flags, ARRAY_MODE) == DC_ARRAY_2D_TILED_THIN1) {
+		unsigned int bankw, bankh, mtaspect, tile_split, num_banks;
 
 		bankw = AMDGPU_TILING_GET(tiling_flags, BANK_WIDTH);
 		bankh = AMDGPU_TILING_GET(tiling_flags, BANK_HEIGHT);
@@ -2483,7 +2482,8 @@ static enum dc_color_depth convert_color_depth_from_display_info(
 	uint32_t bpc = connector->display_info.bpc;
 
 	/* Limited color depth to 8bit
-	 * TODO: Still need to handle deep color*/
+	 * TODO: Still need to handle deep color
+	 */
 	if (bpc > 8)
 		bpc = 8;
 
@@ -2516,6 +2516,7 @@ static enum dc_aspect_ratio get_aspect_ratio(
 {
 	int32_t width = mode_in->crtc_hdisplay * 9;
 	int32_t height = mode_in->crtc_vdisplay * 16;
+
 	if ((width - height) < 10 && (width - height) > -10)
 		return ASPECT_RATIO_16_9;
 	else
@@ -2573,6 +2574,7 @@ static void fill_stream_properties_from_drm_display_mode(
 	const struct drm_connector *connector)
 {
 	struct dc_crtc_timing *timing_out = &stream->timing;
+
 	memset(timing_out, 0, sizeof(struct dc_crtc_timing));
 
 	timing_out->h_border_left = 0;
@@ -2617,6 +2619,7 @@ static void fill_stream_properties_from_drm_display_mode(
 
 	{
 		struct dc_transfer_func *tf = dc_create_transfer_func();
+
 		tf->type = TF_TYPE_PREDEFINED;
 		tf->tf = TRANSFER_FUNCTION_SRGB;
 		stream->out_transfer_func = tf;
@@ -2643,7 +2646,7 @@ static void fill_audio_info(
 		i++;
 	}
 
-	if(cea_revision >= 3) {
+	if (cea_revision >= 3) {
 		audio_info->mode_count = edid_caps->audio_mode_count;
 
 		for (i = 0; i < audio_info->mode_count; ++i) {
@@ -2662,7 +2665,7 @@ static void fill_audio_info(
 	audio_info->flags.all = edid_caps->speaker_flags;
 
 	/* TODO: We only check for the progressive mode, check for interlace mode too */
-	if(drm_connector->latency_present[0]) {
+	if (drm_connector->latency_present[0]) {
 		audio_info->video_latency = drm_connector->video_latency[0];
 		audio_info->audio_latency = drm_connector->audio_latency[0];
 	}
@@ -2680,7 +2683,7 @@ static void copy_crtc_timing_for_drm_display_mode(
 	dst_mode->crtc_clock = src_mode->crtc_clock;
 	dst_mode->crtc_hblank_start = src_mode->crtc_hblank_start;
 	dst_mode->crtc_hblank_end = src_mode->crtc_hblank_end;
-	dst_mode->crtc_hsync_start=  src_mode->crtc_hsync_start;
+	dst_mode->crtc_hsync_start = src_mode->crtc_hsync_start;
 	dst_mode->crtc_hsync_end = src_mode->crtc_hsync_end;
 	dst_mode->crtc_htotal = src_mode->crtc_htotal;
 	dst_mode->crtc_hskew = src_mode->crtc_hskew;
@@ -2718,12 +2721,12 @@ static struct dc_stream *create_stream_for_sink(
 	struct drm_display_mode mode = *drm_mode;
 	bool native_mode_found = false;
 
-	if (NULL == aconnector) {
+	if (aconnector == NULL) {
 		DRM_ERROR("aconnector is NULL!\n");
 		goto drm_connector_null;
 	}
 
-	if (NULL == dm_state) {
+	if (dm_state == NULL) {
 		DRM_ERROR("dm_state is NULL!\n");
 		goto dm_state_null;
 	}
@@ -2731,7 +2734,7 @@ static struct dc_stream *create_stream_for_sink(
 	drm_connector = &aconnector->base;
 	stream = dc_create_stream_for_sink(aconnector->dc_sink);
 
-	if (NULL == stream) {
+	if (stream == NULL) {
 		DRM_ERROR("Failed to create stream for sink!\n");
 		goto stream_create_fail;
 	}
@@ -2749,7 +2752,7 @@ static struct dc_stream *create_stream_for_sink(
 				struct drm_display_mode,
 				head);
 
-	if (NULL == preferred_mode) {
+	if (preferred_mode == NULL) {
 		/* This may not be an error, the use case is when we we have no
 		 * usermode calls to reset and set mode upon hotplug. In this
 		 * case, we call set mode ourselves to restore the previous mode
@@ -3297,13 +3300,13 @@ int amdgpu_dm_connector_mode_valid(
 
 	dc_sink = to_amdgpu_connector(connector)->dc_sink;
 
-	if (NULL == dc_sink) {
+	if (dc_sink == NULL) {
 		DRM_ERROR("dc_sink is NULL!\n");
 		goto null_sink;
 	}
 
 	stream = dc_create_stream_for_sink(dc_sink);
-	if (NULL == stream) {
+	if (stream == NULL) {
 		DRM_ERROR("Failed to create stream for sink!\n");
 		goto stream_create_fail;
 	}
@@ -3336,11 +3339,11 @@ null_sink:
 static const struct drm_connector_helper_funcs
 amdgpu_dm_connector_helper_funcs = {
 	/*
-	* If hotplug a second bigger display in FB Con mode, bigger resolution
-	* modes will be filtered by drm_mode_validate_size(), and those modes
-	* is missing after user start lightdm. So we need to renew modes list.
-	* in get_modes call back, not just return the modes count
-	*/
+	 * If hotplug a second bigger display in FB Con mode, bigger resolution
+	 * modes will be filtered by drm_mode_validate_size(), and those modes
+	 * is missing after user start lightdm. So we need to renew modes list.
+	 * in get_modes call back, not just return the modes count
+	 */
 	.get_modes = get_modes,
 	.mode_valid = amdgpu_dm_connector_mode_valid,
 	.best_encoder = best_encoder
@@ -3626,10 +3629,10 @@ static void dm_plane_helper_cleanup_fb(
 	if (unlikely(r)) {
 		DRM_ERROR("failed to reserve rbo before unpin\n");
 		return;
-	} else {
-		amdgpu_bo_unpin(rbo);
-		amdgpu_bo_unreserve(rbo);
 	}
+
+	amdgpu_bo_unpin(rbo);
+	amdgpu_bo_unreserve(rbo);
 }
 
 int dm_create_validation_set_for_connector(struct drm_connector *connector,
@@ -3645,14 +3648,14 @@ int dm_create_validation_set_for_connector(struct drm_connector *connector,
 			(mode->flags & DRM_MODE_FLAG_DBLSCAN))
 		return result;
 
-	if (NULL == dc_sink) {
+	if (dc_sink == NULL) {
 		DRM_ERROR("dc_sink is NULL!\n");
 		return result;
 	}
 
 	stream = dc_create_stream_for_sink(dc_sink);
 
-	if (NULL == stream) {
+	if (stream == NULL) {
 		DRM_ERROR("Failed to create stream for sink!\n");
 		return result;
 	}
@@ -3817,11 +3820,11 @@ static void amdgpu_dm_get_native_mode(struct drm_connector *connector)
 	if (!list_empty(&connector->probed_modes)) {
 		struct drm_display_mode *preferred_mode = NULL;
 		list_for_each_entry(preferred_mode,
-				&connector->probed_modes,
-				head) {
-		if (preferred_mode->type & DRM_MODE_TYPE_PREFERRED) {
-			amdgpu_encoder->native_mode = *preferred_mode;
-		}
+				    &connector->probed_modes,
+				    head) {
+			if (preferred_mode->type & DRM_MODE_TYPE_PREFERRED)
+				amdgpu_encoder->native_mode = *preferred_mode;
+
 			break;
 		}
 
@@ -3839,7 +3842,7 @@ static struct drm_display_mode *amdgpu_dm_create_common_mode(
 
 	mode = drm_mode_duplicate(dev, native_mode);
 
-	if(mode == NULL)
+	if (mode == NULL)
 		return NULL;
 
 	mode->hdisplay = hdisplay;
@@ -3865,7 +3868,7 @@ static void amdgpu_dm_connector_add_common_modes(struct drm_encoder *encoder,
 		char name[DRM_DISPLAY_MODE_LEN];
 		int w;
 		int h;
-	}common_modes[] = {
+	} common_modes[] = {
 		{  "640x480",  640,  480},
 		{  "800x600",  800,  600},
 		{ "1024x768", 1024,  768},
@@ -3879,21 +3882,21 @@ static void amdgpu_dm_connector_add_common_modes(struct drm_encoder *encoder,
 		{"1920x1200", 1920, 1200}
 	};
 
-	n = sizeof(common_modes) / sizeof(common_modes[0]);
+	n = ARRAY_SIZE(common_modes);
 
 	for (i = 0; i < n; i++) {
 		struct drm_display_mode *curmode = NULL;
 		bool mode_existed = false;
 
 		if (common_modes[i].w > native_mode->hdisplay ||
-			common_modes[i].h > native_mode->vdisplay ||
-			(common_modes[i].w == native_mode->hdisplay &&
-			common_modes[i].h == native_mode->vdisplay))
-				continue;
+		    common_modes[i].h > native_mode->vdisplay ||
+		   (common_modes[i].w == native_mode->hdisplay &&
+		    common_modes[i].h == native_mode->vdisplay))
+			continue;
 
 		list_for_each_entry(curmode, &connector->probed_modes, head) {
 			if (common_modes[i].w == curmode->hdisplay &&
-				common_modes[i].h == curmode->vdisplay) {
+			    common_modes[i].h == curmode->vdisplay) {
 				mode_existed = true;
 				break;
 			}
@@ -3965,8 +3968,9 @@ void amdgpu_dm_connector_init_helper(
 
 	mutex_init(&aconnector->hpd_lock);
 
-	/*configure suport HPD hot plug connector_>polled default value is 0
-	 * which means HPD hot plug not supported*/
+	/* configure suport HPD hot plug connector_>polled default value is 0
+	 * which means HPD hot plug not supported
+	 */
 	switch (connector_type) {
 	case DRM_MODE_CONNECTOR_HDMIA:
 		aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
@@ -4014,7 +4018,7 @@ int amdgpu_dm_i2c_xfer(struct i2c_adapter *i2c_adap,
 	int i;
 	int result = -EIO;
 
-	cmd.payloads = kzalloc(num * sizeof(struct i2c_payload), GFP_KERNEL);
+	cmd.payloads = kcalloc(num, sizeof(struct i2c_payload), GFP_KERNEL);
 
 	if (!cmd.payloads)
 		return result;
@@ -4058,12 +4062,12 @@ static struct amdgpu_i2c_adapter *create_i2c(
 	struct amdgpu_device *adev = ddc_service->ctx->driver_context;
 	struct amdgpu_i2c_adapter *i2c;
 
-	i2c = kzalloc(sizeof (struct amdgpu_i2c_adapter), GFP_KERNEL);
+	i2c = kzalloc(sizeof(struct amdgpu_i2c_adapter), GFP_KERNEL);
 	i2c->base.owner = THIS_MODULE;
 	i2c->base.class = I2C_CLASS_DDC;
 	i2c->base.dev.parent = &adev->pdev->dev;
 	i2c->base.algo = &amdgpu_dm_i2c_algo;
-	snprintf(i2c->base.name, sizeof (i2c->base.name), "AMDGPU DM i2c hw bus %d", link_index);
+	snprintf(i2c->base.name, sizeof(i2c->base.name), "AMDGPU DM i2c hw bus %d", link_index);
 	i2c_set_adapdata(&i2c->base, i2c);
 	i2c->ddc_service = ddc_service;
 
@@ -4071,7 +4075,8 @@ static struct amdgpu_i2c_adapter *create_i2c(
 }
 
 /* Note: this function assumes that dc_link_detect() was called for the
- * dc_link which will be represented by this aconnector. */
+ * dc_link which will be represented by this aconnector.
+ */
 int amdgpu_dm_connector_init(
 	struct amdgpu_display_manager *dm,
 	struct amdgpu_connector *aconnector,
@@ -4143,7 +4148,8 @@ int amdgpu_dm_connector_init(
 	if (link->connector_signal & (SIGNAL_TYPE_EDP | SIGNAL_TYPE_LVDS)) {
 		/* Event if registration failed, we should continue with
 		 * DM initialization because not having a backlight control
-		 * is better then a black screen. */
+		 * is better then a black screen.
+		 */
 		amdgpu_dm_register_backlight_device(dm);
 
 		if (dm->backlight_dev)
@@ -4321,12 +4327,12 @@ static bool is_scaling_state_different(
 	if (!dm_state->underscan_enable && old_dm_state->underscan_enable) {
 		if (old_dm_state->underscan_hborder != 0 && old_dm_state->underscan_vborder != 0)
 			return true;
-	} else  if (dm_state->underscan_enable && !old_dm_state->underscan_enable) {
+	} else if (dm_state->underscan_enable && !old_dm_state->underscan_enable) {
 		if (dm_state->underscan_hborder != 0 && dm_state->underscan_vborder != 0)
 			return true;
-	} else if (dm_state->underscan_hborder != old_dm_state->underscan_hborder
-				|| dm_state->underscan_vborder != old_dm_state->underscan_vborder)
-			return true;
+	} else if (dm_state->underscan_hborder != old_dm_state->underscan_hborder ||
+		   dm_state->underscan_vborder != old_dm_state->underscan_vborder)
+		return true;
 	return false;
 }
 
@@ -4640,10 +4646,9 @@ int amdgpu_dm_atomic_commit(
 					&new_crtcs[i]->base,
 					false);
 			if (!aconnector) {
-				DRM_INFO(
-						"Atomic commit: Failed to find connector for acrtc id:%d "
-						"skipping freesync init\n",
-						new_crtcs[i]->crtc_id);
+				DRM_INFO("Atomic commit: Failed to find connector for acrtc id:%d "
+					 "skipping freesync init\n",
+					 new_crtcs[i]->crtc_id);
 				continue;
 			}
 
@@ -4887,9 +4892,8 @@ static uint32_t remove_from_val_sets(
 
 	set_count--;
 
-	for (; i < set_count; i++) {
+	for (; i < set_count; i++)
 		val_sets[i] = val_sets[i + 1];
-	}
 
 	return set_count;
 }
@@ -5189,6 +5193,7 @@ void amdgpu_dm_add_sink_to_freesync_module(
 
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = dev->dev_private;
+
 	edid_check_required = false;
 	if (!amdgpu_connector->dc_sink) {
 		DRM_ERROR("dc_sink NULL, could not add free_sync module.\n");
