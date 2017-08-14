@@ -2686,7 +2686,11 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 	 */
 #ifdef CONFIG_X86_64
 	if (amdgpu_vm_update_mode == -1) {
-		if (amdgpu_vm_is_large_bar(adev))
+		if (amdgpu_vm_is_large_bar(adev)
+		    /* FIXME: CPU page table updates are broken with
+		     * 2MB pages on Vega10
+		     */
+		    && adev->asic_type != CHIP_VEGA10)
 			adev->vm_manager.vm_update_mode =
 				AMDGPU_VM_USE_CPU_FOR_COMPUTE;
 		else
