@@ -185,11 +185,11 @@ struct amdgpu_connector *amdgpu_dm_find_first_crct_matching_connector(
 struct amdgpu_framebuffer;
 struct amdgpu_display_manager;
 struct dc_validation_set;
-struct dc_surface;
+struct dc_plane_state;
 
 struct dm_plane_state {
 	struct drm_plane_state base;
-	struct dc_surface *dc_surface;
+	struct dc_plane_state *dc_surface;
 };
 
 /*TODO Jodan Hersen use the one in amdgpu_dm*/
