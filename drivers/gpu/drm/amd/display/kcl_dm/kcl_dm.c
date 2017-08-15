@@ -1533,7 +1533,7 @@ static void dm_page_flip(struct amdgpu_device *adev,
 			 int crtc_id, u64 crtc_base, bool async)
 {
 	struct amdgpu_crtc *acrtc;
-	struct dc_stream *stream;
+	struct dc_stream_state *stream;
 	struct dc_flip_addrs addr = { {0} };
 
 	/*
@@ -1607,7 +1607,7 @@ static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 	num_streams = dc_get_current_stream_count(adev->dm.dc);
 
 	for (i = 0; i < num_streams; i++) {
-		struct dc_stream *stream;
+		struct dc_stream_state *stream;
 		stream = dc_get_stream_at_index(adev->dm.dc, i);
 
 		mod_freesync_update_state(adev->dm.freesync_module,
@@ -2398,7 +2398,7 @@ struct amdgpu_connector *aconnector_from_drm_crtc_id(
 static void update_stream_scaling_settings(
 		const struct drm_display_mode *mode,
 		const struct dm_connector_state *dm_state,
-		struct dc_stream *stream)
+		struct dc_stream_state *stream)
 {
 	enum amdgpu_rmx_type rmx_type;
 
@@ -2456,7 +2456,7 @@ static void dm_dc_surface_commit(
 	struct dc_plane_state *dc_surface;
 	struct dc_plane_state *dc_surfaces[1];
 	const struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
-	struct dc_stream *dc_stream = acrtc->stream;
+	struct dc_stream_state *dc_stream = acrtc->stream;
 
 	if (!dc_stream) {
 		dm_error(
@@ -2598,7 +2598,7 @@ static enum dc_color_space get_output_color_space(
 /*****************************************************************************/
 
 static void fill_stream_properties_from_drm_display_mode(
-	struct dc_stream *stream,
+	struct dc_stream_state *stream,
 	const struct drm_display_mode *mode_in,
 	const struct drm_connector *connector)
 {
@@ -2739,14 +2739,14 @@ static void decide_crtc_timing_for_drm_display_mode(
 	}
 }
 
-static struct dc_stream *create_stream_for_sink(
+static struct dc_stream_state *create_stream_for_sink(
 		struct amdgpu_connector *aconnector,
 		const struct drm_display_mode *drm_mode,
 		const struct dm_connector_state *dm_state)
 {
 	struct drm_display_mode *preferred_mode = NULL;
 	const struct drm_connector *drm_connector;
-	struct dc_stream *stream = NULL;
+	struct dc_stream_state *stream = NULL;
 	struct drm_display_mode mode = *drm_mode;
 	bool native_mode_found = false;
 
@@ -3312,7 +3312,7 @@ int amdgpu_dm_connector_mode_valid(
 	struct amdgpu_device *adev = connector->dev->dev_private;
 	struct dc_validation_set val_set = { 0 };
 	/* TODO: Unhardcode stream count */
-	struct dc_stream *stream;
+	struct dc_stream_state *stream;
 	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
 	struct validate_context *context;
 
@@ -3671,7 +3671,7 @@ int dm_create_validation_set_for_connector(struct drm_connector *connector,
 	struct dc_sink *dc_sink =
 			to_amdgpu_connector(connector)->dc_sink;
 	/* TODO: Unhardcode stream count */
-	struct dc_stream *stream;
+	struct dc_stream_state *stream;
 
 	if ((mode->flags & DRM_MODE_FLAG_INTERLACE) ||
 			(mode->flags & DRM_MODE_FLAG_DBLSCAN))
@@ -4488,9 +4488,9 @@ int amdgpu_dm_atomic_commit(
 	uint32_t flip_crtcs_count = 0;
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *old_crtc_state;
-	struct dc_stream *commit_streams[MAX_STREAMS];
+	struct dc_stream_state *commit_streams[MAX_STREAMS];
 	struct amdgpu_crtc *new_crtcs[MAX_STREAMS];
-	struct dc_stream *new_stream;
+	struct dc_stream_state *new_stream;
 	struct drm_crtc *flip_crtcs[MAX_STREAMS];
 	struct amdgpu_flip_work *work[MAX_STREAMS] = {0};
 	struct amdgpu_bo *new_abo[MAX_STREAMS] = {0};
@@ -4653,7 +4653,7 @@ int amdgpu_dm_atomic_commit(
 			continue;
 
 		update_stream_scaling_settings(&con_new_state->base.crtc->mode,
-				con_new_state, (struct dc_stream *)acrtc->stream);
+				con_new_state, (struct dc_stream_state *)acrtc->stream);
 
 		status = dc_stream_get_status(acrtc->stream);
 		WARN_ON(!status);
@@ -4782,8 +4782,8 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 	struct amdgpu_connector *aconnector = to_amdgpu_connector(connector);
 	struct amdgpu_crtc *disconnected_acrtc;
 	const struct dc_sink *sink;
-	struct dc_stream *commit_streams[MAX_STREAMS];
-	struct dc_stream *current_stream;
+	struct dc_stream_state *commit_streams[MAX_STREAMS];
+	struct dc_stream_state *current_stream;
 	uint32_t commit_streams_count = 0;
 
 	if (!aconnector->dc_sink || !connector->state || !connector->encoder)
@@ -4805,7 +4805,7 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 		struct dm_connector_state *dm_state =
 				to_dm_connector_state(aconnector->base.state);
 
-		struct dc_stream *new_stream =
+		struct dc_stream_state *new_stream =
 			create_stream_for_sink(
 				aconnector,
 				&disconnected_acrtc->base.state->mode,
@@ -4876,7 +4876,7 @@ void dm_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 static uint32_t add_val_sets_surface(
 	struct dc_validation_set *val_sets,
 	uint32_t set_count,
-	const struct dc_stream *stream,
+	const struct dc_stream_state *stream,
 	struct dc_plane_state *surface)
 {
 	uint32_t i = 0;
@@ -4897,8 +4897,8 @@ static uint32_t update_in_val_sets_stream(
 	struct dc_validation_set *val_sets,
 	struct drm_crtc **crtcs,
 	uint32_t set_count,
-	struct dc_stream *old_stream,
-	struct dc_stream *new_stream,
+	struct dc_stream_state *old_stream,
+	struct dc_stream_state *new_stream,
 	struct drm_crtc *crtc)
 {
 	uint32_t i = 0;
@@ -4923,7 +4923,7 @@ static uint32_t update_in_val_sets_stream(
 static uint32_t remove_from_val_sets(
 	struct dc_validation_set *val_sets,
 	uint32_t set_count,
-	const struct dc_stream *stream)
+	const struct dc_stream_state *stream)
 {
 	int i;
 
@@ -4956,7 +4956,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 	int set_count;
 	int new_stream_count;
 	struct dc_validation_set set[MAX_STREAMS] = {{ 0 }};
-	struct dc_stream *new_streams[MAX_STREAMS] = { 0 };
+	struct dc_stream_state *new_streams[MAX_STREAMS] = { 0 };
 	struct drm_crtc *crtc_set[MAX_STREAMS] = { 0 };
 	struct amdgpu_device *adev = dev->dev_private;
 	struct dc *dc = adev->dm.dc;
@@ -5073,7 +5073,7 @@ int amdgpu_dm_atomic_check(struct drm_device *dev,
 				to_dm_connector_state(conn_state);
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(con_new_state->base.crtc);
 		struct drm_crtc_state *crtc_state;
-		struct dc_stream *new_stream;
+		struct dc_stream_state *new_stream;
 
 		if (!acrtc)
 			continue;

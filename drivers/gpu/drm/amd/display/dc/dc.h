@@ -417,7 +417,7 @@ struct dc_flip_addrs {
  *   Surface addresses and flip attributes are programmed.
  *   Surface flip occur at next configured time (h_sync or v_sync flip)
  */
-void dc_flip_surface_addrs(struct dc *dc,
+void dc_flip_plane_addrs(struct dc *dc,
 		struct dc_plane_state *const plane_states[],
 		struct dc_flip_addrs flip_addrs[],
 		uint32_t count);
