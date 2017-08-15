@@ -748,7 +748,7 @@ static void dm_dc_surface_commit(
 		struct drm_crtc *crtc)
 {
 	struct dc_surface *dc_surface;
-	const struct dc_surface *dc_surfaces[1];
+	struct dc_surface *dc_surfaces[1];
 	const struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 	const struct dc_stream *dc_stream = acrtc->stream;
 
@@ -2904,7 +2904,7 @@ int amdgpu_dm_atomic_commit(
 				to_dm_connector_state(old_conn_state);
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(con_new_state->base.crtc);
 		struct drm_crtc_state *crtc_state;
-		const struct dc_stream_status *status = NULL;
+		struct dc_stream_status *status = NULL;
 
 		if (!acrtc)
 			continue;
@@ -2932,7 +2932,7 @@ int amdgpu_dm_atomic_commit(
 		/* TODO How it works with MPO ? */
 		if (!dc_commit_surfaces_to_stream(
 					dm->dc,
-					(const struct dc_surface **)status->surfaces,
+					status->surfaces,
 					status->surface_count,
 					acrtc->stream))
 			dm_error("%s: Failed to update stream scaling!\n", __func__);
@@ -3148,7 +3148,7 @@ static uint32_t add_val_sets_surface(
 	struct dc_validation_set *val_sets,
 	uint32_t set_count,
 	const struct dc_stream *stream,
-	const struct dc_surface *surface)
+	struct dc_surface *surface)
 {
 	uint32_t i = 0;
 
