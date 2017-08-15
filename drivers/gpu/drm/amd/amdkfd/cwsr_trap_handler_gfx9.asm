@@ -80,8 +80,6 @@ var EMU_RUN_HACK_RESTORE_NORMAL	    =	0
 var EMU_RUN_HACK_SAVE_NORMAL_EXIT   =	0
 var EMU_RUN_HACK_SAVE_SINGLE_WAVE   =	0
 var EMU_RUN_HACK_SAVE_FIRST_TIME    =	0		    //for interrupted restore in which the first save is through EMU_RUN_HACK
-var EMU_RUN_HACK_SAVE_FIRST_TIME_TBA_LO =   0			//for interrupted restore in which the first save is through EMU_RUN_HACK
-var EMU_RUN_HACK_SAVE_FIRST_TIME_TBA_HI =   0			//for interrupted restore in which the first save is through EMU_RUN_HACK
 var SAVE_LDS			    =	1
 var WG_BASE_ADDR_LO		    =	0x9000a000
 var WG_BASE_ADDR_HI		    =	0x0
@@ -119,7 +117,7 @@ var SQ_WAVE_TRAPSTS_PRE_SAVECTX_SIZE	=   10
 var SQ_WAVE_TRAPSTS_POST_SAVECTX_MASK	=   0xFFFFF800
 var SQ_WAVE_TRAPSTS_POST_SAVECTX_SHIFT	=   11
 var SQ_WAVE_TRAPSTS_POST_SAVECTX_SIZE	=   21
-var SQ_WAVE_TRAPSTS_MEM_VIOL_MASK	= 0x100
+var SQ_WAVE_TRAPSTS_ILLEGAL_INST_MASK	=   0x800
 
 var SQ_WAVE_IB_STS_RCNT_SHIFT		=   16			//FIXME
 var SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT	=   15			//FIXME
@@ -148,12 +146,6 @@ var S_SAVE_PC_HI_FIRST_REPLAY_MASK	=   0x08000000		//FIXME
 var s_save_spi_init_lo		    =	exec_lo
 var s_save_spi_init_hi		    =	exec_hi
 
-						//tba_lo and tba_hi need to be saved/restored
-var tba_lo		    =	ttmp12
-var tba_hi		    =	ttmp13
-var tma_lo		    =	ttmp14
-var tma_hi		    =	ttmp15
-
 var s_save_pc_lo	    =	ttmp0		//{TTMP1, TTMP0} = {3¡¯h0,pc_rewind[3:0], HT[0],trapID[7:0], PC[47:0]}
 var s_save_pc_hi	    =	ttmp1
 var s_save_exec_lo	    =	ttmp2
@@ -167,10 +159,10 @@ var s_save_buf_rsrc1	    =	ttmp9
 var s_save_buf_rsrc2	    =	ttmp10
 var s_save_buf_rsrc3	    =	ttmp11
 
-var s_save_mem_offset	    =	tma_lo
+var s_save_mem_offset	    =	ttmp14
 var s_save_alloc_size	    =	s_save_trapsts		//conflict
 var s_save_tmp		    =	s_save_buf_rsrc2	//shared with s_save_buf_rsrc2	(conflict: should not use mem access with s_save_tmp at the same time)
-var s_save_m0		    =	tma_hi
+var s_save_m0		    =	ttmp15
 
 /*	Restore	    */
 var S_RESTORE_BUF_RSRC_WORD1_STRIDE	    =	S_SAVE_BUF_RSRC_WORD1_STRIDE
@@ -191,9 +183,9 @@ var S_RESTORE_PC_HI_FIRST_REPLAY_MASK	    =	S_SAVE_PC_HI_FIRST_REPLAY_MASK
 var s_restore_spi_init_lo		    =	exec_lo
 var s_restore_spi_init_hi		    =	exec_hi
 
-var s_restore_mem_offset	=   ttmp2
+var s_restore_mem_offset	=   ttmp12
 var s_restore_alloc_size	=   ttmp3
-var s_restore_tmp		=   ttmp6		//tba_lo/hi need to be restored
+var s_restore_tmp		=   ttmp6
 var s_restore_mem_offset_save	=   s_restore_tmp	//no conflict
 
 var s_restore_m0	    =	s_restore_alloc_size	//no conflict
@@ -202,8 +194,8 @@ var s_restore_mode	    =	ttmp7
 
 var s_restore_pc_lo	    =	ttmp0
 var s_restore_pc_hi	    =	ttmp1
-var s_restore_exec_lo	    =	tma_lo			//no conflict
-var s_restore_exec_hi	    =	tma_hi			//no conflict
+var s_restore_exec_lo	    =	ttmp14
+var s_restore_exec_hi	    = 	ttmp15
 var s_restore_status	    =	ttmp4
 var s_restore_trapsts	    =	ttmp5
 var s_restore_xnack_mask_lo =	xnack_mask_lo
@@ -247,19 +239,26 @@ L_SKIP_RESTORE:
 
     // *********    Handle non-CWSR traps	*******************
 if (!EMU_RUN_HACK)
+    // Illegal instruction is a non-maskable exception which blocks context save.
+    // Halt the wavefront and return from the trap.
+    s_and_b32       ttmp8, s_save_trapsts, SQ_WAVE_TRAPSTS_ILLEGAL_INST_MASK
+    s_cbranch_scc1  L_HALT_WAVE
+
     // If STATUS.MEM_VIOL is asserted then we cannot fetch from the TMA.
     // Instead, halt the wavefront and return from the trap.
     s_and_b32       ttmp8, s_save_trapsts, SQ_WAVE_TRAPSTS_MEM_VIOL_MASK
     s_cbranch_scc0  L_NO_MEM_VIOL
+
+L_HALT_WAVE:
     s_or_b32        s_save_status, s_save_status, SQ_WAVE_STATUS_HALT_MASK
     s_branch        L_EXCP_CASE
 
 L_NO_MEM_VIOL:
     /* read tba and tma for next level trap handler, ttmp4 is used as s_save_status */
-    s_getreg_b32    tma_lo,hwreg(HW_REG_SQ_SHADER_TMA_LO)
-    s_getreg_b32    tma_hi,hwreg(HW_REG_SQ_SHADER_TMA_HI)
-    s_lshl_b64      [tma_lo, tma_hi], [tma_lo, tma_hi], 0x8
-    s_load_dwordx4  [ttmp8,ttmp9, ttmp10, ttmp11], [tma_lo,tma_hi], 0
+    s_getreg_b32    ttmp14,hwreg(HW_REG_SQ_SHADER_TMA_LO)
+    s_getreg_b32    ttmp15,hwreg(HW_REG_SQ_SHADER_TMA_HI)
+    s_lshl_b64      [ttmp14, ttmp15], [ttmp14, ttmp15], 0x8
+    s_load_dwordx4  [ttmp8, ttmp9, ttmp10, ttmp11], [ttmp14, ttmp15], 0
     s_waitcnt lgkmcnt(0)
     s_or_b32	    ttmp7, ttmp8, ttmp9
     s_cbranch_scc0  L_NO_NEXT_TRAP //next level trap handler not been set
@@ -412,8 +411,6 @@ end
     if ((EMU_RUN_HACK) && (EMU_RUN_HACK_SAVE_FIRST_TIME))
 	s_add_u32 s_save_pc_lo, s_save_pc_lo, 4		    //pc[31:0]+4
 	s_addc_u32 s_save_pc_hi, s_save_pc_hi, 0x0	    //carry bit over
-	s_mov_b32   tba_lo, EMU_RUN_HACK_SAVE_FIRST_TIME_TBA_LO
-	s_mov_b32   tba_hi, EMU_RUN_HACK_SAVE_FIRST_TIME_TBA_HI
     end
 
     write_hwreg_to_mem(s_save_pc_lo, s_save_buf_rsrc0, s_save_mem_offset)		    //PC
@@ -432,15 +429,11 @@ end
     //use s_save_tmp would introduce conflict here between s_save_tmp and s_save_buf_rsrc2
     s_getreg_b32    s_save_m0, hwreg(HW_REG_MODE)						    //MODE
     write_hwreg_to_mem(s_save_m0, s_save_buf_rsrc0, s_save_mem_offset)
-    write_hwreg_to_mem(tba_lo, s_save_buf_rsrc0, s_save_mem_offset)			//TBA_LO
-    write_hwreg_to_mem(tba_hi, s_save_buf_rsrc0, s_save_mem_offset)			//TBA_HI
 
 
 
     /*	    the first wave in the threadgroup	 */
-	// save fist_wave bits in tba_hi unused bit.26
     s_and_b32	    s_save_tmp, s_save_spi_init_hi, S_SAVE_SPI_INIT_FIRST_WAVE_MASK	// extract fisrt wave bit
-    //s_or_b32	      tba_hi, s_save_tmp, tba_hi					// save first wave bit to tba_hi.bits[26]
     s_mov_b32	     s_save_exec_hi, 0x0
     s_or_b32	     s_save_exec_hi, s_save_tmp, s_save_exec_hi				 // save first wave bit to s_save_exec_hi.bits[26]
 
@@ -474,6 +467,7 @@ end
     //s_mov_b64 s_save_pc_lo, s_save_buf_rsrc0
     s_mov_b64 s_save_xnack_mask_lo, s_save_buf_rsrc0
     s_add_u32 s_save_buf_rsrc0, s_save_buf_rsrc0, s_save_mem_offset
+    s_addc_u32 s_save_buf_rsrc1, s_save_buf_rsrc1, 0
 
     s_mov_b32	    m0, 0x0			    //SGPR initial index value =0
     s_nop	    0x0				    //Manually inserted wait states
@@ -548,7 +542,6 @@ end
     s_cbranch_scc0  L_SAVE_LDS_DONE									       //no lds used? jump to L_SAVE_DONE
 
     s_barrier		    //LDS is used? wait for other waves in the same TG
-    //s_and_b32	    s_save_tmp, tba_hi, S_SAVE_SPI_INIT_FIRST_WAVE_MASK		       //exec is still used here
     s_and_b32	    s_save_tmp, s_save_exec_hi, S_SAVE_SPI_INIT_FIRST_WAVE_MASK		       //exec is still used here
     s_cbranch_scc0  L_SAVE_LDS_DONE
 
@@ -963,9 +956,6 @@ end
 	s_mov_b32	s_restore_buf_rsrc2,  0x1000000					    //NUM_RECORDS in bytes
     end
 
-    /* If 112 SGPRs ar allocated, 4 sgprs are not used TBA(108,109),TMA(110,111),
-       However, we are safe to restore these 4 SGPRs anyway, since TBA,TMA will later be restored by HWREG
-    */
     s_mov_b32 m0, s_restore_alloc_size
 
  L_RESTORE_SGPR_LOOP:
@@ -973,6 +963,7 @@ end
     s_waitcnt	    lgkmcnt(0)								    //ensure data ready
 
     s_sub_u32 m0, m0, 16    // Restore from S[n] to S[0]
+    s_nop 0 // hazard SALU M0=> S_MOVREL
 
     s_movreld_b64   s0, s0	//s[0+m0] = s0
     s_movreld_b64   s2, s2
@@ -1019,8 +1010,6 @@ end
     read_hwreg_from_mem(xnack_mask_lo, s_restore_buf_rsrc0, s_restore_mem_offset)		    //XNACK_MASK_LO
     read_hwreg_from_mem(xnack_mask_hi, s_restore_buf_rsrc0, s_restore_mem_offset)		    //XNACK_MASK_HI
     read_hwreg_from_mem(s_restore_mode, s_restore_buf_rsrc0, s_restore_mem_offset)		//MODE
-    read_hwreg_from_mem(tba_lo, s_restore_buf_rsrc0, s_restore_mem_offset)			//TBA_LO
-    read_hwreg_from_mem(tba_hi, s_restore_buf_rsrc0, s_restore_mem_offset)			//TBA_HI
 
     s_waitcnt	    lgkmcnt(0)											    //from now on, it is safe to restore STATUS and IB_STS
 
@@ -1150,97 +1139,93 @@ end
 #endif
 
 static const uint32_t cwsr_trap_gfx9_hex[] = {
-	0xbf820001, 0xbf82012c,
+	0xbf820001, 0xbf820124,
 	0xb8f0f802, 0x89708670,
 	0xb8f1f803, 0x8674ff71,
-	0x00000400, 0xbf85001a,
-	0x8674ff71, 0x00000100,
-	0xbf840003, 0x8770ff70,
-	0x00002000, 0xbf820010,
-	0xb8faf812, 0xb8fbf813,
-	0x8efa887a, 0xc00a1d3d,
-	0x00000000, 0xbf8cc07f,
-	0x87737574, 0xbf840002,
-	0xb970f802, 0xbe801d74,
-	0xb8f1f803, 0x8671ff71,
-	0x000001ff, 0xbf850002,
-	0x806c846c, 0x826d806d,
-	0x866dff6d, 0x0000ffff,
-	0xb970f802, 0xbe801f6c,
-	0xb8f1f803, 0x8671ff71,
-	0x00000100, 0xbf840006,
-	0xbef60080, 0xb9760203,
-	0x866dff6d, 0x0000ffff,
-	0x80ec886c, 0x82ed806d,
-	0xbef60080, 0xb9760283,
-	0xbef20068, 0xbef30069,
-	0xb8f62407, 0x8e769c76,
-	0x876d766d, 0xb8f603c7,
-	0x8e769b76, 0x876d766d,
-	0xb8f6f807, 0x8676ff76,
-	0x00007fff, 0xb976f807,
-	0xbeee007e, 0xbeef007f,
-	0xbefe0180, 0xbf900004,
-	0xbf8e0002, 0xbf88fffe,
-	0xbef4007e, 0x8675ff7f,
-	0x0000ffff, 0x8775ff75,
-	0x00040000, 0xbef60080,
-	0xbef700ff, 0x00807fac,
-	0x8676ff7f, 0x08000000,
-	0x8f768376, 0x87777677,
-	0x8676ff7f, 0x70000000,
-	0x8f768176, 0x87777677,
-	0xbefb007c, 0xbefa0080,
-	0xb8fa2a05, 0x807a817a,
-	0x8e7a8a7a, 0xb8f61605,
-	0x80768176, 0x8e768676,
-	0x807a767a, 0xbef60084,
+	0x00000400, 0xbf85001d,
+	0x8674ff71, 0x00000800,
+	0xbf850003, 0x8674ff71,
+	0x00000100, 0xbf840003,
+	0x8770ff70, 0x00002000,
+	0xbf820010, 0xb8faf812,
+	0xb8fbf813, 0x8efa887a,
+	0xc00a1d3d, 0x00000000,
+	0xbf8cc07f, 0x87737574,
+	0xbf840002, 0xb970f802,
+	0xbe801d74, 0xb8f1f803,
+	0x8671ff71, 0x000001ff,
+	0xbf850002, 0x806c846c,
+	0x826d806d, 0x866dff6d,
+	0x0000ffff, 0xb970f802,
+	0xbe801f6c, 0xb8f1f803,
+	0x8671ff71, 0x00000100,
+	0xbf840006, 0xbef60080,
+	0xb9760203, 0x866dff6d,
+	0x0000ffff, 0x80ec886c,
+	0x82ed806d, 0xbef60080,
+	0xb9760283, 0xbef20068,
+	0xbef30069, 0xb8f62407,
+	0x8e769c76, 0x876d766d,
+	0xb8f603c7, 0x8e769b76,
+	0x876d766d, 0xb8f6f807,
+	0x8676ff76, 0x00007fff,
+	0xb976f807, 0xbeee007e,
+	0xbeef007f, 0xbefe0180,
+	0xbf900004, 0xbf8e0002,
+	0xbf88fffe, 0xbef4007e,
+	0x8675ff7f, 0x0000ffff,
+	0x8775ff75, 0x00040000,
+	0xbef60080, 0xbef700ff,
+	0x00807fac, 0x8676ff7f,
+	0x08000000, 0x8f768376,
+	0x87777677, 0x8676ff7f,
+	0x70000000, 0x8f768176,
+	0x87777677, 0xbefb007c,
+	0xbefa0080, 0xb8fa2a05,
+	0x807a817a, 0x8e7a8a7a,
+	0xb8f61605, 0x80768176,
+	0x8e768676, 0x807a767a,
+	0xbef60084, 0xbef600ff,
+	0x01000000, 0xbefe007c,
+	0xbefc007a, 0xc0611efa,
+	0x0000007c, 0x807a847a,
+	0xbefc007e, 0xbefe007c,
+	0xbefc007a, 0xc0611b3a,
+	0x0000007c, 0x807a847a,
+	0xbefc007e, 0xbefe007c,
+	0xbefc007a, 0xc0611b7a,
+	0x0000007c, 0x807a847a,
+	0xbefc007e, 0xbefe007c,
+	0xbefc007a, 0xc0611bba,
+	0x0000007c, 0x807a847a,
+	0xbefc007e, 0xbefe007c,
+	0xbefc007a, 0xc0611bfa,
+	0x0000007c, 0x807a847a,
+	0xbefc007e, 0xbefe007c,
+	0xbefc007a, 0xc0611c3a,
+	0x0000007c, 0x807a847a,
+	0xbefc007e, 0xb8f1f803,
+	0xbefe007c, 0xbefc007a,
+	0xc0611c7a, 0x0000007c,
+	0x807a847a, 0xbefc007e,
+	0xbefe007c, 0xbefc007a,
+	0xc0611cba, 0x0000007c,
+	0x807a847a, 0xbefc007e,
+	0xbefe007c, 0xbefc007a,
+	0xc0611cfa, 0x0000007c,
+	0x807a847a, 0xbefc007e,
+	0xb8fbf801, 0xbefe007c,
+	0xbefc007a, 0xc0611efa,
+	0x0000007c, 0x807a847a,
+	0xbefc007e, 0x8676ff7f,
+	0x04000000, 0xbeef0080,
+	0x876f6f76, 0xb8fa2a05,
+	0x807a817a, 0x8e7a8a7a,
+	0xb8f11605, 0x80718171,
+	0x8e718471, 0x8e768271,
 	0xbef600ff, 0x01000000,
-	0xbefe007c, 0xbefc007a,
-	0xc0611efa, 0x0000007c,
-	0x807a847a, 0xbefc007e,
-	0xbefe007c, 0xbefc007a,
-	0xc0611b3a, 0x0000007c,
-	0x807a847a, 0xbefc007e,
-	0xbefe007c, 0xbefc007a,
-	0xc0611b7a, 0x0000007c,
-	0x807a847a, 0xbefc007e,
-	0xbefe007c, 0xbefc007a,
-	0xc0611bba, 0x0000007c,
-	0x807a847a, 0xbefc007e,
-	0xbefe007c, 0xbefc007a,
-	0xc0611bfa, 0x0000007c,
-	0x807a847a, 0xbefc007e,
-	0xbefe007c, 0xbefc007a,
-	0xc0611c3a, 0x0000007c,
-	0x807a847a, 0xbefc007e,
-	0xb8f1f803, 0xbefe007c,
-	0xbefc007a, 0xc0611c7a,
-	0x0000007c, 0x807a847a,
-	0xbefc007e, 0xbefe007c,
-	0xbefc007a, 0xc0611cba,
-	0x0000007c, 0x807a847a,
-	0xbefc007e, 0xbefe007c,
-	0xbefc007a, 0xc0611cfa,
-	0x0000007c, 0x807a847a,
-	0xbefc007e, 0xb8fbf801,
-	0xbefe007c, 0xbefc007a,
-	0xc0611efa, 0x0000007c,
-	0x807a847a, 0xbefc007e,
-	0xbefe007c, 0xbefc007a,
-	0xc0611e3a, 0x0000007c,
-	0x807a847a, 0xbefc007e,
-	0xbefe007c, 0xbefc007a,
-	0xc0611e7a, 0x0000007c,
-	0x807a847a, 0xbefc007e,
-	0x8676ff7f, 0x04000000,
-	0xbeef0080, 0x876f6f76,
-	0xb8fa2a05, 0x807a817a,
-	0x8e7a8a7a, 0xb8f11605,
-	0x80718171, 0x8e718471,
-	0x8e768271, 0xbef600ff,
-	0x01000000, 0xbef20174,
-	0x80747a74, 0xbefc0080,
+	0xbef20174, 0x80747a74,
+	0x82758075, 0xbefc0080,
 	0xbf800000, 0xbe802b00,
 	0xbe822b02, 0xbe842b04,
 	0xbe862b06, 0xbe882b08,
@@ -1300,7 +1285,7 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0x7a1d0300, 0x807c847c,
 	0x807aff7a, 0x00000400,
 	0xbf0a717c, 0xbf85ffef,
-	0xbf9c0000, 0xbf8200ca,
+	0xbf9c0000, 0xbf8200c5,
 	0xbef4007e, 0x8675ff7f,
 	0x0000ffff, 0x8775ff75,
 	0x00040000, 0xbef60080,
@@ -1314,93 +1299,90 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0xbeff00c1, 0xb8ef4306,
 	0x866fc16f, 0xbf840019,
 	0x8e6f866f, 0x8e6f826f,
-	0xbef6006f, 0xb8ee2a05,
-	0x806e816e, 0x8e6e8a6e,
+	0xbef6006f, 0xb8f82a05,
+	0x80788178, 0x8e788a78,
 	0xb8f21605, 0x80728172,
-	0x8e728672, 0x806e726e,
-	0x806eff6e, 0x00000080,
+	0x8e728672, 0x80787278,
+	0x8078ff78, 0x00000080,
 	0xbef600ff, 0x01000000,
 	0xbefc0080, 0xe0510000,
-	0x6e1d0000, 0xe0510100,
-	0x6e1d0000, 0x807cff7c,
-	0x00000200, 0x806eff6e,
+	0x781d0000, 0xe0510100,
+	0x781d0000, 0x807cff7c,
+	0x00000200, 0x8078ff78,
 	0x00000200, 0xbf0a6f7c,
-	0xbf85fff6, 0xbeee0080,
+	0xbf85fff6, 0xbef80080,
 	0xbefe00c1, 0xbeff00c1,
 	0xb8ef2a05, 0x806f816f,
 	0x8e6f826f, 0x8e76886f,
 	0xbef600ff, 0x01000000,
-	0xbef2006e, 0x806eff6e,
+	0xbef20078, 0x8078ff78,
 	0x00000400, 0xbefc0084,
 	0xbf11087c, 0x806fff6f,
 	0x00008000, 0xe0524000,
-	0x6e1d0000, 0xe0524100,
-	0x6e1d0100, 0xe0524200,
-	0x6e1d0200, 0xe0524300,
-	0x6e1d0300, 0xbf8c0f70,
+	0x781d0000, 0xe0524100,
+	0x781d0100, 0xe0524200,
+	0x781d0200, 0xe0524300,
+	0x781d0300, 0xbf8c0f70,
 	0x7e000300, 0x7e020301,
 	0x7e040302, 0x7e060303,
-	0x807c847c, 0x806eff6e,
+	0x807c847c, 0x8078ff78,
 	0x00000400, 0xbf0a6f7c,
 	0xbf85ffee, 0xbf9c0000,
 	0xe0524000, 0x721d0000,
 	0xe0524100, 0x721d0100,
 	0xe0524200, 0x721d0200,
 	0xe0524300, 0x721d0300,
-	0xb8ee2a05, 0x806e816e,
-	0x8e6e8a6e, 0xb8f21605,
+	0xb8f82a05, 0x80788178,
+	0x8e788a78, 0xb8f21605,
 	0x80728172, 0x8e728672,
-	0x806e726e, 0x80eec06e,
+	0x80787278, 0x80f8c078,
 	0xb8ef1605, 0x806f816f,
 	0x8e6f846f, 0x8e76826f,
 	0xbef600ff, 0x01000000,
 	0xbefc006f, 0xc031003a,
-	0x0000006e, 0x80eec06e,
+	0x00000078, 0x80f8c078,
 	0xbf8cc07f, 0x80fc907c,
-	0xbe802d00, 0xbe822d02,
-	0xbe842d04, 0xbe862d06,
-	0xbe882d08, 0xbe8a2d0a,
-	0xbe8c2d0c, 0xbe8e2d0e,
-	0xbf06807c, 0xbf84fff1,
-	0xb8ee2a05, 0x806e816e,
-	0x8e6e8a6e, 0xb8f21605,
-	0x80728172, 0x8e728672,
-	0x806e726e, 0xbef60084,
-	0xbef600ff, 0x01000000,
-	0xc0211bfa, 0x0000006e,
-	0x806e846e, 0xc0211b3a,
-	0x0000006e, 0x806e846e,
-	0xc0211b7a, 0x0000006e,
-	0x806e846e, 0xc0211eba,
-	0x0000006e, 0x806e846e,
-	0xc0211efa, 0x0000006e,
-	0x806e846e, 0xc0211c3a,
-	0x0000006e, 0x806e846e,
-	0xc0211c7a, 0x0000006e,
-	0x806e846e, 0xc0211a3a,
-	0x0000006e, 0x806e846e,
-	0xc0211a7a, 0x0000006e,
-	0x806e846e, 0xc0211cfa,
-	0x0000006e, 0x806e846e,
-	0xc0211e3a, 0x0000006e,
-	0x806e846e, 0xc0211e7a,
-	0x0000006e, 0x806e846e,
-	0xbf8cc07f, 0x866dff6d,
-	0x0000ffff, 0xbefc006f,
-	0xbefe007a, 0xbeff007b,
-	0x866f71ff, 0x000003ff,
-	0xb96f4803, 0x866f71ff,
-	0xfffff800, 0x8f6f8b6f,
-	0xb96fa2c3, 0xb973f801,
-	0x866fff6d, 0xf0000000,
-	0x8f6f9c6f, 0x8e6f906f,
-	0xbef20080, 0x87726f72,
-	0x866fff6d, 0x08000000,
-	0x8f6f9b6f, 0x8e6f8f6f,
-	0x87726f72, 0x866fff70,
-	0x00800000, 0x8f6f976f,
-	0xb972f807, 0x86fe7e7e,
-	0x86ea6a6a, 0xb970f802,
-	0xbf8a0000, 0x95806f6c,
-	0xbf810000, 0x00000000,
+	0xbf800000, 0xbe802d00,
+	0xbe822d02, 0xbe842d04,
+	0xbe862d06, 0xbe882d08,
+	0xbe8a2d0a, 0xbe8c2d0c,
+	0xbe8e2d0e, 0xbf06807c,
+	0xbf84fff0, 0xb8f82a05,
+	0x80788178, 0x8e788a78,
+	0xb8f21605, 0x80728172,
+	0x8e728672, 0x80787278,
+	0xbef60084, 0xbef600ff,
+	0x01000000, 0xc0211bfa,
+	0x00000078, 0x80788478,
+	0xc0211b3a, 0x00000078,
+	0x80788478, 0xc0211b7a,
+	0x00000078, 0x80788478,
+	0xc0211eba, 0x00000078,
+	0x80788478, 0xc0211efa,
+	0x00000078, 0x80788478,
+	0xc0211c3a, 0x00000078,
+	0x80788478, 0xc0211c7a,
+	0x00000078, 0x80788478,
+	0xc0211a3a, 0x00000078,
+	0x80788478, 0xc0211a7a,
+	0x00000078, 0x80788478,
+	0xc0211cfa, 0x00000078,
+	0x80788478, 0xbf8cc07f,
+	0x866dff6d, 0x0000ffff,
+	0xbefc006f, 0xbefe007a,
+	0xbeff007b, 0x866f71ff,
+	0x000003ff, 0xb96f4803,
+	0x866f71ff, 0xfffff800,
+	0x8f6f8b6f, 0xb96fa2c3,
+	0xb973f801, 0x866fff6d,
+	0xf0000000, 0x8f6f9c6f,
+	0x8e6f906f, 0xbef20080,
+	0x87726f72, 0x866fff6d,
+	0x08000000, 0x8f6f9b6f,
+	0x8e6f8f6f, 0x87726f72,
+	0x866fff70, 0x00800000,
+	0x8f6f976f, 0xb972f807,
+	0x86fe7e7e, 0x86ea6a6a,
+	0xb970f802, 0xbf8a0000,
+	0x95806f6c, 0xbf810000,
 };
