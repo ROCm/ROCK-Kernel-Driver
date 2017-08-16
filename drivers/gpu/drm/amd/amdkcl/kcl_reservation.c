@@ -11,12 +11,25 @@ long _kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 	long ret = timeout ? timeout : 1;
 
 retry:
-	fence = NULL;
 	shared_count = 0;
 	seq = read_seqcount_begin(&obj->seq);
 	rcu_read_lock();
 
-	if (wait_all) {
+	fence = rcu_dereference(obj->fence_excl);
+	if (fence && !test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+		if (!dma_fence_get_rcu(fence))
+			goto unlock_retry;
+
+		if (dma_fence_is_signaled(fence)) {
+			dma_fence_put(fence);
+			fence = NULL;
+		}
+
+	} else {
+		fence = NULL;
+	}
+
+	if (!fence && wait_all) {
 		struct reservation_object_list *fobj =
 						rcu_dereference(obj->fence);
 
@@ -42,24 +55,6 @@ retry:
 
 			fence = lfence;
 			break;
-		}
-	}
-
-	if (!shared_count) {
-		struct fence *fence_excl = rcu_dereference(obj->fence_excl);
-
-		if (read_seqcount_retry(&obj->seq, seq))
-			goto unlock_retry;
-
-		if (fence_excl &&
-		    !test_bit(FENCE_FLAG_SIGNALED_BIT, &fence_excl->flags)) {
-			if (!fence_get_rcu(fence_excl))
-				goto unlock_retry;
-
-			if (fence_is_signaled(fence_excl))
-				fence_put(fence_excl);
-			else
-				fence = fence_excl;
 		}
 	}
 
@@ -90,22 +85,24 @@ int _kcl_reservation_object_copy_fences(struct reservation_object *dst,
 
 	src_list = reservation_object_get_list(src);
 
-	/*
-	 * resize dst->fence or allocate if it doesn't exist,
-	 * noop if already correct size
-	 */
-	size = offsetof(typeof(*src_list), shared[src_list->shared_count]);
-	dst_list = kmalloc(size, GFP_KERNEL);
-	if (!dst_list)
-		return -ENOMEM;
+	if (src_list) {
+		size = offsetof(typeof(*src_list),
+				shared[src_list->shared_count]);
+		dst_list = kmalloc(size, GFP_KERNEL);
+		if (!dst_list)
+			return -ENOMEM;
+
+		dst_list->shared_count = src_list->shared_count;
+		dst_list->shared_max = src_list->shared_count;
+		for (i = 0; i < src_list->shared_count; ++i)
+			dst_list->shared[i] =
+				dma_fence_get(src_list->shared[i]);
+	} else {
+		dst_list = NULL;
+	}
 
 	kfree(dst->staged);
 	dst->staged = NULL;
-
-	dst_list->shared_count = src_list->shared_count;
-	dst_list->shared_max = src_list->shared_count;
-	for (i = 0; i < src_list->shared_count; ++i)
-		dst_list->shared[i] = dma_fence_get(src_list->shared[i]);
 
 	src_list = reservation_object_get_list(dst);
 
