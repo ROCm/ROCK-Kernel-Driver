@@ -791,7 +791,7 @@ static int init_scheduler(struct device_queue_manager *dqm)
 
 static int initialize_nocpsch(struct device_queue_manager *dqm)
 {
-	int i;
+	int pipe, queue;
 
 	pr_debug("num of pipes: %d\n", get_pipes_per_mec(dqm));
 
@@ -805,8 +805,14 @@ static int initialize_nocpsch(struct device_queue_manager *dqm)
 	dqm->queue_count = dqm->next_pipe_to_allocate = 0;
 	dqm->sdma_queue_count = 0;
 
-	for (i = 0; i < get_pipes_per_mec(dqm); i++)
-		dqm->allocated_queues[i] = (1 << get_queues_per_pipe(dqm)) - 1;
+	for (pipe = 0; pipe < get_pipes_per_mec(dqm); pipe++) {
+		int pipe_offset = pipe * get_queues_per_pipe(dqm);
+
+		for (queue = 0; queue < get_queues_per_pipe(dqm); queue++)
+			if (test_bit(pipe_offset + queue,
+				     dqm->dev->shared_resources.queue_bitmap))
+				dqm->allocated_queues[pipe] |= 1 << queue;
+	}
 
 	dqm->vmid_bitmap = (1 << dqm->dev->vm_info.vmid_num_kfd) - 1;
 	dqm->sdma_bitmap = (1 << get_num_sdma_queues(dqm)) - 1;
