@@ -189,6 +189,8 @@ struct amdgpu_dm_connector {
 	struct mod_freesync_caps caps;
 
 	struct mutex hpd_lock;
+
+	bool fake_enable;
 };
 
 #define to_amdgpu_dm_connector(x) container_of(x, struct amdgpu_dm_connector, base)
