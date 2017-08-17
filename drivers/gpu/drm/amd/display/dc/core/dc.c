@@ -883,10 +883,6 @@ bool dc_enable_stereo(
 	struct pipe_ctx *pipe;
 	struct dc  *core_dc = dc;
 
-#ifdef ENABLE_FBC
-	struct compressor *fbc_compressor = core_dc->fbc_compressor;
-#endif
-
 	for (i = 0; i < MAX_PIPES; i++) {
 		if (context != NULL)
 			pipe = &context->res_ctx.pipe_ctx[i];
@@ -899,13 +895,6 @@ bool dc_enable_stereo(
 		}
 	}
 
-#ifdef ENABLE_FBC
-	if (fbc_compressor != NULL &&
-	    fbc_compressor->funcs->is_fbc_enabled_in_hw(core_dc->fbc_compressor,
-							NULL))
-		fbc_compressor->funcs->disable_fbc(fbc_compressor);
-
-#endif
 	return ret;
 }
 
