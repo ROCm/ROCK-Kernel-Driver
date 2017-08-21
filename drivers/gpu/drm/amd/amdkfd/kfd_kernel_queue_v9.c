@@ -71,8 +71,6 @@ static int pm_map_process_v9(struct packet_manager *pm,
 		uint32_t *buffer, struct qcm_process_device *qpd)
 {
 	struct pm4_mes_map_process *packet;
-	struct queue *cur;
-	uint32_t num_queues;
 	uint64_t vm_page_table_base_addr =
 		(uint64_t)(qpd->page_table_base) << 12;
 
@@ -88,11 +86,7 @@ static int pm_map_process_v9(struct packet_manager *pm,
 	packet->bitfields14.num_gws = qpd->num_gws;
 	packet->bitfields14.num_oac = qpd->num_oac;
 	packet->bitfields14.sdma_enable = 1;
-
-	num_queues = 0;
-	list_for_each_entry(cur, &qpd->queues_list, list)
-		num_queues++;
-	packet->bitfields14.num_queues = (qpd->is_debug) ? 0 : num_queues;
+	packet->bitfields14.num_queues = (qpd->is_debug) ? 0 : qpd->queue_count;
 
 	packet->sh_mem_config = qpd->sh_mem_config;
 	packet->sh_mem_bases = qpd->sh_mem_bases;

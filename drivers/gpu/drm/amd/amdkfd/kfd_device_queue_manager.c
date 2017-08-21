@@ -277,6 +277,7 @@ static int create_queue_nocpsch(struct device_queue_manager *dqm,
 	}
 
 	list_add(&q->list, &qpd->queues_list);
+	qpd->queue_count++;
 	if (q->properties.is_active)
 		dqm->queue_count++;
 
@@ -439,6 +440,7 @@ static int destroy_queue_nocpsch_locked(struct device_queue_manager *dqm,
 
 		deallocate_vmid(dqm, qpd, q);
 	}
+	qpd->queue_count--;
 	if (q->properties.is_active)
 		dqm->queue_count--;
 
@@ -1124,6 +1126,7 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 		goto out_deallocate_doorbell;
 
 	list_add(&q->list, &qpd->queues_list);
+	qpd->queue_count++;
 	if (q->properties.is_active) {
 		dqm->queue_count++;
 		retval = execute_queues_cpsch(dqm, false, false);
@@ -1312,6 +1315,7 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 	}
 
 	list_del(&q->list);
+	qpd->queue_count--;
 	if (q->properties.is_active)
 		dqm->queue_count--;
 
@@ -1559,6 +1563,7 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 			goto out;
 		}
 		list_del(&q->list);
+		qpd->queue_count--;
 		mqd->uninit_mqd(mqd, q->mqd, q->mqd_mem_obj);
 	}
 
