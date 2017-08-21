@@ -1546,7 +1546,7 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 		}
 	}
 
-	retval = execute_queues_cpsch(dqm, true, true);
+	retval = execute_queues_cpsch(dqm, true, false);
 
 	if (retval || qpd->reset_wavefronts) {
 		pr_warn("Resetting wave fronts (cpsch) on dev %p\n", dqm->dev);

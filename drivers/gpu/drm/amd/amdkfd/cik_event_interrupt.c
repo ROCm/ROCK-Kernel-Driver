@@ -97,7 +97,7 @@ static void cik_event_interrupt_wq(struct kfd_dev *dev,
 
 		memset(&info, 0, sizeof(info));
 		dev->kfd2kgd->get_vm_fault_info(dev->kgd, &info);
-		kfd_process_vm_fault(dev->dqm, ihre->pasid, true);
+		kfd_process_vm_fault(dev->dqm, ihre->pasid, false);
 		if (!info.page_addr && !info.status)
 			return;
 
