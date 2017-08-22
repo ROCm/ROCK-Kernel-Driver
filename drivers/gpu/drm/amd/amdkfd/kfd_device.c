@@ -277,6 +277,7 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x6920, &tonga_device_info   },	/* Tonga */
 	{ 0x6921, &tonga_device_info   },	/* Tonga */
 	{ 0x6928, &tonga_device_info   },	/* Tonga */
+	{ 0x6929, &tonga_device_info   },	/* Tonga */
 	{ 0x692B, &tonga_device_info   },	/* Tonga */
 	{ 0x692F, &tonga_vf_device_info   },	/* Tonga vf */
 	{ 0x6938, &tonga_device_info   },	/* Tonga */
