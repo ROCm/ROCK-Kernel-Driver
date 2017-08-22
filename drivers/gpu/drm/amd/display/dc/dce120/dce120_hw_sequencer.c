@@ -31,7 +31,6 @@
 
 #include "dce110/dce110_hw_sequencer.h"
 
-/* include DCE12.0 register header files */
 #include "dce/dce_12_0_offset.h"
 #include "dce/dce_12_0_sh_mask.h"
 #include "soc15ip.h"
