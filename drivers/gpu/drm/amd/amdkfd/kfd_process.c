@@ -115,10 +115,11 @@ static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 {
 	int err;
 	void *mem = NULL;
+	int handle;
 
 	err = kdev->kfd2kgd->alloc_memory_of_gpu(kdev->kgd, gpu_va, size,
 				pdd->vm,
-				(struct kgd_mem **)&mem, NULL, kptr,
+				(struct kgd_mem **)&mem, NULL, NULL,
 				flags);
 	if (err)
 		goto err_alloc_mem;
@@ -142,15 +143,27 @@ static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 	 * We do not need to take p->mutex, because the process is just
 	 * created and the ioctls have not had the chance to run.
 	 */
-	if (kfd_process_device_create_obj_handle(
-			pdd, mem, gpu_va, size, NULL) < 0) {
-		err = -ENOMEM;
-		*kptr = NULL;
+	handle = kfd_process_device_create_obj_handle(
+			pdd, mem, gpu_va, size, NULL);
+
+	if (handle < 0) {
+		err = handle;
 		goto free_gpuvm;
+	}
+
+	if (kptr) {
+		err = kdev->kfd2kgd->map_gtt_bo_to_kernel(kdev->kgd,
+				(struct kgd_mem *)mem, kptr);
+		if (err) {
+			pr_debug("Map GTT BO to kernel failed\n");
+			goto free_obj_handle;
+		}
 	}
 
 	return err;
 
+free_obj_handle:
+	kfd_process_device_remove_obj_handle(pdd, handle);
 free_gpuvm:
 sync_memory_failed:
 	kfd_process_free_gpuvm(mem, pdd);
