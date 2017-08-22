@@ -1657,17 +1657,25 @@ int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 		struct kgd_mem *mem, void **kptr)
 {
 	int ret;
-	struct amdgpu_bo *bo;
+	struct amdgpu_bo *bo = mem->bo;
 
-	mutex_lock(&mem->lock);
+	if (amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
+		pr_err("userptr can't be mapped to kernel\n");
+		return -EINVAL;
+	}
 
-	bo = mem->bo;
+	/* delete kgd_mem from kfd_bo_list to avoid re-validating
+	 * this BO in BO's restoring after eviction.
+	 */
+	mutex_lock(&mem->process_info->lock);
+
+	list_del_init(&mem->validate_list.head);
 
 	ret = __map_bo_to_kernel(bo, AMDGPU_GEM_DOMAIN_GTT, kptr);
 	if (!ret)
 		mem->kptr = *kptr;
 
-	mutex_unlock(&mem->lock);
+	mutex_unlock(&mem->process_info->lock);
 
 	return ret;
 }
