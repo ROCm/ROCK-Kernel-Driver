@@ -654,8 +654,8 @@ pin_failed:
 
 static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		uint64_t size, void *vm, struct kgd_mem **mem,
-		uint64_t *offset, void **kptr,
-		u32 domain, u64 flags, struct sg_table *sg, bool aql_queue,
+		uint64_t *offset, u32 domain, u64 flags,
+		struct sg_table *sg, bool aql_queue,
 		bool readonly, bool execute, bool coherent, bool no_sub,
 		bool userptr)
 {
@@ -736,12 +736,6 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	if (userptr)
 		bo->flags |= AMDGPU_AMDKFD_USERPTR_BO;
 
-	if (kptr) {
-		ret = __map_bo_to_kernel(bo, domain, kptr);
-		if (ret)
-			goto map_bo_to_kernel_failed;
-	}
-
 	(*mem)->va = va;
 	(*mem)->domain = domain;
 	(*mem)->mapped_to_gpu_memory = 0;
@@ -763,7 +757,6 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 
 	return 0;
 
-map_bo_to_kernel_failed:
 allocate_init_user_pages_failed:
 	amdgpu_bo_unref(&bo);
 err_bo_create:
@@ -1087,8 +1080,7 @@ int amdgpu_amdkfd_gpuvm_sync_memory(
 int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		struct kgd_dev *kgd, uint64_t va, uint64_t size,
 		void *vm, struct kgd_mem **mem,
-		uint64_t *offset, void **kptr,
-		uint32_t flags)
+		uint64_t *offset, uint32_t flags)
 {
 	bool aql_queue, public, readonly, execute, coherent, no_sub, userptr;
 	u64 alloc_flag;
@@ -1112,11 +1104,6 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	coherent  = (flags & ALLOC_MEM_FLAGS_COHERENT) ? true : false;
 	no_sub    = (flags & ALLOC_MEM_FLAGS_NO_SUBSTITUTE) ? true : false;
 	userptr   = (flags & ALLOC_MEM_FLAGS_USERPTR) ? true : false;
-
-	if (userptr && kptr) {
-		pr_err("userptr can't be mapped to kernel\n");
-		return -EINVAL;
-	}
 
 	/*
 	 * Check on which domain to allocate BO
@@ -1156,7 +1143,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 			BOOL_TO_STR(coherent), BOOL_TO_STR(no_sub));
 
 	return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
-			temp_offset, kptr, domain,
+			temp_offset, domain,
 			alloc_flag, sg,
 			aql_queue, readonly, execute,
 			coherent, no_sub, userptr);
