@@ -1242,7 +1242,6 @@ static void amdgpu_dpm_change_power_state_locked(struct amdgpu_device *adev)
 		printk("switching to power state:\n");
 		amdgpu_dpm_print_power_state(adev, adev->pm.dpm.requested_ps);
 	}
-
 	/* update whether vce is active */
 	ps->vce_active = adev->pm.dpm.vce_active;
 
@@ -1505,7 +1504,7 @@ void amdgpu_pm_compute_clocks(struct amdgpu_device *adev)
 			list_for_each_entry(crtc,
 					    &ddev->mode_config.crtc_list, head) {
 				amdgpu_crtc = to_amdgpu_crtc(crtc);
-				if (crtc->enabled) {
+				if (amdgpu_crtc->enabled) {
 					adev->pm.dpm.new_active_crtcs |= (1 << amdgpu_crtc->crtc_id);
 					adev->pm.dpm.new_active_crtc_count++;
 				}
