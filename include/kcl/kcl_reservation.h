@@ -77,4 +77,23 @@ kcl_reservation_object_copy_fences(struct reservation_object *dst,
 	return reservation_object_copy_fences(dst, src);
 #endif
 }
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+static inline bool __must_check
+_kcl_reservation_object_trylock(struct reservation_object *obj)
+{
+	return ww_mutex_trylock(&obj->lock);
+}
+#endif
+
+static inline bool __must_check
+kcl_reservation_object_trylock(struct reservation_object *obj)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	return _kcl_reservation_object_trylock(obj);
+#else
+	return reservation_object_trylock(obj);
+#endif
+}
+
 #endif /* AMDKCL_RESERVATION_H */

@@ -404,7 +404,7 @@ static int ttm_bo_individualize_resv(struct ttm_buffer_object *bo)
 	if (bo->resv == &bo->ttm_resv)
 		return 0;
 
-	BUG_ON(!reservation_object_trylock(&bo->ttm_resv));
+	BUG_ON(!kcl_reservation_object_trylock(&bo->ttm_resv));
 
 	r = kcl_reservation_object_copy_fences(&bo->ttm_resv, bo->resv);
 	if (r)
