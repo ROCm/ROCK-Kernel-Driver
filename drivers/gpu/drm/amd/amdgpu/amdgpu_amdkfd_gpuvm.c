@@ -94,7 +94,7 @@ static bool check_if_add_bo_to_vm(struct amdgpu_vm *avm,
 	struct kfd_bo_va_list *entry;
 
 	list_for_each_entry(entry, &mem->bo_va_list, bo_list)
-		if (entry->bo_va->vm == avm)
+		if (entry->bo_va->base.vm == avm)
 			return false;
 
 	return true;
@@ -873,7 +873,7 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 	INIT_LIST_HEAD(&ctx->duplicates);
 
 	list_for_each_entry(entry, &mem->bo_va_list, bo_list) {
-		if ((vm && vm != entry->bo_va->vm) ||
+		if ((vm && vm != entry->bo_va->base.vm) ||
 			(entry->is_mapped != map_type
 			&& map_type != VA_DO_NOT_CARE))
 			continue;
@@ -897,12 +897,12 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 
 	i = 0;
 	list_for_each_entry(entry, &mem->bo_va_list, bo_list) {
-		if ((vm && vm != entry->bo_va->vm) ||
+		if ((vm && vm != entry->bo_va->base.vm) ||
 			(entry->is_mapped != map_type
 			&& map_type != VA_DO_NOT_CARE))
 			continue;
 
-		amdgpu_vm_get_pd_bo(entry->bo_va->vm, &ctx->list,
+		amdgpu_vm_get_pd_bo(entry->bo_va->base.vm, &ctx->list,
 				&ctx->vm_pd[i]);
 		i++;
 	}
@@ -947,7 +947,7 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 				struct amdgpu_sync *sync)
 {
 	struct amdgpu_bo_va *bo_va = entry->bo_va;
-	struct amdgpu_vm *vm = bo_va->vm;
+	struct amdgpu_vm *vm = bo_va->base.vm;
 	struct amdkfd_vm *kvm = container_of(vm, struct amdkfd_vm, base);
 	struct amdgpu_bo *pd = vm->root.bo;
 
@@ -990,8 +990,8 @@ static int update_gpuvm_pte(struct amdgpu_device *adev,
 	struct amdgpu_bo *bo;
 
 	bo_va = entry->bo_va;
-	vm = bo_va->vm;
-	bo = bo_va->bo;
+	vm = bo_va->base.vm;
+	bo = bo_va->base.bo;
 
 	/* Update the page tables  */
 	ret = amdgpu_vm_bo_update(adev, bo_va, false);
@@ -1022,7 +1022,7 @@ static int map_bo_to_gpuvm(struct amdgpu_device *adev,
 
 	/* Set virtual address for the allocation */
 	ret = amdgpu_vm_bo_map(adev, entry->bo_va, entry->va, 0,
-			amdgpu_bo_size(entry->bo_va->bo), entry->pte_flags);
+			amdgpu_bo_size(entry->bo_va->base.bo), entry->pte_flags);
 	if (ret != 0) {
 		pr_err("Failed to map VA 0x%llx in vm. ret %d\n",
 				entry->va, ret);
@@ -1337,7 +1337,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	}
 
 	list_for_each_entry(entry, &mem->bo_va_list, bo_list) {
-		if (entry->bo_va->vm == vm && !entry->is_mapped) {
+		if (entry->bo_va->base.vm == vm && !entry->is_mapped) {
 			pr_debug("\t map VA 0x%llx - 0x%llx in entry %p\n",
 					entry->va, entry->va + bo_size,
 					entry);
@@ -1546,7 +1546,7 @@ static bool is_mem_on_local_device(struct kgd_dev *kgd,
 	struct kfd_bo_va_list *entry;
 
 	list_for_each_entry(entry, bo_va_list, bo_list) {
-		if (entry->kgd_dev == kgd && entry->bo_va->vm == vm)
+		if (entry->kgd_dev == kgd && entry->bo_va->base.vm == vm)
 			return true;
 	}
 
@@ -1597,7 +1597,7 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 		vm);
 
 	list_for_each_entry(entry, &mem->bo_va_list, bo_list) {
-		if (entry->bo_va->vm == vm && entry->is_mapped) {
+		if (entry->bo_va->base.vm == vm && entry->is_mapped) {
 			pr_debug("\t unmap VA 0x%llx - 0x%llx from entry %p\n",
 					entry->va,
 					entry->va + bo_size,
