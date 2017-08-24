@@ -97,7 +97,15 @@ static void cik_event_interrupt_wq(struct kfd_dev *dev,
 
 		memset(&info, 0, sizeof(info));
 		dev->kfd2kgd->get_vm_fault_info(dev->kgd, &info);
-		kfd_process_vm_fault(dev->dqm, ihre->pasid, false);
+		/* When CWSR is disabled, we choose to reset the device, which
+		 * will reset the queues from other processes on this device.
+		 * This is a bug that we accept given by-pasid reset does not
+		 * work well.
+		 */
+		if (dev->cwsr_enabled)
+			kfd_process_vm_fault(dev->dqm, ihre->pasid, false);
+		else
+			kfd_process_vm_fault(dev->dqm, ihre->pasid, true);
 		if (!info.page_addr && !info.status)
 			return;
 

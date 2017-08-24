@@ -1546,7 +1546,14 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 		}
 	}
 
-	retval = execute_queues_cpsch(dqm, true, false);
+	/* When CWSR is disabled, we choose to reset the device, which will
+	 * reset the queues from other processes on this device. This is
+	 * a bug that we accept given by-pasid reset does not work well.
+	 */
+	if (dqm->dev->cwsr_enabled)
+		retval = execute_queues_cpsch(dqm, true, false);
+	else
+		retval = execute_queues_cpsch(dqm, true, true);
 
 	if (retval || qpd->reset_wavefronts) {
 		pr_warn("Resetting wave fronts (cpsch) on dev %p\n", dqm->dev);
