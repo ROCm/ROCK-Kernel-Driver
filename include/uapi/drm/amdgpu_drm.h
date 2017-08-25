@@ -101,6 +101,8 @@ extern "C" {
 #define AMDGPU_GEM_CREATE_SHADOW		(1 << 4)
 /* Flag that allocating the BO should use linear VRAM */
 #define AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS	(1 << 5)
+/* Flag that BO is always valid in this VM */
+#define AMDGPU_GEM_CREATE_VM_ALWAYS_VALID	(1 << 6)
 
 /* hybrid specific */
 /* Flag that the memory should be in SPARSE resource */
