@@ -822,7 +822,7 @@ struct drm_atomic_state *
 dm_atomic_state_alloc(struct drm_device *dev)
 {
 	struct dm_atomic_state *state = kzalloc(sizeof(*state), GFP_KERNEL);
-	struct validate_context *new_ctx;
+	struct dc_state *new_ctx;
 	struct amdgpu_device *adev = dev->dev_private;
 	struct dc *dc = adev->dm.dc;
 
@@ -857,7 +857,7 @@ dm_atomic_state_clear(struct drm_atomic_state *state)
 	struct dm_atomic_state *dm_state = to_dm_atomic_state(state);
 
 	if (dm_state->context) {
-		dc_release_validate_context(dm_state->context);
+		dc_release_state(dm_state->context);
 		dm_state->context = NULL;
 	}
 
@@ -4485,7 +4485,7 @@ void amdgpu_dm_atomic_commit_tail(
 	}
 
 	if (dm_state->context)
-		WARN_ON(!dc_commit_context(dm->dc, dm_state->context));
+		WARN_ON(!dc_commit_state(dm->dc, dm_state->context));
 
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
