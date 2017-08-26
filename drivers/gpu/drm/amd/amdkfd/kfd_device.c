@@ -417,13 +417,6 @@ static bool device_iommu_pasid_init(struct kfd_dev *kfd)
 	pasid_limit = min_t(unsigned int,
 			(unsigned int)(1 << kfd->device_info->max_pasid_bits),
 			iommu_info.max_pasids);
-	/*
-	 * last pasid is used for kernel queues doorbells
-	 * in the future the last pasid might be used for a kernel thread.
-	 */
-	pasid_limit = min_t(unsigned int,
-				pasid_limit,
-				kfd->doorbell_process_limit - 1);
 
 	if (!kfd_set_pasid_limit(pasid_limit)) {
 		dev_err(kfd_device, "error setting pasid limit\n");
