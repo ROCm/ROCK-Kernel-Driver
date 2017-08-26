@@ -185,6 +185,9 @@ struct tile_config {
  *
  * @get_max_engine_clock_in_mhz: Retrieves maximum GPU clock in MHz
  *
+ * @alloc_pasid: Allocate a PASID
+ * @free_pasid: Free a PASID
+ *
  * @program_sh_mem_settings: A function that should initiate the memory
  * properties such as main aperture memory type (cache / non cached) and
  * secondary aperture base address, size and memory type.
@@ -271,6 +274,9 @@ struct kfd2kgd_calls {
 	uint32_t (*get_process_page_dir)(void *vm);
 
 	int (*open_graphic_handle)(struct kgd_dev *kgd, uint64_t va, void *vm, int fd, uint32_t handle, struct kgd_mem **mem);
+
+	int (*alloc_pasid)(unsigned int bits);
+	void (*free_pasid)(unsigned int pasid);
 
 	/* Register access functions */
 	void (*program_sh_mem_settings)(struct kgd_dev *kgd, uint32_t vmid,
