@@ -2725,6 +2725,8 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		vm->pasid = pasid;
 	}
 
+	INIT_KFIFO(vm->faults);
+
 	return 0;
 
 error_free_root:
@@ -2780,6 +2782,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 {
 	struct amdgpu_bo_va_mapping *mapping, *tmp;
 	bool prt_fini_needed = !!adev->gart.gart_funcs->set_prt;
+	u64 fault;
 	int i;
 
 	if (vm->vm_context == AMDGPU_VM_CONTEXT_COMPUTE) {
@@ -2799,6 +2802,10 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		}
 		mutex_unlock(&id_mgr->lock);
 	}
+
+	/* Clear pending page faults from IH when the VM is destroyed */
+	while (kfifo_get(&vm->faults, &fault))
+		amdgpu_ih_clear_fault(adev, fault);
 
 	if (vm->pasid) {
 		unsigned long flags;
