@@ -840,7 +840,7 @@ dm_atomic_state_alloc(struct drm_device *dev)
 
 	atomic_inc(&new_ctx->ref_count);
 
-	dc_resource_validate_ctx_copy_construct_current(dc, new_ctx);
+	dc_resource_state_copy_construct_current(dc, new_ctx);
 
 	state->context = new_ctx;
 

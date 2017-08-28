@@ -1013,7 +1013,7 @@ void dc_release_state(struct dc_state *context)
 	atomic_dec(&context->ref_count);
 
 	if (atomic_read(&context->ref_count) == 0) {
-		dc_resource_validate_ctx_destruct(context);
+		dc_resource_state_destruct(context);
 		dm_free(context);
 	}
 }
@@ -1285,7 +1285,7 @@ void dc_update_planes_and_stream(struct dc *dc,
 
 		atomic_inc(&context->ref_count);
 
-		dc_resource_validate_ctx_copy_construct(
+		dc_resource_state_copy_construct(
 				dc->current_state, context);
 
 		/*remove old surfaces from context */
@@ -1660,7 +1660,7 @@ void dc_set_power_state(
 
 		/* Preserve refcount */
 		ref_count = dc->current_state->ref_count;
-		dc_resource_validate_ctx_destruct(dc->current_state);
+		dc_resource_state_destruct(dc->current_state);
 		memset(dc->current_state, 0,
 				sizeof(*dc->current_state));
 		dc->current_state->ref_count = ref_count;
