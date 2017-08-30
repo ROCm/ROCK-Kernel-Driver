@@ -1053,7 +1053,7 @@ static int amdgpu_vm_update_level(struct amdgpu_device *adev,
 		ndw = 64;
 
 		/* assume the worst case */
-		ndw += parent->last_entry_used * 6;
+		ndw += parent->last_entry_used * 10;
 
 		pd_addr = amdgpu_bo_gpu_offset(parent->base.bo);
 
@@ -1556,7 +1556,7 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	ndw = 64;
 
 	/* one PDE write for each huge page */
-	ndw += ((nptes >> adev->vm_manager.block_size) + 1) * 6;
+	ndw += ((nptes >> adev->vm_manager.block_size) + 1) * 10;
 
 	if (pages_addr) {
 		/* copy commands needed */
