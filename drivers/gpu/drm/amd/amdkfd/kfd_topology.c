@@ -577,12 +577,12 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 	if (dev->kobj_mem) {
 		list_for_each_entry(mem, &dev->mem_props, list)
 			if (mem->kobj) {
-				kfd_remove_sysfs_file(mem->kobj,
-						&mem->attr_props);
 				/* TODO: Remove when CPU/APU supported */
 				if (dev->node_props.cpu_cores_count == 0)
-					kfd_remove_sysfs_file(mem->kobj,
+					sysfs_remove_file(mem->kobj,
 							&mem->attr_used);
+				kfd_remove_sysfs_file(mem->kobj,
+						&mem->attr_props);
 				mem->kobj = NULL;
 			}
 		kobject_del(dev->kobj_mem);
