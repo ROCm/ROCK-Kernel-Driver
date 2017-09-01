@@ -701,10 +701,6 @@ static void amdgpu_gem_va_update_vm(struct amdgpu_device *adev,
 	if (!amdgpu_vm_ready(vm))
 		return;
 
-	r = amdgpu_vm_update_directories(adev, vm);
-	if (r)
-		goto error;
-
 	r = amdgpu_vm_clear_freed(adev, vm, NULL);
 	if (r)
 		goto error;
@@ -712,6 +708,10 @@ static void amdgpu_gem_va_update_vm(struct amdgpu_device *adev,
 	if (operation == AMDGPU_VA_OP_MAP ||
 	    operation == AMDGPU_VA_OP_REPLACE)
 		r = amdgpu_vm_bo_update(adev, bo_va, false);
+
+	r = amdgpu_vm_update_directories(adev, vm);
+	if (r)
+		goto error;
 
 error:
 	if (r && r != -ERESTARTSYS)
