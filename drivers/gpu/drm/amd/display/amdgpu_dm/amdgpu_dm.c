@@ -5552,11 +5552,8 @@ static void fill_stream_properties_from_drm_display_mode(
 		timing_out->v_sync_width = mode_in->crtc_vsync_end - mode_in->crtc_vsync_start;
 		timing_out->pix_clk_100hz = mode_in->crtc_clock * 10;
 	}
-
 	timing_out->aspect_ratio = get_aspect_ratio(mode_in);
-
 	stream->output_color_space = get_output_color_space(timing_out);
-
 	stream->out_transfer_func->type = TF_TYPE_PREDEFINED;
 	stream->out_transfer_func->tf = TRANSFER_FUNCTION_SRGB;
 	if (stream->signal == SIGNAL_TYPE_HDMI_TYPE_A) {
