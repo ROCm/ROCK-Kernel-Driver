@@ -1189,7 +1189,8 @@ static void amdgpu_vm_invalidate_level(struct amdgpu_vm *vm,
 
 		entry->addr = ~0ULL;
 		spin_lock(&vm->status_lock);
-		list_move(&entry->base.vm_status, &vm->relocated);
+		if (list_empty(&entry->base.vm_status))
+			list_add(&entry->base.vm_status, &vm->relocated);
 		spin_unlock(&vm->status_lock);
 		amdgpu_vm_invalidate_level(vm, entry);
 	}
@@ -2119,7 +2120,8 @@ static void amdgpu_vm_bo_insert_map(struct amdgpu_device *adev,
 
 	if (bo && bo->tbo.resv == vm->root.base.bo->tbo.resv) {
 		spin_lock(&vm->status_lock);
-		list_move(&bo_va->base.vm_status, &vm->moved);
+		if (list_empty(&bo_va->base.vm_status))
+			list_add(&bo_va->base.vm_status, &vm->moved);
 		spin_unlock(&vm->status_lock);
 	}
 	trace_amdgpu_vm_bo_map(bo_va, mapping);
@@ -2474,7 +2476,8 @@ void amdgpu_vm_bo_invalidate(struct amdgpu_device *adev,
 		}
 
 		spin_lock(&bo_base->vm->status_lock);
-		list_move(&bo_base->vm_status, &bo_base->vm->moved);
+		if (list_empty(&bo_base->vm_status))
+			list_add(&bo_base->vm_status, &vm->moved);
 		spin_unlock(&bo_base->vm->status_lock);
 	}
 }
