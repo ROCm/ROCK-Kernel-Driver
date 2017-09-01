@@ -5877,7 +5877,6 @@ static void fill_stream_properties_from_drm_display_mode(
 		timing_out->v_sync_width = mode_in->crtc_vsync_end - mode_in->crtc_vsync_start;
 		timing_out->pix_clk_100hz = mode_in->crtc_clock * 10;
 	}
-
 	timing_out->aspect_ratio = get_aspect_ratio(mode_in);
 
 	stream->out_transfer_func->type = TF_TYPE_PREDEFINED;
