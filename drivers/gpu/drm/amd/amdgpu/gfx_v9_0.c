@@ -1271,6 +1271,7 @@ static int gfx_v9_0_sw_init(void *handle)
 
 	switch (adev->asic_type) {
 	case CHIP_VEGA10:
+	case CHIP_VEGA12:
 	case CHIP_RAVEN:
 		adev->gfx.mec.num_mec = 2;
 		break;
@@ -4485,6 +4486,7 @@ static void gfx_v9_0_set_rlc_funcs(struct amdgpu_device *adev)
 {
 	switch (adev->asic_type) {
 	case CHIP_VEGA10:
+	case CHIP_VEGA12:
 	case CHIP_RAVEN:
 		adev->gfx.rlc.funcs = &gfx_v9_0_rlc_funcs;
 		break;
