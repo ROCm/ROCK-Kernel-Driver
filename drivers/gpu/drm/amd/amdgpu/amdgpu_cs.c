@@ -132,7 +132,11 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data)
 		size = p->chunks[i].length_dw;
 		cdata = kcl_u64_to_user_ptr(user_chunk.chunk_data);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+		p->chunks[i].kdata = drm_malloc_ab(size, sizeof(uint32_t));
+#else
 		p->chunks[i].kdata = kvmalloc_array(size, sizeof(uint32_t), GFP_KERNEL);
+#endif
 		if (p->chunks[i].kdata == NULL) {
 			ret = -ENOMEM;
 			i--;
@@ -192,7 +196,11 @@ free_all_kdata:
 	i = p->nchunks - 1;
 free_partial_kdata:
 	for (; i >= 0; i--)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+		drm_free_large(p->chunks[i].kdata);
+#else
 		kvfree(p->chunks[i].kdata);
+#endif
 	kfree(p->chunks);
 	p->chunks = NULL;
 	p->nchunks = 0;
@@ -514,7 +522,11 @@ static int amdgpu_cs_list_validate(struct amdgpu_cs_parser *p,
 			return r;
 
 		if (binding_userptr) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+			drm_free_large(lobj->user_pages);
+#else
 			kvfree(lobj->user_pages);
+#endif
 			lobj->user_pages = NULL;
 		}
 	}
@@ -577,7 +589,11 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				 */
 				release_pages(e->user_pages,
 					      bo->tbo.ttm->num_pages);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+				drm_free_large(e->user_pages);
+#else
 				kvfree(e->user_pages);
+#endif
 				e->user_pages = NULL;
 			}
 
@@ -607,9 +623,14 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 		list_for_each_entry(e, &need_pages, tv.head) {
 			struct ttm_tt *ttm = e->robj->tbo.ttm;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+			e->user_pages = drm_calloc_large(ttm->num_pages,
+							 sizeof(struct page*));
+#else
 			e->user_pages = kvmalloc_array(ttm->num_pages,
 							 sizeof(struct page*),
 							 GFP_KERNEL | __GFP_ZERO);
+#endif
 			if (!e->user_pages) {
 				r = -ENOMEM;
 				DRM_ERROR("calloc failure in %s\n", __func__);
@@ -619,7 +640,11 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 			r = amdgpu_ttm_tt_get_user_pages(ttm, e->user_pages);
 			if (r) {
 				DRM_ERROR("amdgpu_ttm_tt_get_user_pages failed.\n");
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+				drm_free_large(e->user_pages);
+#else
 				kvfree(e->user_pages);
+#endif
 				e->user_pages = NULL;
 				goto error_free_pages;
 			}
@@ -708,7 +733,11 @@ error_free_pages:
 
 			release_pages(e->user_pages,
 				      e->robj->tbo.ttm->num_pages);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+			drm_free_large(e->user_pages);
+#else
 			kvfree(e->user_pages);
+#endif
 		}
 	}
 
@@ -762,7 +791,11 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 		amdgpu_bo_list_put(parser->bo_list);
 
 	for (i = 0; i < parser->nchunks; i++)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+		drm_free_large(parser->chunks[i].kdata);
+#else
 		kvfree(parser->chunks[i].kdata);
+#endif
 	kfree(parser->chunks);
 	if (parser->job)
 		amdgpu_job_free(parser->job);

@@ -375,9 +375,14 @@ static int amdgpu_vm_alloc_levels(struct amdgpu_device *adev,
 	if (!parent->entries) {
 		unsigned num_entries = amdgpu_vm_num_entries(adev, level);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+		parent->entries = drm_calloc_large(num_entries,
+						   sizeof(struct amdgpu_vm_pt));
+#else
 		parent->entries = kvmalloc_array(num_entries,
 						   sizeof(struct amdgpu_vm_pt),
 						   GFP_KERNEL | __GFP_ZERO);
+#endif
 		if (!parent->entries)
 			return -ENOMEM;
 		memset(parent->entries, 0 , sizeof(struct amdgpu_vm_pt));
@@ -2462,7 +2467,11 @@ static void amdgpu_vm_free_levels(struct amdgpu_device *adev,
 			amdgpu_vm_free_levels(adev, &parent->entries[i],
 					      level + 1);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	drm_free_large(parent->entries);
+#else
 	kvfree(parent->entries);
+#endif
 }
 
 /**

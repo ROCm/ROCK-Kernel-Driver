@@ -40,6 +40,9 @@
 #include <linux/slab.h>
 #include <linux/export.h>
 #include <drm/drm_cache.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#include <drm/drm_mem_util.h>
+#endif
 #include <drm/ttm/ttm_module.h>
 #include <drm/ttm/ttm_bo_driver.h>
 #include <drm/ttm/ttm_placement.h>
@@ -55,8 +58,12 @@
  */
 static int ttm_tt_alloc_page_directory(struct ttm_tt *ttm)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	ttm->pages = drm_calloc_large(ttm->num_pages, sizeof(void*));
+#else
 	ttm->pages = kvmalloc_array(ttm->num_pages, sizeof(void*),
 			GFP_KERNEL | __GFP_ZERO);
+#endif
 	if (!ttm->pages)
 		return -ENOMEM;
 	return 0;
@@ -64,10 +71,16 @@ static int ttm_tt_alloc_page_directory(struct ttm_tt *ttm)
 
 static int ttm_dma_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	ttm->ttm.pages = drm_calloc_large(ttm->ttm.num_pages,
+					  sizeof(*ttm->ttm.pages) +
+					  sizeof(*ttm->dma_address));
+#else
 	ttm->ttm.pages = kvmalloc_array(ttm->ttm.num_pages,
 					  sizeof(*ttm->ttm.pages) +
 					  sizeof(*ttm->dma_address),
 					  GFP_KERNEL | __GFP_ZERO);
+#endif
 	if (!ttm->ttm.pages)
 		return -ENOMEM;
 	ttm->dma_address = (void *) (ttm->ttm.pages + ttm->ttm.num_pages);
@@ -217,7 +230,11 @@ EXPORT_SYMBOL(ttm_tt_init);
 
 void ttm_tt_fini(struct ttm_tt *ttm)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	drm_free_large(ttm->pages);
+#else
 	kvfree(ttm->pages);
+#endif
 	ttm->pages = NULL;
 }
 EXPORT_SYMBOL(ttm_tt_fini);
@@ -251,7 +268,11 @@ void ttm_dma_tt_fini(struct ttm_dma_tt *ttm_dma)
 {
 	struct ttm_tt *ttm = &ttm_dma->ttm;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	drm_free_large(ttm->pages);
+#else
 	kvfree(ttm->pages);
+#endif
 	ttm->pages = NULL;
 	ttm_dma->dma_address = NULL;
 }
