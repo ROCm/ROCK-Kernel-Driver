@@ -1,6 +1,9 @@
 #ifndef AMDGPU_BACKPORT_H
 #define AMDGPU_BACKPORT_H
 
+#if defined(BUILD_AS_DKMS)
+#include <kcl/kcl_amd_asic_type.h>
+#endif
 #include <kcl/kcl_kref.h>
 #include <kcl/kcl_fence.h>
 #include <kcl/kcl_drm.h>

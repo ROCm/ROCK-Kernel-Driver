@@ -23,7 +23,9 @@
 #ifndef __AMD_SHARED_H__
 #define __AMD_SHARED_H__
 
+#if !defined(BUILD_AS_DKMS)
 #include <drm/amd_asic_type.h>
+#endif
 
 
 #define AMD_MAX_USEC_TIMEOUT		200000  /* 200 ms */
