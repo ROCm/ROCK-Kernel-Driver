@@ -33,6 +33,19 @@
 #define DP_DP13_MAX_LINK_RATE               0x2201
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
+#define DRM_MODE_ROTATE_0       (1<<0)
+#define DRM_MODE_ROTATE_90      (1<<1)
+#define DRM_MODE_ROTATE_180     (1<<2)
+#define DRM_MODE_ROTATE_270     (1<<3)
+
+#define DRM_MODE_ROTATE_MASK (\
+		DRM_MODE_ROTATE_0  | \
+		DRM_MODE_ROTATE_90  | \
+		DRM_MODE_ROTATE_180 | \
+		DRM_MODE_ROTATE_270)
+#endif
+
 extern void (*_kcl_drm_fb_helper_cfb_fillrect)(struct fb_info *info,
 				const struct fb_fillrect *rect);
 extern void (*_kcl_drm_fb_helper_cfb_copyarea)(struct fb_info *info,
