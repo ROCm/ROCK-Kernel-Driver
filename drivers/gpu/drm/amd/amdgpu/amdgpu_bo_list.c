@@ -335,12 +335,20 @@ int amdgpu_bo_list_ioctl(struct drm_device *dev, void *data,
 
 	memset(args, 0, sizeof(*args));
 	args->out.list_handle = handle;
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	drm_free_large(info);
+#else
 	kvfree(info);
+#endif
 
 	return 0;
 
 error_free:
 	if (info)
-		kvfree(info);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	drm_free_large(info);
+#else
+	kvfree(info);
+#endif
 	return r;
 }
