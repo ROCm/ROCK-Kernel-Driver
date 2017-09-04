@@ -25,15 +25,22 @@
  *    Jerome Glisse <glisse@freedesktop.org>
  */
 #include <linux/pagemap.h>
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 #include <linux/sync_file.h>
+#endif
 #include <drm/drmP.h>
 #include <drm/amdgpu_drm.h>
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 #include <drm/drm_syncobj.h>
+#endif
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
 #include "amdgpu_gmc.h"
 #include "amdgpu_gem.h"
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#define kvfree drm_free_large
+#endif
 static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 				      struct drm_amdgpu_cs_chunk_fence *data,
 				      uint32_t *offset)
@@ -167,7 +174,11 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, union drm_amdgpu_cs
 		size = p->chunks[i].length_dw;
 		cdata = kcl_u64_to_user_ptr(user_chunk.chunk_data);
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+		p->chunks[i].kdata = drm_malloc_ab(size, sizeof(uint32_t));
+#else
 		p->chunks[i].kdata = kvmalloc_array(size, sizeof(uint32_t), GFP_KERNEL);
+#endif
 		if (p->chunks[i].kdata == NULL) {
 			ret = -ENOMEM;
 			i--;
@@ -212,8 +223,10 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, union drm_amdgpu_cs
 			break;
 
 		case AMDGPU_CHUNK_ID_DEPENDENCIES:
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_IN:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_OUT:
+#endif
 		case AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES:
 			break;
 
@@ -637,7 +650,11 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				 */
 				release_pages(e->user_pages,
 					      bo->tbo.ttm->num_pages);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+				drm_free_large(e->user_pages);
+#else
 				kvfree(e->user_pages);
+#endif
 				e->user_pages = NULL;
 			}
 
@@ -667,9 +684,14 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 		list_for_each_entry(e, &need_pages, tv.head) {
 			struct ttm_tt *ttm = e->tv.bo->ttm;
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+			e->user_pages = drm_calloc_large(ttm->num_pages,
+							 sizeof(struct page*));
+#else
 			e->user_pages = kvmalloc_array(ttm->num_pages,
 							 sizeof(struct page*),
 							 GFP_KERNEL | __GFP_ZERO);
+#endif
 			if (!e->user_pages) {
 				r = -ENOMEM;
 				DRM_ERROR("calloc failure in %s\n", __func__);
@@ -679,7 +701,11 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 			r = amdgpu_ttm_tt_get_user_pages(ttm, e->user_pages);
 			if (r) {
 				DRM_ERROR("amdgpu_ttm_tt_get_user_pages failed.\n");
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+				drm_free_large(e->user_pages);
+#else
 				kvfree(e->user_pages);
+#endif
 				e->user_pages = NULL;
 				goto error_free_pages;
 			}
@@ -763,7 +789,11 @@ error_free_pages:
 			continue;
 
 		release_pages(e->user_pages, e->tv.bo->ttm->num_pages);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+		drm_free_large(e->user_pages);
+#else
 		kvfree(e->user_pages);
+#endif
 	}
 
 	return r;
@@ -804,9 +834,11 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 		ttm_eu_backoff_reservation(&parser->ticket,
 					   &parser->validated);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 	for (i = 0; i < parser->num_post_dep_syncobjs; i++)
 		drm_syncobj_put(parser->post_dep_syncobjs[i]);
 	kfree(parser->post_dep_syncobjs);
+#endif
 
 	dma_fence_put(parser->fence);
 
@@ -818,7 +850,11 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 		amdgpu_bo_list_put(parser->bo_list);
 
 	for (i = 0; i < parser->nchunks; i++)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+		drm_free_large(parser->chunks[i].kdata);
+#else
 		kvfree(parser->chunks[i].kdata);
+#endif
 	kfree(parser->chunks);
 	if (parser->job)
 		amdgpu_job_free(parser->job);
@@ -1116,12 +1152,25 @@ static int amdgpu_cs_process_fence_dep(struct amdgpu_cs_parser *p,
 	return 0;
 }
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 static int amdgpu_syncobj_lookup_and_add_to_sync(struct amdgpu_cs_parser *p,
 						 uint32_t handle)
 {
 	int r;
 	struct dma_fence *fence;
+#if defined(BUILD_AS_DKMS)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+	r = drm_syncobj_fence_get(p->filp, handle, &fence);
+#elif DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+	r = drm_syncobj_find_fence(p->filp, handle, &fence);
+#elif DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+	r = drm_syncobj_find_fence(p->filp, handle, 0, &fence);
+#else
 	r = drm_syncobj_find_fence(p->filp, handle, 0, 0, &fence);
+#endif
+#else
+	r = drm_syncobj_find_fence(p->filp, handle, 0, 0, &fence);
+#endif
 	if (r)
 		return r;
 
@@ -1176,6 +1225,7 @@ static int amdgpu_cs_process_syncobj_out_dep(struct amdgpu_cs_parser *p,
 	}
 	return 0;
 }
+#endif
 
 static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 				  struct amdgpu_cs_parser *p)
@@ -1192,6 +1242,7 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 			r = amdgpu_cs_process_fence_dep(p, chunk);
 			if (r)
 				return r;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 		} else if (chunk->chunk_id == AMDGPU_CHUNK_ID_SYNCOBJ_IN) {
 			r = amdgpu_cs_process_syncobj_in_dep(p, chunk);
 			if (r)
@@ -1200,12 +1251,14 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 			r = amdgpu_cs_process_syncobj_out_dep(p, chunk);
 			if (r)
 				return r;
+#endif
 		}
 	}
 
 	return 0;
 }
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 {
 	int i;
@@ -1213,6 +1266,7 @@ static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 	for (i = 0; i < p->num_post_dep_syncobjs; ++i)
 		drm_syncobj_replace_fence(p->post_dep_syncobjs[i], p->fence);
 }
+#endif
 
 static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 			    union drm_amdgpu_cs *cs)
@@ -1249,7 +1303,9 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	p->fence = dma_fence_get(&job->base.s_fence->finished);
 
 	amdgpu_ctx_add_fence(p->ctx, entity, p->fence, &seq);
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 	amdgpu_cs_post_dependencies(p);
+#endif
 
 	if ((job->preamble_status & AMDGPU_PREAMBLE_IB_PRESENT) &&
 	    !p->ctx->preamble_presented) {
@@ -1376,8 +1432,13 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data,
 		r = PTR_ERR(fence);
 	else if (fence) {
 		r = kcl_fence_wait_timeout(fence, true, timeout);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+		if (r > 0 && fence->status)
+			r = fence->status;
+#else
 		if (r > 0 && fence->error)
 			r = fence->error;
+#endif
 		dma_fence_put(fence);
 	} else
 		r = 1;
@@ -1425,6 +1486,7 @@ static struct dma_fence *amdgpu_cs_get_fence(struct amdgpu_device *adev,
 	return fence;
 }
 
+#if !defined(BUILD_AS_DKMS)
 int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *filp)
 {
@@ -1483,6 +1545,14 @@ int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 		return -EINVAL;
 	}
 }
+#else
+int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
+				    struct drm_file *filp)
+{
+	DRM_ERROR("FENCE_TO_HANDLE ioctl is not supported for kernel < 4.13\n");
+	return -EINVAL;
+}
+#endif
 
 /**
  * amdgpu_cs_wait_all_fence - wait on all fences to signal
@@ -1519,8 +1589,13 @@ static int amdgpu_cs_wait_all_fences(struct amdgpu_device *adev,
 		if (r == 0)
 			break;
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+		if (r > 0 && fence->status)
+			r = fence->status;
+#else
 		if (fence->error)
 			return fence->error;
+#endif
 	}
 
 	memset(wait, 0, sizeof(*wait));
@@ -1582,7 +1657,11 @@ out:
 	wait->out.first_signaled = first;
 
 	if (first < fence_count && array[first])
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+		r = array[first]->status;
+#else
 		r = array[first]->error;
+#endif
 	else
 		r = 0;
 
