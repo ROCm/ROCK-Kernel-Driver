@@ -1036,8 +1036,10 @@ struct amdgpu_cs_parser {
 	/* user fence */
 	struct amdgpu_bo_list_entry	uf_entry;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
 	unsigned num_post_dep_syncobjs;
 	struct drm_syncobj **post_dep_syncobjs;
+#endif
 };
 
 #define AMDGPU_PREAMBLE_IB_PRESENT          (1 << 0) /* bit set means command submit involves a preamble IB */

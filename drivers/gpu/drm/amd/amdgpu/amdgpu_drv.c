@@ -850,7 +850,11 @@ static struct drm_driver kms_driver = {
 	.driver_features =
 	    DRIVER_USE_AGP |
 	    DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_GEM |
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
 	    DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET | DRIVER_SYNCOBJ,
+#else
+	    DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET,
+#endif
 	.load = amdgpu_driver_load_kms,
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
