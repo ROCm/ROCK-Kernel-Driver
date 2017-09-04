@@ -863,8 +863,13 @@ static struct drm_driver kms_driver = {
 	.get_vblank_counter = kcl_amdgpu_get_vblank_counter_kms,
 	.enable_vblank = kcl_amdgpu_enable_vblank_kms,
 	.disable_vblank = kcl_amdgpu_disable_vblank_kms,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
+	.get_vblank_timestamp = kcl_amdgpu_get_vblank_timestamp_kms,
+	.get_scanout_position = kcl_amdgpu_get_crtc_scanoutpos,
+#else
 	.get_vblank_timestamp = drm_calc_vbltimestamp_from_scanoutpos,
 	.get_scanout_position = amdgpu_get_crtc_scanout_position,
+#endif
 	.irq_handler = amdgpu_irq_handler,
 	.ioctls = amdgpu_ioctls_kms,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
