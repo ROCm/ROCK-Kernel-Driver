@@ -29,11 +29,11 @@
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 
 struct amdgpu_display_manager;
-struct amdgpu_connector;
+struct amdgpu_dm_connector;
 
 void amdgpu_dm_initialize_dp_connector(
 	struct amdgpu_display_manager *dm,
-	struct amdgpu_connector *aconnector);
+	struct amdgpu_dm_connector *aconnector);
 
 #else
 #include "../kcl_dm/kcl_dm_mst_types.h"
