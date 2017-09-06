@@ -32,9 +32,12 @@ static inline struct process_queue_node *get_queue_by_qid(
 {
 	struct process_queue_node *pqn;
 
+	BUG_ON(!pqm);
+
 	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
-		if ((pqn->q && pqn->q->properties.queue_id == qid) ||
-		    (pqn->kq && pqn->kq->queue->properties.queue_id == qid))
+		if (pqn->q && pqn->q->properties.queue_id == qid)
+			return pqn;
+		if (pqn->kq && pqn->kq->queue->properties.queue_id == qid)
 			return pqn;
 	}
 
@@ -46,13 +49,17 @@ static int find_available_queue_slot(struct process_queue_manager *pqm,
 {
 	unsigned long found;
 
+	BUG_ON(!pqm || !qid);
+
+	pr_debug("kfd: in %s\n", __func__);
+
 	found = find_first_zero_bit(pqm->queue_slot_bitmap,
 			KFD_MAX_NUM_OF_QUEUES_PER_PROCESS);
 
-	pr_debug("The new slot id %lu\n", found);
+	pr_debug("kfd: the new slot id %lu\n", found);
 
 	if (found >= KFD_MAX_NUM_OF_QUEUES_PER_PROCESS) {
-		pr_info("Cannot open more queues for process with pasid %d\n",
+		pr_info("amdkfd: Can not open more queues for process with pasid %d\n",
 				pqm->process->pasid);
 		return -ENOMEM;
 	}
@@ -65,11 +72,13 @@ static int find_available_queue_slot(struct process_queue_manager *pqm,
 
 int pqm_init(struct process_queue_manager *pqm, struct kfd_process *p)
 {
+	BUG_ON(!pqm);
+
 	INIT_LIST_HEAD(&pqm->queues);
 	pqm->queue_slot_bitmap =
 			kzalloc(DIV_ROUND_UP(KFD_MAX_NUM_OF_QUEUES_PER_PROCESS,
 					BITS_PER_BYTE), GFP_KERNEL);
-	if (!pqm->queue_slot_bitmap)
+	if (pqm->queue_slot_bitmap == NULL)
 		return -ENOMEM;
 	pqm->process = p;
 
@@ -81,6 +90,10 @@ void pqm_uninit(struct process_queue_manager *pqm)
 	int retval;
 	struct process_queue_node *pqn, *next;
 
+	BUG_ON(!pqm);
+
+	pr_debug("In func %s\n", __func__);
+
 	list_for_each_entry_safe(pqn, next, &pqm->queues, process_queue_list) {
 		retval = pqm_destroy_queue(
 				pqm,
@@ -89,7 +102,7 @@ void pqm_uninit(struct process_queue_manager *pqm)
 					pqn->kq->queue->properties.queue_id);
 
 		if (retval != 0) {
-			pr_err("failed to destroy queue\n");
+			pr_err("kfd: failed to destroy queue\n");
 			return;
 		}
 	}
@@ -104,6 +117,8 @@ static int create_cp_queue(struct process_queue_manager *pqm,
 {
 	int retval;
 
+	retval = 0;
+
 	/* Doorbell initialized in user space*/
 	q_properties->doorbell_ptr = NULL;
 
@@ -116,13 +131,16 @@ static int create_cp_queue(struct process_queue_manager *pqm,
 
 	retval = init_queue(q, q_properties);
 	if (retval != 0)
-		return retval;
+		goto err_init_queue;
 
 	(*q)->device = dev;
 	(*q)->process = pqm->process;
 
-	pr_debug("PQM After init queue");
+	pr_debug("kfd: PQM After init queue");
 
+	return retval;
+
+err_init_queue:
 	return retval;
 }
 
@@ -142,6 +160,8 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 	struct kernel_queue *kq;
 	int num_queues = 0;
 	struct queue *cur;
+
+	BUG_ON(!pqm || !dev || !properties || !qid);
 
 	memset(&q_properties, 0, sizeof(struct queue_properties));
 	memcpy(&q_properties, properties, sizeof(struct queue_properties));
@@ -165,7 +185,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 		list_for_each_entry(cur, &pdd->qpd.queues_list, list)
 			num_queues++;
 		if (num_queues >= dev->device_info->max_no_of_hqd/2)
-			return -ENOSPC;
+			return (-ENOSPC);
 	}
 
 	retval = find_available_queue_slot(pqm, qid);
@@ -177,7 +197,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 		dev->dqm->ops.register_process(dev->dqm, &pdd->qpd);
 	}
 
-	pqn = kzalloc(sizeof(*pqn), GFP_KERNEL);
+	pqn = kzalloc(sizeof(struct process_queue_node), GFP_KERNEL);
 	if (!pqn) {
 		retval = -ENOMEM;
 		goto err_allocate_pqn;
@@ -190,7 +210,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 		if ((sched_policy == KFD_SCHED_POLICY_HWS_NO_OVERSUBSCRIPTION) &&
 		((dev->dqm->processes_count >= VMID_PER_DEVICE) ||
 		(dev->dqm->queue_count >= get_queues_num(dev->dqm)))) {
-			pr_err("Over-subscription is not allowed in radeon_kfd.sched_policy == 1\n");
+			pr_err("kfd: over-subscription is not allowed in radeon_kfd.sched_policy == 1\n");
 			retval = -EPERM;
 			goto err_create_queue;
 		}
@@ -207,7 +227,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 		break;
 	case KFD_QUEUE_TYPE_DIQ:
 		kq = kernel_queue_init(dev, KFD_QUEUE_TYPE_DIQ);
-		if (!kq) {
+		if (kq == NULL) {
 			retval = -ENOMEM;
 			goto err_create_queue;
 		}
@@ -218,22 +238,22 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 							kq, &pdd->qpd);
 		break;
 	default:
-		WARN(1, "Invalid queue type %d", type);
-		retval = -EINVAL;
+		BUG();
+		break;
 	}
 
 	if (retval != 0) {
-		pr_err("DQM create queue failed\n");
+		pr_debug("Error dqm create queue\n");
 		goto err_create_queue;
 	}
 
-	pr_debug("PQM After DQM create queue\n");
+	pr_debug("kfd: PQM After DQM create queue\n");
 
 	list_add(&pqn->process_queue_list, &pqm->queues);
 
 	if (q) {
 		*properties = q->properties;
-		pr_debug("PQM done creating queue\n");
+		pr_debug("kfd: PQM done creating queue\n");
 		print_queue_properties(properties);
 	}
 
@@ -259,11 +279,14 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
 
 	dqm = NULL;
 
+	BUG_ON(!pqm);
 	retval = 0;
 
+	pr_debug("kfd: In Func %s\n", __func__);
+
 	pqn = get_queue_by_qid(pqm, qid);
-	if (!pqn) {
-		pr_err("Queue id does not match any known queue\n");
+	if (pqn == NULL) {
+		pr_err("kfd: queue id does not match any known queue\n");
 		return -EINVAL;
 	}
 
@@ -272,8 +295,7 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
 		dev = pqn->kq->dev;
 	if (pqn->q)
 		dev = pqn->q->device;
-	if (WARN_ON(!dev))
-		return -ENODEV;
+	BUG_ON(!dev);
 
 	pdd = kfd_get_process_device_data(dev, pqm->process);
 	if (!pdd) {
@@ -313,9 +335,12 @@ int pqm_update_queue(struct process_queue_manager *pqm, unsigned int qid,
 	int retval;
 	struct process_queue_node *pqn;
 
+	BUG_ON(!pqm);
+
 	pqn = get_queue_by_qid(pqm, qid);
 	if (!pqn) {
-		pr_debug("No queue %d exists for update operation\n", qid);
+		pr_debug("amdkfd: No queue %d exists for update operation\n",
+				qid);
 		return -EFAULT;
 	}
 
@@ -337,6 +362,8 @@ struct kernel_queue *pqm_get_kernel_queue(
 					unsigned int qid)
 {
 	struct process_queue_node *pqn;
+
+	BUG_ON(!pqm);
 
 	pqn = get_queue_by_qid(pqm, qid);
 	if (pqn && pqn->kq)

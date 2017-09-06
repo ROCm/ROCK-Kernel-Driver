@@ -32,8 +32,7 @@ int kfd_pasid_init(void)
 {
 	pasid_limit = KFD_MAX_NUM_OF_PROCESSES;
 
-	pasid_bitmap = kcalloc(BITS_TO_LONGS(pasid_limit), sizeof(long),
-				GFP_KERNEL);
+	pasid_bitmap = kcalloc(BITS_TO_LONGS(pasid_limit), sizeof(long), GFP_KERNEL);
 	if (!pasid_bitmap)
 		return -ENOMEM;
 
@@ -92,6 +91,6 @@ unsigned int kfd_pasid_alloc(void)
 
 void kfd_pasid_free(unsigned int pasid)
 {
-	if (!WARN_ON(pasid == 0 || pasid >= pasid_limit))
-		clear_bit(pasid, pasid_bitmap);
+	BUG_ON(pasid == 0 || pasid >= pasid_limit);
+	clear_bit(pasid, pasid_bitmap);
 }

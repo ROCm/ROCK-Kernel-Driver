@@ -24,7 +24,6 @@
 #include "kfd_device_queue_manager.h"
 #include "cik_regs.h"
 #include "oss/oss_2_4_sh_mask.h"
-#include "gca/gfx_7_2_sh_mask.h"
 
 static bool set_cache_memory_policy_cik(struct device_queue_manager *dqm,
 				   struct qcm_process_device *qpd,
@@ -66,7 +65,7 @@ static uint32_t compute_sh_mem_bases_64bit(unsigned int top_address_nybble)
 	 * for LDS/Scratch and GPUVM.
 	 */
 
-	WARN_ON((top_address_nybble & 1) || top_address_nybble > 0xE ||
+	BUG_ON((top_address_nybble & 1) || top_address_nybble > 0xE ||
 		top_address_nybble == 0);
 
 	return PRIVATE_BASE(top_address_nybble << 12) |
@@ -105,6 +104,8 @@ static int register_process_cik(struct device_queue_manager *dqm,
 	struct kfd_process_device *pdd;
 	unsigned int temp;
 
+	BUG_ON(!dqm || !qpd);
+
 	pdd = qpd_to_pdd(qpd);
 
 	/* check if sh_mem_config register already configured */
@@ -124,10 +125,9 @@ static int register_process_cik(struct device_queue_manager *dqm,
 	} else {
 		temp = get_sh_mem_bases_nybble_64(pdd);
 		qpd->sh_mem_bases = compute_sh_mem_bases_64bit(temp);
-		qpd->sh_mem_config |= 1  << SH_MEM_CONFIG__PRIVATE_ATC__SHIFT;
 	}
 
-	pr_debug("is32bit process: %d sh_mem_bases nybble: 0x%X and register 0x%X\n",
+	pr_debug("kfd: is32bit process: %d sh_mem_bases nybble: 0x%X and register 0x%X\n",
 		qpd->pqm->process->is_32bit_user_mode, temp, qpd->sh_mem_bases);
 
 	return 0;

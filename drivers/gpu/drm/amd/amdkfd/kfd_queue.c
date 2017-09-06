@@ -65,15 +65,17 @@ void print_queue(struct queue *q)
 
 int init_queue(struct queue **q, const struct queue_properties *properties)
 {
-	struct queue *tmp_q;
+	struct queue *tmp;
 
-	tmp_q = kzalloc(sizeof(*tmp_q), GFP_KERNEL);
-	if (!tmp_q)
+	BUG_ON(!q);
+
+	tmp = kzalloc(sizeof(struct queue), GFP_KERNEL);
+	if (!tmp)
 		return -ENOMEM;
 
-	memcpy(&tmp_q->properties, properties, sizeof(*properties));
+	memcpy(&tmp->properties, properties, sizeof(struct queue_properties));
 
-	*q = tmp_q;
+	*q = tmp;
 	return 0;
 }
 
