@@ -183,6 +183,7 @@ struct amdgpu_irq_src;
 struct amdgpu_fpriv;
 struct kfd_vm_fault_info;
 struct amdgpu_mn;
+struct amdgpu_bo_va_mapping;
 
 enum amdgpu_cp_irq {
 	AMDGPU_CP_IRQ_GFX_EOP = 0,
@@ -1999,10 +2000,9 @@ static inline int amdgpu_acpi_init(struct amdgpu_device *adev) { return 0; }
 static inline void amdgpu_acpi_fini(struct amdgpu_device *adev) { }
 #endif
 
-struct amdgpu_bo_va_mapping *
-amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
-		       uint64_t addr, struct amdgpu_bo **bo);
-int amdgpu_cs_sysvm_access_required(struct amdgpu_cs_parser *parser);
+int amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
+			   uint64_t addr, struct amdgpu_bo **bo,
+			   struct amdgpu_bo_va_mapping **mapping);
 
 #if defined(CONFIG_DRM_AMD_DC)
 int amdgpu_dm_display_resume(struct amdgpu_device *adev );
