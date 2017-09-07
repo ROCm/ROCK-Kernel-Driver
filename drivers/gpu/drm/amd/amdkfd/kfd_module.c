@@ -89,6 +89,11 @@ module_param_named(noretry, vega10_noretry, int, 0644);
 MODULE_PARM_DESC(noretry,
 	"Set sh_mem_config.retry_disable on Vega10 (0 = retry enabled (default), 1 = retry disabled)");
 
+int priv_cp_queues;
+module_param(priv_cp_queues, int, 0644);
+MODULE_PARM_DESC(priv_cp_queues,
+	"Enable privileged mode for CP queues (0 = off (default), 1 = on)");
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) && defined(BUILD_AS_DKMS)
 int cma_enable;
 module_param(cma_enable, int, 0644);

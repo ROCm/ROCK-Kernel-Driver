@@ -159,6 +159,10 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 	if (q->format == KFD_QUEUE_FORMAT_AQL)
 		m->cp_hqd_iq_rptr = AQL_ENABLE;
 
+	if (priv_cp_queues)
+		m->cp_hqd_pq_control |=
+			1 << CP_HQD_PQ_CONTROL__PRIV_STATE__SHIFT;
+
 	*mqd = m;
 	if (gart_addr)
 		*gart_addr = addr;

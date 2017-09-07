@@ -142,6 +142,11 @@ extern int ignore_crat;
  */
 extern int vega10_noretry;
 
+/*
+ * Enable privileged mode for all CP queues including user queues
+ */
+extern int priv_cp_queues;
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) && defined(BUILD_AS_DKMS)
 /*
  * Currently, mm_access() function is not exported. So for DKMS build,
