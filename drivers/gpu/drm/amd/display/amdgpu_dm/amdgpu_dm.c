@@ -605,7 +605,7 @@ static int dm_resume(void *handle)
 	return 0;
 }
 
-int amdgpu_dm_display_resume(struct amdgpu_device *adev )
+int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 {
 	struct drm_device *ddev = adev->ddev;
 	struct amdgpu_display_manager *dm = &adev->dm;
@@ -1834,9 +1834,9 @@ static int fill_plane_attributes_from_fb(
 	default:
 		DRM_ERROR("Unsupported screen format %s\n",
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
-		          kcl_drm_get_format_name(fb->pixel_format, &format_name));
+			  kcl_drm_get_format_name(fb->pixel_format, &format_name));
 #else
-		          kcl_drm_get_format_name(fb->format->format, &format_name));
+			  kcl_drm_get_format_name(fb->format->format, &format_name));
 #endif
 		return -EINVAL;
 	}
@@ -2835,7 +2835,7 @@ struct drm_connector_state *amdgpu_dm_connector_atomic_duplicate_state(
 
 	if (new_state) {
 		__drm_atomic_helper_connector_duplicate_state(connector,
-								      &new_state->base);
+							      &new_state->base);
 		return &new_state->base;
 	}
 
