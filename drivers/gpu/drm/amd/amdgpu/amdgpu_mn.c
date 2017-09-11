@@ -113,6 +113,25 @@ static void amdgpu_mn_release(struct mmu_notifier *mn,
 	schedule_work(&rmn->work);
 }
 
+
+/**
+ * amdgpu_mn_lock - take the write side lock for this mn
+ */
+void amdgpu_mn_lock(struct amdgpu_mn *mn)
+{
+	if (mn)
+		down_write(&mn->lock);
+}
+
+/**
+ * amdgpu_mn_unlock - drop the write side lock for this mn
+ */
+void amdgpu_mn_unlock(struct amdgpu_mn *mn)
+{
+	if (mn)
+		up_write(&mn->lock);
+}
+
 /**
  * amdgpu_mn_invalidate_node - unmap all BOs of a node
  *
@@ -133,20 +152,12 @@ static void amdgpu_mn_invalidate_node(struct amdgpu_mn_node *node,
 		if (!amdgpu_ttm_tt_affect_userptr(bo->tbo.ttm, start, end))
 			continue;
 
-		r = amdgpu_bo_reserve(bo, true);
-		if (r) {
-			DRM_ERROR("(%ld) failed to reserve user bo\n", r);
-			continue;
-		}
-
 		r = kcl_reservation_object_wait_timeout_rcu(bo->tbo.resv,
 			true, false, MAX_SCHEDULE_TIMEOUT);
 		if (r <= 0)
 			DRM_ERROR("(%ld) failed to wait for user bo\n", r);
 
 		amdgpu_ttm_tt_mark_user_pages(bo->tbo.ttm);
-
-		amdgpu_bo_unreserve(bo);
 	}
 }
 
@@ -256,7 +267,7 @@ static const struct mmu_notifier_ops amdgpu_mn_ops[] = {
  *
  * Creates a notifier context for current->mm.
  */
-static struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
+struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 				       enum amdgpu_mn_type type)
 {
 	struct mm_struct *mm = current->mm;
@@ -417,3 +428,4 @@ void amdgpu_mn_unregister(struct amdgpu_bo *bo)
 	up_write(&rmn->lock);
 	mutex_unlock(&adev->mn_lock);
 }
+
