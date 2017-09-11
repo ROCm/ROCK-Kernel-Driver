@@ -331,7 +331,11 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 					  unsigned int pipe,
 					  int *max_error,
 					  struct timeval *vblank_time,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
 					  unsigned flags,
+#else
+					  bool in_vblank_irq,
+#endif
 					  const struct drm_crtc *refcrtc,
 					  const struct drm_display_mode *mode)
 {
@@ -341,9 +345,11 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 	!defined(OS_NAME_RHEL_7_4)
 	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
 						     flags, refcrtc, mode);
-#else
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
 	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
 						     flags, mode);
+#else
+	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time, in_vblank_irq);
 #endif
 }
 

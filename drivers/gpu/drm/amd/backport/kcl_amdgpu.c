@@ -19,6 +19,7 @@ void kcl_amdgpu_disable_vblank_kms(struct drm_device *dev, unsigned int crtc)
 	amdgpu_disable_vblank_kms(dev, crtc);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
 int kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int crtc,
 					int *max_error,
 					struct timeval *vblank_time,
@@ -26,6 +27,7 @@ int kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int crt
 {
 	return amdgpu_get_vblank_timestamp_kms(dev, crtc, max_error, vblank_time, flags);
 }
+#endif
 
 int kcl_amdgpu_get_crtc_scanoutpos(struct drm_device *dev, unsigned int crtc,
 				   unsigned int flags, int *vpos, int *hpos,
