@@ -625,26 +625,26 @@ static bool dce110_set_output_transfer_func(
 	struct pipe_ctx *pipe_ctx,
 	const struct dc_stream_state *stream)
 {
-	struct transform *xfm = pipe_ctx->plane_res.xfm;
+	struct output_pixel_processor *opp = pipe_ctx->stream_res.opp;
 
-	xfm->funcs->opp_power_on_regamma_lut(xfm, true);
-	xfm->regamma_params.hw_points_num = GAMMA_HW_POINTS_NUM;
+	opp->funcs->opp_power_on_regamma_lut(opp, true);
+	opp->regamma_params.hw_points_num = GAMMA_HW_POINTS_NUM;
 
 	if (stream->out_transfer_func &&
 		stream->out_transfer_func->type ==
 			TF_TYPE_PREDEFINED &&
 		stream->out_transfer_func->tf ==
 			TRANSFER_FUNCTION_SRGB) {
-		xfm->funcs->opp_set_regamma_mode(xfm, OPP_REGAMMA_SRGB);
+		opp->funcs->opp_set_regamma_mode(opp, OPP_REGAMMA_SRGB);
 	} else if (dce110_translate_regamma_to_hw_format(
-				stream->out_transfer_func, &xfm->regamma_params)) {
-		xfm->funcs->opp_program_regamma_pwl(xfm, &xfm->regamma_params);
-		xfm->funcs->opp_set_regamma_mode(xfm, OPP_REGAMMA_USER);
+				stream->out_transfer_func, &opp->regamma_params)) {
+			opp->funcs->opp_program_regamma_pwl(opp, &opp->regamma_params);
+			opp->funcs->opp_set_regamma_mode(opp, OPP_REGAMMA_USER);
 	} else {
-		xfm->funcs->opp_set_regamma_mode(xfm, OPP_REGAMMA_BYPASS);
+		opp->funcs->opp_set_regamma_mode(opp, OPP_REGAMMA_BYPASS);
 	}
 
-	xfm->funcs->opp_power_on_regamma_lut(xfm, false);
+	opp->funcs->opp_power_on_regamma_lut(opp, false);
 
 	return true;
 }
@@ -1044,14 +1044,14 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	/*  */
 	dc->hwss.prog_pixclk_crtc_otg(pipe_ctx, context, dc);
 
+	pipe_ctx->stream_res.opp->funcs->opp_set_dyn_expansion(
+			pipe_ctx->stream_res.opp,
+			COLOR_SPACE_YCBCR601,
+			stream->timing.display_color_depth,
+			pipe_ctx->stream->signal);
+
 	/* FPGA does not program backend */
 	if (IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment)) {
-		pipe_ctx->stream_res.opp->funcs->opp_set_dyn_expansion(
-		pipe_ctx->stream_res.opp,
-		COLOR_SPACE_YCBCR601,
-		stream->timing.display_color_depth,
-		pipe_ctx->stream->signal);
-
 	pipe_ctx->stream_res.opp->funcs->opp_program_fmt(
 			pipe_ctx->stream_res.opp,
 			&stream->bit_depth_params,
@@ -1064,11 +1064,6 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 			BREAK_TO_DEBUGGER();
 			return DC_ERROR_UNEXPECTED;
 		}
-	pipe_ctx->stream_res.opp->funcs->opp_set_dyn_expansion(
-			pipe_ctx->stream_res.opp,
-			COLOR_SPACE_YCBCR601,
-			stream->timing.display_color_depth,
-			pipe_ctx->stream->signal);
 
 	if (pipe_ctx->stream->signal != SIGNAL_TYPE_VIRTUAL)
 		stream->sink->link->link_enc->funcs->setup(
