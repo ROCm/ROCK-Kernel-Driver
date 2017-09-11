@@ -641,7 +641,7 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev )
 			continue;
 
 		mutex_lock(&aconnector->hpd_lock);
-		dc_link_detect(aconnector->dc_link, false);
+		dc_link_detect(aconnector->dc_link, DETECT_REASON_HPD);
 		aconnector->dc_sink = NULL;
 		amdgpu_dm_update_connector_after_detect(aconnector);
 		mutex_unlock(&aconnector->hpd_lock);
@@ -872,7 +872,7 @@ static void handle_hpd_irq(void *param)
 	 * since (for MST case) MST does this in it's own context.
 	 */
 	mutex_lock(&aconnector->hpd_lock);
-	if (dc_link_detect(aconnector->dc_link, false)) {
+	if (dc_link_detect(aconnector->dc_link, DETECT_REASON_HPD)) {
 		amdgpu_dm_update_connector_after_detect(aconnector);
 
 
@@ -982,7 +982,7 @@ static void handle_hpd_rx_irq(void *param)
 	if (dc_link_handle_hpd_rx_irq(aconnector->dc_link, NULL) &&
 			!is_mst_root_connector) {
 		/* Downstream Port status changed. */
-		if (dc_link_detect(aconnector->dc_link, false)) {
+		if (dc_link_detect(aconnector->dc_link, DETECT_REASON_HPDRX)) {
 			amdgpu_dm_update_connector_after_detect(aconnector);
 
 
@@ -1383,7 +1383,8 @@ int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 			goto fail_free_encoder;
 		}
 
-		if (dc_link_detect(dc_get_link_at_index(dm->dc, i), true))
+		if (dc_link_detect(dc_get_link_at_index(dm->dc, i),
+				DETECT_REASON_BOOT))
 			amdgpu_dm_update_connector_after_detect(aconnector);
 	}
 
