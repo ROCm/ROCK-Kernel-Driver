@@ -1769,7 +1769,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	dma_addr_t *pages_addr = NULL;
 	struct ttm_mem_reg *mem;
 	struct drm_mm_node *nodes;
-	struct dma_fence *exclusive;
+	struct dma_fence *exclusive, **last_update;
 	uint64_t flags;
 	int r;
 
@@ -1797,6 +1797,11 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	else
 		flags = 0x0;
 
+	if (clear || (bo && bo->tbo.resv == vm->root.base.bo->tbo.resv))
+		last_update = &vm->last_update;
+	else
+		last_update = &bo_va->last_pt_update;
+
 	if (!clear && bo_va->base.moved) {
 		bo_va->base.moved = false;
 		list_splice_init(&bo_va->valids, &bo_va->invalids);
@@ -1808,7 +1813,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	list_for_each_entry(mapping, &bo_va->invalids, list) {
 		r = amdgpu_vm_bo_split_mapping(adev, exclusive, pages_addr, vm,
 					       mapping, flags, mem,
-					       &bo_va->last_pt_update);
+					       last_update);
 		if (r)
 			return r;
 	}
@@ -1829,12 +1834,6 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	if (trace_amdgpu_vm_bo_mapping_enabled()) {
 		list_for_each_entry(mapping, &bo_va->valids, list)
 			trace_amdgpu_vm_bo_mapping(mapping);
-	}
-
-	if (bo_va->base.bo &&
-	    bo_va->base.bo->tbo.resv == vm->root.base.bo->tbo.resv) {
-		dma_fence_put(vm->last_update);
-		vm->last_update = dma_fence_get(bo_va->last_pt_update);
 	}
 
 	return 0;
@@ -2034,15 +2033,15 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
  * PTs have to be reserved!
  */
 int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
-			   struct amdgpu_vm *vm,
-			   struct amdgpu_sync *sync)
+			   struct amdgpu_vm *vm)
 {
-	struct amdgpu_bo_va *bo_va = NULL;
 	bool clear;
 	int r = 0;
 
 	spin_lock(&vm->status_lock);
 	while (!list_empty(&vm->moved)) {
+		struct amdgpu_bo_va *bo_va;
+
 		bo_va = list_first_entry(&vm->moved,
 			struct amdgpu_bo_va, base.vm_status);
 		spin_unlock(&vm->status_lock);
@@ -2057,9 +2056,6 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 		spin_lock(&vm->status_lock);
 	}
 	spin_unlock(&vm->status_lock);
-
-	if (bo_va)
-		r = amdgpu_sync_fence(adev, sync, bo_va->last_pt_update);
 
 	return r;
 }
