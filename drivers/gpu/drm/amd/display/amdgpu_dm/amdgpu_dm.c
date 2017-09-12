@@ -3980,7 +3980,8 @@ static void prepare_flip_isr(struct amdgpu_crtc *acrtc)
  */
 static void amdgpu_dm_do_flip(struct drm_crtc *crtc,
 			      struct drm_framebuffer *fb,
-			      uint32_t target)
+			      uint32_t target,
+			      struct dc_state *state)
 {
 	unsigned long flags;
 	uint32_t target_vblank;
@@ -4055,7 +4056,13 @@ static void amdgpu_dm_do_flip(struct drm_crtc *crtc,
 	surface_updates->flip_addr = &addr;
 
 
-	dc_update_planes_and_stream(adev->dm.dc, surface_updates, 1, acrtc_state->stream, NULL);
+	dc_commit_updates_for_stream(adev->dm.dc,
+					     surface_updates,
+					     1,
+					     acrtc_state->stream,
+					     NULL,
+					     &surface_updates->surface,
+					     state);
 
 	DRM_DEBUG_DRIVER("%s Flipping to hi: 0x%x, low: 0x%x \n",
 			 __func__,
@@ -4079,6 +4086,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	struct dc_plane_state *plane_states_constructed[MAX_SURFACES];
 	struct amdgpu_crtc *acrtc_attach = to_amdgpu_crtc(pcrtc);
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(pcrtc->state);
+	struct dm_atomic_state *dm_state = to_dm_atomic_state(state);
 	int planes_count = 0;
 	unsigned long flags;
 
@@ -4139,7 +4147,8 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			amdgpu_dm_do_flip(
 				crtc,
 				fb,
-				drm_crtc_vblank_count(crtc) + *wait_for_vblank);
+				drm_crtc_vblank_count(crtc) + *wait_for_vblank,
+				dm_state->context);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 			/*TODO BUG remove ASAP in 4.12 to avoid race between worker and flip IOCTL */
 
@@ -4165,7 +4174,8 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		if (false == dc_commit_planes_to_stream(dm->dc,
 							plane_states_constructed,
 							planes_count,
-							dc_stream_attach))
+							dc_stream_attach,
+							dm_state->context))
 			dm_error("%s: Failed to attach plane!\n", __func__);
 	} else {
 		/*TODO BUG Here should go disable planes on CRTC. */
@@ -4388,7 +4398,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 				dm->dc,
 				status->plane_states,
 				status->plane_count,
-				new_acrtc_state->stream))
+				new_acrtc_state->stream,
+				dm_state->context))
 			dm_error("%s: Failed to update stream scaling!\n", __func__);
 	}
 
