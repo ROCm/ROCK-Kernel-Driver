@@ -4706,7 +4706,7 @@ static int dm_update_crtcs_state(struct dc *dc,
 			 * TODO: need to dig out the root cause of that
 			 */
 			if (!aconnector || (!aconnector->dc_sink && aconnector->mst_port))
-				continue;
+				goto next_crtc;
 
 			if (modereset_required(crtc_state))
 				goto next_crtc;
