@@ -52,6 +52,7 @@ extern "C" {
 #define DRM_AMDGPU_GEM_USERPTR		0x11
 #define DRM_AMDGPU_WAIT_FENCES		0x12
 #define DRM_AMDGPU_VM			0x13
+#define DRM_AMDGPU_FENCE_TO_HANDLE	0x14
 
 /* hybrid specific ioctls */
 #define DRM_AMDGPU_SEM			0x5b
@@ -73,6 +74,7 @@ extern "C" {
 #define DRM_IOCTL_AMDGPU_GEM_USERPTR	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_USERPTR, struct drm_amdgpu_gem_userptr)
 #define DRM_IOCTL_AMDGPU_WAIT_FENCES	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_WAIT_FENCES, union drm_amdgpu_wait_fences)
 #define DRM_IOCTL_AMDGPU_VM		DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_VM, union drm_amdgpu_vm)
+#define DRM_IOCTL_AMDGPU_FENCE_TO_HANDLE DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_FENCE_TO_HANDLE, union drm_amdgpu_fence_to_handle)
 
 /* hybrid specific ioctls */
 #define DRM_IOCTL_AMDGPU_GEM_DGMA	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_DGMA, struct drm_amdgpu_gem_dgma)
@@ -582,6 +584,20 @@ struct drm_amdgpu_cs_chunk_fence {
 
 struct drm_amdgpu_cs_chunk_sem {
 	__u32 handle;
+};
+
+#define AMDGPU_FENCE_TO_HANDLE_GET_SYNCOBJ	0
+#define AMDGPU_FENCE_TO_HANDLE_GET_SYNCOBJ_FD	1
+#define AMDGPU_FENCE_TO_HANDLE_GET_SYNC_FILE_FD	2
+
+union drm_amdgpu_fence_to_handle {
+	struct {
+		struct drm_amdgpu_fence fence;
+		__u32 what;
+	} in;
+	struct {
+		__u32 handle;
+	} out;
 };
 
 struct drm_amdgpu_cs_chunk_data {
