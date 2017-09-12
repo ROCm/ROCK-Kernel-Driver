@@ -32,7 +32,8 @@ struct insn_state {
 	unsigned char type;
 	bool bp_scratch;
 	bool drap;
-	int drap_reg;
+	int drap_reg, drap_offset;
+	struct cfi_reg vals[CFI_NUM_REGS];
 };
 
 struct instruction {
@@ -61,7 +62,7 @@ struct objtool_file {
 	bool ignore_unreachables, c_file, hints;
 };
 
-int check(const char *objname, bool nofp, bool orc);
+int check(const char *objname, bool no_fp, bool no_unreachable, bool orc);
 
 struct instruction *find_insn(struct objtool_file *file,
 			      struct section *sec, unsigned long offset);

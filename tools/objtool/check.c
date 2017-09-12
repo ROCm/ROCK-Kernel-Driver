@@ -33,7 +33,7 @@ struct alternative {
 };
 
 const char *objname;
-static bool nofp;
+static bool no_fp;
 struct cfi_state initial_func_cfi;
 
 struct instruction *find_insn(struct objtool_file *file,
@@ -57,19 +57,6 @@ static struct instruction *next_insn_same_sec(struct objtool_file *file,
 		return NULL;
 
 	return next;
-}
-
-static bool gcov_enabled(struct objtool_file *file)
-{
-	struct section *sec;
-	struct symbol *sym;
-
-	for_each_sec(file, sec)
-		list_for_each_entry(sym, &sec->symbol_list, list)
-			if (!strncmp(sym->name, "__gcov_.", 8))
-				return true;
-
-	return false;
 }
 
 #define func_for_each_insn(file, func, insn)				\
@@ -231,9 +218,12 @@ static void clear_insn_state(struct insn_state *state)
 
 	memset(state, 0, sizeof(*state));
 	state->cfa.base = CFI_UNDEFINED;
-	for (i = 0; i < CFI_NUM_REGS; i++)
+	for (i = 0; i < CFI_NUM_REGS; i++) {
 		state->regs[i].base = CFI_UNDEFINED;
+		state->vals[i].base = CFI_UNDEFINED;
+	}
 	state->drap_reg = CFI_UNDEFINED;
+	state->drap_offset = -1;
 }
 
 /*
@@ -309,7 +299,7 @@ static int decode_instructions(struct objtool_file *file)
 }
 
 /*
- * Find all uses of the unreachable() macro, which are code path dead ends.
+ * Mark "ud2" instructions and manually annotated dead ends.
  */
 static int add_dead_ends(struct objtool_file *file)
 {
@@ -318,9 +308,20 @@ static int add_dead_ends(struct objtool_file *file)
 	struct instruction *insn;
 	bool found;
 
+	/*
+	 * By default, "ud2" is a dead end unless otherwise annotated, because
+	 * GCC 7 inserts it for certain divide-by-zero cases.
+	 */
+	for_each_insn(file, insn)
+		if (insn->type == INSN_BUG)
+			insn->dead_end = true;
+
+	/*
+	 * Check for manually annotated dead ends.
+	 */
 	sec = find_section_by_name(file->elf, ".rela.discard.unreachable");
 	if (!sec)
-		return 0;
+		goto reachable;
 
 	list_for_each_entry(rela, &sec->rela_list, list) {
 		if (rela->sym->type != STT_SECTION) {
@@ -351,6 +352,48 @@ static int add_dead_ends(struct objtool_file *file)
 		}
 
 		insn->dead_end = true;
+	}
+
+reachable:
+	/*
+	 * These manually annotated reachable checks are needed for GCC 4.4,
+	 * where the Linux unreachable() macro isn't supported.  In that case
+	 * GCC doesn't know the "ud2" is fatal, so it generates code as if it's
+	 * not a dead end.
+	 */
+	sec = find_section_by_name(file->elf, ".rela.discard.reachable");
+	if (!sec)
+		return 0;
+
+	list_for_each_entry(rela, &sec->rela_list, list) {
+		if (rela->sym->type != STT_SECTION) {
+			WARN("unexpected relocation symbol type in %s", sec->name);
+			return -1;
+		}
+		insn = find_insn(file, rela->sym->sec, rela->addend);
+		if (insn)
+			insn = list_prev_entry(insn, list);
+		else if (rela->addend == rela->sym->sec->len) {
+			found = false;
+			list_for_each_entry_reverse(insn, &file->insn_list, list) {
+				if (insn->sec == rela->sym->sec) {
+					found = true;
+					break;
+				}
+			}
+
+			if (!found) {
+				WARN("can't find reachable insn at %s+0x%x",
+				     rela->sym->sec->name, rela->addend);
+				return -1;
+			}
+		} else {
+			WARN("can't find reachable insn at %s+0x%x",
+			     rela->sym->sec->name, rela->addend);
+			return -1;
+		}
+
+		insn->dead_end = false;
 	}
 
 	return 0;
@@ -1070,8 +1113,7 @@ static int update_insn_state_regs(struct instruction *insn, struct insn_state *s
 static void save_reg(struct insn_state *state, unsigned char reg, int base,
 		     int offset)
 {
-	if ((arch_callee_saved_reg(reg) ||
-	    (state->drap && reg == state->drap_reg)) &&
+	if (arch_callee_saved_reg(reg) &&
 	    state->regs[reg].base == CFI_UNDEFINED) {
 		state->regs[reg].base = base;
 		state->regs[reg].offset = offset;
@@ -1161,24 +1203,47 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 		switch (op->src.type) {
 
 		case OP_SRC_REG:
-			if (cfa->base == op->src.reg && cfa->base == CFI_SP &&
-			    op->dest.reg == CFI_BP && regs[CFI_BP].base == CFI_CFA &&
-			    regs[CFI_BP].offset == -cfa->offset) {
+			if (op->src.reg == CFI_SP && op->dest.reg == CFI_BP) {
 
-				/* mov %rsp, %rbp */
-				cfa->base = op->dest.reg;
-				state->bp_scratch = false;
-			} else if (state->drap) {
+				if (cfa->base == CFI_SP &&
+				    regs[CFI_BP].base == CFI_CFA &&
+				    regs[CFI_BP].offset == -cfa->offset) {
 
-				/* drap: mov %rsp, %rbp */
-				regs[CFI_BP].base = CFI_BP;
-				regs[CFI_BP].offset = -state->stack_size;
-				state->bp_scratch = false;
-			} else if (!nofp) {
+					/* mov %rsp, %rbp */
+					cfa->base = op->dest.reg;
+					state->bp_scratch = false;
+				}
 
-				WARN_FUNC("unknown stack-related register move",
-					  insn->sec, insn->offset);
-				return -1;
+				else if (state->drap) {
+
+					/* drap: mov %rsp, %rbp */
+					regs[CFI_BP].base = CFI_BP;
+					regs[CFI_BP].offset = -state->stack_size;
+					state->bp_scratch = false;
+				}
+			}
+
+			else if (op->dest.reg == cfa->base) {
+
+				/* mov %reg, %rsp */
+				if (cfa->base == CFI_SP &&
+				    state->vals[op->src.reg].base == CFI_CFA) {
+
+					/*
+					 * This is needed for the rare case
+					 * where GCC does something dumb like:
+					 *
+					 *   lea    0x8(%rsp), %rcx
+					 *   ...
+					 *   mov    %rcx, %rsp
+					 */
+					cfa->offset = -state->vals[op->src.reg].offset;
+					state->stack_size = cfa->offset;
+
+				} else {
+					cfa->base = CFI_UNDEFINED;
+					cfa->offset = 0;
+				}
 			}
 
 			break;
@@ -1200,11 +1265,25 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 				break;
 			}
 
-			if (op->dest.reg != CFI_BP && op->src.reg == CFI_SP &&
-			    cfa->base == CFI_SP) {
+			if (op->src.reg == CFI_SP && cfa->base == CFI_SP) {
 
 				/* drap: lea disp(%rsp), %drap */
 				state->drap_reg = op->dest.reg;
+
+				/*
+				 * lea disp(%rsp), %reg
+				 *
+				 * This is needed for the rare case where GCC
+				 * does something dumb like:
+				 *
+				 *   lea    0x8(%rsp), %rcx
+				 *   ...
+				 *   mov    %rcx, %rsp
+				 */
+				state->vals[op->dest.reg].base = CFI_CFA;
+				state->vals[op->dest.reg].offset = \
+					-state->stack_size + op->src.offset;
+
 				break;
 			}
 
@@ -1241,7 +1320,6 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 				cfa->base = state->drap_reg;
 				cfa->offset = state->stack_size = 0;
 				state->drap = true;
-
 			}
 
 			/*
@@ -1259,17 +1337,19 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 				cfa->base = CFI_SP;
 			}
 
-			if (regs[op->dest.reg].offset == -state->stack_size) {
+			if (state->drap && cfa->base == CFI_BP_INDIRECT &&
+			    op->dest.type == OP_DEST_REG &&
+			    op->dest.reg == state->drap_reg &&
+			    state->drap_offset == -state->stack_size) {
 
-				if (state->drap && cfa->base == CFI_BP_INDIRECT &&
-				    op->dest.type == OP_DEST_REG &&
-				    op->dest.reg == state->drap_reg) {
+				/* drap: pop %drap */
+				cfa->base = state->drap_reg;
+				cfa->offset = 0;
+				state->drap_offset = -1;
 
-					/* drap: pop %drap */
-					cfa->base = state->drap_reg;
-					cfa->offset = 0;
-				}
+			} else if (regs[op->dest.reg].offset == -state->stack_size) {
 
+				/* pop %reg */
 				restore_reg(state, op->dest.reg);
 			}
 
@@ -1281,14 +1361,18 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 
 		case OP_SRC_REG_INDIRECT:
 			if (state->drap && op->src.reg == CFI_BP &&
+			    op->src.offset == state->drap_offset) {
+
+				/* drap: mov disp(%rbp), %drap */
+				cfa->base = state->drap_reg;
+				cfa->offset = 0;
+				state->drap_offset = -1;
+			}
+
+			if (state->drap && op->src.reg == CFI_BP &&
 			    op->src.offset == regs[op->dest.reg].offset) {
 
 				/* drap: mov disp(%rbp), %reg */
-				if (op->dest.reg == state->drap_reg) {
-					cfa->base = state->drap_reg;
-					cfa->offset = 0;
-				}
-
 				restore_reg(state, op->dest.reg);
 
 			} else if (op->src.reg == cfa->base &&
@@ -1324,8 +1408,8 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 				cfa->base = CFI_BP_INDIRECT;
 				cfa->offset = -state->stack_size;
 
-				/* save drap so we know when to undefine it */
-				save_reg(state, op->src.reg, CFI_CFA, -state->stack_size);
+				/* save drap so we know when to restore it */
+				state->drap_offset = -state->stack_size;
 
 			} else if (op->src.reg == CFI_BP && cfa->base == state->drap_reg) {
 
@@ -1345,7 +1429,7 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 		}
 
 		/* detect when asm code uses rbp as a scratch register */
-		if (!nofp && insn->func && op->src.reg == CFI_BP &&
+		if (!no_fp && insn->func && op->src.reg == CFI_BP &&
 		    cfa->base != CFI_BP)
 			state->bp_scratch = true;
 		break;
@@ -1359,8 +1443,8 @@ static int update_insn_state(struct instruction *insn, struct insn_state *state)
 				cfa->base = CFI_BP_INDIRECT;
 				cfa->offset = op->dest.offset;
 
-				/* save drap so we know when to undefine it */
-				save_reg(state, op->src.reg, CFI_CFA, op->dest.offset);
+				/* save drap offset so we know when to restore it */
+				state->drap_offset = op->dest.offset;
 			}
 
 			else if (regs[op->src.reg].base == CFI_UNDEFINED) {
@@ -1451,11 +1535,12 @@ static bool insn_state_match(struct instruction *insn, struct insn_state *state)
 			  insn->sec, insn->offset, state1->type, state2->type);
 
 	} else if (state1->drap != state2->drap ||
-		 (state1->drap && state1->drap_reg != state2->drap_reg)) {
-		WARN_FUNC("stack state mismatch: drap1=%d(%d) drap2=%d(%d)",
+		 (state1->drap && state1->drap_reg != state2->drap_reg) ||
+		 (state1->drap && state1->drap_offset != state2->drap_offset)) {
+		WARN_FUNC("stack state mismatch: drap1=%d(%d,%d) drap2=%d(%d,%d)",
 			  insn->sec, insn->offset,
-			  state1->drap, state1->drap_reg,
-			  state2->drap, state2->drap_reg);
+			  state1->drap, state1->drap_reg, state1->drap_offset,
+			  state2->drap, state2->drap_reg, state2->drap_offset);
 
 	} else
 		return true;
@@ -1484,26 +1569,26 @@ static int validate_branch(struct objtool_file *file, struct instruction *first,
 	if (insn->alt_group && list_empty(&insn->alts)) {
 		WARN_FUNC("don't know how to handle branch to middle of alternative instruction group",
 			  sec, insn->offset);
-		return -1;
+		return 1;
 	}
 
 	while (1) {
 		next_insn = next_insn_same_sec(file, insn);
 
-		if (file->c_file && insn->func) {
-			if (func && func != insn->func) {
-				WARN("%s() falls through to next function %s()",
-				     func->name, insn->func->name);
-				return 1;
-			}
+
+		if (file->c_file && func && insn->func && func != insn->func) {
+			WARN("%s() falls through to next function %s()",
+			     func->name, insn->func->name);
+			return 1;
 		}
 
-		func = insn->func;
+		if (insn->func)
+			func = insn->func;
 
 		if (func && insn->ignore) {
 			WARN_FUNC("BUG: why am I validating an ignored function?",
 				  sec, insn->offset);
-			return -1;
+			return 1;
 		}
 
 		if (insn->visited) {
@@ -1593,7 +1678,7 @@ static int validate_branch(struct objtool_file *file, struct instruction *first,
 
 			/* fallthrough */
 		case INSN_CALL_DYNAMIC:
-			if (!nofp && func && !has_valid_stack_frame(&state)) {
+			if (!no_fp && func && !has_valid_stack_frame(&state)) {
 				WARN_FUNC("call without frame pointer save/setup",
 					  sec, insn->offset);
 				return 1;
@@ -1641,7 +1726,7 @@ static int validate_branch(struct objtool_file *file, struct instruction *first,
 
 		case INSN_STACK:
 			if (update_insn_state(insn, &state))
-				return -1;
+				return 1;
 
 			break;
 
@@ -1706,8 +1791,13 @@ static bool ignore_unreachable_insn(struct instruction *insn)
 	/*
 	 * Ignore any unused exceptions.  This can happen when a whitelisted
 	 * function has an exception table entry.
+	 *
+	 * Also ignore alternative replacement instructions.  This can happen
+	 * when a whitelisted function uses one of the ALTERNATIVE macros.
 	 */
-	if (!strcmp(insn->sec->name, ".fixup"))
+	if (!strcmp(insn->sec->name, ".fixup") ||
+	    !strcmp(insn->sec->name, ".altinstr_replacement") ||
+	    !strcmp(insn->sec->name, ".altinstr_aux"))
 		return true;
 
 	/*
@@ -1779,15 +1869,6 @@ static int validate_reachable_instructions(struct objtool_file *file)
 		if (insn->visited || ignore_unreachable_insn(insn))
 			continue;
 
-		/*
-		 * gcov produces a lot of unreachable instructions.  If we get
-		 * an unreachable warning and the file has gcov enabled, just
-		 * ignore it, and all other such warnings for the file.  Do
-		 * this here because this is an expensive function.
-		 */
-		if (gcov_enabled(file))
-			return 0;
-
 		WARN_FUNC("unreachable instruction", insn->sec, insn->offset);
 		return 1;
 	}
@@ -1812,13 +1893,13 @@ static void cleanup(struct objtool_file *file)
 	elf_close(file->elf);
 }
 
-int check(const char *_objname, bool _nofp, bool orc)
+int check(const char *_objname, bool _no_fp, bool no_unreachable, bool orc)
 {
 	struct objtool_file file;
 	int ret, warnings = 0;
 
 	objname = _objname;
-	nofp = _nofp;
+	no_fp = _no_fp;
 
 	file.elf = elf_open(objname, orc ? O_RDWR : O_RDONLY);
 	if (!file.elf)
@@ -1829,7 +1910,7 @@ int check(const char *_objname, bool _nofp, bool orc)
 	file.whitelist = find_section_by_name(file.elf, ".discard.func_stack_frame_non_standard");
 	file.rodata = find_section_by_name(file.elf, ".rodata");
 	file.c_file = find_section_by_name(file.elf, ".comment");
-	file.ignore_unreachables = false;
+	file.ignore_unreachables = no_unreachable;
 	file.hints = false;
 
 	arch_initial_func_cfi_state(&initial_func_cfi);
