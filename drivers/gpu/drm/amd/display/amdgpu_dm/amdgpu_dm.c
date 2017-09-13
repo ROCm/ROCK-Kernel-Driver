@@ -380,7 +380,6 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	adev->dm.ddev = adev->ddev;
 	adev->dm.adev = adev;
 
-	DRM_INFO("DAL is enabled\n");
 	/* Zero all the fields */
 	memset(&init_data, 0, sizeof(init_data));
 
@@ -420,7 +419,10 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 
 	init_data.dce_environment = DCE_ENV_PRODUCTION_DRV;
 
-	init_data.log_mask = DC_DEFAULT_LOG_MASK;
+	if (amdgpu_dc_log)
+		init_data.log_mask = DC_DEFAULT_LOG_MASK;
+	else
+		init_data.log_mask = DC_MIN_LOG_MASK;
 
 #ifdef ENABLE_FBC
 	if (adev->family == FAMILY_CZ)
@@ -430,7 +432,9 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	/* Display Core create. */
 	adev->dm.dc = dc_create(&init_data);
 
-	if (!adev->dm.dc)
+	if (adev->dm.dc)
+		DRM_INFO("Display Core initialized!\n");
+	else
 		DRM_INFO("Display Core failed to initialize!\n");
 
 	INIT_WORK(&adev->dm.mst_hotplug_work, hotplug_notify_work_func);
@@ -440,7 +444,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 		DRM_ERROR(
 		"amdgpu: failed to initialize freesync_module.\n");
 	} else
-		DRM_INFO("amdgpu: freesync_module init done %p.\n",
+		DRM_DEBUG_DRIVER("amdgpu: freesync_module init done %p.\n",
 				adev->dm.freesync_module);
 
 	if (amdgpu_dm_initialize_drm_device(adev)) {
@@ -464,7 +468,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 		goto error;
 	}
 
-	DRM_INFO("KMS initialized.\n");
+	DRM_DEBUG_DRIVER("KMS initialized.\n");
 
 	return 0;
 error:
@@ -517,7 +521,7 @@ static int detect_mst_link_for_all_connectors(struct drm_device *dev)
 	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
 		   aconnector = to_amdgpu_dm_connector(connector);
 		if (aconnector->dc_link->type == dc_connection_mst_branch) {
-			DRM_INFO("DM_MST: starting TM on aconnector: %p [id: %d]\n",
+			DRM_DEBUG_DRIVER("DM_MST: starting TM on aconnector: %p [id: %d]\n",
 					aconnector, aconnector->base.base.id);
 
 			ret = drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, true);
@@ -846,12 +850,12 @@ amdgpu_dm_update_connector_after_detect(struct amdgpu_dm_connector *aconnector)
 	if (aconnector->dc_sink == sink) {
 		/* We got a DP short pulse (Link Loss, DP CTS, etc...).
 		 * Do nothing!! */
-		DRM_INFO("DCHPD: connector_id=%d: dc_sink didn't change.\n",
+		DRM_DEBUG_DRIVER("DCHPD: connector_id=%d: dc_sink didn't change.\n",
 				aconnector->connector_id);
 		return;
 	}
 
-	DRM_INFO("DCHPD: connector_id=%d: Old sink=%p New sink=%p\n",
+	DRM_DEBUG_DRIVER("DCHPD: connector_id=%d: Old sink=%p New sink=%p\n",
 		aconnector->connector_id, aconnector->dc_sink, sink);
 
 	mutex_lock(&dev->mode_config.mutex);
@@ -953,7 +957,7 @@ static void dm_handle_hpd_rx_irq(struct amdgpu_dm_connector *aconnector)
 
 		process_count++;
 
-		DRM_DEBUG_KMS("ESI %02x %02x %02x\n", esi[0], esi[1], esi[2]);
+		DRM_DEBUG_DRIVER("ESI %02x %02x %02x\n", esi[0], esi[1], esi[2]);
 		/* handle HPD short pulse irq */
 		if (aconnector->mst_mgr.mst_state)
 			drm_dp_mst_hpd_irq(
@@ -991,7 +995,7 @@ static void dm_handle_hpd_rx_irq(struct amdgpu_dm_connector *aconnector)
 	}
 
 	if (process_count == max_process_count)
-		DRM_DEBUG_KMS("Loop exceeded max iterations\n");
+		DRM_DEBUG_DRIVER("Loop exceeded max iterations\n");
 }
 
 static void handle_hpd_rx_irq(void *param)
@@ -1324,7 +1328,7 @@ amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm)
 	if (NULL == dm->backlight_dev)
 		DRM_ERROR("DM: Backlight registration failed!\n");
 	else
-		DRM_INFO("DM: Registered Backlight device: %s\n", bl_name);
+		DRM_DEBUG_DRIVER("DM: Registered Backlight device: %s\n", bl_name);
 }
 
 #endif
@@ -2074,7 +2078,7 @@ static void update_stream_scaling_settings(const struct drm_display_mode *mode,
 	stream->src = src;
 	stream->dst = dst;
 
-	DRM_DEBUG_KMS("Destination Rectangle x:%d  y:%d  width:%d  height:%d\n",
+	DRM_DEBUG_DRIVER("Destination Rectangle x:%d  y:%d  width:%d  height:%d\n",
 			dst.x, dst.y, dst.width, dst.height);
 
 }
@@ -2383,7 +2387,7 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 		 * case, we call set mode ourselves to restore the previous mode
 		 * and the modelist may not be filled in in time.
 		 */
-		DRM_INFO("No preferred mode found\n");
+		DRM_DEBUG_DRIVER("No preferred mode found\n");
 	} else {
 		decide_crtc_timing_for_drm_display_mode(
 				&mode, preferred_mode,
@@ -2842,7 +2846,7 @@ static struct drm_encoder *best_encoder(struct drm_connector *connector)
 	struct drm_mode_object *obj;
 	struct drm_encoder *encoder;
 
-	DRM_DEBUG_KMS("Finding the best encoder\n");
+	DRM_DEBUG_DRIVER("Finding the best encoder\n");
 
 	/* pick the encoder ids */
 	if (enc_id) {
@@ -3119,7 +3123,7 @@ static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 	dm_plane_state_new = to_dm_plane_state(new_state);
 
 	if (!new_state->fb) {
-		DRM_DEBUG_KMS("No FB bound\n");
+		DRM_DEBUG_DRIVER("No FB bound\n");
 		return 0;
 	}
 
@@ -3665,7 +3669,7 @@ static int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
 	struct amdgpu_i2c_adapter *i2c;
 	((struct dc_link *)link)->priv = aconnector;
 
-	DRM_DEBUG_KMS("%s()\n", __func__);
+	DRM_DEBUG_DRIVER("%s()\n", __func__);
 
 	i2c = create_i2c(link->ddc, link->link_index, &res);
 	aconnector->i2c = i2c;
@@ -3902,11 +3906,11 @@ static void handle_cursor_update(struct drm_plane *plane,
 	if (!plane->state->fb && !old_plane_state->fb)
 		return;
 
-	DRM_DEBUG_KMS("%s: crtc_id=%d with size %d to %d\n",
-		      __func__,
-		      amdgpu_crtc->crtc_id,
-		      plane->state->crtc_w,
-		      plane->state->crtc_h);
+	DRM_DEBUG_DRIVER("%s: crtc_id=%d with size %d to %d\n",
+		         __func__,
+		         amdgpu_crtc->crtc_id,
+		         plane->state->crtc_w,
+		         plane->state->crtc_h);
 
 	ret = get_cursor_position(plane, crtc, &position);
 	if (ret)
@@ -4221,7 +4225,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		old_acrtc_state = to_dm_crtc_state(old_crtc_state);
 
 #if !defined(OS_NAME_RHEL_7_2)
-		DRM_DEBUG_KMS(
+		DRM_DEBUG_DRIVER(
 			"amdgpu_crtc id:%d crtc_state_flags: enable:%d, active:%d, "
 			"planes_changed:%d, mode_changed:%d,active_changed:%d,"
 			"connectors_changed:%d\n",
@@ -4240,7 +4244,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 		if (modeset_required(new_state, new_acrtc_state->stream, old_acrtc_state->stream)) {
 
-			DRM_INFO("Atomic commit: SET crtc id %d: [%p]\n", acrtc->crtc_id, acrtc);
+			DRM_DEBUG_DRIVER("Atomic commit: SET crtc id %d: [%p]\n", acrtc->crtc_id, acrtc);
 
 			if (!new_acrtc_state->stream) {
 				/*
@@ -4258,7 +4262,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 				 * have a sink to keep the pipe running so that
 				 * hw state is consistent with the sw state
 				 */
-				DRM_DEBUG_KMS("%s: Failed to create new stream for crtc %d\n",
+				DRM_DEBUG_DRIVER("%s: Failed to create new stream for crtc %d\n",
 						__func__, acrtc->base.base.id);
 				continue;
 			}
@@ -4285,7 +4289,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 			acrtc->hw_mode = crtc->state->mode;
 			crtc->hwmode = crtc->state->mode;
 		} else if (modereset_required(new_state)) {
-			DRM_INFO("Atomic commit: RESET. crtc id %d:[%p]\n", acrtc->crtc_id, acrtc);
+			DRM_DEBUG_DRIVER("Atomic commit: RESET. crtc id %d:[%p]\n", acrtc->crtc_id, acrtc);
 
 			/* i.e. reset mode */
 			if (old_acrtc_state->stream)
@@ -4310,7 +4314,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 					&new_crtcs[i]->base,
 					false);
 			if (!aconnector) {
-				DRM_INFO("Atomic commit: Failed to find connector for acrtc id:%d "
+				DRM_DEBUG_DRIVER("Atomic commit: Failed to find connector for acrtc id:%d "
 					 "skipping freesync init\n",
 					 new_crtcs[i]->crtc_id);
 				continue;
@@ -4622,7 +4626,7 @@ static int dm_update_crtcs_state(struct dc *dc,
 			 */
 
 			if (!new_stream) {
-				DRM_DEBUG_KMS("%s: Failed to create new stream for crtc %d\n",
+				DRM_DEBUG_DRIVER("%s: Failed to create new stream for crtc %d\n",
 						__func__, acrtc->base.base.id);
 				break;
 			}
@@ -4633,7 +4637,7 @@ static int dm_update_crtcs_state(struct dc *dc,
 
 				crtc_state->mode_changed = false;
 
-				DRM_DEBUG_KMS("Mode change not required, setting mode_changed to %d",
+				DRM_DEBUG_DRIVER("Mode change not required, setting mode_changed to %d",
 					      crtc_state->mode_changed);
 		}
 
@@ -4642,7 +4646,7 @@ static int dm_update_crtcs_state(struct dc *dc,
 			goto next_crtc;
 
 #if !defined(OS_NAME_RHEL_7_2)
-		DRM_DEBUG_KMS(
+		DRM_DEBUG_DRIVER(
 			"amdgpu_crtc id:%d crtc_state_flags: enable:%d, active:%d, "
 			"planes_changed:%d, mode_changed:%d,active_changed:%d,"
 			"connectors_changed:%d\n",
@@ -4661,7 +4665,7 @@ static int dm_update_crtcs_state(struct dc *dc,
 			if (!old_acrtc_state->stream)
 				goto next_crtc;
 
-			DRM_DEBUG_KMS("Disabling DRM crtc: %d\n",
+			DRM_DEBUG_DRIVER("Disabling DRM crtc: %d\n",
 					crtc->base.id);
 
 			/* i.e. reset mode */
@@ -4691,7 +4695,7 @@ static int dm_update_crtcs_state(struct dc *dc,
 				new_acrtc_state->stream = new_stream;
 				dc_stream_retain(new_stream);
 
-				DRM_DEBUG_KMS("Enabling DRM crtc: %d\n",
+				DRM_DEBUG_DRIVER("Enabling DRM crtc: %d\n",
 							crtc->base.id);
 
 				if (!dc_add_stream_to_ctx(
@@ -4774,7 +4778,7 @@ static int dm_update_planes_state(struct dc *dc,
 			if (!old_acrtc_state->stream)
 				continue;
 
-			DRM_DEBUG_KMS("Disabling DRM plane: %d on DRM crtc %d\n",
+			DRM_DEBUG_DRIVER("Disabling DRM plane: %d on DRM crtc %d\n",
 					plane->base.id, old_plane_crtc->base.id);
 
 			if (!dc_remove_plane_from_context(
@@ -4822,7 +4826,7 @@ static int dm_update_planes_state(struct dc *dc,
 
 			new_dm_plane_state->dc_state = dc_create_plane_state(dc);
 
-			DRM_DEBUG_KMS("Enabling DRM plane: %d on DRM crtc %d\n",
+			DRM_DEBUG_DRIVER("Enabling DRM plane: %d on DRM crtc %d\n",
 					plane->base.id, new_plane_crtc->base.id);
 
 			if (!new_dm_plane_state->dc_state) {
@@ -4981,9 +4985,9 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 fail:
 	if (ret == -EDEADLK)
-		DRM_DEBUG_KMS("Atomic check stopped due to to deadlock.\n");
+		DRM_DEBUG_DRIVER("Atomic check stopped due to to deadlock.\n");
 	else if (ret == -EINTR || ret == -EAGAIN || ret == -ERESTARTSYS)
-		DRM_DEBUG_KMS("Atomic check stopped due to to signal.\n");
+		DRM_DEBUG_DRIVER("Atomic check stopped due to to signal.\n");
 	else
 		DRM_ERROR("Atomic check failed with err: %d \n", ret);
 
