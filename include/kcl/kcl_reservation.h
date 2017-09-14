@@ -62,4 +62,19 @@ kcl_reservation_object_unlock(struct reservation_object *obj)
 #endif
 }
 
+#if defined(BUILD_AS_DKMS)
+extern int _kcl_reservation_object_copy_fences(struct reservation_object *dst,
+					struct reservation_object *src);
+#endif
+
+static inline int
+kcl_reservation_object_copy_fences(struct reservation_object *dst,
+				struct reservation_object *src)
+{
+#if defined(BUILD_AS_DKMS)
+	return _kcl_reservation_object_copy_fences(dst, src);
+#else
+	return reservation_object_copy_fences(dst, src);
+#endif
+}
 #endif /* AMDKCL_RESERVATION_H */
