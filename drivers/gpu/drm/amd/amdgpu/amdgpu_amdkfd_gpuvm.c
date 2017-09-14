@@ -1121,6 +1121,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 			alloc_flag = AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 			temp_offset = offset;
 		}
+		alloc_flag |= AMDGPU_GEM_CREATE_VRAM_CLEARED;
 	} else if (flags & (ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_USERPTR)) {
 		domain = AMDGPU_GEM_DOMAIN_GTT;
 		alloc_flag = 0;
