@@ -1218,6 +1218,9 @@ struct amdgpu_firmware {
 
 	/* gpu info firmware data pointer */
 	const struct firmware *gpu_info_fw;
+
+	void *fw_buf_ptr;
+	uint64_t fw_buf_mc;
 };
 
 /*
