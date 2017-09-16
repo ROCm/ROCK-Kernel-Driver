@@ -41,9 +41,7 @@
 static void amdgpu_ttm_bo_destroy(struct ttm_buffer_object *tbo)
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(tbo->bdev);
-	struct amdgpu_bo *bo;
-
-	bo = container_of(tbo, struct amdgpu_bo, tbo);
+	struct amdgpu_bo *bo = ttm_to_amdgpu_bo(tbo);
 
 	if (bo->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT)
 		kfree(tbo->mem.bus.addr);
@@ -923,7 +921,7 @@ void amdgpu_bo_move_notify(struct ttm_buffer_object *bo,
 	if (!amdgpu_ttm_bo_is_amdgpu_bo(bo))
 		return;
 
-	abo = container_of(bo, struct amdgpu_bo, tbo);
+	abo = ttm_to_amdgpu_bo(bo);
 	amdgpu_vm_bo_invalidate(adev, abo, evict);
 
 	amdgpu_bo_kunmap(abo);
@@ -950,7 +948,7 @@ int amdgpu_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 	if (!amdgpu_ttm_bo_is_amdgpu_bo(bo))
 		return 0;
 
-	abo = container_of(bo, struct amdgpu_bo, tbo);
+	abo = ttm_to_amdgpu_bo(bo);
 
 	/* Remember that this BO was accessed by the CPU */
 	abo->flags |= AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
