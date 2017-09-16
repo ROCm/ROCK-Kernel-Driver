@@ -185,7 +185,7 @@ int amdgpu_sync_fence(struct amdgpu_device *adev, struct amdgpu_sync *sync,
  *
  * @sync: sync object to add fences from reservation object to
  * @resv: reservation object with embedded fence
- * @shared: true if we should only sync to the exclusive fence
+ * @explicit_sync: true if we should only sync to the exclusive fence
  *
  * Sync to the fence except if it is KFD eviction fence and owner is
  * AMDGPU_FENCE_OWNER_VM.
@@ -193,7 +193,7 @@ int amdgpu_sync_fence(struct amdgpu_device *adev, struct amdgpu_sync *sync,
 int amdgpu_sync_resv(struct amdgpu_device *adev,
 		     struct amdgpu_sync *sync,
 		     struct reservation_object *resv,
-		     void *owner)
+		     void *owner, bool explicit_sync)
 {
 	struct reservation_object_list *flist;
 	struct dma_fence *f;
@@ -209,6 +209,9 @@ int amdgpu_sync_resv(struct amdgpu_device *adev,
 	if (fence_owner != AMDGPU_FENCE_OWNER_KFD ||
 			owner != AMDGPU_FENCE_OWNER_VM)
 		r = amdgpu_sync_fence(adev, sync, f);
+
+	if (explicit_sync)
+		return r;
 
 	flist = reservation_object_get_list(resv);
 	if (!flist || r)
