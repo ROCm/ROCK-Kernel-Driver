@@ -1715,6 +1715,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 				      struct dma_fence **fence)
 {
 	struct drm_mm_node *nodes = mem ? mem->mm_node : NULL;
+	unsigned min_linear_pages = 1 << adev->vm_manager.fragment_size;
 	uint64_t pfn, start = mapping->start;
 	int r;
 
@@ -1749,8 +1750,10 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 	}
 
 	do {
+		dma_addr_t *dma_addr = NULL;
 		uint64_t max_entries;
 		uint64_t addr, last;
+		uint64_t count;
 
 		if (nodes) {
 			addr = nodes->start << PAGE_SHIFT;
@@ -1759,19 +1762,37 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 			switch (mem->mem_type) {
 			case TTM_PL_TT:
 				max_entries = min(max_entries, 16ull * 1024ull);
-				addr = 0;
+
+				for (count = 1; count < max_entries; ++count) {
+					uint64_t idx = pfn + count;
+
+					if (pages_addr[idx] !=
+					    (pages_addr[idx - 1] + PAGE_SIZE))
+					break;
+				}
+
+				if (count < min_linear_pages) {
+					addr = pfn << PAGE_SHIFT;
+					dma_addr = pages_addr;
+				} else {
+					addr = pages_addr[pfn];
+					max_entries = count;
+				}
 				break;
 			case AMDGPU_PL_DGMA_IMPORT:
 				addr = 0;
 				max_entries = min(max_entries, 16ull * 1024ull);
+				dma_addr = pages_addr;
 				break;
 			case AMDGPU_PL_DGMA:
 				addr += adev->vm_manager.vram_base_offset +
 					adev->mman.bdev.man[mem->mem_type].gpu_offset -
 					adev->mman.bdev.man[TTM_PL_VRAM].gpu_offset;
+				addr += pfn << PAGE_SHIFT;
 				break;
 			case TTM_PL_VRAM:
 				addr += adev->vm_manager.vram_base_offset;
+				addr += pfn << PAGE_SHIFT;
 				break;
 			default:
 				break;
@@ -1781,10 +1802,8 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 			max_entries = S64_MAX;
 		}
 
-		addr += pfn << PAGE_SHIFT;
-
 		last = min((uint64_t)mapping->last, start + max_entries - 1);
-		r = amdgpu_vm_bo_update_mapping(adev, exclusive, pages_addr, vm,
+		r = amdgpu_vm_bo_update_mapping(adev, exclusive, dma_addr, vm,
 						start, last, flags, addr,
 						fence);
 		if (r)
