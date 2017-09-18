@@ -1272,7 +1272,11 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 	}
 
 	ttm_eu_backoff_reservation(&ticket, &list);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 	drm_free_large(vm_bos);
+#else
+	kvfree(vm_bos);
+#endif
 
 	return 0;
 
@@ -1290,7 +1294,11 @@ err_failed_to_pin_pd:
 err_failed_to_pin_pts:
 	ttm_eu_backoff_reservation(&ticket, &list);
 err_failed_to_ttm_reserve:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 	drm_free_large(vm_bos);
+#else
+	kvfree(vm_bos);
+#endif
 err_failed_to_get_bos:
 	unpin_bo(bo, true);
 
@@ -1344,12 +1352,20 @@ static int unmap_bo_from_gpuvm(struct radeon_device *rdev,
 	mutex_unlock(&vm->mutex);
 
 	ttm_eu_backoff_reservation(&ticket, &list);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 	drm_free_large(vm_bos);
+#else
+	kvfree(vm_bos);
+#endif
 
 	return 0;
 
 err_failed_to_ttm_reserve:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 	drm_free_large(vm_bos);
+#else
+	kvfree(vm_bos);
+#endif
 err_failed_to_get_bos:
 	return ret;
 }
