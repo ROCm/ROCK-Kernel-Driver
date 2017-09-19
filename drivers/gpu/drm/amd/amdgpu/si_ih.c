@@ -301,7 +301,7 @@ static const struct amd_ip_funcs si_ih_ip_funcs = {
 
 static const struct amdgpu_ih_funcs si_ih_funcs = {
 	.get_wptr = si_ih_get_wptr,
-	.prescreeen_iv = si_ih_prescreen_iv,
+	.prescreen_iv = si_ih_prescreen_iv,
 	.decode_iv = si_ih_decode_iv,
 	.set_rptr = si_ih_set_rptr
 };
