@@ -9,6 +9,7 @@
 #include <asm/boot.h>
 #include <asm/asm.h>
 #include <asm/page_types.h>
+#include <asm/unwind_hints.h>
 
 #include <xen/interface/elfnote.h>
 #include <xen/interface/features.h>

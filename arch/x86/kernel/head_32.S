@@ -25,7 +25,6 @@
 #include <asm/bootparam.h>
 #include <asm/export.h>
 #include <asm/pgtable_32.h>
-#include "../entry/calling.h"
 
 /* Physical address */
 #define pa(X) ((X) - __PAGE_OFFSET)
