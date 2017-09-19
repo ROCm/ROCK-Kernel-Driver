@@ -296,4 +296,3 @@ _kcl_fence_get_rcu_safe(struct fence * __rcu *fencep)
 }
 EXPORT_SYMBOL(_kcl_fence_get_rcu_safe);
 #endif
-}

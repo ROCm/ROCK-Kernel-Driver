@@ -131,7 +131,7 @@ retry:
 		dst_list = NULL;
 	}
 
-	new = dma_fence_get_rcu_safe(&src->fence_excl);
+	new = kcl_fence_get_rcu_safe(&src->fence_excl);
 	rcu_read_unlock();
 
 	kfree(dst->staged);
