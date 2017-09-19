@@ -228,3 +228,23 @@ void amdkcl_fence_init(void)
 	_kcl_fence_default_wait_cb = amdkcl_fp_setup("fence_default_wait_cb", NULL);
 #endif
 }
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+struct fence *
+_kcl_fence_get_rcu_safe(struct fence * __rcu *fencep)
+{
+	do {
+		struct fence *fence;
+
+		fence = rcu_dereference(*fencep);
+		if (!fence || !fence_get_rcu(fence))
+			return NULL;
+
+		if (fence == rcu_access_pointer(*fencep))
+			return rcu_pointer_handoff(fence);
+
+		fence_put(fence);
+	} while (1);
+}
+EXPORT_SYMBOL(_kcl_fence_get_rcu_safe);
+#endif
