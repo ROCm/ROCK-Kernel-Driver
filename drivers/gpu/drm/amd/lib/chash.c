@@ -35,6 +35,7 @@
 #else
 #include <linux/sched.h>
 #endif
+#include <asm/div64.h>
 #include <linux/chash.h>
 
 /**
@@ -78,9 +79,21 @@ EXPORT_SYMBOL(chash_table_free);
 #ifdef CONFIG_CHASH_STATS
 
 #define DIV_FRAC(nom, denom, quot, frac, frac_digits) do {		\
-		(quot) = (nom) / (denom);				\
-		(frac) = ((nom) % (denom) * (frac_digits) +		\
-			  (denom) / 2) / (denom);			\
+		u64 __nom = (nom);					\
+		u64 __denom = (denom);					\
+		u64 __quot, __frac;					\
+		u32 __rem;						\
+									\
+		while (__denom >> 32) {					\
+			__nom   >>= 1;					\
+			__denom >>= 1;					\
+		}							\
+		__quot = __nom;						\
+		__rem  = do_div(__quot, __denom);			\
+		__frac = __rem * (frac_digits) + (__denom >> 1);	\
+		do_div(__frac, __denom);				\
+		(quot) = __quot;					\
+		(frac) = __frac;					\
 	} while (0)
 
 void __chash_table_dump_stats(struct __chash_table *table)
@@ -570,7 +583,7 @@ module_param_named(test_iters, chash_test_iters, ulong, 0444);
 static int __init chash_init(void)
 {
 	int ret;
-	u64 ts1_ns, ts_delta_us;
+	u64 ts1_ns;
 
 	/* Skip self test on user errors */
 	if (chash_test_bits < 4 || chash_test_bits > 20) {
@@ -611,10 +624,13 @@ static int __init chash_init(void)
 			      chash_test_minfill, chash_test_maxfill,
 			      chash_test_iters);
 	if (!ret) {
-		ts_delta_us = (local_clock() - ts1_ns) / 1000;
+		u64 ts_delta_us = local_clock() - ts1_ns;
+		u64 iters_per_second = (u64)chash_test_iters * 1000000;
+
+		do_div(ts_delta_us, 1000);
+		do_div(iters_per_second, ts_delta_us);
 		pr_info("chash: self test took %llu us, %llu iterations/s\n",
-			ts_delta_us,
-			(u64)chash_test_iters * 1000000 / ts_delta_us);
+			ts_delta_us, iters_per_second);
 	} else {
 		pr_err("chash: self test failed: %d\n", ret);
 	}
