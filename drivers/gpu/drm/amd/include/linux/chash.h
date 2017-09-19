@@ -27,7 +27,15 @@
 #include <linux/types.h>
 #include <linux/hash.h>
 #include <linux/bug.h>
-#include <linux/bitops.h>
+#include <asm/bitsperlong.h>
+
+#if BITS_PER_LONG == 32
+# define _CHASH_LONG_SHIFT 5
+#elif BITS_PER_LONG == 64
+# define _CHASH_LONG_SHIFT 6
+#else
+# error "Unexpected BITS_PER_LONG"
+#endif
 
 struct __chash_table {
 	u8 bits;
@@ -283,31 +291,31 @@ struct chash_iter {
 static inline bool chash_iter_is_valid(const struct chash_iter iter)
 {
 	BUG_ON((unsigned)iter.slot >= (1 << iter.table->bits));
-	return !!(iter.table->valid_bitmap[iter.slot >> _BITOPS_LONG_SHIFT] &
+	return !!(iter.table->valid_bitmap[iter.slot >> _CHASH_LONG_SHIFT] &
 		  iter.mask);
 }
 static inline bool chash_iter_is_empty(const struct chash_iter iter)
 {
 	BUG_ON((unsigned)iter.slot >= (1 << iter.table->bits));
-	return !(iter.table->occup_bitmap[iter.slot >> _BITOPS_LONG_SHIFT] &
+	return !(iter.table->occup_bitmap[iter.slot >> _CHASH_LONG_SHIFT] &
 		 iter.mask);
 }
 
 static inline void chash_iter_set_valid(const struct chash_iter iter)
 {
 	BUG_ON((unsigned)iter.slot >= (1 << iter.table->bits));
-	iter.table->valid_bitmap[iter.slot >> _BITOPS_LONG_SHIFT] |= iter.mask;
-	iter.table->occup_bitmap[iter.slot >> _BITOPS_LONG_SHIFT] |= iter.mask;
+	iter.table->valid_bitmap[iter.slot >> _CHASH_LONG_SHIFT] |= iter.mask;
+	iter.table->occup_bitmap[iter.slot >> _CHASH_LONG_SHIFT] |= iter.mask;
 }
 static inline void chash_iter_set_invalid(const struct chash_iter iter)
 {
 	BUG_ON((unsigned)iter.slot >= (1 << iter.table->bits));
-	iter.table->valid_bitmap[iter.slot >> _BITOPS_LONG_SHIFT] &= ~iter.mask;
+	iter.table->valid_bitmap[iter.slot >> _CHASH_LONG_SHIFT] &= ~iter.mask;
 }
 static inline void chash_iter_set_empty(const struct chash_iter iter)
 {
 	BUG_ON((unsigned)iter.slot >= (1 << iter.table->bits));
-	iter.table->occup_bitmap[iter.slot >> _BITOPS_LONG_SHIFT] &= ~iter.mask;
+	iter.table->occup_bitmap[iter.slot >> _CHASH_LONG_SHIFT] &= ~iter.mask;
 }
 
 static inline u32 chash_iter_key32(const struct chash_iter iter)
