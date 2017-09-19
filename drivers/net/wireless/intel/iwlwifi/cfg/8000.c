@@ -70,9 +70,9 @@
 #include "iwl-agn-hw.h"
 
 /* Highest firmware API version supported */
-#define IWL8000_UCODE_API_MAX	33
+#define IWL8000_UCODE_API_MAX	34
 #define IWL8000_UCODE_API_DEFAULT_FALLBACK	27
-#define IWL8265_UCODE_API_MAX	33
+#define IWL8265_UCODE_API_MAX	34
 #define IWL8265_UCODE_API_DEFAULT_FALLBACK	27
 
 /* Lowest firmware API version supported */

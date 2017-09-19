@@ -179,9 +179,14 @@ struct btrfs_inode {
 	unsigned reserved_extents;
 
 	/*
-	 * always compress this one file
+	 * Cached values of inode properties
 	 */
-	unsigned force_compress;
+	unsigned prop_compress;		/* per-file compression algorithm */
+	/*
+	 * Force compression on the file using the defrag ioctl, could be
+	 * different from prop_compress and takes precedence if set
+	 */
+	unsigned defrag_compress;
 
 	struct btrfs_delayed_node *delayed_node;
 
@@ -231,7 +236,7 @@ static inline void btrfs_insert_inode_hash(struct inode *inode)
 	__insert_inode_hash(inode, h);
 }
 
-static inline u64 btrfs_ino(struct btrfs_inode *inode)
+static inline u64 btrfs_ino(const struct btrfs_inode *inode)
 {
 	u64 ino = inode->location.objectid;
 
