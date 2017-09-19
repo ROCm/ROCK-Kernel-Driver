@@ -452,7 +452,7 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 		/* Last resort, if we fail to allocate memory for the
 		 * fences block for the BO to become idle
 		 */
-		reservation_object_wait_timeout_rcu(bo->resv, true, false,
+		kcl_reservation_object_wait_timeout_rcu(bo->resv, true, false,
 						    30 * HZ);
 		spin_lock(&glob->lru_lock);
 		goto error;
@@ -461,11 +461,11 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 	spin_lock(&glob->lru_lock);
 	ret = __ttm_bo_reserve(bo, false, true, NULL);
 	if (!ret) {
-		if (reservation_object_test_signaled_rcu(&bo->ttm_resv, true)) {
+		if (kcl_reservation_object_test_signaled_rcu(&bo->ttm_resv, true)) {
 			ttm_bo_del_from_lru(bo);
 			spin_unlock(&glob->lru_lock);
 			if (bo->resv != &bo->ttm_resv)
-				reservation_object_unlock(&bo->ttm_resv);
+				kcl_reservation_object_unlock(&bo->ttm_resv);
 			ttm_bo_cleanup_memtype_use(bo);
 			return;
 		}
@@ -485,7 +485,7 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 		__ttm_bo_unreserve(bo);
 	}
 	if (bo->resv != &bo->ttm_resv)
-		reservation_object_unlock(&bo->ttm_resv);
+		kcl_reservation_object_unlock(&bo->ttm_resv);
 
 error:
 	kref_get(&bo->list_kref);
@@ -521,7 +521,7 @@ static int ttm_bo_cleanup_refs_and_unlock(struct ttm_buffer_object *bo,
 	else
 		resv = &bo->ttm_resv;
 
-	if (reservation_object_test_signaled_rcu(resv, true))
+	if (kcl_reservation_object_test_signaled_rcu(resv, true))
 		ret = 0;
 	else
 		ret = -EBUSY;
@@ -531,7 +531,7 @@ static int ttm_bo_cleanup_refs_and_unlock(struct ttm_buffer_object *bo,
 		ww_mutex_unlock(&bo->resv->lock);
 		spin_unlock(&glob->lru_lock);
 
-		lret = reservation_object_wait_timeout_rcu(resv, true,
+		lret = kcl_reservation_object_wait_timeout_rcu(resv, true,
 							   interruptible,
 							   30 * HZ);
 
@@ -1677,7 +1677,7 @@ int ttm_bo_wait(struct ttm_buffer_object *bo,
 			return -EBUSY;
 	}
 
-	timeout = reservation_object_wait_timeout_rcu(bo->resv, true,
+	timeout = kcl_reservation_object_wait_timeout_rcu(bo->resv, true,
 						      interruptible, timeout);
 	if (timeout < 0)
 		return timeout;
