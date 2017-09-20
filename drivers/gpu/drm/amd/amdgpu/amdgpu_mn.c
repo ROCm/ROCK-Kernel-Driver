@@ -264,7 +264,7 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 	/* notification is exclusive, but interval is inclusive */
 	end -= 1;
 
-	mutex_lock(&rmn->lock);
+	amdgpu_mn_read_lock(rmn);
 
 	it = interval_tree_iter_first(&rmn->objects, start, end);
 	while (it) {
@@ -282,8 +282,6 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 				amdgpu_amdkfd_evict_userptr(mem, mm);
 		}
 	}
-
-	mutex_unlock(&rmn->lock);
 }
 
 static const struct mmu_notifier_ops amdgpu_mn_ops[] = {
