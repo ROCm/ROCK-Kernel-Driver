@@ -38,11 +38,6 @@
 #include "amdgpu.h"
 #include "amdgpu_amdkfd.h"
 
-enum amdgpu_mn_type {
-	AMDGPU_MN_TYPE_GFX,
-	AMDGPU_MN_TYPE_HSA,
-};
-
 struct amdgpu_mn {
 	/* constant after initialisation */
 	struct amdgpu_device	*adev;
