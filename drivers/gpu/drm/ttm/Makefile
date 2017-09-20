@@ -17,3 +17,7 @@ obj-$(CONFIG_DRM_TTM) += $(TTM_NAME).o
 
 TTM_FULL_PATH = $(src)
 include $(TTM_FULL_PATH)/backport/Makefile
+
+#if defined(BUILD_AS_DKMS)
+CFLAGS_ttm_tracepoints.o := -I$(src)
+#endif
