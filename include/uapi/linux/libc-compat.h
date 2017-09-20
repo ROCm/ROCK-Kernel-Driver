@@ -158,6 +158,13 @@
 
 #endif /* defined(__NETIPX_IPX_H) */
 
+/* Coordinate with glibc bits/uio.h header. */
+#if defined(_SYS_UIO_H) || defined(_FCNTL_H)
+#define __UAPI_DEF_IOVEC		0
+#else
+#define __UAPI_DEF_IOVEC		1
+#endif
+
 /* Definitions for xattr.h */
 #if defined(_SYS_XATTR_H)
 #define __UAPI_DEF_XATTR		0
@@ -204,13 +211,6 @@
 #define __UAPI_DEF_IPX_INTERFACE_DEFINITION	1
 #define __UAPI_DEF_IPX_CONFIG_DATA		1
 #define __UAPI_DEF_IPX_ROUTE_DEF		1
-
-/* Coordinate with glibc bits/uio.h header. */
-#if defined(_SYS_UIO_H) || defined(_FCNTL_H)
-#define __UAPI_DEF_IOVEC		0
-#else
-#define __UAPI_DEF_IOVEC		1
-#endif
 
 /* Definitions for uio.h */
 #define __UAPI_DEF_IOVEC		1
