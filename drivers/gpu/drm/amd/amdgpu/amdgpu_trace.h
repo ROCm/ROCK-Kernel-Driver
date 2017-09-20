@@ -498,5 +498,9 @@ TRACE_EVENT(amdgpu_ib_pipe_sync,
 
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
+#if defined(BUILD_AS_DKMS)
 #define TRACE_INCLUDE_PATH .
+#else
+#define TRACE_INCLUDE_PATH ../../drivers/gpu/drm/amd/amdgpu
+#endif /* BUILD_AS_DKMS */
 #include <trace/define_trace.h>
