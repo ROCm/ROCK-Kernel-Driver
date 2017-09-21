@@ -253,3 +253,28 @@ bool smum_is_hw_avfs_present(struct pp_hwmgr *hwmgr)
 
 	return false;
 }
+
+
+bool smum_smu_init(struct pp_hwmgr *hwmgr)
+{
+	if (hwmgr->smumgr_funcs->smu_init)
+		return hwmgr->smumgr_funcs->smu_init(hwmgr);
+
+	return false;
+}
+
+bool smum_smu_fini(struct pp_hwmgr *hwmgr)
+{
+	if (hwmgr->smumgr_funcs->smu_fini)
+		return hwmgr->smumgr_funcs->smu_fini(hwmgr);
+
+	return false;
+}
+
+bool smum_start_smu(struct pp_hwmgr *hwmgr)
+{
+	if (hwmgr->smumgr_funcs->start_smu)
+		return hwmgr->smumgr_funcs->start_smu(hwmgr);
+
+	return false;
+}
