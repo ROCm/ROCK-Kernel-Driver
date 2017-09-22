@@ -755,7 +755,6 @@ static void gmc_v7_0_vm_decode_fault(struct amdgpu_device *adev,
 				     u32 status, u32 addr, u32 mc_client)
 {
 	u32 mc_id;
-	struct kfd_vm_fault_info *info = adev->mc.vm_fault_info;
 	u32 vmid = REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS, VMID);
 	u32 protections = REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS,
 					PROTECTIONS);
@@ -770,19 +769,6 @@ static void gmc_v7_0_vm_decode_fault(struct amdgpu_device *adev,
 	       REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS,
 			     MEMORY_CLIENT_RW) ?
 	       "write" : "read", block, mc_client, mc_id);
-
-	if (amdgpu_amdkfd_is_kfd_vmid(adev, vmid)
-		&& !atomic_read(&adev->mc.vm_fault_info_updated)) {
-		info->vmid = vmid;
-		info->mc_id = mc_id;
-		info->page_addr = addr;
-		info->prot_valid = protections & 0x7 ? true : false;
-		info->prot_read = protections & 0x8 ? true : false;
-		info->prot_write = protections & 0x10 ? true : false;
-		info->prot_exec = protections & 0x20 ? true : false;
-		mb();
-		atomic_set(&adev->mc.vm_fault_info_updated, 1);
-	}
 }
 
 
@@ -1261,7 +1247,7 @@ static int gmc_v7_0_process_interrupt(struct amdgpu_device *adev,
 				      struct amdgpu_irq_src *source,
 				      struct amdgpu_iv_entry *entry)
 {
-	u32 addr, status, mc_client;
+	u32 addr, status, mc_client, vmid;
 
 	addr = RREG32(mmVM_CONTEXT1_PROTECTION_FAULT_ADDR);
 	status = RREG32(mmVM_CONTEXT1_PROTECTION_FAULT_STATUS);
@@ -1283,6 +1269,29 @@ static int gmc_v7_0_process_interrupt(struct amdgpu_device *adev,
 		dev_err(adev->dev, "  VM_CONTEXT1_PROTECTION_FAULT_STATUS 0x%08X\n",
 			status);
 		gmc_v7_0_vm_decode_fault(adev, status, addr, mc_client);
+	}
+
+	vmid = REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS,
+			     VMID);
+	if (amdgpu_amdkfd_is_kfd_vmid(adev, vmid)
+		&& !atomic_read(&adev->mc.vm_fault_info_updated)) {
+		struct kfd_vm_fault_info *info = adev->mc.vm_fault_info;
+		u32 protections = REG_GET_FIELD(status,
+					VM_CONTEXT1_PROTECTION_FAULT_STATUS,
+					PROTECTIONS);
+
+		info->vmid = vmid;
+		info->mc_id = REG_GET_FIELD(status,
+					    VM_CONTEXT1_PROTECTION_FAULT_STATUS,
+					    MEMORY_CLIENT_ID);
+		info->status = status;
+		info->page_addr = addr;
+		info->prot_valid = protections & 0x7 ? true : false;
+		info->prot_read = protections & 0x8 ? true : false;
+		info->prot_write = protections & 0x10 ? true : false;
+		info->prot_exec = protections & 0x20 ? true : false;
+		mb();
+		atomic_set(&adev->mc.vm_fault_info_updated, 1);
 	}
 
 	return 0;
