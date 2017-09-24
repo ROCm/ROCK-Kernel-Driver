@@ -45,11 +45,10 @@ static int create_compute_queue_nocpsch(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd);
 
 static int execute_queues_cpsch(struct device_queue_manager *dqm,
-				bool static_queues_included,
-				bool reset);
+				bool static_queues_included);
 static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 		enum kfd_unmap_queues_filter filter,
-		uint32_t filter_param, bool reset);
+		uint32_t filter_param);
 
 static int map_queues_cpsch(struct device_queue_manager *dqm);
 
@@ -503,8 +502,7 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 	/* HWS mode, unmap first to own mqd */
 	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS) {
 		retval = unmap_queues_cpsch(dqm,
-				KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0,
-				false);
+				KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0);
 		if (retval) {
 			pr_err("unmap queue failed");
 			goto out_unlock;
@@ -567,8 +565,7 @@ static struct mqd_manager *get_mqd_manager_nocpsch(
 }
 
 int process_evict_queues(struct device_queue_manager *dqm,
-			 struct qcm_process_device *qpd,
-			 bool reset)
+			 struct qcm_process_device *qpd)
 {
 	struct queue *q, *next;
 	struct mqd_manager *mqd;
@@ -607,7 +604,7 @@ int process_evict_queues(struct device_queue_manager *dqm,
 			dqm->queue_count--;
 	}
 	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
-		retval = execute_queues_cpsch(dqm, qpd->is_debug, reset);
+		retval = execute_queues_cpsch(dqm, qpd->is_debug);
 
 out:
 	mutex_unlock(&dqm->lock);
@@ -677,7 +674,7 @@ int process_restore_queues(struct device_queue_manager *dqm,
 		}
 	}
 	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
-		retval = execute_queues_cpsch(dqm, false, false);
+		retval = execute_queues_cpsch(dqm, false);
 
 	if (retval == 0)
 		qpd->evicted = 0;
@@ -992,7 +989,7 @@ static int start_cpsch(struct device_queue_manager *dqm)
 	init_interrupts(dqm);
 
 	mutex_lock(&dqm->lock);
-	execute_queues_cpsch(dqm, false, false);
+	execute_queues_cpsch(dqm, false);
 	mutex_unlock(&dqm->lock);
 
 	return 0;
@@ -1007,7 +1004,7 @@ static int stop_cpsch(struct device_queue_manager *dqm)
 {
 	mutex_lock(&dqm->lock);
 
-	unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0, false);
+	unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0);
 
 	mutex_unlock(&dqm->lock);
 
@@ -1040,7 +1037,7 @@ static int create_kernel_queue_cpsch(struct device_queue_manager *dqm,
 	list_add(&kq->list, &qpd->priv_queue_list);
 	dqm->queue_count++;
 	qpd->is_debug = true;
-	execute_queues_cpsch(dqm, false, false);
+	execute_queues_cpsch(dqm, false);
 	mutex_unlock(&dqm->lock);
 
 	return 0;
@@ -1055,7 +1052,7 @@ static void destroy_kernel_queue_cpsch(struct device_queue_manager *dqm,
 	list_del(&kq->list);
 	dqm->queue_count--;
 	qpd->is_debug = false;
-	execute_queues_cpsch(dqm, true, false);
+	execute_queues_cpsch(dqm, true);
 	/*
 	 * Unconditionally decrement this counter, regardless of the queue's
 	 * type.
@@ -1129,7 +1126,7 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 	qpd->queue_count++;
 	if (q->properties.is_active) {
 		dqm->queue_count++;
-		retval = execute_queues_cpsch(dqm, false, false);
+		retval = execute_queues_cpsch(dqm, false);
 	}
 
 	if (q->properties.type == KFD_QUEUE_TYPE_SDMA)
@@ -1177,11 +1174,10 @@ int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
 }
 
 static int unmap_sdma_queues(struct device_queue_manager *dqm,
-			     unsigned int sdma_engine,
-			     bool reset)
+			     unsigned int sdma_engine)
 {
 	return pm_send_unmap_queue(&dqm->packets, KFD_QUEUE_TYPE_SDMA,
-			KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0, reset,
+			KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0, false,
 			sdma_engine);
 }
 
@@ -1202,7 +1198,7 @@ static int map_queues_cpsch(struct device_queue_manager *dqm)
 
 	retval = pm_send_runlist(&dqm->packets, &dqm->queues);
 	if (retval) {
-		pr_err("failed to execute runlist");
+		pr_err("failed to execute runlist\n");
 		return retval;
 	}
 	dqm->active_runlist = true;
@@ -1213,7 +1209,7 @@ static int map_queues_cpsch(struct device_queue_manager *dqm)
 /* dqm->lock mutex has to be locked before calling this function */
 static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 		enum kfd_unmap_queues_filter filter,
-		uint32_t filter_param, bool reset)
+		uint32_t filter_param)
 {
 	int retval;
 
@@ -1226,12 +1222,12 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 		dqm->sdma_queue_count);
 
 	if (dqm->sdma_queue_count > 0) {
-		unmap_sdma_queues(dqm, 0, reset);
-		unmap_sdma_queues(dqm, 1, reset);
+		unmap_sdma_queues(dqm, 0);
+		unmap_sdma_queues(dqm, 1);
 	}
 
 	retval = pm_send_unmap_queue(&dqm->packets, KFD_QUEUE_TYPE_COMPUTE,
-			filter, filter_param, reset, 0);
+			filter, filter_param, false, 0);
 	if (retval)
 		return retval;
 
@@ -1242,7 +1238,7 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 	retval = amdkfd_fence_wait_timeout(dqm->fence_addr, KFD_FENCE_COMPLETED,
 				QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS);
 	if (retval) {
-		pr_err("%s queues failed.", reset ? "Resetting" : "Unmapping");
+		pr_err("Unmapping queues failed.\n");
 		return retval;
 	}
 
@@ -1254,8 +1250,7 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 
 /* dqm->lock mutex has to be locked before calling this function */
 static int execute_queues_cpsch(struct device_queue_manager *dqm,
-				bool static_queues_included,
-				bool reset)
+				bool static_queues_included)
 {
 	int retval;
 	enum kfd_unmap_queues_filter filter;
@@ -1264,9 +1259,9 @@ static int execute_queues_cpsch(struct device_queue_manager *dqm,
 			KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES :
 			KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES;
 
-	retval = unmap_queues_cpsch(dqm, filter, 0, reset);
+	retval = unmap_queues_cpsch(dqm, filter, 0);
 	if (retval) {
-		pr_err("The cp might be in an unrecoverable state due to an unsuccessful queues preemption");
+		pr_err("The cp might be in an unrecoverable state due to an unsuccessful queues preemption\n");
 		return retval;
 	}
 
@@ -1319,7 +1314,7 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 	if (q->properties.is_active)
 		dqm->queue_count--;
 
-	retval = execute_queues_cpsch(dqm, false, false);
+	retval = execute_queues_cpsch(dqm, false);
 	if (retval == -ETIME)
 		qpd->reset_wavefronts = true;
 
@@ -1546,15 +1541,7 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 		}
 	}
 
-	/* When CWSR is disabled, we choose to reset the device, which will
-	 * reset the queues from other processes on this device. This is
-	 * a bug that we accept given by-pasid reset does not work well.
-	 */
-	if (dqm->dev->cwsr_enabled)
-		retval = execute_queues_cpsch(dqm, true, false);
-	else
-		retval = execute_queues_cpsch(dqm, true, true);
-
+	retval = execute_queues_cpsch(dqm, true);
 	if (retval || qpd->reset_wavefronts) {
 		pr_warn("Resetting wave fronts (cpsch) on dev %p\n", dqm->dev);
 		dbgdev_wave_reset_wavefronts(dqm->dev, qpd->pqm->process);
@@ -1686,7 +1673,7 @@ void device_queue_manager_uninit(struct device_queue_manager *dqm)
 }
 
 int kfd_process_vm_fault(struct device_queue_manager *dqm,
-			 unsigned int pasid, bool reset)
+			 unsigned int pasid)
 {
 	struct kfd_process_device *pdd;
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
@@ -1696,7 +1683,7 @@ int kfd_process_vm_fault(struct device_queue_manager *dqm,
 		return -EINVAL;
 	pdd = kfd_get_process_device_data(dqm->dev, p);
 	if (pdd)
-		ret = process_evict_queues(dqm, &pdd->qpd, reset);
+		ret = process_evict_queues(dqm, &pdd->qpd);
 	kfd_unref_process(p);
 
 	return ret;

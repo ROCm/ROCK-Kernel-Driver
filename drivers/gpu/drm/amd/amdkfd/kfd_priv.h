@@ -900,8 +900,7 @@ void device_queue_manager_uninit(struct device_queue_manager *dqm);
 struct kernel_queue *kernel_queue_init(struct kfd_dev *dev,
 					enum kfd_queue_type type);
 void kernel_queue_uninit(struct kernel_queue *kq);
-int kfd_process_vm_fault(struct device_queue_manager *dqm,
-			 unsigned int pasid, bool reset);
+int kfd_process_vm_fault(struct device_queue_manager *dqm, unsigned int pasid);
 
 /* Process Queue Manager */
 struct process_queue_node {
