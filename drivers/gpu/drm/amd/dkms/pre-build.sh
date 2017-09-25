@@ -31,9 +31,6 @@ for sym in $SYMS; do
     echo "void *_kcl_$sym = (void *)0x$addr;" >> amd/amdkcl/symbols.c
 done
 
-if version_lt 4.10.0; then
-    echo '#define dma_fence fence' > include/rename_symbol.h
-fi
 find ttm -name '*.c' -exec grep EXPORT_SYMBOL {} + \
     | sort -u \
     | awk -F'[()]' '{print "#define "$2" amd"$2" //"$0}'\
