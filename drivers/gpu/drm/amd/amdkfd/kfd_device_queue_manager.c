@@ -1505,6 +1505,7 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 	struct kernel_queue *kq, *kq_next;
 	struct mqd_manager *mqd;
 	struct device_process_node *cur, *next_dpn;
+	bool unmap_static_queues = false;
 
 	retval = 0;
 
@@ -1516,6 +1517,7 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 		dqm->queue_count--;
 		qpd->is_debug = false;
 		dqm->total_queue_count--;
+		unmap_static_queues = true;
 	}
 
 	/* Clear all user mode queues */
@@ -1541,7 +1543,7 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 		}
 	}
 
-	retval = execute_queues_cpsch(dqm, true);
+	retval = execute_queues_cpsch(dqm, unmap_static_queues);
 	if (retval || qpd->reset_wavefronts) {
 		pr_warn("Resetting wave fronts (cpsch) on dev %p\n", dqm->dev);
 		dbgdev_wave_reset_wavefronts(dqm->dev, qpd->pqm->process);
