@@ -574,7 +574,8 @@ static int ci_populate_fuzzy_fan(struct pp_hwmgr *hwmgr, uint32_t fuse_table_off
 	if ((hwmgr->thermal_controller.advanceFanControlParameters.usFanOutputSensitivity & (1 << 15))
 		|| 0 == hwmgr->thermal_controller.advanceFanControlParameters.usFanOutputSensitivity)
 		tmp = hwmgr->thermal_controller.advanceFanControlParameters.usFanOutputSensitivity
-		    = hwmgr->thermal_controller.advanceFanControlParameters.usDefaultFanOutputSensitivity;
+	else
+		tmp = hwmgr->thermal_controller.advanceFanControlParameters.usDefaultFanOutputSensitivity;
 
 	smu_data->power_tune_table.FuzzyFan_PwmSetDelta = CONVERT_FROM_HOST_TO_SMC_US(tmp);
 
