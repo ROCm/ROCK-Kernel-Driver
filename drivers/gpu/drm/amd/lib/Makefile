@@ -37,3 +37,6 @@ endif
 ccflags-y := -I$(src)/../include
 
 obj-$(CONFIG_CHASH) += $(CHASH_NAME).o
+
+LIB_FULL_PATH = $(src)
+include $(LIB_FULL_PATH)/backport/Makefile

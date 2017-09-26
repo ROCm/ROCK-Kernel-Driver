@@ -5048,6 +5048,13 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		}
 	}
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+			/*TODO BUG remove ASAP in 4.12 to avoid race between worker and flip IOCTL */
+
+			/*clean up the flags for next usage*/
+			acrtc_attach->flip_flags = 0;
+#endif
+
 	if (planes_count) {
 		if (new_pcrtc_state->mode_changed) {
 			bundle->stream_update.src = acrtc_state->stream->src;
