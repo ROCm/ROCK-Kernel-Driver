@@ -164,7 +164,7 @@ int hwmgr_early_init(struct pp_instance *handle)
 		smu7_init_function_pointers(hwmgr);
 		break;
 	case AMDGPU_FAMILY_CZ:
-		hwmgr->smumgr_funcs = &ci_smu_funcs;
+		hwmgr->smumgr_funcs = &cz_smu_funcs;
 		cz_init_function_pointers(hwmgr);
 		break;
 	case AMDGPU_FAMILY_VI:
