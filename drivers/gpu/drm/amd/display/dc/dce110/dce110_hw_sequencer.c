@@ -34,7 +34,7 @@
 #include "dce/dce_hwseq.h"
 #include "gpio_service_interface.h"
 
-#ifdef ENABLE_FBC
+#if defined(CONFIG_DRM_AMD_DC_FBC)
 #include "dce110_compressor.h"
 #endif
 
@@ -1440,7 +1440,7 @@ static void power_down_all_hw_blocks(struct dc *dc)
 
 	power_down_clock_sources(dc);
 
-#ifdef ENABLE_FBC
+#if defined(CONFIG_DRM_AMD_DC_FBC)
 	if (dc->fbc_compressor)
 		dc->fbc_compressor->funcs->disable_fbc(dc->fbc_compressor);
 #endif
@@ -1613,7 +1613,7 @@ static void set_static_screen_control(struct pipe_ctx **pipe_ctx,
 	if (events->cursor_update)
 		value |= 0x2;
 
-#ifdef ENABLE_FBC
+#if defined(CONFIG_DRM_AMD_DC_FBC)
 	value |= 0x84;
 #endif
 
@@ -1743,7 +1743,7 @@ static void apply_min_clocks(
 	}
 }
 
-#ifdef ENABLE_FBC
+#if defined(CONFIG_DRM_AMD_DC_FBC)
 
 /*
  *  Check if FBC can be enabled
@@ -1935,7 +1935,7 @@ enum dc_status dce110_apply_ctx_to_hw(
 
 	set_safe_displaymarks(&context->res_ctx, dc->res_pool);
 
-#ifdef ENABLE_FBC
+#if defined(CONFIG_DRM_AMD_DC_FBC)
 	if (dc->fbc_compressor)
 		dc->fbc_compressor->funcs->disable_fbc(dc->fbc_compressor);
 #endif
@@ -2119,7 +2119,7 @@ enum dc_status dce110_apply_ctx_to_hw(
 
 	dcb->funcs->set_scratch_critical_state(dcb, false);
 
-#ifdef ENABLE_FBC
+#if defined(CONFIG_DRM_AMD_DC_FBC)
 	if (dc->fbc_compressor)
 		enable_fbc(dc, context);
 
@@ -2528,7 +2528,7 @@ static void init_hw(struct dc *dc)
 		abm->funcs->init_backlight(abm);
 		abm->funcs->abm_init(abm);
 	}
-#ifdef ENABLE_FBC
+#if defined(CONFIG_DRM_AMD_DC_FBC)
 	if (dc->fbc_compressor)
 		dc->fbc_compressor->funcs->power_up_fbc(dc->fbc_compressor);
 #endif
@@ -2776,7 +2776,7 @@ static void dce110_program_front_end_for_pipe(
 
 	program_scaler(dc, pipe_ctx);
 
-#ifdef ENABLE_FBC
+#if defined(CONFIG_DRM_AMD_DC_FBC)
 	if (dc->fbc_compressor && old_pipe->stream) {
 		if (plane_state->tiling_info.gfx8.array_mode == DC_ARRAY_LINEAR_GENERAL)
 			dc->fbc_compressor->funcs->disable_fbc(dc->fbc_compressor);
