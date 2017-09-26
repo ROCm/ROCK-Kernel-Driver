@@ -1,6 +1,42 @@
+/*
+ * Copyright (C) 2012-2013 Canonical Ltd
+ *
+ * Based on bo.c which bears the following copyright notice,
+ * but is dual licensed:
+ *
+ * Copyright (c) 2006-2009 VMware, Inc., Palo Alto, CA., USA
+ * All Rights Reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sub license, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the
+ * next paragraph) shall be included in all copies or substantial portions
+ * of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
+ * THE COPYRIGHT HOLDERS, AUTHORS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+ * USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ */
+
 #include <kcl/kcl_fence.h>
 #include <kcl/kcl_reservation.h>
 
+/*
+ * Modifications [2016-10-26] (c) [2016]
+ * Modifications [2017-07-06] (c) [2017]
+ * Advanced Micro Devices, Inc.
+ */
 #if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
 		!defined(OS_NAME_RHEL_7_4)
 long _kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
@@ -16,6 +52,10 @@ retry:
 	seq = read_seqcount_begin(&obj->seq);
 	rcu_read_lock();
 
+	/*
+	 * Modifications [2017-08-16] (c) [2017]
+	 * Advanced Micro Devices, Inc.
+	 */
 	fence = rcu_dereference(obj->fence_excl);
 	if (fence && !test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
 		if (!dma_fence_get_rcu(fence))
@@ -75,6 +115,10 @@ unlock_retry:
 EXPORT_SYMBOL(_kcl_reservation_object_wait_timeout_rcu);
 #endif
 
+/*
+ * Modifications [2017-09-14] (c) [2017]
+ * Advanced Micro Devices, Inc.
+ */
 #if defined(BUILD_AS_DKMS)
 int _kcl_reservation_object_copy_fences(struct reservation_object *dst,
 					struct reservation_object *src)
@@ -158,6 +202,10 @@ retry:
 EXPORT_SYMBOL(_kcl_reservation_object_copy_fences);
 #endif
 
+/*
+ * Modifications [2016-12-27] (c) [2016]
+ * Advanced Micro Devices, Inc.
+ */
 #ifdef OS_NAME_RHEL_6
 static inline int
 reservation_object_test_signaled_single(struct fence *passed_fence)

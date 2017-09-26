@@ -1,11 +1,40 @@
+/*
+ * Fence mechanism for dma-buf and to allow for asynchronous dma access
+ *
+ * Copyright (C) 2012 Canonical Ltd
+ * Copyright (C) 2012 Texas Instruments
+ *
+ * Authors:
+ * Rob Clark <robdclark@gmail.com>
+ * Maarten Lankhorst <maarten.lankhorst@canonical.com>
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ */
+
 #include <linux/version.h>
 #include <linux/sched.h>
 #include <kcl/kcl_mn.h>
 
+/*
+ * Modifications [2016-12-23] (c) [2016]
+ * Modifications [2017-07-06] (c) [2017]
+ * Advanced Micro Devices, Inc.
+ */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0) && \
 	!defined(OS_NAME_RHEL_7_2) && \
 	!defined(OS_NAME_RHEL_7_3) && \
 	!defined(OS_NAME_RHEL_7_4)
+/*
+ * Modifications [2017-03-14] (c) [2017]
+ */
+
 /*
  * This function allows mmu_notifier::release callback to delay a call to
  * a function that will free appropriate resources. The function must be

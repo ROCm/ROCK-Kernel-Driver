@@ -1,3 +1,23 @@
+/*
+ * Fence mechanism for dma-buf and to allow for asynchronous dma access
+ *
+ * Copyright (C) 2012 Canonical Ltd
+ * Copyright (C) 2012 Texas Instruments
+ *
+ * Authors:
+ * Rob Clark <robdclark@gmail.com>
+ * Maarten Lankhorst <maarten.lankhorst@canonical.com>
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ */
+
 #include <linux/slab.h>
 #include <kcl/kcl_fence.h>
 #include <kcl/kcl_rcupdate.h>
@@ -30,6 +50,10 @@ _kcl_fence_init(struct fence *fence, const struct fence_ops *ops,
 	fence->seqno = seqno;
 	fence->flags = 0UL;
 
+	/*
+	 * Modifications [2017-03-29] (c) [2017]
+	 * Advanced Micro Devices, Inc.
+	 */
 	trace_kcl_fence_init(fence);
 }
 EXPORT_SYMBOL(_kcl_fence_init);
@@ -80,6 +104,10 @@ _kcl_fence_default_wait(struct fence *fence, bool intr, signed long timeout)
 		goto out;
 
 	if (!was_set) {
+		/*
+		 * Modifications [2017-03-29] (c) [2017]
+		 * Advanced Micro Devices, Inc.
+		 */
 		trace_kcl_fence_enable_signal(fence);
 
 		if (!fence->ops->enable_signaling(fence)) {
@@ -132,6 +160,10 @@ signed long kcl_fence_default_wait(kcl_fence_t *fence,
 }
 EXPORT_SYMBOL(kcl_fence_default_wait);
 
+/*
+ * Modifications [2017-09-19] (c) [2017]
+ * Advanced Micro Devices, Inc.
+ */
 signed long
 _kcl_fence_wait_any_timeout(struct fence **fences, uint32_t count,
 		       bool intr, signed long timeout, uint32_t *idx)
@@ -214,6 +246,10 @@ _kcl_fence_wait_timeout(struct fence *fence, bool intr, signed long timeout)
 	if (WARN_ON(timeout < 0))
 		return -EINVAL;
 
+	/*
+	 * Modifications [2017-03-29] (c) [2017]
+	 * Advanced Micro Devices, Inc.
+	 */
 	trace_kcl_fence_wait_start(fence);
 	ret = fence->ops->wait(fence, intr, timeout);
 	trace_kcl_fence_wait_end(fence);
@@ -221,6 +257,10 @@ _kcl_fence_wait_timeout(struct fence *fence, bool intr, signed long timeout)
 }
 EXPORT_SYMBOL(_kcl_fence_wait_timeout);
 
+/*
+ * Modifications [2016-12-23] (c) [2016]
+ * Advanced Micro Devices, Inc.
+ */
 void amdkcl_fence_init(void)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
@@ -230,6 +270,10 @@ void amdkcl_fence_init(void)
 #endif
 }
 
+/*
+ * Modifications [2017-09-19] (c) [2017]
+ * Advanced Micro Devices, Inc.
+ */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 struct fence *
 _kcl_fence_get_rcu_safe(struct fence * __rcu *fencep)
