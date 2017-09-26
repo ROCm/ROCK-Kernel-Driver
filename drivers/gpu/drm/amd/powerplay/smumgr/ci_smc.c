@@ -573,7 +573,7 @@ static int ci_populate_fuzzy_fan(struct pp_hwmgr *hwmgr, uint32_t fuse_table_off
 
 	if ((hwmgr->thermal_controller.advanceFanControlParameters.usFanOutputSensitivity & (1 << 15))
 		|| 0 == hwmgr->thermal_controller.advanceFanControlParameters.usFanOutputSensitivity)
-		tmp = hwmgr->thermal_controller.advanceFanControlParameters.usFanOutputSensitivity
+		tmp = hwmgr->thermal_controller.advanceFanControlParameters.usFanOutputSensitivity;
 	else
 		tmp = hwmgr->thermal_controller.advanceFanControlParameters.usDefaultFanOutputSensitivity;
 
