@@ -439,6 +439,9 @@ struct amdgpu_crtc {
 	enum amdgpu_interrupt_state vsync_timer_enabled;
 
 	int otg_inst;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	uint32_t flip_flags;
+#endif
 	struct drm_pending_vblank_event *event;
 };
 

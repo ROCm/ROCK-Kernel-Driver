@@ -4025,7 +4025,11 @@ static void amdgpu_dm_do_flip(struct drm_crtc *crtc,
 	struct amdgpu_framebuffer *afb = to_amdgpu_framebuffer(fb);
 	struct amdgpu_bo *abo = gem_to_amdgpu_bo(afb->obj);
 	struct amdgpu_device *adev = crtc->dev->dev_private;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	bool async_flip = (acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
+#else
 	bool async_flip = (crtc->state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
+#endif
 	struct dc_flip_addrs addr = { {0} };
 	/* TODO eliminate or rename surface_update */
 	struct dc_surface_update surface_updates[1] = { {0} };
@@ -4169,7 +4173,11 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			 * TODO Check if it's correct
 			 */
 			*wait_for_vblank =
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+					acrtc_attach->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC ?
+#else
 					new_pcrtc_state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC ?
+#endif
 				false : true;
 
 			/* TODO: Needs rework for multiplane flip */
@@ -4181,6 +4189,9 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 				fb,
 				drm_crtc_vblank_count(crtc) + *wait_for_vblank,
 				dm_state->context);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+			acrtc_attach->flip_flags = 0;
+#endif
 		}
 
 	}
