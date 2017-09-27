@@ -1120,7 +1120,7 @@ create_fail:
 struct dc_link *link_create(const struct link_init_data *init_params)
 {
 	struct dc_link *link =
-			dm_alloc(sizeof(*link));
+			kzalloc(sizeof(*link), GFP_KERNEL);
 
 	if (NULL == link)
 		goto alloc_fail;
@@ -1131,7 +1131,7 @@ struct dc_link *link_create(const struct link_init_data *init_params)
 	return link;
 
 construct_fail:
-	dm_free(link);
+	kfree(link);
 
 alloc_fail:
 	return NULL;
@@ -1140,7 +1140,7 @@ alloc_fail:
 void link_destroy(struct dc_link **link)
 {
 	destruct(*link);
-	dm_free(*link);
+	kfree(*link);
 	*link = NULL;
 }
 
