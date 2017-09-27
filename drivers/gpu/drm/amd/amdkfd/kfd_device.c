@@ -950,7 +950,7 @@ void kfd_restore_bo_worker(struct work_struct *work)
 		pr_info("Restore failed, try again after %d ms\n",
 			PROCESS_BACK_OFF_TIME_MS);
 		ret = schedule_delayed_work(&p->restore_work,
-				PROCESS_BACK_OFF_TIME_MS);
+				msecs_to_jiffies(PROCESS_BACK_OFF_TIME_MS));
 		WARN(!ret, "reschedule restore work failed\n");
 		return;
 	}
@@ -1050,7 +1050,7 @@ void kfd_evict_bo_worker(struct work_struct *work)
 	if (!ret) {
 		dma_fence_signal(eviction_work->quiesce_fence);
 		schedule_delayed_work(&p->restore_work,
-					PROCESS_RESTORE_TIME_MS);
+				msecs_to_jiffies(PROCESS_RESTORE_TIME_MS));
 	} else
 		pr_err("Failed to quiesce user queues. Cannot evict BOs\n");
 
