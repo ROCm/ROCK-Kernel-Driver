@@ -1,5 +1,6 @@
 #include <kcl/kcl_pci.h>
 
+#if defined(BUILD_AS_DKMS)
 #define PCI_EXP_DEVCAP2_ATOMIC_ROUTE	0x00000040 /* Atomic Op routing */
 #define PCI_EXP_DEVCAP2_ATOMIC_COMP32	0x00000080 /* 32b AtomicOp completion */
 #define PCI_EXP_DEVCAP2_ATOMIC_COMP64	0x00000100 /* Atomic 64-bit compare */
@@ -87,3 +88,5 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev)
 	return 0;
 }
 EXPORT_SYMBOL(pci_enable_atomic_ops_to_root);
+
+#endif
