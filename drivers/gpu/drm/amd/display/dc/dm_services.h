@@ -83,10 +83,6 @@
 #include <asm/i387.h>
 #endif
 
-#define dm_alloc(size) kzalloc(size, GFP_KERNEL)
-#define dm_realloc(ptr, size) krealloc(ptr, size, GFP_KERNEL)
-#define dm_free(ptr) kfree(ptr)
-
 irq_handler_idx dm_register_interrupt(
 	struct dc_context *ctx,
 	struct dc_interrupt_params *int_params,
