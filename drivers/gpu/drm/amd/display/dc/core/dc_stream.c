@@ -33,28 +33,6 @@
 /*******************************************************************************
  * Private functions
  ******************************************************************************/
-#define TMDS_MAX_PIXEL_CLOCK_IN_KHZ_UPMOST 297000
-static void update_stream_signal(struct dc_stream_state *stream)
-{
-	if (stream->output_signal == SIGNAL_TYPE_NONE) {
-		struct dc_sink *dc_sink = stream->sink;
-
-		if (dc_sink->sink_signal == SIGNAL_TYPE_NONE)
-			stream->signal = stream->sink->link->connector_signal;
-		else
-			stream->signal = dc_sink->sink_signal;
-	} else {
-		stream->signal = stream->output_signal;
-	}
-
-	if (dc_is_dvi_signal(stream->signal)) {
-		if (stream->timing.pix_clk_khz > TMDS_MAX_PIXEL_CLOCK_IN_KHZ_UPMOST &&
-			stream->sink->sink_signal != SIGNAL_TYPE_DVI_SINGLE_LINK)
-			stream->signal = SIGNAL_TYPE_DVI_DUAL_LINK;
-		else
-			stream->signal = SIGNAL_TYPE_DVI_SINGLE_LINK;
-	}
-}
 
 static bool construct(struct dc_stream_state *stream,
 	struct dc_sink *dc_sink_data)
@@ -63,6 +41,7 @@ static bool construct(struct dc_stream_state *stream,
 
 	stream->sink = dc_sink_data;
 	stream->ctx = stream->sink->ctx;
+	stream->sink = dc_sink_data;
 
 	dc_sink_retain(dc_sink_data);
 
@@ -102,8 +81,6 @@ static bool construct(struct dc_stream_state *stream,
 	stream->timing.flags.LTE_340MCSC_SCRAMBLE = dc_sink_data->edid_caps.lte_340mcsc_scramble;
 
 	stream->status.link = stream->sink->link;
-
-	update_stream_signal(stream);
 	return true;
 }
 
@@ -119,17 +96,19 @@ static void destruct(struct dc_stream_state *stream)
 
 void dc_stream_retain(struct dc_stream_state *stream)
 {
-	ASSERT(atomic_read(&stream->ref_count) > 0);
-	atomic_inc(&stream->ref_count);
+
+	ASSERT(stream->ref_count > 0);
+	stream->ref_count++;
 }
 
 void dc_stream_release(struct dc_stream_state *stream)
 {
-	if (stream != NULL) {
-		ASSERT(atomic_read(&stream->ref_count) > 0);
-		atomic_dec(&stream->ref_count);
 
-		if (atomic_read(&stream->ref_count) == 0) {
+	if (stream != NULL) {
+		ASSERT(stream->ref_count > 0);
+		stream->ref_count--;
+
+		if (stream->ref_count == 0) {
 			destruct(stream);
 			dm_free(stream);
 		}
@@ -152,7 +131,7 @@ struct dc_stream_state *dc_create_stream_for_sink(
 	if (false == construct(stream, sink))
 			goto construct_fail;
 
-	atomic_inc(&stream->ref_count);
+	stream->ref_count++;
 
 	return stream;
 
@@ -167,11 +146,12 @@ struct dc_stream_status *dc_stream_get_status(
 	struct dc_stream_state *stream)
 {
 	uint8_t i;
-	struct dc  *dc = stream->ctx->dc;
+	struct core_dc *dc = DC_TO_CORE(stream->ctx->dc);
 
-	for (i = 0; i < dc->current_state->stream_count; i++) {
-		if (stream == dc->current_state->streams[i])
-			return &dc->current_state->stream_status[i];
+	for (i = 0; i < dc->current_context->stream_count; i++) {
+		if (stream == dc->current_context->streams[i]) {
+			return &dc->current_context->stream_status[i];
+		}
 	}
 
 	return NULL;
@@ -185,7 +165,7 @@ bool dc_stream_set_cursor_attributes(
 	const struct dc_cursor_attributes *attributes)
 {
 	int i;
-	struct dc  *core_dc;
+	struct core_dc *core_dc;
 	struct resource_context *res_ctx;
 
 	if (NULL == stream) {
@@ -197,8 +177,8 @@ bool dc_stream_set_cursor_attributes(
 			return false;
 	}
 
-	core_dc = stream->ctx->dc;
-	res_ctx = &core_dc->current_state->res_ctx;
+	core_dc = DC_TO_CORE(stream->ctx->dc);
+	res_ctx = &core_dc->current_context->res_ctx;
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[i];
@@ -220,7 +200,7 @@ bool dc_stream_set_cursor_position(
 	const struct dc_cursor_position *position)
 {
 	int i;
-	struct dc  *core_dc;
+	struct core_dc *core_dc;
 	struct resource_context *res_ctx;
 
 	if (NULL == stream) {
@@ -233,8 +213,8 @@ bool dc_stream_set_cursor_position(
 		return false;
 	}
 
-	core_dc = stream->ctx->dc;
-	res_ctx = &core_dc->current_state->res_ctx;
+	core_dc = DC_TO_CORE(stream->ctx->dc);
+	res_ctx = &core_dc->current_context->res_ctx;
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[i];
@@ -268,9 +248,9 @@ bool dc_stream_set_cursor_position(
 uint32_t dc_stream_get_vblank_counter(const struct dc_stream_state *stream)
 {
 	uint8_t i;
-	struct dc  *core_dc = stream->ctx->dc;
+	struct core_dc *core_dc = DC_TO_CORE(stream->ctx->dc);
 	struct resource_context *res_ctx =
-		&core_dc->current_state->res_ctx;
+		&core_dc->current_context->res_ctx;
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		struct timing_generator *tg = res_ctx->pipe_ctx[i].stream_res.tg;
@@ -292,9 +272,9 @@ bool dc_stream_get_scanoutpos(const struct dc_stream_state *stream,
 {
 	uint8_t i;
 	bool ret = false;
-	struct dc  *core_dc = stream->ctx->dc;
+	struct core_dc *core_dc = DC_TO_CORE(stream->ctx->dc);
 	struct resource_context *res_ctx =
-		&core_dc->current_state->res_ctx;
+		&core_dc->current_context->res_ctx;
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		struct timing_generator *tg = res_ctx->pipe_ctx[i].stream_res.tg;

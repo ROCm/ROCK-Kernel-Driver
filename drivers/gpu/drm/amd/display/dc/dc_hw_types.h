@@ -433,7 +433,7 @@ struct dc_gamma {
 	struct dc_context *ctx;
 
 	/* private to dc_surface.c */
-	atomic_t ref_count;
+	int ref_count;
 };
 
 /* Used by both ipp amd opp functions*/

@@ -744,7 +744,7 @@ void dce110_link_encoder_edp_backlight_control(
 		return;
 	}
 
-	if (!enable && !is_panel_backlight_on(enc110)) {
+	if (!enable && !is_panel_powered_on(enc110)) {
 		dm_logger_write(ctx->logger, LOG_HW_RESUME_S3,
 				"%s: panel already powered down. Do nothing.\n",
 				__func__);
@@ -887,9 +887,6 @@ static bool dce110_link_encoder_validate_hdmi_output(
 			crtc_timing->pixel_encoding == PIXEL_ENCODING_YCBCR420)
 		return false;
 
-	if (!enc110->base.features.flags.bits.HDMI_6GB_EN &&
-		adjusted_pix_clk_khz >= 300000)
-		return false;
 	return true;
 }
 
@@ -1011,7 +1008,6 @@ bool dce110_link_encoder_construct(
 				bp_cap_info.DP_HBR2_EN;
 		enc110->base.features.flags.bits.IS_HBR3_CAPABLE =
 				bp_cap_info.DP_HBR3_EN;
-		enc110->base.features.flags.bits.HDMI_6GB_EN = bp_cap_info.HDMI_6GB_EN;
 	}
 
 	return true;
@@ -1292,8 +1288,6 @@ void dce110_link_encoder_disable_output(
 		/* OF_SKIP_POWER_DOWN_INACTIVE_ENCODER */
 		return;
 	}
-	if (enc110->base.connector.id == CONNECTOR_ID_EDP)
-		dce110_link_encoder_edp_backlight_control(enc, false);
 	/* Power-down RX and disable GPU PHY should be paired.
 	 * Disabling PHY without powering down RX may cause
 	 * symbol lock loss, on which we will get DP Sink interrupt. */

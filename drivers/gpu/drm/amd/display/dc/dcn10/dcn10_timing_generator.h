@@ -65,10 +65,8 @@
 	SRI(OTG_NOM_VERT_POSITION, OTG, inst),\
 	SRI(OTG_BLACK_COLOR, OTG, inst),\
 	SRI(OTG_CLOCK_CONTROL, OTG, inst),\
-	SRI(OTG_VERTICAL_INTERRUPT2_POSITION, OTG, inst),\
 	SRI(OPTC_INPUT_CLOCK_CONTROL, ODM, inst),\
 	SRI(OPTC_DATA_SOURCE_SELECT, ODM, inst),\
-	SRI(OPTC_INPUT_GLOBAL_CONTROL, ODM, inst),\
 	SRI(OPPBUF_CONTROL, OPPBUF, inst),\
 	SRI(OPPBUF_3D_PARAMETERS_0, OPPBUF, inst),\
 	SRI(CONTROL, VTG, inst),\
@@ -121,10 +119,8 @@ struct dcn_tg_registers {
 	uint32_t OTG_TEST_PATTERN_CONTROL;
 	uint32_t OTG_TEST_PATTERN_COLOR;
 	uint32_t OTG_CLOCK_CONTROL;
-	uint32_t OTG_VERTICAL_INTERRUPT2_POSITION;
 	uint32_t OPTC_INPUT_CLOCK_CONTROL;
 	uint32_t OPTC_DATA_SOURCE_SELECT;
-	uint32_t OPTC_INPUT_GLOBAL_CONTROL;
 	uint32_t OPPBUF_CONTROL;
 	uint32_t OPPBUF_3D_PARAMETERS_0;
 	uint32_t CONTROL;
@@ -205,11 +201,9 @@ struct dcn_tg_registers {
 	SF(OTG0_OTG_CLOCK_CONTROL, OTG_CLOCK_EN, mask_sh),\
 	SF(OTG0_OTG_CLOCK_CONTROL, OTG_CLOCK_ON, mask_sh),\
 	SF(OTG0_OTG_CLOCK_CONTROL, OTG_CLOCK_GATE_DIS, mask_sh),\
-	SF(OTG0_OTG_VERTICAL_INTERRUPT2_POSITION, OTG_VERTICAL_INTERRUPT2_LINE_START, mask_sh),\
 	SF(ODM0_OPTC_INPUT_CLOCK_CONTROL, OPTC_INPUT_CLK_EN, mask_sh),\
 	SF(ODM0_OPTC_INPUT_CLOCK_CONTROL, OPTC_INPUT_CLK_ON, mask_sh),\
 	SF(ODM0_OPTC_INPUT_CLOCK_CONTROL, OPTC_INPUT_CLK_GATE_DIS, mask_sh),\
-	SF(ODM0_OPTC_INPUT_GLOBAL_CONTROL, OPTC_UNDERFLOW_OCCURRED_STATUS, mask_sh),\
 	SF(OPPBUF0_OPPBUF_CONTROL, OPPBUF_ACTIVE_WIDTH, mask_sh),\
 	SF(OPPBUF0_OPPBUF_3D_PARAMETERS_0, OPPBUF_3D_VACT_SPACE1_SIZE, mask_sh),\
 	SF(VTG0_CONTROL, VTG0_ENABLE, mask_sh),\
@@ -311,13 +305,11 @@ struct dcn_tg_registers {
 	type OTG_CLOCK_EN;\
 	type OTG_CLOCK_ON;\
 	type OTG_CLOCK_GATE_DIS;\
-	type OTG_VERTICAL_INTERRUPT2_LINE_START;\
 	type OPTC_INPUT_CLK_EN;\
 	type OPTC_INPUT_CLK_ON;\
 	type OPTC_INPUT_CLK_GATE_DIS;\
 	type OPTC_SRC_SEL;\
 	type OPTC_SEG0_SRC_SEL;\
-	type OPTC_UNDERFLOW_OCCURRED_STATUS;\
 	type OPPBUF_ACTIVE_WIDTH;\
 	type OPPBUF_3D_VACT_SPACE1_SIZE;\
 	type VTG0_ENABLE;\
@@ -353,26 +345,5 @@ struct dcn10_timing_generator {
 };
 
 void dcn10_timing_generator_init(struct dcn10_timing_generator *tg);
-
-struct dcn_otg_state {
-	uint32_t v_blank_start;
-	uint32_t v_blank_end;
-	uint32_t v_sync_a_pol;
-	uint32_t v_total;
-	uint32_t v_total_max;
-	uint32_t v_total_min;
-	uint32_t v_sync_a_start;
-	uint32_t v_sync_a_end;
-	uint32_t h_blank_start;
-	uint32_t h_blank_end;
-	uint32_t h_sync_a_start;
-	uint32_t h_sync_a_end;
-	uint32_t h_sync_a_pol;
-	uint32_t h_total;
-	uint32_t underflow_occurred_status;
-};
-
-void tgn10_read_otg_state(struct dcn10_timing_generator *tgn10,
-		struct dcn_otg_state *s);
 
 #endif /* __DC_TIMING_GENERATOR_DCN10_H__ */

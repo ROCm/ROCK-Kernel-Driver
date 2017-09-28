@@ -27,8 +27,8 @@
 
 #include "core_types.h"
 #include "core_status.h"
+#include "core_dc.h"
 #include "dal_asic_id.h"
-#include "dm_pp_smu.h"
 
 /* TODO unhardcode, 4 for CZ*/
 #define MEMORY_TYPE_MULTIPLIER 4
@@ -67,28 +67,28 @@ struct resource_create_funcs {
 
 bool resource_construct(
 	unsigned int num_virtual_links,
-	struct dc *dc,
+	struct core_dc *dc,
 	struct resource_pool *pool,
 	const struct resource_create_funcs *create_funcs);
 
 struct resource_pool *dc_create_resource_pool(
-				struct dc *dc,
+				struct core_dc *dc,
 				int num_virtual_links,
 				enum dce_version dc_version,
 				struct hw_asic_id asic_id);
 
-void dc_destroy_resource_pool(struct dc *dc);
+void dc_destroy_resource_pool(struct core_dc *dc);
 
 enum dc_status resource_map_pool_resources(
-		const struct dc *dc,
-		struct dc_state *context,
-		struct dc_stream_state *stream);
+		const struct core_dc *dc,
+		struct validate_context *context,
+		struct validate_context *old_context);
 
 bool resource_build_scaling_params(struct pipe_ctx *pipe_ctx);
 
 enum dc_status resource_build_scaling_params_for_context(
-		const struct dc *dc,
-		struct dc_state *context);
+		const struct core_dc *dc,
+		struct validate_context *context);
 
 void resource_build_info_frame(struct pipe_ctx *pipe_ctx);
 
@@ -122,7 +122,7 @@ bool resource_attach_surfaces_to_context(
 		struct dc_plane_state *const *plane_state,
 		int surface_count,
 		struct dc_stream_state *dc_stream,
-		struct dc_state *context,
+		struct validate_context *context,
 		const struct resource_pool *pool);
 
 struct pipe_ctx *find_idle_secondary_pipe(
@@ -130,32 +130,32 @@ struct pipe_ctx *find_idle_secondary_pipe(
 		const struct resource_pool *pool);
 
 bool resource_is_stream_unchanged(
-	struct dc_state *old_context, struct dc_stream_state *stream);
+	struct validate_context *old_context, struct dc_stream_state *stream);
 
 bool resource_validate_attach_surfaces(
 		const struct dc_validation_set set[],
 		int set_count,
-		const struct dc_state *old_context,
-		struct dc_state *context,
+		const struct validate_context *old_context,
+		struct validate_context *context,
 		const struct resource_pool *pool);
 
 void validate_guaranteed_copy_streams(
-		struct dc_state *context,
+		struct validate_context *context,
 		int max_streams);
 
 void resource_validate_ctx_update_pointer_after_copy(
-		const struct dc_state *src_ctx,
-		struct dc_state *dst_ctx);
+		const struct validate_context *src_ctx,
+		struct validate_context *dst_ctx);
 
 enum dc_status resource_map_clock_resources(
-		const struct dc *dc,
-		struct dc_state *context,
-		struct dc_stream_state *stream);
+		const struct core_dc *dc,
+		struct validate_context *context,
+		struct validate_context *old_context);
 
 enum dc_status resource_map_phy_clock_resources(
-		const struct dc *dc,
-		struct dc_state *context,
-		struct dc_stream_state *stream);
+		const struct core_dc *dc,
+		struct validate_context *context,
+		struct validate_context *old_context);
 
 bool pipe_need_reprogram(
 		struct pipe_ctx *pipe_ctx_old,

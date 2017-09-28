@@ -28,20 +28,20 @@
 
 #include "core_types.h"
 
-struct dc;
+struct core_dc;
 struct resource_pool;
 
 struct resource_pool *dce80_create_resource_pool(
 	uint8_t num_virtual_links,
-	struct dc *dc);
+	struct core_dc *dc);
 
 struct resource_pool *dce81_create_resource_pool(
 	uint8_t num_virtual_links,
-	struct dc *dc);
+	struct core_dc *dc);
 
 struct resource_pool *dce83_create_resource_pool(
 	uint8_t num_virtual_links,
-	struct dc *dc);
+	struct core_dc *dc);
 
 #endif /* __DC_RESOURCE_DCE80_H__ */
 

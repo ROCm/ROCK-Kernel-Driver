@@ -3,7 +3,7 @@
 
 #include "dm_services.h"
 #include "dc.h"
-#include "inc/core_types.h"
+#include "inc/core_dc.h"
 #include "include/ddc_service_types.h"
 #include "include/i2caux_interface.h"
 #include "link_hwss.h"
@@ -62,7 +62,7 @@ void dp_enable_link_phy(
 	struct link_encoder *link_enc = link->link_enc;
 
 	struct pipe_ctx *pipes =
-			link->dc->current_state->res_ctx.pipe_ctx;
+			link->dc->current_context->res_ctx.pipe_ctx;
 	struct clock_source *dp_cs =
 			link->dc->res_pool->dp_clock_source;
 	unsigned int i;
@@ -110,28 +110,6 @@ void dp_enable_link_phy(
 	dp_receiver_power_ctrl(link, true);
 }
 
-bool edp_receiver_ready_T9(struct dc_link *link)
-{
-	unsigned int tries = 0;
-	unsigned char sinkstatus = 0;
-	unsigned char edpRev = 0;
-	enum dc_status result = DC_OK;
-	result = core_link_read_dpcd(link, DP_EDP_DPCD_REV, &edpRev, sizeof(edpRev));
-	if (edpRev < DP_EDP_12)
-		return true;
-	/* start from eDP version 1.2, SINK_STAUS indicate the sink is ready.*/
-	do {
-		sinkstatus = 1;
-		result = core_link_read_dpcd(link, DP_SINK_STATUS, &sinkstatus, sizeof(sinkstatus));
-		if (sinkstatus == 0)
-			break;
-		if (result != DC_OK)
-			break;
-		dm_delay_in_microseconds(link->ctx, 100); //MAx T9
-	} while (++tries < 50);
-	return result;
-}
-
 void dp_disable_link_phy(struct dc_link *link, enum signal_type signal)
 {
 	if (!link->wa_flags.dp_keep_receiver_powered)
@@ -139,7 +117,6 @@ void dp_disable_link_phy(struct dc_link *link, enum signal_type signal)
 
 	if (signal == SIGNAL_TYPE_EDP) {
 		link->link_enc->funcs->backlight_control(link->link_enc, false);
-		edp_receiver_ready_T9(link);
 		link->link_enc->funcs->disable_output(link->link_enc, signal);
 		link->link_enc->funcs->power_control(link->link_enc, false);
 	} else
@@ -262,7 +239,7 @@ void dp_retrain_link_dp_test(struct dc_link *link,
 			bool skip_video_pattern)
 {
 	struct pipe_ctx *pipes =
-			&link->dc->current_state->res_ctx.pipe_ctx[0];
+			&link->dc->current_context->res_ctx.pipe_ctx[0];
 	unsigned int i;
 
 	for (i = 0; i < MAX_PIPES; i++) {
@@ -299,11 +276,10 @@ void dp_retrain_link_dp_test(struct dc_link *link,
 
 			dp_receiver_power_ctrl(link, true);
 
-			perform_link_training_with_retries(
+			dc_link_dp_perform_link_training(
 					link,
 					link_setting,
-					skip_video_pattern,
-					LINK_TRAINING_ATTEMPTS);
+					skip_video_pattern);
 
 			link->cur_link_settings = *link_setting;
 
@@ -311,20 +287,6 @@ void dp_retrain_link_dp_test(struct dc_link *link,
 
 			link->dc->hwss.unblank_stream(&pipes[i],
 					link_setting);
-
-			if (pipes[i].stream_res.audio) {
-				/* notify audio driver for
-				 * audio modes of monitor */
-				pipes[i].stream_res.audio->funcs->az_enable(
-						pipes[i].stream_res.audio);
-
-				/* un-mute audio */
-				/* TODO: audio should be per stream rather than
-				 * per link */
-				pipes[i].stream_res.stream_enc->funcs->
-				audio_mute_control(
-					pipes[i].stream_res.stream_enc, false);
-			}
 		}
 	}
 }

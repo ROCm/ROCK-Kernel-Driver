@@ -30,7 +30,6 @@
 
 #include "dml/display_mode_structs.h"
 
-struct dchub_init_data;
 struct cstate_pstate_watermarks_st {
 	uint32_t cstate_exit_ns;
 	uint32_t cstate_enter_plus_exit_ns;
@@ -72,19 +71,6 @@ struct mem_input {
 	int opp_id;
 	int mpcc_id;
 	struct stutter_modes stutter_mode;
-};
-
-struct vm_system_aperture_param {
-	PHYSICAL_ADDRESS_LOC sys_default;
-	PHYSICAL_ADDRESS_LOC sys_low;
-	PHYSICAL_ADDRESS_LOC sys_high;
-};
-
-struct vm_context0_param {
-	PHYSICAL_ADDRESS_LOC pte_base;
-	PHYSICAL_ADDRESS_LOC pte_start;
-	PHYSICAL_ADDRESS_LOC pte_end;
-	PHYSICAL_ADDRESS_LOC fault_default;
 };
 
 struct mem_input_funcs {
@@ -138,14 +124,6 @@ struct mem_input_funcs {
 		union dc_tiling_info *tiling_info,
 		enum dc_rotation_angle rotation);
 
-	void (*mem_input_set_vm_system_aperture_settings)(
-			struct mem_input *mem_input,
-			struct vm_system_aperture_param *apt);
-
-	void (*mem_input_set_vm_context0_settings)(
-			struct mem_input *mem_input,
-			const struct vm_context0_param *vm0);
-
 	void (*mem_input_program_surface_config)(
 		struct mem_input *mem_input,
 		enum surface_pixel_format format,
@@ -161,8 +139,6 @@ struct mem_input_funcs {
 				struct dchub_init_data *dh_data);
 
 	void (*set_blank)(struct mem_input *mi, bool blank);
-	void (*set_hubp_blank_en)(struct mem_input *mi, bool blank);
-
 };
 
 #endif

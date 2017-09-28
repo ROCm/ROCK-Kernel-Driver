@@ -28,7 +28,7 @@
 #include "dc.h"
 
 /* DC core (private) */
-#include "core_types.h"
+#include "core_dc.h"
 #include "transform.h"
 
 /*******************************************************************************
@@ -64,9 +64,9 @@ void enable_surface_flip_reporting(struct dc_plane_state *plane_state,
 	/*register_flip_interrupt(surface);*/
 }
 
-struct dc_plane_state *dc_create_plane_state(struct dc *dc)
+struct dc_plane_state *dc_create_plane_state(const struct dc *dc)
 {
-	struct dc *core_dc = dc;
+	struct core_dc *core_dc = DC_TO_CORE(dc);
 
 	struct dc_plane_state *plane_state = dm_alloc(sizeof(*plane_state));
 
@@ -76,7 +76,7 @@ struct dc_plane_state *dc_create_plane_state(struct dc *dc)
 	if (false == construct(core_dc->ctx, plane_state))
 		goto construct_fail;
 
-	atomic_inc(&plane_state->ref_count);
+	++plane_state->ref_count;
 
 	return plane_state;
 
@@ -91,7 +91,7 @@ const struct dc_plane_status *dc_plane_get_status(
 		const struct dc_plane_state *plane_state)
 {
 	const struct dc_plane_status *plane_status;
-	struct dc  *core_dc;
+	struct core_dc *core_dc;
 	int i;
 
 	if (!plane_state ||
@@ -102,14 +102,14 @@ const struct dc_plane_status *dc_plane_get_status(
 	}
 
 	plane_status = &plane_state->status;
-	core_dc = plane_state->ctx->dc;
+	core_dc = DC_TO_CORE(plane_state->ctx->dc);
 
-	if (core_dc->current_state == NULL)
+	if (core_dc->current_context == NULL)
 		return NULL;
 
 	for (i = 0; i < core_dc->res_pool->pipe_count; i++) {
 		struct pipe_ctx *pipe_ctx =
-				&core_dc->current_state->res_ctx.pipe_ctx[i];
+				&core_dc->current_context->res_ctx.pipe_ctx[i];
 
 		if (pipe_ctx->plane_state != plane_state)
 			continue;
@@ -122,16 +122,16 @@ const struct dc_plane_status *dc_plane_get_status(
 
 void dc_plane_state_retain(struct dc_plane_state *plane_state)
 {
-	ASSERT(atomic_read(&plane_state->ref_count) > 0);
-	atomic_inc(&plane_state->ref_count);
+	ASSERT(plane_state->ref_count > 0);
+	++plane_state->ref_count;
 }
 
 void dc_plane_state_release(struct dc_plane_state *plane_state)
 {
-	ASSERT(atomic_read(&plane_state->ref_count) > 0);
-	atomic_dec(&plane_state->ref_count);
+	ASSERT(plane_state->ref_count > 0);
+	--plane_state->ref_count;
 
-	if (atomic_read(&plane_state->ref_count) == 0) {
+	if (plane_state->ref_count == 0) {
 		destruct(plane_state);
 		dm_free(plane_state);
 	}
@@ -139,16 +139,16 @@ void dc_plane_state_release(struct dc_plane_state *plane_state)
 
 void dc_gamma_retain(struct dc_gamma *gamma)
 {
-	ASSERT(atomic_read(&gamma->ref_count) > 0);
-	atomic_inc(&gamma->ref_count);
+	ASSERT(gamma->ref_count > 0);
+	++gamma->ref_count;
 }
 
 void dc_gamma_release(struct dc_gamma **gamma)
 {
-	ASSERT(atomic_read(&(*gamma)->ref_count) > 0);
-	atomic_dec(&(*gamma)->ref_count);
+	ASSERT((*gamma)->ref_count > 0);
+	--(*gamma)->ref_count;
 
-	if (atomic_read(&(*gamma)->ref_count) == 0)
+	if ((*gamma)->ref_count == 0)
 		dm_free((*gamma));
 
 	*gamma = NULL;
@@ -161,7 +161,7 @@ struct dc_gamma *dc_create_gamma()
 	if (gamma == NULL)
 		goto alloc_fail;
 
-	atomic_inc(&gamma->ref_count);
+	++gamma->ref_count;
 
 	return gamma;
 
@@ -171,16 +171,16 @@ alloc_fail:
 
 void dc_transfer_func_retain(struct dc_transfer_func *tf)
 {
-	ASSERT(atomic_read(&tf->ref_count) > 0);
-	atomic_inc(&tf->ref_count);
+	ASSERT(tf->ref_count > 0);
+	++tf->ref_count;
 }
 
 void dc_transfer_func_release(struct dc_transfer_func *tf)
 {
-	ASSERT(atomic_read(&tf->ref_count) > 0);
-	atomic_dec(&tf->ref_count);
+	ASSERT(tf->ref_count > 0);
+	--tf->ref_count;
 
-	if (atomic_read(&tf->ref_count) == 0)
+	if (tf->ref_count == 0)
 		dm_free(tf);
 }
 
@@ -191,7 +191,7 @@ struct dc_transfer_func *dc_create_transfer_func()
 	if (tf == NULL)
 		goto alloc_fail;
 
-	atomic_inc(&tf->ref_count);
+	++tf->ref_count;
 
 	return tf;
 

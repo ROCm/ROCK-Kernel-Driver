@@ -25,6 +25,7 @@
 
 #include "dm_services.h"
 #include "core_types.h"
+#include "core_dc.h"
 #include "timing_generator.h"
 #include "hw_sequencer.h"
 
@@ -54,7 +55,7 @@ static const struct tg_color black_color_format[] = {
 };
 
 void color_space_to_black_color(
-	const struct dc *dc,
+	const struct core_dc *dc,
 	enum dc_color_space colorspace,
 	struct tg_color *black_color)
 {

@@ -34,8 +34,8 @@
 #include "display_clock.h"
 #include "../dml/display_mode_lib.h"
 
-struct dc;
-struct dc_state;
+struct core_dc;
+struct validate_context;
 
 /*******************************************************************************
  * DCN data structures.
@@ -620,16 +620,16 @@ struct dcn_ip_params {
 extern const struct dcn_ip_params dcn10_ip_defaults;
 
 bool dcn_validate_bandwidth(
-		struct dc *dc,
-		struct dc_state *context);
+		const struct core_dc *dc,
+		struct validate_context *context);
 
 unsigned int dcn_find_dcfclk_suits_all(
-	const struct dc *dc,
+	const struct core_dc *dc,
 	struct clocks_value *clocks);
 
-void dcn_bw_update_from_pplib(struct dc *dc);
-void dcn_bw_notify_pplib_of_wm_ranges(struct dc *dc);
-void dcn_bw_sync_calcs_and_dml(struct dc *dc);
+void dcn_bw_update_from_pplib(struct core_dc *dc);
+void dcn_bw_notify_pplib_of_wm_ranges(struct core_dc *dc);
+void dcn_bw_sync_calcs_and_dml(struct core_dc *dc);
 
 #endif /* __DCN_CALCS_H__ */
 

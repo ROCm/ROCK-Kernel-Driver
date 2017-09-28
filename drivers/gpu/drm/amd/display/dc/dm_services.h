@@ -76,9 +76,7 @@
 } while (0)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include <asm/fpu/api.h>
-#endif
 #else
 #include <asm/i387.h>
 #endif
@@ -343,8 +341,9 @@ bool dm_pp_notify_wm_clock_changes(
 	const struct dc_context *ctx,
 	struct dm_pp_wm_sets_with_clock_ranges *wm_with_clock_ranges);
 
-void dm_pp_get_funcs_rv(struct dc_context *ctx,
-		struct pp_smu_funcs_rv *funcs);
+bool dm_pp_notify_wm_clock_changes_soc15(
+	const struct dc_context *ctx,
+	struct dm_pp_wm_sets_with_clock_ranges_soc15 *wm_with_clock_ranges);
 
 /* DAL calls this function to notify PP about completion of Mode Set.
  * For PP it means that current DCE clocks are those which were returned

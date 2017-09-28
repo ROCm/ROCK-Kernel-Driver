@@ -54,7 +54,12 @@ struct ipp_prescale_params {
 	uint16_t scale;
 };
 
-
+enum ipp_degamma_mode {
+	IPP_DEGAMMA_MODE_BYPASS,
+	IPP_DEGAMMA_MODE_HW_sRGB,
+	IPP_DEGAMMA_MODE_HW_xvYCC,
+	IPP_DEGAMMA_MODE_USER_PWL
+};
 
 enum ovl_color_space {
 	OVL_COLOR_SPACE_UNKNOWN = 0,
@@ -63,6 +68,16 @@ enum ovl_color_space {
 	OVL_COLOR_SPACE_YUV709
 };
 
+enum expansion_mode {
+	EXPANSION_MODE_DYNAMIC,
+	EXPANSION_MODE_ZERO
+};
+
+enum ipp_output_format {
+	IPP_OUTPUT_FORMAT_12_BIT_FIX,
+	IPP_OUTPUT_FORMAT_16_BIT_BYPASS,
+	IPP_OUTPUT_FORMAT_FLOAT
+};
 
 struct ipp_funcs {
 

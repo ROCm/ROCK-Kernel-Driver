@@ -29,8 +29,6 @@
 #include "os_types.h"
 #include "dc_types.h"
 
-#include "dm_pp_smu.h"
-
 struct dm_pp_clock_range {
 	int min_khz;
 	int max_khz;

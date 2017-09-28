@@ -27,6 +27,7 @@
 
 #include "ObjectID.h"
 #include "atomfirmware.h"
+#include "atomfirmwareid.h"
 
 #include "include/bios_parser_interface.h"
 

@@ -115,7 +115,7 @@ static void wait_for_fbc_state_changed(
 			FBC_STATUS,
 			FBC_ENABLE_STATUS) == enabled)
 			break;
-		msleep(10);
+		udelay(10);
 		counter++;
 	}
 
@@ -124,13 +124,7 @@ static void wait_for_fbc_state_changed(
 			cp110->base.ctx->logger, LOG_WARNING,
 			"%s: wait counter exceeded, changes to HW not applied",
 			__func__);
-	} else {
-		dm_logger_write(
-			cp110->base.ctx->logger, LOG_SYNC,
-			"FBC status changed to %d", enabled);
 	}
-
-
 }
 
 void dce110_compressor_power_up_fbc(struct compressor *compressor)
@@ -189,7 +183,7 @@ void dce110_compressor_enable_fbc(
 		(!dce110_compressor_is_fbc_enabled_in_hw(compressor, NULL))) {
 
 		uint32_t addr;
-		uint32_t value, misc_value;
+		uint32_t value;
 
 
 		addr = mmFBC_CNTL;
@@ -206,23 +200,9 @@ void dce110_compressor_enable_fbc(
 		compressor->attached_inst = params->inst;
 		cp110->offsets = reg_offsets[params->inst];
 
-		/* Toggle it as there is bug in HW */
+		/*Toggle it as there is bug in HW */
 		set_reg_field_value(value, 0, FBC_CNTL, FBC_GRPH_COMP_EN);
 		dm_write_reg(compressor->ctx, addr, value);
-
-		/* FBC usage with scatter & gather for dce110 */
-		misc_value = dm_read_reg(compressor->ctx, mmFBC_MISC);
-
-		set_reg_field_value(misc_value, 1,
-				FBC_MISC, FBC_INVALIDATE_ON_ERROR);
-		set_reg_field_value(misc_value, 1,
-				FBC_MISC, FBC_DECOMPRESS_ERROR_CLEAR);
-		set_reg_field_value(misc_value, 0x14,
-				FBC_MISC, FBC_SLOW_REQ_INTERVAL);
-
-		dm_write_reg(compressor->ctx, mmFBC_MISC, misc_value);
-
-		/* Enable FBC */
 		set_reg_field_value(value, 1, FBC_CNTL, FBC_GRPH_COMP_EN);
 		dm_write_reg(compressor->ctx, addr, value);
 

@@ -32,7 +32,7 @@ struct dc_context;
 struct dc_link;
 struct dc_surface_update;
 struct resource_context;
-struct dc_state;
+struct validate_context;
 
 /*
  *
@@ -76,24 +76,24 @@ void logger_write(struct dal_logger *logger,
 		void *paralist);
 
 void pre_surface_trace(
-		struct dc *dc,
+		const struct dc *dc,
 		const struct dc_plane_state *const *plane_states,
 		int surface_count);
 
 void update_surface_trace(
-		struct dc *dc,
+		const struct dc *dc,
 		const struct dc_surface_update *updates,
 		int surface_count);
 
-void post_surface_trace(struct dc *dc);
+void post_surface_trace(const struct dc *dc);
 
 void context_timing_trace(
-		struct dc *dc,
+		const struct dc *dc,
 		struct resource_context *res_ctx);
 
 void context_clock_trace(
-		struct dc *dc,
-		struct dc_state *context);
+		const struct dc *dc,
+		struct validate_context *context);
 
 /* Any function which is empty or have incomplete implementation should be
  * marked by this macro.

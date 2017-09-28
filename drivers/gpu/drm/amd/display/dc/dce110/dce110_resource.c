@@ -772,35 +772,50 @@ static bool is_surface_pixel_format_supported(struct pipe_ctx *pipe_ctx, unsigne
 }
 
 static enum dc_status build_mapped_resource(
-		const struct dc *dc,
-		struct dc_state *context,
-		struct dc_stream_state *stream)
+		const struct core_dc *dc,
+		struct validate_context *context,
+		struct validate_context *old_context)
 {
 	enum dc_status status = DC_OK;
-	struct pipe_ctx *pipe_ctx = resource_get_head_pipe_for_stream(&context->res_ctx, stream);
+	uint8_t i, j;
 
-	if (!pipe_ctx)
-		return DC_ERROR_UNEXPECTED;
+	for (i = 0; i < context->stream_count; i++) {
+		struct dc_stream_state *stream = context->streams[i];
 
-	if (!is_surface_pixel_format_supported(pipe_ctx,
-			dc->res_pool->underlay_pipe_index))
-		return DC_SURFACE_PIXEL_FORMAT_UNSUPPORTED;
+		if (old_context && resource_is_stream_unchanged(old_context, stream))
+			continue;
 
-	status = dce110_resource_build_pipe_hw_param(pipe_ctx);
+		for (j = 0; j < MAX_PIPES; j++) {
+			struct pipe_ctx *pipe_ctx =
+				&context->res_ctx.pipe_ctx[j];
 
-	if (status != DC_OK)
-		return status;
+			if (context->res_ctx.pipe_ctx[j].stream != stream)
+				continue;
 
-	/* TODO: validate audio ASIC caps, encoder */
+			if (!is_surface_pixel_format_supported(pipe_ctx,
+					dc->res_pool->underlay_pipe_index))
+				return DC_SURFACE_PIXEL_FORMAT_UNSUPPORTED;
 
-	resource_build_info_frame(pipe_ctx);
+			status = dce110_resource_build_pipe_hw_param(pipe_ctx);
+
+			if (status != DC_OK)
+				return status;
+
+			/* TODO: validate audio ASIC caps, encoder */
+
+			resource_build_info_frame(pipe_ctx);
+
+			/* do not need to validate non root pipes */
+			break;
+		}
+	}
 
 	return DC_OK;
 }
 
 static bool dce110_validate_bandwidth(
-	struct dc *dc,
-	struct dc_state *context)
+	const struct core_dc *dc,
+	struct validate_context *context)
 {
 	bool result = false;
 
@@ -811,8 +826,8 @@ static bool dce110_validate_bandwidth(
 
 	if (bw_calcs(
 			dc->ctx,
-			dc->bw_dceip,
-			dc->bw_vbios,
+			&dc->bw_dceip,
+			&dc->bw_vbios,
 			context->res_ctx.pipe_ctx,
 			dc->res_pool->pipe_count,
 			&context->bw.dce))
@@ -826,7 +841,7 @@ static bool dce110_validate_bandwidth(
 			context->streams[0]->timing.v_addressable,
 			context->streams[0]->timing.pix_clk_khz);
 
-	if (memcmp(&dc->current_state->bw.dce,
+	if (memcmp(&dc->current_context->bw.dce,
 			&context->bw.dce, sizeof(context->bw.dce))) {
 		struct log_entry log_entry;
 		dm_logger_open(
@@ -880,30 +895,31 @@ static bool dce110_validate_bandwidth(
 }
 
 static bool dce110_validate_surface_sets(
-		struct dc_state *context)
+		const struct dc_validation_set set[],
+		int set_count)
 {
 	int i;
 
-	for (i = 0; i < context->stream_count; i++) {
-		if (context->stream_status[i].plane_count == 0)
+	for (i = 0; i < set_count; i++) {
+		if (set[i].plane_count == 0)
 			continue;
 
-		if (context->stream_status[i].plane_count > 2)
+		if (set[i].plane_count > 2)
 			return false;
 
-		if (context->stream_status[i].plane_states[0]->format
+		if (set[i].plane_states[0]->format
 				>= SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)
 			return false;
 
-		if (context->stream_status[i].plane_count == 2) {
-			if (context->stream_status[i].plane_states[1]->format
+		if (set[i].plane_count == 2) {
+			if (set[i].plane_states[1]->format
 					< SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)
 				return false;
-			if (context->stream_status[i].plane_states[1]->src_rect.width > 1920
-					|| context->stream_status[i].plane_states[1]->src_rect.height > 1080)
+			if (set[i].plane_states[1]->src_rect.width > 1920
+					|| set[i].plane_states[1]->src_rect.height > 1080)
 				return false;
 
-			if (context->streams[i]->timing.pixel_encoding != PIXEL_ENCODING_RGB)
+			if (set[i].stream->timing.pixel_encoding != PIXEL_ENCODING_RGB)
 				return false;
 		}
 	}
@@ -911,39 +927,54 @@ static bool dce110_validate_surface_sets(
 	return true;
 }
 
-enum dc_status dce110_validate_global(
-		struct dc *dc,
-		struct dc_state *context)
+static enum dc_status dce110_validate_with_context(
+		const struct core_dc *dc,
+		const struct dc_validation_set set[],
+		int set_count,
+		struct validate_context *context,
+		struct validate_context *old_context)
 {
-	if (!dce110_validate_surface_sets(context))
+	struct dc_context *dc_ctx = dc->ctx;
+	enum dc_status result = DC_ERROR_UNEXPECTED;
+	int i;
+
+	if (!dce110_validate_surface_sets(set, set_count))
 		return DC_FAIL_SURFACE_VALIDATE;
 
-	return DC_OK;
-}
+	for (i = 0; i < set_count; i++) {
+		context->streams[i] = set[i].stream;
+		dc_stream_retain(context->streams[i]);
+		context->stream_count++;
+	}
 
-static enum dc_status dce110_add_stream_to_ctx(
-		struct dc *dc,
-		struct dc_state *new_ctx,
-		struct dc_stream_state *dc_stream)
-{
-	enum dc_status result = DC_ERROR_UNEXPECTED;
-
-	result = resource_map_pool_resources(dc, new_ctx, dc_stream);
+	result = resource_map_pool_resources(dc, context, old_context);
 
 	if (result == DC_OK)
-		result = resource_map_clock_resources(dc, new_ctx, dc_stream);
+		result = resource_map_clock_resources(dc, context, old_context);
 
+	if (!resource_validate_attach_surfaces(set, set_count,
+			old_context, context, dc->res_pool)) {
+		DC_ERROR("Failed to attach surface to stream!\n");
+		return DC_FAIL_ATTACH_SURFACES;
+	}
 
 	if (result == DC_OK)
-		result = build_mapped_resource(dc, new_ctx, dc_stream);
+		result = build_mapped_resource(dc, context, old_context);
+
+	if (result == DC_OK)
+		result = resource_build_scaling_params_for_context(dc, context);
+
+	if (result == DC_OK)
+		if (!dce110_validate_bandwidth(dc, context))
+			result = DC_FAIL_BANDWIDTH_VALIDATE;
 
 	return result;
 }
 
 static enum dc_status dce110_validate_guaranteed(
-		struct dc *dc,
+		const struct core_dc *dc,
 		struct dc_stream_state *dc_stream,
-		struct dc_state *context)
+		struct validate_context *context)
 {
 	enum dc_status result = DC_ERROR_UNEXPECTED;
 
@@ -951,17 +982,17 @@ static enum dc_status dce110_validate_guaranteed(
 	dc_stream_retain(context->streams[0]);
 	context->stream_count++;
 
-	result = resource_map_pool_resources(dc, context, dc_stream);
+	result = resource_map_pool_resources(dc, context, NULL);
 
 	if (result == DC_OK)
-		result = resource_map_clock_resources(dc, context, dc_stream);
+		result = resource_map_clock_resources(dc, context, NULL);
 
 	if (result == DC_OK)
-		result = build_mapped_resource(dc, context, dc_stream);
+		result = build_mapped_resource(dc, context, NULL);
 
 	if (result == DC_OK) {
 		validate_guaranteed_copy_streams(
-				context, dc->caps.max_streams);
+				context, dc->public.caps.max_streams);
 		result = resource_build_scaling_params_for_context(dc, context);
 	}
 
@@ -973,11 +1004,11 @@ static enum dc_status dce110_validate_guaranteed(
 }
 
 static struct pipe_ctx *dce110_acquire_underlay(
-		struct dc_state *context,
+		struct validate_context *context,
 		const struct resource_pool *pool,
 		struct dc_stream_state *stream)
 {
-	struct dc *dc = stream->ctx->dc;
+	struct core_dc *dc = DC_TO_CORE(stream->ctx->dc);
 	struct resource_context *res_ctx = &context->res_ctx;
 	unsigned int underlay_idx = pool->underlay_pipe_index;
 	struct pipe_ctx *pipe_ctx = &res_ctx->pipe_ctx[underlay_idx];
@@ -990,11 +1021,12 @@ static struct pipe_ctx *dce110_acquire_underlay(
 	/*pipe_ctx->plane_res.ipp = res_ctx->pool->ipps[underlay_idx];*/
 	pipe_ctx->plane_res.xfm = pool->transforms[underlay_idx];
 	pipe_ctx->stream_res.opp = pool->opps[underlay_idx];
+	pipe_ctx->dis_clk = pool->display_clock;
 	pipe_ctx->pipe_idx = underlay_idx;
 
 	pipe_ctx->stream = stream;
 
-	if (!dc->current_state->res_ctx.pipe_ctx[underlay_idx].stream) {
+	if (!dc->current_context->res_ctx.pipe_ctx[underlay_idx].stream) {
 		struct tg_color black_color = {0};
 		struct dc_bios *dcb = dc->ctx->dc_bios;
 
@@ -1046,11 +1078,10 @@ static void dce110_destroy_resource_pool(struct resource_pool **pool)
 static const struct resource_funcs dce110_res_pool_funcs = {
 	.destroy = dce110_destroy_resource_pool,
 	.link_enc_create = dce110_link_encoder_create,
+	.validate_with_context = dce110_validate_with_context,
 	.validate_guaranteed = dce110_validate_guaranteed,
 	.validate_bandwidth = dce110_validate_bandwidth,
 	.acquire_idle_pipe_for_layer = dce110_acquire_underlay,
-	.add_stream_to_ctx = dce110_add_stream_to_ctx,
-	.validate_global = dce110_validate_global
 };
 
 static bool underlay_create(struct dc_context *ctx, struct resource_pool *pool)
@@ -1086,7 +1117,7 @@ static bool underlay_create(struct dc_context *ctx, struct resource_pool *pool)
 	return true;
 }
 
-static void bw_calcs_data_update_from_pplib(struct dc *dc)
+static void bw_calcs_data_update_from_pplib(struct core_dc *dc)
 {
 	struct dm_pp_clock_levels clks = {0};
 
@@ -1096,21 +1127,21 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 			DM_PP_CLOCK_TYPE_ENGINE_CLK,
 			&clks);
 	/* convert all the clock fro kHz to fix point mHz */
-	dc->bw_vbios->high_sclk = bw_frc_to_fixed(
+	dc->bw_vbios.high_sclk = bw_frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels-1], 1000);
-	dc->bw_vbios->mid1_sclk  = bw_frc_to_fixed(
+	dc->bw_vbios.mid1_sclk  = bw_frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels/8], 1000);
-	dc->bw_vbios->mid2_sclk  = bw_frc_to_fixed(
+	dc->bw_vbios.mid2_sclk  = bw_frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels*2/8], 1000);
-	dc->bw_vbios->mid3_sclk  = bw_frc_to_fixed(
+	dc->bw_vbios.mid3_sclk  = bw_frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels*3/8], 1000);
-	dc->bw_vbios->mid4_sclk  = bw_frc_to_fixed(
+	dc->bw_vbios.mid4_sclk  = bw_frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels*4/8], 1000);
-	dc->bw_vbios->mid5_sclk  = bw_frc_to_fixed(
+	dc->bw_vbios.mid5_sclk  = bw_frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels*5/8], 1000);
-	dc->bw_vbios->mid6_sclk  = bw_frc_to_fixed(
+	dc->bw_vbios.mid6_sclk  = bw_frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels*6/8], 1000);
-	dc->bw_vbios->low_sclk  = bw_frc_to_fixed(
+	dc->bw_vbios.low_sclk  = bw_frc_to_fixed(
 			clks.clocks_in_khz[0], 1000);
 	dc->sclk_lvls = clks;
 
@@ -1119,11 +1150,11 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 			dc->ctx,
 			DM_PP_CLOCK_TYPE_DISPLAY_CLK,
 			&clks);
-	dc->bw_vbios->high_voltage_max_dispclk = bw_frc_to_fixed(
+	dc->bw_vbios.high_voltage_max_dispclk = bw_frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels-1], 1000);
-	dc->bw_vbios->mid_voltage_max_dispclk  = bw_frc_to_fixed(
+	dc->bw_vbios.mid_voltage_max_dispclk  = bw_frc_to_fixed(
 			clks.clocks_in_khz[clks.num_levels>>1], 1000);
-	dc->bw_vbios->low_voltage_max_dispclk  = bw_frc_to_fixed(
+	dc->bw_vbios.low_voltage_max_dispclk  = bw_frc_to_fixed(
 			clks.clocks_in_khz[0], 1000);
 
 	/*do memory clock*/
@@ -1132,12 +1163,12 @@ static void bw_calcs_data_update_from_pplib(struct dc *dc)
 			DM_PP_CLOCK_TYPE_MEMORY_CLK,
 			&clks);
 
-	dc->bw_vbios->low_yclk = bw_frc_to_fixed(
+	dc->bw_vbios.low_yclk = bw_frc_to_fixed(
 		clks.clocks_in_khz[0] * MEMORY_TYPE_MULTIPLIER, 1000);
-	dc->bw_vbios->mid_yclk = bw_frc_to_fixed(
+	dc->bw_vbios.mid_yclk = bw_frc_to_fixed(
 		clks.clocks_in_khz[clks.num_levels>>1] * MEMORY_TYPE_MULTIPLIER,
 		1000);
-	dc->bw_vbios->high_yclk = bw_frc_to_fixed(
+	dc->bw_vbios.high_yclk = bw_frc_to_fixed(
 		clks.clocks_in_khz[clks.num_levels-1] * MEMORY_TYPE_MULTIPLIER,
 		1000);
 }
@@ -1153,7 +1184,7 @@ const struct resource_caps *dce110_resource_cap(
 
 static bool construct(
 	uint8_t num_virtual_links,
-	struct dc *dc,
+	struct core_dc *dc,
 	struct dce110_resource_pool *pool,
 	struct hw_asic_id asic_id)
 {
@@ -1175,9 +1206,9 @@ static bool construct(
 	pool->base.pipe_count = pool->base.res_cap->num_timing_generator;
 	pool->base.underlay_pipe_index = pool->base.pipe_count;
 
-	dc->caps.max_downscale_ratio = 150;
-	dc->caps.i2c_speed_in_khz = 100;
-	dc->caps.max_cursor_size = 128;
+	dc->public.caps.max_downscale_ratio = 150;
+	dc->public.caps.i2c_speed_in_khz = 100;
+	dc->public.caps.max_cursor_size = 128;
 
 	/*************************************************
 	 *  Create resources                             *
@@ -1320,9 +1351,9 @@ static bool construct(
 	if (!dce110_hw_sequencer_construct(dc))
 		goto res_create_fail;
 
-	dc->caps.max_planes =  pool->base.pipe_count;
+	dc->public.caps.max_planes =  pool->base.pipe_count;
 
-	bw_calcs_init(dc->bw_dceip, dc->bw_vbios, dc->ctx->asic_id);
+	bw_calcs_init(&dc->bw_dceip, &dc->bw_vbios, dc->ctx->asic_id);
 
 	bw_calcs_data_update_from_pplib(dc);
 
@@ -1335,7 +1366,7 @@ res_create_fail:
 
 struct resource_pool *dce110_create_resource_pool(
 	uint8_t num_virtual_links,
-	struct dc *dc,
+	struct core_dc *dc,
 	struct hw_asic_id asic_id)
 {
 	struct dce110_resource_pool *pool =

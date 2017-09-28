@@ -24,6 +24,7 @@
  */
 #include "dm_services.h"
 #include "dc.h"
+#include "core_dc.h"
 #include "core_types.h"
 #include "hw_sequencer.h"
 #include "dce100_hw_sequencer.h"
@@ -70,7 +71,7 @@ static const struct dce100_hw_seq_reg_offsets reg_offsets[] = {
 /***************************PIPE_CONTROL***********************************/
 
 static bool dce100_enable_display_power_gating(
-	struct dc *dc,
+	struct core_dc *dc,
 	uint8_t controller_id,
 	struct dc_bios *dcb,
 	enum pipe_gating_control power_gating)
@@ -106,8 +107,8 @@ static bool dce100_enable_display_power_gating(
 }
 
 static void dce100_pplib_apply_display_requirements(
-	struct dc *dc,
-	struct dc_state *context)
+	struct core_dc *dc,
+	struct validate_context *context)
 {
 	struct dm_pp_display_configuration *pp_display_cfg = &context->pp_display_cfg;
 
@@ -126,15 +127,15 @@ static void dce100_pplib_apply_display_requirements(
 }
 
 void dce100_set_bandwidth(
-		struct dc *dc,
-		struct dc_state *context,
+		struct core_dc *dc,
+		struct validate_context *context,
 		bool decrease_allowed)
 {
-	if (decrease_allowed || context->bw.dce.dispclk_khz > dc->current_state->bw.dce.dispclk_khz) {
+	if (decrease_allowed || context->bw.dce.dispclk_khz > dc->current_context->bw.dce.dispclk_khz) {
 		dc->res_pool->display_clock->funcs->set_clock(
 				dc->res_pool->display_clock,
 				context->bw.dce.dispclk_khz * 115 / 100);
-		dc->current_state->bw.dce.dispclk_khz = context->bw.dce.dispclk_khz;
+		dc->current_context->bw.dce.dispclk_khz = context->bw.dce.dispclk_khz;
 	}
 	dce100_pplib_apply_display_requirements(dc, context);
 }
@@ -142,7 +143,7 @@ void dce100_set_bandwidth(
 
 /**************************************************************************/
 
-bool dce100_hw_sequencer_construct(struct dc *dc)
+bool dce100_hw_sequencer_construct(struct core_dc *dc)
 {
 	dce110_hw_sequencer_construct(dc);
 

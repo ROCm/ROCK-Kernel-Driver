@@ -32,7 +32,6 @@
 
 #include "dcn10/dcn10_ipp.h"
 #include "dcn10/dcn10_mpc.h"
-#include "dcn10/dcn10_dwb.h"
 #include "irq/dcn10/irq_service_dcn10.h"
 #include "dcn10/dcn10_dpp.h"
 #include "dcn10/dcn10_timing_generator.h"
@@ -48,7 +47,6 @@
 #include "dce/dce_hwseq.h"
 #include "../virtual/virtual_stream_encoder.h"
 #include "dce110/dce110_resource.h"
-#include "dce112/dce112_resource.h"
 
 #include "vega10/soc15ip.h"
 
@@ -412,7 +410,6 @@ static const struct resource_caps res_cap = {
 		.num_audio = 4,
 		.num_stream_encoder = 4,
 		.num_pll = 4,
-		.num_dwb = 2,
 };
 
 static const struct dc_debug debug_defaults_drv = {
@@ -422,10 +419,6 @@ static const struct dc_debug debug_defaults_drv = {
 		.force_abm_enable = false,
 		.timing_trace = false,
 		.clock_trace = true,
-		/* spread sheet doesn't handle taps_c is one properly,
-		 * need to enable scaler for video surface to pass
-		 * bandwidth validation.*/
-		.always_scale = true,
 		.disable_pplib_clock_request = true,
 		.disable_pplib_wm_range = false,
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
@@ -439,7 +432,6 @@ static const struct dc_debug debug_defaults_diags = {
 		.force_abm_enable = false,
 		.timing_trace = true,
 		.clock_trace = true,
-		.disable_stutter = true,
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		.disable_pplib_clock_request = true,
 		.disable_pplib_wm_range = true,
@@ -684,17 +676,6 @@ void dcn10_clock_source_destroy(struct clock_source **clk_src)
 	*clk_src = NULL;
 }
 
-static struct pp_smu_funcs_rv *dcn10_pp_smu_create(struct dc_context *ctx)
-{
-	struct pp_smu_funcs_rv *pp_smu = dm_alloc(sizeof(*pp_smu));
-
-	if (!pp_smu)
-		return pp_smu;
-
-	dm_pp_get_funcs_rv(ctx, pp_smu);
-	return pp_smu;
-}
-
 static void destruct(struct dcn10_resource_pool *pool)
 {
 	unsigned int i;
@@ -748,11 +729,6 @@ static void destruct(struct dcn10_resource_pool *pool)
 			dce_aud_destroy(&pool->base.audios[i]);
 	}
 
-	for (i = 0; i < pool->base.res_cap->num_dwb; i++) {
-		dm_free(pool->base.dwbc[i]);
-		pool->base.dwbc[i] = NULL;
-	}
-
 	for (i = 0; i < pool->base.clk_src_count; i++) {
 		if (pool->base.clock_sources[i] != NULL) {
 			dcn10_clock_source_destroy(&pool->base.clock_sources[i]);
@@ -773,8 +749,6 @@ static void destruct(struct dcn10_resource_pool *pool)
 
 	if (pool->base.display_clock != NULL)
 		dce_disp_clk_destroy(&pool->base.display_clock);
-
-	dm_free(pool->base.pp_smu);
 }
 
 static struct mem_input *dcn10_mem_input_create(
@@ -849,17 +823,19 @@ static enum dc_status build_pipe_hw_param(struct pipe_ctx *pipe_ctx)
 }
 
 static enum dc_status build_mapped_resource(
-		const struct dc *dc,
-		struct dc_state *context,
-		struct dc_stream_state *stream)
+		const struct core_dc *dc,
+		struct validate_context *context,
+		struct validate_context *old_context)
 {
 	enum dc_status status = DC_OK;
-	struct pipe_ctx *pipe_ctx = resource_get_head_pipe_for_stream(&context->res_ctx, stream);
+	uint8_t i, j;
 
-	/*TODO Seems unneeded anymore */
-	/*	if (old_context && resource_is_stream_unchanged(old_context, stream)) {
+	for (i = 0; i < context->stream_count; i++) {
+		struct dc_stream_state *stream = context->streams[i];
+
+		if (old_context && resource_is_stream_unchanged(old_context, stream)) {
 			if (stream != NULL && old_context->streams[i] != NULL) {
-				 todo: shouldn't have to copy missing parameter here
+				/* todo: shouldn't have to copy missing parameter here */
 				resource_build_bit_depth_reduction_params(stream,
 						&stream->bit_depth_params);
 				stream->clamping.pixel_encoding =
@@ -872,42 +848,76 @@ static enum dc_status build_mapped_resource(
 				continue;
 			}
 		}
-	*/
 
-	if (!pipe_ctx)
-		return DC_ERROR_UNEXPECTED;
+		for (j = 0; j < dc->res_pool->pipe_count ; j++) {
+			struct pipe_ctx *pipe_ctx =
+				&context->res_ctx.pipe_ctx[j];
 
-	status = build_pipe_hw_param(pipe_ctx);
+			if (context->res_ctx.pipe_ctx[j].stream != stream)
+				continue;
 
-	if (status != DC_OK)
-		return status;
+			status = build_pipe_hw_param(pipe_ctx);
+
+			if (status != DC_OK)
+				return status;
+
+			/* do not need to validate non root pipes */
+			break;
+		}
+	}
 
 	return DC_OK;
 }
 
-enum dc_status dcn10_add_stream_to_ctx(
-		struct dc *dc,
-		struct dc_state *new_ctx,
-		struct dc_stream_state *dc_stream)
+enum dc_status dcn10_validate_with_context(
+		const struct core_dc *dc,
+		const struct dc_validation_set set[],
+		int set_count,
+		struct validate_context *context,
+		struct validate_context *old_context)
 {
-	enum dc_status result = DC_ERROR_UNEXPECTED;
+	enum dc_status result = DC_OK;
+	int i;
 
-	result = resource_map_pool_resources(dc, new_ctx, dc_stream);
+	if (set_count == 0)
+		return result;
 
-	if (result == DC_OK)
-		result = resource_map_phy_clock_resources(dc, new_ctx, dc_stream);
+	for (i = 0; i < set_count; i++) {
+		context->streams[i] = set[i].stream;
+		dc_stream_retain(context->streams[i]);
+		context->stream_count++;
+	}
 
+	result = resource_map_pool_resources(dc, context, old_context);
+	if (result != DC_OK)
+		return result;
 
-	if (result == DC_OK)
-		result = build_mapped_resource(dc, new_ctx, dc_stream);
+	result = resource_map_phy_clock_resources(dc, context, old_context);
+	if (result != DC_OK)
+		return result;
+
+	result = build_mapped_resource(dc, context, old_context);
+	if (result != DC_OK)
+		return result;
+
+	if (!resource_validate_attach_surfaces(set, set_count,
+			old_context, context, dc->res_pool))
+		return DC_FAIL_ATTACH_SURFACES;
+
+	result = resource_build_scaling_params_for_context(dc, context);
+	if (result != DC_OK)
+		return result;
+
+	if (!dcn_validate_bandwidth(dc, context))
+		return DC_FAIL_BANDWIDTH_VALIDATE;
 
 	return result;
 }
 
 enum dc_status dcn10_validate_guaranteed(
-		struct dc *dc,
+		const struct core_dc *dc,
 		struct dc_stream_state *dc_stream,
-		struct dc_state *context)
+		struct validate_context *context)
 {
 	enum dc_status result = DC_ERROR_UNEXPECTED;
 
@@ -915,17 +925,17 @@ enum dc_status dcn10_validate_guaranteed(
 	dc_stream_retain(context->streams[0]);
 	context->stream_count++;
 
-	result = resource_map_pool_resources(dc, context, dc_stream);
+	result = resource_map_pool_resources(dc, context, NULL);
 
 	if (result == DC_OK)
-		result = resource_map_phy_clock_resources(dc, context, dc_stream);
+		result = resource_map_phy_clock_resources(dc, context, NULL);
 
 	if (result == DC_OK)
-		result = build_mapped_resource(dc, context, dc_stream);
+		result = build_mapped_resource(dc, context, NULL);
 
 	if (result == DC_OK) {
 		validate_guaranteed_copy_streams(
-				context, dc->caps.max_streams);
+				context, dc->public.caps.max_streams);
 		result = resource_build_scaling_params_for_context(dc, context);
 	}
 	if (result == DC_OK && !dcn_validate_bandwidth(dc, context))
@@ -935,7 +945,7 @@ enum dc_status dcn10_validate_guaranteed(
 }
 
 static struct pipe_ctx *dcn10_acquire_idle_pipe_for_layer(
-		struct dc_state *context,
+		struct validate_context *context,
 		const struct resource_pool *pool,
 		struct dc_stream_state *stream)
 {
@@ -1201,15 +1211,15 @@ static struct dc_cap_funcs cap_funcs = {
 static struct resource_funcs dcn10_res_pool_funcs = {
 	.destroy = dcn10_destroy_resource_pool,
 	.link_enc_create = dcn10_link_encoder_create,
+	.validate_with_context = dcn10_validate_with_context,
 	.validate_guaranteed = dcn10_validate_guaranteed,
 	.validate_bandwidth = dcn_validate_bandwidth,
 	.acquire_idle_pipe_for_layer = dcn10_acquire_idle_pipe_for_layer,
-	.add_stream_to_ctx = dcn10_add_stream_to_ctx
 };
 
 static bool construct(
 	uint8_t num_virtual_links,
-	struct dc *dc,
+	struct core_dc *dc,
 	struct dcn10_resource_pool *pool)
 {
 	int i;
@@ -1232,16 +1242,16 @@ static bool construct(
 
 	/* TODO: Hardcode to correct number of functional controllers */
 	pool->base.pipe_count = 4;
-	dc->caps.max_downscale_ratio = 200;
-	dc->caps.i2c_speed_in_khz = 100;
-	dc->caps.max_cursor_size = 256;
+	dc->public.caps.max_downscale_ratio = 200;
+	dc->public.caps.i2c_speed_in_khz = 100;
+	dc->public.caps.max_cursor_size = 256;
 
-	dc->caps.max_slave_planes = 1;
+	dc->public.caps.max_slave_planes = 1;
 
 	if (dc->ctx->dce_environment == DCE_ENV_PRODUCTION_DRV)
-		dc->debug = debug_defaults_drv;
+		dc->public.debug = debug_defaults_drv;
 	else
-		dc->debug = debug_defaults_diags;
+		dc->public.debug = debug_defaults_diags;
 
 	/*************************************************
 	 *  Create resources                             *
@@ -1310,40 +1320,36 @@ static bool construct(
 	}
 
 	dml_init_instance(&dc->dml, DML_PROJECT_RAVEN1);
-	memcpy(dc->dcn_ip, &dcn10_ip_defaults, sizeof(dcn10_ip_defaults));
-	memcpy(dc->dcn_soc, &dcn10_soc_defaults, sizeof(dcn10_soc_defaults));
+	dc->dcn_ip = dcn10_ip_defaults;
+	dc->dcn_soc = dcn10_soc_defaults;
 
 	if (ASICREV_IS_RV1_F0(dc->ctx->asic_id.hw_internal_rev)) {
-		dc->dcn_soc->urgent_latency = 3;
-		dc->debug.disable_dmcu = true;
-		dc->dcn_soc->fabric_and_dram_bandwidth_vmax0p9 = 41.60f;
+		dc->dcn_soc.urgent_latency = 3;
+		dc->public.debug.disable_dmcu = true;
+		dc->dcn_soc.fabric_and_dram_bandwidth_vmax0p9 = 41.60f;
 	}
 
 
-	dc->dcn_soc->number_of_channels = dc->ctx->asic_id.vram_width / ddr4_dram_width;
-	ASSERT(dc->dcn_soc->number_of_channels < 3);
-	if (dc->dcn_soc->number_of_channels == 0)/*old sbios bug*/
-		dc->dcn_soc->number_of_channels = 2;
+	dc->dcn_soc.number_of_channels = dc->ctx->asic_id.vram_width / ddr4_dram_width;
+	ASSERT(dc->dcn_soc.number_of_channels < 3);
+	if (dc->dcn_soc.number_of_channels == 0)/*old sbios bug*/
+		dc->dcn_soc.number_of_channels = 2;
 
-	if (dc->dcn_soc->number_of_channels == 1) {
-		dc->dcn_soc->fabric_and_dram_bandwidth_vmax0p9 = 19.2f;
-		dc->dcn_soc->fabric_and_dram_bandwidth_vnom0p8 = 17.066f;
-		dc->dcn_soc->fabric_and_dram_bandwidth_vmid0p72 = 14.933f;
-		dc->dcn_soc->fabric_and_dram_bandwidth_vmin0p65 = 12.8f;
+	if (dc->dcn_soc.number_of_channels == 1) {
+		dc->dcn_soc.fabric_and_dram_bandwidth_vmax0p9 = 19.2f;
+		dc->dcn_soc.fabric_and_dram_bandwidth_vnom0p8 = 17.066f;
+		dc->dcn_soc.fabric_and_dram_bandwidth_vmid0p72 = 14.933f;
+		dc->dcn_soc.fabric_and_dram_bandwidth_vmin0p65 = 12.8f;
 		if (ASICREV_IS_RV1_F0(dc->ctx->asic_id.hw_internal_rev)) {
-			dc->dcn_soc->fabric_and_dram_bandwidth_vmax0p9 = 20.80f;
+			dc->dcn_soc.fabric_and_dram_bandwidth_vmax0p9 = 20.80f;
 		}
 	}
 
-	pool->base.pp_smu = dcn10_pp_smu_create(ctx);
-
-	if (!dc->debug.disable_pplib_clock_request)
+	if (!dc->public.debug.disable_pplib_clock_request)
 		dcn_bw_update_from_pplib(dc);
 	dcn_bw_sync_calcs_and_dml(dc);
-	if (!dc->debug.disable_pplib_wm_range) {
-		dc->res_pool = &pool->base;
+	if (!dc->public.debug.disable_pplib_wm_range)
 		dcn_bw_notify_pplib_of_wm_ranges(dc);
-	}
 
 	{
 	#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
@@ -1404,21 +1410,15 @@ static bool construct(
 		goto mpc_create_fail;
 	}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
-	if (!dcn10_dwbc_create(ctx, &pool->base)) {
-		goto dwbc_create_fail;
-	}
-#endif
-
 	if (!resource_construct(num_virtual_links, dc, &pool->base,
 			(!IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment) ?
 			&res_create_funcs : &res_create_maximus_funcs)))
 			goto res_create_fail;
 
 	dcn10_hw_sequencer_construct(dc);
-	dc->caps.max_planes =  pool->base.pipe_count;
+	dc->public.caps.max_planes =  pool->base.pipe_count;
 
-	dc->cap_funcs = cap_funcs;
+	dc->public.cap_funcs = cap_funcs;
 
 	return true;
 
@@ -1432,7 +1432,6 @@ mi_create_fail:
 irqs_create_fail:
 res_create_fail:
 clock_source_create_fail:
-dwbc_create_fail:
 
 	destruct(pool);
 
@@ -1441,7 +1440,7 @@ dwbc_create_fail:
 
 struct resource_pool *dcn10_create_resource_pool(
 		uint8_t num_virtual_links,
-		struct dc *dc)
+		struct core_dc *dc)
 {
 	struct dcn10_resource_pool *pool =
 		dm_alloc(sizeof(struct dcn10_resource_pool));

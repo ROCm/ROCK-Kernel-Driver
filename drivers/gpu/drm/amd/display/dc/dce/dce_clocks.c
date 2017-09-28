@@ -29,12 +29,14 @@
 #include "fixed32_32.h"
 #include "bios_parser_interface.h"
 #include "dc.h"
+#include "core_dc.h"
 #include "dce_abm.h"
 #include "dmcu.h"
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include "dcn_calcs.h"
+#include "core_dc.h"
 #endif
-#include "core_types.h"
+
 
 
 #define TO_DCE_CLOCKS(clocks)\
@@ -325,14 +327,13 @@ static bool dce_clock_set_min_clocks_state(
 	return true;
 }
 
-static int dce_set_clock(
+static void dce_set_clock(
 	struct display_clock *clk,
 	int requested_clk_khz)
 {
 	struct dce_disp_clk *clk_dce = TO_DCE_CLOCKS(clk);
 	struct bp_pixel_clock_parameters pxl_clk_params = { 0 };
 	struct dc_bios *bp = clk->ctx->dc_bios;
-	int actual_clock = requested_clk_khz;
 
 	/* Make sure requested clock isn't lower than minimum threshold*/
 	if (requested_clk_khz > 0)
@@ -350,43 +351,39 @@ static int dce_set_clock(
 		/* Cache the fixed display clock*/
 		clk_dce->dfs_bypass_disp_clk =
 			pxl_clk_params.dfs_bypass_display_clock;
-		actual_clock = pxl_clk_params.dfs_bypass_display_clock;
 	}
 
 	/* from power down, we need mark the clock state as ClocksStateNominal
 	 * from HWReset, so when resume we will call pplib voltage regulator.*/
 	if (requested_clk_khz == 0)
 		clk->cur_min_clks_state = DM_PP_CLOCKS_STATE_NOMINAL;
-	return actual_clock;
 }
 
-static int dce_psr_set_clock(
+static void dce_psr_set_clock(
 	struct display_clock *clk,
 	int requested_clk_khz)
 {
 	struct dce_disp_clk *clk_dce = TO_DCE_CLOCKS(clk);
 	struct dc_context *ctx = clk_dce->base.ctx;
-	struct dc *core_dc = ctx->dc;
+	struct core_dc *core_dc = DC_TO_CORE(ctx->dc);
 	struct dmcu *dmcu = core_dc->res_pool->dmcu;
-	int actual_clk_khz = requested_clk_khz;
 
-	actual_clk_khz = dce_set_clock(clk, requested_clk_khz);
+	dce_set_clock(clk, requested_clk_khz);
 
-	dmcu->funcs->set_psr_wait_loop(dmcu, actual_clk_khz / 1000 / 7);
-	return actual_clk_khz;
+	dmcu->funcs->set_psr_wait_loop(dmcu, requested_clk_khz / 1000 / 7);
 }
 
-static int dce112_set_clock(
+static void dce112_set_clock(
 	struct display_clock *clk,
 	int requested_clk_khz)
 {
 	struct dce_disp_clk *clk_dce = TO_DCE_CLOCKS(clk);
 	struct bp_set_dce_clock_parameters dce_clk_params;
 	struct dc_bios *bp = clk->ctx->dc_bios;
-	struct dc *core_dc = clk->ctx->dc;
+	struct core_dc *core_dc = DC_TO_CORE(clk->ctx->dc);
 	struct abm *abm =  core_dc->res_pool->abm;
 	struct dmcu *dmcu = core_dc->res_pool->dmcu;
-	int actual_clock = requested_clk_khz;
+
 	/* Prepare to program display clock*/
 	memset(&dce_clk_params, 0, sizeof(dce_clk_params));
 
@@ -400,7 +397,6 @@ static int dce112_set_clock(
 	dce_clk_params.clock_type = DCECLOCK_TYPE_DISPLAY_CLOCK;
 
 	bp->funcs->set_dce_clock(bp, &dce_clk_params);
-	actual_clock = dce_clk_params.target_clock_frequency;
 
 	/* from power down, we need mark the clock state as ClocksStateNominal
 	 * from HWReset, so when resume we will call pplib voltage regulator.*/
@@ -417,11 +413,10 @@ static int dce112_set_clock(
 
 	bp->funcs->set_dce_clock(bp, &dce_clk_params);
 
-	if (abm->funcs->is_dmcu_initialized(abm) && clk_dce->dfs_bypass_disp_clk != actual_clock)
+	if (abm->funcs->is_dmcu_initialized(abm))
 		dmcu->funcs->set_psr_wait_loop(dmcu,
-				actual_clock / 1000 / 7);
-	clk_dce->dfs_bypass_disp_clk = actual_clock;
-	return actual_clock;
+				requested_clk_khz / 1000 / 7);
+
 }
 
 static void dce_clock_read_integrated_info(struct dce_disp_clk *clk_dce)
@@ -620,7 +615,7 @@ static bool dce_apply_clock_voltage_request(
 	if (send_request) {
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		if (clk->ctx->dce_version >= DCN_VERSION_1_0) {
-			struct dc *core_dc = clk->ctx->dc;
+			struct core_dc *core_dc = DC_TO_CORE(clk->ctx->dc);
 			/*use dcfclk request voltage*/
 			clock_voltage_req.clk_type = DM_PP_CLOCK_TYPE_DCFCLK;
 			clock_voltage_req.clocks_in_khz =

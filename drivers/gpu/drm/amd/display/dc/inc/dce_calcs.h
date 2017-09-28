@@ -33,8 +33,8 @@
 #include "bw_fixed.h"
 
 struct pipe_ctx;
-struct dc;
-struct dc_state;
+struct core_dc;
+struct validate_context;
 struct dce_bw_output;
 
 enum bw_calcs_version {

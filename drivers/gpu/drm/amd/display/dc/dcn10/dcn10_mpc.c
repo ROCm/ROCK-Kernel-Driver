@@ -127,18 +127,10 @@ static void mpc10_mpcc_remove(
 	for (z_idx = 0; z_idx < opp->mpc_tree.num_pipes; z_idx++)
 		if (opp->mpc_tree.dpp[z_idx] == dpp_id)
 			break;
-
 	if (z_idx == opp->mpc_tree.num_pipes) {
-		/* In case of resume from S3/S4, remove mpcc from bios left over */
-		REG_SET(MPCC_OPP_ID[dpp_id], 0,
-				MPCC_OPP_ID, 0xf);
-		REG_SET(MPCC_TOP_SEL[dpp_id], 0,
-				MPCC_TOP_SEL, 0xf);
-		REG_SET(MPCC_BOT_SEL[dpp_id], 0,
-				MPCC_BOT_SEL, 0xf);
+		ASSERT(0);
 		return;
 	}
-
 	mpcc_id = opp->mpc_tree.mpcc[z_idx];
 
 	REG_SET(MPCC_OPP_ID[mpcc_id], 0,
@@ -237,9 +229,9 @@ static void mpc10_mpcc_add(struct mpc *mpc, struct mpcc_cfg *cfg)
 	mpc10_set_bg_color(mpc10, &cfg->black_color, mpcc_id);
 
 	mpc10->mpcc_in_use_mask |= 1 << mpcc_id;
-	for (z_idx = cfg->opp->mpc_tree.num_pipes; z_idx > cfg->z_index; z_idx--) {
-		cfg->opp->mpc_tree.dpp[z_idx] = cfg->opp->mpc_tree.dpp[z_idx - 1];
-		cfg->opp->mpc_tree.mpcc[z_idx] = cfg->opp->mpc_tree.mpcc[z_idx - 1];
+	for (z_idx = cfg->z_index; z_idx < cfg->opp->mpc_tree.num_pipes; z_idx++) {
+		cfg->opp->mpc_tree.dpp[z_idx + 1] = cfg->opp->mpc_tree.dpp[z_idx];
+		cfg->opp->mpc_tree.mpcc[z_idx + 1] = cfg->opp->mpc_tree.mpcc[z_idx];
 	}
 	cfg->opp->mpc_tree.dpp[cfg->z_index] = cfg->mi->inst;
 	cfg->opp->mpc_tree.mpcc[cfg->z_index] = mpcc_id;

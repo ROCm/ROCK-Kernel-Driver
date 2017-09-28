@@ -28,12 +28,12 @@
 
 #include "core_types.h"
 
-struct dc;
+struct core_dc;
 struct resource_pool;
 
 struct resource_pool *dce120_create_resource_pool(
 	uint8_t num_virtual_links,
-	struct dc *dc);
+	struct core_dc *dc);
 
 #endif /* __DC_RESOURCE_DCE120_H__ */
 
