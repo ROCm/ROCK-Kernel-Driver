@@ -141,6 +141,20 @@ static const struct kfd_device_info polaris11_device_info = {
 	.needs_pci_atomics = true,
 };
 
+static const struct kfd_device_info polaris12_device_info = {
+	.asic_family = CHIP_POLARIS12,
+	.max_pasid_bits = 16,
+	.max_no_of_hqd  = 24,
+	.doorbell_size  = 4,
+	.ih_ring_entry_size = 4 * sizeof(uint32_t),
+	.event_interrupt_class = &event_interrupt_class_cik,
+	.num_of_watch_points = 4,
+	.mqd_size_aligned = MQD_SIZE_ALIGNED,
+	.is_need_iommu_device = false,
+	.supports_cwsr = true,
+	.needs_pci_atomics = true,
+};
+
 static const struct kfd_device_info vega10_device_info = {
 	.asic_family = CHIP_VEGA10,
 	.max_pasid_bits = 16,
@@ -255,7 +269,15 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x6867, &vega10_device_info },	/* Vega10 */
 	{ 0x6868, &vega10_device_info },	/* Vega10 */
 	{ 0x686C, &vega10_device_info },	/* Vega10 */
-	{ 0x687F, &vega10_device_info }		/* Vega10 */
+	{ 0x687F, &vega10_device_info },	/* Vega10 */
+	{ 0x6980, &polaris12_device_info },	/* Polaris12 */
+	{ 0x6981, &polaris12_device_info },	/* Polaris12 */
+	{ 0x6985, &polaris12_device_info },	/* Polaris12 */
+	{ 0x6986, &polaris12_device_info },	/* Polaris12 */
+	{ 0x6987, &polaris12_device_info },	/* Polaris12 */
+	{ 0x6995, &polaris12_device_info },	/* Polaris12 */
+	{ 0x6997, &polaris12_device_info },	/* Polaris12 */
+	{ 0x699F, &polaris12_device_info }	/* Polaris12 */
 };
 
 static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,

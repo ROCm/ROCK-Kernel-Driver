@@ -235,6 +235,7 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 	case CHIP_FIJI:
 	case CHIP_POLARIS10:
 	case CHIP_POLARIS11:
+	case CHIP_POLARIS12:
 		kfd_pm_func_init_vi(pm, fw_ver);
 		break;
 	case CHIP_VEGA10:

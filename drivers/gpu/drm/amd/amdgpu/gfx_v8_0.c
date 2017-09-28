@@ -7037,6 +7037,7 @@ static void gfx_v8_0_get_cu_info(struct amdgpu_device *adev)
 	case CHIP_FIJI:
 	case CHIP_POLARIS10:
 	case CHIP_POLARIS11:
+	case CHIP_POLARIS12:
 		cu_info->max_waves_per_simd = 10;
 		cu_info->max_scratch_slots_per_cu = 32;
 		cu_info->wave_front_size = 64;

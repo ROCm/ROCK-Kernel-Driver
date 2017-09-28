@@ -336,6 +336,7 @@ struct kernel_queue *kernel_queue_init(struct kfd_dev *dev,
 	case CHIP_FIJI:
 	case CHIP_POLARIS10:
 	case CHIP_POLARIS11:
+	case CHIP_POLARIS12:
 		kernel_queue_init_vi(&kq->ops_asic_specific);
 		break;
 

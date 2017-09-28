@@ -211,9 +211,10 @@ int amdgpu_uvd_sw_init(struct amdgpu_device *adev)
 				(family_id << 8));
 
 	if ((adev->asic_type == CHIP_POLARIS10 ||
-	     adev->asic_type == CHIP_POLARIS11) &&
+	     adev->asic_type == CHIP_POLARIS11 ||
+	     adev->asic_type == CHIP_POLARIS12) &&
 	    (adev->uvd.fw_version < FW_1_66_16))
-		DRM_ERROR("POLARIS10/11 UVD firmware version %hu.%hu is too old.\n",
+		DRM_ERROR("POLARIS10/11/12 UVD firmware version %hu.%hu is too old.\n",
 			  version_major, version_minor);
 
 	bo_size = AMDGPU_UVD_STACK_SIZE + AMDGPU_UVD_HEAP_SIZE
