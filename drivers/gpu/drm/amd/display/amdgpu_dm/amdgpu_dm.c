@@ -4725,10 +4725,10 @@ static int dm_update_crtcs_state(struct dc *dc,
 				DRM_DEBUG_DRIVER("Enabling DRM crtc: %d\n",
 							crtc->base.id);
 
-				if (!dc_add_stream_to_ctx(
+				if (dc_add_stream_to_ctx(
 						dc,
 						dm_state->context,
-						new_acrtc_state->stream)) {
+						new_acrtc_state->stream) != DC_OK) {
 					ret = -EINVAL;
 					goto fail;
 				}
