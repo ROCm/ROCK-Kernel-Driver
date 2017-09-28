@@ -493,6 +493,7 @@ static int dce_virtual_hw_init(void *handle)
 	case CHIP_STONEY:
 	case CHIP_POLARIS11:
 	case CHIP_POLARIS10:
+	case CHIP_POLARIS12:
 		dce_v11_0_disable_dce(adev);
 		break;
 	case CHIP_TOPAZ:
