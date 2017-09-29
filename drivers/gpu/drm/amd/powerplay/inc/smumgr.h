@@ -129,9 +129,5 @@ extern int smum_populate_requested_graphic_levels(struct pp_hwmgr *hwmgr,
 
 extern bool smum_is_hw_avfs_present(struct pp_hwmgr *hwmgr);
 
-extern bool smum_smu_init(struct pp_hwmgr *hwmgr);
 
-extern bool smum_smu_fini(struct pp_hwmgr *hwmgr);
-
-extern bool smum_start_smu(struct pp_hwmgr *hwmgr);
 #endif
