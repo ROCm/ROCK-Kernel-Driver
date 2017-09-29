@@ -1416,7 +1416,7 @@ static struct audio *find_first_free_audio(
 {
 	int i;
 	for (i = 0; i < pool->audio_count; i++) {
-		if ((res_ctx->is_audio_acquired[i] == false) && (res_ctx->is_stream_enc_acquired[i] == true)) {
+		if (res_ctx->is_audio_acquired[i] == false) {
 			return pool->audios[i];
 		}
 	}
