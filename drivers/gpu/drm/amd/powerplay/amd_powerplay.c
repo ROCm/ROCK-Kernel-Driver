@@ -163,12 +163,11 @@ static int pp_hw_init(void *handle)
 		}
 		if (ret == PP_DPM_DISABLED)
 			goto exit;
+		ret = hwmgr_hw_init(pp_handle);
+		if (ret)
+			goto exit;
 	}
-
-	ret = hwmgr_hw_init(pp_handle);
-	if (ret)
-		goto exit;
-	return 0;
+	return ret;
 exit:
 	pp_handle->pm_en = 0;
 	cgs_notify_dpm_enabled(hwmgr->device, false);
