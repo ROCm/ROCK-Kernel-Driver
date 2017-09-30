@@ -2658,11 +2658,8 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		if ((adev->vm_manager.n_compute_vms++ == 0) &&
 			(!amdgpu_sriov_vf(adev))) {
 			/* First Compute VM: enable compute power profile */
-			if (adev->pp_enabled)
+			if (adev->powerplay.pp_funcs->switch_power_profile)
 				amdgpu_dpm_switch_power_profile(adev,
-						AMD_PP_COMPUTE_PROFILE);
-			else if (adev->pm.funcs->switch_power_profile)
-				adev->pm.funcs->switch_power_profile(adev,
 						AMD_PP_COMPUTE_PROFILE);
 		}
 		mutex_unlock(&id_mgr->lock);
@@ -2736,11 +2733,8 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		if ((--adev->vm_manager.n_compute_vms == 0) &&
 			(!amdgpu_sriov_vf(adev))) {
 			/* Last Compute VM: enable graphics power profile */
-			if (adev->pp_enabled)
+			if (adev->powerplay.pp_funcs->switch_power_profile)
 				amdgpu_dpm_switch_power_profile(adev,
-						AMD_PP_GFX_PROFILE);
-			else if (adev->pm.funcs->switch_power_profile)
-				adev->pm.funcs->switch_power_profile(adev,
 						AMD_PP_GFX_PROFILE);
 		}
 		mutex_unlock(&id_mgr->lock);
