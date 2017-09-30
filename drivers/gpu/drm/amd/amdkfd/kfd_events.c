@@ -35,22 +35,12 @@
 #include <linux/device.h>
 
 /*
- * A task can only be on a single wait_queue at a time, but we need to support
- * waiting on multiple events (any/all).
- * Instead of each event simply having a wait_queue with sleeping tasks, it
- * has a singly-linked list of tasks.
- * A thread that wants to sleep creates an array of these, one for each event
- * and adds one to each event's waiter chain.
+ * Wrapper around wait_queue_t (wait queue entry)
  */
 struct kfd_event_waiter {
-	struct list_head waiters;
-	struct task_struct *sleeping_task;
-
-	/* Transitions to true when the event this belongs to is signaled. */
-	bool activated;
-
-	/* Event */
-	struct kfd_event *event;
+	wait_queue_t wait;
+	struct kfd_event *event; /* Event to wait for */
+	bool activated;		 /* Becomes true when event is signaled */
 };
 
 #define SLOTS_PER_PAGE KFD_SIGNAL_EVENT_LIMIT
@@ -397,17 +387,12 @@ void kfd_event_init_process(struct kfd_process *p)
 
 static void destroy_event(struct kfd_process *p, struct kfd_event *ev)
 {
-	/* Wake up pending waiters. They will return failure */
-	while (!list_empty(&ev->waiters)) {
-		struct kfd_event_waiter *waiter =
-			list_first_entry(&ev->waiters, struct kfd_event_waiter,
-					 waiters);
+	struct kfd_event_waiter *waiter;
 
+	/* Wake up pending waiters. They will return failure */
+	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
 		waiter->event = NULL;
-		/* _init because free_waiters will call list_del */
-		list_del_init(&waiter->waiters);
-		wake_up_process(waiter->sleeping_task);
-	}
+	wake_up_all(&ev->wq);
 
 	if (ev->signal_page) {
 		release_event_notification_slot(ev->signal_page,
@@ -485,7 +470,7 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 	ev->auto_reset = auto_reset;
 	ev->signaled = false;
 
-	INIT_LIST_HEAD(&ev->waiters);
+	init_waitqueue_head(&ev->wq);
 
 	mutex_lock(&p->event_mutex);
 
@@ -546,19 +531,14 @@ int kfd_event_destroy(struct kfd_process *p, uint32_t event_id)
 static void set_event(struct kfd_event *ev)
 {
 	struct kfd_event_waiter *waiter;
-	struct kfd_event_waiter *next;
 
 	/* Auto reset if the list is non-empty and we're waking someone. */
-	ev->signaled = !ev->auto_reset || list_empty(&ev->waiters);
+	ev->signaled = !ev->auto_reset || !waitqueue_active(&ev->wq);
 
-	list_for_each_entry_safe(waiter, next, &ev->waiters, waiters) {
+	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
 		waiter->activated = true;
 
-		/* _init because free_waiters will call list_del */
-		list_del_init(&waiter->waiters);
-
-		wake_up_process(waiter->sleeping_task);
-	}
+	wake_up_all(&ev->wq);
 }
 
 /* Assumes that p is current. */
@@ -678,8 +658,7 @@ static struct kfd_event_waiter *alloc_event_waiters(uint32_t num_events)
 					GFP_KERNEL);
 
 	for (i = 0; (event_waiters) && (i < num_events) ; i++) {
-		INIT_LIST_HEAD(&event_waiters[i].waiters);
-		event_waiters[i].sleeping_task = current;
+		init_wait(&event_waiters[i].wait);
 		event_waiters[i].activated = false;
 	}
 
@@ -710,7 +689,7 @@ static void init_event_waiter_add_to_waitlist(struct kfd_event_waiter *waiter)
 	 * wait on this event.
 	 */
 	if (!waiter->activated)
-		list_add(&waiter->waiters, &ev->waiters);
+		add_wait_queue(&ev->wq, &waiter->wait);
 }
 
 /* test_event_condition - Test condition of events being waited for
@@ -800,7 +779,9 @@ static void free_waiters(uint32_t num_events, struct kfd_event_waiter *waiters)
 	uint32_t i;
 
 	for (i = 0; i < num_events; i++)
-		list_del(&waiters[i].waiters);
+		if (waiters[i].event)
+			remove_wait_queue(&waiters[i].event->wq,
+					  &waiters[i].wait);
 
 	kfree(waiters);
 }
