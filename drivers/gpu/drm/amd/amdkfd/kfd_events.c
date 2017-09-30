@@ -51,7 +51,6 @@ struct kfd_event_waiter {
 
 	/* Event */
 	struct kfd_event *event;
-	uint32_t input_index;
 };
 
 #define SLOTS_PER_PAGE KFD_SIGNAL_EVENT_LIMIT
@@ -689,8 +688,7 @@ static struct kfd_event_waiter *alloc_event_waiters(uint32_t num_events)
 
 static int init_event_waiter_get_status(struct kfd_process *p,
 		struct kfd_event_waiter *waiter,
-		uint32_t event_id,
-		uint32_t input_index)
+		uint32_t event_id)
 {
 	struct kfd_event *ev = lookup_event_by_id(p, event_id);
 
@@ -698,7 +696,6 @@ static int init_event_waiter_get_status(struct kfd_process *p,
 		return -EINVAL;
 
 	waiter->event = ev;
-	waiter->input_index = input_index;
 	waiter->activated = ev->signaled;
 	ev->signaled = ev->signaled && !ev->auto_reset;
 
@@ -766,7 +763,7 @@ static int copy_signaled_event_data(uint32_t num_events,
 		waiter = &event_waiters[i];
 		event = waiter->event;
 		if (waiter->activated && event->type == KFD_EVENT_TYPE_MEMORY) {
-			dst = &data[waiter->input_index].memory_exception_data;
+			dst = &data[i].memory_exception_data;
 			src = &event->memory_exception_data;
 			if (copy_to_user(dst, src,
 				sizeof(struct kfd_hsa_memory_exception_data)))
@@ -838,7 +835,7 @@ int kfd_wait_on_events(struct kfd_process *p,
 		}
 
 		ret = init_event_waiter_get_status(p, &event_waiters[i],
-				event_data.event_id, i);
+				event_data.event_id);
 		if (ret)
 			goto out_unlock;
 	}
