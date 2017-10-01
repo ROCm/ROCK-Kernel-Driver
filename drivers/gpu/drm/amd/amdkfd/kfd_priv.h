@@ -723,8 +723,8 @@ struct kfd_process {
 	struct mutex event_mutex;
 	/* All events in process hashed by ID, linked on kfd_event.events. */
 	DECLARE_HASHTABLE(events, 4);
-	/* struct slot_page_header.event_pages */
-	struct list_head signal_event_pages;
+	/* Event page */
+	struct kfd_signal_page *signal_page;
 	u32 next_nonsignal_event_id;
 	size_t signal_event_count;
 	bool signal_event_limit_reached;
@@ -1064,7 +1064,6 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		     uint64_t *event_page_offset, uint32_t *event_slot_index,
 		     void *kern_addr);
 int kfd_event_destroy(struct kfd_process *p, uint32_t event_id);
-void kfd_free_signal_page_dgpu(struct kfd_process *p, uint64_t handle);
 
 void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 				struct kfd_vm_fault_info *info);
