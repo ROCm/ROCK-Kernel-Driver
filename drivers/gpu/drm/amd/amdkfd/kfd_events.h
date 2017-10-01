@@ -59,7 +59,6 @@ struct kfd_event {
 	struct list_head waiters; /* List of kfd_event_waiter by waiters. */
 
 	/* Only for signal events. */
-	struct signal_page *signal_page;
 	unsigned int signal_slot_index;
 	uint64_t __user *user_signal_address;
 
