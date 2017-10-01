@@ -30,9 +30,13 @@
 #include "kfd_priv.h"
 #include <uapi/linux/kfd_ioctl.h>
 
-#define KFD_EVENT_ID_NONSIGNAL_MASK 0x80000000U
-#define KFD_FIRST_NONSIGNAL_EVENT_ID KFD_EVENT_ID_NONSIGNAL_MASK
-#define KFD_LAST_NONSIGNAL_EVENT_ID UINT_MAX
+/*
+ * IDR supports non-negative integer IDs. Small IDs are used for
+ * signal events to match their signal slot. Use the upper half of the
+ * ID space for non-signal events.
+ */
+#define KFD_FIRST_NONSIGNAL_EVENT_ID ((INT_MAX >> 1) + 1)
+#define KFD_LAST_NONSIGNAL_EVENT_ID INT_MAX
 
 /*
  * Written into kfd_signal_slot_t to indicate that the event is not signaled.
@@ -46,9 +50,6 @@ struct kfd_event_waiter;
 struct signal_page;
 
 struct kfd_event {
-	/* All events in process, rooted at kfd_process.events. */
-	struct hlist_node events;
-
 	u32 event_id;
 
 	bool signaled;
@@ -59,7 +60,6 @@ struct kfd_event {
 	struct list_head waiters; /* List of kfd_event_waiter by waiters. */
 
 	/* Only for signal events. */
-	unsigned int signal_slot_index;
 	uint64_t __user *user_signal_address;
 
 	/* type specific data */
