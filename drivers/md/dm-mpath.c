@@ -167,7 +167,8 @@ static void free_pgpaths(struct list_head *pgpaths, struct dm_target *ti)
 
 	list_for_each_entry_safe(pgpath, tmp, pgpaths, list) {
 		list_del(&pgpath->list);
-		dm_put_device(ti, pgpath->path.dev);
+		if (pgpath->path.dev)
+			dm_put_device(ti, pgpath->path.dev);
 		free_pgpath(pgpath);
 	}
 }
@@ -367,6 +368,9 @@ static struct pgpath *choose_path_in_pg(struct multipath *m,
 
 	pgpath = path_to_pgpath(path);
 
+	if (!pgpath->path.dev)
+		return ERR_PTR(-ENODEV);
+
 	if (unlikely(lockless_dereference(m->current_pg) != pg)) {
 		/* Only update current_pgpath if pg changed */
 		spin_lock_irqsave(&m->lock, flags);
@@ -470,7 +474,7 @@ static int multipath_clone_and_map(struct dm_target *ti, struct request *rq,
 	struct pgpath *pgpath;
 	struct block_device *bdev;
 	struct dm_mpath_io *mpio = get_mpio(map_context);
-	struct request_queue *q;
+	struct request_queue *q = NULL;
 	struct request *clone;
 
 	/* Do we need to select a new pgpath? */
@@ -494,12 +498,16 @@ static int multipath_clone_and_map(struct dm_target *ti, struct request *rq,
 	mpio->pgpath = pgpath;
 	mpio->nr_bytes = nr_bytes;
 
-	bdev = pgpath->path.dev->bdev;
-	q = bdev_get_queue(bdev);
-	clone = blk_get_request(q, rq->cmd_flags | REQ_NOMERGE, GFP_ATOMIC);
+	if (pgpath->path.dev) {
+		bdev = pgpath->path.dev->bdev;
+		q = bdev_get_queue(bdev);
+		clone = blk_get_request(q, rq->cmd_flags | REQ_NOMERGE,
+					GFP_ATOMIC);
+	} else
+		clone = ERR_PTR(-ENODEV);
 	if (IS_ERR(clone)) {
 		/* EBUSY, ENODEV or EWOULDBLOCK: requeue */
-		bool queue_dying = blk_queue_dying(q);
+		bool queue_dying = q ? blk_queue_dying(q) : false;
 		DMERR_LIMIT("blk_get_request() returned %ld%s - requeuing",
 			    PTR_ERR(clone), queue_dying ? " (path offline)" : "");
 		if (queue_dying) {
@@ -555,7 +563,7 @@ static int __multipath_map_bio(struct multipath *m, struct bio *bio, struct dm_m
 		return DM_MAPIO_SUBMITTED;
 	}
 
-	if (!pgpath) {
+	if (!pgpath || !pgpath->path.dev) {
 		if (test_bit(MPATHF_QUEUE_IF_NO_PATH, &m->flags))
 			return DM_MAPIO_REQUEUE;
 		dm_report_EIO(m);
@@ -737,6 +745,7 @@ static struct pgpath *parse_path(struct dm_arg_set *as, struct path_selector *ps
 {
 	int r;
 	struct pgpath *p;
+	const char *path;
 	struct multipath *m = ti->private;
 	struct request_queue *q = NULL;
 	const char *attached_handler_name;
@@ -751,17 +760,40 @@ static struct pgpath *parse_path(struct dm_arg_set *as, struct path_selector *ps
 	if (!p)
 		return ERR_PTR(-ENOMEM);
 
-	r = dm_get_device(ti, dm_shift_arg(as), dm_table_get_mode(ti->table),
+	path = dm_shift_arg(as);
+	r = dm_get_device(ti, path, dm_table_get_mode(ti->table),
 			  &p->path.dev);
 	if (r) {
-		ti->error = "error getting device";
-		goto bad;
+		unsigned major, minor;
+
+		/* Try to add a failed device */
+		if (r == -ENXIO && sscanf(path, "%u:%u", &major, &minor) == 2) {
+			dev_t dev;
+
+			/* Extract the major/minor numbers */
+			dev = MKDEV(major, minor);
+			if (MAJOR(dev) != major || MINOR(dev) != minor) {
+				/* Nice try, didn't work */
+				DMWARN("Invalid device path %s", path);
+				ti->error = "error converting devnum";
+				goto bad;
+			}
+			DMWARN("adding disabled device %d:%d", major, minor);
+			p->path.dev = NULL;
+			format_dev_t(p->path.pdev, dev);
+			p->is_active = 0;
+		} else {
+			ti->error = "error getting device";
+			goto bad;
+		}
+	} else {
+		memcpy(p->path.pdev, p->path.dev->name, 16);
 	}
 
-	if (test_bit(MPATHF_RETAIN_ATTACHED_HW_HANDLER, &m->flags) || m->hw_handler_name)
+	if (p->path.dev)
 		q = bdev_get_queue(p->path.dev->bdev);
 
-	if (test_bit(MPATHF_RETAIN_ATTACHED_HW_HANDLER, &m->flags)) {
+	if (q && test_bit(MPATHF_RETAIN_ATTACHED_HW_HANDLER, &m->flags)) {
 retain:
 		attached_handler_name = scsi_dh_attached_handler_name(q, GFP_KERNEL);
 		if (attached_handler_name) {
@@ -785,7 +817,7 @@ retain:
 		}
 	}
 
-	if (m->hw_handler_name) {
+	if (q && m->hw_handler_name) {
 		r = scsi_dh_attach(q, m->hw_handler_name);
 		if (r == -EBUSY) {
 			char b[BDEVNAME_SIZE];
@@ -813,10 +845,16 @@ retain:
 
 	r = ps->type->add_path(ps, &p->path, as->argc, as->argv, &ti->error);
 	if (r) {
-		dm_put_device(ti, p->path.dev);
+		if (p->path.dev)
+			dm_put_device(ti, p->path.dev);
 		goto bad;
 	}
 
+	if (!p->is_active) {
+		ps->type->fail_path(ps, &p->path);
+		p->fail_count++;
+		atomic_dec(&m->nr_valid_paths);
+	}
 	return p;
 
  bad:
@@ -1165,10 +1203,10 @@ static int fail_path(struct pgpath *pgpath)
 
 	spin_lock_irqsave(&m->lock, flags);
 
-	if (!pgpath->is_active)
+	if (!pgpath->path.dev || !pgpath->is_active)
 		goto out;
 
-	DMWARN("Failing path %s.", pgpath->path.dev->name);
+	DMWARN("Failing path %s.", pgpath->path.pdev);
 
 	pgpath->pg->ps.type->fail_path(&pgpath->pg->ps, &pgpath->path);
 	pgpath->is_active = false;
@@ -1180,7 +1218,7 @@ static int fail_path(struct pgpath *pgpath)
 		m->current_pgpath = NULL;
 
 	dm_path_uevent(DM_UEVENT_PATH_FAILED, m->ti,
-		       pgpath->path.dev->name, atomic_read(&m->nr_valid_paths));
+		       pgpath->path.pdev, atomic_read(&m->nr_valid_paths));
 
 	schedule_work(&m->trigger_event);
 
@@ -1205,7 +1243,13 @@ static int reinstate_path(struct pgpath *pgpath)
 	if (pgpath->is_active)
 		goto out;
 
-	DMWARN("Reinstating path %s.", pgpath->path.dev->name);
+	if (!pgpath->path.dev) {
+		DMWARN("Cannot reinstate disabled path %s", pgpath->path.pdev);
+		r = -ENODEV;
+		goto out;
+	}
+
+	DMWARN("Reinstating path %s.", pgpath->path.pdev);
 
 	r = pgpath->pg->ps.type->reinstate_path(&pgpath->pg->ps, &pgpath->path);
 	if (r)
@@ -1223,7 +1267,7 @@ static int reinstate_path(struct pgpath *pgpath)
 	}
 
 	dm_path_uevent(DM_UEVENT_PATH_REINSTATED, m->ti,
-		       pgpath->path.dev->name, nr_valid_paths);
+		       pgpath->path.pdev, nr_valid_paths);
 
 	schedule_work(&m->trigger_event);
 
@@ -1246,6 +1290,9 @@ static int action_dev(struct multipath *m, struct dm_dev *dev,
 	int r = -EINVAL;
 	struct pgpath *pgpath;
 	struct priority_group *pg;
+
+	if (!dev)
+		return 0;
 
 	list_for_each_entry(pg, &m->priority_groups, list) {
 		list_for_each_entry(pgpath, &pg->pgpaths, list) {
@@ -1443,12 +1490,15 @@ out:
 
 static void activate_or_offline_path(struct pgpath *pgpath)
 {
-	struct request_queue *q = bdev_get_queue(pgpath->path.dev->bdev);
 
-	if (pgpath->is_active && !blk_queue_dying(q))
-		scsi_dh_activate(q, pg_init_done, pgpath);
-	else
-		pg_init_done(pgpath, SCSI_DH_DEV_OFFLINED);
+	if (pgpath->path.dev) {
+		struct request_queue *q = bdev_get_queue(pgpath->path.dev->bdev);
+		if (pgpath->is_active && !blk_queue_dying(q)) {
+			scsi_dh_activate(q, pg_init_done, pgpath);
+			return;
+		}
+	}
+	pg_init_done(pgpath, SCSI_DH_DEV_OFFLINED);
 }
 
 static void activate_path_work(struct work_struct *work)
@@ -1703,7 +1753,7 @@ static void multipath_status(struct dm_target *ti, status_type_t type,
 			       pg->ps.type->info_args);
 
 			list_for_each_entry(p, &pg->pgpaths, list) {
-				DMEMIT("%s %s %u ", p->path.dev->name,
+				DMEMIT("%s %s %u ", p->path.pdev,
 				       p->is_active ? "A" : "F",
 				       p->fail_count);
 				if (pg->ps.type->status)
@@ -1729,7 +1779,7 @@ static void multipath_status(struct dm_target *ti, status_type_t type,
 			       pg->ps.type->table_args);
 
 			list_for_each_entry(p, &pg->pgpaths, list) {
-				DMEMIT("%s ", p->path.dev->name);
+				DMEMIT("%s ", p->path.pdev);
 				if (pg->ps.type->status)
 					sz += pg->ps.type->status(&pg->ps,
 					      &p->path, type, result + sz,
@@ -1816,7 +1866,7 @@ static int multipath_prepare_ioctl(struct dm_target *ti,
 	if (!current_pgpath)
 		current_pgpath = choose_pgpath(m, 0);
 
-	if (current_pgpath) {
+	if (current_pgpath && current_pgpath->path.dev) {
 		if (!test_bit(MPATHF_QUEUE_IO, &m->flags)) {
 			*bdev = current_pgpath->path.dev->bdev;
 			*mode = current_pgpath->path.dev->mode;
@@ -1862,6 +1912,8 @@ static int multipath_iterate_devices(struct dm_target *ti,
 
 	list_for_each_entry(pg, &m->priority_groups, list) {
 		list_for_each_entry(p, &pg->pgpaths, list) {
+			if (!p->path.dev)
+				continue;
 			ret = fn(ti, p->path.dev, ti->begin, ti->len, data);
 			if (ret)
 				goto out;
@@ -1874,8 +1926,12 @@ out:
 
 static int pgpath_busy(struct pgpath *pgpath)
 {
-	struct request_queue *q = bdev_get_queue(pgpath->path.dev->bdev);
+	struct request_queue *q;
 
+	if (!pgpath->path.dev)
+		return 0;
+
+	q = bdev_get_queue(pgpath->path.dev->bdev);
 	return blk_lld_busy(q);
 }
 

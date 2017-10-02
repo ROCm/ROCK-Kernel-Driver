@@ -507,6 +507,9 @@ void dm_put_device(struct dm_target *ti, struct dm_dev *d)
 	struct list_head *devices = &ti->table->devices;
 	struct dm_dev_internal *dd;
 
+	if (!d)
+		return;
+
 	list_for_each_entry(dd, devices, list) {
 		if (dd->dm_dev == d) {
 			found = 1;
