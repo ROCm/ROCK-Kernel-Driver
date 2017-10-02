@@ -421,21 +421,21 @@ static int rv_populate_clock_table(struct pp_hwmgr *hwmgr)
 	rv_get_clock_voltage_dependency_table(hwmgr, &pinfo->vdd_dep_on_phyclk,
 					ARRAY_SIZE(VddPhyClk), &VddPhyClk[0]);
 
-	PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc(hwmgr->smumgr,
+	PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc(hwmgr,
 			PPSMC_MSG_GetMinGfxclkFrequency),
 			"Attempt to get min GFXCLK Failed!",
 			return -1);
-	PP_ASSERT_WITH_CODE(!rv_read_arg_from_smc(hwmgr->smumgr,
+	PP_ASSERT_WITH_CODE(!rv_read_arg_from_smc(hwmgr,
 			&result),
 			"Attempt to get min GFXCLK Failed!",
 			return -1);
 	rv_data->gfx_min_freq_limit = result * 100;
 
-	PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc(hwmgr->smumgr,
+	PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc(hwmgr,
 			PPSMC_MSG_GetMaxGfxclkFrequency),
 			"Attempt to get max GFXCLK Failed!",
 			return -1);
-	PP_ASSERT_WITH_CODE(!rv_read_arg_from_smc(hwmgr->smumgr,
+	PP_ASSERT_WITH_CODE(!rv_read_arg_from_smc(hwmgr,
 			&result),
 			"Attempt to get max GFXCLK Failed!",
 			return -1);
@@ -626,11 +626,11 @@ static int rv_print_clock_levels(struct pp_hwmgr *hwmgr,
 
 	switch (type) {
 	case PP_SCLK:
-		PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc(hwmgr->smumgr,
+		PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc(hwmgr,
 				PPSMC_MSG_GetGfxclkFrequency),
 				"Attempt to get current GFXCLK Failed!",
 				return -1);
-		PP_ASSERT_WITH_CODE(!rv_read_arg_from_smc(hwmgr->smumgr,
+		PP_ASSERT_WITH_CODE(!rv_read_arg_from_smc(hwmgr,
 				&now),
 				"Attempt to get current GFXCLK Failed!",
 				return -1);
@@ -645,11 +645,11 @@ static int rv_print_clock_levels(struct pp_hwmgr *hwmgr,
 				 == now) ? "*" : "");
 		break;
 	case PP_MCLK:
-		PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc(hwmgr->smumgr,
+		PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc(hwmgr,
 				PPSMC_MSG_GetFclkFrequency),
 				"Attempt to get current MEMCLK Failed!",
 				return -1);
-		PP_ASSERT_WITH_CODE(!rv_read_arg_from_smc(hwmgr->smumgr,
+		PP_ASSERT_WITH_CODE(!rv_read_arg_from_smc(hwmgr,
 				&now),
 				"Attempt to get current MEMCLK Failed!",
 				return -1);
@@ -901,18 +901,18 @@ static int rv_read_sensor(struct pp_hwmgr *hwmgr, int idx,
 
 	switch (idx) {
 	case AMDGPU_PP_SENSOR_GFX_SCLK:
-		ret = smum_send_msg_to_smc(hwmgr->smumgr, PPSMC_MSG_GetGfxclkFrequency);
+		ret = smum_send_msg_to_smc(hwmgr, PPSMC_MSG_GetGfxclkFrequency);
 		if (!ret) {
-			rv_read_arg_from_smc(hwmgr->smumgr, &sclk);
+			rv_read_arg_from_smc(hwmgr, &sclk);
 			/* in units of 10KHZ */
 			*((uint32_t *)value) = sclk * 100;
 			*size = 4;
 		}
 		break;
 	case AMDGPU_PP_SENSOR_GFX_MCLK:
-		ret = smum_send_msg_to_smc(hwmgr->smumgr, PPSMC_MSG_GetFclkFrequency);
+		ret = smum_send_msg_to_smc(hwmgr, PPSMC_MSG_GetFclkFrequency);
 		if (!ret) {
-			rv_read_arg_from_smc(hwmgr->smumgr, &mclk);
+			rv_read_arg_from_smc(hwmgr, &mclk);
 			/* in units of 10KHZ */
 			*((uint32_t *)value) = mclk * 100;
 			*size = 4;
