@@ -232,9 +232,7 @@ KBUILD_CFLAGS += -pipe
 # Workaround for a gcc prelease that unfortunately was shipped in a suse release
 KBUILD_CFLAGS += -Wno-sign-compare
 #
-ifneq ($(CONFIG_UNWIND_INFO),y)
 KBUILD_CFLAGS += -fno-asynchronous-unwind-tables
-endif
 
 archscripts: scripts_basic
 	$(Q)$(MAKE) $(build)=arch/x86/tools relocs

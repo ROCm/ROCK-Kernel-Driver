@@ -45,16 +45,6 @@ config MESSAGE_LOGLEVEL_DEFAULT
 	  by default. To change that, use loglevel=<x> in the kernel bootargs,
 	  or pick a different CONSOLE_LOGLEVEL_DEFAULT configuration value.
 
-config UNWIND_INFO
-	bool "Compile the kernel with frame unwind information"
-	depends on !IA64 && !PARISC && !ARM
-	depends on !MODULES || !(MIPS || PPC || SUPERH || V850)
-	help
-	  If you say Y here the resulting kernel image will be slightly larger
-	  but not slower, and it will give very useful debugging information.
-	  If you don't debug the kernel, you can say N, but we may not be able
-	  to solve problems without frame unwind information or frame pointers.
-
 config BOOT_PRINTK_DELAY
 	bool "Delay each boot printk message by N milliseconds"
 	depends on DEBUG_KERNEL && PRINTK && GENERIC_CALIBRATE_DELAY
@@ -1580,7 +1570,6 @@ config FAULT_INJECTION_STACKTRACE_FILTER
 	depends on !X86_64
 	select STACKTRACE
 	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !ARM_UNWIND && !ARC && !SCORE && !X86
-	select UNWIND_INFO if X86 && !FRAME_POINTER
 	help
 	  Provide stacktrace filter for fault-injection capabilities
 
@@ -1590,7 +1579,6 @@ config LATENCYTOP
 	depends on STACKTRACE_SUPPORT
 	depends on PROC_FS
 	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !ARM_UNWIND && !ARC && !X86
-	select UNWIND_INFO if X86 && !FRAME_POINTER
 	select KALLSYMS
 	select KALLSYMS_ALL
 	select STACKTRACE
