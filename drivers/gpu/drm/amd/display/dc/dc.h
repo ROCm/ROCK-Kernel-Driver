@@ -570,7 +570,7 @@ struct dc_stream_state {
 	struct dc_stream_status status;
 
 	/* from stream struct */
-	atomic_t ref_count;
+	struct kref refcount;
 };
 
 struct dc_stream_update {
