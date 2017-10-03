@@ -49,7 +49,7 @@ static inline struct cn_msg *buffer_to_cn_msg(__u8 *buffer)
 	return (struct cn_msg *)(buffer + 4);
 }
 
-static atomic_t proc_event_num_listeners __read_mostly = ATOMIC_INIT(0);
+static atomic_t proc_event_num_listeners = ATOMIC_INIT(0);
 static struct cb_id cn_proc_event_id = { CN_IDX_PROC, CN_VAL_PROC };
 
 /* proc_event_counts is used as the sequence number of the netlink message */
