@@ -575,30 +575,6 @@ fail:
 	return false;
 }
 
-/*
-void ProgramPixelDurationV(unsigned int pixelClockInKHz )
-{
-	fixed31_32 pixel_duration = Fixed31_32(100000000, pixelClockInKHz) * 10;
-	unsigned int pixDurationInPico = round(pixel_duration);
-
-	DPG_PIPE_ARBITRATION_CONTROL1 arb_control;
-
-	arb_control.u32All = ReadReg (mmDPGV0_PIPE_ARBITRATION_CONTROL1);
-	arb_control.bits.PIXEL_DURATION = pixDurationInPico;
-	WriteReg (mmDPGV0_PIPE_ARBITRATION_CONTROL1, arb_control.u32All);
-
-	arb_control.u32All = ReadReg (mmDPGV1_PIPE_ARBITRATION_CONTROL1);
-	arb_control.bits.PIXEL_DURATION = pixDurationInPico;
-	WriteReg (mmDPGV1_PIPE_ARBITRATION_CONTROL1, arb_control.u32All);
-
-	WriteReg (mmDPGV0_PIPE_ARBITRATION_CONTROL2, 0x4000800);
-	WriteReg (mmDPGV0_REPEATER_PROGRAM, 0x11);
-
-	WriteReg (mmDPGV1_PIPE_ARBITRATION_CONTROL2, 0x4000800);
-	WriteReg (mmDPGV1_REPEATER_PROGRAM, 0x11);
-}
-*/
-
 /*******************************************************************************
  * Public functions
  ******************************************************************************/
@@ -1518,28 +1494,6 @@ struct dc_stream_state *dc_get_stream_at_index(struct dc *dc, uint8_t i)
 	return NULL;
 }
 
-struct dc_link *dc_get_link_at_index(struct dc *dc, uint32_t link_index)
-{
-	return dc->links[link_index];
-}
-
-const struct graphics_object_id dc_get_link_id_at_index(
-	struct dc *dc, uint32_t link_index)
-{
-	return dc->links[link_index]->link_id;
-}
-
-enum dc_irq_source dc_get_hpd_irq_source_at_index(
-	struct dc *dc, uint32_t link_index)
-{
-	return dc->links[link_index]->irq_source_hpd;
-}
-
-const struct audio **dc_get_audios(struct dc *dc)
-{
-	return (const struct audio **)dc->res_pool->audios;
-}
-
 void dc_flip_plane_addrs(
 		struct dc *dc,
 		struct dc_plane_state *const plane_states[],
@@ -1814,17 +1768,6 @@ fail_add_sink:
 	return NULL;
 }
 
-void dc_link_set_sink(struct dc_link *link, struct dc_sink *sink)
-{
-	link->local_sink = sink;
-
-	if (sink == NULL) {
-		link->type = dc_connection_none;
-	} else {
-		link->type = dc_connection_single;
-	}
-}
-
 void dc_link_remove_remote_sink(struct dc_link *link, struct dc_sink *sink)
 {
 	int i;
@@ -1850,37 +1793,3 @@ void dc_link_remove_remote_sink(struct dc_link *link, struct dc_sink *sink)
 		}
 	}
 }
-
-bool dc_init_dchub(struct dc *dc, struct dchub_init_data *dh_data)
-{
-	int i;
-	struct mem_input *mi = NULL;
-
-	for (i = 0; i < dc->res_pool->pipe_count; i++) {
-		if (dc->res_pool->mis[i] != NULL) {
-			mi = dc->res_pool->mis[i];
-			break;
-		}
-	}
-	if (mi == NULL) {
-		dm_error("no mem_input!\n");
-		return false;
-	}
-
-	if (dc->hwss.update_dchub)
-		dc->hwss.update_dchub(dc->hwseq, dh_data);
-	else
-		ASSERT(dc->hwss.update_dchub);
-
-
-	return true;
-
-}
-
-void dc_log_hw_state(struct dc *dc)
-{
-
-	if (dc->hwss.log_hw_state)
-		dc->hwss.log_hw_state(dc);
-}
-
