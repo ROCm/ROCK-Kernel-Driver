@@ -48,7 +48,6 @@
 #include <linux/debugfs.h>
 
 #include "musb_core.h"
-#include "../../../arch/arm/mach-omap2/usb.h"
 
 static const struct of_device_id musb_dsps_of_match[];
 
