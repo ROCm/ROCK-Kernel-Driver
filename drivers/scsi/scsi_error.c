@@ -26,8 +26,6 @@
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/jiffies.h>
-#include <linux/netlink.h>
-#include <net/netlink.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
@@ -41,7 +39,6 @@
 #include <scsi/scsi_ioctl.h>
 #include <scsi/scsi_dh.h>
 #include <scsi/sg.h>
-#include <scsi/scsi_netlink_ml.h>
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -429,80 +426,6 @@ static void scsi_report_sense(struct scsi_device *sdev,
 	}
 }
 
-#ifdef CONFIG_SCSI_NETLINK
-/**
- * scsi_post_sense_event - called to post a 'Sense Code' event
- *
- * @sdev:		SCSI device the sense code occured on
- * @sshdr:		SCSI sense code
- *
- * Returns:
- *   0 on succesful return
- *   otherwise, failing error code
- *
- */
-static void scsi_post_sense_event(struct scsi_device *sdev,
-			struct scsi_sense_hdr *sshdr)
-{
-	struct sk_buff *skb;
-	struct nlmsghdr	*nlh;
-	struct scsi_nl_sense_msg *msg;
-	u32 len, skblen;
-	int err;
-
-	if (!scsi_nl_sock) {
-		err = -ENOENT;
-		goto send_fail;
-	}
-
-	len = SCSI_NL_MSGALIGN(sizeof(*msg));
-	skblen = NLMSG_SPACE(len);
-
-	skb = alloc_skb(skblen, GFP_ATOMIC);
-	if (!skb) {
-		err = -ENOBUFS;
-		goto send_fail;
-	}
-
-	nlh = nlmsg_put(skb, 0, 0, SCSI_TRANSPORT_MSG,
-				skblen - sizeof(*nlh), 0);
-	if (!nlh) {
-		err = -ENOBUFS;
-		goto send_fail_skb;
-	}
-	msg = NLMSG_DATA(nlh);
-
-	INIT_SCSI_NL_HDR(&msg->snlh, SCSI_NL_TRANSPORT_ML,
-			 ML_NL_SCSI_SENSE, len);
-	msg->host_no = sdev->host->host_no;
-	msg->channel = sdev->channel;
-	msg->id = sdev->id;
-	msg->lun = sdev->lun;
-	msg->sense = (sshdr->response_code << 24) | (sshdr->sense_key << 16) |
-		(sshdr->asc << 8) | sshdr->ascq;
-
-	err = nlmsg_multicast(scsi_nl_sock, skb, 0, SCSI_NL_GRP_ML_EVENTS,
-			      GFP_KERNEL);
-	if (err && (err != -ESRCH))
-		/* nlmsg_multicast already kfree_skb'd */
-		goto send_fail;
-
-	return;
-
-send_fail_skb:
-	kfree_skb(skb);
-send_fail:
-	sdev_printk(KERN_WARNING, sdev,
-		    "Dropped SCSI Msg %02x/%02x/%02x/%02x: err %d\n",
-		    sshdr->response_code, sshdr->sense_key,
-		    sshdr->asc, sshdr->ascq, err);
-	return;
-}
-#else
-static inline void scsi_post_sense_event(struct scsi_device *sdev,
-			   struct scsi_sense_hdr *sshdr) {}
-#endif
-
 /**
  * scsi_check_sense - Examine scsi cmd sense
  * @scmd:	Cmd to have sense checked.
@@ -526,8 +449,6 @@ int scsi_check_sense(struct scsi_cmnd *scmd)
 
 	if (scsi_sense_is_deferred(&sshdr))
 		return NEEDS_RETRY;
-
-	scsi_post_sense_event(sdev, &sshdr);
 
 	if (sdev->handler && sdev->handler->check_sense) {
 		int rc;
