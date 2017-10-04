@@ -468,17 +468,6 @@ static int dm_blk_ioctl(struct block_device *bdev, fmode_t mode,
 	if (r < 0)
 		return r;
 
-	if (cmd == BLKRRPART) {
-		r = -EAGAIN;
-		if (dm_suspended_md(md))
-			goto out;
-		r = 0;
-
-		/* Emulate Re-read partitions table */
-		kobject_uevent(&disk_to_dev(md->disk)->kobj, KOBJ_CHANGE);
-		goto out;
-	}
-
 	if (r > 0) {
 		/*
 		 * Target determined this ioctl is being issued against a
