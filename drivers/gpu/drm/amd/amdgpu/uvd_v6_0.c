@@ -525,11 +525,12 @@ static int uvd_v6_0_hw_init(void *handle)
 	}
 
 done:
-	if (!r)
+	if (!r) {
 		if (uvd_v6_0_enc_support(adev))
 			DRM_INFO("UVD and UVD ENC initialized successfully.\n");
 		else
 			DRM_INFO("UVD initialized successfully.\n");
+	}
 
 	return r;
 }
