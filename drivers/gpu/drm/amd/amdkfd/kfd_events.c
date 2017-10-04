@@ -35,10 +35,10 @@
 #include <linux/device.h>
 
 /*
- * Wrapper around wait_queue_t (wait queue entry)
+ * Wrapper around wait_queue_entry_t (wait queue entry)
  */
 struct kfd_event_waiter {
-	wait_queue_t wait;
+	wait_queue_entry_t wait;
 	struct kfd_event *event; /* Event to wait for */
 	bool activated;		 /* Becomes true when event is signaled */
 };
@@ -198,7 +198,7 @@ static void destroy_event(struct kfd_process *p, struct kfd_event *ev)
 	struct kfd_event_waiter *waiter;
 
 	/* Wake up pending waiters. They will return failure */
-	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
+	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
 		waiter->event = NULL;
 	wake_up_all(&ev->wq);
 
@@ -335,7 +335,7 @@ static void set_event(struct kfd_event *ev)
 	/* Auto reset if the list is non-empty and we're waking someone. */
 	ev->signaled = !ev->auto_reset || !waitqueue_active(&ev->wq);
 
-	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
+	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
 		waiter->activated = true;
 
 	wake_up_all(&ev->wq);
