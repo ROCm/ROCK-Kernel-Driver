@@ -251,8 +251,6 @@ config ARCH_VULCAN
 
 config ARCH_XGENE
 	bool "AppliedMicro X-Gene SOC Family"
-	select MFD_SYSCON
-	select POWER_RESET_SYSCON
 	help
 	  This enables support for AppliedMicro X-Gene SOC Family
 

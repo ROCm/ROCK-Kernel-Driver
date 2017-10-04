@@ -276,7 +276,7 @@ core-$(CONFIG_KEXEC_FILE)	+= arch/powerpc/purgatory/
 drivers-$(CONFIG_OPROFILE)	+= arch/powerpc/oprofile/
 
 # Default to zImage, override when needed
-all: vmlinux 
+all: zImage
 
 # With make 3.82 we cannot mix normal and wildcard targets
 BOOT_TARGETS1 := zImage zImage.initrd uImage
