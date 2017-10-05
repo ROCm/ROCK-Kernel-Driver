@@ -85,23 +85,6 @@ PHONY += $(simple-targets)
 $(simple-targets): $(obj)/conf
 	$< $(silent) --$@ $(Kconfig)
 
-UNAME_RELEASE := $(shell uname -r)
-CLONECONFIG := $(firstword $(wildcard /proc/config.gz \
-				      /lib/modules/$(UNAME_RELEASE)/.config \
-				      /etc/kernel-config \
-				      /boot/config-$(UNAME_RELEASE)))
-cloneconfig: $(obj)/conf
-	$(Q)case "$(CLONECONFIG)" in				\
-	'')	echo -e "The configuration of the running"	\
-			"kernel could not be determined\n";	\
-		false ;;					\
-	*.gz)	gzip -cd $(CLONECONFIG) > .config.running ;;	\
-	*)	cat $(CLONECONFIG) > .config.running ;;		\
-	esac &&							\
-	echo -e "Cloning configuration file $(CLONECONFIG)\n"
-	$(Q)$< --defconfig=.config.running arch/$(SRCARCH)/Kconfig
-
-
 PHONY += oldnoconfig savedefconfig defconfig
 
 # oldnoconfig is an alias of olddefconfig, because people already are dependent
