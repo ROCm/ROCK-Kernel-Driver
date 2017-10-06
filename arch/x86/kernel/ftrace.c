@@ -85,20 +85,12 @@ static unsigned long text_ip_addr(unsigned long ip)
 	 * the kernel identity mapping instead of the kernel text mapping
 	 * to modify the kernel text.
 	 *
-	 * This is not needed when the kernel is not set read only. In fact,
-	 * the kernel text mapping might be read only when this function is
-	 * called from ftrace_init() and the kernel was loaded under
-	 * Xen hypervisor. In this situation, we could safely use the
-	 * kernel text mapping.
-	 *
 	 * For 32bit kernels, these mappings are same and we can use
 	 * kernel identity mapping to modify code.
 	 */
-#ifdef CONFIG_STRICT_KERNEL_RWX
-	if (kernel_set_to_readonly &&
-	    within(ip, (unsigned long)_text, (unsigned long)_etext))
+	if (within(ip, (unsigned long)_text, (unsigned long)_etext))
 		ip = (unsigned long)__va(__pa_symbol(ip));
-#endif
+
 	return ip;
 }
 
