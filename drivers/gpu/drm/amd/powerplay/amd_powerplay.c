@@ -396,7 +396,7 @@ static int pp_dpm_force_performance_level(void *handle,
 	hwmgr->request_dpm_level = level;
 	hwmgr_handle_task(pp_handle, AMD_PP_TASK_READJUST_POWER_STATE, NULL, NULL);
 	ret = hwmgr->hwmgr_func->force_dpm_level(hwmgr, level);
-	if (ret)
+	if (!ret)
 		hwmgr->dpm_level = hwmgr->request_dpm_level;
 
 	mutex_unlock(&pp_handle->pp_lock);
