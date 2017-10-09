@@ -726,6 +726,7 @@ struct drm_amdgpu_cs_chunk_data {
 	#define AMDGPU_INFO_SENSOR_VDDGFX		0x7
 /* Number of VRAM page faults on CPU access. */
 #define AMDGPU_INFO_NUM_VRAM_CPU_PAGE_FAULTS	0x1E
+#define AMDGPU_INFO_VRAM_LOST_COUNTER		0x1F
 
 /* Hybrid Stack Specific Defs*/
 /* gpu capability */
