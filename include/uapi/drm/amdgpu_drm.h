@@ -53,6 +53,7 @@ extern "C" {
 #define DRM_AMDGPU_WAIT_FENCES		0x12
 #define DRM_AMDGPU_VM			0x13
 #define DRM_AMDGPU_FENCE_TO_HANDLE	0x14
+#define DRM_AMDGPU_SCHED		0x15
 
 /* hybrid specific ioctls */
 #define DRM_AMDGPU_SEM			0x5b
@@ -75,6 +76,7 @@ extern "C" {
 #define DRM_IOCTL_AMDGPU_WAIT_FENCES	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_WAIT_FENCES, union drm_amdgpu_wait_fences)
 #define DRM_IOCTL_AMDGPU_VM		DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_VM, union drm_amdgpu_vm)
 #define DRM_IOCTL_AMDGPU_FENCE_TO_HANDLE DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_FENCE_TO_HANDLE, union drm_amdgpu_fence_to_handle)
+#define DRM_IOCTL_AMDGPU_SCHED		DRM_IOW(DRM_COMMAND_BASE + DRM_AMDGPU_SCHED, union drm_amdgpu_sched)
 
 /* hybrid specific ioctls */
 #define DRM_IOCTL_AMDGPU_GEM_DGMA	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_DGMA, struct drm_amdgpu_gem_dgma)
@@ -276,6 +278,21 @@ struct drm_amdgpu_vm_out {
 union drm_amdgpu_vm {
 	struct drm_amdgpu_vm_in in;
 	struct drm_amdgpu_vm_out out;
+};
+
+/* sched ioctl */
+#define AMDGPU_SCHED_OP_PROCESS_PRIORITY_OVERRIDE	1
+
+struct drm_amdgpu_sched_in {
+	/* AMDGPU_SCHED_OP_* */
+	__u32	op;
+	__u32	fd;
+	__s32	priority;
+	__u32	flags;
+};
+
+union drm_amdgpu_sched {
+	struct drm_amdgpu_sched_in in;
 };
 
 /*
