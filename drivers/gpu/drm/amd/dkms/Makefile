@@ -71,6 +71,7 @@ export OS_NAME OS_VERSION DKMS_INCLUDE_PREFIX
 export CONFIG_HSA_AMD=m
 export CONFIG_DRM_TTM=m
 export CONFIG_DRM_AMDGPU=m
+export CONFIG_CHASH=m
 export BUILD_AS_DKMS=y
 export CONFIG_DRM_AMDGPU_CIK=y
 export CONFIG_DRM_AMDGPU_SI=y
@@ -86,4 +87,4 @@ subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_0
 
-obj-m += amd/amdgpu/ ttm/ amd/amdkcl/ amd/amdkfd/
+obj-m += amd/lib/ amd/amdgpu/ ttm/ amd/amdkcl/ amd/amdkfd/
