@@ -72,6 +72,50 @@
 
 #include "i2caux_interface.h"
 
+/* basic init/fini API */
+static int amdgpu_dm_init(struct amdgpu_device *adev);
+static void amdgpu_dm_fini(struct amdgpu_device *adev);
+
+/* initializes drm_device display related structures, based on the information
+ * provided by DAL. The drm strcutures are: drm_crtc, drm_connector,
+ * drm_encoder, drm_mode_config
+ *
+ * Returns 0 on success
+ */
+static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev);
+/* removes and deallocates the drm structures, created by the above function */
+static void amdgpu_dm_destroy_drm_device(struct amdgpu_display_manager *dm);
+
+static void
+amdgpu_dm_update_connector_after_detect(struct amdgpu_dm_connector *aconnector);
+
+static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
+				struct amdgpu_plane *aplane,
+				unsigned long possible_crtcs);
+static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
+			       struct drm_plane *plane,
+			       uint32_t link_index);
+static int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
+				    struct amdgpu_dm_connector *amdgpu_dm_connector,
+				    uint32_t link_index,
+				    struct amdgpu_encoder *amdgpu_encoder);
+static int amdgpu_dm_encoder_init(struct drm_device *dev,
+				  struct amdgpu_encoder *aencoder,
+				  uint32_t link_index);
+
+static int amdgpu_dm_connector_get_modes(struct drm_connector *connector);
+
+static int amdgpu_dm_atomic_commit(struct drm_device *dev,
+				   struct drm_atomic_state *state,
+				   bool nonblock);
+
+static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state);
+
+static int amdgpu_dm_atomic_check(struct drm_device *dev,
+				  struct drm_atomic_state *state);
+
+
+
 
 static enum drm_plane_type dm_plane_type_default[AMDGPU_MAX_PLANES] = {
 	DRM_PLANE_TYPE_PRIMARY,
@@ -308,7 +352,7 @@ static void hotplug_notify_work_func(struct work_struct *work)
 /* TODO: Dynamic allocation */
 #define AMDGPU_FBC_SIZE    (3840 * 2160 * 4)
 
-void amdgpu_dm_initialize_fbc(struct amdgpu_device *adev)
+static void amdgpu_dm_initialize_fbc(struct amdgpu_device *adev)
 {
 	int r;
 	struct dm_comressor_info *compressor = &adev->dm.compressor;
@@ -330,7 +374,7 @@ void amdgpu_dm_initialize_fbc(struct amdgpu_device *adev)
  *
  * Returns 0 on success
  */
-int amdgpu_dm_init(struct amdgpu_device *adev)
+static int amdgpu_dm_init(struct amdgpu_device *adev)
 {
 	struct dc_init_data init_data;
 	adev->dm.ddev = adev->ddev;
@@ -427,7 +471,7 @@ error:
 	return -1;
 }
 
-void amdgpu_dm_fini(struct amdgpu_device *adev)
+static void amdgpu_dm_fini(struct amdgpu_device *adev)
 {
 	amdgpu_dm_destroy_drm_device(&adev->dm);
 	/*
@@ -451,7 +495,7 @@ void amdgpu_dm_fini(struct amdgpu_device *adev)
 }
 
 /* moved from amdgpu_dm_kms.c */
-void amdgpu_dm_destroy()
+static void amdgpu_dm_destroy(void)
 {
 }
 
@@ -689,7 +733,7 @@ const struct amdgpu_ip_block_version dm_ip_block =
 };
 
 
-struct drm_atomic_state *
+static struct drm_atomic_state *
 dm_atomic_state_alloc(struct drm_device *dev)
 {
 	struct dm_atomic_state *state = kzalloc(sizeof(*state), GFP_KERNEL);
@@ -757,7 +801,7 @@ static struct drm_mode_config_helper_funcs amdgpu_dm_mode_config_helperfuncs = {
 	.atomic_commit_tail = amdgpu_dm_atomic_commit_tail
 };
 
-void
+static void
 amdgpu_dm_update_connector_after_detect(struct amdgpu_dm_connector *aconnector)
 {
 	struct drm_connector *connector = &aconnector->base;
@@ -1268,7 +1312,8 @@ static const struct backlight_ops amdgpu_dm_backlight_ops = {
 	.update_status	= amdgpu_dm_backlight_update_status,
 };
 
-void amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm)
+static void
+amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm)
 {
 	char bl_name[16];
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
@@ -1309,7 +1354,7 @@ void amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm)
  *
  * Returns 0 on success
  */
-int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
+static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 {
 	struct amdgpu_display_manager *dm = &adev->dm;
 	uint32_t i;
@@ -1442,7 +1487,7 @@ fail_free_planes:
 	return -1;
 }
 
-void amdgpu_dm_destroy_drm_device(struct amdgpu_display_manager *dm)
+static void amdgpu_dm_destroy_drm_device(struct amdgpu_display_manager *dm)
 {
 	drm_mode_config_cleanup(dm->ddev);
 	return;
@@ -1650,13 +1695,13 @@ static int dm_early_init(void *handle)
 	return 0;
 }
 
-bool amdgpu_dm_acquire_dal_lock(struct amdgpu_display_manager *dm)
+static bool amdgpu_dm_acquire_dal_lock(struct amdgpu_display_manager *dm)
 {
 	/* TODO */
 	return true;
 }
 
-bool amdgpu_dm_release_dal_lock(struct amdgpu_display_manager *dm)
+static bool amdgpu_dm_release_dal_lock(struct amdgpu_display_manager *dm)
 {
 	/* TODO */
 	return true;
@@ -1696,7 +1741,7 @@ static bool modereset_required(struct drm_crtc_state *crtc_state)
 	return !crtc_state->enable || !crtc_state->active;
 }
 
-void amdgpu_dm_encoder_destroy(struct drm_encoder *encoder)
+static void amdgpu_dm_encoder_destroy(struct drm_encoder *encoder)
 {
 	drm_encoder_cleanup(encoder);
 	kfree(encoder);
@@ -2012,7 +2057,7 @@ static int fill_plane_attributes(struct amdgpu_device *adev,
 
 /*****************************************************************************/
 
-struct amdgpu_dm_connector *
+static struct amdgpu_dm_connector *
 aconnector_from_drm_crtc_id(const struct drm_crtc *crtc)
 {
 	struct drm_device *dev = crtc->dev;
@@ -2415,7 +2460,7 @@ drm_connector_null:
 	return stream;
 }
 
-void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc)
+static void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc)
 {
 	drm_crtc_cleanup(crtc);
 	kfree(crtc);
@@ -2771,7 +2816,7 @@ int amdgpu_dm_connector_atomic_get_property(struct drm_connector *connector,
 	return ret;
 }
 
-void amdgpu_dm_connector_destroy(struct drm_connector *connector)
+static void amdgpu_dm_connector_destroy(struct drm_connector *connector)
 {
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 	const struct dc_link *link = aconnector->dc_link;
@@ -3219,9 +3264,10 @@ static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
 	amdgpu_bo_unref(&rbo);
 }
 
-int dm_create_validation_set_for_connector(struct drm_connector *connector,
-					   struct drm_display_mode *mode,
-					   struct dc_validation_set *val_set)
+static int
+dm_create_validation_set_for_connector(struct drm_connector *connector,
+				       struct drm_display_mode *mode,
+				       struct dc_validation_set *val_set)
 {
 	int result = MODE_ERROR;
 	struct dc_sink *dc_sink =
@@ -3258,8 +3304,8 @@ int dm_create_validation_set_for_connector(struct drm_connector *connector,
 	return MODE_OK;
 }
 
-int dm_plane_atomic_check(struct drm_plane *plane,
-			  struct drm_plane_state *state)
+static int dm_plane_atomic_check(struct drm_plane *plane,
+				 struct drm_plane_state *state)
 {
 	struct amdgpu_device *adev = plane->dev->dev_private;
 	struct dc *dc = adev->dm.dc;
@@ -3306,9 +3352,9 @@ static const u32 cursor_formats[] = {
 	DRM_FORMAT_ARGB8888
 };
 
-int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
-			 struct amdgpu_plane *aplane,
-			 unsigned long possible_crtcs)
+static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
+				struct amdgpu_plane *aplane,
+				unsigned long possible_crtcs)
 {
 	int res = -EPERM;
 
@@ -3352,9 +3398,9 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	return res;
 }
 
-int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
-			struct drm_plane *plane,
-			uint32_t crtc_index)
+static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
+			       struct drm_plane *plane,
+			       uint32_t crtc_index)
 {
 	struct amdgpu_crtc *acrtc = NULL;
 	struct amdgpu_plane *cursor_plane;
@@ -3559,7 +3605,7 @@ static void amdgpu_dm_connector_ddc_get_modes(struct drm_connector *connector,
 		amdgpu_dm_connector->num_modes = 0;
 }
 
-int amdgpu_dm_connector_get_modes(struct drm_connector *connector)
+static int amdgpu_dm_connector_get_modes(struct drm_connector *connector)
 {
 	const struct drm_connector_helper_funcs *helper =
 			connector->helper_private;
@@ -3634,8 +3680,8 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 	}
 }
 
-int amdgpu_dm_i2c_xfer(struct i2c_adapter *i2c_adap,
-		       struct i2c_msg *msgs, int num)
+static int amdgpu_dm_i2c_xfer(struct i2c_adapter *i2c_adap,
+			      struct i2c_msg *msgs, int num)
 {
 	struct amdgpu_i2c_adapter *i2c = i2c_get_adapdata(i2c_adap);
 	struct ddc_service *ddc_service = i2c->ddc_service;
@@ -3669,7 +3715,7 @@ int amdgpu_dm_i2c_xfer(struct i2c_adapter *i2c_adap,
 	return result;
 }
 
-u32 amdgpu_dm_i2c_func(struct i2c_adapter *adap)
+static u32 amdgpu_dm_i2c_func(struct i2c_adapter *adap)
 {
 	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
 }
@@ -3702,10 +3748,10 @@ create_i2c(struct ddc_service *ddc_service,
 /* Note: this function assumes that dc_link_detect() was called for the
  * dc_link which will be represented by this aconnector.
  */
-int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
-			     struct amdgpu_dm_connector *aconnector,
-			     uint32_t link_index,
-			     struct amdgpu_encoder *aencoder)
+static int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
+				    struct amdgpu_dm_connector *aconnector,
+				    uint32_t link_index,
+				    struct amdgpu_encoder *aencoder)
 {
 	int res = 0;
 	int connector_type;
@@ -3808,9 +3854,9 @@ int amdgpu_dm_get_encoder_crtc_mask(struct amdgpu_device *adev)
 	}
 }
 
-int amdgpu_dm_encoder_init(struct drm_device *dev,
-			   struct amdgpu_encoder *aencoder,
-			   uint32_t link_index)
+static int amdgpu_dm_encoder_init(struct drm_device *dev,
+				  struct amdgpu_encoder *aencoder,
+				  uint32_t link_index)
 {
 	struct amdgpu_device *adev = dev->dev_private;
 
@@ -3891,8 +3937,8 @@ static void remove_stream(struct amdgpu_device *adev,
 	acrtc->enabled = false;
 }
 
-int get_cursor_position(struct drm_plane *plane, struct drm_crtc *crtc,
-			struct dc_cursor_position *position)
+static int get_cursor_position(struct drm_plane *plane, struct drm_crtc *crtc,
+			       struct dc_cursor_position *position)
 {
 	struct amdgpu_crtc *amdgpu_crtc = amdgpu_crtc = to_amdgpu_crtc(crtc);
 	int x, y;
@@ -4210,9 +4256,9 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 }
 
 
-int amdgpu_dm_atomic_commit(struct drm_device *dev,
-			    struct drm_atomic_state *state,
-			    bool nonblock)
+static int amdgpu_dm_atomic_commit(struct drm_device *dev,
+				   struct drm_atomic_state *state,
+				   bool nonblock)
 {
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *new_state;
@@ -4239,7 +4285,7 @@ int amdgpu_dm_atomic_commit(struct drm_device *dev,
 	/*TODO Handle EINTR, reenable IRQ*/
 }
 
-void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
+static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 {
 	struct drm_device *dev = state->dev;
 	struct amdgpu_device *adev = dev->dev_private;
@@ -4900,8 +4946,8 @@ static int dm_update_planes_state(struct dc *dc,
 	return ret;
 }
 
-int amdgpu_dm_atomic_check(struct drm_device *dev,
-			   struct drm_atomic_state *state)
+static int amdgpu_dm_atomic_check(struct drm_device *dev,
+				  struct drm_atomic_state *state)
 {
 	int i;
 	int ret;
