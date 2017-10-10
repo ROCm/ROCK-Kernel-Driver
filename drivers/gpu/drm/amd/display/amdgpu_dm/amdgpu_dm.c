@@ -564,10 +564,10 @@ static int dm_suspend(void *handle)
 	return ret;
 }
 
-struct amdgpu_dm_connector *amdgpu_dm_find_first_crct_matching_connector(
-	struct drm_atomic_state *state,
-	struct drm_crtc *crtc,
-	bool from_state_var)
+static struct amdgpu_dm_connector *
+amdgpu_dm_find_first_crtc_matching_connector(struct drm_atomic_state *state,
+					     struct drm_crtc *crtc,
+					     bool from_state_var)
 {
 	uint32_t i;
 	struct drm_connector_state *conn_state;
@@ -4381,7 +4381,7 @@ void amdgpu_dm_atomic_commit_tail(
 
 			new_stream = new_acrtc_state->stream;
 			aconnector =
-				amdgpu_dm_find_first_crct_matching_connector(
+				amdgpu_dm_find_first_crtc_matching_connector(
 					state,
 					&new_crtcs[i]->base,
 					false);
@@ -4672,7 +4672,7 @@ static int dm_update_crtcs_state(
 		new_acrtc_state = to_dm_crtc_state(crtc_state);
 		acrtc = to_amdgpu_crtc(crtc);
 
-		aconnector = amdgpu_dm_find_first_crct_matching_connector(state, crtc, true);
+		aconnector = amdgpu_dm_find_first_crtc_matching_connector(state, crtc, true);
 
 		/* TODO This hack should go away */
 		if (aconnector) {
