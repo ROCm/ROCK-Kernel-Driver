@@ -287,7 +287,11 @@ static bool gmc_v9_0_prescreen_iv(struct amdgpu_device *adev,
 		return false;
 	}
 	/* No locking required with single writer and single reader */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0)
 	r = kfifo_put(&vm->faults, key);
+#else
+	r = kfifo_put(&vm->faults, &key);
+#endif
 	if (!r) {
 		/* FIFO is full. Ignore it until there is space */
 		amdgpu_vm_clear_fault(vm->fault_hash, key);
