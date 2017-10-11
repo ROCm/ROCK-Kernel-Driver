@@ -2092,6 +2092,8 @@ static const struct file_operations amdgpu_ttm_gtt_fops = {
 
 #endif
 
+#if !defined(OS_NAME_RHEL_6)
+
 static ssize_t amdgpu_iova_to_phys_read(struct file *f, char __user *buf,
 				   size_t size, loff_t *pos)
 {
@@ -2191,6 +2193,8 @@ static const struct file_operations amdgpu_ttm_iova_fops = {
 	.llseek = default_llseek
 };
 
+#endif
+
 static const struct {
 	char *name;
 	const struct file_operations *fops;
@@ -2200,7 +2204,9 @@ static const struct {
 #ifdef CONFIG_DRM_AMDGPU_GART_DEBUGFS
 	{ "amdgpu_gtt", &amdgpu_ttm_gtt_fops, TTM_PL_TT },
 #endif
+#if !defined(OS_NAME_RHEL_6)
 	{ "amdgpu_iova", &amdgpu_ttm_iova_fops, TTM_PL_SYSTEM },
+#endif
 };
 
 #endif
