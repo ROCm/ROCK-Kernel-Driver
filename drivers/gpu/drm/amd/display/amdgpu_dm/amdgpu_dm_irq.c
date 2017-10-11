@@ -68,11 +68,10 @@ struct amdgpu_dm_timer_handler_data {
  * Private functions.
  *****************************************************************************/
 
-static void init_handler_common_data(
-	struct handler_common_data *hcd,
-	void (*ih)(void *),
-	void *args,
-	struct amdgpu_display_manager *dm)
+static void init_handler_common_data(struct handler_common_data *hcd,
+				     void (*ih)(void *),
+				     void *args,
+				     struct amdgpu_display_manager *dm)
 {
 	hcd->handler = ih;
 	hcd->handler_arg = args;
@@ -117,10 +116,9 @@ static void dm_irq_work_func(struct work_struct *work)
  * Remove a handler and return a pointer to hander list from which the
  * handler was removed.
  */
-static struct list_head *remove_irq_handler(
-	struct amdgpu_device *adev,
-	void *ih,
-	const struct dc_interrupt_params *int_params)
+static struct list_head *remove_irq_handler(struct amdgpu_device *adev,
+					    void *ih,
+					    const struct dc_interrupt_params *int_params)
 {
 	struct list_head *hnd_list;
 	struct list_head *entry, *tmp;
@@ -174,9 +172,8 @@ static struct list_head *remove_irq_handler(
 }
 
 /* If 'handler_in == NULL' then remove ALL handlers. */
-static void remove_timer_handler(
-	struct amdgpu_device *adev,
-	struct amdgpu_dm_timer_handler_data *handler_in)
+static void remove_timer_handler(struct amdgpu_device *adev,
+				 struct amdgpu_dm_timer_handler_data *handler_in)
 {
 	struct amdgpu_dm_timer_handler_data *handler_temp;
 	struct list_head *handler_list;
@@ -238,8 +235,7 @@ static void remove_timer_handler(
  *
  * @work: work struct
  */
-static void dm_timer_work_func(
-	struct work_struct *work)
+static void dm_timer_work_func(struct work_struct *work)
 {
 	struct amdgpu_dm_timer_handler_data *handler_data =
 		container_of(work, struct amdgpu_dm_timer_handler_data,
@@ -255,9 +251,9 @@ static void dm_timer_work_func(
 	remove_timer_handler(handler_data->hcd.dm->adev, handler_data);
 }
 
-static bool validate_irq_registration_params(
-	struct dc_interrupt_params *int_params,
-	void (*ih)(void *))
+static bool
+validate_irq_registration_params(struct dc_interrupt_params *int_params,
+				 void (*ih)(void *))
 {
 	if (NULL == int_params || NULL == ih) {
 		DRM_ERROR("DM_IRQ: invalid input!\n");
@@ -279,9 +275,8 @@ static bool validate_irq_registration_params(
 	return true;
 }
 
-static bool validate_irq_unregistration_params(
-	enum dc_irq_source irq_source,
-	irq_handler_idx handler_idx)
+static bool validate_irq_unregistration_params(enum dc_irq_source irq_source,
+					       irq_handler_idx handler_idx)
 {
 	if (DAL_INVALID_IRQ_HANDLER_IDX == handler_idx) {
 		DRM_ERROR("DM_IRQ: invalid handler_idx==NULL!\n");
@@ -301,11 +296,10 @@ static bool validate_irq_unregistration_params(
  * Note: caller is responsible for input validation.
  *****************************************************************************/
 
-void *amdgpu_dm_irq_register_interrupt(
-	struct amdgpu_device *adev,
-	struct dc_interrupt_params *int_params,
-	void (*ih)(void *),
-	void *handler_args)
+void *amdgpu_dm_irq_register_interrupt(struct amdgpu_device *adev,
+				       struct dc_interrupt_params *int_params,
+				       void (*ih)(void *),
+				       void *handler_args)
 {
 	struct list_head *hnd_list;
 	struct amdgpu_dm_irq_handler_data *handler_data;
@@ -361,10 +355,9 @@ void *amdgpu_dm_irq_register_interrupt(
 	return handler_data;
 }
 
-void amdgpu_dm_irq_unregister_interrupt(
-	struct amdgpu_device *adev,
-	enum dc_irq_source irq_source,
-	void *ih)
+void amdgpu_dm_irq_unregister_interrupt(struct amdgpu_device *adev,
+					enum dc_irq_source irq_source,
+					void *ih)
 {
 	struct list_head *handler_list;
 	struct dc_interrupt_params int_params;
@@ -396,8 +389,7 @@ void amdgpu_dm_irq_unregister_interrupt(
 	}
 }
 
-int amdgpu_dm_irq_init(
-	struct amdgpu_device *adev)
+int amdgpu_dm_irq_init(struct amdgpu_device *adev)
 {
 	int src;
 	struct irq_list_head *lh;
@@ -429,11 +421,10 @@ int amdgpu_dm_irq_init(
 	return 0;
 }
 
-void amdgpu_dm_irq_register_timer(
-	struct amdgpu_device *adev,
-	struct dc_timer_interrupt_params *int_params,
-	interrupt_handler ih,
-	void *args)
+void amdgpu_dm_irq_register_timer(struct amdgpu_device *adev,
+				  struct dc_timer_interrupt_params *int_params,
+				  interrupt_handler ih,
+				  void *args)
 {
 	unsigned long jf_delay;
 	struct list_head *handler_list;
@@ -472,8 +463,7 @@ void amdgpu_dm_irq_register_timer(
 }
 
 /* DM IRQ and timer resource release */
-void amdgpu_dm_irq_fini(
-	struct amdgpu_device *adev)
+void amdgpu_dm_irq_fini(struct amdgpu_device *adev)
 {
 	int src;
 	struct irq_list_head *lh;
@@ -494,8 +484,7 @@ void amdgpu_dm_irq_fini(
 	destroy_workqueue(adev->dm.timer_workqueue);
 }
 
-int amdgpu_dm_irq_suspend(
-	struct amdgpu_device *adev)
+int amdgpu_dm_irq_suspend(struct amdgpu_device *adev)
 {
 	int src;
 	struct list_head *hnd_list_h;
@@ -578,9 +567,8 @@ int amdgpu_dm_irq_resume_late(struct amdgpu_device *adev)
  * amdgpu_dm_irq_schedule_work - schedule all work items registered for the
  * "irq_source".
  */
-static void amdgpu_dm_irq_schedule_work(
-	struct amdgpu_device *adev,
-	enum dc_irq_source irq_source)
+static void amdgpu_dm_irq_schedule_work(struct amdgpu_device *adev,
+					enum dc_irq_source irq_source)
 {
 	unsigned long irq_table_flags;
 	struct work_struct *work = NULL;
@@ -603,9 +591,8 @@ static void amdgpu_dm_irq_schedule_work(
 /** amdgpu_dm_irq_immediate_work
  *  Callback high irq work immediately, don't send to work queue
  */
-static void amdgpu_dm_irq_immediate_work(
-	struct amdgpu_device *adev,
-	enum dc_irq_source irq_source)
+static void amdgpu_dm_irq_immediate_work(struct amdgpu_device *adev,
+					 enum dc_irq_source irq_source)
 {
 	struct amdgpu_dm_irq_handler_data *handler_data;
 	struct list_head *entry;
@@ -637,10 +624,9 @@ static void amdgpu_dm_irq_immediate_work(
  * Generic IRQ handler, calls all registered high irq work immediately, and
  * schedules work for low irq
  */
-int amdgpu_dm_irq_handler(
-		struct amdgpu_device *adev,
-		struct amdgpu_irq_src *source,
-		struct amdgpu_iv_entry *entry)
+int amdgpu_dm_irq_handler(struct amdgpu_device *adev,
+			  struct amdgpu_irq_src *source,
+			  struct amdgpu_iv_entry *entry)
 {
 
 	enum dc_irq_source src =
@@ -680,9 +666,9 @@ static enum dc_irq_source amdgpu_dm_hpd_to_dal_irq_source(unsigned type)
 }
 
 static int amdgpu_dm_set_hpd_irq_state(struct amdgpu_device *adev,
-					struct amdgpu_irq_src *source,
-					unsigned type,
-					enum amdgpu_interrupt_state state)
+				       struct amdgpu_irq_src *source,
+				       unsigned type,
+				       enum amdgpu_interrupt_state state)
 {
 	enum dc_irq_source src = amdgpu_dm_hpd_to_dal_irq_source(type);
 	bool st = (state == AMDGPU_IRQ_STATE_ENABLE);
@@ -691,13 +677,12 @@ static int amdgpu_dm_set_hpd_irq_state(struct amdgpu_device *adev,
 	return 0;
 }
 
-static inline int dm_irq_state(
-	struct amdgpu_device *adev,
-	struct amdgpu_irq_src *source,
-	unsigned crtc_id,
-	enum amdgpu_interrupt_state state,
-	const enum irq_type dal_irq_type,
-	const char *func)
+static inline int dm_irq_state(struct amdgpu_device *adev,
+			       struct amdgpu_irq_src *source,
+			       unsigned crtc_id,
+			       enum amdgpu_interrupt_state state,
+			       const enum irq_type dal_irq_type,
+			       const char *func)
 {
 	bool st;
 	enum dc_irq_source irq_source;
@@ -721,9 +706,9 @@ static inline int dm_irq_state(
 }
 
 static int amdgpu_dm_set_pflip_irq_state(struct amdgpu_device *adev,
-					struct amdgpu_irq_src *source,
-					unsigned crtc_id,
-					enum amdgpu_interrupt_state state)
+					 struct amdgpu_irq_src *source,
+					 unsigned crtc_id,
+					 enum amdgpu_interrupt_state state)
 {
 	return dm_irq_state(
 		adev,
