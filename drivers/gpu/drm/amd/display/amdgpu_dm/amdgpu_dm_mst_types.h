@@ -31,9 +31,8 @@
 struct amdgpu_display_manager;
 struct amdgpu_dm_connector;
 
-void amdgpu_dm_initialize_dp_connector(
-	struct amdgpu_display_manager *dm,
-	struct amdgpu_dm_connector *aconnector);
+void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
+				       struct amdgpu_dm_connector *aconnector);
 
 #else
 #include "../kcl_dm/kcl_dm_mst_types.h"
