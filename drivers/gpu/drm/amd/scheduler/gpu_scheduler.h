@@ -30,6 +30,7 @@
 #include <linux/kfifo.h>
 #endif
 #include <kcl/kcl_fence.h>
+#include "spsc_queue.h"
 
 struct amd_gpu_scheduler;
 struct amd_sched_rq;
@@ -60,7 +61,7 @@ struct amd_sched_entity {
 	struct amd_gpu_scheduler	*sched;
 
 	spinlock_t			queue_lock;
-	struct kfifo                    job_queue;
+	struct spsc_queue	job_queue;
 
 	atomic_t			fence_seq;
 	uint64_t                        fence_context;
@@ -92,6 +93,7 @@ struct amd_sched_fence {
 };
 
 struct amd_sched_job {
+	struct spsc_node queue_node;
 	struct amd_gpu_scheduler        *sched;
 	struct amd_sched_entity         *s_entity;
 	struct amd_sched_fence          *s_fence;
