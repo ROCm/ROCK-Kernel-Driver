@@ -1099,7 +1099,11 @@ static int amdgpu_syncobj_lookup_and_add_to_sync(struct amdgpu_cs_parser *p,
 {
 	int r;
 	struct dma_fence *fence;
+#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 	r = drm_syncobj_find_fence(p->filp, handle, &fence);
+#else
+	r = drm_syncobj_fence_get(p->filp, handle, &fence);
+#endif
 	if (r)
 		return r;
 
