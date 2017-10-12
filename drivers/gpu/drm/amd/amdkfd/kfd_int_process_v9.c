@@ -95,18 +95,20 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 					const uint32_t *ih_ring_entry)
 {
 	uint16_t source_id, client_id, pasid, vmid;
+	uint32_t context_id;
 
 	source_id = SOC15_SOURCE_ID_FROM_IH_ENTRY(ih_ring_entry);
 	client_id = SOC15_CLIENT_ID_FROM_IH_ENTRY(ih_ring_entry);
 	pasid = SOC15_PASID_FROM_IH_ENTRY(ih_ring_entry);
 	vmid = SOC15_VMID_FROM_IH_ENTRY(ih_ring_entry);
+	context_id = SOC15_CONTEXT_ID0_FROM_IH_ENTRY(ih_ring_entry);
 
 	if (source_id == SOC15_INTSRC_CP_END_OF_PIPE)
-		kfd_signal_event_interrupt(pasid, 0, 0);
+		kfd_signal_event_interrupt(pasid, context_id, 32);
 	else if (source_id == SOC15_INTSRC_SDMA_TRAP)
-		kfd_signal_event_interrupt(pasid, 0, 0);
+		kfd_signal_event_interrupt(pasid, context_id & 0xfffffff, 28);
 	else if (source_id == SOC15_INTSRC_SQ_INTERRUPT_MSG)
-		kfd_signal_event_interrupt(pasid, 0, 0);  /*todo */
+		kfd_signal_event_interrupt(pasid, context_id & 0xffffff, 24);
 	else if (source_id == SOC15_INTSRC_CP_BAD_OPCODE)
 		kfd_signal_hw_exception_event(pasid);
 	else if (client_id == SOC15_IH_CLIENTID_VMC ||

@@ -79,16 +79,17 @@ static void cik_event_interrupt_wq(struct kfd_dev *dev,
 {
 	const struct cik_ih_ring_entry *ihre =
 			(const struct cik_ih_ring_entry *)ih_ring_entry;
+	uint32_t context_id = ihre->data & 0xfffffff;
 
 	if (ihre->pasid == 0)
 		return;
 
 	if (ihre->source_id == CIK_INTSRC_CP_END_OF_PIPE)
-		kfd_signal_event_interrupt(ihre->pasid, 0, 0);
+		kfd_signal_event_interrupt(ihre->pasid, context_id, 28);
 	else if (ihre->source_id == CIK_INTSRC_SDMA_TRAP)
-		kfd_signal_event_interrupt(ihre->pasid, 0, 0);
+		kfd_signal_event_interrupt(ihre->pasid, context_id, 28);
 	else if (ihre->source_id == CIK_INTSRC_SQ_INTERRUPT_MSG)
-		kfd_signal_event_interrupt(ihre->pasid, ihre->data & 0xFF, 8);
+		kfd_signal_event_interrupt(ihre->pasid, context_id & 0xff, 8);
 	else if (ihre->source_id == CIK_INTSRC_CP_BAD_OPCODE)
 		kfd_signal_hw_exception_event(ihre->pasid);
 	else if (ihre->source_id == CIK_INTSRC_GFX_PAGE_INV_FAULT ||
