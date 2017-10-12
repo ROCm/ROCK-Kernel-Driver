@@ -186,8 +186,14 @@ static int create_signal_event(struct file *devkfd,
 
 static int create_other_event(struct kfd_process *p, struct kfd_event *ev)
 {
+	/* Cast KFD_LAST_NONSIGNAL_EVENT to uint32_t. This allows an
+	 * intentional integer overflow to -1 without a compiler
+	 * warning. idr_alloc treats a negative value as "maximum
+	 * signed integer".
+	 */
 	int id = idr_alloc(&p->event_idr, ev, KFD_FIRST_NONSIGNAL_EVENT_ID,
-			   KFD_LAST_NONSIGNAL_EVENT_ID + 1, GFP_KERNEL);
+			   (uint32_t)KFD_LAST_NONSIGNAL_EVENT_ID + 1,
+			   GFP_KERNEL);
 
 	if (id < 0)
 		return id;
