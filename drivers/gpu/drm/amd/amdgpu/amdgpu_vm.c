@@ -48,7 +48,11 @@
  * space. Therefore PASIDs are allocated using a global IDA. VMs are
  * looked up from the PASID per amdgpu_device.
  */
+#if !defined(OS_NAME_RHEL_6)
 static DEFINE_IDA(amdgpu_vm_pasid_ida);
+#else
+static DEFINE_IDA2(amdgpu_vm_pasid_ida);
+#endif
 
 /**
  * amdgpu_vm_alloc_pasid - Allocate a PASID
