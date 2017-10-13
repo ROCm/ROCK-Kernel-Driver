@@ -282,8 +282,11 @@ _kcl_fence_get_rcu_safe(struct fence * __rcu *fencep)
 		struct fence *fence;
 
 		fence = rcu_dereference(*fencep);
-		if (!fence || !fence_get_rcu(fence))
+		if (!fence)
 			return NULL;
+
+		if (!fence_get_rcu(fence))
+			continue;
 
 		if (fence == rcu_access_pointer(*fencep))
 			return rcu_pointer_handoff(fence);
