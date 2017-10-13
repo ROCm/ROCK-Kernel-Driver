@@ -2812,8 +2812,9 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 {
 	struct amdgpu_bo_va_mapping *mapping, *tmp;
 	bool prt_fini_needed = !!adev->gart.gart_funcs->set_prt;
+	struct amdgpu_bo *root;
 	u64 fault;
-	int i;
+	int i, r;
 
 	if (vm->vm_context == AMDGPU_VM_CONTEXT_COMPUTE) {
 		struct amdgpu_vm_id_manager *id_mgr =
@@ -2865,7 +2866,15 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		amdgpu_vm_free_mapping(adev, vm, mapping, NULL);
 	}
 
-	amdgpu_vm_free_levels(&vm->root);
+	root = amdgpu_bo_ref(vm->root.base.bo);
+	r = amdgpu_bo_reserve(root, true);
+	if (r) {
+		dev_err(adev->dev, "Leaking page tables because BO reservation failed\n");
+	} else {
+		amdgpu_vm_free_levels(&vm->root);
+		amdgpu_bo_unreserve(root);
+	}
+	amdgpu_bo_unref(&root);
 	dma_fence_put(vm->last_update);
 	for (i = 0; i < AMDGPU_MAX_VMHUBS; i++)
 		amdgpu_vm_free_reserved_vmid(adev, vm, i);
