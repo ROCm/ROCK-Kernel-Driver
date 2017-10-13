@@ -188,7 +188,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 	switch (type) {
 	case KFD_QUEUE_TYPE_SDMA:
 		if (dev->dqm->sdma_queue_count >= CIK_SDMA_QUEUES) {
-			pr_err("Over-subscription is not allowed for SDMA\n");
+			pr_debug("Over-subscription is not allowed for SDMA\n");
 			retval = -EPERM;
 			goto err_create_queue;
 		}
@@ -210,7 +210,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 				KFD_SCHED_POLICY_HWS_NO_OVERSUBSCRIPTION) &&
 		((dev->dqm->processes_count >= dev->vm_info.vmid_num_kfd) ||
 		(dev->dqm->queue_count >= get_queues_num(dev->dqm)))) {
-			pr_err("Over-subscription is not allowed in radeon_kfd.sched_policy == 1\n");
+			pr_debug("Over-subscription is not allowed in radeon_kfd.sched_policy == 1\n");
 			retval = -EPERM;
 			goto err_create_queue;
 		}
