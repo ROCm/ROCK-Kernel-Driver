@@ -718,7 +718,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 
 	ret = amdgpu_amdkfd_reserve_system_mem_limit(adev, size, alloc_domain);
 	if (ret) {
-		pr_err("Insufficient system memory\n");
+		pr_debug("Insufficient system memory\n");
 		goto err_bo_create;
 	}
 
@@ -732,7 +732,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 				alloc_domain,
 			       flags, sg, NULL, 0, &bo);
 	if (ret != 0) {
-		pr_err("Failed to create BO on domain %s. ret %d\n",
+		pr_debug("Failed to create BO on domain %s. ret %d\n",
 				domain_string(alloc_domain), ret);
 		unreserve_system_mem_limit(adev, size, alloc_domain);
 		goto err_bo_create;
@@ -1095,7 +1095,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	struct sg_table *sg = NULL;
 
 	if (!(flags & ALLOC_MEM_FLAGS_NONPAGED)) {
-		pr_err("current hw doesn't support paged memory\n");
+		pr_debug("current hw doesn't support paged memory\n");
 		return -EINVAL;
 	}
 
@@ -1174,7 +1174,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	mutex_lock(&mem->lock);
 
 	if (mem->mapped_to_gpu_memory > 0) {
-		pr_err("BO VA 0x%llx size 0x%lx is already mapped to vm %p.\n",
+		pr_debug("BO VA 0x%llx size 0x%lx is already mapped to vm %p.\n",
 				mem->va, bo_size, vm);
 		mutex_unlock(&mem->lock);
 		return -EBUSY;
