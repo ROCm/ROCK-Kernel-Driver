@@ -1297,7 +1297,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 
 	if (args->device_ids_array_size > 0 &&
 			(args->device_ids_array_size < sizeof(uint32_t))) {
-		pr_err("Node IDs array size %u\n",
+		pr_debug("Node IDs array size %u\n",
 				args->device_ids_array_size);
 		return -EFAULT;
 	}
@@ -1336,7 +1336,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		for (i = 0 ; i < num_dev; i++) {
 			peer = kfd_device_by_id(devices_arr[i]);
 			if (!peer) {
-				pr_err("Getting device by id failed for 0x%x\n",
+				pr_debug("Getting device by id failed for 0x%x\n",
 						devices_arr[i]);
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
@@ -1428,7 +1428,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 
 	if (args->device_ids_array_size > 0 &&
 			(args->device_ids_array_size < sizeof(uint32_t))) {
-		pr_err("Node IDs array size %u\n",
+		pr_debug("Node IDs array size %u\n",
 				args->device_ids_array_size);
 		return -EFAULT;
 	}
@@ -1451,7 +1451,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 
 	pdd = kfd_get_process_device_data(dev, p);
 	if (!pdd) {
-		pr_err("Process device data doesn't exist\n");
+		pr_debug("Process device data doesn't exist\n");
 		err = PTR_ERR(pdd);
 		goto bind_process_to_device_failed;
 	}
