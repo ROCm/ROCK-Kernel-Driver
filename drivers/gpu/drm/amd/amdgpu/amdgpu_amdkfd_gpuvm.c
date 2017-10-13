@@ -1352,7 +1352,13 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 		}
 	}
 
-	if (amdgpu_ttm_tt_get_usermm(bo->tbo.ttm) == NULL)
+	if (mem->domain & AMDGPU_GEM_DOMAIN_DGMA) {
+		ret = amdgpu_bo_pin(bo, mem->domain, NULL);
+		if (ret != 0) {
+			pr_err("Unable to pin DGMA BO\n");
+			goto map_bo_to_gpuvm_failed;
+		}
+	} else if (amdgpu_ttm_tt_get_usermm(bo->tbo.ttm) == NULL)
 		amdgpu_bo_fence(bo,
 				&kfd_vm->process_info->eviction_fence->base,
 				true);
@@ -1618,11 +1624,14 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 	/* If BO is unmapped from all VMs, unfence it. It can be evicted if
 	 * required.
 	 */
-	if (mem->mapped_to_gpu_memory == 0 &&
-	    !amdgpu_ttm_tt_get_usermm(mem->bo->tbo.ttm))
-		amdgpu_amdkfd_remove_eviction_fence(mem->bo,
+	if (mem->mapped_to_gpu_memory == 0) {
+		if (mem->domain & AMDGPU_GEM_DOMAIN_DGMA)
+			amdgpu_bo_unpin(mem->bo);
+		else if (!amdgpu_ttm_tt_get_usermm(mem->bo->tbo.ttm))
+			amdgpu_amdkfd_remove_eviction_fence(mem->bo,
 						process_info->eviction_fence,
-						    NULL, NULL);
+						NULL, NULL);
+	}
 
 	if (mapped_before == mem->mapped_to_gpu_memory) {
 		pr_debug("BO VA 0x%llx size 0x%lx is not mapped to vm %p\n",
