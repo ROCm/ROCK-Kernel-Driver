@@ -77,10 +77,14 @@ static struct kfd_signal_page *allocate_signal_page(struct kfd_process *p)
 	if (!page)
 		return NULL;
 
-	backing_store = (void *) __get_free_pages(GFP_KERNEL | __GFP_ZERO,
+	backing_store = (void *) __get_free_pages(GFP_KERNEL,
 					get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
 	if (!backing_store)
 		goto fail_alloc_signal_store;
+
+	/* Initialize all events to unsignaled */
+	memset(backing_store, (uint8_t) UNSIGNALED_EVENT_SLOT,
+	       KFD_SIGNAL_EVENT_LIMIT * 8);
 
 	page->kernel_address = backing_store;
 	pr_debug("Allocated new event signal page at %p, for process %p\n",
@@ -123,6 +127,10 @@ static struct kfd_signal_page *allocate_signal_page_dgpu(
 	my_page = kzalloc(sizeof(*my_page), GFP_KERNEL);
 	if (!my_page)
 		return NULL;
+
+	/* Initialize all events to unsignaled */
+	memset(kernel_address, (uint8_t) UNSIGNALED_EVENT_SLOT,
+	       KFD_SIGNAL_EVENT_LIMIT * 8);
 
 	my_page->kernel_address = kernel_address;
 	my_page->handle = handle;
@@ -443,12 +451,27 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 		uint64_t *slots = page_slots(p->signal_page);
 		uint32_t id;
 
-		idr_for_each_entry(&p->event_idr, ev, id) {
-			if (id >= KFD_SIGNAL_EVENT_LIMIT)
-				break;
+		if (p->signal_event_count < KFD_SIGNAL_EVENT_LIMIT/2) {
+			/* With relatively few events, it's faster to
+			 * iterate over the event IDR
+			 */
+			idr_for_each_entry(&p->event_idr, ev, id) {
+				if (id >= KFD_SIGNAL_EVENT_LIMIT)
+					break;
 
-			if (slots[id] != UNSIGNALED_EVENT_SLOT)
-				set_event_from_interrupt(p, ev);
+				if (slots[id] != UNSIGNALED_EVENT_SLOT)
+					set_event_from_interrupt(p, ev);
+			}
+		} else {
+			/* With relatively many events, it's faster to
+			 * iterate over the signal slots and lookup
+			 * only signaled events from the IDR.
+			 */
+			for (id = 0; id < KFD_SIGNAL_EVENT_LIMIT; id++)
+				if (slots[id] != UNSIGNALED_EVENT_SLOT) {
+					ev = lookup_event_by_id(p, id);
+					set_event_from_interrupt(p, ev);
+				}
 		}
 	}
 
