@@ -2899,7 +2899,7 @@ int amdgpu_sriov_gpu_reset(struct amdgpu_device *adev, struct amdgpu_job *job)
 			amd_sched_job_kickout(&job->base);
 
 		/* only do job_reset on the hang ring if @job not NULL */
-		amd_sched_hw_job_reset(&ring->sched);
+		amd_sched_hw_job_reset(&ring->sched, NULL);
 
 		/* after all hw jobs are reset, hw fence is meaningless, so force_completion */
 		amdgpu_fence_driver_force_completion(ring);
@@ -3020,7 +3020,7 @@ int amdgpu_gpu_reset(struct amdgpu_device *adev)
 		if (!ring || !ring->sched.thread)
 			continue;
 		kcl_kthread_park(ring->sched.thread);
-		amd_sched_hw_job_reset(&ring->sched);
+		amd_sched_hw_job_reset(&ring->sched, NULL);
 		/* after all hw jobs are reset, hw fence is meaningless, so force_completion */
 		amdgpu_fence_driver_force_completion(ring);
 	}
