@@ -1681,6 +1681,7 @@ struct dm_connector_state {
 	uint8_t underscan_vborder;
 	uint8_t underscan_hborder;
 	bool underscan_enable;
+	struct mod_freesync_user_enable user_enable;
 };
 
 #define to_dm_connector_state(x)\
@@ -2608,55 +2609,6 @@ amdgpu_freesync_update_property_atomic(struct drm_connector *connector,
 
 }
 
-static int
-amdgpu_freesync_set_property_atomic(struct drm_connector *connector,
-				    struct drm_connector_state *connector_state,
-				    struct drm_property *property, uint64_t val)
-{
-	struct mod_freesync_user_enable user_enable;
-	struct drm_device *dev;
-	struct amdgpu_device *adev;
-	struct amdgpu_crtc *acrtc;
-	int ret;
-	uint64_t val_capable;
-	struct dm_crtc_state *acrtc_state;
-
-	dev  = connector->dev;
-	adev = dev->dev_private;
-	ret  = -EINVAL;
-
-	if (adev->dm.freesync_module && connector_state->crtc) {
-		ret = drm_object_property_get_value(
-				&connector->base,
-				adev->mode_info.freesync_capable_property,
-				&val_capable);
-		/* if user free sync val property is enable, but the capable
-		 * prop is not, then fail the call
-		 */
-		if (ret != 0 || (val_capable == 0 && val != 0)) {
-			ret  = -EINVAL;
-			goto release;
-		}
-
-		user_enable.enable_for_gaming = val ? true : false;
-		user_enable.enable_for_static = user_enable.enable_for_gaming;
-		user_enable.enable_for_video  = user_enable.enable_for_gaming;
-		ret  = -EINVAL;
-		acrtc = to_amdgpu_crtc(connector_state->crtc);
-		acrtc_state = to_dm_crtc_state(connector_state->crtc->state);
-
-
-		if (connector_state->connector == connector && acrtc_state->stream) {
-			mod_freesync_set_user_enable(adev->dm.freesync_module,
-						     &acrtc_state->stream, 1,
-						     &user_enable);
-			ret = 0;
-		}
-	}
-release:
-	return ret;
-}
-
 int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
 					    struct drm_connector_state *connector_state,
 					    struct drm_property *property,
@@ -2705,10 +2657,10 @@ int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
 		dm_new_state->underscan_enable = val;
 		ret = 0;
 	} else if (property == adev->mode_info.freesync_property) {
-		ret = amdgpu_freesync_set_property_atomic(connector,
-							  connector_state,
-							  property, val);
-		return ret;
+		dm_new_state->user_enable.enable_for_gaming = val;
+		dm_new_state->user_enable.enable_for_static = val;
+		dm_new_state->user_enable.enable_for_video = val;
+		ret = 0;
 	} else if (property == adev->mode_info.freesync_capable_property) {
 		ret = -EINVAL;
 		return ret;
@@ -4337,6 +4289,33 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 			mod_freesync_add_stream(adev->dm.freesync_module,
 						new_stream, &aconnector->caps);
+		}
+
+		list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+
+			struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+			struct amdgpu_dm_connector *aconnector = NULL;
+			struct dm_connector_state *conn_state = NULL;
+			struct dm_crtc_state *acrtc_state = NULL;
+
+			acrtc_state = to_dm_crtc_state(acrtc->base.state);
+
+
+			aconnector =
+				amdgpu_dm_find_first_crtc_matching_connector(
+					state,
+					crtc,
+					false);
+			if (aconnector) {
+				conn_state = to_dm_connector_state(aconnector->base.state);
+
+				if (new_stream) {
+					mod_freesync_set_user_enable(adev->dm.freesync_module,
+								     &acrtc_state->stream,
+								     1,
+								     &conn_state->user_enable);
+				}
+			}
 		}
 	}
 
