@@ -729,7 +729,7 @@ int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,
 
 	bo->pin_count = 1;
 	if (gpu_addr != NULL) {
-		r = amdgpu_ttm_bind(&bo->tbo, &bo->tbo.mem);
+		r = amdgpu_ttm_bind(&bo->tbo);
 		if (unlikely(r)) {
 			dev_err(adev->dev, "%p bind failed\n", bo);
 			goto error;

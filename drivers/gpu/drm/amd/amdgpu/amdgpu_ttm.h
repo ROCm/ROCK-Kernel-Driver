@@ -97,7 +97,7 @@ int amdgpu_mmap(struct file *filp, struct vm_area_struct *vma);
 int amdgpu_bo_mmap(struct file *filp, struct vm_area_struct *vma,
 		   struct ttm_bo_device *bdev);
 bool amdgpu_ttm_is_bound(struct ttm_tt *ttm);
-int amdgpu_ttm_bind(struct ttm_buffer_object *bo, struct ttm_mem_reg *bo_mem);
+int amdgpu_ttm_bind(struct ttm_buffer_object *bo);
 int amdgpu_ttm_recover_gart(struct amdgpu_device *adev);
 
 int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages);
