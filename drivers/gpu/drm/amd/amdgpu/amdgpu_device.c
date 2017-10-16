@@ -2205,9 +2205,6 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	INIT_LIST_HEAD(&adev->shadow_list);
 	mutex_init(&adev->shadow_list_lock);
 
-	INIT_LIST_HEAD(&adev->gtt_list);
-	spin_lock_init(&adev->gtt_list_lock);
-
 	INIT_LIST_HEAD(&adev->ring_lru_list);
 	spin_lock_init(&adev->ring_lru_list_lock);
 
@@ -2907,7 +2904,8 @@ retry:
 				atomic_inc(&adev->vram_lost_counter);
 			}
 
-			r = amdgpu_ttm_recover_gart(adev);
+			r = amdgpu_gtt_mgr_recover(
+				&adev->mman.bdev.man[TTM_PL_TT]);
 			if (r)
 				goto out;
 
@@ -2969,7 +2967,7 @@ static int amdgpu_reset_sriov(struct amdgpu_device *adev, uint64_t *reset_flags,
 		goto error;
 
 	/* we need recover gart prior to run SMC/CP/SDMA resume */
-	amdgpu_ttm_recover_gart(adev);
+	amdgpu_gtt_mgr_recover(&adev->mman.bdev.man[TTM_PL_TT]);
 
 	/* now we are okay to resume SMC/CP/SDMA */
 	r = amdgpu_sriov_reinit_late(adev);
