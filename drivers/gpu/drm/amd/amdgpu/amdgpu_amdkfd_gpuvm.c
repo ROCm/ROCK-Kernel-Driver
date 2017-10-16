@@ -2417,17 +2417,12 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 				  struct dma_fence **f, uint64_t *actual_size)
 {
 	struct amdgpu_device *adev = NULL;
-	struct ttm_mem_reg *src = NULL, *dst = NULL;
-	struct ttm_buffer_object *src_ttm_bo, *dst_ttm_bo;
-	struct drm_mm_node *src_mm, *dst_mm;
-	struct amdgpu_ring *ring;
+	struct amdgpu_copy_mem src, dst;
 	struct ww_acquire_ctx ticket;
 	struct list_head list;
 	struct ttm_validate_buffer resv_list[2];
-	uint64_t src_start, dst_start;
-	uint64_t src_left, dst_left, cur_copy_size, total_copy_size = 0;
 	struct dma_fence *fence = NULL;
-	int r;
+	int i, r;
 
 	if (!kgd || !src_mem || !dst_mem)
 		return -EINVAL;
@@ -2436,28 +2431,21 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 		*actual_size = 0;
 
 	adev = get_amdgpu_device(kgd);
-	src_ttm_bo = &src_mem->bo->tbo;
-	dst_ttm_bo = &dst_mem->bo->tbo;
-	src = &src_ttm_bo->mem;
-	dst = &dst_ttm_bo->mem;
-	src_mm = (struct drm_mm_node *)src->mm_node;
-	dst_mm = (struct drm_mm_node *)dst->mm_node;
-
-	ring = adev->mman.buffer_funcs_ring;
-
 	INIT_LIST_HEAD(&list);
 
-	resv_list[0].bo = src_ttm_bo;
-	resv_list[0].shared = true;
-	resv_list[1].bo = dst_ttm_bo;
-	resv_list[1].shared = true;
+	src.bo = &src_mem->bo->tbo;
+	dst.bo = &dst_mem->bo->tbo;
+	src.mem = &src.bo->mem;
+	dst.mem = &dst.bo->mem;
+	src.offset = src_offset;
+	dst.offset = dst_offset;
 
-	list_add_tail(&resv_list[0].head, &list);
-	list_add_tail(&resv_list[1].head, &list);
+	resv_list[0].bo = src.bo;
+	resv_list[1].bo = dst.bo;
 
-	if (!ring->ready) {
-		pr_err("Trying to move memory with ring turned off.\n");
-		return -EINVAL;
+	for (i = 0; i < 2; i++) {
+		resv_list[i].shared = true;
+		list_add_tail(&resv_list[i].head, &list);
 	}
 
 	r = ttm_eu_reserve_buffers(&ticket, &list, false, NULL);
@@ -2466,120 +2454,20 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 		return r;
 	}
 
-	switch (src->mem_type) {
-	case TTM_PL_TT:
-		r = amdgpu_ttm_bind(src_ttm_bo);
-		if (r) {
-			DRM_ERROR("Copy failed. Cannot bind to gart\n");
-			goto copy_fail;
-		}
-		break;
-	case TTM_PL_VRAM:
-		/* VRAM could be scattered. Find the node in which the offset
-		 * belongs to
-		 */
-		while (src_offset >= (src_mm->size << PAGE_SHIFT)) {
-			src_offset -= (src_mm->size << PAGE_SHIFT);
-			++src_mm;
-		}
-		break;
-	default:
-		DRM_ERROR("Unknown placement %d\n", src->mem_type);
-		r = -EINVAL;
-		goto copy_fail;
-	}
-	src_start = src_mm->start << PAGE_SHIFT;
-	src_start += src_ttm_bo->bdev->man[src->mem_type].gpu_offset;
-	src_start += src_offset;
-	src_left = (src_mm->size << PAGE_SHIFT) - src_offset;
-
-	switch (dst->mem_type) {
-	case TTM_PL_TT:
-		r = amdgpu_ttm_bind(dst_ttm_bo);
-		if (r) {
-			DRM_ERROR("Copy failed. Cannot bind to gart\n");
-			goto copy_fail;
-		}
-		break;
-	case TTM_PL_VRAM:
-		while (dst_offset >= (dst_mm->size << PAGE_SHIFT)) {
-			dst_offset -= (dst_mm->size << PAGE_SHIFT);
-			++dst_mm;
-		}
-		break;
-	default:
-		DRM_ERROR("Unknown placement %d\n", dst->mem_type);
-		r = -EINVAL;
-		goto copy_fail;
-	}
-	dst_start = dst_mm->start << PAGE_SHIFT;
-	dst_start += dst_ttm_bo->bdev->man[dst->mem_type].gpu_offset;
-	dst_start += dst_offset;
-	dst_left = (dst_mm->size << PAGE_SHIFT) - dst_offset;
-
-	do {
-		struct dma_fence *next;
-
-		/* src_left/dst_left: amount of space left in the current node
-		 * Copy minimum of (src_left, dst_left, amount of bytes left to
-		 * copy)
-		 */
-		cur_copy_size = min3(src_left, dst_left,
-				    (size - total_copy_size));
-
-		r = amdgpu_copy_buffer(ring, src_start, dst_start,
-			cur_copy_size, NULL, &next, false, false);
-		if (r)
-			break;
-
-		/* Just keep the last fence */
-		dma_fence_put(fence);
-		fence = next;
-
-		total_copy_size += cur_copy_size;
-		/* Required amount of bytes copied. Done. */
-		if (total_copy_size >= size)
-			break;
-
-		/* If end of src or dst node is reached, move to next node */
-		src_left -= cur_copy_size;
-		if (!src_left) {
-			++src_mm;
-			src_start = src_mm->start << PAGE_SHIFT;
-			src_start +=
-				src_ttm_bo->bdev->man[src->mem_type].gpu_offset;
-			src_left = src_mm->size << PAGE_SHIFT;
-		} else
-			src_start += cur_copy_size;
-
-		dst_left -= cur_copy_size;
-		if (!dst_left) {
-			++dst_mm;
-			dst_start = dst_mm->start << PAGE_SHIFT;
-			dst_start +=
-				dst_ttm_bo->bdev->man[dst->mem_type].gpu_offset;
-			dst_left = dst_mm->size << PAGE_SHIFT;
-		} else
-			dst_start += cur_copy_size;
-
-	} while (total_copy_size < size);
-
-	/* Failure could occur after partial copy. So fill in amount copied
-	 * and fence, still fill-in
-	 */
-	if (actual_size)
-		*actual_size = total_copy_size;
-
+	r = amdgpu_ttm_copy_mem_to_mem(adev, &src, &dst, size, NULL,
+				       &fence);
+	if (r)
+		pr_err("Copy buffer failed %d\n", r);
+	else
+		*actual_size = size;
 	if (fence) {
 		amdgpu_bo_fence(src_mem->bo, fence, true);
 		amdgpu_bo_fence(dst_mem->bo, fence, true);
 	}
-
 	if (f)
-		*f = fence;
+		*f = dma_fence_get(fence);
+	dma_fence_put(fence);
 
-copy_fail:
 	ttm_eu_backoff_reservation(&ticket, &list);
 	return r;
 }
-
