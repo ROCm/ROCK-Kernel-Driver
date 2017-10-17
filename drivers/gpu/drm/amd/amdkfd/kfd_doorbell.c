@@ -31,7 +31,11 @@
  * kernel queues using the first doorbell page reserved for the kernel.
  */
 
+#if !defined(OS_NAME_RHEL_6)
 static DEFINE_IDA(doorbell_ida);
+#else
+static DEFINE_IDA2(doorbell_ida);
+#endif
 static unsigned int max_doorbell_slices;
 
 /*
