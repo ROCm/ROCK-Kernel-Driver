@@ -205,6 +205,8 @@ struct kfd_device_info {
 	bool is_need_iommu_device;
 	bool supports_cwsr;
 	bool needs_pci_atomics;
+	/* obtain from adev->sdma.num_instances */
+	unsigned int num_sdma_engines;
 };
 
 struct kfd_mem_obj {
