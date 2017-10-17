@@ -866,8 +866,8 @@ static int create_sdma_queue_nocpsch(struct device_queue_manager *dqm,
 	if (retval)
 		return retval;
 
-	q->properties.sdma_queue_id = q->sdma_id / CIK_SDMA_QUEUES_PER_ENGINE;
-	q->properties.sdma_engine_id = q->sdma_id % CIK_SDMA_QUEUES_PER_ENGINE;
+	q->properties.sdma_queue_id = q->sdma_id / CIK_SDMA_ENGINE_NUM;
+	q->properties.sdma_engine_id = q->sdma_id % CIK_SDMA_ENGINE_NUM;
 
 	retval = allocate_doorbell(qpd, q);
 	if (retval)
@@ -1091,9 +1091,9 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 		if (retval)
 			goto out_unlock;
 		q->properties.sdma_queue_id =
-			q->sdma_id / CIK_SDMA_QUEUES_PER_ENGINE;
+			q->sdma_id / CIK_SDMA_ENGINE_NUM;
 		q->properties.sdma_engine_id =
-			q->sdma_id % CIK_SDMA_QUEUES_PER_ENGINE;
+			q->sdma_id % CIK_SDMA_ENGINE_NUM;
 	}
 
 	retval = allocate_doorbell(qpd, q);
