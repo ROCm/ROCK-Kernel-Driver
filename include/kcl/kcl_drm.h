@@ -274,6 +274,9 @@ static inline int kcl_drm_universal_plane_init(struct drm_device *dev, struct dr
 			     unsigned long possible_crtcs,
 			     const struct drm_plane_funcs *funcs,
 			     const uint32_t *formats, unsigned int format_count,
+#if defined(UBUNTU_OEM_KERNEL)
+			     const uint64_t *format_modifiers,
+#endif
 			     enum drm_plane_type type,
 			     const char *name, ...)
 {
@@ -281,7 +284,11 @@ static inline int kcl_drm_universal_plane_init(struct drm_device *dev, struct dr
 		defined(OS_NAME_RHEL_7_3) || \
 		defined(OS_NAME_RHEL_7_4)
 		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
+#if defined(UBUNTU_OEM_KERNEL)
+				 formats, format_count, format_modifiers, type, name);
+#else
 				 formats, format_count, type, name);
+#endif
 #else
 		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
 				 formats, format_count, type);

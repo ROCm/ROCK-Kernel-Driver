@@ -3423,6 +3423,9 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 				&dm_plane_funcs,
 				rgb_formats,
 				ARRAY_SIZE(rgb_formats),
+#if defined(UBUNTU_OEM_KERNEL)
+				NULL,
+#endif
 				aplane->base.type, NULL);
 		break;
 	case DRM_PLANE_TYPE_OVERLAY:
@@ -3433,6 +3436,9 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 				&dm_plane_funcs,
 				yuv_formats,
 				ARRAY_SIZE(yuv_formats),
+#if defined(UBUNTU_OEM_KERNEL)
+				NULL,
+#endif
 				aplane->base.type, NULL);
 		break;
 	case DRM_PLANE_TYPE_CURSOR:
@@ -3443,6 +3449,9 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 				&dm_plane_funcs,
 				cursor_formats,
 				ARRAY_SIZE(cursor_formats),
+#if defined(UBUNTU_OEM_KERNEL)
+				NULL,
+#endif
 				aplane->base.type, NULL);
 		break;
 	}
