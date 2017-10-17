@@ -34,9 +34,10 @@
 #define QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS (2 * KFD_UNMAP_LATENCY_MS + 1000)
 
 #define KFD_DQM_FIRST_PIPE			(0)
-#define CIK_SDMA_QUEUES				(4)
 #define CIK_SDMA_QUEUES_PER_ENGINE		(2)
 #define CIK_SDMA_ENGINE_NUM			(2)
+#define CIK_SDMA_QUEUES				(CIK_SDMA_QUEUES_PER_ENGINE \
+						* CIK_SDMA_ENGINE_NUM)
 
 struct device_process_node {
 	struct qcm_process_device *qpd;
