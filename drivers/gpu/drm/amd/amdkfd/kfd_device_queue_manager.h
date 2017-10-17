@@ -34,10 +34,7 @@
 #define QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS (2 * KFD_UNMAP_LATENCY_MS + 1000)
 
 #define KFD_DQM_FIRST_PIPE			(0)
-#define CIK_SDMA_QUEUES_PER_ENGINE		(2)
-#define CIK_SDMA_ENGINE_NUM			(2)
-#define CIK_SDMA_QUEUES				(CIK_SDMA_QUEUES_PER_ENGINE \
-						* CIK_SDMA_ENGINE_NUM)
+#define KFD_SDMA_QUEUES_PER_ENGINE		(2)
 
 struct device_process_node {
 	struct qcm_process_device *qpd;
@@ -215,6 +212,7 @@ void program_sh_mem_settings(struct device_queue_manager *dqm,
 unsigned int get_queues_num(struct device_queue_manager *dqm);
 unsigned int get_queues_per_pipe(struct device_queue_manager *dqm);
 unsigned int get_pipes_per_mec(struct device_queue_manager *dqm);
+unsigned int get_num_sdma_queues(struct device_queue_manager *dqm);
 
 int process_evict_queues(struct device_queue_manager *dqm,
 		struct qcm_process_device *qpd,
