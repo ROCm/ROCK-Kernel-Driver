@@ -25,7 +25,9 @@
  *    Jerome Glisse <glisse@freedesktop.org>
  */
 #include <linux/pagemap.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0)
 #include <linux/sync_file.h>
+#endif
 #include <drm/drmP.h>
 #include <drm/amdgpu_drm.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
@@ -1407,6 +1409,7 @@ static struct dma_fence *amdgpu_cs_get_fence(struct amdgpu_device *adev,
 	return fence;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
 int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *filp)
 {
@@ -1462,6 +1465,14 @@ int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 		return -EINVAL;
 	}
 }
+#else
+int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
+				    struct drm_file *filp)
+{
+	DRM_ERROR("FENCE_TO_HANDLE ioctl is not supported for kernel < 4.13\n");
+	return -EINVAL;
+}
+#endif
 
 /**
  * amdgpu_cs_wait_all_fence - wait on all fences to signal
