@@ -1487,7 +1487,11 @@ static void dce_v6_0_audio_set_avi_infoframe(struct drm_encoder *encoder,
 	ssize_t err;
 	u32 tmp;
 
+#if defined(UBUNTU_OEM_KERNEL)
+	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode, false);
+#else
 	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode);
+#endif
 	if (err < 0) {
 		DRM_ERROR("failed to setup AVI infoframe: %zd\n", err);
 		return;
