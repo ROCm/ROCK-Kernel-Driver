@@ -277,7 +277,9 @@ void amdgpu_irq_fini(struct amdgpu_device *adev)
 {
 	unsigned i, j;
 
+#if !defined(UBUNTU_OEM_KERNEL)
 	drm_vblank_cleanup(adev->ddev);
+#endif
 	if (adev->irq.installed) {
 		drm_irq_uninstall(adev->ddev);
 		adev->irq.installed = false;
