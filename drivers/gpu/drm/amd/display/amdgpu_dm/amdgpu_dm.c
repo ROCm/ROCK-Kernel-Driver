@@ -244,7 +244,11 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	/* wakeup usersapce */
 	if (amdgpu_crtc->event) {
 		/* Update to correct count/ts if racing with vblank irq */
+#if defined(UBUNTU_OEM_KERNEL)
+		drm_crtc_accurate_vblank_count(&amdgpu_crtc->base);
+#else
 		drm_accurate_vblank_count(&amdgpu_crtc->base);
+#endif
 
 		drm_crtc_send_vblank_event(&amdgpu_crtc->base, amdgpu_crtc->event);
 
