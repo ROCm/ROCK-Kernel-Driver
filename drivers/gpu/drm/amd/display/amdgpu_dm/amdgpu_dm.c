@@ -2658,7 +2658,9 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.destroy = amdgpu_dm_crtc_destroy,
 	.gamma_set = drm_atomic_helper_legacy_gamma_set,
 	.set_config = drm_atomic_helper_set_config,
+#if !defined(UBUNTU_OEM_KERNEL)
 	.set_property = drm_atomic_helper_crtc_set_property,
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
 	.page_flip = amdgpu_atomic_helper_page_flip,
 #else
@@ -2929,11 +2931,15 @@ struct drm_connector_state *amdgpu_dm_connector_atomic_duplicate_state(
 }
 
 static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
+#if !defined(UBUNTU_OEM_KERNEL)
 	.dpms = drm_atomic_helper_connector_dpms,
+#endif
 	.reset = amdgpu_dm_connector_funcs_reset,
 	.detect = amdgpu_dm_connector_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
+#if !defined(UBUNTU_OEM_KERNEL)
 	.set_property = drm_atomic_helper_connector_set_property,
+#endif
 	.destroy = amdgpu_dm_connector_destroy,
 	.atomic_duplicate_state = amdgpu_dm_connector_atomic_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
@@ -3196,7 +3202,9 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.update_plane	= drm_atomic_helper_update_plane,
 	.disable_plane	= drm_atomic_helper_disable_plane,
 	.destroy	= drm_plane_cleanup,
+#if !defined(UBUNTU_OEM_KERNEL)
 	.set_property	= drm_atomic_helper_plane_set_property,
+#endif
 	.reset = dm_drm_plane_reset,
 	.atomic_duplicate_state = dm_drm_plane_duplicate_state,
 	.atomic_destroy_state = dm_drm_plane_destroy_state,

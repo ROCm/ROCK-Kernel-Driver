@@ -164,12 +164,16 @@ dm_dp_mst_connector_destroy(struct drm_connector *connector)
 }
 
 static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
+#if !defined(UBUNTU_OEM_KERNEL)
 	.dpms = drm_atomic_helper_connector_dpms,
+#endif
 	.detect = dm_dp_mst_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.destroy = dm_dp_mst_connector_destroy,
 	.reset = amdgpu_dm_connector_funcs_reset,
+#if !defined(UBUNTU_OEM_KERNEL)
 	.set_property = drm_atomic_helper_connector_set_property,
+#endif
 	.atomic_duplicate_state = amdgpu_dm_connector_atomic_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 	.atomic_set_property = amdgpu_dm_connector_atomic_set_property,
