@@ -153,4 +153,6 @@ include $(FULL_AMD_PATH)/backport/Makefile
 
 obj-$(CONFIG_DRM_AMDGPU)+= amdgpu.o
 
+#if defined(BUILD_AS_DKMS)
 CFLAGS_amdgpu_trace_points.o := -I$(src)
+#endif

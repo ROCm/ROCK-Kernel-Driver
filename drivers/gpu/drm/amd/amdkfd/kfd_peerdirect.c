@@ -51,7 +51,6 @@
 #include <linux/module.h>
 
 #include "kfd_priv.h"
-#include "amd_rdma.h"
 
 
 

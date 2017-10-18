@@ -137,4 +137,19 @@ static inline signed long kcl_fence_wait_timeout(kcl_fence_t *fences, bool intr,
 	return dma_fence_wait_timeout(fences, intr, timeout);
 #endif
 }
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+extern struct fence * _kcl_fence_get_rcu_safe(struct fence * __rcu *fencep);
+#endif
+
+static inline struct fence *
+kcl_fence_get_rcu_safe(struct fence * __rcu *fencep)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+	return _kcl_fence_get_rcu_safe(fencep);
+#else
+	return dma_fence_get_rcu_safe(fencep);
+#endif
+}
+
 #endif /* AMDKCL_FENCE_H */

@@ -675,6 +675,7 @@ struct amdgpu_ttm_tt {
 	spinlock_t              guptasklock;
 	struct list_head        guptasks;
 	atomic_t		mmu_invalidations;
+	uint32_t		last_set_pages;
 	struct list_head        list;
 };
 
@@ -692,6 +693,8 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 	if (!(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY))
 		flags |= FOLL_WRITE;
 
+	down_read(&mm->mmap_sem);
+
 	if (gtt->userflags & AMDGPU_GEM_USERPTR_ANONONLY) {
 		/* check that we only use anonymous memory
 		   to prevent problems with writeback */
@@ -699,8 +702,10 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 		struct vm_area_struct *vma;
 
 		vma = find_vma(mm, gtt->userptr);
-		if (!vma || vma->vm_file || vma->vm_end < end)
+		if (!vma || vma->vm_file || vma->vm_end < end) {
+			up_read(&mm->mmap_sem);
 			return -EPERM;
+		}
 	}
 
 	do {
@@ -729,11 +734,45 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 
 	} while (pinned < ttm->num_pages);
 
+	up_read(&mm->mmap_sem);
 	return 0;
 
 release_pages:
 	release_pages(pages, pinned, 0);
+	up_read(&mm->mmap_sem);
 	return r;
+}
+
+void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct page **pages)
+{
+	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	unsigned i;
+
+	gtt->last_set_pages = atomic_read(&gtt->mmu_invalidations);
+	for (i = 0; i < ttm->num_pages; ++i) {
+		if (ttm->pages[i])
+			put_page(ttm->pages[i]);
+
+		ttm->pages[i] = pages ? pages[i] : NULL;
+	}
+}
+
+void amdgpu_ttm_tt_mark_user_pages(struct ttm_tt *ttm)
+{
+	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	unsigned i;
+
+	for (i = 0; i < ttm->num_pages; ++i) {
+		struct page *page = ttm->pages[i];
+
+		if (!page)
+			continue;
+
+		if (!(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY))
+			set_page_dirty(page);
+
+		mark_page_accessed(page);
+	}
 }
 
 static void amdgpu_trace_dma_map(struct ttm_tt *ttm)
@@ -791,7 +830,6 @@ static void amdgpu_ttm_tt_unpin_userptr(struct ttm_tt *ttm)
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(ttm->bdev);
 	struct amdgpu_ttm_tt *gtt = (void *)ttm;
-	struct sg_page_iter sg_iter;
 
 	int write = !(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY);
 	enum dma_data_direction direction = write ?
@@ -804,14 +842,7 @@ static void amdgpu_ttm_tt_unpin_userptr(struct ttm_tt *ttm)
 	/* free the sg table and pages again */
 	dma_unmap_sg(adev->dev, ttm->sg->sgl, ttm->sg->nents, direction);
 
-	for_each_sg_page(ttm->sg->sgl, &sg_iter, ttm->sg->nents, 0) {
-		struct page *page = sg_page_iter_page(&sg_iter);
-		if (!(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY))
-			set_page_dirty(page);
-
-		mark_page_accessed(page);
-		put_page(page);
-	}
+	amdgpu_ttm_tt_mark_user_pages(ttm);
 
 	amdgpu_trace_dma_unmap(ttm);
 
@@ -1036,6 +1067,7 @@ static void amdgpu_ttm_tt_unpopulate(struct ttm_tt *ttm)
 	bool slave = !!(ttm->page_flags & TTM_PAGE_FLAG_SG);
 
 	if (gtt && gtt->userptr) {
+		amdgpu_ttm_tt_set_user_pages(ttm, NULL);
 		kfree(ttm->sg);
 		ttm->page_flags &= ~TTM_PAGE_FLAG_SG;
 		return;
@@ -1065,6 +1097,7 @@ int amdgpu_ttm_tt_set_userptr(struct ttm_tt *ttm, uint64_t addr,
 	spin_lock_init(&gtt->guptasklock);
 	INIT_LIST_HEAD(&gtt->guptasks);
 	atomic_set(&gtt->mmu_invalidations, 0);
+	gtt->last_set_pages = 0;
 
 	return 0;
 }
@@ -1118,6 +1151,16 @@ bool amdgpu_ttm_tt_userptr_invalidated(struct ttm_tt *ttm,
 
 	*last_invalidated = atomic_read(&gtt->mmu_invalidations);
 	return prev_invalidated != *last_invalidated;
+}
+
+bool amdgpu_ttm_tt_userptr_needs_pages(struct ttm_tt *ttm)
+{
+	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+
+	if (gtt == NULL || !gtt->userptr)
+		return false;
+
+	return atomic_read(&gtt->mmu_invalidations) != gtt->last_set_pages;
 }
 
 bool amdgpu_ttm_tt_is_readonly(struct ttm_tt *ttm)
@@ -1239,14 +1282,14 @@ static int amdgpu_ttm_access_memory(struct ttm_buffer_object *bo,
 		}
 
 		spin_lock_irqsave(&adev->mmio_idx_lock, flags);
-		WREG32(mmMM_INDEX, ((uint32_t)aligned_pos) | 0x80000000);
-		WREG32(mmMM_INDEX_HI, aligned_pos >> 31);
+		WREG32_NO_KIQ(mmMM_INDEX, ((uint32_t)aligned_pos) | 0x80000000);
+		WREG32_NO_KIQ(mmMM_INDEX_HI, aligned_pos >> 31);
 		if (!write || mask != 0xffffffff)
-			value = RREG32(mmMM_DATA);
+			value = RREG32_NO_KIQ(mmMM_DATA);
 		if (write) {
 			value &= ~mask;
 			value |= (*(uint32_t *)buf << shift) & mask;
-			WREG32(mmMM_DATA, value);
+			WREG32_NO_KIQ(mmMM_DATA, value);
 		}
 		spin_unlock_irqrestore(&adev->mmio_idx_lock, flags);
 		if (!write) {
@@ -1964,9 +2007,9 @@ static ssize_t amdgpu_ttm_vram_read(struct file *f, char __user *buf,
 			return result;
 
 		spin_lock_irqsave(&adev->mmio_idx_lock, flags);
-		WREG32(mmMM_INDEX, ((uint32_t)*pos) | 0x80000000);
-		WREG32(mmMM_INDEX_HI, *pos >> 31);
-		value = RREG32(mmMM_DATA);
+		WREG32_NO_KIQ(mmMM_INDEX, ((uint32_t)*pos) | 0x80000000);
+		WREG32_NO_KIQ(mmMM_INDEX_HI, *pos >> 31);
+		value = RREG32_NO_KIQ(mmMM_DATA);
 		spin_unlock_irqrestore(&adev->mmio_idx_lock, flags);
 
 		r = put_user(value, (uint32_t *)buf);
@@ -1982,10 +2025,50 @@ static ssize_t amdgpu_ttm_vram_read(struct file *f, char __user *buf,
 	return result;
 }
 
+static ssize_t amdgpu_ttm_vram_write(struct file *f, const char __user *buf,
+				    size_t size, loff_t *pos)
+{
+	struct amdgpu_device *adev = file_inode(f)->i_private;
+	ssize_t result = 0;
+	int r;
+
+	if (size & 0x3 || *pos & 0x3)
+		return -EINVAL;
+
+	if (*pos >= adev->mc.mc_vram_size)
+		return -ENXIO;
+
+	while (size) {
+		unsigned long flags;
+		uint32_t value;
+
+		if (*pos >= adev->mc.mc_vram_size)
+			return result;
+
+		r = get_user(value, (uint32_t *)buf);
+		if (r)
+			return r;
+
+		spin_lock_irqsave(&adev->mmio_idx_lock, flags);
+		WREG32_NO_KIQ(mmMM_INDEX, ((uint32_t)*pos) | 0x80000000);
+		WREG32_NO_KIQ(mmMM_INDEX_HI, *pos >> 31);
+		WREG32_NO_KIQ(mmMM_DATA, value);
+		spin_unlock_irqrestore(&adev->mmio_idx_lock, flags);
+
+		result += 4;
+		buf += 4;
+		*pos += 4;
+		size -= 4;
+	}
+
+	return result;
+}
+
 static const struct file_operations amdgpu_ttm_vram_fops = {
 	.owner = THIS_MODULE,
 	.read = amdgpu_ttm_vram_read,
-	.llseek = default_llseek
+	.write = amdgpu_ttm_vram_write,
+	.llseek = default_llseek,
 };
 
 #ifdef CONFIG_DRM_AMDGPU_GART_DEBUGFS

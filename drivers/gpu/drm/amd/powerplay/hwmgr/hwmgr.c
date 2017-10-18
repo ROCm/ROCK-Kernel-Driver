@@ -35,15 +35,16 @@
 #include "ppsmc.h"
 #include "pp_acpi.h"
 #include "amd_acpi.h"
+#include "pp_psm.h"
 
 extern int cz_init_function_pointers(struct pp_hwmgr *hwmgr);
-
 static int polaris_set_asic_special_caps(struct pp_hwmgr *hwmgr);
 static void hwmgr_init_default_caps(struct pp_hwmgr *hwmgr);
 static int hwmgr_set_user_specify_caps(struct pp_hwmgr *hwmgr);
 static int fiji_set_asic_special_caps(struct pp_hwmgr *hwmgr);
 static int tonga_set_asic_special_caps(struct pp_hwmgr *hwmgr);
 static int topaz_set_asic_special_caps(struct pp_hwmgr *hwmgr);
+static int ci_set_asic_special_caps(struct pp_hwmgr *hwmgr);
 
 uint8_t convert_to_vid(uint16_t vddc)
 {
@@ -73,8 +74,16 @@ int hwmgr_early_init(struct pp_instance *handle)
 	hwmgr->dpm_level = AMD_DPM_FORCED_LEVEL_AUTO;
 	hwmgr_init_default_caps(hwmgr);
 	hwmgr_set_user_specify_caps(hwmgr);
+	hwmgr->fan_ctrl_is_in_default_mode = true;
 
 	switch (hwmgr->chip_family) {
+	case AMDGPU_FAMILY_CI:
+		ci_set_asic_special_caps(hwmgr);
+		hwmgr->feature_mask &= ~(PP_VBI_TIME_SUPPORT_MASK |
+					PP_ENABLE_GFX_CG_THRU_SMU);
+		hwmgr->pp_table_version = PP_TABLE_V0;
+		smu7_init_function_pointers(hwmgr);
+		break;
 	case AMDGPU_FAMILY_CZ:
 		cz_init_function_pointers(hwmgr);
 		break;
@@ -131,80 +140,6 @@ int hwmgr_early_init(struct pp_instance *handle)
 	return 0;
 }
 
-static int hw_init_power_state_table(struct pp_hwmgr *hwmgr)
-{
-	int result;
-	unsigned int i;
-	unsigned int table_entries;
-	struct pp_power_state *state;
-	int size;
-
-	if (hwmgr->hwmgr_func->get_num_of_pp_table_entries == NULL)
-		return -EINVAL;
-
-	if (hwmgr->hwmgr_func->get_power_state_size == NULL)
-		return -EINVAL;
-
-	hwmgr->num_ps = table_entries = hwmgr->hwmgr_func->get_num_of_pp_table_entries(hwmgr);
-
-	hwmgr->ps_size = size = hwmgr->hwmgr_func->get_power_state_size(hwmgr) +
-					  sizeof(struct pp_power_state);
-
-	hwmgr->ps = kzalloc(size * table_entries, GFP_KERNEL);
-	if (hwmgr->ps == NULL)
-		return -ENOMEM;
-
-	hwmgr->request_ps = kzalloc(size, GFP_KERNEL);
-	if (hwmgr->request_ps == NULL) {
-		kfree(hwmgr->ps);
-		hwmgr->ps = NULL;
-		return -ENOMEM;
-	}
-
-	hwmgr->current_ps = kzalloc(size, GFP_KERNEL);
-	if (hwmgr->current_ps == NULL) {
-		kfree(hwmgr->request_ps);
-		kfree(hwmgr->ps);
-		hwmgr->request_ps = NULL;
-		hwmgr->ps = NULL;
-		return -ENOMEM;
-	}
-
-	state = hwmgr->ps;
-
-	for (i = 0; i < table_entries; i++) {
-		result = hwmgr->hwmgr_func->get_pp_table_entry(hwmgr, i, state);
-
-		if (state->classification.flags & PP_StateClassificationFlag_Boot) {
-			hwmgr->boot_ps = state;
-			memcpy(hwmgr->current_ps, state, size);
-			memcpy(hwmgr->request_ps, state, size);
-		}
-
-		state->id = i + 1; /* assigned unique num for every power state id */
-
-		if (state->classification.flags & PP_StateClassificationFlag_Uvd)
-			hwmgr->uvd_ps = state;
-		state = (struct pp_power_state *)((unsigned long)state + size);
-	}
-
-	return 0;
-}
-
-static int hw_fini_power_state_table(struct pp_hwmgr *hwmgr)
-{
-	if (hwmgr == NULL)
-		return -EINVAL;
-
-	kfree(hwmgr->current_ps);
-	kfree(hwmgr->request_ps);
-	kfree(hwmgr->ps);
-	hwmgr->request_ps = NULL;
-	hwmgr->ps = NULL;
-	hwmgr->current_ps = NULL;
-	return 0;
-}
-
 int hwmgr_hw_init(struct pp_instance *handle)
 {
 	struct pp_hwmgr *hwmgr;
@@ -228,9 +163,22 @@ int hwmgr_hw_init(struct pp_instance *handle)
 	if (ret)
 		goto err1;
 
-	ret = hw_init_power_state_table(hwmgr);
+	ret = psm_init_power_state_table(hwmgr);
 	if (ret)
 		goto err2;
+
+	ret = phm_setup_asic(hwmgr);
+	if (ret)
+		goto err2;
+
+	ret = phm_enable_dynamic_state_management(hwmgr);
+	if (ret)
+		goto err2;
+	ret = phm_start_thermal_controller(hwmgr, NULL);
+	ret |= psm_set_performance_states(hwmgr);
+	if (ret)
+		goto err2;
+
 	return 0;
 err2:
 	if (hwmgr->hwmgr_func->backend_fini)
@@ -247,19 +195,137 @@ int hwmgr_hw_fini(struct pp_instance *handle)
 {
 	struct pp_hwmgr *hwmgr;
 
-	if (handle == NULL)
+	if (handle == NULL || handle->hwmgr == NULL)
 		return -EINVAL;
 
 	hwmgr = handle->hwmgr;
+
+	phm_stop_thermal_controller(hwmgr);
+	psm_set_boot_states(hwmgr);
+	psm_adjust_power_state_dynamic(hwmgr, false, NULL);
+	phm_disable_dynamic_state_management(hwmgr);
+	phm_disable_clock_power_gatings(hwmgr);
 
 	if (hwmgr->hwmgr_func->backend_fini)
 		hwmgr->hwmgr_func->backend_fini(hwmgr);
 	if (hwmgr->pptable_func->pptable_fini)
 		hwmgr->pptable_func->pptable_fini(hwmgr);
-	return hw_fini_power_state_table(hwmgr);
+	return psm_fini_power_state_table(hwmgr);
 }
 
+int hwmgr_hw_suspend(struct pp_instance *handle)
+{
+	struct pp_hwmgr *hwmgr;
+	int ret = 0;
 
+	if (handle == NULL || handle->hwmgr == NULL)
+		return -EINVAL;
+
+	hwmgr = handle->hwmgr;
+	phm_disable_smc_firmware_ctf(hwmgr);
+	ret = psm_set_boot_states(hwmgr);
+	if (ret)
+		return ret;
+	ret = psm_adjust_power_state_dynamic(hwmgr, false, NULL);
+	if (ret)
+		return ret;
+	ret = phm_power_down_asic(hwmgr);
+
+	return ret;
+}
+
+int hwmgr_hw_resume(struct pp_instance *handle)
+{
+	struct pp_hwmgr *hwmgr;
+	int ret = 0;
+
+	if (handle == NULL || handle->hwmgr == NULL)
+		return -EINVAL;
+
+	hwmgr = handle->hwmgr;
+	ret = phm_setup_asic(hwmgr);
+	if (ret)
+		return ret;
+
+	ret = phm_enable_dynamic_state_management(hwmgr);
+	if (ret)
+		return ret;
+	ret = phm_start_thermal_controller(hwmgr, NULL);
+	if (ret)
+		return ret;
+
+	ret |= psm_set_performance_states(hwmgr);
+	if (ret)
+		return ret;
+
+	ret = psm_adjust_power_state_dynamic(hwmgr, false, NULL);
+
+	return ret;
+}
+
+static enum PP_StateUILabel power_state_convert(enum amd_pm_state_type  state)
+{
+	switch (state) {
+	case POWER_STATE_TYPE_BATTERY:
+		return PP_StateUILabel_Battery;
+	case POWER_STATE_TYPE_BALANCED:
+		return PP_StateUILabel_Balanced;
+	case POWER_STATE_TYPE_PERFORMANCE:
+		return PP_StateUILabel_Performance;
+	default:
+		return PP_StateUILabel_None;
+	}
+}
+
+int hwmgr_handle_task(struct pp_instance *handle, enum amd_pp_task task_id,
+		void *input, void *output)
+{
+	int ret = 0;
+	struct pp_hwmgr *hwmgr;
+
+	if (handle == NULL || handle->hwmgr == NULL)
+		return -EINVAL;
+
+	hwmgr = handle->hwmgr;
+
+	switch (task_id) {
+	case AMD_PP_TASK_DISPLAY_CONFIG_CHANGE:
+		ret = phm_set_cpu_power_state(hwmgr);
+		if (ret)
+			return ret;
+		ret = psm_set_performance_states(hwmgr);
+		if (ret)
+			return ret;
+		ret = psm_adjust_power_state_dynamic(hwmgr, false, NULL);
+		break;
+	case AMD_PP_TASK_ENABLE_USER_STATE:
+	{
+		enum amd_pm_state_type ps;
+		enum PP_StateUILabel requested_ui_label;
+		struct pp_power_state *requested_ps = NULL;
+
+		if (input == NULL) {
+			ret = -EINVAL;
+			break;
+		}
+		ps = *(unsigned long *)input;
+
+		requested_ui_label = power_state_convert(ps);
+		ret = psm_set_user_performance_state(hwmgr, requested_ui_label, &requested_ps);
+		if (ret)
+			return ret;
+		ret = psm_adjust_power_state_dynamic(hwmgr, false, requested_ps);
+		break;
+	}
+	case AMD_PP_TASK_COMPLETE_INIT:
+	case AMD_PP_TASK_READJUST_POWER_STATE:
+		ret = psm_adjust_power_state_dynamic(hwmgr, false, NULL);
+		break;
+	default:
+		break;
+	}
+	return ret;
+}
 /**
  * Returns once the part of the register indicated by the mask has
  * reached the given value.
@@ -689,27 +755,7 @@ void phm_apply_dal_min_voltage_request(struct pp_hwmgr *hwmgr)
 
 void hwmgr_init_default_caps(struct pp_hwmgr *hwmgr)
 {
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_DisableVoltageTransition);
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_DisableEngineTransition);
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_DisableMemoryTransition);
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_DisableMGClockGating);
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_DisableMGCGTSSM);
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_DisableLSClockGating);
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_Force3DClockSupport);
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_DisableLightSleep);
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_DisableMCLS);
-	phm_cap_set(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_DisablePowerGating);
-
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_DisableDPM);
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_DisableSMUUVDHandshake);
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_ThermalAutoThrottling);
-
 	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_PCIEPerformanceRequest);
-
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_NoOD5Support);
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_UserMaxClockForMultiDisplays);
-
-	phm_cap_unset(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_VpuRecoveryInProgress);
 
 	phm_cap_set(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_UVDDPM);
 	phm_cap_set(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_VCEDPM);
@@ -735,7 +781,6 @@ void hwmgr_init_default_caps(struct pp_hwmgr *hwmgr)
 
 	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
 						PHM_PlatformCaps_FanSpeedInTableIsRPM);
-
 	return;
 }
 
@@ -784,7 +829,8 @@ int phm_get_voltage_evv_on_sclk(struct pp_hwmgr *hwmgr, uint8_t voltage_type,
 
 int polaris_set_asic_special_caps(struct pp_hwmgr *hwmgr)
 {
-
+	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
+						PHM_PlatformCaps_EVV);
 	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
 						PHM_PlatformCaps_SQRamping);
 	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
@@ -792,10 +838,6 @@ int polaris_set_asic_special_caps(struct pp_hwmgr *hwmgr)
 
 	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
 					PHM_PlatformCaps_AutomaticDCTransition);
-
-	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
-				PHM_PlatformCaps_TablelessHardwareInterface);
-
 
 	if (hwmgr->chip_id != CHIP_POLARIS10)
 		phm_cap_set(hwmgr->platform_descriptor.platformCaps,
@@ -814,6 +856,8 @@ int polaris_set_asic_special_caps(struct pp_hwmgr *hwmgr)
 
 int fiji_set_asic_special_caps(struct pp_hwmgr *hwmgr)
 {
+	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
+						PHM_PlatformCaps_EVV);
 	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
 			PHM_PlatformCaps_SQRamping);
 	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
@@ -822,15 +866,13 @@ int fiji_set_asic_special_caps(struct pp_hwmgr *hwmgr)
 			PHM_PlatformCaps_TDRamping);
 	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
 			PHM_PlatformCaps_TCPRamping);
-
-	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
-			PHM_PlatformCaps_TablelessHardwareInterface);
-
 	return 0;
 }
 
 int tonga_set_asic_special_caps(struct pp_hwmgr *hwmgr)
 {
+	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
+						PHM_PlatformCaps_EVV);
 	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
 			PHM_PlatformCaps_SQRamping);
 	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
@@ -844,14 +886,25 @@ int tonga_set_asic_special_caps(struct pp_hwmgr *hwmgr)
 		      PHM_PlatformCaps_UVDPowerGating);
 	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
 		      PHM_PlatformCaps_VCEPowerGating);
-
-	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
-			 PHM_PlatformCaps_TablelessHardwareInterface);
-
 	return 0;
 }
 
 int topaz_set_asic_special_caps(struct pp_hwmgr *hwmgr)
+{
+	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
+						PHM_PlatformCaps_EVV);
+	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
+			PHM_PlatformCaps_SQRamping);
+	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
+			PHM_PlatformCaps_DBRamping);
+	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
+			PHM_PlatformCaps_TDRamping);
+	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
+			PHM_PlatformCaps_TCPRamping);
+	return 0;
+}
+
+int ci_set_asic_special_caps(struct pp_hwmgr *hwmgr)
 {
 	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
 			PHM_PlatformCaps_SQRamping);
@@ -862,8 +915,8 @@ int topaz_set_asic_special_caps(struct pp_hwmgr *hwmgr)
 	phm_cap_unset(hwmgr->platform_descriptor.platformCaps,
 			PHM_PlatformCaps_TCPRamping);
 	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
-			 PHM_PlatformCaps_TablelessHardwareInterface);
+			PHM_PlatformCaps_MemorySpreadSpectrumSupport);
 	phm_cap_set(hwmgr->platform_descriptor.platformCaps,
-		    PHM_PlatformCaps_EVV);
+			PHM_PlatformCaps_EngineSpreadSpectrumSupport);
 	return 0;
 }

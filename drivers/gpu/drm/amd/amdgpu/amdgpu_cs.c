@@ -485,11 +485,16 @@ static int amdgpu_cs_list_validate(struct amdgpu_cs_parser *p,
 			return -EPERM;
 
 		/* Check if we have user pages and nobody bound the BO already */
-		if (lobj->user_pages && bo->tbo.ttm->state != tt_bound) {
-			size_t size = sizeof(struct page *);
-
-			size *= bo->tbo.ttm->num_pages;
-			memcpy(bo->tbo.ttm->pages, lobj->user_pages, size);
+		if (amdgpu_ttm_tt_userptr_needs_pages(bo->tbo.ttm) &&
+		    lobj->user_pages) {
+			amdgpu_ttm_placement_from_domain(bo,
+							 AMDGPU_GEM_DOMAIN_CPU);
+			r = ttm_bo_validate(&bo->tbo, &bo->placement, true,
+					    false);
+			if (r)
+				return r;
+			amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm,
+						     lobj->user_pages);
 			binding_userptr = true;
 		}
 
@@ -518,7 +523,6 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 	struct amdgpu_fpriv *fpriv = p->filp->driver_priv;
 	struct amdgpu_bo_list_entry *e;
 	struct list_head duplicates;
-	bool need_mmap_lock = false;
 	unsigned i, tries = 10;
 	int r;
 
@@ -526,9 +530,9 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 
 	p->bo_list = amdgpu_bo_list_get(fpriv, cs->in.bo_list_handle);
 	if (p->bo_list) {
-		need_mmap_lock = p->bo_list->first_userptr !=
-			p->bo_list->num_entries;
 		amdgpu_bo_list_get_list(p->bo_list, &p->validated);
+		if (p->bo_list->first_userptr != p->bo_list->num_entries)
+			p->mn = amdgpu_mn_get(p->adev, AMDGPU_MN_TYPE_GFX);
 	}
 
 	INIT_LIST_HEAD(&duplicates);
@@ -536,9 +540,6 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 
 	if (p->uf_entry.robj)
 		list_add(&p->uf_entry.tv.head, &p->validated);
-
-	if (need_mmap_lock)
-		down_read(&current->mm->mmap_sem);
 
 	while (1) {
 		struct list_head need_pages;
@@ -559,17 +560,19 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 		INIT_LIST_HEAD(&need_pages);
 		for (i = p->bo_list->first_userptr;
 		     i < p->bo_list->num_entries; ++i) {
+			struct amdgpu_bo *bo;
 
 			e = &p->bo_list->array[i];
+			bo = e->robj;
 
-			if (amdgpu_ttm_tt_userptr_invalidated(e->robj->tbo.ttm,
+			if (amdgpu_ttm_tt_userptr_invalidated(bo->tbo.ttm,
 				 &e->user_invalidated) && e->user_pages) {
 
 				/* We acquired a page array, but somebody
 				 * invalidated it. Free it and try again
 				 */
 				release_pages(e->user_pages,
-					      e->robj->tbo.ttm->num_pages,
+					      bo->tbo.ttm->num_pages,
 					      false);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 				drm_free_large(e->user_pages);
@@ -579,7 +582,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				e->user_pages = NULL;
 			}
 
-			if (e->robj->tbo.ttm->state != tt_bound &&
+			if (amdgpu_ttm_tt_userptr_needs_pages(bo->tbo.ttm) &&
 			    !e->user_pages) {
 				list_del(&e->tv.head);
 				list_add(&e->tv.head, &need_pages);
@@ -705,9 +708,6 @@ error_validate:
 
 error_free_pages:
 
-	if (need_mmap_lock)
-		up_read(&current->mm->mmap_sem);
-
 	if (p->bo_list) {
 		for (i = p->bo_list->first_userptr;
 		     i < p->bo_list->num_entries; ++i) {
@@ -758,11 +758,7 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 {
 	unsigned i;
 
-	if (!error)
-		ttm_eu_fence_buffer_objects(&parser->ticket,
-					    &parser->validated,
-					    parser->fence);
-	else if (backoff)
+	if (error && backoff)
 		ttm_eu_backoff_reservation(&parser->ticket,
 					   &parser->validated);
 
@@ -801,10 +797,6 @@ static int amdgpu_bo_vm_update_pte(struct amdgpu_cs_parser *p)
 	int i, r;
 
 	r = amdgpu_vm_update_directories(adev, vm);
-	if (r)
-		return r;
-
-	r = amdgpu_sync_fence(adev, &p->job->sync, vm->last_dir_update);
 	if (r)
 		return r;
 
@@ -861,7 +853,13 @@ static int amdgpu_bo_vm_update_pte(struct amdgpu_cs_parser *p)
 
 	}
 
-	r = amdgpu_vm_handle_moved(adev, vm, &p->job->sync);
+	r = amdgpu_vm_handle_moved(adev, vm);
+	if (r)
+		return r;
+
+	r = amdgpu_sync_fence(adev, &p->job->sync, vm->last_update);
+	if (r)
+		return r;
 
 	if (amdgpu_vm_debug && p->bo_list) {
 		/* Invalidate all BOs to test for userspace bugs */
@@ -964,11 +962,11 @@ static int amdgpu_cs_ib_fill(struct amdgpu_device *adev,
 			uint64_t offset;
 			uint8_t *kptr;
 
-			m = amdgpu_cs_find_mapping(parser, chunk_ib->va_start,
-						   &aobj);
-			if (!aobj) {
+			r = amdgpu_cs_find_mapping(parser, chunk_ib->va_start,
+						   &aobj, &m);
+			if (r) {
 				DRM_ERROR("IB va_start is invalid\n");
-				return -EINVAL;
+				return r;
 			}
 
 			if ((chunk_ib->va_start + chunk_ib->ib_bytes) >
@@ -1072,7 +1070,11 @@ static int amdgpu_syncobj_lookup_and_add_to_sync(struct amdgpu_cs_parser *p,
 {
 	int r;
 	struct dma_fence *fence;
+#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 	r = drm_syncobj_fence_get(p->filp, handle, &fence);
+#else
+	r = drm_syncobj_find_fence(p->filp, handle, &fence);
+#endif
 	if (r)
 		return r;
 
@@ -1175,7 +1177,21 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	struct amdgpu_ring *ring = p->job->ring;
 	struct amd_sched_entity *entity = &p->ctx->rings[ring->idx].entity;
 	struct amdgpu_job *job;
+	unsigned i;
 	int r;
+
+	amdgpu_mn_lock(p->mn);
+	if (p->bo_list) {
+		for (i = p->bo_list->first_userptr;
+		     i < p->bo_list->num_entries; ++i) {
+			struct amdgpu_bo *bo = p->bo_list->array[i].robj;
+
+			if (amdgpu_ttm_tt_userptr_needs_pages(bo->tbo.ttm)) {
+				amdgpu_mn_unlock(p->mn);
+				return -ERESTARTSYS;
+			}
+		}
+	}
 
 	job = p->job;
 	p->job = NULL;
@@ -1183,6 +1199,7 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	r = amd_sched_job_init(&job->base, &ring->sched, entity, p->filp);
 	if (r) {
 		amdgpu_job_free(job);
+		amdgpu_mn_unlock(p->mn);
 		return r;
 	}
 
@@ -1197,10 +1214,13 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	cs->out.handle = amdgpu_ctx_add_fence(p->ctx, ring, p->fence);
 	job->uf_sequence = cs->out.handle;
 	amdgpu_job_free_resources(job);
-	amdgpu_cs_parser_fini(p, 0, true);
 
 	trace_amdgpu_cs_ioctl(job);
 	amd_sched_entity_push_job(&job->base);
+
+	ttm_eu_fence_buffer_objects(&p->ticket, &p->validated, p->fence);
+	amdgpu_mn_unlock(p->mn);
+
 	return 0;
 }
 
@@ -1255,10 +1275,7 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 		goto out;
 
 	r = amdgpu_cs_submit(&parser, cs);
-	if (r)
-		goto out;
 
-	return 0;
 out:
 	amdgpu_cs_parser_fini(&parser, r, reserved_buffers);
 	return r;
@@ -1431,6 +1448,7 @@ static int amdgpu_cs_wait_any_fence(struct amdgpu_device *adev,
 			array[i] = fence;
 		} else { /* NULL, the fence has been already signaled */
 			r = 1;
+			first = i;
 			goto out;
 		}
 	}
@@ -1510,78 +1528,36 @@ err_free_fences:
  * virtual memory address. Returns allocation structure when found, NULL
  * otherwise.
  */
-struct amdgpu_bo_va_mapping *
-amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
-		       uint64_t addr, struct amdgpu_bo **bo)
+int amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
+			   uint64_t addr, struct amdgpu_bo **bo,
+			   struct amdgpu_bo_va_mapping **map)
 {
+	struct amdgpu_fpriv *fpriv = parser->filp->driver_priv;
+	struct amdgpu_vm *vm = &fpriv->vm;
 	struct amdgpu_bo_va_mapping *mapping;
-	unsigned i;
-
-	if (!parser->bo_list)
-		return NULL;
+	int r;
 
 	addr /= AMDGPU_GPU_PAGE_SIZE;
 
-	for (i = 0; i < parser->bo_list->num_entries; i++) {
-		struct amdgpu_bo_list_entry *lobj;
+	mapping = amdgpu_vm_bo_lookup_mapping(vm, addr);
+	if (!mapping || !mapping->bo_va || !mapping->bo_va->base.bo)
+		return -EINVAL;
 
-		lobj = &parser->bo_list->array[i];
-		if (!lobj->bo_va || amdgpu_ttm_adev(lobj->bo_va->base.bo->tbo.bdev) != parser->adev)
-			continue;
+	*bo = mapping->bo_va->base.bo;
+	*map = mapping;
 
-		list_for_each_entry(mapping, &lobj->bo_va->valids, list) {
-			if (mapping->start > addr ||
-			    addr > mapping->last)
-				continue;
+	/* Double check that the BO is reserved by this CS */
+	if (READ_ONCE((*bo)->tbo.resv->lock.ctx) != &parser->ticket)
+		return -EINVAL;
 
-			*bo = lobj->bo_va->base.bo;
-			return mapping;
-		}
+	r = amdgpu_ttm_bind(&(*bo)->tbo, &(*bo)->tbo.mem);
+	if (unlikely(r))
+		return r;
 
-		list_for_each_entry(mapping, &lobj->bo_va->invalids, list) {
-			if (mapping->start > addr ||
-			    addr > mapping->last)
-				continue;
-
-			*bo = lobj->bo_va->base.bo;
-			return mapping;
-		}
-	}
-
-	return NULL;
-}
-
-/**
- * amdgpu_cs_sysvm_access_required - make BOs accessible by the system VM
- *
- * @parser: command submission parser context
- *
- * Helper for UVD/VCE VM emulation, make sure BOs are accessible by the system VM.
- */
-int amdgpu_cs_sysvm_access_required(struct amdgpu_cs_parser *parser)
-{
-	unsigned i;
-	int r;
-
-	if (!parser->bo_list)
+	if ((*bo)->flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS)
 		return 0;
 
-	for (i = 0; i < parser->bo_list->num_entries; i++) {
-		struct amdgpu_bo *bo = parser->bo_list->array[i].robj;
-
-		r = amdgpu_ttm_bind(&bo->tbo, &bo->tbo.mem);
-		if (unlikely(r))
-			return r;
-
-		if (bo->flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS)
-			continue;
-
-		bo->flags |= AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS;
-		amdgpu_ttm_placement_from_domain(bo, bo->allowed_domains);
-		r = ttm_bo_validate(&bo->tbo, &bo->placement, false, false);
-		if (unlikely(r))
-			return r;
-	}
-
-	return 0;
+	(*bo)->flags |= AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS;
+	amdgpu_ttm_placement_from_domain(*bo, (*bo)->allowed_domains);
+	return ttm_bo_validate(&(*bo)->tbo, &(*bo)->placement, false, false);
 }

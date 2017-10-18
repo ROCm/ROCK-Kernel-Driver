@@ -33,6 +33,7 @@ struct pp_hwmgr;
 #define smu_lower_32_bits(n) ((uint32_t)(n))
 #define smu_upper_32_bits(n) ((uint32_t)(((n)>>16)>>16))
 
+extern const struct pp_smumgr_func ci_smu_funcs;
 extern const struct pp_smumgr_func cz_smu_funcs;
 extern const struct pp_smumgr_func iceland_smu_funcs;
 extern const struct pp_smumgr_func tonga_smu_funcs;
@@ -186,10 +187,8 @@ extern int smum_update_sclk_threshold(struct pp_hwmgr *hwmgr);
 
 extern int smum_update_smc_table(struct pp_hwmgr *hwmgr, uint32_t type);
 extern int smum_process_firmware_header(struct pp_hwmgr *hwmgr);
-extern int smum_thermal_avfs_enable(struct pp_hwmgr *hwmgr,
-		void *input, void *output, void *storage, int result);
-extern int smum_thermal_setup_fan_table(struct pp_hwmgr *hwmgr,
-		void *input, void *output, void *storage, int result);
+extern int smum_thermal_avfs_enable(struct pp_hwmgr *hwmgr);
+extern int smum_thermal_setup_fan_table(struct pp_hwmgr *hwmgr);
 extern int smum_init_smc_table(struct pp_hwmgr *hwmgr);
 extern int smum_populate_all_graphic_levels(struct pp_hwmgr *hwmgr);
 extern int smum_populate_all_memory_levels(struct pp_hwmgr *hwmgr);

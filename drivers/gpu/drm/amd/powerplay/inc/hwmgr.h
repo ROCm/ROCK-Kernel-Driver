@@ -109,10 +109,6 @@ enum PHM_BackEnd_Magic {
 #define PHM_PCIE_POWERGATING_TARGET_PLLCASCADE     2
 #define PHM_PCIE_POWERGATING_TARGET_PHY            3
 
-typedef int (*phm_table_function)(struct pp_hwmgr *hwmgr, void *input,
-				  void *output, void *storage, int result);
-
-typedef bool (*phm_check_function)(struct pp_hwmgr *hwmgr);
 
 struct phm_set_power_state_input {
 	const struct pp_hw_power_state *pcurrent_state;
@@ -147,30 +143,6 @@ struct phm_gfx_arbiter {
 	uint32_t num_cus;
 	uint32_t gfxclk;
 	uint32_t fclk;
-};
-
-/* Entries in the master tables */
-struct phm_master_table_item {
-	phm_check_function isFunctionNeededInRuntimeTable;
-	phm_table_function tableFunction;
-};
-
-enum phm_master_table_flag {
-	PHM_MasterTableFlag_None         = 0,
-	PHM_MasterTableFlag_ExitOnError  = 1,
-};
-
-/* The header of the master tables */
-struct phm_master_table_header {
-	uint32_t storage_size;
-	uint32_t flags;
-	const struct phm_master_table_item *master_list;
-};
-
-struct phm_runtime_table_header {
-	uint32_t storage_size;
-	bool exit_error;
-	phm_table_function *function_list;
 };
 
 struct phm_clock_array {
@@ -215,19 +187,6 @@ struct phm_phase_shedding_limits_record {
 	uint32_t    Sclk;
 	uint32_t    Mclk;
 };
-
-
-extern int phm_dispatch_table(struct pp_hwmgr *hwmgr,
-			      struct phm_runtime_table_header *rt_table,
-			      void *input, void *output);
-
-extern int phm_construct_table(struct pp_hwmgr *hwmgr,
-			       const struct phm_master_table_header *master_table,
-			       struct phm_runtime_table_header *rt_table);
-
-extern int phm_destroy_table(struct pp_hwmgr *hwmgr,
-			     struct phm_runtime_table_header *rt_table);
-
 
 struct phm_uvd_clock_voltage_dependency_record {
 	uint32_t vclk;
@@ -311,10 +270,10 @@ struct pp_hwmgr_func {
 			    unsigned long, struct pp_power_state *);
 	int (*get_num_of_pp_table_entries)(struct pp_hwmgr *hwmgr);
 	int (*powerdown_uvd)(struct pp_hwmgr *hwmgr);
-	int (*powergate_vce)(struct pp_hwmgr *hwmgr, bool bgate);
-	int (*powergate_uvd)(struct pp_hwmgr *hwmgr, bool bgate);
-	int (*get_mclk)(struct pp_hwmgr *hwmgr, bool low);
-	int (*get_sclk)(struct pp_hwmgr *hwmgr, bool low);
+	void (*powergate_vce)(struct pp_hwmgr *hwmgr, bool bgate);
+	void (*powergate_uvd)(struct pp_hwmgr *hwmgr, bool bgate);
+	uint32_t (*get_mclk)(struct pp_hwmgr *hwmgr, bool low);
+	uint32_t (*get_sclk)(struct pp_hwmgr *hwmgr, bool low);
 	int (*power_state_set)(struct pp_hwmgr *hwmgr,
 						const void *state);
 	int (*enable_clock_power_gating)(struct pp_hwmgr *hwmgr);
@@ -328,8 +287,8 @@ struct pp_hwmgr_func {
 	int (*get_temperature)(struct pp_hwmgr *hwmgr);
 	int (*stop_thermal_controller)(struct pp_hwmgr *hwmgr);
 	int (*get_fan_speed_info)(struct pp_hwmgr *hwmgr, struct phm_fan_speed_info *fan_speed_info);
-	int (*set_fan_control_mode)(struct pp_hwmgr *hwmgr, uint32_t mode);
-	int (*get_fan_control_mode)(struct pp_hwmgr *hwmgr);
+	void (*set_fan_control_mode)(struct pp_hwmgr *hwmgr, uint32_t mode);
+	uint32_t (*get_fan_control_mode)(struct pp_hwmgr *hwmgr);
 	int (*set_fan_speed_percent)(struct pp_hwmgr *hwmgr, uint32_t percent);
 	int (*get_fan_speed_percent)(struct pp_hwmgr *hwmgr, uint32_t *speed);
 	int (*set_fan_speed_rpm)(struct pp_hwmgr *hwmgr, uint32_t percent);
@@ -378,6 +337,9 @@ struct pp_hwmgr_func {
 			struct amd_pp_profile *request);
 	int (*avfs_control)(struct pp_hwmgr *hwmgr, bool enable);
 	int (*disable_smc_firmware_ctf)(struct pp_hwmgr *hwmgr);
+	int (*set_active_display_count)(struct pp_hwmgr *hwmgr, uint32_t count);
+	int (*set_deep_sleep_dcefclk)(struct pp_hwmgr *hwmgr, uint32_t clock);
+	int (*start_thermal_controller)(struct pp_hwmgr *hwmgr, struct PP_TemperatureRange *range);
 };
 
 struct pp_table_func {
@@ -525,25 +487,9 @@ struct phm_vq_budgeting_record {
 	uint32_t ulSustainableCUs;
 };
 
-struct phm_vq_budgeting_settings {
-	uint32_t ulSetting1;	/* RV: CUs */
-	uint32_t ulSetting2;	/* RV: SustainableSOCPowerLimitLow in W */
-	uint32_t ulSetting3;	/* RV: SustainableSOCPowerLimitHigh in W */
-	uint8_t ulSetting4;	/* RV: DispConfig */
-	uint32_t ulSetting5;	/* RV: Sustainable GFXCLK in 10KHz */
-	uint32_t ulSetting6;	/* RV: Sustainable FCLK in 10KHz */
-	uint32_t ulSetting7;	/* RV: Sustainable CUs */
-	uint32_t ulSetting8;	/* unused */
-	uint32_t ulSetting9;	/* unused */
-	uint32_t ulSetting10;	/* unused */
-};
-
 struct phm_vq_budgeting_table {
 	uint8_t numEntries;
-	union {
-		struct phm_vq_budgeting_record   entries[1];
-		struct phm_vq_budgeting_settings settings[1];
-	};
+	struct phm_vq_budgeting_record entries[1];
 };
 
 struct phm_clock_and_voltage_limits {
@@ -761,7 +707,7 @@ struct pp_hwmgr {
 
 	enum amd_dpm_forced_level dpm_level;
 	enum amd_dpm_forced_level saved_dpm_level;
-	bool block_hw_access;
+	enum amd_dpm_forced_level request_dpm_level;
 	struct phm_gfx_arbiter gfx_arbiter;
 	struct phm_acp_arbiter acp_arbiter;
 	struct phm_uvd_arbiter uvd_arbiter;
@@ -772,15 +718,6 @@ struct pp_hwmgr {
 	void *backend;
 	enum PP_DAL_POWERLEVEL dal_power_level;
 	struct phm_dynamic_state_info dyn_state;
-	struct phm_runtime_table_header setup_asic;
-	struct phm_runtime_table_header power_down_asic;
-	struct phm_runtime_table_header disable_dynamic_state_management;
-	struct phm_runtime_table_header enable_dynamic_state_management;
-	struct phm_runtime_table_header set_power_state;
-	struct phm_runtime_table_header enable_clock_power_gatings;
-	struct phm_runtime_table_header display_configuration_changed;
-	struct phm_runtime_table_header start_thermal_controller;
-	struct phm_runtime_table_header set_temperature_range;
 	const struct pp_hwmgr_func *hwmgr_func;
 	const struct pp_table_func *pptable_func;
 	struct pp_power_state    *ps;
@@ -800,17 +737,23 @@ struct pp_hwmgr {
 	struct amd_pp_display_configuration display_config;
 	uint32_t feature_mask;
 
-	/* power profile */
+	/* UMD Pstate */
 	struct amd_pp_profile gfx_power_profile;
 	struct amd_pp_profile compute_power_profile;
 	struct amd_pp_profile default_gfx_power_profile;
 	struct amd_pp_profile default_compute_power_profile;
 	enum amd_pp_profile_type current_power_profile;
+	bool en_umd_pstate;
 };
 
 extern int hwmgr_early_init(struct pp_instance *handle);
 extern int hwmgr_hw_init(struct pp_instance *handle);
 extern int hwmgr_hw_fini(struct pp_instance *handle);
+extern int hwmgr_hw_suspend(struct pp_instance *handle);
+extern int hwmgr_hw_resume(struct pp_instance *handle);
+extern int hwmgr_handle_task(struct pp_instance *handle,
+				enum amd_pp_task task_id,
+				void *input, void *output);
 extern int phm_wait_on_register(struct pp_hwmgr *hwmgr, uint32_t index,
 				uint32_t value, uint32_t mask);
 

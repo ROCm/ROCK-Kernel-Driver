@@ -77,7 +77,7 @@ static int gmc_v9_0_vm_fault_interrupt_state(struct amdgpu_device *adev,
 					enum amdgpu_interrupt_state state)
 {
 	struct amdgpu_vmhub *hub;
-	u32 tmp, reg, bits, i;
+	u32 tmp, reg, bits, i, j;
 
 	bits = VM_CONTEXT1_CNTL__RANGE_PROTECTION_FAULT_ENABLE_INTERRUPT_MASK |
 		VM_CONTEXT1_CNTL__DUMMY_PAGE_PROTECTION_FAULT_ENABLE_INTERRUPT_MASK |
@@ -89,43 +89,26 @@ static int gmc_v9_0_vm_fault_interrupt_state(struct amdgpu_device *adev,
 
 	switch (state) {
 	case AMDGPU_IRQ_STATE_DISABLE:
-		/* MM HUB */
-		hub = &adev->vmhub[AMDGPU_MMHUB];
-		for (i = 0; i< 16; i++) {
-			reg = hub->vm_context0_cntl + i;
-			tmp = RREG32(reg);
-			tmp &= ~bits;
-			WREG32(reg, tmp);
-		}
-
-		/* GFX HUB */
-		hub = &adev->vmhub[AMDGPU_GFXHUB];
-		for (i = 0; i < 16; i++) {
-			reg = hub->vm_context0_cntl + i;
-			tmp = RREG32(reg);
-			tmp &= ~bits;
-			WREG32(reg, tmp);
+		for (j = 0; j < AMDGPU_MAX_VMHUBS; j++) {
+			hub = &adev->vmhub[j];
+			for (i = 0; i < 16; i++) {
+				reg = hub->vm_context0_cntl + i;
+				tmp = RREG32(reg);
+				tmp &= ~bits;
+				WREG32(reg, tmp);
+			}
 		}
 		break;
 	case AMDGPU_IRQ_STATE_ENABLE:
-		/* MM HUB */
-		hub = &adev->vmhub[AMDGPU_MMHUB];
-		for (i = 0; i< 16; i++) {
-			reg = hub->vm_context0_cntl + i;
-			tmp = RREG32(reg);
-			tmp |= bits;
-			WREG32(reg, tmp);
+		for (j = 0; j < AMDGPU_MAX_VMHUBS; j++) {
+			hub = &adev->vmhub[j];
+			for (i = 0; i < 16; i++) {
+				reg = hub->vm_context0_cntl + i;
+				tmp = RREG32(reg);
+				tmp |= bits;
+				WREG32(reg, tmp);
+			}
 		}
-
-		/* GFX HUB */
-		hub = &adev->vmhub[AMDGPU_GFXHUB];
-		for (i = 0; i < 16; i++) {
-			reg = hub->vm_context0_cntl + i;
-			tmp = RREG32(reg);
-			tmp |= bits;
-			WREG32(reg, tmp);
-		}
-		break;
 	default:
 		break;
 	}
@@ -736,13 +719,10 @@ static int gmc_v9_0_gart_enable(struct amdgpu_device *adev)
 	if (r)
 		return r;
 
-	tmp = RREG32_SOC15(HDP, 0, mmHDP_MISC_CNTL);
-	tmp |= HDP_MISC_CNTL__FLUSH_INVALIDATE_CACHE_MASK;
-	WREG32_SOC15(HDP, 0, mmHDP_MISC_CNTL, tmp);
+	WREG32_FIELD15(HDP, 0, HDP_MISC_CNTL, FLUSH_INVALIDATE_CACHE, 1);
 
 	tmp = RREG32_SOC15(HDP, 0, mmHDP_HOST_PATH_CNTL);
 	WREG32_SOC15(HDP, 0, mmHDP_HOST_PATH_CNTL, tmp);
-
 
 	if (amdgpu_vm_fault_stop == AMDGPU_VM_FAULT_STOP_ALWAYS)
 		value = false;
@@ -751,7 +731,6 @@ static int gmc_v9_0_gart_enable(struct amdgpu_device *adev)
 
 	gfxhub_v1_0_set_fault_enable_default(adev, value);
 	mmhub_v1_0_set_fault_enable_default(adev, value);
-
 	gmc_v9_0_gart_flush_gpu_tlb(adev, 0);
 
 	DRM_INFO("PCIE GART of %uM enabled (table at 0x%016llX).\n",
@@ -770,17 +749,11 @@ static int gmc_v9_0_hw_init(void *handle)
 	gmc_v9_0_init_golden_registers(adev);
 
 	if (adev->mode_info.num_crtc) {
-		u32 tmp;
-
 		/* Lockout access through VGA aperture*/
-		tmp = RREG32_SOC15(DCE, 0, mmVGA_HDP_CONTROL);
-		tmp = REG_SET_FIELD(tmp, VGA_HDP_CONTROL, VGA_MEMORY_DISABLE, 1);
-		WREG32_SOC15(DCE, 0, mmVGA_HDP_CONTROL, tmp);
+		WREG32_FIELD15(DCE, 0, VGA_HDP_CONTROL, VGA_MEMORY_DISABLE, 1);
 
 		/* disable VGA render */
-		tmp = RREG32_SOC15(DCE, 0, mmVGA_RENDER_CONTROL);
-		tmp = REG_SET_FIELD(tmp, VGA_RENDER_CONTROL, VGA_VSTATUS_CNTL, 0);
-		WREG32_SOC15(DCE, 0, mmVGA_RENDER_CONTROL, tmp);
+		WREG32_FIELD15(DCE, 0, VGA_RENDER_CONTROL, VGA_VSTATUS_CNTL, 0);
 	}
 
 	r = gmc_v9_0_gart_enable(adev);
@@ -822,9 +795,7 @@ static int gmc_v9_0_suspend(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-	gmc_v9_0_hw_fini(adev);
-
-	return 0;
+	return gmc_v9_0_hw_fini(adev);
 }
 
 static int gmc_v9_0_resume(void *handle)

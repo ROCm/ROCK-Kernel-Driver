@@ -66,6 +66,7 @@
 #include "amdgpu_vce.h"
 #include "amdgpu_vcn.h"
 #include "amdgpu_dm.h"
+#include "amdgpu_mn.h"
 
 #include "gpu_scheduler.h"
 #include "amdgpu_virt.h"
@@ -182,6 +183,7 @@ struct amdgpu_job;
 struct amdgpu_irq_src;
 struct amdgpu_fpriv;
 struct kfd_vm_fault_info;
+struct amdgpu_bo_va_mapping;
 
 enum amdgpu_cp_irq {
 	AMDGPU_CP_IRQ_GFX_EOP = 0,
@@ -1086,6 +1088,7 @@ struct amdgpu_cs_parser {
 	/* buffer objects */
 	struct ww_acquire_ctx		ticket;
 	struct amdgpu_bo_list		*bo_list;
+	struct amdgpu_mn		*mn;
 	struct amdgpu_bo_list_entry	vm_pd;
 	struct list_head		validated;
 	struct dma_fence		*fence;
@@ -1227,20 +1230,6 @@ void amdgpu_benchmark(struct amdgpu_device *adev, int test_number);
  * Testing
  */
 void amdgpu_test_moves(struct amdgpu_device *adev);
-
-/*
- * MMU Notifier
- */
-#if defined(CONFIG_MMU_NOTIFIER)
-int amdgpu_mn_register(struct amdgpu_bo *bo, unsigned long addr);
-void amdgpu_mn_unregister(struct amdgpu_bo *bo);
-#else
-static inline int amdgpu_mn_register(struct amdgpu_bo *bo, unsigned long addr)
-{
-	return -ENODEV;
-}
-static inline void amdgpu_mn_unregister(struct amdgpu_bo *bo) {}
-#endif
 
 /*
  * Debugfs
@@ -1881,18 +1870,6 @@ void amdgpu_cs_report_moved_bytes(struct amdgpu_device *adev, u64 num_bytes,
 				  u64 num_vis_bytes);
 void amdgpu_ttm_placement_from_domain(struct amdgpu_bo *abo, u32 domain);
 bool amdgpu_ttm_bo_is_amdgpu_bo(struct ttm_buffer_object *bo);
-int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages);
-int amdgpu_ttm_tt_set_userptr(struct ttm_tt *ttm, uint64_t addr,
-				     uint32_t flags);
-bool amdgpu_ttm_tt_has_userptr(struct ttm_tt *ttm);
-struct mm_struct *amdgpu_ttm_tt_get_usermm(struct ttm_tt *ttm);
-bool amdgpu_ttm_tt_affect_userptr(struct ttm_tt *ttm, unsigned long start,
-				  unsigned long end);
-bool amdgpu_ttm_tt_userptr_invalidated(struct ttm_tt *ttm,
-				       int *last_invalidated);
-bool amdgpu_ttm_tt_is_readonly(struct ttm_tt *ttm);
-uint64_t amdgpu_ttm_tt_pte_flags(struct amdgpu_device *adev, struct ttm_tt *ttm,
-				 struct ttm_mem_reg *mem);
 void amdgpu_vram_location(struct amdgpu_device *adev, struct amdgpu_mc *mc, u64 base);
 void amdgpu_gart_location(struct amdgpu_device *adev, struct amdgpu_mc *mc);
 void amdgpu_ttm_set_active_vram_size(struct amdgpu_device *adev, u64 size);
@@ -1985,10 +1962,9 @@ static inline int amdgpu_acpi_init(struct amdgpu_device *adev) { return 0; }
 static inline void amdgpu_acpi_fini(struct amdgpu_device *adev) { }
 #endif
 
-struct amdgpu_bo_va_mapping *
-amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
-		       uint64_t addr, struct amdgpu_bo **bo);
-int amdgpu_cs_sysvm_access_required(struct amdgpu_cs_parser *parser);
+int amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
+			   uint64_t addr, struct amdgpu_bo **bo,
+			   struct amdgpu_bo_va_mapping **mapping);
 
 #if defined(CONFIG_DRM_AMD_DC)
 int amdgpu_dm_display_resume(struct amdgpu_device *adev );

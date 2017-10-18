@@ -585,9 +585,7 @@ static int init_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 		goto unregister_out;
 	}
 
-	down_read(&mm->mmap_sem);
 	ret = amdgpu_ttm_tt_get_user_pages(bo->tbo.ttm, mem->user_pages);
-	up_read(&mm->mmap_sem);
 	if (ret) {
 		pr_err("%s: Failed to get user pages: %d\n", __func__, ret);
 		goto free_out;
@@ -1961,7 +1959,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 {
 	struct kgd_mem *mem, *tmp_mem;
 	struct amdgpu_bo *bo;
-	int invalid, ret = 0;
+	int invalid, ret;
 
 	/* Move all invalidated BOs to the userptr_inval_list and
 	 * release their user pages by migration to the CPU domain
@@ -1993,7 +1991,6 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		return 0; /* All evicted userptr BOs were freed */
 
 	/* Go through userptr_inval_list and update any invalid user_pages */
-	down_read(&mm->mmap_sem);
 	list_for_each_entry(mem, &process_info->userptr_inval_list,
 			    validate_list.head) {
 		invalid = atomic_read(&mem->invalid);
@@ -2017,10 +2014,9 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 					   GFP_KERNEL | __GFP_ZERO);
 #endif
 			if (!mem->user_pages) {
-				ret = -ENOMEM;
 				pr_err("%s: Failed to allocate pages array\n",
 				       __func__);
-				goto unlock_mmap_out;
+				return -ENOMEM;
 			}
 		} else if (mem->user_pages[0]) {
 			release_pages(mem->user_pages,
@@ -2034,7 +2030,6 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 			mem->user_pages[0] = NULL;
 			pr_info("%s: Failed to get user pages: %d\n",
 				__func__, ret);
-			ret = 0;
 			/* Pretend it succeeded. It will fail later
 			 * with a VM fault if the GPU tries to access
 			 * it. Better than hanging indefinitely with
@@ -2045,14 +2040,10 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		/* Mark the BO as valid unless it was invalidated
 		 * again concurrently
 		 */
-		if (atomic_cmpxchg(&mem->invalid, invalid, 0) != invalid) {
-			ret = -EAGAIN;
-			goto unlock_mmap_out;
-		}
+		if (atomic_cmpxchg(&mem->invalid, invalid, 0) != invalid)
+			return -EAGAIN;
 	}
-unlock_mmap_out:
-	up_read(&mm->mmap_sem);
-	return ret;
+	return 0;
 }
 
 /* Validate invalid userptr BOs

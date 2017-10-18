@@ -66,38 +66,70 @@ MODULE_FIRMWARE("amdgpu/raven_rlc.bin");
 
 static const struct amdgpu_gds_reg_offset amdgpu_gds_reg_offset[] =
 {
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID0_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID0_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID0), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID0)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID1_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID1_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID1), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID1)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID2_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID2_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID2), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID2)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID3_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID3_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID3), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID3)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID4_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID4_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID4), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID4)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID5_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID5_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID5), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID5)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID6_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID6_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID6), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID6)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID7_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID7_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID7), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID7)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID8_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID8_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID8), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID8)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID9_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID9_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID9), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID9)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID10_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID10_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID10), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID10)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID11_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID11_SIZE),
-	       	SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID11), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID11)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID12_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID12_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID12), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID12)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID13_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID13_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID13), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID13)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID14_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID14_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID14), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID14)},
-	{SOC15_REG_OFFSET(GC, 0, mmGDS_VMID15_BASE), SOC15_REG_OFFSET(GC, 0, mmGDS_VMID15_SIZE),
-		SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID15), SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID15)}
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID0_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID0_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID0),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID0) },
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID1_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID1_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID1),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID1) },
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID2_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID2_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID2),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID2) },
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID3_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID3_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID3),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID3) },
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID4_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID4_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID4),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID4) },
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID5_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID5_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID5),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID5) },
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID6_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID6_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID6),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID6) },
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID7_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID7_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID7),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID7) },
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID8_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID8_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID8),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID8) },
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID9_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID9_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID9),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID9) },
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID10_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID10_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID10),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID10) },
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID11_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID11_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID11),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID11) },
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID12_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID12_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID12),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID12)},
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID13_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID13_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID13),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID13) },
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID14_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID14_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID14),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID14) },
+	{ SOC15_REG_OFFSET(GC, 0, mmGDS_VMID15_BASE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_VMID15_SIZE),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_GWS_VMID15),
+	  SOC15_REG_OFFSET(GC, 0, mmGDS_OA_VMID15) }
 };
 
 static const u32 golden_settings_gc_9_0[] =
@@ -1120,30 +1152,22 @@ static int gfx_v9_0_ngg_en(struct amdgpu_device *adev)
 {
 	struct amdgpu_ring *ring = &adev->gfx.gfx_ring[0];
 	int r;
-	u32 data;
-	u32 size;
-	u32 base;
+	u32 data, base;
 
 	if (!amdgpu_ngg)
 		return 0;
 
 	/* Program buffer size */
-	data = 0;
-	size = adev->gfx.ngg.buf[NGG_PRIM].size / 256;
-	data = REG_SET_FIELD(data, WD_BUF_RESOURCE_1, INDEX_BUF_SIZE, size);
-
-	size = adev->gfx.ngg.buf[NGG_POS].size / 256;
-	data = REG_SET_FIELD(data, WD_BUF_RESOURCE_1, POS_BUF_SIZE, size);
-
+	data = REG_SET_FIELD(0, WD_BUF_RESOURCE_1, INDEX_BUF_SIZE,
+			     adev->gfx.ngg.buf[NGG_PRIM].size >> 8);
+	data = REG_SET_FIELD(data, WD_BUF_RESOURCE_1, POS_BUF_SIZE,
+			     adev->gfx.ngg.buf[NGG_POS].size >> 8);
 	WREG32_SOC15(GC, 0, mmWD_BUF_RESOURCE_1, data);
 
-	data = 0;
-	size = adev->gfx.ngg.buf[NGG_CNTL].size / 256;
-	data = REG_SET_FIELD(data, WD_BUF_RESOURCE_2, CNTL_SB_BUF_SIZE, size);
-
-	size = adev->gfx.ngg.buf[NGG_PARAM].size / 1024;
-	data = REG_SET_FIELD(data, WD_BUF_RESOURCE_2, PARAM_BUF_SIZE, size);
-
+	data = REG_SET_FIELD(0, WD_BUF_RESOURCE_2, CNTL_SB_BUF_SIZE,
+			     adev->gfx.ngg.buf[NGG_CNTL].size >> 8);
+	data = REG_SET_FIELD(data, WD_BUF_RESOURCE_2, PARAM_BUF_SIZE,
+			     adev->gfx.ngg.buf[NGG_PARAM].size >> 10);
 	WREG32_SOC15(GC, 0, mmWD_BUF_RESOURCE_2, data);
 
 	/* Program buffer base address */
@@ -1306,7 +1330,10 @@ static int gfx_v9_0_sw_init(void *handle)
 	for (i = 0; i < adev->gfx.num_gfx_rings; i++) {
 		ring = &adev->gfx.gfx_ring[i];
 		ring->ring_obj = NULL;
-		sprintf(ring->name, "gfx");
+		if (!i)
+			sprintf(ring->name, "gfx");
+		else
+			sprintf(ring->name, "gfx_%d", i);
 		ring->use_doorbell = true;
 		ring->doorbell_index = AMDGPU_DOORBELL64_GFX_RING0 << 1;
 		r = amdgpu_ring_init(adev, ring, 1024,
@@ -1740,11 +1767,7 @@ static int gfx_v9_0_init_rlc_save_restore_list(struct amdgpu_device *adev)
 
 static void gfx_v9_0_enable_save_restore_machine(struct amdgpu_device *adev)
 {
-	u32 tmp = 0;
-
-	tmp = RREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_SRM_CNTL));
-	tmp |= RLC_SRM_CNTL__SRM_ENABLE_MASK;
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_SRM_CNTL), tmp);
+	WREG32_FIELD15(GC, 0, RLC_SRM_CNTL, SRM_ENABLE, 1);
 }
 
 static void pwr_10_0_gfxip_control_over_cgpg(struct amdgpu_device *adev,
@@ -1822,16 +1845,11 @@ static void gfx_v9_0_enable_sck_slow_down_on_power_up(struct amdgpu_device *adev
 	uint32_t default_data = 0;
 
 	default_data = data = RREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL));
-
-	if (enable == true) {
-		data |= RLC_PG_CNTL__SMU_CLK_SLOWDOWN_ON_PU_ENABLE_MASK;
-		if (default_data != data)
-			WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL), data);
-	} else {
-		data &= ~RLC_PG_CNTL__SMU_CLK_SLOWDOWN_ON_PU_ENABLE_MASK;
-		if(default_data != data)
-			WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL), data);
-	}
+	data = REG_SET_FIELD(data, RLC_PG_CNTL,
+			     SMU_CLK_SLOWDOWN_ON_PU_ENABLE,
+			     enable ? 1 : 0);
+	if (default_data != data)
+		WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL), data);
 }
 
 static void gfx_v9_0_enable_sck_slow_down_on_power_down(struct amdgpu_device *adev,
@@ -1841,16 +1859,11 @@ static void gfx_v9_0_enable_sck_slow_down_on_power_down(struct amdgpu_device *ad
 	uint32_t default_data = 0;
 
 	default_data = data = RREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL));
-
-	if (enable == true) {
-		data |= RLC_PG_CNTL__SMU_CLK_SLOWDOWN_ON_PD_ENABLE_MASK;
-		if(default_data != data)
-			WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL), data);
-	} else {
-		data &= ~RLC_PG_CNTL__SMU_CLK_SLOWDOWN_ON_PD_ENABLE_MASK;
-		if(default_data != data)
-			WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL), data);
-	}
+	data = REG_SET_FIELD(data, RLC_PG_CNTL,
+			     SMU_CLK_SLOWDOWN_ON_PD_ENABLE,
+			     enable ? 1 : 0);
+	if(default_data != data)
+		WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL), data);
 }
 
 static void gfx_v9_0_enable_cp_power_gating(struct amdgpu_device *adev,
@@ -1860,16 +1873,11 @@ static void gfx_v9_0_enable_cp_power_gating(struct amdgpu_device *adev,
 	uint32_t default_data = 0;
 
 	default_data = data = RREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL));
-
-	if (enable == true) {
-		data &= ~RLC_PG_CNTL__CP_PG_DISABLE_MASK;
-		if(default_data != data)
-			WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL), data);
-	} else {
-		data |= RLC_PG_CNTL__CP_PG_DISABLE_MASK;
-		if(default_data != data)
-			WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL), data);
-	}
+	data = REG_SET_FIELD(data, RLC_PG_CNTL,
+			     CP_PG_DISABLE,
+			     enable ? 0 : 1);
+	if(default_data != data)
+		WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL), data);
 }
 
 static void gfx_v9_0_enable_gfx_cg_power_gating(struct amdgpu_device *adev,
@@ -1878,10 +1886,9 @@ static void gfx_v9_0_enable_gfx_cg_power_gating(struct amdgpu_device *adev,
 	uint32_t data, default_data;
 
 	default_data = data = RREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL));
-	if (enable == true)
-		data |= RLC_PG_CNTL__GFX_POWER_GATING_ENABLE_MASK;
-	else
-		data &= ~RLC_PG_CNTL__GFX_POWER_GATING_ENABLE_MASK;
+	data = REG_SET_FIELD(data, RLC_PG_CNTL,
+			     GFX_POWER_GATING_ENABLE,
+			     enable ? 1 : 0);
 	if(default_data != data)
 		WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL), data);
 }
@@ -1892,10 +1899,9 @@ static void gfx_v9_0_enable_gfx_pipeline_powergating(struct amdgpu_device *adev,
 	uint32_t data, default_data;
 
 	default_data = data = RREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL));
-	if (enable == true)
-		data |= RLC_PG_CNTL__GFX_PIPELINE_PG_ENABLE_MASK;
-	else
-		data &= ~RLC_PG_CNTL__GFX_PIPELINE_PG_ENABLE_MASK;
+	data = REG_SET_FIELD(data, RLC_PG_CNTL,
+			     GFX_PIPELINE_PG_ENABLE,
+			     enable ? 1 : 0);
 	if(default_data != data)
 		WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL), data);
 
@@ -1910,10 +1916,9 @@ static void gfx_v9_0_enable_gfx_static_mg_power_gating(struct amdgpu_device *ade
 	uint32_t data, default_data;
 
 	default_data = data = RREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL));
-	if (enable == true)
-		data |= RLC_PG_CNTL__STATIC_PER_CU_PG_ENABLE_MASK;
-	else
-		data &= ~RLC_PG_CNTL__STATIC_PER_CU_PG_ENABLE_MASK;
+	data = REG_SET_FIELD(data, RLC_PG_CNTL,
+			     STATIC_PER_CU_PG_ENABLE,
+			     enable ? 1 : 0);
 	if(default_data != data)
 		WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL), data);
 }
@@ -1924,10 +1929,9 @@ static void gfx_v9_0_enable_gfx_dynamic_mg_power_gating(struct amdgpu_device *ad
 	uint32_t data, default_data;
 
 	default_data = data = RREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL));
-	if (enable == true)
-		data |= RLC_PG_CNTL__DYN_PER_CU_PG_ENABLE_MASK;
-	else
-		data &= ~RLC_PG_CNTL__DYN_PER_CU_PG_ENABLE_MASK;
+	data = REG_SET_FIELD(data, RLC_PG_CNTL,
+			     DYN_PER_CU_PG_ENABLE,
+			     enable ? 1 : 0);
 	if(default_data != data)
 		WREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_PG_CNTL), data);
 }
@@ -1967,13 +1971,8 @@ static void gfx_v9_0_init_pg(struct amdgpu_device *adev)
 
 void gfx_v9_0_rlc_stop(struct amdgpu_device *adev)
 {
-	u32 tmp = RREG32_SOC15(GC, 0, mmRLC_CNTL);
-
-	tmp = REG_SET_FIELD(tmp, RLC_CNTL, RLC_ENABLE_F32, 0);
-	WREG32_SOC15(GC, 0, mmRLC_CNTL, tmp);
-
+	WREG32_FIELD15(GC, 0, RLC_CNTL, RLC_ENABLE_F32, 0);
 	gfx_v9_0_enable_gui_idle_interrupt(adev, false);
-
 	gfx_v9_0_wait_for_rlc_serdes(adev);
 }
 
@@ -2493,10 +2492,10 @@ static int gfx_v9_0_mqd_init(struct amdgpu_ring *ring)
 				    DOORBELL_SOURCE, 0);
 		tmp = REG_SET_FIELD(tmp, CP_HQD_PQ_DOORBELL_CONTROL,
 				    DOORBELL_HIT, 0);
-	}
-	else
+	} else {
 		tmp = REG_SET_FIELD(tmp, CP_HQD_PQ_DOORBELL_CONTROL,
 					 DOORBELL_EN, 0);
+	}
 
 	mqd->cp_hqd_pq_doorbell_control = tmp;
 
@@ -2941,15 +2940,10 @@ static bool gfx_v9_0_is_idle(void *handle)
 static int gfx_v9_0_wait_for_idle(void *handle)
 {
 	unsigned i;
-	u32 tmp;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
 	for (i = 0; i < adev->usec_timeout; i++) {
-		/* read MC_STATUS */
-		tmp = RREG32_SOC15(GC, 0, mmGRBM_STATUS) &
-			GRBM_STATUS__GUI_ACTIVE_MASK;
-
-		if (!REG_GET_FIELD(tmp, GRBM_STATUS, GUI_ACTIVE))
+		if (gfx_v9_0_is_idle(handle))
 			return 0;
 		udelay(1);
 	}
@@ -3510,7 +3504,9 @@ static void gfx_v9_0_ring_emit_hdp_flush(struct amdgpu_ring *ring)
 	u32 ref_and_mask, reg_mem_engine;
 	struct nbio_hdp_flush_reg *nbio_hf_reg;
 
-	if (ring->adev->asic_type == CHIP_VEGA10)
+	if (ring->adev->flags & AMD_IS_APU)
+		nbio_hf_reg = &nbio_v7_0_hdp_flush_reg;
+	else
 		nbio_hf_reg = &nbio_v6_1_hdp_flush_reg;
 
 	if (ring->funcs->type == AMDGPU_RING_TYPE_COMPUTE) {

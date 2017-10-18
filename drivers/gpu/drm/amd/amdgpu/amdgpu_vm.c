@@ -1152,9 +1152,8 @@ static int amdgpu_vm_update_level(struct amdgpu_device *adev,
 				goto error_free;
 
 			amdgpu_bo_fence(parent->base.bo, fence, true);
-			dma_fence_put(vm->last_dir_update);
-			vm->last_dir_update = dma_fence_get(fence);
-			dma_fence_put(fence);
+			dma_fence_put(vm->last_update);
+			vm->last_update = fence;
 		}
 	}
 
@@ -1547,10 +1546,12 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	nptes = last - start + 1;
 
 	/*
-	 * reserve space for one command every (1 << BLOCK_SIZE)
+	 * reserve space for two commands every (1 << BLOCK_SIZE)
 	 *  entries or 2k dwords (whatever is smaller)
+         *
+         * The second command is for the shadow pagetables.
 	 */
-	ncmds = (nptes >> min(adev->vm_manager.block_size, 11u)) + 1;
+	ncmds = ((nptes >> min(adev->vm_manager.block_size, 11u)) + 1) * 2;
 
 	/* padding, etc. */
 	ndw = 64;
@@ -1768,7 +1769,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	dma_addr_t *pages_addr = NULL;
 	struct ttm_mem_reg *mem;
 	struct drm_mm_node *nodes;
-	struct dma_fence *exclusive;
+	struct dma_fence *exclusive, **last_update;
 	uint64_t flags;
 	int r;
 
@@ -1796,6 +1797,11 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	else
 		flags = 0x0;
 
+	if (clear || (bo && bo->tbo.resv == vm->root.base.bo->tbo.resv))
+		last_update = &vm->last_update;
+	else
+		last_update = &bo_va->last_pt_update;
+
 	if (!clear && bo_va->base.moved) {
 		bo_va->base.moved = false;
 		list_splice_init(&bo_va->valids, &bo_va->invalids);
@@ -1807,7 +1813,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	list_for_each_entry(mapping, &bo_va->invalids, list) {
 		r = amdgpu_vm_bo_split_mapping(adev, exclusive, pages_addr, vm,
 					       mapping, flags, mem,
-					       &bo_va->last_pt_update);
+					       last_update);
 		if (r)
 			return r;
 	}
@@ -2027,15 +2033,15 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
  * PTs have to be reserved!
  */
 int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
-			   struct amdgpu_vm *vm,
-			   struct amdgpu_sync *sync)
+			   struct amdgpu_vm *vm)
 {
-	struct amdgpu_bo_va *bo_va = NULL;
 	bool clear;
 	int r = 0;
 
 	spin_lock(&vm->status_lock);
 	while (!list_empty(&vm->moved)) {
+		struct amdgpu_bo_va *bo_va;
+
 		bo_va = list_first_entry(&vm->moved,
 			struct amdgpu_bo_va, base.vm_status);
 		spin_unlock(&vm->status_lock);
@@ -2050,9 +2056,6 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 		spin_lock(&vm->status_lock);
 	}
 	spin_unlock(&vm->status_lock);
-
-	if (bo_va)
-		r = amdgpu_sync_fence(adev, sync, bo_va->last_pt_update);
 
 	return r;
 }
@@ -2112,6 +2115,7 @@ static void amdgpu_vm_bo_insert_map(struct amdgpu_device *adev,
 	struct amdgpu_vm *vm = bo_va->base.vm;
 	struct amdgpu_bo *bo = bo_va->base.bo;
 
+	mapping->bo_va = bo_va;
 	list_add(&mapping->list, &bo_va->invalids);
 	amdgpu_vm_it_insert(mapping, &vm->va);
 
@@ -2289,6 +2293,7 @@ int amdgpu_vm_bo_unmap(struct amdgpu_device *adev,
 
 	list_del(&mapping->list);
 	amdgpu_vm_it_remove(mapping, &vm->va);
+	mapping->bo_va = NULL;
 	trace_amdgpu_vm_bo_unmap(bo_va, mapping);
 
 	if (valid)
@@ -2374,6 +2379,7 @@ int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
 		if (tmp->last > eaddr)
 		    tmp->last = eaddr;
 
+		tmp->bo_va = NULL;
 		list_add(&tmp->list, &vm->freed);
 		trace_amdgpu_vm_bo_unmap(NULL, tmp);
 	}
@@ -2397,6 +2403,19 @@ int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
 	}
 
 	return 0;
+}
+
+/**
+ * amdgpu_vm_bo_lookup_mapping - find mapping by address
+ *
+ * @vm: the requested VM
+ *
+ * Find a mapping by it's address.
+ */
+struct amdgpu_bo_va_mapping *amdgpu_vm_bo_lookup_mapping(struct amdgpu_vm *vm,
+							 uint64_t addr)
+{
+	return amdgpu_vm_it_iter_first(&vm->va, addr, addr);
 }
 
 /**
@@ -2424,6 +2443,7 @@ void amdgpu_vm_bo_rmv(struct amdgpu_device *adev,
 	list_for_each_entry_safe(mapping, next, &bo_va->valids, list) {
 		list_del(&mapping->list);
 		amdgpu_vm_it_remove(mapping, &vm->va);
+		mapping->bo_va = NULL;
 		trace_amdgpu_vm_bo_unmap(bo_va, mapping);
 		list_add(&mapping->list, &vm->freed);
 	}
@@ -2596,7 +2616,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 			 vm->use_cpu_for_update ? "CPU" : "SDMA");
 	WARN_ONCE((vm->use_cpu_for_update & !amdgpu_vm_is_large_bar(adev)),
 		  "CPU update of VM recommended only for large BAR system\n");
-	vm->last_dir_update = NULL;
+	vm->last_update = NULL;
 
 	flags = AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS |
 			AMDGPU_GEM_CREATE_VRAM_CLEARED;
@@ -2638,11 +2658,8 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		if ((adev->vm_manager.n_compute_vms++ == 0) &&
 			(!amdgpu_sriov_vf(adev))) {
 			/* First Compute VM: enable compute power profile */
-			if (adev->pp_enabled)
+			if (adev->powerplay.pp_funcs->switch_power_profile)
 				amdgpu_dpm_switch_power_profile(adev,
-						AMD_PP_COMPUTE_PROFILE);
-			else if (adev->pm.funcs->switch_power_profile)
-				adev->pm.funcs->switch_power_profile(adev,
 						AMD_PP_COMPUTE_PROFILE);
 		}
 		mutex_unlock(&id_mgr->lock);
@@ -2716,11 +2733,8 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		if ((--adev->vm_manager.n_compute_vms == 0) &&
 			(!amdgpu_sriov_vf(adev))) {
 			/* Last Compute VM: enable graphics power profile */
-			if (adev->pp_enabled)
+			if (adev->powerplay.pp_funcs->switch_power_profile)
 				amdgpu_dpm_switch_power_profile(adev,
-						AMD_PP_GFX_PROFILE);
-			else if (adev->pm.funcs->switch_power_profile)
-				adev->pm.funcs->switch_power_profile(adev,
 						AMD_PP_GFX_PROFILE);
 		}
 		mutex_unlock(&id_mgr->lock);
@@ -2747,7 +2761,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	}
 
 	amdgpu_vm_free_levels(&vm->root);
-	dma_fence_put(vm->last_dir_update);
+	dma_fence_put(vm->last_update);
 	for (i = 0; i < AMDGPU_MAX_VMHUBS; i++)
 		amdgpu_vm_free_reserved_vmid(adev, vm, i);
 }

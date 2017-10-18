@@ -35,6 +35,7 @@
 
 /* bo virtual addresses in a vm */
 struct amdgpu_bo_va_mapping {
+	struct amdgpu_bo_va		*bo_va;
 	struct list_head		list;
 	struct rb_node			rb;
 	uint64_t			start;
@@ -206,14 +207,6 @@ int amdgpu_bo_create(struct amdgpu_device *adev,
 			    struct reservation_object *resv,
 			    uint64_t init_value,
 			    struct amdgpu_bo **bo_ptr);
-int amdgpu_bo_create_restricted(struct amdgpu_device *adev,
-				unsigned long size, int byte_align,
-				bool kernel, u32 domain, u64 flags,
-				struct sg_table *sg,
-				struct ttm_placement *placement,
-			        struct reservation_object *resv,
-				uint64_t init_value,
-				struct amdgpu_bo **bo_ptr);
 int amdgpu_bo_create_reserved(struct amdgpu_device *adev,
 			      unsigned long size, int align,
 			      u32 domain, struct amdgpu_bo **bo_ptr,

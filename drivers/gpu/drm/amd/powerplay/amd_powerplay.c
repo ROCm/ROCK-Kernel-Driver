@@ -29,8 +29,6 @@
 #include "amd_powerplay.h"
 #include "pp_instance.h"
 #include "power_state.h"
-#include "eventmanager.h"
-
 
 static inline int pp_check(struct pp_instance *handle)
 {
@@ -43,8 +41,7 @@ static inline int pp_check(struct pp_instance *handle)
 	if (handle->pm_en == 0)
 		return PP_DPM_DISABLED;
 
-	if (handle->hwmgr == NULL || handle->hwmgr->hwmgr_func == NULL
-		|| handle->eventmgr == NULL)
+	if (handle->hwmgr == NULL || handle->hwmgr->hwmgr_func == NULL)
 		return PP_DPM_DISABLED;
 
 	return 0;
@@ -65,14 +62,6 @@ static int pp_early_init(void *handle)
 
 	ret = hwmgr_early_init(pp_handle);
 	if (ret) {
-		pp_handle->pm_en = 0;
-		return PP_DPM_DISABLED;
-	}
-
-	ret = eventmgr_early_init(pp_handle);
-	if (ret) {
-		kfree(pp_handle->hwmgr);
-		pp_handle->hwmgr = NULL;
 		pp_handle->pm_en = 0;
 		return PP_DPM_DISABLED;
 	}
@@ -122,7 +111,6 @@ static int pp_sw_fini(void *handle)
 static int pp_hw_init(void *handle)
 {
 	struct pp_smumgr *smumgr;
-	struct pp_eventmgr *eventmgr;
 	int ret = 0;
 	struct pp_instance *pp_handle = (struct pp_instance *)handle;
 
@@ -146,38 +134,23 @@ static int pp_hw_init(void *handle)
 	ret = hwmgr_hw_init(pp_handle);
 	if (ret)
 		goto err;
-
-	eventmgr = pp_handle->eventmgr;
-	if (eventmgr->pp_eventmgr_init == NULL ||
-		eventmgr->pp_eventmgr_init(eventmgr))
-		goto err;
-
 	return 0;
 err:
 	pp_handle->pm_en = 0;
-	kfree(pp_handle->eventmgr);
 	kfree(pp_handle->hwmgr);
 	pp_handle->hwmgr = NULL;
-	pp_handle->eventmgr = NULL;
 	return PP_DPM_DISABLED;
 }
 
 static int pp_hw_fini(void *handle)
 {
-	struct pp_eventmgr *eventmgr;
 	struct pp_instance *pp_handle = (struct pp_instance *)handle;
 	int ret = 0;
 
 	ret = pp_check(pp_handle);
-
-	if (ret == 0) {
-		eventmgr = pp_handle->eventmgr;
-
-		if (eventmgr->pp_eventmgr_fini != NULL)
-			eventmgr->pp_eventmgr_fini(eventmgr);
-
+	if (ret == 0)
 		hwmgr_hw_fini(pp_handle);
-	}
+
 	return 0;
 }
 
@@ -244,8 +217,6 @@ static int pp_set_powergating_state(void *handle,
 
 static int pp_suspend(void *handle)
 {
-	struct pp_eventmgr *eventmgr;
-	struct pem_event_data event_data = { {0} };
 	struct pp_instance *pp_handle = (struct pp_instance *)handle;
 	int ret = 0;
 
@@ -256,16 +227,11 @@ static int pp_suspend(void *handle)
 	else if (ret != 0)
 		return ret;
 
-	eventmgr = pp_handle->eventmgr;
-	pem_handle_event(eventmgr, AMD_PP_EVENT_SUSPEND, &event_data);
-
-	return 0;
+	return hwmgr_hw_suspend(pp_handle);
 }
 
 static int pp_resume(void *handle)
 {
-	struct pp_eventmgr *eventmgr;
-	struct pem_event_data event_data = { {0} };
 	struct pp_smumgr *smumgr;
 	int ret, ret1;
 	struct pp_instance *pp_handle = (struct pp_instance *)handle;
@@ -290,11 +256,7 @@ static int pp_resume(void *handle)
 	if (ret1 == PP_DPM_DISABLED)
 		return 0;
 
-	eventmgr = pp_handle->eventmgr;
-
-	pem_handle_event(eventmgr, AMD_PP_EVENT_RESUME, &event_data);
-
-	return 0;
+	return hwmgr_hw_resume(pp_handle);
 }
 
 const struct amd_ip_funcs pp_ip_funcs = {
@@ -324,6 +286,42 @@ static int pp_dpm_fw_loading_complete(void *handle)
 	return 0;
 }
 
+static void pp_dpm_en_umd_pstate(struct pp_hwmgr  *hwmgr,
+						enum amd_dpm_forced_level *level)
+{
+	uint32_t profile_mode_mask = AMD_DPM_FORCED_LEVEL_PROFILE_STANDARD |
+					AMD_DPM_FORCED_LEVEL_PROFILE_MIN_SCLK |
+					AMD_DPM_FORCED_LEVEL_PROFILE_MIN_MCLK |
+					AMD_DPM_FORCED_LEVEL_PROFILE_PEAK;
+
+	if (!(hwmgr->dpm_level & profile_mode_mask)) {
+		/* enter umd pstate, save current level, disable gfx cg*/
+		if (*level & profile_mode_mask) {
+			hwmgr->saved_dpm_level = hwmgr->dpm_level;
+			hwmgr->en_umd_pstate = true;
+			cgs_set_clockgating_state(hwmgr->device,
+						AMD_IP_BLOCK_TYPE_GFX,
+						AMD_CG_STATE_UNGATE);
+			cgs_set_powergating_state(hwmgr->device,
+					AMD_IP_BLOCK_TYPE_GFX,
+					AMD_PG_STATE_UNGATE);
+		}
+	} else {
+		/* exit umd pstate, restore level, enable gfx cg*/
+		if (!(*level & profile_mode_mask)) {
+			if (*level == AMD_DPM_FORCED_LEVEL_PROFILE_EXIT)
+				*level = hwmgr->saved_dpm_level;
+			hwmgr->en_umd_pstate = false;
+			cgs_set_clockgating_state(hwmgr->device,
+					AMD_IP_BLOCK_TYPE_GFX,
+					AMD_CG_STATE_GATE);
+			cgs_set_powergating_state(hwmgr->device,
+					AMD_IP_BLOCK_TYPE_GFX,
+					AMD_PG_STATE_GATE);
+		}
+	}
+}
+
 static int pp_dpm_force_performance_level(void *handle,
 					enum amd_dpm_forced_level level)
 {
@@ -338,13 +336,22 @@ static int pp_dpm_force_performance_level(void *handle,
 
 	hwmgr = pp_handle->hwmgr;
 
+	if (level == hwmgr->dpm_level)
+		return 0;
+
 	if (hwmgr->hwmgr_func->force_dpm_level == NULL) {
 		pr_info("%s was not implemented.\n", __func__);
 		return 0;
 	}
 
 	mutex_lock(&pp_handle->pp_lock);
-	hwmgr->hwmgr_func->force_dpm_level(hwmgr, level);
+	pp_dpm_en_umd_pstate(hwmgr, &level);
+	hwmgr->request_dpm_level = level;
+	hwmgr_handle_task(pp_handle, AMD_PP_TASK_READJUST_POWER_STATE, NULL, NULL);
+	ret = hwmgr->hwmgr_func->force_dpm_level(hwmgr, level);
+	if (!ret)
+		hwmgr->dpm_level = hwmgr->request_dpm_level;
+
 	mutex_unlock(&pp_handle->pp_lock);
 	return 0;
 }
@@ -369,11 +376,12 @@ static enum amd_dpm_forced_level pp_dpm_get_performance_level(
 	return level;
 }
 
-static int pp_dpm_get_sclk(void *handle, bool low)
+static uint32_t pp_dpm_get_sclk(void *handle, bool low)
 {
 	struct pp_hwmgr  *hwmgr;
 	struct pp_instance *pp_handle = (struct pp_instance *)handle;
 	int ret = 0;
+	uint32_t clk = 0;
 
 	ret = pp_check(pp_handle);
 
@@ -387,16 +395,17 @@ static int pp_dpm_get_sclk(void *handle, bool low)
 		return 0;
 	}
 	mutex_lock(&pp_handle->pp_lock);
-	ret = hwmgr->hwmgr_func->get_sclk(hwmgr, low);
+	clk = hwmgr->hwmgr_func->get_sclk(hwmgr, low);
 	mutex_unlock(&pp_handle->pp_lock);
-	return ret;
+	return clk;
 }
 
-static int pp_dpm_get_mclk(void *handle, bool low)
+static uint32_t pp_dpm_get_mclk(void *handle, bool low)
 {
 	struct pp_hwmgr  *hwmgr;
 	struct pp_instance *pp_handle = (struct pp_instance *)handle;
 	int ret = 0;
+	uint32_t clk = 0;
 
 	ret = pp_check(pp_handle);
 
@@ -410,12 +419,12 @@ static int pp_dpm_get_mclk(void *handle, bool low)
 		return 0;
 	}
 	mutex_lock(&pp_handle->pp_lock);
-	ret = hwmgr->hwmgr_func->get_mclk(hwmgr, low);
+	clk = hwmgr->hwmgr_func->get_mclk(hwmgr, low);
 	mutex_unlock(&pp_handle->pp_lock);
-	return ret;
+	return clk;
 }
 
-static int pp_dpm_powergate_vce(void *handle, bool gate)
+static void pp_dpm_powergate_vce(void *handle, bool gate)
 {
 	struct pp_hwmgr  *hwmgr;
 	struct pp_instance *pp_handle = (struct pp_instance *)handle;
@@ -424,21 +433,20 @@ static int pp_dpm_powergate_vce(void *handle, bool gate)
 	ret = pp_check(pp_handle);
 
 	if (ret != 0)
-		return ret;
+		return;
 
 	hwmgr = pp_handle->hwmgr;
 
 	if (hwmgr->hwmgr_func->powergate_vce == NULL) {
 		pr_info("%s was not implemented.\n", __func__);
-		return 0;
+		return;
 	}
 	mutex_lock(&pp_handle->pp_lock);
-	ret = hwmgr->hwmgr_func->powergate_vce(hwmgr, gate);
+	hwmgr->hwmgr_func->powergate_vce(hwmgr, gate);
 	mutex_unlock(&pp_handle->pp_lock);
-	return ret;
 }
 
-static int pp_dpm_powergate_uvd(void *handle, bool gate)
+static void pp_dpm_powergate_uvd(void *handle, bool gate)
 {
 	struct pp_hwmgr  *hwmgr;
 	struct pp_instance *pp_handle = (struct pp_instance *)handle;
@@ -447,74 +455,34 @@ static int pp_dpm_powergate_uvd(void *handle, bool gate)
 	ret = pp_check(pp_handle);
 
 	if (ret != 0)
-		return ret;
+		return;
 
 	hwmgr = pp_handle->hwmgr;
 
 	if (hwmgr->hwmgr_func->powergate_uvd == NULL) {
 		pr_info("%s was not implemented.\n", __func__);
-		return 0;
+		return;
 	}
 	mutex_lock(&pp_handle->pp_lock);
-	ret = hwmgr->hwmgr_func->powergate_uvd(hwmgr, gate);
+	hwmgr->hwmgr_func->powergate_uvd(hwmgr, gate);
 	mutex_unlock(&pp_handle->pp_lock);
-	return ret;
 }
 
-static enum PP_StateUILabel power_state_convert(enum amd_pm_state_type  state)
-{
-	switch (state) {
-	case POWER_STATE_TYPE_BATTERY:
-		return PP_StateUILabel_Battery;
-	case POWER_STATE_TYPE_BALANCED:
-		return PP_StateUILabel_Balanced;
-	case POWER_STATE_TYPE_PERFORMANCE:
-		return PP_StateUILabel_Performance;
-	default:
-		return PP_StateUILabel_None;
-	}
-}
-
-static int pp_dpm_dispatch_tasks(void *handle, enum amd_pp_event event_id,
+static int pp_dpm_dispatch_tasks(void *handle, enum amd_pp_task task_id,
 		void *input, void *output)
 {
 	int ret = 0;
-	struct pem_event_data data = { {0} };
 	struct pp_instance *pp_handle = (struct pp_instance *)handle;
 
 	ret = pp_check(pp_handle);
 
 	if (ret != 0)
 		return ret;
+
 	mutex_lock(&pp_handle->pp_lock);
-	switch (event_id) {
-	case AMD_PP_EVENT_DISPLAY_CONFIG_CHANGE:
-		ret = pem_handle_event(pp_handle->eventmgr, event_id, &data);
-		break;
-	case AMD_PP_EVENT_ENABLE_USER_STATE:
-	{
-		enum amd_pm_state_type  ps;
-
-		if (input == NULL) {
-			ret = -EINVAL;
-			break;
-		}
-		ps = *(unsigned long *)input;
-
-		data.requested_ui_label = power_state_convert(ps);
-		ret = pem_handle_event(pp_handle->eventmgr, event_id, &data);
-		break;
-	}
-	case AMD_PP_EVENT_COMPLETE_INIT:
-		ret = pem_handle_event(pp_handle->eventmgr, event_id, &data);
-		break;
-	case AMD_PP_EVENT_READJUST_POWER_STATE:
-		ret = pem_handle_event(pp_handle->eventmgr, event_id, &data);
-		break;
-	default:
-		break;
-	}
+	ret = hwmgr_handle_task(pp_handle, task_id, input, output);
 	mutex_unlock(&pp_handle->pp_lock);
+
 	return ret;
 }
 
@@ -562,7 +530,7 @@ static enum amd_pm_state_type pp_dpm_get_current_power_state(void *handle)
 	return pm_type;
 }
 
-static int pp_dpm_set_fan_control_mode(void *handle, uint32_t mode)
+static void pp_dpm_set_fan_control_mode(void *handle, uint32_t mode)
 {
 	struct pp_hwmgr  *hwmgr;
 	struct pp_instance *pp_handle = (struct pp_instance *)handle;
@@ -571,25 +539,25 @@ static int pp_dpm_set_fan_control_mode(void *handle, uint32_t mode)
 	ret = pp_check(pp_handle);
 
 	if (ret != 0)
-		return ret;
+		return;
 
 	hwmgr = pp_handle->hwmgr;
 
 	if (hwmgr->hwmgr_func->set_fan_control_mode == NULL) {
 		pr_info("%s was not implemented.\n", __func__);
-		return 0;
+		return;
 	}
 	mutex_lock(&pp_handle->pp_lock);
-	ret = hwmgr->hwmgr_func->set_fan_control_mode(hwmgr, mode);
+	hwmgr->hwmgr_func->set_fan_control_mode(hwmgr, mode);
 	mutex_unlock(&pp_handle->pp_lock);
-	return ret;
 }
 
-static int pp_dpm_get_fan_control_mode(void *handle)
+static uint32_t pp_dpm_get_fan_control_mode(void *handle)
 {
 	struct pp_hwmgr  *hwmgr;
 	struct pp_instance *pp_handle = (struct pp_instance *)handle;
 	int ret = 0;
+	uint32_t mode = 0;
 
 	ret = pp_check(pp_handle);
 
@@ -603,9 +571,9 @@ static int pp_dpm_get_fan_control_mode(void *handle)
 		return 0;
 	}
 	mutex_lock(&pp_handle->pp_lock);
-	ret = hwmgr->hwmgr_func->get_fan_control_mode(hwmgr);
+	mode = hwmgr->hwmgr_func->get_fan_control_mode(hwmgr);
 	mutex_unlock(&pp_handle->pp_lock);
-	return ret;
+	return mode;
 }
 
 static int pp_dpm_set_fan_speed_percent(void *handle, uint32_t percent)
@@ -1128,7 +1096,7 @@ static int pp_dpm_switch_power_profile(void *handle,
 	return 0;
 }
 
-const struct amd_powerplay_funcs pp_dpm_funcs = {
+const struct amd_pm_funcs pp_dpm_funcs = {
 	.get_temperature = pp_dpm_get_temperature,
 	.load_firmware = pp_dpm_load_fw,
 	.wait_for_fw_loading_complete = pp_dpm_fw_loading_complete,
@@ -1190,10 +1158,8 @@ int amd_powerplay_destroy(void *handle)
 	struct pp_instance *instance = (struct pp_instance *)handle;
 
 	if (instance->pm_en) {
-		kfree(instance->eventmgr);
 		kfree(instance->hwmgr);
 		instance->hwmgr = NULL;
-		instance->eventmgr = NULL;
 	}
 
 	kfree(instance->smu_mgr);
@@ -1206,8 +1172,6 @@ int amd_powerplay_destroy(void *handle)
 int amd_powerplay_reset(void *handle)
 {
 	struct pp_instance *instance = (struct pp_instance *)handle;
-	struct pp_eventmgr *eventmgr;
-	struct pem_event_data event_data = { {0} };
 	int ret;
 
 	if (cgs_is_virtualization_enabled(instance->smu_mgr->device))
@@ -1217,7 +1181,7 @@ int amd_powerplay_reset(void *handle)
 	if (ret != 0)
 		return ret;
 
-	ret = pp_hw_fini(handle);
+	ret = pp_hw_fini(instance);
 	if (ret)
 		return ret;
 
@@ -1225,16 +1189,7 @@ int amd_powerplay_reset(void *handle)
 	if (ret)
 		return PP_DPM_DISABLED;
 
-	eventmgr = instance->eventmgr;
-
-	if (eventmgr->pp_eventmgr_init == NULL)
-		return PP_DPM_DISABLED;
-
-	ret = eventmgr->pp_eventmgr_init(eventmgr);
-	if (ret)
-		return ret;
-
-	return pem_handle_event(eventmgr, AMD_PP_EVENT_COMPLETE_INIT, &event_data);
+	return hwmgr_handle_task(instance, AMD_PP_TASK_COMPLETE_INIT, NULL, NULL);
 }
 
 /* export this function to DAL */

@@ -140,7 +140,7 @@ struct amdgpu_vm {
 
 	/* contains the page directory */
 	struct amdgpu_vm_pt     root;
-	struct dma_fence	*last_dir_update;
+	struct dma_fence	*last_update;
 
 	/* protecting freed */
 	spinlock_t		freed_lock;
@@ -255,8 +255,7 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
 			  struct amdgpu_vm *vm,
 			  struct dma_fence **fence);
 int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
-			   struct amdgpu_vm *vm,
-			   struct amdgpu_sync *sync);
+			   struct amdgpu_vm *vm);
 int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 			struct amdgpu_bo_va *bo_va,
 			bool clear);
@@ -281,6 +280,8 @@ int amdgpu_vm_bo_unmap(struct amdgpu_device *adev,
 int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
 				struct amdgpu_vm *vm,
 				uint64_t saddr, uint64_t size);
+struct amdgpu_bo_va_mapping *amdgpu_vm_bo_lookup_mapping(struct amdgpu_vm *vm,
+							 uint64_t addr);
 void amdgpu_vm_bo_rmv(struct amdgpu_device *adev,
 		      struct amdgpu_bo_va *bo_va);
 void amdgpu_vm_set_fragment_size(struct amdgpu_device *adev,

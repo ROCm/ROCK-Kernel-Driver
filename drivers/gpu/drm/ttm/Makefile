@@ -7,7 +7,6 @@ else
 	TTM_NAME = ttm
 endif
 
-ccflags-y := -I$(src)/.
 $(TTM_NAME)-y := ttm_memory.o ttm_tt.o ttm_bo.o \
 	ttm_bo_util.o ttm_bo_vm.o ttm_module.o \
 	ttm_object.o ttm_lock.o ttm_execbuf_util.o ttm_page_alloc.o \
@@ -18,3 +17,7 @@ obj-$(CONFIG_DRM_TTM) += $(TTM_NAME).o
 
 TTM_FULL_PATH = $(src)
 include $(TTM_FULL_PATH)/backport/Makefile
+
+#if defined(BUILD_AS_DKMS)
+CFLAGS_ttm_tracepoints.o := -I$(src)
+#endif

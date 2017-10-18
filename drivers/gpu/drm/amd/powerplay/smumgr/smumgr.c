@@ -65,6 +65,9 @@ int smum_early_init(struct pp_instance *handle)
 	handle->smu_mgr = smumgr;
 
 	switch (smumgr->chip_family) {
+	case AMDGPU_FAMILY_CI:
+		smumgr->smumgr_funcs = &ci_smu_funcs;
+		break;
 	case AMDGPU_FAMILY_CZ:
 		smumgr->smumgr_funcs = &cz_smu_funcs;
 		break;
@@ -114,8 +117,7 @@ int smum_early_init(struct pp_instance *handle)
 	return 0;
 }
 
-int smum_thermal_avfs_enable(struct pp_hwmgr *hwmgr,
-		void *input, void *output, void *storage, int result)
+int smum_thermal_avfs_enable(struct pp_hwmgr *hwmgr)
 {
 	if (NULL != hwmgr->smumgr->smumgr_funcs->thermal_avfs_enable)
 		return hwmgr->smumgr->smumgr_funcs->thermal_avfs_enable(hwmgr);
@@ -123,8 +125,7 @@ int smum_thermal_avfs_enable(struct pp_hwmgr *hwmgr,
 	return 0;
 }
 
-int smum_thermal_setup_fan_table(struct pp_hwmgr *hwmgr,
-		void *input, void *output, void *storage, int result)
+int smum_thermal_setup_fan_table(struct pp_hwmgr *hwmgr)
 {
 	if (NULL != hwmgr->smumgr->smumgr_funcs->thermal_setup_fan_table)
 		return hwmgr->smumgr->smumgr_funcs->thermal_setup_fan_table(hwmgr);
@@ -316,7 +317,7 @@ int smu_allocate_memory(void *device, uint32_t size,
 		return -EINVAL;
 
 	ret = cgs_alloc_gpu_mem(device, type, size, byte_align,
-				0, 0, (cgs_handle_t *)handle);
+				(cgs_handle_t *)handle);
 	if (ret)
 		return -ENOMEM;
 
