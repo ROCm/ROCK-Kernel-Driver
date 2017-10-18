@@ -5045,6 +5045,7 @@ static const struct pp_hwmgr_func vega10_hwmgr_funcs = {
 	.get_mclk_od = vega10_get_mclk_od,
 	.set_mclk_od = vega10_set_mclk_od,
 	.avfs_control = vega10_avfs_enable,
+	.start_thermal_controller = vega10_start_thermal_controller,
 };
 
 int vega10_hwmgr_init(struct pp_hwmgr *hwmgr)
