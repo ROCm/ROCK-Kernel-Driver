@@ -23,7 +23,9 @@
  */
 
 #include <drm/drmP.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
 #include <drm/drm_auth.h>
+#endif
 #include "amdgpu.h"
 #include "amdgpu_sched.h"
 
