@@ -4,7 +4,8 @@
 
 FULL_AMD_PATH=$(src)/..
 
-ccflags-y := -I$(FULL_AMD_PATH)/include/  \
+ccflags-y := -Iinclude/drm \
+		-I$(FULL_AMD_PATH)/include/  \
 		-I$(FULL_AMD_PATH)/include/asic_reg
 
 amdkfd-y	:= kfd_module.o kfd_device.o kfd_chardev.o kfd_topology.o \
