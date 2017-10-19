@@ -65,7 +65,11 @@ static int amdgpu_sched_process_priority_override(struct amdgpu_device *adev,
 
 	pid = get_pid(((struct drm_file *)filp->private_data)->pid);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+	mutex_lock(&adev->ddev->struct_mutex);
+#else
 	mutex_lock(&adev->ddev->filelist_mutex);
+#endif
 	list_for_each_entry(file, &adev->ddev->filelist, lhead) {
 		if (file->pid != pid)
 			continue;
@@ -74,7 +78,11 @@ static int amdgpu_sched_process_priority_override(struct amdgpu_device *adev,
 		idr_for_each_entry(&fpriv->ctx_mgr.ctx_handles, ctx, id)
 				amdgpu_ctx_priority_override(ctx, priority);
 	}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+	mutex_lock(&adev->ddev->struct_mutex);
+#else
 	mutex_unlock(&adev->ddev->filelist_mutex);
+#endif
 
 	put_pid(pid);
 
