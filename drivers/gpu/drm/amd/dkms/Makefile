@@ -20,6 +20,8 @@ else ifeq ("rhel",$(OS_NAME))
 subdir-ccflags-y += -DOS_NAME_RHEL
 else ifeq ("steamos",$(OS_NAME))
 subdir-ccflags-y += -DOS_NAME_STEAMOS
+else ifeq ("opensuse",$(OS_NAME))
+subdir-ccflags-y += -DOS_NAME_SLE
 else ifeq ("sled",$(OS_NAME))
 subdir-ccflags-y += -DOS_NAME_SLE
 else ifeq ("sles",$(OS_NAME))
@@ -33,6 +35,24 @@ endif
 subdir-ccflags-y += \
 	-DOS_VERSION_MAJOR=$(shell echo $(OS_VERSION).0 | cut -d. -f1) \
 	-DOS_VERSION_MINOR=$(shell echo $(OS_VERSION).0 | cut -d. -f2)
+
+ifeq ($(OS_NAME),"opensuse")
+ifeq ($(OS_VERSION),"42.3")
+subdir-ccflags-y += -DOS_NAME_SUSE_42_3
+endif
+endif
+
+ifeq ($(OS_NAME),"sled")
+ifeq ($(OS_VERSION),"12.3")
+subdir-ccflags-y += -DOS_NAME_SLE_12_3
+endif
+endif
+
+ifeq ($(OS_NAME),"sles")
+ifeq ($(OS_VERSION),"12.3")
+subdir-ccflags-y += -DOS_NAME_SLE_12_3
+endif
+endif
 
 ifeq ($(OS_NAME),"ubuntu")
 OS_BUILD_NUM = $(shell echo $(KERNELRELEASE) | cut -d '-' -f 2)
