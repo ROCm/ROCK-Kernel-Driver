@@ -60,6 +60,12 @@ subdir-ccflags-y += \
 	-include /usr/src/kernels/$(KERNELRELEASE)/include/drm/drm_backport.h
 endif
 
+ifeq ($(OS_NAME),"ubuntu")
+ifeq ("oem","$(shell uname -r | awk -F '-' '{ print $$(NF) }')")
+subdir-ccflags-y += -DUBUNTU_OEM_KERNEL
+endif
+endif
+
 DKMS_INCLUDE_PREFIX = \
 	-I$(src)/include \
 	-I$(src)/include/drm \
