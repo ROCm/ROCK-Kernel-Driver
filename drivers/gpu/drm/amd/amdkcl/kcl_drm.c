@@ -522,3 +522,11 @@ void amdkcl_drm_init(void)
 					_kcl_drm_atomic_helper_update_legacy_modeset_state_stub);
 	_kcl_drm_gem_prime_dmabuf_ops = amdkcl_fp_setup("drm_gem_prime_dmabuf_ops", NULL);
 }
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+bool drm_is_current_master(struct drm_file *fpriv)
+{
+	return fpriv->is_master && fpriv->master == fpriv->minor->master;
+}
+EXPORT_SYMBOL(drm_is_current_master);
+#endif

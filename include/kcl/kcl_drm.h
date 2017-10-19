@@ -350,4 +350,8 @@ extern struct dma_buf_ops *_kcl_drm_gem_prime_dmabuf_ops;
 #define drm_gem_prime_dmabuf_ops (*_kcl_drm_gem_prime_dmabuf_ops)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+bool drm_is_current_master(struct drm_file *fpriv);
+#endif
+
 #endif /* AMDKCL_DRM_H */
