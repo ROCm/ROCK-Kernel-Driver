@@ -335,8 +335,7 @@ _kcl_drm_atomic_helper_update_legacy_modeset_state_stub(struct drm_device *dev,
 	}
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0) && \
-	!defined(OS_NAME_UBUNTU)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0) && !(defined(OS_NAME_UBUNTU) || defined(OS_NAME_SLE))
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx)
 {
@@ -541,3 +540,11 @@ void amdkcl_drm_init(void)
 					_kcl_drm_atomic_helper_update_legacy_modeset_state_stub);
 	_kcl_drm_gem_prime_dmabuf_ops = amdkcl_fp_setup("drm_gem_prime_dmabuf_ops", NULL);
 }
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+bool drm_is_current_master(struct drm_file *fpriv)
+{
+	return fpriv->is_master && fpriv->master == fpriv->minor->master;
+}
+EXPORT_SYMBOL(drm_is_current_master);
+#endif
