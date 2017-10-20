@@ -2276,7 +2276,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 	struct amdkfd_vm *peer_vm;
 	struct kgd_mem *mem;
 	struct bo_vm_reservation_context ctx;
-	struct amdgpu_amdkfd_fence *old_fence;
+	struct amdgpu_amdkfd_fence *new_fence;
 	int ret = 0, i;
 	struct list_head duplicate_save;
 	struct amdgpu_sync sync_obj;
@@ -2290,19 +2290,6 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 			     GFP_KERNEL);
 	if (pd_bo_list == NULL)
 		return -ENOMEM;
-
-	/* Release old eviction fence and create new one. Use context and mm
-	 * from the old fence.
-	 */
-	old_fence = process_info->eviction_fence;
-	process_info->eviction_fence =
-		amdgpu_amdkfd_fence_create(old_fence->base.context,
-					   old_fence->mm);
-	dma_fence_put(&old_fence->base);
-	if (!process_info->eviction_fence) {
-		pr_err("Failed to create eviction fence\n");
-		goto evict_fence_fail;
-	}
 
 	i = 0;
 	mutex_lock(&process_info->lock);
@@ -2374,6 +2361,21 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 	}
 
 	amdgpu_sync_wait(ctx.sync, false);
+
+	/* Release old eviction fence and create new one, because fence only
+	 * goes from unsignaled to signaled, fence cannot be reused.
+	 * Use context and mm from the old fence.
+	 */
+	new_fence = amdgpu_amdkfd_fence_create(
+				process_info->eviction_fence->base.context,
+				process_info->eviction_fence->mm);
+	if (!new_fence) {
+		pr_err("Failed to create eviction fence\n");
+		ret = -ENOMEM;
+		goto validate_map_fail;
+	}
+	dma_fence_put(&process_info->eviction_fence->base);
+	process_info->eviction_fence = new_fence;
 
 	/* Wait for validate to finish and attach new eviction fence */
 	list_for_each_entry(mem, &process_info->kfd_bo_list,
