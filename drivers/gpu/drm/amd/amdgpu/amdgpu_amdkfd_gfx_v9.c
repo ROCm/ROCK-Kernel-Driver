@@ -973,7 +973,7 @@ static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
 	struct dma_fence *f;
 	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
 
-	mutex_lock(&adev->gfx.kiq.ring_mutex);
+	spin_lock(&adev->gfx.kiq.ring_lock);
 	amdgpu_ring_alloc(ring, 12); /* fence + invalidate_tlbs package*/
 	amdgpu_ring_write(ring, PACKET3(PACKET3_INVALIDATE_TLBS, 0));
 	amdgpu_ring_write(ring,
@@ -983,7 +983,7 @@ static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
 			PACKET3_INVALIDATE_TLBS_FLUSH_TYPE(2));
 	amdgpu_fence_emit(ring, &f);
 	amdgpu_ring_commit(ring);
-	mutex_unlock(&adev->gfx.kiq.ring_mutex);
+	spin_unlock(&adev->gfx.kiq.ring_lock);
 
 	r = dma_fence_wait(f, false);
 	if (r)
