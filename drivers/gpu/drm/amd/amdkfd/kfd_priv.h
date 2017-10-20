@@ -46,6 +46,14 @@
 #include <drm/amd_rdma.h>
 #include "amd_shared.h"
 
+/* Undefined prior to 4.5 kernel */
+#ifndef idr_for_each_entry_continue
+#define idr_for_each_entry_continue(idr, entry, id)			\
+	for ((entry) = idr_get_next((idr), &(id));			\
+		entry;							\
+		++id, (entry) = idr_get_next((idr), &(id)))
+#endif
+
 #define KFD_SYSFS_FILE_MODE 0444
 
 /* GPU ID hash width in bits */
