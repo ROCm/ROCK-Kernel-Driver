@@ -274,10 +274,8 @@ int psp_v10_0_cmd_submit(struct psp_context *psp,
 		write_frame = ring_buffer_start + (psp_write_ptr_reg / rb_frame_size_dw);
 	/* Check invalid write_frame ptr address */
 	if ((write_frame < ring_buffer_start) || (ring_buffer_end < write_frame)) {
-		DRM_ERROR("ring_buffer_start = %x; ring_buffer_end = %x; write_frame = %x\n",
-				ring_buffer_start,
-				ring_buffer_end,
-				write_frame);
+		DRM_ERROR("ring_buffer_start = %p; ring_buffer_end = %p; write_frame = %p\n",
+			  ring_buffer_start, ring_buffer_end, write_frame);
 		DRM_ERROR("write_frame is pointing to address out of bounds\n");
 		return -EINVAL;
 	}
