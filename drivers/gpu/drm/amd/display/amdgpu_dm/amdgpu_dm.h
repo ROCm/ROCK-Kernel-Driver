@@ -140,6 +140,10 @@ struct amdgpu_display_manager {
 
 	struct mod_freesync *freesync_module;
 
+	/**
+	 * Caches device atomic state for suspend/resume
+	 */
+	struct drm_atomic_state *cached_state;
 #ifdef ENABLE_FBC
 	struct dm_comressor_info compressor;
 #endif
