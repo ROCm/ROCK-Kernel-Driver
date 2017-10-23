@@ -89,6 +89,11 @@ module_param_named(noretry, vega10_noretry, int, 0644);
 MODULE_PARM_DESC(noretry,
 	"Set sh_mem_config.retry_disable on Vega10 (0 = retry enabled (default), 1 = retry disabled)");
 
+int cma_enable;
+module_param(cma_enable, int, 0644);
+MODULE_PARM_DESC(cma_enable,
+	"Enable CMA (1 = enable, 0 = disable (default)). Warning! relaxed access check");
+
 int kgd2kfd_init(unsigned int interface_version,
 		const struct kgd2kfd_calls **g2f)
 {
