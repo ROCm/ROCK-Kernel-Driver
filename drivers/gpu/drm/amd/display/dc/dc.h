@@ -1043,6 +1043,7 @@ struct dc_sink {
 
 	/* private to dc_sink.c */
 	struct kref refcount;
+
 };
 
 void dc_sink_retain(struct dc_sink *sink);
