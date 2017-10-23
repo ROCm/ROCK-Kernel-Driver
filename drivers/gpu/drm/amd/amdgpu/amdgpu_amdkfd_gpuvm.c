@@ -2394,12 +2394,12 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 
 		amdgpu_bo_fence(bo, &process_info->eviction_fence->base, true);
 	}
+
 validate_map_fail:
 	ttm_eu_backoff_reservation(&ctx.ticket, &ctx.list);
 	amdgpu_sync_free(&sync_obj);
 ttm_reserve_fail:
 	mutex_unlock(&process_info->lock);
-evict_fence_fail:
 	kfree(pd_bo_list);
 	return ret;
 }
