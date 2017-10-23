@@ -527,7 +527,7 @@ void amdkcl_drm_init(void)
 	_kcl_drm_gem_prime_dmabuf_ops = amdkcl_fp_setup("drm_gem_prime_dmabuf_ops", NULL);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
 bool drm_is_current_master(struct drm_file *fpriv)
 {
 	return fpriv->is_master && fpriv->master == fpriv->minor->master;
