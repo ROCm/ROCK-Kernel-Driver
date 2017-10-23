@@ -151,6 +151,14 @@ extern int ignore_crat;
  */
 extern int vega10_noretry;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) && defined(BUILD_AS_DKMS)
+/*
+ * Currently, mm_access() function is not exported. So for DKMS build,
+ * CMA will be enabled only if module param is set.
+ */
+extern int cma_enable;
+#endif
+
 /**
  * enum kfd_sched_policy
  *
