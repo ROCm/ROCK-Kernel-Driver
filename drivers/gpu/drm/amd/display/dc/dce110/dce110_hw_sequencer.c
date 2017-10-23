@@ -2272,8 +2272,7 @@ static void set_plane_config(
 	dce_enable_fe_clock(dc->hwseq, pipe_ctx->pipe_idx, true);
 
 	set_default_colors(pipe_ctx);
-	if (pipe_ctx->stream->csc_color_matrix.enable_adjustment
-			== true) {
+	if (pipe_ctx->stream->csc_color_matrix.enable_adjustment == true) {
 		tbl_entry.color_space =
 			pipe_ctx->stream->output_color_space;
 
