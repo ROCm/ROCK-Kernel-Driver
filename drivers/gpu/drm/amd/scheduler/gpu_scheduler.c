@@ -123,7 +123,7 @@ amd_sched_rq_select_entity(struct amd_sched_rq *rq)
 int amd_sched_entity_init(struct amd_gpu_scheduler *sched,
 			  struct amd_sched_entity *entity,
 			  struct amd_sched_rq *rq,
-			  uint32_t jobs)
+			  uint32_t jobs, atomic_t *guilty)
 {
 	int r;
 
@@ -134,6 +134,7 @@ int amd_sched_entity_init(struct amd_gpu_scheduler *sched,
 	INIT_LIST_HEAD(&entity->list);
 	entity->rq = rq;
 	entity->sched = sched;
+	entity->guilty = guilty;
 
 	spin_lock_init(&entity->rq_lock);
 	spin_lock_init(&entity->queue_lock);
