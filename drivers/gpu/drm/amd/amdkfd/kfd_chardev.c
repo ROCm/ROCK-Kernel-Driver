@@ -1680,13 +1680,72 @@ static int kfd_ioctl_get_tile_config(struct file *filep,
 	return 0;
 }
 
+#ifndef PTRACE_MODE_ATTACH_REALCREDS
+#define PTRACE_MODE_ATTACH_REALCREDS  PTRACE_MODE_ATTACH
+#endif
+
 #if defined(BUILD_AS_DKMS)
-static int kfd_ioctl_cross_memory_copy(struct file *filep,
-				       struct kfd_process *local_p, void *data)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
+static bool kfd_may_access(struct task_struct *task, unsigned int mode)
 {
-	return 0;
+	bool access = false;
+	const struct cred *cred = current_cred(), *tcred;
+	kuid_t caller_uid = cred->fsuid;
+	kgid_t caller_gid = cred->fsgid;
+
+	task_lock(task);
+
+	if (same_thread_group(task, current)) {
+		access = true;
+		goto ok;
+	}
+
+	tcred = __task_cred(task);
+	if (uid_eq(caller_uid, tcred->euid) &&
+	    uid_eq(caller_uid, tcred->suid) &&
+	    uid_eq(caller_uid, tcred->uid)  &&
+	    gid_eq(caller_gid, tcred->egid) &&
+	    gid_eq(caller_gid, tcred->sgid) &&
+	    gid_eq(caller_gid, tcred->gid))
+		access = true;
+
+ok:
+	task_unlock(task);
+	return access;
 }
-#else
+/* mm_access() is currently not exported. This is a relaxed implementation
+ * that allows access as long as both process belong to same uid
+ */
+static struct mm_struct *kfd_relaxed_mm_access(struct task_struct *task,
+					       unsigned int mode)
+{
+	struct mm_struct *mm;
+	int err;
+
+	if (!cma_enable)
+		return ERR_PTR(-EACCES);
+
+	err =  mutex_lock_killable(&task->signal->cred_guard_mutex);
+	if (err)
+		return ERR_PTR(err);
+
+	mm = get_task_mm(task);
+	if (mm && mm != current->mm &&
+			!kfd_may_access(task, mode)) {
+		mmput(mm);
+		mm = ERR_PTR(-EACCES);
+	}
+	mutex_unlock(&task->signal->cred_guard_mutex);
+
+	return mm;
+}
+
+#define mm_access(task, mode) kfd_relaxed_mm_access(task, mode)
+#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) */
+#define mm_access(task, mode) ERR_PTR(-EACCES)
+#endif
+#endif /* defined(BUILD_AS_DKMS) */
+
 static int kfd_ioctl_cross_memory_copy(struct file *filep,
 				       struct kfd_process *local_p, void *data)
 {
@@ -1928,7 +1987,6 @@ copy_from_user_fail:
 	args->bytes_copied = total_copied;
 	return err;
 }
-#endif
 
 static int kfd_ioctl_get_queue_wave_state(struct file *filep,
 					  struct kfd_process *p, void *data)
