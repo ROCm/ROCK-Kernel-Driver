@@ -94,7 +94,7 @@ static int amdgpu_ctx_init(struct amdgpu_device *adev,
 			continue;
 
 		r = amd_sched_entity_init(&ring->sched, &ctx->rings[i].entity,
-					  rq, amdgpu_sched_jobs, NULL);
+					  rq, amdgpu_sched_jobs, &ctx->guilty);
 		if (r)
 			goto failed;
 	}
