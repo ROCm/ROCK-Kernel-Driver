@@ -1595,7 +1595,6 @@ void dc_flip_plane_addrs(
 		struct dc_flip_addrs flip_addrs[],
 		uint32_t count)
 {
-	struct core_dc *core_dc = DC_TO_CORE(dc);
 	int i, j;
 
 	for (i = 0; i < count; i++) {
@@ -1604,13 +1603,13 @@ void dc_flip_plane_addrs(
 		plane_state->address = flip_addrs[i].address;
 		plane_state->flip_immediate = flip_addrs[i].flip_immediate;
 
-		for (j = 0; j < core_dc->res_pool->pipe_count; j++) {
-			struct pipe_ctx *pipe_ctx = &core_dc->current_context->res_ctx.pipe_ctx[j];
+		for (j = 0; j < dc->res_pool->pipe_count; j++) {
+			struct pipe_ctx *pipe_ctx = &dc->current_state->res_ctx.pipe_ctx[j];
 
 			if (pipe_ctx->plane_state != plane_state)
 				continue;
 
-			core_dc->hwss.update_plane_addr(core_dc, pipe_ctx);
+			dc->hwss.update_plane_addr(dc, pipe_ctx);
 		}
 	}
 }
