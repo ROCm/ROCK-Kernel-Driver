@@ -4846,7 +4846,12 @@ static int dm_update_planes_state(struct dc *dc,
 		return ret;
 
 	/* Add new planes */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	for_each_plane_in_state(state, plane, new_plane_state, i) {
+		old_plane_state = plane->state;
+#else
 	for_each_oldnew_plane_in_state(state, plane, old_plane_state, new_plane_state, i) {
+#endif
 		new_plane_crtc = new_plane_state->crtc;
 		old_plane_crtc = old_plane_state->crtc;
 		dm_new_plane_state = to_dm_plane_state(new_plane_state);
@@ -4862,7 +4867,11 @@ static int dm_update_planes_state(struct dc *dc,
 			if (!old_plane_crtc)
 				continue;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+			old_crtc_state = kcl_drm_atomic_get_old_crtc_state_before_commit(
+#else
 			old_crtc_state = drm_atomic_get_old_crtc_state(
+#endif
 					state, old_plane_crtc);
 			dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
 
@@ -4890,13 +4899,23 @@ static int dm_update_planes_state(struct dc *dc,
 
 		} else { /* Add new planes */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+			if (drm_atomic_plane_disabling(plane, old_plane_state))
+#else
 			if (drm_atomic_plane_disabling(plane->state, new_plane_state))
+#endif
 				continue;
 
 			if (!new_plane_crtc)
 				continue;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+			new_crtc_state =
+				kcl_drm_atomic_get_new_crtc_state_before_commit(
+				state, new_plane_crtc);
+#else
 			new_crtc_state = drm_atomic_get_new_crtc_state(state, new_plane_crtc);
+#endif
 			dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 
 			if (!dm_new_crtc_state->stream)

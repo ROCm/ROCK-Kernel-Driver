@@ -354,4 +354,20 @@ extern struct dma_buf_ops *_kcl_drm_gem_prime_dmabuf_ops;
 bool drm_is_current_master(struct drm_file *fpriv);
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+static inline struct drm_crtc_state *
+kcl_drm_atomic_get_old_crtc_state_before_commit(struct drm_atomic_state *state,
+					    struct drm_crtc *crtc)
+{
+	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
+}
+
+static inline struct drm_crtc_state *
+kcl_drm_atomic_get_new_crtc_state_before_commit(struct drm_atomic_state *state,
+				  struct drm_crtc *crtc)
+{
+	return state->crtcs[drm_crtc_index(crtc)].state;
+}
+#endif
+
 #endif /* AMDKCL_DRM_H */
