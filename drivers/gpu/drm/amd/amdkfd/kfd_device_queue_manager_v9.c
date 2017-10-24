@@ -29,7 +29,6 @@
 
 static int update_qpd_v9(struct device_queue_manager *dqm,
 			 struct qcm_process_device *qpd);
-static int initialize_cpsch_v9(struct device_queue_manager *dqm);
 static void init_sdma_vm_v9(struct device_queue_manager *dqm, struct queue *q,
 			    struct qcm_process_device *qpd);
 
@@ -37,7 +36,6 @@ void device_queue_manager_init_v9_vega10(
 	struct device_queue_manager_asic_ops *asic_ops)
 {
 	asic_ops->update_qpd = update_qpd_v9;
-	asic_ops->init_cpsch = initialize_cpsch_v9;
 	asic_ops->init_sdma_vm = init_sdma_vm_v9;
 }
 
@@ -74,11 +72,6 @@ static int update_qpd_v9(struct device_queue_manager *dqm,
 
 	pr_debug("sh_mem_bases 0x%X\n", qpd->sh_mem_bases);
 
-	return 0;
-}
-
-static int initialize_cpsch_v9(struct device_queue_manager *dqm)
-{
 	return 0;
 }
 

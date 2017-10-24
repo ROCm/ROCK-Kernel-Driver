@@ -29,11 +29,9 @@
 #include "kfd_priv.h"
 #include "kfd_mqd_manager.h"
 
-#define KFD_HIQ_TIMEOUT				(500)
 #define KFD_UNMAP_LATENCY_MS			(4000)
 #define QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS (2 * KFD_UNMAP_LATENCY_MS + 1000)
 
-#define KFD_DQM_FIRST_PIPE			(0)
 #define KFD_SDMA_QUEUES_PER_ENGINE		(2)
 
 struct device_process_node {
@@ -76,10 +74,6 @@ struct device_process_node {
  *
  * @set_cache_memory_policy: Sets memory policy (cached/ non cached) for the
  * memory apertures.
- *
- * @set_page_directory_base: Sets the PD base address (GPU local memory)
- * in all the queues of the relevant process running on the specified device.
- * It preempts the queues, updates the value and execute the runlist again.
  *
  * @process_termination: Clears all process queues belongs to that device.
  *
@@ -147,7 +141,6 @@ struct device_queue_manager_ops {
 struct device_queue_manager_asic_ops {
 	int	(*update_qpd)(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd);
-	int	(*init_cpsch)(struct device_queue_manager *dqm);
 	bool	(*set_cache_memory_policy)(struct device_queue_manager *dqm,
 					   struct qcm_process_device *qpd,
 					   enum cache_policy default_policy,

@@ -84,7 +84,8 @@ struct mqd_manager *mqd_manager_init(enum KFD_MQD_TYPE type,
 	case CHIP_RAVEN:
 		return mqd_manager_init_v9(type, dev);
 	default:
-		BUG();
+		WARN(1, "Unexpected ASIC family %u",
+		     dev->device_info->asic_family);
 	}
 
 	return NULL;

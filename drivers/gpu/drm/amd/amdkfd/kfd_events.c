@@ -23,11 +23,11 @@
 #include <linux/mm_types.h>
 #include <linux/slab.h>
 #include <linux/types.h>
-#include <linux/uaccess.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
 #include <linux/sched/signal.h>
 #endif
+#include <linux/uaccess.h>
 #include <linux/mman.h>
 #include <linux/memory.h>
 #include "kfd_priv.h"
@@ -35,7 +35,7 @@
 #include <linux/device.h>
 
 /*
- * Wrapper around wait_queue_entry_t (wait queue entry)
+ * Wrapper around wait_queue_entry_t
  */
 struct kfd_event_waiter {
 	wait_queue_entry_t wait;
@@ -673,6 +673,7 @@ int kfd_wait_on_events(struct kfd_process *p,
 			(struct kfd_event_data __user *) data;
 	uint32_t i;
 	int ret = 0;
+
 	struct kfd_event_waiter *event_waiters = NULL;
 	long timeout = user_timeout_to_jiffies(user_timeout_ms);
 

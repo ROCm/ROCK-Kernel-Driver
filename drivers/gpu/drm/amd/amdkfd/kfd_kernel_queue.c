@@ -41,6 +41,9 @@ static bool initialize(struct kernel_queue *kq, struct kfd_dev *dev,
 	int retval;
 	union PM4_MES_TYPE_3_HEADER nop;
 
+	if (WARN_ON(type != KFD_QUEUE_TYPE_DIQ && type != KFD_QUEUE_TYPE_HIQ))
+		return false;
+
 	pr_debug("Initializing queue type %d size %d\n", KFD_QUEUE_TYPE_HIQ,
 			queue_size);
 
@@ -183,7 +186,7 @@ static void uninitialize(struct kernel_queue *kq)
 		kq->mqd->destroy_mqd(kq->mqd,
 					kq->queue->mqd,
 					KFD_PREEMPT_TYPE_WAVEFRONT_RESET,
-					QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS,
+					KFD_UNMAP_LATENCY_MS,
 					kq->queue->pipe,
 					kq->queue->queue);
 	else if (kq->queue->properties.type == KFD_QUEUE_TYPE_DIQ)
@@ -350,15 +353,19 @@ struct kernel_queue *kernel_queue_init(struct kfd_dev *dev,
 		kernel_queue_init_v9(&kq->ops_asic_specific);
 		break;
 	default:
-		BUG();
+		WARN(1, "Unexpected ASIC family %u",
+		     dev->device_info->asic_family);
+		goto out_free;
 	}
 
-	if (!kq->ops.initialize(kq, dev, type, KFD_KERNEL_QUEUE_SIZE)) {
-		pr_err("Failed to init kernel queue\n");
-		kfree(kq);
-		return NULL;
-	}
-	return kq;
+	if (kq->ops.initialize(kq, dev, type, KFD_KERNEL_QUEUE_SIZE))
+		return kq;
+
+	pr_err("Failed to init kernel queue\n");
+
+out_free:
+	kfree(kq);
+	return NULL;
 }
 
 void kernel_queue_uninit(struct kernel_queue *kq)

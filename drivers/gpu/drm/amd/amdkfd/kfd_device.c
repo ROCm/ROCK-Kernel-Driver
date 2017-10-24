@@ -354,7 +354,8 @@ static const struct kfd_device_info *lookup_device_info(unsigned short did)
 		}
 	}
 
-	WARN(1, "device is not added to supported_devices\n");
+	dev_warn(kfd_device, "DID %04x is missing in supported_devices\n",
+		 did);
 
 	return NULL;
 }
@@ -543,27 +544,25 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			 const struct kgd2kfd_shared_resources *gpu_resources)
 {
 	unsigned int size;
-	unsigned int vmid_bitmap_kfd, vmid_num_kfd;
 
 	kfd->mec_fw_version = kfd->kfd2kgd->get_fw_version(kfd->kgd,
 			KGD_ENGINE_MEC1);
 
 	kfd->shared_resources = *gpu_resources;
 
-	vmid_bitmap_kfd = kfd->shared_resources.compute_vmid_bitmap;
-	kfd->vm_info.first_vmid_kfd = ffs(vmid_bitmap_kfd) - 1;
-	kfd->vm_info.last_vmid_kfd = fls(vmid_bitmap_kfd) - 1;
-	vmid_num_kfd = kfd->vm_info.last_vmid_kfd
+	kfd->vm_info.first_vmid_kfd = ffs(gpu_resources->compute_vmid_bitmap)-1;
+	kfd->vm_info.last_vmid_kfd = fls(gpu_resources->compute_vmid_bitmap)-1;
+	kfd->vm_info.vmid_num_kfd = kfd->vm_info.last_vmid_kfd
 			- kfd->vm_info.first_vmid_kfd + 1;
-	kfd->vm_info.vmid_num_kfd = vmid_num_kfd;
 
 	/* Verify module parameters regarding mapped process number*/
 	if ((hws_max_conc_proc < 0)
-			|| (hws_max_conc_proc > vmid_num_kfd)) {
+			|| (hws_max_conc_proc > kfd->vm_info.vmid_num_kfd)) {
 		dev_err(kfd_device,
 			"hws_max_conc_proc %d must be between 0 and %d, use %d instead\n",
-			hws_max_conc_proc, vmid_num_kfd, vmid_num_kfd);
-		kfd->max_proc_per_quantum = vmid_num_kfd;
+			hws_max_conc_proc, kfd->vm_info.vmid_num_kfd,
+			kfd->vm_info.vmid_num_kfd);
+		kfd->max_proc_per_quantum = kfd->vm_info.vmid_num_kfd;
 	} else
 		kfd->max_proc_per_quantum = hws_max_conc_proc;
 
@@ -642,10 +641,8 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	kfd_init_processes_srcu();
 #endif
 
-	if (kfd_resume(kfd)) {
-		dev_err(kfd_device, "Error resuming kfd\n");
+	if (kfd_resume(kfd))
 		goto kfd_resume_error;
-	}
 
 	kfd->dbgmgr = NULL;
 
@@ -760,8 +757,6 @@ static int kfd_resume(struct kfd_dev *kfd)
 			kfd->pdev->vendor, kfd->pdev->device);
 		goto dqm_start_error;
 	}
-
-	kfd->kfd2kgd->write_config_static_mem(kfd->kgd, true, 1, 3, 0);
 
 	return err;
 

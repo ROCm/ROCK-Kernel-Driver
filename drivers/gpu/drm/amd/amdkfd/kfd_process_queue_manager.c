@@ -66,12 +66,11 @@ static int find_available_queue_slot(struct process_queue_manager *pqm,
 void kfd_process_dequeue_from_device(struct kfd_process_device *pdd)
 {
 	struct kfd_dev *dev = pdd->dev;
-	int retval;
 
 	if (pdd->already_dequeued)
 		return;
 
-	retval = dev->dqm->ops.process_termination(dev->dqm, &pdd->qpd);
+	dev->dqm->ops.process_termination(dev->dqm, &pdd->qpd);
 	pdd->already_dequeued = true;
 }
 
@@ -176,7 +175,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 		return retval;
 
 	if (list_empty(&pdd->qpd.queues_list) &&
-			list_empty(&pdd->qpd.priv_queue_list))
+	    list_empty(&pdd->qpd.priv_queue_list))
 		dev->dqm->ops.register_process(dev->dqm, &pdd->qpd);
 
 	pqn = kzalloc(sizeof(*pqn), GFP_KERNEL);
@@ -274,7 +273,7 @@ err_allocate_pqn:
 	/* check if queues list is empty unregister process from device */
 	clear_bit(*qid, pqm->queue_slot_bitmap);
 	if (list_empty(&pdd->qpd.queues_list) &&
-			list_empty(&pdd->qpd.priv_queue_list))
+	    list_empty(&pdd->qpd.priv_queue_list))
 		dev->dqm->ops.unregister_process(dev->dqm, &pdd->qpd);
 	return retval;
 }
@@ -331,7 +330,7 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
 	clear_bit(qid, pqm->queue_slot_bitmap);
 
 	if (list_empty(&pdd->qpd.queues_list) &&
-			list_empty(&pdd->qpd.priv_queue_list))
+	    list_empty(&pdd->qpd.priv_queue_list))
 		dqm->ops.unregister_process(dqm, &pdd->qpd);
 
 	return retval;

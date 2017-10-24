@@ -446,8 +446,6 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 {
 	struct kfd_process *p;
 	struct kfd_process_device *pdd = NULL;
-	struct kfd_dev *dev = NULL;
-	long status = -EFAULT;
 
 	/*
 	 * The kfd_process structure can not be free because the
@@ -467,18 +465,16 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 	mutex_lock(&p->mutex);
 
-	/* Iterate over all process device data structures and if the pdd is in
-	 * debug mode,we should first force unregistration, then we will be
-	 * able to destroy the queues
+	/* Iterate over all process device data structures and if the
+	 * pdd is in debug mode, we should first force unregistration,
+	 * then we will be able to destroy the queues
 	 */
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
-		dev = pdd->dev;
+		struct kfd_dev *dev = pdd->dev;
+
 		mutex_lock(kfd_get_dbgmgr_mutex());
-
-		if (dev && dev->dbgmgr && (dev->dbgmgr->pasid == p->pasid)) {
-
-			status = kfd_dbgmgr_unregister(dev->dbgmgr, p);
-			if (status == 0) {
+		if (dev && dev->dbgmgr && dev->dbgmgr->pasid == p->pasid) {
+			if (!kfd_dbgmgr_unregister(dev->dbgmgr, p)) {
 				kfd_dbgmgr_destroy(dev->dbgmgr);
 				dev->dbgmgr = NULL;
 			}
@@ -487,19 +483,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	}
 
 	kfd_process_dequeue_from_all_devices(p);
-
-	/* now we can uninit the pqm: */
 	pqm_uninit(&p->pqm);
-
-	/* Iterate over all process device data structure and check
-	 * if we should delete debug managers
-	 */
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
-		if ((pdd->dev->dbgmgr) &&
-				(pdd->dev->dbgmgr->pasid == p->pasid))
-			kfd_dbgmgr_destroy(pdd->dev->dbgmgr);
-
-	}
 
 	/* Indicate to other users that MM is no longer valid */
 	p->mm = NULL;
@@ -763,10 +747,9 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 		return ERR_PTR(-ENOMEM);
 	}
 
-	if (pdd->bound == PDD_BOUND)
+	if (pdd->bound == PDD_BOUND) {
 		return pdd;
-
-	if (pdd->bound == PDD_BOUND_SUSPENDED) {
+	} else if (unlikely(pdd->bound == PDD_BOUND_SUSPENDED)) {
 		pr_err("Binding PDD_BOUND_SUSPENDED pdd is unexpected!\n");
 		return ERR_PTR(-EINVAL);
 	}
@@ -786,6 +769,10 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 }
 
 #if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
+/*
+ * Bind processes do the device that have been temporarily unbound
+ * (PDD_BOUND_SUSPENDED) in kfd_unbind_processes_from_device.
+ */
 int kfd_bind_processes_to_device(struct kfd_dev *dev)
 {
 	struct kfd_process_device *pdd;
@@ -821,6 +808,11 @@ int kfd_bind_processes_to_device(struct kfd_dev *dev)
 	return err;
 }
 
+/*
+ * Mark currently bound processes as PDD_BOUND_SUSPENDED. These
+ * processes will be restored to PDD_BOUND state in
+ * kfd_bind_processes_to_device.
+ */
 void kfd_unbind_processes_from_device(struct kfd_dev *dev)
 {
 	struct kfd_process_device *pdd;
@@ -860,9 +852,8 @@ void kfd_process_iommu_unbind_callback(struct kfd_dev *dev, unsigned int pasid)
 
 	mutex_lock(kfd_get_dbgmgr_mutex());
 
-	if (dev->dbgmgr && (dev->dbgmgr->pasid == p->pasid)) {
-
-		if (kfd_dbgmgr_unregister(dev->dbgmgr, p) == 0) {
+	if (dev->dbgmgr && dev->dbgmgr->pasid == p->pasid) {
+		if (!kfd_dbgmgr_unregister(dev->dbgmgr, p)) {
 			kfd_dbgmgr_destroy(dev->dbgmgr);
 			dev->dbgmgr = NULL;
 		}

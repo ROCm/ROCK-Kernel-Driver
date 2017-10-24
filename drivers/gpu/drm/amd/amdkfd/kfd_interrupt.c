@@ -53,9 +53,8 @@ int kfd_interrupt_init(struct kfd_dev *kfd)
 	int r;
 
 	r = kfifo_alloc(&kfd->ih_fifo,
-			KFD_IH_NUM_ENTRIES *
-			kfd->device_info->ih_ring_entry_size,
-			GFP_KERNEL);
+		KFD_IH_NUM_ENTRIES * kfd->device_info->ih_ring_entry_size,
+		GFP_KERNEL);
 	if (r) {
 		dev_err(kfd_chardev(), "Failed to allocate IH fifo\n");
 		return r;

@@ -35,7 +35,6 @@ static bool set_cache_memory_policy_vi(struct device_queue_manager *dqm,
 				   uint64_t alternate_aperture_size);
 static int update_qpd_vi(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd);
-static int initialize_cpsch_vi(struct device_queue_manager *dqm);
 static void init_sdma_vm(struct device_queue_manager *dqm, struct queue *q,
 				struct qcm_process_device *qpd);
 
@@ -59,7 +58,6 @@ void device_queue_manager_init_vi_tonga(
 {
 	asic_ops->set_cache_memory_policy = set_cache_memory_policy_vi_tonga;
 	asic_ops->update_qpd = update_qpd_vi_tonga;
-	asic_ops->init_cpsch = initialize_cpsch_vi;
 	asic_ops->init_sdma_vm = init_sdma_vm_tonga;
 }
 
@@ -69,7 +67,6 @@ void device_queue_manager_init_vi(
 {
 	asic_ops->set_cache_memory_policy = set_cache_memory_policy_vi;
 	asic_ops->update_qpd = update_qpd_vi;
-	asic_ops->init_cpsch = initialize_cpsch_vi;
 	asic_ops->init_sdma_vm = init_sdma_vm;
 }
 
@@ -259,10 +256,4 @@ static void init_sdma_vm_tonga(struct device_queue_manager *dqm,
 		((get_sh_mem_bases_nybble_64(qpd_to_pdd(qpd))) <<
 		 SDMA0_RLC0_VIRTUAL_ADDR__SHARED_BASE__SHIFT) &
 		SDMA0_RLC0_VIRTUAL_ADDR__SHARED_BASE_MASK;
-}
-
-
-static int initialize_cpsch_vi(struct device_queue_manager *dqm)
-{
-	return 0;
 }

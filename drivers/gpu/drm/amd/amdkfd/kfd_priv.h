@@ -259,16 +259,16 @@ struct kfd_dev {
 	unsigned int gtt_sa_chunk_size;
 	unsigned int gtt_sa_num_of_chunks;
 
-	/* QCM Device instance */
-	struct device_queue_manager *dqm;
-
-	bool init_complete;
-
 	/* Interrupts */
 	struct kfifo ih_fifo;
 	struct workqueue_struct *ih_wq;
 	struct work_struct interrupt_work;
 	spinlock_t interrupt_lock;
+
+	/* QCM Device instance */
+	struct device_queue_manager *dqm;
+
+	bool init_complete;
 
 	/*
 	 * Interrupts of interest to KFD are copied
@@ -645,10 +645,7 @@ struct kfd_process_device {
 	uint64_t dgpu_base;
 	uint64_t dgpu_limit;
 
-	uint64_t sh_hidden_private_base_vmid;
-
-	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid)
-	 */
+	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
 	enum kfd_pdd_bound bound;
 
 	/* VM context for GPUVM allocations */
@@ -936,6 +933,10 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm);
 int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm);
 
+int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
+				unsigned int fence_value,
+				unsigned int timeout_ms);
+
 /* Packet Manager */
 
 #define KFD_FENCE_COMPLETED (100)
@@ -1032,9 +1033,6 @@ void kfd_pm_func_init_v9(struct packet_manager *pm, uint16_t fw_ver);
 
 
 uint64_t kfd_get_number_elems(struct kfd_dev *kfd);
-int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
-				unsigned int fence_value,
-				unsigned long timeout_ms);
 
 /* Events */
 extern const struct kfd_event_interrupt_class event_interrupt_class_cik;
