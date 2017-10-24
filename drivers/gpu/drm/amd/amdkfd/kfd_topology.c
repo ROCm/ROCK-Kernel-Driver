@@ -505,10 +505,11 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 			dev->node_props.max_engine_clk_fcompute);
 
 		/*
-		 * If the ASIC is CZ, set local memory size to 0 to disable
-		 * local memory support
+		 * If the ASIC is APU except Kaveri, set local memory size
+		 * to 0 to disable local memory support
 		 */
-		if (dev->gpu->device_info->asic_family != CHIP_CARRIZO) {
+		if (!dev->gpu->device_info->is_need_iommu_device
+			|| dev->gpu->device_info->asic_family == CHIP_KAVERI) {
 			dev->gpu->kfd2kgd->get_local_mem_info(dev->gpu->kgd,
 				&local_mem_info);
 			sysfs_show_64bit_prop(buffer, "local_mem_size",
