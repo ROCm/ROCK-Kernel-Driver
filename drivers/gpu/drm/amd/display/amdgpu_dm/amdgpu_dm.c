@@ -2600,9 +2600,21 @@ int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
 		dm_new_state->underscan_enable = val;
 		ret = 0;
 	} else if (property == adev->mode_info.freesync_property) {
+		struct amdgpu_crtc *acrtc;
+		struct dm_crtc_state *acrtc_state;
+
 		dm_new_state->user_enable.enable_for_gaming = val;
 		dm_new_state->user_enable.enable_for_static = val;
 		dm_new_state->user_enable.enable_for_video = val;
+
+		if (adev->dm.freesync_module && connector_state->crtc) {
+			acrtc = to_amdgpu_crtc(connector_state->crtc);
+			acrtc_state = to_dm_crtc_state(connector_state->crtc->state);
+			mod_freesync_set_user_enable(adev->dm.freesync_module,
+						     &acrtc_state->stream, 1,
+						     &dm_new_state->user_enable);
+		}
+
 		ret = 0;
 	} else if (property == adev->mode_info.freesync_capable_property) {
 		dm_new_state->freesync_capable = val;
