@@ -972,7 +972,7 @@ static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
 static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
 {
 	signed long r;
-	struct dma_fence *f;
+	uint32_t seq;
 	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
 
 	spin_lock(&adev->gfx.kiq.ring_lock);
@@ -983,16 +983,17 @@ static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
 			PACKET3_INVALIDATE_TLBS_ALL_HUB(1) |
 			PACKET3_INVALIDATE_TLBS_PASID(pasid) |
 			PACKET3_INVALIDATE_TLBS_FLUSH_TYPE(2));
-	amdgpu_fence_emit(ring, &f);
+	amdgpu_fence_emit_polling(ring, &seq);
 	amdgpu_ring_commit(ring);
 	spin_unlock(&adev->gfx.kiq.ring_lock);
 
-	r = dma_fence_wait(f, false);
-	if (r)
+	r = amdgpu_fence_wait_polling(ring, seq, adev->usec_timeout);
+	if (r < 1) {
 		DRM_ERROR("wait for kiq fence error: %ld.\n", r);
-	dma_fence_put(f);
+		return -ETIME;
+	}
 
-	return r;
+	return 0;
 }
 
 static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
