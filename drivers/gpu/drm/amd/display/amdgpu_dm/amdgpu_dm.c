@@ -1241,7 +1241,11 @@ static int dm_resume(void *handle)
 	}
 
 	/* Force mode set in atomic commit */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_crtc_in_state(dm->cached_state, crtc, new_crtc_state, i)
+#else
 	for_each_new_crtc_in_state(dm->cached_state, crtc, new_crtc_state, i)
+#endif
 		new_crtc_state->active_changed = true;
 
 	/*
@@ -1249,7 +1253,11 @@ static int dm_resume(void *handle)
 	 * them here, since they were duplicated as part of the suspend
 	 * procedure.
 	 */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_crtc_in_state(adev->dm.cached_state, crtc, new_crtc_state, i) {
+#else
 	for_each_new_crtc_in_state(dm->cached_state, crtc, new_crtc_state, i) {
+#endif
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		if (dm_new_crtc_state->stream) {
 			WARN_ON(kref_read(&dm_new_crtc_state->stream->refcount) > 1);
@@ -5790,7 +5798,12 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		amdgpu_dm_commit_cursors(state);
 
 	/* update planes when needed */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_plane_in_state(state, plane, old_plane_state, i) {
+		new_plane_state = plane->state;
+#else
 	for_each_oldnew_plane_in_state(state, plane, old_plane_state, new_plane_state, i) {
+#endif
 		struct drm_crtc *crtc = new_plane_state->crtc;
 		struct drm_crtc_state *new_crtc_state;
 		struct drm_framebuffer *fb = new_plane_state->fb;
@@ -6200,7 +6213,12 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 	 * TODO: Fix this so we can do this in commit tail and not have to block
 	 * in atomic check.
 	 */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
+		old_crtc_state = crtc->state;
+#else
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
+#endif
 		struct dm_crtc_state *dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
 		struct dm_crtc_state *dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
@@ -6506,6 +6524,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		new_crtc_state->event = NULL;
 	}
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
+#endif
 
 	/* Signal HW programming completion */
 	drm_atomic_helper_commit_hw_done(state);
@@ -6741,7 +6760,11 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 	dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
 	dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 	acrtc = to_amdgpu_crtc(crtc);
-	aconnector = amdgpu_dm_find_first_crtc_matching_connector(state, crtc);
+	aconnector = amdgpu_dm_find_first_crtc_matching_connector(state, crtc
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+								  , true
+#endif
+								  );
 
 	/* TODO This hack should go away */
 	if (aconnector && enable) {
