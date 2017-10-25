@@ -139,6 +139,7 @@ struct kgd2kfd_shared_resources {
 
 	/* GPUVM address space size in bytes */
 	uint64_t gpuvm_size;
+	int drm_render_minor;
 };
 
 struct tile_config {
