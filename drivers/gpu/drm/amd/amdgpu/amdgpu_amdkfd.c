@@ -119,7 +119,8 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 			.compute_vmid_bitmap = global_compute_vmid_bitmap,
 			.num_pipe_per_mec = adev->gfx.mec.num_pipe_per_mec,
 			.num_queue_per_pipe = adev->gfx.mec.num_queue_per_pipe,
-			.gpuvm_size = (uint64_t)amdgpu_vm_size << 30
+			.gpuvm_size = (uint64_t)amdgpu_vm_size << 30,
+			.drm_render_minor = adev->ddev->render->index
 		};
 
 		/* this is going to have a few of the MSBs set that we need to
