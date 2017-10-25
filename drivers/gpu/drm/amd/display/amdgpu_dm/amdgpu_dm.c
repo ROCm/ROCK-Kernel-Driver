@@ -1340,9 +1340,11 @@ static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 	.atomic_commit = amdgpu_dm_atomic_commit,
 };
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 static struct drm_mode_config_helper_funcs amdgpu_dm_mode_config_helperfuncs = {
 	.atomic_commit_tail = amdgpu_dm_atomic_commit_tail
 };
+#endif
 
 static void
 amdgpu_dm_update_connector_after_detect(struct amdgpu_dm_connector *aconnector)
@@ -2484,7 +2486,12 @@ retry:
 			goto fail;
 	}
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_connector_in_state(state, connector, new_con_state, i) {
+		old_con_state = connector->state;
+#else
 	for_each_oldnew_connector_in_state(state, connector, old_con_state, new_con_state, i) {
+#endif
 		struct dm_connector_state *dm_new_con_state = to_dm_connector_state(new_con_state);
 		struct drm_crtc_state *new_crtc_state;
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(dm_new_con_state->base.crtc);
@@ -4187,7 +4194,7 @@ void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector)
 		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP)
 			state->abm_level = amdgpu_dm_abm_level;
 
-		__drm_atomic_helper_connector_reset(connector, &state->base);
+		kcl_drm_atomic_helper_connector_reset(connector, &state->base);
 	}
 }
 
@@ -5762,10 +5769,10 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	struct drm_plane_state *old_plane_state, *new_plane_state;
 	struct amdgpu_crtc *acrtc_attach = to_amdgpu_crtc(pcrtc);
 	struct drm_crtc_state *new_pcrtc_state =
-			drm_atomic_get_new_crtc_state(state, pcrtc);
+			kcl_drm_atomic_get_new_crtc_state_after_commit(state, pcrtc);
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(new_pcrtc_state);
 	struct dm_crtc_state *dm_old_crtc_state =
-			to_dm_crtc_state(drm_atomic_get_old_crtc_state(state, pcrtc));
+			to_dm_crtc_state(kcl_drm_atomic_get_old_crtc_state_after_commit(state, pcrtc));
 	int planes_count = 0, vpos, hpos;
 	long r;
 	unsigned long flags;
@@ -5818,7 +5825,9 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		if (!fb || !crtc || pcrtc != crtc)
 			continue;
 
-		new_crtc_state = drm_atomic_get_new_crtc_state(state, crtc);
+		new_crtc_state =
+			kcl_drm_atomic_get_new_crtc_state_after_commit(
+			state, crtc);
 		if (!new_crtc_state->active)
 			continue;
 
@@ -6649,7 +6658,9 @@ static int do_aquire_global_lock(struct drm_device *dev,
 				 struct drm_atomic_state *state)
 {
 	struct drm_crtc *crtc;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 	struct drm_crtc_commit *commit;
+#endif
 	long ret;
 
 	/*
@@ -6661,6 +6672,7 @@ static int do_aquire_global_lock(struct drm_device *dev,
 	if (ret)
 		return ret;
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		spin_lock(&crtc->commit_lock);
 		commit = list_first_entry_or_null(&crtc->commit_list,
@@ -6690,6 +6702,9 @@ static int do_aquire_global_lock(struct drm_device *dev,
 	}
 
 	return ret < 0 ? ret : 0;
+#else
+	return 0;
+#endif
 }
 
 static void get_freesync_config_for_crtc(
@@ -6917,6 +6932,7 @@ skip_modeset:
 	if (new_stream)
 		 dc_stream_release(new_stream);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	/*
 	 * We want to do dc stream updates that do not require a
 	 * full modeset below.
@@ -6952,6 +6968,7 @@ skip_modeset:
 		if (ret)
 			goto fail;
 	}
+#endif
 
 	/* Update Freesync settings. */
 	get_freesync_config_for_crtc(dm_new_crtc_state,
