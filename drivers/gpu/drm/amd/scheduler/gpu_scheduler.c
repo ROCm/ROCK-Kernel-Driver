@@ -346,6 +346,10 @@ amd_sched_entity_pop_job(struct amd_sched_entity *entity)
 		if (amd_sched_entity_add_dependency_cb(entity))
 			return NULL;
 
+	/* skip jobs from entity that marked guilty */
+	if (entity->guilty && atomic_read(entity->guilty))
+		dma_fence_set_error(&sched_job->s_fence->finished, -ECANCELED);
+
 	spsc_queue_pop(&entity->job_queue);
 	return sched_job;
 }
@@ -442,14 +446,6 @@ static void amd_sched_job_timedout(struct work_struct *work)
 	job->sched->ops->timedout_job(job);
 }
 
-static void amd_sched_set_guilty(struct amd_sched_job *s_job,
-				 struct amd_sched_entity *s_entity)
-{
-	if (atomic_inc_return(&s_job->karma) > s_job->sched->hang_limit)
-		if (s_entity->guilty)
-			atomic_set(s_entity->guilty, 1);
-}
-
 void amd_sched_hw_job_reset(struct amd_gpu_scheduler *sched, struct amd_sched_job *bad)
 {
 	struct amd_sched_job *s_job;
@@ -469,21 +465,24 @@ void amd_sched_hw_job_reset(struct amd_gpu_scheduler *sched, struct amd_sched_jo
 	spin_unlock(&sched->job_list_lock);
 
 	if (bad) {
-		bool found = false;
-
-		for (i = AMD_SCHED_PRIORITY_MIN; i < AMD_SCHED_PRIORITY_MAX; i++ ) {
+		/* don't increase @bad's karma if it's from KERNEL RQ,
+		 * becuase sometimes GPU hang would cause kernel jobs (like VM updating jobs)
+		 * corrupt but keep in mind that kernel jobs always considered good.
+		 */
+		for (i = AMD_SCHED_PRIORITY_MIN; i < AMD_SCHED_PRIORITY_KERNEL; i++ ) {
 			struct amd_sched_rq *rq = &sched->sched_rq[i];
 
 			spin_lock(&rq->lock);
 			list_for_each_entry_safe(entity, tmp, &rq->entities, list) {
 				if (bad->s_fence->scheduled.context == entity->fence_context) {
-					found = true;
-					amd_sched_set_guilty(bad, entity);
+				    if (atomic_inc_return(&bad->karma) > bad->sched->hang_limit)
+						if (entity->guilty)
+							atomic_set(entity->guilty, 1);
 					break;
 				}
 			}
 			spin_unlock(&rq->lock);
-			if (found)
+			if (&entity->list != &rq->entities)
 				break;
 		}
 	}
@@ -501,6 +500,7 @@ void amd_sched_job_kickout(struct amd_sched_job *s_job)
 void amd_sched_job_recovery(struct amd_gpu_scheduler *sched)
 {
 	struct amd_sched_job *s_job, *tmp;
+	bool found_guilty = false;
 	int r;
 
 	spin_lock(&sched->job_list_lock);
@@ -512,6 +512,15 @@ void amd_sched_job_recovery(struct amd_gpu_scheduler *sched)
 	list_for_each_entry_safe(s_job, tmp, &sched->ring_mirror_list, node) {
 		struct amd_sched_fence *s_fence = s_job->s_fence;
 		struct dma_fence *fence;
+		uint64_t guilty_context;
+
+		if (!found_guilty && atomic_read(&s_job->karma) > sched->hang_limit) {
+			found_guilty = true;
+			guilty_context = s_job->s_fence->scheduled.context;
+		}
+
+		if (found_guilty && s_job->s_fence->scheduled.context == guilty_context)
+			dma_fence_set_error(&s_fence->finished, -ECANCELED);
 
 		spin_unlock(&sched->job_list_lock);
 		fence = sched->ops->run_job(s_job);
@@ -527,7 +536,6 @@ void amd_sched_job_recovery(struct amd_gpu_scheduler *sched)
 					  r);
 			dma_fence_put(fence);
 		} else {
-			DRM_ERROR("Failed to run job!\n");
 			amd_sched_process_job(NULL, &s_fence->cb);
 		}
 		spin_lock(&sched->job_list_lock);
@@ -665,7 +673,6 @@ static int amd_sched_main(void *param)
 					  r);
 			dma_fence_put(fence);
 		} else {
-			DRM_ERROR("Failed to run job!\n");
 			amd_sched_process_job(NULL, &s_fence->cb);
 		}
 
