@@ -4926,7 +4926,12 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 			}
 		}
 	} else {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+		for_each_crtc_in_state(state, crtc, crtc_state, i) {
+			old_crtc_state = crtc->state;
+#else
 		for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, crtc_state, i) {
+#endif
 			if (!crtc_state->enable)
 				continue;
 
