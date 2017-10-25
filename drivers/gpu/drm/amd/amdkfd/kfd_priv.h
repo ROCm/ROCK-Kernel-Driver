@@ -143,12 +143,6 @@ extern int ignore_crat;
  */
 extern int vega10_noretry;
 
-/*
- * Currently, mm_access() function is not exported. So for DKMS build,
- * CMA will be enabled only if module param is set.
- */
-extern int cma_enable;
-
 /**
  * enum kfd_sched_policy
  *
