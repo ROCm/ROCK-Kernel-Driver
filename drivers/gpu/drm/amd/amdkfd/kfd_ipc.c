@@ -117,8 +117,6 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 	uint64_t size;
 	int idr_handle;
 	struct kfd_process_device *pdd = NULL;
-	uint64_t kfd_mmap_flags = KFD_MMAP_TYPE_MAP_BO |
-				  KFD_MMAP_GPU_ID(gpu_id);
 
 	if (!handle)
 		return -EINVAL;
@@ -152,8 +150,6 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 	mutex_unlock(&p->mutex);
 
 	*handle = MAKE_HANDLE(gpu_id, idr_handle);
-	if (mmap_offset)
-		*mmap_offset = (kfd_mmap_flags << PAGE_SHIFT) | *mmap_offset;
 
 	return 0;
 

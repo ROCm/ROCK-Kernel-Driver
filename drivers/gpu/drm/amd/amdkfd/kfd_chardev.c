@@ -46,7 +46,6 @@
 static long kfd_ioctl(struct file *, unsigned int, unsigned long);
 static int kfd_open(struct inode *, struct file *);
 static int kfd_mmap(struct file *, struct vm_area_struct *);
-static bool kfd_is_large_bar(struct kfd_dev *dev);
 
 static const char kfd_dev_name[] = "kfd";
 
@@ -1131,25 +1130,6 @@ alloc_memory_of_scratch_failed:
 	return -EFAULT;
 }
 
-bool kfd_is_large_bar(struct kfd_dev *dev)
-{
-	struct kfd_local_mem_info mem_info;
-
-	if (debug_largebar) {
-		pr_debug("Simulate large-bar allocation on non large-bar machine\n");
-		return true;
-	}
-
-	if (dev->device_info->is_need_iommu_device)
-		return false;
-
-	dev->kfd2kgd->get_local_mem_info(dev->kgd, &mem_info);
-	if (mem_info.local_mem_size_private == 0 &&
-			mem_info.local_mem_size_public > 0)
-		return true;
-	return false;
-}
-
 static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 					struct kfd_process *p, void *data)
 {
@@ -1217,15 +1197,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	mutex_unlock(&p->mutex);
 
 	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
-	if ((args->flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) != 0 &&
-			!kfd_is_large_bar(dev)) {
-		args->mmap_offset = 0;
-	} else {
-		args->mmap_offset = KFD_MMAP_TYPE_MAP_BO;
-		args->mmap_offset |= KFD_MMAP_GPU_ID(args->gpu_id);
-		args->mmap_offset <<= PAGE_SHIFT;
-		args->mmap_offset |= offset;
-	}
+	args->mmap_offset = offset;
 
 	return 0;
 
@@ -2205,7 +2177,7 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 	struct kfd_process *process;
 	struct kfd_dev *kfd;
 	unsigned long vm_pgoff;
-	int retval;
+	unsigned long long mmap_type;
 
 	process = kfd_get_process(current);
 	if (IS_ERR(process))
@@ -2213,8 +2185,9 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	vm_pgoff = vma->vm_pgoff;
 	vma->vm_pgoff = KFD_MMAP_OFFSET_VALUE_GET(vma->vm_pgoff);
+	mmap_type = vm_pgoff & KFD_MMAP_TYPE_MASK;
 
-	switch (vm_pgoff & KFD_MMAP_TYPE_MASK) {
+	switch (mmap_type) {
 	case KFD_MMAP_TYPE_DOORBELL:
 		kfd = kfd_device_by_id(KFD_MMAP_GPU_ID_GET(vm_pgoff));
 		if (!kfd)
@@ -2224,16 +2197,12 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 	case KFD_MMAP_TYPE_EVENTS:
 		return kfd_event_mmap(process, vma);
 
-	case KFD_MMAP_TYPE_MAP_BO:
-		kfd = kfd_device_by_id(KFD_MMAP_GPU_ID_GET(vm_pgoff));
-		if (!kfd)
-			return -EFAULT;
-		retval = kfd->kfd2kgd->mmap_bo(kfd->kgd, vma);
-		return retval;
-
 	case KFD_MMAP_TYPE_RESERVED_MEM:
 		return kfd_reserved_mem_mmap(process, vma);
 
+	default:
+		pr_err("Unsupported kfd mmap type %llx\n", mmap_type);
+		break;
 	}
 
 	return -EFAULT;
