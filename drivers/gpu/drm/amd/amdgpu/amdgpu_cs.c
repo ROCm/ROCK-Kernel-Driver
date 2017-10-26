@@ -1414,7 +1414,7 @@ static struct dma_fence *amdgpu_cs_get_fence(struct amdgpu_device *adev,
 	return fence;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
+#if !defined(BUILD_AS_DKMS)
 int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *filp)
 {
