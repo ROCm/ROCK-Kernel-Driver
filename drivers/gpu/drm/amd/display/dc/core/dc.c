@@ -1427,10 +1427,7 @@ void dc_commit_updates_for_stream(struct dc *dc,
 				stream_update,
 				update_type,
 				context);
-
-	if (update_type >= UPDATE_TYPE_FULL)
-		dc_post_update_surfaces_to_stream(dc);
-
+	/*update current_State*/
 	if (dc->current_state != context) {
 
 		struct dc_state *old = dc->current_state;
@@ -1439,6 +1436,9 @@ void dc_commit_updates_for_stream(struct dc *dc,
 		dc_release_state(old);
 
 	}
+	/*let's use current_state to update watermark etc*/
+	if (update_type >= UPDATE_TYPE_FULL)
+		dc_post_update_surfaces_to_stream(dc);
 
 	return;
 
