@@ -4046,8 +4046,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	/* update planes when needed */
 	for_each_oldnew_plane_in_state(state, plane, old_plane_state, new_plane_state, i) {
 		struct drm_crtc *crtc = new_plane_state->crtc;
-		struct drm_crtc_state *new_crtc_state =
-				drm_atomic_get_new_crtc_state(state, crtc);
+		struct drm_crtc_state *new_crtc_state;
 		struct drm_framebuffer *fb = new_plane_state->fb;
 		bool pflip_needed;
 		struct dm_plane_state *dm_new_plane_state = to_dm_plane_state(new_plane_state);
@@ -4057,7 +4056,11 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			continue;
 		}
 
-		if (!fb || !crtc || pcrtc != crtc || !new_crtc_state->active)
+		if (!fb || !crtc || pcrtc != crtc)
+			continue;
+
+		new_crtc_state = drm_atomic_get_new_crtc_state(state, crtc);
+		if (!new_crtc_state->active)
 			continue;
 
 		pflip_needed = !state->allow_modeset;
