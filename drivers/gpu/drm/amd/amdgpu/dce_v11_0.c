@@ -1778,11 +1778,7 @@ static void dce_v11_0_afmt_setmode(struct drm_encoder *encoder,
 	dce_v11_0_audio_write_sad_regs(encoder);
 	dce_v11_0_audio_write_latency_fields(encoder, mode);
 
-#if defined(UBUNTU_OEM_KERNEL)
-	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode, false);
-#else
 	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode);
-#endif
 	if (err < 0) {
 		DRM_ERROR("failed to setup AVI infoframe: %zd\n", err);
 		return;
@@ -2861,9 +2857,7 @@ static const struct drm_crtc_helper_funcs dce_v11_0_crtc_helper_funcs = {
 	.mode_set_base_atomic = dce_v11_0_crtc_set_base_atomic,
 	.prepare = dce_v11_0_crtc_prepare,
 	.commit = dce_v11_0_crtc_commit,
-#if !defined(UBUNTU_OEM_KERNEL)
 	.load_lut = dce_v11_0_crtc_load_lut,
-#endif
 	.disable = dce_v11_0_crtc_disable,
 };
 
