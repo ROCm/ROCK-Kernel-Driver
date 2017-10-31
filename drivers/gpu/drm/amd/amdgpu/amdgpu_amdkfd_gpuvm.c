@@ -624,40 +624,6 @@ out:
 	return ret;
 }
 
-static int __map_bo_to_kernel(struct amdgpu_bo *bo, u32 domain, void **kptr)
-{
-	int ret;
-
-	ret = amdgpu_bo_reserve(bo, true);
-	if (ret) {
-		pr_err("Failed to reserve bo. ret %d\n", ret);
-		return ret;
-	}
-
-	ret = amdgpu_bo_pin(bo, domain, NULL);
-	if (ret) {
-		pr_err("Failed to pin bo. ret %d\n", ret);
-		goto pin_failed;
-	}
-
-	ret = amdgpu_bo_kmap(bo, kptr);
-	if (ret) {
-		pr_err("Failed to map bo to kernel. ret %d\n", ret);
-		goto kmap_failed;
-	}
-
-	amdgpu_bo_unreserve(bo);
-
-	return ret;
-
-kmap_failed:
-	amdgpu_bo_unpin(bo);
-pin_failed:
-	amdgpu_bo_unreserve(bo);
-
-	return ret;
-}
-
 static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 		uint64_t size, void *vm, struct kgd_mem **mem,
 		uint64_t *offset, u32 domain, u64 flags,
@@ -1678,10 +1644,36 @@ int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 
 	list_del_init(&mem->validate_list.head);
 
-	ret = __map_bo_to_kernel(bo, AMDGPU_GEM_DOMAIN_GTT, kptr);
-	if (!ret)
-		mem->kptr = *kptr;
+	ret = amdgpu_bo_reserve(bo, true);
+	if (ret) {
+		pr_err("Failed to reserve bo. ret %d\n", ret);
+		goto bo_reserve_failed;
+	}
 
+	ret = amdgpu_bo_pin(bo, AMDGPU_GEM_DOMAIN_GTT, NULL);
+	if (ret) {
+		pr_err("Failed to pin bo. ret %d\n", ret);
+		goto pin_failed;
+	}
+
+	ret = amdgpu_bo_kmap(bo, kptr);
+	if (ret) {
+		pr_err("Failed to map bo to kernel. ret %d\n", ret);
+		goto kmap_failed;
+	}
+
+	amdgpu_bo_unreserve(bo);
+
+	mem->kptr = *kptr;
+
+	mutex_unlock(&mem->process_info->lock);
+	return 0;
+
+kmap_failed:
+	amdgpu_bo_unpin(bo);
+pin_failed:
+	amdgpu_bo_unreserve(bo);
+bo_reserve_failed:
 	mutex_unlock(&mem->process_info->lock);
 
 	return ret;
