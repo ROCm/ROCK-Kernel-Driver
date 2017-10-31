@@ -609,7 +609,7 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct v9_sdma_mqd *m;
 	uint32_t sdma_base_addr, sdmax_gfx_context_cntl;
-	uint32_t temp, timeout = 2000;
+	unsigned long end_jiffies;
 	uint32_t data;
 	uint64_t data64;
 	uint64_t __user *wptr64 = (uint64_t __user *)wptr;
@@ -624,14 +624,14 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL,
 		m->sdmax_rlcx_rb_cntl & (~SDMA0_RLC0_RB_CNTL__RB_ENABLE_MASK));
 
+	end_jiffies = msecs_to_jiffies(2000) + jiffies;
 	while (true) {
-		temp = RREG32(sdma_base_addr + mmSDMA0_RLC0_CONTEXT_STATUS);
-		if (temp & SDMA0_RLC0_CONTEXT_STATUS__IDLE_MASK)
+		data = RREG32(sdma_base_addr + mmSDMA0_RLC0_CONTEXT_STATUS);
+		if (data & SDMA0_RLC0_CONTEXT_STATUS__IDLE_MASK)
 			break;
-		if (timeout == 0)
+		if (time_after(jiffies, end_jiffies))
 			return -ETIME;
-		msleep(10);
-		timeout -= 10;
+		usleep_range(500, 1000);
 	}
 	data = RREG32(sdmax_gfx_context_cntl);
 	data = REG_SET_FIELD(data, SDMA0_GFX_CONTEXT_CNTL,

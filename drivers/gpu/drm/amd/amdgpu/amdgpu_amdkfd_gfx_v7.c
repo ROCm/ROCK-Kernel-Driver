@@ -472,8 +472,8 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct cik_sdma_rlc_registers *m;
+	unsigned long end_jiffies;
 	uint32_t sdma_base_addr;
-	uint32_t temp, timeout = 2000;
 	uint32_t data;
 
 	m = get_sdma_mqd(mqd);
@@ -482,14 +482,14 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 	WREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL,
 		m->sdma_rlc_rb_cntl & (~SDMA0_RLC0_RB_CNTL__RB_ENABLE_MASK));
 
+	end_jiffies = msecs_to_jiffies(2000) + jiffies;
 	while (true) {
-		temp = RREG32(sdma_base_addr + mmSDMA0_RLC0_CONTEXT_STATUS);
-		if (temp & SDMA0_RLC0_CONTEXT_STATUS__IDLE_MASK)
+		data = RREG32(sdma_base_addr + mmSDMA0_RLC0_CONTEXT_STATUS);
+		if (data & SDMA0_RLC0_CONTEXT_STATUS__IDLE_MASK)
 			break;
-		if (timeout == 0)
+		if (time_after(jiffies, end_jiffies))
 			return -ETIME;
-		msleep(10);
-		timeout -= 10;
+		usleep_range(500, 1000);
 	}
 	if (m->sdma_engine_id) {
 		data = RREG32(mmSDMA1_GFX_CONTEXT_CNTL);
