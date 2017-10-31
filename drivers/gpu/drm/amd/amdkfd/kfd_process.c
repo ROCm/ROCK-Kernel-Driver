@@ -630,16 +630,16 @@ static struct kfd_process *create_process(const struct task_struct *thread,
 	if (err != 0)
 		goto err_init_apertures;
 
+	INIT_DELAYED_WORK(&process->eviction_work.dwork, kfd_evict_bo_worker);
+	INIT_DELAYED_WORK(&process->restore_work, kfd_restore_bo_worker);
+	process->last_restore_timestamp = get_jiffies_64();
+
 	err = kfd_process_reserve_ib_mem(process);
 	if (err)
 		goto err_reserve_ib_mem;
 	err = kfd_process_init_cwsr(process, filep);
 	if (err)
 		goto err_init_cwsr;
-
-	INIT_DELAYED_WORK(&process->eviction_work.dwork, kfd_evict_bo_worker);
-	INIT_DELAYED_WORK(&process->restore_work, kfd_restore_bo_worker);
-	process->last_restore_timestamp = get_jiffies_64();
 
 	/* If PeerDirect interface was not detected try to detect it again
 	 * in case if network driver was loaded later.
