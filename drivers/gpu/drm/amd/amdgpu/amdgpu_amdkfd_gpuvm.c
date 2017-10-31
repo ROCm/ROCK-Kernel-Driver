@@ -1325,7 +1325,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 			pr_err("Unable to pin DGMA BO\n");
 			goto map_bo_to_gpuvm_failed;
 		}
-	} else if (amdgpu_ttm_tt_get_usermm(bo->tbo.ttm) == NULL)
+	} else if (!amdgpu_ttm_tt_get_usermm(bo->tbo.ttm) && !bo->pin_count)
 		amdgpu_bo_fence(bo,
 				&kfd_vm->process_info->eviction_fence->base,
 				true);
@@ -1594,7 +1594,7 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 	if (mem->mapped_to_gpu_memory == 0) {
 		if (mem->domain & AMDGPU_GEM_DOMAIN_DGMA)
 			amdgpu_bo_unpin(mem->bo);
-		else if (!amdgpu_ttm_tt_get_usermm(mem->bo->tbo.ttm))
+		else if (!amdgpu_ttm_tt_get_usermm(mem->bo->tbo.ttm) && !mem->bo->pin_count)
 			amdgpu_amdkfd_remove_eviction_fence(mem->bo,
 						process_info->eviction_fence,
 						NULL, NULL);
@@ -1642,8 +1642,6 @@ int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 	 */
 	mutex_lock(&mem->process_info->lock);
 
-	list_del_init(&mem->validate_list.head);
-
 	ret = amdgpu_bo_reserve(bo, true);
 	if (ret) {
 		pr_err("Failed to reserve bo. ret %d\n", ret);
@@ -1661,6 +1659,10 @@ int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 		pr_err("Failed to map bo to kernel. ret %d\n", ret);
 		goto kmap_failed;
 	}
+
+	amdgpu_amdkfd_remove_eviction_fence(
+		bo, mem->process_info->eviction_fence, NULL, NULL);
+	list_del_init(&mem->validate_list.head);
 
 	amdgpu_bo_unreserve(bo);
 
