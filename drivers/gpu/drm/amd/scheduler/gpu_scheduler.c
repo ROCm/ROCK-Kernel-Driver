@@ -233,10 +233,11 @@ void amd_sched_entity_fini(struct amd_gpu_scheduler *sched,
 		kcl_kthread_unpark(sched->thread);
 		while ((job = to_amd_sched_job(spsc_queue_pop(&entity->job_queue)))) {
 			struct amd_sched_fence *s_fence = job->s_fence;
-
 			amd_sched_fence_scheduled(s_fence);
 			kcl_dma_fence_set_error(&s_fence->finished, -ESRCH);
 			amd_sched_fence_finished(s_fence);
+			dma_fence_put(&s_fence->finished);
+			sched->ops->free_job(job);
 		}
 	}
 }
