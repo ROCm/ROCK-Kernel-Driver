@@ -156,7 +156,8 @@ static int amdgpu_gtt_mgr_alloc(struct ttm_mem_type_manager *man,
 
 	spin_lock(&mgr->lock);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
-	r = drm_mm_insert_node_in_range_generic(&mgr->mm, node, mem->num_pages,
+	r = drm_mm_insert_node_in_range_generic(&mgr->mm, &node->node,
+						mem->num_pages,
 						mem->page_alignment, 0,
 						fpfn, lpfn, sflags, aflags);
 #else
