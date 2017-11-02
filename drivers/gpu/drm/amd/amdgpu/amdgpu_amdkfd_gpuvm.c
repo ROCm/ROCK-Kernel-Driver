@@ -2467,7 +2467,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 
 	switch (src->mem_type) {
 	case TTM_PL_TT:
-		r = amdgpu_ttm_bind(src_ttm_bo, src);
+		r = amdgpu_ttm_bind(src_ttm_bo);
 		if (r) {
 			DRM_ERROR("Copy failed. Cannot bind to gart\n");
 			goto copy_fail;
@@ -2494,7 +2494,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 
 	switch (dst->mem_type) {
 	case TTM_PL_TT:
-		r = amdgpu_ttm_bind(dst_ttm_bo, dst);
+		r = amdgpu_ttm_bind(dst_ttm_bo);
 		if (r) {
 			DRM_ERROR("Copy failed. Cannot bind to gart\n");
 			goto copy_fail;
