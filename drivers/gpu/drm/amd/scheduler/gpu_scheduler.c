@@ -348,7 +348,7 @@ amd_sched_entity_pop_job(struct amd_sched_entity *entity)
 
 	/* skip jobs from entity that marked guilty */
 	if (entity->guilty && atomic_read(entity->guilty))
-		dma_fence_set_error(&sched_job->s_fence->finished, -ECANCELED);
+		kcl_dma_fence_set_error(&sched_job->s_fence->finished, -ECANCELED);
 
 	spsc_queue_pop(&entity->job_queue);
 	return sched_job;
@@ -520,7 +520,7 @@ void amd_sched_job_recovery(struct amd_gpu_scheduler *sched)
 		}
 
 		if (found_guilty && s_job->s_fence->scheduled.context == guilty_context)
-			dma_fence_set_error(&s_fence->finished, -ECANCELED);
+			kcl_dma_fence_set_error(&s_fence->finished, -ECANCELED);
 
 		spin_unlock(&sched->job_list_lock);
 		fence = sched->ops->run_job(s_job);

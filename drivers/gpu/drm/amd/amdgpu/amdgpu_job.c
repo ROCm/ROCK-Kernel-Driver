@@ -197,7 +197,11 @@ static struct dma_fence *amdgpu_job_run(struct amd_sched_job *sched_job)
 	if (job->vram_lost_counter != atomic_read(&adev->vram_lost_counter))
 		kcl_dma_fence_set_error(finished, -ECANCELED);/* skip IB as well if VRAM lost */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+	if (finished->status < 0) {
+#else
 	if (finished->error < 0) {
+#endif
 		DRM_INFO("Skip scheduling IBs!\n");
 	} else {
 		r = amdgpu_ib_schedule(job->ring, job->num_ibs, job->ibs, job,
