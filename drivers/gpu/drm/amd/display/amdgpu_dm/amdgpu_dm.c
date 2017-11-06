@@ -1348,7 +1348,7 @@ amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm)
 			&amdgpu_dm_backlight_ops);
 #endif
 
-	if (NULL == dm->backlight_dev)
+	if (IS_ERR(dm->backlight_dev))
 		DRM_ERROR("DM: Backlight registration failed!\n");
 	else
 		DRM_DEBUG_DRIVER("DM: Registered Backlight device: %s\n", bl_name);
