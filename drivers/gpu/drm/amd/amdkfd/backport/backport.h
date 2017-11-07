@@ -9,5 +9,6 @@
 #include <kcl/kcl_pci.h>
 #include <kcl/kcl_mn.h>
 #include <kcl/kcl_fence.h>
+#include <kcl/kcl_wait.h>
 
 #endif
