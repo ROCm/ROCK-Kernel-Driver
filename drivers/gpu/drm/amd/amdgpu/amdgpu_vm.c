@@ -2724,6 +2724,22 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 			goto error_free_root;
 	}
 
+	if (pasid) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&adev->vm_manager.pasid_lock, flags);
+		r = idr_alloc(&adev->vm_manager.pasid_idr, vm, pasid, pasid + 1,
+			      GFP_ATOMIC);
+		spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
+		if (r < 0)
+			goto error_free_root;
+
+		vm->pasid = pasid;
+	}
+
+	INIT_KFIFO(vm->faults);
+	vm->fault_credit = 16;
+
 	vm->vm_context = vm_context;
 	if (vm_context == AMDGPU_VM_CONTEXT_COMPUTE) {
 		struct amdgpu_vm_id_manager *id_mgr =
@@ -2740,22 +2756,6 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		}
 		mutex_unlock(&id_mgr->lock);
 	}
-
-	if (pasid) {
-		unsigned long flags;
-
-		spin_lock_irqsave(&adev->vm_manager.pasid_lock, flags);
-		r = idr_alloc(&adev->vm_manager.pasid_idr, vm, pasid, pasid + 1,
-			      GFP_ATOMIC);
-		spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
-		if (r < 0)
-			goto error_free_root;
-
-		vm->pasid = pasid;
-	}
-
-	INIT_KFIFO(vm->faults);
-	vm->fault_credit = 16;
 
 	return 0;
 
@@ -2816,6 +2816,18 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	u64 fault;
 	int i, r;
 
+	/* Clear pending page faults from IH when the VM is destroyed */
+	while (kfifo_get(&vm->faults, &fault))
+		amdgpu_ih_clear_fault(adev, fault);
+
+	if (vm->pasid) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&adev->vm_manager.pasid_lock, flags);
+		idr_remove(&adev->vm_manager.pasid_idr, vm->pasid);
+		spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
+	}
+
 	if (vm->vm_context == AMDGPU_VM_CONTEXT_COMPUTE) {
 		struct amdgpu_vm_id_manager *id_mgr =
 				&adev->vm_manager.id_mgr[AMDGPU_GFXHUB];
@@ -2832,18 +2844,6 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 						AMD_PP_GFX_PROFILE);
 		}
 		mutex_unlock(&id_mgr->lock);
-	}
-
-	/* Clear pending page faults from IH when the VM is destroyed */
-	while (kfifo_get(&vm->faults, &fault))
-		amdgpu_ih_clear_fault(adev, fault);
-
-	if (vm->pasid) {
-		unsigned long flags;
-
-		spin_lock_irqsave(&adev->vm_manager.pasid_lock, flags);
-		idr_remove(&adev->vm_manager.pasid_idr, vm->pasid);
-		spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
 	}
 
 	amd_sched_entity_fini(vm->entity.sched, &vm->entity);
