@@ -29,7 +29,7 @@
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_pm4_headers_vi.h"
-#include "cwsr_trap_handler_carrizo.h"
+#include "cwsr_trap_handler_gfx8.asm"
 #include "cwsr_trap_handler_gfx9.asm"
 
 #define MQD_SIZE_ALIGNED 768
@@ -486,9 +486,11 @@ static int kfd_cwsr_init(struct kfd_dev *kfd)
 		unsigned int size;
 
 		if (kfd->device_info->asic_family < CHIP_VEGA10) {
-			cwsr_hex = cwsr_trap_carrizo_hex;
-			size = sizeof(cwsr_trap_carrizo_hex);
+			BUILD_BUG_ON(sizeof(cwsr_trap_gfx8_hex) > PAGE_SIZE);
+			cwsr_hex = cwsr_trap_gfx8_hex;
+			size = sizeof(cwsr_trap_gfx8_hex);
 		} else {
+			BUILD_BUG_ON(sizeof(cwsr_trap_gfx9_hex) > PAGE_SIZE);
 			cwsr_hex = cwsr_trap_gfx9_hex;
 			size = sizeof(cwsr_trap_gfx9_hex);
 		}
