@@ -79,7 +79,8 @@ static uint64_t get_gpu_clock_counter(struct kgd_dev *kgd);
 
 static uint32_t get_max_engine_clock_in_mhz(struct kgd_dev *kgd);
 
-static int create_process_vm(struct kgd_dev *kgd, void **vm, void **info);
+static int create_process_vm(struct kgd_dev *kgd, void **vm, void **info,
+			     struct dma_fence **ef);
 static void destroy_process_vm(struct kgd_dev *kgd, void *vm);
 
 static uint32_t get_process_page_dir(void *vm);
@@ -418,7 +419,8 @@ static uint32_t get_max_engine_clock_in_mhz(struct kgd_dev *kgd)
 /*
  * Creates a VM context for HSA process
  */
-static int create_process_vm(struct kgd_dev *kgd, void **vm, void **info)
+static int create_process_vm(struct kgd_dev *kgd, void **vm, void **info,
+			     struct dma_fence **ef)
 {
 	int ret;
 	struct radeon_vm *new_vm;

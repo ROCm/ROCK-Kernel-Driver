@@ -263,7 +263,7 @@ struct kfd2kgd_calls {
 	uint32_t (*get_max_engine_clock_in_mhz)(struct kgd_dev *kgd);
 
 	int (*create_process_vm)(struct kgd_dev *kgd, void **vm,
-				 void **process_info);
+				 void **process_info, struct dma_fence **ef);
 	void (*destroy_process_vm)(struct kgd_dev *kgd, void *vm);
 
 	int (*create_process_gpumem)(struct kgd_dev *kgd, uint64_t va, size_t size, void *vm, struct kgd_mem **mem);
@@ -393,7 +393,7 @@ struct kfd2kgd_calls {
 	int (*get_tile_config)(struct kgd_dev *kgd,
 			struct tile_config *config);
 
-	int (*restore_process_bos)(void *process_info);
+	int (*restore_process_bos)(void *process_info, struct dma_fence **ef);
 	int (*copy_mem_to_mem)(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 			uint64_t src_offset, struct kgd_mem *dst_mem,
 			uint64_t dest_offset, uint64_t size,

@@ -369,9 +369,11 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 			kfd_flush_tlb(pdd->dev, p->pasid);
 
 		/* Destroy the GPUVM VM context */
-		if (pdd->vm)
+		if (pdd->vm) {
+			dma_fence_put(p->ef);
 			pdd->dev->kfd2kgd->destroy_process_vm(
 				pdd->dev->kgd, pdd->vm);
+		}
 		list_del(&pdd->per_device_list);
 
 		if (pdd->qpd.cwsr_pages) {
@@ -733,7 +735,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 
 	/* Create the GPUVM context for this specific device */
 	if (dev->kfd2kgd->create_process_vm(dev->kgd, &pdd->vm,
-					&p->process_info)) {
+					&p->process_info, &p->ef)) {
 		pr_err("Failed to create process VM object\n");
 		goto err_create_pdd;
 	}

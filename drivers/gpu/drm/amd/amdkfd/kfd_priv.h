@@ -746,6 +746,11 @@ struct kfd_process {
 
 	/* Information used for memory eviction */
 	void *process_info;
+	/* Eviction fence that is attached to all the BOs of this process. The
+	 * fence will be triggered during eviction and new one will be created
+	 * during restore
+	 */
+	struct dma_fence *ef;
 
 	/* Work items for evicting and restoring BOs */
 	struct kfd_eviction_work eviction_work;

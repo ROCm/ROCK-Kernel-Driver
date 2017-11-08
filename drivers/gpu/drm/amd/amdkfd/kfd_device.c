@@ -958,7 +958,7 @@ void kfd_restore_bo_worker(struct work_struct *work)
 	 */
 
 	p->last_restore_timestamp = get_jiffies_64();
-	ret = pdd->dev->kfd2kgd->restore_process_bos(p->process_info);
+	ret = pdd->dev->kfd2kgd->restore_process_bos(p->process_info, &p->ef);
 	if (ret) {
 		pr_info("Restore failed, try again after %d ms\n",
 			PROCESS_BACK_OFF_TIME_MS);
@@ -1062,6 +1062,15 @@ void kfd_evict_bo_worker(struct work_struct *work)
 	ret = quiesce_process_mm(p);
 	if (!ret) {
 		dma_fence_signal(eviction_work->quiesce_fence);
+		WARN_ONCE(eviction_work->quiesce_fence != p->ef,
+			 "Eviction fence mismatch\n");
+		dma_fence_put(p->ef);
+		/* TODO: quiesce_fence is same as kfd_process->ef. But
+		 * quiesce_fence is also used to avoid starting multiple
+		 * eviction work items. This might not be necessary and
+		 * one of the variables could be removed
+		 */
+		p->ef = NULL;
 		schedule_delayed_work(&p->restore_work,
 				msecs_to_jiffies(PROCESS_RESTORE_TIME_MS));
 	} else

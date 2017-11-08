@@ -1408,7 +1408,8 @@ static u64 get_vm_pd_gpu_offset(void *vm)
 }
 
 int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
-					  void **process_info)
+					  void **process_info,
+					  struct dma_fence **ef)
 {
 	int ret;
 	struct amdkfd_vm *new_vm;
@@ -1457,6 +1458,7 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 				  amdgpu_amdkfd_restore_userptr_worker);
 
 		*process_info = info;
+		*ef = dma_fence_get(&info->eviction_fence->base);
 	}
 
 	new_vm->process_info = *process_info;
@@ -2276,7 +2278,7 @@ unlock_out:
  * 8.  Unreserve all BOs
  */
 
-int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
+int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info, struct dma_fence **ef)
 {
 	struct amdgpu_bo_list_entry *pd_bo_list;
 	struct amdkfd_process_info *process_info = info;
@@ -2383,6 +2385,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info)
 	}
 	dma_fence_put(&process_info->eviction_fence->base);
 	process_info->eviction_fence = new_fence;
+	*ef = dma_fence_get(&new_fence->base);
 
 	/* Wait for validate to finish and attach new eviction fence */
 	list_for_each_entry(mem, &process_info->kfd_bo_list,
