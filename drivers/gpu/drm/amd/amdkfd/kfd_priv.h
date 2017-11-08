@@ -617,6 +617,7 @@ void kfd_evict_bo_worker(struct work_struct *work);
 void kfd_restore_bo_worker(struct work_struct *work);
 int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 					       struct dma_fence *fence);
+int quiesce_process_mm(struct kfd_process *p);
 
 
 /* 8 byte handle containing GPU ID in the most significant 4 bytes and
@@ -786,6 +787,8 @@ struct kfd_process *kfd_get_process(const struct task_struct *task);
 struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid);
 struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm);
 void kfd_unref_process(struct kfd_process *p);
+void kfd_suspend_all_processes(void);
+int kfd_resume_all_processes(void);
 
 struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 							struct kfd_process *p);

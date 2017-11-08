@@ -1054,6 +1054,43 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 	return ret_p;
 }
 
+void kfd_suspend_all_processes(void)
+{
+	struct kfd_process *p;
+	unsigned int temp;
+	int idx = srcu_read_lock(&kfd_processes_srcu);
+
+	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+		if (cancel_delayed_work_sync(&p->eviction_work.dwork))
+			dma_fence_put(p->eviction_work.quiesce_fence);
+		cancel_delayed_work_sync(&p->restore_work);
+
+		if (quiesce_process_mm(p))
+			pr_err("Failed to suspend process %d\n", p->pasid);
+		dma_fence_signal(p->ef);
+		dma_fence_put(p->ef);
+		p->ef = NULL;
+	}
+	srcu_read_unlock(&kfd_processes_srcu, idx);
+}
+
+int kfd_resume_all_processes(void)
+{
+	struct kfd_process *p;
+	unsigned int temp;
+	int ret = 0, idx = srcu_read_lock(&kfd_processes_srcu);
+
+	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+		if (!schedule_delayed_work(&p->restore_work, 0)) {
+			pr_err("Restore process %d failed during resume\n",
+			       p->pasid);
+			ret = -EFAULT;
+		}
+	}
+	srcu_read_unlock(&kfd_processes_srcu, idx);
+	return ret;
+}
+
 /* This increments the process->ref counter. */
 struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
 {

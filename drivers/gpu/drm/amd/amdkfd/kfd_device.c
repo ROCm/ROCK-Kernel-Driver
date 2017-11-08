@@ -33,6 +33,7 @@
 #include "cwsr_trap_handler_gfx9.asm"
 
 #define MQD_SIZE_ALIGNED 768
+static atomic_t kfd_device_suspended = ATOMIC_INIT(0);
 
 #if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 static const struct kfd_device_info kaveri_device_info = {
@@ -710,6 +711,10 @@ void kgd2kfd_suspend(struct kfd_dev *kfd)
 	if (!kfd->init_complete)
 		return;
 
+	/* For first KFD device suspend all the KFD processes */
+	if (atomic_inc_return(&kfd_device_suspended) == 1)
+		kfd_suspend_all_processes();
+
 	kfd->dqm->ops.stop(kfd->dqm);
 
 #if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
@@ -726,10 +731,20 @@ void kgd2kfd_suspend(struct kfd_dev *kfd)
 
 int kgd2kfd_resume(struct kfd_dev *kfd)
 {
+	int ret;
+
 	if (!kfd->init_complete)
 		return 0;
 
-	return kfd_resume(kfd);
+	ret = kfd_resume(kfd);
+	if (ret)
+		return ret;
+
+	if (atomic_dec_return(&kfd_device_suspended) == 0)
+		ret = kfd_resume_all_processes();
+	WARN(atomic_read(&kfd_device_suspended) < 0,
+	     "KFD suspend / resume ref. error\n");
+	return ret;
 }
 
 static int kfd_resume(struct kfd_dev *kfd)
@@ -806,7 +821,7 @@ void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 /* quiesce_process_mm -
  *  Quiesce all user queues that belongs to given process p
  */
-static int quiesce_process_mm(struct kfd_process *p)
+int quiesce_process_mm(struct kfd_process *p)
 {
 	struct kfd_process_device *pdd;
 	int r = 0;
