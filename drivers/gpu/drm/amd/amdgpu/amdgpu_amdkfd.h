@@ -140,7 +140,8 @@ int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem, struct mm_struct *mm);
 int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 				uint32_t vmid, uint64_t gpu_addr,
 				uint32_t *ib_cmd, uint32_t ib_len);
-int amdgpu_amdkfd_gpuvm_restore_process_bos(void *process_info);
+int amdgpu_amdkfd_gpuvm_restore_process_bos(void *process_info,
+					    struct dma_fence **ef);
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions(void);
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions(void);
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void);
@@ -202,7 +203,8 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 		struct kgd_dev *kgd, struct kgd_mem *mem, void *vm);
 
 int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
-					  void **process_info);
+					  void **process_info,
+					  struct dma_fence **ef);
 void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm);
 
 uint32_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm);
