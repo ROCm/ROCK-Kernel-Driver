@@ -323,6 +323,10 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
 		kfree(pqn->q->properties.cu_mask);
 		pqn->q->properties.cu_mask = NULL;
 		retval = dqm->ops.destroy_queue(dqm, &pdd->qpd, pqn->q);
+		if (retval) {
+			pr_debug("Destroy queue failed, returned %d\n", retval);
+			goto err_destroy_queue;
+		}
 		uninit_queue(pqn->q);
 	}
 
@@ -334,6 +338,7 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
 			list_empty(&pdd->qpd.priv_queue_list))
 		dqm->ops.unregister_process(dqm, &pdd->qpd);
 
+err_destroy_queue:
 	return retval;
 }
 
