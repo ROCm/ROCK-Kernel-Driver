@@ -23,8 +23,6 @@
  *
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
-
 #include <linux/string.h>
 #include <linux/acpi.h>
 
@@ -384,4 +382,3 @@ void dm_pp_get_funcs_rv(
 {}
 
 /**** end of power component interfaces ****/
-#endif

@@ -678,3 +678,30 @@ void drm_state_dump(struct drm_device *dev, struct drm_printer *p)
 }
 EXPORT_SYMBOL(drm_state_dump);
 #endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 6, 0) && !defined(OS_NAME_RHEL_7_3) && !defined(OS_NAME_RHEL_7_4)
+void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e)
+{
+	assert_spin_locked(&dev->event_lock);
+
+	if (!e->file_priv) {
+		kfree(e);
+		return;
+	}
+
+	list_add_tail(&e->link,
+		      &e->file_priv->event_list);
+	wake_up_interruptible(&e->file_priv->event_wait);
+}
+EXPORT_SYMBOL(drm_send_event_locked);
+
+void drm_send_event(struct drm_device *dev, struct drm_pending_event *e)
+{
+	unsigned long irqflags;
+
+	spin_lock_irqsave(&dev->event_lock, irqflags);
+	drm_send_event_locked(dev, e);
+	spin_unlock_irqrestore(&dev->event_lock, irqflags);
+}
+EXPORT_SYMBOL(drm_send_event);
+#endif

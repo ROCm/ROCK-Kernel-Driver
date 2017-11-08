@@ -23,8 +23,6 @@
  *
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
-
 #include <drm/drmP.h>
 
 #include "dm_services_types.h"
@@ -758,5 +756,3 @@ void amdgpu_dm_hpd_fini(struct amdgpu_device *adev)
 		}
 	}
 }
-
-#endif
