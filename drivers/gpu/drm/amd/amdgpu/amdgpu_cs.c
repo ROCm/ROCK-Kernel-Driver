@@ -1574,12 +1574,15 @@ out:
 	memset(wait, 0, sizeof(*wait));
 	wait->out.status = (r > 0);
 	wait->out.first_signaled = first;
-	/* set return value 0 to indicate success */
+
+	if (array[first])
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
-	r = array[first]->status;
+		r = array[first]->status;
 #else
-	r = array[first]->error;
+		r = array[first]->error;
 #endif
+	else
+		r = 0;
 
 err_free_fence_array:
 	for (i = 0; i < fence_count; i++)
