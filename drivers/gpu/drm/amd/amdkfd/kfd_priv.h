@@ -582,12 +582,11 @@ struct qcm_process_device {
 	uint32_t num_oac;
 	uint32_t sh_hidden_private_base;
 
-	/*cwsr memory*/
+	/* CWSR memory */
+	void *cwsr_kaddr;
 	uint64_t cwsr_base;
 	uint64_t tba_addr;
 	uint64_t tma_addr;
-	void *cwsr_kaddr;
-	struct page *cwsr_pages;
 
 	/* IB memory */
 	uint64_t ib_base; /* ib_base+ib_size must be below cwsr_base */

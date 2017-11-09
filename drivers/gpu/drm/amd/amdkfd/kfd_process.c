@@ -34,7 +34,7 @@
 #include <linux/notifier.h>
 #include <linux/compat.h>
 #include <linux/mman.h>
-#include <linux/highmem.h>
+#include <asm/page.h>
 #include "kfd_ipc.h"
 
 struct mm_struct;
@@ -376,11 +376,9 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 		}
 		list_del(&pdd->per_device_list);
 
-		if (pdd->qpd.cwsr_pages) {
-			kunmap(pdd->qpd.cwsr_pages);
-			__free_pages(pdd->qpd.cwsr_pages,
+		if (pdd->qpd.cwsr_kaddr && !pdd->qpd.cwsr_base)
+			free_pages((unsigned long)pdd->qpd.cwsr_kaddr,
 				get_order(KFD_CWSR_TBA_TMA_SIZE));
-		}
 
 		kfree(pdd->qpd.doorbell_bitmap);
 		idr_destroy(&pdd->alloc_idr);
@@ -1119,8 +1117,6 @@ struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
 int kfd_reserved_mem_mmap(struct kfd_process *process,
 		struct vm_area_struct *vma)
 {
-	unsigned long pfn, i;
-	int ret = 0;
 	struct kfd_dev *dev = kfd_device_by_id(vma->vm_pgoff);
 	struct kfd_process_device *temp, *pdd = NULL;
 	struct qcm_process_device *qpd = NULL;
@@ -1146,25 +1142,19 @@ int kfd_reserved_mem_mmap(struct kfd_process *process,
 	if (!qpd)
 		return -EINVAL;
 
-	qpd->cwsr_pages = alloc_pages(GFP_KERNEL | __GFP_HIGHMEM,
-				get_order(KFD_CWSR_TBA_TMA_SIZE));
-	if (!qpd->cwsr_pages) {
+	qpd->cwsr_kaddr = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
+					get_order(KFD_CWSR_TBA_TMA_SIZE));
+	if (!qpd->cwsr_kaddr) {
 		pr_err("amdkfd: error alloc CWSR isa memory per process.\n");
 		return -ENOMEM;
 	}
-	qpd->cwsr_kaddr = kmap(qpd->cwsr_pages);
 
 	vma->vm_flags |= VM_IO | VM_DONTCOPY | VM_DONTEXPAND
 		| VM_NORESERVE | VM_DONTDUMP | VM_PFNMAP;
-	for (i = 0; i < ((vma->vm_end - vma->vm_start) >> PAGE_SHIFT); ++i) {
-		pfn = page_to_pfn(&qpd->cwsr_pages[i]);
-		/* mapping the page to user process */
-		ret = remap_pfn_range(vma, vma->vm_start + (i << PAGE_SHIFT),
-				pfn, PAGE_SIZE, vma->vm_page_prot);
-		if (ret)
-			break;
-	}
-	return ret;
+	/* Mapping pages to user process */
+	return remap_pfn_range(vma, vma->vm_start,
+			       PFN_DOWN(__pa(qpd->cwsr_kaddr)),
+			       KFD_CWSR_TBA_TMA_SIZE, vma->vm_page_prot);
 }
 
 #if defined(CONFIG_DEBUG_FS)
