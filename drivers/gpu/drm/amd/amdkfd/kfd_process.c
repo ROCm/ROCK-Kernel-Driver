@@ -1118,34 +1118,25 @@ int kfd_reserved_mem_mmap(struct kfd_process *process,
 		struct vm_area_struct *vma)
 {
 	struct kfd_dev *dev = kfd_device_by_id(vma->vm_pgoff);
-	struct kfd_process_device *temp, *pdd = NULL;
-	struct qcm_process_device *qpd = NULL;
+	struct kfd_process_device *pdd;
+	struct qcm_process_device *qpd;
 
 	if (!dev)
 		return -EINVAL;
-	if (((vma->vm_end - vma->vm_start) != KFD_CWSR_TBA_TMA_SIZE) ||
-		(vma->vm_start & (PAGE_SIZE - 1)) ||
-		(vma->vm_end & (PAGE_SIZE - 1))) {
-		pr_err("KFD only support page aligned memory map and correct size.\n");
+	if ((vma->vm_end - vma->vm_start) != KFD_CWSR_TBA_TMA_SIZE) {
+		pr_err("Incorrect CWSR mapping size.\n");
 		return -EINVAL;
 	}
 
-	pr_debug("kfd reserved mem mmap been called.\n");
-
-	list_for_each_entry_safe(pdd, temp, &process->per_device_data,
-				per_device_list) {
-		if (dev == pdd->dev) {
-			qpd = &pdd->qpd;
-			break;
-		}
-	}
-	if (!qpd)
+	pdd = kfd_get_process_device_data(dev, process);
+	if (!pdd)
 		return -EINVAL;
+	qpd = &pdd->qpd;
 
 	qpd->cwsr_kaddr = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
 					get_order(KFD_CWSR_TBA_TMA_SIZE));
 	if (!qpd->cwsr_kaddr) {
-		pr_err("amdkfd: error alloc CWSR isa memory per process.\n");
+		pr_err("Error allocating per process CWSR buffer.\n");
 		return -ENOMEM;
 	}
 
