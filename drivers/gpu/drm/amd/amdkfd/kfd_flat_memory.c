@@ -314,7 +314,7 @@
 int kfd_set_process_dgpu_aperture(struct kfd_process_device *pdd,
 					uint64_t base, uint64_t limit)
 {
-	if (base < (pdd->qpd.cwsr_base + pdd->dev->cwsr_size)) {
+	if (base < (pdd->qpd.cwsr_base + KFD_CWSR_TBA_TMA_SIZE)) {
 		pr_err("Set dgpu vm base 0x%llx failed.\n", base);
 		return -EINVAL;
 	}

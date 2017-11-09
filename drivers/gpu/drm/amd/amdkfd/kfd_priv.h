@@ -96,6 +96,15 @@
 #define KFD_MAX_NUM_OF_QUEUES_PER_PROCESS 1024
 
 /*
+ * Size of the per-process TBA+TMA buffer: 2 pages
+ *
+ * The first page is the TBA used for the CWSR ISA code. The second
+ * page is used as TMA for daisy changing a user-mode trap handler.
+ */
+#define KFD_CWSR_TBA_TMA_SIZE (PAGE_SIZE * 2)
+#define KFD_CWSR_TMA_OFFSET PAGE_SIZE
+
+/*
  * Kernel module parameter to specify maximum number of supported queues per
  * device
  */
@@ -289,11 +298,10 @@ struct kfd_dev {
 	/* Maximum process number mapped to HW scheduler */
 	unsigned int max_proc_per_quantum;
 
-	/* cwsr */
+	/* CWSR */
 	bool cwsr_enabled;
-	struct page *cwsr_pages;
-	uint32_t cwsr_size;
-	uint32_t tma_offset;  /*Offset for TMA from the  start of cwsr_mem*/
+	const void *cwsr_isa;
+	unsigned int cwsr_isa_size;
 
 	/* IB usage */
 	uint32_t ib_size;

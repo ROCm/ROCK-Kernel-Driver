@@ -25,7 +25,6 @@
 #endif
 #include <linux/pci.h>
 #include <linux/slab.h>
-#include <linux/highmem.h>
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_pm4_headers_vi.h"
@@ -477,55 +476,21 @@ static int iommu_invalid_ppr_cb(struct pci_dev *pdev, int pasid,
 
 static int kfd_cwsr_init(struct kfd_dev *kfd)
 {
-	/*
-	 * Initialize the CWSR required memory for TBA and TMA
-	 */
 	if (cwsr_enable && kfd->device_info->supports_cwsr) {
-		const uint32_t *cwsr_hex;
-		void *cwsr_addr = NULL;
-		unsigned int size;
-
 		if (kfd->device_info->asic_family < CHIP_VEGA10) {
 			BUILD_BUG_ON(sizeof(cwsr_trap_gfx8_hex) > PAGE_SIZE);
-			cwsr_hex = cwsr_trap_gfx8_hex;
-			size = sizeof(cwsr_trap_gfx8_hex);
+			kfd->cwsr_isa = cwsr_trap_gfx8_hex;
+			kfd->cwsr_isa_size = sizeof(cwsr_trap_gfx8_hex);
 		} else {
 			BUILD_BUG_ON(sizeof(cwsr_trap_gfx9_hex) > PAGE_SIZE);
-			cwsr_hex = cwsr_trap_gfx9_hex;
-			size = sizeof(cwsr_trap_gfx9_hex);
+			kfd->cwsr_isa = cwsr_trap_gfx9_hex;
+			kfd->cwsr_isa_size = sizeof(cwsr_trap_gfx9_hex);
 		}
 
-		if (size > PAGE_SIZE) {
-			pr_err("Wrong CWSR ISA size.\n");
-			return -EINVAL;
-		}
-		kfd->cwsr_size =
-			ALIGN(size, PAGE_SIZE) + PAGE_SIZE;
-		kfd->cwsr_pages = alloc_pages(GFP_KERNEL | __GFP_HIGHMEM,
-					get_order(kfd->cwsr_size));
-		if (!kfd->cwsr_pages) {
-			pr_err("Failed to allocate CWSR isa memory.\n");
-			return -ENOMEM;
-		}
-		/*Only first page used for cwsr ISA code */
-		cwsr_addr = kmap(kfd->cwsr_pages);
-		memset(cwsr_addr, 0, PAGE_SIZE);
-		memcpy(cwsr_addr, cwsr_hex, size);
-		kunmap(kfd->cwsr_pages);
-		kfd->tma_offset = ALIGN(size, PAGE_SIZE);
 		kfd->cwsr_enabled = true;
-		dev_info(kfd_device,
-			"Reserved %d pages for cwsr.\n",
-			(kfd->cwsr_size >> PAGE_SHIFT));
 	}
 
 	return 0;
-}
-
-static void kfd_cwsr_fini(struct kfd_dev *kfd)
-{
-	if (kfd->cwsr_pages)
-		__free_pages(kfd->cwsr_pages, get_order(kfd->cwsr_size));
 }
 
 static void kfd_ib_mem_init(struct kfd_dev *kdev)
@@ -659,7 +624,6 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	goto out;
 
 kfd_resume_error:
-	kfd_cwsr_fini(kfd);
 device_iommu_pasid_error:
 	device_queue_manager_uninit(kfd->dqm);
 device_queue_manager_error:
@@ -686,7 +650,6 @@ void kgd2kfd_device_exit(struct kfd_dev *kfd)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
 		kfd_cleanup_processes_srcu();
 #endif
-		kfd_cwsr_fini(kfd);
 		device_queue_manager_uninit(kfd->dqm);
 		kfd_interrupt_exit(kfd);
 		kfd_topology_remove_device(kfd);

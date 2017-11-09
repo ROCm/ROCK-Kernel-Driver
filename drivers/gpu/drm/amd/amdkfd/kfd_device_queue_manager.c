@@ -1414,7 +1414,7 @@ static int set_trap_handler(struct device_queue_manager *dqm,
 
 	if (dqm->dev->cwsr_enabled) {
 		/* Jump from CWSR trap handler to user trap */
-		tma = (uint64_t *)(qpd->cwsr_kaddr + dqm->dev->tma_offset);
+		tma = (uint64_t *)(qpd->cwsr_kaddr + KFD_CWSR_TMA_OFFSET);
 		tma[0] = tba_addr;
 		tma[1] = tma_addr;
 	} else {

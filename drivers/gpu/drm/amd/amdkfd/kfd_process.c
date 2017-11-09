@@ -379,7 +379,7 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 		if (pdd->qpd.cwsr_pages) {
 			kunmap(pdd->qpd.cwsr_pages);
 			__free_pages(pdd->qpd.cwsr_pages,
-				get_order(pdd->dev->cwsr_size));
+				get_order(KFD_CWSR_TBA_TMA_SIZE));
 		}
 
 		kfree(pdd->qpd.doorbell_bitmap);
@@ -531,7 +531,7 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 		if (qpd->cwsr_base) {
 			/* cwsr_base is only set for DGPU */
 			ret = kfd_process_alloc_gpuvm(p, dev, qpd->cwsr_base,
-					dev->cwsr_size,	&kaddr, pdd, flags);
+				KFD_CWSR_TBA_TMA_SIZE, &kaddr, pdd, flags);
 			if (!ret) {
 				qpd->cwsr_kaddr = kaddr;
 				qpd->tba_addr = qpd->cwsr_base;
@@ -546,7 +546,7 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 			offset = (dev->id |
 				KFD_MMAP_TYPE_RESERVED_MEM) << PAGE_SHIFT;
 			qpd->tba_addr = (uint64_t)vm_mmap(filep, 0,
-				dev->cwsr_size,	PROT_READ | PROT_EXEC,
+				KFD_CWSR_TBA_TMA_SIZE, PROT_READ | PROT_EXEC,
 				MAP_SHARED, offset);
 
 			if (IS_ERR_VALUE(qpd->tba_addr)) {
@@ -558,10 +558,9 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 			}
 		}
 
-		memcpy(qpd->cwsr_kaddr, kmap(dev->cwsr_pages), PAGE_SIZE);
-		kunmap(dev->cwsr_pages);
+		memcpy(qpd->cwsr_kaddr, dev->cwsr_isa, dev->cwsr_isa_size);
 
-		qpd->tma_addr = qpd->tba_addr + dev->tma_offset;
+		qpd->tma_addr = qpd->tba_addr + KFD_CWSR_TMA_OFFSET;
 		pr_debug("set tba :0x%llx, tma:0x%llx, cwsr_kaddr:%p for pqm.\n",
 			qpd->tba_addr, qpd->tma_addr, qpd->cwsr_kaddr);
 	}
@@ -1128,7 +1127,7 @@ int kfd_reserved_mem_mmap(struct kfd_process *process,
 
 	if (!dev)
 		return -EINVAL;
-	if (((vma->vm_end - vma->vm_start) != dev->cwsr_size) ||
+	if (((vma->vm_end - vma->vm_start) != KFD_CWSR_TBA_TMA_SIZE) ||
 		(vma->vm_start & (PAGE_SIZE - 1)) ||
 		(vma->vm_end & (PAGE_SIZE - 1))) {
 		pr_err("KFD only support page aligned memory map and correct size.\n");
@@ -1148,7 +1147,7 @@ int kfd_reserved_mem_mmap(struct kfd_process *process,
 		return -EINVAL;
 
 	qpd->cwsr_pages = alloc_pages(GFP_KERNEL | __GFP_HIGHMEM,
-				get_order(dev->cwsr_size));
+				get_order(KFD_CWSR_TBA_TMA_SIZE));
 	if (!qpd->cwsr_pages) {
 		pr_err("amdkfd: error alloc CWSR isa memory per process.\n");
 		return -ENOMEM;
