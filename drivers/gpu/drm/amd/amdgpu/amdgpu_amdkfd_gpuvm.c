@@ -1615,19 +1615,6 @@ out:
 	return ret;
 }
 
-int amdgpu_amdkfd_gpuvm_mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma)
-{
-	struct amdgpu_device *adev;
-
-	adev = get_amdgpu_device(kgd);
-	if (!adev) {
-		pr_err("Could not get amdgpu device in %s\n", __func__);
-		return -ENODEV;
-	}
-
-	return amdgpu_bo_mmap(NULL, vma, &adev->mman.bdev);
-}
-
 int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 		struct kgd_mem *mem, void **kptr)
 {

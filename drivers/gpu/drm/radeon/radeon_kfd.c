@@ -150,7 +150,6 @@ static int alloc_memory_of_scratch(struct kgd_dev *kgd,
 					 uint64_t va, uint32_t vmid);
 static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
 		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
-static int mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma);
 static int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 			struct kgd_mem *mem, void **kptr);
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
@@ -192,7 +191,6 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.get_cu_info = get_cu_info,
 	.alloc_memory_of_scratch = alloc_memory_of_scratch,
 	.write_config_static_mem = write_config_static_mem,
-	.mmap_bo = mmap_bo,
 	.map_gtt_bo_to_kernel = map_gtt_bo_to_kernel,
 	.set_vm_context_page_table_base = set_vm_context_page_table_base,
 };
@@ -1659,11 +1657,6 @@ static void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 	cu_info->wave_front_size = rcu_info.wave_front_size;
 	cu_info->max_scratch_slots_per_cu = rcu_info.max_scratch_slots_per_cu;
 	cu_info->lds_size = rcu_info.lds_size;
-}
-
-static int mmap_bo(struct kgd_dev *kgd, struct vm_area_struct *vma)
-{
-	return 0;
 }
 
 static int map_gtt_bo_to_kernel(struct kgd_dev *kgd,

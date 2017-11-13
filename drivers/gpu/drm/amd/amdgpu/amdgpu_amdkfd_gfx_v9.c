@@ -246,7 +246,6 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.get_cu_info = get_cu_info,
 	.alloc_memory_of_scratch = alloc_memory_of_scratch,
 	.write_config_static_mem = write_config_static_mem,
-	.mmap_bo = amdgpu_amdkfd_gpuvm_mmap_bo,
 	.map_gtt_bo_to_kernel = amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel,
 	.set_vm_context_page_table_base = set_vm_context_page_table_base,
 	.pin_get_sg_table_bo = amdgpu_amdkfd_gpuvm_pin_get_sg_table,

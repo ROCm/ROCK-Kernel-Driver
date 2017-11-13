@@ -95,8 +95,6 @@ int amdgpu_fill_buffer(struct amdgpu_bo *bo,
 			struct dma_fence **fence);
 
 int amdgpu_mmap(struct file *filp, struct vm_area_struct *vma);
-int amdgpu_bo_mmap(struct file *filp, struct vm_area_struct *vma,
-		   struct ttm_bo_device *bdev);
 int amdgpu_ttm_bind(struct ttm_buffer_object *bo);
 int amdgpu_ttm_alloc_gart(struct ttm_buffer_object *bo);
 int amdgpu_ttm_recover_gart(struct ttm_buffer_object *tbo);
