@@ -444,16 +444,16 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 		/* Last resort, if we fail to allocate memory for the
 		 * fences block for the BO to become idle
 		 */
-		reservation_object_wait_timeout_rcu(bo->resv, true, false,
+		kcl_reservation_object_wait_timeout_rcu(bo->resv, true, false,
 						    30 * HZ);
 		spin_lock(&glob->lru_lock);
 		goto error;
 	}
 
 	spin_lock(&glob->lru_lock);
-	ret = reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
+	ret = kcl_reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
 	if (!ret) {
-		if (reservation_object_test_signaled_rcu(&bo->ttm_resv, true)) {
+		if (kcl_reservation_object_test_signaled_rcu(&bo->ttm_resv, true)) {
 			ttm_bo_del_from_lru(bo);
 			spin_unlock(&glob->lru_lock);
 			if (bo->resv != &bo->ttm_resv)
@@ -516,7 +516,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 	else
 		resv = &bo->ttm_resv;
 
-	if (reservation_object_test_signaled_rcu(resv, true))
+	if (kcl_reservation_object_test_signaled_rcu(resv, true))
 		ret = 0;
 	else
 		ret = -EBUSY;
@@ -528,7 +528,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 			kcl_reservation_object_unlock(bo->resv);
 		spin_unlock(&glob->lru_lock);
 
-		lret = reservation_object_wait_timeout_rcu(resv, true,
+		lret = kcl_reservation_object_wait_timeout_rcu(resv, true,
 							   interruptible,
 							   30 * HZ);
 
@@ -538,7 +538,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 			return -EBUSY;
 
 		spin_lock(&glob->lru_lock);
-		if (unlock_resv && !reservation_object_trylock(bo->resv)) {
+		if (unlock_resv && !kcl_reservation_object_trylock(bo->resv)) {
 			/*
 			 * We raced, and lost, someone else holds the reservation now,
 			 * and is probably busy in ttm_bo_cleanup_memtype_use.
@@ -596,7 +596,7 @@ static bool ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 
 		if (remove_all || bo->resv != &bo->ttm_resv) {
 			spin_unlock(&glob->lru_lock);
-			reservation_object_lock(bo->resv, NULL);
+			kcl_reservation_object_lock(bo->resv, NULL);
 
 			spin_lock(&glob->lru_lock);
 			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
@@ -740,7 +740,7 @@ static bool ttm_bo_evict_swapout_allowable(struct ttm_buffer_object *bo,
 		if (ctx->allow_reserved_eviction || !list_empty(&bo->ddestroy))
 			ret = true;
 	} else {
-		*locked = reservation_object_trylock(bo->resv);
+		*locked = kcl_reservation_object_trylock(bo->resv);
 		ret = *locked;
 	}
 
@@ -1669,7 +1669,7 @@ int ttm_bo_wait(struct ttm_buffer_object *bo,
 			return -EBUSY;
 	}
 
-	timeout = reservation_object_wait_timeout_rcu(bo->resv, true,
+	timeout = kcl_reservation_object_wait_timeout_rcu(bo->resv, true,
 						      interruptible, timeout);
 	if (timeout < 0)
 		return timeout;
