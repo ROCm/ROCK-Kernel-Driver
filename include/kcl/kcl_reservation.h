@@ -80,6 +80,17 @@ kcl_reservation_object_copy_fences(struct reservation_object *dst,
 #endif
 }
 
+static inline int
+kcl_reservation_object_lock_interruptible(struct reservation_object *obj,
+					struct ww_acquire_ctx *ctx)
+{
+#if defined(BUILD_AS_DKMS)
+	return ww_mutex_lock_interruptible(&obj->lock, ctx);
+#else
+	return reservation_object_lock_interruptible(obj, ctx);
+#endif
+}
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 static inline bool __must_check
 _kcl_reservation_object_trylock(struct reservation_object *obj)

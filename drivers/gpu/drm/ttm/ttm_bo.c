@@ -453,7 +453,7 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 	}
 
 	spin_lock(&glob->lru_lock);
-	ret = reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
+	ret = kcl_reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
 	if (!ret) {
 		if (kcl_reservation_object_test_signaled_rcu(&bo->ttm_resv, true)) {
 			ttm_bo_del_from_lru(bo);
@@ -462,7 +462,7 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 				kcl_reservation_object_unlock(&bo->ttm_resv);
 
 			ttm_bo_cleanup_memtype_use(bo);
-			reservation_object_unlock(bo->resv);
+			kcl_reservation_object_unlock(bo->resv);
 			return;
 		}
 
@@ -478,7 +478,7 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 			ttm_bo_add_to_lru(bo);
 		}
 
-		reservation_object_unlock(bo->resv);
+		kcl_reservation_object_unlock(bo->resv);
 	}
 	if (bo->resv != &bo->ttm_resv)
 		kcl_reservation_object_unlock(&bo->ttm_resv);
@@ -525,7 +525,7 @@ static int ttm_bo_cleanup_refs_and_unlock(struct ttm_buffer_object *bo,
 	if (ret && !no_wait_gpu) {
 		long lret;
 
-		reservation_object_unlock(bo->resv);
+		kcl_reservation_object_unlock(bo->resv);
 		spin_unlock(&glob->lru_lock);
 
 		lret = kcl_reservation_object_wait_timeout_rcu(resv, true,
@@ -538,7 +538,7 @@ static int ttm_bo_cleanup_refs_and_unlock(struct ttm_buffer_object *bo,
 			return -EBUSY;
 
 		spin_lock(&glob->lru_lock);
-		ret = reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
+		ret = kcl_reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
 
 		/*
 		 * We raced, and lost, someone else holds the reservation now,
@@ -555,7 +555,7 @@ static int ttm_bo_cleanup_refs_and_unlock(struct ttm_buffer_object *bo,
 	}
 
 	if (ret || unlikely(list_empty(&bo->ddestroy))) {
-		reservation_object_unlock(bo->resv);
+		kcl_reservation_object_unlock(bo->resv);
 		spin_unlock(&glob->lru_lock);
 		return ret;
 	}
@@ -566,7 +566,7 @@ static int ttm_bo_cleanup_refs_and_unlock(struct ttm_buffer_object *bo,
 
 	spin_unlock(&glob->lru_lock);
 	ttm_bo_cleanup_memtype_use(bo);
-	reservation_object_unlock(bo->resv);
+	kcl_reservation_object_unlock(bo->resv);
 
 	return 0;
 }
@@ -599,10 +599,10 @@ static int ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 			kref_get(&nentry->list_kref);
 		}
 
-		ret = reservation_object_trylock(entry->resv) ? 0 : -EBUSY;
+		ret = kcl_reservation_object_trylock(entry->resv) ? 0 : -EBUSY;
 		if (remove_all && ret) {
 			spin_unlock(&glob->lru_lock);
-			ret = reservation_object_lock(entry->resv, NULL);
+			ret = kcl_reservation_object_lock(entry->resv, NULL);
 			spin_lock(&glob->lru_lock);
 		}
 
@@ -751,13 +751,13 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 	spin_lock(&glob->lru_lock);
 	for (i = 0; i < TTM_MAX_BO_PRIORITY; ++i) {
 		list_for_each_entry(bo, &man->lru[i], lru) {
-			ret = reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
+			ret = kcl_reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
 			if (ret)
 				continue;
 
 			if (place && !bdev->driver->eviction_valuable(bo,
 								      place)) {
-				reservation_object_unlock(bo->resv);
+				kcl_reservation_object_unlock(bo->resv);
 				ret = -EBUSY;
 				continue;
 			}
@@ -1727,7 +1727,7 @@ static int ttm_bo_swapout(struct ttm_mem_shrink *shrink)
 	spin_lock(&glob->lru_lock);
 	for (i = 0; i < TTM_MAX_BO_PRIORITY; ++i) {
 		list_for_each_entry(bo, &glob->swap_lru[i], swap) {
-			ret = reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
+			ret = kcl_reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
 			if (!ret)
 				break;
 		}
@@ -1797,7 +1797,7 @@ out:
 	 * already swapped buffer.
 	 */
 
-	reservation_object_unlock(bo->resv);
+	kcl_reservation_object_unlock(bo->resv);
 	kref_put(&bo->list_kref, ttm_bo_release_list);
 	return ret;
 }
@@ -1831,12 +1831,12 @@ int ttm_bo_wait_unreserved(struct ttm_buffer_object *bo)
 		return -ERESTARTSYS;
 	if (!ww_mutex_is_locked(&bo->resv->lock))
 		goto out_unlock;
-	ret = reservation_object_lock_interruptible(bo->resv, NULL);
+	ret = kcl_reservation_object_lock_interruptible(bo->resv, NULL);
 	if (ret == -EINTR)
 		ret = -ERESTARTSYS;
 	if (unlikely(ret != 0))
 		goto out_unlock;
-	reservation_object_unlock(bo->resv);
+	kcl_reservation_object_unlock(bo->resv);
 
 out_unlock:
 	mutex_unlock(&bo->wu_mutex);

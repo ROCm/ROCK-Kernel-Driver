@@ -842,14 +842,14 @@ static inline int __ttm_bo_reserve(struct ttm_buffer_object *bo,
 		if (WARN_ON(ticket))
 			return -EBUSY;
 
-		success = reservation_object_trylock(bo->resv);
+		success = kcl_reservation_object_trylock(bo->resv);
 		return success ? 0 : -EBUSY;
 	}
 
 	if (interruptible)
-		ret = reservation_object_lock_interruptible(bo->resv, ticket);
+		ret = kcl_reservation_object_lock_interruptible(bo->resv, ticket);
 	else
-		ret = reservation_object_lock(bo->resv, ticket);
+		ret = kcl_reservation_object_lock(bo->resv, ticket);
 	if (ret == -EINTR)
 		return -ERESTARTSYS;
 	return ret;
@@ -960,7 +960,7 @@ static inline void ttm_bo_unreserve(struct ttm_buffer_object *bo)
 		ttm_bo_add_to_lru(bo);
 		spin_unlock(&bo->glob->lru_lock);
 	}
-	reservation_object_unlock(bo->resv);
+	kcl_reservation_object_unlock(bo->resv);
 }
 
 /*
