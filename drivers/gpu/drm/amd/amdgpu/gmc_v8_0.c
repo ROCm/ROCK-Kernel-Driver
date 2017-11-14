@@ -569,6 +569,11 @@ static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 			break;
 		}
 		adev->gmc.vram_width = numchan * chansize;
+		/* FIXME: The above calculation is outdated.
+		 * For HBM provide a temporary fix
+		 */
+		if (adev->gmc.vram_type == AMDGPU_VRAM_TYPE_HBM)
+			adev->gmc.vram_width = AMDGPU_VRAM_TYPE_HBM_WIDTH;
 	}
 	/* size in MB on si */
 	adev->gmc.mc_vram_size = RREG32(mmCONFIG_MEMSIZE) * 1024ULL * 1024ULL;
@@ -972,6 +977,7 @@ static void gmc_v8_0_gart_disable(struct amdgpu_device *adev)
  * @adev: amdgpu_device pointer
  * @status: VM_CONTEXT1_PROTECTION_FAULT_STATUS register value
  * @addr: VM_CONTEXT1_PROTECTION_FAULT_ADDR register value
+ * @mc_client: VM_CONTEXT1_PROTECTION_FAULT_MCCLIENT register value
  *
  * Print human readable fault information (VI).
  */
