@@ -1485,6 +1485,9 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 			default:
 				break;
 			}
+		} else if (flags & AMDGPU_PTE_VALID) {
+			addr += vram_base_offset;
+			addr += pfn << PAGE_SHIFT;
 		} else {
 			addr = 0;
 			max_entries = S64_MAX;
@@ -2401,6 +2404,10 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	uint64_t flags;
 	int r, i;
 
+	/* Temporary use only the first VM manager */
+	unsigned vmhub = 0; /*ring->funcs->vmhub;*/
+	struct amdgpu_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 	vm->va = RB_ROOT;
 #else
@@ -2487,6 +2494,20 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	INIT_KFIFO(vm->faults);
 	vm->fault_credit = 16;
 
+	vm->vm_context = vm_context;
+	if (vm_context == AMDGPU_VM_CONTEXT_COMPUTE) {
+		mutex_lock(&id_mgr->lock);
+
+		if ((adev->vm_manager.n_compute_vms++ == 0) &&
+			(!amdgpu_sriov_vf(adev))) {
+			/* First Compute VM: enable compute power profile */
+			if (adev->powerplay.pp_funcs->switch_power_profile)
+				amdgpu_dpm_switch_power_profile(adev,
+						AMD_PP_COMPUTE_PROFILE);
+		}
+		mutex_unlock(&id_mgr->lock);
+	}
+
 	return 0;
 
 error_unreserve:
@@ -2565,6 +2586,23 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		spin_lock_irqsave(&adev->vm_manager.pasid_lock, flags);
 		idr_remove(&adev->vm_manager.pasid_idr, vm->pasid);
 		spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
+	}
+
+	if (vm->vm_context == AMDGPU_VM_CONTEXT_COMPUTE) {
+		struct amdgpu_vmid_mgr *id_mgr =
+			&adev->vm_manager.id_mgr[AMDGPU_GFXHUB];
+		mutex_lock(&id_mgr->lock);
+
+		WARN(adev->vm_manager.n_compute_vms == 0, "Unbalanced number of Compute VMs");
+
+		if ((--adev->vm_manager.n_compute_vms == 0) &&
+			(!amdgpu_sriov_vf(adev))) {
+			/* Last KFD VM: enable graphics power profile */
+			if (adev->powerplay.pp_funcs->switch_power_profile)
+				amdgpu_dpm_switch_power_profile(adev,
+						AMD_PP_GFX_PROFILE);
+		}
+		mutex_unlock(&id_mgr->lock);
 	}
 
 	drm_sched_entity_fini(vm->entity.sched, &vm->entity);
@@ -2684,6 +2722,7 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 
 	idr_init(&adev->vm_manager.pasid_idr);
 	spin_lock_init(&adev->vm_manager.pasid_lock);
+	adev->vm_manager.n_compute_vms = 0;
 }
 
 /**

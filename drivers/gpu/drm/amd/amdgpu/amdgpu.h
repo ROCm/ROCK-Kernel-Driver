@@ -189,6 +189,7 @@ struct amdgpu_job;
 struct amdgpu_irq_src;
 struct amdgpu_fpriv;
 struct amdgpu_bo_va_mapping;
+struct kfd_vm_fault_info;
 
 enum amdgpu_cp_irq {
   AMDGPU_CP_IRQ_GFX_EOP = 0,
@@ -388,6 +389,8 @@ struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *);
 void *amdgpu_gem_prime_vmap(struct drm_gem_object *obj);
 void amdgpu_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
 int amdgpu_gem_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma);
+
+extern const struct dma_buf_ops amdgpu_dmabuf_ops;
 
 /* sub-allocation manager, it has to be protected by another lock.
  * By conception this is an helper for other part of the driver

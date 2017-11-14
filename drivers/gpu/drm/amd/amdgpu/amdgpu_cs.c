@@ -560,7 +560,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 	if (p->bo_list) {
 		amdgpu_bo_list_get_list(p->bo_list, &p->validated);
 		if (p->bo_list->first_userptr != p->bo_list->num_entries)
-			p->mn = amdgpu_mn_get(p->adev);
+			p->mn = amdgpu_mn_get(p->adev, AMDGPU_MN_TYPE_GFX);
 	}
 
 	INIT_LIST_HEAD(&duplicates);
@@ -1695,7 +1695,8 @@ int amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 	addr /= AMDGPU_GPU_PAGE_SIZE;
 
 	mapping = amdgpu_vm_bo_lookup_mapping(vm, addr);
-	if (!mapping || !mapping->bo_va || !mapping->bo_va->base.bo)
+	if (!mapping || !mapping->bo_va || !mapping->bo_va->base.bo ||
+		amdgpu_ttm_adev(mapping->bo_va->base.bo->tbo.bdev) != parser->adev)
 		return -EINVAL;
 
 	*bo = mapping->bo_va->base.bo;

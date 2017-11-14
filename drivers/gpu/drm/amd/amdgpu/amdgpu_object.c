@@ -36,6 +36,8 @@
 #include <drm/drm_cache.h>
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
+#include "amdgpu_amdkfd.h"
+
 
 static bool amdgpu_need_backup(struct amdgpu_device *adev)
 {
@@ -57,6 +59,9 @@ static void amdgpu_ttm_bo_destroy(struct ttm_buffer_object *tbo)
 
 	if (bo->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT)
 		kfree(tbo->mem.bus.addr);
+	if (bo->kfd_bo)
+		amdgpu_amdkfd_unreserve_system_memory_limit(bo);
+
 	amdgpu_bo_kunmap(bo);
 
 	drm_gem_object_release(&bo->gem_base);

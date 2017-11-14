@@ -214,6 +214,9 @@ struct amdgpu_vm {
 
 	/* Limit non-retry fault storms */
 	unsigned int		fault_credit;
+
+	/* Whether this is a Compute or GFX Context */
+	int			vm_context;
 };
 
 struct amdgpu_vm_manager {
@@ -252,6 +255,9 @@ struct amdgpu_vm_manager {
 	 */
 	struct idr				pasid_idr;
 	spinlock_t				pasid_lock;
+
+	/* Number of Compute VMs, used for detecting Compute activity */
+	unsigned                                n_compute_vms;
 };
 
 void amdgpu_vm_manager_init(struct amdgpu_device *adev);
