@@ -502,8 +502,8 @@ module_param_named(emu_mode, amdgpu_emu_mode, int, 0444);
 #ifdef CONFIG_DRM_AMDGPU_SI
 
 #if defined(CONFIG_DRM_RADEON) || defined(CONFIG_DRM_RADEON_MODULE)
-int amdgpu_si_support = 0;
-MODULE_PARM_DESC(si_support, "SI support (1 = enabled, 0 = disabled (default))");
+int amdgpu_si_support = 1;
+MODULE_PARM_DESC(si_support, "SI support (1 = enabled (default), 0 = disabled)");
 #else
 int amdgpu_si_support = 1;
 MODULE_PARM_DESC(si_support, "SI support (1 = enabled (default), 0 = disabled)");
@@ -520,7 +520,7 @@ module_param_named(si_support, amdgpu_si_support, int, 0444);
  */
 #ifdef CONFIG_DRM_AMDGPU_CIK
 
-#if defined(CONFIG_DRM_RADEON) || defined(CONFIG_DRM_RADEON_MODULE)
+#if (0 && (defined(CONFIG_DRM_RADEON) || defined(CONFIG_DRM_RADEON_MODULE)))
 int amdgpu_cik_support = 0;
 MODULE_PARM_DESC(cik_support, "CIK support (1 = enabled, 0 = disabled (default))");
 #else
@@ -635,6 +635,22 @@ MODULE_PARM_DESC(noretry,
 int halt_if_hws_hang;
 module_param(halt_if_hws_hang, int, 0644);
 MODULE_PARM_DESC(halt_if_hws_hang, "Halt if HWS hang is detected (0 = off (default), 1 = on)");
+
+/**
+ * DOC: priv_cp_queues (int)
+ * Enable privileged mode for CP queues. Default value: 0 (off)
+ */
+int priv_cp_queues;
+module_param(priv_cp_queues, int, 0644);
+MODULE_PARM_DESC(priv_cp_queues, "Enable privileged mode for CP queues (0 = off (default), 1 = on)");
+
+/**
+ * DOC: keep_udle_process_evicted (bool)
+ * Keep an evicted process evicted if it is idle. Default value: false (off)
+ */
+bool keep_idle_process_evicted;
+module_param(keep_idle_process_evicted, bool, 0444);
+MODULE_PARM_DESC(keep_idle_process_evicted, "Restore evicted process only if queues are active (N = off(default), Y = on)");
 #endif
 
 /**
