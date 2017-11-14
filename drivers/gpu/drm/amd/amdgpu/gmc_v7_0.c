@@ -28,8 +28,8 @@
 #include "cik.h"
 #include "gmc_v7_0.h"
 #include "amdgpu_ucode.h"
-#include "amdgpu_amdkfd.h"
 #include "amdgpu_gem.h"
+#include "amdgpu_amdkfd.h"
 
 #include "bif/bif_4_1_d.h"
 #include "bif/bif_4_1_sh_mask.h"
@@ -768,6 +768,7 @@ static void gmc_v7_0_gart_fini(struct amdgpu_device *adev)
  * @adev: amdgpu_device pointer
  * @status: VM_CONTEXT1_PROTECTION_FAULT_STATUS register value
  * @addr: VM_CONTEXT1_PROTECTION_FAULT_ADDR register value
+ * @mc_client: VM_CONTEXT1_PROTECTION_FAULT_MCCLIENT register value
  *
  * Print human readable fault information (CIK).
  */

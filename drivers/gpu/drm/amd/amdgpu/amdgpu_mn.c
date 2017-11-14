@@ -272,6 +272,26 @@ static void amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
 }
 
 /**
+ * amdgpu_mn_invalidate_range_end_gfx - callback to notify about mm change
+ *
+ * @mn: our notifier
+ * @mm: the mm this callback is about
+ * @start: start of updated range
+ * @end: end of updated range
+ *
+ * Release the lock again to allow new command submissions.
+ */
+static void amdgpu_mn_invalidate_range_end_gfx(struct mmu_notifier *mn,
+					       struct mm_struct *mm,
+					       unsigned long start,
+					       unsigned long end)
+{
+	struct amdgpu_mn *amn = container_of(mn, struct amdgpu_mn, mn);
+
+	amdgpu_mn_read_unlock(amn);
+}
+
+/**
  * amdgpu_mn_invalidate_range_start_hsa - callback to notify about mm change
  *
  * @mn: our notifier
@@ -314,20 +334,10 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 	}
 }
 
-/**
- * amdgpu_mn_invalidate_range_end - callback to notify about mm change
- *
- * @mn: our notifier
- * @mm: the mm this callback is about
- * @start: start of updated range
- * @end: end of updated range
- *
- * Release the lock again to allow new command submissions.
- */
-static void amdgpu_mn_invalidate_range_end(struct mmu_notifier *mn,
-					   struct mm_struct *mm,
-					   unsigned long start,
-					   unsigned long end)
+static void amdgpu_mn_invalidate_range_end_hsa(struct mmu_notifier *mn,
+					       struct mm_struct *mm,
+					       unsigned long start,
+					       unsigned long end)
 {
 	struct amdgpu_mn *amn = container_of(mn, struct amdgpu_mn, mn);
 
@@ -338,12 +348,12 @@ static const struct mmu_notifier_ops amdgpu_mn_ops[] = {
 	[AMDGPU_MN_TYPE_GFX] = {
 		.release = amdgpu_mn_release,
 		.invalidate_range_start = amdgpu_mn_invalidate_range_start_gfx,
-		.invalidate_range_end = amdgpu_mn_invalidate_range_end,
+		.invalidate_range_end = amdgpu_mn_invalidate_range_end_gfx,
 	},
 	[AMDGPU_MN_TYPE_HSA] = {
 		.release = amdgpu_mn_release,
 		.invalidate_range_start = amdgpu_mn_invalidate_range_start_hsa,
-		.invalidate_range_end = amdgpu_mn_invalidate_range_end,
+		.invalidate_range_end = amdgpu_mn_invalidate_range_end_hsa,
 	},
 };
 
@@ -398,9 +408,9 @@ struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 
 	amn->adev = adev;
 	amn->mm = mm;
-	init_rwsem(&amn->lock);
 	amn->type = type;
 	amn->mn.ops = &amdgpu_mn_ops[type];
+	init_rwsem(&amn->lock);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 	amn->objects = RB_ROOT;
 #else
