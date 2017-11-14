@@ -1646,6 +1646,7 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 	amdgpu_ttm_debugfs_fini(adev);
 
 	amdgpu_bo_free_kernel(&adev->stolen_vga_memory, NULL, NULL);
+	amdgpu_fw_reserve_vram_fini(adev);
 
 	amdgpu_ssg_fini(adev);
 	amdgpu_direct_gma_fini(adev);
@@ -1659,7 +1660,6 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 	if (adev->gds.oa.total_size)
 		ttm_bo_clean_mm(&adev->mman.bdev, AMDGPU_PL_OA);
 	ttm_bo_device_release(&adev->mman.bdev);
-	amdgpu_gart_fini(adev);
 	amdgpu_ttm_global_fini(adev);
 	adev->mman.initialized = false;
 	DRM_INFO("amdgpu: ttm finalized\n");
