@@ -125,4 +125,21 @@ kcl_reservation_object_test_signaled_rcu(struct reservation_object *obj,
 #endif
 }
 
+#if defined(BUILD_AS_DKMS)
+extern void _kcl_reservation_object_add_shared_fence(
+						struct reservation_object *obj,
+						struct dma_fence *fence);
+#endif
+
+static inline void
+kcl_reservation_object_add_shared_fence(struct reservation_object *obj,
+					struct dma_fence *fence)
+{
+#if defined(BUILD_AS_DKMS)
+	return _kcl_reservation_object_add_shared_fence(obj, fence);
+#else
+	return reservation_object_add_shared_fence(obj, fence);
+#endif
+}
+
 #endif /* AMDKCL_RESERVATION_H */
