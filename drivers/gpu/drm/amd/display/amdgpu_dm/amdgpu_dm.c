@@ -112,6 +112,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state);
 static int amdgpu_dm_atomic_check(struct drm_device *dev,
 				  struct drm_atomic_state *state);
 
+static void prepare_flip_isr(struct amdgpu_crtc *acrtc);
 
 
 
@@ -272,6 +273,9 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	}
 
 	spin_lock_irqsave(&adev->ddev->event_lock, flags);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+	struct amdgpu_flip_work *works = amdgpu_crtc->pflip_works;
+#endif
 
 	if (amdgpu_crtc->pflip_status != AMDGPU_FLIP_SUBMITTED){
 		DRM_DEBUG_DRIVER("amdgpu_crtc->pflip_status = %d !=AMDGPU_FLIP_SUBMITTED(%d) on crtc:%d[%p] \n",
@@ -299,12 +303,19 @@ static void dm_pflip_high_irq(void *interrupt_params)
 		WARN_ON(1);
 
 	amdgpu_crtc->pflip_status = AMDGPU_FLIP_NONE;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+	amdgpu_crtc->pflip_works = NULL;
+#endif
+
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 
 	DRM_DEBUG_DRIVER("%s - crtc :%d[%p], pflip_stat:AMDGPU_FLIP_NONE\n",
 					__func__, amdgpu_crtc->crtc_id, amdgpu_crtc);
 
 	drm_crtc_vblank_put(&amdgpu_crtc->base);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+	schedule_work(&works->unpin_work);
+#endif
 }
 
 static void dm_crtc_high_irq(void *interrupt_params)
@@ -1517,6 +1528,53 @@ static u8 dm_get_backlight_level(struct amdgpu_encoder *amdgpu_encoder)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+/**
+ * dm_page_flip - called by amdgpu_flip_work_func(), which is triggered
+ *                via DRM IOTCL, by user mode.
+ *
+ * @adev: amdgpu_device pointer
+ * @crtc_id: crtc to cleanup pageflip on
+ * @crtc_base: new address of the crtc (GPU MC address)
+ *
+ * Does the actual pageflip (surface address update).
+ */
+static void dm_page_flip(struct amdgpu_device *adev,
+			 int crtc_id, u64 crtc_base, bool async)
+{
+	struct amdgpu_crtc *acrtc = adev->mode_info.crtcs[crtc_id];
+	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(acrtc->base.state);
+	struct dc_stream_state *stream = acrtc_state->stream;
+	struct dc_flip_addrs addr = { {0} };
+
+	/*
+	 * Received a page flip call after the display has been reset.
+	 * Just return in this case. Everything should be clean-up on reset.
+	 */
+	if (!stream) {
+		WARN_ON(1);
+		return;
+	}
+
+	addr.address.grph.addr.low_part = lower_32_bits(crtc_base);
+	addr.address.grph.addr.high_part = upper_32_bits(crtc_base);
+	addr.flip_immediate = async;
+
+	if (acrtc->base.state->event)
+		prepare_flip_isr(acrtc);
+
+	dc_flip_plane_addrs(
+			adev->dm.dc,
+			dc_stream_get_status(stream)->plane_states,
+			&addr, 1);
+
+	DRM_DEBUG_DRIVER("%s Flipping to hi: 0x%x, low: 0x%x \n",
+			 __func__,
+			 addr.address.grph.addr.high_part,
+			 addr.address.grph.addr.low_part);
+}
+#endif
+
 static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 				struct drm_file *filp)
 {
@@ -1558,6 +1616,9 @@ static const struct amdgpu_display_funcs dm_display_funcs = {
 	.hpd_sense = NULL,/* called unconditionally */
 	.hpd_set_polarity = NULL, /* called unconditionally */
 	.hpd_get_gpio_reg = NULL, /* VBIOS parsing. DAL does it. */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+	.page_flip = dm_page_flip,
+#endif
 	.page_flip_get_scanoutpos =
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
@@ -3986,8 +4047,9 @@ static void handle_cursor_update(struct drm_plane *plane,
 
 static void prepare_flip_isr(struct amdgpu_crtc *acrtc)
 {
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 	assert_spin_locked(&acrtc->base.dev->event_lock);
+#endif
 	WARN_ON(acrtc->event);
 
 	acrtc->event = acrtc->base.state->event;
@@ -4194,11 +4256,19 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			if (plane->type == DRM_PLANE_TYPE_PRIMARY)
 				drm_crtc_vblank_get(crtc);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 			amdgpu_dm_do_flip(
 				crtc,
 				fb,
 				drm_crtc_vblank_count(crtc) + *wait_for_vblank,
 				dm_state->context);
+#else
+			amdgpu_crtc_page_flip(
+				crtc,
+				fb,
+				crtc->state->event,
+				acrtc_attach->flip_flags);
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 			/*TODO BUG remove ASAP in 4.12 to avoid race between worker and flip IOCTL */
 
