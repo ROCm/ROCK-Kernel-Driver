@@ -833,7 +833,7 @@ static int apparmor_socket_shutdown(struct socket *sock, int how)
 {
 	struct sock *sk = sock->sk;
 
-	return aa_revalidate_sk(OP_SOCK_SHUTDOWN, sk);
+	return aa_revalidate_sk(OP_SHUTDOWN, sk);
 }
 
 static struct security_hook_list apparmor_hooks[] __lsm_ro_after_init = {
