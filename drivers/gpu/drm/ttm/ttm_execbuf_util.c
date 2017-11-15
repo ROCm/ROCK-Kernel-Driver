@@ -201,7 +201,7 @@ void ttm_eu_fence_buffer_objects(struct ww_acquire_ctx *ticket,
 	list_for_each_entry(entry, list, head) {
 		bo = entry->bo;
 		if (entry->shared)
-			reservation_object_add_shared_fence(bo->resv, fence);
+			kcl_reservation_object_add_shared_fence(bo->resv, fence);
 		else
 			reservation_object_add_excl_fence(bo->resv, fence);
 		ttm_bo_add_to_lru(bo);

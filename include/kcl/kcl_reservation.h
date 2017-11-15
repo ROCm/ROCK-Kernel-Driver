@@ -96,4 +96,37 @@ kcl_reservation_object_trylock(struct reservation_object *obj)
 #endif
 }
 
+#ifdef OS_NAME_RHEL_6
+bool _kcl_reservation_object_test_signaled_rcu(struct reservation_object *obj,
+					       bool test_all);
+#endif
+
+static inline bool
+kcl_reservation_object_test_signaled_rcu(struct reservation_object *obj,
+					 bool test_all)
+{
+#ifdef OS_NAME_RHEL_6
+	return _kcl_reservation_object_test_signaled_rcu(obj, test_all);
+#else
+	return reservation_object_test_signaled_rcu(obj, test_all);
+#endif
+}
+
+#if defined(BUILD_AS_DKMS)
+extern void _kcl_reservation_object_add_shared_fence(
+						struct reservation_object *obj,
+						struct dma_fence *fence);
+#endif
+
+static inline void
+kcl_reservation_object_add_shared_fence(struct reservation_object *obj,
+					struct dma_fence *fence)
+{
+#if defined(BUILD_AS_DKMS)
+	return _kcl_reservation_object_add_shared_fence(obj, fence);
+#else
+	return reservation_object_add_shared_fence(obj, fence);
+#endif
+}
+
 #endif /* AMDKCL_RESERVATION_H */
