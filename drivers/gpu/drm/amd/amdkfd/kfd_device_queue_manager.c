@@ -1724,7 +1724,13 @@ int device_queue_manager_debugfs_hqds(struct seq_file *m, void *data)
 	int r = 0;
 
 	for (pipe = 0; pipe < get_pipes_per_mec(dqm); pipe++) {
+		int pipe_offset = pipe * get_queues_per_pipe(dqm);
+
 		for (queue = 0; queue < get_queues_per_pipe(dqm); queue++) {
+			if (!test_bit(pipe_offset + queue,
+				      dqm->dev->shared_resources.queue_bitmap))
+				continue;
+
 			r = dqm->dev->kfd2kgd->hqd_dump(
 				dqm->dev->kgd, pipe, queue, &dump, &n_regs);
 			if (r)
