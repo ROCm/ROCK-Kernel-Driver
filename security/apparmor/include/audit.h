@@ -125,6 +125,10 @@ struct apparmor_audit_data {
 				const char *target;
 				kuid_t ouid;
 			} fs;
+			struct {
+				int type, protocol;
+				struct sock *sk;
+			} net;
 		};
 		struct {
 			struct aa_profile *profile;
