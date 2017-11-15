@@ -29,7 +29,7 @@
 #include "v9_structs.h"
 #include "vega10/GC/gc_9_0_offset.h"
 #include "vega10/GC/gc_9_0_sh_mask.h"
-#include "vega10/SDMA0/sdma0_4_0_sh_mask.h"
+#include "sdma0/sdma0_4_0_sh_mask.h"
 
 static inline struct v9_mqd *get_mqd(void *mqd)
 {

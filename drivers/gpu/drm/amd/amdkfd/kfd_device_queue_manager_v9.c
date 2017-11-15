@@ -25,7 +25,7 @@
 #include "vega10/vega10_enum.h"
 #include "vega10/GC/gc_9_0_offset.h"
 #include "vega10/GC/gc_9_0_sh_mask.h"
-#include "vega10/SDMA0/sdma0_4_0_sh_mask.h"
+#include "sdma0/sdma0_4_0_sh_mask.h"
 
 static int update_qpd_v9(struct device_queue_manager *dqm,
 			 struct qcm_process_device *qpd);
