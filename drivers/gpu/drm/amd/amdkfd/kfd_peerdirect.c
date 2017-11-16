@@ -109,7 +109,8 @@ struct peer_memory_client {
 	void (*put_pages)(struct sg_table *sg_head, void *client_context);
 	unsigned long (*get_page_size)(void *client_context);
 	void (*release)(void *client_context);
-
+	void* (*get_context_private_data)(u64 peer_id);
+	void (*put_context_private_data)(void *context);
 };
 
 typedef int (*invalidate_peer_memory)(void *reg_handle,
@@ -427,6 +428,8 @@ static struct peer_memory_client amd_mem_client = {
 	.put_pages = amd_put_pages,
 	.get_page_size = amd_get_page_size,
 	.release = amd_release,
+	.get_context_private_data = NULL,
+	.put_context_private_data = NULL,
 };
 
 /** Initialize PeerDirect interface with RDMA Network stack.

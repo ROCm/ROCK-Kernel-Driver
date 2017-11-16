@@ -151,6 +151,11 @@ extern int ignore_crat;
  */
 extern int vega10_noretry;
 
+/*
+ * Enable privileged mode for all CP queues including user queues
+ */
+extern int priv_cp_queues;
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) && defined(BUILD_AS_DKMS)
 /*
  * Currently, mm_access() function is not exported. So for DKMS build,
@@ -909,8 +914,7 @@ void device_queue_manager_uninit(struct device_queue_manager *dqm);
 struct kernel_queue *kernel_queue_init(struct kfd_dev *dev,
 					enum kfd_queue_type type);
 void kernel_queue_uninit(struct kernel_queue *kq);
-int kfd_process_vm_fault(struct device_queue_manager *dqm,
-			 unsigned int pasid, bool reset);
+int kfd_process_vm_fault(struct device_queue_manager *dqm, unsigned int pasid);
 
 /* Process Queue Manager */
 struct process_queue_node {

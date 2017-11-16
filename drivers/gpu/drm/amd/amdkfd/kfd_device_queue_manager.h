@@ -215,8 +215,7 @@ unsigned int get_pipes_per_mec(struct device_queue_manager *dqm);
 unsigned int get_num_sdma_queues(struct device_queue_manager *dqm);
 
 int process_evict_queues(struct device_queue_manager *dqm,
-		struct qcm_process_device *qpd,
-		bool reset);
+		struct qcm_process_device *qpd);
 int process_restore_queues(struct device_queue_manager *dqm,
 		struct qcm_process_device *qpd);
 

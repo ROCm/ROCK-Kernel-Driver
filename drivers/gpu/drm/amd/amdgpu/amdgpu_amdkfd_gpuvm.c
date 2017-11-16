@@ -591,8 +591,7 @@ static int init_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 		goto free_out;
 	}
 
-	memcpy(bo->tbo.ttm->pages, mem->user_pages,
-	       sizeof(struct page *) * bo->tbo.ttm->num_pages);
+	amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm, mem->user_pages);
 
 	ret = amdgpu_bo_reserve(bo, true);
 	if (ret) {
@@ -2122,8 +2121,8 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 
 		/* Copy pages array and validate the BO if we got user pages */
 		if (mem->user_pages[0]) {
-			memcpy(bo->tbo.ttm->pages, mem->user_pages,
-			       sizeof(struct page *) * bo->tbo.ttm->num_pages);
+			amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm,
+						     mem->user_pages);
 			amdgpu_ttm_placement_from_domain(bo, mem->domain);
 			ret = ttm_bo_validate(&bo->tbo, &bo->placement,
 					      false, false);

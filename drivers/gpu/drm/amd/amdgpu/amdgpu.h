@@ -124,6 +124,7 @@ extern int amdgpu_cntl_sb_buf_per_se;
 extern int amdgpu_param_buf_per_se;
 extern int amdgpu_job_hang_limit;
 extern int amdgpu_lbpw;
+extern int amdgpu_compute_multipipe;
 
 #ifdef CONFIG_DRM_AMDGPU_SI
 extern int amdgpu_si_support;
@@ -298,10 +299,14 @@ struct amdgpu_buffer_funcs {
 
 /* provided by hw blocks that can write ptes, e.g., sdma */
 struct amdgpu_vm_pte_funcs {
+	/* number of dw to reserve per operation */
+	unsigned	copy_pte_num_dw;
+
 	/* copy pte entries from GART */
 	void (*copy_pte)(struct amdgpu_ib *ib,
 			 uint64_t pe, uint64_t src,
 			 unsigned count);
+
 	/* write pte one entry at a time with addr mapping */
 	void (*write_pte)(struct amdgpu_ib *ib, uint64_t pe,
 			  uint64_t value, unsigned count,

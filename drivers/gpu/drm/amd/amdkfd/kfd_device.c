@@ -813,7 +813,7 @@ static int quiesce_process_mm(struct kfd_process *p)
 	unsigned int n_evicted = 0;
 
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
-		r = process_evict_queues(pdd->dev->dqm, &pdd->qpd, false);
+		r = process_evict_queues(pdd->dev->dqm, &pdd->qpd);
 		if (r != 0) {
 			pr_err("Failed to evict process queues\n");
 			goto fail;
@@ -885,7 +885,7 @@ int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 		r = -ENODEV;
 		pdd = kfd_get_process_device_data(kfd, p);
 		if (pdd)
-			r = process_evict_queues(kfd->dqm, &pdd->qpd, false);
+			r = process_evict_queues(kfd->dqm, &pdd->qpd);
 	} else {
 		r = quiesce_process_mm(p);
 	}
@@ -963,7 +963,7 @@ void kfd_restore_bo_worker(struct work_struct *work)
 		pr_info("Restore failed, try again after %d ms\n",
 			PROCESS_BACK_OFF_TIME_MS);
 		ret = schedule_delayed_work(&p->restore_work,
-				PROCESS_BACK_OFF_TIME_MS);
+				msecs_to_jiffies(PROCESS_BACK_OFF_TIME_MS));
 		WARN(!ret, "reschedule restore work failed\n");
 		return;
 	}
@@ -1063,7 +1063,7 @@ void kfd_evict_bo_worker(struct work_struct *work)
 	if (!ret) {
 		dma_fence_signal(eviction_work->quiesce_fence);
 		schedule_delayed_work(&p->restore_work,
-					PROCESS_RESTORE_TIME_MS);
+				msecs_to_jiffies(PROCESS_RESTORE_TIME_MS));
 	} else
 		pr_err("Failed to quiesce user queues. Cannot evict BOs\n");
 
