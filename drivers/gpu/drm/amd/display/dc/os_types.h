@@ -26,8 +26,6 @@
 #ifndef _OS_TYPES_H_
 #define _OS_TYPES_H_
 
-#if defined __KERNEL__
-
 #include <asm/byteorder.h>
 #include <linux/types.h>
 #include <drm/drmP.h>
@@ -54,6 +52,12 @@
 
 #define dm_vlog(fmt, args) vprintk(fmt, args)
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+#include <asm/fpu/api.h>
+#endif
+#else
+#include <asm/i387.h>
 #endif
 
 /*
@@ -88,13 +92,5 @@
 	dm_error(__VA_ARGS__); \
 	BREAK_TO_DEBUGGER(); \
 } while (0)
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
-#include <asm/fpu/api.h>
-#endif
-#else
-#include <asm/i387.h>
-#endif
 
 #endif /* _OS_TYPES_H_ */
