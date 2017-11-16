@@ -186,6 +186,49 @@ static void amdgpu_mn_invalidate_node(struct amdgpu_mn_node *node,
 	}
 }
 
+/*
+ * Invalidate page notifiers are called under a spin-lock in Linux
+ * 4.11 and later. This causes problems with the RMN lock sleeping
+ * while atomic.
+ *
+ * In 4.14 the invalidate_page notifier was removed completely.
+ *
+ * In kernels before 4.11 we still need this notifier. Between 4.11
+ * and 4.14 we prefer not to implement it to avoid deadlocks, at the
+ * cost of potential subtle consistency bugs.
+ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+/**
+ * amdgpu_mn_invalidate_page - callback to notify about mm change
+ *
+ * @mn: our notifier
+ * @mn: the mm this callback is about
+ * @address: address of invalidate page
+ *
+ * Invalidation of a single page. Blocks for all BOs mapping it
+ * and unmap them by move them into system domain again.
+ */
+static void amdgpu_mn_invalidate_page(struct mmu_notifier *mn,
+				      struct mm_struct *mm,
+				      unsigned long address)
+{
+	struct amdgpu_mn *rmn = container_of(mn, struct amdgpu_mn, mn);
+	struct interval_tree_node *it;
+
+	amdgpu_mn_read_lock(rmn);
+
+	it = interval_tree_iter_first(&rmn->objects, address, address);
+	if (it) {
+		struct amdgpu_mn_node *node;
+
+		node = container_of(it, struct amdgpu_mn_node, it);
+		amdgpu_mn_invalidate_node(node, address, address);
+	}
+
+	amdgpu_mn_read_unlock(rmn);
+}
+#endif
+
 /**
  * amdgpu_mn_invalidate_range_start_gfx - callback to notify about mm change
  *
@@ -284,14 +327,50 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 	}
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+static void amdgpu_mn_invalidate_page_hsa(struct mmu_notifier *mn,
+					  struct mm_struct *mm,
+					  unsigned long address)
+{
+	struct amdgpu_mn *rmn = container_of(mn, struct amdgpu_mn, mn);
+	struct interval_tree_node *it;
+
+	amdgpu_mn_read_lock(rmn);
+
+	it = interval_tree_iter_first(&rmn->objects, address, address);
+	if (it) {
+		struct amdgpu_mn_node *node;
+		struct amdgpu_bo *bo;
+
+		node = container_of(it, struct amdgpu_mn_node, it);
+
+		list_for_each_entry(bo, &node->bos, mn_list) {
+			struct kgd_mem *mem = bo->kfd_bo;
+
+			if (amdgpu_ttm_tt_affect_userptr(bo->tbo.ttm,
+							 address, address))
+				amdgpu_amdkfd_evict_userptr(mem, mm);
+		}
+	}
+
+	amdgpu_mn_read_unlock(rmn);
+}
+#endif
+
 static const struct mmu_notifier_ops amdgpu_mn_ops[] = {
 	[AMDGPU_MN_TYPE_GFX] = {
 		.release = amdgpu_mn_release,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+		.invalidate_page = amdgpu_mn_invalidate_page,
+#endif
 		.invalidate_range_start = amdgpu_mn_invalidate_range_start_gfx,
 		.invalidate_range_end = amdgpu_mn_invalidate_range_end,
 	},
 	[AMDGPU_MN_TYPE_HSA] = {
 		.release = amdgpu_mn_release,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+		.invalidate_page = amdgpu_mn_invalidate_page_hsa,
+#endif
 		.invalidate_range_start = amdgpu_mn_invalidate_range_start_hsa,
 		.invalidate_range_end = amdgpu_mn_invalidate_range_end,
 	},
