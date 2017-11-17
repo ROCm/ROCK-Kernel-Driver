@@ -1575,7 +1575,7 @@ out:
 	wait->out.status = (r > 0);
 	wait->out.first_signaled = first;
 
-	if (array[first])
+	if (first < fence_count && array[first])
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
 		r = array[first]->status;
 #else
