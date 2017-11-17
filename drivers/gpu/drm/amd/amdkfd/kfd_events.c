@@ -100,17 +100,9 @@ static int allocate_event_notification_slot(struct kfd_process *p,
 		p->signal_page = allocate_signal_page(p);
 		if (!p->signal_page)
 			return -ENOMEM;
-		/* Oldest user mode expects 256 event slots */
-		p->signal_mapped_size = 256*8;
 	}
 
-	/*
-	 * Compatibility with old user mode: Only use signal slots
-	 * user mode has mapped, may be less than
-	 * KFD_SIGNAL_EVENT_LIMIT. This also allows future increase
-	 * of the event limit without breaking user mode.
-	 */
-	id = idr_alloc(&p->event_idr, ev, 0, p->signal_mapped_size / 8,
+	id = idr_alloc(&p->event_idr, ev, 0, KFD_SIGNAL_EVENT_LIMIT,
 		       GFP_KERNEL);
 	if (id < 0)
 		return id;
@@ -207,8 +199,7 @@ static int create_signal_event(struct file *devkfd,
 {
 	int ret;
 
-	if (p->signal_mapped_size &&
-	    p->signal_event_count == p->signal_mapped_size / 8) {
+	if (p->signal_event_count == KFD_SIGNAL_EVENT_LIMIT) {
 		if (!p->signal_event_limit_reached) {
 			pr_warn("Signal event wasn't created because limit was reached\n");
 			p->signal_event_limit_reached = true;
@@ -792,12 +783,12 @@ out:
 
 int kfd_event_mmap(struct kfd_process *p, struct vm_area_struct *vma)
 {
+
 	unsigned long pfn;
 	struct kfd_signal_page *page;
-	int ret;
 
-	/* check required size doesn't exceed the allocated size */
-	if (get_order(KFD_SIGNAL_EVENT_LIMIT * 8) <
+	/* check required size is logical */
+	if (get_order(KFD_SIGNAL_EVENT_LIMIT * 8) !=
 			get_order(vma->vm_end - vma->vm_start)) {
 		pr_err("Event page mmap requested illegal size\n");
 		return -EINVAL;
@@ -827,12 +818,8 @@ int kfd_event_mmap(struct kfd_process *p, struct vm_area_struct *vma)
 	page->user_address = (uint64_t __user *)vma->vm_start;
 
 	/* mapping the page to user process */
-	ret = remap_pfn_range(vma, vma->vm_start, pfn,
+	return remap_pfn_range(vma, vma->vm_start, pfn,
 			vma->vm_end - vma->vm_start, vma->vm_page_prot);
-	if (!ret)
-		p->signal_mapped_size = vma->vm_end - vma->vm_start;
-
-	return ret;
 }
 
 /*
