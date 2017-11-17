@@ -86,10 +86,10 @@ module_param(ignore_crat, int, 0444);
 MODULE_PARM_DESC(ignore_crat,
 	"Ignore CRAT table during KFD initialization (0 = use CRAT (default), 1 = ignore CRAT)");
 
-int vega10_noretry;
+int vega10_noretry = 1;
 module_param_named(noretry, vega10_noretry, int, 0644);
 MODULE_PARM_DESC(noretry,
-	"Set sh_mem_config.retry_disable on Vega10 (0 = retry enabled (default), 1 = retry disabled)");
+	"Set sh_mem_config.retry_disable on Vega10 (0 = retry enabled, 1 = retry disabled (default))");
 
 int priv_cp_queues;
 module_param(priv_cp_queues, int, 0644);
