@@ -784,10 +784,6 @@ static void init_interrupts(struct device_queue_manager *dqm)
 		if (is_pipe_enabled(dqm, 0, i))
 			dqm->dev->kfd2kgd->init_interrupts(dqm->dev->kgd, i);
 }
-static int init_scheduler(struct device_queue_manager *dqm)
-{
-	return 0;
-}
 
 static int initialize_nocpsch(struct device_queue_manager *dqm)
 {
@@ -817,7 +813,6 @@ static int initialize_nocpsch(struct device_queue_manager *dqm)
 	dqm->vmid_bitmap = (1 << dqm->dev->vm_info.vmid_num_kfd) - 1;
 	dqm->sdma_bitmap = (1 << get_num_sdma_queues(dqm)) - 1;
 
-	init_scheduler(dqm);
 	return 0;
 }
 
