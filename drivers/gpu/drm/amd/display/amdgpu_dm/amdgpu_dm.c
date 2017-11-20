@@ -5040,10 +5040,6 @@ void amdgpu_dm_add_sink_to_freesync_module(struct drm_connector *connector,
 			dm_con_state->freesync_capable = true;
 		}
 	}
-
-	dm_con_state->user_enable.enable_for_gaming = dm_con_state->freesync_capable;
-	dm_con_state->user_enable.enable_for_static = dm_con_state->freesync_capable;
-	dm_con_state->user_enable.enable_for_video = dm_con_state->freesync_capable;
 }
 
 void amdgpu_dm_remove_sink_from_freesync_module(struct drm_connector *connector)
