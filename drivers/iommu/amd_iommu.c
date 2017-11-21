@@ -677,7 +677,10 @@ retry:
 		       address, flags);
 		break;
 	default:
-		printk(KERN_ERR "UNKNOWN type=0x%02x]\n", type);
+		printk(KERN_ERR "UNKNOWN device=%02x:%02x.%x type=0x%x "
+		       "domain=0x%04x address=0x%016llx flags=0x%04x]\n",
+		       PCI_BUS_NUM(devid), PCI_SLOT(devid), PCI_FUNC(devid),
+		       type, domid, address, flags);
 	}
 
 	memset(__evt, 0, 4 * sizeof(u32));
