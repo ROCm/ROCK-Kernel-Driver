@@ -1251,7 +1251,8 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 
 	if (!bo) {
 		pr_err("Invalid BO when mapping memory to GPU\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 
 	domain = mem->domain;
@@ -1264,7 +1265,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 
 	ret = reserve_bo_and_vm(mem, vm, &ctx);
 	if (unlikely(ret != 0))
-		goto bo_reserve_failed;
+		goto out;
 
 	/* Userptr can be marked as "not invalid", but not actually be
 	 * validated yet (still in the system domain). In that case
@@ -1331,9 +1332,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 				true);
 	ret = unreserve_bo_and_vms(&ctx, false, false);
 
-	mutex_unlock(&mem->process_info->lock);
-	mutex_unlock(&mem->lock);
-	return ret;
+	goto out;
 
 map_bo_to_gpuvm_failed:
 	if (bo_va_entry_aql)
@@ -1343,7 +1342,8 @@ add_bo_to_vm_failed_aql:
 		remove_bo_from_vm(adev, bo_va_entry, bo_size);
 add_bo_to_vm_failed:
 	unreserve_bo_and_vms(&ctx, false, false);
-bo_reserve_failed:
+
+out:
 	mutex_unlock(&mem->process_info->lock);
 	mutex_unlock(&mem->lock);
 	return ret;

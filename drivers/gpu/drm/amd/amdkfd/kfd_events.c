@@ -336,8 +336,10 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 	if (kern_addr && !p->signal_page) {
 		p->signal_page = allocate_signal_page_dgpu(p, kern_addr,
 							   *event_page_offset);
-		if (!p->signal_page)
-			return -ENOMEM;
+		if (!p->signal_page) {
+			ret = -ENOMEM;
+			goto out;
+		}
 	}
 
 	*event_page_offset = 0;
@@ -364,6 +366,7 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		kfree(ev);
 	}
 
+out:
 	mutex_unlock(&p->event_mutex);
 
 	return ret;
