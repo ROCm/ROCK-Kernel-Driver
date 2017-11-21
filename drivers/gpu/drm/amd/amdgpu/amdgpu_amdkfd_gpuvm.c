@@ -2411,11 +2411,10 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 	struct dma_fence *fence = NULL;
 	int i, r;
 
-	if (!kgd || !src_mem || !dst_mem)
+	if (!kgd || !src_mem || !dst_mem || !actual_size)
 		return -EINVAL;
 
-	if (actual_size)
-		*actual_size = 0;
+	*actual_size = 0;
 
 	adev = get_amdgpu_device(kgd);
 	INIT_LIST_HEAD(&list);
