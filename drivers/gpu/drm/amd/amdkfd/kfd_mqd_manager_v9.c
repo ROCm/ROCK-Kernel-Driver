@@ -108,6 +108,8 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 	 */
 	if (kfd->cwsr_enabled && (q->type == KFD_QUEUE_TYPE_COMPUTE)) {
 		*mqd_mem_obj = kzalloc(sizeof(struct kfd_mem_obj), GFP_NOIO);
+		if (!*mqd_mem_obj)
+			return -ENOMEM;
 		retval = kfd->kfd2kgd->init_gtt_mem_allocation(kfd->kgd,
 			ALIGN(q->ctl_stack_size, PAGE_SIZE) +
 				ALIGN(sizeof(struct v9_mqd), PAGE_SIZE),
