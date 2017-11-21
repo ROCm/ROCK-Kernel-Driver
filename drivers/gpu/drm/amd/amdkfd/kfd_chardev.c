@@ -1296,7 +1296,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	mem = kfd_process_device_translate_handle(pdd,
 						GET_IDR_HANDLE(args->handle));
 	if (!mem) {
-		err = PTR_ERR(mem);
+		err = -ENOMEM;
 		goto get_mem_obj_from_handle_failed;
 	}
 
@@ -1421,14 +1421,14 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	pdd = kfd_get_process_device_data(dev, p);
 	if (!pdd) {
 		pr_debug("Process device data doesn't exist\n");
-		err = PTR_ERR(pdd);
+		err = -ENODEV;
 		goto bind_process_to_device_failed;
 	}
 
 	mem = kfd_process_device_translate_handle(pdd,
 						GET_IDR_HANDLE(args->handle));
 	if (!mem) {
-		err = PTR_ERR(mem);
+		err = -ENOMEM;
 		goto get_mem_obj_from_handle_failed;
 	}
 
