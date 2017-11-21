@@ -508,7 +508,7 @@ static int fill_in_pcache(struct crat_subtype_cache *pcache,
 	int first_active_cu;
 
 	/* First check if enough memory is available */
-	if (mem_available - sizeof(struct crat_subtype_cache) < 0)
+	if (sizeof(struct crat_subtype_cache) > mem_available)
 		return -ENOMEM;
 
 	cu_sibling_map_mask = cu_bitmask;
