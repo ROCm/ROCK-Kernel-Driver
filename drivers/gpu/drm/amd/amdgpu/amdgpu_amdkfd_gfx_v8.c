@@ -128,6 +128,7 @@ static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 		uint32_t page_table_base);
 static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid);
+static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid);
 
 /* Because of REG_GET_FIELD() being used, we put this function in the
  * asic specific file.
@@ -189,6 +190,7 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.get_atc_vmid_pasid_mapping_valid =
 			get_atc_vmid_pasid_mapping_valid,
 	.invalidate_tlbs = invalidate_tlbs,
+	.invalidate_tlbs_vmid = invalidate_tlbs_vmid,
 	.sync_memory = amdgpu_amdkfd_gpuvm_sync_memory,
 	.alloc_memory_of_gpu = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu,
 	.free_memory_of_gpu = amdgpu_amdkfd_gpuvm_free_memory_of_gpu,
@@ -811,6 +813,7 @@ static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
 	int vmid;
+	unsigned int tmp;
 
 #ifdef V8_SUPPORT_IT_OFFICIAL
 	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
@@ -822,16 +825,28 @@ static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 	for (vmid = 0; vmid < 16; vmid++) {
 		if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid))
 			continue;
-		if (RREG32(mmATC_VMID0_PASID_MAPPING + vmid) &
-			ATC_VMID0_PASID_MAPPING__VALID_MASK) {
-			if ((RREG32(mmATC_VMID0_PASID_MAPPING + vmid) &
-				ATC_VMID0_PASID_MAPPING__PASID_MASK) == pasid) {
-				WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);
-				break;
-			}
+
+		tmp = RREG32(mmATC_VMID0_PASID_MAPPING + vmid);
+		if ((tmp & ATC_VMID0_PASID_MAPPING__VALID_MASK) &&
+			(tmp & ATC_VMID0_PASID_MAPPING__PASID_MASK) == pasid) {
+			WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);
+			break;
 		}
 	}
 
+	return 0;
+}
+
+static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
+
+	if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid)) {
+		pr_err("non kfd vmid %d\n", vmid);
+		return 0;
+	}
+
+	WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);
 	return 0;
 }
 

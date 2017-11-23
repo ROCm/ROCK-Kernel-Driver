@@ -147,6 +147,7 @@ static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd, uint8_t vmid);
 static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 							uint8_t vmid);
 static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid);
+static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid);
 static void set_num_of_requests(struct kgd_dev *dev, uint8_t num_of_req);
 static int alloc_memory_of_scratch(struct kgd_dev *kgd,
 					 uint64_t va, uint32_t vmid);
@@ -216,6 +217,7 @@ static const struct kfd2kgd_calls kfd2kgd = {
 			get_atc_vmid_pasid_mapping_valid,
 	.read_vmid_from_vmfault_reg = read_vmid_from_vmfault_reg,
 	.invalidate_tlbs = invalidate_tlbs,
+	.invalidate_tlbs_vmid = invalidate_tlbs_vmid,
 	.sync_memory = amdgpu_amdkfd_gpuvm_sync_memory,
 	.alloc_memory_of_gpu = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu,
 	.free_memory_of_gpu = amdgpu_amdkfd_gpuvm_free_memory_of_gpu,
@@ -841,20 +843,33 @@ static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
 	int vmid;
+	unsigned int tmp;
 
 	for (vmid = 0; vmid < 16; vmid++) {
 		if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid))
 			continue;
-		if (RREG32(mmATC_VMID0_PASID_MAPPING + vmid) &
-			ATC_VMID0_PASID_MAPPING__VALID_MASK) {
-			if ((RREG32(mmATC_VMID0_PASID_MAPPING + vmid) &
-				ATC_VMID0_PASID_MAPPING__PASID_MASK) == pasid) {
-				WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);
-				break;
-			}
+
+		tmp = RREG32(mmATC_VMID0_PASID_MAPPING + vmid);
+		if ((tmp & ATC_VMID0_PASID_MAPPING__VALID_MASK) &&
+			(tmp & ATC_VMID0_PASID_MAPPING__PASID_MASK) == pasid) {
+			WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);
+			break;
 		}
 	}
 
+	return 0;
+}
+
+static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
+
+	if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid)) {
+		pr_err("non kfd vmid\n");
+		return 0;
+	}
+
+	WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);
 	return 0;
 }
 

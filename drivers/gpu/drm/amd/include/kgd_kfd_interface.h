@@ -342,6 +342,7 @@ struct kfd2kgd_calls {
 	uint32_t (*read_vmid_from_vmfault_reg)(struct kgd_dev *kgd);
 
 	int (*invalidate_tlbs)(struct kgd_dev *kgd, uint16_t pasid);
+	int (*invalidate_tlbs_vmid)(struct kgd_dev *kgd, uint16_t vmid);
 
 	int (*sync_memory)(struct kgd_dev *kgd, struct kgd_mem *mem, bool intr);
 
