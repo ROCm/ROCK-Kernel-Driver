@@ -26,9 +26,9 @@
 #include "soc15.h"
 
 
-#include "vega10/soc15ip.h"
-#include "osssys/osssys_4_0_offset.h"
-#include "osssys/osssys_4_0_sh_mask.h"
+#include "soc15ip.h"
+#include "oss/osssys_4_0_offset.h"
+#include "oss/osssys_4_0_sh_mask.h"
 
 #include "soc15_common.h"
 #include "vega10_ih.h"
