@@ -23,8 +23,8 @@
 
 #include "kfd_device_queue_manager.h"
 #include "vega10/vega10_enum.h"
-#include "vega10/GC/gc_9_0_offset.h"
-#include "vega10/GC/gc_9_0_sh_mask.h"
+#include "gc/gc_9_0_offset.h"
+#include "gc/gc_9_0_sh_mask.h"
 #include "sdma0/sdma0_4_0_sh_mask.h"
 
 static int update_qpd_v9(struct device_queue_manager *dqm,

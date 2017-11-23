@@ -27,8 +27,8 @@
 #include "kfd_priv.h"
 #include "kfd_mqd_manager.h"
 #include "v9_structs.h"
-#include "vega10/GC/gc_9_0_offset.h"
-#include "vega10/GC/gc_9_0_sh_mask.h"
+#include "gc/gc_9_0_offset.h"
+#include "gc/gc_9_0_sh_mask.h"
 #include "sdma0/sdma0_4_0_sh_mask.h"
 
 static inline struct v9_mqd *get_mqd(void *mqd)
