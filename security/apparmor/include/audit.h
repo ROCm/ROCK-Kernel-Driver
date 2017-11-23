@@ -121,10 +121,13 @@ struct apparmor_audit_data {
 		/* these entries require a custom callback fn */
 		struct {
 			struct aa_label *peer;
-			struct {
-				const char *target;
-				kuid_t ouid;
-			} fs;
+			union {
+				struct {
+					const char *target;
+					kuid_t ouid;
+				} fs;
+				int signal;
+			};
 			struct {
 				int type, protocol;
 				struct sock *sk;
@@ -135,7 +138,6 @@ struct apparmor_audit_data {
 			const char *ns;
 			long pos;
 		} iface;
-		int signal;
 		struct {
 			int rlim;
 			unsigned long max;
