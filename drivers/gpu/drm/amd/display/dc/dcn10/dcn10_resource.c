@@ -49,7 +49,7 @@
 #include "dce112/dce112_resource.h"
 #include "dcn10_hubp.h"
 
-#include "vega10/soc15ip.h"
+#include "soc15ip.h"
 
 #include "raven1/DCN/dcn_1_0_offset.h"
 #include "raven1/DCN/dcn_1_0_sh_mask.h"
