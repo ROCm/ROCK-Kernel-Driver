@@ -338,6 +338,7 @@ static void amdgpu_amdkfd_add_eviction_fence(struct amdgpu_bo *bo,
 static int amdgpu_amdkfd_bo_validate(struct amdgpu_bo *bo, uint32_t domain,
 				     bool wait)
 {
+	struct ttm_operation_ctx ctx = { false, false };
 	int ret;
 
 	if (WARN(amdgpu_ttm_tt_get_usermm(bo->tbo.ttm),
@@ -346,7 +347,7 @@ static int amdgpu_amdkfd_bo_validate(struct amdgpu_bo *bo, uint32_t domain,
 
 	amdgpu_ttm_placement_from_domain(bo, domain);
 
-	ret = ttm_bo_validate(&bo->tbo, &bo->placement, false, false);
+	ret = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
 	if (ret)
 		goto validate_fail;
 	if (wait) {
@@ -549,6 +550,7 @@ static int init_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 {
 	struct amdkfd_process_info *process_info = mem->process_info;
 	struct amdgpu_bo *bo = mem->bo;
+	struct ttm_operation_ctx ctx = { true, false };
 	int ret = 0;
 
 	mutex_lock(&process_info->lock);
@@ -599,8 +601,7 @@ static int init_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 		goto release_out;
 	}
 	amdgpu_ttm_placement_from_domain(bo, mem->domain);
-	ret = ttm_bo_validate(&bo->tbo, &bo->placement,
-			      true, false);
+	ret = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
 	if (ret)
 		pr_err("%s: failed to validate BO\n", __func__);
 	amdgpu_bo_unreserve(bo);
@@ -1964,6 +1965,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 {
 	struct kgd_mem *mem, *tmp_mem;
 	struct amdgpu_bo *bo;
+	struct ttm_operation_ctx ctx = { false, false };
 	int invalid, ret;
 
 	/* Move all invalidated BOs to the userptr_inval_list and
@@ -1980,7 +1982,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		if (amdgpu_bo_reserve(bo, true))
 			return -EAGAIN;
 		amdgpu_ttm_placement_from_domain(bo, AMDGPU_GEM_DOMAIN_CPU);
-		ret = ttm_bo_validate(&bo->tbo, &bo->placement, false, false);
+		ret = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
 		amdgpu_bo_unreserve(bo);
 		if (ret) {
 			pr_err("%s: Failed to invalidate userptr BO\n",
@@ -2067,6 +2069,7 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 	struct amdkfd_vm *peer_vm;
 	struct kgd_mem *mem, *tmp_mem;
 	struct amdgpu_bo *bo;
+	struct ttm_operation_ctx ctx = { false, false };
 	int i, ret;
 
 	pd_bo_list_entries = kcalloc(process_info->n_vms,
@@ -2129,8 +2132,7 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 			amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm,
 						     mem->user_pages);
 			amdgpu_ttm_placement_from_domain(bo, mem->domain);
-			ret = ttm_bo_validate(&bo->tbo, &bo->placement,
-					      false, false);
+			ret = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
 			if (ret) {
 				pr_err("%s: failed to validate BO\n", __func__);
 				goto unreserve_out;
