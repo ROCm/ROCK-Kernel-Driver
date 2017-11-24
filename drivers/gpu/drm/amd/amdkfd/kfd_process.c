@@ -465,13 +465,13 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	if (WARN_ON(p->mm != mm))
 		return;
 
-	cancel_delayed_work_sync(&p->eviction_work.dwork);
-	cancel_delayed_work_sync(&p->restore_work);
-
 	mutex_lock(&kfd_processes_mutex);
 	hash_del_rcu(&p->kfd_processes);
 	mutex_unlock(&kfd_processes_mutex);
 	synchronize_srcu(&kfd_processes_srcu);
+
+	cancel_delayed_work_sync(&p->eviction_work.dwork);
+	cancel_delayed_work_sync(&p->restore_work);
 
 	mutex_lock(&p->mutex);
 
