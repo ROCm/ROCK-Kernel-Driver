@@ -180,12 +180,12 @@ static int crash_now(void)
 	return 0;
 }
 
-static void crash_timer_cb(unsigned long unused)
+static void crash_timer_cb(struct timer_list *unused)
 {
 	crash_now();
 }
 
-static DEFINE_TIMER(crash_timer, crash_timer_cb, 0, 0);
+static DEFINE_TIMER(crash_timer, crash_timer_cb);
 
 static int __init crasher_init(void)
 {

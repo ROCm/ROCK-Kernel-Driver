@@ -503,7 +503,7 @@ struct aa_profile *aa_new_null_profile(struct aa_profile *parent, bool hat,
 {
 	struct aa_profile *p, *profile;
 	const char *bname;
-	char *name;
+	char *name = NULL;
 
 	AA_BUG(!parent);
 
@@ -546,7 +546,7 @@ name:
 	profile->file.dfa = aa_get_dfa(nulldfa);
 	profile->policy.dfa = aa_get_dfa(nulldfa);
 
-	mutex_lock(&profile->ns->lock);
+	mutex_lock_nested(&profile->ns->lock, profile->ns->level);
 	p = __find_child(&parent->base.profiles, bname);
 	if (p) {
 		aa_free_profile(profile);
@@ -563,6 +563,7 @@ out:
 	return profile;
 
 fail:
+	kfree(name);
 	aa_free_profile(profile);
 	return NULL;
 }
@@ -906,7 +907,7 @@ ssize_t aa_replace_profiles(struct aa_ns *policy_ns, struct aa_label *label,
 	} else
 		ns = aa_get_ns(policy_ns ? policy_ns : labels_ns(label));
 
-	mutex_lock(&ns->lock);
+	mutex_lock_nested(&ns->lock, ns->level);
 	/* check for duplicate rawdata blobs: space and file dedup */
 	list_for_each_entry(rawdata_ent, &ns->rawdata_list, list) {
 		if (aa_rawdata_eq(rawdata_ent, udata)) {
@@ -1117,13 +1118,13 @@ ssize_t aa_remove_profiles(struct aa_ns *policy_ns, struct aa_label *subj,
 
 	if (!name) {
 		/* remove namespace - can only happen if fqname[0] == ':' */
-		mutex_lock(&ns->parent->lock);
+		mutex_lock_nested(&ns->parent->lock, ns->level);
 		__aa_remove_ns(ns);
 		__aa_bump_ns_revision(ns);
 		mutex_unlock(&ns->parent->lock);
 	} else {
 		/* remove profile */
-		mutex_lock(&ns->lock);
+		mutex_lock_nested(&ns->lock, ns->level);
 		profile = aa_get_profile(__lookup_profile(&ns->base, name));
 		if (!profile) {
 			error = -ENOENT;

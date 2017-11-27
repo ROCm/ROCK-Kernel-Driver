@@ -115,7 +115,7 @@ void hyperv_init(void)
 	__u8 d1 = 0x10; /* SuSE */
 	__u16 d2 = 0x0; /* -d of a.b.c-d */
 
-	if (x86_hyper != &x86_hyper_ms_hyperv)
+	if (x86_hyper_type != X86_HYPER_MS_HYPERV)
 		return;
 
 	/* Allocate percpu VP index */
@@ -212,9 +212,10 @@ void hyperv_cleanup(void)
 }
 EXPORT_SYMBOL_GPL(hyperv_cleanup);
 
-void hyperv_report_panic(struct pt_regs *regs)
+void hyperv_report_panic(struct pt_regs *regs, long err)
 {
 	static bool panic_reported;
+	u64 guest_id;
 
 	/*
 	 * We prefer to report panic on 'die' chain as we have proper
@@ -225,11 +226,13 @@ void hyperv_report_panic(struct pt_regs *regs)
 		return;
 	panic_reported = true;
 
-	wrmsrl(HV_X64_MSR_CRASH_P0, regs->ip);
-	wrmsrl(HV_X64_MSR_CRASH_P1, regs->ax);
-	wrmsrl(HV_X64_MSR_CRASH_P2, regs->bx);
-	wrmsrl(HV_X64_MSR_CRASH_P3, regs->cx);
-	wrmsrl(HV_X64_MSR_CRASH_P4, regs->dx);
+	rdmsrl(HV_X64_MSR_GUEST_OS_ID, guest_id);
+
+	wrmsrl(HV_X64_MSR_CRASH_P0, err);
+	wrmsrl(HV_X64_MSR_CRASH_P1, guest_id);
+	wrmsrl(HV_X64_MSR_CRASH_P2, regs->ip);
+	wrmsrl(HV_X64_MSR_CRASH_P3, regs->ax);
+	wrmsrl(HV_X64_MSR_CRASH_P4, regs->sp);
 
 	/*
 	 * Let Hyper-V know there is crash data available

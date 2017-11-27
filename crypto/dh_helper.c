@@ -28,12 +28,12 @@ static inline const u8 *dh_unpack_data(void *dst, const void *src, size_t size)
 	return src + size;
 }
 
-static inline int dh_data_size(const struct dh *p)
+static inline unsigned int dh_data_size(const struct dh *p)
 {
 	return p->key_size + p->p_size + p->g_size;
 }
 
-int crypto_dh_key_len(const struct dh *p)
+unsigned int crypto_dh_key_len(const struct dh *p)
 {
 	return DH_KPP_SECRET_MIN_SIZE + dh_data_size(p);
 }

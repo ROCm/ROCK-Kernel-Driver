@@ -294,6 +294,16 @@ static bool sig_enforce = IS_ENABLED(CONFIG_MODULE_SIG_FORCE);
 module_param(sig_enforce, bool_enable_only, 0644);
 #endif /* !CONFIG_MODULE_SIG_FORCE */
 
+/*
+ * Export sig_enforce kernel cmdline parameter to allow other subsystems rely
+ * on that instead of directly to CONFIG_MODULE_SIG_FORCE config.
+ */
+bool is_module_sig_enforced(void)
+{
+	return sig_enforce;
+}
+EXPORT_SYMBOL(is_module_sig_enforced);
+
 /* Block module loading/unloading? */
 int modules_disabled = 0;
 core_param(nomodule, modules_disabled, bint, 0);
@@ -853,10 +863,8 @@ static int add_module_usage(struct module *a, struct module *b)
 
 	pr_debug("Allocating new usage for %s.\n", a->name);
 	use = kmalloc(sizeof(*use), GFP_ATOMIC);
-	if (!use) {
-		pr_warn("%s: out of memory loading\n", a->name);
+	if (!use)
 		return -ENOMEM;
-	}
 
 	use->source = a;
 	use->target = b;
@@ -1265,14 +1273,14 @@ static struct module_attribute modinfo_taint =
 static void setup_modinfo_supported(struct module *mod, const char *s)
 {
 	if (!s) {
-		mod->taints |= (1 << TAINT_NO_SUPPORT);
+		mod->taints |= (1 << TAINT_AUX);
 		return;
 	}
 
 	if (strcmp(s, "external") == 0)
-		mod->taints |= (1 << TAINT_EXTERNAL_SUPPORT);
+		return;
 	else if (strcmp(s, "yes"))
-		mod->taints |= (1 << TAINT_NO_SUPPORT);
+		mod->taints |= (1 << TAINT_AUX);
 }
 
 static ssize_t show_modinfo_supported(struct module_attribute *mattr,
@@ -1568,7 +1576,7 @@ static void add_sect_attrs(struct module *mod, const struct load_info *info)
 		sattr->mattr.show = module_sect_show;
 		sattr->mattr.store = NULL;
 		sattr->mattr.attr.name = sattr->name;
-		sattr->mattr.attr.mode = S_IRUGO;
+		sattr->mattr.attr.mode = S_IRUSR;
 		*(gattr++) = &(sattr++)->mattr.attr;
 	}
 	*gattr = NULL;
@@ -1861,9 +1869,7 @@ static int mod_sysfs_setup(struct module *mod,
 	add_notes_attrs(mod, info);
 
 #ifdef CONFIG_SUSE_KERNEL_SUPPORTED
-	if (mod->taints & (1 << TAINT_EXTERNAL_SUPPORT))
-		add_taint(TAINT_EXTERNAL_SUPPORT, LOCKDEP_STILL_OK);
-	else if (mod->taints & (1 << TAINT_NO_SUPPORT)) {
+	if (mod->taints & (1 << TAINT_AUX)) {
 		if (suse_unsupported == 0) {
 			printk(KERN_WARNING "%s: module not supported by "
 			       "SUSE, refusing to load. To override, echo "
@@ -1871,7 +1877,7 @@ static int mod_sysfs_setup(struct module *mod,
 			err = -ENOEXEC;
 			goto out_remove_attrs;
 		}
-		add_taint(TAINT_NO_SUPPORT, LOCKDEP_STILL_OK);
+		add_taint(TAINT_AUX, LOCKDEP_STILL_OK);
 		if (suse_unsupported == 1) {
 			printk(KERN_WARNING "%s: module is not supported by "
 			       "SUSE. Our support organization may not be "
@@ -3552,6 +3558,8 @@ static noinline int do_init_module(struct module *mod)
 	if (!mod->async_probe_requested && (current->flags & PF_USED_ASYNC))
 		async_synchronize_full();
 
+	ftrace_free_mem(mod, mod->init_layout.base, mod->init_layout.base +
+			mod->init_layout.size);
 	mutex_lock(&module_mutex);
 	/* Drop initial reference. */
 	module_put(mod);
@@ -4226,6 +4234,7 @@ static int m_show(struct seq_file *m, void *p)
 {
 	struct module *mod = list_entry(p, struct module, list);
 	char buf[MODULE_FLAGS_BUF_SIZE];
+	unsigned long value;
 
 	/* We always ignore unformed modules. */
 	if (mod->state == MODULE_STATE_UNFORMED)
@@ -4241,7 +4250,8 @@ static int m_show(struct seq_file *m, void *p)
 		   mod->state == MODULE_STATE_COMING ? "Loading" :
 		   "Live");
 	/* Used by oprofile and other similar tools. */
-	seq_printf(m, " 0x%pK", mod->core_layout.base);
+	value = m->private ? 0 : (unsigned long)mod->core_layout.base;
+	seq_printf(m, " 0x" KALLSYM_FMT, value);
 
 	/* Taints info */
 	if (mod->taints)
@@ -4263,9 +4273,23 @@ static const struct seq_operations modules_op = {
 	.show	= m_show
 };
 
+/*
+ * This also sets the "private" pointer to non-NULL if the
+ * kernel pointers should be hidden (so you can just test
+ * "m->private" to see if you should keep the values private).
+ *
+ * We use the same logic as for /proc/kallsyms.
+ */
 static int modules_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &modules_op);
+	int err = seq_open(file, &modules_op);
+
+	if (!err) {
+		struct seq_file *m = file->private_data;
+		m->private = kallsyms_show_value() ? NULL : (void *)8ul;
+	}
+
+	return 0;
 }
 
 static const struct file_operations proc_modules_operations = {
