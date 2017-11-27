@@ -44,7 +44,7 @@
 #undef WRITE
 #undef FRAME_SIZE
 
-#define dm_output_to_console(fmt, ...) DRM_INFO(fmt, ##__VA_ARGS__)
+#define dm_output_to_console(fmt, ...) DRM_DEBUG_KMS(fmt, ##__VA_ARGS__)
 
 #define dm_error(fmt, ...) DRM_ERROR(fmt, ##__VA_ARGS__)
 
