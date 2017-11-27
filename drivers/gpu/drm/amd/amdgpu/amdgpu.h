@@ -1501,6 +1501,30 @@ struct amdgpu_ssg {
 #endif
 };
 
+/* Define the HW IP blocks will be used in driver , add more if necessary */
+enum amd_hw_ip_block_type {
+	GC_HWIP = 1,
+	HDP_HWIP,
+	SDMA0_HWIP,
+	SDMA1_HWIP,
+	MMHUB_HWIP,
+	ATHUB_HWIP,
+	NBIO_HWIP,
+	MP0_HWIP,
+	UVD_HWIP,
+	VCN_HWIP = UVD_HWIP,
+	VCE_HWIP,
+	DF_HWIP,
+	DCE_HWIP,
+	OSSSYS_HWIP,
+	SMUIO_HWIP,
+	PWR_HWIP,
+	NBIF_HWIP,
+	MAX_HWIP
+};
+
+#define HWIP_MAX_INSTANCE	6
+
 struct amd_powerplay {
 	struct cgs_device *cgs_device;
 	void *pp_handle;
@@ -1696,6 +1720,9 @@ struct amdgpu_device {
 
 	/* amdkfd interface */
 	struct kfd_dev          *kfd;
+
+	/* soc15 register offset based on ip, instance and  segment */
+	uint32_t 		*reg_offset[MAX_HWIP][HWIP_MAX_INSTANCE];
 
 	/* delayed work_func for deferring clockgating during resume */
 	struct delayed_work     late_init_work;
