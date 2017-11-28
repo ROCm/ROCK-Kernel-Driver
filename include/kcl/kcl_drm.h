@@ -8,6 +8,7 @@
 #include <drm/drm_gem.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_fourcc.h>
+#include <drm/drm_rect.h>
 #include <linux/ctype.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
@@ -368,6 +369,75 @@ kcl_drm_atomic_get_new_crtc_state_before_commit(struct drm_atomic_state *state,
 {
 	return state->crtcs[drm_crtc_index(crtc)].state;
 }
+#endif
+
+static inline struct drm_crtc_state *
+kcl_drm_atomic_get_new_crtc_state_after_commit(struct drm_atomic_state *state,
+					    struct drm_crtc *crtc)
+{
+	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
+}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && !defined(OS_NAME_RHEL_7_4)
+#define DRM_MODE_FMT	"%d:\"%s\" %d %d %d %d %d %d %d %d %d %d 0x%x 0x%x"
+#define DRM_MODE_ARG(m)	\
+	(m)->base.id, (m)->name, (m)->vrefresh, (m)->clock, \
+	(m)->hdisplay, (m)->hsync_start, (m)->hsync_end, (m)->htotal, \
+	(m)->vdisplay, (m)->vsync_start, (m)->vsync_end, (m)->vtotal, \
+	(m)->type, (m)->flags
+
+#define DRM_RECT_FMT	"%dx%d%+d%+d"
+#define DRM_RECT_ARG(r) drm_rect_width(r), drm_rect_height(r), (r)->x1, (r)->y1
+
+#define DRM_RECT_FP_FMT	"%d.%06ux%d.%06u%+d.%06u%+d.%06u"
+#define DRM_RECT_FP_ARG(r) \
+	drm_rect_width(r) >> 16, ((drm_rect_width(r) & 0xffff) * 15625) >> 10, \
+	drm_rect_height(r) >> 16, ((drm_rect_height(r) & 0xffff) * 15625) >> 10, \
+	(r)->x1 >> 16, (((r)->x1 & 0xffff) * 15625) >> 10, \
+	(r)->y1 >> 16, (((r)->y1 & 0xffff) * 15625) >> 10
+
+static inline struct drm_rect
+drm_plane_state_src(const struct drm_plane_state *state)
+{
+	struct drm_rect src = {
+		.x1 = state->src_x,
+		.y1 = state->src_y,
+		.x2 = state->src_x + state->src_w,
+		.y2 = state->src_y + state->src_h,
+	};
+	return src;
+}
+
+static inline struct drm_rect
+drm_plane_state_dest(const struct drm_plane_state *state)
+{
+	struct drm_rect dest = {
+		.x1 = state->crtc_x,
+		.y1 = state->crtc_y,
+		.x2 = state->crtc_x + state->crtc_w,
+		.y2 = state->crtc_y + state->crtc_h,
+	};
+	return dest;
+}
+
+struct drm_printer {
+	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
+	void *arg;
+};
+
+void __drm_printfn_info(struct drm_printer *p, struct va_format *vaf);
+void drm_printf(struct drm_printer *p, const char *f, ...);
+
+static inline struct drm_printer drm_info_printer(struct device *dev)
+{
+	struct drm_printer p = {
+		.printfn = __drm_printfn_info,
+		.arg = dev,
+	};
+	return p;
+}
+
+void drm_state_dump(struct drm_device *dev, struct drm_printer *p);
 #endif
 
 #endif /* AMDKCL_DRM_H */
