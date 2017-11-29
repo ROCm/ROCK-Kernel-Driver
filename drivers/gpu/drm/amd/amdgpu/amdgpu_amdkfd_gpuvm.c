@@ -401,6 +401,13 @@ static int vm_validate_pt_pd_bos(struct amdgpu_vm *vm)
 		pr_err("amdgpu: failed to validate PD\n");
 		return ret;
 	}
+	if (vm->use_cpu_for_update) {
+		ret = amdgpu_bo_kmap(pd, NULL);
+		if (ret) {
+			pr_err("amdgpu: failed to kmap PD, ret=%d\n", ret);
+			return ret;
+		}
+	}
 
 	ret = amdgpu_vm_update_directories(adev, vm);
 	if (ret != 0)
