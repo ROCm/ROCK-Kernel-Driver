@@ -607,15 +607,26 @@ static int dm_suspend(void *handle)
 
 static struct amdgpu_dm_connector *
 amdgpu_dm_find_first_crtc_matching_connector(struct drm_atomic_state *state,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+					     struct drm_crtc *crtc,
+					     bool from_state_var)
+#else
 					     struct drm_crtc *crtc)
+#endif
 {
 	uint32_t i;
 	struct drm_connector_state *new_con_state;
 	struct drm_connector *connector;
 	struct drm_crtc *crtc_from_state;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	for_each_connector_in_state(state, connector, new_con_state, i) {
+		crtc_from_state = from_state_var ? new_con_state->crtc :
+						   connector->state->crtc;
+#else
 	for_each_new_connector_in_state(state, connector, new_con_state, i) {
 		crtc_from_state = new_con_state->crtc;
+#endif
 
 		if (crtc_from_state == crtc)
 			return to_amdgpu_dm_connector(connector);
@@ -682,7 +693,11 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 	}
 
 	/* Force mode set in atomic comit */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	for_each_crtc_in_state(adev->dm.cached_state, crtc, new_crtc_state, i)
+#else
 	for_each_new_crtc_in_state(adev->dm.cached_state, crtc, new_crtc_state, i)
+#endif
 		new_crtc_state->active_changed = true;
 
 	ret = drm_atomic_helper_resume(ddev, adev->dm.cached_state);
@@ -4031,7 +4046,12 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	unsigned long flags;
 
 	/* update planes when needed */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	for_each_plane_in_state(state, plane, old_plane_state, i) {
+		new_plane_state = plane->state;
+#else
 	for_each_oldnew_plane_in_state(state, plane, old_plane_state, new_plane_state, i) {
+#endif
 		struct drm_crtc *crtc = new_plane_state->crtc;
 		struct drm_crtc_state *new_crtc_state;
 		struct drm_framebuffer *fb = new_plane_state->fb;
@@ -4143,7 +4163,12 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 	 * it will update crtc->dm_crtc_state->stream pointer which is used in
 	 * the ISRs.
 	 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
+		old_crtc_state = crtc->state;
+#else
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
+#endif
 		struct dm_crtc_state *dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 
@@ -4178,7 +4203,12 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	dm_state = to_dm_atomic_state(state);
 
 	/* update changed items */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
+		new_crtc_state = crtc->state;
+#else
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
+#endif
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
@@ -4247,8 +4277,13 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	 * are removed from freesync module
 	 */
 	if (adev->dm.freesync_module) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+		for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
+			new_crtc_state = crtc->state;
+#else
 		for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state,
 					      new_crtc_state, i) {
+#endif
 			struct amdgpu_dm_connector *aconnector = NULL;
 			struct dm_connector_state *dm_new_con_state = NULL;
 			struct amdgpu_crtc *acrtc = NULL;
@@ -4274,7 +4309,11 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 			aconnector =
 				amdgpu_dm_find_first_crtc_matching_connector(
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+					state, crtc, false);
+#else
 					state, crtc);
+#endif
 			if (!aconnector) {
 				DRM_DEBUG_DRIVER("Atomic commit: Failed to "
 						 "find connector for acrtc "
@@ -4287,8 +4326,12 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 			mod_freesync_add_stream(adev->dm.freesync_module,
 						dm_new_crtc_state->stream,
 						&aconnector->caps);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+			new_con_state = aconnector->base.state;
+#else
 			new_con_state = drm_atomic_get_new_connector_state(
 					state, &aconnector->base);
+#endif
 			dm_new_con_state = to_dm_connector_state(new_con_state);
 
 			mod_freesync_set_user_enable(adev->dm.freesync_module,
@@ -4301,7 +4344,12 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	if (dm_state->context)
 		WARN_ON(!dc_commit_state(dm->dc, dm_state->context));
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+		new_crtc_state = crtc->state;
+#else
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
+#endif
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
@@ -4318,14 +4366,23 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	}
 
 	/* Handle scaling and underscan changes*/
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	for_each_connector_in_state(state, connector, old_con_state, i) {
+		new_con_state = connector->state;
+#else
 	for_each_oldnew_connector_in_state(state, connector, old_con_state, new_con_state, i) {
+#endif
 		struct dm_connector_state *dm_new_con_state = to_dm_connector_state(new_con_state);
 		struct dm_connector_state *dm_old_con_state = to_dm_connector_state(old_con_state);
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(dm_new_con_state->base.crtc);
 		struct dc_stream_status *status = NULL;
 
 		if (acrtc)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+			new_crtc_state = acrtc->base.state;
+#else
 			new_crtc_state = drm_atomic_get_new_crtc_state(state, &acrtc->base);
+#endif
 
 		/* Skip any modesets/resets */
 		if (!acrtc || drm_atomic_crtc_needs_modeset(new_crtc_state))
@@ -4357,8 +4414,13 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 			dm_error("%s: Failed to update stream scaling!\n", __func__);
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
+		new_crtc_state = crtc->state;
+#else
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state,
 			new_crtc_state, i) {
+#endif
 		/*
 		 * loop to enable interrupts on newly arrived crtc
 		 */
@@ -4384,7 +4446,12 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	}
 
 	/* update planes when needed per crtc*/
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
+		new_crtc_state = crtc->state;
+#else
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, j) {
+#endif
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 
 		if (dm_new_crtc_state->stream)
@@ -4397,7 +4464,12 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	 * mark consumed event for drm_atomic_helper_commit_hw_done
 	 */
 	spin_lock_irqsave(&adev->ddev->event_lock, flags);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
+		new_crtc_state = crtc->state;
+#else
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
+#endif
 
 		if (new_crtc_state->event)
 			drm_send_event_locked(dev, &new_crtc_state->event->base);
@@ -4571,7 +4643,12 @@ static int dm_update_crtcs_state(struct dc *dc,
 
 	/*TODO Move this code into dm_crtc_atomic_check once we get rid of dc_validation_set */
 	/* update changed items */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
+		old_crtc_state = crtc->state;
+#else
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
+#endif
 		struct amdgpu_crtc *acrtc = NULL;
 		struct amdgpu_dm_connector *aconnector = NULL;
 		struct drm_connector_state *new_con_state = NULL;
@@ -4583,7 +4660,12 @@ static int dm_update_crtcs_state(struct dc *dc,
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		acrtc = to_amdgpu_crtc(crtc);
 
-		aconnector = amdgpu_dm_find_first_crtc_matching_connector(state, crtc);
+		aconnector = amdgpu_dm_find_first_crtc_matching_connector(
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+			     state, crtc, true);
+#else
+			     state, crtc);
+#endif
 
 		/* TODO This hack should go away */
 		if (aconnector && enable) {
@@ -4883,7 +4965,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	 * we should not add it to list of affected planes.
 	 */
 	if (state->legacy_cursor_update) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+		for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
+#else
 		for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
+#endif
 			if (new_crtc_state->color_mgmt_changed) {
 				ret = drm_atomic_add_affected_planes(state, crtc);
 				if (ret)
@@ -4892,7 +4978,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 	} else {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
-		for_each_crtc_in_state(state, crtc, crtc_state, i) {
+		for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
 			old_crtc_state = crtc->state;
 #else
 		for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
@@ -4951,14 +5037,23 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	 * new stream into context w\o causing full reset. Need to
 	 * decide how to handle.
 	 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	for_each_connector_in_state(state, connector, new_con_state, i) {
+		old_con_state = connector->state;
+#else
 	for_each_oldnew_connector_in_state(state, connector, old_con_state, new_con_state, i) {
+#endif
 		struct dm_connector_state *dm_old_con_state = to_dm_connector_state(old_con_state);
 		struct dm_connector_state *dm_new_con_state = to_dm_connector_state(new_con_state);
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(dm_new_con_state->base.crtc);
 
 		/* Skip any modesets/resets */
 		if (!acrtc || drm_atomic_crtc_needs_modeset(
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+				acrtc->base.state))
+#else
 				drm_atomic_get_new_crtc_state(state, &acrtc->base)))
+#endif
 			continue;
 
 		/* Skip any thing not scale or underscan changes */
