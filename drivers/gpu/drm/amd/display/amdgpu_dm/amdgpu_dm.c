@@ -4039,7 +4039,11 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	struct dc_plane_state *plane_states_constructed[MAX_SURFACES];
 	struct amdgpu_crtc *acrtc_attach = to_amdgpu_crtc(pcrtc);
 	struct drm_crtc_state *new_pcrtc_state =
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+			kcl_drm_atomic_get_new_crtc_state_after_commit(state, pcrtc);
+#else
 			drm_atomic_get_new_crtc_state(state, pcrtc);
+#endif
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(new_pcrtc_state);
 	struct dm_atomic_state *dm_state = to_dm_atomic_state(state);
 	int planes_count = 0;
@@ -4066,7 +4070,13 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		if (!fb || !crtc || pcrtc != crtc)
 			continue;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+		new_crtc_state =
+			kcl_drm_atomic_get_new_crtc_state_after_commit(
+			state, crtc);
+#else
 		new_crtc_state = drm_atomic_get_new_crtc_state(state, crtc);
+#endif
 		if (!new_crtc_state->active)
 			continue;
 

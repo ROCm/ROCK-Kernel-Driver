@@ -422,4 +422,11 @@ kcl_drm_atomic_get_new_crtc_state_before_commit(struct drm_atomic_state *state,
 }
 #endif
 
+static inline struct drm_crtc_state *
+kcl_drm_atomic_get_new_crtc_state_after_commit(struct drm_atomic_state *state,
+					    struct drm_crtc *crtc)
+{
+	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
+}
+
 #endif /* AMDKCL_DRM_H */
