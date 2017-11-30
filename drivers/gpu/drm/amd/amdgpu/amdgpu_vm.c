@@ -344,9 +344,6 @@ static int amdgpu_vm_alloc_levels(struct amdgpu_device *adev,
 	    to >= amdgpu_vm_num_entries(adev, level))
 		return -EINVAL;
 
-	if (to > parent->last_entry_used)
-		parent->last_entry_used = to;
-
 	++level;
 	saddr = saddr & ((1 << shift) - 1);
 	eaddr = eaddr & ((1 << shift) - 1);
@@ -1199,16 +1196,19 @@ error_free:
  *
  * Mark all PD level as invalid after an error.
  */
-static void amdgpu_vm_invalidate_level(struct amdgpu_vm *vm,
-				       struct amdgpu_vm_pt *parent)
+static void amdgpu_vm_invalidate_level(struct amdgpu_device *adev,
+				       struct amdgpu_vm *vm,
+				       struct amdgpu_vm_pt *parent,
+				       unsigned level)
 {
-	unsigned pt_idx;
+	unsigned pt_idx, num_entries;
 
 	/*
 	 * Recurse into the subdirectories. This recursion is harmless because
 	 * we only have a maximum of 5 layers.
 	 */
-	for (pt_idx = 0; pt_idx <= parent->last_entry_used; ++pt_idx) {
+	num_entries = amdgpu_vm_num_entries(adev, level);
+	for (pt_idx = 0; pt_idx < num_entries; ++pt_idx) {
 		struct amdgpu_vm_pt *entry = &parent->entries[pt_idx];
 
 		if (!entry->base.bo)
@@ -1219,7 +1219,7 @@ static void amdgpu_vm_invalidate_level(struct amdgpu_vm *vm,
 		if (list_empty(&entry->base.vm_status))
 			list_add(&entry->base.vm_status, &vm->relocated);
 		spin_unlock(&vm->status_lock);
-		amdgpu_vm_invalidate_level(vm, entry);
+		amdgpu_vm_invalidate_level(adev, vm, entry, level + 1);
 	}
 }
 
@@ -1261,7 +1261,8 @@ int amdgpu_vm_update_directories(struct amdgpu_device *adev,
 
 			r = amdgpu_vm_update_pde(adev, vm, pt, entry);
 			if (r) {
-				amdgpu_vm_invalidate_level(vm, &vm->root);
+				amdgpu_vm_invalidate_level(adev, vm,
+							   &vm->root, 0);
 				return r;
 			}
 			spin_lock(&vm->status_lock);
@@ -1664,7 +1665,7 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 
 error_free:
 	amdgpu_job_free(job);
-	amdgpu_vm_invalidate_level(vm, &vm->root);
+	amdgpu_vm_invalidate_level(adev, vm, &vm->root, 0);
 	return r;
 }
 
@@ -2771,29 +2772,34 @@ error_free_sched_entity:
 /**
  * amdgpu_vm_free_levels - free PD/PT levels
  *
- * @level: PD/PT starting level to free
+ * @adev: amdgpu device structure
+ * @parent: PD/PT starting level to free
+ * @level: level of parent structure
  *
  * Free the page directory or page table level and all sub levels.
  */
-static void amdgpu_vm_free_levels(struct amdgpu_vm_pt *level)
+static void amdgpu_vm_free_levels(struct amdgpu_device *adev,
+				  struct amdgpu_vm_pt *parent,
+				  unsigned level)
 {
-	unsigned i;
+	unsigned i, num_entries = amdgpu_vm_num_entries(adev, level);
 
-	if (level->base.bo) {
-		list_del(&level->base.bo_list);
-		list_del(&level->base.vm_status);
-		amdgpu_bo_unref(&level->base.bo->shadow);
-		amdgpu_bo_unref(&level->base.bo);
+	if (parent->base.bo) {
+		list_del(&parent->base.bo_list);
+		list_del(&parent->base.vm_status);
+		amdgpu_bo_unref(&parent->base.bo->shadow);
+		amdgpu_bo_unref(&parent->base.bo);
 	}
 
-	if (level->entries)
-		for (i = 0; i <= level->last_entry_used; i++)
-			amdgpu_vm_free_levels(&level->entries[i]);
+	if (parent->entries)
+		for (i = 0; i < num_entries; i++)
+			amdgpu_vm_free_levels(adev, &parent->entries[i],
+					      level + 1);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
-	drm_free_large(level->entries);
+	drm_free_large(parent->entries);
 #else
-	kvfree(level->entries);
+	kvfree(parent->entries);
 #endif
 }
 
@@ -2869,7 +2875,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	if (r) {
 		dev_err(adev->dev, "Leaking page tables because BO reservation failed\n");
 	} else {
-		amdgpu_vm_free_levels(&vm->root);
+		amdgpu_vm_free_levels(adev, &vm->root, 0);
 		amdgpu_bo_unreserve(root);
 	}
 	amdgpu_bo_unref(&root);
