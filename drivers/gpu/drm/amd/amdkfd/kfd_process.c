@@ -1058,7 +1058,13 @@ void kfd_suspend_all_processes(void)
 	unsigned int temp;
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
+#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+#endif
 		if (cancel_delayed_work_sync(&p->eviction_work.dwork))
 			dma_fence_put(p->eviction_work.quiesce_fence);
 		cancel_delayed_work_sync(&p->restore_work);
@@ -1078,7 +1084,13 @@ int kfd_resume_all_processes(void)
 	unsigned int temp;
 	int ret = 0, idx = srcu_read_lock(&kfd_processes_srcu);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
+#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+#endif
 		if (!schedule_delayed_work(&p->restore_work, 0)) {
 			pr_err("Restore process %d failed during resume\n",
 			       p->pasid);
