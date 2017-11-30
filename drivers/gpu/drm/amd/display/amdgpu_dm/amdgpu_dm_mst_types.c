@@ -477,10 +477,17 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 	struct amdgpu_device *adev = dev->dev_private;
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	drm_modeset_lock_all(dev);
+#endif
 	if (adev->mode_info.rfbdev)
 		drm_fb_helper_add_one_connector(&adev->mode_info.rfbdev->helper, connector);
 	else
 		DRM_ERROR("adev->mode_info.rfbdev is NULL\n");
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	drm_modeset_unlock_all(dev);
+#endif
 
 	drm_connector_register(connector);
 
