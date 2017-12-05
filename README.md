@@ -26,7 +26,7 @@ release plus:
 ##### Note regarding libhsakmt compatibility
 Please note that the libhsakmt library in this repository is NOT compatible
 with amdkfd that is distributed as part of the mainline Linux kernel
-from 3.19 and onward.
+from 3.19 and onward (this is still true as of 4.15rc2).
 
 #### Target Platform
 
