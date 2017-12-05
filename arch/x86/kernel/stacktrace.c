@@ -104,25 +104,17 @@ __save_stack_trace_reliable(struct stack_trace *trace,
 
 		regs = unwind_get_entry_regs(&state);
 		if (regs) {
+			if (user_mode(regs))
+				goto success;
+
 			/*
 			 * Kernel mode registers on the stack indicate an
 			 * in-kernel interrupt or exception (e.g., preemption
 			 * or a page fault), which can make frame pointers
 			 * unreliable.
 			 */
-			if (!user_mode(regs))
+			if (IS_ENABLED(CONFIG_FRAME_POINTER))
 				return -EINVAL;
-
-			/*
-			 * The last frame contains the user mode syscall
-			 * pt_regs.  Skip it and finish the unwind.
-			 */
-			unwind_next_frame(&state);
-			if (!unwind_done(&state)) {
-				STACKTRACE_DUMP_ONCE(task);
-				return -EINVAL;
-			}
-			break;
 		}
 
 		addr = unwind_get_return_address(&state);
@@ -132,21 +124,16 @@ __save_stack_trace_reliable(struct stack_trace *trace,
 		 * generated code which __kernel_text_address() doesn't know
 		 * about.
 		 */
-		if (!addr) {
-			STACKTRACE_DUMP_ONCE(task);
+		if (!addr)
 			return -EINVAL;
-		}
 
 		if (save_stack_address(trace, addr, false))
 			return -EINVAL;
 	}
 
-	/* Check for stack corruption */
-	if (unwind_error(&state)) {
-		STACKTRACE_DUMP_ONCE(task);
-		return -EINVAL;
-	}
+	return -EINVAL;
 
+success:
 	if (trace->nr_entries < trace->max_entries)
 		trace->entries[trace->nr_entries++] = ULONG_MAX;
 

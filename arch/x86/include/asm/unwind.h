@@ -12,7 +12,6 @@ struct unwind_state {
 	unsigned long stack_mask;
 	struct task_struct *task;
 	int graph_idx;
-	bool error;
 #if defined(CONFIG_UNWINDER_ORC)
 	bool signal, full_regs;
 	unsigned long sp, bp, ip;
@@ -35,11 +34,6 @@ unsigned long *unwind_get_return_address_ptr(struct unwind_state *state);
 static inline bool unwind_done(struct unwind_state *state)
 {
 	return state->stack_info.type == STACK_TYPE_UNKNOWN;
-}
-
-static inline bool unwind_error(struct unwind_state *state)
-{
-	return state->error;
 }
 
 static inline
