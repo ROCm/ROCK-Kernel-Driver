@@ -119,7 +119,6 @@ static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd,
 		uint8_t vmid);
 static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 		uint8_t vmid);
-static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);
 static void set_num_of_requests(struct kgd_dev *kgd,
 			uint8_t num_of_requests);
 static int alloc_memory_of_scratch(struct kgd_dev *kgd,
@@ -189,7 +188,6 @@ static const struct kfd2kgd_calls kfd2kgd = {
 			get_atc_vmid_pasid_mapping_pasid,
 	.get_atc_vmid_pasid_mapping_valid =
 			get_atc_vmid_pasid_mapping_valid,
-	.write_vmid_invalidate_request = write_vmid_invalidate_request,
 	.invalidate_tlbs = invalidate_tlbs,
 	.sync_memory = amdgpu_amdkfd_gpuvm_sync_memory,
 	.alloc_memory_of_gpu = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu,
@@ -775,13 +773,6 @@ static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 
 	reg = RREG32(mmATC_VMID0_PASID_MAPPING + vmid);
 	return reg & ATC_VMID0_PASID_MAPPING__PASID_MASK;
-}
-
-static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
-
-	WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);
 }
 
 /*

@@ -138,7 +138,6 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd, void *mqd,
 				uint32_t queue_id);
 static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 				unsigned int utimeout);
-static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);
 static uint32_t get_watch_base_addr(struct amdgpu_device *adev);
 static int kgd_address_watch_disable(struct kgd_dev *kgd);
 static int kgd_address_watch_execute(struct kgd_dev *kgd,
@@ -157,7 +156,6 @@ static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd,
 		uint8_t vmid);
 static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 		uint8_t vmid);
-static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);
 static void set_num_of_requests(struct kgd_dev *kgd,
 			uint8_t num_of_requests);
 static int alloc_memory_of_scratch(struct kgd_dev *kgd,
@@ -234,7 +232,6 @@ static const struct kfd2kgd_calls kfd2kgd = {
 			get_atc_vmid_pasid_mapping_pasid,
 	.get_atc_vmid_pasid_mapping_valid =
 			get_atc_vmid_pasid_mapping_valid,
-	.write_vmid_invalidate_request = write_vmid_invalidate_request,
 	.invalidate_tlbs = invalidate_tlbs,
 	.sync_memory = amdgpu_amdkfd_gpuvm_sync_memory,
 	.alloc_memory_of_gpu = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu,
