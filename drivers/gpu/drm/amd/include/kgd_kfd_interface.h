@@ -340,8 +340,6 @@ struct kfd2kgd_calls {
 					struct kgd_dev *kgd,
 					uint8_t vmid);
 	uint32_t (*read_vmid_from_vmfault_reg)(struct kgd_dev *kgd);
-	void (*write_vmid_invalidate_request)(struct kgd_dev *kgd,
-					uint8_t vmid);
 
 	int (*invalidate_tlbs)(struct kgd_dev *kgd, uint16_t pasid);
 
