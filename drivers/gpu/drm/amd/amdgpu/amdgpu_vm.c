@@ -2684,7 +2684,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		AMDGPU_VM_PTE_COUNT(adev) * 8);
 	unsigned ring_instance;
 	struct amdgpu_ring *ring;
-	struct amd_sched_rq *rq;
+	struct drm_sched_rq *rq;
 	int r, i;
 	u64 flags;
 	uint64_t init_pde_value = 0;
@@ -2704,8 +2704,8 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	ring_instance = atomic_inc_return(&adev->vm_manager.vm_pte_next_ring);
 	ring_instance %= adev->vm_manager.vm_pte_num_rings;
 	ring = adev->vm_manager.vm_pte_rings[ring_instance];
-	rq = &ring->sched.sched_rq[AMD_SCHED_PRIORITY_KERNEL];
-	r = amd_sched_entity_init(&ring->sched, &vm->entity,
+	rq = &ring->sched.sched_rq[DRM_SCHED_PRIORITY_KERNEL];
+	r = drm_sched_entity_init(&ring->sched, &vm->entity,
 				  rq, amdgpu_sched_jobs, NULL);
 	if (r)
 		return r;
@@ -2802,7 +2802,7 @@ error_free_root:
 	vm->root.base.bo = NULL;
 
 error_free_sched_entity:
-	amd_sched_entity_fini(&ring->sched, &vm->entity);
+	drm_sched_entity_fini(&ring->sched, &vm->entity);
 
 	return r;
 }
@@ -2883,7 +2883,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		mutex_unlock(&id_mgr->lock);
 	}
 
-	amd_sched_entity_fini(vm->entity.sched, &vm->entity);
+	drm_sched_entity_fini(vm->entity.sched, &vm->entity);
 
 	if (!RB_EMPTY_ROOT(&vm->va)) {
 		dev_err(adev->dev, "still active bo inside vm\n");
