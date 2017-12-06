@@ -716,7 +716,6 @@ bool ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 EXPORT_SYMBOL(ttm_bo_eviction_valuable);
 
 static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
-			       struct reservation_object *resv,
 			       uint32_t mem_type,
 			       const struct ttm_place *place,
 			       struct ttm_operation_ctx *ctx)
@@ -731,8 +730,9 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 	spin_lock(&glob->lru_lock);
 	for (i = 0; i < TTM_MAX_BO_PRIORITY; ++i) {
 		list_for_each_entry(bo, &man->lru[i], lru) {
-			if (bo->resv == resv) {
-				if (list_empty(&bo->ddestroy))
+			if (bo->resv == ctx->resv) {
+				if (!ctx->allow_reserved_eviction &&
+				    list_empty(&bo->ddestroy))
 					continue;
 			} else {
 				locked = kcl_reservation_object_trylock(bo->resv);
@@ -844,7 +844,7 @@ static int ttm_bo_mem_force_space(struct ttm_buffer_object *bo,
 			return ret;
 		if (mem->mm_node)
 			break;
-		ret = ttm_mem_evict_first(bdev, bo->resv, mem_type, place, ctx);
+		ret = ttm_mem_evict_first(bdev, mem_type, place, ctx);
 		if (unlikely(ret != 0))
 			return ret;
 	} while (1);
@@ -1342,8 +1342,7 @@ static int ttm_bo_force_list_clean(struct ttm_bo_device *bdev,
 	for (i = 0; i < TTM_MAX_BO_PRIORITY; ++i) {
 		while (!list_empty(&man->lru[i])) {
 			spin_unlock(&glob->lru_lock);
-			ret = ttm_mem_evict_first(bdev, NULL, mem_type,
-						  NULL, &ctx);
+			ret = ttm_mem_evict_first(bdev, mem_type, NULL, &ctx);
 			if (ret)
 				return ret;
 			spin_lock(&glob->lru_lock);
