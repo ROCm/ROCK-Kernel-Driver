@@ -931,7 +931,7 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 	/* Add the eviction fence back */
 	amdgpu_bo_fence(pd, &kvm->process_info->eviction_fence->base, true);
 
-	amdgpu_sync_fence(adev, sync, bo_va->last_pt_update);
+	amdgpu_sync_fence(adev, sync, bo_va->last_pt_update, false);
 
 	/* Sync objects can't handle multiple GPUs (contexts) updating
 	 * sync->last_vm_update. Fortunately we don't need it for
@@ -965,7 +965,7 @@ static int update_gpuvm_pte(struct amdgpu_device *adev,
 		return ret;
 	}
 
-	amdgpu_sync_fence(adev, sync, bo_va->last_pt_update);
+	amdgpu_sync_fence(adev, sync, bo_va->last_pt_update, false);
 
 	/* Sync objects can't handle multiple GPUs (contexts) updating
 	 * sync->last_vm_update. Fortunately we don't need it for

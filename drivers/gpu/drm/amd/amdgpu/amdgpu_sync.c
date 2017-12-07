@@ -354,7 +354,7 @@ int amdgpu_sync_clone(struct amdgpu_device *adev,
 
 		f = e->fence;
 		if (!dma_fence_is_signaled(f)) {
-			r = amdgpu_sync_fence(adev, clone, f);
+			r = amdgpu_sync_fence(adev, clone, f, false);
 			if (r)
 				return r;
 		} else {
