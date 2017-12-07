@@ -744,6 +744,7 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 								      place)) {
 				if (locked)
 					kcl_reservation_object_unlock(bo->resv);
+				locked = false;
 				continue;
 			}
 			break;
