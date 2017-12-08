@@ -8298,7 +8298,11 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 #endif
 
 	if (wait_for_vblank)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+		drm_atomic_helper_wait_for_vblanks(dev, state);
+#else
 		drm_atomic_helper_wait_for_flip_done(dev, state);
+#endif
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 	drm_atomic_helper_cleanup_planes(dev, state);
