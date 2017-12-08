@@ -5165,8 +5165,12 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #else
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
 #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_RHEL_7_4)
 		if (!drm_atomic_crtc_needs_modeset(new_crtc_state) &&
 		    !new_crtc_state->color_mgmt_changed)
+#else
+		if (!drm_atomic_crtc_needs_modeset(new_crtc_state))
+#endif
 			continue;
 
 		if (!new_crtc_state->enable)
