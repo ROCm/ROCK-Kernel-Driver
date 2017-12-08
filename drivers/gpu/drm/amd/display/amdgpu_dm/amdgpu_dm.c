@@ -731,7 +731,11 @@ static int dm_resume(void *handle)
 		}
 	}
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_plane_in_state(dm->cached_state, plane, new_plane_state, i) {
+#else
 	for_each_new_plane_in_state(dm->cached_state, plane, new_plane_state, i) {
+#endif
 		dm_new_plane_state = to_dm_plane_state(new_plane_state);
 		if (dm_new_plane_state->dc_state) {
 			WARN_ON(kref_read(&dm_new_plane_state->dc_state->refcount) > 1);
