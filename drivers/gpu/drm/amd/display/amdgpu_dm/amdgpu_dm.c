@@ -741,7 +741,11 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 	 * them here, since they were duplicated as part of the suspend
 	 * procedure.
 	 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	for_each_crtc_in_state(adev->dm.cached_state, crtc, new_crtc_state, i) {
+#else
 	for_each_new_crtc_in_state(adev->dm.cached_state, crtc, new_crtc_state, i) {
+#endif
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		if (dm_new_crtc_state->stream) {
 			WARN_ON(kref_read(&dm_new_crtc_state->stream->refcount) > 1);
@@ -750,7 +754,11 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 		}
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+	for_each_plane_in_state(adev->dm.cached_state, plane, new_plane_state, i) {
+#else
 	for_each_new_plane_in_state(adev->dm.cached_state, plane, new_plane_state, i) {
+#endif
 		dm_new_plane_state = to_dm_plane_state(new_plane_state);
 		if (dm_new_plane_state->dc_state) {
 			WARN_ON(kref_read(&dm_new_plane_state->dc_state->refcount) > 1);
