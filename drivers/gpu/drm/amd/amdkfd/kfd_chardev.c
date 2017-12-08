@@ -46,6 +46,7 @@
 static long kfd_ioctl(struct file *, unsigned int, unsigned long);
 static int kfd_open(struct inode *, struct file *);
 static int kfd_mmap(struct file *, struct vm_area_struct *);
+static bool kfd_dev_is_large_bar(struct kfd_dev *dev);
 
 static const char kfd_dev_name[] = "kfd";
 
@@ -1124,6 +1125,25 @@ alloc_memory_of_scratch_failed:
 	return -EFAULT;
 }
 
+bool kfd_dev_is_large_bar(struct kfd_dev *dev)
+{
+	struct kfd_local_mem_info mem_info;
+
+	if (debug_largebar) {
+		pr_debug("Simulate large-bar allocation on non large-bar machine\n");
+		return true;
+	}
+
+	if (dev->device_info->is_need_iommu_device)
+		return false;
+
+	dev->kfd2kgd->get_local_mem_info(dev->kgd, &mem_info);
+	if (mem_info.local_mem_size_private == 0 &&
+			mem_info.local_mem_size_public > 0)
+		return true;
+	return false;
+}
+
 static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 					struct kfd_process *p, void *data)
 {
@@ -1143,6 +1163,13 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	dev = kfd_device_by_id(args->gpu_id);
 	if (!dev)
 		return -EINVAL;
+
+	if ((flags & KFD_IOC_ALLOC_MEM_FLAGS_PUBLIC) &&
+		(flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) &&
+		!kfd_dev_is_large_bar(dev)) {
+		pr_err("Alloc host visible vram on small bar is not allowed\n");
+		return -EINVAL;
+	}
 
 	if (flags & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
 		/* Check if the userptr corresponds to another (or third-party)
