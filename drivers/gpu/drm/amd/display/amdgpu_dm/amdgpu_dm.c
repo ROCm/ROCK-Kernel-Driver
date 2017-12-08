@@ -4602,7 +4602,11 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	drm_atomic_helper_commit_hw_done(state);
 
 	if (wait_for_vblank)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+		drm_atomic_helper_wait_for_vblanks(dev, state);
+#else
 		drm_atomic_helper_wait_for_flip_done(dev, state);
+#endif
 
 	drm_atomic_helper_cleanup_planes(dev, state);
 }
