@@ -10013,7 +10013,11 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 #endif
 
 	if (wait_for_vblank)
+#ifndef HAVE_DRM_ATOMIC_HELPER_WAIT_FOR_FLIP_DONE
+		drm_atomic_helper_wait_for_vblanks(dev, state);
+#else
 		drm_atomic_helper_wait_for_flip_done(dev, state);
+#endif
 
 #ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	drm_atomic_helper_cleanup_planes(dev, state);
