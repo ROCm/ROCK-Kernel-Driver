@@ -24,7 +24,9 @@
 #include <linux/kthread.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <uapi/linux/sched/types.h>
+#endif
 #include <drm/drmP.h>
 #include <drm/gpu_scheduler.h>
 #include <drm/spsc_queue.h>
@@ -227,8 +229,8 @@ void drm_sched_entity_fini(struct drm_gpu_scheduler *sched,
 		/* Park the kernel for a moment to make sure it isn't processing
 		 * our enity.
 		 */
-		kthread_park(sched->thread);
-		kthread_unpark(sched->thread);
+		kcl_kthread_park(sched->thread);
+		kcl_kthread_unpark(sched->thread);
 		if (entity->dependency) {
 			dma_fence_remove_callback(entity->dependency,
 						  &entity->cb);
@@ -626,8 +628,8 @@ static void drm_sched_process_job(struct dma_fence *f, struct dma_fence_cb *cb)
 
 static bool drm_sched_blocked(struct drm_gpu_scheduler *sched)
 {
-	if (kthread_should_park()) {
-		kthread_parkme();
+	if (kcl_kthread_should_park()) {
+		kcl_kthread_parkme();
 		return true;
 	}
 
