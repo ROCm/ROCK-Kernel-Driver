@@ -24,7 +24,9 @@
 #include <linux/kthread.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <uapi/linux/sched/types.h>
+#endif
 #include <drm/drmP.h>
 #include <drm/gpu_scheduler.h>
 #include <drm/spsc_queue.h>
@@ -141,7 +143,7 @@ int drm_sched_entity_init(struct drm_gpu_scheduler *sched,
 	spsc_queue_init(&entity->job_queue);
 
 	atomic_set(&entity->fence_seq, 0);
-	entity->fence_context = dma_fence_context_alloc(2);
+	entity->fence_context = kcl_fence_context_alloc(2);
 
 	return 0;
 }
@@ -227,8 +229,8 @@ void drm_sched_entity_fini(struct drm_gpu_scheduler *sched,
 		/* Park the kernel for a moment to make sure it isn't processing
 		 * our enity.
 		 */
-		kthread_park(sched->thread);
-		kthread_unpark(sched->thread);
+		kcl_kthread_park(sched->thread);
+		kcl_kthread_unpark(sched->thread);
 		if (entity->dependency) {
 			dma_fence_remove_callback(entity->dependency,
 						  &entity->cb);
@@ -239,7 +241,7 @@ void drm_sched_entity_fini(struct drm_gpu_scheduler *sched,
 		while ((job = to_drm_sched_job(spsc_queue_pop(&entity->job_queue)))) {
 			struct drm_sched_fence *s_fence = job->s_fence;
 			drm_sched_fence_scheduled(s_fence);
-			dma_fence_set_error(&s_fence->finished, -ESRCH);
+			kcl_dma_fence_set_error(&s_fence->finished, -ESRCH);
 			drm_sched_fence_finished(s_fence);
 			WARN_ON(s_fence->parent);
 			dma_fence_put(&s_fence->finished);
@@ -358,7 +360,7 @@ drm_sched_entity_pop_job(struct drm_sched_entity *entity)
 
 	/* skip jobs from entity that marked guilty */
 	if (entity->guilty && atomic_read(entity->guilty))
-		dma_fence_set_error(&sched_job->s_fence->finished, -ECANCELED);
+		kcl_dma_fence_set_error(&sched_job->s_fence->finished, -ECANCELED);
 
 	spsc_queue_pop(&entity->job_queue);
 	return sched_job;
@@ -524,7 +526,7 @@ void drm_sched_job_recovery(struct drm_gpu_scheduler *sched)
 		}
 
 		if (found_guilty && s_job->s_fence->scheduled.context == guilty_context)
-			dma_fence_set_error(&s_fence->finished, -ECANCELED);
+			kcl_dma_fence_set_error(&s_fence->finished, -ECANCELED);
 
 		spin_unlock(&sched->job_list_lock);
 		fence = sched->ops->run_job(s_job);
@@ -626,8 +628,8 @@ static void drm_sched_process_job(struct dma_fence *f, struct dma_fence_cb *cb)
 
 static bool drm_sched_blocked(struct drm_gpu_scheduler *sched)
 {
-	if (kthread_should_park()) {
-		kthread_parkme();
+	if (kcl_kthread_should_park()) {
+		kcl_kthread_parkme();
 		return true;
 	}
 

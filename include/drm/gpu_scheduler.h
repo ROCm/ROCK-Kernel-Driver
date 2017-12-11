@@ -25,7 +25,6 @@
 #define _DRM_GPU_SCHEDULER_H_
 
 #include <drm/spsc_queue.h>
-#include <linux/dma-fence.h>
 
 struct drm_gpu_scheduler;
 struct drm_sched_rq;
