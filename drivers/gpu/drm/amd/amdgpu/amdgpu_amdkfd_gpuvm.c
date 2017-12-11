@@ -1064,7 +1064,6 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	bool aql_queue, public, readonly, execute, coherent, no_sub, userptr;
 	u64 alloc_flag;
 	uint32_t domain;
-	uint64_t *temp_offset;
 	struct sg_table *sg = NULL;
 
 	if (!(flags & ALLOC_MEM_FLAGS_NONPAGED)) {
@@ -1074,7 +1073,6 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 
 	domain = 0;
 	alloc_flag = 0;
-	temp_offset = NULL;
 
 	aql_queue = (flags & ALLOC_MEM_FLAGS_AQL_QUEUE_MEM) ? true : false;
 	public    = (flags & ALLOC_MEM_FLAGS_PUBLIC) ? true : false;
@@ -1092,17 +1090,14 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		alloc_flag = AMDGPU_GEM_CREATE_NO_CPU_ACCESS;
 		if (public) {
 			alloc_flag = AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
-			temp_offset = offset;
 		}
 		alloc_flag |= AMDGPU_GEM_CREATE_VRAM_CLEARED;
 	} else if (flags & (ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_USERPTR)) {
 		domain = AMDGPU_GEM_DOMAIN_GTT;
 		alloc_flag = 0;
-		temp_offset = offset;
 	} else if (flags & ALLOC_MEM_FLAGS_DOORBELL) {
 		domain = AMDGPU_GEM_DOMAIN_GTT;
 		alloc_flag = 0;
-		temp_offset = offset;
 		if (size > UINT_MAX)
 			return -EINVAL;
 		sg = create_doorbell_sg(*offset, size);
@@ -1123,7 +1118,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 			BOOL_TO_STR(coherent), BOOL_TO_STR(no_sub));
 
 	return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
-			temp_offset, domain,
+			offset, domain,
 			alloc_flag, sg,
 			aql_queue, readonly, execute,
 			coherent, no_sub, userptr);
