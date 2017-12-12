@@ -7556,9 +7556,46 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 	 * unset legacy_cursor_update
 	 */
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 	return drm_atomic_helper_commit(dev, state, nonblock);
 
 	/*TODO Handle EINTR, reenable IRQ*/
+#else
+	int ret = 0;
+
+	/*
+	 * Right now we receive async commit only from pageflip, in which case
+	 * we should not pin/unpin the fb here, it should be done in
+	 * amdgpu_crtc_flip and from the vblank irq handler.
+	 */
+	if (!nonblock) {
+		ret = drm_atomic_helper_prepare_planes(dev, state);
+		if (ret)
+			goto cleanup;
+	}
+#if defined(OS_NAME_RHEL_6) || defined(OS_NAME_SLE_12_3)
+	else	// Temporary fix for pflip conflict between block and nonblock call
+		return -EBUSY;
+#endif
+
+	drm_atomic_helper_swap_state(dev, state);
+
+	/*
+	 * there is no fences usage yet in plane state.
+	 * wait_for_fences(dev, state);
+	 */
+
+	amdgpu_dm_atomic_commit_tail(state);
+
+	if (!nonblock) {
+		drm_atomic_helper_cleanup_planes(dev, state);
+	}
+
+cleanup:
+	drm_atomic_state_free(state);
+
+	return ret;
+#endif
 }
 
 /**
@@ -7877,6 +7914,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 						dm, crtc, wait_for_vblank);
 	}
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 	/* Enable interrupts for CRTCs going from 0 to n active planes. */
 	amdgpu_dm_enable_crtc_interrupts(dev, state, false);
 
@@ -7903,14 +7941,19 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		new_crtc_state->event = NULL;
 	}
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
+#endif
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 	/* Signal HW programming completion */
 	drm_atomic_helper_commit_hw_done(state);
+#endif
 
 	if (wait_for_vblank)
 		drm_atomic_helper_wait_for_flip_done(dev, state);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 	drm_atomic_helper_cleanup_planes(dev, state);
+#endif
 
 	/*
 	 * Finally, drop a runtime PM reference for each newly disabled CRTC,
