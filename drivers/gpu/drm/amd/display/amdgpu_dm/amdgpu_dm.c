@@ -769,13 +769,8 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 
 	ret = drm_atomic_helper_resume(ddev, adev->dm.cached_state);
 
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && !defined(OS_NAME_RHEL_7_4)
-	drm_atomic_state_free(adev->dm.cached_state);
-#else
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)) || defined(OS_NAME_RHEL_7_4)
 	drm_atomic_state_put(adev->dm.cached_state);
-#endif
 #endif
 	adev->dm.cached_state = NULL;
 
@@ -4330,6 +4325,8 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 	if (!nonblock) {
 		drm_atomic_helper_cleanup_planes(dev, state);
 	}
+
+	drm_atomic_state_free(state);
 
 	return ret;
 #endif
