@@ -4445,9 +4445,16 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 #else
 	int ret = 0;
 
-	ret = drm_atomic_helper_prepare_planes(dev, state);
-	if (ret)
-		return ret;
+	/*
+	 * Right now we receive async commit only from pageflip, in which case
+	 * we should not pin/unpin the fb here, it should be done in
+	 * amdgpu_crtc_flip and from the vblank irq handler.
+	 */
+	if (!nonblock) {
+		ret = drm_atomic_helper_prepare_planes(dev, state);
+		if (ret)
+			return ret;
+	}
 
 	drm_atomic_helper_swap_state(dev, state);
 
@@ -4457,6 +4464,10 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 	 */
 
 	amdgpu_dm_atomic_commit_tail(state);
+
+	if (!nonblock) {
+		drm_atomic_helper_cleanup_planes(dev, state);
+	}
 
 	return ret;
 #endif
@@ -4778,7 +4789,9 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		drm_atomic_helper_wait_for_flip_done(dev, state);
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 	drm_atomic_helper_cleanup_planes(dev, state);
+#endif
 }
 
 
