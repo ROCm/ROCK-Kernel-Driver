@@ -9783,6 +9783,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 						dm, crtc, wait_for_vblank);
 	}
 
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 #if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 	/* Update audio instances for each connector. */
 	amdgpu_dm_commit_audio(dev, state);
@@ -9815,11 +9816,14 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 	/* Signal HW programming completion */
 	drm_atomic_helper_commit_hw_done(state);
+#endif
 
 	if (wait_for_vblank)
 		drm_atomic_helper_wait_for_flip_done(dev, state);
 
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	drm_atomic_helper_cleanup_planes(dev, state);
+#endif
 
 	/* return the stolen vga memory back to VRAM */
 	if (!adev->mman.keep_stolen_vga_memory)
