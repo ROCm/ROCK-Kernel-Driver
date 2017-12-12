@@ -139,7 +139,7 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd, void *mqd,
 static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 				unsigned int utimeout);
 static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);
-static uint32_t get_watch_base_addr(void);
+static uint32_t get_watch_base_addr(struct amdgpu_device *adev);
 static int kgd_address_watch_disable(struct kgd_dev *kgd);
 static int kgd_address_watch_execute(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
@@ -437,10 +437,11 @@ static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id)
 	return 0;
 }
 
-static uint32_t get_sdma_base_addr(unsigned int engine_id,
-				   unsigned int queue_id)
+static uint32_t get_sdma_base_addr(struct amdgpu_device *adev,
+				unsigned int engine_id,
+				unsigned int queue_id)
 {
-	static const uint32_t base[2] = {
+	uint32_t base[2] = {
 		SOC15_REG_OFFSET(SDMA0, 0,
 				 mmSDMA0_RLC0_RB_CNTL) - mmSDMA0_RLC0_RB_CNTL,
 		SOC15_REG_OFFSET(SDMA1, 0,
@@ -456,7 +457,7 @@ static uint32_t get_sdma_base_addr(unsigned int engine_id,
 	return retval;
 }
 
-static uint32_t get_watch_base_addr(void)
+static uint32_t get_watch_base_addr(struct amdgpu_device *adev)
 {
 	uint32_t retval = SOC15_REG_OFFSET(GC, 0, mmTCP_WATCH0_ADDR_H) -
 			mmTCP_WATCH0_ADDR_H;
@@ -615,7 +616,7 @@ static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd,
 	uint64_t __user *wptr64 = (uint64_t __user *)wptr;
 
 	m = get_sdma_mqd(mqd);
-	sdma_base_addr = get_sdma_base_addr(m->sdma_engine_id,
+	sdma_base_addr = get_sdma_base_addr(adev, m->sdma_engine_id,
 					    m->sdma_queue_id);
 	sdmax_gfx_context_cntl = m->sdma_engine_id ?
 		SOC15_REG_OFFSET(SDMA1, 0, mmSDMA1_GFX_CONTEXT_CNTL) :
@@ -682,7 +683,7 @@ static int kgd_hqd_sdma_dump(struct kgd_dev *kgd,
 			     uint32_t (**dump)[2], uint32_t *n_regs)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-	uint32_t sdma_base_addr = get_sdma_base_addr(engine_id, queue_id);
+	uint32_t sdma_base_addr = get_sdma_base_addr(adev, engine_id, queue_id);
 	uint32_t i = 0, reg;
 #undef HQD_N_REGS
 #define HQD_N_REGS (19+6+7+10)
@@ -738,7 +739,7 @@ static bool kgd_hqd_sdma_is_occupied(struct kgd_dev *kgd, void *mqd)
 	uint32_t sdma_rlc_rb_cntl;
 
 	m = get_sdma_mqd(mqd);
-	sdma_base_addr = get_sdma_base_addr(m->sdma_engine_id,
+	sdma_base_addr = get_sdma_base_addr(adev, m->sdma_engine_id,
 					    m->sdma_queue_id);
 
 	sdma_rlc_rb_cntl = RREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL);
@@ -867,7 +868,7 @@ static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 	unsigned long end_jiffies = (utimeout * HZ / 1000) + jiffies;
 
 	m = get_sdma_mqd(mqd);
-	sdma_base_addr = get_sdma_base_addr(m->sdma_engine_id,
+	sdma_base_addr = get_sdma_base_addr(adev, m->sdma_engine_id,
 					    m->sdma_queue_id);
 
 	temp = RREG32(sdma_base_addr + mmSDMA0_RLC0_RB_CNTL);
@@ -1033,7 +1034,7 @@ static int kgd_address_watch_disable(struct kgd_dev *kgd)
 	cntl.bitfields.mask = ADDRESS_WATCH_REG_CNTL_DEFAULT_MASK;
 	cntl.bitfields.atc = 1;
 
-	watch_base_addr = get_watch_base_addr();
+	watch_base_addr = get_watch_base_addr(adev);
 	/* Turning off this address until we set all the registers */
 	for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
 		WREG32(watch_base_addr +
@@ -1054,7 +1055,7 @@ static int kgd_address_watch_execute(struct kgd_dev *kgd,
 	union TCP_WATCH_CNTL_BITS cntl;
 	uint32_t watch_base_addr;
 
-	watch_base_addr = get_watch_base_addr();
+	watch_base_addr = get_watch_base_addr(adev);
 	cntl.u32All = cntl_val;
 
 	/* Turning off this watch point until we set all the registers */
@@ -1108,7 +1109,7 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
 					unsigned int reg_offset)
 {
-	return get_watch_base_addr() +
+	return get_watch_base_addr(get_amdgpu_device(kgd)) +
 		watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + reg_offset];
 }
 
