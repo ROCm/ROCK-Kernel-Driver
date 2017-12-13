@@ -521,6 +521,11 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 		return -EINVAL;
 	}
 
+	if (adev->flags & AMD_IS_APU)
+		adev->nbio_funcs = &nbio_v7_0_funcs;
+	else
+		adev->nbio_funcs = &nbio_v6_1_funcs;
+
 	adev->nbio_funcs->detect_hw_virt(adev);
 
 	if (amdgpu_sriov_vf(adev))
@@ -610,11 +615,6 @@ static int soc15_common_early_init(void *handle)
 	adev->se_cac_wreg = &soc15_se_cac_wreg;
 
 	adev->asic_funcs = &soc15_asic_funcs;
-
-	if (adev->flags & AMD_IS_APU)
-		adev->nbio_funcs = &nbio_v7_0_funcs;
-	else
-		adev->nbio_funcs = &nbio_v6_1_funcs;
 
 	if (amdgpu_get_ip_block(adev, AMD_IP_BLOCK_TYPE_PSP) &&
 		(amdgpu_ip_block_mask & (1 << AMD_IP_BLOCK_TYPE_PSP)))
