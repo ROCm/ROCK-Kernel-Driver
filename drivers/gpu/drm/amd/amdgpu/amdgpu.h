@@ -1983,8 +1983,10 @@ void amdgpu_cs_report_moved_bytes(struct amdgpu_device *adev, u64 num_bytes,
 				  u64 num_vis_bytes);
 void amdgpu_ttm_placement_from_domain(struct amdgpu_bo *abo, u32 domain);
 bool amdgpu_ttm_bo_is_amdgpu_bo(struct ttm_buffer_object *bo);
-void amdgpu_vram_location(struct amdgpu_device *adev, struct amdgpu_mc *mc, u64 base);
-void amdgpu_gart_location(struct amdgpu_device *adev, struct amdgpu_mc *mc);
+void amdgpu_device_vram_location(struct amdgpu_device *adev,
+				 struct amdgpu_mc *mc, u64 base);
+void amdgpu_device_gart_location(struct amdgpu_device *adev,
+				 struct amdgpu_mc *mc);
 #if !defined(BUILD_AS_DKMS) || LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 int amdgpu_device_resize_fb_bar(struct amdgpu_device *adev);
 #endif
