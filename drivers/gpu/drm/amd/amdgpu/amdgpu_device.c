@@ -768,7 +768,7 @@ static void amdgpu_device_check_vm_size(struct amdgpu_device *adev)
 	if (amdgpu_vm_size == -1)
 		return;
 
-	if (amdgpu_vm_size < 1) {
+	if (amdgpu_vm_size != -1 && amdgpu_vm_size < 1) {
 		dev_warn(adev->dev, "VM size (%d) too small, min is 1GB\n",
 			 amdgpu_vm_size);
 		amdgpu_vm_size = -1;
@@ -815,7 +815,7 @@ static void amdgpu_device_check_arguments(struct amdgpu_device *adev)
 	/* Compute the GPU VM space only if the user
 	 * hasn't changed it from the default.
 	 */
-	if (amdgpu_vm_size == -1) {
+	if (amdgpu_vm_size == -1 && adev->asic_type != CHIP_RAVEN) {
 		/* Computation depends on the amount of physical RAM available.
 		 * Cannot exceed 1TB.
 		 */
