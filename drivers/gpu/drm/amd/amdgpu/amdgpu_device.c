@@ -726,6 +726,8 @@ error_create:
 	return r;
 }
 
+
+#if !defined(BUILD_AS_DKMS) ||  LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 /**
  * amdgpu_device_resize_fb_bar - try to resize FB BAR
  *
@@ -795,6 +797,7 @@ int amdgpu_device_resize_fb_bar(struct amdgpu_device *adev)
 
 	return 0;
 }
+#endif
 
 /*
  * GPU helpers function.

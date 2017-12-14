@@ -368,11 +368,13 @@ static int gmc_v7_0_mc_init(struct amdgpu_device *adev)
 	adev->mc.mc_vram_size = RREG32(mmCONFIG_MEMSIZE) * 1024ULL * 1024ULL;
 	adev->mc.real_vram_size = RREG32(mmCONFIG_MEMSIZE) * 1024ULL * 1024ULL;
 
+#if !defined(BUILD_AS_DKMS) || LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 	if (!(adev->flags & AMD_IS_APU)) {
 		r = amdgpu_device_resize_fb_bar(adev);
 		if (r)
 			return r;
 	}
+#endif
 	adev->mc.aper_base = pci_resource_start(adev->pdev, 0);
 	adev->mc.aper_size = pci_resource_len(adev->pdev, 0);
 
