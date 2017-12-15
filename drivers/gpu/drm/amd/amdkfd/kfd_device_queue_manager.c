@@ -1320,7 +1320,7 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 
 	mutex_unlock(&dqm->lock);
 
-	return 0;
+	return retval;
 
 failed:
 failed_try_destroy_debugged_queue:
