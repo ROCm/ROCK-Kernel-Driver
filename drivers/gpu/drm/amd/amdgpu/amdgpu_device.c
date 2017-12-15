@@ -965,9 +965,9 @@ static const struct vga_switcheroo_client_ops amdgpu_switcheroo_ops = {
 	.can_switch = amdgpu_switcheroo_can_switch,
 };
 
-int amdgpu_set_clockgating_state(struct amdgpu_device *adev,
-				  enum amd_ip_block_type block_type,
-				  enum amd_clockgating_state state)
+int amdgpu_device_ip_set_clockgating_state(struct amdgpu_device *adev,
+					   enum amd_ip_block_type block_type,
+					   enum amd_clockgating_state state)
 {
 	int i, r = 0;
 
@@ -987,9 +987,9 @@ int amdgpu_set_clockgating_state(struct amdgpu_device *adev,
 	return r;
 }
 
-int amdgpu_set_powergating_state(struct amdgpu_device *adev,
-				  enum amd_ip_block_type block_type,
-				  enum amd_powergating_state state)
+int amdgpu_device_ip_set_powergating_state(struct amdgpu_device *adev,
+					   enum amd_ip_block_type block_type,
+					   enum amd_powergating_state state)
 {
 	int i, r = 0;
 
@@ -1009,7 +1009,8 @@ int amdgpu_set_powergating_state(struct amdgpu_device *adev,
 	return r;
 }
 
-void amdgpu_get_clockgating_state(struct amdgpu_device *adev, u32 *flags)
+void amdgpu_device_ip_get_clockgating_state(struct amdgpu_device *adev,
+					    u32 *flags)
 {
 	int i;
 
@@ -1021,8 +1022,8 @@ void amdgpu_get_clockgating_state(struct amdgpu_device *adev, u32 *flags)
 	}
 }
 
-int amdgpu_wait_for_idle(struct amdgpu_device *adev,
-			 enum amd_ip_block_type block_type)
+int amdgpu_device_ip_wait_for_idle(struct amdgpu_device *adev,
+				   enum amd_ip_block_type block_type)
 {
 	int i, r;
 
@@ -1040,8 +1041,8 @@ int amdgpu_wait_for_idle(struct amdgpu_device *adev,
 
 }
 
-bool amdgpu_is_idle(struct amdgpu_device *adev,
-		    enum amd_ip_block_type block_type)
+bool amdgpu_device_ip_is_idle(struct amdgpu_device *adev,
+			      enum amd_ip_block_type block_type)
 {
 	int i;
 
@@ -1055,8 +1056,9 @@ bool amdgpu_is_idle(struct amdgpu_device *adev,
 
 }
 
-struct amdgpu_ip_block * amdgpu_get_ip_block(struct amdgpu_device *adev,
-					     enum amd_ip_block_type type)
+struct amdgpu_ip_block *
+amdgpu_device_ip_get_ip_block(struct amdgpu_device *adev,
+			      enum amd_ip_block_type type)
 {
 	int i;
 
@@ -1068,7 +1070,7 @@ struct amdgpu_ip_block * amdgpu_get_ip_block(struct amdgpu_device *adev,
 }
 
 /**
- * amdgpu_ip_block_version_cmp
+ * amdgpu_device_ip_block_version_cmp
  *
  * @adev: amdgpu_device pointer
  * @type: enum amd_ip_block_type
@@ -1078,11 +1080,11 @@ struct amdgpu_ip_block * amdgpu_get_ip_block(struct amdgpu_device *adev,
  * return 0 if equal or greater
  * return 1 if smaller or the ip_block doesn't exist
  */
-int amdgpu_ip_block_version_cmp(struct amdgpu_device *adev,
-				enum amd_ip_block_type type,
-				u32 major, u32 minor)
+int amdgpu_device_ip_block_version_cmp(struct amdgpu_device *adev,
+				       enum amd_ip_block_type type,
+				       u32 major, u32 minor)
 {
-	struct amdgpu_ip_block *ip_block = amdgpu_get_ip_block(adev, type);
+	struct amdgpu_ip_block *ip_block = amdgpu_device_ip_get_ip_block(adev, type);
 
 	if (ip_block && ((ip_block->version->major > major) ||
 			((ip_block->version->major == major) &&
@@ -1093,7 +1095,7 @@ int amdgpu_ip_block_version_cmp(struct amdgpu_device *adev,
 }
 
 /**
- * amdgpu_ip_block_add
+ * amdgpu_device_ip_block_add
  *
  * @adev: amdgpu_device pointer
  * @ip_block_version: pointer to the IP to add
@@ -1101,8 +1103,8 @@ int amdgpu_ip_block_version_cmp(struct amdgpu_device *adev,
  * Adds the IP block driver information to the collection of IPs
  * on the asic.
  */
-int amdgpu_ip_block_add(struct amdgpu_device *adev,
-			const struct amdgpu_ip_block_version *ip_block_version)
+int amdgpu_device_ip_block_add(struct amdgpu_device *adev,
+			       const struct amdgpu_ip_block_version *ip_block_version)
 {
 	if (!ip_block_version)
 		return -EINVAL;
@@ -1600,10 +1602,10 @@ int amdgpu_device_ip_suspend(struct amdgpu_device *adev)
 		amdgpu_virt_request_full_gpu(adev, false);
 
 	/* ungate SMC block first */
-	r = amdgpu_set_clockgating_state(adev, AMD_IP_BLOCK_TYPE_SMC,
-					 AMD_CG_STATE_UNGATE);
+	r = amdgpu_device_ip_set_clockgating_state(adev, AMD_IP_BLOCK_TYPE_SMC,
+						   AMD_CG_STATE_UNGATE);
 	if (r) {
-		DRM_ERROR("set_clockgating_state(ungate) SMC failed %d\n",r);
+		DRM_ERROR("set_clockgating_state(ungate) SMC failed %d\n", r);
 	}
 
 	for (i = adev->num_ip_blocks - 1; i >= 0; i--) {
