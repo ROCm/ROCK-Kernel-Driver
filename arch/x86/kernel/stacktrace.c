@@ -104,6 +104,7 @@ __save_stack_trace_reliable(struct stack_trace *trace,
 
 		regs = unwind_get_entry_regs(&state);
 		if (regs) {
+			/* Success path for user tasks */
 			if (user_mode(regs))
 				goto success;
 
@@ -113,6 +114,7 @@ __save_stack_trace_reliable(struct stack_trace *trace,
 			 * or a page fault), which can make frame pointers
 			 * unreliable.
 			 */
+
 			if (IS_ENABLED(CONFIG_FRAME_POINTER))
 				return -EINVAL;
 		}
@@ -131,7 +133,13 @@ __save_stack_trace_reliable(struct stack_trace *trace,
 			return -EINVAL;
 	}
 
-	return -EINVAL;
+	/* Check for stack corruption */
+	if (unwind_error(&state))
+		return -EINVAL;
+
+	/* Success path for non-user tasks, i.e. kthreads and idle tasks */
+	if (!(task->flags & (PF_KTHREAD | PF_IDLE)))
+		return -EINVAL;
 
 success:
 	if (trace->nr_entries < trace->max_entries)
