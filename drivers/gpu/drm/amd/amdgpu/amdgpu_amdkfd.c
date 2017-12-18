@@ -280,7 +280,7 @@ int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 	ib->ptr = ib_cmd;
 	ib->length_dw = ib_len;
 	/* This works for NO_HWS. TODO: need to handle without knowing VMID */
-	job->vm_id = vmid;
+	job->vmid = vmid;
 
 	ret = amdgpu_ib_schedule(ring, 1, ib, job, &f);
 	if (ret) {
