@@ -2443,6 +2443,7 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 				dm_state ? (dm_state->scaling != RMX_OFF) : false);
 	}
 
+	drm_mode_set_crtcinfo(&mode, 0);
 	fill_stream_properties_from_drm_display_mode(stream,
 			&mode, &aconnector->base);
 	update_stream_scaling_settings(&mode, dm_state, stream);
@@ -2451,6 +2452,8 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 		&stream->audio_info,
 		drm_connector,
 		aconnector->dc_sink);
+
+	update_stream_signal(stream);
 
 	return stream;
 }
@@ -2855,13 +2858,6 @@ int amdgpu_dm_connector_mode_valid(struct drm_connector *connector,
 		DRM_ERROR("Failed to create stream for sink!\n");
 		goto fail;
 	}
-
-	drm_mode_set_crtcinfo(mode, 0);
-	fill_stream_properties_from_drm_display_mode(stream, mode, connector);
-
-	stream->src.width = mode->hdisplay;
-	stream->src.height = mode->vdisplay;
-	stream->dst = stream->src;
 
 	dc_result = dc_validate_stream(adev->dm.dc, stream);
 
