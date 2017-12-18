@@ -1362,6 +1362,7 @@ static u64 get_vm_pd_gpu_offset(void *vm)
 	struct amdgpu_device *adev =
 		amdgpu_ttm_adev(avm->root.base.bo->tbo.bdev);
 	u64 offset;
+	uint64_t flags = AMDGPU_PTE_VALID;
 
 	BUG_ON(avm == NULL);
 
@@ -1375,7 +1376,7 @@ static u64 get_vm_pd_gpu_offset(void *vm)
 	 * to an actual MC address.
 	 */
 	if (adev->gart.gart_funcs->get_vm_pde)
-		offset = amdgpu_gart_get_vm_pde(adev, offset);
+		amdgpu_gart_get_vm_pde(adev, -1, &offset, &flags);
 
 	return offset;
 }
