@@ -70,6 +70,9 @@ static int snd_acp3x_probe(struct pci_dev *pci,
 		goto release_regions;
 	}
 
+	/* set pci bus-mastering */
+	pci_set_master(pci);
+
 	pci_set_drvdata(pci, adata);
 
 	val = rv_readl(adata->acp3x_base + mmACP_I2S_PIN_CONFIG);
