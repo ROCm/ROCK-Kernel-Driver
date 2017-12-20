@@ -359,15 +359,6 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 
 	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
 				 per_device_list) {
-		/* In case of HWS, by now pasid:vmid mapping has been invalid,
-		 * so flushing tlb using PACKET3_INVALID_TLBS packet will cause
-		 * CP hang. Moreover, flushing tlb is not needed here as it has
-		 * been done by HWS when pasid:vmid is dissociated.
-		 * In summary, flushing tlb is only needed for non-HWS case.
-		 */
-		if (pdd->dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
-			kfd_flush_tlb(pdd->dev, p->pasid);
-
 		/* Destroy the GPUVM VM context */
 		if (pdd->vm) {
 			dma_fence_put(p->ef);
