@@ -1739,7 +1739,8 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 	struct dma_fence *fence = NULL, *lfence = NULL;
 	uint64_t dst_va_addr;
 	uint64_t copied, total_copied = 0;
-	uint64_t src_offset, dst_offset;
+	uint64_t src_offset, dst_offset, dst_va_addr_end;
+	const char *cma_op;
 	int i, j = 0, err = 0;
 
 	/* Check parameters */
@@ -1810,10 +1811,12 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 	if (KFD_IS_CROSS_MEMORY_WRITE(args->flags)) {
 		src_p = local_p;
 		dst_p = remote_p;
+		cma_op = "WRITE";
 		pr_debug("CMA WRITE: local -> remote\n");
 	} else {
 		src_p = remote_p;
 		dst_p = local_p;
+		cma_op = "READ";
 		pr_debug("CMA READ: remote -> local\n");
 	}
 
@@ -1828,12 +1831,14 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 	 *                             data will be sourced or copied
 	 */
 	dst_va_addr = dst_array[0].va_addr;
+	dst_va_addr_end = dst_va_addr + dst_array[0].size - 1;
 	mutex_lock(&dst_p->mutex);
 	dst_bo = kfd_process_find_bo_from_interval(dst_p,
 			dst_va_addr,
-			dst_va_addr + dst_array[0].size - 1);
+			dst_va_addr_end);
 	mutex_unlock(&dst_p->mutex);
-	if (!dst_bo) {
+	if (!dst_bo || dst_va_addr_end > dst_bo->it.last) {
+		pr_err("CMA %s failed. Invalid dst range\n", cma_op);
 		err = -EFAULT;
 		goto kfd_process_fail;
 	}
@@ -1850,7 +1855,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 				src_va_addr_end);
 		mutex_unlock(&src_p->mutex);
 		if (!src_bo || src_va_addr_end > src_bo->it.last) {
-			pr_err("Cross mem copy failed. Invalid range\n");
+			pr_err("CMA %s failed. Invalid src range\n", cma_op);
 			err = -EFAULT;
 			break;
 		}
@@ -1876,7 +1881,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 
 			/* Check both BOs belong to same device */
 			if (src_bo->dev->kgd != dst_bo->dev->kgd) {
-				pr_err("Cross Memory failed. Not same device\n");
+				pr_err("CMA %s fail. Not same dev\n", cma_op);
 				err = -EINVAL;
 				break;
 			}
@@ -1895,7 +1900,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 				&fence, &copied);
 
 			if (err) {
-				pr_err("GPU Cross mem copy failed\n");
+				pr_err("GPU CMA %s failed\n", cma_op);
 				err = -EFAULT;
 				break;
 			}
@@ -1913,7 +1918,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 			dst_offset += copied;
 			src_offset += copied;
 			if (dst_va_addr > dst_bo->it.last + 1) {
-				pr_err("Cross mem copy failed. Memory overflow\n");
+				pr_err("CMA %s fail. Mem overflow\n", cma_op);
 				err = -EFAULT;
 				break;
 			}
@@ -1924,11 +1929,19 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 					break;
 
 				dst_va_addr = dst_array[j].va_addr;
+				dst_va_addr_end = dst_va_addr +
+						  dst_array[j].size - 1;
 				dst_bo = kfd_process_find_bo_from_interval(
 						dst_p,
 						dst_va_addr,
-						dst_va_addr +
-						dst_array[j].size - 1);
+						dst_va_addr_end);
+				if (!dst_bo ||
+				    dst_va_addr_end > dst_bo->it.last) {
+					pr_err("CMA %s failed. Invalid dst range\n",
+					       cma_op);
+					err = -EFAULT;
+					break;
+				}
 				dst_offset = dst_va_addr - dst_bo->it.start;
 			}
 
@@ -1944,7 +1957,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 	if (fence) {
 		if (dma_fence_wait_timeout(fence, false, msecs_to_jiffies(1000))
 			< 0)
-			pr_err("Cross mem copy failed. BO timed out\n");
+			pr_err("CMA %s failed. BO timed out\n", cma_op);
 		dma_fence_put(fence);
 	} else if (lfence) {
 		pr_debug("GPU copy fail. But wait for prev DMA to finish\n");
