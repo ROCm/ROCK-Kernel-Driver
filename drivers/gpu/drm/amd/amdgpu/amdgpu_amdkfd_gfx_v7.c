@@ -950,8 +950,8 @@ static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 			uint32_t page_table_base)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-	/* TODO: Don't use hardcoded VMIDs */
-	if (vmid < 8 || vmid > 15) {
+
+	if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid)) {
 		pr_err("trying to set page table base for wrong VMID\n");
 		return;
 	}

@@ -1192,8 +1192,7 @@ static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 	uint64_t base = (uint64_t)page_table_base << PAGE_SHIFT |
 		AMDGPU_PTE_VALID;
 
-	/* TODO: Don't use hardcoded VMIDs */
-	if (vmid < 8 || vmid > 15) {
+	if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid)) {
 		pr_err("trying to set page table base for wrong VMID %u\n",
 		       vmid);
 		return;

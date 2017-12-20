@@ -502,6 +502,7 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 
 	kfd->shared_resources = *gpu_resources;
 
+	/* Usually first_vmid_kfd = 8, last_vmid_kfd = 15 */
 	kfd->vm_info.first_vmid_kfd = ffs(gpu_resources->compute_vmid_bitmap)-1;
 	kfd->vm_info.last_vmid_kfd = fls(gpu_resources->compute_vmid_bitmap)-1;
 	kfd->vm_info.vmid_num_kfd = kfd->vm_info.last_vmid_kfd
