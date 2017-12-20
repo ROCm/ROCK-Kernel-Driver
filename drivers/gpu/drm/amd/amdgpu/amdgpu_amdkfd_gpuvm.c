@@ -2418,7 +2418,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 	struct amdgpu_device *adev = NULL;
 	struct amdgpu_copy_mem src, dst;
 	struct ww_acquire_ctx ticket;
-	struct list_head list;
+	struct list_head list, duplicates;
 	struct ttm_validate_buffer resv_list[2];
 	struct dma_fence *fence = NULL;
 	int i, r;
@@ -2431,6 +2431,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 
 	adev = get_amdgpu_device(kgd);
 	INIT_LIST_HEAD(&list);
+	INIT_LIST_HEAD(&duplicates);
 
 	src.bo = &src_mem->bo->tbo;
 	dst.bo = &dst_mem->bo->tbo;
@@ -2447,7 +2448,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 		list_add_tail(&resv_list[i].head, &list);
 	}
 
-	r = ttm_eu_reserve_buffers(&ticket, &list, false, NULL);
+	r = ttm_eu_reserve_buffers(&ticket, &list, false, &duplicates);
 	if (r) {
 		pr_err("Copy buffer failed. Unable to reserve bo (%d)\n", r);
 		return r;
