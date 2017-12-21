@@ -143,7 +143,6 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd, uint8_t vmid);
 static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 							uint8_t vmid);
-static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);
 static void set_num_of_requests(struct kgd_dev *dev, uint8_t num_of_req);
 static void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info);
 static int alloc_memory_of_scratch(struct kgd_dev *kgd,
@@ -181,7 +180,6 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.address_watch_get_offset = kgd_address_watch_get_offset,
 	.get_atc_vmid_pasid_mapping_pasid = get_atc_vmid_pasid_mapping_pasid,
 	.get_atc_vmid_pasid_mapping_valid = get_atc_vmid_pasid_mapping_valid,
-	.write_vmid_invalidate_request = write_vmid_invalidate_request,
 	.alloc_memory_of_gpu = alloc_memory_of_gpu,
 	.free_memory_of_gpu = free_memory_of_gpu,
 	.map_memory_to_gpu = map_memory_to_gpu,
@@ -1019,12 +1017,6 @@ static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 	struct radeon_device *rdev = (struct radeon_device *) kgd;
 	reg = RREG32(ATC_VMID0_PASID_MAPPING + vmid*4);
 	return reg & ATC_VMID_PASID_MAPPING_PASID_MASK;
-}
-
-static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
-{
-	struct radeon_device *rdev = (struct radeon_device *) kgd;
-	return WREG32(VM_INVALIDATE_REQUEST, 1 << vmid);
 }
 
 static int add_bo_to_vm(struct radeon_device *rdev, uint64_t va,
