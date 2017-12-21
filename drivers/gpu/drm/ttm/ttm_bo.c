@@ -597,7 +597,7 @@ static bool ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 			spin_lock(&glob->lru_lock);
 			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
 
-		} else if (reservation_object_trylock(bo->resv)) {
+		} else if (kcl_reservation_object_trylock(bo->resv)) {
 			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
 		}
 
@@ -1212,7 +1212,7 @@ int ttm_bo_init_reserved(struct ttm_bo_device *bdev,
 	 * since otherwise lockdep will be angered in radeon.
 	 */
 	if (!resv) {
-		locked = reservation_object_trylock(bo->resv);
+		locked = kcl_reservation_object_trylock(bo->resv);
 		WARN_ON(!locked);
 	}
 
