@@ -233,7 +233,7 @@ static void config_acp3x_dma(struct i2s_stream_instance *rtd, int direction)
 	if (direction == SNDRV_PCM_STREAM_PLAYBACK)
 		val = 0;
 	else
-		val = 32;
+		val = rtd->num_pages * 8;
 
 	/* Group Enable */
 	rv_writel(ACP_SRAM_PTE_OFFSET | BIT(31), rtd->acp3x_base +
