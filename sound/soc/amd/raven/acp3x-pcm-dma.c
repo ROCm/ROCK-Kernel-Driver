@@ -235,12 +235,6 @@ static void config_acp3x_dma(struct i2s_stream_instance *rtd, int direction)
 	else
 		val = rtd->num_pages * 8;
 
-	/* Group Enable */
-	rv_writel(ACP_SRAM_PTE_OFFSET | BIT(31), rtd->acp3x_base +
-					mmACPAXI2AXI_ATU_BASE_ADDR_GRP_1);
-	rv_writel(PAGE_SIZE_4K_ENABLE, rtd->acp3x_base +
-			mmACPAXI2AXI_ATU_PAGE_SIZE_GRP_1);
-
 	for (page_idx = 0; page_idx < rtd->num_pages; page_idx++) {
 		/* Load the low address of page int ACP SRAM through SRBM */
 		addr = page_to_phys(pg);
@@ -293,6 +287,7 @@ static void config_acp3x_dma(struct i2s_stream_instance *rtd, int direction)
 	/* Enable  watermark/period interrupt to host */
 	rv_writel(BIT(BT_TX_THRESHOLD) | BIT(BT_RX_THRESHOLD),
 			rtd->acp3x_base + mmACP_EXTERNAL_INTR_CNTL);
+	rv_writel(BIT(0), rtd->acp3x_base + mmACPAXI2AXI_ATU_CTRL);
 }
 
 static int acp3x_dma_open(struct snd_pcm_substream *substream)
@@ -654,6 +649,11 @@ static int acp3x_audio_probe(struct platform_device *pdev)
 	status = acp3x_init(adata->acp3x_base);
 	if (status)
 		return -ENODEV;
+	/* Group Enable */
+	rv_writel(ACP_SRAM_PTE_OFFSET | BIT(31), adata->acp3x_base +
+					mmACPAXI2AXI_ATU_BASE_ADDR_GRP_1);
+	rv_writel(PAGE_SIZE_4K_ENABLE, adata->acp3x_base +
+			mmACPAXI2AXI_ATU_PAGE_SIZE_GRP_1);
 
 	status = snd_soc_register_platform(&pdev->dev, &acp3x_asoc_platform);
 	if (status != 0) {
