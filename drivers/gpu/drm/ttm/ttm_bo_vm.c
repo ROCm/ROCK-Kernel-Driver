@@ -109,6 +109,17 @@ out_unlock:
 	return ret;
 }
 
+static unsigned long ttm_bo_io_mem_pfn(struct ttm_buffer_object *bo,
+				       unsigned long page_offset)
+{
+	struct ttm_bo_device *bdev = bo->bdev;
+
+	if (bdev->driver->io_mem_pfn)
+		return bdev->driver->io_mem_pfn(bo, page_offset);
+
+	return ttm_bo_default_io_mem_pfn(bo, page_offset);
+}
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
 static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 #else
@@ -271,7 +282,7 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 	 */
 	for (i = 0; i < TTM_BO_VM_NUM_PREFAULT; ++i) {
 		if (bo->mem.bus.is_iomem)
-			pfn = bdev->driver->io_mem_pfn(bo, page_offset);
+			pfn = ttm_bo_io_mem_pfn(bo, page_offset);
 		else {
 			page = ttm->pages[page_offset];
 			if (unlikely(!page && i == 0)) {
