@@ -958,7 +958,7 @@ static int gmc_v6_0_resume(void *handle)
 	if (r)
 		return r;
 
-	amdgpu_vmid_reset_all(adev);
+	amdgpu_vm_reset_all_ids(adev);
 
 	return 0;
 }
