@@ -248,7 +248,7 @@ static int gmc_v9_0_process_interrupt(struct amdgpu_device *adev,
 				struct amdgpu_irq_src *source,
 				struct amdgpu_iv_entry *entry)
 {
-	struct amdgpu_vmhub *hub = &adev->vmhub[entry->vmid_src];
+	struct amdgpu_vmhub *hub = &adev->vmhub[entry->vm_id_src];
 	uint32_t status = 0;
 	u64 addr;
 
@@ -262,9 +262,9 @@ static int gmc_v9_0_process_interrupt(struct amdgpu_device *adev,
 
 	if (printk_ratelimit()) {
 		dev_err(adev->dev,
-			"[%s] VMC page fault (src_id:%u ring:%u vmid:%u pas_id:%u)\n",
-			entry->vmid_src ? "mmhub" : "gfxhub",
-			entry->src_id, entry->ring_id, entry->vmid,
+			"[%s] VMC page fault (src_id:%u ring:%u vm_id:%u pas_id:%u)\n",
+			entry->vm_id_src ? "mmhub" : "gfxhub",
+			entry->src_id, entry->ring_id, entry->vm_id,
 			entry->pas_id);
 		dev_err(adev->dev, "  at page 0x%016llx from %d\n",
 			addr, entry->client_id);
@@ -288,13 +288,13 @@ static void gmc_v9_0_set_irq_funcs(struct amdgpu_device *adev)
 	adev->mc.vm_fault.funcs = &gmc_v9_0_irq_funcs;
 }
 
-static uint32_t gmc_v9_0_get_invalidate_req(unsigned int vmid)
+static uint32_t gmc_v9_0_get_invalidate_req(unsigned int vm_id)
 {
 	u32 req = 0;
 
-	/* invalidate using legacy mode on vmid*/
+	/* invalidate using legacy mode on vm_id*/
 	req = REG_SET_FIELD(req, VM_INVALIDATE_ENG0_REQ,
-			    PER_VMID_INVALIDATE_REQ, 1 << vmid);
+			    PER_VMID_INVALIDATE_REQ, 1 << vm_id);
 	req = REG_SET_FIELD(req, VM_INVALIDATE_ENG0_REQ, FLUSH_TYPE, 0);
 	req = REG_SET_FIELD(req, VM_INVALIDATE_ENG0_REQ, INVALIDATE_L2_PTES, 1);
 	req = REG_SET_FIELD(req, VM_INVALIDATE_ENG0_REQ, INVALIDATE_L2_PDE0, 1);

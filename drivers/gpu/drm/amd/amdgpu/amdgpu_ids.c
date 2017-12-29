@@ -154,7 +154,7 @@ static int amdgpu_vmid_grab_reserved_locked(struct amdgpu_vm *vm,
 		dma_fence_put(id->last_flush);
 		id->last_flush = NULL;
 	}
-	job->vmid = id - id_mgr->ids;
+	job->vm_id = id - id_mgr->ids;
 	trace_amdgpu_vm_grab_id(vm, ring, job);
 out:
 	return r;
@@ -305,7 +305,7 @@ needs_flush:
 no_flush_needed:
 	list_move_tail(&id->list, &id_mgr->ids_lru);
 
-	job->vmid = id - id_mgr->ids;
+	job->vm_id = id - id_mgr->ids;
 	trace_amdgpu_vm_grab_id(vm, ring, job);
 
 error:
@@ -364,7 +364,7 @@ void amdgpu_vmid_free_reserved(struct amdgpu_device *adev,
  * amdgpu_vmid_reset - reset VMID to zero
  *
  * @adev: amdgpu device structure
- * @vmid: vmid number to use
+ * @vm_id: vmid number to use
  *
  * Reset saved GDW, GWS and OA to force switch on next flush.
  */
