@@ -460,18 +460,22 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 	drm_kms_helper_hotplug_event(dev);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 static void dm_dp_mst_link_status_reset(struct drm_connector *connector)
 {
 	mutex_lock(&connector->dev->mode_config.mutex);
 	drm_mode_connector_set_link_status_property(connector, DRM_MODE_LINK_STATUS_BAD);
 	mutex_unlock(&connector->dev->mode_config.mutex);
 }
+#endif
 
 static void dm_dp_mst_register_connector(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = dev->dev_private;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 	drm_modeset_lock_all(dev);
@@ -487,8 +491,10 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 
 	drm_connector_register(connector);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 	if (aconnector->mst_connected)
 		dm_dp_mst_link_status_reset(connector);
+#endif
 }
 
 static const struct drm_dp_mst_topology_cbs dm_mst_cbs = {
