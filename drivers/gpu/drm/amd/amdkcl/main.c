@@ -27,6 +27,7 @@ void __exit amdkcl_exit(void)
 {
 	kcl_drm_global_release();
 }
+module_exit(amdkcl_exit);
 
 MODULE_AUTHOR("AMD linux driver team");
 MODULE_DESCRIPTION("Module for OS kernel compatible layer");
