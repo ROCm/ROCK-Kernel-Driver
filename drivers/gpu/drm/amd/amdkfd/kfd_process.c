@@ -136,8 +136,6 @@ static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 		goto sync_memory_failed;
 	}
 
-	kfd_flush_tlb(kdev, p->pasid);
-
 	/* Create an obj handle so kfd_process_device_remove_obj_handle
 	 * will take care of the bo removal when the process finishes.
 	 * We do not need to take p->mutex, because the process is just
