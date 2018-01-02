@@ -26,8 +26,9 @@
 #include <linux/types.h>
 #include <linux/mutex.h>
 #include <linux/list.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0) || defined(OS_NAME_RHEL_7_4)
 #include <linux/dma-fence.h>
-
+#endif
 #include "amdgpu_sync.h"
 
 /* maximum number of VMIDs */

@@ -23,7 +23,9 @@
 #include "amdgpu_ids.h"
 
 #include <linux/idr.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0) || defined(OS_NAME_RHEL_7_4)
 #include <linux/dma-fence-array.h>
+#endif
 #include <drm/drmP.h>
 
 #include "amdgpu.h"
@@ -431,7 +433,7 @@ void amdgpu_vmid_mgr_init(struct amdgpu_device *adev)
 	}
 
 	adev->vm_manager.fence_context =
-		dma_fence_context_alloc(AMDGPU_MAX_RINGS);
+		kcl_fence_context_alloc(AMDGPU_MAX_RINGS);
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i)
 		adev->vm_manager.seqno[i] = 0;
 }
