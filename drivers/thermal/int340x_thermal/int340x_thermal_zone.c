@@ -57,15 +57,16 @@ static int int340x_thermal_get_trip_temp(struct thermal_zone_device *zone,
 	if (d->override_ops && d->override_ops->get_trip_temp)
 		return d->override_ops->get_trip_temp(zone, trip, temp);
 
-	if (trip < d->aux_trip_nr)
+	if (trip < d->aux_trip_nr) {
+		osb();
 		*temp = d->aux_trips[trip];
-	else if (trip == d->crt_trip_id)
+	} else if (trip == d->crt_trip_id) {
 		*temp = d->crt_temp;
-	else if (trip == d->psv_trip_id)
+	} else if (trip == d->psv_trip_id) {
 		*temp = d->psv_temp;
-	else if (trip == d->hot_trip_id)
+	} else if (trip == d->hot_trip_id) {
 		*temp = d->hot_temp;
-	else {
+	} else {
 		for (i = 0; i < INT340X_THERMAL_MAX_ACT_TRIP_COUNT; i++) {
 			if (d->act_trips[i].valid &&
 			    d->act_trips[i].id == trip) {
