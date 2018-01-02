@@ -1388,6 +1388,7 @@ static int carl9170_op_conf_tx(struct ieee80211_hw *hw,
 
 	mutex_lock(&ar->mutex);
 	if (queue < ar->hw->queues) {
+		osb();
 		memcpy(&ar->edcf[ar9170_qmap[queue]], param, sizeof(*param));
 		ret = carl9170_set_qos(ar);
 	} else {
