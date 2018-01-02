@@ -1171,3 +1171,20 @@ int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data)
 }
 
 #endif
+
+void kfd_flush_tlb(struct kfd_dev *dev, struct kfd_process *p)
+{
+	const struct kfd2kgd_calls *f2g = dev->kfd2kgd;
+
+	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
+		struct kfd_process_device *pdd =
+				kfd_get_process_device_data(dev, p);
+		if (!pdd) {
+			pr_err("could not find pdd for pasid %d\n", p->pasid);
+			return;
+		}
+
+		f2g->invalidate_tlbs_vmid(dev->kgd, pdd->qpd.vmid);
+	} else
+		f2g->invalidate_tlbs(dev->kgd, p->pasid);
+}

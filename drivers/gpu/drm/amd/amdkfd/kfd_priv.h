@@ -559,6 +559,7 @@ struct qcm_process_device {
 	struct list_head priv_queue_list;
 
 	unsigned int queue_count;
+	/* a data field only meaningful for non-HWS case */
 	unsigned int vmid;
 	bool is_debug;
 	unsigned int evicted; /* eviction counter, 0=active */
@@ -1083,7 +1084,7 @@ int kfd_event_destroy(struct kfd_process *p, uint32_t event_id);
 void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 				struct kfd_vm_fault_info *info);
 
-void kfd_flush_tlb(struct kfd_dev *dev, uint32_t pasid);
+void kfd_flush_tlb(struct kfd_dev *dev, struct kfd_process *p);
 
 int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 

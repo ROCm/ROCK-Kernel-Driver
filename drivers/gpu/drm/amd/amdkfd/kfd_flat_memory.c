@@ -416,10 +416,3 @@ int kfd_init_apertures(struct kfd_process *process)
 
 	return 0;
 }
-
-void kfd_flush_tlb(struct kfd_dev *dev, uint32_t pasid)
-{
-	const struct kfd2kgd_calls *f2g = dev->kfd2kgd;
-
-	f2g->invalidate_tlbs(dev->kgd, pasid);
-}
