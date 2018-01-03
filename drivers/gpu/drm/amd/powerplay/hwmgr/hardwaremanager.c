@@ -228,7 +228,7 @@ int phm_register_thermal_interrupt(struct pp_hwmgr *hwmgr, const void *info)
 int phm_start_thermal_controller(struct pp_hwmgr *hwmgr)
 {
 	int ret = 0;
-	struct PP_TemperatureRange range = {{TEMP_RANGE_MIN, TEMP_RANGE_MAX}};
+	struct PP_TemperatureRange range = {TEMP_RANGE_MIN, TEMP_RANGE_MAX};
 
 	if (hwmgr->hwmgr_func->get_thermal_temperature_range)
 		hwmgr->hwmgr_func->get_thermal_temperature_range(
