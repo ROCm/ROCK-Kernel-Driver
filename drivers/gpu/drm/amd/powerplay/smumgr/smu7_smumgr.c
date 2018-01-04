@@ -648,7 +648,7 @@ int smu7_init(struct pp_hwmgr *hwmgr)
 
 int smu7_smu_fini(struct pp_hwmgr *hwmgr)
 {
-	struct smu7_smumgr smu_data = (struct smu7_smumgr *)(hwmgr->smu_backend);
+	struct smu7_smumgr *smu_data = (struct smu7_smumgr *)(hwmgr->smu_backend);
 
 	smu_free_memory(hwmgr->device, smu_data->header_buffer.handle);
 	if (!cgs_is_virtualization_enabled(hwmgr->device))
