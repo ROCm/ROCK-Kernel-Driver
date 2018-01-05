@@ -867,6 +867,7 @@ restart:
 	if (vm->use_cpu_for_update) {
 		/* Flush HDP */
 		mb();
+		amdgpu_asic_flush_hdp(adev);
 		amdgpu_gart_flush_gpu_tlb(adev, 0);
 	} else if (params.ib->length_dw == 0) {
 		amdgpu_job_free(job);
@@ -1490,6 +1491,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	if (vm->use_cpu_for_update) {
 		/* Flush HDP */
 		mb();
+		amdgpu_asic_flush_hdp(adev);
 		amdgpu_gart_flush_gpu_tlb(adev, 0);
 	}
 
