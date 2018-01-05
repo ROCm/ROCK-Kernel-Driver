@@ -376,9 +376,10 @@ static int amdgpu_amdkfd_validate(void *param, struct amdgpu_bo *bo)
 
 /* vm_validate_pt_pd_bos - Validate page table and directory BOs
  *
- * Also updates page directory entries so we don't need to do this
- * again later until the page directory is validated again (e.g. after
- * an eviction or allocating new page tables).
+ * Page directories are not updated here because huge page handling
+ * during page table updates can invalidate page directory entries
+ * again. Page directories are only updated after updating page
+ * tables.
  */
 static int vm_validate_pt_pd_bos(struct amdgpu_vm *vm)
 {
@@ -410,11 +411,37 @@ static int vm_validate_pt_pd_bos(struct amdgpu_vm *vm)
 		}
 	}
 
+	return 0;
+}
+
+static int sync_vm_fence(struct amdgpu_device *adev, struct amdgpu_sync *sync,
+			 struct dma_fence *f)
+{
+	int ret = amdgpu_sync_fence(adev, sync, f, false);
+
+	/* Sync objects can't handle multiple GPUs (contexts) updating
+	 * sync->last_vm_update. Fortunately we don't need it for
+	 * KFD's purposes, so we can just drop that fence.
+	 */
+	if (sync->last_vm_update) {
+		dma_fence_put(sync->last_vm_update);
+		sync->last_vm_update = NULL;
+	}
+
+	return ret;
+}
+
+static int vm_update_pds(struct amdgpu_vm *vm, struct amdgpu_sync *sync)
+{
+	struct amdgpu_bo *pd = vm->root.base.bo;
+	struct amdgpu_device *adev = amdgpu_ttm_adev(pd->tbo.bdev);
+	int ret;
+
 	ret = amdgpu_vm_update_directories(adev, vm);
-	if (ret != 0)
+	if (ret)
 		return ret;
 
-	return 0;
+	return sync_vm_fence(adev, sync, vm->last_update);
 }
 
 /* add_bo_to_vm - Add a BO to a VM
@@ -427,7 +454,7 @@ static int vm_validate_pt_pd_bos(struct amdgpu_vm *vm)
  * 2. Add BO to the VM
  * 3. Determine ASIC-specific PTE flags
  * 4. Alloc page tables and directories if needed
- * 4a.  Validate new page tables and directories and update directories
+ * 4a.  Validate new page tables and directories
  */
 static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
 		struct amdgpu_vm *avm, bool is_aql,
@@ -938,16 +965,7 @@ static int unmap_bo_from_gpuvm(struct amdgpu_device *adev,
 	/* Add the eviction fence back */
 	amdgpu_bo_fence(pd, &kvm->process_info->eviction_fence->base, true);
 
-	amdgpu_sync_fence(adev, sync, bo_va->last_pt_update, false);
-
-	/* Sync objects can't handle multiple GPUs (contexts) updating
-	 * sync->last_vm_update. Fortunately we don't need it for
-	 * KFD's purposes, so we can just drop that fence.
-	 */
-	if (sync->last_vm_update) {
-		dma_fence_put(sync->last_vm_update);
-		sync->last_vm_update = NULL;
-	}
+	sync_vm_fence(adev, sync, bo_va->last_pt_update);
 
 	return 0;
 }
@@ -972,18 +990,7 @@ static int update_gpuvm_pte(struct amdgpu_device *adev,
 		return ret;
 	}
 
-	amdgpu_sync_fence(adev, sync, bo_va->last_pt_update, false);
-
-	/* Sync objects can't handle multiple GPUs (contexts) updating
-	 * sync->last_vm_update. Fortunately we don't need it for
-	 * KFD's purposes, so we can just drop that fence.
-	 */
-	if (sync->last_vm_update) {
-		dma_fence_put(sync->last_vm_update);
-		sync->last_vm_update = NULL;
-	}
-
-	return 0;
+	return sync_vm_fence(adev, sync, bo_va->last_pt_update);
 }
 
 static int map_bo_to_gpuvm(struct amdgpu_device *adev,
@@ -1315,6 +1322,13 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 				pr_err("Failed to map radeon bo to gpuvm\n");
 				goto map_bo_to_gpuvm_failed;
 			}
+
+			ret = vm_update_pds(vm, ctx.sync);
+			if (ret) {
+				pr_err("Failed to update page directories\n");
+				goto map_bo_to_gpuvm_failed;
+			}
+
 			entry->is_mapped = true;
 			mem->mapped_to_gpu_memory++;
 			pr_debug("\t INC mapping count %d\n",
@@ -1913,6 +1927,22 @@ static int process_validate_vms(struct amdkfd_process_info *process_info)
 	return 0;
 }
 
+static int process_update_pds(struct amdkfd_process_info *process_info,
+			      struct amdgpu_sync *sync)
+{
+	struct amdkfd_vm *peer_vm;
+	int ret;
+
+	list_for_each_entry(peer_vm, &process_info->vm_list_head,
+			    vm_list_node) {
+		ret = vm_update_pds(&peer_vm->base, sync);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 /* Evict a userptr BO by stopping the queues if necessary
  *
  * Runs in MMU notifier, may be in RECLAIM_FS context. This means it
@@ -2164,6 +2194,10 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 			}
 		}
 	}
+
+	/* Update page directories */
+	ret = process_update_pds(process_info, &sync);
+
 unreserve_out:
 	list_for_each_entry(peer_vm, &process_info->vm_list_head,
 			    vm_list_node)
@@ -2355,6 +2389,13 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info, struct dma_fence **ef)
 				goto validate_map_fail;
 			}
 		}
+	}
+
+	/* Update page directories */
+	ret = process_update_pds(process_info, ctx.sync);
+	if (ret) {
+		pr_debug("Memory eviction: update PDs failed. Try again\n");
+		goto validate_map_fail;
 	}
 
 	amdgpu_sync_wait(ctx.sync, false);
