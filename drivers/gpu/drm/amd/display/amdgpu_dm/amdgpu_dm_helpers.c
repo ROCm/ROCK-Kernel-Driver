@@ -233,8 +233,12 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 
 		pbn = drm_dp_calc_pbn_mode(clock, bpp);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 		slots = drm_dp_find_vcpi_slots(mst_mgr, pbn);
 		ret = drm_dp_mst_allocate_vcpi(mst_mgr, mst_port, pbn, slots);
+#else
+		ret = drm_dp_mst_allocate_vcpi(mst_mgr, mst_port, pbn, &slots);
+#endif
 
 		if (!ret)
 			return false;
