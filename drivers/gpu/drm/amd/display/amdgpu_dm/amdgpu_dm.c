@@ -5500,6 +5500,11 @@ void amdgpu_dm_add_sink_to_freesync_module(struct drm_connector *connector,
 			dm_con_state->freesync_capable = true;
 		}
 	}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	drm_object_property_set_value(&connector->base,
+				      adev->mode_info.freesync_capable_property,
+				      dm_con_state->freesync_capable);
+#endif
 }
 
 void amdgpu_dm_remove_sink_from_freesync_module(struct drm_connector *connector)
@@ -5533,4 +5538,10 @@ void amdgpu_dm_remove_sink_from_freesync_module(struct drm_connector *connector)
 	dm_con_state->user_enable.enable_for_gaming = false;
 	dm_con_state->user_enable.enable_for_static = false;
 	dm_con_state->user_enable.enable_for_video = false;
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	drm_object_property_set_value(&connector->base,
+				      adev->mode_info.freesync_capable_property,
+				      dm_con_state->freesync_capable);
+#endif
 }
