@@ -1546,9 +1546,14 @@ static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 	uint8_t i;
 
 	struct amdgpu_device *adev = dev->dev_private;
+	struct drm_amdgpu_freesync *args = data;
 	int r = 0;
 
-	/* Get freesync enable flag from DRM */
+	freesync_params.state  = FREESYNC_STATE_FULLSCREEN;
+	if (args->op == AMDGPU_FREESYNC_FULLSCREEN_ENTER)
+		freesync_params.enable = true;
+	else
+		freesync_params.enable = false;
 
 	num_streams = dc_get_current_stream_count(adev->dm.dc);
 
@@ -2547,6 +2552,23 @@ amdgpu_dm_connector_detect(struct drm_connector *connector, bool force)
 			connector_status_disconnected);
 }
 
+/* Compare user free sync property with immunable property free sync capable
+ * and if display is not free sync capable sets free sync property to 0
+ */
+static int
+amdgpu_freesync_update_property_atomic(struct drm_connector *connector,
+				       uint64_t val_capable)
+{
+	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = dev->dev_private;
+
+	return drm_object_property_set_value(&connector->base,
+					     adev->mode_info.freesync_property,
+					     val_capable);
+
+
+}
+
 int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
 					    struct drm_connector_state *connector_state,
 					    struct drm_property *property,
@@ -2594,6 +2616,14 @@ int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
 	} else if (property == adev->mode_info.underscan_property) {
 		dm_new_state->underscan_enable = val;
 		ret = 0;
+	} else if (property == adev->mode_info.freesync_property) {
+		dm_new_state->user_enable.enable_for_gaming = val;
+		dm_new_state->user_enable.enable_for_static = val;
+		dm_new_state->user_enable.enable_for_video = val;
+		ret = 0;
+	} else if (property == adev->mode_info.freesync_capable_property) {
+		ret = -EINVAL;
+		return ret;
 	}
 
 	return ret;
@@ -2609,6 +2639,7 @@ int amdgpu_dm_connector_atomic_get_property(struct drm_connector *connector,
 	struct dm_connector_state *dm_state =
 		to_dm_connector_state(state);
 	int ret = -EINVAL;
+	int i;
 
 	if (property == dev->mode_config.scaling_mode_property) {
 		switch (dm_state->scaling) {
@@ -2636,6 +2667,14 @@ int amdgpu_dm_connector_atomic_get_property(struct drm_connector *connector,
 	} else if (property == adev->mode_info.underscan_property) {
 		*val = dm_state->underscan_enable;
 		ret = 0;
+	} else if ((property == adev->mode_info.freesync_property) ||
+		   (property == adev->mode_info.freesync_capable_property)) {
+		for (i = 0; i < connector->base.properties->count; i++) {
+			if (connector->base.properties->properties[i] == property) {
+				*val = connector->base.properties->values[i];
+				ret = 0;
+			}
+		}
 	}
 	return ret;
 }
@@ -3459,6 +3498,14 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 				adev->mode_info.underscan_vborder_property,
 				0);
 
+	if (connector_type == DRM_MODE_CONNECTOR_HDMIA ||
+	    connector_type == DRM_MODE_CONNECTOR_DisplayPort) {
+		drm_object_attach_property(&aconnector->base.base,
+					  adev->mode_info.freesync_property, 0);
+		drm_object_attach_property(&aconnector->base.base,
+				      adev->mode_info.freesync_capable_property,
+					   0);
+	}
 }
 
 static int amdgpu_dm_i2c_xfer(struct i2c_adapter *i2c_adap,
@@ -4994,19 +5041,35 @@ void amdgpu_dm_add_sink_to_freesync_module(struct drm_connector *connector,
 				val_capable = 1;
 		}
 	}
-
-	/*
-	 * TODO figure out how to notify user-mode or DRM of freesync caps
-	 * once we figure out how to deal with freesync in an upstreamable
-	 * fashion
-	 */
+	drm_object_property_set_value(&connector->base,
+				      adev->mode_info.freesync_capable_property,
+				      val_capable);
+	amdgpu_freesync_update_property_atomic(connector, val_capable);
 
 }
 
 void amdgpu_dm_remove_sink_from_freesync_module(struct drm_connector *connector)
 {
-	/*
-	 * TODO fill in once we figure out how to deal with freesync in
-	 * an upstreamable fashion
-	 */
+	struct amdgpu_dm_connector *amdgpu_dm_connector =
+			to_amdgpu_dm_connector(connector);
+
+	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = dev->dev_private;
+
+	if (!amdgpu_dm_connector->dc_sink || !adev->dm.freesync_module) {
+		DRM_ERROR("dc_sink NULL or no free_sync module.\n");
+		return;
+	}
+
+	amdgpu_dm_connector->min_vfreq = 0;
+	amdgpu_dm_connector->max_vfreq = 0;
+	amdgpu_dm_connector->pixel_clock_mhz = 0;
+
+	memset(&amdgpu_dm_connector->caps, 0, sizeof(amdgpu_dm_connector->caps));
+
+	drm_object_property_set_value(&connector->base,
+				      adev->mode_info.freesync_capable_property,
+				      0);
+	amdgpu_freesync_update_property_atomic(connector, 0);
+
 }

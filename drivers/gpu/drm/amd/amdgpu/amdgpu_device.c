@@ -2241,6 +2241,7 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 		DRM_ERROR("amdgpu_device_ip_resume failed (%d).\n", r);
 		goto unlock;
 	}
+
 	amdgpu_fence_driver_resume(adev);
 
 	if (resume) {
