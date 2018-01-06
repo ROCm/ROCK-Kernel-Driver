@@ -250,6 +250,12 @@ if (!EMU_RUN_HACK)
     s_cbranch_scc0  L_NO_MEM_VIOL
 
 L_HALT_WAVE:
+    // If STATUS.HALT is set then this fault must come from SQC instruction fetch.
+    // We cannot prevent further faults so just terminate the wavefront.
+    s_and_b32       ttmp8, s_save_status, SQ_WAVE_STATUS_HALT_MASK
+    s_cbranch_scc0  L_NOT_ALREADY_HALTED
+    s_endpgm
+L_NOT_ALREADY_HALTED:
     s_or_b32        s_save_status, s_save_status, SQ_WAVE_STATUS_HALT_MASK
     s_branch        L_EXCP_CASE
 
@@ -1139,13 +1145,15 @@ end
 #endif
 
 static const uint32_t cwsr_trap_gfx9_hex[] = {
-	0xbf820001, 0xbf820124,
+	0xbf820001, 0xbf820128,
 	0xb8f0f802, 0x89708670,
 	0xb8f1f803, 0x8674ff71,
-	0x00000400, 0xbf85001d,
+	0x00000400, 0xbf850021,
 	0x8674ff71, 0x00000800,
 	0xbf850003, 0x8674ff71,
-	0x00000100, 0xbf840003,
+	0x00000100, 0xbf840007,
+	0x8674ff70, 0x00002000,
+	0xbf840001, 0xbf810000,
 	0x8770ff70, 0x00002000,
 	0xbf820010, 0xb8faf812,
 	0xb8fbf813, 0x8efa887a,
