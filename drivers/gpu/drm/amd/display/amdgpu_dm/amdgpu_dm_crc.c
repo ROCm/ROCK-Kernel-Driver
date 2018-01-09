@@ -46,6 +46,7 @@ static enum amdgpu_dm_pipe_crc_source dm_parse_crc_source(const char *source)
 	return AMDGPU_DM_PIPE_CRC_SOURCE_INVALID;
 }
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 			   size_t *values_cnt)
 {
@@ -126,7 +127,13 @@ void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc)
 	if (!dc_stream_get_crc(stream_state->ctx->dc, stream_state,
 			       &crcs[0], &crcs[1], &crcs[2]))
 		return;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0) || \
+	defined(OS_NAME_SUSE_15)
 	drm_crtc_add_crc_entry(crtc, true,
 			       drm_crtc_accurate_vblank_count(crtc), crcs);
+#else
+	drm_crtc_add_crc_entry(crtc, true,
+			       drm_accurate_vblank_count(crtc), crcs);
+#endif
 }
+#endif
