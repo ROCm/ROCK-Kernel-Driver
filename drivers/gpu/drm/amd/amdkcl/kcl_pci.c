@@ -1,23 +1,19 @@
 #include <kcl/kcl_pci.h>
 
 #if defined(BUILD_AS_DKMS)
-#define PCI_EXP_DEVCAP2_ATOMIC_ROUTE	0x00000040 /* Atomic Op routing */
-#define PCI_EXP_DEVCAP2_ATOMIC_COMP32	0x00000080 /* 32b AtomicOp completion */
-#define PCI_EXP_DEVCAP2_ATOMIC_COMP64	0x00000100 /* Atomic 64-bit compare */
-#define PCI_EXP_DEVCAP2_ATOMIC_COMP128	0x00000200 /* 128b AtomicOp completion*/
-#define PCI_EXP_DEVCTL2_ATOMIC_REQ	0x0040	/* Set Atomic requests */
-#define PCI_EXP_DEVCTL2_ATOMIC_BLOCK	0x0040	/* Block AtomicOp on egress */
 
 /**
  * pci_enable_atomic_ops_to_root - enable AtomicOp requests to root port
  * @dev: the PCI device
+ * @comp_caps: Caps required for atomic request completion
  *
- * Return 0 if the device is capable of generating AtomicOp requests,
- * all upstream bridges support AtomicOp routing, egress blocking is disabled
- * on all upstream ports, and the root port supports 32-bit, 64-bit and/or
- * 128-bit AtomicOp completion, or negative otherwise.
+ * Return 0 if all upstream bridges support AtomicOp routing, egress
+ * blocking is disabled on all upstream ports, and the root port
+ * supports the requested completion capabilities (32-bit, 64-bit
+ * and/or 128-bit AtomicOp completion), or negative otherwise.
+ *
  */
-int pci_enable_atomic_ops_to_root(struct pci_dev *dev)
+int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps)
 {
 	struct pci_bus *bus = dev->bus;
 
@@ -60,18 +56,16 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev)
 		 * capabilities.
 		 */
 		case PCI_EXP_TYPE_ROOT_PORT:
-			if (!(cap & (PCI_EXP_DEVCAP2_ATOMIC_COMP32 |
-				     PCI_EXP_DEVCAP2_ATOMIC_COMP64 |
-				     PCI_EXP_DEVCAP2_ATOMIC_COMP128)))
-				return -EINVAL;
+			if ((cap & comp_caps) != comp_caps)
+                return -EINVAL;
 			break;
 		}
 
 		/*
 		 * Upstream ports may block AtomicOps on egress.
 		 */
-		if (pci_pcie_type(bridge) == PCI_EXP_TYPE_UPSTREAM) {
-			u32 ctl2;
+		if (!bridge->has_secondary_link)
+            u32 ctl2;
 
 			pcie_capability_read_dword(bridge, PCI_EXP_DEVCTL2,
 						   &ctl2);

@@ -359,8 +359,12 @@ struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 
 	if (device_info->needs_pci_atomics) {
 		/* Allow BIF to recode atomics to PCIe 3.0 AtomicOps.
+		 * 32 and 64-bit requests are possible and must be
+		 * supported.
 		 */
-		if (pci_enable_atomic_ops_to_root(pdev) < 0) {
+		if (pci_enable_atomic_ops_to_root(pdev,
+				PCI_EXP_DEVCAP2_ATOMIC_COMP32 |
+				PCI_EXP_DEVCAP2_ATOMIC_COMP64) < 0) {
 			dev_info(kfd_device,
 				"skipped device %x:%x, PCI rejects atomics",
 				 pdev->vendor, pdev->device);
