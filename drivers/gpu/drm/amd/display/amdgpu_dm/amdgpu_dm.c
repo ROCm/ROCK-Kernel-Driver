@@ -2802,7 +2802,9 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 #endif
 	.atomic_duplicate_state = dm_crtc_duplicate_state,
 	.atomic_destroy_state = dm_crtc_destroy_state,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) || defined(OS_NAME_RHEL_7_4)
 	.set_crc_source = amdgpu_dm_crtc_set_crc_source,
+#endif
 };
 
 static enum drm_connector_status
