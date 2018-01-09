@@ -81,6 +81,8 @@ do {									\
 
 #endif
 
+#define osb() alternative("", "lfence", X86_FEATURE_LFENCE_RDTSC)
+
 /* Atomic operations are already serializing on x86 */
 #define __smp_mb__before_atomic()	barrier()
 #define __smp_mb__after_atomic()	barrier()
