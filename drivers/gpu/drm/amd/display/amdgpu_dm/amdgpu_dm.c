@@ -3964,6 +3964,7 @@ static inline int dm_set_vblank(struct drm_crtc *crtc, bool enable)
 	return dc_interrupt_set(adev->dm.dc, irq_source, enable) ? 0 : -EBUSY;
 }
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 static int dm_enable_vblank(struct drm_crtc *crtc)
 {
 	return dm_set_vblank(crtc, true);
@@ -3973,6 +3974,7 @@ static void dm_disable_vblank(struct drm_crtc *crtc)
 {
 	dm_set_vblank(crtc, false);
 }
+#endif
 
 /* Implemented only the options currently availible for the driver */
 static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
@@ -3987,11 +3989,15 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 #endif
 	.atomic_duplicate_state = dm_crtc_duplicate_state,
 	.atomic_destroy_state = dm_crtc_destroy_state,
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 	.set_crc_source = amdgpu_dm_crtc_set_crc_source,
+#endif
 	.verify_crc_source = amdgpu_dm_crtc_verify_crc_source,
 	.get_crc_sources = amdgpu_dm_crtc_get_crc_sources,
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 	.enable_vblank = dm_enable_vblank,
 	.disable_vblank = dm_disable_vblank,
+#endif
 };
 
 static enum drm_connector_status

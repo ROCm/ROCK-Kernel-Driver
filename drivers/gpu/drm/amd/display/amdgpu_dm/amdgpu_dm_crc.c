@@ -133,6 +133,7 @@ unlock:
 	return ret;
 }
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name)
 {
 	enum amdgpu_dm_pipe_crc_source source = dm_parse_crc_source(src_name);
@@ -268,6 +269,7 @@ cleanup:
 
 	return ret;
 }
+#endif
 
 /**
  * amdgpu_dm_crtc_handle_crc_irq: Report to DRM the CRC on given CRTC.
@@ -308,7 +310,13 @@ void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc)
 				       &crcs[0], &crcs[1], &crcs[2]))
 			return;
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0) || \
+	defined(OS_NAME_SUSE_15)
 		drm_crtc_add_crc_entry(crtc, true,
 				       drm_crtc_accurate_vblank_count(crtc), crcs);
+#else
+		drm_crtc_add_crc_entry(crtc, true,
+			       drm_accurate_vblank_count(crtc), crcs);
+#endif
 	}
 }
