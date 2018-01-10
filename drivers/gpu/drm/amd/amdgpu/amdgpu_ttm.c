@@ -727,7 +727,8 @@ static unsigned long amdgpu_ttm_io_mem_pfn(struct ttm_buffer_object *bo,
 			(offset >> PAGE_SHIFT);
 	}
 
-	return ttm_bo_default_io_mem_pfn(bo, page_offset);
+	return ((bo->mem.bus.base + bo->mem.bus.offset) >> PAGE_SHIFT)
+            + page_offset;
 }
 
 /*
