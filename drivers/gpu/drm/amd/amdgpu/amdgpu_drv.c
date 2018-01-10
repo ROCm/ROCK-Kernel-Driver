@@ -101,7 +101,7 @@ int amdgpu_vm_block_size = -1;
 int amdgpu_vm_fault_stop = 0;
 int amdgpu_vm_debug = 0;
 int amdgpu_vram_page_split = 512;
-int amdgpu_vm_update_mode = -1;
+int amdgpu_vm_update_mode;
 int amdgpu_exp_hw_support = 0;
 int amdgpu_dc = -1;
 int amdgpu_sched_jobs = 32;
@@ -201,7 +201,7 @@ module_param_named(vm_fault_stop, amdgpu_vm_fault_stop, int, 0444);
 MODULE_PARM_DESC(vm_debug, "Debug VM handling (0 = disabled (default), 1 = enabled)");
 module_param_named(vm_debug, amdgpu_vm_debug, int, 0644);
 
-MODULE_PARM_DESC(vm_update_mode, "VM update using CPU (0 = never (default except for large BAR(LB)), 1 = Graphics only, 2 = Compute only (default for LB), 3 = Both");
+MODULE_PARM_DESC(vm_update_mode, "VM update using CPU (0 = never (default), 1 = Graphics only, 2 = Compute only, 3 = Both, -1 = Compute only for Large Bar");
 module_param_named(vm_update_mode, amdgpu_vm_update_mode, int, 0444);
 
 MODULE_PARM_DESC(vram_page_split, "Number of pages after we split VRAM allocations (default 512, -1 = disable)");
