@@ -304,18 +304,25 @@ static void __ttm_dma_free_page(struct dma_pool *pool, struct dma_page *d_page)
 static struct dma_page *__ttm_dma_alloc_page(struct dma_pool *pool)
 {
 	struct dma_page *d_page;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 	unsigned long attrs = 0;
+#endif
 	void *vaddr;
 
 	d_page = kmalloc(sizeof(struct dma_page), GFP_KERNEL);
 	if (!d_page)
 		return NULL;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 	if (pool->type & IS_HUGE)
 		attrs = DMA_ATTR_NO_WARN;
 
 	vaddr = dma_alloc_attrs(pool->dev, pool->size, &d_page->dma,
 				pool->gfp_flags, attrs);
+#else
+	vaddr = dma_alloc_coherent(pool->dev, pool->size, &d_page->dma,
+				pool->gfp_flags);
+#endif
 	if (vaddr) {
 		if (is_vmalloc_addr(vaddr))
 			d_page->p = vmalloc_to_page(vaddr);
