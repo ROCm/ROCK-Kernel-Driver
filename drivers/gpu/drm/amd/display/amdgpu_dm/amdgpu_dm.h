@@ -277,8 +277,9 @@ void dm_restore_drm_connector_state(struct drm_device *dev,
 void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 					struct edid *edid);
 
+
 /* amdgpu_dm_crc.c */
-#ifdef CONFIG_DEBUG_FS
+#if defined(CONFIG_DEBUG_FS) && (DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0))
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 				  size_t *values_cnt);
 void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc);
