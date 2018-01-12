@@ -268,7 +268,7 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc);
 #else
 #define amdgpu_dm_crtc_set_crc_source NULL
-static inline void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc) {}
+#define amdgpu_dm_crtc_handle_crc_irq(x)
 #endif
 
 extern const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs;
