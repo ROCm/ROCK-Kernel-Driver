@@ -919,7 +919,7 @@ static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
 	uint32_t req = (1 << vmid) |
-		(1 << VM_INVALIDATE_ENG16_REQ__FLUSH_TYPE__SHIFT) | /* light */
+		(0 << VM_INVALIDATE_ENG16_REQ__FLUSH_TYPE__SHIFT) | /* legacy */
 		VM_INVALIDATE_ENG16_REQ__INVALIDATE_L2_PTES_MASK |
 		VM_INVALIDATE_ENG16_REQ__INVALIDATE_L2_PDE0_MASK |
 		VM_INVALIDATE_ENG16_REQ__INVALIDATE_L2_PDE1_MASK |
@@ -928,7 +928,13 @@ static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
 
 	spin_lock(&adev->tlb_invalidation_lock);
 
-	/* Use light weight invalidation.
+	/* Use legacy mode tlb invalidation.
+	 *
+	 * Currently on Raven the code below is broken for anything but
+	 * legacy mode due to a MMHUB power gating problem. A workaround
+	 * is for MMHUB to wait until the condition PER_VMID_INVALIDATE_REQ
+	 * == PER_VMID_INVALIDATE_ACK instead of simply waiting for the ack
+	 * bit.
 	 *
 	 * TODO 1: agree on the right set of invalidation registers for
 	 * KFD use. Use the last one for now. Invalidate both GC and
@@ -980,7 +986,7 @@ static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
 			PACKET3_INVALIDATE_TLBS_DST_SEL(1) |
 			PACKET3_INVALIDATE_TLBS_ALL_HUB(1) |
 			PACKET3_INVALIDATE_TLBS_PASID(pasid) |
-			PACKET3_INVALIDATE_TLBS_FLUSH_TYPE(2));
+			PACKET3_INVALIDATE_TLBS_FLUSH_TYPE(0)); /* legacy */
 	amdgpu_fence_emit(ring, &f);
 	amdgpu_ring_commit(ring);
 	mutex_unlock(&adev->gfx.kiq.ring_mutex);
