@@ -98,6 +98,12 @@ void amdgpu_amdkfd_device_probe(struct amdgpu_device *adev)
 		break;
 	case CHIP_VEGA10:
 	case CHIP_RAVEN:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0)
+		if (adev->asic_type == CHIP_RAVEN) {
+			dev_dbg(adev->dev, "DKMS installed kfd does not support Raven for kernel < 4.16\n");
+			return;
+		}
+#endif
 		kfd2kgd = amdgpu_amdkfd_gfx_9_0_get_functions();
 		break;
 	default:
