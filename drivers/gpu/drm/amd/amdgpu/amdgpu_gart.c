@@ -243,14 +243,14 @@ int amdgpu_gart_unbind(struct amdgpu_device *adev, uint64_t offset,
 			continue;
 
 		for (j = 0; j < (PAGE_SIZE / AMDGPU_GPU_PAGE_SIZE); j++, t++) {
-			amdgpu_gart_set_pte_pde(adev, adev->gart.ptr,
-						t, page_base, flags);
+			amdgpu_gmc_set_pte_pde(adev, adev->gart.ptr,
+					       t, page_base, flags);
 			page_base += AMDGPU_GPU_PAGE_SIZE;
 		}
 	}
 	mb();
 	amdgpu_asic_flush_hdp(adev);
-	amdgpu_gart_flush_gpu_tlb(adev, 0);
+	amdgpu_gmc_flush_gpu_tlb(adev, 0);
 	return 0;
 }
 
@@ -282,7 +282,7 @@ int amdgpu_gart_map(struct amdgpu_device *adev, uint64_t offset,
 	for (i = 0; i < pages; i++) {
 		page_base = dma_addr[i];
 		for (j = 0; j < (PAGE_SIZE / AMDGPU_GPU_PAGE_SIZE); j++, t++) {
-			amdgpu_gart_set_pte_pde(adev, dst, t, page_base, flags);
+			amdgpu_gmc_set_pte_pde(adev, dst, t, page_base, flags);
 			page_base += AMDGPU_GPU_PAGE_SIZE;
 		}
 	}
@@ -333,7 +333,7 @@ int amdgpu_gart_bind(struct amdgpu_device *adev, uint64_t offset,
 
 	mb();
 	amdgpu_asic_flush_hdp(adev);
-	amdgpu_gart_flush_gpu_tlb(adev, 0);
+	amdgpu_gmc_flush_gpu_tlb(adev, 0);
 	return 0;
 }
 
@@ -361,8 +361,8 @@ int amdgpu_gart_init(struct amdgpu_device *adev)
 	if (r)
 		return r;
 	/* Compute table size */
-	adev->gart.num_cpu_pages = adev->mc.gart_size / PAGE_SIZE;
-	adev->gart.num_gpu_pages = adev->mc.gart_size / AMDGPU_GPU_PAGE_SIZE;
+	adev->gart.num_cpu_pages = adev->gmc.gart_size / PAGE_SIZE;
+	adev->gart.num_gpu_pages = adev->gmc.gart_size / AMDGPU_GPU_PAGE_SIZE;
 	DRM_INFO("GART: num cpu pages %u, num gpu pages %u\n",
 		 adev->gart.num_cpu_pages, adev->gart.num_gpu_pages);
 

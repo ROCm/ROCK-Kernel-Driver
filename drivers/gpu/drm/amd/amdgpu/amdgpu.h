@@ -67,6 +67,7 @@
 #include "amdgpu_uvd.h"
 #include "amdgpu_vce.h"
 #include "amdgpu_vcn.h"
+#include "amdgpu_gmc.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_mn.h"
 #include "amdgpu_virt.h"
@@ -334,28 +335,6 @@ struct amdgpu_vm_pte_funcs {
 			    uint32_t incr, uint64_t flags);
 };
 
-/* provided by the gmc block */
-struct amdgpu_gart_funcs {
-	/* flush the vm tlb via mmio */
-	void (*flush_gpu_tlb)(struct amdgpu_device *adev,
-			      uint32_t vmid);
-	/* write pte/pde updates using the cpu */
-	int (*set_pte_pde)(struct amdgpu_device *adev,
-			   void *cpu_pt_addr, /* cpu addr of page table */
-			   uint32_t gpu_page_idx, /* pte/pde to update */
-			   uint64_t addr, /* addr to write into pte/pde */
-			   uint64_t flags); /* access flags */
-	/* enable/disable PRT support */
-	void (*set_prt)(struct amdgpu_device *adev, bool enable);
-	/* set pte flags based per asic */
-	uint64_t (*get_vm_pte_flags)(struct amdgpu_device *adev,
-				     uint32_t flags);
-	/* get the pde for a given mc addr */
-	void (*get_vm_pde)(struct amdgpu_device *adev, int level,
-			   u64 *dst, u64 *flags);
-	uint32_t (*get_invalidate_req)(unsigned int vmid);
-};
-
 /* provided by the ih block */
 struct amdgpu_ih_funcs {
 	/* ring read/write ptr handling, called from interrupt context */
@@ -509,58 +488,6 @@ int amdgpu_mode_dumb_mmap(struct drm_file *filp,
 			  uint32_t handle, uint64_t *offset_p);
 int amdgpu_fence_slab_init(void);
 void amdgpu_fence_slab_fini(void);
-
-/*
- * VMHUB structures, functions & helpers
- */
-struct amdgpu_vmhub {
-	uint32_t	ctx0_ptb_addr_lo32;
-	uint32_t	ctx0_ptb_addr_hi32;
-	uint32_t	vm_inv_eng0_req;
-	uint32_t	vm_inv_eng0_ack;
-	uint32_t	vm_context0_cntl;
-	uint32_t	vm_l2_pro_fault_status;
-	uint32_t	vm_l2_pro_fault_cntl;
-};
-
-/*
- * GPU MC structures, functions & helpers
- */
-struct amdgpu_mc {
-	resource_size_t		aper_size;
-	resource_size_t		aper_base;
-	/* for some chips with <= 32MB we need to lie
-	 * about vram size near mc fb location */
-	u64			mc_vram_size;
-	u64			visible_vram_size;
-	u64			gart_size;
-	u64			gart_start;
-	u64			gart_end;
-	u64			vram_start;
-	u64			vram_end;
-	unsigned		vram_width;
-	u64			real_vram_size;
-	int			vram_mtrr;
-	u64                     mc_mask;
-	const struct firmware   *fw;	/* MC firmware */
-	uint32_t                fw_version;
-	struct amdgpu_irq_src	vm_fault;
-	uint32_t		vram_type;
-	uint32_t                srbm_soft_reset;
-	bool			prt_warning;
-	uint64_t		stolen_size;
-	/* apertures */
-	u64					shared_aperture_start;
-	u64					shared_aperture_end;
-	u64					private_aperture_start;
-	u64					private_aperture_end;
-	/* protects concurrent invalidation */
-	spinlock_t		invalidate_lock;
-	bool			translate_further;
-
-	struct kfd_vm_fault_info *vm_fault_info;
-	atomic_t		vm_fault_info_updated;
-};
 
 /*
  * GPU doorbell structures, functions & helpers
@@ -1655,7 +1582,7 @@ struct amdgpu_device {
 	struct amdgpu_clock            clock;
 
 	/* MC */
-	struct amdgpu_mc		mc;
+	struct amdgpu_gmc		gmc;
 	struct amdgpu_gart		gart;
 	struct amdgpu_dummy_page	dummy_page;
 	struct amdgpu_vm_manager	vm_manager;
@@ -1924,13 +1851,13 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 #define amdgpu_asic_get_config_memsize(adev) (adev)->asic_funcs->get_config_memsize((adev))
 #define amdgpu_asic_flush_hdp(adev) (adev)->asic_funcs->flush_hdp((adev))
 #define amdgpu_asic_invalidate_hdp(adev) (adev)->asic_funcs->invalidate_hdp((adev))
-#define amdgpu_gart_flush_gpu_tlb(adev, vmid) (adev)->gart.gart_funcs->flush_gpu_tlb((adev), (vmid))
-#define amdgpu_gart_set_pte_pde(adev, pt, idx, addr, flags) (adev)->gart.gart_funcs->set_pte_pde((adev), (pt), (idx), (addr), (flags))
-#define amdgpu_gart_get_vm_pde(adev, level, dst, flags) (adev)->gart.gart_funcs->get_vm_pde((adev), (level), (dst), (flags))
+#define amdgpu_gmc_flush_gpu_tlb(adev, vmid) (adev)->gmc.gmc_funcs->flush_gpu_tlb((adev), (vmid))
+#define amdgpu_gmc_set_pte_pde(adev, pt, idx, addr, flags) (adev)->gmc.gmc_funcs->set_pte_pde((adev), (pt), (idx), (addr), (flags))
+#define amdgpu_gmc_get_vm_pde(adev, level, dst, flags) (adev)->gmc.gmc_funcs->get_vm_pde((adev), (level), (dst), (flags))
+#define amdgpu_gmc_get_pte_flags(adev, flags) (adev)->gmc.gmc_funcs->get_vm_pte_flags((adev),(flags))
 #define amdgpu_vm_copy_pte(adev, ib, pe, src, count) ((adev)->vm_manager.vm_pte_funcs->copy_pte((ib), (pe), (src), (count)))
 #define amdgpu_vm_write_pte(adev, ib, pe, value, count, incr) ((adev)->vm_manager.vm_pte_funcs->write_pte((ib), (pe), (value), (count), (incr)))
 #define amdgpu_vm_set_pte_pde(adev, ib, pe, addr, count, incr, flags) ((adev)->vm_manager.vm_pte_funcs->set_pte_pde((ib), (pe), (addr), (count), (incr), (flags)))
-#define amdgpu_vm_get_pte_flags(adev, flags) (adev)->gart.gart_funcs->get_vm_pte_flags((adev),(flags))
 #define amdgpu_ring_parse_cs(r, p, ib) ((r)->funcs->parse_cs((p), (ib)))
 #define amdgpu_ring_test_ring(r) (r)->funcs->test_ring((r))
 #define amdgpu_ring_test_ib(r, t) (r)->funcs->test_ib((r), (t))
@@ -1987,9 +1914,9 @@ void amdgpu_cs_report_moved_bytes(struct amdgpu_device *adev, u64 num_bytes,
 void amdgpu_ttm_placement_from_domain(struct amdgpu_bo *abo, u32 domain);
 bool amdgpu_ttm_bo_is_amdgpu_bo(struct ttm_buffer_object *bo);
 void amdgpu_device_vram_location(struct amdgpu_device *adev,
-				 struct amdgpu_mc *mc, u64 base);
+				 struct amdgpu_gmc *mc, u64 base);
 void amdgpu_device_gart_location(struct amdgpu_device *adev,
-				 struct amdgpu_mc *mc);
+				 struct amdgpu_gmc *mc);
 #if !defined(BUILD_AS_DKMS) || LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 int amdgpu_device_resize_fb_bar(struct amdgpu_device *adev);
 #endif
