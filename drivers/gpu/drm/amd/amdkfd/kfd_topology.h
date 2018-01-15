@@ -25,7 +25,7 @@
 
 #include <linux/types.h>
 #include <linux/list.h>
-#include "kfd_priv.h"
+#include "kfd_crat.h"
 
 #define KFD_TOPOLOGY_PUBLIC_NAME_SIZE 128
 
@@ -45,6 +45,10 @@
 
 #define HSA_CAP_DOORBELL_TYPE_PRE_1_0		0x0
 #define HSA_CAP_DOORBELL_TYPE_1_0		0x1
+#define HSA_CAP_DOORBELL_TYPE_2_0		0x2
+#define HSA_CAP_WATCH_POINTS_TOTALBITS_MASK	0x00000f00
+#define HSA_CAP_WATCH_POINTS_TOTALBITS_SHIFT	8
+#define HSA_CAP_DOORBELL_PACKET_TYPE		0x00001000
 #define HSA_CAP_AQL_QUEUE_DOUBLE_MAP		0x00004000
 
 struct kfd_node_properties {
@@ -71,6 +75,7 @@ struct kfd_node_properties {
 	uint32_t location_id;
 	uint32_t max_engine_clk_fcompute;
 	uint32_t max_engine_clk_ccompute;
+	int32_t  drm_render_minor;
 	uint16_t marketing_name[KFD_TOPOLOGY_PUBLIC_NAME_SIZE];
 };
 
@@ -93,7 +98,9 @@ struct kfd_mem_properties {
 	uint32_t		width;
 	uint32_t		mem_clk_max;
 	struct kobject		*kobj;
-	struct attribute	attr;
+	struct kfd_dev		*gpu;
+	struct attribute	attr_props;
+	struct attribute	attr_used;
 };
 
 #define HSA_CACHE_TYPE_DATA		0x00000001
@@ -162,9 +169,9 @@ struct kfd_topology_device {
 	struct attribute		attr_gpuid;
 	struct attribute		attr_name;
 	struct attribute		attr_props;
-	uint8_t				oem_id[CRAT_OEMID_LENGTH];
-	uint8_t				oem_table_id[CRAT_OEMTABLEID_LENGTH];
-	uint32_t			oem_revision;
+	uint8_t		oem_id[CRAT_OEMID_LENGTH];
+	uint8_t		oem_table_id[CRAT_OEMTABLEID_LENGTH];
+	uint32_t	oem_revision;
 };
 
 struct kfd_system_properties {
@@ -182,9 +189,5 @@ struct kfd_system_properties {
 struct kfd_topology_device *kfd_create_topology_device(
 		struct list_head *device_list);
 void kfd_release_topology_device_list(struct list_head *device_list);
-
-extern bool amd_iommu_pc_supported(void);
-extern u8 amd_iommu_pc_get_max_banks(u16 devid);
-extern u8 amd_iommu_pc_get_max_counters(u16 devid);
 
 #endif /* __KFD_TOPOLOGY_H__ */

@@ -30,6 +30,7 @@
 #include <linux/memory.h>
 #include "kfd_priv.h"
 #include "kfd_events.h"
+#include "kfd_iommu.h"
 #include <linux/device.h>
 
 /*
@@ -50,6 +51,7 @@ struct kfd_event_waiter {
  */
 struct kfd_signal_page {
 	uint64_t *kernel_address;
+	uint64_t handle;
 	uint64_t __user *user_address;
 };
 
@@ -97,17 +99,9 @@ static int allocate_event_notification_slot(struct kfd_process *p,
 		p->signal_page = allocate_signal_page(p);
 		if (!p->signal_page)
 			return -ENOMEM;
-		/* Oldest user mode expects 256 event slots */
-		p->signal_mapped_size = 256*8;
 	}
 
-	/*
-	 * Compatibility with old user mode: Only use signal slots
-	 * user mode has mapped, may be less than
-	 * KFD_SIGNAL_EVENT_LIMIT. This also allows future increase
-	 * of the event limit without breaking user mode.
-	 */
-	id = idr_alloc(&p->event_idr, ev, 0, p->signal_mapped_size / 8,
+	id = idr_alloc(&p->event_idr, ev, 0, KFD_SIGNAL_EVENT_LIMIT,
 		       GFP_KERNEL);
 	if (id < 0)
 		return id;
@@ -116,6 +110,29 @@ static int allocate_event_notification_slot(struct kfd_process *p,
 	page_slots(p->signal_page)[id] = UNSIGNALED_EVENT_SLOT;
 
 	return 0;
+}
+
+static struct kfd_signal_page *allocate_signal_page_dgpu(
+	struct kfd_process *p, uint64_t *kernel_address, uint64_t handle)
+{
+	struct kfd_signal_page *my_page;
+
+	my_page = kzalloc(sizeof(*my_page), GFP_KERNEL);
+	if (!my_page)
+		return NULL;
+
+	/* Initialize all events to unsignaled */
+	memset(kernel_address, (uint8_t) UNSIGNALED_EVENT_SLOT,
+	       KFD_SIGNAL_EVENT_LIMIT * 8);
+
+	my_page->kernel_address = kernel_address;
+	my_page->handle = handle;
+	my_page->user_address = NULL;
+
+	pr_debug("Allocated new event signal page at %p, for process %p\n",
+			my_page, p);
+
+	return my_page;
 }
 
 /*
@@ -181,8 +198,7 @@ static int create_signal_event(struct file *devkfd,
 {
 	int ret;
 
-	if (p->signal_mapped_size &&
-	    p->signal_event_count == p->signal_mapped_size / 8) {
+	if (p->signal_event_count == KFD_SIGNAL_EVENT_LIMIT) {
 		if (!p->signal_event_limit_reached) {
 			pr_warn("Signal event wasn't created because limit was reached\n");
 			p->signal_event_limit_reached = true;
@@ -268,8 +284,9 @@ static void shutdown_signal_page(struct kfd_process *p)
 	struct kfd_signal_page *page = p->signal_page;
 
 	if (page) {
-		free_pages((unsigned long)page->kernel_address,
-				get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
+		if (page->user_address)
+			free_pages((unsigned long)page->kernel_address,
+					get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
 		kfree(page);
 	}
 }
@@ -294,7 +311,8 @@ static bool event_can_be_cpu_signaled(const struct kfd_event *ev)
 int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		     uint32_t event_type, bool auto_reset, uint32_t node_id,
 		     uint32_t *event_id, uint32_t *event_trigger_data,
-		     uint64_t *event_page_offset, uint32_t *event_slot_index)
+		     uint64_t *event_page_offset, uint32_t *event_slot_index,
+		     void *kern_addr)
 {
 	int ret = 0;
 	struct kfd_event *ev = kzalloc(sizeof(*ev), GFP_KERNEL);
@@ -308,16 +326,25 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 
 	init_waitqueue_head(&ev->wq);
 
-	*event_page_offset = 0;
-
 	mutex_lock(&p->event_mutex);
+
+	if (kern_addr && !p->signal_page) {
+		p->signal_page = allocate_signal_page_dgpu(p, kern_addr,
+							   *event_page_offset);
+		if (!p->signal_page) {
+			ret = -ENOMEM;
+			goto out;
+		}
+	}
+
+	*event_page_offset = 0;
 
 	switch (event_type) {
 	case KFD_EVENT_TYPE_SIGNAL:
 	case KFD_EVENT_TYPE_DEBUG:
 		ret = create_signal_event(devkfd, p, ev);
 		if (!ret) {
-			*event_page_offset = KFD_MMAP_EVENTS_MASK;
+			*event_page_offset = KFD_MMAP_TYPE_EVENTS;
 			*event_page_offset <<= PAGE_SHIFT;
 			*event_slot_index = ev->event_id;
 		}
@@ -334,6 +361,7 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		kfree(ev);
 	}
 
+out:
 	mutex_unlock(&p->event_mutex);
 
 	return ret;
@@ -362,11 +390,7 @@ static void set_event(struct kfd_event *ev)
 {
 	struct kfd_event_waiter *waiter;
 
-	/* Auto reset if the list is non-empty and we're waking
-	 * someone. waitqueue_active is safe here because we're
-	 * protected by the p->event_mutex, which is also held when
-	 * updating the wait queues in kfd_wait_on_events.
-	 */
+	/* Auto reset if the list is non-empty and we're waking someone. */
 	ev->signaled = !ev->auto_reset || !waitqueue_active(&ev->wq);
 
 	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
@@ -468,7 +492,7 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 			pr_debug_ratelimited("Partial ID invalid: %u (%u valid bits)\n",
 					     partial_id, valid_id_bits);
 
-		if (p->signal_event_count < KFD_SIGNAL_EVENT_LIMIT/2) {
+		if (p->signal_event_count < KFD_SIGNAL_EVENT_LIMIT/64) {
 			/* With relatively few events, it's faster to
 			 * iterate over the event IDR
 			 */
@@ -753,12 +777,12 @@ out:
 
 int kfd_event_mmap(struct kfd_process *p, struct vm_area_struct *vma)
 {
+
 	unsigned long pfn;
 	struct kfd_signal_page *page;
-	int ret;
 
-	/* check required size doesn't exceed the allocated size */
-	if (get_order(KFD_SIGNAL_EVENT_LIMIT * 8) <
+	/* check required size is logical */
+	if (get_order(KFD_SIGNAL_EVENT_LIMIT * 8) !=
 			get_order(vma->vm_end - vma->vm_start)) {
 		pr_err("Event page mmap requested illegal size\n");
 		return -EINVAL;
@@ -788,12 +812,8 @@ int kfd_event_mmap(struct kfd_process *p, struct vm_area_struct *vma)
 	page->user_address = (uint64_t __user *)vma->vm_start;
 
 	/* mapping the page to user process */
-	ret = remap_pfn_range(vma, vma->vm_start, pfn,
+	return remap_pfn_range(vma, vma->vm_start, pfn,
 			vma->vm_end - vma->vm_start, vma->vm_page_prot);
-	if (!ret)
-		p->signal_mapped_size = vma->vm_end - vma->vm_start;
-
-	return ret;
 }
 
 /*
@@ -822,6 +842,13 @@ static void lookup_events_by_type_and_signal(struct kfd_process *p,
 				ev->memory_exception_data = *ev_data;
 		}
 
+	if (type == KFD_EVENT_TYPE_MEMORY) {
+		dev_warn(kfd_device,
+			"Sending SIGSEGV to HSA Process with PID %d ",
+				p->lead_thread->pid);
+		send_sig(SIGSEGV, p->lead_thread, 0);
+	}
+
 	/* Send SIGTERM no event of type "type" has been found*/
 	if (send_signal) {
 		if (send_sigterm) {
@@ -837,6 +864,7 @@ static void lookup_events_by_type_and_signal(struct kfd_process *p,
 	}
 }
 
+#ifdef KFD_SUPPORT_IOMMU_V2
 void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 		unsigned long address, bool is_write_requested,
 		bool is_execute_requested)
@@ -896,15 +924,28 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 	up_read(&mm->mmap_sem);
 	mmput(mm);
 
-	mutex_lock(&p->event_mutex);
+	pr_debug("notpresent %d, noexecute %d, readonly %d\n",
+			memory_exception_data.failure.NotPresent,
+			memory_exception_data.failure.NoExecute,
+			memory_exception_data.failure.ReadOnly);
 
-	/* Lookup events by type and signal them */
-	lookup_events_by_type_and_signal(p, KFD_EVENT_TYPE_MEMORY,
-			&memory_exception_data);
+	/* Workaround on Raven to not kill the process when memory is freed
+	 * before IOMMU is able to finish processing all the excessive PPRs
+	 * triggered due to HW flaws.
+	 */
+	if (dev->device_info->asic_family != CHIP_RAVEN) {
+		mutex_lock(&p->event_mutex);
 
-	mutex_unlock(&p->event_mutex);
+		/* Lookup events by type and signal them */
+		lookup_events_by_type_and_signal(p, KFD_EVENT_TYPE_MEMORY,
+				&memory_exception_data);
+
+		mutex_unlock(&p->event_mutex);
+	}
+
 	kfd_unref_process(p);
 }
+#endif /* KFD_SUPPORT_IOMMU_V2 */
 
 void kfd_signal_hw_exception_event(unsigned int pasid)
 {
@@ -922,6 +963,43 @@ void kfd_signal_hw_exception_event(unsigned int pasid)
 
 	/* Lookup events by type and signal them */
 	lookup_events_by_type_and_signal(p, KFD_EVENT_TYPE_HW_EXCEPTION, NULL);
+
+	mutex_unlock(&p->event_mutex);
+	kfd_unref_process(p);
+}
+
+void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
+				struct kfd_vm_fault_info *info)
+{
+	struct kfd_event *ev;
+	uint32_t id;
+	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
+	struct kfd_hsa_memory_exception_data memory_exception_data;
+
+	if (!p)
+		return; /* Presumably process exited. */
+	memset(&memory_exception_data, 0, sizeof(memory_exception_data));
+	memory_exception_data.gpu_id = dev->id;
+	memory_exception_data.failure.imprecise = true;
+	/* Set failure reason */
+	if (info) {
+		memory_exception_data.va = (info->page_addr) << PAGE_SHIFT;
+		memory_exception_data.failure.NotPresent =
+			info->prot_valid ? 1 : 0;
+		memory_exception_data.failure.NoExecute =
+			info->prot_exec ? 1 : 0;
+		memory_exception_data.failure.ReadOnly =
+			info->prot_write ? 1 : 0;
+		memory_exception_data.failure.imprecise = 0;
+	}
+	mutex_lock(&p->event_mutex);
+
+	id = KFD_FIRST_NONSIGNAL_EVENT_ID;
+	idr_for_each_entry_continue(&p->event_idr, ev, id)
+		if (ev->type == KFD_EVENT_TYPE_MEMORY) {
+			ev->memory_exception_data = memory_exception_data;
+			set_event(ev);
+		}
 
 	mutex_unlock(&p->event_mutex);
 	kfd_unref_process(p);

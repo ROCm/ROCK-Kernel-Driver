@@ -30,10 +30,10 @@
 #define KFD_DRIVER_AUTHOR	"AMD Inc. and others"
 
 #define KFD_DRIVER_DESC		"Standalone HSA driver for AMD's GPUs"
-#define KFD_DRIVER_DATE		"20150421"
-#define KFD_DRIVER_MAJOR	0
-#define KFD_DRIVER_MINOR	7
-#define KFD_DRIVER_PATCHLEVEL	2
+#define KFD_DRIVER_DATE		"20160408"
+#define KFD_DRIVER_MAJOR	2
+#define KFD_DRIVER_MINOR	0
+#define KFD_DRIVER_PATCHLEVEL	0
 
 static const struct kgd2kfd_calls kgd2kfd = {
 	.exit		= kgd2kfd_exit,
@@ -43,6 +43,12 @@ static const struct kgd2kfd_calls kgd2kfd = {
 	.interrupt	= kgd2kfd_interrupt,
 	.suspend	= kgd2kfd_suspend,
 	.resume		= kgd2kfd_resume,
+	.quiesce_mm	= kgd2kfd_quiesce_mm,
+	.resume_mm	= kgd2kfd_resume_mm,
+	.schedule_evict_and_restore_process =
+			  kgd2kfd_schedule_evict_and_restore_process,
+	.pre_reset	= kgd2kfd_pre_reset,
+	.post_reset	= kgd2kfd_post_reset,
 };
 
 int sched_policy = KFD_SCHED_POLICY_HWS;
@@ -69,12 +75,27 @@ module_param(send_sigterm, int, 0444);
 MODULE_PARM_DESC(send_sigterm,
 	"Send sigterm to HSA process on unhandled exception (0 = disable, 1 = enable)");
 
+static int amdkfd_init_completed;
+
+int debug_largebar;
+module_param(debug_largebar, int, 0444);
+MODULE_PARM_DESC(debug_largebar,
+	"Debug large-bar flag used to simulate large-bar capability on non-large bar machine (0 = disable, 1 = enable)");
+
 int ignore_crat;
 module_param(ignore_crat, int, 0444);
 MODULE_PARM_DESC(ignore_crat,
 	"Ignore CRAT table during KFD initialization (0 = use CRAT (default), 1 = ignore CRAT)");
 
-static int amdkfd_init_completed;
+int vega10_noretry = 1;
+module_param_named(noretry, vega10_noretry, int, 0644);
+MODULE_PARM_DESC(noretry,
+	"Set sh_mem_config.retry_disable on Vega10 (0 = retry enabled, 1 = retry disabled (default))");
+
+int priv_cp_queues;
+module_param(priv_cp_queues, int, 0644);
+MODULE_PARM_DESC(priv_cp_queues,
+	"Enable privileged mode for CP queues (0 = off (default), 1 = on)");
 
 int kgd2kfd_init(unsigned int interface_version,
 		const struct kgd2kfd_calls **g2f)
@@ -126,7 +147,15 @@ static int __init kfd_module_init(void)
 	if (err < 0)
 		goto err_topology;
 
-	kfd_process_create_wq();
+	err = kfd_ipc_init();
+	if (err < 0)
+		goto err_topology;
+
+	err = kfd_process_create_wq();
+	if (err < 0)
+		goto err_create_wq;
+
+	kfd_init_peer_direct();
 
 	kfd_debugfs_init();
 
@@ -136,6 +165,7 @@ static int __init kfd_module_init(void)
 
 	return 0;
 
+err_create_wq:
 err_topology:
 	kfd_chardev_exit();
 err_ioctl:
@@ -147,6 +177,7 @@ static void __exit kfd_module_exit(void)
 	amdkfd_init_completed = 0;
 
 	kfd_debugfs_fini();
+	kfd_close_peer_direct();
 	kfd_process_destroy_wq();
 	kfd_topology_shutdown();
 	kfd_chardev_exit();

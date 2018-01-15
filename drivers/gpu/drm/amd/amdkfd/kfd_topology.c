@@ -35,6 +35,7 @@
 #include "kfd_crat.h"
 #include "kfd_topology.h"
 #include "kfd_device_queue_manager.h"
+#include "kfd_iommu.h"
 
 /* topology_device_list - Master list of all topology devices */
 static struct list_head topology_device_list;
@@ -88,7 +89,25 @@ struct kfd_dev *kfd_device_by_pci_dev(const struct pci_dev *pdev)
 	down_read(&topology_lock);
 
 	list_for_each_entry(top_dev, &topology_device_list, list)
-		if (top_dev->gpu->pdev == pdev) {
+		if (top_dev->gpu && top_dev->gpu->pdev == pdev) {
+			device = top_dev->gpu;
+			break;
+		}
+
+	up_read(&topology_lock);
+
+	return device;
+}
+
+struct kfd_dev *kfd_device_by_kgd(const struct kgd_dev *kgd)
+{
+	struct kfd_topology_device *top_dev;
+	struct kfd_dev *device = NULL;
+
+	down_read(&topology_lock);
+
+	list_for_each_entry(top_dev, &topology_device_list, list)
+		if (top_dev->gpu && top_dev->gpu->kgd == kgd) {
 			device = top_dev->gpu;
 			break;
 		}
@@ -177,7 +196,6 @@ struct kfd_topology_device *kfd_create_topology_device(
 	return dev;
 }
 
-
 #define sysfs_show_gen_prop(buffer, fmt, ...) \
 		snprintf(buffer, PAGE_SIZE, "%s"fmt, buffer, __VA_ARGS__)
 #define sysfs_show_32bit_prop(buffer, name, value) \
@@ -186,6 +204,8 @@ struct kfd_topology_device *kfd_create_topology_device(
 		sysfs_show_gen_prop(buffer, "%s %llu\n", name, value)
 #define sysfs_show_32bit_val(buffer, value) \
 		sysfs_show_gen_prop(buffer, "%u\n", value)
+#define sysfs_show_64bit_val(buffer, value) \
+		sysfs_show_gen_prop(buffer, "%llu\n", value)
 #define sysfs_show_str_val(buffer, value) \
 		sysfs_show_gen_prop(buffer, "%s\n", value)
 
@@ -268,11 +288,23 @@ static ssize_t mem_show(struct kobject *kobj, struct attribute *attr,
 {
 	ssize_t ret;
 	struct kfd_mem_properties *mem;
+	uint64_t used_mem;
 
 	/* Making sure that the buffer is an empty string */
 	buffer[0] = 0;
 
-	mem = container_of(attr, struct kfd_mem_properties, attr);
+	if (strcmp(attr->name, "used_memory") == 0) {
+		mem = container_of(attr, struct kfd_mem_properties,
+				attr_used);
+		if (mem->gpu) {
+			used_mem = mem->gpu->kfd2kgd->get_vram_usage(mem->gpu->kgd);
+			return sysfs_show_64bit_val(buffer, used_mem);
+		}
+		/* TODO: Report APU/CPU-allocated memory; For now return 0 */
+		return 0;
+	}
+
+	mem = container_of(attr, struct kfd_mem_properties, attr_props);
 	sysfs_show_32bit_prop(buffer, "heap_type", mem->heap_type);
 	sysfs_show_64bit_prop(buffer, "size_in_bytes", mem->size_in_bytes);
 	sysfs_show_32bit_prop(buffer, "flags", mem->flags);
@@ -377,6 +409,7 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 	char public_name[KFD_TOPOLOGY_PUBLIC_NAME_SIZE];
 	uint32_t i;
 	uint32_t log_max_watch_addr;
+	struct kfd_local_mem_info local_mem_info;
 
 	/* Making sure that the buffer is an empty string */
 	buffer[0] = 0;
@@ -440,6 +473,8 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 			dev->node_props.device_id);
 	sysfs_show_32bit_prop(buffer, "location_id",
 			dev->node_props.location_id);
+	sysfs_show_32bit_prop(buffer, "drm_render_minor",
+			dev->node_props.drm_render_minor);
 
 	if (dev->gpu) {
 		log_max_watch_addr =
@@ -462,13 +497,22 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 		sysfs_show_32bit_prop(buffer, "max_engine_clk_fcompute",
 			dev->node_props.max_engine_clk_fcompute);
 
-		sysfs_show_64bit_prop(buffer, "local_mem_size",
-				(unsigned long long int) 0);
+		/*
+		 * If the ASIC is APU except Kaveri, set local memory size
+		 * to 0 to disable local memory support
+		 */
+		if (!dev->gpu->device_info->needs_iommu_device
+			|| dev->gpu->device_info->asic_family == CHIP_KAVERI) {
+			dev->gpu->kfd2kgd->get_local_mem_info(dev->gpu->kgd,
+				&local_mem_info);
+			sysfs_show_64bit_prop(buffer, "local_mem_size",
+					local_mem_info.local_mem_size_private +
+					local_mem_info.local_mem_size_public);
+		} else
+			sysfs_show_64bit_prop(buffer, "local_mem_size", 0ULL);
 
 		sysfs_show_32bit_prop(buffer, "fw_version",
-			dev->gpu->kfd2kgd->get_fw_version(
-						dev->gpu->kgd,
-						KGD_ENGINE_MEC1));
+				dev->gpu->mec_fw_version);
 		sysfs_show_32bit_prop(buffer, "capability",
 				dev->node_props.capability);
 	}
@@ -527,7 +571,12 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 	if (dev->kobj_mem) {
 		list_for_each_entry(mem, &dev->mem_props, list)
 			if (mem->kobj) {
-				kfd_remove_sysfs_file(mem->kobj, &mem->attr);
+				/* TODO: Remove when CPU/APU supported */
+				if (dev->node_props.cpu_cores_count == 0)
+					sysfs_remove_file(mem->kobj,
+							&mem->attr_used);
+				kfd_remove_sysfs_file(mem->kobj,
+						&mem->attr_props);
 				mem->kobj = NULL;
 			}
 		kobject_del(dev->kobj_mem);
@@ -629,12 +678,23 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 		if (ret < 0)
 			return ret;
 
-		mem->attr.name = "properties";
-		mem->attr.mode = KFD_SYSFS_FILE_MODE;
-		sysfs_attr_init(&mem->attr);
-		ret = sysfs_create_file(mem->kobj, &mem->attr);
+		mem->attr_props.name = "properties";
+		mem->attr_props.mode = KFD_SYSFS_FILE_MODE;
+		sysfs_attr_init(&mem->attr_props);
+		ret = sysfs_create_file(mem->kobj, &mem->attr_props);
 		if (ret < 0)
 			return ret;
+
+		/* TODO: Support APU/CPU memory usage */
+		if (dev->node_props.cpu_cores_count == 0) {
+			mem->attr_used.name = "used_memory";
+			mem->attr_used.mode = KFD_SYSFS_FILE_MODE;
+			sysfs_attr_init(&mem->attr_used);
+			ret = sysfs_create_file(mem->kobj, &mem->attr_used);
+			if (ret < 0)
+				return ret;
+		}
+
 		i++;
 	}
 
@@ -828,8 +888,7 @@ static void kfd_debug_print_topology(void)
 	up_read(&topology_lock);
 }
 
-/* Helper function for intializing platform_xx members of
- * kfd_system_properties. Uses OEM info from the last CPU/APU node.
+/* Helper function for intializing platform_xx members of kfd_system_properties
  */
 static void kfd_update_system_properties(void)
 {
@@ -875,19 +934,8 @@ static void find_system_memory(const struct dmi_header *dm,
  */
 static int kfd_add_perf_to_topology(struct kfd_topology_device *kdev)
 {
-	struct kfd_perf_properties *props;
-
-	if (amd_iommu_pc_supported()) {
-		props = kfd_alloc_struct(props);
-		if (!props)
-			return -ENOMEM;
-		strcpy(props->block_name, "iommu");
-		props->max_concurrent = amd_iommu_pc_get_max_banks(0) *
-			amd_iommu_pc_get_max_counters(0); /* assume one iommu */
-		list_add_tail(&props->list, &kdev->perf_props);
-	}
-
-	return 0;
+	/* These are the only counters supported so far */
+	return kfd_iommu_add_perf_counters(kdev);
 }
 
 /* kfd_add_non_crat_information - Add information that is not currently
@@ -904,6 +952,7 @@ static void kfd_add_non_crat_information(struct kfd_topology_device *kdev)
 	/* TODO: For GPU node, rearrange code from kfd_topology_add_device */
 }
 
+#ifdef CONFIG_ACPI
 /* kfd_is_acpi_crat_invalid - CRAT from ACPI is valid only for AMD APU devices.
  *	Ignore CRAT for all other devices. AMD APU is identified if both CPU
  *	and GPU cores are present.
@@ -922,6 +971,7 @@ static bool kfd_is_acpi_crat_invalid(struct list_head *device_list)
 	pr_info("Ignoring ACPI CRAT on non-APU system\n");
 	return true;
 }
+#endif
 
 int kfd_topology_init(void)
 {
@@ -959,24 +1009,26 @@ int kfd_topology_init(void)
 	 * NOTE: The current implementation expects all AMD APUs to have
 	 *	CRAT. If no CRAT is available, it is assumed to be a CPU
 	 */
+#ifdef CONFIG_ACPI
 	ret = kfd_create_crat_image_acpi(&crat_image, &image_size);
-	if (!ret) {
+	if (ret == 0) {
 		ret = kfd_parse_crat_table(crat_image,
 					   &temp_topology_device_list,
 					   proximity_domain);
 		if (ret ||
-		    kfd_is_acpi_crat_invalid(&temp_topology_device_list)) {
+			kfd_is_acpi_crat_invalid(&temp_topology_device_list)) {
+
 			kfd_release_topology_device_list(
 				&temp_topology_device_list);
 			kfd_destroy_crat_image(crat_image);
 			crat_image = NULL;
 		}
 	}
-
+#endif
 	if (!crat_image) {
 		ret = kfd_create_crat_image_virtual(&crat_image, &image_size,
-						    COMPUTE_UNIT_CPU, NULL,
-						    proximity_domain);
+				COMPUTE_UNIT_CPU, NULL,
+				proximity_domain);
 		cpu_only_node = 1;
 		if (ret) {
 			pr_err("Error creating VCRAT table for CPU\n");
@@ -984,26 +1036,25 @@ int kfd_topology_init(void)
 		}
 
 		ret = kfd_parse_crat_table(crat_image,
-					   &temp_topology_device_list,
-					   proximity_domain);
+				&temp_topology_device_list,
+				proximity_domain);
 		if (ret) {
 			pr_err("Error parsing VCRAT table for CPU\n");
 			goto err;
 		}
 	}
-
 	kdev = list_first_entry(&temp_topology_device_list,
 				struct kfd_topology_device, list);
 	kfd_add_perf_to_topology(kdev);
 
 	down_write(&topology_lock);
 	kfd_topology_update_device_list(&temp_topology_device_list,
-					&topology_device_list);
+					    &topology_device_list);
 	atomic_set(&topology_crat_proximity_domain, sys_props.num_devices-1);
 	ret = kfd_topology_update_sysfs();
 	up_write(&topology_lock);
 
-	if (!ret) {
+	if (ret == 0) {
 		sys_props.generation_count++;
 		kfd_update_system_properties();
 		kfd_debug_print_topology();
@@ -1076,15 +1127,22 @@ static struct kfd_topology_device *kfd_assign_gpu(struct kfd_dev *gpu)
 {
 	struct kfd_topology_device *dev;
 	struct kfd_topology_device *out_dev = NULL;
+	struct kfd_mem_properties *mem;
 
 	down_write(&topology_lock);
 	list_for_each_entry(dev, &topology_device_list, list)
 		if (!dev->gpu && (dev->node_props.simd_count > 0)) {
 			dev->gpu = gpu;
 			out_dev = dev;
+
+			/* Assign mem->gpu */
+			list_for_each_entry(mem, &dev->mem_props, list)
+				mem->gpu = dev->gpu;
+
 			break;
 		}
 	up_write(&topology_lock);
+
 	return out_dev;
 }
 
@@ -1152,7 +1210,8 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 
 	pr_debug("Adding new GPU (ID: 0x%x) to topology\n", gpu_id);
 
-	proximity_domain = atomic_inc_return(&topology_crat_proximity_domain);
+	proximity_domain = atomic_inc_return(&
+				topology_crat_proximity_domain);
 
 	/* Check to see if this gpu device exists in the topology_device_list.
 	 * If so, assign the gpu to that device,
@@ -1163,16 +1222,15 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	dev = kfd_assign_gpu(gpu);
 	if (!dev) {
 		res = kfd_create_crat_image_virtual(&crat_image, &image_size,
-						    COMPUTE_UNIT_GPU, gpu,
-						    proximity_domain);
+				COMPUTE_UNIT_GPU,
+				gpu, proximity_domain);
 		if (res) {
 			pr_err("Error creating VCRAT for GPU (ID: 0x%x)\n",
 			       gpu_id);
 			return res;
 		}
 		res = kfd_parse_crat_table(crat_image,
-					   &temp_topology_device_list,
-					   proximity_domain);
+				&temp_topology_device_list, proximity_domain);
 		if (res) {
 			pr_err("Error parsing VCRAT for GPU (ID: 0x%x)\n",
 			       gpu_id);
@@ -1189,13 +1247,14 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 		res = kfd_topology_update_sysfs();
 		up_write(&topology_lock);
 
-		if (!res)
+		if (res == 0)
 			sys_props.generation_count++;
 		else
 			pr_err("Failed to update GPU (ID: 0x%x) to sysfs topology. res=%d\n",
 						gpu_id, res);
 		dev = kfd_assign_gpu(gpu);
-		if (WARN_ON(!dev)) {
+		if (!dev) {
+			pr_err("Could not assign GPU\n");
 			res = -ENODEV;
 			goto err;
 		}
@@ -1224,6 +1283,8 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 		dev->gpu->kfd2kgd->get_max_engine_clock_in_mhz(dev->gpu->kgd);
 	dev->node_props.max_engine_clk_ccompute =
 		cpufreq_quick_get_max(0) / 1000;
+	dev->node_props.drm_render_minor =
+		gpu->shared_resources.drm_render_minor;
 
 	kfd_fill_mem_clk_max_info(dev);
 	kfd_fill_iolink_non_crat_info(dev);
@@ -1245,16 +1306,21 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
 		break;
+	case CHIP_VEGA10:
+	case CHIP_RAVEN:
+		dev->node_props.capability |= ((HSA_CAP_DOORBELL_TYPE_2_0 <<
+			HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
+			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
+		break;
 	default:
-		WARN(1, "Unexpected ASIC family %u",
-		     dev->gpu->device_info->asic_family);
+		BUG();
 	}
 
 	/* Fix errors in CZ CRAT.
-	 * simd_count: Carrizo CRAT reports wrong simd_count, probably
-	 *		because it doesn't consider masked out CUs
-	 * max_waves_per_simd: Carrizo reports wrong max_waves_per_simd
-	 * capability flag: Carrizo CRAT doesn't report IOMMU flags
+	 * simd_count: Carrizo CRAT reports wrong simd_count, probably because
+	 *		it doesn't consider masked out CUs
+	 * max_waves_per_simd: Carrizo reports wrong max_waves_per_simd.
+	 * capability flag: Carrizo CRAT doesn't report IOMMU flags.
 	 */
 	if (dev->gpu->device_info->asic_family == CHIP_CARRIZO) {
 		dev->node_props.simd_count =
@@ -1294,7 +1360,7 @@ int kfd_topology_remove_device(struct kfd_dev *gpu)
 
 	up_write(&topology_lock);
 
-	if (!res)
+	if (res == 0)
 		kfd_notify_gpu_change(gpu_id, 0);
 
 	return res;
@@ -1333,17 +1399,18 @@ int kfd_topology_enum_kfd_devices(uint8_t idx, struct kfd_dev **kdev)
 
 static int kfd_cpumask_to_apic_id(const struct cpumask *cpumask)
 {
-	const struct cpuinfo_x86 *cpuinfo;
 	int first_cpu_of_numa_node;
 
-	if (!cpumask || cpumask == cpu_none_mask)
+	if (!cpumask || (cpumask == cpu_none_mask))
 		return -1;
 	first_cpu_of_numa_node = cpumask_first(cpumask);
 	if (first_cpu_of_numa_node >= nr_cpu_ids)
 		return -1;
-	cpuinfo = &cpu_data(first_cpu_of_numa_node);
-
-	return cpuinfo->apicid;
+#ifdef CONFIG_X86_64
+	return cpu_data(first_cpu_of_numa_node).apicid;
+#else
+	return first_cpu_of_numa_node;
+#endif
 }
 
 /* kfd_numa_node_to_apic_id - Returns the APIC ID of the first logical processor
@@ -1377,7 +1444,7 @@ int kfd_debugfs_hqds_by_device(struct seq_file *m, void *data)
 
 		seq_printf(m, "Node %u, gpu_id %x:\n", i++, dev->gpu->id);
 		r = dqm_debugfs_hqds(m, dev->gpu->dqm);
-		if (r)
+		if (r != 0)
 			break;
 	}
 
@@ -1402,7 +1469,7 @@ int kfd_debugfs_rls_by_device(struct seq_file *m, void *data)
 
 		seq_printf(m, "Node %u, gpu_id %x:\n", i++, dev->gpu->id);
 		r = pm_debugfs_runlist(m, &dev->gpu->dqm->packets);
-		if (r)
+		if (r != 0)
 			break;
 	}
 

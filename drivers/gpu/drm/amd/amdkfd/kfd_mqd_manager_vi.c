@@ -31,6 +31,7 @@
 #include "gca/gfx_8_0_sh_mask.h"
 #include "gca/gfx_8_0_enum.h"
 #include "oss/oss_3_0_sh_mask.h"
+
 #define CP_MQD_CONTROL__PRIV_STATE__SHIFT 0x8
 
 static inline struct vi_mqd *get_mqd(void *mqd)
@@ -41,6 +42,68 @@ static inline struct vi_mqd *get_mqd(void *mqd)
 static inline struct vi_sdma_mqd *get_sdma_mqd(void *mqd)
 {
 	return (struct vi_sdma_mqd *)mqd;
+}
+
+static void update_cu_mask(struct mqd_manager *mm, void *mqd,
+			struct queue_properties *q)
+{
+	struct vi_mqd *m;
+	struct kfd_cu_info cu_info;
+	uint32_t se_mask[4] = {0}; /* 4 is the max # of SEs */
+	uint32_t cu_mask_count = q->cu_mask_count;
+	const uint32_t *cu_mask = q->cu_mask;
+	int se, cu_per_sh, cu_index, i;
+
+	if (cu_mask_count == 0)
+		return;
+
+	m = get_mqd(mqd);
+	m->compute_static_thread_mgmt_se0 = 0;
+	m->compute_static_thread_mgmt_se1 = 0;
+	m->compute_static_thread_mgmt_se2 = 0;
+	m->compute_static_thread_mgmt_se3 = 0;
+
+	mm->dev->kfd2kgd->get_cu_info(mm->dev->kgd, &cu_info);
+
+	/* If # CU mask bits > # CUs, set it to the # of CUs */
+	if (cu_mask_count > cu_info.cu_active_number)
+		cu_mask_count = cu_info.cu_active_number;
+
+	cu_index = 0;
+	for (se = 0; se < cu_info.num_shader_engines; se++) {
+		cu_per_sh = 0;
+
+		/* Get the number of CUs on this Shader Engine */
+		for (i = 0; i < 4; i++)
+			cu_per_sh += hweight32(cu_info.cu_bitmap[se][i]);
+
+		se_mask[se] = cu_mask[cu_index / 32] >> (cu_index % 32);
+		if ((cu_per_sh + (cu_index % 32)) > 32)
+			se_mask[se] |= cu_mask[(cu_index / 32) + 1]
+					<< (32 - (cu_index % 32));
+		se_mask[se] &= (1 << cu_per_sh) - 1;
+		cu_index += cu_per_sh;
+	}
+	m->compute_static_thread_mgmt_se0 = se_mask[0];
+	m->compute_static_thread_mgmt_se1 = se_mask[1];
+	m->compute_static_thread_mgmt_se2 = se_mask[2];
+	m->compute_static_thread_mgmt_se3 = se_mask[3];
+
+	pr_debug("Update cu mask to %#x %#x %#x %#x\n",
+		m->compute_static_thread_mgmt_se0,
+		m->compute_static_thread_mgmt_se1,
+		m->compute_static_thread_mgmt_se2,
+		m->compute_static_thread_mgmt_se3);
+}
+
+static void set_priority(struct vi_mqd *m, struct queue_properties *q)
+{
+	m->cp_hqd_pipe_priority = pipe_priority_map[q->priority];
+	m->cp_hqd_queue_priority = q->priority;
+	m->compute_pgm_rsrc1 = (m->compute_pgm_rsrc1 &
+				(~COMPUTE_PGM_RSRC1__PRIORITY_MASK)) |
+				(spi_priority_map[q->priority] <<
+				COMPUTE_PGM_RSRC1__PRIORITY__SHIFT);
 }
 
 static int init_mqd(struct mqd_manager *mm, void **mqd,
@@ -81,9 +144,7 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 			1 << CP_HQD_QUANTUM__QUANTUM_SCALE__SHIFT |
 			10 << CP_HQD_QUANTUM__QUANTUM_DURATION__SHIFT;
 
-	m->cp_hqd_pipe_priority = 1;
-	m->cp_hqd_queue_priority = 15;
-
+	set_priority(m, q);
 	m->cp_hqd_eop_rptr = 1 << CP_HQD_EOP_RPTR__INIT_FETCHER__SHIFT;
 
 	if (q->format == KFD_QUEUE_FORMAT_AQL)
@@ -98,7 +159,7 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 			(1 << COMPUTE_PGM_RSRC2__TRAP_PRESENT__SHIFT);
 	}
 
-	if (mm->dev->cwsr_enabled && q->ctx_save_restore_area_address) {
+	if (mm->dev->cwsr_enabled) {
 		m->cp_hqd_persistent_state |=
 			(1 << CP_HQD_PERSISTENT_STATE__QSWITCH_MODE__SHIFT);
 		m->cp_hqd_ctx_save_base_addr_lo =
@@ -151,6 +212,8 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 
 	m->cp_hqd_pq_rptr_report_addr_lo = lower_32_bits((uint64_t)q->read_ptr);
 	m->cp_hqd_pq_rptr_report_addr_hi = upper_32_bits((uint64_t)q->read_ptr);
+	m->cp_hqd_pq_wptr_poll_addr_lo = lower_32_bits((uint64_t)q->write_ptr);
+	m->cp_hqd_pq_wptr_poll_addr_hi = upper_32_bits((uint64_t)q->write_ptr);
 
 	m->cp_hqd_pq_doorbell_control =
 		q->doorbell_off <<
@@ -188,15 +251,21 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 		m->cp_hqd_pq_control |= CP_HQD_PQ_CONTROL__NO_UPDATE_RPTR_MASK |
 				2 << CP_HQD_PQ_CONTROL__SLOT_BASED_WPTR__SHIFT;
 	}
-
-	if (mm->dev->cwsr_enabled && q->ctx_save_restore_area_address)
+	if (priv_cp_queues)
+		m->cp_hqd_pq_control |=
+			1 << CP_HQD_PQ_CONTROL__PRIV_STATE__SHIFT;
+	if (mm->dev->cwsr_enabled)
 		m->cp_hqd_ctx_save_control =
 			atc_bit << CP_HQD_CTX_SAVE_CONTROL__ATC__SHIFT |
 			mtype << CP_HQD_CTX_SAVE_CONTROL__MTYPE__SHIFT;
 
+	update_cu_mask(mm, mqd, q);
+	set_priority(m, q);
+
 	q->is_active = (q->queue_size > 0 &&
 			q->queue_address != 0 &&
-			q->queue_percent > 0);
+			q->queue_percent > 0 &&
+			!q->is_evicted);
 
 	return 0;
 }
@@ -206,6 +275,12 @@ static int update_mqd(struct mqd_manager *mm, void *mqd,
 			struct queue_properties *q)
 {
 	return __update_mqd(mm, mqd, q, MTYPE_CC, 1);
+}
+
+static int update_mqd_tonga(struct mqd_manager *mm, void *mqd,
+			struct queue_properties *q)
+{
+	return __update_mqd(mm, mqd, q, MTYPE_UC, 0);
 }
 
 static int destroy_mqd(struct mqd_manager *mm, void *mqd,
@@ -231,6 +306,28 @@ static bool is_occupied(struct mqd_manager *mm, void *mqd,
 	return mm->dev->kfd2kgd->hqd_is_occupied(
 		mm->dev->kgd, queue_address,
 		pipe_id, queue_id);
+}
+
+static int get_wave_state(struct mqd_manager *mm, void *mqd,
+			  void __user *ctl_stack,
+			  u32 *ctl_stack_used_size,
+			  u32 *save_area_used_size)
+{
+	struct vi_mqd *m;
+
+	m = get_mqd(mqd);
+
+	*ctl_stack_used_size = m->cp_hqd_cntl_stack_size -
+		m->cp_hqd_cntl_stack_offset;
+	*save_area_used_size = m->cp_hqd_wg_state_offset -
+		m->cp_hqd_cntl_stack_size;
+
+	/* Control stack is not copied to user mode for GFXv8 because
+	 * it's part of the context save area that is already
+	 * accessible to user mode
+	 */
+
+	return 0;
 }
 
 static int init_mqd_hiq(struct mqd_manager *mm, void **mqd,
@@ -285,7 +382,7 @@ static int init_mqd_sdma(struct mqd_manager *mm, void **mqd,
 	memset(m, 0, sizeof(struct vi_sdma_mqd));
 
 	*mqd = m;
-	if (gart_addr != NULL)
+	if (gart_addr)
 		*gart_addr = (*mqd_mem_obj)->gpu_addr;
 
 	retval = mm->update_mqd(mm, m, q);
@@ -334,7 +431,8 @@ static int update_mqd_sdma(struct mqd_manager *mm, void *mqd,
 
 	q->is_active = (q->queue_size > 0 &&
 			q->queue_address != 0 &&
-			q->queue_percent > 0);
+			q->queue_percent > 0 &&
+			!q->is_evicted);
 
 	return 0;
 }
@@ -384,7 +482,7 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 	if (WARN_ON(type >= KFD_MQD_TYPE_MAX))
 		return NULL;
 
-	mqd = kzalloc(sizeof(*mqd), GFP_KERNEL);
+	mqd = kzalloc(sizeof(*mqd), GFP_NOIO);
 	if (!mqd)
 		return NULL;
 
@@ -399,6 +497,7 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd;
 		mqd->destroy_mqd = destroy_mqd;
 		mqd->is_occupied = is_occupied;
+		mqd->get_wave_state = get_wave_state;
 #if defined(CONFIG_DEBUG_FS)
 		mqd->debugfs_show_mqd = debugfs_show_mqd;
 #endif
@@ -432,3 +531,17 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 
 	return mqd;
 }
+
+struct mqd_manager *mqd_manager_init_vi_tonga(enum KFD_MQD_TYPE type,
+			struct kfd_dev *dev)
+{
+	struct mqd_manager *mqd;
+
+	mqd = mqd_manager_init_vi(type, dev);
+	if (!mqd)
+		return NULL;
+	if ((type == KFD_MQD_TYPE_CP) || (type == KFD_MQD_TYPE_COMPUTE))
+		mqd->update_mqd = update_mqd_tonga;
+	return mqd;
+}
+
