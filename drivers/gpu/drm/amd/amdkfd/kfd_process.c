@@ -369,11 +369,10 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 			kfd_flush_tlb(pdd->dev, p->pasid);
 
 		/* Destroy the GPUVM VM context */
-		if (pdd->vm) {
-			dma_fence_put(p->ef);
+		if (pdd->vm)
 			pdd->dev->kfd2kgd->destroy_process_vm(
 				pdd->dev->kgd, pdd->vm);
-		}
+
 		list_del(&pdd->per_device_list);
 
 		if (pdd->qpd.cwsr_pages) {
@@ -421,6 +420,7 @@ static void kfd_process_wq_release(struct work_struct *work)
 	kfd_process_free_outstanding_kfd_bos(p);
 
 	kfd_process_destroy_pdds(p);
+	dma_fence_put(p->ef);
 
 	kfd_event_free_process(p);
 
