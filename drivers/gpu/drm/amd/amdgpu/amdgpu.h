@@ -283,6 +283,10 @@ struct amdgpu_clock {
 	uint32_t max_pixel_clock;
 };
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
+extern const struct dma_buf_ops amdgpu_dmabuf_ops;
+#endif
+
 /* sub-allocation manager, it has to be protected by another lock.
  * By conception this is an helper for other part of the driver
  * like the indirect buffer or semaphore, which both have their
