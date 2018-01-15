@@ -39,6 +39,14 @@ int amdgpu_gem_object_open(struct drm_gem_object *obj,
 void amdgpu_gem_object_close(struct drm_gem_object *obj,
 				struct drm_file *file_priv);
 unsigned long amdgpu_gem_timeout(uint64_t timeout_ns);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
+struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
+					    struct dma_buf *dma_buf);
+#endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+int amdgpu_gem_prime_pin(struct drm_gem_object *obj);
+void amdgpu_gem_prime_unpin(struct drm_gem_object *obj);
+#endif
 
 /*
  * GEM objects.

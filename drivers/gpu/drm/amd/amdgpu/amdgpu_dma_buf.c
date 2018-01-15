@@ -41,8 +41,7 @@
 #include <linux/dma-fence-array.h>
 
 /**
- * amdgpu_gem_prime_get_sg_table - &drm_driver.gem_prime_get_sg_table
- * implementation
+ * amdgpu_gem_prime_get_sg_table - &drm_driver.gem_prime_get_sg_table * implementation
  * @obj: GEM buffer object (BO)
  *
  * Returns:
@@ -192,6 +191,7 @@ err_fences_put:
  * Returns:
  * 0 on success or a negative error code on failure.
  */
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 static int amdgpu_dma_buf_map_attach(struct dma_buf *dma_buf,
 				     struct dma_buf_attachment *attach)
 {
@@ -268,6 +268,54 @@ static void amdgpu_dma_buf_map_detach(struct dma_buf *dma_buf,
 error:
 	drm_gem_map_detach(dma_buf, attach);
 }
+#endif
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0)
+int amdgpu_gem_prime_pin(struct drm_gem_object *obj)
+{
+	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
+	long ret = 0;
+
+	ret = amdgpu_bo_reserve(bo, false);
+	if (unlikely(ret != 0))
+		return ret;
+
+	/*
+	 * Wait for all shared fences to complete before we switch to future
+	 * use of exclusive fence on this prime shared bo.
+	 */
+	ret = reservation_object_wait_timeout_rcu(bo->tbo.resv, true, false,
+						  MAX_SCHEDULE_TIMEOUT);
+	if (unlikely(ret < 0)) {
+		DRM_DEBUG_PRIME("Fence wait failed: %li\n", ret);
+		amdgpu_bo_unreserve(bo);
+		return ret;
+	}
+
+	/* pin buffer into GTT */
+	ret = amdgpu_bo_pin(bo, AMDGPU_GEM_DOMAIN_GTT);
+	if (likely(ret == 0))
+		bo->prime_shared_count++;
+
+	amdgpu_bo_unreserve(bo);
+	return ret;
+}
+
+void amdgpu_gem_prime_unpin(struct drm_gem_object *obj)
+{
+	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
+	int ret = 0;
+
+	ret = amdgpu_bo_reserve(bo, true);
+	if (unlikely(ret != 0))
+		return;
+
+	amdgpu_bo_unpin(bo);
+	if (bo->prime_shared_count)
+		bo->prime_shared_count--;
+	amdgpu_bo_unreserve(bo);
+}
+#endif
 
 /**
  * amdgpu_gem_prime_res_obj - &drm_driver.gem_prime_res_obj implementation
@@ -295,6 +343,7 @@ struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *obj)
  * Returns:
  * 0 on success or a negative error code on failure.
  */
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 static int amdgpu_dma_buf_begin_cpu_access(struct dma_buf *dma_buf,
 					   enum dma_data_direction direction)
 {
@@ -334,6 +383,7 @@ const struct dma_buf_ops amdgpu_dmabuf_ops = {
 	.vmap = drm_gem_dmabuf_vmap,
 	.vunmap = drm_gem_dmabuf_vunmap,
 };
+#endif
 
 /**
  * amdgpu_gem_prime_export - &drm_driver.gem_prime_export implementation
@@ -361,7 +411,9 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 	buf = drm_gem_prime_export(dev, gobj, flags);
 	if (!IS_ERR(buf)) {
 		buf->file->f_mapping = dev->anon_inode->i_mapping;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 		buf->ops = &amdgpu_dmabuf_ops;
+#endif
 	}
 
 	return buf;
@@ -407,7 +459,9 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	bo->tbo.ttm->sg = sg;
 	bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
 	bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 	if (attach->dmabuf->ops != &amdgpu_dmabuf_ops)
+#endif
 		bo->prime_shared_count = 1;
 
 	ww_mutex_unlock(&resv->lock);
@@ -429,6 +483,7 @@ error:
  * Returns:
  * GEM BO representing the shared DMA buffer for the given device.
  */
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 					    struct dma_buf *dma_buf)
 {
@@ -448,3 +503,4 @@ struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 
 	return drm_gem_prime_import(dev, dma_buf);
 }
+#endif
