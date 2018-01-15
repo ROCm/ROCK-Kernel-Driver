@@ -183,6 +183,7 @@ struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *obj)
 	return bo->tbo.resv;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 static int amdgpu_gem_begin_cpu_access(struct dma_buf *dma_buf,
 				       enum dma_data_direction direction)
 {
@@ -226,6 +227,7 @@ static const struct dma_buf_ops amdgpu_dmabuf_ops = {
 	.vmap = drm_gem_dmabuf_vmap,
 	.vunmap = drm_gem_dmabuf_vunmap,
 };
+#endif
 
 struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 					struct drm_gem_object *gobj,
@@ -241,8 +243,9 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 	buf = drm_gem_prime_export(dev, gobj, flags);
 	if (!IS_ERR(buf))
 		buf->file->f_mapping = dev->anon_inode->i_mapping;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 	buf->ops = &amdgpu_dmabuf_ops;
-
+#endif
 	return buf;
 }
 
@@ -286,6 +289,7 @@ amdgpu_gem_prime_foreign_bo(struct amdgpu_device *adev, struct amdgpu_bo *bo)
 	return &gobj->base;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 					    struct dma_buf *dma_buf)
 {
@@ -305,3 +309,4 @@ struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 
 	return drm_gem_prime_import(dev, dma_buf);
 }
+#endif
