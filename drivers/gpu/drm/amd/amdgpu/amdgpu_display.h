@@ -27,10 +27,12 @@ uint32_t amdgpu_display_framebuffer_domains(struct amdgpu_device *adev);
 struct drm_framebuffer *
 amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 				       struct drm_file *file_priv,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
-				       struct drm_mode_fb_cmd2 *mode_cmd)
-#else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+			defined(OS_NAME_RHEL_7_3) || \
+			defined(OS_NAME_RHEL_7_4)
 				       const struct drm_mode_fb_cmd2 *mode_cmd);
+#else
+				       struct drm_mode_fb_cmd2 *mode_cmd);
 #endif
 void amdgpu_output_poll_changed(struct drm_device *dev);
 
