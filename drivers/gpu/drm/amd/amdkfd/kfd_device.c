@@ -957,21 +957,10 @@ int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 	if (!p)
 		return -ENODEV;
 
-	if (delayed_work_pending(&p->eviction_work.dwork)) {
-		/* It is possible has TTM has lined up couple of BOs of the same
-		 * process to be evicted. Check if the fence is same which
-		 * indicates that previous work item scheduled is not completed
-		 */
-		if (p->eviction_work.quiesce_fence == fence)
-			goto out;
-		else {
-			WARN(1, "Starting new evict with previous evict is not completed\n");
-			if (cancel_delayed_work_sync(&p->eviction_work.dwork))
-				dma_fence_put(p->eviction_work.quiesce_fence);
-		}
-	}
+	if (fence->seqno == p->last_eviction_seqno)
+		goto out;
 
-	p->eviction_work.quiesce_fence = dma_fence_get(fence);
+	p->last_eviction_seqno = fence->seqno;
 
 	/* Avoid KFD process starvation. Wait for at least
 	 * PROCESS_ACTIVE_TIME_MS before evicting the process again
@@ -985,7 +974,7 @@ int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 	/* During process initialization eviction_work.dwork is initialized
 	 * to kfd_evict_bo_worker
 	 */
-	schedule_delayed_work(&p->eviction_work.dwork, delay_jiffies);
+	schedule_delayed_work(&p->eviction_work, delay_jiffies);
 out:
 	kfd_unref_process(p);
 	return 0;
@@ -995,48 +984,39 @@ void kfd_evict_bo_worker(struct work_struct *work)
 {
 	int ret;
 	struct kfd_process *p;
-	struct kfd_eviction_work *eviction_work;
 	struct delayed_work *dwork;
 
 	dwork = to_delayed_work(work);
-	eviction_work = container_of(dwork, struct kfd_eviction_work,
-				     dwork);
 
 	/* Process termination destroys this worker thread. So during the
 	 * lifetime of this thread, kfd_process p will be valid
 	 */
-	p = container_of(eviction_work, struct kfd_process, eviction_work);
+	p = container_of(dwork, struct kfd_process, eviction_work);
+	WARN_ONCE(p->last_eviction_seqno != p->ef->seqno,
+		  "Eviction fence mismatch\n");
 
-	/* Narrow window of overlap between restore and evict work item is
-	 * possible. Once amdgpu_amdkfd_gpuvm_restore_process_bos unreserves
-	 * KFD BOs, it is possible to evicted again. But restore has few more
-	 * steps of finish. So lets wait for the restore work to complete
+	/* Narrow window of overlap between restore and evict work
+	 * item is possible. Once
+	 * amdgpu_amdkfd_gpuvm_restore_process_bos unreserves KFD BOs,
+	 * it is possible to evicted again. But restore has few more
+	 * steps of finish. So lets wait for any previous restore work
+	 * to complete
 	 */
-	if (delayed_work_pending(&p->restore_work))
-		flush_delayed_work(&p->restore_work);
+	flush_delayed_work(&p->restore_work);
 
 	pr_info("Started evicting process of pasid %d\n", p->pasid);
 	ret = quiesce_process_mm(p);
 	if (!ret) {
-		dma_fence_signal(eviction_work->quiesce_fence);
-		WARN_ONCE(eviction_work->quiesce_fence != p->ef,
-			 "Eviction fence mismatch\n");
+		dma_fence_signal(p->ef);
 		dma_fence_put(p->ef);
-		/* TODO: quiesce_fence is same as kfd_process->ef. But
-		 * quiesce_fence is also used to avoid starting multiple
-		 * eviction work items. This might not be necessary and
-		 * one of the variables could be removed
-		 */
 		p->ef = NULL;
 		schedule_delayed_work(&p->restore_work,
 				msecs_to_jiffies(PROCESS_RESTORE_TIME_MS));
+
+		pr_info("Finished evicting process of pasid %d\n", p->pasid);
 	} else
-		pr_err("Failed to quiesce user queues. Cannot evict BOs\n");
-
-	dma_fence_put(eviction_work->quiesce_fence);
-
-	pr_info("Finished evicting process of pasid %d\n", p->pasid);
-
+		pr_err("Failed to quiesce user queues. Cannot evict pasid %d\n",
+		       p->pasid);
 }
 
 static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,
