@@ -472,7 +472,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	mutex_unlock(&kfd_processes_mutex);
 	synchronize_srcu(&kfd_processes_srcu);
 
-	cancel_delayed_work_sync(&p->eviction_work.dwork);
+	cancel_delayed_work_sync(&p->eviction_work);
 	cancel_delayed_work_sync(&p->restore_work);
 
 	mutex_lock(&p->mutex);
@@ -632,7 +632,7 @@ static struct kfd_process *create_process(const struct task_struct *thread,
 	if (err != 0)
 		goto err_init_apertures;
 
-	INIT_DELAYED_WORK(&process->eviction_work.dwork, kfd_evict_bo_worker);
+	INIT_DELAYED_WORK(&process->eviction_work, kfd_evict_bo_worker);
 	INIT_DELAYED_WORK(&process->restore_work, kfd_restore_bo_worker);
 	process->last_restore_timestamp = get_jiffies_64();
 
@@ -1061,8 +1061,7 @@ void kfd_suspend_all_processes(void)
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
-		if (cancel_delayed_work_sync(&p->eviction_work.dwork))
-			dma_fence_put(p->eviction_work.quiesce_fence);
+		cancel_delayed_work_sync(&p->eviction_work);
 		cancel_delayed_work_sync(&p->restore_work);
 
 		if (quiesce_process_mm(p))

@@ -601,10 +601,6 @@ struct qcm_process_device {
 };
 
 /* KFD Memory Eviction */
-struct kfd_eviction_work {
-	struct delayed_work dwork;
-	struct dma_fence *quiesce_fence;
-};
 
 /* Approx. wait time before attempting to restore evicted BOs */
 #define PROCESS_RESTORE_TIME_MS 100
@@ -754,8 +750,10 @@ struct kfd_process {
 	struct dma_fence *ef;
 
 	/* Work items for evicting and restoring BOs */
-	struct kfd_eviction_work eviction_work;
+	struct delayed_work eviction_work;
 	struct delayed_work restore_work;
+	/* seqno of the last scheduled eviction */
+	unsigned int last_eviction_seqno;
 	/* Approx. the last timestamp (in jiffies) when the process was
 	 * restored after an eviction
 	 */
