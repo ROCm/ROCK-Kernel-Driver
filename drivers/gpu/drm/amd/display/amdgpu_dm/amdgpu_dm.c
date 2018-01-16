@@ -786,7 +786,10 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 
 	ret = drm_atomic_helper_resume(ddev, adev->dm.cached_state);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)) || defined(OS_NAME_RHEL_7_4)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)) || \
+    (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && !defined(OS_NAME_UBUNTU)) || \
+    (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)) || \
+    defined(OS_NAME_RHEL_7_4)
 	drm_atomic_state_put(adev->dm.cached_state);
 #endif
 	adev->dm.cached_state = NULL;
