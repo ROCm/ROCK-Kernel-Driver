@@ -9,6 +9,14 @@ config DRM_AMD_DC
 
           Will be deprecated when the DC component is upstream.
 
+config DRM_AMD_DC_PRE_VEGA
+	bool "DC support for Polaris and older ASICs"
+	default n
+	help
+	  Choose this option to enable the new DC support for older asics
+	  by default. This includes Polaris, Carrizo, Tonga, Bonaire,
+	  and Hawaii.
+
 config DRM_AMD_DC_FBC
 	bool "AMD FBC - Enable Frame Buffer Compression"
 	depends on DRM_AMD_DC
