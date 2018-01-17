@@ -381,17 +381,18 @@ static int amdgpu_amdkfd_validate(void *param, struct amdgpu_bo *bo)
  * again. Page directories are only updated after updating page
  * tables.
  */
-static int vm_validate_pt_pd_bos(struct amdgpu_vm *vm)
+static int vm_validate_pt_pd_bos(struct amdkfd_vm *vm)
 {
-	struct amdgpu_bo *pd = vm->root.base.bo;
+	struct amdgpu_bo *pd = vm->base.root.base.bo;
 	struct amdgpu_device *adev = amdgpu_ttm_adev(pd->tbo.bdev);
 	struct amdgpu_vm_parser param;
+	uint64_t addr, flags = AMDGPU_PTE_VALID;
 	int ret;
 
 	param.domain = AMDGPU_GEM_DOMAIN_VRAM;
 	param.wait = false;
 
-	ret = amdgpu_vm_validate_pt_bos(adev, vm, amdgpu_amdkfd_validate,
+	ret = amdgpu_vm_validate_pt_bos(adev, &vm->base, amdgpu_amdkfd_validate,
 					&param);
 	if (ret) {
 		pr_err("amdgpu: failed to validate PT BOs\n");
@@ -403,7 +404,12 @@ static int vm_validate_pt_pd_bos(struct amdgpu_vm *vm)
 		pr_err("amdgpu: failed to validate PD\n");
 		return ret;
 	}
-	if (vm->use_cpu_for_update) {
+
+	addr = amdgpu_bo_gpu_offset(vm->base.root.base.bo);
+	amdgpu_gmc_get_vm_pde(adev, -1, &addr, &flags);
+	vm->pd_phys_addr = addr;
+
+	if (vm->base.use_cpu_for_update) {
 		ret = amdgpu_bo_kmap(pd, NULL);
 		if (ret) {
 			pr_err("amdgpu: failed to kmap PD, ret=%d\n", ret);
@@ -518,7 +524,7 @@ static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
 		goto err_alloc_pts;
 	}
 
-	ret = vm_validate_pt_pd_bos(avm);
+	ret = vm_validate_pt_pd_bos(kvm);
 	if (ret != 0) {
 		pr_err("validate_pt_pd_bos() failed\n");
 		goto err_alloc_pts;
@@ -1365,31 +1371,6 @@ out:
 	return ret;
 }
 
-static u64 get_vm_pd_gpu_offset(void *vm)
-{
-	struct amdgpu_vm *avm = (struct amdgpu_vm *) vm;
-	struct amdgpu_device *adev =
-		amdgpu_ttm_adev(avm->root.base.bo->tbo.bdev);
-	u64 offset;
-	uint64_t flags = AMDGPU_PTE_VALID;
-
-	BUG_ON(avm == NULL);
-
-	amdgpu_bo_reserve(avm->root.base.bo, false);
-
-	offset = amdgpu_bo_gpu_offset(avm->root.base.bo);
-
-	amdgpu_bo_unreserve(avm->root.base.bo);
-
-	/* On some ASICs the FB doesn't start at 0. Adjust FB offset
-	 * to an actual MC address.
-	 */
-	if (adev->gmc.gmc_funcs->get_vm_pde)
-		amdgpu_gmc_get_vm_pde(adev, -1, &offset, &flags);
-
-	return offset;
-}
-
 int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 					  void **process_info,
 					  struct dma_fence **ef)
@@ -1512,7 +1493,9 @@ void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 
 uint32_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm)
 {
-	return get_vm_pd_gpu_offset(vm) >> AMDGPU_GPU_PAGE_SHIFT;
+	struct amdkfd_vm *avm = (struct amdkfd_vm *)vm;
+
+	return avm->pd_phys_addr >> AMDGPU_GPU_PAGE_SHIFT;
 }
 
 int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
@@ -1919,7 +1902,7 @@ static int process_validate_vms(struct amdkfd_process_info *process_info)
 
 	list_for_each_entry(peer_vm, &process_info->vm_list_head,
 			    vm_list_node) {
-		ret = vm_validate_pt_pd_bos(&peer_vm->base);
+		ret = vm_validate_pt_pd_bos(peer_vm);
 		if (ret)
 			return ret;
 	}

@@ -123,6 +123,8 @@ struct amdkfd_vm {
 	struct amdgpu_device *adev;
 	/* Points to the KFD process VM info*/
 	struct amdkfd_process_info *process_info;
+
+	uint64_t pd_phys_addr;
 };
 
 int amdgpu_amdkfd_init(void);
