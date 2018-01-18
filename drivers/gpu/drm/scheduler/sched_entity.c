@@ -73,7 +73,7 @@ int drm_sched_entity_init(struct drm_sched_entity *entity,
 	spsc_queue_init(&entity->job_queue);
 
 	atomic_set(&entity->fence_seq, 0);
-	entity->fence_context = dma_fence_context_alloc(2);
+	entity->fence_context = kcl_fence_context_alloc(2);
 
 	return 0;
 }

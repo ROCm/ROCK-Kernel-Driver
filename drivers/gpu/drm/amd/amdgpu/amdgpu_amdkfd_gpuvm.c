@@ -951,7 +951,7 @@ static int init_kfd_vm(struct amdgpu_vm *vm, void **process_info,
 		INIT_LIST_HEAD(&info->userptr_inval_list);
 
 		info->eviction_fence =
-			amdgpu_amdkfd_fence_create(dma_fence_context_alloc(1),
+			amdgpu_amdkfd_fence_create(kcl_fence_context_alloc(1),
 						   current->mm);
 		if (!info->eviction_fence) {
 			pr_err("Failed to create eviction fence\n");
