@@ -131,7 +131,7 @@ void amdgpu_pasid_free_delayed(struct reservation_object *resv,
 		fence = fences[0];
 		kfree(fences);
 	} else {
-		uint64_t context = dma_fence_context_alloc(1);
+		uint64_t context = kcl_fence_context_alloc(1);
 		struct dma_fence_array *array;
 
 		array = dma_fence_array_create(count, fences, context,
