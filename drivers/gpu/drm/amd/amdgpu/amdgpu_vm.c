@@ -1444,7 +1444,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 		if (mem && mem->mem_type == TTM_PL_VRAM &&
 			adev != bo_adev) {
 			flags |= AMDGPU_PTE_SYSTEM;
-			vram_base_offset = bo_adev->mc.aper_base;
+			vram_base_offset = bo_adev->gmc.aper_base;
 		}
 	} else
 		flags = 0x0;

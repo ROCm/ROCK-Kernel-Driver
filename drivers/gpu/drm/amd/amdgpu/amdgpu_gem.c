@@ -531,8 +531,8 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 			goto release_object;
 		}
 		args->addr = amdgpu_bo_gpu_offset(abo);
-		args->addr -= adev->mc.vram_start;
-		args->addr += adev->mc.aper_base;
+		args->addr -= adev->gmc.vram_start;
+		args->addr += adev->gmc.aper_base;
 		break;
 	default:
 		return -EINVAL;

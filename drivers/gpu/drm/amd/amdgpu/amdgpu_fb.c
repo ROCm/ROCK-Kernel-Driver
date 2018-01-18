@@ -274,7 +274,7 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	/* setup aperture base/size for vesafb takeover */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 35)
 	info->aperture_base = adev->ddev->mode_config.fb_base;
-	info->aperture_size = adev->mc.aper_size;
+	info->aperture_size = adev->gmc.aper_size;
 #else
 	info->apertures->ranges[0].base = adev->ddev->mode_config.fb_base;
 	info->apertures->ranges[0].size = adev->gmc.aper_size;

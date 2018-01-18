@@ -1139,11 +1139,11 @@ static int gmc_v8_0_sw_init(void *handle)
 		adev->vm_manager.vram_base_offset = 0;
 	}
 
-	adev->mc.vm_fault_info = kmalloc(sizeof(struct kfd_vm_fault_info),
+	adev->gmc.vm_fault_info = kmalloc(sizeof(struct kfd_vm_fault_info),
 					GFP_KERNEL);
-	if (!adev->mc.vm_fault_info)
+	if (!adev->gmc.vm_fault_info)
 		return -ENOMEM;
-	atomic_set(&adev->mc.vm_fault_info_updated, 0);
+	atomic_set(&adev->gmc.vm_fault_info_updated, 0);
 
 	return 0;
 }
@@ -1152,7 +1152,7 @@ static int gmc_v8_0_sw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-	kfree(adev->mc.vm_fault_info);
+	kfree(adev->gmc.vm_fault_info);
 	amdgpu_gem_force_release(adev);
 	amdgpu_vm_manager_fini(adev);
 	gmc_v8_0_gart_fini(adev);
@@ -1425,8 +1425,8 @@ static int gmc_v8_0_process_interrupt(struct amdgpu_device *adev,
 	vmid = REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS,
 			     VMID);
 	if (amdgpu_amdkfd_is_kfd_vmid(adev, vmid)
-		&& !atomic_read(&adev->mc.vm_fault_info_updated)) {
-		struct kfd_vm_fault_info *info = adev->mc.vm_fault_info;
+		&& !atomic_read(&adev->gmc.vm_fault_info_updated)) {
+		struct kfd_vm_fault_info *info = adev->gmc.vm_fault_info;
 		u32 protections = REG_GET_FIELD(status,
 					VM_CONTEXT1_PROTECTION_FAULT_STATUS,
 					PROTECTIONS);
@@ -1442,7 +1442,7 @@ static int gmc_v8_0_process_interrupt(struct amdgpu_device *adev,
 		info->prot_write = protections & 0x10 ? true : false;
 		info->prot_exec = protections & 0x20 ? true : false;
 		mb();
-		atomic_set(&adev->mc.vm_fault_info_updated, 1);
+		atomic_set(&adev->gmc.vm_fault_info_updated, 1);
 	}
 
 	return 0;

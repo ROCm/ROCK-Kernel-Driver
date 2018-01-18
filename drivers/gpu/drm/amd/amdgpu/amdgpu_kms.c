@@ -303,12 +303,12 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 		struct drm_amdgpu_virtual_range range_info;
 		switch (info->virtual_range.aperture) {
 		case AMDGPU_SUA_APERTURE_PRIVATE:
-			range_info.start = adev->mc.private_aperture_start;
-			range_info.end = adev->mc.private_aperture_end;
+			range_info.start = adev->gmc.private_aperture_start;
+			range_info.end = adev->gmc.private_aperture_end;
 			break;
 		case AMDGPU_SUA_APERTURE_SHARED:
-			range_info.start = adev->mc.shared_aperture_start;
-			range_info.end = adev->mc.shared_aperture_end;
+			range_info.start = adev->gmc.shared_aperture_start;
+			range_info.end = adev->gmc.shared_aperture_end;
 			break;
 		default:
 			return -EINVAL;

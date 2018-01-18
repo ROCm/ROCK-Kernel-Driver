@@ -495,7 +495,7 @@ static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
 	}
 
 	bo_va_entry->va = va;
-	bo_va_entry->pte_flags = amdgpu_vm_get_pte_flags(adev,
+	bo_va_entry->pte_flags = amdgpu_gmc_get_pte_flags(adev,
 							 mem->mapping_flags);
 	bo_va_entry->kgd_dev = (void *)adev;
 	list_add(&bo_va_entry->bo_list, list_bo_va);
@@ -1384,8 +1384,8 @@ static u64 get_vm_pd_gpu_offset(void *vm)
 	/* On some ASICs the FB doesn't start at 0. Adjust FB offset
 	 * to an actual MC address.
 	 */
-	if (adev->gart.gart_funcs->get_vm_pde)
-		amdgpu_gart_get_vm_pde(adev, -1, &offset, &flags);
+	if (adev->gmc.gmc_funcs->get_vm_pde)
+		amdgpu_gmc_get_vm_pde(adev, -1, &offset, &flags);
 
 	return offset;
 }
@@ -1521,10 +1521,10 @@ int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
 	struct amdgpu_device *adev;
 
 	adev = (struct amdgpu_device *) kgd;
-	if (atomic_read(&adev->mc.vm_fault_info_updated) == 1) {
-		*mem = *adev->mc.vm_fault_info;
+	if (atomic_read(&adev->gmc.vm_fault_info_updated) == 1) {
+		*mem = *adev->gmc.vm_fault_info;
 		mb();
-		atomic_set(&adev->mc.vm_fault_info_updated, 0);
+		atomic_set(&adev->gmc.vm_fault_info_updated, 0);
 	}
 	return 0;
 }
@@ -1753,7 +1753,7 @@ static int get_sg_table(struct amdgpu_device *adev,
 		goto out;
 
 	if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM) {
-		bus_addr = bo->tbo.offset + adev->mc.aper_base + offset;
+		bus_addr = bo->tbo.offset + adev->gmc.aper_base + offset;
 
 		for_each_sg(sg->sgl, s, sg->orig_nents, i) {
 			uint64_t chunk_size, length;

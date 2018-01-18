@@ -691,7 +691,7 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 	case TTM_PL_VRAM:
 	case AMDGPU_PL_DGMA:
 		mem->bus.offset = (mem->start << PAGE_SHIFT) + man->gpu_offset -
-				adev->mc.vram_start;
+				adev->gmc.vram_start;
 		/* check if it's visible */
 		if ((mem->bus.offset + mem->bus.size) > adev->gmc.visible_vram_size)
 			return -EINVAL;
@@ -1464,9 +1464,9 @@ static int amdgpu_ssg_init(struct amdgpu_device *adev)
 
 	init_completion(&adev->ssg.cmp);
 
-	res.start = adev->mc.aper_base +
+	res.start = adev->gmc.aper_base +
 		(amdgpu_bo_gpu_offset(adev->direct_gma.dgma_bo) -
-		 adev->mc.vram_start);
+		 adev->gmc.vram_start);
 	res.end = res.start + amdgpu_bo_size(adev->direct_gma.dgma_bo) - 1;
 	res.name = "DirectGMA";
 
