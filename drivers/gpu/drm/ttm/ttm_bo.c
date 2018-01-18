@@ -1787,8 +1787,8 @@ out:
 	 * Unreserve without putting on LRU to avoid swapping out an
 	 * already swapped buffer.
 	 */
-
-	kcl_reservation_object_unlock(bo->resv);
+	if (locked)
+		kcl_reservation_object_unlock(bo->resv);
 	kref_put(&bo->list_kref, ttm_bo_release_list);
 	return ret;
 }
