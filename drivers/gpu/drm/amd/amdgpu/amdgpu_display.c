@@ -507,10 +507,10 @@ cleanup:
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
-int amdgpu_crtc_set_config(struct drm_mode_set *set,
+int amdgpu_display_crtc_set_config(struct drm_mode_set *set,
 			   struct drm_modeset_acquire_ctx *ctx)
 #else
-int amdgpu_crtc_set_config(struct drm_mode_set *set)
+int amdgpu_display_crtc_set_config(struct drm_mode_set *set)
 #endif
 {
 	struct drm_device *dev;

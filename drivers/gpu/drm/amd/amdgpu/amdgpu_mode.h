@@ -685,10 +685,10 @@ int amdgpu_align_pitch(struct amdgpu_device *adev, int width, int bpp, bool tile
 void amdgpu_print_display_setup(struct drm_device *dev);
 int amdgpu_modeset_create_props(struct amdgpu_device *adev);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
-int amdgpu_crtc_set_config(struct drm_mode_set *set,
+int amdgpu_display_crtc_set_config(struct drm_mode_set *set,
 			   struct drm_modeset_acquire_ctx *ctx);
 #else
-int amdgpu_crtc_set_config(struct drm_mode_set *set);
+int amdgpu_display_crtc_set_config(struct drm_mode_set *set);
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || defined(OS_NAME_RHEL_7_4)
 int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
