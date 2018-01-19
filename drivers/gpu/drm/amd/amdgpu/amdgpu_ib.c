@@ -189,7 +189,7 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 		}
 	}
 
-	if (ring->funcs->init_cond_exec)
+	if (job && ring->funcs->init_cond_exec)
 		patch_offset = amdgpu_ring_init_cond_exec(ring);
 
 	if (ring->funcs->emit_hdp_flush
