@@ -881,7 +881,7 @@ int amdgpu_get_crtc_scanoutpos(struct drm_device *dev, unsigned int pipe,
 	return ret;
 }
 
-int amdgpu_crtc_idx_to_irq_type(struct amdgpu_device *adev, int crtc)
+int amdgpu_display_crtc_idx_to_irq_type(struct amdgpu_device *adev, int crtc)
 {
 	if (crtc < 0 || crtc >= adev->mode_info.num_crtc)
 		return AMDGPU_CRTC_IRQ_NONE;
