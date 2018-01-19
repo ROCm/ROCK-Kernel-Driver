@@ -778,7 +778,7 @@ uint32_t amdgpu_display_framebuffer_domains(struct amdgpu_device *adev)
 }
 
 int
-amdgpu_framebuffer_init(struct drm_device *dev,
+amdgpu_display_framebuffer_init(struct drm_device *dev,
 			struct amdgpu_framebuffer *rfb,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
 			defined(OS_NAME_RHEL_7_3) || \
@@ -838,7 +838,7 @@ amdgpu_user_framebuffer_create(struct drm_device *dev,
 		return ERR_PTR(-ENOMEM);
 	}
 
-	ret = amdgpu_framebuffer_init(dev, amdgpu_fb, mode_cmd, obj);
+	ret = amdgpu_display_framebuffer_init(dev, amdgpu_fb, mode_cmd, obj);
 	if (ret) {
 		kfree(amdgpu_fb);
 		kcl_drm_gem_object_put_unlocked(obj);
