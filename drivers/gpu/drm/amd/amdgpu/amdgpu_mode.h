@@ -682,7 +682,7 @@ void amdgpu_fb_output_poll_changed(struct amdgpu_device *adev);
 int amdgpu_align_pitch(struct amdgpu_device *adev, int width, int bpp, bool tiled);
 
 /* amdgpu_display.c */
-void amdgpu_print_display_setup(struct drm_device *dev);
+void amdgpu_display_print_display_setup(struct drm_device *dev);
 int amdgpu_modeset_create_props(struct amdgpu_device *adev);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 int amdgpu_display_crtc_set_config(struct drm_mode_set *set,
