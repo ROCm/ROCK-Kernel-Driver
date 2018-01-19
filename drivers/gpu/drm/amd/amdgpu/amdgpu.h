@@ -1290,8 +1290,8 @@ int amdgpu_cs_wait_fences_ioctl(struct drm_device *dev, void *data,
 int amdgpu_gem_metadata_ioctl(struct drm_device *dev, void *data,
 				struct drm_file *filp);
 
-int amdgpu_freesync_ioctl(struct drm_device *dev, void *data,
-			    struct drm_file *filp);
+int amdgpu_display_freesync_ioctl(struct drm_device *dev, void *data,
+				  struct drm_file *filp);
 
 int amdgpu_sem_ioctl(struct drm_device *dev, void *data,
 		     struct drm_file *filp);
