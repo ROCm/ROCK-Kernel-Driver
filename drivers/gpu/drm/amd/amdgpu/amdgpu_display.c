@@ -805,7 +805,7 @@ amdgpu_display_framebuffer_init(struct drm_device *dev,
 }
 
 struct drm_framebuffer *
-amdgpu_user_framebuffer_create(struct drm_device *dev,
+amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 			       struct drm_file *file_priv,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
 			defined(OS_NAME_RHEL_7_3) || \
@@ -855,7 +855,7 @@ void amdgpu_output_poll_changed(struct drm_device *dev)
 }
 
 const struct drm_mode_config_funcs amdgpu_mode_funcs = {
-	.fb_create = amdgpu_user_framebuffer_create,
+	.fb_create = amdgpu_display_user_framebuffer_create,
 	.output_poll_changed = amdgpu_output_poll_changed
 };
 
