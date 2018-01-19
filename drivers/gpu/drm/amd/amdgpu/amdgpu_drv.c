@@ -837,7 +837,7 @@ static struct drm_driver kms_driver = {
 	    DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET,
 #endif
 	.load = amdgpu_driver_load_kms,
-	.open = amdgpu_driver_open_kms,
+    .open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
 	.lastclose = amdgpu_driver_lastclose_kms,
 	.set_busid = drm_pci_set_busid,
@@ -857,9 +857,6 @@ static struct drm_driver kms_driver = {
 	.debugfs_cleanup = amdgpu_debugfs_cleanup,
 #endif
 #endif
-	.irq_preinstall = amdgpu_irq_preinstall,
-	.irq_postinstall = amdgpu_irq_postinstall,
-	.irq_uninstall = amdgpu_irq_uninstall,
 	.irq_handler = amdgpu_irq_handler,
 	.ioctls = amdgpu_ioctls_kms,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
