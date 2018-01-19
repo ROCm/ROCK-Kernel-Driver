@@ -917,8 +917,8 @@ int amdgpu_display_crtc_idx_to_irq_type(struct amdgpu_device *adev, int crtc)
 	}
 }
 
-int amdgpu_freesync_ioctl(struct drm_device *dev, void *data,
-			    struct drm_file *filp)
+int amdgpu_display_freesync_ioctl(struct drm_device *dev, void *data,
+				  struct drm_file *filp)
 {
 	int ret = -EPERM;
 	struct amdgpu_device *adev = dev->dev_private;
