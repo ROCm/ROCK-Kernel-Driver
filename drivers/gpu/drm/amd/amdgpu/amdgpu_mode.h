@@ -691,7 +691,7 @@ int amdgpu_crtc_set_config(struct drm_mode_set *set,
 int amdgpu_crtc_set_config(struct drm_mode_set *set);
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || defined(OS_NAME_RHEL_7_4)
-int amdgpu_crtc_page_flip_target(struct drm_crtc *crtc,
+int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 				 struct drm_framebuffer *fb,
 				 struct drm_pending_vblank_event *event,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
