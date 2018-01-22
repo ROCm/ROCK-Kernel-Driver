@@ -483,11 +483,13 @@ long reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 unsigned long timeout)
 {
 	struct dma_fence *fence;
-	unsigned seq, shared_count, i = 0;
+	unsigned seq, shared_count;
 	long ret = timeout ? timeout : 1;
+	int i;
 
 retry:
 	shared_count = 0;
+	i = -1;
 	seq = read_seqcount_begin(&obj->seq);
 	rcu_read_lock();
 
@@ -505,14 +507,14 @@ retry:
 		fence = NULL;
 	}
 
-	if (!fence && wait_all) {
+	if (wait_all) {
 		struct reservation_object_list *fobj =
 						rcu_dereference(obj->fence);
 
 		if (fobj)
 			shared_count = fobj->shared_count;
 
-		for (i = 0; i < shared_count; ++i) {
+		for (i = 0; !fence && i < shared_count; ++i) {
 			struct dma_fence *lfence = rcu_dereference(fobj->shared[i]);
 
 			if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT,
