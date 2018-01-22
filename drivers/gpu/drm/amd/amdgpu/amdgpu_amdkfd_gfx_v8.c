@@ -830,6 +830,7 @@ static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 		if ((tmp & ATC_VMID0_PASID_MAPPING__VALID_MASK) &&
 			(tmp & ATC_VMID0_PASID_MAPPING__PASID_MASK) == pasid) {
 			WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);
+			RREG32(mmVM_INVALIDATE_RESPONSE);
 			break;
 		}
 	}
@@ -847,6 +848,7 @@ static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid)
 	}
 
 	WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);
+	RREG32(mmVM_INVALIDATE_RESPONSE);
 	return 0;
 }
 
