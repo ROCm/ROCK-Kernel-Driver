@@ -1291,25 +1291,27 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
-	if (args->device_ids_array_size > 0 &&
-			(args->device_ids_array_size < sizeof(uint32_t))) {
+	if (args->device_ids_array_size == 0) {
+		pr_debug("Device ID array size is 0\n");
+		return -EINVAL;
+	}
+
+	if (args->device_ids_array_size % sizeof(uint32_t)) {
 		pr_debug("Node IDs array size %u\n",
 				args->device_ids_array_size);
 		return -EFAULT;
 	}
 
-	if (args->device_ids_array_size > 0) {
-		devices_arr = kmalloc(args->device_ids_array_size, GFP_KERNEL);
-		if (!devices_arr)
-			return -ENOMEM;
+	devices_arr = kmalloc(args->device_ids_array_size, GFP_KERNEL);
+	if (!devices_arr)
+		return -ENOMEM;
 
-		err = copy_from_user(devices_arr,
-				(void __user *)args->device_ids_array_ptr,
-				args->device_ids_array_size);
-		if (err != 0) {
-			err = -EFAULT;
-			goto copy_from_user_failed;
-		}
+	err = copy_from_user(devices_arr,
+			(void __user *)args->device_ids_array_ptr,
+			args->device_ids_array_size);
+	if (err != 0) {
+		err = -EFAULT;
+		goto copy_from_user_failed;
 	}
 
 	mutex_lock(&p->mutex);
@@ -1327,35 +1329,26 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		goto get_mem_obj_from_handle_failed;
 	}
 
-	if (args->device_ids_array_size > 0) {
-		num_dev = args->device_ids_array_size / sizeof(uint32_t);
-		for (i = 0 ; i < num_dev; i++) {
-			peer = kfd_device_by_id(devices_arr[i]);
-			if (!peer) {
-				pr_debug("Getting device by id failed for 0x%x\n",
-						devices_arr[i]);
-				err = -EFAULT;
-				goto get_mem_obj_from_handle_failed;
-			}
-
-			peer_pdd = kfd_bind_process_to_device(peer, p);
-			if (!peer_pdd) {
-				err = -EFAULT;
-				goto get_mem_obj_from_handle_failed;
-			}
-			err = peer->kfd2kgd->map_memory_to_gpu(
-				peer->kgd, (struct kgd_mem *)mem, peer_pdd->vm);
-			if (err != 0) {
-				pr_err("Failed to map to gpu %d, num_dev=%d\n",
-					i, num_dev);
-				goto map_memory_to_gpu_failed;
-			}
+	num_dev = args->device_ids_array_size / sizeof(uint32_t);
+	for (i = 0 ; i < num_dev; i++) {
+		peer = kfd_device_by_id(devices_arr[i]);
+		if (!peer) {
+			pr_debug("Getting device by id failed for 0x%x\n",
+					devices_arr[i]);
+			err = -EFAULT;
+			goto get_mem_obj_from_handle_failed;
 		}
-	} else {
-		err = dev->kfd2kgd->map_memory_to_gpu(
-			dev->kgd, (struct kgd_mem *)mem, pdd->vm);
+
+		peer_pdd = kfd_bind_process_to_device(peer, p);
+		if (!peer_pdd) {
+			err = -EFAULT;
+			goto get_mem_obj_from_handle_failed;
+		}
+		err = peer->kfd2kgd->map_memory_to_gpu(
+				peer->kgd, (struct kgd_mem *)mem, peer_pdd->vm);
 		if (err != 0) {
-			pr_err("Failed to map\n");
+			pr_err("Failed to map to gpu %d, num_dev=%d\n",
+					i, num_dev);
 			goto map_memory_to_gpu_failed;
 		}
 	}
@@ -1369,19 +1362,14 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	}
 
 	/* Flush TLBs after waiting for the page table updates to complete */
-	if (args->device_ids_array_size > 0) {
-		for (i = 0; i < num_dev; i++) {
-			peer = kfd_device_by_id(devices_arr[i]);
-			if (WARN_ON_ONCE(!peer))
-				continue;
-			kfd_flush_tlb(peer, p);
-		}
-	} else {
-		kfd_flush_tlb(dev, p);
+	for (i = 0; i < num_dev; i++) {
+		peer = kfd_device_by_id(devices_arr[i]);
+		if (WARN_ON_ONCE(!peer))
+			continue;
+		kfd_flush_tlb(peer, p);
 	}
 
-	if (args->device_ids_array_size > 0 && devices_arr)
-		kfree(devices_arr);
+	kfree(devices_arr);
 
 	return err;
 
@@ -1391,8 +1379,7 @@ map_memory_to_gpu_failed:
 	mutex_unlock(&p->mutex);
 copy_from_user_failed:
 sync_memory_failed:
-	if (args->device_ids_array_size > 0 && devices_arr)
-		kfree(devices_arr);
+	kfree(devices_arr);
 
 	return err;
 }
@@ -1427,25 +1414,27 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
-	if (args->device_ids_array_size > 0 &&
-			(args->device_ids_array_size < sizeof(uint32_t))) {
+	if (args->device_ids_array_size == 0) {
+		pr_debug("Device ID array size is 0\n");
+		return -EINVAL;
+	}
+
+	if (args->device_ids_array_size % sizeof(uint32_t)) {
 		pr_debug("Node IDs array size %u\n",
 				args->device_ids_array_size);
 		return -EFAULT;
 	}
 
-	if (args->device_ids_array_size > 0) {
-		devices_arr = kmalloc(args->device_ids_array_size, GFP_KERNEL);
-		if (!devices_arr)
-			return -ENOMEM;
+	devices_arr = kmalloc(args->device_ids_array_size, GFP_KERNEL);
+	if (!devices_arr)
+		return -ENOMEM;
 
-		err = copy_from_user(devices_arr,
-				(void __user *)args->device_ids_array_ptr,
-				args->device_ids_array_size);
-		if (err != 0) {
-			err = -EFAULT;
-			goto copy_from_user_failed;
-		}
+	err = copy_from_user(devices_arr,
+			(void __user *)args->device_ids_array_ptr,
+			args->device_ids_array_size);
+	if (err != 0) {
+		err = -EFAULT;
+		goto copy_from_user_failed;
 	}
 
 	mutex_lock(&p->mutex);
@@ -1464,25 +1453,22 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 		goto get_mem_obj_from_handle_failed;
 	}
 
-	if (args->device_ids_array_size > 0) {
-		num_dev = args->device_ids_array_size / sizeof(uint32_t);
-		for (i = 0 ; i < num_dev; i++) {
-			peer = kfd_device_by_id(devices_arr[i]);
-			if (!peer) {
-				err = -EFAULT;
-				goto get_mem_obj_from_handle_failed;
-			}
-
-			peer_pdd = kfd_get_process_device_data(peer, p);
-			if (!peer_pdd) {
-				err = -EFAULT;
-				goto get_mem_obj_from_handle_failed;
-			}
-			kfd_unmap_memory_from_gpu(mem, peer_pdd);
+	num_dev = args->device_ids_array_size / sizeof(uint32_t);
+	for (i = 0 ; i < num_dev; i++) {
+		peer = kfd_device_by_id(devices_arr[i]);
+		if (!peer) {
+			err = -EFAULT;
+			goto get_mem_obj_from_handle_failed;
 		}
-		kfree(devices_arr);
-	} else
-		kfd_unmap_memory_from_gpu(mem, pdd);
+
+		peer_pdd = kfd_get_process_device_data(peer, p);
+		if (!peer_pdd) {
+			err = -EFAULT;
+			goto get_mem_obj_from_handle_failed;
+		}
+		kfd_unmap_memory_from_gpu(mem, peer_pdd);
+	}
+	kfree(devices_arr);
 
 	mutex_unlock(&p->mutex);
 
