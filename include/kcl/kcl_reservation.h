@@ -142,4 +142,25 @@ kcl_reservation_object_add_shared_fence(struct reservation_object *obj,
 #endif
 }
 
+#if defined(BUILD_AS_DKMS)
+extern int
+_kcl_reservation_object_get_fences_rcu(struct reservation_object *obj,
+				      struct dma_fence **pfence_excl,
+				      unsigned *pshared_count,
+				      struct dma_fence ***pshared);
+#endif
+
+static inline int
+kcl_reservation_object_get_fences_rcu(struct reservation_object *obj,
+				      struct dma_fence **pfence_excl,
+				      unsigned *pshared_count,
+				      struct dma_fence ***pshared)
+{
+#if defined(BUILD_AS_DKMS)
+	return _kcl_reservation_object_get_fences_rcu(obj, pfence_excl, pshared_count, pshared);
+#else
+	return reservation_object_get_fences_rcu(obj, pfence_excl, pshared_count, pshared);
+#endif
+
+}
 #endif /* AMDKCL_RESERVATION_H */

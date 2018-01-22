@@ -322,7 +322,7 @@ int amdgpu_crtc_page_flip_target(struct drm_crtc *crtc,
 		goto unreserve;
 	}
 
-	r = reservation_object_get_fences_rcu(new_abo->tbo.resv, &work->excl,
+	r = kcl_reservation_object_get_fences_rcu(new_abo->tbo.resv, &work->excl,
 					      &work->shared_count,
 					      &work->shared);
 	if (unlikely(r != 0)) {
@@ -437,7 +437,7 @@ int amdgpu_crtc_page_flip(struct drm_crtc *crtc,
 		goto unreserve;
 	}
 
-	r = reservation_object_get_fences_rcu(new_abo->tbo.resv, &work->excl,
+	r = kcl_reservation_object_get_fences_rcu(new_abo->tbo.resv, &work->excl,
 					      &work->shared_count,
 					      &work->shared);
 	if (unlikely(r != 0)) {
