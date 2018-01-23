@@ -6,5 +6,6 @@
 #include <kcl/kcl_drm.h>
 #include <kcl/kcl_reservation.h>
 #include <kcl/kcl_kref.h>
+#include <kcl/kcl_kernel.h>
 
 #endif
