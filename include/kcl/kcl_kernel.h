@@ -12,4 +12,8 @@
 #define kcl_u64_to_user_ptr(x) u64_to_user_ptr(x)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
+#define __GFP_RETRY_MAYFAIL __GFP_REPEAT
+#endif
+
 #endif /* AMDKCL_KERNEL_H */
