@@ -4,4 +4,5 @@
 
 #include <linux/version.h>
 #include <kcl/kcl_kref.h>
+#include <kcl/kcl_kernel.h>
 #endif
