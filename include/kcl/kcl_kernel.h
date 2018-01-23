@@ -12,4 +12,8 @@
 #define kcl_u64_to_user_ptr(x) u64_to_user_ptr(x)
 #endif
 
+#ifndef __GFP_RETRY_MAYFAIL
+#define __GFP_RETRY_MAYFAIL __GFP_REPEAT
+#endif
+
 #endif /* AMDKCL_KERNEL_H */
