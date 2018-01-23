@@ -31,7 +31,7 @@
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_ucode.h"
 #include "amdgpu_amdkfd_gfx_v8.h"
-#include "soc15ip.h"
+#include "soc15_hw_ip.h"
 #include "gc/gc_9_0_offset.h"
 #include "gc/gc_9_0_sh_mask.h"
 #include "vega10_enum.h"
