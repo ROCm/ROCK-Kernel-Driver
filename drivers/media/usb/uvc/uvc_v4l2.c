@@ -821,7 +821,6 @@ static int uvc_ioctl_enum_input(struct file *file, void *fh,
 		}
 		pin = iterm->id;
 	} else if (index < selector->bNrInPins) {
-		osb();
 		pin = selector->baSourceID[index];
 		list_for_each_entry(iterm, &chain->entities, chain) {
 			if (!UVC_ENTITY_IS_ITERM(iterm))

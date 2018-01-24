@@ -34,6 +34,7 @@
 #include <linux/tboot.h>
 #include <linux/hrtimer.h>
 #include <linux/frame.h>
+#include <linux/nospec.h>
 #include "kvm_cache_regs.h"
 #include "x86.h"
 
@@ -898,21 +899,15 @@ static const unsigned short vmcs_field_to_offset_table[] = {
 
 static inline short vmcs_field_to_offset(unsigned long field)
 {
+	const unsigned short *offset;
+
 	BUILD_BUG_ON(ARRAY_SIZE(vmcs_field_to_offset_table) > SHRT_MAX);
 
-	if (field >= ARRAY_SIZE(vmcs_field_to_offset_table))
+	offset = array_ptr(vmcs_field_to_offset_table, field,
+			ARRAY_SIZE(vmcs_field_to_offset_table));
+	if (!offset || *offset == 0)
 		return -ENOENT;
-
-	/*
-	 * FIXME: Mitigation for CVE-2017-5753.  To be replaced with a
-	 * generic mechanism.
-	 */
-	asm("lfence");
-
-	if (vmcs_field_to_offset_table[field] == 0)
-		return -ENOENT;
-
-	return vmcs_field_to_offset_table[field];
+	return *offset;
 }
 
 static inline struct vmcs12 *get_vmcs12(struct kvm_vcpu *vcpu)

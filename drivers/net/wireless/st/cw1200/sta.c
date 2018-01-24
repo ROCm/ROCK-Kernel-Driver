@@ -619,7 +619,6 @@ int cw1200_conf_tx(struct ieee80211_hw *dev, struct ieee80211_vif *vif,
 	mutex_lock(&priv->conf_mutex);
 
 	if (queue < dev->queues) {
-		osb();
 		old_uapsd_flags = le16_to_cpu(priv->uapsd_info.uapsd_flags);
 
 		WSM_TX_QUEUE_SET(&priv->tx_queue_params, queue, 0, 0, 0);
