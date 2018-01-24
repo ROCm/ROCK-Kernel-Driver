@@ -102,6 +102,64 @@ static void probe_xeon_phi_r3mwait(struct cpuinfo_x86 *c)
 		ELF_HWCAP2 |= HWCAP2_RING3MWAIT;
 }
 
+/*
+ * Early microcode releases for the Spectre v2 mitigation were broken.
+ * Information taken from;
+ * • https://newsroom.intel.com/wp-content/uploads/sites/11/2018/01/microcode-update-guidance.pdf
+ * • https://kb.vmware.com/s/article/52345
+ * • Microcode revisions observed in the wild
+ * • releasenote from 20180108 microcode release
+ */
+struct sku_microcode {
+	u8 model;
+	u8 stepping;
+	u32 microcode;
+};
+static const struct sku_microcode spectre_bad_microcodes[] = {
+	{ INTEL_FAM6_KABYLAKE_DESKTOP, 0x0B, 0x80 },
+	/* Corrected typo in Intel doc */
+	{ INTEL_FAM6_KABYLAKE_DESKTOP, 0x0A, 0x80 },
+	{ INTEL_FAM6_KABYLAKE_MOBILE, 0x0A, 0x80 },
+	{ INTEL_FAM6_KABYLAKE_MOBILE, 0x09, 0x80 },
+	{ INTEL_FAM6_KABYLAKE_DESKTOP, 0x09, 0x80 },
+	{ INTEL_FAM6_SKYLAKE_X, 0x04, 0x0200003C },
+	{ INTEL_FAM6_SKYLAKE_MOBILE, 0x03, 0x000000C2 },
+	{ INTEL_FAM6_SKYLAKE_DESKTOP, 0x03, 0x000000C2 },
+	{ INTEL_FAM6_BROADWELL_CORE, 0x04, 0x28 },
+	{ INTEL_FAM6_BROADWELL_GT3E, 0x01, 0x0000001B },
+	{ INTEL_FAM6_HASWELL_ULT, 0x01, 0x21 },
+	{ INTEL_FAM6_HASWELL_GT3E, 0x01, 0x18 },
+	{ INTEL_FAM6_HASWELL_CORE, 0x03, 0x23 },
+	{ INTEL_FAM6_IVYBRIDGE_X, 0x04, 0x42a },
+	{ INTEL_FAM6_HASWELL_X, 0x02, 0x3b },
+	{ INTEL_FAM6_HASWELL_X, 0x04, 0x10 },
+	/* Dropped repeat of HSW 306C3, 0x23 */
+	{ INTEL_FAM6_BROADWELL_XEON_D, 0x02, 0x14 },
+	{ INTEL_FAM6_BROADWELL_XEON_D, 0x03, 0x7000011 },
+	/* Dropped repeat of BDW 40671, 0x1B */
+	{ INTEL_FAM6_BROADWELL_X, 0x01, 0x0b000025 },
+	/* Dropped repeat of KBL Desktop 906E9, 0x80 */
+	{ INTEL_FAM6_SKYLAKE_X, 0x03, 0x0100013e },
+	/* Dropped repeat of SKX 50654, 0x200003c */
+	/* Updated in the 20180108 release; blacklist until we know otherwise */
+	{ INTEL_FAM6_ATOM_GEMINI_LAKE, 0x01, 0x22 },
+	/* Observed in the wild */
+	{ INTEL_FAM6_SANDYBRIDGE_X, 0x06, 0x61b },
+	{ INTEL_FAM6_SANDYBRIDGE_X, 0x07, 0x712 },
+};
+
+static bool bad_spectre_microcode(struct cpuinfo_x86 *c)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(spectre_bad_microcodes); i++) {
+		if (c->x86_model == spectre_bad_microcodes[i].model &&
+		    c->x86_mask == spectre_bad_microcodes[i].stepping)
+			return (c->microcode <= spectre_bad_microcodes[i].microcode);
+	}
+	return false;
+}
+
 static void early_init_intel(struct cpuinfo_x86 *c)
 {
 	u64 misc_enable;
@@ -121,6 +179,24 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 
 	if (c->x86 >= 6 && !cpu_has(c, X86_FEATURE_IA64))
 		c->microcode = intel_get_microcode_revision();
+
+	if ((cpu_has(c, X86_FEATURE_SPEC_CTRL) ||
+	     cpu_has(c, X86_FEATURE_STIBP) ||
+	     cpu_has(c, X86_FEATURE_AMD_SPEC_CTRL) ||
+	     cpu_has(c, X86_FEATURE_AMD_STIBP)) && bad_spectre_microcode(c)) {
+		pr_warn("Intel Spectre v2 broken microcode detected; disabling SPEC_CTRL\n");
+		/*
+		 * Intel's X86_FEATURE_SPEC_CTRL says both MSRs are available.
+		 * We can't leave that set, but we can turn on the AMD bit
+		 * which advertises PRED_CMD alone. IBPB is believed to be OK.
+		 */
+		if (cpu_has(c, X86_FEATURE_SPEC_CTRL))
+			set_cpu_cap(c, X86_FEATURE_AMD_PRED_CMD);
+		clear_cpu_cap(c, X86_FEATURE_SPEC_CTRL);
+		clear_cpu_cap(c, X86_FEATURE_STIBP);
+		clear_cpu_cap(c, X86_FEATURE_AMD_SPEC_CTRL);
+		clear_cpu_cap(c, X86_FEATURE_AMD_STIBP);
+	}
 
 	/*
 	 * Atom erratum AAE44/AAF40/AAG38/AAH41:
