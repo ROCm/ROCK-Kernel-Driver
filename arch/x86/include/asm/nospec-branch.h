@@ -262,5 +262,51 @@ static inline void unrestrict_branch_speculation(void)
 		     : "memory");
 }
 
+static inline u64 save_and_restrict_branch_speculation(void)
+{
+	u64 ret;
+	unsigned long ax = 0, cx = 0, dx = 0;
+
+	/* save */
+	asm volatile(ALTERNATIVE("",
+				 "movl %[msr], %%ecx\n\t"
+				 "rdmsr\n\t",
+				 X86_FEATURE_IBRS)
+		     : "=a" (ax), "=c" (cx), "=d" (dx)
+		     : [msr] "i" (MSR_IA32_SPEC_CTRL)
+		     : "memory");
+
+	ret = ax | (dx << 32);
+
+	/* restrict speculation */
+	asm volatile(ALTERNATIVE("",
+				 "movl %[msr], %%ecx\n\t"
+				 "movl %[val], %%eax\n\t"
+				 "movl $0, %%edx\n\t"
+				 "wrmsr",
+				 X86_FEATURE_IBRS)
+		     : "=a" (ax), "=c" (cx), "=d" (dx)
+		     : [msr] "i" (MSR_IA32_SPEC_CTRL),
+		       [val] "i" (SPEC_CTRL_IBRS)
+		     : "memory");
+
+	return ret;
+}
+
+static inline void restore_branch_speculation(u64 val)
+{
+	unsigned long ax, cx, dx;
+
+	asm volatile(ALTERNATIVE("",
+				 "movl %[msr], %%ecx\n\t"
+				 "wrmsr",
+				 X86_FEATURE_IBRS)
+		     : "=a" (ax), "=c" (cx), "=d" (dx)
+		     : [msr] "i" (MSR_IA32_SPEC_CTRL),
+		       [val_low] "a" (val & 0xffffffff),
+		       [val_high] "d" (val >> 32)
+		     : "memory");
+}
+
 #endif /* __ASSEMBLY__ */
 #endif /* __NOSPEC_BRANCH_H__ */
