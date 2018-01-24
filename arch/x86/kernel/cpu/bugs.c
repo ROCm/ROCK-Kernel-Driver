@@ -99,13 +99,13 @@ static enum spectre_v2_mitigation spectre_v2_enabled = SPECTRE_V2_NONE;
 static void __init spec2_print_if_insecure(const char *reason)
 {
 	if (boot_cpu_has_bug(X86_BUG_SPECTRE_V2))
-		pr_info("%s\n", reason);
+		pr_info("%s selected on command line.\n", reason);
 }
 
 static void __init spec2_print_if_secure(const char *reason)
 {
 	if (!boot_cpu_has_bug(X86_BUG_SPECTRE_V2))
-		pr_info("%s\n", reason);
+		pr_info("%s selected on command line.\n", reason);
 }
 
 static inline bool retp_compiler(void)
@@ -120,62 +120,79 @@ static inline bool match_option(const char *arg, int arglen, const char *opt)
 	return len == arglen && !strncmp(arg, opt, len);
 }
 
+static struct {
+	char *option;
+	enum spectre_v2_mitigation_cmd cmd;
+	bool secure;
+} mitigation_options[] = {
+	{ "off",               SPECTRE_V2_CMD_NONE,              false },
+	{ "on",                SPECTRE_V2_CMD_FORCE,             true },
+	{ "retpoline",         SPECTRE_V2_CMD_RETPOLINE,         false },
+	{ "retpoline,amd",     SPECTRE_V2_CMD_RETPOLINE_AMD,     false },
+	{ "retpoline,generic", SPECTRE_V2_CMD_RETPOLINE_GENERIC, false },
+	{ "ibrs",              SPECTRE_V2_CMD_IBRS,              false },
+	{ "auto",              SPECTRE_V2_CMD_AUTO,              false },
+};
+
+static const int mitigation_options_count = sizeof(mitigation_options) /
+					    sizeof(mitigation_options[0]);
+
 static enum spectre_v2_mitigation_cmd __init spectre_v2_parse_cmdline(void)
 {
 	char arg[20];
-	int ret;
+	int ret, i;
+	enum spectre_v2_mitigation_cmd cmd = SPECTRE_V2_CMD_AUTO;
+
+	if (cmdline_find_option_bool(boot_command_line, "nospectre_v2"))
+		return SPECTRE_V2_CMD_NONE;
 
 	ret = cmdline_find_option(boot_command_line, "spectre_v2", arg,
 				  sizeof(arg));
-	if (ret > 0)  {
-		if (match_option(arg, ret, "off")) {
-			goto disable;
-		} else if (match_option(arg, ret, "on")) {
-			spec2_print_if_secure("force enabled on command line.");
-			return SPECTRE_V2_CMD_FORCE;
-		} else if (match_option(arg, ret, "retpoline")) {
-			if (!IS_ENABLED(CONFIG_RETPOLINE)) {
-				pr_err("retpoline selected but not compiled in. Switching to AUTO select\n");
-				return SPECTRE_V2_CMD_AUTO;
-			}
-			spec2_print_if_insecure("retpoline selected on command line.");
-			return SPECTRE_V2_CMD_RETPOLINE;
-		} else if (match_option(arg, ret, "retpoline,amd")) {
-			if (!IS_ENABLED(CONFIG_RETPOLINE)) {
-				pr_err("retpoline,amd selected but not compiled in. Switching to AUTO select\n");
-				return SPECTRE_V2_CMD_AUTO;
-			}
-			if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) {
-				pr_err("retpoline,amd selected but CPU is not AMD. Switching to AUTO select\n");
-				return SPECTRE_V2_CMD_AUTO;
-			}
-			spec2_print_if_insecure("AMD retpoline selected on command line.");
-			return SPECTRE_V2_CMD_RETPOLINE_AMD;
-		} else if (match_option(arg, ret, "retpoline,generic")) {
-			if (!IS_ENABLED(CONFIG_RETPOLINE)) {
-				pr_err("retpoline,generic selected but not compiled in. Switching to AUTO select\n");
-				return SPECTRE_V2_CMD_AUTO;
-			}
-			spec2_print_if_insecure("generic retpoline selected on command line.");
-			return SPECTRE_V2_CMD_RETPOLINE_GENERIC;
-		} else if (match_option(arg, ret, "ibrs")) {
-			if (!boot_cpu_has(X86_FEATURE_SPEC_CTRL) &&
-			    !boot_cpu_has(X86_FEATURE_AMD_SPEC_CTRL)) {
-				pr_err("IBRS selected but no CPU support. Switching to AUTO select\n");
-				return SPECTRE_V2_CMD_AUTO;
-			}
-			spec2_print_if_insecure("IBRS seleted on command line.");
-			return SPECTRE_V2_CMD_IBRS;
-		} else if (match_option(arg, ret, "auto")) {
-			return SPECTRE_V2_CMD_AUTO;
-		}
+	if (ret < 0)
+		return SPECTRE_V2_CMD_AUTO;
+
+	for (i = 0; i < mitigation_options_count; i++) {
+		if (!match_option(arg, ret, mitigation_options[i].option))
+			continue;
+		cmd = mitigation_options[i].cmd;
+		break;
 	}
 
-	if (!cmdline_find_option_bool(boot_command_line, "nospectre_v2"))
+	if (i >= mitigation_options_count) {
+		pr_err("unknown option (%s). Switching to AUTO select\n",
+		       mitigation_options[i].option);
 		return SPECTRE_V2_CMD_AUTO;
-disable:
-	spec2_print_if_insecure("disabled on command line.");
-	return SPECTRE_V2_CMD_NONE;
+	}
+
+	if (cmd == SPECTRE_V2_CMD_IBRS &&
+	    !boot_cpu_has(X86_FEATURE_SPEC_CTRL) &&
+	    !boot_cpu_has(X86_FEATURE_AMD_SPEC_CTRL)) {
+			pr_err("%s selected but no CPU support. Switching to AUTO select\n",
+			       mitigation_options[i].option);
+			return SPECTRE_V2_CMD_AUTO;
+	}
+
+	if ((cmd == SPECTRE_V2_CMD_RETPOLINE ||
+	     cmd == SPECTRE_V2_CMD_RETPOLINE_AMD ||
+	     cmd == SPECTRE_V2_CMD_RETPOLINE_GENERIC) &&
+	    !IS_ENABLED(CONFIG_RETPOLINE)) {
+			pr_err("%s selected but not compiled in. Switching to AUTO select\n",
+			       mitigation_options[i].option);
+			return SPECTRE_V2_CMD_AUTO;
+	}
+
+	if (cmd == SPECTRE_V2_CMD_RETPOLINE_AMD &&
+	    boot_cpu_data.x86_vendor != X86_VENDOR_AMD) {
+			pr_err("retpoline,amd selected but CPU is not AMD. Switching to AUTO select\n");
+			return SPECTRE_V2_CMD_AUTO;
+	}
+
+	if (mitigation_options[i].secure)
+		spec2_print_if_secure(mitigation_options[i].option);
+	else
+		spec2_print_if_insecure(mitigation_options[i].option);
+
+	return cmd;
 }
 
 /* Check for Skylake-like CPUs (for RSB and IBRS handling) */
