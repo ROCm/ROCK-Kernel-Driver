@@ -127,7 +127,7 @@ static void amdgpu_flip_work_func(struct work_struct *__work)
 	 * our vblank counter and vblank timestamps in order to work around the
 	 * problem that the hw fires vblank interrupts before actual start of
 	 * vblank (when line buffer refilling is done for a frame). It
-	 * complements the fudging logic in amdgpu_get_crtc_scanoutpos() for
+	 * complements the fudging logic in amdgpu_display_get_crtc_scanoutpos() for
 	 * timestamping and amdgpu_get_vblank_counter_kms() for vblank counts.
 	 *
 	 * In practice this won't execute very often unless on very fast
@@ -138,7 +138,7 @@ static void amdgpu_flip_work_func(struct work_struct *__work)
 		 * start in hpos, and to the "fudged earlier" vblank start in
 		 * vpos.
 		 */
-		stat = amdgpu_get_crtc_scanoutpos(adev->ddev, work->crtc_id,
+		stat = amdgpu_display_get_crtc_scanoutpos(adev->ddev, work->crtc_id,
 						  GET_DISTANCE_TO_VBLANKSTART,
 						  &vpos, &hpos, NULL, NULL,
 						  &crtc->hwmode);

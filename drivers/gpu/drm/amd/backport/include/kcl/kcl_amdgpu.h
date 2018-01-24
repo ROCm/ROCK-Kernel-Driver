@@ -15,7 +15,7 @@ int kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int crt
 					int *max_error,
 					struct timeval *vblank_time,
 					unsigned flags);
-int kcl_amdgpu_get_crtc_scanoutpos(struct drm_device *dev, unsigned int crtc,
+int kcl_amdgpu_display_get_crtc_scanoutpos(struct drm_device *dev, unsigned int crtc,
 				   unsigned int flags, int *vpos, int *hpos,
 				   ktime_t *stime, ktime_t *etime,
 				   const struct drm_display_mode *mode);
@@ -27,7 +27,7 @@ int kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, int crtc,
 					int *max_error,
 					struct timeval *vblank_time,
 					unsigned flags);
-int kcl_amdgpu_get_crtc_scanoutpos(struct drm_device *dev, int crtc, unsigned int flags,
+int kcl_amdgpu_display_get_crtc_scanoutpos(struct drm_device *dev, int crtc, unsigned int flags,
 				   int *vpos, int *hpos, ktime_t *stime, ktime_t *etime);
 #endif
 
