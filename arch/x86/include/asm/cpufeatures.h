@@ -208,6 +208,7 @@
 #define X86_FEATURE_INTEL_PPIN		( 7*32+14) /* Intel Processor Inventory Number */
 #define X86_FEATURE_INTEL_PT		( 7*32+15) /* Intel Processor Trace */
 
+#define X86_FEATURE_IBPB		( 7*32+16) /* Using Indirect Branch Prediction Barrier */
 #define X86_FEATURE_MBA			( 7*32+18) /* Memory Bandwidth Allocation */
 #define X86_FEATURE_RSB_CTXSW		( 7*32+19) /* Fill RSB on context switches */
 
