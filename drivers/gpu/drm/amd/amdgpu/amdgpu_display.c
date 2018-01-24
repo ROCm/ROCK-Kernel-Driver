@@ -69,7 +69,7 @@ static bool amdgpu_display_flip_handle_fence(struct amdgpu_flip_work *work,
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && !defined(OS_NAME_RHEL_7_4)
-static void amdgpu_flip_work_func(struct work_struct *__work)
+static void amdgpu_display_flip_work_func(struct work_struct *__work)
 {
 	struct amdgpu_flip_work *work =
 		container_of(__work, struct amdgpu_flip_work, flip_work);
@@ -80,11 +80,11 @@ static void amdgpu_flip_work_func(struct work_struct *__work)
 	unsigned long flags;
 	unsigned i;
 
-	if (amdgpu_flip_handle_fence(work, &work->excl))
+	if (amdgpu_display_flip_handle_fence(work, &work->excl))
 		return;
 
 	for (i = 0; i < work->shared_count; ++i)
-		if (amdgpu_flip_handle_fence(work, &work->shared[i]))
+		if (amdgpu_display_flip_handle_fence(work, &work->shared[i]))
 			return;
 
 	/* We borrow the event spin lock for protecting flip_status */
@@ -97,7 +97,7 @@ static void amdgpu_flip_work_func(struct work_struct *__work)
 	adev->mode_info.funcs->page_flip(adev, work->crtc_id, work->base, work->async);
 }
 #elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && !defined(OS_NAME_RHEL_7_4)
-static void amdgpu_flip_work_func(struct work_struct *__work)
+static void amdgpu_display_flip_work_func(struct work_struct *__work)
 {
 	struct amdgpu_flip_work *work =
 		container_of(__work, struct amdgpu_flip_work, flip_work);
@@ -110,11 +110,11 @@ static void amdgpu_flip_work_func(struct work_struct *__work)
 	int vpos, hpos, stat, min_udelay = 0;
 	struct drm_vblank_crtc *vblank = &crtc->dev->vblank[work->crtc_id];
 
-	if (amdgpu_flip_handle_fence(work, &work->excl))
+	if (amdgpu_display_flip_handle_fence(work, &work->excl))
 		return;
 
 	for (i = 0; i < work->shared_count; ++i)
-		if (amdgpu_flip_handle_fence(work, &work->shared[i]))
+		if (amdgpu_display_flip_handle_fence(work, &work->shared[i]))
 			return;
 
 	/* We borrow the event spin lock for protecting flip_status */
@@ -405,8 +405,8 @@ int amdgpu_crtc_page_flip(struct drm_crtc *crtc,
 	if (work == NULL)
 		return -ENOMEM;
 
-	INIT_WORK(&work->flip_work, amdgpu_flip_work_func);
-	INIT_WORK(&work->unpin_work, amdgpu_unpin_work_func);
+	INIT_WORK(&work->flip_work, amdgpu_display_flip_work_func);
+	INIT_WORK(&work->unpin_work, amdgpu_display_unpin_work_func);
 
 	work->event = event;
 	work->adev = adev;
@@ -476,7 +476,7 @@ int amdgpu_crtc_page_flip(struct drm_crtc *crtc,
 	/* update crtc fb */
 	crtc->primary->fb = fb;
 	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
-	amdgpu_flip_work_func(&work->flip_work);
+	amdgpu_display_flip_work_func(&work->flip_work);
 	return 0;
 
 vblank_cleanup:
