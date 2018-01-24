@@ -1301,6 +1301,10 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 			if (ret != 0)
 				goto add_bo_to_vm_failed_aql;
 		}
+	} else {
+		ret = vm_validate_pt_pd_bos((struct amdkfd_vm *)vm);
+		if (unlikely(ret != 0))
+			goto add_bo_to_vm_failed;
 	}
 
 	if (mem->mapped_to_gpu_memory == 0 &&
@@ -1562,6 +1566,10 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 	ret = reserve_bo_and_cond_vms(mem, vm, VA_MAPPED, &ctx);
 	if (unlikely(ret != 0))
 		goto out;
+
+	ret = vm_validate_pt_pd_bos((struct amdkfd_vm *)vm);
+	if (unlikely(ret != 0))
+		goto unreserve_out;
 
 	pr_debug("Unmap VA 0x%llx - 0x%llx from vm %p\n",
 		mem->va,
