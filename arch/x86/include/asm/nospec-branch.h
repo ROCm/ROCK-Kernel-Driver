@@ -202,7 +202,6 @@ enum spectre_v2_mitigation {
  */
 static inline void vmexit_fill_RSB(void)
 {
-#ifdef CONFIG_RETPOLINE
 	unsigned long loops;
 
 	asm volatile (ANNOTATE_NOSPEC_ALTERNATIVE
@@ -212,7 +211,6 @@ static inline void vmexit_fill_RSB(void)
 		      "910:"
 		      : "=r" (loops), ASM_CALL_CONSTRAINT
 		      : : "memory" );
-#endif
 }
 
 static inline void indirect_branch_prediction_barrier(void)
