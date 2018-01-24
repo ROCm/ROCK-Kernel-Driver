@@ -156,9 +156,8 @@ static void ttm_bo_release_list(struct kref *list_kref)
 	mutex_destroy(&bo->wu_mutex);
 	if (bo->destroy)
 		bo->destroy(bo);
-	else {
+	else
 		kfree(bo);
-	}
 	ttm_mem_global_free(bdev->glob->mem_glob, acc_size);
 }
 
@@ -170,7 +169,6 @@ void ttm_bo_add_to_lru(struct ttm_buffer_object *bo)
 	reservation_object_assert_held(bo->resv);
 
 	if (!(bo->mem.placement & TTM_PL_FLAG_NO_EVICT)) {
-
 		BUG_ON(!list_empty(&bo->lru));
 
 		man = &bdev->man[bo->mem.mem_type];
@@ -621,10 +619,9 @@ static void ttm_bo_delayed_workqueue(struct work_struct *work)
 	struct ttm_bo_device *bdev =
 	    container_of(work, struct ttm_bo_device, wq.work);
 
-	if (!ttm_bo_delayed_delete(bdev, false)) {
+	if (!ttm_bo_delayed_delete(bdev, false))
 		schedule_delayed_work(&bdev->wq,
 				      ((HZ / 100) < 1) ? 1 : HZ / 100);
-	}
 }
 
 static void ttm_bo_release(struct kref *kref)
