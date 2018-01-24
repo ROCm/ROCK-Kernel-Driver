@@ -1119,7 +1119,7 @@ static struct drm_driver kms_driver = {
 #if DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
 	!defined(OS_NAME_SUSE_15)
 	.get_vblank_timestamp = kcl_amdgpu_get_vblank_timestamp_kms,
-	.get_scanout_position = kcl_amdgpu_get_crtc_scanoutpos,
+	.get_scanout_position = kcl_amdgpu_display_get_crtc_scanoutpos,
 #else
 	.get_vblank_timestamp = drm_calc_vbltimestamp_from_scanoutpos,
 	.get_scanout_position = amdgpu_get_crtc_scanout_position,
