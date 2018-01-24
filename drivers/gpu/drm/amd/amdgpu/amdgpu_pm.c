@@ -1617,9 +1617,6 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 	if (adev->pm.dpm_enabled == 0)
 		return 0;
 
-	if (adev->powerplay.pp_funcs->get_temperature == NULL)
-		return 0;
-
 	adev->pm.int_hwmon_dev = kcl_hwmon_device_register_with_groups(adev->dev,
 								   DRIVER_NAME, adev,
 								   hwmon_groups);
