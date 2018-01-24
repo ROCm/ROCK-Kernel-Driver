@@ -2291,6 +2291,7 @@ static void vmx_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	if (per_cpu(current_vmcs, cpu) != vmx->loaded_vmcs->vmcs) {
 		per_cpu(current_vmcs, cpu) = vmx->loaded_vmcs->vmcs;
 		vmcs_load(vmx->loaded_vmcs->vmcs);
+		indirect_branch_prediction_barrier();
 	}
 
 	if (!already_loaded) {
@@ -6829,6 +6830,16 @@ static __init int hardware_setup(void)
 		kvm_max_tsc_scaling_ratio = KVM_VMX_TSC_MULTIPLIER_MAX;
 		kvm_tsc_scaling_ratio_frac_bits = 48;
 	}
+
+	/*
+	 * The AMD_PRED_CMD bit might be exposed by hypervisors on Intel
+	 * chips which only want to expose PRED_CMD to guests and not
+	 * SPEC_CTRL. Because PRED_CMD is one-shot write-only, while
+	 * PRED_CMD requires storage, live migration support, etc.
+	 */
+	if (boot_cpu_has(X86_FEATURE_SPEC_CTRL) ||
+	    boot_cpu_has(X86_FEATURE_AMD_PRED_CMD))
+		vmx_disable_intercept_for_msr(MSR_IA32_PRED_CMD, false);
 
 	vmx_disable_intercept_for_msr(MSR_FS_BASE, false);
 	vmx_disable_intercept_for_msr(MSR_GS_BASE, false);
