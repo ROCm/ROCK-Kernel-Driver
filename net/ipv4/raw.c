@@ -476,7 +476,6 @@ static int raw_getfrag(void *from, char *to, int offset, int len, int odd,
 	if (offset < rfv->hlen) {
 		int copy = min(rfv->hlen - offset, len);
 
-		osb();
 		if (skb->ip_summed == CHECKSUM_PARTIAL)
 			memcpy(to, rfv->hdr.c + offset, copy);
 		else

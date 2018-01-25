@@ -6,6 +6,8 @@
 #include <asm/percpu.h>
 #include <asm/asm-offsets.h>
 #include <asm/processor-flags.h>
+#include <asm/msr-index.h>
+#include <asm/cpufeatures.h>
 
 /*
 
@@ -348,4 +350,75 @@ For 32-bit we have the following conventions - kernel is built with
 	call enter_from_user_mode
 .Lafter_call_\@:
 #endif
+.endm
+
+/*
+ * IBRS related macros
+ */
+.macro PUSH_MSR_REGS
+	pushq	%rax
+	pushq	%rcx
+	pushq	%rdx
+.endm
+
+.macro POP_MSR_REGS
+	popq	%rdx
+	popq	%rcx
+	popq	%rax
+.endm
+
+.macro WRMSR_ASM msr_nr:req edx_val:req eax_val:req
+	movl	\msr_nr, %ecx
+	movl	\edx_val, %edx
+	movl	\eax_val, %eax
+	wrmsr
+.endm
+
+.macro RESTRICT_IB_SPEC
+	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_IBRS
+	PUSH_MSR_REGS
+	WRMSR_ASM $MSR_IA32_SPEC_CTRL, $0, $SPEC_CTRL_IBRS
+	POP_MSR_REGS
+.Lskip_\@:
+.endm
+
+.macro UNRESTRICT_IB_SPEC
+	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_IBRS
+	PUSH_MSR_REGS
+	WRMSR_ASM $MSR_IA32_SPEC_CTRL, $0, $0
+	POP_MSR_REGS
+.Lskip_\@:
+.endm
+
+.macro RESTRICT_IB_SPEC_CLOBBER
+	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_IBRS
+	WRMSR_ASM $MSR_IA32_SPEC_CTRL, $0, $SPEC_CTRL_IBRS
+.Lskip_\@:
+.endm
+
+.macro UNRESTRICT_IB_SPEC_CLOBBER
+	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_IBRS
+	WRMSR_ASM $MSR_IA32_SPEC_CTRL, $0, $0
+.Lskip_\@:
+.endm
+
+.macro RESTRICT_IB_SPEC_SAVE_AND_CLOBBER save_reg:req
+	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_IBRS
+	movl	$MSR_IA32_SPEC_CTRL, %ecx
+	rdmsr
+	movl	%eax, \save_reg
+	movl	$0, %edx
+	movl	$SPEC_CTRL_IBRS, %eax
+	wrmsr
+.Lskip_\@:
+.endm
+
+.macro RESTORE_IB_SPEC_CLOBBER save_reg:req
+	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_IBRS
+	/* Set IBRS to the value saved in the save_reg */
+	movl    $MSR_IA32_SPEC_CTRL, %ecx
+	movl    $0, %edx
+	movl    \save_reg, %eax
+	wrmsr
+.Lskip_\@:
 .endm

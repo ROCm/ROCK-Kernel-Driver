@@ -11,7 +11,7 @@
  * Fill the CPU return stack buffer.
  *
  * Each entry in the RSB, if used for a speculative 'ret', contains an
- * infinite 'pause; jmp' loop to capture speculative execution.
+ * infinite 'pause; lfence; jmp' loop to capture speculative execution.
  *
  * This is required in various cases for retpoline and IBRS-based
  * mitigations for the Spectre variant 2 vulnerability. Sometimes to
@@ -38,11 +38,13 @@
 	call	772f;				\
 773:	/* speculation trap */			\
 	pause;					\
+	lfence;					\
 	jmp	773b;				\
 772:						\
 	call	774f;				\
 775:	/* speculation trap */			\
 	pause;					\
+	lfence;					\
 	jmp	775b;				\
 774:						\
 	dec	reg;				\
@@ -73,6 +75,7 @@
 	call	.Ldo_rop_\@
 .Lspec_trap_\@:
 	pause
+	lfence
 	jmp	.Lspec_trap_\@
 .Ldo_rop_\@:
 	mov	\reg, (%_ASM_SP)
@@ -165,6 +168,7 @@
 	"       .align 16\n"					\
 	"901:	call   903f;\n"					\
 	"902:	pause;\n"					\
+	"    	lfence;\n"					\
 	"       jmp    902b;\n"					\
 	"       .align 16\n"					\
 	"903:	addl   $4, %%esp;\n"				\
@@ -198,17 +202,111 @@ enum spectre_v2_mitigation {
  */
 static inline void vmexit_fill_RSB(void)
 {
-#ifdef CONFIG_RETPOLINE
-	unsigned long loops = RSB_CLEAR_LOOPS / 2;
+	unsigned long loops;
 
 	asm volatile (ANNOTATE_NOSPEC_ALTERNATIVE
 		      ALTERNATIVE("jmp 910f",
 				  __stringify(__FILL_RETURN_BUFFER(%0, RSB_CLEAR_LOOPS, %1)),
 				  X86_FEATURE_RETPOLINE)
 		      "910:"
-		      : "=&r" (loops), ASM_CALL_CONSTRAINT
-		      : "r" (loops) : "memory" );
-#endif
+		      : "=r" (loops), ASM_CALL_CONSTRAINT
+		      : : "memory" );
 }
+
+static inline void indirect_branch_prediction_barrier(void)
+{
+	asm volatile(ALTERNATIVE("",
+				 "movl %[msr], %%ecx\n\t"
+				 "movl %[val], %%eax\n\t"
+				 "movl $0, %%edx\n\t"
+				 "wrmsr",
+				 X86_FEATURE_IBPB)
+		     : : [msr] "i" (MSR_IA32_PRED_CMD),
+			 [val] "i" (PRED_CMD_IBPB)
+		     : "eax", "ecx", "edx", "memory");
+}
+
+/*
+ * This also performs a barrier, and setting it again when it was already
+ * set is NOT a no-op.
+ */
+static inline void restrict_branch_speculation(void)
+{
+	unsigned long ax, cx, dx;
+
+	asm volatile(ALTERNATIVE("",
+				 "movl %[msr], %%ecx\n\t"
+				 "movl %[val], %%eax\n\t"
+				 "movl $0, %%edx\n\t"
+				 "wrmsr",
+				 X86_FEATURE_IBRS)
+		     : "=a" (ax), "=c" (cx), "=d" (dx)
+		     : [msr] "i" (MSR_IA32_SPEC_CTRL),
+		       [val] "i" (SPEC_CTRL_IBRS)
+		     : "memory");
+}
+
+static inline void unrestrict_branch_speculation(void)
+{
+	unsigned long ax, cx, dx;
+
+	asm volatile(ALTERNATIVE("",
+				 "movl %[msr], %%ecx\n\t"
+				 "movl %[val], %%eax\n\t"
+				 "movl $0, %%edx\n\t"
+				 "wrmsr",
+				 X86_FEATURE_IBRS)
+		     : "=a" (ax), "=c" (cx), "=d" (dx)
+		     : [msr] "i" (MSR_IA32_SPEC_CTRL),
+		       [val] "i" (0)
+		     : "memory");
+}
+
+static inline u64 save_and_restrict_branch_speculation(void)
+{
+	u64 ret;
+	unsigned long ax = 0, cx = 0, dx = 0;
+
+	/* save */
+	asm volatile(ALTERNATIVE("",
+				 "movl %[msr], %%ecx\n\t"
+				 "rdmsr\n\t",
+				 X86_FEATURE_IBRS)
+		     : "=a" (ax), "=c" (cx), "=d" (dx)
+		     : [msr] "i" (MSR_IA32_SPEC_CTRL)
+		     : "memory");
+
+	ret = ax | (dx << 32);
+
+	/* restrict speculation */
+	asm volatile(ALTERNATIVE("",
+				 "movl %[msr], %%ecx\n\t"
+				 "movl %[val], %%eax\n\t"
+				 "movl $0, %%edx\n\t"
+				 "wrmsr",
+				 X86_FEATURE_IBRS)
+		     : "=a" (ax), "=c" (cx), "=d" (dx)
+		     : [msr] "i" (MSR_IA32_SPEC_CTRL),
+		       [val] "i" (SPEC_CTRL_IBRS)
+		     : "memory");
+
+	return ret;
+}
+
+static inline void restore_branch_speculation(u64 val)
+{
+	unsigned long ax, cx, dx;
+
+	asm volatile(ALTERNATIVE("",
+				 "movl %[msr], %%ecx\n\t"
+				 "wrmsr",
+				 X86_FEATURE_IBRS)
+		     : "=a" (ax), "=c" (cx), "=d" (dx)
+		     : [msr] "i" (MSR_IA32_SPEC_CTRL),
+		       [val_low] "a" (val & 0xffffffff),
+		       [val_high] "d" (val >> 32)
+		     : "memory");
+}
+
 #endif /* __ASSEMBLY__ */
 #endif /* __NOSPEC_BRANCH_H__ */

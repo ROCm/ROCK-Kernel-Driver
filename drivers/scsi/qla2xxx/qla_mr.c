@@ -2304,12 +2304,10 @@ qlafx00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 	req = ha->req_q_map[que];
 
 	/* Validate handle. */
-	if (handle < req->num_outstanding_cmds) {
-		osb();
+	if (handle < req->num_outstanding_cmds)
 		sp = req->outstanding_cmds[handle];
-	} else {
+	else
 		sp = NULL;
-	}
 
 	if (sp == NULL) {
 		ql_dbg(ql_dbg_io, vha, 0x3034,
@@ -2657,12 +2655,10 @@ qlafx00_multistatus_entry(struct scsi_qla_host *vha,
 		req = ha->req_q_map[que];
 
 		/* Validate handle. */
-		if (handle < req->num_outstanding_cmds) {
-			osb();
+		if (handle < req->num_outstanding_cmds)
 			sp = req->outstanding_cmds[handle];
-		} else {
+		else
 			sp = NULL;
-		}
 
 		if (sp == NULL) {
 			ql_dbg(ql_dbg_io, vha, 0x3044,

@@ -653,8 +653,6 @@ static void *m_start(struct seq_file *seq, loff_t *ppos,
 	if (pos >= extents)
 		return NULL;
 
-	osb();
-
 	if (extents <= UID_GID_MAP_MAX_BASE_EXTENTS)
 		return &map->extent[pos];
 

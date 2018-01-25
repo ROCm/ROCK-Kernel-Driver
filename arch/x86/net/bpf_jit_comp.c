@@ -16,7 +16,6 @@
 #include <linux/bpf.h>
 
 int bpf_jit_enable __read_mostly;
-u8 bpf_jit_fence = 0;
 
 /*
  * assembly code in arch/x86/net/bpf_jit.S
@@ -108,18 +107,6 @@ static void bpf_flush_icache(void *start, void *end)
 	smp_wmb();
 	flush_icache_range((unsigned long)start, (unsigned long)end);
 	set_fs(old_fs);
-}
-
-static void emit_memory_barrier(u8 **pprog)
-{
-	u8 *prog = *pprog;
-	int cnt = 0;
-
-	if (bpf_jit_fence)
-			EMIT3(0x0f, 0xae, 0xe8);
-
-	*pprog = prog;
-	return;
 }
 
 #define CHOOSE_LOAD_FUNC(K, func) \
@@ -413,7 +400,7 @@ static int do_jit(struct bpf_prog *bpf_prog, int *addrs, u8 *image,
 			case BPF_ADD: b2 = 0x01; break;
 			case BPF_SUB: b2 = 0x29; break;
 			case BPF_AND: b2 = 0x21; break;
-			case BPF_OR: b2 = 0x09; emit_memory_barrier(&prog); break;
+			case BPF_OR: b2 = 0x09; break;
 			case BPF_XOR: b2 = 0x31; break;
 			}
 			if (BPF_CLASS(insn->code) == BPF_ALU64)
@@ -660,16 +647,6 @@ static int do_jit(struct bpf_prog *bpf_prog, int *addrs, u8 *image,
 		case BPF_ALU64 | BPF_RSH | BPF_X:
 		case BPF_ALU64 | BPF_ARSH | BPF_X:
 
-			/* If blinding is enabled, each
-			 * BPF_LD | BPF_IMM | BPF_DW instruction
-			 * is converted to 4 eBPF instructions with
-			 * BPF_ALU64_IMM(BPF_LSH, BPF_REG_AX, 32)
-			 * always present(number 3). Detect such cases
-			 * and insert memory barriers. */
-			if ((BPF_CLASS(insn->code) == BPF_ALU64)
-				&& (BPF_OP(insn->code) == BPF_LSH)
-				&& (src_reg == BPF_REG_AX))
-				emit_memory_barrier(&prog);
 			/* check for bad case when dst_reg == rcx */
 			if (dst_reg == BPF_REG_4) {
 				/* mov r11, dst_reg */
@@ -1146,9 +1123,6 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 
 	if (!bpf_jit_enable)
 		return orig_prog;
-
-	if (bpf_jit_fence_present() && bpf_jit_blinding_enabled())
-		bpf_jit_fence = 1;
 
 	tmp = bpf_jit_blind_constants(prog);
 	/* If blinding was requested and we failed during blinding,
