@@ -56,7 +56,7 @@
 /**
  * Allocates storage for pointers to the pages that back the ttm.
  */
-static void ttm_tt_alloc_page_directory(struct ttm_tt *ttm)
+static int ttm_tt_alloc_page_directory(struct ttm_tt *ttm)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 	ttm->pages = drm_calloc_large(ttm->num_pages, sizeof(void*));
@@ -64,10 +64,12 @@ static void ttm_tt_alloc_page_directory(struct ttm_tt *ttm)
 	ttm->pages = kvmalloc_array(ttm->num_pages, sizeof(void*),
 			GFP_KERNEL | __GFP_ZERO);
 #endif
+	if (!ttm->pages)
+		return -ENOMEM;
+	return 0;
 }
 
-
-static void ttm_dma_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
+static int ttm_dma_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 	ttm->ttm.pages = drm_calloc_large(ttm->ttm.num_pages,
@@ -79,7 +81,10 @@ static void ttm_dma_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
 					  sizeof(*ttm->dma_address),
 					  GFP_KERNEL | __GFP_ZERO);
 #endif
+	if (!ttm->ttm.pages)
+		return -ENOMEM;
 	ttm->dma_address = (void *) (ttm->ttm.pages + ttm->ttm.num_pages);
+	return 0;
 }
 
 #ifdef CONFIG_X86
@@ -214,8 +219,7 @@ int ttm_tt_init(struct ttm_tt *ttm, struct ttm_bo_device *bdev,
 	ttm->state = tt_unpopulated;
 	ttm->swap_storage = NULL;
 
-	ttm_tt_alloc_page_directory(ttm);
-	if (!ttm->pages) {
+	if (ttm_tt_alloc_page_directory(ttm)) {
 		ttm_tt_destroy(ttm);
 		pr_err("Failed allocating page table\n");
 		return -ENOMEM;
@@ -251,8 +255,7 @@ int ttm_dma_tt_init(struct ttm_dma_tt *ttm_dma, struct ttm_bo_device *bdev,
 	ttm->swap_storage = NULL;
 
 	INIT_LIST_HEAD(&ttm_dma->pages_list);
-	ttm_dma_tt_alloc_page_directory(ttm_dma);
-	if (!ttm->pages) {
+	if (ttm_dma_tt_alloc_page_directory(ttm_dma)) {
 		ttm_tt_destroy(ttm);
 		pr_err("Failed allocating page table\n");
 		return -ENOMEM;
