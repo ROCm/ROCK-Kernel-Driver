@@ -221,7 +221,8 @@ static int update_mqd(struct mqd_manager *mm, void *mqd,
 	pr_debug("cp_hqd_pq_doorbell_control 0x%x\n",
 			m->cp_hqd_pq_doorbell_control);
 
-	m->cp_hqd_ib_control = 3 << CP_HQD_IB_CONTROL__MIN_IB_AVAIL_SIZE__SHIFT;
+	m->cp_hqd_ib_control = 3 << CP_HQD_IB_CONTROL__MIN_IB_AVAIL_SIZE__SHIFT |
+			1 << CP_HQD_IB_CONTROL__IB_EXE_DISABLE__SHIFT;
 
 	/*
 	 * HW does not clamp this field correctly. Maximum EOP queue size
