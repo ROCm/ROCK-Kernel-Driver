@@ -360,7 +360,7 @@ static void ttm_bo_vm_close(struct vm_area_struct *vma)
 
 static int ttm_bo_vm_access_kmap(struct ttm_buffer_object *bo,
 				 unsigned long offset,
-				 void *buf, int len, int write)
+				 uint8_t *buf, int len, int write)
 {
 	unsigned long page = offset >> PAGE_SHIFT;
 	unsigned long bytes_left = len;
@@ -389,6 +389,7 @@ static int ttm_bo_vm_access_kmap(struct ttm_buffer_object *bo,
 		ttm_bo_kunmap(&map);
 
 		page++;
+		buf += bytes;
 		bytes_left -= bytes;
 		offset = 0;
 	} while (bytes_left);
