@@ -71,6 +71,22 @@ ENTRY(cpu_v7_switch_mm)
 ENDPROC(cpu_v7_switch_mm)
 ENDPROC(cpu_v7_btbinv_switch_mm)
 
+/*
+ *	Cortex-A15 requires ACTLR[0] to be set from secure in order
+ *	for the icache invalidation to also invalidate the BTB.
+ */
+ENTRY(cpu_ca15_switch_mm)
+#ifdef CONFIG_MMU
+	mcr	p15, 0, r0, c7, c5, 0			@ ICIALLU
+	mmid	r2, r2
+	asid	r2, r2
+	orr	rpgdh, rpgdh, r2, lsl #(48 - 32)	@ upper 32-bits of pgd
+	mcrr	p15, 0, rpgdl, rpgdh, c2		@ set TTB 0
+	isb
+#endif
+	ret	lr
+ENDPROC(cpu_ca15_switch_mm)
+
 #ifdef __ARMEB__
 #define rl r3
 #define rh r2
