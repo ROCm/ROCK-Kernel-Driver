@@ -136,6 +136,7 @@ export CONFIG_DRM_AMDGPU_SI=y
 export CONFIG_DRM_AMDGPU_USERPTR=y
 export CONFIG_DRM_AMD_DC=y
 export CONFIG_DRM_AMD_DC_DCN1_0=y
+export CONFIG_DRM_AMD_DC_DCN2_x=y
 
 subdir-ccflags-y += -DCONFIG_HSA_AMD
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_CIK
@@ -143,5 +144,6 @@ subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_SI
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_0
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_x
 
 obj-m += scheduler/ amd/amdgpu/ ttm/ amd/amdkcl/
