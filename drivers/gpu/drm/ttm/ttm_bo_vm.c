@@ -145,7 +145,6 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 #else
 	unsigned long address = vmf->address;
 #endif
-	int retval = VM_FAULT_NOPAGE;
 	struct ttm_mem_type_manager *man =
 		&bdev->man[bo->mem.mem_type];
 	struct vm_area_struct cvma;
@@ -189,7 +188,7 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 	 * (if at all) by redirecting mmap to the exporter.
 	 */
 	if (bo->ttm && (bo->ttm->page_flags & TTM_PAGE_FLAG_SG)) {
-		retval = VM_FAULT_SIGBUS;
+		ret = VM_FAULT_SIGBUS;
 		goto out_unlock;
 	}
 
@@ -200,10 +199,10 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 			break;
 		case -EBUSY:
 		case -ERESTARTSYS:
-			retval = VM_FAULT_NOPAGE;
+			ret = VM_FAULT_NOPAGE;
 			goto out_unlock;
 		default:
-			retval = VM_FAULT_SIGBUS;
+			ret = VM_FAULT_SIGBUS;
 			goto out_unlock;
 		}
 	}
@@ -218,16 +217,15 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 	ret = ttm_bo_vm_fault_idle(bo, vmf);
 #endif
 	if (unlikely(ret != 0)) {
-		retval = ret;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
-		if (retval == VM_FAULT_RETRY &&
+		if (ret == VM_FAULT_RETRY &&
 		    !(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 #else
-		if (retval == VM_FAULT_RETRY) {
+		if (ret == VM_FAULT_RETRY) {
 #endif
 			/* The BO has already been unreserved. */
-			return retval;
+			return ret;
 		}
 
 		goto out_unlock;
@@ -235,12 +233,12 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 
 	ret = ttm_mem_io_lock(man, true);
 	if (unlikely(ret != 0)) {
-		retval = VM_FAULT_NOPAGE;
+		ret = VM_FAULT_NOPAGE;
 		goto out_unlock;
 	}
 	ret = ttm_mem_io_reserve_vm(bo);
 	if (unlikely(ret != 0)) {
-		retval = VM_FAULT_SIGBUS;
+		ret = VM_FAULT_SIGBUS;
 		goto out_io_unlock;
 	}
 
@@ -250,7 +248,7 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 		drm_vma_node_start(&bo->vma_node);
 
 	if (unlikely(page_offset >= bo->num_pages)) {
-		retval = VM_FAULT_SIGBUS;
+		ret = VM_FAULT_SIGBUS;
 		goto out_io_unlock;
 	}
 
@@ -277,7 +275,7 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 
 		/* Allocate all page at once, most common usage */
 		if (ttm->bdev->driver->ttm_tt_populate(ttm, &ctx)) {
-			retval = VM_FAULT_OOM;
+			ret = VM_FAULT_OOM;
 			goto out_io_unlock;
 		}
 	}
@@ -292,7 +290,7 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 		else {
 			page = ttm->pages[page_offset];
 			if (unlikely(!page && i == 0)) {
-				retval = VM_FAULT_OOM;
+				ret = VM_FAULT_OOM;
 				goto out_io_unlock;
 			} else if (unlikely(!page)) {
 				break;
@@ -324,7 +322,7 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 		if (unlikely((ret == -EBUSY) || (ret != 0 && i > 0)))
 			break;
 		else if (unlikely(ret != 0)) {
-			retval =
+			ret =
 			    (ret == -ENOMEM) ? VM_FAULT_OOM : VM_FAULT_SIGBUS;
 			goto out_io_unlock;
 		}
@@ -333,11 +331,12 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 		if (unlikely(++page_offset >= page_last))
 			break;
 	}
+	ret = VM_FAULT_NOPAGE;
 out_io_unlock:
 	ttm_mem_io_unlock(man);
 out_unlock:
 	ttm_bo_unreserve(bo);
-	return retval;
+	return ret;
 }
 
 static void ttm_bo_vm_open(struct vm_area_struct *vma)
