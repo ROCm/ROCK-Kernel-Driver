@@ -248,6 +248,8 @@ struct tile_config {
  *
  * @get_vram_usage: Returns current VRAM usage
  *
+ * @gpu_recover: let kgd reset gpu after kfd detect CPC hang
+ *
  * This structure contains function pointers to services that the kgd driver
  * provides to amdkfd driver.
  *
@@ -403,6 +405,8 @@ struct kfd2kgd_calls {
 			uint64_t dest_offset, uint64_t size,
 			struct dma_fence **f, uint64_t *actual_size);
 	uint64_t (*get_vram_usage)(struct kgd_dev *kgd);
+
+	void (*gpu_recover)(struct kgd_dev *kgd);
 };
 
 /**
@@ -428,6 +432,10 @@ struct kfd2kgd_calls {
  * @schedule_evict_and_restore_process: Schedules work queue that will prepare
  * for safe eviction of KFD BOs that belong to the specified process.
  *
+ * @pre_reset: Notifies amdkfd that amdgpu about to reset the gpu
+ *
+ * @post_reset: Notify amdkfd that amgpu successfuly reseted the gpu
+ *
  * This structure contains function callback pointers so the kgd driver
  * will notify to the amdkfd about certain status changes.
  *
@@ -446,6 +454,8 @@ struct kgd2kfd_calls {
 	int (*resume_mm)(struct kfd_dev *kfd, struct mm_struct *mm);
 	int (*schedule_evict_and_restore_process)(struct mm_struct *mm,
 			struct dma_fence *fence);
+	int  (*pre_reset)(struct kfd_dev *kfd);
+	int  (*post_reset)(struct kfd_dev *kfd);
 };
 
 int kgd2kfd_init(unsigned interface_version,
