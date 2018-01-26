@@ -155,6 +155,12 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev,
 			u32 vmid);
 
+int amdgpu_amdkfd_pre_reset(struct amdgpu_device *adev);
+
+int amdgpu_amdkfd_post_reset(struct amdgpu_device *adev);
+
+void amdgpu_amdkfd_gpu_reset(struct kgd_dev *kgd);
+
 /* Shared API */
 int map_bo(struct amdgpu_device *rdev, uint64_t va, void *vm,
 		struct amdgpu_bo *bo, struct amdgpu_bo_va **bo_va);

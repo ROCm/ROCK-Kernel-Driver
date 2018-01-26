@@ -248,6 +248,33 @@ int amdgpu_amdkfd_resume(struct amdgpu_device *adev)
 	return r;
 }
 
+int amdgpu_amdkfd_pre_reset(struct amdgpu_device *adev)
+{
+	int r = 0;
+
+	if (adev->kfd)
+		r = kgd2kfd->pre_reset(adev->kfd);
+
+	return r;
+}
+
+int amdgpu_amdkfd_post_reset(struct amdgpu_device *adev)
+{
+	int r = 0;
+
+	if (adev->kfd)
+		r = kgd2kfd->post_reset(adev->kfd);
+
+	return r;
+}
+
+void amdgpu_amdkfd_gpu_reset(struct kgd_dev *kgd)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+
+	amdgpu_device_gpu_recover(adev, NULL, false);
+}
+
 int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 				uint32_t vmid, uint64_t gpu_addr,
 				uint32_t *ib_cmd, uint32_t ib_len)
