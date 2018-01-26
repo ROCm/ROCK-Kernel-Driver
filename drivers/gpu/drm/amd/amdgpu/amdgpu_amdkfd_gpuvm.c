@@ -972,7 +972,7 @@ static int process_sync_pds_resv(struct amdkfd_process_info *process_info,
 			    vm_list_node) {
 		struct amdgpu_bo *pd = peer_vm->root.base.bo;
 
-		ret = amdgpu_sync_resv(NULL,
+		ret = amdgpu_sync_resv(amdgpu_ttm_adev(pd->tbo.bdev),
 					sync, pd->tbo.resv,
 					AMDGPU_FENCE_OWNER_UNDEFINED, false);
 		if (ret)
