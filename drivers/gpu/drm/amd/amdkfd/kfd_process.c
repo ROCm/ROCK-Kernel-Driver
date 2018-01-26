@@ -1183,7 +1183,13 @@ void kfd_flush_tlb(struct kfd_dev *dev, struct kfd_process *p)
 			return;
 		}
 
-		f2g->invalidate_tlbs_vmid(dev->kgd, pdd->qpd.vmid);
+		/* vmid allocation is delayed to the creation of the first
+		 * queue of the process. For buffers allocated and mapped
+		 * before queue creation, vmid is still no allocated (valued 0).
+		 * Ignore tlb invalidation request for this case.
+		 */
+		if (pdd->qpd.vmid)
+			f2g->invalidate_tlbs_vmid(dev->kgd, pdd->qpd.vmid);
 	} else
 		f2g->invalidate_tlbs(dev->kgd, p->pasid);
 }
