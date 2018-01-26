@@ -37,6 +37,7 @@
 
 #include <linux/highmem.h>
 #include <asm/cacheflush.h>
+#include <asm/cputype.h>
 #include <asm/pgalloc.h>
 #include <asm/stage2_pgtable.h>
 
@@ -223,7 +224,17 @@ static inline unsigned int kvm_get_vmid_bits(void)
 
 static inline void *kvm_get_hyp_vector(void)
 {
-	return kvm_ksym_ref(__kvm_hyp_vector);
+	extern char __kvm_hyp_vector[];
+	extern char __kvm_hyp_vector_bp_inv[];
+
+	switch(read_cpuid_part()) {
+	case ARM_CPU_PART_CORTEX_A12:
+	case ARM_CPU_PART_CORTEX_A17:
+		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
+
+	default:
+		return kvm_ksym_ref(__kvm_hyp_vector);
+	}
 }
 
 static inline int kvm_map_vectors(void)
