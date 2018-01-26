@@ -1296,7 +1296,6 @@ static void uvd_v7_0_ring_emit_vm_flush(struct amdgpu_ring *ring,
 					uint64_t pd_addr)
 {
 	struct amdgpu_vmhub *hub = &ring->adev->vmhub[ring->funcs->vmhub];
-	unsigned eng = ring->vm_inv_eng;
 	uint32_t data0, data1, mask;
 
 	pd_addr = amdgpu_gmc_emit_flush_gpu_tlb(ring, vmid, pasid, pd_addr);
@@ -1305,12 +1304,6 @@ static void uvd_v7_0_ring_emit_vm_flush(struct amdgpu_ring *ring,
 	data0 = hub->ctx0_ptb_addr_lo32 + vmid * 2;
 	data1 = lower_32_bits(pd_addr);
 	mask = 0xffffffff;
-	uvd_v7_0_ring_emit_reg_wait(ring, data0, data1, mask);
-
-	/* wait for flush */
-	data0 = hub->vm_inv_eng0_ack + eng;
-	data1 = 1 << vmid;
-	mask =  1 << vmid;
 	uvd_v7_0_ring_emit_reg_wait(ring, data0, data1, mask);
 }
 
@@ -1344,17 +1337,12 @@ static void uvd_v7_0_enc_ring_emit_vm_flush(struct amdgpu_ring *ring,
 					    uint64_t pd_addr)
 {
 	struct amdgpu_vmhub *hub = &ring->adev->vmhub[ring->funcs->vmhub];
-	unsigned eng = ring->vm_inv_eng;
 
 	pd_addr = amdgpu_gmc_emit_flush_gpu_tlb(ring, vmid, pasid, pd_addr);
 
 	/* wait for reg writes */
 	uvd_v7_0_enc_ring_emit_reg_wait(ring, hub->ctx0_ptb_addr_lo32 + vmid * 2,
 					lower_32_bits(pd_addr), 0xffffffff);
-
-	/* wait for flush */
-	uvd_v7_0_enc_ring_emit_reg_wait(ring, hub->vm_inv_eng0_ack + eng,
-					1 << vmid, 1 << vmid);
 }
 
 static void uvd_v7_0_enc_ring_emit_wreg(struct amdgpu_ring *ring,
@@ -1701,7 +1689,9 @@ static const struct amdgpu_ring_funcs uvd_v7_0_ring_vm_funcs = {
 	.emit_frame_size =
 		2 + /* uvd_v7_0_ring_emit_hdp_flush */
 		2 + /* uvd_v7_0_ring_emit_hdp_invalidate */
-		SOC15_FLUSH_GPU_TLB_NUM_WREG * 6 + 16 + /* uvd_v7_0_ring_emit_vm_flush */
+		SOC15_FLUSH_GPU_TLB_NUM_WREG * 6 +
+		SOC15_FLUSH_GPU_TLB_NUM_REG_WAIT * 8 +
+		8 + /* uvd_v7_0_ring_emit_vm_flush */
 		14 + 14, /* uvd_v7_0_ring_emit_fence x2 vm fence */
 	.emit_ib_size = 8, /* uvd_v7_0_ring_emit_ib */
 	.emit_ib = uvd_v7_0_ring_emit_ib,
@@ -1729,7 +1719,9 @@ static const struct amdgpu_ring_funcs uvd_v7_0_enc_ring_vm_funcs = {
 	.get_wptr = uvd_v7_0_enc_ring_get_wptr,
 	.set_wptr = uvd_v7_0_enc_ring_set_wptr,
 	.emit_frame_size =
-		SOC15_FLUSH_GPU_TLB_NUM_WREG * 3 + 8 + /* uvd_v7_0_enc_ring_emit_vm_flush */
+		SOC15_FLUSH_GPU_TLB_NUM_WREG * 3 +
+		SOC15_FLUSH_GPU_TLB_NUM_REG_WAIT * 4 +
+		4 + /* uvd_v7_0_enc_ring_emit_vm_flush */
 		5 + 5 + /* uvd_v7_0_enc_ring_emit_fence x2 vm fence */
 		1, /* uvd_v7_0_enc_ring_insert_end */
 	.emit_ib_size = 5, /* uvd_v7_0_enc_ring_emit_ib */
