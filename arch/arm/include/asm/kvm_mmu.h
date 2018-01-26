@@ -226,11 +226,15 @@ static inline void *kvm_get_hyp_vector(void)
 {
 	extern char __kvm_hyp_vector[];
 	extern char __kvm_hyp_vector_bp_inv[];
+	extern char __kvm_hyp_vector_ic_inv[];
 
 	switch(read_cpuid_part()) {
 	case ARM_CPU_PART_CORTEX_A12:
 	case ARM_CPU_PART_CORTEX_A17:
 		return kvm_ksym_ref(__kvm_hyp_vector_bp_inv);
+
+	case ARM_CPU_PART_CORTEX_A15:
+		return kvm_ksym_ref(__kvm_hyp_vector_ic_inv);
 
 	default:
 		return kvm_ksym_ref(__kvm_hyp_vector);
