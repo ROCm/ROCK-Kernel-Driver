@@ -1477,19 +1477,6 @@ out:
 	return ret;
 }
 
-static bool is_mem_on_local_device(struct kgd_dev *kgd,
-		struct list_head *bo_va_list, void *vm)
-{
-	struct kfd_bo_va_list *entry;
-
-	list_for_each_entry(entry, bo_va_list, bo_list) {
-		if (entry->kgd_dev == kgd && entry->bo_va->base.vm == vm)
-			return true;
-	}
-
-	return false;
-}
-
 int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 		struct kgd_dev *kgd, struct kgd_mem *mem, void *vm)
 {
@@ -1498,31 +1485,19 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 		((struct amdkfd_vm *)vm)->process_info;
 	unsigned long bo_size = mem->bo->tbo.mem.size;
 	struct kfd_bo_va_list *entry;
-	unsigned int mapped_before;
 	struct bo_vm_reservation_context ctx;
 	int ret;
 
 	mutex_lock(&mem->lock);
 
-	/*
-	 * Make sure that this BO mapped on KGD before unmappping it
-	 */
-	if (!is_mem_on_local_device(kgd, &mem->bo_va_list, vm)) {
-		ret = -EINVAL;
-		goto out;
-	}
-
-	if (mem->mapped_to_gpu_memory == 0) {
-		pr_debug("BO VA 0x%llx size 0x%lx is not mapped to vm %p\n",
-				mem->va, bo_size, vm);
-		ret = -EINVAL;
-		goto out;
-	}
-	mapped_before = mem->mapped_to_gpu_memory;
-
 	ret = reserve_bo_and_cond_vms(mem, vm, BO_VM_MAPPED, &ctx);
 	if (unlikely(ret))
 		goto out;
+	/* If no VMs were reserved, it means the BO wasn't actually mapped */
+	if (ctx.n_vms == 0) {
+		ret = -EINVAL;
+		goto unreserve_out;
+	}
 
 	ret = vm_validate_pt_pd_bos((struct amdkfd_vm *)vm);
 	if (unlikely(ret))
@@ -1565,12 +1540,6 @@ int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 			amdgpu_amdkfd_remove_eviction_fence(mem->bo,
 						process_info->eviction_fence,
 						NULL, NULL);
-	}
-
-	if (mapped_before == mem->mapped_to_gpu_memory) {
-		pr_debug("BO VA 0x%llx size 0x%lx is not mapped to vm %p\n",
-			mem->va, bo_size, vm);
-		ret = -EINVAL;
 	}
 
 unreserve_out:
