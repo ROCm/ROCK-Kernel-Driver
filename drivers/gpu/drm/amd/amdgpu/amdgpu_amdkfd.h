@@ -64,10 +64,7 @@ struct kgd_mem {
 
 	struct amdgpu_sync sync;
 
-	/* flags bitfield */
-	bool coherent      : 1;
-	bool no_substitute : 1;
-	bool aql_queue     : 1;
+	bool aql_queue;
 };
 
 /* KFD Memory Eviction */

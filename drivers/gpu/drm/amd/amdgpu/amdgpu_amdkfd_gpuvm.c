@@ -1106,35 +1106,52 @@ uint32_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm)
 	return avm->pd_phys_addr >> AMDGPU_GPU_PAGE_SHIFT;
 }
 
-static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
-		uint64_t size, void *vm, struct kgd_mem **mem,
-		uint64_t *offset, u32 domain, u64 flags,
-		struct sg_table *sg, bool aql_queue,
-		bool readonly, bool execute, bool coherent, bool no_sub,
-		bool userptr)
+int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
+		struct kgd_dev *kgd, uint64_t va, uint64_t size,
+		void *vm, struct kgd_mem **mem,
+		uint64_t *offset, uint32_t flags)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct amdkfd_vm *kfd_vm = (struct amdkfd_vm *)vm;
-	struct amdgpu_bo *bo;
 	uint64_t user_addr = 0;
+	struct sg_table *sg = NULL;
+	struct amdgpu_bo *bo;
 	int byte_align;
-	u32 alloc_domain;
+	u32 domain, alloc_domain;
+	u64 alloc_flags;
 	uint32_t mapping_flags;
 	int ret;
 
-	if (aql_queue)
-		size = size >> 1;
-	if (userptr) {
+	/*
+	 * Check on which domain to allocate BO
+	 */
+	if (flags & ALLOC_MEM_FLAGS_VRAM) {
+		domain = alloc_domain = AMDGPU_GEM_DOMAIN_VRAM;
+		alloc_flags = AMDGPU_GEM_CREATE_VRAM_CLEARED;
+		alloc_flags |= (flags & ALLOC_MEM_FLAGS_PUBLIC) ?
+			AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED :
+			AMDGPU_GEM_CREATE_NO_CPU_ACCESS;
+	} else if (flags & ALLOC_MEM_FLAGS_GTT) {
+		domain = alloc_domain = AMDGPU_GEM_DOMAIN_GTT;
+		alloc_flags = 0;
+	} else if (flags & ALLOC_MEM_FLAGS_USERPTR) {
+		domain = AMDGPU_GEM_DOMAIN_GTT;
+		alloc_domain = AMDGPU_GEM_DOMAIN_CPU;
+		alloc_flags = 0;
 		if (!offset || !*offset)
 			return -EINVAL;
 		user_addr = *offset;
+	} else if (flags & ALLOC_MEM_FLAGS_DOORBELL) {
+		domain = alloc_domain = AMDGPU_GEM_DOMAIN_GTT;
+		alloc_flags = 0;
+		if (size > UINT_MAX)
+			return -EINVAL;
+		sg = create_doorbell_sg(*offset, size);
+		if (!sg)
+			return -ENOMEM;
+	} else {
+		return -EINVAL;
 	}
-
-	byte_align = (adev->family == AMDGPU_FAMILY_VI &&
-			adev->asic_type != CHIP_FIJI &&
-			adev->asic_type != CHIP_POLARIS10 &&
-			adev->asic_type != CHIP_POLARIS11) ?
-			VI_BO_SIZE_ALIGN : 1;
 
 	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
 	if (!*mem) {
@@ -1143,30 +1160,39 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	}
 	INIT_LIST_HEAD(&(*mem)->bo_va_list);
 	mutex_init(&(*mem)->lock);
-	(*mem)->coherent = coherent;
-	(*mem)->no_substitute = no_sub;
-	(*mem)->aql_queue = aql_queue;
+	(*mem)->aql_queue     = !!(flags & ALLOC_MEM_FLAGS_AQL_QUEUE_MEM);
+
+	/* Workaround for AQL queue wraparound bug. Map the same
+	 * memory twice. That means we only actually allocate half
+	 * the memory.
+	 */
+	if ((*mem)->aql_queue)
+		size = size >> 1;
+
+	/* Workaround for TLB bug on older VI chips */
+	byte_align = (adev->family == AMDGPU_FAMILY_VI &&
+			adev->asic_type != CHIP_FIJI &&
+			adev->asic_type != CHIP_POLARIS10 &&
+			adev->asic_type != CHIP_POLARIS11) ?
+			VI_BO_SIZE_ALIGN : 1;
 
 	mapping_flags = AMDGPU_VM_PAGE_READABLE;
-	if (!readonly)
+	if (!(flags & ALLOC_MEM_FLAGS_READONLY))
 		mapping_flags |= AMDGPU_VM_PAGE_WRITEABLE;
-	if (execute)
+	if (flags & ALLOC_MEM_FLAGS_EXECUTE_ACCESS)
 		mapping_flags |= AMDGPU_VM_PAGE_EXECUTABLE;
-	if (coherent)
+	if (flags & ALLOC_MEM_FLAGS_COHERENT)
 		mapping_flags |= AMDGPU_VM_MTYPE_UC;
 	else
 		mapping_flags |= AMDGPU_VM_MTYPE_NC;
-
 	(*mem)->mapping_flags = mapping_flags;
-
-	alloc_domain = userptr ? AMDGPU_GEM_DOMAIN_CPU : domain;
 
 	amdgpu_sync_create(&(*mem)->sync);
 
 	ret = amdgpu_amdkfd_reserve_system_mem_limit(adev, size, alloc_domain);
 	if (ret) {
 		pr_debug("Insufficient system memory\n");
-		goto err_bo_create;
+		goto err_reserve_limit;
 	}
 
 	pr_debug("\tcreate BO VA 0x%llx size 0x%llx domain %s\n",
@@ -1176,25 +1202,24 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	 * in the CPU domain, get moved to GTT when pinned.
 	 */
 	ret = amdgpu_bo_create(adev, size, byte_align, false,
-			       alloc_domain, flags, sg, NULL, &bo);
+			       alloc_domain, alloc_flags, sg, NULL, &bo);
 	if (ret) {
 		pr_debug("Failed to create BO on domain %s. ret %d\n",
 				domain_string(alloc_domain), ret);
-		unreserve_system_mem_limit(adev, size, alloc_domain);
 		goto err_bo_create;
 	}
 	bo->kfd_bo = *mem;
 	(*mem)->bo = bo;
-	if (userptr)
+	if (user_addr)
 		bo->flags |= AMDGPU_AMDKFD_USERPTR_BO;
 
 	(*mem)->va = va;
 	(*mem)->domain = domain;
 	(*mem)->mapped_to_gpu_memory = 0;
 	(*mem)->process_info = kfd_vm->process_info;
-	add_kgd_mem_to_kfd_bo_list(*mem, kfd_vm->process_info, userptr);
+	add_kgd_mem_to_kfd_bo_list(*mem, kfd_vm->process_info, user_addr);
 
-	if (userptr) {
+	if (user_addr) {
 		ret = init_user_pages(*mem, current->mm, user_addr);
 		if (ret) {
 			mutex_lock(&kfd_vm->process_info->lock);
@@ -1212,79 +1237,15 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 allocate_init_user_pages_failed:
 	amdgpu_bo_unref(&bo);
 err_bo_create:
+	unreserve_system_mem_limit(adev, size, alloc_domain);
+err_reserve_limit:
 	kfree(*mem);
 err:
+	if (sg) {
+		sg_free_table(sg);
+		kfree(sg);
+	}
 	return ret;
-}
-
-#define BOOL_TO_STR(b)	(b == true) ? "true" : "false"
-
-int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
-		struct kgd_dev *kgd, uint64_t va, uint64_t size,
-		void *vm, struct kgd_mem **mem,
-		uint64_t *offset, uint32_t flags)
-{
-	bool aql_queue, public, readonly, execute, coherent, no_sub, userptr;
-	u64 alloc_flag;
-	uint32_t domain;
-	struct sg_table *sg = NULL;
-
-	if (!(flags & ALLOC_MEM_FLAGS_NONPAGED)) {
-		pr_debug("current hw doesn't support paged memory\n");
-		return -EINVAL;
-	}
-
-	domain = 0;
-	alloc_flag = 0;
-
-	aql_queue = (flags & ALLOC_MEM_FLAGS_AQL_QUEUE_MEM) ? true : false;
-	public    = (flags & ALLOC_MEM_FLAGS_PUBLIC) ? true : false;
-	readonly  = (flags & ALLOC_MEM_FLAGS_READONLY) ? true : false;
-	execute   = (flags & ALLOC_MEM_FLAGS_EXECUTE_ACCESS) ? true : false;
-	coherent  = (flags & ALLOC_MEM_FLAGS_COHERENT) ? true : false;
-	no_sub    = (flags & ALLOC_MEM_FLAGS_NO_SUBSTITUTE) ? true : false;
-	userptr   = (flags & ALLOC_MEM_FLAGS_USERPTR) ? true : false;
-
-	/*
-	 * Check on which domain to allocate BO
-	 */
-	if (flags & ALLOC_MEM_FLAGS_VRAM) {
-		domain = AMDGPU_GEM_DOMAIN_VRAM;
-		alloc_flag = AMDGPU_GEM_CREATE_NO_CPU_ACCESS;
-		if (public) {
-			alloc_flag = AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
-		}
-		alloc_flag |= AMDGPU_GEM_CREATE_VRAM_CLEARED;
-	} else if (flags & (ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_USERPTR)) {
-		domain = AMDGPU_GEM_DOMAIN_GTT;
-		alloc_flag = 0;
-	} else if (flags & ALLOC_MEM_FLAGS_DOORBELL) {
-		domain = AMDGPU_GEM_DOMAIN_GTT;
-		alloc_flag = 0;
-		if (size > UINT_MAX)
-			return -EINVAL;
-		sg = create_doorbell_sg(*offset, size);
-		if (!sg)
-			return -ENOMEM;
-	}
-
-	if (offset && !userptr)
-		*offset = 0;
-
-	pr_debug("Allocate VA 0x%llx - 0x%llx domain %s aql %s\n",
-			va, va + size, domain_string(domain),
-			BOOL_TO_STR(aql_queue));
-
-	pr_debug("\t alloc_flag 0x%llx public %s readonly %s execute %s coherent %s no_sub %s\n",
-			alloc_flag, BOOL_TO_STR(public),
-			BOOL_TO_STR(readonly), BOOL_TO_STR(execute),
-			BOOL_TO_STR(coherent), BOOL_TO_STR(no_sub));
-
-	return __alloc_memory_of_gpu(kgd, va, size, vm, mem,
-			offset, domain,
-			alloc_flag, sg,
-			aql_queue, readonly, execute,
-			coherent, no_sub, userptr);
 }
 
 int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
