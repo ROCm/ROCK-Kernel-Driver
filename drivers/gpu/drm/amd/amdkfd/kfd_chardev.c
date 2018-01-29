@@ -1224,8 +1224,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 
 err_free:
 	dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
-					 (struct kgd_mem *) mem,
-					 pdd->vm);
+					 (struct kgd_mem *) mem);
 err_unlock:
 	mutex_unlock(&p->mutex);
 	return err;
@@ -1261,8 +1260,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	}
 	run_rdma_free_callback(buf_obj);
 
-	ret = dev->kfd2kgd->free_memory_of_gpu(dev->kgd, buf_obj->mem,
-					       pdd->vm);
+	ret = dev->kfd2kgd->free_memory_of_gpu(dev->kgd, buf_obj->mem);
 
 	/* If freeing the buffer failed, leave the handle in place for
 	 * clean-up during process tear-down.
