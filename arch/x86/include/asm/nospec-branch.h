@@ -276,7 +276,7 @@ static inline u64 save_and_restrict_branch_speculation(void)
 		     : [msr] "i" (MSR_IA32_SPEC_CTRL)
 		     : "memory");
 
-	ret = ax | (dx << 32);
+	ret = ax | ((u64)dx << 32);
 
 	/* restrict speculation */
 	asm volatile(ALTERNATIVE("",
@@ -303,8 +303,8 @@ static inline void restore_branch_speculation(u64 val)
 				 X86_FEATURE_IBRS)
 		     : "=a" (ax), "=c" (cx), "=d" (dx)
 		     : [msr] "i" (MSR_IA32_SPEC_CTRL),
-		       [val_low] "a" (val & 0xffffffff),
-		       [val_high] "d" (val >> 32)
+		       [val_low] "a" ((unsigned long)(val & 0xffffffff)),
+		       [val_high] "d" ((unsigned long)(val >> 32))
 		     : "memory");
 }
 
