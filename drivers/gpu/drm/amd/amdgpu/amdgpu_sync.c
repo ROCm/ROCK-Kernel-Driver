@@ -89,7 +89,7 @@ static void *amdgpu_sync_get_owner(struct dma_fence *f)
 	struct drm_sched_fence *s_fence;
 	struct amdgpu_amdkfd_fence *kfd_fence;
 
-	if (f == NULL)
+	if (!f)
 		return AMDGPU_FENCE_OWNER_UNDEFINED;
 
 	s_fence = to_drm_sched_fence(f);
@@ -193,8 +193,7 @@ int amdgpu_sync_fence(struct amdgpu_device *adev, struct amdgpu_sync *sync,
  * @resv: reservation object with embedded fence
  * @explicit_sync: true if we should only sync to the exclusive fence
  *
- * Sync to the fence except if it is KFD eviction fence and owner is
- * AMDGPU_FENCE_OWNER_VM.
+ * Sync to the fence
  */
 int amdgpu_sync_resv(struct amdgpu_device *adev,
 		     struct amdgpu_sync *sync,
@@ -221,6 +220,9 @@ int amdgpu_sync_resv(struct amdgpu_device *adev,
 	for (i = 0; i < flist->shared_count; ++i) {
 		f = rcu_dereference_protected(flist->shared[i],
 					      reservation_object_held(resv));
+		/* We only want to trigger KFD eviction fences on
+		 * evict or move jobs. Skip KFD fences otherwise.
+		 */
 		fence_owner = amdgpu_sync_get_owner(f);
 		if (fence_owner == AMDGPU_FENCE_OWNER_KFD &&
 		    owner != AMDGPU_FENCE_OWNER_UNDEFINED)
