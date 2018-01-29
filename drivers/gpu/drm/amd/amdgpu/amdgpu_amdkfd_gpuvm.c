@@ -23,26 +23,14 @@
 #undef pr_fmt
 #define pr_fmt(fmt) "kfd2kgd: " fmt
 
-#include <linux/module.h>
-#include <linux/fdtable.h>
-#include <linux/uaccess.h>
-#include <linux/firmware.h>
 #include <linux/list.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
 #endif
 #include <drm/drmP.h>
-#include <linux/dma-buf.h>
-#include <linux/pagemap.h>
+#include "amdgpu_object.h"
+#include "amdgpu_vm.h"
 #include "amdgpu_amdkfd.h"
-#include "amdgpu_ucode.h"
-#include "gca/gfx_8_0_sh_mask.h"
-#include "gca/gfx_8_0_d.h"
-#include "gca/gfx_8_0_enum.h"
-#include "oss/oss_3_0_sh_mask.h"
-#include "oss/oss_3_0_d.h"
-#include "gmc/gmc_8_1_sh_mask.h"
-#include "gmc/gmc_8_1_d.h"
 
 /* Special VM and GART address alignment needed for VI pre-Fiji due to
  * a HW bug.
