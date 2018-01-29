@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Advanced Micro Devices, Inc.
+ * Copyright 2016-2018 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 #include <linux/stacktrace.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/sched/mm.h>
 #include "amdgpu_amdkfd.h"
 
 const struct dma_fence_ops amd_kfd_fence_ops;
@@ -60,7 +61,7 @@ static int amd_kfd_fence_signal(struct dma_fence *f);
  */
 
 struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
-						       void *mm)
+						       struct mm_struct *mm)
 {
 	struct amdgpu_amdkfd_fence *fence = NULL;
 
@@ -68,10 +69,8 @@ struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 	if (fence == NULL)
 		return NULL;
 
-	/* mm_struct mm is used as void pointer to identify the parent
-	 * KFD process. Don't dereference it. Fence and any threads using
-	 * mm is guranteed to be released before process termination.
-	 */
+	/* This reference gets released in amd_kfd_fence_release */
+	mmgrab(mm);
 	fence->mm = mm;
 	get_task_comm(fence->timeline_name, current);
 	spin_lock_init(&fence->lock);
@@ -124,8 +123,7 @@ static bool amd_kfd_fence_enable_signaling(struct dma_fence *f)
 	if (dma_fence_is_signaled(f))
 		return true;
 
-	if (!kgd2kfd->schedule_evict_and_restore_process(
-				(struct mm_struct *)fence->mm, f))
+	if (!kgd2kfd->schedule_evict_and_restore_process(fence->mm, f))
 		return true;
 
 	return false;
@@ -163,6 +161,7 @@ static void amd_kfd_fence_release(struct dma_fence *f)
 		return; /* Not an amdgpu_amdkfd_fence */
 
 	amd_kfd_fence_signal(f);
+	mmdrop(fence->mm);
 	kfree_rcu(f, rcu);
 }
 
@@ -173,7 +172,7 @@ static void amd_kfd_fence_release(struct dma_fence *f)
  * @f: [IN] fence
  * @mm: [IN] mm that needs to be verified
 */
-bool amd_kfd_fence_check_mm(struct dma_fence *f, void *mm)
+bool amd_kfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm)
 {
 	struct amdgpu_amdkfd_fence *fence = to_amdgpu_amdkfd_fence(f);
 
@@ -193,4 +192,3 @@ const struct dma_fence_ops amd_kfd_fence_ops = {
 	.wait = dma_fence_default_wait,
 	.release = amd_kfd_fence_release,
 };
-

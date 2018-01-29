@@ -74,14 +74,14 @@ struct kgd_mem {
 /* KFD Memory Eviction */
 struct amdgpu_amdkfd_fence {
 	struct dma_fence base;
-	void *mm;
+	struct mm_struct *mm;
 	spinlock_t lock;
 	char timeline_name[TASK_COMM_LEN];
 };
 
 struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
-						       void *mm);
-bool amd_kfd_fence_check_mm(struct dma_fence *f, void *mm);
+						       struct mm_struct *mm);
+bool amd_kfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm);
 struct amdgpu_amdkfd_fence *to_amdgpu_amdkfd_fence(struct dma_fence *f);
 
 struct amdkfd_process_info {
