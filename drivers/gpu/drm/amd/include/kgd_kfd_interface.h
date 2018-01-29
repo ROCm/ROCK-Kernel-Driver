@@ -358,7 +358,7 @@ struct kfd2kgd_calls {
 	void (*get_cu_info)(struct kgd_dev *kgd,
 			struct kfd_cu_info *cu_info);
 	int (*map_gtt_bo_to_kernel)(struct kgd_dev *kgd,
-			struct kgd_mem *mem, void **kptr);
+			struct kgd_mem *mem, void **kptr, uint64_t *size);
 	void (*set_vm_context_page_table_base)(struct kgd_dev *kgd, uint32_t vmid,
 			uint32_t page_table_base);
 

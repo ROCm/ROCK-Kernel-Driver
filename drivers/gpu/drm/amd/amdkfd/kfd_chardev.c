@@ -1024,7 +1024,7 @@ static int kfd_ioctl_create_event(struct file *filp, struct kfd_process *p,
 
 			/* Map dGPU gtt BO to kernel */
 			kfd->kfd2kgd->map_gtt_bo_to_kernel(kfd->kgd,
-					mem, &kern_addr);
+					mem, &kern_addr, NULL);
 		}
 	}
 

@@ -151,7 +151,7 @@ static int kfd_process_alloc_gpuvm(struct kfd_process *p,
 
 	if (kptr) {
 		err = kdev->kfd2kgd->map_gtt_bo_to_kernel(kdev->kgd,
-				(struct kgd_mem *)mem, kptr);
+				(struct kgd_mem *)mem, kptr, NULL);
 		if (err) {
 			pr_debug("Map GTT BO to kernel failed\n");
 			goto free_obj_handle;

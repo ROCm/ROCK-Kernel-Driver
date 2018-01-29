@@ -1567,7 +1567,7 @@ int amdgpu_amdkfd_gpuvm_sync_memory(
 }
 
 int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
-		struct kgd_mem *mem, void **kptr)
+		struct kgd_mem *mem, void **kptr, uint64_t *size)
 {
 	int ret;
 	struct amdgpu_bo *bo = mem->bo;
@@ -1603,6 +1603,9 @@ int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 	amdgpu_amdkfd_remove_eviction_fence(
 		bo, mem->process_info->eviction_fence, NULL, NULL);
 	list_del_init(&mem->validate_list.head);
+
+	if (size)
+		*size = amdgpu_bo_size(bo);
 
 	amdgpu_bo_unreserve(bo);
 
