@@ -1632,15 +1632,13 @@ out:
 int amdgpu_amdkfd_gpuvm_sync_memory(
 		struct kgd_dev *kgd, struct kgd_mem *mem, bool intr)
 {
-	int ret = 0;
 	struct amdgpu_sync sync;
-	struct amdgpu_device *adev;
+	int ret;
 
-	adev = get_amdgpu_device(kgd);
 	amdgpu_sync_create(&sync);
 
 	mutex_lock(&mem->lock);
-	amdgpu_sync_clone(adev, &mem->sync, &sync);
+	amdgpu_sync_clone(&mem->sync, &sync);
 	mutex_unlock(&mem->lock);
 
 	ret = amdgpu_sync_wait(&sync, intr);

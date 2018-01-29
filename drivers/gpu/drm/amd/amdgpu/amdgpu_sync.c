@@ -338,9 +338,16 @@ struct dma_fence *amdgpu_sync_get_fence(struct amdgpu_sync *sync, bool *explicit
 	return NULL;
 }
 
-int amdgpu_sync_clone(struct amdgpu_device *adev,
-					 struct amdgpu_sync *source,
-					 struct amdgpu_sync *clone)
+/**
+ * amdgpu_sync_clone - clone a sync object
+ *
+ * @source: sync object to clone
+ * @clone: pointer to destination sync object
+ *
+ * Adds references to all unsignaled fences in @source to @clone. Also
+ * removes signaled fences from @source while at it.
+ */
+int amdgpu_sync_clone(struct amdgpu_sync *source, struct amdgpu_sync *clone)
 {
 	struct amdgpu_sync_entry *e;
 	struct hlist_node *tmp;
@@ -357,7 +364,7 @@ int amdgpu_sync_clone(struct amdgpu_device *adev,
 
 		f = e->fence;
 		if (!dma_fence_is_signaled(f)) {
-			r = amdgpu_sync_fence(adev, clone, f, false);
+			r = amdgpu_sync_fence(NULL, clone, f, false);
 			if (r)
 				return r;
 		} else {
@@ -366,6 +373,10 @@ int amdgpu_sync_clone(struct amdgpu_device *adev,
 			kmem_cache_free(amdgpu_sync_slab, e);
 		}
 	}
+
+	dma_fence_put(clone->last_vm_update);
+	clone->last_vm_update = dma_fence_get(source->last_vm_update);
+
 	return 0;
 }
 
