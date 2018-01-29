@@ -197,8 +197,6 @@ struct tile_config {
  * @set_pasid_vmid_mapping: Exposes pasid/vmid pair to the H/W for no cp
  * scheduling mode. Only used for no cp scheduling mode.
  *
- * @init_pipeline: Initialized the compute pipelines.
- *
  * @hqd_load: Loads the mqd structure to a H/W hqd slot. used only for no cp
  * sceduling mode.
  *
@@ -225,9 +223,6 @@ struct tile_config {
  * @unmap_memory_to_gpu: Releases and unpins BO, PD and all related PTs
  *
  * @get_fw_version: Returns FW versions from the header
- *
- * @set_num_of_requests: Sets number of Peripheral Page Request (PPR) sent to
- * IOMMU when address translation failed
  *
  * @get_cu_info: Retrieves activated cu info
  *
@@ -276,8 +271,6 @@ struct kfd2kgd_calls {
 
 	uint32_t (*get_process_page_dir)(void *vm);
 
-	int (*open_graphic_handle)(struct kgd_dev *kgd, uint64_t va, void *vm, int fd, uint32_t handle, struct kgd_mem **mem);
-
 	int (*alloc_pasid)(unsigned int bits);
 	void (*free_pasid)(unsigned int pasid);
 
@@ -288,9 +281,6 @@ struct kfd2kgd_calls {
 
 	int (*set_pasid_vmid_mapping)(struct kgd_dev *kgd, unsigned int pasid,
 					unsigned int vmid);
-
-	int (*init_pipeline)(struct kgd_dev *kgd, uint32_t pipe_id,
-				uint32_t hpd_size, uint64_t hpd_gpu_addr);
 
 	int (*init_interrupts)(struct kgd_dev *kgd, uint32_t pipe_id);
 	
@@ -362,8 +352,6 @@ struct kfd2kgd_calls {
 	uint16_t (*get_fw_version)(struct kgd_dev *kgd,
 				enum kgd_engine_type type);
 
-	void (*set_num_of_requests)(struct kgd_dev *kgd,
-			uint8_t num_of_requests);
 	int (*alloc_memory_of_scratch)(struct kgd_dev *kgd,
 			uint64_t va, uint32_t vmid);
 	int (*write_config_static_mem)(struct kgd_dev *kgd, bool swizzle_enable,

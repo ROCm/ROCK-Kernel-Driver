@@ -1688,8 +1688,6 @@ int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 
 	amdgpu_bo_unreserve(bo);
 
-	mem->kptr = *kptr;
-
 	mutex_unlock(&mem->process_info->lock);
 	return 0;
 

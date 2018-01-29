@@ -99,9 +99,6 @@ static int create_process_gpumem(struct kgd_dev *kgd, uint64_t va, size_t size,
 		void *vm, struct kgd_mem **mem);
 static void destroy_process_gpumem(struct kgd_dev *kgd, struct kgd_mem *mem);
 
-static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm,
-				int fd, uint32_t handle, struct kgd_mem **mem);
-
 static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
 
 /*
@@ -114,8 +111,6 @@ static void kgd_program_sh_mem_settings(struct kgd_dev *kgd, uint32_t vmid,
 		uint32_t sh_mem_bases);
 static int kgd_set_pasid_vmid_mapping(struct kgd_dev *kgd, unsigned int pasid,
 		unsigned int vmid);
-static int kgd_init_pipeline(struct kgd_dev *kgd, uint32_t pipe_id,
-		uint32_t hpd_size, uint64_t hpd_gpu_addr);
 static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id);
 static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 			uint32_t queue_id, uint32_t __user *wptr,
@@ -156,8 +151,6 @@ static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd,
 		uint8_t vmid);
 static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 		uint8_t vmid);
-static void set_num_of_requests(struct kgd_dev *kgd,
-			uint8_t num_of_requests);
 static int alloc_memory_of_scratch(struct kgd_dev *kgd,
 				 uint64_t va, uint32_t vmid);
 static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
@@ -210,12 +203,10 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.create_process_gpumem = create_process_gpumem,
 	.destroy_process_gpumem = destroy_process_gpumem,
 	.get_process_page_dir = amdgpu_amdkfd_gpuvm_get_process_page_dir,
-	.open_graphic_handle = open_graphic_handle,
 	.program_sh_mem_settings = kgd_program_sh_mem_settings,
 	.alloc_pasid = amdgpu_pasid_alloc,
 	.free_pasid = amdgpu_pasid_free,
 	.set_pasid_vmid_mapping = kgd_set_pasid_vmid_mapping,
-	.init_pipeline = kgd_init_pipeline,
 	.init_interrupts = kgd_init_interrupts,
 	.hqd_load = kgd_hqd_load,
 	.hqd_sdma_load = kgd_hqd_sdma_load,
@@ -241,7 +232,6 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.map_memory_to_gpu = amdgpu_amdkfd_gpuvm_map_memory_to_gpu,
 	.unmap_memory_to_gpu = amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu,
 	.get_fw_version = get_fw_version,
-	.set_num_of_requests = set_num_of_requests,
 	.get_cu_info = get_cu_info,
 	.alloc_memory_of_scratch = alloc_memory_of_scratch,
 	.write_config_static_mem = write_config_static_mem,
@@ -275,12 +265,6 @@ static int create_process_gpumem(struct kgd_dev *kgd, uint64_t va, size_t size,
 static void destroy_process_gpumem(struct kgd_dev *kgd, struct kgd_mem *mem)
 {
 
-}
-
-static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm,
-				int fd, uint32_t handle, struct kgd_mem **mem)
-{
-	return 0;
 }
 
 static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
@@ -401,13 +385,6 @@ static int kgd_set_pasid_vmid_mapping(struct kgd_dev *kgd, unsigned int pasid,
 	/* Mapping vmid to pasid also for IH block */
 	WREG32(SOC15_REG_OFFSET(OSSSYS, 0, mmIH_VMID_0_LUT_MM) + vmid,
 	       pasid_mapping);
-	return 0;
-}
-
-static int kgd_init_pipeline(struct kgd_dev *kgd, uint32_t pipe_id,
-				uint32_t hpd_size, uint64_t hpd_gpu_addr)
-{
-	/* amdgpu owns the per-pipe state */
 	return 0;
 }
 
@@ -1198,12 +1175,6 @@ static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type)
 
 	/* Only 12 bit in use*/
 	return hdr->common.ucode_version;
-}
-
-static void set_num_of_requests(struct kgd_dev *kgd,
-			uint8_t num_of_requests)
-{
-	pr_debug("This is a stub\n");
 }
 
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,

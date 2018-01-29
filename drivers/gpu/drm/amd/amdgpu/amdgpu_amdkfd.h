@@ -54,7 +54,6 @@ struct kgd_mem {
 	struct ttm_validate_buffer resv_list;
 	uint32_t domain;
 	unsigned int mapped_to_gpu_memory;
-	void *kptr;
 	uint64_t va;
 
 	uint32_t mapping_flags;
@@ -160,8 +159,6 @@ int amdgpu_amdkfd_post_reset(struct amdgpu_device *adev);
 void amdgpu_amdkfd_gpu_reset(struct kgd_dev *kgd);
 
 /* Shared API */
-int map_bo(struct amdgpu_device *rdev, uint64_t va, void *vm,
-		struct amdgpu_bo *bo, struct amdgpu_bo_va **bo_va);
 int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 			void **mem_obj, uint64_t *gpu_addr,
 			void **cpu_ptr);
@@ -235,8 +232,6 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
 				      struct kgd_mem *mem,
 				      struct dma_buf **dmabuf);
-int amdgpu_amdkfd_gpuvm_evict_mem(struct kgd_mem *mem, struct mm_struct *mm);
-int amdgpu_amdkfd_gpuvm_restore_mem(struct kgd_mem *mem, struct mm_struct *mm);
 
 void amdgpu_amdkfd_gpuvm_init_mem_limits(void);
 void amdgpu_amdkfd_unreserve_system_memory_limit(struct amdgpu_bo *bo);
