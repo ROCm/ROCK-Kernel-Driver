@@ -1368,7 +1368,7 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 	r = amdgpu_bo_create(adev, size, PAGE_SIZE, true, AMDGPU_GEM_DOMAIN_VRAM,
 			     AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED | AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS |
 			     AMDGPU_GEM_CREATE_TOP_DOWN,
-			     NULL, NULL, 0, &abo);
+			     NULL, NULL, &abo);
 	if (unlikely(r))
 		goto error_out;
 

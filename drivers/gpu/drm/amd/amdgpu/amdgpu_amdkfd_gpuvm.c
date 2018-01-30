@@ -736,7 +736,7 @@ static int __alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 	 */
 	ret = amdgpu_bo_create(adev, size, byte_align, false,
 				alloc_domain,
-			       flags, sg, NULL, 0, &bo);
+			       flags, sg, NULL, &bo);
 	if (ret != 0) {
 		pr_debug("Failed to create BO on domain %s. ret %d\n",
 				domain_string(alloc_domain), ret);
