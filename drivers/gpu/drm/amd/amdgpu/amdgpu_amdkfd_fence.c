@@ -31,8 +31,6 @@
 const struct dma_fence_ops amd_kfd_fence_ops;
 static atomic_t fence_seq = ATOMIC_INIT(0);
 
-static int amd_kfd_fence_signal(struct dma_fence *f);
-
 /* Eviction Fence
  * Fence helper functions to deal with KFD memory eviction.
  * Big Idea - Since KFD submissions are done by user queues, a BO cannot be
@@ -129,38 +127,24 @@ static bool amd_kfd_fence_enable_signaling(struct dma_fence *f)
 	return false;
 }
 
-static int amd_kfd_fence_signal(struct dma_fence *f)
-{
-	unsigned long flags;
-	int ret;
-
-	spin_lock_irqsave(f->lock, flags);
-	/* Set enabled bit so cb will called */
-	set_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT, &f->flags);
-	ret = dma_fence_signal_locked(f);
-	spin_unlock_irqrestore(f->lock, flags);
-
-	return ret;
-}
-
 /**
  * amd_kfd_fence_release - callback that fence can be freed
  *
  * @fence: fence
  *
  * This function is called when the reference count becomes zero.
- * It just RCU schedules freeing up the fence.
-*/
+ * Drops the mm_struct reference and RCU schedules freeing up the fence.
+ */
 static void amd_kfd_fence_release(struct dma_fence *f)
 {
 	struct amdgpu_amdkfd_fence *fence = to_amdgpu_amdkfd_fence(f);
+
 	/* Unconditionally signal the fence. The process is getting
 	 * terminated.
 	 */
 	if (WARN_ON(!fence))
 		return; /* Not an amdgpu_amdkfd_fence */
 
-	amd_kfd_fence_signal(f);
 	mmdrop(fence->mm);
 	kfree_rcu(f, rcu);
 }
