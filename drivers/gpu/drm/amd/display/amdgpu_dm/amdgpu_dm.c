@@ -2315,7 +2315,7 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 		       const struct dm_connector_state *dm_state)
 {
 	struct drm_display_mode *preferred_mode = NULL;
-	struct drm_connector *drm_connector;
+	const struct drm_connector *drm_connector;
 	struct dc_stream_state *stream = NULL;
 	struct drm_display_mode mode = *drm_mode;
 	bool native_mode_found = false;
@@ -2334,13 +2334,11 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 
 	if (!aconnector->dc_sink) {
 		/*
-		 * Create dc_sink when necessary to MST
-		 * Don't apply fake_sink to MST
+		 * Exclude MST from creating fake_sink
+		 * TODO: need to enable MST into fake_sink feature
 		 */
-		if (aconnector->mst_port) {
-			dm_dp_mst_dc_sink_create(drm_connector);
-			goto mst_dc_sink_create_done;
-		}
+		if (aconnector->mst_port)
+			goto stream_create_fail;
 
 		if (create_fake_sink(aconnector))
 			goto stream_create_fail;
@@ -2391,7 +2389,6 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 stream_create_fail:
 dm_state_null:
 drm_connector_null:
-mst_dc_sink_create_done:
 	return stream;
 }
 
