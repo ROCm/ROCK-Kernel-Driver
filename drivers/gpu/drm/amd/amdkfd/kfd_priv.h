@@ -647,8 +647,6 @@ struct kfd_process_device {
 	uint64_t gpuvm_limit;
 	uint64_t scratch_base;
 	uint64_t scratch_limit;
-	uint64_t dgpu_base;
-	uint64_t dgpu_limit;
 
 	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
 	enum kfd_pdd_bound bound;

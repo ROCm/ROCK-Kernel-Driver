@@ -305,21 +305,21 @@
 #define MAKE_LDS_APP_BASE_V9() ((uint64_t)(0x1UL) << 48)
 #define MAKE_SCRATCH_APP_BASE_V9() ((uint64_t)(0x2UL) << 48)
 
-/* Some VM address space reserved for kernel use (CWSR trap handlers
- * and kernel IBs)
+/* User mode manages most of the SVM aperture address space. The low
+ * 16MB are reserved for kernel use (CWSR trap handler and kernel IB
+ * for now).
  */
-#define DGPU_VM_BASE_DEFAULT 0x100000
-#define DGPU_IB_BASE_DEFAULT (DGPU_VM_BASE_DEFAULT - PAGE_SIZE)
+#define SVM_USER_BASE 0x1000000ull
+#define SVM_CWSR_BASE (SVM_USER_BASE - KFD_CWSR_TBA_TMA_SIZE)
+#define SVM_IB_BASE   (SVM_CWSR_BASE - PAGE_SIZE)
 
 int kfd_set_process_dgpu_aperture(struct kfd_process_device *pdd,
 					uint64_t base, uint64_t limit)
 {
-	if (base < (pdd->qpd.cwsr_base + KFD_CWSR_TBA_TMA_SIZE)) {
+	if (base < SVM_USER_BASE) {
 		pr_err("Set dgpu vm base 0x%llx failed.\n", base);
 		return -EINVAL;
 	}
-	pdd->dgpu_base = base;
-	pdd->dgpu_limit = limit;
 	return 0;
 }
 
@@ -397,8 +397,14 @@ int kfd_init_apertures(struct kfd_process *process)
 			}
 
 			if (!dev->device_info->is_need_iommu_device) {
-				pdd->qpd.cwsr_base = DGPU_VM_BASE_DEFAULT;
-				pdd->qpd.ib_base = DGPU_IB_BASE_DEFAULT;
+				/* dGPUs: SVM aperture starting at 0
+				 * with small reserved space for kernel
+				 */
+				pdd->gpuvm_base = SVM_USER_BASE;
+				pdd->gpuvm_limit =
+					dev->shared_resources.gpuvm_size - 1;
+				pdd->qpd.cwsr_base = SVM_CWSR_BASE;
+				pdd->qpd.ib_base = SVM_IB_BASE;
 			}
 		}
 
