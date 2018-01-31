@@ -605,8 +605,8 @@ struct qcm_process_device {
 
 int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 					       struct dma_fence *fence);
-int quiesce_process_mm(struct kfd_process *p);
-int resume_process_mm(struct kfd_process *p);
+int kfd_process_evict_queues(struct kfd_process *p);
+int kfd_process_restore_queues(struct kfd_process *p);
 
 
 /* 8 byte handle containing GPU ID in the most significant 4 bytes and

@@ -766,9 +766,10 @@ int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 		r = -ENODEV;
 		pdd = kfd_get_process_device_data(kfd, p);
 		if (pdd)
-			r = process_evict_queues(kfd->dqm, &pdd->qpd);
+			r = kfd->dqm->ops.evict_process_queues(kfd->dqm,
+							       &pdd->qpd);
 	} else {
-		r = quiesce_process_mm(p);
+		r = kfd_process_evict_queues(p);
 	}
 
 	kfd_unref_process(p);
@@ -793,9 +794,10 @@ int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 		r = -ENODEV;
 		pdd = kfd_get_process_device_data(kfd, p);
 		if (pdd)
-			r = process_restore_queues(kfd->dqm, &pdd->qpd);
+			r = kfd->dqm->ops.restore_process_queues(kfd->dqm,
+								 &pdd->qpd);
 	} else {
-		r = resume_process_mm(p);
+		r = kfd_process_restore_queues(p);
 	}
 
 	kfd_unref_process(p);

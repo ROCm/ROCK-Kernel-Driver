@@ -1059,7 +1059,7 @@ void kfd_suspend_all_processes(void)
 		cancel_delayed_work_sync(&p->eviction_work);
 		cancel_delayed_work_sync(&p->restore_work);
 
-		if (quiesce_process_mm(p))
+		if (kfd_process_evict_queues(p))
 			pr_err("Failed to suspend process %d\n", p->pasid);
 		dma_fence_signal(p->ef);
 		dma_fence_put(p->ef);
@@ -1107,18 +1107,21 @@ struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
 	return p;
 }
 
-/* quiesce_process_mm -
- *  Quiesce all user queues that belongs to given process p
+/* kfd_process_evict_queues - Evict all user queues of a process
+ *
+ * Eviction is reference-counted per process-device. This means multiple
+ * evictions from different sources can be nested safely.
  */
-int quiesce_process_mm(struct kfd_process *p)
+int kfd_process_evict_queues(struct kfd_process *p)
 {
 	struct kfd_process_device *pdd;
 	int r = 0;
 	unsigned int n_evicted = 0;
 
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
-		r = process_evict_queues(pdd->dev->dqm, &pdd->qpd);
-		if (r != 0) {
+		r = pdd->dev->dqm->ops.evict_process_queues(pdd->dev->dqm,
+							    &pdd->qpd);
+		if (r) {
 			pr_err("Failed to evict process queues\n");
 			goto fail;
 		}
@@ -1134,7 +1137,8 @@ fail:
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		if (n_evicted == 0)
 			break;
-		if (process_restore_queues(pdd->dev->dqm, &pdd->qpd))
+		if (pdd->dev->dqm->ops.restore_process_queues(pdd->dev->dqm,
+							      &pdd->qpd))
 			pr_err("Failed to restore queues\n");
 
 		n_evicted--;
@@ -1143,21 +1147,18 @@ fail:
 	return r;
 }
 
-/* resume_process_mm -
- *  Resume all user queues that belongs to given process p. The caller must
- *  ensure that process p context is valid.
- */
-int resume_process_mm(struct kfd_process *p)
+/* kfd_process_restore_queues - Restore all user queues of a process */
+int kfd_process_restore_queues(struct kfd_process *p)
 {
 	struct kfd_process_device *pdd;
-	struct mm_struct *mm = (struct mm_struct *)p->mm;
 	int r, ret = 0;
 
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
-		r = process_restore_queues(pdd->dev->dqm, &pdd->qpd);
-		if (r != 0) {
+		r = pdd->dev->dqm->ops.restore_process_queues(pdd->dev->dqm,
+							      &pdd->qpd);
+		if (r) {
 			pr_err("Failed to restore process queues\n");
-			if (ret == 0)
+			if (!ret)
 				ret = r;
 		}
 	}
@@ -1190,7 +1191,7 @@ static void evict_process_worker(struct work_struct *work)
 	flush_delayed_work(&p->restore_work);
 
 	pr_info("Started evicting process of pasid %d\n", p->pasid);
-	ret = quiesce_process_mm(p);
+	ret = kfd_process_evict_queues(p);
 	if (!ret) {
 		dma_fence_signal(p->ef);
 		dma_fence_put(p->ef);
@@ -1250,7 +1251,7 @@ static void restore_process_worker(struct work_struct *work)
 		return;
 	}
 
-	ret = resume_process_mm(p);
+	ret = kfd_process_restore_queues(p);
 	if (ret)
 		pr_err("Failed to resume user queues\n");
 
