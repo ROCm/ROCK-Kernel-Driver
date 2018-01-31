@@ -719,7 +719,7 @@ static void pci_amd_enable_64bit_bar(struct pci_dev *dev)
 		if (conflict->name != name)
 			return;
 
-		/* We are resuming from suspend; just reenable the window */
+		/* We are resuming from suspend, just reprogram the regs. */
 		res = conflict;
 	} else {
 		dev_info(&dev->dev, "adding root bus resource %pR (tainting kernel)\n",
