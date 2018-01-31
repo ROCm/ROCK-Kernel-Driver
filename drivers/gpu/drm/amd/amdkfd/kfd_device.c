@@ -462,7 +462,7 @@ static int iommu_invalid_ppr_cb(struct pci_dev *pdev, int pasid,
 }
 #endif /* CONFIG_AMD_IOMMU_V2 */
 
-static int kfd_cwsr_init(struct kfd_dev *kfd)
+static void kfd_cwsr_init(struct kfd_dev *kfd)
 {
 	if (cwsr_enable && kfd->device_info->supports_cwsr) {
 		if (kfd->device_info->asic_family < CHIP_VEGA10) {
@@ -477,8 +477,6 @@ static int kfd_cwsr_init(struct kfd_dev *kfd)
 
 		kfd->cwsr_enabled = true;
 	}
-
-	return 0;
 }
 
 static void kfd_ib_mem_init(struct kfd_dev *kdev)
@@ -587,11 +585,7 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	}
 #endif
 
-	if (kfd_cwsr_init(kfd)) {
-		dev_err(kfd_device, "Error initializing cwsr\n");
-		goto device_iommu_pasid_error;
-	}
-
+	kfd_cwsr_init(kfd);
 	kfd_ib_mem_init(kfd);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
