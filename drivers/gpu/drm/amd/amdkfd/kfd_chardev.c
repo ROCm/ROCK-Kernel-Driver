@@ -1379,22 +1379,6 @@ sync_memory_failed:
 	return err;
 }
 
-int kfd_unmap_memory_from_gpu(void *mem, struct kfd_process_device *pdd)
-{
-	int err;
-	struct kfd_dev *dev = pdd->dev;
-
-	err = dev->kfd2kgd->unmap_memory_to_gpu(
-		dev->kgd, (struct kgd_mem *) mem, pdd->vm);
-
-	if (err != 0)
-		return err;
-
-	kfd_flush_tlb(dev, pdd->process->pasid);
-
-	return 0;
-}
-
 static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 					struct kfd_process *p, void *data)
 {
@@ -1460,11 +1444,23 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 				err = -EFAULT;
 				goto get_mem_obj_from_handle_failed;
 			}
-			kfd_unmap_memory_from_gpu(mem, peer_pdd);
+			err = dev->kfd2kgd->unmap_memory_to_gpu(
+				peer->kgd, (struct kgd_mem *)mem, peer_pdd->vm);
+			if (err) {
+				pr_err("Failed to unmap from gpu %d/%d\n",
+				       i, num_dev);
+				goto unmap_memory_from_gpu_failed;
+			}
 		}
 		kfree(devices_arr);
-	} else
-		kfd_unmap_memory_from_gpu(mem, pdd);
+	} else {
+		err = dev->kfd2kgd->unmap_memory_to_gpu(
+			dev->kgd, (struct kgd_mem *)mem, pdd->vm);
+		if (err) {
+			pr_err("Failed to unmap from gpu\n");
+			goto unmap_memory_from_gpu_failed;
+		}
+	}
 
 	mutex_unlock(&p->mutex);
 
@@ -1472,6 +1468,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 
 bind_process_to_device_failed:
 get_mem_obj_from_handle_failed:
+unmap_memory_from_gpu_failed:
 	mutex_unlock(&p->mutex);
 copy_from_user_failed:
 	kfree(devices_arr);
