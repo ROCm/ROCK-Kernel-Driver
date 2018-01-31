@@ -90,6 +90,7 @@ var SIM_RUN_HACK		    =	0		    //any hack that needs to be made to run this code
 var SGPR_SAVE_USE_SQC		    =	1		    //use SQC D$ to do the write
 var USE_MTBUF_INSTEAD_OF_MUBUF	    =	0		    //becasue TC EMU curently asserts on 0 of // overload DFMT field to carry 4 more bits of stride for MUBUF opcodes
 var SWIZZLE_EN			    =	0		    //whether we use swizzled buffer addressing
+var ACK_SQC_STORE		    =	1		    //workaround for suspected SQC store bug causing incorrect stores under concurrency
 
 /**************************************************************************/
 /*			variables					  */
@@ -1089,6 +1090,9 @@ function write_hwreg_to_mem(s, s_rsrc, s_mem_offset)
 	s_mov_b32 exec_lo, m0			//assuming exec_lo is not needed anymore from this point on
 	s_mov_b32 m0, s_mem_offset
 	s_buffer_store_dword s, s_rsrc, m0	glc:1
+if ACK_SQC_STORE
+	s_waitcnt lgkmcnt(0)
+end
 	s_add_u32	s_mem_offset, s_mem_offset, 4
 	s_mov_b32   m0, exec_lo
 end
@@ -1098,9 +1102,21 @@ end
 function write_16sgpr_to_mem(s, s_rsrc, s_mem_offset)
 
 	s_buffer_store_dwordx4 s[0], s_rsrc, 0	glc:1
+if ACK_SQC_STORE
+	s_waitcnt lgkmcnt(0)
+end
 	s_buffer_store_dwordx4 s[4], s_rsrc, 16	 glc:1
+if ACK_SQC_STORE
+	s_waitcnt lgkmcnt(0)
+end
 	s_buffer_store_dwordx4 s[8], s_rsrc, 32	 glc:1
+if ACK_SQC_STORE
+	s_waitcnt lgkmcnt(0)
+end
 	s_buffer_store_dwordx4 s[12], s_rsrc, 48 glc:1
+if ACK_SQC_STORE
+	s_waitcnt lgkmcnt(0)
+end
 	s_add_u32	s_rsrc[0], s_rsrc[0], 4*16
 	s_addc_u32	s_rsrc[1], s_rsrc[1], 0x0	      // +scc
 end
@@ -1145,7 +1161,7 @@ end
 #endif
 
 static const uint32_t cwsr_trap_gfx9_hex[] = {
-	0xbf820001, 0xbf820128,
+	0xbf820001, 0xbf820136,
 	0xb8f0f802, 0x89708670,
 	0xb8f1f803, 0x8674ff71,
 	0x00000400, 0xbf850021,
@@ -1196,35 +1212,40 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0xbef60084, 0xbef600ff,
 	0x01000000, 0xbefe007c,
 	0xbefc007a, 0xc0611efa,
-	0x0000007c, 0x807a847a,
-	0xbefc007e, 0xbefe007c,
-	0xbefc007a, 0xc0611b3a,
-	0x0000007c, 0x807a847a,
+	0x0000007c, 0xbf8cc07f,
+	0x807a847a, 0xbefc007e,
+	0xbefe007c, 0xbefc007a,
+	0xc0611b3a, 0x0000007c,
+	0xbf8cc07f, 0x807a847a,
 	0xbefc007e, 0xbefe007c,
 	0xbefc007a, 0xc0611b7a,
-	0x0000007c, 0x807a847a,
-	0xbefc007e, 0xbefe007c,
-	0xbefc007a, 0xc0611bba,
-	0x0000007c, 0x807a847a,
+	0x0000007c, 0xbf8cc07f,
+	0x807a847a, 0xbefc007e,
+	0xbefe007c, 0xbefc007a,
+	0xc0611bba, 0x0000007c,
+	0xbf8cc07f, 0x807a847a,
 	0xbefc007e, 0xbefe007c,
 	0xbefc007a, 0xc0611bfa,
-	0x0000007c, 0x807a847a,
-	0xbefc007e, 0xbefe007c,
-	0xbefc007a, 0xc0611c3a,
-	0x0000007c, 0x807a847a,
+	0x0000007c, 0xbf8cc07f,
+	0x807a847a, 0xbefc007e,
+	0xbefe007c, 0xbefc007a,
+	0xc0611c3a, 0x0000007c,
+	0xbf8cc07f, 0x807a847a,
 	0xbefc007e, 0xb8f1f803,
 	0xbefe007c, 0xbefc007a,
 	0xc0611c7a, 0x0000007c,
-	0x807a847a, 0xbefc007e,
-	0xbefe007c, 0xbefc007a,
-	0xc0611cba, 0x0000007c,
+	0xbf8cc07f, 0x807a847a,
+	0xbefc007e, 0xbefe007c,
+	0xbefc007a, 0xc0611cba,
+	0x0000007c, 0xbf8cc07f,
 	0x807a847a, 0xbefc007e,
 	0xbefe007c, 0xbefc007a,
 	0xc0611cfa, 0x0000007c,
-	0x807a847a, 0xbefc007e,
-	0xb8fbf801, 0xbefe007c,
-	0xbefc007a, 0xc0611efa,
-	0x0000007c, 0x807a847a,
+	0xbf8cc07f, 0x807a847a,
+	0xbefc007e, 0xb8fbf801,
+	0xbefe007c, 0xbefc007a,
+	0xc0611efa, 0x0000007c,
+	0xbf8cc07f, 0x807a847a,
 	0xbefc007e, 0x8676ff7f,
 	0x04000000, 0xbeef0080,
 	0x876f6f76, 0xb8fa2a05,
@@ -1239,12 +1260,14 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0xbe862b06, 0xbe882b08,
 	0xbe8a2b0a, 0xbe8c2b0c,
 	0xbe8e2b0e, 0xc06b003a,
-	0x00000000, 0xc06b013a,
-	0x00000010, 0xc06b023a,
-	0x00000020, 0xc06b033a,
-	0x00000030, 0x8074c074,
+	0x00000000, 0xbf8cc07f,
+	0xc06b013a, 0x00000010,
+	0xbf8cc07f, 0xc06b023a,
+	0x00000020, 0xbf8cc07f,
+	0xc06b033a, 0x00000030,
+	0xbf8cc07f, 0x8074c074,
 	0x82758075, 0x807c907c,
-	0xbf0a717c, 0xbf85ffeb,
+	0xbf0a717c, 0xbf85ffe7,
 	0xbef40172, 0xbefa0080,
 	0xbefe00c1, 0xbeff00c1,
 	0xbef600ff, 0x01000000,
