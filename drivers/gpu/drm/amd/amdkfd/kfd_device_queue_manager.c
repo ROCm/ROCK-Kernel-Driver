@@ -198,7 +198,7 @@ static int allocate_vmid(struct device_queue_manager *dqm,
 			qpd->vmid,
 			qpd->page_table_base);
 	/*invalidate the VM context after pasid and vmid mapping is set up*/
-	kfd_flush_tlb(dqm->dev, qpd->pqm->process);
+	kfd_flush_tlb(qpd_to_pdd(qpd));
 
 	return 0;
 }
@@ -229,7 +229,7 @@ static void deallocate_vmid(struct device_queue_manager *dqm,
 		if (flush_texture_cache_nocpsch(q->device, qpd))
 			pr_err("Failed to flush TC\n");
 
-	kfd_flush_tlb(dqm->dev, qpd->pqm->process);
+	kfd_flush_tlb(qpd_to_pdd(qpd));
 
 	/* Release the vmid mapping */
 	set_pasid_vmid_mapping(dqm, 0, qpd->vmid);
@@ -661,7 +661,7 @@ int process_restore_queues(struct device_queue_manager *dqm,
 				qpd->vmid,
 				qpd->page_table_base);
 
-		kfd_flush_tlb(dqm->dev, pdd->process);
+		kfd_flush_tlb(pdd);
 	}
 
 	/* activate all active queues on the qpd */

@@ -1136,6 +1136,23 @@ int kfd_reserved_mem_mmap(struct kfd_process *process,
 			       KFD_CWSR_TBA_TMA_SIZE, vma->vm_page_prot);
 }
 
+
+void kfd_flush_tlb(struct kfd_process_device *pdd)
+{
+	struct kfd_dev *dev = pdd->dev;
+	const struct kfd2kgd_calls *f2g = dev->kfd2kgd;
+
+	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
+		/* Nothing to flush until a VMID is assigned, which
+		 * only happens when the first queue is created.
+		 */
+		if (pdd->qpd.vmid)
+			f2g->invalidate_tlbs_vmid(dev->kgd, pdd->qpd.vmid);
+	} else {
+		f2g->invalidate_tlbs(dev->kgd, pdd->process->pasid);
+	}
+}
+
 #if defined(CONFIG_DEBUG_FS)
 
 int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data)
@@ -1170,26 +1187,3 @@ int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data)
 }
 
 #endif
-
-void kfd_flush_tlb(struct kfd_dev *dev, struct kfd_process *p)
-{
-	const struct kfd2kgd_calls *f2g = dev->kfd2kgd;
-
-	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
-		struct kfd_process_device *pdd =
-				kfd_get_process_device_data(dev, p);
-		if (!pdd) {
-			pr_err("could not find pdd for pasid %d\n", p->pasid);
-			return;
-		}
-
-		/* vmid allocation is delayed to the creation of the first
-		 * queue of the process. For buffers allocated and mapped
-		 * before queue creation, vmid is still no allocated (valued 0).
-		 * Ignore tlb invalidation request for this case.
-		 */
-		if (pdd->qpd.vmid)
-			f2g->invalidate_tlbs_vmid(dev->kgd, pdd->qpd.vmid);
-	} else
-		f2g->invalidate_tlbs(dev->kgd, p->pasid);
-}

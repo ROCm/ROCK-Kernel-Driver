@@ -1364,7 +1364,10 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		peer = kfd_device_by_id(devices_arr[i]);
 		if (WARN_ON_ONCE(!peer))
 			continue;
-		kfd_flush_tlb(peer, p);
+		peer_pdd = kfd_get_process_device_data(peer, p);
+		if (WARN_ON_ONCE(!peer_pdd))
+			continue;
+		kfd_flush_tlb(peer_pdd);
 	}
 
 	kfree(devices_arr);
@@ -1393,7 +1396,7 @@ int kfd_unmap_memory_from_gpu(void *mem, struct kfd_process_device *pdd)
 	if (err != 0)
 		return err;
 
-	kfd_flush_tlb(dev, pdd->process);
+	kfd_flush_tlb(pdd);
 
 	return 0;
 }
