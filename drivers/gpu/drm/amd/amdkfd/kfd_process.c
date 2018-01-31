@@ -195,12 +195,12 @@ static int kfd_process_reserve_ib_mem(struct kfd_process *p)
 				per_device_list) {
 		kdev = pdd->dev;
 		qpd = &pdd->qpd;
-		if (!kdev->ib_size || qpd->ib_kaddr)
+		if (qpd->ib_kaddr)
 			continue;
 
 		if (qpd->ib_base) { /* is dGPU */
 			ret = kfd_process_alloc_gpuvm(p, kdev,
-				qpd->ib_base, kdev->ib_size,
+				qpd->ib_base, PAGE_SIZE,
 				&kaddr, pdd, flags);
 			if (!ret)
 				qpd->ib_kaddr = kaddr;

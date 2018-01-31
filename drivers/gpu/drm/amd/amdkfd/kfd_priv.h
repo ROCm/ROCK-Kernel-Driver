@@ -302,9 +302,6 @@ struct kfd_dev {
 	bool cwsr_enabled;
 	const void *cwsr_isa;
 	unsigned int cwsr_isa_size;
-
-	/* IB usage */
-	uint32_t ib_size;
 };
 
 struct kfd_ipc_obj;

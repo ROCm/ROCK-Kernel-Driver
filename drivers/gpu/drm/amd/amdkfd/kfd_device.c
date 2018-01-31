@@ -479,21 +479,6 @@ static void kfd_cwsr_init(struct kfd_dev *kfd)
 	}
 }
 
-static void kfd_ib_mem_init(struct kfd_dev *kdev)
-{
-	/* In certain cases we need to send IB from kernel using the GPU address
-	 * space created by user applications.
-	 * For example, on GFX v7, we need to flush TC associated to the VMID
-	 * before tearing down the VMID. In order to do so, we need an address
-	 * valid to the VMID to place the IB while this space was created on
-	 * the user's side, not the kernel.
-	 * Since kfd_set_process_dgpu_aperture reserves "cwsr_base + cwsr_size"
-	 * but CWSR only uses pages above cwsr_base, we'll use one page memory
-	 * under cwsr_base for IB submissions
-	 */
-	kdev->ib_size = PAGE_SIZE;
-}
-
 bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			 const struct kgd2kfd_shared_resources *gpu_resources)
 {
@@ -586,7 +571,6 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 #endif
 
 	kfd_cwsr_init(kfd);
-	kfd_ib_mem_init(kfd);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
 	kfd_init_processes_srcu();
