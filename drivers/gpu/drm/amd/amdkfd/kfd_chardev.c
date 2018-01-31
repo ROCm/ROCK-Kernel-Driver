@@ -1338,8 +1338,8 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		}
 
 		peer_pdd = kfd_bind_process_to_device(peer, p);
-		if (!peer_pdd) {
-			err = -EFAULT;
+		if (IS_ERR(peer_pdd)) {
+			err = PTR_ERR(peer_pdd);
 			goto get_mem_obj_from_handle_failed;
 		}
 		err = peer->kfd2kgd->map_memory_to_gpu(
