@@ -100,8 +100,10 @@ void kfd_process_destroy_wq(void)
 static void kfd_process_free_gpuvm(struct kgd_mem *mem,
 			struct kfd_process_device *pdd)
 {
-	kfd_unmap_memory_from_gpu(mem, pdd);
-	pdd->dev->kfd2kgd->free_memory_of_gpu(pdd->dev->kgd, mem);
+	struct kfd_dev *dev = pdd->dev;
+
+	dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd, mem, pdd->vm);
+	dev->kfd2kgd->free_memory_of_gpu(dev->kgd, mem);
 }
 
 /* kfd_process_alloc_gpuvm - Allocate GPU VM for the KFD process
