@@ -1479,7 +1479,7 @@ int kfd_debugfs_hqds_by_device(struct seq_file *m, void *data)
 		}
 
 		seq_printf(m, "Node %u, gpu_id %x:\n", i++, dev->gpu->id);
-		r = device_queue_manager_debugfs_hqds(m, dev->gpu->dqm);
+		r = dqm_debugfs_hqds(m, dev->gpu->dqm);
 		if (r != 0)
 			break;
 	}

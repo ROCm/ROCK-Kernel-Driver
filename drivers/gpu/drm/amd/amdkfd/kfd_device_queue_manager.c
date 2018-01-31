@@ -1686,6 +1686,8 @@ int kfd_process_vm_fault(struct device_queue_manager *dqm,
 	return ret;
 }
 
+#if defined(CONFIG_DEBUG_FS)
+
 static void seq_reg_dump(struct seq_file *m,
 			 uint32_t (*dump)[2], uint32_t n_regs)
 {
@@ -1707,7 +1709,7 @@ static void seq_reg_dump(struct seq_file *m,
 	seq_puts(m, "\n");
 }
 
-int device_queue_manager_debugfs_hqds(struct seq_file *m, void *data)
+int dqm_debugfs_hqds(struct seq_file *m, void *data)
 {
 	struct device_queue_manager *dqm = data;
 	uint32_t (*dump)[2], n_regs;
@@ -1752,3 +1754,5 @@ int device_queue_manager_debugfs_hqds(struct seq_file *m, void *data)
 
 	return r;
 }
+
+#endif
