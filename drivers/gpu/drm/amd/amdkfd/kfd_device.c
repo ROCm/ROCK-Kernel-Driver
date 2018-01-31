@@ -663,7 +663,7 @@ void kgd2kfd_suspend(struct kfd_dev *kfd)
 
 int kgd2kfd_resume(struct kfd_dev *kfd)
 {
-	int ret;
+	int ret, count;
 
 	if (!kfd->init_complete)
 		return 0;
@@ -672,10 +672,11 @@ int kgd2kfd_resume(struct kfd_dev *kfd)
 	if (ret)
 		return ret;
 
-	if (atomic_dec_return(&kfd_device_suspended) == 0)
+	count = atomic_dec_return(&kfd_device_suspended);
+	WARN_ONCE(count < 0, "KFD suspend / resume ref. error");
+	if (count == 0)
 		ret = kfd_resume_all_processes();
-	WARN(atomic_read(&kfd_device_suspended) < 0,
-	     "KFD suspend / resume ref. error\n");
+
 	return ret;
 }
 
@@ -699,11 +700,8 @@ static int kfd_resume(struct kfd_dev *kfd)
 				iommu_invalid_ppr_cb);
 
 		err = kfd_bind_processes_to_device(kfd);
-		if (err) {
-			dev_err(kfd_device,
-				"failed to bind process to device\n");
-			return -ENXIO;
-		}
+		if (err)
+			goto processes_bind_error;
 	}
 #endif
 
@@ -718,6 +716,7 @@ static int kfd_resume(struct kfd_dev *kfd)
 	return err;
 
 dqm_start_error:
+processes_bind_error:
 #if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 	if (kfd->device_info->is_need_iommu_device)
 		amd_iommu_free_device(kfd->pdev);
