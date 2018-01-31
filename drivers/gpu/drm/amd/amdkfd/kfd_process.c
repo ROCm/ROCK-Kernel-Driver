@@ -1154,18 +1154,12 @@ int resume_process_mm(struct kfd_process *p)
 	int r, ret = 0;
 
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
-		if (pdd->dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
-			down_read(&mm->mmap_sem);
-
 		r = process_restore_queues(pdd->dev->dqm, &pdd->qpd);
 		if (r != 0) {
 			pr_err("Failed to restore process queues\n");
 			if (ret == 0)
 				ret = r;
 		}
-
-		if (pdd->dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
-			up_read(&mm->mmap_sem);
 	}
 
 	return ret;
