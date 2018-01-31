@@ -78,6 +78,9 @@ static struct kfd_process *create_process(const struct task_struct *thread,
 					struct file *filep);
 static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep);
 
+static void evict_process_worker(struct work_struct *work);
+static void restore_process_worker(struct work_struct *work);
+
 
 void kfd_process_create_wq(void)
 {
@@ -609,8 +612,8 @@ static struct kfd_process *create_process(const struct task_struct *thread,
 	if (err != 0)
 		goto err_init_apertures;
 
-	INIT_DELAYED_WORK(&process->eviction_work, kfd_evict_bo_worker);
-	INIT_DELAYED_WORK(&process->restore_work, kfd_restore_bo_worker);
+	INIT_DELAYED_WORK(&process->eviction_work, evict_process_worker);
+	INIT_DELAYED_WORK(&process->restore_work, restore_process_worker);
 	process->last_restore_timestamp = get_jiffies_64();
 
 	err = kfd_process_reserve_ib_mem(process);
@@ -1102,6 +1105,162 @@ struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 
 	return p;
+}
+
+/* quiesce_process_mm -
+ *  Quiesce all user queues that belongs to given process p
+ */
+int quiesce_process_mm(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+	int r = 0;
+	unsigned int n_evicted = 0;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		r = process_evict_queues(pdd->dev->dqm, &pdd->qpd);
+		if (r != 0) {
+			pr_err("Failed to evict process queues\n");
+			goto fail;
+		}
+		n_evicted++;
+	}
+
+	return r;
+
+fail:
+	/* To keep state consistent, roll back partial eviction by
+	 * restoring queues
+	 */
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		if (n_evicted == 0)
+			break;
+		if (process_restore_queues(pdd->dev->dqm, &pdd->qpd))
+			pr_err("Failed to restore queues\n");
+
+		n_evicted--;
+	}
+
+	return r;
+}
+
+/* resume_process_mm -
+ *  Resume all user queues that belongs to given process p. The caller must
+ *  ensure that process p context is valid.
+ */
+int resume_process_mm(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+	struct mm_struct *mm = (struct mm_struct *)p->mm;
+	int r, ret = 0;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		if (pdd->dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
+			down_read(&mm->mmap_sem);
+
+		r = process_restore_queues(pdd->dev->dqm, &pdd->qpd);
+		if (r != 0) {
+			pr_err("Failed to restore process queues\n");
+			if (ret == 0)
+				ret = r;
+		}
+
+		if (pdd->dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
+			up_read(&mm->mmap_sem);
+	}
+
+	return ret;
+}
+
+static void evict_process_worker(struct work_struct *work)
+{
+	int ret;
+	struct kfd_process *p;
+	struct delayed_work *dwork;
+
+	dwork = to_delayed_work(work);
+
+	/* Process termination destroys this worker thread. So during the
+	 * lifetime of this thread, kfd_process p will be valid
+	 */
+	p = container_of(dwork, struct kfd_process, eviction_work);
+	WARN_ONCE(p->last_eviction_seqno != p->ef->seqno,
+		  "Eviction fence mismatch\n");
+
+	/* Narrow window of overlap between restore and evict work
+	 * item is possible. Once
+	 * amdgpu_amdkfd_gpuvm_restore_process_bos unreserves KFD BOs,
+	 * it is possible to evicted again. But restore has few more
+	 * steps of finish. So lets wait for any previous restore work
+	 * to complete
+	 */
+	flush_delayed_work(&p->restore_work);
+
+	pr_info("Started evicting process of pasid %d\n", p->pasid);
+	ret = quiesce_process_mm(p);
+	if (!ret) {
+		dma_fence_signal(p->ef);
+		dma_fence_put(p->ef);
+		p->ef = NULL;
+		schedule_delayed_work(&p->restore_work,
+				msecs_to_jiffies(PROCESS_RESTORE_TIME_MS));
+
+		pr_info("Finished evicting process of pasid %d\n", p->pasid);
+	} else
+		pr_err("Failed to quiesce user queues. Cannot evict pasid %d\n",
+		       p->pasid);
+}
+
+static void restore_process_worker(struct work_struct *work)
+{
+	struct delayed_work *dwork;
+	struct kfd_process *p;
+	struct kfd_process_device *pdd;
+	int ret = 0;
+
+	dwork = to_delayed_work(work);
+
+	/* Process termination destroys this worker thread. So during the
+	 * lifetime of this thread, kfd_process p will be valid
+	 */
+	p = container_of(dwork, struct kfd_process, restore_work);
+
+	/* Call restore_process_bos on the first KGD device. This function
+	 * takes care of restoring the whole process including other devices.
+	 * Restore can fail if enough memory is not available. If so,
+	 * reschedule again.
+	 */
+	pdd = list_first_entry(&p->per_device_data,
+			       struct kfd_process_device,
+			       per_device_list);
+
+	pr_info("Started restoring process of pasid %d\n", p->pasid);
+
+	/* Setting last_restore_timestamp before successful restoration.
+	 * Otherwise this would have to be set by KGD (restore_process_bos)
+	 * before KFD BOs are unreserved. If not, the process can be evicted
+	 * again before the timestamp is set.
+	 * If restore fails, the timestamp will be set again in the next
+	 * attempt. This would mean that the minimum GPU quanta would be
+	 * PROCESS_ACTIVE_TIME_MS - (time to execute the following two
+	 * functions)
+	 */
+
+	p->last_restore_timestamp = get_jiffies_64();
+	ret = pdd->dev->kfd2kgd->restore_process_bos(p->process_info, &p->ef);
+	if (ret) {
+		pr_info("Restore failed, try again after %d ms\n",
+			PROCESS_BACK_OFF_TIME_MS);
+		ret = schedule_delayed_work(&p->restore_work,
+				msecs_to_jiffies(PROCESS_BACK_OFF_TIME_MS));
+		WARN(!ret, "reschedule restore work failed\n");
+		return;
+	}
+
+	ret = resume_process_mm(p);
+	if (ret)
+		pr_err("Failed to resume user queues\n");
+
+	pr_info("Finished restoring process of pasid %d\n", p->pasid);
 }
 
 int kfd_reserved_mem_mmap(struct kfd_process *process,

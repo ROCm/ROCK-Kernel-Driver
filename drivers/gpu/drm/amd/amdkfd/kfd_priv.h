@@ -603,11 +603,10 @@ struct qcm_process_device {
 /* Approx. time before evicting the process again */
 #define PROCESS_ACTIVE_TIME_MS 10
 
-void kfd_evict_bo_worker(struct work_struct *work);
-void kfd_restore_bo_worker(struct work_struct *work);
 int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 					       struct dma_fence *fence);
 int quiesce_process_mm(struct kfd_process *p);
+int resume_process_mm(struct kfd_process *p);
 
 
 /* 8 byte handle containing GPU ID in the most significant 4 bytes and
