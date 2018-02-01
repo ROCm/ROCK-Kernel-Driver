@@ -1125,6 +1125,48 @@ alloc_memory_of_scratch_failed:
 	return -EFAULT;
 }
 
+static int kfd_ioctl_get_tile_config(struct file *filep,
+		struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_get_tile_config_args *args = data;
+	struct kfd_dev *dev;
+	struct tile_config config;
+	int err = 0;
+
+	dev = kfd_device_by_id(args->gpu_id);
+	if (!dev)
+		return -EINVAL;
+
+	dev->kfd2kgd->get_tile_config(dev->kgd, &config);
+
+	args->gb_addr_config = config.gb_addr_config;
+	args->num_banks = config.num_banks;
+	args->num_ranks = config.num_ranks;
+
+	if (args->num_tile_configs > config.num_tile_configs)
+		args->num_tile_configs = config.num_tile_configs;
+	err = copy_to_user((void __user *)args->tile_config_ptr,
+			config.tile_config_ptr,
+			args->num_tile_configs * sizeof(uint32_t));
+	if (err) {
+		args->num_tile_configs = 0;
+		return -EFAULT;
+	}
+
+	if (args->num_macro_tile_configs > config.num_macro_tile_configs)
+		args->num_macro_tile_configs =
+				config.num_macro_tile_configs;
+	err = copy_to_user((void __user *)args->macro_tile_config_ptr,
+			config.macro_tile_config_ptr,
+			args->num_macro_tile_configs * sizeof(uint32_t));
+	if (err) {
+		args->num_macro_tile_configs = 0;
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
 bool kfd_dev_is_large_bar(struct kfd_dev *dev)
 {
 	struct kfd_local_mem_info mem_info;
@@ -1616,47 +1658,6 @@ static int kfd_ioctl_ipc_import_handle(struct file *filep,
 	return r;
 }
 
-static int kfd_ioctl_get_tile_config(struct file *filep,
-		struct kfd_process *p, void *data)
-{
-	struct kfd_ioctl_get_tile_config_args *args = data;
-	struct kfd_dev *dev;
-	struct tile_config config;
-	int err = 0;
-
-	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev)
-		return -EINVAL;
-
-	dev->kfd2kgd->get_tile_config(dev->kgd, &config);
-
-	args->gb_addr_config = config.gb_addr_config;
-	args->num_banks = config.num_banks;
-	args->num_ranks = config.num_ranks;
-
-	if (args->num_tile_configs > config.num_tile_configs)
-		args->num_tile_configs = config.num_tile_configs;
-	err = copy_to_user((void __user *)args->tile_config_ptr,
-			config.tile_config_ptr,
-			args->num_tile_configs * sizeof(uint32_t));
-	if (err) {
-		args->num_tile_configs = 0;
-		return -EFAULT;
-	}
-
-	if (args->num_macro_tile_configs > config.num_macro_tile_configs)
-		args->num_macro_tile_configs =
-				config.num_macro_tile_configs;
-	err = copy_to_user((void __user *)args->macro_tile_config_ptr,
-			config.macro_tile_config_ptr,
-			args->num_macro_tile_configs * sizeof(uint32_t));
-	if (err) {
-		args->num_macro_tile_configs = 0;
-		return -EFAULT;
-	}
-
-	return 0;
-}
 
 #ifndef PTRACE_MODE_ATTACH_REALCREDS
 #define PTRACE_MODE_ATTACH_REALCREDS  PTRACE_MODE_ATTACH
