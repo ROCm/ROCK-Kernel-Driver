@@ -188,7 +188,7 @@ err_alloc_mem:
 static int kfd_process_reserve_ib_mem(struct kfd_process *p)
 {
 	int ret = 0;
-	struct kfd_process_device *temp, *pdd = NULL;
+	struct kfd_process_device *pdd = NULL;
 	struct kfd_dev *kdev = NULL;
 	struct qcm_process_device *qpd = NULL;
 	void *kaddr;
@@ -196,8 +196,7 @@ static int kfd_process_reserve_ib_mem(struct kfd_process *p)
 			 ALLOC_MEM_FLAGS_NO_SUBSTITUTE |
 			 ALLOC_MEM_FLAGS_EXECUTE_ACCESS;
 
-	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
-				per_device_list) {
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		kdev = pdd->dev;
 		qpd = &pdd->qpd;
 		if (qpd->ib_kaddr)
@@ -505,7 +504,7 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 {
 	int ret;
 	unsigned long  offset;
-	struct kfd_process_device *temp, *pdd = NULL;
+	struct kfd_process_device *pdd = NULL;
 	struct kfd_dev *dev = NULL;
 	struct qcm_process_device *qpd = NULL;
 	void *kaddr;
@@ -514,8 +513,7 @@ static int kfd_process_init_cwsr(struct kfd_process *p, struct file *filep)
 			 ALLOC_MEM_FLAGS_READONLY |
 			 ALLOC_MEM_FLAGS_EXECUTE_ACCESS;
 
-	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
-				per_device_list) {
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		dev = pdd->dev;
 		qpd = &pdd->qpd;
 		if (!dev->cwsr_enabled || qpd->cwsr_kaddr)
