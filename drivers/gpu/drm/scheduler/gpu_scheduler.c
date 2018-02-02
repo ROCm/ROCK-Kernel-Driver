@@ -239,7 +239,7 @@ void drm_sched_entity_fini(struct drm_gpu_scheduler *sched,
 		while ((job = to_drm_sched_job(spsc_queue_pop(&entity->job_queue)))) {
 			struct drm_sched_fence *s_fence = job->s_fence;
 			drm_sched_fence_scheduled(s_fence);
-			dma_fence_set_error(&s_fence->finished, -ESRCH);
+			kcl_dma_fence_set_error(&s_fence->finished, -ESRCH);
 			drm_sched_fence_finished(s_fence);
 			WARN_ON(s_fence->parent);
 			dma_fence_put(&s_fence->finished);
@@ -358,7 +358,7 @@ drm_sched_entity_pop_job(struct drm_sched_entity *entity)
 
 	/* skip jobs from entity that marked guilty */
 	if (entity->guilty && atomic_read(entity->guilty))
-		dma_fence_set_error(&sched_job->s_fence->finished, -ECANCELED);
+		kcl_dma_fence_set_error(&sched_job->s_fence->finished, -ECANCELED);
 
 	spsc_queue_pop(&entity->job_queue);
 	return sched_job;
@@ -524,7 +524,7 @@ void drm_sched_job_recovery(struct drm_gpu_scheduler *sched)
 		}
 
 		if (found_guilty && s_job->s_fence->scheduled.context == guilty_context)
-			dma_fence_set_error(&s_fence->finished, -ECANCELED);
+			kcl_dma_fence_set_error(&s_fence->finished, -ECANCELED);
 
 		spin_unlock(&sched->job_list_lock);
 		fence = sched->ops->run_job(s_job);
