@@ -459,7 +459,6 @@ int kfd_parse_crat_table(void *crat_image,
 	struct crat_header *crat_table = (struct crat_header *)crat_image;
 	uint16_t num_nodes;
 	uint32_t image_len;
-	uint32_t last_header_type, last_header_length;
 
 	if (!crat_image)
 		return -EINVAL;
@@ -491,34 +490,15 @@ int kfd_parse_crat_table(void *crat_image,
 			CRAT_OEMTABLEID_LENGTH);
 	top_dev->oem_revision = crat_table->oem_revision;
 
-	last_header_type = last_header_length = 0;
 	sub_type_hdr = (struct crat_subtype_generic *)(crat_table+1);
 	while ((char *)sub_type_hdr + sizeof(struct crat_subtype_generic) <
 			((char *)crat_image) + image_len) {
-		pr_debug("Parsing CRAT subtype header %p enabled: %s type: 0x%x length %d\n",
-				sub_type_hdr,
-				(sub_type_hdr->flags &
-					CRAT_SUBTYPE_FLAGS_ENABLED)
-					? "true" : "false",
-				sub_type_hdr->type,
-				sub_type_hdr->length);
-
-		if (sub_type_hdr->length == 0) {
-			pr_err("Parsing wrong CRAT's subtype header last header type: %d last header len %d\n",
-				last_header_type, last_header_type);
-			pr_err("Current header type %d length %d\n",
-				sub_type_hdr->type, sub_type_hdr->length);
-			break;
-		}
-
 		if (sub_type_hdr->flags & CRAT_SUBTYPE_FLAGS_ENABLED) {
 			ret = kfd_parse_subtype(sub_type_hdr, device_list);
-			if (ret != 0)
+			if (ret)
 				break;
 		}
 
-		last_header_type = sub_type_hdr->type;
-		last_header_length = sub_type_hdr->length;
 		sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
 				sub_type_hdr->length);
 	}
