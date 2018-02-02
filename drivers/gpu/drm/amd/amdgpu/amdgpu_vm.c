@@ -427,6 +427,7 @@ static int amdgpu_vm_alloc_levels(struct amdgpu_device *adev,
 
 			r = amdgpu_vm_clear_bo(adev, vm, pt, level, ats);
 			if (r) {
+				amdgpu_bo_unref(&pt->shadow);
 				amdgpu_bo_unref(&pt);
 				return r;
 			}
@@ -434,6 +435,7 @@ static int amdgpu_vm_alloc_levels(struct amdgpu_device *adev,
 			if (vm->use_cpu_for_update) {
 				r = amdgpu_bo_kmap(pt, NULL);
 				if (r) {
+					amdgpu_bo_unref(&pt->shadow);
 					amdgpu_bo_unref(&pt);
 					return r;
 				}
