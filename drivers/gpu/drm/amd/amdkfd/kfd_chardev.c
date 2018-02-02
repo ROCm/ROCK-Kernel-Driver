@@ -1900,7 +1900,6 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 
 			if (err) {
 				pr_err("GPU CMA %s failed\n", cma_op);
-				err = -EFAULT;
 				break;
 			}
 
