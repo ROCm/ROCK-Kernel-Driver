@@ -679,18 +679,6 @@ amdgpu_dm_find_first_crtc_matching_connector(struct drm_atomic_state *state,
 static int dm_resume(void *handle)
 {
 	struct amdgpu_device *adev = handle;
-	struct amdgpu_display_manager *dm = &adev->dm;
-	int ret = 0;
-
-	/* power on hardware */
-	dc_set_power_state(dm->dc, DC_ACPI_CM_POWER_STATE_D0);
-
-	ret = amdgpu_dm_display_resume(adev);
-	return ret;
-}
-
-int amdgpu_dm_display_resume(struct amdgpu_device *adev)
-{
 	struct drm_device *ddev = adev->ddev;
 	struct amdgpu_display_manager *dm = &adev->dm;
 	struct amdgpu_dm_connector *aconnector;
@@ -701,9 +689,11 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 	struct drm_plane *plane;
 	struct drm_plane_state *new_plane_state;
 	struct dm_plane_state *dm_new_plane_state;
-
-	int ret = 0;
+	int ret;
 	int i;
+
+	/* power on hardware */
+	dc_set_power_state(dm->dc, DC_ACPI_CM_POWER_STATE_D0);
 
 	/* program HPD filter */
 	dc_resume(dm->dc);
@@ -718,8 +708,7 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 	amdgpu_dm_irq_resume_early(adev);
 
 	/* Do detection*/
-	list_for_each_entry(connector,
-			&ddev->mode_config.connector_list, head) {
+	list_for_each_entry(connector, &ddev->mode_config.connector_list, head) {
 		aconnector = to_amdgpu_dm_connector(connector);
 
 		/*
@@ -743,9 +732,9 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 	/* Force mode set in atomic comit */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
 	!defined(OS_NAME_RHEL_7_5)
-	for_each_crtc_in_state(adev->dm.cached_state, crtc, new_crtc_state, i)
+	for_each_crtc_in_state(dm->cached_state, crtc, new_crtc_state, i)
 #else
-	for_each_new_crtc_in_state(adev->dm.cached_state, crtc, new_crtc_state, i)
+	for_each_new_crtc_in_state(dm->cached_state, crtc, new_crtc_state, i)
 #endif
 		new_crtc_state->active_changed = true;
 
@@ -758,7 +747,7 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 	!defined(OS_NAME_RHEL_7_5)
 	for_each_crtc_in_state(adev->dm.cached_state, crtc, new_crtc_state, i) {
 #else
-	for_each_new_crtc_in_state(adev->dm.cached_state, crtc, new_crtc_state, i) {
+	for_each_new_crtc_in_state(dm->cached_state, crtc, new_crtc_state, i) {
 #endif
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		if (dm_new_crtc_state->stream) {
@@ -770,9 +759,9 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
 	!defined(OS_NAME_RHEL_7_5)
-	for_each_plane_in_state(adev->dm.cached_state, plane, new_plane_state, i) {
+	for_each_plane_in_state(dm->cached_state, plane, new_plane_state, i) {
 #else
-	for_each_new_plane_in_state(adev->dm.cached_state, plane, new_plane_state, i) {
+	for_each_new_plane_in_state(dm->cached_state, plane, new_plane_state, i) {
 #endif
 		dm_new_plane_state = to_dm_plane_state(new_plane_state);
 		if (dm_new_plane_state->dc_state) {
@@ -782,15 +771,15 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 		}
 	}
 
-	ret = drm_atomic_helper_resume(ddev, adev->dm.cached_state);
+	ret = drm_atomic_helper_resume(ddev, dm->cached_state);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)) || \
     (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && !defined(OS_NAME_UBUNTU)) || \
     (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)) || \
     defined(OS_NAME_RHEL_7_4_5)
-	drm_atomic_state_put(adev->dm.cached_state);
+	drm_atomic_state_put(dm->cached_state);
 #endif
-	adev->dm.cached_state = NULL;
+	dm->cached_state = NULL;
 
 	amdgpu_dm_irq_resume_late(adev);
 
