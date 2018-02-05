@@ -59,6 +59,9 @@ struct amdgpu_vmid {
 	uint32_t		gws_size;
 	uint32_t		oa_base;
 	uint32_t		oa_size;
+
+	unsigned		pasid;
+	struct dma_fence	*pasid_mapping;
 };
 
 struct amdgpu_vmid_mgr {
