@@ -25,32 +25,32 @@
 #endif
 
 /**
- * array_ptr_mask - generate a mask for array_ptr() that is ~0UL when
- * the bounds check succeeds and 0 otherwise
+ * array_index_mask_nospec() - generate a mask that is ~0UL when the
+ * 	bounds check succeeds and 0 otherwise
+ * @index: array element index
+ * @size: number of elements in array
+ *
+ * Returns:
+ *     0 - (index < size)
  */
-#define array_ptr_mask array_ptr_mask
-static inline unsigned long array_ptr_mask(unsigned long idx, unsigned long sz)
+static inline unsigned long array_index_mask_nospec(unsigned long index,
+		unsigned long size)
 {
 	unsigned long mask;
 
-	/*
-	 * mask = index - size, if that result is >= 0 then the index is
-	 * invalid and the mask is 0 else ~0
-	 */
-#ifdef CONFIG_X86_32
-	asm ("cmpl %1,%2; sbbl %0,%0;"
-#else
-	asm ("cmpq %1,%2; sbbq %0,%0;"
-#endif
+	asm ("cmp %1,%2; sbb %0,%0;"
 			:"=r" (mask)
-			:"r"(sz),"r" (idx)
+			:"r"(size),"r" (index)
 			:"cc");
 	return mask;
 }
 
-/* prevent speculative execution past this barrier */
-#define ifence() alternative_2("", "mfence", X86_FEATURE_MFENCE_RDTSC, \
-				   "lfence", X86_FEATURE_LFENCE_RDTSC)
+/* Override the default implementation from linux/nospec.h. */
+#define array_index_mask_nospec array_index_mask_nospec
+
+/* Prevent speculative execution past this barrier. */
+#define barrier_nospec() alternative_2("", "mfence", X86_FEATURE_MFENCE_RDTSC, \
+					   "lfence", X86_FEATURE_LFENCE_RDTSC)
 
 #ifdef CONFIG_X86_PPRO_FENCE
 #define dma_rmb()	rmb()

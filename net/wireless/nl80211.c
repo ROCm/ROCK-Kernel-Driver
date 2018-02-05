@@ -2057,7 +2057,7 @@ static const struct nla_policy txq_params_policy[NL80211_TXQ_ATTR_MAX + 1] = {
 static int parse_txq_params(struct nlattr *tb[],
 			    struct ieee80211_txq_params *txq_params)
 {
-	u8 ac, *idx;
+	u8 ac;
 
 	if (!tb[NL80211_TXQ_ATTR_AC] || !tb[NL80211_TXQ_ATTR_TXOP] ||
 	    !tb[NL80211_TXQ_ATTR_CWMIN] || !tb[NL80211_TXQ_ATTR_CWMAX] ||
@@ -2070,10 +2070,9 @@ static int parse_txq_params(struct nlattr *tb[],
 	txq_params->cwmax = nla_get_u16(tb[NL80211_TXQ_ATTR_CWMAX]);
 	txq_params->aifs = nla_get_u8(tb[NL80211_TXQ_ATTR_AIFS]);
 
-	idx = array_idx(ac, NL80211_NUM_ACS);
-	if (!idx)
+	if (ac >= NL80211_NUM_ACS)
 		return -EINVAL;
-	txq_params->ac = *idx;
+	txq_params->ac = array_index_nospec(ac, NL80211_NUM_ACS);
 	return 0;
 }
 

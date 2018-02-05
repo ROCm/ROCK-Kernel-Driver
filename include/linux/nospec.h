@@ -1,65 +1,72 @@
 // SPDX-License-Identifier: GPL-2.0
+// Copyright(c) 2018 Linus Torvalds. All rights reserved.
+// Copyright(c) 2018 Alexei Starovoitov. All rights reserved.
 // Copyright(c) 2018 Intel Corporation. All rights reserved.
 
-#ifndef __NOSPEC_H__
-#define __NOSPEC_H__
+#ifndef _LINUX_NOSPEC_H
+#define _LINUX_NOSPEC_H
 
-#include <linux/jump_label.h>
-#include <asm/barrier.h>
-
-/*
- * If idx is negative or if idx > size then bit 63 is set in the mask,
- * and the value of ~(-1L) is zero. When the mask is zero, bounds check
- * failed, array_ptr will return NULL.
+/**
+ * array_index_mask_nospec() - generate a ~0 mask when index < size, 0 otherwise
+ * @index: array element index
+ * @size: number of elements in array
+ *
+ * When @index is out of bounds (@index >= @size), the sign bit will be
+ * set.  Extend the sign bit to all bits and invert, giving a result of
+ * zero for an out of bounds index, or ~0 if within bounds [0, @size).
  */
-#ifndef array_ptr_mask
-static inline unsigned long array_ptr_mask(unsigned long idx, unsigned long sz)
+#ifndef array_index_mask_nospec
+static inline unsigned long array_index_mask_nospec(unsigned long index,
+						    unsigned long size)
 {
-	return ~(long)(idx | (sz - 1 - idx)) >> (BITS_PER_LONG - 1);
+	/*
+	 * Warn developers about inappropriate array_index_nospec() usage.
+	 *
+	 * Even if the CPU speculates past the WARN_ONCE branch, the
+	 * sign bit of @index is taken into account when generating the
+	 * mask.
+	 *
+	 * This warning is compiled out when the compiler can infer that
+	 * @index and @size are less than LONG_MAX.
+	 */
+	if (WARN_ONCE(index > LONG_MAX || size > LONG_MAX,
+			"array_index_nospec() limited to range of [0, LONG_MAX]\n"))
+		return 0;
+
+	/*
+	 * Always calculate and emit the mask even if the compiler
+	 * thinks the mask is not needed. The compiler does not take
+	 * into account the value of @index under speculation.
+	 */
+	OPTIMIZER_HIDE_VAR(index);
+	return ~(long)(index | (size - 1UL - index)) >> (BITS_PER_LONG - 1);
 }
 #endif
 
-/**
- * array_ptr - Generate a pointer to an array element, ensuring
- * the pointer is bounded under speculation to NULL.
+/*
+ * array_index_nospec - sanitize an array index after a bounds check
  *
- * @base: the base of the array
- * @idx: the index of the element, must be less than LONG_MAX
- * @sz: the number of elements in the array, must be less than LONG_MAX
+ * For a code sequence like:
  *
- * If @idx falls in the interval [0, @sz), returns the pointer to
- * @arr[@idx], otherwise returns NULL.
+ *     if (index < size) {
+ *         index = array_index_nospec(index, size);
+ *         val = array[index];
+ *     }
+ *
+ * ...if the CPU speculates past the bounds check then
+ * array_index_nospec() will clamp the index within the range of [0,
+ * size).
  */
-#define array_ptr(base, idx, sz)					\
+#define array_index_nospec(index, size)					\
 ({									\
-	union { typeof(*(base)) *_ptr; unsigned long _bit; } __u;	\
-	typeof(*(base)) *_arr = (base);					\
-	unsigned long _i = (idx);					\
-	unsigned long _mask = array_ptr_mask(_i, (sz));			\
+	typeof(index) _i = (index);					\
+	typeof(size) _s = (size);					\
+	unsigned long _mask = array_index_mask_nospec(_i, _s);		\
 									\
-	__u._ptr = _arr + _i;						\
-	__u._bit &= _mask;						\
-	__u._ptr;							\
-})
-
-/**
- * array_idx - Generate a pointer to an array index, ensuring the
- * pointer is bounded under speculation to NULL.
- *
- * @idx: the index of the element, must be less than LONG_MAX
- * @sz: the number of elements in the array, must be less than LONG_MAX
- *
- * If @idx falls in the interval [0, @sz), returns &@idx otherwise
- * returns NULL.
- */
-#define array_idx(idx, sz)						\
-({									\
-	union { typeof((idx)) *_ptr; unsigned long _bit; } __u;		\
-	typeof(idx) *_i = &(idx);					\
-	unsigned long _mask = array_ptr_mask(*_i, (sz));		\
+	BUILD_BUG_ON(sizeof(_i) > sizeof(long));			\
+	BUILD_BUG_ON(sizeof(_s) > sizeof(long));			\
 									\
-	__u._ptr = _i;							\
-	__u._bit &= _mask;						\
-	__u._ptr;							\
+	_i &= _mask;							\
+	_i;								\
 })
-#endif /* __NOSPEC_H__ */
+#endif /* _LINUX_NOSPEC_H */

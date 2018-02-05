@@ -214,7 +214,7 @@ static __always_inline unsigned long long rdtsc_ordered(void)
 	 * that some other imaginary CPU is updating continuously with a
 	 * time stamp.
 	 */
-	ifence();
+	barrier_nospec();
 	return rdtsc();
 }
 
