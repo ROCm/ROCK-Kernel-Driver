@@ -1263,9 +1263,14 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	struct kfd_bo_va_list *bo_va_entry_aql = NULL;
 	struct amdkfd_vm *kfd_vm = (struct amdkfd_vm *)vm;
 	unsigned long bo_size;
-	bool is_invalid_userptr;
+	bool is_invalid_userptr = false;
 
 	adev = get_amdgpu_device(kgd);
+	bo = mem->bo;
+	if (!bo) {
+		pr_err("Invalid BO when mapping memory to GPU\n");
+		return -EINVAL;
+	}
 
 	/* Make sure restore is not running concurrently. Since we
 	 * don't map invalid userptr BOs, we rely on the next restore
@@ -1277,19 +1282,13 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	 * sure that the MMU notifier is no longer running
 	 * concurrently and the queues are actually stopped
 	 */
-	down_read(&current->mm->mmap_sem);
-	is_invalid_userptr = atomic_read(&mem->invalid);
-	up_read(&current->mm->mmap_sem);
+	if (amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
+		down_write(&current->mm->mmap_sem);
+		is_invalid_userptr = atomic_read(&mem->invalid);
+		up_write(&current->mm->mmap_sem);
+	}
 
 	mutex_lock(&mem->lock);
-
-	bo = mem->bo;
-
-	if (!bo) {
-		pr_err("Invalid BO when mapping memory to GPU\n");
-		ret = -EINVAL;
-		goto out;
-	}
 
 	domain = mem->domain;
 	bo_size = bo->tbo.mem.size;
