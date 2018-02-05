@@ -70,7 +70,6 @@ u64 kvm_supported_xcr0(void)
 /* These are scattered features in cpufeatures.h. */
 #define KVM_CPUID_BIT_AVX512_4VNNIW     2
 #define KVM_CPUID_BIT_AVX512_4FMAPS     3
-#define KVM_CPUID_BIT_SPEC_CTRL        26
 #define KF(x) bit(KVM_CPUID_BIT_##x)
 
 int kvm_update_cpuid(struct kvm_vcpu *vcpu)
@@ -393,7 +392,7 @@ static inline int __do_cpuid_ent(struct kvm_cpuid_entry2 *entry, u32 function,
 
 	/* cpuid 7.0.edx*/
 	const u32 kvm_cpuid_7_0_edx_x86_features =
-		KF(AVX512_4VNNIW) | KF(AVX512_4FMAPS) | KF(SPEC_CTRL);
+		KF(AVX512_4VNNIW) | KF(AVX512_4FMAPS);
 
 	/* all calls to cpuid_count() should be made on the same cpu */
 	get_cpu();

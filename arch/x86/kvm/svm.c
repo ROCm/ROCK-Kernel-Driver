@@ -529,7 +529,6 @@ struct svm_cpu_data {
 	struct kvm_ldttss_desc *tss_desc;
 
 	struct page *save_area;
-	struct vmcb *current_vmcb;
 };
 
 static DEFINE_PER_CPU(struct svm_cpu_data *, svm_data);
@@ -919,9 +918,6 @@ static void svm_vcpu_init_msrpm(u32 *msrpm)
 
 		set_msr_interception(msrpm, direct_access_msrs[i].index, 1, 1);
 	}
-
-	if (boot_cpu_has(X86_FEATURE_AMD_PRED_CMD))
-		set_msr_interception(msrpm, MSR_IA32_PRED_CMD, 1, 1);
 }
 
 static void add_msr_offset(u32 offset)
@@ -1707,17 +1703,11 @@ static void svm_free_vcpu(struct kvm_vcpu *vcpu)
 	__free_pages(virt_to_page(svm->nested.msrpm), MSRPM_ALLOC_ORDER);
 	kvm_vcpu_uninit(vcpu);
 	kmem_cache_free(kvm_vcpu_cache, svm);
-	/*
-	 * The vmcb page can be recycled, causing a false negative in
-	 * svm_vcpu_load(). So do a full IBPB now.
-	 */
-	indirect_branch_prediction_barrier();
 }
 
 static void svm_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
-	struct svm_cpu_data *sd = per_cpu(svm_data, cpu);
 	int i;
 
 	if (unlikely(cpu != vcpu->cpu)) {
@@ -1746,10 +1736,6 @@ static void svm_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	if (static_cpu_has(X86_FEATURE_RDTSCP))
 		wrmsrl(MSR_TSC_AUX, svm->tsc_aux);
 
-	if (sd->current_vmcb != svm->vmcb) {
-		sd->current_vmcb = svm->vmcb;
-		indirect_branch_prediction_barrier();
-	}
 	avic_vcpu_load(vcpu, cpu);
 }
 

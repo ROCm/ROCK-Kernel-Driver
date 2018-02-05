@@ -11,6 +11,7 @@
 #include <linux/init.h>
 #include <linux/utsname.h>
 #include <linux/cpu.h>
+#include <linux/module.h>
 
 #include <asm/nospec-branch.h>
 #include <asm/cmdline.h>
@@ -92,9 +93,30 @@ static const char *spectre_v2_strings[] = {
 };
 
 #undef pr_fmt
-#define pr_fmt(fmt)     "Spectre V2 mitigation: " fmt
+#define pr_fmt(fmt)     "Spectre V2 : " fmt
 
 static enum spectre_v2_mitigation spectre_v2_enabled = SPECTRE_V2_NONE;
+
+#ifdef RETPOLINE
+static bool spectre_v2_bad_module;
+
+bool retpoline_module_ok(bool has_retpoline)
+{
+	if (spectre_v2_enabled == SPECTRE_V2_NONE || has_retpoline)
+		return true;
+
+	pr_err("System may be vunerable to spectre v2\n");
+	spectre_v2_bad_module = true;
+	return false;
+}
+
+static inline const char *spectre_v2_module_string(void)
+{
+	return spectre_v2_bad_module ? " - vulnerable module loaded" : "";
+}
+#else
+static inline const char *spectre_v2_module_string(void) { return ""; }
+#endif
 
 static void __init spec2_print_if_insecure(const char *reason)
 {
@@ -120,8 +142,8 @@ static inline bool match_option(const char *arg, int arglen, const char *opt)
 	return len == arglen && !strncmp(arg, opt, len);
 }
 
-static struct {
-	char *option;
+static const struct {
+	const char *option;
 	enum spectre_v2_mitigation_cmd cmd;
 	bool secure;
 } mitigation_options[] = {
@@ -134,9 +156,6 @@ static struct {
 	{ "auto",              SPECTRE_V2_CMD_AUTO,              false },
 };
 
-static const int mitigation_options_count = sizeof(mitigation_options) /
-					    sizeof(mitigation_options[0]);
-
 static enum spectre_v2_mitigation_cmd __init spectre_v2_parse_cmdline(void)
 {
 	char arg[20];
@@ -145,46 +164,39 @@ static enum spectre_v2_mitigation_cmd __init spectre_v2_parse_cmdline(void)
 
 	if (cmdline_find_option_bool(boot_command_line, "nospectre_v2"))
 		return SPECTRE_V2_CMD_NONE;
+	else {
+		ret = cmdline_find_option(boot_command_line, "spectre_v2", arg,
+					  sizeof(arg));
+		if (ret < 0)
+			return SPECTRE_V2_CMD_AUTO;
 
-	ret = cmdline_find_option(boot_command_line, "spectre_v2", arg,
-				  sizeof(arg));
-	if (ret < 0)
-		return SPECTRE_V2_CMD_AUTO;
+		for (i = 0; i < ARRAY_SIZE(mitigation_options); i++) {
+			if (!match_option(arg, ret, mitigation_options[i].option))
+				continue;
+			cmd = mitigation_options[i].cmd;
+			break;
+		}
 
-	for (i = 0; i < mitigation_options_count; i++) {
-		if (!match_option(arg, ret, mitigation_options[i].option))
-			continue;
-		cmd = mitigation_options[i].cmd;
-		break;
-	}
-
-	if (i >= mitigation_options_count) {
-		pr_err("unknown option (%s). Switching to AUTO select\n",
-		       mitigation_options[i].option);
-		return SPECTRE_V2_CMD_AUTO;
-	}
-
-	if (cmd == SPECTRE_V2_CMD_IBRS &&
-	    !boot_cpu_has(X86_FEATURE_SPEC_CTRL) &&
-	    !boot_cpu_has(X86_FEATURE_AMD_SPEC_CTRL)) {
-			pr_err("%s selected but no CPU support. Switching to AUTO select\n",
+		if (i >= ARRAY_SIZE(mitigation_options)) {
+			pr_err("unknown option (%s). Switching to AUTO select\n",
 			       mitigation_options[i].option);
 			return SPECTRE_V2_CMD_AUTO;
+		}
 	}
 
 	if ((cmd == SPECTRE_V2_CMD_RETPOLINE ||
 	     cmd == SPECTRE_V2_CMD_RETPOLINE_AMD ||
 	     cmd == SPECTRE_V2_CMD_RETPOLINE_GENERIC) &&
 	    !IS_ENABLED(CONFIG_RETPOLINE)) {
-			pr_err("%s selected but not compiled in. Switching to AUTO select\n",
-			       mitigation_options[i].option);
-			return SPECTRE_V2_CMD_AUTO;
+		pr_err("%s selected but not compiled in. Switching to AUTO select\n",
+		       mitigation_options[i].option);
+		return SPECTRE_V2_CMD_AUTO;
 	}
 
 	if (cmd == SPECTRE_V2_CMD_RETPOLINE_AMD &&
 	    boot_cpu_data.x86_vendor != X86_VENDOR_AMD) {
-			pr_err("retpoline,amd selected but CPU is not AMD. Switching to AUTO select\n");
-			return SPECTRE_V2_CMD_AUTO;
+		pr_err("retpoline,amd selected but CPU is not AMD. Switching to AUTO select\n");
+		return SPECTRE_V2_CMD_AUTO;
 	}
 
 	if (mitigation_options[i].secure)
@@ -217,61 +229,73 @@ static void __init spectre_v2_select_mitigation(void)
 	enum spectre_v2_mitigation_cmd cmd = spectre_v2_parse_cmdline();
 	enum spectre_v2_mitigation mode = SPECTRE_V2_NONE;
 
+	/*
+	 * If the CPU is not affected and the command line mode is NONE or AUTO
+	 * then nothing to do.
+	 */
+	if (!boot_cpu_has_bug(X86_BUG_SPECTRE_V2) &&
+	    (cmd == SPECTRE_V2_CMD_NONE || cmd == SPECTRE_V2_CMD_AUTO))
+		return;
+
 	switch (cmd) {
 	case SPECTRE_V2_CMD_NONE:
-		if (boot_cpu_has_bug(X86_BUG_SPECTRE_V2))
-			pr_err("kernel not compiled with retpoline; no mitigation available!");
 		return;
+
+	case SPECTRE_V2_CMD_RETPOLINE_AMD:
+		if (IS_ENABLED(CONFIG_RETPOLINE))
+			goto retpoline_amd;
+		break;
+
+	case SPECTRE_V2_CMD_RETPOLINE_GENERIC:
+		if (IS_ENABLED(CONFIG_RETPOLINE))
+			goto retpoline_generic;
+		break;
+
 	case SPECTRE_V2_CMD_IBRS:
 		mode = SPECTRE_V2_IBRS;
-		setup_force_cpu_cap(X86_FEATURE_IBRS);
-		break;
+		setup_force_cpu_cap(X86_FEATURE_USE_IBRS);
+		goto enabled;
+
 	case SPECTRE_V2_CMD_AUTO:
-		if (!boot_cpu_has_bug(X86_BUG_SPECTRE_V2))
-			return;
-		/* Fall through */
 	case SPECTRE_V2_CMD_FORCE:
 		/*
 		 * If we have IBRS support, and either Skylake or !RETPOLINE,
 		 * then that's what we do.
 		 */
-		if ((boot_cpu_has(X86_FEATURE_SPEC_CTRL) ||
-		     boot_cpu_has(X86_FEATURE_AMD_SPEC_CTRL)) &&
+		if (boot_cpu_has(X86_FEATURE_IBRS) &&
 		    (is_skylake_era() || !retp_compiler())) {
 			mode = SPECTRE_V2_IBRS;
-			setup_force_cpu_cap(X86_FEATURE_IBRS);
-			break;
+			setup_force_cpu_cap(X86_FEATURE_USE_IBRS);
+			goto enabled;
 		}
-		/* Fall through */
+		/* fall through */
 	case SPECTRE_V2_CMD_RETPOLINE:
-	case SPECTRE_V2_CMD_RETPOLINE_AMD:
-		if (IS_ENABLED(CONFIG_RETPOLINE) &&
-		    boot_cpu_data.x86_vendor == X86_VENDOR_AMD) {
-			if (boot_cpu_has(X86_FEATURE_LFENCE_RDTSC)) {
-				mode = retp_compiler() ? SPECTRE_V2_RETPOLINE_AMD :
-							 SPECTRE_V2_RETPOLINE_MINIMAL_AMD;
-				setup_force_cpu_cap(X86_FEATURE_RETPOLINE_AMD);
-				setup_force_cpu_cap(X86_FEATURE_RETPOLINE);
-				break;
-			}
+		if (IS_ENABLED(CONFIG_RETPOLINE))
+			goto retpoline_auto;
+		break;
+	}
+	pr_err("kernel not compiled with retpoline; no mitigation available!");
+	return;
 
+retpoline_auto:
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) {
+	retpoline_amd:
+		if (!boot_cpu_has(X86_FEATURE_LFENCE_RDTSC)) {
 			pr_err("LFENCE not serializing. Switching to generic retpoline\n");
+			goto retpoline_generic;
 		}
-		/* Fall through */
-	case SPECTRE_V2_CMD_RETPOLINE_GENERIC:
-		if (IS_ENABLED(CONFIG_RETPOLINE)) {
-			mode = retp_compiler() ? SPECTRE_V2_RETPOLINE_GENERIC :
-						 SPECTRE_V2_RETPOLINE_MINIMAL;
-			setup_force_cpu_cap(X86_FEATURE_RETPOLINE);
-			break;
-		}
-		/* Fall through */
-	default:
-		if (boot_cpu_has_bug(X86_BUG_SPECTRE_V2))
-			pr_err("kernel not compiled with retpoline; no mitigation available!");
-		return;
+		mode = retp_compiler() ? SPECTRE_V2_RETPOLINE_AMD :
+					 SPECTRE_V2_RETPOLINE_MINIMAL_AMD;
+		setup_force_cpu_cap(X86_FEATURE_RETPOLINE_AMD);
+		setup_force_cpu_cap(X86_FEATURE_RETPOLINE);
+	} else {
+	retpoline_generic:
+		mode = retp_compiler() ? SPECTRE_V2_RETPOLINE_GENERIC :
+					 SPECTRE_V2_RETPOLINE_MINIMAL;
+		setup_force_cpu_cap(X86_FEATURE_RETPOLINE);
 	}
 
+ enabled:
 	spectre_v2_enabled = mode;
 	pr_info("%s\n", spectre_v2_strings[mode]);
 
@@ -287,16 +311,15 @@ static void __init spectre_v2_select_mitigation(void)
 	 * or deactivated in favour of retpolines the RSB fill on context
 	 * switch is required.
 	 */
-	if ((!boot_cpu_has(X86_FEATURE_PTI) &&
-	     !boot_cpu_has(X86_FEATURE_SMEP)) || is_skylake_era()) {
+	if ((!boot_cpu_has(X86_FEATURE_PTI) && !boot_cpu_has(X86_FEATURE_SMEP)) ||
+	    (!boot_cpu_has(X86_FEATURE_USE_IBRS) && is_skylake_era())) {
 		setup_force_cpu_cap(X86_FEATURE_RSB_CTXSW);
 		pr_info("Filling RSB on context switch\n");
 	}
 
 	/* Initialize Indirect Branch Prediction Barrier if supported */
-	if (boot_cpu_has(X86_FEATURE_SPEC_CTRL) ||
-	    boot_cpu_has(X86_FEATURE_AMD_PRED_CMD)) {
-		setup_force_cpu_cap(X86_FEATURE_IBPB);
+	if (boot_cpu_has(X86_FEATURE_IBPB)) {
+		setup_force_cpu_cap(X86_FEATURE_USE_IBPB);
 		pr_info("Enabling Indirect Branch Prediction Barrier\n");
 	}
 }
@@ -328,6 +351,14 @@ ssize_t cpu_show_spectre_v2(struct device *dev,
 	if (!boot_cpu_has_bug(X86_BUG_SPECTRE_V2))
 		return sprintf(buf, "Not affected\n");
 
-	return sprintf(buf, "%s\n", spectre_v2_strings[spectre_v2_enabled]);
+	return sprintf(buf, "%s%s%s\n", spectre_v2_strings[spectre_v2_enabled],
+		       boot_cpu_has(X86_FEATURE_USE_IBPB) ? ", IBPB" : "",
+		       spectre_v2_module_string());
 }
 #endif
+
+void __ibp_barrier(void)
+{
+	__wrmsr(MSR_IA32_PRED_CMD, PRED_CMD_IBPB, 0);
+}
+EXPORT_SYMBOL_GPL(__ibp_barrier);

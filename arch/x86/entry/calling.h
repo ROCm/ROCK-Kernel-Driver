@@ -375,7 +375,7 @@ For 32-bit we have the following conventions - kernel is built with
 .endm
 
 .macro RESTRICT_IB_SPEC
-	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_IBRS
+	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_USE_IBRS
 	PUSH_MSR_REGS
 	WRMSR_ASM $MSR_IA32_SPEC_CTRL, $0, $SPEC_CTRL_IBRS
 	POP_MSR_REGS
@@ -383,7 +383,7 @@ For 32-bit we have the following conventions - kernel is built with
 .endm
 
 .macro UNRESTRICT_IB_SPEC
-	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_IBRS
+	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_USE_IBRS
 	PUSH_MSR_REGS
 	WRMSR_ASM $MSR_IA32_SPEC_CTRL, $0, $0
 	POP_MSR_REGS
@@ -391,19 +391,19 @@ For 32-bit we have the following conventions - kernel is built with
 .endm
 
 .macro RESTRICT_IB_SPEC_CLOBBER
-	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_IBRS
+	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_USE_IBRS
 	WRMSR_ASM $MSR_IA32_SPEC_CTRL, $0, $SPEC_CTRL_IBRS
 .Lskip_\@:
 .endm
 
 .macro UNRESTRICT_IB_SPEC_CLOBBER
-	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_IBRS
+	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_USE_IBRS
 	WRMSR_ASM $MSR_IA32_SPEC_CTRL, $0, $0
 .Lskip_\@:
 .endm
 
 .macro RESTRICT_IB_SPEC_SAVE_AND_CLOBBER save_reg:req
-	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_IBRS
+	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_USE_IBRS
 	movl	$MSR_IA32_SPEC_CTRL, %ecx
 	rdmsr
 	movl	%eax, \save_reg
@@ -414,7 +414,7 @@ For 32-bit we have the following conventions - kernel is built with
 .endm
 
 .macro RESTORE_IB_SPEC_CLOBBER save_reg:req
-	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_IBRS
+	ALTERNATIVE "jmp .Lskip_\@", "", X86_FEATURE_USE_IBRS
 	/* Set IBRS to the value saved in the save_reg */
 	movl    $MSR_IA32_SPEC_CTRL, %ecx
 	movl    $0, %edx
