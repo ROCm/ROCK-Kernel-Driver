@@ -593,8 +593,14 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				/* We acquired a page array, but somebody
 				 * invalidated it. Free it and try again
 				 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
+				release_pages(e->user_pages,
+					      bo->tbo.ttm->num_pages,
+					      false);
+#else
 				release_pages(e->user_pages,
 					      bo->tbo.ttm->num_pages);
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 				drm_free_large(e->user_pages);
 #else
@@ -737,8 +743,13 @@ error_free_pages:
 			if (!e->user_pages)
 				continue;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
+			release_pages(e->user_pages,
+				      e->robj->tbo.ttm->num_pages, false);
+#else
 			release_pages(e->user_pages,
 				      e->robj->tbo.ttm->num_pages);
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 			drm_free_large(e->user_pages);
 #else
