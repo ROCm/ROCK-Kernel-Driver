@@ -94,6 +94,7 @@ void amdgpu_amdkfd_device_probe(struct amdgpu_device *adev)
 		kfd2kgd = amdgpu_amdkfd_gfx_8_0_get_functions();
 		break;
 	case CHIP_VEGA10:
+	case CHIP_VEGA20:
 	case CHIP_RAVEN:
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0)
 		if (adev->asic_type == CHIP_RAVEN) {
