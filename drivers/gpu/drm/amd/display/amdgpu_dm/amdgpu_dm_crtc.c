@@ -329,6 +329,9 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.atomic_get_property = dm_crtc_funcs_atomic_get_property,
 #endif
 	.set_config = drm_atomic_helper_set_config,
+#ifdef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY
+	.set_property = drm_atomic_helper_crtc_set_property,
+#endif
 	.page_flip = drm_atomic_helper_page_flip,
 	.atomic_duplicate_state = dm_crtc_duplicate_state,
 	.atomic_destroy_state = dm_crtc_destroy_state,
