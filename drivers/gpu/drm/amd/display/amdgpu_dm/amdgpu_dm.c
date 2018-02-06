@@ -6435,6 +6435,9 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.atomic_get_property = dm_crtc_funcs_atomic_get_property,
 #endif
 	.set_config = drm_atomic_helper_set_config,
+#ifdef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY
+	.set_property = drm_atomic_helper_crtc_set_property,
+#endif
 	.page_flip = drm_atomic_helper_page_flip,
 	.atomic_duplicate_state = dm_crtc_duplicate_state,
 	.atomic_destroy_state = dm_crtc_destroy_state,
@@ -6747,6 +6750,10 @@ amdgpu_dm_connector_late_register(struct drm_connector *connector)
 #endif
 
 static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
+#ifdef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY
+	.dpms = drm_atomic_helper_connector_dpms,
+	.set_property = drm_atomic_helper_connector_set_property,
+#endif
 	.reset = amdgpu_dm_connector_funcs_reset,
 	.detect = amdgpu_dm_connector_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
@@ -7346,6 +7353,9 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.update_plane	= drm_atomic_helper_update_plane,
 	.disable_plane	= drm_atomic_helper_disable_plane,
 	.destroy	= drm_primary_helper_destroy,
+#ifdef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY
+	.set_property	= drm_atomic_helper_plane_set_property,
+#endif
 	.reset = dm_drm_plane_reset,
 	.atomic_duplicate_state = dm_drm_plane_duplicate_state,
 	.atomic_destroy_state = dm_drm_plane_destroy_state,
