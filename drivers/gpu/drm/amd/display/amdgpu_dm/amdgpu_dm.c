@@ -290,8 +290,13 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	/* wakeup usersapce */
 	if (amdgpu_crtc->event) {
 		/* Update to correct count/ts if racing with vblank irq */
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0) || \
+		defined(OS_NAME_SUSE_15)
 		drm_crtc_accurate_vblank_count(&amdgpu_crtc->base);
-
+#elif DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+		/* Update to correct count/ts if racing with vblank irq */
+		drm_accurate_vblank_count(&amdgpu_crtc->base);
+#endif
 		drm_crtc_send_vblank_event(&amdgpu_crtc->base, amdgpu_crtc->event);
 
 		/* page flip completed. clean up */
