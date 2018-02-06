@@ -241,7 +241,11 @@ amdgpu_connector_update_scratch_regs(struct drm_connector *connector,
 		if (connector->encoder_ids[i] == 0)
 			break;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 		encoder = drm_encoder_find(connector->dev,
+#else
+		encoder = drm_encoder_find(connector->dev, NULL,
+#endif
 					connector->encoder_ids[i]);
 		if (!encoder)
 			continue;
@@ -266,7 +270,11 @@ amdgpu_connector_find_encoder(struct drm_connector *connector,
 	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
 		if (connector->encoder_ids[i] == 0)
 			break;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 		encoder = drm_encoder_find(connector->dev,
+#else
+		encoder = drm_encoder_find(connector->dev, NULL,
+#endif
 					connector->encoder_ids[i]);
 		if (!encoder)
 			continue;
@@ -382,7 +390,11 @@ amdgpu_connector_best_single_encoder(struct drm_connector *connector)
 
 	/* pick the encoder ids */
 	if (enc_id)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 		return drm_encoder_find(connector->dev, enc_id);
+#else
+		return drm_encoder_find(connector->dev, NULL, enc_id);
+#endif
 	return NULL;
 }
 
@@ -1093,7 +1105,11 @@ amdgpu_connector_dvi_detect(struct drm_connector *connector, bool force)
 			if (connector->encoder_ids[i] == 0)
 				break;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 			encoder = drm_encoder_find(connector->dev, connector->encoder_ids[i]);
+#else
+			encoder = drm_encoder_find(connector->dev, NULL, connector->encoder_ids[i]);
+#endif
 			if (!encoder)
 				continue;
 
@@ -1150,7 +1166,11 @@ amdgpu_connector_dvi_encoder(struct drm_connector *connector)
 		if (connector->encoder_ids[i] == 0)
 			break;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 		encoder = drm_encoder_find(connector->dev, connector->encoder_ids[i]);
+#else
+		encoder = drm_encoder_find(connector->dev, NULL, connector->encoder_ids[i]);
+#endif
 		if (!encoder)
 			continue;
 
@@ -1169,7 +1189,11 @@ amdgpu_connector_dvi_encoder(struct drm_connector *connector)
 	/* then check use digitial */
 	/* pick the first one */
 	if (enc_id)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 		return drm_encoder_find(connector->dev, enc_id);
+#else
+		return drm_encoder_find(connector->dev, NULL, enc_id);
+#endif
 	return NULL;
 }
 
@@ -1312,7 +1336,11 @@ u16 amdgpu_connector_encoder_get_dp_bridge_encoder_id(struct drm_connector *conn
 		if (connector->encoder_ids[i] == 0)
 			break;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 		encoder = drm_encoder_find(connector->dev,
+#else
+		encoder = drm_encoder_find(connector->dev, NULL,
+#endif
 					connector->encoder_ids[i]);
 		if (!encoder)
 			continue;
@@ -1341,7 +1369,11 @@ static bool amdgpu_connector_encoder_is_hbr2(struct drm_connector *connector)
 	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
 		if (connector->encoder_ids[i] == 0)
 			break;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 		encoder = drm_encoder_find(connector->dev,
+#else
+		encoder = drm_encoder_find(connector->dev, NULL,
+#endif
 					connector->encoder_ids[i]);
 		if (!encoder)
 			continue;
