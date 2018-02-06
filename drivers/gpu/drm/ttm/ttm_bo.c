@@ -1832,7 +1832,7 @@ int ttm_bo_wait_unreserved(struct ttm_buffer_object *bo)
 		return -ERESTARTSYS;
 	if (!ww_mutex_is_locked(&bo->resv->lock))
 		goto out_unlock;
-	ret = reservation_object_lock_interruptible(bo->resv, NULL);
+	ret = kcl_reservation_object_lock_interruptible(bo->resv, NULL);
 	if (ret == -EINTR)
 		ret = -ERESTARTSYS;
 	if (unlikely(ret != 0))
