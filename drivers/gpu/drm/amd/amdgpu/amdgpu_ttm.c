@@ -1406,7 +1406,7 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 	struct ttm_buffer_object gtt_bo;
 	struct ttm_place place = {
 		.fpfn = 0,
-		.lpfn = adev->mc.gart_size >> PAGE_SHIFT,
+		.lpfn = adev->gmc.gart_size >> PAGE_SHIFT,
 		.flags = TTM_PL_FLAG_TOPDOWN
 	};
 	unsigned long size;
@@ -1421,7 +1421,7 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 	r = amdgpu_bo_create(adev, size, PAGE_SIZE, true, AMDGPU_GEM_DOMAIN_VRAM,
 			     AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED | AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS |
 			     AMDGPU_GEM_CREATE_TOP_DOWN,
-			     NULL, NULL, 0, &abo);
+			     NULL, NULL, &abo);
 	if (unlikely(r))
 		goto error_out;
 
@@ -1530,9 +1530,9 @@ static int amdgpu_ssg_init(struct amdgpu_device *adev)
 
 	init_completion(&adev->ssg.cmp);
 
-	res.start = adev->mc.aper_base +
+	res.start = adev->gmc.aper_base +
 		(amdgpu_bo_gpu_offset(adev->direct_gma.dgma_bo) -
-		 adev->mc.vram_start);
+		 adev->gmc.vram_start);
 	res.end = res.start + amdgpu_bo_size(adev->direct_gma.dgma_bo) - 1;
 	res.name = "DirectGMA";
 

@@ -471,7 +471,7 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 		/* create a gem object to contain this object in */
 		r = amdgpu_gem_object_create(adev, args->size, 0,
 					     AMDGPU_GEM_DOMAIN_DGMA_IMPORT, 0,
-					     0, &gobj);
+					     0, NULL, &gobj);
 		if (r)
 			return r;
 
@@ -516,8 +516,8 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 			goto release_object;
 		}
 		args->addr = amdgpu_bo_gpu_offset(abo);
-		args->addr -= adev->mc.vram_start;
-		args->addr += adev->mc.aper_base;
+		args->addr -= adev->gmc.vram_start;
+		args->addr += adev->gmc.aper_base;
 		break;
 	default:
 		return -EINVAL;
