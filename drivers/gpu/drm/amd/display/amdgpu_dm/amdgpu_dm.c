@@ -2608,6 +2608,44 @@ static void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc)
 	drm_crtc_cleanup(crtc);
 	kfree(crtc);
 }
+#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
+static void amdgpu_dm_atomic_crtc_gamma_set(
+		struct drm_crtc *crtc,
+		u16 *red,
+		u16 *green,
+		u16 *blue,
+		uint32_t start,
+		uint32_t size)
+{
+	struct drm_device *dev = crtc->dev;
+	struct drm_property *prop = dev->mode_config.prop_crtc_id;
+
+	crtc->mode.private_flags |= AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
+
+	drm_atomic_helper_crtc_set_property(crtc, prop, 0);
+}
+
+static int dm_crtc_funcs_atomic_set_property(
+	struct drm_crtc *crtc,
+	struct drm_crtc_state *crtc_state,
+	struct drm_property *property,
+	uint64_t val)
+{
+	struct drm_plane_state *plane_state;
+
+	crtc_state->planes_changed = true;
+
+	plane_state =
+		drm_atomic_get_plane_state(
+			crtc_state->state,
+			crtc->primary);
+
+	if (!plane_state)
+		return -EINVAL;
+
+	return 0;
+}
+#endif
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
 static int amdgpu_atomic_helper_page_flip(struct drm_crtc *crtc,
@@ -2780,8 +2818,16 @@ static void dm_disable_vblank(struct drm_crtc *crtc)
 static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.reset = dm_crtc_reset_state,
 	.destroy = amdgpu_dm_crtc_destroy,
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	.gamma_set = drm_atomic_helper_legacy_gamma_set,
+#else
+	.gamma_set = amdgpu_dm_atomic_crtc_gamma_set,
+	.atomic_set_property = dm_crtc_funcs_atomic_set_property,
+#endif
 	.set_config = drm_atomic_helper_set_config,
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+	.set_property = drm_atomic_helper_crtc_set_property,
+#endif
 #if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
 	.page_flip = amdgpu_atomic_helper_page_flip,
 #else
@@ -2989,6 +3035,10 @@ amdgpu_dm_connector_atomic_duplicate_state(struct drm_connector *connector)
 }
 
 static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+	.dpms = drm_atomic_helper_connector_dpms,
+	.set_property = drm_atomic_helper_connector_set_property,
+#endif
 	.reset = amdgpu_dm_connector_funcs_reset,
 	.detect = amdgpu_dm_connector_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
@@ -3252,6 +3302,9 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.update_plane	= drm_atomic_helper_update_plane,
 	.disable_plane	= drm_atomic_helper_disable_plane,
 	.destroy	= drm_plane_cleanup,
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+	.set_property	= drm_atomic_helper_plane_set_property,
+#endif
 	.reset = dm_drm_plane_reset,
 	.atomic_duplicate_state = dm_drm_plane_duplicate_state,
 	.atomic_destroy_state = dm_drm_plane_destroy_state,
