@@ -268,12 +268,22 @@ void amdgpu_fence_process(struct amdgpu_ring *ring)
  *
  * Checks for fence activity.
  */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 static void amdgpu_fence_fallback(unsigned long arg)
 {
 	struct amdgpu_ring *ring = (void *)arg;
 
 	amdgpu_fence_process(ring);
 }
+#else
+static void amdgpu_fence_fallback(struct timer_list *t)
+{
+	struct amdgpu_ring *ring = from_timer(ring, t,
+					      fence_drv.fallback_timer);
+
+	amdgpu_fence_process(ring);
+}
+#endif
 
 /**
  * amdgpu_fence_wait_empty - wait for all fences to signal
@@ -421,8 +431,12 @@ int amdgpu_fence_driver_init_ring(struct amdgpu_ring *ring,
 	atomic_set(&ring->fence_drv.last_seq, 0);
 	ring->fence_drv.initialized = false;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 	setup_timer(&ring->fence_drv.fallback_timer, amdgpu_fence_fallback,
 		    (unsigned long)ring);
+#else
+	timer_setup(&ring->fence_drv.fallback_timer, amdgpu_fence_fallback, 0);
+#endif
 
 	ring->fence_drv.num_fences_mask = num_hw_submission * 2 - 1;
 	spin_lock_init(&ring->fence_drv.lock);
