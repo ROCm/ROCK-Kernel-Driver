@@ -188,7 +188,11 @@ struct amdgpu_retryfault_hashtable {
 
 struct amdgpu_vm {
 	/* tree of virtual addresses mapped */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	struct rb_root	va;
+#else
 	struct rb_root_cached	va;
+#endif
 
 	/* BOs who needs a validation */
 	struct list_head	evicted;
