@@ -339,12 +339,12 @@ typedef struct {
 typedef enum {
   WM_SOCCLK = 0,
   WM_DCEFCLK,
-  WM_COUNT,
+  WM_COUNT_PP,
 } WM_CLOCK_e;
 
 typedef struct {
   /* Watermarks */
-  WatermarkRowGeneric_t WatermarkRow[WM_COUNT][NUM_WM_RANGES];
+  WatermarkRowGeneric_t WatermarkRow[WM_COUNT_PP][NUM_WM_RANGES];
 
   uint32_t     MmHubPadding[7]; /* SMU internal use */
 } Watermarks_t;
