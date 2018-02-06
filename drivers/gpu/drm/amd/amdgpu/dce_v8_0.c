@@ -1675,7 +1675,11 @@ static void dce_v8_0_afmt_setmode(struct drm_encoder *encoder,
 	dce_v8_0_audio_write_sad_regs(encoder);
 	dce_v8_0_audio_write_latency_fields(encoder, mode);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode);
+#else
 	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode, false);
+#endif
 	if (err < 0) {
 		DRM_ERROR("failed to setup AVI infoframe: %zd\n", err);
 		return;
