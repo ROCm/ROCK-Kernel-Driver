@@ -168,7 +168,11 @@ struct amdgpu_vm_pt {
 
 struct amdgpu_vm {
 	/* tree of virtual addresses mapped */
-	struct rb_root		va;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	struct rb_root	va;
+#else
+	struct rb_root_cached	va;
+#endif
 
 	/* protecting invalidated */
 	spinlock_t		status_lock;

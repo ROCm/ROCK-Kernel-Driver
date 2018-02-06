@@ -2419,7 +2419,11 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	uint64_t flags;
 	int r, i;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 	vm->va = RB_ROOT;
+#else
+	vm->va = RB_ROOT_CACHED;
+#endif
 	for (i = 0; i < AMDGPU_MAX_VMHUBS; i++)
 		vm->reserved_vmid[i] = NULL;
 	spin_lock_init(&vm->status_lock);
@@ -2690,10 +2694,19 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 
 	drm_sched_entity_fini(vm->entity.sched, &vm->entity);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 	if (!RB_EMPTY_ROOT(&vm->va)) {
+#else
+	if (!RB_EMPTY_ROOT(&vm->va.rb_root)) {
+#endif
 		dev_err(adev->dev, "still active bo inside vm\n");
 	}
-	rbtree_postorder_for_each_entry_safe(mapping, tmp, &vm->va, rb) {
+	rbtree_postorder_for_each_entry_safe(mapping, tmp,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+					     &vm->va, rb) {
+#else
+					     &vm->va.rb_root, rb) {
+#endif
 		list_del(&mapping->list);
 		amdgpu_vm_it_remove(mapping, &vm->va);
 		kfree(mapping);
