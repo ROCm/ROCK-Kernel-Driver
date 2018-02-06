@@ -84,7 +84,11 @@ struct amdgpu_mn {
 
 	/* objects protected by lock */
 	struct rw_semaphore	lock;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	struct rb_root		objects;
+#else
 	struct rb_root_cached	objects;
+#endif
 	struct mutex		read_lock;
 	atomic_t		recursion;
 };
@@ -120,7 +124,11 @@ static void amdgpu_mn_destroy(struct work_struct *work)
 	down_write(&amn->lock);
 	hash_del(&amn->node);
 	rbtree_postorder_for_each_entry_safe(node, next_node,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+					     &amn->objects, it.rb) {
+#else
 					     &amn->objects.rb_root, it.rb) {
+#endif
 		list_for_each_entry_safe(bo, next_bo, &node->bos, mn_list) {
 			bo->mn = NULL;
 			list_del_init(&bo->mn_list);
@@ -360,6 +368,9 @@ struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 	struct amdgpu_mn *amn;
 	unsigned long key = AMDGPU_MN_KEY(mm, type);
 	int r;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+#endif
 
 	mutex_lock(&adev->mn_lock);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
@@ -371,7 +382,11 @@ struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 	}
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	hash_for_each_possible(adev->mn_hash, amn, node, node, key)
+#else
 	hash_for_each_possible(adev->mn_hash, amn, node, key)
+#endif
 		if (AMDGPU_MN_KEY(amn->mm, amn->type) == key)
 			goto release_locks;
 
@@ -386,7 +401,11 @@ struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 	init_rwsem(&amn->lock);
 	amn->type = type;
 	amn->mn.ops = &amdgpu_mn_ops[type];
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	amn->objects = RB_ROOT;
+#else
 	amn->objects = RB_ROOT_CACHED;
+#endif
 	mutex_init(&amn->read_lock);
 	atomic_set(&amn->recursion, 0);
 
