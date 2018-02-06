@@ -1200,7 +1200,7 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 		}
 	}
 
-	return amdgpu_sem_add_cs(p->ctx, p->job->ring, &p->job->dep_sync);
+	return amdgpu_sem_add_cs(p->ctx, p->job->ring, &p->job->sync);
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
