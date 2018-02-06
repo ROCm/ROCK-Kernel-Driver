@@ -42,7 +42,9 @@
 #include <linux/rbtree.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 #include <linux/mem_encrypt.h>
+#endif
 
 #define TTM_BO_VM_NUM_PREFAULT 16
 
@@ -274,8 +276,10 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 	 */
 	for (i = 0; i < TTM_BO_VM_NUM_PREFAULT; ++i) {
 		if (bo->mem.bus.is_iomem) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 			/* Iomem should not be marked encrypted */
 			cvma.vm_page_prot = pgprot_decrypted(cvma.vm_page_prot);
+#endif
 			pfn = ttm_bo_io_mem_pfn(bo, page_offset);
 		} else {
 			page = ttm->pages[page_offset];
