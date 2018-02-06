@@ -444,7 +444,11 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 	return 0;
 
 free_pages:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 	release_pages(bo->tbo.ttm->pages, bo->tbo.ttm->num_pages, false);
+#else
+	release_pages(bo->tbo.ttm->pages, bo->tbo.ttm->num_pages);
+#endif
 
 release_object:
 	kcl_drm_gem_object_put_unlocked(gobj);
