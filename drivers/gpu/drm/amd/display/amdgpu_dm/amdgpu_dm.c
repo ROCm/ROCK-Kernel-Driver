@@ -113,6 +113,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state);
 static int amdgpu_dm_atomic_check(struct drm_device *dev,
 				  struct drm_atomic_state *state);
 
+static void prepare_flip_isr(struct amdgpu_crtc *acrtc);
 
 
 
@@ -273,6 +274,9 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	}
 
 	spin_lock_irqsave(&adev->ddev->event_lock, flags);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+	struct amdgpu_flip_work *works = amdgpu_crtc->pflip_works;
+#endif
 
 	if (amdgpu_crtc->pflip_status != AMDGPU_FLIP_SUBMITTED){
 		DRM_DEBUG_DRIVER("amdgpu_crtc->pflip_status = %d !=AMDGPU_FLIP_SUBMITTED(%d) on crtc:%d[%p] \n",
@@ -303,12 +307,19 @@ static void dm_pflip_high_irq(void *interrupt_params)
 		WARN_ON(1);
 
 	amdgpu_crtc->pflip_status = AMDGPU_FLIP_NONE;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+	amdgpu_crtc->pflip_works = NULL;
+#endif
+
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 
 	DRM_DEBUG_DRIVER("%s - crtc :%d[%p], pflip_stat:AMDGPU_FLIP_NONE\n",
 					__func__, amdgpu_crtc->crtc_id, amdgpu_crtc);
 
 	drm_crtc_vblank_put(&amdgpu_crtc->base);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+	schedule_work(&works->unpin_work);
+#endif
 }
 
 static void dm_crtc_high_irq(void *interrupt_params)
@@ -863,9 +874,11 @@ static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 	.atomic_state_free = dm_atomic_state_alloc_free
 };
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 static struct drm_mode_config_helper_funcs amdgpu_dm_mode_config_helperfuncs = {
 	.atomic_commit_tail = amdgpu_dm_atomic_commit_tail
 };
+#endif
 
 static void
 amdgpu_dm_update_connector_after_detect(struct amdgpu_dm_connector *aconnector)
@@ -1332,7 +1345,9 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 	adev->mode_info.mode_config_initialized = true;
 
 	adev->ddev->mode_config.funcs = (void *)&amdgpu_dm_mode_funcs;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 	adev->ddev->mode_config.helper_private = &amdgpu_dm_mode_config_helperfuncs;
+#endif
 
 	adev->ddev->mode_config.max_width = 16384;
 	adev->ddev->mode_config.max_height = 16384;
@@ -1586,6 +1601,53 @@ static u8 dm_get_backlight_level(struct amdgpu_encoder *amdgpu_encoder)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+/**
+ * dm_page_flip - called by amdgpu_flip_work_func(), which is triggered
+ *                via DRM IOTCL, by user mode.
+ *
+ * @adev: amdgpu_device pointer
+ * @crtc_id: crtc to cleanup pageflip on
+ * @crtc_base: new address of the crtc (GPU MC address)
+ *
+ * Does the actual pageflip (surface address update).
+ */
+static void dm_page_flip(struct amdgpu_device *adev,
+			 int crtc_id, u64 crtc_base, bool async)
+{
+	struct amdgpu_crtc *acrtc = adev->mode_info.crtcs[crtc_id];
+	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(acrtc->base.state);
+	struct dc_stream_state *stream = acrtc_state->stream;
+	struct dc_flip_addrs addr = { {0} };
+
+	/*
+	 * Received a page flip call after the display has been reset.
+	 * Just return in this case. Everything should be clean-up on reset.
+	 */
+	if (!stream) {
+		WARN_ON(1);
+		return;
+	}
+
+	addr.address.grph.addr.low_part = lower_32_bits(crtc_base);
+	addr.address.grph.addr.high_part = upper_32_bits(crtc_base);
+	addr.flip_immediate = async;
+
+	if (acrtc->base.state->event)
+		prepare_flip_isr(acrtc);
+
+	dc_flip_plane_addrs(
+			adev->dm.dc,
+			dc_stream_get_status(stream)->plane_states,
+			&addr, 1);
+
+	DRM_DEBUG_DRIVER("%s Flipping to hi: 0x%x, low: 0x%x \n",
+			 __func__,
+			 addr.address.grph.addr.high_part,
+			 addr.address.grph.addr.low_part);
+}
+#endif
+
 static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 				struct drm_file *filp)
 {
@@ -1627,6 +1689,9 @@ static const struct amdgpu_display_funcs dm_display_funcs = {
 	.hpd_sense = NULL,/* called unconditionally */
 	.hpd_set_polarity = NULL, /* called unconditionally */
 	.hpd_get_gpio_reg = NULL, /* VBIOS parsing. DAL does it. */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+	.page_flip = dm_page_flip,
+#endif
 	.page_flip_get_scanoutpos =
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
@@ -1758,6 +1823,10 @@ static int dm_early_init(void *handle)
 
 	return 0;
 }
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 6, 0) && !defined(OS_NAME_RHEL_7_3) && !defined(OS_NAME_RHEL_7_4)
+#define AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET 1
+#endif
 
 static bool modeset_required(struct drm_crtc_state *crtc_state,
 			     struct dc_stream_state *new_stream,
@@ -2015,6 +2084,7 @@ static int fill_plane_attributes_from_fb(struct amdgpu_device *adev,
 
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_RHEL_7_4)
 static void fill_gamma_from_crtc_state(const struct drm_crtc_state *crtc_state,
 				       struct dc_plane_state *plane_state)
 {
@@ -2040,6 +2110,37 @@ static void fill_gamma_from_crtc_state(const struct drm_crtc_state *crtc_state,
 
 	plane_state->gamma_correction = gamma;
 }
+#else
+static void fill_gamma_from_crtc(
+	const struct drm_crtc *crtc,
+	struct dc_plane_state *plane_state)
+{
+	int i;
+	struct dc_gamma *gamma;
+	uint16_t *red, *green, *blue;
+	int end = (crtc->gamma_size > GAMMA_RGB_256_ENTRIES) ?
+			GAMMA_RGB_256_ENTRIES : crtc->gamma_size;
+
+	red = crtc->gamma_store;
+	green = red + crtc->gamma_size;
+	blue = green + crtc->gamma_size;
+
+	gamma = dc_create_gamma();
+
+	if (gamma == NULL)
+		return;
+
+	gamma->type = GAMMA_RGB_256;
+	gamma->num_entries = GAMMA_RGB_256_ENTRIES;
+	for (i = 0; i < end; i++) {
+		gamma->entries.red[i] = dal_fixed31_32_from_int((unsigned short)red[i]);
+		gamma->entries.green[i] = dal_fixed31_32_from_int((unsigned short)green[i]);
+		gamma->entries.blue[i] = dal_fixed31_32_from_int((unsigned short)blue[i]);
+	}
+
+	plane_state->gamma_correction = gamma;
+}
+#endif
 
 static int fill_plane_attributes(struct amdgpu_device *adev,
 				 struct dc_plane_state *dc_plane_state,
@@ -2074,8 +2175,17 @@ static int fill_plane_attributes(struct amdgpu_device *adev,
 	dc_plane_state->in_transfer_func = input_tf;
 
 	/* In case of gamma set, update gamma value */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_RHEL_7_4)
 	if (crtc_state->gamma_lut)
 		fill_gamma_from_crtc_state(crtc_state, dc_plane_state);
+#else
+	if (crtc->mode.private_flags & AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET) {
+		fill_gamma_from_crtc(crtc, dc_plane_state);
+		/* reset trigger of gamma */
+		crtc->mode.private_flags &=
+			~AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
+	}
+#endif
 
 	return ret;
 }
@@ -2524,6 +2634,24 @@ static void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc)
 	kfree(crtc);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 6, 0) && !defined(OS_NAME_RHEL_7_3) && !defined(OS_NAME_RHEL_7_4)
+static void amdgpu_dm_atomic_crtc_gamma_set(
+		struct drm_crtc *crtc,
+		u16 *red,
+		u16 *green,
+		u16 *blue,
+		uint32_t start,
+		uint32_t size)
+{
+	struct drm_device *dev = crtc->dev;
+	struct drm_property *prop = dev->mode_config.prop_crtc_id;
+
+	crtc->state->mode.private_flags |= AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
+
+	drm_atomic_helper_crtc_set_property(crtc, prop, 0);
+}
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
 static int amdgpu_atomic_helper_page_flip(struct drm_crtc *crtc,
 				struct drm_framebuffer *fb,
@@ -2615,9 +2743,11 @@ static void dm_crtc_destroy_state(struct drm_crtc *crtc,
 	if (cur->stream)
 		dc_stream_release(cur->stream);
 
-
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 7, 0) || defined(OS_NAME_RHEL_7_4)
 	__drm_atomic_helper_crtc_destroy_state(state);
-
+#else
+	__drm_atomic_helper_crtc_destroy_state(crtc, state);
+#endif
 
 	kfree(state);
 }
@@ -2668,7 +2798,11 @@ dm_crtc_duplicate_state(struct drm_crtc *crtc)
 static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.reset = dm_crtc_reset_state,
 	.destroy = amdgpu_dm_crtc_destroy,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_RHEL_7_4)
 	.gamma_set = drm_atomic_helper_legacy_gamma_set,
+#else
+	.gamma_set = amdgpu_dm_atomic_crtc_gamma_set,
+#endif
 	.set_config = drm_atomic_helper_set_config,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 	.set_property = drm_atomic_helper_crtc_set_property,
@@ -4055,7 +4189,9 @@ static void handle_cursor_update(struct drm_plane *plane,
 static void prepare_flip_isr(struct amdgpu_crtc *acrtc)
 {
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 	assert_spin_locked(&acrtc->base.dev->event_lock);
+#endif
 	WARN_ON(acrtc->event);
 
 	acrtc->event = acrtc->base.state->event;
@@ -4183,7 +4319,11 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	struct dc_plane_state *plane_states_constructed[MAX_SURFACES];
 	struct amdgpu_crtc *acrtc_attach = to_amdgpu_crtc(pcrtc);
 	struct drm_crtc_state *new_pcrtc_state =
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+			kcl_drm_atomic_get_new_crtc_state_after_commit(state, pcrtc);
+#else
 			drm_atomic_get_new_crtc_state(state, pcrtc);
+#endif
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(new_pcrtc_state);
 	struct dm_atomic_state *dm_state = to_dm_atomic_state(state);
 	int planes_count = 0;
@@ -4210,7 +4350,13 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		if (!fb || !crtc || pcrtc != crtc)
 			continue;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+		new_crtc_state =
+			kcl_drm_atomic_get_new_crtc_state_after_commit(
+			state, crtc);
+#else
 		new_crtc_state = drm_atomic_get_new_crtc_state(state, crtc);
+#endif
 		if (!new_crtc_state->active)
 			continue;
 
@@ -4251,12 +4397,23 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			if (plane->type == DRM_PLANE_TYPE_PRIMARY)
 				drm_crtc_vblank_get(crtc);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 			amdgpu_dm_do_flip(
 				crtc,
 				fb,
 				drm_crtc_vblank_count(crtc) + *wait_for_vblank,
 				dm_state->context);
+#else
+			amdgpu_crtc_page_flip(
+				crtc,
+				fb,
+				crtc->state->event,
+				acrtc_attach->flip_flags);
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+			/*TODO BUG remove ASAP in 4.12 to avoid race between worker and flip IOCTL */
+
+			/*clean up the flags for next usage*/
 			acrtc_attach->flip_flags = 0;
 #endif
 		}
@@ -4651,7 +4808,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 			amdgpu_dm_commit_planes(state, dev, dm, crtc, &wait_for_vblank);
 	}
 
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 	/*
 	 * send vblank event on all events not handled in flip and
 	 * mark consumed event for drm_atomic_helper_commit_hw_done
@@ -4670,9 +4827,12 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		new_crtc_state->event = NULL;
 	}
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
+#endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 	/* Signal HW programming completion */
 	drm_atomic_helper_commit_hw_done(state);
+#endif
 
 	if (wait_for_vblank)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
@@ -4788,7 +4948,9 @@ static int do_aquire_global_lock(struct drm_device *dev,
 				 struct drm_atomic_state *state)
 {
 	struct drm_crtc *crtc;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 	struct drm_crtc_commit *commit;
+#endif
 	long ret;
 
 	/* Adding all modeset locks to aquire_ctx will
@@ -4799,6 +4961,7 @@ static int do_aquire_global_lock(struct drm_device *dev,
 	if (ret)
 		return ret;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		spin_lock(&crtc->commit_lock);
 		commit = list_first_entry_or_null(&crtc->commit_list,
@@ -4827,6 +4990,9 @@ static int do_aquire_global_lock(struct drm_device *dev,
 	}
 
 	return ret < 0 ? ret : 0;
+#else
+	return 0;
+#endif
 }
 
 static int dm_update_crtcs_state(struct dc *dc,
