@@ -393,7 +393,7 @@ static u64 get_vm_pd_gpu_offset(struct amdkfd_vm *kvm, bool reserve)
 	/* On some ASICs the FB doesn't start at 0. Adjust FB offset
 	 * to an actual MC address.
 	 */
-	adev->gart.gart_funcs->get_vm_pde(adev, -1, &offset, &flags);
+	adev->gmc.gmc_funcs->get_vm_pde(adev, -1, &offset, &flags);
 
 	return offset;
 }
