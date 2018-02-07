@@ -1449,6 +1449,12 @@ static struct drm_driver kms_driver = {
 	.disable_vblank = kcl_amdgpu_disable_vblank_kms,
 	.get_vblank_timestamp = drm_calc_vbltimestamp_from_scanoutpos,
 	.get_scanout_position = amdgpu_get_crtc_scanout_position,
+#if defined(CONFIG_DEBUG_FS)
+#if defined(BUILD_AS_DKMS) && \
+	DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+	.debugfs_cleanup = amdgpu_debugfs_cleanup,
+#endif
+#endif
 	.irq_handler = amdgpu_irq_handler,
 	.ioctls = amdgpu_ioctls_kms,
 	.gem_free_object_unlocked = amdgpu_gem_object_free,
