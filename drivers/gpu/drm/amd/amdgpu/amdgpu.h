@@ -594,6 +594,11 @@ void amdgpu_benchmark(struct amdgpu_device *adev, int test_number);
  */
 void amdgpu_test_moves(struct amdgpu_device *adev);
 
+#if defined(CONFIG_DEBUG_FS)
+#if defined(BUILD_AS_DKMS) &&  LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+void amdgpu_debugfs_cleanup(struct drm_minor *minor);
+#endif
+#endif
 
 /*
  * amdgpu smumgr functions
