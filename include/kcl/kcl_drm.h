@@ -414,14 +414,22 @@ static inline struct drm_crtc_state *
 kcl_drm_atomic_get_old_crtc_state_before_commit(struct drm_atomic_state *state,
 					    struct drm_crtc *crtc)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
+#else
+	return state->crtcs[drm_crtc_index(crtc)]->state;
+#endif
 }
 
 static inline struct drm_crtc_state *
 kcl_drm_atomic_get_new_crtc_state_before_commit(struct drm_atomic_state *state,
 				  struct drm_crtc *crtc)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 	return state->crtcs[drm_crtc_index(crtc)].state;
+#else
+	return state->crtc_states[drm_crtc_index(crtc)];
+#endif
 }
 #endif
 
@@ -429,7 +437,11 @@ static inline struct drm_crtc_state *
 kcl_drm_atomic_get_new_crtc_state_after_commit(struct drm_atomic_state *state,
 					    struct drm_crtc *crtc)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
 	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
+#else
+	return state->crtcs[drm_crtc_index(crtc)]->state;
+#endif
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && !defined(OS_NAME_RHEL_7_4)
@@ -492,6 +504,11 @@ static inline struct drm_printer drm_info_printer(struct device *dev)
 }
 
 void drm_state_dump(struct drm_device *dev, struct drm_printer *p);
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 6, 0) && !defined(OS_NAME_RHEL_7_3) && !defined(OS_NAME_RHEL_7_4)
+void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
+void drm_send_event(struct drm_device *dev, struct drm_pending_event *e);
 #endif
 
 #endif /* AMDKCL_DRM_H */
