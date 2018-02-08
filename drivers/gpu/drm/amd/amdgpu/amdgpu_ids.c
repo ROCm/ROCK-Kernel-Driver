@@ -40,7 +40,11 @@
  * space. Therefore PASIDs are allocated using a global IDA. VMs are
  * looked up from the PASID per amdgpu_device.
  */
-static DEFINE_IDA(amdgpu_pasid_ida);
+#if !defined(OS_NAME_RHEL_6)
+static DEFINE_IDA(amdgpu_vm_pasid_ida);
+#else
+static DEFINE_IDA2(amdgpu_vm_pasid_ida);
+#endif
 
 /* Helper to free pasid from a fence callback */
 struct amdgpu_pasid_cb {
@@ -64,7 +68,7 @@ int amdgpu_pasid_alloc(unsigned int bits)
 	int pasid = -EINVAL;
 
 	for (bits = min(bits, 31U); bits > 0; bits--) {
-		pasid = ida_simple_get(&amdgpu_pasid_ida,
+		pasid = ida_simple_get(&amdgpu_vm_pasid_ida,
 				       1U << (bits - 1), 1U << bits,
 				       GFP_KERNEL);
 		if (pasid != -ENOSPC)
@@ -84,7 +88,7 @@ int amdgpu_pasid_alloc(unsigned int bits)
 void amdgpu_pasid_free(unsigned int pasid)
 {
 	trace_amdgpu_pasid_freed(pasid);
-	ida_simple_remove(&amdgpu_pasid_ida, pasid);
+	ida_simple_remove(&amdgpu_vm_pasid_ida, pasid);
 }
 
 static void amdgpu_pasid_free_cb(struct dma_fence *fence,
