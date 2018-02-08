@@ -396,7 +396,7 @@ int kfd_init_apertures(struct kfd_process *process)
 				return -1;
 			}
 
-			if (!dev->device_info->is_need_iommu_device) {
+			if (!dev->device_info->needs_iommu_device) {
 				/* dGPUs: SVM aperture starting at 0
 				 * with small reserved space for kernel
 				 */

@@ -1005,7 +1005,7 @@ static int kfd_ioctl_create_event(struct file *filp, struct kfd_process *p,
 			pr_err("Getting device by id failed in %s\n", __func__);
 			return -EFAULT;
 		}
-		if (!kfd->device_info->is_need_iommu_device) {
+		if (!kfd->device_info->needs_iommu_device) {
 			mutex_lock(&p->mutex);
 			pdd = kfd_bind_process_to_device(kfd, p);
 			if (IS_ERR(pdd)) {
@@ -1176,7 +1176,7 @@ bool kfd_dev_is_large_bar(struct kfd_dev *dev)
 		return true;
 	}
 
-	if (dev->device_info->is_need_iommu_device)
+	if (dev->device_info->needs_iommu_device)
 		return false;
 
 	dev->kfd2kgd->get_local_mem_info(dev->kgd, &mem_info);

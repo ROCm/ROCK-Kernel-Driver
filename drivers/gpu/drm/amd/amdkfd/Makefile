@@ -21,6 +21,10 @@ amdkfd-y	:= kfd_module.o kfd_device.o kfd_chardev.o kfd_topology.o \
 		kfd_dbgdev.o kfd_dbgmgr.o kfd_flat_memory.o kfd_crat.o kfd_rdma.o \
 		kfd_peerdirect.o kfd_ipc.o
 
+ifneq ($(CONFIG_AMD_IOMMU_V2),)
+amdkfd-y += kfd_iommu.o
+endif
+
 amdkfd-$(CONFIG_DEBUG_FS) += kfd_debugfs.o
 
 obj-$(CONFIG_HSA_AMD)	+= amdkfd.o
