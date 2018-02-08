@@ -2149,7 +2149,11 @@ static int fill_plane_attributes(struct amdgpu_device *adev,
 {
 	const struct amdgpu_framebuffer *amdgpu_fb =
 		to_amdgpu_framebuffer(plane_state->fb);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_RHEL_7_4)
 	const struct drm_crtc *crtc = plane_state->crtc;
+#else
+	struct drm_crtc *crtc = plane_state->crtc;
+#endif
 	struct dc_transfer_func *input_tf;
 	int ret = 0;
 
