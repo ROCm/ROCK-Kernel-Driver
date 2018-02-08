@@ -912,7 +912,19 @@ struct dc_flip_addrs {
 	/* TODO: add flip duration for FreeSync */
 	bool triplebuffer_flips;
 };
-
+#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+/*
+ * Optimized flip address update function.
+ *
+ * After this call:
+ *   Surface addresses and flip attributes are programmed.
+ *   Surface flip occur at next configured time (h_sync or v_sync flip)
+ */
+void dc_flip_plane_addrs(struct dc *dc,
+		struct dc_plane_state *const plane_states[],
+		struct dc_flip_addrs flip_addrs[],
+		uint32_t count);
+#endif
 bool dc_post_update_surfaces_to_stream(
 		struct dc *dc);
 
