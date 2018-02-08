@@ -386,6 +386,9 @@ struct amdgpu_atom_ss {
 struct amdgpu_crtc {
 	struct drm_crtc base;
 	int crtc_id;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	u16 lut_r[256], lut_g[256], lut_b[256];
+#endif
 	bool enabled;
 	bool can_tile;
 	uint32_t crtc_offset;
