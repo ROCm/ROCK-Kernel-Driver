@@ -2230,7 +2230,11 @@ static int fill_plane_attributes(struct amdgpu_device *adev,
 {
 	const struct amdgpu_framebuffer *amdgpu_fb =
 		to_amdgpu_framebuffer(plane_state->fb);
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	const struct drm_crtc *crtc = plane_state->crtc;
+#else
+	struct drm_crtc *crtc = plane_state->crtc;
+#endif
 	int ret = 0;
 
 	if (!fill_rects_from_plane_state(plane_state, dc_plane_state))
@@ -2453,6 +2457,14 @@ static void adjust_colour_depth_from_display_info(struct dc_crtc_timing *timing_
 }
 /*****************************************************************************/
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+static inline bool drm_mode_is_420_only(const struct drm_display_info *display,
+			  const struct drm_display_mode *mode)
+{
+	/* DRM < 4.4 ,un-support this pixel format */
+	return false;
+}
+#endif
 static void
 fill_stream_properties_from_drm_display_mode(struct dc_stream_state *stream,
 					     const struct drm_display_mode *mode_in,
@@ -3947,13 +3959,17 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 	switch (connector_type) {
 	case DRM_MODE_CONNECTOR_HDMIA:
 		aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		aconnector->base.ycbcr_420_allowed =
 			link->link_enc->features.ycbcr420_supported ? true : false;
+#endif
 		break;
 	case DRM_MODE_CONNECTOR_DisplayPort:
 		aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		aconnector->base.ycbcr_420_allowed =
 			link->link_enc->features.ycbcr420_supported ? true : false;
+#endif
 		break;
 	case DRM_MODE_CONNECTOR_DVID:
 		aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
