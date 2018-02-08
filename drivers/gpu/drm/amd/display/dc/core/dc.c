@@ -3037,6 +3037,33 @@ struct dc_stream_state *dc_stream_find_from_link(const struct dc_link *link)
 	return NULL;
 }
 
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
+void dc_flip_plane_addrs(
+		struct dc *dc,
+		struct dc_plane_state *const plane_states[],
+		struct dc_flip_addrs flip_addrs[],
+		uint32_t count)
+{
+	int i, j;
+
+	for (i = 0; i < count; i++) {
+		struct dc_plane_state *plane_state = plane_states[i];
+
+		plane_state->address = flip_addrs[i].address;
+		plane_state->flip_immediate = flip_addrs[i].flip_immediate;
+
+		for (j = 0; j < dc->res_pool->pipe_count; j++) {
+			struct pipe_ctx *pipe_ctx = &dc->current_state->res_ctx.pipe_ctx[j];
+
+			if (pipe_ctx->plane_state != plane_state)
+				continue;
+
+			dc->hwss.update_plane_addr(dc, pipe_ctx);
+		}
+	}
+}
+#endif
+
 enum dc_irq_source dc_interrupt_to_irq_source(
 		struct dc *dc,
 		uint32_t src_id,
