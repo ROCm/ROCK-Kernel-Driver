@@ -271,7 +271,9 @@ void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc);
 #define amdgpu_dm_crtc_handle_crc_irq(x)
 #endif
 
-#define MAX_COLOR_LUT_ENTRIES 256
+#define MAX_COLOR_LUT_ENTRIES 4096
+/* Legacy gamm LUT users such as X doesn't like large LUT sizes */
+#define MAX_COLOR_LEGACY_LUT_ENTRIES 256
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
 	defined(OS_NAME_RHEL_7_3) || \
