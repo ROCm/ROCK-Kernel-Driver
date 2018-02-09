@@ -222,6 +222,7 @@ struct kfd_device_info {
 	bool needs_pci_atomics;
 	/* obtain from adev->sdma.num_instances */
 	unsigned int num_sdma_engines;
+	unsigned int num_sdma_queues_per_engine;
 };
 
 struct kfd_mem_obj {
