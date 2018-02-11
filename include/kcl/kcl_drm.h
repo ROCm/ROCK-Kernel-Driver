@@ -277,10 +277,14 @@ static inline int kcl_drm_universal_plane_init(struct drm_device *dev, struct dr
 			     unsigned long possible_crtcs,
 			     const struct drm_plane_funcs *funcs,
 			     const uint32_t *formats, unsigned int format_count,
+			     const uint64_t *format_modifiers,
 			     enum drm_plane_type type,
 			     const char *name, ...)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
+				 formats, format_count, format_modifiers, type, name);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
 		defined(OS_NAME_RHEL_7_3) || \
 		defined(OS_NAME_RHEL_7_4)
 		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
@@ -333,7 +337,11 @@ static inline int
 kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 					  unsigned int pipe,
 					  int *max_error,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+					  ktime_t *vblank_time,
+#else
 					  struct timeval *vblank_time,
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
 					  unsigned flags,
 #else
