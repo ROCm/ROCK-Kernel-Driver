@@ -303,7 +303,7 @@ static void acquire_queue(struct kgd_dev *kgd, uint32_t pipe_id,
 static uint32_t get_queue_mask(struct amdgpu_device *adev,
 			       uint32_t pipe_id, uint32_t queue_id)
 {
-	unsigned int bit = (pipe_id * adev->gfx.mec.num_pipe_per_mec +
+	unsigned int bit = (pipe_id * adev->gfx.mec.num_queue_per_pipe +
 			    queue_id) & 31;
 
 	return ((uint32_t)1) << bit;
