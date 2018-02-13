@@ -2807,6 +2807,28 @@ dm_crtc_duplicate_state(struct drm_crtc *crtc)
 	return &state->base;
 }
 
+
+static inline int dm_set_vblank(struct drm_crtc *crtc, bool enable)
+{
+	enum dc_irq_source irq_source;
+	struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+	struct amdgpu_device *adev = crtc->dev->dev_private;
+
+	irq_source = IRQ_TYPE_VBLANK + acrtc->otg_inst;
+	dc_interrupt_set(adev->dm.dc, irq_source, enable);
+	return 0;
+}
+
+static int dm_enable_vblank(struct drm_crtc *crtc)
+{
+	return dm_set_vblank(crtc, true);
+}
+
+static void dm_disable_vblank(struct drm_crtc *crtc)
+{
+	dm_set_vblank(crtc, false);
+}
+
 /* Implemented only the options currently availible for the driver */
 static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.reset = dm_crtc_reset_state,
@@ -2835,6 +2857,8 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	defined(OS_NAME_RHEL_7_4_5)
 	.set_crc_source = amdgpu_dm_crtc_set_crc_source,
 #endif
+	.enable_vblank = dm_enable_vblank,
+	.disable_vblank = dm_disable_vblank,
 };
 
 static enum drm_connector_status
