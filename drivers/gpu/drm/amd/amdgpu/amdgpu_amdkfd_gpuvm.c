@@ -999,7 +999,6 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 		pr_err("Failed init vm ret %d\n", ret);
 		goto vm_init_fail;
 	}
-	new_vm->adev = adev;
 
 	if (!*process_info) {
 		info = kzalloc(sizeof(*info), GFP_KERNEL);

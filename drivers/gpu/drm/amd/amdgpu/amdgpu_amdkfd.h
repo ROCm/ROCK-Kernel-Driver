@@ -116,7 +116,6 @@ struct amdkfd_vm {
 	/* List node in amdkfd_process_info.vm_list_head*/
 	struct list_head vm_list_node;
 
-	struct amdgpu_device *adev;
 	/* Points to the KFD process VM info*/
 	struct amdkfd_process_info *process_info;
 
