@@ -908,8 +908,6 @@ static struct drm_driver kms_driver = {
 #else
 	.gem_prime_import = drm_gem_prime_import,
 #endif
-	.gem_prime_pin = amdgpu_gem_prime_pin,
-	.gem_prime_unpin = amdgpu_gem_prime_unpin,
 	.gem_prime_res_obj = amdgpu_gem_prime_res_obj,
 	.gem_prime_get_sg_table = amdgpu_gem_prime_get_sg_table,
 	.gem_prime_import_sg_table = amdgpu_gem_prime_import_sg_table,
