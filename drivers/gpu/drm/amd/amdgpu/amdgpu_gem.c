@@ -109,12 +109,7 @@ retry:
 		return -ENOMEM;
 	}
 
-	r = drm_gem_object_init(adev->ddev, &gobj->base, amdgpu_bo_size(robj));
-	if (unlikely(r)) {
-		kfree(gobj);
-		amdgpu_bo_unref(&robj);
-		return r;
-	}
+	drm_gem_private_object_init(adev->ddev, &gobj->base, amdgpu_bo_size(robj));
 
 	list_add(&gobj->list, &robj->gem_objects);
 	gobj->bo = robj;

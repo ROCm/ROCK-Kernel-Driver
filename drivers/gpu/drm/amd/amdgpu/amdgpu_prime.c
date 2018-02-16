@@ -120,12 +120,7 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 		return ERR_PTR(-ENOMEM);
 	}
 
-	ret = drm_gem_object_init(adev->ddev, &gobj->base, amdgpu_bo_size(bo));
-	if (unlikely(ret)) {
-		kfree(gobj);
-		amdgpu_bo_unref(&bo);
-		return ERR_PTR(ret);
-	}
+	drm_gem_private_object_init(adev->ddev, &gobj->base, amdgpu_bo_size(bo));
 
 	list_add(&gobj->list, &bo->gem_objects);
 	gobj->bo = amdgpu_bo_ref(bo);
@@ -300,12 +295,7 @@ amdgpu_gem_prime_foreign_bo(struct amdgpu_device *adev, struct amdgpu_bo *bo)
 		return ERR_PTR(-ENOMEM);
 	}
 
-	r = drm_gem_object_init(adev->ddev, &gobj->base, amdgpu_bo_size(bo));
-	if (unlikely(r)) {
-		kfree(gobj);
-		ww_mutex_unlock(&bo->tbo.resv->lock);
-		return ERR_PTR(r);
-	}
+	drm_gem_private_object_init(adev->ddev, &gobj->base, amdgpu_bo_size(bo));
 
 	list_add(&gobj->list, &bo->gem_objects);
 	gobj->bo = amdgpu_bo_ref(bo);
