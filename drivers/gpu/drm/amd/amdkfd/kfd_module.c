@@ -157,7 +157,9 @@ static int __init kfd_module_init(void)
 	if (err < 0)
 		goto err_topology;
 
-	kfd_process_create_wq();
+	err = kfd_process_create_wq();
+	if (err < 0)
+		goto err_create_wq;
 
 	kfd_init_peer_direct();
 
@@ -169,6 +171,7 @@ static int __init kfd_module_init(void)
 
 	return 0;
 
+err_create_wq:
 err_topology:
 	kfd_chardev_exit();
 err_ioctl:

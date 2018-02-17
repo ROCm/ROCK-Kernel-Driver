@@ -66,7 +66,16 @@ void kfd_cleanup_processes_srcu(void)
 DEFINE_SRCU(kfd_processes_srcu);
 #endif
 
+/* For process termination handling */
 static struct workqueue_struct *kfd_process_wq;
+
+/* Ordered, single-threaded workqueue for restoring evicted
+ * processes. Restoring multiple processes concurrently under memory
+ * pressure can lead to processes blocking each other from validating
+ * their BOs and result in a live-lock situation where processes
+ * remain evicted indefinitely.
+ */
+static struct workqueue_struct *kfd_restore_wq;
 
 #define MIN_IDR_ID 1
 #define MAX_IDR_ID 0 /*0 - for unlimited*/
@@ -82,7 +91,7 @@ static void evict_process_worker(struct work_struct *work);
 static void restore_process_worker(struct work_struct *work);
 
 
-void kfd_process_create_wq(void)
+int kfd_process_create_wq(void)
 {
 	if (!kfd_process_wq)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
@@ -90,6 +99,10 @@ void kfd_process_create_wq(void)
 #else
 		kfd_process_wq = alloc_workqueue("kfd_process_wq", 0, 0);
 #endif
+	if (!kfd_restore_wq)
+		kfd_restore_wq = alloc_ordered_workqueue("kfd_restore_wq", 0);
+
+	return kfd_process_wq && kfd_restore_wq ? 0 : -ENOMEM;
 }
 
 void kfd_process_destroy_wq(void)
@@ -97,6 +110,10 @@ void kfd_process_destroy_wq(void)
 	if (kfd_process_wq) {
 		destroy_workqueue(kfd_process_wq);
 		kfd_process_wq = NULL;
+	}
+	if (kfd_restore_wq) {
+		destroy_workqueue(kfd_restore_wq);
+		kfd_restore_wq = NULL;
 	}
 }
 
@@ -941,7 +958,7 @@ int kfd_resume_all_processes(void)
 #else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
 #endif
-		if (!schedule_delayed_work(&p->restore_work, 0)) {
+		if (!queue_delayed_work(kfd_restore_wq, &p->restore_work, 0)) {
 			pr_err("Restore process %d failed during resume\n",
 			       p->pasid);
 			ret = -EFAULT;
@@ -1056,7 +1073,7 @@ static void evict_process_worker(struct work_struct *work)
 		dma_fence_signal(p->ef);
 		dma_fence_put(p->ef);
 		p->ef = NULL;
-		schedule_delayed_work(&p->restore_work,
+		queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_RESTORE_TIME_MS));
 
 		pr_info("Finished evicting process of pasid %d\n", p->pasid);
@@ -1105,7 +1122,7 @@ static void restore_process_worker(struct work_struct *work)
 	if (ret) {
 		pr_info("Restore failed, try again after %d ms\n",
 			PROCESS_BACK_OFF_TIME_MS);
-		ret = schedule_delayed_work(&p->restore_work,
+		ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_BACK_OFF_TIME_MS));
 		WARN(!ret, "reschedule restore work failed\n");
 		return;
