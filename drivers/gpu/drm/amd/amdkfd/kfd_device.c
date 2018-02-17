@@ -977,7 +977,7 @@ void kfd_restore_bo_worker(struct work_struct *work)
 	if (ret) {
 		pr_info("Restore failed, try again after %d ms\n",
 			PROCESS_BACK_OFF_TIME_MS);
-		ret = schedule_delayed_work(&p->restore_work,
+		ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_BACK_OFF_TIME_MS));
 		WARN(!ret, "reschedule restore work failed\n");
 		return;
@@ -1068,7 +1068,7 @@ void kfd_evict_bo_worker(struct work_struct *work)
 		dma_fence_signal(p->ef);
 		dma_fence_put(p->ef);
 		p->ef = NULL;
-		schedule_delayed_work(&p->restore_work,
+		queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_RESTORE_TIME_MS));
 
 		pr_info("Finished evicting process of pasid %d\n", p->pasid);

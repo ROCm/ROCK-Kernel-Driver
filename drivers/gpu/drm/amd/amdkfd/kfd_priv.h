@@ -778,7 +778,7 @@ struct amdkfd_ioctl_desc {
 	const char *name;
 };
 
-void kfd_process_create_wq(void);
+int kfd_process_create_wq(void);
 void kfd_process_destroy_wq(void);
 struct kfd_process *kfd_create_process(struct file *filep);
 struct kfd_process *kfd_get_process(const struct task_struct *task);
@@ -922,6 +922,9 @@ void kernel_queue_uninit(struct kernel_queue *kq);
 int kfd_process_vm_fault(struct device_queue_manager *dqm, unsigned int pasid);
 
 /* Process Queue Manager */
+
+extern struct workqueue_struct *kfd_restore_wq;
+
 struct process_queue_node {
 	struct queue *q;
 	struct kernel_queue *kq;
