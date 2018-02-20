@@ -258,6 +258,12 @@ L_HALT_WAVE:
     s_endpgm
 L_NOT_ALREADY_HALTED:
     s_or_b32        s_save_status, s_save_status, SQ_WAVE_STATUS_HALT_MASK
+
+    // If the PC points to S_ENDPGM then context save will fail if STATUS.HALT is set.
+    // Rewind the PC to prevent this from occurring. The debugger compensates for this.
+    s_sub_u32       ttmp0, ttmp0, 0x8
+    s_subb_u32      ttmp1, ttmp1, 0x0
+
     s_branch        L_EXCP_CASE
 
 L_NO_MEM_VIOL:
@@ -296,19 +302,8 @@ if G8SR_DEBUG_TIMESTAMP
 	s_waitcnt lgkmcnt(0)	     //FIXME, will cause xnack??
 end
 
-    //check whether there is mem_viol
-    s_getreg_b32    s_save_trapsts, hwreg(HW_REG_TRAPSTS)
-    s_and_b32	s_save_trapsts, s_save_trapsts, SQ_WAVE_TRAPSTS_MEM_VIOL_MASK
-    s_cbranch_scc0  L_NO_PC_REWIND
-
-    //if so, need rewind PC assuming GDS operation gets NACKed
-    s_mov_b32	    s_save_tmp, 0							    //clear mem_viol bit
-    s_setreg_b32    hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_MEM_VIOL_SHIFT, 1), s_save_tmp    //clear mem_viol bit
     s_and_b32	    s_save_pc_hi, s_save_pc_hi, 0x0000ffff    //pc[47:32]
-    s_sub_u32	    s_save_pc_lo, s_save_pc_lo, 8	      //pc[31:0]-8
-    s_subb_u32	    s_save_pc_hi, s_save_pc_hi, 0x0	      // -scc
 
-L_NO_PC_REWIND:
     s_mov_b32	    s_save_tmp, 0							    //clear saveCtx bit
     s_setreg_b32    hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_SAVECTX_SHIFT, 1), s_save_tmp	    //clear saveCtx bit
 
@@ -1161,16 +1156,17 @@ end
 #endif
 
 static const uint32_t cwsr_trap_gfx9_hex[] = {
-	0xbf820001, 0xbf820136,
+	0xbf820001, 0xbf820130,
 	0xb8f0f802, 0x89708670,
 	0xb8f1f803, 0x8674ff71,
-	0x00000400, 0xbf850021,
+	0x00000400, 0xbf850023,
 	0x8674ff71, 0x00000800,
 	0xbf850003, 0x8674ff71,
-	0x00000100, 0xbf840007,
+	0x00000100, 0xbf840009,
 	0x8674ff70, 0x00002000,
 	0xbf840001, 0xbf810000,
 	0x8770ff70, 0x00002000,
+	0x80ec886c, 0x82ed806d,
 	0xbf820010, 0xb8faf812,
 	0xb8fbf813, 0x8efa887a,
 	0xc00a1d3d, 0x00000000,
@@ -1181,12 +1177,8 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0xbf850002, 0x806c846c,
 	0x826d806d, 0x866dff6d,
 	0x0000ffff, 0xb970f802,
-	0xbe801f6c, 0xb8f1f803,
-	0x8671ff71, 0x00000100,
-	0xbf840006, 0xbef60080,
-	0xb9760203, 0x866dff6d,
-	0x0000ffff, 0x80ec886c,
-	0x82ed806d, 0xbef60080,
+	0xbe801f6c, 0x866dff6d,
+	0x0000ffff, 0xbef60080,
 	0xb9760283, 0xbef20068,
 	0xbef30069, 0xb8f62407,
 	0x8e769c76, 0x876d766d,
