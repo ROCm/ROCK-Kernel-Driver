@@ -215,10 +215,10 @@ int amdgpu_bo_create_reserved(struct amdgpu_device *adev,
 	int r;
 
 	if (!*bo_ptr) {
-		r = amdgpu_bo_create(adev, size, align, true, domain,
+		r = amdgpu_bo_create(adev, size, align, domain,
 				     AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED |
 				     AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS,
-				     NULL, NULL, bo_ptr);
+				     ttm_bo_type_kernel, NULL, bo_ptr);
 		if (r) {
 			dev_err(adev->dev, "(%d) failed to allocate kernel bo\n",
 				r);
@@ -359,21 +359,19 @@ fail:
 	return false;
 }
 
-static int amdgpu_bo_do_create(struct amdgpu_device *adev,
-			       unsigned long size, int byte_align,
-			       bool kernel, u32 domain, u64 flags,
-			       struct sg_table *sg,
+static int amdgpu_bo_do_create(struct amdgpu_device *adev, unsigned long size,
+			       int byte_align, u32 domain,
+			       u64 flags, enum ttm_bo_type type,
 			       struct reservation_object *resv,
 			       struct amdgpu_bo **bo_ptr)
 {
 	struct ttm_operation_ctx ctx = {
-		.interruptible = !kernel,
+		.interruptible = (type != ttm_bo_type_kernel),
 		.no_wait_gpu = false,
 		.resv = resv,
 		.flags = TTM_OPT_FLAG_ALLOW_RES_EVICT
 	};
 	struct amdgpu_bo *bo;
-	enum ttm_bo_type type;
 	unsigned long page_align;
 	size_t acc_size;
 	int r;
@@ -384,13 +382,6 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	if (!amdgpu_bo_validate_size(adev, size, domain))
 		return -ENOMEM;
 
-	if (kernel) {
-		type = ttm_bo_type_kernel;
-	} else if (sg) {
-		type = ttm_bo_type_sg;
-	} else {
-		type = ttm_bo_type_device;
-	}
 	*bo_ptr = NULL;
 
 	acc_size = ttm_bo_dma_acc_size(&adev->mman.bdev, size,
@@ -411,7 +402,8 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 					 AMDGPU_GEM_DOMAIN_DGMA |
 					 AMDGPU_GEM_DOMAIN_DGMA_IMPORT);
 	bo->allowed_domains = bo->preferred_domains;
-	if (!kernel && bo->allowed_domains == AMDGPU_GEM_DOMAIN_VRAM)
+	if (type != ttm_bo_type_kernel &&
+	    bo->allowed_domains == AMDGPU_GEM_DOMAIN_VRAM)
 		bo->allowed_domains |= AMDGPU_GEM_DOMAIN_GTT;
 
 	bo->flags = flags;
@@ -449,7 +441,7 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 
 	r = ttm_bo_init_reserved(&adev->mman.bdev, &bo->tbo, size, type,
 				 &bo->placement, page_align, &ctx, acc_size,
-				 sg, resv, &amdgpu_ttm_bo_destroy);
+				 NULL, resv, &amdgpu_ttm_bo_destroy);
 	if (unlikely(r != 0))
 		return r;
 
@@ -464,7 +456,7 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	if (domain & AMDGPU_GEM_DOMAIN_DGMA && adev->ssg.enabled)
 		bo->tbo.ssg_can_map = true;
 
-	if (kernel)
+	if (type == ttm_bo_type_kernel)
 		bo->tbo.priority = 1;
 
 	if (flags & AMDGPU_GEM_CREATE_VRAM_CLEARED &&
@@ -521,12 +513,11 @@ static int amdgpu_bo_create_shadow(struct amdgpu_device *adev,
 	if (bo->shadow)
 		return 0;
 
-	r = amdgpu_bo_do_create(adev, size, byte_align, true,
-				AMDGPU_GEM_DOMAIN_GTT,
+	r = amdgpu_bo_do_create(adev, size, byte_align, AMDGPU_GEM_DOMAIN_GTT,
 				AMDGPU_GEM_CREATE_CPU_GTT_USWC |
 				AMDGPU_GEM_CREATE_SHADOW,
-				NULL, bo->tbo.resv,
-				&bo->shadow);
+				ttm_bo_type_kernel,
+				bo->tbo.resv, &bo->shadow);
 	if (!r) {
 		bo->shadow->parent = amdgpu_bo_ref(bo);
 		mutex_lock(&adev->shadow_list_lock);
@@ -537,18 +528,17 @@ static int amdgpu_bo_create_shadow(struct amdgpu_device *adev,
 	return r;
 }
 
-int amdgpu_bo_create(struct amdgpu_device *adev,
-		     unsigned long size, int byte_align,
-		     bool kernel, u32 domain, u64 flags,
-		     struct sg_table *sg,
+int amdgpu_bo_create(struct amdgpu_device *adev, unsigned long size,
+		     int byte_align, u32 domain,
+		     u64 flags, enum ttm_bo_type type,
 		     struct reservation_object *resv,
 		     struct amdgpu_bo **bo_ptr)
 {
 	uint64_t parent_flags = flags & ~AMDGPU_GEM_CREATE_SHADOW;
 	int r;
 
-	r = amdgpu_bo_do_create(adev, size, byte_align, kernel, domain,
-				parent_flags, sg, resv, bo_ptr);
+	r = amdgpu_bo_do_create(adev, size, byte_align, domain,
+				parent_flags, type, resv, bo_ptr);
 	if (r)
 		return r;
 
