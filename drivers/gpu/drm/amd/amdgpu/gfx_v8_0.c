@@ -7108,21 +7108,10 @@ static void gfx_v8_0_get_cu_info(struct amdgpu_device *adev)
 	cu_info->number = active_cu_number;
 	cu_info->ao_cu_mask = ao_cu_mask;
 	cu_info->simd_per_cu = NUM_SIMD_PER_CU;
-	switch (adev->asic_type) {
-	case CHIP_CARRIZO:
-	case CHIP_TONGA:
-	case CHIP_FIJI:
-	case CHIP_POLARIS10:
-	case CHIP_POLARIS11:
-		cu_info->max_waves_per_simd = 10;
-		cu_info->max_scratch_slots_per_cu = 32;
-		cu_info->wave_front_size = 64;
-		cu_info->lds_size = 64;
-		break;
-	default:
-		dev_warn(adev->dev, "CU info asic_type [0x%x] not supported\n",
-					adev->asic_type);
-	}
+	cu_info->max_waves_per_simd = 10;
+	cu_info->max_scratch_slots_per_cu = 32;
+	cu_info->wave_front_size = 64;
+	cu_info->lds_size = 64;
 }
 
 const struct amdgpu_ip_block_version gfx_v8_0_ip_block =
