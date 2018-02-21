@@ -1841,22 +1841,13 @@ int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
 				      struct dma_buf **dmabuf)
 {
 	struct amdgpu_device *adev = NULL;
-	struct amdgpu_bo *bo = NULL;
-	struct drm_gem_object *gobj = NULL;
 
 	if (!dmabuf || !kgd || !vm || !mem)
 		return -EINVAL;
 
 	adev = get_amdgpu_device(kgd);
-	bo = mem->bo;
 
-	gobj = amdgpu_gem_prime_foreign_bo(adev, bo);
-	if (!gobj) {
-		pr_err("Export BO failed. Unable to find/create GEM object\n");
-		return -EINVAL;
-	}
-
-	*dmabuf = amdgpu_gem_prime_export(adev->ddev, gobj, 0);
+	*dmabuf = amdgpu_gem_prime_export(adev->ddev, &mem->bo->gem_base, 0);
 	return 0;
 }
 

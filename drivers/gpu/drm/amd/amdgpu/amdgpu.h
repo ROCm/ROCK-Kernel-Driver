@@ -67,9 +67,9 @@
 #include "amdgpu_uvd.h"
 #include "amdgpu_vce.h"
 #include "amdgpu_vcn.h"
+#include "amdgpu_mn.h"
 #include "amdgpu_gmc.h"
 #include "amdgpu_dm.h"
-#include "amdgpu_mn.h"
 #include "amdgpu_virt.h"
 #include "amdgpu_gart.h"
 #include "amdgpu_debugfs.h"
@@ -394,8 +394,6 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 					struct drm_gem_object *gobj,
 					int flags);
-struct drm_gem_object *
-amdgpu_gem_prime_foreign_bo(struct amdgpu_device *adev, struct amdgpu_bo *bo);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 					       struct dma_buf *dma_buf);

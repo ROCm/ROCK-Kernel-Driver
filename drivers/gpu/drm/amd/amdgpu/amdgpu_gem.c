@@ -33,20 +33,14 @@
 
 void amdgpu_gem_object_free(struct drm_gem_object *gobj)
 {
-	struct amdgpu_gem_object *aobj;
+	struct amdgpu_bo *robj = gem_to_amdgpu_bo(gobj);
 
-	aobj = container_of((gobj), struct amdgpu_gem_object, base);
-	if (aobj->base.import_attach)
-		drm_prime_gem_destroy(&aobj->base, aobj->bo->tbo.sg);
-
-	ww_mutex_lock(&aobj->bo->tbo.resv->lock, NULL);
-	list_del(&aobj->list);
-	ww_mutex_unlock(&aobj->bo->tbo.resv->lock);
-
-	amdgpu_mn_unregister(aobj->bo);
-	amdgpu_bo_unref(&aobj->bo);
-	drm_gem_object_release(&aobj->base);
-	kfree(aobj);
+	if (robj) {
+		if (robj->gem_base.import_attach)
+			drm_prime_gem_destroy(&robj->gem_base, robj->tbo.sg);
+		amdgpu_mn_unregister(robj);
+		amdgpu_bo_unref(&robj);
+	}
 }
 
 int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
@@ -55,9 +49,8 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 			     struct reservation_object *resv,
 			     struct drm_gem_object **obj)
 {
-	struct amdgpu_bo *robj;
-	struct amdgpu_gem_object *gobj;
 	unsigned long max_size;
+	struct amdgpu_bo *bo;
 	int r;
 
 	*obj = NULL;
@@ -85,7 +78,7 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 
 retry:
 	r = amdgpu_bo_create(adev, size, alignment, kernel, initial_domain,
-			     flags, NULL, resv, &robj);
+			     flags, NULL, resv, &bo);
 	if (r) {
 		if (r != -ERESTARTSYS) {
 			if (flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED) {
@@ -102,18 +95,7 @@ retry:
 		}
 		return r;
 	}
-
-	gobj = kzalloc(sizeof(struct amdgpu_gem_object), GFP_KERNEL);
-	if (unlikely(!gobj)) {
-		amdgpu_bo_unref(&robj);
-		return -ENOMEM;
-	}
-
-	drm_gem_private_object_init(adev->ddev, &gobj->base, amdgpu_bo_size(robj));
-
-	list_add(&gobj->list, &robj->gem_objects);
-	gobj->bo = robj;
-	*obj = &gobj->base;
+	*obj = &bo->gem_base;
 
 
 	return 0;
@@ -877,7 +859,7 @@ int amdgpu_gem_op_ioctl(struct drm_device *dev, void *data,
 		struct drm_amdgpu_gem_create_in info;
 		void __user *out = kcl_u64_to_user_ptr(args->value);
 
-		info.bo_size = amdgpu_bo_size(robj);
+		info.bo_size = robj->gem_base.size;
 		info.alignment = robj->tbo.mem.page_alignment << PAGE_SHIFT;
 		info.domains = robj->preferred_domains;
 		info.domain_flags = robj->flags;

@@ -61,6 +61,7 @@ static void amdgpu_ttm_bo_destroy(struct ttm_buffer_object *tbo)
 		amdgpu_amdkfd_unreserve_system_memory_limit(bo);
 	amdgpu_bo_kunmap(bo);
 
+	drm_gem_object_release(&bo->gem_base);
 	amdgpu_bo_unref(&bo->parent);
 	if (!list_empty(&bo->shadow_list)) {
 		mutex_lock(&adev->shadow_list_lock);
@@ -395,10 +396,9 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	bo = kzalloc(sizeof(struct amdgpu_bo), GFP_KERNEL);
 	if (bo == NULL)
 		return -ENOMEM;
-
+	drm_gem_private_object_init(adev->ddev, &bo->gem_base, size);
 	INIT_LIST_HEAD(&bo->shadow_list);
 	INIT_LIST_HEAD(&bo->va);
-	INIT_LIST_HEAD(&bo->gem_objects);
 	bo->preferred_domains = domain & (AMDGPU_GEM_DOMAIN_VRAM |
 					 AMDGPU_GEM_DOMAIN_GTT |
 					 AMDGPU_GEM_DOMAIN_CPU |

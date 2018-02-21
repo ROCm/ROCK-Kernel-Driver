@@ -102,7 +102,6 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	struct reservation_object *resv = attach->dmabuf->resv;
 	struct amdgpu_device *adev = dev->dev_private;
 	struct amdgpu_bo *bo;
-	struct amdgpu_gem_object *gobj;
 	int ret;
 
 	ww_mutex_lock(&resv->lock, NULL);
@@ -113,19 +112,7 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 		return ERR_PTR(ret);
 
 	bo->prime_shared_count = 1;
-
-	gobj = kzalloc(sizeof(struct amdgpu_gem_object), GFP_KERNEL);
-	if (unlikely(!gobj)) {
-		amdgpu_bo_unref(&bo);
-		return ERR_PTR(-ENOMEM);
-	}
-
-	drm_gem_private_object_init(adev->ddev, &gobj->base, amdgpu_bo_size(bo));
-
-	list_add(&gobj->list, &bo->gem_objects);
-	gobj->bo = amdgpu_bo_ref(bo);
-
-	return &gobj->base;
+	return &bo->gem_base;
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
@@ -271,41 +258,6 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 	}
 
 	return buf;
-}
-
-struct drm_gem_object *
-amdgpu_gem_prime_foreign_bo(struct amdgpu_device *adev, struct amdgpu_bo *bo)
-{
-	struct amdgpu_gem_object *gobj;
-	int r;
-
-	ww_mutex_lock(&bo->tbo.resv->lock, NULL);
-
-	list_for_each_entry(gobj, &bo->gem_objects, list) {
-		if (gobj->base.dev != adev->ddev)
-			continue;
-
-		ww_mutex_unlock(&bo->tbo.resv->lock);
-		drm_gem_object_reference(&gobj->base);
-		return &gobj->base;
-	}
-
-
-	gobj = kzalloc(sizeof(struct amdgpu_gem_object), GFP_KERNEL);
-	if (unlikely(!gobj)) {
-		ww_mutex_unlock(&bo->tbo.resv->lock);
-		return ERR_PTR(-ENOMEM);
-	}
-
-	drm_gem_private_object_init(adev->ddev, &gobj->base, amdgpu_bo_size(bo));
-
-	list_add(&gobj->list, &bo->gem_objects);
-	gobj->bo = amdgpu_bo_ref(bo);
-	bo->flags |= AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
-
-	ww_mutex_unlock(&bo->tbo.resv->lock);
-
-	return &gobj->base;
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)

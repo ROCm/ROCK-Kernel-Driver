@@ -278,39 +278,24 @@ gtt:
 
 static int amdgpu_verify_access(struct ttm_buffer_object *bo, struct file *filp)
 {
-	struct amdgpu_bo *abo;
-	struct drm_file *file_priv;
-	struct amdgpu_gem_object *gobj;
+	struct amdgpu_bo *abo = ttm_to_amdgpu_bo(bo);
 
-
-	abo = ttm_to_amdgpu_bo(bo);
 	/*
 	 * Don't verify access for KFD BO as it doesn't necessary has
 	 * KGD file pointer
 	 */
 	if (!abo || abo->kfd_bo || !filp)
 		return 0;
-	file_priv = filp->private_data;
 
 	if (amdgpu_ttm_tt_get_usermm(bo->ttm))
 		return -EPERM;
 
-	ww_mutex_lock(&abo->tbo.resv->lock, NULL);
-	list_for_each_entry(gobj, &abo->gem_objects, list) {
-		if (gobj->base.dev != file_priv->minor->dev)
-			continue;
-
-		ww_mutex_unlock(&abo->tbo.resv->lock);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && !defined(OS_NAME_RHEL_7_4)
-		return drm_vma_node_verify_access(&gobj->base.vma_node, filp);
+	return drm_vma_node_verify_access(&abo->gem_base.vma_node, filp);
 #else
-		return drm_vma_node_verify_access(&gobj->base.vma_node,
+	return drm_vma_node_verify_access(&abo->gem_base.vma_node,
 					filp->private_data);
 #endif
-	}
-	ww_mutex_unlock(&abo->tbo.resv->lock);
-
-	return -EPERM;
 }
 
 static void amdgpu_move_null(struct ttm_buffer_object *bo,
