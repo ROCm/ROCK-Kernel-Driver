@@ -1080,6 +1080,7 @@ void ttm_page_alloc_fini(void)
 static void
 ttm_pool_unpopulate_helper(struct ttm_tt *ttm, unsigned mem_count_update)
 {
+	struct ttm_mem_global *mem_glob = ttm->bdev->glob->mem_glob;
 	unsigned i;
 
 	if (mem_count_update == 0)
@@ -1089,8 +1090,7 @@ ttm_pool_unpopulate_helper(struct ttm_tt *ttm, unsigned mem_count_update)
 		if (!ttm->pages[i])
 			continue;
 
-		ttm_mem_global_free_page(ttm->glob->mem_glob, ttm->pages[i],
-					 PAGE_SIZE);
+		ttm_mem_global_free_page(mem_glob, ttm->pages[i], PAGE_SIZE);
 	}
 
 put_pages:
@@ -1101,7 +1101,7 @@ put_pages:
 
 int ttm_pool_populate(struct ttm_tt *ttm, struct ttm_operation_ctx *ctx)
 {
-	struct ttm_mem_global *mem_glob = ttm->glob->mem_glob;
+	struct ttm_mem_global *mem_glob = ttm->bdev->glob->mem_glob;
 	unsigned i;
 	int ret;
 
