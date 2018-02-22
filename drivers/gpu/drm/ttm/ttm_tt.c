@@ -32,13 +32,9 @@
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <linux/sched.h>
-#include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/shmem_fs.h>
 #include <linux/file.h>
-#include <linux/swap.h>
-#include <linux/slab.h>
-#include <linux/export.h>
 #include <drm/drm_cache.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
 	!defined(OS_NAME_RHEL_7_5)
@@ -46,7 +42,6 @@
 #endif
 #include <drm/ttm/ttm_module.h>
 #include <drm/ttm/ttm_bo_driver.h>
-#include <drm/ttm/ttm_placement.h>
 #include <drm/ttm/ttm_page_alloc.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 #ifdef CONFIG_X86
