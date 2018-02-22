@@ -167,9 +167,10 @@ void run_rdma_free_callback(struct kfd_bo *buf_obj)
 		if (rdma_cb_data->free_callback)
 			rdma_cb_data->free_callback(
 					rdma_cb_data->client_priv);
-
-		put_pages_helper(&rdma_cb_data->amd_p2p_data);
 	}
+	list_for_each_entry_safe(rdma_cb_data, tmp,
+			&buf_obj->cb_data_head, node)
+		put_pages_helper(&rdma_cb_data->amd_p2p_data);
 }
 
 /**
