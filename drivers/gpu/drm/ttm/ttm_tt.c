@@ -128,6 +128,16 @@ static int ttm_dma_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
 	return 0;
 }
 
+static int ttm_sg_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
+{
+	ttm->dma_address = kvmalloc_array(ttm->ttm.num_pages,
+					  sizeof(*ttm->dma_address),
+					  GFP_KERNEL | __GFP_ZERO);
+	if (!ttm->dma_address)
+		return -ENOMEM;
+	return 0;
+}
+
 #ifdef CONFIG_X86
 static inline int ttm_tt_set_page_caching(struct page *p,
 					  enum ttm_caching_state c_old,
@@ -247,8 +257,8 @@ void ttm_tt_destroy(struct ttm_tt *ttm)
 	ttm->func->destroy(ttm);
 }
 
-int ttm_tt_init(struct ttm_tt *ttm, struct ttm_bo_device *bdev,
-		unsigned long size, uint32_t page_flags)
+void ttm_tt_init_fields(struct ttm_tt *ttm, struct ttm_bo_device *bdev,
+			unsigned long size, uint32_t page_flags)
 {
 	ttm->bdev = bdev;
 	ttm->num_pages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
@@ -256,6 +266,12 @@ int ttm_tt_init(struct ttm_tt *ttm, struct ttm_bo_device *bdev,
 	ttm->page_flags = page_flags;
 	ttm->state = tt_unpopulated;
 	ttm->swap_storage = NULL;
+}
+
+int ttm_tt_init(struct ttm_tt *ttm, struct ttm_bo_device *bdev,
+		unsigned long size, uint32_t page_flags)
+{
+	ttm_tt_init_fields(ttm, bdev, size, page_flags);
 
 	if (ttm_tt_alloc_page_directory(ttm)) {
 		ttm_tt_destroy(ttm);
@@ -283,12 +299,7 @@ int ttm_dma_tt_init(struct ttm_dma_tt *ttm_dma, struct ttm_bo_device *bdev,
 {
 	struct ttm_tt *ttm = &ttm_dma->ttm;
 
-	ttm->bdev = bdev;
-	ttm->num_pages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
-	ttm->caching_state = tt_cached;
-	ttm->page_flags = page_flags;
-	ttm->state = tt_unpopulated;
-	ttm->swap_storage = NULL;
+	ttm_tt_init_fields(ttm, bdev, size, page_flags);
 
 	INIT_LIST_HEAD(&ttm_dma->pages_list);
 	if (ttm_dma_tt_alloc_page_directory(ttm_dma)) {
@@ -300,15 +311,43 @@ int ttm_dma_tt_init(struct ttm_dma_tt *ttm_dma, struct ttm_bo_device *bdev,
 }
 EXPORT_SYMBOL(ttm_dma_tt_init);
 
+int ttm_sg_tt_init(struct ttm_dma_tt *ttm_dma, struct ttm_bo_device *bdev,
+		   unsigned long size, uint32_t page_flags)
+{
+	struct ttm_tt *ttm = &ttm_dma->ttm;
+	int ret;
+
+	ttm_tt_init_fields(ttm, bdev, size, page_flags);
+
+	INIT_LIST_HEAD(&ttm_dma->pages_list);
+	if (page_flags & TTM_PAGE_FLAG_SG)
+		ret = ttm_sg_tt_alloc_page_directory(ttm_dma);
+	else
+		ret = ttm_dma_tt_alloc_page_directory(ttm_dma);
+	if (ret) {
+		ttm_tt_destroy(ttm);
+		pr_err("Failed allocating page table\n");
+		return -ENOMEM;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(ttm_sg_tt_init);
+
 void ttm_dma_tt_fini(struct ttm_dma_tt *ttm_dma)
 {
 	struct ttm_tt *ttm = &ttm_dma->ttm;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
 	!defined(OS_NAME_RHEL_7_5)
-	drm_free_large(ttm->pages);
+	if (ttm->pages)
+	  drm_free_large(ttm->pages);
+  else
+	  drm_free_large(ttm_dma->dma_address);
 #else
-	kvfree(ttm->pages);
+	if (ttm->pages)
+		kvfree(ttm->pages);
+	else
+		kvfree(ttm_dma->dma_address);
 #endif
 	ttm->pages = NULL;
 	ttm_dma->dma_address = NULL;
