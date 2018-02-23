@@ -1036,7 +1036,7 @@ static struct ttm_tt *amdgpu_ttm_tt_create(struct ttm_bo_device *bdev,
 		return NULL;
 	}
 	gtt->ttm.ttm.func = &amdgpu_backend_func;
-	if (ttm_dma_tt_init(&gtt->ttm, bdev, size, page_flags)) {
+	if (ttm_sg_tt_init(&gtt->ttm, bdev, size, page_flags)) {
 		kfree(gtt);
 		return NULL;
 	}
@@ -1062,7 +1062,8 @@ static int amdgpu_ttm_tt_populate(struct ttm_tt *ttm,
 
 	if (slave && ttm->sg) {
 		drm_prime_sg_to_page_addr_arrays(ttm->sg, ttm->pages,
-						 gtt->ttm.dma_address, ttm->num_pages);
+						 gtt->ttm.dma_address,
+						 ttm->num_pages);
 		ttm->state = tt_unbound;
 		return 0;
 	}
