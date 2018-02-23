@@ -131,27 +131,25 @@ static void kfd_process_free_gpuvm(struct kgd_mem *mem,
  *	to avoid concurrency. Because of that exclusiveness, we do
  *	not need to take p->mutex.
  */
-static int kfd_process_alloc_gpuvm(struct kfd_process *p,
-		struct kfd_dev *kdev, uint64_t gpu_va, uint32_t size,
-		void **kptr, struct kfd_process_device *pdd, uint32_t flags)
+static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
+				   uint64_t gpu_va, uint32_t size,
+				   uint32_t flags, void **kptr)
 {
-	int err;
-	void *mem = NULL;
+	struct kfd_dev *kdev = pdd->dev;
+	struct kgd_mem *mem = NULL;
 	int handle;
+	int err;
 
 	err = kdev->kfd2kgd->alloc_memory_of_gpu(kdev->kgd, gpu_va, size,
-				pdd->vm,
-				(struct kgd_mem **)&mem, NULL, flags);
+						 pdd->vm, &mem, NULL, flags);
 	if (err)
 		goto err_alloc_mem;
 
-	err = kdev->kfd2kgd->map_memory_to_gpu(
-				kdev->kgd, (struct kgd_mem *)mem, pdd->vm);
+	err = kdev->kfd2kgd->map_memory_to_gpu(kdev->kgd, mem, pdd->vm);
 	if (err)
 		goto err_map_mem;
 
-	err = kdev->kfd2kgd->sync_memory(kdev->kgd, (struct kgd_mem *) mem,
-				true);
+	err = kdev->kfd2kgd->sync_memory(kdev->kgd, mem, true);
 	if (err) {
 		pr_debug("Sync memory failed, wait interrupted by user signal\n");
 		goto sync_memory_failed;
@@ -213,9 +211,8 @@ static int kfd_process_device_reserve_ib_mem(struct kfd_process_device *pdd)
 		return 0;
 
 	/* ib_base is only set for dGPU */
-	ret = kfd_process_alloc_gpuvm(pdd->process, pdd->dev,
-				      qpd->ib_base, PAGE_SIZE,
-				      &kaddr, pdd, flags);
+	ret = kfd_process_alloc_gpuvm(pdd, qpd->ib_base, PAGE_SIZE, flags,
+				      &kaddr);
 	if (ret)
 		return ret;
 
@@ -541,9 +538,8 @@ static int kfd_process_device_init_cwsr_dgpu(struct kfd_process_device *pdd)
 		return 0;
 
 	/* cwsr_base is only set for dGPU */
-	ret = kfd_process_alloc_gpuvm(pdd->process, dev, qpd->cwsr_base,
-				      KFD_CWSR_TBA_TMA_SIZE, &kaddr, pdd,
-				      flags);
+	ret = kfd_process_alloc_gpuvm(pdd, qpd->cwsr_base,
+				      KFD_CWSR_TBA_TMA_SIZE, flags, &kaddr);
 	if (ret)
 		return ret;
 
