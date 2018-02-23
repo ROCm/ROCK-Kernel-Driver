@@ -1695,8 +1695,7 @@ int amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 	addr /= AMDGPU_GPU_PAGE_SIZE;
 
 	mapping = amdgpu_vm_bo_lookup_mapping(vm, addr);
-	if (!mapping || !mapping->bo_va || !mapping->bo_va->base.bo ||
-		amdgpu_ttm_adev(mapping->bo_va->base.bo->tbo.bdev) != parser->adev)
+	if (!mapping || !mapping->bo_va || !mapping->bo_va->base.bo)
 		return -EINVAL;
 
 	*bo = mapping->bo_va->base.bo;
