@@ -359,20 +359,14 @@ static int amdgpu_amdkfd_validate(void *param, struct amdgpu_bo *bo)
 	return amdgpu_amdkfd_bo_validate(bo, p->domain, p->wait);
 }
 
-static u64 get_vm_pd_gpu_offset(struct amdgpu_vm *vm, bool reserve)
+static u64 get_vm_pd_gpu_offset(struct amdgpu_vm *vm)
 {
 	struct amdgpu_device *adev =
 		amdgpu_ttm_adev(vm->root.base.bo->tbo.bdev);
 	u64 offset;
 	uint64_t flags = AMDGPU_PTE_VALID;
 
-	if (reserve)
-		amdgpu_bo_reserve(vm->root.base.bo, false);
-
 	offset = amdgpu_bo_gpu_offset(vm->root.base.bo);
-
-	if (reserve)
-		amdgpu_bo_unreserve(vm->root.base.bo);
 
 	/* On some ASICs the FB doesn't start at 0. Adjust FB offset
 	 * to an actual MC address.
@@ -412,7 +406,7 @@ static int vm_validate_pt_pd_bos(struct amdgpu_vm *vm)
 		return ret;
 	}
 
-	vm->pd_phys_addr = get_vm_pd_gpu_offset(vm, false);
+	vm->pd_phys_addr = get_vm_pd_gpu_offset(vm);
 
 	if (vm->use_cpu_for_update) {
 		ret = amdgpu_bo_kmap(pd, NULL);
@@ -1002,7 +996,7 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 {
 	int ret;
 	struct amdgpu_vm *new_vm;
-	struct amdkfd_process_info *info;
+	struct amdkfd_process_info *info = NULL;
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 
 	new_vm = kzalloc(sizeof(*new_vm), GFP_KERNEL);
@@ -1048,8 +1042,21 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 	}
 
 	new_vm->process_info = *process_info;
-	new_vm->pd_phys_addr = get_vm_pd_gpu_offset(new_vm, true);
 
+	/* Validate page directory and attach eviction fence */
+	ret = amdgpu_bo_reserve(new_vm->root.base.bo, true);
+	if (ret)
+		goto reserve_pd_fail;
+	ret = vm_validate_pt_pd_bos(new_vm);
+	if (ret) {
+		pr_err("validate_pt_pd_bos() failed\n");
+		goto validate_pd_fail;
+	}
+	amdgpu_bo_fence(new_vm->root.base.bo,
+			&new_vm->process_info->eviction_fence->base, true);
+	amdgpu_bo_unreserve(new_vm->root.base.bo);
+
+	/* Update process info */
 	mutex_lock(&new_vm->process_info->lock);
 	list_add_tail(&new_vm->vm_list_node,
 			&(new_vm->process_info->vm_list_head));
@@ -1062,6 +1069,9 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 
 	return ret;
 
+validate_pd_fail:
+	amdgpu_bo_unreserve(new_vm->root.base.bo);
+reserve_pd_fail:
 create_evict_fence_fail:
 	kfree(info);
 alloc_process_info_fail:
