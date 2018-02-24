@@ -990,32 +990,16 @@ static int process_update_pds(struct amdkfd_process_info *process_info,
 	return 0;
 }
 
-int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
-					  void **process_info,
-					  struct dma_fence **ef)
+static int init_kfd_vm(struct amdgpu_vm *vm, void **process_info,
+		       struct dma_fence **ef)
 {
-	int ret;
-	struct amdgpu_vm *new_vm;
 	struct amdkfd_process_info *info = NULL;
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-
-	new_vm = kzalloc(sizeof(*new_vm), GFP_KERNEL);
-	if (!new_vm)
-		return -ENOMEM;
-
-	/* Initialize the VM context, allocate the page directory and zero it */
-	ret = amdgpu_vm_init(adev, new_vm, AMDGPU_VM_CONTEXT_COMPUTE, 0);
-	if (ret) {
-		pr_err("Failed init vm ret %d\n", ret);
-		goto vm_init_fail;
-	}
+	int ret;
 
 	if (!*process_info) {
 		info = kzalloc(sizeof(*info), GFP_KERNEL);
-		if (!info) {
-			ret = -ENOMEM;
-			goto alloc_process_info_fail;
-		}
+		if (!info)
+			return -ENOMEM;
 
 		mutex_init(&info->lock);
 		INIT_LIST_HEAD(&info->vm_list_head);
@@ -1028,11 +1012,11 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 						   current->mm);
 		if (!info->eviction_fence) {
 			pr_err("Failed to create eviction fence\n");
+			ret = -ENOMEM;
 			goto create_evict_fence_fail;
 		}
 
-		info->pid = get_task_pid(current->group_leader,
-					 PIDTYPE_PID);
+		info->pid = get_task_pid(current->group_leader, PIDTYPE_PID);
 		atomic_set(&info->evicted_bos, 0);
 		INIT_DELAYED_WORK(&info->work,
 				  amdgpu_amdkfd_restore_userptr_worker);
@@ -1041,72 +1025,131 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 		*ef = dma_fence_get(&info->eviction_fence->base);
 	}
 
-	new_vm->process_info = *process_info;
+	vm->process_info = *process_info;
 
 	/* Validate page directory and attach eviction fence */
-	ret = amdgpu_bo_reserve(new_vm->root.base.bo, true);
+	ret = amdgpu_bo_reserve(vm->root.base.bo, true);
 	if (ret)
 		goto reserve_pd_fail;
-	ret = vm_validate_pt_pd_bos(new_vm);
+	ret = vm_validate_pt_pd_bos(vm);
 	if (ret) {
 		pr_err("validate_pt_pd_bos() failed\n");
 		goto validate_pd_fail;
 	}
-	amdgpu_bo_fence(new_vm->root.base.bo,
-			&new_vm->process_info->eviction_fence->base, true);
-	amdgpu_bo_unreserve(new_vm->root.base.bo);
+	amdgpu_bo_fence(vm->root.base.bo,
+			&vm->process_info->eviction_fence->base, true);
+	amdgpu_bo_unreserve(vm->root.base.bo);
 
 	/* Update process info */
-	mutex_lock(&new_vm->process_info->lock);
-	list_add_tail(&new_vm->vm_list_node,
-			&(new_vm->process_info->vm_list_head));
-	new_vm->process_info->n_vms++;
-	mutex_unlock(&new_vm->process_info->lock);
+	mutex_lock(&vm->process_info->lock);
+	list_add_tail(&vm->vm_list_node,
+			&(vm->process_info->vm_list_head));
+	vm->process_info->n_vms++;
+	mutex_unlock(&vm->process_info->lock);
+
+	return 0;
+
+validate_pd_fail:
+	amdgpu_bo_unreserve(vm->root.base.bo);
+reserve_pd_fail:
+	vm->process_info = NULL;
+	if (info) {
+		/* Two fence references: one in info and one in *ef */
+		dma_fence_put(&info->eviction_fence->base);
+		dma_fence_put(*ef);
+		*ef = NULL;
+		*process_info = NULL;
+create_evict_fence_fail:
+		kfree(info);
+	}
+	return ret;
+}
+
+int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
+					  void **process_info,
+					  struct dma_fence **ef)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	struct amdgpu_vm *new_vm;
+	int ret;
+
+	new_vm = kzalloc(sizeof(*new_vm), GFP_KERNEL);
+	if (!new_vm)
+		return -ENOMEM;
+
+	/* Initialize AMDGPU part of the VM */
+	ret = amdgpu_vm_init(adev, new_vm, AMDGPU_VM_CONTEXT_COMPUTE, 0);
+	if (ret) {
+		pr_err("Failed init vm ret %d\n", ret);
+		goto amdgpu_vm_init_fail;
+	}
+
+	/* Initialize KFD part of the VM and process info */
+	ret = init_kfd_vm(new_vm, process_info, ef);
+	if (ret)
+		goto init_kfd_vm_fail;
 
 	*vm = (void *) new_vm;
 
-	pr_debug("Created process vm %p\n", *vm);
+	return 0;
 
-	return ret;
-
-validate_pd_fail:
-	amdgpu_bo_unreserve(new_vm->root.base.bo);
-reserve_pd_fail:
-create_evict_fence_fail:
-	kfree(info);
-alloc_process_info_fail:
+init_kfd_vm_fail:
 	amdgpu_vm_fini(adev, new_vm);
-vm_init_fail:
+amdgpu_vm_init_fail:
 	kfree(new_vm);
 	return ret;
-
 }
 
-void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
+int amdgpu_amdkfd_gpuvm_acquire_process_vm(struct kgd_dev *kgd,
+					   struct file *filp,
+					   void **vm, void **process_info,
+					   struct dma_fence **ef)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-	struct amdgpu_vm *avm = (struct amdgpu_vm *)vm;
-	struct amdgpu_bo *pd;
-	struct amdkfd_process_info *process_info;
+	struct drm_file *drm_priv = filp->private_data;
+	struct amdgpu_fpriv *drv_priv = drm_priv->driver_priv;
+	struct amdgpu_vm *avm = &drv_priv->vm;
+	int ret;
 
-	if (WARN_ON(!kgd || !vm))
+	/* Convert VM into a compute VM */
+	ret = amdgpu_vm_make_compute(adev, avm);
+	if (ret)
+		return ret;
+
+	/* Initialize KFD part of the VM and process info */
+	ret = init_kfd_vm(avm, process_info, ef);
+	if (ret)
+		return ret;
+
+	*vm = (void *)avm;
+
+	return 0;
+}
+
+void amdgpu_amdkfd_gpuvm_destroy_cb(struct amdgpu_device *adev,
+				    struct amdgpu_vm *vm)
+{
+	struct amdkfd_process_info *process_info = vm->process_info;
+	struct amdgpu_bo *pd = vm->root.base.bo;
+
+	if (vm->vm_context != AMDGPU_VM_CONTEXT_COMPUTE)
 		return;
 
-	pr_debug("Destroying process vm %p\n", vm);
 	/* Release eviction fence from PD */
-	pd = avm->root.base.bo;
 	amdgpu_bo_reserve(pd, false);
 	amdgpu_bo_fence(pd, NULL, false);
 	amdgpu_bo_unreserve(pd);
 
-	process_info = avm->process_info;
+	if (!process_info)
+		return;
 
+	/* Update process info */
 	mutex_lock(&process_info->lock);
 	process_info->n_vms--;
-	list_del(&avm->vm_list_node);
+	list_del(&vm->vm_list_node);
 	mutex_unlock(&process_info->lock);
 
-	/* Release per-process resources */
+	/* Release per-process resources when last compute VM is destroyed */
 	if (!process_info->n_vms) {
 		WARN_ON(!list_empty(&process_info->kfd_bo_list));
 		WARN_ON(!list_empty(&process_info->userptr_valid_list));
@@ -1117,6 +1160,17 @@ void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 		put_pid(process_info->pid);
 		kfree(process_info);
 	}
+}
+
+void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	struct amdgpu_vm *avm = (struct amdgpu_vm *)vm;
+
+	if (WARN_ON(!kgd || !vm))
+		return;
+
+	pr_debug("Destroying process vm %p\n", vm);
 
 	/* Release the VM context */
 	amdgpu_vm_fini(adev, avm);

@@ -264,6 +264,9 @@ struct kfd2kgd_calls {
 
 	int (*create_process_vm)(struct kgd_dev *kgd, void **vm,
 				 void **process_info, struct dma_fence **ef);
+	int (*acquire_process_vm)(struct kgd_dev *kgd, struct file *filp,
+				  void **vm, void **process_info,
+				  struct dma_fence **ef);
 	void (*destroy_process_vm)(struct kgd_dev *kgd, void *vm);
 
 	int (*create_process_gpumem)(struct kgd_dev *kgd, uint64_t va, size_t size, void *vm, struct kgd_mem **mem);

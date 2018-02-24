@@ -182,6 +182,7 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.get_gpu_clock_counter = get_gpu_clock_counter,
 	.get_max_engine_clock_in_mhz = get_max_engine_clock_in_mhz,
 	.create_process_vm = amdgpu_amdkfd_gpuvm_create_process_vm,
+	.acquire_process_vm = amdgpu_amdkfd_gpuvm_acquire_process_vm,
 	.destroy_process_vm = amdgpu_amdkfd_gpuvm_destroy_process_vm,
 	.get_process_page_dir = amdgpu_amdkfd_gpuvm_get_process_page_dir,
 	.alloc_pasid = amdgpu_pasid_alloc,
