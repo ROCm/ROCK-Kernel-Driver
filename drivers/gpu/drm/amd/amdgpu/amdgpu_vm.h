@@ -217,6 +217,15 @@ struct amdgpu_vm {
 
 	/* Whether this is a Compute or GFX Context */
 	int			vm_context;
+
+	/* Points to the KFD process VM info */
+	struct amdkfd_process_info *process_info;
+
+	/* List node in amdkfd_process_info.vm_list_head */
+	struct list_head	vm_list_node;
+
+	/* Valid while the PD is reserved or fenced */
+	uint64_t		pd_phys_addr;
 };
 
 struct amdgpu_vm_manager {
