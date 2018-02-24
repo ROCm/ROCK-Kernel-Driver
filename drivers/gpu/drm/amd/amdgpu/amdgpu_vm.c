@@ -2379,6 +2379,23 @@ void amdgpu_vm_adjust_size(struct amdgpu_device *adev, uint32_t vm_size,
 		 adev->vm_manager.fragment_size);
 }
 
+static void amdgpu_inc_compute_vms(struct amdgpu_device *adev)
+{
+	/* Temporary use only the first VM manager */
+	unsigned int vmhub = 0; /*ring->funcs->vmhub;*/
+	struct amdgpu_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
+
+	mutex_lock(&id_mgr->lock);
+	if ((adev->vm_manager.n_compute_vms++ == 0) &&
+	    (!amdgpu_sriov_vf(adev))) {
+		/* First Compute VM: enable compute power profile */
+		if (adev->powerplay.pp_funcs->switch_power_profile)
+			amdgpu_dpm_switch_power_profile(adev,
+							AMD_PP_COMPUTE_PROFILE);
+	}
+	mutex_unlock(&id_mgr->lock);
+}
+
 /**
  * amdgpu_vm_init - initialize a vm instance
  *
@@ -2483,21 +2500,8 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	vm->fault_credit = 16;
 
 	vm->vm_context = vm_context;
-	if (vm_context == AMDGPU_VM_CONTEXT_COMPUTE) {
-		struct amdgpu_vmid_mgr *id_mgr =
-				&adev->vm_manager.id_mgr[AMDGPU_GFXHUB];
-
-		mutex_lock(&id_mgr->lock);
-
-		if ((adev->vm_manager.n_compute_vms++ == 0) &&
-			(!amdgpu_sriov_vf(adev))) {
-			/* First Compute VM: enable compute power profile */
-			if (adev->powerplay.pp_funcs->switch_power_profile)
-				amdgpu_dpm_switch_power_profile(adev,
-						AMD_PP_COMPUTE_PROFILE);
-		}
-		mutex_unlock(&id_mgr->lock);
-	}
+	if (vm_context == AMDGPU_VM_CONTEXT_COMPUTE)
+		amdgpu_inc_compute_vms(adev);
 
 	return 0;
 
@@ -2512,6 +2516,86 @@ error_free_root:
 error_free_sched_entity:
 	drm_sched_entity_fini(&ring->sched, &vm->entity);
 
+	return r;
+}
+
+/**
+ * amdgpu_vm_make_compute - Turn a GFX VM into a compute VM
+ *
+ * This only works on GFX VMs that don't have any BOs added and no
+ * page tables allocated yet.
+ *
+ * Changes the following VM parameters:
+ * - vm_context
+ * - use_cpu_for_update
+ * - pte_supports_ats
+ * - pasid (old PASID is released, because compute manages its own PASIDs)
+ *
+ * Reinitializes the page directory to reflect the changed ATS
+ * setting. May also switch to the compute power profile if this is
+ * the first compute VM. May leave behind an unused shadow BO for the
+ * page directory when switching from SDMA updates to CPU updates.
+ *
+ * Returns 0 for success, -errno for errors.
+ */
+int amdgpu_vm_make_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm)
+{
+	bool pte_support_ats = (adev->asic_type == CHIP_RAVEN);
+	int r;
+
+	r = amdgpu_bo_reserve(vm->root.base.bo, true);
+	if (r)
+		return r;
+
+	/* Sanity checks */
+	if (vm->vm_context == AMDGPU_VM_CONTEXT_COMPUTE) {
+		/* Can happen if ioctl is interrupted by a signal after
+		 * this function already completed. Just return success.
+		 */
+		r = 0;
+		goto error;
+	}
+	if (!RB_EMPTY_ROOT(&vm->va) || vm->root.entries) {
+		r = -EINVAL;
+		goto error;
+	}
+
+	/* Check if PD needs to be reinitialized and do it before
+	 * changing any other state, in case it fails.
+	 */
+	if (pte_support_ats != vm->pte_support_ats) {
+		r = amdgpu_vm_clear_bo(adev, vm, vm->root.base.bo,
+			       adev->vm_manager.root_level,
+			       pte_support_ats);
+		if (r)
+			goto error;
+	}
+
+	/* Update VM state */
+	vm->vm_context = AMDGPU_VM_CONTEXT_COMPUTE;
+	vm->use_cpu_for_update = !!(adev->vm_manager.vm_update_mode &
+				    AMDGPU_VM_USE_CPU_FOR_COMPUTE);
+	vm->pte_support_ats = pte_support_ats;
+	DRM_DEBUG_DRIVER("VM update mode is %s\n",
+			 vm->use_cpu_for_update ? "CPU" : "SDMA");
+	WARN_ONCE((vm->use_cpu_for_update & !amdgpu_vm_is_large_bar(adev)),
+		  "CPU update of VM recommended only for large BAR system\n");
+
+	if (vm->pasid) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&adev->vm_manager.pasid_lock, flags);
+		idr_remove(&adev->vm_manager.pasid_idr, vm->pasid);
+		spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
+
+		vm->pasid = 0;
+	}
+
+	/* Count the new compute VM */
+	amdgpu_inc_compute_vms(adev);
+
+error:
+	amdgpu_bo_unreserve(vm->root.base.bo);
 	return r;
 }
 
