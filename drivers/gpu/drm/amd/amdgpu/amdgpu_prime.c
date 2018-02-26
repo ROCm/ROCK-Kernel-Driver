@@ -115,6 +115,7 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	return &bo->gem_base;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0) && !defined(BUILD_AS_DKMS)
 static int amdgpu_gem_map_attach(struct dma_buf *dma_buf,
 				 struct device *target_dev,
 				 struct dma_buf_attachment *attach)
@@ -182,6 +183,7 @@ static void amdgpu_gem_map_detach(struct dma_buf *dma_buf,
 error:
 	drm_gem_map_detach(dma_buf, attach);
 }
+#endif
 
 struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *obj)
 {
