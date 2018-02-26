@@ -59,7 +59,8 @@
  */
 static int ttm_tt_alloc_page_directory(struct ttm_tt *ttm)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	ttm->pages = drm_calloc_large(ttm->num_pages, sizeof(void*));
 #else
 	ttm->pages = kvmalloc_array(ttm->num_pages, sizeof(void*),
@@ -72,7 +73,8 @@ static int ttm_tt_alloc_page_directory(struct ttm_tt *ttm)
 
 static int ttm_dma_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	ttm->ttm.pages = drm_calloc_large(ttm->ttm.num_pages,
 					  sizeof(*ttm->ttm.pages) +
 					  sizeof(*ttm->dma_address));
@@ -231,7 +233,8 @@ EXPORT_SYMBOL(ttm_tt_init);
 
 void ttm_tt_fini(struct ttm_tt *ttm)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	drm_free_large(ttm->pages);
 #else
 	kvfree(ttm->pages);
@@ -269,7 +272,8 @@ void ttm_dma_tt_fini(struct ttm_dma_tt *ttm_dma)
 {
 	struct ttm_tt *ttm = &ttm_dma->ttm;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	drm_free_large(ttm->pages);
 #else
 	kvfree(ttm->pages);

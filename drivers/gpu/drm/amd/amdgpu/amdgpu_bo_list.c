@@ -51,7 +51,8 @@ static void amdgpu_bo_list_release_rcu(struct kref *ref)
 		amdgpu_bo_unref(&list->array[i].robj);
 
 	mutex_destroy(&list->lock);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	drm_free_large(list->array);
 #else
 	kvfree(list->array);
@@ -134,7 +135,8 @@ static int amdgpu_bo_list_set(struct amdgpu_device *adev,
 	int r;
 	unsigned long total_size = 0;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)&& \
+	!defined(OS_NAME_RHEL_7_5)
 	array = drm_malloc_ab(num_entries, sizeof(struct amdgpu_bo_list_entry));
 #else
 	array = kvmalloc_array(num_entries, sizeof(struct amdgpu_bo_list_entry), GFP_KERNEL);
@@ -190,7 +192,8 @@ static int amdgpu_bo_list_set(struct amdgpu_device *adev,
 	for (i = 0; i < list->num_entries; ++i)
 		amdgpu_bo_unref(&list->array[i].robj);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	drm_free_large(list->array);
 #else
 	kvfree(list->array);
@@ -209,7 +212,8 @@ static int amdgpu_bo_list_set(struct amdgpu_device *adev,
 error_free:
 	while (i--)
 		amdgpu_bo_unref(&array[i].robj);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	drm_free_large(array);
 #else
 	kvfree(array);
@@ -287,7 +291,8 @@ void amdgpu_bo_list_free(struct amdgpu_bo_list *list)
 		amdgpu_bo_unref(&list->array[i].robj);
 
 	mutex_destroy(&list->lock);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	drm_free_large(list->array);
 #else
 	kvfree(list->array);
@@ -311,7 +316,8 @@ int amdgpu_bo_list_ioctl(struct drm_device *dev, void *data,
 
 	int r;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	info = drm_malloc_ab(args->in.bo_number,
 			     sizeof(struct drm_amdgpu_bo_list_entry));
 #else
@@ -377,7 +383,8 @@ int amdgpu_bo_list_ioctl(struct drm_device *dev, void *data,
 
 	memset(args, 0, sizeof(*args));
 	args->out.list_handle = handle;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	drm_free_large(info);
 #else
 	kvfree(info);
@@ -386,7 +393,8 @@ int amdgpu_bo_list_ioctl(struct drm_device *dev, void *data,
 	return 0;
 
 error_free:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	drm_free_large(info);
 #else
 	kvfree(info);
