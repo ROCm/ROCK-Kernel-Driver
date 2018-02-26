@@ -181,7 +181,8 @@ static int ttm_bo_man_takedown(struct ttm_mem_type_manager *man)
 }
 
 static void ttm_bo_man_debug(struct ttm_mem_type_manager *man,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 			     const char *prefix)
 #else
 			     struct drm_printer *printer)
@@ -190,7 +191,8 @@ static void ttm_bo_man_debug(struct ttm_mem_type_manager *man,
 	struct ttm_range_manager *rman = (struct ttm_range_manager *) man->priv;
 
 	spin_lock(&rman->lock);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	drm_mm_debug_table(&rman->mm, prefix);
 #else
 	drm_mm_print(&rman->mm, printer);

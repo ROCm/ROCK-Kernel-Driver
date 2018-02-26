@@ -238,7 +238,8 @@ struct ttm_mem_type_manager_func {
 	 * type manager to aid debugging of out-of-memory conditions.
 	 * It may not be called from within atomic context.
 	 */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 	void (*debug)(struct ttm_mem_type_manager *man,
 		      struct drm_printer *printer);
 #else
