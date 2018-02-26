@@ -850,7 +850,8 @@ static struct drm_driver kms_driver = {
 	.driver_features =
 	    DRIVER_USE_AGP |
 	    DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_GEM |
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 	    DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET | DRIVER_SYNCOBJ,
 #else
 	    DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET,
@@ -859,14 +860,16 @@ static struct drm_driver kms_driver = {
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
 	.lastclose = amdgpu_driver_lastclose_kms,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	.set_busid = drm_pci_set_busid,
 #endif
 	.unload = amdgpu_driver_unload_kms,
 	.get_vblank_counter = kcl_amdgpu_get_vblank_counter_kms,
 	.enable_vblank = kcl_amdgpu_enable_vblank_kms,
 	.disable_vblank = kcl_amdgpu_disable_vblank_kms,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	.get_vblank_timestamp = kcl_amdgpu_get_vblank_timestamp_kms,
 	.get_scanout_position = kcl_amdgpu_display_get_crtc_scanoutpos,
 #else
@@ -874,7 +877,9 @@ static struct drm_driver kms_driver = {
 	.get_scanout_position = amdgpu_get_crtc_scanout_position,
 #endif
 #if defined(CONFIG_DEBUG_FS)
-#if defined(BUILD_AS_DKMS) &&  LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(BUILD_AS_DKMS) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	.debugfs_cleanup = amdgpu_debugfs_cleanup,
 #endif
 #endif

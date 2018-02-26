@@ -45,7 +45,8 @@
  * This is the main unload function for KMS (all asics).
  * Returns 0 on success.
  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 int amdgpu_driver_unload_kms(struct drm_device *dev)
 #else
 void amdgpu_driver_unload_kms(struct drm_device *dev)
@@ -54,7 +55,8 @@ void amdgpu_driver_unload_kms(struct drm_device *dev)
 	struct amdgpu_device *adev = dev->dev_private;
 
 	if (adev == NULL)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 		return 0;
 #else
 		return;
@@ -78,7 +80,8 @@ void amdgpu_driver_unload_kms(struct drm_device *dev)
 done_free:
 	kfree(adev);
 	dev->dev_private = NULL;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	return 0;
 #endif
 }

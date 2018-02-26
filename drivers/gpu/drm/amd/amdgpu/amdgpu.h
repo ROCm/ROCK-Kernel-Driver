@@ -1935,7 +1935,8 @@ extern const struct drm_ioctl_desc amdgpu_ioctls_kms[];
 extern const int amdgpu_max_kms_ioctl;
 
 int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 int amdgpu_driver_unload_kms(struct drm_device *dev);
 #else
 void amdgpu_driver_unload_kms(struct drm_device *dev);
