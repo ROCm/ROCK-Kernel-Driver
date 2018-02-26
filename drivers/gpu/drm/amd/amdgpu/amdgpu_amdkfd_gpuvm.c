@@ -2467,6 +2467,23 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 		return r;
 	}
 
+	/* The process to which the Source and Dest BOs belong to could be
+	 * evicted and the BOs invalidated. So validate BOs before use
+	 */
+	r = amdgpu_amdkfd_bo_validate(src_mem->bo, src_mem->domain, false);
+	if (r) {
+		pr_err("CMA fail: SRC BO validate failed %d\n", r);
+		goto validate_fail;
+	}
+
+
+	r = amdgpu_amdkfd_bo_validate(dst_mem->bo, dst_mem->domain, false);
+	if (r) {
+		pr_err("CMA fail: DST BO validate failed %d\n", r);
+		goto validate_fail;
+	}
+
+
 	r = amdgpu_ttm_copy_mem_to_mem(adev, &src, &dst, size, NULL,
 				       &fence);
 	if (r)
@@ -2481,6 +2498,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 		*f = dma_fence_get(fence);
 	dma_fence_put(fence);
 
+validate_fail:
 	ttm_eu_backoff_reservation(&ticket, &list);
 	return r;
 }
