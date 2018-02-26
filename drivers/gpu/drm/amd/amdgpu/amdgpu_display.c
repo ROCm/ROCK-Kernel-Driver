@@ -504,7 +504,8 @@ cleanup:
 }
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 int amdgpu_display_crtc_set_config(struct drm_mode_set *set,
 				   struct drm_modeset_acquire_ctx *ctx)
 #else
@@ -526,7 +527,8 @@ int amdgpu_display_crtc_set_config(struct drm_mode_set *set)
 	if (ret < 0)
 		return ret;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 	ret = drm_crtc_helper_set_config(set, ctx);
 #else
 	ret = drm_crtc_helper_set_config(set);
@@ -788,7 +790,8 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 {
 	int ret;
 	rfb->obj = obj;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	drm_helper_mode_fill_fb_struct(&rfb->base, mode_cmd);
 #else
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
