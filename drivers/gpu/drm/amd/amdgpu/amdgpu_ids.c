@@ -23,7 +23,8 @@
 #include "amdgpu_ids.h"
 
 #include <linux/idr.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0) || \
+	defined(OS_NAME_RHEL_7_4_5)
 #include <linux/dma-fence-array.h>
 #endif
 #include <drm/drmP.h>

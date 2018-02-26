@@ -653,7 +653,7 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 				    struct amdgpu_framebuffer *rfb,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
 			defined(OS_NAME_RHEL_7_3) || \
-			defined(OS_NAME_RHEL_7_4)
+				defined(OS_NAME_RHEL_7_4_5)
 				    const struct drm_mode_fb_cmd2 *mode_cmd,
 #else
 				    struct drm_mode_fb_cmd2 *mode_cmd,
@@ -693,7 +693,8 @@ int amdgpu_display_crtc_set_config(struct drm_mode_set *set,
 #else
 int amdgpu_display_crtc_set_config(struct drm_mode_set *set);
 #endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || \
+				defined(OS_NAME_RHEL_7_4_5)
 int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 				struct drm_framebuffer *fb,
 				struct drm_pending_vblank_event *event,

@@ -38,7 +38,7 @@
 #include <linux/mm.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
 		defined(OS_NAME_RHEL_7_3) || \
-		defined(OS_NAME_RHEL_7_4) || \
+		defined(OS_NAME_RHEL_7_4_5) || \
 		defined(OS_NAME_SLE)
 #include <linux/pfn_t.h>
 #endif
@@ -312,7 +312,7 @@ static int ttm_bo_vm_fault(struct vm_fault *vmf)
 			ret = vm_insert_mixed(&cvma, address,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
 	defined(OS_NAME_RHEL_7_3) || \
-	defined(OS_NAME_RHEL_7_4) || \
+	defined(OS_NAME_RHEL_7_4_5) || \
 	defined(OS_NAME_SLE)
 			__pfn_to_pfn_t(pfn, PFN_DEV | (bo->ssg_can_map ? PFN_MAP : 0)));
 #else

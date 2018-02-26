@@ -347,7 +347,7 @@ bool dm_helpers_dp_mst_start_top_mgr(
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
 		defined(OS_NAME_RHEL_7_3) || \
-		defined(OS_NAME_RHEL_7_4)
+		defined(OS_NAME_RHEL_7_4_5)
 	struct amdgpu_dm_connector *aconnector = link->priv;
 
 	if (!aconnector) {
@@ -376,7 +376,7 @@ void dm_helpers_dp_mst_stop_top_mgr(
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
 		defined(OS_NAME_RHEL_7_3) || \
-		defined(OS_NAME_RHEL_7_4)
+		defined(OS_NAME_RHEL_7_4_5)
 	struct amdgpu_dm_connector *aconnector = link->priv;
 
 	if (!aconnector) {

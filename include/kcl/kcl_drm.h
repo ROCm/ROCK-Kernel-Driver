@@ -64,7 +64,7 @@ extern void
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
 	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3) && \
-	!defined(OS_NAME_RHEL_7_4) && !defined(OS_NAME_SLE)
+	!defined(OS_NAME_RHEL_7_4_5) && !defined(OS_NAME_SLE)
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx);
 int drm_atomic_helper_disable_all(struct drm_device *dev,
@@ -79,7 +79,8 @@ int drm_atomic_helper_resume(struct drm_device *dev,
 			     struct drm_atomic_state *state);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && \
+		!defined(OS_NAME_RHEL_7_4_5)
 extern int drm_crtc_force_disable(struct drm_crtc *crtc);
 extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #endif
@@ -103,12 +104,13 @@ extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #define ____or(arg1_or_junk, y)		__take_second_arg(arg1_or_junk 1, y)
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0) && !defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0) && \
+		!defined(OS_NAME_RHEL_7_4_5)
 #define IS_REACHABLE(option) __or(IS_BUILTIN(option), \
 				__and(IS_MODULE(option), __is_defined(MODULE)))
 #endif
 
-#if !defined(OS_NAME_RHEL_7_4)
+#if !defined(OS_NAME_RHEL_7_4_5)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0)
 static inline void
 drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
@@ -137,7 +139,7 @@ drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
 	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3) && \
-	!defined(OS_NAME_RHEL_7_4) && !defined(OS_NAME_SLE)
+	!defined(OS_NAME_RHEL_7_4_5) && !defined(OS_NAME_SLE)
 extern int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw);
 #endif
 
@@ -247,7 +249,7 @@ static inline int kcl_drm_encoder_init(struct drm_device *dev,
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
 		defined(OS_NAME_RHEL_7_3) || \
-		defined(OS_NAME_RHEL_7_4)
+		defined(OS_NAME_RHEL_7_4_5)
 	return drm_encoder_init(dev, encoder, funcs,
 			 encoder_type, name);
 #else
@@ -264,7 +266,7 @@ static inline int kcl_drm_crtc_init_with_planes(struct drm_device *dev, struct d
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
 		defined(OS_NAME_RHEL_7_3) || \
-		defined(OS_NAME_RHEL_7_4)
+		defined(OS_NAME_RHEL_7_4_5)
 		return drm_crtc_init_with_planes(dev, crtc, primary,
 				 cursor, funcs, name);
 #else
@@ -286,7 +288,7 @@ static inline int kcl_drm_universal_plane_init(struct drm_device *dev, struct dr
 				 formats, format_count, format_modifiers, type, name);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
 		defined(OS_NAME_RHEL_7_3) || \
-		defined(OS_NAME_RHEL_7_4)
+		defined(OS_NAME_RHEL_7_4_5)
 		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
 				 formats, format_count, type, name);
 #else
@@ -299,7 +301,8 @@ static inline struct drm_gem_object *
 kcl_drm_gem_object_lookup(struct drm_device *dev, struct drm_file *filp,
 				u32 handle)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0) && !defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0) && \
+		!defined(OS_NAME_RHEL_7_4_5)
 		return drm_gem_object_lookup(dev, filp, handle);
 #else
 		return drm_gem_object_lookup(filp, handle);
@@ -353,7 +356,7 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && \
 	!defined(OS_NAME_RHEL_6) && \
 	!defined(OS_NAME_RHEL_7_3) && \
-	!defined(OS_NAME_RHEL_7_4)
+	!defined(OS_NAME_RHEL_7_4_5)
 	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
 						     flags, refcrtc, mode);
 #elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
@@ -365,7 +368,7 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
-#if !defined(OS_NAME_RHEL_7_4)
+#if !defined(OS_NAME_RHEL_7_4_5)
 /**
  * struct drm_format_name_buf - name of a DRM format
  * @str: string buffer containing the format name
@@ -413,7 +416,8 @@ extern struct dma_buf_ops *_kcl_drm_gem_prime_dmabuf_ops;
 #define drm_gem_prime_dmabuf_ops (*_kcl_drm_gem_prime_dmabuf_ops)
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && \
+	!defined(OS_NAME_RHEL_7_4_5)
 bool drm_is_current_master(struct drm_file *fpriv);
 #endif
 
@@ -422,7 +426,8 @@ static inline struct drm_crtc_state *
 kcl_drm_atomic_get_old_crtc_state_before_commit(struct drm_atomic_state *state,
 					    struct drm_crtc *crtc)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || \
+	defined(OS_NAME_RHEL_7_4_5)
 	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
 #else
 	return state->crtcs[drm_crtc_index(crtc)]->state;
@@ -433,7 +438,8 @@ static inline struct drm_crtc_state *
 kcl_drm_atomic_get_new_crtc_state_before_commit(struct drm_atomic_state *state,
 				  struct drm_crtc *crtc)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || \
+	defined(OS_NAME_RHEL_7_4_5)
 	return state->crtcs[drm_crtc_index(crtc)].state;
 #else
 	return state->crtc_states[drm_crtc_index(crtc)];
@@ -445,14 +451,16 @@ static inline struct drm_crtc_state *
 kcl_drm_atomic_get_new_crtc_state_after_commit(struct drm_atomic_state *state,
 					    struct drm_crtc *crtc)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || \
+	defined(OS_NAME_RHEL_7_4_5)
 	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
 #else
 	return state->crtcs[drm_crtc_index(crtc)]->state;
 #endif
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && !defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
+	!defined(OS_NAME_RHEL_7_4_5)
 #define DRM_MODE_FMT	"%d:\"%s\" %d %d %d %d %d %d %d %d %d %d 0x%x 0x%x"
 #define DRM_MODE_ARG(m)	\
 	(m)->base.id, (m)->name, (m)->vrefresh, (m)->clock, \
@@ -514,7 +522,9 @@ static inline struct drm_printer drm_info_printer(struct device *dev)
 void drm_state_dump(struct drm_device *dev, struct drm_printer *p);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 6, 0) && !defined(OS_NAME_RHEL_7_3) && !defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 6, 0) && \
+		!defined(OS_NAME_RHEL_7_3) && \
+		!defined(OS_NAME_RHEL_7_4_5)
 void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
 void drm_send_event(struct drm_device *dev, struct drm_pending_event *e);
 #endif

@@ -29,7 +29,7 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 				       struct drm_file *file_priv,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
 			defined(OS_NAME_RHEL_7_3) || \
-			defined(OS_NAME_RHEL_7_4)
+			defined(OS_NAME_RHEL_7_4_5)
 				       const struct drm_mode_fb_cmd2 *mode_cmd);
 #else
 				       struct drm_mode_fb_cmd2 *mode_cmd);

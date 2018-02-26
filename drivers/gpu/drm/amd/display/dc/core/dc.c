@@ -1461,7 +1461,8 @@ struct dc_stream_state *dc_get_stream_at_index(struct dc *dc, uint8_t i)
 	return NULL;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && \
+	!defined(OS_NAME_RHEL_7_4_5)
 void dc_flip_plane_addrs(
 		struct dc *dc,
 		struct dc_plane_state *const plane_states[],

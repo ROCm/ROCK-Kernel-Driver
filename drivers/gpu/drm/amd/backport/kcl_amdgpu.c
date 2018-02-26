@@ -3,7 +3,7 @@
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0) || \
 		defined(OS_NAME_RHEL_6) || \
 		defined(OS_NAME_RHEL_7_3) || \
-		defined(OS_NAME_RHEL_7_4)
+		defined(OS_NAME_RHEL_7_4_5)
 u32 kcl_amdgpu_get_vblank_counter_kms(struct drm_device *dev, unsigned int crtc)
 {
 	return amdgpu_get_vblank_counter_kms(dev, crtc);

@@ -22,7 +22,8 @@
 #ifndef __LINUX_FENCE_ARRAY_H
 #define __LINUX_FENCE_ARRAY_H
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && \
+	!defined(OS_NAME_RHEL_7_4_5)
 #include <linux/fence.h>
 
 /**

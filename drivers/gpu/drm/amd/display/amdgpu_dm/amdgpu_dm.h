@@ -261,7 +261,8 @@ amdgpu_dm_remove_sink_from_freesync_module(struct drm_connector *connector);
 
 
 /* amdgpu_dm_crc.c */
-#if defined(CONFIG_DEBUG_FS) && (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) || defined(OS_NAME_RHEL_7_4))
+#if defined(CONFIG_DEBUG_FS) && (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) || \
+	defined(OS_NAME_RHEL_7_4_5))
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 				  size_t *values_cnt);
 void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc);

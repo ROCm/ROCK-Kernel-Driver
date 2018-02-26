@@ -38,7 +38,7 @@
  * Advanced Micro Devices, Inc.
  */
 #if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
-		!defined(OS_NAME_RHEL_7_4)
+		!defined(OS_NAME_RHEL_7_4_5)
 long _kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 bool wait_all, bool intr,
 					 unsigned long timeout)

@@ -26,7 +26,8 @@
 #include <linux/types.h>
 #include <linux/mutex.h>
 #include <linux/list.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) || \
+	defined(OS_NAME_RHEL_7_4_5)
 #include <linux/dma-fence.h>
 #endif
 #include "amdgpu_sync.h"

@@ -1,7 +1,8 @@
 #include <kcl/kcl_drm.h>
 #include "kcl_common.h"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && \
+	!defined(OS_NAME_RHEL_7_4_5)
 /**
  * drm_crtc_force_disable - Forcibly turn off a CRTC
  * @crtc: CRTC to turn off
@@ -50,7 +51,7 @@ EXPORT_SYMBOL(drm_crtc_force_disable_all);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
 	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3) && \
-	!defined(OS_NAME_RHEL_7_4) && !defined(OS_NAME_SLE)
+	!defined(OS_NAME_RHEL_7_4_5) && !defined(OS_NAME_SLE)
 int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw)
 {
 	struct pci_dev *root;
@@ -244,7 +245,8 @@ static inline struct drm_plane_state *
 _kcl_drm_atomic_get_existing_plane_state(struct drm_atomic_state *state,
                     struct drm_plane *plane)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && \
+	!defined(OS_NAME_RHEL_7_4_5)
 	return state->plane_states[drm_plane_index(plane)];
 #else
 	return state->planes[drm_plane_index(plane)].state;
@@ -319,7 +321,7 @@ _kcl_drm_atomic_helper_update_legacy_modeset_state_stub(struct drm_device *dev,
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
 	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3) && \
-	!defined(OS_NAME_SLE) && !defined(OS_NAME_RHEL_7_4)
+	!defined(OS_NAME_SLE) && !defined(OS_NAME_RHEL_7_4_5)
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx)
 {
@@ -527,7 +529,8 @@ void amdkcl_drm_init(void)
 	_kcl_drm_gem_prime_dmabuf_ops = amdkcl_fp_setup("drm_gem_prime_dmabuf_ops", NULL);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && !defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) && \
+	!defined(OS_NAME_RHEL_7_4_5)
 bool drm_is_current_master(struct drm_file *fpriv)
 {
 	return fpriv->is_master && fpriv->master == fpriv->minor->master;
@@ -535,7 +538,8 @@ bool drm_is_current_master(struct drm_file *fpriv)
 EXPORT_SYMBOL(drm_is_current_master);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && !defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
+	!defined(OS_NAME_RHEL_7_4_5)
 void __drm_printfn_info(struct drm_printer *p, struct va_format *vaf)
 {
 	dev_printk(KERN_INFO, p->arg, "[" DRM_NAME "] %pV", vaf);
@@ -560,7 +564,9 @@ static void drm_atomic_crtc_print_state(struct drm_printer *p,
 {
 	struct drm_crtc *crtc = state->crtc;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4_5)
 	drm_printf(p, "crtc[%u]: %s\n", crtc->base.id, crtc->name);
 #else
 	drm_printf(p, "crtc[%u]:\n", crtc->base.id);
@@ -571,16 +577,24 @@ static void drm_atomic_crtc_print_state(struct drm_printer *p,
 	drm_printf(p, "\tmode_changed=%d\n", state->mode_changed);
 	drm_printf(p, "\tactive_changed=%d\n", state->active_changed);
 	drm_printf(p, "\tconnectors_changed=%d\n", state->connectors_changed);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4_5)
 	drm_printf(p, "\tcolor_mgmt_changed=%d\n", state->color_mgmt_changed);
 #endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4_5)
 	drm_printf(p, "\tplane_mask=%x\n", state->plane_mask);
 #endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4_5)
 	drm_printf(p, "\tconnector_mask=%x\n", state->connector_mask);
 #endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4_5)
 	drm_printf(p, "\tencoder_mask=%x\n", state->encoder_mask);
 #endif
 	drm_printf(p, "\tmode: " DRM_MODE_FMT "\n", DRM_MODE_ARG(&state->mode));
@@ -593,7 +607,9 @@ static void drm_atomic_plane_print_state(struct drm_printer *p,
 	struct drm_rect src  = drm_plane_state_src(state);
 	struct drm_rect dest = drm_plane_state_dest(state);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4_5)
 	drm_printf(p, "plane[%u]: %s\n", plane->base.id, plane->name);
 	drm_printf(p, "\tcrtc=%s\n", state->crtc ? state->crtc->name : "(null)");
 #else
@@ -627,7 +643,9 @@ static void drm_atomic_connector_print_state(struct drm_printer *p,
 	struct drm_connector *connector = state->connector;
 
 	drm_printf(p, "connector[%u]: %s\n", connector->base.id, connector->name);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4_5)
 	drm_printf(p, "\tcrtc=%s\n", state->crtc ? state->crtc->name : "(null)");
 #else
 	drm_printf(p, "\tcrtc=%d\n", state->crtc ? state->crtc->base.id : 0);
@@ -679,7 +697,9 @@ void drm_state_dump(struct drm_device *dev, struct drm_printer *p)
 EXPORT_SYMBOL(drm_state_dump);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 6, 0) && !defined(OS_NAME_RHEL_7_3) && !defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 6, 0) && \
+	!defined(OS_NAME_RHEL_7_3) && \
+	!defined(OS_NAME_RHEL_7_4_5)
 void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e)
 {
 	assert_spin_locked(&dev->event_lock);
