@@ -155,7 +155,8 @@ kcl_fence_get_rcu_safe(struct fence * __rcu *fencep)
 static inline void kcl_dma_fence_set_error(struct dma_fence *fence,
 				       int error)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	BUG_ON(test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags));
 	BUG_ON(error >= 0 || error < -MAX_ERRNO);
 
