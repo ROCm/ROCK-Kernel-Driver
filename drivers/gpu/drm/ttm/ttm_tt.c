@@ -40,7 +40,8 @@
 #include <linux/slab.h>
 #include <linux/export.h>
 #include <drm/drm_cache.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 #include <drm/drm_mem_util.h>
 #endif
 #include <drm/ttm/ttm_module.h>
