@@ -3,7 +3,7 @@
 #include "kcl_common.h"
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && \
-	!defined(OS_NAME_RHEL_7_4) && \
+	!defined(OS_NAME_RHEL_7_4_5) && \
 	defined(CONFIG_X86_PAT)
 #include <asm/pgtable_types.h>
 

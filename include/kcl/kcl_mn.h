@@ -5,7 +5,7 @@
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0) && \
 	!defined(OS_NAME_RHEL_7_3) && \
-	!defined(OS_NAME_RHEL_7_4)
+	!defined(OS_NAME_RHEL_7_4_5)
 extern void mmu_notifier_call_srcu(struct rcu_head *rcu,
                             void (*func)(struct rcu_head *rcu));
 

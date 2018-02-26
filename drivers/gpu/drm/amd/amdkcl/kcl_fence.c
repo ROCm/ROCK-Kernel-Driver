@@ -25,7 +25,8 @@
 
 #define CREATE_TRACE_POINTS
 #include <kcl/kcl_trace.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && !defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
+	!defined(OS_NAME_RHEL_7_4_5)
 static atomic64_t fence_context_counter = ATOMIC64_INIT(0);
 u64 _kcl_fence_context_alloc(unsigned num)
 {

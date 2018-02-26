@@ -30,7 +30,7 @@
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0) && \
 	!defined(OS_NAME_RHEL_7_2) && \
 	!defined(OS_NAME_RHEL_7_3) && \
-	!defined(OS_NAME_RHEL_7_4)
+	!defined(OS_NAME_RHEL_7_4_5)
 /*
  * Modifications [2017-03-14] (c) [2017]
  */

@@ -23,7 +23,8 @@
  */
 
 #include <drm/drmP.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || \
+		defined(OS_NAME_RHEL_7_4_5)
 #include <drm/drm_auth.h>
 #endif
 #include "amdgpu.h"

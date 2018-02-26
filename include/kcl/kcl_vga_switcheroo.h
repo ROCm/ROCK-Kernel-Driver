@@ -21,12 +21,12 @@ static inline int kcl_vga_switcheroo_register_client(struct pci_dev *dev,
 #if defined(CONFIG_VGA_SWITCHEROO)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && \
 		!defined(OS_NAME_RHEL_7_3) && \
-		!defined(OS_NAME_RHEL_7_4)
+		!defined(OS_NAME_RHEL_7_4_5)
 static inline int kcl_vga_switcheroo_register_handler(struct vga_switcheroo_handler *handler,
 						      int handler_flags)
 #elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 6, 0) && \
 		!defined(OS_NAME_RHEL_7_3) && \
-		!defined(OS_NAME_RHEL_7_4) && \
+		!defined(OS_NAME_RHEL_7_4_5) && \
 		!defined(OS_NAME_SLE_12_3) && \
 		!defined(OS_NAME_SUSE_42_3)
 static inline int kcl_vga_switcheroo_register_handler(const struct vga_switcheroo_handler *handler,
@@ -38,7 +38,7 @@ static inline int kcl_vga_switcheroo_register_handler(const struct vga_switchero
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 6, 0) && \
 		!defined(OS_NAME_RHEL_7_3) && \
-		!defined(OS_NAME_RHEL_7_4) && \
+		!defined(OS_NAME_RHEL_7_4_5) && \
 		!defined(OS_NAME_SLE_12_3) && \
 		!defined(OS_NAME_SUSE_42_3)
 	return vga_switcheroo_register_handler(handler);
@@ -51,14 +51,14 @@ static inline int kcl_vga_switcheroo_register_handler(const struct vga_switchero
 #else
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && \
 		!defined(OS_NAME_RHEL_7_3) && \
-		!defined(OS_NAME_RHEL_7_4) && \
+		!defined(OS_NAME_RHEL_7_4_5) && \
 		!defined(OS_NAME_SLE_12_3) && \
 		!defined(OS_NAME_SUSE_42_3)
 static inline int kcl_vga_switcheroo_register_handler(struct vga_switcheroo_handler *handler,
 						      int handler_flags)
 #elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 6, 0) && \
 		!defined(OS_NAME_RHEL_7_3) && \
-		!defined(OS_NAME_RHEL_7_4) && \
+		!defined(OS_NAME_RHEL_7_4_5) && \
 		!defined(OS_NAME_SLE_12_3) && \
 		!defined(OS_NAME_SUSE_42_3)
 static inline int kcl_vga_switcheroo_register_handler(const struct vga_switcheroo_handler *handler,

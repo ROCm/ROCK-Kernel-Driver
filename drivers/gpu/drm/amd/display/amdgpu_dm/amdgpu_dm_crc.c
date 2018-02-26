@@ -46,7 +46,8 @@ static enum amdgpu_dm_pipe_crc_source dm_parse_crc_source(const char *source)
 	return AMDGPU_DM_PIPE_CRC_SOURCE_INVALID;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) || defined(OS_NAME_RHEL_7_4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) || \
+	defined(OS_NAME_RHEL_7_4_5)
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 			   size_t *values_cnt)
 {
