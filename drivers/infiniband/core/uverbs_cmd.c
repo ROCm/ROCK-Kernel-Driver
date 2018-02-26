@@ -340,6 +340,8 @@ ssize_t ib_uverbs_alloc_pd(struct ib_uverbs_file *file,
 	uobj->object = pd;
 	memset(&resp, 0, sizeof resp);
 	resp.pd_handle = uobj->id;
+	pd->res.type = RDMA_RESTRACK_PD;
+	rdma_restrack_add(&pd->res);
 
 	if (copy_to_user(u64_to_user_ptr(cmd.response), &resp, sizeof resp)) {
 		ret = -EFAULT;
@@ -560,10 +562,9 @@ ssize_t ib_uverbs_open_xrcd(struct ib_uverbs_file *file,
 	if (f.file)
 		fdput(f);
 
-	mutex_unlock(&file->device->xrcd_tree_mutex);
-
 	uobj_alloc_commit(&obj->uobject);
 
+	mutex_unlock(&file->device->xrcd_tree_mutex);
 	return in_len;
 
 err_copy:
@@ -602,8 +603,10 @@ ssize_t ib_uverbs_close_xrcd(struct ib_uverbs_file *file,
 
 	uobj  = uobj_get_write(uobj_get_type(xrcd), cmd.xrcd_handle,
 			       file->ucontext);
-	if (IS_ERR(uobj))
+	if (IS_ERR(uobj)) {
+		mutex_unlock(&file->device->xrcd_tree_mutex);
 		return PTR_ERR(uobj);
+	}
 
 	ret = uobj_remove_commit(uobj);
 	return ret ?: in_len;
@@ -1032,6 +1035,8 @@ static struct ib_ucq_object *create_cq(struct ib_uverbs_file *file,
 		goto err_cb;
 
 	uobj_alloc_commit(&obj->uobject);
+	cq->res.type = RDMA_RESTRACK_CQ;
+	rdma_restrack_add(&cq->res);
 
 	return obj;
 
@@ -1144,10 +1149,7 @@ int ib_uverbs_ex_create_cq(struct ib_uverbs_file *file,
 			min(ucore->inlen, sizeof(cmd)),
 			ib_uverbs_ex_create_cq_cb, NULL);
 
-	if (IS_ERR(obj))
-		return PTR_ERR(obj);
-
-	return 0;
+	return PTR_ERR_OR_ZERO(obj);
 }
 
 ssize_t ib_uverbs_resize_cq(struct ib_uverbs_file *file,
@@ -1198,7 +1200,7 @@ static int copy_wc_to_user(struct ib_device *ib_dev, void __user *dest,
 	tmp.opcode		= wc->opcode;
 	tmp.vendor_err		= wc->vendor_err;
 	tmp.byte_len		= wc->byte_len;
-	tmp.ex.imm_data		= (__u32 __force) wc->ex.imm_data;
+	tmp.ex.imm_data		= wc->ex.imm_data;
 	tmp.qp_num		= wc->qp->qp_num;
 	tmp.src_qp		= wc->src_qp;
 	tmp.wc_flags		= wc->wc_flags;
@@ -1516,7 +1518,7 @@ static int create_qp(struct ib_uverbs_file *file,
 	if (cmd->qp_type == IB_QPT_XRC_TGT)
 		qp = ib_create_qp(pd, &attr);
 	else
-		qp = device->create_qp(pd, &attr, uhw);
+		qp = _ib_create_qp(device, pd, &attr, uhw);
 
 	if (IS_ERR(qp)) {
 		ret = PTR_ERR(qp);
@@ -1529,7 +1531,6 @@ static int create_qp(struct ib_uverbs_file *file,
 			goto err_cb;
 
 		qp->real_qp	  = qp;
-		qp->device	  = device;
 		qp->pd		  = pd;
 		qp->send_cq	  = attr.send_cq;
 		qp->recv_cq	  = attr.recv_cq;
@@ -1970,15 +1971,8 @@ static int modify_qp(struct ib_uverbs_file *file,
 		goto release_qp;
 	}
 
-	if ((cmd->base.attr_mask & IB_QP_AV) &&
-	    !rdma_is_port_valid(qp->device, cmd->base.dest.port_num)) {
-		ret = -EINVAL;
-		goto release_qp;
-	}
-
 	if ((cmd->base.attr_mask & IB_QP_ALT_PATH) &&
-	    (!rdma_is_port_valid(qp->device, cmd->base.alt_port_num) ||
-	    !rdma_is_port_valid(qp->device, cmd->base.alt_dest.port_num))) {
+	    !rdma_is_port_valid(qp->device, cmd->base.alt_port_num)) {
 		ret = -EINVAL;
 		goto release_qp;
 	}

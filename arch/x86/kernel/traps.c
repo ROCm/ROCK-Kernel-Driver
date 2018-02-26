@@ -181,7 +181,7 @@ int fixup_bug(struct pt_regs *regs, int trapnr)
 		break;
 
 	case BUG_TRAP_TYPE_WARN:
-		regs->ip += LEN_UD2;
+		regs->ip += LEN_UD0;
 		return 1;
 	}
 

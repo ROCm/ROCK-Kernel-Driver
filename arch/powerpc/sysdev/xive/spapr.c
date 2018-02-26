@@ -356,8 +356,7 @@ static int xive_spapr_configure_queue(u32 target, struct xive_q *q, u8 prio,
 
 	rc = plpar_int_get_queue_info(0, target, prio, &esn_page, &esn_size);
 	if (rc) {
-		pr_err("Error %lld getting queue info CPU %d prio %d\n", rc,
-		       target, prio);
+		pr_err("Error %lld getting queue info prio %d\n", rc, prio);
 		rc = -EIO;
 		goto fail;
 	}
@@ -371,8 +370,7 @@ static int xive_spapr_configure_queue(u32 target, struct xive_q *q, u8 prio,
 	/* Configure and enable the queue in HW */
 	rc = plpar_int_set_queue_config(flags, target, prio, qpage_phys, order);
 	if (rc) {
-		pr_err("Error %lld setting queue for CPU %d prio %d\n", rc,
-		       target, prio);
+		pr_err("Error %lld setting queue for prio %d\n", rc, prio);
 		rc = -EIO;
 	} else {
 		q->qpage = qpage;
@@ -391,8 +389,8 @@ static int xive_spapr_setup_queue(unsigned int cpu, struct xive_cpu *xc,
 	if (IS_ERR(qpage))
 		return PTR_ERR(qpage);
 
-	return xive_spapr_configure_queue(get_hard_smp_processor_id(cpu),
-					  q, prio, qpage, xive_queue_shift);
+	return xive_spapr_configure_queue(cpu, q, prio, qpage,
+					  xive_queue_shift);
 }
 
 static void xive_spapr_cleanup_queue(unsigned int cpu, struct xive_cpu *xc,
@@ -401,12 +399,10 @@ static void xive_spapr_cleanup_queue(unsigned int cpu, struct xive_cpu *xc,
 	struct xive_q *q = &xc->queue[prio];
 	unsigned int alloc_order;
 	long rc;
-	int hw_cpu = get_hard_smp_processor_id(cpu);
 
-	rc = plpar_int_set_queue_config(0, hw_cpu, prio, 0, 0);
+	rc = plpar_int_set_queue_config(0, cpu, prio, 0, 0);
 	if (rc)
-		pr_err("Error %ld setting queue for CPU %d prio %d\n", rc,
-		       hw_cpu, prio);
+		pr_err("Error %ld setting queue for prio %d\n", rc, prio);
 
 	alloc_order = xive_alloc_order(xive_queue_shift);
 	free_pages((unsigned long)q->qpage, alloc_order);

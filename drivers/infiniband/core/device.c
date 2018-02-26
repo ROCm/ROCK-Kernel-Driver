@@ -263,6 +263,8 @@ struct ib_device *ib_alloc_device(size_t size)
 	if (!device)
 		return NULL;
 
+	rdma_restrack_init(&device->res);
+
 	device->dev.class = &ib_class;
 	device_initialize(&device->dev);
 
@@ -288,7 +290,7 @@ void ib_dealloc_device(struct ib_device *device)
 {
 	WARN_ON(device->reg_state != IB_DEV_UNREGISTERED &&
 		device->reg_state != IB_DEV_UNINITIALIZED);
-	kobject_put(&device->dev.kobj);
+	put_device(&device->dev);
 }
 EXPORT_SYMBOL(ib_dealloc_device);
 
@@ -595,6 +597,8 @@ void ib_unregister_device(struct ib_device *device)
 			context->client->remove(device, context->data);
 	}
 	up_read(&lists_rwsem);
+
+	rdma_restrack_clean(&device->res);
 
 	ib_device_unregister_rdmacg(device);
 	ib_device_unregister_sysfs(device);
@@ -1041,32 +1045,22 @@ EXPORT_SYMBOL(ib_modify_port);
 
 /**
  * ib_find_gid - Returns the port number and GID table index where
- *   a specified GID value occurs.
+ *   a specified GID value occurs. Its searches only for IB link layer.
  * @device: The device to query.
  * @gid: The GID value to search for.
- * @gid_type: Type of GID.
  * @ndev: The ndev related to the GID to search for.
  * @port_num: The port number of the device where the GID value was found.
  * @index: The index into the GID table where the GID was found.  This
  *   parameter may be NULL.
  */
 int ib_find_gid(struct ib_device *device, union ib_gid *gid,
-		enum ib_gid_type gid_type, struct net_device *ndev,
-		u8 *port_num, u16 *index)
+		struct net_device *ndev, u8 *port_num, u16 *index)
 {
 	union ib_gid tmp_gid;
 	int ret, port, i;
 
 	for (port = rdma_start_port(device); port <= rdma_end_port(device); ++port) {
-		if (rdma_cap_roce_gid_table(device, port)) {
-			if (!ib_find_cached_gid_by_port(device, gid, gid_type, port,
-							ndev, index)) {
-				*port_num = port;
-				return 0;
-			}
-		}
-
-		if (gid_type != IB_GID_TYPE_IB)
+		if (rdma_cap_roce_gid_table(device, port))
 			continue;
 
 		for (i = 0; i < device->port_immutable[port].gid_tbl_len; ++i) {

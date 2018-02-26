@@ -105,12 +105,20 @@ int ovl_getattr(const struct path *path, struct kstat *stat,
 			 * Lower hardlinks may be broken on copy up to different
 			 * upper files, so we cannot use the lower origin st_ino
 			 * for those different files, even for the same fs case.
+			 *
+			 * Similarly, several redirected dirs can point to the
+			 * same dir on a lower layer. With the "verify_lower"
+			 * feature, we do not use the lower origin st_ino, if
+			 * we haven't verified that this redirect is unique.
+			 *
 			 * With inodes index enabled, it is safe to use st_ino
-			 * of an indexed hardlinked origin. The index validates
-			 * that the upper hardlink is not broken.
+			 * of an indexed origin. The index validates that the
+			 * upper hardlink is not broken and that a redirected
+			 * dir is the only redirect to that origin.
 			 */
-			if (is_dir || lowerstat.nlink == 1 ||
-			    ovl_test_flag(OVL_INDEX, d_inode(dentry)))
+			if (ovl_test_flag(OVL_INDEX, d_inode(dentry)) ||
+			    (!ovl_verify_lower(dentry->d_sb) &&
+			     (is_dir || lowerstat.nlink == 1)))
 				stat->ino = lowerstat.ino;
 
 			if (samefs)
@@ -343,8 +351,10 @@ struct posix_acl *ovl_get_acl(struct inode *inode, int type)
 
 static bool ovl_open_need_copy_up(struct dentry *dentry, int flags)
 {
+	/* Copy up of disconnected dentry does not set upper alias */
 	if (ovl_dentry_upper(dentry) &&
-	    ovl_dentry_has_upper_alias(dentry))
+	    (ovl_dentry_has_upper_alias(dentry) ||
+	     (dentry->d_flags & DCACHE_DISCONNECTED)))
 		return false;
 
 	if (special_file(d_inode(dentry)->i_mode))
@@ -604,9 +614,15 @@ static int ovl_inode_set(struct inode *inode, void *data)
 }
 
 static bool ovl_verify_inode(struct inode *inode, struct dentry *lowerdentry,
-			     struct dentry *upperdentry)
+			     struct dentry *upperdentry, bool strict)
 {
-	if (S_ISDIR(inode->i_mode)) {
+	/*
+	 * For directories, @strict verify from lookup path performs consistency
+	 * checks, so NULL lower/upper in dentry must match NULL lower/upper in
+	 * inode. Non @strict verify from NFS handle decode path passes NULL for
+	 * 'unknown' lower/upper.
+	 */
+	if (S_ISDIR(inode->i_mode) && strict) {
 		/* Real lower dir moved to upper layer under us? */
 		if (!lowerdentry && ovl_inode_lower(inode))
 			return false;
@@ -635,14 +651,33 @@ static bool ovl_verify_inode(struct inode *inode, struct dentry *lowerdentry,
 	return true;
 }
 
-struct inode *ovl_get_inode(struct dentry *dentry, struct dentry *upperdentry,
-			    struct dentry *index)
+struct inode *ovl_lookup_inode(struct super_block *sb, struct dentry *real,
+			       bool is_upper)
 {
-	struct dentry *lowerdentry = ovl_dentry_lower(dentry);
+	struct inode *inode, *key = d_inode(real);
+
+	inode = ilookup5(sb, (unsigned long) key, ovl_inode_test, key);
+	if (!inode)
+		return NULL;
+
+	if (!ovl_verify_inode(inode, is_upper ? NULL : real,
+			      is_upper ? real : NULL, false)) {
+		iput(inode);
+		return ERR_PTR(-ESTALE);
+	}
+
+	return inode;
+}
+
+struct inode *ovl_get_inode(struct super_block *sb, struct dentry *upperdentry,
+			    struct dentry *lowerdentry, struct dentry *index,
+			    unsigned int numlower)
+{
+	struct ovl_fs *ofs = sb->s_fs_info;
 	struct inode *realinode = upperdentry ? d_inode(upperdentry) : NULL;
 	struct inode *inode;
 	/* Already indexed or could be indexed on copy up? */
-	bool indexed = (index || (ovl_indexdir(dentry->d_sb) && !upperdentry));
+	bool indexed = (index || (ovl_indexdir(sb) && !upperdentry));
 	struct dentry *origin = indexed ? lowerdentry : NULL;
 	bool is_dir;
 
@@ -658,16 +693,17 @@ struct inode *ovl_get_inode(struct dentry *dentry, struct dentry *upperdentry,
 	 * Hash non-dir that is or could be indexed by origin inode.
 	 * Hash dir that is or could be merged by origin inode.
 	 * Hash pure upper and non-indexed non-dir by upper inode.
+	 * Hash non-indexed dir by upper inode for NFS export.
 	 */
 	is_dir = S_ISDIR(realinode->i_mode);
-	if (is_dir)
+	if (is_dir && (indexed || !sb->s_export_op || !ofs->upper_mnt))
 		origin = lowerdentry;
 
 	if (upperdentry || origin) {
 		struct inode *key = d_inode(origin ?: upperdentry);
 		unsigned int nlink = is_dir ? 1 : realinode->i_nlink;
 
-		inode = iget5_locked(dentry->d_sb, (unsigned long) key,
+		inode = iget5_locked(sb, (unsigned long) key,
 				     ovl_inode_test, ovl_inode_set, key);
 		if (!inode)
 			goto out_nomem;
@@ -676,7 +712,8 @@ struct inode *ovl_get_inode(struct dentry *dentry, struct dentry *upperdentry,
 			 * Verify that the underlying files stored in the inode
 			 * match those in the dentry.
 			 */
-			if (!ovl_verify_inode(inode, lowerdentry, upperdentry)) {
+			if (!ovl_verify_inode(inode, lowerdentry, upperdentry,
+					      true)) {
 				iput(inode);
 				inode = ERR_PTR(-ESTALE);
 				goto out;
@@ -691,7 +728,7 @@ struct inode *ovl_get_inode(struct dentry *dentry, struct dentry *upperdentry,
 			nlink = ovl_get_nlink(lowerdentry, upperdentry, nlink);
 		set_nlink(inode, nlink);
 	} else {
-		inode = new_inode(dentry->d_sb);
+		inode = new_inode(sb);
 		if (!inode)
 			goto out_nomem;
 	}
@@ -703,9 +740,7 @@ struct inode *ovl_get_inode(struct dentry *dentry, struct dentry *upperdentry,
 
 	/* Check for non-merge dir that may have whiteouts */
 	if (is_dir) {
-		struct ovl_entry *oe = dentry->d_fsdata;
-
-		if (((upperdentry && lowerdentry) || oe->numlower > 1) ||
+		if (((upperdentry && lowerdentry) || numlower > 1) ||
 		    ovl_check_origin_xattr(upperdentry ?: lowerdentry)) {
 			ovl_set_flag(OVL_WHITEOUTS, inode);
 		}

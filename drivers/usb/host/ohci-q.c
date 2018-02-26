@@ -1019,8 +1019,6 @@ skip_ed:
 		 * have modified this list.  normally it's just prepending
 		 * entries (which we'd ignore), but paranoia won't hurt.
 		 */
-		*last = ed->ed_next;
-		ed->ed_next = NULL;
 		modified = 0;
 
 		/* unlink urbs as requested, but rescan the list after
@@ -1079,22 +1077,21 @@ rescan_this:
 			goto rescan_this;
 
 		/*
-		 * If no TDs are queued, ED is now idle.
+		 * If no TDs are queued, take ED off the ed_rm_list.
 		 * Otherwise, if the HC is running, reschedule.
-		 * If the HC isn't running, add ED back to the
-		 * start of the list for later processing.
+		 * If not, leave it on the list for further dequeues.
 		 */
 		if (list_empty(&ed->td_list)) {
+			*last = ed->ed_next;
+			ed->ed_next = NULL;
 			ed->state = ED_IDLE;
 			list_del(&ed->in_use_list);
 		} else if (ohci->rh_state == OHCI_RH_RUNNING) {
+			*last = ed->ed_next;
+			ed->ed_next = NULL;
 			ed_schedule(ohci, ed);
 		} else {
-			ed->ed_next = ohci->ed_rm_list;
-			ohci->ed_rm_list = ed;
-			/* Don't loop on the same ED */
-			if (last == &ohci->ed_rm_list)
-				last = &ed->ed_next;
+			last = &ed->ed_next;
 		}
 
 		if (modified)

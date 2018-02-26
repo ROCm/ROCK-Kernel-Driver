@@ -76,7 +76,6 @@ struct xb_req_data {
 	struct list_head list;
 	wait_queue_head_t wq;
 	struct xsd_sockmsg msg;
-	uint32_t caller_req_id;
 	enum xsd_sockmsg_type type;
 	char *body;
 	const struct kvec *vec;

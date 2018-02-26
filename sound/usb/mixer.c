@@ -347,20 +347,17 @@ static int get_ctl_value_v2(struct usb_mixer_elem_info *cval, int request,
 			    int validx, int *value_ret)
 {
 	struct snd_usb_audio *chip = cval->head.mixer->chip;
-	/* enough space for one range */
-	unsigned char buf[sizeof(__u16) + 3 * sizeof(__u32)];
+	unsigned char buf[4 + 3 * sizeof(__u32)]; /* enough space for one range */
 	unsigned char *val;
-	int idx = 0, ret, val_size, size;
+	int idx = 0, ret, size;
 	__u8 bRequest;
-
-	val_size = uac2_ctl_value_size(cval->val_type);
 
 	if (request == UAC_GET_CUR) {
 		bRequest = UAC2_CS_CUR;
-		size = val_size;
+		size = uac2_ctl_value_size(cval->val_type);
 	} else {
 		bRequest = UAC2_CS_RANGE;
-		size = sizeof(__u16) + 3 * val_size;
+		size = sizeof(buf);
 	}
 
 	memset(buf, 0, sizeof(buf));
@@ -393,17 +390,16 @@ error:
 		val = buf + sizeof(__u16);
 		break;
 	case UAC_GET_MAX:
-		val = buf + sizeof(__u16) + val_size;
+		val = buf + sizeof(__u16) * 2;
 		break;
 	case UAC_GET_RES:
-		val = buf + sizeof(__u16) + val_size * 2;
+		val = buf + sizeof(__u16) * 3;
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	*value_ret = convert_signed_value(cval,
-					  snd_usb_combine_bytes(val, val_size));
+	*value_ret = convert_signed_value(cval, snd_usb_combine_bytes(val, sizeof(__u16)));
 
 	return 0;
 }
@@ -660,10 +656,14 @@ static int get_term_name(struct mixer_build *state, struct usb_audio_term *iterm
 			 unsigned char *name, int maxlen, int term_only)
 {
 	struct iterm_name_combo *names;
+	int len;
 
-	if (iterm->name)
-		return snd_usb_copy_string_desc(state, iterm->name,
+	if (iterm->name) {
+		len = snd_usb_copy_string_desc(state, iterm->name,
 						name, maxlen);
+		if (len)
+			return len;
+	}
 
 	/* virtual type - not a real terminal */
 	if (iterm->type >> 16) {

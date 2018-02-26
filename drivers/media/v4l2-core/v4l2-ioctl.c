@@ -46,37 +46,37 @@ struct std_descr {
 };
 
 static const struct std_descr standards[] = {
-	{ V4L2_STD_NTSC, 	"NTSC"      },
-	{ V4L2_STD_NTSC_M, 	"NTSC-M"    },
-	{ V4L2_STD_NTSC_M_JP, 	"NTSC-M-JP" },
+	{ V4L2_STD_NTSC,	"NTSC"      },
+	{ V4L2_STD_NTSC_M,	"NTSC-M"    },
+	{ V4L2_STD_NTSC_M_JP,	"NTSC-M-JP" },
 	{ V4L2_STD_NTSC_M_KR,	"NTSC-M-KR" },
-	{ V4L2_STD_NTSC_443, 	"NTSC-443"  },
-	{ V4L2_STD_PAL, 	"PAL"       },
-	{ V4L2_STD_PAL_BG, 	"PAL-BG"    },
-	{ V4L2_STD_PAL_B, 	"PAL-B"     },
-	{ V4L2_STD_PAL_B1, 	"PAL-B1"    },
-	{ V4L2_STD_PAL_G, 	"PAL-G"     },
-	{ V4L2_STD_PAL_H, 	"PAL-H"     },
-	{ V4L2_STD_PAL_I, 	"PAL-I"     },
-	{ V4L2_STD_PAL_DK, 	"PAL-DK"    },
-	{ V4L2_STD_PAL_D, 	"PAL-D"     },
-	{ V4L2_STD_PAL_D1, 	"PAL-D1"    },
-	{ V4L2_STD_PAL_K, 	"PAL-K"     },
-	{ V4L2_STD_PAL_M, 	"PAL-M"     },
-	{ V4L2_STD_PAL_N, 	"PAL-N"     },
-	{ V4L2_STD_PAL_Nc, 	"PAL-Nc"    },
-	{ V4L2_STD_PAL_60, 	"PAL-60"    },
-	{ V4L2_STD_SECAM, 	"SECAM"     },
-	{ V4L2_STD_SECAM_B, 	"SECAM-B"   },
-	{ V4L2_STD_SECAM_G, 	"SECAM-G"   },
-	{ V4L2_STD_SECAM_H, 	"SECAM-H"   },
-	{ V4L2_STD_SECAM_DK, 	"SECAM-DK"  },
-	{ V4L2_STD_SECAM_D, 	"SECAM-D"   },
-	{ V4L2_STD_SECAM_K, 	"SECAM-K"   },
-	{ V4L2_STD_SECAM_K1, 	"SECAM-K1"  },
-	{ V4L2_STD_SECAM_L, 	"SECAM-L"   },
-	{ V4L2_STD_SECAM_LC, 	"SECAM-Lc"  },
-	{ 0, 			"Unknown"   }
+	{ V4L2_STD_NTSC_443,	"NTSC-443"  },
+	{ V4L2_STD_PAL,		"PAL"       },
+	{ V4L2_STD_PAL_BG,	"PAL-BG"    },
+	{ V4L2_STD_PAL_B,	"PAL-B"     },
+	{ V4L2_STD_PAL_B1,	"PAL-B1"    },
+	{ V4L2_STD_PAL_G,	"PAL-G"     },
+	{ V4L2_STD_PAL_H,	"PAL-H"     },
+	{ V4L2_STD_PAL_I,	"PAL-I"     },
+	{ V4L2_STD_PAL_DK,	"PAL-DK"    },
+	{ V4L2_STD_PAL_D,	"PAL-D"     },
+	{ V4L2_STD_PAL_D1,	"PAL-D1"    },
+	{ V4L2_STD_PAL_K,	"PAL-K"     },
+	{ V4L2_STD_PAL_M,	"PAL-M"     },
+	{ V4L2_STD_PAL_N,	"PAL-N"     },
+	{ V4L2_STD_PAL_Nc,	"PAL-Nc"    },
+	{ V4L2_STD_PAL_60,	"PAL-60"    },
+	{ V4L2_STD_SECAM,	"SECAM"     },
+	{ V4L2_STD_SECAM_B,	"SECAM-B"   },
+	{ V4L2_STD_SECAM_G,	"SECAM-G"   },
+	{ V4L2_STD_SECAM_H,	"SECAM-H"   },
+	{ V4L2_STD_SECAM_DK,	"SECAM-DK"  },
+	{ V4L2_STD_SECAM_D,	"SECAM-D"   },
+	{ V4L2_STD_SECAM_K,	"SECAM-K"   },
+	{ V4L2_STD_SECAM_K1,	"SECAM-K1"  },
+	{ V4L2_STD_SECAM_L,	"SECAM-L"   },
+	{ V4L2_STD_SECAM_LC,	"SECAM-Lc"  },
+	{ 0,			"Unknown"   }
 };
 
 /* video4linux standard ID conversion to standard name
@@ -1202,6 +1202,10 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
 	case V4L2_PIX_FMT_SGBRG10P:	descr = "10-bit Bayer GBGB/RGRG Packed"; break;
 	case V4L2_PIX_FMT_SGRBG10P:	descr = "10-bit Bayer GRGR/BGBG Packed"; break;
 	case V4L2_PIX_FMT_SRGGB10P:	descr = "10-bit Bayer RGRG/GBGB Packed"; break;
+	case V4L2_PIX_FMT_IPU3_SBGGR10: descr = "10-bit bayer BGGR IPU3 Packed"; break;
+	case V4L2_PIX_FMT_IPU3_SGBRG10: descr = "10-bit bayer GBRG IPU3 Packed"; break;
+	case V4L2_PIX_FMT_IPU3_SGRBG10: descr = "10-bit bayer GRBG IPU3 Packed"; break;
+	case V4L2_PIX_FMT_IPU3_SRGGB10: descr = "10-bit bayer RGGB IPU3 Packed"; break;
 	case V4L2_PIX_FMT_SBGGR10ALAW8:	descr = "8-bit Bayer BGBG/GRGR (A-law)"; break;
 	case V4L2_PIX_FMT_SGBRG10ALAW8:	descr = "8-bit Bayer GBGB/RGRG (A-law)"; break;
 	case V4L2_PIX_FMT_SGRBG10ALAW8:	descr = "8-bit Bayer GRGR/BGBG (A-law)"; break;
@@ -1246,6 +1250,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
 	case V4L2_TCH_FMT_TU08:		descr = "8-bit unsigned touch data"; break;
 	case V4L2_META_FMT_VSP1_HGO:	descr = "R-Car VSP1 1-D Histogram"; break;
 	case V4L2_META_FMT_VSP1_HGT:	descr = "R-Car VSP1 2-D Histogram"; break;
+	case V4L2_META_FMT_UVC:		descr = "UVC payload header metadata"; break;
 
 	default:
 		/* Compressed formats */
@@ -2507,7 +2512,7 @@ struct v4l2_ioctl_info {
 #define INFO_FL_CLEAR(v4l2_struct, field)			\
 	((offsetof(struct v4l2_struct, field) +			\
 	  sizeof(((struct v4l2_struct *)0)->field)) << 16)
-#define INFO_FL_CLEAR_MASK 	(_IOC_SIZEMASK << 16)
+#define INFO_FL_CLEAR_MASK	(_IOC_SIZEMASK << 16)
 
 #define IOCTL_INFO_STD(_ioctl, _vidioc, _debug, _flags)			\
 	[_IOC_NR(_ioctl)] = {						\

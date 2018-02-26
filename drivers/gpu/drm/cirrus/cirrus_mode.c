@@ -294,7 +294,22 @@ static void cirrus_crtc_prepare(struct drm_crtc *crtc)
 {
 }
 
-static void cirrus_crtc_load_lut(struct drm_crtc *crtc)
+/*
+ * This is called after a mode is programmed. It should reverse anything done
+ * by the prepare function
+ */
+static void cirrus_crtc_commit(struct drm_crtc *crtc)
+{
+}
+
+/*
+ * The core can pass us a set of gamma values to program. We actually only
+ * use this for 8-bit mode so can't perform smooth fades on deeper modes,
+ * but it's a requirement that we provide the function
+ */
+static int cirrus_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				 u16 *blue, uint32_t size,
+				 struct drm_modeset_acquire_ctx *ctx)
 {
 	struct drm_device *dev = crtc->dev;
 	struct cirrus_device *cdev = dev->dev_private;
@@ -302,7 +317,7 @@ static void cirrus_crtc_load_lut(struct drm_crtc *crtc)
 	int i;
 
 	if (!crtc->enabled)
-		return;
+		return 0;
 
 	r = crtc->gamma_store;
 	g = r + crtc->gamma_size;
@@ -315,27 +330,6 @@ static void cirrus_crtc_load_lut(struct drm_crtc *crtc)
 		WREG8(PALETTE_DATA, *g++ >> 8);
 		WREG8(PALETTE_DATA, *b++ >> 8);
 	}
-}
-
-/*
- * This is called after a mode is programmed. It should reverse anything done
- * by the prepare function
- */
-static void cirrus_crtc_commit(struct drm_crtc *crtc)
-{
-	cirrus_crtc_load_lut(crtc);
-}
-
-/*
- * The core can pass us a set of gamma values to program. We actually only
- * use this for 8-bit mode so can't perform smooth fades on deeper modes,
- * but it's a requirement that we provide the function
- */
-static int cirrus_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
-				 u16 *blue, uint32_t size,
-				 struct drm_modeset_acquire_ctx *ctx)
-{
-	cirrus_crtc_load_lut(crtc);
 
 	return 0;
 }

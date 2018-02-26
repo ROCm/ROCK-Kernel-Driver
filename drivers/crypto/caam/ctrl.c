@@ -228,16 +228,12 @@ static int instantiate_rng(struct device *ctrldev, int state_handle_mask,
 		 * without any error (HW optimizations for later
 		 * CAAM eras), then try again.
 		 */
-		if (ret)
-			break;
-
 		rdsta_val = rd_reg32(&ctrl->r4tst[0].rdsta) & RDSTA_IFMASK;
 		if ((status && status != JRSTA_SSRC_JUMP_HALT_CC) ||
-		    !(rdsta_val & (1 << sh_idx))) {
+		    !(rdsta_val & (1 << sh_idx)))
 			ret = -EAGAIN;
+		if (ret)
 			break;
-		}
-
 		dev_info(ctrldev, "Instantiated RNG4 SH%d\n", sh_idx);
 		/* Clear the contents before recreating the descriptor */
 		memset(desc, 0x00, CAAM_CMD_SZ * 7);
@@ -615,6 +611,8 @@ static int caam_probe(struct platform_device *pdev)
 		goto iounmap_ctrl;
 	}
 
+	ctrlpriv->era = caam_get_era();
+
 	ret = of_platform_populate(nprop, caam_match, NULL, dev);
 	if (ret) {
 		dev_err(dev, "JR platform devices creation error\n");
@@ -746,7 +744,7 @@ static int caam_probe(struct platform_device *pdev)
 
 	/* Report "alive" for developer to see */
 	dev_info(dev, "device ID = 0x%016llx (Era %d)\n", caam_id,
-		 caam_get_era());
+		 ctrlpriv->era);
 	dev_info(dev, "job rings = %d, qi = %d, dpaa2 = %s\n",
 		 ctrlpriv->total_jobrs, ctrlpriv->qi_present,
 		 caam_dpaa2 ? "yes" : "no");

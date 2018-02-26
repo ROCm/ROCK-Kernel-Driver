@@ -124,8 +124,8 @@ static inline void __uaccess_ttbr0_disable(void)
 	local_irq_save(flags);
 	ttbr = read_sysreg(ttbr1_el1);
 	ttbr &= ~TTBR_ASID_MASK;
-	/* reserved_ttbr0 placed at the end of swapper_pg_dir */
-	write_sysreg(ttbr + SWAPPER_DIR_SIZE, ttbr0_el1);
+	/* reserved_ttbr0 placed before swapper_pg_dir */
+	write_sysreg(ttbr - RESERVED_TTBR0_SIZE, ttbr0_el1);
 	isb();
 	/* Set reserved ASID */
 	write_sysreg(ttbr, ttbr1_el1);
@@ -184,6 +184,18 @@ static inline bool uaccess_ttbr0_enable(void)
 	return false;
 }
 #endif
+
+static inline void __uaccess_disable_hw_pan(void)
+{
+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,
+			CONFIG_ARM64_PAN));
+}
+
+static inline void __uaccess_enable_hw_pan(void)
+{
+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,
+			CONFIG_ARM64_PAN));
+}
 
 #define __uaccess_disable(alt)						\
 do {									\
