@@ -255,7 +255,8 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 
 	strcpy(info->fix.id, "amdgpudrmfb");
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->depth);
 #else
 	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->format->depth);
@@ -290,7 +291,8 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	DRM_INFO("fb mappable at 0x%lX\n",  info->fix.smem_start);
 	DRM_INFO("vram apper at 0x%lX\n",  (unsigned long)adev->gmc.aper_base);
 	DRM_INFO("size %lu\n", (unsigned long)amdgpu_bo_size(abo));
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	DRM_INFO("fb depth is %d\n", fb->depth);
 #else
 	DRM_INFO("fb depth is %d\n", fb->format->depth);
@@ -369,7 +371,8 @@ int amdgpu_fbdev_init(struct amdgpu_device *adev)
 			&amdgpu_fb_helper_funcs);
 
 	ret = drm_fb_helper_init(adev->ddev, &rfbdev->helper,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 				 adev->mode_info.num_crtc,
 #endif
 				 AMDGPUFB_CONN_LIMIT);
