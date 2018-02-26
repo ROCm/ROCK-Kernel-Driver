@@ -72,7 +72,8 @@ static inline int ttm_mem_type_from_place(const struct ttm_place *place,
 static void ttm_mem_type_debug(struct ttm_bo_device *bdev, int mem_type)
 {
 	struct ttm_mem_type_manager *man = &bdev->man[mem_type];
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 	struct drm_printer p = drm_debug_printer(TTM_PFX);
 #endif
 
@@ -84,7 +85,8 @@ static void ttm_mem_type_debug(struct ttm_bo_device *bdev, int mem_type)
 	pr_err("    available_caching: 0x%08X\n", man->available_caching);
 	pr_err("    default_caching: 0x%08X\n", man->default_caching);
 	if (mem_type != TTM_PL_SYSTEM)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 		(*man->func->debug)(man, &p);
 #else
 		(*man->func->debug)(man, TTM_PFX);
