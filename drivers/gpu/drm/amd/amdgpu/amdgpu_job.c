@@ -195,7 +195,8 @@ static struct dma_fence *amdgpu_job_run(struct drm_sched_job *sched_job)
 	if (job->vram_lost_counter != atomic_read(&adev->vram_lost_counter))
 		kcl_dma_fence_set_error(finished, -ECANCELED);/* skip IB as well if VRAM lost */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	if (finished->status < 0) {
 #else
 	if (finished->error < 0) {

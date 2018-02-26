@@ -1371,7 +1371,8 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data,
 		r = PTR_ERR(fence);
 	else if (fence) {
 		r = kcl_fence_wait_timeout(fence, true, timeout);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+		!defined(OS_NAME_RHEL_7_5)
 		if (r > 0 && fence->status)
 			r = fence->status;
 #else
@@ -1525,7 +1526,8 @@ static int amdgpu_cs_wait_all_fences(struct amdgpu_device *adev,
 		if (r == 0)
 			break;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+		!defined(OS_NAME_RHEL_7_5)
 		if (r > 0 && fence->status)
 			r = fence->status;
 #else
