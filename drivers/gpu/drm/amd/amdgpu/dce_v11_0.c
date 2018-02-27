@@ -1778,7 +1778,8 @@ static void dce_v11_0_afmt_setmode(struct drm_encoder *encoder,
 	dce_v11_0_audio_write_sad_regs(encoder);
 	dce_v11_0_audio_write_latency_fields(encoder, mode);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode);
 #else
 	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode, false);
