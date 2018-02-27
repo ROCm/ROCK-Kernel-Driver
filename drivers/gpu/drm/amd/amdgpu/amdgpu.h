@@ -1497,6 +1497,7 @@ struct amdgpu_ssg {
 struct amd_powerplay {
 	void *pp_handle;
 	const struct amd_pm_funcs *pp_funcs;
+	uint32_t pp_feature;
 };
 
 #define AMDGPU_RESET_MAGIC_NUM 64
