@@ -293,10 +293,11 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	/* wakeup usersapce */
 	if (amdgpu_crtc->event) {
 		/* Update to correct count/ts if racing with vblank irq */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0) || \
+		defined(OS_NAME_RHEL_7_5)
 		drm_crtc_accurate_vblank_count(&amdgpu_crtc->base);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || \
-		defined(OS_NAME_RHEL_7_4_5)
+		defined(OS_NAME_RHEL_7_4)
 		/* Update to correct count/ts if racing with vblank irq */
 		drm_accurate_vblank_count(&amdgpu_crtc->base);
 #endif

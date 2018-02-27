@@ -115,7 +115,8 @@ void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc)
 	if (!dc_stream_get_crc(stream_state->ctx->dc, stream_state,
 			       &crcs[0], &crcs[1], &crcs[2]))
 		return;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,14,0) || \
+	defined(OS_NAME_RHEL_7_5)
 	drm_crtc_add_crc_entry(crtc, true,
 			       drm_crtc_accurate_vblank_count(crtc), crcs);
 #else
