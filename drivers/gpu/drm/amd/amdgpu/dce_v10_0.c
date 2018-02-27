@@ -2533,7 +2533,8 @@ static void dce_v10_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green
 	dce_v10_0_crtc_load_lut(crtc);
 }
 #else
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 static int dce_v10_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
 				    u16 *blue, uint32_t size,
 				    struct drm_modeset_acquire_ctx *ctx)
