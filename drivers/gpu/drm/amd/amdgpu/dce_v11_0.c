@@ -1978,7 +1978,8 @@ static int dce_v11_0_crtc_do_set_base(struct drm_crtc *crtc,
 
 	pipe_config = AMDGPU_TILING_GET(tiling_flags, PIPE_CONFIG);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	switch (target_fb->pixel_format) {
 #else
 	switch (target_fb->format->format) {
@@ -2055,7 +2056,8 @@ static int dce_v11_0_crtc_do_set_base(struct drm_crtc *crtc,
 		break;
 	default:
 		DRM_ERROR("Unsupported screen format %s\n",
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+		!defined(OS_NAME_RHEL_7_5)
 		          kcl_drm_get_format_name(target_fb->pixel_format, &format_name));
 #else
 		          kcl_drm_get_format_name(target_fb->format->format, &format_name));
@@ -2134,7 +2136,8 @@ static int dce_v11_0_crtc_do_set_base(struct drm_crtc *crtc,
 	WREG32(mmGRPH_X_END + amdgpu_crtc->crtc_offset, target_fb->width);
 	WREG32(mmGRPH_Y_END + amdgpu_crtc->crtc_offset, target_fb->height);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	fb_pitch_pixels = target_fb->pitches[0] / (target_fb->bits_per_pixel / 8);
 #else
 	fb_pitch_pixels = target_fb->pitches[0] / target_fb->format->cpp[0];
