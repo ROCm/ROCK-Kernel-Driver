@@ -115,7 +115,8 @@ static int amdgpu_vram_mgr_new(struct ttm_mem_type_manager *man,
 	struct amdgpu_vram_mgr *mgr = man->priv;
 	struct drm_mm *mm = &mgr->mm;
 	struct drm_mm_node *nodes;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	enum drm_mm_search_flags sflags = DRM_MM_SEARCH_DEFAULT;
 	enum drm_mm_allocator_flags aflags = DRM_MM_CREATE_DEFAULT;
 #else
@@ -144,7 +145,8 @@ static int amdgpu_vram_mgr_new(struct ttm_mem_type_manager *man,
 	if (!nodes)
 		return -ENOMEM;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	if (place->flags & TTM_PL_FLAG_TOPDOWN) {
 		sflags = DRM_MM_SEARCH_BELOW;
 		aflags = DRM_MM_CREATE_TOP;
@@ -166,7 +168,8 @@ static int amdgpu_vram_mgr_new(struct ttm_mem_type_manager *man,
 
 		if (pages == pages_per_node)
 			alignment = pages_per_node;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+		!defined(OS_NAME_RHEL_7_5)
 		else
 			sflags |= DRM_MM_SEARCH_BEST;
 
@@ -292,7 +295,8 @@ uint64_t amdgpu_vram_mgr_vis_usage(struct ttm_mem_type_manager *man)
  * Dump the table content using printk.
  */
 static void amdgpu_vram_mgr_debug(struct ttm_mem_type_manager *man,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 				  struct drm_printer *printer)
 #else
 				  const char *prefix)
@@ -301,14 +305,16 @@ static void amdgpu_vram_mgr_debug(struct ttm_mem_type_manager *man,
 	struct amdgpu_vram_mgr *mgr = man->priv;
 
 	spin_lock(&mgr->lock);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 	drm_mm_print(&mgr->mm, printer);
 #else
 	drm_mm_debug_table(&mgr->mm, prefix);
 #endif
 	spin_unlock(&mgr->lock);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 	drm_printf(printer, "man size:%llu pages, ram usage:%lluMB, vis usage:%lluMB\n",
 		   man->size, amdgpu_vram_mgr_usage(man) >> 20,
 		   amdgpu_vram_mgr_vis_usage(man) >> 20);
