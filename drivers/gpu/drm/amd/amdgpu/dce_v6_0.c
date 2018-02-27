@@ -1429,7 +1429,12 @@ static void dce_v6_0_audio_set_avi_infoframe(struct drm_encoder *encoder,
 	ssize_t err;
 	u32 tmp;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode);
+#else
+	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode, false);
+#endif
 	if (err < 0) {
 		DRM_ERROR("failed to setup AVI infoframe: %zd\n", err);
 		return;
