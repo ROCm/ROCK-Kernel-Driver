@@ -115,7 +115,8 @@ static int amdgpu_gtt_mgr_alloc(struct ttm_mem_type_manager *man,
 	struct amdgpu_device *adev = amdgpu_ttm_adev(man->bdev);
 	struct amdgpu_gtt_mgr *mgr = man->priv;
 	struct amdgpu_gtt_node *node = mem->mm_node;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	enum drm_mm_search_flags sflags = DRM_MM_SEARCH_BEST;
 	enum drm_mm_allocator_flags aflags = DRM_MM_CREATE_DEFAULT;
 #else
@@ -137,7 +138,8 @@ static int amdgpu_gtt_mgr_alloc(struct ttm_mem_type_manager *man,
 	else
 		lpfn = adev->gart.num_cpu_pages;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	if (place && place->flags & TTM_PL_FLAG_TOPDOWN) {
 		sflags = DRM_MM_SEARCH_BELOW;
 		aflags = DRM_MM_CREATE_TOP;
@@ -149,7 +151,8 @@ static int amdgpu_gtt_mgr_alloc(struct ttm_mem_type_manager *man,
 #endif
 
 	spin_lock(&mgr->lock);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	r = drm_mm_insert_node_in_range_generic(&mgr->mm, &node->node,
 						mem->num_pages,
 						mem->page_alignment, 0,
@@ -298,7 +301,8 @@ int amdgpu_gtt_mgr_recover(struct ttm_mem_type_manager *man)
  * Dump the table content using printk.
  */
 static void amdgpu_gtt_mgr_debug(struct ttm_mem_type_manager *man,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 				 struct drm_printer *printer)
 #else
 				 const char *prefix)
@@ -307,14 +311,16 @@ static void amdgpu_gtt_mgr_debug(struct ttm_mem_type_manager *man,
 	struct amdgpu_gtt_mgr *mgr = man->priv;
 
 	spin_lock(&mgr->lock);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 	drm_mm_print(&mgr->mm, printer);
 #else
 	drm_mm_debug_table(&mgr->mm, prefix);
 #endif
 	spin_unlock(&mgr->lock);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 	drm_printf(printer, "man size:%llu pages, gtt available:%lld pages, usage:%lluMB\n",
 		   man->size, (u64)atomic64_read(&mgr->available),
 		   amdgpu_gtt_mgr_usage(man) >> 20);
