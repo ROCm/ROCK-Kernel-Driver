@@ -62,7 +62,9 @@ int amdgpu_debugfs_add_files(struct amdgpu_device *adev,
 	return 0;
 }
 
-#if defined(BUILD_AS_DKMS) &&  LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(BUILD_AS_DKMS) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 void amdgpu_debugfs_cleanup(struct drm_minor *minor)
 {
 	struct drm_info_node *node, *tmp;
