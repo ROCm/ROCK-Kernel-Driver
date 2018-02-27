@@ -1167,6 +1167,50 @@ static int kfd_ioctl_get_tile_config(struct file *filep,
 	return 0;
 }
 
+static int kfd_ioctl_acquire_vm(struct file *filep, struct kfd_process *p,
+				void *data)
+{
+	struct kfd_ioctl_acquire_vm_args *args = data;
+	struct kfd_process_device *pdd;
+	struct kfd_dev *dev;
+	struct file *drm_file;
+	int ret;
+
+	dev = kfd_device_by_id(args->gpu_id);
+	if (!dev)
+		return -EINVAL;
+
+	drm_file = fget(args->drm_fd);
+	if (!drm_file)
+		return -EINVAL;
+
+	mutex_lock(&p->mutex);
+
+	pdd = kfd_get_process_device_data(dev, p);
+	if (!pdd) {
+		ret = -EINVAL;
+		goto err_unlock;
+	}
+
+	if (pdd->drm_file) {
+		ret = pdd->drm_file == drm_file ? 0 : -EBUSY;
+		goto err_unlock;
+	}
+
+	ret = kfd_process_device_init_vm(pdd, drm_file);
+	if (ret)
+		goto err_unlock;
+	/* On success, the PDD keeps the drm_file reference */
+	mutex_unlock(&p->mutex);
+
+	return 0;
+
+err_unlock:
+	mutex_unlock(&p->mutex);
+	fput(drm_file);
+	return ret;
+}
+
 bool kfd_dev_is_large_bar(struct kfd_dev *dev)
 {
 	struct kfd_local_mem_info mem_info;
@@ -2097,7 +2141,10 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 				kfd_ioctl_cross_memory_copy, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_QUEUE_WAVE_STATE,
-				kfd_ioctl_get_queue_wave_state, 0)
+				kfd_ioctl_get_queue_wave_state, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ACQUIRE_VM,
+				kfd_ioctl_acquire_vm, 0)
 
 };
 

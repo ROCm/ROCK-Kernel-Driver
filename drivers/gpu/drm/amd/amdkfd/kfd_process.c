@@ -368,7 +368,9 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
 				 per_device_list) {
 		/* Destroy the GPUVM VM context */
-		if (pdd->vm)
+		if (pdd->drm_file)
+			fput(pdd->drm_file);
+		else if (pdd->vm)
 			pdd->dev->kfd2kgd->destroy_process_vm(
 				pdd->dev->kgd, pdd->vm);
 
@@ -716,7 +718,22 @@ err_create_pdd:
 	return NULL;
 }
 
-static int kfd_process_device_init_vm(struct kfd_process_device *pdd)
+/**
+ * kfd_process_device_init_vm - Initialize a VM for a process-device
+ *
+ * @pdd: The process-device
+ * @drm_file: Optional pointer to a DRM file descriptor
+ *
+ * If @drm_file is specified, it will be used to acquire the VM from
+ * that file descriptor. If successful, the @pdd takes ownership of
+ * the file descriptor.
+ *
+ * If @drm_file is NULL, a new VM is created.
+ *
+ * Returns 0 on success, -errno on failure.
+ */
+int kfd_process_device_init_vm(struct kfd_process_device *pdd,
+			       struct file *drm_file)
 {
 	struct kfd_process *p;
 	struct kfd_dev *dev;
@@ -728,8 +745,12 @@ static int kfd_process_device_init_vm(struct kfd_process_device *pdd)
 	p = pdd->process;
 	dev = pdd->dev;
 
-	ret = dev->kfd2kgd->create_process_vm(dev->kgd, &pdd->vm,
-					      &p->process_info, &p->ef);
+	if (drm_file)
+		ret = dev->kfd2kgd->acquire_process_vm(
+			dev->kgd, drm_file, &pdd->vm, &p->process_info, &p->ef);
+	else
+		ret = dev->kfd2kgd->create_process_vm(
+			dev->kgd, &pdd->vm, &p->process_info, &p->ef);
 	if (ret) {
 		pr_err("Failed to create process VM object\n");
 		return ret;
@@ -742,12 +763,15 @@ static int kfd_process_device_init_vm(struct kfd_process_device *pdd)
 	if (ret)
 		goto err_init_cwsr;
 
+	pdd->drm_file = drm_file;
+
 	return 0;
 
 err_init_cwsr:
 err_reserve_ib_mem:
 	kfd_process_device_free_bos(pdd);
-	dev->kfd2kgd->destroy_process_vm(dev->kgd, pdd->vm);
+	if (!drm_file)
+		dev->kfd2kgd->destroy_process_vm(dev->kgd, pdd->vm);
 	pdd->vm = NULL;
 
 	return ret;
@@ -776,7 +800,7 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 	if (err)
 		return ERR_PTR(err);
 
-	err = kfd_process_device_init_vm(pdd);
+	err = kfd_process_device_init_vm(pdd, NULL);
 	if (err)
 		return ERR_PTR(err);
 

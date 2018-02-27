@@ -649,6 +649,7 @@ struct kfd_process_device {
 	uint64_t scratch_limit;
 
 	/* VM context for GPUVM allocations */
+	struct file *drm_file;
 	void *vm;
 
 	/* GPUVM allocations storage */
@@ -778,6 +779,8 @@ void kfd_unref_process(struct kfd_process *p);
 void kfd_suspend_all_processes(void);
 int kfd_resume_all_processes(void);
 
+int kfd_process_device_init_vm(struct kfd_process_device *pdd,
+			       struct file *drm_file);
 struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 							struct kfd_process *p);
 struct kfd_process_device *kfd_get_process_device_data(struct kfd_dev *dev,
