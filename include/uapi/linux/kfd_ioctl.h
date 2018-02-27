@@ -278,6 +278,11 @@ struct kfd_ioctl_alloc_memory_of_scratch_args {
 	uint32_t pad;
 };
 
+struct kfd_ioctl_acquire_vm_args {
+	uint32_t drm_fd;	/* to KFD */
+	uint32_t gpu_id;	/* to KFD */
+};
+
 /* Allocation flags: memory types */
 #define KFD_IOC_ALLOC_MEM_FLAGS_VRAM		(1 << 0)
 #define KFD_IOC_ALLOC_MEM_FLAGS_GTT		(1 << 1)
@@ -516,7 +521,10 @@ struct kfd_ioctl_cross_memory_copy_args {
 #define AMDKFD_IOC_GET_QUEUE_WAVE_STATE		\
 		AMDKFD_IOWR(0x20, struct kfd_ioctl_get_queue_wave_state_args)
 
+#define AMDKFD_IOC_ACQUIRE_VM			\
+		AMDKFD_IOW(0x21, struct kfd_ioctl_acquire_vm_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x21
+#define AMDKFD_COMMAND_END		0x22
 
 #endif
