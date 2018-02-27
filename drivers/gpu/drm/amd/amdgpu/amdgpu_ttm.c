@@ -650,6 +650,7 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 	struct ttm_mem_type_manager *man = &bdev->man[mem->mem_type];
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bdev);
 	struct ttm_mem_reg backup;
+	struct drm_mm_node *mm_node = mem->mm_node;
 
 	backup = *mem;
 	mem->bus.addr = NULL;
@@ -672,6 +673,15 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 		/* check if it's visible */
 		if ((mem->bus.offset + mem->bus.size) > adev->gmc.visible_vram_size)
 			return -EINVAL;
+		/* Only physically contiguous buffers apply. In a contiguous
+		 * buffer, size of the first mm_node would match the number of
+		 * pages in ttm_mem_reg.
+		 */
+		if (adev->mman.aper_base_kaddr &&
+		    (mm_node->size == mem->num_pages))
+			mem->bus.addr = (u8 *)adev->mman.aper_base_kaddr +
+					mem->bus.offset;
+
 		mem->bus.base = adev->gmc.aper_base;
 		mem->bus.is_iomem = true;
 		break;
@@ -1596,6 +1606,10 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 
 	/* Change the size here instead of the init above so only lpfn is affected */
 	amdgpu_ttm_set_active_vram_size(adev, adev->gmc.visible_vram_size);
+#ifdef CONFIG_64BIT
+	adev->mman.aper_base_kaddr = ioremap_wc(adev->gmc.aper_base,
+						adev->gmc.visible_vram_size);
+#endif
 
 	/*
 	 *The reserved vram for firmware must be pinned to the specified
@@ -1691,6 +1705,9 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 	amdgpu_ttm_debugfs_fini(adev);
 	amdgpu_bo_free_kernel(&adev->stolen_vga_memory, NULL, NULL);
 	amdgpu_ttm_fw_reserve_vram_fini(adev);
+	if (adev->mman.aper_base_kaddr)
+		iounmap(adev->mman.aper_base_kaddr);
+	adev->mman.aper_base_kaddr = NULL;
 
 	amdgpu_ssg_fini(adev);
 	amdgpu_direct_gma_fini(adev);
