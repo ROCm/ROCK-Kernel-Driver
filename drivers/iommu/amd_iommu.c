@@ -616,9 +616,8 @@ retry:
 		       address, flags);
 		break;
 	default:
-		printk(KERN_ERR "UNKNOWN device=%02x:%02x.%x type=0x%x "
+		printk(KERN_ERR "UNKNOWN type=0x%02x event[0]=0x%08x "
 		       "event[1]=0x%08x event[2]=0x%08x event[3]=0x%08x\n",
-		       PCI_BUS_NUM(devid), PCI_SLOT(devid), PCI_FUNC(devid),
 		       type, event[0], event[1], event[2], event[3]);
 	}
 
