@@ -138,6 +138,11 @@ static int kfd_open(struct inode *inode, struct file *filep)
 	if (IS_ERR(process))
 		return PTR_ERR(process);
 
+	if (kfd_is_locked()) {
+		kfd_unref_process(process);
+		return -EAGAIN;
+	}
+
 	dev_dbg(kfd_device, "process %d opened, compat mode (32 bit) - %d\n",
 		process->pasid, process->is_32bit_user_mode);
 

@@ -1022,3 +1022,8 @@ void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 	mutex_unlock(&p->event_mutex);
 	kfd_unref_process(p);
 }
+
+void kfd_signal_reset_event(struct kfd_dev *dev)
+{
+	/*todo*/
+}
