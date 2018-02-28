@@ -2424,7 +2424,9 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info, struct dma_fence **ef)
 			pr_debug("Memory eviction: Validate BOs failed. Try again\n");
 			goto validate_map_fail;
 		}
-		ret = amdgpu_sync_fence(NULL, &sync_obj, bo->tbo.moving, false);
+
+		ret = amdgpu_sync_fence(amdgpu_ttm_adev(bo->tbo.bdev),
+					&sync_obj, bo->tbo.moving, false);
 		if (ret) {
 			pr_debug("Memory eviction: Sync BO fence failed. Try again\n");
 			goto validate_map_fail;
