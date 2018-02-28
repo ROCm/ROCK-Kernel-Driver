@@ -1039,7 +1039,8 @@ struct amdgpu_cs_parser {
 	/* user fence */
 	struct amdgpu_bo_list_entry	uf_entry;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 	unsigned num_post_dep_syncobjs;
 	struct drm_syncobj **post_dep_syncobjs;
 #endif

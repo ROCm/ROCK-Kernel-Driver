@@ -25,12 +25,14 @@
  *    Jerome Glisse <glisse@freedesktop.org>
  */
 #include <linux/pagemap.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 #include <linux/sync_file.h>
 #endif
 #include <drm/drmP.h>
 #include <drm/amdgpu_drm.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 #include <drm/drm_syncobj.h>
 #endif
 #include "amdgpu.h"
@@ -173,7 +175,8 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, void *data)
 			break;
 
 		case AMDGPU_CHUNK_ID_DEPENDENCIES:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0) || \
+		defined(OS_NAME_RHEL_7_5)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_IN:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_OUT:
 #endif
@@ -801,7 +804,8 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 		ttm_eu_backoff_reservation(&parser->ticket,
 					   &parser->validated);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 	for (i = 0; i < parser->num_post_dep_syncobjs; i++)
 		drm_syncobj_put(parser->post_dep_syncobjs[i]);
 	kfree(parser->post_dep_syncobjs);
@@ -1114,13 +1118,16 @@ static int amdgpu_cs_process_fence_dep(struct amdgpu_cs_parser *p,
 	return 0;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 static int amdgpu_syncobj_lookup_and_add_to_sync(struct amdgpu_cs_parser *p,
 						 uint32_t handle)
 {
 	int r;
 	struct dma_fence *fence;
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#if defined(BUILD_AS_DKMS) && \
+	LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	r = drm_syncobj_fence_get(p->filp, handle, &fence);
 #else
 	r = drm_syncobj_find_fence(p->filp, handle, &fence);
@@ -1195,7 +1202,8 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 			r = amdgpu_cs_process_fence_dep(p, chunk);
 			if (r)
 				return r;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0) || \
+		defined(OS_NAME_RHEL_7_5)
 		} else if (chunk->chunk_id == AMDGPU_CHUNK_ID_SYNCOBJ_IN) {
 			r = amdgpu_cs_process_syncobj_in_dep(p, chunk);
 			if (r)
@@ -1211,7 +1219,8 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 	return amdgpu_sem_add_cs(p->ctx, p->job->ring, &p->job->sync);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 {
 	int i;
@@ -1268,7 +1277,8 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 		return r;
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 	amdgpu_cs_post_dependencies(p);
 #endif
 
