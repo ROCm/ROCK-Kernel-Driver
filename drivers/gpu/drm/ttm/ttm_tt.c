@@ -85,9 +85,6 @@ int ttm_tt_create(struct ttm_buffer_object *bo, bool zero_alloc)
 	if (unlikely(bo->ttm == NULL))
 		return -ENOMEM;
 
-	if (bo->type == ttm_bo_type_sg)
-		bo->ttm->sg = bo->sg;
-
 	return 0;
 }
 
@@ -271,6 +268,7 @@ void ttm_tt_init_fields(struct ttm_tt *ttm, struct ttm_buffer_object *bo,
 	ttm->page_flags = page_flags;
 	ttm->state = tt_unpopulated;
 	ttm->swap_storage = NULL;
+	ttm->sg = bo->sg;
 }
 
 int ttm_tt_init(struct ttm_tt *ttm, struct ttm_buffer_object *bo,
