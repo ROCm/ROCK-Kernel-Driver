@@ -231,9 +231,7 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 	switch (bo->mem.mem_type) {
 	case TTM_PL_VRAM:
 	case AMDGPU_PL_DGMA:
-		if (adev->mman.buffer_funcs &&
-		    adev->mman.buffer_funcs_ring &&
-		    adev->mman.buffer_funcs_ring->ready == false) {
+		if (!adev->mman.buffer_funcs_enabled) {
 			amdgpu_ttm_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_CPU);
 		} else if (adev->gmc.visible_vram_size < adev->gmc.real_vram_size &&
 			   !(abo->flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED)) {
@@ -355,7 +353,7 @@ int amdgpu_ttm_copy_mem_to_mem(struct amdgpu_device *adev,
 	const uint64_t GTT_MAX_BYTES = (AMDGPU_GTT_MAX_TRANSFER_SIZE *
 					AMDGPU_GPU_PAGE_SIZE);
 
-	if (!ring->ready) {
+	if (!adev->mman.buffer_funcs_enabled) {
 		DRM_ERROR("Trying to move memory with ring turned off.\n");
 		return -EINVAL;
 	}
@@ -605,12 +603,9 @@ static int amdgpu_bo_move(struct ttm_buffer_object *bo, bool evict,
 		amdgpu_move_null(bo, new_mem);
 		return 0;
 	}
-	if (adev->mman.buffer_funcs == NULL ||
-	    adev->mman.buffer_funcs_ring == NULL ||
-	    !adev->mman.buffer_funcs_ring->ready) {
-		/* use memcpy */
+
+	if (!adev->mman.buffer_funcs_enabled)
 		goto memcpy;
-	}
 
 	if (old_mem->mem_type == TTM_PL_VRAM &&
 	    new_mem->mem_type == TTM_PL_SYSTEM) {
@@ -1748,6 +1743,7 @@ void amdgpu_ttm_set_buffer_funcs_status(struct amdgpu_device *adev, bool enable)
 	else
 		size = adev->gmc.visible_vram_size;
 	man->size = size >> PAGE_SHIFT;
+	adev->mman.buffer_funcs_enabled = enable;
 }
 
 int amdgpu_mmap(struct file *filp, struct vm_area_struct *vma)
@@ -1846,6 +1842,11 @@ int amdgpu_copy_buffer(struct amdgpu_ring *ring, uint64_t src_offset,
 	unsigned i;
 	int r;
 
+	if (direct_submit && !ring->ready) {
+		DRM_ERROR("Trying to move memory with ring turned off.\n");
+		return -EINVAL;
+	}
+
 	max_bytes = adev->mman.buffer_funcs->copy_max_bytes;
 	num_loops = DIV_ROUND_UP(byte_count, max_bytes);
 	num_dw = num_loops * adev->mman.buffer_funcs->copy_num_dw;
@@ -1919,7 +1920,7 @@ int amdgpu_fill_buffer(struct amdgpu_bo *bo,
 	struct amdgpu_job *job;
 	int r;
 
-	if (!ring->ready) {
+	if (!adev->mman.buffer_funcs_enabled) {
 		DRM_ERROR("Trying to clear memory with ring turned off.\n");
 		return -EINVAL;
 	}
