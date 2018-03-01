@@ -1939,7 +1939,8 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 
 	if (amdgpu_device_is_px(ddev))
 		runtime = true;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 	if (!pci_is_thunderbolt_attached(adev->pdev))
 #endif
 		kcl_vga_switcheroo_register_client(adev->pdev,
@@ -2151,7 +2152,8 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 
 	kfree(adev->bios);
 	adev->bios = NULL;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 	if (!pci_is_thunderbolt_attached(adev->pdev))
 #endif
 		vga_switcheroo_unregister_client(adev->pdev);
