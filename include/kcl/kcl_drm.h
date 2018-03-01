@@ -188,7 +188,8 @@ static inline void kcl_drm_fb_helper_release_fbi(struct drm_fb_helper *fb_helper
 #ifdef BUILD_AS_DKMS
 	_kcl_drm_fb_helper_release_fbi(fb_helper);
 #else
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	drm_fb_helper_release_fbi(fb_helper);
 #endif
 #endif
@@ -407,7 +408,8 @@ static inline const char *kcl_drm_get_format_name(uint32_t format, struct drm_fo
 
 static inline void kcl_drm_gem_object_put_unlocked(struct drm_gem_object *obj)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	return drm_gem_object_unreference_unlocked(obj);
 #else
 	return drm_gem_object_put_unlocked(obj);
@@ -424,7 +426,8 @@ extern struct dma_buf_ops *_kcl_drm_gem_prime_dmabuf_ops;
 bool drm_is_current_master(struct drm_file *fpriv);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 static inline struct drm_crtc_state *
 kcl_drm_atomic_get_old_crtc_state_before_commit(struct drm_atomic_state *state,
 					    struct drm_crtc *crtc)

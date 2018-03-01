@@ -142,7 +142,8 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 	    amdgpu_has_atpx() &&
 	    (amdgpu_is_atpx_hybrid() ||
 	     amdgpu_has_atpx_dgpu_power_cntl()) &&
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	    ((flags & AMD_IS_APU) == 0))
 #else
 	    ((flags & AMD_IS_APU) == 0) &&

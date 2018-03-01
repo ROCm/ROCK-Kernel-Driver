@@ -658,7 +658,8 @@ static int dm_suspend(void *handle)
 
 static struct amdgpu_dm_connector *
 amdgpu_dm_find_first_crtc_matching_connector(struct drm_atomic_state *state,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 					     struct drm_crtc *crtc,
 					     bool from_state_var)
 #else
@@ -670,7 +671,8 @@ amdgpu_dm_find_first_crtc_matching_connector(struct drm_atomic_state *state,
 	struct drm_connector *connector;
 	struct drm_crtc *crtc_from_state;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_connector_in_state(state, connector, new_con_state, i) {
 		crtc_from_state = from_state_var ? new_con_state->crtc :
 						   connector->state->crtc;
@@ -749,7 +751,8 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 	}
 
 	/* Force mode set in atomic comit */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_crtc_in_state(adev->dm.cached_state, crtc, new_crtc_state, i)
 #else
 	for_each_new_crtc_in_state(adev->dm.cached_state, crtc, new_crtc_state, i)
@@ -761,7 +764,8 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 	 * them here, since they were duplicated as part of the suspend
 	 * procedure.
 	 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_crtc_in_state(adev->dm.cached_state, crtc, new_crtc_state, i) {
 #else
 	for_each_new_crtc_in_state(adev->dm.cached_state, crtc, new_crtc_state, i) {
@@ -774,7 +778,8 @@ int amdgpu_dm_display_resume(struct amdgpu_device *adev)
 		}
 	}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_plane_in_state(adev->dm.cached_state, plane, new_plane_state, i) {
 #else
 	for_each_new_plane_in_state(adev->dm.cached_state, plane, new_plane_state, i) {
@@ -3434,13 +3439,14 @@ static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 	return 0;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || \
+	defined(OS_NAME_RHEL_7_5)
 static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
 				       struct drm_plane_state *old_state)
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0) || \
 	defined(OS_NAME_RHEL_6) || \
 	defined(OS_NAME_RHEL_7_3) || \
-	defined(OS_NAME_RHEL_7_4_5)
+	defined(OS_NAME_RHEL_7_4)
 static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
 				       const struct drm_plane_state *old_state)
 #else
@@ -4262,7 +4268,8 @@ static void amdgpu_dm_do_flip(struct drm_crtc *crtc,
 	struct amdgpu_framebuffer *afb = to_amdgpu_framebuffer(fb);
 	struct amdgpu_bo *abo = gem_to_amdgpu_bo(afb->obj);
 	struct amdgpu_device *adev = crtc->dev->dev_private;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	bool async_flip = (acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
 #else
 	bool async_flip = (crtc->state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
@@ -4358,7 +4365,8 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	struct dc_plane_state *plane_states_constructed[MAX_SURFACES];
 	struct amdgpu_crtc *acrtc_attach = to_amdgpu_crtc(pcrtc);
 	struct drm_crtc_state *new_pcrtc_state =
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 			kcl_drm_atomic_get_new_crtc_state_after_commit(state, pcrtc);
 #else
 			drm_atomic_get_new_crtc_state(state, pcrtc);
@@ -4369,7 +4377,8 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	unsigned long flags;
 
 	/* update planes when needed */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_plane_in_state(state, plane, old_plane_state, i) {
 		new_plane_state = plane->state;
 #else
@@ -4389,7 +4398,8 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		if (!fb || !crtc || pcrtc != crtc)
 			continue;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+		!defined(OS_NAME_RHEL_7_5)
 		new_crtc_state =
 			kcl_drm_atomic_get_new_crtc_state_after_commit(
 			state, crtc);
@@ -4425,7 +4435,8 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			 * TODO Check if it's correct
 			 */
 			*wait_for_vblank =
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+		!defined(OS_NAME_RHEL_7_5)
 					acrtc_attach->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC ?
 #else
 					new_pcrtc_state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC ?
@@ -4450,7 +4461,8 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 				crtc->state->event,
 				acrtc_attach->flip_flags);
 #endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+			!defined(OS_NAME_RHEL_7_5)
 			/*TODO BUG remove ASAP in 4.12 to avoid race between worker and flip IOCTL */
 
 			/*clean up the flags for next usage*/
@@ -4513,7 +4525,8 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 	 * it will update crtc->dm_crtc_state->stream pointer which is used in
 	 * the ISRs.
 	 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
 		old_crtc_state = crtc->state;
 #else
@@ -4586,7 +4599,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	dm_state = to_dm_atomic_state(state);
 
 	/* update changed items */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		new_crtc_state = crtc->state;
 #else
@@ -4666,7 +4680,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	 * are removed from freesync module
 	 */
 	if (adev->dm.freesync_module) {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+		!defined(OS_NAME_RHEL_7_5)
 		for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 			new_crtc_state = crtc->state;
 #else
@@ -4698,7 +4713,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 			aconnector =
 				amdgpu_dm_find_first_crtc_matching_connector(
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+			!defined(OS_NAME_RHEL_7_5)
 					state, crtc, false);
 #else
 					state, crtc);
@@ -4715,7 +4731,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 			mod_freesync_add_stream(adev->dm.freesync_module,
 						dm_new_crtc_state->stream,
 						&aconnector->caps);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+			!defined(OS_NAME_RHEL_7_5)
 			new_con_state = aconnector->base.state;
 #else
 			new_con_state = drm_atomic_get_new_connector_state(
@@ -4735,7 +4752,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		WARN_ON(!dc_commit_state(dm->dc, dm_state->context));
 	}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		new_crtc_state = crtc->state;
 #else
@@ -4757,7 +4775,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	}
 
 	/* Handle scaling and underscan changes*/
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_connector_in_state(state, connector, old_con_state, i) {
 		new_con_state = connector->state;
 #else
@@ -4769,7 +4788,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		struct dc_stream_status *status = NULL;
 
 		if (acrtc)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+			!defined(OS_NAME_RHEL_7_5)
 			new_crtc_state = acrtc->base.state;
 #else
 			new_crtc_state = drm_atomic_get_new_crtc_state(state, &acrtc->base);
@@ -4805,7 +4825,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 			dm_error("%s: Failed to update stream scaling!\n", __func__);
 	}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		new_crtc_state = crtc->state;
 #else
@@ -4837,7 +4858,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	}
 
 	/* update planes when needed per crtc*/
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		new_crtc_state = crtc->state;
 #else
@@ -4856,7 +4878,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	 * mark consumed event for drm_atomic_helper_commit_hw_done
 	 */
 	spin_lock_irqsave(&adev->ddev->event_lock, flags);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		new_crtc_state = crtc->state;
 #else
@@ -4878,7 +4901,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 #endif
 
 	if (wait_for_vblank)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && \
+		!defined(OS_NAME_RHEL_7_5)
 		drm_atomic_helper_wait_for_vblanks(dev, state);
 #else
 		drm_atomic_helper_wait_for_flip_done(dev, state);
@@ -5057,7 +5081,8 @@ static int dm_update_crtcs_state(struct dc *dc,
 
 	/*TODO Move this code into dm_crtc_atomic_check once we get rid of dc_validation_set */
 	/* update changed items */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
 		old_crtc_state = crtc->state;
 #else
@@ -5075,7 +5100,8 @@ static int dm_update_crtcs_state(struct dc *dc,
 		acrtc = to_amdgpu_crtc(crtc);
 
 		aconnector = amdgpu_dm_find_first_crtc_matching_connector(
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+		!defined(OS_NAME_RHEL_7_5)
 			     state, crtc, true);
 #else
 			     state, crtc);
@@ -5230,7 +5256,8 @@ static int dm_update_planes_state(struct dc *dc,
 		return ret;
 
 	/* Add new planes */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_plane_in_state(state, plane, new_plane_state, i) {
 		old_plane_state = plane->state;
 #else
@@ -5251,7 +5278,8 @@ static int dm_update_planes_state(struct dc *dc,
 			if (!old_plane_crtc)
 				continue;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+			!defined(OS_NAME_RHEL_7_5)
 			old_crtc_state = kcl_drm_atomic_get_old_crtc_state_before_commit(
 #else
 			old_crtc_state = drm_atomic_get_old_crtc_state(
@@ -5283,7 +5311,8 @@ static int dm_update_planes_state(struct dc *dc,
 
 		} else { /* Add new planes */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+			!defined(OS_NAME_RHEL_7_5)
 			if (drm_atomic_plane_disabling(plane, old_plane_state))
 #else
 			if (drm_atomic_plane_disabling(plane->state, new_plane_state))
@@ -5293,7 +5322,8 @@ static int dm_update_planes_state(struct dc *dc,
 			if (!new_plane_crtc)
 				continue;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+			!defined(OS_NAME_RHEL_7_5)
 			new_crtc_state =
 				kcl_drm_atomic_get_new_crtc_state_before_commit(
 				state, new_plane_crtc);
@@ -5372,7 +5402,8 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	if (ret)
 		goto fail;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
 		old_crtc_state = crtc->state;
 #else
@@ -5438,7 +5469,8 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	 * new stream into context w\o causing full reset. Need to
 	 * decide how to handle.
 	 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	for_each_connector_in_state(state, connector, new_con_state, i) {
 		old_con_state = connector->state;
 #else
@@ -5450,7 +5482,8 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 		/* Skip any modesets/resets */
 		if (!acrtc || drm_atomic_crtc_needs_modeset(
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+		!defined(OS_NAME_RHEL_7_5)
 				acrtc->base.state))
 #else
 				drm_atomic_get_new_crtc_state(state, &acrtc->base)))
@@ -5598,7 +5631,8 @@ void amdgpu_dm_add_sink_to_freesync_module(struct drm_connector *connector,
 			dm_con_state->freesync_capable = true;
 		}
 	}
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	drm_object_property_set_value(&connector->base,
 				      adev->mode_info.freesync_capable_property,
 				      dm_con_state->freesync_capable);
@@ -5637,7 +5671,8 @@ void amdgpu_dm_remove_sink_from_freesync_module(struct drm_connector *connector)
 	dm_con_state->user_enable.enable_for_static = false;
 	dm_con_state->user_enable.enable_for_video = false;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 	drm_object_property_set_value(&connector->base,
 				      adev->mode_info.freesync_capable_property,
 				      dm_con_state->freesync_capable);
