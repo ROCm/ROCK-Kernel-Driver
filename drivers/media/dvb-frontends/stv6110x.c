@@ -26,7 +26,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 
-#include "dvb_frontend.h"
+#include <media/dvb_frontend.h>
 
 #include "stv6110x_reg.h"
 #include "stv6110x.h"
@@ -46,7 +46,7 @@ static int stv6110x_read_reg(struct stv6110x_state *stv6110x, u8 reg, u8 *data)
 	u8 b0[] = { reg };
 	u8 b1[] = { 0 };
 	struct i2c_msg msg[] = {
-		{ .addr = config->addr, .flags = 0, 	   .buf = b0, .len = 1 },
+		{ .addr = config->addr, .flags = 0,	   .buf = b0, .len = 1 },
 		{ .addr = config->addr, .flags = I2C_M_RD, .buf = b1, .len = 1 }
 	};
 

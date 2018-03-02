@@ -90,6 +90,7 @@ static inline void update_numa_cpu_lookup_table(unsigned int cpu, int node) {}
 extern int start_topology_update(void);
 extern int stop_topology_update(void);
 extern int prrn_is_enabled(void);
+extern int find_and_online_cpu_nid(int cpu);
 #else
 static inline int start_topology_update(void)
 {
@@ -100,6 +101,10 @@ static inline int stop_topology_update(void)
 	return 0;
 }
 static inline int prrn_is_enabled(void)
+{
+	return 0;
+}
+static inline int find_and_online_cpu_nid(int cpu)
 {
 	return 0;
 }

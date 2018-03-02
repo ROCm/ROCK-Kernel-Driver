@@ -88,6 +88,7 @@ enum {
 #define RDS_RECONNECT_PENDING	1
 #define RDS_IN_XMIT		2
 #define RDS_RECV_REFILL		3
+#define	RDS_DESTROY_PENDING	4
 
 /* Max number of multipaths per RDS connection. Must be a power of 2 */
 #define	RDS_MPATH_WORKERS	8
@@ -139,8 +140,7 @@ struct rds_connection {
 	__be32			c_faddr;
 	unsigned int		c_loopback:1,
 				c_ping_triggered:1,
-				c_destroy_in_prog:1,
-				c_pad_to_32:29;
+				c_pad_to_32:30;
 	int			c_npaths;
 	struct rds_connection	*c_passive;
 	struct rds_transport	*c_trans;
@@ -518,6 +518,7 @@ struct rds_transport {
 	void (*sync_mr)(void *trans_private, int direction);
 	void (*free_mr)(void *trans_private, int invalidate);
 	void (*flush_mrs)(void);
+	bool (*t_unloading)(struct rds_connection *conn);
 };
 
 struct rds_sock {
@@ -860,6 +861,12 @@ static inline void rds_mr_put(struct rds_mr *mr)
 {
 	if (refcount_dec_and_test(&mr->r_refcount))
 		__rds_put_mr_final(mr);
+}
+
+static inline bool rds_destroy_pending(struct rds_connection *conn)
+{
+	return !check_net(rds_conn_net(conn)) ||
+	       (conn->c_trans->t_unloading && conn->c_trans->t_unloading(conn));
 }
 
 /* stats.c */

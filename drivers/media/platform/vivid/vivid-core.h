@@ -27,7 +27,7 @@
 #include <media/v4l2-device.h>
 #include <media/v4l2-dev.h>
 #include <media/v4l2-ctrls.h>
-#include <media/v4l2-tpg.h>
+#include <media/tpg/v4l2-tpg.h>
 #include "vivid-rds-gen.h"
 #include "vivid-vbi-gen.h"
 
@@ -511,7 +511,7 @@ struct vivid_dev {
 
 	/* Shared between radio receiver and transmitter */
 	bool				radio_rds_loop;
-	struct timespec			radio_rds_init_ts;
+	ktime_t				radio_rds_init_time;
 
 	/* CEC */
 	struct cec_adapter		*cec_rx_adap;

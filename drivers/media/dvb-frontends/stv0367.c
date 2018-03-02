@@ -25,7 +25,7 @@
 #include <linux/slab.h>
 #include <linux/i2c.h>
 
-#include "dvb_math.h"
+#include <media/dvb_math.h>
 
 #include "stv0367.h"
 #include "stv0367_defs.h"
@@ -1549,7 +1549,6 @@ static int stv0367ter_read_ber(struct dvb_frontend *fe, u32 *ber)
 	} else if (abc == 0x7) {
 		if (Errors <= 4) {
 			temporary = (Errors * 1000000000) / (8 * (1 << 14));
-			temporary =  temporary;
 		} else if (Errors <= 42) {
 			temporary = (Errors * 100000000) / (8 * (1 << 14));
 			temporary = temporary * 10;
@@ -1627,7 +1626,6 @@ static u32 stv0367ter_get_per(struct stv0367_state *state)
 	else if (abc == 0x9) {
 		if (Errors <= 4) {
 			temporary = (Errors * 1000000000) / (8 * (1 << 8));
-			temporary =  temporary;
 		} else if (Errors <= 42) {
 			temporary = (Errors * 100000000) / (8 * (1 << 8));
 			temporary = temporary * 10;

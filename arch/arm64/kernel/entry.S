@@ -324,6 +324,10 @@ alternative_else_nop_endif
 	ldp	x28, x29, [sp, #16 * 14]
 	ldr	lr, [sp, #S_LR]
 	add	sp, sp, #S_FRAME_SIZE		// restore sp
+	/*
+	 * ARCH_HAS_MEMBARRIER_SYNC_CORE rely on eret context synchronization
+	 * when returning from IPI handler, and when returning to user-space.
+	 */
 
 	.if	\el == 0
 alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
@@ -1000,7 +1004,7 @@ __ni_sys_trace:
 
 	.macro tramp_map_kernel, tmp
 	mrs	\tmp, ttbr1_el1
-	sub	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
+	add	\tmp, \tmp, #(PAGE_SIZE + RESERVED_TTBR0_SIZE)
 	bic	\tmp, \tmp, #USER_ASID_FLAG
 	msr	ttbr1_el1, \tmp
 #ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
@@ -1019,7 +1023,7 @@ alternative_else_nop_endif
 
 	.macro tramp_unmap_kernel, tmp
 	mrs	\tmp, ttbr1_el1
-	add	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
+	sub	\tmp, \tmp, #(PAGE_SIZE + RESERVED_TTBR0_SIZE)
 	orr	\tmp, \tmp, #USER_ASID_FLAG
 	msr	ttbr1_el1, \tmp
 	/*
@@ -1156,3 +1160,180 @@ ENTRY(ret_from_fork)
 	b	ret_to_user
 ENDPROC(ret_from_fork)
 NOKPROBE(ret_from_fork)
+
+#ifdef CONFIG_ARM_SDE_INTERFACE
+
+#include <asm/sdei.h>
+#include <uapi/linux/arm_sdei.h>
+
+.macro sdei_handler_exit exit_mode
+	/* On success, this call never returns... */
+	cmp	\exit_mode, #SDEI_EXIT_SMC
+	b.ne	99f
+	smc	#0
+	b	.
+99:	hvc	#0
+	b	.
+.endm
+
+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+/*
+ * The regular SDEI entry point may have been unmapped along with the rest of
+ * the kernel. This trampoline restores the kernel mapping to make the x1 memory
+ * argument accessible.
+ *
+ * This clobbers x4, __sdei_handler() will restore this from firmware's
+ * copy.
+ */
+.ltorg
+.pushsection ".entry.tramp.text", "ax"
+ENTRY(__sdei_asm_entry_trampoline)
+	mrs	x4, ttbr1_el1
+	tbz	x4, #USER_ASID_BIT, 1f
+
+	tramp_map_kernel tmp=x4
+	isb
+	mov	x4, xzr
+
+	/*
+	 * Use reg->interrupted_regs.addr_limit to remember whether to unmap
+	 * the kernel on exit.
+	 */
+1:	str	x4, [x1, #(SDEI_EVENT_INTREGS + S_ORIG_ADDR_LIMIT)]
+
+#ifdef CONFIG_RANDOMIZE_BASE
+	adr	x4, tramp_vectors + PAGE_SIZE
+	add	x4, x4, #:lo12:__sdei_asm_trampoline_next_handler
+	ldr	x4, [x4]
+#else
+	ldr	x4, =__sdei_asm_handler
+#endif
+	br	x4
+ENDPROC(__sdei_asm_entry_trampoline)
+NOKPROBE(__sdei_asm_entry_trampoline)
+
+/*
+ * Make the exit call and restore the original ttbr1_el1
+ *
+ * x0 & x1: setup for the exit API call
+ * x2: exit_mode
+ * x4: struct sdei_registered_event argument from registration time.
+ */
+ENTRY(__sdei_asm_exit_trampoline)
+	ldr	x4, [x4, #(SDEI_EVENT_INTREGS + S_ORIG_ADDR_LIMIT)]
+	cbnz	x4, 1f
+
+	tramp_unmap_kernel	tmp=x4
+
+1:	sdei_handler_exit exit_mode=x2
+ENDPROC(__sdei_asm_exit_trampoline)
+NOKPROBE(__sdei_asm_exit_trampoline)
+	.ltorg
+.popsection		// .entry.tramp.text
+#ifdef CONFIG_RANDOMIZE_BASE
+.pushsection ".rodata", "a"
+__sdei_asm_trampoline_next_handler:
+	.quad	__sdei_asm_handler
+.popsection		// .rodata
+#endif /* CONFIG_RANDOMIZE_BASE */
+#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+
+/*
+ * Software Delegated Exception entry point.
+ *
+ * x0: Event number
+ * x1: struct sdei_registered_event argument from registration time.
+ * x2: interrupted PC
+ * x3: interrupted PSTATE
+ * x4: maybe clobbered by the trampoline
+ *
+ * Firmware has preserved x0->x17 for us, we must save/restore the rest to
+ * follow SMC-CC. We save (or retrieve) all the registers as the handler may
+ * want them.
+ */
+ENTRY(__sdei_asm_handler)
+	stp     x2, x3, [x1, #SDEI_EVENT_INTREGS + S_PC]
+	stp     x4, x5, [x1, #SDEI_EVENT_INTREGS + 16 * 2]
+	stp     x6, x7, [x1, #SDEI_EVENT_INTREGS + 16 * 3]
+	stp     x8, x9, [x1, #SDEI_EVENT_INTREGS + 16 * 4]
+	stp     x10, x11, [x1, #SDEI_EVENT_INTREGS + 16 * 5]
+	stp     x12, x13, [x1, #SDEI_EVENT_INTREGS + 16 * 6]
+	stp     x14, x15, [x1, #SDEI_EVENT_INTREGS + 16 * 7]
+	stp     x16, x17, [x1, #SDEI_EVENT_INTREGS + 16 * 8]
+	stp     x18, x19, [x1, #SDEI_EVENT_INTREGS + 16 * 9]
+	stp     x20, x21, [x1, #SDEI_EVENT_INTREGS + 16 * 10]
+	stp     x22, x23, [x1, #SDEI_EVENT_INTREGS + 16 * 11]
+	stp     x24, x25, [x1, #SDEI_EVENT_INTREGS + 16 * 12]
+	stp     x26, x27, [x1, #SDEI_EVENT_INTREGS + 16 * 13]
+	stp     x28, x29, [x1, #SDEI_EVENT_INTREGS + 16 * 14]
+	mov	x4, sp
+	stp     lr, x4, [x1, #SDEI_EVENT_INTREGS + S_LR]
+
+	mov	x19, x1
+
+#ifdef CONFIG_VMAP_STACK
+	/*
+	 * entry.S may have been using sp as a scratch register, find whether
+	 * this is a normal or critical event and switch to the appropriate
+	 * stack for this CPU.
+	 */
+	ldrb	w4, [x19, #SDEI_EVENT_PRIORITY]
+	cbnz	w4, 1f
+	ldr_this_cpu dst=x5, sym=sdei_stack_normal_ptr, tmp=x6
+	b	2f
+1:	ldr_this_cpu dst=x5, sym=sdei_stack_critical_ptr, tmp=x6
+2:	mov	x6, #SDEI_STACK_SIZE
+	add	x5, x5, x6
+	mov	sp, x5
+#endif
+
+	/*
+	 * We may have interrupted userspace, or a guest, or exit-from or
+	 * return-to either of these. We can't trust sp_el0, restore it.
+	 */
+	mrs	x28, sp_el0
+	ldr_this_cpu	dst=x0, sym=__entry_task, tmp=x1
+	msr	sp_el0, x0
+
+	/* If we interrupted the kernel point to the previous stack/frame. */
+	and     x0, x3, #0xc
+	mrs     x1, CurrentEL
+	cmp     x0, x1
+	csel	x29, x29, xzr, eq	// fp, or zero
+	csel	x4, x2, xzr, eq		// elr, or zero
+
+	stp	x29, x4, [sp, #-16]!
+	mov	x29, sp
+
+	add	x0, x19, #SDEI_EVENT_INTREGS
+	mov	x1, x19
+	bl	__sdei_handler
+
+	msr	sp_el0, x28
+	/* restore regs >x17 that we clobbered */
+	mov	x4, x19         // keep x4 for __sdei_asm_exit_trampoline
+	ldp	x28, x29, [x4, #SDEI_EVENT_INTREGS + 16 * 14]
+	ldp	x18, x19, [x4, #SDEI_EVENT_INTREGS + 16 * 9]
+	ldp	lr, x1, [x4, #SDEI_EVENT_INTREGS + S_LR]
+	mov	sp, x1
+
+	mov	x1, x0			// address to complete_and_resume
+	/* x0 = (x0 <= 1) ? EVENT_COMPLETE:EVENT_COMPLETE_AND_RESUME */
+	cmp	x0, #1
+	mov_q	x2, SDEI_1_0_FN_SDEI_EVENT_COMPLETE
+	mov_q	x3, SDEI_1_0_FN_SDEI_EVENT_COMPLETE_AND_RESUME
+	csel	x0, x2, x3, ls
+
+	ldr_l	x2, sdei_exit_mode
+
+alternative_if_not ARM64_UNMAP_KERNEL_AT_EL0
+	sdei_handler_exit exit_mode=x2
+alternative_else_nop_endif
+
+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+	tramp_alias	dst=x5, sym=__sdei_asm_exit_trampoline
+	br	x5
+#endif
+ENDPROC(__sdei_asm_handler)
+NOKPROBE(__sdei_asm_handler)
+#endif /* CONFIG_ARM_SDE_INTERFACE */
