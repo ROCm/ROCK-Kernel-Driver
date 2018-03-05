@@ -253,6 +253,26 @@ _kcl_drm_atomic_get_existing_plane_state(struct drm_atomic_state *state,
 #endif
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+
+#define for_each_connector_in_state(__state, connector, connector_state, __i) \
+	for ((__i) = 0;							\
+	     (__i) < (__state)->num_connector &&				\
+	     ((connector) = (__state)->connectors[__i].ptr,			\
+	     (connector_state) = (__state)->connectors[__i].state, 1); 	\
+	     (__i)++)							\
+		for_each_if (connector)
+
+#define for_each_crtc_in_state(__state, crtc, crtc_state, __i)	\
+	for ((__i) = 0;						\
+	     (__i) < (__state)->dev->mode_config.num_crtc &&	\
+	     ((crtc) = (__state)->crtcs[__i].ptr,			\
+	     (crtc_state) = (__state)->crtcs[__i].state, 1);	\
+	     (__i)++)						\
+		for_each_if (crtc_state)
+
+#endif
+
 void
 _kcl_drm_atomic_helper_update_legacy_modeset_state_stub(struct drm_device *dev,
 					      struct drm_atomic_state *old_state)
