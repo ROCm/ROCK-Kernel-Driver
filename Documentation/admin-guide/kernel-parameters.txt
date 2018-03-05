@@ -3993,6 +3993,7 @@
 			retpoline	  - replace indirect branches
 			retpoline,generic - google's original retpoline
 			retpoline,amd     - AMD-specific minimal thunk
+			ibrs		  - Intel/AMD microcode feature
 
 			Not specifying this option is equivalent to
 			spectre_v2=auto.
