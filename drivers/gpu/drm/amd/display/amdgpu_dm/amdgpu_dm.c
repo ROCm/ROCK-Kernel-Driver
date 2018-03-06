@@ -3578,8 +3578,6 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 
 	switch (aplane->base.type) {
 	case DRM_PLANE_TYPE_PRIMARY:
-		aplane->base.format_default = true;
-
 		res = kcl_drm_universal_plane_init(
 				dm->adev->ddev,
 				&aplane->base,
