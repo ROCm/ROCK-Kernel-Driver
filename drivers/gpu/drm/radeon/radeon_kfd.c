@@ -85,7 +85,6 @@ static void destroy_process_vm(struct kgd_dev *kgd, void *vm);
 
 static uint32_t get_process_page_dir(void *vm);
 
-static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm, int fd, uint32_t handle, struct kgd_mem **mem);
 static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 		void *vm);
 static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
@@ -93,8 +92,7 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
 static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, uint64_t size,
 		void *vm, struct kgd_mem **mem,
 		uint64_t *offset, uint32_t flags);
-static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
-			      void *vm);
+static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
 
 static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
 
@@ -109,8 +107,6 @@ static void kgd_program_sh_mem_settings(struct kgd_dev *kgd, uint32_t vmid,
 static int kgd_set_pasid_vmid_mapping(struct kgd_dev *kgd, unsigned int pasid,
 					unsigned int vmid);
 
-static int kgd_init_pipeline(struct kgd_dev *kgd, uint32_t pipe_id,
-				uint32_t hpd_size, uint64_t hpd_gpu_addr);
 static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id);
 static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 			uint32_t queue_id, uint32_t __user *wptr,
@@ -143,14 +139,11 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd, uint8_t vmid);
 static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 							uint8_t vmid);
-static void set_num_of_requests(struct kgd_dev *dev, uint8_t num_of_req);
 static void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info);
 static int alloc_memory_of_scratch(struct kgd_dev *kgd,
 					 uint64_t va, uint32_t vmid);
 static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
 		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
-static int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
-			struct kgd_mem *mem, void **kptr);
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 			uint32_t page_table_base);
 
@@ -163,10 +156,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.create_process_vm = create_process_vm,
 	.destroy_process_vm = destroy_process_vm,
 	.get_process_page_dir = get_process_page_dir,
-	.open_graphic_handle = open_graphic_handle,
 	.program_sh_mem_settings = kgd_program_sh_mem_settings,
 	.set_pasid_vmid_mapping = kgd_set_pasid_vmid_mapping,
-	.init_pipeline = kgd_init_pipeline,
 	.init_interrupts = kgd_init_interrupts,
 	.hqd_load = kgd_hqd_load,
 	.hqd_sdma_load = kgd_hqd_sdma_load,
@@ -185,11 +176,9 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.map_memory_to_gpu = map_memory_to_gpu,
 	.unmap_memory_to_gpu = unmap_memory_from_gpu,
 	.get_fw_version = get_fw_version,
-	.set_num_of_requests = set_num_of_requests,
 	.get_cu_info = get_cu_info,
 	.alloc_memory_of_scratch = alloc_memory_of_scratch,
 	.write_config_static_mem = write_config_static_mem,
-	.map_gtt_bo_to_kernel = map_gtt_bo_to_kernel,
 	.set_vm_context_page_table_base = set_vm_context_page_table_base,
 };
 
@@ -475,69 +464,6 @@ static uint32_t get_process_page_dir(void *vm)
 	return vm_id->pd_gpu_addr >> RADEON_GPU_PAGE_SHIFT;
 }
 
-static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm,
-				int fd, uint32_t handle, struct kgd_mem **mem)
-{
-	struct radeon_device *rdev = (struct radeon_device *) kgd;
-	int ret;
-	struct radeon_bo_va *bo_va;
-	struct radeon_bo *bo;
-	struct file *filp;
-	struct drm_gem_object *gem_obj;
-
-	BUG_ON(kgd == NULL);
-	BUG_ON(kgd == NULL);
-	BUG_ON(mem == NULL);
-	BUG_ON(vm == NULL);
-
-	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
-	if (!*mem) {
-		ret = -ENOMEM;
-		goto err;
-	}
-	mutex_init(&(*mem)->data2.lock);
-
-	/* Translate fd to file */
-	rcu_read_lock();
-	filp = fcheck(fd);
-	rcu_read_unlock();
-
-	BUG_ON(filp == NULL);
-
-	/* Get object by handle*/
-	gem_obj = drm_gem_object_lookup(filp->private_data, handle);
-	BUG_ON(gem_obj == NULL);
-
-	/* No need to increment GEM refcount*/
-	drm_gem_object_unreference(gem_obj);
-
-	bo = gem_to_radeon_bo(gem_obj);
-
-	/* Inc TTM refcount*/
-	ttm_bo_reference(&bo->tbo);
-
-	ret = add_bo_to_vm(rdev, va, vm, bo, &bo_va);
-	if (ret != 0)
-		goto err_map;
-
-	/* The allocated BO, PD and appropriate PTs are pinned, virtual to MC address mapping created */
-	ret = map_bo_to_gpuvm(rdev, bo, bo_va);
-	if (ret != 0)
-		goto err_failed_to_pin_bo;
-
-	(*mem)->data2.bo = bo;
-	(*mem)->data2.bo_va = bo_va;
-	return 0;
-
-err_failed_to_pin_bo:
-	remove_bo_from_vm(rdev, bo, bo_va);
-err_map:
-	radeon_bo_unref(&bo);
-	kfree(*mem);
-err:
-	return ret;
-}
-
 static inline struct radeon_device *get_radeon_device(struct kgd_dev *kgd)
 {
 	return (struct radeon_device *)kgd;
@@ -630,13 +556,6 @@ static int kgd_set_pasid_vmid_mapping(struct kgd_dev *kgd, unsigned int pasid,
 	write_register(kgd, IH_VMID_0_LUT + vmid * sizeof(uint32_t),
 			pasid_mapping);
 
-	return 0;
-}
-
-static int kgd_init_pipeline(struct kgd_dev *kgd, uint32_t pipe_id,
-				uint32_t hpd_size, uint64_t hpd_gpu_addr)
-{
-	/* nothing to do here */
 	return 0;
 }
 
@@ -1441,8 +1360,7 @@ err:
 
 }
 
-static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem,
-			      void *vm)
+static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 {
 	struct radeon_device *rdev = (struct radeon_device *) kgd;
 
@@ -1614,17 +1532,6 @@ static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type)
 	return hdr->common.ucode_version;
 }
 
-static void set_num_of_requests(struct kgd_dev *dev, uint8_t num_of_req)
-{
-	uint32_t value;
-
-	value = read_register(dev, ATC_ATS_DEBUG);
-	value &= ~NUM_REQUESTS_AT_ERR_MASK;
-	value |= NUM_REQUESTS_AT_ERR(num_of_req);
-
-	write_register(dev, ATC_ATS_DEBUG, value);
-}
-
 static void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 {
 	struct radeon_device *rdev = (struct radeon_device *) kgd;
@@ -1649,12 +1556,6 @@ static void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 	cu_info->wave_front_size = rcu_info.wave_front_size;
 	cu_info->max_scratch_slots_per_cu = rcu_info.max_scratch_slots_per_cu;
 	cu_info->lds_size = rcu_info.lds_size;
-}
-
-static int map_gtt_bo_to_kernel(struct kgd_dev *kgd,
-			struct kgd_mem *mem, void **kptr)
-{
-	return 0;
 }
 
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
