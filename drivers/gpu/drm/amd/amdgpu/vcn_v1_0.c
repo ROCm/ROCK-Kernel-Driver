@@ -810,6 +810,21 @@ static void vcn_v1_0_dec_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64
 }
 
 /**
+ * vcn_v1_0_dec_ring_hdp_invalidate - emit an hdp invalidate
+ *
+ * @ring: amdgpu_ring pointer
+ *
+ * Emits an hdp invalidate.
+ */
+static void vcn_v1_0_dec_ring_emit_hdp_invalidate(struct amdgpu_ring *ring)
+{
+	struct amdgpu_device *adev = ring->adev;
+
+	amdgpu_ring_write(ring, PACKET0(SOC15_REG_OFFSET(HDP, 0, mmHDP_READ_CACHE_INVALIDATE), 0));
+	amdgpu_ring_write(ring, 1);
+}
+
+/**
  * vcn_v1_0_dec_ring_emit_ib - execute indirect buffer
  *
  * @ring: amdgpu_ring pointer
@@ -1091,7 +1106,7 @@ static const struct amdgpu_ring_funcs vcn_v1_0_dec_ring_vm_funcs = {
 	.get_wptr = vcn_v1_0_dec_ring_get_wptr,
 	.set_wptr = vcn_v1_0_dec_ring_set_wptr,
 	.emit_frame_size =
-		6 + 6 + /* hdp invalidate / flush */
+		2 + /* vcn_v1_0_dec_ring_emit_hdp_invalidate */		
 		SOC15_FLUSH_GPU_TLB_NUM_WREG * 6 +
 		SOC15_FLUSH_GPU_TLB_NUM_REG_WAIT * 8 +
 		8 + /* vcn_v1_0_dec_ring_emit_vm_flush */
@@ -1101,6 +1116,7 @@ static const struct amdgpu_ring_funcs vcn_v1_0_dec_ring_vm_funcs = {
 	.emit_ib = vcn_v1_0_dec_ring_emit_ib,
 	.emit_fence = vcn_v1_0_dec_ring_emit_fence,
 	.emit_vm_flush = vcn_v1_0_dec_ring_emit_vm_flush,
+	.emit_hdp_invalidate = vcn_v1_0_dec_ring_emit_hdp_invalidate,
 	.test_ring = amdgpu_vcn_dec_ring_test_ring,
 	.test_ib = amdgpu_vcn_dec_ring_test_ib,
 	.insert_nop = vcn_v1_0_ring_insert_nop,
