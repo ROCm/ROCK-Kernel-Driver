@@ -80,6 +80,7 @@ enum spectre_v2_mitigation_cmd {
 	SPECTRE_V2_CMD_RETPOLINE,
 	SPECTRE_V2_CMD_RETPOLINE_GENERIC,
 	SPECTRE_V2_CMD_RETPOLINE_AMD,
+	SPECTRE_V2_CMD_IBRS,
 };
 
 static const char *spectre_v2_strings[] = {
@@ -88,6 +89,7 @@ static const char *spectre_v2_strings[] = {
 	[SPECTRE_V2_RETPOLINE_MINIMAL_AMD]	= "Vulnerable: Minimal AMD ASM retpoline",
 	[SPECTRE_V2_RETPOLINE_GENERIC]		= "Mitigation: Full generic retpoline",
 	[SPECTRE_V2_RETPOLINE_AMD]		= "Mitigation: Full AMD retpoline",
+	[SPECTRE_V2_IBRS]			= "Mitigation: Indirect Branch Restricted Speculation",
 };
 
 #undef pr_fmt
@@ -150,6 +152,7 @@ static const struct {
 	{ "retpoline",         SPECTRE_V2_CMD_RETPOLINE,         false },
 	{ "retpoline,amd",     SPECTRE_V2_CMD_RETPOLINE_AMD,     false },
 	{ "retpoline,generic", SPECTRE_V2_CMD_RETPOLINE_GENERIC, false },
+	{ "ibrs",              SPECTRE_V2_CMD_IBRS,              false },
 	{ "auto",              SPECTRE_V2_CMD_AUTO,              false },
 };
 
@@ -201,7 +204,7 @@ static enum spectre_v2_mitigation_cmd __init spectre_v2_parse_cmdline(void)
 	return cmd;
 }
 
-/* Check for Skylake-like CPUs (for RSB handling) */
+/* Check for Skylake-like CPUs (for RSB and IBRS handling) */
 static bool __init is_skylake_era(void)
 {
 	if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
@@ -235,19 +238,34 @@ static void __init spectre_v2_select_mitigation(void)
 	case SPECTRE_V2_CMD_NONE:
 		return;
 
-	case SPECTRE_V2_CMD_FORCE:
-	case SPECTRE_V2_CMD_AUTO:
-		if (IS_ENABLED(CONFIG_RETPOLINE))
-			goto retpoline_auto;
-		break;
 	case SPECTRE_V2_CMD_RETPOLINE_AMD:
 		if (IS_ENABLED(CONFIG_RETPOLINE))
 			goto retpoline_amd;
 		break;
+
 	case SPECTRE_V2_CMD_RETPOLINE_GENERIC:
 		if (IS_ENABLED(CONFIG_RETPOLINE))
 			goto retpoline_generic;
 		break;
+
+	case SPECTRE_V2_CMD_IBRS:
+		mode = SPECTRE_V2_IBRS;
+		setup_force_cpu_cap(X86_FEATURE_USE_IBRS);
+		goto enabled;
+
+	case SPECTRE_V2_CMD_AUTO:
+	case SPECTRE_V2_CMD_FORCE:
+		/*
+		 * If we have IBRS support, and either Skylake or !RETPOLINE,
+		 * then that's what we do.
+		 */
+		if (boot_cpu_has(X86_FEATURE_IBRS) &&
+		    (is_skylake_era() || !retp_compiler())) {
+			mode = SPECTRE_V2_IBRS;
+			setup_force_cpu_cap(X86_FEATURE_USE_IBRS);
+			goto enabled;
+		}
+		/* fall through */
 	case SPECTRE_V2_CMD_RETPOLINE:
 		if (IS_ENABLED(CONFIG_RETPOLINE))
 			goto retpoline_auto;
@@ -274,6 +292,7 @@ retpoline_auto:
 		setup_force_cpu_cap(X86_FEATURE_RETPOLINE);
 	}
 
+ enabled:
 	spectre_v2_enabled = mode;
 	pr_info("%s\n", spectre_v2_strings[mode]);
 
@@ -289,8 +308,8 @@ retpoline_auto:
 	 * or deactivated in favour of retpolines the RSB fill on context
 	 * switch is required.
 	 */
-	if ((!boot_cpu_has(X86_FEATURE_PTI) &&
-	     !boot_cpu_has(X86_FEATURE_SMEP)) || is_skylake_era()) {
+	if ((!boot_cpu_has(X86_FEATURE_PTI) && !boot_cpu_has(X86_FEATURE_SMEP)) ||
+	    (!boot_cpu_has(X86_FEATURE_USE_IBRS) && is_skylake_era())) {
 		setup_force_cpu_cap(X86_FEATURE_RSB_CTXSW);
 		pr_info("Spectre v2 mitigation: Filling RSB on context switch\n");
 	}
