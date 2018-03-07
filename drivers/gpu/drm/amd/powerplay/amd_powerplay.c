@@ -1081,7 +1081,7 @@ static int pp_dpm_switch_power_profile(void *handle,
 {
 	struct pp_hwmgr *hwmgr;
 	struct pp_instance *pp_handle = (struct pp_instance *)handle;
-	long *workload;
+	long workload;
 	uint32_t index;
 
 	if (pp_check(pp_handle))
@@ -1100,19 +1100,19 @@ static int pp_dpm_switch_power_profile(void *handle,
 	mutex_lock(&pp_handle->pp_lock);
 
 	if (!en) {
-		hwmgr->workload_mask &= ~(1 < hwmgr->workload_prority[type]);
+		hwmgr->workload_mask &= ~(1 << hwmgr->workload_prority[type]);
 		index = fls(hwmgr->workload_mask);
-		index = index > 0 && index <= Workload_Policy_Max? index - 1 : 0;
-		*workload = hwmgr->workload_setting[index];
+		index = index > 0 && index <= Workload_Policy_Max ? index - 1 : 0;
+		workload = hwmgr->workload_setting[index];
 	} else {
-		hwmgr->workload_mask |= (1 < hwmgr->workload_prority[type]);
+		hwmgr->workload_mask |= (1 << hwmgr->workload_prority[type]);
 		index = fls(hwmgr->workload_mask);
 		index = index <= Workload_Policy_Max ? index - 1 : 0;
-		*workload = hwmgr->workload_setting[index];
+		workload = hwmgr->workload_setting[index];
 	}
 
 	if (hwmgr->dpm_level != AMD_DPM_FORCED_LEVEL_MANUAL)
-		hwmgr->hwmgr_func->set_power_profile_mode(hwmgr, workload, 0);
+		hwmgr->hwmgr_func->set_power_profile_mode(hwmgr, &workload, 0);
 	mutex_unlock(&pp_handle->pp_lock);
 
 	return 0;

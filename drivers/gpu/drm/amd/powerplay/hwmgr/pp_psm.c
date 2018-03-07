@@ -251,7 +251,7 @@ int psm_adjust_power_state_dynamic(struct pp_hwmgr *hwmgr, bool skip,
 
 	if (hwmgr->dpm_level != AMD_DPM_FORCED_LEVEL_MANUAL) {
 		index = fls(hwmgr->workload_mask);
-		index = index > 0 && index <= Workload_Policy_Max? index - 1 : 0;
+		index = index > 0 && index <= Workload_Policy_Max ? index - 1 : 0;
 		workload = hwmgr->workload_setting[index];
 
 		if (hwmgr->power_profile_mode != workload && hwmgr->hwmgr_func->set_power_profile_mode)

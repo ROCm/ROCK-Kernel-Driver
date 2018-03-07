@@ -133,11 +133,11 @@ static void hwmgr_init_workload_prority(struct pp_hwmgr *hwmgr)
 	hwmgr->workload_prority[PP_SMC_POWER_PROFILE_VR] = 3;
 	hwmgr->workload_prority[PP_SMC_POWER_PROFILE_COMPUTE] = 4;
 
-	hwmgr->workload_setting[0]= PP_SMC_POWER_PROFILE_POWERSAVING;
-	hwmgr->workload_setting[1]= PP_SMC_POWER_PROFILE_VIDEO;
-	hwmgr->workload_setting[2]= PP_SMC_POWER_PROFILE_FULLSCREEN3D;
-	hwmgr->workload_setting[3]= PP_SMC_POWER_PROFILE_VR;
-	hwmgr->workload_setting[4]= PP_SMC_POWER_PROFILE_COMPUTE;
+	hwmgr->workload_setting[0] = PP_SMC_POWER_PROFILE_POWERSAVING;
+	hwmgr->workload_setting[1] = PP_SMC_POWER_PROFILE_VIDEO;
+	hwmgr->workload_setting[2] = PP_SMC_POWER_PROFILE_FULLSCREEN3D;
+	hwmgr->workload_setting[3] = PP_SMC_POWER_PROFILE_VR;
+	hwmgr->workload_setting[4] = PP_SMC_POWER_PROFILE_COMPUTE;
 }
 
 int hwmgr_early_init(struct pp_instance *handle)

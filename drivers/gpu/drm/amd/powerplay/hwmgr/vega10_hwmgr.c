@@ -766,7 +766,7 @@ static int vega10_hwmgr_backend_init(struct pp_hwmgr *hwmgr)
 
 	hwmgr->backend = data;
 
-	hwmgr->workload_mask = 1 < hwmgr->workload_prority[PP_SMC_POWER_PROFILE_VIDEO];
+	hwmgr->workload_mask = 1 << hwmgr->workload_prority[PP_SMC_POWER_PROFILE_VIDEO];
 	hwmgr->power_profile_mode = PP_SMC_POWER_PROFILE_VIDEO;
 	hwmgr->default_power_profile_mode = PP_SMC_POWER_PROFILE_VIDEO;
 
