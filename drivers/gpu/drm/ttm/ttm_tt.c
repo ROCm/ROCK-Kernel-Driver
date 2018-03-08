@@ -130,9 +130,15 @@ static int ttm_dma_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
 
 static int ttm_sg_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
+	ttm->ttm.pages = drm_calloc_large(ttm->ttm.num_pages,
+					  sizeof(*ttm->dma_address));
+#else
 	ttm->dma_address = kvmalloc_array(ttm->ttm.num_pages,
 					  sizeof(*ttm->dma_address),
 					  GFP_KERNEL | __GFP_ZERO);
+#endif
 	if (!ttm->dma_address)
 		return -ENOMEM;
 	return 0;
