@@ -2736,7 +2736,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 		if (!ring || !ring->sched.thread)
 			continue;
 
-		kthread_park(ring->sched.thread);
+		kcl_kthread_park(ring->sched.thread);
 
 		if (job && job->ring->idx != i)
 			continue;
