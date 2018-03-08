@@ -6873,7 +6873,6 @@ static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_state *state,
 			continue;
 
 		slot_num = DIV_ROUND_UP(pbn, pbn_div);
-
 		if (stream->timing.flags.DSC != 1) {
 			dm_conn_state->pbn = pbn;
 			dm_conn_state->vcpi_slots = slot_num;
