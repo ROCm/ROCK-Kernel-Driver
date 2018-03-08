@@ -466,8 +466,10 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 		DRM_DEBUG_DRIVER("amdgpu: freesync_module init done %p.\n",
 				adev->dm.freesync_module);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	amdgpu_dm_init_color_mod();
 
+#endif
 	if (amdgpu_dm_initialize_drm_device(adev)) {
 		DRM_ERROR(
 		"amdgpu: failed to initialize sw for display support.\n");
@@ -3600,10 +3602,11 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	acrtc->base.enabled = false;
 
 	dm->adev->mode_info.crtcs[crtc_index] = acrtc;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 	drm_crtc_enable_color_mgmt(&acrtc->base, MAX_COLOR_LUT_ENTRIES,
 				   true, MAX_COLOR_LUT_ENTRIES);
+#endif
 	drm_mode_crtc_set_gamma_size(&acrtc->base, MAX_COLOR_LEGACY_LUT_ENTRIES);
-
 	return 0;
 
 fail:

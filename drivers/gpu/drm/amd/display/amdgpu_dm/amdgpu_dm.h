@@ -292,9 +292,11 @@ void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc);
 /* Legacy gamm LUT users such as X doesn't like large LUT sizes */
 #define MAX_COLOR_LEGACY_LUT_ENTRIES 256
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 void amdgpu_dm_init_color_mod(void);
 int amdgpu_dm_set_degamma_lut(struct drm_crtc_state *crtc_state,
 			      struct dc_plane_state *dc_plane_state);
+#endif
 void amdgpu_dm_set_ctm(struct dm_crtc_state *crtc);
 int amdgpu_dm_set_regamma_lut(struct dm_crtc_state *crtc);
 
