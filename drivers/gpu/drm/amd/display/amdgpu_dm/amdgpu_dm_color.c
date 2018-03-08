@@ -28,6 +28,7 @@
 #include "dc.h"
 #include "modules/color/color_gamma.h"
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 #define MAX_DRM_LUT_VALUE 0xFFFF
 
 /*
@@ -289,4 +290,6 @@ int amdgpu_dm_set_degamma_lut(struct drm_crtc_state *crtc_state,
 
 	return 0;
 }
+
+#endif
 
