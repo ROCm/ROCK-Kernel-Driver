@@ -528,7 +528,9 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 /* Legacy gamm LUT users such as X doesn't like large LUT sizes */
 #define MAX_COLOR_LEGACY_LUT_ENTRIES 256
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 void amdgpu_dm_init_color_mod(void);
+#endif
 int amdgpu_dm_update_crtc_color_mgmt(struct dm_crtc_state *crtc);
 int amdgpu_dm_update_plane_color_mgmt(struct dm_crtc_state *crtc,
 				      struct dm_plane_state *plane);
