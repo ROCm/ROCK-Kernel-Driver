@@ -273,9 +273,13 @@ void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc);
 
 #define MAX_COLOR_LUT_ENTRIES 256
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4_5)
 void amdgpu_dm_init_color_mod(void);
 int amdgpu_dm_set_degamma_lut(struct drm_crtc_state *crtc_state,
 			      struct dc_plane_state *dc_plane_state);
+#endif
 void amdgpu_dm_set_ctm(struct dm_crtc_state *crtc);
 int amdgpu_dm_set_regamma_lut(struct dm_crtc_state *crtc);
 

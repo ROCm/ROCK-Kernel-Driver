@@ -27,6 +27,9 @@
 #include "amdgpu_dm.h"
 #include "modules/color/color_gamma.h"
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
+defined(OS_NAME_RHEL_7_3) || \
+defined(OS_NAME_RHEL_7_4_5)
 /*
  * Initialize the color module.
  *
@@ -225,4 +228,6 @@ int amdgpu_dm_set_degamma_lut(struct drm_crtc_state *crtc_state,
 	dc_plane_state->in_transfer_func->tf = TRANSFER_FUNCTION_SRGB;
 	return -EINVAL;
 }
+
+#endif
 

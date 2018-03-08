@@ -486,8 +486,12 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 		DRM_DEBUG_DRIVER("amdgpu: freesync_module init done %p.\n",
 				adev->dm.freesync_module);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4_5)
 	amdgpu_dm_init_color_mod();
 
+#endif
 	if (amdgpu_dm_initialize_drm_device(adev)) {
 		DRM_ERROR(
 		"amdgpu: failed to initialize sw for display support.\n");
@@ -3587,10 +3591,14 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	acrtc->base.enabled = false;
 
 	dm->adev->mode_info.crtcs[crtc_index] = acrtc;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4_5)
 	drm_crtc_enable_color_mgmt(&acrtc->base, MAX_COLOR_LUT_ENTRIES,
 				   true, MAX_COLOR_LUT_ENTRIES);
 	drm_mode_crtc_set_gamma_size(&acrtc->base, MAX_COLOR_LUT_ENTRIES);
 
+#endif
 	return 0;
 
 fail:
@@ -5205,6 +5213,9 @@ next_crtc:
 		if (new_stream)
 			 dc_stream_release(new_stream);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4_5)
 		/*
 		 * We want to do dc stream updates that do not require a
 		 * full modeset below.
@@ -5228,6 +5239,7 @@ next_crtc:
 				goto fail;
 			amdgpu_dm_set_ctm(dm_new_crtc_state);
 		}
+#endif
 	}
 
 	return ret;
