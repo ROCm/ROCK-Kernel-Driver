@@ -280,8 +280,9 @@ struct kfd_dev {
 	/* Debug manager */
 	struct kfd_dbgmgr *dbgmgr;
 
-	/* MEC firmware version*/
+	/* Firmware versions*/
 	uint16_t mec_fw_version;
+	uint16_t sdma_fw_version;
 
 	/* Maximum process number mapped to HW scheduler */
 	unsigned int max_proc_per_quantum;
