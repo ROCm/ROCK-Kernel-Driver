@@ -87,6 +87,8 @@ static const char *amdgpu_asic_name[] = {
 	"LAST",
 };
 
+static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev);
+
 bool amdgpu_device_is_px(struct drm_device *dev)
 {
 	struct amdgpu_device *adev = dev->dev_private;
@@ -1961,6 +1963,8 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	if (adev->rio_mem == NULL)
 		DRM_INFO("PCI I/O BAR is not found.\n");
 
+	amdgpu_device_get_pcie_info(adev);
+
 	/* early init functions */
 	r = amdgpu_device_ip_early_init(adev);
 	if (r)
@@ -2850,7 +2854,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 	return r;
 }
 
-void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
+static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
 {
 	u32 mask;
 	int ret;
