@@ -404,7 +404,8 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 
 	kfd->mec_fw_version = kfd->kfd2kgd->get_fw_version(kfd->kgd,
 			KGD_ENGINE_MEC1);
-
+	kfd->sdma_fw_version = kfd->kfd2kgd->get_fw_version(kfd->kgd,
+			KGD_ENGINE_SDMA1);
 	kfd->shared_resources = *gpu_resources;
 
 	/* Usually first_vmid_kfd = 8, last_vmid_kfd = 15 */
