@@ -213,6 +213,7 @@ EXPORT_SYMBOL_GPL(kernel_kobj);
 #ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 const char *supported_printable(int taint)
 {
+#ifdef CONFIG_SUSE_KERNEL_RELEASE
 	int mask = (1 << TAINT_PROPRIETARY_MODULE) | (1 << TAINT_NO_SUPPORT);
 	if ((taint & mask) == mask)
 		return "No, Proprietary and Unsupported modules are loaded";
@@ -224,6 +225,9 @@ const char *supported_printable(int taint)
 		return "Yes, External";
 	else
 		return "Yes";
+#else
+		return "No, Unreleased kernel";
+#endif
 }
 
 static ssize_t supported_show(struct kobject *kobj,
