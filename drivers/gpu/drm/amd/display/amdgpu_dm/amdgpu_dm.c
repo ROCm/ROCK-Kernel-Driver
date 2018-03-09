@@ -5437,7 +5437,12 @@ static int dm_atomic_check_plane_state_fb(struct drm_atomic_state *state,
 	struct drm_plane *plane;
 	struct drm_crtc_state *crtc_state;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+			!defined(OS_NAME_RHEL_7_5)
+	WARN_ON(!kcl_drm_atomic_get_new_crtc_state_before_commit(state,crtc));
+#else
 	WARN_ON(!drm_atomic_get_new_crtc_state(state, crtc));
+#endif
 
 	drm_for_each_plane_mask(plane, state->dev, crtc->state->plane_mask) {
 		struct drm_plane_state *plane_state =
