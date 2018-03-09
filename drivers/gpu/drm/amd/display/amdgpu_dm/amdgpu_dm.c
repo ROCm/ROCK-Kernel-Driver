@@ -4559,6 +4559,10 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 		if (ret)
 			return ret;
 	}
+#if defined(OS_NAME_RHEL_6)
+	else	// Temporary fix for pflip conflict between block and nonblock call
+		return -EBUSY;
+#endif
 
 	drm_atomic_helper_swap_state(dev, state);
 
