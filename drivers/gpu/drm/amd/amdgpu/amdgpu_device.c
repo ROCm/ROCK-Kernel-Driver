@@ -908,6 +908,8 @@ static void amdgpu_device_check_arguments(struct amdgpu_device *adev)
 
 	/* Max DGMA size is 96M Bytes */
 	amdgpu_direct_gma_size = min(amdgpu_direct_gma_size, 96);
+
+	adev->firmware.load_type = amdgpu_ucode_get_load_type(adev, amdgpu_fw_load_type);
 }
 
 /**
