@@ -22,6 +22,7 @@
 #include <linux/time.h>
 #include <linux/workqueue.h>
 #include <linux/delay.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_dh.h>
 #include <linux/atomic.h>
 #include <linux/blk-mq.h>
@@ -212,25 +213,13 @@ static int alloc_multipath_stage2(struct dm_target *ti, struct multipath *m)
 		else
 			m->queue_mode = DM_TYPE_REQUEST_BASED;
 
-	} else if (m->queue_mode == DM_TYPE_BIO_BASED ||
-		   m->queue_mode == DM_TYPE_NVME_BIO_BASED) {
+	} else if (m->queue_mode == DM_TYPE_BIO_BASED) {
 		INIT_WORK(&m->process_queued_bios, process_queued_bios);
-
-		if (m->queue_mode == DM_TYPE_BIO_BASED) {
-			/*
-			 * bio-based doesn't support any direct scsi_dh management;
-			 * it just discovers if a scsi_dh is attached.
-			 */
-			set_bit(MPATHF_RETAIN_ATTACHED_HW_HANDLER, &m->flags);
-		}
-	}
-
-	if (m->queue_mode != DM_TYPE_NVME_BIO_BASED) {
-		set_bit(MPATHF_QUEUE_IO, &m->flags);
-		atomic_set(&m->pg_init_in_progress, 0);
-		atomic_set(&m->pg_init_count, 0);
-		m->pg_init_delay_msecs = DM_PG_INIT_DELAY_DEFAULT;
-		init_waitqueue_head(&m->pg_init_wait);
+		/*
+		 * bio-based doesn't support any direct scsi_dh management;
+		 * it just discovers if a scsi_dh is attached.
+		 */
+		set_bit(MPATHF_RETAIN_ATTACHED_HW_HANDLER, &m->flags);
 	}
 
 	dm_table_set_type(ti->table, m->queue_mode);
@@ -338,14 +327,12 @@ static void __switch_pg(struct multipath *m, struct priority_group *pg)
 {
 	m->current_pg = pg;
 
-	if (m->queue_mode == DM_TYPE_NVME_BIO_BASED)
-		return;
-
 	/* Must we initialise the PG first, and queue I/O till it's ready? */
 	if (m->hw_handler_name) {
 		set_bit(MPATHF_PG_INIT_REQUIRED, &m->flags);
 		set_bit(MPATHF_QUEUE_IO, &m->flags);
 	} else {
+		/* FIXME: not needed if no scsi_dh is attached */
 		clear_bit(MPATHF_PG_INIT_REQUIRED, &m->flags);
 		clear_bit(MPATHF_QUEUE_IO, &m->flags);
 	}
@@ -386,8 +373,7 @@ static struct pgpath *choose_pgpath(struct multipath *m, size_t nr_bytes)
 	unsigned bypassed = 1;
 
 	if (!atomic_read(&m->nr_valid_paths)) {
-		if (m->queue_mode != DM_TYPE_NVME_BIO_BASED)
-			clear_bit(MPATHF_QUEUE_IO, &m->flags);
+		clear_bit(MPATHF_QUEUE_IO, &m->flags);
 		goto failed;
 	}
 
@@ -600,7 +586,7 @@ static struct pgpath *__map_bio(struct multipath *m, struct bio *bio)
 	return pgpath;
 }
 
-static struct pgpath *__map_bio_nvme(struct multipath *m, struct bio *bio)
+static struct pgpath *__map_bio_fast(struct multipath *m, struct bio *bio)
 {
 	struct pgpath *pgpath;
 	unsigned long flags;
@@ -635,8 +621,8 @@ static int __multipath_map_bio(struct multipath *m, struct bio *bio,
 {
 	struct pgpath *pgpath;
 
-	if (m->queue_mode == DM_TYPE_NVME_BIO_BASED)
-		pgpath = __map_bio_nvme(m, bio);
+	if (!m->hw_handler_name)
+		pgpath = __map_bio_fast(m, bio);
 	else
 		pgpath = __map_bio(m, bio);
 
@@ -676,8 +662,7 @@ static void process_queued_io_list(struct multipath *m)
 {
 	if (m->queue_mode == DM_TYPE_MQ_REQUEST_BASED)
 		dm_mq_kick_requeue_list(dm_table_get_md(m->ti->table));
-	else if (m->queue_mode == DM_TYPE_BIO_BASED ||
-		 m->queue_mode == DM_TYPE_NVME_BIO_BASED)
+	else if (m->queue_mode == DM_TYPE_BIO_BASED)
 		queue_work(kmultipathd, &m->process_queued_bios);
 }
 
@@ -839,6 +824,16 @@ retain:
 			 */
 			kfree(m->hw_handler_name);
 			m->hw_handler_name = attached_handler_name;
+
+			/*
+			 * Init fields that are only used when a scsi_dh is attached
+			 */
+			if (!test_and_set_bit(MPATHF_QUEUE_IO, &m->flags)) {
+				atomic_set(&m->pg_init_in_progress, 0);
+				atomic_set(&m->pg_init_count, 0);
+				m->pg_init_delay_msecs = DM_PG_INIT_DELAY_DEFAULT;
+				init_waitqueue_head(&m->pg_init_wait);
+			}
 		}
 	}
 
@@ -874,6 +869,7 @@ static struct pgpath *parse_path(struct dm_arg_set *as, struct path_selector *ps
 	int r;
 	struct pgpath *p;
 	struct multipath *m = ti->private;
+	struct scsi_device *sdev;
 
 	/* we need at least a path arg */
 	if (as->argc < 1) {
@@ -892,7 +888,9 @@ static struct pgpath *parse_path(struct dm_arg_set *as, struct path_selector *ps
 		goto bad;
 	}
 
-	if (m->queue_mode != DM_TYPE_NVME_BIO_BASED) {
+	sdev = scsi_device_from_queue(bdev_get_queue(p->path.dev->bdev));
+	if (sdev) {
+		put_device(&sdev->sdev_gendev);
 		INIT_DELAYED_WORK(&p->activate_path, activate_path_work);
 		r = setup_scsi_dh(p->path.dev->bdev, m, &ti->error);
 		if (r) {
@@ -1002,8 +1000,7 @@ static int parse_hw_handler(struct dm_arg_set *as, struct multipath *m)
 	if (!hw_argc)
 		return 0;
 
-	if (m->queue_mode == DM_TYPE_BIO_BASED ||
-	    m->queue_mode == DM_TYPE_NVME_BIO_BASED) {
+	if (m->queue_mode == DM_TYPE_BIO_BASED) {
 		dm_consume_args(as, hw_argc);
 		DMERR("bio-based multipath doesn't allow hardware handler args");
 		return 0;
@@ -1096,8 +1093,6 @@ static int parse_features(struct dm_arg_set *as, struct multipath *m)
 
 			if (!strcasecmp(queue_mode_name, "bio"))
 				m->queue_mode = DM_TYPE_BIO_BASED;
-			else if (!strcasecmp(queue_mode_name, "nvme"))
-				m->queue_mode = DM_TYPE_NVME_BIO_BASED;
 			else if (!strcasecmp(queue_mode_name, "rq"))
 				m->queue_mode = DM_TYPE_REQUEST_BASED;
 			else if (!strcasecmp(queue_mode_name, "mq"))
@@ -1198,7 +1193,7 @@ static int multipath_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	ti->num_discard_bios = 1;
 	ti->num_write_same_bios = 1;
 	ti->num_write_zeroes_bios = 1;
-	if (m->queue_mode == DM_TYPE_BIO_BASED || m->queue_mode == DM_TYPE_NVME_BIO_BASED)
+	if (m->queue_mode == DM_TYPE_BIO_BASED)
 		ti->per_io_data_size = multipath_per_bio_data_size();
 	else
 		ti->per_io_data_size = sizeof(struct dm_mpath_io);
@@ -1737,9 +1732,6 @@ static void multipath_status(struct dm_target *ti, status_type_t type,
 			switch(m->queue_mode) {
 			case DM_TYPE_BIO_BASED:
 				DMEMIT("queue_mode bio ");
-				break;
-			case DM_TYPE_NVME_BIO_BASED:
-				DMEMIT("queue_mode nvme ");
 				break;
 			case DM_TYPE_MQ_REQUEST_BASED:
 				DMEMIT("queue_mode mq ");
