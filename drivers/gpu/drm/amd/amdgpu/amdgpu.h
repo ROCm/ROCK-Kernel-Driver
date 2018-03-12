@@ -1460,9 +1460,7 @@ struct amdgpu_ssg {
 };
 
 struct amd_powerplay {
-	struct cgs_device *cgs_device;
 	void *pp_handle;
-	const struct amd_ip_funcs *ip_funcs;
 	const struct amd_pm_funcs *pp_funcs;
 };
 
