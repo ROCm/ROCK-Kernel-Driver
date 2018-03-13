@@ -972,7 +972,7 @@ static int process_sync_pds_resv(struct amdkfd_process_info *process_info,
 			    vm_list_node) {
 		struct amdgpu_bo *pd = peer_vm->root.base.bo;
 
-		ret = amdgpu_sync_resv(amdgpu_ttm_adev(pd->tbo.bdev),
+		ret = amdgpu_sync_resv(NULL,
 					sync, pd->tbo.resv,
 					AMDGPU_FENCE_OWNER_UNDEFINED, false);
 		if (ret)
@@ -2425,8 +2425,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info, struct dma_fence **ef)
 			goto validate_map_fail;
 		}
 
-		ret = amdgpu_sync_fence(amdgpu_ttm_adev(bo->tbo.bdev),
-					&sync_obj, bo->tbo.moving, false);
+		ret = amdgpu_sync_fence(NULL, &sync_obj, bo->tbo.moving, false);
 		if (ret) {
 			pr_debug("Memory eviction: Sync BO fence failed. Try again\n");
 			goto validate_map_fail;
