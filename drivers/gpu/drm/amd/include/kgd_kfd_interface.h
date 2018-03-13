@@ -277,7 +277,7 @@ struct kfd2kgd_calls {
 	int (*create_process_gpumem)(struct kgd_dev *kgd, uint64_t va, size_t size, void *vm, struct kgd_mem **mem);
 	void (*destroy_process_gpumem)(struct kgd_dev *kgd, struct kgd_mem *mem);
 
-	uint32_t (*get_process_page_dir)(void *vm);
+	uint64_t (*get_process_page_dir)(void *vm);
 
 	int (*alloc_pasid)(unsigned int bits);
 	void (*free_pasid)(unsigned int pasid);
@@ -368,7 +368,7 @@ struct kfd2kgd_calls {
 	int (*map_gtt_bo_to_kernel)(struct kgd_dev *kgd,
 			struct kgd_mem *mem, void **kptr, uint64_t *size);
 	void (*set_vm_context_page_table_base)(struct kgd_dev *kgd, uint32_t vmid,
-			uint32_t page_table_base);
+			uint64_t page_table_base);
 
 	int (*pin_get_sg_table_bo)(struct kgd_dev *kgd,
 			struct kgd_mem *mem, uint64_t offset,
