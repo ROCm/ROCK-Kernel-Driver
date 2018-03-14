@@ -2579,7 +2579,8 @@ static void amdgpu_inc_compute_vms(struct amdgpu_device *adev)
 	if ((adev->vm_manager.n_compute_vms++ == 0) &&
 	    (!amdgpu_sriov_vf(adev))) {
 		/* First Compute VM: enable compute power profile */
-		if (adev->powerplay.pp_funcs->switch_power_profile)
+		if (adev->powerplay.pp_funcs &&
+			adev->powerplay.pp_funcs->switch_power_profile)
 			amdgpu_dpm_switch_power_profile(adev,
 					PP_SMC_POWER_PROFILE_COMPUTE, true);
 	}
@@ -2877,7 +2878,8 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		if ((--adev->vm_manager.n_compute_vms == 0) &&
 			(!amdgpu_sriov_vf(adev))) {
 			/* Last KFD VM: enable graphics power profile */
-			if (adev->powerplay.pp_funcs->switch_power_profile)
+			if (adev->powerplay.pp_funcs &&
+				adev->powerplay.pp_funcs->switch_power_profile)
 				amdgpu_dpm_switch_power_profile(adev,
 					PP_SMC_POWER_PROFILE_COMPUTE, true);
 		}
