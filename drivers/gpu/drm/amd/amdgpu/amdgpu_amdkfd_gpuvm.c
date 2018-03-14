@@ -1744,7 +1744,8 @@ static int get_sg_table(struct amdgpu_device *adev,
 		goto out;
 
 	if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM) {
-		bus_addr = bo->tbo.offset + adev->mc.aper_base + offset;
+		bus_addr = amdgpu_bo_gpu_offset(bo) - adev->mc.vram_start
+			   + adev->mc.aper_base + offset;
 
 		for_each_sg(sg->sgl, s, sg->orig_nents, i) {
 			uint64_t chunk_size, length;
