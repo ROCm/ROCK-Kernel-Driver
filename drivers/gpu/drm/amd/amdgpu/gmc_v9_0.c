@@ -792,6 +792,7 @@ static int gmc_v9_0_mc_init(struct amdgpu_device *adev)
 	if (amdgpu_gart_size == -1) {
 		switch (adev->asic_type) {
 		case CHIP_VEGA10:  /* all engines support GPUVM */
+		case CHIP_VEGA12:  /* all engines support GPUVM */
 		default:
 			adev->gmc.gart_size = 512ULL << 20;
 			break;
@@ -850,6 +851,7 @@ static int gmc_v9_0_sw_init(void *handle)
 		}
 		break;
 	case CHIP_VEGA10:
+	case CHIP_VEGA12:
 		/*
 		 * To fulfill 4-level page support,
 		 * vm size is 256TB (48bit), maximum size of Vega10,
@@ -958,6 +960,7 @@ static void gmc_v9_0_init_golden_registers(struct amdgpu_device *adev)
 
 	switch (adev->asic_type) {
 	case CHIP_VEGA10:
+	case CHIP_VEGA12:
 		soc15_program_register_sequence(adev,
 						golden_settings_mmhub_1_0_0,
 						ARRAY_SIZE(golden_settings_mmhub_1_0_0));
