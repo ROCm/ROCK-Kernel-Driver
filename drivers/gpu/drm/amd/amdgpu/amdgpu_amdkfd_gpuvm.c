@@ -1297,6 +1297,8 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 
 allocate_init_user_pages_failed:
 	amdgpu_bo_unref(&bo);
+	/* Don't unreserve system mem limit twice */
+	goto err_reserve_limit;
 err_bo_create:
 	unreserve_system_mem_limit(adev, size, alloc_domain);
 err_reserve_limit:
