@@ -3945,7 +3945,7 @@ static int smu7_program_display_gap(struct pp_hwmgr *hwmgr)
 	cgs_write_ind_register(hwmgr->device, CGS_IND_REG__SMC, ixCG_DISPLAY_GAP_CNTL, display_gap);
 
 	ref_clock =  amdgpu_asic_get_xclk((struct amdgpu_device *)hwmgr->adev);
-	pr_info("ref_clock is %d \n", ref_clock);
+
 	refresh_rate = mode_info.refresh_rate;
 
 	if (0 == refresh_rate)
