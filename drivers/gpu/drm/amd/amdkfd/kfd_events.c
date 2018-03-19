@@ -53,8 +53,8 @@ struct kfd_event_waiter {
  */
 struct kfd_signal_page {
 	uint64_t *kernel_address;
-	uint64_t handle;
 	uint64_t __user *user_address;
+	bool need_to_free_pages;
 };
 
 
@@ -82,6 +82,7 @@ static struct kfd_signal_page *allocate_signal_page(struct kfd_process *p)
 	       KFD_SIGNAL_EVENT_LIMIT * 8);
 
 	page->kernel_address = backing_store;
+	page->need_to_free_pages = true;
 	pr_debug("Allocated new event signal page at %p, for process %p\n",
 			page, p);
 
@@ -112,29 +113,6 @@ static int allocate_event_notification_slot(struct kfd_process *p,
 	page_slots(p->signal_page)[id] = UNSIGNALED_EVENT_SLOT;
 
 	return 0;
-}
-
-static struct kfd_signal_page *allocate_signal_page_dgpu(
-	struct kfd_process *p, uint64_t *kernel_address, uint64_t handle)
-{
-	struct kfd_signal_page *my_page;
-
-	my_page = kzalloc(sizeof(*my_page), GFP_KERNEL);
-	if (!my_page)
-		return NULL;
-
-	/* Initialize all events to unsignaled */
-	memset(kernel_address, (uint8_t) UNSIGNALED_EVENT_SLOT,
-	       KFD_SIGNAL_EVENT_LIMIT * 8);
-
-	my_page->kernel_address = kernel_address;
-	my_page->handle = handle;
-	my_page->user_address = NULL;
-
-	pr_debug("Allocated new event signal page at %p, for process %p\n",
-			my_page, p);
-
-	return my_page;
 }
 
 /*
@@ -290,9 +268,9 @@ static void shutdown_signal_page(struct kfd_process *p)
 	struct kfd_signal_page *page = p->signal_page;
 
 	if (page) {
-		if (page->user_address)
+		if (page->need_to_free_pages)
 			free_pages((unsigned long)page->kernel_address,
-					get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
+				   get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
 		kfree(page);
 	}
 }
@@ -314,11 +292,32 @@ static bool event_can_be_cpu_signaled(const struct kfd_event *ev)
 	return ev->type == KFD_EVENT_TYPE_SIGNAL;
 }
 
+int kfd_event_page_set(struct kfd_process *p, void *kernel_address)
+{
+	struct kfd_signal_page *page;
+
+	if (p->signal_page)
+		return -EBUSY;
+
+	page = kzalloc(sizeof(*page), GFP_KERNEL);
+	if (!page)
+		return -ENOMEM;
+
+	/* Initialize all events to unsignaled */
+	memset(kernel_address, (uint8_t) UNSIGNALED_EVENT_SLOT,
+	       KFD_SIGNAL_EVENT_LIMIT * 8);
+
+	page->kernel_address = kernel_address;
+
+	p->signal_page = page;
+
+	return 0;
+}
+
 int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		     uint32_t event_type, bool auto_reset, uint32_t node_id,
 		     uint32_t *event_id, uint32_t *event_trigger_data,
-		     uint64_t *event_page_offset, uint32_t *event_slot_index,
-		     void *kern_addr)
+		     uint64_t *event_page_offset, uint32_t *event_slot_index)
 {
 	int ret = 0;
 	struct kfd_event *ev = kzalloc(sizeof(*ev), GFP_KERNEL);
@@ -332,18 +331,9 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 
 	init_waitqueue_head(&ev->wq);
 
-	mutex_lock(&p->event_mutex);
-
-	if (kern_addr && !p->signal_page) {
-		p->signal_page = allocate_signal_page_dgpu(p, kern_addr,
-							   *event_page_offset);
-		if (!p->signal_page) {
-			ret = -ENOMEM;
-			goto out;
-		}
-	}
-
 	*event_page_offset = 0;
+
+	mutex_lock(&p->event_mutex);
 
 	switch (event_type) {
 	case KFD_EVENT_TYPE_SIGNAL:
@@ -367,7 +357,6 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		kfree(ev);
 	}
 
-out:
 	mutex_unlock(&p->event_mutex);
 
 	return ret;
