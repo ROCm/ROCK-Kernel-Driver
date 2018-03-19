@@ -724,6 +724,7 @@ struct kfd_process {
 	struct idr event_idr;
 	/* Event page */
 	struct kfd_signal_page *signal_page;
+	size_t signal_mapped_size;
 	size_t signal_event_count;
 	bool signal_event_limit_reached;
 
@@ -1072,7 +1073,8 @@ void kfd_signal_iommu_event(struct kfd_dev *dev,
 void kfd_signal_hw_exception_event(unsigned int pasid);
 int kfd_set_event(struct kfd_process *p, uint32_t event_id);
 int kfd_reset_event(struct kfd_process *p, uint32_t event_id);
-int kfd_event_page_set(struct kfd_process *p, void *kernel_address);
+int kfd_event_page_set(struct kfd_process *p, void *kernel_address,
+		       uint64_t size);
 int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		     uint32_t event_type, bool auto_reset, uint32_t node_id,
 		     uint32_t *event_id, uint32_t *event_trigger_data,

@@ -1002,6 +1002,7 @@ static int kfd_ioctl_create_event(struct file *filp, struct kfd_process *p,
 		struct kfd_dev *kfd;
 		struct kfd_process_device *pdd;
 		void *mem, *kern_addr;
+		uint64_t size;
 
 		if (p->signal_page) {
 			pr_err("Event page is already set\n");
@@ -1032,13 +1033,13 @@ static int kfd_ioctl_create_event(struct file *filp, struct kfd_process *p,
 		mutex_unlock(&p->mutex);
 
 		err = kfd->kfd2kgd->map_gtt_bo_to_kernel(kfd->kgd,
-						mem, &kern_addr, NULL);
+						mem, &kern_addr, &size);
 		if (err) {
 			pr_err("Failed to map event page to kernel\n");
 			return err;
 		}
 
-		err = kfd_event_page_set(p, kern_addr);
+		err = kfd_event_page_set(p, kern_addr, size);
 		if (err) {
 			pr_err("Failed to set event page\n");
 			return err;
