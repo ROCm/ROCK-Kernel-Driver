@@ -31,7 +31,7 @@
 #include <linux/types.h>
 #include <linux/mm_types.h>
 #include <linux/scatterlist.h>
-#include <linux/dma-fence.h>
+#include <kcl/kcl_fence.h>
 #include <linux/dma-buf.h>
 #include <linux/bitmap.h>
 
