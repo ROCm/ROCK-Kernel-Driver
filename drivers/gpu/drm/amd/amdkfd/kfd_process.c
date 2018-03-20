@@ -28,7 +28,6 @@
 #include <linux/sched/task.h>
 #endif
 #include <linux/slab.h>
-#include <linux/amd-iommu.h>
 #include <linux/notifier.h>
 #include <linux/compat.h>
 #include <linux/mman.h>
@@ -78,7 +77,11 @@ static void restore_process_worker(struct work_struct *work);
 int kfd_process_create_wq(void)
 {
 	if (!kfd_process_wq)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
 		kfd_process_wq = alloc_workqueue("kfd_process_wq", 0, 0);
+#else
+		kfd_process_wq = create_workqueue("kfd_process_wq");
+#endif
 	if (!kfd_restore_wq)
 		kfd_restore_wq = alloc_ordered_workqueue("kfd_restore_wq", 0);
 
@@ -253,9 +256,14 @@ struct kfd_process *kfd_get_process(const struct task_struct *thread)
 static struct kfd_process *find_process_by_mm(const struct mm_struct *mm)
 {
 	struct kfd_process *process;
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+	hash_for_each_possible_rcu(kfd_processes_table, process, node,
+					kfd_processes, (uintptr_t)mm)
+#else
 	hash_for_each_possible_rcu(kfd_processes_table, process,
 					kfd_processes, (uintptr_t)mm)
+#endif
 		if (process->mm == mm)
 			return process;
 
