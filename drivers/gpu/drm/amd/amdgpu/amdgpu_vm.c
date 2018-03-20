@@ -2556,7 +2556,11 @@ int amdgpu_vm_make_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		r = 0;
 		goto error;
 	}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 	if (!RB_EMPTY_ROOT(&vm->va) || vm->root.entries) {
+#else
+	if (!RB_EMPTY_ROOT(&vm->va.rb_root) || vm->root.entries) {
+#endif
 		r = -EINVAL;
 		goto error;
 	}
