@@ -23,14 +23,15 @@
 #include <linux/mm_types.h>
 #include <linux/slab.h>
 #include <linux/types.h>
-#include <linux/sched/signal.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
+#include <linux/sched/signal.h>
+#endif
 #include <linux/uaccess.h>
 #include <linux/mman.h>
 #include <linux/memory.h>
 #include "kfd_priv.h"
 #include "kfd_events.h"
-#include "kfd_iommu.h"
 #include <linux/device.h>
 
 /*
@@ -253,7 +254,11 @@ static void destroy_event(struct kfd_process *p, struct kfd_event *ev)
 	struct kfd_event_waiter *waiter;
 
 	/* Wake up pending waiters. They will return failure */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
+	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
+#else
 	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
+#endif
 		waiter->event = NULL;
 	wake_up_all(&ev->wq);
 
@@ -393,7 +398,11 @@ static void set_event(struct kfd_event *ev)
 	/* Auto reset if the list is non-empty and we're waking someone. */
 	ev->signaled = !ev->auto_reset || !waitqueue_active(&ev->wq);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
+	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
+#else
 	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
+#endif
 		waiter->activated = true;
 
 	wake_up_all(&ev->wq);
@@ -975,6 +984,9 @@ void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 	uint32_t id;
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
 	struct kfd_hsa_memory_exception_data memory_exception_data;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+#endif
 
 	if (!p)
 		return; /* Presumably process exited. */

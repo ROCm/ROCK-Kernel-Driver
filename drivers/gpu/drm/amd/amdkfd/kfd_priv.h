@@ -36,7 +36,11 @@
 #include <linux/interval_tree.h>
 #include <linux/seq_file.h>
 #include <linux/kref.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+#include <linux/kfifo-new.h>
+#else
 #include <linux/kfifo.h>
+#endif
 #include <kgd_kfd_interface.h>
 
 #include "amd_rdma.h"
@@ -151,6 +155,14 @@ extern int vega10_noretry;
  * Enable privileged mode for all CP queues including user queues
  */
 extern int priv_cp_queues;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) && defined(BUILD_AS_DKMS)
+/*
+ * Currently, mm_access() function is not exported. So for DKMS build,
+ * CMA will be enabled only if module param is set.
+ */
+extern int cma_enable;
+#endif
 
 /**
  * enum kfd_sched_policy

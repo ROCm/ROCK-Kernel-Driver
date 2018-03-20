@@ -20,10 +20,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <linux/bsearch.h>
+
 #include <linux/pci.h>
 #include <linux/slab.h>
-#include <linux/dma-fence.h>
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_pm4_headers_vi.h"
@@ -331,6 +330,11 @@ static void kfd_gtt_sa_fini(struct kfd_dev *kfd);
 
 static int kfd_resume(struct kfd_dev *kfd);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+void kfd_init_processes_srcu(void);
+void kfd_cleanup_processes_srcu(void);
+#endif
+
 static const struct kfd_device_info *lookup_device_info(unsigned short did)
 {
 	size_t i;
@@ -500,6 +504,10 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 
 	kfd_cwsr_init(kfd);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+	kfd_init_processes_srcu();
+#endif
+
 	if (kfd_resume(kfd))
 		goto kfd_resume_error;
 
@@ -538,6 +546,9 @@ void kgd2kfd_device_exit(struct kfd_dev *kfd)
 {
 	if (kfd->init_complete) {
 		kgd2kfd_suspend(kfd);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+		kfd_cleanup_processes_srcu();
+#endif
 		device_queue_manager_uninit(kfd->dqm);
 		kfd_interrupt_exit(kfd);
 		kfd_topology_remove_device(kfd);

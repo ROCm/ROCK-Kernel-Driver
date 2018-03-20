@@ -20,7 +20,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <linux/dma-fence.h>
 #include <linux/spinlock.h>
 #include <linux/atomic.h>
 #include <linux/stacktrace.h>

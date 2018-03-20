@@ -97,6 +97,13 @@ module_param(priv_cp_queues, int, 0644);
 MODULE_PARM_DESC(priv_cp_queues,
 	"Enable privileged mode for CP queues (0 = off (default), 1 = on)");
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) && defined(BUILD_AS_DKMS)
+int cma_enable;
+module_param(cma_enable, int, 0644);
+MODULE_PARM_DESC(cma_enable,
+	"Enable CMA (1 = enable, 0 = disable (default)). Warning! relaxed access check");
+#endif
+
 int kgd2kfd_init(unsigned int interface_version,
 		const struct kgd2kfd_calls **g2f)
 {
