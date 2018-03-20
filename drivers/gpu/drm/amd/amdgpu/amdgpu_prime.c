@@ -108,8 +108,10 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	if (ret)
 		goto error;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0) && !defined(BUILD_AS_DKMS)
 	if (attach->dmabuf->ops != &amdgpu_dmabuf_ops)
 		bo->prime_shared_count = 1;
+#endif
 
 	ww_mutex_unlock(&resv->lock);
 	return &bo->gem_base;
