@@ -1510,6 +1510,9 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 		goto out;
 	}
 out:
+	/* fall back to vbios tables for vega20 */
+	if (adev->asic_type == CHIP_VEGA20)
+		return 0;
 	return err;
 }
 
