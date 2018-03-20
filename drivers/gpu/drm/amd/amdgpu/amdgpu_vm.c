@@ -2396,7 +2396,7 @@ static void amdgpu_inc_compute_vms(struct amdgpu_device *adev)
 		/* First Compute VM: enable compute power profile */
 		if (adev->powerplay.pp_funcs->switch_power_profile)
 			amdgpu_dpm_switch_power_profile(adev,
-							AMD_PP_COMPUTE_PROFILE);
+							PP_SMC_POWER_PROFILE_COMPUTE, true);
 	}
 	mutex_unlock(&id_mgr->lock);
 }
@@ -2691,7 +2691,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 			/* Last KFD VM: enable graphics power profile */
 			if (adev->powerplay.pp_funcs->switch_power_profile)
 				amdgpu_dpm_switch_power_profile(adev,
-						AMD_PP_GFX_PROFILE);
+							PP_SMC_POWER_PROFILE_COMPUTE, true);
 		}
 		mutex_unlock(&id_mgr->lock);
 	}
