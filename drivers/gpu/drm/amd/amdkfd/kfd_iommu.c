@@ -328,6 +328,7 @@ int kfd_iommu_resume(struct kfd_dev *kfd)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 extern bool amd_iommu_pc_supported(void);
 extern u8 amd_iommu_pc_get_max_banks(u16 devid);
 extern u8 amd_iommu_pc_get_max_counters(u16 devid);
@@ -354,3 +355,4 @@ int kfd_iommu_add_perf_counters(struct kfd_topology_device *kdev)
 
 	return 0;
 }
+#endif
