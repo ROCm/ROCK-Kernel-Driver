@@ -169,7 +169,8 @@ void amdgpu_amdkfd_unreserve_system_memory_limit(struct amdgpu_bo *bo)
 	if (bo->flags & AMDGPU_AMDKFD_USERPTR_BO) {
 		kfd_mem_limit.system_mem_used -= bo->tbo.acc_size;
 		kfd_mem_limit.userptr_mem_used -= amdgpu_bo_size(bo);
-	} else if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_GTT) {
+	} else if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_GTT &&
+		   !bo->tbo.sg) {
 		kfd_mem_limit.system_mem_used -=
 			(bo->tbo.acc_size + amdgpu_bo_size(bo));
 	}
@@ -1196,6 +1197,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	struct amdgpu_vm *avm = (struct amdgpu_vm *)vm;
 	uint64_t user_addr = 0;
 	struct sg_table *sg = NULL;
+	enum ttm_bo_type bo_type = ttm_bo_type_device;
 	struct amdgpu_bo *bo;
 	int byte_align;
 	u32 domain, alloc_domain;
@@ -1223,13 +1225,15 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 			return -EINVAL;
 		user_addr = *offset;
 	} else if (flags & ALLOC_MEM_FLAGS_DOORBELL) {
-		domain = alloc_domain = AMDGPU_GEM_DOMAIN_GTT;
+		domain = AMDGPU_GEM_DOMAIN_GTT;
+		alloc_domain = AMDGPU_GEM_DOMAIN_CPU;
 		alloc_flags = 0;
 		if (size > UINT_MAX)
 			return -EINVAL;
 		sg = create_doorbell_sg(*offset, size);
 		if (!sg)
 			return -ENOMEM;
+		bo_type = ttm_bo_type_sg;
 	} else {
 		return -EINVAL;
 	}
@@ -1270,10 +1274,13 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 
 	amdgpu_sync_create(&(*mem)->sync);
 
-	ret = amdgpu_amdkfd_reserve_system_mem_limit(adev, size, alloc_domain);
-	if (ret) {
-		pr_debug("Insufficient system memory\n");
-		goto err_reserve_limit;
+	if (!sg) {
+		ret = amdgpu_amdkfd_reserve_system_mem_limit(adev, size,
+							     alloc_domain);
+		if (ret) {
+			pr_debug("Insufficient system memory\n");
+			goto err_reserve_limit;
+		}
 	}
 
 	pr_debug("\tcreate BO VA 0x%llx size 0x%llx domain %s\n",
@@ -1282,12 +1289,16 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	/* Allocate buffer object. Userptr objects need to start out
 	 * in the CPU domain, get moved to GTT when pinned.
 	 */
-	ret = amdgpu_bo_create(adev, size, byte_align, false,
-			       alloc_domain, alloc_flags, sg, NULL, &bo);
+	ret = amdgpu_bo_create(adev, size, byte_align, alloc_domain,
+			       alloc_flags, bo_type, NULL, &bo);
 	if (ret) {
 		pr_debug("Failed to create BO on domain %s. ret %d\n",
 				domain_string(alloc_domain), ret);
 		goto err_bo_create;
+	}
+	if (bo_type == ttm_bo_type_sg) {
+		bo->tbo.sg = sg;
+		bo->tbo.ttm->sg = sg;
 	}
 	bo->kfd_bo = *mem;
 	(*mem)->bo = bo;
@@ -1318,7 +1329,8 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 allocate_init_user_pages_failed:
 	amdgpu_bo_unref(&bo);
 err_bo_create:
-	unreserve_system_mem_limit(adev, size, alloc_domain);
+	if (!sg)
+		unreserve_system_mem_limit(adev, size, alloc_domain);
 err_reserve_limit:
 	kfree(*mem);
 err:
