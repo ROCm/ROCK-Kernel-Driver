@@ -157,7 +157,7 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 	 * created and the ioctls have not had the chance to run.
 	 */
 	handle = kfd_process_device_create_obj_handle(
-			pdd, mem, gpu_va, size, NULL);
+			pdd, mem, gpu_va, size, 0, NULL);
 
 	if (handle < 0) {
 		err = handle;
@@ -832,7 +832,7 @@ bool kfd_has_process_device_data(struct kfd_process *p)
  */
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 					void *mem, uint64_t start,
-					uint64_t length,
+					uint64_t length, uint64_t cpuva,
 					struct kfd_ipc_obj *ipc_obj)
 {
 	int handle;
@@ -853,6 +853,7 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 	buf_obj->mem = mem;
 	buf_obj->dev = pdd->dev;
 	buf_obj->kfd_ipc_obj = ipc_obj;
+	buf_obj->cpuva = cpuva;
 
 	INIT_LIST_HEAD(&buf_obj->cb_data_head);
 
