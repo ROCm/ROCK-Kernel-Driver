@@ -25,6 +25,8 @@
 
 #if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 
+#define KFD_SUPPORT_IOMMU_V2
+
 int kfd_iommu_check_device(struct kfd_dev *kfd);
 int kfd_iommu_device_init(struct kfd_dev *kfd);
 

@@ -30,7 +30,6 @@
 #include "kfd_topology.h"
 #include "kfd_iommu.h"
 
-#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
 static const u32 required_iommu_flags = AMD_IOMMU_DEVICE_FLAG_ATS_SUP |
 					AMD_IOMMU_DEVICE_FLAG_PRI_SUP |
 					AMD_IOMMU_DEVICE_FLAG_PASID_SUP;
@@ -359,4 +358,3 @@ int kfd_iommu_add_perf_counters(struct kfd_topology_device *kdev)
 	return 0;
 }
 
-#endif

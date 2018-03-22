@@ -142,7 +142,7 @@ struct kfd_iolink_properties {
 	struct attribute	attr;
 };
 
-#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 struct kfd_perf_properties {
 	struct list_head	list;
 	char			block_name[16];
@@ -161,7 +161,7 @@ struct kfd_topology_device {
 	struct list_head		cache_props;
 	uint32_t			io_link_count;
 	struct list_head		io_link_props;
-#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 	struct list_head		perf_props;
 #endif
 	struct kfd_dev			*gpu;
@@ -169,7 +169,7 @@ struct kfd_topology_device {
 	struct kobject			*kobj_mem;
 	struct kobject			*kobj_cache;
 	struct kobject			*kobj_iolink;
-#if defined(CONFIG_AMD_IOMMU_V2_MODULE) || defined(CONFIG_AMD_IOMMU_V2)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 	struct kobject			*kobj_perf;
 #endif
 	struct attribute		attr_gpuid;
