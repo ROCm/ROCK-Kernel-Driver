@@ -313,6 +313,8 @@ struct kfd_bo {
 	struct kfd_dev *dev;
 	struct list_head cb_data_head;
 	struct kfd_ipc_obj *kfd_ipc_obj;
+	/* page-aligned VA address */
+	uint64_t cpuva;
 };
 
 /* Similar to iov_iter */
@@ -812,7 +814,7 @@ int kfd_reserved_mem_mmap(struct kfd_process *process,
 /* KFD process API for creating and translating handles */
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 					void *mem, uint64_t start,
-					uint64_t length,
+					uint64_t length, uint64_t cpuva,
 					struct kfd_ipc_obj *ipc_obj);
 void *kfd_process_device_translate_handle(struct kfd_process_device *p,
 					int handle);

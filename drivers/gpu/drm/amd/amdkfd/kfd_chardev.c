@@ -1242,6 +1242,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	uint64_t offset = args->mmap_offset;
 	uint32_t flags = args->flags;
 	struct vm_area_struct *vma;
+	uint64_t cpuva = 0;
 
 	if (args->size == 0)
 		return -EINVAL;
@@ -1271,6 +1272,13 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 			flags |= KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL;
 			flags &= ~KFD_IOC_ALLOC_MEM_FLAGS_USERPTR;
 			offset = (pfn << PAGE_SHIFT);
+		} else {
+			if (offset & (PAGE_SIZE - 1)) {
+				pr_debug("Unaligned userptr address:%llx\n",
+					 offset);
+				return -EINVAL;
+			}
+			cpuva = offset;
 		}
 	} else if (flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
 		if (args->size != kfd_doorbell_process_slice(dev))
@@ -1295,7 +1303,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		goto err_unlock;
 
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
-			args->va_addr, args->size, NULL);
+			args->va_addr, args->size, cpuva, NULL);
 	if (idr_handle < 0) {
 		err = -EFAULT;
 		goto err_free;
