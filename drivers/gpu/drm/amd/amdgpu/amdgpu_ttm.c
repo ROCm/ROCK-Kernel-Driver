@@ -1458,10 +1458,10 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 
 	size = (unsigned long)amdgpu_direct_gma_size << 20;
 	/* reserve in visible vram */
-	r = amdgpu_bo_create(adev, size, PAGE_SIZE, true, AMDGPU_GEM_DOMAIN_VRAM,
+	r = amdgpu_bo_create(adev, size, PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM,
 			     AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED | AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS |
 			     AMDGPU_GEM_CREATE_TOP_DOWN,
-			     NULL, NULL, &abo);
+			     ttm_bo_type_kernel, NULL, &abo);
 	if (unlikely(r))
 		goto error_out;
 
