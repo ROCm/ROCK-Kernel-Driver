@@ -2651,10 +2651,12 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	/* disable all interrupts */
 	amdgpu_irq_disable_all(adev);
 	if (adev->mode_info.mode_config_initialized){
-		if (!amdgpu_device_has_dc_support(adev))
-			drm_crtc_force_disable_all(adev->ddev);
-		else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+		if (amdgpu_device_has_dc_support(adev))
 			drm_atomic_helper_shutdown(adev->ddev);
+		else
+#endif
+			drm_crtc_force_disable_all(adev->ddev);
 	}
 	amdgpu_ib_pool_fini(adev);
 	amdgpu_fence_driver_fini(adev);
