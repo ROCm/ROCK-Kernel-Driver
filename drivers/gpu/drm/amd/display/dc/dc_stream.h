@@ -64,7 +64,7 @@ struct dc_stream_state {
 
 	struct audio_info audio_info;
 
-	struct dc_hdr_static_metadata hdr_static_metadata;
+	struct dc_info_packet hdr_static_metadata;
 	struct dc_transfer_func *out_transfer_func;
 	struct colorspace_transform gamut_remap_matrix;
 	struct csc_transform csc_color_matrix;
@@ -119,8 +119,8 @@ struct dc_stream_update {
 	struct rect src;
 	struct rect dst;
 	struct dc_transfer_func *out_transfer_func;
-	struct dc_hdr_static_metadata *hdr_static_metadata;
 	enum color_transfer_func color_output_tf;
+	struct dc_info_packet *hdr_static_metadata;
 	unsigned int *abm_level;
 	unsigned long long *periodic_fn_vsync_delta;
 	struct dc_crtc_timing_adjust *adjust;
