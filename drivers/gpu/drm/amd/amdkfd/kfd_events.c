@@ -33,6 +33,7 @@
 #include "kfd_priv.h"
 #include "kfd_events.h"
 #include <linux/device.h>
+#include "kfd_iommu.h"
 
 /*
  * Wrapper around wait_queue_entry_t
