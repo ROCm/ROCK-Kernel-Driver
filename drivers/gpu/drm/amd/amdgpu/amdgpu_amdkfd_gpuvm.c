@@ -926,6 +926,17 @@ static struct sg_table *create_doorbell_sg(uint64_t addr, uint32_t size)
 	return sg;
 }
 
+static bool check_sg_size(struct sg_table *sgt, uint64_t size)
+{
+	unsigned int count;
+	struct scatterlist *sg;
+
+	for_each_sg(sgt->sgl, sg, sgt->nents, count)
+		size -= sg->length;
+
+	return (size == 0);
+}
+
 static int process_validate_vms(struct amdkfd_process_info *process_info)
 {
 	struct amdgpu_vm *peer_vm;
@@ -1173,13 +1184,12 @@ uint32_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm)
 
 int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		struct kgd_dev *kgd, uint64_t va, uint64_t size,
-		void *vm, struct kgd_mem **mem,
+		void *vm, struct sg_table *sg, struct kgd_mem **mem,
 		uint64_t *offset, uint32_t flags)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct amdgpu_vm *avm = (struct amdgpu_vm *)vm;
 	uint64_t user_addr = 0;
-	struct sg_table *sg = NULL;
 	enum ttm_bo_type bo_type = ttm_bo_type_device;
 	struct amdgpu_bo *bo;
 	int byte_align;
@@ -1200,6 +1210,8 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	} else if (flags & ALLOC_MEM_FLAGS_GTT) {
 		domain = alloc_domain = AMDGPU_GEM_DOMAIN_GTT;
 		alloc_flags = 0;
+		if (sg && !check_sg_size(sg, size))
+			return -EINVAL;
 	} else if (flags & ALLOC_MEM_FLAGS_USERPTR) {
 		domain = AMDGPU_GEM_DOMAIN_GTT;
 		alloc_domain = AMDGPU_GEM_DOMAIN_CPU;
@@ -1209,18 +1221,21 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		user_addr = *offset;
 	} else if (flags & ALLOC_MEM_FLAGS_DOORBELL) {
 		domain = AMDGPU_GEM_DOMAIN_GTT;
-		alloc_domain = AMDGPU_GEM_DOMAIN_CPU;
 		alloc_flags = 0;
 		if (size > UINT_MAX)
 			return -EINVAL;
+		WARN_ON(sg);
 		sg = create_doorbell_sg(*offset, size);
 		if (!sg)
 			return -ENOMEM;
-		bo_type = ttm_bo_type_sg;
 	} else {
 		return -EINVAL;
 	}
 
+	if (sg) {
+		alloc_domain = AMDGPU_GEM_DOMAIN_CPU;
+		bo_type = ttm_bo_type_sg;
+	}
 	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
 	if (!*mem) {
 		ret = -ENOMEM;
