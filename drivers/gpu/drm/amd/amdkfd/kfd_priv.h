@@ -992,14 +992,14 @@ struct packet_manager_funcs {
 			uint64_t fence_address,	uint32_t fence_value);
 	uint32_t (*release_mem)(uint64_t gpu_addr, uint32_t *buffer);
 
-	uint32_t (*get_map_process_packet_size)(void);
-	uint32_t (*get_runlist_packet_size)(void);
-	uint32_t (*get_set_resources_packet_size)(void);
-	uint32_t (*get_map_queues_packet_size)(void);
-	uint32_t (*get_unmap_queues_packet_size)(void);
-	uint32_t (*get_query_status_packet_size)(void);
-	uint32_t (*get_release_mem_packet_size)(void);
-
+	/* Packet sizes */
+	int map_process_size;
+	int runlist_size;
+	int set_resources_size;
+	int map_queues_size;
+	int unmap_queues_size;
+	int query_status_size;
+	int release_mem_size;
 };
 
 int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm);
@@ -1021,7 +1021,6 @@ void pm_release_ib(struct packet_manager *pm);
 unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size);
 int pm_set_resources_vi(struct packet_manager *pm, uint32_t *buffer,
 				struct scheduling_resources *res);
-uint32_t pm_get_set_resources_packet_size_vi(void);
 
 void kfd_pm_func_init_vi(struct packet_manager *pm);
 void kfd_pm_func_init_v9(struct packet_manager *pm);

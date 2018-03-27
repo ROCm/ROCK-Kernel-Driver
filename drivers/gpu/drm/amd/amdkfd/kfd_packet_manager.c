@@ -69,9 +69,9 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 		pr_debug("Over subscribed runlist\n");
 	}
 
-	map_queue_size = pm->pmf->get_map_queues_packet_size();
+	map_queue_size = pm->pmf->map_queues_size;
 	/* calculate run list ib allocation size */
-	*rlib_size = process_count * pm->pmf->get_map_process_packet_size() +
+	*rlib_size = process_count * pm->pmf->map_process_size +
 		     queue_count * map_queue_size;
 
 	/*
@@ -79,7 +79,7 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 	 * when over subscription
 	 */
 	if (*over_subscription)
-		*rlib_size += pm->pmf->get_runlist_packet_size();
+		*rlib_size += pm->pmf->runlist_size;
 
 	pr_debug("runlist ib size %d\n", *rlib_size);
 }
@@ -160,7 +160,7 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 			return retval;
 
 		proccesses_mapped++;
-		inc_wptr(&rl_wptr, pm->pmf->get_map_process_packet_size(),
+		inc_wptr(&rl_wptr, pm->pmf->map_process_size,
 				alloc_size_bytes);
 
 		list_for_each_entry(kq, &qpd->priv_queue_list, list) {
@@ -178,7 +178,7 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 				return retval;
 
 			inc_wptr(&rl_wptr,
-				pm->pmf->get_map_queues_packet_size(),
+				pm->pmf->map_queues_size,
 				alloc_size_bytes);
 		}
 
@@ -197,7 +197,7 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 				return retval;
 
 			inc_wptr(&rl_wptr,
-				pm->pmf->get_map_queues_packet_size(),
+				pm->pmf->map_queues_size,
 				alloc_size_bytes);
 		}
 	}
@@ -262,7 +262,7 @@ int pm_send_set_resources(struct packet_manager *pm,
 	uint32_t *buffer, size;
 	int retval = 0;
 
-	size = pm->pmf->get_set_resources_packet_size();
+	size = pm->pmf->set_resources_size;
 	mutex_lock(&pm->lock);
 	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
 					size / sizeof(uint32_t),
@@ -299,7 +299,7 @@ int pm_send_runlist(struct packet_manager *pm, struct list_head *dqm_queues)
 
 	pr_debug("runlist IB address: 0x%llX\n", rl_gpu_ib_addr);
 
-	packet_size_dwords = pm->pmf->get_runlist_packet_size() /
+	packet_size_dwords = pm->pmf->runlist_size /
 		sizeof(uint32_t);
 	mutex_lock(&pm->lock);
 
@@ -337,7 +337,7 @@ int pm_send_query_status(struct packet_manager *pm, uint64_t fence_address,
 	if (WARN_ON(!fence_address))
 		return -EFAULT;
 
-	size = pm->pmf->get_query_status_packet_size();
+	size = pm->pmf->query_status_size;
 	mutex_lock(&pm->lock);
 	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
 			size / sizeof(uint32_t), (unsigned int **)&buffer);
@@ -366,7 +366,7 @@ int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
 	uint32_t *buffer, size;
 	int retval = 0;
 
-	size = pm->pmf->get_unmap_queues_packet_size();
+	size = pm->pmf->unmap_queues_size;
 	mutex_lock(&pm->lock);
 	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
 			size / sizeof(uint32_t), (unsigned int **)&buffer);

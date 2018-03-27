@@ -323,51 +323,21 @@ static uint32_t pm_release_mem_v9(uint64_t gpu_addr, uint32_t *buffer)
 	return sizeof(struct pm4_mec_release_mem) / sizeof(unsigned int);
 }
 
-static uint32_t pm_get_map_process_packet_size_v9(void)
-{
-	return sizeof(struct pm4_mes_map_process);
-}
-
-static uint32_t pm_get_runlist_packet_size_v9(void)
-{
-	return sizeof(struct pm4_mes_runlist);
-}
-
-static uint32_t pm_get_map_queues_packet_size_v9(void)
-{
-	return sizeof(struct pm4_mes_map_queues);
-}
-
-static uint32_t pm_get_unmap_queues_packet_size_v9(void)
-{
-	return sizeof(struct pm4_mes_unmap_queues);
-}
-
-static uint32_t pm_get_query_status_packet_size_v9(void)
-{
-	return sizeof(struct pm4_mes_query_status);
-}
-
-static uint32_t pm_get_release_mem_packet_size_v9(void)
-{
-	return sizeof(struct pm4_mec_release_mem);
-}
-
 static struct packet_manager_funcs kfd_v9_pm_funcs = {
-	.map_process			= pm_map_process_v9,
-	.runlist			= pm_runlist_v9,
-	.set_resources			= pm_set_resources_vi,
-	.map_queues			= pm_map_queues_v9,
-	.unmap_queues			= pm_unmap_queues_v9,
-	.query_status			= pm_query_status_v9,
-	.release_mem			= pm_release_mem_v9,
-	.get_map_process_packet_size	= pm_get_map_process_packet_size_v9,
-	.get_runlist_packet_size	= pm_get_runlist_packet_size_v9,
-	.get_set_resources_packet_size	= pm_get_set_resources_packet_size_vi,
-	.get_map_queues_packet_size	= pm_get_map_queues_packet_size_v9,
-	.get_unmap_queues_packet_size	= pm_get_unmap_queues_packet_size_v9,
-	.get_query_status_packet_size	= pm_get_query_status_packet_size_v9,
-	.get_release_mem_packet_size	= pm_get_release_mem_packet_size_v9,
+	.map_process		= pm_map_process_v9,
+	.runlist		= pm_runlist_v9,
+	.set_resources		= pm_set_resources_vi,
+	.map_queues		= pm_map_queues_v9,
+	.unmap_queues		= pm_unmap_queues_v9,
+	.query_status		= pm_query_status_v9,
+	.release_mem		= pm_release_mem_v9,
+	.map_process_size	= sizeof(struct pm4_mes_map_process),
+	.runlist_size		= sizeof(struct pm4_mes_runlist),
+	.set_resources_size	= sizeof(struct pm4_mes_set_resources),
+	.map_queues_size	= sizeof(struct pm4_mes_map_queues),
+	.unmap_queues_size	= sizeof(struct pm4_mes_unmap_queues),
+	.query_status_size	= sizeof(struct pm4_mes_query_status),
+	.release_mem_size	= sizeof(struct pm4_mec_release_mem)
 };
 
 void kfd_pm_func_init_v9(struct packet_manager *pm)
