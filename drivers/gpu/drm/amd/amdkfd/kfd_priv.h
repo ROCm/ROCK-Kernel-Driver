@@ -1020,6 +1020,8 @@ void pm_release_ib(struct packet_manager *pm);
 
 /* Following  PM funcs can be shared among CIK and VI  */
 unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size);
+int pm_map_process_vi(struct packet_manager *pm,
+			uint32_t *buffer, struct qcm_process_device *qpd);
 int pm_runlist_vi(struct packet_manager *pm, uint32_t *buffer,
 			uint64_t ib, size_t ib_size_in_dwords, bool chain);
 int pm_map_queues_vi(struct packet_manager *pm, uint32_t *buffer,

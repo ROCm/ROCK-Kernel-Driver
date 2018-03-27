@@ -67,7 +67,7 @@ static void submit_packet_vi(struct kernel_queue *kq)
 				kq->pending_wptr);
 }
 
-static int pm_map_process_vi(struct packet_manager *pm,
+int pm_map_process_vi(struct packet_manager *pm,
 		uint32_t *buffer, struct qcm_process_device *qpd)
 {
 	struct pm4_mes_map_process *packet;
