@@ -1553,6 +1553,7 @@ static void gfx_v9_0_gpu_init(struct amdgpu_device *adev)
 		tmp = 0;
 		tmp = REG_SET_FIELD(tmp, SH_MEM_CONFIG, ALIGNMENT_MODE,
 				    SH_MEM_ALIGNMENT_MODE_UNALIGNED);
+		tmp = REG_SET_FIELD(tmp, SH_MEM_CONFIG, RETRY_DISABLE, 1);
 		WREG32_SOC15(GC, 0, mmSH_MEM_CONFIG, tmp);
 		WREG32_SOC15(GC, 0, mmSH_MEM_BASES, 0);
 	}
