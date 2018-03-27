@@ -885,7 +885,7 @@ static void uninitialize(struct device_queue_manager *dqm)
 static int start_nocpsch(struct device_queue_manager *dqm)
 {
 	init_interrupts(dqm);
-	return pm_init(&dqm->packets, dqm, dqm->dev->mec_fw_version);
+	return pm_init(&dqm->packets, dqm);
 }
 
 static int stop_nocpsch(struct device_queue_manager *dqm)
@@ -1030,7 +1030,7 @@ static int start_cpsch(struct device_queue_manager *dqm)
 
 	retval = 0;
 
-	retval = pm_init(&dqm->packets, dqm, dqm->dev->mec_fw_version);
+	retval = pm_init(&dqm->packets, dqm);
 	if (retval)
 		goto fail_packet_manager_init;
 

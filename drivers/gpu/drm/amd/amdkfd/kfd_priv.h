@@ -1002,8 +1002,7 @@ struct packet_manager_funcs {
 
 };
 
-int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
-		uint16_t fw_ver);
+int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm);
 void pm_uninit(struct packet_manager *pm);
 int pm_send_set_resources(struct packet_manager *pm,
 				struct scheduling_resources *res);
@@ -1020,36 +1019,12 @@ void pm_release_ib(struct packet_manager *pm);
 
 /* Following  PM funcs can be shared among CIK and VI  */
 unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size);
-int pm_map_process_vi(struct packet_manager *pm,
-			uint32_t *buffer, struct qcm_process_device *qpd);
-int pm_runlist_vi(struct packet_manager *pm, uint32_t *buffer,
-			uint64_t ib, size_t ib_size_in_dwords, bool chain);
-int pm_map_queues_vi(struct packet_manager *pm, uint32_t *buffer,
-				struct queue *q, bool is_static);
 int pm_set_resources_vi(struct packet_manager *pm, uint32_t *buffer,
 				struct scheduling_resources *res);
-int pm_unmap_queues_vi(struct packet_manager *pm, uint32_t *buffer,
-			enum kfd_queue_type type,
-			enum kfd_unmap_queues_filter filter,
-			uint32_t filter_param, bool reset,
-			unsigned int sdma_engine);
-int pm_query_status_vi(struct packet_manager *pm, uint32_t *buffer,
-			uint64_t fence_address,	uint32_t fence_value);
-uint32_t pm_release_mem_vi(uint64_t gpu_addr, uint32_t *buffer);
-
-uint32_t pm_get_map_process_packet_size_vi(void);
-uint32_t pm_get_runlist_packet_size_vi(void);
 uint32_t pm_get_set_resources_packet_size_vi(void);
-uint32_t pm_get_map_queues_packet_size_vi(void);
-uint32_t pm_get_unmap_queues_packet_size_vi(void);
-uint32_t pm_get_query_status_packet_size_vi(void);
-uint32_t pm_get_release_mem_packet_size_vi(void);
 
-
-void kfd_pm_func_init_vi(struct packet_manager *pm, uint16_t fw_ver);
-void kfd_pm_func_init_cik(struct packet_manager *pm, uint16_t fw_ver);
-
-void kfd_pm_func_init_v9(struct packet_manager *pm, uint16_t fw_ver);
+void kfd_pm_func_init_vi(struct packet_manager *pm);
+void kfd_pm_func_init_v9(struct packet_manager *pm);
 
 
 uint64_t kfd_get_number_elems(struct kfd_dev *kfd);

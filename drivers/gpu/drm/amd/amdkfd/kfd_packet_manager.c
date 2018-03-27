@@ -217,8 +217,7 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 	return retval;
 }
 
-int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
-		uint16_t fw_ver)
+int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm)
 {
 	pm->dqm = dqm;
 	mutex_init(&pm->lock);
@@ -232,18 +231,17 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 	switch (pm->dqm->dev->device_info->asic_family) {
 	case CHIP_KAVERI:
 	case CHIP_HAWAII:
-		kfd_pm_func_init_cik(pm, fw_ver);
-		break;
+		/* PM4 packet structures on CIK are the same as on VI */
 	case CHIP_CARRIZO:
 	case CHIP_TONGA:
 	case CHIP_FIJI:
 	case CHIP_POLARIS10:
 	case CHIP_POLARIS11:
-		kfd_pm_func_init_vi(pm, fw_ver);
+		kfd_pm_func_init_vi(pm);
 		break;
 	case CHIP_VEGA10:
 	case CHIP_RAVEN:
-		kfd_pm_func_init_v9(pm, fw_ver);
+		kfd_pm_func_init_v9(pm);
 		break;
 	default:
 		BUG();

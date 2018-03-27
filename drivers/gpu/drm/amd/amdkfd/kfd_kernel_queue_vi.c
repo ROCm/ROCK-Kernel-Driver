@@ -67,7 +67,7 @@ static void submit_packet_vi(struct kernel_queue *kq)
 				kq->pending_wptr);
 }
 
-int pm_map_process_vi(struct packet_manager *pm,
+static int pm_map_process_vi(struct packet_manager *pm,
 		uint32_t *buffer, struct qcm_process_device *qpd)
 {
 	struct pm4_mes_map_process *packet;
@@ -112,7 +112,7 @@ unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size)
 	return header.u32All;
 }
 
-int pm_runlist_vi(struct packet_manager *pm, uint32_t *buffer,
+static int pm_runlist_vi(struct packet_manager *pm, uint32_t *buffer,
 			uint64_t ib, size_t ib_size_in_dwords, bool chain)
 {
 	struct pm4_mes_runlist *packet;
@@ -150,7 +150,7 @@ int pm_runlist_vi(struct packet_manager *pm, uint32_t *buffer,
 	return 0;
 }
 
-int pm_map_queues_vi(struct packet_manager *pm, uint32_t *buffer,
+static int pm_map_queues_vi(struct packet_manager *pm, uint32_t *buffer,
 		struct queue *q, bool is_static)
 {
 	struct pm4_mes_map_queues *packet;
@@ -237,7 +237,7 @@ int pm_set_resources_vi(struct packet_manager *pm, uint32_t *buffer,
 	return 0;
 }
 
-int pm_unmap_queues_vi(struct packet_manager *pm, uint32_t *buffer,
+static int pm_unmap_queues_vi(struct packet_manager *pm, uint32_t *buffer,
 			enum kfd_queue_type type,
 			enum kfd_unmap_queues_filter filter,
 			uint32_t filter_param, bool reset,
@@ -302,7 +302,7 @@ int pm_unmap_queues_vi(struct packet_manager *pm, uint32_t *buffer,
 
 }
 
-int pm_query_status_vi(struct packet_manager *pm, uint32_t *buffer,
+static int pm_query_status_vi(struct packet_manager *pm, uint32_t *buffer,
 			uint64_t fence_address,	uint32_t fence_value)
 {
 	struct pm4_mes_query_status *packet;
@@ -329,7 +329,7 @@ int pm_query_status_vi(struct packet_manager *pm, uint32_t *buffer,
 }
 
 
-uint32_t pm_release_mem_vi(uint64_t gpu_addr, uint32_t *buffer)
+static uint32_t pm_release_mem_vi(uint64_t gpu_addr, uint32_t *buffer)
 {
 	struct pm4_mec_release_mem *packet;
 
@@ -358,12 +358,12 @@ uint32_t pm_release_mem_vi(uint64_t gpu_addr, uint32_t *buffer)
 	return sizeof(struct pm4_mec_release_mem) / sizeof(unsigned int);
 }
 
-uint32_t pm_get_map_process_packet_size_vi(void)
+static uint32_t pm_get_map_process_packet_size_vi(void)
 {
 	return sizeof(struct pm4_mes_map_process);
 }
 
-uint32_t pm_get_runlist_packet_size_vi(void)
+static uint32_t pm_get_runlist_packet_size_vi(void)
 {
 	return sizeof(struct pm4_mes_runlist);
 }
@@ -373,22 +373,22 @@ uint32_t pm_get_set_resources_packet_size_vi(void)
 	return sizeof(struct pm4_mes_set_resources);
 }
 
-uint32_t pm_get_map_queues_packet_size_vi(void)
+static uint32_t pm_get_map_queues_packet_size_vi(void)
 {
 	return sizeof(struct pm4_mes_map_queues);
 }
 
-uint32_t pm_get_unmap_queues_packet_size_vi(void)
+static uint32_t pm_get_unmap_queues_packet_size_vi(void)
 {
 	return sizeof(struct pm4_mes_unmap_queues);
 }
 
-uint32_t pm_get_query_status_packet_size_vi(void)
+static uint32_t pm_get_query_status_packet_size_vi(void)
 {
 	return sizeof(struct pm4_mes_query_status);
 }
 
-uint32_t pm_get_release_mem_packet_size_vi(void)
+static uint32_t pm_get_release_mem_packet_size_vi(void)
 {
 	return sizeof(struct pm4_mec_release_mem);
 }
@@ -411,7 +411,7 @@ static struct packet_manager_funcs kfd_vi_pm_funcs = {
 	.get_release_mem_packet_size	= pm_get_release_mem_packet_size_vi,
 };
 
-void kfd_pm_func_init_vi(struct packet_manager *pm, uint16_t fw_ver)
+void kfd_pm_func_init_vi(struct packet_manager *pm)
 {
 	pm->pmf = &kfd_vi_pm_funcs;
 }

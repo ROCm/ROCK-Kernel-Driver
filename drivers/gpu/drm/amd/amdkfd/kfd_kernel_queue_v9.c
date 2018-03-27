@@ -370,7 +370,7 @@ static struct packet_manager_funcs kfd_v9_pm_funcs = {
 	.get_release_mem_packet_size	= pm_get_release_mem_packet_size_v9,
 };
 
-void kfd_pm_func_init_v9(struct packet_manager *pm, uint16_t fw_ver)
+void kfd_pm_func_init_v9(struct packet_manager *pm)
 {
 	pm->pmf = &kfd_v9_pm_funcs;
 }
