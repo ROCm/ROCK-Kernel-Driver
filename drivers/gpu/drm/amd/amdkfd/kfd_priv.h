@@ -317,6 +317,13 @@ struct kfd_bo {
 	uint64_t cpuva;
 };
 
+struct cma_system_bo {
+	struct kgd_mem *mem;
+	struct sg_table *sg;
+	struct kfd_dev *dev;
+	struct list_head list;
+};
+
 /* Similar to iov_iter */
 struct cma_iter {
 	/* points to current entry of range array */
@@ -334,6 +341,12 @@ struct cma_iter {
 	struct kfd_bo *cur_bo;
 	/* offset w.r.t cur_bo */
 	unsigned long bo_offset;
+	/* If cur_bo is a userptr BO, then a shadow system BO is created
+	 * using its underlying pages. cma_bo holds this BO. cma_list is a
+	 * list cma_bos created in one session
+	 */
+	struct cma_system_bo *cma_bo;
+	struct list_head cma_list;
 };
 
 /* KGD2KFD callbacks */
