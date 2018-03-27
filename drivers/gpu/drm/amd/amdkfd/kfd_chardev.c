@@ -1803,6 +1803,187 @@ static struct mm_struct *kfd_relaxed_mm_access(struct task_struct *task,
 #define MAX_KMALLOC_PAGES (PAGE_SIZE * 2)
 #define MAX_PP_KMALLOC_COUNT (MAX_KMALLOC_PAGES/sizeof(struct page *))
 
+static void kfd_put_sg_table(struct sg_table *sg)
+{
+	unsigned int i;
+	struct scatterlist *s;
+
+	for_each_sg(sg->sgl, s, sg->nents, i)
+		put_page(sg_page(s));
+}
+
+
+/* Create a sg table for the given userptr BO by pinning its system pages
+ * @bo: userptr BO
+ * @offset: Offset into BO
+ * @mm/@task: mm_struct & task_struct of the process that holds the BO
+ * @size: in/out: desired size / actual size which could be smaller
+ * @sg_size: out: Size of sg table. This is ALIGN_UP(@size)
+ * @ret_sg: out sg table
+ */
+static int kfd_create_sg_table_from_userptr_bo(struct kfd_bo *bo,
+					       int64_t offset, int cma_write,
+					       struct mm_struct *mm,
+					       struct task_struct *task,
+					       uint64_t *size,
+					       uint64_t *sg_size,
+					       struct sg_table **ret_sg)
+{
+	int ret, locked = 1;
+	struct sg_table *sg = NULL;
+	unsigned int i, offset_in_page, flags = 0;
+	unsigned long nents, n;
+	unsigned long pa = (bo->cpuva + offset) & PAGE_MASK;
+	unsigned int cur_page = 0;
+	struct scatterlist *s;
+	uint64_t sz = *size;
+	struct page **process_pages;
+
+	*sg_size = 0;
+	sg = kmalloc(sizeof(*sg), GFP_KERNEL);
+	if (!sg)
+		return -ENOMEM;
+
+	offset_in_page = offset & (PAGE_SIZE - 1);
+	nents = (sz + offset_in_page + PAGE_SIZE - 1) / PAGE_SIZE;
+
+	ret = sg_alloc_table(sg, nents, GFP_KERNEL);
+	if (unlikely(ret)) {
+		ret = -ENOMEM;
+		goto sg_alloc_fail;
+	}
+	process_pages = kmalloc_array(nents, sizeof(struct pages *),
+				      GFP_KERNEL);
+	if (!process_pages) {
+		ret = -ENOMEM;
+		goto page_alloc_fail;
+	}
+
+	if (cma_write)
+		flags = FOLL_WRITE;
+	locked = 1;
+	down_read(&mm->mmap_sem);
+	n = get_user_pages_remote(task, mm, pa, nents, flags, process_pages,
+				  NULL, &locked);
+	if (locked)
+		up_read(&mm->mmap_sem);
+	if (n <= 0) {
+		pr_err("CMA: Invalid virtual address 0x%lx\n", pa);
+		ret = -EFAULT;
+		goto get_user_fail;
+	}
+	if (n != nents) {
+		/* Pages pinned < requested. Set the size accordingly */
+		*size = (n * PAGE_SIZE) - offset_in_page;
+		pr_debug("Requested %lx but pinned %lx\n", nents, n);
+	}
+
+	sz = 0;
+	for_each_sg(sg->sgl, s, n, i) {
+		sg_set_page(s, process_pages[cur_page], PAGE_SIZE,
+			    offset_in_page);
+		sg_dma_address(s) = page_to_phys(process_pages[cur_page]);
+		offset_in_page = 0;
+		cur_page++;
+		sz += PAGE_SIZE;
+	}
+	*ret_sg = sg;
+	*sg_size = sz;
+
+	kfree(process_pages);
+	return 0;
+
+get_user_fail:
+	kfree(process_pages);
+page_alloc_fail:
+	sg_free_table(sg);
+sg_alloc_fail:
+	kfree(sg);
+	return ret;
+}
+
+static void kfd_free_cma_bos(struct cma_iter *ci)
+{
+	struct cma_system_bo *cma_bo, *tmp;
+
+	list_for_each_entry_safe(cma_bo, tmp, &ci->cma_list, list) {
+		struct kfd_dev *dev = cma_bo->dev;
+
+		/* sg table is deleted by free_memory_of_gpu */
+		kfd_put_sg_table(cma_bo->sg);
+		dev->kfd2kgd->free_memory_of_gpu(dev->kgd, cma_bo->mem);
+		list_del(&cma_bo->list);
+		kfree(cma_bo);
+	}
+}
+
+/* Create a system BO by pinning underlying system pages of the given userptr
+ * BO @ubo
+ * @ubo: Userptr BO
+ * @offset: Offset into ubo
+ * @size: in/out: The size of the new BO could be less than requested if all
+ *        the pages couldn't be pinned. This would be reflected in @size
+ * @mm/@task: mm/task to which @ubo belongs to
+ * @cma_bo: out: new system BO
+ */
+static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *ubo,
+				    uint64_t *size, uint64_t offset,
+				    int cma_write, struct kfd_process *p,
+				    struct mm_struct *mm,
+				    struct task_struct *task,
+				    struct cma_system_bo **cma_bo)
+{
+	int ret;
+	struct kfd_process_device *pdd = NULL;
+	struct cma_system_bo *cbo;
+	uint64_t sg_size;
+
+	uint32_t flags = ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_NONPAGED |
+			 ALLOC_MEM_FLAGS_NO_SUBSTITUTE;
+
+	*cma_bo = NULL;
+	cbo = kzalloc(sizeof(**cma_bo), GFP_KERNEL);
+	if (!cbo)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&cbo->list);
+	ret = kfd_create_sg_table_from_userptr_bo(ubo, offset, cma_write, mm,
+						  task, size, &sg_size,
+						  &cbo->sg);
+	if (ret) {
+		pr_err("Failed to create system BO. sg table error %d\n", ret);
+		return ret;
+	}
+
+	mutex_lock(&p->mutex);
+	pdd = kfd_get_process_device_data(kdev, p);
+	if (!pdd) {
+		pr_err("Process device data doesn't exist\n");
+		ret = -EINVAL;
+		goto pdd_fail;
+	}
+
+	ret = kdev->kfd2kgd->alloc_memory_of_gpu(kdev->kgd, 0ULL, sg_size,
+						 pdd->vm, cbo->sg,
+						 &cbo->mem, NULL, flags);
+	if (ret) {
+		pr_err("Failed to create shadow system BO %d\n", ret);
+		goto pdd_fail;
+	}
+	mutex_unlock(&p->mutex);
+	cbo->dev = kdev;
+	*cma_bo = cbo;
+
+	return ret;
+
+pdd_fail:
+	mutex_unlock(&p->mutex);
+	kfd_put_sg_table(cbo->sg);
+	sg_free_table(cbo->sg);
+	kfree(cbo->sg);
+	return ret;
+}
+
 /* Update cma_iter.cur_bo with KFD BO that is assocaited with
  * cma_iter.array.va_addr
  */
@@ -1861,6 +2042,7 @@ static int kfd_cma_iter_init(struct kfd_memory_range *arr, unsigned long segs,
 		return -EINVAL;
 
 	memset(ci, 0, sizeof(*ci));
+	INIT_LIST_HEAD(&ci->cma_list);
 	ci->array = arr;
 	ci->nr_segs = segs;
 	ci->p = p;
@@ -2027,8 +2209,36 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 	if (src_bo->cpuva && dst_bo->cpuva)
 		return kfd_copy_userptr_bos(si, di, cma_write, size, copied);
 
-	if (src_bo->dev->kgd != dst_bo->dev->kgd) {
+	/* If either source or dest. is userptr, create a shadow system BO
+	 * by using the underlying userptr BO pages. Then use this shadow
+	 * BO for copy. src_offset & dst_offset are adjusted because the new BO
+	 * is only created for the window (offset, size) requested.
+	 * The BOs are stored in cma_list for deferred cleanup. This minimizes
+	 * fence waiting just to the last fence.
+	 */
+	if (src_bo->cpuva) {
+		err = kfd_create_cma_system_bo(dst_bo->dev, src_bo, &size,
+					       si->bo_offset, cma_write,
+					       si->p, si->mm, si->task,
+					       &si->cma_bo);
+		src_mem = si->cma_bo->mem;
+		src_offset = si->bo_offset & (PAGE_SIZE - 1);
+		list_add_tail(&si->cma_bo->list, &si->cma_list);
+	} else if (dst_bo->cpuva) {
+		err = kfd_create_cma_system_bo(src_bo->dev, dst_bo, &size,
+					       di->bo_offset, cma_write,
+					       di->p, di->mm, di->task,
+					       &di->cma_bo);
+		dst_mem = di->cma_bo->mem;
+		dst_offset = di->bo_offset & (PAGE_SIZE - 1);
+		list_add_tail(&di->cma_bo->list, &di->cma_list);
+	} else if (src_bo->dev->kgd != dst_bo->dev->kgd) {
 		pr_err("CMA %d fail. Not same dev\n", cma_write);
+		err = -EINVAL;
+	}
+
+	if (err) {
+		pr_err("Failed to create system BO %d", err);
 		err = -EINVAL;
 	}
 
@@ -2036,7 +2246,6 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 						     src_offset, dst_mem,
 						     dst_offset, size, f,
 						     copied);
-
 	return err;
 }
 
@@ -2237,6 +2446,9 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 			pr_err("CMA %s failed. BO timed out\n", cma_op);
 		dma_fence_put(lfence);
 	}
+
+	kfd_free_cma_bos(&si);
+	kfd_free_cma_bos(&di);
 
 kfd_process_fail:
 	mmput(remote_mm);
