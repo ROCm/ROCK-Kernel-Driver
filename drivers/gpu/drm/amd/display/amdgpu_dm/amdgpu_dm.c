@@ -4508,15 +4508,10 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	struct dc_plane_state *plane_states_constructed[MAX_SURFACES];
 	struct amdgpu_crtc *acrtc_attach = to_amdgpu_crtc(pcrtc);
 	struct drm_crtc_state *new_pcrtc_state =
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
-	!defined(OS_NAME_RHEL_7_5)
 			kcl_drm_atomic_get_new_crtc_state_after_commit(state, pcrtc);
-#else
-			drm_atomic_get_new_crtc_state(state, pcrtc);
-#endif
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(new_pcrtc_state);
 	struct dm_crtc_state *dm_old_crtc_state =
-			to_dm_crtc_state(drm_atomic_get_old_crtc_state(state, pcrtc));
+			to_dm_crtc_state(kcl_drm_atomic_get_old_crtc_state_after_commit(state, pcrtc));
 	struct dm_atomic_state *dm_state = to_dm_atomic_state(state);
 	int planes_count = 0;
 	unsigned long flags;
@@ -4543,14 +4538,9 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		if (!fb || !crtc || pcrtc != crtc)
 			continue;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
-		!defined(OS_NAME_RHEL_7_5)
 		new_crtc_state =
 			kcl_drm_atomic_get_new_crtc_state_after_commit(
 			state, crtc);
-#else
-		new_crtc_state = drm_atomic_get_new_crtc_state(state, crtc);
-#endif
 		if (!new_crtc_state->active)
 			continue;
 
@@ -5461,12 +5451,7 @@ static int dm_update_planes_state(struct dc *dc,
 			if (!old_plane_crtc)
 				continue;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
-			!defined(OS_NAME_RHEL_7_5)
 			old_crtc_state = kcl_drm_atomic_get_old_crtc_state_before_commit(
-#else
-			old_crtc_state = drm_atomic_get_old_crtc_state(
-#endif
 					state, old_plane_crtc);
 			dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
 
@@ -5506,14 +5491,9 @@ static int dm_update_planes_state(struct dc *dc,
 			if (!new_plane_crtc)
 				continue;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
-			!defined(OS_NAME_RHEL_7_5)
 			new_crtc_state =
 				kcl_drm_atomic_get_new_crtc_state_before_commit(
 				state, new_plane_crtc);
-#else
-			new_crtc_state = drm_atomic_get_new_crtc_state(state, new_plane_crtc);
-#endif
 			dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 
 			if (!dm_new_crtc_state->stream)
@@ -5579,12 +5559,7 @@ static int dm_atomic_check_plane_state_fb(struct drm_atomic_state *state,
 	struct drm_plane *plane;
 	struct drm_crtc_state *crtc_state;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
-			!defined(OS_NAME_RHEL_7_5)
 	WARN_ON(!kcl_drm_atomic_get_new_crtc_state_before_commit(state,crtc));
-#else
-	WARN_ON(!drm_atomic_get_new_crtc_state(state, crtc));
-#endif
 
 	drm_for_each_plane_mask(plane, state->dev, crtc->state->plane_mask) {
 		struct drm_plane_state *plane_state =
