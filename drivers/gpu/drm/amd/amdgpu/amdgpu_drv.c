@@ -80,6 +80,8 @@
 #define KMS_DRIVER_MINOR	25
 #define KMS_DRIVER_PATCHLEVEL	0
 
+#define AMDGPU_VERSION		"18.20.1.15"
+
 int amdgpu_vram_limit = 0;
 int amdgpu_vis_vram_limit = 0;
 int amdgpu_gart_size = -1; /* auto */
@@ -969,6 +971,7 @@ static int __init amdgpu_init(void)
 		return -EINVAL;
 	}
 	DRM_INFO("amdgpu kernel modesetting enabled.\n");
+	DRM_INFO("amdgpu version: %s\n", AMDGPU_VERSION);
 	driver = &kms_driver;
 	pdriver = &amdgpu_kms_pci_driver;
 	driver->num_ioctls = amdgpu_max_kms_ioctl;
@@ -998,4 +1001,4 @@ module_exit(amdgpu_exit);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL and additional rights");
-MODULE_VERSION("18.20.1.15");
+MODULE_VERSION(AMDGPU_VERSION);
