@@ -1674,6 +1674,9 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 				((uint64_t)si.totalram * si.mem_unit));
 	} else
 		gtt_size = (uint64_t)amdgpu_gtt_size << 20;
+
+	/* reserve for DGMA import domain */
+	gtt_size -= (uint64_t)amdgpu_direct_gma_size << 20;
 	r = ttm_bo_init_mm(&adev->mman.bdev, TTM_PL_TT, gtt_size >> PAGE_SHIFT);
 	if (r) {
 		DRM_ERROR("Failed initializing GTT heap.\n");
