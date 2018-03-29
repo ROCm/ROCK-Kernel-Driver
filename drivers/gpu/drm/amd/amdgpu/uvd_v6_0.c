@@ -430,7 +430,7 @@ static int uvd_v6_0_sw_init(void *handle)
 		ring = &adev->uvd.inst->ring_enc[0];
 		rq = &ring->sched.sched_rq[DRM_SCHED_PRIORITY_NORMAL];
 		r = drm_sched_entity_init(&ring->sched, &adev->uvd.inst->entity_enc,
-					  rq, amdgpu_sched_jobs, NULL);
+					  rq, NULL);
 		if (r) {
 			DRM_ERROR("Failed setting up UVD ENC run queue.\n");
 			return r;

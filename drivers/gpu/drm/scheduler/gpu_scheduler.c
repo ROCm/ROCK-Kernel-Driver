@@ -120,14 +120,13 @@ drm_sched_rq_select_entity(struct drm_sched_rq *rq)
  * @entity	The pointer to a valid drm_sched_entity
  * @rq		The run queue this entity belongs
  * @kernel	If this is an entity for the kernel
- * @jobs	The max number of jobs in the job queue
  *
  * return 0 if succeed. negative error code on failure
 */
 int drm_sched_entity_init(struct drm_gpu_scheduler *sched,
 			  struct drm_sched_entity *entity,
 			  struct drm_sched_rq *rq,
-			  uint32_t jobs, atomic_t *guilty)
+			  atomic_t *guilty)
 {
 	if (!(sched && entity && rq))
 		return -EINVAL;
