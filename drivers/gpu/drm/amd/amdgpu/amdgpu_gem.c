@@ -34,8 +34,16 @@
 void amdgpu_gem_object_free(struct drm_gem_object *gobj)
 {
 	struct amdgpu_bo *robj = gem_to_amdgpu_bo(gobj);
+	struct amdgpu_device *adev = amdgpu_ttm_adev(robj->tbo.bdev);
 
 	if (robj) {
+		if (robj->tbo.mem.mem_type == AMDGPU_PL_DGMA)
+			atomic64_sub(amdgpu_bo_size(robj),
+				     &adev->direct_gma.vram_usage);
+		else if (robj->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT)
+			atomic64_sub(amdgpu_bo_size(robj),
+				     &adev->direct_gma.gart_usage);
+
 		amdgpu_mn_unregister(robj);
 		amdgpu_bo_unref(&robj);
 	}
@@ -82,6 +90,11 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 		return r;
 	}
 	*obj = &bo->gem_base;
+
+	if (initial_domain & AMDGPU_GEM_DOMAIN_DGMA)
+		atomic64_add(size, &adev->direct_gma.vram_usage);
+	else if (initial_domain & AMDGPU_GEM_DOMAIN_DGMA_IMPORT)
+		atomic64_add(size, &adev->direct_gma.gart_usage);
 
 	return 0;
 }
