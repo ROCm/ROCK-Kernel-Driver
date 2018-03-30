@@ -38,11 +38,11 @@ static const union atom_voltage_object_v4 *pp_atomfwctrl_lookup_voltage_type_v4(
 
 	while (offset < size) {
 		const union atom_voltage_object_v4 *voltage_object =
-				(const union atom_voltage_object_v4 *)(start + offset);
+			(const union atom_voltage_object_v4 *)(start + offset);
 
-	if (voltage_type == voltage_object->gpio_voltage_obj.header.voltage_type &&
-		voltage_mode == voltage_object->gpio_voltage_obj.header.voltage_mode)
-		return voltage_object;
+		if (voltage_type == voltage_object->gpio_voltage_obj.header.voltage_type &&
+		    voltage_mode == voltage_object->gpio_voltage_obj.header.voltage_mode)
+			return voltage_object;
 
 		offset += le16_to_cpu(voltage_object->gpio_voltage_obj.header.object_size);
 
