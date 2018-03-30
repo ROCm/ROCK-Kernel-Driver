@@ -958,6 +958,11 @@ static int __init amdgpu_init(void)
 {
 	int r;
 
+	if (vgacon_text_force()) {
+		DRM_ERROR("VGACON disables amdgpu kernel modesetting.\n");
+		return -EINVAL;
+	}
+
 	r = amdgpu_sync_init();
 	if (r)
 		goto error_sync;
@@ -966,10 +971,6 @@ static int __init amdgpu_init(void)
 	if (r)
 		goto error_fence;
 
-	if (vgacon_text_force()) {
-		DRM_ERROR("VGACON disables amdgpu kernel modesetting.\n");
-		return -EINVAL;
-	}
 	DRM_INFO("amdgpu kernel modesetting enabled.\n");
 	DRM_INFO("amdgpu version: %s\n", AMDGPU_VERSION);
 	driver = &kms_driver;
