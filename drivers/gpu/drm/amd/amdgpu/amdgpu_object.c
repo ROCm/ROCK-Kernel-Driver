@@ -450,7 +450,8 @@ retry:
 	r = ttm_bo_init_reserved(&adev->mman.bdev, &bo->tbo, size, type,
 				 &bo->placement, page_align, &ctx, acc_size,
 				 NULL, resv, &amdgpu_ttm_bo_destroy);
-	if (unlikely(r && r != -ERESTARTSYS) && type == ttm_bo_type_device) {
+	if (unlikely(r && r != -ERESTARTSYS) && type == ttm_bo_type_device &&
+	    !(flags & AMDGPU_GEM_CREATE_NO_FALLBACK)) {
 		if (flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED) {
 			flags &= ~AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 			goto retry;
