@@ -610,7 +610,7 @@ static int init_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 	 */
 	WARN(mem->user_pages, "Leaking user_pages array");
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && !defined(OS_NAME_RHEL_7_5)
 	mem->user_pages = drm_calloc_large(bo->tbo.ttm->num_pages,
 					   sizeof(struct page *));
 #else
@@ -651,7 +651,7 @@ release_out:
 		release_pages(mem->user_pages, bo->tbo.ttm->num_pages);
 #endif
 free_out:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && !defined(OS_NAME_RHEL_7_5)
 	drm_free_large(mem->user_pages);
 #else
 	kvfree(mem->user_pages);
@@ -1385,7 +1385,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 			release_pages(mem->user_pages,
 					mem->bo->tbo.ttm->num_pages);
 #endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && !defined(OS_NAME_RHEL_7_5)
 		drm_free_large(mem->user_pages);
 #else
 		kvfree(mem->user_pages);
@@ -2026,7 +2026,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		bo = mem->bo;
 
 		if (!mem->user_pages) {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && !defined(OS_NAME_RHEL_7_5)
 			mem->user_pages =
 				drm_calloc_large(bo->tbo.ttm->num_pages,
 						 sizeof(struct page *));
@@ -2164,7 +2164,7 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 		 * the userptr_valid_list. If we need to revalidate
 		 * it, we need to start from scratch.
 		 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && !defined(OS_NAME_RHEL_7_5)
 		drm_free_large(mem->user_pages);
 #else
 		kvfree(mem->user_pages);
