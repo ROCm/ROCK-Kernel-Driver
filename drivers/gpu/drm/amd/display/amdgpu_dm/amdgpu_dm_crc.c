@@ -62,25 +62,32 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 		return -EINVAL;
 	}
 
+	/* When enabling CRC, we should also disable dithering. */
 	if (source == AMDGPU_DM_PIPE_CRC_SOURCE_AUTO) {
 		if (dc_stream_configure_crc(stream_state->ctx->dc,
 					    stream_state,
-					    true, true))
+					    true, true)) {
 			crtc_state->crc_enabled = true;
+			dc_stream_set_dither_option(stream_state,
+						    DITHER_OPTION_TRUN8);
+		}
 		else
 			return -EINVAL;
 	} else {
 		if (dc_stream_configure_crc(stream_state->ctx->dc,
 					    stream_state,
-					    false, false))
+					    false, false)) {
 			crtc_state->crc_enabled = false;
+			dc_stream_set_dither_option(stream_state,
+						    DITHER_OPTION_DEFAULT);
+		}
 		else
 			return -EINVAL;
 	}
 
 	*values_cnt = 3;
-	/* Reset crc_skipped flag on dm state */
-	crtc_state->crc_first_skipped = false;
+	/* Reset crc_skipped on dm state */
+	crtc_state->crc_skip_count = 0;
 	return 0;
 }
 
@@ -104,11 +111,11 @@ void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc)
 	/*
 	 * Since flipping and crc enablement happen asynchronously, we - more
 	 * often than not - will be returning an 'uncooked' crc on first frame.
-	 * Probably because hw isn't ready yet. Simply skip the first crc
-	 * value.
+	 * Probably because hw isn't ready yet. For added security, skip the
+	 * first two CRC values.
 	 */
-	if (!crtc_state->crc_first_skipped) {
-		crtc_state->crc_first_skipped = true;
+	if (crtc_state->crc_skip_count < 2) {
+		crtc_state->crc_skip_count += 1;
 		return;
 	}
 

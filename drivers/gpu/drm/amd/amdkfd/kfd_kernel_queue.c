@@ -99,7 +99,7 @@ static bool initialize(struct kernel_queue *kq, struct kfd_dev *dev,
 	kq->rptr_kernel = kq->rptr_mem->cpu_ptr;
 	kq->rptr_gpu_addr = kq->rptr_mem->gpu_addr;
 
-	retval = kfd_gtt_sa_allocate(dev, sizeof(*kq->wptr_kernel),
+	retval = kfd_gtt_sa_allocate(dev, dev->device_info->doorbell_size,
 					&kq->wptr_mem);
 
 	if (retval != 0)
@@ -123,6 +123,7 @@ static bool initialize(struct kernel_queue *kq, struct kfd_dev *dev,
 	prop.write_ptr = (uint32_t *) kq->wptr_gpu_addr;
 	prop.eop_ring_buffer_address = kq->eop_gpu_addr;
 	prop.eop_ring_buffer_size = PAGE_SIZE;
+	prop.cu_mask = NULL;
 
 	if (init_queue(&kq->queue, &prop) != 0)
 		goto err_init_queue;
@@ -208,6 +209,7 @@ static int acquire_packet_buffer(struct kernel_queue *kq,
 	size_t available_size;
 	size_t queue_size_dwords;
 	uint32_t wptr, rptr;
+	uint64_t wptr64;
 	unsigned int *queue_address;
 
 	/* When rptr == wptr, the buffer is empty.
@@ -216,7 +218,8 @@ static int acquire_packet_buffer(struct kernel_queue *kq,
 	 * the opposite. So we can only use up to queue_size_dwords - 1 dwords.
 	 */
 	rptr = *kq->rptr_kernel;
-	wptr = *kq->wptr_kernel;
+	wptr = kq->pending_wptr;
+	wptr64 = kq->pending_wptr64;
 	queue_address = (unsigned int *)kq->pq_kernel_addr;
 	queue_size_dwords = kq->queue->properties.queue_size / 4;
 
@@ -232,27 +235,64 @@ static int acquire_packet_buffer(struct kernel_queue *kq,
 		 * make sure calling functions know
 		 * acquire_packet_buffer() failed
 		 */
-		*buffer_ptr = NULL;
-		return -ENOMEM;
+		goto err_no_space;
 	}
 
 	if (wptr + packet_size_in_dwords >= queue_size_dwords) {
 		/* make sure after rolling back to position 0, there is
 		 * still enough space.
 		 */
-		if (packet_size_in_dwords >= rptr) {
-			*buffer_ptr = NULL;
-			return -ENOMEM;
-		}
+		if (packet_size_in_dwords >= rptr)
+			goto err_no_space;
+
 		/* fill nops, roll back and start at position 0 */
 		while (wptr > 0) {
 			queue_address[wptr] = kq->nop_packet;
 			wptr = (wptr + 1) % queue_size_dwords;
+			wptr64++;
 		}
 	}
 
 	*buffer_ptr = &queue_address[wptr];
 	kq->pending_wptr = wptr + packet_size_in_dwords;
+	kq->pending_wptr64 = wptr64 + packet_size_in_dwords;
+
+	return 0;
+
+err_no_space:
+	*buffer_ptr = NULL;
+	return -ENOMEM;
+}
+
+static int acquire_inline_ib(struct kernel_queue *kq,
+			     size_t size_in_dwords,
+			     unsigned int **buffer_ptr,
+			     uint64_t *gpu_addr)
+{
+	int ret;
+	unsigned int *buf;
+	union PM4_MES_TYPE_3_HEADER nop;
+
+	if (size_in_dwords >= (1 << 14))
+		return -EINVAL;
+
+	/* Allocate size_in_dwords on the ring, plus an extra dword
+	 * for a NOP packet header
+	 */
+	ret = acquire_packet_buffer(kq, size_in_dwords + 1,  &buf);
+	if (ret)
+		return ret;
+
+	/* Build a NOP packet that contains the IB as "payload". */
+	nop.u32all = 0;
+	nop.opcode = IT_NOP;
+	nop.count = size_in_dwords - 1;
+	nop.type = PM4_TYPE_3;
+
+	*buf = nop.u32all;
+	*buffer_ptr = buf + 1;
+	*gpu_addr = kq->pq_gpu_addr + ((unsigned long)*buffer_ptr -
+				       (unsigned long)kq->pq_kernel_addr);
 
 	return 0;
 }
@@ -270,9 +310,7 @@ static void submit_packet(struct kernel_queue *kq)
 	pr_debug("\n");
 #endif
 
-	*kq->wptr_kernel = kq->pending_wptr;
-	write_kernel_doorbell(kq->queue->properties.doorbell_ptr,
-				kq->pending_wptr);
+	kq->ops_asic_specific.submit_packet(kq);
 }
 
 static void rollback_packet(struct kernel_queue *kq)
@@ -292,16 +330,27 @@ struct kernel_queue *kernel_queue_init(struct kfd_dev *dev,
 	kq->ops.initialize = initialize;
 	kq->ops.uninitialize = uninitialize;
 	kq->ops.acquire_packet_buffer = acquire_packet_buffer;
+	kq->ops.acquire_inline_ib = acquire_inline_ib;
 	kq->ops.submit_packet = submit_packet;
 	kq->ops.rollback_packet = rollback_packet;
 
 	switch (dev->device_info->asic_family) {
 	case CHIP_CARRIZO:
+	case CHIP_TONGA:
+	case CHIP_FIJI:
+	case CHIP_POLARIS10:
+	case CHIP_POLARIS11:
 		kernel_queue_init_vi(&kq->ops_asic_specific);
 		break;
 
 	case CHIP_KAVERI:
+	case CHIP_HAWAII:
 		kernel_queue_init_cik(&kq->ops_asic_specific);
+		break;
+
+	case CHIP_VEGA10:
+	case CHIP_RAVEN:
+		kernel_queue_init_v9(&kq->ops_asic_specific);
 		break;
 	default:
 		WARN(1, "Unexpected ASIC family %u",

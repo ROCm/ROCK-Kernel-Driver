@@ -83,17 +83,21 @@ static ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux,
 	enum i2c_mot_mode mot = (msg->request & DP_AUX_I2C_MOT) ?
 		I2C_MOT_TRUE : I2C_MOT_FALSE;
 	enum ddc_result res;
+	ssize_t read_bytes;
+
+	if (WARN_ON(msg->size > 16))
+		return -E2BIG;
 
 	switch (msg->request & ~DP_AUX_I2C_MOT) {
 	case DP_AUX_NATIVE_READ:
-		res = dal_ddc_service_read_dpcd_data(
+		read_bytes = dal_ddc_service_read_dpcd_data(
 				TO_DM_AUX(aux)->ddc_service,
 				false,
 				I2C_MOT_UNDEF,
 				msg->address,
 				msg->buffer,
 				msg->size);
-		break;
+		return read_bytes;
 	case DP_AUX_NATIVE_WRITE:
 		res = dal_ddc_service_write_dpcd_data(
 				TO_DM_AUX(aux)->ddc_service,
@@ -104,14 +108,14 @@ static ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux,
 				msg->size);
 		break;
 	case DP_AUX_I2C_READ:
-		res = dal_ddc_service_read_dpcd_data(
+		read_bytes = dal_ddc_service_read_dpcd_data(
 				TO_DM_AUX(aux)->ddc_service,
 				true,
 				mot,
 				msg->address,
 				msg->buffer,
 				msg->size);
-		break;
+		return read_bytes;
 	case DP_AUX_I2C_WRITE:
 		res = dal_ddc_service_write_dpcd_data(
 				TO_DM_AUX(aux)->ddc_service,
@@ -164,6 +168,15 @@ dm_dp_mst_connector_destroy(struct drm_connector *connector)
 }
 
 static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
+/* 
+ * Need to add support for DRM < 4.14 as DP1.1 does
+ * 4.13 DRM uses .set_property hook, while 4.15 doesn't
+ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && \
+        !defined(OS_NAME_RHEL_7_5)
+        .dpms = drm_atomic_helper_connector_dpms,
+        .set_property = drm_atomic_helper_connector_set_property,
+#endif
 	.detect = dm_dp_mst_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.destroy = dm_dp_mst_connector_destroy,

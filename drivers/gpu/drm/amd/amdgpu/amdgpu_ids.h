@@ -45,7 +45,7 @@ struct amdgpu_vmid {
 	struct list_head	list;
 	struct amdgpu_sync	active;
 	struct dma_fence	*last_flush;
-	atomic64_t		owner;
+	uint64_t		owner;
 
 	uint64_t		pd_gpu_addr;
 	/* last flushed PD/PT update */
@@ -59,6 +59,9 @@ struct amdgpu_vmid {
 	uint32_t		gws_size;
 	uint32_t		oa_base;
 	uint32_t		oa_size;
+
+	unsigned		pasid;
+	struct dma_fence	*pasid_mapping;
 };
 
 struct amdgpu_vmid_mgr {

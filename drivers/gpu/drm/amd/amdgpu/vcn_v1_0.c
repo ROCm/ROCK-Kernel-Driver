@@ -75,13 +75,13 @@ static int vcn_v1_0_sw_init(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
 	/* VCN DEC TRAP */
-	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_VCN, 124, &adev->vcn.irq);
+	r = amdgpu_irq_add_id(adev, SOC15_IH_CLIENTID_VCN, 124, &adev->vcn.irq);
 	if (r)
 		return r;
 
 	/* VCN ENC TRAP */
 	for (i = 0; i < adev->vcn.num_enc_rings; ++i) {
-		r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_VCN, i + 119,
+		r = amdgpu_irq_add_id(adev, SOC15_IH_CLIENTID_VCN, i + 119,
 					&adev->vcn.irq);
 		if (r)
 			return r;
@@ -874,13 +874,12 @@ static void vcn_v1_0_dec_ring_emit_reg_wait(struct amdgpu_ring *ring,
 }
 
 static void vcn_v1_0_dec_ring_emit_vm_flush(struct amdgpu_ring *ring,
-					    unsigned vmid, unsigned pasid,
-					    uint64_t pd_addr)
+					    unsigned vmid, uint64_t pd_addr)
 {
 	struct amdgpu_vmhub *hub = &ring->adev->vmhub[ring->funcs->vmhub];
 	uint32_t data0, data1, mask;
 
-	pd_addr = amdgpu_gmc_emit_flush_gpu_tlb(ring, vmid, pasid, pd_addr);
+	pd_addr = amdgpu_gmc_emit_flush_gpu_tlb(ring, vmid, pd_addr);
 
 	/* wait for register write */
 	data0 = hub->ctx0_ptb_addr_lo32 + vmid * 2;
@@ -1012,12 +1011,11 @@ static void vcn_v1_0_enc_ring_emit_reg_wait(struct amdgpu_ring *ring,
 }
 
 static void vcn_v1_0_enc_ring_emit_vm_flush(struct amdgpu_ring *ring,
-					    unsigned int vmid, unsigned pasid,
-					    uint64_t pd_addr)
+					    unsigned int vmid, uint64_t pd_addr)
 {
 	struct amdgpu_vmhub *hub = &ring->adev->vmhub[ring->funcs->vmhub];
 
-	pd_addr = amdgpu_gmc_emit_flush_gpu_tlb(ring, vmid, pasid, pd_addr);
+	pd_addr = amdgpu_gmc_emit_flush_gpu_tlb(ring, vmid, pd_addr);
 
 	/* wait for reg writes */
 	vcn_v1_0_enc_ring_emit_reg_wait(ring, hub->ctx0_ptb_addr_lo32 + vmid * 2,

@@ -37,6 +37,7 @@
 /* some special values for the owner field */
 #define AMDGPU_FENCE_OWNER_UNDEFINED	((void*)0ul)
 #define AMDGPU_FENCE_OWNER_VM		((void*)1ul)
+#define AMDGPU_FENCE_OWNER_KFD		((void *)2ul)
 
 #define AMDGPU_FENCE_FLAG_64BIT         (1 << 0)
 #define AMDGPU_FENCE_FLAG_INT           (1 << 1)
@@ -126,7 +127,7 @@ struct amdgpu_ring_funcs {
 			   uint64_t seq, unsigned flags);
 	void (*emit_pipeline_sync)(struct amdgpu_ring *ring);
 	void (*emit_vm_flush)(struct amdgpu_ring *ring, unsigned vmid,
-			      unsigned pasid, uint64_t pd_addr);
+			      uint64_t pd_addr);
 	void (*emit_hdp_flush)(struct amdgpu_ring *ring);
 	void (*emit_hdp_invalidate)(struct amdgpu_ring *ring);
 	void (*emit_gds_switch)(struct amdgpu_ring *ring, uint32_t vmid,
@@ -197,6 +198,7 @@ struct amdgpu_ring {
 	u64			cond_exe_gpu_addr;
 	volatile u32		*cond_exe_cpu_addr;
 	unsigned		vm_inv_eng;
+	struct dma_fence	*vmid_wait;
 	bool			has_compute_vm_bug;
 
 	atomic_t		num_jobs[DRM_SCHED_PRIORITY_MAX];

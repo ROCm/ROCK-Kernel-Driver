@@ -314,21 +314,19 @@ static void qxl_ttm_tt_unpopulate(struct ttm_tt *ttm)
 	ttm_pool_unpopulate(ttm);
 }
 
-static struct ttm_tt *qxl_ttm_tt_create(struct ttm_bo_device *bdev,
-					unsigned long size, uint32_t page_flags,
-					struct page *dummy_read_page)
+static struct ttm_tt *qxl_ttm_tt_create(struct ttm_buffer_object *bo,
+					uint32_t page_flags)
 {
 	struct qxl_device *qdev;
 	struct qxl_ttm_tt *gtt;
 
-	qdev = qxl_get_qdev(bdev);
+	qdev = qxl_get_qdev(bo->bdev);
 	gtt = kzalloc(sizeof(struct qxl_ttm_tt), GFP_KERNEL);
 	if (gtt == NULL)
 		return NULL;
 	gtt->ttm.ttm.func = &qxl_backend_func;
 	gtt->qdev = qdev;
-	if (ttm_dma_tt_init(&gtt->ttm, bdev, size, page_flags,
-			    dummy_read_page)) {
+	if (ttm_dma_tt_init(&gtt->ttm, bo, page_flags)) {
 		kfree(gtt);
 		return NULL;
 	}

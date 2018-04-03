@@ -939,7 +939,7 @@ int ttm_dma_populate(struct ttm_dma_tt *ttm_dma, struct device *dev,
 			struct ttm_operation_ctx *ctx)
 {
 	struct ttm_tt *ttm = &ttm_dma->ttm;
-	struct ttm_mem_global *mem_glob = ttm->glob->mem_glob;
+	struct ttm_mem_global *mem_glob = ttm->bdev->glob->mem_glob;
 	unsigned long num_pages = ttm->num_pages;
 	struct dma_pool *pool;
 	struct dma_page *d_page;
@@ -949,6 +949,9 @@ int ttm_dma_populate(struct ttm_dma_tt *ttm_dma, struct device *dev,
 
 	if (ttm->state != tt_unpopulated)
 		return 0;
+
+	if (ttm_check_under_lowerlimit(mem_glob, num_pages, ctx))
+		return -ENOMEM;
 
 	INIT_LIST_HEAD(&ttm_dma->pages_list);
 	i = 0;
@@ -1041,6 +1044,7 @@ EXPORT_SYMBOL_GPL(ttm_dma_populate);
 void ttm_dma_unpopulate(struct ttm_dma_tt *ttm_dma, struct device *dev)
 {
 	struct ttm_tt *ttm = &ttm_dma->ttm;
+	struct ttm_mem_global *mem_glob = ttm->bdev->glob->mem_glob;
 	struct dma_pool *pool;
 	struct dma_page *d_page, *next;
 	enum pool_type type;
@@ -1061,8 +1065,8 @@ void ttm_dma_unpopulate(struct ttm_dma_tt *ttm_dma, struct device *dev)
 
 			count++;
 			if (d_page->vaddr & VADDR_FLAG_UPDATED_COUNT) {
-				ttm_mem_global_free_page(ttm->glob->mem_glob,
-							 d_page->p, pool->size);
+				ttm_mem_global_free_page(mem_glob, d_page->p,
+							 pool->size);
 				d_page->vaddr &= ~VADDR_FLAG_UPDATED_COUNT;
 			}
 			ttm_dma_page_put(pool, d_page);
@@ -1090,8 +1094,8 @@ void ttm_dma_unpopulate(struct ttm_dma_tt *ttm_dma, struct device *dev)
 		count++;
 
 		if (d_page->vaddr & VADDR_FLAG_UPDATED_COUNT) {
-			ttm_mem_global_free_page(ttm->glob->mem_glob,
-						 d_page->p, pool->size);
+			ttm_mem_global_free_page(mem_glob, d_page->p,
+						 pool->size);
 			d_page->vaddr &= ~VADDR_FLAG_UPDATED_COUNT;
 		}
 

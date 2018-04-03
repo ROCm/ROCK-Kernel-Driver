@@ -38,7 +38,7 @@
 #include "inc/compressor.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.1.29"
+#define DC_VER "3.1.38"
 
 #define MAX_SURFACES 3
 #define MAX_STREAMS 6
@@ -48,6 +48,18 @@
 /*******************************************************************************
  * Display Core Interfaces
  ******************************************************************************/
+struct dmcu_version {
+	unsigned int date;
+	unsigned int month;
+	unsigned int year;
+	unsigned int interface_version;
+};
+
+struct dc_versions {
+	const char *dc_ver;
+	struct dmcu_version dmcu_version;
+};
+
 struct dc_caps {
 	uint32_t max_streams;
 	uint32_t max_links;
@@ -95,6 +107,7 @@ struct dc_surface_dcc_cap {
 };
 
 struct dc_static_screen_events {
+	bool force_trigger;
 	bool cursor_update;
 	bool surface_update;
 	bool overlay_update;
@@ -171,6 +184,16 @@ enum wm_report_mode {
 	WM_REPORT_OVERRIDE = 1,
 };
 
+struct dc_clocks {
+	int dispclk_khz;
+	int max_supported_dppclk_khz;
+	int dppclk_khz;
+	int dcfclk_khz;
+	int socclk_khz;
+	int dcfclk_deep_sleep_khz;
+	int fclk_khz;
+};
+
 struct dc_debug {
 	bool surface_visual_confirm;
 	bool sanity_checks;
@@ -220,6 +243,7 @@ struct dc_state;
 struct resource_pool;
 struct dce_hwseq;
 struct dc {
+	struct dc_versions versions;
 	struct dc_caps caps;
 	struct dc_cap_funcs cap_funcs;
 	struct dc_config config;
@@ -255,6 +279,8 @@ struct dc {
 	struct dm_pp_display_configuration prev_display_config;
 
 	bool optimized_required;
+
+	bool apply_edp_fast_boot_optimization;
 
 	/* FBC compressor */
 #if defined(CONFIG_DRM_AMD_DC_FBC)
@@ -420,6 +446,7 @@ union surface_update_flags {
 
 struct dc_plane_state {
 	struct dc_plane_address address;
+	struct dc_plane_flip_time time;
 	struct scaling_taps scaling_quality;
 	struct rect src_rect;
 	struct rect dst_rect;
@@ -530,6 +557,7 @@ struct dc_transfer_func *dc_create_transfer_func(void);
  */
 struct dc_flip_addrs {
 	struct dc_plane_address address;
+	unsigned int flip_timestamp_in_us;
 	bool flip_immediate;
 	/* TODO: add flip duration for FreeSync */
 };
@@ -690,7 +718,7 @@ enum dc_irq_source dc_interrupt_to_irq_source(
 		struct dc *dc,
 		uint32_t src_id,
 		uint32_t ext_id);
-void dc_interrupt_set(struct dc *dc, enum dc_irq_source src, bool enable);
+bool dc_interrupt_set(struct dc *dc, enum dc_irq_source src, bool enable);
 void dc_interrupt_ack(struct dc *dc, enum dc_irq_source src);
 enum dc_irq_source dc_get_hpd_irq_source_at_index(
 		struct dc *dc, uint32_t link_index);

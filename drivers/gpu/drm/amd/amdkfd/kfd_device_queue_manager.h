@@ -31,10 +31,7 @@
 
 #define KFD_UNMAP_LATENCY_MS			(4000)
 #define QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS (2 * KFD_UNMAP_LATENCY_MS + 1000)
-
-#define CIK_SDMA_QUEUES				(4)
-#define CIK_SDMA_QUEUES_PER_ENGINE		(2)
-#define CIK_SDMA_ENGINE_NUM			(2)
+#define KFD_SDMA_QUEUES_PER_ENGINE		(2)
 
 struct device_process_node {
 	struct qcm_process_device *qpd;
@@ -79,6 +76,12 @@ struct device_process_node {
  *
  * @process_termination: Clears all process queues belongs to that device.
  *
+ * @evict_process_queues: Evict all active queues of a process
+ *
+ * @restore_process_queues: Restore all evicted queues queues of a process
+ *
+ * @get_wave_state: Retrieves context save state and optionally copies the
+ * control stack, if kept in the MQD, to the given userspace address.
  */
 
 struct device_queue_manager_ops {
@@ -129,6 +132,17 @@ struct device_queue_manager_ops {
 
 	int (*process_termination)(struct device_queue_manager *dqm,
 			struct qcm_process_device *qpd);
+
+	int (*evict_process_queues)(struct device_queue_manager *dqm,
+				    struct qcm_process_device *qpd);
+	int (*restore_process_queues)(struct device_queue_manager *dqm,
+				      struct qcm_process_device *qpd);
+
+	int	(*get_wave_state)(struct device_queue_manager *dqm,
+				  struct queue *q,
+				  void __user *ctl_stack,
+				  u32 *ctl_stack_used_size,
+				  u32 *save_area_used_size);
 };
 
 struct device_queue_manager_asic_ops {
@@ -180,23 +194,38 @@ struct device_queue_manager {
 	unsigned int		*fence_addr;
 	struct kfd_mem_obj	*fence_mem;
 	bool			active_runlist;
+	int			sched_policy;
 };
 
 void device_queue_manager_init_cik(
 		struct device_queue_manager_asic_ops *asic_ops);
+void device_queue_manager_init_cik_hawaii(
+		struct device_queue_manager_asic_ops *asic_ops);
 void device_queue_manager_init_vi(
+		struct device_queue_manager_asic_ops *asic_ops);
+void device_queue_manager_init_vi_tonga(
+		struct device_queue_manager_asic_ops *asic_ops);
+void device_queue_manager_init_v9_vega10(
 		struct device_queue_manager_asic_ops *asic_ops);
 void program_sh_mem_settings(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd);
 unsigned int get_queues_num(struct device_queue_manager *dqm);
 unsigned int get_queues_per_pipe(struct device_queue_manager *dqm);
 unsigned int get_pipes_per_mec(struct device_queue_manager *dqm);
+unsigned int get_num_sdma_queues(struct device_queue_manager *dqm);
+
+int process_evict_queues(struct device_queue_manager *dqm,
+		struct qcm_process_device *qpd);
+int process_restore_queues(struct device_queue_manager *dqm,
+		struct qcm_process_device *qpd);
+
 
 static inline unsigned int get_sh_mem_bases_32(struct kfd_process_device *pdd)
 {
 	return (pdd->lds_base >> 16) & 0xFF;
 }
 
+/* This function is only useful for GFXv7 and v8 */
 static inline unsigned int
 get_sh_mem_bases_nybble_64(struct kfd_process_device *pdd)
 {

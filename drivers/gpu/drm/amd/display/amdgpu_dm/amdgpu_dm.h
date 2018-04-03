@@ -80,6 +80,29 @@ struct dm_comressor_info {
 };
 #endif
 
+/**
+ * for_each_oldnew_plane_in_state_reverse - iterate over all planes in an atomic
+ * update in reverse order
+ * @__state: &struct drm_atomic_state pointer
+ * @plane: &struct drm_plane iteration cursor
+ * @old_plane_state: &struct drm_plane_state iteration cursor for the old state
+ * @new_plane_state: &struct drm_plane_state iteration cursor for the new state
+ * @__i: int iteration cursor, for macro-internal use
+ *
+ * This iterates over all planes in an atomic update in reverse order,
+ * tracking both old and  new state. This is useful in places where the
+ * state delta needs to be considered, for example in atomic check functions.
+ */
+#ifndef for_each_oldnew_plane_in_state_reverse
+#define for_each_oldnew_plane_in_state_reverse(__state, plane, old_plane_state, new_plane_state, __i) \
+	for ((__i) = ((__state)->dev->mode_config.num_total_plane - 1);	\
+	     (__i) >= 0;						\
+	     (__i)--)							\
+		for_each_if ((__state)->planes[__i].ptr &&		\
+			     ((plane) = (__state)->planes[__i].ptr,	\
+			      (old_plane_state) = (__state)->planes[__i].old_state,\
+			      (new_plane_state) = (__state)->planes[__i].new_state, 1))
+#endif
 
 struct amdgpu_display_manager {
 	struct dal *dal;
@@ -198,7 +221,7 @@ struct dm_crtc_state {
 	struct drm_crtc_state base;
 	struct dc_stream_state *stream;
 
-	bool crc_first_skipped;
+	int crc_skip_count;
 	bool crc_enabled;
 };
 
@@ -268,8 +291,22 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc);
 #else
 #define amdgpu_dm_crtc_set_crc_source NULL
-static inline void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc) {}
+#define amdgpu_dm_crtc_handle_crc_irq(x)
 #endif
+
+#define MAX_COLOR_LUT_ENTRIES 4096
+/* Legacy gamm LUT users such as X doesn't like large LUT sizes */
+#define MAX_COLOR_LEGACY_LUT_ENTRIES 256
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_4_5)
+void amdgpu_dm_init_color_mod(void);
+int amdgpu_dm_set_degamma_lut(struct drm_crtc_state *crtc_state,
+			      struct dc_plane_state *dc_plane_state);
+#endif
+void amdgpu_dm_set_ctm(struct dm_crtc_state *crtc);
+int amdgpu_dm_set_regamma_lut(struct dm_crtc_state *crtc);
 
 extern const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs;
 

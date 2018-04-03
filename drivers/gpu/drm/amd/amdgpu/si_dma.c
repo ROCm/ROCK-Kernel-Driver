@@ -135,7 +135,7 @@ static void si_dma_stop(struct amdgpu_device *adev)
 		WREG32(DMA_RB_CNTL + sdma_offsets[i], rb_cntl);
 
 		if (adev->mman.buffer_funcs_ring == ring)
-			amdgpu_ttm_set_active_vram_size(adev, adev->gmc.visible_vram_size);
+			amdgpu_ttm_set_buffer_funcs_status(adev, false);
 		ring->ready = false;
 	}
 }
@@ -198,7 +198,7 @@ static int si_dma_start(struct amdgpu_device *adev)
 		}
 
 		if (adev->mman.buffer_funcs_ring == ring)
-			amdgpu_ttm_set_active_vram_size(adev, adev->gmc.real_vram_size);
+			amdgpu_ttm_set_buffer_funcs_status(adev, true);
 	}
 
 	return 0;
@@ -474,10 +474,9 @@ static void si_dma_ring_emit_pipeline_sync(struct amdgpu_ring *ring)
  * using sDMA (VI).
  */
 static void si_dma_ring_emit_vm_flush(struct amdgpu_ring *ring,
-				      unsigned vmid, unsigned pasid,
-				      uint64_t pd_addr)
+				      unsigned vmid, uint64_t pd_addr)
 {
-	amdgpu_gmc_emit_flush_gpu_tlb(ring, vmid, pasid, pd_addr);
+	amdgpu_gmc_emit_flush_gpu_tlb(ring, vmid, pd_addr);
 
 	/* wait for invalidate to complete */
 	amdgpu_ring_write(ring, DMA_PACKET(DMA_PACKET_POLL_REG_MEM, 0, 0, 0, 0));

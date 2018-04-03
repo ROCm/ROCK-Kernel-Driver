@@ -142,64 +142,6 @@ static void dce_v6_0_audio_endpt_wreg(struct amdgpu_device *adev,
 	spin_unlock_irqrestore(&adev->audio_endpt_idx_lock, flags);
 }
 
-static bool dce_v6_0_is_in_vblank(struct amdgpu_device *adev, int crtc)
-{
-	if (RREG32(mmCRTC_STATUS + crtc_offsets[crtc]) & CRTC_STATUS__CRTC_V_BLANK_MASK)
-		return true;
-	else
-		return false;
-}
-
-static bool dce_v6_0_is_counter_moving(struct amdgpu_device *adev, int crtc)
-{
-	u32 pos1, pos2;
-
-	pos1 = RREG32(mmCRTC_STATUS_POSITION + crtc_offsets[crtc]);
-	pos2 = RREG32(mmCRTC_STATUS_POSITION + crtc_offsets[crtc]);
-
-	if (pos1 != pos2)
-		return true;
-	else
-		return false;
-}
-
-/**
- * dce_v6_0_wait_for_vblank - vblank wait asic callback.
- *
- * @crtc: crtc to wait for vblank on
- *
- * Wait for vblank on the requested crtc (evergreen+).
- */
-static void dce_v6_0_vblank_wait(struct amdgpu_device *adev, int crtc)
-{
-	unsigned i = 100;
-
-	if (crtc >= adev->mode_info.num_crtc)
-		return;
-
-	if (!(RREG32(mmCRTC_CONTROL + crtc_offsets[crtc]) & CRTC_CONTROL__CRTC_MASTER_EN_MASK))
-		return;
-
-	/* depending on when we hit vblank, we may be close to active; if so,
-	 * wait for another frame.
-	 */
-	while (dce_v6_0_is_in_vblank(adev, crtc)) {
-		if (i++ == 100) {
-			i = 0;
-			if (!dce_v6_0_is_counter_moving(adev, crtc))
-				break;
-		}
-	}
-
-	while (!dce_v6_0_is_in_vblank(adev, crtc)) {
-		if (i++ == 100) {
-			i = 0;
-			if (!dce_v6_0_is_counter_moving(adev, crtc))
-				break;
-		}
-	}
-}
-
 static u32 dce_v6_0_vblank_get_counter(struct amdgpu_device *adev, int crtc)
 {
 	if (crtc >= adev->mode_info.num_crtc)
@@ -2837,6 +2779,11 @@ static int dce_v6_0_hw_fini(void *handle)
 
 static int dce_v6_0_suspend(void *handle)
 {
+	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+
+	adev->mode_info.bl_level =
+		amdgpu_atombios_encoder_get_backlight_level_from_reg(adev);
+
 	return dce_v6_0_hw_fini(handle);
 }
 
@@ -2844,6 +2791,9 @@ static int dce_v6_0_resume(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	int ret;
+
+	amdgpu_atombios_encoder_set_backlight_level_to_reg(adev,
+							   adev->mode_info.bl_level);
 
 	ret = dce_v6_0_hw_init(handle);
 
@@ -3144,7 +3094,7 @@ static int dce_v6_0_hpd_irq(struct amdgpu_device *adev,
 		tmp |= DC_HPD1_INT_CONTROL__DC_HPD1_INT_ACK_MASK;
 		WREG32(mmDC_HPD1_INT_CONTROL + hpd_offsets[hpd], tmp);
 		schedule_work(&adev->hotplug_work);
-		DRM_INFO("IH: HPD%d\n", hpd + 1);
+		DRM_DEBUG("IH: HPD%d\n", hpd + 1);
 	}
 
 	return 0;
@@ -3458,7 +3408,6 @@ static void dce_v6_0_encoder_add(struct amdgpu_device *adev,
 static const struct amdgpu_display_funcs dce_v6_0_display_funcs = {
 	.bandwidth_update = &dce_v6_0_bandwidth_update,
 	.vblank_get_counter = &dce_v6_0_vblank_get_counter,
-	.vblank_wait = &dce_v6_0_vblank_wait,
 	.backlight_set_level = &amdgpu_atombios_encoder_set_backlight_level,
 	.backlight_get_level = &amdgpu_atombios_encoder_get_backlight_level,
 	.hpd_sense = &dce_v6_0_hpd_sense,

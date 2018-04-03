@@ -391,8 +391,8 @@ int ttm_bo_move_memcpy(struct ttm_buffer_object *bo,
 	/*
 	 * TTM might be null for moves within the same region.
 	 */
-	if (ttm && ttm->state == tt_unpopulated) {
-		ret = ttm->bdev->driver->ttm_tt_populate(ttm, ctx);
+	if (ttm) {
+		ret = ttm_tt_populate(ttm, ctx);
 		if (ret)
 			goto out1;
 	}
@@ -486,7 +486,7 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 	 * TODO: Explicit member copy would probably be better here.
 	 */
 
-	atomic_inc(&bo->glob->bo_count);
+	atomic_inc(&bo->bdev->glob->bo_count);
 	INIT_LIST_HEAD(&fbo->ddestroy);
 	INIT_LIST_HEAD(&fbo->lru);
 	INIT_LIST_HEAD(&fbo->swap);
@@ -573,11 +573,9 @@ static int ttm_bo_kmap_ttm(struct ttm_buffer_object *bo,
 
 	BUG_ON(!ttm);
 
-	if (ttm->state == tt_unpopulated) {
-		ret = ttm->bdev->driver->ttm_tt_populate(ttm, &ctx);
-		if (ret)
-			return ret;
-	}
+	ret = ttm_tt_populate(ttm, &ctx);
+	if (ret)
+		return ret;
 
 	if (num_pages == 1 && (mem->placement & TTM_PL_FLAG_CACHED)) {
 		/*
@@ -819,3 +817,27 @@ int ttm_bo_pipeline_move(struct ttm_buffer_object *bo,
 	return 0;
 }
 EXPORT_SYMBOL(ttm_bo_pipeline_move);
+
+int ttm_bo_pipeline_gutting(struct ttm_buffer_object *bo)
+{
+	struct ttm_buffer_object *ghost;
+	int ret;
+
+	ret = ttm_buffer_object_transfer(bo, &ghost);
+	if (ret)
+		return ret;
+
+	ret = kcl_reservation_object_copy_fences(ghost->resv, bo->resv);
+	/* Last resort, wait for the BO to be idle when we are OOM */
+	if (ret)
+		ttm_bo_wait(bo, false, false);
+
+	memset(&bo->mem, 0, sizeof(bo->mem));
+	bo->mem.mem_type = TTM_PL_SYSTEM;
+	bo->ttm = NULL;
+
+	ttm_bo_unreserve(ghost);
+	ttm_bo_unref(&ghost);
+
+	return 0;
+}

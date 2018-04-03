@@ -214,6 +214,18 @@ struct amdgpu_vm {
 
 	/* Limit non-retry fault storms */
 	unsigned int		fault_credit;
+
+	/* Whether this is a Compute or GFX Context */
+	int			vm_context;
+
+	/* Points to the KFD process VM info */
+	struct amdkfd_process_info *process_info;
+
+	/* List node in amdkfd_process_info.vm_list_head */
+	struct list_head	vm_list_node;
+
+	/* Valid while the PD is reserved or fenced */
+	uint64_t		pd_phys_addr;
 };
 
 struct amdgpu_vm_manager {
@@ -252,12 +264,16 @@ struct amdgpu_vm_manager {
 	 */
 	struct idr				pasid_idr;
 	spinlock_t				pasid_lock;
+
+	/* Number of Compute VMs, used for detecting Compute activity */
+	unsigned                                n_compute_vms;
 };
 
 void amdgpu_vm_manager_init(struct amdgpu_device *adev);
 void amdgpu_vm_manager_fini(struct amdgpu_device *adev);
 int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		   int vm_context, unsigned int pasid);
+int amdgpu_vm_make_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm);
 void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm);
 bool amdgpu_vm_pasid_fault_credit(struct amdgpu_device *adev,
 				  unsigned int pasid);

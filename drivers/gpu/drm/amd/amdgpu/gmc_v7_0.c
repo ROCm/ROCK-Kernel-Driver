@@ -27,6 +27,7 @@
 #include "cik.h"
 #include "gmc_v7_0.h"
 #include "amdgpu_ucode.h"
+#include "amdgpu_amdkfd.h"
 
 #include "bif/bif_4_1_d.h"
 #include "bif/bif_4_1_sh_mask.h"
@@ -437,8 +438,7 @@ static void gmc_v7_0_flush_gpu_tlb(struct amdgpu_device *adev, uint32_t vmid)
 }
 
 static uint64_t gmc_v7_0_emit_flush_gpu_tlb(struct amdgpu_ring *ring,
-					    unsigned vmid, unsigned pasid,
-					    uint64_t pd_addr)
+					    unsigned vmid, uint64_t pd_addr)
 {
 	uint32_t reg;
 
@@ -448,12 +448,16 @@ static uint64_t gmc_v7_0_emit_flush_gpu_tlb(struct amdgpu_ring *ring,
 		reg = mmVM_CONTEXT8_PAGE_TABLE_BASE_ADDR + vmid - 8;
 	amdgpu_ring_emit_wreg(ring, reg, pd_addr >> 12);
 
-	amdgpu_ring_emit_wreg(ring, mmIH_VMID_0_LUT + vmid, pasid);
-
 	/* bits 0-15 are the VM contexts0-15 */
 	amdgpu_ring_emit_wreg(ring, mmVM_INVALIDATE_REQUEST, 1 << vmid);
 
 	return pd_addr;
+}
+
+static void gmc_v7_0_emit_pasid_mapping(struct amdgpu_ring *ring, unsigned vmid,
+					unsigned pasid)
+{
+	amdgpu_ring_emit_wreg(ring, mmIH_VMID_0_LUT + vmid, pasid);
 }
 
 /**
@@ -642,7 +646,7 @@ static int gmc_v7_0_gart_enable(struct amdgpu_device *adev)
 	WREG32(mmVM_CONTEXT0_PAGE_TABLE_END_ADDR, adev->gmc.gart_end >> 12);
 	WREG32(mmVM_CONTEXT0_PAGE_TABLE_BASE_ADDR, adev->gart.table_addr >> 12);
 	WREG32(mmVM_CONTEXT0_PROTECTION_FAULT_DEFAULT_ADDR,
-			(u32)(adev->dummy_page.addr >> 12));
+			(u32)(adev->dummy_page_addr >> 12));
 	WREG32(mmVM_CONTEXT0_CNTL2, 0);
 	tmp = RREG32(mmVM_CONTEXT0_CNTL);
 	tmp = REG_SET_FIELD(tmp, VM_CONTEXT0_CNTL, ENABLE_CONTEXT, 1);
@@ -672,7 +676,7 @@ static int gmc_v7_0_gart_enable(struct amdgpu_device *adev)
 
 	/* enable context1-15 */
 	WREG32(mmVM_CONTEXT1_PROTECTION_FAULT_DEFAULT_ADDR,
-	       (u32)(adev->dummy_page.addr >> 12));
+	       (u32)(adev->dummy_page_addr >> 12));
 	WREG32(mmVM_CONTEXT1_CNTL2, 4);
 	tmp = RREG32(mmVM_CONTEXT1_CNTL);
 	tmp = REG_SET_FIELD(tmp, VM_CONTEXT1_CNTL, ENABLE_CONTEXT, 1);
@@ -763,6 +767,7 @@ static void gmc_v7_0_gart_fini(struct amdgpu_device *adev)
  * @adev: amdgpu_device pointer
  * @status: VM_CONTEXT1_PROTECTION_FAULT_STATUS register value
  * @addr: VM_CONTEXT1_PROTECTION_FAULT_ADDR register value
+ * @mc_client: VM_CONTEXT1_PROTECTION_FAULT_MCCLIENT register value
  *
  * Print human readable fault information (CIK).
  */
@@ -1055,6 +1060,12 @@ static int gmc_v7_0_sw_init(void *handle)
 		adev->vm_manager.vram_base_offset = 0;
 	}
 
+	adev->gmc.vm_fault_info = kmalloc(sizeof(struct kfd_vm_fault_info),
+					GFP_KERNEL);
+	if (!adev->gmc.vm_fault_info)
+		return -ENOMEM;
+	atomic_set(&adev->gmc.vm_fault_info_updated, 0);
+
 	return 0;
 }
 
@@ -1064,6 +1075,7 @@ static int gmc_v7_0_sw_fini(void *handle)
 
 	amdgpu_gem_force_release(adev);
 	amdgpu_vm_manager_fini(adev);
+	kfree(adev->gmc.vm_fault_info);
 	gmc_v7_0_gart_fini(adev);
 	amdgpu_bo_fini(adev);
 	release_firmware(adev->gmc.fw);
@@ -1253,7 +1265,7 @@ static int gmc_v7_0_process_interrupt(struct amdgpu_device *adev,
 				      struct amdgpu_irq_src *source,
 				      struct amdgpu_iv_entry *entry)
 {
-	u32 addr, status, mc_client;
+	u32 addr, status, mc_client, vmid;
 
 	addr = RREG32(mmVM_CONTEXT1_PROTECTION_FAULT_ADDR);
 	status = RREG32(mmVM_CONTEXT1_PROTECTION_FAULT_STATUS);
@@ -1276,6 +1288,29 @@ static int gmc_v7_0_process_interrupt(struct amdgpu_device *adev,
 			status);
 		gmc_v7_0_vm_decode_fault(adev, status, addr, mc_client,
 					 entry->pasid);
+	}
+
+	vmid = REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS,
+			     VMID);
+	if (amdgpu_amdkfd_is_kfd_vmid(adev, vmid)
+		&& !atomic_read(&adev->gmc.vm_fault_info_updated)) {
+		struct kfd_vm_fault_info *info = adev->gmc.vm_fault_info;
+		u32 protections = REG_GET_FIELD(status,
+					VM_CONTEXT1_PROTECTION_FAULT_STATUS,
+					PROTECTIONS);
+
+		info->vmid = vmid;
+		info->mc_id = REG_GET_FIELD(status,
+					    VM_CONTEXT1_PROTECTION_FAULT_STATUS,
+					    MEMORY_CLIENT_ID);
+		info->status = status;
+		info->page_addr = addr;
+		info->prot_valid = protections & 0x7 ? true : false;
+		info->prot_read = protections & 0x8 ? true : false;
+		info->prot_write = protections & 0x10 ? true : false;
+		info->prot_exec = protections & 0x20 ? true : false;
+		mb();
+		atomic_set(&adev->gmc.vm_fault_info_updated, 1);
 	}
 
 	return 0;
@@ -1327,6 +1362,7 @@ static const struct amd_ip_funcs gmc_v7_0_ip_funcs = {
 static const struct amdgpu_gmc_funcs gmc_v7_0_gmc_funcs = {
 	.flush_gpu_tlb = gmc_v7_0_flush_gpu_tlb,
 	.emit_flush_gpu_tlb = gmc_v7_0_emit_flush_gpu_tlb,
+	.emit_pasid_mapping = gmc_v7_0_emit_pasid_mapping,
 	.set_pte_pde = gmc_v7_0_set_pte_pde,
 	.set_prt = gmc_v7_0_set_prt,
 	.get_vm_pte_flags = gmc_v7_0_get_vm_pte_flags,

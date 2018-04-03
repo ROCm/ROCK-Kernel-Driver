@@ -80,6 +80,8 @@
 #define KMS_DRIVER_MINOR	25
 #define KMS_DRIVER_PATCHLEVEL	0
 
+#define AMDGPU_VERSION		"18.20.1.15"
+
 int amdgpu_vram_limit = 0;
 int amdgpu_vis_vram_limit = 0;
 int amdgpu_gart_size = -1; /* auto */
@@ -122,7 +124,7 @@ uint amdgpu_pg_mask = 0xffffffff;
 uint amdgpu_sdma_phase_quantum = 32;
 char *amdgpu_disable_cu = NULL;
 char *amdgpu_virtual_display = NULL;
-uint amdgpu_pp_feature_mask = 0x3fff;
+uint amdgpu_pp_feature_mask = 0xffffbfff;
 int amdgpu_ngg = 0;
 int amdgpu_prim_buf_per_se = 0;
 int amdgpu_pos_buf_per_se = 0;
@@ -132,6 +134,7 @@ int amdgpu_job_hang_limit = 0;
 int amdgpu_lbpw = -1;
 int amdgpu_compute_multipipe = -1;
 int amdgpu_gpu_recovery = -1; /* auto */
+int amdgpu_emu_mode = 0;
 
 MODULE_PARM_DESC(vramlimit, "Restrict VRAM for testing, in megabytes");
 module_param_named(vramlimit, amdgpu_vram_limit, int, 0600);
@@ -287,21 +290,33 @@ module_param_named(lbpw, amdgpu_lbpw, int, 0444);
 MODULE_PARM_DESC(compute_multipipe, "Force compute queues to be spread across pipes (1 = enable, 0 = disable, -1 = auto)");
 module_param_named(compute_multipipe, amdgpu_compute_multipipe, int, 0444);
 
-MODULE_PARM_DESC(gpu_recovery, "Enable GPU recovery mechanism, (1 = enable, 0 = disable, -1 = auto");
+MODULE_PARM_DESC(gpu_recovery, "Enable GPU recovery mechanism, (1 = enable, 0 = disable, -1 = auto)");
 module_param_named(gpu_recovery, amdgpu_gpu_recovery, int, 0444);
+
+MODULE_PARM_DESC(emu_mode, "Emulation mode, (1 = enable, 0 = disable)");
+module_param_named(emu_mode, amdgpu_emu_mode, int, 0444);
 
 #ifdef CONFIG_DRM_AMDGPU_SI
 
+#if defined(CONFIG_DRM_RADEON) || defined(CONFIG_DRM_RADEON_MODULE)
 int amdgpu_si_support = 1;
 MODULE_PARM_DESC(si_support, "SI support (1 = enabled (default), 0 = disabled)");
-
+#else
+int amdgpu_si_support = 1;
+MODULE_PARM_DESC(si_support, "SI support (1 = enabled (default), 0 = disabled)");
+#endif
 module_param_named(si_support, amdgpu_si_support, int, 0444);
 #endif
 
 #ifdef CONFIG_DRM_AMDGPU_CIK
 
+#if (0 && (defined(CONFIG_DRM_RADEON) || defined(CONFIG_DRM_RADEON_MODULE)))
+int amdgpu_cik_support = 0;
+MODULE_PARM_DESC(cik_support, "CIK support (1 = enabled, 0 = disabled (default))");
+#else
 int amdgpu_cik_support = 1;
 MODULE_PARM_DESC(cik_support, "CIK support (1 = enabled (default), 0 = disabled)");
+#endif
 module_param_named(cik_support, amdgpu_cik_support, int, 0444);
 #endif
 
@@ -533,6 +548,12 @@ static const struct pci_device_id pciidlist[] = {
 	{0x1002, 0x6868, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_VEGA10},
 	{0x1002, 0x686c, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_VEGA10},
 	{0x1002, 0x687f, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_VEGA10},
+	/* Vega 12 */
+	{0x1002, 0x69A0, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_VEGA12},
+	{0x1002, 0x69A1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_VEGA12},
+	{0x1002, 0x69A2, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_VEGA12},
+	{0x1002, 0x69A3, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_VEGA12},
+	{0x1002, 0x69AF, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_VEGA12},
 	/* Raven */
 	{0x1002, 0x15dd, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_RAVEN|AMD_IS_APU},
 
@@ -904,8 +925,6 @@ static struct drm_driver kms_driver = {
 #else
 	.gem_prime_import = drm_gem_prime_import,
 #endif
-	.gem_prime_pin = amdgpu_gem_prime_pin,
-	.gem_prime_unpin = amdgpu_gem_prime_unpin,
 	.gem_prime_res_obj = amdgpu_gem_prime_res_obj,
 	.gem_prime_get_sg_table = amdgpu_gem_prime_get_sg_table,
 	.gem_prime_import_sg_table = amdgpu_gem_prime_import_sg_table,
@@ -952,6 +971,7 @@ static int __init amdgpu_init(void)
 		return -EINVAL;
 	}
 	DRM_INFO("amdgpu kernel modesetting enabled.\n");
+	DRM_INFO("amdgpu version: %s\n", AMDGPU_VERSION);
 	driver = &kms_driver;
 	pdriver = &amdgpu_kms_pci_driver;
 	driver->num_ioctls = amdgpu_max_kms_ioctl;
@@ -981,4 +1001,4 @@ module_exit(amdgpu_exit);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL and additional rights");
-MODULE_VERSION("18.20.0.15");
+MODULE_VERSION(AMDGPU_VERSION);

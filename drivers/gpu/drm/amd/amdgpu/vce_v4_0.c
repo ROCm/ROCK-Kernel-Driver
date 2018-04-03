@@ -420,7 +420,7 @@ static int vce_v4_0_sw_init(void *handle)
 	unsigned size;
 	int r, i;
 
-	r = amdgpu_irq_add_id(adev, AMDGPU_IH_CLIENTID_VCE0, 167, &adev->vce.irq);
+	r = amdgpu_irq_add_id(adev, SOC15_IH_CLIENTID_VCE0, 167, &adev->vce.irq);
 	if (r)
 		return r;
 
@@ -975,12 +975,11 @@ static void vce_v4_0_emit_reg_wait(struct amdgpu_ring *ring, uint32_t reg,
 }
 
 static void vce_v4_0_emit_vm_flush(struct amdgpu_ring *ring,
-				   unsigned int vmid, unsigned pasid,
-				   uint64_t pd_addr)
+				   unsigned int vmid, uint64_t pd_addr)
 {
 	struct amdgpu_vmhub *hub = &ring->adev->vmhub[ring->funcs->vmhub];
 
-	pd_addr = amdgpu_gmc_emit_flush_gpu_tlb(ring, vmid, pasid, pd_addr);
+	pd_addr = amdgpu_gmc_emit_flush_gpu_tlb(ring, vmid, pd_addr);
 
 	/* wait for reg writes */
 	vce_v4_0_emit_reg_wait(ring, hub->ctx0_ptb_addr_lo32 + vmid * 2,

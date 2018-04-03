@@ -734,161 +734,6 @@ fail:
 	return -EINVAL;
 }
 
-static ssize_t amdgpu_get_pp_power_profile(struct device *dev,
-		char *buf, struct amd_pp_profile *query)
-{
-	struct drm_device *ddev = dev_get_drvdata(dev);
-	struct amdgpu_device *adev = ddev->dev_private;
-	int ret = 0xff;
-
-	if (adev->powerplay.pp_funcs->get_power_profile_state)
-		ret = amdgpu_dpm_get_power_profile_state(
-				adev, query);
-
-	if (ret)
-		return ret;
-
-	return snprintf(buf, PAGE_SIZE,
-			"%d %d %d %d %d\n",
-			query->min_sclk / 100,
-			query->min_mclk / 100,
-			query->activity_threshold,
-			query->up_hyst,
-			query->down_hyst);
-}
-
-static ssize_t amdgpu_get_pp_gfx_power_profile(struct device *dev,
-		struct device_attribute *attr,
-		char *buf)
-{
-	struct amd_pp_profile query = {0};
-
-	query.type = AMD_PP_GFX_PROFILE;
-
-	return amdgpu_get_pp_power_profile(dev, buf, &query);
-}
-
-static ssize_t amdgpu_get_pp_compute_power_profile(struct device *dev,
-		struct device_attribute *attr,
-		char *buf)
-{
-	struct amd_pp_profile query = {0};
-
-	query.type = AMD_PP_COMPUTE_PROFILE;
-
-	return amdgpu_get_pp_power_profile(dev, buf, &query);
-}
-
-static ssize_t amdgpu_set_pp_power_profile(struct device *dev,
-		const char *buf,
-		size_t count,
-		struct amd_pp_profile *request)
-{
-	struct drm_device *ddev = dev_get_drvdata(dev);
-	struct amdgpu_device *adev = ddev->dev_private;
-	uint32_t loop = 0;
-	char *sub_str, buf_cpy[128], *tmp_str;
-	const char delimiter[3] = {' ', '\n', '\0'};
-	long int value;
-	int ret = 0xff;
-
-	if (strncmp("reset", buf, strlen("reset")) == 0) {
-		if (adev->powerplay.pp_funcs->reset_power_profile_state)
-			ret = amdgpu_dpm_reset_power_profile_state(
-					adev, request);
-		if (ret) {
-			count = -EINVAL;
-			goto fail;
-		}
-		return count;
-	}
-
-	if (strncmp("set", buf, strlen("set")) == 0) {
-		if (adev->powerplay.pp_funcs->set_power_profile_state)
-			ret = amdgpu_dpm_set_power_profile_state(
-					adev, request);
-
-		if (ret) {
-			count = -EINVAL;
-			goto fail;
-		}
-		return count;
-	}
-
-	if (count + 1 >= 128) {
-		count = -EINVAL;
-		goto fail;
-	}
-
-	memcpy(buf_cpy, buf, count + 1);
-	tmp_str = buf_cpy;
-
-	while (tmp_str[0]) {
-		sub_str = strsep(&tmp_str, delimiter);
-		ret = kstrtol(sub_str, 0, &value);
-		if (ret) {
-			count = -EINVAL;
-			goto fail;
-		}
-
-		switch (loop) {
-		case 0:
-			/* input unit MHz convert to dpm table unit 10KHz*/
-			request->min_sclk = (uint32_t)value * 100;
-			break;
-		case 1:
-			/* input unit MHz convert to dpm table unit 10KHz*/
-			request->min_mclk = (uint32_t)value * 100;
-			break;
-		case 2:
-			request->activity_threshold = (uint16_t)value;
-			break;
-		case 3:
-			request->up_hyst = (uint8_t)value;
-			break;
-		case 4:
-			request->down_hyst = (uint8_t)value;
-			break;
-		default:
-			break;
-		}
-
-		loop++;
-	}
-	if (adev->powerplay.pp_funcs->set_power_profile_state)
-		ret = amdgpu_dpm_set_power_profile_state(adev, request);
-
-	if (ret)
-		count = -EINVAL;
-
-fail:
-	return count;
-}
-
-static ssize_t amdgpu_set_pp_gfx_power_profile(struct device *dev,
-		struct device_attribute *attr,
-		const char *buf,
-		size_t count)
-{
-	struct amd_pp_profile request = {0};
-
-	request.type = AMD_PP_GFX_PROFILE;
-
-	return amdgpu_set_pp_power_profile(dev, buf, count, &request);
-}
-
-static ssize_t amdgpu_set_pp_compute_power_profile(struct device *dev,
-		struct device_attribute *attr,
-		const char *buf,
-		size_t count)
-{
-	struct amd_pp_profile request = {0};
-
-	request.type = AMD_PP_COMPUTE_PROFILE;
-
-	return amdgpu_set_pp_power_profile(dev, buf, count, &request);
-}
-
 static DEVICE_ATTR(power_dpm_state, S_IRUGO | S_IWUSR, amdgpu_get_dpm_state, amdgpu_set_dpm_state);
 static DEVICE_ATTR(power_dpm_force_performance_level, S_IRUGO | S_IWUSR,
 		   amdgpu_get_dpm_forced_performance_level,
@@ -916,12 +761,6 @@ static DEVICE_ATTR(pp_sclk_od, S_IRUGO | S_IWUSR,
 static DEVICE_ATTR(pp_mclk_od, S_IRUGO | S_IWUSR,
 		amdgpu_get_pp_mclk_od,
 		amdgpu_set_pp_mclk_od);
-static DEVICE_ATTR(pp_gfx_power_profile, S_IRUGO | S_IWUSR,
-		amdgpu_get_pp_gfx_power_profile,
-		amdgpu_set_pp_gfx_power_profile);
-static DEVICE_ATTR(pp_compute_power_profile, S_IRUGO | S_IWUSR,
-		amdgpu_get_pp_compute_power_profile,
-		amdgpu_set_pp_compute_power_profile);
 static DEVICE_ATTR(pp_power_profile_mode, S_IRUGO | S_IWUSR,
 		amdgpu_get_pp_power_profile_mode,
 		amdgpu_set_pp_power_profile_mode);
@@ -1207,6 +1046,69 @@ static ssize_t amdgpu_hwmon_show_power_avg(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%u\n", uw);
 }
 
+static ssize_t amdgpu_hwmon_show_power_cap_min(struct device *dev,
+					 struct device_attribute *attr,
+					 char *buf)
+{
+	return sprintf(buf, "%i\n", 0);
+}
+
+static ssize_t amdgpu_hwmon_show_power_cap_max(struct device *dev,
+					 struct device_attribute *attr,
+					 char *buf)
+{
+	struct amdgpu_device *adev = dev_get_drvdata(dev);
+	uint32_t limit = 0;
+
+	if (adev->powerplay.pp_funcs && adev->powerplay.pp_funcs->get_power_limit) {
+		adev->powerplay.pp_funcs->get_power_limit(adev->powerplay.pp_handle, &limit, true);
+		return snprintf(buf, PAGE_SIZE, "%u\n", limit * 1000000);
+	} else {
+		return snprintf(buf, PAGE_SIZE, "\n");
+	}
+}
+
+static ssize_t amdgpu_hwmon_show_power_cap(struct device *dev,
+					 struct device_attribute *attr,
+					 char *buf)
+{
+	struct amdgpu_device *adev = dev_get_drvdata(dev);
+	uint32_t limit = 0;
+
+	if (adev->powerplay.pp_funcs && adev->powerplay.pp_funcs->get_power_limit) {
+		adev->powerplay.pp_funcs->get_power_limit(adev->powerplay.pp_handle, &limit, false);
+		return snprintf(buf, PAGE_SIZE, "%u\n", limit * 1000000);
+	} else {
+		return snprintf(buf, PAGE_SIZE, "\n");
+	}
+}
+
+
+static ssize_t amdgpu_hwmon_set_power_cap(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf,
+		size_t count)
+{
+	struct amdgpu_device *adev = dev_get_drvdata(dev);
+	int err;
+	u32 value;
+
+	err = kstrtou32(buf, 10, &value);
+	if (err)
+		return err;
+
+	value = value / 1000000; /* convert to Watt */
+	if (adev->powerplay.pp_funcs && adev->powerplay.pp_funcs->set_power_limit) {
+		err = adev->powerplay.pp_funcs->set_power_limit(adev->powerplay.pp_handle, value);
+		if (err)
+			return err;
+	} else {
+		return -EINVAL;
+	}
+
+	return count;
+}
+
 static SENSOR_DEVICE_ATTR(temp1_input, S_IRUGO, amdgpu_hwmon_show_temp, NULL, 0);
 static SENSOR_DEVICE_ATTR(temp1_crit, S_IRUGO, amdgpu_hwmon_show_temp_thresh, NULL, 0);
 static SENSOR_DEVICE_ATTR(temp1_crit_hyst, S_IRUGO, amdgpu_hwmon_show_temp_thresh, NULL, 1);
@@ -1220,6 +1122,9 @@ static SENSOR_DEVICE_ATTR(in0_label, S_IRUGO, amdgpu_hwmon_show_vddgfx_label, NU
 static SENSOR_DEVICE_ATTR(in1_input, S_IRUGO, amdgpu_hwmon_show_vddnb, NULL, 0);
 static SENSOR_DEVICE_ATTR(in1_label, S_IRUGO, amdgpu_hwmon_show_vddnb_label, NULL, 0);
 static SENSOR_DEVICE_ATTR(power1_average, S_IRUGO, amdgpu_hwmon_show_power_avg, NULL, 0);
+static SENSOR_DEVICE_ATTR(power1_cap_max, S_IRUGO, amdgpu_hwmon_show_power_cap_max, NULL, 0);
+static SENSOR_DEVICE_ATTR(power1_cap_min, S_IRUGO, amdgpu_hwmon_show_power_cap_min, NULL, 0);
+static SENSOR_DEVICE_ATTR(power1_cap, S_IRUGO | S_IWUSR, amdgpu_hwmon_show_power_cap, amdgpu_hwmon_set_power_cap, 0);
 
 static struct attribute *hwmon_attributes[] = {
 	&sensor_dev_attr_temp1_input.dev_attr.attr,
@@ -1235,6 +1140,9 @@ static struct attribute *hwmon_attributes[] = {
 	&sensor_dev_attr_in1_input.dev_attr.attr,
 	&sensor_dev_attr_in1_label.dev_attr.attr,
 	&sensor_dev_attr_power1_average.dev_attr.attr,
+	&sensor_dev_attr_power1_cap_max.dev_attr.attr,
+	&sensor_dev_attr_power1_cap_min.dev_attr.attr,
+	&sensor_dev_attr_power1_cap.dev_attr.attr,
 	NULL
 };
 
@@ -1246,7 +1154,7 @@ static umode_t hwmon_attributes_visible(struct kobject *kobj,
 	umode_t effective_mode = attr->mode;
 
 	/* handle non-powerplay limitations */
-	if (!adev->powerplay.cgs_device) {
+	if (!adev->powerplay.pp_handle) {
 		/* Skip fan attributes if fan is not present */
 		if (adev->pm.no_fan &&
 		    (attr == &sensor_dev_attr_pwm1.dev_attr.attr ||
@@ -1281,6 +1189,12 @@ static umode_t hwmon_attributes_visible(struct kobject *kobj,
 	    (!adev->powerplay.pp_funcs->set_fan_control_mode &&
 	     attr == &sensor_dev_attr_pwm1_enable.dev_attr.attr)) /* can't manage state */
 		effective_mode &= ~S_IWUSR;
+
+	if ((adev->flags & AMD_IS_APU) &&
+	    (attr == &sensor_dev_attr_power1_cap_max.dev_attr.attr ||
+	     attr == &sensor_dev_attr_power1_cap_min.dev_attr.attr||
+	     attr == &sensor_dev_attr_power1_cap.dev_attr.attr))
+		return 0;
 
 	/* hide max/min values if we can't both query and manage the fan */
 	if ((!adev->powerplay.pp_funcs->set_fan_speed_percent &&
@@ -1692,21 +1606,6 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 		return ret;
 	}
 	ret = device_create_file(adev->dev,
-			&dev_attr_pp_gfx_power_profile);
-	if (ret) {
-		DRM_ERROR("failed to create device file	"
-				"pp_gfx_power_profile\n");
-		return ret;
-	}
-	ret = device_create_file(adev->dev,
-			&dev_attr_pp_compute_power_profile);
-	if (ret) {
-		DRM_ERROR("failed to create device file	"
-				"pp_compute_power_profile\n");
-		return ret;
-	}
-
-	ret = device_create_file(adev->dev,
 			&dev_attr_pp_power_profile_mode);
 	if (ret) {
 		DRM_ERROR("failed to create device file	"
@@ -1751,10 +1650,6 @@ void amdgpu_pm_sysfs_fini(struct amdgpu_device *adev)
 	device_remove_file(adev->dev, &dev_attr_pp_dpm_pcie);
 	device_remove_file(adev->dev, &dev_attr_pp_sclk_od);
 	device_remove_file(adev->dev, &dev_attr_pp_mclk_od);
-	device_remove_file(adev->dev,
-			&dev_attr_pp_gfx_power_profile);
-	device_remove_file(adev->dev,
-			&dev_attr_pp_compute_power_profile);
 	device_remove_file(adev->dev,
 			&dev_attr_pp_power_profile_mode);
 	device_remove_file(adev->dev,
