@@ -122,11 +122,14 @@ var SQ_WAVE_TRAPSTS_ILLEGAL_INST_MASK	=   0x800
 
 var SQ_WAVE_IB_STS_RCNT_SHIFT		=   16			//FIXME
 var SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT	=   15			//FIXME
+var SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK	= 0x1F8000
 var SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK_NEG	= 0x00007FFF	//FIXME
 
 var SQ_BUF_RSRC_WORD1_ATC_SHIFT	    =	24
 var SQ_BUF_RSRC_WORD3_MTYPE_SHIFT   =	27
 
+var TTMP11_SAVE_RCNT_FIRST_REPLAY_SHIFT	=   26			// bits [31:26] unused by SPI debug data
+var TTMP11_SAVE_RCNT_FIRST_REPLAY_MASK	=   0xFC000000
 
 /*	Save	    */
 var S_SAVE_BUF_RSRC_WORD1_STRIDE	=   0x00040000		//stride is 4 bytes
@@ -151,7 +154,7 @@ var s_save_pc_lo	    =	ttmp0		//{TTMP1, TTMP0} = {3¡¯h0,pc_rewind[3:0], HT[0],tr
 var s_save_pc_hi	    =	ttmp1
 var s_save_exec_lo	    =	ttmp2
 var s_save_exec_hi	    =	ttmp3
-var s_save_status	    =	ttmp4
+var s_save_tmp		    =	ttmp4
 var s_save_trapsts	    =	ttmp5		//not really used until the end of the SAVE routine
 var s_save_xnack_mask_lo    =	ttmp6
 var s_save_xnack_mask_hi    =	ttmp7
@@ -159,11 +162,12 @@ var s_save_buf_rsrc0	    =	ttmp8
 var s_save_buf_rsrc1	    =	ttmp9
 var s_save_buf_rsrc2	    =	ttmp10
 var s_save_buf_rsrc3	    =	ttmp11
-
+var s_save_status	    =	ttmp12
 var s_save_mem_offset	    =	ttmp14
 var s_save_alloc_size	    =	s_save_trapsts		//conflict
-var s_save_tmp		    =	s_save_buf_rsrc2	//shared with s_save_buf_rsrc2	(conflict: should not use mem access with s_save_tmp at the same time)
 var s_save_m0		    =	ttmp15
+var s_save_ttmps_lo	    =	s_save_tmp		//no conflict
+var s_save_ttmps_hi	    =	s_save_trapsts		//no conflict
 
 /*	Restore	    */
 var S_RESTORE_BUF_RSRC_WORD1_STRIDE	    =	S_SAVE_BUF_RSRC_WORD1_STRIDE
@@ -186,7 +190,7 @@ var s_restore_spi_init_hi		    =	exec_hi
 
 var s_restore_mem_offset	=   ttmp12
 var s_restore_alloc_size	=   ttmp3
-var s_restore_tmp		=   ttmp6
+var s_restore_tmp		=   ttmp2
 var s_restore_mem_offset_save	=   s_restore_tmp	//no conflict
 
 var s_restore_m0	    =	s_restore_alloc_size	//no conflict
@@ -205,6 +209,8 @@ var s_restore_buf_rsrc0	    =	ttmp8
 var s_restore_buf_rsrc1	    =	ttmp9
 var s_restore_buf_rsrc2	    =	ttmp10
 var s_restore_buf_rsrc3	    =	ttmp11
+var s_restore_ttmps_lo	    =	s_restore_tmp		//no conflict
+var s_restore_ttmps_hi	    =	s_restore_alloc_size	//no conflict
 
 /**************************************************************************/
 /*			trap handler entry points			  */
@@ -235,25 +241,25 @@ L_SKIP_RESTORE:
     s_getreg_b32    s_save_status, hwreg(HW_REG_STATUS)				    //save STATUS since we will change SCC
     s_andn2_b32	    s_save_status, s_save_status, SQ_WAVE_STATUS_SPI_PRIO_MASK	    //check whether this is for save
     s_getreg_b32    s_save_trapsts, hwreg(HW_REG_TRAPSTS)
-    s_and_b32	    ttmp8, s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_MASK    //check whether this is for save
+    s_and_b32       ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_MASK    //check whether this is for save
     s_cbranch_scc1  L_SAVE					//this is the operation for save
 
     // *********    Handle non-CWSR traps	*******************
 if (!EMU_RUN_HACK)
     // Illegal instruction is a non-maskable exception which blocks context save.
     // Halt the wavefront and return from the trap.
-    s_and_b32       ttmp8, s_save_trapsts, SQ_WAVE_TRAPSTS_ILLEGAL_INST_MASK
+    s_and_b32       ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_ILLEGAL_INST_MASK
     s_cbranch_scc1  L_HALT_WAVE
 
     // If STATUS.MEM_VIOL is asserted then we cannot fetch from the TMA.
     // Instead, halt the wavefront and return from the trap.
-    s_and_b32       ttmp8, s_save_trapsts, SQ_WAVE_TRAPSTS_MEM_VIOL_MASK
-    s_cbranch_scc0  L_NO_MEM_VIOL
+    s_and_b32       ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_MEM_VIOL_MASK
+    s_cbranch_scc0  L_FETCH_2ND_TRAP
 
 L_HALT_WAVE:
     // If STATUS.HALT is set then this fault must come from SQC instruction fetch.
     // We cannot prevent further faults so just terminate the wavefront.
-    s_and_b32       ttmp8, s_save_status, SQ_WAVE_STATUS_HALT_MASK
+    s_and_b32       ttmp2, s_save_status, SQ_WAVE_STATUS_HALT_MASK
     s_cbranch_scc0  L_NOT_ALREADY_HALTED
     s_endpgm
 L_NOT_ALREADY_HALTED:
@@ -264,19 +270,31 @@ L_NOT_ALREADY_HALTED:
     s_sub_u32       ttmp0, ttmp0, 0x8
     s_subb_u32      ttmp1, ttmp1, 0x0
 
-    s_branch        L_EXCP_CASE
+L_FETCH_2ND_TRAP:
+    // Preserve and clear scalar XNACK state before issuing scalar reads.
+    // Save IB_STS.FIRST_REPLAY[15] and IB_STS.RCNT[20:16] into unused space ttmp11[31:26].
+    s_getreg_b32    ttmp2, hwreg(HW_REG_IB_STS)
+    s_and_b32       ttmp3, ttmp2, SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK
+    s_lshl_b32      ttmp3, ttmp3, (TTMP11_SAVE_RCNT_FIRST_REPLAY_SHIFT - SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT)
+    s_andn2_b32     ttmp11, ttmp11, TTMP11_SAVE_RCNT_FIRST_REPLAY_MASK
+    s_or_b32        ttmp11, ttmp11, ttmp3
 
-L_NO_MEM_VIOL:
-    /* read tba and tma for next level trap handler, ttmp4 is used as s_save_status */
-    s_getreg_b32    ttmp14,hwreg(HW_REG_SQ_SHADER_TMA_LO)
-    s_getreg_b32    ttmp15,hwreg(HW_REG_SQ_SHADER_TMA_HI)
-    s_lshl_b64      [ttmp14, ttmp15], [ttmp14, ttmp15], 0x8
-    s_load_dwordx4  [ttmp8, ttmp9, ttmp10, ttmp11], [ttmp14, ttmp15], 0
-    s_waitcnt lgkmcnt(0)
-    s_or_b32	    ttmp7, ttmp8, ttmp9
-    s_cbranch_scc0  L_NO_NEXT_TRAP //next level trap handler not been set
-    s_setreg_b32    hwreg(HW_REG_STATUS), s_save_status //restore HW status(SCC)
-    s_setpc_b64	    [ttmp8,ttmp9] //jump to next level trap handler
+    s_andn2_b32     ttmp2, ttmp2, SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK
+    s_setreg_b32    hwreg(HW_REG_IB_STS), ttmp2
+
+    // Read second-level TBA/TMA from first-level TMA and jump if available.
+    // ttmp[2:5] and ttmp12 can be used (others hold SPI-initialized debug data)
+    // ttmp12 holds SQ_WAVE_STATUS
+    s_getreg_b32    ttmp4, hwreg(HW_REG_SQ_SHADER_TMA_LO)
+    s_getreg_b32    ttmp5, hwreg(HW_REG_SQ_SHADER_TMA_HI)
+    s_lshl_b64      [ttmp4, ttmp5], [ttmp4, ttmp5], 0x8
+    s_load_dwordx2  [ttmp2, ttmp3], [ttmp4, ttmp5], 0x0 glc:1 // second-level TBA
+    s_waitcnt       lgkmcnt(0)
+    s_load_dwordx2  [ttmp4, ttmp5], [ttmp4, ttmp5], 0x8 glc:1 // second-level TMA
+    s_waitcnt       lgkmcnt(0)
+    s_and_b64       [ttmp2, ttmp3], [ttmp2, ttmp3], [ttmp2, ttmp3]
+    s_cbranch_scc0  L_NO_NEXT_TRAP // second-level trap handler not been set
+    s_setpc_b64     [ttmp2, ttmp3] // jump to second-level trap handler
 
 L_NO_NEXT_TRAP:
     s_getreg_b32    s_save_trapsts, hwreg(HW_REG_TRAPSTS)
@@ -286,8 +304,18 @@ L_NO_NEXT_TRAP:
     s_addc_u32	ttmp1, ttmp1, 0
 L_EXCP_CASE:
     s_and_b32	ttmp1, ttmp1, 0xFFFF
-    s_setreg_b32    hwreg(HW_REG_STATUS), s_save_status //restore HW status(SCC)
-    s_rfe_b64	    [ttmp0, ttmp1]
+
+    // Restore SQ_WAVE_IB_STS.
+    s_lshr_b32      ttmp2, ttmp11, (TTMP11_SAVE_RCNT_FIRST_REPLAY_SHIFT - SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT)
+    s_and_b32       ttmp2, ttmp2, SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK
+    s_setreg_b32    hwreg(HW_REG_IB_STS), ttmp2
+
+    // Restore SQ_WAVE_STATUS.
+    s_and_b64       exec, exec, exec // Restore STATUS.EXECZ, not writable by s_setreg_b32
+    s_and_b64       vcc, vcc, vcc    // Restore STATUS.VCCZ, not writable by s_setreg_b32
+    s_setreg_b32    hwreg(HW_REG_STATUS), s_save_status
+
+    s_rfe_b64       [ttmp0, ttmp1]
 end
     // *********	End handling of non-CWSR traps	 *******************
 
@@ -307,8 +335,6 @@ end
     s_mov_b32	    s_save_tmp, 0							    //clear saveCtx bit
     s_setreg_b32    hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_SAVECTX_SHIFT, 1), s_save_tmp	    //clear saveCtx bit
 
-    s_mov_b32	    s_save_xnack_mask_lo,   xnack_mask_lo				    //save XNACK_MASK
-    s_mov_b32	    s_save_xnack_mask_hi,   xnack_mask_hi    //save XNACK must before any memory operation
     s_getreg_b32    s_save_tmp, hwreg(HW_REG_IB_STS, SQ_WAVE_IB_STS_RCNT_SHIFT, SQ_WAVE_IB_STS_RCNT_SIZE)		    //save RCNT
     s_lshl_b32	    s_save_tmp, s_save_tmp, S_SAVE_PC_HI_RCNT_SHIFT
     s_or_b32	    s_save_pc_hi, s_save_pc_hi, s_save_tmp
@@ -350,7 +376,6 @@ if G8SR_DEBUG_TIMESTAMP
 	s_waitcnt lgkmcnt(0)
 end
 
-    /*	    setup Resource Contants    */
     if ((EMU_RUN_HACK) && (!EMU_RUN_HACK_SAVE_SINGLE_WAVE))
 	//calculate wd_addr using absolute thread id
 	v_readlane_b32 s_save_tmp, v9, 0
@@ -368,7 +393,24 @@ end
     else
     end
 
+    // Save trap temporaries 6-11, 13-15 initialized by SPI debug dispatch logic
+    // ttmp SR memory offset : size(VGPR)+size(SGPR)+0x40
+    get_vgpr_size_bytes(s_save_ttmps_lo)
+    get_sgpr_size_bytes(s_save_ttmps_hi)
+    s_add_u32	    s_save_ttmps_lo, s_save_ttmps_lo, s_save_ttmps_hi
+    s_add_u32	    s_save_ttmps_lo, s_save_ttmps_lo, s_save_spi_init_lo
+    s_addc_u32	    s_save_ttmps_hi, s_save_spi_init_hi, 0x0
+    s_and_b32	    s_save_ttmps_hi, s_save_ttmps_hi, 0xFFFF
+    s_store_dwordx2 [ttmp6, ttmp7], [s_save_ttmps_lo, s_save_ttmps_hi], 0x40 glc:1
+    ack_sqc_store_workaround()
+    s_store_dwordx4 [ttmp8, ttmp9, ttmp10, ttmp11], [s_save_ttmps_lo, s_save_ttmps_hi], 0x48 glc:1
+    ack_sqc_store_workaround()
+    s_store_dword   ttmp13, [s_save_ttmps_lo, s_save_ttmps_hi], 0x58 glc:1
+    ack_sqc_store_workaround()
+    s_store_dwordx2 [ttmp14, ttmp15], [s_save_ttmps_lo, s_save_ttmps_hi], 0x5C glc:1
+    ack_sqc_store_workaround()
 
+    /*	    setup Resource Contants    */
     s_mov_b32	    s_save_buf_rsrc0,	s_save_spi_init_lo							//base_addr_lo
     s_and_b32	    s_save_buf_rsrc1,	s_save_spi_init_hi, 0x0000FFFF						//base_addr_hi
     s_or_b32	    s_save_buf_rsrc1,	s_save_buf_rsrc1,  S_SAVE_BUF_RSRC_WORD1_STRIDE
@@ -425,8 +467,8 @@ end
     s_getreg_b32    s_save_trapsts, hwreg(HW_REG_TRAPSTS)
     write_hwreg_to_mem(s_save_trapsts, s_save_buf_rsrc0, s_save_mem_offset)		//TRAPSTS
 
-    write_hwreg_to_mem(s_save_xnack_mask_lo, s_save_buf_rsrc0, s_save_mem_offset)	    //XNACK_MASK_LO
-    write_hwreg_to_mem(s_save_xnack_mask_hi, s_save_buf_rsrc0, s_save_mem_offset)	    //XNACK_MASK_HI
+    write_hwreg_to_mem(xnack_mask_lo, s_save_buf_rsrc0, s_save_mem_offset)	    //XNACK_MASK_LO
+    write_hwreg_to_mem(xnack_mask_hi, s_save_buf_rsrc0, s_save_mem_offset)	    //XNACK_MASK_HI
 
     //use s_save_tmp would introduce conflict here between s_save_tmp and s_save_buf_rsrc2
     s_getreg_b32    s_save_m0, hwreg(HW_REG_MODE)						    //MODE
@@ -502,6 +544,8 @@ end
     s_mov_b32	    s_save_mem_offset, 0
     s_mov_b32	    exec_lo, 0xFFFFFFFF						    //need every thread from now on
     s_mov_b32	    exec_hi, 0xFFFFFFFF
+    s_mov_b32	    xnack_mask_lo, 0x0
+    s_mov_b32	    xnack_mask_hi, 0x0
 
     if (SWIZZLE_EN)
 	s_add_u32	s_save_buf_rsrc2, s_save_buf_rsrc2, 0x0			    //FIXME need to use swizzle to enable bounds checking?
@@ -1038,6 +1082,21 @@ end
     s_setreg_b32    hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_POST_SAVECTX_SHIFT, SQ_WAVE_TRAPSTS_POST_SAVECTX_SIZE), s_restore_m0
     //s_setreg_b32  hwreg(HW_REG_TRAPSTS),  s_restore_trapsts	   //don't overwrite SAVECTX bit as it may be set through external SAVECTX during restore
     s_setreg_b32    hwreg(HW_REG_MODE),	    s_restore_mode
+
+    // Restore trap temporaries 6-11, 13-15 initialized by SPI debug dispatch logic
+    // ttmp SR memory offset : size(VGPR)+size(SGPR)+0x40
+    get_vgpr_size_bytes(s_restore_ttmps_lo)
+    get_sgpr_size_bytes(s_restore_ttmps_hi)
+    s_add_u32	    s_restore_ttmps_lo, s_restore_ttmps_lo, s_restore_ttmps_hi
+    s_add_u32	    s_restore_ttmps_lo, s_restore_ttmps_lo, s_restore_buf_rsrc0
+    s_addc_u32	    s_restore_ttmps_hi, s_restore_buf_rsrc1, 0x0
+    s_and_b32	    s_restore_ttmps_hi, s_restore_ttmps_hi, 0xFFFF
+    s_load_dwordx2  [ttmp6, ttmp7], [s_restore_ttmps_lo, s_restore_ttmps_hi], 0x40 glc:1
+    s_load_dwordx4  [ttmp8, ttmp9, ttmp10, ttmp11], [s_restore_ttmps_lo, s_restore_ttmps_hi], 0x48 glc:1
+    s_load_dword    ttmp13, [s_restore_ttmps_lo, s_restore_ttmps_hi], 0x58 glc:1
+    s_load_dwordx2  [ttmp14, ttmp15], [s_restore_ttmps_lo, s_restore_ttmps_hi], 0x5C glc:1
+    s_waitcnt	    lgkmcnt(0)
+
     //reuse s_restore_m0 as a temp register
     s_and_b32	    s_restore_m0, s_restore_pc_hi, S_SAVE_PC_HI_RCNT_MASK
     s_lshr_b32	    s_restore_m0, s_restore_m0, S_SAVE_PC_HI_RCNT_SHIFT
@@ -1085,9 +1144,7 @@ function write_hwreg_to_mem(s, s_rsrc, s_mem_offset)
 	s_mov_b32 exec_lo, m0			//assuming exec_lo is not needed anymore from this point on
 	s_mov_b32 m0, s_mem_offset
 	s_buffer_store_dword s, s_rsrc, m0	glc:1
-if ACK_SQC_STORE
-	s_waitcnt lgkmcnt(0)
-end
+	ack_sqc_store_workaround()
 	s_add_u32	s_mem_offset, s_mem_offset, 4
 	s_mov_b32   m0, exec_lo
 end
@@ -1097,21 +1154,13 @@ end
 function write_16sgpr_to_mem(s, s_rsrc, s_mem_offset)
 
 	s_buffer_store_dwordx4 s[0], s_rsrc, 0	glc:1
-if ACK_SQC_STORE
-	s_waitcnt lgkmcnt(0)
-end
+	ack_sqc_store_workaround()
 	s_buffer_store_dwordx4 s[4], s_rsrc, 16	 glc:1
-if ACK_SQC_STORE
-	s_waitcnt lgkmcnt(0)
-end
+	ack_sqc_store_workaround()
 	s_buffer_store_dwordx4 s[8], s_rsrc, 32	 glc:1
-if ACK_SQC_STORE
-	s_waitcnt lgkmcnt(0)
-end
+	ack_sqc_store_workaround()
 	s_buffer_store_dwordx4 s[12], s_rsrc, 48 glc:1
-if ACK_SQC_STORE
-	s_waitcnt lgkmcnt(0)
-end
+	ack_sqc_store_workaround()
 	s_add_u32	s_rsrc[0], s_rsrc[0], 4*16
 	s_addc_u32	s_rsrc[1], s_rsrc[1], 0x0	      // +scc
 end
@@ -1151,56 +1200,80 @@ function get_hwreg_size_bytes
     return 128 //HWREG size 128 bytes
 end
 
+function ack_sqc_store_workaround
+    if ACK_SQC_STORE
+        s_waitcnt lgkmcnt(0)
+    end
+end
 
 
 #endif
 
 static const uint32_t cwsr_trap_gfx9_hex[] = {
-	0xbf820001, 0xbf820130,
-	0xb8f0f802, 0x89708670,
-	0xb8f1f803, 0x8674ff71,
-	0x00000400, 0xbf850023,
-	0x8674ff71, 0x00000800,
-	0xbf850003, 0x8674ff71,
-	0x00000100, 0xbf840009,
-	0x8674ff70, 0x00002000,
+	0xbf820001, 0xbf820158,
+	0xb8f8f802, 0x89788678,
+	0xb8f1f803, 0x866eff71,
+	0x00000400, 0xbf850034,
+	0x866eff71, 0x00000800,
+	0xbf850003, 0x866eff71,
+	0x00000100, 0xbf840008,
+	0x866eff78, 0x00002000,
 	0xbf840001, 0xbf810000,
-	0x8770ff70, 0x00002000,
+	0x8778ff78, 0x00002000,
 	0x80ec886c, 0x82ed806d,
-	0xbf820010, 0xb8faf812,
-	0xb8fbf813, 0x8efa887a,
-	0xc00a1d3d, 0x00000000,
-	0xbf8cc07f, 0x87737574,
-	0xbf840002, 0xb970f802,
-	0xbe801d74, 0xb8f1f803,
-	0x8671ff71, 0x000001ff,
-	0xbf850002, 0x806c846c,
-	0x826d806d, 0x866dff6d,
-	0x0000ffff, 0xb970f802,
-	0xbe801f6c, 0x866dff6d,
-	0x0000ffff, 0xbef60080,
-	0xb9760283, 0xbef20068,
-	0xbef30069, 0xb8f62407,
-	0x8e769c76, 0x876d766d,
-	0xb8f603c7, 0x8e769b76,
-	0x876d766d, 0xb8f6f807,
-	0x8676ff76, 0x00007fff,
-	0xb976f807, 0xbeee007e,
-	0xbeef007f, 0xbefe0180,
-	0xbf900004, 0xbf8e0002,
-	0xbf88fffe, 0xbef4007e,
+	0xb8eef807, 0x866fff6e,
+	0x001f8000, 0x8e6f8b6f,
+	0x8977ff77, 0xfc000000,
+	0x87776f77, 0x896eff6e,
+	0x001f8000, 0xb96ef807,
+	0xb8f0f812, 0xb8f1f813,
+	0x8ef08870, 0xc0071bb8,
+	0x00000000, 0xbf8cc07f,
+	0xc0071c38, 0x00000008,
+	0xbf8cc07f, 0x86ee6e6e,
+	0xbf840001, 0xbe801d6e,
+	0xb8f1f803, 0x8671ff71,
+	0x000001ff, 0xbf850002,
+	0x806c846c, 0x826d806d,
+	0x866dff6d, 0x0000ffff,
+	0x8f6e8b77, 0x866eff6e,
+	0x001f8000, 0xb96ef807,
+	0x86fe7e7e, 0x86ea6a6a,
+	0xb978f802, 0xbe801f6c,
+	0x866dff6d, 0x0000ffff,
+	0xbef00080, 0xb9700283,
+	0xb8f02407, 0x8e709c70,
+	0x876d706d, 0xb8f003c7,
+	0x8e709b70, 0x876d706d,
+	0xb8f0f807, 0x8670ff70,
+	0x00007fff, 0xb970f807,
+	0xbeee007e, 0xbeef007f,
+	0xbefe0180, 0xbf900004,
+	0xbf8e0002, 0xbf88fffe,
+	0xb8f02a05, 0x80708170,
+	0x8e708a70, 0xb8f11605,
+	0x80718171, 0x8e718671,
+	0x80707170, 0x80707e70,
+	0x8271807f, 0x8671ff71,
+	0x0000ffff, 0xc0471cb8,
+	0x00000040, 0xbf8cc07f,
+	0xc04b1d38, 0x00000048,
+	0xbf8cc07f, 0xc0431e78,
+	0x00000058, 0xbf8cc07f,
+	0xc0471eb8, 0x0000005c,
+	0xbf8cc07f, 0xbef4007e,
 	0x8675ff7f, 0x0000ffff,
 	0x8775ff75, 0x00040000,
 	0xbef60080, 0xbef700ff,
-	0x00807fac, 0x8676ff7f,
-	0x08000000, 0x8f768376,
-	0x87777677, 0x8676ff7f,
-	0x70000000, 0x8f768176,
-	0x87777677, 0xbefb007c,
+	0x00807fac, 0x8670ff7f,
+	0x08000000, 0x8f708370,
+	0x87777077, 0x8670ff7f,
+	0x70000000, 0x8f708170,
+	0x87777077, 0xbefb007c,
 	0xbefa0080, 0xb8fa2a05,
 	0x807a817a, 0x8e7a8a7a,
-	0xb8f61605, 0x80768176,
-	0x8e768676, 0x807a767a,
+	0xb8f01605, 0x80708170,
+	0x8e708670, 0x807a707a,
 	0xbef60084, 0xbef600ff,
 	0x01000000, 0xbefe007c,
 	0xbefc007a, 0xc0611efa,
@@ -1221,26 +1294,26 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0x0000007c, 0xbf8cc07f,
 	0x807a847a, 0xbefc007e,
 	0xbefe007c, 0xbefc007a,
-	0xc0611c3a, 0x0000007c,
+	0xc0611e3a, 0x0000007c,
 	0xbf8cc07f, 0x807a847a,
 	0xbefc007e, 0xb8f1f803,
 	0xbefe007c, 0xbefc007a,
 	0xc0611c7a, 0x0000007c,
 	0xbf8cc07f, 0x807a847a,
 	0xbefc007e, 0xbefe007c,
-	0xbefc007a, 0xc0611cba,
+	0xbefc007a, 0xc0611a3a,
 	0x0000007c, 0xbf8cc07f,
 	0x807a847a, 0xbefc007e,
 	0xbefe007c, 0xbefc007a,
-	0xc0611cfa, 0x0000007c,
+	0xc0611a7a, 0x0000007c,
 	0xbf8cc07f, 0x807a847a,
 	0xbefc007e, 0xb8fbf801,
 	0xbefe007c, 0xbefc007a,
 	0xc0611efa, 0x0000007c,
 	0xbf8cc07f, 0x807a847a,
-	0xbefc007e, 0x8676ff7f,
+	0xbefc007e, 0x8670ff7f,
 	0x04000000, 0xbeef0080,
-	0x876f6f76, 0xb8fa2a05,
+	0x876f6f70, 0xb8fa2a05,
 	0x807a817a, 0x8e7a8a7a,
 	0xb8f11605, 0x80718171,
 	0x8e718471, 0x8e768271,
@@ -1262,6 +1335,7 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0xbf0a717c, 0xbf85ffe7,
 	0xbef40172, 0xbefa0080,
 	0xbefe00c1, 0xbeff00c1,
+	0xbee80080, 0xbee90080,
 	0xbef600ff, 0x01000000,
 	0xe0724000, 0x7a1d0000,
 	0xe0724100, 0x7a1d0100,
@@ -1270,13 +1344,13 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0xbefe00c1, 0xbeff00c1,
 	0xb8f14306, 0x8671c171,
 	0xbf84002c, 0xbf8a0000,
-	0x8676ff6f, 0x04000000,
+	0x8670ff6f, 0x04000000,
 	0xbf840028, 0x8e718671,
 	0x8e718271, 0xbef60071,
 	0xb8fa2a05, 0x807a817a,
-	0x8e7a8a7a, 0xb8f61605,
-	0x80768176, 0x8e768676,
-	0x807a767a, 0x807aff7a,
+	0x8e7a8a7a, 0xb8f01605,
+	0x80708170, 0x8e708670,
+	0x807a707a, 0x807aff7a,
 	0x00000080, 0xbef600ff,
 	0x01000000, 0xbefc0080,
 	0xd28c0002, 0x000100c1,
@@ -1308,24 +1382,24 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0x7a1d0300, 0x807c847c,
 	0x807aff7a, 0x00000400,
 	0xbf0a717c, 0xbf85ffef,
-	0xbf9c0000, 0xbf8200c5,
+	0xbf9c0000, 0xbf8200d9,
 	0xbef4007e, 0x8675ff7f,
 	0x0000ffff, 0x8775ff75,
 	0x00040000, 0xbef60080,
 	0xbef700ff, 0x00807fac,
-	0x8672ff7f, 0x08000000,
-	0x8f728372, 0x87777277,
-	0x8672ff7f, 0x70000000,
-	0x8f728172, 0x87777277,
-	0x8672ff7f, 0x04000000,
+	0x866eff7f, 0x08000000,
+	0x8f6e836e, 0x87776e77,
+	0x866eff7f, 0x70000000,
+	0x8f6e816e, 0x87776e77,
+	0x866eff7f, 0x04000000,
 	0xbf84001e, 0xbefe00c1,
 	0xbeff00c1, 0xb8ef4306,
 	0x866fc16f, 0xbf840019,
 	0x8e6f866f, 0x8e6f826f,
 	0xbef6006f, 0xb8f82a05,
 	0x80788178, 0x8e788a78,
-	0xb8f21605, 0x80728172,
-	0x8e728672, 0x80787278,
+	0xb8ee1605, 0x806e816e,
+	0x8e6e866e, 0x80786e78,
 	0x8078ff78, 0x00000080,
 	0xbef600ff, 0x01000000,
 	0xbefc0080, 0xe0510000,
@@ -1338,7 +1412,7 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0xb8ef2a05, 0x806f816f,
 	0x8e6f826f, 0x8e76886f,
 	0xbef600ff, 0x01000000,
-	0xbef20078, 0x8078ff78,
+	0xbeee0078, 0x8078ff78,
 	0x00000400, 0xbefc0084,
 	0xbf11087c, 0x806fff6f,
 	0x00008000, 0xe0524000,
@@ -1351,14 +1425,14 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0x807c847c, 0x8078ff78,
 	0x00000400, 0xbf0a6f7c,
 	0xbf85ffee, 0xbf9c0000,
-	0xe0524000, 0x721d0000,
-	0xe0524100, 0x721d0100,
-	0xe0524200, 0x721d0200,
-	0xe0524300, 0x721d0300,
+	0xe0524000, 0x6e1d0000,
+	0xe0524100, 0x6e1d0100,
+	0xe0524200, 0x6e1d0200,
+	0xe0524300, 0x6e1d0300,
 	0xb8f82a05, 0x80788178,
-	0x8e788a78, 0xb8f21605,
-	0x80728172, 0x8e728672,
-	0x80787278, 0x80f8c078,
+	0x8e788a78, 0xb8ee1605,
+	0x806e816e, 0x8e6e866e,
+	0x80786e78, 0x80f8c078,
 	0xb8ef1605, 0x806f816f,
 	0x8e6f846f, 0x8e76826f,
 	0xbef600ff, 0x01000000,
@@ -1372,8 +1446,8 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0xbe8e2d0e, 0xbf06807c,
 	0xbf84fff0, 0xb8f82a05,
 	0x80788178, 0x8e788a78,
-	0xb8f21605, 0x80728172,
-	0x8e728672, 0x80787278,
+	0xb8ee1605, 0x806e816e,
+	0x8e6e866e, 0x80786e78,
 	0xbef60084, 0xbef600ff,
 	0x01000000, 0xc0211bfa,
 	0x00000078, 0x80788478,
@@ -1397,14 +1471,24 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0x000003ff, 0xb96f4803,
 	0x866f71ff, 0xfffff800,
 	0x8f6f8b6f, 0xb96fa2c3,
-	0xb973f801, 0x866fff6d,
+	0xb973f801, 0xb8ee2a05,
+	0x806e816e, 0x8e6e8a6e,
+	0xb8ef1605, 0x806f816f,
+	0x8e6f866f, 0x806e6f6e,
+	0x806e746e, 0x826f8075,
+	0x866fff6f, 0x0000ffff,
+	0xc0071cb7, 0x00000040,
+	0xc00b1d37, 0x00000048,
+	0xc0031e77, 0x00000058,
+	0xc0071eb7, 0x0000005c,
+	0xbf8cc07f, 0x866fff6d,
 	0xf0000000, 0x8f6f9c6f,
-	0x8e6f906f, 0xbef20080,
-	0x87726f72, 0x866fff6d,
+	0x8e6f906f, 0xbeee0080,
+	0x876e6f6e, 0x866fff6d,
 	0x08000000, 0x8f6f9b6f,
-	0x8e6f8f6f, 0x87726f72,
+	0x8e6f8f6f, 0x876e6f6e,
 	0x866fff70, 0x00800000,
-	0x8f6f976f, 0xb972f807,
+	0x8f6f976f, 0xb96ef807,
 	0x86fe7e7e, 0x86ea6a6a,
 	0xb970f802, 0xbf8a0000,
 	0x95806f6c, 0xbf810000,
