@@ -210,6 +210,15 @@ struct kfd_ioctl_dbg_wave_control_args {
 
 #define KFD_SIGNAL_EVENT_LIMIT		4096
 
+/* For kfd_event_data.hw_exception_data.reset_type. */
+#define KFD_HW_EXCEPTION_WHOLE_GPU_RESET	0
+#define KFD_HW_EXCEPTION_PER_ENGINE_RESET	1
+
+/* For kfd_event_data.hw_exception_data.reset_cause. */
+#define KFD_HW_EXCEPTION_GPU_HANG	0
+#define KFD_HW_EXCEPTION_ECC		1
+
+
 struct kfd_ioctl_create_event_args {
 	uint64_t event_page_offset;	/* from KFD */
 	uint32_t event_trigger_data;	/* from KFD - signal events only */
@@ -251,10 +260,19 @@ struct kfd_hsa_memory_exception_data {
 	uint32_t pad;
 };
 
+/* hw exception data */
+struct kfd_hsa_hw_exception_data {
+	uint32_t reset_type;
+	uint32_t reset_cause;
+	uint32_t memory_lost;
+	uint32_t gpu_id;
+};
+
 /* Event data */
 struct kfd_event_data {
 	union {
 		struct kfd_hsa_memory_exception_data memory_exception_data;
+		struct kfd_hsa_hw_exception_data hw_exception_data;
 	};				/* From KFD */
 	uint64_t kfd_event_data_ext;	/* pointer to an extension structure
 	 	 	 	 	   for future exception types */
