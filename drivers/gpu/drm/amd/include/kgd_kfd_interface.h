@@ -342,7 +342,7 @@ struct kfd2kgd_calls {
 	int (*sync_memory)(struct kgd_dev *kgd, struct kgd_mem *mem, bool intr);
 
 	int (*alloc_memory_of_gpu)(struct kgd_dev *kgd, uint64_t va,
-			uint64_t size, void *vm,
+			uint64_t size, void *vm, struct sg_table *sg,
 			struct kgd_mem **mem, uint64_t *offset,
 			uint32_t flags);
 	int (*free_memory_of_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);

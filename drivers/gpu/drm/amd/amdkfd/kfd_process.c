@@ -141,7 +141,8 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 	int err;
 
 	err = kdev->kfd2kgd->alloc_memory_of_gpu(kdev->kgd, gpu_va, size,
-						 pdd->vm, &mem, NULL, flags);
+						 pdd->vm, NULL, &mem, NULL,
+						 flags);
 	if (err)
 		goto err_alloc_mem;
 
