@@ -37,6 +37,7 @@
 #include <linux/mman.h>
 #include <asm/processor.h>
 #include <linux/ptrace.h>
+#include <linux/pagemap.h>
 
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
@@ -1777,6 +1778,12 @@ static struct mm_struct *kfd_relaxed_mm_access(struct task_struct *task,
 #endif
 #endif /* defined(BUILD_AS_DKMS) */
 
+/* Maximum number of entries for process pages array which lives on stack */
+#define MAX_PP_STACK_COUNT 16
+/* Maximum number of pages kmalloc'd to hold struct page's during copy */
+#define MAX_KMALLOC_PAGES (PAGE_SIZE * 2)
+#define MAX_PP_KMALLOC_COUNT (MAX_KMALLOC_PAGES/sizeof(struct page *))
+
 /* Update cma_iter.cur_bo with KFD BO that is assocaited with
  * cma_iter.array.va_addr
  */
@@ -1825,7 +1832,8 @@ static int kfd_cma_iter_advance(struct cma_iter *ci, unsigned long size)
 }
 
 static int kfd_cma_iter_init(struct kfd_memory_range *arr, unsigned long segs,
-			     struct kfd_process *p, struct cma_iter *ci)
+			     struct kfd_process *p, struct mm_struct *mm,
+			     struct task_struct *task, struct cma_iter *ci)
 {
 	int ret;
 	int nr;
@@ -1838,6 +1846,8 @@ static int kfd_cma_iter_init(struct kfd_memory_range *arr, unsigned long segs,
 	ci->nr_segs = segs;
 	ci->p = p;
 	ci->offset = 0;
+	ci->mm = mm;
+	ci->task = task;
 	for (nr = 0; nr < segs; nr++)
 		ci->total += arr[nr].size;
 
@@ -1856,6 +1866,156 @@ static bool kfd_cma_iter_end(struct cma_iter *ci)
 	if (!(ci->nr_segs) || !(ci->total))
 		return true;
 	return false;
+}
+
+/* Copies @size bytes from si->cur_bo to di->cur_bo BO. The function assumes
+ * both source and dest. BOs are userptr BOs. Both BOs can either belong to
+ * current process or one of the BOs can belong to a differnt
+ * process. @Returns 0 on success, -ve on failure
+ *
+ * @si: Source iter
+ * @di: Dest. iter
+ * @cma_write: Indicates if it is write to remote or read from remote
+ * @size: amount of bytes to be copied
+ * @copied: Return number of bytes actually copied.
+ */
+static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
+				bool cma_write, uint64_t size,
+				uint64_t *copied)
+{
+	int i, ret = 0;
+	unsigned int nents, nl;
+	unsigned int offset_in_page;
+	struct page *pp_stack[MAX_PP_STACK_COUNT];
+	struct page **process_pages = pp_stack;
+	unsigned long rva, lva = 0, flags = 0;
+	uint64_t copy_size, to_copy = size;
+	struct cma_iter *li, *ri;
+
+	if (cma_write) {
+		ri = di;
+		li = si;
+		flags |= FOLL_WRITE;
+	} else {
+		li = di;
+		ri = si;
+	}
+	/* rva: remote virtual address. Page aligned to start page.
+	 * rva + offset_in_page: Points to remote start address
+	 * lva: local virtual address. Points to the start address.
+	 * nents: computes number of remote pages to request
+	 */
+	offset_in_page = ri->bo_offset & (PAGE_SIZE - 1);
+	rva = (ri->cur_bo->cpuva + ri->bo_offset) & PAGE_MASK;
+	lva = li->cur_bo->cpuva + li->bo_offset;
+
+	nents = (size + offset_in_page + PAGE_SIZE - 1) / PAGE_SIZE;
+
+	copy_size = min_t(uint64_t, size, PAGE_SIZE - offset_in_page);
+	*copied = 0;
+
+	if (nents > MAX_PP_STACK_COUNT) {
+		/* For reliability kmalloc only 2 pages worth */
+		process_pages = kmalloc(min_t(size_t, MAX_KMALLOC_PAGES,
+					      sizeof(struct pages *)*nents),
+					GFP_KERNEL);
+
+		if (!process_pages)
+			return -ENOMEM;
+	}
+
+	while (nents && to_copy) {
+		nl = min_t(unsigned int, MAX_PP_KMALLOC_COUNT, nents);
+		down_read(&ri->mm->mmap_sem);
+		nl = kcl_get_user_pages(ri->task, ri->mm, rva, nl, flags, 0,
+					process_pages, NULL);
+		up_read(&ri->mm->mmap_sem);
+		if (nl <= 0) {
+			pr_err("CMA: Invalid virtual address 0x%lx\n", rva);
+			ret = -EFAULT;
+			break;
+		}
+
+		for (i = 0; i < nl; i++) {
+			unsigned int n;
+			void *kaddr = kmap_atomic(process_pages[i]);
+
+			if (cma_write) {
+				n = copy_from_user(kaddr+offset_in_page,
+						   (void *)lva, copy_size);
+				set_page_dirty(process_pages[i]);
+			} else {
+				n = copy_to_user((void *)lva,
+						 kaddr+offset_in_page,
+						 copy_size);
+			}
+			kunmap_atomic(kaddr);
+			if (n) {
+				ret = -EFAULT;
+				break;
+			}
+			to_copy -= copy_size;
+			if (!to_copy)
+				break;
+			lva += copy_size;
+			rva += (copy_size + offset_in_page);
+			WARN_ONCE(rva & (PAGE_SIZE - 1),
+				  "CMA: Error in remote VA computation");
+			offset_in_page = 0;
+			copy_size = min_t(uint64_t, to_copy, PAGE_SIZE);
+		}
+
+		for (i = 0; i < nl; i++)
+			put_page(process_pages[i]);
+
+		if (ret)
+			break;
+		nents -= nl;
+	}
+
+	if (process_pages != pp_stack)
+		kfree(process_pages);
+
+	*copied = (size - to_copy);
+	return ret;
+
+}
+
+/* Copies @size bytes from si->cur_bo to di->cur_bo starting at their
+ * respective offset.
+ * @si: Source iter
+ * @di: Dest. iter
+ * @cma_write: Indicates if it is write to remote or read from remote
+ * @size: amount of bytes to be copied
+ * @f: Return the last fence if any
+ * @copied: Return number of bytes actually copied.
+ */
+static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
+			int cma_write, uint64_t size,
+			struct dma_fence **f, uint64_t *copied)
+{
+	int err = 0;
+	struct kfd_bo *dst_bo = di->cur_bo, *src_bo = si->cur_bo;
+	uint64_t src_offset = si->bo_offset, dst_offset = di->bo_offset;
+	struct kgd_mem *src_mem = src_bo->mem, *dst_mem = dst_bo->mem;
+
+	*copied = 0;
+	if (f)
+		*f = NULL;
+	if (src_bo->cpuva && dst_bo->cpuva)
+		return kfd_copy_userptr_bos(si, di, cma_write, size, copied);
+
+	if (src_bo->dev->kgd != dst_bo->dev->kgd) {
+		pr_err("CMA %d fail. Not same dev\n", cma_write);
+		err = -EINVAL;
+	}
+
+	err = dst_bo->dev->kfd2kgd->copy_mem_to_mem(src_bo->dev->kgd, src_mem,
+						     src_offset, dst_mem,
+						     dst_offset, size, f,
+						     copied);
+
+	return err;
 }
 
 /* Copy single range from source iterator @si to destination iterator @di.
@@ -1892,11 +2052,9 @@ static int kfd_copy_single_range(struct cma_iter *si, struct cma_iter *di,
 			return -EINVAL;
 		}
 
-		err = dst_bo->dev->kfd2kgd->copy_mem_to_mem(src_bo->dev->kgd,
-			src_bo->mem, si->bo_offset, dst_bo->mem, di->bo_offset,
-			copy_size, &fence, &n);
+		err = kfd_copy_bos(si, di, cma_write, copy_size, &fence, &n);
 		if (err) {
-			pr_err("GPU CMA %d failed\n", err);
+			pr_err("CMA %d failed\n", err);
 			break;
 		}
 
@@ -2005,11 +2163,11 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 		cma_op = "WRITE";
 		pr_debug("CMA WRITE: local -> remote\n");
 		err = kfd_cma_iter_init(dst_array, args->dst_mem_array_size,
-					remote_p, &di);
+					remote_p, remote_mm, remote_task, &di);
 		if (err)
 			goto kfd_process_fail;
 		err = kfd_cma_iter_init(src_array, args->src_mem_array_size,
-					local_p, &si);
+					local_p, current->mm, current, &si);
 		if (err)
 			goto kfd_process_fail;
 	} else {
@@ -2017,11 +2175,11 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 		pr_debug("CMA READ: remote -> local\n");
 
 		err = kfd_cma_iter_init(dst_array, args->dst_mem_array_size,
-					local_p, &di);
+					local_p, current->mm, current, &di);
 		if (err)
 			goto kfd_process_fail;
 		err = kfd_cma_iter_init(src_array, args->src_mem_array_size,
-					remote_p, &si);
+					remote_p, remote_mm, remote_task, &si);
 		if (err)
 			goto kfd_process_fail;
 	}

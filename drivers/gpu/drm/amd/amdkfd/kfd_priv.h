@@ -328,6 +328,8 @@ struct cma_iter {
 	/* offset into the entry pointed by cma_iter.array */
 	unsigned long offset;
 	struct kfd_process *p;
+	struct mm_struct *mm;
+	struct task_struct *task;
 	/* current kfd_bo associated with cma_iter.array.va_addr */
 	struct kfd_bo *cur_bo;
 	/* offset w.r.t cur_bo */
