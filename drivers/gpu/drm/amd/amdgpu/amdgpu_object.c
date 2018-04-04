@@ -414,6 +414,8 @@ retry:
 	drm_gem_private_object_init(adev->ddev, &bo->gem_base, size);
 	INIT_LIST_HEAD(&bo->shadow_list);
 	INIT_LIST_HEAD(&bo->va);
+	bo->preferred_domains = preferred_domains;
+	bo->allowed_domains = allowed_domains;
 
 	bo->flags = flags;
 
