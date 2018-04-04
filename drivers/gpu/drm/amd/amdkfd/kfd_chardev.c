@@ -1769,22 +1769,164 @@ static struct mm_struct *kfd_relaxed_mm_access(struct task_struct *task,
 #endif
 #endif /* defined(BUILD_AS_DKMS) */
 
+/* Update cma_iter.cur_bo with KFD BO that is assocaited with
+ * cma_iter.array.va_addr
+ */
+static int kfd_cma_iter_update_bo(struct cma_iter *ci)
+{
+	struct kfd_memory_range *arr = ci->array;
+	uint64_t va_end = arr->va_addr + arr->size - 1;
+
+	mutex_lock(&ci->p->mutex);
+	ci->cur_bo = kfd_process_find_bo_from_interval(ci->p, arr->va_addr,
+						       va_end);
+	mutex_unlock(&ci->p->mutex);
+
+	if (!ci->cur_bo || va_end > ci->cur_bo->it.last) {
+		pr_err("CMA failed. Range out of bounds\n");
+		return -EFAULT;
+	}
+	return 0;
+}
+
+/* Advance iter by @size bytes. */
+static int kfd_cma_iter_advance(struct cma_iter *ci, unsigned long size)
+{
+	int ret = 0;
+
+	ci->offset += size;
+	if (WARN_ON(size > ci->total || ci->offset > ci->array->size))
+		return -EFAULT;
+	ci->total -= size;
+	/* If current range is copied, move to next range if available. */
+	if (ci->offset == ci->array->size) {
+
+		/* End of all ranges */
+		if (!(--ci->nr_segs))
+			return 0;
+
+		ci->array++;
+		ci->offset = 0;
+		ret = kfd_cma_iter_update_bo(ci);
+		if (ret)
+			return ret;
+	}
+	ci->bo_offset = (ci->array->va_addr + ci->offset) -
+			   ci->cur_bo->it.start;
+	return ret;
+}
+
+static int kfd_cma_iter_init(struct kfd_memory_range *arr, unsigned long segs,
+			     struct kfd_process *p, struct cma_iter *ci)
+{
+	int ret;
+	int nr;
+
+	if (!arr || !segs)
+		return -EINVAL;
+
+	memset(ci, 0, sizeof(*ci));
+	ci->array = arr;
+	ci->nr_segs = segs;
+	ci->p = p;
+	ci->offset = 0;
+	for (nr = 0; nr < segs; nr++)
+		ci->total += arr[nr].size;
+
+	/* Valid but size is 0. So copied will also be 0 */
+	if (!ci->total)
+		return 0;
+
+	ret = kfd_cma_iter_update_bo(ci);
+	if (!ret)
+		ci->bo_offset = arr->va_addr - ci->cur_bo->it.start;
+	return ret;
+}
+
+static bool kfd_cma_iter_end(struct cma_iter *ci)
+{
+	if (!(ci->nr_segs) || !(ci->total))
+		return true;
+	return false;
+}
+
+/* Copy single range from source iterator @si to destination iterator @di.
+ * @si will move to next range and @di will move by bytes copied.
+ * @return : 0 for success or -ve for failure
+ * @f: The last fence if any
+ * @copied: out: number of bytes copied
+ */
+static int kfd_copy_single_range(struct cma_iter *si, struct cma_iter *di,
+				 bool cma_write, struct dma_fence **f,
+				 uint64_t *copied)
+{
+	int err = 0;
+	uint64_t copy_size, n;
+	uint64_t size = si->array->size;
+	struct kfd_bo *src_bo = si->cur_bo;
+	struct dma_fence *lfence = NULL;
+
+	if (!src_bo || !di || !copied)
+		return -EINVAL;
+	*copied = 0;
+	if (f)
+		*f = NULL;
+
+	while (size && !kfd_cma_iter_end(di)) {
+		struct dma_fence *fence = NULL;
+		struct kfd_bo *dst_bo = di->cur_bo;
+
+		copy_size = min(size, (di->array->size - di->offset));
+
+		/* Check both BOs belong to same device */
+		if (src_bo->dev->kgd != dst_bo->dev->kgd) {
+			pr_err("CMA fail. Not same dev\n");
+			return -EINVAL;
+		}
+
+		err = dst_bo->dev->kfd2kgd->copy_mem_to_mem(src_bo->dev->kgd,
+			src_bo->mem, si->bo_offset, dst_bo->mem, di->bo_offset,
+			copy_size, &fence, &n);
+		if (err) {
+			pr_err("GPU CMA %d failed\n", err);
+			break;
+		}
+
+		if (fence) {
+			dma_fence_put(lfence);
+			lfence = fence;
+		}
+		size -= n;
+		*copied += n;
+		err = kfd_cma_iter_advance(si, n);
+		if (err)
+			break;
+		err = kfd_cma_iter_advance(di, n);
+		if (err)
+			break;
+	}
+
+	if (f)
+		*f = dma_fence_get(lfence);
+	dma_fence_put(lfence);
+
+	return err;
+}
+
 static int kfd_ioctl_cross_memory_copy(struct file *filep,
 				       struct kfd_process *local_p, void *data)
 {
 	struct kfd_ioctl_cross_memory_copy_args *args = data;
 	struct kfd_memory_range *src_array, *dst_array;
-	struct kfd_bo *src_bo, *dst_bo;
-	struct kfd_process *remote_p, *src_p, *dst_p;
+	struct kfd_process *remote_p;
 	struct task_struct *remote_task;
 	struct mm_struct *remote_mm;
 	struct pid *remote_pid;
-	struct dma_fence *fence = NULL, *lfence = NULL;
-	uint64_t dst_va_addr;
-	uint64_t copied, total_copied = 0;
-	uint64_t src_offset, dst_offset, dst_va_addr_end;
+	struct dma_fence *lfence = NULL;
+	uint64_t copied = 0, total_copied = 0;
+	struct cma_iter di, si;
 	const char *cma_op;
-	int i, j = 0, err = 0;
+	int err = 0;
 
 	/* Check parameters */
 	if (args->src_mem_range_array == 0 || args->dst_mem_range_array == 0 ||
@@ -1850,160 +1992,61 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 		err = -EINVAL;
 		goto kfd_process_fail;
 	}
-
+	/* Initialise cma_iter si & @di with source & destination range. */
 	if (KFD_IS_CROSS_MEMORY_WRITE(args->flags)) {
-		src_p = local_p;
-		dst_p = remote_p;
 		cma_op = "WRITE";
 		pr_debug("CMA WRITE: local -> remote\n");
+		err = kfd_cma_iter_init(dst_array, args->dst_mem_array_size,
+					remote_p, &di);
+		if (err)
+			goto kfd_process_fail;
+		err = kfd_cma_iter_init(src_array, args->src_mem_array_size,
+					local_p, &si);
+		if (err)
+			goto kfd_process_fail;
 	} else {
-		src_p = remote_p;
-		dst_p = local_p;
 		cma_op = "READ";
 		pr_debug("CMA READ: remote -> local\n");
+
+		err = kfd_cma_iter_init(dst_array, args->dst_mem_array_size,
+					local_p, &di);
+		if (err)
+			goto kfd_process_fail;
+		err = kfd_cma_iter_init(src_array, args->src_mem_array_size,
+					remote_p, &si);
+		if (err)
+			goto kfd_process_fail;
 	}
 
-
-	/* For each source kfd_range:
-	 * - Find the BO. Each range has to be within the same BO.
-	 * - Copy this range to single or multiple destination BOs.
-	 * - dst_va_addr - will point to next va address into which data will
-	 *                 be copied.
-	 * - dst_bo & src_bo - the current destination and source BOs
-	 * - src_offset & dst_offset - offset into the respective BOs from
-	 *                             data will be sourced or copied
+	/* Copy one si range at a time into di. After each call to
+	 * kfd_copy_single_range() si will move to next range. di will be
+	 * incremented by bytes copied
 	 */
-	dst_va_addr = dst_array[0].va_addr;
-	dst_va_addr_end = dst_va_addr + dst_array[0].size - 1;
-	mutex_lock(&dst_p->mutex);
-	dst_bo = kfd_process_find_bo_from_interval(dst_p,
-			dst_va_addr,
-			dst_va_addr_end);
-	mutex_unlock(&dst_p->mutex);
-	if (!dst_bo || dst_va_addr_end > dst_bo->it.last) {
-		pr_err("CMA %s failed. Invalid dst range\n", cma_op);
-		err = -EFAULT;
-		goto kfd_process_fail;
-	}
-	dst_offset = dst_va_addr - dst_bo->it.start;
+	while (!kfd_cma_iter_end(&si) && !kfd_cma_iter_end(&di)) {
+		struct dma_fence *fence = NULL;
 
-	for (i = 0; i < args->src_mem_array_size; i++) {
-		uint64_t src_va_addr_end = src_array[i].va_addr +
-					   src_array[i].size - 1;
-		uint64_t src_size_to_copy = src_array[i].size;
+		err = kfd_copy_single_range(&si, &di,
+					KFD_IS_CROSS_MEMORY_WRITE(args->flags),
+					&fence, &copied);
+		total_copied += copied;
 
-		mutex_lock(&src_p->mutex);
-		src_bo = kfd_process_find_bo_from_interval(src_p,
-				src_array[i].va_addr,
-				src_va_addr_end);
-		mutex_unlock(&src_p->mutex);
-		if (!src_bo || src_va_addr_end > src_bo->it.last) {
-			pr_err("CMA %s failed. Invalid src range\n", cma_op);
-			err = -EFAULT;
-			break;
-		}
-
-		src_offset = src_array[i].va_addr - src_bo->it.start;
-
-		/* Copy src_bo to one or multiple dst_bo(s) based on size and
-		 * and current copy location.
-		 */
-		while (j < args->dst_mem_array_size) {
-			uint64_t copy_size;
-			int64_t space_left;
-
-			/* Find the current copy_size. This will be smaller of
-			 * the following
-			 * - space left in the current dest memory range
-			 * - data left to copy from source range
-			 */
-			space_left = (dst_array[j].va_addr + dst_array[j].size)
-					- dst_va_addr;
-			copy_size = (src_size_to_copy < space_left) ?
-					src_size_to_copy : space_left;
-
-			/* Check both BOs belong to same device */
-			if (src_bo->dev->kgd != dst_bo->dev->kgd) {
-				pr_err("CMA %s fail. Not same dev\n", cma_op);
-				err = -EINVAL;
-				break;
-			}
-
-			/* Store prev fence. Release it when a later fence is
-			 * created
-			 */
-			lfence = fence;
-			fence = NULL;
-
-			err = dst_bo->dev->kfd2kgd->copy_mem_to_mem(
-				src_bo->dev->kgd,
-				src_bo->mem, src_offset,
-				dst_bo->mem, dst_offset,
-				copy_size,
-				&fence, &copied);
-
-			if (err) {
-				pr_err("GPU CMA %s failed\n", cma_op);
-				break;
-			}
-
-			/* Later fence available. Release old fence */
-			if (fence && lfence) {
-				dma_fence_put(lfence);
-				lfence = NULL;
-			}
-
-			total_copied += copied;
-			src_size_to_copy -= copied;
-			space_left -= copied;
-			dst_va_addr += copied;
-			dst_offset += copied;
-			src_offset += copied;
-			if (dst_va_addr > dst_bo->it.last + 1) {
-				pr_err("CMA %s fail. Mem overflow\n", cma_op);
-				err = -EFAULT;
-				break;
-			}
-
-			/* If the cur dest range is full move to next one */
-			if (space_left <= 0) {
-				if (++j >= args->dst_mem_array_size)
-					break;
-
-				dst_va_addr = dst_array[j].va_addr;
-				dst_va_addr_end = dst_va_addr +
-						  dst_array[j].size - 1;
-				dst_bo = kfd_process_find_bo_from_interval(
-						dst_p,
-						dst_va_addr,
-						dst_va_addr_end);
-				if (!dst_bo ||
-				    dst_va_addr_end > dst_bo->it.last) {
-					pr_err("CMA %s failed. Invalid dst range\n",
-					       cma_op);
-					err = -EFAULT;
-					break;
-				}
-				dst_offset = dst_va_addr - dst_bo->it.start;
-			}
-
-			/* If the cur src range is done, move to next one */
-			if (src_size_to_copy <= 0)
-				break;
-		}
 		if (err)
 			break;
+
+		/* Release old fence if a later fence is created. If no
+		 * new fence is created, then keep the preivous fence
+		 */
+		if (fence) {
+			dma_fence_put(lfence);
+			lfence = fence;
+		}
 	}
 
 	/* Wait for the last fence irrespective of error condition */
-	if (fence) {
-		if (dma_fence_wait_timeout(fence, false, msecs_to_jiffies(1000))
-			< 0)
+	if (lfence) {
+		if (dma_fence_wait_timeout(lfence, false,
+					   msecs_to_jiffies(1000)) < 0)
 			pr_err("CMA %s failed. BO timed out\n", cma_op);
-		dma_fence_put(fence);
-	} else if (lfence) {
-		pr_debug("GPU copy fail. But wait for prev DMA to finish\n");
-		dma_fence_wait_timeout(lfence, true, msecs_to_jiffies(1000));
 		dma_fence_put(lfence);
 	}
 

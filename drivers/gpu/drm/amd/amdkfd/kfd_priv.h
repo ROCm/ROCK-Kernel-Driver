@@ -315,6 +315,23 @@ struct kfd_bo {
 	struct kfd_ipc_obj *kfd_ipc_obj;
 };
 
+/* Similar to iov_iter */
+struct cma_iter {
+	/* points to current entry of range array */
+	struct kfd_memory_range *array;
+	/* total number of entries in the initial array */
+	unsigned long nr_segs;
+	/* total amount of data pointed by kfd array*/
+	unsigned long total;
+	/* offset into the entry pointed by cma_iter.array */
+	unsigned long offset;
+	struct kfd_process *p;
+	/* current kfd_bo associated with cma_iter.array.va_addr */
+	struct kfd_bo *cur_bo;
+	/* offset w.r.t cur_bo */
+	unsigned long bo_offset;
+};
+
 /* KGD2KFD callbacks */
 void kgd2kfd_exit(void);
 struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
