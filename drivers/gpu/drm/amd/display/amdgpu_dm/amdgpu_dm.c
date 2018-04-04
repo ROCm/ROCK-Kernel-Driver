@@ -2244,7 +2244,6 @@ static int fill_plane_attributes(struct amdgpu_device *adev,
 #else
 	struct drm_crtc *crtc = plane_state->crtc;
 #endif
-	struct dc_transfer_func *input_tf;
 	int ret = 0;
 
 	if (!fill_rects_from_plane_state(plane_state, dc_plane_state))
@@ -2258,12 +2257,6 @@ static int fill_plane_attributes(struct amdgpu_device *adev,
 	if (ret)
 		return ret;
 
-	input_tf = dc_create_transfer_func();
-
-	if (input_tf == NULL)
-		return -ENOMEM;
-
-	dc_plane_state->in_transfer_func = input_tf;
 
 	/* In case of gamma set, update gamma value */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
