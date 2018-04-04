@@ -749,9 +749,6 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 				    min((size_t)size, sizeof(cap))) ? -EFAULT : 0;
 	}
 	case AMDGPU_INFO_SENSOR: {
-		struct pp_gpu_power query = {0};
-		int query_size = sizeof(query);
-
 		if (!adev->pm.dpm_enabled)
 			return -ENOENT;
 
@@ -794,10 +791,10 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 			/* get average GPU power */
 			if (amdgpu_dpm_read_sensor(adev,
 						   AMDGPU_PP_SENSOR_GPU_POWER,
-						   (void *)&query, &query_size)) {
+						   (void *)&ui32, &ui32_size)) {
 				return -EINVAL;
 			}
-			ui32 = query.average_gpu_power >> 8;
+			ui32 >>= 8;
 			break;
 		case AMDGPU_INFO_SENSOR_VDDNB:
 			/* get VDDNB in millivolts */
