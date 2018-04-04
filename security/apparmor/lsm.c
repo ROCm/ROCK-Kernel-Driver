@@ -745,11 +745,11 @@ static int apparmor_socket_create(int family, int type, int protocol, int kern)
 	if (kern)
 		return 0;
 
-	label = __begin_current_label_crit_section();
+	label = begin_current_label_crit_section();
 	if (!unconfined(label))
-		error = aa_net_perm(OP_CREATE, labels_profile(label),
+		error = aa_label_net_perm(label, OP_CREATE,
 				family, type, protocol, NULL);
-	__end_current_label_crit_section(label);
+	end_current_label_crit_section(label);
 	return error;
 }
 

@@ -32,7 +32,7 @@ struct aa_net {
 
 extern struct aa_sfs_entry aa_sfs_entry_network[];
 
-int aa_net_perm(const char *op, struct aa_profile *profile, u16 family,
+int aa_label_net_perm(struct aa_label *label, const char *op, u16 family,
 		       int type, int protocol, struct sock *sk);
 int aa_revalidate_sk(const char *op, struct sock *sk);
 

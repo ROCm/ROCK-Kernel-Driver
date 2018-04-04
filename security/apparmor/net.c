@@ -114,7 +114,7 @@ static int audit_net(struct aa_profile *profile, const char *op,
  *
  * Returns: %0 else error if permission denied
  */
-int aa_net_perm(const char *op, struct aa_profile *profile, u16 family,
+static int aa_net_perm(const char *op, struct aa_profile *profile, u16 family,
 		int type, int protocol, struct sock *sk)
 {
 	u16 family_mask;
@@ -137,6 +137,18 @@ int aa_net_perm(const char *op, struct aa_profile *profile, u16 family,
 	return audit_net(profile, op, family, type, protocol, sk, error);
 }
 
+int aa_label_net_perm(struct aa_label *label, const char *op, u16 family,
+		int type, int protocol, struct sock *sk)
+{
+	struct aa_profile *profile;
+
+	if (!unconfined(label))
+		return 0;
+
+	return fn_for_each_confined(label, profile,
+			aa_net_perm(op, profile, family, type, protocol, sk));
+}
+
 /**
  * aa_revalidate_sk - Revalidate access to a sock
  * @op: operation being checked
@@ -155,11 +167,10 @@ int aa_revalidate_sk(const char *op, struct sock *sk)
 	if (in_interrupt())
 		return 0;
 
-	label = __begin_current_label_crit_section();
-	if (!unconfined(label))
-		error = aa_net_perm(op, labels_profile(label), sk->sk_family,
-				sk->sk_type, sk->sk_protocol, sk);
-	__end_current_label_crit_section(label);
+	label = begin_current_label_crit_section();
+	error = aa_label_net_perm(label, op, sk->sk_family, sk->sk_type,
+			sk->sk_protocol, sk);
+	end_current_label_crit_section(label);
 
 	return error;
 }
