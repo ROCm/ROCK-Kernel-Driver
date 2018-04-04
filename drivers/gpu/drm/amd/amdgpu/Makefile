@@ -66,7 +66,8 @@ amdgpu-y += \
 
 # add DF block
 amdgpu-y += \
-	df_v1_7.o
+	df_v1_7.o \
+	df_v3_6.o
 
 # add GMC block
 amdgpu-y += \
