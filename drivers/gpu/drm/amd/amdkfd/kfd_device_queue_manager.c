@@ -60,6 +60,8 @@ static int create_sdma_queue_nocpsch(struct device_queue_manager *dqm,
 static void deallocate_sdma_queue(struct device_queue_manager *dqm,
 				unsigned int sdma_queue_id);
 
+static void kfd_process_hw_exception(struct work_struct *work);
+
 static inline
 enum KFD_MQD_TYPE get_mqd_type_from_queue_type(enum kfd_queue_type type)
 {
@@ -1021,6 +1023,8 @@ static int initialize_cpsch(struct device_queue_manager *dqm)
 	dqm->active_runlist = false;
 	dqm->sdma_bitmap = (1 << get_num_sdma_queues(dqm)) - 1;
 
+	INIT_WORK(&dqm->hw_exception_work, kfd_process_hw_exception);
+
 	return 0;
 }
 
@@ -1053,6 +1057,8 @@ static int start_cpsch(struct device_queue_manager *dqm)
 	init_interrupts(dqm);
 
 	mutex_lock(&dqm->lock);
+	/* clear hang status when driver try to start the hw scheduler */
+	dqm->is_hws_hang = false;
 	execute_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0);
 	mutex_unlock(&dqm->lock);
 
@@ -1268,6 +1274,8 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 {
 	int retval = 0;
 
+	if (dqm->is_hws_hang)
+		return -EIO;
 	if (!dqm->active_runlist)
 		return retval;
 
@@ -1306,9 +1314,13 @@ static int execute_queues_cpsch(struct device_queue_manager *dqm,
 {
 	int retval;
 
+	if (dqm->is_hws_hang)
+		return -EIO;
 	retval = unmap_queues_cpsch(dqm, filter, filter_param);
 	if (retval) {
 		pr_err("The cp might be in an unrecoverable state due to an unsuccessful queues preemption\n");
+		dqm->is_hws_hang = true;
+		schedule_work(&dqm->hw_exception_work);
 		return retval;
 	}
 
@@ -1591,7 +1603,7 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 	}
 
 	retval = execute_queues_cpsch(dqm, filter, 0);
-	if (retval || qpd->reset_wavefronts) {
+	if ((!dqm->is_hws_hang) && (retval || qpd->reset_wavefronts)) {
 		pr_warn("Resetting wave fronts (cpsch) on dev %p\n", dqm->dev);
 		dbgdev_wave_reset_wavefronts(dqm->dev, qpd->pqm->process);
 		qpd->reset_wavefronts = false;
@@ -1612,6 +1624,7 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 
 out:
 	mutex_unlock(&dqm->lock);
+
 	return retval;
 }
 
@@ -1743,6 +1756,13 @@ int kfd_process_vm_fault(struct device_queue_manager *dqm,
 	kfd_unref_process(p);
 
 	return ret;
+}
+
+static void kfd_process_hw_exception(struct work_struct *work)
+{
+	struct device_queue_manager *dqm = container_of(work,
+			struct device_queue_manager, hw_exception_work);
+	dqm->dev->kfd2kgd->gpu_recover(dqm->dev->kgd);
 }
 
 #if defined(CONFIG_DEBUG_FS)
