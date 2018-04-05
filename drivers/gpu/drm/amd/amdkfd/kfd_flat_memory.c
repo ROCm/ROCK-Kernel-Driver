@@ -332,9 +332,22 @@ void kfd_init_apertures_vi(struct kfd_process_device *pdd, uint8_t id)
 	pdd->lds_base = MAKE_LDS_APP_BASE_VI();
 	pdd->lds_limit = MAKE_LDS_APP_LIMIT(pdd->lds_base);
 
-	pdd->gpuvm_base = MAKE_GPUVM_APP_BASE_VI(id + 1);
-	pdd->gpuvm_limit = MAKE_GPUVM_APP_LIMIT(
-		pdd->gpuvm_base, pdd->dev->shared_resources.gpuvm_size);
+	if (!pdd->dev->device_info->needs_iommu_device) {
+		/* dGPUs: SVM aperture starting at 0
+		 * with small reserved space for kernel.
+		 * Set them to CANONICAL addresses.
+		 */
+		pdd->gpuvm_base = SVM_USER_BASE;
+		pdd->gpuvm_limit =
+			pdd->dev->shared_resources.gpuvm_size - 1;
+	} else {
+		/* set them to non CANONICAL addresses, and no SVM is
+		 * allocated.
+		 */
+		pdd->gpuvm_base = MAKE_GPUVM_APP_BASE_VI(id + 1);
+		pdd->gpuvm_limit = MAKE_GPUVM_APP_LIMIT(pdd->gpuvm_base,
+				pdd->dev->shared_resources.gpuvm_size);
+	}
 
 	pdd->scratch_base = MAKE_SCRATCH_APP_BASE_VI();
 	pdd->scratch_limit = MAKE_SCRATCH_APP_LIMIT(pdd->scratch_base);
@@ -344,6 +357,16 @@ void kfd_init_apertures_v9(struct kfd_process_device *pdd, uint8_t id)
 {
 	pdd->lds_base = MAKE_LDS_APP_BASE_V9();
 	pdd->lds_limit = MAKE_LDS_APP_LIMIT(pdd->lds_base);
+
+	/* Raven needs SVM to support graphic handle, etc. Leave the small
+	 * reserved space before SVM on Raven as well, even though we don't
+	 * have to.
+	 * Set gpuvm_base and gpuvm_limit to CANONICAL addresses so that they
+	 * are used in Thunk to reserve SVM.
+	 */
+	pdd->gpuvm_base = SVM_USER_BASE;
+	pdd->gpuvm_limit =
+		pdd->dev->shared_resources.gpuvm_size - 1;
 
 	pdd->scratch_base = MAKE_SCRATCH_APP_BASE_V9();
 	pdd->scratch_limit = MAKE_SCRATCH_APP_LIMIT(pdd->scratch_base);
@@ -397,12 +420,9 @@ int kfd_init_apertures(struct kfd_process *process)
 			}
 
 			if (!dev->device_info->needs_iommu_device) {
-				/* dGPUs: SVM aperture starting at 0
-				 * with small reserved space for kernel
+				/* dGPUs: the reserved space for kernel
+				 * before SVM
 				 */
-				pdd->gpuvm_base = SVM_USER_BASE;
-				pdd->gpuvm_limit =
-					dev->shared_resources.gpuvm_size - 1;
 				pdd->qpd.cwsr_base = SVM_CWSR_BASE;
 				pdd->qpd.ib_base = SVM_IB_BASE;
 			}
