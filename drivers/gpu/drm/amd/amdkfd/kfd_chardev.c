@@ -2208,6 +2208,7 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 	struct kfd_bo *dst_bo = di->cur_bo, *src_bo = si->cur_bo;
 	uint64_t src_offset = si->bo_offset, dst_offset = di->bo_offset;
 	struct kgd_mem *src_mem = src_bo->mem, *dst_mem = dst_bo->mem;
+	struct kfd_dev *dev = dst_bo->dev;
 
 	*copied = 0;
 	if (f)
@@ -2219,11 +2220,14 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 	 * by using the underlying userptr BO pages. Then use this shadow
 	 * BO for copy. src_offset & dst_offset are adjusted because the new BO
 	 * is only created for the window (offset, size) requested.
+	 * The shadow BO is created on the other device. This means if the
+	 * other BO is a device memory, the copy will be using that device.
 	 * The BOs are stored in cma_list for deferred cleanup. This minimizes
 	 * fence waiting just to the last fence.
 	 */
 	if (src_bo->cpuva) {
-		err = kfd_create_cma_system_bo(dst_bo->dev, src_bo, &size,
+		dev = dst_bo->dev;
+		err = kfd_create_cma_system_bo(dev, src_bo, &size,
 					       si->bo_offset, cma_write,
 					       si->p, si->mm, si->task,
 					       &si->cma_bo);
@@ -2231,7 +2235,8 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 		src_offset = si->bo_offset & (PAGE_SIZE - 1);
 		list_add_tail(&si->cma_bo->list, &si->cma_list);
 	} else if (dst_bo->cpuva) {
-		err = kfd_create_cma_system_bo(src_bo->dev, dst_bo, &size,
+		dev = src_bo->dev;
+		err = kfd_create_cma_system_bo(dev, dst_bo, &size,
 					       di->bo_offset, cma_write,
 					       di->p, di->mm, di->task,
 					       &di->cma_bo);
@@ -2240,15 +2245,15 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 		list_add_tail(&di->cma_bo->list, &di->cma_list);
 	} else if (src_bo->dev->kgd != dst_bo->dev->kgd) {
 		pr_err("CMA %d fail. Not same dev\n", cma_write);
-		err = -EINVAL;
+		return -EINVAL;
 	}
 
 	if (err) {
 		pr_err("Failed to create system BO %d", err);
-		err = -EINVAL;
+		return -EINVAL;
 	}
 
-	err = dst_bo->dev->kfd2kgd->copy_mem_to_mem(src_bo->dev->kgd, src_mem,
+	err = dst_bo->dev->kfd2kgd->copy_mem_to_mem(dev->kgd, src_mem,
 						     src_offset, dst_mem,
 						     dst_offset, size, f,
 						     copied);
@@ -2282,12 +2287,6 @@ static int kfd_copy_single_range(struct cma_iter *si, struct cma_iter *di,
 		struct kfd_bo *dst_bo = di->cur_bo;
 
 		copy_size = min(size, (di->array->size - di->offset));
-
-		/* Check both BOs belong to same device */
-		if (src_bo->dev->kgd != dst_bo->dev->kgd) {
-			pr_err("CMA fail. Not same dev\n");
-			return -EINVAL;
-		}
 
 		err = kfd_copy_bos(si, di, cma_write, copy_size, &fence, &n);
 		if (err) {
