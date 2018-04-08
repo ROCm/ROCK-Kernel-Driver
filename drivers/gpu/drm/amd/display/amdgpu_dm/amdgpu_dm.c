@@ -4881,14 +4881,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		struct dc_stream_status *status = NULL;
 
 		if (acrtc){
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
-			!defined(OS_NAME_RHEL_7_5)
-			new_crtc_state = kcl_drm_atomic_get_old_crtc_state_after_commit(state, &acrtc->base);
+			new_crtc_state = kcl_drm_atomic_get_new_crtc_state_after_commit(state, &acrtc->base);
 			old_crtc_state = kcl_drm_atomic_get_old_crtc_state_after_commit(state, &acrtc->base);
-#else
-			new_crtc_state = drm_atomic_get_new_crtc_state(state, &acrtc->base);
-			old_crtc_state = drm_atomic_get_old_crtc_state(state, &acrtc->base);
-#endif
 		}
 
 		/* Skip any modesets/resets */
