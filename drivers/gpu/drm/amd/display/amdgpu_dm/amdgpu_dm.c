@@ -1766,7 +1766,7 @@ retry:
 			continue;
 		}
 
-		new_crtc_state = drm_atomic_get_new_crtc_state(state, &acrtc->base);
+		new_crtc_state = kcl_drm_atomic_get_new_crtc_state_before_commit(state, &acrtc->base);
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 
 		dm_new_crtc_state->freesync_enabled = enable;
@@ -1781,7 +1781,12 @@ fail:
 		goto retry;
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
+	!defined(OS_NAME_RHEL_7_4_5)
+	drm_atomic_state_free(state);
+#else
 	drm_atomic_state_put(state);
+#endif
 
 out:
 	drm_modeset_drop_locks(&ctx);
