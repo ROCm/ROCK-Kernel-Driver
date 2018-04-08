@@ -37,10 +37,15 @@
 
 unsigned long long dm_get_timestamp(struct dc_context *ctx)
 {
+#if defined(OS_NAME_RHEL_6)
+	struct timespec time;
+	getrawmonotonic(&time);
+	return (unsigned long long)timespec_to_ns(&time);
+#else
 	struct timespec64 time;
-
 	getrawmonotonic64(&time);
 	return timespec64_to_ns(&time);
+#endif
 }
 
 unsigned long long dm_get_elapse_time_in_ns(struct dc_context *ctx,
