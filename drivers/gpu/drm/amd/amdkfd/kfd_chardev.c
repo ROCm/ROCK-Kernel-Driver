@@ -2295,7 +2295,6 @@ static int kfd_copy_single_range(struct cma_iter *si, struct cma_iter *di,
 
 	while (size && !kfd_cma_iter_end(di)) {
 		struct dma_fence *fence = NULL;
-		struct kfd_bo *dst_bo = di->cur_bo;
 
 		copy_size = min(size, (di->array->size - di->offset));
 
