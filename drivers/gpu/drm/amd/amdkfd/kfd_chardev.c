@@ -2249,8 +2249,14 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 		dst_offset = di->bo_offset & (PAGE_SIZE - 1);
 		list_add_tail(&di->cma_bo->list, &di->cma_list);
 	} else if (src_bo->dev->kgd != dst_bo->dev->kgd) {
-		pr_err("CMA %d fail. Not same dev\n", cma_write);
-		return -EINVAL;
+		/* This indicates that either or/both BOs are in local mem. */
+		if (src_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM &&
+		    dst_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
+			pr_err("CMA fail. Local mem & not in same dev\n");
+			return -EINVAL;
+		} else if (src_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
+			dev = src_bo->dev;
+		/* else already set to dst_bo->dev */
 	}
 
 	if (err) {
