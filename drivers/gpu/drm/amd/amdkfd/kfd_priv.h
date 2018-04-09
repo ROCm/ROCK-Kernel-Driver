@@ -315,6 +315,7 @@ struct kfd_bo {
 	struct kfd_ipc_obj *kfd_ipc_obj;
 	/* page-aligned VA address */
 	uint64_t cpuva;
+	unsigned int mem_type;
 };
 
 struct cma_system_bo {
@@ -835,6 +836,7 @@ int kfd_reserved_mem_mmap(struct kfd_process *process,
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 					void *mem, uint64_t start,
 					uint64_t length, uint64_t cpuva,
+					unsigned int mem_type,
 					struct kfd_ipc_obj *ipc_obj);
 void *kfd_process_device_translate_handle(struct kfd_process_device *p,
 					int handle);
