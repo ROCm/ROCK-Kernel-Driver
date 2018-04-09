@@ -139,6 +139,7 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 	struct kgd_mem *mem = NULL;
 	int handle;
 	int err;
+	unsigned int mem_type;
 
 	err = kdev->kfd2kgd->alloc_memory_of_gpu(kdev->kgd, gpu_va, size,
 						 pdd->vm, NULL, &mem, NULL,
@@ -156,13 +157,18 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 		goto sync_memory_failed;
 	}
 
+	mem_type = flags & (KFD_IOC_ALLOC_MEM_FLAGS_VRAM |
+			    KFD_IOC_ALLOC_MEM_FLAGS_GTT |
+			    KFD_IOC_ALLOC_MEM_FLAGS_USERPTR |
+			    KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL);
+
 	/* Create an obj handle so kfd_process_device_remove_obj_handle
 	 * will take care of the bo removal when the process finishes.
 	 * We do not need to take p->mutex, because the process is just
 	 * created and the ioctls have not had the chance to run.
 	 */
 	handle = kfd_process_device_create_obj_handle(
-			pdd, mem, gpu_va, size, 0, NULL);
+			pdd, mem, gpu_va, size, 0, mem_type, NULL);
 
 	if (handle < 0) {
 		err = handle;
@@ -836,6 +842,7 @@ bool kfd_has_process_device_data(struct kfd_process *p)
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 					void *mem, uint64_t start,
 					uint64_t length, uint64_t cpuva,
+					unsigned int mem_type,
 					struct kfd_ipc_obj *ipc_obj)
 {
 	int handle;
@@ -857,6 +864,7 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 	buf_obj->dev = pdd->dev;
 	buf_obj->kfd_ipc_obj = ipc_obj;
 	buf_obj->cpuva = cpuva;
+	buf_obj->mem_type = mem_type;
 
 	INIT_LIST_HEAD(&buf_obj->cb_data_head);
 

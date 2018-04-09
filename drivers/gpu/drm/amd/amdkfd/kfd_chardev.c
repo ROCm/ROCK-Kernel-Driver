@@ -1244,6 +1244,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	uint32_t flags = args->flags;
 	struct vm_area_struct *vma;
 	uint64_t cpuva = 0;
+	unsigned int mem_type = 0;
 
 	if (args->size == 0)
 		return -EINVAL;
@@ -1303,8 +1304,12 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	if (err)
 		goto err_unlock;
 
+	mem_type = flags & (KFD_IOC_ALLOC_MEM_FLAGS_VRAM |
+			    KFD_IOC_ALLOC_MEM_FLAGS_GTT |
+			    KFD_IOC_ALLOC_MEM_FLAGS_USERPTR |
+			    KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL);
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
-			args->va_addr, args->size, cpuva, NULL);
+			args->va_addr, args->size, cpuva, mem_type, NULL);
 	if (idr_handle < 0) {
 		err = -EFAULT;
 		goto err_free;
