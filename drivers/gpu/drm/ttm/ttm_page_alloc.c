@@ -894,9 +894,6 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 	if (pool == NULL) {
 		gfp_t gfp_flags = GFP_USER;
 		unsigned i;
-#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-		unsigned j;
-#endif
 
 		/* set zero flag for page allocation if required */
 		if (flags & TTM_PAGE_FLAG_ZERO_ALLOC)
@@ -911,24 +908,6 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 			gfp_flags |= GFP_HIGHUSER;
 
 		i = 0;
-#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-		while (npages >= HPAGE_PMD_NR) {
-			gfp_t huge_flags = gfp_flags;
-
-			huge_flags |= GFP_TRANSHUGE;
-			huge_flags &= ~__GFP_MOVABLE;
-			huge_flags &= ~__GFP_COMP;
-			p = alloc_pages(huge_flags, HPAGE_PMD_ORDER);
-			if (!p)
-				break;
-
-			for (j = 0; j < HPAGE_PMD_NR; ++j)
-				pages[i++] = p++;
-
-			npages -= HPAGE_PMD_NR;
-		}
-#endif
-
 		first = i;
 		while (npages) {
 			p = alloc_page(gfp_flags);
