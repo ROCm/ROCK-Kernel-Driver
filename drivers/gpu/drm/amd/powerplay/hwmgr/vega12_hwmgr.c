@@ -546,6 +546,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -565,6 +566,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -585,6 +587,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -605,6 +608,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 		return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -625,6 +629,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -645,6 +650,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 		return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -666,6 +672,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -686,6 +693,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -706,6 +714,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -726,6 +735,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
