@@ -3319,10 +3319,10 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 		amdgpu_vf_error_put(adev, AMDGIM_ERROR_VF_GPU_RESET_FAIL, 0, r);
 	} else {
 		dev_info(adev->dev, "GPU reset(%d) successed!\n",atomic_read(&adev->gpu_reset_counter));
-		/*unlock kfd after a successfully recovery*/
-		amdgpu_amdkfd_post_reset(adev);
 	}
 
+	/*unlock kfd */
+	amdgpu_amdkfd_post_reset(adev);
 	amdgpu_vf_error_trans_all(adev);
 	adev->in_gpu_reset = 0;
 	mutex_unlock(&adev->lock_reset);
