@@ -1913,7 +1913,8 @@ static void kfd_free_cma_bos(struct cma_iter *ci)
 		struct kfd_dev *dev = cma_bo->dev;
 
 		/* sg table is deleted by free_memory_of_gpu */
-		kfd_put_sg_table(cma_bo->sg);
+		if (cma_bo->sg)
+			kfd_put_sg_table(cma_bo->sg);
 		dev->kfd2kgd->free_memory_of_gpu(dev->kgd, cma_bo->mem);
 		list_del(&cma_bo->list);
 		kfree(cma_bo);
@@ -1949,16 +1950,21 @@ static int kfd_fence_put_wait_if_diff_context(struct dma_fence *cf,
 	return ret;
 }
 
-/* Create a system BO by pinning underlying system pages of the given userptr
- * BO @ubo
- * @ubo: Userptr BO
- * @offset: Offset into ubo
+#define MAX_SYSTEM_BO_SIZE (512*PAGE_SIZE)
+
+/* Create an equivalent system BO for the given @bo. If @bo is a userptr then
+ * create a new system BO by pinning underlying system pages of the given
+ * userptr BO. If @bo is in Local Memory then create an empty system BO and
+ * then copy @bo into this new BO.
+ * @bo: Userptr BO or Local Memory BO
+ * @offset: Offset into bo
  * @size: in/out: The size of the new BO could be less than requested if all
- *        the pages couldn't be pinned. This would be reflected in @size
- * @mm/@task: mm/task to which @ubo belongs to
+ *        the pages couldn't be pinned or size > MAX_SYSTEM_BO_SIZE. This would
+ *        be reflected in @size
+ * @mm/@task: mm/task to which @bo belongs to
  * @cma_bo: out: new system BO
  */
-static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *ubo,
+static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 				    uint64_t *size, uint64_t offset,
 				    int cma_write, struct kfd_process *p,
 				    struct mm_struct *mm,
@@ -1968,7 +1974,8 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *ubo,
 	int ret;
 	struct kfd_process_device *pdd = NULL;
 	struct cma_system_bo *cbo;
-	uint64_t sg_size;
+	uint64_t bo_size = 0;
+	struct dma_fence *f;
 
 	uint32_t flags = ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_NONPAGED |
 			 ALLOC_MEM_FLAGS_NO_SUBSTITUTE;
@@ -1979,40 +1986,75 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *ubo,
 		return -ENOMEM;
 
 	INIT_LIST_HEAD(&cbo->list);
-	ret = kfd_create_sg_table_from_userptr_bo(ubo, offset, cma_write, mm,
-						  task, size, &sg_size,
-						  &cbo->sg);
-	if (ret) {
-		pr_err("Failed to create system BO. sg table error %d\n", ret);
-		return ret;
+	if (bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
+		bo_size = min(*size, MAX_SYSTEM_BO_SIZE);
+	else if (bo->cpuva) {
+		ret = kfd_create_sg_table_from_userptr_bo(bo, offset,
+							  cma_write, mm, task,
+							  size, &bo_size,
+							  &cbo->sg);
+		if (ret) {
+			pr_err("CMA: BO create with sg failed %d\n", ret);
+			goto sg_fail;
+		}
+	} else {
+		WARN_ON(1);
+		ret = -EINVAL;
+		goto sg_fail;
 	}
-
 	mutex_lock(&p->mutex);
 	pdd = kfd_get_process_device_data(kdev, p);
 	if (!pdd) {
+		mutex_unlock(&p->mutex);
 		pr_err("Process device data doesn't exist\n");
 		ret = -EINVAL;
 		goto pdd_fail;
 	}
 
-	ret = kdev->kfd2kgd->alloc_memory_of_gpu(kdev->kgd, 0ULL, sg_size,
+	ret = kdev->kfd2kgd->alloc_memory_of_gpu(kdev->kgd, 0ULL, bo_size,
 						 pdd->vm, cbo->sg,
 						 &cbo->mem, NULL, flags);
+	mutex_unlock(&p->mutex);
 	if (ret) {
 		pr_err("Failed to create shadow system BO %d\n", ret);
 		goto pdd_fail;
 	}
-	mutex_unlock(&p->mutex);
+
+	if (bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
+		ret = kdev->kfd2kgd->copy_mem_to_mem(kdev->kgd, bo->mem,
+						     offset, cbo->mem, 0,
+						     bo_size, &f, size);
+		if (ret) {
+			pr_err("CMA: Intermediate copy failed %d\n", ret);
+			goto copy_fail;
+		}
+
+		/* Wait for the copy to finish as subsequent copy will be done
+		 * by different device
+		 */
+		ret = kfd_cma_fence_wait(f);
+		dma_fence_put(f);
+		if (ret) {
+			pr_err("CMA: Intermediate copy timed out %d\n", ret);
+			goto copy_fail;
+		}
+	}
+
 	cbo->dev = kdev;
 	*cma_bo = cbo;
 
 	return ret;
 
+copy_fail:
+	kdev->kfd2kgd->free_memory_of_gpu(kdev->kgd, bo->mem);
 pdd_fail:
-	mutex_unlock(&p->mutex);
-	kfd_put_sg_table(cbo->sg);
-	sg_free_table(cbo->sg);
-	kfree(cbo->sg);
+	if (cbo->sg) {
+		kfd_put_sg_table(cbo->sg);
+		sg_free_table(cbo->sg);
+		kfree(cbo->sg);
+	}
+sg_fail:
+	kfree(cbo);
 	return ret;
 }
 
@@ -2243,6 +2285,7 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 	uint64_t src_offset = si->bo_offset, dst_offset = di->bo_offset;
 	struct kgd_mem *src_mem = src_bo->mem, *dst_mem = dst_bo->mem;
 	struct kfd_dev *dev = dst_bo->dev;
+	struct cma_system_bo *tmp_bo = NULL;
 
 	*copied = 0;
 	if (f)
@@ -2278,11 +2321,22 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 		dst_offset = di->bo_offset & (PAGE_SIZE - 1);
 		list_add_tail(&di->cma_bo->list, &di->cma_list);
 	} else if (src_bo->dev->kgd != dst_bo->dev->kgd) {
-		/* This indicates that either or/both BOs are in local mem. */
+		/* This indicates that atleast on of the BO is in local mem.
+		 * If both are in local mem of different devices then create an
+		 * intermediate System BO and do a double copy
+		 * [VRAM]--gpu1-->[System BO]--gpu2-->[VRAM].
+		 * If only one BO is in VRAM then use that GPU to do the copy
+		 */
 		if (src_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM &&
 		    dst_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
-			pr_err("CMA fail. Local mem & not in same dev\n");
-			return -EINVAL;
+			dev = dst_bo->dev;
+			err = kfd_create_cma_system_bo(src_bo->dev, src_bo,
+						       &size, si->bo_offset,
+						       cma_write, si->p,
+						       si->mm, si->task,
+						       &tmp_bo);
+			src_mem = tmp_bo->mem;
+			src_offset = 0;
 		} else if (src_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
 			dev = src_bo->dev;
 		/* else already set to dst_bo->dev */
@@ -2293,10 +2347,22 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 		return -EINVAL;
 	}
 
-	err = dst_bo->dev->kfd2kgd->copy_mem_to_mem(dev->kgd, src_mem,
-						     src_offset, dst_mem,
-						     dst_offset, size, f,
-						     copied);
+	err = dev->kfd2kgd->copy_mem_to_mem(dev->kgd, src_mem, src_offset,
+					    dst_mem, dst_offset, size, f,
+					    copied);
+	/* The tmp_bo allocates additional memory. So it is better to wait and
+	 * delete. Also since multiple GPUs are involved the copies are
+	 * currently not pipelined.
+	 */
+	if (tmp_bo) {
+		if (!err) {
+			kfd_cma_fence_wait(*f);
+			dma_fence_put(*f);
+			*f = NULL;
+		}
+		dev->kfd2kgd->free_memory_of_gpu(dev->kgd, tmp_bo->mem);
+		kfree(tmp_bo);
+	}
 	return err;
 }
 
