@@ -1935,6 +1935,20 @@ static int kfd_cma_fence_wait(struct dma_fence *f)
 	return ret;
 }
 
+/* Put previous (old) fence @pf but it waits for @pf to signal if the context
+ * of the current fence @cf is different.
+ */
+static int kfd_fence_put_wait_if_diff_context(struct dma_fence *cf,
+					      struct dma_fence *pf)
+{
+	int ret = 0;
+
+	if (pf && cf && cf->context != pf->context)
+		ret = kfd_cma_fence_wait(pf);
+	dma_fence_put(pf);
+	return ret;
+}
+
 /* Create a system BO by pinning underlying system pages of the given userptr
  * BO @ubo
  * @ubo: Userptr BO
@@ -2320,9 +2334,13 @@ static int kfd_copy_single_range(struct cma_iter *si, struct cma_iter *di,
 		}
 
 		if (fence) {
-			dma_fence_put(lfence);
+			err = kfd_fence_put_wait_if_diff_context(fence,
+								 lfence);
 			lfence = fence;
+			if (err)
+				break;
 		}
+
 		size -= n;
 		*copied += n;
 		err = kfd_cma_iter_advance(si, n);
@@ -2464,8 +2482,11 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 		 * new fence is created, then keep the preivous fence
 		 */
 		if (fence) {
-			dma_fence_put(lfence);
+			err = kfd_fence_put_wait_if_diff_context(fence,
+								 lfence);
 			lfence = fence;
+			if (err)
+				break;
 		}
 	}
 
