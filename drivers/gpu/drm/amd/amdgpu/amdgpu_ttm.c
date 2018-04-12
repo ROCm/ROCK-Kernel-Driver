@@ -869,7 +869,7 @@ static int amdgpu_ttm_tt_pin_userptr(struct ttm_tt *ttm)
 	if (nents != ttm->sg->nents)
 		goto release_sg;
 
-	drm_prime_sg_to_page_addr_arrays(ttm->sg, ttm->pages,
+	kcl_drm_prime_sg_to_page_addr_arrays(ttm->sg, ttm->pages,
 					 gtt->ttm.dma_address, ttm->num_pages);
 
 	return 0;
@@ -1083,7 +1083,7 @@ static int amdgpu_ttm_tt_populate(struct ttm_tt *ttm,
 	}
 
 	if (slave && ttm->sg) {
-		drm_prime_sg_to_page_addr_arrays(ttm->sg, ttm->pages,
+		kcl_drm_prime_sg_to_page_addr_arrays(ttm->sg, ttm->pages,
 						 gtt->ttm.dma_address,
 						 ttm->num_pages);
 		ttm->state = tt_unbound;

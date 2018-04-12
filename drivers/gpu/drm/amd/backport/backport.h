@@ -27,5 +27,6 @@
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 7, 0)
 #include <kcl/kcl_interval_tree_generic.h>
 #endif
+#include <kcl/kcl_prime.h>
 
 #endif /* AMDGPU_BACKPORT_H */
