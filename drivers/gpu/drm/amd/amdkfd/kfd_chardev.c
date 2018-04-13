@@ -1920,6 +1920,21 @@ static void kfd_free_cma_bos(struct cma_iter *ci)
 	}
 }
 
+/* 1 second timeout */
+#define CMA_WAIT_TIMEOUT msecs_to_jiffies(1000)
+
+static int kfd_cma_fence_wait(struct dma_fence *f)
+{
+	int ret;
+
+	ret = dma_fence_wait_timeout(f, false, CMA_WAIT_TIMEOUT);
+	if (likely(ret > 0))
+		return 0;
+	if (!ret)
+		ret = -ETIME;
+	return ret;
+}
+
 /* Create a system BO by pinning underlying system pages of the given userptr
  * BO @ubo
  * @ubo: Userptr BO
@@ -2456,10 +2471,10 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 
 	/* Wait for the last fence irrespective of error condition */
 	if (lfence) {
-		if (dma_fence_wait_timeout(lfence, false,
-					   msecs_to_jiffies(1000)) < 0)
-			pr_err("CMA %s failed. BO timed out\n", cma_op);
+		err = kfd_cma_fence_wait(lfence);
 		dma_fence_put(lfence);
+		if (err)
+			pr_err("CMA %s failed. BO timed out\n", cma_op);
 	}
 
 	kfd_free_cma_bos(&si);
