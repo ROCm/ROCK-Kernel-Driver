@@ -1037,7 +1037,13 @@ void kfd_signal_reset_event(struct kfd_dev *dev)
 	hw_exception_data.memory_lost = 1;
 
 	idx  = srcu_read_lock(&kfd_processes_srcu);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
+#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+#endif
 		mutex_lock(&p->event_mutex);
 		id = KFD_FIRST_NONSIGNAL_EVENT_ID;
 		idr_for_each_entry_continue(&p->event_idr, ev, id)
