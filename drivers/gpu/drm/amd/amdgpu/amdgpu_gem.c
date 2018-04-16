@@ -57,8 +57,10 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 {
 	struct amdgpu_bo *bo;
 	unsigned long max_size;
+	struct amdgpu_bo_param bp;
 	int r;
 
+	memset(&bp, 0, sizeof(bp));
 	*obj = NULL;
 	/* At least align on page size */
 	if (alignment < PAGE_SIZE) {
@@ -82,9 +84,14 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 		}
 	}
 
+	bp.size = size;
+	bp.byte_align = alignment;
+	bp.type = type;
+	bp.resv = resv;
 retry:
-	r = amdgpu_bo_create(adev, size, alignment, initial_domain,
-			     flags, type, resv, &bo);
+	bp.flags = flags;
+	bp.domain = initial_domain;
+	r = amdgpu_bo_create(adev, &bp, &bo);
 	if (r) {
 		if (r != -ERESTARTSYS) {
 			if (flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED) {

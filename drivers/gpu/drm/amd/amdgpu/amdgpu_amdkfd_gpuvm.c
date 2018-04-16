@@ -1192,6 +1192,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	uint64_t user_addr = 0;
 	enum ttm_bo_type bo_type = ttm_bo_type_device;
 	struct amdgpu_bo *bo;
+	struct amdgpu_bo_param bp;
 	int byte_align;
 	u32 domain, alloc_domain;
 	u64 alloc_flags;
@@ -1284,11 +1285,14 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	pr_debug("\tcreate BO VA 0x%llx size 0x%llx domain %s\n",
 			va, size, domain_string(alloc_domain));
 
-	/* Allocate buffer object. Userptr objects need to start out
-	 * in the CPU domain, get moved to GTT when pinned.
-	 */
-	ret = amdgpu_bo_create(adev, size, byte_align, alloc_domain,
-			       alloc_flags, bo_type, NULL, &bo);
+	memset(&bp, 0, sizeof(bp));
+	bp.size = size;
+	bp.byte_align = byte_align;
+	bp.domain = alloc_domain;
+	bp.flags = alloc_flags;
+	bp.type = bo_type;
+	bp.resv = NULL;
+	ret = amdgpu_bo_create(adev, &bp, &bo);
 	if (ret) {
 		pr_debug("Failed to create BO on domain %s. ret %d\n",
 				domain_string(alloc_domain), ret);
