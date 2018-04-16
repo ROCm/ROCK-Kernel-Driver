@@ -6,7 +6,7 @@
 static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				unsigned long start, unsigned long nr_pages,
 				int write, int force, struct page **pages,
-				struct vm_area_struct **vmas)
+				struct vm_area_struct **vmas, int *locked)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0) || \
 	defined(OS_NAME_RHEL_7_4_5) || \
@@ -20,7 +20,7 @@ static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *
 	defined(OS_NAME_SLE_12_3) || \
 	defined(OS_NAME_SUSE_42_3)
 		return get_user_pages_remote(tsk, mm, start, nr_pages,
-				write, pages, vmas, NULL);
+				write, pages, vmas, locked);
 #else
 		return get_user_pages_remote(tsk, mm, start, nr_pages,
 				write, pages, vmas);

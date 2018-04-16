@@ -1863,7 +1863,7 @@ static int kfd_create_sg_table_from_userptr_bo(struct kfd_bo *bo,
 		flags = FOLL_WRITE;
 	locked = 1;
 	down_read(&mm->mmap_sem);
-	n = get_user_pages_remote(task, mm, pa, nents, flags, process_pages,
+	n = kcl_get_user_pages(task, mm, pa, nents, flags, 0, process_pages,
 				  NULL, &locked);
 	if (locked)
 		up_read(&mm->mmap_sem);
@@ -2129,8 +2129,8 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 		nl = min_t(unsigned int, MAX_PP_KMALLOC_COUNT, nents);
 		locked = 1;
 		down_read(&ri->mm->mmap_sem);
-		nl = get_user_pages_remote(ri->task, ri->mm, rva, nl,
-					   flags, process_pages, NULL,
+		nl = kcl_get_user_pages(ri->task, ri->mm, rva, nl,
+					   flags, 0, process_pages, NULL,
 					   &locked);
 		if (locked)
 			up_read(&ri->mm->mmap_sem);
@@ -2142,7 +2142,11 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 
 		for (i = 0; i < nl; i++) {
 			unsigned int n;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)
 			void *kaddr = kmap_atomic(process_pages[i]);
+#else
+			void *kaddr = kmap_atomic(process_pages[i], KM_USER0);
+#endif
 
 			if (cma_write) {
 				n = copy_from_user(kaddr+offset_in_page,
@@ -2153,7 +2157,11 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 						 kaddr+offset_in_page,
 						 copy_size);
 			}
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)
 			kunmap_atomic(kaddr);
+#else
+			kunmap_atomic(kaddr, KM_USER0);
+#endif
 			if (n) {
 				ret = -EFAULT;
 				break;
