@@ -308,6 +308,9 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 	if (!info->return_size || !info->return_pointer)
 		return -EINVAL;
 
+	/* Ensure IB tests are run on ring */
+	flush_delayed_work(&adev->late_init_work);
+
 	switch (info->query) {
 	case AMDGPU_INFO_VIRTUAL_RANGE: {
 		struct drm_amdgpu_virtual_range range_info;
