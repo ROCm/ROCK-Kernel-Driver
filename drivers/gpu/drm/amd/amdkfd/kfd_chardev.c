@@ -1987,7 +1987,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 
 	INIT_LIST_HEAD(&cbo->list);
 	if (bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
-		bo_size = min(*size, MAX_SYSTEM_BO_SIZE);
+		bo_size = min_t(uint64_t, *size, MAX_SYSTEM_BO_SIZE);
 	else if (bo->cpuva) {
 		ret = kfd_create_sg_table_from_userptr_bo(bo, offset,
 							  cma_write, mm, task,
