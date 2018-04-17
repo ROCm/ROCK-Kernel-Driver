@@ -274,10 +274,10 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 		if (aconnector->dc_sink)
 			amdgpu_dm_update_freesync_caps(
 					connector, edid);
-
-		drm_mode_connector_update_edid_property(
-						&aconnector->base, edid);
 	}
+
+	drm_mode_connector_update_edid_property(
+			&aconnector->base, aconnector->edid);
 
 	ret = dm_connector_update_modes(connector, aconnector->edid);
 
