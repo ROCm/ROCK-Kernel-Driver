@@ -279,9 +279,9 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 	}
 
 	drm_mode_connector_update_edid_property(
-			&aconnector->base, aconnector->edid);
+					&aconnector->base, aconnector->edid);
 
-	ret = dm_connector_update_modes(connector, aconnector->edid);
+	ret = drm_add_edid_modes(connector, aconnector->edid);
 
 	return ret;
 }
