@@ -97,6 +97,7 @@ var ACK_SQC_STORE		    =	1		    //workaround for suspected SQC store bug causing
 /**************************************************************************/
 var SQ_WAVE_STATUS_INST_ATC_SHIFT  = 23
 var SQ_WAVE_STATUS_INST_ATC_MASK   = 0x00800000
+var SQ_WAVE_STATUS_SPI_PRIO_SHIFT  = 1
 var SQ_WAVE_STATUS_SPI_PRIO_MASK   = 0x00000006
 var SQ_WAVE_STATUS_HALT_MASK       = 0x2000
 
@@ -335,6 +336,10 @@ end
     else
 	s_sendmsg   sendmsg(MSG_SAVEWAVE)  //send SPI a message and wait for SPI's write to EXEC
     end
+
+    // Set SPI_PRIO=2 to avoid starving instruction fetch in the waves we're waiting for.
+    s_or_b32 s_save_tmp, s_save_status, (2 << SQ_WAVE_STATUS_SPI_PRIO_SHIFT)
+    s_setreg_b32 hwreg(HW_REG_STATUS), s_save_tmp
 
   L_SLEEP:
     s_sleep 0x2		       // sleep 1 (64clk) is not enough for 8 waves per SIMD, which will cause SQ hang, since the 7,8th wave could not get arbit to exec inst, while other waves are stuck into the sleep-loop and waiting for wrexec!=0
@@ -1156,7 +1161,7 @@ end
 #endif
 
 static const uint32_t cwsr_trap_gfx9_hex[] = {
-	0xbf820001, 0xbf820130,
+	0xbf820001, 0xbf820132,
 	0xb8f0f802, 0x89708670,
 	0xb8f1f803, 0x8674ff71,
 	0x00000400, 0xbf850023,
@@ -1187,7 +1192,8 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0x8676ff76, 0x00007fff,
 	0xb976f807, 0xbeee007e,
 	0xbeef007f, 0xbefe0180,
-	0xbf900004, 0xbf8e0002,
+	0xbf900004, 0x87768470,
+	0xb976f802, 0xbf8e0002,
 	0xbf88fffe, 0xbef4007e,
 	0x8675ff7f, 0x0000ffff,
 	0x8775ff75, 0x00040000,
