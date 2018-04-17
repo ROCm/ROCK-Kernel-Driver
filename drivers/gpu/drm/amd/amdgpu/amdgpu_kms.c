@@ -31,6 +31,7 @@
 #include "amdgpu_sched.h"
 #include "amdgpu_uvd.h"
 #include "amdgpu_vce.h"
+#include "atom.h"
 
 #include <linux/vga_switcheroo.h>
 #include <linux/slab.h>
@@ -1220,6 +1221,7 @@ static int amdgpu_debugfs_firmware_info(struct seq_file *m, void *data)
 	struct amdgpu_device *adev = dev->dev_private;
 	struct drm_amdgpu_info_firmware fw_info;
 	struct drm_amdgpu_query_fw query_fw;
+	struct atom_context *ctx = adev->mode_info.atom_context;
 	int ret, i;
 
 	/* VCE */
@@ -1341,6 +1343,9 @@ static int amdgpu_debugfs_firmware_info(struct seq_file *m, void *data)
 		return ret;
 	seq_printf(m, "VCN feature version: %u, firmware version: 0x%08x\n",
 		   fw_info.feature, fw_info.ver);
+
+
+	seq_printf(m, "VBIOS version: %s\n", ctx->vbios_version);
 
 	return 0;
 }
