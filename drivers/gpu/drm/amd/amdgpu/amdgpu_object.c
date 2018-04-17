@@ -384,7 +384,6 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	};
 	struct amdgpu_bo *bo;
 	unsigned long page_align, size = bp->size;
-	u32 preferred_domains;
 	size_t acc_size;
 	int r;
 
@@ -405,16 +404,8 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	drm_gem_private_object_init(adev->ddev, &bo->gem_base, size);
 	INIT_LIST_HEAD(&bo->shadow_list);
 	INIT_LIST_HEAD(&bo->va);
-	preferred_domains = bp->preferred_domain ? bp->preferred_domain :
+	bo->preferred_domains = bp->preferred_domain ? bp->preferred_domain :
 		bp->domain;
-	bo->preferred_domains = preferred_domains & (AMDGPU_GEM_DOMAIN_VRAM |
-					 AMDGPU_GEM_DOMAIN_GTT |
-					 AMDGPU_GEM_DOMAIN_CPU |
-					 AMDGPU_GEM_DOMAIN_GDS |
-					 AMDGPU_GEM_DOMAIN_GWS |
-					 AMDGPU_GEM_DOMAIN_OA |
-					 AMDGPU_GEM_DOMAIN_DGMA |
-					 AMDGPU_GEM_DOMAIN_DGMA_IMPORT);
 	bo->allowed_domains = bo->preferred_domains;
 	if (bp->type != ttm_bo_type_kernel &&
 	    bo->allowed_domains == AMDGPU_GEM_DOMAIN_VRAM)
