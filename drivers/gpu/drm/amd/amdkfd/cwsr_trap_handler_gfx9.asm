@@ -77,7 +77,7 @@ var G8SR_RESTORE_BUF_RSRC_WORD1_STRIDE_DWx4  = G8SR_SAVE_BUF_RSRC_WORD1_STRIDE_D
 /*************************************************************************/
 /*		    control on how to run the shader			 */
 /*************************************************************************/
-//any hack that needs to be made to run this code in EMU (either becasue various EMU code are not ready or no compute save & restore in EMU run)
+//any hack that needs to be made to run this code in EMU (either because various EMU code are not ready or no compute save & restore in EMU run)
 var EMU_RUN_HACK		    =	0
 var EMU_RUN_HACK_RESTORE_NORMAL	    =	0
 var EMU_RUN_HACK_SAVE_NORMAL_EXIT   =	0
@@ -89,9 +89,9 @@ var WG_BASE_ADDR_HI		    =	0x0
 var WAVE_SPACE			    =	0x5000		    //memory size that each wave occupies in workgroup state mem
 var CTX_SAVE_CONTROL		    =	0x0
 var CTX_RESTORE_CONTROL		    =	CTX_SAVE_CONTROL
-var SIM_RUN_HACK		    =	0		    //any hack that needs to be made to run this code in SIM (either becasue various RTL code are not ready or no compute save & restore in RTL run)
+var SIM_RUN_HACK		    =	0		    //any hack that needs to be made to run this code in SIM (either because various RTL code are not ready or no compute save & restore in RTL run)
 var SGPR_SAVE_USE_SQC		    =	1		    //use SQC D$ to do the write
-var USE_MTBUF_INSTEAD_OF_MUBUF	    =	0		    //becasue TC EMU curently asserts on 0 of // overload DFMT field to carry 4 more bits of stride for MUBUF opcodes
+var USE_MTBUF_INSTEAD_OF_MUBUF	    =	0		    //because TC EMU currently asserts on 0 of // overload DFMT field to carry 4 more bits of stride for MUBUF opcodes
 var SWIZZLE_EN			    =	0		    //whether we use swizzled buffer addressing
 var ACK_SQC_STORE		    =	1		    //workaround for suspected SQC store bug causing incorrect stores under concurrency
 
@@ -1122,7 +1122,7 @@ end
     s_and_b64	 vcc, vcc, vcc	// Restore STATUS.VCCZ, not writable by s_setreg_b32
     s_setreg_b32    hwreg(HW_REG_STATUS),   s_restore_status	 // SCC is included, which is changed by previous salu
 
-    s_barrier							//barrier to ensure the readiness of LDS before access attemps from any other wave in the same TG //FIXME not performance-optimal at this time
+    s_barrier							//barrier to ensure the readiness of LDS before access attempts from any other wave in the same TG //FIXME not performance-optimal at this time
 
 if G8SR_DEBUG_TIMESTAMP
     s_memrealtime s_g8sr_ts_restore_d
