@@ -1150,11 +1150,9 @@ static int gfx_v9_0_gpu_early_init(struct amdgpu_device *adev)
 		gb_addr_config &= ~0xf3e777ff;
 		gb_addr_config |= 0x22014042;
 		/* check vbios table if gpu info is not available */
-		if (!adev->gfx.config.max_shader_engines) {
-			err = amdgpu_atomfirmware_get_gfx_info(adev);
-			if (err)
-				return err;
-		}
+		err = amdgpu_atomfirmware_get_gfx_info(adev);
+		if (err)
+			return err;
 		break;
 	case CHIP_RAVEN:
 		adev->gfx.config.max_hw_contexts = 8;

@@ -60,7 +60,6 @@
 
 MODULE_FIRMWARE("amdgpu/vega10_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/vega12_gpu_info.bin");
-MODULE_FIRMWARE("amdgpu/vega20_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/raven_gpu_info.bin");
 
 #define AMDGPU_RESUME_MS		2000
@@ -1441,6 +1440,7 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 	case CHIP_KABINI:
 	case CHIP_MULLINS:
 #endif
+    case CHIP_VEGA20:
 	default:
 		return 0;
 	case CHIP_VEGA10:
@@ -1448,9 +1448,6 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 		break;
 	case CHIP_VEGA12:
 		chip_name = "vega12";
-		break;
-	case CHIP_VEGA20:
-		chip_name = "vega20";
 		break;
 	case CHIP_RAVEN:
 		chip_name = "raven";
@@ -1510,9 +1507,6 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 		goto out;
 	}
 out:
-	/* fall back to vbios tables for vega20 */
-	if (adev->asic_type == CHIP_VEGA20)
-		return 0;
 	return err;
 }
 
