@@ -90,7 +90,7 @@ static const struct IP_BASE MP0_BASE            ={ { { { 0x00016000, 0, 0, 0, 0,
                                         { { 0, 0, 0, 0, 0, 0 } },
                                         { { 0, 0, 0, 0, 0, 0 } },
                                         { { 0, 0, 0, 0, 0, 0 } } } };
-static const struct IP_BASE MP1_BASE            ={ { { { 0x00016200, 0, 0, 0, 0, 0 } },
+static const struct IP_BASE MP1_BASE            ={ { { { 0x00016000, 0, 0, 0, 0, 0 } },
                                         { { 0, 0, 0, 0, 0, 0 } },
                                         { { 0, 0, 0, 0, 0, 0 } },
                                         { { 0, 0, 0, 0, 0, 0 } },
@@ -542,7 +542,7 @@ static const struct IP_BASE RSMU_BASE            ={ { { { 0x00012000, 0, 0, 0, 0
 #define MP0_BASE__INST5_SEG4                       0
 #define MP0_BASE__INST5_SEG5                       0
 
-#define MP1_BASE__INST0_SEG0                       0x00016200
+#define MP1_BASE__INST0_SEG0                       0x00016000
 #define MP1_BASE__INST0_SEG1                       0
 #define MP1_BASE__INST0_SEG2                       0
 #define MP1_BASE__INST0_SEG3                       0
