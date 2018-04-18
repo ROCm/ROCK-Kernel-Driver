@@ -404,7 +404,7 @@ drm_sched_entity_pop_job(struct drm_sched_entity *entity)
 		kcl_dma_fence_set_error(&sched_job->s_fence->finished, -ECANCELED);
 
 	dma_fence_put(entity->last_scheduled);
-	entity->last_scheduled = dma_fence_get(&s_fence->finished);
+	entity->last_scheduled = dma_fence_get(&sched_job->s_fence->finished);
 
 	spsc_queue_pop(&entity->job_queue);
 	return sched_job;
