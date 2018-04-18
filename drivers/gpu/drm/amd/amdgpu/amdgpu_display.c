@@ -317,7 +317,7 @@ int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 		goto cleanup;
 	}
 
-	r = amdgpu_bo_pin(new_abo, amdgpu_display_framebuffer_domains(adev), &base);
+	r = amdgpu_bo_pin(new_abo, amdgpu_display_supported_domains(adev), &base);
 	if (unlikely(r != 0)) {
 		DRM_ERROR("failed to pin new abo buffer before flip\n");
 		goto unreserve;
@@ -764,7 +764,7 @@ static const struct drm_framebuffer_funcs amdgpu_fb_funcs = {
 	.create_handle = amdgpu_display_user_framebuffer_create_handle,
 };
 
-uint32_t amdgpu_display_framebuffer_domains(struct amdgpu_device *adev)
+uint32_t amdgpu_display_supported_domains(struct amdgpu_device *adev)
 {
 	uint32_t domain = AMDGPU_GEM_DOMAIN_VRAM;
 
