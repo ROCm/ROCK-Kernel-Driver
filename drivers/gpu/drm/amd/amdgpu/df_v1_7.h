@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Advanced Micro Devices, Inc.
+ * Copyright 2018 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -20,34 +20,21 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-#ifndef _VEGA12_POWERTUNE_H_
-#define _VEGA12_POWERTUNE_H_
 
-enum vega12_didt_config_reg_type {
-	VEGA12_CONFIGREG_DIDT = 0,
-	VEGA12_CONFIGREG_GCCAC,
-	VEGA12_CONFIGREG_SECAC
+#ifndef __DF_V1_7_H__
+#define __DF_V1_7_H__
+
+#include "soc15_common.h"
+enum DF_V1_7_MGCG
+{
+	DF_V1_7_MGCG_DISABLE = 0,
+	DF_V1_7_MGCG_ENABLE_00_CYCLE_DELAY =1,
+	DF_V1_7_MGCG_ENABLE_01_CYCLE_DELAY =2,
+	DF_V1_7_MGCG_ENABLE_15_CYCLE_DELAY =13,
+	DF_V1_7_MGCG_ENABLE_31_CYCLE_DELAY =14,
+	DF_V1_7_MGCG_ENABLE_63_CYCLE_DELAY =15
 };
 
-/* PowerContainment Features */
-#define POWERCONTAINMENT_FEATURE_DTE             0x00000001
-#define POWERCONTAINMENT_FEATURE_TDCLimit        0x00000002
-#define POWERCONTAINMENT_FEATURE_PkgPwrLimit     0x00000004
+extern const struct amdgpu_df_funcs df_v1_7_funcs;
 
-struct vega12_didt_config_reg {
-	uint32_t		offset;
-	uint32_t		mask;
-	uint32_t		shift;
-	uint32_t		value;
-};
-
-int vega12_enable_power_containment(struct pp_hwmgr *hwmgr);
-int vega12_set_power_limit(struct pp_hwmgr *hwmgr, uint32_t n);
-int vega12_power_control_set_level(struct pp_hwmgr *hwmgr);
-int vega12_disable_power_containment(struct pp_hwmgr *hwmgr);
-
-int vega12_enable_didt_config(struct pp_hwmgr *hwmgr);
-int vega12_disable_didt_config(struct pp_hwmgr *hwmgr);
-
-#endif  /* _VEGA12_POWERTUNE_H_ */
-
+#endif

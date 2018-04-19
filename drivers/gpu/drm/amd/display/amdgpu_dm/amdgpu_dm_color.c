@@ -25,6 +25,7 @@
 
 #include "amdgpu_mode.h"
 #include "amdgpu_dm.h"
+#include "dc.h"
 #include "modules/color/color_gamma.h"
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \

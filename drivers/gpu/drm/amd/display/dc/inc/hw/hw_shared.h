@@ -140,11 +140,6 @@ enum opp_regamma {
 	OPP_REGAMMA_USER
 };
 
-struct csc_transform {
-	uint16_t matrix[12];
-	bool enable_adjustment;
-};
-
 struct dc_bias_and_scale {
 	uint16_t scale_red;
 	uint16_t bias_red;
@@ -191,4 +186,26 @@ enum controller_dp_test_pattern {
 	CONTROLLER_DP_TEST_PATTERN_COLORSQUARES_CEA
 };
 
+enum dp_pixel_encoding_type {
+	DP_PIXEL_ENCODING_TYPE_RGB444		= 0x00000000,
+	DP_PIXEL_ENCODING_TYPE_YCBCR422		= 0x00000001,
+	DP_PIXEL_ENCODING_TYPE_YCBCR444		= 0x00000002,
+	DP_PIXEL_ENCODING_TYPE_RGB_WIDE_GAMUT	= 0x00000003,
+	DP_PIXEL_ENCODING_TYPE_Y_ONLY		= 0x00000004,
+	DP_PIXEL_ENCODING_TYPE_YCBCR420		= 0x00000005
+};
+
+enum dp_component_depth {
+	DP_COMPONENT_PIXEL_DEPTH_6BPC		= 0x00000000,
+	DP_COMPONENT_PIXEL_DEPTH_8BPC		= 0x00000001,
+	DP_COMPONENT_PIXEL_DEPTH_10BPC		= 0x00000002,
+	DP_COMPONENT_PIXEL_DEPTH_12BPC		= 0x00000003,
+	DP_COMPONENT_PIXEL_DEPTH_16BPC		= 0x00000004
+};
+
+enum dc_lut_mode {
+	LUT_BYPASS,
+	LUT_RAM_A,
+	LUT_RAM_B
+};
 #endif /* __DAL_HW_SHARED_H__ */

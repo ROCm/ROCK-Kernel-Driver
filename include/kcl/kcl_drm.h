@@ -426,14 +426,13 @@ extern struct dma_buf_ops *_kcl_drm_gem_prime_dmabuf_ops;
 bool drm_is_current_master(struct drm_file *fpriv);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
-	!defined(OS_NAME_RHEL_7_5)
 static inline struct drm_crtc_state *
 kcl_drm_atomic_get_old_crtc_state_before_commit(struct drm_atomic_state *state,
 					    struct drm_crtc *crtc)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || \
-	defined(OS_NAME_RHEL_7_4_5)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0) || defined(OS_NAME_RHEL_7_5)
+	return drm_atomic_get_old_crtc_state(state, crtc);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4_5)
 	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
 #else
 	return state->crtcs[drm_crtc_index(crtc)]->state;
@@ -441,24 +440,38 @@ kcl_drm_atomic_get_old_crtc_state_before_commit(struct drm_atomic_state *state,
 }
 
 static inline struct drm_crtc_state *
-kcl_drm_atomic_get_new_crtc_state_before_commit(struct drm_atomic_state *state,
+kcl_drm_atomic_get_old_crtc_state_after_commit(struct drm_atomic_state *state,
 				  struct drm_crtc *crtc)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || \
-	defined(OS_NAME_RHEL_7_4_5)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0) || defined(OS_NAME_RHEL_7_5)
+	return drm_atomic_get_old_crtc_state(state, crtc);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4_5)
 	return state->crtcs[drm_crtc_index(crtc)].state;
 #else
 	return state->crtc_states[drm_crtc_index(crtc)];
 #endif
 }
+
+static inline struct drm_crtc_state *
+kcl_drm_atomic_get_new_crtc_state_before_commit(struct drm_atomic_state *state,
+				  struct drm_crtc *crtc)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0) || defined(OS_NAME_RHEL_7_5)
+	return drm_atomic_get_new_crtc_state(state,crtc);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4_5)
+	return state->crtcs[drm_crtc_index(crtc)].state;
+#else
+	return state->crtc_states[drm_crtc_index(crtc)];
 #endif
+}
 
 static inline struct drm_crtc_state *
 kcl_drm_atomic_get_new_crtc_state_after_commit(struct drm_atomic_state *state,
 					    struct drm_crtc *crtc)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || \
-	defined(OS_NAME_RHEL_7_4_5)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0) || defined(OS_NAME_RHEL_7_5)
+	return drm_atomic_get_new_crtc_state(state,crtc);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4_5)
 	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
 #else
 	return state->crtcs[drm_crtc_index(crtc)]->state;
@@ -533,6 +546,27 @@ void drm_state_dump(struct drm_device *dev, struct drm_printer *p);
 		!defined(OS_NAME_RHEL_7_4_5)
 void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
 void drm_send_event(struct drm_device *dev, struct drm_pending_event *e);
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && \
+		defined(BUILD_AS_DKMS)
+
+#define _DRM_PRINTK(once, level, fmt, ...)				\
+	do {								\
+		printk##once(KERN_##level "[" DRM_NAME "] " fmt,	\
+			     ##__VA_ARGS__);				\
+	} while (0)
+
+#define DRM_NOTE(fmt, ...)						\
+	_DRM_PRINTK(, NOTICE, fmt, ##__VA_ARGS__)
+#define DRM_WARN(fmt, ...)						\
+	_DRM_PRINTK(, WARNING, fmt, ##__VA_ARGS__)
+
+#define DRM_NOTE_ONCE(fmt, ...)						\
+	_DRM_PRINTK(_once, NOTICE, fmt, ##__VA_ARGS__)
+#define DRM_WARN_ONCE(fmt, ...)						\
+	_DRM_PRINTK(_once, WARNING, fmt, ##__VA_ARGS__)
+
 #endif
 
 #endif /* AMDKCL_DRM_H */

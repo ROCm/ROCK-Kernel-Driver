@@ -370,12 +370,6 @@ struct dc_csc_adjustments {
 	struct fixed31_32 hue;
 };
 
-enum {
-	MAX_LANES = 2,
-	MAX_COFUNC_PATH = 6,
-	LAYER_INDEX_PRIMARY = -1,
-};
-
 enum dpcd_downstream_port_max_bpc {
 	DOWN_STREAM_MAX_8BPC = 0,
 	DOWN_STREAM_MAX_10BPC,
@@ -521,13 +515,20 @@ struct audio_info {
 	struct audio_mode modes[DC_MAX_AUDIO_DESC_COUNT];
 };
 
-struct vrr_params {
-	enum vrr_state state;
-	uint32_t window_min;
-	uint32_t window_max;
-	uint32_t inserted_frame_duration_in_us;
-	uint32_t frames_to_insert;
-	uint32_t frame_counter;
+enum dc_infoframe_type {
+	DC_HDMI_INFOFRAME_TYPE_VENDOR = 0x81,
+	DC_HDMI_INFOFRAME_TYPE_AVI = 0x82,
+	DC_HDMI_INFOFRAME_TYPE_SPD = 0x83,
+	DC_HDMI_INFOFRAME_TYPE_AUDIO = 0x84,
+};
+
+struct dc_info_packet {
+	bool valid;
+	uint8_t hb0;
+	uint8_t hb1;
+	uint8_t hb2;
+	uint8_t hb3;
+	uint8_t sb[32];
 };
 
 #define DC_PLANE_UPDATE_TIMES_MAX 10
@@ -536,16 +537,6 @@ struct dc_plane_flip_time {
 	unsigned int time_elapsed_in_us[DC_PLANE_UPDATE_TIMES_MAX];
 	unsigned int index;
 	unsigned int prev_update_time_in_us;
-};
-
-// Will combine with vrr_params at some point.
-struct freesync_context {
-	bool supported;
-	bool enabled;
-	bool active;
-
-	unsigned int min_refresh_in_micro_hz;
-	unsigned int nominal_refresh_in_micro_hz;
 };
 
 struct psr_config {

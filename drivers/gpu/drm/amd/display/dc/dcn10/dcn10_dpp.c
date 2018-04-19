@@ -121,6 +121,13 @@ bool dpp_get_optimal_number_of_taps(
 	else
 		pixel_width = scl_data->viewport.width;
 
+	/* Some ASICs does not support  FP16 scaling, so we reject modes require this*/
+	if (scl_data->viewport.width  != scl_data->h_active &&
+		scl_data->viewport.height != scl_data->v_active &&
+		dpp->caps->dscl_data_proc_format == DSCL_DATA_PRCESSING_FIXED_FORMAT &&
+		scl_data->format == PIXEL_FORMAT_FP16)
+		return false;
+
 	/* TODO: add lb check */
 
 	/* No support for programming ratio of 4, drop to 3.99999.. */
@@ -257,7 +264,7 @@ void dpp1_cnv_setup (
 		struct dpp *dpp_base,
 		enum surface_pixel_format format,
 		enum expansion_mode mode,
-		struct csc_transform input_csc_color_matrix,
+		struct dc_csc_transform input_csc_color_matrix,
 		enum dc_color_space input_color_space)
 {
 	uint32_t pixel_format;
@@ -416,7 +423,7 @@ void dpp1_set_cursor_position(
 	if (src_x_offset >= (int)param->viewport_width)
 		cur_en = 0;  /* not visible beyond right edge*/
 
-	if (src_x_offset + (int)width < 0)
+	if (src_x_offset + (int)width <= 0)
 		cur_en = 0;  /* not visible beyond left edge*/
 
 	REG_UPDATE(CURSOR0_CONTROL,

@@ -423,6 +423,11 @@ enum dc_gamma_type {
 	GAMMA_CS_TFM_1D = 3,
 };
 
+struct dc_csc_transform {
+	uint16_t matrix[12];
+	bool enable_adjustment;
+};
+
 struct dc_gamma {
 	struct kref refcount;
 	enum dc_gamma_type type;
@@ -690,12 +695,6 @@ struct crtc_trigger_info {
 	struct dc_stream_state *event_source;
 	enum crtc_event event;
 	enum trigger_delay delay;
-};
-
-enum vrr_state {
-	VRR_STATE_OFF = 0,
-	VRR_STATE_VARIABLE,
-	VRR_STATE_FIXED,
 };
 
 struct dc_crtc_timing_adjust {

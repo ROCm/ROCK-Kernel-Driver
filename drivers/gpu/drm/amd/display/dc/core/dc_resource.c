@@ -45,8 +45,9 @@
 #include "dcn10/dcn10_resource.h"
 #endif
 #include "dce120/dce120_resource.h"
-#define DC_LOGGER \
-	ctx->logger
+
+#define DC_LOGGER_INIT(logger)
+
 enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 {
 	enum dce_version dc_version = DCE_VERSION_UNKNOWN;
@@ -835,13 +836,16 @@ bool resource_build_scaling_params(struct pipe_ctx *pipe_ctx)
 	struct dc_crtc_timing *timing = &pipe_ctx->stream->timing;
 	struct view recout_skip = { 0 };
 	bool res = false;
-	struct dc_context *ctx = pipe_ctx->stream->ctx;
+	DC_LOGGER_INIT(pipe_ctx->stream->ctx->logger);
 	/* Important: scaling ratio calculation requires pixel format,
 	 * lb depth calculation requires recout and taps require scaling ratios.
 	 * Inits require viewport, taps, ratios and recout of split pipe
 	 */
 	pipe_ctx->plane_res.scl_data.format = convert_pixel_format_to_dalsurface(
 			pipe_ctx->plane_state->format);
+
+	if (pipe_ctx->stream->timing.flags.INTERLACE)
+		pipe_ctx->stream->dst.height *= 2;
 
 	calculate_scaling_ratios(pipe_ctx);
 
@@ -863,6 +867,8 @@ bool resource_build_scaling_params(struct pipe_ctx *pipe_ctx)
 
 	pipe_ctx->plane_res.scl_data.h_active = timing->h_addressable + timing->h_border_left + timing->h_border_right;
 	pipe_ctx->plane_res.scl_data.v_active = timing->v_addressable + timing->v_border_top + timing->v_border_bottom;
+	if (pipe_ctx->stream->timing.flags.INTERLACE)
+		pipe_ctx->plane_res.scl_data.v_active *= 2;
 
 
 	/* Taps calculations */
@@ -907,6 +913,9 @@ bool resource_build_scaling_params(struct pipe_ctx *pipe_ctx)
 				plane_state->dst_rect.width,
 				plane_state->dst_rect.x,
 				plane_state->dst_rect.y);
+
+	if (pipe_ctx->stream->timing.flags.INTERLACE)
+		pipe_ctx->stream->dst.height /= 2;
 
 	return res;
 }
@@ -1599,18 +1608,6 @@ enum dc_status dc_remove_stream_from_ctx(
 	return DC_OK;
 }
 
-static void copy_pipe_ctx(
-	const struct pipe_ctx *from_pipe_ctx, struct pipe_ctx *to_pipe_ctx)
-{
-	struct dc_plane_state *plane_state = to_pipe_ctx->plane_state;
-	struct dc_stream_state *stream = to_pipe_ctx->stream;
-
-	*to_pipe_ctx = *from_pipe_ctx;
-	to_pipe_ctx->stream = stream;
-	if (plane_state != NULL)
-		to_pipe_ctx->plane_state = plane_state;
-}
-
 static struct dc_stream_state *find_pll_sharable_stream(
 		struct dc_stream_state *stream_needs_pll,
 		struct dc_state *context)
@@ -1752,26 +1749,6 @@ enum dc_status resource_map_pool_resources(
 	return DC_ERROR_UNEXPECTED;
 }
 
-/* first stream in the context is used to populate the rest */
-void validate_guaranteed_copy_streams(
-		struct dc_state *context,
-		int max_streams)
-{
-	int i;
-
-	for (i = 1; i < max_streams; i++) {
-		context->streams[i] = context->streams[0];
-
-		copy_pipe_ctx(&context->res_ctx.pipe_ctx[0],
-			      &context->res_ctx.pipe_ctx[i]);
-		context->res_ctx.pipe_ctx[i].stream =
-				context->res_ctx.pipe_ctx[0].stream;
-
-		dc_stream_retain(context->streams[i]);
-		context->stream_count++;
-	}
-}
-
 void dc_resource_state_copy_construct_current(
 		const struct dc *dc,
 		struct dc_state *dst_ctx)
@@ -1843,7 +1820,7 @@ enum dc_status dc_validate_global_state(
 }
 
 static void patch_gamut_packet_checksum(
-		struct encoder_info_packet *gamut_packet)
+		struct dc_info_packet *gamut_packet)
 {
 	/* For gamut we recalc checksum */
 	if (gamut_packet->valid) {
@@ -1862,12 +1839,11 @@ static void patch_gamut_packet_checksum(
 }
 
 static void set_avi_info_frame(
-		struct encoder_info_packet *info_packet,
+		struct dc_info_packet *info_packet,
 		struct pipe_ctx *pipe_ctx)
 {
 	struct dc_stream_state *stream = pipe_ctx->stream;
 	enum dc_color_space color_space = COLOR_SPACE_UNKNOWN;
-	struct info_frame info_frame = { {0} };
 	uint32_t pixel_encoding = 0;
 	enum scanning_type scan_type = SCANNING_TYPE_NODATA;
 	enum dc_aspect_ratio aspect = ASPECT_RATIO_NO_DATA;
@@ -1877,10 +1853,12 @@ static void set_avi_info_frame(
 	unsigned int cn0_cn1_value = 0;
 	uint8_t *check_sum = NULL;
 	uint8_t byte_index = 0;
-	union hdmi_info_packet *hdmi_info = &info_frame.avi_info_packet.info_packet_hdmi;
+	union hdmi_info_packet hdmi_info;
 	union display_content_support support = {0};
 	unsigned int vic = pipe_ctx->stream->timing.vic;
 	enum dc_timing_3d_format format;
+
+	memset(&hdmi_info, 0, sizeof(union hdmi_info_packet));
 
 	color_space = pipe_ctx->stream->output_color_space;
 	if (color_space == COLOR_SPACE_UNKNOWN)
@@ -1888,11 +1866,11 @@ static void set_avi_info_frame(
 			COLOR_SPACE_SRGB:COLOR_SPACE_YCBCR709;
 
 	/* Initialize header */
-	hdmi_info->bits.header.info_frame_type = HDMI_INFOFRAME_TYPE_AVI;
+	hdmi_info.bits.header.info_frame_type = HDMI_INFOFRAME_TYPE_AVI;
 	/* InfoFrameVersion_3 is defined by CEA861F (Section 6.4), but shall
 	* not be used in HDMI 2.0 (Section 10.1) */
-	hdmi_info->bits.header.version = 2;
-	hdmi_info->bits.header.length = HDMI_AVI_INFOFRAME_SIZE;
+	hdmi_info.bits.header.version = 2;
+	hdmi_info.bits.header.length = HDMI_AVI_INFOFRAME_SIZE;
 
 	/*
 	 * IDO-defined (Y2,Y1,Y0 = 1,1,1) shall not be used by devices built
@@ -1918,39 +1896,39 @@ static void set_avi_info_frame(
 
 	/* Y0_Y1_Y2 : The pixel encoding */
 	/* H14b AVI InfoFrame has extension on Y-field from 2 bits to 3 bits */
-	hdmi_info->bits.Y0_Y1_Y2 = pixel_encoding;
+	hdmi_info.bits.Y0_Y1_Y2 = pixel_encoding;
 
 	/* A0 = 1 Active Format Information valid */
-	hdmi_info->bits.A0 = ACTIVE_FORMAT_VALID;
+	hdmi_info.bits.A0 = ACTIVE_FORMAT_VALID;
 
 	/* B0, B1 = 3; Bar info data is valid */
-	hdmi_info->bits.B0_B1 = BAR_INFO_BOTH_VALID;
+	hdmi_info.bits.B0_B1 = BAR_INFO_BOTH_VALID;
 
-	hdmi_info->bits.SC0_SC1 = PICTURE_SCALING_UNIFORM;
+	hdmi_info.bits.SC0_SC1 = PICTURE_SCALING_UNIFORM;
 
 	/* S0, S1 : Underscan / Overscan */
 	/* TODO: un-hardcode scan type */
 	scan_type = SCANNING_TYPE_UNDERSCAN;
-	hdmi_info->bits.S0_S1 = scan_type;
+	hdmi_info.bits.S0_S1 = scan_type;
 
 	/* C0, C1 : Colorimetry */
 	if (color_space == COLOR_SPACE_YCBCR709 ||
 			color_space == COLOR_SPACE_YCBCR709_LIMITED)
-		hdmi_info->bits.C0_C1 = COLORIMETRY_ITU709;
+		hdmi_info.bits.C0_C1 = COLORIMETRY_ITU709;
 	else if (color_space == COLOR_SPACE_YCBCR601 ||
 			color_space == COLOR_SPACE_YCBCR601_LIMITED)
-		hdmi_info->bits.C0_C1 = COLORIMETRY_ITU601;
+		hdmi_info.bits.C0_C1 = COLORIMETRY_ITU601;
 	else {
-		hdmi_info->bits.C0_C1 = COLORIMETRY_NO_DATA;
+		hdmi_info.bits.C0_C1 = COLORIMETRY_NO_DATA;
 	}
 	if (color_space == COLOR_SPACE_2020_RGB_FULLRANGE ||
 			color_space == COLOR_SPACE_2020_RGB_LIMITEDRANGE ||
 			color_space == COLOR_SPACE_2020_YCBCR) {
-		hdmi_info->bits.EC0_EC2 = COLORIMETRYEX_BT2020RGBYCBCR;
-		hdmi_info->bits.C0_C1   = COLORIMETRY_EXTENDED;
+		hdmi_info.bits.EC0_EC2 = COLORIMETRYEX_BT2020RGBYCBCR;
+		hdmi_info.bits.C0_C1   = COLORIMETRY_EXTENDED;
 	} else if (color_space == COLOR_SPACE_ADOBERGB) {
-		hdmi_info->bits.EC0_EC2 = COLORIMETRYEX_ADOBERGB;
-		hdmi_info->bits.C0_C1   = COLORIMETRY_EXTENDED;
+		hdmi_info.bits.EC0_EC2 = COLORIMETRYEX_ADOBERGB;
+		hdmi_info.bits.C0_C1   = COLORIMETRY_EXTENDED;
 	}
 
 	/* TODO: un-hardcode aspect ratio */
@@ -1959,18 +1937,18 @@ static void set_avi_info_frame(
 	switch (aspect) {
 	case ASPECT_RATIO_4_3:
 	case ASPECT_RATIO_16_9:
-		hdmi_info->bits.M0_M1 = aspect;
+		hdmi_info.bits.M0_M1 = aspect;
 		break;
 
 	case ASPECT_RATIO_NO_DATA:
 	case ASPECT_RATIO_64_27:
 	case ASPECT_RATIO_256_135:
 	default:
-		hdmi_info->bits.M0_M1 = 0;
+		hdmi_info.bits.M0_M1 = 0;
 	}
 
 	/* Active Format Aspect ratio - same as Picture Aspect Ratio. */
-	hdmi_info->bits.R0_R3 = ACTIVE_FORMAT_ASPECT_RATIO_SAME_AS_PICTURE;
+	hdmi_info.bits.R0_R3 = ACTIVE_FORMAT_ASPECT_RATIO_SAME_AS_PICTURE;
 
 	/* TODO: un-hardcode cn0_cn1 and itc */
 
@@ -2013,8 +1991,8 @@ static void set_avi_info_frame(
 				}
 			}
 		}
-		hdmi_info->bits.CN0_CN1 = cn0_cn1_value;
-		hdmi_info->bits.ITC = itc_value;
+		hdmi_info.bits.CN0_CN1 = cn0_cn1_value;
+		hdmi_info.bits.ITC = itc_value;
 	}
 
 	/* TODO : We should handle YCC quantization */
@@ -2023,19 +2001,19 @@ static void set_avi_info_frame(
 			stream->sink->edid_caps.qy_bit == 1) {
 		if (color_space == COLOR_SPACE_SRGB ||
 			color_space == COLOR_SPACE_2020_RGB_FULLRANGE) {
-			hdmi_info->bits.Q0_Q1   = RGB_QUANTIZATION_FULL_RANGE;
-			hdmi_info->bits.YQ0_YQ1 = YYC_QUANTIZATION_FULL_RANGE;
+			hdmi_info.bits.Q0_Q1   = RGB_QUANTIZATION_FULL_RANGE;
+			hdmi_info.bits.YQ0_YQ1 = YYC_QUANTIZATION_FULL_RANGE;
 		} else if (color_space == COLOR_SPACE_SRGB_LIMITED ||
 					color_space == COLOR_SPACE_2020_RGB_LIMITEDRANGE) {
-			hdmi_info->bits.Q0_Q1   = RGB_QUANTIZATION_LIMITED_RANGE;
-			hdmi_info->bits.YQ0_YQ1 = YYC_QUANTIZATION_LIMITED_RANGE;
+			hdmi_info.bits.Q0_Q1   = RGB_QUANTIZATION_LIMITED_RANGE;
+			hdmi_info.bits.YQ0_YQ1 = YYC_QUANTIZATION_LIMITED_RANGE;
 		} else {
-			hdmi_info->bits.Q0_Q1   = RGB_QUANTIZATION_DEFAULT_RANGE;
-			hdmi_info->bits.YQ0_YQ1 = YYC_QUANTIZATION_LIMITED_RANGE;
+			hdmi_info.bits.Q0_Q1   = RGB_QUANTIZATION_DEFAULT_RANGE;
+			hdmi_info.bits.YQ0_YQ1 = YYC_QUANTIZATION_LIMITED_RANGE;
 		}
 	} else {
-		hdmi_info->bits.Q0_Q1   = RGB_QUANTIZATION_DEFAULT_RANGE;
-		hdmi_info->bits.YQ0_YQ1   = YYC_QUANTIZATION_LIMITED_RANGE;
+		hdmi_info.bits.Q0_Q1   = RGB_QUANTIZATION_DEFAULT_RANGE;
+		hdmi_info.bits.YQ0_YQ1   = YYC_QUANTIZATION_LIMITED_RANGE;
 	}
 
 	///VIC
@@ -2060,51 +2038,49 @@ static void set_avi_info_frame(
 			break;
 		}
 	}
-	hdmi_info->bits.VIC0_VIC7 = vic;
+	hdmi_info.bits.VIC0_VIC7 = vic;
 
 	/* pixel repetition
 	 * PR0 - PR3 start from 0 whereas pHwPathMode->mode.timing.flags.pixel
 	 * repetition start from 1 */
-	hdmi_info->bits.PR0_PR3 = 0;
+	hdmi_info.bits.PR0_PR3 = 0;
 
 	/* Bar Info
 	 * barTop:    Line Number of End of Top Bar.
 	 * barBottom: Line Number of Start of Bottom Bar.
 	 * barLeft:   Pixel Number of End of Left Bar.
 	 * barRight:  Pixel Number of Start of Right Bar. */
-	hdmi_info->bits.bar_top = stream->timing.v_border_top;
-	hdmi_info->bits.bar_bottom = (stream->timing.v_total
+	hdmi_info.bits.bar_top = stream->timing.v_border_top;
+	hdmi_info.bits.bar_bottom = (stream->timing.v_total
 			- stream->timing.v_border_bottom + 1);
-	hdmi_info->bits.bar_left  = stream->timing.h_border_left;
-	hdmi_info->bits.bar_right = (stream->timing.h_total
+	hdmi_info.bits.bar_left  = stream->timing.h_border_left;
+	hdmi_info.bits.bar_right = (stream->timing.h_total
 			- stream->timing.h_border_right + 1);
 
 	/* check_sum - Calculate AFMT_AVI_INFO0 ~ AFMT_AVI_INFO3 */
-	check_sum = &info_frame.avi_info_packet.info_packet_hdmi.packet_raw_data.sb[0];
+	check_sum = &hdmi_info.packet_raw_data.sb[0];
 
 	*check_sum = HDMI_INFOFRAME_TYPE_AVI + HDMI_AVI_INFOFRAME_SIZE + 2;
 
 	for (byte_index = 1; byte_index <= HDMI_AVI_INFOFRAME_SIZE; byte_index++)
-		*check_sum += hdmi_info->packet_raw_data.sb[byte_index];
+		*check_sum += hdmi_info.packet_raw_data.sb[byte_index];
 
 	/* one byte complement */
 	*check_sum = (uint8_t) (0x100 - *check_sum);
 
 	/* Store in hw_path_mode */
-	info_packet->hb0 = hdmi_info->packet_raw_data.hb0;
-	info_packet->hb1 = hdmi_info->packet_raw_data.hb1;
-	info_packet->hb2 = hdmi_info->packet_raw_data.hb2;
+	info_packet->hb0 = hdmi_info.packet_raw_data.hb0;
+	info_packet->hb1 = hdmi_info.packet_raw_data.hb1;
+	info_packet->hb2 = hdmi_info.packet_raw_data.hb2;
 
-	for (byte_index = 0; byte_index < sizeof(info_frame.avi_info_packet.
-				info_packet_hdmi.packet_raw_data.sb); byte_index++)
-		info_packet->sb[byte_index] = info_frame.avi_info_packet.
-				info_packet_hdmi.packet_raw_data.sb[byte_index];
+	for (byte_index = 0; byte_index < sizeof(hdmi_info.packet_raw_data.sb); byte_index++)
+		info_packet->sb[byte_index] = hdmi_info.packet_raw_data.sb[byte_index];
 
 	info_packet->valid = true;
 }
 
 static void set_vendor_info_packet(
-		struct encoder_info_packet *info_packet,
+		struct dc_info_packet *info_packet,
 		struct dc_stream_state *stream)
 {
 	uint32_t length = 0;
@@ -2217,225 +2193,34 @@ static void set_vendor_info_packet(
 }
 
 static void set_spd_info_packet(
-		struct encoder_info_packet *info_packet,
+		struct dc_info_packet *info_packet,
 		struct dc_stream_state *stream)
 {
 	/* SPD info packet for FreeSync */
 
-	unsigned char checksum = 0;
-	unsigned int idx, payload_size = 0;
-
 	/* Check if Freesync is supported. Return if false. If true,
 	 * set the corresponding bit in the info packet
 	 */
-	if (stream->freesync_ctx.supported == false)
+	if (!stream->vrr_infopacket.valid)
 		return;
 
-	if (dc_is_hdmi_signal(stream->signal)) {
-
-		/* HEADER */
-
-		/* HB0  = Packet Type = 0x83 (Source Product
-		 *	  Descriptor InfoFrame)
-		 */
-		info_packet->hb0 = HDMI_INFOFRAME_TYPE_SPD;
-
-		/* HB1  = Version = 0x01 */
-		info_packet->hb1 = 0x01;
-
-		/* HB2  = [Bits 7:5 = 0] [Bits 4:0 = Length = 0x08] */
-		info_packet->hb2 = 0x08;
-
-		payload_size = 0x08;
-
-	} else if (dc_is_dp_signal(stream->signal)) {
-
-		/* HEADER */
-
-		/* HB0  = Secondary-data Packet ID = 0 - Only non-zero
-		 *	  when used to associate audio related info packets
-		 */
-		info_packet->hb0 = 0x00;
-
-		/* HB1  = Packet Type = 0x83 (Source Product
-		 *	  Descriptor InfoFrame)
-		 */
-		info_packet->hb1 = HDMI_INFOFRAME_TYPE_SPD;
-
-		/* HB2  = [Bits 7:0 = Least significant eight bits -
-		 *	  For INFOFRAME, the value must be 1Bh]
-		 */
-		info_packet->hb2 = 0x1B;
-
-		/* HB3  = [Bits 7:2 = INFOFRAME SDP Version Number = 0x1]
-		 *	  [Bits 1:0 = Most significant two bits = 0x00]
-		 */
-		info_packet->hb3 = 0x04;
-
-		payload_size = 0x1B;
-	}
-
-	/* PB1 = 0x1A (24bit AMD IEEE OUI (0x00001A) - Byte 0) */
-	info_packet->sb[1] = 0x1A;
-
-	/* PB2 = 0x00 (24bit AMD IEEE OUI (0x00001A) - Byte 1) */
-	info_packet->sb[2] = 0x00;
-
-	/* PB3 = 0x00 (24bit AMD IEEE OUI (0x00001A) - Byte 2) */
-	info_packet->sb[3] = 0x00;
-
-	/* PB4 = Reserved */
-	info_packet->sb[4] = 0x00;
-
-	/* PB5 = Reserved */
-	info_packet->sb[5] = 0x00;
-
-	/* PB6 = [Bits 7:3 = Reserved] */
-	info_packet->sb[6] = 0x00;
-
-	if (stream->freesync_ctx.supported == true)
-		/* PB6 = [Bit 0 = FreeSync Supported] */
-		info_packet->sb[6] |= 0x01;
-
-	if (stream->freesync_ctx.enabled == true)
-		/* PB6 = [Bit 1 = FreeSync Enabled] */
-		info_packet->sb[6] |= 0x02;
-
-	if (stream->freesync_ctx.active == true)
-		/* PB6 = [Bit 2 = FreeSync Active] */
-		info_packet->sb[6] |= 0x04;
-
-	/* PB7 = FreeSync Minimum refresh rate (Hz) */
-	info_packet->sb[7] = (unsigned char) (stream->freesync_ctx.
-			min_refresh_in_micro_hz / 1000000);
-
-	/* PB8 = FreeSync Maximum refresh rate (Hz)
-	 *
-	 * Note: We do not use the maximum capable refresh rate
-	 * of the panel, because we should never go above the field
-	 * rate of the mode timing set.
-	 */
-	info_packet->sb[8] = (unsigned char) (stream->freesync_ctx.
-			nominal_refresh_in_micro_hz / 1000000);
-
-	/* PB9 - PB27  = Reserved */
-	for (idx = 9; idx <= 27; idx++)
-		info_packet->sb[idx] = 0x00;
-
-	/* Calculate checksum */
-	checksum += info_packet->hb0;
-	checksum += info_packet->hb1;
-	checksum += info_packet->hb2;
-	checksum += info_packet->hb3;
-
-	for (idx = 1; idx <= payload_size; idx++)
-		checksum += info_packet->sb[idx];
-
-	/* PB0 = Checksum (one byte complement) */
-	info_packet->sb[0] = (unsigned char) (0x100 - checksum);
-
-	info_packet->valid = true;
+	*info_packet = stream->vrr_infopacket;
 }
 
 static void set_hdr_static_info_packet(
-		struct encoder_info_packet *info_packet,
+		struct dc_info_packet *info_packet,
 		struct dc_stream_state *stream)
 {
-	uint16_t i = 0;
-	enum signal_type signal = stream->signal;
-	uint32_t data;
+	/* HDR Static Metadata info packet for HDR10 */
 
-	if (!stream->hdr_static_metadata.hdr_supported)
+	if (!stream->hdr_static_metadata.valid)
 		return;
 
-	if (dc_is_hdmi_signal(signal)) {
-		info_packet->valid = true;
-
-		info_packet->hb0 = 0x87;
-		info_packet->hb1 = 0x01;
-		info_packet->hb2 = 0x1A;
-		i = 1;
-	} else if (dc_is_dp_signal(signal)) {
-		info_packet->valid = true;
-
-		info_packet->hb0 = 0x00;
-		info_packet->hb1 = 0x87;
-		info_packet->hb2 = 0x1D;
-		info_packet->hb3 = (0x13 << 2);
-		i = 2;
-	}
-
-	data = stream->hdr_static_metadata.is_hdr;
-	info_packet->sb[i++] = data ? 0x02 : 0x00;
-	info_packet->sb[i++] = 0x00;
-
-	data = stream->hdr_static_metadata.chromaticity_green_x / 2;
-	info_packet->sb[i++] = data & 0xFF;
-	info_packet->sb[i++] = (data & 0xFF00) >> 8;
-
-	data = stream->hdr_static_metadata.chromaticity_green_y / 2;
-	info_packet->sb[i++] = data & 0xFF;
-	info_packet->sb[i++] = (data & 0xFF00) >> 8;
-
-	data = stream->hdr_static_metadata.chromaticity_blue_x / 2;
-	info_packet->sb[i++] = data & 0xFF;
-	info_packet->sb[i++] = (data & 0xFF00) >> 8;
-
-	data = stream->hdr_static_metadata.chromaticity_blue_y / 2;
-	info_packet->sb[i++] = data & 0xFF;
-	info_packet->sb[i++] = (data & 0xFF00) >> 8;
-
-	data = stream->hdr_static_metadata.chromaticity_red_x / 2;
-	info_packet->sb[i++] = data & 0xFF;
-	info_packet->sb[i++] = (data & 0xFF00) >> 8;
-
-	data = stream->hdr_static_metadata.chromaticity_red_y / 2;
-	info_packet->sb[i++] = data & 0xFF;
-	info_packet->sb[i++] = (data & 0xFF00) >> 8;
-
-	data = stream->hdr_static_metadata.chromaticity_white_point_x / 2;
-	info_packet->sb[i++] = data & 0xFF;
-	info_packet->sb[i++] = (data & 0xFF00) >> 8;
-
-	data = stream->hdr_static_metadata.chromaticity_white_point_y / 2;
-	info_packet->sb[i++] = data & 0xFF;
-	info_packet->sb[i++] = (data & 0xFF00) >> 8;
-
-	data = stream->hdr_static_metadata.max_luminance;
-	info_packet->sb[i++] = data & 0xFF;
-	info_packet->sb[i++] = (data & 0xFF00) >> 8;
-
-	data = stream->hdr_static_metadata.min_luminance;
-	info_packet->sb[i++] = data & 0xFF;
-	info_packet->sb[i++] = (data & 0xFF00) >> 8;
-
-	data = stream->hdr_static_metadata.maximum_content_light_level;
-	info_packet->sb[i++] = data & 0xFF;
-	info_packet->sb[i++] = (data & 0xFF00) >> 8;
-
-	data = stream->hdr_static_metadata.maximum_frame_average_light_level;
-	info_packet->sb[i++] = data & 0xFF;
-	info_packet->sb[i++] = (data & 0xFF00) >> 8;
-
-	if (dc_is_hdmi_signal(signal)) {
-		uint32_t checksum = 0;
-
-		checksum += info_packet->hb0;
-		checksum += info_packet->hb1;
-		checksum += info_packet->hb2;
-
-		for (i = 1; i <= info_packet->hb2; i++)
-			checksum += info_packet->sb[i];
-
-		info_packet->sb[0] = 0x100 - checksum;
-	} else if (dc_is_dp_signal(signal)) {
-		info_packet->sb[0] = 0x01;
-		info_packet->sb[1] = 0x1A;
-	}
+	*info_packet = stream->hdr_static_metadata;
 }
 
 static void set_vsc_info_packet(
-		struct encoder_info_packet *info_packet,
+		struct dc_info_packet *info_packet,
 		struct dc_stream_state *stream)
 {
 	unsigned int vscPacketRevision = 0;

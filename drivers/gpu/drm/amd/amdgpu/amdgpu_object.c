@@ -380,7 +380,7 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev, unsigned long size,
 	struct amdgpu_bo *bo;
 	unsigned long page_align;
 	size_t acc_size;
-	u32 domains;
+	u32 domains, preferred_domains, allowed_domains;
 	int r;
 
 	page_align = roundup(byte_align, PAGE_SIZE) >> PAGE_SHIFT;
@@ -394,13 +394,7 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev, unsigned long size,
 	acc_size = ttm_bo_dma_acc_size(&adev->mman.bdev, size,
 				       sizeof(struct amdgpu_bo));
 
-	bo = kzalloc(sizeof(struct amdgpu_bo), GFP_KERNEL);
-	if (bo == NULL)
-		return -ENOMEM;
-	drm_gem_private_object_init(adev->ddev, &bo->gem_base, size);
-	INIT_LIST_HEAD(&bo->shadow_list);
-	INIT_LIST_HEAD(&bo->va);
-	bo->preferred_domains = domain & (AMDGPU_GEM_DOMAIN_VRAM |
+	preferred_domains = domain & (AMDGPU_GEM_DOMAIN_VRAM |
 					 AMDGPU_GEM_DOMAIN_GTT |
 					 AMDGPU_GEM_DOMAIN_CPU |
 					 AMDGPU_GEM_DOMAIN_GDS |
@@ -408,10 +402,20 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev, unsigned long size,
 					 AMDGPU_GEM_DOMAIN_OA |
 					 AMDGPU_GEM_DOMAIN_DGMA |
 					 AMDGPU_GEM_DOMAIN_DGMA_IMPORT);
-	bo->allowed_domains = bo->preferred_domains;
+	allowed_domains = preferred_domains;
 	if (type != ttm_bo_type_kernel &&
-	    bo->allowed_domains == AMDGPU_GEM_DOMAIN_VRAM)
-		bo->allowed_domains |= AMDGPU_GEM_DOMAIN_GTT;
+	    allowed_domains == AMDGPU_GEM_DOMAIN_VRAM)
+		allowed_domains |= AMDGPU_GEM_DOMAIN_GTT;
+	domains = preferred_domains;
+retry:
+	bo = kzalloc(sizeof(struct amdgpu_bo), GFP_KERNEL);
+	if (bo == NULL)
+		return -ENOMEM;
+	drm_gem_private_object_init(adev->ddev, &bo->gem_base, size);
+	INIT_LIST_HEAD(&bo->shadow_list);
+	INIT_LIST_HEAD(&bo->va);
+	bo->preferred_domains = preferred_domains;
+	bo->allowed_domains = allowed_domains;
 
 	bo->flags = flags;
 
@@ -444,19 +448,17 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev, unsigned long size,
 #endif
 
 	bo->tbo.bdev = &adev->mman.bdev;
-	domains = bo->preferred_domains;
-retry:
 	amdgpu_ttm_placement_from_domain(bo, domains);
 	r = ttm_bo_init_reserved(&adev->mman.bdev, &bo->tbo, size, type,
 				 &bo->placement, page_align, &ctx, acc_size,
 				 NULL, resv, &amdgpu_ttm_bo_destroy);
-
-	if (unlikely(r && r != -ERESTARTSYS)) {
-		if (bo->flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED) {
-			bo->flags &= ~AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
+	if (unlikely(r && r != -ERESTARTSYS) && type == ttm_bo_type_device &&
+	    !(flags & AMDGPU_GEM_CREATE_NO_FALLBACK)) {
+		if (flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED) {
+			flags &= ~AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 			goto retry;
-		} else if (domains != bo->preferred_domains) {
-			domains = bo->allowed_domains;
+		} else if (domains != allowed_domains) {
+			domains = allowed_domains;
 			goto retry;
 		}
 	}

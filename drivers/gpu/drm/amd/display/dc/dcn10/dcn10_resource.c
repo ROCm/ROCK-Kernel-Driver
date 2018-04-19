@@ -39,7 +39,7 @@
 #include "dce110/dce110_hw_sequencer.h"
 #include "dcn10/dcn10_opp.h"
 #include "dce/dce_link_encoder.h"
-#include "dce/dce_stream_encoder.h"
+#include "dcn10/dcn10_stream_encoder.h"
 #include "dce/dce_clocks.h"
 #include "dce/dce_clock_source.h"
 #include "dce/dce_audio.h"
@@ -166,36 +166,22 @@ static const struct dce_abm_mask abm_mask = {
 
 #define stream_enc_regs(id)\
 [id] = {\
-	SE_DCN_REG_LIST(id),\
-	.TMDS_CNTL = 0,\
-	.AFMT_AVI_INFO0 = 0,\
-	.AFMT_AVI_INFO1 = 0,\
-	.AFMT_AVI_INFO2 = 0,\
-	.AFMT_AVI_INFO3 = 0,\
+	SE_DCN_REG_LIST(id)\
 }
 
-static const struct dce110_stream_enc_registers stream_enc_regs[] = {
+static const struct dcn10_stream_enc_registers stream_enc_regs[] = {
 	stream_enc_regs(0),
 	stream_enc_regs(1),
 	stream_enc_regs(2),
 	stream_enc_regs(3),
 };
 
-static const struct dce_stream_encoder_shift se_shift = {
+static const struct dcn10_stream_encoder_shift se_shift = {
 		SE_COMMON_MASK_SH_LIST_DCN10(__SHIFT)
 };
 
-static const struct dce_stream_encoder_mask se_mask = {
-		SE_COMMON_MASK_SH_LIST_DCN10(_MASK),
-		.AFMT_GENERIC0_UPDATE = 0,
-		.AFMT_GENERIC2_UPDATE = 0,
-		.DP_DYN_RANGE = 0,
-		.DP_YCBCR_RANGE = 0,
-		.HDMI_AVI_INFO_SEND = 0,
-		.HDMI_AVI_INFO_CONT = 0,
-		.HDMI_AVI_INFO_LINE = 0,
-		.DP_SEC_AVI_ENABLE = 0,
-		.AFMT_AVI_INFO_VERSION = 0
+static const struct dcn10_stream_encoder_mask se_mask = {
+		SE_COMMON_MASK_SH_LIST_DCN10(_MASK)
 };
 
 #define audio_regs(id)\
@@ -320,11 +306,14 @@ static const struct dcn_dpp_registers tf_regs[] = {
 };
 
 static const struct dcn_dpp_shift tf_shift = {
-	TF_REG_LIST_SH_MASK_DCN10(__SHIFT)
+	TF_REG_LIST_SH_MASK_DCN10(__SHIFT),
+	TF_DEBUG_REG_LIST_SH_DCN10
+
 };
 
 static const struct dcn_dpp_mask tf_mask = {
 	TF_REG_LIST_SH_MASK_DCN10(_MASK),
+	TF_DEBUG_REG_LIST_MASK_DCN10
 };
 
 static const struct dcn_mpc_registers mpc_regs = {
@@ -650,16 +639,16 @@ static struct stream_encoder *dcn10_stream_encoder_create(
 	enum engine_id eng_id,
 	struct dc_context *ctx)
 {
-	struct dce110_stream_encoder *enc110 =
-		kzalloc(sizeof(struct dce110_stream_encoder), GFP_KERNEL);
+	struct dcn10_stream_encoder *enc1 =
+		kzalloc(sizeof(struct dcn10_stream_encoder), GFP_KERNEL);
 
-	if (!enc110)
+	if (!enc1)
 		return NULL;
 
-	dce110_stream_encoder_construct(enc110, ctx, ctx->dc_bios, eng_id,
+	dcn10_stream_encoder_construct(enc1, ctx, ctx->dc_bios, eng_id,
 					&stream_enc_regs[eng_id],
 					&se_shift, &se_mask);
-	return &enc110->base;
+	return &enc1->base;
 }
 
 static const struct dce_hwseq_registers hwseq_reg = {
@@ -914,36 +903,6 @@ enum dc_status dcn10_add_stream_to_ctx(
 
 	if (result == DC_OK)
 		result = build_mapped_resource(dc, new_ctx, dc_stream);
-
-	return result;
-}
-
-enum dc_status dcn10_validate_guaranteed(
-		struct dc *dc,
-		struct dc_stream_state *dc_stream,
-		struct dc_state *context)
-{
-	enum dc_status result = DC_ERROR_UNEXPECTED;
-
-	context->streams[0] = dc_stream;
-	dc_stream_retain(context->streams[0]);
-	context->stream_count++;
-
-	result = resource_map_pool_resources(dc, context, dc_stream);
-
-	if (result == DC_OK)
-		result = resource_map_phy_clock_resources(dc, context, dc_stream);
-
-	if (result == DC_OK)
-		result = build_mapped_resource(dc, context, dc_stream);
-
-	if (result == DC_OK) {
-		validate_guaranteed_copy_streams(
-				context, dc->caps.max_streams);
-		result = resource_build_scaling_params_for_context(dc, context);
-	}
-	if (result == DC_OK && !dcn_validate_bandwidth(dc, context))
-		return DC_FAIL_BANDWIDTH_VALIDATE;
 
 	return result;
 }
@@ -1233,7 +1192,6 @@ static struct dc_cap_funcs cap_funcs = {
 static struct resource_funcs dcn10_res_pool_funcs = {
 	.destroy = dcn10_destroy_resource_pool,
 	.link_enc_create = dcn10_link_encoder_create,
-	.validate_guaranteed = dcn10_validate_guaranteed,
 	.validate_bandwidth = dcn_validate_bandwidth,
 	.acquire_idle_pipe_for_layer = dcn10_acquire_idle_pipe_for_layer,
 	.validate_plane = dcn10_validate_plane,

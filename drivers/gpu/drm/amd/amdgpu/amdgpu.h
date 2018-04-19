@@ -224,12 +224,12 @@ enum amdgpu_kiq_irq {
   AMDGPU_CP_KIQ_IRQ_LAST
 };
 
-int amdgpu_device_ip_set_clockgating_state(struct amdgpu_device *adev,
-                                           enum amd_ip_block_type block_type,
-                                           enum amd_clockgating_state state);
-int amdgpu_device_ip_set_powergating_state(struct amdgpu_device *adev,
-                                           enum amd_ip_block_type block_type,
-                                           enum amd_powergating_state state);
+int amdgpu_device_ip_set_clockgating_state(void *dev,
+					   enum amd_ip_block_type block_type,
+					   enum amd_clockgating_state state);
+int amdgpu_device_ip_set_powergating_state(void *dev,
+					   enum amd_ip_block_type block_type,
+					   enum amd_powergating_state state);
 void amdgpu_device_ip_get_clockgating_state(struct amdgpu_device *adev,
                                             u32 *flags);
 int amdgpu_device_ip_wait_for_idle(struct amdgpu_device *adev,
@@ -907,6 +907,7 @@ struct amdgpu_gfx_funcs {
 	void (*read_wave_data)(struct amdgpu_device *adev, uint32_t simd, uint32_t wave, uint32_t *dst, int *no_fields);
 	void (*read_wave_vgprs)(struct amdgpu_device *adev, uint32_t simd, uint32_t wave, uint32_t thread, uint32_t start, uint32_t size, uint32_t *dst);
 	void (*read_wave_sgprs)(struct amdgpu_device *adev, uint32_t simd, uint32_t wave, uint32_t start, uint32_t size, uint32_t *dst);
+	void (*select_me_pipe_q)(struct amdgpu_device *adev, u32 me, u32 pipe, u32 queue);
 };
 
 struct amdgpu_ngg_buf {
@@ -1230,6 +1231,8 @@ struct amdgpu_asic_funcs {
 	/* invalidate hdp read cache */
 	void (*invalidate_hdp)(struct amdgpu_device *adev,
 			       struct amdgpu_ring *ring);
+	/* check if the asic needs a full reset of if soft reset will work */
+	bool (*need_full_reset)(struct amdgpu_device *adev);
 };
 
 /*
@@ -1410,7 +1413,17 @@ struct amdgpu_nbio_funcs {
 	void (*detect_hw_virt)(struct amdgpu_device *adev);
 };
 
-
+struct amdgpu_df_funcs {
+	void (*init)(struct amdgpu_device *adev);
+	void (*enable_broadcast_mode)(struct amdgpu_device *adev,
+				      bool enable);
+	u32 (*get_fb_channel_number)(struct amdgpu_device *adev);
+	u32 (*get_hbm_channel_number)(struct amdgpu_device *adev);
+	void (*update_medium_grain_clock_gating)(struct amdgpu_device *adev,
+						 bool enable);
+	void (*get_clockgating_state)(struct amdgpu_device *adev,
+				      u32 *flags);
+};
 /* Define the HW IP blocks will be used in driver , add more if necessary */
 enum amd_hw_ip_block_type {
 	GC_HWIP = 1,
@@ -1657,6 +1670,7 @@ struct amdgpu_device {
 	uint32_t 		*reg_offset[MAX_HWIP][HWIP_MAX_INSTANCE];
 
 	const struct amdgpu_nbio_funcs	*nbio_funcs;
+	const struct amdgpu_df_funcs	*df_funcs;
 
 	/* delayed work_func for deferring clockgating during resume */
 	struct delayed_work     late_init_work;
@@ -1831,6 +1845,7 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 #define amdgpu_asic_get_config_memsize(adev) (adev)->asic_funcs->get_config_memsize((adev))
 #define amdgpu_asic_flush_hdp(adev, r) (adev)->asic_funcs->flush_hdp((adev), (r))
 #define amdgpu_asic_invalidate_hdp(adev, r) (adev)->asic_funcs->invalidate_hdp((adev), (r))
+#define amdgpu_asic_need_full_reset(adev) (adev)->asic_funcs->need_full_reset((adev))
 #define amdgpu_gmc_flush_gpu_tlb(adev, vmid) (adev)->gmc.gmc_funcs->flush_gpu_tlb((adev), (vmid))
 #define amdgpu_gmc_emit_flush_gpu_tlb(r, vmid, addr) (r)->adev->gmc.gmc_funcs->emit_flush_gpu_tlb((r), (vmid), (addr))
 #define amdgpu_gmc_emit_pasid_mapping(r, vmid, pasid) (r)->adev->gmc.gmc_funcs->emit_pasid_mapping((r), (vmid), (pasid))
@@ -1883,6 +1898,7 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 #define amdgpu_gfx_select_se_sh(adev, se, sh, instance) (adev)->gfx.funcs->select_se_sh((adev), (se), (sh), (instance))
 #define amdgpu_gds_switch(adev, r, v, d, w, a) (adev)->gds.funcs->patch_gds_switch((r), (v), (d), (w), (a))
 #define amdgpu_psp_check_fw_loading_status(adev, i) (adev)->firmware.funcs->check_fw_loading_status((adev), (i))
+#define amdgpu_gfx_select_me_pipe_q(adev, me, pipe, q) (adev)->gfx.funcs->select_me_pipe_q((adev), (me), (pipe), (q))
 
 /* Common functions */
 int amdgpu_device_gpu_recover(struct amdgpu_device *adev,

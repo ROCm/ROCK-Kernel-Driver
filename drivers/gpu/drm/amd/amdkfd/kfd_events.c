@@ -33,6 +33,7 @@
 #include "kfd_priv.h"
 #include "kfd_events.h"
 #include <linux/device.h>
+#include "kfd_iommu.h"
 
 /*
  * Wrapper around wait_queue_entry_t
@@ -953,13 +954,6 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 	}
 
 	kfd_unref_process(p);
-}
-#else
-void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
-		unsigned long address, bool is_write_requested,
-		bool is_execute_requested)
-{
-	return;
 }
 #endif /* KFD_SUPPORT_IOMMU_V2 */
 

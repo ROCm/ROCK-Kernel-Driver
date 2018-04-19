@@ -170,11 +170,9 @@ failed_alloc:
 }
 
 bool dc_stream_adjust_vmin_vmax(struct dc *dc,
-		struct dc_stream_state **streams, int num_streams,
-		int vmin, int vmax)
+		struct dc_stream_state *stream,
+		struct dc_crtc_timing_adjust *adjust)
 {
-	/* TODO: Support multiple streams */
-	struct dc_stream_state *stream = streams[0];
 	int i = 0;
 	bool ret = false;
 
@@ -182,11 +180,11 @@ bool dc_stream_adjust_vmin_vmax(struct dc *dc,
 		struct pipe_ctx *pipe = &dc->current_state->res_ctx.pipe_ctx[i];
 
 		if (pipe->stream == stream && pipe->stream_res.stream_enc) {
-			dc->hwss.set_drr(&pipe, 1, vmin, vmax);
-
-			/* build and update the info frame */
-			resource_build_info_frame(pipe);
-			dc->hwss.update_info_frame(pipe);
+			pipe->stream->adjust = *adjust;
+			dc->hwss.set_drr(&pipe,
+					1,
+					adjust->v_total_min,
+					adjust->v_total_max);
 
 			ret = true;
 		}
@@ -199,7 +197,7 @@ bool dc_stream_get_crtc_position(struct dc *dc,
 		unsigned int *v_pos, unsigned int *nom_v_pos)
 {
 	/* TODO: Support multiple streams */
-	struct dc_stream_state *stream = streams[0];
+	const struct dc_stream_state *stream = streams[0];
 	int i = 0;
 	bool ret = false;
 	struct crtc_position position;
@@ -936,95 +934,6 @@ bool dc_post_update_surfaces_to_stream(struct dc *dc)
 	return true;
 }
 
-/*
- * TODO this whole function needs to go
- *
- * dc_surface_update is needlessly complex. See if we can just replace this
- * with a dc_plane_state and follow the atomic model a bit more closely here.
- */
-bool dc_commit_planes_to_stream(
-		struct dc *dc,
-		struct dc_plane_state **plane_states,
-		uint8_t new_plane_count,
-		struct dc_stream_state *dc_stream,
-		struct dc_state *state)
-{
-	/* no need to dynamically allocate this. it's pretty small */
-	struct dc_surface_update updates[MAX_SURFACES];
-	struct dc_flip_addrs *flip_addr;
-	struct dc_plane_info *plane_info;
-	struct dc_scaling_info *scaling_info;
-	int i;
-	struct dc_stream_update *stream_update =
-			kzalloc(sizeof(struct dc_stream_update), GFP_KERNEL);
-
-	if (!stream_update) {
-		BREAK_TO_DEBUGGER();
-		return false;
-	}
-
-	flip_addr = kcalloc(MAX_SURFACES, sizeof(struct dc_flip_addrs),
-			    GFP_KERNEL);
-	plane_info = kcalloc(MAX_SURFACES, sizeof(struct dc_plane_info),
-			     GFP_KERNEL);
-	scaling_info = kcalloc(MAX_SURFACES, sizeof(struct dc_scaling_info),
-			       GFP_KERNEL);
-
-	if (!flip_addr || !plane_info || !scaling_info) {
-		kfree(flip_addr);
-		kfree(plane_info);
-		kfree(scaling_info);
-		kfree(stream_update);
-		return false;
-	}
-
-	memset(updates, 0, sizeof(updates));
-
-	stream_update->src = dc_stream->src;
-	stream_update->dst = dc_stream->dst;
-	stream_update->out_transfer_func = dc_stream->out_transfer_func;
-
-	for (i = 0; i < new_plane_count; i++) {
-		updates[i].surface = plane_states[i];
-		updates[i].gamma =
-			(struct dc_gamma *)plane_states[i]->gamma_correction;
-		updates[i].in_transfer_func = plane_states[i]->in_transfer_func;
-		flip_addr[i].address = plane_states[i]->address;
-		flip_addr[i].flip_immediate = plane_states[i]->flip_immediate;
-		plane_info[i].color_space = plane_states[i]->color_space;
-		plane_info[i].input_tf = plane_states[i]->input_tf;
-		plane_info[i].format = plane_states[i]->format;
-		plane_info[i].plane_size = plane_states[i]->plane_size;
-		plane_info[i].rotation = plane_states[i]->rotation;
-		plane_info[i].horizontal_mirror = plane_states[i]->horizontal_mirror;
-		plane_info[i].stereo_format = plane_states[i]->stereo_format;
-		plane_info[i].tiling_info = plane_states[i]->tiling_info;
-		plane_info[i].visible = plane_states[i]->visible;
-		plane_info[i].per_pixel_alpha = plane_states[i]->per_pixel_alpha;
-		plane_info[i].dcc = plane_states[i]->dcc;
-		scaling_info[i].scaling_quality = plane_states[i]->scaling_quality;
-		scaling_info[i].src_rect = plane_states[i]->src_rect;
-		scaling_info[i].dst_rect = plane_states[i]->dst_rect;
-		scaling_info[i].clip_rect = plane_states[i]->clip_rect;
-
-		updates[i].flip_addr = &flip_addr[i];
-		updates[i].plane_info = &plane_info[i];
-		updates[i].scaling_info = &scaling_info[i];
-	}
-
-	dc_commit_updates_for_stream(
-			dc,
-			updates,
-			new_plane_count,
-			dc_stream, stream_update, plane_states, state);
-
-	kfree(flip_addr);
-	kfree(plane_info);
-	kfree(scaling_info);
-	kfree(stream_update);
-	return true;
-}
-
 struct dc_state *dc_create_state(void)
 {
 	struct dc_state *context = kzalloc(sizeof(struct dc_state),
@@ -1106,9 +1015,6 @@ static enum surface_update_type get_plane_info_update_type(const struct dc_surfa
 
 	if (u->plane_info->color_space != u->surface->color_space)
 		update_flags->bits.color_space_change = 1;
-
-	if (u->plane_info->input_tf != u->surface->input_tf)
-		update_flags->bits.input_tf_change = 1;
 
 	if (u->plane_info->horizontal_mirror != u->surface->horizontal_mirror)
 		update_flags->bits.horizontal_mirror_change = 1;
@@ -1243,9 +1149,17 @@ static enum surface_update_type det_surface_update(const struct dc *dc,
 	if (u->input_csc_color_matrix)
 		update_flags->bits.input_csc_change = 1;
 
-	if (update_flags->bits.in_transfer_func_change
-			|| update_flags->bits.input_csc_change) {
+	if (u->coeff_reduction_factor)
+		update_flags->bits.coeff_reduction_change = 1;
+
+	if (update_flags->bits.in_transfer_func_change) {
 		type = UPDATE_TYPE_MED;
+		elevate_update_type(&overall_type, type);
+	}
+
+	if (update_flags->bits.input_csc_change
+			|| update_flags->bits.coeff_reduction_change) {
+		type = UPDATE_TYPE_FULL;
 		elevate_update_type(&overall_type, type);
 	}
 
@@ -1265,8 +1179,22 @@ static enum surface_update_type check_update_surfaces_for_stream(
 	if (stream_status == NULL || stream_status->plane_count != surface_count)
 		return UPDATE_TYPE_FULL;
 
-	if (stream_update)
-		return UPDATE_TYPE_FULL;
+	/* some stream updates require passive update */
+	if (stream_update) {
+		if ((stream_update->src.height != 0) &&
+				(stream_update->src.width != 0))
+			return UPDATE_TYPE_FULL;
+
+		if ((stream_update->dst.height != 0) &&
+				(stream_update->dst.width != 0))
+			return UPDATE_TYPE_FULL;
+
+		if (stream_update->out_transfer_func)
+			return UPDATE_TYPE_FULL;
+
+		if (stream_update->abm_level)
+			return UPDATE_TYPE_FULL;
+	}
 
 	for (i = 0 ; i < surface_count; i++) {
 		enum surface_update_type type =
@@ -1297,7 +1225,7 @@ enum surface_update_type dc_check_update_surfaces_for_stream(
 	type = check_update_surfaces_for_stream(dc, updates, surface_count, stream_update, stream_status);
 	if (type == UPDATE_TYPE_FULL)
 		for (i = 0; i < surface_count; i++)
-			updates[i].surface->update_flags.bits.full_update = 1;
+			updates[i].surface->update_flags.raw = 0xFFFFFFFF;
 
 	return type;
 }
@@ -1345,7 +1273,6 @@ static void commit_planes_for_stream(struct dc *dc,
 		return;
 	}
 
-	/* Full fe update*/
 	for (j = 0; j < dc->res_pool->pipe_count; j++) {
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[j];
 
@@ -1356,11 +1283,22 @@ static void commit_planes_for_stream(struct dc *dc,
 
 			top_pipe_to_program = pipe_ctx;
 
-			if (update_type == UPDATE_TYPE_FAST || !pipe_ctx->plane_state)
+			if (!pipe_ctx->plane_state)
+				continue;
+
+			/* Fast update*/
+			// VRR program can be done as part of FAST UPDATE
+			if (stream_update && stream_update->adjust)
+				dc->hwss.set_drr(&pipe_ctx, 1,
+					stream_update->adjust->v_total_min,
+					stream_update->adjust->v_total_max);
+
+			/* Full fe update*/
+			if (update_type == UPDATE_TYPE_FAST)
 				continue;
 
 			stream_status =
-					stream_get_status(context, pipe_ctx->stream);
+				stream_get_status(context, pipe_ctx->stream);
 
 			dc->hwss.apply_ctx_for_surface(
 					dc, pipe_ctx->stream, stream_status->plane_count, context);
@@ -1375,6 +1313,12 @@ static void commit_planes_for_stream(struct dc *dc,
 					pipe_ctx->stream_res.abm->funcs->set_abm_level(
 							pipe_ctx->stream_res.abm, stream->abm_level);
 			}
+
+			if (stream_update && stream_update->periodic_fn_vsync_delta &&
+					pipe_ctx->stream_res.tg->funcs->program_vline_interrupt)
+				pipe_ctx->stream_res.tg->funcs->program_vline_interrupt(
+						pipe_ctx->stream_res.tg, &pipe_ctx->stream->timing,
+						pipe_ctx->stream->periodic_fn_vsync_delta);
 		}
 	}
 
@@ -1409,7 +1353,7 @@ static void commit_planes_for_stream(struct dc *dc,
 		dc->hwss.pipe_control_lock(dc, top_pipe_to_program, false);
 	}
 
-	if (stream && stream_update && update_type > UPDATE_TYPE_FAST)
+	if (stream && stream_update)
 		for (j = 0; j < dc->res_pool->pipe_count; j++) {
 			struct pipe_ctx *pipe_ctx =
 					&context->res_ctx.pipe_ctx[j];
@@ -1417,7 +1361,8 @@ static void commit_planes_for_stream(struct dc *dc,
 			if (pipe_ctx->stream != stream)
 				continue;
 
-			if (stream_update->hdr_static_metadata) {
+			if (stream_update->hdr_static_metadata ||
+				(stream_update->vrr_infopacket)) {
 				resource_build_info_frame(pipe_ctx);
 				dc->hwss.update_info_frame(pipe_ctx);
 			}

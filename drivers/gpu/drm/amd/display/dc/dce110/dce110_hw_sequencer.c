@@ -70,8 +70,9 @@
 
 #define CTX \
 	hws->ctx
-#define DC_LOGGER \
-	ctx->logger
+
+#define DC_LOGGER_INIT()
+
 #define REG(reg)\
 	hws->regs->reg
 
@@ -279,7 +280,9 @@ dce110_set_input_transfer_func(struct pipe_ctx *pipe_ctx,
 	build_prescale_params(&prescale_params, plane_state);
 	ipp->funcs->ipp_program_prescale(ipp, &prescale_params);
 
-	if (plane_state->gamma_correction && dce_use_lut(plane_state->format))
+	if (plane_state->gamma_correction &&
+			!plane_state->gamma_correction->is_identity &&
+			dce_use_lut(plane_state->format))
 		ipp->funcs->ipp_program_input_lut(ipp, plane_state->gamma_correction);
 
 	if (tf == NULL) {
@@ -848,6 +851,28 @@ void hwss_edp_power_control(
 
 	if (power_up != is_panel_powered_on(hwseq)) {
 		/* Send VBIOS command to prompt eDP panel power */
+		if (power_up) {
+			unsigned long long current_ts = dm_get_timestamp(ctx);
+			unsigned long long duration_in_ms =
+					dm_get_elapse_time_in_ns(
+							ctx,
+							current_ts,
+							link->link_trace.time_stamp.edp_poweroff) / 1000000;
+			unsigned long long wait_time_ms = 0;
+
+			/* max 500ms from LCDVDD off to on */
+			if (link->link_trace.time_stamp.edp_poweroff == 0)
+				wait_time_ms = 500;
+			else if (duration_in_ms < 500)
+				wait_time_ms = 500 - duration_in_ms;
+
+			if (wait_time_ms) {
+				msleep(wait_time_ms);
+				dm_output_to_console("%s: wait %lld ms to power on eDP.\n",
+						__func__, wait_time_ms);
+			}
+
+		}
 
 		DC_LOG_HW_RESUME_S3(
 				"%s: Panel Power action: %s\n",
@@ -861,8 +886,13 @@ void hwss_edp_power_control(
 		cntl.coherent = false;
 		cntl.lanes_number = LANE_COUNT_FOUR;
 		cntl.hpd_sel = link->link_enc->hpd_source;
-
 		bp_result = link_transmitter_control(ctx->dc_bios, &cntl);
+
+		if (!power_up)
+			/*save driver power off time stamp*/
+			link->link_trace.time_stamp.edp_poweroff = dm_get_timestamp(ctx);
+		else
+			link->link_trace.time_stamp.edp_poweron = dm_get_timestamp(ctx);
 
 		if (bp_result != BP_RESULT_OK)
 			DC_LOG_ERROR(
@@ -1008,7 +1038,7 @@ void dce110_unblank_stream(struct pipe_ctx *pipe_ctx,
 
 	if (link->local_sink && link->local_sink->sink_signal == SIGNAL_TYPE_EDP) {
 		link->dc->hwss.edp_backlight_control(link, true);
-		stream->bl_pwm_level = 0;
+		stream->bl_pwm_level = EDP_BACKLIGHT_RAMP_DISABLE_LEVEL;
 	}
 }
 void dce110_blank_stream(struct pipe_ctx *pipe_ctx)
@@ -1207,6 +1237,8 @@ static enum dc_status dce110_prog_pixclk_crtc_otg(
 	struct pipe_ctx *pipe_ctx_old = &dc->current_state->res_ctx.
 			pipe_ctx[pipe_ctx->pipe_idx];
 	struct tg_color black_color = {0};
+	struct drr_params params = {0};
+	unsigned int event_triggers = 0;
 
 	if (!pipe_ctx_old->stream) {
 
@@ -1236,9 +1268,19 @@ static enum dc_status dce110_prog_pixclk_crtc_otg(
 				&stream->timing,
 				true);
 
-		pipe_ctx->stream_res.tg->funcs->set_static_screen_control(
-				pipe_ctx->stream_res.tg,
-				0x182);
+		params.vertical_total_min = stream->adjust.v_total_min;
+		params.vertical_total_max = stream->adjust.v_total_max;
+		if (pipe_ctx->stream_res.tg->funcs->set_drr)
+			pipe_ctx->stream_res.tg->funcs->set_drr(
+				pipe_ctx->stream_res.tg, &params);
+
+		// DRR should set trigger event to monitor surface update event
+		if (stream->adjust.v_total_min != 0 &&
+				stream->adjust.v_total_max != 0)
+			event_triggers = 0x80;
+		if (pipe_ctx->stream_res.tg->funcs->set_static_screen_control)
+			pipe_ctx->stream_res.tg->funcs->set_static_screen_control(
+				pipe_ctx->stream_res.tg, event_triggers);
 	}
 
 	if (!pipe_ctx_old->stream) {
@@ -1248,8 +1290,6 @@ static enum dc_status dce110_prog_pixclk_crtc_otg(
 			return DC_ERROR_UNEXPECTED;
 		}
 	}
-
-
 
 	return DC_OK;
 }
@@ -1539,6 +1579,7 @@ static void dce110_set_displaymarks(
 			pipe_ctx->plane_res.mi,
 			context->bw.dce.nbp_state_change_wm_ns[num_pipes],
 			context->bw.dce.stutter_exit_wm_ns[num_pipes],
+			context->bw.dce.stutter_entry_wm_ns[num_pipes],
 			context->bw.dce.urgent_wm_ns[num_pipes],
 			total_dest_line_time_ns);
 		if (i == underlay_idx) {
@@ -1564,6 +1605,7 @@ static void set_safe_displaymarks(
 		MAX_WATERMARK, MAX_WATERMARK, MAX_WATERMARK, MAX_WATERMARK };
 	struct dce_watermarks nbp_marks = {
 		SAFE_NBP_MARK, SAFE_NBP_MARK, SAFE_NBP_MARK, SAFE_NBP_MARK };
+	struct dce_watermarks min_marks = { 0, 0, 0, 0};
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		if (res_ctx->pipe_ctx[i].stream == NULL || res_ctx->pipe_ctx[i].plane_res.mi == NULL)
@@ -1573,6 +1615,7 @@ static void set_safe_displaymarks(
 				res_ctx->pipe_ctx[i].plane_res.mi,
 				nbp_marks,
 				max_marks,
+				min_marks,
 				max_marks,
 				MAX_WATERMARK);
 
@@ -1596,16 +1639,24 @@ static void set_drr(struct pipe_ctx **pipe_ctx,
 {
 	int i = 0;
 	struct drr_params params = {0};
+	// DRR should set trigger event to monitor surface update event
+	unsigned int event_triggers = 0x80;
 
 	params.vertical_total_max = vmax;
 	params.vertical_total_min = vmin;
 
 	/* TODO: If multiple pipes are to be supported, you need
-	 * some GSL stuff
+	 * some GSL stuff. Static screen triggers may be programmed differently
+	 * as well.
 	 */
-
 	for (i = 0; i < num_pipes; i++) {
-		pipe_ctx[i]->stream_res.tg->funcs->set_drr(pipe_ctx[i]->stream_res.tg, &params);
+		pipe_ctx[i]->stream_res.tg->funcs->set_drr(
+			pipe_ctx[i]->stream_res.tg, &params);
+
+		if (vmax != 0 && vmin != 0)
+			pipe_ctx[i]->stream_res.tg->funcs->set_static_screen_control(
+					pipe_ctx[i]->stream_res.tg,
+					event_triggers);
 	}
 }
 
@@ -1797,6 +1848,9 @@ static bool should_enable_fbc(struct dc *dc,
 			break;
 		}
 	}
+
+	/* Pipe context should be found */
+	ASSERT(pipe_ctx);
 
 	/* Only supports eDP */
 	if (pipe_ctx->stream->sink->link->connector_signal != SIGNAL_TYPE_EDP)
@@ -2695,7 +2749,7 @@ static void dce110_program_front_end_for_pipe(
 	struct xfm_grph_csc_adjustment adjust;
 	struct out_csc_color_matrix tbl_entry;
 	unsigned int i;
-	struct dc_context *ctx = dc->ctx;
+	DC_LOGGER_INIT();
 	memset(&tbl_entry, 0, sizeof(tbl_entry));
 
 	if (dc->current_state)
@@ -2771,13 +2825,13 @@ static void dce110_program_front_end_for_pipe(
 		dc->hwss.set_output_transfer_func(pipe_ctx, pipe_ctx->stream);
 
 	DC_LOG_SURFACE(
-			"Pipe:%d 0x%x: addr hi:0x%x, "
+			"Pipe:%d %p: addr hi:0x%x, "
 			"addr low:0x%x, "
 			"src: %d, %d, %d,"
 			" %d; dst: %d, %d, %d, %d;"
 			"clip: %d, %d, %d, %d\n",
 			pipe_ctx->pipe_idx,
-			pipe_ctx->plane_state,
+			(void *) pipe_ctx->plane_state,
 			pipe_ctx->plane_state->address.grph.addr.high_part,
 			pipe_ctx->plane_state->address.grph.addr.low_part,
 			pipe_ctx->plane_state->src_rect.x,

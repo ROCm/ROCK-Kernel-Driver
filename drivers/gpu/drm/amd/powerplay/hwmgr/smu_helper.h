@@ -27,6 +27,9 @@ struct pp_atomctrl_voltage_table;
 struct pp_hwmgr;
 struct phm_ppt_v1_voltage_lookup_table;
 
+uint8_t convert_to_vid(uint16_t vddc);
+uint16_t convert_to_vddc(uint8_t vid);
+
 extern int phm_wait_for_register_unequal(struct pp_hwmgr *hwmgr,
 					uint32_t index,
 					uint32_t value, uint32_t mask);
@@ -78,6 +81,9 @@ int phm_irq_process(struct amdgpu_device *adev,
 			   struct amdgpu_iv_entry *entry);
 
 int smu9_register_irq_handlers(struct pp_hwmgr *hwmgr);
+
+void *smu_atom_get_data_table(void *dev, uint32_t table, uint16_t *size,
+						uint8_t *frev, uint8_t *crev);
 
 #define PHM_FIELD_SHIFT(reg, field) reg##__##field##__SHIFT
 #define PHM_FIELD_MASK(reg, field) reg##__##field##_MASK
