@@ -759,6 +759,9 @@ nfsd4_read(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	if (read->rd_offset >= OFFSET_MAX)
 		return nfserr_inval;
 
+	trace_nfsd_read_start(rqstp, &cstate->current_fh,
+			      read->rd_offset, read->rd_length);
+
 	/*
 	 * If we do a zero copy read, then a client will see read data
 	 * that reflects the state of the file *after* performing the
@@ -791,6 +794,8 @@ nfsd4_read_release(union nfsd4_op_u *u)
 {
 	if (u->read.rd_filp)
 		fput(u->read.rd_filp);
+	trace_nfsd_read_done(u->read.rd_rqstp, u->read.rd_fhp,
+			     u->read.rd_offset, u->read.rd_length);
 }
 
 static __be32
@@ -1009,6 +1014,9 @@ nfsd4_write(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	if (write->wr_offset >= OFFSET_MAX)
 		return nfserr_inval;
 
+	cnt = write->wr_buflen;
+	trace_nfsd_write_start(rqstp, &cstate->current_fh,
+			       write->wr_offset, cnt);
 	status = nfs4_preprocess_stateid_op(rqstp, cstate, &cstate->current_fh,
 						stateid, WR_STATE, &filp, NULL);
 	if (status) {
@@ -1016,7 +1024,6 @@ nfsd4_write(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 		return status;
 	}
 
-	cnt = write->wr_buflen;
 	write->wr_how_written = write->wr_stable_how;
 	gen_boot_verifier(&write->wr_verifier, SVC_NET(rqstp));
 
@@ -1029,7 +1036,8 @@ nfsd4_write(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	fput(filp);
 
 	write->wr_bytes_written = cnt;
-
+	trace_nfsd_write_done(rqstp, &cstate->current_fh,
+			      write->wr_offset, cnt);
 	return status;
 }
 
@@ -1114,7 +1122,6 @@ nfsd4_copy(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	else {
 		copy->cp_res.wr_bytes_written = bytes;
 		copy->cp_res.wr_stable_how = NFS_UNSTABLE;
-		copy->cp_consecutive = 1;
 		copy->cp_synchronous = 1;
 		gen_boot_verifier(&copy->cp_res.wr_verifier, SVC_NET(rqstp));
 		status = nfs_ok;
@@ -1420,7 +1427,7 @@ nfsd4_layoutget(struct svc_rqst *rqstp,
 	nfserr = nfsd4_preprocess_layout_stateid(rqstp, cstate, &lgp->lg_sid,
 						true, lgp->lg_layout_type, &ls);
 	if (nfserr) {
-		trace_layout_get_lookup_fail(&lgp->lg_sid);
+		trace_nfsd_layout_get_lookup_fail(&lgp->lg_sid);
 		goto out;
 	}
 
@@ -1489,7 +1496,7 @@ nfsd4_layoutcommit(struct svc_rqst *rqstp,
 						false, lcp->lc_layout_type,
 						&ls);
 	if (nfserr) {
-		trace_layout_commit_lookup_fail(&lcp->lc_sid);
+		trace_nfsd_layout_commit_lookup_fail(&lcp->lc_sid);
 		/* fixup error code as per RFC5661 */
 		if (nfserr == nfserr_bad_stateid)
 			nfserr = nfserr_badlayout;
@@ -1722,12 +1729,10 @@ nfsd4_proc_compound(struct svc_rqst *rqstp)
 		goto encode_op;
 	}
 
+	trace_nfsd_compound(rqstp, args->opcnt);
 	while (!status && resp->opcnt < args->opcnt) {
 		op = &args->ops[resp->opcnt++];
 
-		dprintk("nfsv4 compound op #%d/%d: %d (%s)\n",
-			resp->opcnt, args->opcnt, op->opnum,
-			nfsd4_op_name(op->opnum));
 		/*
 		 * The XDR decode routines may have pre-set op->status;
 		 * for example, if there is a miscellaneous XDR error
@@ -1801,9 +1806,8 @@ encode_op:
 			status = op->status;
 		}
 
-		dprintk("nfsv4 compound op %p opcnt %d #%d: %d: status %d\n",
-			args->ops, args->opcnt, resp->opcnt, op->opnum,
-			be32_to_cpu(status));
+		trace_nfsd_compound_status(args->opcnt, resp->opcnt, status,
+					   nfsd4_op_name(op->opnum));
 
 		nfsd4_cstate_clear_replay(cstate);
 		nfsd4_increment_op_stats(op->opnum);

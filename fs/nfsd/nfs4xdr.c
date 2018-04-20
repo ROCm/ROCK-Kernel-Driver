@@ -1757,7 +1757,7 @@ nfsd4_decode_copy(struct nfsd4_compoundargs *argp, struct nfsd4_copy *copy)
 	p = xdr_decode_hyper(p, &copy->cp_src_pos);
 	p = xdr_decode_hyper(p, &copy->cp_dst_pos);
 	p = xdr_decode_hyper(p, &copy->cp_count);
-	copy->cp_consecutive = be32_to_cpup(p++);
+	p++; /* ca_consecutive: we always do consecutive copies */
 	copy->cp_synchronous = be32_to_cpup(p++);
 	tmp = be32_to_cpup(p); /* Source server list not supported */
 
@@ -3425,8 +3425,9 @@ static __be32 nfsd4_encode_splice_read(
 		return nfserr_resource;
 
 	len = maxcount;
-	nfserr = nfsd_splice_read(read->rd_rqstp, file,
-				  read->rd_offset, &maxcount);
+	nfserr = nfsd_splice_read(read->rd_rqstp, read->rd_fhp,
+				  file, read->rd_offset, &maxcount);
+	read->rd_length = maxcount;
 	if (nfserr) {
 		/*
 		 * nfsd_splice_actor may have already messed with the
@@ -3509,8 +3510,9 @@ static __be32 nfsd4_encode_readv(struct nfsd4_compoundres *resp,
 	read->rd_vlen = v;
 
 	len = maxcount;
-	nfserr = nfsd_readv(file, read->rd_offset, resp->rqstp->rq_vec,
-			read->rd_vlen, &maxcount);
+	nfserr = nfsd_readv(resp->rqstp, read->rd_fhp, file, read->rd_offset,
+			    resp->rqstp->rq_vec, read->rd_vlen, &maxcount);
+	read->rd_length = maxcount;
 	if (nfserr)
 		return nfserr;
 	xdr_truncate_encode(xdr, starting_len + 8 + ((maxcount+3)&~3));
@@ -4212,7 +4214,7 @@ nfsd4_encode_copy(struct nfsd4_compoundres *resp, __be32 nfserr,
 		return nfserr;
 
 	p = xdr_reserve_space(&resp->xdr, 4 + 4);
-	*p++ = cpu_to_be32(copy->cp_consecutive);
+	*p++ = xdr_one; /* cr_consecutive */
 	*p++ = cpu_to_be32(copy->cp_synchronous);
 	return 0;
 }

@@ -130,12 +130,17 @@ struct apparmor_audit_data {
 					int rlim;
 					unsigned long max;
 				} rlim;
-				int signal;
+				struct {
+					int signal;
+					int unmappedsig;
+				};
+				struct {
+					int type, protocol;
+					struct sock *peer_sk;
+					void *addr;
+					int addrlen;
+				} net;
 			};
-			struct {
-				int type, protocol;
-				struct sock *sk;
-			} net;
 		};
 		struct {
 			struct aa_profile *profile;

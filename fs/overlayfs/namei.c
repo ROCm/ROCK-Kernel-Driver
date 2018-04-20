@@ -180,7 +180,8 @@ invalid:
 	goto out;
 }
 
-struct dentry *ovl_decode_fh(struct ovl_fh *fh, struct vfsmount *mnt)
+struct dentry *ovl_decode_real_fh(struct ovl_fh *fh, struct vfsmount *mnt,
+				  bool connected)
 {
 	struct dentry *real;
 	int bytes;
@@ -195,7 +196,7 @@ struct dentry *ovl_decode_fh(struct ovl_fh *fh, struct vfsmount *mnt)
 	bytes = (fh->len - offsetof(struct ovl_fh, fid));
 	real = exportfs_decode_fh(mnt, (struct fid *)fh->fid,
 				  bytes >> 2, (int)fh->type,
-				  ovl_acceptable, mnt);
+				  connected ? ovl_acceptable : NULL, mnt);
 	if (IS_ERR(real)) {
 		/*
 		 * Treat stale file handle to lower file as "origin unknown".
@@ -229,6 +230,7 @@ static int ovl_lookup_single(struct dentry *base, struct ovl_lookup_data *d,
 {
 	struct dentry *this;
 	int err;
+	bool last_element = !post[0];
 
 	this = lookup_one_len_unlocked(name, base, namelen);
 	if (IS_ERR(this)) {
@@ -254,11 +256,23 @@ static int ovl_lookup_single(struct dentry *base, struct ovl_lookup_data *d,
 		d->stop = true;
 		if (d->is_dir)
 			goto put_and_out;
+
+		/*
+		 * NB: handle failure to lookup non-last element when non-dir
+		 * redirects become possible
+		 */
+		WARN_ON(!last_element);
 		goto out;
 	}
-	d->is_dir = true;
-	if (!d->last && ovl_is_opaquedir(this)) {
-		d->stop = d->opaque = true;
+	if (last_element)
+		d->is_dir = true;
+	if (d->last)
+		goto out;
+
+	if (ovl_is_opaquedir(this)) {
+		d->stop = true;
+		if (last_element)
+			d->opaque = true;
 		goto out;
 	}
 	err = ovl_check_redirect(this, d, prelen, post);
@@ -319,14 +333,15 @@ static int ovl_lookup_layer(struct dentry *base, struct ovl_lookup_data *d,
 }
 
 
-int ovl_check_origin_fh(struct ovl_fs *ofs, struct ovl_fh *fh,
+int ovl_check_origin_fh(struct ovl_fs *ofs, struct ovl_fh *fh, bool connected,
 			struct dentry *upperdentry, struct ovl_path **stackp)
 {
 	struct dentry *origin = NULL;
 	int i;
 
 	for (i = 0; i < ofs->numlower; i++) {
-		origin = ovl_decode_fh(fh, ofs->lower_layers[i].mnt);
+		origin = ovl_decode_real_fh(fh, ofs->lower_layers[i].mnt,
+					    connected);
 		if (origin)
 			break;
 	}
@@ -370,7 +385,7 @@ static int ovl_check_origin(struct ovl_fs *ofs, struct dentry *upperdentry,
 	if (IS_ERR_OR_NULL(fh))
 		return PTR_ERR(fh);
 
-	err = ovl_check_origin_fh(ofs, fh, upperdentry, stackp);
+	err = ovl_check_origin_fh(ofs, fh, false, upperdentry, stackp);
 	kfree(fh);
 
 	if (err) {
@@ -424,7 +439,7 @@ int ovl_verify_set_fh(struct dentry *dentry, const char *name,
 	struct ovl_fh *fh;
 	int err;
 
-	fh = ovl_encode_fh(real, is_upper);
+	fh = ovl_encode_real_fh(real, is_upper);
 	err = PTR_ERR(fh);
 	if (IS_ERR(fh))
 		goto fail;
@@ -460,7 +475,7 @@ struct dentry *ovl_index_upper(struct ovl_fs *ofs, struct dentry *index)
 	if (IS_ERR_OR_NULL(fh))
 		return ERR_CAST(fh);
 
-	upper = ovl_decode_fh(fh, ofs->upper_mnt);
+	upper = ovl_decode_real_fh(fh, ofs->upper_mnt, true);
 	kfree(fh);
 
 	if (IS_ERR_OR_NULL(upper))
@@ -567,7 +582,7 @@ int ovl_verify_index(struct ovl_fs *ofs, struct dentry *index)
 
 	/* Check if non-dir index is orphan and don't warn before cleaning it */
 	if (!d_is_dir(index) && d_inode(index)->i_nlink == 1) {
-		err = ovl_check_origin_fh(ofs, fh, index, &stack);
+		err = ovl_check_origin_fh(ofs, fh, false, index, &stack);
 		if (err)
 			goto fail;
 
@@ -628,7 +643,7 @@ int ovl_get_index_name(struct dentry *origin, struct qstr *name)
 	struct ovl_fh *fh;
 	int err;
 
-	fh = ovl_encode_fh(origin, false);
+	fh = ovl_encode_real_fh(origin, false);
 	if (IS_ERR(fh))
 		return PTR_ERR(fh);
 
@@ -989,17 +1004,18 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 		upperdentry = dget(index);
 
 	if (upperdentry || ctr) {
-		if (ctr)
-			origin = stack[0].dentry;
-		inode = ovl_get_inode(dentry->d_sb, upperdentry, origin, index,
+		inode = ovl_get_inode(dentry->d_sb, upperdentry, stack, index,
 				      ctr);
 		err = PTR_ERR(inode);
 		if (IS_ERR(inode))
 			goto out_free_oe;
 
+		/*
+		 * NB: handle redirected hard links when non-dir redirects
+		 * become possible
+		 */
+		WARN_ON(OVL_I(inode)->redirect);
 		OVL_I(inode)->redirect = upperredirect;
-		if (index)
-			ovl_set_flag(OVL_INDEX, inode);
 	}
 
 	revert_creds(old_cred);

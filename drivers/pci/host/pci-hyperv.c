@@ -656,7 +656,7 @@ static void _hv_pcifront_read_config(struct hv_pci_dev *hpdev, int where,
 			break;
 		}
 		/*
-		 * Make sure the write was done before we release the spinlock
+		 * Make sure the read was done before we release the spinlock
 		 * allowing consecutive reads/writes.
 		 */
 		mb();
@@ -1789,6 +1789,7 @@ static void hv_pci_devices_present(struct hv_pcibus_device *hbus,
 	struct hv_dr_state *dr;
 	struct hv_dr_work *dr_wrk;
 	unsigned long flags;
+	bool pending_dr;
 
 	dr_wrk = kzalloc(sizeof(*dr_wrk), GFP_NOWAIT);
 	if (!dr_wrk)
@@ -1812,11 +1813,21 @@ static void hv_pci_devices_present(struct hv_pcibus_device *hbus,
 	}
 
 	spin_lock_irqsave(&hbus->device_list_lock, flags);
+	/*
+	 * If pending_dr is true, we have already queued a work,
+	 * which will see the new dr. Otherwise, we need to
+	 * queue a new work.
+	 */
+	pending_dr = !list_empty(&hbus->dr_list);
 	list_add_tail(&dr->list_entry, &hbus->dr_list);
 	spin_unlock_irqrestore(&hbus->device_list_lock, flags);
 
-	get_hvpcibus(hbus);
-	queue_work(hbus->wq, &dr_wrk->wrk);
+	if (pending_dr) {
+		kfree(dr_wrk);
+	} else {
+		get_hvpcibus(hbus);
+		queue_work(hbus->wq, &dr_wrk->wrk);
+	}
 }
 
 /**
@@ -1842,10 +1853,7 @@ static void hv_eject_device_work(struct work_struct *work)
 
 	hpdev = container_of(work, struct hv_pci_dev, wrk);
 
-	if (hpdev->state != hv_pcichild_ejecting) {
-		put_pcichild(hpdev, hv_pcidev_ref_pnp);
-		return;
-	}
+	WARN_ON(hpdev->state != hv_pcichild_ejecting);
 
 	/*
 	 * Ejection can come before or after the PCI bus has been set up, so

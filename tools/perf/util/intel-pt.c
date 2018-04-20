@@ -132,6 +132,7 @@ struct intel_pt_queue {
 	struct intel_pt *pt;
 	unsigned int queue_nr;
 	struct auxtrace_buffer *buffer;
+	struct auxtrace_buffer *old_buffer;
 	void *decoder;
 	const struct intel_pt_state *state;
 	struct ip_callchain *chain;
@@ -222,38 +223,14 @@ static int intel_pt_do_fix_overlap(struct intel_pt *pt, struct auxtrace_buffer *
 	return 0;
 }
 
-static void intel_pt_use_buffer_pid_tid(struct intel_pt_queue *ptq,
-					struct auxtrace_queue *queue,
-					struct auxtrace_buffer *buffer)
-{
-	if (queue->cpu == -1 && buffer->cpu != -1)
-		ptq->cpu = buffer->cpu;
-
-	ptq->pid = buffer->pid;
-	ptq->tid = buffer->tid;
-
-	intel_pt_log("queue %u cpu %d pid %d tid %d\n",
-		     ptq->queue_nr, ptq->cpu, ptq->pid, ptq->tid);
-
-	thread__zput(ptq->thread);
-
-	if (ptq->tid != -1) {
-		if (ptq->pid != -1)
-			ptq->thread = machine__findnew_thread(ptq->pt->machine,
-							      ptq->pid,
-							      ptq->tid);
-		else
-			ptq->thread = machine__find_thread(ptq->pt->machine, -1,
-							   ptq->tid);
-	}
-}
-
 /* This function assumes data is processed sequentially only */
 static int intel_pt_get_trace(struct intel_pt_buffer *b, void *data)
 {
 	struct intel_pt_queue *ptq = data;
-	struct auxtrace_buffer *buffer = ptq->buffer, *old_buffer = buffer;
+	struct auxtrace_buffer *buffer = ptq->buffer;
+	struct auxtrace_buffer *old_buffer = ptq->old_buffer;
 	struct auxtrace_queue *queue;
+	bool might_overlap;
 
 	if (ptq->stop) {
 		b->len = 0;
@@ -261,7 +238,7 @@ static int intel_pt_get_trace(struct intel_pt_buffer *b, void *data)
 	}
 
 	queue = &ptq->pt->queues.queue_array[ptq->queue_nr];
-next:
+
 	buffer = auxtrace_buffer__next(queue, buffer);
 	if (!buffer) {
 		if (old_buffer)
@@ -280,7 +257,8 @@ next:
 			return -ENOMEM;
 	}
 
-	if (ptq->pt->snapshot_mode && !buffer->consecutive && old_buffer &&
+	might_overlap = ptq->pt->snapshot_mode || ptq->pt->sampling_mode;
+	if (might_overlap && !buffer->consecutive && old_buffer &&
 	    intel_pt_do_fix_overlap(ptq->pt, old_buffer, buffer))
 		return -ENOMEM;
 
@@ -293,33 +271,24 @@ next:
 	}
 	b->ref_timestamp = buffer->reference;
 
-	/*
-	 * If in snapshot mode and the buffer has no usable data, get next
-	 * buffer and again check overlap against old_buffer.
-	 */
-	if (ptq->pt->snapshot_mode && !b->len)
-		goto next;
-
-	if (old_buffer)
-		auxtrace_buffer__drop_data(old_buffer);
-
-	if (!old_buffer || ptq->pt->sampling_mode || (ptq->pt->snapshot_mode &&
-						      !buffer->consecutive)) {
+	if (!old_buffer || (might_overlap && !buffer->consecutive)) {
 		b->consecutive = false;
 		b->trace_nr = buffer->buffer_nr + 1;
 	} else {
 		b->consecutive = true;
 	}
 
-	if (ptq->use_buffer_pid_tid && (ptq->pid != buffer->pid ||
-					ptq->tid != buffer->tid))
-		intel_pt_use_buffer_pid_tid(ptq, queue, buffer);
-
 	if (ptq->step_through_buffers)
 		ptq->stop = true;
 
-	if (!b->len)
+	if (b->len) {
+		if (old_buffer)
+			auxtrace_buffer__drop_data(old_buffer);
+		ptq->old_buffer = buffer;
+	} else {
+		auxtrace_buffer__drop_data(buffer);
 		return intel_pt_get_trace(b, data);
+	}
 
 	return 0;
 }
@@ -958,12 +927,9 @@ static int intel_pt_setup_queue(struct intel_pt *pt,
 			ptq->cpu = queue->cpu;
 		ptq->tid = queue->tid;
 
-		if (pt->sampling_mode) {
-			if (pt->timeless_decoding)
-				ptq->step_through_buffers = true;
-			if (pt->timeless_decoding || !pt->have_sched_switch)
-				ptq->use_buffer_pid_tid = true;
-		}
+		if (pt->sampling_mode && !pt->snapshot_mode &&
+		    pt->timeless_decoding)
+			ptq->step_through_buffers = true;
 
 		ptq->sync_switch = pt->sync_switch;
 	}
@@ -2095,9 +2061,6 @@ static int intel_pt_process_auxtrace_event(struct perf_session *session,
 {
 	struct intel_pt *pt = container_of(session->auxtrace, struct intel_pt,
 					   auxtrace);
-
-	if (pt->sampling_mode)
-		return 0;
 
 	if (!pt->data_queued) {
 		struct auxtrace_buffer *buffer;
