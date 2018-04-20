@@ -164,6 +164,11 @@ extern int priv_cp_queues;
 extern int cma_enable;
 #endif
 
+/*
+ * Halt if HWS hang is detected
+ */
+extern int halt_if_hws_hang;
+
 /**
  * enum kfd_sched_policy
  *
