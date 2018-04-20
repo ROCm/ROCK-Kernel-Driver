@@ -63,7 +63,7 @@ MODULE_PARM_DESC(hws_max_conc_proc,
 
 int cwsr_enable = 1;
 module_param(cwsr_enable, int, 0444);
-MODULE_PARM_DESC(cwsr_enable, "CWSR enable (0 = Off, 1 = On (Default))");
+MODULE_PARM_DESC(cwsr_enable, "CWSR enable (0 = off, 1 = on (default))");
 
 int max_num_of_queues_per_device = KFD_MAX_NUM_OF_QUEUES_PER_DEVICE_DEFAULT;
 module_param(max_num_of_queues_per_device, int, 0444);
@@ -75,8 +75,6 @@ module_param(send_sigterm, int, 0444);
 MODULE_PARM_DESC(send_sigterm,
 	"Send sigterm to HSA process on unhandled exception (0 = disable, 1 = enable)");
 
-static int amdkfd_init_completed;
-
 int debug_largebar;
 module_param(debug_largebar, int, 0444);
 MODULE_PARM_DESC(debug_largebar,
@@ -87,10 +85,10 @@ module_param(ignore_crat, int, 0444);
 MODULE_PARM_DESC(ignore_crat,
 	"Ignore CRAT table during KFD initialization (0 = use CRAT (default), 1 = ignore CRAT)");
 
-int vega10_noretry = 1;
-module_param_named(noretry, vega10_noretry, int, 0644);
+int noretry = 1;
+module_param(noretry, int, 0644);
 MODULE_PARM_DESC(noretry,
-	"Set sh_mem_config.retry_disable on Vega10 (0 = retry enabled, 1 = retry disabled (default))");
+	"Set sh_mem_config.retry_disable on GFXv9+ dGPUs (0 = retry enabled, 1 = retry disabled (default))");
 
 int priv_cp_queues;
 module_param(priv_cp_queues, int, 0644);
@@ -107,6 +105,10 @@ MODULE_PARM_DESC(cma_enable,
 int halt_if_hws_hang;
 module_param(halt_if_hws_hang, int, 0644);
 MODULE_PARM_DESC(halt_if_hws_hang, "Halt if HWS hang is detected (0 = off (default), 1 = on)");
+
+
+static int amdkfd_init_completed;
+
 
 int kgd2kfd_init(unsigned int interface_version,
 		const struct kgd2kfd_calls **g2f)
