@@ -37,6 +37,11 @@
 	(AMDGPU_GPU_PAGE_ALIGN(le32_to_cpu(((const struct common_firmware_header *)(adev)->uvd.fw->data)->ucode_size_bytes) + \
 			       8) - AMDGPU_UVD_FIRMWARE_OFFSET)
 
+struct amdgpu_delayed_work{
+	struct delayed_work idle_work;
+	unsigned ip_instance;
+};
+
 struct amdgpu_uvd_inst {
 	struct amdgpu_bo	*vcpu_bo;
 	void			*cpu_addr;
@@ -44,12 +49,12 @@ struct amdgpu_uvd_inst {
 	void			*saved_bo;
 	atomic_t		handles[AMDGPU_MAX_UVD_HANDLES];
 	struct drm_file		*filp[AMDGPU_MAX_UVD_HANDLES];
-	struct delayed_work	idle_work;
 	struct amdgpu_ring	ring;
 	struct amdgpu_ring	ring_enc[AMDGPU_MAX_UVD_ENC_RINGS];
 	struct amdgpu_irq_src	irq;
 	struct drm_sched_entity entity;
 	struct drm_sched_entity entity_enc;
+	struct amdgpu_delayed_work	delayed_work;
 	uint32_t                srbm_soft_reset;
 };
 
