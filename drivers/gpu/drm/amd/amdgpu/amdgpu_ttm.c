@@ -1450,6 +1450,7 @@ error_create:
 static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 {
 	struct amdgpu_bo *abo;
+	struct amdgpu_bo_param bp;
 	unsigned long size;
 	int r;
 
@@ -1457,11 +1458,18 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 		return 0;
 
 	size = (unsigned long)amdgpu_direct_gma_size << 20;
+
+	memset(&bp, 0, sizeof(bp));
+	bp.size = size;
+	bp.byte_align = PAGE_SIZE;
+	bp.domain = AMDGPU_GEM_DOMAIN_VRAM;
+	bp.flags = AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED | AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS |
+						AMDGPU_GEM_CREATE_TOP_DOWN;
+	bp.type = ttm_bo_type_kernel;
+	bp.resv = NULL;
+
 	/* reserve in visible vram */
-	r = amdgpu_bo_create(adev, size, PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM,
-			     AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED | AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS |
-			     AMDGPU_GEM_CREATE_TOP_DOWN,
-			     ttm_bo_type_kernel, NULL, &abo);
+	r = amdgpu_bo_create(adev, &bp, &abo);
 	if (unlikely(r))
 		goto error_out;
 
