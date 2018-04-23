@@ -411,11 +411,12 @@ static int amdgpu_vm_alloc_levels(struct amdgpu_device *adev,
 	eaddr = eaddr & ((1 << shift) - 1);
 
 	flags = AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS;
+	if (vm->root.base.bo->shadow)
+		flags |= AMDGPU_GEM_CREATE_SHADOW;
 	if (vm->use_cpu_for_update)
 		flags |= AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 	else
-		flags |= (AMDGPU_GEM_CREATE_NO_CPU_ACCESS |
-				AMDGPU_GEM_CREATE_SHADOW);
+		flags |= AMDGPU_GEM_CREATE_NO_CPU_ACCESS;
 
 	/* walk over the address space and allocate the page tables */
 	for (pt_idx = from; pt_idx <= to; ++pt_idx) {
@@ -2483,7 +2484,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	flags = AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS;
 	if (vm->use_cpu_for_update)
 		flags |= AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
-	else
+	else if (vm_context != AMDGPU_VM_CONTEXT_COMPUTE)
 		flags |= AMDGPU_GEM_CREATE_SHADOW;
 
 	size = amdgpu_vm_bo_size(adev, adev->vm_manager.root_level);
@@ -2563,8 +2564,7 @@ error_free_sched_entity:
  *
  * Reinitializes the page directory to reflect the changed ATS
  * setting. May also switch to the compute power profile if this is
- * the first compute VM. May leave behind an unused shadow BO for the
- * page directory when switching from SDMA updates to CPU updates.
+ * the first compute VM.
  *
  * Returns 0 for success, -errno for errors.
  */
@@ -2627,6 +2627,8 @@ int amdgpu_vm_make_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 
 	/* Count the new compute VM */
 	amdgpu_inc_compute_vms(adev);
+	/* Free the shadow bo for compute VM */
+	amdgpu_bo_unref(&vm->root.base.bo->shadow);
 
 error:
 	amdgpu_bo_unreserve(vm->root.base.bo);
