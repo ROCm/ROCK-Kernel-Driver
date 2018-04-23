@@ -2797,6 +2797,7 @@ int amdgpu_vm_make_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	amdgpu_bo_unref(&vm->root.base.bo->shadow);
 	/* Count the new compute VM */
 	amdgpu_inc_compute_vms(adev);
+
 error:
 	amdgpu_bo_unreserve(vm->root.base.bo);
 	return r;
