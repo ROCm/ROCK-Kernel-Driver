@@ -1542,7 +1542,6 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	uint64_t flags;
 	uint64_t vram_base_offset = adev->vm_manager.vram_base_offset;
 	struct amdgpu_device *bo_adev;
-	uint32_t mem_type;
 	int r;
 
 	if (clear || !bo_va->base.bo) {
@@ -1609,9 +1608,9 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	 * the evicted list so that it gets validated again on the
 	 * next command submission.
 	 */
-	mem_type = bo->tbo.mem.mem_type;
 	if (bo && bo->tbo.resv == vm->root.base.bo->tbo.resv &&
-	    !(bo->preferred_domains & amdgpu_mem_type_to_domain(mem_type)))
+	    !(bo->preferred_domains &
+	    amdgpu_mem_type_to_domain(bo->tbo.mem.mem_type)))
 		list_add_tail(&bo_va->base.vm_status, &vm->evicted);
 	spin_unlock(&vm->status_lock);
 
