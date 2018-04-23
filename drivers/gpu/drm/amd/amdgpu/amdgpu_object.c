@@ -464,7 +464,7 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	else
 		amdgpu_cs_report_moved_bytes(adev, ctx.bytes_moved, 0);
 
-	if (domain & AMDGPU_GEM_DOMAIN_DGMA && adev->ssg.enabled)
+	if (bp->domain & AMDGPU_GEM_DOMAIN_DGMA && adev->ssg.enabled)
 		bo->tbo.ssg_can_map = true;
 
 	if (bp->type == ttm_bo_type_kernel)
@@ -497,12 +497,12 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	if (bp->type == ttm_bo_type_device)
 		bo->flags &= ~AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 
-	if (((flags & AMDGPU_GEM_CREATE_NO_EVICT) && amdgpu_no_evict) ||
-	    domain & (AMDGPU_GEM_DOMAIN_DGMA | AMDGPU_GEM_DOMAIN_DGMA_IMPORT)) {
+	if (((bp->flags & AMDGPU_GEM_CREATE_NO_EVICT) && amdgpu_no_evict) ||
+	    bp->domain & (AMDGPU_GEM_DOMAIN_DGMA | AMDGPU_GEM_DOMAIN_DGMA_IMPORT)) {
 		r = amdgpu_bo_reserve(bo, false);
 		if (unlikely(r != 0))
 			return r;
-		r = amdgpu_bo_pin(bo, domain, NULL);
+		r = amdgpu_bo_pin(bo, bp->domain, NULL);
 		amdgpu_bo_unreserve(bo);
 	}
 
