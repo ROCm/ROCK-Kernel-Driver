@@ -2801,34 +2801,33 @@ err_i1:
 static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	struct kfd_process *process;
-	struct kfd_dev *kfd;
+	struct kfd_dev *dev = NULL;
 	unsigned long vm_pgoff;
-	unsigned long long mmap_type;
+	unsigned int gpu_id;
 
 	process = kfd_get_process(current);
 	if (IS_ERR(process))
 		return PTR_ERR(process);
 
 	vm_pgoff = vma->vm_pgoff;
-	vma->vm_pgoff = KFD_MMAP_OFFSET_VALUE_GET(vma->vm_pgoff);
-	mmap_type = vm_pgoff & KFD_MMAP_TYPE_MASK;
+	vma->vm_pgoff = KFD_MMAP_OFFSET_VALUE_GET(vm_pgoff);
+	gpu_id = KFD_MMAP_GPU_ID_GET(vm_pgoff);
+	if (gpu_id)
+		dev = kfd_device_by_id(gpu_id);
 
-	switch (mmap_type) {
+	switch (vm_pgoff & KFD_MMAP_TYPE_MASK) {
 	case KFD_MMAP_TYPE_DOORBELL:
-		kfd = kfd_device_by_id(KFD_MMAP_GPU_ID_GET(vm_pgoff));
-		if (!kfd)
-			return -EFAULT;
-		return kfd_doorbell_mmap(kfd, process, vma);
+		if (!dev)
+			return -ENODEV;
+		return kfd_doorbell_mmap(dev, process, vma);
 
 	case KFD_MMAP_TYPE_EVENTS:
 		return kfd_event_mmap(process, vma);
 
 	case KFD_MMAP_TYPE_RESERVED_MEM:
-		return kfd_reserved_mem_mmap(process, vma);
-
-	default:
-		pr_err("Unsupported kfd mmap type %llx\n", mmap_type);
-		break;
+		if (!dev)
+			return -ENODEV;
+		return kfd_reserved_mem_mmap(dev, process, vma);
 	}
 
 	return -EFAULT;

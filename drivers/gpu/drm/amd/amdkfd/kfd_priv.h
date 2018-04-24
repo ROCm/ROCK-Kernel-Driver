@@ -53,8 +53,7 @@
 /* Use upper bits of mmap offset to store KFD driver specific information.
  * BITS[63:62] - Encode MMAP type
  * BITS[61:46] - Encode gpu_id. To identify to which GPU the offset belongs to
- * BITS[45:40] - Reserved. Not Used.
- * BITS[39:0]  - MMAP offset value. Used by TTM.
+ * BITS[45:0]  - MMAP offset value
  *
  * NOTE: struct vm_area_struct.vm_pgoff uses offset in pages. Hence, these
  *  defines are w.r.t to PAGE_SIZE
@@ -73,7 +72,7 @@
 #define KFD_MMAP_GPU_ID_GET(offset)    ((offset & KFD_MMAP_GPU_ID_MASK) \
 				>> KFD_MMAP_GPU_ID_SHIFT)
 
-#define KFD_MMAP_OFFSET_VALUE_MASK	(0xFFFFFFFFFFULL >> PAGE_SHIFT)
+#define KFD_MMAP_OFFSET_VALUE_MASK	(0x3FFFFFFFFFFFULL >> PAGE_SHIFT)
 #define KFD_MMAP_OFFSET_VALUE_GET(offset) (offset & KFD_MMAP_OFFSET_VALUE_MASK)
 
 /*
@@ -833,8 +832,8 @@ struct kfd_process_device *kfd_get_process_device_data(struct kfd_dev *dev,
 struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 							struct kfd_process *p);
 
-int kfd_reserved_mem_mmap(struct kfd_process *process,
-		struct vm_area_struct *vma);
+int kfd_reserved_mem_mmap(struct kfd_dev *dev, struct kfd_process *process,
+			  struct vm_area_struct *vma);
 
 /* KFD process API for creating and translating handles */
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
