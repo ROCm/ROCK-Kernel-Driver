@@ -315,7 +315,13 @@ static void submit_packet(struct kernel_queue *kq)
 
 static void rollback_packet(struct kernel_queue *kq)
 {
-	kq->pending_wptr = *kq->queue->properties.write_ptr;
+	if (kq->dev->device_info->doorbell_size == 8) {
+		kq->pending_wptr64 = *kq->wptr64_kernel;
+		kq->pending_wptr = *kq->wptr_kernel %
+			(kq->queue->properties.queue_size / 4);
+	} else {
+		kq->pending_wptr = *kq->wptr_kernel;
+	}
 }
 
 struct kernel_queue *kernel_queue_init(struct kfd_dev *dev,
