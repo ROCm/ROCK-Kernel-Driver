@@ -49,9 +49,9 @@
 #include <linux/slab.h>
 #include <linux/scatterlist.h>
 #include <linux/module.h>
+#include <drm/amd_rdma.h>
 
 #include "kfd_priv.h"
-#include "amd_rdma.h"
 
 
 

@@ -43,7 +43,6 @@
 #endif
 #include <kgd_kfd_interface.h>
 
-#include "amd_rdma.h"
 #include "amd_shared.h"
 
 #define KFD_SYSFS_FILE_MODE 0444
