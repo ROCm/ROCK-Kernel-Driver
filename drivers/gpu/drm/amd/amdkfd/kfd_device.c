@@ -687,10 +687,9 @@ void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 	spin_unlock(&kfd->interrupt_lock);
 }
 
-int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm)
+int kgd2kfd_quiesce_mm(struct mm_struct *mm)
 {
 	struct kfd_process *p;
-	struct kfd_process_device *pdd;
 	int r;
 
 	/* Because we are called from arbitrary context (workqueue) as opposed
@@ -699,26 +698,17 @@ int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 	 */
 	p = kfd_lookup_process_by_mm(mm);
 	if (!p)
-		return -ENODEV;
+		return -ESRCH;
 
-	if (kfd) {
-		r = -ENODEV;
-		pdd = kfd_get_process_device_data(kfd, p);
-		if (pdd)
-			r = kfd->dqm->ops.evict_process_queues(kfd->dqm,
-							       &pdd->qpd);
-	} else {
-		r = kfd_process_evict_queues(p);
-	}
+	r = kfd_process_evict_queues(p);
 
 	kfd_unref_process(p);
 	return r;
 }
 
-int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm)
+int kgd2kfd_resume_mm(struct mm_struct *mm)
 {
 	struct kfd_process *p;
-	struct kfd_process_device *pdd;
 	int r;
 
 	/* Because we are called from arbitrary context (workqueue) as opposed
@@ -727,17 +717,9 @@ int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 	 */
 	p = kfd_lookup_process_by_mm(mm);
 	if (!p)
-		return -ENODEV;
+		return -ESRCH;
 
-	if (kfd) {
-		r = -ENODEV;
-		pdd = kfd_get_process_device_data(kfd, p);
-		if (pdd)
-			r = kfd->dqm->ops.restore_process_queues(kfd->dqm,
-								 &pdd->qpd);
-	} else {
-		r = kfd_process_restore_queues(p);
-	}
+	r = kfd_process_restore_queues(p);
 
 	kfd_unref_process(p);
 	return r;

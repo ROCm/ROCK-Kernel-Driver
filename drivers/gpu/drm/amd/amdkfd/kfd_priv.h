@@ -642,11 +642,10 @@ struct qcm_process_device {
 /* Approx. time before evicting the process again */
 #define PROCESS_ACTIVE_TIME_MS 10
 
+int kgd2kfd_quiesce_mm(struct mm_struct *mm);
+int kgd2kfd_resume_mm(struct mm_struct *mm);
 int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 					       struct dma_fence *fence);
-int kfd_process_evict_queues(struct kfd_process *p);
-int kfd_process_restore_queues(struct kfd_process *p);
-
 
 /* 8 byte handle containing GPU ID in the most significant 4 bytes and
  * idr_handle in the least significant 4 bytes
@@ -820,6 +819,8 @@ struct kfd_process *kfd_get_process(const struct task_struct *task);
 struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid);
 struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm);
 void kfd_unref_process(struct kfd_process *p);
+int kfd_process_evict_queues(struct kfd_process *p);
+int kfd_process_restore_queues(struct kfd_process *p);
 void kfd_suspend_all_processes(void);
 int kfd_resume_all_processes(void);
 
@@ -987,8 +988,6 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 		       void __user *ctl_stack,
 		       u32 *ctl_stack_used_size,
 		       u32 *save_area_used_size);
-int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm);
-int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm);
 
 int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
 				unsigned int fence_value,

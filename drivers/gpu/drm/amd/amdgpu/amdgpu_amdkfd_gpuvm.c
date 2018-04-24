@@ -1965,7 +1965,7 @@ int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem,
 	evicted_bos = atomic_inc_return(&process_info->evicted_bos);
 	if (evicted_bos == 1) {
 		/* First eviction, stop the queues */
-		r = kgd2kfd->quiesce_mm(NULL, mm);
+		r = kgd2kfd->quiesce_mm(mm);
 		if (r)
 			pr_err("Failed to quiesce KFD\n");
 		schedule_delayed_work(&process_info->work, 1);
@@ -2269,7 +2269,7 @@ static void amdgpu_amdkfd_restore_userptr_worker(struct work_struct *work)
 	    evicted_bos)
 		goto unlock_out;
 	evicted_bos = 0;
-	if (kgd2kfd->resume_mm(NULL, mm)) {
+	if (kgd2kfd->resume_mm(mm)) {
 		pr_err("%s: Failed to resume KFD\n", __func__);
 		/* No recovery from this failure. Probably the CP is
 		 * hanging. No point trying again.

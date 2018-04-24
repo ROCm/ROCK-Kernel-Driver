@@ -443,8 +443,8 @@ struct kgd2kfd_calls {
 	void (*interrupt)(struct kfd_dev *kfd, const void *ih_ring_entry);
 	void (*suspend)(struct kfd_dev *kfd);
 	int (*resume)(struct kfd_dev *kfd);
-	int (*quiesce_mm)(struct kfd_dev *kfd, struct mm_struct *mm);
-	int (*resume_mm)(struct kfd_dev *kfd, struct mm_struct *mm);
+	int (*quiesce_mm)(struct mm_struct *mm);
+	int (*resume_mm)(struct mm_struct *mm);
 	int (*schedule_evict_and_restore_process)(struct mm_struct *mm,
 			struct dma_fence *fence);
 	int  (*pre_reset)(struct kfd_dev *kfd);
