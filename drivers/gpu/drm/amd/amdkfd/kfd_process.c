@@ -97,7 +97,12 @@ int kfd_process_create_wq(void)
 	if (!kfd_restore_wq)
 		kfd_restore_wq = alloc_ordered_workqueue("kfd_restore_wq", 0);
 
-	return kfd_process_wq && kfd_restore_wq ? 0 : -ENOMEM;
+	if (!kfd_process_wq || !kfd_restore_wq) {
+		kfd_process_destroy_wq();
+		return -ENOMEM;
+	}
+
+	return 0;
 }
 
 void kfd_process_destroy_wq(void)

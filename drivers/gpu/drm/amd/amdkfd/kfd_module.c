@@ -109,7 +109,6 @@ MODULE_PARM_DESC(halt_if_hws_hang, "Halt if HWS hang is detected (0 = off (defau
 
 static int amdkfd_init_completed;
 
-
 int kgd2kfd_init(unsigned int interface_version,
 		const struct kgd2kfd_calls **g2f)
 {
@@ -162,7 +161,7 @@ static int __init kfd_module_init(void)
 
 	err = kfd_ipc_init();
 	if (err < 0)
-		goto err_topology;
+		goto err_ipc;
 
 	err = kfd_process_create_wq();
 	if (err < 0)
@@ -179,6 +178,8 @@ static int __init kfd_module_init(void)
 	return 0;
 
 err_create_wq:
+err_ipc:
+	kfd_topology_shutdown();
 err_topology:
 	kfd_chardev_exit();
 err_ioctl:
