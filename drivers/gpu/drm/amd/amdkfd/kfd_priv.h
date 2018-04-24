@@ -1008,7 +1008,7 @@ struct packet_manager {
 	struct kfd_mem_obj *ib_buffer_obj;
 	unsigned int ib_size_bytes;
 
-	struct packet_manager_funcs *pmf;
+	const struct packet_manager_funcs *pmf;
 };
 
 struct packet_manager_funcs {
@@ -1040,6 +1040,9 @@ struct packet_manager_funcs {
 	int release_mem_size;
 };
 
+extern const struct packet_manager_funcs kfd_vi_pm_funcs;
+extern const struct packet_manager_funcs kfd_v9_pm_funcs;
+
 int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm);
 void pm_uninit(struct packet_manager *pm);
 int pm_send_set_resources(struct packet_manager *pm,
@@ -1059,10 +1062,6 @@ void pm_release_ib(struct packet_manager *pm);
 unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size);
 int pm_set_resources_vi(struct packet_manager *pm, uint32_t *buffer,
 				struct scheduling_resources *res);
-
-void kfd_pm_func_init_vi(struct packet_manager *pm);
-void kfd_pm_func_init_v9(struct packet_manager *pm);
-
 
 uint64_t kfd_get_number_elems(struct kfd_dev *kfd);
 

@@ -323,7 +323,7 @@ static int pm_release_mem_v9(uint64_t gpu_addr, uint32_t *buffer)
 	return 0;
 }
 
-static struct packet_manager_funcs kfd_v9_pm_funcs = {
+const struct packet_manager_funcs kfd_v9_pm_funcs = {
 	.map_process		= pm_map_process_v9,
 	.runlist		= pm_runlist_v9,
 	.set_resources		= pm_set_resources_vi,
@@ -339,9 +339,3 @@ static struct packet_manager_funcs kfd_v9_pm_funcs = {
 	.query_status_size	= sizeof(struct pm4_mes_query_status),
 	.release_mem_size	= sizeof(struct pm4_mec_release_mem)
 };
-
-void kfd_pm_func_init_v9(struct packet_manager *pm)
-{
-	pm->pmf = &kfd_v9_pm_funcs;
-}
-
