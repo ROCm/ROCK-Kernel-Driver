@@ -329,7 +329,7 @@ static int pm_query_status_vi(struct packet_manager *pm, uint32_t *buffer,
 }
 
 
-static uint32_t pm_release_mem_vi(uint64_t gpu_addr, uint32_t *buffer)
+static int pm_release_mem_vi(uint64_t gpu_addr, uint32_t *buffer)
 {
 	struct pm4_mec_release_mem *packet;
 
@@ -355,7 +355,7 @@ static uint32_t pm_release_mem_vi(uint64_t gpu_addr, uint32_t *buffer)
 
 	packet->data_lo = 0;
 
-	return sizeof(struct pm4_mec_release_mem) / sizeof(unsigned int);
+	return 0;
 }
 
 static struct packet_manager_funcs kfd_vi_pm_funcs = {

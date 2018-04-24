@@ -1028,7 +1028,7 @@ struct packet_manager_funcs {
 			unsigned int sdma_engine);
 	int (*query_status)(struct packet_manager *pm, uint32_t *buffer,
 			uint64_t fence_address,	uint32_t fence_value);
-	uint32_t (*release_mem)(uint64_t gpu_addr, uint32_t *buffer);
+	int (*release_mem)(uint64_t gpu_addr, uint32_t *buffer);
 
 	/* Packet sizes */
 	int map_process_size;
