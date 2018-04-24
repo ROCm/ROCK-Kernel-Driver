@@ -21,10 +21,11 @@
  *
  */
 
+#include <linux/ratelimit.h>
+#include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/list.h>
 #include <linux/types.h>
-#include <linux/printk.h>
 #include <linux/bitops.h>
 #include <linux/sched.h>
 #include "kfd_priv.h"
@@ -199,7 +200,7 @@ static int allocate_vmid(struct device_queue_manager *dqm,
 	dqm->dev->kfd2kgd->set_vm_context_page_table_base(dqm->dev->kgd,
 			qpd->vmid,
 			qpd->page_table_base);
-	/*invalidate the VM context after pasid and vmid mapping is set up*/
+	/* invalidate the VM context after pasid and vmid mapping is set up */
 	kfd_flush_tlb(qpd_to_pdd(qpd));
 
 	return 0;
@@ -289,7 +290,6 @@ static int create_queue_nocpsch(struct device_queue_manager *dqm,
 	if (retval) {
 		if (list_empty(&qpd->queues_list))
 			deallocate_vmid(dqm, qpd, q);
-
 		goto out_unlock;
 	}
 
@@ -482,11 +482,9 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 	int retval;
 	struct mqd_manager *mqd;
 	struct kfd_process_device *pdd;
-
 	bool prev_active = false;
 
 	mutex_lock(&dqm->lock);
-
 	pdd = kfd_get_process_device_data(q->device, q->process);
 	if (!pdd) {
 		retval = -ENODEV;
@@ -502,7 +500,7 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 	 * Eviction state logic: we only mark active queues as evicted
 	 * to avoid the overhead of restoring inactive queues later
 	 */
-	if (pdd->qpd.evicted > 0)
+	if (pdd->qpd.evicted)
 		q->properties.is_evicted = (q->properties.queue_size > 0 &&
 					    q->properties.queue_percent > 0 &&
 					    q->properties.queue_address != 0);
@@ -762,9 +760,9 @@ static int register_process(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd)
 {
 	struct device_process_node *n;
-	int retval;
 	struct kfd_process_device *pdd;
 	uint32_t pd_base;
+	int retval;
 
 	n = kzalloc(sizeof(*n), GFP_KERNEL);
 	if (!n)
@@ -781,7 +779,6 @@ static int register_process(struct device_queue_manager *dqm,
 
 	/* Update PD Base in QPD */
 	qpd->page_table_base = pd_base;
-	pr_debug("Updated PD address to 0x%08x\n", pd_base);
 
 	retval = dqm->asic_ops.update_qpd(dqm, qpd);
 
@@ -1076,9 +1073,7 @@ fail_packet_manager_init:
 static int stop_cpsch(struct device_queue_manager *dqm)
 {
 	mutex_lock(&dqm->lock);
-
 	unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0);
-
 	mutex_unlock(&dqm->lock);
 
 	kfd_gtt_sa_free(dqm->dev, dqm->fence_mem);
@@ -1634,7 +1629,6 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 
 out:
 	mutex_unlock(&dqm->lock);
-
 	return retval;
 }
 
@@ -1649,7 +1643,13 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		return NULL;
 
 	switch (dev->device_info->asic_family) {
+	/* HWS is not available on Hawaii. */
 	case CHIP_HAWAII:
+	/* HWS depends on CWSR for timely dequeue. CWSR is not
+	 * available on Tonga.
+	 *
+	 * FIXME: This argument also applies to Kaveri.
+	 */
 	case CHIP_TONGA:
 		dqm->sched_policy = KFD_SCHED_POLICY_NO_HWS;
 		break;
@@ -1729,7 +1729,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 
 	case CHIP_VEGA10:
 	case CHIP_RAVEN:
-		device_queue_manager_init_v9_vega10(&dqm->asic_ops);
+		device_queue_manager_init_v9(&dqm->asic_ops);
 		break;
 	default:
 		WARN(1, "Unexpected ASIC family %u",

@@ -22,8 +22,6 @@
  */
 
 #include "kfd_kernel_queue.h"
-#include "kfd_pm4_headers.h"
-#include "kfd_pm4_opcodes.h"
 
 static bool initialize_cik(struct kernel_queue *kq, struct kfd_dev *dev,
 			enum kfd_queue_type type, unsigned int queue_size);

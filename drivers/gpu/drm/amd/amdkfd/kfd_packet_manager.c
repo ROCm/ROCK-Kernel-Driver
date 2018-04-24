@@ -26,7 +26,6 @@
 #include "kfd_device_queue_manager.h"
 #include "kfd_kernel_queue.h"
 #include "kfd_priv.h"
-#include "kfd_pm4_opcodes.h"
 
 static inline void inc_wptr(unsigned int *wptr, unsigned int increment_bytes,
 				unsigned int buffer_size_bytes)
@@ -45,8 +44,7 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 	unsigned int process_count, queue_count, compute_queue_count;
 	unsigned int map_queue_size;
 	unsigned int max_proc_per_quantum = 1;
-
-	struct kfd_dev	*dev = pm->dqm->dev;
+	struct kfd_dev *dev = pm->dqm->dev;
 
 	process_count = pm->dqm->processes_count;
 	queue_count = pm->dqm->queue_count;
@@ -57,14 +55,13 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 	 * hws_max_conc_proc has been done in
 	 * kgd2kfd_device_init().
 	 */
-
 	*over_subscription = false;
 
 	if (dev->max_proc_per_quantum > 1)
 		max_proc_per_quantum = dev->max_proc_per_quantum;
 
 	if ((process_count > max_proc_per_quantum) ||
-		compute_queue_count > get_queues_num(pm->dqm)) {
+	    compute_queue_count > get_queues_num(pm->dqm)) {
 		*over_subscription = true;
 		pr_debug("Over subscribed runlist\n");
 	}
@@ -193,6 +190,7 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 						&rl_buffer[rl_wptr],
 						q,
 						qpd->is_debug);
+
 			if (retval)
 				return retval;
 
@@ -301,8 +299,7 @@ int pm_send_runlist(struct packet_manager *pm, struct list_head *dqm_queues)
 
 	pr_debug("runlist IB address: 0x%llX\n", rl_gpu_ib_addr);
 
-	packet_size_dwords = pm->pmf->runlist_size /
-		sizeof(uint32_t);
+	packet_size_dwords = pm->pmf->runlist_size / sizeof(uint32_t);
 	mutex_lock(&pm->lock);
 
 	retval = pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
@@ -311,7 +308,7 @@ int pm_send_runlist(struct packet_manager *pm, struct list_head *dqm_queues)
 		goto fail_acquire_packet_buffer;
 
 	retval = pm->pmf->runlist(pm, rl_buffer, rl_gpu_ib_addr,
-				rl_ib_size / sizeof(uint32_t), false);
+					rl_ib_size / sizeof(uint32_t), false);
 	if (retval)
 		goto fail_create_runlist;
 

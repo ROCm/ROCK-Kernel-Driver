@@ -46,9 +46,6 @@
 #define HSA_CAP_DOORBELL_TYPE_PRE_1_0		0x0
 #define HSA_CAP_DOORBELL_TYPE_1_0		0x1
 #define HSA_CAP_DOORBELL_TYPE_2_0		0x2
-#define HSA_CAP_WATCH_POINTS_TOTALBITS_MASK	0x00000f00
-#define HSA_CAP_WATCH_POINTS_TOTALBITS_SHIFT	8
-#define HSA_CAP_DOORBELL_PACKET_TYPE		0x00001000
 #define HSA_CAP_AQL_QUEUE_DOUBLE_MAP		0x00004000
 
 struct kfd_node_properties {
@@ -175,9 +172,9 @@ struct kfd_topology_device {
 	struct attribute		attr_gpuid;
 	struct attribute		attr_name;
 	struct attribute		attr_props;
-	uint8_t		oem_id[CRAT_OEMID_LENGTH];
-	uint8_t		oem_table_id[CRAT_OEMTABLEID_LENGTH];
-	uint32_t	oem_revision;
+	uint8_t				oem_id[CRAT_OEMID_LENGTH];
+	uint8_t				oem_table_id[CRAT_OEMTABLEID_LENGTH];
+	uint32_t			oem_revision;
 };
 
 struct kfd_system_properties {

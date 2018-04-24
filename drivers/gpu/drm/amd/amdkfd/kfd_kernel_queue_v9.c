@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Advanced Micro Devices, Inc.
+ * Copyright 2016-2018 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -44,7 +44,7 @@ static bool initialize_v9(struct kernel_queue *kq, struct kfd_dev *dev,
 	int retval;
 
 	retval = kfd_gtt_sa_allocate(dev, PAGE_SIZE, &kq->eop_mem);
-	if (retval != 0)
+	if (retval)
 		return false;
 
 	kq->eop_gpu_addr = kq->eop_mem->gpu_addr;
@@ -125,7 +125,6 @@ static int pm_runlist_v9(struct packet_manager *pm, uint32_t *buffer,
 	 */
 	concurrent_proc_cnt = min(pm->dqm->processes_count,
 			kfd->max_proc_per_quantum);
-
 
 	packet = (struct pm4_mes_runlist *)buffer;
 

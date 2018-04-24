@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Advanced Micro Devices, Inc.
+ * Copyright 2016-2018 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -32,7 +32,7 @@ static int update_qpd_v9(struct device_queue_manager *dqm,
 static void init_sdma_vm_v9(struct device_queue_manager *dqm, struct queue *q,
 			    struct qcm_process_device *qpd);
 
-void device_queue_manager_init_v9_vega10(
+void device_queue_manager_init_v9(
 	struct device_queue_manager_asic_ops *asic_ops)
 {
 	asic_ops->update_qpd = update_qpd_v9;

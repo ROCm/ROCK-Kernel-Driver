@@ -396,7 +396,11 @@ static void set_event(struct kfd_event *ev)
 {
 	struct kfd_event_waiter *waiter;
 
-	/* Auto reset if the list is non-empty and we're waking someone. */
+	/* Auto reset if the list is non-empty and we're waking
+	 * someone. waitqueue_active is safe here because we're
+	 * protected by the p->event_mutex, which is also held when
+	 * updating the wait queues in kfd_wait_on_events.
+	 */
 	ev->signaled = !ev->auto_reset || !waitqueue_active(&ev->wq);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
@@ -787,7 +791,6 @@ out:
 
 int kfd_event_mmap(struct kfd_process *p, struct vm_area_struct *vma)
 {
-
 	unsigned long pfn;
 	struct kfd_signal_page *page;
 	int ret;

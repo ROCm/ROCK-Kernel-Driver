@@ -30,10 +30,8 @@
 #include <linux/atomic.h>
 #include <linux/workqueue.h>
 #include <linux/spinlock.h>
-#include <linux/idr.h>
 #include <linux/kfd_ioctl.h>
-#include <linux/pid.h>
-#include <linux/interval_tree.h>
+#include <linux/idr.h>
 #include <linux/seq_file.h>
 #include <linux/kref.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
@@ -41,6 +39,8 @@
 #else
 #include <linux/kfifo.h>
 #endif
+#include <linux/pid.h>
+#include <linux/interval_tree.h>
 #include <kgd_kfd_interface.h>
 
 #include "amd_shared.h"
@@ -85,7 +85,6 @@
 #define KFD_CIK_HIQ_PIPE 4
 #define KFD_CIK_HIQ_QUEUE 0
 
-
 /* Macro for allocating structures */
 #define kfd_alloc_struct(ptr_to_struct)	\
 	((typeof(ptr_to_struct)) kzalloc(sizeof(*ptr_to_struct), GFP_KERNEL))
@@ -118,13 +117,13 @@ extern int max_num_of_queues_per_device;
 /* Kernel module parameter to specify the scheduling policy */
 extern int sched_policy;
 
-extern int cwsr_enable;
-
 /*
  * Kernel module parameter to specify the maximum process
  * number per HW scheduler
  */
 extern int hws_max_conc_proc;
+
+extern int cwsr_enable;
 
 /*
  * Kernel module parameter to specify whether to send sigterm to HSA process on
@@ -454,7 +453,11 @@ enum KFD_QUEUE_PRIORITY {
  * @is_interop: Defines if this is a interop queue. Interop queue means that
  * the queue can access both graphics and compute resources.
  *
- * @is_active: Defines if the queue is active or not.
+ * @is_evicted: Defines if the queue is evicted. Only active queues
+ * are evicted, rendering them inactive.
+ *
+ * @is_active: Defines if the queue is active or not. @is_active and
+ * @is_evicted are protected by the DQM lock.
  *
  * @vmid: If the scheduling mode is no cp scheduling the field defines the vmid
  * of the queue.
@@ -476,7 +479,7 @@ struct queue_properties {
 	void __iomem *doorbell_ptr;
 	uint32_t doorbell_off;
 	bool is_interop;
-	bool is_evicted; /* true -> queue is evicted */
+	bool is_evicted;
 	bool is_active;
 	/* Not relevant for user mode queues in cp scheduling */
 	unsigned int vmid;
@@ -595,7 +598,6 @@ struct qcm_process_device {
 	struct list_head priv_queue_list;
 
 	unsigned int queue_count;
-	/* a data field only meaningful for non-HWS case */
 	unsigned int vmid;
 	bool is_debug;
 	unsigned int evicted; /* eviction counter, 0=active */
@@ -626,11 +628,11 @@ struct qcm_process_device {
 	uint64_t tma_addr;
 
 	/* IB memory */
-	uint64_t ib_base; /* ib_base+ib_size must be below cwsr_base */
+	uint64_t ib_base;
 	void *ib_kaddr;
 
 	/*doorbell resources per process per device*/
-	unsigned long           *doorbell_bitmap;
+	unsigned long *doorbell_bitmap;
 };
 
 /* KFD Memory Eviction */
@@ -772,7 +774,7 @@ struct kfd_process {
 #endif
 
 	/* Information used for memory eviction */
-	void *process_info;
+	void *kgd_process_info;
 	/* Eviction fence that is attached to all the BOs of this process. The
 	 * fence will be triggered during eviction and new one will be created
 	 * during restore
@@ -815,7 +817,7 @@ struct amdkfd_ioctl_desc {
 int kfd_process_create_wq(void);
 void kfd_process_destroy_wq(void);
 struct kfd_process *kfd_create_process(struct file *filep);
-struct kfd_process *kfd_get_process(const struct task_struct *task);
+struct kfd_process *kfd_get_process(const struct task_struct *);
 struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid);
 struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm);
 void kfd_unref_process(struct kfd_process *p);
@@ -827,7 +829,7 @@ int kfd_resume_all_processes(void);
 int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 			       struct file *drm_file);
 struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
-							struct kfd_process *p);
+						struct kfd_process *p);
 struct kfd_process_device *kfd_get_process_device_data(struct kfd_dev *dev,
 							struct kfd_process *p);
 struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
@@ -875,7 +877,7 @@ void kfd_pasid_free(unsigned int pasid);
 size_t kfd_doorbell_process_slice(struct kfd_dev *kfd);
 int kfd_doorbell_init(struct kfd_dev *kfd);
 void kfd_doorbell_fini(struct kfd_dev *kfd);
-int kfd_doorbell_mmap(struct kfd_dev *kfd, struct kfd_process *process,
+int kfd_doorbell_mmap(struct kfd_dev *dev, struct kfd_process *process,
 		      struct vm_area_struct *vma);
 void __iomem *kfd_get_kernel_doorbell(struct kfd_dev *kfd,
 					unsigned int *doorbell_off);
@@ -998,8 +1000,6 @@ int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
 #define KFD_FENCE_COMPLETED (100)
 #define KFD_FENCE_INIT   (10)
 
-struct packet_manager_func;
-
 struct packet_manager {
 	struct device_queue_manager *dqm;
 	struct kernel_queue *priv_queue;
@@ -1012,7 +1012,7 @@ struct packet_manager {
 };
 
 struct packet_manager_funcs {
-	/* Support different firmware versions for PM4  packets */
+	/* Support ASIC-specific packet formats for PM4 packets */
 	int (*map_process)(struct packet_manager *pm, uint32_t *buffer,
 			struct qcm_process_device *qpd);
 	int (*runlist)(struct packet_manager *pm, uint32_t *buffer,
@@ -1058,7 +1058,7 @@ int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
 
 void pm_release_ib(struct packet_manager *pm);
 
-/* Following  PM funcs can be shared among CIK and VI  */
+/* Following PM funcs can be shared among VI and AI */
 unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size);
 int pm_set_resources_vi(struct packet_manager *pm, uint32_t *buffer,
 				struct scheduling_resources *res);
@@ -1104,8 +1104,6 @@ void kfd_flush_tlb(struct kfd_process_device *pdd);
 int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 
 bool kfd_is_locked(void);
-
-#define KFD_SCRATCH_KV_FW_VER 413
 
 /* PeerDirect support */
 void kfd_init_peer_direct(void);

@@ -31,6 +31,7 @@
 #include <linux/notifier.h>
 #include <linux/compat.h>
 #include <linux/mman.h>
+#include <linux/file.h>
 #include <asm/page.h>
 #include "kfd_ipc.h"
 
@@ -201,8 +202,8 @@ err_alloc_mem:
 /* kfd_process_device_reserve_ib_mem - Reserve memory inside the
  *	process for IB usage The memory reserved is for KFD to submit
  *	IB to AMDGPU from kernel.  If the memory is reserved
- *	successfully, ib_kaddr_assigned will have the CPU/kernel
- *	address. Check ib_kaddr_assigned before accessing the memory.
+ *	successfully, ib_kaddr will have the CPU/kernel
+ *	address. Check ib_kaddr before accessing the memory.
  */
 static int kfd_process_device_reserve_ib_mem(struct kfd_process_device *pdd)
 {
@@ -229,7 +230,6 @@ static int kfd_process_device_reserve_ib_mem(struct kfd_process_device *pdd)
 struct kfd_process *kfd_create_process(struct file *filep)
 {
 	struct kfd_process *process;
-
 	struct task_struct *thread = current;
 
 	if (!thread->mm)
@@ -370,7 +370,9 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 
 	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
 				 per_device_list) {
-		/* Destroy the GPUVM VM context */
+		pr_debug("Releasing pdd (topology id %d) for process (pasid %d)\n",
+				pdd->dev->id, p->pasid);
+
 		if (pdd->drm_file)
 			fput(pdd->drm_file);
 		else if (pdd->vm)
@@ -422,9 +424,6 @@ static void kfd_process_wq_release(struct work_struct *work)
 static void kfd_process_ref_release(struct kref *ref)
 {
 	struct kfd_process *p = container_of(ref, struct kfd_process, ref);
-
-	if (WARN_ON(!kfd_process_wq))
-		return;
 
 	INIT_WORK(&p->release_work, kfd_process_wq_release);
 	queue_work(kfd_process_wq, &p->release_work);
@@ -508,9 +507,9 @@ static int kfd_process_init_cwsr_apu(struct kfd_process *p, struct file *filep)
 
 		offset = (KFD_MMAP_TYPE_RESERVED_MEM | KFD_MMAP_GPU_ID(dev->id))
 			<< PAGE_SHIFT;
-		qpd->tba_addr = (uint64_t)vm_mmap(filep, 0,
-				KFD_CWSR_TBA_TMA_SIZE, PROT_READ | PROT_EXEC,
-				MAP_SHARED, offset);
+		qpd->tba_addr = (int64_t)vm_mmap(filep, 0,
+			KFD_CWSR_TBA_TMA_SIZE, PROT_READ | PROT_EXEC,
+			MAP_SHARED, offset);
 
 		if (IS_ERR_VALUE(qpd->tba_addr)) {
 			int err = qpd->tba_addr;
@@ -751,10 +750,11 @@ int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 
 	if (drm_file)
 		ret = dev->kfd2kgd->acquire_process_vm(
-			dev->kgd, drm_file, &pdd->vm, &p->process_info, &p->ef);
+			dev->kgd, drm_file,
+			&pdd->vm, &p->kgd_process_info, &p->ef);
 	else
 		ret = dev->kfd2kgd->create_process_vm(
-			dev->kgd, &pdd->vm, &p->process_info, &p->ef);
+			dev->kgd, &pdd->vm, &p->kgd_process_info, &p->ef);
 	if (ret) {
 		pr_err("Failed to create process VM object\n");
 		return ret;
@@ -974,54 +974,6 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 	return ret_p;
 }
 
-void kfd_suspend_all_processes(void)
-{
-	struct kfd_process *p;
-	unsigned int temp;
-	int idx = srcu_read_lock(&kfd_processes_srcu);
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
-	struct hlist_node *node;
-
-	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
-#else
-	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
-#endif
-		cancel_delayed_work_sync(&p->eviction_work);
-		cancel_delayed_work_sync(&p->restore_work);
-
-		if (kfd_process_evict_queues(p))
-			pr_err("Failed to suspend process %d\n", p->pasid);
-		dma_fence_signal(p->ef);
-		dma_fence_put(p->ef);
-		p->ef = NULL;
-	}
-	srcu_read_unlock(&kfd_processes_srcu, idx);
-}
-
-int kfd_resume_all_processes(void)
-{
-	struct kfd_process *p;
-	unsigned int temp;
-	int ret = 0, idx = srcu_read_lock(&kfd_processes_srcu);
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
-	struct hlist_node *node;
-
-	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
-#else
-	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
-#endif
-		if (!queue_delayed_work(kfd_restore_wq, &p->restore_work, 0)) {
-			pr_err("Restore process %d failed during resume\n",
-			       p->pasid);
-			ret = -EFAULT;
-		}
-	}
-	srcu_read_unlock(&kfd_processes_srcu, idx);
-	return ret;
-}
-
 /* This increments the process->ref counter. */
 struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
 {
@@ -1113,15 +1065,14 @@ static void evict_process_worker(struct work_struct *work)
 		  "Eviction fence mismatch\n");
 
 	/* Narrow window of overlap between restore and evict work
-	 * item is possible. Once
-	 * amdgpu_amdkfd_gpuvm_restore_process_bos unreserves KFD BOs,
-	 * it is possible to evicted again. But restore has few more
-	 * steps of finish. So lets wait for any previous restore work
-	 * to complete
+	 * item is possible. Once amdgpu_amdkfd_gpuvm_restore_process_bos
+	 * unreserves KFD BOs, it is possible to evicted again. But
+	 * restore has few more steps of finish. So lets wait for any
+	 * previous restore work to complete
 	 */
 	flush_delayed_work(&p->restore_work);
 
-	pr_info("Started evicting process of pasid %d\n", p->pasid);
+	pr_info("Started evicting pasid %d\n", p->pasid);
 	ret = kfd_process_evict_queues(p);
 	if (!ret) {
 		dma_fence_signal(p->ef);
@@ -1130,10 +1081,9 @@ static void evict_process_worker(struct work_struct *work)
 		queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_RESTORE_TIME_MS));
 
-		pr_info("Finished evicting process of pasid %d\n", p->pasid);
+		pr_info("Finished evicting pasid %d\n", p->pasid);
 	} else
-		pr_err("Failed to quiesce user queues. Cannot evict pasid %d\n",
-		       p->pasid);
+		pr_err("Failed to evict queues of pasid %d\n", p->pasid);
 }
 
 static void restore_process_worker(struct work_struct *work)
@@ -1159,7 +1109,7 @@ static void restore_process_worker(struct work_struct *work)
 			       struct kfd_process_device,
 			       per_device_list);
 
-	pr_info("Started restoring process of pasid %d\n", p->pasid);
+	pr_info("Started restoring pasid %d\n", p->pasid);
 
 	/* Setting last_restore_timestamp before successful restoration.
 	 * Otherwise this would have to be set by KGD (restore_process_bos)
@@ -1172,10 +1122,11 @@ static void restore_process_worker(struct work_struct *work)
 	 */
 
 	p->last_restore_timestamp = get_jiffies_64();
-	ret = pdd->dev->kfd2kgd->restore_process_bos(p->process_info, &p->ef);
+	ret = pdd->dev->kfd2kgd->restore_process_bos(p->kgd_process_info,
+						     &p->ef);
 	if (ret) {
-		pr_info("Restore failed, try again after %d ms\n",
-			PROCESS_BACK_OFF_TIME_MS);
+		pr_info("Failed to restore BOs of pasid %d, retry after %d ms\n",
+			 p->pasid, PROCESS_BACK_OFF_TIME_MS);
 		ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_BACK_OFF_TIME_MS));
 		WARN(!ret, "reschedule restore work failed\n");
@@ -1183,10 +1134,46 @@ static void restore_process_worker(struct work_struct *work)
 	}
 
 	ret = kfd_process_restore_queues(p);
-	if (ret)
-		pr_err("Failed to resume user queues\n");
+	if (!ret)
+		pr_info("Finished restoring pasid %d\n", p->pasid);
+	else
+		pr_err("Failed to restore queues of pasid %d\n", p->pasid);
+}
 
-	pr_info("Finished restoring process of pasid %d\n", p->pasid);
+void kfd_suspend_all_processes(void)
+{
+	struct kfd_process *p;
+	unsigned int temp;
+	int idx = srcu_read_lock(&kfd_processes_srcu);
+
+	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+		cancel_delayed_work_sync(&p->eviction_work);
+		cancel_delayed_work_sync(&p->restore_work);
+
+		if (kfd_process_evict_queues(p))
+			pr_err("Failed to suspend process %d\n", p->pasid);
+		dma_fence_signal(p->ef);
+		dma_fence_put(p->ef);
+		p->ef = NULL;
+	}
+	srcu_read_unlock(&kfd_processes_srcu, idx);
+}
+
+int kfd_resume_all_processes(void)
+{
+	struct kfd_process *p;
+	unsigned int temp;
+	int ret = 0, idx = srcu_read_lock(&kfd_processes_srcu);
+
+	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+		if (!queue_delayed_work(kfd_restore_wq, &p->restore_work, 0)) {
+			pr_err("Restore process %d failed during resume\n",
+			       p->pasid);
+			ret = -EFAULT;
+		}
+	}
+	srcu_read_unlock(&kfd_processes_srcu, idx);
+	return ret;
 }
 
 int kfd_reserved_mem_mmap(struct kfd_dev *dev, struct kfd_process *process,
@@ -1219,7 +1206,6 @@ int kfd_reserved_mem_mmap(struct kfd_dev *dev, struct kfd_process *process,
 			       PFN_DOWN(__pa(qpd->cwsr_kaddr)),
 			       KFD_CWSR_TBA_TMA_SIZE, vma->vm_page_prot);
 }
-
 
 void kfd_flush_tlb(struct kfd_process_device *pdd)
 {
@@ -1261,7 +1247,7 @@ int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data)
 		r = pqm_debugfs_mqds(m, &p->pqm);
 		mutex_unlock(&p->mutex);
 
-		if (r != 0)
+		if (r)
 			break;
 	}
 

@@ -24,6 +24,7 @@
 #include <linux/export.h>
 #include <linux/err.h>
 #include <linux/fs.h>
+#include <linux/file.h>
 #include <linux/sched.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
@@ -47,7 +48,6 @@
 static long kfd_ioctl(struct file *, unsigned int, unsigned long);
 static int kfd_open(struct inode *, struct file *);
 static int kfd_mmap(struct file *, struct vm_area_struct *);
-static bool kfd_dev_is_large_bar(struct kfd_dev *dev);
 
 static const char kfd_dev_name[] = "kfd";
 
@@ -919,7 +919,7 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 		mutex_lock(&p->mutex);
 
 		if (!kfd_has_process_device_data(p))
-			goto out_upwrite;
+			goto out_unlock;
 
 		/* Run over all pdd of the process */
 		pdd = kfd_get_first_process_device_data(p);
@@ -928,7 +928,7 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 			pdd = kfd_get_next_process_device_data(p, pdd);
 		} while (pdd);
 
-		goto out_upwrite;
+		goto out_unlock;
 	}
 
 	/* Fill in process-aperture information for all available
@@ -945,7 +945,7 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 	if (!kfd_has_process_device_data(p)) {
 		args->num_of_nodes = 0;
 		kfree(pa);
-		goto out_upwrite;
+		goto out_unlock;
 	}
 
 	/* Run over all pdd of the process */
@@ -987,7 +987,7 @@ static int kfd_ioctl_get_process_apertures_new(struct file *filp,
 	kfree(pa);
 	return ret ? -EFAULT : 0;
 
-out_upwrite:
+out_unlock:
 	mutex_unlock(&p->mutex);
 	return 0;
 }
@@ -1341,8 +1341,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	return 0;
 
 err_free:
-	dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
-					 (struct kgd_mem *) mem);
+	dev->kfd2kgd->free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem);
 err_unlock:
 	mutex_unlock(&p->mutex);
 	return err;
@@ -1383,7 +1382,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	/* If freeing the buffer failed, leave the handle in place for
 	 * clean-up during process tear-down.
 	 */
-	if (ret == 0)
+	if (!ret)
 		kfd_process_device_remove_obj_handle(
 			pdd, GET_IDR_HANDLE(args->handle));
 

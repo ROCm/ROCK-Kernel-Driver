@@ -289,7 +289,6 @@
 
 #define MAKE_LDS_APP_BASE_VI() \
 	(((uint64_t)(0x1UL) << 61) + 0x0)
-
 #define MAKE_LDS_APP_LIMIT(base) \
 	(((uint64_t)(base) & 0xFFFFFFFF00000000UL) | 0xFFFFFFFF)
 
@@ -323,7 +322,7 @@ int kfd_set_process_dgpu_aperture(struct kfd_process_device *pdd,
 	return 0;
 }
 
-void kfd_init_apertures_vi(struct kfd_process_device *pdd, uint8_t id)
+static void kfd_init_apertures_vi(struct kfd_process_device *pdd, uint8_t id)
 {
 	/*
 	 * node id couldn't be 0 - the three MSB bits of
@@ -353,7 +352,7 @@ void kfd_init_apertures_vi(struct kfd_process_device *pdd, uint8_t id)
 	pdd->scratch_limit = MAKE_SCRATCH_APP_LIMIT(pdd->scratch_base);
 }
 
-void kfd_init_apertures_v9(struct kfd_process_device *pdd, uint8_t id)
+static void kfd_init_apertures_v9(struct kfd_process_device *pdd, uint8_t id)
 {
 	pdd->lds_base = MAKE_LDS_APP_BASE_V9();
 	pdd->lds_limit = MAKE_LDS_APP_LIMIT(pdd->lds_base);
@@ -388,10 +387,10 @@ int kfd_init_apertures(struct kfd_process *process)
 		pdd = kfd_create_process_device_data(dev, process);
 		if (!pdd) {
 			pr_err("Failed to create process device data\n");
-			return -1;
+			return -ENOMEM;
 		}
 		/*
-		 * For 64 bit process aperture will be statically reserved in
+		 * For 64 bit process apertures will be statically reserved in
 		 * the x86_64 non canonical process address space
 		 * amdkfd doesn't currently support apertures for 32 bit process
 		 */
@@ -415,8 +414,9 @@ int kfd_init_apertures(struct kfd_process *process)
 				kfd_init_apertures_v9(pdd, id);
 				break;
 			default:
-				pr_err("Unknown chip in kfd_init_apertures\n");
-				return -1;
+				WARN(1, "Unexpected ASIC family %u",
+				     dev->device_info->asic_family);
+				return -EINVAL;
 			}
 
 			if (!dev->device_info->needs_iommu_device) {

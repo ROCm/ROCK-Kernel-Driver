@@ -239,6 +239,7 @@ static const struct kfd_device_info vega10_vf_device_info = {
 	.num_sdma_engines = 2,
 };
 
+
 struct kfd_deviceid {
 	unsigned short did;
 	const struct kfd_device_info *device_info;
@@ -287,35 +288,35 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x67B9, &hawaii_device_info },	/* Hawaii */
 	{ 0x67BA, &hawaii_device_info },	/* Hawaii */
 	{ 0x67BE, &hawaii_device_info },	/* Hawaii */
-	{ 0x6920, &tonga_device_info   },	/* Tonga */
-	{ 0x6921, &tonga_device_info   },	/* Tonga */
-	{ 0x6928, &tonga_device_info   },	/* Tonga */
-	{ 0x6929, &tonga_device_info   },	/* Tonga */
-	{ 0x692B, &tonga_device_info   },	/* Tonga */
-	{ 0x692F, &tonga_vf_device_info   },	/* Tonga vf */
-	{ 0x6938, &tonga_device_info   },	/* Tonga */
-	{ 0x6939, &tonga_device_info   },	/* Tonga */
-	{ 0x7300, &fiji_device_info    },	/* Fiji */
-	{ 0x730F, &fiji_vf_device_info    },	/* Fiji vf*/
-	{ 0x67C0, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67C1, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67C2, &polaris10_device_info },     /* Polaris10 */
+	{ 0x6920, &tonga_device_info },		/* Tonga */
+	{ 0x6921, &tonga_device_info },		/* Tonga */
+	{ 0x6928, &tonga_device_info },		/* Tonga */
+	{ 0x6929, &tonga_device_info },		/* Tonga */
+	{ 0x692B, &tonga_device_info },		/* Tonga */
+	{ 0x692F, &tonga_vf_device_info },	/* Tonga vf */
+	{ 0x6938, &tonga_device_info },		/* Tonga */
+	{ 0x6939, &tonga_device_info },		/* Tonga */
+	{ 0x7300, &fiji_device_info },		/* Fiji */
+	{ 0x730F, &fiji_vf_device_info },	/* Fiji vf*/
+	{ 0x67C0, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67C1, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67C2, &polaris10_device_info },	/* Polaris10 */
 	{ 0x67C4, &polaris10_device_info },	/* Polaris10 */
 	{ 0x67C7, &polaris10_device_info },	/* Polaris10 */
-	{ 0x67C8, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67C9, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67CA, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67CC, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67CF, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67D0, &polaris10_vf_device_info },     /* Polaris10 vf*/
+	{ 0x67C8, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67C9, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67CA, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67CC, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67CF, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67D0, &polaris10_vf_device_info },	/* Polaris10 vf*/
 	{ 0x67DF, &polaris10_device_info },	/* Polaris10 */
-	{ 0x67E0, &polaris11_device_info },     /* Polaris11 */
-	{ 0x67E1, &polaris11_device_info },     /* Polaris11 */
+	{ 0x67E0, &polaris11_device_info },	/* Polaris11 */
+	{ 0x67E1, &polaris11_device_info },	/* Polaris11 */
 	{ 0x67E3, &polaris11_device_info },	/* Polaris11 */
-	{ 0x67E7, &polaris11_device_info },     /* Polaris11 */
-	{ 0x67E8, &polaris11_device_info },     /* Polaris11 */
-	{ 0x67E9, &polaris11_device_info },     /* Polaris11 */
-	{ 0x67EB, &polaris11_device_info },     /* Polaris11 */
+	{ 0x67E7, &polaris11_device_info },	/* Polaris11 */
+	{ 0x67E8, &polaris11_device_info },	/* Polaris11 */
+	{ 0x67E9, &polaris11_device_info },	/* Polaris11 */
+	{ 0x67EB, &polaris11_device_info },	/* Polaris11 */
 	{ 0x67EF, &polaris11_device_info },	/* Polaris11 */
 	{ 0x67FF, &polaris11_device_info },	/* Polaris11 */
 	{ 0x6860, &vega10_device_info },	/* Vega10 */
@@ -379,7 +380,7 @@ struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 			PCI_EXP_DEVCAP2_ATOMIC_COMP64);
 	if (device_info->needs_pci_atomics && ret  < 0) {
 		dev_info(kfd_device,
-			"skipped device %x:%x, PCI rejects atomics",
+			 "skipped device %x:%x, PCI rejects atomics\n",
 			 pdev->vendor, pdev->device);
 		return NULL;
 	}
@@ -429,7 +430,6 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			KGD_ENGINE_SDMA1);
 	kfd->shared_resources = *gpu_resources;
 
-	/* Usually first_vmid_kfd = 8, last_vmid_kfd = 15 */
 	kfd->vm_info.first_vmid_kfd = ffs(gpu_resources->compute_vmid_bitmap)-1;
 	kfd->vm_info.last_vmid_kfd = fls(gpu_resources->compute_vmid_bitmap)-1;
 	kfd->vm_info.vmid_num_kfd = kfd->vm_info.last_vmid_kfd
@@ -678,10 +678,11 @@ void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 
 	spin_lock(&kfd->interrupt_lock);
 
-	if (kfd->interrupts_active && interrupt_is_wanted(kfd, ih_ring_entry,
-						patched_ihre, &is_patched)
+	if (kfd->interrupts_active
+	    && interrupt_is_wanted(kfd, ih_ring_entry,
+				   patched_ihre, &is_patched)
 	    && enqueue_ih_ring_entry(kfd,
-				is_patched ? patched_ihre : ih_ring_entry))
+				     is_patched ? patched_ihre : ih_ring_entry))
 		queue_work(kfd->ih_wq, &kfd->interrupt_work);
 
 	spin_unlock(&kfd->interrupt_lock);

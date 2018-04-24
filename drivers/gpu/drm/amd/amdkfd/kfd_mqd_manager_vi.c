@@ -548,4 +548,3 @@ struct mqd_manager *mqd_manager_init_vi_tonga(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd_tonga;
 	return mqd;
 }
-
