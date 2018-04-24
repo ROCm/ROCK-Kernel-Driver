@@ -24,18 +24,13 @@
 #include "kfd_events.h"
 #include "cik_int.h"
 
-static bool is_cpc_vm_fault(struct kfd_dev *dev,
-					const uint32_t *ih_ring_entry)
+static bool is_cpc_vm_fault(struct kfd_dev *dev, uint32_t source_id,
+			    unsigned int vmid)
 {
-	const struct cik_ih_ring_entry *ihre =
-			(const struct cik_ih_ring_entry *)ih_ring_entry;
-
-	if ((ihre->source_id == CIK_INTSRC_GFX_PAGE_INV_FAULT ||
-		ihre->source_id == CIK_INTSRC_GFX_MEM_PROT_FAULT) &&
-	    ihre->vmid >= dev->vm_info.first_vmid_kfd &&
-	    ihre->vmid <= dev->vm_info.last_vmid_kfd)
-		return true;
-	return false;
+	return (source_id == CIK_INTSRC_GFX_PAGE_INV_FAULT ||
+		source_id == CIK_INTSRC_GFX_MEM_PROT_FAULT) &&
+		vmid >= dev->vm_info.first_vmid_kfd &&
+		vmid <= dev->vm_info.last_vmid_kfd;
 }
 
 static bool cik_event_interrupt_isr(struct kfd_dev *dev,
@@ -46,8 +41,7 @@ static bool cik_event_interrupt_isr(struct kfd_dev *dev,
 	const struct cik_ih_ring_entry *ihre =
 			(const struct cik_ih_ring_entry *)ih_ring_entry;
 	const struct kfd2kgd_calls *f2g = dev->kfd2kgd;
-	struct cik_ih_ring_entry *tmp_ihre =
-			(struct cik_ih_ring_entry *) patched_ihre;
+	unsigned int vmid, pasid;
 
 	/* This workaround is due to HW/FW limitation on Hawaii that
 	 * VMID and PASID are not written into ih_ring_entry
@@ -55,23 +49,34 @@ static bool cik_event_interrupt_isr(struct kfd_dev *dev,
 	if ((ihre->source_id == CIK_INTSRC_GFX_PAGE_INV_FAULT ||
 		ihre->source_id == CIK_INTSRC_GFX_MEM_PROT_FAULT) &&
 		dev->device_info->asic_family == CHIP_HAWAII) {
+		struct cik_ih_ring_entry *tmp_ihre =
+			(struct cik_ih_ring_entry *)patched_ihre;
+
 		*patched_flag = true;
 		*tmp_ihre = *ihre;
 
-		tmp_ihre->vmid = f2g->read_vmid_from_vmfault_reg(dev->kgd);
-		tmp_ihre->pasid = f2g->get_atc_vmid_pasid_mapping_pasid(
-						 dev->kgd, tmp_ihre->vmid);
-		return (tmp_ihre->pasid != 0) &&
-			tmp_ihre->vmid >= dev->vm_info.first_vmid_kfd &&
-			tmp_ihre->vmid <= dev->vm_info.last_vmid_kfd;
+		vmid = f2g->read_vmid_from_vmfault_reg(dev->kgd);
+		pasid = f2g->get_atc_vmid_pasid_mapping_pasid(dev->kgd, vmid);
+
+		tmp_ihre->ring_id &= 0x000000ff;
+		tmp_ihre->ring_id |= vmid << 8;
+		tmp_ihre->ring_id |= pasid << 16;
+
+		return (pasid != 0) &&
+			vmid >= dev->vm_info.first_vmid_kfd &&
+			vmid <= dev->vm_info.last_vmid_kfd;
 	}
+
+	vmid  = (ihre->ring_id & 0x0000ff00) >> 8;
+	pasid = (ihre->ring_id & 0xffff0000) >> 16;
+
 	/* Do not process in ISR, just request it to be forwarded to WQ. */
-	return (ihre->pasid != 0) &&
+	return (pasid != 0) &&
 		(ihre->source_id == CIK_INTSRC_CP_END_OF_PIPE ||
-		ihre->source_id == CIK_INTSRC_SDMA_TRAP ||
-		ihre->source_id == CIK_INTSRC_SQ_INTERRUPT_MSG ||
-		ihre->source_id == CIK_INTSRC_CP_BAD_OPCODE ||
-		is_cpc_vm_fault(dev, ih_ring_entry));
+		 ihre->source_id == CIK_INTSRC_SDMA_TRAP ||
+		 ihre->source_id == CIK_INTSRC_SQ_INTERRUPT_MSG ||
+		 ihre->source_id == CIK_INTSRC_CP_BAD_OPCODE ||
+		 is_cpc_vm_fault(dev, ihre->source_id, vmid));
 }
 
 static void cik_event_interrupt_wq(struct kfd_dev *dev,
@@ -80,33 +85,35 @@ static void cik_event_interrupt_wq(struct kfd_dev *dev,
 	const struct cik_ih_ring_entry *ihre =
 			(const struct cik_ih_ring_entry *)ih_ring_entry;
 	uint32_t context_id = ihre->data & 0xfffffff;
+	unsigned int vmid  = (ihre->ring_id & 0x0000ff00) >> 8;
+	unsigned int pasid = (ihre->ring_id & 0xffff0000) >> 16;
 
-	if (ihre->pasid == 0)
+	if (pasid == 0)
 		return;
 
 	if (ihre->source_id == CIK_INTSRC_CP_END_OF_PIPE)
-		kfd_signal_event_interrupt(ihre->pasid, context_id, 28);
+		kfd_signal_event_interrupt(pasid, context_id, 28);
 	else if (ihre->source_id == CIK_INTSRC_SDMA_TRAP)
-		kfd_signal_event_interrupt(ihre->pasid, context_id, 28);
+		kfd_signal_event_interrupt(pasid, context_id, 28);
 	else if (ihre->source_id == CIK_INTSRC_SQ_INTERRUPT_MSG)
-		kfd_signal_event_interrupt(ihre->pasid, context_id & 0xff, 8);
+		kfd_signal_event_interrupt(pasid, context_id & 0xff, 8);
 	else if (ihre->source_id == CIK_INTSRC_CP_BAD_OPCODE)
-		kfd_signal_hw_exception_event(ihre->pasid);
+		kfd_signal_hw_exception_event(pasid);
 	else if (ihre->source_id == CIK_INTSRC_GFX_PAGE_INV_FAULT ||
 		ihre->source_id == CIK_INTSRC_GFX_MEM_PROT_FAULT) {
 		struct kfd_vm_fault_info info;
 
-		kfd_process_vm_fault(dev->dqm, ihre->pasid);
+		kfd_process_vm_fault(dev->dqm, pasid);
 
 		memset(&info, 0, sizeof(info));
 		dev->kfd2kgd->get_vm_fault_info(dev->kgd, &info);
 		if (!info.page_addr && !info.status)
 			return;
 
-		if (info.vmid == ihre->vmid)
-			kfd_signal_vm_fault_event(dev, ihre->pasid, &info);
+		if (info.vmid == vmid)
+			kfd_signal_vm_fault_event(dev, pasid, &info);
 		else
-			kfd_signal_vm_fault_event(dev, ihre->pasid, NULL);
+			kfd_signal_vm_fault_event(dev, pasid, NULL);
 	}
 }
 
