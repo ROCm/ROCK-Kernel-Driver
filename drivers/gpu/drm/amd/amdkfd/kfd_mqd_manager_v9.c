@@ -159,7 +159,7 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 			(1 << COMPUTE_PGM_RSRC2__TRAP_PRESENT__SHIFT);
 	}
 
-	if (mm->dev->cwsr_enabled) {
+	if (mm->dev->cwsr_enabled && q->ctx_save_restore_area_address) {
 		m->cp_hqd_persistent_state |=
 			(1 << CP_HQD_PERSISTENT_STATE__QSWITCH_MODE__SHIFT);
 		m->cp_hqd_ctx_save_base_addr_lo =
@@ -249,7 +249,7 @@ static int update_mqd(struct mqd_manager *mm, void *mqd,
 	if (priv_cp_queues)
 		m->cp_hqd_pq_control |=
 			1 << CP_HQD_PQ_CONTROL__PRIV_STATE__SHIFT;
-	if (mm->dev->cwsr_enabled)
+	if (mm->dev->cwsr_enabled && q->ctx_save_restore_area_address)
 		m->cp_hqd_ctx_save_control = 0;
 
 	update_cu_mask(mm, mqd, q);
