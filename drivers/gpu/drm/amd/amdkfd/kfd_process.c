@@ -516,11 +516,12 @@ static int kfd_process_init_cwsr_apu(struct kfd_process *p, struct file *filep)
 				MAP_SHARED, offset);
 
 		if (IS_ERR_VALUE(qpd->tba_addr)) {
-			pr_err("Failure to set tba address. error -%d.\n",
-			       (int)qpd->tba_addr);
+			int err = qpd->tba_addr;
+
+			pr_err("Failure to set tba address. error %d.\n", err);
 			qpd->tba_addr = 0;
 			qpd->cwsr_kaddr = NULL;
-			return -ENOMEM;
+			return err;
 		}
 
 		memcpy(qpd->cwsr_kaddr, dev->cwsr_isa, dev->cwsr_isa_size);
