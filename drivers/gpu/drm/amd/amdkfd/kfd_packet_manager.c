@@ -219,16 +219,7 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 
 int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm)
 {
-	pm->dqm = dqm;
-	mutex_init(&pm->lock);
-	pm->priv_queue = kernel_queue_init(dqm->dev, KFD_QUEUE_TYPE_HIQ);
-	if (!pm->priv_queue) {
-		mutex_destroy(&pm->lock);
-		return -ENOMEM;
-	}
-	pm->allocated = false;
-
-	switch (pm->dqm->dev->device_info->asic_family) {
+	switch (dqm->dev->device_info->asic_family) {
 	case CHIP_KAVERI:
 	case CHIP_HAWAII:
 		/* PM4 packet structures on CIK are the same as on VI */
@@ -244,8 +235,19 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm)
 		pm->pmf = &kfd_v9_pm_funcs;
 		break;
 	default:
-		BUG();
+		WARN(1, "Unexpected ASIC family %u",
+		     dqm->dev->device_info->asic_family);
+		return -EINVAL;
 	}
+
+	pm->dqm = dqm;
+	mutex_init(&pm->lock);
+	pm->priv_queue = kernel_queue_init(dqm->dev, KFD_QUEUE_TYPE_HIQ);
+	if (!pm->priv_queue) {
+		mutex_destroy(&pm->lock);
+		return -ENOMEM;
+	}
+	pm->allocated = false;
 
 	return 0;
 }
