@@ -1672,7 +1672,7 @@ static void vega10_populate_vddc_soc_levels(struct pp_hwmgr *hwmgr)
 	struct phm_ppt_v2_information *table_info = hwmgr->pptable;
 	struct phm_ppt_v1_voltage_lookup_table *vddc_lookup_table;
 
-	uint8_t soc_vid;
+	uint8_t soc_vid = 0;
 	uint32_t i, max_vddc_level;
 
 	if (hwmgr->od_enabled)
