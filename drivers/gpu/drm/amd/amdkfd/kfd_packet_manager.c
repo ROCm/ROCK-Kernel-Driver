@@ -400,13 +400,17 @@ void pm_release_ib(struct packet_manager *pm)
 	mutex_unlock(&pm->lock);
 }
 
+#if defined(CONFIG_DEBUG_FS)
+
 int pm_debugfs_runlist(struct seq_file *m, void *data)
 {
 	struct packet_manager *pm = data;
 
+	mutex_lock(&pm->lock);
+
 	if (!pm->allocated) {
 		seq_puts(m, "  No active runlist\n");
-		return 0;
+		goto out;
 	}
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(4, 3, 0)
@@ -414,5 +418,9 @@ int pm_debugfs_runlist(struct seq_file *m, void *data)
 		     pm->ib_buffer_obj->cpu_ptr, pm->ib_size_bytes, false);
 #endif
 
+out:
+	mutex_unlock(&pm->lock);
 	return 0;
 }
+
+#endif
