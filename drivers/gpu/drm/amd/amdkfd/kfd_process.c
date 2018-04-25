@@ -702,6 +702,12 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	if (!pdd)
 		return NULL;
 
+	if (init_doorbell_bitmap(&pdd->qpd, dev)) {
+		pr_err("Failed to init doorbell for process\n");
+		kfree(pdd);
+		return NULL;
+	}
+
 	pdd->dev = dev;
 	INIT_LIST_HEAD(&pdd->qpd.queues_list);
 	INIT_LIST_HEAD(&pdd->qpd.priv_queue_list);
@@ -715,19 +721,8 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 
 	/* Init idr used for memory handle translation */
 	idr_init(&pdd->alloc_idr);
-	if (init_doorbell_bitmap(&pdd->qpd, dev)) {
-		pr_err("Failed to init doorbell for process\n");
-		goto err_create_pdd;
-	}
 
 	return pdd;
-
-err_create_pdd:
-	kfree(pdd->qpd.doorbell_bitmap);
-	idr_destroy(&pdd->alloc_idr);
-	list_del(&pdd->per_device_list);
-	kfree(pdd);
-	return NULL;
 }
 
 /**
