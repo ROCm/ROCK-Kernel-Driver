@@ -73,9 +73,6 @@ static struct workqueue_struct *kfd_process_wq;
  */
 static struct workqueue_struct *kfd_restore_wq;
 
-#define MIN_IDR_ID 1
-#define MAX_IDR_ID 0 /*0 - for unlimited*/
-
 static struct kfd_process *find_process(const struct task_struct *thread,
 		bool ref);
 static void kfd_process_ref_release(struct kref *ref);
@@ -868,12 +865,7 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 
 	INIT_LIST_HEAD(&buf_obj->cb_data_head);
 
-	idr_preload(GFP_KERNEL);
-
-	handle = idr_alloc(&pdd->alloc_idr, buf_obj, MIN_IDR_ID, MAX_IDR_ID,
-			GFP_NOWAIT);
-
-	idr_preload_end();
+	handle = idr_alloc(&pdd->alloc_idr, buf_obj, 0, 0, GFP_KERNEL);
 
 	if (handle < 0)
 		kfree(buf_obj);
