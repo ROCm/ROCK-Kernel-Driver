@@ -744,7 +744,7 @@ int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 	int ret;
 
 	if (pdd->vm)
-		return 0;
+		return drm_file ? -EBUSY : 0;
 
 	p = pdd->process;
 	dev = pdd->dev;
