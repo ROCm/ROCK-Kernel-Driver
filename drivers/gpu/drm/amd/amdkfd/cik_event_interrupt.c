@@ -24,15 +24,6 @@
 #include "kfd_events.h"
 #include "cik_int.h"
 
-static bool is_cpc_vm_fault(struct kfd_dev *dev, uint32_t source_id,
-			    unsigned int vmid)
-{
-	return (source_id == CIK_INTSRC_GFX_PAGE_INV_FAULT ||
-		source_id == CIK_INTSRC_GFX_MEM_PROT_FAULT) &&
-		vmid >= dev->vm_info.first_vmid_kfd &&
-		vmid <= dev->vm_info.last_vmid_kfd;
-}
-
 static bool cik_event_interrupt_isr(struct kfd_dev *dev,
 					const uint32_t *ih_ring_entry,
 					uint32_t *patched_ihre,
@@ -67,16 +58,26 @@ static bool cik_event_interrupt_isr(struct kfd_dev *dev,
 			vmid <= dev->vm_info.last_vmid_kfd;
 	}
 
+	/* Only handle interrupts from KFD VMIDs */
 	vmid  = (ihre->ring_id & 0x0000ff00) >> 8;
-	pasid = (ihre->ring_id & 0xffff0000) >> 16;
+	if (vmid < dev->vm_info.first_vmid_kfd ||
+	    vmid > dev->vm_info.last_vmid_kfd)
+		return 0;
 
-	/* Do not process in ISR, just request it to be forwarded to WQ. */
-	return (pasid != 0) &&
-		(ihre->source_id == CIK_INTSRC_CP_END_OF_PIPE ||
-		 ihre->source_id == CIK_INTSRC_SDMA_TRAP ||
-		 ihre->source_id == CIK_INTSRC_SQ_INTERRUPT_MSG ||
-		 ihre->source_id == CIK_INTSRC_CP_BAD_OPCODE ||
-		 is_cpc_vm_fault(dev, ihre->source_id, vmid));
+	/* If there is no valid PASID, it's likely a firmware bug */
+	pasid = (ihre->ring_id & 0xffff0000) >> 16;
+	if (WARN_ONCE(pasid == 0, "FW bug: No PASID in KFD interrupt"))
+		return 0;
+
+	/* Interrupt types we care about: various signals and faults.
+	 * They will be forwarded to a work queue (see below).
+	 */
+	return ihre->source_id == CIK_INTSRC_CP_END_OF_PIPE ||
+		ihre->source_id == CIK_INTSRC_SDMA_TRAP ||
+		ihre->source_id == CIK_INTSRC_SQ_INTERRUPT_MSG ||
+		ihre->source_id == CIK_INTSRC_CP_BAD_OPCODE ||
+		ihre->source_id == CIK_INTSRC_GFX_PAGE_INV_FAULT ||
+		ihre->source_id == CIK_INTSRC_GFX_MEM_PROT_FAULT;
 }
 
 static void cik_event_interrupt_wq(struct kfd_dev *dev,
