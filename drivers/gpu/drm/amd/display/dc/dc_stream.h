@@ -127,6 +127,8 @@ struct dc_stream_update {
 
 	struct dc_crtc_timing_adjust *adjust;
 	struct dc_info_packet *vrr_infopacket;
+
+	bool *dpms_off;
 };
 
 bool dc_is_stream_unchanged(
