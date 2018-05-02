@@ -91,7 +91,6 @@ void amdgpu_debugfs_cleanup(struct drm_minor *minor)
 #endif
 
 #if defined(CONFIG_DEBUG_FS)
-
 /**
  * amdgpu_debugfs_process_reg_op - Handle MMIO register reads/writes
  *
