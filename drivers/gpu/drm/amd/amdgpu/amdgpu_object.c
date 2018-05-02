@@ -1016,6 +1016,7 @@ static const char *amdgpu_vram_names[] = {
 	"HBM",
 	"DDR3",
 	"DDR4",
+	"GDDR6",
 };
 
 /**
