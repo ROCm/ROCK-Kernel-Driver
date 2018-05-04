@@ -2195,7 +2195,7 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 
 		for (i = 0; i < nl; i++) {
 			unsigned int n;
-			void *kaddr = kmap_atomic(process_pages[i]);
+			void *kaddr = kmap(process_pages[i]);
 
 			if (cma_write) {
 				n = copy_from_user(kaddr+offset_in_page,
@@ -2206,7 +2206,7 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 						 kaddr+offset_in_page,
 						 copy_size);
 			}
-			kunmap_atomic(kaddr);
+			kunmap(kaddr);
 			if (n) {
 				ret = -EFAULT;
 				break;
