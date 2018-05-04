@@ -2215,11 +2215,7 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 
 		for (i = 0; i < nl; i++) {
 			unsigned int n;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)
-			void *kaddr = kmap_atomic(process_pages[i]);
-#else
-			void *kaddr = kmap_atomic(process_pages[i], KM_USER0);
-#endif
+			void *kaddr = kmap(process_pages[i]);
 
 			if (cma_write) {
 				n = copy_from_user(kaddr+offset_in_page,
@@ -2230,11 +2226,7 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 						 kaddr+offset_in_page,
 						 copy_size);
 			}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)
-			kunmap_atomic(kaddr);
-#else
-			kunmap_atomic(kaddr, KM_USER0);
-#endif
+			kunmap(kaddr);
 			if (n) {
 				ret = -EFAULT;
 				break;
