@@ -989,7 +989,10 @@ static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 	int vmid;
 	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
 
-	if (ring->ready && (!adev->in_gpu_reset))
+	if (adev->in_gpu_reset)
+		return -EIO;
+
+	if (ring->ready)
 		return invalidate_tlbs_with_kiq(adev, pasid);
 
 	for (vmid = 0; vmid < 16; vmid++) {
