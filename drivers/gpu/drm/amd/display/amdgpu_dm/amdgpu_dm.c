@@ -5230,7 +5230,7 @@ static int dm_update_crtcs_state(struct amdgpu_display_manager *dm,
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		acrtc = to_amdgpu_crtc(crtc);
 
-		new_plane_state = drm_atomic_get_new_plane_state(state, new_crtc_state->crtc->primary);
+		new_plane_state = kcl_drm_atomic_get_new_plane_state_before_commit(state, new_crtc_state->crtc->primary);
 
 		if (new_crtc_state->enable && new_plane_state && !new_plane_state->fb) {
 			ret = -EINVAL;
