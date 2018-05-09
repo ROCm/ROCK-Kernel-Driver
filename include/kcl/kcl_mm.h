@@ -39,4 +39,9 @@ static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *
 #endif
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#define kvzalloc kzalloc
+#define kvfree kfree
+#endif
+
 #endif /* AMDKCL_MM_H */
