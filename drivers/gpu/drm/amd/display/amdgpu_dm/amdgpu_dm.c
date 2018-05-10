@@ -2279,6 +2279,10 @@ static int fill_plane_attributes(struct amdgpu_device *adev,
 		dc_plane_state->in_transfer_func = NULL;
 	}
 #else
+#if defined(OS_NAME_RHEL_6)
+	dc_plane_state->in_transfer_func->type = TF_TYPE_PREDEFINED;
+	dc_plane_state->in_transfer_func->tf = TRANSFER_FUNCTION_SRGB;
+#endif
 	if (crtc->mode.private_flags & AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET) {
 		fill_gamma_from_crtc(crtc, dc_plane_state);
 		/* reset trigger of gamma */
