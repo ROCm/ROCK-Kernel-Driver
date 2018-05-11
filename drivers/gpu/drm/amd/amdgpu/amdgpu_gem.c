@@ -973,10 +973,6 @@ static int amdgpu_debugfs_gem_bo_info(int id, void *ptr, void *data)
 	seq_printf(m, "\t0x%08x: %12ld byte %s",
 		   id, amdgpu_bo_size(bo), placement);
 
-	offset = READ_ONCE(bo->tbo.mem.start);
-	if (offset != AMDGPU_BO_INVALID_OFFSET)
-		seq_printf(m, " @ 0x%010Lx", offset);
-
 	pin_count = READ_ONCE(bo->pin_count);
 	if (pin_count)
 		seq_printf(m, " pin count %d", pin_count);
