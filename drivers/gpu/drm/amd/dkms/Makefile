@@ -69,6 +69,8 @@ ifeq ($(OS_VERSION),"6.8")
 subdir-ccflags-y += -DOS_NAME_RHEL_6
 else ifeq ($(OS_VERSION),"6.9")
 subdir-ccflags-y += -DOS_NAME_RHEL_6
+else ifeq ($(OS_VERSION),"6.10")
+subdir-ccflags-y += -DOS_NAME_RHEL_6
 else ifeq ($(OS_VERSION),"7.2")
 subdir-ccflags-y += -DOS_NAME_RHEL_7_2
 else ifeq ($(OS_VERSION),"7.3")
