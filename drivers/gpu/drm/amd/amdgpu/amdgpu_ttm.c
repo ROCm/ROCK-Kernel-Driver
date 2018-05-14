@@ -2246,7 +2246,7 @@ static const struct {
 #ifdef CONFIG_DRM_AMDGPU_GART_DEBUGFS
 	{ "amdgpu_gtt", &amdgpu_ttm_gtt_fops, TTM_PL_TT },
 #endif
-#if !defined(OS_NAME_RHEL_6)
+#if !defined(OS_NAME_RHEL_6) && !defined(OS_NAME_RHEL_7_2)
 	{ "amdgpu_iova", &amdgpu_ttm_iova_fops, TTM_PL_SYSTEM },
 #endif
 };
