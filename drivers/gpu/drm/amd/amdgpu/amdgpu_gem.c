@@ -955,7 +955,6 @@ static int amdgpu_debugfs_gem_bo_info(int id, void *ptr, void *data)
 	unsigned domain;
 	const char *placement;
 	unsigned pin_count;
-	uint64_t offset;
 
 	domain = amdgpu_mem_type_to_domain(bo->tbo.mem.mem_type);
 	switch (domain) {
