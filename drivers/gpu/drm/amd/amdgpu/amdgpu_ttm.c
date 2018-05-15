@@ -2198,7 +2198,7 @@ static const struct file_operations amdgpu_ttm_gtt_fops = {
 
 #endif
 
-#if !defined(OS_NAME_RHEL_6)
+#if !defined(OS_NAME_RHEL_6) && !defined(OS_NAME_RHEL_7_2)
 
 static ssize_t amdgpu_iova_to_phys_read(struct file *f, char __user *buf,
 				   size_t size, loff_t *pos)
