@@ -24,7 +24,6 @@
 #define KFD_CRAT_H_INCLUDED
 
 #include <linux/types.h>
-#include "kfd_priv.h"
 
 #pragma pack(1)
 
@@ -228,12 +227,12 @@ struct crat_subtype_ccompute {
 /*
  * HSA IO Link Affinity structure and definitions
  */
-#define CRAT_IOLINK_FLAGS_ENABLED	(1 << 0)
-#define CRAT_IOLINK_FLAGS_NON_COHERENT	(1 << 1)
-#define CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT (1 << 2)
-#define CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT (1 << 3)
-#define CRAT_IOLINK_FLAGS_NO_PEER_TO_PEER_DMA (1 << 4)
-#define CRAT_IOLINK_FLAGS_RESERVED_MASK 0xffffffe0
+#define CRAT_IOLINK_FLAGS_ENABLED		(1 << 0)
+#define CRAT_IOLINK_FLAGS_NON_COHERENT		(1 << 1)
+#define CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT	(1 << 2)
+#define CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT	(1 << 3)
+#define CRAT_IOLINK_FLAGS_NO_PEER_TO_PEER_DMA	(1 << 4)
+#define CRAT_IOLINK_FLAGS_RESERVED_MASK		0xffffffe0
 
 /*
  * IO interface types
@@ -241,18 +240,18 @@ struct crat_subtype_ccompute {
 #define CRAT_IOLINK_TYPE_UNDEFINED	0
 #define CRAT_IOLINK_TYPE_HYPERTRANSPORT	1
 #define CRAT_IOLINK_TYPE_PCIEXPRESS	2
-#define CRAT_IOLINK_TYPE_AMBA 3
-#define CRAT_IOLINK_TYPE_MIPI 4
-#define CRAT_IOLINK_TYPE_QPI_1_1 5
-#define CRAT_IOLINK_TYPE_RESERVED1 6
-#define CRAT_IOLINK_TYPE_RESERVED2 7
-#define CRAT_IOLINK_TYPE_RAPID_IO 8
-#define CRAT_IOLINK_TYPE_INFINIBAND 9
-#define CRAT_IOLINK_TYPE_RESERVED3 10
-#define CRAT_IOLINK_TYPE_OTHER 11
-#define CRAT_IOLINK_TYPE_MAX 255
+#define CRAT_IOLINK_TYPE_AMBA		3
+#define CRAT_IOLINK_TYPE_MIPI		4
+#define CRAT_IOLINK_TYPE_QPI_1_1	5
+#define CRAT_IOLINK_TYPE_RESERVED1	6
+#define CRAT_IOLINK_TYPE_RESERVED2	7
+#define CRAT_IOLINK_TYPE_RAPID_IO	8
+#define CRAT_IOLINK_TYPE_INFINIBAND	9
+#define CRAT_IOLINK_TYPE_RESERVED3	10
+#define CRAT_IOLINK_TYPE_OTHER		11
+#define CRAT_IOLINK_TYPE_MAX		255
 
-#define CRAT_IOLINK_RESERVED_LENGTH 24
+#define CRAT_IOLINK_RESERVED_LENGTH	24
 
 struct crat_subtype_iolink {
 	uint8_t		type;
@@ -308,13 +307,16 @@ struct cdit_header {
 
 #pragma pack()
 
+struct kfd_dev;
+
 #ifdef CONFIG_ACPI
 int kfd_create_crat_image_acpi(void **crat_image, size_t *size);
 #endif
 void kfd_destroy_crat_image(void *crat_image);
-int kfd_parse_crat_table(void *crat_image,
-		struct list_head *device_list,
-		uint32_t proximity_domain);
+int kfd_parse_crat_table(void *crat_image, struct list_head *device_list,
+			 uint32_t proximity_domain);
 int kfd_create_crat_image_virtual(void **crat_image, size_t *size,
-		int flags, struct kfd_dev *kdev, uint32_t proximity_domain);
+				  int flags, struct kfd_dev *kdev,
+				  uint32_t proximity_domain);
+
 #endif /* KFD_CRAT_H_INCLUDED */

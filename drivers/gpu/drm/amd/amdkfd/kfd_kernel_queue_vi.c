@@ -67,12 +67,25 @@ static void submit_packet_vi(struct kernel_queue *kq)
 				kq->pending_wptr);
 }
 
-static int pm_map_process_vi(struct packet_manager *pm,
-		uint32_t *buffer, struct qcm_process_device *qpd)
+unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size)
+{
+	union PM4_MES_TYPE_3_HEADER header;
+
+	header.u32All = 0;
+	header.opcode = opcode;
+	header.count = packet_size / 4 - 2;
+	header.type = PM4_TYPE_3;
+
+	return header.u32All;
+}
+
+static int pm_map_process_vi(struct packet_manager *pm, uint32_t *buffer,
+				struct qcm_process_device *qpd)
 {
 	struct pm4_mes_map_process *packet;
 
 	packet = (struct pm4_mes_map_process *)buffer;
+
 	memset(buffer, 0, sizeof(struct pm4_mes_map_process));
 
 	packet->header.u32All = pm_build_pm4_header(IT_MAP_PROCESS,
@@ -99,26 +112,15 @@ static int pm_map_process_vi(struct packet_manager *pm,
 	return 0;
 }
 
-
-unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size)
-{
-	union PM4_MES_TYPE_3_HEADER header;
-
-	header.u32All = 0;
-	header.opcode = opcode;
-	header.count = packet_size / 4 - 2;
-	header.type = PM4_TYPE_3;
-
-	return header.u32All;
-}
-
-int pm_runlist_vi(struct packet_manager *pm, uint32_t *buffer,
+static int pm_runlist_vi(struct packet_manager *pm, uint32_t *buffer,
 			uint64_t ib, size_t ib_size_in_dwords, bool chain)
 {
 	struct pm4_mes_runlist *packet;
-
 	int concurrent_proc_cnt = 0;
 	struct kfd_dev *kfd = pm->dqm->dev;
+
+	if (WARN_ON(!ib))
+		return -EFAULT;
 
 	/* Determine the number of processes to map together to HW:
 	 * it can not exceed the number of VMIDs available to the
@@ -131,7 +133,6 @@ int pm_runlist_vi(struct packet_manager *pm, uint32_t *buffer,
 	 */
 	concurrent_proc_cnt = min(pm->dqm->processes_count,
 			kfd->max_proc_per_quantum);
-
 
 	packet = (struct pm4_mes_runlist *)buffer;
 
@@ -150,7 +151,35 @@ int pm_runlist_vi(struct packet_manager *pm, uint32_t *buffer,
 	return 0;
 }
 
-int pm_map_queues_vi(struct packet_manager *pm, uint32_t *buffer,
+int pm_set_resources_vi(struct packet_manager *pm, uint32_t *buffer,
+				struct scheduling_resources *res)
+{
+	struct pm4_mes_set_resources *packet;
+
+	packet = (struct pm4_mes_set_resources *)buffer;
+	memset(buffer, 0, sizeof(struct pm4_mes_set_resources));
+
+	packet->header.u32All = pm_build_pm4_header(IT_SET_RESOURCES,
+					sizeof(struct pm4_mes_set_resources));
+
+	packet->bitfields2.queue_type =
+			queue_type__mes_set_resources__hsa_interface_queue_hiq;
+	packet->bitfields2.vmid_mask = res->vmid_mask;
+	packet->bitfields2.unmap_latency = KFD_UNMAP_LATENCY_MS / 100;
+	packet->bitfields7.oac_mask = res->oac_mask;
+	packet->bitfields8.gds_heap_base = res->gds_heap_base;
+	packet->bitfields8.gds_heap_size = res->gds_heap_size;
+
+	packet->gws_mask_lo = lower_32_bits(res->gws_mask);
+	packet->gws_mask_hi = upper_32_bits(res->gws_mask);
+
+	packet->queue_mask_lo = lower_32_bits(res->queue_mask);
+	packet->queue_mask_hi = upper_32_bits(res->queue_mask);
+
+	return 0;
+}
+
+static int pm_map_queues_vi(struct packet_manager *pm, uint32_t *buffer,
 		struct queue *q, bool is_static)
 {
 	struct pm4_mes_map_queues *packet;
@@ -209,35 +238,7 @@ int pm_map_queues_vi(struct packet_manager *pm, uint32_t *buffer,
 	return 0;
 }
 
-int pm_set_resources_vi(struct packet_manager *pm, uint32_t *buffer,
-				struct scheduling_resources *res)
-{
-	struct pm4_mes_set_resources *packet;
-
-	packet = (struct pm4_mes_set_resources *)buffer;
-	memset(buffer, 0, sizeof(struct pm4_mes_set_resources));
-
-	packet->header.u32All = pm_build_pm4_header(IT_SET_RESOURCES,
-					sizeof(struct pm4_mes_set_resources));
-
-	packet->bitfields2.queue_type =
-			queue_type__mes_set_resources__hsa_interface_queue_hiq;
-	packet->bitfields2.vmid_mask = res->vmid_mask;
-	packet->bitfields2.unmap_latency = KFD_UNMAP_LATENCY_MS / 100;
-	packet->bitfields7.oac_mask = res->oac_mask;
-	packet->bitfields8.gds_heap_base = res->gds_heap_base;
-	packet->bitfields8.gds_heap_size = res->gds_heap_size;
-
-	packet->gws_mask_lo = lower_32_bits(res->gws_mask);
-	packet->gws_mask_hi = upper_32_bits(res->gws_mask);
-
-	packet->queue_mask_lo = lower_32_bits(res->queue_mask);
-	packet->queue_mask_hi = upper_32_bits(res->queue_mask);
-
-	return 0;
-}
-
-int pm_unmap_queues_vi(struct packet_manager *pm, uint32_t *buffer,
+static int pm_unmap_queues_vi(struct packet_manager *pm, uint32_t *buffer,
 			enum kfd_queue_type type,
 			enum kfd_unmap_queues_filter filter,
 			uint32_t filter_param, bool reset,
@@ -302,14 +303,13 @@ int pm_unmap_queues_vi(struct packet_manager *pm, uint32_t *buffer,
 
 }
 
-int pm_query_status_vi(struct packet_manager *pm, uint32_t *buffer,
+static int pm_query_status_vi(struct packet_manager *pm, uint32_t *buffer,
 			uint64_t fence_address,	uint32_t fence_value)
 {
 	struct pm4_mes_query_status *packet;
 
 	packet = (struct pm4_mes_query_status *)buffer;
 	memset(buffer, 0, sizeof(struct pm4_mes_query_status));
-
 
 	packet->header.u32All = pm_build_pm4_header(IT_QUERY_STATUS,
 					sizeof(struct pm4_mes_query_status));
@@ -328,16 +328,15 @@ int pm_query_status_vi(struct packet_manager *pm, uint32_t *buffer,
 	return 0;
 }
 
-
-uint32_t pm_release_mem_vi(uint64_t gpu_addr, uint32_t *buffer)
+static int pm_release_mem_vi(uint64_t gpu_addr, uint32_t *buffer)
 {
 	struct pm4_mec_release_mem *packet;
 
 	packet = (struct pm4_mec_release_mem *)buffer;
-	memset(buffer, 0, sizeof(struct pm4_mec_release_mem));
+	memset(buffer, 0, sizeof(*packet));
 
 	packet->header.u32All = pm_build_pm4_header(IT_RELEASE_MEM,
-					sizeof(struct pm4_mec_release_mem));
+						 sizeof(*packet));
 
 	packet->bitfields2.event_type = CACHE_FLUSH_AND_INV_TS_EVENT;
 	packet->bitfields2.event_index = event_index___release_mem__end_of_pipe;
@@ -355,63 +354,22 @@ uint32_t pm_release_mem_vi(uint64_t gpu_addr, uint32_t *buffer)
 
 	packet->data_lo = 0;
 
-	return sizeof(struct pm4_mec_release_mem) / sizeof(unsigned int);
+	return 0;
 }
 
-uint32_t pm_get_map_process_packet_size_vi(void)
-{
-	return sizeof(struct pm4_mes_map_process);
-}
-
-uint32_t pm_get_runlist_packet_size_vi(void)
-{
-	return sizeof(struct pm4_mes_runlist);
-}
-
-uint32_t pm_get_set_resources_packet_size_vi(void)
-{
-	return sizeof(struct pm4_mes_set_resources);
-}
-
-uint32_t pm_get_map_queues_packet_size_vi(void)
-{
-	return sizeof(struct pm4_mes_map_queues);
-}
-
-uint32_t pm_get_unmap_queues_packet_size_vi(void)
-{
-	return sizeof(struct pm4_mes_unmap_queues);
-}
-
-uint32_t pm_get_query_status_packet_size_vi(void)
-{
-	return sizeof(struct pm4_mes_query_status);
-}
-
-uint32_t pm_get_release_mem_packet_size_vi(void)
-{
-	return sizeof(struct pm4_mec_release_mem);
-}
-
-
-static struct packet_manager_funcs kfd_vi_pm_funcs = {
-	.map_process			= pm_map_process_vi,
-	.runlist			= pm_runlist_vi,
-	.set_resources			= pm_set_resources_vi,
-	.map_queues			= pm_map_queues_vi,
-	.unmap_queues			= pm_unmap_queues_vi,
-	.query_status			= pm_query_status_vi,
-	.release_mem			= pm_release_mem_vi,
-	.get_map_process_packet_size	= pm_get_map_process_packet_size_vi,
-	.get_runlist_packet_size	= pm_get_runlist_packet_size_vi,
-	.get_set_resources_packet_size	= pm_get_set_resources_packet_size_vi,
-	.get_map_queues_packet_size	= pm_get_map_queues_packet_size_vi,
-	.get_unmap_queues_packet_size	= pm_get_unmap_queues_packet_size_vi,
-	.get_query_status_packet_size	= pm_get_query_status_packet_size_vi,
-	.get_release_mem_packet_size	= pm_get_release_mem_packet_size_vi,
+const struct packet_manager_funcs kfd_vi_pm_funcs = {
+	.map_process		= pm_map_process_vi,
+	.runlist		= pm_runlist_vi,
+	.set_resources		= pm_set_resources_vi,
+	.map_queues		= pm_map_queues_vi,
+	.unmap_queues		= pm_unmap_queues_vi,
+	.query_status		= pm_query_status_vi,
+	.release_mem		= pm_release_mem_vi,
+	.map_process_size	= sizeof(struct pm4_mes_map_process),
+	.runlist_size		= sizeof(struct pm4_mes_runlist),
+	.set_resources_size	= sizeof(struct pm4_mes_set_resources),
+	.map_queues_size	= sizeof(struct pm4_mes_map_queues),
+	.unmap_queues_size	= sizeof(struct pm4_mes_unmap_queues),
+	.query_status_size	= sizeof(struct pm4_mes_query_status),
+	.release_mem_size	= sizeof(struct pm4_mec_release_mem)
 };
-
-void kfd_pm_func_init_vi(struct packet_manager *pm, uint16_t fw_ver)
-{
-	pm->pmf = &kfd_vi_pm_funcs;
-}

@@ -159,7 +159,7 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 			(1 << COMPUTE_PGM_RSRC2__TRAP_PRESENT__SHIFT);
 	}
 
-	if (mm->dev->cwsr_enabled) {
+	if (mm->dev->cwsr_enabled && q->ctx_save_restore_area_address) {
 		m->cp_hqd_persistent_state |=
 			(1 << CP_HQD_PERSISTENT_STATE__QSWITCH_MODE__SHIFT);
 		m->cp_hqd_ctx_save_base_addr_lo =
@@ -254,7 +254,7 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 	if (priv_cp_queues)
 		m->cp_hqd_pq_control |=
 			1 << CP_HQD_PQ_CONTROL__PRIV_STATE__SHIFT;
-	if (mm->dev->cwsr_enabled)
+	if (mm->dev->cwsr_enabled && q->ctx_save_restore_area_address)
 		m->cp_hqd_ctx_save_control =
 			atc_bit << CP_HQD_CTX_SAVE_CONTROL__ATC__SHIFT |
 			mtype << CP_HQD_CTX_SAVE_CONTROL__MTYPE__SHIFT;
@@ -548,4 +548,3 @@ struct mqd_manager *mqd_manager_init_vi_tonga(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd_tonga;
 	return mqd;
 }
-

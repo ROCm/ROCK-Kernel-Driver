@@ -3,4 +3,5 @@
 LINUXINCLUDE := $(DKMS_INCLUDE_PREFIX) $(LINUXINCLUDE)
 
 ccflags-y += \
-	-include $(AMDKFD_FULL_PATH)/backport/backport.h
+	-I$(AMDKFD_FULL_PATH) \
+	-include backport/backport.h

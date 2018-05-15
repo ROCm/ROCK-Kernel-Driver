@@ -38,6 +38,8 @@ struct phm_fan_speed_info;
 struct pp_atomctrl_voltage_table;
 
 #define VOLTAGE_SCALE 4
+#define VOLTAGE_VID_OFFSET_SCALE1   625
+#define VOLTAGE_VID_OFFSET_SCALE2   100
 
 enum DISPLAY_GAP {
 	DISPLAY_GAP_VBLANK_OR_WM = 0,   /* Wait for vblank or MCHG watermark. */
@@ -63,24 +65,6 @@ struct vi_dpm_table {
 #define PCIE_PERF_REQ_GEN1         2
 #define PCIE_PERF_REQ_GEN2         3
 #define PCIE_PERF_REQ_GEN3         4
-
-enum PP_FEATURE_MASK {
-	PP_SCLK_DPM_MASK = 0x1,
-	PP_MCLK_DPM_MASK = 0x2,
-	PP_PCIE_DPM_MASK = 0x4,
-	PP_SCLK_DEEP_SLEEP_MASK = 0x8,
-	PP_POWER_CONTAINMENT_MASK = 0x10,
-	PP_UVD_HANDSHAKE_MASK = 0x20,
-	PP_SMC_VOLTAGE_CONTROL_MASK = 0x40,
-	PP_VBI_TIME_SUPPORT_MASK = 0x80,
-	PP_ULV_MASK = 0x100,
-	PP_ENABLE_GFX_CG_THRU_SMU = 0x200,
-	PP_CLOCK_STRETCH_MASK = 0x400,
-	PP_OD_FUZZY_FAN_CONTROL_MASK = 0x800,
-	PP_SOCCLK_DPM_MASK = 0x1000,
-	PP_DCEFCLK_DPM_MASK = 0x2000,
-	PP_OVERDRIVE_MASK = 0x4000,
-};
 
 enum PHM_BackEnd_Magic {
 	PHM_Dummy_Magic       = 0xAA5555AA,
@@ -312,6 +296,7 @@ struct pp_hwmgr_func {
 	int (*display_clock_voltage_request)(struct pp_hwmgr *hwmgr,
 			struct pp_display_clock_request *clock);
 	int (*get_max_high_clocks)(struct pp_hwmgr *hwmgr, struct amd_pp_simple_clock_info *clocks);
+	int (*gfx_off_control)(struct pp_hwmgr *hwmgr, bool enable);
 	int (*power_off_asic)(struct pp_hwmgr *hwmgr);
 	int (*force_clock_level)(struct pp_hwmgr *hwmgr, enum pp_clock_type type, uint32_t mask);
 	int (*print_clock_levels)(struct pp_hwmgr *hwmgr, enum pp_clock_type type, char *buf);

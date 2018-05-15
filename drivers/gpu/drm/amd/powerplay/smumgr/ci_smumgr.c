@@ -61,9 +61,6 @@
 
 #define SMC_RAM_END 0x40000
 
-#define VOLTAGE_SCALE               4
-#define VOLTAGE_VID_OFFSET_SCALE1    625
-#define VOLTAGE_VID_OFFSET_SCALE2    100
 #define CISLAND_MINIMUM_ENGINE_CLOCK 800
 #define CISLAND_MAX_DEEPSLEEP_DIVIDER_ID 5
 
@@ -211,9 +208,7 @@ static int ci_send_msg_to_smc(struct pp_hwmgr *hwmgr, uint16_t msg)
 {
 	int ret;
 
-	if (!ci_is_smc_ram_running(hwmgr))
-		return -EINVAL;
-
+	cgs_write_register(hwmgr->device, mmSMC_RESP_0, 0);
 	cgs_write_register(hwmgr->device, mmSMC_MESSAGE_0, msg);
 
 	PHM_WAIT_FIELD_UNEQUAL(hwmgr, SMC_RESP_0, SMC_RESP, 0);

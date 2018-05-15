@@ -287,6 +287,7 @@ static struct soc15_allowed_register_entry soc15_allowed_read_registers[] = {
 	{ SOC15_REG_ENTRY(GC, 0, mmCP_CPC_STALLED_STAT1)},
 	{ SOC15_REG_ENTRY(GC, 0, mmCP_CPC_STATUS)},
 	{ SOC15_REG_ENTRY(GC, 0, mmGB_ADDR_CONFIG)},
+	{ SOC15_REG_ENTRY(GC, 0, mmDB_DEBUG2)},
 };
 
 static uint32_t soc15_read_indexed_register(struct amdgpu_device *adev, u32 se_num,
@@ -315,6 +316,8 @@ static uint32_t soc15_get_register_value(struct amdgpu_device *adev,
 	} else {
 		if (reg_offset == SOC15_REG_OFFSET(GC, 0, mmGB_ADDR_CONFIG))
 			return adev->gfx.config.gb_addr_config;
+		else if (reg_offset == SOC15_REG_OFFSET(GC, 0, mmDB_DEBUG2))
+			return adev->gfx.config.db_debug2;
 		return RREG32(reg_offset);
 	}
 }
@@ -678,6 +681,11 @@ static int soc15_common_early_init(void *handle)
 			AMD_CG_SUPPORT_SDMA_MGCG |
 			AMD_CG_SUPPORT_SDMA_LS;
 		adev->pg_flags = AMD_PG_SUPPORT_SDMA;
+
+		if (adev->powerplay.pp_feature & PP_GFXOFF_MASK)
+			adev->pg_flags |= AMD_PG_SUPPORT_GFX_PG |
+				AMD_PG_SUPPORT_CP |
+				AMD_PG_SUPPORT_RLC_SMU_HS;
 
 		adev->external_rev_id = 0x1;
 		break;

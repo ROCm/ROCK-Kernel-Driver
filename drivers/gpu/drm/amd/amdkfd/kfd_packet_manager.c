@@ -26,7 +26,6 @@
 #include "kfd_device_queue_manager.h"
 #include "kfd_kernel_queue.h"
 #include "kfd_priv.h"
-#include "kfd_pm4_opcodes.h"
 
 static inline void inc_wptr(unsigned int *wptr, unsigned int increment_bytes,
 				unsigned int buffer_size_bytes)
@@ -45,8 +44,7 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 	unsigned int process_count, queue_count, compute_queue_count;
 	unsigned int map_queue_size;
 	unsigned int max_proc_per_quantum = 1;
-
-	struct kfd_dev	*dev = pm->dqm->dev;
+	struct kfd_dev *dev = pm->dqm->dev;
 
 	process_count = pm->dqm->processes_count;
 	queue_count = pm->dqm->queue_count;
@@ -57,21 +55,20 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 	 * hws_max_conc_proc has been done in
 	 * kgd2kfd_device_init().
 	 */
-
 	*over_subscription = false;
 
 	if (dev->max_proc_per_quantum > 1)
 		max_proc_per_quantum = dev->max_proc_per_quantum;
 
 	if ((process_count > max_proc_per_quantum) ||
-		compute_queue_count > get_queues_num(pm->dqm)) {
+	    compute_queue_count > get_queues_num(pm->dqm)) {
 		*over_subscription = true;
 		pr_debug("Over subscribed runlist\n");
 	}
 
-	map_queue_size = pm->pmf->get_map_queues_packet_size();
+	map_queue_size = pm->pmf->map_queues_size;
 	/* calculate run list ib allocation size */
-	*rlib_size = process_count * pm->pmf->get_map_process_packet_size() +
+	*rlib_size = process_count * pm->pmf->map_process_size +
 		     queue_count * map_queue_size;
 
 	/*
@@ -79,7 +76,7 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 	 * when over subscription
 	 */
 	if (*over_subscription)
-		*rlib_size += pm->pmf->get_runlist_packet_size();
+		*rlib_size += pm->pmf->runlist_size;
 
 	pr_debug("runlist ib size %d\n", *rlib_size);
 }
@@ -160,7 +157,7 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 			return retval;
 
 		proccesses_mapped++;
-		inc_wptr(&rl_wptr, pm->pmf->get_map_process_packet_size(),
+		inc_wptr(&rl_wptr, pm->pmf->map_process_size,
 				alloc_size_bytes);
 
 		list_for_each_entry(kq, &qpd->priv_queue_list, list) {
@@ -178,7 +175,7 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 				return retval;
 
 			inc_wptr(&rl_wptr,
-				pm->pmf->get_map_queues_packet_size(),
+				pm->pmf->map_queues_size,
 				alloc_size_bytes);
 		}
 
@@ -193,11 +190,12 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 						&rl_buffer[rl_wptr],
 						q,
 						qpd->is_debug);
+
 			if (retval)
 				return retval;
 
 			inc_wptr(&rl_wptr,
-				pm->pmf->get_map_queues_packet_size(),
+				pm->pmf->map_queues_size,
 				alloc_size_bytes);
 		}
 	}
@@ -217,9 +215,29 @@ static int pm_create_runlist_ib(struct packet_manager *pm,
 	return retval;
 }
 
-int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
-		uint16_t fw_ver)
+int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm)
 {
+	switch (dqm->dev->device_info->asic_family) {
+	case CHIP_KAVERI:
+	case CHIP_HAWAII:
+		/* PM4 packet structures on CIK are the same as on VI */
+	case CHIP_CARRIZO:
+	case CHIP_TONGA:
+	case CHIP_FIJI:
+	case CHIP_POLARIS10:
+	case CHIP_POLARIS11:
+		pm->pmf = &kfd_vi_pm_funcs;
+		break;
+	case CHIP_VEGA10:
+	case CHIP_RAVEN:
+		pm->pmf = &kfd_v9_pm_funcs;
+		break;
+	default:
+		WARN(1, "Unexpected ASIC family %u",
+		     dqm->dev->device_info->asic_family);
+		return -EINVAL;
+	}
+
 	pm->dqm = dqm;
 	mutex_init(&pm->lock);
 	pm->priv_queue = kernel_queue_init(dqm->dev, KFD_QUEUE_TYPE_HIQ);
@@ -228,26 +246,6 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm,
 		return -ENOMEM;
 	}
 	pm->allocated = false;
-
-	switch (pm->dqm->dev->device_info->asic_family) {
-	case CHIP_KAVERI:
-	case CHIP_HAWAII:
-		kfd_pm_func_init_cik(pm, fw_ver);
-		break;
-	case CHIP_CARRIZO:
-	case CHIP_TONGA:
-	case CHIP_FIJI:
-	case CHIP_POLARIS10:
-	case CHIP_POLARIS11:
-		kfd_pm_func_init_vi(pm, fw_ver);
-		break;
-	case CHIP_VEGA10:
-	case CHIP_RAVEN:
-		kfd_pm_func_init_v9(pm, fw_ver);
-		break;
-	default:
-		BUG();
-	}
 
 	return 0;
 }
@@ -264,7 +262,7 @@ int pm_send_set_resources(struct packet_manager *pm,
 	uint32_t *buffer, size;
 	int retval = 0;
 
-	size = pm->pmf->get_set_resources_packet_size();
+	size = pm->pmf->set_resources_size;
 	mutex_lock(&pm->lock);
 	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
 					size / sizeof(uint32_t),
@@ -301,8 +299,7 @@ int pm_send_runlist(struct packet_manager *pm, struct list_head *dqm_queues)
 
 	pr_debug("runlist IB address: 0x%llX\n", rl_gpu_ib_addr);
 
-	packet_size_dwords = pm->pmf->get_runlist_packet_size() /
-		sizeof(uint32_t);
+	packet_size_dwords = pm->pmf->runlist_size / sizeof(uint32_t);
 	mutex_lock(&pm->lock);
 
 	retval = pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
@@ -311,7 +308,7 @@ int pm_send_runlist(struct packet_manager *pm, struct list_head *dqm_queues)
 		goto fail_acquire_packet_buffer;
 
 	retval = pm->pmf->runlist(pm, rl_buffer, rl_gpu_ib_addr,
-				rl_ib_size / sizeof(uint32_t), false);
+					rl_ib_size / sizeof(uint32_t), false);
 	if (retval)
 		goto fail_create_runlist;
 
@@ -339,7 +336,7 @@ int pm_send_query_status(struct packet_manager *pm, uint64_t fence_address,
 	if (WARN_ON(!fence_address))
 		return -EFAULT;
 
-	size = pm->pmf->get_query_status_packet_size();
+	size = pm->pmf->query_status_size;
 	mutex_lock(&pm->lock);
 	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
 			size / sizeof(uint32_t), (unsigned int **)&buffer);
@@ -368,7 +365,7 @@ int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
 	uint32_t *buffer, size;
 	int retval = 0;
 
-	size = pm->pmf->get_unmap_queues_packet_size();
+	size = pm->pmf->unmap_queues_size;
 	mutex_lock(&pm->lock);
 	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
 			size / sizeof(uint32_t), (unsigned int **)&buffer);
@@ -400,13 +397,17 @@ void pm_release_ib(struct packet_manager *pm)
 	mutex_unlock(&pm->lock);
 }
 
+#if defined(CONFIG_DEBUG_FS)
+
 int pm_debugfs_runlist(struct seq_file *m, void *data)
 {
 	struct packet_manager *pm = data;
 
+	mutex_lock(&pm->lock);
+
 	if (!pm->allocated) {
 		seq_puts(m, "  No active runlist\n");
-		return 0;
+		goto out;
 	}
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(4, 3, 0)
@@ -414,5 +415,9 @@ int pm_debugfs_runlist(struct seq_file *m, void *data)
 		     pm->ib_buffer_obj->cpu_ptr, pm->ib_size_bytes, false);
 #endif
 
+out:
+	mutex_unlock(&pm->lock);
 	return 0;
 }
+
+#endif

@@ -31,6 +31,7 @@
 #include "amdgpu_sched.h"
 #include "amdgpu_uvd.h"
 #include "amdgpu_vce.h"
+#include "atom.h"
 
 #include <linux/vga_switcheroo.h>
 #include <linux/slab.h>
@@ -229,6 +230,18 @@ static int amdgpu_firmware_info(struct drm_amdgpu_info_firmware *fw_info,
 	case AMDGPU_INFO_FW_GFX_RLC:
 		fw_info->ver = adev->gfx.rlc_fw_version;
 		fw_info->feature = adev->gfx.rlc_feature_version;
+		break;
+	case AMDGPU_INFO_FW_GFX_RLC_RESTORE_LIST_CNTL:
+		fw_info->ver = adev->gfx.rlc_srlc_fw_version;
+		fw_info->feature = adev->gfx.rlc_srlc_feature_version;
+		break;
+	case AMDGPU_INFO_FW_GFX_RLC_RESTORE_LIST_GPM_MEM:
+		fw_info->ver = adev->gfx.rlc_srlg_fw_version;
+		fw_info->feature = adev->gfx.rlc_srlg_feature_version;
+		break;
+	case AMDGPU_INFO_FW_GFX_RLC_RESTORE_LIST_SRM_MEM:
+		fw_info->ver = adev->gfx.rlc_srls_fw_version;
+		fw_info->feature = adev->gfx.rlc_srls_feature_version;
 		break;
 	case AMDGPU_INFO_FW_GFX_MEC:
 		if (query_fw->index == 0) {
@@ -749,9 +762,6 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 				    min((size_t)size, sizeof(cap))) ? -EFAULT : 0;
 	}
 	case AMDGPU_INFO_SENSOR: {
-		struct pp_gpu_power query = {0};
-		int query_size = sizeof(query);
-
 		if (!adev->pm.dpm_enabled)
 			return -ENOENT;
 
@@ -794,10 +804,10 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 			/* get average GPU power */
 			if (amdgpu_dpm_read_sensor(adev,
 						   AMDGPU_PP_SENSOR_GPU_POWER,
-						   (void *)&query, &query_size)) {
+						   (void *)&ui32, &ui32_size)) {
 				return -EINVAL;
 			}
-			ui32 = query.average_gpu_power >> 8;
+			ui32 >>= 8;
 			break;
 		case AMDGPU_INFO_SENSOR_VDDNB:
 			/* get VDDNB in millivolts */
@@ -882,7 +892,7 @@ int amdgpu_driver_open_kms(struct drm_device *dev, struct drm_file *file_priv)
 {
 	struct amdgpu_device *adev = dev->dev_private;
 	struct amdgpu_fpriv *fpriv;
-	int r;
+	int r, pasid;
 
 	file_priv->driver_priv = NULL;
 
@@ -896,28 +906,25 @@ int amdgpu_driver_open_kms(struct drm_device *dev, struct drm_file *file_priv)
 		goto out_suspend;
 	}
 
-	r = amdgpu_vm_init(adev, &fpriv->vm,
-			   AMDGPU_VM_CONTEXT_GFX, 0);
-	if (r) {
-		kfree(fpriv);
-		goto out_suspend;
+	pasid = amdgpu_pasid_alloc(16);
+	if (pasid < 0) {
+		dev_warn(adev->dev, "No more PASIDs available!");
+		pasid = 0;
 	}
+	r = amdgpu_vm_init(adev, &fpriv->vm, AMDGPU_VM_CONTEXT_GFX, pasid);
+	if (r)
+		goto error_pasid;
 
 	fpriv->prt_va = amdgpu_vm_bo_add(adev, &fpriv->vm, NULL);
 	if (!fpriv->prt_va) {
 		r = -ENOMEM;
-		amdgpu_vm_fini(adev, &fpriv->vm);
-		kfree(fpriv);
-		goto out_suspend;
+		goto error_vm;
 	}
 
 	if (amdgpu_sriov_vf(adev)) {
 		r = amdgpu_map_static_csa(adev, &fpriv->vm, &fpriv->csa_va);
-		if (r) {
-			amdgpu_vm_fini(adev, &fpriv->vm);
-			kfree(fpriv);
-			goto out_suspend;
-		}
+		if (r)
+			goto error_vm;
 	}
 
 	mutex_init(&fpriv->bo_list_lock);
@@ -928,6 +935,16 @@ int amdgpu_driver_open_kms(struct drm_device *dev, struct drm_file *file_priv)
 	amdgpu_ctx_mgr_init(&fpriv->ctx_mgr);
 
 	file_priv->driver_priv = fpriv;
+	goto out_suspend;
+
+error_vm:
+	amdgpu_vm_fini(adev, &fpriv->vm);
+
+error_pasid:
+	if (pasid)
+		amdgpu_pasid_free(pasid);
+
+	kfree(fpriv);
 
 out_suspend:
 	pm_runtime_mark_last_busy(dev->dev);
@@ -951,14 +968,15 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 	struct amdgpu_fpriv *fpriv = file_priv->driver_priv;
 	struct amdgpu_bo_list *list;
 	struct amdgpu_sem *sem;
+	struct amdgpu_bo *pd;
+	unsigned int pasid;
 	int handle;
 
 	if (!fpriv)
 		return;
 
 	pm_runtime_get_sync(dev->dev);
-
-	amdgpu_ctx_mgr_fini(&fpriv->ctx_mgr);
+	amdgpu_ctx_mgr_entity_fini(&fpriv->ctx_mgr);
 
 	if (adev->asic_type != CHIP_RAVEN) {
 		amdgpu_uvd_free_handles(adev, file_priv);
@@ -975,7 +993,15 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 		amdgpu_bo_unreserve(adev->virt.csa_obj);
 	}
 
+	pasid = fpriv->vm.pasid;
+	pd = amdgpu_bo_ref(fpriv->vm.root.base.bo);
+
 	amdgpu_vm_fini(adev, &fpriv->vm);
+	amdgpu_ctx_mgr_fini(&fpriv->ctx_mgr);
+
+	if (pasid)
+		amdgpu_pasid_free_delayed(pd->tbo.resv, pasid);
+	amdgpu_bo_unref(&pd);
 
 	idr_for_each_entry(&fpriv->bo_list_handles, list, handle)
 		amdgpu_bo_list_free(list);
@@ -1204,6 +1230,7 @@ static int amdgpu_debugfs_firmware_info(struct seq_file *m, void *data)
 	struct amdgpu_device *adev = dev->dev_private;
 	struct drm_amdgpu_info_firmware fw_info;
 	struct drm_amdgpu_query_fw query_fw;
+	struct atom_context *ctx = adev->mode_info.atom_context;
 	int ret, i;
 
 	/* VCE */
@@ -1260,6 +1287,30 @@ static int amdgpu_debugfs_firmware_info(struct seq_file *m, void *data)
 	if (ret)
 		return ret;
 	seq_printf(m, "RLC feature version: %u, firmware version: 0x%08x\n",
+		   fw_info.feature, fw_info.ver);
+
+	/* RLC SAVE RESTORE LIST CNTL */
+	query_fw.fw_type = AMDGPU_INFO_FW_GFX_RLC_RESTORE_LIST_CNTL;
+	ret = amdgpu_firmware_info(&fw_info, &query_fw, adev);
+	if (ret)
+		return ret;
+	seq_printf(m, "RLC SRLC feature version: %u, firmware version: 0x%08x\n",
+		   fw_info.feature, fw_info.ver);
+
+	/* RLC SAVE RESTORE LIST GPM MEM */
+	query_fw.fw_type = AMDGPU_INFO_FW_GFX_RLC_RESTORE_LIST_GPM_MEM;
+	ret = amdgpu_firmware_info(&fw_info, &query_fw, adev);
+	if (ret)
+		return ret;
+	seq_printf(m, "RLC SRLG feature version: %u, firmware version: 0x%08x\n",
+		   fw_info.feature, fw_info.ver);
+
+	/* RLC SAVE RESTORE LIST SRM MEM */
+	query_fw.fw_type = AMDGPU_INFO_FW_GFX_RLC_RESTORE_LIST_SRM_MEM;
+	ret = amdgpu_firmware_info(&fw_info, &query_fw, adev);
+	if (ret)
+		return ret;
+	seq_printf(m, "RLC SRLS feature version: %u, firmware version: 0x%08x\n",
 		   fw_info.feature, fw_info.ver);
 
 	/* MEC */
@@ -1325,6 +1376,9 @@ static int amdgpu_debugfs_firmware_info(struct seq_file *m, void *data)
 		return ret;
 	seq_printf(m, "VCN feature version: %u, firmware version: 0x%08x\n",
 		   fw_info.feature, fw_info.ver);
+
+
+	seq_printf(m, "VBIOS version: %s\n", ctx->vbios_version);
 
 	return 0;
 }

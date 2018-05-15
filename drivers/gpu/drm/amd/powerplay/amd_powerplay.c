@@ -53,7 +53,7 @@ static int amd_powerplay_create(struct amdgpu_device *adev)
 	mutex_init(&hwmgr->smu_lock);
 	hwmgr->chip_family = adev->family;
 	hwmgr->chip_id = adev->asic_type;
-	hwmgr->feature_mask = amdgpu_pp_feature_mask;
+	hwmgr->feature_mask = adev->powerplay.pp_feature;
 	hwmgr->display_config = &adev->pm.pm_display_cfg;
 	adev->powerplay.pp_handle = hwmgr;
 	adev->powerplay.pp_funcs = &pp_dpm_funcs;
@@ -145,10 +145,42 @@ static int pp_hw_fini(void *handle)
 	return 0;
 }
 
+static void pp_reserve_vram_for_smu(struct amdgpu_device *adev)
+{
+	int r = -EINVAL;
+	void *cpu_ptr = NULL;
+	uint64_t gpu_addr;
+	struct pp_hwmgr *hwmgr = adev->powerplay.pp_handle;
+
+	if (amdgpu_bo_create_kernel(adev, adev->pm.smu_prv_buffer_size,
+						PAGE_SIZE, AMDGPU_GEM_DOMAIN_GTT,
+						&adev->pm.smu_prv_buffer,
+						&gpu_addr,
+						&cpu_ptr)) {
+		DRM_ERROR("amdgpu: failed to create smu prv buffer\n");
+		return;
+	}
+
+	if (hwmgr->hwmgr_func->notify_cac_buffer_info)
+		r = hwmgr->hwmgr_func->notify_cac_buffer_info(hwmgr,
+					lower_32_bits((unsigned long)cpu_ptr),
+					upper_32_bits((unsigned long)cpu_ptr),
+					lower_32_bits(gpu_addr),
+					upper_32_bits(gpu_addr),
+					adev->pm.smu_prv_buffer_size);
+
+	if (r) {
+		amdgpu_bo_free_kernel(&adev->pm.smu_prv_buffer, NULL, NULL);
+		adev->pm.smu_prv_buffer = NULL;
+		DRM_ERROR("amdgpu: failed to notify SMU buffer address\n");
+	}
+}
+
 static int pp_late_init(void *handle)
 {
 	struct amdgpu_device *adev = handle;
 	struct pp_hwmgr *hwmgr = adev->powerplay.pp_handle;
+	int ret;
 
 	if (hwmgr && hwmgr->pm_en) {
 		mutex_lock(&hwmgr->smu_lock);
@@ -156,6 +188,16 @@ static int pp_late_init(void *handle)
 					AMD_PP_TASK_COMPLETE_INIT, NULL);
 		mutex_unlock(&hwmgr->smu_lock);
 	}
+	if (adev->pm.smu_prv_buffer_size != 0)
+		pp_reserve_vram_for_smu(adev);
+
+	if (hwmgr->hwmgr_func->gfx_off_control &&
+	    (hwmgr->feature_mask & PP_GFXOFF_MASK)) {
+		ret = hwmgr->hwmgr_func->gfx_off_control(hwmgr, true);
+		if (ret)
+			pr_err("gfx off enabling failed!\n");
+	}
+
 	return 0;
 }
 
@@ -163,6 +205,8 @@ static void pp_late_fini(void *handle)
 {
 	struct amdgpu_device *adev = handle;
 
+	if (adev->pm.smu_prv_buffer)
+		amdgpu_bo_free_kernel(&adev->pm.smu_prv_buffer, NULL, NULL);
 	amd_powerplay_destroy(adev);
 }
 
@@ -187,9 +231,18 @@ static int pp_set_powergating_state(void *handle,
 {
 	struct amdgpu_device *adev = handle;
 	struct pp_hwmgr *hwmgr = adev->powerplay.pp_handle;
+	int ret;
 
 	if (!hwmgr || !hwmgr->pm_en)
 		return 0;
+
+	if (hwmgr->hwmgr_func->gfx_off_control) {
+		/* Enable/disable GFX off through SMU */
+		ret = hwmgr->hwmgr_func->gfx_off_control(hwmgr,
+							 state == AMD_PG_STATE_GATE);
+		if (ret)
+			pr_err("gfx off control failed!\n");
+	}
 
 	if (hwmgr->hwmgr_func->enable_per_cu_power_gating == NULL) {
 		pr_info("%s was not implemented.\n", __func__);
@@ -899,35 +952,6 @@ static int pp_dpm_switch_power_profile(void *handle,
 	return 0;
 }
 
-static int pp_dpm_notify_smu_memory_info(void *handle,
-					uint32_t virtual_addr_low,
-					uint32_t virtual_addr_hi,
-					uint32_t mc_addr_low,
-					uint32_t mc_addr_hi,
-					uint32_t size)
-{
-	struct pp_hwmgr *hwmgr = handle;
-	int ret = 0;
-
-	if (!hwmgr || !hwmgr->pm_en)
-		return -EINVAL;
-
-	if (hwmgr->hwmgr_func->notify_cac_buffer_info == NULL) {
-		pr_info("%s was not implemented.\n", __func__);
-		return -EINVAL;
-	}
-
-	mutex_lock(&hwmgr->smu_lock);
-
-	ret = hwmgr->hwmgr_func->notify_cac_buffer_info(hwmgr, virtual_addr_low,
-					virtual_addr_hi, mc_addr_low, mc_addr_hi,
-					size);
-
-	mutex_unlock(&hwmgr->smu_lock);
-
-	return ret;
-}
-
 static int pp_set_power_limit(void *handle, uint32_t limit)
 {
 	struct pp_hwmgr *hwmgr = handle;
@@ -1194,7 +1218,6 @@ static const struct amd_pm_funcs pp_dpm_funcs = {
 	.get_vce_clock_state = pp_dpm_get_vce_clock_state,
 	.switch_power_profile = pp_dpm_switch_power_profile,
 	.set_clockgating_by_smu = pp_set_clockgating_by_smu,
-	.notify_smu_memory_info = pp_dpm_notify_smu_memory_info,
 	.get_power_profile_mode = pp_get_power_profile_mode,
 	.set_power_profile_mode = pp_set_power_profile_mode,
 	.odn_edit_dpm_table = pp_odn_edit_dpm_table,

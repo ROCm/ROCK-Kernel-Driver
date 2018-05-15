@@ -21,10 +21,11 @@
  *
  */
 
+#include <linux/ratelimit.h>
+#include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/list.h>
 #include <linux/types.h>
-#include <linux/printk.h>
 #include <linux/bitops.h>
 #include <linux/sched.h>
 #include "kfd_priv.h"
@@ -59,6 +60,8 @@ static int create_sdma_queue_nocpsch(struct device_queue_manager *dqm,
 
 static void deallocate_sdma_queue(struct device_queue_manager *dqm,
 				unsigned int sdma_queue_id);
+
+static void kfd_process_hw_exception(struct work_struct *work);
 
 static inline
 enum KFD_MQD_TYPE get_mqd_type_from_queue_type(enum kfd_queue_type type)
@@ -197,7 +200,7 @@ static int allocate_vmid(struct device_queue_manager *dqm,
 	dqm->dev->kfd2kgd->set_vm_context_page_table_base(dqm->dev->kgd,
 			qpd->vmid,
 			qpd->page_table_base);
-	/*invalidate the VM context after pasid and vmid mapping is set up*/
+	/* invalidate the VM context after pasid and vmid mapping is set up */
 	kfd_flush_tlb(qpd_to_pdd(qpd));
 
 	return 0;
@@ -206,16 +209,19 @@ static int allocate_vmid(struct device_queue_manager *dqm,
 static int flush_texture_cache_nocpsch(struct kfd_dev *kdev,
 				struct qcm_process_device *qpd)
 {
-	uint32_t len;
+	const struct packet_manager_funcs *pmf = qpd->dqm->packets.pmf;
+	int ret;
 
 	if (!qpd->ib_kaddr)
 		return -ENOMEM;
 
-	len = qpd->dqm->packets.pmf->release_mem(qpd->ib_base,
-						 (uint32_t *)qpd->ib_kaddr);
+	ret = pmf->release_mem(qpd->ib_base, (uint32_t *)qpd->ib_kaddr);
+	if (ret)
+		return ret;
 
 	return kdev->kfd2kgd->submit_ib(kdev->kgd, KGD_ENGINE_MEC1, qpd->vmid,
-				qpd->ib_base, (uint32_t *)qpd->ib_kaddr, len);
+				qpd->ib_base, (uint32_t *)qpd->ib_kaddr,
+				pmf->release_mem_size / sizeof(uint32_t));
 }
 
 static void deallocate_vmid(struct device_queue_manager *dqm,
@@ -284,7 +290,6 @@ static int create_queue_nocpsch(struct device_queue_manager *dqm,
 	if (retval) {
 		if (list_empty(&qpd->queues_list))
 			deallocate_vmid(dqm, qpd, q);
-
 		goto out_unlock;
 	}
 
@@ -477,11 +482,9 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 	int retval;
 	struct mqd_manager *mqd;
 	struct kfd_process_device *pdd;
-
 	bool prev_active = false;
 
 	mutex_lock(&dqm->lock);
-
 	pdd = kfd_get_process_device_data(q->device, q->process);
 	if (!pdd) {
 		retval = -ENODEV;
@@ -497,7 +500,7 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 	 * Eviction state logic: we only mark active queues as evicted
 	 * to avoid the overhead of restoring inactive queues later
 	 */
-	if (pdd->qpd.evicted > 0)
+	if (pdd->qpd.evicted)
 		q->properties.is_evicted = (q->properties.queue_size > 0 &&
 					    q->properties.queue_percent > 0 &&
 					    q->properties.queue_address != 0);
@@ -757,9 +760,9 @@ static int register_process(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd)
 {
 	struct device_process_node *n;
-	int retval;
 	struct kfd_process_device *pdd;
 	uint32_t pd_base;
+	int retval;
 
 	n = kzalloc(sizeof(*n), GFP_KERNEL);
 	if (!n)
@@ -776,7 +779,6 @@ static int register_process(struct device_queue_manager *dqm,
 
 	/* Update PD Base in QPD */
 	qpd->page_table_base = pd_base;
-	pr_debug("Updated PD address to 0x%08x\n", pd_base);
 
 	retval = dqm->asic_ops.update_qpd(dqm, qpd);
 
@@ -885,7 +887,7 @@ static void uninitialize(struct device_queue_manager *dqm)
 static int start_nocpsch(struct device_queue_manager *dqm)
 {
 	init_interrupts(dqm);
-	return pm_init(&dqm->packets, dqm, dqm->dev->mec_fw_version);
+	return pm_init(&dqm->packets, dqm);
 }
 
 static int stop_nocpsch(struct device_queue_manager *dqm)
@@ -1021,6 +1023,8 @@ static int initialize_cpsch(struct device_queue_manager *dqm)
 	dqm->active_runlist = false;
 	dqm->sdma_bitmap = (1 << get_num_sdma_queues(dqm)) - 1;
 
+	INIT_WORK(&dqm->hw_exception_work, kfd_process_hw_exception);
+
 	return 0;
 }
 
@@ -1030,7 +1034,7 @@ static int start_cpsch(struct device_queue_manager *dqm)
 
 	retval = 0;
 
-	retval = pm_init(&dqm->packets, dqm, dqm->dev->mec_fw_version);
+	retval = pm_init(&dqm->packets, dqm);
 	if (retval)
 		goto fail_packet_manager_init;
 
@@ -1053,6 +1057,8 @@ static int start_cpsch(struct device_queue_manager *dqm)
 	init_interrupts(dqm);
 
 	mutex_lock(&dqm->lock);
+	/* clear hang status when driver try to start the hw scheduler */
+	dqm->is_hws_hang = false;
 	execute_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0);
 	mutex_unlock(&dqm->lock);
 
@@ -1067,9 +1073,7 @@ fail_packet_manager_init:
 static int stop_cpsch(struct device_queue_manager *dqm)
 {
 	mutex_lock(&dqm->lock);
-
 	unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0);
-
 	mutex_unlock(&dqm->lock);
 
 	kfd_gtt_sa_free(dqm->dev, dqm->fence_mem);
@@ -1224,6 +1228,13 @@ int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
 	while (*fence_addr != fence_value) {
 		if (time_after(jiffies, end_jiffies)) {
 			pr_err("qcm fence wait loop timeout expired\n");
+			/* In HWS case, this is used to halt the driver thread
+			 * in order not to mess up CP states before doing
+			 * scandumps for FW debugging.
+			 */
+			while (halt_if_hws_hang)
+				schedule();
+
 			return -ETIME;
 		}
 		schedule();
@@ -1268,6 +1279,8 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 {
 	int retval = 0;
 
+	if (dqm->is_hws_hang)
+		return -EIO;
 	if (!dqm->active_runlist)
 		return retval;
 
@@ -1306,9 +1319,13 @@ static int execute_queues_cpsch(struct device_queue_manager *dqm,
 {
 	int retval;
 
+	if (dqm->is_hws_hang)
+		return -EIO;
 	retval = unmap_queues_cpsch(dqm, filter, filter_param);
 	if (retval) {
 		pr_err("The cp might be in an unrecoverable state due to an unsuccessful queues preemption\n");
+		dqm->is_hws_hang = true;
+		schedule_work(&dqm->hw_exception_work);
 		return retval;
 	}
 
@@ -1591,7 +1608,7 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 	}
 
 	retval = execute_queues_cpsch(dqm, filter, 0);
-	if (retval || qpd->reset_wavefronts) {
+	if ((!dqm->is_hws_hang) && (retval || qpd->reset_wavefronts)) {
 		pr_warn("Resetting wave fronts (cpsch) on dev %p\n", dqm->dev);
 		dbgdev_wave_reset_wavefronts(dqm->dev, qpd->pqm->process);
 		qpd->reset_wavefronts = false;
@@ -1626,7 +1643,13 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		return NULL;
 
 	switch (dev->device_info->asic_family) {
+	/* HWS is not available on Hawaii. */
 	case CHIP_HAWAII:
+	/* HWS depends on CWSR for timely dequeue. CWSR is not
+	 * available on Tonga.
+	 *
+	 * FIXME: This argument also applies to Kaveri.
+	 */
 	case CHIP_TONGA:
 		dqm->sched_policy = KFD_SCHED_POLICY_NO_HWS;
 		break;
@@ -1706,7 +1729,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 
 	case CHIP_VEGA10:
 	case CHIP_RAVEN:
-		device_queue_manager_init_v9_vega10(&dqm->asic_ops);
+		device_queue_manager_init_v9(&dqm->asic_ops);
 		break;
 	default:
 		WARN(1, "Unexpected ASIC family %u",
@@ -1743,6 +1766,13 @@ int kfd_process_vm_fault(struct device_queue_manager *dqm,
 	kfd_unref_process(p);
 
 	return ret;
+}
+
+static void kfd_process_hw_exception(struct work_struct *work)
+{
+	struct device_queue_manager *dqm = container_of(work,
+			struct device_queue_manager, hw_exception_work);
+	dqm->dev->kfd2kgd->gpu_recover(dqm->dev->kgd);
 }
 
 #if defined(CONFIG_DEBUG_FS)

@@ -188,7 +188,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 	case KFD_QUEUE_TYPE_SDMA:
 		if (dev->dqm->sdma_queue_count
 			>= get_num_sdma_queues(dev->dqm)) {
-			pr_debug("Over-subscription is not allowed for SDMA\n");
+			pr_debug("Over-subscription is not allowed for SDMA.\n");
 			retval = -EPERM;
 			goto err_create_queue;
 		}
@@ -206,7 +206,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 	case KFD_QUEUE_TYPE_COMPUTE:
 		/* check if there is over subscription */
 		if ((dev->dqm->sched_policy ==
-				KFD_SCHED_POLICY_HWS_NO_OVERSUBSCRIPTION) &&
+		     KFD_SCHED_POLICY_HWS_NO_OVERSUBSCRIPTION) &&
 		((dev->dqm->processes_count >= dev->vm_info.vmid_num_kfd) ||
 		(dev->dqm->queue_count >= get_queues_num(dev->dqm)))) {
 			pr_debug("Over-subscription is not allowed in radeon_kfd.sched_policy == 1\n");
@@ -241,7 +241,8 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 	}
 
 	if (retval != 0) {
-		pr_err("DQM create queue failed\n");
+		pr_err("Pasid %d DQM create queue %d failed. ret %d\n",
+			pqm->process->pasid, type, retval);
 		goto err_create_queue;
 	}
 
@@ -317,13 +318,16 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
 
 	if (pqn->q) {
 		dqm = pqn->q->device->dqm;
-		kfree(pqn->q->properties.cu_mask);
-		pqn->q->properties.cu_mask = NULL;
 		retval = dqm->ops.destroy_queue(dqm, &pdd->qpd, pqn->q);
 		if (retval) {
-			pr_debug("Destroy queue failed, returned %d\n", retval);
-			goto err_destroy_queue;
+			pr_err("Pasid %d destroy queue %d failed, ret %d\n",
+				pqm->process->pasid,
+				pqn->q->properties.queue_id, retval);
+			if (retval != -ETIME)
+				goto err_destroy_queue;
 		}
+		kfree(pqn->q->properties.cu_mask);
+		pqn->q->properties.cu_mask = NULL;
 		uninit_queue(pqn->q);
 	}
 

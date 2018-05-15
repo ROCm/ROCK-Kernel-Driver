@@ -75,7 +75,8 @@ int kfd_iommu_device_init(struct kfd_dev *kfd)
 	}
 
 	if ((iommu_info.flags & required_iommu_flags) != required_iommu_flags) {
-		dev_err(kfd_device, "error required iommu flags ats %i, pri %i, pasid %i\n",
+		dev_err(kfd_device,
+			"error required iommu flags ats %i, pri %i, pasid %i\n",
 		       (iommu_info.flags & AMD_IOMMU_DEVICE_FLAG_ATS_SUP) != 0,
 		       (iommu_info.flags & AMD_IOMMU_DEVICE_FLAG_PRI_SUP) != 0,
 		       (iommu_info.flags & AMD_IOMMU_DEVICE_FLAG_PASID_SUP)

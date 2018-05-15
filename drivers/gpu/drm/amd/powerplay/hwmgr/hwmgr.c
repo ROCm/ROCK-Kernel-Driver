@@ -40,6 +40,7 @@ extern const struct pp_smumgr_func iceland_smu_funcs;
 extern const struct pp_smumgr_func tonga_smu_funcs;
 extern const struct pp_smumgr_func fiji_smu_funcs;
 extern const struct pp_smumgr_func polaris10_smu_funcs;
+extern const struct pp_smumgr_func vegam_smu_funcs;
 extern const struct pp_smumgr_func vega10_smu_funcs;
 extern const struct pp_smumgr_func vega12_smu_funcs;
 extern const struct pp_smumgr_func smu10_smu_funcs;
@@ -95,7 +96,8 @@ int hwmgr_early_init(struct pp_hwmgr *hwmgr)
 		hwmgr->smumgr_funcs = &ci_smu_funcs;
 		ci_set_asic_special_caps(hwmgr);
 		hwmgr->feature_mask &= ~(PP_VBI_TIME_SUPPORT_MASK |
-					PP_ENABLE_GFX_CG_THRU_SMU);
+					 PP_ENABLE_GFX_CG_THRU_SMU |
+					 PP_GFXOFF_MASK);
 		hwmgr->pp_table_version = PP_TABLE_V0;
 		hwmgr->od_enabled = false;
 		smu7_init_function_pointers(hwmgr);
@@ -103,9 +105,11 @@ int hwmgr_early_init(struct pp_hwmgr *hwmgr)
 	case AMDGPU_FAMILY_CZ:
 		hwmgr->od_enabled = false;
 		hwmgr->smumgr_funcs = &smu8_smu_funcs;
+		hwmgr->feature_mask &= ~PP_GFXOFF_MASK;
 		smu8_init_function_pointers(hwmgr);
 		break;
 	case AMDGPU_FAMILY_VI:
+		hwmgr->feature_mask &= ~PP_GFXOFF_MASK;
 		switch (hwmgr->chip_id) {
 		case CHIP_TOPAZ:
 			hwmgr->smumgr_funcs = &iceland_smu_funcs;
@@ -133,12 +137,18 @@ int hwmgr_early_init(struct pp_hwmgr *hwmgr)
 			polaris_set_asic_special_caps(hwmgr);
 			hwmgr->feature_mask &= ~(PP_UVD_HANDSHAKE_MASK);
 			break;
+		case CHIP_VEGAM:
+			hwmgr->smumgr_funcs = &vegam_smu_funcs;
+			polaris_set_asic_special_caps(hwmgr);
+			hwmgr->feature_mask &= ~(PP_UVD_HANDSHAKE_MASK);
+			break;
 		default:
 			return -EINVAL;
 		}
 		smu7_init_function_pointers(hwmgr);
 		break;
 	case AMDGPU_FAMILY_AI:
+		hwmgr->feature_mask &= ~PP_GFXOFF_MASK;
 		switch (hwmgr->chip_id) {
 		case CHIP_VEGA10:
 			hwmgr->smumgr_funcs = &vega10_smu_funcs;
@@ -218,6 +228,9 @@ int hwmgr_hw_init(struct pp_hwmgr *hwmgr)
 	ret = hwmgr->pptable_func->pptable_init(hwmgr);
 	if (ret)
 		goto err;
+
+	((struct amdgpu_device *)hwmgr->adev)->pm.no_fan =
+				hwmgr->thermal_controller.fanInfo.bNoFan;
 
 	ret = hwmgr->hwmgr_func->backend_init(hwmgr);
 	if (ret)

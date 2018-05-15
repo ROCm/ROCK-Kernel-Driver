@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Advanced Micro Devices, Inc.
+ * Copyright 2016-2018 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -159,7 +159,7 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 			(1 << COMPUTE_PGM_RSRC2__TRAP_PRESENT__SHIFT);
 	}
 
-	if (mm->dev->cwsr_enabled) {
+	if (mm->dev->cwsr_enabled && q->ctx_save_restore_area_address) {
 		m->cp_hqd_persistent_state |=
 			(1 << CP_HQD_PERSISTENT_STATE__QSWITCH_MODE__SHIFT);
 		m->cp_hqd_ctx_save_base_addr_lo =
@@ -217,8 +217,9 @@ static int update_mqd(struct mqd_manager *mm, void *mqd,
 	pr_debug("cp_hqd_pq_doorbell_control 0x%x\n",
 			m->cp_hqd_pq_doorbell_control);
 
-	m->cp_hqd_ib_control = 3 << CP_HQD_IB_CONTROL__MIN_IB_AVAIL_SIZE__SHIFT |
-			1 << CP_HQD_IB_CONTROL__IB_EXE_DISABLE__SHIFT;
+	m->cp_hqd_ib_control =
+		3 << CP_HQD_IB_CONTROL__MIN_IB_AVAIL_SIZE__SHIFT |
+		1 << CP_HQD_IB_CONTROL__IB_EXE_DISABLE__SHIFT;
 
 	/*
 	 * HW does not clamp this field correctly. Maximum EOP queue size
@@ -243,13 +244,13 @@ static int update_mqd(struct mqd_manager *mm, void *mqd,
 				2 << CP_HQD_PQ_CONTROL__SLOT_BASED_WPTR__SHIFT |
 				1 << CP_HQD_PQ_CONTROL__QUEUE_FULL_EN__SHIFT |
 				1 << CP_HQD_PQ_CONTROL__WPP_CLAMP_EN__SHIFT;
-		m->cp_hqd_pq_doorbell_control |=
-			1 << CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_BIF_DROP__SHIFT;
+		m->cp_hqd_pq_doorbell_control |= 1 <<
+			CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_BIF_DROP__SHIFT;
 	}
 	if (priv_cp_queues)
 		m->cp_hqd_pq_control |=
 			1 << CP_HQD_PQ_CONTROL__PRIV_STATE__SHIFT;
-	if (mm->dev->cwsr_enabled)
+	if (mm->dev->cwsr_enabled && q->ctx_save_restore_area_address)
 		m->cp_hqd_ctx_save_control = 0;
 
 	update_cu_mask(mm, mqd, q);

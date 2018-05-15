@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Advanced Micro Devices, Inc.
+ * Copyright 2016-2018 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -25,70 +25,43 @@
 #include "soc15_int.h"
 
 
-static uint32_t kfd_get_pasid_from_vmid(struct kfd_dev *dev, uint8_t vmid)
-{
-	uint32_t pasid = 0;
-	const struct kfd2kgd_calls *f2g = dev->kfd2kgd;
-
-	if (f2g->get_atc_vmid_pasid_mapping_valid(dev->kgd, vmid))
-		pasid = f2g->get_atc_vmid_pasid_mapping_pasid(dev->kgd, vmid);
-
-	return pasid;
-}
-
 static bool event_interrupt_isr_v9(struct kfd_dev *dev,
 					const uint32_t *ih_ring_entry,
 					uint32_t *patched_ihre,
 					bool *patched_flag)
 {
 	uint16_t source_id, client_id, pasid, vmid;
-	bool result = false;
+	const uint32_t *data = ih_ring_entry;
+
+	/* Only handle interrupts from KFD VMIDs */
+	vmid = SOC15_VMID_FROM_IH_ENTRY(ih_ring_entry);
+	if (vmid < dev->vm_info.first_vmid_kfd ||
+	    vmid > dev->vm_info.last_vmid_kfd)
+		return 0;
+
+	/* If there is no valid PASID, it's likely a firmware bug */
+	pasid = SOC15_PASID_FROM_IH_ENTRY(ih_ring_entry);
+	if (WARN_ONCE(pasid == 0, "FW bug: No PASID in KFD interrupt"))
+		return 0;
 
 	source_id = SOC15_SOURCE_ID_FROM_IH_ENTRY(ih_ring_entry);
 	client_id = SOC15_CLIENT_ID_FROM_IH_ENTRY(ih_ring_entry);
-	pasid = SOC15_PASID_FROM_IH_ENTRY(ih_ring_entry);
-	vmid = SOC15_VMID_FROM_IH_ENTRY(ih_ring_entry);
 
-	if (pasid) {
-		const uint32_t *data = ih_ring_entry;
+	pr_debug("client id 0x%x, source id %d, pasid 0x%x. raw data:\n",
+		 client_id, source_id, pasid);
+	pr_debug("%8X, %8X, %8X, %8X, %8X, %8X, %8X, %8X.\n",
+		 data[0], data[1], data[2], data[3],
+		 data[4], data[5], data[6], data[7]);
 
-		pr_debug("client id 0x%x, source id %d, pasid 0x%x. raw data:\n",
-			 client_id, source_id, pasid);
-		pr_debug("%8X, %8X, %8X, %8X, %8X, %8X, %8X, %8X.\n",
-			 data[0], data[1], data[2], data[3],
-			 data[4], data[5], data[6], data[7]);
-	}
-
-	if ((vmid >= dev->vm_info.first_vmid_kfd &&
-	     vmid <= dev->vm_info.last_vmid_kfd) &&
-	    (source_id == SOC15_INTSRC_CP_END_OF_PIPE ||
-	     source_id == SOC15_INTSRC_SDMA_TRAP ||
-	     source_id == SOC15_INTSRC_SQ_INTERRUPT_MSG ||
-	     source_id == SOC15_INTSRC_CP_BAD_OPCODE ||
-	     client_id == SOC15_IH_CLIENTID_VMC ||
-	     client_id == SOC15_IH_CLIENTID_UTCL2)) {
-
-		/*
-		 * KFD want to handle this INT, but MEC firmware did
-		 * not send pasid. Try to get it from vmid mapping
-		 * and patch the ih entry. It's a temp workaround.
-		 */
-		WARN_ONCE((!pasid), "Fix me.\n");
-		if (!pasid) {
-			uint32_t temp = le32_to_cpu(ih_ring_entry[3]);
-
-			pasid = kfd_get_pasid_from_vmid(dev, vmid);
-			memcpy(patched_ihre, ih_ring_entry,
-			       dev->device_info->ih_ring_entry_size);
-			patched_ihre[3] = cpu_to_le32(temp | pasid);
-			*patched_flag = true;
-		}
-		result = pasid ? true : false;
-	}
-
-	/* Do not process in ISR, just request it to be forwarded to WQ. */
-	return result;
-
+	/* Interrupt types we care about: various signals and faults.
+	 * They will be forwarded to a work queue (see below).
+	 */
+	return source_id == SOC15_INTSRC_CP_END_OF_PIPE ||
+		source_id == SOC15_INTSRC_SDMA_TRAP ||
+		source_id == SOC15_INTSRC_SQ_INTERRUPT_MSG ||
+		source_id == SOC15_INTSRC_CP_BAD_OPCODE ||
+		client_id == SOC15_IH_CLIENTID_VMC ||
+		client_id == SOC15_IH_CLIENTID_UTCL2;
 }
 
 static void event_interrupt_wq_v9(struct kfd_dev *dev,

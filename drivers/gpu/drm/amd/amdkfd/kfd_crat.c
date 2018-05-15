@@ -1,7 +1,27 @@
-#include <linux/kernel.h>
-#include <linux/acpi.h>
-#include <linux/mm.h>
+/*
+ * Copyright 2015-2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE COPYRIGHT HOLDER(S) OR AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 #include <linux/pci.h>
+#include <linux/acpi.h>
 #include "kfd_crat.h"
 #include "kfd_priv.h"
 #include "kfd_topology.h"
@@ -266,6 +286,7 @@ static int kfd_parse_subtype_cache(struct crat_subtype_cache *cache,
 
 	id = cache->processor_id_low;
 
+	pr_debug("Found cache entry in CRAT table with processor_id=%d\n", id);
 	list_for_each_entry(dev, device_list, list) {
 		total_num_of_cu = (dev->node_props.array_count *
 					dev->node_props.cu_per_simd_array);
@@ -415,11 +436,15 @@ static int kfd_parse_subtype(struct crat_subtype_generic *sub_type_hdr,
 		ret = kfd_parse_subtype_cache(cache, device_list);
 		break;
 	case CRAT_SUBTYPE_TLB_AFFINITY:
-		/* For now, nothing to do here */
+		/*
+		 * For now, nothing to do here
+		 */
 		pr_debug("Found TLB entry in CRAT table (not processing)\n");
 		break;
 	case CRAT_SUBTYPE_CCOMPUTE_AFFINITY:
-		/* For now, nothing to do here */
+		/*
+		 * For now, nothing to do here
+		 */
 		pr_debug("Found CCOMPUTE entry in CRAT table (not processing)\n");
 		break;
 	case CRAT_SUBTYPE_IOLINK_AFFINITY:
@@ -444,9 +469,8 @@ static int kfd_parse_subtype(struct crat_subtype_generic *sub_type_hdr,
  *
  *	Return - 0 if successful else -ve value
  */
-int kfd_parse_crat_table(void *crat_image,
-				struct list_head *device_list,
-				uint32_t proximity_domain)
+int kfd_parse_crat_table(void *crat_image, struct list_head *device_list,
+			 uint32_t proximity_domain)
 {
 	struct kfd_topology_device *top_dev = NULL;
 	struct crat_subtype_generic *sub_type_hdr;
@@ -693,7 +717,7 @@ static int kfd_fill_gpu_cache_info(struct kfd_dev *kdev,
  *		     crat_image will be NULL
  *	@size: [OUT] size of crat_image
  *
- *	Return 0 if successful else return -ve value
+ *	Return 0 if successful else return error code
  */
 #ifdef CONFIG_ACPI
 int kfd_create_crat_image_acpi(void **crat_image, size_t *size)
@@ -725,10 +749,8 @@ int kfd_create_crat_image_acpi(void **crat_image, size_t *size)
 	}
 
 	pcrat_image = kmalloc(crat_table->length, GFP_KERNEL);
-	if (!pcrat_image) {
-		pr_err("No memory for allocating CRAT image\n");
+	if (!pcrat_image)
 		return -ENOMEM;
-	}
 
 	memcpy(pcrat_image, crat_table, crat_table->length);
 
@@ -919,7 +941,7 @@ static int kfd_create_vcrat_image_cpu(void *pcrat_image, size_t *size)
 
 #ifdef CONFIG_ACPI
 	status = acpi_get_table("DSDT", 0, &acpi_table);
-	if (status == AE_NOT_FOUND)
+	if (status != AE_OK)
 		pr_warn("DSDT table not found for OEM information\n");
 	else {
 		crat_table->oem_revision = acpi_table->revision;
@@ -1076,8 +1098,8 @@ static int kfd_fill_gpu_direct_io_link(int *avail_size,
  *		[OUT] actual size of data filled in crat_image
  */
 static int kfd_create_vcrat_image_gpu(void *pcrat_image,
-			size_t *size, struct kfd_dev *kdev,
-			uint32_t proximity_domain)
+				      size_t *size, struct kfd_dev *kdev,
+				      uint32_t proximity_domain)
 {
 	struct crat_header *crat_table = (struct crat_header *)pcrat_image;
 	struct crat_subtype_generic *sub_type_hdr;
@@ -1245,7 +1267,8 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
  *	Return 0 if successful else return -ve value
  */
 int kfd_create_crat_image_virtual(void **crat_image, size_t *size,
-		int flags, struct kfd_dev *kdev, uint32_t proximity_domain)
+				  int flags, struct kfd_dev *kdev,
+				  uint32_t proximity_domain)
 {
 	void *pcrat_image = NULL;
 	int ret = 0;
@@ -1275,8 +1298,8 @@ int kfd_create_crat_image_virtual(void **crat_image, size_t *size,
 		if (!pcrat_image)
 			return -ENOMEM;
 		*size = VCRAT_SIZE_FOR_GPU;
-		ret = kfd_create_vcrat_image_gpu(pcrat_image, size,
-				kdev, proximity_domain);
+		ret = kfd_create_vcrat_image_gpu(pcrat_image, size, kdev,
+						 proximity_domain);
 		break;
 	case (COMPUTE_UNIT_CPU | COMPUTE_UNIT_GPU):
 		/* TODO: */

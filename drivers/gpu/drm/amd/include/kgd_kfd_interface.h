@@ -345,7 +345,7 @@ struct kfd2kgd_calls {
 	int (*sync_memory)(struct kgd_dev *kgd, struct kgd_mem *mem, bool intr);
 
 	int (*alloc_memory_of_gpu)(struct kgd_dev *kgd, uint64_t va,
-			uint64_t size, void *vm,
+			uint64_t size, void *vm, struct sg_table *sg,
 			struct kgd_mem **mem, uint64_t *offset,
 			uint32_t flags);
 	int (*free_memory_of_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
@@ -443,8 +443,8 @@ struct kgd2kfd_calls {
 	void (*interrupt)(struct kfd_dev *kfd, const void *ih_ring_entry);
 	void (*suspend)(struct kfd_dev *kfd);
 	int (*resume)(struct kfd_dev *kfd);
-	int (*quiesce_mm)(struct kfd_dev *kfd, struct mm_struct *mm);
-	int (*resume_mm)(struct kfd_dev *kfd, struct mm_struct *mm);
+	int (*quiesce_mm)(struct mm_struct *mm);
+	int (*resume_mm)(struct mm_struct *mm);
 	int (*schedule_evict_and_restore_process)(struct mm_struct *mm,
 			struct dma_fence *fence);
 	int  (*pre_reset)(struct kfd_dev *kfd);

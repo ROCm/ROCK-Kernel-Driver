@@ -477,6 +477,18 @@ kcl_drm_atomic_get_new_crtc_state_after_commit(struct drm_atomic_state *state,
 	return state->crtcs[drm_crtc_index(crtc)]->state;
 #endif
 }
+static inline struct drm_plane_state *
+kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
+							struct drm_plane *plane)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0) || defined(OS_NAME_RHEL_7_5)
+	return drm_atomic_get_new_plane_state(state,plane);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4_5)
+	return state->planes[drm_plane_index(plane)].state;
+#else
+	return state->plane_states[drm_plane_index(plane)];
+#endif
+}
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
 	!defined(OS_NAME_RHEL_7_4_5)

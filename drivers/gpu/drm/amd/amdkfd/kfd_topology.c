@@ -202,6 +202,7 @@ struct kfd_topology_device *kfd_create_topology_device(
 	return dev;
 }
 
+
 #define sysfs_show_gen_prop(buffer, fmt, ...) \
 		snprintf(buffer, PAGE_SIZE, "%s"fmt, buffer, __VA_ARGS__)
 #define sysfs_show_32bit_prop(buffer, name, value) \
@@ -757,7 +758,7 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
 	/* All hardware blocks have the same number of attributes. */
-	num_attrs = sizeof(perf_attr_iommu)/sizeof(struct kfd_perf_attr);
+	num_attrs = ARRAY_SIZE(perf_attr_iommu);
 	list_for_each_entry(perf, &dev->perf_props, list) {
 		perf->attr_group = kzalloc(sizeof(struct kfd_perf_attr)
 			* num_attrs + sizeof(struct attribute_group),
@@ -909,7 +910,8 @@ static void kfd_debug_print_topology(void)
 	up_read(&topology_lock);
 }
 
-/* Helper function for intializing platform_xx members of kfd_system_properties
+/* Helper function for intializing platform_xx members of
+ * kfd_system_properties. Uses OEM info from the last CPU/APU node.
  */
 static void kfd_update_system_properties(void)
 {
@@ -1034,13 +1036,12 @@ int kfd_topology_init(void)
 	 */
 #ifdef CONFIG_ACPI
 	ret = kfd_create_crat_image_acpi(&crat_image, &image_size);
-	if (ret == 0) {
+	if (!ret) {
 		ret = kfd_parse_crat_table(crat_image,
 					   &temp_topology_device_list,
 					   proximity_domain);
 		if (ret ||
-			kfd_is_acpi_crat_invalid(&temp_topology_device_list)) {
-
+		    kfd_is_acpi_crat_invalid(&temp_topology_device_list)) {
 			kfd_release_topology_device_list(
 				&temp_topology_device_list);
 			kfd_destroy_crat_image(crat_image);
@@ -1050,8 +1051,8 @@ int kfd_topology_init(void)
 #endif
 	if (!crat_image) {
 		ret = kfd_create_crat_image_virtual(&crat_image, &image_size,
-				COMPUTE_UNIT_CPU, NULL,
-				proximity_domain);
+						    COMPUTE_UNIT_CPU, NULL,
+						    proximity_domain);
 		cpu_only_node = 1;
 		if (ret) {
 			pr_err("Error creating VCRAT table for CPU\n");
@@ -1059,8 +1060,8 @@ int kfd_topology_init(void)
 		}
 
 		ret = kfd_parse_crat_table(crat_image,
-				&temp_topology_device_list,
-				proximity_domain);
+					   &temp_topology_device_list,
+					   proximity_domain);
 		if (ret) {
 			pr_err("Error parsing VCRAT table for CPU\n");
 			goto err;
@@ -1075,12 +1076,12 @@ int kfd_topology_init(void)
 
 	down_write(&topology_lock);
 	kfd_topology_update_device_list(&temp_topology_device_list,
-					    &topology_device_list);
+					&topology_device_list);
 	atomic_set(&topology_crat_proximity_domain, sys_props.num_devices-1);
 	ret = kfd_topology_update_sysfs();
 	up_write(&topology_lock);
 
-	if (ret == 0) {
+	if (!ret) {
 		sys_props.generation_count++;
 		kfd_update_system_properties();
 		kfd_debug_print_topology();
@@ -1168,7 +1169,6 @@ static struct kfd_topology_device *kfd_assign_gpu(struct kfd_dev *gpu)
 			break;
 		}
 	up_write(&topology_lock);
-
 	return out_dev;
 }
 
@@ -1236,8 +1236,7 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 
 	pr_debug("Adding new GPU (ID: 0x%x) to topology\n", gpu_id);
 
-	proximity_domain = atomic_inc_return(&
-				topology_crat_proximity_domain);
+	proximity_domain = atomic_inc_return(&topology_crat_proximity_domain);
 
 	/* Check to see if this gpu device exists in the topology_device_list.
 	 * If so, assign the gpu to that device,
@@ -1248,15 +1247,16 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	dev = kfd_assign_gpu(gpu);
 	if (!dev) {
 		res = kfd_create_crat_image_virtual(&crat_image, &image_size,
-				COMPUTE_UNIT_GPU,
-				gpu, proximity_domain);
+						    COMPUTE_UNIT_GPU, gpu,
+						    proximity_domain);
 		if (res) {
 			pr_err("Error creating VCRAT for GPU (ID: 0x%x)\n",
 			       gpu_id);
 			return res;
 		}
 		res = kfd_parse_crat_table(crat_image,
-				&temp_topology_device_list, proximity_domain);
+					   &temp_topology_device_list,
+					   proximity_domain);
 		if (res) {
 			pr_err("Error parsing VCRAT for GPU (ID: 0x%x)\n",
 			       gpu_id);
@@ -1273,14 +1273,13 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 		res = kfd_topology_update_sysfs();
 		up_write(&topology_lock);
 
-		if (res == 0)
+		if (!res)
 			sys_props.generation_count++;
 		else
 			pr_err("Failed to update GPU (ID: 0x%x) to sysfs topology. res=%d\n",
 						gpu_id, res);
 		dev = kfd_assign_gpu(gpu);
-		if (!dev) {
-			pr_err("Could not assign GPU\n");
+		if (WARN_ON(!dev)) {
 			res = -ENODEV;
 			goto err;
 		}
@@ -1339,14 +1338,15 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
 		break;
 	default:
-		BUG();
+		WARN(1, "Unexpected ASIC family %u",
+		     dev->gpu->device_info->asic_family);
 	}
 
 	/* Fix errors in CZ CRAT.
-	 * simd_count: Carrizo CRAT reports wrong simd_count, probably because
-	 *		it doesn't consider masked out CUs
-	 * max_waves_per_simd: Carrizo reports wrong max_waves_per_simd.
-	 * capability flag: Carrizo CRAT doesn't report IOMMU flags.
+	 * simd_count: Carrizo CRAT reports wrong simd_count, probably
+	 *		because it doesn't consider masked out CUs
+	 * max_waves_per_simd: Carrizo reports wrong max_waves_per_simd
+	 * capability flag: Carrizo CRAT doesn't report IOMMU flags
 	 */
 	if (dev->gpu->device_info->asic_family == CHIP_CARRIZO) {
 		dev->node_props.simd_count =
@@ -1386,7 +1386,7 @@ int kfd_topology_remove_device(struct kfd_dev *gpu)
 
 	up_write(&topology_lock);
 
-	if (res == 0)
+	if (!res)
 		kfd_notify_gpu_change(gpu_id, 0);
 
 	return res;
@@ -1427,7 +1427,7 @@ static int kfd_cpumask_to_apic_id(const struct cpumask *cpumask)
 {
 	int first_cpu_of_numa_node;
 
-	if (!cpumask || (cpumask == cpu_none_mask))
+	if (!cpumask || cpumask == cpu_none_mask)
 		return -1;
 	first_cpu_of_numa_node = cpumask_first(cpumask);
 	if (first_cpu_of_numa_node >= nr_cpu_ids)
@@ -1470,7 +1470,7 @@ int kfd_debugfs_hqds_by_device(struct seq_file *m, void *data)
 
 		seq_printf(m, "Node %u, gpu_id %x:\n", i++, dev->gpu->id);
 		r = dqm_debugfs_hqds(m, dev->gpu->dqm);
-		if (r != 0)
+		if (r)
 			break;
 	}
 
@@ -1495,7 +1495,7 @@ int kfd_debugfs_rls_by_device(struct seq_file *m, void *data)
 
 		seq_printf(m, "Node %u, gpu_id %x:\n", i++, dev->gpu->id);
 		r = pm_debugfs_runlist(m, &dev->gpu->dqm->packets);
-		if (r != 0)
+		if (r)
 			break;
 	}
 

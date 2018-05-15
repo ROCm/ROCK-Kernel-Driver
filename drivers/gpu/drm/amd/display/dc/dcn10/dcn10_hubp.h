@@ -93,6 +93,8 @@
 	SRI(DCN_SURF0_TTU_CNTL1, HUBPREQ, id),\
 	SRI(DCN_SURF1_TTU_CNTL0, HUBPREQ, id),\
 	SRI(DCN_SURF1_TTU_CNTL1, HUBPREQ, id),\
+	SRI(DCN_CUR0_TTU_CNTL0, HUBPREQ, id),\
+	SRI(DCN_CUR0_TTU_CNTL1, HUBPREQ, id),\
 	SRI(HUBP_CLK_CNTL, HUBP, id)
 
 /* Register address initialization macro for ASICs with VM */
@@ -203,6 +205,8 @@
 	uint32_t DCN_SURF0_TTU_CNTL1; \
 	uint32_t DCN_SURF1_TTU_CNTL0; \
 	uint32_t DCN_SURF1_TTU_CNTL1; \
+	uint32_t DCN_CUR0_TTU_CNTL0; \
+	uint32_t DCN_CUR0_TTU_CNTL1; \
 	uint32_t DCN_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_MSB; \
 	uint32_t DCN_VM_CONTEXT0_PAGE_TABLE_BASE_ADDR_LSB; \
 	uint32_t DCN_VM_CONTEXT0_PAGE_TABLE_START_ADDR_MSB; \
@@ -368,7 +372,11 @@
 	HUBP_SF(HUBPREQ0_NOM_PARAMETERS_2, DST_Y_PER_PTE_ROW_NOM_C, mask_sh),\
 	HUBP_SF(HUBPREQ0_NOM_PARAMETERS_3, REFCYC_PER_PTE_GROUP_NOM_C, mask_sh),\
 	HUBP_SF(HUBPREQ0_DCN_VM_MX_L1_TLB_CNTL, ENABLE_L1_TLB, mask_sh),\
-	HUBP_SF(HUBPREQ0_DCN_VM_MX_L1_TLB_CNTL, SYSTEM_ACCESS_MODE, mask_sh)
+	HUBP_SF(HUBPREQ0_DCN_VM_MX_L1_TLB_CNTL, SYSTEM_ACCESS_MODE, mask_sh),\
+	HUBP_SF(HUBPREQ0_DCN_CUR0_TTU_CNTL0, REFCYC_PER_REQ_DELIVERY, mask_sh),\
+	HUBP_SF(HUBPREQ0_DCN_CUR0_TTU_CNTL0, QoS_LEVEL_FIXED, mask_sh),\
+	HUBP_SF(HUBPREQ0_DCN_CUR0_TTU_CNTL0, QoS_RAMP_DISABLE, mask_sh),\
+	HUBP_SF(HUBPREQ0_DCN_CUR0_TTU_CNTL1, REFCYC_PER_REQ_DELIVERY_PRE, mask_sh)
 
 #define HUBP_MASK_SH_LIST_DCN10(mask_sh)\
 	HUBP_MASK_SH_LIST_DCN(mask_sh),\
@@ -611,8 +619,29 @@ struct dcn_mi_mask {
 	DCN_HUBP_REG_FIELD_LIST(uint32_t);
 };
 
+struct dcn_hubp_state {
+	struct _vcs_dpi_display_dlg_regs_st dlg_attr;
+	struct _vcs_dpi_display_ttu_regs_st ttu_attr;
+	struct _vcs_dpi_display_rq_regs_st rq_regs;
+	uint32_t pixel_format;
+	uint32_t inuse_addr_hi;
+	uint32_t viewport_width;
+	uint32_t viewport_height;
+	uint32_t rotation_angle;
+	uint32_t h_mirror_en;
+	uint32_t sw_mode;
+	uint32_t dcc_en;
+	uint32_t blank_en;
+	uint32_t underflow_status;
+	uint32_t ttu_disable;
+	uint32_t min_ttu_vblank;
+	uint32_t qos_level_low_wm;
+	uint32_t qos_level_high_wm;
+};
+
 struct dcn10_hubp {
 	struct hubp base;
+	struct dcn_hubp_state state;
 	const struct dcn_mi_registers *hubp_regs;
 	const struct dcn_mi_shift *hubp_shift;
 	const struct dcn_mi_mask *hubp_mask;
@@ -690,25 +719,7 @@ void dcn10_hubp_construct(
 	const struct dcn_mi_shift *hubp_shift,
 	const struct dcn_mi_mask *hubp_mask);
 
-
-struct dcn_hubp_state {
-	uint32_t pixel_format;
-	uint32_t inuse_addr_hi;
-	uint32_t viewport_width;
-	uint32_t viewport_height;
-	uint32_t rotation_angle;
-	uint32_t h_mirror_en;
-	uint32_t sw_mode;
-	uint32_t dcc_en;
-	uint32_t blank_en;
-	uint32_t underflow_status;
-	uint32_t ttu_disable;
-	uint32_t min_ttu_vblank;
-	uint32_t qos_level_low_wm;
-	uint32_t qos_level_high_wm;
-};
-void hubp1_read_state(struct dcn10_hubp *hubp1,
-		struct dcn_hubp_state *s);
+void hubp1_read_state(struct hubp *hubp);
 
 enum cursor_pitch hubp1_get_cursor_pitch(unsigned int pitch);
 

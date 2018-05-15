@@ -130,6 +130,7 @@ extern int amdgpu_lbpw;
 extern int amdgpu_compute_multipipe;
 extern int amdgpu_gpu_recovery;
 extern int amdgpu_emu_mode;
+extern uint amdgpu_smu_memory_pool_size;
 
 #ifdef CONFIG_DRM_AMDGPU_SI
 extern int amdgpu_si_support;
@@ -138,6 +139,7 @@ extern int amdgpu_si_support;
 extern int amdgpu_cik_support;
 #endif
 
+#define AMDGPU_SG_THRESHOLD			(256*1024*1024)
 #define AMDGPU_DEFAULT_GTT_SIZE_MB		3072ULL /* 3GB by default */
 #define AMDGPU_WAIT_IDLE_TIMEOUT_IN_MS	        3000
 #define AMDGPU_MAX_USEC_TIMEOUT			100000	/* 100 ms */
@@ -696,6 +698,8 @@ int amdgpu_ctx_ioctl(struct drm_device *dev, void *data,
 int amdgpu_ctx_wait_prev_fence(struct amdgpu_ctx *ctx, unsigned ring_id);
 
 void amdgpu_ctx_mgr_init(struct amdgpu_ctx_mgr *mgr);
+void amdgpu_ctx_mgr_entity_cleanup(struct amdgpu_ctx_mgr *mgr);
+void amdgpu_ctx_mgr_entity_fini(struct amdgpu_ctx_mgr *mgr);
 void amdgpu_ctx_mgr_fini(struct amdgpu_ctx_mgr *mgr);
 
 
@@ -788,9 +792,18 @@ struct amdgpu_rlc {
 	u32 starting_offsets_start;
 	u32 reg_list_format_size_bytes;
 	u32 reg_list_size_bytes;
+	u32 reg_list_format_direct_reg_list_length;
+	u32 save_restore_list_cntl_size_bytes;
+	u32 save_restore_list_gpm_size_bytes;
+	u32 save_restore_list_srm_size_bytes;
 
 	u32 *register_list_format;
 	u32 *register_restore;
+	u8 *save_restore_list_cntl;
+	u8 *save_restore_list_gpm;
+	u8 *save_restore_list_srm;
+
+	bool is_rlc_v2_1;
 };
 
 #define AMDGPU_MAX_COMPUTE_QUEUES KGD_MAX_QUEUES
@@ -884,6 +897,8 @@ struct amdgpu_gfx_config {
 
 	/* gfx configure feature */
 	uint32_t double_offchip_lds_buf;
+	/* cached value of DB_DEBUG2 */
+	uint32_t db_debug2;
 };
 
 struct amdgpu_cu_info {
@@ -955,6 +970,12 @@ struct amdgpu_gfx {
 	uint32_t			ce_feature_version;
 	uint32_t			pfp_feature_version;
 	uint32_t			rlc_feature_version;
+	uint32_t			rlc_srlc_fw_version;
+	uint32_t			rlc_srlc_feature_version;
+	uint32_t			rlc_srlg_fw_version;
+	uint32_t			rlc_srlg_feature_version;
+	uint32_t			rlc_srls_fw_version;
+	uint32_t			rlc_srls_feature_version;
 	uint32_t			mec_feature_version;
 	uint32_t			mec2_feature_version;
 	struct amdgpu_ring		gfx_ring[AMDGPU_MAX_GFX_RINGS];
@@ -1434,6 +1455,7 @@ enum amd_hw_ip_block_type {
 	ATHUB_HWIP,
 	NBIO_HWIP,
 	MP0_HWIP,
+	MP1_HWIP,
 	UVD_HWIP,
 	VCN_HWIP = UVD_HWIP,
 	VCE_HWIP,
@@ -1443,6 +1465,7 @@ enum amd_hw_ip_block_type {
 	SMUIO_HWIP,
 	PWR_HWIP,
 	NBIF_HWIP,
+	THM_HWIP,
 	MAX_HWIP
 };
 
@@ -1475,6 +1498,7 @@ struct amdgpu_ssg {
 struct amd_powerplay {
 	void *pp_handle;
 	const struct amd_pm_funcs *pp_funcs;
+	uint32_t pp_feature;
 };
 
 #define AMDGPU_RESET_MAGIC_NUM 64
@@ -1873,6 +1897,7 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
 #define amdgpu_ring_emit_rreg(r, d) (r)->funcs->emit_rreg((r), (d))
 #define amdgpu_ring_emit_wreg(r, d, v) (r)->funcs->emit_wreg((r), (d), (v))
 #define amdgpu_ring_emit_reg_wait(r, d, v, m) (r)->funcs->emit_reg_wait((r), (d), (v), (m))
+#define amdgpu_ring_emit_reg_write_reg_wait(r, d0, d1, v, m) (r)->funcs->emit_reg_write_reg_wait((r), (d0), (d1), (v), (m))
 #define amdgpu_ring_emit_tmz(r, b) (r)->funcs->emit_tmz((r), (b))
 #define amdgpu_ring_pad_ib(r, ib) ((r)->funcs->pad_ib((r), (ib)))
 #define amdgpu_ring_init_cond_exec(r) (r)->funcs->init_cond_exec((r))

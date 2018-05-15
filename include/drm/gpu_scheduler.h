@@ -64,6 +64,8 @@ struct drm_sched_entity {
 	struct dma_fence		*dependency;
 	struct dma_fence_cb		cb;
 	atomic_t			*guilty; /* points to ctx's guilty */
+	int            fini_status;
+	struct dma_fence    *last_scheduled;
 };
 
 /**
@@ -118,6 +120,7 @@ struct drm_sched_job {
 	uint64_t			id;
 	atomic_t			karma;
 	enum drm_sched_priority		s_priority;
+	struct drm_sched_entity  *entity;
 };
 
 static inline bool drm_sched_invalidate_job(struct drm_sched_job *s_job,
@@ -185,6 +188,10 @@ int drm_sched_entity_init(struct drm_gpu_scheduler *sched,
 			  struct drm_sched_entity *entity,
 			  struct drm_sched_rq *rq,
 			  uint32_t jobs, atomic_t *guilty);
+void drm_sched_entity_do_release(struct drm_gpu_scheduler *sched,
+			   struct drm_sched_entity *entity);
+void drm_sched_entity_cleanup(struct drm_gpu_scheduler *sched,
+			   struct drm_sched_entity *entity);
 void drm_sched_entity_fini(struct drm_gpu_scheduler *sched,
 			   struct drm_sched_entity *entity);
 void drm_sched_entity_push_job(struct drm_sched_job *sched_job,

@@ -11,5 +11,6 @@
 #include <kcl/kcl_fence.h>
 #include <kcl/kcl_wait.h>
 #include <kcl/kcl_idr.h>
+#include <kcl/kcl_mm.h>
 
 #endif

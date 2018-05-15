@@ -79,6 +79,10 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 				ASIC_REV_IS_POLARIS12_V(asic_id.hw_internal_rev)) {
 			dc_version = DCE_VERSION_11_2;
 		}
+#if defined(CONFIG_DRM_AMD_DC_VEGAM)
+		if (ASIC_REV_IS_VEGAM(asic_id.hw_internal_rev))
+			dc_version = DCE_VERSION_11_22;
+#endif
 		break;
 	case FAMILY_AI:
 		dc_version = DCE_VERSION_12_0;
@@ -125,6 +129,9 @@ struct resource_pool *dc_create_resource_pool(
 			num_virtual_links, dc, asic_id);
 		break;
 	case DCE_VERSION_11_2:
+#if defined(CONFIG_DRM_AMD_DC_VEGAM)
+	case DCE_VERSION_11_22:
+#endif
 		res_pool = dce112_create_resource_pool(
 			num_virtual_links, dc);
 		break;
@@ -1303,6 +1310,19 @@ bool dc_add_all_planes_for_stream(
 }
 
 
+static bool is_hdr_static_meta_changed(struct dc_stream_state *cur_stream,
+	struct dc_stream_state *new_stream)
+{
+	if (cur_stream == NULL)
+		return true;
+
+	if (memcmp(&cur_stream->hdr_static_metadata,
+			&new_stream->hdr_static_metadata,
+			sizeof(struct dc_info_packet)) != 0)
+		return true;
+
+	return false;
+}
 
 static bool is_timing_changed(struct dc_stream_state *cur_stream,
 		struct dc_stream_state *new_stream)
@@ -1336,6 +1356,9 @@ static bool are_stream_backends_same(
 		return false;
 
 	if (is_timing_changed(stream_a, stream_b))
+		return false;
+
+	if (is_hdr_static_meta_changed(stream_a, stream_b))
 		return false;
 
 	return true;
@@ -1700,7 +1723,7 @@ enum dc_status resource_map_pool_resources(
 		pipe_idx = acquire_first_split_pipe(&context->res_ctx, pool, stream);
 #endif
 
-	if (pipe_idx < 0)
+	if (pipe_idx < 0 || context->res_ctx.pipe_ctx[pipe_idx].stream_res.tg == NULL)
 		return DC_NO_CONTROLLER_RESOURCE;
 
 	pipe_ctx = &context->res_ctx.pipe_ctx[pipe_idx];
@@ -1775,9 +1798,9 @@ enum dc_status dc_validate_global_state(
 		return DC_ERROR_UNEXPECTED;
 
 	if (dc->res_pool->funcs->validate_global) {
-			result = dc->res_pool->funcs->validate_global(dc, new_ctx);
-			if (result != DC_OK)
-				return result;
+		result = dc->res_pool->funcs->validate_global(dc, new_ctx);
+		if (result != DC_OK)
+			return result;
 	}
 
 	for (i = 0; i < new_ctx->stream_count; i++) {
@@ -2435,6 +2458,8 @@ bool pipe_need_reprogram(
 	if (is_timing_changed(pipe_ctx_old->stream, pipe_ctx->stream))
 		return true;
 
+	if (is_hdr_static_meta_changed(pipe_ctx_old->stream, pipe_ctx->stream))
+		return true;
 
 	return false;
 }

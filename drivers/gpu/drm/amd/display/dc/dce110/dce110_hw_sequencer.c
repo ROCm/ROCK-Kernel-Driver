@@ -456,10 +456,13 @@ dce110_translate_regamma_to_hw_format(const struct dc_transfer_func *output_tf,
 
 	} else {
 		/* 10 segments
-		 * segment is from 2^-10 to 2^0
+		 * segment is from 2^-10 to 2^1
+		 * We include an extra segment for range [2^0, 2^1). This is to
+		 * ensure that colors with normalized values of 1 don't miss the
+		 * LUT.
 		 */
 		region_start = -10;
-		region_end = 0;
+		region_end = 1;
 
 		seg_distr[0] = 4;
 		seg_distr[1] = 4;
@@ -471,7 +474,7 @@ dce110_translate_regamma_to_hw_format(const struct dc_transfer_func *output_tf,
 		seg_distr[7] = 4;
 		seg_distr[8] = 4;
 		seg_distr[9] = 4;
-		seg_distr[10] = -1;
+		seg_distr[10] = 0;
 		seg_distr[11] = -1;
 		seg_distr[12] = -1;
 		seg_distr[13] = -1;
@@ -857,7 +860,7 @@ void hwss_edp_power_control(
 					dm_get_elapse_time_in_ns(
 							ctx,
 							current_ts,
-							link->link_trace.time_stamp.edp_poweroff) / 1000000;
+							div64_u64(link->link_trace.time_stamp.edp_poweroff, 1000000));
 			unsigned long long wait_time_ms = 0;
 
 			/* max 500ms from LCDVDD off to on */
@@ -1046,8 +1049,10 @@ void dce110_blank_stream(struct pipe_ctx *pipe_ctx)
 	struct dc_stream_state *stream = pipe_ctx->stream;
 	struct dc_link *link = stream->sink->link;
 
-	if (link->local_sink && link->local_sink->sink_signal == SIGNAL_TYPE_EDP)
+	if (link->local_sink && link->local_sink->sink_signal == SIGNAL_TYPE_EDP) {
 		link->dc->hwss.edp_backlight_control(link, false);
+		dc_link_set_abm_disable(link);
+	}
 
 	if (dc_is_dp_signal(pipe_ctx->stream->signal))
 		pipe_ctx->stream_res.stream_enc->funcs->dp_blank(pipe_ctx->stream_res.stream_enc);
@@ -1228,7 +1233,7 @@ static void program_scaler(const struct dc *dc,
 		&pipe_ctx->plane_res.scl_data);
 }
 
-static enum dc_status dce110_prog_pixclk_crtc_otg(
+static enum dc_status dce110_enable_stream_timing(
 		struct pipe_ctx *pipe_ctx,
 		struct dc_state *context,
 		struct dc *dc)
@@ -1304,7 +1309,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 			pipe_ctx[pipe_ctx->pipe_idx];
 
 	/*  */
-	dc->hwss.prog_pixclk_crtc_otg(pipe_ctx, context, dc);
+	dc->hwss.enable_stream_timing(pipe_ctx, context, dc);
 
 	/* FPGA does not program backend */
 	if (IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment)) {
@@ -1476,6 +1481,17 @@ static void disable_vga_and_power_gate_all_controllers(
 	}
 }
 
+static struct dc_link *get_link_for_edp(struct dc *dc)
+{
+	int i;
+
+	for (i = 0; i < dc->link_count; i++) {
+		if (dc->links[i]->connector_signal == SIGNAL_TYPE_EDP)
+			return dc->links[i];
+	}
+	return NULL;
+}
+
 static struct dc_link *get_link_for_edp_not_in_use(
 		struct dc *dc,
 		struct dc_state *context)
@@ -1510,20 +1526,21 @@ static struct dc_link *get_link_for_edp_not_in_use(
  */
 void dce110_enable_accelerated_mode(struct dc *dc, struct dc_state *context)
 {
-	struct dc_bios *dcb = dc->ctx->dc_bios;
-
-	/* vbios already light up eDP, so we can leverage vbios and skip eDP
-	 * programming
-	 */
-	bool can_eDP_fast_boot_optimize =
-			(dcb->funcs->get_vga_enabled_displays(dc->ctx->dc_bios) == ATOM_DISPLAY_LCD1_ACTIVE);
-
-	/* if OS doesn't light up eDP and eDP link is available, we want to disable */
 	struct dc_link *edp_link_to_turnoff = NULL;
+	struct dc_link *edp_link = get_link_for_edp(dc);
+	bool can_eDP_fast_boot_optimize = false;
+
+	if (edp_link) {
+		can_eDP_fast_boot_optimize =
+				edp_link->link_enc->funcs->is_dig_enabled(edp_link->link_enc);
+	}
 
 	if (can_eDP_fast_boot_optimize) {
 		edp_link_to_turnoff = get_link_for_edp_not_in_use(dc, context);
 
+		/* if OS doesn't light up eDP and eDP link is available, we want to disable
+		 * If resume from S4/S5, should optimization.
+		 */
 		if (!edp_link_to_turnoff)
 			dc->apply_edp_fast_boot_optimization = true;
 	}
@@ -2748,6 +2765,9 @@ static void dce110_program_front_end_for_pipe(
 	struct dc_plane_state *plane_state = pipe_ctx->plane_state;
 	struct xfm_grph_csc_adjustment adjust;
 	struct out_csc_color_matrix tbl_entry;
+#if defined(CONFIG_DRM_AMD_DC_FBC)
+	unsigned int underlay_idx = dc->res_pool->underlay_pipe_index;
+#endif
 	unsigned int i;
 	DC_LOGGER_INIT();
 	memset(&tbl_entry, 0, sizeof(tbl_entry));
@@ -2789,7 +2809,9 @@ static void dce110_program_front_end_for_pipe(
 	program_scaler(dc, pipe_ctx);
 
 #if defined(CONFIG_DRM_AMD_DC_FBC)
-	if (dc->fbc_compressor && old_pipe->stream) {
+	/* fbc not applicable on Underlay pipe */
+	if (dc->fbc_compressor && old_pipe->stream &&
+	    pipe_ctx->pipe_idx != underlay_idx) {
 		if (plane_state->tiling_info.gfx8.array_mode == DC_ARRAY_LINEAR_GENERAL)
 			dc->fbc_compressor->funcs->disable_fbc(dc->fbc_compressor);
 		else
@@ -3042,7 +3064,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.get_position = get_position,
 	.set_static_screen_control = set_static_screen_control,
 	.reset_hw_ctx_wrap = dce110_reset_hw_ctx_wrap,
-	.prog_pixclk_crtc_otg = dce110_prog_pixclk_crtc_otg,
+	.enable_stream_timing = dce110_enable_stream_timing,
 	.setup_stereo = NULL,
 	.set_avmute = dce110_set_avmute,
 	.wait_for_mpcc_disconnect = dce110_wait_for_mpcc_disconnect,

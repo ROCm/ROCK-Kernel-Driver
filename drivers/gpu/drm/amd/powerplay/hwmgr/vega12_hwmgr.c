@@ -34,7 +34,6 @@
 #include "atomfirmware.h"
 #include "cgs_common.h"
 #include "vega12_inc.h"
-#include "pp_soc15.h"
 #include "pppcielanes.h"
 #include "vega12_hwmgr.h"
 #include "vega12_processpptables.h"
@@ -546,6 +545,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -565,6 +565,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -585,6 +586,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -605,6 +607,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 		return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -625,6 +628,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -645,6 +649,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 		return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -666,6 +671,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -686,6 +692,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -706,6 +713,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -726,6 +734,7 @@ static int vega12_setup_default_dpm_tables(struct pp_hwmgr *hwmgr)
 			return -EINVAL);
 
 		dpm_table->dpm_levels[i].value = clock;
+		dpm_table->dpm_levels[i].enabled = true;
 	}
 
 	vega12_init_dpm_state(&(dpm_table->dpm_state));
@@ -992,14 +1001,54 @@ static uint32_t vega12_find_highest_dpm_level(
 
 static int vega12_upload_dpm_min_level(struct pp_hwmgr *hwmgr)
 {
+	struct vega12_hwmgr *data = hwmgr->backend;
+	if (data->smc_state_table.gfx_boot_level !=
+			data->dpm_table.gfx_table.dpm_state.soft_min_level) {
+		smum_send_msg_to_smc_with_parameter(hwmgr,
+			PPSMC_MSG_SetSoftMinByFreq,
+			PPCLK_GFXCLK<<16 | data->dpm_table.gfx_table.dpm_levels[data->smc_state_table.gfx_boot_level].value);
+		data->dpm_table.gfx_table.dpm_state.soft_min_level =
+				data->smc_state_table.gfx_boot_level;
+	}
+
+	if (data->smc_state_table.mem_boot_level !=
+			data->dpm_table.mem_table.dpm_state.soft_min_level) {
+		smum_send_msg_to_smc_with_parameter(hwmgr,
+			PPSMC_MSG_SetSoftMinByFreq,
+			PPCLK_UCLK<<16 | data->dpm_table.mem_table.dpm_levels[data->smc_state_table.mem_boot_level].value);
+		data->dpm_table.mem_table.dpm_state.soft_min_level =
+				data->smc_state_table.mem_boot_level;
+	}
+
 	return 0;
+
 }
 
 static int vega12_upload_dpm_max_level(struct pp_hwmgr *hwmgr)
 {
+	struct vega12_hwmgr *data = hwmgr->backend;
+	if (data->smc_state_table.gfx_max_level !=
+		data->dpm_table.gfx_table.dpm_state.soft_max_level) {
+		smum_send_msg_to_smc_with_parameter(hwmgr,
+			PPSMC_MSG_SetSoftMaxByFreq,
+			/* plus the vale by 1 to align the resolution */
+			PPCLK_GFXCLK<<16 | (data->dpm_table.gfx_table.dpm_levels[data->smc_state_table.gfx_max_level].value + 1));
+		data->dpm_table.gfx_table.dpm_state.soft_max_level =
+				data->smc_state_table.gfx_max_level;
+	}
+
+	if (data->smc_state_table.mem_max_level !=
+		data->dpm_table.mem_table.dpm_state.soft_max_level) {
+		smum_send_msg_to_smc_with_parameter(hwmgr,
+			PPSMC_MSG_SetSoftMaxByFreq,
+			/* plus the vale by 1 to align the resolution */
+			PPCLK_UCLK<<16 | (data->dpm_table.mem_table.dpm_levels[data->smc_state_table.mem_max_level].value + 1));
+		data->dpm_table.mem_table.dpm_state.soft_max_level =
+				data->smc_state_table.mem_max_level;
+	}
+
 	return 0;
 }
-
 
 int vega12_enable_disable_vce_dpm(struct pp_hwmgr *hwmgr, bool enable)
 {
@@ -1064,8 +1113,7 @@ static uint32_t vega12_dpm_get_mclk(struct pp_hwmgr *hwmgr, bool low)
 	return (mem_clk * 100);
 }
 
-static int vega12_get_gpu_power(struct pp_hwmgr *hwmgr,
-		struct pp_gpu_power *query)
+static int vega12_get_gpu_power(struct pp_hwmgr *hwmgr, uint32_t *query)
 {
 #if 0
 	uint32_t value;
@@ -1077,7 +1125,7 @@ static int vega12_get_gpu_power(struct pp_hwmgr *hwmgr,
 
 	vega12_read_arg_from_smc(hwmgr, &value);
 	/* power value is an integer */
-	query->average_gpu_power = value << 8;
+	*query = value << 8;
 #endif
 	return 0;
 }
@@ -1186,12 +1234,8 @@ static int vega12_read_sensor(struct pp_hwmgr *hwmgr, int idx,
 		*size = 4;
 		break;
 	case AMDGPU_PP_SENSOR_GPU_POWER:
-		if (*size < sizeof(struct pp_gpu_power))
-			ret = -EINVAL;
-		else {
-			*size = sizeof(struct pp_gpu_power);
-			ret = vega12_get_gpu_power(hwmgr, (struct pp_gpu_power *)value);
-		}
+		ret = vega12_get_gpu_power(hwmgr, (uint32_t *)value);
+
 		break;
 	default:
 		ret = -EINVAL;

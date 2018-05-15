@@ -26,12 +26,17 @@
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_pm4_headers_vi.h"
-#include "cwsr_trap_handler_gfx8.asm"
-#include "cwsr_trap_handler_gfx9.asm"
+#include "cwsr_trap_handler.h"
 #include "kfd_iommu.h"
 
 #define MQD_SIZE_ALIGNED 768
-static atomic_t kfd_device_suspended = ATOMIC_INIT(0);
+
+/*
+ * kfd_locked is used to lock the kfd driver during suspend or reset
+ * once locked, kfd driver will stop any further GPU execution.
+ * create process (open) will return -EAGAIN.
+ */
+static atomic_t kfd_locked = ATOMIC_INIT(0);
 
 #ifdef KFD_SUPPORT_IOMMU_V2
 static const struct kfd_device_info kaveri_device_info = {
@@ -215,7 +220,7 @@ static const struct kfd_device_info vega10_device_info = {
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
-	.needs_pci_atomics = true,
+	.needs_pci_atomics = false,
 	.num_sdma_engines = 2,
 };
 
@@ -233,6 +238,7 @@ static const struct kfd_device_info vega10_vf_device_info = {
 	.needs_pci_atomics = false,
 	.num_sdma_engines = 2,
 };
+
 
 struct kfd_deviceid {
 	unsigned short did;
@@ -282,35 +288,35 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x67B9, &hawaii_device_info },	/* Hawaii */
 	{ 0x67BA, &hawaii_device_info },	/* Hawaii */
 	{ 0x67BE, &hawaii_device_info },	/* Hawaii */
-	{ 0x6920, &tonga_device_info   },	/* Tonga */
-	{ 0x6921, &tonga_device_info   },	/* Tonga */
-	{ 0x6928, &tonga_device_info   },	/* Tonga */
-	{ 0x6929, &tonga_device_info   },	/* Tonga */
-	{ 0x692B, &tonga_device_info   },	/* Tonga */
-	{ 0x692F, &tonga_vf_device_info   },	/* Tonga vf */
-	{ 0x6938, &tonga_device_info   },	/* Tonga */
-	{ 0x6939, &tonga_device_info   },	/* Tonga */
-	{ 0x7300, &fiji_device_info    },	/* Fiji */
-	{ 0x730F, &fiji_vf_device_info    },	/* Fiji vf*/
-	{ 0x67C0, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67C1, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67C2, &polaris10_device_info },     /* Polaris10 */
+	{ 0x6920, &tonga_device_info },		/* Tonga */
+	{ 0x6921, &tonga_device_info },		/* Tonga */
+	{ 0x6928, &tonga_device_info },		/* Tonga */
+	{ 0x6929, &tonga_device_info },		/* Tonga */
+	{ 0x692B, &tonga_device_info },		/* Tonga */
+	{ 0x692F, &tonga_vf_device_info },	/* Tonga vf */
+	{ 0x6938, &tonga_device_info },		/* Tonga */
+	{ 0x6939, &tonga_device_info },		/* Tonga */
+	{ 0x7300, &fiji_device_info },		/* Fiji */
+	{ 0x730F, &fiji_vf_device_info },	/* Fiji vf*/
+	{ 0x67C0, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67C1, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67C2, &polaris10_device_info },	/* Polaris10 */
 	{ 0x67C4, &polaris10_device_info },	/* Polaris10 */
 	{ 0x67C7, &polaris10_device_info },	/* Polaris10 */
-	{ 0x67C8, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67C9, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67CA, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67CC, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67CF, &polaris10_device_info },     /* Polaris10 */
-	{ 0x67D0, &polaris10_vf_device_info },     /* Polaris10 vf*/
+	{ 0x67C8, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67C9, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67CA, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67CC, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67CF, &polaris10_device_info },	/* Polaris10 */
+	{ 0x67D0, &polaris10_vf_device_info },	/* Polaris10 vf*/
 	{ 0x67DF, &polaris10_device_info },	/* Polaris10 */
-	{ 0x67E0, &polaris11_device_info },     /* Polaris11 */
-	{ 0x67E1, &polaris11_device_info },     /* Polaris11 */
+	{ 0x67E0, &polaris11_device_info },	/* Polaris11 */
+	{ 0x67E1, &polaris11_device_info },	/* Polaris11 */
 	{ 0x67E3, &polaris11_device_info },	/* Polaris11 */
-	{ 0x67E7, &polaris11_device_info },     /* Polaris11 */
-	{ 0x67E8, &polaris11_device_info },     /* Polaris11 */
-	{ 0x67E9, &polaris11_device_info },     /* Polaris11 */
-	{ 0x67EB, &polaris11_device_info },     /* Polaris11 */
+	{ 0x67E7, &polaris11_device_info },	/* Polaris11 */
+	{ 0x67E8, &polaris11_device_info },	/* Polaris11 */
+	{ 0x67E9, &polaris11_device_info },	/* Polaris11 */
+	{ 0x67EB, &polaris11_device_info },	/* Polaris11 */
 	{ 0x67EF, &polaris11_device_info },	/* Polaris11 */
 	{ 0x67FF, &polaris11_device_info },	/* Polaris11 */
 	{ 0x6860, &vega10_device_info },	/* Vega10 */
@@ -356,7 +362,7 @@ struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 	struct pci_dev *pdev, const struct kfd2kgd_calls *f2g)
 {
 	struct kfd_dev *kfd;
-
+	int ret;
 	const struct kfd_device_info *device_info =
 					lookup_device_info(pdev->device);
 
@@ -365,19 +371,18 @@ struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 		return NULL;
 	}
 
-	if (device_info->needs_pci_atomics) {
-		/* Allow BIF to recode atomics to PCIe 3.0 AtomicOps.
-		 * 32 and 64-bit requests are possible and must be
-		 * supported.
-		 */
-		if (pci_enable_atomic_ops_to_root(pdev,
-				PCI_EXP_DEVCAP2_ATOMIC_COMP32 |
-				PCI_EXP_DEVCAP2_ATOMIC_COMP64) < 0) {
-			dev_info(kfd_device,
-				"skipped device %x:%x, PCI rejects atomics",
-				 pdev->vendor, pdev->device);
-			return NULL;
-		}
+	/* Allow BIF to recode atomics to PCIe 3.0 AtomicOps.
+	 * 32 and 64-bit requests are possible and must be
+	 * supported.
+	 */
+	ret = pci_enable_atomic_ops_to_root(pdev,
+			PCI_EXP_DEVCAP2_ATOMIC_COMP32 |
+			PCI_EXP_DEVCAP2_ATOMIC_COMP64);
+	if (device_info->needs_pci_atomics && ret  < 0) {
+		dev_info(kfd_device,
+			 "skipped device %x:%x, PCI rejects atomics\n",
+			 pdev->vendor, pdev->device);
+		return NULL;
 	}
 
 	kfd = kzalloc(sizeof(*kfd), GFP_KERNEL);
@@ -425,7 +430,6 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			KGD_ENGINE_SDMA1);
 	kfd->shared_resources = *gpu_resources;
 
-	/* Usually first_vmid_kfd = 8, last_vmid_kfd = 15 */
 	kfd->vm_info.first_vmid_kfd = ffs(gpu_resources->compute_vmid_bitmap)-1;
 	kfd->vm_info.last_vmid_kfd = fls(gpu_resources->compute_vmid_bitmap)-1;
 	kfd->vm_info.vmid_num_kfd = kfd->vm_info.last_vmid_kfd
@@ -562,12 +566,43 @@ void kgd2kfd_device_exit(struct kfd_dev *kfd)
 
 int kgd2kfd_pre_reset(struct kfd_dev *kfd)
 {
+	if (!kfd->init_complete)
+		return 0;
+	kgd2kfd_suspend(kfd);
+
+	/* hold dqm->lock to prevent further execution*/
+	mutex_lock(&kfd->dqm->lock);
+
+	kfd_signal_reset_event(kfd);
 	return 0;
 }
 
+/*
+ * Fix me. KFD won't be able to resume existing process for now.
+ * We will keep all existing process in a evicted state and
+ * wait the process to be terminated.
+ */
+
 int kgd2kfd_post_reset(struct kfd_dev *kfd)
 {
+	int ret, count;
+
+	if (!kfd->init_complete)
+		return 0;
+
+	mutex_unlock(&kfd->dqm->lock);
+
+	ret = kfd_resume(kfd);
+	if (ret)
+		return ret;
+	count = atomic_dec_return(&kfd_locked);
+	WARN_ONCE(count != 0, "KFD reset ref. error");
 	return 0;
+}
+
+bool kfd_is_locked(void)
+{
+	return  (atomic_read(&kfd_locked) > 0);
 }
 
 void kgd2kfd_suspend(struct kfd_dev *kfd)
@@ -576,7 +611,7 @@ void kgd2kfd_suspend(struct kfd_dev *kfd)
 		return;
 
 	/* For first KFD device suspend all the KFD processes */
-	if (atomic_inc_return(&kfd_device_suspended) == 1)
+	if (atomic_inc_return(&kfd_locked) == 1)
 		kfd_suspend_all_processes();
 
 	kfd->dqm->ops.stop(kfd->dqm);
@@ -595,7 +630,7 @@ int kgd2kfd_resume(struct kfd_dev *kfd)
 	if (ret)
 		return ret;
 
-	count = atomic_dec_return(&kfd_device_suspended);
+	count = atomic_dec_return(&kfd_locked);
 	WARN_ONCE(count < 0, "KFD suspend / resume ref. error");
 	if (count == 0)
 		ret = kfd_resume_all_processes();
@@ -643,19 +678,19 @@ void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 
 	spin_lock(&kfd->interrupt_lock);
 
-	if (kfd->interrupts_active && interrupt_is_wanted(kfd, ih_ring_entry,
-						patched_ihre, &is_patched)
+	if (kfd->interrupts_active
+	    && interrupt_is_wanted(kfd, ih_ring_entry,
+				   patched_ihre, &is_patched)
 	    && enqueue_ih_ring_entry(kfd,
-				is_patched ? patched_ihre : ih_ring_entry))
+				     is_patched ? patched_ihre : ih_ring_entry))
 		queue_work(kfd->ih_wq, &kfd->interrupt_work);
 
 	spin_unlock(&kfd->interrupt_lock);
 }
 
-int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm)
+int kgd2kfd_quiesce_mm(struct mm_struct *mm)
 {
 	struct kfd_process *p;
-	struct kfd_process_device *pdd;
 	int r;
 
 	/* Because we are called from arbitrary context (workqueue) as opposed
@@ -664,26 +699,17 @@ int kgd2kfd_quiesce_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 	 */
 	p = kfd_lookup_process_by_mm(mm);
 	if (!p)
-		return -ENODEV;
+		return -ESRCH;
 
-	if (kfd) {
-		r = -ENODEV;
-		pdd = kfd_get_process_device_data(kfd, p);
-		if (pdd)
-			r = kfd->dqm->ops.evict_process_queues(kfd->dqm,
-							       &pdd->qpd);
-	} else {
-		r = kfd_process_evict_queues(p);
-	}
+	r = kfd_process_evict_queues(p);
 
 	kfd_unref_process(p);
 	return r;
 }
 
-int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm)
+int kgd2kfd_resume_mm(struct mm_struct *mm)
 {
 	struct kfd_process *p;
-	struct kfd_process_device *pdd;
 	int r;
 
 	/* Because we are called from arbitrary context (workqueue) as opposed
@@ -692,17 +718,9 @@ int kgd2kfd_resume_mm(struct kfd_dev *kfd, struct mm_struct *mm)
 	 */
 	p = kfd_lookup_process_by_mm(mm);
 	if (!p)
-		return -ENODEV;
+		return -ESRCH;
 
-	if (kfd) {
-		r = -ENODEV;
-		pdd = kfd_get_process_device_data(kfd, p);
-		if (pdd)
-			r = kfd->dqm->ops.restore_process_queues(kfd->dqm,
-								 &pdd->qpd);
-	} else {
-		r = kfd_process_restore_queues(p);
-	}
+	r = kfd_process_restore_queues(p);
 
 	kfd_unref_process(p);
 	return r;

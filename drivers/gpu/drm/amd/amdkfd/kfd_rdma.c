@@ -25,7 +25,7 @@
 #include <linux/pid.h>
 #include <linux/err.h>
 #include <linux/slab.h>
-#include "amd_rdma.h"
+#include <drm/amd_rdma.h>
 #include "kfd_priv.h"
 
 

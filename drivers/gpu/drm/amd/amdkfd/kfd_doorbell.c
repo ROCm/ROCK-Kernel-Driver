@@ -119,7 +119,7 @@ int kfd_doorbell_init(struct kfd_dev *kfd)
 	pr_debug("doorbell aperture size  == 0x%08lX\n",
 			kfd->shared_resources.doorbell_aperture_size);
 
-	pr_debug("doorbell kernel address == 0x%p\n", kfd->doorbell_kernel_ptr);
+	pr_debug("doorbell kernel address == %p\n", kfd->doorbell_kernel_ptr);
 
 	return 0;
 }
@@ -193,7 +193,7 @@ void __iomem *kfd_get_kernel_doorbell(struct kfd_dev *kfd,
 
 	pr_debug("Get kernel queue doorbell\n"
 			 "     doorbell offset   == 0x%08X\n"
-			 "     kernel address    == 0x%p\n",
+			 "     kernel address    == %p\n",
 		*doorbell_off, (kfd->doorbell_kernel_ptr + inx));
 
 	return kfd->doorbell_kernel_ptr + inx;
@@ -214,7 +214,7 @@ void write_kernel_doorbell(void __iomem *db, u32 value)
 {
 	if (db) {
 		writel(value, db);
-		pr_debug("Writing %d to doorbell address 0x%p\n", value, db);
+		pr_debug("Writing %d to doorbell address %p\n", value, db);
 	}
 }
 
@@ -224,14 +224,10 @@ void write_kernel_doorbell64(void __iomem *db, u64 value)
 		WARN(((unsigned long)db & 7) != 0,
 		     "Unaligned 64-bit doorbell");
 		writeq(value, (u64 __iomem *)db);
-		pr_debug("writing %llu to doorbell address 0x%p\n", value, db);
+		pr_debug("writing %llu to doorbell address %p\n", value, db);
 	}
 }
 
-/*
- * queue_ids are in the range [0,MAX_PROCESS_QUEUES) and are mapped 1:1
- * to doorbells with the process's doorbell page
- */
 unsigned int kfd_doorbell_id_to_offset(struct kfd_dev *kfd,
 					struct kfd_process *process,
 					unsigned int doorbell_id)
@@ -243,7 +239,8 @@ unsigned int kfd_doorbell_id_to_offset(struct kfd_dev *kfd,
 	 * units regardless of the ASIC-dependent doorbell size.
 	 */
 	return kfd->doorbell_id_offset +
-		process->doorbell_index * (kfd_doorbell_process_slice(kfd)/sizeof(u32)) +
+		process->doorbell_index
+		* kfd_doorbell_process_slice(kfd) / sizeof(u32) +
 		doorbell_id * kfd->device_info->doorbell_size / sizeof(u32);
 }
 

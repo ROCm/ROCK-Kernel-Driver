@@ -49,9 +49,9 @@
 #include <linux/slab.h>
 #include <linux/scatterlist.h>
 #include <linux/module.h>
+#include <drm/amd_rdma.h>
 
 #include "kfd_priv.h"
-#include "amd_rdma.h"
 
 
 
@@ -137,7 +137,6 @@ static void (*pfn_ib_unregister_peer_memory_client)(void *reg_handle);
 
 static const struct amd_rdma_interface *rdma_interface;
 
-static invalidate_peer_memory ib_invalidate_callback;
 static void *ib_reg_handle;
 
 struct amd_mem_context {
@@ -168,9 +167,6 @@ static void free_callback(void *client_priv)
 	}
 
 	pr_debug("mem_context->core_context 0x%p\n", mem_context->core_context);
-
-	/* Call back IB stack asking to invalidate memory */
-	(*ib_invalidate_callback) (ib_reg_handle, mem_context->core_context);
 
 	/* amdkfd will free resources when we return from this callback.
 	 * Set flag to inform that there is nothing to do on "put_pages", etc.
@@ -478,7 +474,7 @@ void kfd_init_peer_direct(void)
 	strcpy(amd_mem_client.version, AMD_PEER_BRIDGE_DRIVER_VERSION);
 
 	ib_reg_handle = pfn_ib_register_peer_memory_client(&amd_mem_client,
-						&ib_invalidate_callback);
+							   NULL);
 
 	if (!ib_reg_handle) {
 		pr_err("Cannot register peer memory client\n");
