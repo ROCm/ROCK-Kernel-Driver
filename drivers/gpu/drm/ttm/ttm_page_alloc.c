@@ -874,9 +874,12 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 		if (!(gfp_flags & GFP_DMA32)) {
 			while (npages >= HPAGE_PMD_NR) {
 				gfp_t huge_flags = gfp_flags;
-
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 4, 0)
 				huge_flags |= GFP_TRANSHUGE_LIGHT | __GFP_NORETRY |
 					__GFP_KSWAPD_RECLAIM;
+#else
+				huge_flags |= GFP_TRANSHUGE;
+#endif
 				huge_flags &= ~__GFP_MOVABLE;
 				huge_flags &= ~__GFP_COMP;
 				p = alloc_pages(huge_flags, HPAGE_PMD_ORDER);
@@ -993,16 +996,24 @@ int ttm_page_alloc_init(struct ttm_mem_global *glob, unsigned max_pages)
 				  GFP_USER | GFP_DMA32, "uc dma", 0);
 
 	ttm_page_pool_init_locked(&_manager->wc_pool_huge,
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 4, 0)
 				  (GFP_TRANSHUGE_LIGHT | __GFP_NORETRY |
 				   __GFP_KSWAPD_RECLAIM) &
 				  ~(__GFP_MOVABLE | __GFP_COMP),
+#else
+				  GFP_TRANSHUGE & ~(__GFP_MOVABLE | __GFP_COMP ),
+#endif
 				  "wc huge", order);
 
 	ttm_page_pool_init_locked(&_manager->uc_pool_huge,
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 4, 0)
 				  (GFP_TRANSHUGE_LIGHT | __GFP_NORETRY |
 				   __GFP_KSWAPD_RECLAIM) &
-				  ~(__GFP_MOVABLE | __GFP_COMP)
-				  , "uc huge", order);
+				  ~(__GFP_MOVABLE | __GFP_COMP),
+#else
+				  GFP_TRANSHUGE & ~(__GFP_MOVABLE | __GFP_COMP ),
+#endif
+				  "uc huge", order);
 
 	_manager->options.max_size = max_pages;
 	_manager->options.small = SMALL_ALLOCATION;
