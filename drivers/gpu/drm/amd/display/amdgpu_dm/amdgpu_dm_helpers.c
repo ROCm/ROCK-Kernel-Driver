@@ -1093,13 +1093,8 @@ enum dc_edid_status dm_helpers_read_local_edid(
 				edid_status,
 				aconnector->base.name);
 	if (link->aux_mode) {
-#ifdef HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM
-		/* DP Compliance Test 4.2.2.3 */
-		drm_dp_send_real_edid_checksum(&aconnector->dm_dp_aux.aux,
-				sink->dc_edid.raw_edid[sink->dc_edid.length-1]);
-#else
-		union test_request test_request = { {0} };
-		union test_response test_response = { {0} };
+		union test_request test_request = {0};
+		union test_response test_response = {0};
 
 		dm_helpers_dp_read_dpcd(ctx,
 					link,
@@ -1123,7 +1118,6 @@ enum dc_edid_status dm_helpers_read_local_edid(
 					DP_TEST_RESPONSE,
 					&test_response.raw,
 					sizeof(test_response));
-#endif
 	}
 
 	return edid_status;
