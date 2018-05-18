@@ -2228,9 +2228,9 @@ static void fill_gamma_from_crtc(
 	gamma->type = GAMMA_RGB_256;
 	gamma->num_entries = GAMMA_RGB_256_ENTRIES;
 	for (i = 0; i < end; i++) {
-		gamma->entries.red[i] = dal_fixed31_32_from_int((unsigned short)red[i]);
-		gamma->entries.green[i] = dal_fixed31_32_from_int((unsigned short)green[i]);
-		gamma->entries.blue[i] = dal_fixed31_32_from_int((unsigned short)blue[i]);
+		gamma->entries.red[i] = dc_fixpt_from_int((unsigned short)red[i]);
+		gamma->entries.green[i] = dc_fixpt_from_int((unsigned short)green[i]);
+		gamma->entries.blue[i] = dc_fixpt_from_int((unsigned short)blue[i]);
 	}
 
 	plane_state->gamma_correction = gamma;
