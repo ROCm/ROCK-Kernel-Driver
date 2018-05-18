@@ -2881,7 +2881,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 			if (adev->powerplay.pp_funcs &&
 				adev->powerplay.pp_funcs->switch_power_profile)
 				amdgpu_dpm_switch_power_profile(adev,
-					PP_SMC_POWER_PROFILE_COMPUTE, true);
+					PP_SMC_POWER_PROFILE_COMPUTE, false);
 		}
 		mutex_unlock(&id_mgr->lock);
 	}
