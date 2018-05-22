@@ -115,7 +115,7 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	return &bo->gem_base;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 static int amdgpu_gem_map_attach(struct dma_buf *dma_buf,
 				 struct device *target_dev,
 				 struct dma_buf_attachment *attach)
@@ -185,6 +185,53 @@ error:
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+int amdgpu_gem_prime_pin(struct drm_gem_object *obj)
+{
+	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
+	long ret = 0;
+
+	ret = amdgpu_bo_reserve(bo, false);
+	if (unlikely(ret != 0))
+		return ret;
+
+	/*
+	 * Wait for all shared fences to complete before we switch to future
+	 * use of exclusive fence on this prime shared bo.
+	 */
+	ret = reservation_object_wait_timeout_rcu(bo->tbo.resv, true, false,
+						  MAX_SCHEDULE_TIMEOUT);
+	if (unlikely(ret < 0)) {
+		DRM_DEBUG_PRIME("Fence wait failed: %li\n", ret);
+		amdgpu_bo_unreserve(bo);
+		return ret;
+	}
+
+	/* pin buffer into GTT */
+	ret = amdgpu_bo_pin(bo, AMDGPU_GEM_DOMAIN_GTT, NULL);
+	if (likely(ret == 0))
+		bo->prime_shared_count++;
+
+	amdgpu_bo_unreserve(bo);
+	return ret;
+}
+
+void amdgpu_gem_prime_unpin(struct drm_gem_object *obj)
+{
+	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
+	int ret = 0;
+
+	ret = amdgpu_bo_reserve(bo, true);
+	if (unlikely(ret != 0))
+		return;
+
+	amdgpu_bo_unpin(bo);
+	if (bo->prime_shared_count)
+		bo->prime_shared_count--;
+	amdgpu_bo_unreserve(bo);
+}
+#endif
+
 struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *obj)
 {
 	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
@@ -192,7 +239,7 @@ struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *obj)
 	return bo->tbo.resv;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 static int amdgpu_gem_begin_cpu_access(struct dma_buf *dma_buf,
 				       enum dma_data_direction direction)
 {
@@ -252,15 +299,15 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 	buf = drm_gem_prime_export(dev, gobj, flags);
 	if (!IS_ERR(buf)) {
 		buf->file->f_mapping = dev->anon_inode->i_mapping;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
-	buf->ops = &amdgpu_dmabuf_ops;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+		buf->ops = &amdgpu_dmabuf_ops;
 #endif
 	}
 
 	return buf;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 					    struct dma_buf *dma_buf)
 {
