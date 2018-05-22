@@ -383,7 +383,7 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
                                         struct drm_gem_object *gobj,
                                         int flags);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
 struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
                                                struct dma_buf *dma_buf);
 #endif
@@ -391,8 +391,12 @@ struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *);
 void *amdgpu_gem_prime_vmap(struct drm_gem_object *obj);
 void amdgpu_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
 int amdgpu_gem_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && defined(BUILD_AS_DKMS)
+int amdgpu_gem_prime_pin(struct drm_gem_object *obj);
+void amdgpu_gem_prime_unpin(struct drm_gem_object *obj);
+#endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0) && !defined(BUILD_AS_DKMS)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
 extern const struct dma_buf_ops amdgpu_dmabuf_ops;
 #endif
 
