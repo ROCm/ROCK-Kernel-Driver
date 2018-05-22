@@ -1045,7 +1045,13 @@ static struct ttm_tt *amdgpu_ttm_tt_create(struct ttm_buffer_object *bo,
 		return NULL;
 	}
 	gtt->ttm.ttm.func = &amdgpu_backend_func;
+
+	/* allocate space for the uninitialized page entries */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
 	if (ttm_sg_tt_init(&gtt->ttm, bo, page_flags)) {
+#else
+	if (ttm_dma_tt_init(&gtt->ttm, bo, page_flags)) {
+#endif
 		kfree(gtt);
 		return NULL;
 	}
