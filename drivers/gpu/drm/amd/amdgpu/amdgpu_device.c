@@ -3244,7 +3244,6 @@ error:
 int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 			      struct amdgpu_job *job, bool force)
 {
-	struct drm_atomic_state *state = NULL;
 	int i, r, resched;
 
 	if (!force && !amdgpu_device_ip_check_soft_reset(adev)) {
