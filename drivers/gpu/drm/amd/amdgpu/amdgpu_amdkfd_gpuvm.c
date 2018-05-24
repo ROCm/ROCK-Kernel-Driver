@@ -1261,9 +1261,9 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 			VI_BO_SIZE_ALIGN : 1;
 
 	mapping_flags = AMDGPU_VM_PAGE_READABLE;
-	if (!(flags & ALLOC_MEM_FLAGS_READONLY))
+	if (flags & ALLOC_MEM_FLAGS_WRITABLE)
 		mapping_flags |= AMDGPU_VM_PAGE_WRITEABLE;
-	if (flags & ALLOC_MEM_FLAGS_EXECUTE_ACCESS)
+	if (flags & ALLOC_MEM_FLAGS_EXECUTABLE)
 		mapping_flags |= AMDGPU_VM_PAGE_EXECUTABLE;
 	if (flags & ALLOC_MEM_FLAGS_COHERENT)
 		mapping_flags |= AMDGPU_VM_MTYPE_UC;

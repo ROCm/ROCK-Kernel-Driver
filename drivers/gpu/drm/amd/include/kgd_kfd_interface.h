@@ -156,24 +156,26 @@ struct tile_config {
 	uint32_t num_ranks;
 };
 
+
 /*
- * Allocation flag domains currently only VRAM and GTT domain supported
+ * Allocation flag domains
+ * NOTE: This must match the corresponding definitions in kfd_ioctl.h.
  */
-#define ALLOC_MEM_FLAGS_VRAM			(1 << 0)
-#define ALLOC_MEM_FLAGS_GTT				(1 << 1)
-#define ALLOC_MEM_FLAGS_USERPTR			(1 << 2)
-#define ALLOC_MEM_FLAGS_DOORBELL		(1 << 3)
+#define ALLOC_MEM_FLAGS_VRAM		(1 << 0)
+#define ALLOC_MEM_FLAGS_GTT		(1 << 1)
+#define ALLOC_MEM_FLAGS_USERPTR		(1 << 2)
+#define ALLOC_MEM_FLAGS_DOORBELL	(1 << 3)
 
 /*
  * Allocation flags attributes/access options.
+ * NOTE: This must match the corresponding definitions in kfd_ioctl.h.
  */
-#define ALLOC_MEM_FLAGS_NONPAGED		(1 << 31)
-#define ALLOC_MEM_FLAGS_READONLY		(1 << 30)
-#define ALLOC_MEM_FLAGS_PUBLIC			(1 << 29)
-#define ALLOC_MEM_FLAGS_NO_SUBSTITUTE	(1 << 28)
+#define ALLOC_MEM_FLAGS_WRITABLE	(1 << 31)
+#define ALLOC_MEM_FLAGS_EXECUTABLE	(1 << 30)
+#define ALLOC_MEM_FLAGS_PUBLIC		(1 << 29)
+#define ALLOC_MEM_FLAGS_NO_SUBSTITUTE	(1 << 28) /* TODO */
 #define ALLOC_MEM_FLAGS_AQL_QUEUE_MEM	(1 << 27)
-#define ALLOC_MEM_FLAGS_EXECUTE_ACCESS	(1 << 26)
-#define ALLOC_MEM_FLAGS_COHERENT	(1 << 25)
+#define ALLOC_MEM_FLAGS_COHERENT	(1 << 26) /* For GFXv9 or later */
 
 /**
  * struct kfd2kgd_calls
