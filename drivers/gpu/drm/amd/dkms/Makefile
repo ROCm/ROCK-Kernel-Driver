@@ -171,6 +171,7 @@ subdir-ccflags-y += \
 endif
 endif
 
+subdir-ccflags-y += -include $(src)/config/config.h
 DKMS_INCLUDE_PREFIX = \
 	-I$(src)/include \
 	-I$(src)/include/drm \
