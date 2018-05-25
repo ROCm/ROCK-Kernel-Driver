@@ -48,3 +48,6 @@ for file in $FILES; do
 		| awk -F'[()]' '{print "#define "$2" amd"$2" //"$0}'\
 		>> include/rename_symbol.h
 done
+
+./autogen.sh
+./configure
