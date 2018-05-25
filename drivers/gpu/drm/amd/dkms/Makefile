@@ -175,6 +175,8 @@ endif
 
 export OS_NAME OS_VERSION
 
+subdir-ccflags-y += -include $(src)/config/config.h
+
 LINUXINCLUDE := \
 	-I$(src)/include \
 	-I$(src)/include/uapi \
