@@ -33,9 +33,6 @@
 #include <linux/file.h>
 #include <asm/page.h>
 #include "kfd_ipc.h"
-
-struct mm_struct;
-
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_dbgmgr.h"
@@ -369,7 +366,7 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 
 		kfree(pdd->qpd.doorbell_bitmap);
 		idr_destroy(&pdd->alloc_idr);
-
+		mutex_destroy(&pdd->qpd.doorbell_lock);
 		kfree(pdd);
 	}
 }
@@ -687,6 +684,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->qpd.dqm = dev->dqm;
 	pdd->qpd.pqm = &p->pqm;
 	pdd->qpd.evicted = 0;
+	mutex_init(&pdd->qpd.doorbell_lock);
 	pdd->process = p;
 	pdd->bound = PDD_UNBOUND;
 	pdd->already_dequeued = false;
@@ -1020,6 +1018,97 @@ int kfd_process_restore_queues(struct kfd_process *p)
 	return ret;
 }
 
+void kfd_process_schedule_restore(struct kfd_process *p)
+{
+	int ret;
+	unsigned long evicted_jiffies;
+	unsigned long delay_jiffies = msecs_to_jiffies(PROCESS_RESTORE_TIME_MS);
+
+	/* wait at least PROCESS_RESTORE_TIME_MS before attempting to restore
+	 */
+	evicted_jiffies = get_jiffies_64() - p->last_evict_timestamp;
+	if (delay_jiffies > evicted_jiffies)
+		delay_jiffies -= evicted_jiffies;
+	else
+		delay_jiffies = 0;
+
+	pr_debug("Process %d schedule restore work\n", p->pasid);
+	ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
+				delay_jiffies);
+	WARN(!ret, "Schedule restore work failed\n");
+}
+
+static void kfd_process_unmap_doorbells(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+	struct mm_struct *mm = p->mm;
+
+	if (down_write_killable(&mm->mmap_sem))
+		return;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
+		kfd_doorbell_unmap(pdd);
+
+	up_write(&mm->mmap_sem);
+}
+
+int kfd_process_remap_doorbells_locked(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+	int ret = 0;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
+		ret = kfd_doorbell_remap(pdd);
+
+	return ret;
+}
+
+static int kfd_process_remap_doorbells(struct kfd_process *p)
+{
+	struct mm_struct *mm = p->mm;
+	int ret = 0;
+
+	if (down_write_killable(&mm->mmap_sem))
+		return 0;
+	ret = kfd_process_remap_doorbells_locked(p);
+	up_write(&mm->mmap_sem);
+
+	return ret;
+}
+
+/**
+ * kfd_process_unmap_doorbells_if_idle - Check if queues are active
+ *
+ * Returns true if queues are idle, and unmap doorbells.
+ * Returns false if queues are active
+ */
+static bool kfd_process_unmap_doorbells_if_idle(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+	bool busy = false;
+
+	if (!keep_idle_process_evicted)
+		return false;
+
+	/* Unmap doorbell first to avoid race conditions. Otherwise while the
+	 * second queue is checked, the first queue may get more work, but we
+	 * won't detect that since it has been checked
+	 */
+	kfd_process_unmap_doorbells(p);
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		busy = check_if_queues_active(pdd->qpd.dqm, &pdd->qpd);
+		if (busy)
+			break;
+	}
+
+	/* Remap doorbell if process queue is not idle */
+	if (busy)
+		kfd_process_remap_doorbells(p);
+
+	return !busy;
+}
+
 static void evict_process_worker(struct work_struct *work)
 {
 	int ret;
@@ -1043,14 +1132,20 @@ static void evict_process_worker(struct work_struct *work)
 	 */
 	flush_delayed_work(&p->restore_work);
 
+	p->last_evict_timestamp = get_jiffies_64();
+
 	pr_info("Started evicting pasid %d\n", p->pasid);
 	ret = kfd_process_evict_queues(p);
 	if (!ret) {
 		dma_fence_signal(p->ef);
 		dma_fence_put(p->ef);
 		p->ef = NULL;
-		queue_delayed_work(kfd_restore_wq, &p->restore_work,
-				msecs_to_jiffies(PROCESS_RESTORE_TIME_MS));
+
+		if (!kfd_process_unmap_doorbells_if_idle(p))
+			kfd_process_schedule_restore(p);
+		else
+			pr_debug("Process %d queues idle, doorbell unmapped\n",
+				p->pasid);
 
 		pr_info("Finished evicting pasid %d\n", p->pasid);
 	} else
@@ -1098,9 +1193,10 @@ static void restore_process_worker(struct work_struct *work)
 	if (ret) {
 		pr_info("Failed to restore BOs of pasid %d, retry after %d ms\n",
 			 p->pasid, PROCESS_BACK_OFF_TIME_MS);
+
 		ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_BACK_OFF_TIME_MS));
-		WARN(!ret, "reschedule restore work failed\n");
+		WARN(!ret, "Reschedule restore work failed\n");
 		return;
 	}
 
