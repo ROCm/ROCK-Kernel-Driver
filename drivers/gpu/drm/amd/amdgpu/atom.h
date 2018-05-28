@@ -26,6 +26,7 @@
 #define ATOM_H
 
 #include <linux/types.h>
+#include <linux/spinlock_types.h>
 #include <drm/drmP.h>
 
 #define ATOM_BIOS_MAGIC		0xAA55
@@ -125,7 +126,7 @@ struct card_info {
 
 struct atom_context {
 	struct card_info *card;
-	struct mutex mutex;
+	spinlock_t lock;
 	void *bios;
 	uint32_t cmd_table, data_table;
 	uint16_t *iio;
