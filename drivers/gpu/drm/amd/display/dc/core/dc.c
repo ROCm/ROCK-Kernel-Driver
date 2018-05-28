@@ -953,7 +953,7 @@ bool dc_post_update_surfaces_to_stream(struct dc *dc)
 struct dc_state *dc_create_state(void)
 {
 	struct dc_state *context = kzalloc(sizeof(struct dc_state),
-					   GFP_KERNEL);
+					   GFP_ATOMIC);
 
 	if (!context)
 		return NULL;
