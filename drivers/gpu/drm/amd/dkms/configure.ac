@@ -1,6 +1,7 @@
 AC_INIT(amdgpu-dkms, 18.30)
 
 m4_include([m4/kernel.m4])
+m4_include([m4/acpi-handle.m4])
 
 AC_LANG(C)
 AC_CONFIG_AUX_DIR([config])
