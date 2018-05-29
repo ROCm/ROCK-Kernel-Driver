@@ -1,5 +1,5 @@
 ## wattman-like functionality
-# boot with amdgpu.ppfeaturemask=0xffffffff (make sure PP_OVERDRIVE_MASK bit is set see hwmgr.h)
+# boot with amdgpu.ppfeaturemask=0xffff7fff (make sure PP_OVERDRIVE_MASK bit is set see amd_shared.h)
 # see the current dpm clock and voltage levels
 cat /sys/class/drm/card0/device/pp_od_clk_voltage
 #OD_SCLK:
