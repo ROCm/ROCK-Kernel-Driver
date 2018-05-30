@@ -703,12 +703,12 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				     p->bytes_moved_vis);
 
 	if (p->bo_list) {
-		gds = p->bo_list->gds_obj;
-		gws = p->bo_list->gws_obj;
-		oa = p->bo_list->oa_obj;
 		struct amdgpu_vm *vm = &fpriv->vm;
 		unsigned i;
 
+		gds = p->bo_list->gds_obj;
+		gws = p->bo_list->gws_obj;
+		oa = p->bo_list->oa_obj;
 		for (i = 0; i < p->bo_list->num_entries; i++) {
 			struct amdgpu_bo *bo = p->bo_list->array[i].robj;
 
