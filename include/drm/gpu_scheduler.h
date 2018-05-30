@@ -26,6 +26,8 @@
 
 #include <drm/spsc_queue.h>
 
+#define MAX_WAIT_SCHED_ENTITY_Q_EMPTY msecs_to_jiffies(1000)
+
 struct drm_gpu_scheduler;
 struct drm_sched_rq;
 
@@ -83,7 +85,6 @@ struct drm_sched_entity {
 	struct dma_fence		*dependency;
 	struct dma_fence_cb		cb;
 	atomic_t			*guilty;
-	int                             fini_status;
 	struct dma_fence                *last_scheduled;
 };
 
@@ -282,8 +283,8 @@ int drm_sched_entity_init(struct drm_gpu_scheduler *sched,
 			  struct drm_sched_entity *entity,
 			  struct drm_sched_rq *rq,
 			  atomic_t *guilty);
-void drm_sched_entity_do_release(struct drm_gpu_scheduler *sched,
-			   struct drm_sched_entity *entity);
+long drm_sched_entity_do_release(struct drm_gpu_scheduler *sched,
+			   struct drm_sched_entity *entity, long timeout);
 void drm_sched_entity_cleanup(struct drm_gpu_scheduler *sched,
 			   struct drm_sched_entity *entity);
 void drm_sched_entity_fini(struct drm_gpu_scheduler *sched,
