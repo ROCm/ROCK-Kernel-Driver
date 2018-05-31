@@ -34,9 +34,7 @@
 #include "dce/dce_hwseq.h"
 #include "gpio_service_interface.h"
 
-#if defined(CONFIG_DRM_AMD_DC_FBC)
 #include "dce110_compressor.h"
-#endif
 
 #include "bios/bios_parser_helper.h"
 #include "timing_generator.h"
@@ -1471,10 +1469,8 @@ static void power_down_all_hw_blocks(struct dc *dc)
 
 	power_down_clock_sources(dc);
 
-#if defined(CONFIG_DRM_AMD_DC_FBC)
 	if (dc->fbc_compressor)
 		dc->fbc_compressor->funcs->disable_fbc(dc->fbc_compressor);
-#endif
 }
 
 static void disable_vga_and_power_gate_all_controllers(
@@ -1724,9 +1720,7 @@ static void set_static_screen_control(struct pipe_ctx **pipe_ctx,
 	if (events->force_trigger)
 		value |= 0x1;
 
-#if defined(CONFIG_DRM_AMD_DC_FBC)
 	value |= 0x84;
-#endif
 
 	for (i = 0; i < num_pipes; i++)
 		pipe_ctx[i]->stream_res.tg->funcs->
@@ -1854,8 +1848,6 @@ static void apply_min_clocks(
 	}
 }
 
-#if defined(CONFIG_DRM_AMD_DC_FBC)
-
 /*
  *  Check if FBC can be enabled
  */
@@ -1934,7 +1926,6 @@ static void enable_fbc(struct dc *dc,
 		compr->funcs->enable_fbc(compr, &params);
 	}
 }
-#endif
 
 static void dce110_reset_hw_ctx_wrap(
 		struct dc *dc,
@@ -2111,10 +2102,9 @@ enum dc_status dce110_apply_ctx_to_hw(
 
 	set_safe_displaymarks(&context->res_ctx, dc->res_pool);
 
-#if defined(CONFIG_DRM_AMD_DC_FBC)
 	if (dc->fbc_compressor)
 		dc->fbc_compressor->funcs->disable_fbc(dc->fbc_compressor);
-#endif
+
 	/*TODO: when pplib works*/
 	apply_min_clocks(dc, context, &clocks_state, true);
 
@@ -2192,11 +2182,8 @@ enum dc_status dce110_apply_ctx_to_hw(
 
 	dcb->funcs->set_scratch_critical_state(dcb, false);
 
-#if defined(CONFIG_DRM_AMD_DC_FBC)
 	if (dc->fbc_compressor)
 		enable_fbc(dc, context);
-
-#endif
 
 	return DC_OK;
 }
@@ -2512,10 +2499,9 @@ static void init_hw(struct dc *dc)
 		abm->funcs->init_backlight(abm);
 		abm->funcs->abm_init(abm);
 	}
-#if defined(CONFIG_DRM_AMD_DC_FBC)
+
 	if (dc->fbc_compressor)
 		dc->fbc_compressor->funcs->power_up_fbc(dc->fbc_compressor);
-#endif
 
 }
 
@@ -2701,9 +2687,7 @@ static void dce110_program_front_end_for_pipe(
 	struct dc_plane_state *plane_state = pipe_ctx->plane_state;
 	struct xfm_grph_csc_adjustment adjust;
 	struct out_csc_color_matrix tbl_entry;
-#if defined(CONFIG_DRM_AMD_DC_FBC)
 	unsigned int underlay_idx = dc->res_pool->underlay_pipe_index;
-#endif
 	unsigned int i;
 	DC_LOGGER_INIT();
 	memset(&tbl_entry, 0, sizeof(tbl_entry));
@@ -2744,7 +2728,6 @@ static void dce110_program_front_end_for_pipe(
 
 	program_scaler(dc, pipe_ctx);
 
-#if defined(CONFIG_DRM_AMD_DC_FBC)
 	/* fbc not applicable on Underlay pipe */
 	if (dc->fbc_compressor && old_pipe->stream &&
 	    pipe_ctx->pipe_idx != underlay_idx) {
@@ -2753,7 +2736,6 @@ static void dce110_program_front_end_for_pipe(
 		else
 			enable_fbc(dc, dc->current_state);
 	}
-#endif
 
 	mi->funcs->mem_input_program_surface_config(
 			mi,
