@@ -4,6 +4,7 @@ dnl #
 AC_DEFUN([AC_CONFIG_KERNEL], [
 	AC_KERNEL
 	AC_AMDGPU_ACPI_HANDLE
+	AC_AMDGPU_BITMAP_FIND_NEXT_ZERO_AREA_OFF
 
 	AS_IF([test "$LINUX_OBJ" != "$LINUX"], [
 		KERNEL_MAKE="$KERNEL_MAKE O=$LINUX_OBJ"
@@ -210,4 +211,54 @@ AC_DEFUN([AC_KERNEL_TRY_COMPILE],
 	[modules],
 	[test -s build/conftest.o],
 	[$3], [$4])
+])
+
+dnl #
+dnl # AC_KERNEL_CHECK_SYMBOL_EXPORT
+dnl # check symbol exported or not
+dnl #
+AC_DEFUN([AC_KERNEL_CHECK_SYMBOL_EXPORT], [
+	grep -q -E '[[[:space:]]]$1[[[:space:]]]' \
+		$LINUX_OBJ/$LINUX_SYMBOLS 2>/dev/null
+	rc=$?
+	if test $rc -ne 0; then
+		export=0
+		for file in $2; do
+			grep -q -E "EXPORT_SYMBOL.*($1)" \
+				"$LINUX/$file" 2>/dev/null
+			rc=$?
+			if test $rc -eq 0; then
+				export=1
+				break;
+			fi
+		done
+		if test $export -eq 0; then :
+			$4
+		else :
+			$3
+		fi
+	else :
+		$3
+	fi
+])
+
+dnl #
+dnl # AC_KERNEL_TRY_COMPILE_SYMBOL
+dnl # like AC_KERNEL_TRY_COMPILE, except AC_KERNEL_CHECK_SYMBOL_EXPORT
+dnl # is called if not compiling for builtin
+dnl #
+AC_DEFUN([AC_KERNEL_TRY_COMPILE_SYMBOL], [
+	AC_KERNEL_TRY_COMPILE([$1], [$2], [rc=0], [rc=1])
+	if test $rc -ne 0; then :
+		$6
+	else
+		if test "x$enable_linux_builtin" != xyes; then
+			AC_KERNEL_CHECK_SYMBOL_EXPORT([$3], [$4], [rc=0], [rc=1])
+		fi
+		if test $rc -ne 0; then :
+			$6
+		else :
+			$5
+		fi
+	fi
 ])
