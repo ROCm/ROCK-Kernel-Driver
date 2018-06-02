@@ -1538,7 +1538,7 @@ static int get_wave_state(struct device_queue_manager *dqm,
 	struct mqd_manager *mqd_mgr;
 	int r;
 
-	mutex_lock(&dqm->lock);
+	dqm_lock(dqm);
 
 	if (q->properties.type != KFD_QUEUE_TYPE_COMPUTE ||
 	    q->properties.is_active || !q->device->cwsr_enabled) {
@@ -1561,7 +1561,7 @@ static int get_wave_state(struct device_queue_manager *dqm,
 			ctl_stack_used_size, save_area_used_size);
 
 dqm_unlock:
-	mutex_unlock(&dqm->lock);
+	dqm_unlock(dqm);
 	return r;
 }
 
