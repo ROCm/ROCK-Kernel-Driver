@@ -1237,9 +1237,9 @@ static void kfd_fill_iolink_non_crat_info(struct kfd_topology_device *dev)
 			CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
 
 	if (!dev->gpu->pci_atomic_requested ||
-		dev->gpu->device_info->asic_family == CHIP_HAWAII)
-			flag |= CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
-				CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
+	    dev->gpu->device_info->asic_family == CHIP_HAWAII)
+		flag |= CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
+			CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
 
 	/* GPU only creates direct links so apply flags setting to all */
 	list_for_each_entry(link, &dev->io_link_props, list) {
