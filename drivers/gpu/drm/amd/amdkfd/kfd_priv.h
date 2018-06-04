@@ -306,6 +306,8 @@ struct kfd_dev {
 	bool cwsr_enabled;
 	const void *cwsr_isa;
 	unsigned int cwsr_isa_size;
+
+	bool pci_atomic_requested;
 };
 
 struct kfd_ipc_obj;
