@@ -2165,8 +2165,7 @@ int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
 			before->last = saddr - 1;
 			before->offset = tmp->offset;
 			before->flags = tmp->flags;
-			before->bo_va = tmp->bo_va;
-			list_add(&before->list, &tmp->bo_va->invalids);
+			list_add(&before->list, &tmp->list);
 		}
 
 		/* Remember mapping split at the end */
@@ -2176,8 +2175,7 @@ int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
 			after->offset = tmp->offset;
 			after->offset += after->start - tmp->start;
 			after->flags = tmp->flags;
-			after->bo_va = tmp->bo_va;
-			list_add(&after->list, &tmp->bo_va->invalids);
+			list_add(&after->list, &tmp->list);
 		}
 
 		list_del(&tmp->list);
