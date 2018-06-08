@@ -141,7 +141,12 @@ static int amdgpu_vram_mgr_new(struct ttm_mem_type_manager *man,
 		num_nodes = DIV_ROUND_UP(mem->num_pages, pages_per_node);
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 	nodes = kcalloc(num_nodes, sizeof(*nodes), GFP_KERNEL);
+#else
+	nodes = kvmalloc_array(num_nodes, sizeof(*nodes),
+			       GFP_KERNEL | __GFP_ZERO);
+#endif
 	if (!nodes)
 		return -ENOMEM;
 
@@ -214,7 +219,11 @@ error:
 		drm_mm_remove_node(&nodes[i]);
 	spin_unlock(&mgr->lock);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 	kfree(nodes);
+#else
+	kvfree(nodes);
+#endif
 	return r == -ENOSPC ? 0 : r;
 }
 
@@ -253,7 +262,11 @@ static void amdgpu_vram_mgr_del(struct ttm_mem_type_manager *man,
 	atomic64_sub(usage, &mgr->usage);
 	atomic64_sub(vis_usage, &mgr->vis_usage);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 	kfree(mem->mm_node);
+#else
+	kvfree(mem->mm_node);
+#endif
 	mem->mm_node = NULL;
 }
 
