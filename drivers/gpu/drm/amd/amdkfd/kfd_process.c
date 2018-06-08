@@ -272,6 +272,8 @@ struct kfd_process *kfd_get_process(const struct task_struct *thread)
 		return ERR_PTR(-EINVAL);
 
 	process = find_process(thread, false);
+	if (!process)
+		return ERR_PTR(-EINVAL);
 
 	return process;
 }
