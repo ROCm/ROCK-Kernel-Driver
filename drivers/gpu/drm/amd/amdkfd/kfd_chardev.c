@@ -2454,7 +2454,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 	}
 
 	remote_p = kfd_get_process(remote_task);
-	if (!remote_p) {
+	if (IS_ERR(remote_p)) {
 		pr_err("Cross mem copy failed. Invalid kfd process %d\n",
 		       args->pid);
 		err = -EINVAL;
