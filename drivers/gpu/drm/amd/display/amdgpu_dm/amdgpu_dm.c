@@ -3118,7 +3118,12 @@ void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector)
 		to_dm_connector_state(connector->state);
 
 	if (connector->state)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0) || \
+		defined(OS_NAME_RHEL_7_4_5)
 		__drm_atomic_helper_connector_destroy_state(connector->state);
+#else
+		__drm_atomic_helper_connector_destroy_state(connector, connector->state);
+#endif
 
 	kfree(state);
 
