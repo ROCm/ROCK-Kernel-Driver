@@ -1643,8 +1643,8 @@ static int vega12_get_sclks(struct pp_hwmgr *hwmgr,
 		return -1;
 
 	dpm_table = &(data->dpm_table.gfx_table);
-	ucount = (dpm_table->count > VG12_PSUEDO_NUM_GFXCLK_DPM_LEVELS) ?
-		VG12_PSUEDO_NUM_GFXCLK_DPM_LEVELS : dpm_table->count;
+	ucount = (dpm_table->count > MAX_NUM_CLOCKS) ?
+		MAX_NUM_CLOCKS : dpm_table->count;
 
 	for (i = 0; i < ucount; i++) {
 		clocks->data[i].clocks_in_khz =
@@ -1675,11 +1675,12 @@ static int vega12_get_memclocks(struct pp_hwmgr *hwmgr,
 		return -1;
 
 	dpm_table = &(data->dpm_table.mem_table);
-	ucount = (dpm_table->count > VG12_PSUEDO_NUM_UCLK_DPM_LEVELS) ?
-		VG12_PSUEDO_NUM_UCLK_DPM_LEVELS : dpm_table->count;
+	ucount = (dpm_table->count > MAX_NUM_CLOCKS) ?
+		MAX_NUM_CLOCKS : dpm_table->count;
 
 	for (i = 0; i < ucount; i++) {
 		clocks->data[i].clocks_in_khz =
+			data->mclk_latency_table.entries[i].frequency =
 			dpm_table->dpm_levels[i].value * 100;
 
 		clocks->data[i].latency_in_us =
@@ -1705,8 +1706,8 @@ static int vega12_get_dcefclocks(struct pp_hwmgr *hwmgr,
 
 
 	dpm_table = &(data->dpm_table.dcef_table);
-	ucount = (dpm_table->count > VG12_PSUEDO_NUM_DCEFCLK_DPM_LEVELS) ?
-		VG12_PSUEDO_NUM_DCEFCLK_DPM_LEVELS : dpm_table->count;
+	ucount = (dpm_table->count > MAX_NUM_CLOCKS) ?
+		MAX_NUM_CLOCKS : dpm_table->count;
 
 	for (i = 0; i < ucount; i++) {
 		clocks->data[i].clocks_in_khz =
@@ -1733,8 +1734,8 @@ static int vega12_get_socclocks(struct pp_hwmgr *hwmgr,
 
 
 	dpm_table = &(data->dpm_table.soc_table);
-	ucount = (dpm_table->count > VG12_PSUEDO_NUM_SOCCLK_DPM_LEVELS) ?
-		VG12_PSUEDO_NUM_SOCCLK_DPM_LEVELS : dpm_table->count;
+	ucount = (dpm_table->count > MAX_NUM_CLOCKS) ?
+		MAX_NUM_CLOCKS : dpm_table->count;
 
 	for (i = 0; i < ucount; i++) {
 		clocks->data[i].clocks_in_khz =
