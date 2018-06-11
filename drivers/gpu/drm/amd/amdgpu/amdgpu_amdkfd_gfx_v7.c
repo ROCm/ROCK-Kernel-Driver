@@ -584,6 +584,9 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd, void *mqd,
 	unsigned long flags, end_jiffies;
 	int retry;
 
+	if (adev->in_gpu_reset)
+		return -EIO;
+
 	acquire_queue(kgd, pipe_id, queue_id);
 	WREG32(mmCP_HQD_PQ_DOORBELL_CONTROL, 0);
 
@@ -820,6 +823,9 @@ static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
 	int vmid;
 	unsigned int tmp;
+
+	if (adev->in_gpu_reset)
+		return -EIO;
 
 	for (vmid = 0; vmid < 16; vmid++) {
 		if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid))

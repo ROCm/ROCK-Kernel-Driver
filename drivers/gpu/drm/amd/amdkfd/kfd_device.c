@@ -466,7 +466,8 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 
 	if (kfd->kfd2kgd->init_gtt_mem_allocation(
 			kfd->kgd, size, &kfd->gtt_mem,
-			&kfd->gtt_start_gpu_addr, &kfd->gtt_start_cpu_ptr)){
+			&kfd->gtt_start_gpu_addr, &kfd->gtt_start_cpu_ptr,
+			false)) {
 		dev_err(kfd_device, "Could not allocate %d bytes\n", size);
 		goto out;
 	}
@@ -955,3 +956,26 @@ int kfd_gtt_sa_free(struct kfd_dev *kfd, struct kfd_mem_obj *mem_obj)
 	kfree(mem_obj);
 	return 0;
 }
+
+#if defined(CONFIG_DEBUG_FS)
+
+/* This function will send a package to HIQ to hang the HWS
+ * which will trigger a GPU reset and bring the HWS back to normal state
+ */
+int kfd_debugfs_hang_hws(struct kfd_dev *dev)
+{
+	int r = 0;
+
+	if (dev->dqm->sched_policy != KFD_SCHED_POLICY_HWS) {
+		pr_err("HWS is not enabled");
+		return -EINVAL;
+	}
+
+	r = pm_debugfs_hang_hws(&dev->dqm->packets);
+	if (!r)
+		r = dqm_debugfs_execute_queues(dev->dqm);
+
+	return r;
+}
+
+#endif

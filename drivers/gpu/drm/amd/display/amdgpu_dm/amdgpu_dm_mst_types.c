@@ -533,7 +533,8 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 	aconnector->mst_mgr.cbs = &dm_mst_cbs;
 	drm_dp_mst_topology_mgr_init(
 		&aconnector->mst_mgr,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
 		dm->adev->dev,
 #else
 		dm->adev->ddev,

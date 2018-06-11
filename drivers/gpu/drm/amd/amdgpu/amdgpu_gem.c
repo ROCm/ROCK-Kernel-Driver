@@ -938,6 +938,12 @@ int amdgpu_mode_dumb_create(struct drm_file *file_priv,
 }
 
 #if defined(CONFIG_DEBUG_FS)
+
+#define amdgpu_debugfs_gem_bo_print_flag(m, bo, flag)	\
+	if (bo->flags & (AMDGPU_GEM_CREATE_ ## flag)) {	\
+		seq_printf((m), " " #flag);		\
+	}
+
 static int amdgpu_debugfs_gem_bo_info(int id, void *ptr, void *data)
 {
 	struct drm_gem_object *gobj = ptr;
@@ -949,7 +955,6 @@ static int amdgpu_debugfs_gem_bo_info(int id, void *ptr, void *data)
 	unsigned domain;
 	const char *placement;
 	unsigned pin_count;
-	uint64_t offset;
 
 	domain = amdgpu_mem_type_to_domain(bo->tbo.mem.mem_type);
 	switch (domain) {
@@ -973,10 +978,6 @@ static int amdgpu_debugfs_gem_bo_info(int id, void *ptr, void *data)
 	seq_printf(m, "\t0x%08x: %12ld byte %s",
 		   id, amdgpu_bo_size(bo), placement);
 
-	offset = READ_ONCE(bo->tbo.mem.start);
-	if (offset != AMDGPU_BO_INVALID_OFFSET)
-		seq_printf(m, " @ 0x%010Lx", offset);
-
 	pin_count = READ_ONCE(bo->pin_count);
 	if (pin_count)
 		seq_printf(m, " pin count %d", pin_count);
@@ -988,6 +989,15 @@ static int amdgpu_debugfs_gem_bo_info(int id, void *ptr, void *data)
 		seq_printf(m, " imported from %p", dma_buf);
 	else if (dma_buf)
 		seq_printf(m, " exported as %p", dma_buf);
+
+	amdgpu_debugfs_gem_bo_print_flag(m, bo, CPU_ACCESS_REQUIRED);
+	amdgpu_debugfs_gem_bo_print_flag(m, bo, NO_CPU_ACCESS);
+	amdgpu_debugfs_gem_bo_print_flag(m, bo, CPU_GTT_USWC);
+	amdgpu_debugfs_gem_bo_print_flag(m, bo, VRAM_CLEARED);
+	amdgpu_debugfs_gem_bo_print_flag(m, bo, SHADOW);
+	amdgpu_debugfs_gem_bo_print_flag(m, bo, VRAM_CONTIGUOUS);
+	amdgpu_debugfs_gem_bo_print_flag(m, bo, VM_ALWAYS_VALID);
+	amdgpu_debugfs_gem_bo_print_flag(m, bo, EXPLICIT_SYNC);
 
 	seq_printf(m, "\n");
 

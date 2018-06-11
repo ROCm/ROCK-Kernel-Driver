@@ -55,7 +55,6 @@ struct drm_sched_entity {
 	spinlock_t			rq_lock;
 	struct drm_gpu_scheduler	*sched;
 
-	spinlock_t			queue_lock;
 	struct spsc_queue		job_queue;
 
 	atomic_t			fence_seq;
@@ -187,7 +186,7 @@ void drm_sched_fini(struct drm_gpu_scheduler *sched);
 int drm_sched_entity_init(struct drm_gpu_scheduler *sched,
 			  struct drm_sched_entity *entity,
 			  struct drm_sched_rq *rq,
-			  uint32_t jobs, atomic_t *guilty);
+			  atomic_t *guilty);
 void drm_sched_entity_do_release(struct drm_gpu_scheduler *sched,
 			   struct drm_sched_entity *entity);
 void drm_sched_entity_cleanup(struct drm_gpu_scheduler *sched,

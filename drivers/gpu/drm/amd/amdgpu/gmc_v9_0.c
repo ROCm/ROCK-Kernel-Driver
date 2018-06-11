@@ -42,20 +42,6 @@
 #include "gfxhub_v1_0.h"
 #include "mmhub_v1_0.h"
 
-#define mmDF_CS_AON0_DramBaseAddress0                                                                  0x0044
-#define mmDF_CS_AON0_DramBaseAddress0_BASE_IDX                                                         0
-//DF_CS_AON0_DramBaseAddress0
-#define DF_CS_AON0_DramBaseAddress0__AddrRngVal__SHIFT                                                        0x0
-#define DF_CS_AON0_DramBaseAddress0__LgcyMmioHoleEn__SHIFT                                                    0x1
-#define DF_CS_AON0_DramBaseAddress0__IntLvNumChan__SHIFT                                                      0x4
-#define DF_CS_AON0_DramBaseAddress0__IntLvAddrSel__SHIFT                                                      0x8
-#define DF_CS_AON0_DramBaseAddress0__DramBaseAddr__SHIFT                                                      0xc
-#define DF_CS_AON0_DramBaseAddress0__AddrRngVal_MASK                                                          0x00000001L
-#define DF_CS_AON0_DramBaseAddress0__LgcyMmioHoleEn_MASK                                                      0x00000002L
-#define DF_CS_AON0_DramBaseAddress0__IntLvNumChan_MASK                                                        0x000000F0L
-#define DF_CS_AON0_DramBaseAddress0__IntLvAddrSel_MASK                                                        0x00000700L
-#define DF_CS_AON0_DramBaseAddress0__DramBaseAddr_MASK                                                        0xFFFFF000L
-
 /* add these here since we already include dce12 headers and these are for DCN */
 #define mmHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION                                                          0x055d
 #define mmHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION_BASE_IDX                                                 2
@@ -706,10 +692,7 @@ static void gmc_v9_0_vram_gtt_location(struct amdgpu_device *adev,
 	amdgpu_device_vram_location(adev, &adev->gmc, base);
 	amdgpu_device_gart_location(adev, mc);
 	/* base offset of vram pages */
-	if (adev->flags & AMD_IS_APU)
-		adev->vm_manager.vram_base_offset = gfxhub_v1_0_get_mc_fb_offset(adev);
-	else
-		adev->vm_manager.vram_base_offset = 0;
+	adev->vm_manager.vram_base_offset = gfxhub_v1_0_get_mc_fb_offset(adev);
 }
 
 /**
@@ -770,6 +753,7 @@ static int gmc_v9_0_mc_init(struct amdgpu_device *adev)
 		switch (adev->asic_type) {
 		case CHIP_VEGA10:  /* all engines support GPUVM */
 		case CHIP_VEGA12:  /* all engines support GPUVM */
+		case CHIP_VEGA20:
 		default:
 			adev->gmc.gart_size = 512ULL << 20;
 			break;
@@ -875,6 +859,7 @@ static int gmc_v9_0_sw_init(void *handle)
 		break;
 	case CHIP_VEGA10:
 	case CHIP_VEGA12:
+	case CHIP_VEGA20:
 		/*
 		 * To fulfill 4-level page support,
 		 * vm size is 256TB (48bit), maximum size of Vega10,
@@ -991,6 +976,7 @@ static void gmc_v9_0_init_golden_registers(struct amdgpu_device *adev)
 
 	switch (adev->asic_type) {
 	case CHIP_VEGA10:
+	case CHIP_VEGA20:
 		soc15_program_register_sequence(adev,
 						golden_settings_mmhub_1_0_0,
 						ARRAY_SIZE(golden_settings_mmhub_1_0_0));

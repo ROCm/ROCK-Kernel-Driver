@@ -443,6 +443,8 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 
 	bo->tbo.bdev = &adev->mman.bdev;
 	amdgpu_ttm_placement_from_domain(bo, bp->domain);
+	if (bp->type == ttm_bo_type_kernel)
+		bo->tbo.priority = 1;
 
 	r = ttm_bo_init_reserved(&adev->mman.bdev, &bo->tbo, size, bp->type,
 				 &bo->placement, page_align, &ctx, acc_size,
@@ -460,9 +462,6 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 
 	if (bp->domain & AMDGPU_GEM_DOMAIN_DGMA && adev->ssg.enabled)
 		bo->tbo.ssg_can_map = true;
-
-	if (bp->type == ttm_bo_type_kernel)
-		bo->tbo.priority = 1;
 
 	if (bp->flags & AMDGPU_GEM_CREATE_VRAM_CLEARED &&
 	    bo->tbo.mem.placement & TTM_PL_FLAG_VRAM) {

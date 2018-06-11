@@ -1021,7 +1021,7 @@ static int smu7_enable_sclk_mclk_dpm(struct pp_hwmgr *hwmgr)
 	struct smu7_hwmgr *data = (struct smu7_hwmgr *)(hwmgr->backend);
 
 	/* enable SCLK dpm */
-	if (!data->sclk_dpm_key_disabled)
+	if (!data->sclk_dpm_key_disabled) {
 		if (hwmgr->chip_id == CHIP_VEGAM)
 			smu7_disable_sclk_vce_handshake(hwmgr);
 
@@ -1029,6 +1029,7 @@ static int smu7_enable_sclk_mclk_dpm(struct pp_hwmgr *hwmgr)
 		(0 == smum_send_msg_to_smc(hwmgr, PPSMC_MSG_DPM_Enable)),
 		"Failed to enable SCLK DPM during DPM Start Function!",
 		return -EINVAL);
+	}
 
 	/* enable MCLK dpm */
 	if (0 == data->mclk_dpm_key_disabled) {
@@ -1273,7 +1274,7 @@ static int smu7_enable_dpm_tasks(struct pp_hwmgr *hwmgr)
 
 		tmp_result = smu7_construct_voltage_tables(hwmgr);
 		PP_ASSERT_WITH_CODE((0 == tmp_result),
-				"Failed to contruct voltage tables!",
+				"Failed to construct voltage tables!",
 				result = tmp_result);
 	}
 	smum_initialize_mc_reg_table(hwmgr);

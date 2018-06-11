@@ -57,6 +57,7 @@
 
 #define FIRMWARE_VEGA10		"amdgpu/vega10_vce.bin"
 #define FIRMWARE_VEGA12		"amdgpu/vega12_vce.bin"
+#define FIRMWARE_VEGA20		"amdgpu/vega20_vce.bin"
 
 #ifdef CONFIG_DRM_AMDGPU_CIK
 MODULE_FIRMWARE(FIRMWARE_BONAIRE);
@@ -76,6 +77,7 @@ MODULE_FIRMWARE(FIRMWARE_VEGAM);
 
 MODULE_FIRMWARE(FIRMWARE_VEGA10);
 MODULE_FIRMWARE(FIRMWARE_VEGA12);
+MODULE_FIRMWARE(FIRMWARE_VEGA20);
 
 static void amdgpu_vce_idle_work_handler(struct work_struct *work);
 
@@ -143,6 +145,9 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
 	case CHIP_VEGA12:
 		fw_name = FIRMWARE_VEGA12;
 		break;
+	case CHIP_VEGA20:
+		fw_name = FIRMWARE_VEGA20;
+		break;
 
 	default:
 		return -EINVAL;
@@ -186,7 +191,7 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
 	ring = &adev->vce.ring[0];
 	rq = &ring->sched.sched_rq[DRM_SCHED_PRIORITY_NORMAL];
 	r = drm_sched_entity_init(&ring->sched, &adev->vce.entity,
-				  rq, amdgpu_sched_jobs, NULL);
+				  rq, NULL);
 	if (r != 0) {
 		DRM_ERROR("Failed setting up VCE run queue.\n");
 		return r;

@@ -1856,4 +1856,16 @@ int dqm_debugfs_hqds(struct seq_file *m, void *data)
 	return r;
 }
 
+int dqm_debugfs_execute_queues(struct device_queue_manager *dqm)
+{
+	int r = 0;
+
+	mutex_lock(&dqm->lock);
+	dqm->active_runlist = true;
+	r = execute_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0);
+	mutex_unlock(&dqm->lock);
+
+	return r;
+}
+
 #endif

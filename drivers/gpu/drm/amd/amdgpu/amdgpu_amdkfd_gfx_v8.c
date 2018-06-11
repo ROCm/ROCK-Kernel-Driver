@@ -608,6 +608,9 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd, void *mqd,
 	int retry;
 	struct vi_mqd *m = get_mqd(mqd);
 
+	if (adev->in_gpu_reset)
+		return -EIO;
+
 	acquire_queue(kgd, pipe_id, queue_id);
 
 	if (m->cp_hqd_vmid == 0)
@@ -790,6 +793,9 @@ static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
 	int vmid;
 	unsigned int tmp;
+
+	if (adev->in_gpu_reset)
+		return -EIO;
 
 #ifdef V8_SUPPORT_IT_OFFICIAL
 	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;

@@ -776,7 +776,7 @@ static int dm_resume(void *handle)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)) || \
     (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && !defined(OS_NAME_UBUNTU)) || \
     (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)) || \
-    defined(OS_NAME_RHEL_7_4_5)
+    defined(OS_NAME_RHEL_7_4)
 	drm_atomic_state_put(dm->cached_state);
 #endif
 	dm->cached_state = NULL;
@@ -968,6 +968,7 @@ amdgpu_dm_update_connector_after_detect(struct amdgpu_dm_connector *aconnector)
 		drm_mode_connector_update_edid_property(connector, NULL);
 		aconnector->num_modes = 0;
 		aconnector->dc_sink = NULL;
+		aconnector->edid = NULL;
 	}
 
 	mutex_unlock(&dev->mode_config.mutex);
@@ -1172,6 +1173,7 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 
 	if (adev->asic_type == CHIP_VEGA10 ||
 	    adev->asic_type == CHIP_VEGA12 ||
+	    adev->asic_type == CHIP_VEGA20 ||
 	    adev->asic_type == CHIP_RAVEN)
 		client_id = SOC15_IH_CLIENTID_DCE;
 
@@ -1586,11 +1588,10 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	case CHIP_POLARIS11:
 	case CHIP_POLARIS10:
 	case CHIP_POLARIS12:
-#if defined(CONFIG_DRM_AMD_DC_VEGAM)
 	case CHIP_VEGAM:
-#endif
 	case CHIP_VEGA10:
 	case CHIP_VEGA12:
+	case CHIP_VEGA20:
 		if (dce110_register_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
 			goto fail;
@@ -1890,9 +1891,7 @@ static int dm_early_init(void *handle)
 		adev->mode_info.plane_type = dm_plane_type_default;
 		break;
 	case CHIP_POLARIS10:
-#if defined(CONFIG_DRM_AMD_DC_VEGAM)
 	case CHIP_VEGAM:
-#endif
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
@@ -1900,6 +1899,7 @@ static int dm_early_init(void *handle)
 		break;
 	case CHIP_VEGA10:
 	case CHIP_VEGA12:
+	case CHIP_VEGA20:
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
@@ -2169,6 +2169,7 @@ static int fill_plane_attributes_from_fb(struct amdgpu_device *adev,
 
 	if (adev->asic_type == CHIP_VEGA10 ||
 	    adev->asic_type == CHIP_VEGA12 ||
+	    adev->asic_type == CHIP_VEGA20 ||
 	    adev->asic_type == CHIP_RAVEN) {
 		/* Fill GFX9 params */
 		plane_state->tiling_info.gfx9.num_pipes =
@@ -2227,9 +2228,9 @@ static void fill_gamma_from_crtc(
 	gamma->type = GAMMA_RGB_256;
 	gamma->num_entries = GAMMA_RGB_256_ENTRIES;
 	for (i = 0; i < end; i++) {
-		gamma->entries.red[i] = dal_fixed31_32_from_int((unsigned short)red[i]);
-		gamma->entries.green[i] = dal_fixed31_32_from_int((unsigned short)green[i]);
-		gamma->entries.blue[i] = dal_fixed31_32_from_int((unsigned short)blue[i]);
+		gamma->entries.red[i] = dc_fixpt_from_int((unsigned short)red[i]);
+		gamma->entries.green[i] = dc_fixpt_from_int((unsigned short)green[i]);
+		gamma->entries.blue[i] = dc_fixpt_from_int((unsigned short)blue[i]);
 	}
 
 	plane_state->gamma_correction = gamma;
@@ -2279,6 +2280,10 @@ static int fill_plane_attributes(struct amdgpu_device *adev,
 		dc_plane_state->in_transfer_func = NULL;
 	}
 #else
+#if defined(OS_NAME_RHEL_6)
+	dc_plane_state->in_transfer_func->type = TF_TYPE_PREDEFINED;
+	dc_plane_state->in_transfer_func->tf = TRANSFER_FUNCTION_SRGB;
+#endif
 	if (crtc->mode.private_flags & AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET) {
 		fill_gamma_from_crtc(crtc, dc_plane_state);
 		/* reset trigger of gamma */
@@ -4207,7 +4212,7 @@ static void remove_stream(struct amdgpu_device *adev,
 static int get_cursor_position(struct drm_plane *plane, struct drm_crtc *crtc,
 			       struct dc_cursor_position *position)
 {
-	struct amdgpu_crtc *amdgpu_crtc = amdgpu_crtc = to_amdgpu_crtc(crtc);
+	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
 	int x, y;
 	int xorigin = 0, yorigin = 0;
 
@@ -4584,7 +4589,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		}
 		spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
 
-		if (!pflip_needed) {
+		if (!pflip_needed || plane->type == DRM_PLANE_TYPE_OVERLAY) {
 			WARN_ON(!dm_new_plane_state->dc_state);
 
 			plane_states_constructed[planes_count] = dm_new_plane_state->dc_state;
@@ -5443,7 +5448,8 @@ static int dm_update_planes_state(struct dc *dc,
 
 		/* Remove any changed/removed planes */
 		if (!enable) {
-			if (pflip_needed)
+			if (pflip_needed &&
+			    plane->type != DRM_PLANE_TYPE_OVERLAY)
 				continue;
 
 			if (!old_plane_crtc)
@@ -5497,7 +5503,8 @@ static int dm_update_planes_state(struct dc *dc,
 			if (!dm_new_crtc_state->stream)
 				continue;
 
-			if (pflip_needed)
+			if (pflip_needed &&
+			    plane->type != DRM_PLANE_TYPE_OVERLAY)
 				continue;
 
 			WARN_ON(dm_new_plane_state->dc_state);
