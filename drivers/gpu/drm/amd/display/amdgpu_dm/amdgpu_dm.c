@@ -5020,7 +5020,13 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	 * displays anymore
 	 */
 	pm_runtime_mark_last_busy(dev->dev);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0) && \
+	!defined(OS_NAME_RHEL_7_5)
+	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
+		new_crtc_state = crtc->state;
+#else
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
+#endif
 		if (old_crtc_state->active && !new_crtc_state->active)
 			pm_runtime_put_autosuspend(dev->dev);
 	}
