@@ -600,4 +600,11 @@ void drm_send_event(struct drm_device *dev, struct drm_pending_event *e);
 
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
+#define DP_LANE0_1_STATUS_ESI                  0x200c /* status same as 0x202 */
+#define DP_LANE2_3_STATUS_ESI                  0x200d /* status same as 0x203 */
+#define DP_LANE_ALIGN_STATUS_UPDATED_ESI       0x200e /* status same as 0x204 */
+#define DP_SINK_STATUS_ESI                     0x200f /* status same as 0x205 */
+#endif
+
 #endif /* AMDKCL_DRM_H */
