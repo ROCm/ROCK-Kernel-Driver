@@ -2750,9 +2750,30 @@ static void amdgpu_dm_atomic_crtc_gamma_set(
 	struct drm_device *dev = crtc->dev;
 	struct drm_property *prop = dev->mode_config.prop_crtc_id;
 
-	crtc->state->mode.private_flags |= AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
+	crtc->mode.private_flags |= AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
 
 	drm_atomic_helper_crtc_set_property(crtc, prop, 0);
+}
+
+static int dm_crtc_funcs_atomic_set_property(
+	struct drm_crtc *crtc,
+	struct drm_crtc_state *crtc_state,
+	struct drm_property *property,
+	uint64_t val)
+{
+	struct drm_plane_state *plane_state;
+
+	crtc_state->planes_changed = true;
+
+	plane_state =
+		drm_atomic_get_plane_state(
+			crtc_state->state,
+			crtc->primary);
+
+	if (!plane_state)
+		return -EINVAL;
+
+	return 0;
 }
 #endif
 
@@ -2940,6 +2961,7 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.gamma_set = drm_atomic_helper_legacy_gamma_set,
 #else
 	.gamma_set = amdgpu_dm_atomic_crtc_gamma_set,
+	.atomic_set_property = dm_crtc_funcs_atomic_set_property,
 #endif
 	.set_config = drm_atomic_helper_set_config,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && \
@@ -3720,8 +3742,8 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	defined(OS_NAME_RHEL_7_4_5)
 	drm_crtc_enable_color_mgmt(&acrtc->base, MAX_COLOR_LUT_ENTRIES,
 				   true, MAX_COLOR_LUT_ENTRIES);
-	drm_mode_crtc_set_gamma_size(&acrtc->base, MAX_COLOR_LEGACY_LUT_ENTRIES);
 #endif
+	drm_mode_crtc_set_gamma_size(&acrtc->base, MAX_COLOR_LEGACY_LUT_ENTRIES);
 	return 0;
 
 fail:
