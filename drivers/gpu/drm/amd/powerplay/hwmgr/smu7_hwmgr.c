@@ -3761,7 +3761,10 @@ static int smu7_generate_dpm_level_enable_mask(
 	const struct smu7_power_state *smu7_ps =
 			cast_const_phw_smu7_power_state(states->pnew_state);
 
-	result = smu7_trim_dpm_states(hwmgr, smu7_ps);
+	/*skip the trim if od is enabled*/
+	if (!hwmgr->od_enabled)
+		result = smu7_trim_dpm_states(hwmgr, smu7_ps);
+
 	if (result)
 		return result;
 
