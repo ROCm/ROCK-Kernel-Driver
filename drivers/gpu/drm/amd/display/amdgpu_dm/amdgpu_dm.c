@@ -1773,10 +1773,8 @@ fail:
 		goto retry;
 	}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
-	!defined(OS_NAME_RHEL_7_4_5)
-	drm_atomic_state_free(state);
-#else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0) || \
+	defined(OS_NAME_RHEL_7_4_5)
 	drm_atomic_state_put(state);
 #endif
 
@@ -4740,7 +4738,7 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 	if (!nonblock) {
 		ret = drm_atomic_helper_prepare_planes(dev, state);
 		if (ret)
-			return ret;
+			goto cleanup;
 	}
 #if defined(OS_NAME_RHEL_6) || defined(OS_NAME_SLE_12_3)
 	else	// Temporary fix for pflip conflict between block and nonblock call
@@ -4760,6 +4758,7 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 		drm_atomic_helper_cleanup_planes(dev, state);
 	}
 
+cleanup:
 	drm_atomic_state_free(state);
 
 	return ret;
