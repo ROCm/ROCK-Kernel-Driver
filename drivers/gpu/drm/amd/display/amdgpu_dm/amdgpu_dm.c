@@ -1731,12 +1731,24 @@ static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 
 retry:
 	drm_for_each_crtc(crtc, dev) {
+		struct drm_plane *plane;
+
 		ret = drm_atomic_add_affected_connectors(state, crtc);
 		if (ret)
 			goto fail;
 
 		/* TODO rework amdgpu_dm_commit_planes so we don't need this */
-		ret = drm_atomic_add_affected_planes(state, crtc);
+		WARN_ON(!drm_atomic_get_crtc_state(state, crtc));
+
+		drm_for_each_plane_mask(plane, state->dev, crtc->state->plane_mask) {
+			struct drm_plane_state *plane_state =
+				drm_atomic_get_plane_state(state, plane);
+
+			if (IS_ERR(plane_state)) {
+				ret = PTR_ERR(plane_state);
+				break;
+			}
+		}
 		if (ret)
 			goto fail;
 	}
