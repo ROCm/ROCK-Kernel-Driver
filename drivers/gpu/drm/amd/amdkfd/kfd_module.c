@@ -30,10 +30,10 @@
 #define KFD_DRIVER_AUTHOR	"AMD Inc. and others"
 
 #define KFD_DRIVER_DESC		"Standalone HSA driver for AMD's GPUs"
-#define KFD_DRIVER_DATE		"20150421"
-#define KFD_DRIVER_MAJOR	0
-#define KFD_DRIVER_MINOR	7
-#define KFD_DRIVER_PATCHLEVEL	2
+#define KFD_DRIVER_DATE		"20160408"
+#define KFD_DRIVER_MAJOR	2
+#define KFD_DRIVER_MINOR	0
+#define KFD_DRIVER_PATCHLEVEL	0
 
 static const struct kgd2kfd_calls kgd2kfd = {
 	.exit		= kgd2kfd_exit,
@@ -85,18 +85,25 @@ module_param(ignore_crat, int, 0444);
 MODULE_PARM_DESC(ignore_crat,
 	"Ignore CRAT table during KFD initialization (0 = use CRAT (default), 1 = ignore CRAT)");
 
-int noretry;
+int noretry = 1;
 module_param(noretry, int, 0644);
 MODULE_PARM_DESC(noretry,
-	"Set sh_mem_config.retry_disable on GFXv9+ dGPUs (0 = retry enabled (default), 1 = retry disabled)");
+	"Set sh_mem_config.retry_disable on GFXv9+ dGPUs (0 = retry enabled, 1 = retry disabled (default))");
+
+int priv_cp_queues;
+module_param(priv_cp_queues, int, 0644);
+MODULE_PARM_DESC(priv_cp_queues,
+	"Enable privileged mode for CP queues (0 = off (default), 1 = on)");
 
 int halt_if_hws_hang;
 module_param(halt_if_hws_hang, int, 0644);
 MODULE_PARM_DESC(halt_if_hws_hang, "Halt if HWS hang is detected (0 = off (default), 1 = on)");
 
+bool keep_idle_process_evicted;
+module_param(keep_idle_process_evicted, bool, 0444);
+MODULE_PARM_DESC(keep_idle_process_evicted, "Restore evicted process only if queues are active (N = off(default), Y = on)");
 
 static int amdkfd_init_completed;
-
 
 int kgd2kfd_init(unsigned int interface_version,
 		const struct kgd2kfd_calls **g2f)
@@ -148,9 +155,15 @@ static int __init kfd_module_init(void)
 	if (err < 0)
 		goto err_topology;
 
+	err = kfd_ipc_init();
+	if (err < 0)
+		goto err_ipc;
+
 	err = kfd_process_create_wq();
 	if (err < 0)
 		goto err_create_wq;
+
+	kfd_init_peer_direct();
 
 	kfd_debugfs_init();
 
@@ -161,6 +174,7 @@ static int __init kfd_module_init(void)
 	return 0;
 
 err_create_wq:
+err_ipc:
 	kfd_topology_shutdown();
 err_topology:
 	kfd_chardev_exit();
@@ -173,6 +187,7 @@ static void __exit kfd_module_exit(void)
 	amdkfd_init_completed = 0;
 
 	kfd_debugfs_fini();
+	kfd_close_peer_direct();
 	kfd_process_destroy_wq();
 	kfd_topology_shutdown();
 	kfd_chardev_exit();

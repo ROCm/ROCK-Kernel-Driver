@@ -20,8 +20,10 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#define pr_fmt(fmt) "kfd2kgd: " fmt
+
 #include "amdgpu_amdkfd.h"
-#include "amd_shared.h"
+#include <linux/dma-buf.h>
 #include <drm/drmP.h>
 #include "amdgpu.h"
 #include "amdgpu_gfx.h"
@@ -30,7 +32,7 @@
 const struct kgd2kfd_calls *kgd2kfd;
 bool (*kgd2kfd_init_p)(unsigned int, const struct kgd2kfd_calls**);
 
-static const unsigned int compute_vmid_bitmap = 0xFF00;
+static unsigned int compute_vmid_bitmap = 0xFF00;
 
 int amdgpu_amdkfd_init(void)
 {
@@ -99,6 +101,7 @@ void amdgpu_amdkfd_device_probe(struct amdgpu_device *adev)
 		kfd2kgd = amdgpu_amdkfd_gfx_8_0_get_functions();
 		break;
 	case CHIP_VEGA10:
+	case CHIP_VEGA20:
 	case CHIP_RAVEN:
 		kfd2kgd = amdgpu_amdkfd_gfx_9_0_get_functions();
 		break;
@@ -146,8 +149,9 @@ static void amdgpu_doorbell_get_kfd_info(struct amdgpu_device *adev,
 
 void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 {
-	int i;
+	int i, n;
 	int last_valid_bit;
+
 	if (adev->kfd) {
 		struct kgd2kfd_shared_resources gpu_resources = {
 			.compute_vmid_bitmap = compute_vmid_bitmap,
@@ -160,7 +164,8 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 		};
 
 		/* this is going to have a few of the MSBs set that we need to
-		 * clear */
+		 * clear
+		 */
 		bitmap_complement(gpu_resources.queue_bitmap,
 				  adev->gfx.mec.queue_bitmap,
 				  KGD_MAX_QUEUES);
@@ -174,7 +179,8 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 				  gpu_resources.queue_bitmap);
 
 		/* According to linux/bitmap.h we shouldn't use bitmap_clear if
-		 * nbits is not compile time constant */
+		 * nbits is not compile time constant
+		 */
 		last_valid_bit = 1 /* only first MEC can have compute queues */
 				* adev->gfx.mec.num_pipe_per_mec
 				* adev->gfx.mec.num_queue_per_pipe;
@@ -185,7 +191,15 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 				&gpu_resources.doorbell_physical_address,
 				&gpu_resources.doorbell_aperture_size,
 				&gpu_resources.doorbell_start_offset);
-		if (adev->asic_type >= CHIP_VEGA10) {
+
+		if (adev->asic_type < CHIP_VEGA10) {
+			kgd2kfd->device_init(adev->kfd, &gpu_resources);
+			return;
+		}
+
+		n = (adev->asic_type < CHIP_VEGA20) ? 2 : 8;
+
+		for (i = 0; i < n; i += 2) {
 			/* On SOC15 the BIF is involved in routing
 			 * doorbells using the low 12 bits of the
 			 * address. Communicate the assignments to
@@ -193,20 +207,20 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 			 * process in case of 64-bit doorbells so we
 			 * can use each doorbell assignment twice.
 			 */
-			gpu_resources.sdma_doorbell[0][0] =
-				AMDGPU_DOORBELL64_sDMA_ENGINE0;
-			gpu_resources.sdma_doorbell[0][1] =
-				AMDGPU_DOORBELL64_sDMA_ENGINE0 + 0x200;
-			gpu_resources.sdma_doorbell[1][0] =
-				AMDGPU_DOORBELL64_sDMA_ENGINE1;
-			gpu_resources.sdma_doorbell[1][1] =
-				AMDGPU_DOORBELL64_sDMA_ENGINE1 + 0x200;
-			/* Doorbells 0x0f0-0ff and 0x2f0-2ff are reserved for
-			 * SDMA, IH and VCN. So don't use them for the CP.
-			 */
-			gpu_resources.reserved_doorbell_mask = 0x1f0;
-			gpu_resources.reserved_doorbell_val  = 0x0f0;
+			gpu_resources.sdma_doorbell[0][i] =
+				AMDGPU_DOORBELL64_sDMA_ENGINE0 + (i >> 1);
+			gpu_resources.sdma_doorbell[0][i+1] =
+				AMDGPU_DOORBELL64_sDMA_ENGINE0 + 0x200 + (i >> 1);
+			gpu_resources.sdma_doorbell[1][i] =
+				AMDGPU_DOORBELL64_sDMA_ENGINE1 + (i >> 1);
+			gpu_resources.sdma_doorbell[1][i+1] =
+				AMDGPU_DOORBELL64_sDMA_ENGINE1 + 0x200 + (i >> 1);
 		}
+		/* Doorbells 0x0e0-0ff and 0x2e0-2ff are reserved for
+		 * SDMA, IH and VCN. So don't use them for the CP.
+		 */
+		gpu_resources.reserved_doorbell_mask = 0x1e0;
+		gpu_resources.reserved_doorbell_val  = 0x0e0;
 
 		kgd2kfd->device_init(adev->kfd, &gpu_resources);
 	}
@@ -270,9 +284,17 @@ void amdgpu_amdkfd_gpu_reset(struct kgd_dev *kgd)
 	amdgpu_device_gpu_recover(adev, NULL, false);
 }
 
+u32 pool_to_domain(enum kgd_memory_pool p)
+{
+	switch (p) {
+	case KGD_POOL_FRAMEBUFFER: return AMDGPU_GEM_DOMAIN_VRAM;
+	default: return AMDGPU_GEM_DOMAIN_GTT;
+	}
+}
+
 int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 			void **mem_obj, uint64_t *gpu_addr,
-			void **cpu_ptr)
+			void **cpu_ptr, bool mqd_gfx9)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 	struct amdgpu_bo *bo = NULL;
@@ -287,6 +309,10 @@ int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 	bp.flags = AMDGPU_GEM_CREATE_CPU_GTT_USWC;
 	bp.type = ttm_bo_type_kernel;
 	bp.resv = NULL;
+
+	if (mqd_gfx9)
+		bp.flags |= AMDGPU_GEM_CREATE_MQD_GFX9;
+
 	r = amdgpu_bo_create(adev, &bp, &bo);
 	if (r) {
 		dev_err(adev->dev,
@@ -350,12 +376,15 @@ void free_gtt_mem(struct kgd_dev *kgd, void *mem_obj)
 }
 
 void get_local_mem_info(struct kgd_dev *kgd,
-			struct kfd_local_mem_info *mem_info)
+				struct kfd_local_mem_info *mem_info)
 {
+	uint64_t address_mask;
+	resource_size_t aper_limit;
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-	uint64_t address_mask = adev->dev->dma_mask ? ~*adev->dev->dma_mask :
+
+	address_mask = adev->dev->dma_mask ? ~*adev->dev->dma_mask :
 					     ~((1ULL << 32) - 1);
-	resource_size_t aper_limit = adev->gmc.aper_base + adev->gmc.aper_size;
+	aper_limit = adev->gmc.aper_base + adev->gmc.aper_size;
 
 	memset(mem_info, 0, sizeof(*mem_info));
 	if (!(adev->gmc.aper_base & address_mask || aper_limit & address_mask)) {
@@ -415,7 +444,7 @@ void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 	cu_info->cu_active_number = acu_info.number;
 	cu_info->cu_ao_mask = acu_info.ao_cu_mask;
 	memcpy(&cu_info->cu_bitmap[0], &acu_info.bitmap[0],
-	       sizeof(acu_info.bitmap));
+					sizeof(acu_info.bitmap));
 	cu_info->num_shader_engines = adev->gfx.config.max_shader_engines;
 	cu_info->num_shader_arrays_per_engine = adev->gfx.config.max_sh_per_se;
 	cu_info->num_cu_per_sh = adev->gfx.config.max_cu_per_sh;
@@ -426,11 +455,68 @@ void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 	cu_info->lds_size = acu_info.lds_size;
 }
 
+int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
+				  struct kgd_dev **dma_buf_kgd,
+				  uint64_t *bo_size, void *metadata_buffer,
+				  size_t buffer_size, uint32_t *metadata_size,
+				  uint32_t *flags)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+	struct dma_buf *dma_buf;
+	struct drm_gem_object *obj;
+	struct amdgpu_bo *bo;
+	uint64_t metadata_flags;
+	int r = -EINVAL;
+
+	dma_buf = dma_buf_get(dma_buf_fd);
+	if (IS_ERR(dma_buf))
+		return PTR_ERR(dma_buf);
+
+	if (dma_buf->ops != &amdgpu_dmabuf_ops)
+		/* Can't handle non-graphics buffers */
+		goto out_put;
+
+	obj = dma_buf->priv;
+	if (obj->dev->driver != adev->ddev->driver)
+		/* Can't handle buffers from different drivers */
+		goto out_put;
+
+	adev = obj->dev->dev_private;
+	bo = gem_to_amdgpu_bo(obj);
+	if (!(bo->preferred_domains & (AMDGPU_GEM_DOMAIN_VRAM |
+				    AMDGPU_GEM_DOMAIN_GTT)))
+		/* Only VRAM and GTT BOs are supported */
+		goto out_put;
+
+	r = 0;
+	if (dma_buf_kgd)
+		*dma_buf_kgd = (struct kgd_dev *)adev;
+	if (bo_size)
+		*bo_size = amdgpu_bo_size(bo);
+	if (metadata_size)
+		*metadata_size = bo->metadata_size;
+	if (metadata_buffer)
+		r = amdgpu_bo_get_metadata(bo, metadata_buffer, buffer_size,
+					   metadata_size, &metadata_flags);
+	if (flags) {
+		*flags = (bo->preferred_domains & AMDGPU_GEM_DOMAIN_VRAM) ?
+			ALLOC_MEM_FLAGS_VRAM : ALLOC_MEM_FLAGS_GTT;
+
+		if (bo->flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED)
+			*flags |= ALLOC_MEM_FLAGS_PUBLIC;
+	}
+
+out_put:
+	dma_buf_put(dma_buf);
+	return r;
+}
+
 uint64_t amdgpu_amdkfd_get_vram_usage(struct kgd_dev *kgd)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-
-	return amdgpu_vram_mgr_usage(&adev->mman.bdev.man[TTM_PL_VRAM]);
+	uint64_t usage =
+		amdgpu_vram_mgr_usage(&adev->mman.bdev.man[TTM_PL_VRAM]);
+	return usage;
 }
 
 int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
@@ -496,7 +582,8 @@ void amdgpu_amdkfd_set_compute_idle(struct kgd_dev *kgd, bool idle)
 					PP_SMC_POWER_PROFILE_COMPUTE, !idle);
 }
 
-bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev, u32 vmid)
+bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev,
+			u32 vmid)
 {
 	if (adev->kfd) {
 		if ((1 << vmid) & compute_vmid_bitmap)

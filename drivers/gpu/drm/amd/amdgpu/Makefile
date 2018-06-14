@@ -27,7 +27,7 @@ FULL_AMD_PATH=$(src)/..
 DISPLAY_FOLDER_NAME=display
 FULL_AMD_DISPLAY_PATH = $(FULL_AMD_PATH)/$(DISPLAY_FOLDER_NAME)
 
-ccflags-y := -I$(FULL_AMD_PATH)/include/asic_reg \
+ccflags-y := -Iinclude/drm -I$(FULL_AMD_PATH)/include/asic_reg \
 	-I$(FULL_AMD_PATH)/include \
 	-I$(FULL_AMD_PATH)/amdgpu \
 	-I$(FULL_AMD_PATH)/powerplay/inc \
@@ -138,6 +138,7 @@ ifneq ($(CONFIG_HSA_AMD),)
 amdgpu-y += \
 	 amdgpu_amdkfd_fence.o \
 	 amdgpu_amdkfd_gpuvm.o \
+	 amdgpu_amdkfd_gfx_v7.o \
 	 amdgpu_amdkfd_gfx_v8.o \
 	 amdgpu_amdkfd_gfx_v9.o
 

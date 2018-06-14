@@ -31,6 +31,8 @@
 #include <linux/compat.h>
 #include <linux/mman.h>
 #include <linux/file.h>
+#include <asm/page.h>
+#include "kfd_ipc.h"
 
 struct mm_struct;
 
@@ -59,7 +61,8 @@ static struct workqueue_struct *kfd_process_wq;
  */
 static struct workqueue_struct *kfd_restore_wq;
 
-static struct kfd_process *find_process(const struct task_struct *thread);
+static struct kfd_process *find_process(const struct task_struct *thread,
+		bool ref);
 static void kfd_process_ref_release(struct kref *ref);
 static struct kfd_process *create_process(const struct task_struct *thread,
 					struct file *filep);
@@ -118,9 +121,11 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 	struct kgd_mem *mem = NULL;
 	int handle;
 	int err;
+	unsigned int mem_type;
 
 	err = kdev->kfd2kgd->alloc_memory_of_gpu(kdev->kgd, gpu_va, size,
-						 pdd->vm, &mem, NULL, flags);
+						 pdd->vm, NULL, &mem, NULL,
+						 flags);
 	if (err)
 		goto err_alloc_mem;
 
@@ -134,12 +139,18 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 		goto sync_memory_failed;
 	}
 
+	mem_type = flags & (KFD_IOC_ALLOC_MEM_FLAGS_VRAM |
+			    KFD_IOC_ALLOC_MEM_FLAGS_GTT |
+			    KFD_IOC_ALLOC_MEM_FLAGS_USERPTR |
+			    KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL);
+
 	/* Create an obj handle so kfd_process_device_remove_obj_handle
 	 * will take care of the bo removal when the process finishes.
 	 * We do not need to take p->mutex, because the process is just
 	 * created and the ioctls have not had the chance to run.
 	 */
-	handle = kfd_process_device_create_obj_handle(pdd, mem);
+	handle = kfd_process_device_create_obj_handle(
+			pdd, mem, gpu_va, size, 0, mem_type, NULL);
 
 	if (handle < 0) {
 		err = handle;
@@ -221,7 +232,7 @@ struct kfd_process *kfd_create_process(struct file *filep)
 	mutex_lock(&kfd_processes_mutex);
 
 	/* A prior open of /dev/kfd could have already created the process. */
-	process = find_process(thread);
+	process = find_process(thread, false);
 	if (process)
 		pr_debug("Process already found\n");
 	else
@@ -243,7 +254,7 @@ struct kfd_process *kfd_get_process(const struct task_struct *thread)
 	if (thread->group_leader->mm != thread->mm)
 		return ERR_PTR(-EINVAL);
 
-	process = find_process(thread);
+	process = find_process(thread, false);
 	if (!process)
 		return ERR_PTR(-EINVAL);
 
@@ -262,13 +273,16 @@ static struct kfd_process *find_process_by_mm(const struct mm_struct *mm)
 	return NULL;
 }
 
-static struct kfd_process *find_process(const struct task_struct *thread)
+static struct kfd_process *find_process(const struct task_struct *thread,
+		bool ref)
 {
 	struct kfd_process *p;
 	int idx;
 
 	idx = srcu_read_lock(&kfd_processes_srcu);
 	p = find_process_by_mm(thread->mm);
+	if (p && ref)
+		kref_get(&p->ref);
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 
 	return p;
@@ -279,17 +293,34 @@ void kfd_unref_process(struct kfd_process *p)
 	kref_put(&p->ref, kfd_process_ref_release);
 }
 
+/* This increments the process->ref counter. */
+struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid)
+{
+	struct task_struct *task = NULL;
+	struct kfd_process *p    = NULL;
+
+	if (!pid)
+		task = current;
+	else
+		task = get_pid_task(pid, PIDTYPE_PID);
+
+	if (task)
+		p = find_process(task, true);
+
+	return p;
+}
+
 static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 {
 	struct kfd_process *p = pdd->process;
-	void *mem;
+	struct kfd_bo *buf_obj;
 	int id;
 
 	/*
 	 * Remove all handles from idr and release appropriate
 	 * local memory object
 	 */
-	idr_for_each_entry(&pdd->alloc_idr, mem, id) {
+	idr_for_each_entry(&pdd->alloc_idr, buf_obj, id) {
 		struct kfd_process_device *peer_pdd;
 
 		list_for_each_entry(peer_pdd, &p->per_device_data,
@@ -297,10 +328,12 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 			if (!peer_pdd->vm)
 				continue;
 			peer_pdd->dev->kfd2kgd->unmap_memory_to_gpu(
-				peer_pdd->dev->kgd, mem, peer_pdd->vm);
+				peer_pdd->dev->kgd, buf_obj->mem, peer_pdd->vm);
 		}
 
-		pdd->dev->kfd2kgd->free_memory_of_gpu(pdd->dev->kgd, mem);
+		run_rdma_free_callback(buf_obj);
+		pdd->dev->kfd2kgd->free_memory_of_gpu(pdd->dev->kgd,
+						      buf_obj->mem);
 		kfd_process_device_remove_obj_handle(pdd, id);
 	}
 }
@@ -520,6 +553,8 @@ static struct kfd_process *create_process(const struct task_struct *thread,
 	if (!process)
 		goto err_alloc_process;
 
+	process->bo_interval_tree = RB_ROOT_CACHED;
+
 	process->pasid = kfd_pasid_alloc();
 	if (process->pasid == 0)
 		goto err_alloc_pasid;
@@ -566,6 +601,11 @@ static struct kfd_process *create_process(const struct task_struct *thread,
 	err = kfd_process_init_cwsr_apu(process, filep);
 	if (err)
 		goto err_init_cwsr;
+
+	/* If PeerDirect interface was not detected try to detect it again
+	 * in case if network driver was loaded later.
+	 */
+	kfd_init_peer_direct();
 
 	return process;
 
@@ -774,9 +814,49 @@ bool kfd_has_process_device_data(struct kfd_process *p)
  * Assumes that the process lock is held.
  */
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
-					void *mem)
+					void *mem, uint64_t start,
+					uint64_t length, uint64_t cpuva,
+					unsigned int mem_type,
+					struct kfd_ipc_obj *ipc_obj)
 {
-	return idr_alloc(&pdd->alloc_idr, mem, 0, 0, GFP_KERNEL);
+	int handle;
+	struct kfd_bo *buf_obj;
+	struct kfd_process *p;
+
+	p = pdd->process;
+
+	buf_obj = kzalloc(sizeof(*buf_obj), GFP_KERNEL);
+
+	if (!buf_obj)
+		return -ENOMEM;
+
+	buf_obj->it.start = start;
+	buf_obj->it.last = start + length - 1;
+	interval_tree_insert(&buf_obj->it, &p->bo_interval_tree);
+
+	buf_obj->mem = mem;
+	buf_obj->dev = pdd->dev;
+	buf_obj->kfd_ipc_obj = ipc_obj;
+	buf_obj->cpuva = cpuva;
+	buf_obj->mem_type = mem_type;
+
+	INIT_LIST_HEAD(&buf_obj->cb_data_head);
+
+	handle = idr_alloc(&pdd->alloc_idr, buf_obj, 0, 0, GFP_KERNEL);
+
+	if (handle < 0)
+		kfree(buf_obj);
+
+	return handle;
+}
+
+struct kfd_bo *kfd_process_device_find_bo(struct kfd_process_device *pdd,
+					int handle)
+{
+	if (handle < 0)
+		return NULL;
+
+	return (struct kfd_bo *)idr_find(&pdd->alloc_idr, handle);
 }
 
 /* Translate specific handle from process local memory idr
@@ -785,10 +865,37 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 void *kfd_process_device_translate_handle(struct kfd_process_device *pdd,
 					int handle)
 {
-	if (handle < 0)
-		return NULL;
+	struct kfd_bo *buf_obj;
 
-	return idr_find(&pdd->alloc_idr, handle);
+	buf_obj = kfd_process_device_find_bo(pdd, handle);
+
+	return buf_obj->mem;
+}
+
+void *kfd_process_find_bo_from_interval(struct kfd_process *p,
+					uint64_t start_addr,
+					uint64_t last_addr)
+{
+	struct interval_tree_node *it_node;
+	struct kfd_bo *buf_obj;
+
+	it_node = interval_tree_iter_first(&p->bo_interval_tree,
+			start_addr, last_addr);
+	if (!it_node) {
+		pr_err("0x%llx-0x%llx does not relate to an existing buffer\n",
+				start_addr, last_addr);
+		return NULL;
+	}
+
+	if (interval_tree_iter_next(it_node, start_addr, last_addr)) {
+		pr_err("0x%llx-0x%llx spans more than a single BO\n",
+				start_addr, last_addr);
+		return NULL;
+	}
+
+	buf_obj = container_of(it_node, struct kfd_bo, it);
+
+	return buf_obj;
 }
 
 /* Remove specific handle from process local memory idr
@@ -797,8 +904,24 @@ void *kfd_process_device_translate_handle(struct kfd_process_device *pdd,
 void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 					int handle)
 {
-	if (handle >= 0)
-		idr_remove(&pdd->alloc_idr, handle);
+	struct kfd_bo *buf_obj;
+	struct kfd_process *p;
+
+	p = pdd->process;
+
+	if (handle < 0)
+		return;
+
+	buf_obj = kfd_process_device_find_bo(pdd, handle);
+
+	if (buf_obj->kfd_ipc_obj)
+		ipc_obj_put(&buf_obj->kfd_ipc_obj);
+
+	idr_remove(&pdd->alloc_idr, handle);
+
+	interval_tree_remove(&buf_obj->it, &p->bo_interval_tree);
+
+	kfree(buf_obj);
 }
 
 /* This increments the process->ref counter. */
@@ -838,7 +961,7 @@ struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
 	return p;
 }
 
-/* process_evict_queues - Evict all user queues of a process
+/* kfd_process_evict_queues - Evict all user queues of a process
  *
  * Eviction is reference-counted per process-device. This means multiple
  * evictions from different sources can be nested safely.
@@ -878,7 +1001,7 @@ fail:
 	return r;
 }
 
-/* process_restore_queues - Restore all user queues of a process */
+/* kfd_process_restore_queues - Restore all user queues of a process */
 int kfd_process_restore_queues(struct kfd_process *p)
 {
 	struct kfd_process_device *pdd;
@@ -920,7 +1043,7 @@ static void evict_process_worker(struct work_struct *work)
 	 */
 	flush_delayed_work(&p->restore_work);
 
-	pr_debug("Started evicting pasid %d\n", p->pasid);
+	pr_info("Started evicting pasid %d\n", p->pasid);
 	ret = kfd_process_evict_queues(p);
 	if (!ret) {
 		dma_fence_signal(p->ef);
@@ -929,7 +1052,7 @@ static void evict_process_worker(struct work_struct *work)
 		queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_RESTORE_TIME_MS));
 
-		pr_debug("Finished evicting pasid %d\n", p->pasid);
+		pr_info("Finished evicting pasid %d\n", p->pasid);
 	} else
 		pr_err("Failed to evict queues of pasid %d\n", p->pasid);
 }
@@ -957,7 +1080,7 @@ static void restore_process_worker(struct work_struct *work)
 			       struct kfd_process_device,
 			       per_device_list);
 
-	pr_debug("Started restoring pasid %d\n", p->pasid);
+	pr_info("Started restoring pasid %d\n", p->pasid);
 
 	/* Setting last_restore_timestamp before successful restoration.
 	 * Otherwise this would have to be set by KGD (restore_process_bos)
@@ -973,7 +1096,7 @@ static void restore_process_worker(struct work_struct *work)
 	ret = pdd->dev->kfd2kgd->restore_process_bos(p->kgd_process_info,
 						     &p->ef);
 	if (ret) {
-		pr_debug("Failed to restore BOs of pasid %d, retry after %d ms\n",
+		pr_info("Failed to restore BOs of pasid %d, retry after %d ms\n",
 			 p->pasid, PROCESS_BACK_OFF_TIME_MS);
 		ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_BACK_OFF_TIME_MS));
@@ -983,7 +1106,7 @@ static void restore_process_worker(struct work_struct *work)
 
 	ret = kfd_process_restore_queues(p);
 	if (!ret)
-		pr_debug("Finished restoring pasid %d\n", p->pasid);
+		pr_info("Finished restoring pasid %d\n", p->pasid);
 	else
 		pr_err("Failed to restore queues of pasid %d\n", p->pasid);
 }

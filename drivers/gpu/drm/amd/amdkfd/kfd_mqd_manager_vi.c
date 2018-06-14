@@ -31,6 +31,7 @@
 #include "gca/gfx_8_0_sh_mask.h"
 #include "gca/gfx_8_0_enum.h"
 #include "oss/oss_3_0_sh_mask.h"
+
 #define CP_MQD_CONTROL__PRIV_STATE__SHIFT 0x8
 
 static inline struct vi_mqd *get_mqd(void *mqd)
@@ -41,6 +42,45 @@ static inline struct vi_mqd *get_mqd(void *mqd)
 static inline struct vi_sdma_mqd *get_sdma_mqd(void *mqd)
 {
 	return (struct vi_sdma_mqd *)mqd;
+}
+
+static bool check_sdma_queue_active(struct queue *q)
+{
+	uint32_t rptr, wptr;
+	struct vi_sdma_mqd *m = get_sdma_mqd(q->mqd);
+
+	rptr = m->sdmax_rlcx_rb_rptr;
+	wptr = m->sdmax_rlcx_rb_wptr;
+	pr_debug("rptr=%d, wptr=%d\n", rptr, wptr);
+
+	return (rptr != wptr);
+}
+
+static bool check_queue_active(struct queue *q)
+{
+	uint32_t rptr, wptr;
+	uint32_t cntl_stack_offset, cntl_stack_size;
+	struct vi_mqd *m = get_mqd(q->mqd);
+
+	rptr = m->cp_hqd_pq_rptr;
+	wptr = m->cp_hqd_pq_wptr;
+	cntl_stack_offset = m->cp_hqd_cntl_stack_offset;
+	cntl_stack_size = m->cp_hqd_cntl_stack_size;
+
+	pr_debug("rptr=%d, wptr=%d\n", rptr, wptr);
+	pr_debug("m->cp_hqd_cntl_stack_offset=0x%08x\n", cntl_stack_offset);
+	pr_debug("m->cp_hqd_cntl_stack_size=0x%08x\n", cntl_stack_size);
+
+	if ((rptr == 0 && wptr == 0) ||
+		cntl_stack_offset == 0xffffffff ||
+		cntl_stack_size > 0x5000)
+		return false;
+
+	/* Process is idle if both conditions are meet:
+	 * queue's rptr equals to wptr
+	 * control stack is empty, cntl_stack_offset = cntl_stack_size
+	 */
+	return (rptr != wptr || cntl_stack_offset != cntl_stack_size);
 }
 
 static void update_cu_mask(struct mqd_manager *mm, void *mqd,
@@ -66,6 +106,16 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 		m->compute_static_thread_mgmt_se1,
 		m->compute_static_thread_mgmt_se2,
 		m->compute_static_thread_mgmt_se3);
+}
+
+static void set_priority(struct vi_mqd *m, struct queue_properties *q)
+{
+	m->cp_hqd_pipe_priority = pipe_priority_map[q->priority];
+	m->cp_hqd_queue_priority = q->priority;
+	m->compute_pgm_rsrc1 = (m->compute_pgm_rsrc1 &
+				(~COMPUTE_PGM_RSRC1__PRIORITY_MASK)) |
+				(spi_priority_map[q->priority] <<
+				COMPUTE_PGM_RSRC1__PRIORITY__SHIFT);
 }
 
 static int init_mqd(struct mqd_manager *mm, void **mqd,
@@ -106,9 +156,7 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 			1 << CP_HQD_QUANTUM__QUANTUM_SCALE__SHIFT |
 			10 << CP_HQD_QUANTUM__QUANTUM_DURATION__SHIFT;
 
-	m->cp_hqd_pipe_priority = 1;
-	m->cp_hqd_queue_priority = 15;
-
+	set_priority(m, q);
 	m->cp_hqd_eop_rptr = 1 << CP_HQD_EOP_RPTR__INIT_FETCHER__SHIFT;
 
 	if (q->format == KFD_QUEUE_FORMAT_AQL)
@@ -215,13 +263,16 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 		m->cp_hqd_pq_control |= CP_HQD_PQ_CONTROL__NO_UPDATE_RPTR_MASK |
 				2 << CP_HQD_PQ_CONTROL__SLOT_BASED_WPTR__SHIFT;
 	}
-
+	if (priv_cp_queues)
+		m->cp_hqd_pq_control |=
+			1 << CP_HQD_PQ_CONTROL__PRIV_STATE__SHIFT;
 	if (mm->dev->cwsr_enabled && q->ctx_save_restore_area_address)
 		m->cp_hqd_ctx_save_control =
 			atc_bit << CP_HQD_CTX_SAVE_CONTROL__ATC__SHIFT |
 			mtype << CP_HQD_CTX_SAVE_CONTROL__MTYPE__SHIFT;
 
 	update_cu_mask(mm, mqd, q);
+	set_priority(m, q);
 
 	q->is_active = (q->queue_size > 0 &&
 			q->queue_address != 0 &&
@@ -267,6 +318,28 @@ static bool is_occupied(struct mqd_manager *mm, void *mqd,
 	return mm->dev->kfd2kgd->hqd_is_occupied(
 		mm->dev->kgd, queue_address,
 		pipe_id, queue_id);
+}
+
+static int get_wave_state(struct mqd_manager *mm, void *mqd,
+			  void __user *ctl_stack,
+			  u32 *ctl_stack_used_size,
+			  u32 *save_area_used_size)
+{
+	struct vi_mqd *m;
+
+	m = get_mqd(mqd);
+
+	*ctl_stack_used_size = m->cp_hqd_cntl_stack_size -
+		m->cp_hqd_cntl_stack_offset;
+	*save_area_used_size = m->cp_hqd_wg_state_offset -
+		m->cp_hqd_cntl_stack_size;
+
+	/* Control stack is not copied to user mode for GFXv8 because
+	 * it's part of the context save area that is already
+	 * accessible to user mode
+	 */
+
+	return 0;
 }
 
 static int init_mqd_hiq(struct mqd_manager *mm, void **mqd,
@@ -321,7 +394,7 @@ static int init_mqd_sdma(struct mqd_manager *mm, void **mqd,
 	memset(m, 0, sizeof(struct vi_sdma_mqd));
 
 	*mqd = m;
-	if (gart_addr != NULL)
+	if (gart_addr)
 		*gart_addr = (*mqd_mem_obj)->gpu_addr;
 
 	retval = mm->update_mqd(mm, m, q);
@@ -436,6 +509,8 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd;
 		mqd->destroy_mqd = destroy_mqd;
 		mqd->is_occupied = is_occupied;
+		mqd->get_wave_state = get_wave_state;
+		mqd->check_queue_active = check_queue_active;
 #if defined(CONFIG_DEBUG_FS)
 		mqd->debugfs_show_mqd = debugfs_show_mqd;
 #endif
@@ -447,6 +522,7 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd_hiq;
 		mqd->destroy_mqd = destroy_mqd;
 		mqd->is_occupied = is_occupied;
+		mqd->check_queue_active = check_queue_active;
 #if defined(CONFIG_DEBUG_FS)
 		mqd->debugfs_show_mqd = debugfs_show_mqd;
 #endif
@@ -458,6 +534,7 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd_sdma;
 		mqd->destroy_mqd = destroy_mqd_sdma;
 		mqd->is_occupied = is_occupied_sdma;
+		mqd->check_queue_active = check_sdma_queue_active;
 #if defined(CONFIG_DEBUG_FS)
 		mqd->debugfs_show_mqd = debugfs_show_mqd_sdma;
 #endif
