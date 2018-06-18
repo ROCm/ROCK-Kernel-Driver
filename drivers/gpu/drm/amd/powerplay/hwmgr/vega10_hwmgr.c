@@ -4066,7 +4066,7 @@ static void vega10_get_sclks(struct pp_hwmgr *hwmgr,
 	for (i = 0; i < dep_table->count; i++) {
 		if (dep_table->entries[i].clk) {
 			clocks->data[clocks->num_levels].clocks_in_khz =
-					dep_table->entries[i].clk;
+					dep_table->entries[i].clk * 10;
 			clocks->num_levels++;
 		}
 	}
@@ -4103,7 +4103,7 @@ static void vega10_get_memclocks(struct pp_hwmgr *hwmgr,
 			clocks->data[clocks->num_levels].clocks_in_khz =
 			data->mclk_latency_table.entries
 			[data->mclk_latency_table.count].frequency =
-					dep_table->entries[i].clk;
+					dep_table->entries[i].clk * 10;
 			clocks->data[clocks->num_levels].latency_in_us =
 			data->mclk_latency_table.entries
 			[data->mclk_latency_table.count].latency =
@@ -4125,7 +4125,7 @@ static void vega10_get_dcefclocks(struct pp_hwmgr *hwmgr,
 	uint32_t i;
 
 	for (i = 0; i < dep_table->count; i++) {
-		clocks->data[i].clocks_in_khz = dep_table->entries[i].clk;
+		clocks->data[i].clocks_in_khz = dep_table->entries[i].clk * 10;
 		clocks->data[i].latency_in_us = 0;
 		clocks->num_levels++;
 	}
@@ -4141,7 +4141,7 @@ static void vega10_get_socclocks(struct pp_hwmgr *hwmgr,
 	uint32_t i;
 
 	for (i = 0; i < dep_table->count; i++) {
-		clocks->data[i].clocks_in_khz = dep_table->entries[i].clk;
+		clocks->data[i].clocks_in_khz = dep_table->entries[i].clk * 10;
 		clocks->data[i].latency_in_us = 0;
 		clocks->num_levels++;
 	}
@@ -4201,7 +4201,7 @@ static int vega10_get_clock_by_type_with_voltage(struct pp_hwmgr *hwmgr,
 	}
 
 	for (i = 0; i < dep_table->count; i++) {
-		clocks->data[i].clocks_in_khz = dep_table->entries[i].clk;
+		clocks->data[i].clocks_in_khz = dep_table->entries[i].clk  * 10;
 		clocks->data[i].voltage_in_mv = (uint32_t)(table_info->vddc_lookup_table->
 				entries[dep_table->entries[i].vddInd].us_vdd);
 		clocks->num_levels++;
