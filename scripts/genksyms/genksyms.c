@@ -45,7 +45,6 @@ int in_source_file;
 
 static int flag_debug, flag_dump_defs, flag_reference, flag_dump_types,
 	   flag_override, flag_preserve, flag_warnings, flag_rel_crcs;
-static const char *mod_prefix = "";
 
 static int errors;
 static int nsyms;
@@ -695,10 +694,10 @@ void export_symbol(const char *name)
 			fputs(">\n", debugfile);
 
 		/* Used as a linker script. */
-		printf(!flag_rel_crcs ? "%s__crc_%s = 0x%08lx;\n" :
+		printf(!flag_rel_crcs ? "__crc_%s = 0x%08lx;\n" :
 		       "SECTIONS { .rodata : ALIGN(4) { "
-		       "%s__crc_%s = .; LONG(0x%08lx); } }\n",
-		       mod_prefix, name, crc);
+		       "__crc_%s = .; LONG(0x%08lx); } }\n",
+		       name, crc);
 	}
 }
 
@@ -773,7 +772,6 @@ int main(int argc, char **argv)
 
 #ifdef __GNU_LIBRARY__
 	struct option long_opts[] = {
-		{"symbol-prefix", 1, 0, 's'},
 		{"debug", 0, 0, 'd'},
 		{"warnings", 0, 0, 'w'},
 		{"quiet", 0, 0, 'q'},
@@ -794,9 +792,6 @@ int main(int argc, char **argv)
 	while ((o = getopt(argc, argv, "s:dwqVDr:T:ophR")) != EOF)
 #endif				/* __GNU_LIBRARY__ */
 		switch (o) {
-		case 's':
-			mod_prefix = optarg;
-			break;
 		case 'd':
 			flag_debug++;
 			break;

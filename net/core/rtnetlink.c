@@ -59,6 +59,9 @@
 #include <net/rtnetlink.h>
 #include <net/net_namespace.h>
 
+#define RTNL_MAX_TYPE		48
+#define RTNL_SLAVE_MAX_TYPE	36
+
 struct rtnl_link {
 	rtnl_doit_func		doit;
 	rtnl_dumpit_func	dumpit;
@@ -388,6 +391,11 @@ EXPORT_SYMBOL_GPL(__rtnl_link_register);
 int rtnl_link_register(struct rtnl_link_ops *ops)
 {
 	int err;
+
+	/* Sanity-check max sizes to avoid stack buffer overflow. */
+	if (WARN_ON(ops->maxtype > RTNL_MAX_TYPE ||
+		    ops->slave_maxtype > RTNL_SLAVE_MAX_TYPE))
+		return -EINVAL;
 
 	rtnl_lock();
 	err = __rtnl_link_register(ops);
@@ -785,13 +793,15 @@ int rtnl_put_cacheinfo(struct sk_buff *skb, struct dst_entry *dst, u32 id,
 		       long expires, u32 error)
 {
 	struct rta_cacheinfo ci = {
-		.rta_lastuse = jiffies_delta_to_clock_t(jiffies - dst->lastuse),
-		.rta_used = dst->__use,
-		.rta_clntref = atomic_read(&(dst->__refcnt)),
 		.rta_error = error,
 		.rta_id =  id,
 	};
 
+	if (dst) {
+		ci.rta_lastuse = jiffies_delta_to_clock_t(jiffies - dst->lastuse);
+		ci.rta_used = dst->__use;
+		ci.rta_clntref = atomic_read(&dst->__refcnt);
+	}
 	if (expires) {
 		unsigned long clock;
 
@@ -2900,13 +2910,16 @@ replay:
 	}
 
 	if (1) {
-		struct nlattr *attr[ops ? ops->maxtype + 1 : 1];
-		struct nlattr *slave_attr[m_ops ? m_ops->slave_maxtype + 1 : 1];
+		struct nlattr *attr[RTNL_MAX_TYPE + 1];
+		struct nlattr *slave_attr[RTNL_SLAVE_MAX_TYPE + 1];
 		struct nlattr **data = NULL;
 		struct nlattr **slave_data = NULL;
 		struct net *dest_net, *link_net = NULL;
 
 		if (ops) {
+			if (ops->maxtype > RTNL_MAX_TYPE)
+				return -EINVAL;
+
 			if (ops->maxtype && linkinfo[IFLA_INFO_DATA]) {
 				err = nla_parse_nested(attr, ops->maxtype,
 						       linkinfo[IFLA_INFO_DATA],
@@ -2923,6 +2936,9 @@ replay:
 		}
 
 		if (m_ops) {
+			if (m_ops->slave_maxtype > RTNL_SLAVE_MAX_TYPE)
+				return -EINVAL;
+
 			if (m_ops->slave_maxtype &&
 			    linkinfo[IFLA_INFO_SLAVE_DATA]) {
 				err = nla_parse_nested(slave_attr,

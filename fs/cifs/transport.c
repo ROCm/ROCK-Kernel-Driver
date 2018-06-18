@@ -212,10 +212,24 @@ rqst_len(struct smb_rqst *rqst)
 	for (i = 0; i < rqst->rq_nvec; i++)
 		buflen += iov[i].iov_len;
 
-	/* add in the page array if there is one */
+	/*
+	 * Add in the page array if there is one. The caller needs to make
+	 * sure rq_offset and rq_tailsz are set correctly. If a buffer of
+	 * multiple pages ends at page boundary, rq_tailsz needs to be set to
+	 * PAGE_SIZE.
+	 */
 	if (rqst->rq_npages) {
-		buflen += rqst->rq_pagesz * (rqst->rq_npages - 1);
-		buflen += rqst->rq_tailsz;
+		if (rqst->rq_npages == 1)
+			buflen += rqst->rq_tailsz;
+		else {
+			/*
+			 * If there is more than one page, calculate the
+			 * buffer length based on rq_offset and rq_tailsz
+			 */
+			buflen += rqst->rq_pagesz * (rqst->rq_npages - 1) -
+					rqst->rq_offset;
+			buflen += rqst->rq_tailsz;
+		}
 	}
 
 	return buflen;
@@ -274,15 +288,13 @@ __smb_send_rqst(struct TCP_Server_Info *server, struct smb_rqst *rqst)
 
 	/* now walk the page array and send each page in it */
 	for (i = 0; i < rqst->rq_npages; i++) {
-		size_t len = i == rqst->rq_npages - 1
-				? rqst->rq_tailsz
-				: rqst->rq_pagesz;
-		struct bio_vec bvec = {
-			.bv_page = rqst->rq_pages[i],
-			.bv_len = len
-		};
+		struct bio_vec bvec;
+
+		bvec.bv_page = rqst->rq_pages[i];
+		rqst_page_get_length(rqst, i, &bvec.bv_len, &bvec.bv_offset);
+
 		iov_iter_bvec(&smb_msg.msg_iter, WRITE | ITER_BVEC,
-			      &bvec, 1, len);
+			      &bvec, 1, bvec.bv_len);
 		rc = smb_send_kvec(server, &smb_msg, &sent);
 		if (rc < 0)
 			break;
@@ -800,8 +812,8 @@ cifs_send_recv(const unsigned int xid, struct cifs_ses *ses,
 #ifdef CONFIG_CIFS_SMB311
 	if ((ses->status == CifsNew) || (optype & CIFS_NEG_OP)) {
 		struct kvec iov = {
-			.iov_base = buf + 4,
-			.iov_len = get_rfc1002_length(buf)
+			.iov_base = buf,
+			.iov_len = midQ->resp_buf_size
 		};
 		smb311_update_preauth_hash(ses, &iov, 1);
 	}
@@ -832,8 +844,8 @@ SendReceive2(const unsigned int xid, struct cifs_ses *ses,
 	int rc;
 
 	if (n_vec + 1 > CIFS_MAX_IOV_SIZE) {
-		new_iov = kmalloc(sizeof(struct kvec) * (n_vec + 1),
-				  GFP_KERNEL);
+		new_iov = kmalloc_array(n_vec + 1, sizeof(struct kvec),
+					GFP_KERNEL);
 		if (!new_iov) {
 			/* otherwise cifs_send_recv below sets resp_buf_type */
 			*resp_buf_type = CIFS_NO_BUFFER;
@@ -874,8 +886,8 @@ smb2_send_recv(const unsigned int xid, struct cifs_ses *ses,
 	__be32 rfc1002_marker;
 
 	if (n_vec + 1 > CIFS_MAX_IOV_SIZE) {
-		new_iov = kmalloc(sizeof(struct kvec) * (n_vec + 1),
-				  GFP_KERNEL);
+		new_iov = kmalloc_array(n_vec + 1, sizeof(struct kvec),
+					GFP_KERNEL);
 		if (!new_iov)
 			return -ENOMEM;
 	} else

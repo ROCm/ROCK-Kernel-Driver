@@ -180,7 +180,8 @@ static const struct nla_policy ip6mr_rule_policy[FRA_MAX + 1] = {
 };
 
 static int ip6mr_rule_configure(struct fib_rule *rule, struct sk_buff *skb,
-				struct fib_rule_hdr *frh, struct nlattr **tb)
+				struct fib_rule_hdr *frh, struct nlattr **tb,
+				struct netlink_ext_ack *extack)
 {
 	return 0;
 }
@@ -444,19 +445,6 @@ static const struct seq_operations ip6mr_vif_seq_ops = {
 	.show  = ip6mr_vif_seq_show,
 };
 
-static int ip6mr_vif_open(struct inode *inode, struct file *file)
-{
-	return seq_open_net(inode, file, &ip6mr_vif_seq_ops,
-			    sizeof(struct mr_vif_iter));
-}
-
-static const struct file_operations ip6mr_vif_fops = {
-	.open    = ip6mr_vif_open,
-	.read    = seq_read,
-	.llseek  = seq_lseek,
-	.release = seq_release_net,
-};
-
 static void *ipmr_mfc_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct net *net = seq_file_net(seq);
@@ -516,19 +504,6 @@ static const struct seq_operations ipmr_mfc_seq_ops = {
 	.next  = mr_mfc_seq_next,
 	.stop  = mr_mfc_seq_stop,
 	.show  = ipmr_mfc_seq_show,
-};
-
-static int ipmr_mfc_open(struct inode *inode, struct file *file)
-{
-	return seq_open_net(inode, file, &ipmr_mfc_seq_ops,
-			    sizeof(struct mr_mfc_iter));
-}
-
-static const struct file_operations ip6mr_mfc_fops = {
-	.open    = ipmr_mfc_open,
-	.read    = seq_read,
-	.llseek  = seq_lseek,
-	.release = seq_release_net,
 };
 #endif
 
@@ -1321,9 +1296,11 @@ static int __net_init ip6mr_net_init(struct net *net)
 
 #ifdef CONFIG_PROC_FS
 	err = -ENOMEM;
-	if (!proc_create("ip6_mr_vif", 0, net->proc_net, &ip6mr_vif_fops))
+	if (!proc_create_net("ip6_mr_vif", 0, net->proc_net, &ip6mr_vif_seq_ops,
+			sizeof(struct mr_vif_iter)))
 		goto proc_vif_fail;
-	if (!proc_create("ip6_mr_cache", 0, net->proc_net, &ip6mr_mfc_fops))
+	if (!proc_create_net("ip6_mr_cache", 0, net->proc_net, &ipmr_mfc_seq_ops,
+			sizeof(struct mr_mfc_iter)))
 		goto proc_cache_fail;
 #endif
 

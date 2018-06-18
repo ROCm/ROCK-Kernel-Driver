@@ -16,6 +16,7 @@
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+#include <linux/arm-smccc.h>
 #include <linux/linkage.h>
 #include <asm/kvm_arm.h>
 #include <asm/kvm_asm.h>
@@ -71,6 +72,7 @@ __kvm_hyp_vector:
 	W(b)	hyp_irq
 	W(b)	hyp_fiq
 
+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
 	.align 5
 __kvm_hyp_vector_ic_inv:
 	.global __kvm_hyp_vector_ic_inv
@@ -86,9 +88,7 @@ __kvm_hyp_vector_ic_inv:
 	W(add)	sp, sp, #1	/* Data abort	  3 */
 	W(add)	sp, sp, #1	/* HVC		  2 */
 	W(add)	sp, sp, #1	/* IRQ		  1 */
-	W(add)	sp, sp, #1	/* FIQ		  0 */
-
-	sub	sp, sp, #1
+	W(nop)			/* FIQ		  0 */
 
 	mcr	p15, 0, r0, c7, c5, 0	/* ICIALLU */
 	isb
@@ -110,14 +110,14 @@ __kvm_hyp_vector_bp_inv:
 	W(add)	sp, sp, #1	/* Data abort	  3 */
 	W(add)	sp, sp, #1	/* HVC		  2 */
 	W(add)	sp, sp, #1	/* IRQ		  1 */
-	W(add)	sp, sp, #1	/* FIQ		  0 */
-
-	sub	sp, sp, #1
+	W(nop)			/* FIQ		  0 */
 
 	mcr	p15, 0, r0, c7, c5, 6	/* BPIALL */
 	isb
 
 decode_vectors:
+
+#ifdef CONFIG_THUMB2_KERNEL
 	/*
 	 * Yet another silly hack: Use VPIDR as a temp register.
 	 * Thumb2 is really a pain, as SP cannot be used with most
@@ -133,10 +133,16 @@ decode_vectors:
 	mrc	p15, 4, r0, c0, c0, 0	/* VPIDR */
 	mrc	p15, 0, r2, c0, c0, 0	/* MIDR  */
 	mcr	p15, 4, r2, c0, c0, 0	/* VPIDR */
+#endif
 
 .macro vect_br val, targ
-	cmp	r1, #\val
-	popeq	{r1, r2}
+ARM(	eor	sp, sp, #\val	)
+ARM(	tst	sp, #7		)
+ARM(	eorne	sp, sp, #\val	)
+
+THUMB(	cmp	r1, #\val	)
+THUMB(	popeq	{r1, r2}	)
+
 	beq	\targ
 .endm
 
@@ -148,6 +154,7 @@ decode_vectors:
 	vect_br	5, hyp_svc
 	vect_br	6, hyp_undef
 	vect_br	7, hyp_reset
+#endif
 
 .macro invalid_vector label, cause
 	.align
@@ -196,7 +203,7 @@ hyp_hvc:
 	lsr     r2, r2, #16
 	and     r2, r2, #0xff
 	cmp     r2, #0
-	bne	guest_trap		@ Guest called HVC
+	bne	guest_hvc_trap		@ Guest called HVC
 
 	/*
 	 * Getting here means host called HVC, we shift parameters and branch
@@ -245,6 +252,20 @@ THUMB(	orr	lr, #1)
 	blx	lr			@ Call the HYP function
 
 	pop	{r2, lr}
+	eret
+
+guest_hvc_trap:
+	movw	r2, #:lower16:ARM_SMCCC_ARCH_WORKAROUND_1
+	movt	r2, #:upper16:ARM_SMCCC_ARCH_WORKAROUND_1
+	ldr	r0, [sp]		@ Guest's r0
+	teq	r0, r2
+	bne	guest_trap
+	add	sp, sp, #12
+	@ Returns:
+	@ r0 = 0
+	@ r1 = HSR value (perfectly predictable)
+	@ r2 = ARM_SMCCC_ARCH_WORKAROUND_1
+	mov	r0, #0
 	eret
 
 guest_trap:
