@@ -208,8 +208,10 @@ err_alloc_mem:
 static int kfd_process_device_reserve_ib_mem(struct kfd_process_device *pdd)
 {
 	struct qcm_process_device *qpd = &pdd->qpd;
-	uint32_t flags = ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_NONPAGED |
-		ALLOC_MEM_FLAGS_NO_SUBSTITUTE | ALLOC_MEM_FLAGS_EXECUTE_ACCESS;
+	uint32_t flags = ALLOC_MEM_FLAGS_GTT |
+			 ALLOC_MEM_FLAGS_NO_SUBSTITUTE |
+			 ALLOC_MEM_FLAGS_WRITABLE |
+			 ALLOC_MEM_FLAGS_EXECUTABLE;
 	void *kaddr;
 	int ret;
 
@@ -270,6 +272,8 @@ struct kfd_process *kfd_get_process(const struct task_struct *thread)
 		return ERR_PTR(-EINVAL);
 
 	process = find_process(thread, false);
+	if (!process)
+		return ERR_PTR(-EINVAL);
 
 	return process;
 }
@@ -534,9 +538,8 @@ static int kfd_process_device_init_cwsr_dgpu(struct kfd_process_device *pdd)
 {
 	struct kfd_dev *dev = pdd->dev;
 	struct qcm_process_device *qpd = &pdd->qpd;
-	uint32_t flags = ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_NONPAGED |
-		ALLOC_MEM_FLAGS_NO_SUBSTITUTE | ALLOC_MEM_FLAGS_READONLY |
-		ALLOC_MEM_FLAGS_EXECUTE_ACCESS;
+	uint32_t flags = ALLOC_MEM_FLAGS_GTT |
+		ALLOC_MEM_FLAGS_NO_SUBSTITUTE | ALLOC_MEM_FLAGS_EXECUTABLE;
 	void *kaddr;
 	int ret;
 

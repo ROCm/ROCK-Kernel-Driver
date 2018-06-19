@@ -1206,17 +1206,40 @@ static void kfd_fill_mem_clk_max_info(struct kfd_topology_device *dev)
 
 static void kfd_fill_iolink_non_crat_info(struct kfd_topology_device *dev)
 {
-	struct kfd_iolink_properties *link;
+	struct kfd_iolink_properties *link, *cpu_link;
+	struct kfd_topology_device *cpu_dev;
+	uint32_t cap;
+	uint32_t cpu_flag = CRAT_IOLINK_FLAGS_ENABLED;
+	uint32_t flag = CRAT_IOLINK_FLAGS_ENABLED;
 
 	if (!dev || !dev->gpu)
 		return;
 
-	/* GPU only creates direck links so apply flags setting to all */
-	if (dev->gpu->device_info->asic_family == CHIP_HAWAII)
-		list_for_each_entry(link, &dev->io_link_props, list)
-			link->flags = CRAT_IOLINK_FLAGS_ENABLED |
-				CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
+	pcie_capability_read_dword(dev->gpu->pdev,
+			PCI_EXP_DEVCAP2, &cap);
+
+	if (!(cap & (PCI_EXP_DEVCAP2_ATOMIC_COMP32 |
+			PCI_EXP_DEVCAP2_ATOMIC_COMP64)))
+		cpu_flag |= CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
+			CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
+
+	if (!dev->gpu->pci_atomic_requested ||
+		dev->gpu->device_info->asic_family == CHIP_HAWAII)
+			flag |= CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
 				CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
+
+	/* GPU only creates direct links so apply flags setting to all */
+	list_for_each_entry(link, &dev->io_link_props, list) {
+		link->flags = flag;
+		cpu_dev = kfd_topology_device_by_proximity_domain(
+				link->node_to);
+		if (cpu_dev) {
+			list_for_each_entry(cpu_link,
+					&cpu_dev->io_link_props, list)
+				if (cpu_link->node_to == link->node_from)
+					cpu_link->flags = cpu_flag;
+		}
+	}
 }
 
 int kfd_topology_add_device(struct kfd_dev *gpu)
@@ -1332,6 +1355,7 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
 		break;
 	case CHIP_VEGA10:
+	case CHIP_VEGA20:
 	case CHIP_RAVEN:
 		dev->node_props.capability |= ((HSA_CAP_DOORBELL_TYPE_2_0 <<
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &

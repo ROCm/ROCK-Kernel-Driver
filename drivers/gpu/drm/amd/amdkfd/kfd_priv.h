@@ -222,6 +222,7 @@ struct kfd_device_info {
 	bool needs_pci_atomics;
 	/* obtain from adev->sdma.num_instances */
 	unsigned int num_sdma_engines;
+	unsigned int num_sdma_queues_per_engine;
 };
 
 struct kfd_mem_obj {
@@ -305,6 +306,8 @@ struct kfd_dev {
 	bool cwsr_enabled;
 	const void *cwsr_isa;
 	unsigned int cwsr_isa_size;
+
+	bool pci_atomic_requested;
 };
 
 struct kfd_ipc_obj;
@@ -611,11 +614,11 @@ struct qcm_process_device {
 	 * All the memory management data should be here too
 	 */
 	uint64_t gds_context_area;
+	uint64_t page_table_base;
 	uint32_t sh_mem_config;
 	uint32_t sh_mem_bases;
 	uint32_t sh_mem_ape1_base;
 	uint32_t sh_mem_ape1_limit;
-	uint32_t page_table_base;
 	uint32_t gds_size;
 	uint32_t num_gws;
 	uint32_t num_oac;
@@ -934,8 +937,6 @@ int kgd2kfd_post_reset(struct kfd_dev *kfd);
 
 /* amdkfd Apertures */
 int kfd_init_apertures(struct kfd_process *process);
-int kfd_set_process_dgpu_aperture(struct kfd_process_device *pdd,
-				uint64_t base, uint64_t limit);
 
 /* Queue Context Management */
 int init_queue(struct queue **q, const struct queue_properties *properties);

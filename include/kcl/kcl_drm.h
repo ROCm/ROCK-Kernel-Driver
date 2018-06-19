@@ -490,6 +490,25 @@ kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
 #endif
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
+	!defined(OS_NAME_RHEL_7_4_5)
+extern void
+__kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
+				    struct drm_connector_state *conn_state);
+#endif
+
+static inline void
+kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
+				    struct drm_connector_state *conn_state)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
+	!defined(OS_NAME_RHEL_7_4_5)
+	return __kcl_drm_atomic_helper_connector_reset(connector, conn_state);
+#else
+	return __drm_atomic_helper_connector_reset(connector, conn_state);
+#endif
+}
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && \
 	!defined(OS_NAME_RHEL_7_4_5)
 #define DRM_MODE_FMT	"%d:\"%s\" %d %d %d %d %d %d %d %d %d %d 0x%x 0x%x"
@@ -579,6 +598,13 @@ void drm_send_event(struct drm_device *dev, struct drm_pending_event *e);
 #define DRM_WARN_ONCE(fmt, ...)						\
 	_DRM_PRINTK(_once, WARNING, fmt, ##__VA_ARGS__)
 
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
+#define DP_LANE0_1_STATUS_ESI                  0x200c /* status same as 0x202 */
+#define DP_LANE2_3_STATUS_ESI                  0x200d /* status same as 0x203 */
+#define DP_LANE_ALIGN_STATUS_UPDATED_ESI       0x200e /* status same as 0x204 */
+#define DP_SINK_STATUS_ESI                     0x200f /* status same as 0x205 */
 #endif
 
 #endif /* AMDKCL_DRM_H */

@@ -312,16 +312,6 @@
 #define SVM_CWSR_BASE (SVM_USER_BASE - KFD_CWSR_TBA_TMA_SIZE)
 #define SVM_IB_BASE   (SVM_CWSR_BASE - PAGE_SIZE)
 
-int kfd_set_process_dgpu_aperture(struct kfd_process_device *pdd,
-					uint64_t base, uint64_t limit)
-{
-	if (base < SVM_USER_BASE) {
-		pr_err("Set dgpu vm base 0x%llx failed.\n", base);
-		return -EINVAL;
-	}
-	return 0;
-}
-
 static void kfd_init_apertures_vi(struct kfd_process_device *pdd, uint8_t id)
 {
 	/*
@@ -410,6 +400,7 @@ int kfd_init_apertures(struct kfd_process *process)
 				kfd_init_apertures_vi(pdd, id);
 				break;
 			case CHIP_VEGA10:
+			case CHIP_VEGA20:
 			case CHIP_RAVEN:
 				kfd_init_apertures_v9(pdd, id);
 				break;

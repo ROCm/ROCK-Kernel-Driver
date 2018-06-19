@@ -124,10 +124,10 @@ struct kgd2kfd_shared_resources {
 	 * is reserved: (D & reserved_doorbell_mask) == reserved_doorbell_val
 	 *
 	 * KFD currently uses 1024 (= 0x3ff) doorbells per process. If
-	 * doorbells 0x0f0-0x0f7 and 0x2f-0x2f7 are reserved, that means
-	 * mask would be set to 0x1f8 and val set to 0x0f0.
+	 * doorbells 0x0e0-0x0ff and 0x2e0-0x2ff are reserved, that means
+	 * mask would be set to 0x1e0 and val set to 0x0e0.
 	 */
-	unsigned int sdma_doorbell[2][2];
+	unsigned int sdma_doorbell[2][8];
 	unsigned int reserved_doorbell_mask;
 	unsigned int reserved_doorbell_val;
 
@@ -156,24 +156,26 @@ struct tile_config {
 	uint32_t num_ranks;
 };
 
+
 /*
- * Allocation flag domains currently only VRAM and GTT domain supported
+ * Allocation flag domains
+ * NOTE: This must match the corresponding definitions in kfd_ioctl.h.
  */
-#define ALLOC_MEM_FLAGS_VRAM			(1 << 0)
-#define ALLOC_MEM_FLAGS_GTT				(1 << 1)
-#define ALLOC_MEM_FLAGS_USERPTR			(1 << 2)
-#define ALLOC_MEM_FLAGS_DOORBELL		(1 << 3)
+#define ALLOC_MEM_FLAGS_VRAM		(1 << 0)
+#define ALLOC_MEM_FLAGS_GTT		(1 << 1)
+#define ALLOC_MEM_FLAGS_USERPTR		(1 << 2)
+#define ALLOC_MEM_FLAGS_DOORBELL	(1 << 3)
 
 /*
  * Allocation flags attributes/access options.
+ * NOTE: This must match the corresponding definitions in kfd_ioctl.h.
  */
-#define ALLOC_MEM_FLAGS_NONPAGED		(1 << 31)
-#define ALLOC_MEM_FLAGS_READONLY		(1 << 30)
-#define ALLOC_MEM_FLAGS_PUBLIC			(1 << 29)
-#define ALLOC_MEM_FLAGS_NO_SUBSTITUTE	(1 << 28)
+#define ALLOC_MEM_FLAGS_WRITABLE	(1 << 31)
+#define ALLOC_MEM_FLAGS_EXECUTABLE	(1 << 30)
+#define ALLOC_MEM_FLAGS_PUBLIC		(1 << 29)
+#define ALLOC_MEM_FLAGS_NO_SUBSTITUTE	(1 << 28) /* TODO */
 #define ALLOC_MEM_FLAGS_AQL_QUEUE_MEM	(1 << 27)
-#define ALLOC_MEM_FLAGS_EXECUTE_ACCESS	(1 << 26)
-#define ALLOC_MEM_FLAGS_COHERENT	(1 << 25)
+#define ALLOC_MEM_FLAGS_COHERENT	(1 << 26) /* For GFXv9 or later */
 
 /**
  * struct kfd2kgd_calls
@@ -275,7 +277,7 @@ struct kfd2kgd_calls {
 	int (*create_process_gpumem)(struct kgd_dev *kgd, uint64_t va, size_t size, void *vm, struct kgd_mem **mem);
 	void (*destroy_process_gpumem)(struct kgd_dev *kgd, struct kgd_mem *mem);
 
-	uint32_t (*get_process_page_dir)(void *vm);
+	uint64_t (*get_process_page_dir)(void *vm);
 
 	int (*alloc_pasid)(unsigned int bits);
 	void (*free_pasid)(unsigned int pasid);
@@ -366,7 +368,7 @@ struct kfd2kgd_calls {
 	int (*map_gtt_bo_to_kernel)(struct kgd_dev *kgd,
 			struct kgd_mem *mem, void **kptr, uint64_t *size);
 	void (*set_vm_context_page_table_base)(struct kgd_dev *kgd, uint32_t vmid,
-			uint32_t page_table_base);
+			uint64_t page_table_base);
 
 	int (*pin_get_sg_table_bo)(struct kgd_dev *kgd,
 			struct kgd_mem *mem, uint64_t offset,

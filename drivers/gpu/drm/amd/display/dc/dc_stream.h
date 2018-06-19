@@ -65,6 +65,8 @@ struct dc_stream_state {
 	struct audio_info audio_info;
 
 	struct dc_info_packet hdr_static_metadata;
+	PHYSICAL_ADDRESS_LOC dmdata_address;
+
 	struct dc_transfer_func *out_transfer_func;
 	struct colorspace_transform gamut_remap_matrix;
 	struct dc_csc_transform csc_color_matrix;
@@ -125,6 +127,8 @@ struct dc_stream_update {
 
 	struct dc_crtc_timing_adjust *adjust;
 	struct dc_info_packet *vrr_infopacket;
+
+	bool *dpms_off;
 };
 
 bool dc_is_stream_unchanged(

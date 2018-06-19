@@ -1101,16 +1101,13 @@ static int kfd_ioctl_wait_events(struct file *filp, struct kfd_process *p,
 
 	return err;
 }
-static int kfd_ioctl_alloc_scratch_memory(struct file *filep,
+static int kfd_ioctl_set_scratch_backing_va(struct file *filep,
 					struct kfd_process *p, void *data)
 {
-	struct kfd_ioctl_alloc_memory_of_scratch_args *args = data;
+	struct kfd_ioctl_set_scratch_backing_va_args *args = data;
 	struct kfd_process_device *pdd;
 	struct kfd_dev *dev;
 	long err;
-
-	if (args->size == 0)
-		return -EINVAL;
 
 	dev = kfd_device_by_id(args->gpu_id);
 	if (!dev)
@@ -1399,31 +1396,30 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	void *mem;
 	struct kfd_dev *dev, *peer;
 	long err = 0;
-	int i, num_dev = 0;
+	int i;
 	uint32_t *devices_arr = NULL;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (!dev)
 		return -EINVAL;
 
-	if (args->device_ids_array_size == 0) {
-		pr_debug("Device ID array size is 0\n");
+	if (!args->n_devices) {
+		pr_debug("Device IDs array empty\n");
+		return -EINVAL;
+	}
+	if (args->n_success > args->n_devices) {
+		pr_debug("n_success exceeds n_devices\n");
 		return -EINVAL;
 	}
 
-	if (args->device_ids_array_size % sizeof(uint32_t)) {
-		pr_debug("Node IDs array size %u\n",
-				args->device_ids_array_size);
-		return -EINVAL;
-	}
-
-	devices_arr = kmalloc(args->device_ids_array_size, GFP_KERNEL);
+	devices_arr = kmalloc_array(args->n_devices, sizeof(*devices_arr),
+				    GFP_KERNEL);
 	if (!devices_arr)
 		return -ENOMEM;
 
 	err = copy_from_user(devices_arr,
-			(void __user *)args->device_ids_array_ptr,
-			args->device_ids_array_size);
+			     (void __user *)args->device_ids_array_ptr,
+			     args->n_devices * sizeof(*devices_arr));
 	if (err != 0) {
 		err = -EFAULT;
 		goto copy_from_user_failed;
@@ -1444,12 +1440,11 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		goto get_mem_obj_from_handle_failed;
 	}
 
-	num_dev = args->device_ids_array_size / sizeof(uint32_t);
-	for (i = 0 ; i < num_dev; i++) {
+	for (i = args->n_success; i < args->n_devices; i++) {
 		peer = kfd_device_by_id(devices_arr[i]);
 		if (!peer) {
 			pr_debug("Getting device by id failed for 0x%x\n",
-					devices_arr[i]);
+				 devices_arr[i]);
 			err = -EINVAL;
 			goto get_mem_obj_from_handle_failed;
 		}
@@ -1460,12 +1455,13 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 			goto get_mem_obj_from_handle_failed;
 		}
 		err = peer->kfd2kgd->map_memory_to_gpu(
-				peer->kgd, (struct kgd_mem *)mem, peer_pdd->vm);
-		if (err != 0) {
-			pr_err("Failed to map to gpu %d, num_dev=%d\n",
-					i, num_dev);
+			peer->kgd, (struct kgd_mem *)mem, peer_pdd->vm);
+		if (err) {
+			pr_err("Failed to map to gpu %d/%d\n",
+			       i, args->n_devices);
 			goto map_memory_to_gpu_failed;
 		}
+		args->n_success = i+1;
 	}
 
 	mutex_unlock(&p->mutex);
@@ -1477,7 +1473,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	}
 
 	/* Flush TLBs after waiting for the page table updates to complete */
-	for (i = 0; i < num_dev; i++) {
+	for (i = 0; i < args->n_devices; i++) {
 		peer = kfd_device_by_id(devices_arr[i]);
 		if (WARN_ON_ONCE(!peer))
 			continue;
@@ -1510,30 +1506,29 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	void *mem;
 	struct kfd_dev *dev, *peer;
 	long err = 0;
-	uint32_t *devices_arr = NULL, num_dev, i;
+	uint32_t *devices_arr = NULL, i;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (!dev)
 		return -EINVAL;
 
-	if (args->device_ids_array_size == 0) {
-		pr_debug("Device ID array size is 0\n");
+	if (!args->n_devices) {
+		pr_debug("Device IDs array empty\n");
+		return -EINVAL;
+	}
+	if (args->n_success > args->n_devices) {
+		pr_debug("n_success exceeds n_devices\n");
 		return -EINVAL;
 	}
 
-	if (args->device_ids_array_size % sizeof(uint32_t)) {
-		pr_debug("Node IDs array size %u\n",
-				args->device_ids_array_size);
-		return -EINVAL;
-	}
-
-	devices_arr = kmalloc(args->device_ids_array_size, GFP_KERNEL);
+	devices_arr = kmalloc_array(args->n_devices, sizeof(*devices_arr),
+				    GFP_KERNEL);
 	if (!devices_arr)
 		return -ENOMEM;
 
 	err = copy_from_user(devices_arr,
-			(void __user *)args->device_ids_array_ptr,
-			args->device_ids_array_size);
+			     (void __user *)args->device_ids_array_ptr,
+			     args->n_devices * sizeof(*devices_arr));
 	if (err != 0) {
 		err = -EFAULT;
 		goto copy_from_user_failed;
@@ -1543,8 +1538,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 
 	pdd = kfd_get_process_device_data(dev, p);
 	if (!pdd) {
-		pr_debug("Process device data doesn't exist\n");
-		err = -ENODEV;
+		err = -EINVAL;
 		goto bind_process_to_device_failed;
 	}
 
@@ -1555,8 +1549,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 		goto get_mem_obj_from_handle_failed;
 	}
 
-	num_dev = args->device_ids_array_size / sizeof(uint32_t);
-	for (i = 0 ; i < num_dev; i++) {
+	for (i = args->n_success; i < args->n_devices; i++) {
 		peer = kfd_device_by_id(devices_arr[i]);
 		if (!peer) {
 			err = -EINVAL;
@@ -1572,9 +1565,10 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 			peer->kgd, (struct kgd_mem *)mem, peer_pdd->vm);
 		if (err) {
 			pr_err("Failed to unmap from gpu %d/%d\n",
-			       i, num_dev);
+			       i, args->n_devices);
 			goto unmap_memory_from_gpu_failed;
 		}
+		args->n_success = i+1;
 	}
 	kfree(devices_arr);
 
@@ -1588,34 +1582,6 @@ unmap_memory_from_gpu_failed:
 	mutex_unlock(&p->mutex);
 copy_from_user_failed:
 	kfree(devices_arr);
-	return err;
-}
-
-static int kfd_ioctl_set_process_dgpu_aperture(struct file *filep,
-		struct kfd_process *p, void *data)
-{
-	struct kfd_ioctl_set_process_dgpu_aperture_args *args = data;
-	struct kfd_dev *dev;
-	struct kfd_process_device *pdd;
-	long err;
-
-	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev)
-		return -EINVAL;
-
-	mutex_lock(&p->mutex);
-
-	pdd = kfd_bind_process_to_device(dev, p);
-	if (IS_ERR(pdd)) {
-		err = PTR_ERR(pdd);
-		goto exit;
-	}
-
-	err = kfd_set_process_dgpu_aperture(pdd, args->dgpu_base,
-			args->dgpu_limit);
-
-exit:
-	mutex_unlock(&p->mutex);
 	return err;
 }
 
@@ -1976,7 +1942,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 	uint64_t bo_size = 0;
 	struct dma_fence *f;
 
-	uint32_t flags = ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_NONPAGED |
+	uint32_t flags = ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_WRITABLE |
 			 ALLOC_MEM_FLAGS_NO_SUBSTITUTE;
 
 	*cma_bo = NULL;
@@ -2488,7 +2454,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 	}
 
 	remote_p = kfd_get_process(remote_task);
-	if (!remote_p) {
+	if (IS_ERR(remote_p)) {
 		pr_err("Cross mem copy failed. Invalid kfd process %d\n",
 		       args->pid);
 		err = -EINVAL;
@@ -2646,6 +2612,21 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_WAVE_CONTROL,
 			kfd_ioctl_dbg_wave_control, 0),
 
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_SCRATCH_BACKING_VA,
+			kfd_ioctl_set_scratch_backing_va, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_TILE_CONFIG,
+			kfd_ioctl_get_tile_config, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_TRAP_HANDLER,
+			kfd_ioctl_set_trap_handler, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_PROCESS_APERTURES_NEW,
+			kfd_ioctl_get_process_apertures_new, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ACQUIRE_VM,
+			kfd_ioctl_acquire_vm, 0),
+
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ALLOC_MEMORY_OF_GPU,
 			kfd_ioctl_alloc_memory_of_gpu, 0),
 
@@ -2658,29 +2639,14 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU,
 			kfd_ioctl_unmap_memory_from_gpu, 0),
 
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ALLOC_MEMORY_OF_SCRATCH,
-			kfd_ioctl_alloc_scratch_memory, 0),
-
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_CU_MASK,
 			kfd_ioctl_set_cu_mask, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_PROCESS_DGPU_APERTURE,
-			kfd_ioctl_set_process_dgpu_aperture, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_TRAP_HANDLER,
-			kfd_ioctl_set_trap_handler, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_PROCESS_APERTURES_NEW,
-				kfd_ioctl_get_process_apertures_new, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_DMABUF_INFO,
 				kfd_ioctl_get_dmabuf_info, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IMPORT_DMABUF,
 				kfd_ioctl_import_dmabuf, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_TILE_CONFIG,
-				kfd_ioctl_get_tile_config, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_IMPORT_HANDLE,
 				kfd_ioctl_ipc_import_handle, 0),
@@ -2693,9 +2659,6 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_QUEUE_WAVE_STATE,
 				kfd_ioctl_get_queue_wave_state, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ACQUIRE_VM,
-				kfd_ioctl_acquire_vm, 0)
 
 };
 

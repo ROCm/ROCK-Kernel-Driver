@@ -261,9 +261,8 @@ static void pp_to_dc_clock_levels_with_latency(
 
 	for (i = 0; i < clk_level_info->num_levels; i++) {
 		DRM_DEBUG("DM_PPLIB:\t %d\n", pp_clks->data[i].clocks_in_khz);
-		/* translate 10kHz to kHz */
 		clk_level_info->data[i].clocks_in_khz = pp_clks->data[i].clocks_in_khz;
-		clk_level_info->data[i].latency_in_us = pp_clks->data[i].clocks_in_khz;
+		clk_level_info->data[i].latency_in_us = pp_clks->data[i].latency_in_us;
 	}
 }
 
@@ -349,7 +348,7 @@ bool dm_pp_get_clock_levels_by_type_with_latency(
 	struct pp_clock_levels_with_latency pp_clks = { 0 };
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
 
-	if (!pp_funcs->get_clock_by_type_with_latency)
+	if (!pp_funcs || !pp_funcs->get_clock_by_type_with_latency)
 		return false;
 
 	if (pp_funcs->get_clock_by_type_with_latency(pp_handle,

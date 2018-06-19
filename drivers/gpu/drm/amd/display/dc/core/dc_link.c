@@ -1861,28 +1861,6 @@ static enum dc_status enable_link(
 		break;
 	}
 
-	if (pipe_ctx->stream_res.audio && status == DC_OK) {
-		struct dc *core_dc = pipe_ctx->stream->ctx->dc;
-		/* notify audio driver for audio modes of monitor */
-		struct pp_smu_funcs_rv *pp_smu = core_dc->res_pool->pp_smu;
-		unsigned int i, num_audio = 1;
-		for (i = 0; i < MAX_PIPES; i++) {
-			/*current_state not updated yet*/
-			if (core_dc->current_state->res_ctx.pipe_ctx[i].stream_res.audio != NULL)
-				num_audio++;
-		}
-
-		pipe_ctx->stream_res.audio->funcs->az_enable(pipe_ctx->stream_res.audio);
-
-		if (num_audio == 1 && pp_smu != NULL && pp_smu->set_pme_wa_enable != NULL)
-			/*this is the first audio. apply the PME w/a in order to wake AZ from D3*/
-			pp_smu->set_pme_wa_enable(&pp_smu->pp_smu);
-		/* un-mute audio */
-		/* TODO: audio should be per stream rather than per link */
-		pipe_ctx->stream_res.stream_enc->funcs->audio_mute_control(
-			pipe_ctx->stream_res.stream_enc, false);
-	}
-
 	return status;
 }
 
@@ -2382,8 +2360,42 @@ void core_link_enable_stream(
 		struct pipe_ctx *pipe_ctx)
 {
 	struct dc  *core_dc = pipe_ctx->stream->ctx->dc;
+	struct dc_stream_state *stream = pipe_ctx->stream;
 	enum dc_status status;
 	DC_LOGGER_INIT(pipe_ctx->stream->ctx->logger);
+
+	if (pipe_ctx->stream->signal != SIGNAL_TYPE_VIRTUAL) {
+		stream->sink->link->link_enc->funcs->setup(
+			stream->sink->link->link_enc,
+			pipe_ctx->stream->signal);
+		pipe_ctx->stream_res.stream_enc->funcs->setup_stereo_sync(
+			pipe_ctx->stream_res.stream_enc,
+			pipe_ctx->stream_res.tg->inst,
+			stream->timing.timing_3d_format != TIMING_3D_FORMAT_NONE);
+	}
+
+	if (dc_is_dp_signal(pipe_ctx->stream->signal))
+		pipe_ctx->stream_res.stream_enc->funcs->dp_set_stream_attribute(
+			pipe_ctx->stream_res.stream_enc,
+			&stream->timing,
+			stream->output_color_space);
+
+	if (dc_is_hdmi_signal(pipe_ctx->stream->signal))
+		pipe_ctx->stream_res.stream_enc->funcs->hdmi_set_stream_attribute(
+			pipe_ctx->stream_res.stream_enc,
+			&stream->timing,
+			stream->phy_pix_clk,
+			pipe_ctx->stream_res.audio != NULL);
+
+	if (dc_is_dvi_signal(pipe_ctx->stream->signal))
+		pipe_ctx->stream_res.stream_enc->funcs->dvi_set_stream_attribute(
+			pipe_ctx->stream_res.stream_enc,
+			&stream->timing,
+			(pipe_ctx->stream->signal == SIGNAL_TYPE_DVI_DUAL_LINK) ?
+			true : false);
+
+	resource_build_info_frame(pipe_ctx);
+	core_dc->hwss.update_info_frame(pipe_ctx);
 
 	/* eDP lit up by bios already, no need to enable again. */
 	if (pipe_ctx->stream->signal == SIGNAL_TYPE_EDP &&
@@ -2414,6 +2426,8 @@ void core_link_enable_stream(
 				return;
 			}
 	}
+
+	core_dc->hwss.enable_audio_stream(pipe_ctx);
 
 	/* turn off otg test pattern if enable */
 	pipe_ctx->stream_res.tg->funcs->set_test_pattern(pipe_ctx->stream_res.tg,
@@ -2453,6 +2467,22 @@ void core_link_set_avmute(struct pipe_ctx *pipe_ctx, bool enable)
 	core_dc->hwss.set_avmute(pipe_ctx, enable);
 }
 
+/**
+ *****************************************************************************
+ *  Function: dc_link_enable_hpd_filter
+ *
+ *  @brief
+ *     If enable is true, programs HPD filter on associated HPD line using
+ *     delay_on_disconnect/delay_on_connect values dependent on
+ *     link->connector_signal
+ *
+ *     If enable is false, programs HPD filter on associated HPD line with no
+ *     delays on connect or disconnect
+ *
+ *  @param [in] link: pointer to the dc link
+ *  @param [in] enable: boolean specifying whether to enable hbd
+ *****************************************************************************
+ */
 void dc_link_enable_hpd_filter(struct dc_link *link, bool enable)
 {
 	struct gpio *hpd;

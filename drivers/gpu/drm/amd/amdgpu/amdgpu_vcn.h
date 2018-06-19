@@ -66,9 +66,8 @@ struct amdgpu_vcn {
 	const struct firmware	*fw;	/* VCN firmware */
 	struct amdgpu_ring	ring_dec;
 	struct amdgpu_ring	ring_enc[AMDGPU_VCN_MAX_ENC_RINGS];
+	struct amdgpu_ring	ring_jpeg;
 	struct amdgpu_irq_src	irq;
-	struct drm_sched_entity entity_dec;
-	struct drm_sched_entity entity_enc;
 	unsigned		num_enc_rings;
 };
 
@@ -84,5 +83,8 @@ int amdgpu_vcn_dec_ring_test_ib(struct amdgpu_ring *ring, long timeout);
 
 int amdgpu_vcn_enc_ring_test_ring(struct amdgpu_ring *ring);
 int amdgpu_vcn_enc_ring_test_ib(struct amdgpu_ring *ring, long timeout);
+
+int amdgpu_vcn_jpeg_ring_test_ring(struct amdgpu_ring *ring);
+int amdgpu_vcn_jpeg_ring_test_ib(struct amdgpu_ring *ring, long timeout);
 
 #endif
