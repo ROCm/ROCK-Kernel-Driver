@@ -1720,8 +1720,7 @@ static int vega12_set_watermarks_for_clocks_ranges(struct pp_hwmgr *hwmgr,
 {
 	struct vega12_hwmgr *data = (struct vega12_hwmgr *)(hwmgr->backend);
 	Watermarks_t *table = &(data->smc_state_table.water_marks_table);
-	int result = 0;
-	struct pp_wm_sets_with_clock_ranges_soc15 *wm_with_clock_ranges = clock_ranges;
+	struct dm_pp_wm_sets_with_clock_ranges_soc15 *wm_with_clock_ranges = clock_ranges;
 
 	if (!data->registry_data.disable_water_mark &&
 			data->smu_features[GNLD_DPM_DCEFCLK].supported &&
@@ -1731,7 +1730,7 @@ static int vega12_set_watermarks_for_clocks_ranges(struct pp_hwmgr *hwmgr,
 		data->water_marks_bitmap &= ~WaterMarksLoaded;
 	}
 
-	return result;
+	return 0;
 }
 
 static int vega12_force_clock_level(struct pp_hwmgr *hwmgr,
