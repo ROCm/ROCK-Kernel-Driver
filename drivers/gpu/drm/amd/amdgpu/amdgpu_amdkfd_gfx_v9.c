@@ -187,6 +187,11 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.invalidate_tlbs = invalidate_tlbs,
 	.invalidate_tlbs_vmid = invalidate_tlbs_vmid,
 	.get_hive_id = amdgpu_amdkfd_get_hive_id,
+	.enable_debug_trap = kgd_enable_debug_trap,
+	.disable_debug_trap = kgd_disable_debug_trap,
+	.set_debug_trap_data = kgd_set_debug_trap_data,
+	.set_wave_launch_trap_override = kgd_set_wave_launch_trap_override,
+	.set_wave_launch_mode = kgd_set_wave_launch_mode,
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void)
