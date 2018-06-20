@@ -407,6 +407,20 @@ struct kfd2kgd_calls {
 	void (*gpu_recover)(struct kgd_dev *kgd);
 
 	void (*set_compute_idle)(struct kgd_dev *kgd, bool idle);
+	uint32_t (*enable_debug_trap)(struct kgd_dev *kgd,
+					uint32_t trap_debug_wave_launch_mode,
+					uint32_t vmid);
+	uint32_t (*disable_debug_trap)(struct kgd_dev *kgd);
+	uint32_t (*set_debug_trap_data)(struct kgd_dev *kgd,
+					int trap_data0,
+					int trap_data1);
+	uint32_t (*set_wave_launch_trap_override)(struct kgd_dev *kgd,
+						uint32_t trap_override,
+						uint32_t trap_mask);
+	uint32_t (*set_wave_launch_mode)(struct kgd_dev *kgd,
+					uint8_t wave_launch_mode,
+					uint32_t vmid);
+
 };
 
 /**

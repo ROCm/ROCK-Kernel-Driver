@@ -186,6 +186,37 @@ struct kfd_ioctl_dbg_wave_control_args {
 	__u32 buf_size_in_bytes;	/*including gpu_id and buf_size */
 };
 
+/* KFD_IOC_DBG_TRAP_ENABLE:
+ * data1: 0=disable, 1=enable
+ * data2: queue ID (for future use)
+ */
+#define KFD_IOC_DBG_TRAP_ENABLE 0
+
+/* KFD_IOC_DBG_TRAP_SET_TRAP_DATA:
+ * data1: SPI_GDBG_TRAP_DATA0
+ * data2: SPI_GDBG_TRAP_DATA1
+ */
+#define KFD_IOC_DBG_TRAP_SET_TRAP_DATA 1
+
+/* KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
+ * data1: override mode: 0=OR, 1=REPLACE
+ * data2: mask
+ */
+#define KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE 2
+
+/* KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE:
+ * data1: 0=normal, 1=halt, 2=kill, 3=singlestep, 4=disable
+ * data2: unused
+ */
+#define KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE 3
+
+struct kfd_ioctl_dbg_trap_args {
+	__u32 gpu_id;  /* to KFD */
+	__u32 op;      /* to KFD */
+	__u32 data1;   /* to KFD */
+	__u32 data2;   /* to KFD */
+};
+
 /* Matching HSA_EVENTTYPE */
 #define KFD_IOC_EVENT_SIGNAL			0
 #define KFD_IOC_EVENT_NODECHANGE		1
@@ -565,7 +596,10 @@ struct kfd_ioctl_cross_memory_copy_args {
 #define AMDKFD_IOC_CROSS_MEMORY_COPY		\
 		AMDKFD_IOWR(0x20, struct kfd_ioctl_cross_memory_copy_args)
 
+#define AMDKFD_IOC_DBG_TRAP			\
+		AMDKFD_IOW(0x21, struct kfd_ioctl_dbg_trap_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x21
+#define AMDKFD_COMMAND_END		0x22
 
 #endif

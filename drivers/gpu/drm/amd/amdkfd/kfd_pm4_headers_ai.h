@@ -144,10 +144,13 @@ struct pm4_mes_map_process {
 
 	union {
 		struct {
-			uint32_t pasid:16;
-			uint32_t reserved1:8;
-			uint32_t diq_enable:1;
-			uint32_t process_quantum:7;
+			uint32_t pasid:16;	    /* 0 - 15  */
+			uint32_t reserved1:2;	    /* 16 - 17 */
+			uint32_t debug_vmid:4;	    /* 18 - 21 */
+			uint32_t new_debug:1;	    /* 22      */
+			uint32_t tmz:1;		    /* 23      */
+			uint32_t diq_enable:1;      /* 24      */
+			uint32_t process_quantum:7; /* 25 - 31 */
 		} bitfields2;
 		uint32_t ordinal2;
 	};

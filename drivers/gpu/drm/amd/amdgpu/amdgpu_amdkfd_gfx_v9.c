@@ -150,7 +150,19 @@ static int kgd_wave_control_execute(struct kgd_dev *kgd,
 static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
 					unsigned int reg_offset);
-
+static uint32_t kgd_enable_debug_trap(struct kgd_dev *kgd,
+				uint32_t trap_debug_wave_launch_mode,
+				uint32_t vmid);
+static uint32_t kgd_disable_debug_trap(struct kgd_dev *kgd);
+static uint32_t kgd_set_debug_trap_data(struct kgd_dev *kgd,
+					int trap_data0,
+					int trap_data1);
+static uint32_t kgd_set_wave_launch_trap_override(struct kgd_dev *kgd,
+						uint32_t trap_override,
+						uint32_t trap_mask);
+static uint32_t kgd_set_wave_launch_mode(struct kgd_dev *kgd,
+					uint8_t wave_launch_mode,
+					uint32_t vmid);
 static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd,
 		uint8_t vmid);
 static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
@@ -224,6 +236,11 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.address_watch_disable = kgd_address_watch_disable,
 	.address_watch_execute = kgd_address_watch_execute,
 	.wave_control_execute = kgd_wave_control_execute,
+	.enable_debug_trap = kgd_enable_debug_trap,
+	.disable_debug_trap = kgd_disable_debug_trap,
+	.set_debug_trap_data = kgd_set_debug_trap_data,
+	.set_wave_launch_trap_override = kgd_set_wave_launch_trap_override,
+	.set_wave_launch_mode = kgd_set_wave_launch_mode,
 	.address_watch_get_offset = kgd_address_watch_get_offset,
 	.get_atc_vmid_pasid_mapping_pasid =
 			get_atc_vmid_pasid_mapping_pasid,
@@ -1119,6 +1136,142 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 {
 	return get_watch_base_addr(get_amdgpu_device(kgd)) +
 		watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + reg_offset];
+}
+
+static uint32_t kgd_enable_debug_trap(struct kgd_dev *kgd,
+				uint32_t trap_debug_wave_launch_mode,
+				uint32_t vmid)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	uint32_t data = 0;
+	uint32_t orig_wave_cntl_value;
+	uint32_t orig_stall_vmid;
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	orig_wave_cntl_value = RREG32(SOC15_REG_OFFSET(GC,
+							0,
+							mmSPI_GDBG_WAVE_CNTL));
+	orig_stall_vmid = REG_GET_FIELD(orig_wave_cntl_value,
+					SPI_GDBG_WAVE_CNTL,
+					STALL_VMID);
+
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), 0);
+
+	data = 0;
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
+
+	data = 0;
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
+		VMID_SEL, 1<<vmid);
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
+		TRAP_EN, 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_CONFIG), data);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), orig_stall_vmid);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
+}
+
+static uint32_t kgd_disable_debug_trap(struct kgd_dev *kgd)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_CONFIG), 0);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), 0);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
+}
+
+static uint32_t kgd_set_debug_trap_data(struct kgd_dev *kgd,
+					int trap_data0,
+					int trap_data1)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), trap_data0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), trap_data1);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+	return 0;
+}
+
+static uint32_t kgd_set_wave_launch_trap_override(struct kgd_dev *kgd,
+						uint32_t trap_override,
+						uint32_t trap_mask)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	uint32_t data = 0;
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	data = 0;
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_MASK,
+		EXCP_EN, trap_mask);
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_MASK,
+		REPLACE, trap_override);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
+
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
+}
+
+static uint32_t kgd_set_wave_launch_mode(struct kgd_dev *kgd,
+					uint8_t wave_launch_mode,
+					uint32_t vmid)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	uint32_t data = 0;
+	bool is_stall_mode;
+	bool is_mode_set;
+
+
+	is_stall_mode = (wave_launch_mode == 4);
+	is_mode_set = (wave_launch_mode != 0 && wave_launch_mode != 4);
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL2,
+		VMID_MASK, is_mode_set ? 1 << vmid : 0);
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL2,
+		MODE, is_mode_set ? wave_launch_mode : 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL2), data);
+
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL,
+		STALL_VMID, is_stall_mode ? 1 << vmid : 0);
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL,
+		STALL_RA, is_stall_mode ? 1 : 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
 }
 
 static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
