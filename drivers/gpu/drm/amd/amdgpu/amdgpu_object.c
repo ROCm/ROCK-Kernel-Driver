@@ -67,7 +67,6 @@ static void amdgpu_ttm_bo_destroy(struct ttm_buffer_object *tbo)
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(tbo->bdev);
 	struct amdgpu_bo *bo = ttm_to_amdgpu_bo(tbo);
-	u64 offset;
 
 	if (bo->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT)
 		kfree(tbo->mem.bus.addr);
