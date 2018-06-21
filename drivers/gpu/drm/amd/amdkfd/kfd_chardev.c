@@ -458,6 +458,9 @@ static int kfd_ioctl_set_cu_mask(struct file *filp, struct kfd_process *p,
 
 	mutex_unlock(&p->mutex);
 
+	if (retval)
+		kfree(properties.cu_mask);
+
 	return retval;
 }
 
