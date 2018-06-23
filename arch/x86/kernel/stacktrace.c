@@ -81,16 +81,6 @@ EXPORT_SYMBOL_GPL(save_stack_trace_tsk);
 
 #ifdef CONFIG_HAVE_RELIABLE_STACKTRACE
 
-#define STACKTRACE_DUMP_ONCE(task) ({				\
-	static bool __section(.data.unlikely) __dumped;		\
-								\
-	if (!__dumped) {					\
-		__dumped = true;				\
-		WARN_ON(1);					\
-		show_stack(task, NULL);				\
-	}							\
-})
-
 static int __always_inline
 __save_stack_trace_reliable(struct stack_trace *trace,
 			    struct task_struct *task)
@@ -99,7 +89,8 @@ __save_stack_trace_reliable(struct stack_trace *trace,
 	struct pt_regs *regs;
 	unsigned long addr;
 
-	for (unwind_start(&state, task, NULL, NULL); !unwind_done(&state);
+	for (unwind_start(&state, task, NULL, NULL);
+	     !unwind_done(&state) && !unwind_error(&state);
 	     unwind_next_frame(&state)) {
 
 		regs = unwind_get_entry_regs(&state, NULL);
