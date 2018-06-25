@@ -356,7 +356,7 @@ _kcl_drm_atomic_helper_update_legacy_modeset_state_stub(struct drm_device *dev,
 	}
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0) && !(defined(OS_NAME_UBUNTU) || defined(OS_NAME_SLE))
+#if !defined(HAVE_DRM_MODESET_LOCK_ALL_CTX)
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx)
 {
@@ -383,7 +383,11 @@ int drm_modeset_lock_all_ctx(struct drm_device *dev,
 	return 0;
 }
 EXPORT_SYMBOL(drm_modeset_lock_all_ctx);
+#endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
+	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3) && \
+	!defined(OS_NAME_SLE) && !defined(OS_NAME_RHEL_7_4_5)
 int drm_atomic_helper_disable_all(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx)
 {

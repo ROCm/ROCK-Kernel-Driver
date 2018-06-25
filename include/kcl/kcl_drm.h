@@ -73,9 +73,14 @@ extern void
 (*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
 					      struct drm_atomic_state *old_state);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0) && !(defined(OS_NAME_UBUNTU) || defined(OS_NAME_SLE))
+#if !defined(HAVE_DRM_MODESET_LOCK_ALL_CTX)
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx);
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
+	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3) && \
+	!defined(OS_NAME_RHEL_7_4_5) && !defined(OS_NAME_SLE)
 int drm_atomic_helper_disable_all(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx);
 #ifndef OS_NAME_RHEL_6
