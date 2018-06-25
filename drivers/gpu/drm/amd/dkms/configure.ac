@@ -16,6 +16,7 @@ m4_include([m4/drm-connector-update-edid-property.m4])
 m4_include([m4/drm-connector-attach-encoder.m4])
 m4_include([m4/drm-connector-set-path-property.m4])
 m4_include([m4/drm-dp-cec-correlation-functions.m4])
+m4_include([m4/drm-modeset-lock-all-ctx.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
