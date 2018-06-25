@@ -2,6 +2,7 @@
 #define AMDKCL_DRM_H
 
 #include <drm/drm_dp_helper.h>
+#include <drm/drm_modes.h>
 
 #ifndef DP_ADJUST_REQUEST_POST_CURSOR2
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
@@ -97,6 +98,11 @@
 #ifndef drm_for_each_fb
 #define drm_for_each_fb(fb, dev) \
 	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
+#endif
+
+#if !defined(HAVE_DRM_MODESET_LOCK_ALL_CTX)
+int drm_modeset_lock_all_ctx(struct drm_device *dev,
+			     struct drm_modeset_acquire_ctx *ctx);
 #endif
 
 #endif /* AMDKCL_DRM_H */
