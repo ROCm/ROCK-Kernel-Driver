@@ -105,4 +105,9 @@ int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx);
 #endif
 
+#if !defined(HAVE_DRM_ATOMIC_HELPER_DISABLE_ALL)
+int drm_atomic_helper_disable_all(struct drm_device *dev,
+				  struct drm_modeset_acquire_ctx *ctx);
+#endif
+
 #endif /* AMDKCL_DRM_H */
