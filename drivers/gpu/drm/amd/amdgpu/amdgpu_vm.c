@@ -1632,9 +1632,6 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 			default:
 				break;
 			}
-		} else if (flags & AMDGPU_PTE_VALID) {
-			addr += vram_base_offset;
-			addr += pfn << PAGE_SHIFT;
 		} else {
 			addr = 0;
 			max_entries = S64_MAX;
