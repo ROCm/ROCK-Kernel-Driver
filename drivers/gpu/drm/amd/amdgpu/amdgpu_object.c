@@ -274,11 +274,13 @@ int amdgpu_bo_create_reserved(struct amdgpu_device *adev,
 		goto error_free;
 	}
 
-	r = amdgpu_bo_pin(*bo_ptr, domain, gpu_addr);
+	r = amdgpu_bo_pin(*bo_ptr, domain);
 	if (r) {
 		dev_err(adev->dev, "(%d) kernel bo pin failed\n", r);
 		goto error_unreserve;
 	}
+	if (gpu_addr)
+		*gpu_addr = amdgpu_bo_gpu_offset(*bo_ptr);
 
 	if (cpu_addr) {
 		r = amdgpu_bo_kmap(*bo_ptr, cpu_addr);
@@ -528,7 +530,7 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 		r = amdgpu_bo_reserve(bo, false);
 		if (unlikely(r != 0))
 			return r;
-		r = amdgpu_bo_pin(bo, bp->domain, NULL);
+		r = amdgpu_bo_pin(bo, bp->domain);
 		amdgpu_bo_unreserve(bo);
 	}
 
@@ -855,7 +857,6 @@ void amdgpu_bo_unref(struct amdgpu_bo **bo)
  * @domain: domain to be pinned to
  * @min_offset: the start of requested address range
  * @max_offset: the end of requested address range
- * @gpu_addr: GPU offset of the &amdgpu_bo buffer object
  *
  * Pins the buffer object according to requested domain and address range. If
  * the memory is unbound gart memory, binds the pages into gart table. Adjusts
@@ -873,8 +874,7 @@ void amdgpu_bo_unref(struct amdgpu_bo **bo)
  * 0 for success or a negative error code on failure.
  */
 int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,
-			     u64 min_offset, u64 max_offset,
-			     u64 *gpu_addr)
+			     u64 min_offset, u64 max_offset)
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
 	struct ttm_operation_ctx ctx = { false, false };
@@ -906,8 +906,6 @@ int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,
 			return -EINVAL;
 
 		bo->pin_count++;
-		if (gpu_addr)
-			*gpu_addr = amdgpu_bo_gpu_offset(bo);
 
 		if (max_offset != 0) {
 			u64 domain_start = bo->tbo.bdev->man[mem_type].gpu_offset;
@@ -950,8 +948,6 @@ int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,
 	}
 
 	bo->pin_count = 1;
-	if (gpu_addr != NULL)
-		*gpu_addr = amdgpu_bo_gpu_offset(bo);
 
 	domain = amdgpu_mem_type_to_domain(bo->tbo.mem.mem_type);
 	if (domain == AMDGPU_GEM_DOMAIN_VRAM) {
@@ -970,7 +966,6 @@ error:
  * amdgpu_bo_pin - pin an &amdgpu_bo buffer object
  * @bo: &amdgpu_bo buffer object to be pinned
  * @domain: domain to be pinned to
- * @gpu_addr: GPU offset of the &amdgpu_bo buffer object
  *
  * A simple wrapper to amdgpu_bo_pin_restricted().
  * Provides a simpler API for buffers that do not have any strict restrictions
@@ -979,9 +974,9 @@ error:
  * Returns:
  * 0 for success or a negative error code on failure.
  */
-int amdgpu_bo_pin(struct amdgpu_bo *bo, u32 domain, u64 *gpu_addr)
+int amdgpu_bo_pin(struct amdgpu_bo *bo, u32 domain)
 {
-	return amdgpu_bo_pin_restricted(bo, domain, 0, 0, gpu_addr);
+	return amdgpu_bo_pin_restricted(bo, domain, 0, 0);
 }
 
 /**

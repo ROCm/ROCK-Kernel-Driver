@@ -1736,7 +1736,7 @@ static int amdgpu_ttm_fw_reserve_vram_init(struct amdgpu_device *adev)
 			AMDGPU_GEM_DOMAIN_VRAM,
 			adev->fw_vram_usage.start_offset,
 			(adev->fw_vram_usage.start_offset +
-			adev->fw_vram_usage.size), NULL);
+			adev->fw_vram_usage.size));
 		if (r)
 			goto error_pin;
 		r = amdgpu_bo_kmap(adev->fw_vram_usage.reserved_bo,
@@ -1791,7 +1791,7 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 	if (unlikely(r))
 		goto error_free;
 
-	r = amdgpu_bo_pin(abo, AMDGPU_GEM_DOMAIN_VRAM, NULL);
+	r = amdgpu_bo_pin(abo, AMDGPU_GEM_DOMAIN_VRAM);
 	amdgpu_bo_unreserve(abo);
 	if (unlikely(r))
 		goto error_free;

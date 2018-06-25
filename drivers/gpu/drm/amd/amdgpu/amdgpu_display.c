@@ -283,7 +283,6 @@ int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 	struct amdgpu_bo *new_abo;
 	unsigned long flags;
 	u64 tiling_flags;
-	u64 base;
 	int i, r;
 
 	work = kzalloc(sizeof *work, GFP_KERNEL);
@@ -317,7 +316,7 @@ int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 		goto cleanup;
 	}
 
-	r = amdgpu_bo_pin(new_abo, amdgpu_display_supported_domains(adev), &base);
+	r = amdgpu_bo_pin(new_abo, amdgpu_display_supported_domains(adev));
 	if (unlikely(r != 0)) {
 		DRM_ERROR("failed to pin new abo buffer before flip\n");
 		goto unreserve;
@@ -334,8 +333,8 @@ int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 	amdgpu_bo_get_tiling_flags(new_abo, &tiling_flags);
 	amdgpu_bo_unreserve(new_abo);
 
-	work->base = base;
-	work->target_vblank = target - drm_crtc_vblank_count(crtc) +
+	work->base = amdgpu_bo_gpu_offset(new_abo);
+	work->target_vblank = target - (uint32_t)drm_crtc_vblank_count(crtc) +
 		amdgpu_get_vblank_counter_kms(dev, work->crtc_id);
 
 	/* we borrow the event spin lock for protecting flip_wrok */
@@ -431,7 +430,7 @@ int amdgpu_crtc_page_flip(struct drm_crtc *crtc,
 		goto cleanup;
 	}
 
-	r = amdgpu_bo_pin(new_abo, AMDGPU_GEM_DOMAIN_VRAM, &base);
+	r = amdgpu_bo_pin(new_abo, AMDGPU_GEM_DOMAIN_VRAM);
 	if (unlikely(r != 0)) {
 		r = -EINVAL;
 		DRM_ERROR("failed to pin new abo buffer before flip\n");
