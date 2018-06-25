@@ -88,42 +88,15 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 			struct queue_properties *q)
 {
 	struct v9_mqd *m;
-	struct kfd_cu_info cu_info;
 	uint32_t se_mask[4] = {0}; /* 4 is the max # of SEs */
-	uint32_t cu_mask_count = q->cu_mask_count;
-	const uint32_t *cu_mask = q->cu_mask;
-	int se, cu_per_sh, cu_index, i;
 
-	if (cu_mask_count == 0)
+	if (q->cu_mask_count == 0)
 		return;
 
+	mqd_symmetrically_map_cu_mask(mm,
+		q->cu_mask, q->cu_mask_count, se_mask);
+
 	m = get_mqd(mqd);
-	m->compute_static_thread_mgmt_se0 = 0;
-	m->compute_static_thread_mgmt_se1 = 0;
-	m->compute_static_thread_mgmt_se2 = 0;
-	m->compute_static_thread_mgmt_se3 = 0;
-
-	mm->dev->kfd2kgd->get_cu_info(mm->dev->kgd, &cu_info);
-
-	/* If # CU mask bits > # CUs, set it to the # of CUs */
-	if (cu_mask_count > cu_info.cu_active_number)
-		cu_mask_count = cu_info.cu_active_number;
-
-	cu_index = 0;
-	for (se = 0; se < cu_info.num_shader_engines; se++) {
-		cu_per_sh = 0;
-
-		/* Get the number of CUs on this Shader Engine */
-		for (i = 0; i < 4; i++)
-			cu_per_sh += hweight32(cu_info.cu_bitmap[se][i]);
-
-		se_mask[se] = cu_mask[cu_index / 32] >> (cu_index % 32);
-		if ((cu_per_sh + (cu_index % 32)) > 32)
-			se_mask[se] |= cu_mask[(cu_index / 32) + 1]
-					<< (32 - (cu_index % 32));
-		se_mask[se] &= (1 << cu_per_sh) - 1;
-		cu_index += cu_per_sh;
-	}
 	m->compute_static_thread_mgmt_se0 = se_mask[0];
 	m->compute_static_thread_mgmt_se1 = se_mask[1];
 	m->compute_static_thread_mgmt_se2 = se_mask[2];
