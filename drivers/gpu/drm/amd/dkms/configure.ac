@@ -122,6 +122,7 @@ m4_include([m4/dev-pm-set-driver-flags.m4])
 m4_include([m4/arch-io-reserve-free-memtype-wc.m4])
 m4_include([m4/kref-read.m4])
 m4_include([m4/memalloc-nofs-save.m4])
+m4_include([m4/vmf-insert.m4])
 m4_include([m4/config.m4])
 
 

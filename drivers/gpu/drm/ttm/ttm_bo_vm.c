@@ -39,7 +39,9 @@
 #include <drm/ttm/ttm_placement.h>
 #include <drm/drm_vma_manager.h>
 #include <linux/mm.h>
+#ifdef HAVE_PFN_T
 #include <linux/pfn_t.h>
+#endif
 #include <linux/rbtree.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
