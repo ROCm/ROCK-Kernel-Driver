@@ -6,6 +6,7 @@ m4_include([m4/drm-modeset-lock-all-ctx.m4])
 m4_include([m4/drm-atomic-helper-disable-all.m4])
 m4_include([m4/drm-atomic-helper-duplicate-state.m4])
 m4_include([m4/drm-atomic-helper-suspend.m4])
+m4_include([m4/drm-atomic-helper-resume.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
