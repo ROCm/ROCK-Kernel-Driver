@@ -110,4 +110,10 @@ int drm_atomic_helper_disable_all(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx);
 #endif
 
+#if !defined(HAVE_DRM_ATOMIC_HELPER_DUPLICATE_STATE)
+struct drm_atomic_state *
+drm_atomic_helper_duplicate_state(struct drm_device *dev,
+				  struct drm_modeset_acquire_ctx *ctx);
+#endif
+
 #endif /* AMDKCL_DRM_H */
