@@ -82,6 +82,7 @@ m4_include([m4/memalloc-nofs-save.m4])
 m4_include([m4/mmgrab.m4])
 m4_include([m4/get-user-pages.m4])
 m4_include([m4/get-user-pages-remote.m4])
+m4_include([m4/vmf-insert.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)

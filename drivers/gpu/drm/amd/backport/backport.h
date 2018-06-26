@@ -9,6 +9,7 @@
 #include <kcl/kcl_device.h>
 #include <kcl/kcl_device_cgroup_backport.h>
 #include <kcl/kcl_kref.h>
+#include <kcl/kcl_mm_types.h>
 #include <kcl/kcl_drm_backport.h>
 #include <kcl/kcl_drm_atomic_helper.h>
 #include <kcl/kcl_drm_cache.h>
