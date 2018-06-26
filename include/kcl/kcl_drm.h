@@ -89,10 +89,13 @@ drm_atomic_helper_duplicate_state(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx);
 #endif
 
+#if !defined(HAVE_DRM_ATOMIC_HELPER_SUSPEND)
+struct drm_atomic_state *drm_atomic_helper_suspend(struct drm_device *dev);
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
 	!defined(OS_NAME_UBUNTU) && !defined(OS_NAME_RHEL_7_3) && \
 	!defined(OS_NAME_RHEL_7_4_5) && !defined(OS_NAME_SLE)
-struct drm_atomic_state *drm_atomic_helper_suspend(struct drm_device *dev);
 int drm_atomic_helper_resume(struct drm_device *dev,
 			     struct drm_atomic_state *state);
 #endif
