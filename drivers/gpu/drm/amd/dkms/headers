@@ -24,4 +24,4 @@ drm/drm_plane.h kcl/kcl_drm_plane_h.h
 linux/dma-fence.h kcl/kcl_fence_backport.h
 linux/dma-fence-array.h kcl/kcl_fence_backport.h
 linux/interval_tree_generic.h kcl/kcl_interval_tree_generic.h
-
+linux/pfn_t.h kcl/kcl_mm_types.h
