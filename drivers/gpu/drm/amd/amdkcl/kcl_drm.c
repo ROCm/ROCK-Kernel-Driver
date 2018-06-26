@@ -131,3 +131,59 @@ free:
 }
 EXPORT_SYMBOL(drm_atomic_helper_duplicate_state);
 #endif
+
+#if !defined(HAVE_DRM_ATOMIC_HELPER_SUSPEND_RESUME)
+struct drm_atomic_state *drm_atomic_helper_suspend(struct drm_device *dev)
+{
+	struct drm_modeset_acquire_ctx ctx;
+	struct drm_atomic_state *state;
+	int err;
+
+	drm_modeset_acquire_init(&ctx, 0);
+
+retry:
+	err = drm_modeset_lock_all_ctx(dev, &ctx);
+	if (err < 0) {
+		state = ERR_PTR(err);
+		goto unlock;
+	}
+
+	state = drm_atomic_helper_duplicate_state(dev, &ctx);
+	if (IS_ERR(state))
+		goto unlock;
+
+	err = drm_atomic_helper_disable_all(dev, &ctx);
+	if (err < 0) {
+		drm_atomic_state_free(state);
+		state = ERR_PTR(err);
+		goto unlock;
+	}
+
+unlock:
+	if (PTR_ERR(state) == -EDEADLK) {
+		drm_modeset_backoff(&ctx);
+		goto retry;
+	}
+
+	drm_modeset_drop_locks(&ctx);
+	drm_modeset_acquire_fini(&ctx);
+	return state;
+}
+EXPORT_SYMBOL(drm_atomic_helper_suspend);
+
+int drm_atomic_helper_resume(struct drm_device *dev,
+			     struct drm_atomic_state *state)
+{
+	struct drm_mode_config *config = &dev->mode_config;
+	int err;
+
+	drm_mode_config_reset(dev);
+	drm_modeset_lock_all(dev);
+	state->acquire_ctx = config->acquire_ctx;
+	err = drm_atomic_commit(state);
+	drm_modeset_unlock_all(dev);
+
+	return err;
+}
+EXPORT_SYMBOL(drm_atomic_helper_resume);
+#endif
