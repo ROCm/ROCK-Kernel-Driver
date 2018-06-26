@@ -4,6 +4,7 @@ m4_include([m4/kernel.m4])
 m4_include([m4/drm-probe-helper-h.m4])
 m4_include([m4/kobj-to-dev.m4])
 m4_include([m4/drm-modeset-lock-all-ctx.m4])
+m4_include([m4/drm-atomic-helper-disable-all.m4])
 m4_include([m4/drm-atomic-helper-duplicate-state.m4])
 m4_include([m4/config.m4])
 
