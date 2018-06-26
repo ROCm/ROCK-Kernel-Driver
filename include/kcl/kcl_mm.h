@@ -7,7 +7,14 @@
 #ifndef AMDKCL_MM_H
 #define AMDKCL_MM_H
 
+#include <linux/sched/mm.h>
+#include <asm/page.h>
+#include <linux/mm_types.h>
 #include <linux/mm.h>
+#include <linux/gfp.h>
+#include <linux/slab.h>
+#include <kcl/kcl_mm_types.h>
+#include <kcl/kcl_memory.h>
 
 #ifndef untagged_addr
 /* Copied from include/linux/mm.h */
