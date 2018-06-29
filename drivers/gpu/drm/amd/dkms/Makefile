@@ -64,6 +64,8 @@ subdir-ccflags-y += -DOS_NAME_UBUNTU_1604
 endif
 endif
 
+BUILD_DC = 1
+
 ifeq ($(OS_NAME),"rhel")
 ifeq ($(OS_VERSION),"6.8")
 subdir-ccflags-y += -DOS_NAME_RHEL_6
@@ -73,6 +75,7 @@ else ifeq ($(OS_VERSION),"6.10")
 subdir-ccflags-y += -DOS_NAME_RHEL_6
 else ifeq ($(OS_VERSION),"7.2")
 subdir-ccflags-y += -DOS_NAME_RHEL_7_2
+BUILD_DC = 0
 else ifeq ($(OS_VERSION),"7.3")
 subdir-ccflags-y += -DOS_NAME_RHEL_7_3
 else ifeq ($(OS_VERSION),"7.4")
@@ -103,15 +106,19 @@ export BUILD_AS_DKMS=y
 export CONFIG_DRM_AMDGPU_CIK=y
 export CONFIG_DRM_AMDGPU_SI=y
 export CONFIG_DRM_AMDGPU_USERPTR=y
+ifeq ($(BUILD_DC), 1)
 export CONFIG_DRM_AMD_DC=y
 export CONFIG_DRM_AMD_DC_DCN1_0=y
+endif
 
 subdir-ccflags-y += -DCONFIG_HSA_AMD
 subdir-ccflags-y += -DBUILD_AS_DKMS
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_CIK
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_SI
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
+ifeq ($(BUILD_DC), 1)
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_0
+endif
 
 obj-m += amd/lib/ scheduler/ amd/amdgpu/ ttm/ amd/amdkcl/  amd/amdkfd/

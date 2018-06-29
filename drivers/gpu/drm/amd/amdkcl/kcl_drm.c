@@ -596,7 +596,9 @@ static void drm_atomic_crtc_print_state(struct drm_printer *p,
 	drm_printf(p, "\tplanes_changed=%d\n", state->planes_changed);
 	drm_printf(p, "\tmode_changed=%d\n", state->mode_changed);
 	drm_printf(p, "\tactive_changed=%d\n", state->active_changed);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0) || defined(OS_NAME_RHEL_7_3) || defined(OS_NAME_RHEL_7_4_5)
 	drm_printf(p, "\tconnectors_changed=%d\n", state->connectors_changed);
+#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0) || \
 	defined(OS_NAME_RHEL_7_3) || \
 	defined(OS_NAME_RHEL_7_4_5)
