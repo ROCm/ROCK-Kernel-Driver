@@ -297,4 +297,11 @@ void drm_fb_helper_fill_info(struct fb_info *info,
 			     struct drm_fb_helper_surface_size *sizes);
 #endif
 
+#ifndef HAVE_DRM_DEV_PUT
+static inline void drm_dev_put(struct drm_device *dev)
+{
+	return drm_dev_unref(dev);
+}
+#endif
+
 #endif /* AMDKCL_DRM_H */
