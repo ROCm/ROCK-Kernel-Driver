@@ -2057,12 +2057,16 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	if (bo) {
 		flags = amdgpu_ttm_tt_pte_flags(adev, bo->tbo.ttm, mem);
 		bo_adev = amdgpu_ttm_adev(bo->tbo.bdev);
-		if (mem && mem->mem_type == TTM_PL_VRAM &&
-			adev != bo_adev) {
-			if (!(bo->flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED))
-				return -EINVAL;
-			flags |= AMDGPU_PTE_SYSTEM;
-			vram_base_offset = bo_adev->gmc.aper_base;
+		if (mem && mem->mem_type == TTM_PL_VRAM && adev != bo_adev) {
+			if (adev->gmc.xgmi.hive_id &&
+			    adev->gmc.xgmi.hive_id == bo_adev->gmc.xgmi.hive_id) {
+				vram_base_offset = bo_adev->vm_manager.vram_base_offset;
+			} else {
+				if (!(bo->flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED))
+					return -EINVAL;
+				flags |= AMDGPU_PTE_SYSTEM;
+				vram_base_offset = bo_adev->gmc.aper_base;
+			}
 		}
 	} else
 		flags = 0x0;
