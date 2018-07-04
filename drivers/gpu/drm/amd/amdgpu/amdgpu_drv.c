@@ -873,7 +873,11 @@ retry_init:
 err_pci:
 	pci_disable_device(pdev);
 err_free:
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 15, 0)
 	drm_dev_put(dev);
+#else
+	drm_dev_unref(dev);
+#endif
 	return ret;
 }
 
@@ -883,7 +887,11 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	struct drm_device *dev = pci_get_drvdata(pdev);
 
 	drm_dev_unregister(dev);
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 15, 0)
 	drm_dev_put(dev);
+#else
+	drm_dev_unref(dev);
+#endif
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 }
