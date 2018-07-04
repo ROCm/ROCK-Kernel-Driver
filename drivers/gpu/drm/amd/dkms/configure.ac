@@ -91,6 +91,7 @@ m4_include([m4/sched-mm-h.m4])
 m4_include([m4/mm-access.m4])
 m4_include([m4/mmu-notifier.m4])
 m4_include([m4/drm-fb-helper-fill-info.m4])
+m4_include([m4/drm-dev-put.m4])
 m4_include([m4/config.m4])
 
 
