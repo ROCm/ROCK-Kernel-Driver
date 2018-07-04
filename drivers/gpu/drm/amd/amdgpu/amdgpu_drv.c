@@ -962,7 +962,11 @@ retry_init:
 err_pci:
 	pci_disable_device(pdev);
 err_free:
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 15, 0)
 	drm_dev_put(dev);
+#else
+	drm_dev_unref(dev);
+#endif
 	return ret;
 }
 
