@@ -316,15 +316,7 @@ struct tile_config {
  * @set_compute_idle: Indicates that compute is idle on a device. This
  * can be used to change power profiles depending on compute activity.
  *
- * @get_dmabuf_info: Returns information about a dmabuf if it was
- * created by the GPU driver
- *
- * @import_dmabuf: Imports a DMA buffer, creating a new kgd_mem object
- * Supports only DMA buffers created by GPU driver on the same GPU
- *
- * @export_dmabuf: Emports a KFD BO for sharing with other process
- *
- * @copy_mem_to_mem: Copies size bytes from source BO to destination BO
+ * @get_hive_id: Returns hive id of current  device,  0 if xgmi is not enabled
  *
  * This structure contains function pointers to services that the kgd driver
  * provides to amdkfd driver.
@@ -452,6 +444,7 @@ struct kfd2kgd_calls {
 
 	void (*set_compute_idle)(struct kgd_dev *kgd, bool idle);
 
+	uint64_t (*get_hive_id)(struct kgd_dev *kgd);
 	int (*get_dmabuf_info)(struct kgd_dev *kgd, int dma_buf_fd,
 			       struct kgd_dev **dma_buf_kgd, uint64_t *bo_size,
 			       void *metadata_buffer, size_t buffer_size,
@@ -460,32 +453,32 @@ struct kfd2kgd_calls {
 			     uint64_t va, void *vm, struct kgd_mem **mem,
 			     uint64_t *size, uint64_t *mmap_offset);
 	int (*export_dmabuf)(struct kgd_dev *kgd, void *vm, struct kgd_mem *mem,
-				struct dma_buf **dmabuf);
-
+			     struct dma_buf **dmabuf);
 	int (*pin_get_sg_table_bo)(struct kgd_dev *kgd,
-			struct kgd_mem *mem, uint64_t offset,
-			uint64_t size, struct sg_table **ret_sg);
+				   struct kgd_mem *mem, uint64_t offset,
+				   uint64_t size, struct sg_table **ret_sg);
 	void (*unpin_put_sg_table_bo)(struct kgd_mem *mem,
-			struct sg_table *sg);
+				      struct sg_table *sg);
 
 	int (*copy_mem_to_mem)(struct kgd_dev *kgd, struct kgd_mem *src_mem,
-			uint64_t src_offset, struct kgd_mem *dst_mem,
-			uint64_t dest_offset, uint64_t size,
-			struct dma_fence **f, uint64_t *actual_size);
+			       uint64_t src_offset, struct kgd_mem *dst_mem,
+			       uint64_t dest_offset, uint64_t size,
+			       struct dma_fence **f, uint64_t *actual_size);
 
 	uint32_t (*enable_debug_trap)(struct kgd_dev *kgd,
-					uint32_t trap_debug_wave_launch_mode,
-					uint32_t vmid);
+				      uint32_t trap_debug_wave_launch_mode,
+				      uint32_t vmid);
 	uint32_t (*disable_debug_trap)(struct kgd_dev *kgd);
 	uint32_t (*set_debug_trap_data)(struct kgd_dev *kgd,
-					int trap_data0,
-					int trap_data1);
+				        int trap_data0,
+				        int trap_data1);
 	uint32_t (*set_wave_launch_trap_override)(struct kgd_dev *kgd,
-						uint32_t trap_override,
-						uint32_t trap_mask);
+				        uint32_t trap_override,
+				        uint32_t trap_mask);
 	uint32_t (*set_wave_launch_mode)(struct kgd_dev *kgd,
-					uint8_t wave_launch_mode,
-					uint32_t vmid);
+				        uint8_t wave_launch_mode,
+				        uint32_t vmid);
+
 };
 
 /**
