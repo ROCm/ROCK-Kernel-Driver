@@ -4,6 +4,7 @@
 
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
+#include <kcl/header/kcl_drm_device_h.h>
 
 #ifndef DRM_MODE_ROTATE_0
 #define DRM_MODE_ROTATE_0       (1<<0)
@@ -54,6 +55,11 @@
 #ifndef drm_for_each_fb
 #define drm_for_each_fb(fb, dev) \
 	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
+#endif
+
+#if !defined(HAVE_DRM_CRTC_FORCE_DISABLE_ALL)
+extern int drm_crtc_force_disable(struct drm_crtc *crtc);
+extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #endif
 
 #endif
