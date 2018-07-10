@@ -50,6 +50,7 @@
 
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_device.h>
 
 /* Copied from include/drm/drm_mode.h */
 #ifndef DRM_MODE_ROTATE_0
@@ -71,6 +72,11 @@
 		DRM_MODE_ROTATE_90  | \
 		DRM_MODE_ROTATE_180 | \
 		DRM_MODE_ROTATE_270)
+#endif
+
+#if !defined(HAVE_DRM_CRTC_FORCE_DISABLE_ALL)
+extern int drm_crtc_force_disable(struct drm_crtc *crtc);
+extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #endif
 
 #endif
