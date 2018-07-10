@@ -122,5 +122,9 @@ int drm_atomic_helper_resume(struct drm_device *dev,
 			     struct drm_atomic_state *state);
 #endif
 
+#if !defined(HAVE_DRM_CRTC_FORCE_DISABLE_ALL)
+extern int drm_crtc_force_disable(struct drm_crtc *crtc);
+extern int drm_crtc_force_disable_all(struct drm_device *dev);
+#endif
 
 #endif /* AMDKCL_DRM_H */

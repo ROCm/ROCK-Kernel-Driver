@@ -187,3 +187,50 @@ int drm_atomic_helper_resume(struct drm_device *dev,
 }
 EXPORT_SYMBOL(drm_atomic_helper_resume);
 #endif
+
+#if !defined(HAVE_DRM_CRTC_FORCE_DISABLE_ALL)
+/**
+ * drm_crtc_force_disable - Forcibly turn off a CRTC
+ * @crtc: CRTC to turn off
+ *
+ * Returns:
+ * Zero on success, error code on failure.
+ */
+int drm_crtc_force_disable(struct drm_crtc *crtc)
+{
+       struct drm_mode_set set = {
+               .crtc = crtc,
+       };
+
+       return drm_mode_set_config_internal(&set);
+}
+EXPORT_SYMBOL(drm_crtc_force_disable);
+
+/**
+ * drm_crtc_force_disable_all - Forcibly turn off all enabled CRTCs
+ * @dev: DRM device whose CRTCs to turn off
+ *
+ * Drivers may want to call this on unload to ensure that all displays are
+ * unlit and the GPU is in a consistent, low power state. Takes modeset locks.
+ *
+ * Returns:
+ * Zero on success, error code on failure.
+ */
+int drm_crtc_force_disable_all(struct drm_device *dev)
+{
+	struct drm_crtc *crtc;
+	int ret = 0;
+
+	drm_modeset_lock_all(dev);
+	drm_for_each_crtc(crtc, dev)
+		if (crtc->enabled) {
+			ret = drm_crtc_force_disable(crtc);
+			if (ret)
+				goto out;
+		}
+out:
+	drm_modeset_unlock_all(dev);
+	return ret;
+}
+EXPORT_SYMBOL(drm_crtc_force_disable_all);
+#endif
