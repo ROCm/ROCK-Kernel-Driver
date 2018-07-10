@@ -1,6 +1,36 @@
 #include <kcl/kcl_drm.h>
 #include "kcl_common.h"
 
+/**
+ * drm_crtc_force_disable_all - Forcibly turn off all enabled CRTCs
+ * @dev: DRM device whose CRTCs to turn off
+ *
+ * Drivers may want to call this on unload to ensure that all displays are
+ * unlit and the GPU is in a consistent, low power state. Takes modeset locks.
+ *
+ * Returns:
+ * Zero on success, error code on failure.
+ */
+#if !defined(HAVE_DRM_CRTC_FORCE_DISABLE_ALL)
+int drm_crtc_force_disable_all(struct drm_device *dev)
+{
+	struct drm_crtc *crtc;
+	int ret = 0;
+
+	drm_modeset_lock_all(dev);
+	kcl_drm_for_each_crtc(crtc, dev)
+		if (crtc->enabled) {
+			ret = drm_crtc_force_disable(crtc);
+			if (ret)
+				goto out;
+		}
+out:
+	drm_modeset_unlock_all(dev);
+	return ret;
+}
+EXPORT_SYMBOL(drm_crtc_force_disable_all);
+#endif
+
 void (*_kcl_drm_fb_helper_set_suspend)(struct drm_fb_helper *fb_helper, int state);
 EXPORT_SYMBOL(_kcl_drm_fb_helper_set_suspend);
 
