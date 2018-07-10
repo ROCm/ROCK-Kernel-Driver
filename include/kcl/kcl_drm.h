@@ -98,8 +98,7 @@ int drm_atomic_helper_resume(struct drm_device *dev,
 			     struct drm_atomic_state *state);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
-extern int drm_crtc_force_disable(struct drm_crtc *crtc);
+#if !defined(HAVE_DRM_CRTC_FORCE_DISABLE_ALL)
 extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #endif
 

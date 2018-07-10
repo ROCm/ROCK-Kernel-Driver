@@ -1,24 +1,7 @@
 #include <kcl/kcl_drm.h>
 #include "kcl_common.h"
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
-/**
- * drm_crtc_force_disable - Forcibly turn off a CRTC
- * @crtc: CRTC to turn off
- *
- * Returns:
- * Zero on success, error code on failure.
- */
-int drm_crtc_force_disable(struct drm_crtc *crtc)
-{
-	struct drm_mode_set set = {
-		.crtc = crtc,
-	};
-
-	return drm_mode_set_config_internal(&set);
-}
-EXPORT_SYMBOL(drm_crtc_force_disable);
-
+#if !defined(HAVE_DRM_CRTC_FORCE_DISABLE_ALL)
 /**
  * drm_crtc_force_disable_all - Forcibly turn off all enabled CRTCs
  * @dev: DRM device whose CRTCs to turn off
