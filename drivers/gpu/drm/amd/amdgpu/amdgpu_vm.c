@@ -1093,7 +1093,7 @@ restart:
 					   struct amdgpu_vm_bo_base,
 					   vm_status);
 		bo_base->moved = false;
-		list_del_init(&bo_base->vm_status);
+		list_move(&bo_base->vm_status, &vm->idle);
 
 		bo = bo_base->bo->parent;
 		if (!bo)
