@@ -29,7 +29,7 @@
 #include <linux/types.h>
 #include <linux/tracepoint.h>
 
-#include <kfd_priv.h>
+#include "kfd_priv.h"
 #include <linux/kfd_ioctl.h>
 
 #undef TRACE_SYSTEM
