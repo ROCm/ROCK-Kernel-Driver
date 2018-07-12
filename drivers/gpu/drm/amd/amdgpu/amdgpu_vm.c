@@ -315,19 +315,6 @@ int amdgpu_vm_validate_pt_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		}
 	}
 
-	spin_lock(&glob->lru_lock);
-	list_for_each_entry(bo_base, &vm->idle, vm_status) {
-		struct amdgpu_bo *bo = bo_base->bo;
-
-		if (!bo->parent)
-			continue;
-
-		ttm_bo_move_to_lru_tail(&bo->tbo);
-		if (bo->shadow)
-			ttm_bo_move_to_lru_tail(&bo->shadow->tbo);
-	}
-	spin_unlock(&glob->lru_lock);
-
 	return r;
 }
 
@@ -1093,7 +1080,7 @@ restart:
 					   struct amdgpu_vm_bo_base,
 					   vm_status);
 		bo_base->moved = false;
-		list_move(&bo_base->vm_status, &vm->idle);
+		list_del_init(&bo_base->vm_status);
 
 		bo = bo_base->bo->parent;
 		if (!bo)
@@ -1740,14 +1727,10 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	 * the evicted list so that it gets validated again on the
 	 * next command submission.
 	 */
-	if (bo && bo->tbo.resv == vm->root.base.bo->tbo.resv) {
-		uint32_t mem_type = bo->tbo.mem.mem_type;
-
-		if (!(bo->preferred_domains & amdgpu_mem_type_to_domain(mem_type)))
-			list_add_tail(&bo_va->base.vm_status, &vm->evicted);
-		else
-			list_add(&bo_va->base.vm_status, &vm->idle);
-	}
+	if (bo && bo->tbo.resv == vm->root.base.bo->tbo.resv &&
+	    !(bo->preferred_domains &
+	    amdgpu_mem_type_to_domain(bo->tbo.mem.mem_type)))
+		list_add_tail(&bo_va->base.vm_status, &vm->evicted);
 
 	list_splice_init(&bo_va->invalids, &bo_va->valids);
 	bo_va->cleared = clear;
@@ -2604,7 +2587,6 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	INIT_LIST_HEAD(&vm->relocated);
 	spin_lock_init(&vm->moved_lock);
 	INIT_LIST_HEAD(&vm->moved);
-	INIT_LIST_HEAD(&vm->idle);
 	INIT_LIST_HEAD(&vm->freed);
 
 	/* create scheduler entity for page table updates */
