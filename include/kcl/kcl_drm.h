@@ -127,6 +127,7 @@ extern int drm_crtc_force_disable(struct drm_crtc *crtc);
 extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #endif
 
+#if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS)
 #if !defined(IS_REACHABLE)
 #define __ARG_PLACEHOLDER_1 0,
 #define __take_second_arg(__ignored, val, ...) val
@@ -146,5 +147,26 @@ extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #define IS_REACHABLE(option) __or(IS_BUILTIN(option), \
 				__and(IS_MODULE(option), __is_defined(MODULE)))
 #endif /*IS_REACHABLE*/
+
+extern int remove_conflicting_pci_framebuffers(struct pci_dev *pdev, int res_id,
+					       const char *name);
+static inline int
+_kcl_drm_fb_helper_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
+						  const char *name)
+{
+#if IS_REACHABLE(CONFIG_FB)
+	return remove_conflicting_pci_framebuffers(pdev, 0, name);
+#else
+	return 0;
+#endif
+}
+#elif !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PP)
+static inline int
+_kcl_drm_fb_helper_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
+						  const char *name)
+{
+	return drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, name);
+}
+#endif
 
 #endif /* AMDKCL_DRM_H */
