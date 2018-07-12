@@ -37,5 +37,6 @@
 #include <kcl/backport/kcl_drm_backport.h>
 #include <kcl/backport/kcl_drm_fourcc.h>
 #include <kcl/backport/kcl_drm_vma_manager_backport.h>
+#include <kcl/backport/kcl_drm_fb.h>
 
 #endif /* AMDGPU_BACKPORT_H */
