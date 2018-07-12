@@ -4,6 +4,7 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_encoder.h>
 #include <drm/drm_edid.h>
+#include <drm/drm_fb_helper.h>
 #include <kcl/kcl_drm.h>
 
 #if !defined(HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE)
@@ -24,6 +25,10 @@ int _kcl_drm_add_edid_modes(struct drm_connector *connector, struct edid *edid)
 	return ret;
 }
 #define drm_add_edid_modes _kcl_drm_add_edid_modes
+#endif
+
+#if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PP)
+#define drm_fb_helper_remove_conflicting_pci_framebuffers _kcl_drm_fb_helper_remove_conflicting_pci_framebuffers
 #endif
 
 #endif /* AMDKCL_DRM_BACKPORT_H */

@@ -21,6 +21,7 @@ m4_include([m4/drm-atomic-helper-disable-all.m4])
 m4_include([m4/drm-atomic-helper-duplicate-state.m4])
 m4_include([m4/drm-atomic-helper-suspend-resume.m4])
 m4_include([m4/drm-crtc-force-disable-all.m4])
+m4_include([m4/drm-fb-helper-remove-conflicting-pci-framebuffers.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
