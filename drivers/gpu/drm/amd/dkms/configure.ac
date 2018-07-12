@@ -10,6 +10,7 @@ m4_include([m4/drm-atomic-helper-suspend.m4])
 m4_include([m4/drm-atomic-helper-resume.m4])
 m4_include([m4/drm-crtc-force-disable-all.m4])
 m4_include([m4/drm-audio-component-header.m4])
+m4_include([m4/remove-conflicting-framebuffers.m4])
 m4_include([m4/config.m4])
 
 

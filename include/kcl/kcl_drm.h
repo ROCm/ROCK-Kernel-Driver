@@ -93,8 +93,7 @@ extern int drm_crtc_force_disable_all(struct drm_device *dev);
 				__and(IS_MODULE(option), __is_defined(MODULE)))
 #endif
 
-#if !defined(OS_NAME_RHEL_7_4_5)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0)
+#if !defined(HAVE_REMOVE_CONFLICTING_FRAMEBUFFERS_RETURNS_INT)
 static inline void
 drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
 					      const char *name, bool primary)
@@ -116,7 +115,6 @@ drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
 	return 0;
 #endif
 }
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0) */
 #endif
 #endif
 
