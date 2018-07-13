@@ -102,7 +102,7 @@ int drm_atomic_helper_resume(struct drm_device *dev,
 extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+#if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_FRAMEBUFFERS)
 
 #if !defined(IS_REACHABLE)
 #define __ARG_PLACEHOLDER_1 0,
