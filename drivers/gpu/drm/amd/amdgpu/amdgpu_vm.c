@@ -2569,24 +2569,6 @@ void amdgpu_vm_adjust_size(struct amdgpu_device *adev, uint32_t vm_size,
 		 adev->vm_manager.fragment_size);
 }
 
-static void amdgpu_inc_compute_vms(struct amdgpu_device *adev)
-{
-	/* Temporary use only the first VM manager */
-	unsigned int vmhub = 0; /*ring->funcs->vmhub;*/
-	struct amdgpu_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
-
-	mutex_lock(&id_mgr->lock);
-	if ((adev->vm_manager.n_compute_vms++ == 0) &&
-	    (!amdgpu_sriov_vf(adev))) {
-		/* First Compute VM: enable compute power profile */
-		if (adev->powerplay.pp_funcs &&
-			adev->powerplay.pp_funcs->switch_power_profile)
-			amdgpu_dpm_switch_power_profile(adev,
-					PP_SMC_POWER_PROFILE_COMPUTE, true);
-	}
-	mutex_unlock(&id_mgr->lock);
-}
-
 /**
  * amdgpu_vm_init - initialize a vm instance
  *
@@ -2696,10 +2678,6 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	INIT_KFIFO(vm->faults);
 	vm->fault_credit = 16;
 
-	vm->vm_context = vm_context;
-	if (vm_context == AMDGPU_VM_CONTEXT_COMPUTE)
-		amdgpu_inc_compute_vms(adev);
-
 	return 0;
 
 error_unreserve:
@@ -2726,7 +2704,6 @@ error_free_sched_entity:
  * page tables allocated yet.
  *
  * Changes the following VM parameters:
- * - vm_context
  * - use_cpu_for_update
  * - pte_supports_ats
  * - pasid (old PASID is released, because compute manages its own PASIDs)
@@ -2745,13 +2722,7 @@ int amdgpu_vm_make_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	r = amdgpu_bo_reserve(vm->root.base.bo, true);
 	if (r)
 		return r;
-	if (vm->vm_context == AMDGPU_VM_CONTEXT_COMPUTE) {
-		/* Can happen if ioctl is interrupted by a signal after
-		 * this function already completed. Just return success.
-		 */
-		r = 0;
-		goto error;
-	}
+
 	/* Sanity checks */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 	if (!RB_EMPTY_ROOT(&vm->va) || vm->root.entries) {
@@ -2774,7 +2745,6 @@ int amdgpu_vm_make_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	}
 
 	/* Update VM state */
-	vm->vm_context = AMDGPU_VM_CONTEXT_COMPUTE;
 	vm->use_cpu_for_update = !!(adev->vm_manager.vm_update_mode &
 				    AMDGPU_VM_USE_CPU_FOR_COMPUTE);
 	vm->pte_support_ats = pte_support_ats;
@@ -2793,11 +2763,8 @@ int amdgpu_vm_make_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		vm->pasid = 0;
 	}
 
-
 	/* Free the shadow bo for compute VM */
 	amdgpu_bo_unref(&vm->root.base.bo->shadow);
-	/* Count the new compute VM */
-	amdgpu_inc_compute_vms(adev);
 
 error:
 	amdgpu_bo_unreserve(vm->root.base.bo);
@@ -2868,23 +2835,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		idr_remove(&adev->vm_manager.pasid_idr, vm->pasid);
 		spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
 	}
-	if (vm->vm_context == AMDGPU_VM_CONTEXT_COMPUTE) {
-		struct amdgpu_vmid_mgr *id_mgr =
-			&adev->vm_manager.id_mgr[AMDGPU_GFXHUB];
-		mutex_lock(&id_mgr->lock);
 
-		WARN(adev->vm_manager.n_compute_vms == 0, "Unbalanced number of Compute VMs");
-
-		if ((--adev->vm_manager.n_compute_vms == 0) &&
-			(!amdgpu_sriov_vf(adev))) {
-			/* Last KFD VM: enable graphics power profile */
-			if (adev->powerplay.pp_funcs &&
-				adev->powerplay.pp_funcs->switch_power_profile)
-				amdgpu_dpm_switch_power_profile(adev,
-					PP_SMC_POWER_PROFILE_COMPUTE, false);
-		}
-		mutex_unlock(&id_mgr->lock);
-	}
 	drm_sched_entity_destroy(&vm->entity);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 	if (!RB_EMPTY_ROOT(&vm->va)) {
@@ -3002,7 +2953,6 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 
 	idr_init(&adev->vm_manager.pasid_idr);
 	spin_lock_init(&adev->vm_manager.pasid_lock);
-	adev->vm_manager.n_compute_vms = 0;
 }
 
 /**

@@ -1100,6 +1100,10 @@ int amdgpu_amdkfd_gpuvm_acquire_process_vm(struct kgd_dev *kgd,
 	struct amdgpu_vm *avm = &drv_priv->vm;
 	int ret;
 
+	/* Already a compute VM? */
+	if (avm->process_info)
+		return -EINVAL;
+
 	/* Convert VM into a compute VM */
 	ret = amdgpu_vm_make_compute(adev, avm);
 	if (ret)
@@ -1121,16 +1125,13 @@ void amdgpu_amdkfd_gpuvm_destroy_cb(struct amdgpu_device *adev,
 	struct amdkfd_process_info *process_info = vm->process_info;
 	struct amdgpu_bo *pd = vm->root.base.bo;
 
-	if (vm->vm_context != AMDGPU_VM_CONTEXT_COMPUTE)
+	if (!process_info)
 		return;
 
 	/* Release eviction fence from PD */
 	amdgpu_bo_reserve(pd, false);
 	amdgpu_bo_fence(pd, NULL, false);
 	amdgpu_bo_unreserve(pd);
-
-	if (!process_info)
-		return;
 
 	/* Update process info */
 	mutex_lock(&process_info->lock);
