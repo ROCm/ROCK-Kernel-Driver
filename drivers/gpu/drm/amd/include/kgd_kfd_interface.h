@@ -250,18 +250,6 @@ struct tile_config {
  *
  * @gpu_recover: let kgd reset gpu after kfd detect CPC hang
  *
- * @get_vm_fault_info: Return information about a recent VM fault on
- * GFXv7 and v8. If multiple VM faults occurred since the last call of
- * this function, it will return information about the first of those
- * faults. On GFXv9 VM fault information is fully contained in the IH
- * packet and this function is not needed.
- *
- * @read_vmid_from_vmfault_reg: On Hawaii the VMID is not set in the
- * IH ring entry. This function allows the KFD ISR to get the VMID
- * from the fault status register as early as possible.
- *
- * @gpu_recover: let kgd reset gpu after kfd detect CPC hang
- *
  * @set_compute_idle: Indicates that compute is idle on a device. This
  * can be used to change power profiles depending on compute activity.
  *
