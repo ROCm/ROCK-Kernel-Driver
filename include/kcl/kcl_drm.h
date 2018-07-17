@@ -309,13 +309,10 @@ static inline int kcl_drm_universal_plane_init(struct drm_device *dev, struct dr
 			     enum drm_plane_type type,
 			     const char *name, ...)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0) || \
-	defined(OS_NAME_SUSE_15) || defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_9ARGS_DRM_UNIVERSAL_PLANE_INIT)
 		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
 				 formats, format_count, format_modifiers, type, name);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
-		defined(OS_NAME_RHEL_7_3) || \
-		defined(OS_NAME_RHEL_7_4)
+#elif defined(HAVE_8ARGS_DRM_UNIVERSAL_PLANE_INIT)
 		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
 				 formats, format_count, type, name);
 #else
