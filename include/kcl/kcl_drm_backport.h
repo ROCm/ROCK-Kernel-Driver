@@ -60,4 +60,24 @@ int _kcl_drm_crtc_init_with_planes(struct drm_device *dev, struct drm_crtc *crtc
 #define drm_crtc_init_with_planes _kcl_drm_crtc_init_with_planes
 #endif
 
+#ifndef HAVE_DRM_UNIVERSAL_PLANE_INIT_9ARGS
+static inline int _kcl_drm_universal_plane_init(struct drm_device *dev, struct drm_plane *plane,
+			     unsigned long possible_crtcs,
+			     const struct drm_plane_funcs *funcs,
+			     const uint32_t *formats, unsigned int format_count,
+			     const uint64_t *format_modifiers,
+			     enum drm_plane_type type,
+			     const char *name, ...)
+{
+#if defined(HAVE_DRM_UNIVERSAL_PLANE_INIT_8ARGS)
+	return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
+			 formats, format_count, type, name);
+#else
+	return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
+			 formats, format_count, type);
+#endif
+}
+#define drm_universal_plane_init _kcl_drm_universal_plane_init
+#endif
+
 #endif /* AMDKCL_DRM_BACKPORT_H */
