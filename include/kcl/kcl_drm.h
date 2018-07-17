@@ -292,7 +292,7 @@ static inline int kcl_drm_crtc_init_with_planes(struct drm_device *dev, struct d
 			      const struct drm_crtc_funcs *funcs,
 			      const char *name, ...)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0)
+#if defined(HAVE_DRM_CRTC_INIT_WITH_PLANES_VALID_WITH_NAME)
 		return drm_crtc_init_with_planes(dev, crtc, primary,
 				 cursor, funcs, name);
 #else
