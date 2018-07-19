@@ -3572,18 +3572,6 @@ static void dm_bandwidth_update(struct amdgpu_device *adev)
 	/* TODO: implement later */
 }
 
-static void dm_set_backlight_level(struct amdgpu_encoder *amdgpu_encoder,
-				     u8 level)
-{
-	/* TODO: translate amdgpu_encoder to display_index and call DAL */
-}
-
-static u8 dm_get_backlight_level(struct amdgpu_encoder *amdgpu_encoder)
-{
-	/* TODO: translate amdgpu_encoder to display_index and call DAL */
-	return 0;
-}
-
 #if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
 /**
  * dm_page_flip - called by amdgpu_flip_work_func(), which is triggered
