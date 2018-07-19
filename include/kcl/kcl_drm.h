@@ -325,10 +325,10 @@ static inline struct drm_gem_object *
 kcl_drm_gem_object_lookup(struct drm_device *dev, struct drm_file *filp,
 				u32 handle)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
-		return drm_gem_object_lookup(dev, filp, handle);
-#else
+#if defined(HAVE_2ARGS_DRM_GEM_OBJECT_LOOKUP)
 		return drm_gem_object_lookup(filp, handle);
+#else
+		return drm_gem_object_lookup(dev, filp, handle);
 #endif
 }
 
