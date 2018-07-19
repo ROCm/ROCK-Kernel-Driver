@@ -191,6 +191,7 @@ m4_include([m4/linux-io-64-nonatomic-lo-hi-h.m4])
 m4_include([m4/device.m4])
 m4_include([m4/dma-buf.m4])
 m4_include([m4/drm-crtc-state.m4])
+m4_include([m4/drm-gem-object-lookup.m4])
 m4_include([m4/config.m4])
 
 

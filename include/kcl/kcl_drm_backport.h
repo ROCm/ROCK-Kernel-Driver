@@ -7,6 +7,7 @@
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_crtc.h>
 #include <drm/drm_cache.h>
+#include <drm/drm_gem.h>
 #include <kcl/kcl_drm_file_h.h>
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 #include <drm/drm_syncobj.h>
@@ -156,4 +157,13 @@ int _kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 #define AMDKCL_AMDGPU_DMABUF_OPS
 #endif
 
-#endif /* AMDKCL_DRM_BACKPORT_H */
+#ifndef HAVE_DRM_GEM_OBJECT_LOOKUP_2ARGS
+static inline struct drm_gem_object *
+_kcl_drm_gem_object_lookup(struct drm_file *filp, u32 handle)
+{
+	return drm_gem_object_lookup(filp->minor->dev, filp, handle);
+}
+#define drm_gem_object_lookup _kcl_drm_gem_object_lookup
+#endif
+
+#endif/*AMDKCL_DRM_BACKPORT_H*/
