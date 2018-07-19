@@ -242,6 +242,12 @@ struct kfd_vmid_info {
 	uint32_t vmid_num_kfd;
 };
 
+struct kfd_vram_limit {
+	uint64_t max_vram_limit;
+	int64_t  vram_used;
+	spinlock_t vram_limit_lock;
+};
+
 struct kfd_dev {
 	struct kgd_dev *kgd;
 
@@ -311,6 +317,9 @@ struct kfd_dev {
 	unsigned int cwsr_isa_size;
 
 	bool pci_atomic_requested;
+
+	/* VRAM limit */
+	struct kfd_vram_limit vram_limit;
 };
 
 struct kfd_ipc_obj;

@@ -29,6 +29,8 @@
 #include "cwsr_trap_handler.h"
 #include "kfd_iommu.h"
 
+uint64_t kfd_total_mem_size;
+
 #define MQD_SIZE_ALIGNED 768
 
 /*
@@ -449,6 +451,37 @@ static void kfd_cwsr_init(struct kfd_dev *kfd)
 	}
 }
 
+static void kfd_vram_limit_init(struct kfd_dev *kfd)
+{
+	struct kfd_local_mem_info local_mem_info;
+	uint64_t vram_used;
+
+	spin_lock_init(&kfd->vram_limit.vram_limit_lock);
+
+	if (kfd_total_mem_size == 0) {
+		uint64_t mem;
+		struct sysinfo si;
+
+		si_meminfo(&si);
+		mem = si.totalram - si.totalhigh;
+		mem *= si.mem_unit;
+
+		kfd_total_mem_size += mem;
+	}
+
+	kfd->kfd2kgd->get_local_mem_info(kfd->kgd,
+			&local_mem_info);
+
+	vram_used = kfd->kfd2kgd->get_vram_usage(kfd->kgd);
+
+	kfd->vram_limit.max_vram_limit =
+			local_mem_info.local_mem_size_private +
+			local_mem_info.local_mem_size_public -
+			vram_used;
+
+	kfd_total_mem_size += kfd->vram_limit.max_vram_limit;
+}
+
 bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			 const struct kgd2kfd_shared_resources *gpu_resources)
 {
@@ -538,6 +571,8 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	}
 
 	kfd_cwsr_init(kfd);
+
+	kfd_vram_limit_init(kfd);
 
 	if (kfd_resume(kfd))
 		goto kfd_resume_error;
