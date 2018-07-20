@@ -125,6 +125,7 @@ struct kfd_cache_properties {
 	uint32_t		cache_type;
 	uint8_t			sibling_map[CRAT_SIBLINGMAP_SIZE];
 	struct kobject		*kobj;
+	struct kfd_dev		*gpu;
 	struct attribute	attr;
 };
 
@@ -143,6 +144,7 @@ struct kfd_iolink_properties {
 	uint32_t		rec_transfer_size;
 	uint32_t		flags;
 	struct kobject		*kobj;
+	struct kfd_dev		*gpu;
 	struct attribute	attr;
 };
 
