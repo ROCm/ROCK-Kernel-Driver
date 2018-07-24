@@ -29,7 +29,6 @@
 #include "cwsr_trap_handler.h"
 #include "kfd_iommu.h"
 #include "amdgpu_amdkfd.h"
-#include "cwsr_trap_handler_gfx10.asm"
 
 #define MQD_SIZE_ALIGNED 768
 
