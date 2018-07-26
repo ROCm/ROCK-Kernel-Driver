@@ -2662,7 +2662,7 @@ static void pplib_apply_display_requirements(
 	dc->prev_display_config = *pp_display_cfg;
 }
 
-static void dce110_set_bandwidth(
+void dce110_set_bandwidth(
 		struct dc *dc,
 		struct dc_state *context,
 		bool decrease_allowed)

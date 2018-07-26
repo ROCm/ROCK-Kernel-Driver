@@ -39,6 +39,7 @@
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
 #include "amdgpu_amdkfd.h"
+#include "amdgpu_gmc.h"
 
 /**
  * DOC: GPUVM
@@ -313,19 +314,6 @@ int amdgpu_vm_validate_pt_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 			list_move(&bo_base->vm_status, &vm->relocated);
 		}
 	}
-
-	spin_lock(&glob->lru_lock);
-	list_for_each_entry(bo_base, &vm->idle, vm_status) {
-		struct amdgpu_bo *bo = bo_base->bo;
-
-		if (!bo->parent)
-			continue;
-
-		ttm_bo_move_to_lru_tail(&bo->tbo);
-		if (bo->shadow)
-			ttm_bo_move_to_lru_tail(&bo->shadow->tbo);
-	}
-	spin_unlock(&glob->lru_lock);
 
 	return r;
 }
@@ -679,19 +667,6 @@ bool amdgpu_vm_need_pipeline_sync(struct amdgpu_ring *ring,
 		return true;
 
 	return vm_flush_needed || gds_switch_needed;
-}
-
-/**
- * amdgpu_vm_is_large_bar - Check if BAR is large enough
- *
- * @adev: amdgpu_device pointer
- *
- * Returns:
- * True if BAR is large enough.
- */
-static bool amdgpu_vm_is_large_bar(struct amdgpu_device *adev)
-{
-	return (adev->gmc.real_vram_size == adev->gmc.visible_vram_size);
 }
 
 /**
@@ -1105,7 +1080,7 @@ restart:
 					   struct amdgpu_vm_bo_base,
 					   vm_status);
 		bo_base->moved = false;
-		list_move(&bo_base->vm_status, &vm->idle);
+		list_del_init(&bo_base->vm_status);
 
 		bo = bo_base->bo->parent;
 		if (!bo)
@@ -1749,14 +1724,10 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	 * the evicted list so that it gets validated again on the
 	 * next command submission.
 	 */
-	if (bo && bo->tbo.resv == vm->root.base.bo->tbo.resv) {
-		uint32_t mem_type = bo->tbo.mem.mem_type;
-
-		if (!(bo->preferred_domains & amdgpu_mem_type_to_domain(mem_type)))
-			list_add_tail(&bo_va->base.vm_status, &vm->evicted);
-		else
-			list_add(&bo_va->base.vm_status, &vm->idle);
-	}
+	if (bo && bo->tbo.resv == vm->root.base.bo->tbo.resv &&
+	    !(bo->preferred_domains &
+	    amdgpu_mem_type_to_domain(bo->tbo.mem.mem_type)))
+		list_add_tail(&bo_va->base.vm_status, &vm->evicted);
 
 	list_splice_init(&bo_va->invalids, &bo_va->valids);
 	bo_va->cleared = clear;
@@ -2613,7 +2584,6 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	INIT_LIST_HEAD(&vm->relocated);
 	spin_lock_init(&vm->moved_lock);
 	INIT_LIST_HEAD(&vm->moved);
-	INIT_LIST_HEAD(&vm->idle);
 	INIT_LIST_HEAD(&vm->freed);
 
 	/* create scheduler entity for page table updates */
@@ -2641,7 +2611,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	}
 	DRM_DEBUG_DRIVER("VM update mode is %s\n",
 			 vm->use_cpu_for_update ? "CPU" : "SDMA");
-	WARN_ONCE((vm->use_cpu_for_update & !amdgpu_vm_is_large_bar(adev)),
+	WARN_ONCE((vm->use_cpu_for_update & !amdgpu_gmc_vram_full_visible(&adev->gmc)),
 		  "CPU update of VM recommended only for large BAR system\n");
 	vm->last_update = NULL;
 
@@ -2778,7 +2748,7 @@ int amdgpu_vm_make_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	vm->pte_support_ats = pte_support_ats;
 	DRM_DEBUG_DRIVER("VM update mode is %s\n",
 			 vm->use_cpu_for_update ? "CPU" : "SDMA");
-	WARN_ONCE((vm->use_cpu_for_update & !amdgpu_vm_is_large_bar(adev)),
+	WARN_ONCE((vm->use_cpu_for_update & !amdgpu_gmc_vram_full_visible(&adev->gmc)),
 		  "CPU update of VM recommended only for large BAR system\n");
 
 	if (vm->pasid) {
@@ -2991,7 +2961,7 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 	 */
 #ifdef CONFIG_X86_64
 	if (amdgpu_vm_update_mode == -1) {
-		if (amdgpu_vm_is_large_bar(adev))
+		if (amdgpu_gmc_vram_full_visible(&adev->gmc))
 			adev->vm_manager.vm_update_mode =
 				AMDGPU_VM_USE_CPU_FOR_COMPUTE;
 		else
