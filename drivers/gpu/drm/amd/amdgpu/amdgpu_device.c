@@ -2800,6 +2800,9 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 	if (r)
 		return r;
 
+	/* Make sure IB tests flushed */
+	flush_delayed_work(&adev->late_init_work);
+
 	/* blat the mode back in */
 	if (fbcon) {
 		if (!amdgpu_device_has_dc_support(adev)) {
