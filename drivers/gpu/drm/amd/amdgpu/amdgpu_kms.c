@@ -1315,9 +1315,9 @@ int amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int pipe,
 	}
 
 	/* Helper routine in DRM core does all the work: */
-	return kcl_drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error,
-						     vblank_time, flags,
-						     crtc, &crtc->hwmode);
+	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error,
+						vblank_time, flags,
+						&crtc->hwmode);
 }
 #endif
 

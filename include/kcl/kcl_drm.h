@@ -354,39 +354,6 @@ kcl_assert_drm_connector_list_read_locked(struct drm_mode_config *mode_config)
 			!drm_modeset_is_locked(&mode_config->connection_mutex));
 }
 
-static inline int
-kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
-					  unsigned int pipe,
-					  int *max_error,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0) || defined(OS_NAME_SUSE_15_1)
-					  ktime_t *vblank_time,
-#else
-					  struct timeval *vblank_time,
-#endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
-					  unsigned flags,
-#else
-					  bool in_vblank_irq,
-#endif
-					  const struct drm_crtc *refcrtc,
-					  const struct drm_display_mode *mode)
-{
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && \
-	!defined(OS_NAME_RHEL_6) && \
-	!defined(OS_NAME_RHEL_7_3) && \
-	!defined(OS_NAME_RHEL_7_X)
-	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
-						     flags, refcrtc, mode);
-#elif DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
-	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
-						     flags, mode);
-#else
-	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time, in_vblank_irq);
-#endif
-}
-
 #if !defined(HAVE_DRM_GET_FORMAT_NAME)
 /**
  * struct drm_format_name_buf - name of a DRM format
