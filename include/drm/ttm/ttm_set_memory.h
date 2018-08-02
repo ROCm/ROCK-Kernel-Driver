@@ -35,7 +35,11 @@
 
 #ifdef CONFIG_X86
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 #include <asm/set_memory.h>
+#else
+#include <asm/cacheflush.h>
+#endif
 
 static inline int ttm_set_pages_array_wb(struct page **pages, int addrinarray)
 {
