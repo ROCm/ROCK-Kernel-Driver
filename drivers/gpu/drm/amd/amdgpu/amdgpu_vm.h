@@ -35,6 +35,7 @@
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 #include <drm/drm_file.h>
 #endif
+#include <drm/ttm/ttm_bo_driver.h>
 
 #include "amdgpu_sync.h"
 #include "amdgpu_ring.h"
@@ -257,6 +258,11 @@ struct amdgpu_vm {
 
 	/* Some basic info about the task */
 	struct amdgpu_task_info task_info;
+
+	/* Store positions of group of BOs */
+	struct ttm_lru_bulk_move lru_bulk_move;
+	/* mark whether can do the bulk move */
+	bool			bulk_moveable;
 };
 
 struct amdgpu_vm_manager {
@@ -364,8 +370,11 @@ bool amdgpu_vm_need_pipeline_sync(struct amdgpu_ring *ring,
 void amdgpu_vm_check_compute_bug(struct amdgpu_device *adev);
 
 void amdgpu_vm_get_task_info(struct amdgpu_device *adev, unsigned int pasid,
-			 struct amdgpu_task_info *task_info);
+			     struct amdgpu_task_info *task_info);
 
 void amdgpu_vm_set_task_info(struct amdgpu_vm *vm);
+
+void amdgpu_vm_move_to_lru_tail(struct amdgpu_device *adev,
+				struct amdgpu_vm *vm);
 
 #endif
