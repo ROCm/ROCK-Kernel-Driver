@@ -429,8 +429,9 @@ typedef enum _AMDGPU_DOORBELL64_ASSIGNMENT
 	AMDGPU_DOORBELL64_sDMA_HI_PRI_ENGINE1     = 0xE9,
 
 	/* For vega10 sriov, the sdma doorbell must be fixed as follow
-	* to keep the same setting with host driver, or it will
-	* happen conflicts */
+	 * to keep the same setting with host driver, or it will
+	 * happen conflicts
+	 */
 	AMDGPU_VEGA10_DOORBELL64_sDMA_ENGINE0            = 0xF0,
 	AMDGPU_VEGA10_DOORBELL64_sDMA_HI_PRI_ENGINE0     = 0xF1,
 	AMDGPU_VEGA10_DOORBELL64_sDMA_ENGINE1            = 0xF2,
