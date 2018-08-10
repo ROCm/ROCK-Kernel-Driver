@@ -1,3 +1,15 @@
+DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(srctree)/Makefile)
+DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(srctree)/Makefile)
+ifeq ($(DRM_VER),)
+DRM_VER = $(VERSION)
+DRM_PATCH = $(PATCHLEVEL)
+endif
+
+subdir-ccflags-y += \
+	-DDRM_VER=$(DRM_VER) \
+	-DDRM_PATCH=$(DRM_PATCH) \
+	-DDRM_SUB="0"
+
 LINUXINCLUDE := \
 	-I$(src)/include \
 	-I$(src)/include/uapi \
