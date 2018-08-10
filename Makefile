@@ -1299,7 +1299,12 @@ define filechk_version.h
 	((c) > 255 ? 255 : (c)))';                                       \
 	echo \#define LINUX_VERSION_MAJOR $(VERSION);                    \
 	echo \#define LINUX_VERSION_PATCHLEVEL $(PATCHLEVEL);            \
-	echo \#define LINUX_VERSION_SUBLEVEL $(SUBLEVEL)
+	echo \#define LINUX_VERSION_SUBLEVEL $(SUBLEVEL);		 \
+	echo '#define DRM_VER $(VERSION)';                                \
+	echo '#define DRM_PATCH $(PATCHLEVEL)';                           \
+	echo '#define DRM_SUB $(SUBLEVEL)';                               \
+	echo \#define DRM_VERSION_CODE LINUX_VERSION_CODE;                \
+	echo '#define DRM_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))'
 endef
 
 $(version_h): PATCHLEVEL := $(if $(PATCHLEVEL), $(PATCHLEVEL), 0)
