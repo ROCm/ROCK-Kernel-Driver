@@ -44,6 +44,7 @@ struct drm_framebuffer *
 amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 				       struct drm_file *file_priv,
 				       const struct drm_mode_fb_cmd2 *mode_cmd);
+
 int amdgpu_sem_ioctl(struct drm_device *dev, void *data,
 		     struct drm_file *filp);
 
