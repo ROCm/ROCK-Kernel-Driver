@@ -100,5 +100,9 @@ TRACE_EVENT(drm_sched_job_wait_dep,
 
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
+#ifdef BUILD_AS_DKMS
+#define TRACE_INCLUDE_PATH ./
+#else
 #define TRACE_INCLUDE_PATH ../../drivers/gpu/drm/scheduler
+#endif
 #include <trace/define_trace.h>
