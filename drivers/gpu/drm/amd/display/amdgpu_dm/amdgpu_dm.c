@@ -832,7 +832,11 @@ dm_atomic_state_alloc_free(struct drm_atomic_state *state)
 
 static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 	.fb_create = amdgpu_display_user_framebuffer_create,
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 16, 0)
 	.output_poll_changed = drm_fb_helper_output_poll_changed,
+#else
+	.output_poll_changed = amdgpu_output_poll_changed,
+#endif
 	.atomic_check = amdgpu_dm_atomic_check,
 	.atomic_commit = amdgpu_dm_atomic_commit,
 	.atomic_state_alloc = dm_atomic_state_alloc,
