@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-BACKPORT_OBJS :=
+BACKPORT_OBJS := kcl_drm_fb_helper.o
 
 amdgpu-y += $(addprefix ../backport/,$(BACKPORT_OBJS))
 
