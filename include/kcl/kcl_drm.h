@@ -495,6 +495,10 @@ kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 #endif
 }
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && defined(BUILD_AS_DKMS)
+u64 drm_get_max_iomem(void);
+#endif
+
 #if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 #define DRM_MODE_FMT	"%d:\"%s\" %d %d %d %d %d %d %d %d %d %d 0x%x 0x%x"
 #define DRM_MODE_ARG(m)	\
