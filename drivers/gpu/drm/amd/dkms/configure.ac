@@ -21,6 +21,7 @@ m4_include([m4/drm-gem-object-ref.m4])
 m4_include([m4/drm-fb-helper-remove-conflicting-pci-framebuffers.m4])
 m4_include([m4/drm-is-current-master.m4])
 m4_include([m4/drm-atomic-helper-connector-reset.m4])
+m4_include([m4/drm-get-max-iomem.m4])
 m4_include([m4/config.m4])
 
 

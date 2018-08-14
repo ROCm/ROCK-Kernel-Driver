@@ -382,8 +382,7 @@ void drm_printf(struct drm_printer *p, const char *f, ...)
 EXPORT_SYMBOL(drm_printf);
 #endif
 
-
-#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && defined(BUILD_AS_DKMS)
+#if !defined(HAVE_DRM_GET_MAX_IOMEM)
 u64 drm_get_max_iomem(void)
 {
 	struct resource *tmp;
