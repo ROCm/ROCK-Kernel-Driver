@@ -694,3 +694,18 @@ void drm_state_dump(struct drm_device *dev, struct drm_printer *p)
 }
 EXPORT_SYMBOL(drm_state_dump);
 #endif
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && defined(BUILD_AS_DKMS)
+u64 drm_get_max_iomem(void)
+{
+	struct resource *tmp;
+	resource_size_t max_iomem = 0;
+
+	for (tmp = iomem_resource.child; tmp; tmp = tmp->sibling) {
+		max_iomem = max(max_iomem,  tmp->end);
+	}
+
+	return max_iomem;
+}
+EXPORT_SYMBOL(drm_get_max_iomem);
+#endif
