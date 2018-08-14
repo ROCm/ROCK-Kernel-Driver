@@ -1867,6 +1867,8 @@ static int amdgpu_device_ip_fini(struct amdgpu_device *adev)
 	int i, r;
 
 	amdgpu_amdkfd_device_fini(adev);
+
+	amdgpu_device_set_pg_state(adev, AMD_PG_STATE_UNGATE);
 	/* need to disable SMC first */
 	for (i = 0; i < adev->num_ip_blocks; i++) {
 		if (!adev->ip_blocks[i].status.hw)
@@ -1881,8 +1883,7 @@ static int amdgpu_device_ip_fini(struct amdgpu_device *adev)
 					  adev->ip_blocks[i].version->funcs->name, r);
 				return r;
 			}
-			amdgpu_gfx_off_ctrl(adev, false);
-			cancel_delayed_work_sync(&adev->gfx.gfx_off_delay_work);
+
 			r = adev->ip_blocks[i].version->funcs->hw_fini((void *)adev);
 			/* XXX handle errors */
 			if (r) {
@@ -2005,6 +2006,8 @@ static int amdgpu_device_ip_suspend_phase1(struct amdgpu_device *adev)
 	if (amdgpu_sriov_vf(adev))
 		amdgpu_virt_request_full_gpu(adev, false);
 
+	amdgpu_device_set_pg_state(adev, AMD_PG_STATE_UNGATE);
+
 	for (i = adev->num_ip_blocks - 1; i >= 0; i--) {
 		if (!adev->ip_blocks[i].status.valid)
 			continue;
@@ -2059,10 +2062,6 @@ static int amdgpu_device_ip_suspend_phase2(struct amdgpu_device *adev)
 	if (r) {
 		DRM_ERROR("set_clockgating_state(ungate) SMC failed %d\n", r);
 	}
-
-	/* call smu to disable gfx off feature first when suspend */
-	amdgpu_gfx_off_ctrl(adev, false);
-	cancel_delayed_work_sync(&adev->gfx.gfx_off_delay_work);
 
 	for (i = adev->num_ip_blocks - 1; i >= 0; i--) {
 		if (!adev->ip_blocks[i].status.valid)
