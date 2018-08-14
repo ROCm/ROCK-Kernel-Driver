@@ -194,4 +194,8 @@ __drm_atomic_helper_connector_reset(struct drm_connector *connector,
 }
 #endif
 
+#if !defined(HAVE_DRM_GET_MAX_IOMEM)
+u64 drm_get_max_iomem(void);
+#endif
+
 #endif /* AMDKCL_DRM_H */
