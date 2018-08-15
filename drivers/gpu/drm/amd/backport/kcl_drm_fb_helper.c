@@ -62,3 +62,16 @@ void drm_fb_helper_output_poll_changed(struct drm_device *dev)
 		drm_fb_helper_hotplug_event(&adev->mode_info.rfbdev->helper);
 }
 #endif
+
+#ifndef HAVE_DRM_DRM_GEM_FRAMEBUFFER_HELPER_H
+struct drm_gem_object *drm_gem_fb_get_obj(struct drm_framebuffer *fb,
+					  unsigned int plane)
+{
+	struct amdgpu_framebuffer *afb = to_amdgpu_framebuffer(fb);
+	(void)plane; /* for compile un-used warning */
+	if (afb)
+		return afb->obj;
+	else
+		return NULL;
+}
+#endif
