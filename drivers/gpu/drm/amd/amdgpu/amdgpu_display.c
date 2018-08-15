@@ -894,3 +894,18 @@ int amdgpu_display_crtc_idx_to_irq_type(struct amdgpu_device *adev, int crtc)
 		return AMDGPU_CRTC_IRQ_NONE;
 	}
 }
+
+int amdgpu_display_freesync_ioctl(struct drm_device *dev, void *data,
+				  struct drm_file *filp)
+{
+	int ret = -EPERM;
+	struct amdgpu_device *adev = dev->dev_private;
+
+	if (adev->mode_info.funcs->notify_freesync)
+		ret = adev->mode_info.funcs->notify_freesync(dev,data,filp);
+	else
+		DRM_DEBUG("amdgpu no notify_freesync ioctl\n");
+
+	return ret;
+}
+
