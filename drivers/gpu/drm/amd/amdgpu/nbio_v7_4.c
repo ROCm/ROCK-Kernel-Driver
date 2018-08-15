@@ -188,7 +188,7 @@ static u32 nbio_v7_4_get_pcie_data_offset(struct amdgpu_device *adev)
 	return SOC15_REG_OFFSET(NBIO, 0, mmPCIE_DATA2);
 }
 
-const struct nbio_hdp_flush_reg nbio_v7_4_hdp_flush_reg = {
+static const struct nbio_hdp_flush_reg nbio_v7_4_hdp_flush_reg = {
 	.ref_and_mask_cp0 = GPU_HDP_FLUSH_DONE__CP0_MASK,
 	.ref_and_mask_cp1 = GPU_HDP_FLUSH_DONE__CP1_MASK,
 	.ref_and_mask_cp2 = GPU_HDP_FLUSH_DONE__CP2_MASK,
