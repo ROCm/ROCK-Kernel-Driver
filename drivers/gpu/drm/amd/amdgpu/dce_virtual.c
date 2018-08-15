@@ -196,7 +196,7 @@ static void dce_virtual_crtc_disable(struct drm_crtc *crtc)
 		int r;
 		struct amdgpu_bo *abo;
 
-		abo = gem_to_amdgpu_bo(crtc->primary->fb->obj[0]);
+		abo = gem_to_amdgpu_bo(kcl_drm_fb_get_gem_obj(crtc->primary->fb, 0));
 		r = amdgpu_bo_reserve(abo, true);
 		if (unlikely(r))
 			DRM_ERROR("failed to reserve abo before unpin\n");
