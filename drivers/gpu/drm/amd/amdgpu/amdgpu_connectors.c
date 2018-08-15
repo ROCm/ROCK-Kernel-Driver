@@ -38,6 +38,13 @@
 
 #include <linux/pm_runtime.h>
 
+#if DRM_VERSION_CODE < DRM_VERSION(4 ,16, 0)
+bool inline drm_kms_helper_is_poll_worker(void)
+{
+	return false;
+}
+#endif
+
 void amdgpu_connector_hotplug(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
