@@ -32,6 +32,10 @@
 #define NUM_REGIONS 32
 #define MAX_HW_POINTS (NUM_PTS_IN_REGION*NUM_REGIONS)
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4 ,18, 0)
+#define kvcalloc(n, size, gfp)	kvzalloc(((n)*(size)), gfp)
+#endif
+
 static struct hw_x_point coordinates_x[MAX_HW_POINTS + 2];
 
 static struct fixed31_32 pq_table[MAX_HW_POINTS + 2];
