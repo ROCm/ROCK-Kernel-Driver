@@ -2715,6 +2715,12 @@ int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
 	} else if (property == adev->mode_info.underscan_property) {
 		dm_new_state->underscan_enable = val;
 		ret = 0;
+	} else if (property == adev->mode_info.freesync_property) {
+		dm_new_state->freesync_enable = val;
+		ret = 0;
+	} else if (property == adev->mode_info.freesync_capable_property) {
+		dm_new_state->freesync_capable = val;
+		ret = 0;
 	}
 
 	return ret;
@@ -2756,6 +2762,12 @@ int amdgpu_dm_connector_atomic_get_property(struct drm_connector *connector,
 		ret = 0;
 	} else if (property == adev->mode_info.underscan_property) {
 		*val = dm_state->underscan_enable;
+		ret = 0;
+	} else if (property == adev->mode_info.freesync_property) {
+		*val = dm_state->freesync_enable;
+		ret = 0;
+	} else if (property == adev->mode_info.freesync_capable_property) {
+		*val = dm_state->freesync_capable;
 		ret = 0;
 	}
 	return ret;
@@ -3583,6 +3595,13 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 				adev->mode_info.underscan_vborder_property,
 				0);
 
+	if (connector_type == DRM_MODE_CONNECTOR_HDMIA ||
+	    connector_type == DRM_MODE_CONNECTOR_DisplayPort) {
+		drm_object_attach_property(&aconnector->base.base,
+				adev->mode_info.freesync_property, 0);
+		drm_object_attach_property(&aconnector->base.base,
+				adev->mode_info.freesync_capable_property, 0);
+	}
 }
 
 static int amdgpu_dm_i2c_xfer(struct i2c_adapter *i2c_adap,

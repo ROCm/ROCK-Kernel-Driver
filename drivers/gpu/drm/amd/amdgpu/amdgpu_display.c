@@ -626,6 +626,19 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 					 "dither",
 					 amdgpu_dither_enum_list, sz);
 
+	if (amdgpu_device_has_dc_support(adev)) {
+		adev->mode_info.freesync_property =
+			drm_property_create_bool(adev->ddev, 0, "freesync");
+		if (!adev->mode_info.freesync_property)
+			return -ENOMEM;
+		adev->mode_info.freesync_capable_property =
+			drm_property_create_bool(adev->ddev,
+						 0,
+						 "freesync_capable");
+		if (!adev->mode_info.freesync_capable_property)
+			return -ENOMEM;
+	}
+
 	return 0;
 }
 
