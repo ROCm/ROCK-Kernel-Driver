@@ -3709,7 +3709,7 @@ static int get_fb_info(const struct amdgpu_framebuffer *amdgpu_fb,
 		return 0;
 	}
 
-	rbo = gem_to_amdgpu_bo(amdgpu_fb->base.obj[0]);
+	rbo = gem_to_amdgpu_bo(drm_gem_fb_get_obj(&amdgpu_fb->base, 0));
 	r = amdgpu_bo_reserve(rbo, false);
 
 	if (unlikely(r)) {
@@ -5824,7 +5824,7 @@ static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 	}
 
 	afb = to_amdgpu_framebuffer(new_state->fb);
-	obj = new_state->fb->obj[0];
+	obj = drm_gem_fb_get_obj(new_state->fb, 0);
 	rbo = gem_to_amdgpu_bo(obj);
 	adev = amdgpu_ttm_adev(rbo->tbo.bdev);
 	INIT_LIST_HEAD(&list);
@@ -5903,7 +5903,7 @@ static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
 	if (!old_state->fb)
 		return;
 
-	rbo = gem_to_amdgpu_bo(old_state->fb->obj[0]);
+	rbo = gem_to_amdgpu_bo(drm_gem_fb_get_obj(old_state->fb, 0));
 	r = amdgpu_bo_reserve(rbo, false);
 	if (unlikely(r)) {
 		DRM_ERROR("failed to reserve rbo before unpin\n");
@@ -7185,7 +7185,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			continue;
 		}
 
-		abo = gem_to_amdgpu_bo(fb->obj[0]);
+		abo = gem_to_amdgpu_bo(drm_gem_fb_get_obj(fb, 0));
 
 		/*
 		 * Wait for all fences on this FB. Do limited wait to avoid

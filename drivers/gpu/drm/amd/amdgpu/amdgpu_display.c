@@ -174,13 +174,13 @@ int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 	work->async = (page_flip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
 
 	/* schedule unpin of the old buffer */
-	obj = crtc->primary->fb->obj[0];
 
+	obj = drm_gem_fb_get_obj(crtc->primary->fb, 0);
 	/* take a reference to the old object */
 	work->old_abo = gem_to_amdgpu_bo(obj);
 	amdgpu_bo_ref(work->old_abo);
 
-	obj = fb->obj[0];
+	obj = drm_gem_fb_get_obj(fb, 0);
 	new_abo = gem_to_amdgpu_bo(obj);
 
 	/* pin the new buffer */
@@ -543,11 +543,11 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 				    struct drm_gem_object *obj)
 {
 	int ret;
-	rfb->base.obj[0] = obj;
+	kcl_drm_gem_fb_set_obj(&rfb->base, 0, obj);
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
 	ret = drm_framebuffer_init(dev, &rfb->base, &amdgpu_fb_funcs);
 	if (ret) {
-		rfb->base.obj[0] = NULL;
+		kcl_drm_gem_fb_set_obj(&rfb->base, 0, NULL);
 		return ret;
 	}
 	return 0;
