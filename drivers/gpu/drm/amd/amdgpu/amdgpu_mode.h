@@ -301,6 +301,9 @@ struct amdgpu_display_funcs {
 
 struct amdgpu_framebuffer {
 	struct drm_framebuffer base;
+#ifndef HAVE_DRM_DRM_GEM_FRAMEBUFFER_HELPER_H
+	struct drm_gem_object *obj;
+#endif
 
 	uint64_t tiling_flags;
 	bool tmz_surface;

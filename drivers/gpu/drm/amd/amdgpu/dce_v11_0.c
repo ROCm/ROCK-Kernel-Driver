@@ -1924,7 +1924,7 @@ static int dce_v11_0_crtc_do_set_base(struct drm_crtc *crtc,
 	/* If atomic, assume fb object is pinned & idle & fenced and
 	 * just update base pointers
 	 */
-	obj = target_fb->obj[0];
+	obj = drm_gem_fb_get_obj(target_fb, 0);
 	abo = gem_to_amdgpu_bo(obj);
 	r = amdgpu_bo_reserve(abo, false);
 	if (unlikely(r != 0))
@@ -2136,7 +2136,7 @@ static int dce_v11_0_crtc_do_set_base(struct drm_crtc *crtc,
 	WREG32(mmCRTC_MASTER_UPDATE_MODE + amdgpu_crtc->crtc_offset, 0);
 
 	if (!atomic && fb && fb != crtc->primary->fb) {
-		abo = gem_to_amdgpu_bo(fb->obj[0]);
+		abo = gem_to_amdgpu_bo(drm_gem_fb_get_obj(fb, 0));
 		r = amdgpu_bo_reserve(abo, true);
 		if (unlikely(r != 0))
 			return r;
@@ -2655,7 +2655,7 @@ static void dce_v11_0_crtc_disable(struct drm_crtc *crtc)
 		int r;
 		struct amdgpu_bo *abo;
 
-		abo = gem_to_amdgpu_bo(crtc->primary->fb->obj[0]);
+		abo = gem_to_amdgpu_bo(drm_gem_fb_get_obj(crtc->primary->fb, 0));
 		r = amdgpu_bo_reserve(abo, true);
 		if (unlikely(r))
 			DRM_ERROR("failed to reserve abo before unpin\n");

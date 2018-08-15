@@ -172,13 +172,13 @@ int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 	work->async = (page_flip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
 
 	/* schedule unpin of the old buffer */
-	obj = crtc->primary->fb->obj[0];
 
+	obj = drm_gem_fb_get_obj(crtc->primary->fb, 0);
 	/* take a reference to the old object */
 	work->old_abo = gem_to_amdgpu_bo(obj);
 	amdgpu_bo_ref(work->old_abo);
 
-	obj = fb->obj[0];
+	obj = drm_gem_fb_get_obj(fb, 0);
 	new_abo = gem_to_amdgpu_bo(obj);
 
 	/* pin the new buffer */
