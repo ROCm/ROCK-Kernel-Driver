@@ -327,12 +327,14 @@ void amdgpu_fbdev_restore_mode(struct amdgpu_device *adev)
 static int amdgpu_fbdev_destroy(struct drm_device *dev, struct amdgpu_fbdev *rfbdev)
 {
 	struct amdgpu_framebuffer *rfb = &rfbdev->rfb;
+	struct drm_gem_object * obj = NULL;
 
 	drm_fb_helper_unregister_fbi(&rfbdev->helper);
+	obj = kcl_drm_fb_get_gem_obj(&rfb->base, 0);
 
-	if (rfb->base.obj[0]) {
-		amdgpufb_destroy_pinned_object(rfb->base.obj[0]);
-		rfb->base.obj[0] = NULL;
+	if (obj) {
+		amdgpufb_destroy_pinned_object(obj);
+		kcl_drm_fb_set_gem_obj(&rfb->base, 0, NULL);
 		drm_framebuffer_unregister_private(&rfb->base);
 		drm_framebuffer_cleanup(&rfb->base);
 	}
@@ -419,7 +421,7 @@ int amdgpu_fbdev_total_size(struct amdgpu_device *adev)
 	if (!adev->mode_info.rfbdev)
 		return 0;
 
-	robj = gem_to_amdgpu_bo(adev->mode_info.rfbdev->rfb.base.obj[0]);
+	robj = gem_to_amdgpu_bo(kcl_drm_fb_get_gem_obj(&adev->mode_info.rfbdev->rfb.base, 0));
 	size += amdgpu_bo_size(robj);
 	return size;
 }
@@ -428,7 +430,7 @@ bool amdgpu_fbdev_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj)
 {
 	if (!adev->mode_info.rfbdev)
 		return false;
-	if (robj == gem_to_amdgpu_bo(adev->mode_info.rfbdev->rfb.base.obj[0]))
+	if (robj == gem_to_amdgpu_bo(kcl_drm_fb_get_gem_obj(&adev->mode_info.rfbdev->rfb.base, 0)))
 		return true;
 	return false;
 }

@@ -302,10 +302,46 @@ struct amdgpu_display_funcs {
 
 struct amdgpu_framebuffer {
 	struct drm_framebuffer base;
+#if DRM_VERSION_CODE < DRM_VERSION(4 ,14, 0)
+	struct drm_gem_object *obj;
+#endif
 
 	/* caching for later use */
 	uint64_t address;
 };
+
+static inline struct drm_gem_object *
+kcl_drm_fb_get_gem_obj(const struct drm_framebuffer * fb,int index)
+{
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+	if(fb)
+		return fb->obj[index];
+	else
+		return NULL;
+#else
+	struct amdgpu_framebuffer * afb = to_amdgpu_framebuffer(fb);
+	(void)index; /* for compile un-used warning */
+	if(afb)
+		return afb->obj;
+	else
+		return NULL;
+#endif
+}
+
+static inline void
+kcl_drm_fb_set_gem_obj(struct drm_framebuffer * fb, int index ,struct drm_gem_object * obj)
+{
+
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+	if(fb)
+		fb->obj[index] = obj;
+#else
+	struct amdgpu_framebuffer * afb = to_amdgpu_framebuffer(fb);
+	(void)index; /* for compile un-used warning */
+	if(afb)
+		 afb->obj = obj;
+#endif
+}
 
 struct amdgpu_fbdev {
 	struct drm_fb_helper helper;
