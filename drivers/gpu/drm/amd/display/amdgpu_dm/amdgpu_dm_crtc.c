@@ -212,10 +212,11 @@ static void dm_crtc_destroy_state(struct drm_crtc *crtc,
 	if (cur->stream)
 		dc_stream_release(cur->stream);
 
-
+#ifdef HAVE___DRM_ATOMIC_HELPER_CRTC_DESTROY_STATE_P
 	__drm_atomic_helper_crtc_destroy_state(state);
-
-
+#else
+	__drm_atomic_helper_crtc_destroy_state(crtc, state);
+#endif
 	kfree(state);
 }
 
