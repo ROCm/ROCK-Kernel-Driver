@@ -322,6 +322,9 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	}
 
 	spin_lock_irqsave(&adev->ddev->event_lock, flags);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+	struct amdgpu_flip_work *works = amdgpu_crtc->pflip_works;
+#endif
 
 	if (amdgpu_crtc->pflip_status != AMDGPU_FLIP_SUBMITTED){
 		DRM_DEBUG_DRIVER("amdgpu_crtc->pflip_status = %d !=AMDGPU_FLIP_SUBMITTED(%d) on crtc:%d[%p] \n",
@@ -398,11 +401,20 @@ static void dm_pflip_high_irq(void *interrupt_params)
 		amdgpu_get_vblank_counter_kms(&amdgpu_crtc->base);
 
 	amdgpu_crtc->pflip_status = AMDGPU_FLIP_NONE;
+#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+	amdgpu_crtc->pflip_works = NULL;
+#endif
+
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 
 	DRM_DEBUG_DRIVER("crtc:%d[%p], pflip_stat:AMDGPU_FLIP_NONE, vrr[%d]-fp %d\n",
 			 amdgpu_crtc->crtc_id, amdgpu_crtc,
 			 vrr_active, (int) !e);
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+	schedule_work(&works->unpin_work);
+#endif
+
 }
 
 static void dm_vupdate_high_irq(void *interrupt_params)
@@ -3247,6 +3259,65 @@ static void dm_bandwidth_update(struct amdgpu_device *adev)
 	/* TODO: implement later */
 }
 
+static void dm_set_backlight_level(struct amdgpu_encoder *amdgpu_encoder,
+				     u8 level)
+{
+	/* TODO: translate amdgpu_encoder to display_index and call DAL */
+}
+
+static u8 dm_get_backlight_level(struct amdgpu_encoder *amdgpu_encoder)
+{
+	/* TODO: translate amdgpu_encoder to display_index and call DAL */
+	return 0;
+}
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+/**
+ * dm_page_flip - called by amdgpu_flip_work_func(), which is triggered
+ *                via DRM IOTCL, by user mode.
+ *
+ * @adev: amdgpu_device pointer
+ * @crtc_id: crtc to cleanup pageflip on
+ * @crtc_base: new address of the crtc (GPU MC address)
+ *
+ * Does the actual pageflip (surface address update).
+ */
+static void dm_page_flip(struct amdgpu_device *adev,
+			 int crtc_id, u64 crtc_base, bool async)
+{
+	struct amdgpu_crtc *acrtc = adev->mode_info.crtcs[crtc_id];
+	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(acrtc->base.state);
+	struct dc_stream_state *stream = acrtc_state->stream;
+	struct dc_flip_addrs addr = { {0} };
+
+	/*
+	 * Received a page flip call after the display has been reset.
+	 * Just return in this case. Everything should be clean-up on reset.
+	 */
+	if (!stream) {
+		WARN_ON(1);
+		return;
+	}
+
+	addr.address.grph.addr.low_part = lower_32_bits(crtc_base);
+	addr.address.grph.addr.high_part = upper_32_bits(crtc_base);
+	addr.flip_immediate = async;
+
+	if (acrtc->base.state->event)
+		prepare_flip_isr(acrtc);
+
+	dc_flip_plane_addrs(
+			adev->dm.dc,
+			dc_stream_get_status(stream)->plane_states,
+			&addr, 1);
+
+	DRM_DEBUG_DRIVER("%s Flipping to hi: 0x%x, low: 0x%x \n",
+			 __func__,
+			 addr.address.grph.addr.high_part,
+			 addr.address.grph.addr.low_part);
+}
+#endif
+
 static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 				struct drm_file *filp)
 {
@@ -3338,6 +3409,9 @@ static const struct amdgpu_display_funcs dm_display_funcs = {
 	.hpd_sense = NULL,/* called unconditionally */
 	.hpd_set_polarity = NULL, /* called unconditionally */
 	.hpd_get_gpio_reg = NULL, /* VBIOS parsing. DAL does it. */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+	.page_flip = dm_page_flip,
+#endif
 	.page_flip_get_scanoutpos =
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
@@ -3481,6 +3555,10 @@ static int dm_early_init(void *handle)
 
 	return 0;
 }
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
+#define AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET 1
+#endif
 
 static bool modeset_required(struct drm_crtc_state *crtc_state,
 			     struct dc_stream_state *new_stream,
@@ -3970,6 +4048,38 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	return 0;
 }
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
+static void fill_gamma_from_crtc(
+	const struct drm_crtc *crtc,
+	struct dc_plane_state *plane_state)
+{
+	int i;
+	struct dc_gamma *gamma;
+	uint16_t *red, *green, *blue;
+	int end = (crtc->gamma_size > GAMMA_RGB_256_ENTRIES) ?
+			GAMMA_RGB_256_ENTRIES : crtc->gamma_size;
+
+	red = crtc->gamma_store;
+	green = red + crtc->gamma_size;
+	blue = green + crtc->gamma_size;
+
+	gamma = dc_create_gamma();
+
+	if (gamma == NULL)
+		return;
+
+	gamma->type = GAMMA_RGB_256;
+	gamma->num_entries = GAMMA_RGB_256_ENTRIES;
+	for (i = 0; i < end; i++) {
+		gamma->entries.red[i] = dc_fixpt_from_int((unsigned short)red[i]);
+		gamma->entries.green[i] = dc_fixpt_from_int((unsigned short)green[i]);
+		gamma->entries.blue[i] = dc_fixpt_from_int((unsigned short)blue[i]);
+	}
+
+	plane_state->gamma_correction = gamma;
+}
+#endif
+
 static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 				    struct dm_plane_state *dm_plane_state,
 				    struct drm_plane_state *plane_state,
@@ -3998,6 +4108,7 @@ static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 	if (ret)
 		return ret;
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	ret = fill_dc_plane_info_and_addr(adev, plane_state, tiling_flags,
 					  &plane_info,
 					  &dc_plane_state->address,
@@ -4030,6 +4141,14 @@ static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 		return ret;
 #endif
 
+#else
+	if (crtc->mode.private_flags & AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET) {
+		fill_gamma_from_crtc(crtc, dc_plane_state);
+		/* reset trigger of gamma */
+		crtc->mode.private_flags &=
+			~AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
+	}
+#endif
 	return 0;
 }
 
@@ -4756,9 +4875,11 @@ static void dm_crtc_destroy_state(struct drm_crtc *crtc,
 	if (cur->stream)
 		dc_stream_release(cur->stream);
 
-
+#if DRM_VERSION_CODE > DRM_VERSION(4, 7, 0)
 	__drm_atomic_helper_crtc_destroy_state(state);
-
+#else
+	__drm_atomic_helper_crtc_destroy_state(crtc, state);
+#endif
 
 	kfree(state);
 }
@@ -6841,7 +6962,9 @@ static void handle_cursor_update(struct drm_plane *plane,
 static void prepare_flip_isr(struct amdgpu_crtc *acrtc)
 {
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 	assert_spin_locked(&acrtc->base.dev->event_lock);
+#endif
 	WARN_ON(acrtc->event);
 
 	acrtc->event = acrtc->base.state->event;
