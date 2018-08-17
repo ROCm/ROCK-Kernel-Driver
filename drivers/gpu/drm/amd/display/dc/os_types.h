@@ -49,10 +49,12 @@
 
 #define dm_error(fmt, ...) DRM_ERROR(fmt, ##__VA_ARGS__)
 
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #if defined(HAVE_ASM_FPU_API_H)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include <asm/fpu/api.h>
 #endif
+#else
+#include <asm/i387.h>
 #endif
 
 /*
