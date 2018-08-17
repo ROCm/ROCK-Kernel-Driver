@@ -210,4 +210,9 @@ struct drm_printer {
 
 void drm_printf(struct drm_printer *p, const char *f, ...);
 #endif
+
+#if !defined(HAVE_DRM_SEND_EVENT_LOCKED)
+void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
+#endif
+
 #endif /* AMDKCL_DRM_H */
