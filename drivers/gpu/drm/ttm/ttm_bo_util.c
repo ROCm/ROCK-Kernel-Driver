@@ -262,8 +262,17 @@ static int ttm_copy_io_page(void *dst, void *src, unsigned long page)
 }
 
 #ifdef CONFIG_X86
+#ifdef OS_NAME_RHEL_6
+#define __kcl__kmap_atomic(__page) 	kmap_atomic(__page, KM_USER0)
+#define __kcl__kunmap_atomic(__addr) 	kunmap_atomic(__addr, KM_USER0)
+#define __ttm_kmap_atomic_prot(__page, __prot)	kmap_atomic_prot(__page, KM_USER0, __prot)
+#define __ttm_kunmap_atomic(__addr) 		kunmap_atomic(__addr, KM_USER0)
+#else
+#define __kcl__kmap_atomic(__page) 	kmap_atomic(__page)
+#define __kcl__kunmap_atomic(__addr) 	kunmap_atomic(__addr)
 #define __ttm_kmap_atomic_prot(__page, __prot) kmap_atomic_prot(__page, __prot)
 #define __ttm_kunmap_atomic(__addr) kunmap_atomic(__addr)
+#endif
 #else
 #define __ttm_kmap_atomic_prot(__page, __prot) vmap(&__page, 1, 0,  __prot)
 #define __ttm_kunmap_atomic(__addr) vunmap(__addr)
@@ -287,7 +296,7 @@ static int ttm_copy_io_page(void *dst, void *src, unsigned long page)
 void *ttm_kmap_atomic_prot(struct page *page, pgprot_t prot)
 {
 	if (pgprot_val(prot) == pgprot_val(PAGE_KERNEL))
-		return kmap_atomic(page);
+		return __kcl__kmap_atomic(page);
 	else
 		return __ttm_kmap_atomic_prot(page, prot);
 }
@@ -303,7 +312,7 @@ EXPORT_SYMBOL(ttm_kmap_atomic_prot);
 void ttm_kunmap_atomic_prot(void *addr, pgprot_t prot)
 {
 	if (pgprot_val(prot) == pgprot_val(PAGE_KERNEL))
-		kunmap_atomic(addr);
+		__kcl__kunmap_atomic(addr);
 	else
 		__ttm_kunmap_atomic(addr);
 }
