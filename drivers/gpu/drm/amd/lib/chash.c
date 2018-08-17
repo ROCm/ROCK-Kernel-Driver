@@ -27,6 +27,9 @@
 #include <linux/bug.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#if defined(OS_NAME_RHEL_6)
+#include <linux/kernel.h>
+#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/clock.h>
 #else
