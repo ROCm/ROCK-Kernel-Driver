@@ -32,7 +32,9 @@
 #endif
 #include <linux/rbtree.h>
 #include <drm/gpu_scheduler.h>
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 #include <drm/drm_file.h>
+#endif
 
 #include "amdgpu_sync.h"
 #include "amdgpu_ring.h"
