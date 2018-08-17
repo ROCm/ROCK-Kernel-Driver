@@ -403,3 +403,20 @@ __kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 }
 EXPORT_SYMBOL(__kcl_drm_atomic_helper_connector_reset);
 #endif
+
+#if !defined(HAVE_DRM_SEND_EVENT_LOCKED)
+void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e)
+{
+	assert_spin_locked(&dev->event_lock);
+
+	if (!e->file_priv) {
+		kfree(e);
+		return;
+	}
+
+	list_add_tail(&e->link,
+		      &e->file_priv->event_list);
+	wake_up_interruptible(&e->file_priv->event_wait);
+}
+EXPORT_SYMBOL(drm_send_event_locked);
+#endif

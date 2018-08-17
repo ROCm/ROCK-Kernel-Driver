@@ -485,9 +485,8 @@ struct drm_printer {
 void drm_printf(struct drm_printer *p, const char *f, ...);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
+#if !defined(HAVE_DRM_SEND_EVENT_LOCKED)
 void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
-void drm_send_event(struct drm_device *dev, struct drm_pending_event *e);
 #endif
 
 #ifndef _DRM_PRINTK

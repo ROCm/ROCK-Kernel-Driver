@@ -428,9 +428,6 @@ static void dm_vupdate_high_irq(void *interrupt_params)
 			}
 		}
 	}
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
-	schedule_work(&works->unpin_work);
-#endif
 }
 
 static void dm_crtc_high_irq(void *interrupt_params)
