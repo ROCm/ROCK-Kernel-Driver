@@ -26,7 +26,9 @@
 
 #include <drm/amdgpu_drm.h>
 #include <drm/gpu_scheduler.h>
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 #include <drm/drm_print.h>
+#endif
 
 /* max number of rings */
 #define AMDGPU_MAX_RINGS		21
