@@ -48,8 +48,17 @@
 
 #define dm_error(fmt, ...) DRM_ERROR(fmt, ##__VA_ARGS__)
 
+
+#define dm_debug(fmt, ...) DRM_DEBUG_KMS(fmt, ##__VA_ARGS__)
+
+#define dm_vlog(fmt, args) vprintk(fmt, args)
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
 #ifdef CONFIG_X86
 #include <asm/fpu/api.h>
+#endif
+#else
+#include <asm/i387.h>
 #endif
 
 /*

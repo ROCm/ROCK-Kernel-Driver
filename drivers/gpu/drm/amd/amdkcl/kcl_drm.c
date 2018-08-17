@@ -695,6 +695,7 @@ void drm_state_dump(struct drm_device *dev, struct drm_printer *p)
 EXPORT_SYMBOL(drm_state_dump);
 #endif
 
+
 #if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && defined(BUILD_AS_DKMS)
 u64 drm_get_max_iomem(void)
 {
@@ -708,4 +709,44 @@ u64 drm_get_max_iomem(void)
 	return max_iomem;
 }
 EXPORT_SYMBOL(drm_get_max_iomem);
+#endif
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
+void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e)
+{
+	assert_spin_locked(&dev->event_lock);
+
+	if (!e->file_priv) {
+		kfree(e);
+		return;
+	}
+
+	list_add_tail(&e->link,
+		      &e->file_priv->event_list);
+	wake_up_interruptible(&e->file_priv->event_wait);
+}
+EXPORT_SYMBOL(drm_send_event_locked);
+
+void drm_send_event(struct drm_device *dev, struct drm_pending_event *e)
+{
+	unsigned long irqflags;
+
+	spin_lock_irqsave(&dev->event_lock, irqflags);
+	drm_send_event_locked(dev, e);
+	spin_unlock_irqrestore(&dev->event_lock, irqflags);
+}
+EXPORT_SYMBOL(drm_send_event);
+#endif
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+void
+__kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
+				    struct drm_connector_state *conn_state)
+{
+	if (conn_state)
+		conn_state->connector = connector;
+
+	connector->state = conn_state;
+}
+EXPORT_SYMBOL(__kcl_drm_atomic_helper_connector_reset);
 #endif
