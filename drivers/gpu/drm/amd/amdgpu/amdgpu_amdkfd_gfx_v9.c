@@ -167,8 +167,8 @@ static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd,
 		uint8_t vmid);
 static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 		uint8_t vmid);
-static int alloc_memory_of_scratch(struct kgd_dev *kgd,
-				 uint64_t va, uint32_t vmid);
+static void set_scratch_backing_va(struct kgd_dev *kgd,
+					uint64_t va, uint32_t vmid);
 static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
 		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
@@ -255,7 +255,7 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.unmap_memory_to_gpu = amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu,
 	.get_fw_version = get_fw_version,
 	.get_cu_info = get_cu_info,
-	.alloc_memory_of_scratch = alloc_memory_of_scratch,
+	.set_scratch_backing_va = set_scratch_backing_va,
 	.write_config_static_mem = write_config_static_mem,
 	.map_gtt_bo_to_kernel = amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel,
 	.set_vm_context_page_table_base = set_vm_context_page_table_base,
@@ -1283,15 +1283,13 @@ static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
 
 	return 0;
 }
-static int alloc_memory_of_scratch(struct kgd_dev *kgd,
-				 uint64_t va, uint32_t vmid)
+static void set_scratch_backing_va(struct kgd_dev *kgd,
+					uint64_t va, uint32_t vmid)
 {
 	/* No longer needed on GFXv9. The scratch base address is
 	 * passed to the shader by the CP. It's the user mode driver's
 	 * responsibility.
 	 */
-
-	return 0;
 }
 
 /* FIXME: Does this need to be ASIC-specific code? */

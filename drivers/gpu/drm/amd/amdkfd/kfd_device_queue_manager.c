@@ -406,7 +406,7 @@ static int create_compute_queue_nocpsch(struct device_queue_manager *dqm,
 	pr_debug("Loading mqd to hqd on pipe %d, queue %d\n",
 			q->pipe, q->queue);
 
-	dqm->dev->kfd2kgd->alloc_memory_of_scratch(
+	dqm->dev->kfd2kgd->set_scratch_backing_va(
 			dqm->dev->kgd, qpd->sh_hidden_private_base, qpd->vmid);
 
 	if (!q->properties.is_active)

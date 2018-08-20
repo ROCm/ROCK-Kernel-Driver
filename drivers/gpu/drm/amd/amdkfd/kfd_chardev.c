@@ -1129,19 +1129,15 @@ static int kfd_ioctl_set_scratch_backing_va(struct file *filep,
 	mutex_unlock(&p->mutex);
 
 	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
-	    pdd->qpd.vmid != 0) {
-		err = dev->kfd2kgd->alloc_memory_of_scratch(
+	    pdd->qpd.vmid != 0)
+		dev->kfd2kgd->set_scratch_backing_va(
 			dev->kgd, args->va_addr, pdd->qpd.vmid);
-		if (err != 0)
-			goto alloc_memory_of_scratch_failed;
-	}
 
 	return 0;
 
 bind_process_to_device_fail:
 	mutex_unlock(&p->mutex);
-alloc_memory_of_scratch_failed:
-	return -EFAULT;
+	return err;
 }
 
 static int kfd_ioctl_get_tile_config(struct file *filep,
