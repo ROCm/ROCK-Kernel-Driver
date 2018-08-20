@@ -41,6 +41,8 @@
 #include <linux/kref.h>
 #include <linux/pid.h>
 #include <linux/interval_tree.h>
+#include <linux/device_cgroup.h>
+#include <drm/drmP.h>
 #include <kgd_kfd_interface.h>
 
 #include "amd_shared.h"
@@ -1150,6 +1152,17 @@ void kfd_close_peer_direct(void);
 
 /* IPC Support */
 int kfd_ipc_init(void);
+
+/* Cgroup Support */
+/* Check with device cgroup if @kfd device is accessible */
+static inline int kfd_devcgroup_check_permission(struct kfd_dev *kfd)
+{
+	struct drm_device *ddev = kfd->ddev;
+
+	return devcgroup_check_permission(DEVCG_DEV_CHAR, ddev->driver->major,
+					  ddev->render->index,
+					  DEVCG_ACC_WRITE | DEVCG_ACC_READ);
+}
 
 /* Debugfs */
 #if defined(CONFIG_DEBUG_FS)
