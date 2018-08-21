@@ -182,6 +182,7 @@ extern int amdgpu_dc;
 extern int amdgpu_sched_jobs;
 extern int amdgpu_sched_hw_submission;
 extern int amdgpu_no_evict;
+extern int amdgpu_direct_gma_size;
 extern uint amdgpu_pcie_gen_cap;
 extern uint amdgpu_pcie_lane_cap;
 extern u64 amdgpu_cg_mask;
@@ -644,6 +645,9 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data, struct drm_file *fi
 int amdgpu_cs_wait_fences_ioctl(struct drm_device *dev, void *data,
 				struct drm_file *filp);
 
+int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
+			   struct drm_file *filp);
+
 /* VRAM scratch page for HDP bug, default vram page */
 struct amdgpu_mem_scratch {
 	struct amdgpu_bo		*robj;
@@ -732,6 +736,14 @@ enum amd_hw_ip_block_type {
 #define IP_VERSION_VARIANT(ver)		(((ver) >> 4) & 0xF)
 #define IP_VERSION_SUBREV(ver)		((ver) & 0xF)
 #define IP_VERSION_MAJ_MIN_REV(ver)	((ver) >> 8)
+
+struct amdgpu_direct_gma {
+	/* reserved in visible vram*/
+	struct amdgpu_bo	*dgma_bo;
+	atomic64_t		vram_usage;
+	/* reserved in gart */
+	atomic64_t		gart_usage;
+};
 
 struct amdgpu_ip_map_info {
 	/* Map of logical to actual dev instances/mask */
@@ -871,6 +883,9 @@ struct amdgpu_device {
 	uint32_t			bios_size;
 	uint32_t			bios_scratch_reg_offset;
 	uint32_t			bios_scratch[AMDGPU_BIOS_NUM_SCRATCH];
+
+	/* Direct GMA */
+	struct amdgpu_direct_gma	direct_gma;
 
 	/* Register/doorbell mmio */
 	resource_size_t			rmmio_base;
