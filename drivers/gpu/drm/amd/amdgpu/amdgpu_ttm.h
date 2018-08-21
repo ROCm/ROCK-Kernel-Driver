@@ -33,6 +33,8 @@
 #define AMDGPU_PL_GWS		(TTM_PL_PRIV + 1)
 #define AMDGPU_PL_OA		(TTM_PL_PRIV + 2)
 #define AMDGPU_PL_PREEMPT	(TTM_PL_PRIV + 3)
+#define AMDGPU_PL_DGMA		(TTM_PL_PRIV + 4)
+#define AMDGPU_PL_DGMA_IMPORT	(TTM_PL_PRIV + 5)
 
 #define AMDGPU_GTT_MAX_TRANSFER_SIZE	512
 #define AMDGPU_GTT_NUM_TRANSFER_WINDOWS	2
@@ -45,6 +47,13 @@ struct amdgpu_gtt_mgr {
 	struct ttm_resource_manager manager;
 	struct drm_mm mm;
 	spinlock_t lock;
+};
+
+struct amdgpu_dgma_import_mgr {
+	struct ttm_resource_manager manager;
+	struct drm_mm mm;
+	spinlock_t lock;
+	atomic64_t available;
 };
 
 struct amdgpu_mman {
@@ -63,6 +72,7 @@ struct amdgpu_mman {
 
 	struct amdgpu_vram_mgr vram_mgr;
 	struct amdgpu_gtt_mgr gtt_mgr;
+	struct amdgpu_dgma_import_mgr dgma_import_mgr;
 	struct ttm_resource_manager preempt_mgr;
 
 	uint64_t		stolen_vga_size;

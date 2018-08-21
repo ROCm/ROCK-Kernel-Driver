@@ -108,6 +108,10 @@ struct amdgpu_bo {
 	struct mmu_interval_notifier	notifier;
 #endif
 	struct kgd_mem                  *kfd_bo;
+
+	/* DGMA imported buffer info */
+	void				*dgma_addr;
+	phys_addr_t			dgma_import_base;
 };
 
 struct amdgpu_bo_user {
@@ -116,7 +120,6 @@ struct amdgpu_bo_user {
 	u64				metadata_flags;
 	void				*metadata;
 	u32				metadata_size;
-
 };
 
 struct amdgpu_bo_vm {
@@ -152,6 +155,10 @@ static inline unsigned amdgpu_mem_type_to_domain(u32 mem_type)
 		return AMDGPU_GEM_DOMAIN_GWS;
 	case AMDGPU_PL_OA:
 		return AMDGPU_GEM_DOMAIN_OA;
+	case AMDGPU_PL_DGMA:
+		return AMDGPU_GEM_DOMAIN_DGMA;
+	case AMDGPU_PL_DGMA_IMPORT:
+		return AMDGPU_GEM_DOMAIN_DGMA_IMPORT;
 	default:
 		break;
 	}
