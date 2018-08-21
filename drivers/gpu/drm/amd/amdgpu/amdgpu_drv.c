@@ -134,6 +134,7 @@ int amdgpu_dc = -1;
 int amdgpu_sched_jobs = 32;
 int amdgpu_sched_hw_submission = 2;
 int amdgpu_no_evict;
+int amdgpu_direct_gma_size;
 uint amdgpu_pcie_gen_cap;
 uint amdgpu_pcie_lane_cap;
 uint amdgpu_cg_mask = 0xffffffff;
@@ -440,6 +441,10 @@ module_param_named(ppfeaturemask, amdgpu_pp_feature_mask, hexint, 0444);
 
 MODULE_PARM_DESC(no_evict, "Support pinning request from user space (1 = enable, 0 = disable (default))");
 module_param_named(no_evict, amdgpu_no_evict, int, 0444);
+
+MODULE_PARM_DESC(direct_gma_size, "Direct GMA size in megabytes (max 96MB)");
+module_param_named(direct_gma_size, amdgpu_direct_gma_size, int, 0444);
+
 /**
  * DOC: forcelongtraining (uint)
  * Force long memory training in resume.
@@ -1775,6 +1780,8 @@ const struct drm_ioctl_desc amdgpu_ioctls_kms[] = {
 	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_VA, amdgpu_gem_va_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_OP, amdgpu_gem_op_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_USERPTR, amdgpu_gem_userptr_ioctl, DRM_AUTH|DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(AMDGPU_FREESYNC, amdgpu_display_freesync_ioctl, DRM_MASTER),
+	DRM_IOCTL_DEF_DRV(AMDGPU_GEM_DGMA, amdgpu_gem_dgma_ioctl, DRM_AUTH|DRM_RENDER_ALLOW)
 };
 
 static const struct drm_driver amdgpu_kms_driver = {

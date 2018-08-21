@@ -56,6 +56,8 @@ static void amdgpu_bo_destroy(struct ttm_buffer_object *tbo)
 {
 	struct amdgpu_bo *bo = ttm_to_amdgpu_bo(tbo);
 
+	kfree(bo->dgma_addr);
+
 	amdgpu_bo_kunmap(bo);
 
 	if (bo->tbo.base.import_attach)
@@ -127,6 +129,22 @@ void amdgpu_bo_placement_from_domain(struct amdgpu_bo *abo, u32 domain)
 	struct ttm_place *places = abo->placements;
 	u64 flags = abo->flags;
 	u32 c = 0, i;
+
+	if ((domain & AMDGPU_GEM_DOMAIN_DGMA) && amdgpu_direct_gma_size) {
+		places[c].fpfn = 0;
+		places[c].lpfn = 0;
+		places[c].mem_type = AMDGPU_PL_DGMA;
+		places[c].flags = 0;
+		c++;
+	}
+
+	if ((domain & AMDGPU_GEM_DOMAIN_DGMA_IMPORT) && amdgpu_direct_gma_size) {
+		places[c].fpfn = 0;
+		places[c].lpfn = 0;
+		places[c].mem_type = AMDGPU_PL_DGMA_IMPORT;
+		places[c].flags = 0;
+		c++;
+	}
 
 	if (domain & AMDGPU_GEM_DOMAIN_VRAM) {
 		unsigned visible_pfn = adev->gmc.visible_vram_size >> PAGE_SHIFT;
@@ -626,7 +644,8 @@ int amdgpu_bo_create(struct amdgpu_device *adev,
 	if (bp->type == ttm_bo_type_device)
 		bo->flags &= ~AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 
-	if ((bp->flags & AMDGPU_GEM_CREATE_NO_EVICT) && amdgpu_no_evict) {
+	if (((bp->flags & AMDGPU_GEM_CREATE_NO_EVICT) && amdgpu_no_evict) ||
+	    bp->domain & (AMDGPU_GEM_DOMAIN_DGMA | AMDGPU_GEM_DOMAIN_DGMA_IMPORT)) {
 		r = amdgpu_bo_reserve(bo, false);
 		if (unlikely(r != 0))
 			return r;
@@ -1510,6 +1529,7 @@ u64 amdgpu_bo_gpu_offset(struct amdgpu_bo *bo)
 	WARN_ON_ONCE(bo->tbo.resource->start == AMDGPU_BO_INVALID_OFFSET);
 	WARN_ON_ONCE(bo->tbo.resource->mem_type == TTM_PL_VRAM &&
 		     !(bo->flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS));
+	WARN_ON_ONCE(bo->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT);
 
 	return amdgpu_bo_gpu_offset_no_check(bo);
 }
@@ -1584,6 +1604,12 @@ u64 amdgpu_bo_print_info(int id, struct amdgpu_bo *bo, struct seq_file *m)
 	switch (domain) {
 	case AMDGPU_GEM_DOMAIN_VRAM:
 		placement = "VRAM";
+		break;
+	case AMDGPU_GEM_DOMAIN_DGMA:
+		placement = "DGMA";
+		break;
+	case AMDGPU_GEM_DOMAIN_DGMA_IMPORT:
+		placement = "DGMA_IMPORT";
 		break;
 	case AMDGPU_GEM_DOMAIN_GTT:
 		placement = " GTT";

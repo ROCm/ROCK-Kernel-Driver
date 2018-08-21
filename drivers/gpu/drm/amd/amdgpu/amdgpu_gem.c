@@ -85,8 +85,15 @@ static const struct vm_operations_struct amdgpu_gem_vm_ops = {
 static void amdgpu_gem_object_free(struct drm_gem_object *gobj)
 {
 	struct amdgpu_bo *robj = gem_to_amdgpu_bo(gobj);
+	struct amdgpu_device *adev = amdgpu_ttm_adev(robj->tbo.bdev);
 
 	if (robj) {
+		if (robj->tbo.mem.mem_type == AMDGPU_PL_DGMA)
+			atomic64_sub(amdgpu_bo_size(robj),
+				     &adev->direct_gma.vram_usage);
+		else if (robj->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT)
+			atomic64_sub(amdgpu_bo_size(robj),
+				     &adev->direct_gma.gart_usage);
 		amdgpu_mn_unregister(robj);
 		amdgpu_bo_unref(&robj);
 	}
@@ -101,10 +108,28 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 	struct amdgpu_bo *bo;
 	struct amdgpu_bo_user *ubo;
 	struct amdgpu_bo_param bp;
+	unsigned long max_size;
 	int r;
 
 	memset(&bp, 0, sizeof(bp));
 	*obj = NULL;
+
+	if ((initial_domain & AMDGPU_GEM_DOMAIN_DGMA) ||
+		(initial_domain & AMDGPU_GEM_DOMAIN_DGMA_IMPORT)) {
+		flags |= AMDGPU_GEM_CREATE_NO_EVICT;
+		max_size = (unsigned long)amdgpu_direct_gma_size << 20;
+
+		if (initial_domain & AMDGPU_GEM_DOMAIN_DGMA)
+			max_size -= atomic64_read(&adev->direct_gma.vram_usage);
+		else if (initial_domain & AMDGPU_GEM_DOMAIN_DGMA_IMPORT)
+			max_size -= atomic64_read(&adev->direct_gma.gart_usage);
+
+		if (size > max_size) {
+			DRM_DEBUG("Allocation size %ldMb bigger than %ldMb limit\n",
+				size >> 20, max_size >> 20);
+			return -ENOMEM;
+		}
+	}
 
 	bp.size = size;
 	bp.byte_align = alignment;
@@ -122,6 +147,11 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 	bo = &ubo->bo;
 	*obj = &bo->tbo.base;
 	(*obj)->funcs = &amdgpu_gem_object_funcs;
+
+	if (initial_domain & AMDGPU_GEM_DOMAIN_DGMA)
+		atomic64_add(size, &adev->direct_gma.vram_usage);
+	else if (initial_domain & AMDGPU_GEM_DOMAIN_DGMA_IMPORT)
+		atomic64_add(size, &adev->direct_gma.gart_usage);
 
 	return 0;
 }
@@ -458,6 +488,61 @@ user_pages_done:
 release_object:
 	drm_gem_object_put(gobj);
 
+	return r;
+}
+
+int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
+			   struct drm_file *filp)
+{
+	struct amdgpu_device *adev = drm_to_adev(dev);
+	struct drm_amdgpu_gem_dgma *args = data;
+	struct drm_gem_object *gobj;
+	struct amdgpu_bo *abo;
+	dma_addr_t *dma_addr;
+	uint32_t handle;
+	int i, r = 0;
+
+	switch (args->op) {
+	case AMDGPU_GEM_DGMA_IMPORT:
+		/* create a gem object to contain this object in */
+		r = amdgpu_gem_object_create(adev, args->size, 0,
+					     AMDGPU_GEM_DOMAIN_DGMA_IMPORT, 0,
+					     0, NULL, &gobj);
+		if (r)
+			return r;
+
+		abo = gem_to_amdgpu_bo(gobj);
+		dma_addr = kmalloc_array(abo->tbo.mem.num_pages, sizeof(dma_addr_t), GFP_KERNEL);
+		if (unlikely(dma_addr == NULL))
+			goto release_object;
+
+		for (i = 0; i < abo->tbo.mem.num_pages; i++)
+			dma_addr[i] = args->addr + i * PAGE_SIZE;
+		abo->dgma_import_base = args->addr;
+		abo->dgma_addr = (void *)dma_addr;
+		r = drm_gem_handle_create(filp, gobj, &handle);
+		args->handle = handle;
+		break;
+	case AMDGPU_GEM_DGMA_QUERY_PHYS_ADDR:
+		gobj = drm_gem_object_lookup(filp, args->handle);
+		if (gobj == NULL)
+			return -ENOENT;
+
+		abo = gem_to_amdgpu_bo(gobj);
+		if (abo->tbo.mem.mem_type != AMDGPU_PL_DGMA) {
+			r = -EINVAL;
+			goto release_object;
+		}
+		args->addr = amdgpu_bo_gpu_offset(abo) -
+			amdgpu_ttm_domain_start(adev, TTM_PL_VRAM) +
+			adev->gmc.aper_base;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+release_object:
+	drm_gem_object_put(gobj);
 	return r;
 }
 

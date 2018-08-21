@@ -1691,15 +1691,16 @@ static int amdgpu_vm_update_ptes(struct amdgpu_vm_update_params *params,
  * 0 for success, -EINVAL for failure.
  */
 int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
-				struct amdgpu_device *bo_adev,
-				struct amdgpu_vm *vm, bool immediate,
-				bool unlocked, struct dma_resv *resv,
-				uint64_t start, uint64_t last,
-				uint64_t flags, uint64_t offset,
-				struct ttm_resource *res,
-				dma_addr_t *pages_addr,
-				struct dma_fence **fence,
-				bool *table_freed)
+                                struct amdgpu_device *bo_adev,
+                                struct amdgpu_vm *vm, bool immediate,
+                                bool unlocked, struct dma_resv *resv,
+                                uint64_t start, uint64_t last,
+                                uint64_t flags, uint64_t offset,
+                                struct ttm_resource *res,
+                                dma_addr_t *pages_addr,
+                                struct dma_fence **fence,
+                                bool *table_freed,
+                                uint64_t vram_base_offset)
 {
 	struct amdgpu_vm_update_params params;
 	struct amdgpu_res_cursor cursor;
@@ -1748,6 +1749,7 @@ int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 		uint64_t tmp, num_entries, addr;
 
 		num_entries = cursor.size >> AMDGPU_GPU_PAGE_SHIFT;
+
 		if (pages_addr) {
 			bool contiguous = true;
 
@@ -1778,10 +1780,8 @@ int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 				addr = pages_addr[cursor.start >> PAGE_SHIFT];
 				params.pages_addr = NULL;
 			}
-
 		} else if (flags & (AMDGPU_PTE_VALID | AMDGPU_PTE_PRT)) {
-			addr = bo_adev->vm_manager.vram_base_offset +
-				cursor.start;
+			addr = vram_base_offset + cursor.start;
 		} else {
 			addr = 0;
 		}
@@ -1798,7 +1798,7 @@ int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	r = vm->update_funcs->commit(&params, fence);
 
 	if (table_freed)
-		*table_freed = params.table_freed;
+		*table_freed = *table_freed || params.table_freed;
 
 error_unlock:
 	amdgpu_vm_eviction_unlock(vm);
@@ -1895,6 +1895,8 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 		if (mem->mem_type == TTM_PL_TT ||
 		    mem->mem_type == AMDGPU_PL_PREEMPT)
 			pages_addr = bo->tbo.ttm->dma_address;
+		else if (mem->mem_type == AMDGPU_PL_DGMA_IMPORT)
+			pages_addr = (dma_addr_t *)bo->tbo.mem.bus.addr;
 	}
 
 	if (bo) {
@@ -1924,6 +1926,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 
 	list_for_each_entry(mapping, &bo_va->invalids, list) {
 		uint64_t update_flags = flags;
+		uint64_t vram_base_offset = bo_adev->vm_manager.vram_base_offset;
 
 		/* normally,bo_va->flags only contians READABLE and WIRTEABLE bit go here
 		 * but in case of something, we filter the flags in first place
@@ -1942,7 +1945,8 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 						resv, mapping->start,
 						mapping->last, update_flags,
 						mapping->offset, mem,
-						pages_addr, last_update, NULL);
+						pages_addr, last_update,
+						vram_base_offset);
 		if (r)
 			return r;
 	}
@@ -2152,7 +2156,7 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
 		r = amdgpu_vm_bo_update_mapping(adev, adev, vm, false, false,
 						resv, mapping->start,
 						mapping->last, init_pte_value,
-						0, NULL, NULL, &f, NULL);
+						0, NULL, NULL, &f, NULL, 0);
 		amdgpu_vm_free_mapping(adev, vm, mapping, f);
 		if (r) {
 			dma_fence_put(f);
@@ -3421,7 +3425,7 @@ bool amdgpu_vm_handle_fault(struct amdgpu_device *adev, u32 pasid,
 
 	r = amdgpu_vm_bo_update_mapping(adev, adev, vm, true, false, NULL, addr,
 					addr, flags, value, NULL, NULL, NULL,
-					NULL);
+					NULL, 0);
 	if (r)
 		goto error_unlock;
 
