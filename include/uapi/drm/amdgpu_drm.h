@@ -54,6 +54,8 @@ extern "C" {
 #define DRM_AMDGPU_VM			0x13
 #define DRM_AMDGPU_FENCE_TO_HANDLE	0x14
 #define DRM_AMDGPU_SCHED		0x15
+/* not upstream */
+#define DRM_AMDGPU_GEM_DGMA		0x5c
 
 /* hybrid specific ioctls */
 #define DRM_AMDGPU_SEM			0x5b
@@ -74,6 +76,8 @@ extern "C" {
 #define DRM_IOCTL_AMDGPU_VM		DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_VM, union drm_amdgpu_vm)
 #define DRM_IOCTL_AMDGPU_FENCE_TO_HANDLE DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_FENCE_TO_HANDLE, union drm_amdgpu_fence_to_handle)
 #define DRM_IOCTL_AMDGPU_SCHED		DRM_IOW(DRM_COMMAND_BASE + DRM_AMDGPU_SCHED, union drm_amdgpu_sched)
+
+#define DRM_IOCTL_AMDGPU_GEM_DGMA	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_DGMA, struct drm_amdgpu_gem_dgma)
 
 /**
  * DOC: memory domains
@@ -107,12 +111,16 @@ extern "C" {
 #define AMDGPU_GEM_DOMAIN_GDS		0x8
 #define AMDGPU_GEM_DOMAIN_GWS		0x10
 #define AMDGPU_GEM_DOMAIN_OA		0x20
+#define AMDGPU_GEM_DOMAIN_DGMA		0x40
+#define AMDGPU_GEM_DOMAIN_DGMA_IMPORT	0x80
 #define AMDGPU_GEM_DOMAIN_MASK		(AMDGPU_GEM_DOMAIN_CPU | \
 					 AMDGPU_GEM_DOMAIN_GTT | \
 					 AMDGPU_GEM_DOMAIN_VRAM | \
 					 AMDGPU_GEM_DOMAIN_GDS | \
 					 AMDGPU_GEM_DOMAIN_GWS | \
-					 AMDGPU_GEM_DOMAIN_OA)
+					 AMDGPU_GEM_DOMAIN_OA |\
+					 AMDGPU_GEM_DOMAIN_DGMA |\
+					 AMDGPU_GEM_DOMAIN_DGMA_IMPORT)
 
 /* Flag that CPU access will be required for the case of VRAM domain */
 #define AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED	(1 << 0)
@@ -398,6 +406,15 @@ struct drm_amdgpu_gem_userptr {
 	/* AMDGPU_GEM_USERPTR_* */
 	__u32		flags;
 	/* Resulting GEM handle */
+	__u32		handle;
+};
+
+#define AMDGPU_GEM_DGMA_IMPORT			0
+#define AMDGPU_GEM_DGMA_QUERY_PHYS_ADDR		1
+struct drm_amdgpu_gem_dgma {
+	__u64		addr;
+	__u64		size;
+	__u32		op;
 	__u32		handle;
 };
 
@@ -922,6 +939,8 @@ struct drm_amdgpu_cs_chunk_data {
 #define AMDGPU_INFO_VIRTUAL_RANGE		0x51
 /* query pin memory capability */
 #define AMDGPU_CAPABILITY_PIN_MEM_FLAG  (1 << 0)
+/* query direct gma capability */
+#define AMDGPU_CAPABILITY_DIRECT_GMA_FLAG	(1 << 1)
 
 #define AMDGPU_INFO_MMR_SE_INDEX_SHIFT	0
 #define AMDGPU_INFO_MMR_SE_INDEX_MASK	0xff
@@ -1261,6 +1280,7 @@ struct drm_amdgpu_virtual_range {
 
 struct drm_amdgpu_capability {
 	__u32 flag;
+	__u32 direct_gma_size;
 };
 
 /*
