@@ -1058,13 +1058,9 @@ static int amdgpu_cs_ib_fill(struct amdgpu_device *adev,
 		if (r)
 			return r;
 
-		if (chunk_ib->flags & AMDGPU_IB_FLAG_PREAMBLE) {
-			parser->job->preamble_status |= AMDGPU_PREAMBLE_IB_PRESENT;
-			if (!parser->ctx->preamble_presented) {
-				parser->job->preamble_status |= AMDGPU_PREAMBLE_IB_PRESENT_FIRST;
-				parser->ctx->preamble_presented = true;
-			}
-		}
+		if (chunk_ib->flags & AMDGPU_IB_FLAG_PREAMBLE)
+			parser->job->preamble_status |=
+				AMDGPU_PREAMBLE_IB_PRESENT;
 
 		if (parser->entity && parser->entity != entity)
 			return -EINVAL;
@@ -1290,6 +1286,12 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 	amdgpu_cs_post_dependencies(p);
 #endif
+
+	if ((job->preamble_status & AMDGPU_PREAMBLE_IB_PRESENT) &&
+	    !p->ctx->preamble_presented) {
+		job->preamble_status |= AMDGPU_PREAMBLE_IB_PRESENT_FIRST;
+		p->ctx->preamble_presented = true;
+	}
 
 	cs->out.handle = seq;
 	job->uf_sequence = seq;
