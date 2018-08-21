@@ -133,6 +133,10 @@ static inline unsigned amdgpu_mem_type_to_domain(u32 mem_type)
 		return AMDGPU_GEM_DOMAIN_GWS;
 	case AMDGPU_PL_OA:
 		return AMDGPU_GEM_DOMAIN_OA;
+	case AMDGPU_PL_DGMA:
+		return AMDGPU_GEM_DOMAIN_DGMA;
+	case AMDGPU_PL_DGMA_IMPORT:
+		return AMDGPU_GEM_DOMAIN_DGMA_IMPORT;
 	default:
 		break;
 	}
@@ -201,6 +205,8 @@ static inline bool amdgpu_bo_gpu_accessible(struct amdgpu_bo *bo)
 {
 	switch (bo->tbo.mem.mem_type) {
 	case TTM_PL_TT: return amdgpu_gtt_mgr_has_gart_addr(&bo->tbo.mem);
+	case AMDGPU_PL_DGMA:
+	case AMDGPU_PL_DGMA_IMPORT:
 	case TTM_PL_VRAM: return true;
 	default: return false;
 	}

@@ -110,6 +110,7 @@ int amdgpu_dc = -1;
 int amdgpu_sched_jobs = 32;
 int amdgpu_sched_hw_submission = 2;
 int amdgpu_no_evict = 0;
+int amdgpu_direct_gma_size = 0;
 uint amdgpu_pcie_gen_cap = 0;
 uint amdgpu_pcie_lane_cap = 0;
 uint amdgpu_cg_mask = 0xffffffff;
@@ -366,6 +367,10 @@ module_param_named(ppfeaturemask, amdgpu_pp_feature_mask, uint, 0444);
 
 MODULE_PARM_DESC(no_evict, "Support pinning request from user space (1 = enable, 0 = disable (default))");
 module_param_named(no_evict, amdgpu_no_evict, int, 0444);
+
+MODULE_PARM_DESC(direct_gma_size, "Direct GMA size in megabytes (max 96MB)");
+module_param_named(direct_gma_size, amdgpu_direct_gma_size, int, 0444);
+
 /**
  * DOC: pcie_gen_cap (uint)
  * Override PCIE gen speed capabilities. See the CAIL flags in drivers/gpu/drm/amd/include/amd_pcie.h.
