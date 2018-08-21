@@ -65,7 +65,7 @@ static atomic_t fence_seq = ATOMIC_INIT(0);
 struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 						       struct mm_struct *mm)
 {
-	struct amdgpu_amdkfd_fence *fence = NULL;
+	struct amdgpu_amdkfd_fence *fence;
 
 	fence = kzalloc(sizeof(*fence), GFP_KERNEL);
 	if (fence == NULL)
