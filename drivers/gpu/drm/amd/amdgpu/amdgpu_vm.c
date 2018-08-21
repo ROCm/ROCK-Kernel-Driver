@@ -1023,6 +1023,7 @@ int amdgpu_vm_update_range(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		uint64_t tmp, num_entries, addr;
 
 		num_entries = cursor.size >> AMDGPU_GPU_PAGE_SHIFT;
+
 		if (pages_addr) {
 			bool contiguous = true;
 
@@ -1185,6 +1186,8 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 		if (mem && (mem->mem_type == TTM_PL_TT ||
 			    mem->mem_type == AMDGPU_PL_PREEMPT))
 			pages_addr = bo->tbo.ttm->dma_address;
+		else if (mem->mem_type == AMDGPU_PL_DGMA_IMPORT)
+			pages_addr = (dma_addr_t *)bo->tbo.mem.bus.addr;
 	}
 
 	if (bo) {
