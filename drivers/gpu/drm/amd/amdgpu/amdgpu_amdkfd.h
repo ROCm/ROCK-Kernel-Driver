@@ -77,8 +77,8 @@ struct amdgpu_amdkfd_fence {
 
 struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 						       struct mm_struct *mm);
-struct amdgpu_amdkfd_fence *to_amdgpu_amdkfd_fence(struct dma_fence *f);
 bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm);
+struct amdgpu_amdkfd_fence *to_amdgpu_amdkfd_fence(struct dma_fence *f);
 
 struct amdkfd_process_info {
 	/* List head of all VMs that belong to a KFD process */
@@ -220,4 +220,3 @@ void amdgpu_amdkfd_gpuvm_init_mem_limits(void);
 void amdgpu_amdkfd_unreserve_system_memory_limit(struct amdgpu_bo *bo);
 
 #endif /* AMDGPU_AMDKFD_H_INCLUDED */
-
