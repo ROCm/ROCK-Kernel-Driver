@@ -611,6 +611,9 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	else
 		amdgpu_cs_report_moved_bytes(adev, ctx.bytes_moved, 0);
 
+	if (bp->domain & AMDGPU_GEM_DOMAIN_DGMA && adev->ssg.enabled)
+		bo->tbo.ssg_can_map = true;
+
 	if (bp->flags & AMDGPU_GEM_CREATE_VRAM_CLEARED &&
 	    bo->tbo.mem.placement & TTM_PL_FLAG_VRAM) {
 		struct dma_fence *fence;

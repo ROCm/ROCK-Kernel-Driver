@@ -298,7 +298,7 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 		 */
 		if (vma->vm_flags & VM_MIXEDMAP)
 			ret = vmf_insert_mixed_prot(vma, address,
-						    __pfn_to_pfn_t(pfn, PFN_DEV),
+						    __pfn_to_pfn_t(pfn, PFN_DEV | (bo->ssg_can_map ? PFN_MAP : 0)),
 						    prot);
 		else
 			ret = vmf_insert_pfn_prot(vma, address, pfn, prot);
@@ -491,7 +491,7 @@ static void ttm_bo_mmap_vma_setup(struct ttm_buffer_object *bo, struct vm_area_s
 	 * VM_MIXEDMAP on all mappings. See freedesktop.org bug #75719
 	 */
 	vma->vm_flags |= VM_MIXEDMAP;
-	vma->vm_flags |= VM_IO | VM_DONTEXPAND | VM_DONTDUMP;
+	vma->vm_flags |= (bo->ssg_can_map ? 0 : VM_IO) | VM_DONTEXPAND | VM_DONTDUMP;
 }
 
 int ttm_bo_mmap(struct file *filp, struct vm_area_struct *vma,

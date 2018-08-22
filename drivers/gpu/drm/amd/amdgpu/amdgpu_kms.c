@@ -861,6 +861,8 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 			cap.flag |= AMDGPU_CAPABILITY_DIRECT_GMA_FLAG;
 			cap.direct_gma_size = amdgpu_direct_gma_size;
 		}
+		if (adev->ssg.enabled)
+			cap.flag |= AMDGPU_CAPABILITY_SSG_FLAG;
 		return copy_to_user(out, &cap,
 				    min((size_t)size, sizeof(cap))) ? -EFAULT : 0;
 	}

@@ -1976,6 +1976,87 @@ static void amdgpu_direct_gma_fini(struct amdgpu_device *adev)
 	atomic64_sub((u64)amdgpu_direct_gma_size << 20, &adev->gart_pin_size);
 }
 
+#ifdef CONFIG_ENABLE_SSG
+#include <linux/memremap.h>
+
+static struct amdgpu_ssg *to_amdgpu_ssg(struct percpu_ref *ref)
+{
+	return container_of(ref, struct amdgpu_ssg, ref);
+}
+
+static void amdgpu_ssg_percpu_release(struct percpu_ref *ref)
+{
+	struct amdgpu_ssg *ssg = to_amdgpu_ssg(ref);
+
+	complete(&ssg->cmp);
+}
+
+static int amdgpu_ssg_init(struct amdgpu_device *adev)
+{
+	struct resource res;
+	void *addr;
+	int rc;
+
+	adev->ssg.enabled = false;
+
+	if (!amdgpu_ssg_enabled)
+		return 0;
+
+	if (amdgpu_direct_gma_size == 0) {
+		DRM_INFO("SSG: not enabled due to DirectGMA is disabled\n");
+		return 0;
+	}
+
+	init_completion(&adev->ssg.cmp);
+
+	res.start = adev->gmc.aper_base +
+		(amdgpu_bo_gpu_offset(adev->direct_gma.dgma_bo) -
+		 adev->gmc.vram_start);
+	res.end = res.start + amdgpu_bo_size(adev->direct_gma.dgma_bo) - 1;
+	res.name = "DirectGMA";
+
+	rc = percpu_ref_init(&adev->ssg.ref, amdgpu_ssg_percpu_release,
+			     0, GFP_KERNEL);
+	if (rc)
+		return rc;
+
+	adev->ssg.pgmap.res.start = res.start;
+	adev->ssg.pgmap.res.end = res.end;
+	adev->ssg.pgmap.res.name = res.name;
+	adev->ssg.pgmap.ref = &adev->ssg.ref;
+	addr = devm_memremap_pages(adev->dev, &adev->ssg.pgmap);
+	if (IS_ERR(addr)) {
+		percpu_ref_exit(&adev->ssg.ref);
+		return PTR_ERR(addr);
+	}
+
+	adev->ssg.enabled = true;
+	DRM_INFO("SSG: remap %llx-%llx to %p\n", res.start, res.end, addr);
+	return 0;
+}
+
+static void amdgpu_ssg_fini(struct amdgpu_device *adev)
+{
+	if (!adev->ssg.enabled)
+		return;
+
+	percpu_ref_kill(&adev->ssg.ref);
+	wait_for_completion(&adev->ssg.cmp);
+	percpu_ref_exit(&adev->ssg.ref);
+}
+#else
+static int amdgpu_ssg_init(struct amdgpu_device *adev)
+{
+	adev->ssg.enabled = false;
+	return 0;
+}
+
+static void amdgpu_ssg_fini(struct amdgpu_device *adev)
+{
+
+}
+#endif
+
 /**
  * amdgpu_ttm_init - Init the memory management (ttm) as well as various
  * gtt/vram related fields.
@@ -2102,6 +2183,7 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 		 (unsigned)(gtt_size / (1024 * 1024)));
 
 	amdgpu_direct_gma_init(adev);
+	amdgpu_ssg_init(adev);
 
 	/* Initialize various on-chip memory pools */
 	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_GDS,
@@ -2155,6 +2237,7 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 		iounmap(adev->mman.aper_base_kaddr);
 	adev->mman.aper_base_kaddr = NULL;
 
+	amdgpu_ssg_fini(adev);
 	amdgpu_direct_gma_fini(adev);
 	ttm_bo_clean_mm(&adev->mman.bdev, TTM_PL_VRAM);
 	ttm_bo_clean_mm(&adev->mman.bdev, TTM_PL_TT);
