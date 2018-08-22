@@ -348,6 +348,9 @@ int amdgpu_vm_validate_pt_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 			list_move(&bo_base->vm_status, &vm->moved);
 			spin_unlock(&vm->moved_lock);
 		} else {
+			r = amdgpu_ttm_alloc_gart(&bo->tbo);
+			if (r)
+				break;
 			list_move(&bo_base->vm_status, &vm->relocated);
 		}
 	}
@@ -424,6 +427,10 @@ static int amdgpu_vm_clear_bo(struct amdgpu_device *adev,
 	if (r)
 		goto error;
 
+	r = amdgpu_ttm_alloc_gart(&bo->tbo);
+	if (r)
+		return r;
+
 	r = amdgpu_job_alloc_with_ib(adev, 64, &job);
 	if (r)
 		goto error;
@@ -471,6 +478,37 @@ error_free:
 
 error:
 	return r;
+}
+
+/**
+ * amdgpu_vm_bo_param - fill in parameters for PD/PT allocation
+ *
+ * @adev: amdgpu_device pointer
+ * @vm: requesting vm
+ * @bp: resulting BO allocation parameters
+ */
+static void amdgpu_vm_bo_param(struct amdgpu_device *adev, struct amdgpu_vm *vm,
+			       int level, struct amdgpu_bo_param *bp)
+{
+	memset(bp, 0, sizeof(*bp));
+
+	bp->size = amdgpu_vm_bo_size(adev, level);
+	bp->byte_align = AMDGPU_GPU_PAGE_SIZE;
+	bp->domain = AMDGPU_GEM_DOMAIN_VRAM;
+	if (bp->size <= PAGE_SIZE && adev->asic_type >= CHIP_VEGA10 &&
+	    adev->flags & AMD_IS_APU)
+		bp->domain |= AMDGPU_GEM_DOMAIN_GTT;
+	bp->domain = amdgpu_bo_get_preferred_pin_domain(adev, bp->domain);
+	bp->flags = AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS |
+		AMDGPU_GEM_CREATE_CPU_GTT_USWC;
+	if (vm->use_cpu_for_update)
+		bp->flags |= AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
+	else
+		bp->flags |= AMDGPU_GEM_CREATE_SHADOW |
+			AMDGPU_GEM_CREATE_NO_CPU_ACCESS;
+	bp->type = ttm_bo_type_kernel;
+	if (vm->root.base.bo)
+		bp->resv = vm->root.base.bo->tbo.resv;
 }
 
 /**
