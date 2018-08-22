@@ -130,10 +130,15 @@ void kfd_doorbell_fini(struct kfd_dev *kfd)
 		iounmap(kfd->doorbell_kernel_ptr);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 static int kfd_doorbell_vm_fault(struct vm_fault *vmf)
 {
 	struct kfd_process *process = vmf->vma->vm_private_data;
-
+#else
+static int kfd_doorbell_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	struct kfd_process *process = vma->vm_private_data;
+#endif
 	pr_debug("Process %d doorbell vm page fault\n", process->pasid);
 
 	kfd_process_remap_doorbells_locked(process);
