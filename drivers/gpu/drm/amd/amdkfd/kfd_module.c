@@ -20,20 +20,10 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/moduleparam.h>
 #include <linux/device.h>
-#include <linux/printk.h>
 #include "kfd_priv.h"
-
-#define KFD_DRIVER_AUTHOR	"AMD Inc. and others"
-
-#define KFD_DRIVER_DESC		"Standalone HSA driver for AMD's GPUs"
-#define KFD_DRIVER_DATE		"20160408"
-#define KFD_DRIVER_MAJOR	2
-#define KFD_DRIVER_MINOR	0
-#define KFD_DRIVER_PATCHLEVEL	0
 
 static const struct kgd2kfd_calls kgd2kfd = {
 	.exit		= kgd2kfd_exit,
@@ -110,32 +100,7 @@ bool keep_idle_process_evicted;
 module_param(keep_idle_process_evicted, bool, 0444);
 MODULE_PARM_DESC(keep_idle_process_evicted, "Restore evicted process only if queues are active (N = off(default), Y = on)");
 
-static int amdkfd_init_completed;
-
-int kgd2kfd_init(unsigned int interface_version,
-		const struct kgd2kfd_calls **g2f)
-{
-	if (!amdkfd_init_completed)
-		return -EPROBE_DEFER;
-
-	/*
-	 * Only one interface version is supported,
-	 * no kfd/kgd version skew allowed.
-	 */
-	if (interface_version != KFD_INTERFACE_VERSION)
-		return -EINVAL;
-
-	*g2f = &kgd2kfd;
-
-	return 0;
-}
-EXPORT_SYMBOL(kgd2kfd_init);
-
-void kgd2kfd_exit(void)
-{
-}
-
-static int __init kfd_module_init(void)
+static int kfd_init(void)
 {
 	int err;
 
@@ -143,7 +108,7 @@ static int __init kfd_module_init(void)
 	if ((sched_policy < KFD_SCHED_POLICY_HWS) ||
 		(sched_policy > KFD_SCHED_POLICY_NO_HWS)) {
 		pr_err("sched_policy has invalid value\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	/* Verify module parameters */
@@ -151,7 +116,7 @@ static int __init kfd_module_init(void)
 		(max_num_of_queues_per_device >
 			KFD_MAX_NUM_OF_QUEUES_PER_DEVICE)) {
 		pr_err("max_num_of_queues_per_device must be between 1 to KFD_MAX_NUM_OF_QUEUES_PER_DEVICE\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	err = kfd_chardev_init();
@@ -174,10 +139,6 @@ static int __init kfd_module_init(void)
 
 	kfd_debugfs_init();
 
-	amdkfd_init_completed = 1;
-
-	dev_info(kfd_device, "Initialized module\n");
-
 	return 0;
 
 err_create_wq:
@@ -189,24 +150,31 @@ err_ioctl:
 	return err;
 }
 
-static void __exit kfd_module_exit(void)
+static void kfd_exit(void)
 {
-	amdkfd_init_completed = 0;
-
 	kfd_debugfs_fini();
 	kfd_close_peer_direct();
 	kfd_process_destroy_wq();
 	kfd_topology_shutdown();
 	kfd_chardev_exit();
-	pr_info("amdkfd: Removed module\n");
 }
 
-module_init(kfd_module_init);
-module_exit(kfd_module_exit);
+int kgd2kfd_init(unsigned int interface_version,
+		const struct kgd2kfd_calls **g2f)
+{
+	int err;
 
-MODULE_AUTHOR(KFD_DRIVER_AUTHOR);
-MODULE_DESCRIPTION(KFD_DRIVER_DESC);
-MODULE_LICENSE("GPL and additional rights");
-MODULE_VERSION(__stringify(KFD_DRIVER_MAJOR) "."
-	       __stringify(KFD_DRIVER_MINOR) "."
-	       __stringify(KFD_DRIVER_PATCHLEVEL));
+	err = kfd_init();
+	if (err)
+		return err;
+
+	*g2f = &kgd2kfd;
+
+	return 0;
+}
+EXPORT_SYMBOL(kgd2kfd_init);
+
+void kgd2kfd_exit(void)
+{
+	kfd_exit();
+}
