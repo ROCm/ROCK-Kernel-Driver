@@ -124,6 +124,7 @@ extern char *amdgpu_disable_cu;
 extern char *amdgpu_virtual_display;
 extern uint amdgpu_pp_feature_mask;
 extern int amdgpu_vram_page_split;
+extern int amdgpu_ssg_enabled;
 extern int amdgpu_ngg;
 extern int amdgpu_prim_buf_per_se;
 extern int amdgpu_pos_buf_per_se;
@@ -827,6 +828,18 @@ struct amdgpu_direct_gma {
 	atomic64_t		gart_usage;
 };
 
+#if defined(CONFIG_ZONE_DEVICE) && (DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0))
+#define CONFIG_ENABLE_SSG
+#endif
+
+struct amdgpu_ssg {
+	bool			enabled;
+#ifdef CONFIG_ENABLE_SSG
+	struct percpu_ref	ref;
+	struct completion	cmp;
+#endif
+};
+
 struct amd_powerplay {
 	void *pp_handle;
 	const struct amd_pm_funcs *pp_funcs;
@@ -881,6 +894,8 @@ struct amdgpu_device {
 
 	/* Direct GMA */
 	struct amdgpu_direct_gma	direct_gma;
+	/* SSG */
+	struct amdgpu_ssg		ssg;
 
 	/* Register/doorbell mmio */
 	resource_size_t			rmmio_base;

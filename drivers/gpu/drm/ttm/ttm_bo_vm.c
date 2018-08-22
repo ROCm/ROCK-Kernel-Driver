@@ -316,7 +316,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	defined(OS_NAME_RHEL_7_3) || \
 	defined(OS_NAME_RHEL_7_4_5) || \
 	defined(OS_NAME_SLE)
-			__pfn_to_pfn_t(pfn, PFN_DEV ));
+			__pfn_to_pfn_t(pfn, PFN_DEV | (bo->ssg_can_map ? PFN_MAP : 0)));
 #else
 					pfn);
 #endif
@@ -507,7 +507,7 @@ int ttm_bo_mmap(struct file *filp, struct vm_area_struct *vma,
 	 * VM_MIXEDMAP on all mappings. See freedesktop.org bug #75719
 	 */
 	vma->vm_flags |= VM_MIXEDMAP;
-	vma->vm_flags |= VM_IO | VM_DONTEXPAND | VM_DONTDUMP;
+	vma->vm_flags |= (bo->ssg_can_map ? 0 : VM_IO) | VM_DONTEXPAND | VM_DONTDUMP;
 	return 0;
 out_unref:
 	ttm_bo_put(bo);

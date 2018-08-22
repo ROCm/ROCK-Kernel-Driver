@@ -1177,6 +1177,7 @@ int ttm_bo_init_reserved(struct ttm_bo_device *bdev,
 	bo->mem.placement = (TTM_PL_FLAG_SYSTEM | TTM_PL_FLAG_CACHED);
 	bo->acc_size = acc_size;
 	bo->sg = sg;
+	bo->ssg_can_map = false;
 	if (resv) {
 		bo->resv = resv;
 		reservation_object_assert_held(bo->resv);
