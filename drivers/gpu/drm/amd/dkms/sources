@@ -7,5 +7,6 @@ drivers/gpu/drm/scheduler .
 include/drm/gpu_scheduler.h include/drm/
 drivers/gpu/drm/scheduler/gpu_scheduler_trace.h include/drm/
 include/drm/spsc_queue.h include/drm/
+include/drm/amd_rdma.h include/drm
 include/uapi/linux/kfd_ioctl.h include/uapi/linux
 drivers/gpu/drm/radeon/cik_reg.h radeon

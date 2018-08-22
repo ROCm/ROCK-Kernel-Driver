@@ -32,7 +32,7 @@
 #include <linux/spinlock.h>
 #include <linux/kfd_ioctl.h>
 #include <linux/idr.h>
-#ifdef OS_NAME_RHEL_6
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
 #include <linux/kfifo-new.h>
 #else
 #include <linux/kfifo.h>
@@ -784,7 +784,11 @@ struct kfd_process {
 	size_t signal_event_count;
 	bool signal_event_limit_reached;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	struct rb_root bo_interval_tree;
+#else
 	struct rb_root_cached bo_interval_tree;
+#endif
 
 	/* Information used for memory eviction */
 	void *kgd_process_info;

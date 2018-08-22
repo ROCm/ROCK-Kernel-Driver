@@ -26,7 +26,9 @@
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/sched.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
+#endif
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/compat.h>
@@ -825,6 +827,11 @@ static int kfd_ioctl_get_clock_counters(struct file *filep,
 {
 	struct kfd_ioctl_get_clock_counters_args *args = data;
 	struct kfd_dev *dev;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0)
+	struct timespec time;
+#else
+	struct timespec64 time;
+#endif
 
 	dev = kfd_device_by_id(args->gpu_id);
 	if (dev)
@@ -835,8 +842,22 @@ static int kfd_ioctl_get_clock_counters(struct file *filep,
 		args->gpu_clock_counter = 0;
 
 	/* No access to rdtsc. Using raw monotonic time */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)
 	args->cpu_clock_counter = ktime_get_raw_ns();
+#else
+	getrawmonotonic(&time);
+	args->cpu_clock_counter = (uint64_t)timespec_to_ns(&time);
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 	args->system_clock_counter = ktime_get_boot_ns();
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)
+	get_monotonic_boottime64(&time);
+	args->system_clock_counter = (uint64_t)timespec64_to_ns(&time);
+#else
+	get_monotonic_boottime(&time);
+	args->system_clock_counter = (uint64_t)timespec_to_ns(&time);
+#endif
 
 	/* Since the counter is in nano-seconds we use 1GHz frequency */
 	args->system_clock_freq = 1000000000;
@@ -1700,6 +1721,10 @@ static int kfd_ioctl_ipc_import_handle(struct file *filep,
 	return r;
 }
 
+#ifndef PTRACE_MODE_ATTACH_REALCREDS
+#define PTRACE_MODE_ATTACH_REALCREDS  PTRACE_MODE_ATTACH
+#endif
+
 /* Maximum number of entries for process pages array which lives on stack */
 #define MAX_PP_STACK_COUNT 16
 /* Maximum number of pages kmalloc'd to hold struct page's during copy */
@@ -1766,7 +1791,7 @@ static int kfd_create_sg_table_from_userptr_bo(struct kfd_bo *bo,
 		flags = FOLL_WRITE;
 	locked = 1;
 	down_read(&mm->mmap_sem);
-	n = get_user_pages_remote(task, mm, pa, nents, flags, process_pages,
+	n = kcl_get_user_pages(task, mm, pa, nents, flags, 0, process_pages,
 				  NULL, &locked);
 	if (locked)
 		up_read(&mm->mmap_sem);
@@ -2103,8 +2128,8 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 		nl = min_t(unsigned int, MAX_PP_KMALLOC_COUNT, nents);
 		locked = 1;
 		down_read(&ri->mm->mmap_sem);
-		nl = get_user_pages_remote(ri->task, ri->mm, rva, nl,
-					   flags, process_pages, NULL,
+		nl = kcl_get_user_pages(ri->task, ri->mm, rva, nl,
+					   flags, 0, process_pages, NULL,
 					   &locked);
 		if (locked)
 			up_read(&ri->mm->mmap_sem);
@@ -2435,7 +2460,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 	}
 
 	/* Check access permission */
-	remote_mm = mm_access(remote_task, PTRACE_MODE_ATTACH_REALCREDS);
+	remote_mm = kcl_mm_access(remote_task, PTRACE_MODE_ATTACH_REALCREDS);
 	if (!remote_mm || IS_ERR(remote_mm)) {
 		err = IS_ERR(remote_mm) ? PTR_ERR(remote_mm) : -ESRCH;
 		if (err == -EACCES) {

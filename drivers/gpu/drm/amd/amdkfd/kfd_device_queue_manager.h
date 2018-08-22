@@ -27,7 +27,9 @@
 #include <linux/rwsem.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
+#endif
 #include "kfd_priv.h"
 #include "kfd_mqd_manager.h"
 

@@ -25,7 +25,9 @@
 
 #include <linux/list.h>
 #include <linux/pagemap.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
+#endif
 #include <linux/dma-buf.h>
 #include <drm/drmP.h>
 #include "amdgpu_object.h"
@@ -1816,9 +1818,11 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 	struct amdgpu_bo *bo;
 	struct amdgpu_vm *avm = (struct amdgpu_vm *)vm;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0) && !defined(BUILD_AS_DKMS)
 	if (dma_buf->ops != &amdgpu_dmabuf_ops)
 		/* Can't handle non-graphics buffers */
 		return -EINVAL;
+#endif
 
 	obj = dma_buf->priv;
 	if (obj->dev->dev_private != adev)
