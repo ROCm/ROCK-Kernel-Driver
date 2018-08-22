@@ -845,7 +845,11 @@ static int kfd_fill_mem_info_for_cpu(int numa_node_id, int *avail_size,
 	 */
 	pgdat = NODE_DATA(numa_node_id);
 	for (zone_type = 0; zone_type < MAX_NR_ZONES; zone_type++)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+		mem_in_bytes += pgdat->node_zones[zone_type].present_pages;
+#else
 		mem_in_bytes += pgdat->node_zones[zone_type].managed_pages;
+#endif
 	mem_in_bytes <<= PAGE_SHIFT;
 
 	sub_type_hdr->length_low = lower_32_bits(mem_in_bytes);

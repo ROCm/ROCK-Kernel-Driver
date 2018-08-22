@@ -104,6 +104,12 @@ void amdgpu_amdkfd_device_probe(struct amdgpu_device *adev)
 	case CHIP_VEGA10:
 	case CHIP_VEGA20:
 	case CHIP_RAVEN:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0) && defined(BUILD_AS_DKMS)
+		if (adev->asic_type == CHIP_RAVEN) {
+			dev_dbg(adev->dev, "DKMS installed kfd does not support Raven for kernel < 4.16\n");
+			return;
+		}
+#endif
 		kfd2kgd = amdgpu_amdkfd_gfx_9_0_get_functions();
 		break;
 	default:
@@ -473,9 +479,11 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 	if (IS_ERR(dma_buf))
 		return PTR_ERR(dma_buf);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0) && !defined(BUILD_AS_DKMS)
 	if (dma_buf->ops != &amdgpu_dmabuf_ops)
 		/* Can't handle non-graphics buffers */
 		goto out_put;
+#endif
 
 	obj = dma_buf->priv;
 	if (obj->dev->driver != adev->ddev->driver)

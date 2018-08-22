@@ -23,10 +23,11 @@
 #include <linux/mutex.h>
 #include <linux/log2.h>
 #include <linux/sched.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
 #include <linux/sched/task.h>
+#endif
 #include <linux/slab.h>
-#include <linux/amd-iommu.h>
 #include <linux/notifier.h>
 #include <linux/compat.h>
 #include <linux/mman.h>
@@ -46,9 +47,21 @@
 DEFINE_HASHTABLE(kfd_processes_table, KFD_PROCESS_TABLE_SIZE);
 static DEFINE_MUTEX(kfd_processes_mutex);
 
-DEFINE_SRCU(kfd_processes_srcu);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+struct srcu_struct kfd_processes_srcu;
+void kfd_init_processes_srcu(void)
+{
+	init_srcu_struct(&kfd_processes_srcu);
+}
 
-/* For process termination handling */
+void kfd_cleanup_processes_srcu(void)
+{
+	cleanup_srcu_struct(&kfd_processes_srcu);
+}
+#else
+DEFINE_SRCU(kfd_processes_srcu);
+#endif
+
 static struct workqueue_struct *kfd_process_wq;
 
 /* Ordered, single-threaded workqueue for restoring evicted
@@ -72,7 +85,11 @@ static void restore_process_worker(struct work_struct *work);
 int kfd_process_create_wq(void)
 {
 	if (!kfd_process_wq)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+		kfd_process_wq = create_workqueue("kfd_process_wq");
+#else
 		kfd_process_wq = alloc_workqueue("kfd_process_wq", 0, 0);
+#endif
 	if (!kfd_restore_wq)
 		kfd_restore_wq = alloc_ordered_workqueue("kfd_restore_wq", 0);
 
@@ -262,9 +279,14 @@ struct kfd_process *kfd_get_process(const struct task_struct *thread)
 static struct kfd_process *find_process_by_mm(const struct mm_struct *mm)
 {
 	struct kfd_process *process;
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+	hash_for_each_possible_rcu(kfd_processes_table, process, node,
+					kfd_processes, (uintptr_t)mm)
+#else
 	hash_for_each_possible_rcu(kfd_processes_table, process,
 					kfd_processes, (uintptr_t)mm)
+#endif
 		if (process->mm == mm)
 			return process;
 
@@ -551,7 +573,11 @@ static struct kfd_process *create_process(const struct task_struct *thread,
 	if (!process)
 		goto err_alloc_process;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	process->bo_interval_tree = RB_ROOT;
+#else
 	process->bo_interval_tree = RB_ROOT_CACHED;
+#endif
 
 	process->pasid = kfd_pasid_alloc();
 	if (process->pasid == 0)
@@ -931,7 +957,13 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
+#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+#endif
 		if (p->pasid == pasid) {
 			kref_get(&p->ref);
 			ret_p = p;
@@ -1219,7 +1251,13 @@ void kfd_suspend_all_processes(void)
 	unsigned int temp;
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
+#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+#endif
 		cancel_delayed_work_sync(&p->eviction_work);
 		cancel_delayed_work_sync(&p->restore_work);
 
@@ -1238,7 +1276,13 @@ int kfd_resume_all_processes(void)
 	unsigned int temp;
 	int ret = 0, idx = srcu_read_lock(&kfd_processes_srcu);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
+#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+#endif
 		if (!queue_delayed_work(kfd_restore_wq, &p->restore_work, 0)) {
 			pr_err("Restore process %d failed during resume\n",
 			       p->pasid);
@@ -1306,7 +1350,13 @@ int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data)
 
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
+#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+#endif
 		seq_printf(m, "Process %d PASID %d:\n",
 			   p->lead_thread->tgid, p->pasid);
 

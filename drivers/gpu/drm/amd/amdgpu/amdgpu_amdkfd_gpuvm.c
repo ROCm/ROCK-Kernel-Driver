@@ -24,7 +24,9 @@
 #define pr_fmt(fmt) "kfd2kgd: " fmt
 
 #include <linux/list.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
+#endif
 #include <drm/drmP.h>
 #include "amdgpu_object.h"
 #include "amdgpu_vm.h"
@@ -592,9 +594,14 @@ static int init_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 	 */
 	WARN(mem->user_pages, "Leaking user_pages array");
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	mem->user_pages = drm_calloc_large(bo->tbo.ttm->num_pages,
+					   sizeof(struct page *));
+#else
 	mem->user_pages = kvmalloc_array(bo->tbo.ttm->num_pages,
 					   sizeof(struct page *),
 					   GFP_KERNEL | __GFP_ZERO);
+#endif
 	if (!mem->user_pages) {
 		pr_err("%s: Failed to allocate pages array\n", __func__);
 		ret = -ENOMEM;
@@ -629,7 +636,11 @@ release_out:
 		release_pages(mem->user_pages, bo->tbo.ttm->num_pages);
 #endif
 free_out:
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	drm_free_large(mem->user_pages);
+#else
 	kvfree(mem->user_pages);
+#endif
 	mem->user_pages = NULL;
 unregister_out:
 	if (ret)
@@ -1391,7 +1402,11 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 			release_pages(mem->user_pages,
 					mem->bo->tbo.ttm->num_pages);
 #endif
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+		drm_free_large(mem->user_pages);
+#else
 		kvfree(mem->user_pages);
+#endif
 	}
 
 	ret = reserve_bo_and_cond_vms(mem, NULL, BO_VM_ALL, &ctx);
@@ -1882,9 +1897,11 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 	struct amdgpu_bo *bo;
 	struct amdgpu_vm *avm = (struct amdgpu_vm *)vm;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0) && !defined(BUILD_AS_DKMS)
 	if (dma_buf->ops != &amdgpu_dmabuf_ops)
 		/* Can't handle non-graphics buffers */
 		return -EINVAL;
+#endif
 
 	obj = dma_buf->priv;
 	if (obj->dev->dev_private != adev)
@@ -2027,10 +2044,16 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		bo = mem->bo;
 
 		if (!mem->user_pages) {
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+			mem->user_pages =
+				drm_calloc_large(bo->tbo.ttm->num_pages,
+						 sizeof(struct page *));
+#else
 			mem->user_pages =
 				kvmalloc_array(bo->tbo.ttm->num_pages,
-						 sizeof(struct page *),
-						 GFP_KERNEL | __GFP_ZERO);
+					   sizeof(struct page *),
+					   GFP_KERNEL | __GFP_ZERO);
+#endif
 			if (!mem->user_pages) {
 				pr_err("%s: Failed to allocate pages array\n",
 				       __func__);
@@ -2160,7 +2183,11 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 		 * the userptr_valid_list. If we need to revalidate
 		 * it, we need to start from scratch.
 		 */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+		drm_free_large(mem->user_pages);
+#else
 		kvfree(mem->user_pages);
+#endif
 		mem->user_pages = NULL;
 		list_move_tail(&mem->validate_list.head,
 			       &process_info->userptr_valid_list);

@@ -411,8 +411,10 @@ int pm_debugfs_runlist(struct seq_file *m, void *data)
 		goto out;
 	}
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 3, 0)
 	seq_hex_dump(m, "  ", DUMP_PREFIX_OFFSET, 32, 4,
 		     pm->ib_buffer_obj->cpu_ptr, pm->ib_size_bytes, false);
+#endif
 
 out:
 	mutex_unlock(&pm->lock);

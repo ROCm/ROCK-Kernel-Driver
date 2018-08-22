@@ -23,8 +23,10 @@
 #include <linux/mm_types.h>
 #include <linux/slab.h>
 #include <linux/types.h>
-#include <linux/sched/signal.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
+#include <linux/sched/signal.h>
+#endif
 #include <linux/uaccess.h>
 #include <linux/mman.h>
 #include <linux/memory.h>
@@ -240,7 +242,12 @@ static void destroy_event(struct kfd_process *p, struct kfd_event *ev)
 	struct kfd_event_waiter *waiter;
 
 	/* Wake up pending waiters. They will return failure */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0) && \
+	!defined(OS_NAME_SUSE_15)
+	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
+#else
 	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
+#endif
 		waiter->event = NULL;
 	wake_up_all(&ev->wq);
 
@@ -397,7 +404,12 @@ static void set_event(struct kfd_event *ev)
 	 */
 	ev->signaled = !ev->auto_reset || !waitqueue_active(&ev->wq);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0) && \
+	!defined(OS_NAME_SUSE_15)
+	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
+#else
 	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
+#endif
 		waiter->activated = true;
 
 	wake_up_all(&ev->wq);
@@ -979,6 +991,9 @@ void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 	uint32_t id;
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
 	struct kfd_hsa_memory_exception_data memory_exception_data;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+#endif
 
 	if (!p)
 		return; /* Presumably process exited. */
@@ -1023,7 +1038,13 @@ void kfd_signal_reset_event(struct kfd_dev *dev)
 	hw_exception_data.memory_lost = 1;
 
 	idx  = srcu_read_lock(&kfd_processes_srcu);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+	struct hlist_node *node;
+
+	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
+#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+#endif
 		mutex_lock(&p->event_mutex);
 		id = KFD_FIRST_NONSIGNAL_EVENT_ID;
 		idr_for_each_entry_continue(&p->event_idr, ev, id)

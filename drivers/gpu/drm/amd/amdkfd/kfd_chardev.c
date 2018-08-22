@@ -26,7 +26,9 @@
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/sched.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
+#endif
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/compat.h>
@@ -809,6 +811,11 @@ static int kfd_ioctl_get_clock_counters(struct file *filep,
 {
 	struct kfd_ioctl_get_clock_counters_args *args = data;
 	struct kfd_dev *dev;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0)
+	struct timespec time;
+#else
+	struct timespec64 time;
+#endif
 
 	dev = kfd_device_by_id(args->gpu_id);
 	if (dev)
@@ -820,8 +827,19 @@ static int kfd_ioctl_get_clock_counters(struct file *filep,
 		args->gpu_clock_counter = 0;
 
 	/* No access to rdtsc. Using raw monotonic time */
-	args->cpu_clock_counter = ktime_get_raw_ns();
-	args->system_clock_counter = ktime_get_boot_ns();
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0)
+	getrawmonotonic(&time);
+	args->cpu_clock_counter = (uint64_t)timespec_to_ns(&time);
+
+	get_monotonic_boottime(&time);
+	args->system_clock_counter = (uint64_t)timespec_to_ns(&time);
+#else
+	getrawmonotonic64(&time);
+	args->cpu_clock_counter = (uint64_t)timespec64_to_ns(&time);
+
+	get_monotonic_boottime64(&time);
+	args->system_clock_counter = (uint64_t)timespec64_to_ns(&time);
+#endif
 
 	/* Since the counter is in nano-seconds we use 1GHz frequency */
 	args->system_clock_freq = 1000000000;
@@ -1736,6 +1754,72 @@ static int kfd_ioctl_ipc_import_handle(struct file *filep,
 	return r;
 }
 
+#ifndef PTRACE_MODE_ATTACH_REALCREDS
+#define PTRACE_MODE_ATTACH_REALCREDS  PTRACE_MODE_ATTACH
+#endif
+
+#if defined(BUILD_AS_DKMS)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
+static bool kfd_may_access(struct task_struct *task, unsigned int mode)
+{
+	bool access = false;
+	const struct cred *cred = current_cred(), *tcred;
+	kuid_t caller_uid = cred->fsuid;
+	kgid_t caller_gid = cred->fsgid;
+
+	task_lock(task);
+
+	if (same_thread_group(task, current)) {
+		access = true;
+		goto ok;
+	}
+
+	tcred = __task_cred(task);
+	if (uid_eq(caller_uid, tcred->euid) &&
+	    uid_eq(caller_uid, tcred->suid) &&
+	    uid_eq(caller_uid, tcred->uid)  &&
+	    gid_eq(caller_gid, tcred->egid) &&
+	    gid_eq(caller_gid, tcred->sgid) &&
+	    gid_eq(caller_gid, tcred->gid))
+		access = true;
+
+ok:
+	task_unlock(task);
+	return access;
+}
+/* mm_access() is currently not exported. This is a relaxed implementation
+ * that allows access as long as both process belong to same uid
+ */
+static struct mm_struct *kfd_relaxed_mm_access(struct task_struct *task,
+					       unsigned int mode)
+{
+	struct mm_struct *mm;
+	int err;
+
+	if (!cma_enable)
+		return ERR_PTR(-EACCES);
+
+	err =  mutex_lock_killable(&task->signal->cred_guard_mutex);
+	if (err)
+		return ERR_PTR(err);
+
+	mm = get_task_mm(task);
+	if (mm && mm != current->mm &&
+			!kfd_may_access(task, mode)) {
+		mmput(mm);
+		mm = ERR_PTR(-EACCES);
+	}
+	mutex_unlock(&task->signal->cred_guard_mutex);
+
+	return mm;
+}
+
+#define mm_access(task, mode) kfd_relaxed_mm_access(task, mode)
+#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) */
+#define mm_access(task, mode) ERR_PTR(-EACCES)
+#endif
+#endif /* defined(BUILD_AS_DKMS) */
+
 /* Maximum number of entries for process pages array which lives on stack */
 #define MAX_PP_STACK_COUNT 16
 /* Maximum number of pages kmalloc'd to hold struct page's during copy */
@@ -1802,7 +1886,7 @@ static int kfd_create_sg_table_from_userptr_bo(struct kfd_bo *bo,
 		flags = FOLL_WRITE;
 	locked = 1;
 	down_read(&mm->mmap_sem);
-	n = get_user_pages_remote(task, mm, pa, nents, flags, process_pages,
+	n = kcl_get_user_pages(task, mm, pa, nents, flags, 0, process_pages,
 				  NULL, &locked);
 	if (locked)
 		up_read(&mm->mmap_sem);
@@ -2139,8 +2223,8 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 		nl = min_t(unsigned int, MAX_PP_KMALLOC_COUNT, nents);
 		locked = 1;
 		down_read(&ri->mm->mmap_sem);
-		nl = get_user_pages_remote(ri->task, ri->mm, rva, nl,
-					   flags, process_pages, NULL,
+		nl = kcl_get_user_pages(ri->task, ri->mm, rva, nl,
+					   flags, 0, process_pages, NULL,
 					   &locked);
 		if (locked)
 			up_read(&ri->mm->mmap_sem);
