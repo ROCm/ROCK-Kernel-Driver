@@ -407,7 +407,7 @@ static int vm_validate_pt_pd_bos(struct amdgpu_vm *vm)
 		return ret;
 	}
 
-	vm->pd_phys_addr = get_vm_pd_gpu_offset(vm);
+	vm->pd_phys_addr = amdgpu_gmc_pd_addr(vm->root.base.bo);
 
 	if (vm->use_cpu_for_update) {
 		ret = amdgpu_bo_kmap(pd, NULL);
