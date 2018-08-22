@@ -855,6 +855,8 @@ struct drm_amdgpu_cs_chunk_data {
 #define AMDGPU_CAPABILITY_PIN_MEM_FLAG  (1 << 0)
 /* query direct gma capability */
 #define AMDGPU_CAPABILITY_DIRECT_GMA_FLAG	(1 << 1)
+/* query ssg capability */
+#define AMDGPU_CAPABILITY_SSG_FLAG		(1 << 2)
 
 #define AMDGPU_INFO_MMR_SE_INDEX_SHIFT	0
 #define AMDGPU_INFO_MMR_SE_INDEX_MASK	0xff

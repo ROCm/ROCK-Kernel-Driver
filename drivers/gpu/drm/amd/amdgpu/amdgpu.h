@@ -190,6 +190,7 @@ extern char *amdgpu_disable_cu;
 extern char *amdgpu_virtual_display;
 extern uint amdgpu_pp_feature_mask;
 extern uint amdgpu_force_long_training;
+extern int amdgpu_ssg_enabled;
 extern int amdgpu_job_hang_limit;
 extern int amdgpu_lbpw;
 extern int amdgpu_compute_multipipe;
@@ -779,6 +780,19 @@ struct amdgpu_direct_gma {
 	atomic64_t		gart_usage;
 };
 
+#if defined(CONFIG_ZONE_DEVICE)
+#define CONFIG_ENABLE_SSG
+#endif
+
+struct amdgpu_ssg {
+	bool			enabled;
+#ifdef CONFIG_ENABLE_SSG
+	struct percpu_ref	ref;
+	struct completion	cmp;
+	struct dev_pagemap	pgmap;
+#endif
+};
+
 struct amd_powerplay {
 	void *pp_handle;
 	const struct amd_pm_funcs *pp_funcs;
@@ -865,6 +879,8 @@ struct amdgpu_device {
 
 	/* Direct GMA */
 	struct amdgpu_direct_gma	direct_gma;
+	/* SSG */
+	struct amdgpu_ssg		ssg;
 
 	/* Register/doorbell mmio */
 	resource_size_t			rmmio_base;

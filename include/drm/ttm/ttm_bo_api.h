@@ -131,6 +131,8 @@ struct ttm_buffer_object {
 	uint32_t page_alignment;
 	void (*destroy) (struct ttm_buffer_object *);
 
+	bool ssg_can_map;
+
 	/**
 	* Members not needing protection.
 	*/

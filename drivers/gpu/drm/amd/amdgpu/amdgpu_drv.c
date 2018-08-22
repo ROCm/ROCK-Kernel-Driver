@@ -135,6 +135,7 @@ int amdgpu_sched_jobs = 32;
 int amdgpu_sched_hw_submission = 2;
 int amdgpu_no_evict;
 int amdgpu_direct_gma_size;
+int amdgpu_ssg_enabled;
 uint amdgpu_pcie_gen_cap;
 uint amdgpu_pcie_lane_cap;
 uint amdgpu_cg_mask = 0xffffffff;
@@ -444,6 +445,9 @@ module_param_named(no_evict, amdgpu_no_evict, int, 0444);
 
 MODULE_PARM_DESC(direct_gma_size, "Direct GMA size in megabytes (max 96MB)");
 module_param_named(direct_gma_size, amdgpu_direct_gma_size, int, 0444);
+
+MODULE_PARM_DESC(ssg, "SSG support (1 = enable, 0 = disable (default))");
+module_param_named(ssg, amdgpu_ssg_enabled, int, 0444);
 
 /**
  * DOC: forcelongtraining (uint)

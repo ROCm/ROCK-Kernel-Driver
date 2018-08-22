@@ -1009,6 +1009,7 @@ int ttm_bo_init_reserved(struct ttm_device *bdev,
 	bo->moving = NULL;
 	bo->pin_count = 0;
 	bo->sg = sg;
+	bo->ssg_can_map = false;
 	if (resv) {
 		amdkcl_ttm_resvp(bo) = resv;
 		dma_resv_assert_held(amdkcl_ttm_resvp(bo));
