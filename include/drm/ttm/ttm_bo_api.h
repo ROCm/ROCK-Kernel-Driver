@@ -175,6 +175,7 @@ struct ttm_buffer_object {
 	void (*destroy) (struct ttm_buffer_object *);
 	unsigned long num_pages;
 	size_t acc_size;
+	bool ssg_can_map;
 
 	/**
 	* Members not needing protection.
