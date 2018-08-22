@@ -1075,6 +1075,7 @@ int ttm_bo_init_reserved(struct ttm_device *bdev,
 	bo->mem.placement = 0;
 	bo->pin_count = 0;
 	bo->sg = sg;
+	bo->ssg_can_map = false;
 	if (resv) {
 		bo->base.resv = resv;
 		dma_resv_assert_held(bo->base.resv);

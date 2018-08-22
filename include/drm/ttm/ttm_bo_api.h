@@ -125,6 +125,8 @@ struct ttm_buffer_object {
 	enum ttm_bo_type type;
 	void (*destroy) (struct ttm_buffer_object *);
 
+	bool ssg_can_map;
+
 	/**
 	* Members not needing protection.
 	*/
