@@ -565,7 +565,11 @@ static int amdgpu_atpx_init(void)
  * look up whether we are the integrated or discrete GPU (all asics).
  * Returns the client id.
  */
+#ifdef HAVE_VGA_SWITCHEROO_GET_CLIENT_ID_RETURN_INT
+static int amdgpu_atpx_get_client_id(struct pci_dev *pdev)
+#else
 static enum vga_switcheroo_client_id amdgpu_atpx_get_client_id(struct pci_dev *pdev)
+#endif
 {
 	if (amdgpu_atpx_priv.dhandle == ACPI_HANDLE(&pdev->dev))
 		return VGA_SWITCHEROO_IGD;
@@ -573,7 +577,12 @@ static enum vga_switcheroo_client_id amdgpu_atpx_get_client_id(struct pci_dev *p
 		return VGA_SWITCHEROO_DIS;
 }
 
+#if defined(HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_HANDLER) ||\
+	defined(HAVE_1ARG_CONST_VGA_SWITCHEROO_REGISTER_HANDLER)
 static const struct vga_switcheroo_handler amdgpu_atpx_handler = {
+#else
+static struct vga_switcheroo_handler amdgpu_atpx_handler = {
+#endif
 	.switchto = amdgpu_atpx_switchto,
 	.power_state = amdgpu_atpx_power_state,
 	.get_client_id = amdgpu_atpx_get_client_id,
@@ -671,7 +680,7 @@ static bool amdgpu_atpx_detect(void)
 void amdgpu_register_atpx_handler(void)
 {
 	bool r;
-#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
+#ifndef HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_HANDLER
 	int handler_flags = 0;
 #else
 	enum vga_switcheroo_handler_flags_t handler_flags = 0;
