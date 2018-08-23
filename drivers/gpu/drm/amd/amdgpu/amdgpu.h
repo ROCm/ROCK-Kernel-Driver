@@ -1218,10 +1218,6 @@ bool amdgpu_device_need_post(struct amdgpu_device *adev);
 
 void amdgpu_cs_report_moved_bytes(struct amdgpu_device *adev, u64 num_bytes,
 				  u64 num_vis_bytes);
-void amdgpu_device_vram_location(struct amdgpu_device *adev,
-				 struct amdgpu_gmc *mc, u64 base);
-void amdgpu_device_gart_location(struct amdgpu_device *adev,
-				 struct amdgpu_gmc *mc);
 #if !defined(BUILD_AS_DKMS) || LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 int amdgpu_device_resize_fb_bar(struct amdgpu_device *adev);
 #endif
