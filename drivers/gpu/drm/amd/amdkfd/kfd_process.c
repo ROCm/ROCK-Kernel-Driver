@@ -1044,8 +1044,7 @@ static void kfd_process_unmap_doorbells(struct kfd_process *p)
 	struct kfd_process_device *pdd;
 	struct mm_struct *mm = p->mm;
 
-	if (down_write_killable(&mm->mmap_sem))
-		return;
+	down_write(&mm->mmap_sem);
 
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
 		kfd_doorbell_unmap(pdd);
@@ -1069,8 +1068,7 @@ static int kfd_process_remap_doorbells(struct kfd_process *p)
 	struct mm_struct *mm = p->mm;
 	int ret = 0;
 
-	if (down_write_killable(&mm->mmap_sem))
-		return 0;
+	down_write(&mm->mmap_sem);
 	ret = kfd_process_remap_doorbells_locked(p);
 	up_write(&mm->mmap_sem);
 
