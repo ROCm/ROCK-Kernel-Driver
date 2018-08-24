@@ -1287,14 +1287,7 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	job->owner = p->filp;
 	p->fence = dma_fence_get(&job->base.s_fence->finished);
 
-	r = amdgpu_ctx_add_fence(p->ctx, entity, p->fence, &seq);
-	if (r) {
-		dma_fence_put(p->fence);
-		dma_fence_put(&job->base.s_fence->finished);
-		amdgpu_job_free(job);
-		amdgpu_mn_unlock(p->mn);
-		return r;
-	}
+	amdgpu_ctx_add_fence(p->ctx, entity, p->fence, &seq);
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 	amdgpu_cs_post_dependencies(p);
