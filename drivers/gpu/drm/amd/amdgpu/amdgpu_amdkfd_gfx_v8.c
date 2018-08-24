@@ -112,13 +112,6 @@ static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid);
 static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid);
 
-/* TODO: remove */
-static int create_process_gpumem(struct kgd_dev *kgd, uint64_t va, size_t size,
-		void *vm, struct kgd_mem **mem);
-static void destroy_process_gpumem(struct kgd_dev *kgd, struct kgd_mem *mem);
-static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
-		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
-
 /* Because of REG_GET_FIELD() being used, we put this function in the
  * asic specific file.
  */
@@ -200,28 +193,11 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.pin_get_sg_table_bo = amdgpu_amdkfd_gpuvm_pin_get_sg_table,
 	.unpin_put_sg_table_bo = amdgpu_amdkfd_gpuvm_unpin_put_sg_table,
 	.copy_mem_to_mem = amdgpu_amdkfd_copy_mem_to_mem,
-	/* TODO: remove */
-	.create_process_gpumem = create_process_gpumem,
-	.destroy_process_gpumem = destroy_process_gpumem,
-	.write_config_static_mem = write_config_static_mem,
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions(void)
 {
 	return (struct kfd2kgd_calls *)&kfd2kgd;
-}
-
-/* TODO: remove */
-static int create_process_gpumem(struct kgd_dev *kgd, uint64_t va, size_t size,
-				void *vm, struct kgd_mem **mem)
-{
-	return 0;
-}
-
-/* Destroys the GPU allocation and frees the kgd_mem structure */
-static void destroy_process_gpumem(struct kgd_dev *kgd, struct kgd_mem *mem)
-{
-
 }
 
 static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
@@ -846,21 +822,6 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 	return watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + reg_offset];
 }
 
-/* TODO: remove */
-static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
-		uint8_t element_size, uint8_t index_stride, uint8_t mtype)
-{
-	uint32_t reg;
-	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
-
-	reg = swizzle_enable << SH_STATIC_MEM_CONFIG__SWIZZLE_ENABLE__SHIFT |
-		element_size << SH_STATIC_MEM_CONFIG__ELEMENT_SIZE__SHIFT |
-		index_stride << SH_STATIC_MEM_CONFIG__INDEX_STRIDE__SHIFT |
-		mtype << SH_STATIC_MEM_CONFIG__PRIVATE_MTYPE__SHIFT;
-
-	WREG32(mmSH_STATIC_MEM_CONFIG, reg);
-	return 0;
-}
 static void set_scratch_backing_va(struct kgd_dev *kgd,
 					uint64_t va, uint32_t vmid)
 {

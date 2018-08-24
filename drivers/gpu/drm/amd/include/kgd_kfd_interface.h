@@ -456,12 +456,6 @@ struct kfd2kgd_calls {
 	uint32_t (*set_wave_launch_mode)(struct kgd_dev *kgd,
 					uint8_t wave_launch_mode,
 					uint32_t vmid);
-
-	/* unused interfaces. TODO: remove them */
-	int (*write_config_static_mem)(struct kgd_dev *kgd, bool swizzle_enable,
-		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
-	int (*create_process_gpumem)(struct kgd_dev *kgd, uint64_t va, size_t size, void *vm, struct kgd_mem **mem);
-	void (*destroy_process_gpumem)(struct kgd_dev *kgd, struct kgd_mem *mem);
 };
 
 /**

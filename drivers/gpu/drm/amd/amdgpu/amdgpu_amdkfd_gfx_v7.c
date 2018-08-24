@@ -150,10 +150,6 @@ static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid);
 static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid);
 static uint32_t read_vmid_from_vmfault_reg(struct kgd_dev *kgd);
 
-/* TODO: remove */
-static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
-		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
-
 /* Because of REG_GET_FIELD() being used, we put this function in the
  * asic specific file.
  */
@@ -234,8 +230,6 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.pin_get_sg_table_bo = amdgpu_amdkfd_gpuvm_pin_get_sg_table,
 	.unpin_put_sg_table_bo = amdgpu_amdkfd_gpuvm_unpin_put_sg_table,
 	.copy_mem_to_mem = amdgpu_amdkfd_copy_mem_to_mem,
-	/* TODO: remove */
-	.write_config_static_mem = write_config_static_mem,
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions(void)
@@ -817,22 +811,6 @@ static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 
 	reg = RREG32(mmATC_VMID0_PASID_MAPPING + vmid);
 	return reg & ATC_VMID0_PASID_MAPPING__PASID_MASK;
-}
-
-/* TODO: remove */
-static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
-		uint8_t element_size, uint8_t index_stride, uint8_t mtype)
-{
-	uint32_t reg;
-	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
-
-	reg = swizzle_enable << SH_STATIC_MEM_CONFIG__SWIZZLE_ENABLE__SHIFT |
-		element_size << SH_STATIC_MEM_CONFIG__ELEMENT_SIZE__SHIFT |
-		index_stride << SH_STATIC_MEM_CONFIG__INDEX_STRIDE__SHIFT |
-		mtype << SH_STATIC_MEM_CONFIG__PRIVATE_MTYPE__SHIFT;
-
-	WREG32(mmSH_STATIC_MEM_CONFIG, reg);
-	return 0;
 }
 
 static void set_scratch_backing_va(struct kgd_dev *kgd,

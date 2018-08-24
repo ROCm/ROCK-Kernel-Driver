@@ -168,13 +168,6 @@ static void set_scratch_backing_va(struct kgd_dev *kgd,
 static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid);
 static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid);
 
-/* TODO: remove */
-static int create_process_gpumem(struct kgd_dev *kgd, uint64_t va, size_t size,
-		void *vm, struct kgd_mem **mem);
-static void destroy_process_gpumem(struct kgd_dev *kgd, struct kgd_mem *mem);
-static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
-		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
-
 /* Because of REG_GET_FIELD() being used, we put this function in the
  * asic specific file.
  */
@@ -256,29 +249,11 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.pin_get_sg_table_bo = amdgpu_amdkfd_gpuvm_pin_get_sg_table,
 	.unpin_put_sg_table_bo = amdgpu_amdkfd_gpuvm_unpin_put_sg_table,
 	.copy_mem_to_mem = amdgpu_amdkfd_copy_mem_to_mem,
-	/* TODO: remove */
-	.create_process_gpumem = create_process_gpumem,
-	.destroy_process_gpumem = destroy_process_gpumem,
-	.write_config_static_mem = write_config_static_mem,
-	.get_vm_fault_info = amdgpu_amdkfd_gpuvm_get_vm_fault_info, /* not used on GFXv9 */
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void)
 {
 	return (struct kfd2kgd_calls *)&kfd2kgd;
-}
-
-/* TODO: remove */
-static int create_process_gpumem(struct kgd_dev *kgd, uint64_t va, size_t size,
-				void *vm, struct kgd_mem **mem)
-{
-	return 0;
-}
-
-/* Destroys the GPU allocation and frees the kgd_mem structure */
-static void destroy_process_gpumem(struct kgd_dev *kgd, struct kgd_mem *mem)
-{
-
 }
 
 static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
@@ -1202,16 +1177,6 @@ static uint32_t kgd_set_wave_launch_mode(struct kgd_dev *kgd,
 	return 0;
 }
 
-/* TODO: remove */
-static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
-		uint8_t element_size, uint8_t index_stride, uint8_t mtype)
-{
-	/* No longer needed on GFXv9. These values are now hard-coded,
-	 * except for the MTYPE which comes from the page table.
-	 */
-
-	return 0;
-}
 static void set_scratch_backing_va(struct kgd_dev *kgd,
 					uint64_t va, uint32_t vmid)
 {
