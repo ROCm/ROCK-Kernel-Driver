@@ -388,7 +388,6 @@ set_phys_lowmem:
 	}
 	return err;
 }
-EXPORT_SYMBOL_GPL(skcipher_walk_next);
 
 static int skcipher_copy_iv(struct skcipher_walk *walk)
 {
@@ -438,7 +437,6 @@ static int skcipher_walk_first(struct skcipher_walk *walk)
 	}
 
 	walk->page = NULL;
-	walk->nbytes = walk->total;
 
 	return skcipher_walk_next(walk);
 }

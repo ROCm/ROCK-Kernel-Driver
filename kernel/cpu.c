@@ -291,6 +291,12 @@ void cpus_read_lock(void)
 }
 EXPORT_SYMBOL_GPL(cpus_read_lock);
 
+int cpus_read_trylock(void)
+{
+	return percpu_down_read_trylock(&cpu_hotplug_lock);
+}
+EXPORT_SYMBOL_GPL(cpus_read_trylock);
+
 void cpus_read_unlock(void)
 {
 	percpu_up_read(&cpu_hotplug_lock);
@@ -1367,7 +1373,7 @@ static struct cpuhp_step cpuhp_hp_states[] = {
 	 * otherwise a RCU stall occurs.
 	 */
 	[CPUHP_TIMERS_PREPARE] = {
-		.name			= "timers:dead",
+		.name			= "timers:prepare",
 		.startup.single		= timers_prepare_cpu,
 		.teardown.single	= timers_dead_cpu,
 	},
@@ -1436,6 +1442,11 @@ static struct cpuhp_step cpuhp_hp_states[] = {
 		.name			= "perf:online",
 		.startup.single		= perf_event_init_cpu,
 		.teardown.single	= perf_event_exit_cpu,
+	},
+	[CPUHP_AP_WATCHDOG_ONLINE] = {
+		.name			= "lockup_detector:online",
+		.startup.single		= lockup_detector_online_cpu,
+		.teardown.single	= lockup_detector_offline_cpu,
 	},
 	[CPUHP_AP_WORKQUEUE_ONLINE] = {
 		.name			= "workqueue:online",

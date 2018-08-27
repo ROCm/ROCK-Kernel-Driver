@@ -28,8 +28,8 @@
 #include <asm/pgtable.h>
 #include <asm/set_memory.h>
 #include <asm/intel-family.h>
-#include <asm/hypervisor.h>
 #include <asm/e820/api.h>
+#include <asm/hypervisor.h>
 
 static void __init spectre_v2_select_mitigation(void);
 static void __init ssb_select_mitigation(void);
@@ -143,6 +143,7 @@ static const char *spectre_v2_strings[] = {
 	[SPECTRE_V2_RETPOLINE_GENERIC]		= "Mitigation: Full generic retpoline",
 	[SPECTRE_V2_RETPOLINE_AMD]		= "Mitigation: Full AMD retpoline",
 	[SPECTRE_V2_IBRS]			= "Mitigation: Indirect Branch Restricted Speculation",
+	[SPECTRE_V2_IBRS_ENHANCED]		= "Mitigation: Enhanced IBRS",
 };
 
 #undef pr_fmt
@@ -327,7 +328,7 @@ static enum spectre_v2_mitigation_cmd __init spectre_v2_parse_cmdline(void)
 	return cmd;
 }
 
-/* Check for Skylake-like CPUs (for IBRS handling) */
+/* Check for Skylake-like CPUs (for RSB handling) */
 static bool __init is_skylake_era(void)
 {
 	if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
@@ -361,6 +362,30 @@ static void __init spectre_v2_select_mitigation(void)
 	case SPECTRE_V2_CMD_NONE:
 		return;
 
+	case SPECTRE_V2_CMD_FORCE:
+	case SPECTRE_V2_CMD_AUTO:
+		if (boot_cpu_has(X86_FEATURE_IBRS_ENHANCED)) {
+			mode = SPECTRE_V2_IBRS_ENHANCED;
+			/* Force it so VMEXIT will restore correctly */
+			x86_spec_ctrl_base |= SPEC_CTRL_IBRS;
+			wrmsrl(MSR_IA32_SPEC_CTRL, x86_spec_ctrl_base);
+			goto specv2_set_mode;
+		}
+		if (boot_cpu_has(X86_FEATURE_IBRS) &&
+		    (is_skylake_era() || !retp_compiler())) {
+			mode = SPECTRE_V2_IBRS;
+			setup_force_cpu_cap(X86_FEATURE_USE_IBRS);
+			goto specv2_set_mode;
+		}
+		if (IS_ENABLED(CONFIG_RETPOLINE))
+			goto retpoline_auto;
+		break;
+
+	case SPECTRE_V2_CMD_IBRS:
+		mode = SPECTRE_V2_IBRS;
+		setup_force_cpu_cap(X86_FEATURE_USE_IBRS);
+		goto specv2_set_mode;
+
 	case SPECTRE_V2_CMD_RETPOLINE_AMD:
 		if (IS_ENABLED(CONFIG_RETPOLINE))
 			goto retpoline_amd;
@@ -371,24 +396,6 @@ static void __init spectre_v2_select_mitigation(void)
 			goto retpoline_generic;
 		break;
 
-	case SPECTRE_V2_CMD_IBRS:
-		mode = SPECTRE_V2_IBRS;
-		setup_force_cpu_cap(X86_FEATURE_USE_IBRS);
-		goto enabled;
-
-	case SPECTRE_V2_CMD_AUTO:
-	case SPECTRE_V2_CMD_FORCE:
-		/*
-		 * If we have IBRS support, and either Skylake or !RETPOLINE,
-		 * then that's what we do.
-		 */
-		if (boot_cpu_has(X86_FEATURE_IBRS) &&
-		    (is_skylake_era() || !retp_compiler())) {
-			mode = SPECTRE_V2_IBRS;
-			setup_force_cpu_cap(X86_FEATURE_USE_IBRS);
-			goto enabled;
-		}
-		/* fall through */
 	case SPECTRE_V2_CMD_RETPOLINE:
 		if (IS_ENABLED(CONFIG_RETPOLINE))
 			goto retpoline_auto;
@@ -415,7 +422,7 @@ retpoline_auto:
 		setup_force_cpu_cap(X86_FEATURE_RETPOLINE);
 	}
 
- enabled:
+specv2_set_mode:
 	spectre_v2_enabled = mode;
 	pr_info("%s\n", spectre_v2_strings[mode]);
 
@@ -438,9 +445,16 @@ retpoline_auto:
 
 	/*
 	 * Retpoline means the kernel is safe because it has no indirect
-	 * branches. But firmware isn't, so use IBRS to protect that.
+	 * branches. Enhanced IBRS protects firmware too, so, enable restricted
+	 * speculation around firmware calls only when Enhanced IBRS isn't
+	 * supported.
+	 *
+	 * Use "mode" to check Enhanced IBRS instead of boot_cpu_has(), because
+	 * the user might select retpoline on the kernel command line and if
+	 * the CPU supports Enhanced IBRS, kernel might un-intentionally not
+	 * enable IBRS around firmware calls.
 	 */
-	if (boot_cpu_has(X86_FEATURE_IBRS)) {
+	if (boot_cpu_has(X86_FEATURE_IBRS) && mode != SPECTRE_V2_IBRS_ENHANCED) {
 		setup_force_cpu_cap(X86_FEATURE_USE_IBRS_FW);
 		pr_info("Enabling Restricted Speculation for firmware calls\n");
 	}
@@ -725,7 +739,7 @@ static void __init l1tf_select_mitigation(void)
 		pr_info("You may make it effective by booting the kernel with mem=%llu parameter.\n",
 				half_pa);
 		pr_info("However, doing so will make a part of your RAM unusable.\n");
-		pr_info("Reading Documentation/admin-guide/l1tf.rst might help you decide.\n");
+		pr_info("Reading https://www.kernel.org/doc/html/latest/admin-guide/l1tf.html might help you decide.\n");
 		return;
 	}
 

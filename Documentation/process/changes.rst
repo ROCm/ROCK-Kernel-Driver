@@ -29,7 +29,7 @@ you probably needn't concern yourself with isdn4k-utils.
 ====================== ===============  ========================================
         Program        Minimal version       Command to check the version
 ====================== ===============  ========================================
-GNU C                  3.2              gcc --version
+GNU C                  4.6              gcc --version
 GNU make               3.81             make --version
 binutils               2.20             ld -v
 flex                   2.5.35           flex --version
@@ -80,6 +80,14 @@ Binutils
 The build system has, as of 4.13, switched to using thin archives (`ar T`)
 rather than incremental linking (`ld -r`) for built-in.a intermediate steps.
 This requires binutils 2.20 or newer.
+
+pkg-config
+----------
+
+The build system, as of 4.18, requires pkg-config to check for installed
+kconfig tools and to determine flags settings for use in
+'make {menu,n,g,x}config'.  Previously pkg-config was being used but not
+verified or documented.
 
 Flex
 ----

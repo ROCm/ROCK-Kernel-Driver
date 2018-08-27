@@ -8,7 +8,7 @@ modpost-objs	:= modpost.o file2alias.o sumversion.o
 
 ksym-provides-objs	:= ksym-provides.o
 
-HOSTLOADLIBES_ksym-provides := -lelf
+HOSTLDLIBS_ksym-provides := -lelf
 
 devicetable-offsets-file := devicetable-offsets.h
 
