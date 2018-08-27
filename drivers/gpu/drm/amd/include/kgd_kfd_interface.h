@@ -385,10 +385,11 @@ struct kfd2kgd_calls {
 			struct kfd_cu_info *cu_info);
 	uint64_t (*get_vram_usage)(struct kgd_dev *kgd);
 
-	int (*create_process_vm)(struct kgd_dev *kgd, void **vm,
+	int (*create_process_vm)(struct kgd_dev *kgd, unsigned int pasid, void **vm,
 			void **process_info, struct dma_fence **ef);
 	int (*acquire_process_vm)(struct kgd_dev *kgd, struct file *filp,
-			void **vm, void **process_info, struct dma_fence **ef);
+			unsigned int pasid, void **vm, void **process_info,
+			struct dma_fence **ef);
 	void (*destroy_process_vm)(struct kgd_dev *kgd, void *vm);
 	void (*release_process_vm)(struct kgd_dev *kgd, void *vm);
 	uint64_t (*get_process_page_dir)(void *vm);
