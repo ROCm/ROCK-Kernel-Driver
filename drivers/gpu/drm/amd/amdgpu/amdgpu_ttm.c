@@ -1147,30 +1147,35 @@ int amdgpu_ttm_alloc_gart(struct ttm_buffer_object *bo)
 
 	struct ttm_placement placement;
 	struct ttm_place placements;
-	uint64_t flags;
+	uint64_t addr, flags;
 	int r;
 
 	if (bo->mem.start != AMDGPU_BO_INVALID_OFFSET)
 		return 0;
 
-	/* allocate GART space */
-	tmp = bo->mem;
-	tmp.mm_node = NULL;
-	placement.num_placement = 1;
-	placement.placement = &placements;
-	placement.num_busy_placement = 1;
-	placement.busy_placement = &placements;
-	placements.fpfn = 0;
-	placements.lpfn = adev->gmc.gart_size >> PAGE_SHIFT;
-	placements.flags = (bo->mem.placement & ~TTM_PL_MASK_MEM) |
-		TTM_PL_FLAG_TT;
+	addr = amdgpu_gmc_agp_addr(bo);
+	if (addr != AMDGPU_BO_INVALID_OFFSET) {
+		bo->mem.start = addr >> PAGE_SHIFT;
+	} else {
 
-	r = ttm_bo_mem_space(bo, &placement, &tmp, &ctx);
-	if (unlikely(r))
-		return r;
+		/* allocate GART space */
+		tmp = bo->mem;
+		tmp.mm_node = NULL;
+		placement.num_placement = 1;
+		placement.placement = &placements;
+		placement.num_busy_placement = 1;
+		placement.busy_placement = &placements;
+		placements.fpfn = 0;
+		placements.lpfn = adev->gmc.gart_size >> PAGE_SHIFT;
+		placements.flags = (bo->mem.placement & ~TTM_PL_MASK_MEM) |
+			TTM_PL_FLAG_TT;
 
-	/* compute PTE flags for this buffer object */
-	flags = amdgpu_ttm_tt_pte_flags(adev, bo->ttm, &tmp);
+		r = ttm_bo_mem_space(bo, &placement, &tmp, &ctx);
+		if (unlikely(r))
+			return r;
+
+		/* compute PTE flags for this buffer object */
+		flags = amdgpu_ttm_tt_pte_flags(adev, bo->ttm, &tmp);
 
 	/* Bind pages */
 	gtt->offset = (u64)tmp.start << PAGE_SHIFT;
@@ -1178,10 +1183,12 @@ int amdgpu_ttm_alloc_gart(struct ttm_buffer_object *bo)
 	if (unlikely(r)) {
 		ttm_bo_mem_put(bo, &tmp);
 		return r;
-	}
+		}
 
 	ttm_bo_mem_put(bo, &bo->mem);
 	bo->mem = tmp;
+	}
+
 	bo->offset = (bo->mem.start << PAGE_SHIFT) +
 		bo->bdev->man[bo->mem.mem_type].gpu_offset;
 
