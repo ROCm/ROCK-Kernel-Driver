@@ -1168,8 +1168,6 @@ void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 	kfree(vm);
 }
 
-
-
 void amdgpu_amdkfd_gpuvm_release_process_vm(struct kgd_dev *kgd, void *vm)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
@@ -1188,7 +1186,6 @@ void amdgpu_amdkfd_gpuvm_release_process_vm(struct kgd_dev *kgd, void *vm)
          */
 	amdgpu_vm_release_compute(adev, avm);
 }
-
 
 uint64_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm)
 {
