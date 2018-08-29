@@ -109,7 +109,6 @@
  */
 extern int max_num_of_queues_per_device;
 
-#define KFD_MAX_NUM_OF_QUEUES_PER_DEVICE_DEFAULT 4096
 #define KFD_MAX_NUM_OF_QUEUES_PER_DEVICE		\
 	(KFD_MAX_NUM_OF_PROCESSES *			\
 			KFD_MAX_NUM_OF_QUEUES_PER_PROCESS)
@@ -178,11 +177,6 @@ extern bool keep_idle_process_evicted;
  */
 extern uint64_t kfd_total_mem_size;
 
-enum kfd_sched_policy {
-		KFD_SCHED_POLICY_HWS = 0,
-		KFD_SCHED_POLICY_HWS_NO_OVERSUBSCRIPTION,
-		KFD_SCHED_POLICY_NO_HWS
-	};
 
 enum cache_policy {
 	cache_policy_coherent,
