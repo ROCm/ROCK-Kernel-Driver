@@ -552,7 +552,6 @@ static int amdgpu_vm_alloc_levels(struct amdgpu_device *adev,
 #endif
 		if (!parent->entries)
 			return -ENOMEM;
-		memset(parent->entries, 0 , sizeof(struct amdgpu_vm_pt));
 	}
 
 	from = saddr >> shift;
