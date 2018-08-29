@@ -1810,7 +1810,7 @@ static int get_sg_table(struct amdgpu_device *adev,
 {
 	struct amdgpu_bo *bo = mem->bo;
 	struct sg_table *sg = NULL;
-	unsigned long bus_addr;
+	unsigned long bus_addr, aper_limit;
 	unsigned int chunks;
 	unsigned int i;
 	struct scatterlist *s;
@@ -1818,6 +1818,8 @@ static int get_sg_table(struct amdgpu_device *adev,
 	unsigned int page_size;
 	int ret;
 
+	if (size + offset > amdgpu_bo_size(bo))
+		return -EFAULT;
 	sg = kmalloc(sizeof(*sg), GFP_KERNEL);
 	if (!sg) {
 		ret = -ENOMEM;
@@ -1841,6 +1843,12 @@ static int get_sg_table(struct amdgpu_device *adev,
 	if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM) {
 		bus_addr = amdgpu_bo_gpu_offset(bo) - adev->gmc.vram_start
 			   + adev->gmc.aper_base + offset;
+		aper_limit = adev->gmc.aper_base + adev->gmc.aper_size;
+		if (bus_addr + (chunks * page_size) > aper_limit) {
+			pr_err("sg: bus addr not inside pci aperture\n");
+			ret = -EFAULT;
+			goto out_of_range;
+		}
 
 		for_each_sg(sg->sgl, s, sg->orig_nents, i) {
 			uint64_t chunk_size, length;
@@ -1881,6 +1889,9 @@ static int get_sg_table(struct amdgpu_device *adev,
 
 	*ret_sg = sg;
 	return 0;
+
+out_of_range:
+	sg_free_table(sg);
 out:
 	kfree(sg);
 	*ret_sg = NULL;
