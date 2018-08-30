@@ -105,6 +105,8 @@ static int amdgpu_ctx_init(struct amdgpu_device *adev,
 
 		entity->sequence = 1;
 		entity->fences = &ctx->fences[amdgpu_sched_jobs * i];
+		INIT_LIST_HEAD(&entity->sem_dep_list);
+		mutex_init(&entity->sem_lock);
 	}
 	for (i = 1; i < AMDGPU_HW_IP_NUM; ++i)
 		ctx->entities[i] = ctx->entities[i - 1] +
