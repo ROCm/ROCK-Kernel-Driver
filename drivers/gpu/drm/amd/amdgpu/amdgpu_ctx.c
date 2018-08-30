@@ -213,6 +213,8 @@ static int amdgpu_ctx_init_entity(struct amdgpu_ctx *ctx, u32 hw_ip,
 			 GFP_KERNEL);
 	if (!entity)
 		return  -ENOMEM;
+	INIT_LIST_HEAD(&entity->sem_dep_list);
+	mutex_init(&entity->sem_lock);
 
 	ctx_prio = (ctx->override_priority == AMDGPU_CTX_PRIORITY_UNSET) ?
 			ctx->init_priority : ctx->override_priority;
