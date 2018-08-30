@@ -37,6 +37,7 @@
 #include "amdgpu_trace.h"
 #include "amdgpu_gmc.h"
 #include "amdgpu_gem.h"
+#include "amdgpu_display.h"
 
 static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 				      struct drm_amdgpu_cs_chunk_fence *data,
@@ -1249,7 +1250,7 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 		}
 	}
 
-	return 0;
+	return amdgpu_sem_add_cs(p->ctx, p->entity, &p->job->sync);
 }
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
