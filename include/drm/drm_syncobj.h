@@ -136,7 +136,7 @@ void drm_syncobj_add_callback(struct drm_syncobj *syncobj,
 			      drm_syncobj_func_t func);
 void drm_syncobj_remove_callback(struct drm_syncobj *syncobj,
 				 struct drm_syncobj_cb *cb);
-void drm_syncobj_replace_fence(struct drm_syncobj *syncobj,
+void drm_syncobj_replace_fence(struct drm_syncobj *syncobj, u64 point,
 			       struct dma_fence *fence);
 int drm_syncobj_find_fence(struct drm_file *file_private,
 			   u32 handle,

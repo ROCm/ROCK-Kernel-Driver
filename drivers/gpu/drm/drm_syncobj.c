@@ -155,11 +155,13 @@ EXPORT_SYMBOL(drm_syncobj_remove_callback);
 /**
  * drm_syncobj_replace_fence - replace fence in a sync object.
  * @syncobj: Sync object to replace fence in
+ * @point: timeline point
  * @fence: fence to install in sync file.
  *
- * This replaces the fence on a sync object.
+ * This replaces the fence on a sync object, or a timeline point fence.
  */
 void drm_syncobj_replace_fence(struct drm_syncobj *syncobj,
+			       u64 point,
 			       struct dma_fence *fence)
 {
 	struct dma_fence *old_fence;
@@ -268,7 +270,7 @@ void drm_syncobj_free(struct kref *kref)
 	struct drm_syncobj *syncobj = container_of(kref,
 						   struct drm_syncobj,
 						   refcount);
-	drm_syncobj_replace_fence(syncobj, NULL);
+	drm_syncobj_replace_fence(syncobj, 0, NULL);
 	kfree(syncobj);
 }
 EXPORT_SYMBOL(drm_syncobj_free);
@@ -302,7 +304,7 @@ int drm_syncobj_create(struct drm_syncobj **out_syncobj, uint32_t flags,
 		drm_syncobj_assign_null_handle(syncobj);
 
 	if (fence)
-		drm_syncobj_replace_fence(syncobj, fence);
+		drm_syncobj_replace_fence(syncobj, 0, fence);
 
 	*out_syncobj = syncobj;
 	return 0;
@@ -487,7 +489,7 @@ static int drm_syncobj_import_sync_file_fence(struct drm_file *file_private,
 		return -ENOENT;
 	}
 
-	drm_syncobj_replace_fence(syncobj, fence);
+	drm_syncobj_replace_fence(syncobj, 0, fence);
 	dma_fence_put(fence);
 	drm_syncobj_put(syncobj);
 	return 0;
@@ -969,7 +971,7 @@ drm_syncobj_reset_ioctl(struct drm_device *dev, void *data,
 		return ret;
 
 	for (i = 0; i < args->count_handles; i++)
-		drm_syncobj_replace_fence(syncobjs[i], NULL);
+		drm_syncobj_replace_fence(syncobjs[i], 0, NULL);
 
 	drm_syncobj_array_free(syncobjs, args->count_handles);
 
