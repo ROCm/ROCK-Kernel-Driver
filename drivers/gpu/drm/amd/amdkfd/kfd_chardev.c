@@ -1270,7 +1270,7 @@ static int kfd_reserve_vram_limit(struct kfd_dev *dev, uint64_t size)
 	return ret;
 }
 
-static void kfd_unreserve_vram_limit(struct kfd_dev *dev, uint64_t size)
+void kfd_unreserve_vram_limit(struct kfd_dev *dev, uint64_t size)
 {
 	spin_lock(&dev->vram_limit.vram_limit_lock);
 	dev->vram_limit.vram_used -= size;
@@ -1421,13 +1421,17 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	/* If freeing the buffer failed, leave the handle in place for
 	 * clean-up during process tear-down.
 	 */
-	if (!ret)
-		kfd_process_device_remove_obj_handle(
-			pdd, GET_IDR_HANDLE(args->handle));
-
-	if (buf_obj->mem_type & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
-		kfd_unreserve_vram_limit(dev,
+	if (!ret) {
+		/* kfd_process_device_remove_obj_handle will free buf_obj.
+		 * So do that last.
+		 */
+		if (buf_obj->mem_type & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
+			kfd_unreserve_vram_limit(dev,
 				buf_obj->it.last - buf_obj->it.start + 1);
+
+		kfd_process_device_remove_obj_handle(
+				pdd, GET_IDR_HANDLE(args->handle));
+	}
 
 err_unlock:
 	mutex_unlock(&p->mutex);

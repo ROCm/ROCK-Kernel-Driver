@@ -390,6 +390,7 @@ struct kfd2kgd_calls {
 	int (*acquire_process_vm)(struct kgd_dev *kgd, struct file *filp,
 			void **vm, void **process_info, struct dma_fence **ef);
 	void (*destroy_process_vm)(struct kgd_dev *kgd, void *vm);
+	void (*release_process_vm)(struct kgd_dev *kgd, void *vm);
 	uint64_t (*get_process_page_dir)(void *vm);
 	void (*set_vm_context_page_table_base)(struct kgd_dev *kgd,
 			uint32_t vmid, uint64_t page_table_base);
