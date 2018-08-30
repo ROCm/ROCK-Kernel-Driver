@@ -141,6 +141,7 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 	unsigned i;
 	int r = 0;
 	bool need_pipe_sync = false;
+	unsigned extra_nop = 0;
 
 	if (num_ibs == 0)
 		return -EINVAL;
@@ -174,6 +175,11 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 	alloc_size = ring->funcs->emit_frame_size + num_ibs *
 		ring->funcs->emit_ib_size;
 
+	if (job && !job->vm_needs_flush && ring->funcs->type == AMDGPU_RING_TYPE_GFX) {
+		extra_nop = 128;
+		alloc_size += extra_nop;
+	}
+
 	r = amdgpu_ring_alloc(ring, alloc_size);
 	if (r) {
 		dev_err(adev->dev, "scheduling IB failed (%d).\n", r);
@@ -204,6 +210,8 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 		ring->funcs->insert_start(ring);
 
 	if (job) {
+		amdgpu_ring_insert_nop(ring, extra_nop); /* prevent CE go too fast than DE */
+
 		r = amdgpu_vm_flush(ring, job, need_pipe_sync);
 		if (r) {
 			amdgpu_ring_undo(ring);

@@ -35,6 +35,8 @@ struct amdgpu_fpriv;
 struct amdgpu_ctx_entity {
 	uint64_t		sequence;
 	struct drm_sched_entity	entity;
+	struct list_head	sem_dep_list;
+	struct mutex		sem_lock;
 	struct dma_fence	*fences[];
 };
 
