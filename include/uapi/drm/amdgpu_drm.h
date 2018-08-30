@@ -58,6 +58,9 @@ extern "C" {
 #define DRM_AMDGPU_FREESYNC	        0x5d
 #define DRM_AMDGPU_GEM_DGMA		0x5c
 
+/* hybrid specific ioctls */
+#define DRM_AMDGPU_SEM			0x5b
+
 #define DRM_IOCTL_AMDGPU_GEM_CREATE	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_CREATE, union drm_amdgpu_gem_create)
 #define DRM_IOCTL_AMDGPU_GEM_MMAP	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_MMAP, union drm_amdgpu_gem_mmap)
 #define DRM_IOCTL_AMDGPU_CTX		DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_CTX, union drm_amdgpu_ctx)
@@ -100,6 +103,9 @@ extern "C" {
  * %AMDGPU_GEM_DOMAIN_OA	Ordered append, used by 3D or Compute engines
  * for appending data.
  */
+/* hybrid specific ioctls */
+#define DRM_IOCTL_AMDGPU_SEM		DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_SEM, union drm_amdgpu_sem)
+
 #define AMDGPU_GEM_DOMAIN_CPU		0x1
 #define AMDGPU_GEM_DOMAIN_GTT		0x2
 #define AMDGPU_GEM_DOMAIN_VRAM		0x4
@@ -151,6 +157,8 @@ extern "C" {
 #define AMDGPU_GEM_CREATE_PREEMPTIBLE		(1 << 11)
 
 /* hybrid specific */
+/* Flag that the memory should be in SPARSE resource */
+#define AMDGPU_GEM_CREATE_SPARSE		(1ULL << 29)
 /* Flag that the memory allocation should be from top of domain */
 #define AMDGPU_GEM_CREATE_TOP_DOWN		(1ULL << 30)
 /* Flag that the memory allocation should be pinned */
@@ -282,6 +290,35 @@ union drm_amdgpu_ctx_out {
 union drm_amdgpu_ctx {
 	struct drm_amdgpu_ctx_in in;
 	union drm_amdgpu_ctx_out out;
+};
+
+/* sem related */
+#define AMDGPU_SEM_OP_CREATE_SEM        1
+#define AMDGPU_SEM_OP_WAIT_SEM	        2
+#define AMDGPU_SEM_OP_SIGNAL_SEM        3
+#define AMDGPU_SEM_OP_DESTROY_SEM       4
+#define AMDGPU_SEM_OP_IMPORT_SEM	5
+#define AMDGPU_SEM_OP_EXPORT_SEM	6
+
+struct drm_amdgpu_sem_in {
+	/** AMDGPU_SEM_OP_* */
+	uint32_t	op;
+	uint32_t        handle;
+	uint32_t	ctx_id;
+	uint32_t        ip_type;
+	uint32_t        ip_instance;
+	uint32_t        ring;
+	uint64_t        seq;
+};
+
+union drm_amdgpu_sem_out {
+	int32_t         fd;
+	uint32_t	handle;
+};
+
+union drm_amdgpu_sem {
+	struct drm_amdgpu_sem_in in;
+	union drm_amdgpu_sem_out out;
 };
 
 /* vm ioctl */

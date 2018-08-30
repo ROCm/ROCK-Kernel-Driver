@@ -104,6 +104,8 @@ static int amdgpu_ctx_init_entity(struct amdgpu_ctx *ctx, u32 hw_ip,
 			 GFP_KERNEL);
 	if (!entity)
 		return  -ENOMEM;
+	INIT_LIST_HEAD(&entity->sem_dep_list);
+	mutex_init(&entity->sem_lock);
 
 	entity->sequence = 1;
 	priority = (ctx->override_priority == DRM_SCHED_PRIORITY_UNSET) ?
