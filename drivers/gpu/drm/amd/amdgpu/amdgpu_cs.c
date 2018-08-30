@@ -38,6 +38,7 @@
 #include "amdgpu_gmc.h"
 #include "amdgpu_gem.h"
 #include "amdgpu_ras.h"
+#include "amdgpu_display.h"
 
 static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 				      struct drm_amdgpu_cs_chunk_fence *data,
@@ -1150,7 +1151,7 @@ static int amdgpu_cs_process_syncobj_timeline_out_dep(struct amdgpu_cs_parser *p
 static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 				  struct amdgpu_cs_parser *p)
 {
-	int i, r;
+	int i, r = 0;
 
 	/* TODO: Investigate why we still need the context lock */
 	mutex_unlock(&p->ctx->lock);
@@ -1192,7 +1193,9 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 
 out:
 	mutex_lock(&p->ctx->lock);
-	return r;
+	if (r)
+		return r;
+	return amdgpu_sem_add_cs(p->ctx, p->entity, &p->job->sync);
 }
 
 static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
