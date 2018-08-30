@@ -40,6 +40,7 @@
 #include "amdgpu_gmc.h"
 #include "amdgpu_gem.h"
 #include "amdgpu_ras.h"
+#include "amdgpu_display.h"
 
 static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p,
 				 struct amdgpu_device *adev,
@@ -592,7 +593,7 @@ static int amdgpu_cs_p2_shadow(struct amdgpu_cs_parser *p,
 static int amdgpu_cs_pass2(struct amdgpu_cs_parser *p)
 {
 	unsigned int ce_preempt = 0, de_preempt = 0;
-	int i, r;
+	int i, r = 0;
 
 	for (i = 0; i < p->nchunks; ++i) {
 		struct amdgpu_cs_chunk *chunk;
@@ -639,7 +640,7 @@ static int amdgpu_cs_pass2(struct amdgpu_cs_parser *p)
 		}
 	}
 
-	return 0;
+	return amdgpu_sem_add_cs(p->ctx, p->entity, &p->job->sync);
 }
 
 /* Convert microseconds to bytes. */
