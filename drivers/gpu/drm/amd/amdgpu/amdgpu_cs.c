@@ -37,6 +37,7 @@
 #include "amdgpu_trace.h"
 #include "amdgpu_gmc.h"
 #include "amdgpu_gem.h"
+#include "amdgpu_display.h"
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
 #define kvfree drm_free_large
@@ -1255,7 +1256,7 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 		}
 	}
 
-	return 0;
+	return amdgpu_sem_add_cs(p->ctx, p->entity, &p->job->sync);
 }
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)

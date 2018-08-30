@@ -50,5 +50,11 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 #if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0)
 void amdgpu_output_poll_changed(struct drm_device *dev);
 #endif
+int amdgpu_sem_ioctl(struct drm_device *dev, void *data,
+		     struct drm_file *filp);
 
+int amdgpu_sem_add_cs(struct amdgpu_ctx *ctx, struct drm_sched_entity *entity,
+		     struct amdgpu_sync *sync);
+
+void amdgpu_sem_destroy(struct amdgpu_fpriv *fpriv, u32 handle);
 #endif
