@@ -76,6 +76,7 @@
 #include "amdgpu_sync.h"
 #include "amdgpu_ring.h"
 #include "amdgpu_vm.h"
+#include "amdgpu_sem.h"
 #include "amdgpu_dpm.h"
 #include "amdgpu_acp.h"
 #include "amdgpu_uvd.h"
@@ -487,6 +488,8 @@ struct amdgpu_fpriv {
 	struct mutex		bo_list_lock;
 	struct idr		bo_list_handles;
 	struct amdgpu_ctx_mgr	ctx_mgr;
+	spinlock_t		sem_handles_lock;
+	struct idr		sem_handles;
 };
 
 int amdgpu_file_to_fpriv(struct file *filp, struct amdgpu_fpriv **fpriv);
