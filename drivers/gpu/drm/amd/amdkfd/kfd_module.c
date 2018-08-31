@@ -186,8 +186,9 @@ static void __exit kfd_module_exit(void)
 	kfd_close_peer_direct();
 	kfd_process_destroy_wq();
 	kfd_topology_shutdown();
-	kfd_chardev_exit();
+        /* Output message before kfd_device is freed. */
 	dev_info(kfd_device, "Removed module\n");
+	kfd_chardev_exit();
 }
 
 module_init(kfd_module_init);
