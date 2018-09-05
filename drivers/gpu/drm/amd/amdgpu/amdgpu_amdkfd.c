@@ -76,9 +76,11 @@ void amdgpu_amdkfd_device_probe(struct amdgpu_device *adev)
 	case CHIP_FIJI:
 	case CHIP_POLARIS10:
 	case CHIP_POLARIS11:
+	case CHIP_POLARIS12:
 		kfd2kgd = amdgpu_amdkfd_gfx_8_0_get_functions();
 		break;
 	case CHIP_VEGA10:
+	case CHIP_VEGA12:
 	case CHIP_VEGA20:
 	case CHIP_RAVEN:
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0) && defined(BUILD_AS_DKMS)
