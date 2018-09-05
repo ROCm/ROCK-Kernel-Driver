@@ -134,7 +134,7 @@ int amdgpu_param_buf_per_se = 0;
 int amdgpu_job_hang_limit = 0;
 int amdgpu_lbpw = -1;
 int amdgpu_compute_multipipe = -1;
-int amdgpu_gpu_recovery = -1; /* auto */
+int amdgpu_gpu_recovery = 1; /* enabled */
 int amdgpu_emu_mode = 0;
 uint amdgpu_smu_memory_pool_size = 0;
 
