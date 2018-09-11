@@ -149,4 +149,4 @@ subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_0
 
-obj-m += amd/lib/ scheduler/ amd/amdgpu/ ttm/ amd/amdkcl/  amd/amdkfd/
+obj-m += amd/lib/ scheduler/ amd/amdgpu/ ttm/ amd/amdkcl/
