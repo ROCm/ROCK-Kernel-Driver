@@ -572,7 +572,7 @@ fail_unreserve:
 }
 
 static int amdgpu_bo_create_shadow(struct amdgpu_device *adev,
-				   unsigned long size, int byte_align,
+				   unsigned long size,
 				   struct amdgpu_bo *bo)
 {
 	struct amdgpu_bo_param bp;
@@ -583,7 +583,6 @@ static int amdgpu_bo_create_shadow(struct amdgpu_device *adev,
 
 	memset(&bp, 0, sizeof(bp));
 	bp.size = size;
-	bp.byte_align = byte_align;
 	bp.domain = AMDGPU_GEM_DOMAIN_GTT;
 	bp.flags = AMDGPU_GEM_CREATE_CPU_GTT_USWC |
 		AMDGPU_GEM_CREATE_SHADOW;
@@ -632,7 +631,7 @@ int amdgpu_bo_create(struct amdgpu_device *adev,
 			WARN_ON(kcl_reservation_object_lock((*bo_ptr)->tbo.resv,
 							NULL));
 
-		r = amdgpu_bo_create_shadow(adev, bp->size, bp->byte_align, (*bo_ptr));
+		r = amdgpu_bo_create_shadow(adev, bp->size, *bo_ptr);
 
 		if (!bp->resv)
 			kcl_reservation_object_unlock((*bo_ptr)->tbo.resv);
