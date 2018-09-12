@@ -3830,6 +3830,7 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 
 	acrtc->crtc_id = crtc_index;
 	acrtc->base.enabled = false;
+	acrtc->otg_inst = -1;
 
 	dm->adev->mode_info.crtcs[crtc_index] = acrtc;
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
