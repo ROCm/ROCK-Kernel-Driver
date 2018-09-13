@@ -77,8 +77,8 @@ struct amdgpu_amdkfd_fence {
 
 struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 						       struct mm_struct *mm);
-bool amd_kfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm);
 struct amdgpu_amdkfd_fence *to_amdgpu_amdkfd_fence(struct dma_fence *f);
+bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm);
 
 struct amdkfd_process_info {
 	/* List head of all VMs that belong to a KFD process */
