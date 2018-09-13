@@ -90,4 +90,21 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps)
 EXPORT_SYMBOL(pci_enable_atomic_ops_to_root);
 #endif
 
+void _kcl_pci_configure_extended_tags(struct pci_dev *dev)
+{
+	u32 dev_cap;
+	int ret;
+
+	if (!pci_is_pcie(dev))
+		return;
+
+	ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &dev_cap);
+	if (ret)
+		return;
+
+	if (dev_cap & PCI_EXP_DEVCAP_EXT_TAG)
+		pcie_capability_set_word(dev, PCI_EXP_DEVCTL,
+					 PCI_EXP_DEVCTL_EXT_TAG);
+}
+EXPORT_SYMBOL(_kcl_pci_configure_extended_tags);
 #endif
