@@ -512,7 +512,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 error:
 	amdgpu_dm_fini(adev);
 
-	return -1;
+	return -EINVAL;
 }
 
 static void amdgpu_dm_fini(struct amdgpu_device *adev)
@@ -567,7 +567,7 @@ static int load_dmcu_fw(struct amdgpu_device *adev)
 		break;
 	default:
 		DRM_ERROR("Unsupported ASIC type: 0x%X\n", adev->asic_type);
-		return -1;
+		return -EINVAL;
 	}
 
 	if (adev->firmware.load_type != AMDGPU_FW_LOAD_PSP) {
@@ -1592,7 +1592,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	link_cnt = dm->dc->caps.max_links;
 	if (amdgpu_dm_mode_config_init(dm->adev)) {
 		DRM_ERROR("DM: Failed to initialize mode config\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	/* Identify the number of planes to be initialized */
@@ -1707,7 +1707,7 @@ fail:
 	kfree(aconnector);
 	for (i = 0; i < dm->dc->caps.max_planes; i++)
 		kfree(mode_info->planes[i]);
-	return -1;
+	return -EINVAL;
 }
 
 static void amdgpu_dm_destroy_drm_device(struct amdgpu_display_manager *dm)
